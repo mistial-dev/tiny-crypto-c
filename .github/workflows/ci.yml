@@ -1,0 +1,120 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+name: CI
+
+on:
+  push:
+    branches: [master]
+    tags: ['v*']
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  host:
+    name: ${{ matrix.os }} ${{ matrix.compiler }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-latest, compiler: gcc, cc: gcc, cxx: g++}
+          - {os: ubuntu-latest, compiler: clang, cc: clang, cxx: clang++}
+          - {os: macos-latest, compiler: clang, cc: clang, cxx: clang++}
+          - {os: windows-latest, compiler: msvc, cc: cl, cxx: cl}
+    env:
+      CC: ${{ matrix.cc }}
+      CXX: ${{ matrix.cxx }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_COMPILE_WARNING_AS_ERROR=ON
+      - name: Build
+        run: cmake --build build --config Release --parallel 4
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+
+  extended:
+    name: Extended ${{ matrix.compiler }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {compiler: gcc, cc: gcc, cxx: g++}
+          - {compiler: clang, cc: clang, cxx: clang++}
+    env:
+      CC: ${{ matrix.cc }}
+      CXX: ${{ matrix.cxx }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install AVR compiler
+        if: matrix.compiler == 'gcc'
+        run: sudo apt-get update && sudo apt-get install -y gcc-avr avr-libc
+      - name: Full vector corpora
+        run: make test-full
+      - name: AVR C++ header gate
+        if: matrix.compiler == 'gcc'
+        run: ctest --test-dir build-full --output-on-failure -R test_cpp_headers_avr
+      - name: Address and undefined behavior sanitizers
+        run: make test-sanitize
+      - name: Sanitizer benchmark linkage
+        run: cmake --build build-sanitize --target benchmark --parallel 4
+      - name: Memory sanitizer
+        if: matrix.compiler == 'clang'
+        run: make test-msan
+      - name: Option forwarding and legacy opt-in profile
+        run: make test BUILD_DIR=build-legacy TINY_CRYPTO_ENABLE_SHA1=ON TINY_CRYPTO_ENABLE_DES=ON
+      - name: SHA-384-only core gating under -Werror
+        run: make test BUILD_DIR=build-sha384 CMAKE_ARGS=-DCMAKE_COMPILE_WARNING_AS_ERROR=ON TINY_CRYPTO_ENABLE_SHA256=OFF TINY_CRYPTO_ENABLE_SHA384=ON TINY_CRYPTO_ENABLE_HMAC=ON
+      - name: KDF shipped-library profile
+        run: make test BUILD_DIR=build-kdf CMAKE_ARGS=-DCMAKE_COMPILE_WARNING_AS_ERROR=ON TINY_CRYPTO_ENABLE_KDF=ON TINY_CRYPTO_ENABLE_HMAC=ON TINY_CRYPTO_AES_CMAC=ON
+      - uses: actions/setup-python@v5
+        if: matrix.compiler == 'gcc'
+        with:
+          python-version: '3.x'
+      - name: PlatformIO example builds
+        if: matrix.compiler == 'gcc'
+        run: |
+          pip install --upgrade platformio
+          pio ci --lib="." --board=uno --board=esp32dev --board=nucleo_f401re examples/aes_ctr.ino
+          pio ci --lib="." --board=uno examples/kbkdf.cpp --project-option="build_flags=-DTC_ENABLE_HMAC=1 -DTC_ENABLE_KDF=1"
+
+  resources:
+    name: Embedded resource reports
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Install pinned measurement toolchain
+        run: |
+          pip install platformio==6.1.19
+          pio pkg install --global --tool "platformio/toolchain-atmelavr@1.70300.191015"
+          pio pkg install --global --tool "platformio/toolchain-gccarmnoneeabi@1.120301.0"
+      - name: Checkout pinned Pico SDK
+        uses: actions/checkout@v4
+        with:
+          repository: raspberrypi/pico-sdk
+          ref: 079c6f39023649b154152db30f1d781e884879bc
+          path: build-tools/pico-sdk
+      - name: Test report generator
+        run: python3 tests/test_benchmark_report.py
+      - name: Validate fixtures and check benchmark document
+        run: |
+          export PICO_SDK_PATH="$GITHUB_WORKSPACE/build-tools/pico-sdk"
+          export PICO_TOOLCHAIN_PATH="$HOME/.platformio/packages/toolchain-gccarmnoneeabi/bin"
+          make benchmark-report-check
+      - name: Enforce linked flash and stack budgets
+        run: |
+          export AVR_CC="$HOME/.platformio/packages/toolchain-atmelavr/bin/avr-gcc"
+          export AVR_SIZE="$HOME/.platformio/packages/toolchain-atmelavr/bin/avr-size"
+          python3 tools/measure_avr_resources.py --check tests/budgets/avr.json --output avr-resources.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: embedded-resources
+          path: |
+            build-benchmark-report/resources.json
+            build-benchmark-report/benchmarks.md
+            avr-resources.json

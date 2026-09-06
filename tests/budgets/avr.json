@@ -1,0 +1,8 @@
+{
+  "description": "ATmega328P, avr-gcc 7.3.0, -Os without LTO. Rounded headroom over the recorded baseline. Stack covers project call chains, excluding application/libc/interrupt frames.",
+  "profiles": {
+    "aes_ctr": {"flash": 2200, "static_ram": 100, "project_stack_estimate": 90},
+    "kdf_sha256": {"flash": 9000, "static_ram": 110, "project_stack_estimate": 850, "kdf_workspace_frame": 450},
+    "kdf_mixed": {"flash": 9300, "static_ram": 120, "project_stack_estimate": 1150, "kdf_workspace_frame": 420}
+  }
+}
