@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Mistial Dev -->
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
+
 # Contributing to tiny-crypto-c
 
 Contributions are welcome under GPL-2.0-or-later.

@@ -11,7 +11,16 @@ if(TINY_CRYPTO_BUILD_BENCHMARKS)
   tc_use_test_sanitizers(tiny-crypto-c-benchmark-support)
   set(tc_benchmarks)
   set(tc_benchmark_commands)
-  foreach(algorithm hash aes des kdf)
+  set(tc_benchmark_algorithms hash aes des kdf tlv ec piv_sm)
+  find_package(Python3 COMPONENTS Interpreter QUIET)
+  if(Python3_Interpreter_FOUND)
+    list(APPEND tc_benchmark_algorithms pki)
+    add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/generated/pki_fixtures.h
+      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/pki_fixtures.py
+        --output ${CMAKE_CURRENT_BINARY_DIR}/generated/pki_fixtures.h
+      DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tools/pki_fixtures.py VERBATIM)
+  endif()
+  foreach(algorithm IN LISTS tc_benchmark_algorithms)
     # Each executable reports skipped operations when its profile omits them.
     add_executable(benchmark_${algorithm} EXCLUDE_FROM_ALL
       benchmarks/${algorithm}.c)
@@ -26,6 +35,14 @@ if(TINY_CRYPTO_BUILD_BENCHMARKS)
     list(APPEND tc_benchmarks benchmark_${algorithm})
     list(APPEND tc_benchmark_commands COMMAND $<TARGET_FILE:benchmark_${algorithm}>)
   endforeach()
+  if(TARGET benchmark_pki)
+    target_sources(benchmark_pki PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/generated/pki_fixtures.h)
+    target_include_directories(benchmark_pki PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/generated)
+  endif()
+  if(TINY_CRYPTO_ENABLE_PIV_SM AND TINY_CRYPTO_ENABLE_PIV_CVC)
+    target_sources(benchmark_piv_sm PRIVATE examples/piv_sm_wire.c)
+    tc_sm_fixture_header(benchmark_piv_sm)
+  endif()
   add_custom_target(benchmark ${tc_benchmark_commands}
     DEPENDS ${tc_benchmarks}
     COMMENT "Benchmarking the selected firmware profile")

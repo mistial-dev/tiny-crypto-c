@@ -1,0 +1,4409 @@
+{
+ "generator": "tools/generate_x509_vectors.py",
+ "openssl": "OpenSSL 3.6.3 9 Jun 2026 (Library: OpenSSL 3.6.3 9 Jun 2026)",
+ "entries": [
+  {
+   "file": "algorithms/leaf_mlkem1024_signed_mldsa87.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "ML-KEM-1024 public key (RFC 9935) in an end-entity certificate signed with mldsa87",
+   "sha256": "a0ee49b827a46c050ca38ddddfde27b699ff289c9dd84d77c1d050a226b3e24a",
+   "size": 8854,
+   "openssl": "parsed",
+   "chain": [
+    "algorithms/root_mldsa87.pem"
+   ]
+  },
+  {
+   "file": "algorithms/leaf_mlkem512_signed_mldsa44.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "ML-KEM-512 public key (RFC 9935) in an end-entity certificate signed with mldsa44",
+   "sha256": "2cae2817c64189363c9ceab3a39df778247809f9cdf11572a1c64bfbf5faa476",
+   "size": 4824,
+   "openssl": "parsed",
+   "chain": [
+    "algorithms/root_mldsa44.pem"
+   ]
+  },
+  {
+   "file": "algorithms/leaf_mlkem768_signed_mldsa65.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "ML-KEM-768 public key (RFC 9935) in an end-entity certificate signed with mldsa65",
+   "sha256": "77805126d2586fd55966c9cace1fbda75b67004e1cbb9bbceface5f61e7089d7",
+   "size": 6546,
+   "openssl": "parsed",
+   "chain": [
+    "algorithms/root_mldsa65.pem"
+   ]
+  },
+  {
+   "file": "algorithms/leaf_x25519_signed_ed25519.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "X25519 key agreement public key (RFC 8410 \u00a710.2 style) signed with ed25519",
+   "sha256": "a6afec7e646204a901a08d50443a846b92c75cbb3383c95d537ae04c60944953",
+   "size": 570,
+   "openssl": "parsed",
+   "chain": [
+    "algorithms/root_ed25519.pem"
+   ]
+  },
+  {
+   "file": "algorithms/leaf_x448_signed_ed448.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "X448 key agreement public key (RFC 8410 \u00a710.2 style) signed with ed448",
+   "sha256": "c4b542d8dde0f8823920025ff7296f05e13f72e4075499f9fe70d463acc6a1d5",
+   "size": 664,
+   "openssl": "parsed",
+   "chain": [
+    "algorithms/root_ed448.pem"
+   ]
+  },
+  {
+   "file": "algorithms/root_brainpoolp256r1_sha256.der",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "ECDSA brainpoolP256r1 (RFC 5639 curve) (DER)",
+   "sha256": "d9c206532d3c487ed0d1691d76dab95717a8b66f57da7a03ed7d34ed4ecd61d5",
+   "size": 494,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_brainpoolp256r1_sha256.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "ECDSA brainpoolP256r1 (RFC 5639 curve)",
+   "sha256": "ece207c4a2fd2cce21158551769b48a88378bd984878c11e0f56b1892953fbac",
+   "size": 725,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_brainpoolp384r1_sha384.der",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "ECDSA brainpoolP384r1 (DER)",
+   "sha256": "5243a3c9946e4974b6dd752b541523e1da4709a0c52733db541266d6d6ec43d4",
+   "size": 558,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_brainpoolp384r1_sha384.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "ECDSA brainpoolP384r1",
+   "sha256": "572db839330cf7c41271130566a579c0a3651a60cc7232e69bd0da997752954b",
+   "size": 810,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_dsa2048_sha1.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "DSA-2048 signed with dsaWithSHA1 (RFC 3279)",
+   "sha256": "2bf32ae4825d0f9f773750542556256bdc76d9f777dea4b9d460633cf64a72bb",
+   "size": 1590,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_dsa2048_sha256.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "DSA-2048/256, id-dsa-with-sha256 (RFC 5758)",
+   "sha256": "ac142fc3cbe17db7e29d83e127dc5f7ffc88968c81136bb116492da0377d623b",
+   "size": 1582,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_ecp224_sha224.der",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "ECDSA P-224, ecdsa-with-SHA224 (DER)",
+   "sha256": "73d2e11ce1bda0aa46c4badc694037122fd8e8dff8490443d1d9b89846ef90a4",
+   "size": 456,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_ecp224_sha224.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "ECDSA P-224, ecdsa-with-SHA224",
+   "sha256": "d1040061af7aa0c63276b24a6fb8a1152739935ad34a081ca14229b93a4243da",
+   "size": 672,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_ecp256_compressed_point.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "P-256 SPKI with compressed point (02/03 prefix); RFC 5480 says implementations SHOULD support it",
+   "sha256": "089d89f69c7ac15837663018c2a47540438bf113ada0848148bf9839b73b38c5",
+   "size": 562,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_ecp256_explicit_sha256.der",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "P-256 key with explicit (specifiedCurve) domain parameters in SPKI - forbidden by RFC 5480 for PKIX but seen in the wild (DER)",
+   "sha256": "87b44646745245793828b8b24cd438398a5e71a8811a5dc06b96acd378cb6e3e",
+   "size": 739,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_ecp256_explicit_sha256.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "P-256 key with explicit (specifiedCurve) domain parameters in SPKI - forbidden by RFC 5480 for PKIX but seen in the wild",
+   "sha256": "cd54346dbfb85bad1943dbf4c62d7515d9b0d2680681ddf4e64e8c6a902aec4d",
+   "size": 1058,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_ecp256_sha1.der",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "ECDSA P-256 signed with ecdsa-with-SHA1 (DER)",
+   "sha256": "506735a9cc680b2da15b1f503428e308a1a2d61147d458f2d3cdb554096e17d7",
+   "size": 470,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_ecp256_sha1.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "ECDSA P-256 signed with ecdsa-with-SHA1",
+   "sha256": "6443ed901b7be819ce6dfb4c38bc328f24b6b2afaa29122e24c6dac1189e5c9b",
+   "size": 692,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_ecp256_sha256.der",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "ECDSA P-256, ecdsa-with-SHA256 (DER)",
+   "sha256": "ea38f2a562c5ef5bd815a157922c8275d42ef3ff41549405cdd49cd6e3838cc3",
+   "size": 475,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_ecp256_sha256.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "ECDSA P-256, ecdsa-with-SHA256",
+   "sha256": "faf190c479917f0a880b0d078c9f23554f7dc96c54912cfa0a93142b8b2e3df2",
+   "size": 700,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_ecp256_sha3_256.der",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "ECDSA P-256, id-ecdsa-with-sha3-256 (DER)",
+   "sha256": "277903c1e83a8aacfee8f0728ac69544ece73630c0a43d30f6387f08abf906fd",
+   "size": 482,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_ecp256_sha3_256.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "ECDSA P-256, id-ecdsa-with-sha3-256",
+   "sha256": "a68909f1a75d3812cddcda4b2f52d90ff07be9c687456123b8b61a935e274a41",
+   "size": 709,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_ecp384_sha384.der",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "ECDSA P-384, ecdsa-with-SHA384 (DER)",
+   "sha256": "837235f15e0af2a4e2fe7a0964deb62420c49a6fb9e967b769436ad46aabca7a",
+   "size": 537,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_ecp384_sha384.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "ECDSA P-384, ecdsa-with-SHA384",
+   "sha256": "cf360189c4fb59434a25a4843606c0a5ad0ff0bc93cf113403e552645b08d988",
+   "size": 782,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_ecp521_sha512.der",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "ECDSA P-521, ecdsa-with-SHA512 (DER)",
+   "sha256": "faa9da5528540e9dad7b094ab3365f90e16df54ff37a13dddcf6eb39382a40ce",
+   "size": 612,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_ecp521_sha512.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "ECDSA P-521, ecdsa-with-SHA512",
+   "sha256": "bfe170b4072273a64311fef0699965d34ed72ce3317acef6f15ac241cac0e404",
+   "size": 883,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_ed25519.der",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "Ed25519 (RFC 8410), no digest, absent parameters (DER)",
+   "sha256": "bb8d70a6985b4b7aa2a8d5136eaffdd52abd575a83f50041572c37ccca3d9f58",
+   "size": 400,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_ed25519.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "Ed25519 (RFC 8410), no digest, absent parameters",
+   "sha256": "614aa1643c3a1c43cbf67900b9562ae21df36c0d9a93728eb44c1168f8eec9a4",
+   "size": 599,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_ed448.der",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "Ed448 (RFC 8410) (DER)",
+   "sha256": "6d5a5fc12e5021b011994a8088e05d4835b86935dfe31bfe795713507d9b9b17",
+   "size": 471,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_ed448.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "Ed448 (RFC 8410)",
+   "sha256": "86571b235c990403867bee1041371735e0971cca1daf4e5e1a2d2632d31d41ae",
+   "size": 692,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_mldsa44.der",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "ML-DSA-44 (RFC 9881) (DER)",
+   "sha256": "fe2c2ceedc40123db46cd972f37da32592400a29e9fbc595d5e0491363e1db1f",
+   "size": 4060,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_mldsa44.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "ML-DSA-44 (RFC 9881)",
+   "sha256": "f3e289af30958a0b87e75d87b990364793458963741f706d8bdf2ca7e2336d86",
+   "size": 5555,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_mldsa65.der",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "ML-DSA-65 (RFC 9881) (DER)",
+   "sha256": "dcecd8a62a6fdfb25a3791e06aba0dc40f5562b855a17590877e6cf391792903",
+   "size": 5589,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_mldsa65.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "ML-DSA-65 (RFC 9881)",
+   "sha256": "95be65ea4771d3552428f15bd9d8d6b1cf5b457a5aa610d5d7d458b494f16553",
+   "size": 7623,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_mldsa87.der",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "ML-DSA-87 (RFC 9881) (DER)",
+   "sha256": "22b6c159865c58f469b19b78dbe7945371c357e88716d054247734743dd373bc",
+   "size": 7547,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_mldsa87.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "ML-DSA-87 (RFC 9881)",
+   "sha256": "aa228fc7766940e6e019c792607a191fea0607b855922cd5dd0606f98e2cb14f",
+   "size": 10276,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_rsa1024_sha256.der",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "RSA-1024 (legacy, below current minimum) (DER)",
+   "sha256": "41b277caede7a56ae207185fa5c4ac374e986427fa183f2f7149f538c72a3ecc",
+   "size": 613,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_rsa1024_sha256.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "RSA-1024 (legacy, below current minimum)",
+   "sha256": "37cd430c30d059f5927e4873d3155d96bbf8ce329a62c3f2119c74c52dc9473d",
+   "size": 887,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_rsa2048_e3_sha256.der",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "RSA-2048 with public exponent 3 (DER)",
+   "sha256": "a1158fb447727eefba25dccdbbaadfc800c526986520ba3120acf1be21941bb0",
+   "size": 878,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_rsa2048_e3_sha256.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "RSA-2048 with public exponent 3",
+   "sha256": "36159b8cf878470006fe71ca00028ce08dacec2867a8fb462a423b04e4e825ca",
+   "size": 1245,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_rsa2048_pss_sha256_mgf1sha1.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "RSASSA-PSS with hashAlgorithm sha256 but MGF1 hash sha1 (legal but forbidden by RFC 4055 \u00a73.1 and RFC 8017 profiles that require equality)",
+   "sha256": "1dda1c370411d51b8920194ee194989a48d9e091d9e0f17525d9f83ff48c58fc",
+   "size": 1192,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_rsa2048_pss_sha256_salt20.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "RSASSA-PSS with saltLength 20 (default omitted in DER? no: explicit 20)",
+   "sha256": "a3a7c7c907fec0eaa9b23413f54c577ef399703d4476d45a1c027f84761508a0",
+   "size": 1245,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_rsa2048_pss_sha256_salt32.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "rsaEncryption SPKI, RSASSA-PSS signature (sha256/MGF1-sha256/salt 32) with explicit parameters (RFC 4055)",
+   "sha256": "6bffd24c3caa927f0d771fd8ef58513713bc031ad9f1830eefc96d3a4bf094eb",
+   "size": 1257,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_rsa2048_sha1.der",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "RSA-2048 signed with sha1WithRSAEncryption (weak digest) (DER)",
+   "sha256": "ac3bbd6df3029ea7e685363fa1b0c732b873d64458cce4ee276ccc4fa0f3f7da",
+   "size": 870,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_rsa2048_sha1.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "RSA-2048 signed with sha1WithRSAEncryption (weak digest)",
+   "sha256": "0ae161f5339d7d1f9d8b747ca2c005b6aa6f25b0bd9f9b702d9017443c055816",
+   "size": 1233,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_rsa2048_sha224.der",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "RSA-2048, sha224WithRSAEncryption (DER)",
+   "sha256": "14a4a843caf22c8412ae0f5dc150e1c203b2d4a1490edcb599458f4e4261bb5a",
+   "size": 874,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_rsa2048_sha224.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "RSA-2048, sha224WithRSAEncryption",
+   "sha256": "bc668f1ff9cdee08230ffdc4205ab14f8811b8595244805396119f1cb15b2b4b",
+   "size": 1241,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_rsa2048_sha256.der",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "RSA-2048, sha256WithRSAEncryption (DER)",
+   "sha256": "b8732924a4be044a2a276d36ad5f16df193e57c0c4581a6ba8ea620c079ad83f",
+   "size": 874,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_rsa2048_sha256.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "RSA-2048, sha256WithRSAEncryption",
+   "sha256": "c78f30ea1dbddb0fc8a582d0acc540fa95f8e55f83e203fbd01035a9af7ea336",
+   "size": 1241,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_rsa2048_sha3_256.der",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "RSA-2048, id-rsassa-pkcs1-v1_5-with-sha3-256 (DER)",
+   "sha256": "618623efc2727d66be9a7631013148df7e80f32d0b725b6cfd27add573f80ef2",
+   "size": 878,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_rsa2048_sha3_256.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "RSA-2048, id-rsassa-pkcs1-v1_5-with-sha3-256",
+   "sha256": "d118c2ec2e437a8db0554d4ade6ebe0ff2b41ead04ff721459f844690e7cfbf5",
+   "size": 1245,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_rsa2048_sha512_256.der",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "RSA-2048, sha512-256WithRSAEncryption (RFC 8017 truncated SHA-512) (DER)",
+   "sha256": "98e68e52bce3e81cf71933aacb850bdf70d145e2e2914faec3b4bf6a9b049ea1",
+   "size": 882,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_rsa2048_sha512_256.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "RSA-2048, sha512-256WithRSAEncryption (RFC 8017 truncated SHA-512)",
+   "sha256": "373cc19db019c2cf59e9c3882e12a2d17cab0460d434f5a68eb6d5034956bdd3",
+   "size": 1249,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_rsa3072_pss_sha384_salt48.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "RSASSA-PSS sha384/MGF1-sha384/salt 48",
+   "sha256": "c41357ccbd792c2f8e14454d9f01049ebcdad28f04c0e80cfcf65350e2b64426",
+   "size": 1606,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_rsa3072_sha384.der",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "RSA-3072, sha384WithRSAEncryption (DER)",
+   "sha256": "ef230b334367fb60f2b219bf0348d040dd9a2d2c3f5eb447dd551430e5686ba8",
+   "size": 1130,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_rsa3072_sha384.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "RSA-3072, sha384WithRSAEncryption",
+   "sha256": "871c7688d4f00a6a087b9f3f18fc49f9d2fa3747bcc1ce054123f265bbb7e8f4",
+   "size": 1586,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_rsa4096_sha512.der",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "RSA-4096, sha512WithRSAEncryption (DER)",
+   "sha256": "da9326d30357fcf76898c6a953c189709399b2728387a0720e7a6bae4c59a34a",
+   "size": 1386,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_rsa4096_sha512.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "RSA-4096, sha512WithRSAEncryption",
+   "sha256": "bbd83b7eba067c51ceaf06e85da71a071fca31d262285dee1bfbde31291dd051",
+   "size": 1931,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_rsa512_sha256.der",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "RSA-512 (toy key; signature shorter than digest info + padding minimum edge) (DER)",
+   "sha256": "1fa5f5d29a1abce1dec0fdbdf433bc94352634d54aa7028c551cf0f4d2ec3562",
+   "size": 478,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_rsa512_sha256.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "RSA-512 (toy key; signature shorter than digest info + padding minimum edge)",
+   "sha256": "567cfcd2b53f9d44f635c24c1d92faadaaf4aad7fe80ca010ba1335b1c4c621c",
+   "size": 704,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_rsa8192_sha256.der",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "RSA-8192 (very large modulus) (DER)",
+   "sha256": "0ec9e48dfcf256e448c506ca62d09def84879d7ff4036af31bb2d19aeb959716",
+   "size": 2410,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_rsa8192_sha256.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "RSA-8192 (very large modulus)",
+   "sha256": "4747f3c051ed200e6c279d24853c00afa00135037ef16191c1a937dfd925efd7",
+   "size": 3321,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_rsapss_restricted_key.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "SPKI algorithm id-RSASSA-PSS with parameter restrictions (RFC 4055 \u00a73.3)",
+   "sha256": "e214e13dfc5a444d91ca6e70975fd3324fd427081f73b5f66e8f3377efde1b29",
+   "size": 1338,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_secp256k1_sha256.der",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "ECDSA secp256k1 (non-NIST curve) (DER)",
+   "sha256": "b66d0a9b481585f5472de655304aea3fc418b2497914f4023cb520c5959e34b8",
+   "size": 479,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_secp256k1_sha256.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "ECDSA secp256k1 (non-NIST curve)",
+   "sha256": "eef5685e63d6c6a4a4f8d0a29673f0a08ae157ee416076ba1404972bfeb0bc23",
+   "size": 704,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_slhdsa_sha2_128s.der",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "SLH-DSA-SHA2-128s (RFC 9909), ~8 KB signature (DER)",
+   "sha256": "843a1bc72e446feb596cb8f3f755acbe9e35791869e192b0dfed4c419e77ac2a",
+   "size": 8230,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_slhdsa_sha2_128s.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "SLH-DSA-SHA2-128s (RFC 9909), ~8 KB signature",
+   "sha256": "35fa10a327b4317f13d5130671def0b4f53f19734e6dcc1bbbd87aac38c0feab",
+   "size": 11202,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_slhdsa_shake_128f.der",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "SLH-DSA-SHAKE-128f (RFC 9909), ~17 KB signature (DER)",
+   "sha256": "9ba2c6d0222efbdb14b97a000bace0a0deedf245775a5aff65981c82df1efdf7",
+   "size": 17464,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "algorithms/root_slhdsa_shake_128f.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "SLH-DSA-SHAKE-128f (RFC 9909), ~17 KB signature",
+   "sha256": "a2c536ec77bf771847632ec7bf298fa73813a1da601ef823dc60885a52daa0ab",
+   "size": 23706,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "chains/cross_signed/intermediate_signed_by_a.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "same intermediate key+subject, issued by root A",
+   "sha256": "af7bd98a7530cfdf371e9443324c5641adf758cc601077af54d56c4d40a04f04",
+   "size": 1257,
+   "openssl": "parsed",
+   "chain": [
+    "chains/cross_signed/root_a_rsa.pem"
+   ]
+  },
+  {
+   "file": "chains/cross_signed/intermediate_signed_by_b.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "same intermediate key+subject, issued by root B",
+   "sha256": "8787d7fe31c2a3e7c60955f161e618481cdfd56ee4bc6c009b838e669f28a768",
+   "size": 997,
+   "openssl": "parsed",
+   "chain": [
+    "chains/cross_signed/root_b_ec.pem"
+   ]
+  },
+  {
+   "file": "chains/cross_signed/leaf.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "leaf validates through either intermediate (AKID is keyid only)",
+   "sha256": "381322987ba84db197e2280f89cb478454ac9ae4128bbeb9b0f40f20239bc35e",
+   "size": 932,
+   "openssl": "parsed",
+   "chain": [
+    "chains/cross_signed/intermediate_signed_by_a.pem",
+    "chains/cross_signed/root_a_rsa.pem"
+   ],
+   "openssl_verify": "ok | via B: ok"
+  },
+  {
+   "file": "chains/cross_signed/root_a_rsa.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "cross-signing: root A (RSA)",
+   "sha256": "c78f30ea1dbddb0fc8a582d0acc540fa95f8e55f83e203fbd01035a9af7ea336",
+   "size": 1241,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "chains/cross_signed/root_b_ec.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "cross-signing: root B (EC)",
+   "sha256": "faf190c479917f0a880b0d078c9f23554f7dc96c54912cfa0a93142b8b2e3df2",
+   "size": 700,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "chains/deep/intermediate_0.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "deep chain intermediate 0 (pathlen 5)",
+   "sha256": "7d6ca5410fba3f34717b56243d6f623e6121c5ce342b31e60d869b34d3313bbd",
+   "size": 672,
+   "openssl": "parsed",
+   "chain": [
+    "chains/deep/root.pem"
+   ]
+  },
+  {
+   "file": "chains/deep/intermediate_1.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "deep chain intermediate 1 (pathlen 4)",
+   "sha256": "333f1c958f819396bc5578c61d4d11de9c5934d252ca3cca8afe0252c7ae2855",
+   "size": 615,
+   "openssl": "parsed",
+   "chain": [
+    "chains/deep/intermediate_0.pem",
+    "chains/deep/root.pem"
+   ]
+  },
+  {
+   "file": "chains/deep/intermediate_2.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "deep chain intermediate 2 (pathlen 3)",
+   "sha256": "f516f57c9a9e96079f82ae71eaf4e403f5f413e0c19bc4dedf04b9bf88b956f6",
+   "size": 615,
+   "openssl": "parsed",
+   "chain": [
+    "chains/deep/intermediate_1.pem",
+    "chains/deep/intermediate_0.pem",
+    "chains/deep/root.pem"
+   ]
+  },
+  {
+   "file": "chains/deep/intermediate_3.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "deep chain intermediate 3 (pathlen 2)",
+   "sha256": "08e97b15e3a916cc72a3133381d3804187a4a77064a1dea3a37d8c2647f5b1f1",
+   "size": 615,
+   "openssl": "parsed",
+   "chain": [
+    "chains/deep/intermediate_2.pem",
+    "chains/deep/intermediate_1.pem",
+    "chains/deep/intermediate_0.pem",
+    "chains/deep/root.pem"
+   ]
+  },
+  {
+   "file": "chains/deep/intermediate_4.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "deep chain intermediate 4 (pathlen 1)",
+   "sha256": "af641673f793666a8c63e6d0517b9944332dc9d3299477345ef04175745125f2",
+   "size": 611,
+   "openssl": "parsed",
+   "chain": [
+    "chains/deep/intermediate_3.pem",
+    "chains/deep/intermediate_2.pem",
+    "chains/deep/intermediate_1.pem",
+    "chains/deep/intermediate_0.pem",
+    "chains/deep/root.pem"
+   ]
+  },
+  {
+   "file": "chains/deep/intermediate_5.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "deep chain intermediate 5 (pathlen 0)",
+   "sha256": "dfda123b4e8240472a673183ff329fe045c186ce45ff094f6d327e55b6121f52",
+   "size": 615,
+   "openssl": "parsed",
+   "chain": [
+    "chains/deep/intermediate_4.pem",
+    "chains/deep/intermediate_3.pem",
+    "chains/deep/intermediate_2.pem",
+    "chains/deep/intermediate_1.pem",
+    "chains/deep/intermediate_0.pem",
+    "chains/deep/root.pem"
+   ]
+  },
+  {
+   "file": "chains/deep/leaf.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "leaf at depth 8 (root + 6 intermediates)",
+   "sha256": "8eee522293db5fe7861647fcc8980234afabd5335177f7e0b941c63df27c3e27",
+   "size": 615,
+   "openssl": "parsed",
+   "chain": [
+    "chains/deep/intermediate_5.pem",
+    "chains/deep/intermediate_4.pem",
+    "chains/deep/intermediate_3.pem",
+    "chains/deep/intermediate_2.pem",
+    "chains/deep/intermediate_1.pem",
+    "chains/deep/intermediate_0.pem",
+    "chains/deep/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "chains/deep/root.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "deep chain root",
+   "sha256": "faf190c479917f0a880b0d078c9f23554f7dc96c54912cfa0a93142b8b2e3df2",
+   "size": 700,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "chains/ec/chain.p7b",
+   "kind": "p7b",
+   "expect": "parse",
+   "reason": "P-384 root -> P-384 intermediate -> P-256 leaf [PKCS#7 certs-only bundle, DER]",
+   "sha256": "e8ab727033f2fc5b42beedb1c49694fc2925085ccf3ed3de6c992e7ef6419a14",
+   "size": 1753,
+   "openssl": "parsed"
+  },
+  {
+   "file": "chains/ec/chain.pem",
+   "kind": "bundle",
+   "expect": "parse",
+   "reason": "P-384 root -> P-384 intermediate -> P-256 leaf [PEM bundle leaf,intermediate,root]",
+   "sha256": "e3f262ffac7be9cab1f40d9cdf242c3be7bc9882923eaaf20ad6e3613f3c0ab2",
+   "size": 2475
+  },
+  {
+   "file": "chains/ec/intermediate.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "P-384 root -> P-384 intermediate -> P-256 leaf [intermediate]",
+   "sha256": "3ecfc0940807c4be124cc5f9a89420ed5efcf4ce5fa1ac048ccc7cf2b1f8602b",
+   "size": 810,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ec/root.pem"
+   ]
+  },
+  {
+   "file": "chains/ec/leaf.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "P-384 root -> P-384 intermediate -> P-256 leaf [leaf]",
+   "sha256": "1509c2e63c9315b07111447f26a8874a2fba476c3c5e21d11757ee1b5b9e77e4",
+   "size": 883,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ec/intermediate.pem",
+    "chains/ec/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "chains/ec/root.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "P-384 root -> P-384 intermediate -> P-256 leaf [root]",
+   "sha256": "cf360189c4fb59434a25a4843606c0a5ad0ff0bc93cf113403e552645b08d988",
+   "size": 782,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "chains/ed25519/chain.p7b",
+   "kind": "p7b",
+   "expect": "parse",
+   "reason": "Ed25519 root -> Ed25519 intermediate -> Ed25519 leaf [PKCS#7 certs-only bundle, DER]",
+   "sha256": "2a9e022ecce4e2f206db11dd0eca029c74eafe46c87736d2875422e5fdd7fb0c",
+   "size": 1416,
+   "openssl": "parsed"
+  },
+  {
+   "file": "chains/ed25519/chain.pem",
+   "kind": "bundle",
+   "expect": "parse",
+   "reason": "Ed25519 root -> Ed25519 intermediate -> Ed25519 leaf [PEM bundle leaf,intermediate,root]",
+   "sha256": "ef1bd8fe4eaa326ddda02b9c80bb56cb052513431f023ef94d616cfdc6656da0",
+   "size": 2025
+  },
+  {
+   "file": "chains/ed25519/intermediate.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "Ed25519 root -> Ed25519 intermediate -> Ed25519 leaf [intermediate]",
+   "sha256": "36356d1c74f877ff1223d2ca5c1aeea6826d6d3b25aacd756cbd91fdad52bb53",
+   "size": 644,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ed25519/root.pem"
+   ]
+  },
+  {
+   "file": "chains/ed25519/leaf.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "Ed25519 root -> Ed25519 intermediate -> Ed25519 leaf [leaf]",
+   "sha256": "e46e37c1f441123f943e9ec4315a66b54e65ee30a0fe041e9f3b736f588ada9f",
+   "size": 782,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ed25519/intermediate.pem",
+    "chains/ed25519/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "chains/ed25519/root.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "Ed25519 root -> Ed25519 intermediate -> Ed25519 leaf [root]",
+   "sha256": "614aa1643c3a1c43cbf67900b9562ae21df36c0d9a93728eb44c1168f8eec9a4",
+   "size": 599,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "chains/mldsa/chain.p7b",
+   "kind": "p7b",
+   "expect": "parse",
+   "reason": "ML-DSA-87 root -> ML-DSA-65 intermediate -> ML-DSA-44 leaf [PKCS#7 certs-only bundle, DER]",
+   "sha256": "62ebd45a8677620e0fcc63565a62e99c97a8702e704f12492a37eeabccfebeac",
+   "size": 19609,
+   "openssl": "parsed"
+  },
+  {
+   "file": "chains/mldsa/chain.pem",
+   "kind": "bundle",
+   "expect": "parse",
+   "reason": "ML-DSA-87 root -> ML-DSA-65 intermediate -> ML-DSA-44 leaf [PEM bundle leaf,intermediate,root]",
+   "sha256": "ee62ef95ec5306a74f0e3f00260550994e71e58e4af3b6f8f269572031824eb0",
+   "size": 26659
+  },
+  {
+   "file": "chains/mldsa/intermediate.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "ML-DSA-87 root -> ML-DSA-65 intermediate -> ML-DSA-44 leaf [intermediate]",
+   "sha256": "aa15a5a388c86fc38dd2cf5ef2885a2bab81740ba2e68dc67876d66d58ccea68",
+   "size": 9451,
+   "openssl": "parsed",
+   "chain": [
+    "chains/mldsa/root.pem"
+   ]
+  },
+  {
+   "file": "chains/mldsa/leaf.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "ML-DSA-87 root -> ML-DSA-65 intermediate -> ML-DSA-44 leaf [leaf]",
+   "sha256": "6ebb6090981769310b881efb3ac984ff41760aa028972702ea8303c959900193",
+   "size": 6932,
+   "openssl": "parsed",
+   "chain": [
+    "chains/mldsa/intermediate.pem",
+    "chains/mldsa/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "chains/mldsa/root.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "ML-DSA-87 root -> ML-DSA-65 intermediate -> ML-DSA-44 leaf [root]",
+   "sha256": "aa228fc7766940e6e019c792607a191fea0607b855922cd5dd0606f98e2cb14f",
+   "size": 10276,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "chains/pss/chain.p7b",
+   "kind": "p7b",
+   "expect": "parse",
+   "reason": "RSA-PSS signatures at every level [PKCS#7 certs-only bundle, DER]",
+   "sha256": "51a315d87e8b0a8a387a9f9ea52c68865c6ab19e8939b76368ac574bcd8b1242",
+   "size": 2973,
+   "openssl": "parsed"
+  },
+  {
+   "file": "chains/pss/chain.pem",
+   "kind": "bundle",
+   "expect": "parse",
+   "reason": "RSA-PSS signatures at every level [PEM bundle leaf,intermediate,root]",
+   "sha256": "fd184678d72573e894110d0e4264f639ed7fc41233108982d603e3e8c178483b",
+   "size": 4128
+  },
+  {
+   "file": "chains/pss/intermediate.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "RSA-PSS signatures at every level [intermediate]",
+   "sha256": "9429ccd80d7b3cad186a599218a7d200207810b35acfba1940c4aed6cad9af18",
+   "size": 1350,
+   "openssl": "parsed",
+   "chain": [
+    "chains/pss/root.pem"
+   ]
+  },
+  {
+   "file": "chains/pss/leaf.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "RSA-PSS signatures at every level [leaf]",
+   "sha256": "cd404537458d36f7dc67637bac05baac970ef79f5b17798dd42b019e2c24c64d",
+   "size": 1521,
+   "openssl": "parsed",
+   "chain": [
+    "chains/pss/intermediate.pem",
+    "chains/pss/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "chains/pss/root.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "RSA-PSS signatures at every level [root]",
+   "sha256": "6bffd24c3caa927f0d771fd8ef58513713bc031ad9f1830eefc96d3a4bf094eb",
+   "size": 1257,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "chains/rsa/chain.p7b",
+   "kind": "p7b",
+   "expect": "parse",
+   "reason": "RSA-4096 root -> RSA-2048 intermediate -> P-256 leaf (mixed algorithms) [PKCS#7 certs-only bundle, DER]",
+   "sha256": "11401098633739c0f3af54afef441f7f48b2ed349f5f3fc4e4f35403d8117770",
+   "size": 3362,
+   "openssl": "parsed"
+  },
+  {
+   "file": "chains/rsa/chain.pem",
+   "kind": "bundle",
+   "expect": "parse",
+   "reason": "RSA-4096 root -> RSA-2048 intermediate -> P-256 leaf (mixed algorithms) [PEM bundle leaf,intermediate,root]",
+   "sha256": "75dc18e51cfaeb4463af3c581453b2d1659c7999217c461427d2cab8561c113c",
+   "size": 4652
+  },
+  {
+   "file": "chains/rsa/intermediate.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "RSA-4096 root -> RSA-2048 intermediate -> P-256 leaf (mixed algorithms) [intermediate]",
+   "sha256": "0e1639ca8c1d1431a948b93bc74bbf8ed21941f7691281b4a31d16ec1b4356d2",
+   "size": 1614,
+   "openssl": "parsed",
+   "chain": [
+    "chains/rsa/root.pem"
+   ]
+  },
+  {
+   "file": "chains/rsa/leaf.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "RSA-4096 root -> RSA-2048 intermediate -> P-256 leaf (mixed algorithms) [leaf]",
+   "sha256": "d41efc067d76e984f7324c911538c0d2050657784e4f96ab0f2ad72284e5078e",
+   "size": 1107,
+   "openssl": "parsed",
+   "chain": [
+    "chains/rsa/intermediate.pem",
+    "chains/rsa/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "chains/rsa/root.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "RSA-4096 root -> RSA-2048 intermediate -> P-256 leaf (mixed algorithms) [root]",
+   "sha256": "bbd83b7eba067c51ceaf06e85da71a071fca31d262285dee1bfbde31291dd051",
+   "size": 1931,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "crls/crl_v1_no_extensions.pem",
+   "kind": "crl",
+   "expect": "parse",
+   "reason": "v1 CRL: no version field, no CRL extensions, entries still carry reason codes",
+   "sha256": "715594a261c8319533e26305a64edef1ed1ab0c495992d9fa3c1b42b0a3b251d",
+   "size": 1125,
+   "openssl": "parsed"
+  },
+  {
+   "file": "crls/crl_v2_bad_signature.der",
+   "kind": "crl",
+   "expect": "parse-only",
+   "reason": "last signature byte flipped: parses, signature verification must fail",
+   "sha256": "9af40d8f65dfe637672fd09c26dd5be905a2525e2b31966b734b91e94afc2613",
+   "size": 880,
+   "openssl": "parsed"
+  },
+  {
+   "file": "crls/crl_v2_ec.pem",
+   "kind": "crl",
+   "expect": "parse",
+   "reason": "CRL signed by the ec chain intermediate, revoking chains/ec/leaf.pem",
+   "sha256": "3499321980459480342a542f85b4d6385b597e9b2974115f6b19e2425a487ffe",
+   "size": 503,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ec/intermediate.pem",
+    "chains/ec/root.pem"
+   ]
+  },
+  {
+   "file": "crls/crl_v2_ed25519.pem",
+   "kind": "crl",
+   "expect": "parse",
+   "reason": "CRL signed by the ed25519 chain intermediate, revoking chains/ed25519/leaf.pem",
+   "sha256": "9b7103e2ce38ed8a344a2728d36149373bcf9b5bd2fe8dca0ceb8f1b14018ffc",
+   "size": 447,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ed25519/intermediate.pem",
+    "chains/ed25519/root.pem"
+   ]
+  },
+  {
+   "file": "crls/crl_v2_empty.der",
+   "kind": "crl",
+   "expect": "parse",
+   "reason": "same, DER",
+   "sha256": "29d2bf0b89563f5c4c5337678682c1646c2ad9e80bc70d9fba7623a2bbcb95fe",
+   "size": 490,
+   "openssl": "parsed"
+  },
+  {
+   "file": "crls/crl_v2_empty.pem",
+   "kind": "crl",
+   "expect": "parse",
+   "reason": "v2 CRL with no revoked certificates (no revokedCertificates field), crlNumber + AKID + issuerAltName",
+   "sha256": "efa0fd2625cbb84fe02dbeee2bacdbfa2a9bdf2cb8f7b5c9d288f67724d5f129",
+   "size": 715,
+   "openssl": "parsed"
+  },
+  {
+   "file": "crls/crl_v2_mldsa.pem",
+   "kind": "crl",
+   "expect": "parse",
+   "reason": "CRL signed by the mldsa chain intermediate, revoking chains/mldsa/leaf.pem",
+   "sha256": "52c1be0efd064f1d21b617aedbf4de8a324b95c8029088f38175ae1a3ae8b604",
+   "size": 4854,
+   "openssl": "parsed",
+   "chain": [
+    "chains/mldsa/intermediate.pem",
+    "chains/mldsa/root.pem"
+   ]
+  },
+  {
+   "file": "crls/crl_v2_nextupdate_generalizedtime.pem",
+   "kind": "crl",
+   "expect": "parse",
+   "reason": "nextUpdate ~24 years out, so it is a GeneralizedTime (year >= 2050)",
+   "sha256": "cdb630744b05de1f7d986ef7b4d840ea2d4fe5075361f89531947286ea05454e",
+   "size": 1243,
+   "openssl": "parsed"
+  },
+  {
+   "file": "crls/crl_v2_sha1.pem",
+   "kind": "crl",
+   "expect": "parse-only",
+   "reason": "CRL signed with sha1WithRSAEncryption",
+   "sha256": "0e9d235c5ec45b86b4c2d29ad27cb48ff40ebc8e5f84e2c2ce11438445e3e99c",
+   "size": 1243,
+   "openssl": "parsed"
+  },
+  {
+   "file": "crls/crl_v2_signature_from_other_issuer.der",
+   "kind": "crl",
+   "expect": "parse-only",
+   "reason": "TBSCertList of the RSA CRL with the ECDSA signature (and outer signatureAlgorithm) of another CRL: algorithm mismatch between tbs.signature and outer signatureAlgorithm",
+   "sha256": "8fd9da8c667a1a2a6238ed94451e2f766ea24550b467b5fd31842f56afd00c73",
+   "size": 722,
+   "openssl": "parsed"
+  },
+  {
+   "file": "crls/crl_v2_ten_entries_all_reasons.der",
+   "kind": "crl",
+   "expect": "parse",
+   "reason": "same, DER",
+   "sha256": "44494b14253271a7b8a9a103c3f99fb151eef166f67ae1d0fc13a8f938f0a781",
+   "size": 880,
+   "openssl": "parsed"
+  },
+  {
+   "file": "crls/crl_v2_ten_entries_all_reasons.pem",
+   "kind": "crl",
+   "expect": "parse",
+   "reason": "v2 CRL with 9 entries: every CRLReason value openssl ca can emit (0-6, 8), one invalidityDate, one entry without extensions",
+   "sha256": "1f72268f9871afbe20fd3ab1d047e001346bc1fd91b2eba03ca1b78f1c479c3b",
+   "size": 1243,
+   "openssl": "parsed"
+  },
+  {
+   "file": "crls/revoked_leaf.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "leaf revoked (keyCompromise) in crl_v2_ten_entries_all_reasons",
+   "sha256": "a1585ce0adb0db5e329d631718e57ae4a10cf2caf74ad2c24db0ef2d2ed26e89",
+   "size": 899,
+   "openssl": "parsed",
+   "chain": [
+    "chains/rsa/intermediate.pem",
+    "chains/rsa/root.pem"
+   ],
+   "openssl_verify": "error 23 at 0 depth lookup: certificate revoked"
+  },
+  {
+   "file": "csr/csr_ecp256_basic.pem",
+   "kind": "csr",
+   "expect": "parse",
+   "reason": "PKCS#10 request, P-256, no attributes",
+   "sha256": "4885d6c5a85740c11a881a8d005bd7b6768488e7f9b5c511f1cd47629d8d88b4",
+   "size": 400,
+   "openssl": "parsed"
+  },
+  {
+   "file": "csr/csr_ecp256_with_extension_request.der",
+   "kind": "csr",
+   "expect": "parse",
+   "reason": "same, DER",
+   "sha256": "b9f70f4fcd02099942a9c597c105a677dc54212c04925576896842a2614aeb7b",
+   "size": 329,
+   "openssl": "parsed"
+  },
+  {
+   "file": "csr/csr_ecp256_with_extension_request.pem",
+   "kind": "csr",
+   "expect": "parse",
+   "reason": "PKCS#10 with extensionRequest attribute (SAN, KU, EKU)",
+   "sha256": "dd971606b55eca69d1ad0c6f8eb7f73522e83b7096429b2ff9cd4f7c61449e53",
+   "size": 517,
+   "openssl": "parsed"
+  },
+  {
+   "file": "csr/csr_mldsa44.pem",
+   "kind": "csr",
+   "expect": "parse",
+   "reason": "PKCS#10 signed with ML-DSA-44",
+   "sha256": "63b06200aa08ece4d4e7892770f44b2726198d4a4edd63b8f6aaaf0b269d192a",
+   "size": 5242,
+   "openssl": "parsed"
+  },
+  {
+   "file": "csr/csr_rsa2048_sha256.pem",
+   "kind": "csr",
+   "expect": "parse",
+   "reason": "PKCS#10 RSA-2048 sha256WithRSAEncryption",
+   "sha256": "61366fb3f775b029596ee0798302200ec72185eb7392b0e15eee885c76309c2d",
+   "size": 903,
+   "openssl": "parsed"
+  },
+  {
+   "file": "extensions/aia_crldp_ocsp.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "AIA (OCSP + two caIssuers), two CRL DPs and SIA",
+   "sha256": "c43a2444b28cd967be8db1221a36396ecac2a6fa5b9a309019ab81fcc799074c",
+   "size": 1334,
+   "openssl": "parsed",
+   "chain": [
+    "chains/rsa/intermediate.pem",
+    "chains/rsa/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "extensions/all_general_name_types.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "SAN with dNSName, IPv4, IPv6, rfc822Name, URI, registeredID, directoryName, otherName (UPN) and SRVName otherName",
+   "sha256": "1bd693f2e8a57f2eca150c6a3cafe55f8a8dd5811059cf2e244afb169f520a57",
+   "size": 1220,
+   "openssl": "parsed",
+   "chain": [
+    "chains/rsa/intermediate.pem",
+    "chains/rsa/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "extensions/basic_constraints_ca_true_in_leaf.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "end-entity style cert claiming CA:TRUE without keyCertSign (parse; policy mismatch)",
+   "sha256": "e320e4f15d6187f175b3e56ca434b0971bd0fd73cb826bc80ce5f73ffefa1862",
+   "size": 924,
+   "openssl": "parsed",
+   "chain": [
+    "chains/rsa/intermediate.pem",
+    "chains/rsa/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "extensions/basic_constraints_pathlen_without_ca.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "pathLenConstraint present although cA is FALSE (RFC 5280 says MUST NOT appear)",
+   "sha256": "e183cacf79d5b18d3fb1503487a4f4503321b88c4d6dfaedcadf547219dacd7a",
+   "size": 899,
+   "openssl": "parsed",
+   "chain": [
+    "chains/rsa/intermediate.pem",
+    "chains/rsa/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "extensions/ca_basic_constraints_not_critical.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "CA whose basicConstraints is not marked critical (RFC 5280 says MUST be critical in CA certs)",
+   "sha256": "a6c512fe1af0224a96159ac48bb0b29b825e2f7bff590ad0ffe6bdbaec09fbed",
+   "size": 684,
+   "openssl": "parsed",
+   "chain": [
+    "algorithms/root_ecp256_sha256.pem"
+   ]
+  },
+  {
+   "file": "extensions/ca_missing_key_usage.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "CA without keyUsage extension (allowed by RFC 5280 for CAs, forbidden by CABF)",
+   "sha256": "febe334bd260994679a00d100675b322cb35cc58b8bd2208734f6d1851d28914",
+   "size": 648,
+   "openssl": "parsed",
+   "chain": [
+    "algorithms/root_ecp256_sha256.pem"
+   ]
+  },
+  {
+   "file": "extensions/ca_name_constraints.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "CA with nameConstraints: permitted DNS/email/IPv4/IPv6/dirName subtrees and excluded DNS/URI",
+   "sha256": "b0f6212bd0882f7f3def571cad56a5dabb2a021b1d9cb6a6259bdb8cc5df736d",
+   "size": 948,
+   "openssl": "parsed",
+   "chain": [
+    "algorithms/root_ecp256_sha256.pem"
+   ]
+  },
+  {
+   "file": "extensions/ca_pathlen_zero.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "CA with pathLenConstraint 0 and keyUsage without cRLSign",
+   "sha256": "11994a650d40bf5ff73bf40ef76b9cc56222ec0cb377934fb9953104d92499ae",
+   "size": 668,
+   "openssl": "parsed",
+   "chain": [
+    "algorithms/root_ecp256_sha256.pem"
+   ]
+  },
+  {
+   "file": "extensions/ca_policy_constraints.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "CA with policyConstraints, policyMappings and inhibitAnyPolicy",
+   "sha256": "65b3faeb37852377c0f9f1f2b00c8a5a4996a38d39b4ffa6d42b0f5c25d2baac",
+   "size": 859,
+   "openssl": "parsed",
+   "chain": [
+    "algorithms/root_ecp256_sha256.pem"
+   ]
+  },
+  {
+   "file": "extensions/certificate_policies_any.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "critical certificatePolicies containing only anyPolicy (RFC 5280 says anyPolicy in EE is fine; critical is unusual)",
+   "sha256": "2ae91408170dc3fe67a300ec6505ff9acbab3ea98a6a583ad976e0534e966c53",
+   "size": 924,
+   "openssl": "parsed",
+   "chain": [
+    "chains/rsa/intermediate.pem",
+    "chains/rsa/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "extensions/certificate_policies_qualifiers.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "certificatePolicies with CABF DV OID, plain OIDs, CPS URIs and a UserNotice with NoticeReference",
+   "sha256": "453f247dae98418541c83ed7651d98b5ebbb91248fb3c8cdf32b7d22241fd38e",
+   "size": 1192,
+   "openssl": "parsed",
+   "chain": [
+    "chains/rsa/intermediate.pem",
+    "chains/rsa/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "extensions/crldp_full.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "DistributionPoint with fullName, cRLIssuer and a reasons ReasonFlags BIT STRING",
+   "sha256": "58103c490e3c7d3ee72002b8be3b8bbab9475495de13e44c5d621e75bd11fa2f",
+   "size": 1038,
+   "openssl": "parsed",
+   "chain": [
+    "chains/rsa/intermediate.pem",
+    "chains/rsa/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "extensions/eku_many.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "critical EKU with fifteen purposes incl. id-PIV-cardAuth (2.16.840.1.101.3.6.8), MS smartcard logon and anyExtendedKeyUsage",
+   "sha256": "06e88a18d8ae1b7361969b00a7868be00f2d6edd75d8a91a82f65c10e6b3e3b7",
+   "size": 1131,
+   "openssl": "parsed",
+   "chain": [
+    "chains/rsa/intermediate.pem",
+    "chains/rsa/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "extensions/ext_value_octet_string_empty.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "extension whose extnValue OCTET STRING wraps an empty SEQUENCE",
+   "sha256": "6536ab8540383d02e79164a298a8e8a97e7cea80f9de3d8e73db6e3c068b6bb7",
+   "size": 920,
+   "openssl": "parsed",
+   "chain": [
+    "chains/rsa/intermediate.pem",
+    "chains/rsa/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "extensions/freshest_crl.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "freshestCRL (delta CRL distribution point) extension",
+   "sha256": "65529a6d0ab6df67341c08223d7c1ed6f816a2b0315b6a55e1c7e11f9f9fe7a8",
+   "size": 964,
+   "openssl": "parsed",
+   "chain": [
+    "chains/rsa/intermediate.pem",
+    "chains/rsa/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "extensions/issuer_alt_name.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "issuerAltName extension",
+   "sha256": "f165372d84486ee26ce7422f346ac30f43564410abc6f626152956c8ffcdb32c",
+   "size": 952,
+   "openssl": "parsed",
+   "chain": [
+    "chains/rsa/intermediate.pem",
+    "chains/rsa/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "extensions/key_usage_all_bits.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "all nine KeyUsage bits set (9 bits -> 2 octets, 7 unused bits)",
+   "sha256": "a1b17787f016576e7cc4b8456475c6b3f7f5db6e39ce5f189b75eb8c5ff6aab6",
+   "size": 916,
+   "openssl": "parsed",
+   "chain": [
+    "chains/rsa/intermediate.pem",
+    "chains/rsa/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "extensions/key_usage_decipher_only.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "decipherOnly (bit 8) forces a 2-octet BIT STRING",
+   "sha256": "88db5f3904c2e8ac8d1892d59ba183ea1a506cdf7fde692dd1f7d29c8cdee613",
+   "size": 916,
+   "openssl": "parsed",
+   "chain": [
+    "chains/rsa/intermediate.pem",
+    "chains/rsa/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "extensions/many_extensions.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "fourteen extensions including Netscape legacy nsCertType/nsComment",
+   "sha256": "f8a311849ea7e00672ccc4978ea67ea64e24083a9093bce9b35b3fb4ce2e8cec",
+   "size": 1318,
+   "openssl": "parsed",
+   "chain": [
+    "chains/rsa/intermediate.pem",
+    "chains/rsa/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "extensions/name_constraints_on_leaf.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "nameConstraints in an end-entity certificate (MUST only appear in CA certs)",
+   "sha256": "5b40466ed1c6332c1deb97a4d902c28a6a679c679eb0457112be0b62028a278f",
+   "size": 936,
+   "openssl": "parsed",
+   "chain": [
+    "chains/rsa/intermediate.pem",
+    "chains/rsa/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "extensions/ocsp_nocheck.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "OCSP responder cert with id-pkix-ocsp-nocheck (NULL value extension)",
+   "sha256": "8022bf331d8bd99a2a095d8e396441e1ea725a0255f07dfd9bf14f13aef412c8",
+   "size": 944,
+   "openssl": "parsed",
+   "chain": [
+    "chains/rsa/intermediate.pem",
+    "chains/rsa/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "extensions/piv_style_fascn_upn.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "PIV Authentication certificate profile: FASC-N otherName, UPN, UUID URI, id-fpki-common-authentication policy, smartcard logon EKU",
+   "sha256": "ecd70fa4f7bdc5bcd7c94a5627f3129e0f72183db90d96eb4dedd1580c8868a7",
+   "size": 1257,
+   "openssl": "parsed",
+   "chain": [
+    "chains/rsa/intermediate.pem",
+    "chains/rsa/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "extensions/precert_poison.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "CT precertificate poison extension (critical NULL) - RFC 6962 \u00a73.1; must not be treated as a valid certificate",
+   "sha256": "d49ac6feee8b4431821ee6e6026345f88c240bcac0454c58428f449c54472246",
+   "size": 924,
+   "openssl": "parsed",
+   "chain": [
+    "chains/rsa/intermediate.pem",
+    "chains/rsa/root.pem"
+   ],
+   "openssl_verify": "error 34 at 0 depth lookup: unhandled critical extension"
+  },
+  {
+   "file": "extensions/qc_statements.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "qcStatements (ETSI EN 319 412-5 QcCompliance + QcType eSign)",
+   "sha256": "fc760a432017abc5d895dbf8e193b8ef8fd940faf9d171e6b1d90544aaf07a1f",
+   "size": 956,
+   "openssl": "parsed",
+   "chain": [
+    "chains/rsa/intermediate.pem",
+    "chains/rsa/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "extensions/san_1000_dns.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "1000 dNSName SAN entries (~25 KB certificate)",
+   "sha256": "cfe0ab09e4f4fa9efc71f8901d8d49181e0ed583f61ffe4242a41c57e6424005",
+   "size": 29215,
+   "openssl": "parsed",
+   "chain": [
+    "chains/rsa/intermediate.pem",
+    "chains/rsa/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "extensions/san_email_only.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "S/MIME style: rfc822Name SAN, contentCommitment (nonRepudiation) bit, emailProtection EKU",
+   "sha256": "d147105f7b9ff49d2c174c011a16a6941d633ac8cb111b1a369d70a47f08d40d",
+   "size": 1029,
+   "openssl": "parsed",
+   "chain": [
+    "chains/rsa/intermediate.pem",
+    "chains/rsa/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "extensions/san_ip_ranges_in_ee.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "iPAddress SANs including loopback IPv6 and 0.0.0.0",
+   "sha256": "441573831849563ae0d2563e5759c20b032d5270f6d1e94b150f82122c603824",
+   "size": 948,
+   "openssl": "parsed",
+   "chain": [
+    "chains/rsa/intermediate.pem",
+    "chains/rsa/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "extensions/sct_list_fake.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "signedCertificateTimestampList extension with an empty (zero-length) SCT list",
+   "sha256": "440c7436b903d60e3f41b676eb0e2a5c0c5573f15209ab23ab2784b20b786eeb",
+   "size": 920,
+   "openssl": "parsed",
+   "chain": [
+    "chains/rsa/intermediate.pem",
+    "chains/rsa/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "extensions/subject_directory_attributes.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "subjectDirectoryAttributes carrying countryOfCitizenship (RFC 3739)",
+   "sha256": "3bff9b8db0999f91e321ee9bd571c9aaf259c2d2b686ef1f5638b9db13c54235",
+   "size": 932,
+   "openssl": "parsed",
+   "chain": [
+    "chains/rsa/intermediate.pem",
+    "chains/rsa/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "extensions/subject_key_identifier_manual.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "explicit SKID value plus AKID with keyid, issuer name and serial",
+   "sha256": "9a82054893a4b1d0f5fc4a349477b607a23cf1e75b87fa9d6bcd8755798f7a01",
+   "size": 1021,
+   "openssl": "parsed",
+   "chain": [
+    "chains/rsa/intermediate.pem",
+    "chains/rsa/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "extensions/tls_feature_must_staple.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "TLS Feature extension (RFC 7633 must-staple)",
+   "sha256": "061e808f85da60bc51453c829d25d8c959123d2b073f7d1c9b9961bdca18be76",
+   "size": 920,
+   "openssl": "parsed",
+   "chain": [
+    "chains/rsa/intermediate.pem",
+    "chains/rsa/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "extensions/unknown_critical_extension.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "unrecognised CRITICAL extension - RFC 5280 \u00a74.2 requires rejection during validation",
+   "sha256": "4f94b4dce2be180dd4346b9649a3908b104090cfc6696dc2002f4a644d708e98",
+   "size": 956,
+   "openssl": "parsed",
+   "chain": [
+    "chains/rsa/intermediate.pem",
+    "chains/rsa/root.pem"
+   ],
+   "openssl_verify": "error 34 at 0 depth lookup: unhandled critical extension"
+  },
+  {
+   "file": "extensions/unknown_noncritical_extension.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "unrecognised non-critical extension (private arc) - must be ignored",
+   "sha256": "f4f1bca973c805b99235f38e97ee9a6433c58592ddd18f1815fc49fe375ff1f0",
+   "size": 952,
+   "openssl": "parsed",
+   "chain": [
+    "chains/rsa/intermediate.pem",
+    "chains/rsa/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "extensions/v1_no_extensions.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "X.509 v1 certificate (no version field, no extensions) issued and validly signed by a v3 CA",
+   "sha256": "9f23d42e0783e7d29874c311afb494e3dca36d8dfcf2446fc16976548d3753ca",
+   "size": 778,
+   "openssl": "parsed",
+   "chain": [
+    "chains/rsa/intermediate.pem",
+    "chains/rsa/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "extensions/v1_self_signed_root.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "X.509 v1 self-signed certificate (what 1990s roots look like)",
+   "sha256": "b31e12e89f050ad8fdd746efd64ce3e1dcd7332d05b27d7606f923b3123cbc4d",
+   "size": 1017,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "extensions/v3_empty_extensions_none.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "minimal v3: only basicConstraints",
+   "sha256": "220845f0b5358b4b4b22675bc6bcf3d8a0d2bd083c6322b393fba48eff5bde44",
+   "size": 891,
+   "openssl": "parsed",
+   "chain": [
+    "chains/rsa/intermediate.pem",
+    "chains/rsa/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "fields/dn_all_common_attributes.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "DN using most attribute types from RFC 4519 / X.520 / CABF EV",
+   "sha256": "a0f27f12ec7bdbe8815db9518e041e665467b8c3aca27d57609d439a1c4af442",
+   "size": 1318,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ec/intermediate.pem",
+    "chains/ec/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "fields/dn_bmpstring.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "non-ASCII with string_mask default -> BMPString / T61String legacy types",
+   "sha256": "8d8102cebac660a751035f44164fb601af6f428b2046f0c805473343a630ccfb",
+   "size": 765,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ec/intermediate.pem",
+    "chains/ec/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "fields/dn_duplicate_attributes.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "two CN RDNs and two OU RDNs (legal, order significant)",
+   "sha256": "d1d07efaa53bd802790d9fb38592931c3d7976afd5a62330f2ac78938f696764",
+   "size": 765,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ec/intermediate.pem",
+    "chains/ec/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "fields/dn_long_cn.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "CN of 76 characters (exceeds X.520 ub-common-name 64; OpenSSL refuses to create it, so the value was patched in and the certificate re-signed)",
+   "sha256": "7cd06939b301159c10b796b90abba549003d3ce4417becffd9e41238b7bd89e7",
+   "size": 806,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ec/intermediate.pem",
+    "chains/ec/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "fields/dn_multivalued_rdn.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "multi-valued RDN (SET with three AttributeTypeAndValue, DER sorted)",
+   "sha256": "02604b9dca593e749074e79b68ebce5804d572fd7934e2862e10e76b8527be16",
+   "size": 782,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ec/intermediate.pem",
+    "chains/ec/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "fields/dn_printablestring.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "DN attributes as PrintableString (string_mask default)",
+   "sha256": "3e04bdb2c8c8960bad697004ba438052a9476ca9a42e4feec80330b65197d416",
+   "size": 830,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ec/intermediate.pem",
+    "chains/ec/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "fields/dn_t61string.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "string_mask nombstr forces T61String (TeletexString) for non-ASCII",
+   "sha256": "12892ada072ed0c078bc9dd863e0d96e9e55eec82986dbf52679724de8ea17cb",
+   "size": 765,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ec/intermediate.pem",
+    "chains/ec/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "fields/dn_unknown_attribute_oid.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "DN with attribute types given by OID, including a private-enterprise arc",
+   "sha256": "0b791b5a9c20ddaaa4eb9ac100c00e2dcc9cbad006c593a9392c54e0254942ed",
+   "size": 794,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ec/intermediate.pem",
+    "chains/ec/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "fields/dn_utf8_nonascii.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "UTF8String DN with Latin-1, symbol and CJK characters",
+   "sha256": "fae398031b2373202f10ba98b8980e6026187fddc12dac6f43d5c1b6df5d9785",
+   "size": 790,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ec/intermediate.pem",
+    "chains/ec/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "fields/dn_utf8string.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "DN attributes as UTF8String",
+   "sha256": "03649acbd963dc0ce0c774d96033f010d1fa6a49d225d406847e4f948f66548a",
+   "size": 761,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ec/intermediate.pem",
+    "chains/ec/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "fields/serial_1.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "serialNumber = 1 (single byte)",
+   "sha256": "4af6d8d7fef7dd9d67dcb8520a1cf8a7b5e8fac62d748979570a4e47dc08f332",
+   "size": 709,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ec/intermediate.pem",
+    "chains/ec/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "fields/serial_20_bytes.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "20-octet positive serialNumber (RFC 5280 maximum)",
+   "sha256": "9900079d28582ab8e9dc344e784497abf639f86910507b18a86bd93af47656b2",
+   "size": 737,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ec/intermediate.pem",
+    "chains/ec/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "fields/serial_21_bytes.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "21-octet serialNumber, exceeds the RFC 5280 20-octet limit (conforming CAs MUST NOT; parsers SHOULD accept gracefully)",
+   "sha256": "ab94c2645e11cd78d2787dfaaa77e307c39b14e8d95ffa09827cb28190c5ea71",
+   "size": 741,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ec/intermediate.pem",
+    "chains/ec/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "fields/serial_high_bit_20_bytes.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "serialNumber whose magnitude needs 20 bytes with the high bit set, so DER needs 21 content octets (leading 00) - still legal per RFC 5280 \u00a74.1.2.2 erratum discussions; many parsers cap at 20",
+   "sha256": "d63ffb6502618dcc66e20524dcf6c8c5fe40a18144fbeb39544cb478ccdfa002",
+   "size": 737,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ec/intermediate.pem",
+    "chains/ec/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "fields/serial_negative.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "negative serialNumber (RFC 5280 says CAs MUST use positive; parsers SHOULD handle non-conforming negative values)",
+   "sha256": "9ac761d707c83c2786a6cfcce1150a96bd39964737d894ce08ab6967d781fdbd",
+   "size": 717,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ec/intermediate.pem",
+    "chains/ec/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "fields/serial_zero.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "serialNumber = 0 (non-positive, non-conforming but seen in the wild)",
+   "sha256": "65f475917a56f38fd64433819cc12bbc43098f537e97369bccaa03e5e449e9b3",
+   "size": 709,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ec/intermediate.pem",
+    "chains/ec/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "fields/subject_cn_only_no_san.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "hostname only in CN, no SAN (legacy; CABF forbids since 2012)",
+   "sha256": "ad6f1bbdb8cd2d418c6bd8f71eaeced399e0270a964872d428e3b7b02147bc2f",
+   "size": 680,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ec/intermediate.pem",
+    "chains/ec/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "fields/subject_empty_san_critical.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "empty subject SEQUENCE with critical SAN (RFC 5280 \u00a74.1.2.6)",
+   "sha256": "09275676175fbf851ee0e1d48eb937750651747e42e918a8d2c9f105bb00ddd6",
+   "size": 696,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ec/intermediate.pem",
+    "chains/ec/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "fields/subject_empty_san_not_critical.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "empty subject but SAN not marked critical (violates RFC 5280 MUST)",
+   "sha256": "d1bd15321e393ce0d0420f687bcaa7b086b59ef1d241542af40fab38a31d8e52",
+   "size": 692,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ec/intermediate.pem",
+    "chains/ec/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "fields/subject_idn_punycode.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "IDN A-labels (punycode) in SAN",
+   "sha256": "738fbfec19ccc56970120b8827755b9e85da30914cab65ac3de4682f25da267e",
+   "size": 757,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ec/intermediate.pem",
+    "chains/ec/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "fields/subject_ip_in_cn.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "IPv4 address as CN and iPAddress SAN",
+   "sha256": "631e1ffd81081fc6d68e36ad1c2ac070ca845175b32114ba42a2b3e0ea8331ae",
+   "size": 688,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ec/intermediate.pem",
+    "chains/ec/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "fields/subject_wildcard.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "wildcard dNSName",
+   "sha256": "ed7f0af06fb862338765a8f79e4e23e20e37382408714d76391a0507619b54d9",
+   "size": 725,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ec/intermediate.pem",
+    "chains/ec/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "fields/validity_before_1950.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "notBefore 1949 must be GeneralizedTime; UTCTime cannot express it",
+   "sha256": "4d5341adf185559dc36acd7263e89b3b4e791ab493a687af79d5aee7f3fc2508",
+   "size": 721,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ec/intermediate.pem",
+    "chains/ec/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "fields/validity_expired.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "expired certificate (semantically invalid, structurally fine)",
+   "sha256": "8b38efc2269f28f955871e1d29b0558f54a4d31ca9c5ab8f86f91d1852611b01",
+   "size": 713,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ec/intermediate.pem",
+    "chains/ec/root.pem"
+   ],
+   "openssl_verify": "error 10 at 0 depth lookup: certificate has expired"
+  },
+  {
+   "file": "fields/validity_generalizedtime.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "notAfter in 2060 must be GeneralizedTime (RFC 5280 \u00a74.1.2.5)",
+   "sha256": "90539884e3e02bc0a603ed4b99472dd1cf17f6bcc9c11189220a2e7c00e15fba",
+   "size": 729,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ec/intermediate.pem",
+    "chains/ec/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "fields/validity_inverted.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "notBefore after notAfter (validly re-signed by the issuer)",
+   "sha256": "580483e0d8b46c579e3284c0a5cadebcbf57239009de0ff010a41f7fa574243a",
+   "size": 717,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ec/intermediate.pem",
+    "chains/ec/root.pem"
+   ],
+   "openssl_verify": "error 9 at 0 depth lookup: certificate is not yet valid or the system clock is incorrect"
+  },
+  {
+   "file": "fields/validity_no_well_defined_expiry.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "notAfter 99991231235959Z: RFC 5280 'no well-defined expiration date'",
+   "sha256": "a75e7866775c70831ce8ce32ef3e9b498a9b57c5a4db631c9e95cef6ee590789",
+   "size": 717,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ec/intermediate.pem",
+    "chains/ec/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "fields/validity_not_yet_valid.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "not yet valid (notBefore in 2050 - also exercises GeneralizedTime for notBefore)",
+   "sha256": "06681e0ef2ae934ff01f1674e050c330478ac230e4cb5e32742172564c32b08e",
+   "size": 729,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ec/intermediate.pem",
+    "chains/ec/root.pem"
+   ],
+   "openssl_verify": "error 9 at 0 depth lookup: certificate is not yet valid or the system clock is incorrect"
+  },
+  {
+   "file": "fields/validity_one_second.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "1-second validity window (2026-01-01 00:00:00 to 00:00:01, so expired)",
+   "sha256": "3c8bcda276f4edcea3343e75c5814fd8d250bbab58e4f858988c9296b2b173ea",
+   "size": 717,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ec/intermediate.pem",
+    "chains/ec/root.pem"
+   ],
+   "openssl_verify": "error 10 at 0 depth lookup: certificate has expired"
+  },
+  {
+   "file": "fields/validity_utctime.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "UTCTime for both dates, notAfter at the 2049 boundary",
+   "sha256": "9434a8cd8ff16587ce1e2b38d911afbbced86746cd1f03ea79263571400bc4a9",
+   "size": 713,
+   "openssl": "parsed",
+   "chain": [
+    "chains/ec/intermediate.pem",
+    "chains/ec/root.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "malformed/ber_indefinite_lengths_everywhere.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "every constructed element BER indefinite-length (a strict DER parser must reject; the signature is over the DER TBS so a lenient one must re-encode)",
+   "sha256": "2a35e42ecad518ffdb5de83e90e620d0f5f7d8dc0e00d90191d0047dedf04c09",
+   "size": 665,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/ber_long_form_lengths_everywhere.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "every length encoded in long form 82 xx xx even where one byte suffices (BER, not DER)",
+   "sha256": "bba6771531626db409151dea10efc877087e293568a8d7671d0c47f48ae4400a",
+   "size": 735,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/empty.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "zero-length input",
+   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "size": 0,
+   "openssl": "error: Could not find certificate from tests/vectors/x509/synthetic/malformed/empty.der",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/ext_2000_extensions.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "2000 distinct unknown non-critical extensions",
+   "sha256": "4fc171c34785b3e39ee4ca3c8220aa103388694db39fd662173bfe42fb723f30",
+   "size": 38485,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/ext_akid_empty_keyid.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "authorityKeyIdentifier with zero-length keyIdentifier",
+   "sha256": "3964a145895612dcf7f08336f46adde8527c99d520df11344cc6937f5fb2a4a8",
+   "size": 591,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/ext_akid_marked_critical.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "authorityKeyIdentifier marked critical (RFC 5280: MUST be non-critical)",
+   "sha256": "ab6d3c4095956188b9f32bbf74de3077f230b4a5cbcd8eb7e87726d0ab7d509b",
+   "size": 614,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/ext_basic_constraints_ca_boolean_0x01.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "BasicConstraints cA TRUE encoded as 0x01 (accepted by many, not DER)",
+   "sha256": "38aa96795046a7599e4791c474d38d75a427c141fe0fb889f1980f1cec009d97",
+   "size": 614,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/ext_basic_constraints_garbage.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "basicConstraints extnValue holds non-DER bytes",
+   "sha256": "bda39a03728c5767755ca8e016e61fca0f9efa10956248bb6bbeedba9a0f091a",
+   "size": 612,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/ext_basic_constraints_pathlen_negative.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "BasicConstraints pathLenConstraint = -1",
+   "sha256": "7bcf16ce1c0296acde15f7740b70ab395c57243283f5d57b8b6a8afe6073db37",
+   "size": 617,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/ext_basic_constraints_trailing_byte.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "trailing byte after the BasicConstraints SEQUENCE inside extnValue",
+   "sha256": "1af25df8ca98da00495a6cda98d5cf6f3cbd2de7de80df1514e223418e61c093",
+   "size": 612,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/ext_critical_boolean_0x01.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "critical BOOLEAN TRUE encoded as 0x01 instead of 0xFF (BER, not DER)",
+   "sha256": "373d2923f5b8d55d84dfaec3497d86d60dfee48f553ab3c8bc1c6b67994edf5c",
+   "size": 611,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/ext_critical_false_explicit.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "critical FALSE encoded explicitly (DER forbids encoding DEFAULT values)",
+   "sha256": "49ad4d99863dbb6f24d87d082e327f974ef8ce36c66e95d2e1057c1da855a13f",
+   "size": 614,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/ext_deeply_nested_500.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "unknown extension whose value is a SEQUENCE nested 500 deep (recursion probe)",
+   "sha256": "40d21649f71da4dc112513183915dbf075d1f63691d5a11c8873ae1b1df6aad2",
+   "size": 2466,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/ext_duplicate.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "the first extension appears twice (RFC 5280: a certificate MUST NOT include more than one instance of a particular extension)",
+   "sha256": "497777f6574951aaa122a3250353734efb7cd93015425f4bfa0f2d7a784762de",
+   "size": 622,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/ext_empty_sequence.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "Extensions SEQUENCE present but empty (SIZE (1..MAX) violated)",
+   "sha256": "d6b4e91ad9d8c65608c61ecc5641ce9d0862fb625dafd01f0edefe4684c10106",
+   "size": 430,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/ext_key_usage_no_bits_set.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "critical KeyUsage with zero bits set (RFC 5280: at least one bit MUST be set)",
+   "sha256": "f625c4173b98010f09aa6cded33cb9e6c58604e08cc17362f35933307db92665",
+   "size": 626,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/ext_key_usage_trailing_zero_octet.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "KeyUsage BIT STRING with a trailing all-zero octet (DER requires trailing zero bits be removed)",
+   "sha256": "8ad42905747b0978dd7f0c3b4cc743a8bfc296641a8751dc75c590320d7e2bed",
+   "size": 612,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/ext_oid_single_octet.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "extension OID with a single octet (2.5)",
+   "sha256": "79594810fe6d19121b37c4ca43356ec6a7860f24a4c4bcb42bdd51e62ad4ab54",
+   "size": 609,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/ext_san_dnsname_embedded_nul.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "dNSName with embedded NUL",
+   "sha256": "57c2ac6c4613482455d172cb5467ea030248fe243b6995e46cf09a13d06d5b43",
+   "size": 597,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/ext_san_dnsname_single_space.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "dNSName consisting of a single space (RFC 5280 says MUST NOT)",
+   "sha256": "40f6d420a85dfb9e472572fcb8b03a8ddf888587460f38bd161ae7489c7354dd",
+   "size": 568,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/ext_san_dnsname_utf8_not_ia5.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "dNSName containing raw UTF-8 (IA5String required; must be A-label)",
+   "sha256": "56f91a1f47305f279ed6fda4b0017087bd86cc2817d6d0f2e02608cf4322337c",
+   "size": 582,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/ext_san_empty_dnsname.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "dNSName of zero length",
+   "sha256": "a5ca2a254dcfbc269ba74402a25f6fca017ebcd3d0f4bb72019cfbb8341116d0",
+   "size": 567,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/ext_san_empty_sequence.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "subjectAltName with an empty GeneralNames SEQUENCE (SIZE (1..MAX))",
+   "sha256": "379881516b52ea21a3c87503d424522bec52c08c96756336997bbc5ed8dc9847",
+   "size": 565,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/ext_san_ipaddress_5_bytes.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "iPAddress of 5 octets (must be 4 or 16 in a SAN)",
+   "sha256": "bd7854a4739e06a02089eaffd2b40095533877e73251a80e6045a74a4d92c81e",
+   "size": 572,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/ext_san_ipaddress_8_bytes_cidr_in_ee.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "iPAddress with address+mask (8 octets) in a SAN - only legal in nameConstraints",
+   "sha256": "4ca70690715a1cd9db0f72cd6c406dd8d0c8b0d54e859f9d67f2370c49e1f497",
+   "size": 575,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/ext_san_unknown_generalname_tag.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "GeneralName with context tag [9], which does not exist",
+   "sha256": "36b672bb419c198b088d30e666cab1e18e792de08babbcdf040ae375f6fa7b8e",
+   "size": 570,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/ext_value_not_octet_string.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "extnValue tagged SEQUENCE instead of OCTET STRING",
+   "sha256": "0ac382639a4c43c2c840c565118057b819209c8c66d449853038aa1b148b827b",
+   "size": 611,
+   "openssl": "error: 802139F001000000:error:1608010C:STORE routines:ossl_store_handle_load_result:unsupported:crypto/store/store_result.c:160:provider=default",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/ext_wrapper_context_tag_4.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "extensions wrapped in [4] instead of [3]",
+   "sha256": "8de6a5dfe4327fc2b65c3132ede1075abbce12c2963f185cdf3acf96663931b3",
+   "size": 611,
+   "openssl": "error: 802139F001000000:error:1608010C:STORE routines:ossl_store_handle_load_result:unsupported:crypto/store/store_result.c:160:provider=default",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/ext_wrapper_implicit_tagging.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "extensions [3] used as IMPLICIT wrapper (the inner SEQUENCE is missing)",
+   "sha256": "e1f2c27ae731e543683d1279367bce991341cc3f6ad28f4a18ffb6e174a01fb4",
+   "size": 608,
+   "openssl": "error: 802139F001000000:error:1608010C:STORE routines:ossl_store_handle_load_result:unsupported:crypto/store/store_result.c:160:provider=default",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/generalizedtime_for_2030.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "notAfter 2030 encoded as GeneralizedTime (RFC 5280: dates before 2050 MUST use UTCTime)",
+   "sha256": "561c5cd292a8698c1a918370fe3d0bc9b9d89f1c2526e5470eb4eaaae4a17347",
+   "size": 613,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/generalizedtime_fractional_seconds.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "GeneralizedTime with fractional seconds (RFC 5280 forbids)",
+   "sha256": "89986289a62990d6d74da3cdae7d03c484aaf70057cd3a9336c0622b3c10dce6",
+   "size": 615,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/generalizedtime_local_time.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "GeneralizedTime without Z (local time)",
+   "sha256": "f7a064a9feeb22f7b5c07e48311ced2493990606ccd652936b884c65780aa9f8",
+   "size": 612,
+   "openssl": "error: 802139F001000000:error:1608010C:STORE routines:ossl_store_handle_load_result:unsupported:crypto/store/store_result.c:160:provider=default",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/generalizedtime_no_seconds.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "GeneralizedTime without seconds",
+   "sha256": "981bb60d45957a6aba873fac068e496cd1d5535c23d45b0743746ee9a2009f44",
+   "size": 611,
+   "openssl": "error: 802139F001000000:error:1608010C:STORE routines:ossl_store_handle_load_result:unsupported:crypto/store/store_result.c:160:provider=default",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/issuer_empty.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "issuer Name is an empty SEQUENCE (RFC 5280: issuer MUST be non-empty)",
+   "sha256": "4d7dbb61d164c06131e7078417c71a8dc2f89803af8d5a160d4d45f8a6c00140",
+   "size": 540,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/just_sequence_header.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "SEQUENCE with zero length",
+   "sha256": "e4f60d0aa6d7f3d3b6a6494b1c861b99f649c6f9ec51abaf201b20f297327c95",
+   "size": 2,
+   "openssl": "error: 802139F001000000:error:1608010C:STORE routines:ossl_store_handle_load_result:unsupported:crypto/store/store_result.c:160:provider=default",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/only_tag.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "a lone SEQUENCE tag with no length",
+   "sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+   "size": 1,
+   "openssl": "error: Could not find certificate from tests/vectors/x509/synthetic/malformed/only_tag.der",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/outer_length_0x80_0xff.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "length field 0xFFFFFFFF (integer overflow probe)",
+   "sha256": "d1c4f04ccf092cb3577fd43f242a671575d1b66fe61c4dd2c079ee26ad59d3ac",
+   "size": 613,
+   "openssl": "error: 802139F001000000:error:1608010C:STORE routines:ossl_store_handle_load_result:unsupported:crypto/store/store_result.c:160:provider=default",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/outer_length_5_octets.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "5-octet length field",
+   "sha256": "128d2f138bdaa2c49b05d35109afd97a3f9ded6108f803aff5b18cac2a59ebc3",
+   "size": 614,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/outer_length_indefinite.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "outer SEQUENCE with BER indefinite length (0x80 ... 00 00) - not DER",
+   "sha256": "47f36f12632d26cf8ce37aad965c3b85bcaeb8683970522118594ac1de722c55",
+   "size": 611,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/outer_length_long_form_non_minimal.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "length encoded in 3 octets where 2 suffice (non-minimal, not DER)",
+   "sha256": "90e7f713fe8cdc2c995ea722db024ea2f3260988aa446d6442c8c05aa3711148",
+   "size": 612,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/outer_length_too_long.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "outer SEQUENCE length claims 10 more bytes than present",
+   "sha256": "c401324536c7e92f411a8d86fb3f4bd5036093dbfcf8059644fd7a3c605ce059",
+   "size": 611,
+   "openssl": "error: Could not find certificate from tests/vectors/x509/synthetic/malformed/outer_length_too_long.der",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/outer_length_too_short.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "outer SEQUENCE length 10 bytes short (leaves trailing data)",
+   "sha256": "ada0af6f3b43b1a19870cabb9b5589bbef2f5d0d953c8d589519fda85604c0d5",
+   "size": 611,
+   "openssl": "error: 802139F001000000:error:1608010C:STORE routines:ossl_store_handle_load_result:unsupported:crypto/store/store_result.c:160:provider=default",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/outer_tag_high_tag_number.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "high-tag-number form 0x3F 0x10 for SEQUENCE",
+   "sha256": "d85a50d3f91e7791bd2147b4662243fbfe414e369edb78d2c5b0dcfcea0d0435",
+   "size": 612,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/outer_tag_primitive_sequence.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "SEQUENCE tag without the constructed bit (0x10)",
+   "sha256": "f1d1f26f36744c5c0e4408e792c8b56ddef6eed59bb19e386e0cceff417a6f9c",
+   "size": 611,
+   "openssl": "error: 802139F001000000:error:1608010C:STORE routines:ossl_store_handle_load_result:unsupported:crypto/store/store_result.c:160:provider=default",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/outer_tag_set.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "outer tag is SET (0x31) instead of SEQUENCE",
+   "sha256": "a81c06700323009b13d96734860f51c9ff2f874cceb2ad4153d4b0244bebf701",
+   "size": 611,
+   "openssl": "error: 802139F001000000:error:1608010C:STORE routines:ossl_store_handle_load_result:unsupported:crypto/store/store_result.c:160:provider=default",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/pem_base64_bad_char.pem",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "PEM body with an illegal base64 character",
+   "sha256": "62e6782a162d21a61f22b3f994a453094dab40cda130dc8344774b6d00c0dd9a",
+   "size": 883,
+   "openssl": "error: 802139F001000000:error:1E08010C:DECODER routines:OSSL_DECODER_from_bio:unsupported:crypto/encode_decode/decoder_lib.c:104:No supported data to decode.  Input ty",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/pem_base64_truncated_line.pem",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "PEM body with extra base64 (decodes to trailing garbage)",
+   "sha256": "fd45ec08655d6016c2d616f16baad518920fb0e59768e95618652dcecbb176d5",
+   "size": 891,
+   "openssl": "error: 802139F001000000:error:1E08010C:DECODER routines:OSSL_DECODER_from_bio:unsupported:crypto/encode_decode/decoder_lib.c:104:No supported data to decode.  Input ty",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/pem_crlf_line_endings.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "PEM with CRLF line endings",
+   "sha256": "64a6a5f61d678f039e7eb65fe83238cc96c651f435d2e024e8459d597053fd7e",
+   "size": 898,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/pem_leading_text_and_bag_attributes.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "explanatory text before the PEM block (OpenSSL pkcs12 output style)",
+   "sha256": "ebc36b9800cc5e10f00ee89a5c260dfebba99c3ac6cb8b26cd164fe562c3425f",
+   "size": 934,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/pem_missing_end_line.pem",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "PEM without the END line",
+   "sha256": "f8b4cd5954fb89001868083b52fb5d2acfa37dddb8a8f629a9bb5c3e7e7daf33",
+   "size": 857,
+   "openssl": "error: Could not find certificate from tests/vectors/x509/synthetic/malformed/pem_missing_end_line.pem",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/pem_no_line_breaks.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "PEM body on a single line",
+   "sha256": "c8abf35bc77eafa69bae2236aab794c2f1237c834d60adaac4814abc3c44b749",
+   "size": 871,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/pem_trusted_certificate_label.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "OpenSSL 'TRUSTED CERTIFICATE' PEM label wrapping a plain certificate (RFC 7468 does not define it)",
+   "sha256": "78a3b7350c5c52f6dbe58b48fc57f3bd64aa3546ee8a77abc965bc2e6b67ede7",
+   "size": 899,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/pem_wrong_label.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "PEM with a non-standard label",
+   "sha256": "a0b3fad662865c386d5430406f0955058e21973596edc202992e252641fe5600",
+   "size": 881,
+   "openssl": "error: 802139F001000000:error:1E08010C:DECODER routines:OSSL_DECODER_from_bio:unsupported:crypto/encode_decode/decoder_lib.c:104:No supported data to decode.  Input ty",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/pem_x509_certificate_label.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "legacy 'X509 CERTIFICATE' label (RFC 7468 \u00a75.1 says parsers SHOULD accept)",
+   "sha256": "117f687c83e51f0de5783843a022e749079e6d3ce714295280c83b0082b402f9",
+   "size": 893,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/random_bytes_256.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "256 non-DER bytes",
+   "sha256": "40aff2e9d2d8922e47afd4648e6967497158785fbd1da870e7110266bf944880",
+   "size": 256,
+   "openssl": "error: 802139F001000000:error:1E08010C:DECODER routines:OSSL_DECODER_from_bio:unsupported:crypto/encode_decode/decoder_lib.c:104:No supported data to decode.  Input ty",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/resigned_2000_extensions.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "2000 extensions, validly signed | openssl verify: ok",
+   "sha256": "0f05cdb2602661fcf8df53de6122c84e0af3dea1f595fb79f714893f5e6acfdc",
+   "size": 38486,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/resigned_ca_boolean_0x01.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "BasicConstraints cA encoded 0x01, validly signed (over the non-DER TBS) | openssl verify: ok",
+   "sha256": "5052a230fdeb13f575aae217ca4e567932466d8f8f56a76beed8f0b7377ea1fc",
+   "size": 614,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/resigned_cn_embedded_nul.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "CN with embedded NUL, validly signed | openssl verify: ok",
+   "sha256": "cbfba01ae425d3d0b8a069aff34ae81e3a4d3ad23540955958258e29cdd0c22e",
+   "size": 623,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/resigned_deeply_nested_500.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "500-deep nested extension value, validly signed | openssl verify: ok",
+   "sha256": "d134491e6aa6338f06beda7a0933a38cda2ef95444cb0992a53a31610e1fa882",
+   "size": 2467,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/resigned_duplicate_extension.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "duplicate extension, validly signed | openssl verify: error 20 at 0 depth lookup: unable to get local issuer certificate",
+   "sha256": "8bedfaa7bf28fb5368bb4bc7b5b4693d90f8db102f0f3a1af2ed2d8fb89a7c7d",
+   "size": 623,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/resigned_generalizedtime_for_2030.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "GeneralizedTime used for 2030 notAfter, validly signed | openssl verify: ok",
+   "sha256": "c48f9eee7493d718fa424f3c20100143abe4e7bce7426f1575ecd6daf2273db2",
+   "size": 613,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/resigned_key_usage_trailing_zero_octet.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "KeyUsage with trailing zero octet, validly signed | openssl verify: ok",
+   "sha256": "6a480df1d5900d0718104f059b5bee4adde0f4a3ec673813b6c5ba9545fce3a6",
+   "size": 611,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/resigned_san_dnsname_embedded_nul.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "dNSName with embedded NUL, validly signed | openssl verify: ok",
+   "sha256": "5e9802ebf1d392462372a32ca5fe0d71ddb91300aebcf9ede37448341c4eadca",
+   "size": 596,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/resigned_serial_negative_nonminimal.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "non-minimal negative serial, validly signed | openssl verify: fail: 802139F001000000:error:1608010C:STORE routines:ossl_store_handle_load_result:unsupported:crypto/store/store_result.c:160:provider=default",
+   "sha256": "6c14e7ecf2ecfce859070cd4bd427bec13516bd72054d9900fa4f3179af7973b",
+   "size": 604,
+   "openssl": "error: 802139F001000000:error:1608010C:STORE routines:ossl_store_handle_load_result:unsupported:crypto/store/store_result.c:160:provider=default",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/resigned_sigalg_inner_outer_mismatch.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "tbs.signature != signatureAlgorithm, validly signed with the outer algorithm | openssl verify: error 7 at 0 depth lookup: certificate signature failure",
+   "sha256": "1338d5b81f1b258f59df3febcb23c3d242117154de8ac8832e1606a3004da299",
+   "size": 610,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/resigned_unique_ids.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "issuerUniqueID and subjectUniqueID present, validly signed | openssl verify: ok",
+   "sha256": "6003d6fab731c6761854a4f3738b54ac9dd8e5c6fac4e80039deeee7f984f324",
+   "size": 633,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/resigned_utctime_for_2050.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "UTCTime used for 2050 notAfter, validly signed | openssl verify: error 10 at 0 depth lookup: certificate has expired",
+   "sha256": "e554094e44bc3c4bae482435a83f2fb45d756543b13a06c21a6c0390234f0469",
+   "size": 611,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/resigned_version_v2_with_extensions.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "version = v2 with extensions, validly signed | openssl verify: ok",
+   "sha256": "3019b5890ab51ee159bd8d90ac5d4c90119c0cf8481de5bb9604c96c6ca5feb7",
+   "size": 612,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/serial_1000_bytes.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "1000-octet serialNumber",
+   "sha256": "76edc5746ace5aea41bc9a6f770b2895a95bc99e8e51710bab01f7da62d02ff1",
+   "size": 1605,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/serial_empty.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "serialNumber INTEGER with zero-length content",
+   "sha256": "6305e370ad5101f1c7328d0f96f09e90db3024d5cdca95bd04391cecf473346c",
+   "size": 603,
+   "openssl": "error: 802139F001000000:error:1608010C:STORE routines:ossl_store_handle_load_result:unsupported:crypto/store/store_result.c:160:provider=default",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/serial_non_minimal_leading_ff.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "negative serial -128 encoded as FF 80 (non-minimal, not DER)",
+   "sha256": "55917131d2bfe79ede509cd3c016d273ee2f9d6d9fe4151537c11de4e08e844c",
+   "size": 605,
+   "openssl": "error: 802139F001000000:error:1608010C:STORE routines:ossl_store_handle_load_result:unsupported:crypto/store/store_result.c:160:provider=default",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/serial_non_minimal_leading_zero.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "serialNumber 0x7F encoded as 00 7F (non-minimal, not DER)",
+   "sha256": "62445ac6f714e5cca5e0022fbec3140843cebaa780a145d7636efdbd26282d3f",
+   "size": 605,
+   "openssl": "error: 802139F001000000:error:1608010C:STORE routines:ossl_store_handle_load_result:unsupported:crypto/store/store_result.c:160:provider=default",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/serial_tag_octet_string.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "serialNumber encoded as OCTET STRING instead of INTEGER",
+   "sha256": "0a00f87b6d80b3bd9840e24e19bb4a99929546d3b7c31bc08a856bebc51b18d1",
+   "size": 611,
+   "openssl": "error: 802139F001000000:error:1608010C:STORE routines:ossl_store_handle_load_result:unsupported:crypto/store/store_result.c:160:provider=default",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/sig_bitstring_unused_bits_4.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "signatureValue BIT STRING claims 4 unused bits",
+   "sha256": "c7a661845382b3a0f443d5051b38db2ebd98e93a4ad4210e472c5c59f15e9d8a",
+   "size": 611,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/sig_ecdsa_r_negative.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "ECDSA r INTEGER negative (missing 00 pad / high bit set)",
+   "sha256": "733918b15377d2136d246c8a61ac3788c936779549dbe042597d15d70cecccaf",
+   "size": 610,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/sig_ecdsa_r_non_minimal.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "ECDSA r INTEGER with superfluous leading zeros (BER, not DER)",
+   "sha256": "ddfc3396253821a236df715d299d647114b751eae2c4d88c331eeb4018ffde20",
+   "size": 612,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/sig_ecdsa_r_zero.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "ECDSA-Sig-Value with r = 0",
+   "sha256": "683b326096d54db69d5b4540472c19f11ab8b94e69462321c97033d01753c3a9",
+   "size": 563,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/sig_ecdsa_raw_r_s_concatenated.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "ECDSA signature as raw r||s (64 bytes) instead of DER SEQUENCE (as used in JWS/COSE, wrong for X.509)",
+   "sha256": "6608a716a64d1d5901688e46f228985c8ea12ed42d4b9aa9c5dfe86f3460b6ea",
+   "size": 604,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/sig_ecdsa_three_integers.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "ECDSA-Sig-Value SEQUENCE with three INTEGERs",
+   "sha256": "0b6e928eaf823e15f53af8969c7943f6a2a1618029eae31f71e7a300041327f5",
+   "size": 614,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/sig_ecdsa_trailing_byte.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "trailing byte after ECDSA-Sig-Value inside the BIT STRING",
+   "sha256": "540b5e435d9c7c648659de89bd3d2233389ab2e056ebe56a5ed364226ce6c34e",
+   "size": 612,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/sig_ed25519_63_bytes.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "Ed25519 signature of 63 bytes",
+   "sha256": "4f1c03a4c43915dc4a33efbbac8f53d9d79ffcae2c08d87fca0b1ed6c65b5f3a",
+   "size": 399,
+   "openssl": "parsed",
+   "derived_from": "algorithms/root_ed25519.pem"
+  },
+  {
+   "file": "malformed/sig_empty.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "zero-length signature (BIT STRING with only the unused-bits octet)",
+   "sha256": "03180fffc282141c9c20633f69f3942bc58b39a9c259862f0789ad638cdc89ee",
+   "size": 508,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/sig_last_bit_flipped.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "one bit of the ECDSA signature flipped: well-formed, fails verification",
+   "sha256": "c6c273d6301a706e5c3c22e129bc6223685461ec72b83dc43c84d3cda5bed1aa",
+   "size": 611,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/sig_missing.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "Certificate SEQUENCE with only tbsCertificate and signatureAlgorithm (RFC 9925 'unsigned certificates' use a different construction)",
+   "sha256": "0048137eb586ad8d99f93511da1f2ce8e5401ee75bf6af827a7066284aa92cef",
+   "size": 505,
+   "openssl": "error: 802139F001000000:error:1608010C:STORE routines:ossl_store_handle_load_result:unsupported:crypto/store/store_result.c:160:provider=default",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/sig_rsa_all_ff_ge_modulus.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "RSA signature integer >= modulus (all 0xFF)",
+   "sha256": "6687255d60bb4094f69eeb0602278a0bb275989e99adcdd28f823e3811416965",
+   "size": 874,
+   "openssl": "parsed",
+   "derived_from": "algorithms/root_rsa2048_sha256.pem"
+  },
+  {
+   "file": "malformed/sig_rsa_all_zero.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "RSA signature of all zero bytes",
+   "sha256": "d3c09e49f7a567100e818770fc0b8c1708deaf7d87c7808b41c8720ba25fb539",
+   "size": 874,
+   "openssl": "parsed",
+   "derived_from": "algorithms/root_rsa2048_sha256.pem"
+  },
+  {
+   "file": "malformed/sig_rsa_one_byte_short.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "RSA signature 255 bytes instead of 256",
+   "sha256": "af910575efd9f27171b8e4cecf097da2793de53d78ad0129a0bbe0c10fc9578f",
+   "size": 873,
+   "openssl": "parsed",
+   "derived_from": "algorithms/root_rsa2048_sha256.pem"
+  },
+  {
+   "file": "malformed/sigalg_ecdsa_with_null_params.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "outer ecdsa-with-SHA256 AlgorithmIdentifier with explicit NULL parameters (RFC 5758: MUST be absent)",
+   "sha256": "68081221cd5b1b16f11330a48ee047ea6479416ecff52eb1dec0f38b307ddd2f",
+   "size": 613,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/sigalg_ed25519_null_params.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "Ed25519 signature AlgorithmIdentifier with NULL parameters in both places",
+   "sha256": "11c5604a266b4e36913ce86accdd900cd60c2530a1a3997f6f9dfd43439143d8",
+   "size": 404,
+   "openssl": "parsed",
+   "derived_from": "algorithms/root_ed25519.pem"
+  },
+  {
+   "file": "malformed/sigalg_empty_sequence.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "outer signatureAlgorithm is an empty SEQUENCE",
+   "sha256": "994169d4510cc5b156da1c7a4e420383007f87fde5a8f07da7a179893f24d6e0",
+   "size": 601,
+   "openssl": "error: 802139F001000000:error:1608010C:STORE routines:ossl_store_handle_load_result:unsupported:crypto/store/store_result.c:160:provider=default",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/sigalg_extra_integer.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "AlgorithmIdentifier with a trailing INTEGER after parameters",
+   "sha256": "f5471ebf870d96e8c0476135418c7ae4e31112deb144738281de2fbf04310f36",
+   "size": 614,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/sigalg_inner_outer_mismatch.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "tbs.signature (ecdsa-with-SHA384) differs from outer signatureAlgorithm (ecdsa-with-SHA256) - RFC 5280 \u00a74.1.1.2 MUST match",
+   "sha256": "978e02bea858486367c87e6bde2223044c554e8de88fbccaec552cfa09c0e257",
+   "size": 611,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/sigalg_oid_arc_overflow.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "OID with an 91-bit sub-identifier (overflows 64-bit arcs)",
+   "sha256": "45723ffe383de7c090bdf14b933db7a021b437528c6663738e636a7bfc75ca83",
+   "size": 617,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/sigalg_oid_empty.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "OBJECT IDENTIFIER with zero-length content",
+   "sha256": "6322023ee0a144faca5e583b7a5fd5b4c473fb6c44e2a9ccf3dc803b32696683",
+   "size": 603,
+   "openssl": "error: 802139F001000000:error:1608010C:STORE routines:ossl_store_handle_load_result:unsupported:crypto/store/store_result.c:160:provider=default",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/sigalg_oid_leading_0x80.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "OID sub-identifier with a leading 0x80 octet (non-minimal base-128, not DER)",
+   "sha256": "6a225b37d5feb67f3820b0b7ded0f888d73d46e48a5d8ed232844bf113dc6680",
+   "size": 612,
+   "openssl": "error: 802139F001000000:error:1608010C:STORE routines:ossl_store_handle_load_result:unsupported:crypto/store/store_result.c:160:provider=default",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/sigalg_oid_unterminated.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "OID whose final sub-identifier octet has the continuation bit set",
+   "sha256": "35046f87e3332d939d2710ce4db18de5c08de0b185dd1acb4316c2b5ea640503",
+   "size": 611,
+   "openssl": "error: 802139F001000000:error:1608010C:STORE routines:ossl_store_handle_load_result:unsupported:crypto/store/store_result.c:160:provider=default",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/sigalg_unknown_oid.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "signature algorithm OID from a private arc (1.3.6.1.4.1.99999.1.1)",
+   "sha256": "e7849badbb266ae501312183b2cca71d41c093b7f8ed45b46e244012a8b71a0c",
+   "size": 615,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/spki_bitstring_constructed.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "subjectPublicKey as a constructed BIT STRING (BER segmented, not DER)",
+   "sha256": "2640a36aa89dcdeba7d18d4af5a1ee128c1b0694e9fa01aa75657b97d132834f",
+   "size": 613,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/spki_bitstring_empty.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "subjectPublicKey BIT STRING with no content at all (not even the unused-bits octet)",
+   "sha256": "5c971f2d3b57d9ca46afa26497c775d833f20ae84eceeb9151216ab2579b15b7",
+   "size": 545,
+   "openssl": "error: 802139F001000000:error:1608010C:STORE routines:ossl_store_handle_load_result:unsupported:crypto/store/store_result.c:160:provider=default",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/spki_bitstring_unused_bits_8.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "BIT STRING initial octet 8 (must be 0..7)",
+   "sha256": "af9d45708a8364ec1703d76c00a8c2cc3d9fac35759733261f227049c1406a50",
+   "size": 611,
+   "openssl": "error: 802139F001000000:error:1608010C:STORE routines:ossl_store_handle_load_result:unsupported:crypto/store/store_result.c:160:provider=default",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/spki_bitstring_unused_bits_nonzero.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "subjectPublicKey BIT STRING claims 3 unused bits (must be 0 for a key octet string)",
+   "sha256": "cdd105825ca80a22d62071cd025f3ca6162fa374361689d44674010e7caa4819",
+   "size": 611,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/spki_ec_params_absent.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "id-ecPublicKey without parameters (RFC 5480: MUST be present)",
+   "sha256": "afcff7741ebe5d849f2204fb826ba1a46de0b6704287ad9e75bbb02b31366a69",
+   "size": 601,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/spki_ec_params_null.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "id-ecPublicKey with NULL parameters instead of namedCurve",
+   "sha256": "ab8d03aacf0a4a27f453bae612bf11472773c7e7de14c539ebfa1591d4946ef5",
+   "size": 603,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/spki_ec_point_at_infinity.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "EC public key encoded as the point at infinity (single 0x00)",
+   "sha256": "057869d5ae8f60f62d24f35baf14a9d5d1a1f853b22e49f5e2427eaf4a70531d",
+   "size": 547,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/spki_ec_point_hybrid_form.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "EC point in hybrid form (0x06/0x07 prefix) - X9.62 legal, PKIX implementations MUST NOT accept? (RFC 5480 says hybrid SHOULD NOT be used)",
+   "sha256": "911f5dd7b8ec494be62c8874c6e251a038ee5c113721c5607ee3c0c3b427bdee",
+   "size": 611,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/spki_ec_point_not_on_curve.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "last byte of the P-256 point flipped: point is not on the curve",
+   "sha256": "a1a17fdcb9823a2410faf388d24b850b3b05fb4ebb0d595f83843411d732a429",
+   "size": 611,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/spki_ec_point_truncated.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "uncompressed P-256 point one byte short",
+   "sha256": "a4cb8a09463ff0c8212e86adea11103b7da0629a5f95f20318a2d6291da9bfc6",
+   "size": 610,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/spki_ec_unknown_curve_oid.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "namedCurve OID from a private arc",
+   "sha256": "20dabe4b2b263a05c5ec5e739c86092608826cb8ab3f138303190c4950cb56a5",
+   "size": 612,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/spki_ed25519_key_31_bytes.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "Ed25519 public key of 31 bytes",
+   "sha256": "cee88b8dae4aee70d49e86cbfabb92ca179a89153fb7605a676c205622554d70",
+   "size": 399,
+   "openssl": "parsed",
+   "derived_from": "algorithms/root_ed25519.pem"
+  },
+  {
+   "file": "malformed/spki_ed25519_params_null.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "id-Ed25519 AlgorithmIdentifier with NULL parameters (RFC 8410: MUST be absent)",
+   "sha256": "c2a272b6d22d53a2aa866fbbbc3dc46ed7df9c739fa7876ecf80c8471d23447f",
+   "size": 402,
+   "openssl": "parsed",
+   "derived_from": "algorithms/root_ed25519.pem"
+  },
+  {
+   "file": "malformed/spki_key_as_octet_string.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "subjectPublicKey encoded as OCTET STRING instead of BIT STRING",
+   "sha256": "5d783284aa7e77e9a8ac4a51d62e58f47b841ce66b387b82fa7ac111275b7ba7",
+   "size": 610,
+   "openssl": "error: 802139F001000000:error:1608010C:STORE routines:ossl_store_handle_load_result:unsupported:crypto/store/store_result.c:160:provider=default",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/spki_rsa_exponent_0.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "RSA public exponent e = 0",
+   "sha256": "f26c125e93cf5dc3f0f98f74ab42257841c2340d455cf5e69f81bfc7894889d2",
+   "size": 872,
+   "openssl": "parsed",
+   "derived_from": "algorithms/root_rsa2048_sha256.pem"
+  },
+  {
+   "file": "malformed/spki_rsa_exponent_1.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "RSA public exponent e = 1",
+   "sha256": "74c91a8d36a28332c08c8a8ba75438384fc2e604d725a9166a23803486fac612",
+   "size": 872,
+   "openssl": "parsed",
+   "derived_from": "algorithms/root_rsa2048_sha256.pem"
+  },
+  {
+   "file": "malformed/spki_rsa_exponent_2401_bits.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "RSA public exponent larger than the modulus",
+   "sha256": "d89a4f3d2f5894e6bcef4257eb7b1a6cf5b274566ad5491c6e1976022c9adbb5",
+   "size": 1174,
+   "openssl": "parsed",
+   "derived_from": "algorithms/root_rsa2048_sha256.pem"
+  },
+  {
+   "file": "malformed/spki_rsa_exponent_even.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "RSA public exponent e = 65536 (even)",
+   "sha256": "73bcccec1150cce964ce817cef3d6f2ab1e81ff42fb3784476de979857a94602",
+   "size": 874,
+   "openssl": "parsed",
+   "derived_from": "algorithms/root_rsa2048_sha256.pem"
+  },
+  {
+   "file": "malformed/spki_rsa_key_bare_integer.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "subjectPublicKey for rsaEncryption holding a bare INTEGER instead of RSAPublicKey",
+   "sha256": "a97cef1845c2b845d4a7f328c75b3d088e09d6f912b64e2cb18f8cf1abbbf5d0",
+   "size": 603,
+   "openssl": "parsed",
+   "derived_from": "algorithms/root_rsa2048_sha256.pem"
+  },
+  {
+   "file": "malformed/spki_rsa_key_missing_exponent.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "RSAPublicKey with only the modulus",
+   "sha256": "b4b1a969f16e5654f3def8432c581ca6f5237a5b12f5823b2c40509ec304cc85",
+   "size": 869,
+   "openssl": "parsed",
+   "derived_from": "algorithms/root_rsa2048_sha256.pem"
+  },
+  {
+   "file": "malformed/spki_rsa_key_three_integers.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "RSAPublicKey SEQUENCE with a third INTEGER",
+   "sha256": "694b7e550401e1873c2d918e741356ce1c028ff345b22167a703db753a7498b4",
+   "size": 877,
+   "openssl": "parsed",
+   "derived_from": "algorithms/root_rsa2048_sha256.pem"
+  },
+  {
+   "file": "malformed/spki_rsa_modulus_even.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "RSA modulus made even (invalid key; signature cannot verify)",
+   "sha256": "ceb7af8b79ede6a22bd6190f41461390c3b181cd8f1c8225014f329ab787479e",
+   "size": 874,
+   "openssl": "parsed",
+   "derived_from": "algorithms/root_rsa2048_sha256.pem"
+  },
+  {
+   "file": "malformed/spki_rsa_modulus_negative.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "RSA modulus leading 0x00 stripped so the INTEGER is negative",
+   "sha256": "7b46518f0e347106f3b682b83274c264a953e9aaa6349479981bb256b3dc4fa1",
+   "size": 873,
+   "openssl": "parsed",
+   "derived_from": "algorithms/root_rsa2048_sha256.pem"
+  },
+  {
+   "file": "malformed/spki_rsa_modulus_non_minimal.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "RSA modulus INTEGER with two leading zero octets (non-minimal, not DER)",
+   "sha256": "a9864b85cccf4f3f5ebc2d22c9282c3c28e6acc1313ba9305aac111cfcd74dec",
+   "size": 875,
+   "openssl": "parsed",
+   "derived_from": "algorithms/root_rsa2048_sha256.pem"
+  },
+  {
+   "file": "malformed/spki_rsa_modulus_tiny.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "RSA modulus n = 3",
+   "sha256": "240f6e5da8f22b8318736273c97b58b2cc49cf4ba6d268d329025bbc39a04baf",
+   "size": 610,
+   "openssl": "parsed",
+   "derived_from": "algorithms/root_rsa2048_sha256.pem"
+  },
+  {
+   "file": "malformed/spki_rsa_params_absent.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "rsaEncryption AlgorithmIdentifier without the mandatory NULL parameters (RFC 3279 \u00a72.3.1)",
+   "sha256": "1480460396ad8f5c46875228c723f73d78e4562edcd3680100224d5cc0021a54",
+   "size": 872,
+   "openssl": "parsed",
+   "derived_from": "algorithms/root_rsa2048_sha256.pem"
+  },
+  {
+   "file": "malformed/spki_rsa_params_empty_sequence.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "rsaEncryption with an empty SEQUENCE as parameters",
+   "sha256": "8e6b111e28eed5175bcaafc616575817147e724c44e75ecdf5a3fdc3f70a25f5",
+   "size": 874,
+   "openssl": "parsed",
+   "derived_from": "algorithms/root_rsa2048_sha256.pem"
+  },
+  {
+   "file": "malformed/subject_atv_missing_value.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "AttributeTypeAndValue with only the type OID",
+   "sha256": "059fdbcba09261e9e66a94a0e9e99e757fa7f24688401555ba00b84f7b3f8e2f",
+   "size": 607,
+   "openssl": "error: 802139F001000000:error:1608010C:STORE routines:ossl_store_handle_load_result:unsupported:crypto/store/store_result.c:160:provider=default",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/subject_cn_bmpstring_odd_length.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "BMPString with an odd number of octets",
+   "sha256": "82f17d31dfcd255bd16002833950bad4ff0f6a430076987881f3fe6da4736af3",
+   "size": 597,
+   "openssl": "error: 802139F001000000:error:1608010C:STORE routines:ossl_store_handle_load_result:unsupported:crypto/store/store_result.c:160:provider=default",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/subject_cn_embedded_nul.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "CN contains an embedded NUL byte (classic hostname-truncation attack); signature no longer valid",
+   "sha256": "e0de72c21561566484c88473f6bf66d792fce4621a8da6286a8ad4124586c396",
+   "size": 622,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/subject_cn_ia5string_high_bit.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "IA5String CN with an octet >= 0x80",
+   "sha256": "d190184b3b6751decebad6f29cdab8269606118f611f37ab74932e20333bc994",
+   "size": 596,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/subject_cn_invalid_utf8.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "UTF8String CN containing invalid UTF-8 sequences",
+   "sha256": "bbc19a4d852d651bc56a1be95be31893a8ebff95246a8e8edab3583a826c8e8d",
+   "size": 602,
+   "openssl": "error: 802139F001000000:error:1608010C:STORE routines:ossl_store_handle_load_result:unsupported:crypto/store/store_result.c:160:provider=default",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/subject_cn_printablestring_illegal_chars.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "PrintableString containing @, _ and ! which are outside the PrintableString repertoire",
+   "sha256": "8a62f3d96646297be74e083da5708a402fb36fe19e7e6813cb7df2b8e85035a0",
+   "size": 612,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/subject_cn_universalstring.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "CN as UniversalString (UTF-32BE) - legal DirectoryString choice rarely supported",
+   "sha256": "fba2ac4008e530a301f26cc6ec289c29fe87a8a49be73384a2afbc0ab630718c",
+   "size": 608,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/subject_multivalued_rdn_unsorted_set.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "multi-valued RDN SET whose elements are not in DER canonical order (BER, not DER)",
+   "sha256": "49cd0983897e6d9395e5651dfe4f5f464210851b6e101c045edeb255a9872abc",
+   "size": 637,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/subject_rdn_empty_set.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "subject contains an RDN that is an empty SET (SIZE (1..MAX) violated)",
+   "sha256": "e0ce4b2ed89a15afaa550920d8edc4fe8dd19210ac9f8b0fc6fe53b489dac707",
+   "size": 613,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/subject_rdn_sequence_instead_of_set.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "RelativeDistinguishedName encoded as SEQUENCE rather than SET",
+   "sha256": "3904971f6e82174a05b2d71ec36415b8a810441d56ea9156e36d7430d188908d",
+   "size": 611,
+   "openssl": "error: 802139F001000000:error:1608010C:STORE routines:ossl_store_handle_load_result:unsupported:crypto/store/store_result.c:160:provider=default",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/tbs_serial_changed_signature_stale.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "serialNumber altered after signing: canonical DER, signature verification must fail",
+   "sha256": "ea4fe70db26a25450798a8071f0b84f9713a77f3d37e01d6ded37be4ecae0cba",
+   "size": 604,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/time_empty.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "empty UTCTime",
+   "sha256": "0bdcce3ec342e84a27bc31e7d224ead6e661ff9d4cad1cc51fdaf005b15a4d5a",
+   "size": 598,
+   "openssl": "error: 802139F001000000:error:1608010C:STORE routines:ossl_store_handle_load_result:unsupported:crypto/store/store_result.c:160:provider=default",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/time_non_digit.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "UTCTime with a non-digit character",
+   "sha256": "3d35b36b5528fcf6b17147d2f1f0bb89323b293a33398100956c007345c021c1",
+   "size": 611,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/time_wrong_tag_octet_string.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "notBefore encoded as OCTET STRING",
+   "sha256": "961ea95bced530c1ba32b8e4c8a04763810c3481c5361600ab7b0b3ebab4e2db",
+   "size": 611,
+   "openssl": "error: 802139F001000000:error:1608010C:STORE routines:ossl_store_handle_load_result:unsupported:crypto/store/store_result.c:160:provider=default",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/trailing_garbage.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "four trailing bytes after the outer SEQUENCE",
+   "sha256": "2548948542bc4da60d6b196ca63a852dd909c55b0c376781b2890fd219332555",
+   "size": 615,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/trailing_zero.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "single trailing NUL byte",
+   "sha256": "4cae440cfd8796f763f45e1ba790819af1be22109ec998718646de45a9a293f9",
+   "size": 612,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/truncated_after_tbs.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "TBSCertificate only, no signatureAlgorithm/signatureValue",
+   "sha256": "4ba6d6cb10e7e90433898ec146468a9cee38b72496863389a914ec9196a37357",
+   "size": 493,
+   "openssl": "error: Could not find certificate from tests/vectors/x509/synthetic/malformed/truncated_after_tbs.der",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/truncated_half.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "certificate cut in half",
+   "sha256": "781752cf8753aa4daf7f6f2bfb28d1baa71aab138c3b465bca38b517b2527df1",
+   "size": 305,
+   "openssl": "error: Could not find certificate from tests/vectors/x509/synthetic/malformed/truncated_half.der",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/truncated_last_byte.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "last byte of signature missing (outer length now exceeds data)",
+   "sha256": "26b3bc92bfe5a480e78b56145b936ca643299ec387de050285ecf6b8d2b92162",
+   "size": 610,
+   "openssl": "error: Could not find certificate from tests/vectors/x509/synthetic/malformed/truncated_last_byte.der",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/two_certificates_concatenated.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "two DER certificates back to back (a stream, not a single certificate)",
+   "sha256": "1c3361477161fff7d119fad38d6a632b1a10707ea3376d0aa6cb21ef999d41d1",
+   "size": 1222,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/uids_in_v1_certificate.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "v1 certificate (no version) that carries a subjectUniqueID (requires v2)",
+   "sha256": "5053e96bec0b4fda72cc582f5fe6777d84750f32d133bafe607b4f37155ea8a2",
+   "size": 432,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/uids_issuer_and_subject_unique_id.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "issuerUniqueID [1] and subjectUniqueID [2] present (v3 permits; RFC 5280 says CAs MUST NOT generate)",
+   "sha256": "80edcd2ce16580a82872cffec746bb305e641150c5712aeb32edf59376156a29",
+   "size": 633,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/utctime_feb_30.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "UTCTime 30 February",
+   "sha256": "fe23ff22b4c34efb72ff4ddceafd41fcff421bfbb1cf0f28377e2a5bcaa73392",
+   "size": 611,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/utctime_for_2050.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "notAfter 2050 encoded as UTCTime (must be GeneralizedTime; UTCTime 50 means 1950)",
+   "sha256": "affc680a659bca4b369ce9b401f5516eea33e70ea8c930685478b10d6b52e2ea",
+   "size": 611,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/utctime_hour_24.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "UTCTime hour 24",
+   "sha256": "ff919e412d5cc03b447a098fa5fe0947705d2aca813cc00c22c231306ad57845",
+   "size": 611,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/utctime_invalid_month.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "UTCTime month 13",
+   "sha256": "fdba970246ee02515bff0138ba4664ddaa9858b7be65fcf81b9accb0c75e1b17",
+   "size": 611,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/utctime_lowercase_z.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "UTCTime terminated with lowercase z",
+   "sha256": "afb0cde8430045a9ccf531c46d0de2f20a9457077a8a644dfb82acd2b4ff6e28",
+   "size": 611,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/utctime_no_seconds.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "UTCTime YYMMDDHHMMZ without seconds (X.680 allows, RFC 5280 requires seconds)",
+   "sha256": "e9fb8efa092a670c5dd0291b8bfaedc0a25c42b013b369c0e0f6001eb0de13a4",
+   "size": 609,
+   "openssl": "error: 802139F001000000:error:1608010C:STORE routines:ossl_store_handle_load_result:unsupported:crypto/store/store_result.c:160:provider=default",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/utctime_second_60.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "UTCTime leap second 60 (not permitted)",
+   "sha256": "0bc0318eda72cf6237771892f24b90d7d79db3bae8f27d6e376374bcd39d55e9",
+   "size": 611,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/utctime_with_offset.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "UTCTime with +0100 offset instead of Z (RFC 5280 MUST use Z)",
+   "sha256": "8ac4f8557b95ad37b72bd67ad672eafced9d2bf50d19998837319d325c77043f",
+   "size": 615,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/validity_three_times.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "Validity SEQUENCE with three time elements",
+   "sha256": "bf884619cde2202249fd2ba9cbfe9fb7060e4316719da734105f8d5926d8be8c",
+   "size": 626,
+   "openssl": "error: 802139F001000000:error:1608010C:STORE routines:ossl_store_handle_load_result:unsupported:crypto/store/store_result.c:160:provider=default",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/version_absent_with_extensions.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "version field absent (implies v1) but extensions [3] present",
+   "sha256": "bb1006d05c0a5434123ec28b055b0237c1f5b511344ff67b7fd27c3cc47a71c7",
+   "size": 606,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/version_negative.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "version = -1",
+   "sha256": "1432ce7f84c8290e96ed889d6acfce957c41b1695fc45c232f291b699f417a85",
+   "size": 611,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/version_non_minimal_integer.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "version INTEGER 2 encoded as 00 02 (non-minimal, not DER)",
+   "sha256": "4a065b9bf371986b7187b522953d592779f86004c5179a896e5f10bbf4f85018",
+   "size": 612,
+   "openssl": "error: 802139F001000000:error:1608010C:STORE routines:ossl_store_handle_load_result:unsupported:crypto/store/store_result.c:160:provider=default",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/version_v1_explicit_with_extensions.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "explicit version = 0 (v1) with extensions present; DER also forbids encoding the DEFAULT value",
+   "sha256": "280ee620831b67197c28e40d8e50125d7806efb0392b244a38cf5d0f7590b799",
+   "size": 611,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/version_v255.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "version INTEGER 255 (encoded 00 FF)",
+   "sha256": "1432ce7f84c8290e96ed889d6acfce957c41b1695fc45c232f291b699f417a85",
+   "size": 611,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/version_v2_with_extensions.der",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "version = 1 (v2) although extensions are present (RFC 5280: version MUST be 3)",
+   "sha256": "b89334ce25f42818cde42cfba160ee017cd255346f9eecc5d3d9a1cdc2ca4a2e",
+   "size": 611,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/version_v4.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "version = 3 (v4) - undefined",
+   "sha256": "273b46074a8161a30c4754a73c0e59c45b9499dfb7bf091f3ba4bb005570f097",
+   "size": 611,
+   "openssl": "parsed",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "malformed/version_wrong_context_tag.der",
+   "kind": "cert",
+   "expect": "reject",
+   "reason": "version wrapped in [1] instead of [0]",
+   "sha256": "77f152461bdaa5f96ecd302bcf24c1bdcdfa9f5c4d279897f2d084977910b1a1",
+   "size": 611,
+   "openssl": "error: 802139F001000000:error:1608010C:STORE routines:ossl_store_handle_load_result:unsupported:crypto/store/store_result.c:160:provider=default",
+   "derived_from": "chains/ec/leaf.pem"
+  },
+  {
+   "file": "path_violations/akid_mismatch/leaf.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "authorityKeyIdentifier keyIdentifier last byte flipped: does not match issuer SKID (signature is now also invalid since TBS changed)",
+   "sha256": "73e77d005d3dbc5670121f1cb6ee0e6666e4bab3ea14508e22655704b19cc6ee",
+   "size": 660,
+   "openssl": "parsed",
+   "chain": [
+    "path_violations/issuer_name_mismatch/intermediate.pem",
+    "algorithms/root_rsa2048_sha256.pem"
+   ],
+   "openssl_verify": "error 20 at 0 depth lookup: unable to get local issuer certificate"
+  },
+  {
+   "file": "path_violations/eku_ca_restricts/intermediate.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "CA EKU emailProtection only; leaf serverAuth (RFC 5280 does not chain EKU, CABF/Microsoft/Chrome do) [intermediate]",
+   "sha256": "c664a2f08d3321d89b37e9c4cbf7a85f8e0a2271ca24fc0b3224c4ff37bd2969",
+   "size": 973,
+   "openssl": "parsed",
+   "chain": [
+    "algorithms/root_rsa2048_sha256.pem"
+   ]
+  },
+  {
+   "file": "path_violations/eku_ca_restricts/leaf.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "CA EKU emailProtection only; leaf serverAuth (RFC 5280 does not chain EKU, CABF/Microsoft/Chrome do) [leaf; chain must fail]",
+   "sha256": "9c36fc963633579b268dbfbd8df61ed9eaa55c856f32ef9ce0f8b101987f30fd",
+   "size": 680,
+   "openssl": "parsed",
+   "chain": [
+    "path_violations/eku_ca_restricts/intermediate.pem",
+    "algorithms/root_rsa2048_sha256.pem"
+   ],
+   "openssl_verify": "error 26 at 1 depth lookup: unsuitable certificate purpose"
+  },
+  {
+   "file": "path_violations/inhibit_any_policy/intermediate.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "inhibitAnyPolicy:0 in CA, leaf asserts only anyPolicy; fails when an explicit policy is required [intermediate]",
+   "sha256": "afb2d8ee0ed00cd49d8e2cdcb92a48dfcc4ca9e61f70c6442cd355fb9b9c55ef",
+   "size": 1005,
+   "openssl": "parsed",
+   "chain": [
+    "algorithms/root_rsa2048_sha256.pem"
+   ]
+  },
+  {
+   "file": "path_violations/inhibit_any_policy/leaf.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "inhibitAnyPolicy:0 in CA, leaf asserts only anyPolicy; fails when an explicit policy is required [leaf; chain must fail]",
+   "sha256": "88cf6861e60ab65121c18c9cb42bd451fbd97702188c065b2e5bcbc2326c7fdc",
+   "size": 709,
+   "openssl": "parsed",
+   "chain": [
+    "path_violations/inhibit_any_policy/intermediate.pem",
+    "algorithms/root_rsa2048_sha256.pem"
+   ],
+   "openssl_verify": "error 43 at 0 depth lookup: no explicit policy"
+  },
+  {
+   "file": "path_violations/intermediate_expired/intermediate.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "intermediate expired in 2015 [intermediate]",
+   "sha256": "56ff303414d46d3cd19b97ea74237502aceff50835503c327049fb6d5a7351fb",
+   "size": 952,
+   "openssl": "parsed",
+   "chain": [
+    "algorithms/root_rsa2048_sha256.pem"
+   ]
+  },
+  {
+   "file": "path_violations/intermediate_expired/leaf.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "intermediate expired in 2015 [leaf; chain must fail]",
+   "sha256": "7f1aa514ec8fdb3843ad704da2f60a7032625149a75cbd0c997cefaab1ae5673",
+   "size": 680,
+   "openssl": "parsed",
+   "chain": [
+    "path_violations/intermediate_expired/intermediate.pem",
+    "algorithms/root_rsa2048_sha256.pem"
+   ],
+   "openssl_verify": "error 10 at 1 depth lookup: certificate has expired"
+  },
+  {
+   "file": "path_violations/intermediate_missing_basic_constraints/intermediate.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "intermediate lacks basicConstraints entirely (v3) [intermediate]",
+   "sha256": "bf3d243be5b4d3a132a0ec40570248b0717048727febfd3cf45d3d8faf654aba",
+   "size": 952,
+   "openssl": "parsed",
+   "chain": [
+    "algorithms/root_rsa2048_sha256.pem"
+   ]
+  },
+  {
+   "file": "path_violations/intermediate_missing_basic_constraints/leaf.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "intermediate lacks basicConstraints entirely (v3) [leaf; chain must fail]",
+   "sha256": "2316d8c44820013104b5ad828751beff23d76c29d91c2a8a1b7fdc2873d5987e",
+   "size": 709,
+   "openssl": "parsed",
+   "chain": [
+    "path_violations/intermediate_missing_basic_constraints/intermediate.pem",
+    "algorithms/root_rsa2048_sha256.pem"
+   ],
+   "openssl_verify": "error 79 at 1 depth lookup: invalid CA certificate"
+  },
+  {
+   "file": "path_violations/intermediate_no_keycertsign/intermediate.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "intermediate keyUsage lacks keyCertSign [intermediate]",
+   "sha256": "087dc2bd3aa9eb23cd4bd0618199a6c432e0ee4a050f9cf5d7700ca07ef04f32",
+   "size": 960,
+   "openssl": "parsed",
+   "chain": [
+    "algorithms/root_rsa2048_sha256.pem"
+   ]
+  },
+  {
+   "file": "path_violations/intermediate_no_keycertsign/leaf.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "intermediate keyUsage lacks keyCertSign [leaf; chain must fail]",
+   "sha256": "92f4f30cb6bef5d2d910e7b87e0903befd1b48291ce44982a97ddc7cedfbf258",
+   "size": 692,
+   "openssl": "parsed",
+   "chain": [
+    "path_violations/intermediate_no_keycertsign/intermediate.pem",
+    "algorithms/root_rsa2048_sha256.pem"
+   ],
+   "openssl_verify": "error 79 at 1 depth lookup: invalid CA certificate"
+  },
+  {
+   "file": "path_violations/intermediate_not_ca/intermediate.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "intermediate has basicConstraints cA=FALSE [intermediate]",
+   "sha256": "c6b967b052da4e8e1fe809e168cde89d21d0e843900a9763851318af75ce8501",
+   "size": 948,
+   "openssl": "parsed",
+   "chain": [
+    "algorithms/root_rsa2048_sha256.pem"
+   ]
+  },
+  {
+   "file": "path_violations/intermediate_not_ca/leaf.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "intermediate has basicConstraints cA=FALSE [leaf; chain must fail]",
+   "sha256": "bf275ea8bf991a2a98f729eeafa5f10f378a54e4e8bc465d8cbb6eb7150fa8b0",
+   "size": 680,
+   "openssl": "parsed",
+   "chain": [
+    "path_violations/intermediate_not_ca/intermediate.pem",
+    "algorithms/root_rsa2048_sha256.pem"
+   ],
+   "openssl_verify": "error 79 at 1 depth lookup: invalid CA certificate"
+  },
+  {
+   "file": "path_violations/intermediate_not_yet_valid/intermediate.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "intermediate not valid until 2050 [intermediate]",
+   "sha256": "d6751eb76cfe72dd2ed90f704146de45f2ea02a3a4fdb1004e5bf5b62d8e9a26",
+   "size": 964,
+   "openssl": "parsed",
+   "chain": [
+    "algorithms/root_rsa2048_sha256.pem"
+   ]
+  },
+  {
+   "file": "path_violations/intermediate_not_yet_valid/leaf.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "intermediate not valid until 2050 [leaf; chain must fail]",
+   "sha256": "7a4cc71b56ae7c1d41a3123dc502ffd92fccb2bb1ae8b454db91dafa202ecc18",
+   "size": 688,
+   "openssl": "parsed",
+   "chain": [
+    "path_violations/intermediate_not_yet_valid/intermediate.pem",
+    "algorithms/root_rsa2048_sha256.pem"
+   ],
+   "openssl_verify": "error 9 at 1 depth lookup: certificate is not yet valid or the system clock is incorrect"
+  },
+  {
+   "file": "path_violations/issuer_name_mismatch/intermediate.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "name chaining: real intermediate",
+   "sha256": "98324d351e6895d04913cb14e0cef7543f640aa81319742bc79c0ad26d78501c",
+   "size": 928,
+   "openssl": "parsed",
+   "chain": [
+    "algorithms/root_rsa2048_sha256.pem"
+   ]
+  },
+  {
+   "file": "path_violations/issuer_name_mismatch/leaf.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "leaf issuer name replaced by the root's name, so it chains by name to the root but the signature is the intermediate's (signature check fails against root, name check fails against intermediate)",
+   "sha256": "f383705f8d85b506fc5098c05c44960b9460241516915b970d77299e8c273161",
+   "size": 725,
+   "openssl": "parsed",
+   "chain": [
+    "path_violations/issuer_name_mismatch/intermediate.pem",
+    "algorithms/root_rsa2048_sha256.pem"
+   ],
+   "openssl_verify": "error 20 at 0 depth lookup: unable to get local issuer certificate"
+  },
+  {
+   "file": "path_violations/leaf_ca_true/intermediate.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "leaf is itself a CA certificate presented as end entity (fails -purpose sslserver) [intermediate]",
+   "sha256": "7e8f8e37d908caea128feb7831e464f1ad02ecb50a49911657866d965bb0096b",
+   "size": 940,
+   "openssl": "parsed",
+   "chain": [
+    "algorithms/root_rsa2048_sha256.pem"
+   ]
+  },
+  {
+   "file": "path_violations/leaf_ca_true/leaf.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "leaf is itself a CA certificate presented as end entity (fails -purpose sslserver) [leaf; chain must fail]",
+   "sha256": "d3b7fd43bd7ff1afc507ddd7b7d41cc65228516393445008f3c089e24a0d93f1",
+   "size": 611,
+   "openssl": "parsed",
+   "chain": [
+    "path_violations/leaf_ca_true/intermediate.pem",
+    "algorithms/root_rsa2048_sha256.pem"
+   ],
+   "openssl_verify": "error 26 at 0 depth lookup: unsuitable certificate purpose"
+  },
+  {
+   "file": "path_violations/leaf_expired/intermediate.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "leaf expired [intermediate]",
+   "sha256": "298ce81b96059b093158a5456b94869caf171c61146634f68a3bea88e929c0b2",
+   "size": 940,
+   "openssl": "parsed",
+   "chain": [
+    "algorithms/root_rsa2048_sha256.pem"
+   ]
+  },
+  {
+   "file": "path_violations/leaf_expired/leaf.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "leaf expired [leaf; chain must fail]",
+   "sha256": "5e0670e40ef382902e54002e52800459ae385af8d3d1c513e746a0572dc7c9a8",
+   "size": 668,
+   "openssl": "parsed",
+   "chain": [
+    "path_violations/leaf_expired/intermediate.pem",
+    "algorithms/root_rsa2048_sha256.pem"
+   ],
+   "openssl_verify": "error 10 at 0 depth lookup: certificate has expired"
+  },
+  {
+   "file": "path_violations/leaf_key_usage_no_digital_signature/intermediate.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "EC leaf with keyUsage keyEncipherment only (incompatible with ECDSA; TLS 1.3 needs digitalSignature) [intermediate]",
+   "sha256": "08a731cf2b505b260c10599e18f6ad7231b1c14dee9fa555e358ea35f66d7226",
+   "size": 973,
+   "openssl": "parsed",
+   "chain": [
+    "algorithms/root_rsa2048_sha256.pem"
+   ]
+  },
+  {
+   "file": "path_violations/leaf_key_usage_no_digital_signature/leaf.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "EC leaf with keyUsage keyEncipherment only (incompatible with ECDSA; TLS 1.3 needs digitalSignature) [leaf; chain must fail]",
+   "sha256": "ad3a3e0671c727567019f57cd7fed5f546beee48349f4cccdf1b3092e2c28bb4",
+   "size": 700,
+   "openssl": "parsed",
+   "chain": [
+    "path_violations/leaf_key_usage_no_digital_signature/intermediate.pem",
+    "algorithms/root_rsa2048_sha256.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "path_violations/leaf_outside_intermediate_validity/intermediate.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "leaf validity extends beyond intermediate's notAfter (fine per RFC 5280 at validation time, flagged by some profiles) [intermediate]",
+   "sha256": "becdbacce44948b7d0defdae3f8b01d1bd91ca0c529785ee99a8b274941d0802",
+   "size": 973,
+   "openssl": "parsed",
+   "chain": [
+    "algorithms/root_rsa2048_sha256.pem"
+   ]
+  },
+  {
+   "file": "path_violations/leaf_outside_intermediate_validity/leaf.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "leaf validity extends beyond intermediate's notAfter (fine per RFC 5280 at validation time, flagged by some profiles) [leaf]",
+   "sha256": "cb24395bef91d454c4186fefa8c70eef3ca49e66870b8ba87671a5c0cf9b8f70",
+   "size": 700,
+   "openssl": "parsed",
+   "chain": [
+    "path_violations/leaf_outside_intermediate_validity/intermediate.pem",
+    "algorithms/root_rsa2048_sha256.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "path_violations/name_constraints_cn_fallback/intermediate.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "no SAN; CN pv.example.com outside permitted DNS subtree (only matters if CN is treated as hostname) [intermediate]",
+   "sha256": "0826cac4c7248d7bea979399f946b90d347d49a21eae5b8e7e7ea0ea0c9fe76d",
+   "size": 1009,
+   "openssl": "parsed",
+   "chain": [
+    "algorithms/root_rsa2048_sha256.pem"
+   ]
+  },
+  {
+   "file": "path_violations/name_constraints_cn_fallback/leaf.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "no SAN; CN pv.example.com outside permitted DNS subtree (only matters if CN is treated as hostname) [leaf; chain must fail]",
+   "sha256": "c31c78ce9092241fdfe9b9cac951acb619da9a1aa0b9cfafe8c791a3f799806e",
+   "size": 603,
+   "openssl": "parsed",
+   "chain": [
+    "path_violations/name_constraints_cn_fallback/intermediate.pem",
+    "algorithms/root_rsa2048_sha256.pem"
+   ],
+   "openssl_verify": "error 47 at 0 depth lookup: permitted subtree violation"
+  },
+  {
+   "file": "path_violations/name_constraints_excluded/intermediate.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "leaf dNSName pv.example.com falls in an excluded subtree [intermediate]",
+   "sha256": "7438ba295a8bb85cfc44ee4525a02db7a294e060bbd566d5241ca31ebc8049b1",
+   "size": 1005,
+   "openssl": "parsed",
+   "chain": [
+    "algorithms/root_rsa2048_sha256.pem"
+   ]
+  },
+  {
+   "file": "path_violations/name_constraints_excluded/leaf.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "leaf dNSName pv.example.com falls in an excluded subtree [leaf; chain must fail]",
+   "sha256": "50caf7de7d8d37f97b2d3c90913c142219e63e0cbb30882b3f14da003dd9fe10",
+   "size": 688,
+   "openssl": "parsed",
+   "chain": [
+    "path_violations/name_constraints_excluded/intermediate.pem",
+    "algorithms/root_rsa2048_sha256.pem"
+   ],
+   "openssl_verify": "error 48 at 0 depth lookup: excluded subtree violation"
+  },
+  {
+   "file": "path_violations/name_constraints_not_permitted/intermediate.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "leaf dNSName not in permitted subtrees [intermediate]",
+   "sha256": "75cb16db1a48ebfe47356b84c2d0d511aa07179a84831748ad9d1f972ed86993",
+   "size": 1013,
+   "openssl": "parsed",
+   "chain": [
+    "algorithms/root_rsa2048_sha256.pem"
+   ]
+  },
+  {
+   "file": "path_violations/name_constraints_not_permitted/leaf.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "leaf dNSName not in permitted subtrees [leaf; chain must fail]",
+   "sha256": "f1b27f31711bd38749616321dee4aed17ed0b58b6317846efef470e8f3ca9696",
+   "size": 696,
+   "openssl": "parsed",
+   "chain": [
+    "path_violations/name_constraints_not_permitted/intermediate.pem",
+    "algorithms/root_rsa2048_sha256.pem"
+   ],
+   "openssl_verify": "error 47 at 0 depth lookup: permitted subtree violation"
+  },
+  {
+   "file": "path_violations/pathlen_exceeded/intermediate.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "intermediate with pathlen:0; this leaf directly below it is fine [intermediate]",
+   "sha256": "e93f6135a956f5260aaf72052e0164d7aacdbb1a6ba8b0b7a9083bb95f86144d",
+   "size": 952,
+   "openssl": "parsed",
+   "chain": [
+    "algorithms/root_rsa2048_sha256.pem"
+   ]
+  },
+  {
+   "file": "path_violations/pathlen_exceeded/intermediate_2.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "second intermediate issued under a pathlen:0 CA",
+   "sha256": "0b316529ff9d247bdb9adeb2ed1b3d52f269276299a0ec4a522745f43167d7a3",
+   "size": 635,
+   "openssl": "parsed",
+   "chain": [
+    "path_violations/pathlen_exceeded/intermediate.pem",
+    "algorithms/root_rsa2048_sha256.pem"
+   ]
+  },
+  {
+   "file": "path_violations/pathlen_exceeded/leaf.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "intermediate with pathlen:0; this leaf directly below it is fine [leaf]",
+   "sha256": "40dcc6a5178fd6ea6ffaa26c8a3df2824f83cfe07031e6c1d03be5a54002f1f5",
+   "size": 676,
+   "openssl": "parsed",
+   "chain": [
+    "path_violations/pathlen_exceeded/intermediate.pem",
+    "algorithms/root_rsa2048_sha256.pem"
+   ],
+   "openssl_verify": "ok"
+  },
+  {
+   "file": "path_violations/pathlen_exceeded/leaf_depth2.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "leaf under two intermediates where the first has pathlen:0 - must fail",
+   "sha256": "95a3c376669ba569a60a2107a3b4dd8fa79496ef66cd65ea3d5b6882c692b2b1",
+   "size": 672,
+   "openssl": "parsed",
+   "chain": [
+    "path_violations/pathlen_exceeded/intermediate_2.pem",
+    "path_violations/pathlen_exceeded/intermediate.pem",
+    "algorithms/root_rsa2048_sha256.pem"
+   ],
+   "openssl_verify": "error 25 at 2 depth lookup: path length constraint exceeded"
+  },
+  {
+   "file": "path_violations/policy_required_missing/intermediate.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "requireExplicitPolicy:0 but the leaf has no certificatePolicies [intermediate]",
+   "sha256": "a0076d2bcba4b72f13175f6c5d8c6ae8c55859852c17e35bdb865388634142b0",
+   "size": 1017,
+   "openssl": "parsed",
+   "chain": [
+    "algorithms/root_rsa2048_sha256.pem"
+   ]
+  },
+  {
+   "file": "path_violations/policy_required_missing/leaf.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "requireExplicitPolicy:0 but the leaf has no certificatePolicies [leaf; chain must fail]",
+   "sha256": "3427d590d25af69e9515f7be3848973829a538b74bc0877e5c655a143733d7b2",
+   "size": 684,
+   "openssl": "parsed",
+   "chain": [
+    "path_violations/policy_required_missing/intermediate.pem",
+    "algorithms/root_rsa2048_sha256.pem"
+   ],
+   "openssl_verify": "error 43 at 0 depth lookup: no explicit policy"
+  },
+  {
+   "file": "path_violations/self_signed_wrong_key/self_signed_bad_signature.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "issuer == subject and SPKI is the subject's key, but the signature was made with a different key (self-signature verification must fail)",
+   "sha256": "1fac89523d2618930810aef71503d408c37d2275a7c85963fa9ab48151eb5d0c",
+   "size": 574,
+   "openssl": "parsed",
+   "self_signed": true,
+   "openssl_verify": "error 7 at 0 depth lookup: certificate signature failure"
+  },
+  {
+   "file": "path_violations/self_signed_wrong_key/self_signed_good.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "genuine self-signed certificate",
+   "sha256": "f7421cdcf7111b569989da5b0383213b2fa71d459b9c3d7d0df8fcda27129bf4",
+   "size": 574,
+   "openssl": "parsed",
+   "self_signed": true
+  },
+  {
+   "file": "path_violations/signature_wrong_key/leaf.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "issuer name and AKID match the intermediate but the signature was made with an unrelated key",
+   "sha256": "693813607e05b852abfba814778dbc7f2cabef377bf2e47daa7aacef4cd239cf",
+   "size": 660,
+   "openssl": "parsed",
+   "chain": [
+    "path_violations/issuer_name_mismatch/intermediate.pem",
+    "algorithms/root_rsa2048_sha256.pem"
+   ],
+   "openssl_verify": "error 7 at 0 depth lookup: certificate signature failure"
+  },
+  {
+   "file": "path_violations/unknown_critical_ext_in_intermediate/intermediate.pem",
+   "kind": "cert",
+   "expect": "parse",
+   "reason": "intermediate carries an unrecognised critical extension [intermediate]",
+   "sha256": "72ccb250904ea27bf1696f73c8cfb4704c2d31c2bd3606ad04478956cf7840df",
+   "size": 1034,
+   "openssl": "parsed",
+   "chain": [
+    "algorithms/root_rsa2048_sha256.pem"
+   ]
+  },
+  {
+   "file": "path_violations/unknown_critical_ext_in_intermediate/leaf.pem",
+   "kind": "cert",
+   "expect": "parse-only",
+   "reason": "intermediate carries an unrecognised critical extension [leaf; chain must fail]",
+   "sha256": "a0dce3ef9c793fe27fa5cdc7889c742e86aaa7a8e58ff3c5a491ae6bf5dbcd12",
+   "size": 704,
+   "openssl": "parsed",
+   "chain": [
+    "path_violations/unknown_critical_ext_in_intermediate/intermediate.pem",
+    "algorithms/root_rsa2048_sha256.pem"
+   ],
+   "openssl_verify": "error 34 at 1 depth lookup: unhandled critical extension"
+  }
+ ]
+}

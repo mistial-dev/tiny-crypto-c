@@ -18,7 +18,7 @@ endif
 TINY_CRYPTO_VARIABLES := $(filter TINY_CRYPTO_%,$(.VARIABLES))
 TINY_CRYPTO_CACHE_ARGS := $(foreach name,$(TINY_CRYPTO_VARIABLES),-D$(name)=$($(name)))
 
-.PHONY: all configure test test-compilers test-full test-sanitize test-msan test-cpp benchmark size regenerate-vectors install clean
+.PHONY: all configure test test-compilers test-full test-sanitize test-sanitize-full test-msan test-msan-full test-cpp benchmark size regenerate-vectors install clean
 
 all: configure
 	$(CMAKE) --build $(BUILD_DIR) --parallel
@@ -48,12 +48,22 @@ test-full:
 	$(MAKE) test BUILD_DIR=$(BUILD_DIR)-full TINY_CRYPTO_TEST_FULL=ON
 
 test-sanitize:
-	$(MAKE) test BUILD_DIR=$(BUILD_DIR)-sanitize \
+	$(MAKE) all BUILD_DIR=$(BUILD_DIR)-sanitize \
+		TINY_CRYPTO_SANITIZE=address,undefined CMAKE_BUILD_TYPE=Debug
+	$(CTEST) --test-dir $(BUILD_DIR)-sanitize --output-on-failure -LE extended
+
+test-sanitize-full:
+	$(MAKE) test BUILD_DIR=$(BUILD_DIR)-sanitize-full \
 		TINY_CRYPTO_SANITIZE=address,undefined CMAKE_BUILD_TYPE=Debug
 
 # MemorySanitizer needs clang on Linux; macOS clang does not offer it.
 test-msan:
-	$(MAKE) test BUILD_DIR=$(BUILD_DIR)-msan \
+	$(MAKE) all BUILD_DIR=$(BUILD_DIR)-msan \
+		TINY_CRYPTO_SANITIZE=memory CMAKE_BUILD_TYPE=Debug
+	$(CTEST) --test-dir $(BUILD_DIR)-msan --output-on-failure -LE extended
+
+test-msan-full:
+	$(MAKE) test BUILD_DIR=$(BUILD_DIR)-msan-full \
 		TINY_CRYPTO_SANITIZE=memory CMAKE_BUILD_TYPE=Debug
 
 test-cpp: all

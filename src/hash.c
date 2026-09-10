@@ -18,6 +18,7 @@
 #include <tiny_crypto/hash.h>
 #endif
 #include "internal.h"
+#include "hash64_internal.h"
 
 /* SHA-224 reuses the SHA-256 compression function; either digest pulls in
  * the shared core, and each public API is gated on its own switch. */
@@ -127,8 +128,6 @@ static int tc_hash_length_overflow(uint64_t count, size_t len)
   return (uint64_t)len > (HASH_MAX_BYTES - count);
 }
 
-typedef void (*tc_hash_compress_fn)(uint32_t* state, const uint8_t* block);
-
 /* SHA-1 and SHA-256 share the same 64-byte Merkle-Damgard buffering rules.
  * Keep that state machine here; only the compression function differs. */
 static TC_status tc_hash_stream_update(uint32_t* state, uint64_t* count,
@@ -142,32 +141,7 @@ static TC_status tc_hash_stream_update(uint32_t* state, uint64_t* count,
     return TC_ERROR;
 
   *count += (uint64_t)len;
-  if (*buf_len != 0)
-  {
-    const size_t space = 64u - *buf_len;
-    const size_t take = len < space ? len : space;
-    memcpy(buf + *buf_len, data, take);
-    *buf_len = (uint8_t)(*buf_len + take);
-    data += take;
-    len -= take;
-    if (*buf_len == 64u)
-    {
-      compress(state, buf);
-      *buf_len = 0;
-    }
-  }
-
-  while (len >= 64u)
-  {
-    compress(state, data);
-    data += 64u;
-    len -= 64u;
-  }
-  if (len != 0)
-  {
-    memcpy(buf, data, len);
-    *buf_len = (uint8_t)len;
-  }
+  tc_hash64_absorb(state,buf_len,buf,data,len,compress);
   return TC_OK;
 }
 
@@ -175,19 +149,8 @@ static void tc_hash_stream_final(uint32_t* state, size_t state_words,
                               uint64_t count, uint8_t* buf_len, uint8_t* buf,
                               uint8_t* digest, tc_hash_compress_fn compress)
 {
-  const uint64_t bit_count = count << 3;
   size_t i;
-
-  buf[(*buf_len)++] = 0x80u;
-  if (*buf_len > 56u)
-  {
-    memset(buf + *buf_len, 0, 64u - *buf_len);
-    compress(state, buf);
-    *buf_len = 0;
-  }
-  memset(buf + *buf_len, 0, 56u - *buf_len);
-  tc_internal_store_be64(buf + 56u, bit_count);
-  compress(state, buf);
+  tc_hash64_finish(state,count,buf_len,buf,compress,TC_HASH_LENGTH_BIG_ENDIAN);
 
   for (i = 0; i < state_words; ++i)
     tc_hash_store_be32(digest + (4u * i), state[i]);

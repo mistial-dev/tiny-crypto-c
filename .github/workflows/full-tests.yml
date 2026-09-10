@@ -1,0 +1,57 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+name: Full test suite
+
+on:
+  workflow_dispatch:
+
+jobs:
+  full:
+    name: Full ${{ matrix.compiler }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {compiler: gcc, cc: gcc, cxx: g++}
+          - {compiler: clang, cc: clang, cxx: clang++}
+    env:
+      CTEST_PARALLEL_LEVEL: 4
+      CC: ${{ matrix.cc }}
+      CXX: ${{ matrix.cxx }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev
+      - name: Fetch reference data
+        run: |
+          curl --fail --location --retry 3 https://codeload.github.com/C2SP/wycheproof/zip/3fa63dd0344abb611f1fb1d77e119938603ea230 -o "$RUNNER_TEMP/wycheproof.zip"
+          curl --fail --location --retry 3 https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/components/ecccdhtestvectors.zip -o "$RUNNER_TEMP/ecccdh.zip"
+          mkdir -p "$RUNNER_TEMP/unicode"
+          for name in UnicodeData CompositionExclusions NormalizationTest CaseFolding; do
+            curl --fail --location --retry 3 "https://www.unicode.org/Public/3.2-Update/$name-3.2.0.txt" -o "$RUNNER_TEMP/unicode/$name-3.2.0.txt"
+          done
+          for number in 3454 4518; do
+            curl --fail --location --retry 3 "https://www.rfc-editor.org/rfc/rfc$number.txt" -o "$RUNNER_TEMP/unicode/rfc$number.txt"
+          done
+      - name: Full release suite
+        run: >-
+          make test-full TINY_CRYPTO_TEST_OPENSSL=ON
+          TINY_CRYPTO_TEST_WYCHEPROOF_ARCHIVE="$RUNNER_TEMP/wycheproof.zip"
+          TINY_CRYPTO_TEST_EC_CAVP_ARCHIVE="$RUNNER_TEMP/ecccdh.zip"
+          TINY_CRYPTO_TEST_UNICODE_DIR="$RUNNER_TEMP/unicode"
+      - name: Full sanitizer suite
+        run: >-
+          make test-sanitize-full TINY_CRYPTO_TEST_FULL=ON
+          TINY_CRYPTO_TEST_OPENSSL=ON
+          TINY_CRYPTO_TEST_WYCHEPROOF_ARCHIVE="$RUNNER_TEMP/wycheproof.zip"
+          TINY_CRYPTO_TEST_EC_CAVP_ARCHIVE="$RUNNER_TEMP/ecccdh.zip"
+          TINY_CRYPTO_TEST_UNICODE_DIR="$RUNNER_TEMP/unicode"
+      - name: Full memory sanitizer suite
+        if: matrix.compiler == 'clang'
+        run: >-
+          make test-msan-full TINY_CRYPTO_TEST_FULL=ON
+          TINY_CRYPTO_TEST_WYCHEPROOF_ARCHIVE="$RUNNER_TEMP/wycheproof.zip"
+          TINY_CRYPTO_TEST_EC_CAVP_ARCHIVE="$RUNNER_TEMP/ecccdh.zip"
+          TINY_CRYPTO_TEST_UNICODE_DIR="$RUNNER_TEMP/unicode"

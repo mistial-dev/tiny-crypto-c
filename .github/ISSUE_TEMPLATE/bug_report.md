@@ -6,6 +6,9 @@ labels: bug
 assignees: ''
 ---
 
+<!-- SPDX-FileCopyrightText: Mistial Dev -->
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
+
 ## Problem description
 
 Clear description of the incorrect behaviour.

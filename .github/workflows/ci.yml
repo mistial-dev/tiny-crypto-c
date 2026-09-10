@@ -11,6 +11,24 @@ on:
   workflow_dispatch:
 
 jobs:
+  esp32p4:
+    name: ESP32-P4 ${{ matrix.role }}
+    runs-on: ubuntu-latest
+    container: espressif/idf:v5.5.1
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        role: [piv-acu, piv-pd]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build ESP-IDF target
+        shell: bash
+        run: |
+          . "$IDF_PATH/export.sh"
+          idf.py -C examples/esp32-p4 -B /tmp/tiny-crypto-esp32p4 \
+            -DTINY_CRYPTO_TARGET=${{ matrix.role }} build size-components
+
   host:
     name: ${{ matrix.os }} ${{ matrix.compiler }}
     runs-on: ${{ matrix.os }}
@@ -37,6 +55,7 @@ jobs:
   extended:
     name: Extended ${{ matrix.compiler }}
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
@@ -44,6 +63,7 @@ jobs:
           - {compiler: gcc, cc: gcc, cxx: g++}
           - {compiler: clang, cc: clang, cxx: clang++}
     env:
+      CTEST_PARALLEL_LEVEL: 4
       CC: ${{ matrix.cc }}
       CXX: ${{ matrix.cxx }}
     steps:
@@ -51,13 +71,27 @@ jobs:
       - name: Install AVR compiler
         if: matrix.compiler == 'gcc'
         run: sudo apt-get update && sudo apt-get install -y gcc-avr avr-libc
-      - name: Full vector corpora
-        run: make test-full
+      - name: Install OpenSSL development files
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev
+      - name: Fetch Unicode reference data
+        run: |
+          mkdir -p "$RUNNER_TEMP/unicode"
+          for name in UnicodeData CompositionExclusions NormalizationTest CaseFolding; do
+            curl --fail --location --retry 3 "https://www.unicode.org/Public/3.2-Update/$name-3.2.0.txt" -o "$RUNNER_TEMP/unicode/$name-3.2.0.txt"
+          done
+          for number in 3454 4518; do
+            curl --fail --location --retry 3 "https://www.rfc-editor.org/rfc/rfc$number.txt" -o "$RUNNER_TEMP/unicode/rfc$number.txt"
+          done
+      - name: Unicode reference tests
+        run: |
+          cmake -S . -B build-full -DTINY_CRYPTO_TEST_UNICODE_DIR="$RUNNER_TEMP/unicode"
+          cmake --build build-full --target test_unicode --parallel 4
+          ctest --test-dir build-full --output-on-failure -R '^test_unicode'
       - name: AVR C++ header gate
         if: matrix.compiler == 'gcc'
         run: ctest --test-dir build-full --output-on-failure -R test_cpp_headers_avr
       - name: Address and undefined behavior sanitizers
-        run: make test-sanitize
+        run: make test-sanitize TINY_CRYPTO_TEST_OPENSSL=ON
       - name: Sanitizer benchmark linkage
         run: cmake --build build-sanitize --target benchmark --parallel 4
       - name: Memory sanitizer
@@ -101,6 +135,10 @@ jobs:
           path: build-tools/pico-sdk
       - name: Test report generator
         run: python3 tests/test_benchmark_report.py
+      - name: Check library package
+        run: |
+          pio pkg pack . --output "$RUNNER_TEMP/tiny-crypto-c.tar.gz"
+          python3 tests/test_package_boundaries.py --archive "$RUNNER_TEMP/tiny-crypto-c.tar.gz"
       - name: Validate fixtures and check benchmark document
         run: |
           export PICO_SDK_PATH="$GITHUB_WORKSPACE/build-tools/pico-sdk"
@@ -118,3 +156,36 @@ jobs:
             build-benchmark-report/resources.json
             build-benchmark-report/benchmarks.md
             avr-resources.json
+
+  parser:
+    name: Parser fuzz and external tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch pinned ASN.1 length tests
+        run: |
+          curl --fail --location --retry 3 https://raw.githubusercontent.com/Mbed-TLS/mbedtls/091fd1b18806098d74bd58ace7aacb7f171bcb42/tests/suites/test_suite_asn1parse.data -o "$RUNNER_TEMP/asn1parse.data"
+      - name: Configure
+        run: >-
+          cmake -S . -B build-parser
+          -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+          -DTINY_CRYPTO_BUILD_FUZZERS=ON
+          -DTINY_CRYPTO_TLV_MBEDTLS_SUITE="$RUNNER_TEMP/asn1parse.data"
+      - name: Build
+        run: >-
+          cmake --build build-parser --target
+          fuzz_tlv fuzz_pki fuzz_piv_sm fuzz_gzip
+          test_tlv_corpus_reader test_x509_reader test_piv_cvc test_piv_chuid
+          test_x509_key test_eac_cvc test_eac_reader --parallel 4
+      - name: External length cases
+        run: ctest --test-dir build-parser -R test_tlv_external_lengths --output-on-failure
+      - name: Certificate and PIV cases
+        run: ctest --test-dir build-parser -R 'test_(x509_schema|x509_key|piv_cvc|piv_chuid|eac_cvc|eac_schema)$' --output-on-failure
+      - name: Fuzz TLV
+        run: build-parser/fuzz_tlv -max_total_time=60 -max_len=8192 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"
+      - name: Fuzz certificates and PIV objects
+        run: build-parser/fuzz_pki -max_total_time=60 -max_len=8192 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"
+      - name: Fuzz PIV secure messaging responses
+        run: build-parser/fuzz_piv_sm -max_total_time=60 -max_len=8192 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"
+      - name: Fuzz certificate decompression
+        run: build-parser/fuzz_gzip -max_total_time=60 -max_len=8192 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"

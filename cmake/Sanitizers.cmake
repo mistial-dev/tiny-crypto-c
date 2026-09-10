@@ -5,7 +5,7 @@ if(NOT TINY_CRYPTO_SANITIZE STREQUAL "")
   if(MSVC)
     message(FATAL_ERROR "TINY_CRYPTO_SANITIZE requires GCC or Clang")
   endif()
-  set(tc_sanitize_flags -fsanitize=${TINY_CRYPTO_SANITIZE}
+  set(tc_sanitize_flags -O1 -fsanitize=${TINY_CRYPTO_SANITIZE}
       -fno-omit-frame-pointer)
 endif()
 

@@ -1,3 +1,5 @@
+/* SPDX-FileCopyrightText: Mistial Dev
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 /* Test-only reference implementation for the hardware GHASH hook. */
 #include <string.h>
 

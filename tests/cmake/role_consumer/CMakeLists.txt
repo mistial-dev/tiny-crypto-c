@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+cmake_minimum_required(VERSION 3.24)
+project(role_consumer LANGUAGES C)
+set(TINY_CRYPTO_BUILD_TESTS OFF)
+set(TINY_CRYPTO_BUILD_BENCHMARKS OFF)
+add_subdirectory("${SOURCE_DIR}" library)
+add_executable(role_check role.c "${SOURCE_DIR}/tests/support/munit.c"
+  "${SOURCE_DIR}/tests/support/test_util.c" "${SOURCE_DIR}/tests/support/cavp.c")
+set_target_properties(role_check PROPERTIES C_STANDARD 99 C_STANDARD_REQUIRED ON C_EXTENSIONS OFF)
+target_include_directories(role_check PRIVATE "${SOURCE_DIR}/tests/support")
+target_link_libraries(role_check PRIVATE tiny-crypto-c::tiny-crypto-c)
+if(TINY_CRYPTO_TARGET STREQUAL "piv-pd")
+  target_compile_definitions(role_check PRIVATE EXPECT_PD=1)
+else()
+  target_compile_definitions(role_check PRIVATE EXPECT_PD=0)
+endif()
+enable_testing()
+add_test(NAME role_runtime COMMAND role_check)

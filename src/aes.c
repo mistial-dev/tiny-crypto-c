@@ -12,6 +12,7 @@
 #include <string.h> /* memcpy, memset */
 #include <tiny_crypto/aes.h>
 #include "aes_internal.h"
+#include "aes_platform_internal.h"
 
 /* Keep fixed S-boxes in AVR flash. Runtime S-box mode remains writable SRAM
  * by design and therefore bypasses these accessors. */
@@ -75,7 +76,7 @@ static const uint8_t sbox[256] TC_AES_TABLE_STORAGE = {
 #endif
 
 #if (defined(TC_AES_ENABLE_CBC) && TC_AES_ENABLE_CBC == 1) || (defined(TC_AES_ENABLE_ECB) && TC_AES_ENABLE_ECB == 1) || \
-    (defined(TC_AES_CAVP) && TC_AES_CAVP == 1)
+    (defined(TC_AES_CAVP) && TC_AES_CAVP == 1) || TC_AES_ENABLE_DYNAMIC
 #if TC_AES_SBOX_MODE == TC_AES_SBOX_MODE_RUNTIME
 static uint8_t rsbox[256];
 #elif TC_AES_SBOX_MODE == TC_AES_SBOX_MODE_FAST
@@ -161,7 +162,7 @@ void TC_AES_init_sbox(void)
   }
 
 #if (defined(TC_AES_ENABLE_CBC) && TC_AES_ENABLE_CBC == 1) || (defined(TC_AES_ENABLE_ECB) && TC_AES_ENABLE_ECB == 1) || \
-    (defined(TC_AES_CAVP) && TC_AES_CAVP == 1)
+    (defined(TC_AES_CAVP) && TC_AES_CAVP == 1) || TC_AES_ENABLE_DYNAMIC
   for (i = 0; i < 256; ++i)
     rsbox[sbox[i]] = (uint8_t)i;
 #endif
@@ -236,15 +237,15 @@ static uint8_t tc_aes_sbox_value(uint8_t num)
 #endif
 }
 
-static void tc_aes_key_expansion(uint8_t* round_key, const uint8_t* key)
+static void tc_aes_key_expansion(uint8_t* round_key, const uint8_t* key, unsigned words)
 {
   unsigned i, j, k;
   uint8_t tempa[4];
   uint8_t rcon = 0x01;
 
-  tc_aes_copy_bytes(round_key, key, Nk * 4);
+  tc_aes_copy_bytes(round_key, key, words * 4);
 
-  for (i = Nk; i < Nb * (Nr + 1); ++i)
+  for (i = words; i < Nb * ((words + 6) + 1); ++i)
   {
     {
       k = (i - 1) * 4;
@@ -255,7 +256,7 @@ static void tc_aes_key_expansion(uint8_t* round_key, const uint8_t* key)
 
     }
 
-    if (i % Nk == 0)
+    if (i % words == 0)
     {
       {
         const uint8_t u8tmp = tempa[0];
@@ -275,8 +276,8 @@ static void tc_aes_key_expansion(uint8_t* round_key, const uint8_t* key)
       tempa[0] = tempa[0] ^ rcon;
       rcon = tc_aes_xtime(rcon);
     }
-#if TC_AES_KEY_BITS == 256
-    if (i % Nk == 4)
+#if TC_AES_KEY_BITS == 256 || TC_AES_ENABLE_DYNAMIC
+    if (words == 8 && i % words == 4)
     {
       {
         tempa[0] = tc_aes_sbox_value(tempa[0]);
@@ -286,7 +287,7 @@ static void tc_aes_key_expansion(uint8_t* round_key, const uint8_t* key)
       }
     }
 #endif
-    j = i * 4; k=(i - Nk) * 4;
+    j = i * 4; k=(i - words) * 4;
     round_key[j + 0] = round_key[k + 0] ^ tempa[0];
     round_key[j + 1] = round_key[k + 1] ^ tempa[1];
     round_key[j + 2] = round_key[k + 2] ^ tempa[2];
@@ -305,7 +306,7 @@ TC_status TC_AES_key_init(struct TC_AES_key_ctx* ctx, const uint8_t* key)
   if (!sbox_ready)
     return TC_ERROR;
 #endif
-  tc_aes_key_expansion(ctx->round_key, key);
+  tc_aes_key_expansion(ctx->round_key, key, Nk);
   return TC_OK;
 }
 
@@ -365,7 +366,7 @@ TC_status TC_AES_ctx_set_iv(struct TC_AES_ctx* ctx, const uint8_t* iv)
     (defined(TC_AES_ENABLE_EAX_PRIME) && TC_AES_ENABLE_EAX_PRIME == 1) || \
     (defined(TC_AES_ENABLE_SIV) && TC_AES_ENABLE_SIV == 1) || \
     (defined(TC_AES_ENABLE_CMAC) && TC_AES_ENABLE_CMAC == 1) || \
-    (defined(TC_AES_CAVP) && TC_AES_CAVP == 1)
+    (defined(TC_AES_CAVP) && TC_AES_CAVP == 1) || TC_AES_ENABLE_DYNAMIC
 
 /* Add the selected round key to the state. */
 static void tc_aes_add_round_key(uint8_t round, state_t* state, const uint8_t* round_key)
@@ -434,7 +435,7 @@ static void tc_aes_mix_columns(state_t* state)
 }
 
 #if (defined(TC_AES_ENABLE_CBC) && TC_AES_ENABLE_CBC == 1) || (defined(TC_AES_ENABLE_ECB) && TC_AES_ENABLE_ECB == 1) || \
-    (defined(TC_AES_CAVP) && TC_AES_CAVP == 1)
+    (defined(TC_AES_CAVP) && TC_AES_CAVP == 1) || TC_AES_ENABLE_DYNAMIC
 static uint8_t tc_aes_inverse_sbox_value(uint8_t num)
 {
 #if TC_AES_SBOX_MODE == TC_AES_SBOX_MODE_FAST
@@ -543,9 +544,14 @@ static void tc_aes_inverse_shift_rows(state_t* state)
 }
 #endif
 
-void tc_aes_cipher(state_t* state, const uint8_t* round_key)
+TC_status tc_aes_cipher_rounds(state_t* state, const uint8_t* round_key, uint8_t rounds)
 {
   uint8_t round = 0;
+#if TC_AES_PLATFORM
+  tc_aes_platform_result result = tc_aes_platform_block(round_key, rounds, (uint8_t*)state, 0);
+  if (result != TC_AES_PLATFORM_UNSUPPORTED)
+    return result == TC_AES_PLATFORM_OK ? TC_OK : TC_ERROR;
+#endif
 
   tc_aes_add_round_key(0, state, round_key);
 
@@ -553,15 +559,18 @@ void tc_aes_cipher(state_t* state, const uint8_t* round_key)
   {
     tc_aes_sub_bytes(state);
     tc_aes_shift_rows(state);
-    if (round == Nr) {
+    if (round == rounds) {
       break;
     }
     tc_aes_mix_columns(state);
     tc_aes_add_round_key(round, state, round_key);
   }
-  tc_aes_add_round_key(Nr, state, round_key);
+  tc_aes_add_round_key(rounds, state, round_key);
+  return TC_OK;
 }
 
+TC_status tc_aes_cipher(state_t* state, const uint8_t* round_key)
+{ return tc_aes_cipher_rounds(state, round_key, Nr); }
 #endif
 
 #if defined(TC_AES_CAVP) && (TC_AES_CAVP == 1)
@@ -580,14 +589,19 @@ void TC_AES_CAVP_encrypt_block(const uint8_t* key, uint8_t block[TC_AES_BLOCKLEN
 #endif
 
 #if (defined(TC_AES_ENABLE_CBC) && TC_AES_ENABLE_CBC == 1) || (defined(TC_AES_ENABLE_ECB) && TC_AES_ENABLE_ECB == 1) || \
-    (defined(TC_AES_CAVP) && TC_AES_CAVP == 1)
-static void tc_aes_inverse_cipher(state_t* state, const uint8_t* round_key)
+    (defined(TC_AES_CAVP) && TC_AES_CAVP == 1) || TC_AES_ENABLE_DYNAMIC
+static TC_status tc_aes_inverse_rounds(state_t* state, const uint8_t* round_key, uint8_t rounds)
 {
   uint8_t round = 0;
+#if TC_AES_PLATFORM
+  tc_aes_platform_result result = tc_aes_platform_block(round_key, rounds, (uint8_t*)state, 1);
+  if (result != TC_AES_PLATFORM_UNSUPPORTED)
+    return result == TC_AES_PLATFORM_OK ? TC_OK : TC_ERROR;
+#endif
 
-  tc_aes_add_round_key(Nr, state, round_key);
+  tc_aes_add_round_key(rounds, state, round_key);
 
-  for (round = (Nr - 1); ; --round)
+  for (round = (rounds - 1); ; --round)
   {
     tc_aes_inverse_shift_rows(state);
     tc_aes_inverse_sub_bytes(state);
@@ -597,8 +611,13 @@ static void tc_aes_inverse_cipher(state_t* state, const uint8_t* round_key)
     }
     tc_aes_inverse_mix_columns(state);
   }
-
+  return TC_OK;
 }
+
+#if TC_AES_ENABLE_CBC || TC_AES_ENABLE_ECB || (defined(TC_AES_CAVP) && TC_AES_CAVP == 1)
+static TC_status tc_aes_inverse_cipher(state_t* state, const uint8_t* round_key)
+{ return tc_aes_inverse_rounds(state, round_key, Nr); }
+#endif
 #endif
 
 #if defined(TC_AES_CAVP) && (TC_AES_CAVP == 1)
@@ -625,16 +644,14 @@ TC_status TC_AES_ECB_encrypt(const struct TC_AES_key_ctx* ctx, uint8_t* buf)
 {
   if (ctx == NULL || buf == NULL)
     return TC_ERROR;
-  tc_aes_cipher((state_t*)buf, ctx->round_key);
-  return TC_OK;
+  return tc_aes_cipher((state_t*)buf, ctx->round_key);
 }
 
 TC_status TC_AES_ECB_decrypt(const struct TC_AES_key_ctx* ctx, uint8_t* buf)
 {
   if (ctx == NULL || buf == NULL)
     return TC_ERROR;
-  tc_aes_inverse_cipher((state_t*)buf, ctx->round_key);
-  return TC_OK;
+  return tc_aes_inverse_cipher((state_t*)buf, ctx->round_key);
 }
 
 
@@ -644,56 +661,58 @@ TC_status TC_AES_ECB_decrypt(const struct TC_AES_key_ctx* ctx, uint8_t* buf)
 
 
 
-#if defined(TC_AES_ENABLE_CBC) && (TC_AES_ENABLE_CBC == 1)
-
-TC_status TC_AES_CBC_encrypt(struct TC_AES_ctx *ctx, uint8_t* buf, size_t length)
+#if TC_AES_ENABLE_CBC || TC_AES_ENABLE_DYNAMIC
+static TC_status tc_aes_cbc_encrypt(const uint8_t* key, uint8_t rounds, uint8_t iv[16],
+                               uint8_t* buffer, size_t length)
 {
-  size_t i;
-  uint8_t *iv;
-
-#if TC_STRICT
-  if (ctx == NULL || (length != 0 && buf == NULL))
-    return TC_ERROR;
-#endif
-  if ((length & (TC_AES_BLOCKLEN - 1u)) != 0)
-    return TC_ERROR;
-
-  iv = ctx->iv;
-  for (i = 0; i < length; i += TC_AES_BLOCKLEN)
-  {
-    tc_internal_xor(buf, iv, TC_AES_BLOCKLEN);
-    tc_aes_cipher((state_t*)buf, ctx->key.round_key);
-    iv = buf;
-    buf += TC_AES_BLOCKLEN;
-  }
-  /* store iv in ctx for next call */
-  tc_aes_copy_bytes(ctx->iv, iv, TC_AES_BLOCKLEN);
-  return TC_OK;
-}
-
-TC_status TC_AES_CBC_decrypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length)
-{
-  size_t i;
-  uint8_t storeNextIv[TC_AES_BLOCKLEN];
-
-#if TC_STRICT
-  if (ctx == NULL || (length != 0 && buf == NULL))
-    return TC_ERROR;
-#endif
-  if ((length & (TC_AES_BLOCKLEN - 1u)) != 0)
-    return TC_ERROR;
-
-  for (i = 0; i < length; i += TC_AES_BLOCKLEN)
-  {
-    tc_aes_copy_bytes(storeNextIv, buf, TC_AES_BLOCKLEN);
-    tc_aes_inverse_cipher((state_t*)buf, ctx->key.round_key);
-    tc_internal_xor(buf, ctx->iv, TC_AES_BLOCKLEN);
-    tc_aes_copy_bytes(ctx->iv, storeNextIv, TC_AES_BLOCKLEN);
-    buf += TC_AES_BLOCKLEN;
+  size_t offset;
+  for (offset = 0; offset < length; offset += 16) {
+    tc_internal_xor(buffer + offset, iv, 16);
+    if (tc_aes_cipher_rounds((state_t*)(buffer + offset), key, rounds) != TC_OK)
+      return TC_ERROR;
+    memcpy(iv, buffer + offset, 16);
   }
   return TC_OK;
 }
 
+static TC_status tc_aes_cbc_decrypt(const uint8_t* key, uint8_t rounds, uint8_t iv[16],
+                               uint8_t* buffer, size_t length)
+{
+  uint8_t previous[16];
+  size_t offset;
+  TC_status status = TC_OK;
+  for (offset = 0; offset < length; offset += 16) {
+    memcpy(previous, buffer + offset, 16);
+    status = tc_aes_inverse_rounds((state_t*)(buffer + offset), key, rounds);
+    if (status != TC_OK) break;
+    tc_internal_xor(buffer + offset, iv, 16);
+    memcpy(iv, previous, 16);
+  }
+#if TC_ZEROIZE
+  TC_secure_zero(previous, sizeof previous);
+#endif
+  return status;
+}
+#endif
+
+#if TC_AES_ENABLE_CBC
+TC_status TC_AES_CBC_encrypt(struct TC_AES_ctx* ctx, uint8_t* buffer, size_t length)
+{
+#if TC_STRICT
+  if (!ctx || (!buffer && length)) return TC_ERROR;
+#endif
+  if (length % 16) return TC_ERROR;
+  return tc_aes_cbc_encrypt(ctx->key.round_key, Nr, ctx->iv, buffer, length);
+}
+
+TC_status TC_AES_CBC_decrypt(struct TC_AES_ctx* ctx, uint8_t* buffer, size_t length)
+{
+#if TC_STRICT
+  if (!ctx || (!buffer && length)) return TC_ERROR;
+#endif
+  if (length % 16) return TC_ERROR;
+  return tc_aes_cbc_decrypt(ctx->key.round_key, Nr, ctx->iv, buffer, length);
+}
 #endif /* CBC */
 
 
@@ -729,7 +748,8 @@ TC_status TC_AES_CTR_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length)
   while (length - offset >= TC_AES_BLOCKLEN)
   {
     tc_aes_copy_bytes(ctx->ctr_stream, ctx->iv, TC_AES_BLOCKLEN);
-    tc_aes_cipher((state_t*)ctx->ctr_stream, ctx->key.round_key);
+    if (tc_aes_cipher((state_t*)ctx->ctr_stream, ctx->key.round_key) != TC_OK)
+      return TC_ERROR;
     tc_internal_increment_be(ctx->iv, TC_AES_BLOCKLEN);
     tc_internal_xor(buf + offset, ctx->ctr_stream, TC_AES_BLOCKLEN);
     offset += TC_AES_BLOCKLEN;
@@ -739,7 +759,8 @@ TC_status TC_AES_CTR_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length)
   if (offset < length)
   {
     tc_aes_copy_bytes(ctx->ctr_stream, ctx->iv, TC_AES_BLOCKLEN);
-    tc_aes_cipher((state_t*)ctx->ctr_stream, ctx->key.round_key);
+    if (tc_aes_cipher((state_t*)ctx->ctr_stream, ctx->key.round_key) != TC_OK)
+      return TC_ERROR;
     tc_internal_increment_be(ctx->iv, TC_AES_BLOCKLEN);
     ctx->ctr_pos = 0;
     while (offset < length)
@@ -767,7 +788,10 @@ TC_status TC_AES_OFB_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length)
   {
     if (pos == TC_AES_BLOCKLEN)
     {
-      tc_aes_cipher((state_t*)ctx->iv, ctx->key.round_key);
+      if (tc_aes_cipher((state_t*)ctx->iv, ctx->key.round_key) != TC_OK) {
+        ctx->ofb_pos = pos;
+        return TC_ERROR;
+      }
       pos = 0;
     }
     *buf++ ^= ctx->iv[pos++];
@@ -777,3 +801,62 @@ TC_status TC_AES_OFB_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length)
 }
 
 #endif /* OFB */
+
+#if TC_AES_ENABLE_DYNAMIC
+TC_status TC_AES_dynamic_key_init(TC_AES_dynamic_key* ctx, const uint8_t* key, size_t length)
+{
+  if (!ctx || !key || (length != 16 && length != 24 && length != 32) ||
+      !tc_internal_ranges_disjoint(ctx, sizeof *ctx, key, length)) return TC_ERROR;
+#if TC_AES_SBOX_MODE == TC_AES_SBOX_MODE_RUNTIME
+  if (!sbox_ready) return TC_ERROR;
+#endif
+  tc_aes_key_expansion(ctx->round_key, key, (unsigned)(length / 4));
+  ctx->rounds = (uint8_t)(length / 4 + 6);
+  memset(ctx->round_key + 16 * (ctx->rounds + 1), 0,
+         sizeof ctx->round_key - 16 * (ctx->rounds + 1));
+  return TC_OK;
+}
+
+void TC_AES_dynamic_key_clear(TC_AES_dynamic_key* ctx)
+{ if (ctx) TC_secure_zero(ctx, sizeof *ctx); }
+
+static int tc_aes_dynamic_key_valid(const TC_AES_dynamic_key* ctx)
+{ return ctx && (ctx->rounds == 10 || ctx->rounds == 12 || ctx->rounds == 14); }
+
+TC_status TC_AES_dynamic_encrypt(const TC_AES_dynamic_key* ctx, uint8_t block[16])
+{
+  if (!tc_aes_dynamic_key_valid(ctx) || !block ||
+      !tc_internal_ranges_disjoint(ctx, sizeof *ctx, block, 16)) return TC_ERROR;
+  return tc_aes_cipher_rounds((state_t*)block, ctx->round_key, ctx->rounds);
+}
+
+TC_status TC_AES_dynamic_decrypt(const TC_AES_dynamic_key* ctx, uint8_t block[16])
+{
+  if (!tc_aes_dynamic_key_valid(ctx) || !block ||
+      !tc_internal_ranges_disjoint(ctx, sizeof *ctx, block, 16)) return TC_ERROR;
+  return tc_aes_inverse_rounds((state_t*)block, ctx->round_key, ctx->rounds);
+}
+
+static int tc_aes_dynamic_cbc_valid(const TC_AES_dynamic_key* ctx,
+    const uint8_t* iv, const uint8_t* buffer, size_t length)
+{
+  return tc_aes_dynamic_key_valid(ctx) && iv && (buffer || !length) && !(length % 16) &&
+    tc_internal_ranges_disjoint(ctx, sizeof *ctx, iv, 16) &&
+    tc_internal_ranges_disjoint(ctx, sizeof *ctx, buffer, length) &&
+    tc_internal_ranges_disjoint(iv, 16, buffer, length);
+}
+
+TC_status TC_AES_dynamic_CBC_encrypt(const TC_AES_dynamic_key* ctx, uint8_t iv[16],
+    uint8_t* buffer, size_t length)
+{
+  if (!tc_aes_dynamic_cbc_valid(ctx, iv, buffer, length)) return TC_ERROR;
+  return tc_aes_cbc_encrypt(ctx->round_key, ctx->rounds, iv, buffer, length);
+}
+
+TC_status TC_AES_dynamic_CBC_decrypt(const TC_AES_dynamic_key* ctx, uint8_t iv[16],
+    uint8_t* buffer, size_t length)
+{
+  if (!tc_aes_dynamic_cbc_valid(ctx, iv, buffer, length)) return TC_ERROR;
+  return tc_aes_cbc_decrypt(ctx->round_key, ctx->rounds, iv, buffer, length);
+}
+#endif

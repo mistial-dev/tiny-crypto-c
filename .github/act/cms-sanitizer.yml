@@ -1,0 +1,25 @@
+name: Push sanitizer checks
+
+on:
+  workflow_dispatch:
+
+jobs:
+  gcc:
+    runs-on: ubuntu-latest
+    steps:
+      - run: sudo apt-get update && sudo apt-get install -y cmake libssl-dev
+      - run: >-
+          make test-sanitize CC=gcc CXX=g++ BUILD_DIR=build-act
+          TINY_CRYPTO_TEST_OPENSSL=ON
+  clang:
+    runs-on: ubuntu-latest
+    steps:
+      - run: sudo apt-get update && sudo apt-get install -y clang cmake libssl-dev
+      - run: >-
+          make test-sanitize CC=clang CXX=clang++ BUILD_DIR=build-act
+          TINY_CRYPTO_TEST_OPENSSL=ON
+  msan:
+    runs-on: ubuntu-latest
+    steps:
+      - run: sudo apt-get update && sudo apt-get install -y clang cmake
+      - run: make test-msan CC=clang CXX=clang++ BUILD_DIR=build-act

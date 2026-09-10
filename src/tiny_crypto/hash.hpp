@@ -10,12 +10,18 @@
 #endif
 
 #include <tiny_crypto/common.hpp>
+#if TC_ENABLE_SHA1 || TC_ENABLE_SHA224 || TC_ENABLE_SHA256 || \
+    TC_ENABLE_SHA384 || TC_ENABLE_SHA512
 #include <tiny_crypto/hash.h>
+#endif
+#if TC_ENABLE_MD5
+#include <tiny_crypto/md5.h>
+#endif
 
 namespace tiny_crypto {
 namespace detail {
 
-#define TINY_CRYPTO_SHA_TRAITS(name, C_NAME, context_type, digest_len) \
+#define TINY_CRYPTO_HASH_TRAITS(name, C_NAME, context_type, digest_len) \
 struct name { \
     using context = context_type; \
     static constexpr size_t digest_size = digest_len; \
@@ -59,23 +65,26 @@ struct name { \
     static void clear(context* ctx) { TC_HMAC_##C_NAME##_ctx_clear(ctx); } \
 };
 
+#if TC_ENABLE_MD5
+TINY_CRYPTO_HASH_TRAITS(tc_md5_traits, MD5, TC_MD5_ctx, TC_MD5_DIGESTLEN)
+#endif
 #if TC_ENABLE_SHA1
-TINY_CRYPTO_SHA_TRAITS(tc_sha1_traits, SHA1, TC_SHA1_ctx, TC_SHA1_DIGESTLEN)
+TINY_CRYPTO_HASH_TRAITS(tc_sha1_traits, SHA1, TC_SHA1_ctx, TC_SHA1_DIGESTLEN)
 #endif
 #if TC_ENABLE_SHA224
-TINY_CRYPTO_SHA_TRAITS(tc_sha224_traits, SHA224, TC_SHA224_ctx,
+TINY_CRYPTO_HASH_TRAITS(tc_sha224_traits, SHA224, TC_SHA224_ctx,
                        TC_SHA224_DIGESTLEN)
 #endif
 #if TC_ENABLE_SHA256
-TINY_CRYPTO_SHA_TRAITS(tc_sha256_traits, SHA256, TC_SHA256_ctx,
+TINY_CRYPTO_HASH_TRAITS(tc_sha256_traits, SHA256, TC_SHA256_ctx,
                        TC_SHA256_DIGESTLEN)
 #endif
 #if TC_ENABLE_SHA384
-TINY_CRYPTO_SHA_TRAITS(tc_sha384_traits, SHA384, TC_SHA384_ctx,
+TINY_CRYPTO_HASH_TRAITS(tc_sha384_traits, SHA384, TC_SHA384_ctx,
                        TC_SHA384_DIGESTLEN)
 #endif
 #if TC_ENABLE_SHA512
-TINY_CRYPTO_SHA_TRAITS(tc_sha512_traits, SHA512, TC_SHA512_ctx,
+TINY_CRYPTO_HASH_TRAITS(tc_sha512_traits, SHA512, TC_SHA512_ctx,
                        TC_SHA512_DIGESTLEN)
 #endif
 
@@ -101,12 +110,11 @@ TINY_CRYPTO_HMAC_TRAITS(tc_hmac_sha512_traits, SHA512, TC_HMAC_SHA512_ctx,
 #endif
 
 #undef TINY_CRYPTO_HMAC_TRAITS
-#undef TINY_CRYPTO_SHA_TRAITS
+#undef TINY_CRYPTO_HASH_TRAITS
 
 } // namespace detail
 
-/* Traits keep SHA-1 and the SHA-2 family on one tested control path while
- * preserving their small, concrete C contexts. */
+/* Each hash retains its concrete C context. */
 template <class Traits>
 class basic_hash {
 public:
@@ -215,6 +223,9 @@ private:
     bool active_;
 };
 
+#if TC_ENABLE_MD5
+typedef basic_hash<detail::tc_md5_traits> MD5;
+#endif
 #if TC_ENABLE_SHA1
 typedef basic_hash<detail::tc_sha1_traits> SHA1;
 #endif

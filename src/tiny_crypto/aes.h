@@ -232,7 +232,8 @@ TC_status TC_AES_GCM_init(struct TC_AES_GCM_ctx* ctx, const uint8_t* key,
 /* AAD must be supplied before the first encrypt/decrypt update. A context is
  * single-direction; reinitialize before switching direction. Check every
  * return value. Streaming decryption writes provisional plaintext during
- * update; do not use it until decrypt_finish returns TC_OK. */
+ * update; do not use it until decrypt_finish returns TC_OK. On any failure,
+ * discard and wipe plaintext from all preceding updates. */
 TC_status TC_AES_GCM_aad_update(struct TC_AES_GCM_ctx* ctx, const uint8_t* aad,
                        size_t length);
 TC_status TC_AES_GCM_encrypt_update(struct TC_AES_GCM_ctx* ctx, uint8_t* buf,
@@ -248,8 +249,9 @@ TC_status TC_AES_GCM_decrypt_finish(struct TC_AES_GCM_ctx* ctx, const uint8_t* t
  * One-shot GCM. tag_len is fixed for this key use (SP 800-38D).
  * Buffer contract (all one-shot AEAD): exact alias of in/out is OK; fully
  * disjoint is OK; partial overlap returns TC_ERROR.
- * Decrypt authenticates before releasing plaintext; on failure a non-aliasing
- * output is left untouched and an in-place buffer is zeroed.
+ * Decrypt authenticates before releasing plaintext. GCM and CCM leave a
+ * separate output untouched and wipe in-place ciphertext on a tag mismatch.
+ * EAX leaves both kinds of output untouched on authentication failure.
  */
 TC_status TC_AES_GCM_encrypt(const uint8_t* key,
                     const uint8_t* iv, size_t iv_len,
