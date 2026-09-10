@@ -394,8 +394,8 @@ static void test_ccm_vector(const uint8_t* key, const uint8_t* nonce,
   munit_assert_int(TC_AES_CCM_decrypt(key, nonce, nonce_len, aad, aad_len,
                                    output, plaintext_len, generated_tag,
                                    tag_len, buffer), ==, TC_MISMATCH);
-  for (size_t i = 0; i < plaintext_len; ++i)
-    munit_assert_uint8(buffer[i], ==, 0);
+  for (size_t i = 0; i < sizeof(buffer); ++i)
+    munit_assert_uint8(buffer[i], ==, 0xa5);
 }
 
 static MunitResult test_ccm(const MunitParameter params[], void* data)
@@ -519,8 +519,8 @@ static MunitResult test_ccm_api(const MunitParameter params[], void* data)
                                    sizeof(ccm_nist_ciphertext1),
                                    ccm_nist_tag1, sizeof(ccm_nist_tag1),
                                    buffer), ==, TC_MISMATCH);
-  for (i = 0; i < sizeof(ccm_nist_plaintext1); ++i)
-    munit_assert_uint8(buffer[i], ==, 0);
+  for (i = 0; i < sizeof(buffer); ++i)
+    munit_assert_uint8(buffer[i], ==, 0xa5);
 
   bad_tag[0] ^= 1;
   memset(buffer, 0xa5, sizeof(buffer));

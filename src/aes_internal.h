@@ -3,10 +3,15 @@
 #ifndef TC_AES_INTERNAL_H
 #define TC_AES_INTERNAL_H
 #include <tiny_crypto/aes.h>
+#if TC_AES_ENABLE_DYNAMIC
+#include <tiny_crypto/aes_dynamic.h>
+#endif
 #include "internal.h"
 
 typedef uint8_t state_t[4][4];
-void tc_aes_cipher(state_t* state, const uint8_t* round_key);
+TC_status tc_aes_cipher(state_t* state, const uint8_t* round_key);
+TC_status tc_aes_cipher_rounds(state_t* state, const uint8_t* round_key, uint8_t rounds);
+#define TC_AES_FIXED_ROUNDS (TC_AES_KEY_BITS / 32 + 6)
 
 static inline void tc_aes_copy_bytes(uint8_t* dst, const uint8_t* src, size_t length)
 {

@@ -16,7 +16,7 @@ import subprocess
 import sys
 import tempfile
 
-from benchmark_cases import FEATURES, SKETCH, definitions
+from benchmark_cases import FEATURES, RP2350_FEATURES, SKETCH, definitions, features_for_board
 
 ROOT = Path(__file__).resolve().parents[1]
 SDK_REVISION = "079c6f39023649b154152db30f1d781e884879bc"
@@ -47,6 +47,8 @@ def validate_host(directory, name, body, flags):
     command += ["-std=c99", "-O1", "-g", "-fsanitize=address,undefined",
                 "-fno-omit-frame-pointer", "-I" + str(ROOT / "src")]
     command += ["-D" + k + "=" + v for k, v in definitions(flags).items()]
+    if definitions(flags).get("TC_ENABLE_PIV_SM") == "1":
+        command += ["-I" + str(ROOT / "examples"), ROOT / "examples/piv_sm_wire.c"]
     command += [source, *sorted((ROOT / "src").glob("*.c")), "-o", executable]
     run(command)
     run([executable])
@@ -59,6 +61,9 @@ def validate_kmac_vectors(directory):
     run([*command, "-std=c99", "-O1", "-g", "-fsanitize=address,undefined",
          "-fno-omit-frame-pointer", "-DTC_ENABLE_KMAC256=1", "-I" + str(ROOT / "src"),
          ROOT / "tests/kmac/test.c", ROOT / "src/kmac.c", ROOT / "src/common.c",
+         "-I" + str(ROOT / "tests/support"), ROOT / "tests/support/munit.c",
+         ROOT / "tests/support/test_util.c",
+         ROOT / "tests/support/cavp.c",
          "-o", executable])
     run([executable])
     print("Validated NIST and PIV Auto KMAC256 vectors", file=sys.stderr)
@@ -118,10 +123,10 @@ def account(sections, board):
 def measure_uno(directory, body, flags):
     source = directory / "fixture.cpp"
     source.write_text(SKETCH % body, encoding="utf-8")
-    build = directory / "pio"
     normalized = " ".join("-D" + k + "=" + v for k, v in definitions(flags).items())
-    # PlatformIO copies --lib recursively, so keep build output out of its input.
-    with tempfile.TemporaryDirectory() as temporary:
+    # pio ci keeps old configuration and library copies in a reused project.
+    with tempfile.TemporaryDirectory(dir=directory, prefix="pio-") as project, tempfile.TemporaryDirectory() as temporary:
+        build = Path(project)
         library = Path(temporary) / "tiny-crypto-c"
         shutil.copytree(ROOT / "src", library / "src")
         shutil.copy2(ROOT / "library.json", library / "library.json")
@@ -130,12 +135,12 @@ def measure_uno(directory, body, flags):
                       "--project-option=platform=" + PLATFORM,
                       "--project-option=platform_packages=platformio/framework-arduino-avr@5.2.0, platformio/toolchain-atmelavr@1.70300.191015",
                       "--project-option=build_flags=" + normalized])
-    for package in ("framework-arduino-avr @ 5.2.0", "toolchain-atmelavr @ 1.70300.191015"):
-        if package not in output:
-            raise ValueError("Unexpected Uno toolchain: " + package)
-    core = Path(os.environ.get("PLATFORMIO_CORE_DIR", Path.home() / ".platformio"))
-    objdump = core / "packages/toolchain-atmelavr/bin/avr-objdump"
-    return account(sections_from_objdump(run([objdump, "-h", build / ".pio/build/uno/firmware.elf"])), "uno")
+        for package in ("framework-arduino-avr @ 5.2.0", "toolchain-atmelavr @ 1.70300.191015"):
+            if package not in output:
+                raise ValueError("Unexpected Uno toolchain: " + package)
+        core = Path(os.environ.get("PLATFORMIO_CORE_DIR", Path.home() / ".platformio"))
+        objdump = core / "packages/toolchain-atmelavr/bin/avr-objdump"
+        return account(sections_from_objdump(run([objdump, "-h", build / ".pio/build/uno/firmware.elf"])), "uno")
 
 
 def pico_environment():
@@ -192,7 +197,7 @@ def collect(directory, boards):
         raise ValueError("Resource reports require PlatformIO 6.1.19")
     if "pico2" in boards:
         toolchain, env = pico_environment()
-    report = {"schema": 1, "boards": {}}
+    report = {"schema": 5, "boards": {}}
     for board in boards:
         report["boards"][board] = {
             "capacity": CAPACITIES[board],
@@ -200,11 +205,26 @@ def collect(directory, boards):
                           if board == "uno" else "Pico SDK 2.3.1; Arm GCC 12.3.Rel1; pico2; rp2350-arm-s"),
             "optimization": "-Os; section GC; " + ("LTO enabled" if board == "uno" else "LTO disabled"),
             "rows": []}
-    for index, (name, body, flags) in enumerate(FEATURES):
+        if board == "uno":
+            core = Path(os.environ.get("PLATFORMIO_CORE_DIR", Path.home() / ".platformio"))
+            compiler = core / "packages/toolchain-atmelavr/bin/avr-gcc"
+            nm = compiler.with_name("avr-nm")
+            flags = ["-mmcu=atmega328p"]
+        else:
+            compiler = toolchain / "arm-none-eabi-gcc"
+            nm = toolchain / "arm-none-eabi-nm"
+            flags = ["-mcpu=cortex-m33", "-mthumb"]
+        report["boards"][board]["tlv"] = tlv_storage(directory / board / "layout", compiler, nm, flags)
+        report["boards"][board]["pki"] = pki_storage(directory / board / "pki-layout", compiler, nm, flags)
+    cases = FEATURES + (RP2350_FEATURES if "pico2" in boards else [])
+    for index, (name, body, flags) in enumerate(cases):
         validation = directory / "host" / str(index)
         validation.mkdir(parents=True, exist_ok=True)
         validate_host(validation, name, body, flags)
+    for index, (name, body, flags) in enumerate(cases):
         for board in boards:
+            if (name, body, flags) not in features_for_board(board):
+                continue
             build = directory / board / str(index)
             build.mkdir(parents=True, exist_ok=True)
             print("Measuring " + board + ": " + name, file=sys.stderr)
@@ -215,25 +235,84 @@ def collect(directory, boards):
     return report
 
 
+def tlv_storage(directory, compiler, nm, flags):
+    return parser_storage(directory, compiler, nm, flags,
+        (("reader", "TC_TLV_reader"), ("stream", "TC_TLV_stream"),
+         ("frame", "TC_TLV_frame"), ("element", "TC_TLV_element")),
+        ("tlv", "tlv_walk", "der"))
+
+
+def pki_storage(directory, compiler, nm, flags):
+    return parser_storage(directory, compiler, nm, flags,
+        (("certificate", "TC_X509_certificate"), ("public_key", "TC_X509_public_key"),
+         ("chuid", "TC_PIV_CHUID"), ("cvc", "TC_PIV_CVC"), ("extension_slot", "TC_bytes"),
+         ("eac_certificate", "TC_EAC_CVC"), ("eac_key", "TC_EAC_CVC_public_key"),
+         ("path_workspace", "TC_X509_path_workspace"),
+         ("policy_node", "TC_X509_policy_node"), ("policy_edge", "TC_X509_policy_edge"),
+         ("policy_expected", "TC_X509_policy_expected"),
+         ("policy_mapping", "TC_X509_policy_mapping")),
+        ("x509", "x509_time", "x509_key", "x509_ext", "x509_name", "x509_path", "x509_policy",
+         "asn1_string", "unicode", "piv_chuid", "piv_cvc", "eac_cvc", "der"))
+
+
+def stack_frame_size(line):
+    function, size, kind = line.rsplit("\t", 2)
+    # GCC's bounded qualifier makes the reported size a reliable maximum.
+    if kind not in ("static", "dynamic,bounded"):
+        raise ValueError(f"Unbounded or unknown stack frame: {function} ({kind})")
+    if not size.isdecimal():
+        raise ValueError(f"Invalid stack frame size: {function} ({size})")
+    return int(size)
+
+
+def parser_storage(directory, compiler, nm, flags, types, sources):
+    directory.mkdir(parents=True, exist_ok=True)
+    source = directory / "layout.c"
+    source.write_text('#include <tiny_crypto/tiny_crypto.h>\n' + "".join(
+        f"unsigned char tc_size_{name}[sizeof({kind})];\n" for name, kind in
+        types), encoding="utf-8")
+    command = [compiler, *flags, "-std=c99", "-Os", "-fno-common", "-I" + str(ROOT / "src"),
+               "-DTC_ENABLE_TLV=1", "-DTC_ENABLE_DER=1", "-DTC_TLV_ENABLE_BER=1",
+               "-DTC_TLV_ENABLE_STREAM=1", "-DTC_ENABLE_X509=1",
+               "-DTC_ENABLE_X509_PATH=1",
+               "-DTC_ENABLE_PIV_CVC=1", "-DTC_ENABLE_PIV_CHUID=1", "-DTC_ENABLE_EAC_CVC=1"]
+    run([*command, "-c", source, "-o", directory / "layout.o"])
+    symbols = run([nm, "-S", directory / "layout.o"])
+    sizes = {name: int(size, 16) for size, name in re.findall(
+        r"[0-9a-fA-F]+\s+([0-9a-fA-F]+)\s+\w\s+tc_size_(\w+)", symbols)}
+    if set(sizes) != {name for name, _ in types}:
+        raise ValueError("Missing parser layout symbols")
+    stack = []
+    for name in sources:
+        run([*command, "-fstack-usage", "-c", ROOT / f"src/{name}.c",
+             "-o", directory / f"{name}.o"])
+        for line in (directory / f"{name}.su").read_text().splitlines():
+            stack.append(stack_frame_size(line))
+    sizes["largest_stack_frame"] = max(stack)
+    return sizes
+
+
 def render(report):
-    if report["schema"] != 1 or set(report["boards"]) != set(CAPACITIES):
+    if report["schema"] != 5 or set(report["boards"]) != set(CAPACITIES):
         raise ValueError("Report must contain Uno and Pico 2 measurements")
-    lines = ["<!-- Generated by make benchmark-report. Do not edit by hand. -->",
+    lines = ["<!-- SPDX-FileCopyrightText: Mistial Dev -->",
+             "<!-- SPDX-License-Identifier: GPL-2.0-or-later -->", "",
+             "<!-- Generated by make benchmark-report. Do not edit by hand. -->",
              "# Embedded resource benchmarks", "",
              "Each row shows the flash and static RAM used by a small program that",
-             "calls the named function. The totals include startup code and the test",
-             "program, not just the library. Percentages are of the board's total memory.", "",
+             "calls the named function. Totals include the library, startup code and",
+             "test program. Percentages use the board's physical memory capacity.", "",
              "Leave room for the stack and your application: the RAM column counts",
              "static allocations only. Reserved stack and heap sizes come from the",
-             "linker; they don't tell you how much memory a running program will use.", "",
+             "linker. Measure peak runtime use in your application.", "",
              "The Pico 2 builds use one Cortex-M33 core and run code from flash,",
-             "without an RTOS or USB/UART output. These are size measurements, not",
-             "speed tests.", "",
+             "with the RTOS and USB/UART output disabled. The report measures memory",
+             "use; run host throughput tests with `make benchmark`.", "",
              "## Updating the numbers", "",
              "Run `make benchmark-report` to rebuild this page, or",
              "`make benchmark-report-check` to check that it's up to date.",
-             "Both run the tests on your computer and build for each board.",
-             "You don't need either board connected.", "",
+             "Both validate fixtures on the host and cross-compile for each board.",
+             "Boards can remain disconnected.", "",
              "Install PlatformIO 6.1.19 and Arm GCC 12.3.Rel1. Set",
              "`PICO_SDK_PATH` to an unmodified Pico SDK 2.3.1 checkout and",
              "`PICO_TOOLCHAIN_PATH` to the Arm compiler's `bin` directory.",
@@ -243,7 +322,7 @@ def render(report):
         cap = data["capacity"]
         if cap != CAPACITIES[board]:
             raise ValueError("Unexpected board capacity")
-        if [row["feature"] for row in data["rows"]] != [case[0] for case in FEATURES]:
+        if [row["feature"] for row in data["rows"]] != [case[0] for case in features_for_board(board)]:
             raise ValueError("Missing or reordered measurement profiles")
         lines += ["## " + title, "", data["toolchain"] + ".", "",
                   "Build: " + data["optimization"] + ".", "",
@@ -251,10 +330,41 @@ def render(report):
                   f"Application flash limit: {cap['application_flash']:,} bytes.", ""]
         if board == "uno":
             lines += ["The bootloader takes another 512 bytes, not included in the table.", ""]
+        storage = data["tlv"]
+        for field in ("reader", "stream", "frame", "element", "largest_stack_frame"):
+            if type(storage[field]) is not int or storage[field] <= 0:
+                raise ValueError("Invalid TLV storage measurement")
+        lines += [f"TLV object sizes: reader {storage['reader']}, stream {storage['stream']},",
+                  f"element {storage['element']}, and nesting frame {storage['frame']} bytes.",
+                  "Frame storage is caller-owned; multiply its size by the allowed depth.",
+                  f"The largest compiler-reported TLV/DER stack frame is {storage['largest_stack_frame']} bytes",
+                  "at `-Os` without LTO. Called functions and callbacks need additional stack.", ""]
+        pki = data["pki"]
+        for field in ("certificate", "public_key", "chuid", "cvc", "extension_slot", "eac_certificate", "eac_key",
+                      "path_workspace", "policy_node", "policy_edge", "policy_expected", "policy_mapping",
+                      "largest_stack_frame"):
+            if type(pki[field]) is not int or pki[field] <= 0:
+                raise ValueError("Invalid PKI storage measurement")
+        lines += [f"Parsed object sizes: X.509 certificate {pki['certificate']}, public key {pki['public_key']},",
+                  f"CHUID {pki['chuid']}, and CVC {pki['cvc']} bytes.",
+                  f"EAC certificate and public-key objects use {pki['eac_certificate']} and {pki['eac_key']} bytes.",
+                  f"X.509 needs another {pki['extension_slot']} bytes of scratch space per extension,",
+                  "plus the nesting frames above. Input buffers must remain available while",
+                  "using the parsed fields.",
+                  f"The path workspace descriptor uses {pki['path_workspace']} bytes, excluding its arrays.",
+                  f"Policy array entries use {pki['policy_node']} bytes per node, {pki['policy_edge']} per edge,",
+                  f"{pki['policy_expected']} per expected policy, and {pki['policy_mapping']} per mapping.",
+                  "Name comparison also needs two caller-sized Unicode scalar arrays (4 bytes per scalar)",
+                  "and an attribute-match array (1 byte per entry). See [path validation](x509-path.md)",
+                  "for workspace setup and buffer lifetimes.",
+                  f"The largest compiler-reported PKI stack frame is {pki['largest_stack_frame']} bytes",
+                  "at `-Os` without LTO. This includes name and path processing, but excludes",
+                  "called functions and the application's signature verifier. Object and frame sizes",
+                  "alone do not establish that a complete validation fits on the board.", ""]
         lines += ["| Feature | Flash bytes | Flash % | Static RAM bytes | RAM % | Reserved stack / heap bytes |",
                   "| --- | ---: | ---: | ---: | ---: | ---: |"]
         for row in data["rows"]:
-            case = next(case for case in FEATURES if case[0] == row["feature"])
+            case = next(case for case in features_for_board(board) if case[0] == row["feature"])
             if row["definitions"] != definitions(case[2]):
                 raise ValueError("Unexpected feature definitions")
             for field in ("flash", "static_ram", "reserved_stack", "reserved_heap"):

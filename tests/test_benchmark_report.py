@@ -14,6 +14,14 @@ import benchmark_report as report
 
 
 class ResourceTests(unittest.TestCase):
+    def test_stack_frame_bounds(self):
+        self.assertEqual(report.stack_frame_size("x.c:1:1:f\t32\tstatic"), 32)
+        self.assertEqual(report.stack_frame_size("x.c:1:1:f\t48\tdynamic,bounded"), 48)
+        for line in ("x.c:1:1:f\t32\tdynamic", "x.c:1:1:f\t32\tunknown",
+                     "x.c:1:1:f\t-1\tstatic", "x.c:1:1:f\tNaN\tstatic", "garbage"):
+            with self.subTest(line=line), self.assertRaises(ValueError):
+                report.stack_frame_size(line)
+
     def test_uno_library_excludes_build_output(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -22,9 +30,15 @@ class ResourceTests(unittest.TestCase):
             (root / "library.json").write_text('{"name": "tiny-crypto-c"}')
             build = root / "build/uno"
             build.mkdir(parents=True)
+            (build / "pio").mkdir()
+            (build / "pio/platformio.ini").write_text("[env:uno]\nbuild_flags = -DSTALE=1\n")
 
             def run(command):
                 if command[0] == "pio":
+                    project = Path(command[command.index("--build-dir") + 1])
+                    self.assertNotEqual(project, build / "pio")
+                    self.assertFalse((project / "platformio.ini").exists())
+                    self.assertIn("--project-option=build_flags=-DTC_ENABLE_PIV_CHUID=1", command)
                     library = Path(command[2].removeprefix("--lib="))
                     self.assertEqual(sorted(p.name for p in library.iterdir()),
                                      ["library.json", "src"])
@@ -35,7 +49,7 @@ class ResourceTests(unittest.TestCase):
                         "                  CONTENTS, ALLOC, LOAD, READONLY, CODE\n")
 
             with patch.object(report, "ROOT", root), patch.object(report, "run", side_effect=run):
-                self.assertEqual(report.measure_uno(build, "", "")["flash"], 16)
+                self.assertEqual(report.measure_uno(build, "", "-DTC_ENABLE_PIV_CHUID=1")["flash"], 16)
 
     def section(self, name, size, vma, lma, load=True):
         return dict(name=name, size=size, vma=vma, lma=lma,
@@ -77,15 +91,21 @@ class ResourceTests(unittest.TestCase):
             report.account([self.section(".text", 32257, 0, 0)], "uno")
 
     def fixture(self):
-        data = {"schema": 1, "boards": {}}
+        data = {"schema": 5, "boards": {}}
         for board in report.CAPACITIES:
             cap = report.CAPACITIES[board]
             rows = [dict(feature=n, definitions=report.definitions(f), flash=100,
                          static_ram=20, reserved_stack=0, reserved_heap=0,
                          flash_percent=10000 / cap["flash"],
                          static_ram_percent=2000 / cap["ram"])
-                    for n, _, f in report.FEATURES]
+                    for n, _, f in report.features_for_board(board)]
             data["boards"][board] = dict(capacity=cap, toolchain="fixture",
+                                         tlv=dict(reader=32, stream=64, frame=16, element=32, largest_stack_frame=96),
+                                         pki=dict(certificate=128, public_key=64, chuid=32, cvc=64,
+                                                  eac_certificate=256, eac_key=128,
+                                                  extension_slot=8, largest_stack_frame=128,
+                                                  path_workspace=128, policy_node=24, policy_edge=8,
+                                                  policy_expected=12, policy_mapping=16),
                                          optimization="-Os", rows=rows)
         return data
 
@@ -122,6 +142,23 @@ class ResourceTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertEqual(destination.read_bytes(), b"stale\n")
             self.assertEqual((directory / "build/benchmarks.md").read_bytes(), expected)
+
+    def test_path_storage_required(self):
+        for field in ("path_workspace", "policy_node", "policy_edge", "policy_expected", "policy_mapping"):
+            for value in (0, -1, True, "16"):
+                with self.subTest(field=field, value=value):
+                    data = self.fixture()
+                    data["boards"]["pico2"]["pki"][field] = value
+                    with self.assertRaises(ValueError):
+                        report.render(data)
+            data = self.fixture()
+            del data["boards"]["uno"]["pki"][field]
+            with self.assertRaises(KeyError):
+                report.render(data)
+        data = self.fixture()
+        data["schema"] = 4
+        with self.assertRaises(ValueError):
+            report.render(data)
 
 
 if __name__ == "__main__":

@@ -2,13 +2,15 @@
  * SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
+#include "munit.h"
 
 #include <string.h>
 
 #include <tiny_crypto/aes.h>
 
-int main(void)
+static MunitResult test_profile(const MunitParameter params[], void* user)
 {
+  (void)params; (void)user;
   static const uint8_t expected_ciphertext[16] = {
     0x03, 0x88, 0xda, 0xce, 0x60, 0xb6, 0xa3, 0x92,
     0xf3, 0x28, 0xc2, 0xb9, 0x71, 0xb2, 0xfe, 0x78
@@ -24,14 +26,19 @@ int main(void)
   uint8_t recovered[16];
   uint8_t tag[16];
 
-  if (TC_AES_GCM_encrypt(key, iv, sizeof(iv), NULL, 0, plaintext,
-                         sizeof(plaintext), ciphertext, tag, sizeof(tag)) != TC_OK)
-    return 1;
-  if (memcmp(ciphertext, expected_ciphertext, sizeof(ciphertext)) != 0 ||
-      memcmp(tag, expected_tag, sizeof(tag)) != 0)
-    return 2;
-  if (TC_AES_GCM_decrypt(key, iv, sizeof(iv), NULL, 0, ciphertext,
-                         sizeof(ciphertext), tag, sizeof(tag), recovered) != TC_OK)
-    return 3;
+  munit_assert_false(TC_AES_GCM_encrypt(key, iv, sizeof(iv), NULL, 0, plaintext,
+                         sizeof(plaintext), ciphertext, tag, sizeof(tag)) != TC_OK);
+  munit_assert_false(memcmp(ciphertext, expected_ciphertext, sizeof(ciphertext)) != 0 ||
+      memcmp(tag, expected_tag, sizeof(tag)) != 0);
+  munit_assert_false(TC_AES_GCM_decrypt(key, iv, sizeof(iv), NULL, 0, ciphertext,
+                         sizeof(ciphertext), tag, sizeof(tag), recovered) != TC_OK);
   return memcmp(recovered, plaintext, sizeof(plaintext)) == 0 ? 0 : 4;
 }
+
+static MunitTest tests[] = {
+  {"/profile", test_profile, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+  {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}
+};
+static const MunitSuite suite = {"/gcm-profile", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};
+int main(int argc, char* argv[])
+{ return munit_suite_main(&suite, NULL, argc, argv); }

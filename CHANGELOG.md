@@ -3,6 +3,10 @@
 
 # Changelog
 
+## 1.0.1
+
+- Adds embedded PIV/TWIC validation, PKI support, and target benchmarks.
+
 ## 1.0.0
 
 - Initial release.

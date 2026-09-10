@@ -12,6 +12,19 @@
   #include <stdlib.h>
 #endif
 
+/* Keep mask selection as arithmetic. Otherwise an optimizer may replace it
+ * with a conditional pointer and load only the selected secret operand. */
+static inline uint32_t tc_internal_mask_barrier(uint32_t mask)
+{
+#if defined(__GNUC__) || defined(__clang__)
+  __asm__ __volatile__("" : "+r"(mask));
+#else
+  volatile uint32_t value = mask;
+  mask = value;
+#endif
+  return mask;
+}
+
 /* Test whether two byte ranges are disjoint without forming end pointers.
  * Subtraction avoids wrap when a range begins near UINTPTR_MAX. */
 static inline int tc_internal_ranges_disjoint(const void* a, size_t a_len,

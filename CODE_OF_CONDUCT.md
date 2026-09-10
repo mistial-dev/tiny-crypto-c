@@ -1,8 +1,11 @@
+<!-- SPDX-License-Identifier: MIT -->
+
 # Bounded Contribution Policy
 
 **Version 2.0.3** (adopted from
 [OpenPhysical/BoundedContributionPolicy](https://github.com/OpenPhysical/BoundedContributionPolicy))
 | [Upstream changelog](https://github.com/OpenPhysical/BoundedContributionPolicy/blob/master/docs/CHANGELOG.md)
+| [MIT license](LICENSES/BoundedContributionPolicy-MIT.txt)
 
 This document is the project's Bounded Contribution Policy. The conventional
 `CODE_OF_CONDUCT.md` filename is retained for platform compatibility.

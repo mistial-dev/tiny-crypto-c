@@ -303,22 +303,32 @@ static int tc_aes_gcm_packet_length_ok(const struct TC_AES_GCM_ctx* ctx,
   return 1;
 }
 
-static void tc_aes_gcm_make_tag(const struct TC_AES_GCM_ctx* ctx, uint8_t* tag)
+static void tc_aes_gcm_invalidate(struct TC_AES_GCM_ctx* ctx)
+{
+  TC_AES_GCM_clear(ctx);
+  ctx->phase = TC_AES_GCM_PHASE_FINAL;
+}
+
+static TC_status tc_aes_gcm_make_tag(const struct TC_AES_GCM_ctx* ctx, uint8_t* tag)
 {
   uint8_t mask[TC_AES_BLOCKLEN];
   uint8_t hash[TC_AES_BLOCKLEN];
   uint8_t i;
+  TC_status status;
 
   tc_aes_copy_bytes(mask, ctx->J0, TC_AES_BLOCKLEN);
-  tc_aes_cipher((state_t*)mask, ctx->key.round_key);
+  status = tc_aes_cipher((state_t*)mask, ctx->key.round_key);
+  if (status != TC_OK) goto done;
   tc_aes_copy_bytes(hash, ctx->S, TC_AES_BLOCKLEN);
   /* MSBt truncation: leading tag_len bytes of the 128-bit block. */
   for (i = 0; i < ctx->tag_len; ++i)
     tag[i] = (uint8_t)(mask[i] ^ hash[i]);
+done:
 #if TC_ZEROIZE
   TC_secure_zero(mask, sizeof(mask));
   TC_secure_zero(hash, sizeof(hash));
 #endif
+  return status;
 }
 
 TC_status TC_AES_GCM_init(struct TC_AES_GCM_ctx* ctx, const uint8_t* key,
@@ -334,7 +344,10 @@ TC_status TC_AES_GCM_init(struct TC_AES_GCM_ctx* ctx, const uint8_t* key,
   if (TC_AES_key_init(&ctx->key, key) != TC_OK)
     return TC_ERROR;
   tc_aes_copy_bytes(ctx->H, zero, TC_AES_BLOCKLEN);
-  tc_aes_cipher((state_t*)ctx->H, ctx->key.round_key);
+  if (tc_aes_cipher((state_t*)ctx->H, ctx->key.round_key) != TC_OK) {
+    tc_aes_gcm_invalidate(ctx);
+    return TC_ERROR;
+  }
 #if TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_FAST_TABLE
   tc_aes_gcm_init_table(ctx);
 #endif
@@ -373,6 +386,7 @@ static int tc_aes_gcm_update(struct TC_AES_GCM_ctx* ctx, uint8_t* buf, size_t le
 {
   size_t i;
   const size_t total_length = length;
+  uint8_t* const output = buf;
   const uint8_t direction = decrypt ? TC_AES_GCM_DIRECTION_DECRYPT :
                                      TC_AES_GCM_DIRECTION_ENCRYPT;
 
@@ -400,7 +414,7 @@ static int tc_aes_gcm_update(struct TC_AES_GCM_ctx* ctx, uint8_t* buf, size_t le
 
     tc_aes_gcm_increment_counter(ctx->counter);
     tc_aes_copy_bytes(ctx->stream, ctx->counter, TC_AES_BLOCKLEN);
-    tc_aes_cipher((state_t*)ctx->stream, ctx->key.round_key);
+    if (tc_aes_cipher((state_t*)ctx->stream, ctx->key.round_key) != TC_OK) goto failed;
     if (decrypt)
       tc_aes_gcm_absorb(ctx, buf, TC_AES_BLOCKLEN);
     for (j = 0; j < TC_AES_BLOCKLEN; ++j)
@@ -420,7 +434,7 @@ static int tc_aes_gcm_update(struct TC_AES_GCM_ctx* ctx, uint8_t* buf, size_t le
     {
       tc_aes_gcm_increment_counter(ctx->counter);
       tc_aes_copy_bytes(ctx->stream, ctx->counter, TC_AES_BLOCKLEN);
-      tc_aes_cipher((state_t*)ctx->stream, ctx->key.round_key);
+      if (tc_aes_cipher((state_t*)ctx->stream, ctx->key.round_key) != TC_OK) goto failed;
       ctx->stream_pos = 0;
     }
 
@@ -438,6 +452,10 @@ static int tc_aes_gcm_update(struct TC_AES_GCM_ctx* ctx, uint8_t* buf, size_t le
   }
   ctx->text_len += (uint64_t)total_length;
   return TC_OK;
+failed:
+  TC_secure_zero(output, total_length);
+  tc_aes_gcm_invalidate(ctx);
+  return TC_ERROR;
 }
 
 TC_status TC_AES_GCM_encrypt_update(struct TC_AES_GCM_ctx* ctx, uint8_t* buf,
@@ -465,7 +483,10 @@ TC_status TC_AES_GCM_encrypt_finish(struct TC_AES_GCM_ctx* ctx, uint8_t* tag)
     ctx->phase = TC_AES_GCM_PHASE_TEXT;
   }
   tc_aes_gcm_finish_ghash(ctx);
-  tc_aes_gcm_make_tag(ctx, tag);
+  if (tc_aes_gcm_make_tag(ctx, tag) != TC_OK) {
+    tc_aes_gcm_invalidate(ctx);
+    return TC_ERROR;
+  }
   ctx->phase = TC_AES_GCM_PHASE_FINAL;
   return TC_OK;
 }
@@ -486,11 +507,13 @@ TC_status TC_AES_GCM_decrypt_finish(struct TC_AES_GCM_ctx* ctx, const uint8_t* t
     ctx->phase = TC_AES_GCM_PHASE_TEXT;
   }
   tc_aes_gcm_finish_ghash(ctx);
-  tc_aes_gcm_make_tag(ctx, expected);
+  status = tc_aes_gcm_make_tag(ctx, expected);
   /* Authentication tags contain secrets, so comparison time must not reveal
    * the first byte that differs. */
-  status = TC_ct_equal(expected, tag, ctx->tag_len);
-  ctx->phase = TC_AES_GCM_PHASE_FINAL;
+  if (status == TC_OK) {
+    status = TC_ct_equal(expected, tag, ctx->tag_len);
+    ctx->phase = TC_AES_GCM_PHASE_FINAL;
+  } else tc_aes_gcm_invalidate(ctx);
 #if TC_ZEROIZE
   TC_secure_zero(expected, sizeof(expected));
 #endif
@@ -552,6 +575,8 @@ TC_status TC_AES_GCM_encrypt(const uint8_t* key,
   status = TC_AES_GCM_encrypt_update(&ctx, ciphertext, plaintext_len);
   if (status == TC_OK)
     status = TC_AES_GCM_encrypt_finish(&ctx, tag);
+  if (status != TC_OK && plaintext_len != 0)
+    TC_secure_zero(ciphertext, plaintext_len);
 
 #if TC_ZEROIZE
   TC_AES_GCM_clear(&ctx);
@@ -611,7 +636,7 @@ TC_status TC_AES_GCM_decrypt(const uint8_t* key,
   ctx.direction = TC_AES_GCM_DIRECTION_DECRYPT;
 
   tc_aes_gcm_finish_ghash(&ctx);
-  tc_aes_gcm_make_tag(&ctx, expected);
+  if (tc_aes_gcm_make_tag(&ctx, expected) != TC_OK) goto done;
   status = TC_ct_equal(expected, tag, ctx.tag_len);
   ctx.phase = TC_AES_GCM_PHASE_FINAL;
 
@@ -639,7 +664,8 @@ TC_status TC_AES_GCM_decrypt(const uint8_t* key,
 
       tc_aes_gcm_increment_counter(counter);
       tc_aes_copy_bytes(stream, counter, TC_AES_BLOCKLEN);
-      tc_aes_cipher((state_t*)stream, ctx.key.round_key);
+      status = tc_aes_cipher((state_t*)stream, ctx.key.round_key);
+      if (status != TC_OK) break;
       for (j = 0; j < (uint8_t)count; ++j)
         plaintext[offset + j] =
           (uint8_t)(ciphertext[offset + j] ^ stream[j]);
@@ -650,7 +676,8 @@ TC_status TC_AES_GCM_decrypt(const uint8_t* key,
     TC_secure_zero(stream, sizeof(stream));
 #endif
   }
-  status = TC_OK;
+  if (status != TC_OK && ciphertext_len != 0)
+    TC_secure_zero(plaintext, ciphertext_len);
 
 done:
 #if TC_ZEROIZE

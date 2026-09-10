@@ -1,0 +1,1370 @@
+[
+ {
+  "file": "removed/GTE_CyberTrust_Global_Root.der",
+  "label": "GTE CyberTrust Global Root",
+  "sha256": "a53125188d2110aa964b02c7b7c6da3203170894e5fb71fffb6667d5e6810a36",
+  "sigalg": "md5WithRSAEncryption",
+  "version": "1",
+  "keybits": "1024",
+  "notBefore": "Aug 13 00:29:00 1998 GMT"
+ },
+ {
+  "file": "removed/Thawte_Server_CA.der",
+  "label": "Thawte Server CA",
+  "sha256": "b4410b73e2e6eaca47fbc42f8fa4018af4381dc54cfaa84450461eed09454de9",
+  "sigalg": "md5WithRSAEncryption",
+  "version": "3",
+  "keybits": "1024",
+  "notBefore": "Aug  1 00:00:00 1996 GMT"
+ },
+ {
+  "file": "removed/Thawte_Premium_Server_CA.der",
+  "label": "Thawte Premium Server CA",
+  "sha256": "ab7036365c7154aa29c2c29f5d4191163b162a2225011357d56d07ffa7bc1f72",
+  "sigalg": "md5WithRSAEncryption",
+  "version": "3",
+  "keybits": "1024",
+  "notBefore": "Aug  1 00:00:00 1996 GMT"
+ },
+ {
+  "file": "removed/Equifax_Secure_CA.der",
+  "label": "Equifax Secure CA",
+  "sha256": "08297a4047dba23680c731db6e317653ca7848e1bebd3a0b0179a707f92cf178",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "1024",
+  "notBefore": "Aug 22 16:41:51 1998 GMT"
+ },
+ {
+  "file": "removed/Digital_Signature_Trust_Co_Global_CA_1.der",
+  "label": "Digital Signature Trust Co. Global CA 1",
+  "sha256": "630419aec478cbb4bb8083de9d9cf279752f039def16e46471b679ca93002db0",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "1024",
+  "notBefore": "Dec 10 18:10:23 1998 GMT"
+ },
+ {
+  "file": "removed/Digital_Signature_Trust_Co_Global_CA_3.der",
+  "label": "Digital Signature Trust Co. Global CA 3",
+  "sha256": "8f62d7736f99dbd33ee00e10c7e329339c988a5b47ef25f408293cf2426b4d44",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "1024",
+  "notBefore": "Dec  9 19:17:26 1998 GMT"
+ },
+ {
+  "file": "removed/Verisign_Class_3_Public_Primary_Certification_Authority.der",
+  "label": "Verisign Class 3 Public Primary Certification Authority",
+  "sha256": "e7685634efacf69ace939a6b255b7b4fabef42935b50a265acb5cb6027e44e70",
+  "sigalg": "md2WithRSAEncryption",
+  "version": "1",
+  "keybits": "1024",
+  "notBefore": "Jan 29 00:00:00 1996 GMT"
+ },
+ {
+  "file": "removed/Verisign_Class_1_Public_Primary_Certification_Authority_G2.der",
+  "label": "Verisign Class 1 Public Primary Certification Authority - G2",
+  "sha256": "341de98b1392abf7f4ab90a960cf25d4bd6ec65b9a51ce6ed067d00ec7ce9b7f",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "1",
+  "keybits": "1024",
+  "notBefore": "May 18 00:00:00 1998 GMT"
+ },
+ {
+  "file": "removed/Verisign_Class_2_Public_Primary_Certification_Authority_G2.der",
+  "label": "Verisign Class 2 Public Primary Certification Authority - G2",
+  "sha256": "3a43e220fe7f3ea9653d1e21742eac2b75c20fd8980305bc502caf8c2d9b41a1",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "1",
+  "keybits": "1024",
+  "notBefore": "May 18 00:00:00 1998 GMT"
+ },
+ {
+  "file": "removed/Verisign_Class_3_Public_Primary_Certification_Authority_G2.der",
+  "label": "Verisign Class 3 Public Primary Certification Authority - G2",
+  "sha256": "83ce3c1229688a593d485f81973c0f9195431eda37cc5e36430e79c7a888638b",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "1",
+  "keybits": "1024",
+  "notBefore": "May 18 00:00:00 1998 GMT"
+ },
+ {
+  "file": "removed/GlobalSign_Root_CA_R2.der",
+  "label": "GlobalSign Root CA - R2",
+  "sha256": "ca42dd41745fd0b81eb902362cf9d8bf719da1bd1b1efc946f5b4c99f42c1b9e",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Dec 15 08:00:00 2006 GMT"
+ },
+ {
+  "file": "removed/ValiCert_Class_1_VA.der",
+  "label": "ValiCert Class 1 VA",
+  "sha256": "f4c149551a3013a35bc7bffe17a7f3449bc1ab5b5a0ae74b06c23b90004c0104",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "1",
+  "keybits": "1024",
+  "notBefore": "Jun 25 22:23:48 1999 GMT"
+ },
+ {
+  "file": "removed/ValiCert_Class_2_VA.der",
+  "label": "ValiCert Class 2 VA",
+  "sha256": "58d017279cd4dc63abddb196a6c9906c30c4e08783eae8c1609954d69355596b",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "1",
+  "keybits": "1024",
+  "notBefore": "Jun 26 00:19:54 1999 GMT"
+ },
+ {
+  "file": "removed/RSA_Root_Certificate_1.der",
+  "label": "RSA Root Certificate 1",
+  "sha256": "bc23f98a313cb92de3bbfc3a5a9f4461ac39494c4ae15a9e9df131e99b73019a",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "1",
+  "keybits": "1024",
+  "notBefore": "Jun 26 00:22:33 1999 GMT"
+ },
+ {
+  "file": "removed/Verisign_Class_1_Public_Primary_Certification_Authority_G3.der",
+  "label": "Verisign Class 1 Public Primary Certification Authority - G3",
+  "sha256": "cbb5af185e942a2402f9eacbc0ed5bb876eea3c1223623d00447e4f3ba554b65",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "1",
+  "keybits": "2048",
+  "notBefore": "Oct  1 00:00:00 1999 GMT"
+ },
+ {
+  "file": "removed/Verisign_Class_2_Public_Primary_Certification_Authority_G3.der",
+  "label": "Verisign Class 2 Public Primary Certification Authority - G3",
+  "sha256": "92a9d9833fe1944db366e8bfae7a95b6480c2d6c6c2a1be65d4236b608fca1bb",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "1",
+  "keybits": "2048",
+  "notBefore": "Oct  1 00:00:00 1999 GMT"
+ },
+ {
+  "file": "removed/Verisign_Class_3_Public_Primary_Certification_Authority_G3.der",
+  "label": "Verisign Class 3 Public Primary Certification Authority - G3",
+  "sha256": "eb04cf5eb1f39afa762f2bb120f296cba520c1b97db1589565b81cb9a17b7244",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "1",
+  "keybits": "2048",
+  "notBefore": "Oct  1 00:00:00 1999 GMT"
+ },
+ {
+  "file": "removed/Verisign_Class_4_Public_Primary_Certification_Authority_G3.der",
+  "label": "Verisign Class 4 Public Primary Certification Authority - G3",
+  "sha256": "e389360d0fdbaeb3d250584b4730314e222f39c156a020144e8d960561791506",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "1",
+  "keybits": "2048",
+  "notBefore": "Oct  1 00:00:00 1999 GMT"
+ },
+ {
+  "file": "removed/Entrust_net_Secure_Server_CA.der",
+  "label": "Entrust.net Secure Server CA",
+  "sha256": "62f240278c564c4dd8bf7d9d4f6f366ea894d22f5f34d989a983acec2fffed50",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "1024",
+  "notBefore": "May 25 16:09:40 1999 GMT"
+ },
+ {
+  "file": "removed/Baltimore_CyberTrust_Root.der",
+  "label": "Baltimore CyberTrust Root",
+  "sha256": "16af57a9f676b0ab126095aa5ebadef22ab31119d644ac95cd4b93dbf3f26aeb",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "May 12 18:46:00 2000 GMT"
+ },
+ {
+  "file": "removed/Equifax_Secure_Global_eBusiness_CA.der",
+  "label": "Equifax Secure Global eBusiness CA",
+  "sha256": "5f0b62eab5e353ea6521651658fbb65359f443280a4afbd104d77d10f9f04c07",
+  "sigalg": "md5WithRSAEncryption",
+  "version": "3",
+  "keybits": "1024",
+  "notBefore": "Jun 21 04:00:00 1999 GMT"
+ },
+ {
+  "file": "removed/Equifax_Secure_eBusiness_CA_1.der",
+  "label": "Equifax Secure eBusiness CA 1",
+  "sha256": "cf56ff46a4a186109dd96584b5eeb58a510c4275b0e5f94f40bbae865e19f673",
+  "sigalg": "md5WithRSAEncryption",
+  "version": "3",
+  "keybits": "1024",
+  "notBefore": "Jun 21 04:00:00 1999 GMT"
+ },
+ {
+  "file": "removed/AddTrust_Low_Value_Services_Root.der",
+  "label": "AddTrust Low-Value Services Root",
+  "sha256": "8c7209279ac04e275e16d07fd3b775e80154b5968046e31f52dd25766324e9a7",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "May 30 10:38:31 2000 GMT"
+ },
+ {
+  "file": "removed/AddTrust_External_Root.der",
+  "label": "AddTrust External Root",
+  "sha256": "687fa451382278fff0c8b11f8d43d576671c6eb2bceab413fb83d965d06d2ff2",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "May 30 10:48:38 2000 GMT"
+ },
+ {
+  "file": "removed/AddTrust_Public_Services_Root.der",
+  "label": "AddTrust Public Services Root",
+  "sha256": "0791ca0749b20782aad3c7d7bd0cdfc9485835843eb2d7996009ce43ab6c6927",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "May 30 10:41:50 2000 GMT"
+ },
+ {
+  "file": "removed/AddTrust_Qualified_Certificates_Root.der",
+  "label": "AddTrust Qualified Certificates Root",
+  "sha256": "8095210805db4bbc355e4428d8fd6ec2cde3ab5fb97a9942988eb8f4dcd06016",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "May 30 10:44:50 2000 GMT"
+ },
+ {
+  "file": "removed/Entrust_Root_Certification_Authority.der",
+  "label": "Entrust Root Certification Authority",
+  "sha256": "73c176434f1bc6d5adf45b0e76e727287c8de57616c1e6e6141a2b2cbc7d8e4c",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Nov 27 20:23:42 2006 GMT"
+ },
+ {
+  "file": "removed/RSA_Security_2048_v3.der",
+  "label": "RSA Security 2048 v3",
+  "sha256": "af8b6762a1e528228161a95d5c559ee266278f75d79e830189a503506abd6b4c",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Feb 22 20:39:23 2001 GMT"
+ },
+ {
+  "file": "removed/GeoTrust_Global_CA.der",
+  "label": "GeoTrust Global CA",
+  "sha256": "ff856a2d251dcd88d36656f450126798cfabaade40799c722de4d2b5db36a73a",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "May 21 04:00:00 2002 GMT"
+ },
+ {
+  "file": "removed/GeoTrust_Global_CA_2.der",
+  "label": "GeoTrust Global CA 2",
+  "sha256": "ca2d82a08677072f8ab6764ff035676cfe3e5e325e012172df3f92096db79b85",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Mar  4 05:00:00 2004 GMT"
+ },
+ {
+  "file": "removed/GeoTrust_Universal_CA.der",
+  "label": "GeoTrust Universal CA",
+  "sha256": "a0459b9f63b22559f5fa5d4c6db3f9f72ff19342033578f073bf1d1b46cbb912",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "4096",
+  "notBefore": "Mar  4 05:00:00 2004 GMT"
+ },
+ {
+  "file": "removed/GeoTrust_Universal_CA_2.der",
+  "label": "GeoTrust Universal CA 2",
+  "sha256": "a0234f3bc8527ca5628eec81ad5d69895da5680dc91d1cb8477f33f878b95b0b",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "4096",
+  "notBefore": "Mar  4 05:00:00 2004 GMT"
+ },
+ {
+  "file": "removed/UTN_USER_First_Network_Applications.der",
+  "label": "UTN-USER First-Network Applications",
+  "sha256": "c38dcb38959393358691ea4d4f3ce495ce748996e64ed1891d897a0fc4dd55c6",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Jul  9 18:48:39 1999 GMT"
+ },
+ {
+  "file": "removed/America_Online_Root_Certification_Authority_1.der",
+  "label": "America Online Root Certification Authority 1",
+  "sha256": "77407312c63a153d5bc00b4e51759cdfdac237dc2a33b67946e98e9bfa680ae3",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "May 28 06:00:00 2002 GMT"
+ },
+ {
+  "file": "removed/America_Online_Root_Certification_Authority_2.der",
+  "label": "America Online Root Certification Authority 2",
+  "sha256": "7d3b465a6014e526c0affcee2127d2311727ad811c26842d006af37306cc80bd",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "4096",
+  "notBefore": "May 28 06:00:00 2002 GMT"
+ },
+ {
+  "file": "removed/Visa_eCommerce_Root.der",
+  "label": "Visa eCommerce Root",
+  "sha256": "69fac9bd55fb0ac78d53bbee5cf1d597989fd0aaab20a25151bdf1733ee7d122",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Jun 26 02:18:36 2002 GMT"
+ },
+ {
+  "file": "removed/Comodo_Secure_Services_root.der",
+  "label": "Comodo Secure Services root",
+  "sha256": "bd81ce3b4f6591d11a67b5fc7a47fdef25521bf9aa4e18b9e3df2e34a7803be8",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Jan  1 00:00:00 2004 GMT"
+ },
+ {
+  "file": "removed/Comodo_Trusted_Services_root.der",
+  "label": "Comodo Trusted Services root",
+  "sha256": "3f06e55681d496f5be169eb5389f9f2b8ff61e1708df6881724849cd5d27cb69",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Jan  1 00:00:00 2004 GMT"
+ },
+ {
+  "file": "removed/QuoVadis_Root_CA.der",
+  "label": "QuoVadis Root CA",
+  "sha256": "a45ede3bbbf09c8ae15c72efc07268d693a21c996fd51e67ca079460fd6d8873",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Mar 19 18:33:33 2001 GMT"
+ },
+ {
+  "file": "removed/Security_Communication_Root_CA.der",
+  "label": "Security Communication Root CA",
+  "sha256": "e75e72ed9f560eec6eb4800073a43fc3ad19195a392282017895974a99026b6c",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Sep 30 04:20:49 2003 GMT"
+ },
+ {
+  "file": "removed/Sonera_Class_1_Root_CA.der",
+  "label": "Sonera Class 1 Root CA",
+  "sha256": "cd808284cf746ff2fd6eb58aa1d59c4ad4b3ca56fdc6274a8926a7835f32313d",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Apr  6 10:49:13 2001 GMT"
+ },
+ {
+  "file": "removed/Sonera_Class_2_Root_CA.der",
+  "label": "Sonera Class 2 Root CA",
+  "sha256": "7908b40314c138100b518d0735807ffbfcf8518a0095337105ba386b153dd927",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Apr  6 07:29:40 2001 GMT"
+ },
+ {
+  "file": "removed/Staat_der_Nederlanden_Root_CA.der",
+  "label": "Staat der Nederlanden Root CA",
+  "sha256": "d41d829e8c1659822af93fce62bffcde264fc84e8b950c5ff275d052354695a3",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Dec 17 09:23:49 2002 GMT"
+ },
+ {
+  "file": "removed/TDC_Internet_Root_CA.der",
+  "label": "TDC Internet Root CA",
+  "sha256": "4898c6888c0cffb0d3e31aca8a37d4e3515ff746d02635d86646cfa0a3185ae7",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Apr  5 16:33:17 2001 GMT"
+ },
+ {
+  "file": "removed/TDC_OCES_Root_CA.der",
+  "label": "TDC OCES Root CA",
+  "sha256": "39c75caecee8920c909f132491641350b57e2702a65a991545b01d1be4a2220b",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Feb 11 08:39:30 2003 GMT"
+ },
+ {
+  "file": "removed/UTN_DATACorp_SGC_Root_CA.der",
+  "label": "UTN DATACorp SGC Root CA",
+  "sha256": "85fb2f91dd12275a0145b636534f84024ad68b69b8ee88684ff711375805b348",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Jun 24 18:57:21 1999 GMT"
+ },
+ {
+  "file": "removed/UTN_USERFirst_Email_Root_CA.der",
+  "label": "UTN USERFirst Email Root CA",
+  "sha256": "43f257412d440d627476974f877da8f1fc2444565a367ae60eddc27a412531ae",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Jul  9 17:28:50 1999 GMT"
+ },
+ {
+  "file": "removed/UTN_USERFirst_Hardware_Root_CA.der",
+  "label": "UTN USERFirst Hardware Root CA",
+  "sha256": "6ea54741d004667eed1b4816634aa3a79e6e4b96950f8279dafc8d9bd8812137",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Jul  9 18:10:42 1999 GMT"
+ },
+ {
+  "file": "removed/UTN_USERFirst_Object_Root_CA.der",
+  "label": "UTN USERFirst Object Root CA",
+  "sha256": "6fff78e400a70c11011cd85977c459fb5af96a3df0540820d0f4b8607875e58f",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Jul  9 18:31:20 1999 GMT"
+ },
+ {
+  "file": "removed/Camerfirma_Chambers_of_Commerce_Root.der",
+  "label": "Camerfirma Chambers of Commerce Root",
+  "sha256": "0c258a12a5674aef25f28ba7dcfaeceea348e541e6f5cc4ee63b71b361606ac3",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Sep 30 16:13:43 2003 GMT"
+ },
+ {
+  "file": "removed/Camerfirma_Global_Chambersign_Root.der",
+  "label": "Camerfirma Global Chambersign Root",
+  "sha256": "ef3cb417fc8ebf6f97876c9e4ece39de1ea5fe649141d1028b7d11c0b2298ced",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Sep 30 16:14:18 2003 GMT"
+ },
+ {
+  "file": "removed/NetLock_Qualified_Class_QA_Root.der",
+  "label": "NetLock Qualified (Class QA) Root",
+  "sha256": "e606ddeee2ee7f5cdef5d9058ff8b7d0a9f042877f6a171ed8ff6960e4cc5ea5",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Mar 30 01:47:11 2003 GMT"
+ },
+ {
+  "file": "removed/NetLock_Notary_Class_A_Root.der",
+  "label": "NetLock Notary (Class A) Root",
+  "sha256": "7f12cd5f7e5e290ec7d85179d5b72c20a5be7508ffdb5bf81ab9684a7fc9f667",
+  "sigalg": "md5WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Feb 24 23:14:47 1999 GMT"
+ },
+ {
+  "file": "removed/NetLock_Business_Class_B_Root.der",
+  "label": "NetLock Business (Class B) Root",
+  "sha256": "39df7b682b7b938f84715481ccde8d60d8f22ec598877d0aaac12b59182b0312",
+  "sigalg": "md5WithRSAEncryption",
+  "version": "3",
+  "keybits": "1024",
+  "notBefore": "Feb 25 14:10:22 1999 GMT"
+ },
+ {
+  "file": "removed/NetLock_Express_Class_C_Root.der",
+  "label": "NetLock Express (Class C) Root",
+  "sha256": "0b5eed4e846403cf55e065848440ed2a82758bf5b9aa1f253d4613cfa080ff3f",
+  "sigalg": "md5WithRSAEncryption",
+  "version": "3",
+  "keybits": "1024",
+  "notBefore": "Feb 25 14:08:11 1999 GMT"
+ },
+ {
+  "file": "removed/XRamp_Global_CA_Root.der",
+  "label": "XRamp Global CA Root",
+  "sha256": "cecddc905099d8dadfc5b1d209b737cbe2c18cfb2c10c0ff0bcf0d3286fc1aa2",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Nov  1 17:14:04 2004 GMT"
+ },
+ {
+  "file": "removed/StartCom_Certification_Authority.der",
+  "label": "StartCom Certification Authority",
+  "sha256": "c766a9bef2d4071c863a31aa4920e813b2d198608cb7b7cfe21143b836df09ea",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "4096",
+  "notBefore": "Sep 17 19:46:36 2006 GMT"
+ },
+ {
+  "file": "removed/Taiwan_GRCA.der",
+  "label": "Taiwan GRCA",
+  "sha256": "7600295eefe85b9e1fd624db76062aaaae59818a54d2774cd4c0b2c01131e1b3",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "4096",
+  "notBefore": "Dec  5 13:23:33 2002 GMT"
+ },
+ {
+  "file": "removed/Firmaprofesional_Root_CA.der",
+  "label": "Firmaprofesional Root CA",
+  "sha256": "c1cf0b52096435e3f1b71daaec455a2311c8404f5583a9e213c69d857d943305",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Oct 24 22:00:00 2001 GMT"
+ },
+ {
+  "file": "removed/Wells_Fargo_Root_CA.der",
+  "label": "Wells Fargo Root CA",
+  "sha256": "03458b6abeecc214953d97149af45391691de9f9cdcc2647863a3d67c95c243b",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Oct 11 16:41:28 2000 GMT"
+ },
+ {
+  "file": "removed/Swisscom_Root_CA_1.der",
+  "label": "Swisscom Root CA 1",
+  "sha256": "21db20123660bb2ed418205da11ee7a85a65e2bc6e55b5af7e7899c8a266d92e",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "4096",
+  "notBefore": "Aug 18 12:06:20 2005 GMT"
+ },
+ {
+  "file": "removed/Certplus_Class_2_Primary_CA.der",
+  "label": "Certplus Class 2 Primary CA",
+  "sha256": "0f993c8aef97baaf5687140ed59ad1821bb4afacf0aa9a58b5d57a338a3afbcb",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Jul  7 17:05:00 1999 GMT"
+ },
+ {
+  "file": "removed/DST_Root_CA_X3.der",
+  "label": "DST Root CA X3",
+  "sha256": "0687260331a72403d909f105e69bcf0d32e1bd2493ffc6d9206d11bcd6770739",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Sep 30 21:12:19 2000 GMT"
+ },
+ {
+  "file": "removed/DST_ACES_CA_X6.der",
+  "label": "DST ACES CA X6",
+  "sha256": "767c955a76412c89af688e90a1c70f556cfd6b6025dbea10416d7eb6831f8c40",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Nov 20 21:19:58 2003 GMT"
+ },
+ {
+  "file": "removed/TURKTRUST_Certificate_Services_Provider_Root_1.der",
+  "label": "TURKTRUST Certificate Services Provider Root 1",
+  "sha256": "4404e33b5e140dcf998051fdfc8028c7c81615c5ee737b111b588233a9b535a0",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "May 13 10:27:17 2005 GMT"
+ },
+ {
+  "file": "removed/TURKTRUST_Certificate_Services_Provider_Root_2.der",
+  "label": "TURKTRUST Certificate Services Provider Root 2",
+  "sha256": "c470cf547e2302b977fb29dd71a89a7b6c1f60777b0329f56017f328bf4f6be6",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Nov  7 10:07:57 2005 GMT"
+ },
+ {
+  "file": "removed/SwissSign_Platinum_CA_G2.der",
+  "label": "SwissSign Platinum CA - G2",
+  "sha256": "3b222e566711e992300dc0b15ab9473dafdef8c84d0cef7d3317b4c1821d1436",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "4096",
+  "notBefore": "Oct 25 08:36:00 2006 GMT"
+ },
+ {
+  "file": "removed/SwissSign_Silver_CA_G2.der",
+  "label": "SwissSign Silver CA - G2",
+  "sha256": "be6c4da2bbb9ba59b6f3939768374246c3c005993fa98f020d1dedbed48a81d5",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "4096",
+  "notBefore": "Oct 25 08:32:46 2006 GMT"
+ },
+ {
+  "file": "removed/GeoTrust_Primary_Certification_Authority.der",
+  "label": "GeoTrust Primary Certification Authority",
+  "sha256": "37d51006c512eaab626421f1ec8c92013fc5f82ae98ee533eb4619b8deb4d06c",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Nov 27 00:00:00 2006 GMT"
+ },
+ {
+  "file": "removed/thawte_Primary_Root_CA.der",
+  "label": "thawte Primary Root CA",
+  "sha256": "8d722f81a9c113c0791df136a2966db26c950a971db46b4199f4ea54b78bfb9f",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Nov 17 00:00:00 2006 GMT"
+ },
+ {
+  "file": "removed/VeriSign_Class_3_Public_Primary_Certification_Authority_G5.der",
+  "label": "VeriSign Class 3 Public Primary Certification Authority - G5",
+  "sha256": "9acfab7e43c8d880d06b262a94deeee4b4659989c3d0caf19baf6405e41ab7df",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Nov  8 00:00:00 2006 GMT"
+ },
+ {
+  "file": "removed/SecureTrust_CA.der",
+  "label": "SecureTrust CA",
+  "sha256": "f1c1b50ae5a20dd8030ec9f6bc24823dd367b5255759b4e71b61fce9f7375d73",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Nov  7 19:31:18 2006 GMT"
+ },
+ {
+  "file": "removed/Secure_Global_CA.der",
+  "label": "Secure Global CA",
+  "sha256": "4200f5043ac8590ebb527d209ed1503029fbcbd41ca1b506ec27f15ade7dac69",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Nov  7 19:42:28 2006 GMT"
+ },
+ {
+  "file": "removed/Network_Solutions_Certificate_Authority.der",
+  "label": "Network Solutions Certificate Authority",
+  "sha256": "15f0ba00a3ac7af3ac884c072b1011a077bd77c097f40164b2f8598abd83860c",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Dec  1 00:00:00 2006 GMT"
+ },
+ {
+  "file": "removed/WellsSecure_Public_Root_Certificate_Authority.der",
+  "label": "WellsSecure Public Root Certificate Authority",
+  "sha256": "a71272aeaaa3cfe8727f7fb39f0fb3d1e5426e9060b06ee6f13e9a3c5833cd43",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Dec 13 17:07:54 2007 GMT"
+ },
+ {
+  "file": "removed/MD5_Collisions_Forged_Rogue_CA_25c3.der",
+  "label": "MD5 Collisions Forged Rogue CA 25c3",
+  "sha256": "227ae307e614f55c17b32ed40b5427da67b88e949b9269e65c156bb5f35fd475",
+  "sigalg": "md5WithRSAEncryption",
+  "version": "3",
+  "keybits": "1024",
+  "notBefore": "Jul 31 00:00:01 2004 GMT"
+ },
+ {
+  "file": "removed/IGC_A.der",
+  "label": "IGC/A",
+  "sha256": "b9bea7860a962ea3611dab97ab6da3e21c1068b97d55575ed0e11279c11c8932",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Dec 13 14:29:23 2002 GMT"
+ },
+ {
+  "file": "removed/Security_Communication_EV_RootCA1.der",
+  "label": "Security Communication EV RootCA1",
+  "sha256": "a22dba681e97376e2d397d728aae3a9b6296b9fdba60bc2e11f647f2c675fb37",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Jun  6 02:12:32 2007 GMT"
+ },
+ {
+  "file": "removed/S_TRUST_Authentication_and_Encryption_Root_CA_2005_PN.der",
+  "label": "S-TRUST Authentication and Encryption Root CA 2005 PN",
+  "sha256": "37d8dc8af7867845da3344a6b1bade448d8a80e47b5579f96bf631768f9f30f6",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Jun 22 00:00:00 2005 GMT"
+ },
+ {
+  "file": "removed/Microsec_e_Szigno_Root_CA.der",
+  "label": "Microsec e-Szigno Root CA",
+  "sha256": "327a3d761abadea034eb998406275cb1a4776efdae2fdf6d0168ea1c4f5567d0",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Apr  6 12:28:44 2005 GMT"
+ },
+ {
+  "file": "removed/AC_Ra_z_Certic_mara_S_A.der",
+  "label": "AC Raíz Certicámara S.A.",
+  "sha256": "a6c51e0da5ca0a9309d2e4c0e40c2af9107aae8203857fe198e3e769e343085c",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "4096",
+  "notBefore": "Nov 27 20:46:29 2006 GMT"
+ },
+ {
+  "file": "removed/TC_TrustCenter_Class_2_CA_II.der",
+  "label": "TC TrustCenter Class 2 CA II",
+  "sha256": "e6b8f8766485f807ae7f8dac1670461f07c0a13eef3a1ff717538d7abad391b4",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Jan 12 14:38:43 2006 GMT"
+ },
+ {
+  "file": "removed/TC_TrustCenter_Class_3_CA_II.der",
+  "label": "TC TrustCenter Class 3 CA II",
+  "sha256": "8da084fcf99ce07722f89b3205939806fa5cb811e1c813f6a108c7d336b3408e",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Jan 12 14:41:57 2006 GMT"
+ },
+ {
+  "file": "removed/TC_TrustCenter_Universal_CA_I.der",
+  "label": "TC TrustCenter Universal CA I",
+  "sha256": "ebf3c02a8789b1fb7d511995d663b72906d913ce0d5e10568a8a77e2586167e7",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Mar 22 15:54:28 2006 GMT"
+ },
+ {
+  "file": "removed/Deutsche_Telekom_Root_CA_2.der",
+  "label": "Deutsche Telekom Root CA 2",
+  "sha256": "b6191a50d0c3977f7da99bcdaac86a227daeb9679ec70ba3b0c9d92271c170d3",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Jul  9 12:11:00 1999 GMT"
+ },
+ {
+  "file": "removed/ComSign_CA.der",
+  "label": "ComSign CA",
+  "sha256": "ae4457b40d9eda96677b0d3c92d57b5177abd7ac1037958356d1e094518be5f2",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Mar 24 11:32:18 2004 GMT"
+ },
+ {
+  "file": "removed/ComSign_Secured_CA.der",
+  "label": "ComSign Secured CA",
+  "sha256": "507941c74460a0b47086220d4e9932572ab5d1b5bbcb8980ab1cb17651a844d2",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Mar 24 11:37:20 2004 GMT"
+ },
+ {
+  "file": "removed/Cybertrust_Global_Root.der",
+  "label": "Cybertrust Global Root",
+  "sha256": "960adf0063e96356750c2965dd0a0867da0b9cbd6e77714aeafb2349ab393da3",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Dec 15 08:00:00 2006 GMT"
+ },
+ {
+  "file": "removed/ePKI_Root_Certification_Authority.der",
+  "label": "ePKI Root Certification Authority",
+  "sha256": "c0a6f4dc63a24bfdcf54ef2a6a082a0a72de35803e2ff5ff527ae5d87206dfd5",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "4096",
+  "notBefore": "Dec 20 02:31:27 2004 GMT"
+ },
+ {
+  "file": "removed/T_B_TAK_UEKAE_K_k_Sertifika_Hizmet_Sa_lay_c_s_S_r_m_3.der",
+  "label": "TÜBİTAK UEKAE Kök Sertifika Hizmet Sağlayıcısı - Sürüm 3",
+  "sha256": "e4c73430d7a5b50925df43370a0d216e9a79b9d6db8373a0c69eb1cc31c7c52a",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Aug 24 11:37:07 2007 GMT"
+ },
+ {
+  "file": "removed/Buypass_Class_2_CA_1.der",
+  "label": "Buypass Class 2 CA 1",
+  "sha256": "0f4e9cdd264b025550d170806340214fe94434c9b02f697ec710fc5feafb5e38",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Oct 13 10:25:09 2006 GMT"
+ },
+ {
+  "file": "removed/Buypass_Class_3_CA_1.der",
+  "label": "Buypass Class 3 CA 1",
+  "sha256": "b7b12b171f821daa990cd0fe5087b128448ba8e5184f84c51e02b5c8fb962b24",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "May  9 14:13:03 2005 GMT"
+ },
+ {
+  "file": "removed/EBG_Elektronik_Sertifika_Hizmet_Sa_lay_c_s.der",
+  "label": "EBG Elektronik Sertifika Hizmet Sağlayıcısı",
+  "sha256": "35ae5bddd8f7ae635cffba5682a8f00b95f48462c7108ee9a0e5292b074aafb2",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "4096",
+  "notBefore": "Aug 17 00:21:09 2006 GMT"
+ },
+ {
+  "file": "removed/certSIGN_ROOT_CA.der",
+  "label": "certSIGN ROOT CA",
+  "sha256": "eaa962c4fa4a6bafebe415196d351ccd888d4f53f3fa8ae6d7c466a94e6042bb",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Jul  4 17:20:04 2006 GMT"
+ },
+ {
+  "file": "removed/CNNIC_ROOT.der",
+  "label": "CNNIC ROOT",
+  "sha256": "e28393773da845a679f2080cc7fb44a3b7a1c3792cb7eb7729fdcb6a8d99aea7",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Apr 16 07:09:14 2007 GMT"
+ },
+ {
+  "file": "removed/ApplicationCA_Japanese_Government.der",
+  "label": "ApplicationCA - Japanese Government",
+  "sha256": "2d47437de17951215a12f3c58e51c729a58026ef1fcc0a5fb3d9dc012f600d19",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Dec 12 15:00:00 2007 GMT"
+ },
+ {
+  "file": "removed/GeoTrust_Primary_Certification_Authority_G3.der",
+  "label": "GeoTrust Primary Certification Authority - G3",
+  "sha256": "b478b812250df878635c2aa7ec7d155eaa625ee82916e2cd294361886cd1fbd4",
+  "sigalg": "sha256WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Apr  2 00:00:00 2008 GMT"
+ },
+ {
+  "file": "removed/thawte_Primary_Root_CA_G2.der",
+  "label": "thawte Primary Root CA - G2",
+  "sha256": "a4310d50af18a6447190372a86afaf8b951ffb431d837f1e5688b45971ed1557",
+  "sigalg": "ecdsa-with-SHA384",
+  "version": "3",
+  "keybits": "384",
+  "notBefore": "Nov  5 00:00:00 2007 GMT"
+ },
+ {
+  "file": "removed/thawte_Primary_Root_CA_G3.der",
+  "label": "thawte Primary Root CA - G3",
+  "sha256": "4b03f45807ad70f21bfc2cae71c9fde4604c064cf5ffb686bae5dbaad7fdd34c",
+  "sigalg": "sha256WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Apr  2 00:00:00 2008 GMT"
+ },
+ {
+  "file": "removed/GeoTrust_Primary_Certification_Authority_G2.der",
+  "label": "GeoTrust Primary Certification Authority - G2",
+  "sha256": "5edb7ac43b82a06a8761e8d7be4979ebf2611f7dd79bf91c1c6b566a219ed766",
+  "sigalg": "ecdsa-with-SHA384",
+  "version": "3",
+  "keybits": "384",
+  "notBefore": "Nov  5 00:00:00 2007 GMT"
+ },
+ {
+  "file": "removed/VeriSign_Universal_Root_Certification_Authority.der",
+  "label": "VeriSign Universal Root Certification Authority",
+  "sha256": "2399561127a57125de8cefea610ddf2fa078b5c8067f4e828290bfb860e84b3c",
+  "sigalg": "sha256WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Apr  2 00:00:00 2008 GMT"
+ },
+ {
+  "file": "removed/VeriSign_Class_3_Public_Primary_Certification_Authority_G4.der",
+  "label": "VeriSign Class 3 Public Primary Certification Authority - G4",
+  "sha256": "69ddd7ea90bb57c93e135dc85ea6fcd5480b603239bdc454fc758b2a26cf7f79",
+  "sigalg": "ecdsa-with-SHA384",
+  "version": "3",
+  "keybits": "384",
+  "notBefore": "Nov  5 00:00:00 2007 GMT"
+ },
+ {
+  "file": "removed/Staat_der_Nederlanden_Root_CA_G2.der",
+  "label": "Staat der Nederlanden Root CA - G2",
+  "sha256": "668c83947da63b724bece1743c31a0e6aed0db8ec5b31be377bb784f91b6716f",
+  "sigalg": "sha256WithRSAEncryption",
+  "version": "3",
+  "keybits": "4096",
+  "notBefore": "Mar 26 11:18:17 2008 GMT"
+ },
+ {
+  "file": "removed/CA_Disig.der",
+  "label": "CA Disig",
+  "sha256": "92bf5119abeccad0b1332dc4e1d05fba75b5679044ee0ca26e931f744f2f33cf",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Mar 22 01:39:34 2006 GMT"
+ },
+ {
+  "file": "removed/Juur_SK.der",
+  "label": "Juur-SK",
+  "sha256": "ecc3e9c3407503bee091aa952f41348ff88baa863b2264befac807901574e939",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Aug 30 14:23:01 2001 GMT"
+ },
+ {
+  "file": "removed/Hongkong_Post_Root_CA_1.der",
+  "label": "Hongkong Post Root CA 1",
+  "sha256": "f9e67d336c51002ac054c632022d66dda2e7e3fff10ad061ed31d8bbb410cfb2",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "May 15 05:13:14 2003 GMT"
+ },
+ {
+  "file": "removed/SecureSign_RootCA11.der",
+  "label": "SecureSign RootCA11",
+  "sha256": "bf0feefb9e3a581ad5f9e9db7589985743d261085c4d314f6f5d7259aa421612",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Apr  8 04:56:47 2009 GMT"
+ },
+ {
+  "file": "removed/ACEDICOM_Root.der",
+  "label": "ACEDICOM Root",
+  "sha256": "03950fb49a531f3e1991942398dfa9e0ea32d7ba1cdd9bc85db57ed9400b434a",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "4096",
+  "notBefore": "Apr 18 16:24:22 2008 GMT"
+ },
+ {
+  "file": "removed/Verisign_Class_1_Public_Primary_Certification_Authority.der",
+  "label": "Verisign Class 1 Public Primary Certification Authority",
+  "sha256": "51847c8cbd2e9a72c91e292d2ae247d7de1e3fd270547a20ef7d610f38b8842c",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "1",
+  "keybits": "1024",
+  "notBefore": "Jan 29 00:00:00 1996 GMT"
+ },
+ {
+  "file": "removed/Verisign_Class_3_Public_Primary_Certification_Authority.der",
+  "label": "Verisign Class 3 Public Primary Certification Authority",
+  "sha256": "a4b6b3996fc2f306b3fd8681bd63413d8c5009cc4fa329c2ccf0e2fa1b140305",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "1",
+  "keybits": "1024",
+  "notBefore": "Jan 29 00:00:00 1996 GMT"
+ },
+ {
+  "file": "removed/E_Guven_Kok_Elektronik_Sertifika_Hizmet_Saglayicisi.der",
+  "label": "E-Guven Kok Elektronik Sertifika Hizmet Saglayicisi",
+  "sha256": "e609078465a419780cb6ac4c1c0bfb4653d9d9cc6eb3946eb7f3d69997bad598",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Jan  4 11:32:48 2007 GMT"
+ },
+ {
+  "file": "removed/TC_TrustCenter_Universal_CA_III.der",
+  "label": "TC TrustCenter Universal CA III",
+  "sha256": "309b4a87f6ca56c93169aaa99c6d988854d7892bd5437e2d07b29cbeda55d35d",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Sep  9 08:15:27 2009 GMT"
+ },
+ {
+  "file": "removed/Autoridad_de_Certificacion_Firmaprofesional_CIF_A62634068.der",
+  "label": "Autoridad de Certificacion Firmaprofesional CIF A62634068",
+  "sha256": "04048028bf1f2864d48f9ad4d83294366a828856553f3b14303f90147f5d40ef",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "4096",
+  "notBefore": "May 20 08:38:15 2009 GMT"
+ },
+ {
+  "file": "removed/Chambers_of_Commerce_Root_2008.der",
+  "label": "Chambers of Commerce Root - 2008",
+  "sha256": "063e4afac491dfd332f3089b8542e94617d893d7fe944e10a7937ee29d9693c0",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "4096",
+  "notBefore": "Aug  1 12:29:50 2008 GMT"
+ },
+ {
+  "file": "removed/Global_Chambersign_Root_2008.der",
+  "label": "Global Chambersign Root - 2008",
+  "sha256": "136335439334a7698016a0d324de72284e079d7b5220bb8fbd747816eebebaca",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "4096",
+  "notBefore": "Aug  1 12:31:40 2008 GMT"
+ },
+ {
+  "file": "removed/Bogus_Mozilla_Addons.der",
+  "label": "Bogus Mozilla Addons",
+  "sha256": "4bf6bb839b03b72839329b4ea70bb1b2f0d07e014d9d24aa9cc596114702bee3",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Mar 15 00:00:00 2011 GMT"
+ },
+ {
+  "file": "removed/Bogus_Global_Trustee.der",
+  "label": "Bogus Global Trustee",
+  "sha256": "be144b56fb1163c49c9a0e6b5a458df6b29f7e6449985960c178a4744624b7bc",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "4096",
+  "notBefore": "Mar 15 00:00:00 2011 GMT"
+ },
+ {
+  "file": "removed/Bogus_GMail.der",
+  "label": "Bogus GMail",
+  "sha256": "8290cc3fc1c3aac3239782c141ace8f88aeef4e9576a43d01867cf19d025be66",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Mar 15 00:00:00 2011 GMT"
+ },
+ {
+  "file": "removed/Bogus_Google.der",
+  "label": "Bogus Google",
+  "sha256": "9532e8b504964331c271f3f5f10070131a08bf8ba438978ce394c34feeae246f",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Mar 15 00:00:00 2011 GMT"
+ },
+ {
+  "file": "removed/Bogus_Skype.der",
+  "label": "Bogus Skype",
+  "sha256": "ead610e6e90b439f2ecb51628b0932620f6ef340bd843fca38d3181b8f4ba197",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Mar 15 00:00:00 2011 GMT"
+ },
+ {
+  "file": "removed/Bogus_Yahoo_1.der",
+  "label": "Bogus Yahoo 1",
+  "sha256": "933f7d8cda9f0d7c8bfd3c22bf4653f4161fd38ccdcf66b22e95a2f49c2650f8",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Mar 15 00:00:00 2011 GMT"
+ },
+ {
+  "file": "removed/Bogus_Yahoo_2.der",
+  "label": "Bogus Yahoo 2",
+  "sha256": "f8a5ff189fedbfe34e21103389a68340174439ad12974a4e8d4d784d1f3a0faa",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Mar 15 00:00:00 2011 GMT"
+ },
+ {
+  "file": "removed/Bogus_Yahoo_3.der",
+  "label": "Bogus Yahoo 3",
+  "sha256": "79f69a47cfd6c4b4ceae8030d04b49f6171d3b5d6c812f58d040e586f1cb3f14",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Mar 15 00:00:00 2011 GMT"
+ },
+ {
+  "file": "removed/Bogus_live_com.der",
+  "label": "Bogus live.com",
+  "sha256": "2a3699deca1e9fd099ba45de8489e205977c9f2a5e29d5dd747381eec0744d71",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Mar 15 00:00:00 2011 GMT"
+ },
+ {
+  "file": "removed/Bogus_kuix_de.der",
+  "label": "Bogus kuix.de",
+  "sha256": "fa1d6d4105a664dc3cb7e21b74cfd0fab7de2155f0b806d616636c7fb228d140",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "1024",
+  "notBefore": "Mar 17 00:00:00 2011 GMT"
+ },
+ {
+  "file": "removed/AffirmTrust_Commercial.der",
+  "label": "AffirmTrust Commercial",
+  "sha256": "0376ab1d54c5f9803ce4b2e201a0ee7eef7b57b636e8a93c9b8d4860c96f5fa7",
+  "sigalg": "sha256WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Jan 29 14:06:06 2010 GMT"
+ },
+ {
+  "file": "removed/AffirmTrust_Networking.der",
+  "label": "AffirmTrust Networking",
+  "sha256": "0a81ec5a929777f145904af38d5d509f66b5e2c58fcdb531058b0e17f3f0b41b",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Jan 29 14:08:24 2010 GMT"
+ },
+ {
+  "file": "removed/AffirmTrust_Premium.der",
+  "label": "AffirmTrust Premium",
+  "sha256": "70a73f7f376b60074248904534b11482d5bf0e698ecc498df52577ebf2e93b9a",
+  "sigalg": "sha384WithRSAEncryption",
+  "version": "3",
+  "keybits": "4096",
+  "notBefore": "Jan 29 14:10:36 2010 GMT"
+ },
+ {
+  "file": "removed/AffirmTrust_Premium_ECC.der",
+  "label": "AffirmTrust Premium ECC",
+  "sha256": "bd71fdf6da97e4cf62d1647add2581b07d79adf8397eb4ecba9c5e8488821423",
+  "sigalg": "ecdsa-with-SHA384",
+  "version": "3",
+  "keybits": "384",
+  "notBefore": "Jan 29 14:20:24 2010 GMT"
+ },
+ {
+  "file": "removed/Certinomis_Autorit_Racine.der",
+  "label": "Certinomis - Autorité Racine",
+  "sha256": "fcbfe2886206f72b27593c8b070297e12d769ed10ed7930705a8098effc14d17",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "4096",
+  "notBefore": "Sep 17 08:28:59 2008 GMT"
+ },
+ {
+  "file": "removed/Root_CA_Generalitat_Valenciana.der",
+  "label": "Root CA Generalitat Valenciana",
+  "sha256": "8c4edfd04348f322969e7e29a4cd4dca004655061c16e1b076422ef342ad630e",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Jul  6 16:22:47 2001 GMT"
+ },
+ {
+  "file": "removed/A_Trust_nQual_03.der",
+  "label": "A-Trust-nQual-03",
+  "sha256": "793cbf4559b9fde38ab22df16869f69881ae14c4b0139ac788a78a1afcca02fb",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Aug 17 22:00:00 2005 GMT"
+ },
+ {
+  "file": "removed/Explicitly_Distrust_DigiNotar_Root_CA.der",
+  "label": "Explicitly Distrust DigiNotar Root CA",
+  "sha256": "9187a8d3b4b711dd51f53c2fd29041cf7c7b9535329556bfc9c706f38db0f81a",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "4096",
+  "notBefore": "Jul 27 17:19:37 2007 GMT"
+ },
+ {
+  "file": "removed/Explicitly_Distrust_DigiNotar_Services_1024_CA.der",
+  "label": "Explicitly Distrust DigiNotar Services 1024 CA",
+  "sha256": "8ece92c47f637c3f4d2c1c45025dd37f7b884c32e551e7f77c5656c49014436b",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "1024",
+  "notBefore": "Jul 26 15:59:01 2007 GMT"
+ },
+ {
+  "file": "removed/Explicitly_Distrust_DigiNotar_Cyber_CA.der",
+  "label": "Explicitly Distrust DigiNotar Cyber CA",
+  "sha256": "a51a9377273f1ed8cf25066073de2d2a48ec5971017bbf53a8316ea9a90180fa",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "4096",
+  "notBefore": "Oct  4 10:54:12 2006 GMT"
+ },
+ {
+  "file": "removed/Explicitly_Distrust_DigiNotar_Cyber_CA_2nd.der",
+  "label": "Explicitly Distrust DigiNotar Cyber CA 2nd",
+  "sha256": "19c5bab420c22e47a34c110f5ee396b488d256a01270df5bb1b4a0ade080cb1e",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "4096",
+  "notBefore": "Sep 27 10:53:53 2006 GMT"
+ },
+ {
+  "file": "removed/Explicitly_Distrusted_DigiNotar_PKIoverheid.der",
+  "label": "Explicitly Distrusted DigiNotar PKIoverheid",
+  "sha256": "e22d8881e2a6fbb4e67aa1e82092b8f990737f2b918146ab2af17380ab4f00c1",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Jul  5 08:42:08 2007 GMT"
+ },
+ {
+  "file": "removed/Explicitly_Distrusted_DigiNotar_PKIoverheid_G2.der",
+  "label": "Explicitly Distrusted DigiNotar PKIoverheid G2",
+  "sha256": "fb6b5816d5067a1847e612ac9d5cb4ec6a18ea5bbdbf1e7b06ed72f8a9d96040",
+  "sigalg": "sha256WithRSAEncryption",
+  "version": "3",
+  "keybits": "4096",
+  "notBefore": "May 12 08:51:39 2010 GMT"
+ },
+ {
+  "file": "removed/Explicitly_Distrusted_Malaysian_Digicert_Sdn_Bhd_cyb.der",
+  "label": "Explicitly Distrusted Malaysian Digicert Sdn. Bhd. (cyb)",
+  "sha256": "b20c71d620d76b2813083ecd60e64d91f58070d374a99b4a33ec601506c9fabc",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "1024",
+  "notBefore": "Jul 17 15:17:49 2007 GMT"
+ },
+ {
+  "file": "removed/Explicitly_Distrusted_Malaysian_Digicert_Sdn_Bhd_en.der",
+  "label": "Explicitly Distrusted Malaysian Digicert Sdn. Bhd. (en)",
+  "sha256": "7aa1f825d2d9f8cf3865e9479ccf759dd662d6c71dab3b6098418e375a92be6e",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Jul 16 17:23:38 2010 GMT"
+ },
+ {
+  "file": "removed/EC_ACC.der",
+  "label": "EC-ACC",
+  "sha256": "88497f01602f3154246ae28c4d5aef10f1d87ebb76626f4ae0b7f95ba7968799",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Jan  7 23:00:00 2003 GMT"
+ },
+ {
+  "file": "removed/Hellenic_Academic_and_Research_Institutions_RootCA_2011.der",
+  "label": "Hellenic Academic and Research Institutions RootCA 2011",
+  "sha256": "bc104f15a48be709dca542a7e1d4b9df6f054527e802eaa92d595444258afe71",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Dec  6 13:49:52 2011 GMT"
+ },
+ {
+  "file": "removed/Trustis_FPS_Root_CA.der",
+  "label": "Trustis FPS Root CA",
+  "sha256": "c1b48299aba5208fe9630ace55ca68a03eda5a519c8802a0d3a673be8f8e557d",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Dec 23 12:14:06 2003 GMT"
+ },
+ {
+  "file": "removed/StartCom_Certification_Authority.der",
+  "label": "StartCom Certification Authority",
+  "sha256": "e17890ee09a3fbf4f48b9c414a17d637b7a50647e9bc752322727fcc1742a911",
+  "sigalg": "sha256WithRSAEncryption",
+  "version": "3",
+  "keybits": "4096",
+  "notBefore": "Sep 17 19:46:37 2006 GMT"
+ },
+ {
+  "file": "removed/StartCom_Certification_Authority_G2.der",
+  "label": "StartCom Certification Authority G2",
+  "sha256": "c7ba6567de93a798ae1faa791e712d378fae1f93c4397fea441bb7cbe6fd5995",
+  "sigalg": "sha256WithRSAEncryption",
+  "version": "3",
+  "keybits": "4096",
+  "notBefore": "Jan  1 01:00:01 2010 GMT"
+ },
+ {
+  "file": "removed/EE_Certification_Centre_Root_CA.der",
+  "label": "EE Certification Centre Root CA",
+  "sha256": "3e84ba4342908516e77573c0992f0979ca084e4685681ff195ccba8a229b8a76",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Oct 30 10:10:30 2010 GMT"
+ },
+ {
+  "file": "removed/TURKTRUST_Certificate_Services_Provider_Root_2007.der",
+  "label": "TURKTRUST Certificate Services Provider Root 2007",
+  "sha256": "978cd966f2faa07ba7aa9500d9c02e9d77f2cdada6ad6ba74af4b91c66593c50",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Dec 25 18:37:19 2007 GMT"
+ },
+ {
+  "file": "removed/PSCProcert.der",
+  "label": "PSCProcert",
+  "sha256": "3cfc3c14d1f684ff17e38c43ca440c00b967ec933e8bfe064ca1d72c90f2adb0",
+  "sigalg": "sha256WithRSAEncryption",
+  "version": "3",
+  "keybits": "4096",
+  "notBefore": "Dec 28 16:51:00 2010 GMT"
+ },
+ {
+  "file": "removed/China_Internet_Network_Information_Center_EV_Certificates_Root.der",
+  "label": "China Internet Network Information Center EV Certificates Root",
+  "sha256": "1c01c6f4dbb2fefc22558b2bca32563f49844acfc32b7be4b0ff599f9e8c7af7",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "2048",
+  "notBefore": "Aug 31 07:11:25 2010 GMT"
+ },
+ {
+  "file": "removed/Swisscom_Root_CA_2.der",
+  "label": "Swisscom Root CA 2",
+  "sha256": "f09b122c7114f4a09bd4ea4f4a99d558b46e4c25cd81140d29c05613914c3841",
+  "sigalg": "sha256WithRSAEncryption",
+  "version": "3",
+  "keybits": "4096",
+  "notBefore": "Jun 24 08:38:14 2011 GMT"
+ },
+ {
+  "file": "removed/Swisscom_Root_EV_CA_2.der",
+  "label": "Swisscom Root EV CA 2",
+  "sha256": "d95fea3ca4eedce74cd76e75fc6d1ff62c441f0fa8bc77f034b19e5db258015d",
+  "sigalg": "sha256WithRSAEncryption",
+  "version": "3",
+  "keybits": "4096",
+  "notBefore": "Jun 24 09:45:08 2011 GMT"
+ },
+ {
+  "file": "removed/CA_Disig_Root_R1.der",
+  "label": "CA Disig Root R1",
+  "sha256": "f96f23f4c3e79c077a46988d5af5900676a0f039cb645dd17549b216c82440ce",
+  "sigalg": "sha1WithRSAEncryption",
+  "version": "3",
+  "keybits": "4096",
+  "notBefore": "Jul 19 09:06:56 2012 GMT"
+ }
+]

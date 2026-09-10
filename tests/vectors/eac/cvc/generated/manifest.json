@@ -1,0 +1,1544 @@
+{
+ "generator": "tools/generate_cvc_vectors.py + eID-Testbeds/common-testbed-utilities BouncyCertGenerator",
+ "reference_date": "2026-09-01",
+ "entries": [
+  {
+   "file": "certs/BP160_cvca.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "self-signed CVCA root, TA_ECDSA_SHA_1 BRAINPOOL::p160r1, domain parameters included, holder authorization AT with every right",
+   "sha256": "e1c9b6a8697d7e0531ddaa9adc89f940af055c713aafd6cee8daca82c3e3d05e",
+   "size": 322,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP160_dv.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "DV_DOMESTIC issued by BP160_cvca, TA_ECDSA_SHA_1 BRAINPOOL::p160r1, public key without domain parameters",
+   "sha256": "9526be6d673491b18b14ae2e22c6320c9d55bada1644c646395ccff303b79056",
+   "size": 185,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP160_terminal.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "TERMINAL issued by BP160_dv, TA_ECDSA_SHA_1 BRAINPOOL::p160r1, 90-day validity from 2026-09-01",
+   "sha256": "a68bb8735cc583370a642e9d45db466110b8407cbf874ccb7f88dd045fa1d16a",
+   "size": 185,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP192_cvca.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "self-signed CVCA root, TA_ECDSA_SHA_1 BRAINPOOL::p192r1, domain parameters included, holder authorization AT with every right",
+   "sha256": "ac5601f4c0b43aefb0054220791ae3a634dbb63addb82e6233e8e4bd910d75be",
+   "size": 362,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP192_dv.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "DV_DOMESTIC issued by BP192_cvca, TA_ECDSA_SHA_1 BRAINPOOL::p192r1, public key without domain parameters",
+   "sha256": "297b9aadf1b59a7c68a392944f6146e285884148c909795164003dcd7edacd4f",
+   "size": 201,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP192_terminal.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "TERMINAL issued by BP192_dv, TA_ECDSA_SHA_1 BRAINPOOL::p192r1, 90-day validity from 2026-09-01",
+   "sha256": "3ff15833105a5b8e6ce7a8f43d9710df1985c40a28befe43d0cd86c0a2231a0b",
+   "size": 201,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP224_cvca.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "self-signed CVCA root, TA_ECDSA_SHA_224 BRAINPOOL::p224r1, domain parameters included, holder authorization AT with every right",
+   "sha256": "3557da83aca0353e4f72cdbdb3222aa2caf0359360bb9b5e429781ac58370a44",
+   "size": 402,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP224_dv.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "DV_DOMESTIC issued by BP224_cvca, TA_ECDSA_SHA_224 BRAINPOOL::p224r1, public key without domain parameters",
+   "sha256": "619b12f45871e209163ab64e220de83ac35366b3f61559b762479eb8606d2b52",
+   "size": 217,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP224_terminal.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "TERMINAL issued by BP224_dv, TA_ECDSA_SHA_224 BRAINPOOL::p224r1, 90-day validity from 2026-09-01",
+   "sha256": "64ceeb559cdf8ec8be611beec3d21f9426a7205ab4654242e2dd87a57cc97ae7",
+   "size": 217,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP256IS_cvca.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "self-signed CVCA root, TA_ECDSA_SHA_256 BRAINPOOL::p256r1, domain parameters included, holder authorization IS with every right",
+   "sha256": "6083d6c27fc9263748a534b8209b41357ed58a6ecbb7678272395777c65ad8c4",
+   "size": 443,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP256IS_dv.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "DV_DOMESTIC issued by BP256IS_cvca, TA_ECDSA_SHA_256 BRAINPOOL::p256r1, public key without domain parameters",
+   "sha256": "2dce2c69531c385ffa3ef6fcbc041904e968ee7b30515e3a4a3b028845378e57",
+   "size": 233,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP256IS_terminal.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "TERMINAL issued by BP256IS_dv, TA_ECDSA_SHA_256 BRAINPOOL::p256r1, 90-day validity from 2026-09-01",
+   "sha256": "ebd8083f04008f31cf61dd5f9d6cf54d97075eaf098eb6478882fe3af7218dca",
+   "size": 233,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP256T_cvca.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "self-signed CVCA root, TA_ECDSA_SHA_256 BRAINPOOL::p256t1, domain parameters included, holder authorization AT with every right",
+   "sha256": "2340962cf5b7cb3c5f635201be703a6a2a0ba27bf40b476825b84cd2e8e20596",
+   "size": 445,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP256T_dv.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "DV_DOMESTIC issued by BP256T_cvca, TA_ECDSA_SHA_256 BRAINPOOL::p256t1, public key without domain parameters",
+   "sha256": "ac6019caeaa5528bf14ddc03e1ff088182eeb64aefdce22f63e7e49d3237eab4",
+   "size": 235,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP256T_terminal.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "TERMINAL issued by BP256T_dv, TA_ECDSA_SHA_256 BRAINPOOL::p256t1, 90-day validity from 2026-09-01",
+   "sha256": "8462df52b1b0d497c78550fb0b098ddacacc43f7a3d12028b3c516e704a6e490",
+   "size": 235,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP256_cvca.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "self-signed CVCA root, TA_ECDSA_SHA_256 BRAINPOOL::p256r1, domain parameters included, holder authorization AT with every right",
+   "sha256": "5f8156e17cf85d8359dad40d69f7b64c8c0f6db9ad4e97bf2003c272881aa4d5",
+   "size": 443,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP256_cvca2_self_signed.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "the same generation 2 CVCA key self-signed",
+   "sha256": "212e2ece73bbbe4eabc0c2f94fdb1409d31c8ceec1fc410bc5d297097303095f",
+   "size": 443,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP256_dv.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "DV_DOMESTIC issued by BP256_cvca, TA_ECDSA_SHA_256 BRAINPOOL::p256r1, public key without domain parameters",
+   "sha256": "36cc0607761e7f853647b8e7836d7a03c36b777b4198b14ba24e9c22c529b933",
+   "size": 233,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP256_dv_expired.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "DV that expired in 2016",
+   "sha256": "9f35f360a974f1a44550680dc7db33dc1cda2e9057846513f0b55e6e38f91126",
+   "size": 233,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP256_dv_foreign.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "DV_FOREIGN issued by BP256_cvca",
+   "sha256": "ddabd600910449e53c94c1d67b18b5eaa333cc97e8b5d9585ec8a5972584668b",
+   "size": 233,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP256_dv_under_cvca2.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "DV issued by CVCA generation 2 (validates only through the link certificate)",
+   "sha256": "bc4bd6c0c0028663aad9fc36b69556c2c1e198f1eecd4791f96455fad2fc26d5",
+   "size": 233,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP256_link_cvca1_to_cvca2.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "link certificate: CVCA generation 2 key signed by generation 1 (CAR != CHR, role CVCA, domain parameters)",
+   "sha256": "f2077c5e47b7e12aac5fb0e9c4db2af05ce536f43e9049df13b801ca369ae2e8",
+   "size": 443,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP256_terminal.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "TERMINAL issued by BP256_dv, TA_ECDSA_SHA_256 BRAINPOOL::p256r1, 90-day validity from 2026-09-01, with certificate description and terminal sector extensions",
+   "sha256": "e43554df1d9edd1f9488d28af6d4272626e4681b8dd0a385782d81518279809e",
+   "size": 330,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP256_terminal_2049_2050.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "TERMINAL valid 2049-12-31 to 2050-01-01 (BCD date YYMMDD wraps 49 -> 50)",
+   "sha256": "b887a80aae6b245a37f16029ca2c77e5620386c60d446a7bc731783fdea5be36",
+   "size": 233,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP256_terminal_forced_is_oid_with_at_bits.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "authorization template OID says id-IS (0.4.0.127.0.7.3.1.2.1) but the discretionary data is an AT bitmap (5 bytes instead of 1)",
+   "sha256": "3c5a65dbed162c0fa00ff2beab97b5004a04e9306b2e71b4f8326331a4ebf9d1",
+   "size": 233,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP256_terminal_foreign_no_rights.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "TERMINAL under the foreign DV with no authorization bits set and no extensions",
+   "sha256": "5d616e5490b15985e60e95a94ef5adb9e85baf993ebb56cd4b0625617bd46813",
+   "size": 233,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP256_terminal_not_yet_valid.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "TERMINAL not valid before 2040",
+   "sha256": "59430cacec6f2c5a7e2ac3f03db070c44ddc4c2140003a92b3e6dcd72f483e38",
+   "size": 233,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP256_terminal_one_day.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "TERMINAL with expiration date equal to effective date (one day); sequence number 00002 for the same key",
+   "sha256": "d04877038b1798d59d0109c1ccbe0265cdfda91b1bd5109a1c9f4e1f74fe1255",
+   "size": 233,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP256_terminal_profile_id_1.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "certificate profile identifier 1 (only 0 is defined by TR-03110)",
+   "sha256": "ae6c462c4257adca92f753fd7afed74c5ee80ecdc53a1a9016d377227183b6b0",
+   "size": 233,
+   "verify": "parse: profile identifier 01"
+  },
+  {
+   "file": "certs/BP320_cvca.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "self-signed CVCA root, TA_ECDSA_SHA_256 BRAINPOOL::p320r1, domain parameters included, holder authorization AT with every right",
+   "sha256": "b42b5bed970fecc93569457dad0215e412fdbdf07a6dbad4cccb6d2c165d36b5",
+   "size": 523,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP320_dv.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "DV_DOMESTIC issued by BP320_cvca, TA_ECDSA_SHA_256 BRAINPOOL::p320r1, public key without domain parameters",
+   "sha256": "2f21047f2daaf6f3e82990e23fb00a90c84ed13d4d3d173fb0a1daa592864cee",
+   "size": 266,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP320_terminal.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "TERMINAL issued by BP320_dv, TA_ECDSA_SHA_256 BRAINPOOL::p320r1, 90-day validity from 2026-09-01",
+   "sha256": "533f617556303890bb9430cae3811a35846289a787bd380367643fd9a12ac4aa",
+   "size": 266,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP384ST_cvca.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "self-signed CVCA root, TA_ECDSA_SHA_256 BRAINPOOL::p384r1, domain parameters included, holder authorization ST with every right",
+   "sha256": "7f3bde53224a79af9adeab78c56475cdfb02a0f002dd9a2d9e5034eff2bf39d7",
+   "size": 603,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP384ST_dv.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "DV_DOMESTIC issued by BP384ST_cvca, TA_ECDSA_SHA_256 BRAINPOOL::p384r1, public key without domain parameters",
+   "sha256": "f71ee71486648f8e454a3d8b756e22c703a730632aa8542dba0d40cf3fe52a09",
+   "size": 298,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP384ST_terminal.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "TERMINAL issued by BP384ST_dv, TA_ECDSA_SHA_256 BRAINPOOL::p384r1, 90-day validity from 2026-09-01",
+   "sha256": "2e7635adfe063607314dd8be6f27dd5e3dbf4feb0c66e1ef96cc7fdf6ea5537a",
+   "size": 298,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP384_cvca.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "self-signed CVCA root, TA_ECDSA_SHA_256 BRAINPOOL::p384r1, domain parameters included, holder authorization AT with every right",
+   "sha256": "18e7f7ab7282ffb94e448f2683cbea54f78289a4779e2a15ee0c7cea16bd2163",
+   "size": 603,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP384_dv.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "DV_DOMESTIC issued by BP384_cvca, TA_ECDSA_SHA_256 BRAINPOOL::p384r1, public key without domain parameters",
+   "sha256": "9dd7b83e7bb72ebdf83b3be6aa93be34e3761664b98a1aab8ee4de6f8eb11930",
+   "size": 298,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP384_terminal.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "TERMINAL issued by BP384_dv, TA_ECDSA_SHA_256 BRAINPOOL::p384r1, 90-day validity from 2026-09-01",
+   "sha256": "77ff99851c9f66be7839a8028d15e429a4644e23d7441d764cf48b3d2e6fd04d",
+   "size": 298,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP512T_cvca.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "self-signed CVCA root, TA_ECDSA_SHA_256 BRAINPOOL::p512t1, domain parameters included, holder authorization AT with every right",
+   "sha256": "53c53b140b09fce1aebd90a0732cc6c384ee6902dfe0972a4a6921a74c7a00aa",
+   "size": 768,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP512T_dv.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "DV_DOMESTIC issued by BP512T_cvca, TA_ECDSA_SHA_256 BRAINPOOL::p512t1, public key without domain parameters",
+   "sha256": "87ef2328b3de0590306849cca62b4473406f21bab46bf76833bfa4e4736265d7",
+   "size": 367,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP512T_terminal.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "TERMINAL issued by BP512T_dv, TA_ECDSA_SHA_256 BRAINPOOL::p512t1, 90-day validity from 2026-09-01",
+   "sha256": "41a24b231b57fd2f1ab83a203108c38e45617c5fdc5d3ec2935be4baa732e171",
+   "size": 367,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP512_cvca.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "self-signed CVCA root, TA_ECDSA_SHA_256 BRAINPOOL::p512r1, domain parameters included, holder authorization AT with every right",
+   "sha256": "99d14f3c9efbc27ba8c8d2d99333cf7e7eb8b778d9b669c3cba78171d0869bc6",
+   "size": 766,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP512_dv.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "DV_DOMESTIC issued by BP512_cvca, TA_ECDSA_SHA_256 BRAINPOOL::p512r1, public key without domain parameters",
+   "sha256": "1836ce2c9735f93859dfce46cff9384a369d384f69570ad25cb54721e3321afc",
+   "size": 365,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/BP512_terminal.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "TERMINAL issued by BP512_dv, TA_ECDSA_SHA_256 BRAINPOOL::p512r1, 90-day validity from 2026-09-01",
+   "sha256": "ec17b19c82aa289a7798ba62dc68e91563af4a94236a9bdfc3b7e4760c1d4017",
+   "size": 365,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/K256_cvca.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "self-signed CVCA root, TA_ECDSA_SHA_256 ASN1::secp256k1, domain parameters included, holder authorization AT with every right",
+   "sha256": "f0030ef6cf8ece969c294f009f9f41de4db93d2a38682181d3550be458f01100",
+   "size": 378,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/K256_dv.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "DV_DOMESTIC issued by K256_cvca, TA_ECDSA_SHA_256 ASN1::secp256k1, public key without domain parameters",
+   "sha256": "fc6a223a078b7c843e86124f22d923b1fa65d65ef2178e86393e9305494e1ce3",
+   "size": 231,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/K256_terminal.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "TERMINAL issued by K256_dv, TA_ECDSA_SHA_256 ASN1::secp256k1, 90-day validity from 2026-09-01",
+   "sha256": "7f9a214d52e7e27a18eebd64d6caed258160e3134cdf09f81689f6eda54fccbc",
+   "size": 231,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/P160_cvca.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "self-signed CVCA root, TA_ECDSA_SHA_1 ASN1::secp160r1, domain parameters included, holder authorization AT with every right | NOTE: SIGNATURE INVALID - the generator strips leading zero octets from r/s or coordinates, which TR-03110 D.3.3 forbids; kept as a non-conforming sample",
+   "sha256": "a0edb3c3f6655b169e3e19657c825b9e0350adc8b1423ffc70e904411d82db51",
+   "size": 321,
+   "verify": "SIGNATURE INVALID"
+  },
+  {
+   "file": "certs/P160_dv.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "DV_DOMESTIC issued by P160_cvca, TA_ECDSA_SHA_1 ASN1::secp160r1, public key without domain parameters | NOTE: SIGNATURE INVALID - the generator strips leading zero octets from r/s or coordinates, which TR-03110 D.3.3 forbids; kept as a non-conforming sample",
+   "sha256": "a1df3bd6a114a8c9774f7a14e87e64cbd9f15d645a848bc8e04d2ab150708f95",
+   "size": 183,
+   "verify": "SIGNATURE INVALID"
+  },
+  {
+   "file": "certs/P160_terminal.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "TERMINAL issued by P160_dv, TA_ECDSA_SHA_1 ASN1::secp160r1, 90-day validity from 2026-09-01 | NOTE: SIGNATURE INVALID - the generator strips leading zero octets from r/s or coordinates, which TR-03110 D.3.3 forbids; kept as a non-conforming sample",
+   "sha256": "93db81d84fca8619b6591e73d5fbef9be0c91e7d11b7bb2fc4ff0404e2c0cc1c",
+   "size": 183,
+   "verify": "SIGNATURE INVALID"
+  },
+  {
+   "file": "certs/P192_cvca.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "self-signed CVCA root, TA_ECDSA_SHA_1 ASN1::secp192r1, domain parameters included, holder authorization AT with every right",
+   "sha256": "ab2ce7b40a36e3d87c057e15aab9a4f21515ce5882cbd3b060e47e726d4935fd",
+   "size": 360,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/P192_dv.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "DV_DOMESTIC issued by P192_cvca, TA_ECDSA_SHA_1 ASN1::secp192r1, public key without domain parameters",
+   "sha256": "a1f1a752e3406c7b6673853f66c3bd5ec6e8bfd1ea1d088974c2cccc41075147",
+   "size": 199,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/P192_terminal.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "TERMINAL issued by P192_dv, TA_ECDSA_SHA_1 ASN1::secp192r1, 90-day validity from 2026-09-01",
+   "sha256": "f7ec5f60df96013a6b70dcc436e1f852d5faa85ad95b508960a5e1c7cecaf19a",
+   "size": 199,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/P224_cvca.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "self-signed CVCA root, TA_ECDSA_SHA_224 ASN1::secp224r1, domain parameters included, holder authorization AT with every right",
+   "sha256": "bd1124793ad77057c3e78f97f64dce2a3babeb7e1da382f54876fe9bd320cd24",
+   "size": 400,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/P224_dv.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "DV_DOMESTIC issued by P224_cvca, TA_ECDSA_SHA_224 ASN1::secp224r1, public key without domain parameters",
+   "sha256": "5b1a8e712b7a4dcc4f6578d58a1d5ba7487552ff753561b28d28c50d47addea8",
+   "size": 215,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/P224_terminal.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "TERMINAL issued by P224_dv, TA_ECDSA_SHA_224 ASN1::secp224r1, 90-day validity from 2026-09-01",
+   "sha256": "9e80288f8f30d9a984fd103e89e0549e7aebccd1029c2c2cb88096147ad966b3",
+   "size": 215,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/P256IS_cvca.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "self-signed CVCA root, TA_ECDSA_SHA_256 ASN1::secp256r1, domain parameters included, holder authorization IS with every right",
+   "sha256": "143038e91662c6040ab70a2531d2f4c6af0a17a15364f93b9ada0a36398a2e13",
+   "size": 441,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/P256IS_dv.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "DV_DOMESTIC issued by P256IS_cvca, TA_ECDSA_SHA_256 ASN1::secp256r1, public key without domain parameters",
+   "sha256": "748bc0d87122043c69efa5e0dbd64a3748bbcb64ff74d1f7b161b2ca43f97e96",
+   "size": 231,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/P256IS_terminal.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "TERMINAL issued by P256IS_dv, TA_ECDSA_SHA_256 ASN1::secp256r1, 90-day validity from 2026-09-01",
+   "sha256": "b253ac77c453a03ecdd59cf740144abd7478e6523ee628bc93e69d2f93593a96",
+   "size": 231,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/P256_cvca.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "self-signed CVCA root, TA_ECDSA_SHA_256 ASN1::secp256r1, domain parameters included, holder authorization AT with every right",
+   "sha256": "efc05a29bb60c4393d036f95d5a16beeb83aa7064ea7035ee227e800f10157c7",
+   "size": 441,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/P256_dv.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "DV_DOMESTIC issued by P256_cvca, TA_ECDSA_SHA_256 ASN1::secp256r1, public key without domain parameters",
+   "sha256": "fcb66c2e795faf3e98671b12be43c9797417f552e8d1321e34d7dd8fda083587",
+   "size": 231,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/P256_terminal.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "TERMINAL issued by P256_dv, TA_ECDSA_SHA_256 ASN1::secp256r1, 90-day validity from 2026-09-01",
+   "sha256": "a47cf63f141a381699fab1f3ed49c32da9949d59e93a97f9c5e6636ab4beae8c",
+   "size": 231,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/P384_cvca.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "self-signed CVCA root, TA_ECDSA_SHA_256 ASN1::secp384r1, domain parameters included, holder authorization AT with every right",
+   "sha256": "e55d40492aabfc00e24460a864a3d86edd358f84f3175d352c46746b2f0de411",
+   "size": 601,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/P384_dv.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "DV_DOMESTIC issued by P384_cvca, TA_ECDSA_SHA_256 ASN1::secp384r1, public key without domain parameters",
+   "sha256": "38c97eddac390b51dca30e9d26fcb830b8dc3f9b7e7a790cd454e179f72f20d7",
+   "size": 296,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/P384_terminal.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "TERMINAL issued by P384_dv, TA_ECDSA_SHA_256 ASN1::secp384r1, 90-day validity from 2026-09-01",
+   "sha256": "50c8419b630ec20f9f34c649a34975789f6984a6d64123b4776e67c5ead80228",
+   "size": 296,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/P521_cvca.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "self-signed CVCA root, TA_ECDSA_SHA_256 ASN1::secp521r1, domain parameters included, holder authorization AT with every right | NOTE: SIGNATURE INVALID - the generator strips leading zero octets from r/s or coordinates, which TR-03110 D.3.3 forbids; kept as a non-conforming sample",
+   "sha256": "8a79ef740277277eb8dd9f4a09fc9445293de787dcc16ccdef363d192ad9351f",
+   "size": 781,
+   "verify": "SIGNATURE INVALID"
+  },
+  {
+   "file": "certs/P521_dv.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "DV_DOMESTIC issued by P521_cvca, TA_ECDSA_SHA_256 ASN1::secp521r1, public key without domain parameters | NOTE: SIGNATURE INVALID - the generator strips leading zero octets from r/s or coordinates, which TR-03110 D.3.3 forbids; kept as a non-conforming sample",
+   "sha256": "9116e78bd1cbbcad7ade4bca09f2b6c00093025dbd2f18b16b38637662feadcc",
+   "size": 371,
+   "verify": "SIGNATURE INVALID"
+  },
+  {
+   "file": "certs/P521_terminal.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "TERMINAL issued by P521_dv, TA_ECDSA_SHA_256 ASN1::secp521r1, 90-day validity from 2026-09-01",
+   "sha256": "c6a9f69b5ebaa1fa515bcbbea4918e4e8b7ef41ccef4ca030760916d37f94825",
+   "size": 371,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/R512_cvca.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "self-signed CVCA root, TA_RSA_v1_5_SHA_1 RSA-512, domain parameters included, holder authorization AT with every right",
+   "sha256": "4ebf8d87a314fc8cffaa01d56247286eaa7984ce9188be490b19cf864f90d535",
+   "size": 235,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/R512_dv.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "DV_DOMESTIC issued by R512_cvca, TA_RSA_v1_5_SHA_1 RSA-512, public key without domain parameters",
+   "sha256": "9135b9f691ac978a967ca141e1f5bfb556712b3ef62b93e8e069fd2000ef9009",
+   "size": 235,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/R512_terminal.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "TERMINAL issued by R512_dv, TA_RSA_v1_5_SHA_1 RSA-512, 90-day validity from 2026-09-01",
+   "sha256": "16173fd43b43dc8f0c48920b006987a0fcbb4eebb2663d62a41f45e02d7280c6",
+   "size": 235,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/RE3_cvca.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "self-signed CVCA root, TA_RSA_v1_5_SHA_256 RSA-2048 e=3, domain parameters included, holder authorization AT with every right",
+   "sha256": "312eeb3cb9be1696976e9b854f5588513aa105c12ea182de463874e70daabc56",
+   "size": 623,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/RE3_dv.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "DV_DOMESTIC issued by RE3_cvca, TA_RSA_v1_5_SHA_256 RSA-2048 e=3, public key without domain parameters",
+   "sha256": "dcabe81b61ac22c1c51e17a51a6d57b531c4f0db1425cfb6e0640d902469ab7f",
+   "size": 623,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/RE3_terminal.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "TERMINAL issued by RE3_dv, TA_RSA_v1_5_SHA_256 RSA-2048 e=3, 90-day validity from 2026-09-01",
+   "sha256": "c71aac52ddd8c0f875e64863e0a3f323ccd42f3f7a845c21ec45ea0555f566bc",
+   "size": 623,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/RPSS1_cvca.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "self-signed CVCA root, TA_RSA_PSS_SHA_1 RSA-1536, domain parameters included, holder authorization AT with every right",
+   "sha256": "3d6a65770d2517f80f8df1c273149a8113af66ac241c0be71ea2fb4803a7f063",
+   "size": 498,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/RPSS1_dv.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "DV_DOMESTIC issued by RPSS1_cvca, TA_RSA_PSS_SHA_1 RSA-1536, public key without domain parameters",
+   "sha256": "549cd847a7946d2cecd41bc75bdef492062debdb46accf3b46dee57d687c7e00",
+   "size": 498,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/RPSS1_terminal.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "TERMINAL issued by RPSS1_dv, TA_RSA_PSS_SHA_1 RSA-1536, 90-day validity from 2026-09-01",
+   "sha256": "43a4bb0229cdb095716fe414b03cff8e6ad2f31e863b317e1ae897eb8fb32188",
+   "size": 498,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/RPSS256_cvca.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "self-signed CVCA root, TA_RSA_PSS_SHA_256 RSA-2048, domain parameters included, holder authorization AT with every right",
+   "sha256": "a0f43f7cd9f52f22f93b3324f1811c937f52d123b602edccbdba29ae3e53efd3",
+   "size": 633,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/RPSS256_dv.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "DV_DOMESTIC issued by RPSS256_cvca, TA_RSA_PSS_SHA_256 RSA-2048, public key without domain parameters",
+   "sha256": "cd487b29e9a9846a5da6961e8ca0f0538109eabfdf396d4d4058b9f9b2837b92",
+   "size": 633,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/RPSS256_terminal.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "TERMINAL issued by RPSS256_dv, TA_RSA_PSS_SHA_256 RSA-2048, 90-day validity from 2026-09-01",
+   "sha256": "18dd4e116ca86a9a75b74a8a9494f6587cf542fb2fbe1d65a98d4731fb3031b8",
+   "size": 633,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/RV151_cvca.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "self-signed CVCA root, TA_RSA_v1_5_SHA_1 RSA-1024, domain parameters included, holder authorization AT with every right",
+   "sha256": "24260fc3a4f093aee8e01905eae524f81791d22625e3ffdff5c4311bc8675b4d",
+   "size": 369,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/RV151_dv.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "DV_DOMESTIC issued by RV151_cvca, TA_RSA_v1_5_SHA_1 RSA-1024, public key without domain parameters",
+   "sha256": "e6ae2989f482c40a4d55e8502890b082ae2328f8cc436a234dfe41b491aa8f89",
+   "size": 369,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/RV151_terminal.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "TERMINAL issued by RV151_dv, TA_RSA_v1_5_SHA_1 RSA-1024, 90-day validity from 2026-09-01",
+   "sha256": "2169a6f01dc0da3310180c314d4185c60e6b657c0e24ccb213fb06babfddb00c",
+   "size": 369,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/RV15256_cvca.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "self-signed CVCA root, TA_RSA_v1_5_SHA_256 RSA-3072, domain parameters included, holder authorization AT with every right",
+   "sha256": "7e155058e0e0e1fd02a720f74c2490beb8f0bbcd4d665783560681723329e5a1",
+   "size": 889,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/RV15256_dv.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "DV_DOMESTIC issued by RV15256_cvca, TA_RSA_v1_5_SHA_256 RSA-3072, public key without domain parameters",
+   "sha256": "a08c89dd09270a3f56b4bcfa79c0fee2c3dab433e4af944693dc7791e159c3af",
+   "size": 889,
+   "verify": "signature ok"
+  },
+  {
+   "file": "certs/RV15256_terminal.cvcert",
+   "kind": "cvc",
+   "expect": "parse",
+   "reason": "TERMINAL issued by RV15256_dv, TA_RSA_v1_5_SHA_256 RSA-3072, 90-day validity from 2026-09-01",
+   "sha256": "b9ccc5066ef7a008dc4c2a3577bdc799fd3a8250cd60bc6f5537859257560dc5",
+   "size": 889,
+   "verify": "signature ok"
+  },
+  {
+   "file": "descriptions/BP256_terminal.bin",
+   "kind": "certificate-description",
+   "expect": "parse",
+   "reason": "CertificateDescription (TR-03110-4 / TR-03110-3 C.3.1) DER whose SHA-256 is referenced from the terminal certificate's 65 extension",
+   "sha256": "15d2d9041ebfaf97c79c53a0bffb2be2d483191fbe4a9d2826286c0969bebb50",
+   "size": 223
+  },
+  {
+   "file": "malformed/body_car_lowercase_country.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "CAR country code in lower case",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "2ed68dbd8f063c1b3a461c308a8a1b3b8cc3634fbbb801dbf67400fa9f00547d",
+   "size": 334,
+   "verify": "parse: CAR/CHR length"
+  },
+  {
+   "file": "malformed/body_car_non_ascii.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "CAR with bytes outside ISO 8859-1 letters/digits",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "25e98eed1f784fd2553d77c7ed424dcbbffde4b76231410d8eca409ee626f99f",
+   "size": 327,
+   "verify": "no issuer in set"
+  },
+  {
+   "file": "malformed/body_car_too_long.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "CAR of 22 characters (maximum is 16)",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "a10d637bd3a07844333d944a1d6842c9ca5383ae6eed436de0789e6605a90fc2",
+   "size": 339,
+   "verify": "parse: CAR/CHR length"
+  },
+  {
+   "file": "malformed/body_car_too_short.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "CAR of 6 characters (minimum is 8: 2 country + 1 mnemonic + 5 sequence)",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "6967585baf812c4131ae598f0803f94cc340d5f233061e6010502b97889d197e",
+   "size": 322,
+   "verify": "parse: CAR/CHR length"
+  },
+  {
+   "file": "malformed/body_chat_discretionary_data_wrong_length.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "id-AT template with a 3-byte bitmap (must be 5)",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "70f1336608ce95f340a727f802e7e7a06cbb2286c5336107c898081859086d57",
+   "size": 328,
+   "verify": "SIGNATURE INVALID"
+  },
+  {
+   "file": "malformed/body_chat_empty.cvcert",
+   "kind": "cvc",
+   "expect": "reject",
+   "reason": "7F4C with no content",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "e520c0a80bfd11d3ac9962377a8192e0a27624be9d1a3cdcc539d65450fe76ad",
+   "size": 312,
+   "verify": "parse: 6"
+  },
+  {
+   "file": "malformed/body_chat_missing.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "7F4C certificate holder authorization template absent (mandatory in TR-03110 v2)",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "7ac982862f4b4882ac0ae78e93e8c760c76445c828ed768e5cff17124283678f",
+   "size": 309,
+   "verify": "parse: body order ['5F29', '42', '7F49', '5F20', '5F25', '5F24', '65']"
+  },
+  {
+   "file": "malformed/body_chat_reserved_bits_set.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "id-AT template with every bit set including RFU bits",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "7b64daec3527da44df84f124e317f5e319861005bafdec380c6cc788c290dcca",
+   "size": 330,
+   "verify": "SIGNATURE INVALID"
+  },
+  {
+   "file": "malformed/body_chat_role_cvca_in_terminal.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "authorization role bits say CVCA (11) on a certificate issued by a DV",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "4c811b4a0e5fcf6aa1e8f62621b8590f76cb0e54f3ce5e5e8c678b5c10372d3d",
+   "size": 330,
+   "verify": "SIGNATURE INVALID"
+  },
+  {
+   "file": "malformed/body_chr_equals_car_on_terminal.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "terminal certificate whose CHR equals its CAR (looks self-issued but role is TERMINAL)",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "8417a2d61e5c1798c8249bad38917b833bb75e32b5c2c62c14659b2969217042",
+   "size": 330,
+   "verify": "SIGNATURE INVALID"
+  },
+  {
+   "file": "malformed/body_chr_missing.cvcert",
+   "kind": "cvc",
+   "expect": "reject",
+   "reason": "5F20 certificate holder reference absent",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "12bb4b70a70fb6cdada172c6b5548fcf3f9cde00d31720600d5129639d3dab41",
+   "size": 313,
+   "verify": "parse: body order ['5F29', '42', '7F49', '7F4C', '5F25', '5F24', '65']"
+  },
+  {
+   "file": "malformed/body_duplicate_car.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "second 42 element appended",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "543f7f2bc322b2584268eda37f8310cffd2da5b466ca6ba33f7f3f6357d9cd29",
+   "size": 347,
+   "verify": "parse: body order ['5F29', '42', '7F49', '5F20', '7F4C', '5F25', '5F24', '65', '42']"
+  },
+  {
+   "file": "malformed/body_effective_date_5_bytes.cvcert",
+   "kind": "cvc",
+   "expect": "reject",
+   "reason": "date with 5 octets instead of 6",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "f376db9f44d0de45f5ef3841c15d271d210e52ed520e51fc664e4828b9ef3ddb",
+   "size": 329,
+   "verify": "parse: effective date not 6 BCD digits"
+  },
+  {
+   "file": "malformed/body_effective_date_bcd_invalid.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "effective date with month 13 (BCD digits 1,3)",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "7a8fe33ffac8513996644ce2e153dbe0cb616262459effac7a01ff17306760d6",
+   "size": 330,
+   "verify": "SIGNATURE INVALID"
+  },
+  {
+   "file": "malformed/body_effective_date_digit_gt_9.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "date digit 0x0A (not a decimal digit)",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "281af4ef8386fccdfeb268bf3abf9899b478a4c3c52a3e42d230a2ac84541950",
+   "size": 330,
+   "verify": "parse: effective date not 6 BCD digits"
+  },
+  {
+   "file": "malformed/body_effective_date_missing.cvcert",
+   "kind": "cvc",
+   "expect": "reject",
+   "reason": "5F25 effective date absent",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "040c466dd76bad791cdd806007b91eced12dc3e34be18789d49cf21a1ee6a461",
+   "size": 321,
+   "verify": "parse: body order ['5F29', '42', '7F49', '5F20', '7F4C', '5F24', '65']"
+  },
+  {
+   "file": "malformed/body_elements_reordered.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "7F49 before 42: elements out of the TR-03110 order",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "a99fef0176b4adffcafce6773d5fd45d2a7568c16db59e9a72aaece9c14976a4",
+   "size": 330,
+   "verify": "parse: body order ['5F29', '7F49', '42', '5F20', '7F4C', '5F25', '5F24', '65']"
+  },
+  {
+   "file": "malformed/body_expiration_before_effective.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "expiration date 2020-01-01 before effective date",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "120c3bb9158f2350167646b9ff6103e01c2a6622a2b878ba48e9cf0cd2ca3245",
+   "size": 330,
+   "verify": "SIGNATURE INVALID"
+  },
+  {
+   "file": "malformed/body_expiration_missing.cvcert",
+   "kind": "cvc",
+   "expect": "reject",
+   "reason": "5F24 expiration date absent",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "e238f08903c542b4a2df961eadedf9c880882efc92c061f5075e70baf75a4c23",
+   "size": 321,
+   "verify": "parse: body order ['5F29', '42', '7F49', '5F20', '7F4C', '5F25', '65']"
+  },
+  {
+   "file": "malformed/body_extension_unknown_oid.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "extension discretionary data template with an unknown OID",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "3bb6f36dd5bdfd7e56eaa5cf67bf32565b436aa1778eb6b66676bd915a6a2dc0",
+   "size": 379,
+   "verify": "SIGNATURE INVALID"
+  },
+  {
+   "file": "malformed/body_extensions_empty.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "65 certificate extensions template present but empty",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "0f3c5aac46e7405c8a5e8fe54bc09a9630dd511974a92e8d04b0acb3a6983a38",
+   "size": 235,
+   "verify": "SIGNATURE INVALID"
+  },
+  {
+   "file": "malformed/body_missing_car.cvcert",
+   "kind": "cvc",
+   "expect": "reject",
+   "reason": "42 certification authority reference absent",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "b3bd6ec4cc19df90a82d0e51025e00b52c453e89ee5f36fe24a47de614251db2",
+   "size": 314,
+   "verify": "parse: body order ['5F29', '7F49', '5F20', '7F4C', '5F25', '5F24', '65']"
+  },
+  {
+   "file": "malformed/body_missing_profile_identifier.cvcert",
+   "kind": "cvc",
+   "expect": "reject",
+   "reason": "5F29 certificate profile identifier absent",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "1f8ce3d893d267e28991297b9aa13afb00ebfe70f8b6f98d00ea3aa0755fff42",
+   "size": 326,
+   "verify": "parse: body order ['42', '7F49', '5F20', '7F4C', '5F25', '5F24', '65']"
+  },
+  {
+   "file": "malformed/body_missing_signature.cvcert",
+   "kind": "cvc",
+   "expect": "reject",
+   "reason": "7F21 containing only the 7F4E body, no 5F37 signature",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "e357db66ea16ff4f0b73ab049ef61b94216bb3468fbd981bd2e0f6cb7d759c88",
+   "size": 263,
+   "verify": "parse: 7F21 children ['7F4E'] (expected 7F4E, 5F37)"
+  },
+  {
+   "file": "malformed/body_nested_length_mismatch.cvcert",
+   "kind": "cvc",
+   "expect": "reject",
+   "reason": "7F4E length claims 5 more bytes than its content",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "8970a2a6c8be156f2f1499c9381608349f9dad3aab236090e5ce037604b4e3fd",
+   "size": 331,
+   "verify": "parse: length overrun at 269"
+  },
+  {
+   "file": "malformed/body_profile_identifier_ff.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "5F29 = 0xFF (undefined profile)",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "cd4a7bd8b191369450cc6134421329af4a60bcc7926e7f2396ae33613cb48cdb",
+   "size": 330,
+   "verify": "parse: profile identifier ff"
+  },
+  {
+   "file": "malformed/body_profile_identifier_two_bytes.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "5F29 with two octets",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "2350672963842881f8b671ca61a35ac8f66bb12395b19d4fecd40d935a92ec01",
+   "size": 331,
+   "verify": "parse: profile identifier 0000"
+  },
+  {
+   "file": "malformed/body_pubkey_domain_params_in_terminal.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "terminal certificate carrying full domain parameters (81..85, 87) in 7F49 - only CVCA certificates may",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "12ed36f016fab0e0f088839e52cc296e9a2ed51aafc5cf34941480035572229f",
+   "size": 539,
+   "verify": "SIGNATURE INVALID"
+  },
+  {
+   "file": "malformed/body_pubkey_empty.cvcert",
+   "kind": "cvc",
+   "expect": "reject",
+   "reason": "7F49 public key with no content",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "dcbc9d17223c36fc460561087f4c24ba0e70008cc3a3220ce429d55f608a7ce5",
+   "size": 250,
+   "verify": "parse: 6"
+  },
+  {
+   "file": "malformed/body_pubkey_missing.cvcert",
+   "kind": "cvc",
+   "expect": "reject",
+   "reason": "7F49 public key absent",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "9a020f0bc9934ad56b614d1ce81b523d3f101eadc242fd6d31775c926688f402",
+   "size": 247,
+   "verify": "parse: body order ['5F29', '42', '5F20', '7F4C', '5F25', '5F24', '65']"
+  },
+  {
+   "file": "malformed/body_pubkey_only_oid.cvcert",
+   "kind": "cvc",
+   "expect": "reject",
+   "reason": "7F49 with the algorithm OID but no 86 public point",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "dca69f6bd6cbe955f91e8933dc95a83843fd565fddfd7f02846f72fdc85a13cf",
+   "size": 263,
+   "verify": "SIGNATURE INVALID"
+  },
+  {
+   "file": "malformed/body_pubkey_point_compressed.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "86 public point in compressed form (TR-03110 requires uncompressed 04||x||y)",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "0d14b4aacf8f96c1bd2ef68df5b04067d9912f4fc0071c1d1588c8ab9c1181b8",
+   "size": 298,
+   "verify": "SIGNATURE INVALID"
+  },
+  {
+   "file": "malformed/body_pubkey_point_not_on_curve.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "86 public point that is not on brainpoolP256r1",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "61b1f3b6ad645a09b4993a3dbc705a06c496c8b80c59ccb4949e90250d4ff91f",
+   "size": 330,
+   "verify": "SIGNATURE INVALID"
+  },
+  {
+   "file": "malformed/body_pubkey_point_wrong_length.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "86 public point one byte short",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "c2ac2aa9cc5c7c911ad71cd9142d8b37486e22ed0a9d1c862ad349bef9fc3cd2",
+   "size": 329,
+   "verify": "SIGNATURE INVALID"
+  },
+  {
+   "file": "malformed/body_pubkey_rsa_oid_with_ec_point.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "7F49 OID id-TA-RSA-v1-5-SHA-1 but the element is an EC point (86)",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "362fae80675040adf298e0d383959a8e9701018b8cf3fc5256b5034dfa073025",
+   "size": 330,
+   "verify": "SIGNATURE INVALID"
+  },
+  {
+   "file": "malformed/body_pubkey_unknown_oid.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "7F49 with an unknown algorithm OID",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "7cb6c446eb899959ce3b5a43094fdfe3e491d8f49d40b17f30bb0069052ee553",
+   "size": 329,
+   "verify": "SIGNATURE INVALID"
+  },
+  {
+   "file": "malformed/body_unknown_element.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "unknown 5F99 element appended to the body",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "2e82f6e1ac5e7c6f745d61bfd701f2071a56aaefd19f92c5cd8b0477f426f59c",
+   "size": 337,
+   "verify": "parse: body order ['5F29', '42', '7F49', '5F20', '7F4C', '5F25', '5F24', '65', '5F99']"
+  },
+  {
+   "file": "malformed/duplicate_signature.cvcert",
+   "kind": "cvc",
+   "expect": "reject",
+   "reason": "two 5F37 elements",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "f4b86a0c4be5a5dc15e9fe1fc7f3dd0df9e7a1cb9f6afe873e262a79b7a22c6c",
+   "size": 397,
+   "verify": "parse: 7F21 children ['7F4E', '5F37', '5F37'] (expected 7F4E, 5F37)"
+  },
+  {
+   "file": "malformed/empty.cvcert",
+   "kind": "cvc",
+   "expect": "reject",
+   "reason": "zero-length input",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "size": 0,
+   "verify": "parse: not a single 7F21 template"
+  },
+  {
+   "file": "malformed/outer_length_indefinite.cvcert",
+   "kind": "cvc",
+   "expect": "reject",
+   "reason": "BER indefinite length on the outer template",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "2733b2825349f5b83064c857daa22c7c9b1aef440d65116127847c0400575ee5",
+   "size": 331,
+   "verify": "parse: not a single 7F21 template"
+  },
+  {
+   "file": "malformed/outer_length_non_minimal.cvcert",
+   "kind": "cvc",
+   "expect": "reject",
+   "reason": "3-octet length where 2 suffice",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "28dea3169b2255ca631aabd1d6211a5b6674f788a59a191ca896e4fbb947bcb4",
+   "size": 332,
+   "verify": "parse: 7F21 children ['45', '4', '7F00', '1', '9B', '0', '3', '65', '5F37'] (expected 7F4E, 5F37)"
+  },
+  {
+   "file": "malformed/outer_tag_7f21_wrong_length_long.cvcert",
+   "kind": "cvc",
+   "expect": "reject",
+   "reason": "outer length 20 bytes too long",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "896198eeb67ea07f2412d18d7ef01c868d45268ad33401bcba32447192a03f00",
+   "size": 331,
+   "verify": "parse: length overrun at 0"
+  },
+  {
+   "file": "malformed/outer_tag_7f21_wrong_length_short.cvcert",
+   "kind": "cvc",
+   "expect": "reject",
+   "reason": "outer length 20 bytes too short",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "aaeb838f2d38fb34d08ead4736e25ca83373baa0fee35e66442c89d1833c6abd",
+   "size": 331,
+   "verify": "parse: length overrun at 311"
+  },
+  {
+   "file": "malformed/outer_tag_7f22.cvcert",
+   "kind": "cvc",
+   "expect": "reject",
+   "reason": "outer tag 7F22 instead of 7F21 (CV certificate)",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "db5c0c9ad610fc3c01d8712b5fba76592cbb1ea01804a1ca207ef3a6d7471d91",
+   "size": 330,
+   "verify": "parse: not a single 7F21 template"
+  },
+  {
+   "file": "malformed/signature_all_zero.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "signature r = s = 0",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "26b245b144f3a000d7b810a20039f646abfb8c94f54a7e304456a29b85ae7b4f",
+   "size": 330,
+   "verify": "SIGNATURE INVALID"
+  },
+  {
+   "file": "malformed/signature_before_body.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "5F37 signature placed before the 7F4E body (order is fixed by TR-03110)",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "e1b96a477747f99c19fbd4c1a397d104b1eb4a9ff69858631201422fca53567c",
+   "size": 330,
+   "verify": "parse: 7F21 children ['5F37', '7F4E'] (expected 7F4E, 5F37)"
+  },
+  {
+   "file": "malformed/signature_der_encoded.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "signature as X9.62 DER SEQUENCE instead of plain r||s (TR-03110 requires plain format)",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "8ac2a8ded1c3b18112a675bcbedd6ded597079c779e0abcb6fbaf10c5a36215a",
+   "size": 336,
+   "verify": "SIGNATURE INVALID"
+  },
+  {
+   "file": "malformed/signature_empty.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "zero-length signature",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "f964f3c2aba7d2035706635e3920c4f358eb1b38d6056a8a254a3f2518b87fd1",
+   "size": 266,
+   "verify": "SIGNATURE INVALID"
+  },
+  {
+   "file": "malformed/signature_flipped_bit.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "one bit of the ECDSA signature flipped: well formed, verification must fail",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "bd85c2609dd8f225845c0b9dbc0808f44fc52f7b2b9861d091dc36d18b0a36aa",
+   "size": 330,
+   "verify": "SIGNATURE INVALID"
+  },
+  {
+   "file": "malformed/signature_short.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "signature one byte short (63 bytes for a 256-bit curve r||s)",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "0e73e6b8f76d596898ba4b96288da25af35329de580f9149ae5ed9f7d63abd36",
+   "size": 329,
+   "verify": "SIGNATURE INVALID"
+  },
+  {
+   "file": "malformed/trailing_garbage.cvcert",
+   "kind": "cvc",
+   "expect": "reject",
+   "reason": "three bytes after the 7F21 template",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "1e382d975674bad2b0e3244dc488d665877c0daea96320b3ea881b21bba36876",
+   "size": 333,
+   "verify": "parse: not a single 7F21 template"
+  },
+  {
+   "file": "malformed/truncated_half.cvcert",
+   "kind": "cvc",
+   "expect": "reject",
+   "reason": "certificate cut in half",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "8c464113564994bc315666566b7888d373e2bd64fe14562c3386dfeafa589aa1",
+   "size": 165,
+   "verify": "parse: length overrun at 0"
+  },
+  {
+   "file": "malformed/truncated_last_byte.cvcert",
+   "kind": "cvc",
+   "expect": "reject",
+   "reason": "last signature byte missing",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "158c28a6634a6e78ff85c3ce6dd41f0e7b4895547163efd3fa60407575549588",
+   "size": 329,
+   "verify": "parse: length overrun at 0"
+  },
+  {
+   "file": "malformed/two_certificates_concatenated.cvcert",
+   "kind": "cvc",
+   "expect": "parse-only",
+   "reason": "two certificates back to back",
+   "derived_from": "certs/BP256_terminal.cvcert",
+   "sha256": "3a2fd38087b276f7946fa49ff345ea0f532e9d3809399d724d207dea0b2082f8",
+   "size": 660,
+   "verify": "parse: not a single 7F21 template"
+  },
+  {
+   "file": "public_keys/XXC2BP256.x509.cv",
+   "kind": "cvc-public-key",
+   "expect": "parse",
+   "reason": "7F49 public key template with domain parameters (as exported for CVCA and sector keys)",
+   "sha256": "39a18e9f5a63a75a59b5eb653591bcaf46290413d875e97136b52d4e7cee2455",
+   "size": 290
+  },
+  {
+   "file": "public_keys/XXCVBP160.x509.cv",
+   "kind": "cvc-public-key",
+   "expect": "parse",
+   "reason": "7F49 public key template with domain parameters (as exported for CVCA and sector keys)",
+   "sha256": "66b52ab3b08de30f372d684059c82c434314f52482dafe1fd52d55995c923669",
+   "size": 193
+  },
+  {
+   "file": "public_keys/XXCVBP192.x509.cv",
+   "kind": "cvc-public-key",
+   "expect": "parse",
+   "reason": "7F49 public key template with domain parameters (as exported for CVCA and sector keys)",
+   "sha256": "b70865f37b8c0cf6ca8f11c7e7ebeaf39c95959710bd9c05a55d2d45e88ca02e",
+   "size": 225
+  },
+  {
+   "file": "public_keys/XXCVBP224.x509.cv",
+   "kind": "cvc-public-key",
+   "expect": "parse",
+   "reason": "7F49 public key template with domain parameters (as exported for CVCA and sector keys)",
+   "sha256": "3e40114b7ccaad02a135ccf7e217d020c045e94beb1a3d7e161789c818e16b63",
+   "size": 257
+  },
+  {
+   "file": "public_keys/XXCVBP256.x509.cv",
+   "kind": "cvc-public-key",
+   "expect": "parse",
+   "reason": "7F49 public key template with domain parameters (as exported for CVCA and sector keys)",
+   "sha256": "31215ab0135b4762a06e3f2b47b44e4e080ea5600d37d69a440aa1c3e78d6fe0",
+   "size": 290
+  },
+  {
+   "file": "public_keys/XXCVBP256IS.x509.cv",
+   "kind": "cvc-public-key",
+   "expect": "parse",
+   "reason": "7F49 public key template with domain parameters (as exported for CVCA and sector keys)",
+   "sha256": "74dfbd3887327fb1c0e7d287c5e0bd6cd8b9e376ace47b22393307badc44f710",
+   "size": 290
+  },
+  {
+   "file": "public_keys/XXCVBP256T.x509.cv",
+   "kind": "cvc-public-key",
+   "expect": "parse",
+   "reason": "7F49 public key template with domain parameters (as exported for CVCA and sector keys)",
+   "sha256": "9edae723b2943c5f54c662f433f82b02e1fb2eb3579888aca749a0830f8bcbe9",
+   "size": 290
+  },
+  {
+   "file": "public_keys/XXCVBP320.x509.cv",
+   "kind": "cvc-public-key",
+   "expect": "parse",
+   "reason": "7F49 public key template with domain parameters (as exported for CVCA and sector keys)",
+   "sha256": "f242a09d1d92b62e5ab36cc8d180982c0ab3c141f9f6954d2e6cbd365acf2e7f",
+   "size": 354
+  },
+  {
+   "file": "public_keys/XXCVBP384.x509.cv",
+   "kind": "cvc-public-key",
+   "expect": "parse",
+   "reason": "7F49 public key template with domain parameters (as exported for CVCA and sector keys)",
+   "sha256": "0fa06e48d4cc6602c300032085942d64ce866370b939ec04b01afb0713b712f5",
+   "size": 418
+  },
+  {
+   "file": "public_keys/XXCVBP384ST.x509.cv",
+   "kind": "cvc-public-key",
+   "expect": "parse",
+   "reason": "7F49 public key template with domain parameters (as exported for CVCA and sector keys)",
+   "sha256": "a7e030cc516cd49cbc0a3edd35fcf4398da3000c9fdfb2bd39e4386b028b3b98",
+   "size": 418
+  },
+  {
+   "file": "public_keys/XXCVBP512.x509.cv",
+   "kind": "cvc-public-key",
+   "expect": "parse",
+   "reason": "7F49 public key template with domain parameters (as exported for CVCA and sector keys)",
+   "sha256": "2820c715c55753b45361c0c1042dfb222a844386c3a78dc7dcba8b0883bd70bc",
+   "size": 548
+  },
+  {
+   "file": "public_keys/XXCVBP512T.x509.cv",
+   "kind": "cvc-public-key",
+   "expect": "parse",
+   "reason": "7F49 public key template with domain parameters (as exported for CVCA and sector keys)",
+   "sha256": "ed5a44d6df542c411d0113ba10fbc64d4c5eb90711e882c96a3972688915151c",
+   "size": 548
+  },
+  {
+   "file": "public_keys/XXCVK256.x509.cv",
+   "kind": "cvc-public-key",
+   "expect": "parse",
+   "reason": "7F49 public key template with domain parameters (as exported for CVCA and sector keys)",
+   "sha256": "50f6ce012635734bb52340f8f6f77a9d5fc79a7431f433cb43aee8489d43231f",
+   "size": 227
+  },
+  {
+   "file": "public_keys/XXCVP160.x509.cv",
+   "kind": "cvc-public-key",
+   "expect": "parse",
+   "reason": "7F49 public key template with domain parameters (as exported for CVCA and sector keys)",
+   "sha256": "680013228950d27f9e47862450cc8d40a90b4ef99310a709889dba6de9e3f12d",
+   "size": 194
+  },
+  {
+   "file": "public_keys/XXCVP192.x509.cv",
+   "kind": "cvc-public-key",
+   "expect": "parse",
+   "reason": "7F49 public key template with domain parameters (as exported for CVCA and sector keys)",
+   "sha256": "d35328080d2d567383556fed691a0f19d5c077c1b4ed2f14a7526dadecf8573d",
+   "size": 225
+  },
+  {
+   "file": "public_keys/XXCVP224.x509.cv",
+   "kind": "cvc-public-key",
+   "expect": "parse",
+   "reason": "7F49 public key template with domain parameters (as exported for CVCA and sector keys)",
+   "sha256": "7032614f80104ccdfa3e409cbc44bc40783ec65c21fbbcfe16aace076f8b3a5d",
+   "size": 257
+  },
+  {
+   "file": "public_keys/XXCVP256.x509.cv",
+   "kind": "cvc-public-key",
+   "expect": "parse",
+   "reason": "7F49 public key template with domain parameters (as exported for CVCA and sector keys)",
+   "sha256": "836a3c1479faaad1d5c9908d1083bac7b799ba4bef70e228d86057f5bf63920e",
+   "size": 290
+  },
+  {
+   "file": "public_keys/XXCVP256IS.x509.cv",
+   "kind": "cvc-public-key",
+   "expect": "parse",
+   "reason": "7F49 public key template with domain parameters (as exported for CVCA and sector keys)",
+   "sha256": "b364f7112401347ebc276407d7a0c359c03170f5473323eed07ce894034caeb9",
+   "size": 290
+  },
+  {
+   "file": "public_keys/XXCVP384.x509.cv",
+   "kind": "cvc-public-key",
+   "expect": "parse",
+   "reason": "7F49 public key template with domain parameters (as exported for CVCA and sector keys)",
+   "sha256": "a9d5a91e14e466044422c8a20c23bff49a6a87f5bca9c4d22be556ec3632755b",
+   "size": 418
+  },
+  {
+   "file": "public_keys/XXCVP521.x509.cv",
+   "kind": "cvc-public-key",
+   "expect": "parse",
+   "reason": "7F49 public key template with domain parameters (as exported for CVCA and sector keys)",
+   "sha256": "438270f479e8b8760925a89ef5342e3159703372b0b405824405aa187533acfc",
+   "size": 561
+  },
+  {
+   "file": "public_keys/XXCVR512.x509.cv",
+   "kind": "cvc-public-key",
+   "expect": "parse",
+   "reason": "7F49 public key template with domain parameters (as exported for CVCA and sector keys)",
+   "sha256": "110bc33cad973345dff0592e4784e9a4af2aced0527c1668182a78802dd60fd5",
+   "size": 86
+  },
+  {
+   "file": "public_keys/XXCVRE3.x509.cv",
+   "kind": "cvc-public-key",
+   "expect": "parse",
+   "reason": "7F49 public key template with domain parameters (as exported for CVCA and sector keys)",
+   "sha256": "422ea60ef959f5d4ab5b0e7877d52a32a6987edd71383f388afe2084bf8a6b5c",
+   "size": 280
+  },
+  {
+   "file": "public_keys/XXCVRPSS1.x509.cv",
+   "kind": "cvc-public-key",
+   "expect": "parse",
+   "reason": "7F49 public key template with domain parameters (as exported for CVCA and sector keys)",
+   "sha256": "62b74f58f3a8d6b1c8eaabfe90a6f5c18fbdd72421bcee0438de30918784af77",
+   "size": 216
+  },
+  {
+   "file": "public_keys/XXCVRPSS256.x509.cv",
+   "kind": "cvc-public-key",
+   "expect": "parse",
+   "reason": "7F49 public key template with domain parameters (as exported for CVCA and sector keys)",
+   "sha256": "e165b76b8b594aad2f03cc7027b941d0b79d2a1bd40dcc98f96f61156811ae94",
+   "size": 282
+  },
+  {
+   "file": "public_keys/XXCVRV151.x509.cv",
+   "kind": "cvc-public-key",
+   "expect": "parse",
+   "reason": "7F49 public key template with domain parameters (as exported for CVCA and sector keys)",
+   "sha256": "9bd57ffb9a4adfa614f6f001d0e1b17ac03cfe6f77d5620ee83f91d668f273ca",
+   "size": 152
+  },
+  {
+   "file": "public_keys/XXCVRV15256.x509.cv",
+   "kind": "cvc-public-key",
+   "expect": "parse",
+   "reason": "7F49 public key template with domain parameters (as exported for CVCA and sector keys)",
+   "sha256": "ac8de22b1f67f9d6140fb65bc3e8b031bc543c757c422d68af5c50b3d91a9076",
+   "size": 410
+  },
+  {
+   "file": "public_keys/XXSKBP256.x509.cv",
+   "kind": "cvc-public-key",
+   "expect": "parse",
+   "reason": "7F49 public key template with domain parameters (as exported for CVCA and sector keys)",
+   "sha256": "53eca7176fd18cf83fe7de9a7a00df21a7f9d87383d6ca4fdb61cc8eb70e9e44",
+   "size": 290
+  }
+ ]
+}

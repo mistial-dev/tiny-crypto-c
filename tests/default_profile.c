@@ -4,10 +4,12 @@
  *
  * Test the configured library target instead of recompiling its sources.
  */
+#include "munit.h"
 
 #include <string.h>
 
 #include <tiny_crypto/config.h>
+#include <tiny_crypto/common.h>
 #if TC_ENABLE_AES
 #include <tiny_crypto/aes.h>
 #endif
@@ -23,8 +25,14 @@ static int bytes_equal(const uint8_t* left, const uint8_t* right, size_t length)
 }
 #endif
 
-int main(void)
+static MunitResult test_profile(const MunitParameter params[], void* user)
 {
+  uint8_t cleared[16];
+  size_t i;
+  (void)params; (void)user;
+  memset(cleared, 0xa5, sizeof cleared);
+  TC_secure_zero(cleared, sizeof cleared);
+  for (i = 0; i < sizeof cleared; ++i) munit_assert_uint8(cleared[i], ==, 0);
 #if TC_ENABLE_AES && TC_AES_ENABLE_CTR
 #if TC_AES_KEY_BITS == 256
   static const uint8_t expected[TC_AES_BLOCKLEN] = {
@@ -50,10 +58,9 @@ int main(void)
 #if TC_AES_SBOX_MODE == TC_AES_SBOX_MODE_RUNTIME
   TC_AES_init_sbox();
 #endif
-  if (TC_AES_init_ctx_iv(&aes, key, iv) != TC_OK ||
-      TC_AES_CTR_crypt(&aes, block, sizeof(block)) != TC_OK ||
-      !bytes_equal(block, expected, sizeof(expected)))
-    return 1;
+  munit_assert_int(TC_AES_init_ctx_iv(&aes, key, iv), ==, TC_OK);
+  munit_assert_int(TC_AES_CTR_crypt(&aes, block, sizeof(block)), ==, TC_OK);
+  munit_assert(bytes_equal(block, expected, sizeof(expected)));
 #endif
 
 #if TC_ENABLE_SHA256
@@ -66,10 +73,9 @@ int main(void)
   uint8_t digest[TC_SHA256_DIGESTLEN];
   struct TC_SHA256_ctx sha256;
 
-  if (TC_SHA256_init(&sha256) != TC_OK ||
+  munit_assert_false(TC_SHA256_init(&sha256) != TC_OK ||
       TC_SHA256_final(&sha256, digest) != TC_OK ||
-      !bytes_equal(digest, expected_empty, sizeof(expected_empty)))
-    return 2;
+      !bytes_equal(digest, expected_empty, sizeof(expected_empty)));
 #endif
 
 #if TC_ENABLE_SHA512
@@ -83,12 +89,19 @@ int main(void)
     uint8_t digest512[TC_SHA512_DIGESTLEN];
     struct TC_SHA512_ctx sha512;
 
-    if (TC_SHA512_init(&sha512) != TC_OK ||
+    munit_assert_false(TC_SHA512_init(&sha512) != TC_OK ||
         TC_SHA512_final(&sha512, digest512) != TC_OK ||
-        !bytes_equal(digest512, expected_empty512, sizeof(expected_empty512)))
-      return 3;
+        !bytes_equal(digest512, expected_empty512, sizeof(expected_empty512)));
   }
 #endif
 
-  return 0;
+  return MUNIT_OK;
 }
+
+static MunitTest tests[] = {
+  {"/profile", test_profile, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+  {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}
+};
+static const MunitSuite suite = {"/default-profile", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};
+int main(int argc, char* argv[])
+{ return munit_suite_main(&suite, NULL, argc, argv); }

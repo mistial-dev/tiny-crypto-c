@@ -6,6 +6,9 @@ labels: enhancement
 assignees: ''
 ---
 
+<!-- SPDX-FileCopyrightText: Mistial Dev -->
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
+
 ## Objective
 
 Describe the technical problem or gap (not a vague wish list).

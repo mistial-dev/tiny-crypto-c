@@ -13,6 +13,9 @@
 
 namespace tiny_crypto {
 
+typedef ::TC_bytes bytes;
+typedef ::TC_credential_status credential_status;
+
 /* The byte count is public. This only avoids content-dependent early exit. */
 inline TC_status ct_equal(const uint8_t* a, const uint8_t* b,
                           size_t length) noexcept {

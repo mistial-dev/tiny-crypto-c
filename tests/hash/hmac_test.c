@@ -825,6 +825,17 @@ static void run_wycheproof_file(int alg, const char* path)
   long expected_total = -1;
   long ran = 0;
   const size_t digest_len = (size_t)alg;
+  const char* directory = getenv("TC_TEST_HMAC_WYCHEPROOF_DIR");
+  char external_path[4096];
+
+  if (directory != NULL) {
+    const char* name = strrchr(path, '/');
+    int length = snprintf(external_path, sizeof external_path, "%s/%s", directory,
+                           name ? name + 1 : path);
+    munit_assert_int(length, >=, 0);
+    munit_assert_size((size_t)length, <, sizeof external_path);
+    path = external_path;
+  }
 
   file = tc_test_fopen(path, "r");
   if (file == NULL)
@@ -891,9 +902,15 @@ static void run_wycheproof_file(int alg, const char* path)
         int rc = hmac_verify(alg, tc.key, tc.key_len, tc.msg, tc.msg_len, tc.tag, tc.tag_len);
         munit_assert_int(rc, ==, valid ? TC_OK : TC_MISMATCH);
       }
+      else
+      {
+        munit_assert_int(hmac_verify(alg, tc.key, tc.key_len, tc.msg, tc.msg_len,
+                                     tc.tag, tc.tag_len), ==, TC_ERROR);
+      }
       ran++;
     }
   }
+  munit_assert_false(ferror(file));
   fclose(file);
 
   munit_assert_long(expected_total, >, 0);

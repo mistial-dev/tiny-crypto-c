@@ -2,18 +2,13 @@
  * SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
+#include "munit.h"
 
 #include <stdio.h>
 #include <string.h>
 
 #include <tiny_crypto/des.h>
 
-#define CHECK(condition) do {                                                \
-  if (!(condition)) {                                                       \
-    fprintf(stderr, "weak-key check failed at line %d\n", __LINE__);       \
-    return 1;                                                               \
-  }                                                                         \
-} while (0)
 
 static const uint8_t weak_keys[16][TC_DES_KEYLEN] = {
   { 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01 },
@@ -43,8 +38,9 @@ static int expect_key_status(TC_status status)
 #endif
 }
 
-int main(void)
+static MunitResult test_profile(const MunitParameter params[], void* user)
 {
+  (void)params; (void)user;
   static const uint8_t k1[TC_DES_KEYLEN] =
     { 0x13, 0x34, 0x57, 0x79, 0x9b, 0xbc, 0xdf, 0xf1 };
   static const uint8_t k2[TC_DES_KEYLEN] =
@@ -59,12 +55,12 @@ int main(void)
   uint8_t key[TC_DES3_KEYLEN_3KEY];
   size_t i;
 
-  CHECK(TC_DES_init_ctx(&des, k1) == TC_OK);
+  munit_assert(TC_DES_init_ctx(&des, k1) == TC_OK);
   for (i = 0; i < 16; ++i)
   {
-    CHECK(expect_key_status(TC_DES_init_ctx(&des, weak_keys[i])));
+    munit_assert(expect_key_status(TC_DES_init_ctx(&des, weak_keys[i])));
 #if TC_DES_ENABLE_CMAC
-    CHECK(expect_key_status(TC_DES_CMAC_init(&cmac, weak_keys[i],
+    munit_assert(expect_key_status(TC_DES_CMAC_init(&cmac, weak_keys[i],
                                              TC_DES_KEYLEN)));
 #endif
   }
@@ -72,62 +68,70 @@ int main(void)
   memcpy(key, weak_keys[0], TC_DES_KEYLEN);
   for (i = 0; i < TC_DES_KEYLEN; ++i)
     key[i] ^= 0x01u;
-  CHECK(expect_key_status(TC_DES_init_ctx(&des, key)));
+  munit_assert(expect_key_status(TC_DES_init_ctx(&des, key)));
 
   memcpy(key, k1, TC_DES_KEYLEN);
   memcpy(key + TC_DES_KEYLEN, k2, TC_DES_KEYLEN);
-  CHECK(TC_DES3_init_ctx(&des3, key, TC_DES3_KEYLEN_2KEY) == TC_OK);
+  munit_assert(TC_DES3_init_ctx(&des3, key, TC_DES3_KEYLEN_2KEY) == TC_OK);
 
   memcpy(key + TC_DES_KEYLEN, weak_keys[0], TC_DES_KEYLEN);
-  CHECK(expect_key_status(
+  munit_assert(expect_key_status(
     TC_DES3_init_ctx(&des3, key, TC_DES3_KEYLEN_2KEY)));
 #if TC_DES_ENABLE_CMAC
-  CHECK(expect_key_status(TC_DES_CMAC_init(&cmac, key,
+  munit_assert(expect_key_status(TC_DES_CMAC_init(&cmac, key,
                                            TC_DES3_KEYLEN_2KEY)));
 #endif
 
   memcpy(key + TC_DES_KEYLEN, k1, TC_DES_KEYLEN);
-  CHECK(expect_key_status(
+  munit_assert(expect_key_status(
     TC_DES3_init_ctx(&des3, key, TC_DES3_KEYLEN_2KEY)));
   for (i = TC_DES_KEYLEN; i < TC_DES3_KEYLEN_2KEY; ++i)
     key[i] ^= 0x01u;
-  CHECK(expect_key_status(
+  munit_assert(expect_key_status(
     TC_DES3_init_ctx(&des3, key, TC_DES3_KEYLEN_2KEY)));
 
   memcpy(key, k1, TC_DES_KEYLEN);
   memcpy(key + TC_DES_KEYLEN, k2, TC_DES_KEYLEN);
   memcpy(key + (2u * TC_DES_KEYLEN), k1, TC_DES_KEYLEN);
-  CHECK(TC_DES3_init_ctx(&des3, key, TC_DES3_KEYLEN_3KEY) == TC_OK);
+  munit_assert(TC_DES3_init_ctx(&des3, key, TC_DES3_KEYLEN_3KEY) == TC_OK);
 
   memcpy(key + (2u * TC_DES_KEYLEN), k3, TC_DES_KEYLEN);
-  CHECK(TC_DES3_init_ctx(&des3, key, TC_DES3_KEYLEN_3KEY) == TC_OK);
+  munit_assert(TC_DES3_init_ctx(&des3, key, TC_DES3_KEYLEN_3KEY) == TC_OK);
 
   memcpy(key, weak_keys[0], TC_DES_KEYLEN);
-  CHECK(expect_key_status(
+  munit_assert(expect_key_status(
     TC_DES3_init_ctx(&des3, key, TC_DES3_KEYLEN_3KEY)));
 
   memcpy(key, k1, TC_DES_KEYLEN);
   memcpy(key + TC_DES_KEYLEN, weak_keys[0], TC_DES_KEYLEN);
-  CHECK(expect_key_status(
+  munit_assert(expect_key_status(
     TC_DES3_init_ctx(&des3, key, TC_DES3_KEYLEN_3KEY)));
 
   memcpy(key + TC_DES_KEYLEN, k2, TC_DES_KEYLEN);
   memcpy(key + (2u * TC_DES_KEYLEN), weak_keys[0], TC_DES_KEYLEN);
-  CHECK(expect_key_status(
+  munit_assert(expect_key_status(
     TC_DES3_init_ctx(&des3, key, TC_DES3_KEYLEN_3KEY)));
 
   memcpy(key, k1, TC_DES_KEYLEN);
   memcpy(key + TC_DES_KEYLEN, k1, TC_DES_KEYLEN);
   memcpy(key + (2u * TC_DES_KEYLEN), k3, TC_DES_KEYLEN);
-  CHECK(expect_key_status(
+  munit_assert(expect_key_status(
     TC_DES3_init_ctx(&des3, key, TC_DES3_KEYLEN_3KEY)));
 
   memcpy(key, k1, TC_DES_KEYLEN);
   memcpy(key + TC_DES_KEYLEN, k2, TC_DES_KEYLEN);
   memcpy(key + (2u * TC_DES_KEYLEN), k2, TC_DES_KEYLEN);
-  CHECK(expect_key_status(
+  munit_assert(expect_key_status(
     TC_DES3_init_ctx(&des3, key, TC_DES3_KEYLEN_3KEY)));
 
   puts("DES weak-key policy: OK");
-  return 0;
+  return MUNIT_OK;
 }
+
+static MunitTest tests[] = {
+  {"/profile", test_profile, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+  {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}
+};
+static const MunitSuite suite = {"/des-weak-keys", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};
+int main(int argc, char* argv[])
+{ return munit_suite_main(&suite, NULL, argc, argv); }

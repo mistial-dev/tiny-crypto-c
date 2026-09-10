@@ -9,8 +9,8 @@
 #endif
 
 #if TC_ENABLE_KMAC256
-/* KMAC256 (SP 800-185). Call init before use; don't modify the fields directly.
- * No heap allocation. A 32-byte result is not a truncated 48-byte result. */
+/* KMAC256 state (SP 800-185). Initialize through TC_KMAC256_init.
+ * Members are private to the implementation. */
 struct TC_KMAC256_ctx {
   uint64_t State[25];
   uint8_t Position;
@@ -26,12 +26,17 @@ extern "C" {
  * Neither input may overlap ctx. */
 TC_status TC_KMAC256_init(struct TC_KMAC256_ctx* ctx,
     const uint8_t* key, size_t key_len, const uint8_t* custom, size_t custom_len);
+/* Absorb len bytes into an active context. data may be NULL when len is zero.
+ * Input must be separate from ctx. Rejected calls leave ctx unchanged. */
 TC_status TC_KMAC256_update(struct TC_KMAC256_ctx* ctx,
     const uint8_t* data, size_t len);
-/* Call init again after final. TC_ZEROIZE=1 also wipes the context.
+/* Produce out_len bytes. The requested length is part of the KMAC computation;
+ * changing it changes the output, including the common prefix.
+ * Call init again after final. TC_ZEROIZE=1 also wipes the context.
  * Output must be nonempty and separate from ctx. On error, neither changes. */
 TC_status TC_KMAC256_final(struct TC_KMAC256_ctx* ctx,
     uint8_t* out, size_t out_len);
+/* Wipe the context, including its key-dependent state. NULL is accepted. */
 void TC_KMAC256_ctx_clear(struct TC_KMAC256_ctx* ctx);
 /* Checks pointers even with TC_STRICT=0. Output may overlap inputs because
  * all input is read before any output is written. */
