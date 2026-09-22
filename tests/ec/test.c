@@ -238,10 +238,243 @@ static MunitResult captured_answer(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+typedef struct { unsigned calls, invalid_first; int fail; } SignRandom;
+
+static TC_status sign_nonce(void* context, uint8_t* output, size_t length)
+{
+  SignRandom* source = context;
+  if (source->fail) return TC_ERROR;
+  memset(output, 0, length);
+  if (!source->invalid_first || source->calls) output[length - 1] = 1;
+  ++source->calls;
+  return TC_OK;
+}
+
+static TC_status fixed_nonce(void* context, uint8_t* output, size_t length)
+{
+  const TC_bytes* value = context;
+  if (value->length != length) return TC_ERROR;
+  memcpy(output, value->data, length);
+  return TC_OK;
+}
+
+static MunitResult generation_answers(const MunitParameter params[], void* user)
+{
+  TC_EC_workspace workspace;
+  uint8_t private_key[TC_EC_MAX_BYTES], public_key[1 + 2 * TC_EC_MAX_BYTES];
+  uint8_t expected[1 + 2 * TC_EC_MAX_BYTES];
+  SignRandom random;
+  TC_random_source source = {sign_nonce, &random};
+  size_t i, j;
+  (void)params; (void)user;
+  for (i = 0; i < sizeof vectors / sizeof vectors[0]; ++i) {
+    size_t n = vectors[i].bytes;
+    munit_assert_size(tc_test_decode_hex(vectors[i].generator, expected, sizeof expected), ==, 1 + 2 * n);
+    memset(private_key, 0xa5, sizeof private_key);
+    memset(public_key, 0xa5, sizeof public_key);
+    random = (SignRandom){0, 1, 0};
+    munit_assert_int(TC_EC_generate_key_pair(vectors[i].curve, private_key, n,
+        public_key, 1 + 2 * n, source, 2, &workspace), ==, TC_OK);
+    munit_assert_uint(random.calls, ==, 2);
+    for (j = 0; j < n - 1; ++j) munit_assert_uint(private_key[j], ==, 0);
+    munit_assert_uint(private_key[n - 1], ==, 1);
+    munit_assert_memory_equal(1 + 2 * n, public_key, expected);
+    munit_assert_true(tc_test_all_zero(&workspace, sizeof workspace));
+
+    memset(private_key, 0xa5, sizeof private_key);
+    memset(public_key, 0xa5, sizeof public_key);
+    random = (SignRandom){0, 1, 0};
+    munit_assert_int(TC_EC_generate_key_pair(vectors[i].curve, private_key, n,
+        public_key, 1 + 2 * n, source, 1, &workspace), ==, TC_ERROR);
+    for (j = 0; j < sizeof private_key; ++j) munit_assert_uint(private_key[j], ==, 0xa5);
+    for (j = 0; j < sizeof public_key; ++j) munit_assert_uint(public_key[j], ==, 0xa5);
+    random = (SignRandom){0, 0, 1};
+    munit_assert_int(TC_EC_generate_key_pair(vectors[i].curve, private_key, n,
+        public_key, 1 + 2 * n, source, 2, &workspace), ==, TC_ERROR);
+    for (j = 0; j < sizeof private_key; ++j) munit_assert_uint(private_key[j], ==, 0xa5);
+    for (j = 0; j < sizeof public_key; ++j) munit_assert_uint(public_key[j], ==, 0xa5);
+  }
+  return MUNIT_OK;
+}
+
+static MunitResult signing_rfc6979(const MunitParameter params[], void* user)
+{
+  /* RFC 6979 A.2.5 and A.2.6, SHA-256/P-256 and SHA-384/P-384, "sample".
+   * The API accepts injected randomness; these fixed nonces test the ECDSA
+   * operation, not an RFC 6979 nonce generator. */
+  static const struct {
+    TC_EC_curve curve; size_t bytes;
+    const char *private_key, *digest, *nonce, *signature;
+  } answers[] = {
+#if TC_EC_ENABLE_P256
+    {TC_EC_P256, 32,
+     "C9AFA9D845BA75166B5C215767B1D6934E50C3DB36E89B127B8A622B120F6721",
+     "AF2BDBE1AA9B6EC1E2ADE1D694F41FC71A831D0268E9891562113D8A62ADD1BF",
+     "A6E3C57DD01ABE90086538398355DD4C3B17AA873382B0F24D6129493D8AAD60",
+     "EFD48B2AACB6A8FD1140DD9CD45E81D69D2C877B56AAF991C34D0EA84EAF3716"
+     "F7CB1C942D657C41D436C7A1B6E29F65F3E900DBB9AFF4064DC4AB2F843ACDA8"},
+#endif
+#if TC_EC_ENABLE_P384
+    {TC_EC_P384, 48,
+     "6B9D3DAD2E1B8C1C05B19875B6659F4DE23C3B667BF297BA9AA47740787137D8"
+     "96D5724E4C70A825F872C9EA60D2EDF5",
+     "9A9083505BC92276AEC4BE312696EF7BF3BF603F4BBD381196A029F340585312"
+     "313BCA4A9B5B890EFEE42C77B1EE25FE",
+     "94ED910D1A099DAD3254E9242AE85ABDE4BA15168EAF0CA87A555FD56D10FBCA"
+     "2907E3E83BA95368623B8C4686915CF9",
+     "94EDBB92A5ECB8AAD4736E56C691916B3F88140666CE9FA73D64C4EA95AD133C"
+     "81A648152E44ACF96E36DD1E80FABE46"
+     "99EF4AEB15F178CEA1FE40DB2603138F130E740A19624526203B6351D0A3A94F"
+     "A329C145786E679E7B82C71A38628AC8"},
+#endif
+  };
+  TC_ECDSA_workspace workspace;
+  uint8_t private_key[48], digest[48], nonce[48], signature[96], expected[96];
+  size_t i;
+  (void)params; (void)user;
+  for (i = 0; i < sizeof answers / sizeof answers[0]; ++i) {
+    size_t n = answers[i].bytes;
+    TC_bytes fixed = {nonce, n};
+    TC_random_source random = {fixed_nonce, &fixed};
+    munit_assert_size(tc_test_decode_hex(answers[i].private_key, private_key, sizeof private_key), ==, n);
+    munit_assert_size(tc_test_decode_hex(answers[i].digest, digest, sizeof digest), ==, n);
+    munit_assert_size(tc_test_decode_hex(answers[i].nonce, nonce, sizeof nonce), ==, n);
+    munit_assert_size(tc_test_decode_hex(answers[i].signature, expected, sizeof expected), ==, 2 * n);
+    munit_assert_int(TC_ECDSA_sign_digest(answers[i].curve, private_key, n, digest, n,
+        signature, 2 * n, random, 1, &workspace), ==, TC_OK);
+    munit_assert_memory_equal(2 * n, signature, expected);
+    munit_assert_true(tc_test_all_zero(&workspace, sizeof workspace));
+  }
+  return MUNIT_OK;
+}
+
+static MunitResult signing_rejects_invalid_keys_and_aliasing(const MunitParameter params[], void* user)
+{
+#if TC_EC_ENABLE_P256
+  TC_ECDSA_workspace workspace;
+  uint8_t key[32] = {0}, digest[32] = {1}, signature[64], overlapping[64] = {0};
+  SignRandom random = {0, 0, 0};
+  TC_random_source source = {sign_nonce, &random};
+  (void)params; (void)user;
+  memset(signature, 0xa5, sizeof signature);
+  munit_assert_int(TC_ECDSA_sign_digest(TC_EC_P256, key, 32, digest, 32,
+      signature, 64, source, 1, &workspace), ==, TC_ERROR);
+  munit_assert_true(tc_test_all_zero(&workspace, sizeof workspace));
+  munit_assert_uint(random.calls, ==, 0);
+  munit_assert_size(tc_test_decode_hex(
+      "FFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551",
+      key, sizeof key), ==, 32);
+  munit_assert_int(TC_ECDSA_sign_digest(TC_EC_P256, key, 32, digest, 32,
+      signature, 64, source, 1, &workspace), ==, TC_ERROR);
+  munit_assert_true(tc_test_all_zero(&workspace, sizeof workspace));
+  munit_assert_uint(random.calls, ==, 0);
+  for (size_t i = 0; i < sizeof signature; ++i) munit_assert_uint(signature[i], ==, 0xa5);
+  overlapping[31] = 1;
+  munit_assert_int(TC_ECDSA_sign_digest(TC_EC_P256, overlapping, 32, digest, 32,
+      overlapping, 64, source, 1, &workspace), ==, TC_ERROR);
+  munit_assert_uint(overlapping[31], ==, 1);
+  munit_assert_uint(random.calls, ==, 0);
+  munit_assert_int(TC_ECDSA_sign_digest(TC_EC_P256, overlapping, 32,
+      overlapping, 32, signature, 64, source, 1, &workspace), ==, TC_ERROR);
+  munit_assert_uint(random.calls, ==, 0);
+  munit_assert_int(TC_ECDSA_sign_digest(TC_EC_P256, overlapping, 32, digest, 32,
+      signature, 64, source, 0, &workspace), ==, TC_ERROR);
+  munit_assert_uint(random.calls, ==, 0);
+#else
+  (void)params; (void)user;
+#endif
+  return MUNIT_OK;
+}
+
+static MunitResult signing_answers(const MunitParameter params[], void* user)
+{
+  static const char* signatures[] = {
+#if TC_EC_ENABLE_P256
+    "6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296"
+    "1A43ADD58BC7B108DB6AC8BBF89860B9D49F9FD5EFBD1E3162F8AC0D3EE36F04",
+#endif
+#if TC_EC_ENABLE_P384
+    "AA87CA22BE8B05378EB1C71EF320AD746E1D3B628BA79B9859F741E082542A385502F25DBF55296C3A545E3872760AB7"
+    "45184D731A5427AE3D76855019B79CF061DC9BA1D764D3AA29341E51CE754F6B2E24AEF612000B004C4C7145579F0742",
+#endif
+  };
+  TC_ECDSA_workspace workspace;
+  TC_EC_workspace key_workspace;
+  uint8_t private_key[48] = {0}, digest[48], signature[96], expected[96], public_key[97];
+  SignRandom random;
+  TC_random_source source = {sign_nonce, &random};
+  size_t i, n;
+  (void)params; (void)user;
+  for (i = 0; i < sizeof vectors / sizeof vectors[0]; ++i) {
+    n = vectors[i].bytes;
+    memset(private_key, 0, sizeof private_key); private_key[n - 1] = 1;
+    if (n == 48) {
+      munit_assert_size(tc_test_decode_hex(
+          "9A9083505BC92276AEC4BE312696EF7BF3BF603F4BBD381196A029F340585312313BCA4A9B5B890EFEE42C77B1EE25FE",
+          digest, sizeof digest), ==, 48);
+    } else {
+      munit_assert_size(tc_test_decode_hex(
+          "AF2BDBE1AA9B6EC1E2ADE1D694F41FC71A831D0268E9891562113D8A62ADD1BF",
+          digest, sizeof digest), ==, 32);
+    }
+    munit_assert_size(tc_test_decode_hex(signatures[i], expected, sizeof expected), ==, 2 * n);
+    memset(signature, 0xa5, sizeof signature);
+    random = (SignRandom){0, 1, 0};
+    munit_assert_int(TC_ECDSA_sign_digest(vectors[i].curve, private_key, n,
+        digest, n == 48 ? 48 : 32, signature, 2 * n, source, 2, &workspace), ==, TC_OK);
+    munit_assert_uint(random.calls, ==, 2);
+    munit_assert_memory_equal(2 * n, signature, expected);
+    munit_assert_true(tc_test_all_zero(&workspace, sizeof workspace));
+    munit_assert_int(TC_EC_public_key(vectors[i].curve, private_key, n,
+        public_key, 1 + 2 * n, &key_workspace), ==, TC_OK);
+    munit_assert_int(TC_ECDSA_verify_digest(vectors[i].curve, public_key, 1 + 2 * n,
+        digest, n == 48 ? 48 : 32, signature, 2 * n, &workspace), ==, TC_OK);
+
+    memset(signature, 0xa5, sizeof signature);
+    random = (SignRandom){0, 1, 0};
+    munit_assert_int(TC_ECDSA_sign_digest(vectors[i].curve, private_key, n,
+        digest, n == 48 ? 48 : 32, signature, 2 * n, source, 1, &workspace), ==, TC_ERROR);
+    munit_assert_uint(random.calls, ==, 1);
+    for (size_t j = 0; j < sizeof signature; ++j) munit_assert_uint(signature[j], ==, 0xa5);
+    munit_assert_true(tc_test_all_zero(&workspace, sizeof workspace));
+    random = (SignRandom){0, 0, 1};
+    munit_assert_int(TC_ECDSA_sign_digest(vectors[i].curve, private_key, n,
+        digest, n == 48 ? 48 : 32, signature, 2 * n, source, 2, &workspace), ==, TC_ERROR);
+    for (size_t j = 0; j < sizeof signature; ++j) munit_assert_uint(signature[j], ==, 0xa5);
+    munit_assert_true(tc_test_all_zero(&workspace, sizeof workspace));
+  }
+#if TC_EC_ENABLE_P192
+  {
+    static const char *answer =
+        "188DA80EB03090F67CBF20EB43A18800F4FF0AFD82FF1012"
+        "C7B983F05ACBFFB85F6D02C1D895A7C80F8227FFEBE89927";
+    memset(private_key, 0, sizeof private_key); private_key[23] = 1;
+    munit_assert_size(tc_test_decode_hex(
+        "AF2BDBE1AA9B6EC1E2ADE1D694F41FC71A831D0268E9891562113D8A62ADD1BF",
+        digest, sizeof digest), ==, 32);
+    munit_assert_size(tc_test_decode_hex(answer, expected, sizeof expected), ==, 48);
+    random = (SignRandom){0, 0, 0};
+    munit_assert_int(TC_ECDSA_sign_digest(TC_EC_P192, private_key, 24,
+        digest, 32, signature, 48, source, 1, &workspace), ==, TC_OK);
+    munit_assert_memory_equal(48, signature, expected);
+    munit_assert_true(tc_test_all_zero(&workspace, sizeof workspace));
+    munit_assert_int(TC_EC_public_key(TC_EC_P192, private_key, 24,
+        public_key, 49, &key_workspace), ==, TC_OK);
+    munit_assert_int(TC_ECDSA_verify_digest(TC_EC_P192, public_key, 49,
+        digest, 32, signature, 48, &workspace), ==, TC_OK);
+  }
+#endif
+  return MUNIT_OK;
+}
+
 static MunitTest tests[] = {
   {"/wycheproof", wycheproof, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {"/known-answers", known_answers, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {"/signature-answers", signature_answers, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+  {"/signing-answers", signing_answers, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+  {"/signing-rfc6979", signing_rfc6979, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+  {"/signing-invalid", signing_rejects_invalid_keys_and_aliasing, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+  {"/generation-answers", generation_answers, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {"/rejected-inputs", rejected_inputs, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {"/captured-answer", captured_answer, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}

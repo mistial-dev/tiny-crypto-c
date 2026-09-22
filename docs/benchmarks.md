@@ -173,12 +173,12 @@ alone do not establish that a complete validation fits on the board.
 | EAC CVC inherited EC with encoding checks | 10,632 | 0.25% | 1,284 | 0.24% | 2,048 / 2,048 |
 | X.509 RSA-2048 certificate reader | 16,604 | 0.40% | 1,284 | 0.24% | 2,048 / 2,048 |
 | X.509 EC-256 certificate reader | 16,400 | 0.39% | 1,284 | 0.24% | 2,048 / 2,048 |
-| ECDH P-256, byte limbs | 8,664 | 0.21% | 2,344 | 0.44% | 2,048 / 2,048 |
-| ECDH P-256, native limbs | 8,656 | 0.21% | 2,348 | 0.44% | 2,048 / 2,048 |
-| ECDH P-384, byte limbs | 8,776 | 0.21% | 2,872 | 0.54% | 2,048 / 2,048 |
-| ECDH P-384, native limbs | 8,776 | 0.21% | 2,876 | 0.54% | 2,048 / 2,048 |
-| PIV SM CS2 handshake and message | 20,356 | 0.49% | 2,380 | 0.45% | 2,048 / 2,048 |
-| PIV SM CS7 handshake and message | 23,056 | 0.55% | 2,924 | 0.55% | 2,048 / 2,048 |
+| ECDH P-256, byte limbs | 8,632 | 0.21% | 2,344 | 0.44% | 2,048 / 2,048 |
+| ECDH P-256, native limbs | 8,608 | 0.21% | 2,348 | 0.44% | 2,048 / 2,048 |
+| ECDH P-384, byte limbs | 8,744 | 0.21% | 2,872 | 0.54% | 2,048 / 2,048 |
+| ECDH P-384, native limbs | 8,720 | 0.21% | 2,876 | 0.54% | 2,048 / 2,048 |
+| PIV SM CS2 handshake and message | 20,300 | 0.48% | 2,380 | 0.45% | 2,048 / 2,048 |
+| PIV SM CS7 handshake and message | 23,008 | 0.55% | 2,924 | 0.55% | 2,048 / 2,048 |
 
 ## Feature definitions
 
