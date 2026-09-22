@@ -43,6 +43,17 @@ extern "C" {
  * after use. Unsupported curves return TC_ERROR. */
 TC_status TC_EC_public_key(TC_EC_curve curve, const uint8_t* scalar, size_t scalar_len,
     uint8_t* output, size_t output_len, TC_EC_workspace* workspace);
+/* Generate a private scalar and matching SEC 1 public key. The RNG must be
+ * cryptographically secure and fill the whole request. Invalid scalar draws
+ * are retried up to max_attempts (1..16). Outputs remain unchanged on failure.
+ * After input validation, temporary scalar and public-key storage are wiped
+ * on return when TC_ZEROIZE=1. Outputs and workspace must be disjoint; the
+ * RNG context must not overlap them. */
+TC_status TC_EC_generate_key_pair(TC_EC_curve curve,
+    uint8_t* private_key, size_t private_key_len,
+    uint8_t* public_key, size_t public_key_len,
+    TC_random_source random, unsigned max_attempts,
+    TC_EC_workspace* workspace);
 TC_status TC_EC_validate_public_key(TC_EC_curve curve, const uint8_t* public_key,
     size_t public_key_len, TC_EC_workspace* workspace);
 /* Returns the shared point's X coordinate, including leading zero bytes.

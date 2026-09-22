@@ -401,6 +401,39 @@ TC_status TC_EC_public_key(TC_EC_curve curve, const uint8_t* scalar, size_t scal
   return key_operation(curve, scalar, scalar_len, NULL, 0, output, output_len, workspace, 0);
 }
 
+TC_status TC_EC_generate_key_pair(TC_EC_curve curve,
+    uint8_t* private_key, size_t private_key_len,
+    uint8_t* public_key, size_t public_key_len,
+    TC_random_source random, unsigned max_attempts,
+    TC_EC_workspace* workspace)
+{
+  size_t bytes = curve_bytes(curve);
+  uint8_t candidate[TC_EC_MAX_BYTES] = {0};
+  uint8_t point[1 + 2 * TC_EC_MAX_BYTES] = {0};
+  TC_status status = TC_ERROR;
+  unsigned attempt;
+  if (!bytes || !private_key || private_key_len != bytes ||
+      !public_key || public_key_len != 1 + 2 * bytes || !workspace ||
+      !random.fill || !max_attempts || max_attempts > 16 ||
+      !tc_internal_ranges_disjoint(private_key, private_key_len, public_key, public_key_len) ||
+      !tc_internal_ranges_disjoint(workspace, sizeof *workspace, private_key, private_key_len) ||
+      !tc_internal_ranges_disjoint(workspace, sizeof *workspace, public_key, public_key_len))
+    return TC_ERROR;
+  for (attempt = 0; attempt < max_attempts; ++attempt) {
+    if (random.fill(random.context, candidate, bytes) != TC_OK) break;
+    if (TC_EC_public_key(curve, candidate, bytes, point, 1 + 2 * bytes,
+                         workspace) != TC_OK) continue;
+    memcpy(private_key, candidate, bytes);
+    memcpy(public_key, point, 1 + 2 * bytes);
+    status = TC_OK;
+    break;
+  }
+  TC_secure_zero(candidate, sizeof candidate);
+  TC_secure_zero(point, sizeof point);
+  TC_secure_zero(workspace, sizeof *workspace);
+  return status;
+}
+
 TC_status TC_ECDH(TC_EC_curve curve, const uint8_t* scalar, size_t scalar_len,
     const uint8_t* public_key, size_t public_key_len, uint8_t* output,
     size_t output_len, TC_EC_workspace* workspace)

@@ -258,6 +258,45 @@ static TC_status fixed_nonce(void* context, uint8_t* output, size_t length)
   return TC_OK;
 }
 
+static MunitResult generation_answers(const MunitParameter params[], void* user)
+{
+  TC_EC_workspace workspace;
+  uint8_t private_key[TC_EC_MAX_BYTES], public_key[1 + 2 * TC_EC_MAX_BYTES];
+  uint8_t expected[1 + 2 * TC_EC_MAX_BYTES];
+  SignRandom random;
+  TC_random_source source = {sign_nonce, &random};
+  size_t i, j;
+  (void)params; (void)user;
+  for (i = 0; i < sizeof vectors / sizeof vectors[0]; ++i) {
+    size_t n = vectors[i].bytes;
+    munit_assert_size(tc_test_decode_hex(vectors[i].generator, expected, sizeof expected), ==, 1 + 2 * n);
+    memset(private_key, 0xa5, sizeof private_key);
+    memset(public_key, 0xa5, sizeof public_key);
+    random = (SignRandom){0, 1, 0};
+    munit_assert_int(TC_EC_generate_key_pair(vectors[i].curve, private_key, n,
+        public_key, 1 + 2 * n, source, 2, &workspace), ==, TC_OK);
+    munit_assert_uint(random.calls, ==, 2);
+    for (j = 0; j < n - 1; ++j) munit_assert_uint(private_key[j], ==, 0);
+    munit_assert_uint(private_key[n - 1], ==, 1);
+    munit_assert_memory_equal(1 + 2 * n, public_key, expected);
+    munit_assert_true(tc_test_all_zero(&workspace, sizeof workspace));
+
+    memset(private_key, 0xa5, sizeof private_key);
+    memset(public_key, 0xa5, sizeof public_key);
+    random = (SignRandom){0, 1, 0};
+    munit_assert_int(TC_EC_generate_key_pair(vectors[i].curve, private_key, n,
+        public_key, 1 + 2 * n, source, 1, &workspace), ==, TC_ERROR);
+    for (j = 0; j < sizeof private_key; ++j) munit_assert_uint(private_key[j], ==, 0xa5);
+    for (j = 0; j < sizeof public_key; ++j) munit_assert_uint(public_key[j], ==, 0xa5);
+    random = (SignRandom){0, 0, 1};
+    munit_assert_int(TC_EC_generate_key_pair(vectors[i].curve, private_key, n,
+        public_key, 1 + 2 * n, source, 2, &workspace), ==, TC_ERROR);
+    for (j = 0; j < sizeof private_key; ++j) munit_assert_uint(private_key[j], ==, 0xa5);
+    for (j = 0; j < sizeof public_key; ++j) munit_assert_uint(public_key[j], ==, 0xa5);
+  }
+  return MUNIT_OK;
+}
+
 static MunitResult signing_rfc6979(const MunitParameter params[], void* user)
 {
   /* RFC 6979 A.2.5 and A.2.6, SHA-256/P-256 and SHA-384/P-384, "sample".
@@ -435,6 +474,7 @@ static MunitTest tests[] = {
   {"/signing-answers", signing_answers, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {"/signing-rfc6979", signing_rfc6979, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {"/signing-invalid", signing_rejects_invalid_keys_and_aliasing, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+  {"/generation-answers", generation_answers, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {"/rejected-inputs", rejected_inputs, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {"/captured-answer", captured_answer, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}
