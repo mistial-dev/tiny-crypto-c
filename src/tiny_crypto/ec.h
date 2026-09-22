@@ -63,6 +63,21 @@ TC_status TC_ECDSA_verify_digest(TC_EC_curve curve,
     const uint8_t* signature, size_t signature_len,
     TC_ECDSA_workspace* workspace);
 
+/* Sign a precomputed digest with a fixed-width private scalar. The RNG supplies
+ * an independent secret nonce on each attempt; it must be cryptographically
+ * secure and fill the entire request. At most 16 attempts are allowed. Signature
+ * encoding is fixed-width big-endian r || s. Digests longer than the order are
+ * truncated to their leftmost bytes. Output remains unchanged on failure.
+ * After input validation, workspace and nonce storage are wiped on return when
+ * TC_ZEROIZE=1. Inputs, output and workspace must be pairwise disjoint. The
+ * RNG context must not overlap them. */
+TC_status TC_ECDSA_sign_digest(TC_EC_curve curve,
+    const uint8_t* private_key, size_t private_key_len,
+    const uint8_t* digest, size_t digest_len,
+    uint8_t* signature, size_t signature_len,
+    TC_random_source random, unsigned max_attempts,
+    TC_ECDSA_workspace* workspace);
+
 #ifdef __cplusplus
 }
 #endif

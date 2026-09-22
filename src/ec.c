@@ -433,6 +433,18 @@ static void order_mul(ec_state* s, word* out, const word* a, const word* b)
       tc_mp_montgomery_factor(F(s, EC_N)[0]), s->w->product, s->w->reduced);
 }
 
+static void digest_scalar(ec_state* s, word* out,
+    const uint8_t* digest, size_t digest_len)
+{
+  size_t i;
+  if (digest_len > s->bytes) digest_len = s->bytes;
+  memset(out, 0, s->bytes);
+  for (i = 0; i < digest_len; ++i)
+    out[i / sizeof(word)] |= (word)((word)digest[digest_len - 1 - i] <<
+        (8 * (i % sizeof(word))));
+  tc_mp_reduce(out, out, 0, F(s, EC_N), s->words, s->w->reduced);
+}
+
 static int verification_scalars(ec_state* s, const uint8_t* digest, size_t digest_len,
     const uint8_t* signature, TC_ECDSA_workspace* workspace)
 {
@@ -444,12 +456,7 @@ static int verification_scalars(ec_state* s, const uint8_t* digest, size_t diges
       !subtract(s->w->reduced, F(s, 7), F(s, EC_N), s->words)) return 0;
 
   /* Supported orders fill their byte width. Short hashes are zero-extended. */
-  if (digest_len > s->bytes) digest_len = s->bytes;
-  memset(F(s, 8), 0, s->bytes);
-  for (i = 0; i < digest_len; ++i)
-    F(s, 8)[i / sizeof(word)] |= (word)((word)digest[digest_len - 1 - i] <<
-        (8 * (i % sizeof(word))));
-  tc_mp_reduce(F(s, 8), F(s, 8), 0, F(s, EC_N), s->words, s->w->reduced);
+  digest_scalar(s, F(s, 8), digest, digest_len);
   tc_mp_montgomery_r2(F(s, 0), F(s, EC_N), s->words, s->w->reduced);
   memset(F(s, 1), 0, s->bytes);
   F(s, 1)[0] = 1;
@@ -519,6 +526,90 @@ TC_status TC_ECDSA_verify_digest(TC_EC_curve curve,
   import_bytes(&s, F(&s, 1), signature, 0);
   if (memcmp(F(&s, 0), F(&s, 1), bytes) == 0) status = TC_OK;
 done:
+  TC_secure_zero(workspace, sizeof *workspace);
+  return status;
+}
+
+TC_status TC_ECDSA_sign_digest(TC_EC_curve curve,
+    const uint8_t* private_key, size_t private_key_len,
+    const uint8_t* digest, size_t digest_len,
+    uint8_t* signature, size_t signature_len,
+    TC_random_source random, unsigned max_attempts,
+    TC_ECDSA_workspace* workspace)
+{
+  ec_state s;
+  size_t bytes = curve_bytes(curve);
+  uint8_t nonce[TC_EC_MAX_BYTES] = {0};
+  TC_status status = TC_ERROR;
+  unsigned attempt;
+  size_t i;
+  if (!bytes || !private_key || private_key_len != bytes || !digest || !digest_len ||
+      !signature || signature_len != 2 * bytes || !workspace || !random.fill ||
+      !max_attempts || max_attempts > 16 ||
+      !tc_internal_ranges_disjoint(workspace, sizeof *workspace, private_key, private_key_len) ||
+      !tc_internal_ranges_disjoint(workspace, sizeof *workspace, digest, digest_len) ||
+      !tc_internal_ranges_disjoint(workspace, sizeof *workspace, signature, signature_len) ||
+      !tc_internal_ranges_disjoint(private_key, private_key_len, digest, digest_len) ||
+      !tc_internal_ranges_disjoint(private_key, private_key_len, signature, signature_len) ||
+      !tc_internal_ranges_disjoint(digest, digest_len, signature, signature_len))
+    return TC_ERROR;
+
+  initialize(&s, &workspace->ec, bytes);
+  import_bytes(&s, workspace->scalars[0], private_key, 0);
+  if (zero_mask(workspace->scalars[0], s.words) ||
+      !subtract(s.w->reduced, workspace->scalars[0], F(&s, EC_N), s.words)) goto done;
+  digest_scalar(&s, workspace->scalars[1], digest, digest_len);
+
+  for (attempt = 0; attempt < max_attempts; ++attempt) {
+    initialize(&s, &workspace->ec, bytes);
+    if (random.fill(random.context, nonce, bytes) != TC_OK) goto done;
+    import_bytes(&s, F(&s, EC_SCALAR), nonce, 0);
+    if (zero_mask(F(&s, EC_SCALAR), s.words) ||
+        !subtract(s.w->reduced, F(&s, EC_SCALAR), F(&s, EC_N), s.words)) continue;
+    copy(&s, workspace->point[2], F(&s, EC_SCALAR));
+    if (!validate_point(&s)) goto done;
+    multiply_point(&s);
+    if (zero_mask(F(&s, 2), s.words)) continue;
+    point_to_affine(&s);
+    memset(F(&s, 3), 0, bytes);
+    F(&s, 3)[0] = 1;
+    mul(&s, F(&s, 0), F(&s, 0), F(&s, 3));
+    tc_mp_reduce(workspace->point[0], F(&s, 0), 0,
+                 F(&s, EC_N), s.words, s.w->reduced);
+    if (zero_mask(workspace->point[0], s.words)) continue;
+
+    initialize(&s, &workspace->ec, bytes);
+    tc_mp_montgomery_r2(F(&s, 0), F(&s, EC_N), s.words, s.w->reduced);
+    memset(F(&s, 1), 0, bytes);
+    F(&s, 1)[0] = 1;
+    order_mul(&s, F(&s, 2), F(&s, 1), F(&s, 0));
+    order_mul(&s, F(&s, 3), workspace->point[0], F(&s, 0));
+    order_mul(&s, F(&s, 4), workspace->scalars[0], F(&s, 0));
+    order_mul(&s, F(&s, 5), F(&s, 3), F(&s, 4));
+    order_mul(&s, F(&s, 6), workspace->scalars[1], F(&s, 0));
+    tc_mp_add_mod(F(&s, 7), F(&s, 5), F(&s, 6),
+                  F(&s, EC_N), s.words, s.w->reduced);
+    order_mul(&s, F(&s, 8), workspace->point[2], F(&s, 0));
+    copy(&s, F(&s, 9), F(&s, 2));
+    /* k^-1 = k^(n-2); the exponent is public and independent of the nonce. */
+    for (i = bytes * 8; i > 0; --i) {
+      size_t index = (i - 1) / TC_EC_WORD_BITS;
+      word exponent = F(&s, EC_N)[index];
+      if (index == 0) exponent = (word)(exponent - 2u);
+      order_mul(&s, F(&s, 9), F(&s, 9), F(&s, 9));
+      if ((exponent >> ((i - 1) % TC_EC_WORD_BITS)) & 1u)
+        order_mul(&s, F(&s, 9), F(&s, 9), F(&s, 8));
+    }
+    order_mul(&s, F(&s, 10), F(&s, 7), F(&s, 9));
+    order_mul(&s, F(&s, 11), F(&s, 10), F(&s, 1));
+    if (zero_mask(F(&s, 11), s.words)) continue;
+    tc_mp_to_be(signature, workspace->point[0], bytes);
+    tc_mp_to_be(signature + bytes, F(&s, 11), bytes);
+    status = TC_OK;
+    break;
+  }
+done:
+  TC_secure_zero(nonce, sizeof nonce);
   TC_secure_zero(workspace, sizeof *workspace);
   return status;
 }
