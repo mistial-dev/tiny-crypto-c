@@ -614,7 +614,7 @@ static TC_status tc_aes_inverse_rounds(state_t* state, const uint8_t* round_key,
   return TC_OK;
 }
 
-#if TC_AES_ENABLE_CBC || TC_AES_ENABLE_ECB || (defined(TC_AES_CAVP) && TC_AES_CAVP == 1)
+#if TC_AES_ENABLE_ECB || (defined(TC_AES_CAVP) && TC_AES_CAVP == 1)
 static TC_status tc_aes_inverse_cipher(state_t* state, const uint8_t* round_key)
 { return tc_aes_inverse_rounds(state, round_key, Nr); }
 #endif
