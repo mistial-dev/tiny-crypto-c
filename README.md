@@ -8,9 +8,10 @@
 [![CLA assistant](https://cla-assistant.io/readme/badge/mistial-dev/tiny-crypto-c)](https://cla-assistant.io/mistial-dev/tiny-crypto-c)
 
 tiny-crypto-c provides small, portable cryptographic primitives for embedded C
-and C++. Callers supply all memory. The C++11 wrappers use pointer-length pairs
-and C arrays, work without the standard library or exceptions, and preserve the
-C API's result types. Disabled algorithms and modes are left out of the build.
+and C++. Library code is heap free; callers supply all memory. The C++11 wrappers
+use pointer-length pairs and C arrays, work without the standard library or
+exceptions, and preserve the C API's result types. Disabled algorithms and
+modes are left out of the build.
 
 The default profile enables **AES-128 CTR and SHA-256**. DES, 3DES, SHA-1,
 SHA-224, SHA-384, SHA-512, HMAC, KMAC256, the NIST SP 800-108 key-based KDF,
@@ -77,51 +78,79 @@ select `TC_RESOURCE_PROFILE=TC_RESOURCE_MICRO`, `TC_RESOURCE_MINI`, or
 `TC_RESOURCE_DESKTOP`. The defaults below describe a build with no profile
 selected.
 
-| Option | Default | Meaning |
+### Cryptography
+
+| Option | Default | Purpose |
 | --- | ---: | --- |
 | `TINY_CRYPTO_ENABLE_AES` | ON | AES implementation |
+| `TINY_CRYPTO_AES_DYNAMIC` | OFF | Per-context AES-128/192/256 keys, CBC, and CMAC |
 | `TINY_CRYPTO_ENABLE_DES` | OFF | DES and 3DES implementation |
 | `TINY_CRYPTO_DES_ISO9797` | OFF | ISO/IEC 9797-1 DES MAC algorithms 1 and 3; requires DES |
+| `TINY_CRYPTO_ENABLE_EC` | OFF | P-256/P-384 ECDH, key generation, and ECDSA |
+| `TINY_CRYPTO_ENABLE_RSA` | OFF | RSA public and private-key operations |
 | `TINY_CRYPTO_ENABLE_SHA1` | OFF | SHA-1 implementation |
-| `TINY_CRYPTO_ENABLE_SHA224` | OFF | SHA-224 (shares the SHA-256 core) |
+| `TINY_CRYPTO_ENABLE_SHA224` | OFF | SHA-224; shares the SHA-256 core |
 | `TINY_CRYPTO_ENABLE_SHA256` | ON | SHA-256 implementation |
-| `TINY_CRYPTO_ENABLE_SHA384` | OFF | SHA-384 (shares the SHA-512 core) |
+| `TINY_CRYPTO_ENABLE_SHA384` | OFF | SHA-384; shares the SHA-512 core |
 | `TINY_CRYPTO_ENABLE_SHA512` | OFF | SHA-512 implementation |
+| `TINY_CRYPTO_ENABLE_MD5` | OFF | MD5 checksums for legacy data |
 | `TINY_CRYPTO_ENABLE_HMAC` | OFF | HMAC for enabled hashes |
 | `TINY_CRYPTO_ENABLE_KMAC256` | OFF | Fixed-output KMAC256 with customization |
-| `TINY_CRYPTO_ENABLE_RSA` | OFF | RSA public-key operations |
-| `TINY_CRYPTO_ENABLE_MD5` | OFF | MD5 download checksums for legacy data |
-| `TINY_CRYPTO_ENABLE_GZIP` | OFF | Bounded GZIP decompression |
-| `TINY_CRYPTO_ENABLE_TWIC_CCL` | OFF | TWIC canceled card list reader |
+| `TINY_CRYPTO_ENABLE_KDF` | OFF | SP 800-108 KBKDF over enabled HMAC and CMAC PRFs |
+| `TINY_CRYPTO_ENABLE_SSKDF` | OFF | Single-step hash KDF with SHA-256 or SHA-384 |
+
+### Formats, compression, and trust
+
+| Option | Default | Purpose |
+| --- | ---: | --- |
 | `TINY_CRYPTO_ENABLE_TLV` | OFF | Bounded TLV readers and tree traversal |
+| `TINY_CRYPTO_TLV_BER` | OFF | ASN.1 BER, including indefinite lengths; requires TLV |
+| `TINY_CRYPTO_TLV_STREAM` | OFF | Incremental TLV reader; requires TLV |
 | `TINY_CRYPTO_ENABLE_DER` | OFF | DER value helpers; requires TLV |
 | `TINY_CRYPTO_ENABLE_X509` | OFF | X.509 certificate and public-key readers; requires DER |
-| `TINY_CRYPTO_ENABLE_KEY_CHALLENGE` | OFF | Generic key proof-of-possession challenge; requires X.509 |
-| `TINY_CRYPTO_ENABLE_X509_PATH` | OFF | X.509 path validation and stores; requires X.509 |
+| `TINY_CRYPTO_ENABLE_X509_PATH` | OFF | Path validation and stores; requires X.509 |
+| `TINY_CRYPTO_ENABLE_TRUST_ANCHOR_FORMAT` | OFF | RFC 5914 lists; requires X.509 path validation |
+| `TINY_CRYPTO_TAF_CERTIFICATE` | OFF | Certificate choice in RFC 5914 lists |
+| `TINY_CRYPTO_TAF_TBS_CERTIFICATE` | OFF | TBS certificate choice in RFC 5914 lists |
+| `TINY_CRYPTO_TAF_TRUST_ANCHOR_INFO` | OFF | TrustAnchorInfo choice in RFC 5914 lists |
 | `TINY_CRYPTO_ENABLE_X509_REVOCATION` | OFF | CRL parsing and path revocation; requires X.509 path support |
-| `TINY_CRYPTO_ENABLE_PIV_OIDS` | OFF | Registered PIV and TWIC identifier classification |
-| `TINY_CRYPTO_ENABLE_CMS` | OFF | CMS parsing and signature verification; requires X.509, BER, and PIV/TWIC identifiers |
-| `TINY_CRYPTO_ENABLE_CMS_VALIDATION` | OFF | CMS/X.509 validation context, signer paths, and revocation; requires CMS and X.509 revocation |
-| `TINY_CRYPTO_ENABLE_PIV_OBJECTS` | OFF | PIV and TWIC credential-object readers; requires CMS, TWIC UUID, and PIV/TWIC identifiers |
-| `TINY_CRYPTO_ENABLE_CREDENTIAL` | OFF | Composed credential validation; requires PIV objects, CHUID, and CMS validation |
+| `TINY_CRYPTO_ENABLE_KEY_CHALLENGE` | OFF | Key proof-of-possession challenge; requires X.509 |
+| `TINY_CRYPTO_ENABLE_GZIP` | OFF | Bounded GZIP decompression |
+
+### PIV, TWIC, and credentials
+
+| Option | Default | Purpose |
+| --- | ---: | --- |
+| `TINY_CRYPTO_ENABLE_PIV_OIDS` | OFF | PIV and TWIC identifier classification |
+| `TINY_CRYPTO_ENABLE_CMS` | OFF | CMS parsing and verification; requires X.509, BER, and identifiers |
+| `TINY_CRYPTO_ENABLE_CMS_VALIDATION` | OFF | CMS signer paths and revocation; requires CMS and X.509 revocation |
+| `TINY_CRYPTO_ENABLE_PIV_OBJECTS` | OFF | PIV and TWIC object readers; requires CMS, TWIC UUID, and identifiers |
+| `TINY_CRYPTO_ENABLE_CREDENTIAL` | OFF | Credential validation; requires PIV objects, CHUID, and CMS validation |
 | `TINY_CRYPTO_ENABLE_PIV_CHUID` | OFF | PIV CHUID reader; requires TLV |
 | `TINY_CRYPTO_ENABLE_PIV_CVC` | OFF | PIV secure messaging CVC reader; requires DER |
 | `TINY_CRYPTO_ENABLE_EAC_CVC` | OFF | TR-03110 EAC CVC reader; requires DER |
-| `TINY_CRYPTO_ENABLE_AAMVA` | OFF | ANSI AAMVA payload readers |
+| `TINY_CRYPTO_ENABLE_PIV_SM` | OFF | PD-side PIV secure messaging, CS2 and CS7 |
 | `TINY_CRYPTO_ENABLE_FASCN` | OFF | FASC-N readers and writers |
 | `TINY_CRYPTO_ENABLE_TWIC_UUID` | OFF | TWIC NEXGEN UUID helpers; requires FASC-N |
+| `TINY_CRYPTO_ENABLE_TWIC_CCL` | OFF | TWIC canceled card list reader |
 | `TINY_CRYPTO_ENABLE_TWIC_TPK` | OFF | TWIC privacy-key container reader; requires TLV |
 | `TINY_CRYPTO_ENABLE_TWIC_OBJECT_CRYPTO` | OFF | TWIC private-object encryption; requires AES-128 ECB |
-| `TINY_CRYPTO_TLV_BER` | OFF | ASN.1 BER, including constructed indefinite lengths; requires TLV |
-| `TINY_CRYPTO_TLV_STREAM` | OFF | Incremental reader; requires TLV |
-| `TINY_CRYPTO_ENABLE_KDF` | OFF | SP 800-108 KBKDF over the enabled HMAC and CMAC PRFs |
-| `TINY_CRYPTO_ENABLE_SSKDF` | OFF | Hash-based single-step KDF with SHA-256 or SHA-384 |
-| `TINY_CRYPTO_ENABLE_EC` | OFF | P-256 and P-384 ECDH and public-key generation |
-| `TINY_CRYPTO_ENABLE_PIV_SM` | OFF | PD-side PIV secure messaging, CS2 and CS7 |
-| `TINY_CRYPTO_AES_DYNAMIC` | OFF | Per-context AES-128/192/256 keys, CBC, and CMAC |
+| `TINY_CRYPTO_ENABLE_AAMVA` | OFF | ANSI AAMVA payload readers |
+
+### Safety and target storage
+
+| Option | Default | Purpose |
+| --- | ---: | --- |
 | `TINY_CRYPTO_ZEROIZE` | ON | Wipe contexts and stack secrets |
 | `TINY_CRYPTO_STRICT` | ON | Validate public API pointers |
 | `TINY_CRYPTO_AVR_PROGMEM` | ON | Keep constant tables out of AVR SRAM |
+
+The three `TINY_CRYPTO_TAF_*` choices follow the trust-anchor-format switch
+under `AUTO`. At least one choice must be enabled when the format is enabled.
+See [Trust anchors](docs/x509-trust-anchors.md) for importing authenticated
+lists and applying their constraints.
+
+### Modes and implementation choices
 
 AES uses `TINY_CRYPTO_AES_KEY_BITS=128`, constant-time S-box access, and CTR by
 default. `AES_CBC`, `AES_ECB`, `AES_OFB`, `AES_GCM`, `AES_CCM`,
@@ -157,10 +186,6 @@ PRF: HMAC with an enabled SHA digest, `TINY_CRYPTO_AES_CMAC`, or
 (`TC_KBKDF_HMAC_SHA256_counter`, `TC_KBKDF_AES_CMAC_feedback`, ...), so unused
 PRFs compile out. AES-CMAC keys follow `TINY_CRYPTO_AES_KEY_BITS`; TDEA-CMAC is
 kept for legacy interoperability only.
-
-Run the host suite with every available GCC and Clang toolchain using
-`make test-compilers`. Override the pairs when compiler names are versioned,
-for example `make test-compilers TOOLCHAINS='gcc-15:g++-15 clang:clang++'`.
 
 Projects that compile the C files directly can define the corresponding
 `TC_*` macros documented in [`config.h`](src/tiny_crypto/config.h).
@@ -331,7 +356,8 @@ These are linked firmware sizes, not peak runtime memory measurements.
 Run `make benchmark-report` to regenerate the report, or
 `make benchmark-report-check` to check that it is up to date. Neither command
 needs a connected board. Use `make benchmark` to measure throughput on the host
-with the current build configuration.
+with the current build configuration. PR CI uploads a fresh resource report and
+enforces flash and stack budgets; the checked-in report is refreshed for releases.
 
 ## PIV secure messaging
 
@@ -369,7 +395,7 @@ can be reused between operations.
 
 The underlying `TC_ECDH`, `TC_EC_public_key`, and `TC_EC_validate_public_key`
 APIs take fixed-width scalars and uncompressed SEC1 public keys. They support
-P-256 and P-384 without heap allocation. `TC_SSKDF_SHA256` and
+P-256 and P-384. `TC_SSKDF_SHA256` and
 `TC_SSKDF_SHA384` accept OtherInfo as spans, avoiding a concatenation buffer.
 They implement the single-step KDF, not SP 800-108 KBKDF or HKDF.
 
@@ -377,6 +403,12 @@ They implement the single-step KDF, not SP 800-108 KBKDF or HKDF.
 
 See [Running the tests](docs/testing.md) for full-suite commands, external
 corpora, sanitizers, compiler and profile runs, and fuzzing.
+The standard suites use vendored vectors without OpenSSL.
+`TINY_CRYPTO_TEST_OPENSSL=ON` adds optional cross-checks.
+
+Run the host suite with every available GCC and Clang toolchain using
+`make test-compilers`. Override versioned compiler names with, for example,
+`make test-compilers TOOLCHAINS='gcc-15:g++-15 clang:clang++'`.
 
 `test_default_profile` tests the configured `tiny-crypto-c` target. The other
 tests share libraries built for specific configurations: full API, AES-192/256,

@@ -344,7 +344,7 @@ TC_status TC_AES_EAX_PRIME_decrypt(const uint8_t* key, const uint8_t* cleartext,
 #define TC_AES_CMAC_TAG_MAX TC_AES_BLOCKLEN
 
 /*
- * AES-CMAC (NIST SP 800-38B). Heap-free one-shot.
+ * AES-CMAC (NIST SP 800-38B). One-shot.
  * tag_len must be in TC_AES_CMAC_MIN_TAG_LEN..TC_AES_CMAC_TAG_MAX (default min 8;
  * SP 800-38B truncation: most significant octets of the full T). Empty
  * message: msg may be NULL when msg_len is 0. Stack secrets wiped when

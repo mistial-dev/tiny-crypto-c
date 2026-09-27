@@ -205,6 +205,8 @@ int main(void)
 - [PIV CVC validation](piv-cvc.md) covers signer trust and secure-messaging
   CVC chains.
 - [Trust stores](x509-store.md) covers snapshot ownership and publication.
+- [Trust anchors](x509-trust-anchors.md) covers RFC 5914 input and RFC 5937
+  path constraints.
 - [TWIC cancellation lists](twic-ccl.md) covers import, lookup and freshness.
 - [Credential reader](credential-reader.md) describes the supported card checks.
 - [GZIP decoding](gzip.md) shows bounded output and caller-owned scratch.

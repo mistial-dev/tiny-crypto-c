@@ -5,7 +5,7 @@
 
 Enable `TINY_CRYPTO_ENABLE_TWIC_CCL=ON` and include
 `<tiny_crypto/twic_ccl.h>`. The desktop resource profile enables it by default.
-The reader has no heap or cryptographic dependencies.
+The reader has no cryptographic dependencies.
 
 The [TSA CCL feed](https://tsaenrollmentbyidemia.tsa.dhs.gov/canceled-card-lists)
 identifies canceled or suspended credentials by FASC-N. Each CSV row contains

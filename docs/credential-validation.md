@@ -92,7 +92,7 @@ usage and an explicit purpose match before accepting the path.
 All encoded inputs and trust sources are borrowed. Keep the certificate, CHUID,
 object inventory, applicable CCL snapshot, and their backing storage immutable
 until the acceptance decision is complete. `ExampleCredentialValidationResult`
-retains borrowed views into those inputs. The example allocates no heap storage.
+retains borrowed views into those inputs.
 
 `example_credential_validate` returns a typed verdict for invalid credentials,
 revocation, cancellation, stale data, unavailable evidence, unsupported

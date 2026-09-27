@@ -36,6 +36,15 @@ rejection before reader access. These tests use no connected credential.
 
 ## Checked-in suites
 
+`test_x509_trust_anchor`, `test_x509_anchor_constraints`, and
+`test_twic_synthetic_validation` use vendored RFC 5914 and synthetic
+Legacy/NEXGEN DER. `test_trust_anchor_options` builds all seven enabled choice
+combinations and rejects invalid settings. `test_twic_synthetic_fixture` and
+`test_twic_apdu_corpus` check credential objects and APDU replay. These tests
+use native crypto and run without OpenSSL. The optional fixture generator and
+independent oracle are described in the
+[synthetic corpus README](../tests/vectors/twic/synthetic/README.md).
+
 TWIC CCL parsing and lookup use `test_twic_ccl`. See the
 [CCL guide](twic-ccl.md#tests) for testing a downloaded TSA feed. Its external
 file case skips when `TC_TEST_TWIC_CCL` is unset; synthetic cases always run.

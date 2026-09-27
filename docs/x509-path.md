@@ -8,6 +8,8 @@ Include `<tiny_crypto/x509_path.h>` and enable `TINY_CRYPTO_ENABLE_X509_PATH`.
 trust anchor. It does not find a path or check revocation.
 The [CRL reader](x509-crl.md) provides separate parsing of revocation lists.
 Use [path revocation checking](x509-revocation.md) after validation.
+The [trust-anchor reader](x509-trust-anchors.md) supplies RFC 5914 anchors
+whose RFC 5937 constraints are enforced for the selected path.
 
 Signature verification comes from `options.signatures`. Use
 [`TC_X509_native_provider`](x509-crypto.md) for the library's ECDSA and RSA

@@ -460,7 +460,7 @@ TC_status TC_DES3_OFB_crypt(struct TC_DES3_ctx* ctx, uint8_t* buf, size_t length
 #endif
 
 /*
- * DES/3DES-CMAC (NIST SP 800-38B). Heap-free one-shot.
+ * DES/3DES-CMAC (NIST SP 800-38B). One-shot.
  * keylen must be 8 (single DES), 16 (2-key TDEA), or 24 (3-key TDEA).
  * tag_len must be in TC_DES_CMAC_MIN_TAG_LEN..TC_DES_CMAC_TAG_MAX.
  * Empty message: msg may be NULL when msg_len is 0.

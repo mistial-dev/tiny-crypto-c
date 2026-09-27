@@ -12,7 +12,7 @@
  * @brief NIST SP 800-108 key-based key derivation (KBKDF) in counter,
  *        feedback and double-pipeline mode over HMAC and CMAC PRFs.
  *
- * Every derivation is a heap-free one-shot: it expands a key-derivation key
+ * Every derivation is a one-shot: it expands a key-derivation key
  * (KDK) and caller-supplied fixed input into out_len bytes of keying material.
  * The library never interprets the fixed input; TC_KBKDF_fixed_input builds
  * the conventional Label || 0x00 || Context || [L]_32 encoding. A cached

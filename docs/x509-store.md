@@ -4,12 +4,14 @@
 # Certificate store
 
 Include `<tiny_crypto/x509_store.h>`. The store publishes caller-owned certificate
-sources and keeps old sources alive while readers use them. It allocates no memory
-and does not copy certificate bytes.
+sources and keeps old sources alive while readers use them. It does not copy
+certificate bytes.
 
 A source provides separate callbacks for untrusted candidate certificates and
-explicit trust anchors. Each anchor can carry name constraints. Source callbacks
+explicit trust anchors. Each anchor can carry path constraints. Source callbacks
 return borrowed spans and charge reads against the supplied work budget.
+An RFC 5914 list can supply anchors through the
+[trust-anchor reader](x509-trust-anchors.md).
 
 ## Updating a source
 
