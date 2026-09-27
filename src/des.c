@@ -264,6 +264,19 @@ static void tc_des_key_schedule(uint8_t (*sk)[6], const uint8_t* key)
 #endif
 }
 
+#if TC_DES_ENABLE_TDES || TC_DES_ENABLE_CMAC || TC_DES_ENABLE_ISO9797
+static void tc_des_bundle_schedule(uint8_t (*sk)[6], const uint8_t* key,
+                                   size_t keylen)
+{
+  tc_des_key_schedule(&sk[0], key);
+  tc_des_key_schedule(&sk[16], key + 8);
+  if (keylen == 16)
+    memcpy(&sk[32], &sk[0], 16u * 6u);
+  else
+    tc_des_key_schedule(&sk[32], key + 16);
+}
+#endif
+
 /* Fast 32-bit Outerbridge Initial Permutation (IP) */
 static inline void tc_des_initial_permutation(uint32_t* pL, uint32_t* pR)
 {
@@ -858,19 +871,7 @@ TC_status TC_DES3_init_ctx(struct TC_DES3_ctx* ctx, const uint8_t* key, size_t k
     return TC_ERROR;
 #endif
 
-  tc_des_key_schedule(&ctx->Sk[0], key);
-  if (keylen == 16)
-  {
-    /* 2-Key 3DES: K1, K2, K1 */
-    tc_des_key_schedule(&ctx->Sk[16], key + 8);
-    tc_des_key_schedule(&ctx->Sk[32], key);
-  }
-  else
-  {
-    /* 3-Key 3DES: K1, K2, K3 */
-    tc_des_key_schedule(&ctx->Sk[16], key + 8);
-    tc_des_key_schedule(&ctx->Sk[32], key + 16);
-  }
+  tc_des_bundle_schedule(ctx->Sk, key, keylen);
 #if TC_DES_NEEDS_IV
   memset(ctx->Iv, 0, TC_DES_BLOCKLEN);
 #endif
@@ -1134,19 +1135,10 @@ TC_status TC_DES_CMAC_init(struct TC_DES_CMAC_ctx* ctx, const uint8_t* key, size
 #endif
 
   ctx->triple = (uint8_t)(keylen != 8);
-  tc_des_key_schedule(&ctx->sk[0], key);
-  if (keylen == 16)
-  {
-    /* 2-Key 3DES: K1, K2, K1 */
-    tc_des_key_schedule(&ctx->sk[16], key + 8);
-    tc_des_key_schedule(&ctx->sk[32], key);
-  }
-  else if (keylen == 24)
-  {
-    /* 3-Key 3DES: K1, K2, K3 */
-    tc_des_key_schedule(&ctx->sk[16], key + 8);
-    tc_des_key_schedule(&ctx->sk[32], key + 16);
-  }
+  if (keylen == 8)
+    tc_des_key_schedule(&ctx->sk[0], key);
+  else
+    tc_des_bundle_schedule(ctx->sk, key, keylen);
   tc_des_cmac_generate_subkeys(ctx, ctx->k1, ctx->k2);
   memset(ctx->mac, 0, TC_DES_BLOCKLEN);
   memset(ctx->buf, 0, TC_DES_BLOCKLEN);
@@ -1328,24 +1320,29 @@ TC_status TC_DES_ISO9797_init(struct TC_DES_ISO9797_ctx* ctx,
     TC_DES_ISO9797_clear(ctx);
     return TC_ERROR;
   }
-  TC_DES_ISO9797_clear(ctx);
   if (key == NULL ||
       (algorithm != TC_DES_ISO9797_ALG1 && algorithm != TC_DES_ISO9797_ALG3) ||
       (padding != TC_DES_ISO9797_PAD_NONE && padding != TC_DES_ISO9797_PAD1 &&
        padding != TC_DES_ISO9797_PAD2) ||
       (algorithm == TC_DES_ISO9797_ALG1 && keylen != 16 && keylen != 24) ||
       (algorithm == TC_DES_ISO9797_ALG3 && keylen != 16))
+  {
+    TC_DES_ISO9797_clear(ctx);
     return TC_ERROR;
+  }
 #if TC_DES_REJECT_WEAK_KEYS
   if (tc_des_bundle_is_rejected(key, keylen))
-    return TC_ERROR;
-#endif
-  tc_des_key_schedule(&ctx->sk[0], key);
-  if (keylen != 8)
   {
-    tc_des_key_schedule(&ctx->sk[16], key + 8);
-    tc_des_key_schedule(&ctx->sk[32], keylen == 16 ? key : key + 16);
+    TC_DES_ISO9797_clear(ctx);
+    return TC_ERROR;
   }
+#endif
+  ctx->active = 0;
+  tc_des_bundle_schedule(ctx->sk, key, keylen);
+  memset(ctx->mac, 0, sizeof ctx->mac);
+  memset(ctx->buf, 0, sizeof ctx->buf);
+  ctx->used = 0;
+  ctx->nonempty = 0;
   ctx->keylen = (uint8_t)keylen;
   ctx->algorithm = (uint8_t)algorithm;
   ctx->padding = (uint8_t)padding;

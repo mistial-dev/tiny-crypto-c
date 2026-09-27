@@ -223,16 +223,20 @@ TC_status TC_PIV_SM_unprotect(TC_PIV_SM* session,
     length = request->ciphertext.length - padding;
   }
   if (capacity < length) { preserve_session = 1; goto done; }
-  for (offset = 0; offset < length; offset += 16) {
-    size_t take = length - offset;
-    if (take > 16) take = 16;
+  if (request->ciphertext.length) {
+    const size_t last = request->ciphertext.length - 16;
+    if (length > last)
+      memcpy(plaintext + last, TC_SM_SYM(workspace).block, length - last);
+  }
+  for (offset = 0; offset + 16 < request->ciphertext.length && offset < length;
+       offset += 16) {
     memcpy(TC_SM_SYM(workspace).block,request->ciphertext.data + offset,16);
     if (TC_AES_dynamic_CBC_decrypt(&TC_SM_SYM(workspace).cipher.aes,
         TC_SM_SYM(workspace).material,TC_SM_SYM(workspace).block,16) != TC_OK) {
       TC_secure_zero(plaintext,length);
       goto done;
     }
-    memcpy(plaintext + offset,TC_SM_SYM(workspace).block,take);
+    memcpy(plaintext + offset,TC_SM_SYM(workspace).block,16);
   }
   memcpy(session->data.traffic.response_mcv,TC_SM_SYM(workspace).digest,16);
   session->state = TC_PIV_SM_READY;

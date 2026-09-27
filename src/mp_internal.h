@@ -212,4 +212,30 @@ static inline void tc_mp_power(tc_mp_word* out, const tc_mp_word* base,
   tc_mp_power_padded(out,base,exponent,exponent_length,exponent_length,
       one,p,n,n0,temporary,product,reduced);
 }
+
+/* Public exponents may select multiplies by bit. Secret exponents use
+ * tc_mp_power_padded so their bit pattern does not control the work. */
+static inline void tc_mp_power_public(tc_mp_word* out, const tc_mp_word* base,
+    const uint8_t* exponent, size_t exponent_length, const tc_mp_word* one,
+    const tc_mp_word* p, size_t n, tc_mp_word n0,
+    tc_mp_word* product, tc_mp_word* reduced)
+{
+  int started = 0;
+  memcpy(out, one, n * sizeof *out);
+  for (size_t i = 0; i < exponent_length; ++i) {
+    for (unsigned bit = 8; bit; --bit) {
+      const unsigned set = (exponent[i] >> (bit - 1)) & 1u;
+      if (started)
+        tc_mp_montgomery(out, out, out, p, n, n0, product, reduced);
+      if (set) {
+        if (started)
+          tc_mp_montgomery(out, out, base, p, n, n0, product, reduced);
+        else {
+          memcpy(out, base, n * sizeof *out);
+          started = 1;
+        }
+      }
+    }
+  }
+}
 #endif

@@ -347,6 +347,14 @@ static int validate_point(ec_state* s)
   return zero_mask(T(s, 0), s->words) != 0;
 }
 
+/* The built-in generator coordinates are fixed curve parameters. */
+static void prepare_generator(ec_state* s)
+{
+  mul(s, F(s, 3), F(s, 3), F(s, EC_R2));
+  mul(s, F(s, 4), F(s, 4), F(s, EC_R2));
+  copy(s, F(s, 5), F(s, EC_ONE));
+}
+
 static void export_coordinate(ec_state* s, uint8_t* output, unsigned coordinate)
 {
   size_t i;
@@ -379,7 +387,9 @@ static TC_status key_operation(TC_EC_curve curve, const uint8_t* scalar, size_t 
     import_bytes(&s, F(&s, 3), public_key + 1, 0);
     import_bytes(&s, F(&s, 4), public_key + 1 + bytes, 0);
   }
-  if (!validate_point(&s)) goto done;
+  if (agreement) {
+    if (!validate_point(&s)) goto done;
+  } else prepare_generator(&s);
   multiply_point(&s);
   if (zero_mask(F(&s, 2), s.words)) goto done;
   point_to_affine(&s);
@@ -543,7 +553,7 @@ TC_status TC_ECDSA_verify_digest(TC_EC_curve curve,
   for (i = 0; i < 3; ++i) copy(&s, workspace->point[i], F(&s, i));
 
   initialize(&s, &workspace->ec, bytes);
-  if (!validate_point(&s)) goto done;
+  prepare_generator(&s);
   copy(&s, F(&s, EC_SCALAR), workspace->scalars[0]);
   multiply_point(&s);
   for (i = 0; i < 3; ++i) copy(&s, F(&s, 3 + i), workspace->point[i]);
@@ -600,7 +610,7 @@ TC_status TC_ECDSA_sign_digest(TC_EC_curve curve,
     if (zero_mask(F(&s, EC_SCALAR), s.words) ||
         !subtract(s.w->reduced, F(&s, EC_SCALAR), F(&s, EC_N), s.words)) continue;
     copy(&s, workspace->point[2], F(&s, EC_SCALAR));
-    if (!validate_point(&s)) goto done;
+    prepare_generator(&s);
     multiply_point(&s);
     if (zero_mask(F(&s, 2), s.words)) continue;
     point_to_affine(&s);

@@ -54,7 +54,7 @@ static inline tc_rsa_result tc_rsa_public_operation(const uint8_t* modulus,
   memset(one,0,length); one[0] = 1;
   tc_mp_montgomery(one,one,temporary,p,n,factor,product,reduced);
   tc_mp_montgomery(base,base,temporary,p,n,factor,product,reduced);
-  tc_mp_power(result,base,exponent,exponent_length,one,p,n,factor,temporary,product,reduced);
+  tc_mp_power_public(result,base,exponent,exponent_length,one,p,n,factor,product,reduced);
   memset(one,0,length); one[0] = 1;
   tc_mp_montgomery(result,result,one,p,n,factor,product,reduced);
   tc_mp_to_be(out,result,length);

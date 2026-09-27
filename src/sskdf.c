@@ -13,11 +13,11 @@ typedef struct {
   TC_status (*final)(void*, uint8_t*);
 } tc_sskdf_hash;
 
-static TC_status derive(const tc_sskdf_hash* hash, void* ctx,
+static TC_status derive(const tc_sskdf_hash* hash, void* ctx, uint8_t* digest,
     const uint8_t* z, size_t z_len, const TC_bytes* info, size_t count,
     uint8_t* output, size_t output_len)
 {
-  uint8_t counter[4], digest[48];
+  uint8_t counter[4];
   size_t total, i, offset = 0, take;
   uint32_t round = 1;
   TC_status status = TC_ERROR;
@@ -57,7 +57,7 @@ static TC_status derive(const tc_sskdf_hash* hash, void* ctx,
   status = TC_OK;
 done:
   TC_secure_zero(ctx, hash->context_size);
-  TC_secure_zero(digest, sizeof digest);
+  TC_secure_zero(digest, hash->digest_size);
   if (status != TC_OK) TC_secure_zero(output, output_len);
   return status;
 }
@@ -71,8 +71,9 @@ done:
                           uint8_t* output, size_t output_len) \
   { \
     struct TC_SHA##N##_ctx ctx; \
+    uint8_t digest[BYTES]; \
     static const tc_sskdf_hash hash = {BYTES, sizeof ctx, init_##N, update_##N, final_##N}; \
-    return derive(&hash, &ctx, z, z_len, info, count, output, output_len); \
+    return derive(&hash, &ctx, digest, z, z_len, info, count, output, output_len); \
   }
 #if TC_ENABLE_SHA256
 TC_SSKDF_FAMILY(256, 32)

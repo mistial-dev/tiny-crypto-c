@@ -350,7 +350,7 @@ static TC_status tc_kdf_derive(const struct tc_kdf_prf* prf, int mode,
 #if TC_ZEROIZE
   prf->clear(initialized);
   prf->clear(ctx);
-  TC_secure_zero(chain, h);
+  if (chain != NULL) TC_secure_zero(chain, h);
   TC_secure_zero(block, h);
 #endif
   return TC_OK;
@@ -359,7 +359,7 @@ fail:
   prf->clear(initialized);
   prf->clear(ctx);
   TC_secure_zero(out, out_len);
-  TC_secure_zero(chain, h);
+  if (chain != NULL) TC_secure_zero(chain, h);
   TC_secure_zero(block, h);
   return TC_ERROR;
 }
@@ -425,8 +425,11 @@ TC_status TC_KBKDF_fixed_input(const uint8_t* label, size_t label_len,
                                       const uint8_t* after, size_t after_len, \
                                       uint8_t* out, size_t out_len) \
   { \
-    return tc_kdf_##NAME(TC_KDF_MODE_COUNTER, key, key_len, params, \
-                         before, before_len, after, after_len, out, out_len); \
+    CTX initialized, ctx; \
+    uint8_t block[DIGESTLEN]; \
+    return tc_kdf_derive(&PRF, TC_KDF_MODE_COUNTER, key, key_len, params, \
+                         before, before_len, after, after_len, out, out_len, \
+                         &initialized, &ctx, NULL, block); \
   } \
   TC_status TC_KBKDF_##NAME##_feedback(const uint8_t* key, size_t key_len, \
                                        const struct TC_KBKDF_params* params, \

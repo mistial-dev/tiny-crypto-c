@@ -157,6 +157,7 @@ ISO/IEC 9797-1 MAC algorithms 1 and 3. Include `<tiny_crypto/des.h>`.
 Algorithm 1 accepts 16 or 24-byte TDEA keys. Algorithm 3, the retail MAC,
 accepts a 16-byte two-key input. The separate `TC_DES_RETAIL3_*` functions
 provide the three-key retail extension with final encryption under K3.
+ISO/IEC 9797-1:2011 clause 5 restricts single DES to Algorithms 3 and 4.
 Choose no padding for block-aligned input, method 1
 for zero padding of a partial block, or method 2 for an `0x80` byte followed by
 zeroes. Method 1 processes an empty message as one zero block. No padding

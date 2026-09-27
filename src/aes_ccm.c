@@ -50,6 +50,13 @@ static TC_status tc_aes_ccm_mac_absorb(uint8_t* mac, uint8_t* block, size_t* use
 {
   while (length != 0)
   {
+    if (*used == 0 && length >= TC_AES_BLOCKLEN)
+    {
+      if (tc_aes_ccm_mac_block(mac, data, round_key) != TC_OK) return TC_ERROR;
+      data += TC_AES_BLOCKLEN;
+      length -= TC_AES_BLOCKLEN;
+      continue;
+    }
     const size_t available = TC_AES_BLOCKLEN - *used;
     const size_t count = length < available ? length : available;
     tc_aes_copy_bytes(block + *used, data, count);
@@ -211,11 +218,16 @@ static TC_status tc_aes_ccm_crypt(const uint8_t* key, const uint8_t* nonce,
     const size_t length = (input_len - offset < TC_AES_BLOCKLEN) ?
                           input_len - offset : TC_AES_BLOCKLEN;
 
+    if (!decrypt && tc_aes_ccm_mac_absorb(st.mac, st.block, &used,
+                                           input + offset, length,
+                                           st.aes.round_key) != TC_OK)
+      goto done;
     memset(st.plain, 0, TC_AES_BLOCKLEN);
     tc_aes_copy_bytes(st.plain, input + offset, length);
     if (decrypt && tc_aes_ccm_xor_block(st.plain, length, st.counter, st.aes.round_key) != TC_OK)
       goto done;
-    if (tc_aes_ccm_mac_absorb(st.mac, st.block, &used, st.plain, length, st.aes.round_key) != TC_OK)
+    if (decrypt && tc_aes_ccm_mac_absorb(st.mac, st.block, &used, st.plain,
+                                          length, st.aes.round_key) != TC_OK)
       goto done;
     if (!decrypt)
     {
