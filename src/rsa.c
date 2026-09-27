@@ -325,33 +325,37 @@ TC_RSA_result TC_RSA_encode_pss_digest(const TC_RSA_pss_options* options,
   return result;
 }
 
+static TC_RSA_result tc_rsa_storage_status(const tc_pki_storage_plan* plan)
+{
+  return tc_pki_storage_plan_finish(plan,NULL) == TC_TLV_OK ? TC_RSA_OK : TC_RSA_ARGUMENT;
+}
+
 static TC_RSA_result tc_rsa_workspace_inputs(const TC_RSA_workspace* workspace,
     const TC_bytes* inputs, size_t count)
 {
   TC_bytes writes;
-  TC_TLV_result checked;
-  size_t checks = count;
+  tc_pki_storage_plan plan;
   if ((uintptr_t)workspace->words % sizeof(TC_RSA_word)) return TC_RSA_ARGUMENT;
-  checked = tc_pki_storage_span(workspace->words,workspace->capacity,sizeof *workspace->words,&writes);
-  if (checked != TC_TLV_OK) return TC_RSA_ARGUMENT;
-  for (size_t i = 0; i < count; ++i)
-    if (tc_pki_storage_input(&writes,1,inputs[i],&checks) != TC_TLV_OK) return TC_RSA_ARGUMENT;
-  return TC_RSA_OK;
+  tc_pki_storage_plan_begin(&plan,&writes,1,SIZE_MAX);
+  TC_PKI_PLAN_WRITE(&plan,workspace->words,workspace->capacity);
+  tc_pki_storage_plan_seal(&plan);
+  tc_pki_storage_plan_input_spans(&plan,inputs,count);
+  return tc_rsa_storage_status(&plan);
 }
 
 /* Output and scratch are separate from each other and every borrowed input. */
 static TC_RSA_result tc_rsa_output_inputs(const TC_RSA_workspace* workspace,
     const TC_bytes* inputs, size_t count, TC_bytes output)
 {
-  TC_RSA_result checked = tc_rsa_workspace_inputs(workspace,inputs,count);
-  if (checked != TC_RSA_OK) return checked;
-  checked = tc_rsa_workspace_inputs(workspace,&output,1);
-  if (checked != TC_RSA_OK) return checked;
-  size_t checks = count;
-  for (size_t i = 0; i < count; ++i)
-    if (tc_pki_storage_input(&output,1,inputs[i],&checks) != TC_TLV_OK)
-      return TC_RSA_ARGUMENT;
-  return TC_RSA_OK;
+  TC_bytes writes[2];
+  tc_pki_storage_plan plan;
+  if ((uintptr_t)workspace->words % sizeof(TC_RSA_word)) return TC_RSA_ARGUMENT;
+  tc_pki_storage_plan_begin(&plan,writes,2,SIZE_MAX);
+  TC_PKI_PLAN_WRITE(&plan,workspace->words,workspace->capacity);
+  tc_pki_storage_plan_write_span(&plan,output);
+  tc_pki_storage_plan_seal(&plan);
+  tc_pki_storage_plan_input_spans(&plan,inputs,count);
+  return tc_rsa_storage_status(&plan);
 }
 
 static TC_RSA_result tc_rsa_control_inputs(const TC_RSA_workspace* workspace,
@@ -562,16 +566,15 @@ static TC_RSA_result tc_rsa_decrypt_inputs(const TC_RSA_private_key* key,
   TC_RSA_result status = tc_rsa_private_inputs(key,ciphertext,
       (TC_bytes){plaintext,capacity},workspace);
   if (status != TC_RSA_OK) return status;
-  TC_bytes scratch;
-  if (tc_pki_storage_span(workspace->words,workspace->capacity,sizeof *workspace->words,
-      &scratch) != TC_TLV_OK) return TC_RSA_ARGUMENT;
-  const TC_bytes writes[] = {scratch,{plaintext,capacity},
-      {(const uint8_t*)plaintext_length,sizeof *plaintext_length}};
-  size_t checks = 3;
-  if (tc_pki_storage_input(writes,3,(TC_bytes){label.data,label.length},&checks) != TC_TLV_OK)
-    return TC_RSA_ARGUMENT;
-  checks = 2;
-  if (tc_pki_storage_input(writes,2,writes[2],&checks) != TC_TLV_OK) return TC_RSA_ARGUMENT;
+  TC_bytes writes[3];
+  tc_pki_storage_plan plan;
+  tc_pki_storage_plan_begin(&plan,writes,3,SIZE_MAX);
+  TC_PKI_PLAN_WRITE(&plan,workspace->words,workspace->capacity);
+  TC_PKI_PLAN_WRITE(&plan,plaintext,capacity);
+  TC_PKI_PLAN_WRITE(&plan,plaintext_length,1);
+  tc_pki_storage_plan_seal(&plan);
+  tc_pki_storage_plan_input_span(&plan,label);
+  if (tc_rsa_storage_status(&plan) != TC_RSA_OK) return TC_RSA_ARGUMENT;
   /* Treat the length object as another output when checking key and ciphertext. */
   return tc_rsa_private_inputs(key,ciphertext,writes[2],workspace);
 }
@@ -962,24 +965,18 @@ static TC_RSA_result tc_rsa_prepared_inputs(const TC_RSA_prepared_public_key* se
     {(const uint8_t*)workspace,sizeof *workspace},
     {(const uint8_t*)work,sizeof *work},setup->key.modulus,setup->key.exponent
   };
-  for (size_t i = 0; i < sizeof inputs / sizeof *inputs; ++i)
-    if (!tc_internal_ranges_disjoint(setup,sizeof *setup,inputs[i].data,inputs[i].length))
-      return TC_RSA_ARGUMENT;
-  if (workspace->capacity > SIZE_MAX / sizeof *workspace->words ||
-      !tc_internal_ranges_disjoint(setup,sizeof *setup,workspace->words,
-        workspace->capacity * sizeof *workspace->words)) return TC_RSA_ARGUMENT;
   if (!setup->r2.words || setup->r2.capacity <
-        setup->key.modulus.length / sizeof(TC_RSA_word) ||
-      setup->r2.capacity > SIZE_MAX / sizeof(TC_RSA_word)) return TC_RSA_ARGUMENT;
-  const size_t cache_bytes = setup->r2.capacity * sizeof(TC_RSA_word);
-  for (size_t i = 0; i < sizeof inputs / sizeof *inputs; ++i)
-    if (!tc_internal_ranges_disjoint(setup->r2.words,cache_bytes,
-          inputs[i].data,inputs[i].length)) return TC_RSA_ARGUMENT;
-  if (!tc_internal_ranges_disjoint(setup->r2.words,cache_bytes,
-        workspace->words,workspace->capacity * sizeof *workspace->words) ||
-      !tc_internal_ranges_disjoint(setup->r2.words,cache_bytes,setup,
-        sizeof *setup)) return TC_RSA_ARGUMENT;
-  return TC_RSA_OK;
+        setup->key.modulus.length / sizeof(TC_RSA_word)) return TC_RSA_ARGUMENT;
+  /* The setup and its cached R^2 stay unchanged while the operation runs. */
+  TC_bytes protected_ranges[3];
+  tc_pki_storage_plan plan;
+  tc_pki_storage_plan_begin(&plan,protected_ranges,3,SIZE_MAX);
+  TC_PKI_PLAN_WRITE(&plan,setup,1);
+  TC_PKI_PLAN_WRITE(&plan,setup->r2.words,setup->r2.capacity);
+  TC_PKI_PLAN_WRITE(&plan,workspace->words,workspace->capacity);
+  tc_pki_storage_plan_seal(&plan);
+  tc_pki_storage_plan_input_spans(&plan,inputs,sizeof inputs / sizeof *inputs);
+  return tc_rsa_storage_status(&plan);
 }
 
 static TC_RSA_result tc_rsa_verify_v15_digest_impl(const TC_RSA_public_key* key,

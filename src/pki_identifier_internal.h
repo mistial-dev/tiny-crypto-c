@@ -43,13 +43,13 @@ static inline TC_TLV_result tc_pki_authority_matches(
     if (order || authority->serial_negative != candidate->serial_negative) {
       *matched = 0; return TC_TLV_OK;
     }
-    if (tc_x509_path_charge(tree->work,authority->issuer.length) != TC_TLV_OK ||
-        tc_x509_path_charge(tree->work,authority->issuer.length) != TC_TLV_OK) return TC_TLV_LIMIT;
+    if (tc_pki_work_charge(tree->work,authority->issuer.length) != TC_TLV_OK ||
+        tc_pki_work_charge(tree->work,authority->issuer.length) != TC_TLV_OK) return TC_TLV_LIMIT;
     result = TC_TLV_reader_init(&reader,authority->issuer.data,authority->issuer.length,TC_TLV_DER,limits);
     if (result != TC_TLV_OK) return result;
     while (!tc_pki_end(&reader)) {
       int equal;
-      if (tc_x509_path_charge(tree->work,1) != TC_TLV_OK) return TC_TLV_LIMIT;
+      if (tc_pki_work_charge(tree->work,1) != TC_TLV_OK) return TC_TLV_LIMIT;
       result = TC_X509_general_name_next(&reader,tree->frames,tree->capacity,&name);
       if (result != TC_TLV_OK) return result;
       if (name.type != DIRECTORY_NAME) { unsupported = 1; continue; }

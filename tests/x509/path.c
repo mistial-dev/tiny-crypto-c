@@ -40,7 +40,7 @@ static MunitResult basic(const MunitParameter params[], void* user)
   TC_X509_name_workspace workspace = {left,right,32,used,4};
   Provider state = {0,TC_X509_SIGNATURE_VALID};
   TC_X509_signature_provider signatures = {verify,&state,NULL};
-  tc_x509_path_input input = {certificates,3,3,3,&anchor,&at,&signatures,&limits,NULL,NULL,NULL};
+  tc_x509_path_input input = {certificates,3,3,3,&anchor,&at,&signatures,&limits,NULL,NULL,NULL,NULL};
   size_t i, work = 100000, required;
   int accepted = 99;
   (void)params; (void)user;
@@ -118,7 +118,7 @@ static MunitResult names(const MunitParameter params[], void* user)
   TC_TLV_frame frames[8];
   TC_X509_name_workspace name_workspace = {left,right,32,used,4};
   TC_X509_constraint_workspace workspace = {frames,8,&name_workspace};
-  tc_x509_path_input input = {certificates,3,3,3,NULL,NULL,NULL,&limits,NULL,NULL,NULL};
+  tc_x509_path_input input = {certificates,3,3,3,NULL,NULL,NULL,&limits,NULL,NULL,NULL,NULL};
   size_t i, work = 100000, required;
   int accepted = 99;
   (void)params; (void)user;
@@ -164,6 +164,16 @@ static MunitResult names(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+/* Policy controls as the policy pass derives them from a certificate. */
+static TC_TLV_result read_controls(const TC_X509_certificate* certificate,
+    const TC_TLV_limits* limits, size_t* work, tc_x509_policy_controls* out)
+{
+  TC_X509_extension_summary summary;
+  TC_TLV_result result = tc_x509_extensions_summarize(certificate, limits, work, &summary);
+  if (result == TC_TLV_OK) tc_x509_policy_controls_from_summary(&summary, out);
+  return result;
+}
+
 static MunitResult policy_controls(const MunitParameter params[], void* user)
 {
   uint8_t extensions[] = {0x30,29,
@@ -178,7 +188,7 @@ static MunitResult policy_controls(const MunitParameter params[], void* user)
   (void)params; (void)user;
   memset(&certificate, 0, sizeof certificate);
   certificate.extensions.data = extensions; certificate.extensions.length = sizeof extensions;
-  munit_assert_int(tc_x509_policy_controls_read(&certificate, &limits, &work, &controls), ==, TC_TLV_OK);
+  munit_assert_int(read_controls(&certificate, &limits, &work, &controls), ==, TC_TLV_OK);
   munit_assert_int(controls.constraints.has_require_explicit_policy, ==, 1);
   munit_assert_int(controls.constraints.has_inhibit_policy_mapping, ==, 1);
   munit_assert_int(controls.has_inhibit_any, ==, 1);
@@ -188,7 +198,7 @@ static MunitResult policy_controls(const MunitParameter params[], void* user)
   saved = controls; required = 1000 - work;
   for (i = 0; i < required; ++i) {
     work = i;
-    munit_assert_int(tc_x509_policy_controls_read(&certificate, &limits, &work, &controls), ==, TC_TLV_LIMIT);
+    munit_assert_int(read_controls(&certificate, &limits, &work, &controls), ==, TC_TLV_LIMIT);
     munit_assert_memory_equal(sizeof controls, &controls, &saved);
   }
   for (target = 0; target < 2; ++target) {
@@ -206,10 +216,10 @@ static MunitResult policy_controls(const MunitParameter params[], void* user)
   munit_assert_size(counters.explicit_policy, ==, 0);
   munit_assert_size(counters.mapping, ==, 5); munit_assert_size(counters.any, ==, 5);
   controls = saved; extensions[30] = 0xff; work = 1000;
-  munit_assert_int(tc_x509_policy_controls_read(&certificate, &limits, &work, &controls), ==, TC_TLV_INVALID);
+  munit_assert_int(read_controls(&certificate, &limits, &work, &controls), ==, TC_TLV_INVALID);
   munit_assert_memory_equal(sizeof controls, &controls, &saved);
   certificate.extensions.data = NULL; certificate.extensions.length = 0; work = 1000;
-  munit_assert_int(tc_x509_policy_controls_read(&certificate, &limits, &work, &controls), ==, TC_TLV_OK);
+  munit_assert_int(read_controls(&certificate, &limits, &work, &controls), ==, TC_TLV_OK);
   munit_assert_int(controls.has_inhibit_any, ==, 0);
   munit_assert_int(controls.constraints.has_require_explicit_policy, ==, 0);
   munit_assert_int(controls.constraints.has_inhibit_policy_mapping, ==, 0);
@@ -332,7 +342,7 @@ static MunitResult policies(const MunitParameter params[], void* user)
   const uint8_t leaf[] = {0x30,17,0x30,15,6,3,0x55,0x1d,32,4,8,0x30,6,0x30,4,6,2,0x2a,2};
   TC_X509_certificate certificates[2];
   const TC_TLV_limits limits = {1024,1024,64,8};
-  tc_x509_path_input input = {certificates,2,2,2048,NULL,NULL,NULL,&limits,NULL,NULL,NULL};
+  tc_x509_path_input input = {certificates,2,2,2048,NULL,NULL,NULL,&limits,NULL,NULL,NULL,NULL};
   uint32_t left[32], right[32];
   uint8_t used[4];
   TC_X509_name_workspace names = {left,right,32,used,4};
@@ -470,7 +480,7 @@ static MunitResult usage(const MunitParameter params[], void* user)
     0x30,15,6,3,0x55,0x1d,37,4,8,0x30,6,6,4,0x55,0x1d,37,0};
   TC_X509_certificate certificates[2];
   const TC_TLV_limits limits = {1024,1024,64,8};
-  tc_x509_path_input input = {certificates,1,2,2048,NULL,NULL,NULL,&limits,NULL,NULL,NULL};
+  tc_x509_path_input input = {certificates,1,2,2048,NULL,NULL,NULL,&limits,NULL,NULL,NULL,NULL};
   uint32_t left[32], right[32];
   uint8_t used[4];
   TC_TLV_frame frames[8];

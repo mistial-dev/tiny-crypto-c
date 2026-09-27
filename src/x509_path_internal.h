@@ -6,6 +6,7 @@
 #include <tiny_crypto/x509_store.h>
 #include "x509_policy_internal.h"
 #include "pki_budget_internal.h"
+#include "pki_storage_internal.h"
 
 /* An unevaluated branch prevents a definitive no-path result. */
 static inline void tc_x509_path_remember(TC_X509_path_status status, TC_X509_path_status* failure)
@@ -14,10 +15,6 @@ static inline void tc_x509_path_remember(TC_X509_path_status status, TC_X509_pat
       (status == TC_X509_PATH_UNSUPPORTED && *failure != TC_X509_PATH_LIMIT)) *failure = status;
 }
 
-static inline TC_TLV_result tc_x509_path_charge(size_t* work, size_t amount)
-{
-  return tc_pki_work_charge(work, amount);
-}
 
 static inline TC_X509_path_status tc_x509_path_status(TC_TLV_result result)
 {
@@ -61,12 +58,19 @@ enum {
   TC_X509_PATH_STORAGE_NAME_MATCHED, TC_X509_PATH_STORAGE_NODES,
   TC_X509_PATH_STORAGE_EDGES, TC_X509_PATH_STORAGE_EXPECTED,
   TC_X509_PATH_STORAGE_MAPPINGS, TC_X509_PATH_STORAGE_POLICIES,
-  TC_X509_PATH_STORAGE_CERTIFICATES,
+  TC_X509_PATH_STORAGE_CERTIFICATES, TC_X509_PATH_STORAGE_SUMMARIES,
   TC_X509_PATH_STORAGE_COUNT
 };
-/* One checked byte range per validation scratch array. */
-TC_TLV_result tc_x509_path_storage_writes(const TC_X509_path_workspace* workspace,
-    TC_bytes writes[TC_X509_PATH_STORAGE_COUNT]);
+/* Record one write per validation scratch array, in TC_X509_PATH_STORAGE_*
+ * slot order. The plan must start empty. */
+void tc_x509_path_storage_plan(tc_pki_storage_plan* plan,
+    const TC_X509_path_workspace* workspace);
+/* Check policy-option bytes: the initial-policy array and entries, purpose and
+ * anchor-name constraints. The options object itself needs its own input. */
+void tc_x509_policy_plan_inputs(tc_pki_storage_plan* plan, const TC_bytes* initial_policies,
+    size_t initial_policy_count, TC_bytes purpose, const TC_X509_name_constraints* anchor_names);
+void tc_x509_path_options_plan_inputs(tc_pki_storage_plan* plan,
+    const TC_X509_path_options* options);
 typedef TC_X509_store_anchor tc_x509_search_anchor;
 typedef TC_X509_store_source tc_x509_search_source;
 /* Callbacks consume work without increasing it. Returned spans reference a stable
@@ -97,7 +101,42 @@ typedef struct {
   TC_X509_workspace* parser;
   /* Filled in order by the basic pass, then exposed through certificates. */
   TC_X509_certificate* cache;
+  /* Optional per-entry extension summaries, one per certificate. */
+  TC_X509_extension_summary* summaries;
 } tc_x509_path_input;
+
+int tc_x509_path_source_valid(const tc_x509_path_input* input);
+/* Parsed view of path entry index, reading into the cache when needed. */
+TC_TLV_result tc_x509_path_certificate(const tc_x509_path_input* input, size_t index,
+    size_t* work, const TC_X509_certificate** certificate);
+
+/* TC_X509_extension_summary slots, one per path-relevant extension. */
+enum {
+  TC_X509_SUMMARY_KEY_USAGE, TC_X509_SUMMARY_SUBJECT_ALT_NAME,
+  TC_X509_SUMMARY_BASIC_CONSTRAINTS, TC_X509_SUMMARY_NAME_CONSTRAINTS,
+  TC_X509_SUMMARY_POLICIES, TC_X509_SUMMARY_POLICY_MAPPINGS,
+  TC_X509_SUMMARY_POLICY_CONSTRAINTS, TC_X509_SUMMARY_EXTENDED_KEY_USAGE,
+  TC_X509_SUMMARY_INHIBIT_ANY
+};
+static inline int tc_x509_summary_has(const TC_X509_extension_summary* summary, unsigned slot)
+{ return (summary->present >> slot) & 1u; }
+static inline int tc_x509_summary_critical(const TC_X509_extension_summary* summary, unsigned slot)
+{ return (summary->critical >> slot) & 1u; }
+/* Record every path-relevant extension in one metered walk. A duplicate
+ * extension returns TC_TLV_INVALID. basicConstraints, keyUsage,
+ * policyConstraints and inhibitAnyPolicy are decoded into the summary, and
+ * the remaining values stay as spans borrowed from the certificate DER.
+ * Extension parsing charges work through tc_pki_extension_next. out changes
+ * only on TC_TLV_OK. */
+TC_TLV_result tc_x509_extensions_summarize(const TC_X509_certificate* certificate,
+    const TC_TLV_limits* limits, size_t* work, TC_X509_extension_summary* out);
+/* Summary of path entry index: the cached one when input->summaries is set,
+ * otherwise a fresh one in storage. */
+TC_TLV_result tc_x509_path_summary(const tc_x509_path_input* input, size_t index,
+    size_t* work, TC_X509_extension_summary* storage, const TC_X509_extension_summary** out);
+/* Charge and reject unsupported subtree distances in name constraints. */
+TC_TLV_result tc_x509_path_constraint_distances(const TC_X509_name_constraints* constraints,
+    const TC_TLV_limits* limits, const TC_X509_constraint_workspace* workspace, size_t* work);
 
 /* Basic certificate pass. Does not process policies, name constraints,
  * application usage, critical extensions or revocation. Caller keeps input
@@ -114,11 +153,17 @@ typedef struct {
   uint32_t inhibit_any;
   int has_inhibit_any;
 } tc_x509_policy_controls;
+/* Policy constraints and inhibitAnyPolicy as recorded in a summary. */
+static inline void tc_x509_policy_controls_from_summary(
+    const TC_X509_extension_summary* extensions, tc_x509_policy_controls* out)
+{
+  out->constraints = extensions->policy_constraints;
+  out->inhibit_any = extensions->inhibit_any;
+  out->has_inhibit_any = tc_x509_summary_has(extensions, TC_X509_SUMMARY_INHIBIT_ANY);
+}
 typedef struct {
   size_t explicit_policy, mapping, any;
 } tc_x509_policy_counters;
-TC_TLV_result tc_x509_policy_controls_read(const TC_X509_certificate* certificate,
-    const TC_TLV_limits* limits, size_t* work, tc_x509_policy_controls* out);
 /* Apply after processing this certificate's policies and mappings. */
 void tc_x509_policy_counters_advance(tc_x509_policy_counters* counters,
     const tc_x509_policy_controls* controls, int self_issued, int target);

@@ -21,8 +21,8 @@ static inline TC_TLV_result tc_cms_content_digest_check(const TC_CMS_signed_attr
     return TC_TLV_ARGUMENT;
   if (!tc_hash_info_get(algorithm,&info)) return TC_TLV_UNSUPPORTED;
   if (digest.length != info.digest_length) return TC_TLV_ARGUMENT;
-  if (tc_x509_path_charge(work,expected_type.length) != TC_TLV_OK ||
-      tc_x509_path_charge(work,info.digest_length) != TC_TLV_OK) return TC_TLV_LIMIT;
+  if (tc_pki_work_charge(work,expected_type.length) != TC_TLV_OK ||
+      tc_pki_work_charge(work,info.digest_length) != TC_TLV_OK) return TC_TLV_LIMIT;
   *matched = tc_pki_equal(expected_type,attributes->content_type) &&
     attributes->message_digest.length == info.digest_length &&
     TC_ct_equal(digest.data,attributes->message_digest.data,info.digest_length) == TC_OK;

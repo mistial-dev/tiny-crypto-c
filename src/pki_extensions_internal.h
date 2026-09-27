@@ -10,7 +10,7 @@
 static inline TC_TLV_result tc_pki_extensions_init(TC_TLV_reader* reader,
     const TC_X509_certificate* certificate, const TC_TLV_limits* limits, size_t* work)
 {
-  if (tc_x509_path_charge(work,certificate->extensions.length) != TC_TLV_OK) return TC_TLV_LIMIT;
+  if (tc_pki_work_charge(work,certificate->extensions.length) != TC_TLV_OK) return TC_TLV_LIMIT;
   return TC_X509_extensions_init(reader,certificate->extensions.data,certificate->extensions.length,limits);
 }
 
@@ -18,7 +18,7 @@ static inline TC_TLV_result tc_pki_extension_next(TC_TLV_reader* reader,
     size_t* work, TC_X509_extension* extension)
 {
   if (tc_pki_end(reader)) return TC_TLV_END;
-  if (tc_x509_path_charge(work,1) != TC_TLV_OK) return TC_TLV_LIMIT;
+  if (tc_pki_work_charge(work,1) != TC_TLV_OK) return TC_TLV_LIMIT;
   return TC_X509_extension_next(reader,extension);
 }
 
@@ -88,7 +88,7 @@ static inline TC_TLV_result tc_pki_subject_key_identifier(const TC_X509_certific
   while ((result = tc_pki_extension_next(&reader,work,&extension)) == TC_TLV_OK) {
     if (tc_pki_extension_id(&extension) != SUBJECT_KEY_IDENTIFIER) continue;
     if (identifier.data) return TC_TLV_INVALID;
-    if (tc_x509_path_charge(work,extension.value.length) != TC_TLV_OK) return TC_TLV_LIMIT;
+    if (tc_pki_work_charge(work,extension.value.length) != TC_TLV_OK) return TC_TLV_LIMIT;
     result = TC_X509_subject_key_identifier_read(extension.value.data,extension.value.length,limits,&identifier);
     if (result != TC_TLV_OK) return result;
   }
@@ -97,16 +97,4 @@ static inline TC_TLV_result tc_pki_subject_key_identifier(const TC_X509_certific
   return TC_TLV_OK;
 }
 
-/* Shared single-occurrence KeyUsage decoder for certificate policy passes. */
-static inline TC_TLV_result tc_pki_key_usage_value(TC_bytes value,
-    int* present, uint16_t* usage)
-{
-  uint16_t parsed;
-  TC_TLV_result result;
-  if (*present) return TC_TLV_INVALID;
-  result = TC_X509_key_usage_read(value.data,value.length,&parsed);
-  if (result != TC_TLV_OK) return result;
-  *present = 1; *usage = parsed;
-  return TC_TLV_OK;
-}
 #endif

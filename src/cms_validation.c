@@ -71,7 +71,7 @@ static TC_TLV_result cms_collection_next(tc_cms_collection* reader,
   if (!reader || !tree || !tree->work || !out) return TC_TLV_ARGUMENT;
   next = *reader;
   if (tc_pki_end(&next.embedded) && (!external || next.external_index == external->count)) return TC_TLV_END;
-  if (!next.remaining || tc_x509_path_charge(tree->work,1) != TC_TLV_OK) return TC_TLV_LIMIT;
+  if (!next.remaining || tc_pki_work_charge(tree->work,1) != TC_TLV_OK) return TC_TLV_LIMIT;
   if (!tc_pki_end(&next.embedded)) {
     result = tc_pki_tree_next(&next.embedded,tree,&element);
     if (result != TC_TLV_OK) return result;
@@ -182,37 +182,24 @@ TC_TLV_result tc_cms_crl_index_init(const tc_cms_revocations* reader,
   tc_cms_revocations next;
   tc_cms_revocation_choice choice;
   TC_X509_crl_index index = {records,0,0};
-  TC_bytes writes[CRL_WRITES], input;
+  TC_bytes writes[CRL_WRITES];
   TC_TLV_result result;
   if (!reader || !tree || !tree->work || !out) return TC_TLV_ARGUMENT;
-  size_t budget = *tree->work;
-#define CRL_INDEX_ARRAY(pointer, count, span) do { \
-  result = tc_pki_storage_span((pointer),(count),sizeof *(pointer),(span)); \
-  if (result != TC_TLV_OK) return result; \
-} while (0)
-  CRL_INDEX_ARRAY(records,capacity,&writes[CRL_ROWS]);
-  CRL_INDEX_ARRAY(oids,oid_capacity,&writes[CRL_OIDS]);
-  CRL_INDEX_ARRAY(tree->frames,tree->capacity,&writes[CRL_FRAMES]);
-  CRL_INDEX_ARRAY(tree->work,1,&writes[CRL_WORK]);
-  CRL_INDEX_ARRAY(out,1,&writes[CRL_OUTPUT]);
-  for (size_t i = 0; i < CRL_WRITES; ++i) {
-    result = tc_pki_storage_input(writes,i,writes[i],&budget);
-    if (result != TC_TLV_OK) return result;
-  }
-#define CRL_INDEX_INPUT(pointer) do { \
-  CRL_INDEX_ARRAY((pointer),1,&input); \
-  result = tc_pki_storage_input(writes,CRL_WRITES,input,&budget); \
-  if (result != TC_TLV_OK) return result; \
-} while (0)
-  CRL_INDEX_INPUT(reader);
-  CRL_INDEX_INPUT(tree);
-  if (reader->external) { CRL_INDEX_INPUT(reader->external); }
-#undef CRL_INDEX_INPUT
-#undef CRL_INDEX_ARRAY
-  result = tc_pki_storage_input(writes,CRL_WRITES,reader->collection.embedded.input,&budget);
-  if (result != TC_TLV_OK) return result;
+  tc_pki_storage_plan plan;
+  tc_pki_storage_plan_begin(&plan, writes, CRL_WRITES, *tree->work);
+  TC_PKI_PLAN_WRITE(&plan, records, capacity);
+  TC_PKI_PLAN_WRITE(&plan, oids, oid_capacity);
+  TC_PKI_PLAN_WRITE(&plan, tree->frames, tree->capacity);
+  TC_PKI_PLAN_WRITE(&plan, tree->work, 1);
+  TC_PKI_PLAN_WRITE(&plan, out, 1);
+  tc_pki_storage_plan_seal(&plan);
+  TC_PKI_PLAN_INPUT(&plan, reader, 1);
+  TC_PKI_PLAN_INPUT(&plan, tree, 1);
+  if (reader->external) TC_PKI_PLAN_INPUT(&plan, reader->external, 1);
+  tc_pki_storage_plan_input_span(&plan, reader->collection.embedded.input);
   /* Keep bookkeeping private until work is known to be disjoint from inputs. */
-  *tree->work = budget;
+  result = tc_pki_storage_plan_finish(&plan, tree->work);
+  if (result != TC_TLV_OK) return result;
   tc_pki_record_guard guard = {reader->external,writes,CRL_WRITES};
   const tc_pki_record_source guarded = {&guard,reader->external ? reader->external->count : 0,
     tc_pki_record_guard_read};
@@ -236,7 +223,7 @@ static TC_TLV_result cms_indexed_candidate(void* context, size_t index, size_t* 
 {
   const tc_cms_path_source* source = context;
   if (!source || index >= source->count || !work || !out) return TC_TLV_ARGUMENT;
-  if (tc_x509_path_charge(work,1) != TC_TLV_OK) return TC_TLV_LIMIT;
+  if (tc_pki_work_charge(work,1) != TC_TLV_OK) return TC_TLV_LIMIT;
   *out = source->certificates[index];
   return TC_TLV_OK;
 }
@@ -291,7 +278,7 @@ TC_TLV_result tc_cms_x509_candidate_next(tc_cms_candidates* reader,
     if (result == TC_TLV_END) { *reader = next; return result; }
     if (result != TC_TLV_OK) return result;
     if (choice.kind != TC_CMS_CERT_X509) continue;
-    if (tc_x509_path_charge(tree->work,choice.encoded.length) != TC_TLV_OK) return TC_TLV_LIMIT;
+    if (tc_pki_work_charge(tree->work,choice.encoded.length) != TC_TLV_OK) return TC_TLV_LIMIT;
     result = TC_X509_read(choice.encoded.data,choice.encoded.length,&next.collection.embedded.limits,parser,scratch);
     if (result != TC_TLV_OK) return result;
     if (filter) {
@@ -482,24 +469,39 @@ enum {
   CMS_SIGNATURE_WRITE, CMS_SIGNED_DIGEST_WRITE, CMS_RESULT_WRITE, CMS_WORK_WRITE, CMS_PATH_WRITE_COUNT
 };
 
-static TC_TLV_result cms_policy_storage(const TC_X509_path_options* policy,
-    const TC_bytes* writes, size_t write_count, size_t* work)
+/* Record path, search, index, signature, result and work writes in
+ * CMS_*_WRITE slot order. */
+static void cms_path_plan_writes(tc_pki_storage_plan* plan,
+    const TC_CMS_path_workspace* workspace, size_t* work, TC_X509_search_result* out)
 {
-  TC_bytes policies;
-  TC_TLV_result result = tc_pki_storage_span(policy->initial_policies,
-      policy->initial_policy_count,sizeof *policy->initial_policies,&policies);
-  if (result != TC_TLV_OK) return result;
-  const TC_bytes fields[] = {policies,policy->purpose,
-    policy->anchor_names.permitted,policy->anchor_names.excluded};
-  for (size_t i = 0; i < sizeof fields / sizeof *fields; ++i) {
-    result = tc_pki_storage_input(writes,write_count,fields[i],work);
-    if (result != TC_TLV_OK) return result;
+  tc_x509_path_storage_plan(plan, &workspace->validation);
+  TC_PKI_PLAN_WRITE(plan, workspace->search.path, workspace->search.capacity);
+  TC_PKI_PLAN_WRITE(plan, workspace->search.frames, workspace->search.capacity);
+  TC_PKI_PLAN_WRITE(plan, workspace->certificates, workspace->certificate_capacity);
+  TC_PKI_PLAN_WRITE(plan, workspace->signature, workspace->signature_capacity);
+  TC_PKI_PLAN_WRITE(plan, workspace->signed_digest, workspace->signed_digest_capacity);
+  TC_PKI_PLAN_WRITE(plan, out, 1);
+  TC_PKI_PLAN_WRITE(plan, work, 1);
+}
+
+static void cms_path_plan_inputs(tc_pki_storage_plan* plan, const TC_CMS_signer_info* signer,
+    const TC_bytes* inputs, size_t input_count, const TC_bytes* parts, size_t part_count,
+    const TC_X509_store_source* source, const TC_CMS_path_options* options,
+    const TC_CMS_path_workspace* workspace)
+{
+  if (signer) TC_PKI_PLAN_INPUT(plan, signer, 1);
+  TC_PKI_PLAN_INPUT(plan, source, 1);
+  TC_PKI_PLAN_INPUT(plan, options, 1);
+  TC_PKI_PLAN_INPUT(plan, workspace, 1);
+  TC_PKI_PLAN_INPUT(plan, parts, part_count);
+  if (signer) {
+    TC_bytes signer_fields[TC_CMS_SIGNER_SPAN_COUNT];
+    tc_cms_signer_spans(signer, signer_fields);
+    tc_pki_storage_plan_input_spans(plan, signer_fields, TC_CMS_SIGNER_SPAN_COUNT);
   }
-  for (size_t i = 0; i < policy->initial_policy_count; ++i) {
-    result = tc_pki_storage_input(writes,write_count,policy->initial_policies[i],work);
-    if (result != TC_TLV_OK) return result;
-  }
-  return TC_TLV_OK;
+  tc_pki_storage_plan_input_spans(plan, inputs, input_count);
+  tc_pki_storage_plan_input_spans(plan, parts, part_count);
+  tc_x509_path_options_plan_inputs(plan, &options->path);
 }
 
 static TC_TLV_result cms_path_storage(const TC_CMS_signer_info* signer,
@@ -509,57 +511,13 @@ static TC_TLV_result cms_path_storage(const TC_CMS_signer_info* signer,
     const TC_CMS_path_workspace* workspace, size_t* work, TC_X509_search_result* out,
     TC_bytes writes[CMS_PATH_WRITE_COUNT], size_t* remaining)
 {
-  TC_bytes input, signer_fields[TC_CMS_SIGNER_SPAN_COUNT];
-  TC_TLV_result result;
-  size_t budget = *work;
-  result = tc_x509_path_storage_writes(&workspace->validation,writes);
-  if (result != TC_TLV_OK) return result;
-#define CMS_PATH_ARRAY(pointer, count, dest) do { \
-  result = tc_pki_storage_span((pointer),(count),sizeof *(pointer),(dest)); \
-  if (result != TC_TLV_OK) return result; \
-} while (0)
-  CMS_PATH_ARRAY(workspace->search.path,workspace->search.capacity,&writes[CMS_PATH_WRITE]);
-  CMS_PATH_ARRAY(workspace->search.frames,workspace->search.capacity,&writes[CMS_SEARCH_WRITE]);
-  CMS_PATH_ARRAY(workspace->certificates,workspace->certificate_capacity,&writes[CMS_INDEX_WRITE]);
-  CMS_PATH_ARRAY(workspace->signature,workspace->signature_capacity,&writes[CMS_SIGNATURE_WRITE]);
-  CMS_PATH_ARRAY(workspace->signed_digest,workspace->signed_digest_capacity,&writes[CMS_SIGNED_DIGEST_WRITE]);
-  CMS_PATH_ARRAY(out,1,&writes[CMS_RESULT_WRITE]);
-  CMS_PATH_ARRAY(work,1,&writes[CMS_WORK_WRITE]);
-  for (size_t i = 0; i < CMS_PATH_WRITE_COUNT; ++i) {
-    result = tc_pki_storage_input(writes,i,writes[i],&budget);
-    if (result != TC_TLV_OK) return result;
-  }
-#define CMS_PATH_INPUT(pointer, count) do { \
-  CMS_PATH_ARRAY((pointer),(count),&input); \
-  result = tc_pki_storage_input(writes,CMS_PATH_WRITE_COUNT,input,&budget); \
-  if (result != TC_TLV_OK) return result; \
-} while (0)
-  if (signer) { CMS_PATH_INPUT(signer,1); }
-  CMS_PATH_INPUT(source,1);
-  CMS_PATH_INPUT(options,1);
-  CMS_PATH_INPUT(workspace,1);
-  CMS_PATH_INPUT(parts,part_count);
-#undef CMS_PATH_INPUT
-#undef CMS_PATH_ARRAY
-  if (signer) {
-    tc_cms_signer_spans(signer,signer_fields);
-    for (size_t i = 0; i < TC_CMS_SIGNER_SPAN_COUNT; ++i) {
-      result = tc_pki_storage_input(writes,CMS_PATH_WRITE_COUNT,signer_fields[i],&budget);
-      if (result != TC_TLV_OK) return result;
-    }
-  }
-  for (size_t i = 0; i < input_count; ++i) {
-    result = tc_pki_storage_input(writes,CMS_PATH_WRITE_COUNT,inputs[i],&budget);
-    if (result != TC_TLV_OK) return result;
-  }
-  for (size_t i = 0; i < part_count; ++i) {
-    result = tc_pki_storage_input(writes,CMS_PATH_WRITE_COUNT,parts[i],&budget);
-    if (result != TC_TLV_OK) return result;
-  }
-  result = cms_policy_storage(&options->path,writes,CMS_PATH_WRITE_COUNT,&budget);
-  if (result != TC_TLV_OK) return result;
-  *remaining = budget;
-  return TC_TLV_OK;
+  tc_pki_storage_plan plan;
+  tc_pki_storage_plan_begin(&plan, writes, CMS_PATH_WRITE_COUNT, *work);
+  cms_path_plan_writes(&plan, workspace, work, out);
+  tc_pki_storage_plan_seal(&plan);
+  cms_path_plan_inputs(&plan, signer, inputs, input_count, parts, part_count,
+      source, options, workspace);
+  return tc_pki_storage_plan_finish(&plan, remaining);
 }
 
 static int cms_path_arguments(const TC_X509_store_source* source,
@@ -685,7 +643,7 @@ static TC_X509_path_status cms_signed_data_path_build_parts(TC_bytes encoded, si
   if (result != TC_TLV_OK) return tc_x509_path_status(result);
   const TC_TLV_limits* limits = &options->path.parsing;
   const tc_pki_tree_workspace tree = {workspace->validation.frames,workspace->validation.frame_capacity,work};
-  if (tc_x509_path_charge(work,expected_type.length) != TC_TLV_OK) return TC_X509_PATH_LIMIT;
+  if (tc_pki_work_charge(work,expected_type.length) != TC_TLV_OK) return TC_X509_PATH_LIMIT;
   if (TC_DER_oid_contents(expected_type.data,expected_type.length) != TC_TLV_OK) return TC_X509_PATH_ERROR;
   if (prepared) {
     if (signer_index || !prepared->data || !prepared->signer ||
@@ -698,7 +656,7 @@ static TC_X509_path_status cms_signed_data_path_build_parts(TC_bytes encoded, si
   }
   /* Attached content cannot be replaced by application bytes. */
   if (data.has_content && detached_count) return TC_X509_PATH_ERROR;
-  if (tc_x509_path_charge(work,data.content_type.length) != TC_TLV_OK) return TC_X509_PATH_LIMIT;
+  if (tc_pki_work_charge(work,data.content_type.length) != TC_TLV_OK) return TC_X509_PATH_LIMIT;
   if (!tc_pki_equal(data.content_type,expected_type)) return TC_X509_PATH_INVALID;
   if (prepared) signer = *prepared->signer;
   else {
@@ -775,7 +733,7 @@ static TC_credential_status cms_credential_validate_impl(
     const tc_cms_prepared_signed_data* prepared)
 {
   enum { HELD_PATH = CMS_PATH_WRITE_COUNT, CRL_STATES, CRL_NODES, WRITE_COUNT };
-  TC_bytes writes[WRITE_COUNT], input;
+  TC_bytes writes[WRITE_COUNT];
   TC_X509_search_result path;
   TC_TLV_result result;
   int time_order;
@@ -803,62 +761,32 @@ static TC_credential_status cms_credential_validate_impl(
       time_order) return TC_CREDENTIAL_ERROR;
   if (workspace->path_capacity < workspace->path->search.capacity ||
       workspace->crl_capacity < revocation->index->count) return TC_CREDENTIAL_LIMIT;
-  size_t budget = *work;
   const TC_bytes inputs[] = {encoded,expected_type,selected};
-  result = cms_path_storage(NULL,inputs,sizeof inputs / sizeof *inputs,detached_content,detached_count,
-      source,options,workspace->path,work,&path,writes,&budget);
-  if (result != TC_TLV_OK) return cms_credential_error(result);
-#define CMS_CREDENTIAL_ARRAY(pointer, count, destination) do { \
-  result = tc_pki_storage_span((pointer),(count),sizeof *(pointer),(destination)); \
-  if (result != TC_TLV_OK) return cms_credential_error(result); \
-} while (0)
-  CMS_CREDENTIAL_ARRAY(workspace->held_path,workspace->path_capacity,&writes[HELD_PATH]);
-  CMS_CREDENTIAL_ARRAY(workspace->crl_states,workspace->crl_capacity,&writes[CRL_STATES]);
-  CMS_CREDENTIAL_ARRAY(workspace->nodes,workspace->node_capacity,&writes[CRL_NODES]);
-  for (size_t i = HELD_PATH; i < WRITE_COUNT; ++i) {
-    result = tc_pki_storage_input(writes,i,writes[i],&budget);
-    if (result != TC_TLV_OK) return cms_credential_error(result);
-  }
-#define CMS_CREDENTIAL_INPUT(pointer, count) do { \
-  CMS_CREDENTIAL_ARRAY((pointer),(count),&input); \
-  result = tc_pki_storage_input(writes,WRITE_COUNT,input,&budget); \
-  if (result != TC_TLV_OK) return cms_credential_error(result); \
-} while (0)
-  CMS_CREDENTIAL_INPUT(workspace,1);
-  CMS_CREDENTIAL_INPUT(request,1);
-  CMS_CREDENTIAL_INPUT(workspace->path,1);
-  CMS_CREDENTIAL_INPUT(source,1);
-  CMS_CREDENTIAL_INPUT(options,1);
-  CMS_CREDENTIAL_INPUT(revocation,1);
-  CMS_CREDENTIAL_INPUT(revocation->index,1);
-  CMS_CREDENTIAL_INPUT(revocation->index->records,revocation->index->count);
-  CMS_CREDENTIAL_INPUT(revocation->signer_policy,1);
-  CMS_CREDENTIAL_INPUT(detached_content,detached_count);
+  size_t budget;
+  tc_pki_storage_plan plan;
+  tc_pki_storage_plan_begin(&plan, writes, WRITE_COUNT, *work);
+  cms_path_plan_writes(&plan, workspace->path, work, &path);
+  TC_PKI_PLAN_WRITE(&plan, workspace->held_path, workspace->path_capacity);
+  TC_PKI_PLAN_WRITE(&plan, workspace->crl_states, workspace->crl_capacity);
+  TC_PKI_PLAN_WRITE(&plan, workspace->nodes, workspace->node_capacity);
+  tc_pki_storage_plan_seal(&plan);
+  cms_path_plan_inputs(&plan, NULL, inputs, sizeof inputs / sizeof *inputs,
+      detached_content, detached_count, source, options, workspace->path);
+  TC_PKI_PLAN_INPUT(&plan, workspace, 1);
+  TC_PKI_PLAN_INPUT(&plan, request, 1);
+  TC_PKI_PLAN_INPUT(&plan, revocation, 1);
+  TC_PKI_PLAN_INPUT(&plan, revocation->index, 1);
+  TC_PKI_PLAN_INPUT(&plan, revocation->index->records, revocation->index->count);
+  TC_PKI_PLAN_INPUT(&plan, revocation->signer_policy, 1);
   if (prepared) {
-    CMS_CREDENTIAL_INPUT(prepared,1);
-    CMS_CREDENTIAL_INPUT(prepared->data,1);
-    CMS_CREDENTIAL_INPUT(prepared->signer,1);
+    TC_PKI_PLAN_INPUT(&plan, prepared, 1);
+    TC_PKI_PLAN_INPUT(&plan, prepared->data, 1);
+    TC_PKI_PLAN_INPUT(&plan, prepared->signer, 1);
   }
-  const TC_X509_path_options* policies[] = {&options->path,revocation->signer_policy};
-  for (size_t i = 0; i < sizeof policies / sizeof *policies; ++i) {
-    result = cms_policy_storage(policies[i],writes,WRITE_COUNT,&budget);
-    if (result != TC_TLV_OK) return cms_credential_error(result);
-  }
-#undef CMS_CREDENTIAL_INPUT
-#undef CMS_CREDENTIAL_ARRAY
-  for (size_t i = 0; i < sizeof inputs / sizeof *inputs; ++i) {
-    result = tc_pki_storage_input(writes,WRITE_COUNT,inputs[i],&budget);
-    if (result != TC_TLV_OK) return cms_credential_error(result);
-  }
-  for (size_t i = 0; i < detached_count; ++i) {
-    result = tc_pki_storage_input(writes,WRITE_COUNT,detached_content[i],&budget);
-    if (result != TC_TLV_OK) return cms_credential_error(result);
-  }
-  for (size_t i = 0; i < metadata_count; ++i) {
-    result = tc_pki_storage_input(writes,WRITE_COUNT,metadata[i],&budget);
-    if (result != TC_TLV_OK) return cms_credential_error(result);
-  }
-  result = tc_x509_crl_index_storage_bytes(revocation->index,writes,WRITE_COUNT,&budget);
+  tc_x509_path_options_plan_inputs(&plan, revocation->signer_policy);
+  tc_pki_storage_plan_input_spans(&plan, metadata, metadata_count);
+  tc_x509_crl_index_plan_inputs(&plan, revocation->index);
+  result = tc_pki_storage_plan_finish(&plan, &budget);
   if (result != TC_TLV_OK) return cms_credential_error(result);
   tc_pki_source_guard guard = {source,writes,WRITE_COUNT};
   const TC_X509_store_source guarded = tc_pki_source_guard_bind(&guard);
@@ -1125,8 +1053,8 @@ TC_TLV_result tc_cms_signer_matches(const tc_cms_signer_info* signer, TC_TLV_pro
   if (signer->version == 1) {
     if (!names || !signer->issuer.data || !signer->serial.length || signer->subject_key_id.data)
       return TC_TLV_ARGUMENT;
-    if (tc_x509_path_charge(tree->work,signer->serial.length) != TC_TLV_OK ||
-        tc_x509_path_charge(tree->work,certificate->serial.length) != TC_TLV_OK) return TC_TLV_LIMIT;
+    if (tc_pki_work_charge(tree->work,signer->serial.length) != TC_TLV_OK ||
+        tc_pki_work_charge(tree->work,certificate->serial.length) != TC_TLV_OK) return TC_TLV_LIMIT;
     /* Both readers require minimal INTEGER contents, including sign padding. */
     if (signer->serial_negative != certificate->serial_negative ||
         !tc_pki_equal(signer->serial,certificate->serial)) { *matched = 0; return TC_TLV_OK; }

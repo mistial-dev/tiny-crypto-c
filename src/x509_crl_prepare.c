@@ -31,56 +31,40 @@ static TC_TLV_result prepare_storage(const TC_source* source,
     const TC_X509_crl_prepare_options* options,
     const TC_X509_crl_prepare_workspace* w, size_t* work, TC_X509_crl_job** out)
 {
-  enum { WRITE_COUNT = 13, INPUT_COUNT = 4 };
-  TC_bytes writes[WRITE_COUNT], inputs[INPUT_COUNT];
+  TC_bytes writes[13];
+  tc_pki_storage_plan plan;
   if (!source || !source->read || !options || !w || !work || !out ||
       !w->state.data || !w->window.data || !w->window.capacity ||
       !w->metadata.data || !w->metadata.capacity ||
       (uintptr_t)w->state.data % TC_X509_crl_prepare_alignment()) return TC_TLV_ARGUMENT;
   if (w->state.capacity < sizeof(TC_X509_crl_job) || count > w->match_capacity ||
       source->length > options->max_input) return TC_TLV_LIMIT;
-  writes[0] = (TC_bytes){w->state.data,w->state.capacity};
-  writes[1] = (TC_bytes){w->window.data,w->window.capacity};
-  writes[2] = (TC_bytes){w->metadata.data,w->metadata.capacity};
-  writes[3] = (TC_bytes){w->entry.data,w->entry.capacity};
-  writes[4] = (TC_bytes){w->issuer.data,w->issuer.capacity};
-#define SPAN(slot, pointer, count_) do { \
-  if (tc_pki_storage_span((pointer),(count_),sizeof *(pointer),&(slot)) != TC_TLV_OK) return TC_TLV_ARGUMENT; \
-} while (0)
-  SPAN(writes[5],w->parsing.frames,w->parsing.frame_capacity);
-  SPAN(writes[6],w->parsing.extension_oids,w->parsing.extension_capacity);
-  SPAN(writes[7],w->names.left,w->names.scalar_capacity);
-  SPAN(writes[8],w->names.right,w->names.scalar_capacity);
-  SPAN(writes[9],w->names.matched,w->names.attribute_capacity);
-  SPAN(writes[10],w->matches,w->match_capacity);
-  SPAN(writes[11],work,1);
-  SPAN(writes[12],out,1);
-  SPAN(inputs[0],source,1);
-  SPAN(inputs[1],options,1);
-  SPAN(inputs[2],w,1);
-  SPAN(inputs[3],targets,count);
-#undef SPAN
-  size_t budget = *work;
-  TC_TLV_result result;
-  for (size_t i = 0; i < WRITE_COUNT; ++i) {
-    if (!writes[i].data && writes[i].length) return TC_TLV_ARGUMENT;
-    result = tc_pki_storage_input(writes,i,writes[i],&budget);
-    if (result != TC_TLV_OK) return result;
-  }
-  for (size_t i = 0; i < INPUT_COUNT; ++i) {
-    result = tc_pki_storage_input(writes,WRITE_COUNT,inputs[i],&budget);
-    if (result != TC_TLV_OK) return result;
-  }
-  for (size_t i = 0; i < count; ++i) {
+  tc_pki_storage_plan_begin(&plan,writes,13,*work);
+  tc_pki_storage_plan_write(&plan,w->state.data,w->state.capacity,1);
+  tc_pki_storage_plan_write(&plan,w->window.data,w->window.capacity,1);
+  tc_pki_storage_plan_write(&plan,w->metadata.data,w->metadata.capacity,1);
+  tc_pki_storage_plan_write(&plan,w->entry.data,w->entry.capacity,1);
+  tc_pki_storage_plan_write(&plan,w->issuer.data,w->issuer.capacity,1);
+  TC_PKI_PLAN_WRITE(&plan,w->parsing.frames,w->parsing.frame_capacity);
+  TC_PKI_PLAN_WRITE(&plan,w->parsing.extension_oids,w->parsing.extension_capacity);
+  TC_PKI_PLAN_WRITE(&plan,w->names.left,w->names.scalar_capacity);
+  TC_PKI_PLAN_WRITE(&plan,w->names.right,w->names.scalar_capacity);
+  TC_PKI_PLAN_WRITE(&plan,w->names.matched,w->names.attribute_capacity);
+  TC_PKI_PLAN_WRITE(&plan,w->matches,w->match_capacity);
+  TC_PKI_PLAN_WRITE(&plan,work,1);
+  TC_PKI_PLAN_WRITE(&plan,out,1);
+  tc_pki_storage_plan_seal(&plan);
+  TC_PKI_PLAN_INPUT(&plan,source,1);
+  TC_PKI_PLAN_INPUT(&plan,options,1);
+  TC_PKI_PLAN_INPUT(&plan,w,1);
+  TC_PKI_PLAN_INPUT(&plan,targets,count);
+  for (size_t i = 0; plan.status == TC_TLV_OK && i < count; ++i) {
     if (!targets[i].serial.data || !targets[i].serial.length ||
         !targets[i].issuer.data || !targets[i].issuer.length) return TC_TLV_ARGUMENT;
-    result = tc_pki_storage_input(writes,WRITE_COUNT,targets[i].serial,&budget);
-    if (result != TC_TLV_OK) return result;
-    result = tc_pki_storage_input(writes,WRITE_COUNT,targets[i].issuer,&budget);
-    if (result != TC_TLV_OK) return result;
+    tc_pki_storage_plan_input_span(&plan,targets[i].serial);
+    tc_pki_storage_plan_input_span(&plan,targets[i].issuer);
   }
-  *work = budget;
-  return TC_TLV_OK;
+  return tc_pki_storage_plan_finish(&plan,work);
 }
 
 TC_TLV_result TC_X509_crl_prepare_begin(const TC_source* source,
@@ -126,39 +110,26 @@ TC_TLV_result TC_X509_crl_prepare_begin(const TC_source* source,
   return TC_TLV_OK;
 }
 
-static TC_TLV_result prepare_outputs(const TC_X509_crl_job* job,
-    const TC_bytes* writes, size_t count, size_t* budget)
+/* The job's workspace and targets stay unchanged while outputs are written. */
+static void prepare_plan_inputs(tc_pki_storage_plan* plan, const TC_X509_crl_job* job)
 {
   const TC_X509_crl_prepare_workspace* w = &job->workspace;
-  TC_TLV_result result;
-  for (size_t i = 0; i < count; ++i) {
-    result = tc_pki_storage_input(writes,i,writes[i],budget);
-    if (result != TC_TLV_OK) return result;
+  tc_pki_storage_plan_input(plan,w->state.data,w->state.capacity,1);
+  tc_pki_storage_plan_input(plan,w->window.data,w->window.capacity,1);
+  tc_pki_storage_plan_input(plan,w->metadata.data,w->metadata.capacity,1);
+  tc_pki_storage_plan_input(plan,w->entry.data,w->entry.capacity,1);
+  tc_pki_storage_plan_input(plan,w->issuer.data,w->issuer.capacity,1);
+  TC_PKI_PLAN_INPUT(plan,w->parsing.frames,w->parsing.frame_capacity);
+  TC_PKI_PLAN_INPUT(plan,w->parsing.extension_oids,w->parsing.extension_capacity);
+  TC_PKI_PLAN_INPUT(plan,w->names.left,w->names.scalar_capacity);
+  TC_PKI_PLAN_INPUT(plan,w->names.right,w->names.scalar_capacity);
+  TC_PKI_PLAN_INPUT(plan,w->names.matched,w->names.attribute_capacity);
+  TC_PKI_PLAN_INPUT(plan,w->matches,w->match_capacity);
+  TC_PKI_PLAN_INPUT(plan,job->prepared.targets,job->prepared.count);
+  for (size_t i = 0; plan->status == TC_TLV_OK && i < job->prepared.count; ++i) {
+    tc_pki_storage_plan_input_span(plan,job->prepared.targets[i].serial);
+    tc_pki_storage_plan_input_span(plan,job->prepared.targets[i].issuer);
   }
-#define INPUT(pointer, count_) do { \
-  TC_bytes span; \
-  result = tc_pki_storage_span((pointer),(count_),sizeof *(pointer),&span); \
-  if (result == TC_TLV_OK) result = tc_pki_storage_input(writes,count,span,budget); \
-  if (result != TC_TLV_OK) return result; \
-} while (0)
-  INPUT(w->state.data,w->state.capacity);
-  INPUT(w->window.data,w->window.capacity);
-  INPUT(w->metadata.data,w->metadata.capacity);
-  INPUT(w->entry.data,w->entry.capacity);
-  INPUT(w->issuer.data,w->issuer.capacity);
-  INPUT(w->parsing.frames,w->parsing.frame_capacity);
-  INPUT(w->parsing.extension_oids,w->parsing.extension_capacity);
-  INPUT(w->names.left,w->names.scalar_capacity);
-  INPUT(w->names.right,w->names.scalar_capacity);
-  INPUT(w->names.matched,w->names.attribute_capacity);
-  INPUT(w->matches,w->match_capacity);
-  INPUT(job->prepared.targets,job->prepared.count);
-  for (size_t i = 0; i < job->prepared.count; ++i) {
-    INPUT(job->prepared.targets[i].serial.data,job->prepared.targets[i].serial.length);
-    INPUT(job->prepared.targets[i].issuer.data,job->prepared.targets[i].issuer.length);
-  }
-#undef INPUT
-  return TC_TLV_OK;
 }
 
 TC_TLV_result TC_X509_crl_prepare_step(TC_X509_crl_job* job, size_t max_entries,
@@ -166,11 +137,15 @@ TC_TLV_result TC_X509_crl_prepare_step(TC_X509_crl_job* job, size_t max_entries,
 {
   if (!job || !work || !complete || !max_entries || !max_bytes ||
       (job->phase != CRL_JOB_SCANNING && job->phase != CRL_JOB_HASHING)) return TC_TLV_ARGUMENT;
-  const TC_bytes writes[] = {{(const uint8_t*)work,sizeof *work},{(const uint8_t*)complete,sizeof *complete}};
-  size_t budget = *work;
-  TC_TLV_result result = prepare_outputs(job,writes,2,&budget);
+  TC_bytes writes[2];
+  tc_pki_storage_plan plan;
+  tc_pki_storage_plan_begin(&plan,writes,2,*work);
+  TC_PKI_PLAN_WRITE(&plan,work,1);
+  TC_PKI_PLAN_WRITE(&plan,complete,1);
+  tc_pki_storage_plan_seal(&plan);
+  prepare_plan_inputs(&plan,job);
+  TC_TLV_result result = tc_pki_storage_plan_finish(&plan,work);
   if (result != TC_TLV_OK) return result;
-  *work = budget;
   const tc_pki_tree_workspace tree = {job->workspace.parsing.frames,job->workspace.parsing.frame_capacity,work};
   int done = 0;
   if (job->phase == CRL_JOB_SCANNING) {
@@ -182,7 +157,7 @@ TC_TLV_result TC_X509_crl_prepare_step(TC_X509_crl_job* job, size_t max_entries,
   if (result == TC_TLV_OK && job->phase == CRL_JOB_HASHING) {
     const uint64_t remaining = job->hash.end - job->hash.offset;
     const size_t bytes = remaining < max_bytes ? (size_t)remaining : max_bytes;
-    result = tc_x509_path_charge(work,bytes);
+    result = tc_pki_work_charge(work,bytes);
     TC_result hashed = TC_RESULT_OK;
     if (result == TC_TLV_OK) hashed = tc_source_hash_step(&job->hash,max_bytes,&done);
     if (hashed != TC_RESULT_OK) result = hashed == TC_RESULT_LIMIT ? TC_TLV_LIMIT : TC_TLV_IO;
@@ -211,9 +186,13 @@ TC_TLV_result TC_X509_crl_prepare_finish(const TC_X509_crl_job* job, TC_X509_crl
 {
   if (!job || !out || job->phase != CRL_JOB_COMPLETE ||
       !tc_internal_ranges_disjoint(job,sizeof *job,out,sizeof *out)) return TC_TLV_ARGUMENT;
-  const TC_bytes writes = {(const uint8_t*)out,sizeof *out};
-  size_t budget = SIZE_MAX;
-  TC_TLV_result result = prepare_outputs(job,&writes,1,&budget);
+  TC_bytes writes;
+  tc_pki_storage_plan plan;
+  tc_pki_storage_plan_begin(&plan,&writes,1,SIZE_MAX);
+  TC_PKI_PLAN_WRITE(&plan,out,1);
+  tc_pki_storage_plan_seal(&plan);
+  prepare_plan_inputs(&plan,job);
+  TC_TLV_result result = tc_pki_storage_plan_finish(&plan,NULL);
   if (result != TC_TLV_OK) return result;
   *out = job->record;
   return TC_TLV_OK;

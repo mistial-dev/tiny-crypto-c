@@ -190,41 +190,36 @@ TC_TLV_result TC_PIV_CMS_identifiers_match(const TC_PIV_CMS_object* object,
     TC_PIV_CMS_kind kind, TC_bytes fascn, TC_bytes uuid, const TC_TLV_limits* limits,
     TC_TLV_frame* frames, size_t frame_capacity, size_t* work, int* matched)
 {
-  enum { FASCN_BYTES = 25, UUID_BYTES = 16, WRITE_COUNT = 3, READ_COUNT = 7,
-    STORAGE_WORK = WRITE_COUNT * READ_COUNT + WRITE_COUNT * (WRITE_COUNT - 1) / 2 };
-  TC_bytes writes[WRITE_COUNT], reads[READ_COUNT];
-  size_t checks = STORAGE_WORK;
+  enum { FASCN_BYTES = 25, UUID_BYTES = 16 };
+  TC_bytes writes[3];
+  tc_pki_storage_plan plan;
   int fascn_matches = 1, uuid_matches = 1;
   TC_TLV_result result;
   if (!object || !limits || !work || !matched || !fascn.data || !uuid.data ||
       !cms_kind_valid(kind) ||
-      fascn.length != FASCN_BYTES || uuid.length != UUID_BYTES ||
-      tc_pki_storage_span(frames,frame_capacity,sizeof *frames,&writes[0]) != TC_TLV_OK ||
-      tc_pki_storage_span(work,1,sizeof *work,&writes[1]) != TC_TLV_OK ||
-      tc_pki_storage_span(matched,1,sizeof *matched,&writes[2]) != TC_TLV_OK ||
-      tc_pki_storage_span(object,1,sizeof *object,&reads[0]) != TC_TLV_OK ||
-      tc_pki_storage_span(limits,1,sizeof *limits,&reads[1]) != TC_TLV_OK) return TC_TLV_ARGUMENT;
-  reads[2] = fascn; reads[3] = uuid;
-  reads[4] = object->attributes.fascn_octets;
-  reads[5] = object->attributes.entry_uuid_octets;
-  reads[6] = object->envelope.encoded;
-  for (size_t i = 0; i < WRITE_COUNT; ++i) {
-    result = tc_pki_storage_input(writes,i,writes[i],&checks);
-    if (result != TC_TLV_OK) return result;
-  }
-  for (size_t i = 0; i < READ_COUNT; ++i) {
-    result = tc_pki_storage_input(writes,WRITE_COUNT,reads[i],&checks);
-    if (result != TC_TLV_OK) return result;
-  }
-  if (!cms_identifiers_present(kind,reads[4],reads[5])) return TC_TLV_INVALID;
-  result = tc_x509_path_charge(work,STORAGE_WORK);
+      fascn.length != FASCN_BYTES || uuid.length != UUID_BYTES) return TC_TLV_ARGUMENT;
+  const TC_bytes fascn_octets = object->attributes.fascn_octets;
+  const TC_bytes uuid_octets = object->attributes.entry_uuid_octets;
+  const TC_bytes fields[] = {fascn, uuid, fascn_octets, uuid_octets, object->envelope.encoded};
+  tc_pki_storage_plan_begin(&plan,writes,3,SIZE_MAX);
+  TC_PKI_PLAN_WRITE(&plan,frames,frame_capacity);
+  TC_PKI_PLAN_WRITE(&plan,work,1);
+  TC_PKI_PLAN_WRITE(&plan,matched,1);
+  tc_pki_storage_plan_seal(&plan);
+  TC_PKI_PLAN_INPUT(&plan,object,1);
+  TC_PKI_PLAN_INPUT(&plan,limits,1);
+  tc_pki_storage_plan_input_spans(&plan,fields,sizeof fields / sizeof *fields);
+  result = tc_pki_storage_plan_finish(&plan,NULL);
   if (result != TC_TLV_OK) return result;
-  if (reads[4].data) {
-    result = tc_pki_octets_equal(reads[4],4,fascn,TC_TLV_BER,limits,frames,frame_capacity,work,&fascn_matches);
+  if (!cms_identifiers_present(kind,fascn_octets,uuid_octets)) return TC_TLV_INVALID;
+  result = tc_pki_work_charge(work,tc_pki_storage_plan_used(&plan));
+  if (result != TC_TLV_OK) return result;
+  if (fascn_octets.data) {
+    result = tc_pki_octets_equal(fascn_octets,4,fascn,TC_TLV_BER,limits,frames,frame_capacity,work,&fascn_matches);
     if (result != TC_TLV_OK) return result;
   }
-  if (reads[5].data) {
-    result = tc_pki_octets_equal(reads[5],4,uuid,TC_TLV_BER,limits,frames,frame_capacity,work,&uuid_matches);
+  if (uuid_octets.data) {
+    result = tc_pki_octets_equal(uuid_octets,4,uuid,TC_TLV_BER,limits,frames,frame_capacity,work,&uuid_matches);
     if (result != TC_TLV_OK) return result;
   }
   *matched = fascn_matches && uuid_matches;

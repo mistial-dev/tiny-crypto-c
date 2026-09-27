@@ -332,4 +332,9 @@ TC_TLV_result tc_x509_crl_entry_next(TC_TLV_reader* reader, unsigned version,
 TC_TLV_result tc_x509_crl_extensions_check(const tc_x509_crl* crl,
     const TC_TLV_limits* limits, const tc_pki_tree_workspace* tree,
     TC_bytes* oids, size_t capacity);
+/* CRLReason values defined by RFC 5280 section 5.3.1 (7 is unassigned). */
+enum { CRL_REASON_UNUSED = 7, CRL_REASON_REMOVE = 8, CRL_REASON_LAST = 10 };
+static inline int tc_x509_crl_reason_known(unsigned reason)
+{ return reason <= CRL_REASON_LAST && reason != CRL_REASON_UNUSED; }
+
 #endif

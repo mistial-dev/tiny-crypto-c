@@ -48,13 +48,13 @@ tc_module_feature(TINY_CRYPTO_ENABLE_X509_PATH TC_ENABLE_X509_PATH
   "Build X.509 path validation and stores")
 set(tc_module_requires_TC_ENABLE_X509_PATH TINY_CRYPTO_ENABLE_X509)
 set(tc_module_sources_TC_ENABLE_X509_PATH
-  src/x509_path.c src/x509_search.c src/x509_store.c src/x509_policy.c)
+  src/x509_path.c src/x509_path_extensions.c src/x509_search.c src/x509_store.c src/x509_policy.c)
 
 tc_module_feature(TINY_CRYPTO_ENABLE_X509_REVOCATION TC_ENABLE_X509_REVOCATION
   "Build X.509 CRL and revocation validation")
 set(tc_module_requires_TC_ENABLE_X509_REVOCATION TINY_CRYPTO_ENABLE_X509_PATH)
 set(tc_module_sources_TC_ENABLE_X509_REVOCATION
-  src/x509_crl.c src/x509_revocation.c src/source.c src/source_der.c src/x509_crl_source.c src/x509_crl_prepare.c)
+  src/x509_crl.c src/x509_crl_extensions.c src/x509_crl_selected.c src/x509_crl_evidence.c src/x509_crl_entries.c src/x509_revocation.c src/x509_crl_scope.c src/x509_crl_scope_storage.c src/x509_crl_delta.c src/source.c src/source_der.c src/x509_crl_source.c src/x509_crl_prepare.c)
 
 tc_module_feature(TINY_CRYPTO_ENABLE_CMS TC_ENABLE_CMS
   "Build CMS parsing and signature verification")

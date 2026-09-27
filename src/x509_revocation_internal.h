@@ -213,8 +213,8 @@ typedef struct {
 } tc_x509_crl_held_path;
 
 /* Caller guards the path object before this checks its borrowed inputs. */
-TC_TLV_result tc_x509_crl_path_storage_inputs(const tc_x509_crl_held_path* path,
-    const TC_bytes* writes, size_t write_count, size_t* work);
+void tc_x509_crl_path_plan_inputs(tc_pki_storage_plan* plan,
+    const tc_x509_crl_held_path* path);
 
 /* Collect borrowed revocation fields through the checked extension visitor.
  * Zero-initialize fields and supply limits/tree before visiting extensions. */
@@ -283,9 +283,10 @@ typedef struct {
   int* source_failed;
 } tc_x509_crl_extra_storage;
 
-/* Caller guards extra and validates the node array/count before inspecting bytes. */
-TC_TLV_result tc_x509_crl_extra_storage_inputs(const tc_x509_crl_extra_storage* extra,
-    const TC_bytes* writes, size_t write_count, size_t* work);
+/* Check the node array and borrowed bytes of extra as plan inputs. The caller
+ * records extra itself as a write or input. */
+void tc_x509_crl_extra_plan_inputs(tc_pki_storage_plan* plan,
+    const tc_x509_crl_extra_storage* extra);
 
 /* Guard borrowed certificate bytes before adding a dependency. */
 TC_TLV_result tc_x509_crl_dependency_add(tc_x509_crl_dependencies* dependencies,
@@ -366,25 +367,24 @@ TC_TLV_result tc_x509_crl_resolve(const TC_X509_certificate* target,
 TC_TLV_result tc_x509_crl_path_operation(tc_x509_crl_held_path* held,
     const tc_x509_crl_resolution* resolution, const tc_x509_crl_resolution_workspace* workspace);
 
-/* Append operation outputs to the prepared scope spans and check all overlaps.
- * Writes and work are provisional; caller commits its work budget after input checks. */
-TC_TLV_result tc_x509_crl_scope_storage_check(const tc_x509_crl_extra_storage* extra,
-    const tc_x509_crl_held_path* path, TC_bytes writes[CRL_SCOPE_WRITES], size_t* work);
-/* Describe validation/search/scope storage through CRL_SCOPE_WORK. The caller
- * supplies remaining operation spans and checks all input/output overlaps. */
-TC_TLV_result tc_x509_crl_scope_storage_writes(const tc_x509_crl_scope_processing* processing,
-    const tc_x509_crl_trust* trust, TC_X509_search_result* out,
-    TC_bytes writes[CRL_SCOPE_NODES]);
+/* Record the dependency-node, output and held-path result writes in the
+ * CRL_SCOPE_NODES through CRL_SCOPE_PATH_OUTPUT slots. Absent storage records
+ * an empty span so slot numbers stay fixed. */
+void tc_x509_crl_scope_plan_outputs(tc_pki_storage_plan* plan,
+    const tc_x509_crl_extra_storage* extra, const tc_x509_crl_held_path* path);
+/* Record validation, search and scope writes in CRL_SCOPE_* slot order through
+ * CRL_SCOPE_SIGNER_POLICIES. The caller appends the operation outputs. */
+void tc_x509_crl_scope_plan_writes(tc_pki_storage_plan* plan,
+    const tc_x509_crl_scope_processing* processing, const tc_x509_crl_trust* trust,
+    TC_X509_search_result* out);
 
-/* Check all borrowed record fields against operation writes. The caller
- * validates index/record metadata storage before visiting its byte spans. */
-TC_TLV_result tc_x509_crl_index_storage_bytes(const TC_X509_crl_index* index,
-    const TC_bytes* writes, size_t write_count, size_t* work);
+/* Check all borrowed record fields against a sealed plan. The caller checks
+ * the index object and record array before this visits their byte spans. */
+void tc_x509_crl_index_plan_inputs(tc_pki_storage_plan* plan, const TC_X509_crl_index* index);
 
-/* Guard shared scope/query/policy metadata and borrowed bytes against writes.
- * Work is provisional; the operation commits its budget after all guards pass. */
-TC_TLV_result tc_x509_crl_scope_storage_inputs(const tc_x509_crl_scope_processing* processing,
-    const tc_x509_crl_trust* trust, const TC_bytes* writes, size_t write_count, size_t* work);
+/* Check shared scope, query and policy metadata and their borrowed bytes. */
+void tc_x509_crl_scope_plan_inputs(tc_pki_storage_plan* plan,
+    const tc_x509_crl_scope_processing* processing, const tc_x509_crl_trust* trust);
 
 /* Match issuer, authority identifiers and cRLSign usage on parsed inputs.
  * Signature and path checks follow candidate selection. matched changes on OK;
@@ -501,8 +501,25 @@ static inline TC_TLV_result x509_crl_order(const tc_x509_crl_selected* left,
   }
   const tc_x509_crl* a = left->delta ? left->delta : left->base;
   const tc_x509_crl* b = right->delta ? right->delta : right->base;
-  TC_TLV_result result = tc_x509_path_charge(work,1);
+  TC_TLV_result result = tc_pki_work_charge(work,1);
   return result == TC_TLV_OK ? TC_X509_time_compare(&a->this_update,&b->this_update,order) : result;
 }
+
+/* FNV-1a over encoded bytes, used to bucket certificates and CRL scopes. */
+static inline uint32_t tc_x509_crl_bytes_hash(TC_bytes bytes)
+{
+  uint32_t hash = UINT32_C(2166136261);
+  for (size_t i = 0; i < bytes.length; ++i)
+    hash = (hash ^ bytes.data[i]) * UINT32_C(16777619);
+  return hash;
+}
+
+/* Preflight storage for a scope operation, then commit the checked budget.
+ * writes receives the CRL_SCOPE_* slots used by source guards. */
+TC_TLV_result tc_x509_crl_scope_prepare(const tc_x509_crl_operation_source* candidates,
+    const tc_x509_crl_scope_processing* processing, const tc_x509_crl_trust* trust,
+    const TC_bytes* points, const tc_x509_crl_extra_storage* extra,
+    const tc_x509_crl_held_path* path, TC_X509_search_result* out,
+    TC_bytes writes[CRL_SCOPE_WRITES]);
 
 #endif

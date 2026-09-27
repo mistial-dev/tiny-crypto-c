@@ -516,42 +516,26 @@ TC_PIV_security_validate(const TC_PIV_security_validation_request *request,
                              {(const uint8_t *)request->card_expiration,
                               sizeof *request->card_expiration},
                              {(const uint8_t *)request->objects,
-                              request->count * sizeof *request->objects},
-                             {workspace->content, workspace->content_capacity}};
-  const size_t initial_work = *work;
-  TC_TLV_result stored =
-      tc_validation_storage(context, inputs, sizeof inputs / sizeof *inputs,
-                            work, out, sizeof *out, writes);
+                              request->count * sizeof *request->objects}};
+  /* The content decoder writes only after every signature and inventory
+   * input has been checked for overlap with its buffer. */
+  tc_pki_storage_plan plan;
+  tc_pki_storage_plan_begin(&plan, writes, SECURITY_WRITES, *work);
+  tc_validation_plan_writes(&plan, context, work, out, sizeof *out);
+  tc_pki_storage_plan_write(&plan, workspace->content,
+                            workspace->content_capacity, 1);
+  tc_pki_storage_plan_seal(&plan);
+  tc_validation_plan_inputs(&plan, context, inputs,
+                            sizeof inputs / sizeof *inputs);
+  for (size_t i = 0; plan.status == TC_TLV_OK && i < request->count; ++i) {
+    TC_PKI_PLAN_INPUT(&plan, request->objects[i].parts,
+                      request->objects[i].count);
+    tc_pki_storage_plan_input_spans(&plan, request->objects[i].parts,
+                                    request->objects[i].count);
+  }
+  TC_TLV_result stored = tc_pki_storage_plan_finish(&plan, work);
   if (stored != TC_TLV_OK)
     return tc_validation_status(stored);
-  size_t budget = *work;
-  writes[TC_VALIDATION_WRITES] =
-      (TC_bytes){workspace->content, workspace->content_capacity};
-  /* The content decoder writes only after all signature and inventory inputs
-   * have been checked for overlap with its buffer. */
-  for (size_t i = 0; i + 1 < sizeof inputs / sizeof *inputs; ++i) {
-    stored = tc_pki_storage_input(&writes[TC_VALIDATION_WRITES], 1, inputs[i],
-                                  &budget);
-    if (stored != TC_TLV_OK)
-      break;
-  }
-  for (size_t i = 0; stored == TC_TLV_OK && i < request->count; ++i) {
-    TC_bytes parts;
-    stored = tc_pki_storage_span(request->objects[i].parts,
-                                 request->objects[i].count,
-                                 sizeof *request->objects[i].parts, &parts);
-    if (stored == TC_TLV_OK)
-      stored = tc_pki_storage_input(writes, SECURITY_WRITES, parts, &budget);
-    for (size_t j = 0; stored == TC_TLV_OK && j < request->objects[i].count;
-         ++j)
-      stored = tc_pki_storage_input(writes, SECURITY_WRITES,
-                                    request->objects[i].parts[j], &budget);
-  }
-  if (stored != TC_TLV_OK) {
-    *work = initial_work;
-    return tc_validation_status(stored);
-  }
-  *work = budget;
   tc_pki_source_guard guard = {context->trust.certificates, writes,
                                SECURITY_WRITES};
   const TC_X509_store_source source = tc_pki_source_guard_bind(&guard);
@@ -665,42 +649,28 @@ static TC_TLV_result
 unsigned_chuid_storage(const TC_TWIC_unsigned_CHUID_validation_request *request,
                        const TC_PIV_security_result *security,
                        const TC_validation_context *context, size_t *work) {
+  /* The only write is the caller's work counter. */
   TC_bytes counter;
-  TC_TLV_result status = tc_pki_storage_span(work, 1, sizeof *work, &counter);
-  if (status != TC_TLV_OK)
-    return status;
-  size_t budget = *work;
-#define INPUT(pointer, count)                                                  \
-  do {                                                                         \
-    TC_bytes span;                                                             \
-    status =                                                                   \
-        tc_pki_storage_span((pointer), (count), sizeof *(pointer), &span);     \
-    if (status != TC_TLV_OK)                                                   \
-      return status;                                                           \
-    status = tc_pki_storage_input(&counter, 1, span, &budget);                 \
-    if (status != TC_TLV_OK)                                                   \
-      return status;                                                           \
-  } while (0)
-  INPUT(request, 1);
-  INPUT(request->encoded.data, request->encoded.length);
-  INPUT(request->card, 1);
-  INPUT(request->card->fascn.data, request->card->fascn.length);
-  INPUT(request->card->fascn_oid.data, request->card->fascn_oid.length);
-  INPUT(request->card->uuid_urn.data, request->card->uuid_urn.length);
-  INPUT(security, 1);
-  INPUT(security->signer.data, security->signer.length);
-  INPUT(context, 1);
-  INPUT(context->options, 1);
-  INPUT(security->objects, security->count);
-  for (size_t i = 0; i < security->count; ++i) {
+  tc_pki_storage_plan plan;
+  tc_pki_storage_plan_begin(&plan, &counter, 1, *work);
+  TC_PKI_PLAN_WRITE(&plan, work, 1);
+  tc_pki_storage_plan_seal(&plan);
+  const TC_bytes fields[] = {request->encoded, request->card->fascn,
+                             request->card->fascn_oid, request->card->uuid_urn,
+                             security->signer};
+  TC_PKI_PLAN_INPUT(&plan, request, 1);
+  TC_PKI_PLAN_INPUT(&plan, request->card, 1);
+  TC_PKI_PLAN_INPUT(&plan, security, 1);
+  TC_PKI_PLAN_INPUT(&plan, context, 1);
+  TC_PKI_PLAN_INPUT(&plan, context->options, 1);
+  tc_pki_storage_plan_input_spans(&plan, fields, sizeof fields / sizeof *fields);
+  TC_PKI_PLAN_INPUT(&plan, security->objects, security->count);
+  for (size_t i = 0; plan.status == TC_TLV_OK && i < security->count; ++i) {
     const TC_PIV_security_data *object = &security->objects[i];
-    INPUT(object->parts, object->count);
-    for (size_t j = 0; j < object->count; ++j)
-      INPUT(object->parts[j].data, object->parts[j].length);
+    TC_PKI_PLAN_INPUT(&plan, object->parts, object->count);
+    tc_pki_storage_plan_input_spans(&plan, object->parts, object->count);
   }
-#undef INPUT
-  *work = budget;
-  return TC_TLV_OK;
+  return tc_pki_storage_plan_finish(&plan, work);
 }
 
 TC_credential_status TC_TWIC_unsigned_CHUID_validate(

@@ -115,7 +115,10 @@ static inline TC_TLV_result tc_pki_tree_algorithm(TC_bytes input,
   *out = (TC_DER_algorithm){parsed.oid,parsed.value};
   return TC_TLV_OK;
 }
-/* Read one attribute, retaining its encoded value for matching. */
+/* Read one attribute, retaining its encoded value for matching. This is the
+ * BER-tolerant counterpart of TC_X509_attribute_next: it walks constructed
+ * string encodings, which DER-only certificate parsing rejects. Both share
+ * the attribute syntax checks. */
 static inline TC_TLV_result tc_pki_tree_attribute(TC_TLV_reader* reader,
     const tc_pki_tree_workspace* workspace, TC_X509_name_attribute* out)
 {

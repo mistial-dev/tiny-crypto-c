@@ -63,7 +63,6 @@ static TC_TLV_result ec(TC_X509_public_key* key)
 TC_TLV_result TC_X509_subject_public_key(const uint8_t* data, size_t length, TC_X509_public_key* out)
 {
   const TC_bytes ec_oid = tc_pki_ec_public_key_oid();
-  static const uint8_t dsa_oid[] = {0x2a,0x86,0x48,0xce,0x38,4,1};
   TC_DER_public_key decoded;
   TC_X509_public_key key;
   TC_TLV_result result;
@@ -79,7 +78,7 @@ TC_TLV_result TC_X509_subject_public_key(const uint8_t* data, size_t length, TC_
   } else if (tc_pki_equal(key.algorithm.oid, ec_oid)) {
     key.type = TC_KEY_EC;
     result = ec(&key);
-  } else if (tc_pki_equal(key.algorithm.oid, (TC_bytes){dsa_oid, sizeof dsa_oid})) {
+  } else if (tc_pki_equal(key.algorithm.oid, tc_pki_dsa_oid())) {
     TC_TLV_reader reader;
     TC_bytes value;
     key.type = TC_KEY_DSA;

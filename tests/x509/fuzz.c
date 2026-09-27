@@ -325,9 +325,11 @@ static void fuzz_path(const uint8_t *data, size_t length,
   TC_X509_policy_expected expected[64];
   TC_X509_policy_mapping mappings[16];
   TC_X509_certificate certificates[16];
+  TC_X509_extension_summary summaries[16];
   TC_X509_path_workspace workspace =
       TC_X509_PATH_WORKSPACE_INIT(frames, oids, left, right, matched, nodes,
-                                  edges, expected, mappings, policies, certificates);
+                                  edges, expected, mappings, policies, certificates,
+                                  summaries);
   TC_X509_path_options options = {0};
   TC_X509_trust_anchor anchor = {0};
   TC_X509_path_result output, saved;

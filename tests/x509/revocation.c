@@ -19,6 +19,69 @@ static TC_TLV_result signer_next(void* context, const tc_pki_tree_workspace* tre
   return cursor->result;
 }
 
+/* Seal the given writes as an operation's preflight would, then run one input step. */
+static tc_pki_storage_plan sealed_plan(TC_bytes* writes, size_t count, size_t work)
+{
+  tc_pki_storage_plan plan;
+  tc_pki_storage_plan_begin(&plan,writes,count,work);
+  for (size_t i = 0; i < count; ++i) tc_pki_storage_plan_write_span(&plan,writes[i]);
+  tc_pki_storage_plan_seal(&plan);
+  return plan;
+}
+
+static TC_TLV_result index_inputs(const TC_X509_crl_index* index, TC_bytes write, size_t* work)
+{
+  tc_pki_storage_plan plan = sealed_plan(&write,1,*work);
+  tc_x509_crl_index_plan_inputs(&plan,index);
+  return tc_pki_storage_plan_finish(&plan,work);
+}
+
+static TC_TLV_result scope_inputs_result(const tc_x509_crl_scope_processing* processing,
+    const tc_x509_crl_trust* trust, TC_bytes write, size_t* work)
+{
+  tc_pki_storage_plan plan = sealed_plan(&write,1,*work);
+  tc_x509_crl_scope_plan_inputs(&plan,processing,trust);
+  return tc_pki_storage_plan_finish(&plan,work);
+}
+
+static TC_TLV_result path_inputs_result(const tc_x509_crl_held_path* path, TC_bytes write,
+    size_t* work)
+{
+  tc_pki_storage_plan plan = sealed_plan(&write,1,*work);
+  tc_x509_crl_path_plan_inputs(&plan,path);
+  return tc_pki_storage_plan_finish(&plan,work);
+}
+
+static TC_TLV_result extra_inputs_result(const tc_x509_crl_extra_storage* extra, TC_bytes write,
+    size_t* work)
+{
+  tc_pki_storage_plan plan = sealed_plan(&write,1,*work);
+  tc_x509_crl_extra_plan_inputs(&plan,extra);
+  return tc_pki_storage_plan_finish(&plan,work);
+}
+
+/* Record the scope writes through CRL_SCOPE_SIGNER_POLICIES. */
+static TC_TLV_result scope_writes_result(const tc_x509_crl_scope_processing* processing,
+    const tc_x509_crl_trust* trust, TC_X509_search_result* out, TC_bytes writes[CRL_SCOPE_WRITES])
+{
+  tc_pki_storage_plan plan;
+  tc_pki_storage_plan_begin(&plan,writes,CRL_SCOPE_WRITES,0);
+  tc_x509_crl_scope_plan_writes(&plan,processing,trust,out);
+  return tc_pki_storage_plan_finish(&plan,NULL);
+}
+
+/* Append operation outputs after the prefix slots and seal every write. */
+static TC_TLV_result scope_outputs_result(const tc_x509_crl_extra_storage* extra,
+    const tc_x509_crl_held_path* path, TC_bytes writes[CRL_SCOPE_WRITES], size_t* work)
+{
+  tc_pki_storage_plan plan;
+  tc_pki_storage_plan_begin(&plan,writes,CRL_SCOPE_WRITES,*work);
+  for (size_t i = 0; i < CRL_SCOPE_NODES; ++i) tc_pki_storage_plan_write_span(&plan,writes[i]);
+  tc_x509_crl_scope_plan_outputs(&plan,extra,path);
+  tc_pki_storage_plan_seal(&plan);
+  return tc_pki_storage_plan_finish(&plan,work);
+}
+
 static MunitResult signer_search(const MunitParameter params[], void* user)
 {
   const TC_X509_path_options options = {0};
@@ -363,7 +426,7 @@ static MunitResult storage_spans(const MunitParameter params[], void* user)
     TC_X509_search_result out;
     TC_bytes writes[CRL_SCOPE_WRITES], saved[CRL_SCOPE_WRITES];
     memset(writes,0xa5,sizeof writes); memcpy(saved,writes,sizeof writes);
-    munit_assert_int(tc_x509_crl_scope_storage_writes(&processing,&trust,&out,writes), ==,
+    munit_assert_int(scope_writes_result(&processing,&trust,&out,writes), ==,
         scenario == MISSING_STATES || scenario == FRAME_OVERFLOW ? TC_TLV_ARGUMENT : TC_TLV_OK);
     munit_assert_size(work, ==, 100);
     munit_assert_memory_equal(sizeof writes - CRL_SCOPE_NODES * sizeof *writes,
@@ -412,11 +475,11 @@ static MunitResult record_storage(const MunitParameter params[], void* user)
   for (size_t i = 0; i < sizeof fields / sizeof *fields; ++i) {
     size_t work = 1000;
     *fields[i] = write;
-    munit_assert_int(tc_x509_crl_index_storage_bytes(&index,&write,1,&work), ==, TC_TLV_ARGUMENT);
+    munit_assert_int(index_inputs(&index,write,&work), ==, TC_TLV_ARGUMENT);
     *fields[i] = (TC_bytes){NULL,0};
   }
   size_t work = 1000;
-  munit_assert_int(tc_x509_crl_index_storage_bytes(&index,&write,1,&work), ==, TC_TLV_OK);
+  munit_assert_int(index_inputs(&index,write,&work), ==, TC_TLV_OK);
   return MUNIT_OK;
 }
 
@@ -448,17 +511,17 @@ static MunitResult scope_inputs(const MunitParameter params[], void* user)
   (void)params; (void)user;
   for (size_t i = 0; i < sizeof metadata / sizeof *metadata; ++i) {
     work = 1000;
-    munit_assert_int(tc_x509_crl_scope_storage_inputs(&processing,&trust,&metadata[i],1,&work), ==, TC_TLV_ARGUMENT);
+    munit_assert_int(scope_inputs_result(&processing,&trust,metadata[i],&work), ==, TC_TLV_ARGUMENT);
   }
   for (size_t i = 0; i < sizeof fields / sizeof *fields; ++i) {
     work = 1000; *fields[i] = bytes;
-    munit_assert_int(tc_x509_crl_scope_storage_inputs(&processing,&trust,&bytes,1,&work), ==, TC_TLV_ARGUMENT);
+    munit_assert_int(scope_inputs_result(&processing,&trust,bytes,&work), ==, TC_TLV_ARGUMENT);
     *fields[i] = (TC_bytes){NULL,0};
   }
   work = 1000;
-  munit_assert_int(tc_x509_crl_scope_storage_inputs(&processing,&trust,&bytes,1,&work), ==, TC_TLV_OK);
+  munit_assert_int(scope_inputs_result(&processing,&trust,bytes,&work), ==, TC_TLV_OK);
   work = 0;
-  munit_assert_int(tc_x509_crl_scope_storage_inputs(&processing,&trust,&bytes,1,&work), ==, TC_TLV_LIMIT);
+  munit_assert_int(scope_inputs_result(&processing,&trust,bytes,&work), ==, TC_TLV_LIMIT);
   return MUNIT_OK;
 }
 
@@ -548,7 +611,7 @@ static MunitResult path_inputs(const MunitParameter params[], void* user)
     }
     const tc_x509_crl_held_path saved = path;
     const TC_bytes saved_chain = chain[0];
-    munit_assert_int(tc_x509_crl_path_storage_inputs(&path,&writes,1,&work), ==,
+    munit_assert_int(path_inputs_result(&path,writes,&work), ==,
         scenario == VALID ? TC_TLV_OK : scenario == NO_WORK ? TC_TLV_LIMIT : TC_TLV_ARGUMENT);
     munit_assert_memory_equal(sizeof path,&path,&saved);
     munit_assert_memory_equal(sizeof saved_chain,chain,&saved_chain);
@@ -664,7 +727,7 @@ static MunitResult extra_inputs(const MunitParameter params[], void* user)
     }
     const tc_x509_crl_extra_storage saved = extra;
     const TC_X509_revocation_node saved_node = node;
-    munit_assert_int(tc_x509_crl_extra_storage_inputs(&extra,&writes,1,&work), ==,
+    munit_assert_int(extra_inputs_result(&extra,writes,&work), ==,
         scenario == VALID ? TC_TLV_OK : scenario == NO_WORK ? TC_TLV_LIMIT : TC_TLV_ARGUMENT);
     munit_assert_memory_equal(sizeof extra,&extra,&saved);
     munit_assert_memory_equal(sizeof node,&node,&saved_node);
@@ -786,7 +849,7 @@ static MunitResult scope_storage_check(const MunitParameter params[], void* user
       case BAD_SPAN: extra.nodes_storage.data = NULL; break;
       default: break;
     }
-    munit_assert_int(tc_x509_crl_scope_storage_check(scenario == EMPTY ? NULL : &extra,
+    munit_assert_int(scope_outputs_result(scenario == EMPTY ? NULL : &extra,
         scenario == EMPTY ? NULL : &path,writes,&work), ==,
         scenario == VALID || scenario == EMPTY ? TC_TLV_OK :
         scenario == NO_WORK ? TC_TLV_LIMIT : TC_TLV_ARGUMENT);

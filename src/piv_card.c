@@ -83,12 +83,12 @@ static TC_TLV_result read_fascn(const TC_X509_general_name *name,
     return result;
   /* Recognize both namespaces before applying the selected acceptance policy.
    */
-  if (tc_x509_path_charge(tree->work, other.oid.length) != TC_TLV_OK)
+  if (tc_pki_work_charge(tree->work, other.oid.length) != TC_TLV_OK)
     return TC_TLV_LIMIT;
   if (TC_PIV_oid_identify(other.oid, TC_PIV_OIDS_TWIC_COMPATIBLE) !=
       TC_PIV_OID_FASCN)
     return TC_TLV_OK;
-  if (tc_x509_path_charge(tree->work, other.oid.length) != TC_TLV_OK)
+  if (tc_pki_work_charge(tree->work, other.oid.length) != TC_TLV_OK)
     return TC_TLV_LIMIT;
   if (identifiers->fascn.data ||
       TC_PIV_oid_identify(other.oid, profile) != TC_PIV_OID_FASCN)
@@ -149,7 +149,7 @@ identifiers_read(TC_bytes encoded, TC_PIV_card_profile profile,
       return result;
     /* next_tree and GeneralName schema checks each scan the name's bytes. */
     for (unsigned scan = 0; scan < 2; ++scan)
-      if (tc_x509_path_charge(work, element.encoded.length) != TC_TLV_OK)
+      if (tc_pki_work_charge(work, element.encoded.length) != TC_TLV_OK)
         return TC_TLV_LIMIT;
     result = TC_X509_general_name_next(&reader, frames, frame_capacity, &name);
     if (result != TC_TLV_OK)
@@ -162,14 +162,14 @@ identifiers_read(TC_bytes encoded, TC_PIV_card_profile profile,
       const size_t prefix_bytes = name.value.length < UUID_PREFIX_BYTES
                                       ? name.value.length
                                       : UUID_PREFIX_BYTES;
-      if (tc_x509_path_charge(work, prefix_bytes) != TC_TLV_OK)
+      if (tc_pki_work_charge(work, prefix_bytes) != TC_TLV_OK)
         return TC_TLV_LIMIT;
       if (!uuid_prefix(name.value))
         continue;
       const size_t uuid_capacity = authentication ? 2 : 1;
       if (uuid_count == uuid_capacity)
         return TC_TLV_INVALID;
-      if (tc_x509_path_charge(work, name.value.length) != TC_TLV_OK)
+      if (tc_pki_work_charge(work, name.value.length) != TC_TLV_OK)
         return TC_TLV_LIMIT;
       result = uuid_read(name.value, uuids[uuid_count]);
       if (result != TC_TLV_OK || !uuid_profile(uuids[uuid_count], profile))
@@ -200,14 +200,14 @@ identifiers_read(TC_bytes encoded, TC_PIV_card_profile profile,
   } else if (uuid_count) {
     identifiers.uuid_urn = uuid_urns[0];
   }
-  if (tc_x509_path_charge(work, FASCN_BYTES) != TC_TLV_OK)
+  if (tc_pki_work_charge(work, FASCN_BYTES) != TC_TLV_OK)
     return TC_TLV_LIMIT;
   TC_FASCN decoded;
   result = TC_FASCN_read(identifiers.fascn, &decoded);
   if (result != TC_TLV_OK)
     return result;
   if (profile == TC_TWIC_NEXGEN_CARD && identifiers.uuid_urn.data) {
-    if (tc_x509_path_charge(work, UUID_BYTES) != TC_TLV_OK)
+    if (tc_pki_work_charge(work, UUID_BYTES) != TC_TLV_OK)
       return TC_TLV_LIMIT;
     int matched;
     result = TC_TWIC_uuid_match((TC_bytes){uuids[0], sizeof uuids[0]}, &decoded,
@@ -272,43 +272,32 @@ static TC_TLV_result
 identifiers_match(const TC_PIV_card_identifiers *identifiers, TC_bytes fascn,
                   TC_bytes guid, int reader_policy, size_t *work,
                   int *matched) {
-  enum {
-    WRITE_COUNT = 2,
-    READ_COUNT = 7,
-    STORAGE_WORK = WRITE_COUNT * READ_COUNT + 1
-  };
-  TC_bytes writes[WRITE_COUNT], reads[READ_COUNT];
-  size_t checks = STORAGE_WORK;
+  TC_bytes writes[2];
+  tc_pki_storage_plan plan;
   if (!identifiers || !work || !matched || !fascn.data ||
-      fascn.length != FASCN_BYTES || !guid.data || guid.length != UUID_BYTES ||
-      tc_pki_storage_span(work, 1, sizeof *work, &writes[0]) != TC_TLV_OK ||
-      tc_pki_storage_span(matched, 1, sizeof *matched, &writes[1]) !=
-          TC_TLV_OK ||
-      tc_pki_storage_span(identifiers, 1, sizeof *identifiers, &reads[0]) !=
-          TC_TLV_OK)
+      fascn.length != FASCN_BYTES || !guid.data || guid.length != UUID_BYTES)
     return TC_TLV_ARGUMENT;
-  reads[1] = identifiers->fascn;
-  reads[2] = identifiers->fascn_oid;
-  reads[3] = identifiers->uuid_urn;
-  reads[4] = identifiers->cardholder_uuid_urn;
-  reads[5] = fascn;
-  reads[6] = guid;
-  TC_TLV_result result = tc_pki_storage_input(writes, 1, writes[1], &checks);
+  const TC_bytes fields[] = {identifiers->fascn, identifiers->fascn_oid,
+                             identifiers->uuid_urn,
+                             identifiers->cardholder_uuid_urn, fascn, guid};
+  tc_pki_storage_plan_begin(&plan, writes, 2, SIZE_MAX);
+  TC_PKI_PLAN_WRITE(&plan, work, 1);
+  TC_PKI_PLAN_WRITE(&plan, matched, 1);
+  tc_pki_storage_plan_seal(&plan);
+  TC_PKI_PLAN_INPUT(&plan, identifiers, 1);
+  tc_pki_storage_plan_input_spans(&plan, fields, sizeof fields / sizeof *fields);
+  TC_TLV_result result = tc_pki_storage_plan_finish(&plan, NULL);
   if (result != TC_TLV_OK)
     return result;
-  for (size_t i = 0; i < READ_COUNT; ++i) {
-    result = tc_pki_storage_input(writes, WRITE_COUNT, reads[i], &checks);
-    if (result != TC_TLV_OK)
-      return result;
-  }
   if (!identifiers->fascn.data || identifiers->fascn.length != FASCN_BYTES)
     return TC_TLV_INVALID;
-  result = tc_x509_path_charge(work, STORAGE_WORK + FASCN_BYTES + UUID_BYTES);
+  result = tc_pki_work_charge(work, tc_pki_storage_plan_used(&plan) +
+                                         FASCN_BYTES + UUID_BYTES);
   if (result != TC_TLV_OK)
     return result;
   uint8_t uuid[UUID_BYTES] = {0};
   if (identifiers->uuid_urn.data || identifiers->uuid_urn.length) {
-    result = tc_x509_path_charge(work, identifiers->uuid_urn.length);
+    result = tc_pki_work_charge(work, identifiers->uuid_urn.length);
     if (result != TC_TLV_OK)
       return result;
     result = uuid_read(identifiers->uuid_urn, uuid);

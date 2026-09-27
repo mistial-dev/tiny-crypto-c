@@ -45,7 +45,7 @@ static inline TC_TLV_result tc_pki_children(TC_bytes encoded, unsigned tag,
   result = TC_TLV_header_read(encoded.data,encoded.length,profile,limits,&root.header);
   if (result != TC_TLV_OK) return result;
   if (!root.header.constructed || !tc_pki_tag(&root,tag)) return TC_TLV_INVALID;
-  if (tc_x509_path_charge(work,encoded.length) != TC_TLV_OK) return TC_TLV_LIMIT;
+  if (tc_pki_work_charge(work,encoded.length) != TC_TLV_OK) return TC_TLV_LIMIT;
   result = TC_TLV_walk(encoded.data,encoded.length,profile,limits,frames,frame_capacity,
       tc_pki_children_visit,&state);
   if (result != TC_TLV_OK) return result;

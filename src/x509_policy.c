@@ -4,6 +4,7 @@
 #if TC_ENABLE_X509_PATH
 #include "x509_policy_internal.h"
 #include "pki_internal.h"
+#include "pki_budget_internal.h"
 #include "string_internal.h"
 
 static const uint8_t any_oid[] = {0x55,0x1d,0x20,0};
@@ -11,19 +12,13 @@ static int is_any(TC_bytes oid)
 {
   return oid.length == sizeof any_oid && memcmp(oid.data, any_oid, sizeof any_oid) == 0;
 }
-static TC_TLV_result charge(size_t* work, size_t amount)
-{
-  if (*work < amount) { *work = 0; return TC_TLV_LIMIT; }
-  *work -= amount;
-  return TC_TLV_OK;
-}
 static TC_TLV_result equal(TC_bytes a, TC_bytes b, size_t* work, int* same)
 {
-  TC_TLV_result result = charge(work, 1);
+  TC_TLV_result result = tc_pki_work_charge(work, 1);
   if (result != TC_TLV_OK) return result;
   *same = 0;
   if (a.length != b.length) return TC_TLV_OK;
-  result = charge(work, a.length);
+  result = tc_pki_work_charge(work, a.length);
   if (result != TC_TLV_OK) return result;
   *same = tc_pki_equal(a, b);
   return TC_TLV_OK;
@@ -34,7 +29,7 @@ static TC_TLV_result find(const tc_x509_policy_graph* graph, size_t depth,
   size_t i;
   for (i = 0; i < graph->node_count; ++i) {
     int same;
-    TC_TLV_result result = charge(work, 1);
+    TC_TLV_result result = tc_pki_work_charge(work, 1);
     if (result != TC_TLV_OK) return result;
     if (!graph->nodes[i].alive || graph->nodes[i].depth != depth) continue;
     result = equal(graph->nodes[i].oid, oid, work, &same);
@@ -47,7 +42,7 @@ static TC_TLV_result find(const tc_x509_policy_graph* graph, size_t depth,
 static TC_TLV_result node(tc_x509_policy_graph* graph, size_t depth,
     TC_bytes oid, size_t* work, size_t* index)
 {
-  TC_TLV_result result = charge(work, 1);
+  TC_TLV_result result = tc_pki_work_charge(work, 1);
   tc_x509_policy_node* added;
   if (result != TC_TLV_OK) return result;
   if (graph->node_count == graph->node_capacity) return TC_TLV_LIMIT;
@@ -58,7 +53,7 @@ static TC_TLV_result node(tc_x509_policy_graph* graph, size_t depth,
 }
 static TC_TLV_result link(tc_x509_policy_graph* graph, size_t parent, size_t child, size_t* work)
 {
-  TC_TLV_result result = charge(work, 1);
+  TC_TLV_result result = tc_pki_work_charge(work, 1);
   if (result != TC_TLV_OK) return result;
   if (graph->edge_count == graph->edge_capacity) return TC_TLV_LIMIT;
   graph->edges[graph->edge_count].parent = parent;
@@ -72,7 +67,7 @@ static TC_TLV_result expects(const tc_x509_policy_graph* graph, size_t parent,
   *matched = 0;
   if (!graph->nodes[parent].mapped) return equal(graph->nodes[parent].oid, oid, work, matched);
   for (i = 0; i < graph->expected_count; ++i) {
-    TC_TLV_result result = charge(work, 1);
+    TC_TLV_result result = tc_pki_work_charge(work, 1);
     if (result != TC_TLV_OK) return result;
     if (graph->expected[i].node != parent) continue;
     result = equal(graph->expected[i].oid, oid, work, matched);
@@ -87,7 +82,7 @@ static TC_TLV_result child(tc_x509_policy_graph* graph, TC_bytes oid, size_t* wo
   if (result != TC_TLV_OK || index != SIZE_MAX) return result;
   for (i = 0; i < previous; ++i) {
     int matched;
-    result = charge(work, 1);
+    result = tc_pki_work_charge(work, 1);
     if (result != TC_TLV_OK) return result;
     if (!graph->nodes[i].alive || graph->nodes[i].depth != graph->depth - 1) continue;
     if (is_any(graph->nodes[i].oid)) fallback = i;
@@ -114,12 +109,12 @@ static TC_TLV_result prune(tc_x509_policy_graph* graph, size_t* work)
   while (i) {
     size_t j;
     int has_child = 0;
-    TC_TLV_result result = charge(work, 1);
+    TC_TLV_result result = tc_pki_work_charge(work, 1);
     if (result != TC_TLV_OK) return result;
     --i;
     if (!graph->nodes[i].alive || graph->nodes[i].depth == graph->depth) continue;
     for (j = 0; j < graph->edge_count; ++j) {
-      result = charge(work, 1);
+      result = tc_pki_work_charge(work, 1);
       if (result != TC_TLV_OK) return result;
       if (graph->edges[j].parent == i && graph->nodes[graph->edges[j].child].alive) {
         has_child = 1; break;
@@ -155,7 +150,7 @@ TC_TLV_result tc_x509_policy_graph_step(tc_x509_policy_graph* graph,
   previous = graph->node_count; ++graph->depth;
   for (i = 0; i < policy_count; ++i) {
     if (!policies[i].data || !policies[i].length) return TC_TLV_ARGUMENT;
-    result = charge(work, 1);
+    result = tc_pki_work_charge(work, 1);
     if (result != TC_TLV_OK) return result;
     for (j = 0; j < i; ++j) {
       int same;
@@ -169,14 +164,14 @@ TC_TLV_result tc_x509_policy_graph_step(tc_x509_policy_graph* graph,
   }
   if (any && allow_any) {
     for (i = 0; i < previous; ++i) {
-      result = charge(work, 1);
+      result = tc_pki_work_charge(work, 1);
       if (result != TC_TLV_OK) return result;
       if (!graph->nodes[i].alive || graph->nodes[i].depth != graph->depth - 1) continue;
       if (!graph->nodes[i].mapped) {
         result = child(graph, graph->nodes[i].oid, work);
         if (result != TC_TLV_OK) return result;
       } else for (j = 0; j < graph->expected_count; ++j) {
-        result = charge(work, 1);
+        result = tc_pki_work_charge(work, 1);
         if (result != TC_TLV_OK) return result;
         if (graph->expected[j].node != i) continue;
         result = child(graph, graph->expected[j].oid, work);
@@ -225,7 +220,7 @@ TC_TLV_result tc_x509_policy_graph_map(tc_x509_policy_graph* graph,
     graph->nodes[index].mapped = 1;
     for (j = 0; j < graph->expected_count; ++j) {
       int same;
-      result = charge(work, 1);
+      result = tc_pki_work_charge(work, 1);
       if (result != TC_TLV_OK) return result;
       if (graph->expected[j].node != index) continue;
       result = equal(graph->expected[j].oid, mapping->subject_policy, work, &same);
@@ -249,7 +244,7 @@ static TC_TLV_result append_policy(TC_bytes oid, TC_bytes* output,
     TC_TLV_result result = equal(output[i], oid, work, &same);
     if (result != TC_TLV_OK || same) return result;
   }
-  if (charge(work, 1) != TC_TLV_OK) return TC_TLV_LIMIT;
+  if (tc_pki_work_charge(work, 1) != TC_TLV_OK) return TC_TLV_LIMIT;
   if (*count == capacity) return TC_TLV_LIMIT;
   output[(*count)++] = oid;
   return TC_TLV_OK;
@@ -264,19 +259,19 @@ TC_TLV_result tc_x509_policy_graph_output(const tc_x509_policy_graph* graph,
   if (!graph || !work || !count || (initial_count && !initial) || (capacity && !output)) return TC_TLV_ARGUMENT;
   for (i = 0; i < initial_count; ++i) {
     if (!initial[i].data || !initial[i].length) return TC_TLV_ARGUMENT;
-    if (charge(work, 1) != TC_TLV_OK) return TC_TLV_LIMIT;
+    if (tc_pki_work_charge(work, 1) != TC_TLV_OK) return TC_TLV_LIMIT;
     if (is_any(initial[i])) unrestricted = 1;
   }
   for (i = 0; i < graph->node_count; ++i) {
     const tc_x509_policy_node* node = &graph->nodes[i];
     TC_TLV_result result;
     int authority = 0, wildcard;
-    if (charge(work, 1) != TC_TLV_OK) return TC_TLV_LIMIT;
+    if (tc_pki_work_charge(work, 1) != TC_TLV_OK) return TC_TLV_LIMIT;
     if (!node->alive) continue;
     wildcard = is_any(node->oid);
     if (wildcard) authority = node->depth == graph->depth;
     else for (j = 0; j < graph->edge_count; ++j) {
-      if (charge(work, 1) != TC_TLV_OK) return TC_TLV_LIMIT;
+      if (tc_pki_work_charge(work, 1) != TC_TLV_OK) return TC_TLV_LIMIT;
       if (graph->edges[j].child == i && is_any(graph->nodes[graph->edges[j].parent].oid)) {
         authority = 1; break;
       }
@@ -303,7 +298,7 @@ static TC_TLV_result qualifier_next(TC_TLV_reader* reader, TC_TLV_limits* budget
     size_t* work, TC_TLV_element* element)
 {
   TC_TLV_result result;
-  if (charge(work, 1) != TC_TLV_OK) return TC_TLV_LIMIT;
+  if (tc_pki_work_charge(work, 1) != TC_TLV_OK) return TC_TLV_LIMIT;
   if (tc_pki_end(reader)) return TC_TLV_END;
   if (!budget->max_elements) return TC_TLV_LIMIT;
   result = TC_TLV_next(reader, element);
@@ -328,7 +323,7 @@ static TC_TLV_result display_text(const TC_TLV_element* element, size_t* work)
   /* RFC 5280 asks readers to tolerate notices longer than 200 characters. */
   while (offset < element->value.length) {
     TC_TLV_result result;
-    if (charge(work, 1) != TC_TLV_OK) return TC_TLV_LIMIT;
+    if (tc_pki_work_charge(work, 1) != TC_TLV_OK) return TC_TLV_LIMIT;
     result = tc_asn1_string_next(tag, element->value, &offset, &point);
     if (result != TC_TLV_OK) return result;
   }
@@ -384,7 +379,7 @@ TC_TLV_result tc_x509_policy_qualifiers_check(const TC_X509_policy* policy,
   TC_X509_policy_qualifier qualifier;
   TC_TLV_result result;
   if (!policy || !limits || !work) return TC_TLV_ARGUMENT;
-  if (charge(work, policy->qualifiers.length) != TC_TLV_OK) return TC_TLV_LIMIT;
+  if (tc_pki_work_charge(work, policy->qualifiers.length) != TC_TLV_OK) return TC_TLV_LIMIT;
   result = TC_TLV_walk(policy->qualifiers.data, policy->qualifiers.length,
     TC_TLV_DER, limits, frames, capacity, NULL, NULL);
   if (result != TC_TLV_OK) return result;
@@ -392,7 +387,7 @@ TC_TLV_result tc_x509_policy_qualifiers_check(const TC_X509_policy* policy,
   if (result != TC_TLV_OK) return result;
   while ((result = TC_X509_policy_qualifier_next(&reader, &qualifier)) == TC_TLV_OK) {
     unsigned kind = 0;
-    if (charge(work, qualifier.value.length) != TC_TLV_OK) return TC_TLV_LIMIT;
+    if (tc_pki_work_charge(work, qualifier.value.length) != TC_TLV_OK) return TC_TLV_LIMIT;
     if (qualifier.oid.length == sizeof prefix + 1 && !memcmp(qualifier.oid.data, prefix, sizeof prefix))
       kind = qualifier.oid.data[sizeof prefix];
     if (kind == 1) {
@@ -406,7 +401,7 @@ TC_TLV_result tc_x509_policy_qualifiers_check(const TC_X509_policy* policy,
       if (result != TC_TLV_OK) return result;
       if (!tc_pki_end(&value)) return TC_TLV_INVALID;
       while (offset < element.value.length) {
-        if (charge(work, 1) != TC_TLV_OK) return TC_TLV_LIMIT;
+        if (tc_pki_work_charge(work, 1) != TC_TLV_OK) return TC_TLV_LIMIT;
         result = tc_asn1_string_next(0x16, element.value, &offset, &point);
         if (result != TC_TLV_OK) return result;
       }

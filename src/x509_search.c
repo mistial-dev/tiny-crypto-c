@@ -12,7 +12,7 @@ static TC_TLV_result search_read(TC_bytes encoded, const TC_X509_path_options* o
 {
   TC_X509_workspace parser = {workspace->frames, workspace->frame_capacity,
                               workspace->oids, workspace->oid_capacity};
-  if (tc_x509_path_charge(work, encoded.length) != TC_TLV_OK) return TC_TLV_LIMIT;
+  if (tc_pki_work_charge(work, encoded.length) != TC_TLV_OK) return TC_TLV_LIMIT;
   return TC_X509_read(encoded.data, encoded.length, &options->parsing, &parser, out);
 }
 
@@ -91,7 +91,7 @@ TC_X509_path_status tc_x509_path_search_source(TC_bytes target,
     tc_x509_search_frame* frame = &search->frames[depth - 1];
     TC_bytes* path = search->path + capacity - depth;
     int equal;
-    if (tc_x509_path_charge(work, 1) != TC_TLV_OK) return TC_X509_PATH_LIMIT;
+    if (tc_pki_work_charge(work, 1) != TC_TLV_OK) return TC_X509_PATH_LIMIT;
     if (frame->anchor < source->anchor_count) {
       size_t anchor = frame->anchor++;
       size_t before = *work;
@@ -130,9 +130,9 @@ TC_X509_path_status tc_x509_path_search_source(TC_bytes target,
       if (!candidate.data || !candidate.length) return TC_X509_PATH_ERROR;
       /* Compare encodings, not entry IDs: duplicate records must not form cycles. */
       for (i = 0; i < depth; ++i) {
-        if (tc_x509_path_charge(work, 1) != TC_TLV_OK) return TC_X509_PATH_LIMIT;
+        if (tc_pki_work_charge(work, 1) != TC_TLV_OK) return TC_X509_PATH_LIMIT;
         if (candidate.length != path[i].length) continue;
-        if (tc_x509_path_charge(work, candidate.length) != TC_TLV_OK) return TC_X509_PATH_LIMIT;
+        if (tc_pki_work_charge(work, candidate.length) != TC_TLV_OK) return TC_X509_PATH_LIMIT;
         if (!candidate.length || !memcmp(candidate.data, path[i].data, candidate.length)) break;
       }
       if (i != depth) continue;
@@ -193,56 +193,33 @@ TC_X509_path_status tc_x509_path_build_work(TC_bytes target,
   TC_bytes writes[SEARCH_WRITE_COUNT];
   tc_pki_source_guard checked = {source,writes,SEARCH_WRITE_COUNT};
   TC_X509_store_source guarded;
-  TC_bytes input;
   TC_TLV_result result;
-  size_t initial_work, budget;
+  size_t initial_work;
   if (!source || !options || !validation || !search || !work || !out ||
       (options->flags & ~(unsigned)TC_X509_PATH_SUPPORTED_FLAGS) ||
       (source->candidate_count && !source->candidate) || (source->anchor_count && !source->anchor))
     return TC_X509_PATH_ERROR;
-  initial_work = budget = *work;
-  result = tc_x509_path_storage_writes(validation,writes);
-  if (result != TC_TLV_OK) return tc_x509_path_status(result);
-#define SEARCH_ARRAY(pointer, count, dest) do { \
-  result = tc_pki_storage_span((pointer),(count),sizeof *(pointer),(dest)); \
-  if (result != TC_TLV_OK) return tc_x509_path_status(result); \
-} while (0)
-  SEARCH_ARRAY(search->path,search->capacity,&writes[SEARCH_PATH_WRITE]);
-  SEARCH_ARRAY(search->frames,search->capacity,&writes[SEARCH_FRAMES_WRITE]);
-  SEARCH_ARRAY(out,1,&writes[SEARCH_RESULT_WRITE]);
-  SEARCH_ARRAY(work,1,&writes[SEARCH_WORK_WRITE]);
-  /* Preflight uses private bookkeeping: work may itself alias an input. */
-  for (size_t i = 0; i < SEARCH_WRITE_COUNT; ++i) {
-    result = tc_pki_storage_input(writes,i,writes[i],&budget);
-    if (result != TC_TLV_OK) return tc_x509_path_status(result);
-  }
-#define SEARCH_INPUT(pointer, count) do { \
-  SEARCH_ARRAY((pointer),(count),&input); \
-  result = tc_pki_source_guard_input(&checked,input,&budget); \
-  if (result != TC_TLV_OK) return tc_x509_path_status(result); \
-} while (0)
-  SEARCH_INPUT(source,1);
-  SEARCH_INPUT(options,1);
-  SEARCH_INPUT(validation,1);
-  SEARCH_INPUT(search,1);
-  SEARCH_INPUT(options->initial_policies,options->initial_policy_count);
-#undef SEARCH_INPUT
-#undef SEARCH_ARRAY
-  result = tc_pki_source_guard_input(&checked,target,&budget);
-  if (result != TC_TLV_OK) return tc_x509_path_status(result);
-  for (size_t i = 0; i < options->initial_policy_count; ++i) {
-    result = tc_pki_source_guard_input(&checked,options->initial_policies[i],&budget);
-    if (result != TC_TLV_OK) return tc_x509_path_status(result);
-  }
+  initial_work = *work;
   {
-    TC_bytes spans[] = {options->anchor_names.permitted,options->anchor_names.excluded,options->purpose};
-    for (size_t i = 0; i < 3; ++i) {
-      result = tc_pki_source_guard_input(&checked,spans[i],&budget);
-      if (result != TC_TLV_OK) return tc_x509_path_status(result);
-    }
+    tc_pki_storage_plan plan;
+    /* Preflight uses private bookkeeping: work may itself alias an input. */
+    tc_pki_storage_plan_begin(&plan, writes, SEARCH_WRITE_COUNT, *work);
+    tc_x509_path_storage_plan(&plan, validation);
+    TC_PKI_PLAN_WRITE(&plan, search->path, search->capacity);
+    TC_PKI_PLAN_WRITE(&plan, search->frames, search->capacity);
+    TC_PKI_PLAN_WRITE(&plan, out, 1);
+    TC_PKI_PLAN_WRITE(&plan, work, 1);
+    tc_pki_storage_plan_seal(&plan);
+    TC_PKI_PLAN_INPUT(&plan, source, 1);
+    TC_PKI_PLAN_INPUT(&plan, options, 1);
+    TC_PKI_PLAN_INPUT(&plan, validation, 1);
+    TC_PKI_PLAN_INPUT(&plan, search, 1);
+    tc_pki_storage_plan_input_span(&plan, target);
+    tc_x509_path_options_plan_inputs(&plan, options);
+    result = tc_pki_storage_plan_finish(&plan, work);
+    if (result != TC_TLV_OK) return tc_x509_path_status(result);
   }
   guarded = tc_pki_source_guard_bind(&checked);
-  *work = budget;
   {
     TC_X509_path_status status = tc_x509_path_search_source(target,&guarded,options,validation,search,work,out);
     if (status == TC_X509_PATH_VALID) out->validation.work_used = initial_work - *work;

@@ -81,6 +81,14 @@ array. Later passes reuse those views. Each view borrows its DER, key bytes and
 extension values from the original buffers. Workspace limits bound the policy
 graph; the work budget also bounds scanning and comparison work.
 
+The optional summary array holds one `TC_X509_extension_summary` per path
+certificate. Each certificate's extensions are then scanned once per
+validation and every pass reads the summary. With a NULL or shorter summary
+array, each pass scans the extensions again: results are the same, and the
+work used is higher. The validator owns the summary fields. Size the array like
+the certificate array; `TC_X509_PATH_WORKSPACE_INIT` takes it as the last
+argument.
+
 Workspace arrays must not overlap each other, the inputs or the result object.
 The signature provider's context must also be separate from workspace and the
 result. Input spans must remain valid and unchanged throughout validation.

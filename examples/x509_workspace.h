@@ -17,6 +17,7 @@ typedef struct {
   TC_X509_policy_mapping mappings[16];
   TC_bytes policies[EXAMPLE_X509_POLICY_CAPACITY];
   TC_X509_certificate certificates[EXAMPLE_X509_PATH_CAPACITY];
+  TC_X509_extension_summary summaries[EXAMPLE_X509_PATH_CAPACITY];
 } ExampleX509Workspace;
 
 typedef struct {
@@ -30,7 +31,7 @@ static inline TC_X509_path_workspace example_x509_workspace(ExampleX509Workspace
   TC_X509_path_workspace workspace = TC_X509_PATH_WORKSPACE_INIT(
       storage->frames,storage->oids,storage->left,storage->right,storage->matched,
       storage->nodes,storage->edges,storage->expected,storage->mappings,storage->policies,
-      storage->certificates);
+      storage->certificates,storage->summaries);
   return workspace;
 }
 

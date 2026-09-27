@@ -71,6 +71,23 @@ static fixture make_crl(unsigned version, unsigned flags)
   return out;
 }
 
+/* Seal the given writes as an operation's preflight would, then run one input step. */
+static tc_pki_storage_plan sealed_plan(TC_bytes* writes, size_t count, size_t work)
+{
+  tc_pki_storage_plan plan;
+  tc_pki_storage_plan_begin(&plan,writes,count,work);
+  for (size_t i = 0; i < count; ++i) tc_pki_storage_plan_write_span(&plan,writes[i]);
+  tc_pki_storage_plan_seal(&plan);
+  return plan;
+}
+
+static TC_TLV_result index_inputs(const TC_X509_crl_index* index, TC_bytes write, size_t* work)
+{
+  tc_pki_storage_plan plan = sealed_plan(&write,1,*work);
+  tc_x509_crl_index_plan_inputs(&plan,index);
+  return tc_pki_storage_plan_finish(&plan,work);
+}
+
 static MunitResult public_reader(const MunitParameter params[], void* user)
 {
   (void)params; (void)user;
@@ -648,7 +665,7 @@ static MunitResult source_batch(const MunitParameter params[], void* user)
       const TC_X509_crl_index index = {&record,1,0};
       const TC_bytes overlapping = {(const uint8_t*)output,sizeof output};
       work = WORK_BUDGET;
-      munit_assert_int(tc_x509_crl_index_storage_bytes(&index,&overlapping,1,&work),==,TC_TLV_ARGUMENT);
+      munit_assert_int(index_inputs(&index,overlapping,&work),==,TC_TLV_ARGUMENT);
     }
   }
   return MUNIT_OK;

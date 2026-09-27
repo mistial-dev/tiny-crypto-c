@@ -4,6 +4,7 @@
 #define TC_CMS_SIGNATURE_INTERNAL_H_
 #include "cms_base_internal.h"
 #include "pki_signature_internal.h"
+#include "pki_key_internal.h"
 
 typedef struct {
   TC_hash_algorithm content_hash;
@@ -26,7 +27,6 @@ static inline TC_TLV_result tc_cms_signature_resolve_policy(const tc_cms_signer_
     const tc_pki_tree_workspace* tree, TC_CMS_rsa_parameters rsa_parameters,
     tc_cms_signature_algorithm* out)
 {
-  static const uint8_t rsa_encryption[] = {0x2a,0x86,0x48,0x86,0xf7,0x0d,1,1,1};
   tc_cms_signature_algorithm parsed = {TC_HASH_UNKNOWN,
     {TC_SIGNATURE_RSA_V15,TC_HASH_UNKNOWN,TC_HASH_UNKNOWN,0}};
   TC_TLV_result result;
@@ -38,12 +38,11 @@ static inline TC_TLV_result tc_cms_signature_resolve_policy(const tc_cms_signer_
     const TC_bytes fields[] = {signer->digest_algorithm.oid,signer->digest_algorithm.parameters,
       signer->signature_algorithm.oid,signer->signature_algorithm.parameters,key->algorithm.parameters};
     for (size_t i = 0; i < sizeof fields / sizeof fields[0]; ++i)
-      if (tc_x509_path_charge(tree->work,fields[i].length) != TC_TLV_OK) return TC_TLV_LIMIT;
+      if (tc_pki_work_charge(tree->work,fields[i].length) != TC_TLV_OK) return TC_TLV_LIMIT;
   }
   result = tc_pki_hash_algorithm_profile(&signer->digest_algorithm,profile,&parsed.content_hash);
   if (result != TC_TLV_OK) return result;
-  if (tc_pki_equal(signer->signature_algorithm.oid,
-      (TC_bytes){rsa_encryption,sizeof rsa_encryption})) {
+  if (tc_pki_equal(signer->signature_algorithm.oid,tc_pki_rsa_encryption_oid())) {
     /* RFC 3370: rsaEncryption takes its hash from digestAlgorithm. */
     if (signer->signature_algorithm.parameters.length || rsa_parameters == TC_CMS_RSA_PARAMETERS_NULL)
       if (tc_pki_null(signer->signature_algorithm.parameters,profile) != TC_TLV_OK) return TC_TLV_INVALID;

@@ -111,15 +111,13 @@ TC_TLV_result tc_x509_pss_parameters(TC_bytes encoded)
 TC_TLV_result tc_pki_rsa_key_algorithm(const TC_DER_algorithm* algorithm,
                                       TC_key_type* out)
 {
-  static const uint8_t rsa_oid[] = {0x2a,0x86,0x48,0x86,0xf7,0x0d,1,1,1};
-  static const uint8_t pss_oid[] = {0x2a,0x86,0x48,0x86,0xf7,0x0d,1,1,10};
   TC_key_type type = TC_KEY_UNKNOWN;
   if (!algorithm || !out) return TC_TLV_ARGUMENT;
-  if (tc_pki_equal(algorithm->oid,(TC_bytes){rsa_oid,sizeof rsa_oid})) {
+  if (tc_pki_equal(algorithm->oid,tc_pki_rsa_encryption_oid())) {
     type = TC_KEY_RSA;
     if (TC_DER_null(algorithm->parameters.data,algorithm->parameters.length) != TC_TLV_OK)
       return TC_TLV_INVALID;
-  } else if (tc_pki_equal(algorithm->oid,(TC_bytes){pss_oid,sizeof pss_oid})) {
+  } else if (tc_pki_equal(algorithm->oid,tc_pki_rsa_pss_oid())) {
     type = TC_KEY_RSA_PSS;
     if (algorithm->parameters.length) {
       TC_TLV_result result = tc_x509_pss_parameters(algorithm->parameters);

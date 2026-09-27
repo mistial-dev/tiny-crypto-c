@@ -17,6 +17,29 @@ typedef struct {
 typedef struct { size_t parent, child; } TC_X509_policy_edge;
 typedef struct { size_t node; TC_bytes oid; } TC_X509_policy_expected;
 
+/* One path certificate's validation-relevant extensions. The validator fills
+ * a summary with one metered walk over the certificate's extensions, and every
+ * later pass of the same validation reads it. Callers provide the storage
+ * through TC_X509_path_workspace.summaries, and the validator owns every
+ * field. The layout is public so applications can size and place the array.
+ *
+ * The nine slots cover keyUsage, subjectAltName, basicConstraints,
+ * nameConstraints, certificatePolicies, policyMappings, policyConstraints,
+ * extendedKeyUsage and inhibitAnyPolicy. */
+enum { TC_X509_EXTENSION_SUMMARY_SLOTS = 9 };
+typedef struct {
+  /* extnValue contents per slot, borrowed from the certificate DER. */
+  TC_bytes values[TC_X509_EXTENSION_SUMMARY_SLOTS];
+  /* Decoded fixed-form values, valid when the matching slot is present. */
+  TC_X509_basic_constraints basic;
+  TC_X509_policy_constraints policy_constraints;
+  uint32_t inhibit_any;      /* SkipCerts */
+  uint16_t present, critical; /* one bit per slot */
+  uint16_t key_usage;         /* TC_KEY_USAGE_* bits */
+  uint8_t unknown_critical;   /* a critical extension outside the slots */
+  uint8_t ready;              /* set once the walk completes */
+} TC_X509_extension_summary;
+
 typedef struct {
   TC_TLV_frame* frames;
   size_t frame_capacity;
@@ -37,12 +60,17 @@ typedef struct {
   /* One parsed view per path entry. Views borrow the input DER. */
   TC_X509_certificate* certificates;
   size_t certificate_capacity;
+  /* Optional: one extension summary per path entry. With a NULL array or
+   * fewer entries than the path, each validation pass summarizes the
+   * certificate again. Results match, and the work used is higher. */
+  TC_X509_extension_summary* summaries;
+  size_t summary_capacity;
 } TC_X509_path_workspace;
 
 /* Array arguments only, not pointers. The shorter name buffer sets the limit.
  * Use as an initializer in C or C++: TC_X509_path_workspace w = ...; */
 #define TC_X509_PATH_ARRAY_COUNT_(a) (sizeof(a) / sizeof((a)[0]))
-#define TC_X509_PATH_WORKSPACE_INIT(frames_, oids_, left_, right_, matched_, nodes_, edges_, expected_, mappings_, policies_, certificates_) \
+#define TC_X509_PATH_WORKSPACE_INIT(frames_, oids_, left_, right_, matched_, nodes_, edges_, expected_, mappings_, policies_, certificates_, summaries_) \
   { (frames_), TC_X509_PATH_ARRAY_COUNT_(frames_), (oids_), TC_X509_PATH_ARRAY_COUNT_(oids_), \
     { (left_), (right_), \
       TC_X509_PATH_ARRAY_COUNT_(left_) < TC_X509_PATH_ARRAY_COUNT_(right_) \
@@ -51,7 +79,8 @@ typedef struct {
     (nodes_), TC_X509_PATH_ARRAY_COUNT_(nodes_), (edges_), TC_X509_PATH_ARRAY_COUNT_(edges_), \
     (expected_), TC_X509_PATH_ARRAY_COUNT_(expected_), (mappings_), TC_X509_PATH_ARRAY_COUNT_(mappings_), \
     (policies_), TC_X509_PATH_ARRAY_COUNT_(policies_), \
-    (certificates_), TC_X509_PATH_ARRAY_COUNT_(certificates_) }
+    (certificates_), TC_X509_PATH_ARRAY_COUNT_(certificates_), \
+    (summaries_), TC_X509_PATH_ARRAY_COUNT_(summaries_) }
 
 enum {
   TC_X509_PATH_REQUIRE_EXPLICIT_POLICY = 1u,

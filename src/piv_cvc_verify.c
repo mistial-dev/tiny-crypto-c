@@ -31,10 +31,6 @@ static TC_TLV_result storage_check(const TC_PIV_CVC_chain_request* request,
   if (!request || !request->signer || !limits || !provider || !points || !work || !out ||
       !request->card.data || !request->card.length ||
       (request->card_uuid.length && request->card_uuid.length != CARD_UUID_BYTES)) return TC_TLV_ARGUMENT;
-  TC_bytes writes[3];
-  if (tc_pki_storage_span(points,1,sizeof *points,&writes[0]) != TC_TLV_OK ||
-      tc_pki_storage_span(work,1,sizeof *work,&writes[1]) != TC_TLV_OK ||
-      tc_pki_storage_span(out,1,sizeof *out,&writes[2]) != TC_TLV_OK) return TC_TLV_ARGUMENT;
   const TC_X509_public_key* key = &request->signer->public_key;
   const TC_bytes reads[] = {
     {(const uint8_t*)request,sizeof *request}, {(const uint8_t*)limits,sizeof *limits},
@@ -43,12 +39,15 @@ static TC_TLV_result storage_check(const TC_PIV_CVC_chain_request* request,
     request->signer->encoded, key->algorithm.oid, key->algorithm.parameters,
     key->key, key->modulus, key->exponent, key->curve_oid
   };
-  size_t checks = sizeof reads / sizeof *reads * 3 + 3;
-  for (size_t i = 0; i < 3; ++i)
-    if (tc_pki_storage_input(writes,i,writes[i],&checks) != TC_TLV_OK) return TC_TLV_ARGUMENT;
-  for (size_t i = 0; i < sizeof reads / sizeof *reads; ++i)
-    if (tc_pki_storage_input(writes,3,reads[i],&checks) != TC_TLV_OK) return TC_TLV_ARGUMENT;
-  return TC_TLV_OK;
+  TC_bytes writes[3];
+  tc_pki_storage_plan plan;
+  tc_pki_storage_plan_begin(&plan,writes,3,SIZE_MAX);
+  TC_PKI_PLAN_WRITE(&plan,points,1);
+  TC_PKI_PLAN_WRITE(&plan,work,1);
+  TC_PKI_PLAN_WRITE(&plan,out,1);
+  tc_pki_storage_plan_seal(&plan);
+  tc_pki_storage_plan_input_spans(&plan,reads,sizeof reads / sizeof *reads);
+  return tc_pki_storage_plan_finish(&plan,NULL) == TC_TLV_OK ? TC_TLV_OK : TC_TLV_ARGUMENT;
 }
 
 static TC_X509_signature_result check_point(const TC_PIV_CVC* cvc, TC_EC_curve curve,
@@ -66,7 +65,7 @@ static TC_X509_signature_result check_point(const TC_PIV_CVC* cvc, TC_EC_curve c
     default: return TC_X509_SIGNATURE_UNSUPPORTED;
   }
   if (cvc->key_bits != bits) return TC_X509_SIGNATURE_INVALID;
-  if (tc_x509_path_charge(work,bits * POINT_WORK_PER_BIT) != TC_TLV_OK) return TC_X509_SIGNATURE_LIMIT;
+  if (tc_pki_work_charge(work,bits * POINT_WORK_PER_BIT) != TC_TLV_OK) return TC_X509_SIGNATURE_LIMIT;
   return TC_EC_validate_public_key(curve,cvc->public_key.data,cvc->public_key.length,points) == TC_OK ?
       TC_X509_SIGNATURE_VALID : TC_X509_SIGNATURE_INVALID;
 #else
@@ -79,7 +78,7 @@ static TC_X509_signature_result intermediate_subject(const TC_PIV_CVC* cvc, size
 {
 #if TC_ENABLE_SHA1
   uint8_t digest[TC_SHA1_DIGESTLEN];
-  if (tc_x509_path_charge(work,cvc->public_key.length + ISSUER_BYTES) != TC_TLV_OK) return TC_X509_SIGNATURE_LIMIT;
+  if (tc_pki_work_charge(work,cvc->public_key.length + ISSUER_BYTES) != TC_TLV_OK) return TC_X509_SIGNATURE_LIMIT;
   if (TC_SHA1_digest(cvc->public_key.data,cvc->public_key.length,digest) != TC_OK)
     return TC_X509_SIGNATURE_ERROR;
   const int matched = !memcmp(digest,cvc->subject.data,ISSUER_BYTES);
@@ -102,7 +101,7 @@ TC_X509_signature_result TC_PIV_CVC_chain_verify(const TC_PIV_CVC_chain_request*
   if (request->card.length > limits->max_input || request->intermediate.length > limits->max_input ||
       request->signer->extensions.length > limits->max_input) return TC_X509_SIGNATURE_LIMIT;
   TC_PIV_CVC card, intermediate;
-  if (tc_x509_path_charge(work,request->card.length) != TC_TLV_OK) return TC_X509_SIGNATURE_LIMIT;
+  if (tc_pki_work_charge(work,request->card.length) != TC_TLV_OK) return TC_X509_SIGNATURE_LIMIT;
   parsed = TC_PIV_CVC_read(request->card.data,request->card.length,&card);
   if (parsed != TC_TLV_OK) return parse_result(parsed);
   if (card.role != TC_PIV_CVC_CARD_APPLICATION || (request->card_uuid.length &&
@@ -116,7 +115,7 @@ TC_X509_signature_result TC_PIV_CVC_chain_verify(const TC_PIV_CVC_chain_request*
   uint8_t curve_parameters[DER_OID_HEADER_BYTES + MAX_CURVE_OID_BYTES];
   TC_X509_signature_result result;
   if (request->intermediate.length) {
-    if (tc_x509_path_charge(work,request->intermediate.length) != TC_TLV_OK) return TC_X509_SIGNATURE_LIMIT;
+    if (tc_pki_work_charge(work,request->intermediate.length) != TC_TLV_OK) return TC_X509_SIGNATURE_LIMIT;
     parsed = TC_PIV_CVC_read(request->intermediate.data,request->intermediate.length,&intermediate);
     if (parsed != TC_TLV_OK) return parse_result(parsed);
     if (intermediate.role != TC_PIV_CVC_INTERMEDIATE ||

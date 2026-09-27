@@ -1057,9 +1057,10 @@ static MunitResult revocations(const MunitParameter params[], void *user) {
   TC_bytes policies[POLICY_CAPACITY], path[PATH_CAPACITY];
   TC_X509_search_frame search_frames[PATH_CAPACITY];
   TC_X509_certificate certificate_cache[PATH_CAPACITY];
+  TC_X509_extension_summary summaries[PATH_CAPACITY];
   TC_X509_path_workspace validation = TC_X509_PATH_WORKSPACE_INIT(
       frames, oids, name_left, name_right, name_flags, nodes, edges, expected,
-      mappings, policies, certificate_cache);
+      mappings, policies, certificate_cache, summaries);
   TC_X509_search_workspace search = {path, search_frames, PATH_CAPACITY};
   TC_X509_workspace parser = {frames, FRAME_CAPACITY, oids, EXTENSION_CAPACITY};
   TC_X509_certificate signer;
@@ -5593,9 +5594,11 @@ static MunitResult embedded_path(const MunitParameter params[], void *user) {
   TC_X509_policy_mapping mappings[POLICY_CAPACITY];
   TC_X509_search_frame search_frames[PATH_CAPACITY];
   TC_X509_certificate certificate_cache[PATH_CAPACITY];
+  TC_X509_extension_summary summaries[PATH_CAPACITY];
   TC_X509_path_workspace validation =
       TC_X509_PATH_WORKSPACE_INIT(frames, oids, left, right, name_flags, nodes,
-                                  edges, expected, mappings, policies, certificate_cache);
+                                  edges, expected, mappings, policies, certificate_cache,
+                                  summaries);
   TC_X509_search_workspace search = {path, search_frames, PATH_CAPACITY};
   TC_X509_workspace parser = {frames, FRAME_CAPACITY, oids, POLICY_CAPACITY};
   const TC_TLV_limits limits = {CMS_CAPACITY, CMS_CAPACITY, 256,
@@ -6587,8 +6590,10 @@ static MunitResult embedded_path(const MunitParameter params[], void *user) {
         munit_assert_memory_equal(sizeof found,&found,&saved);
       }
       TC_bytes writes[TC_X509_PATH_STORAGE_COUNT + 7];
-      munit_assert_int(tc_x509_path_storage_writes(&validation, writes), ==,
-                       TC_TLV_OK);
+      tc_pki_storage_plan plan;
+      tc_pki_storage_plan_begin(&plan, writes, TC_X509_PATH_STORAGE_COUNT, 0);
+      tc_x509_path_storage_plan(&plan, &validation);
+      munit_assert_int(tc_pki_storage_plan_finish(&plan, NULL), ==, TC_TLV_OK);
       size_t n = TC_X509_PATH_STORAGE_COUNT;
       writes[n++] = (TC_bytes){(const uint8_t *)path, sizeof path};
       writes[n++] =

@@ -41,7 +41,7 @@ static inline TC_TLV_result tc_pki_octets_implicit(TC_bytes encoded, unsigned ro
   TC_TLV_result result;
   if (!work || root_tag > 255 || (root_tag & 0x20) || (root_tag & 31) == 31)
     return TC_TLV_ARGUMENT;
-  if (tc_x509_path_charge(work,encoded.length) != TC_TLV_OK) return TC_TLV_LIMIT;
+  if (tc_pki_work_charge(work,encoded.length) != TC_TLV_OK) return TC_TLV_LIMIT;
   result = TC_TLV_walk(encoded.data,encoded.length,profile,limits,frames,capacity,
       tc_pki_octets_visit,&state);
   if (result != TC_TLV_OK) return result;
@@ -67,7 +67,7 @@ static TC_TLV_result tc_pki_octets_compare_chunk(void* context, TC_bytes bytes)
   tc_pki_octets_comparison* state = context;
   size_t remaining = state->expected.length - state->offset;
   size_t count = bytes.length < remaining ? bytes.length : remaining;
-  if (tc_x509_path_charge(state->work,bytes.length) != TC_TLV_OK) return TC_TLV_LIMIT;
+  if (tc_pki_work_charge(state->work,bytes.length) != TC_TLV_OK) return TC_TLV_LIMIT;
   if (bytes.length > remaining || (count &&
       memcmp(bytes.data,state->expected.data + state->offset,count))) state->equal = 0;
   state->offset += count;
@@ -105,7 +105,7 @@ static TC_TLV_result tc_pki_octets_store_chunk(void* context, TC_bytes bytes)
   if (bytes.length > SIZE_MAX - state->length) return TC_TLV_LIMIT;
   if (state->buffer) {
     if (bytes.length > state->buffer_size - state->length) return TC_TLV_LIMIT;
-    if (tc_x509_path_charge(state->work,bytes.length) != TC_TLV_OK) return TC_TLV_LIMIT;
+    if (tc_pki_work_charge(state->work,bytes.length) != TC_TLV_OK) return TC_TLV_LIMIT;
     memcpy(state->buffer + state->length,bytes.data,bytes.length);
   }
   if (!state->chunks) state->first = bytes;

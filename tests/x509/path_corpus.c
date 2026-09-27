@@ -116,8 +116,9 @@ static MunitResult corpus_case(const MunitParameter params[], void* user)
   TC_bytes policies[64], path[MAX_CERTIFICATES], held[MAX_CERTIFICATES];
   TC_X509_search_frame search_frames[MAX_CERTIFICATES];
   TC_X509_certificate certificate_cache[MAX_CERTIFICATES];
+  TC_X509_extension_summary summaries[MAX_CERTIFICATES];
   TC_X509_path_workspace validation = TC_X509_PATH_WORKSPACE_INIT(path_frames,path_oids,
-      left,right,matched,nodes,edges,expected,mappings,policies,certificate_cache);
+      left,right,matched,nodes,edges,expected,mappings,policies,certificate_cache,summaries);
   TC_X509_search_workspace search = {path,search_frames,MAX_CERTIFICATES};
   TC_X509_revocation_node dependencies[MAX_CERTIFICATES];
   TC_X509_revocation_scope scopes[MAX_CRLS];
@@ -163,6 +164,20 @@ static MunitResult corpus_case(const MunitParameter params[], void* user)
   munit_assert_size(records.anchor_calls, >, 0);
   munit_assert_size(records.candidate_calls, <=, WORK_BUDGET);
   munit_assert_size(records.anchor_calls, <=, WORK_BUDGET);
+
+  /* Without extension summaries each pass rescans extensions: the result is
+   * identical and the cached run never costs more work. */
+  if (path_status == TC_X509_PATH_VALID) {
+    TC_X509_path_workspace uncached = validation;
+    TC_X509_search_result rescanned;
+    uncached.summaries = NULL; uncached.summary_capacity = 0;
+    munit_assert_int(TC_X509_path_build(target,&source,&options,&uncached,&search,&rescanned),
+        ==, TC_X509_PATH_VALID);
+    munit_assert_size(rescanned.count, ==, result.count);
+    munit_assert_size(rescanned.anchor_index, ==, result.anchor_index);
+    munit_assert_size(rescanned.validation.policy_count, ==, result.validation.policy_count);
+    munit_assert_size(result.validation.work_used, <=, rescanned.validation.work_used);
+  }
 
   if (path_status == TC_X509_PATH_VALID && getenv("TC_X509_EXPECT_REVOCATION")) {
     const char* expected_revocation = getenv("TC_X509_EXPECT_REVOCATION");

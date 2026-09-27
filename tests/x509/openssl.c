@@ -820,9 +820,10 @@ static MunitResult paths(const MunitParameter params[], void* user)
         TC_X509_policy_mapping mappings[8];
         TC_bytes policies[8];
         TC_X509_certificate certificate_cache[4];
+        TC_X509_extension_summary summaries[4];
         TC_X509_path_workspace workspace = TC_X509_PATH_WORKSPACE_INIT(
           frames,oids,left,right,used,nodes,edges,expected,mappings,policies,
-          certificate_cache);
+          certificate_cache,summaries);
         TC_X509_path_options options;
         TC_X509_path_result result, unchanged;
         TC_X509_path_status wanted = TC_X509_PATH_INVALID;

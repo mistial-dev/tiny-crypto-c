@@ -14,7 +14,7 @@ typedef struct {
 static TC_TLV_result tc_pki_octets_hash_update(void* context, TC_bytes bytes)
 {
   tc_pki_octets_hash_state* state = context;
-  if (tc_x509_path_charge(state->work,bytes.length) != TC_TLV_OK) return TC_TLV_LIMIT;
+  if (tc_pki_work_charge(state->work,bytes.length) != TC_TLV_OK) return TC_TLV_LIMIT;
   return tc_hash_update(state->algorithm,state->workspace,bytes) == TC_OK ? TC_TLV_OK : TC_TLV_INVALID;
 }
 

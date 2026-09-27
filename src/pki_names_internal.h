@@ -15,12 +15,12 @@ static inline TC_TLV_result tc_pki_general_names_contents_check(TC_bytes content
   if (!tree || !tree->work) return TC_TLV_ARGUMENT;
   if (!contents.length) return TC_TLV_INVALID;
   /* The existing reader scans framing and then the name's value. */
-  if (tc_x509_path_charge(tree->work,contents.length) != TC_TLV_OK ||
-      tc_x509_path_charge(tree->work,contents.length) != TC_TLV_OK) return TC_TLV_LIMIT;
+  if (tc_pki_work_charge(tree->work,contents.length) != TC_TLV_OK ||
+      tc_pki_work_charge(tree->work,contents.length) != TC_TLV_OK) return TC_TLV_LIMIT;
   result = TC_TLV_reader_init(&reader,contents.data,contents.length,TC_TLV_DER,limits);
   if (result != TC_TLV_OK) return result;
   while (!tc_pki_end(&reader)) {
-    if (tc_x509_path_charge(tree->work,1) != TC_TLV_OK) return TC_TLV_LIMIT;
+    if (tc_pki_work_charge(tree->work,1) != TC_TLV_OK) return TC_TLV_LIMIT;
     result = TC_X509_general_name_next(&reader,tree->frames,tree->capacity,&name);
     if (result != TC_TLV_OK) return result;
   }
@@ -46,7 +46,7 @@ static inline TC_TLV_result tc_pki_rdn_contents_check(TC_bytes contents,
   }
   /* Attribute framing, values and ordering comparisons each scan the input. */
   for (unsigned i = 0; i < RDN_SCANS; ++i)
-    if (tc_x509_path_charge(tree->work,contents.length) != TC_TLV_OK) return TC_TLV_LIMIT;
+    if (tc_pki_work_charge(tree->work,contents.length) != TC_TLV_OK) return TC_TLV_LIMIT;
   return tc_x509_rdn_contents(&attributes);
 }
 

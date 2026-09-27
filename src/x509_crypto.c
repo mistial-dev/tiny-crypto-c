@@ -19,53 +19,38 @@ static TC_X509_signature_result native_storage(const TC_X509_native_workspace* w
     const TC_bytes* algorithm_fields, size_t field_count, TC_bytes signature,
     const TC_X509_public_key* key, size_t* work)
 {
-  TC_bytes message_storage, ec_storage, rsa_storage;
+  TC_bytes writes[3];
+  tc_pki_storage_plan plan;
   size_t budget;
-  TC_TLV_result checked;
   if (!workspace || !key || !work || (count && !message)) return TC_X509_SIGNATURE_ERROR;
-  budget = *work;
-  if (tc_pki_storage_span(message,count,sizeof *message,&message_storage) != TC_TLV_OK ||
-      tc_pki_storage_span(workspace->ec,workspace->ec ? 1 : 0,sizeof *workspace->ec,&ec_storage) != TC_TLV_OK ||
-      tc_pki_storage_span(workspace->rsa ? workspace->rsa->words : NULL,
-          workspace->rsa ? workspace->rsa->capacity : 0,sizeof(TC_RSA_word),&rsa_storage) != TC_TLV_OK)
-    return TC_X509_SIGNATURE_ERROR;
-  const TC_bytes writes[] = {ec_storage,rsa_storage,{(const uint8_t*)work,sizeof *work}};
-  const TC_bytes metadata[] = {
-    message_storage, {(const uint8_t*)workspace,sizeof *workspace},
-    {(const uint8_t*)workspace->rsa,workspace->rsa ? sizeof *workspace->rsa : 0},
-    algorithm_metadata, {(const uint8_t*)key,sizeof *key}
-  };
   const TC_bytes fields[] = {
     key->algorithm.oid, key->algorithm.parameters,
     key->key, key->modulus, key->exponent, key->curve_oid, signature
   };
-  const size_t write_count = sizeof writes / sizeof *writes;
-  for (size_t i = 0; i < write_count; ++i)
-    for (size_t j = i + 1; j < write_count; ++j)
-      if (!tc_internal_ranges_disjoint(writes[i].data,writes[i].length,writes[j].data,writes[j].length))
-        return TC_X509_SIGNATURE_ERROR;
-  for (size_t i = 0; i < sizeof metadata / sizeof *metadata; ++i) {
-    checked = tc_pki_storage_input(writes,write_count,metadata[i],&budget);
-    if (checked != TC_TLV_OK) return native_status(checked);
-  }
-  for (size_t i = 0; i < sizeof fields / sizeof *fields; ++i) {
-    checked = tc_pki_storage_input(writes,write_count,fields[i],&budget);
-    if (checked != TC_TLV_OK) return native_status(checked);
-  }
-  for (size_t i = 0; i < field_count; ++i) {
-    checked = tc_pki_storage_input(writes,write_count,algorithm_fields[i],&budget);
-    if (checked != TC_TLV_OK) return native_status(checked);
-    if (tc_x509_path_charge(&budget,algorithm_fields[i].length) != TC_TLV_OK)
+  tc_pki_storage_plan_begin(&plan,writes,3,*work);
+  TC_PKI_PLAN_WRITE(&plan,workspace->ec,workspace->ec ? 1 : 0);
+  tc_pki_storage_plan_write(&plan,workspace->rsa ? workspace->rsa->words : NULL,
+      workspace->rsa ? workspace->rsa->capacity : 0,sizeof(TC_RSA_word));
+  TC_PKI_PLAN_WRITE(&plan,work,1);
+  tc_pki_storage_plan_seal(&plan);
+  TC_PKI_PLAN_INPUT(&plan,message,count);
+  TC_PKI_PLAN_INPUT(&plan,workspace,1);
+  TC_PKI_PLAN_INPUT(&plan,workspace->rsa,workspace->rsa ? 1 : 0);
+  tc_pki_storage_plan_input_span(&plan,algorithm_metadata);
+  TC_PKI_PLAN_INPUT(&plan,key,1);
+  tc_pki_storage_plan_input_spans(&plan,fields,sizeof fields / sizeof *fields);
+  tc_pki_storage_plan_input_spans(&plan,algorithm_fields,field_count);
+  tc_pki_storage_plan_input_spans(&plan,message,count);
+  TC_TLV_result checked = tc_pki_storage_plan_finish(&plan,&budget);
+  if (checked != TC_TLV_OK) return native_status(checked);
+  /* Charge encoded bytes before parsing OIDs, PSS parameters and signatures. */
+  for (size_t i = 0; i < field_count; ++i)
+    if (tc_pki_work_charge(&budget,algorithm_fields[i].length) != TC_TLV_OK)
       return TC_X509_SIGNATURE_LIMIT;
-  }
-  for (size_t i = 0; i < count; ++i) {
-    checked = tc_pki_storage_input(writes,write_count,message[i],&budget);
-    if (checked != TC_TLV_OK) return native_status(checked);
-    if (tc_x509_path_charge(&budget,message[i].length) != TC_TLV_OK) return TC_X509_SIGNATURE_LIMIT;
-  }
-  /* Charge encoded fields before parsing OIDs, PSS parameters and signatures. */
+  for (size_t i = 0; i < count; ++i)
+    if (tc_pki_work_charge(&budget,message[i].length) != TC_TLV_OK) return TC_X509_SIGNATURE_LIMIT;
   for (size_t i = 0; i < sizeof fields / sizeof *fields; ++i)
-    if (tc_x509_path_charge(&budget,fields[i].length) != TC_TLV_OK) return TC_X509_SIGNATURE_LIMIT;
+    if (tc_pki_work_charge(&budget,fields[i].length) != TC_TLV_OK) return TC_X509_SIGNATURE_LIMIT;
   *work = budget;
   return TC_X509_SIGNATURE_VALID;
 }
@@ -83,7 +68,7 @@ static TC_X509_signature_result native_verify_digest(void* context, TC_bytes dig
   if (result != TC_X509_SIGNATURE_VALID) return result;
   checked = tc_pki_signature_key_check(algorithm,key);
   if (checked != TC_TLV_OK) return native_status(checked);
-  if (tc_x509_path_charge(work,workspace->signature_work) != TC_TLV_OK)
+  if (tc_pki_work_charge(work,workspace->signature_work) != TC_TLV_OK)
     return TC_X509_SIGNATURE_LIMIT;
   return tc_pki_verify_digest(algorithm,key,digest,signature,workspace->ec,workspace->rsa,
       workspace->signature_work);
@@ -111,7 +96,7 @@ static TC_X509_signature_result native_verify(void* context, const TC_bytes* mes
   if (checked != TC_TLV_OK) return native_status(checked);
   if (!tc_hash_available(selected.hash) || !tc_hash_info_get(selected.hash,&hash))
     return TC_X509_SIGNATURE_UNSUPPORTED;
-  if (tc_x509_path_charge(work,workspace->signature_work) != TC_TLV_OK) return TC_X509_SIGNATURE_LIMIT;
+  if (tc_pki_work_charge(work,workspace->signature_work) != TC_TLV_OK) return TC_X509_SIGNATURE_LIMIT;
   if (tc_hash_digest_parts(selected.hash,message,count,digest,&hash_workspace) != TC_OK)
     return TC_X509_SIGNATURE_ERROR;
   result = tc_pki_verify_digest(&selected,key,(TC_bytes){digest,hash.digest_length},

@@ -43,9 +43,10 @@ void tiny_crypto_cpp_header_compile(void) {
     TC_X509_policy_expected expected[4];
     TC_X509_policy_mapping mappings[4];
     TC_X509_certificate certificates[4];
+    TC_X509_extension_summary summaries[4];
     TC_X509_path_workspace workspace = TC_X509_PATH_WORKSPACE_INIT(
         frames, oids, left, right, matched, nodes, edges, expected, mappings, policies,
-        certificates);
+        certificates, summaries);
     (void)workspace;
 #endif
 #if TC_ENABLE_TLV

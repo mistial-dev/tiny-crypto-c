@@ -502,24 +502,25 @@ TC_X509_signature_result TC_X509_signature_verify_digest(TC_bytes digest,
     size_t* work)
 {
   enum { INPUT_COUNT = 11 };
-  TC_bytes inputs[INPUT_COUNT], output;
+  TC_bytes output;
+  tc_pki_storage_plan plan;
   tc_hash_info hash;
-  size_t checks = INPUT_COUNT, available;
+  size_t available;
   TC_X509_signature_result result;
   if (!algorithm || !issuer_key || !work) return TC_X509_SIGNATURE_ERROR;
   if (!provider || !provider->verify_digest) return TC_X509_SIGNATURE_UNSUPPORTED;
-  if (tc_pki_storage_span(work,1,sizeof *work,&output) != TC_TLV_OK ||
-      tc_pki_storage_span(algorithm,1,sizeof *algorithm,&inputs[0]) != TC_TLV_OK ||
-      tc_pki_storage_span(issuer_key,1,sizeof *issuer_key,&inputs[1]) != TC_TLV_OK ||
-      tc_pki_storage_span(provider,1,sizeof *provider,&inputs[2]) != TC_TLV_OK)
-    return TC_X509_SIGNATURE_ERROR;
-  inputs[3] = digest; inputs[4] = signature;
-  inputs[5] = issuer_key->algorithm.oid; inputs[6] = issuer_key->algorithm.parameters;
-  inputs[7] = issuer_key->key; inputs[8] = issuer_key->modulus;
-  inputs[9] = issuer_key->exponent; inputs[10] = issuer_key->curve_oid;
-  for (size_t i = 0; i < INPUT_COUNT; ++i)
-    if (tc_pki_storage_input(&output,1,inputs[i],&checks) != TC_TLV_OK)
-      return TC_X509_SIGNATURE_ERROR;
+  const TC_bytes inputs[] = {
+    {(const uint8_t*)algorithm,sizeof *algorithm},
+    {(const uint8_t*)issuer_key,sizeof *issuer_key},
+    {(const uint8_t*)provider,sizeof *provider},
+    digest, signature, issuer_key->algorithm.oid, issuer_key->algorithm.parameters,
+    issuer_key->key, issuer_key->modulus, issuer_key->exponent, issuer_key->curve_oid
+  };
+  tc_pki_storage_plan_begin(&plan,&output,1,SIZE_MAX);
+  TC_PKI_PLAN_WRITE(&plan,work,1);
+  tc_pki_storage_plan_seal(&plan);
+  tc_pki_storage_plan_input_spans(&plan,inputs,INPUT_COUNT);
+  if (tc_pki_storage_plan_finish(&plan,NULL) != TC_TLV_OK) return TC_X509_SIGNATURE_ERROR;
   if (!signature.length || !issuer_key->key.length || !issuer_key->algorithm.oid.length)
     return TC_X509_SIGNATURE_ERROR;
   if (!tc_hash_info_get(algorithm->hash,&hash)) return TC_X509_SIGNATURE_UNSUPPORTED;

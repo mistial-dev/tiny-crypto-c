@@ -22,11 +22,11 @@ static inline TC_TLV_result tc_pki_store_candidate_next(void* context,
   if (!reader || !reader->source || !tree || !tree->work || !parser || !out ||
       reader->index > reader->source->candidate_count) return TC_TLV_ARGUMENT;
   if (reader->index == reader->source->candidate_count) return TC_TLV_END;
-  if (!reader->remaining || tc_x509_path_charge(tree->work,1) != TC_TLV_OK) return TC_TLV_LIMIT;
+  if (!reader->remaining || tc_pki_work_charge(tree->work,1) != TC_TLV_OK) return TC_TLV_LIMIT;
   TC_bytes encoded;
   TC_TLV_result result = tc_pki_source_candidate(reader->source,reader->index,tree->work,&encoded);
   if (result != TC_TLV_OK) return result;
-  if (encoded.length > reader->bytes_left || tc_x509_path_charge(tree->work,encoded.length) != TC_TLV_OK)
+  if (encoded.length > reader->bytes_left || tc_pki_work_charge(tree->work,encoded.length) != TC_TLV_OK)
     return TC_TLV_LIMIT;
   result = TC_X509_read(encoded.data,encoded.length,&reader->limits,parser,out);
   if (result != TC_TLV_OK) return result;
@@ -65,7 +65,7 @@ static inline TC_TLV_result tc_pki_certificate_search(void* cursor, tc_pki_candi
     if (*tree->work > before) { *tree->work = 0; result = TC_TLV_ARGUMENT; }
     if (result == TC_TLV_END) return tc_x509_path_result_status(failure);
     if (result != TC_TLV_OK) { if (source_failed) *source_failed = 1; return result; }
-    if (tc_x509_path_charge(tree->work,1) != TC_TLV_OK) return TC_TLV_LIMIT;
+    if (tc_pki_work_charge(tree->work,1) != TC_TLV_OK) return TC_TLV_LIMIT;
     int matched = 0;
     before = *tree->work;
     result = filter(filter_context,&candidate,limits,tree,&matched);

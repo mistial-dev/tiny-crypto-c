@@ -79,6 +79,7 @@ static TC_result layout(const TC_validation_capacity* c, uint8_t* arena,
   ARRAY(path.validation.mappings,TC_X509_policy_mapping,c->policy_mappings);
   ARRAY(path.validation.policies,TC_bytes,c->policies);
   ARRAY(path.validation.certificates,TC_X509_certificate,c->path);
+  ARRAY(path.validation.summaries,TC_X509_extension_summary,c->path);
   ARRAY(path.search.path,TC_bytes,c->path);
   ARRAY(path.search.frames,TC_X509_search_frame,c->path);
   ARRAY(path.certificates,TC_bytes,c->certificates);
@@ -101,6 +102,7 @@ static TC_result layout(const TC_validation_capacity* c, uint8_t* arena,
   w->path.validation.mapping_capacity = c->policy_mappings;
   w->path.validation.policy_capacity = c->policies;
   w->path.validation.certificate_capacity = c->path;
+  w->path.validation.summary_capacity = c->path;
   w->path.search.capacity = c->path;
   w->path.certificate_capacity = c->certificates;
   w->path.signature_capacity = c->signature_bytes;
@@ -220,75 +222,70 @@ int tc_validation_policies(const TC_validation_context* context,
   return 1;
 }
 
+void tc_validation_plan_writes(tc_pki_storage_plan* plan,
+    const TC_validation_context* context, size_t* work, void* out, size_t out_size)
+{
+  if (!context || !context->options || !context->workspace ||
+      !context->workspace->path || !context->trust.certificates ||
+      !context->trust.crls || !work) {
+    tc_pki_storage_plan_fail(plan, TC_TLV_ARGUMENT);
+    return;
+  }
+  const TC_CMS_credential_workspace* w = context->workspace;
+  const TC_CMS_path_workspace* p = w->path;
+  tc_x509_path_storage_plan(plan, &p->validation);
+  TC_PKI_PLAN_WRITE(plan, p->search.path, p->search.capacity);
+  TC_PKI_PLAN_WRITE(plan, p->search.frames, p->search.capacity);
+  TC_PKI_PLAN_WRITE(plan, p->certificates, p->certificate_capacity);
+  TC_PKI_PLAN_WRITE(plan, p->signature, p->signature_capacity);
+  TC_PKI_PLAN_WRITE(plan, p->signed_digest, p->signed_digest_capacity);
+  TC_PKI_PLAN_WRITE(plan, w->held_path, w->path_capacity);
+  TC_PKI_PLAN_WRITE(plan, w->crl_states, w->crl_capacity);
+  TC_PKI_PLAN_WRITE(plan, w->nodes, w->node_capacity);
+  TC_PKI_PLAN_WRITE(plan, work, 1);
+  TC_PKI_PLAN_WRITE(plan, (uint8_t*)out, out_size);
+}
+
+void tc_validation_plan_inputs(tc_pki_storage_plan* plan,
+    const TC_validation_context* context, const TC_bytes* inputs, size_t input_count)
+{
+  if (plan->status != TC_TLV_OK) return;
+  if (input_count && !inputs) {
+    tc_pki_storage_plan_fail(plan, TC_TLV_ARGUMENT);
+    return;
+  }
+  const TC_CMS_credential_workspace* w = context->workspace;
+  const TC_validation_certificate_policy* policies[] = {
+    &context->options->certificate,&context->options->crl_signer
+  };
+  TC_PKI_PLAN_INPUT(plan, context, 1);
+  TC_PKI_PLAN_INPUT(plan, context->options, 1);
+  TC_PKI_PLAN_INPUT(plan, context->trust.certificates, 1);
+  TC_PKI_PLAN_INPUT(plan, context->trust.crls, 1);
+  TC_PKI_PLAN_INPUT(plan, w, 1);
+  TC_PKI_PLAN_INPUT(plan, w->path, 1);
+  TC_PKI_PLAN_INPUT(plan, inputs, input_count);
+  for (size_t i = 0; i < sizeof policies / sizeof *policies; ++i)
+    tc_x509_policy_plan_inputs(plan, policies[i]->initial_policies,
+        policies[i]->initial_policy_count, policies[i]->purpose, &policies[i]->anchor_names);
+  tc_pki_storage_plan_input_spans(plan, inputs, input_count);
+  tc_x509_crl_index_plan_inputs(plan, context->trust.crls);
+  if (w->path_capacity < w->path->search.capacity ||
+      w->crl_capacity < context->trust.crls->count)
+    tc_pki_storage_plan_fail(plan, TC_TLV_LIMIT);
+}
+
 TC_TLV_result tc_validation_storage(const TC_validation_context* context,
     const TC_bytes* inputs, size_t input_count, size_t* work,
     void* out, size_t out_size, TC_bytes writes[TC_VALIDATION_WRITES])
 {
-  if (!context || !context->options || !context->workspace ||
-      !context->workspace->path || !context->trust.certificates ||
-      !context->trust.crls || !work || (input_count && !inputs))
-    return TC_TLV_ARGUMENT;
-  const TC_CMS_credential_workspace* w = context->workspace;
-  const TC_CMS_path_workspace* p = w->path;
-  size_t budget = *work, next = TC_X509_PATH_STORAGE_COUNT;
-  TC_TLV_result status = tc_x509_path_storage_writes(&p->validation,writes);
-  if (status != TC_TLV_OK) return status;
-#define WRITE(pointer, count) do { \
-  status = tc_pki_storage_span((pointer),(count),sizeof *(pointer),&writes[next++]); \
-  if (status != TC_TLV_OK) return status; \
-} while (0)
-  WRITE(p->search.path,p->search.capacity);
-  WRITE(p->search.frames,p->search.capacity);
-  WRITE(p->certificates,p->certificate_capacity);
-  WRITE(p->signature,p->signature_capacity);
-  WRITE(p->signed_digest,p->signed_digest_capacity);
-  WRITE(w->held_path,w->path_capacity);
-  WRITE(w->crl_states,w->crl_capacity);
-  WRITE(w->nodes,w->node_capacity);
-  WRITE(work,1);
-  WRITE((uint8_t*)out,out_size);
-#undef WRITE
-  for (size_t i = 0; i < next; ++i) {
-    status = tc_pki_storage_input(writes,i,writes[i],&budget);
-    if (status != TC_TLV_OK) return status;
-  }
-#define INPUT(pointer, count) do { \
-  TC_bytes span; \
-  status = tc_pki_storage_span((pointer),(count),sizeof *(pointer),&span); \
-  if (status != TC_TLV_OK) return status; \
-  status = tc_pki_storage_input(writes,next,span,&budget); \
-  if (status != TC_TLV_OK) return status; \
-} while (0)
-  INPUT(context,1);
-  INPUT(context->options,1);
-  INPUT(context->trust.certificates,1);
-  INPUT(context->trust.crls,1);
-  INPUT(w,1);
-  INPUT(p,1);
-  INPUT(inputs,input_count);
-  const TC_validation_certificate_policy* policies[] = {
-    &context->options->certificate,&context->options->crl_signer
-  };
-  for (size_t i = 0; i < sizeof policies / sizeof *policies; ++i) {
-    const TC_validation_certificate_policy* policy = policies[i];
-    INPUT(policy->initial_policies,policy->initial_policy_count);
-    INPUT(policy->purpose.data,policy->purpose.length);
-    INPUT(policy->anchor_names.permitted.data,policy->anchor_names.permitted.length);
-    INPUT(policy->anchor_names.excluded.data,policy->anchor_names.excluded.length);
-    for (size_t j = 0; j < policy->initial_policy_count; ++j)
-      INPUT(policy->initial_policies[j].data,policy->initial_policies[j].length);
-  }
-#undef INPUT
-  for (size_t i = 0; i < input_count; ++i) {
-    status = tc_pki_storage_input(writes,next,inputs[i],&budget);
-    if (status != TC_TLV_OK) return status;
-  }
-  status = tc_x509_crl_index_storage_bytes(context->trust.crls,writes,next,&budget);
-  if (status != TC_TLV_OK) return status;
-  if (w->path_capacity < p->search.capacity ||
-      w->crl_capacity < context->trust.crls->count) return TC_TLV_LIMIT;
-  *work = budget;
-  return TC_TLV_OK;
+  tc_pki_storage_plan plan;
+  if (!work) return TC_TLV_ARGUMENT;
+  tc_pki_storage_plan_begin(&plan, writes, TC_VALIDATION_WRITES, *work);
+  tc_validation_plan_writes(&plan, context, work, out, out_size);
+  tc_pki_storage_plan_seal(&plan);
+  tc_validation_plan_inputs(&plan, context, inputs, input_count);
+  return tc_pki_storage_plan_finish(&plan, work);
 }
 
 TC_credential_status TC_CMS_validate(const TC_CMS_validation_request* request,
