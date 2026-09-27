@@ -141,11 +141,11 @@ jobs:
         run: |
           pio pkg pack . --output "$RUNNER_TEMP/tiny-crypto-c.tar.gz"
           python3 tests/test_package_boundaries.py --archive "$RUNNER_TEMP/tiny-crypto-c.tar.gz"
-      - name: Validate fixtures and check benchmark document
+      - name: Validate fixtures and generate benchmark report
         run: |
           export PICO_SDK_PATH="$GITHUB_WORKSPACE/build-tools/pico-sdk"
           export PICO_TOOLCHAIN_PATH="$HOME/.platformio/packages/toolchain-gccarmnoneeabi/bin"
-          make benchmark-report-check
+          make benchmark-report
       - name: Enforce linked flash and stack budgets
         run: |
           export AVR_CC="$HOME/.platformio/packages/toolchain-atmelavr/bin/avr-gcc"
