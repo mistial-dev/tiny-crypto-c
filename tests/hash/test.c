@@ -32,18 +32,16 @@ MunitResult test_cavp_hmac(const MunitParameter params[], void* data);
 #define TC_SHA_ASSERT_CLEARED(ctx) ((void)0)
 #endif
 
-#if TC_STRICT
-#define TC_SHA_STRICT_CHECKS(N, ctx, out) \
+#define TC_SHA_ARGUMENT_CHECKS(N, ctx, out) \
   do { \
     TC_SHA##N##_init(&(ctx)); \
     munit_assert_int(TC_SHA##N##_update(NULL, fips_abc_msg, 1), ==, TC_ERROR); \
     munit_assert_int(TC_SHA##N##_update(&(ctx), NULL, 1), ==, TC_ERROR); \
+    munit_assert_int(TC_SHA##N##_update(&(ctx), (const uint8_t*)&(ctx), 1), ==, TC_ERROR); \
     munit_assert_int(TC_SHA##N##_final(NULL, (out)), ==, TC_ERROR); \
     munit_assert_int(TC_SHA##N##_final(&(ctx), NULL), ==, TC_ERROR); \
+    munit_assert_int(TC_SHA##N##_final(&(ctx), (uint8_t*)&(ctx)), ==, TC_ERROR); \
   } while (0)
-#else
-#define TC_SHA_STRICT_CHECKS(N, ctx, out) ((void)0)
-#endif
 
 #define TC_SHA_TEST_MATRIX(N, digest_bytes, block_bytes, count_limit) \
   static MunitResult test_sha##N##_fips(const MunitParameter params[], void* data) \
@@ -175,7 +173,7 @@ MunitResult test_cavp_hmac(const MunitParameter params[], void* data);
     munit_assert_int(TC_SHA##N##_update(&ctx, fips_abc_msg, 1), ==, TC_ERROR); \
     ctx.Count = (count_limit) - 1; \
     munit_assert_int(TC_SHA##N##_update(&ctx, fips_abc_msg, 1), ==, TC_OK); \
-    TC_SHA_STRICT_CHECKS(N, ctx, out); \
+    TC_SHA_ARGUMENT_CHECKS(N, ctx, out); \
     munit_assert_int(TC_SHA##N##_DIGESTLEN, ==, digest_bytes); \
     munit_assert_int(TC_SHA##N##_BLOCKLEN, ==, block_bytes); \
     return MUNIT_OK; \
@@ -198,7 +196,7 @@ TC_SHA_TEST_MATRIX(512, 64, 128, UINT64_MAX)
 #endif
 
 #undef TC_SHA_TEST_MATRIX
-#undef TC_SHA_STRICT_CHECKS
+#undef TC_SHA_ARGUMENT_CHECKS
 #undef TC_SHA_ASSERT_CLEARED
 
 /* Secure wipe test and status codes */

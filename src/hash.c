@@ -26,6 +26,7 @@
 #define TC_HASH_CORE32      (TC_ENABLE_SHA1 || TC_HASH_SHA256_CORE)
 
 #if TC_HASH_CORE32
+#include "hash_validation_internal.h"
 
 #if defined(__AVR__) && TC_AVR_PROGMEM
   #include <avr/pgmspace.h>
@@ -283,12 +284,8 @@ TC_status TC_SHA1_init(struct TC_SHA1_ctx* ctx)
 
 TC_status TC_SHA1_update(struct TC_SHA1_ctx* ctx, const uint8_t* data, size_t len)
 {
-#if TC_STRICT
-  if (ctx == NULL || (len != 0 && data == NULL))
-    return TC_ERROR;
-#endif
-  if (ctx == NULL || ctx->active != 1 ||
-      (len != 0 && data == NULL) || ctx->BufLen >= TC_SHA1_BLOCKLEN)
+  if (!tc_hash_update_args(ctx, sizeof *ctx, data, len) ||
+      ctx->active != 1 || ctx->BufLen >= TC_SHA1_BLOCKLEN)
     return TC_ERROR;
   return tc_hash_stream_update(ctx->State, &ctx->Count, &ctx->BufLen, ctx->Buf,
                             data, len, tc_hash_sha1_compress);
@@ -296,12 +293,8 @@ TC_status TC_SHA1_update(struct TC_SHA1_ctx* ctx, const uint8_t* data, size_t le
 
 TC_status TC_SHA1_final(struct TC_SHA1_ctx* ctx, uint8_t* digest)
 {
-#if TC_STRICT
-  if (ctx == NULL || digest == NULL)
-    return TC_ERROR;
-#endif
-  if (ctx == NULL || ctx->active != 1 || digest == NULL ||
-      ctx->BufLen >= TC_SHA1_BLOCKLEN)
+  if (!tc_hash_final_args(ctx, sizeof *ctx, digest, TC_SHA1_DIGESTLEN) ||
+      ctx->active != 1 || ctx->BufLen >= TC_SHA1_BLOCKLEN)
     return TC_ERROR;
   tc_hash_stream_final(ctx->State, 5, ctx->Count, &ctx->BufLen, ctx->Buf,
                     digest, tc_hash_sha1_compress);
@@ -470,12 +463,8 @@ TC_status TC_SHA256_init(struct TC_SHA256_ctx* ctx)
 
 TC_status TC_SHA256_update(struct TC_SHA256_ctx* ctx, const uint8_t* data, size_t len)
 {
-#if TC_STRICT
-  if (ctx == NULL || (len != 0 && data == NULL))
-    return TC_ERROR;
-#endif
-  if (ctx == NULL || ctx->active != 1 ||
-      (len != 0 && data == NULL) || ctx->BufLen >= TC_SHA256_BLOCKLEN)
+  if (!tc_hash_update_args(ctx, sizeof *ctx, data, len) ||
+      ctx->active != 1 || ctx->BufLen >= TC_SHA256_BLOCKLEN)
     return TC_ERROR;
   return tc_hash_stream_update(ctx->State, &ctx->Count, &ctx->BufLen, ctx->Buf,
                             data, len, tc_hash_sha256_compress);
@@ -483,12 +472,8 @@ TC_status TC_SHA256_update(struct TC_SHA256_ctx* ctx, const uint8_t* data, size_
 
 TC_status TC_SHA256_final(struct TC_SHA256_ctx* ctx, uint8_t* digest)
 {
-#if TC_STRICT
-  if (ctx == NULL || digest == NULL)
-    return TC_ERROR;
-#endif
-  if (ctx == NULL || ctx->active != 1 || digest == NULL ||
-      ctx->BufLen >= TC_SHA256_BLOCKLEN)
+  if (!tc_hash_final_args(ctx, sizeof *ctx, digest, TC_SHA256_DIGESTLEN) ||
+      ctx->active != 1 || ctx->BufLen >= TC_SHA256_BLOCKLEN)
     return TC_ERROR;
   tc_hash_stream_final(ctx->State, 8, ctx->Count, &ctx->BufLen, ctx->Buf,
                     digest, tc_hash_sha256_compress);
@@ -554,12 +539,8 @@ TC_status TC_SHA224_init(struct TC_SHA224_ctx* ctx)
 
 TC_status TC_SHA224_update(struct TC_SHA224_ctx* ctx, const uint8_t* data, size_t len)
 {
-#if TC_STRICT
-  if (ctx == NULL || (len != 0 && data == NULL))
-    return TC_ERROR;
-#endif
-  if (ctx == NULL || ctx->active != 1 ||
-      (len != 0 && data == NULL) || ctx->BufLen >= TC_SHA224_BLOCKLEN)
+  if (!tc_hash_update_args(ctx, sizeof *ctx, data, len) ||
+      ctx->active != 1 || ctx->BufLen >= TC_SHA224_BLOCKLEN)
     return TC_ERROR;
   return tc_hash_stream_update(ctx->State, &ctx->Count, &ctx->BufLen, ctx->Buf,
                             data, len, tc_hash_sha256_compress);
@@ -567,12 +548,8 @@ TC_status TC_SHA224_update(struct TC_SHA224_ctx* ctx, const uint8_t* data, size_
 
 TC_status TC_SHA224_final(struct TC_SHA224_ctx* ctx, uint8_t* digest)
 {
-#if TC_STRICT
-  if (ctx == NULL || digest == NULL)
-    return TC_ERROR;
-#endif
-  if (ctx == NULL || ctx->active != 1 || digest == NULL ||
-      ctx->BufLen >= TC_SHA224_BLOCKLEN)
+  if (!tc_hash_final_args(ctx, sizeof *ctx, digest, TC_SHA224_DIGESTLEN) ||
+      ctx->active != 1 || ctx->BufLen >= TC_SHA224_BLOCKLEN)
     return TC_ERROR;
   /* Emit the leftmost seven state words (224 bits). */
   tc_hash_stream_final(ctx->State, 7, ctx->Count, &ctx->BufLen, ctx->Buf,
@@ -716,10 +693,6 @@ TC_status TC_HMAC_SHA1_init(struct TC_HMAC_SHA1_ctx* ctx, const uint8_t* key, si
 
 TC_status TC_HMAC_SHA1_update(struct TC_HMAC_SHA1_ctx* ctx, const uint8_t* data, size_t len)
 {
-#if TC_STRICT
-  if (ctx == NULL)
-    return TC_ERROR;
-#endif
   if (ctx == NULL)
     return TC_ERROR;
   return TC_SHA1_update(&ctx->Inner, data, len);
@@ -729,10 +702,6 @@ TC_status TC_HMAC_SHA1_final(struct TC_HMAC_SHA1_ctx* ctx, uint8_t* tag)
 {
   uint8_t inner[TC_SHA1_DIGESTLEN];
 
-#if TC_STRICT
-  if (ctx == NULL || tag == NULL)
-    return TC_ERROR;
-#endif
   if (ctx == NULL || tag == NULL)
     return TC_ERROR;
 
@@ -837,10 +806,6 @@ TC_status TC_HMAC_SHA224_init(struct TC_HMAC_SHA224_ctx* ctx, const uint8_t* key
 
 TC_status TC_HMAC_SHA224_update(struct TC_HMAC_SHA224_ctx* ctx, const uint8_t* data, size_t len)
 {
-#if TC_STRICT
-  if (ctx == NULL)
-    return TC_ERROR;
-#endif
   if (ctx == NULL)
     return TC_ERROR;
   return TC_SHA224_update(&ctx->Inner, data, len);
@@ -850,10 +815,6 @@ TC_status TC_HMAC_SHA224_final(struct TC_HMAC_SHA224_ctx* ctx, uint8_t* tag)
 {
   uint8_t inner[TC_SHA224_DIGESTLEN];
 
-#if TC_STRICT
-  if (ctx == NULL || tag == NULL)
-    return TC_ERROR;
-#endif
   if (ctx == NULL || tag == NULL)
     return TC_ERROR;
 
@@ -955,10 +916,6 @@ TC_status TC_HMAC_SHA256_init(struct TC_HMAC_SHA256_ctx* ctx, const uint8_t* key
 
 TC_status TC_HMAC_SHA256_update(struct TC_HMAC_SHA256_ctx* ctx, const uint8_t* data, size_t len)
 {
-#if TC_STRICT
-  if (ctx == NULL)
-    return TC_ERROR;
-#endif
   if (ctx == NULL)
     return TC_ERROR;
   return TC_SHA256_update(&ctx->Inner, data, len);
@@ -968,10 +925,6 @@ TC_status TC_HMAC_SHA256_final(struct TC_HMAC_SHA256_ctx* ctx, uint8_t* tag)
 {
   uint8_t inner[TC_SHA256_DIGESTLEN];
 
-#if TC_STRICT
-  if (ctx == NULL || tag == NULL)
-    return TC_ERROR;
-#endif
   if (ctx == NULL || tag == NULL)
     return TC_ERROR;
 

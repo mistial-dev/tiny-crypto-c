@@ -4,6 +4,7 @@
 #if TC_ENABLE_MD5
 #include "hash64_internal.h"
 #include "internal.h"
+#include "hash_validation_internal.h"
 
 #if defined(__AVR__) && TC_AVR_PROGMEM
 #include <avr/pgmspace.h>
@@ -73,9 +74,8 @@ TC_status TC_MD5_init(struct TC_MD5_ctx* ctx)
 
 TC_status TC_MD5_update(struct TC_MD5_ctx* ctx, const uint8_t* data, size_t length)
 {
-  if (!ctx || ctx->active != 1 || (!data && length) || ctx->BufLen >= TC_MD5_BLOCKLEN ||
-      length > UINTPTR_MAX - (uintptr_t)data ||
-      !tc_internal_ranges_disjoint(ctx,sizeof *ctx,data,length)) return TC_ERROR;
+  if (!tc_hash_update_args(ctx, sizeof *ctx, data, length) ||
+      ctx->active != 1 || ctx->BufLen >= TC_MD5_BLOCKLEN) return TC_ERROR;
   /* RFC 1321 uses the low 64 bits of the encoded bit count. */
   ctx->Count += (uint64_t)length;
   tc_hash64_absorb(ctx->State,&ctx->BufLen,ctx->Buf,data,length,compress);
@@ -84,8 +84,8 @@ TC_status TC_MD5_update(struct TC_MD5_ctx* ctx, const uint8_t* data, size_t leng
 
 TC_status TC_MD5_final(struct TC_MD5_ctx* ctx, uint8_t digest[TC_MD5_DIGESTLEN])
 {
-  if (!ctx || ctx->active != 1 || !digest || ctx->BufLen >= TC_MD5_BLOCKLEN ||
-      !tc_internal_ranges_disjoint(ctx,sizeof *ctx,digest,TC_MD5_DIGESTLEN)) return TC_ERROR;
+  if (!tc_hash_final_args(ctx, sizeof *ctx, digest, TC_MD5_DIGESTLEN) ||
+      ctx->active != 1 || ctx->BufLen >= TC_MD5_BLOCKLEN) return TC_ERROR;
   tc_hash64_finish(ctx->State,ctx->Count,&ctx->BufLen,ctx->Buf,compress,TC_HASH_LENGTH_LITTLE_ENDIAN);
   for (unsigned word = 0; word < 4; ++word)
     for (unsigned byte = 0; byte < 4; ++byte)

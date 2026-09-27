@@ -21,6 +21,9 @@
 #define TC_HASH_SHA512_CORE (TC_ENABLE_SHA384 || TC_ENABLE_SHA512)
 
 #if TC_HASH_SHA512_CORE
+#include "hash_validation_internal.h"
+#endif
+#if TC_HASH_SHA512_CORE
 
 #if defined(__AVR__) && TC_AVR_PROGMEM
   #include <avr/pgmspace.h>
@@ -264,12 +267,8 @@ TC_status TC_SHA512_init(struct TC_SHA512_ctx* ctx)
 
 TC_status TC_SHA512_update(struct TC_SHA512_ctx* ctx, const uint8_t* data, size_t len)
 {
-#if TC_STRICT
-  if (ctx == NULL || (len != 0 && data == NULL))
-    return TC_ERROR;
-#endif
-  if (ctx == NULL || ctx->active != 1 ||
-      (len != 0 && data == NULL) || ctx->BufLen >= TC_SHA512_BLOCKLEN)
+  if (!tc_hash_update_args(ctx, sizeof *ctx, data, len) ||
+      ctx->active != 1 || ctx->BufLen >= TC_SHA512_BLOCKLEN)
     return TC_ERROR;
   return tc_sha512_stream_update(ctx->State, &ctx->Count, &ctx->BufLen, ctx->Buf,
                                  data, len, tc_sha512_compress);
@@ -277,12 +276,8 @@ TC_status TC_SHA512_update(struct TC_SHA512_ctx* ctx, const uint8_t* data, size_
 
 TC_status TC_SHA512_final(struct TC_SHA512_ctx* ctx, uint8_t* digest)
 {
-#if TC_STRICT
-  if (ctx == NULL || digest == NULL)
-    return TC_ERROR;
-#endif
-  if (ctx == NULL || ctx->active != 1 || digest == NULL ||
-      ctx->BufLen >= TC_SHA512_BLOCKLEN)
+  if (!tc_hash_final_args(ctx, sizeof *ctx, digest, TC_SHA512_DIGESTLEN) ||
+      ctx->active != 1 || ctx->BufLen >= TC_SHA512_BLOCKLEN)
     return TC_ERROR;
   tc_sha512_stream_final(ctx->State, 8, ctx->Count, &ctx->BufLen, ctx->Buf,
                          digest, tc_sha512_compress);
@@ -352,12 +347,8 @@ TC_status TC_SHA384_init(struct TC_SHA384_ctx* ctx)
 
 TC_status TC_SHA384_update(struct TC_SHA384_ctx* ctx, const uint8_t* data, size_t len)
 {
-#if TC_STRICT
-  if (ctx == NULL || (len != 0 && data == NULL))
-    return TC_ERROR;
-#endif
-  if (ctx == NULL || ctx->active != 1 ||
-      (len != 0 && data == NULL) || ctx->BufLen >= TC_SHA384_BLOCKLEN)
+  if (!tc_hash_update_args(ctx, sizeof *ctx, data, len) ||
+      ctx->active != 1 || ctx->BufLen >= TC_SHA384_BLOCKLEN)
     return TC_ERROR;
   return tc_sha512_stream_update(ctx->State, &ctx->Count, &ctx->BufLen, ctx->Buf,
                                  data, len, tc_sha512_compress);
@@ -365,12 +356,8 @@ TC_status TC_SHA384_update(struct TC_SHA384_ctx* ctx, const uint8_t* data, size_
 
 TC_status TC_SHA384_final(struct TC_SHA384_ctx* ctx, uint8_t* digest)
 {
-#if TC_STRICT
-  if (ctx == NULL || digest == NULL)
-    return TC_ERROR;
-#endif
-  if (ctx == NULL || ctx->active != 1 || digest == NULL ||
-      ctx->BufLen >= TC_SHA384_BLOCKLEN)
+  if (!tc_hash_final_args(ctx, sizeof *ctx, digest, TC_SHA384_DIGESTLEN) ||
+      ctx->active != 1 || ctx->BufLen >= TC_SHA384_BLOCKLEN)
     return TC_ERROR;
   /* Emit the leftmost six state words (384 bits). */
   tc_sha512_stream_final(ctx->State, 6, ctx->Count, &ctx->BufLen, ctx->Buf,
@@ -515,10 +502,6 @@ TC_status TC_HMAC_SHA384_init(struct TC_HMAC_SHA384_ctx* ctx, const uint8_t* key
 
 TC_status TC_HMAC_SHA384_update(struct TC_HMAC_SHA384_ctx* ctx, const uint8_t* data, size_t len)
 {
-#if TC_STRICT
-  if (ctx == NULL)
-    return TC_ERROR;
-#endif
   if (ctx == NULL)
     return TC_ERROR;
   return TC_SHA384_update(&ctx->Inner, data, len);
@@ -528,10 +511,6 @@ TC_status TC_HMAC_SHA384_final(struct TC_HMAC_SHA384_ctx* ctx, uint8_t* tag)
 {
   uint8_t inner[TC_SHA384_DIGESTLEN];
 
-#if TC_STRICT
-  if (ctx == NULL || tag == NULL)
-    return TC_ERROR;
-#endif
   if (ctx == NULL || tag == NULL)
     return TC_ERROR;
 
@@ -635,10 +614,6 @@ TC_status TC_HMAC_SHA512_init(struct TC_HMAC_SHA512_ctx* ctx, const uint8_t* key
 
 TC_status TC_HMAC_SHA512_update(struct TC_HMAC_SHA512_ctx* ctx, const uint8_t* data, size_t len)
 {
-#if TC_STRICT
-  if (ctx == NULL)
-    return TC_ERROR;
-#endif
   if (ctx == NULL)
     return TC_ERROR;
   return TC_SHA512_update(&ctx->Inner, data, len);
@@ -648,10 +623,6 @@ TC_status TC_HMAC_SHA512_final(struct TC_HMAC_SHA512_ctx* ctx, uint8_t* tag)
 {
   uint8_t inner[TC_SHA512_DIGESTLEN];
 
-#if TC_STRICT
-  if (ctx == NULL || tag == NULL)
-    return TC_ERROR;
-#endif
   if (ctx == NULL || tag == NULL)
     return TC_ERROR;
 

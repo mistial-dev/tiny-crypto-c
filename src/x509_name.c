@@ -153,6 +153,7 @@ static TC_TLV_result rdn_equal(TC_bytes left, TC_bytes right,
     while ((result = next_attribute(&b, work, &second, tree)) == TC_TLV_OK) {
       if (!workspace->matched[index] && tc_pki_equal(first.oid, second.oid)) {
         size_t other_length;
+        int binary_pair;
         if (!prepared && !binary_only) {
           result = prepare(&first, left_profile, workspace->left,
               workspace->scalar_capacity, &length, work, limits, tree);
@@ -163,7 +164,16 @@ static TC_TLV_result rdn_equal(TC_bytes left, TC_bytes right,
             return result;
           prepared = 1;
         }
-        if (binary_only) {
+        binary_pair = binary_only;
+        if (!binary_pair) {
+          result = prepare(&second, right_profile, workspace->right,
+              workspace->scalar_capacity, &other_length, work, limits, tree);
+          if (result == TC_TLV_UNSUPPORTED) {
+            result = TC_TLV_OK;
+            binary_pair = 1;
+          } else if (result != TC_TLV_OK) return result;
+        }
+        if (binary_pair) {
           if (charge(work, first.value.length) != TC_TLV_OK) return TC_TLV_LIMIT;
           if (tc_pki_equal(first.value, second.value)) {
             workspace->matched[index] = 1;
@@ -173,20 +183,6 @@ static TC_TLV_result rdn_equal(TC_bytes left, TC_bytes right,
           ++index;
           continue;
         }
-        result = prepare(&second, right_profile, workspace->right, workspace->scalar_capacity,
-            &other_length, work, limits, tree);
-        if (result == TC_TLV_UNSUPPORTED) {
-          result = TC_TLV_OK;
-          if (charge(work, first.value.length) != TC_TLV_OK) return TC_TLV_LIMIT;
-          if (tc_pki_equal(first.value, second.value)) {
-            workspace->matched[index] = 1;
-            found = 1;
-            break;
-          }
-          ++index;
-          continue;
-        }
-        if (result != TC_TLV_OK) return result;
         if (charge(work, length) != TC_TLV_OK) return TC_TLV_LIMIT;
         if (length == other_length && !memcmp(workspace->left, workspace->right, length * sizeof(uint32_t))) {
           workspace->matched[index] = 1;
