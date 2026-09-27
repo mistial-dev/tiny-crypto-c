@@ -11,7 +11,10 @@ TC_TLV_result example_check_path_revocation(const TC_bytes* chain, size_t count,
   TC_X509_search_workspace search = example_x509_search_workspace(&storage->search);
   const TC_X509_revocation_workspace workspace = {
     &validation,&search,storage->states,sizeof storage->states,
-    storage->nodes,sizeof storage->nodes / sizeof storage->nodes[0]
+    storage->nodes,sizeof storage->nodes / sizeof storage->nodes[0],
+    storage->scopes,sizeof storage->scopes / sizeof storage->scopes[0],
+    storage->signer_path,sizeof storage->signer_path / sizeof storage->signer_path[0],
+    storage->signer_policies,sizeof storage->signer_policies / sizeof storage->signer_policies[0]
   };
   return TC_X509_path_check_revocation(chain,count,options,&workspace,work,result);
 }

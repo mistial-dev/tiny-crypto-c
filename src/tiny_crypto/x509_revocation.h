@@ -17,11 +17,18 @@ typedef struct {
   uint16_t reasons;
   TC_X509_crl_match revocation;
 } TC_X509_crl_evidence;
-/* Provisional workspace entries; fields are managed by the resolver. */
+/* Provisional workspace entries; fields are managed by the resolver. Each
+ * entry uses two size_t links for bounded dependency lookup. */
 typedef struct {
   TC_bytes certificate;
   TC_X509_revocation_status status;
+  /* Internal hash chains; keep all entries until the operation completes. */
+  size_t hash_next, hash_head;
 } TC_X509_revocation_node;
+/* One caller-owned slot per indexed CRL, managed during revocation checks. */
+typedef struct {
+  size_t representative, next, head;
+} TC_X509_revocation_scope;
 typedef enum {
   TC_X509_CRL_COMPLETE_ONLY, TC_X509_CRL_DELTA_IF_AVAILABLE, TC_X509_CRL_DELTA_REQUIRED
 } TC_X509_crl_delta_policy;
@@ -43,6 +50,12 @@ typedef struct {
   size_t state_capacity;
   TC_X509_revocation_node* nodes;
   size_t node_capacity;
+  TC_X509_revocation_scope* scopes;
+  size_t scope_capacity;
+  TC_bytes* signer_path;
+  size_t signer_path_capacity;
+  TC_bytes* signer_policies;
+  size_t signer_policy_capacity;
 } TC_X509_revocation_workspace;
 typedef struct {
   TC_X509_revocation_status status;
@@ -55,7 +68,11 @@ typedef struct {
  * candidates supply CRL signers and their paths; signer_policy is distinct from
  * the holder's purpose/usage policy. max_candidate_bytes bounds their collection.
  * states needs one byte per indexed CRL; nodes covers the path and distinct
- * signer dependencies. Verified nodes are reused only within this call.
+ * signer dependencies. Each node is 2 size_t larger for lookup links.
+ * scopes needs one slot per indexed CRL. Verified nodes and scope groups are
+ * reused only within this call. signer_path needs search->capacity entries;
+ * signer_policies needs validation->policy_capacity entries. Their spans borrow
+ * stable source bytes and stay in scratch until this call returns.
  * Input/metadata, workspace arrays, work and out must be disjoint. Save path
  * spans outside search scratch before calling. Work and scratch are provisional.
  * OK means a determined result: callers must inspect status. REVOKED includes

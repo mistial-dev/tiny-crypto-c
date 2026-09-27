@@ -23,9 +23,10 @@ typedef TC_EC_word word;
 typedef struct {
   TC_EC_workspace* w;
   size_t words, bytes;
+  word order_factor;
 } ec_state;
 
-/* SEC 2 v2.0 parameters. Rows are p, n, b, R^2 mod p, Gx, Gy;
+/* SEC 2 v2.0 parameters. Rows are p, n, b, R^2 mod p, GxR mod p, GyR mod p;
  * R = 2^(8 * coordinate_bytes). These curves have a = -3, h = 1. */
 #if TC_EC_ENABLE_P192
 static const uint8_t params_192[6][24] EC_STORAGE = {
@@ -37,10 +38,15 @@ static const uint8_t params_192[6][24] EC_STORAGE = {
    0x72,0x24,0x30,0x49,0xfe,0xb8,0xde,0xec,0xc1,0x46,0xb9,0xb1},
   {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01,0x00,0x00,0x00,0x00,
    0x00,0x00,0x00,0x02,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01},
-  {0x18,0x8d,0xa8,0x0e,0xb0,0x30,0x90,0xf6,0x7c,0xbf,0x20,0xeb,
-   0x43,0xa1,0x88,0x00,0xf4,0xff,0x0a,0xfd,0x82,0xff,0x10,0x12},
-  {0x07,0x19,0x2b,0x95,0xff,0xc8,0xda,0x78,0x63,0x10,0x11,0xed,
-   0x6b,0x24,0xcd,0xd5,0x73,0xf9,0x77,0xa1,0x1e,0x79,0x48,0x11}
+  {0x95,0x4c,0xc8,0xf9,0xf3,0xd2,0x18,0xf7,0x8a,0x4b,0xd3,0xf7,
+   0x76,0xd1,0x29,0x09,0x0d,0x8c,0xb3,0x0c,0x33,0x2f,0xa1,0x08},
+  {0x6a,0x29,0x3d,0x83,0x6a,0xed,0xa8,0x4d,0xde,0x22,0xb5,0x24,
+   0x89,0x66,0xf0,0x5e,0x7b,0x12,0xa3,0x37,0x1e,0x42,0x22,0x89}
+};
+/* R² modulo the group order, with R = 2^192. */
+static const uint8_t order_r2_192[24] EC_STORAGE = {
+  0x28,0xbe,0x56,0x77,0xea,0x05,0x81,0xa2,0x46,0x96,0xea,0x5b,
+  0xbb,0x3a,0x6b,0xee,0xce,0x66,0xba,0xcc,0xde,0xb3,0x59,0x61
 };
 #endif
 #if TC_EC_ENABLE_P256
@@ -62,13 +68,17 @@ static const uint8_t params_256[6][32] EC_STORAGE = {
     0xff, 0xff, 0xff, 0xfb, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03
   },
   {
-    0x6b, 0x17, 0xd1, 0xf2, 0xe1, 0x2c, 0x42, 0x47, 0xf8, 0xbc, 0xe6, 0xe5, 0x63, 0xa4, 0x40, 0xf2,
-    0x77, 0x03, 0x7d, 0x81, 0x2d, 0xeb, 0x33, 0xa0, 0xf4, 0xa1, 0x39, 0x45, 0xd8, 0x98, 0xc2, 0x96
+    0x18, 0x90, 0x5f, 0x76, 0xa5, 0x37, 0x55, 0xc6, 0x79, 0xfb, 0x73, 0x2b, 0x77, 0x62, 0x25, 0x10,
+    0x75, 0xba, 0x95, 0xfc, 0x5f, 0xed, 0xb6, 0x01, 0x79, 0xe7, 0x30, 0xd4, 0x18, 0xa9, 0x14, 0x3c
   },
   {
-    0x4f, 0xe3, 0x42, 0xe2, 0xfe, 0x1a, 0x7f, 0x9b, 0x8e, 0xe7, 0xeb, 0x4a, 0x7c, 0x0f, 0x9e, 0x16,
-    0x2b, 0xce, 0x33, 0x57, 0x6b, 0x31, 0x5e, 0xce, 0xcb, 0xb6, 0x40, 0x68, 0x37, 0xbf, 0x51, 0xf5
+    0x85, 0x71, 0xff, 0x18, 0x25, 0x88, 0x5d, 0x85, 0xd2, 0xe8, 0x86, 0x88, 0xdd, 0x21, 0xf3, 0x25,
+    0x8b, 0x4a, 0xb8, 0xe4, 0xba, 0x19, 0xe4, 0x5c, 0xdd, 0xf2, 0x53, 0x57, 0xce, 0x95, 0x56, 0x0a
   },
+};
+static const uint8_t order_r2_256[32] EC_STORAGE = {
+  0x66,0xe1,0x2d,0x94,0xf3,0xd9,0x56,0x20,0x28,0x45,0xb2,0x39,0x2b,0x6b,0xec,0x59,
+  0x46,0x99,0x79,0x9c,0x49,0xbd,0x6f,0xa6,0x83,0x24,0x4c,0x95,0xbe,0x79,0xee,0xa2
 };
 #endif
 #if TC_EC_ENABLE_P384
@@ -94,15 +104,20 @@ static const uint8_t params_384[6][48] EC_STORAGE = {
     0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xfe, 0x00, 0x00, 0x00, 0x01
   },
   {
-    0xaa, 0x87, 0xca, 0x22, 0xbe, 0x8b, 0x05, 0x37, 0x8e, 0xb1, 0xc7, 0x1e, 0xf3, 0x20, 0xad, 0x74,
-    0x6e, 0x1d, 0x3b, 0x62, 0x8b, 0xa7, 0x9b, 0x98, 0x59, 0xf7, 0x41, 0xe0, 0x82, 0x54, 0x2a, 0x38,
-    0x55, 0x02, 0xf2, 0x5d, 0xbf, 0x55, 0x29, 0x6c, 0x3a, 0x54, 0x5e, 0x38, 0x72, 0x76, 0x0a, 0xb7
+    0x4d, 0x3a, 0xad, 0xc2, 0x29, 0x9e, 0x15, 0x13, 0x81, 0x2f, 0xf7, 0x23, 0x61, 0x4e, 0xde, 0x2b,
+    0x64, 0x54, 0x86, 0x84, 0x59, 0xa3, 0x0e, 0xff, 0x87, 0x9c, 0x3a, 0xfc, 0x54, 0x1b, 0x4d, 0x6e,
+    0x20, 0xe3, 0x78, 0xe2, 0xa0, 0xd6, 0xce, 0x38, 0x3d, 0xd0, 0x75, 0x66, 0x49, 0xc0, 0xb5, 0x28
   },
   {
-    0x36, 0x17, 0xde, 0x4a, 0x96, 0x26, 0x2c, 0x6f, 0x5d, 0x9e, 0x98, 0xbf, 0x92, 0x92, 0xdc, 0x29,
-    0xf8, 0xf4, 0x1d, 0xbd, 0x28, 0x9a, 0x14, 0x7c, 0xe9, 0xda, 0x31, 0x13, 0xb5, 0xf0, 0xb8, 0xc0,
-    0x0a, 0x60, 0xb1, 0xce, 0x1d, 0x7e, 0x81, 0x9d, 0x7a, 0x43, 0x1d, 0x7c, 0x90, 0xea, 0x0e, 0x5f
+    0x2b, 0x78, 0xab, 0xc2, 0x5a, 0x15, 0xc5, 0xe9, 0xdd, 0x80, 0x02, 0x26, 0x39, 0x69, 0xa8, 0x40,
+    0xc6, 0xc3, 0x52, 0x19, 0x68, 0xf4, 0xff, 0xd9, 0x8b, 0xad, 0xe7, 0x56, 0x2e, 0x83, 0xb0, 0x50,
+    0xa1, 0xbf, 0xa8, 0xbf, 0x7b, 0xb4, 0xa9, 0xac, 0x23, 0x04, 0x3d, 0xad, 0x4b, 0x03, 0xa4, 0xfe
   },
+};
+static const uint8_t order_r2_384[48] EC_STORAGE = {
+  0x0c,0x84,0xee,0x01,0x2b,0x39,0xbf,0x21,0x3f,0xb0,0x5b,0x7a,0x28,0x26,0x68,0x95,
+  0xd4,0x0d,0x49,0x17,0x4a,0xab,0x1c,0xc5,0xbc,0x3e,0x48,0x3a,0xfc,0xb8,0x29,0x47,
+  0xff,0x3d,0x81,0xe5,0xdf,0x1a,0xa4,0x19,0x2d,0x31,0x9b,0x24,0x19,0xb4,0x09,0xa9
 };
 #endif
 
@@ -182,9 +197,9 @@ static void point_double(ec_state* s, unsigned out, unsigned in)
   add(s, F(s, out + 2), F(s, out + 2), F(s, out + 2));
 }
 
-/* Compute R0 + R1 in slots 6..8. Doubling R0 is already in slots 9..11.
- * Equal points and infinity use masked selection, not scalar-dependent paths. */
-static void point_add(ec_state* s)
+/* Compute R0 + R1 in slots 6..8. Secret-scalar callers precompute doubling
+ * in slots 9..11. Public-scalar callers compute it only for equal points. */
+static void point_add(ec_state* s, int public_inputs)
 {
   word equal, first_infinity, second_infinity;
   unsigned i;
@@ -214,6 +229,7 @@ static void point_add(ec_state* s)
   sub(s, F(s, 7), F(s, 7), T(s, 4));
   mul(s, F(s, 8), F(s, 2), F(s, 5));
   mul(s, F(s, 8), F(s, 8), T(s, 3));
+  if (public_inputs && equal) point_double(s, 9, 0);
   for (i = 0; i < 3; ++i) {
     select_words(F(s, 6 + i), F(s, 9 + i), F(s, 6 + i), equal, s->words);
     select_words(F(s, 6 + i), F(s, 3 + i), F(s, 6 + i), first_infinity, s->words);
@@ -244,7 +260,7 @@ static void multiply_point(ec_state* s)
                                 ((i - 1) % TC_EC_WORD_BITS)) & 1u);
     swap_points(s, bit);
     point_double(s, 9, 0);
-    point_add(s);
+    point_add(s, 0);
     for (coordinate = 0; coordinate < 3; ++coordinate) {
       copy(s, F(s, coordinate), F(s, 9 + coordinate));
       copy(s, F(s, 3 + coordinate), F(s, 6 + coordinate));
@@ -253,19 +269,47 @@ static void multiply_point(ec_state* s)
   }
 }
 
+/* Verification scalars are public. Skip point additions for zero bits while
+ * retaining the same complete addition formulas for exceptional points. */
+static void multiply_point_public(ec_state* s)
+{
+  for (unsigned coordinate = 0; coordinate < 3; ++coordinate)
+    memset(F(s, coordinate), 0, s->bytes);
+  for (size_t i = s->bytes * 8; i > 0; --i) {
+    const unsigned bit = (unsigned)((F(s, EC_SCALAR)[(i - 1) / TC_EC_WORD_BITS] >>
+        ((i - 1) % TC_EC_WORD_BITS)) & 1u);
+    point_double(s, 9, 0);
+    for (unsigned coordinate = 0; coordinate < 3; ++coordinate)
+      copy(s, F(s, coordinate), F(s, 9 + coordinate));
+    if (bit) {
+      point_add(s, 1);
+      for (unsigned coordinate = 0; coordinate < 3; ++coordinate)
+        copy(s, F(s, coordinate), F(s, 6 + coordinate));
+    }
+  }
+}
+
+/* Fermat inversion over either curve prime. The exponent and loop shape are
+ * public; base may contain a secret nonce or point coordinate. */
+static void invert_prime(ec_state* s, word* out, const word* base,
+    const word* one, const word* prime, word factor)
+{
+  copy(s, out, one);
+  for (size_t i = s->bytes * 8; i > 0; --i) {
+    const size_t index = (i - 1) / TC_EC_WORD_BITS;
+    word exponent = prime[index];
+    if (index == 0) exponent = (word)(exponent - 2u);
+    tc_mp_montgomery(out,out,out,prime,s->words,factor,
+        s->w->product,s->w->reduced);
+    if ((exponent >> ((i - 1) % TC_EC_WORD_BITS)) & 1u)
+      tc_mp_montgomery(out,out,base,prime,s->words,factor,
+          s->w->product,s->w->reduced);
+  }
+}
+
 static void point_to_affine(ec_state* s)
 {
-  size_t i;
-  /* Fermat inversion. The exponent p-2 is public and fixed for each curve. */
-  copy(s, F(s, 3), F(s, EC_ONE));
-  for (i = s->bytes * 8; i > 0; --i) {
-    size_t index = (i - 1) / TC_EC_WORD_BITS;
-    word exponent = F(s, EC_P)[index];
-    if (index == 0) exponent = (word)(exponent - 2u);
-    mul(s, F(s, 3), F(s, 3), F(s, 3));
-    if ((exponent >> ((i - 1) % TC_EC_WORD_BITS)) & 1u)
-      mul(s, F(s, 3), F(s, 3), F(s, 2));
-  }
+  invert_prime(s,F(s, 3),F(s, 2),F(s, EC_ONE),F(s, EC_P),1);
   mul(s, F(s, 4), F(s, 3), F(s, 3));
   mul(s, F(s, 0), F(s, 0), F(s, 4));
   mul(s, F(s, 4), F(s, 4), F(s, 3));
@@ -302,19 +346,22 @@ static void import_bytes(ec_state* s, word* out, const uint8_t* bytes, int rom)
 static void initialize(ec_state* s, TC_EC_workspace* workspace, size_t bytes)
 {
   const uint8_t* params = NULL;
+  const uint8_t* order_r2 = NULL;
   unsigned i;
   s->w = workspace; s->bytes = bytes; s->words = bytes / sizeof(word);
   memset(workspace, 0, sizeof *workspace);
 #if TC_EC_ENABLE_P192
-  if (bytes == 24) params = &params_192[0][0];
+  if (bytes == 24) { params = &params_192[0][0]; order_r2 = order_r2_192; }
 #endif
 #if TC_EC_ENABLE_P256
-  if (bytes == 32) params = &params_256[0][0];
+  if (bytes == 32) { params = &params_256[0][0]; order_r2 = order_r2_256; }
 #endif
 #if TC_EC_ENABLE_P384
-  if (bytes == 48) params = &params_384[0][0];
+  if (bytes == 48) { params = &params_384[0][0]; order_r2 = order_r2_384; }
 #endif
   for (i = 0; i < 4; ++i) import_bytes(s, F(s, EC_P + i), params + i * bytes, 1);
+  import_bytes(s, F(s, EC_SCALAR), order_r2, 1);
+  s->order_factor = tc_mp_montgomery_factor(F(s, EC_N)[0]);
   import_bytes(s, F(s, 3), params + 4 * bytes, 1);
   import_bytes(s, F(s, 4), params + 5 * bytes, 1);
   F(s, EC_ONE)[0] = 1;
@@ -340,11 +387,9 @@ static int validate_point(ec_state* s)
   return zero_mask(T(s, 0), s->words) != 0;
 }
 
-/* The built-in generator coordinates are fixed curve parameters. */
+/* The built-in generator coordinates are already Montgomery residues. */
 static void prepare_generator(ec_state* s)
 {
-  mul(s, F(s, 3), F(s, 3), F(s, EC_R2));
-  mul(s, F(s, 4), F(s, 4), F(s, EC_R2));
   copy(s, F(s, 5), F(s, EC_ONE));
 }
 
@@ -466,7 +511,7 @@ TC_status TC_EC_validate_public_key(TC_EC_curve curve, const uint8_t* public_key
 static void order_mul(ec_state* s, word* out, const word* a, const word* b)
 {
   tc_mp_montgomery(out, a, b, F(s, EC_N), s->words,
-      tc_mp_montgomery_factor(F(s, EC_N)[0]), s->w->product, s->w->reduced);
+      s->order_factor, s->w->product, s->w->reduced);
 }
 
 static void digest_scalar(ec_state* s, word* out,
@@ -484,7 +529,6 @@ static void digest_scalar(ec_state* s, word* out,
 static int verification_scalars(ec_state* s, const uint8_t* digest, size_t digest_len,
     const uint8_t* signature, TC_ECDSA_workspace* workspace)
 {
-  size_t i;
   import_bytes(s, F(s, 6), signature, 0);
   import_bytes(s, F(s, 7), signature + s->bytes, 0);
   if (zero_mask(F(s, 6), s->words) || zero_mask(F(s, 7), s->words) ||
@@ -493,21 +537,12 @@ static int verification_scalars(ec_state* s, const uint8_t* digest, size_t diges
 
   /* Supported orders fill their byte width. Short hashes are zero-extended. */
   digest_scalar(s, F(s, 8), digest, digest_len);
-  tc_mp_montgomery_r2(F(s, 0), F(s, EC_N), s->words, s->w->reduced);
+  copy(s, F(s, 0), F(s, EC_SCALAR));
   memset(F(s, 1), 0, s->bytes);
   F(s, 1)[0] = 1;
   order_mul(s, F(s, 2), F(s, 1), F(s, 0));
   order_mul(s, F(s, 7), F(s, 7), F(s, 0));
-  copy(s, F(s, 9), F(s, 2));
-  /* s^-1 = s^(n-2); n is prime and s was checked nonzero. */
-  for (i = s->bytes * 8; i > 0; --i) {
-    size_t index = (i - 1) / TC_EC_WORD_BITS;
-    word exponent = F(s, EC_N)[index];
-    if (index == 0) exponent = (word)(exponent - 2u);
-    order_mul(s, F(s, 9), F(s, 9), F(s, 9));
-    if ((exponent >> ((i - 1) % TC_EC_WORD_BITS)) & 1u)
-      order_mul(s, F(s, 9), F(s, 9), F(s, 7));
-  }
+  invert_prime(s,F(s, 9),F(s, 7),F(s, 2),F(s, EC_N),s->order_factor);
   order_mul(s, F(s, 8), F(s, 8), F(s, 0));
   order_mul(s, F(s, 6), F(s, 6), F(s, 0));
   order_mul(s, F(s, 8), F(s, 8), F(s, 9));
@@ -542,16 +577,15 @@ TC_status TC_ECDSA_verify_digest(TC_EC_curve curve,
   import_bytes(&s, F(&s, 4), public_key + 1 + bytes, 0);
   if (!validate_point(&s)) goto done;
   copy(&s, F(&s, EC_SCALAR), workspace->scalars[1]);
-  multiply_point(&s);
+  multiply_point_public(&s);
   for (i = 0; i < 3; ++i) copy(&s, workspace->point[i], F(&s, i));
 
   initialize(&s, &workspace->ec, bytes);
   prepare_generator(&s);
   copy(&s, F(&s, EC_SCALAR), workspace->scalars[0]);
-  multiply_point(&s);
+  multiply_point_public(&s);
   for (i = 0; i < 3; ++i) copy(&s, F(&s, 3 + i), workspace->point[i]);
-  point_double(&s, 9, 0);
-  point_add(&s);
+  point_add(&s, 1);
   for (i = 0; i < 3; ++i) copy(&s, F(&s, i), F(&s, 6 + i));
   if (zero_mask(F(&s, 2), s.words)) goto done;
   point_to_affine(&s);
@@ -578,7 +612,6 @@ TC_status TC_ECDSA_sign_digest(TC_EC_curve curve,
   uint8_t nonce[TC_EC_MAX_BYTES] = {0};
   TC_status status = TC_ERROR;
   unsigned attempt;
-  size_t i;
   if (!bytes || !private_key || private_key_len != bytes || !digest || !digest_len ||
       !signature || signature_len != 2 * bytes || !workspace || !random.fill ||
       !max_attempts || max_attempts > 16 ||
@@ -615,7 +648,7 @@ TC_status TC_ECDSA_sign_digest(TC_EC_curve curve,
     if (zero_mask(workspace->point[0], s.words)) continue;
 
     initialize(&s, &workspace->ec, bytes);
-    tc_mp_montgomery_r2(F(&s, 0), F(&s, EC_N), s.words, s.w->reduced);
+    copy(&s, F(&s, 0), F(&s, EC_SCALAR));
     memset(F(&s, 1), 0, bytes);
     F(&s, 1)[0] = 1;
     order_mul(&s, F(&s, 2), F(&s, 1), F(&s, 0));
@@ -626,16 +659,7 @@ TC_status TC_ECDSA_sign_digest(TC_EC_curve curve,
     tc_mp_add_mod(F(&s, 7), F(&s, 5), F(&s, 6),
                   F(&s, EC_N), s.words, s.w->reduced);
     order_mul(&s, F(&s, 8), workspace->point[2], F(&s, 0));
-    copy(&s, F(&s, 9), F(&s, 2));
-    /* k^-1 = k^(n-2); the exponent is public and independent of the nonce. */
-    for (i = bytes * 8; i > 0; --i) {
-      size_t index = (i - 1) / TC_EC_WORD_BITS;
-      word exponent = F(&s, EC_N)[index];
-      if (index == 0) exponent = (word)(exponent - 2u);
-      order_mul(&s, F(&s, 9), F(&s, 9), F(&s, 9));
-      if ((exponent >> ((i - 1) % TC_EC_WORD_BITS)) & 1u)
-        order_mul(&s, F(&s, 9), F(&s, 9), F(&s, 8));
-    }
+    invert_prime(&s,F(&s, 9),F(&s, 8),F(&s, 2),F(&s, EC_N),s.order_factor);
     order_mul(&s, F(&s, 10), F(&s, 7), F(&s, 9));
     order_mul(&s, F(&s, 11), F(&s, 10), F(&s, 1));
     if (zero_mask(F(&s, 11), s.words)) continue;

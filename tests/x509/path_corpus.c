@@ -115,10 +115,13 @@ static MunitResult corpus_case(const MunitParameter params[], void* user)
   TC_X509_policy_mapping mappings[32];
   TC_bytes policies[64], path[MAX_CERTIFICATES], held[MAX_CERTIFICATES];
   TC_X509_search_frame search_frames[MAX_CERTIFICATES];
+  TC_X509_certificate certificate_cache[MAX_CERTIFICATES];
   TC_X509_path_workspace validation = TC_X509_PATH_WORKSPACE_INIT(path_frames,path_oids,
-      left,right,matched,nodes,edges,expected,mappings,policies);
+      left,right,matched,nodes,edges,expected,mappings,policies,certificate_cache);
   TC_X509_search_workspace search = {path,search_frames,MAX_CERTIFICATES};
   TC_X509_revocation_node dependencies[MAX_CERTIFICATES];
+  TC_X509_revocation_scope scopes[MAX_CRLS];
+  TC_bytes signer_path[MAX_CERTIFICATES], signer_policies[64];
   TC_X509_crl_record crl_records[MAX_CRLS];
   TC_X509_crl_index crl_index;
   TC_ECDSA_workspace ec;
@@ -184,7 +187,8 @@ static MunitResult corpus_case(const MunitParameter params[], void* user)
       512 * 1024,delta ? TC_X509_CRL_DELTA_IF_AVAILABLE : TC_X509_CRL_COMPLETE_ONLY,
       TC_X509_CRL_ORDER_NUMBER};
     TC_X509_revocation_workspace workspace = {&validation,&search,states,sizeof states,
-      dependencies,MAX_CERTIFICATES};
+      dependencies,MAX_CERTIFICATES,scopes,MAX_CRLS,
+      signer_path,MAX_CERTIFICATES,signer_policies,64};
     TC_X509_revocation_result evidence, saved_evidence;
     TC_TLV_result expected_checked;
     if (strcmp(expected_revocation,"unsupported") == 0) expected_checked = TC_TLV_UNSUPPORTED;

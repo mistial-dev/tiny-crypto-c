@@ -363,6 +363,40 @@ static MunitResult content_signature(const MunitParameter params[],
                            &provider, &limits, &verification,
                            &verification_work),
                        ==, TC_X509_SIGNATURE_VALID);
+      {
+        uint8_t cached_digest[TC_CMS_SIGNED_DIGEST_BYTES];
+        tc_cms_signed_attrs_cache cache = {0};
+        signature_retry_probe retry = {provider,0,1,TC_X509_SIGNATURE_INVALID};
+        TC_X509_signature_provider retry_provider = provider;
+        size_t cached_remaining, uncached_remaining;
+        cache.digest = cached_digest;
+        cache.capacity = sizeof cached_digest;
+        retry_provider.context = &retry;
+        retry_provider.verify_digest = retry_digest;
+        verification_work = WORK_BUDGET;
+        munit_assert_int(tc_cms_signer_verify_cached(&info,
+            (TC_bytes){content_type,sizeof content_type},(TC_bytes){digest,sizeof digest},
+            TC_CMS_VERIFY_DIGEST,(TC_CMS_verification_policy){mode,TC_CMS_RSA_PARAMETERS_NULL},
+            &key,&retry_provider,&limits,&verification,&verification_work,NULL,&cache),
+            ==,TC_X509_SIGNATURE_INVALID);
+        munit_assert_int(cache.valid,==,1);
+        verification_work = WORK_BUDGET;
+        munit_assert_int(tc_cms_signer_verify_cached(&info,
+            (TC_bytes){content_type,sizeof content_type},(TC_bytes){digest,sizeof digest},
+            TC_CMS_VERIFY_DIGEST,(TC_CMS_verification_policy){mode,TC_CMS_RSA_PARAMETERS_NULL},
+            &key,&retry_provider,&limits,&verification,&verification_work,NULL,&cache),
+            ==,TC_X509_SIGNATURE_VALID);
+        cached_remaining = verification_work;
+        munit_assert_size(retry.calls,==,2);
+        verification_work = WORK_BUDGET;
+        munit_assert_int(tc_cms_signer_verify_cached(&info,
+            (TC_bytes){content_type,sizeof content_type},(TC_bytes){digest,sizeof digest},
+            TC_CMS_VERIFY_DIGEST,(TC_CMS_verification_policy){mode,TC_CMS_RSA_PARAMETERS_NULL},
+            &key,&provider,&limits,&verification,&verification_work,NULL,NULL),
+            ==,TC_X509_SIGNATURE_VALID);
+        uncached_remaining = verification_work;
+        munit_assert_size(cached_remaining,>,uncached_remaining);
+      }
       if (mode != TC_CMS_ATTRIBUTES_DER) {
         verification_work = WORK_BUDGET;
         munit_assert_int(
@@ -1022,9 +1056,10 @@ static MunitResult revocations(const MunitParameter params[], void *user) {
   TC_X509_policy_mapping mappings[POLICY_CAPACITY];
   TC_bytes policies[POLICY_CAPACITY], path[PATH_CAPACITY];
   TC_X509_search_frame search_frames[PATH_CAPACITY];
+  TC_X509_certificate certificate_cache[PATH_CAPACITY];
   TC_X509_path_workspace validation = TC_X509_PATH_WORKSPACE_INIT(
       frames, oids, name_left, name_right, name_flags, nodes, edges, expected,
-      mappings, policies);
+      mappings, policies, certificate_cache);
   TC_X509_search_workspace search = {path, search_frames, PATH_CAPACITY};
   TC_X509_workspace parser = {frames, FRAME_CAPACITY, oids, EXTENSION_CAPACITY};
   TC_X509_certificate signer;
@@ -2135,7 +2170,7 @@ static MunitResult revocations(const MunitParameter params[], void *user) {
                           TC_X509_CRL_ORDER_NUMBER};
                       const tc_x509_crl_resolution_workspace workspace = {
                           &tree,         &validation, &search, states,
-                          sizeof states, nodes,       1};
+                          sizeof states, nodes,       1, 0, NULL, 0, NULL};
                       evidence = empty;
                       work = TRUST_WORK_BUDGET;
                       munit_assert_int(
@@ -2598,6 +2633,8 @@ static MunitResult revocations(const MunitParameter params[], void *user) {
                 TC_X509_crl_record rows[DEPENDENCIES];
                 TC_X509_crl_index index;
                 TC_X509_revocation_node nodes[DEPENDENCIES] = {0};
+                TC_X509_revocation_scope scopes[DEPENDENCIES];
+                TC_bytes signer_path[PATH_CAPACITY], signer_policies[POLICY_CAPACITY];
                 uint8_t states[DEPENDENCIES];
                 work = TRUST_WORK_BUDGET;
                 munit_assert_int(
@@ -2620,7 +2657,7 @@ static MunitResult revocations(const MunitParameter params[], void *user) {
                     TC_X509_CRL_ORDER_NUMBER};
                 tc_x509_crl_resolution_workspace workspace = {
                     &tree,         &validation, &search,     states,
-                    sizeof states, nodes,       DEPENDENCIES};
+                    sizeof states, nodes,       DEPENDENCIES, 0, NULL, 0, NULL};
                 const tc_x509_crl_evidence empty = {0};
                 TC_X509_revocation_result path_evidence, path_sentinel;
                 memset(&path_sentinel, 0xa5, sizeof path_sentinel);
@@ -2632,9 +2669,61 @@ static MunitResult revocations(const MunitParameter params[], void *user) {
                     sizeof issuer_der + sizeof signer_der,
                     TC_X509_CRL_COMPLETE_ONLY,
                     TC_X509_CRL_ORDER_NUMBER};
+                if (!rejected) {
+                  TC_X509_certificate issuer_view;
+                  munit_assert_int(TC_X509_read(issuer_der,issuer_length,&limits,
+                      &parser,&issuer_view), ==, TC_TLV_OK);
+                  signature_retry_probe signature_count = {provider,0,0,TC_X509_SIGNATURE_ERROR};
+                  TC_X509_path_options counted = options;
+                  counted.signatures = (TC_X509_signature_provider){retry_signature,
+                      &signature_count,retry_digest};
+                  const tc_x509_crl_trust trusted = {&complete_source,1,&counted,
+                      &tree,&validation,&search};
+                  const tc_pki_distribution_point fallback = {0};
+                  const tc_x509_crl_query query = {&issuer_view,&fallback,0};
+                  tc_x509_crl_evidence evidence = {0};
+                  tc_x509_crl_signer_cache signer_cache = {{0},{0},signer_path,
+                      PATH_CAPACITY,signer_policies,POLICY_CAPACITY,0};
+                  tc_x509_crl_scope_processing attempt = {&index,1,
+                      TC_X509_CRL_COMPLETE_ONLY,TC_X509_CRL_ORDER_NUMBER,
+                      &query,states,sizeof states,&evidence,NULL,NULL,NULL,
+                      NULL,&signer_cache};
+                  TC_X509_search_result first, second;
+                  work = TRUST_WORK_BUDGET;
+                  munit_assert_int(tc_x509_crl_scope_attempt(&attempt,&signer,
+                      &trusted,&first), ==, TC_TLV_OK);
+                  munit_assert_int(signer_cache.valid, ==, 1);
+                  munit_assert_size(signature_count.calls, >, 0);
+                  const size_t verified = signature_count.calls;
+                  const size_t first_work = TRUST_WORK_BUDGET - work;
+                  evidence = (tc_x509_crl_evidence){0};
+                  work = TRUST_WORK_BUDGET;
+                  munit_assert_int(tc_x509_crl_scope_attempt(&attempt,&signer,
+                      &trusted,&second), ==, TC_TLV_OK);
+                  munit_assert_size(signature_count.calls, ==, verified);
+                  munit_assert_size(TRUST_WORK_BUDGET - work, <, first_work);
+                  munit_assert_ptr_equal(second.path,signer_path);
+                  munit_assert_size(second.count, ==, first.count);
+                }
                 TC_X509_revocation_workspace public_workspace = {
                     &validation,   &search, states,
-                    sizeof states, nodes,   DEPENDENCIES};
+                    sizeof states, nodes,   DEPENDENCIES,
+                    scopes, DEPENDENCIES, signer_path, PATH_CAPACITY,
+                    signer_policies, POLICY_CAPACITY};
+                public_workspace.scope_capacity = 1;
+                work = TRUST_WORK_BUDGET; path_evidence = path_sentinel;
+                munit_assert_int(TC_X509_path_check_revocation(chain,DEPENDENCIES,
+                    &public_options,&public_workspace,&work,&path_evidence), ==, TC_TLV_LIMIT);
+                munit_assert_memory_equal(sizeof path_evidence,&path_evidence,&path_sentinel);
+                public_workspace.scope_capacity = DEPENDENCIES;
+                public_workspace.signer_path_capacity = 1;
+                munit_assert_int(TC_X509_path_check_revocation(chain,DEPENDENCIES,
+                    &public_options,&public_workspace,&work,&path_evidence), ==, TC_TLV_LIMIT);
+                public_workspace.signer_path_capacity = PATH_CAPACITY;
+                public_workspace.signer_policy_capacity = 1;
+                munit_assert_int(TC_X509_path_check_revocation(chain,DEPENDENCIES,
+                    &public_options,&public_workspace,&work,&path_evidence), ==, TC_TLV_LIMIT);
+                public_workspace.signer_policy_capacity = POLICY_CAPACITY;
                 path_evidence = path_sentinel;
                 work = TRUST_WORK_BUDGET;
                 munit_assert_int(TC_X509_path_check_revocation(
@@ -3479,7 +3568,7 @@ static MunitResult revocations(const MunitParameter params[], void *user) {
                             TC_X509_CRL_ORDER_NUMBER};
                         tc_x509_crl_resolution_workspace resolve_workspace = {
                             &tree,         &validation,  &search,      states,
-                            sizeof states, dependencies, PATH_CAPACITY};
+                            sizeof states, dependencies, PATH_CAPACITY, 0, NULL, 0, NULL};
                         evidence = empty;
                         work = TRUST_WORK_BUDGET;
                         const TC_TLV_result resolved_result =
@@ -5503,9 +5592,10 @@ static MunitResult embedded_path(const MunitParameter params[], void *user) {
   TC_X509_policy_expected expected[POLICY_CAPACITY];
   TC_X509_policy_mapping mappings[POLICY_CAPACITY];
   TC_X509_search_frame search_frames[PATH_CAPACITY];
+  TC_X509_certificate certificate_cache[PATH_CAPACITY];
   TC_X509_path_workspace validation =
       TC_X509_PATH_WORKSPACE_INIT(frames, oids, left, right, name_flags, nodes,
-                                  edges, expected, mappings, policies);
+                                  edges, expected, mappings, policies, certificate_cache);
   TC_X509_search_workspace search = {path, search_frames, PATH_CAPACITY};
   TC_X509_workspace parser = {frames, FRAME_CAPACITY, oids, POLICY_CAPACITY};
   const TC_TLV_limits limits = {CMS_CAPACITY, CMS_CAPACITY, 256,
@@ -5677,12 +5767,14 @@ static MunitResult embedded_path(const MunitParameter params[], void *user) {
     munit_assert_size(work, ==, 0);
     {
       uint8_t signature_bytes[SIGNATURE_CAPACITY];
+      uint8_t signed_digest[TC_CMS_SIGNED_DIGEST_BYTES];
       TC_CMS_path_options settings = {options, INDEX_CAPACITY, CMS_CAPACITY,
                                       TC_CMS_ATTRIBUTES_DER,
                                       TC_CMS_RSA_PARAMETERS_NULL};
       TC_CMS_path_workspace workspace = {
           validation,     search,          index,
-          INDEX_CAPACITY, signature_bytes, sizeof signature_bytes};
+          INDEX_CAPACITY, signature_bytes, sizeof signature_bytes,
+          signed_digest, sizeof signed_digest};
       const TC_bytes envelope = {encoded, (size_t)length};
       {
         ExampleCMSCredentialWorkspace credential;
@@ -5727,7 +5819,13 @@ static MunitResult embedded_path(const MunitParameter params[], void *user) {
               credential.crl_states,
               sizeof credential.crl_states,
               credential.nodes,
-              EXAMPLE_CMS_REVOCATION_NODES};
+              EXAMPLE_CMS_REVOCATION_NODES,
+              credential.scopes,
+              EXAMPLE_CMS_CRL_CAPACITY,
+              credential.signer_path,
+              EXAMPLE_X509_PATH_CAPACITY,
+              credential.signer_policies,
+              EXAMPLE_X509_POLICY_CAPACITY};
           uint8_t saved[sizeof aliased];
           memset(&aliased, 0, sizeof aliased);
           aliased.request = request;
@@ -6478,7 +6576,17 @@ static MunitResult embedded_path(const MunitParameter params[], void *user) {
                          ==, TC_X509_PATH_LIMIT);
         munit_assert_memory_equal(sizeof found, &found, &saved);
       }
-      TC_bytes writes[TC_X509_PATH_STORAGE_COUNT + 6];
+      {
+        TC_CMS_path_workspace short_workspace = workspace;
+        short_workspace.signed_digest_capacity = TC_CMS_SIGNED_DIGEST_BYTES - 1;
+        work = WORK_BUDGET;
+        memcpy(&found,&saved,sizeof found);
+        munit_assert_int(TC_CMS_signer_path_build(&signer,container.content_type,
+            content_digest,container.certificates,&external,&settings,
+            &short_workspace,&work,&found),==,TC_X509_PATH_ERROR);
+        munit_assert_memory_equal(sizeof found,&found,&saved);
+      }
+      TC_bytes writes[TC_X509_PATH_STORAGE_COUNT + 7];
       munit_assert_int(tc_x509_path_storage_writes(&validation, writes), ==,
                        TC_TLV_OK);
       size_t n = TC_X509_PATH_STORAGE_COUNT;
@@ -6487,6 +6595,7 @@ static MunitResult embedded_path(const MunitParameter params[], void *user) {
           (TC_bytes){(const uint8_t *)search_frames, sizeof search_frames};
       writes[n++] = (TC_bytes){(const uint8_t *)index, sizeof index};
       writes[n++] = (TC_bytes){signature_bytes, sizeof signature_bytes};
+      writes[n++] = (TC_bytes){signed_digest, sizeof signed_digest};
       writes[n++] = (TC_bytes){(const uint8_t *)&found, sizeof found};
       writes[n++] = (TC_bytes){(const uint8_t *)&work, sizeof work};
       for (size_t i = 0; i < n; ++i) {
@@ -6732,11 +6841,13 @@ static MunitResult embedded_path(const MunitParameter params[], void *user) {
     encoded[signature_offset] ^= 1;
   }
   {
+    uint8_t signed_digest[TC_CMS_SIGNED_DIGEST_BYTES];
     const TC_CMS_path_options settings = {options, INDEX_CAPACITY, CMS_CAPACITY,
                                           TC_CMS_ATTRIBUTES_DER,
                                           TC_CMS_RSA_PARAMETERS_NULL};
     const TC_CMS_path_workspace workspace = {validation,     search, index,
-                                             INDEX_CAPACITY, NULL,   0};
+                                             INDEX_CAPACITY, NULL,   0,
+                                             signed_digest, sizeof signed_digest};
     static const uint8_t id_data[] = {0x2a, 0x86, 0x48, 0x86, 0xf7,
                                       0x0d, 1,    7,    1};
     for (unsigned wrong_name = 0; wrong_name < 2; ++wrong_name) {

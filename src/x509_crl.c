@@ -515,13 +515,14 @@ TC_TLV_result tc_x509_crl_scope_equal(const tc_x509_crl* left,
   if ((left_info->present ^ right_info->present) & TC_CRL_EXT_DISTRIBUTION) {
     *equal = 0; return TC_TLV_OK;
   }
-  TC_TLV_result result = TC_X509_name_equal(left->issuer,right->issuer,limits,names,tree->work,&matched);
-  if (result != TC_TLV_OK) return result;
-  if (!matched) { *equal = 0; return TC_TLV_OK; }
-  result = tc_pki_span_compare(left_info->distribution_encoded,right_info->distribution_encoded,
+  /* Distribution bytes differ cheaply for unrelated scopes. */
+  TC_TLV_result result = tc_pki_span_compare(left_info->distribution_encoded,right_info->distribution_encoded,
       tree->work,&order);
   if (result != TC_TLV_OK) return result;
-  *equal = order == 0;
+  if (order) { *equal = 0; return TC_TLV_OK; }
+  result = TC_X509_name_equal(left->issuer,right->issuer,limits,names,tree->work,&matched);
+  if (result != TC_TLV_OK) return result;
+  *equal = matched;
   return TC_TLV_OK;
 }
 

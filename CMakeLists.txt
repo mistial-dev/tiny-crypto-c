@@ -299,7 +299,7 @@ list(APPEND TC_PUBLIC_DEFINITIONS
   TC_AES_SBOX_MODE=${sbox_value}
   TC_AES_GCM_GHASH_MODE=${ghash_value})
 
-set(tc_aes_sources src/aes.c src/aes_gcm.c src/aes_ccm.c src/aes_mac.c)
+set(tc_aes_sources src/aes.c src/aes_gcm.c src/aes_ccm.c src/aes_mac.c src/mac_core.c)
 
 # One utility translation unit keeps zeroization and constant-time comparison
 # consistent across algorithms, and avoids duplicate code in firmware images.
@@ -312,7 +312,7 @@ if(TINY_CRYPTO_ENABLE_DER)
 endif()
 if(TINY_CRYPTO_ENABLE_X509)
   list(APPEND tc_sources src/x509.c src/x509_crypto.c src/x509_time.c
-    src/x509_key.c src/x509_ext.c src/x509_name.c
+    src/x509_key.c src/x509_ext.c src/x509_name.c src/pki_signature_oid.c
     src/asn1_string.c src/unicode.c)
 endif()
 if(TINY_CRYPTO_ENABLE_EAC_CVC)
@@ -323,6 +323,14 @@ if(TINY_CRYPTO_ENABLE_PIV_CVC)
 endif()
 if(TINY_CRYPTO_ENABLE_PIV_CHUID)
   list(APPEND tc_sources src/piv_chuid.c)
+endif()
+if(TINY_CRYPTO_ENABLE_PIV_CHUID OR TINY_CRYPTO_ENABLE_PIV_OBJECTS)
+  list(APPEND tc_sources src/piv_container_internal.c)
+endif()
+if(TINY_CRYPTO_ENABLE_PIV_OBJECTS OR TINY_CRYPTO_ENABLE_PIV_CHUID OR
+   TINY_CRYPTO_ENABLE_TWIC_CCL OR
+   TINY_CRYPTO_ENABLE_TWIC_TPK)
+  list(APPEND tc_sources src/credential_text_internal.c)
 endif()
 if(TINY_CRYPTO_ENABLE_TWIC_CCL)
   list(APPEND tc_sources src/twic_ccl.c)
@@ -342,6 +350,9 @@ if(TINY_CRYPTO_ENABLE_AES)
 endif()
 if(TINY_CRYPTO_ENABLE_DES)
   list(APPEND tc_sources src/des.c)
+  if((TINY_CRYPTO_DES_CMAC OR TINY_CRYPTO_DES_ISO9797) AND NOT TINY_CRYPTO_ENABLE_AES)
+    list(APPEND tc_sources src/mac_core.c)
+  endif()
 endif()
 if(TINY_CRYPTO_ENABLE_SHA1 OR TINY_CRYPTO_ENABLE_SHA224 OR TINY_CRYPTO_ENABLE_SHA256)
   list(APPEND tc_sources src/hash.c)
@@ -349,6 +360,7 @@ endif()
 if(TINY_CRYPTO_ENABLE_SHA384 OR TINY_CRYPTO_ENABLE_SHA512)
   list(APPEND tc_sources src/sha512.c)
 endif()
+list(APPEND tc_sources src/hash_adapter.c)
 if(TINY_CRYPTO_ENABLE_KDF)
   list(APPEND tc_sources src/kdf.c)
 endif()

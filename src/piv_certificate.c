@@ -4,9 +4,10 @@
 #if TC_ENABLE_PIV_OBJECTS
 #include "internal.h"
 #include "pki_internal.h"
+#include "piv_container_internal.h"
 
 enum { CERTIFICATE_TAG = 0x70, CERTINFO_TAG = 0x71, INTERMEDIATE_TAG = 0x7f21,
-  ERROR_DETECTION_TAG = 0xfe, CONTAINER_TAG = 0x53,
+  ERROR_DETECTION_TAG = 0xfe,
   CERTIFICATE_MAX = 1856, INTERMEDIATE_MAX = 601 };
 static const TC_TLV_limits limits = {SIZE_MAX,SIZE_MAX,4,1};
 
@@ -15,11 +16,10 @@ static TC_TLV_result read_container(TC_bytes input,
 {
   TC_TLV_element element;
   TC_TLV_reader reader;
-  TC_TLV_result result = TC_TLV_read(input.data,input.length,TC_TLV_ISO7816,&limits,&element);
+  TC_bytes contents;
+  TC_TLV_result result = tc_piv_container_contents(input,&limits,&contents);
   if (result != TC_TLV_OK) return result;
-  if (!tc_pki_tag(&element,CONTAINER_TAG) || element.encoded.length != input.length)
-    return TC_TLV_INVALID;
-  result = TC_TLV_reader_init(&reader,element.value.data,element.value.length,TC_TLV_ISO7816,&limits);
+  result = TC_TLV_reader_init(&reader,contents.data,contents.length,TC_TLV_ISO7816,&limits);
   if (result != TC_TLV_OK) return result;
   result = tc_pki_next(&reader,CERTIFICATE_TAG,&element);
   if (result != TC_TLV_OK) return result;

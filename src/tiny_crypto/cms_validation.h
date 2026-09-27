@@ -17,6 +17,8 @@ typedef struct {
   TC_CMS_rsa_parameters rsa_parameters;
 } TC_CMS_path_options;
 
+enum { TC_CMS_SIGNED_DIGEST_BYTES = 64 };
+
 typedef struct {
   TC_X509_path_workspace validation;
   TC_X509_search_workspace search;
@@ -24,6 +26,10 @@ typedef struct {
   size_t certificate_capacity;
   uint8_t* signature;
   size_t signature_capacity;
+  /* At least TC_CMS_SIGNED_DIGEST_BYTES, separate from inputs and other scratch.
+   * Cleared after each signer search. */
+  uint8_t* signed_digest;
+  size_t signed_digest_capacity;
 } TC_CMS_path_workspace;
 
 /* Find a signer certificate, verify its signature, and build a trusted path.
@@ -63,6 +69,13 @@ typedef struct {
   size_t crl_capacity;
   TC_X509_revocation_node* nodes;
   size_t node_capacity;
+  TC_X509_revocation_scope* scopes;
+  size_t scope_capacity;
+  /* Borrowed signer path and policy views; capacity matches path scratch. */
+  TC_bytes* signer_path;
+  size_t signer_path_capacity;
+  TC_bytes* signer_policies;
+  size_t signer_policy_capacity;
 } TC_CMS_credential_workspace;
 
 typedef struct {

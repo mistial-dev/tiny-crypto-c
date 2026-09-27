@@ -42,6 +42,32 @@ static MunitResult arguments(const MunitParameter params[], void* user)
   memset(scratch,0xa5,sizeof scratch);
   munit_assert_int(verify(&key,TC_HASH_SHA256,hashed,signed_bytes,&workspace,10000), ==, TC_RSA_ARGUMENT);
   for (size_t i = 0; i < sizeof scratch; ++i) munit_assert_uint(((uint8_t*)scratch)[i], ==, 0xa5);
+  hashed.data = digest;
+  TC_RSA_prepared_public_key prepared = {0};
+  TC_RSA_word cache_words[128 / sizeof(TC_RSA_word)];
+  TC_RSA_workspace cache = {cache_words,sizeof cache_words / sizeof *cache_words};
+  TC_work_budget setup_work = {16 * sizeof modulus + 1};
+  cache.capacity--;
+  munit_assert_int(TC_RSA_prepare_public_key(&prepared,&key,&cache,&workspace,
+      &setup_work), ==, TC_RSA_LIMIT);
+  munit_assert_uint(setup_work.remaining, ==, 16 * sizeof modulus + 1);
+  cache.capacity++;
+  cache.words = scratch;
+  munit_assert_int(TC_RSA_prepare_public_key(&prepared,&key,&cache,&workspace,
+      &setup_work), ==, TC_RSA_ARGUMENT);
+  cache.words = cache_words;
+  munit_assert_int(TC_RSA_prepare_public_key(&prepared,&key,&cache,&workspace,
+      &setup_work), ==, TC_RSA_OK);
+  munit_assert_uint(setup_work.remaining, ==, 0);
+  TC_work_budget prepared_work = {10000};
+  munit_assert_int(TC_RSA_verify_v15_prepared(&prepared,&options,hashed,signed_bytes,
+      &workspace,&prepared_work), ==, TC_RSA_INVALID);
+  munit_assert_uint(prepared_work.remaining, ==, work.remaining + 16 * sizeof modulus);
+  TC_RSA_prepared_public_key_clear(&prepared);
+  for (size_t i = 0; i < sizeof cache_words; ++i)
+    munit_assert_uint(((uint8_t*)cache_words)[i], ==, 0);
+  munit_assert_int(TC_RSA_verify_v15_prepared(&prepared,&options,hashed,signed_bytes,
+      &workspace,&prepared_work), ==, TC_RSA_ARGUMENT);
   return MUNIT_OK;
 }
 

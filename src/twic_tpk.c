@@ -3,6 +3,7 @@
 #include <tiny_crypto/twic_tpk.h>
 #include <tiny_crypto/common.h>
 #if TC_ENABLE_TWIC_TPK
+#include "credential_text_internal.h"
 #include "internal.h"
 #include <string.h>
 
@@ -41,14 +42,6 @@ static TC_TLV_result container_read(TC_bytes input, TC_TWIC_tpk* out)
   return fields_read(container.value,out);
 }
 
-static int nibble(uint8_t byte)
-{
-  if (byte >= '0' && byte <= '9') return byte - '0';
-  if (byte >= 'A' && byte <= 'F') return byte - 'A' + 10;
-  if (byte >= 'a' && byte <= 'f') return byte - 'a' + 10;
-  return -1;
-}
-
 TC_TLV_result TC_TWIC_tpk_read(TC_bytes input, TC_TWIC_tpk_encoding encoding, TC_TWIC_tpk* out)
 {
   if (!out || (input.length && !input.data) ||
@@ -62,7 +55,8 @@ TC_TLV_result TC_TWIC_tpk_read(TC_bytes input, TC_TWIC_tpk_encoding encoding, TC
   TC_TLV_result result = TC_TLV_INVALID;
   const size_t length = input.length / 2;
   for (size_t i = 0; i < length; ++i) {
-    const int high = nibble(input.data[2 * i]), low = nibble(input.data[2 * i + 1]);
+    const int high = tc_credential_hex_digit(input.data[2 * i]);
+    const int low = tc_credential_hex_digit(input.data[2 * i + 1]);
     if (high < 0 || low < 0) goto cleanup;
     decoded[i] = (uint8_t)(high * 16 + low);
   }

@@ -5,6 +5,23 @@
 #include <tiny_crypto/rsa.h>
 #include "mp_prime_internal.h"
 
+/* Restrict a random base to the candidate's significant bit width. The
+ * candidate may have leading zero bytes within the arithmetic width. */
+static inline void tc_rsa_mask_candidate_width(uint8_t* sampled,
+    const uint8_t* candidate, size_t candidate_length, size_t width)
+{
+  const size_t padding = width - candidate_length;
+  unsigned seen = 0;
+  for (size_t i = 0; i < width; ++i) {
+    const unsigned value = i < padding ? 0 : candidate[i - padding];
+    unsigned mask = value;
+    mask |= mask >> 1; mask |= mask >> 2; mask |= mask >> 4;
+    mask |= 0u - seen;
+    sampled[i] &= (uint8_t)mask;
+    seen |= (unsigned)(value != 0);
+  }
+}
+
 /* Test an odd candidate using independent uniformly random bases.
  * length selects the working width, a limb multiple at most 384 bytes.
  * The candidate fits that width; leading zero bytes are accepted.
@@ -47,17 +64,8 @@ static inline TC_RSA_result tc_rsa_probable_prime_magnitude(TC_bytes candidate,
       status = TC_RSA_ERROR; break;
     }
     /* Mask to the candidate's bit width before rejection sampling. */
-    unsigned seen = 0;
     uint8_t* bytes = (uint8_t*)temporary;
-    const size_t padding = length - candidate.length;
-    for (size_t i = 0; i < length; ++i) {
-      const unsigned value = i < padding ? 0 : candidate.data[i - padding];
-      unsigned mask = value;
-      mask |= mask >> 1; mask |= mask >> 2; mask |= mask >> 4;
-      mask |= 0u - seen;
-      bytes[i] &= (uint8_t)mask;
-      seen |= (unsigned)(value != 0);
-    }
+    tc_rsa_mask_candidate_width(bytes,candidate.data,candidate.length,length);
     tc_mp_from_be(base,(const uint8_t*)temporary,length);
     memcpy(last,p,length); --last[0];
     const tc_mp_word below_last = tc_mp_subtract(temporary,base,last,n);

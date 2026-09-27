@@ -16,6 +16,7 @@
 #include <string.h>
 #include <tiny_crypto/kdf.h>
 #include "internal.h"
+#include "hash_adapter_internal.h"
 
 #if TC_ENABLE_KDF
 
@@ -35,54 +36,38 @@ struct tc_kdf_prf
 };
 
 #if TC_KBKDF_HAVE_HMAC
-/* HMAC takes any key; the shared core already rejects an empty KDK. */
 static int tc_kdf_key_any(size_t key_len)
 {
   (void)key_len;
   return 1;
 }
 
-/* Adapters to one HMAC family; typed storage is provided by its wrapper. */
-#define TC_KDF_HMAC_FAMILY(N, DIGESTLEN) \
-  static TC_status tc_kdf_hmac_sha##N##_init(void* ctx, \
-                                             const uint8_t* key, size_t key_len) \
+#define TC_KDF_HMAC_PRF(N) \
+  static struct tc_kdf_prf tc_kdf_hmac_prf_sha##N(void) \
   { \
-    return TC_HMAC_SHA##N##_init((struct TC_HMAC_SHA##N##_ctx*)ctx, key, key_len); \
-  } \
-  static TC_status tc_kdf_hmac_sha##N##_update(void* ctx, \
-                                               const uint8_t* data, size_t len) \
-  { \
-    return TC_HMAC_SHA##N##_update((struct TC_HMAC_SHA##N##_ctx*)ctx, data, len); \
-  } \
-  static TC_status tc_kdf_hmac_sha##N##_final(void* ctx, uint8_t* out) \
-  { \
-    return TC_HMAC_SHA##N##_final((struct TC_HMAC_SHA##N##_ctx*)ctx, out); \
-  } \
-  static void tc_kdf_hmac_sha##N##_clear(void* ctx) \
-  { \
-    TC_HMAC_SHA##N##_ctx_clear((struct TC_HMAC_SHA##N##_ctx*)ctx); \
-  } \
-  static const struct tc_kdf_prf tc_kdf_prf_hmac_sha##N = { \
-    DIGESTLEN, sizeof(struct TC_HMAC_SHA##N##_ctx), tc_kdf_key_any, \
-    tc_kdf_hmac_sha##N##_init, tc_kdf_hmac_sha##N##_update, \
-    tc_kdf_hmac_sha##N##_final, tc_kdf_hmac_sha##N##_clear \
-  };
-#endif /* TC_KBKDF_HAVE_HMAC */
-
+    tc_hmac_adapter hash; \
+    tc_hmac_adapter_load_##N(&hash); \
+    struct tc_kdf_prf prf = { \
+      hash.digest_length, hash.hmac_context_size, tc_kdf_key_any, \
+      hash.hmac_init, hash.hmac_update, hash.hmac_final, hash.hmac_clear \
+    }; \
+    return prf; \
+  }
 #if TC_KBKDF_HAVE_HMAC_SHA1
-TC_KDF_HMAC_FAMILY(1, TC_SHA1_DIGESTLEN)
+TC_KDF_HMAC_PRF(1)
 #endif
 #if TC_KBKDF_HAVE_HMAC_SHA224
-TC_KDF_HMAC_FAMILY(224, TC_SHA224_DIGESTLEN)
+TC_KDF_HMAC_PRF(224)
 #endif
 #if TC_KBKDF_HAVE_HMAC_SHA256
-TC_KDF_HMAC_FAMILY(256, TC_SHA256_DIGESTLEN)
+TC_KDF_HMAC_PRF(256)
 #endif
 #if TC_KBKDF_HAVE_HMAC_SHA384
-TC_KDF_HMAC_FAMILY(384, TC_SHA384_DIGESTLEN)
+TC_KDF_HMAC_PRF(384)
 #endif
 #if TC_KBKDF_HAVE_HMAC_SHA512
-TC_KDF_HMAC_FAMILY(512, TC_SHA512_DIGESTLEN)
+TC_KDF_HMAC_PRF(512)
+#endif
 #endif
 
 #if TC_KBKDF_HAVE_AES_CMAC
@@ -414,8 +399,9 @@ TC_status TC_KBKDF_fixed_input(const uint8_t* label, size_t label_len,
                                   uint8_t* out, size_t out_len) \
   { \
     CTX initialized, ctx; \
+    const struct tc_kdf_prf prf = PRF; \
     uint8_t chain[DIGESTLEN], block[DIGESTLEN]; \
-    return tc_kdf_derive(&PRF, mode, key, key_len, params, \
+    return tc_kdf_derive(&prf, mode, key, key_len, params, \
                          in1, in1_len, in2, in2_len, out, out_len, \
                          &initialized, &ctx, chain, block); \
   } \
@@ -426,8 +412,9 @@ TC_status TC_KBKDF_fixed_input(const uint8_t* label, size_t label_len,
                                       uint8_t* out, size_t out_len) \
   { \
     CTX initialized, ctx; \
+    const struct tc_kdf_prf prf = PRF; \
     uint8_t block[DIGESTLEN]; \
-    return tc_kdf_derive(&PRF, TC_KDF_MODE_COUNTER, key, key_len, params, \
+    return tc_kdf_derive(&prf, TC_KDF_MODE_COUNTER, key, key_len, params, \
                          before, before_len, after, after_len, out, out_len, \
                          &initialized, &ctx, NULL, block); \
   } \
@@ -450,23 +437,23 @@ TC_status TC_KBKDF_fixed_input(const uint8_t* label, size_t label_len,
   }
 
 #if TC_KBKDF_HAVE_HMAC_SHA1
-TC_KDF_DEFINE_FAMILY(HMAC_SHA1, tc_kdf_prf_hmac_sha1,
+TC_KDF_DEFINE_FAMILY(HMAC_SHA1, tc_kdf_hmac_prf_sha1(),
                      struct TC_HMAC_SHA1_ctx, TC_SHA1_DIGESTLEN)
 #endif
 #if TC_KBKDF_HAVE_HMAC_SHA224
-TC_KDF_DEFINE_FAMILY(HMAC_SHA224, tc_kdf_prf_hmac_sha224,
+TC_KDF_DEFINE_FAMILY(HMAC_SHA224, tc_kdf_hmac_prf_sha224(),
                      struct TC_HMAC_SHA224_ctx, TC_SHA224_DIGESTLEN)
 #endif
 #if TC_KBKDF_HAVE_HMAC_SHA256
-TC_KDF_DEFINE_FAMILY(HMAC_SHA256, tc_kdf_prf_hmac_sha256,
+TC_KDF_DEFINE_FAMILY(HMAC_SHA256, tc_kdf_hmac_prf_sha256(),
                      struct TC_HMAC_SHA256_ctx, TC_SHA256_DIGESTLEN)
 #endif
 #if TC_KBKDF_HAVE_HMAC_SHA384
-TC_KDF_DEFINE_FAMILY(HMAC_SHA384, tc_kdf_prf_hmac_sha384,
+TC_KDF_DEFINE_FAMILY(HMAC_SHA384, tc_kdf_hmac_prf_sha384(),
                      struct TC_HMAC_SHA384_ctx, TC_SHA384_DIGESTLEN)
 #endif
 #if TC_KBKDF_HAVE_HMAC_SHA512
-TC_KDF_DEFINE_FAMILY(HMAC_SHA512, tc_kdf_prf_hmac_sha512,
+TC_KDF_DEFINE_FAMILY(HMAC_SHA512, tc_kdf_hmac_prf_sha512(),
                      struct TC_HMAC_SHA512_ctx, TC_SHA512_DIGESTLEN)
 #endif
 #if TC_KBKDF_HAVE_AES_CMAC

@@ -4,6 +4,7 @@
 #define TC_RSA_CRT_INTERNAL_H_
 #include "mp_internal.h"
 #include "mp_inverse_internal.h"
+#include "rsa_blinding_internal.h"
 #include "rsa_internal.h"
 #include <tiny_crypto/rsa.h>
 
@@ -122,7 +123,6 @@ static inline TC_RSA_result tc_rsa_crt_private_operation(
   const size_t n = length / sizeof(tc_mp_word), h = n / 2;
   const size_t prime_length = length / 2, required = 13 * n;
   const size_t operations = 48 * length + 32 * exponent_length + 12;
-  const size_t attempt_work = 16 * length + 1;
   TC_bytes fields[] = {p_bytes,q_bytes,crt->dp,crt->dq,crt->q_inverse};
   for (size_t i = 0; i < sizeof fields / sizeof *fields; ++i) {
     if (!fields[i].length || fields[i].length > length) return TC_RSA_INVALID;
@@ -151,21 +151,9 @@ static inline TC_RSA_result tc_rsa_crt_private_operation(
   status = TC_RSA_INVALID;
   if (!tc_mp_subtract(temporary,c,n_words,n)) goto cleanup;
 
-  status = TC_RSA_LIMIT;
   tc_mp_word* blind = factors;
-  for (size_t attempt = 0; attempt < max_attempts; ++attempt) {
-    if (*work < attempt_work) goto cleanup;
-    *work -= attempt_work;
-    if (random(random_context,(uint8_t*)temporary,length) != TC_OK) {
-      status = TC_RSA_ERROR; goto cleanup;
-    }
-    tc_mp_from_be(blind,(const uint8_t*)temporary,length);
-    const tc_mp_word below_modulus = tc_mp_subtract(reduced,blind,n_words,n);
-    tc_mp_word above_one = (tc_mp_word)(blind[0] & ~1u);
-    for (size_t i = 1; i < n; ++i) above_one |= blind[i];
-    if (!below_modulus || !above_one) continue;
-    if (tc_mp_inverse(inverse,blind,n_words,n,arena)) { status = TC_RSA_OK; break; }
-  }
+  status = tc_rsa_sample_blinding(n_words,blind,inverse,arena,n,random,
+      random_context,max_attempts,work);
   if (status != TC_RSA_OK) goto cleanup;
 
   /* Blind modulo n before reducing into the two prime fields. */
@@ -178,6 +166,9 @@ static inline TC_RSA_result tc_rsa_crt_private_operation(
   tc_mp_power(value,blind,exponent,exponent_length,results,n_words,n,nf,
       temporary,product,reduced);
   tc_mp_montgomery(value,c,value,n_words,n,nf,product,reduced);
+  /* The encoded input remains available for the final fault check. Keep R² in
+   * c while residues is reused for the two prime fields. */
+  memcpy(c,residues,length);
   memset(temporary,0,length); temporary[0] = 1;
   tc_mp_montgomery(value,value,temporary,n_words,n,nf,product,reduced);
 
@@ -235,16 +226,18 @@ static inline TC_RSA_result tc_rsa_crt_private_operation(
   }
 
   /* Unblind modulo n and verify with the public exponent before publication. */
-  tc_mp_montgomery_r2(residues,n_words,n,reduced);
   memset(results,0,length); results[0] = 1;
-  tc_mp_montgomery(results,results,residues,n_words,n,nf,product,reduced);
-  tc_mp_montgomery(value,value,residues,n_words,n,nf,product,reduced);
-  tc_mp_montgomery(inverse,inverse,residues,n_words,n,nf,product,reduced);
+  tc_mp_montgomery(results,results,c,n_words,n,nf,product,reduced);
+  tc_mp_montgomery(value,value,c,n_words,n,nf,product,reduced);
+  tc_mp_montgomery(inverse,inverse,c,n_words,n,nf,product,reduced);
   tc_mp_montgomery(value,value,inverse,n_words,n,nf,product,reduced);
   tc_mp_power(residues,value,exponent,exponent_length,results,n_words,n,nf,
       temporary,product,reduced);
-  tc_mp_word difference = 0;
-  for (size_t i = 0; i < n; ++i) difference |= residues[i] ^ c[i];
+  memset(temporary,0,length); temporary[0] = 1;
+  tc_mp_montgomery(residues,residues,temporary,n_words,n,nf,product,reduced);
+  tc_mp_to_be((uint8_t*)temporary,residues,length);
+  uint8_t difference = 0;
+  for (size_t i = 0; i < length; ++i) difference |= ((uint8_t*)temporary)[i] ^ input[i];
   if (difference) { status = TC_RSA_ERROR; goto cleanup; }
   memset(temporary,0,length); temporary[0] = 1;
   tc_mp_montgomery(value,value,temporary,n_words,n,nf,product,reduced);

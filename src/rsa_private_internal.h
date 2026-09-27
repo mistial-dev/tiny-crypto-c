@@ -4,6 +4,7 @@
 #define TC_RSA_PRIVATE_INTERNAL_H_
 #include "rsa_internal.h"
 #include "mp_inverse_internal.h"
+#include "rsa_blinding_internal.h"
 #include "rsa_prime_internal.h"
 
 static inline int tc_rsa_private_exponent_check(const tc_mp_word* d,
@@ -154,7 +155,6 @@ static inline TC_RSA_result tc_rsa_private_operation_magnitude(const uint8_t* mo
   if (status != TC_RSA_OK) return status;
   const size_t n = length / sizeof(tc_mp_word), required = 13 * n;
   const size_t operations = 32 * length + 32 * exponent_length + 8;
-  const size_t attempt_work = 16 * length + 1;
   if (!max_attempts || scratch_words < required || *work < operations) return TC_RSA_LIMIT;
   *work -= operations;
   tc_mp_word* p = scratch;
@@ -173,20 +173,8 @@ static inline TC_RSA_result tc_rsa_private_operation_magnitude(const uint8_t* mo
   status = TC_RSA_INVALID;
   if (!tc_rsa_private_exponent_check(one,p,n,temporary) ||
       !tc_mp_subtract(temporary,c,p,n)) goto cleanup;
-  status = TC_RSA_LIMIT;
-  for (size_t attempt = 0; attempt < max_attempts; ++attempt) {
-    if (*work < attempt_work) goto cleanup;
-    *work -= attempt_work;
-    if (random(random_context,(uint8_t*)temporary,length) != TC_OK) {
-      status = TC_RSA_ERROR; goto cleanup;
-    }
-    tc_mp_from_be(blind,(const uint8_t*)temporary,length);
-    const tc_mp_word below_modulus = tc_mp_subtract(reduced,blind,p,n);
-    tc_mp_word above_one = (tc_mp_word)(blind[0] & ~1u);
-    for (size_t i = 1; i < n; ++i) above_one |= blind[i];
-    if (!below_modulus || !above_one) continue;
-    if (tc_mp_inverse(inverse,blind,p,n,arena)) { status = TC_RSA_OK; break; }
-  }
+  status = tc_rsa_sample_blinding(p,blind,inverse,arena,n,random,
+      random_context,max_attempts,work);
   if (status != TC_RSA_OK) goto cleanup;
   const tc_mp_word factor = tc_mp_montgomery_factor(p[0]);
   tc_mp_montgomery_r2(r2,p,n,reduced);

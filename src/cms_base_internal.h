@@ -36,6 +36,16 @@ typedef enum {
   TC_CMS_VERIFY_BER
 } tc_cms_verify_input;
 
+/* Valid only during one signer search; signer_name borrows the signed input. */
+typedef struct {
+  uint8_t* digest;
+  size_t capacity;
+  size_t digest_length;
+  TC_hash_algorithm hash;
+  TC_bytes signer_name;
+  int valid;
+} tc_cms_signed_attrs_cache;
+
 /* Shared with the optional path and revocation layer. */
 void tc_cms_signer_spans(const TC_CMS_signer_info* signer, TC_bytes* spans);
 TC_TLV_result tc_cms_hash_content(TC_bytes input,
@@ -50,6 +60,14 @@ TC_X509_signature_result tc_cms_signer_verify(
     const TC_TLV_limits* limits,
     const TC_CMS_signature_workspace* workspace, size_t* work,
     TC_bytes* signer_name);
+TC_X509_signature_result tc_cms_signer_verify_cached(
+    const TC_CMS_signer_info* signer, TC_bytes content_type, TC_bytes input,
+    tc_cms_verify_input input_kind, TC_CMS_verification_policy policy,
+    const TC_X509_public_key* key,
+    const TC_X509_signature_provider* provider,
+    const TC_TLV_limits* limits,
+    const TC_CMS_signature_workspace* workspace, size_t* work,
+    TC_bytes* signer_name, tc_cms_signed_attrs_cache* cache);
 TC_TLV_result tc_cms_signed_data_check(const TC_CMS_signed_data* input,
     const TC_TLV_limits* limits, const tc_pki_tree_workspace* tree,
     size_t signer_index, TC_CMS_signer_info* selected);

@@ -663,7 +663,7 @@ static MunitResult paths(const MunitParameter params[], void* user)
   TC_X509_trust_anchor anchor;
   unsigned group, scenario, source, i, calls = 0;
   TC_X509_signature_provider provider = {verify,&calls,NULL};
-  tc_x509_path_input input = {parsed + 1, 3, 3, 6144, &anchor, &at, &provider, &limits, encoded_path, &parse_workspace};
+  tc_x509_path_input input = {parsed + 1, 3, 3, 6144, &anchor, &at, &provider, &limits, encoded_path, &parse_workspace, parsed + 1};
   (void)params;
   (void)user;
   for (group = 0; group < 2; ++group) {
@@ -819,8 +819,10 @@ static MunitResult paths(const MunitParameter params[], void* user)
         TC_X509_policy_expected expected[16];
         TC_X509_policy_mapping mappings[8];
         TC_bytes policies[8];
+        TC_X509_certificate certificate_cache[4];
         TC_X509_path_workspace workspace = TC_X509_PATH_WORKSPACE_INIT(
-          frames,oids,left,right,used,nodes,edges,expected,mappings,policies);
+          frames,oids,left,right,used,nodes,edges,expected,mappings,policies,
+          certificate_cache);
         TC_X509_path_options options;
         TC_X509_path_result result, unchanged;
         TC_X509_path_status wanted = TC_X509_PATH_INVALID;
@@ -841,6 +843,22 @@ static MunitResult paths(const MunitParameter params[], void* user)
         if (scenario == UNKNOWN_CRITICAL) wanted = TC_X509_PATH_UNSUPPORTED;
         memset(&result, 0xa5, sizeof result); memcpy(&unchanged, &result, sizeof result);
         munit_assert_int(TC_X509_path_validate(encoded_path,3,&anchor,&options,&workspace,&result), ==, wanted);
+        if (wanted == TC_X509_PATH_VALID) {
+          TC_X509_path_workspace short_cache = workspace;
+          short_cache.certificate_capacity = 2;
+          TC_X509_path_result untouched;
+          memset(&untouched,0xa5,sizeof untouched);
+          munit_assert_int(TC_X509_path_validate(encoded_path,3,&anchor,&options,
+              &short_cache,&untouched), ==, TC_X509_PATH_LIMIT);
+          munit_assert_memory_equal(sizeof untouched,&untouched,&unchanged);
+          short_cache = workspace;
+          short_cache.certificates = (TC_X509_certificate*)(void*)encoded_path[0].data;
+          munit_assert_int(TC_X509_path_validate(encoded_path,3,&anchor,&options,
+              &short_cache,&untouched), ==, TC_X509_PATH_ERROR);
+          munit_assert_memory_equal(sizeof untouched,&untouched,&unchanged);
+          for (size_t entry = 0; entry < 3; ++entry)
+            munit_assert_ptr_equal(certificate_cache[entry].encoded.data,encoded_path[entry].data);
+        }
         if (scenario >= USAGE_VALID) {
           const unsigned original_flags = options.flags;
           TC_X509_path_result explicit_result;
@@ -928,6 +946,26 @@ static MunitResult paths(const MunitParameter params[], void* user)
             munit_assert_size(found.validation.work_used, ==, consumed);
             for (size_t entry = 0; entry < 3; ++entry)
               munit_assert_ptr_equal(found.path[entry].data, encoded_path[entry].data);
+            {
+              TC_bytes wrong_subject = encoded_path[0];
+              size_t empty_work = 2000000, mismatch_work = 2000000;
+              munit_assert_int(tc_x509_path_search(encoded_path[2],NULL,0,&anchor,1,
+                  &options,&workspace,&search,&empty_work,&found), ==, TC_X509_PATH_INVALID);
+              munit_assert_int(tc_x509_path_search(encoded_path[2],&wrong_subject,1,&anchor,1,
+                  &options,&workspace,&search,&mismatch_work,&found), ==, TC_X509_PATH_INVALID);
+              /* A subject mismatch need not walk and validate the full certificate. */
+              munit_assert_size(empty_work - mismatch_work, <, wrong_subject.length);
+              uint8_t malformed[2048];
+              munit_assert_size(wrong_subject.length, <=, sizeof malformed);
+              memcpy(malformed,wrong_subject.data,wrong_subject.length);
+              malformed[0] = 0x31;
+              wrong_subject.data = malformed;
+              mismatch_work = 2000000;
+              munit_assert_int(tc_x509_path_search(encoded_path[2],&wrong_subject,1,&anchor,1,
+                  &options,&workspace,&search,&mismatch_work,&found), ==, TC_X509_PATH_INVALID);
+              /* Broken framing still reaches the full parser's error path. */
+              munit_assert_size(empty_work - mismatch_work, >=, wrong_subject.length);
+            }
             budget = consumed;
             munit_assert_int(tc_x509_path_search(encoded_path[2],candidates,3,&anchor,1,
                 &options,&workspace,&search,&budget,&found), ==, TC_X509_PATH_VALID);

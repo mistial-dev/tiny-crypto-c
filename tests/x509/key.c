@@ -256,10 +256,50 @@ static MunitResult signature_restrictions(const MunitParameter params[], void* u
   return MUNIT_OK;
 }
 
+static MunitResult signature_oid_classification(const MunitParameter params[], void* user)
+{
+  static const struct {
+    uint8_t oid[9];
+    size_t length;
+    tc_pki_signature_kind kind;
+    TC_hash_algorithm hash;
+  } cases[] = {
+    {{0x2a,0x86,0x48,0x86,0xf7,0x0d,1,1,2},9,TC_PKI_SIGNATURE_RSA_V15,TC_HASH_UNKNOWN},
+    {{0x2a,0x86,0x48,0x86,0xf7,0x0d,1,1,5},9,TC_PKI_SIGNATURE_RSA_V15,TC_HASH_SHA1},
+    {{0x2a,0x86,0x48,0x86,0xf7,0x0d,1,1,10},9,TC_PKI_SIGNATURE_RSA_PSS,TC_HASH_UNKNOWN},
+    {{0x2a,0x86,0x48,0x86,0xf7,0x0d,1,1,14},9,TC_PKI_SIGNATURE_RSA_V15,TC_HASH_SHA224},
+    {{0x2a,0x86,0x48,0xce,0x38,4,3},7,TC_PKI_SIGNATURE_DSA,TC_HASH_UNKNOWN},
+    {{0x2a,0x86,0x48,0xce,0x3d,4,3,4},8,TC_PKI_SIGNATURE_ECDSA,TC_HASH_SHA512},
+    {{0x2b,0x65,112},3,TC_PKI_SIGNATURE_ED25519,TC_HASH_UNKNOWN},
+    {{0x2b,0x65,113},3,TC_PKI_SIGNATURE_ED448,TC_HASH_UNKNOWN}
+  };
+  (void)params; (void)user;
+  for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
+    tc_pki_signature_oid_info info = tc_pki_signature_oid_classify(
+      (TC_bytes){cases[i].oid,cases[i].length});
+    munit_assert_int(info.kind, ==, cases[i].kind);
+    munit_assert_int(info.hash, ==, cases[i].hash);
+    if (cases[i].kind != TC_PKI_SIGNATURE_RSA_PSS) {
+      TC_DER_algorithm algorithm = {{cases[i].oid,cases[i].length},{NULL,0}};
+      TC_signature_algorithm parsed;
+      const TC_TLV_result expected = cases[i].hash == TC_HASH_UNKNOWN ?
+        TC_TLV_UNSUPPORTED : TC_TLV_OK;
+      munit_assert_int(tc_pki_signature_algorithm_read(&algorithm,TC_TLV_DER,NULL,NULL,&parsed),
+        ==, expected);
+      if (expected == TC_TLV_OK) munit_assert_int(parsed.hash, ==, cases[i].hash);
+    }
+  }
+  static const uint8_t unknown[] = {0x2a,0x86,0x48,0x86,0xf7,0x0d,1,1,17};
+  tc_pki_signature_oid_info info = tc_pki_signature_oid_classify((TC_bytes){unknown,sizeof unknown});
+  munit_assert_int(info.kind, ==, TC_PKI_SIGNATURE_UNKNOWN);
+  return MUNIT_OK;
+}
+
 static MunitTest tests[] = {
   {"/key-challenge", key_challenge, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {"/rsa-algorithm", rsa_algorithm, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {"/signature-restrictions", signature_restrictions, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+  {"/signature-oid-classification", signature_oid_classification, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {"/pss-parameters", pss_parameters, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {"/key-encodings", test_key_encodings, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}

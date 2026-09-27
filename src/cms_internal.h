@@ -44,6 +44,18 @@ typedef struct {
   tc_cms_certificate_kind kind;
 } tc_cms_certificate_choice;
 
+/* Views returned by the PIV CMS reader for this same immutable encoding. */
+typedef struct {
+  const TC_CMS_signed_data* data;
+  const TC_CMS_signer_info* signer;
+} tc_cms_prepared_signed_data;
+TC_credential_status tc_cms_credential_validate_prepared(
+    const TC_CMS_validation_request* request,
+    const TC_X509_store_source* source, const TC_CMS_path_options* options,
+    const TC_CMS_revocation_policy* revocation,
+    const TC_CMS_credential_workspace* workspace, size_t* work,
+    const tc_cms_prepared_signed_data* prepared);
+
 /* Shared validation engine. Additional metadata spans preserve caller-owned
  * configuration alias checks when public options are adapted on the stack. */
 TC_credential_status tc_cms_credential_validate_with_metadata(

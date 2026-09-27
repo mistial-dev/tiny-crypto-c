@@ -7,19 +7,14 @@
 #include <tiny_crypto/rsa.h>
 #endif
 #include "internal.h"
+#include "hash_info_internal.h"
 
 enum { KEY_CHALLENGE_ACTIVE = 0x4b455943u };
 
 static size_t challenge_digest_length(TC_hash_algorithm hash)
 {
-  switch (hash) {
-    case TC_HASH_SHA1: return 20;
-    case TC_HASH_SHA224: return 28;
-    case TC_HASH_SHA256: return 32;
-    case TC_HASH_SHA384: return 48;
-    case TC_HASH_SHA512: return 64;
-    default: return 0;
-  }
+  tc_hash_info info;
+  return tc_hash_info_get(hash, &info) ? info.digest_length : 0;
 }
 
 static TC_key_challenge_result challenge_parameters(

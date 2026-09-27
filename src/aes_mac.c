@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
-#include "aes_internal.h"
+#include "aes_mac_core_internal.h"
 
 #if (defined(TC_AES_ENABLE_EAX) && (TC_AES_ENABLE_EAX == 1)) || \
     (defined(TC_AES_ENABLE_CMAC) && (TC_AES_ENABLE_CMAC == 1)) || \
@@ -7,17 +7,52 @@
 /* Left-shift in GF(2^128), poly x^128+x^7+x^2+x+1. */
 static void tc_aes_gf128_double(uint8_t value[TC_AES_BLOCKLEN])
 {
-  uint8_t carry = 0;
-  unsigned i;
+  tc_mac_gf_double(value, value, TC_AES_BLOCKLEN, 0x87);
+}
+#endif
 
-  for (i = TC_AES_BLOCKLEN; i > 0; --i)
+#if (defined(TC_AES_ENABLE_EAX) && (TC_AES_ENABLE_EAX == 1)) || \
+    (defined(TC_AES_ENABLE_EAX_PRIME) && (TC_AES_ENABLE_EAX_PRIME == 1)) || \
+    (defined(TC_AES_ENABLE_SIV) && (TC_AES_ENABLE_SIV == 1))
+typedef struct {
+  uint8_t first_clear_bit;
+  uint8_t second_clear_bit;
+  uint8_t enabled;
+} tc_aes_mac_ctr_bits;
+
+static TC_status tc_aes_mac_ctr_xor(const uint8_t* round_key,
+                        const uint8_t initial[TC_AES_BLOCKLEN],
+                        const uint8_t* input, uint8_t* output, size_t length,
+                        tc_aes_mac_ctr_bits bits)
+{
+  uint8_t counter[TC_AES_BLOCKLEN];
+  uint8_t stream[TC_AES_BLOCKLEN];
+  size_t offset = 0;
+  TC_status status = TC_OK;
+
+  tc_aes_copy_bytes(counter, initial, TC_AES_BLOCKLEN);
+  if (bits.enabled)
   {
-    const unsigned offset = i - 1u;
-    const uint8_t next = (uint8_t)(value[offset] >> 7);
-    value[offset] = (uint8_t)((value[offset] << 1) | carry);
-    carry = next;
+    counter[bits.first_clear_bit] &= 0x7fu;
+    counter[bits.second_clear_bit] &= 0x7fu;
   }
-  value[TC_AES_BLOCKLEN - 1u] ^= (uint8_t)(0x87u & (uint8_t)(0u - carry));
+  while (offset < length)
+  {
+    const size_t count = length - offset < TC_AES_BLOCKLEN ?
+                         length - offset : TC_AES_BLOCKLEN;
+    tc_aes_copy_bytes(stream, counter, TC_AES_BLOCKLEN);
+    status = tc_aes_cipher((state_t*)stream, round_key);
+    if (status != TC_OK) break;
+    for (size_t i = 0; i < count; ++i)
+      output[offset + i] = (uint8_t)(input[offset + i] ^ stream[i]);
+    tc_internal_increment_be(counter, TC_AES_BLOCKLEN);
+    offset += count;
+  }
+#if TC_ZEROIZE
+  TC_secure_zero(counter, sizeof(counter));
+  TC_secure_zero(stream, sizeof(stream));
+#endif
+  return status;
 }
 #endif
 
@@ -43,34 +78,34 @@ static void tc_aes_eax_prime_double(uint8_t value[TC_AES_BLOCKLEN])
 }
 #endif
 
-static TC_status tc_aes_eax_mac_block(uint8_t mac[TC_AES_BLOCKLEN],
-                          const uint8_t block[TC_AES_BLOCKLEN],
-                          const uint8_t* round_key)
+#if (defined(TC_AES_ENABLE_EAX) && (TC_AES_ENABLE_EAX == 1)) || \
+    (defined(TC_AES_ENABLE_EAX_PRIME) && (TC_AES_ENABLE_EAX_PRIME == 1))
+static TC_status tc_aes_eax_constants(const struct TC_AES_key_ctx* aes,
+                              uint8_t d[TC_AES_BLOCKLEN],
+                              uint8_t q[TC_AES_BLOCKLEN],
+                              void (*double_subkey)(uint8_t[TC_AES_BLOCKLEN]))
 {
-  unsigned i;
-
-  for (i = 0; i < TC_AES_BLOCKLEN; ++i)
-    mac[i] ^= block[i];
-  return tc_aes_cipher((state_t*)mac, round_key);
+  uint8_t l[TC_AES_BLOCKLEN] = { 0 };
+  TC_status status = tc_aes_cipher((state_t*)l, aes->round_key);
+  if (status != TC_OK) goto done;
+  tc_aes_copy_bytes(d, l, TC_AES_BLOCKLEN);
+  double_subkey(d);
+  tc_aes_copy_bytes(q, d, TC_AES_BLOCKLEN);
+  double_subkey(q);
+done:
+#if TC_ZEROIZE
+  TC_secure_zero(l, sizeof(l));
+#endif
+  return status;
 }
+#endif
 
 #if defined(TC_AES_ENABLE_EAX) && (TC_AES_ENABLE_EAX == 1)
 static TC_status tc_aes_eax_key_constants(const struct TC_AES_key_ctx* aes,
                               uint8_t d[TC_AES_BLOCKLEN],
                               uint8_t q[TC_AES_BLOCKLEN])
 {
-  uint8_t l[TC_AES_BLOCKLEN] = { 0 };
-  TC_status status = tc_aes_cipher((state_t*)l, aes->round_key);
-  if (status != TC_OK) goto done;
-  tc_aes_copy_bytes(d, l, TC_AES_BLOCKLEN);
-  tc_aes_gf128_double(d);
-  tc_aes_copy_bytes(q, d, TC_AES_BLOCKLEN);
-  tc_aes_gf128_double(q);
-done:
-#if TC_ZEROIZE
-  TC_secure_zero(l, sizeof(l));
-#endif
-  return status;
+  return tc_aes_eax_constants(aes, d, q, tc_aes_gf128_double);
 }
 #endif
 
@@ -79,18 +114,7 @@ static TC_status tc_aes_eax_prime_key_constants(const struct TC_AES_key_ctx* aes
                                     uint8_t d[TC_AES_BLOCKLEN],
                                     uint8_t q[TC_AES_BLOCKLEN])
 {
-  uint8_t l[TC_AES_BLOCKLEN] = { 0 };
-  TC_status status = tc_aes_cipher((state_t*)l, aes->round_key);
-  if (status != TC_OK) goto done;
-  tc_aes_copy_bytes(d, l, TC_AES_BLOCKLEN);
-  tc_aes_eax_prime_double(d);
-  tc_aes_copy_bytes(q, d, TC_AES_BLOCKLEN);
-  tc_aes_eax_prime_double(q);
-done:
-#if TC_ZEROIZE
-  TC_secure_zero(l, sizeof(l));
-#endif
-  return status;
+  return tc_aes_eax_constants(aes, d, q, tc_aes_eax_prime_double);
 }
 #endif
 
@@ -105,52 +129,19 @@ static TC_status tc_aes_eax_cmac(const struct TC_AES_key_ctx* aes,
 {
   uint8_t mac[TC_AES_BLOCKLEN];
   uint8_t block[TC_AES_BLOCKLEN] = { 0 };
-  size_t count;
-  TC_status status;
+  size_t used = 0;
+  const tc_aes_mac_key mac_key = {aes->round_key,TC_AES_FIXED_ROUNDS};
+  const tc_mac_cipher cipher = tc_aes_mac_cipher(&mac_key);
+  TC_status status = TC_OK;
 
   tc_aes_copy_bytes(mac, initial, TC_AES_BLOCKLEN);
-  if (domain >= 0 && length == 0)
-  {
+  if (domain >= 0) {
     block[TC_AES_BLOCKLEN - 1u] = (uint8_t)domain;
-    for (count = 0; count < TC_AES_BLOCKLEN; ++count)
-      block[count] ^= complete_subkey[count];
+    used = TC_AES_BLOCKLEN;
   }
-  else
-  {
-    if (domain >= 0)
-    {
-      block[TC_AES_BLOCKLEN - 1u] = (uint8_t)domain;
-      status = tc_aes_eax_mac_block(mac, block, aes->round_key);
-      if (status != TC_OK) goto done;
-      memset(block, 0, TC_AES_BLOCKLEN);
-    }
-
-    while (length > TC_AES_BLOCKLEN)
-    {
-      status = tc_aes_eax_mac_block(mac, data, aes->round_key);
-      if (status != TC_OK) goto done;
-      data += TC_AES_BLOCKLEN;
-      length -= TC_AES_BLOCKLEN;
-    }
-
-    if (length == TC_AES_BLOCKLEN)
-    {
-      tc_aes_copy_bytes(block, data, TC_AES_BLOCKLEN);
-      for (count = 0; count < TC_AES_BLOCKLEN; ++count)
-        block[count] ^= complete_subkey[count];
-    }
-    else
-    {
-      tc_aes_copy_bytes(block, data, length);
-      block[length] = 0x80;
-      for (count = 0; count < TC_AES_BLOCKLEN; ++count)
-        block[count] ^= partial_subkey[count];
-    }
-  }
-  status = tc_aes_eax_mac_block(mac, block, aes->round_key);
-  if (status != TC_OK) goto done;
-  tc_aes_copy_bytes(result, mac, TC_AES_BLOCKLEN);
-done:
+  status = tc_mac_cbc_update(&cipher,mac,block,&used,data,length,1);
+  if (status == TC_OK)
+    status = tc_mac_cmac_final(&cipher,mac,block,used,complete_subkey,partial_subkey,result);
 #if TC_ZEROIZE
   TC_secure_zero(mac, sizeof(mac));
   TC_secure_zero(block, sizeof(block));
@@ -174,34 +165,8 @@ static TC_status tc_aes_eax_ctr_xor(const struct TC_AES_key_ctx* aes,
                         const uint8_t* input, uint8_t* output, size_t length,
                         int prime)
 {
-  uint8_t counter[TC_AES_BLOCKLEN];
-  uint8_t stream[TC_AES_BLOCKLEN];
-  size_t offset = 0;
-  TC_status status = TC_OK;
-
-  tc_aes_copy_bytes(counter, initial, TC_AES_BLOCKLEN);
-  if (prime)
-  {
-    counter[1] &= 0x7f;
-    counter[3] &= 0x7f;
-  }
-  while (offset < length)
-  {
-    const size_t count = length - offset < TC_AES_BLOCKLEN ?
-                         length - offset : TC_AES_BLOCKLEN;
-    tc_aes_copy_bytes(stream, counter, TC_AES_BLOCKLEN);
-    status = tc_aes_cipher((state_t*)stream, aes->round_key);
-    if (status != TC_OK) break;
-    for (size_t i = 0; i < count; ++i)
-      output[offset + i] = (uint8_t)(input[offset + i] ^ stream[i]);
-    tc_internal_increment_be(counter, TC_AES_BLOCKLEN);
-    offset += count;
-  }
-#if TC_ZEROIZE
-  TC_secure_zero(counter, sizeof(counter));
-  TC_secure_zero(stream, sizeof(stream));
-#endif
-  return status;
+  return tc_aes_mac_ctr_xor(aes->round_key, initial, input, output, length,
+                            (tc_aes_mac_ctr_bits){ 1u, 3u, (uint8_t)prime });
 }
 
 #if defined(TC_AES_ENABLE_EAX) && (TC_AES_ENABLE_EAX == 1)
@@ -434,68 +399,15 @@ static TC_status tc_aes_cmac_concat(const uint8_t* round_key,
                             uint8_t out[TC_AES_BLOCKLEN])
 {
   uint8_t mac[TC_AES_BLOCKLEN] = { 0 };
-  uint8_t block[TC_AES_BLOCKLEN];
-  size_t total = a_len + b_len;
-  size_t pos = 0;
-  uint8_t i;
-  TC_status status;
-
-  if (total == 0)
-  {
-    memset(block, 0, TC_AES_BLOCKLEN);
-    block[0] = 0x80;
-    for (i = 0; i < TC_AES_BLOCKLEN; ++i)
-      block[i] ^= k2[i];
-    for (i = 0; i < TC_AES_BLOCKLEN; ++i)
-      mac[i] ^= block[i];
-    status = tc_aes_cipher((state_t*)mac, round_key);
-    if (status != TC_OK) goto done;
-    tc_aes_copy_bytes(out, mac, TC_AES_BLOCKLEN);
-    goto done;
-  }
-
-  while (total - pos > TC_AES_BLOCKLEN)
-  {
-    for (i = 0; i < TC_AES_BLOCKLEN; ++i)
-    {
-      const size_t p = pos + i;
-      const uint8_t byte = (p < a_len) ? a[p] : b[p - a_len];
-      mac[i] ^= byte;
-    }
-    status = tc_aes_cipher((state_t*)mac, round_key);
-    if (status != TC_OK) goto done;
-    pos += TC_AES_BLOCKLEN;
-  }
-
-  {
-    const size_t rem = total - pos;
-    memset(block, 0, TC_AES_BLOCKLEN);
-    for (i = 0; i < (uint8_t)rem; ++i)
-    {
-      const size_t p = pos + i;
-      block[i] = (p < a_len) ? a[p] : b[p - a_len];
-    }
-    if (rem == TC_AES_BLOCKLEN)
-    {
-      for (i = 0; i < TC_AES_BLOCKLEN; ++i)
-        block[i] ^= k1[i];
-    }
-    else
-    {
-      block[rem] = 0x80;
-      for (i = 0; i < TC_AES_BLOCKLEN; ++i)
-        block[i] ^= k2[i];
-    }
-  }
-
-  for (i = 0; i < TC_AES_BLOCKLEN; ++i)
-    mac[i] ^= block[i];
-  status = tc_aes_cipher((state_t*)mac, round_key);
-  if (status != TC_OK) goto done;
-  tc_aes_copy_bytes(out, mac, TC_AES_BLOCKLEN);
-
-done:
-  (void)0;
+  uint8_t block[TC_AES_BLOCKLEN] = { 0 };
+  size_t used = 0;
+  const tc_aes_mac_key mac_key = {round_key,TC_AES_FIXED_ROUNDS};
+  const tc_mac_cipher cipher = tc_aes_mac_cipher(&mac_key);
+  TC_status status = tc_mac_cbc_update(&cipher,mac,block,&used,a,a_len,1);
+  if (status == TC_OK)
+    status = tc_mac_cbc_update(&cipher,mac,block,&used,b,b_len,1);
+  if (status == TC_OK)
+    status = tc_mac_cmac_final(&cipher,mac,block,used,k1,k2,out);
 #if TC_ZEROIZE
   TC_secure_zero(mac, sizeof(mac));
   TC_secure_zero(block, sizeof(block));
@@ -517,49 +429,23 @@ static TC_status tc_aes_cmac_with_subkeys(const uint8_t* round_key,
 
 
 #if TC_AES_ENABLE_CMAC || TC_AES_ENABLE_DYNAMIC
-static TC_status tc_aes_cmac_absorb(const uint8_t* key, uint8_t rounds, uint8_t mac[16],
-                               const uint8_t block[16])
-{
-  tc_internal_xor(mac, block, 16);
-  return tc_aes_cipher_rounds((state_t*)mac, key, rounds);
-}
-
 static TC_status tc_aes_cmac_update(const uint8_t* key, uint8_t rounds, uint8_t mac[16],
     uint8_t buffer[16], uint8_t* used, const uint8_t* data, size_t length)
 {
-  /* Retain the last block until finalization chooses its subkey. */
-  while (length) {
-    size_t take;
-    if (*used == 16) {
-      if (tc_aes_cmac_absorb(key, rounds, mac, buffer) != TC_OK) return TC_ERROR;
-      *used = 0;
-    }
-    if (!*used && length > 16) {
-      if (tc_aes_cmac_absorb(key, rounds, mac, data) != TC_OK) return TC_ERROR;
-      data += 16; length -= 16;
-      continue;
-    }
-    take = 16u - *used;
-    if (take > length) take = length;
-    memcpy(buffer + *used, data, take);
-    *used = (uint8_t)(*used + take);
-    data += take; length -= take;
-  }
-  return TC_OK;
+  const tc_aes_mac_key mac_key = {key,rounds};
+  const tc_mac_cipher cipher = tc_aes_mac_cipher(&mac_key);
+  size_t count = *used;
+  const TC_status status = tc_mac_cbc_update(&cipher,mac,buffer,&count,data,length,1);
+  *used = (uint8_t)count;
+  return status;
 }
 
 static TC_status tc_aes_cmac_final(const uint8_t* key, uint8_t rounds, uint8_t mac[16],
     uint8_t buffer[16], uint8_t used, const uint8_t k1[16], const uint8_t k2[16], uint8_t tag[16])
 {
-  if (used == 16) tc_internal_xor(buffer, k1, 16);
-  else {
-    memset(buffer + used, 0, 16u - used);
-    buffer[used] = 0x80;
-    tc_internal_xor(buffer, k2, 16);
-  }
-  if (tc_aes_cmac_absorb(key, rounds, mac, buffer) != TC_OK) return TC_ERROR;
-  memcpy(tag, mac, 16);
-  return TC_OK;
+  const tc_aes_mac_key mac_key = {key,rounds};
+  const tc_mac_cipher cipher = tc_aes_mac_cipher(&mac_key);
+  return tc_mac_cmac_final(&cipher,mac,buffer,used,k1,k2,tag);
 }
 #endif
 
@@ -792,36 +678,9 @@ done:
 static TC_status tc_aes_siv_ctr(const uint8_t* k2_round, const uint8_t v[TC_AES_BLOCKLEN],
                     const uint8_t* input, uint8_t* output, size_t length)
 {
-  uint8_t counter[TC_AES_BLOCKLEN];
-  uint8_t stream[TC_AES_BLOCKLEN];
-  size_t offset = 0;
-  uint8_t i;
-  TC_status status = TC_OK;
-
-  tc_aes_copy_bytes(counter, v, TC_AES_BLOCKLEN);
-  /* Clear bit 63 and bit 31 (rightmost bit is bit 0). */
-  counter[8] &= 0x7fu;
-  counter[12] &= 0x7fu;
-
-  while (offset < length)
-  {
-    const size_t count = length - offset < TC_AES_BLOCKLEN ?
-                         length - offset : TC_AES_BLOCKLEN;
-    tc_aes_copy_bytes(stream, counter, TC_AES_BLOCKLEN);
-    status = tc_aes_cipher((state_t*)stream, k2_round);
-    if (status != TC_OK) break;
-    for (i = 0; i < (uint8_t)count; ++i)
-      output[offset + i] = (uint8_t)(input[offset + i] ^ stream[i]);
-
-    tc_internal_increment_be(counter, TC_AES_BLOCKLEN);
-    offset += count;
-  }
-
-#if TC_ZEROIZE
-  TC_secure_zero(counter, sizeof(counter));
-  TC_secure_zero(stream, sizeof(stream));
-#endif
-  return status;
+  /* RFC 5297 clears bit 63 and bit 31 of the synthetic IV. */
+  return tc_aes_mac_ctr_xor(k2_round, v, input, output, length,
+                            (tc_aes_mac_ctr_bits){ 8u, 12u, 1u });
 }
 
 static TC_status tc_aes_siv_crypt(const uint8_t* key, const uint8_t* const* ad,

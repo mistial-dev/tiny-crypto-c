@@ -38,12 +38,20 @@ fallback, and delta pairing still requires numbers.
 ## Workspace and results
 
 `TC_X509_revocation_workspace` borrows validation and search workspaces. Its
-`states` array needs one byte per indexed CRL. Its node array must cover all
-distinct path certificates and signer dependencies visited during the call.
+`states` array needs one byte per indexed CRL. `scopes` needs one slot per
+indexed CRL. Its node array must cover all distinct path certificates and signer
+dependencies visited during the call. Each node carries two `size_t` lookup
+links, and each scope slot carries three `size_t` links. `signer_path` needs
+`search.capacity` spans; `signer_policies` needs
+`validation.policy_capacity` spans. The signer arrays hold borrowed views into
+the fixed source snapshot. Keep those source bytes unchanged through the call.
 Insufficient storage or work returns `TC_TLV_LIMIT`.
 
-Verified dependencies are shared across path members within one call. They are
-not retained as trusted results across calls. Cycles without independent evidence
+Scope groups are reused across point scans for each target. The most recently
+validated signer path and its per-CRL signature results are reused when the
+same signer appears again. Verified dependencies are shared across path members.
+These results are not retained as trusted results across calls.
+Cycles without independent evidence
 and missing CRLs return `TC_TLV_UNSUPPORTED`. Input bytes, options, source records
 and workspace metadata must remain stable while the call runs.
 
@@ -55,7 +63,7 @@ Check `result.status`:
   contains its revocation reason and date. Read the invalidity date only when
   `has_invalidity_date` is set.
 
-Other return codes leave the result unchanged. Work, signature states and node
+Other return codes leave the result unchanged. Work, cache arrays and node
 storage are provisional and may change. An unrevoked result uses `SIZE_MAX` for
 the member index and zero evidence.
 

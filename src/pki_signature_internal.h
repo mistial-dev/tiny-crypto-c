@@ -6,6 +6,7 @@
 #include "pki_hash_internal.h"
 #include "pki_tree_internal.h"
 #include "pki_key_internal.h"
+#include "pki_signature_oid_internal.h"
 
 static inline TC_TLV_result tc_pki_pss_resolve_profile(TC_bytes encoded,
     TC_TLV_profile profile, const TC_TLV_limits* limits, const tc_pki_tree_workspace* tree,
@@ -70,37 +71,23 @@ static inline TC_TLV_result tc_pki_signature_algorithm_read(const TC_DER_algorit
     TC_TLV_profile profile, const TC_TLV_limits* limits,
     const tc_pki_tree_workspace* tree, TC_signature_algorithm* out)
 {
-  static const uint8_t rsa[] = {0x2a,0x86,0x48,0x86,0xf7,0x0d,1,1};
-  static const uint8_t ec[] = {0x2a,0x86,0x48,0xce,0x3d,4};
   TC_signature_algorithm parsed = {TC_SIGNATURE_ECDSA,TC_HASH_UNKNOWN,TC_HASH_UNKNOWN,0};
   TC_TLV_result result;
   if (!algorithm || !out || (profile != TC_TLV_DER && profile != TC_TLV_BER) ||
       (profile == TC_TLV_BER && !tree)) return TC_TLV_ARGUMENT;
-  TC_bytes oid = algorithm->oid;
-  if (oid.length == 9 && !memcmp(oid.data,rsa,sizeof rsa)) {
-    if (oid.data[8] == 10) {
-      result = tc_pki_pss_resolve_profile(algorithm->parameters,profile,limits,tree,&parsed);
-      if (result != TC_TLV_OK) return result;
-    } else {
-      switch (oid.data[8]) {
-        case 5: parsed.hash = TC_HASH_SHA1; break;
-        case 14: parsed.hash = TC_HASH_SHA224; break;
-        case 11: parsed.hash = TC_HASH_SHA256; break;
-        case 12: parsed.hash = TC_HASH_SHA384; break;
-        case 13: parsed.hash = TC_HASH_SHA512; break;
-        default: return TC_TLV_UNSUPPORTED;
-      }
-      if (algorithm->parameters.length &&
-          tc_pki_null(algorithm->parameters,profile) != TC_TLV_OK)
-        return TC_TLV_INVALID;
-      parsed.scheme = TC_SIGNATURE_RSA_V15;
-    }
-  } else if ((oid.length == 7 || oid.length == 8) && !memcmp(oid.data,ec,sizeof ec)) {
+  tc_pki_signature_oid_info info = tc_pki_signature_oid_classify(algorithm->oid);
+  if (info.kind == TC_PKI_SIGNATURE_RSA_PSS) {
+    result = tc_pki_pss_resolve_profile(algorithm->parameters,profile,limits,tree,&parsed);
+    if (result != TC_TLV_OK) return result;
+  } else if (info.kind == TC_PKI_SIGNATURE_RSA_V15 && info.hash != TC_HASH_UNKNOWN) {
+    if (algorithm->parameters.length &&
+        tc_pki_null(algorithm->parameters,profile) != TC_TLV_OK)
+      return TC_TLV_INVALID;
+    parsed.scheme = TC_SIGNATURE_RSA_V15;
+    parsed.hash = info.hash;
+  } else if (info.kind == TC_PKI_SIGNATURE_ECDSA) {
     if (algorithm->parameters.length) return TC_TLV_INVALID;
-    if (oid.length == 7 && oid.data[6] == 1) parsed.hash = TC_HASH_SHA1;
-    else if (oid.length == 8 && oid.data[6] == 3 && oid.data[7] >= 1 && oid.data[7] <= 4)
-      parsed.hash = (TC_hash_algorithm)(TC_HASH_SHA224 + oid.data[7] - 1);
-    else return TC_TLV_UNSUPPORTED;
+    parsed.hash = info.hash;
   } else return TC_TLV_UNSUPPORTED;
   *out = parsed;
   return TC_TLV_OK;

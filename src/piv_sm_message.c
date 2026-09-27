@@ -27,15 +27,6 @@ static TC_status prepare_cipher(TC_PIV_SM* session, const tc_sm_suite* suite,
   return TC_AES_dynamic_encrypt(&TC_SM_SYM(w).cipher.aes,iv);
 }
 
-static int spans_valid(const TC_bytes* spans, size_t count)
-{
-  size_t i;
-  if (!spans && count) return 0;
-  for (i = 0; i < count; ++i)
-    if (!spans[i].data && spans[i].length) return 0;
-  return 1;
-}
-
 static int span_contains(TC_bytes outer, TC_bytes inner)
 {
   uintptr_t start, contained;
@@ -82,7 +73,7 @@ TC_status TC_PIV_SM_protect(TC_PIV_SM* session,
       ((!request->plaintext.data) && request->plaintext.length) ||
       ((!request->ciphertext) && request->ciphertext_capacity) ||
       request->authenticated_count > TC_PIV_SM_AUTHENTICATED_SPANS_MAX ||
-      !spans_valid(request->authenticated,request->authenticated_count) ||
+      !tc_sm_disjoint(NULL, 0, request->authenticated, request->authenticated_count) ||
       session->state != TC_PIV_SM_READY ||
       TC_PIV_SM_ciphertext_size(request->plaintext.length,&needed) != TC_OK ||
       request->ciphertext_capacity < needed ||
@@ -120,19 +111,11 @@ TC_status TC_PIV_SM_protect(TC_PIV_SM* session,
           TC_SM_SYM(workspace).material,request->ciphertext,needed) != TC_OK) goto done;
     TC_AES_dynamic_key_clear(&TC_SM_SYM(workspace).cipher.aes);
   }
-  {
-    TC_AES_dynamic_CMAC* mac = &TC_SM_SYM(workspace).cipher.cmac;
-    size_t i;
-    status = TC_AES_dynamic_CMAC_init(mac,session->data.traffic.mac_key,suite->key_bytes);
-    if (status == TC_OK) status = TC_AES_dynamic_CMAC_update(mac,
-      session->data.traffic.command_mcv,16);
-    for (i = 0; i < request->authenticated_count && status == TC_OK; ++i)
-      status = TC_AES_dynamic_CMAC_update(mac,request->authenticated[i].data,
-                                          request->authenticated[i].length);
-    if (status == TC_OK) status = TC_AES_dynamic_CMAC_final(mac,TC_SM_SYM(workspace).digest);
-    TC_AES_dynamic_CMAC_clear(mac);
-    if (status != TC_OK) goto done;
-  }
+  status = tc_sm_mac(workspace, session->data.traffic.mac_key, suite->key_bytes,
+      (TC_bytes){session->data.traffic.command_mcv, 16},
+      request->authenticated, request->authenticated_count,
+      TC_SM_SYM(workspace).digest);
+  if (status != TC_OK) goto done;
   memcpy(tag,TC_SM_SYM(workspace).digest,8);
   memcpy(session->data.traffic.command_mcv,TC_SM_SYM(workspace).digest,16);
   tc_internal_increment_be(session->data.traffic.counter,16);
@@ -174,7 +157,7 @@ TC_status TC_PIV_SM_unprotect(TC_PIV_SM* session,
       ((!request->ciphertext.data) && request->ciphertext.length) ||
       !request->tag.data || request->tag.length != 8 ||
       request->authenticated_count > TC_PIV_SM_AUTHENTICATED_SPANS_MAX ||
-      !spans_valid(request->authenticated,request->authenticated_count) ||
+      !tc_sm_disjoint(NULL, 0, request->authenticated, request->authenticated_count) ||
       ((!plaintext) && capacity) || request->ciphertext.length % 16 ||
       !spans_contain(request->authenticated,request->authenticated_count,
         request->ciphertext) ||
@@ -192,19 +175,11 @@ TC_status TC_PIV_SM_unprotect(TC_PIV_SM* session,
   }
   suite = tc_sm_suite_get(session->suite);
   if (!suite || !counter_nonzero(session->data.traffic.counter)) goto done;
-  {
-    TC_AES_dynamic_CMAC* mac = &TC_SM_SYM(workspace).cipher.cmac;
-    size_t i;
-    status = TC_AES_dynamic_CMAC_init(mac,session->data.traffic.rmac_key,suite->key_bytes);
-    if (status == TC_OK) status = TC_AES_dynamic_CMAC_update(mac,
-      session->data.traffic.response_mcv,16);
-    for (i = 0; i < request->authenticated_count && status == TC_OK; ++i)
-      status = TC_AES_dynamic_CMAC_update(mac,request->authenticated[i].data,
-                                          request->authenticated[i].length);
-    if (status == TC_OK) status = TC_AES_dynamic_CMAC_final(mac,TC_SM_SYM(workspace).digest);
-    TC_AES_dynamic_CMAC_clear(mac);
-    if (status != TC_OK) goto done;
-  }
+  status = tc_sm_mac(workspace, session->data.traffic.rmac_key, suite->key_bytes,
+      (TC_bytes){session->data.traffic.response_mcv, 16},
+      request->authenticated, request->authenticated_count,
+      TC_SM_SYM(workspace).digest);
+  if (status != TC_OK) goto done;
   status = TC_ct_equal(TC_SM_SYM(workspace).digest,request->tag.data,8);
   if (status != TC_OK) goto done;
   status = TC_ERROR;

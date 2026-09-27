@@ -876,8 +876,11 @@ static MunitResult test_des_iso9797(const MunitParameter params[], void* data)
     0x00,0x11,0x22,0x33,0x44,0x55,0x66,0x77
   };
   static const uint8_t msg[] = "Now is the time for all ";
+  static const uint8_t msg2[] = "Now is the time for it";
   static const uint8_t retail_none[8] = {0xa1,0xc7,0x2e,0x74,0xea,0x3f,0xa9,0xb6};
   static const uint8_t retail_pad2[8] = {0xe9,0x08,0x62,0x30,0xca,0x3b,0xe7,0x96};
+  static const uint8_t annex_b_msg2_pad1[8] = {0x2e,0x2b,0x14,0x28,0xcc,0x78,0x25,0x4f};
+  static const uint8_t annex_b_msg2_pad2[8] = {0x5a,0x69,0x2c,0xe6,0x4f,0x40,0x41,0x45};
   static const uint8_t alg1_3key_pad1[8] = {0x44,0x07,0xa0,0x1f,0xa8,0x7c,0x18,0xe2};
   static const uint8_t alg3_3key_pad2[8] = {0x5c,0xcd,0x8f,0x7a,0x05,0xc8,0x05,0x22};
   struct TC_DES_ISO9797_ctx ctx;
@@ -887,8 +890,7 @@ static MunitResult test_des_iso9797(const MunitParameter params[], void* data)
   (void)params;
   (void)data;
 
-  /* ANSI X9.19's published "Now is the time for all " retail-MAC vector.
-   * Other expected values were generated independently with OpenSSL DES/TDEA. */
+  /* ISO/IEC 9797-1:2011 Annex B.4 gives these Algorithm 3 tags. */
   munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3,
       TC_DES_ISO9797_PAD_NONE, key2, sizeof key2, msg, sizeof msg - 1,
       tag, sizeof tag), ==, TC_OK);
@@ -897,6 +899,14 @@ static MunitResult test_des_iso9797(const MunitParameter params[], void* data)
       TC_DES_ISO9797_PAD2, key2, sizeof key2, msg, sizeof msg - 1,
       tag, sizeof tag), ==, TC_OK);
   munit_assert_memory_equal(8, tag, retail_pad2);
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3,
+      TC_DES_ISO9797_PAD1, key2, sizeof key2, msg2, sizeof msg2 - 1,
+      tag, sizeof tag), ==, TC_OK);
+  munit_assert_memory_equal(8, tag, annex_b_msg2_pad1);
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3,
+      TC_DES_ISO9797_PAD2, key2, sizeof key2, msg2, sizeof msg2 - 1,
+      tag, sizeof tag), ==, TC_OK);
+  munit_assert_memory_equal(8, tag, annex_b_msg2_pad2);
   munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG1,
       TC_DES_ISO9797_PAD1, key3, sizeof key3, msg, sizeof msg - 2,
       tag, sizeof tag), ==, TC_OK);

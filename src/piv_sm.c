@@ -22,6 +22,7 @@ const tc_sm_suite* tc_sm_suite_get(unsigned suite)
 int tc_sm_disjoint(const TC_bytes* writable, size_t count, const TC_bytes* input, size_t inputs)
 {
   size_t i, j;
+  if ((count && !writable) || (inputs && !input)) return 0;
   for (j = 0; j < inputs; ++j)
     if (!input[j].data && input[j].length) return 0;
   for (i = 0; i < count; ++i) {
@@ -37,11 +38,13 @@ int tc_sm_disjoint(const TC_bytes* writable, size_t count, const TC_bytes* input
 }
 
 TC_status tc_sm_mac(TC_PIV_SM_workspace* w, const uint8_t* key, size_t key_len,
-    const TC_bytes* input, size_t count, uint8_t output[16])
+    TC_bytes prefix, const TC_bytes* input, size_t count, uint8_t output[16])
 {
   size_t i;
   TC_AES_dynamic_CMAC* mac = &TC_SM_SYM(w).cipher.cmac;
   TC_status status = TC_AES_dynamic_CMAC_init(mac, key, key_len);
+  if (status == TC_OK && prefix.length)
+    status = TC_AES_dynamic_CMAC_update(mac, prefix.data, prefix.length);
   for (i = 0; i < count && status == TC_OK; ++i)
     status = TC_AES_dynamic_CMAC_update(mac, input[i].data, input[i].length);
   if (status == TC_OK) status = TC_AES_dynamic_CMAC_final(mac, output);
@@ -128,7 +131,7 @@ static TC_status finish_response(TC_PIV_SM* session, const TC_PIV_SM_peer* parse
       {session->data.handshake.host_id, 8},
       {session->data.handshake.public_key + 1, 2 * settings->coordinate_bytes}};
     status = tc_sm_mac(workspace, TC_SM_SYM(workspace).material, settings->key_bytes,
-                        mac_input, 4, TC_SM_SYM(workspace).block);
+                        (TC_bytes){NULL, 0}, mac_input, 4, TC_SM_SYM(workspace).block);
   }
   if (status != TC_OK) goto done;
   status = TC_ct_equal(TC_SM_SYM(workspace).block, parsed->cryptogram.data, 16);

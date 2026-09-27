@@ -67,7 +67,9 @@ TC_status TC_ECDH(TC_EC_curve curve, const uint8_t* scalar, size_t scalar_len,
  * longer than the curve order are truncated to their leftmost bytes.
  * TC_MISMATCH means the signature or public key is invalid; TC_ERROR means
  * an invalid argument or unsupported curve. Workspace must be disjoint
- * from all inputs and is wiped after use. Both high and low s are accepted. */
+ * from all inputs and is wiped after use. Both high and low s are accepted.
+ * Verification branches on public scalar bits; private-scalar operations use
+ * constant-work point multiplication. */
 TC_status TC_ECDSA_verify_digest(TC_EC_curve curve,
     const uint8_t* public_key, size_t public_key_len,
     const uint8_t* digest, size_t digest_len,

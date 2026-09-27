@@ -40,7 +40,7 @@ static MunitResult basic(const MunitParameter params[], void* user)
   TC_X509_name_workspace workspace = {left,right,32,used,4};
   Provider state = {0,TC_X509_SIGNATURE_VALID};
   TC_X509_signature_provider signatures = {verify,&state,NULL};
-  tc_x509_path_input input = {certificates,3,3,3,&anchor,&at,&signatures,&limits,NULL,NULL};
+  tc_x509_path_input input = {certificates,3,3,3,&anchor,&at,&signatures,&limits,NULL,NULL,NULL};
   size_t i, work = 100000, required;
   int accepted = 99;
   (void)params; (void)user;
@@ -118,7 +118,7 @@ static MunitResult names(const MunitParameter params[], void* user)
   TC_TLV_frame frames[8];
   TC_X509_name_workspace name_workspace = {left,right,32,used,4};
   TC_X509_constraint_workspace workspace = {frames,8,&name_workspace};
-  tc_x509_path_input input = {certificates,3,3,3,NULL,NULL,NULL,&limits,NULL,NULL};
+  tc_x509_path_input input = {certificates,3,3,3,NULL,NULL,NULL,&limits,NULL,NULL,NULL};
   size_t i, work = 100000, required;
   int accepted = 99;
   (void)params; (void)user;
@@ -332,7 +332,7 @@ static MunitResult policies(const MunitParameter params[], void* user)
   const uint8_t leaf[] = {0x30,17,0x30,15,6,3,0x55,0x1d,32,4,8,0x30,6,0x30,4,6,2,0x2a,2};
   TC_X509_certificate certificates[2];
   const TC_TLV_limits limits = {1024,1024,64,8};
-  tc_x509_path_input input = {certificates,2,2,2048,NULL,NULL,NULL,&limits,NULL,NULL};
+  tc_x509_path_input input = {certificates,2,2,2048,NULL,NULL,NULL,&limits,NULL,NULL,NULL};
   uint32_t left[32], right[32];
   uint8_t used[4];
   TC_X509_name_workspace names = {left,right,32,used,4};
@@ -470,7 +470,7 @@ static MunitResult usage(const MunitParameter params[], void* user)
     0x30,15,6,3,0x55,0x1d,37,4,8,0x30,6,6,4,0x55,0x1d,37,0};
   TC_X509_certificate certificates[2];
   const TC_TLV_limits limits = {1024,1024,64,8};
-  tc_x509_path_input input = {certificates,1,2,2048,NULL,NULL,NULL,&limits,NULL,NULL};
+  tc_x509_path_input input = {certificates,1,2,2048,NULL,NULL,NULL,&limits,NULL,NULL,NULL};
   uint32_t left[32], right[32];
   uint8_t used[4];
   TC_TLV_frame frames[8];

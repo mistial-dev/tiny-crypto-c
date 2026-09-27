@@ -8,7 +8,8 @@ TC_CMS_path_workspace example_cms_path_workspace(ExampleCMSPathWorkspace* storag
     example_x509_workspace(&storage->path.validation),
     example_x509_search_workspace(&storage->path),
     storage->certificates,EXAMPLE_CMS_CERTIFICATE_CAPACITY,
-    storage->signature,sizeof storage->signature
+    storage->signature,sizeof storage->signature,
+    storage->signed_digest,sizeof storage->signed_digest
   };
   return workspace;
 }
@@ -19,7 +20,10 @@ TC_CMS_credential_workspace example_cms_credential_workspace(
   const TC_CMS_credential_workspace workspace = {
     path,storage->held_path,EXAMPLE_X509_PATH_CAPACITY,
     storage->crl_states,sizeof storage->crl_states,
-    storage->nodes,EXAMPLE_CMS_REVOCATION_NODES
+    storage->nodes,EXAMPLE_CMS_REVOCATION_NODES,
+    storage->scopes,EXAMPLE_CMS_CRL_CAPACITY,
+    storage->signer_path,EXAMPLE_X509_PATH_CAPACITY,
+    storage->signer_policies,EXAMPLE_X509_POLICY_CAPACITY
   };
   return workspace;
 }

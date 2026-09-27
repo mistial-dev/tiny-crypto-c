@@ -83,6 +83,19 @@ TEST_CASE("RSA workspace view and verification") {
         {signature, sizeof signature},workspace,work) == TC_RSA_ARGUMENT);
     CHECK(tiny_crypto::rsa_verify_pss_digest(key,pss,{nullptr, sizeof digest},
         {signature, sizeof signature},workspace,work) == TC_RSA_ARGUMENT);
+    TC_RSA_word cache_words[1024 / TC_RSA_WORD_BITS];
+    auto cache = tiny_crypto::rsa_workspace_for(cache_words);
+    tiny_crypto::rsa_prepared_public_key prepared = {};
+    work.remaining = 16 * sizeof modulus + 1;
+    CHECK(tiny_crypto::rsa_prepare_public_key(prepared,key,cache,workspace,work)
+        == TC_RSA_OK);
+    work.remaining = 10000;
+    CHECK(tiny_crypto::rsa_verify_v15_prepared(prepared,v15,
+        {digest, sizeof digest},{signature, sizeof signature},workspace,work)
+        == TC_RSA_INVALID);
+    tiny_crypto::rsa_prepared_public_key_clear(prepared);
+    CHECK(prepared.marker == 0);
+    for (TC_RSA_word word : cache_words) CHECK(word == 0);
 }
 
 static TC_status unavailable_random(void* context, uint8_t*, size_t) {

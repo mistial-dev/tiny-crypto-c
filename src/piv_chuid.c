@@ -5,17 +5,13 @@
 #include <tiny_crypto/piv_chuid.h>
 #include "internal.h"
 #include "pki_internal.h"
+#include "piv_container_internal.h"
+#include "credential_text_internal.h"
 #include <string.h>
 
 static int expiration(TC_bytes date)
 {
-  unsigned i, y = 0, m, d;
-  if (date.length != 8) return 0;
-  for (i = 0; i < 8; ++i) if (date.data[i] < '0' || date.data[i] > '9') return 0;
-  for (i = 0; i < 4; ++i) y = y * 10 + date.data[i] - '0';
-  m = (date.data[4] - '0') * 10 + date.data[5] - '0';
-  d = (date.data[6] - '0') * 10 + date.data[7] - '0';
-  return tc_pki_date(y, m, d);
+  return tc_credential_yyyymmdd(date.data, date.length, NULL, NULL, NULL);
 }
 
 TC_TLV_result TC_PIV_CHUID_read(const uint8_t* data, size_t length,
@@ -41,11 +37,10 @@ TC_TLV_result TC_PIV_CHUID_read_profile(const uint8_t* data, size_t length,
       (encoding != TC_PIV_CHUID_CONTENTS && encoding != TC_PIV_CHUID_CONTAINER)) return TC_TLV_ARGUMENT;
   if (!tc_internal_ranges_disjoint(data,length,out,sizeof *out)) return TC_TLV_ARGUMENT;
   if (encoding == TC_PIV_CHUID_CONTAINER) {
-    result = TC_TLV_read(data, length, TC_TLV_ISO7816, &limits, &element);
+    TC_bytes contents;
+    result = tc_piv_container_contents((TC_bytes){data,length}, &limits, &contents);
     if (result != TC_TLV_OK) return result;
-    if (element.header.tag_length != 1 || element.header.tag[0] != 0x53 ||
-        element.encoded.length != length) return TC_TLV_INVALID;
-    data = element.value.data; length = element.value.length;
+    data = contents.data; length = contents.length;
   }
   memset(&chuid, 0, sizeof chuid);
   result = TC_TLV_reader_init(&reader, data, length, TC_TLV_ISO7816, &limits);

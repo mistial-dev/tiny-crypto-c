@@ -26,13 +26,14 @@ static inline tc_rsa_result tc_rsa_public_key_check(const uint8_t* modulus,
  * have length bytes; out has the same capacity. Exponent is minimally encoded.
  * All ranges, work and scratch are disjoint. The caller validates address ranges.
  * Scratch needs 8*(length/sizeof(word))+2 limbs and is wiped after use.
- * Work counts modular additions/multiplications plus one setup unit; each has a
- * size-bounded loop.
+ * Work counts modular additions/multiplications plus one setup unit when R²
+ * is computed here; each has a size-bounded loop. Prepared R² belongs to the
+ * same unchanged modulus and stays outside scratch.
  * Output changes only on OK. Validation covers encodings and numeric bounds. */
 static inline tc_rsa_result tc_rsa_public_operation(const uint8_t* modulus,
     size_t length, const uint8_t* exponent, size_t exponent_length,
     const uint8_t* input, uint8_t* out, tc_mp_word* scratch, size_t scratch_words,
-    size_t* work)
+    size_t* work, const tc_mp_word* prepared_r2)
 {
   size_t n, required, cost;
   tc_mp_word *p, *base, *one, *result, *temporary, *reduced, *product, factor;
@@ -42,7 +43,7 @@ static inline tc_rsa_result tc_rsa_public_operation(const uint8_t* modulus,
   if (memcmp(input,modulus,length) >= 0) return TC_RSA_INVALID;
   n = length / sizeof(tc_mp_word);
   required = 8 * n + 2;
-  cost = 16 * length + 16 * exponent_length + 4;
+  cost = (prepared_r2 ? 0 : 16 * length) + 16 * exponent_length + 4;
   if (scratch_words < required || *work < cost) return TC_RSA_LIMIT;
   *work -= cost;
   p = scratch; base = p + n; one = base + n; result = one + n;
@@ -50,10 +51,13 @@ static inline tc_rsa_result tc_rsa_public_operation(const uint8_t* modulus,
   tc_mp_from_be(p,modulus,length);
   tc_mp_from_be(base,input,length);
   factor = tc_mp_montgomery_factor(p[0]);
-  tc_mp_montgomery_r2(temporary,p,n,reduced);
+  if (!prepared_r2) {
+    tc_mp_montgomery_r2(temporary,p,n,reduced);
+    prepared_r2 = temporary;
+  }
   memset(one,0,length); one[0] = 1;
-  tc_mp_montgomery(one,one,temporary,p,n,factor,product,reduced);
-  tc_mp_montgomery(base,base,temporary,p,n,factor,product,reduced);
+  tc_mp_montgomery(one,one,prepared_r2,p,n,factor,product,reduced);
+  tc_mp_montgomery(base,base,prepared_r2,p,n,factor,product,reduced);
   tc_mp_power_public(result,base,exponent,exponent_length,one,p,n,factor,product,reduced);
   memset(one,0,length); one[0] = 1;
   tc_mp_montgomery(result,result,one,p,n,factor,product,reduced);
@@ -69,7 +73,7 @@ static inline tc_rsa_result tc_rsa_verify_v15(const uint8_t* modulus, size_t len
     const uint8_t* exponent, size_t exponent_length, const uint8_t* signature,
     size_t signature_length, TC_hash_algorithm hash,
     const uint8_t* digest, size_t digest_length, tc_mp_word* scratch,
-    size_t scratch_words, size_t* work)
+    size_t scratch_words, size_t* work, const tc_mp_word* prepared_r2)
 {
   size_t n, arithmetic_words;
   uint8_t* encoded;
@@ -88,7 +92,7 @@ static inline tc_rsa_result tc_rsa_verify_v15(const uint8_t* modulus, size_t len
   *work -= length;
   encoded = (uint8_t*)(scratch + arithmetic_words);
   result = tc_rsa_public_operation(modulus,length,exponent,exponent_length,
-      signature,encoded,scratch,arithmetic_words,work);
+      signature,encoded,scratch,arithmetic_words,work,prepared_r2);
   if (result != TC_RSA_OK) return result;
   checked = tc_rsa_v15_check(encoded,length,info.digest_info.data,info.digest_info.length,digest,digest_length);
   TC_secure_zero(encoded,length);

@@ -143,25 +143,25 @@ static MunitResult public_operation(const MunitParameter params[], void* user)
   memset(modulus,0xff,sizeof modulus); modulus[127] = 0xd3; input[127] = 1;
   memset(output,0xa5,sizeof output); memcpy(saved,output,sizeof saved);
   work = cost - 1;
-  munit_assert_int(tc_rsa_public_operation(modulus,128,exponent,1,input,output,scratch,capacity,&work), ==, TC_RSA_LIMIT);
+  munit_assert_int(tc_rsa_public_operation(modulus,128,exponent,1,input,output,scratch,capacity,&work,NULL), ==, TC_RSA_LIMIT);
   munit_assert_memory_equal(sizeof output,output,saved);
   work = cost;
-  munit_assert_int(tc_rsa_public_operation(modulus,128,exponent,1,input,output,scratch,capacity - 1,&work), ==, TC_RSA_LIMIT);
+  munit_assert_int(tc_rsa_public_operation(modulus,128,exponent,1,input,output,scratch,capacity - 1,&work,NULL), ==, TC_RSA_LIMIT);
   munit_assert_size(work, ==, cost);
   munit_assert_memory_equal(sizeof output,output,saved);
   for (unsigned invalid = 0; invalid < 3; ++invalid) {
     exponent[0] = (uint8_t)invalid;
-    munit_assert_int(tc_rsa_public_operation(modulus,128,exponent,1,input,output,scratch,capacity,&work), ==, TC_RSA_INVALID);
+    munit_assert_int(tc_rsa_public_operation(modulus,128,exponent,1,input,output,scratch,capacity,&work,NULL), ==, TC_RSA_INVALID);
     munit_assert_memory_equal(sizeof output,output,saved);
   }
   exponent[0] = 3;
-  munit_assert_int(tc_rsa_public_operation(modulus,128,exponent,1,modulus,output,scratch,capacity,&work), ==, TC_RSA_INVALID);
+  munit_assert_int(tc_rsa_public_operation(modulus,128,exponent,1,modulus,output,scratch,capacity,&work,NULL), ==, TC_RSA_INVALID);
   munit_assert_memory_equal(sizeof output,output,saved);
   modulus[127] &= 0xfe;
-  munit_assert_int(tc_rsa_public_operation(modulus,128,exponent,1,input,output,scratch,capacity,&work), ==, TC_RSA_INVALID);
+  munit_assert_int(tc_rsa_public_operation(modulus,128,exponent,1,input,output,scratch,capacity,&work,NULL), ==, TC_RSA_INVALID);
   munit_assert_memory_equal(sizeof output,output,saved);
   modulus[127] |= 1;
-  munit_assert_int(tc_rsa_public_operation(modulus,128,exponent,1,input,output,scratch,capacity,&work), ==, TC_RSA_OK);
+  munit_assert_int(tc_rsa_public_operation(modulus,128,exponent,1,input,output,scratch,capacity,&work,NULL), ==, TC_RSA_OK);
   munit_assert_memory_equal(sizeof output,output,input);
   munit_assert_size(work, ==, 0);
   for (size_t i = 0; i < capacity; ++i) munit_assert_uint(scratch[i], ==, 0);

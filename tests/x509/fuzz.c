@@ -324,9 +324,10 @@ static void fuzz_path(const uint8_t *data, size_t length,
   TC_X509_policy_edge edges[64];
   TC_X509_policy_expected expected[64];
   TC_X509_policy_mapping mappings[16];
+  TC_X509_certificate certificates[16];
   TC_X509_path_workspace workspace =
       TC_X509_PATH_WORKSPACE_INIT(frames, oids, left, right, matched, nodes,
-                                  edges, expected, mappings, policies);
+                                  edges, expected, mappings, policies, certificates);
   TC_X509_path_options options = {0};
   TC_X509_trust_anchor anchor = {0};
   TC_X509_path_result output, saved;
@@ -439,13 +440,16 @@ static void fuzz_cms_path(const uint8_t *data, size_t length) {
                                       0x0d, 1,    7,    1};
   ExampleX509SearchWorkspace storage;
   TC_bytes certificates[CERTIFICATES];
+  uint8_t signed_digest[TC_CMS_SIGNED_DIGEST_BYTES];
   TC_CMS_path_workspace workspace = {
       example_x509_workspace(&storage.validation),
       example_x509_search_workspace(&storage),
       certificates,
       CERTIFICATES,
       NULL,
-      0};
+      0,
+      signed_digest,
+      sizeof signed_digest};
   TC_CMS_path_options options = {0};
   const TC_X509_store_source source = {0};
   TC_X509_search_result found, saved;

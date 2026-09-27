@@ -42,6 +42,7 @@ PROFILES = {
           0, 0, iv, sizeof(iv), out, sizeof(out)) != TC_OK;
     """, "TC_KBKDF_HMAC_SHA256_counter"),
 }
+MAC_CIPHER_CALLBACKS = {"tc_aes_mac_encrypt", "tc_des_mac_encrypt"}
 SOURCE = """
 #include <tiny_crypto/tiny_crypto.h>
 static uint8_t key[32], iv[16], out[32];
@@ -59,9 +60,23 @@ def normalize(name):
     return re.sub(r"\.(?:constprop|isra|part)(?:\.\d+)?", "", name)
 
 
+def mac_cipher_callbacks():
+    """Keep the stack model in step with concrete MAC cipher descriptors."""
+    sources = list((ROOT / "src").glob("*.c")) + list((ROOT / "src").glob("*.h"))
+    found = set()
+    for source in sources:
+        found.update(re.findall(
+            r"tc_mac_cipher\s+\w+\s*=\s*\{[^}]*,\s*(tc_\w+)\s*\}",
+            source.read_text()))
+    if found != MAC_CIPHER_CALLBACKS:
+        raise RuntimeError(f"MAC descriptor callbacks changed: {sorted(found)}")
+    return found
+
+
 def measure(directory, definitions, body, entry):
     flags = BASE + ["-D" + item for item in definitions]
     frames, edges, objects, unknown_indirect = {}, {}, [], []
+    all_address_taken = set()
     for source in sorted((ROOT / "src").glob("*.c")):
         assembly = directory / (source.stem + ".s")
         run([CC, *flags, "-S", str(source), "-o", str(assembly)])
@@ -74,6 +89,7 @@ def measure(directory, definitions, body, entry):
         text = assembly.read_text()
         address_taken = {normalize(x) for x in
                          re.findall(r"gs\(([A-Za-z_]\w*(?:\.\w+)*)\)", text)}
+        all_address_taken.update(address_taken)
         current = None
         for line in text.splitlines():
             match = re.search(r"\.type\s+([^,]+),\s*@function", line)
@@ -109,6 +125,7 @@ def measure(directory, definitions, body, entry):
     if ".text" not in sections:
         raise RuntimeError("Missing linked .text section")
     unknown = set()
+    mac_targets = mac_cipher_callbacks() & all_address_taken
 
     def chain(name, active):
         if name in active:
@@ -118,10 +135,14 @@ def measure(directory, definitions, body, entry):
                 raise RuntimeError("Missing project stack frame: " + name)
             unknown.add(name)
             return 0, []
-        if name in unknown_indirect:
+        if name in unknown_indirect and name != "tc_mac_cbc_block":
             raise RuntimeError("Unresolved indirect call: " + name)
-        children = [chain(child, active | {name})
-                    for child in sorted(edges.get(name, ()))]
+        if name == "tc_mac_cbc_block" and name in unknown_indirect and not mac_targets:
+            raise RuntimeError("Unresolved MAC descriptor call: " + name)
+        callees = set(edges.get(name, ()))
+        if name == "tc_mac_cbc_block":
+            callees.update(mac_targets)
+        children = [chain(child, active | {name}) for child in sorted(callees)]
         size, path = max(children, default=(0, []), key=lambda item: item[0])
         return frames[name] + size, [name] + path
 

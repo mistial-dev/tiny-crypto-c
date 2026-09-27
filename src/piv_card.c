@@ -3,6 +3,7 @@
 #include <tiny_crypto/piv_card.h>
 #include <tiny_crypto/twic_uuid.h>
 #if TC_ENABLE_PIV_OBJECTS
+#include "credential_text_internal.h"
 #include "pki_reader_internal.h"
 #include "pki_tree_internal.h"
 
@@ -36,15 +37,6 @@ static int uuid_prefix(TC_bytes text) {
   return 1;
 }
 
-static int hex_digit(unsigned value) {
-  value = ascii_lower(value);
-  if (value >= '0' && value <= '9')
-    return (int)(value - '0');
-  if (value >= 'a' && value <= 'f')
-    return (int)(value - 'a' + 10);
-  return -1;
-}
-
 static TC_TLV_result uuid_read(TC_bytes text, uint8_t uuid[UUID_BYTES]) {
   if (!text.data || text.length != UUID_URN_BYTES || !uuid_prefix(text))
     return TC_TLV_INVALID;
@@ -53,8 +45,8 @@ static TC_TLV_result uuid_read(TC_bytes text, uint8_t uuid[UUID_BYTES]) {
     if (i == 4 || i == 6 || i == 8 || i == 10)
       if (text.data[position++] != '-')
         return TC_TLV_INVALID;
-    const int high = hex_digit(text.data[position++]);
-    const int low = hex_digit(text.data[position++]);
+    const int high = tc_credential_hex_digit(text.data[position++]);
+    const int low = tc_credential_hex_digit(text.data[position++]);
     if (high < 0 || low < 0)
       return TC_TLV_INVALID;
     uuid[i] = (uint8_t)(high * 16 + low);

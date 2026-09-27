@@ -28,6 +28,7 @@ typedef union {
   TC_X509_policy_mapping mapping;
   TC_X509_search_frame search;
   TC_X509_revocation_node revocation;
+  TC_X509_revocation_scope scope;
   uint32_t scalar;
 } TC_validation_storage;
 

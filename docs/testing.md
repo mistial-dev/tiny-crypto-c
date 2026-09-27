@@ -698,6 +698,7 @@ Check the test listing before treating this as a full run. Expect
 `test_tlv_external_lengths`, and the parser corpus tests. Optional tests can
 be absent when their paths are unset or Python is unavailable.
 Also check for `test_wycheproof_ecdsa`, `test_wycheproof_rsa_signatures`,
+`test_wycheproof_rsa_generation`, `test_wycheproof_primality`,
 `test_wycheproof_rsa_oaep`, `test_cms_native`, and the OpenSSL RSA private-operation
 tests. On macOS, this configuration includes `test_twic_authenticate_command`.
 
@@ -720,9 +721,19 @@ Its acceptable cases are rejected under the API's strict DER, named-curve,
 uncompressed-point policy. This is not yet coverage of every applicable
 Wycheproof algorithm.
 
+The pinned RSA PKCS#1 v1.5 generation files supply 102 supported signatures at
+1024, 2048, and 3072 bits. The test compares every generated signature byte
+for byte; 1536-bit and 4096-bit groups are reported as unsupported sizes.
+The primality file supplies 302 positive and negative verdicts for the RSA
+odd-candidate test. Fourteen signed negative encodings are also tested as
+unsigned byte magnitudes against a separate Python probable-prime oracle.
+The even prime 2 is outside that API's odd-candidate domain.
+
 KMAC256 runs the no-customization suite in strict and relaxed builds. Valid
 tags must match the digest; invalid tags must differ. These are digest
 comparisons, not tests of a tag-verification API.
+`test_kmac_acvp` checks a separate fixed-output, byte-aligned NIST ACVP-Server
+sample with a 512-byte key and nonempty customization.
 
 Dynamic AES-CMAC runs all three key sizes, checks invalid-key rejection, and
 compares valid and invalid tags. HMAC runs SHA-1/224/256/384/512 through the

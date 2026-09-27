@@ -4,16 +4,9 @@
 #include "internal.h"
 #include <string.h>
 #if TC_ENABLE_SSKDF
-#include <tiny_crypto/hash.h>
+#include "hash_adapter_internal.h"
 
-typedef struct {
-  size_t digest_size, context_size;
-  TC_status (*init)(void*);
-  TC_status (*update)(void*, const uint8_t*, size_t);
-  TC_status (*final)(void*, uint8_t*);
-} tc_sskdf_hash;
-
-static TC_status derive(const tc_sskdf_hash* hash, void* ctx, uint8_t* digest,
+static TC_status derive(const tc_hash_adapter* hash, void* ctx, uint8_t* digest,
     const uint8_t* z, size_t z_len, const TC_bytes* info, size_t count,
     uint8_t* output, size_t output_len)
 {
@@ -36,49 +29,46 @@ static TC_status derive(const tc_sskdf_hash* hash, void* ctx, uint8_t* digest,
 #endif
 #if SIZE_MAX > UINT32_MAX
   {
-    size_t blocks = output_len / hash->digest_size + (output_len % hash->digest_size != 0);
+    size_t blocks = output_len / hash->digest_length + (output_len % hash->digest_length != 0);
     if (blocks > UINT32_MAX) return TC_ERROR;
   }
 #endif
   while (offset < output_len) {
     counter[0] = (uint8_t)(round >> 24); counter[1] = (uint8_t)(round >> 16);
     counter[2] = (uint8_t)(round >> 8); counter[3] = (uint8_t)round;
-    if (hash->init(ctx) != TC_OK || hash->update(ctx, counter, 4) != TC_OK ||
-        hash->update(ctx, z, z_len) != TC_OK) goto done;
+    if (hash->hash_init(ctx) != TC_OK || hash->hash_update(ctx, counter, 4) != TC_OK ||
+        hash->hash_update(ctx, z, z_len) != TC_OK) goto done;
     for (i = 0; i < count; ++i)
-      if (hash->update(ctx, info[i].data, info[i].length) != TC_OK) goto done;
-    if (hash->final(ctx, digest) != TC_OK) goto done;
+      if (hash->hash_update(ctx, info[i].data, info[i].length) != TC_OK) goto done;
+    if (hash->hash_final(ctx, digest) != TC_OK) goto done;
     take = output_len - offset;
-    if (take > hash->digest_size) take = hash->digest_size;
+    if (take > hash->digest_length) take = hash->digest_length;
     memcpy(output + offset, digest, take);
     offset += take;
     ++round;
   }
   status = TC_OK;
 done:
-  TC_secure_zero(ctx, hash->context_size);
-  TC_secure_zero(digest, hash->digest_size);
+  TC_secure_zero(ctx, hash->hash_context_size);
+  TC_secure_zero(digest, hash->digest_length);
   if (status != TC_OK) TC_secure_zero(output, output_len);
   return status;
 }
 
 #define TC_SSKDF_FAMILY(N, BYTES) \
-  static TC_status init_##N(void* c) { return TC_SHA##N##_init((struct TC_SHA##N##_ctx*)c); } \
-  static TC_status update_##N(void* c, const uint8_t* p, size_t n) \
-  { return TC_SHA##N##_update((struct TC_SHA##N##_ctx*)c, p, n); } \
-  static TC_status final_##N(void* c, uint8_t* p) { return TC_SHA##N##_final((struct TC_SHA##N##_ctx*)c, p); } \
   TC_status TC_SSKDF_SHA##N(const uint8_t* z, size_t z_len, const TC_bytes* info, size_t count, \
                           uint8_t* output, size_t output_len) \
   { \
     struct TC_SHA##N##_ctx ctx; \
     uint8_t digest[BYTES]; \
-    static const tc_sskdf_hash hash = {BYTES, sizeof ctx, init_##N, update_##N, final_##N}; \
+    tc_hash_adapter hash; \
+    tc_hash_adapter_load_##N(&hash); \
     return derive(&hash, &ctx, digest, z, z_len, info, count, output, output_len); \
   }
 #if TC_ENABLE_SHA256
-TC_SSKDF_FAMILY(256, 32)
+TC_SSKDF_FAMILY(256, TC_SHA256_DIGESTLEN)
 #endif
 #if TC_ENABLE_SHA384
-TC_SSKDF_FAMILY(384, 48)
+TC_SSKDF_FAMILY(384, TC_SHA384_DIGESTLEN)
 #endif
 #endif

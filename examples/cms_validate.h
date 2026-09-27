@@ -15,6 +15,7 @@ typedef struct {
   ExampleX509SearchWorkspace path;
   TC_bytes certificates[EXAMPLE_CMS_CERTIFICATE_CAPACITY];
   uint8_t signature[EXAMPLE_CMS_SIGNATURE_CAPACITY];
+  uint8_t signed_digest[TC_CMS_SIGNED_DIGEST_BYTES];
 } ExampleCMSPathWorkspace;
 
 enum { EXAMPLE_CMS_CRL_CAPACITY = 4, EXAMPLE_CMS_REVOCATION_NODES = 8 };
@@ -23,6 +24,9 @@ typedef struct {
   TC_bytes held_path[EXAMPLE_X509_PATH_CAPACITY];
   uint8_t crl_states[EXAMPLE_CMS_CRL_CAPACITY];
   TC_X509_revocation_node nodes[EXAMPLE_CMS_REVOCATION_NODES];
+  TC_X509_revocation_scope scopes[EXAMPLE_CMS_CRL_CAPACITY];
+  TC_bytes signer_path[EXAMPLE_X509_PATH_CAPACITY];
+  TC_bytes signer_policies[EXAMPLE_X509_POLICY_CAPACITY];
 } ExampleCMSCredentialWorkspace;
 
 TC_CMS_path_workspace example_cms_path_workspace(ExampleCMSPathWorkspace* storage);

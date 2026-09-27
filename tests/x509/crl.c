@@ -1033,6 +1033,7 @@ static MunitResult scope_groups(const MunitParameter params[], void* user)
     munit_assert_int(tc_x509_crl_scope_equal(&a,&ai,&b,&bi,&limits,&tree,&names,&equal), ==, TC_TLV_OK);
     munit_assert_int(equal, ==, expected[scenario]);
     const size_t required = WORK_BUDGET - work;
+    if (scenario == OTHER_IDP) munit_assert_size(required, <=, sizeof idp + 1);
     for (size_t budget = 0; budget <= required; ++budget) {
       equal = -1; work = budget;
       munit_assert_int(tc_x509_crl_scope_equal(&a,&ai,&b,&bi,&limits,&tree,&names,&equal),

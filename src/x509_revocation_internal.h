@@ -142,6 +142,16 @@ typedef struct {
 } tc_x509_crl_path_check;
 
 typedef struct {
+  TC_bytes signer;
+  TC_X509_search_result result;
+  TC_bytes* path;
+  size_t path_capacity;
+  TC_bytes* policies;
+  size_t policy_capacity;
+  int valid;
+} tc_x509_crl_signer_cache;
+
+typedef struct {
   const TC_X509_crl_index* index;
   size_t reference;
   TC_X509_crl_delta_policy delta_policy;
@@ -153,6 +163,8 @@ typedef struct {
   const tc_x509_crl_path_check* check;
   tc_x509_crl_proposal* proposal;
   tc_x509_crl_proposal* unresolved;
+  const TC_X509_revocation_scope* scopes;
+  tc_x509_crl_signer_cache* signer_cache;
 } tc_x509_crl_scope_processing;
 
 /* Validate scope inputs before describing or using writable storage. */
@@ -171,6 +183,10 @@ typedef TC_TLV_result (*tc_x509_crl_search)(const void* candidates,
 
 TC_TLV_result tc_x509_crl_same_scope(const tc_x509_crl_scope_processing* processing,
     size_t other, const tc_x509_crl_trust* trust, int* same);
+TC_TLV_result tc_x509_crl_scopes_index(const TC_X509_crl_index* index,
+    const TC_TLV_limits* limits, const tc_pki_tree_workspace* tree,
+    const TC_X509_name_workspace* names, TC_X509_revocation_scope* slots,
+    size_t capacity);
 /* Search each reference key before ranking authenticated scope proposals.
  * Inputs and storage are validated by the caller; search preserves work limits. */
 TC_TLV_result tc_x509_crl_group(const void* candidates, tc_x509_crl_search search,
@@ -228,6 +244,10 @@ typedef struct {
   size_t state_capacity;
   TC_X509_revocation_node* nodes;
   size_t node_capacity;
+  int indexed_dependencies;
+  TC_X509_revocation_scope* scopes;
+  size_t scope_capacity;
+  tc_x509_crl_signer_cache* signer_cache;
 } tc_x509_crl_resolution_workspace;
 
 typedef struct {
@@ -280,6 +300,9 @@ TC_X509_path_status tc_x509_crl_dependencies_check(void* context,
  * nodes valid. Failures preserve nodes, count and index; work is provisional. */
 TC_TLV_result tc_x509_crl_dependency_find(TC_X509_revocation_node* nodes,
     size_t capacity, size_t* count, TC_bytes certificate, size_t* work, size_t* index);
+/* Production resolver uses the node array as its own hash bucket storage. */
+TC_TLV_result tc_x509_crl_dependency_find_indexed(TC_X509_revocation_node* nodes,
+    size_t capacity, size_t* count, TC_bytes certificate, size_t* work, size_t* index);
 
 /* Both effective records must verify with the anchor to bypass signer paths. */
 TC_X509_signature_result tc_x509_crl_selected_anchor_check(const tc_x509_crl_selected* selected,
@@ -317,6 +340,7 @@ TC_TLV_result tc_x509_crl_path_resolve(const TC_bytes* chain, size_t count,
 enum {
   CRL_SCOPE_PATH = TC_X509_PATH_STORAGE_COUNT, CRL_SCOPE_SEARCH, CRL_SCOPE_TREE,
   CRL_SCOPE_STATES, CRL_SCOPE_EVIDENCE, CRL_SCOPE_RESULT, CRL_SCOPE_WORK,
+  CRL_SCOPE_SCOPES, CRL_SCOPE_SIGNER_CACHE, CRL_SCOPE_SIGNER_PATH, CRL_SCOPE_SIGNER_POLICIES,
   CRL_SCOPE_NODES, CRL_SCOPE_OUTPUT, CRL_SCOPE_PATH_OUTPUT, CRL_SCOPE_WRITES
 };
 
@@ -378,6 +402,7 @@ typedef struct {
   const TC_X509_name_workspace* names;
   uint8_t* states;
   size_t capacity;
+  const TC_X509_revocation_scope* scopes;
 } tc_x509_crl_signature_cache;
 /* One byte per indexed record, scoped to this signer/provider and stable input
  * snapshot. Cache valid/invalid signatures only; limits and provider errors can

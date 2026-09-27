@@ -63,8 +63,10 @@ exception; the target does not.
 ## Workspace and buffer lifetime
 
 Allocate the typed arrays listed in `TC_X509_path_workspace` and set each
-capacity in elements, not bytes. Node, edge and expected-policy storage belongs
-to the validator; callers should not interpret or edit its working fields.
+capacity in elements, not bytes. The certificate array needs at least one
+entry per path certificate. A shorter array returns `TC_X509_PATH_LIMIT`.
+The node, edge and expected-policy arrays belong to the validator; callers
+should not interpret or edit their working fields.
 
 `TC_X509_PATH_WORKSPACE_INIT` fills the workspace from arrays and infers their
 capacities. Pass arrays, including array members of a storage structure, not
@@ -74,14 +76,15 @@ One OID array is reused for extension decoding, policy decoding and EKU checks.
 The returned policy array is separate. The two name buffers hold prepared
 Unicode scalars, and the attribute buffer holds matching state for one RDN.
 
-Certificates are scanned in their original buffers. The validator reuses a
-certificate view instead of retaining a parsed structure for every certificate.
-It does not copy DER, key bytes or extension values. Workspace limits bound the
-policy graph; the work budget also bounds rescanning and comparison work.
+The basic pass parses each certificate once into the caller-owned certificate
+array. Later passes reuse those views. Each view borrows its DER, key bytes and
+extension values from the original buffers. Workspace limits bound the policy
+graph; the work budget also bounds scanning and comparison work.
 
 Workspace arrays must not overlap each other, the inputs or the result object.
 The signature provider's context must also be separate from workspace and the
 result. Input spans must remain valid and unchanged throughout validation.
+Certificate views are scratch and may be overwritten by the next validation.
 
 After success, the returned key borrows the target DER. Policy OIDs can borrow
 issuer DER or `initial_policies`, and the policy-span array belongs to workspace.

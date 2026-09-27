@@ -32,6 +32,17 @@ For this verifier, a sufficient arithmetic budget is
 `TC_RSA_OK`, `TC_RSA_INVALID`, `TC_RSA_LIMIT`, `TC_RSA_ARGUMENT`, or
 `TC_RSA_UNSUPPORTED`. Only `TC_RSA_OK` accepts the signature.
 
+For repeated verification with one key, initialize a caller-owned
+`TC_RSA_prepared_public_key` with `TC_RSA_prepare_public_key`. Preparation uses
+a cache of one modulus width of limbs, a temporary workspace of two modulus
+widths, and a budget of `16 * modulus_bytes + 1`. It wipes temporary storage
+on success. Keep the borrowed modulus, exponent, and cache storage alive and
+unchanged until `TC_RSA_prepared_public_key_clear`, which wipes the cache.
+Use `TC_RSA_verify_v15_prepared` or `TC_RSA_verify_pss_prepared` with a separate
+verification workspace. Each prepared v1.5 verification needs at least
+`modulus_bytes + 16 * exponent_bytes + 4` work units. The one-shot functions
+remain useful when the key is used only once.
+
 `TINY_CRYPTO_RSA_SMALL=ON` selects byte limbs. Native builds otherwise use
 32-bit limbs; AVR uses byte limbs. RSA verification does not require EC or a
 hash implementation when the caller supplies the digest.
@@ -67,6 +78,9 @@ same C verifier and returns `TC_RSA_result`. `rsa_workspace_for(words)` builds
 a borrowed workspace view from a `TC_RSA_word` array, inferring its capacity.
 Neither helper allocates memory or throws exceptions. Keep the array alive and
 exclusive to the operation; copying a view does not create independent scratch.
+The `rsa_prepare_public_key`, `rsa_verify_v15_prepared`,
+`rsa_verify_pss_prepared`, and `rsa_prepared_public_key_clear` wrappers expose
+the same caller-owned cache and borrowed-key lifetime as the C API.
 
 `tiny_crypto::rsa_private_key` holds the same borrowed components as the C type.
 `rsa_validate_private_key` takes references to the key, workspace, and

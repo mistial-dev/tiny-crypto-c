@@ -134,7 +134,9 @@ jobs:
           ref: 079c6f39023649b154152db30f1d781e884879bc
           path: build-tools/pico-sdk
       - name: Test report generator
-        run: python3 tests/test_benchmark_report.py
+        run: |
+          python3 tests/test_benchmark_report.py
+          python3 tests/test_measure_avr_resources.py
       - name: Check library package
         run: |
           pio pkg pack . --output "$RUNNER_TEMP/tiny-crypto-c.tar.gz"

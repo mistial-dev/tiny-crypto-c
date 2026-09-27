@@ -14,6 +14,9 @@ typedef struct {
   ExampleX509SearchWorkspace search;
   uint8_t states[EXAMPLE_CRL_CAPACITY];
   TC_X509_revocation_node nodes[EXAMPLE_REVOCATION_NODES];
+  TC_X509_revocation_scope scopes[EXAMPLE_CRL_CAPACITY];
+  TC_bytes signer_path[EXAMPLE_X509_PATH_CAPACITY];
+  TC_bytes signer_policies[EXAMPLE_X509_POLICY_CAPACITY];
 } ExampleX509RevocationWorkspace;
 
 /* The path is already validated and held separately from this scratch. */

@@ -77,13 +77,18 @@ static TC_result layout(const TC_validation_capacity* c, uint8_t* arena,
   ARRAY(path.validation.expected,TC_X509_policy_expected,c->policy_expected);
   ARRAY(path.validation.mappings,TC_X509_policy_mapping,c->policy_mappings);
   ARRAY(path.validation.policies,TC_bytes,c->policies);
+  ARRAY(path.validation.certificates,TC_X509_certificate,c->path);
   ARRAY(path.search.path,TC_bytes,c->path);
   ARRAY(path.search.frames,TC_X509_search_frame,c->path);
   ARRAY(path.certificates,TC_bytes,c->certificates);
   ARRAY(path.signature,uint8_t,c->signature_bytes);
+  ARRAY(path.signed_digest,uint8_t,TC_CMS_SIGNED_DIGEST_BYTES);
   ARRAY(credential.held_path,TC_bytes,c->path);
   ARRAY(credential.crl_states,uint8_t,c->crls);
   ARRAY(credential.nodes,TC_X509_revocation_node,c->revocation_nodes);
+  ARRAY(credential.scopes,TC_X509_revocation_scope,c->crls);
+  ARRAY(credential.signer_path,TC_bytes,c->path);
+  ARRAY(credential.signer_policies,TC_bytes,c->policies);
 #undef ARRAY
   w->path.validation.frame_capacity = c->frames;
   w->path.validation.oid_capacity = c->oids;
@@ -94,12 +99,17 @@ static TC_result layout(const TC_validation_capacity* c, uint8_t* arena,
   w->path.validation.expected_capacity = c->policy_expected;
   w->path.validation.mapping_capacity = c->policy_mappings;
   w->path.validation.policy_capacity = c->policies;
+  w->path.validation.certificate_capacity = c->path;
   w->path.search.capacity = c->path;
   w->path.certificate_capacity = c->certificates;
   w->path.signature_capacity = c->signature_bytes;
+  w->path.signed_digest_capacity = TC_CMS_SIGNED_DIGEST_BYTES;
   w->credential.path_capacity = c->path;
   w->credential.crl_capacity = c->crls;
   w->credential.node_capacity = c->revocation_nodes;
+  w->credential.scope_capacity = c->crls;
+  w->credential.signer_path_capacity = c->path;
+  w->credential.signer_policy_capacity = c->policies;
   *bytes = offset;
   return TC_RESULT_OK;
 }
@@ -230,6 +240,7 @@ TC_TLV_result tc_validation_storage(const TC_validation_context* context,
   WRITE(p->search.frames,p->search.capacity);
   WRITE(p->certificates,p->certificate_capacity);
   WRITE(p->signature,p->signature_capacity);
+  WRITE(p->signed_digest,p->signed_digest_capacity);
   WRITE(w->held_path,w->path_capacity);
   WRITE(w->crl_states,w->crl_capacity);
   WRITE(w->nodes,w->node_capacity);
@@ -342,7 +353,10 @@ TC_credential_status TC_X509_validate(TC_bytes encoded,
     revocation.delta_policy,revocation.order_policy};
   const TC_X509_revocation_workspace scratch = {
     &workspace->path->validation,&workspace->path->search,
-    workspace->crl_states,workspace->crl_capacity,workspace->nodes,workspace->node_capacity
+    workspace->crl_states,workspace->crl_capacity,workspace->nodes,workspace->node_capacity,
+    workspace->scopes,workspace->scope_capacity,
+    workspace->signer_path,workspace->signer_path_capacity,
+    workspace->signer_policies,workspace->signer_policy_capacity
   };
   TC_X509_revocation_result checked;
   status = TC_X509_path_check_revocation(workspace->held_path,path.count,

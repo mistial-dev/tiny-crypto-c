@@ -13,6 +13,56 @@ import munit_runner
 
 
 class ReaderTests(unittest.TestCase):
+    def test_primality_records_scope(self):
+        document = {"algorithm": "PrimalityTest", "schema": "primality_test_schema_v1.json",
+                    "numberOfTests": 5, "testGroups": [{"type": "PrimalityTest", "tests": [
+                        {"tcId": 1, "value": "03", "result": "valid", "flags": ["Prime"]},
+                        {"tcId": 2, "value": "09", "result": "invalid", "flags": []},
+                        {"tcId": 3, "value": "02", "result": "valid", "flags": ["Prime"]},
+                        {"tcId": 4, "value": "feff", "result": "acceptable", "flags": ["NegativeOfPrime"]},
+                        {"tcId": 5, "value": "04", "result": "invalid", "flags": []}]}]}
+        records, counts, derived, excluded = wycheproof.primality_records(document)
+        self.assertEqual(records,"03 valid 1\n09 invalid 2\nfeff invalid 4\n04 invalid 5\n")
+        self.assertEqual(counts,{"valid": 1, "invalid": 2})
+        self.assertEqual(derived,{"invalid": 1})
+        self.assertEqual(excluded,{"even-prime": 1})
+        document["numberOfTests"] = 6
+        with self.assertRaises(AssertionError):
+            wycheproof.primality_records(document)
+
+    def test_rsa_generation_records(self):
+        document = {"algorithm": "RSASSA-PKCS1-v1_5",
+                    "schema": "rsassa_pkcs1_generate_schema_v1.json",
+                    "numberOfTests": 2, "testGroups": [{
+                        "type": "RsassaPkcs1Generate", "keySize": 1024,
+                        "sha": "SHA-256", "privateKey": {
+                            "modulus": "80" + "00" * 127,
+                            "publicExponent": "010001", "privateExponent": "03"},
+                        "tests": [{"tcId": 1, "msg": "", "sig": "00" * 128,
+                                   "result": "valid"},
+                                  {"tcId": 2, "msg": "00", "sig": "01" * 128,
+                                   "result": "acceptable"}]}]}
+        records, counts = wycheproof.rsa_generation_records(document)
+        self.assertEqual(counts, {"valid": 1, "acceptable": 1})
+        fields = records.splitlines()[0].split()
+        self.assertEqual(len(fields), 8)
+        self.assertEqual(fields[3], "SHA-256")
+        self.assertEqual(fields[6:], ["match", "1"])
+        self.assertEqual(fields[4], wycheproof.signature_digest("SHA-256", b""))
+        excluded = copy.deepcopy(document)
+        excluded["testGroups"][0]["keySize"] = 4096
+        reasons = wycheproof.Counter()
+        self.assertEqual(wycheproof.rsa_generation_records(excluded,reasons), ("", {}))
+        self.assertEqual(reasons, {(4096,"SHA-256"): 2})
+        invalid = copy.deepcopy(document)
+        invalid["testGroups"][0]["tests"][0]["result"] = "invalid"
+        with self.assertRaises(AssertionError):
+            wycheproof.rsa_generation_records(invalid)
+        invalid = copy.deepcopy(document)
+        invalid["numberOfTests"] = 3
+        with self.assertRaises(AssertionError):
+            wycheproof.rsa_generation_records(invalid)
+
     def test_signature_digest(self):
         self.assertEqual(wycheproof.signature_digest("SHAKE128", b""),
             "7f9c2ba4e88f827d616045507605853ed73b8093f6efbc88eb1a6eacfa66ef26")

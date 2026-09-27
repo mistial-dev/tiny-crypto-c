@@ -5,6 +5,10 @@
 #include "../../src/mp_prime_internal.h"
 #include "../../src/rsa_prime_internal.h"
 #include "munit.h"
+#include "test_util.h"
+#include <stdio.h>
+
+static const char* primality_path;
 
 static uint32_t power(uint32_t base, uint32_t exponent, uint32_t modulus)
 {
@@ -213,9 +217,66 @@ static MunitResult padded_sampling(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+static TC_status corpus_random(void* context, uint8_t* output, size_t length)
+{
+  uint32_t* state = context;
+  for (size_t i = 0; i < length; ++i) {
+    *state ^= *state << 13;
+    *state ^= *state >> 17;
+    *state ^= *state << 5;
+    output[i] = (uint8_t)*state;
+  }
+  return TC_OK;
+}
+
+static MunitResult primality_vectors(const MunitParameter params[], void* user)
+{
+  uint8_t candidate[384];
+  tc_mp_word scratch[12 * (384 / sizeof(tc_mp_word)) + 2];
+  char line[1024];
+  size_t count = 0;
+  FILE* file;
+  (void)params; (void)user;
+  if (!primality_path) return MUNIT_SKIP;
+  file = fopen(primality_path,"r");
+  munit_assert_not_null(file);
+  while (fgets(line,sizeof line,file)) {
+    char* value = strtok(line," \t\r\n");
+    char* verdict = strtok(NULL," \t\r\n");
+    char* id = strtok(NULL," \t\r\n");
+    munit_assert_not_null(value);
+    munit_assert_not_null(verdict);
+    munit_assert_not_null(id);
+    munit_assert_null(strtok(NULL," \t\r\n"));
+    size_t length = tc_test_decode_hex(value,candidate,sizeof candidate);
+    munit_assert_size(length * 2,==,strlen(value));
+    size_t width = (length + sizeof(tc_mp_word) - 1) / sizeof(tc_mp_word) * sizeof(tc_mp_word);
+    uint32_t seed = UINT32_C(0x9e3779b9);
+    for (const char* digit = id; *digit; ++digit) {
+      munit_assert_true(*digit >= '0' && *digit <= '9');
+      seed = seed * 33u + (uint32_t)(*digit - '0');
+    }
+    if (!seed) seed = 1;
+    uint32_t work = UINT32_MAX;
+    TC_RSA_result result = tc_rsa_probable_prime_magnitude((TC_bytes){candidate,length},
+        width,65,corpus_random,&seed,4096,scratch,
+        12 * (width / sizeof(tc_mp_word)) + 2,&work);
+    if (result != TC_RSA_OK && result != TC_RSA_INVALID)
+      munit_errorf("primality vector %s: unexpected status %d",id,result);
+    if ((result == TC_RSA_OK) != !strcmp(verdict,"valid"))
+      munit_errorf("primality vector %s: status %d, expected %s",id,result,verdict);
+    ++count;
+  }
+  munit_assert_int(ferror(file),==,0);
+  munit_assert_int(fclose(file),==,0);
+  munit_assert_size(count,>,0);
+  return MUNIT_OK;
+}
+
 int main(int argc, char** argv)
 {
   MunitTest tests[] = {
+    {"/wycheproof",primality_vectors,NULL,NULL,MUNIT_TEST_OPTION_NONE,NULL},
     {"/small-candidates",small_candidates,NULL,NULL,MUNIT_TEST_OPTION_NONE,NULL},
     {"/pseudoprimes",pseudoprimes,NULL,NULL,MUNIT_TEST_OPTION_NONE,NULL},
     {"/prepared-rounds",prepared_rounds,NULL,NULL,MUNIT_TEST_OPTION_NONE,NULL},
@@ -224,5 +285,10 @@ int main(int argc, char** argv)
     {NULL,NULL,NULL,NULL,MUNIT_TEST_OPTION_NONE,NULL}
   };
   MunitSuite suite = {"/mp/miller-rabin",tests,NULL,1,MUNIT_SUITE_OPTION_NONE};
+  if (argc == 3 && !strcmp(argv[1],"--primality-vectors")) {
+    primality_path = argv[2];
+    argv[1] = "/mp/miller-rabin/wycheproof";
+    argc = 2;
+  }
   return munit_suite_main(&suite,NULL,argc,argv);
 }

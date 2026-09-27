@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
-#include "aes_internal.h"
+#include "aes_mac_core_internal.h"
 
 #if defined(TC_AES_ENABLE_CCM) && (TC_AES_ENABLE_CCM == 1)
 
@@ -32,58 +32,6 @@ static void tc_aes_ccm_store_length(uint8_t* dst, uint64_t value, unsigned lengt
     dst[length] = (uint8_t)value;
     value >>= 8;
   }
-}
-
-static TC_status tc_aes_ccm_mac_block(uint8_t* mac, const uint8_t* block,
-                          const uint8_t* round_key)
-{
-  unsigned i;
-
-  for (i = 0; i < TC_AES_BLOCKLEN; ++i)
-    mac[i] ^= block[i];
-  return tc_aes_cipher((state_t*)mac, round_key);
-}
-
-static TC_status tc_aes_ccm_mac_absorb(uint8_t* mac, uint8_t* block, size_t* used,
-                           const uint8_t* data, size_t length,
-                           const uint8_t* round_key)
-{
-  while (length != 0)
-  {
-    if (*used == 0 && length >= TC_AES_BLOCKLEN)
-    {
-      if (tc_aes_ccm_mac_block(mac, data, round_key) != TC_OK) return TC_ERROR;
-      data += TC_AES_BLOCKLEN;
-      length -= TC_AES_BLOCKLEN;
-      continue;
-    }
-    const size_t available = TC_AES_BLOCKLEN - *used;
-    const size_t count = length < available ? length : available;
-    tc_aes_copy_bytes(block + *used, data, count);
-    *used += count;
-    data += count;
-    length -= count;
-    if (*used == TC_AES_BLOCKLEN)
-    {
-      if (tc_aes_ccm_mac_block(mac, block, round_key) != TC_OK) return TC_ERROR;
-      *used = 0;
-      memset(block, 0, TC_AES_BLOCKLEN);
-    }
-  }
-  return TC_OK;
-}
-
-static TC_status tc_aes_ccm_mac_pad(uint8_t* mac, uint8_t* block, size_t* used,
-                        const uint8_t* round_key)
-{
-  if (*used != 0)
-  {
-    memset(block + *used, 0, TC_AES_BLOCKLEN - *used);
-    if (tc_aes_ccm_mac_block(mac, block, round_key) != TC_OK) return TC_ERROR;
-    *used = 0;
-    memset(block, 0, TC_AES_BLOCKLEN);
-  }
-  return TC_OK;
 }
 
 static void tc_aes_ccm_make_counter(uint8_t* counter, const uint8_t* nonce,
@@ -144,6 +92,8 @@ static TC_status tc_aes_ccm_crypt(const uint8_t* key, const uint8_t* nonce,
     uint8_t s0[TC_AES_BLOCKLEN];
     uint8_t plain[TC_AES_BLOCKLEN];
   } st;
+  const tc_aes_mac_key mac_key = {st.aes.round_key,TC_AES_FIXED_ROUNDS};
+  const tc_mac_cipher mac_cipher = tc_aes_mac_cipher(&mac_key);
   size_t used = 0;
   size_t offset = 0;
   unsigned q;
@@ -175,7 +125,7 @@ static TC_status tc_aes_ccm_crypt(const uint8_t* key, const uint8_t* nonce,
 
   if (TC_AES_key_init(&st.aes, key) != TC_OK)
     goto done;
-  if (tc_aes_ccm_mac_block(st.mac, st.work, st.aes.round_key) != TC_OK) goto done;
+  if (tc_mac_cbc_block(&mac_cipher,st.mac,st.work) != TC_OK) goto done;
 
   if (aad_len != 0)
   {
@@ -201,10 +151,9 @@ static TC_status tc_aes_ccm_crypt(const uint8_t* key, const uint8_t* nonce,
       aad_header[1] = 0xff;
       tc_aes_ccm_store_length(aad_header + 2, (uint64_t)aad_len, 8);
     }
-    if (tc_aes_ccm_mac_absorb(st.mac, st.block, &used, aad_header, header_len,
-                            st.aes.round_key) != TC_OK ||
-        tc_aes_ccm_mac_absorb(st.mac, st.block, &used, aad, aad_len, st.aes.round_key) != TC_OK ||
-        tc_aes_ccm_mac_pad(st.mac, st.block, &used, st.aes.round_key) != TC_OK)
+    if (tc_mac_cbc_update(&mac_cipher,st.mac,st.block,&used,aad_header,header_len,0) != TC_OK ||
+        tc_mac_cbc_update(&mac_cipher,st.mac,st.block,&used,aad,aad_len,0) != TC_OK ||
+        tc_mac_cbc_pad(&mac_cipher,st.mac,st.block,&used) != TC_OK)
       goto done;
   }
 
@@ -218,16 +167,15 @@ static TC_status tc_aes_ccm_crypt(const uint8_t* key, const uint8_t* nonce,
     const size_t length = (input_len - offset < TC_AES_BLOCKLEN) ?
                           input_len - offset : TC_AES_BLOCKLEN;
 
-    if (!decrypt && tc_aes_ccm_mac_absorb(st.mac, st.block, &used,
-                                           input + offset, length,
-                                           st.aes.round_key) != TC_OK)
+    if (!decrypt && tc_mac_cbc_update(&mac_cipher,st.mac,st.block,&used,
+                                      input + offset,length,0) != TC_OK)
       goto done;
     memset(st.plain, 0, TC_AES_BLOCKLEN);
     tc_aes_copy_bytes(st.plain, input + offset, length);
     if (decrypt && tc_aes_ccm_xor_block(st.plain, length, st.counter, st.aes.round_key) != TC_OK)
       goto done;
-    if (decrypt && tc_aes_ccm_mac_absorb(st.mac, st.block, &used, st.plain,
-                                          length, st.aes.round_key) != TC_OK)
+    if (decrypt && tc_mac_cbc_update(&mac_cipher,st.mac,st.block,&used,
+                                     st.plain,length,0) != TC_OK)
       goto done;
     if (!decrypt)
     {
@@ -239,7 +187,7 @@ static TC_status tc_aes_ccm_crypt(const uint8_t* key, const uint8_t* nonce,
     tc_aes_ccm_increment_counter(st.counter, q);
     offset += length;
   }
-  if (tc_aes_ccm_mac_pad(st.mac, st.block, &used, st.aes.round_key) != TC_OK) goto done;
+  if (tc_mac_cbc_pad(&mac_cipher,st.mac,st.block,&used) != TC_OK) goto done;
 
   for (i = 0; i < TC_AES_BLOCKLEN; ++i)
     st.work[i] = (uint8_t)(st.mac[i] ^ st.s0[i]);

@@ -90,6 +90,36 @@ static MunitResult signatures(const MunitParameter params[], void *user)
       munit_assert_int(EVP_PKEY_sign(signer,signature,&length,digest,digest_length), ==, 1);
       munit_assert_int(verify_pss(&key,hash,mgf_hash,
         (size_t)salts[i],(TC_bytes){digest,digest_length},(TC_bytes){signature,length},&workspace,SIZE_MAX), ==, TC_RSA_OK);
+      if (i == 0) {
+        TC_RSA_prepared_public_key prepared = {0};
+        TC_RSA_word cache_words[TC_RSA_RAW_PUBLIC_WORKSPACE_WORDS(3072)];
+        TC_RSA_workspace cache = {cache_words,key.modulus.length / sizeof *cache_words};
+        TC_work_budget setup_work = {(uint32_t)(16 * key.modulus.length + 1)};
+        TC_RSA_pss_options options = {hash,mgf_hash,(size_t)salts[i]};
+        munit_assert_int(TC_RSA_prepare_public_key(&prepared,&key,&cache,&workspace,
+            &setup_work), ==, TC_RSA_OK);
+        munit_assert_uint(setup_work.remaining, ==, 0);
+        TC_work_budget ordinary = {100000};
+        munit_assert_int(TC_RSA_verify_pss_digest(&key,&options,
+            (TC_bytes){digest,digest_length},(TC_bytes){signature,length},
+            &workspace,&ordinary), ==, TC_RSA_OK);
+        for (unsigned repeat = 0; repeat < 2; ++repeat) {
+          TC_work_budget cached = {100000};
+          munit_assert_int(TC_RSA_verify_pss_prepared(&prepared,&options,
+              (TC_bytes){digest,digest_length},(TC_bytes){signature,length},
+              &workspace,&cached), ==, TC_RSA_OK);
+          munit_assert_uint(cached.remaining - ordinary.remaining, ==,
+              16 * key.modulus.length);
+        }
+        digest[0] ^= 1;
+        TC_work_budget invalid = {100000};
+        munit_assert_int(TC_RSA_verify_pss_prepared(&prepared,&options,
+            (TC_bytes){digest,digest_length},(TC_bytes){signature,length},
+            &workspace,&invalid), ==, TC_RSA_INVALID);
+        digest[0] ^= 1;
+        TC_RSA_prepared_public_key_clear(&prepared);
+        munit_assert_true(tc_test_all_zero(cache_words,key.modulus.length));
+      }
       munit_assert_true(tc_test_all_zero(scratch,TC_RSA_verify_workspace_words(bits) * sizeof scratch[0]));
       munit_assert_int(verify_pss(&key,hash,mgf_hash,
         (size_t)salts[i] + 1,(TC_bytes){digest,digest_length},(TC_bytes){signature,length},&workspace,SIZE_MAX), ==, TC_RSA_INVALID);

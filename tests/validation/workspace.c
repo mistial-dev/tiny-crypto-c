@@ -24,6 +24,7 @@ static MunitResult profiles(const MunitParameter params[], void* context)
         (TC_buffer){(uint8_t*)arena,bytes},&workspace),==,TC_RESULT_OK);
     munit_assert_ptr_equal(workspace.credential.path,&workspace.path);
     munit_assert_size(workspace.path.search.capacity,==,capacity.path);
+    munit_assert_size(workspace.path.validation.certificate_capacity,==,capacity.path);
     munit_assert_size(workspace.credential.path_capacity,==,capacity.path);
     munit_assert_size(workspace.path.validation.names.scalar_capacity,==,capacity.name_scalars);
     const void* starts[] = {workspace.path.validation.frames,
@@ -31,7 +32,8 @@ static MunitResult profiles(const MunitParameter params[], void* context)
       workspace.path.validation.names.right,workspace.path.validation.names.matched,
       workspace.path.validation.nodes,workspace.path.validation.edges,
       workspace.path.validation.expected,workspace.path.validation.mappings,
-      workspace.path.validation.policies,workspace.path.search.path,
+      workspace.path.validation.policies,workspace.path.validation.certificates,
+      workspace.path.search.path,
       workspace.path.search.frames,workspace.path.certificates,workspace.path.signature,
       workspace.credential.held_path,workspace.credential.crl_states,workspace.credential.nodes};
     uintptr_t last = (uintptr_t)arena;

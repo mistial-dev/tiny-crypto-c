@@ -11,6 +11,49 @@
 #include <tiny_crypto/hash.h>
 #include "test_util.h"
 #include "test_vectors.h"
+#include "../../src/hash_stream_internal.h"
+
+typedef struct {
+  uint8_t last[128];
+  size_t block_bytes;
+  unsigned calls;
+} hash_stream_capture;
+
+static void capture_hash_block(void* context, const uint8_t* block)
+{
+  hash_stream_capture* capture = (hash_stream_capture*)context;
+  memcpy(capture->last, block, capture->block_bytes);
+  ++capture->calls;
+}
+
+static MunitResult test_hash_stream_length_fields(const MunitParameter params[], void* data)
+{
+  hash_stream_capture capture = {{0},128u,0u};
+  uint8_t block[128] = {0};
+  uint8_t used = 112u;
+  (void)params;
+  (void)data;
+
+  /* SHA-512's high length word first becomes nonzero at 2^61 bytes. */
+  tc_hash_stream_finish(&capture, UINT64_C(1) << 61, &used, block,
+                        128u, 16u, TC_HASH_LENGTH_BIG_ENDIAN,
+                        capture_hash_block);
+  munit_assert_uint(capture.calls, ==, 2u);
+  munit_assert_uint8(capture.last[119], ==, 1u);
+  munit_assert_uint8(capture.last[127], ==, 0u);
+
+  capture.block_bytes = 64u;
+  capture.calls = 0u;
+  used = 0u;
+  memset(block, 0, sizeof block);
+  tc_hash_stream_finish(&capture, 1u, &used, block,
+                        64u, 8u, TC_HASH_LENGTH_LITTLE_ENDIAN,
+                        capture_hash_block);
+  munit_assert_uint(capture.calls, ==, 1u);
+  munit_assert_uint8(capture.last[56], ==, 8u);
+  munit_assert_uint8(capture.last[63], ==, 0u);
+  return MUNIT_OK;
+}
 
 /* Provided by hmac_test.c (returns MUNIT_SKIP when HMAC is disabled). */
 MunitResult test_hmac_rfc(const MunitParameter params[], void* data);
@@ -250,6 +293,7 @@ static MunitResult test_ct_eq(const MunitParameter params[], void* data)
 /* --- Test Suite Setup --- */
 
 static MunitTest test_suite_tests[] = {
+  { "/stream/length_fields", test_hash_stream_length_fields, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL },
 #if TC_ENABLE_SHA256
   { "/sha256/fips",        test_sha256_fips,        NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL },
   { "/sha256/million_a",   test_sha256_million,     NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL },

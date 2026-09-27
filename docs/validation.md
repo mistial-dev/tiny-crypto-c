@@ -23,6 +23,8 @@ adjustable before sizing the arena.
 Profiles select resource capacities. Build options select algorithms. Choose
 capacities for your provisioned trust set and the credentials you accept; a
 limit result requires an application decision about additional resources.
+The path capacity allocates one parsed certificate view per path entry. Views
+borrow the original certificate DER during validation.
 
 ```c
 #include <tiny_crypto/validation.h>
@@ -51,6 +53,9 @@ remain useful when each array has a fixed application-defined location.
 Keep the workspace descriptor at the address used during initialization.
 Place large arenas in static or application-owned memory on constrained devices.
 One operation at a time may use an arena. Signature-provider scratch is separate.
+The arena sizes CRL scope slots from `capacity.crls`, signer path spans from
+`capacity.path`, and signer policy spans from `capacity.policies`. It also holds
+64 bytes for the signed-attribute digest during CMS signer search.
 
 ## Configure policy and trust
 

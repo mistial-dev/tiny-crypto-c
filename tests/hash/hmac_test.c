@@ -564,6 +564,8 @@ MunitResult test_hmac_streaming(const MunitParameter params[], void* data)
     munit_assert_int(TC_HMAC_SHA256_digest(key, sizeof(key), NULL, 0, expected, TC_SHA256_DIGESTLEN), ==, TC_OK);
     munit_assert_int(TC_HMAC_SHA256_init(&ctx, key, sizeof(key)), ==, TC_OK);
     munit_assert_int(TC_HMAC_SHA256_update(&ctx, NULL, 0), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA256_update(&ctx, (const uint8_t*)ctx.OuterState, 1), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA256_final(&ctx, (uint8_t*)ctx.OuterState), ==, TC_ERROR);
     munit_assert_int(TC_HMAC_SHA256_final(&ctx, tag), ==, TC_OK);
     munit_assert_memory_equal(TC_SHA256_DIGESTLEN, tag, expected);
     TC_HMAC_SHA256_ctx_clear(&ctx);
@@ -645,6 +647,8 @@ MunitResult test_hmac_streaming(const MunitParameter params[], void* data)
     munit_assert_int(TC_HMAC_SHA512_digest(key, sizeof(key), NULL, 0, expected, TC_SHA512_DIGESTLEN), ==, TC_OK);
     munit_assert_int(TC_HMAC_SHA512_init(&ctx, key, sizeof(key)), ==, TC_OK);
     munit_assert_int(TC_HMAC_SHA512_update(&ctx, NULL, 0), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA512_update(&ctx, (const uint8_t*)ctx.OuterState, 1), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA512_final(&ctx, (uint8_t*)ctx.OuterState), ==, TC_ERROR);
     munit_assert_int(TC_HMAC_SHA512_final(&ctx, tag), ==, TC_OK);
     munit_assert_memory_equal(TC_SHA512_DIGESTLEN, tag, expected);
 #if TC_STRICT

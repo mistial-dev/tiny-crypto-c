@@ -157,6 +157,162 @@ static void tc_hash_stream_final(uint32_t* state, size_t state_words,
     tc_hash_store_be32(digest + (4u * i), state[i]);
 }
 
+/* AVR single-algorithm builds bind the shared body to compile-time
+ * constants. Multi-algorithm builds keep descriptors in program memory. */
+#if defined(__AVR__) && TC_AVR_PROGMEM
+#define TC_HASH_DESC_STORAGE PROGMEM
+#else
+#define TC_HASH_DESC_STORAGE
+#endif
+
+#if defined(__AVR__) && TC_AVR_PROGMEM && \
+    (TC_ENABLE_SHA1 + TC_ENABLE_SHA224 + TC_ENABLE_SHA256 == 1)
+#if TC_ENABLE_SHA1
+#define TC_HASH32_TYPE TC_SHA1_ctx
+#define TC_HMAC32_TYPE TC_HMAC_SHA1_ctx
+#define TC_HASH32_WORDS 5
+#define TC_HASH32_LENGTH TC_SHA1_DIGESTLEN
+#define TC_HASH32_INIT tc_hash_sha1_state_init
+#define TC_HASH32_COMPRESS tc_hash_sha1_compress
+#define TC_HASH32_SECRET tc_hash_sha1_compress_secret
+#elif TC_ENABLE_SHA224
+#define TC_HASH32_TYPE TC_SHA224_ctx
+#define TC_HMAC32_TYPE TC_HMAC_SHA224_ctx
+#define TC_HASH32_WORDS 7
+#define TC_HASH32_LENGTH TC_SHA224_DIGESTLEN
+#define TC_HASH32_INIT tc_hash_sha224_state_init
+#define TC_HASH32_COMPRESS tc_hash_sha256_compress
+#define TC_HASH32_SECRET tc_hash_sha256_compress_secret
+#else
+#define TC_HASH32_TYPE TC_SHA256_ctx
+#define TC_HMAC32_TYPE TC_HMAC_SHA256_ctx
+#define TC_HASH32_WORDS 8
+#define TC_HASH32_LENGTH TC_SHA256_DIGESTLEN
+#define TC_HASH32_INIT tc_hash_sha256_state_init
+#define TC_HASH32_COMPRESS tc_hash_sha256_compress
+#define TC_HASH32_SECRET tc_hash_sha256_compress_secret
+#endif
+#define TC_HASH32_FIELD_context_size sizeof(struct TC_HASH32_TYPE)
+#define TC_HASH32_FIELD_count_offset offsetof(struct TC_HASH32_TYPE, Count)
+#define TC_HASH32_FIELD_state_offset offsetof(struct TC_HASH32_TYPE, State)
+#define TC_HASH32_FIELD_buf_len_offset offsetof(struct TC_HASH32_TYPE, BufLen)
+#define TC_HASH32_FIELD_active_offset offsetof(struct TC_HASH32_TYPE, active)
+#define TC_HASH32_FIELD_buffer_offset offsetof(struct TC_HASH32_TYPE, Buf)
+#define TC_HASH32_FIELD_state_words TC_HASH32_WORDS
+#define TC_HASH32_FIELD_digest_len TC_HASH32_LENGTH
+#define TC_HASH32_FIELD_state_init TC_HASH32_INIT
+#define TC_HASH32_FIELD_compress TC_HASH32_COMPRESS
+#define TC_HASH32_FIELD_compress_secret TC_HASH32_SECRET
+#define TC_HMAC32_FIELD_context_size sizeof(struct TC_HMAC32_TYPE)
+#define TC_HMAC32_FIELD_outer_offset offsetof(struct TC_HMAC32_TYPE, OuterState)
+#define TC_HMAC32_FIELD_hash ((const tc_hash32_info*)0)
+#define TC_HASH32_READ(info, field) TC_HASH32_FIELD_##field
+#define TC_HMAC32_READ(info, field) TC_HMAC32_FIELD_##field
+#define TC_HASH_DESC_LOAD(type, source, local) (void)(source)
+#elif defined(__AVR__) && TC_AVR_PROGMEM
+#define TC_HASH32_READ(info, field) ((info)->field)
+#define TC_HMAC32_READ(info, field) ((info)->field)
+#define TC_HASH_DESC_LOAD(type, source, local) \
+  type local; memcpy_P(&local, source, sizeof(local)); source = &local
+#else
+#define TC_HASH32_READ(info, field) ((info)->field)
+#define TC_HMAC32_READ(info, field) ((info)->field)
+#define TC_HASH_DESC_LOAD(type, source, local)
+#endif
+
+#if defined(__AVR__) && TC_AVR_PROGMEM && \
+    (TC_ENABLE_SHA1 + TC_ENABLE_SHA224 + TC_ENABLE_SHA256 == 1)
+static void TC_HASH32_INIT(uint32_t*);
+static void TC_HASH32_COMPRESS(uint32_t*, const uint8_t*);
+#if TC_ENABLE_HMAC
+static void TC_HASH32_SECRET(uint32_t*, const uint8_t*);
+#endif
+#endif
+
+/* Member offsets keep SHA-1's five-word state compact while sharing the
+ * operation bodies with SHA-224 and SHA-256. Each offset names a typed member. */
+typedef struct {
+  size_t context_size, count_offset, state_offset, buf_len_offset;
+  size_t active_offset, buffer_offset;
+  uint8_t state_words, digest_len;
+  void (*state_init)(uint32_t*);
+  tc_hash_compress_fn compress, compress_secret;
+} tc_hash32_info;
+
+#define TC_HASH32_MEMBER(ctx, info, member, type) \
+  ((type*)((uint8_t*)(ctx) + TC_HASH32_READ(info, member##_offset)))
+
+static TC_status tc_hash32_init(const tc_hash32_info* info, void* ctx)
+{
+  TC_HASH_DESC_LOAD(tc_hash32_info, info, local_info);
+  if (ctx == NULL) return TC_ERROR;
+  TC_secure_zero(ctx, TC_HASH32_READ(info, context_size));
+  TC_HASH32_READ(info, state_init)(TC_HASH32_MEMBER(ctx, info, state, uint32_t));
+  *TC_HASH32_MEMBER(ctx, info, active, uint8_t) = 1;
+  return TC_OK;
+}
+
+static TC_status tc_hash32_update(const tc_hash32_info* info, void* ctx,
+                                  const uint8_t* data, size_t len)
+{
+  TC_HASH_DESC_LOAD(tc_hash32_info, info, local_info);
+  if (!tc_hash_update_args(ctx, TC_HASH32_READ(info, context_size), data, len) ||
+      *TC_HASH32_MEMBER(ctx, info, active, uint8_t) != 1 ||
+      *TC_HASH32_MEMBER(ctx, info, buf_len, uint8_t) >= 64)
+    return TC_ERROR;
+  return tc_hash_stream_update(TC_HASH32_MEMBER(ctx, info, state, uint32_t),
+      TC_HASH32_MEMBER(ctx, info, count, uint64_t),
+      TC_HASH32_MEMBER(ctx, info, buf_len, uint8_t),
+      TC_HASH32_MEMBER(ctx, info, buffer, uint8_t), data, len, TC_HASH32_READ(info, compress));
+}
+
+static TC_status tc_hash32_final(const tc_hash32_info* info, void* ctx,
+                                 uint8_t* digest)
+{
+  TC_HASH_DESC_LOAD(tc_hash32_info, info, local_info);
+  if (!tc_hash_final_args(ctx, TC_HASH32_READ(info, context_size), digest, TC_HASH32_READ(info, digest_len)) ||
+      *TC_HASH32_MEMBER(ctx, info, active, uint8_t) != 1 ||
+      *TC_HASH32_MEMBER(ctx, info, buf_len, uint8_t) >= 64)
+    return TC_ERROR;
+  tc_hash_stream_final(TC_HASH32_MEMBER(ctx, info, state, uint32_t),
+      TC_HASH32_READ(info, state_words), *TC_HASH32_MEMBER(ctx, info, count, uint64_t),
+      TC_HASH32_MEMBER(ctx, info, buf_len, uint8_t),
+      TC_HASH32_MEMBER(ctx, info, buffer, uint8_t), digest, TC_HASH32_READ(info, compress));
+#if TC_ZEROIZE
+  TC_secure_zero(ctx, TC_HASH32_READ(info, context_size));
+#else
+  *TC_HASH32_MEMBER(ctx, info, active, uint8_t) = 0;
+#endif
+  return TC_OK;
+}
+
+static void tc_hash32_clear(const tc_hash32_info* info, void* ctx)
+{
+  TC_HASH_DESC_LOAD(tc_hash32_info, info, local_info);
+  if (ctx != NULL) TC_secure_zero(ctx, TC_HASH32_READ(info, context_size));
+}
+
+#define TC_HASH32_INFO(name, type, words, length, init_fn, compress_fn, secret_fn) \
+  static const tc_hash32_info name TC_HASH_DESC_STORAGE = { sizeof(struct type), \
+    offsetof(struct type, Count), offsetof(struct type, State), \
+    offsetof(struct type, BufLen), offsetof(struct type, active), \
+    offsetof(struct type, Buf), words, length, init_fn, compress_fn, secret_fn }
+
+
+/* Callers provide their typed context so each digest uses its exact stack size. */
+static TC_status tc_hash32_digest(const tc_hash32_info* info,
+    void* workspace, const uint8_t* data, size_t len, uint8_t* digest)
+{
+  if (digest == NULL || (len != 0 && data == NULL)) return TC_ERROR;
+  if (tc_hash32_init(info, workspace) != TC_OK ||
+      tc_hash32_update(info, workspace, data, len) != TC_OK)
+  {
+    tc_hash32_clear(info, workspace);
+    return TC_ERROR;
+  }
+  return tc_hash32_final(info, workspace, digest);
+}
+
 /*****************************************************************************/
 /* SHA-1                                                                     */
 /*****************************************************************************/
@@ -270,64 +426,39 @@ static void tc_hash_sha1_state_init(uint32_t state[5])
   state[4] = 0xC3D2E1F0U;
 }
 
+#if TC_ENABLE_HMAC
+#define TC_SHA1_SECRET tc_hash_sha1_compress_secret
+#else
+#define TC_SHA1_SECRET NULL
+#endif
+TC_HASH32_INFO(tc_sha1_info, TC_SHA1_ctx, 5, TC_SHA1_DIGESTLEN,
+               tc_hash_sha1_state_init, tc_hash_sha1_compress, TC_SHA1_SECRET);
+#undef TC_SHA1_SECRET
+
 TC_status TC_SHA1_init(struct TC_SHA1_ctx* ctx)
 {
-  if (ctx == NULL)
-    return TC_ERROR;
-  /* Wipe Buf as well as State: re-init without *_ctx_clear would otherwise
-     leave the previous partial block (HMAC pad residue or message) in RAM. */
-  TC_secure_zero(ctx, sizeof(*ctx));
-  tc_hash_sha1_state_init(ctx->State);
-  ctx->active = 1;
-  return TC_OK;
+  return tc_hash32_init(&tc_sha1_info, ctx);
 }
 
 TC_status TC_SHA1_update(struct TC_SHA1_ctx* ctx, const uint8_t* data, size_t len)
 {
-  if (!tc_hash_update_args(ctx, sizeof *ctx, data, len) ||
-      ctx->active != 1 || ctx->BufLen >= TC_SHA1_BLOCKLEN)
-    return TC_ERROR;
-  return tc_hash_stream_update(ctx->State, &ctx->Count, &ctx->BufLen, ctx->Buf,
-                            data, len, tc_hash_sha1_compress);
+  return tc_hash32_update(&tc_sha1_info, ctx, data, len);
 }
 
 TC_status TC_SHA1_final(struct TC_SHA1_ctx* ctx, uint8_t* digest)
 {
-  if (!tc_hash_final_args(ctx, sizeof *ctx, digest, TC_SHA1_DIGESTLEN) ||
-      ctx->active != 1 || ctx->BufLen >= TC_SHA1_BLOCKLEN)
-    return TC_ERROR;
-  tc_hash_stream_final(ctx->State, 5, ctx->Count, &ctx->BufLen, ctx->Buf,
-                    digest, tc_hash_sha1_compress);
-
-#if TC_ZEROIZE
-  TC_secure_zero(ctx, sizeof(*ctx));
-#else
-  ctx->active = 0;
-#endif
-  return TC_OK;
+  return tc_hash32_final(&tc_sha1_info, ctx, digest);
 }
 
 void TC_SHA1_ctx_clear(struct TC_SHA1_ctx* ctx)
 {
-  if (ctx == NULL)
-    return;
-  TC_secure_zero(ctx, sizeof(*ctx));
+  tc_hash32_clear(&tc_sha1_info, ctx);
 }
 
 TC_status TC_SHA1_digest(const uint8_t* data, size_t len, uint8_t* digest)
 {
   struct TC_SHA1_ctx ctx;
-
-  if (digest == NULL || (len != 0 && data == NULL))
-    return TC_ERROR;
-
-  TC_SHA1_init(&ctx);
-  if (TC_SHA1_update(&ctx, data, len) != TC_OK)
-  {
-    TC_SHA1_ctx_clear(&ctx);
-    return TC_ERROR;
-  }
-  return TC_SHA1_final(&ctx, digest);
+  return tc_hash32_digest(&tc_sha1_info, &ctx, data, len, digest);
 }
 
 #endif /* TC_ENABLE_SHA1 */
@@ -449,64 +580,39 @@ static void tc_hash_sha256_state_init(uint32_t state[8])
   state[7] = 0x5BE0CD19U;
 }
 
+#if TC_ENABLE_HMAC
+#define TC_SHA256_SECRET tc_hash_sha256_compress_secret
+#else
+#define TC_SHA256_SECRET NULL
+#endif
+TC_HASH32_INFO(tc_sha256_info, TC_SHA256_ctx, 8, TC_SHA256_DIGESTLEN,
+               tc_hash_sha256_state_init, tc_hash_sha256_compress, TC_SHA256_SECRET);
+#undef TC_SHA256_SECRET
+
 TC_status TC_SHA256_init(struct TC_SHA256_ctx* ctx)
 {
-  if (ctx == NULL)
-    return TC_ERROR;
-  /* Wipe Buf as well as State: re-init without *_ctx_clear would otherwise
-     leave the previous partial block (HMAC pad residue or message) in RAM. */
-  TC_secure_zero(ctx, sizeof(*ctx));
-  tc_hash_sha256_state_init(ctx->State);
-  ctx->active = 1;
-  return TC_OK;
+  return tc_hash32_init(&tc_sha256_info, ctx);
 }
 
 TC_status TC_SHA256_update(struct TC_SHA256_ctx* ctx, const uint8_t* data, size_t len)
 {
-  if (!tc_hash_update_args(ctx, sizeof *ctx, data, len) ||
-      ctx->active != 1 || ctx->BufLen >= TC_SHA256_BLOCKLEN)
-    return TC_ERROR;
-  return tc_hash_stream_update(ctx->State, &ctx->Count, &ctx->BufLen, ctx->Buf,
-                            data, len, tc_hash_sha256_compress);
+  return tc_hash32_update(&tc_sha256_info, ctx, data, len);
 }
 
 TC_status TC_SHA256_final(struct TC_SHA256_ctx* ctx, uint8_t* digest)
 {
-  if (!tc_hash_final_args(ctx, sizeof *ctx, digest, TC_SHA256_DIGESTLEN) ||
-      ctx->active != 1 || ctx->BufLen >= TC_SHA256_BLOCKLEN)
-    return TC_ERROR;
-  tc_hash_stream_final(ctx->State, 8, ctx->Count, &ctx->BufLen, ctx->Buf,
-                    digest, tc_hash_sha256_compress);
-
-#if TC_ZEROIZE
-  TC_secure_zero(ctx, sizeof(*ctx));
-#else
-  ctx->active = 0;
-#endif
-  return TC_OK;
+  return tc_hash32_final(&tc_sha256_info, ctx, digest);
 }
 
 void TC_SHA256_ctx_clear(struct TC_SHA256_ctx* ctx)
 {
-  if (ctx == NULL)
-    return;
-  TC_secure_zero(ctx, sizeof(*ctx));
+  tc_hash32_clear(&tc_sha256_info, ctx);
 }
 
 TC_status TC_SHA256_digest(const uint8_t* data, size_t len, uint8_t* digest)
 {
   struct TC_SHA256_ctx ctx;
-
-  if (digest == NULL || (len != 0 && data == NULL))
-    return TC_ERROR;
-
-  TC_SHA256_init(&ctx);
-  if (TC_SHA256_update(&ctx, data, len) != TC_OK)
-  {
-    TC_SHA256_ctx_clear(&ctx);
-    return TC_ERROR;
-  }
-  return TC_SHA256_final(&ctx, digest);
+  return tc_hash32_digest(&tc_sha256_info, &ctx, data, len, digest);
 }
 
 #endif /* TC_ENABLE_SHA256 */
@@ -527,63 +633,39 @@ static void tc_hash_sha224_state_init(uint32_t state[8])
   state[7] = 0xBEFA4FA4U;
 }
 
+#if TC_ENABLE_HMAC
+#define TC_SHA224_SECRET tc_hash_sha256_compress_secret
+#else
+#define TC_SHA224_SECRET NULL
+#endif
+TC_HASH32_INFO(tc_sha224_info, TC_SHA224_ctx, 7, TC_SHA224_DIGESTLEN,
+               tc_hash_sha224_state_init, tc_hash_sha256_compress, TC_SHA224_SECRET);
+#undef TC_SHA224_SECRET
+
 TC_status TC_SHA224_init(struct TC_SHA224_ctx* ctx)
 {
-  if (ctx == NULL)
-    return TC_ERROR;
-  TC_secure_zero(ctx, sizeof(*ctx));
-  tc_hash_sha224_state_init(ctx->State);
-  ctx->active = 1;
-  return TC_OK;
+  return tc_hash32_init(&tc_sha224_info, ctx);
 }
 
 TC_status TC_SHA224_update(struct TC_SHA224_ctx* ctx, const uint8_t* data, size_t len)
 {
-  if (!tc_hash_update_args(ctx, sizeof *ctx, data, len) ||
-      ctx->active != 1 || ctx->BufLen >= TC_SHA224_BLOCKLEN)
-    return TC_ERROR;
-  return tc_hash_stream_update(ctx->State, &ctx->Count, &ctx->BufLen, ctx->Buf,
-                            data, len, tc_hash_sha256_compress);
+  return tc_hash32_update(&tc_sha224_info, ctx, data, len);
 }
 
 TC_status TC_SHA224_final(struct TC_SHA224_ctx* ctx, uint8_t* digest)
 {
-  if (!tc_hash_final_args(ctx, sizeof *ctx, digest, TC_SHA224_DIGESTLEN) ||
-      ctx->active != 1 || ctx->BufLen >= TC_SHA224_BLOCKLEN)
-    return TC_ERROR;
-  /* Emit the leftmost seven state words (224 bits). */
-  tc_hash_stream_final(ctx->State, 7, ctx->Count, &ctx->BufLen, ctx->Buf,
-                    digest, tc_hash_sha256_compress);
-
-#if TC_ZEROIZE
-  TC_secure_zero(ctx, sizeof(*ctx));
-#else
-  ctx->active = 0;
-#endif
-  return TC_OK;
+  return tc_hash32_final(&tc_sha224_info, ctx, digest);
 }
 
 void TC_SHA224_ctx_clear(struct TC_SHA224_ctx* ctx)
 {
-  if (ctx == NULL)
-    return;
-  TC_secure_zero(ctx, sizeof(*ctx));
+  tc_hash32_clear(&tc_sha224_info, ctx);
 }
 
 TC_status TC_SHA224_digest(const uint8_t* data, size_t len, uint8_t* digest)
 {
   struct TC_SHA224_ctx ctx;
-
-  if (digest == NULL || (len != 0 && data == NULL))
-    return TC_ERROR;
-
-  TC_SHA224_init(&ctx);
-  if (TC_SHA224_update(&ctx, data, len) != TC_OK)
-  {
-    TC_SHA224_ctx_clear(&ctx);
-    return TC_ERROR;
-  }
-  return TC_SHA224_final(&ctx, digest);
+  return tc_hash32_digest(&tc_sha224_info, &ctx, data, len, digest);
 }
 
 #endif /* TC_ENABLE_SHA224 */
@@ -671,337 +753,244 @@ static void tc_hash_hmac_outer_final(uint32_t* state, size_t state_words,
 #endif
 }
 
-#if TC_ENABLE_SHA1
 
-TC_status TC_HMAC_SHA1_init(struct TC_HMAC_SHA1_ctx* ctx, const uint8_t* key, size_t keylen)
+typedef struct {
+  const tc_hash32_info* hash;
+  size_t context_size, outer_offset;
+} tc_hmac32_info;
+
+static TC_status tc_hmac32_init(const tc_hmac32_info* info, void* ctx,
+                                const uint8_t* key, size_t keylen)
 {
-  if (ctx == NULL)
-    return TC_ERROR;
-  TC_secure_zero(ctx, sizeof(*ctx));
-  if (keylen != 0 && key == NULL)
-    return TC_ERROR;
-  if (tc_hash_hmac_init_common(ctx->Inner.State, &ctx->Inner.Count,
-                          &ctx->Inner.BufLen, ctx->Inner.Buf, ctx->OuterState,
-                          5, key, keylen, tc_hash_sha1_state_init,
-                          tc_hash_sha1_compress_secret) != TC_OK) {
-    TC_secure_zero(ctx, sizeof(*ctx));
+  TC_HASH_DESC_LOAD(tc_hmac32_info, info, local_info);
+  uint8_t* inner = ctx;
+  const tc_hash32_info* hash = TC_HMAC32_READ(info, hash);
+  TC_HASH_DESC_LOAD(tc_hash32_info, hash, local_hash);
+  if (ctx == NULL) return TC_ERROR;
+  TC_secure_zero(ctx, TC_HMAC32_READ(info, context_size));
+  if (keylen != 0 && key == NULL) return TC_ERROR;
+  if (tc_hash_hmac_init_common(TC_HASH32_MEMBER(inner, hash, state, uint32_t),
+          TC_HASH32_MEMBER(inner, hash, count, uint64_t),
+          TC_HASH32_MEMBER(inner, hash, buf_len, uint8_t),
+          TC_HASH32_MEMBER(inner, hash, buffer, uint8_t),
+          (uint32_t*)((uint8_t*)ctx + TC_HMAC32_READ(info, outer_offset)), TC_HASH32_READ(hash, state_words),
+          key, keylen, TC_HASH32_READ(hash, state_init), TC_HASH32_READ(hash, compress_secret)) != TC_OK)
+  {
+    TC_secure_zero(ctx, TC_HMAC32_READ(info, context_size));
     return TC_ERROR;
   }
-  ctx->Inner.active = 1;
+  *TC_HASH32_MEMBER(inner, hash, active, uint8_t) = 1;
   return TC_OK;
 }
 
-TC_status TC_HMAC_SHA1_update(struct TC_HMAC_SHA1_ctx* ctx, const uint8_t* data, size_t len)
+static TC_status tc_hmac32_update(const tc_hmac32_info* info, void* ctx,
+                                  const uint8_t* data, size_t len)
 {
-  if (ctx == NULL)
-    return TC_ERROR;
-  return TC_SHA1_update(&ctx->Inner, data, len);
+  TC_HASH_DESC_LOAD(tc_hmac32_info, info, local_info);
+  if (!tc_hash_update_args(ctx, info->context_size, data, len)) return TC_ERROR;
+  return tc_hash32_update(TC_HMAC32_READ(info, hash), ctx, data, len);
 }
 
-TC_status TC_HMAC_SHA1_final(struct TC_HMAC_SHA1_ctx* ctx, uint8_t* tag)
+static TC_status tc_hmac32_final(const tc_hmac32_info* info, void* ctx,
+                                 uint8_t* tag)
 {
-  uint8_t inner[TC_SHA1_DIGESTLEN];
-
-  if (ctx == NULL || tag == NULL)
-    return TC_ERROR;
-
-  /* One-shot: TC_ZEROIZE wipes the context; call TC_HMAC_SHA1_init to reuse. */
-  if (TC_SHA1_final(&ctx->Inner, inner) != TC_OK)
+  TC_HASH_DESC_LOAD(tc_hmac32_info, info, local_info);
+  uint8_t inner[TC_SHA256_DIGESTLEN];
+  const tc_hash32_info* hash = TC_HMAC32_READ(info, hash);
+  const tc_hash32_info* hash_flash = hash;
+  TC_HASH_DESC_LOAD(tc_hash32_info, hash, local_hash);
+  if (!tc_hash_final_args(ctx, TC_HMAC32_READ(info, context_size),
+                          tag, TC_HASH32_READ(hash, digest_len))) return TC_ERROR;
+  if (tc_hash32_final(hash_flash, ctx, inner) != TC_OK)
   {
-    TC_HMAC_SHA1_ctx_clear(ctx);
+    TC_secure_zero(ctx, TC_HMAC32_READ(info, context_size));
     return TC_ERROR;
   }
-  tc_hash_hmac_outer_final(ctx->OuterState, 5, TC_SHA1_DIGESTLEN, inner, tag,
-                   tc_hash_sha1_compress_secret);
-
+  tc_hash_hmac_outer_final((uint32_t*)((uint8_t*)ctx + TC_HMAC32_READ(info, outer_offset)),
+      TC_HASH32_READ(hash, state_words), TC_HASH32_READ(hash, digest_len), inner, tag, TC_HASH32_READ(hash, compress_secret));
 #if TC_ZEROIZE
   TC_secure_zero(inner, sizeof(inner));
-  TC_secure_zero(ctx, sizeof(*ctx));
+  TC_secure_zero(ctx, TC_HMAC32_READ(info, context_size));
 #endif
   return TC_OK;
 }
 
-void TC_HMAC_SHA1_ctx_clear(struct TC_HMAC_SHA1_ctx* ctx)
+static void tc_hmac32_clear(const tc_hmac32_info* info, void* ctx)
 {
-  if (ctx == NULL)
-    return;
-  TC_secure_zero(ctx, sizeof(*ctx));
+  TC_HASH_DESC_LOAD(tc_hmac32_info, info, local_info);
+  if (ctx != NULL) TC_secure_zero(ctx, TC_HMAC32_READ(info, context_size));
 }
 
-TC_status TC_HMAC_SHA1_digest(const uint8_t* key, size_t keylen,
-                  const uint8_t* msg, size_t msg_len,
-              uint8_t* tag, size_t tag_len)
+#define TC_HMAC32_INFO(name, type, hash_info) \
+  static const tc_hmac32_info name TC_HASH_DESC_STORAGE = { &hash_info, sizeof(struct type), \
+    offsetof(struct type, OuterState) }
+
+
+static uint8_t tc_hmac32_digest_size(const tc_hmac32_info* info)
 {
-  struct TC_HMAC_SHA1_ctx ctx;
-  uint8_t full[TC_SHA1_DIGESTLEN];
+  const tc_hash32_info* hash;
+  TC_HASH_DESC_LOAD(tc_hmac32_info, info, local_info);
+  hash = TC_HMAC32_READ(info, hash);
+  TC_HASH_DESC_LOAD(tc_hash32_info, hash, local_hash);
+  return TC_HASH32_READ(hash, digest_len);
+}
 
-  if (tag == NULL ||
-      tag_len < TC_HMAC_MIN_TAG_LEN || tag_len > TC_SHA1_DIGESTLEN ||
-      (msg_len != 0 && msg == NULL))
-  {
+static TC_status tc_hmac32_digest(const tc_hmac32_info* info,
+    void* workspace, const uint8_t* key, size_t keylen, const uint8_t* msg, size_t msg_len,
+    uint8_t* tag, size_t tag_len)
+{
+  uint8_t full[32];
+  if (tag == NULL || tag_len < TC_HMAC_MIN_TAG_LEN ||
+      tag_len > tc_hmac32_digest_size(info) || (msg_len != 0 && msg == NULL))
     return TC_ERROR;
-  }
-  if (TC_HMAC_SHA1_init(&ctx, key, keylen) != TC_OK)
-    return TC_ERROR;
-
-  if (TC_HMAC_SHA1_update(&ctx, msg, msg_len) != TC_OK ||
-      TC_HMAC_SHA1_final(&ctx, full) != TC_OK)
+  if (tc_hmac32_init(info, workspace, key, keylen) != TC_OK) return TC_ERROR;
+  if (tc_hmac32_update(info, workspace, msg, msg_len) != TC_OK ||
+      tc_hmac32_final(info, workspace, full) != TC_OK)
   {
-    TC_HMAC_SHA1_ctx_clear(&ctx);
+    tc_hmac32_clear(info, workspace);
     TC_secure_zero(full, sizeof(full));
     return TC_ERROR;
   }
   memcpy(tag, full, tag_len);
-
 #if TC_ZEROIZE
   TC_secure_zero(full, sizeof(full));
 #endif
   return TC_OK;
 }
 
-TC_status TC_HMAC_SHA1_verify(const uint8_t* key, size_t keylen, const uint8_t* msg, size_t msg_len,
-                     const uint8_t* tag, size_t tag_len)
+static TC_status tc_hmac32_verify(const tc_hmac32_info* info,
+    void* workspace, const uint8_t* key, size_t keylen, const uint8_t* msg, size_t msg_len,
+    const uint8_t* tag, size_t tag_len)
 {
-  uint8_t computed[TC_SHA1_DIGESTLEN];
-  int rc;
-
-  if (tag == NULL ||
-      tag_len < TC_HMAC_MIN_TAG_LEN || tag_len > TC_SHA1_DIGESTLEN)
-  {
+  uint8_t computed[32];
+  int result;
+  if (tag == NULL || tag_len < TC_HMAC_MIN_TAG_LEN ||
+      tag_len > tc_hmac32_digest_size(info)) return TC_ERROR;
+  if (tc_hmac32_digest(info, workspace, key, keylen, msg, msg_len, computed, tag_len) != TC_OK)
     return TC_ERROR;
-  }
-  if (TC_HMAC_SHA1_digest(key, keylen, msg, msg_len, computed, tag_len) != TC_OK)
-    return TC_ERROR;
-
-  /* TC_MISMATCH vs TC_ERROR: a well-formed miss is not a programming error. */
-  rc = TC_ct_equal(computed, tag, tag_len);
+  result = TC_ct_equal(computed, tag, tag_len);
 #if TC_ZEROIZE
   TC_secure_zero(computed, sizeof(computed));
 #endif
-  return rc;
+  return result;
+}
+
+#if TC_ENABLE_SHA1
+
+TC_HMAC32_INFO(tc_hmac_sha1_info, TC_HMAC_SHA1_ctx, tc_sha1_info);
+
+TC_status TC_HMAC_SHA1_init(struct TC_HMAC_SHA1_ctx* ctx, const uint8_t* key, size_t keylen)
+{
+  return tc_hmac32_init(&tc_hmac_sha1_info, ctx, key, keylen);
+}
+
+TC_status TC_HMAC_SHA1_update(struct TC_HMAC_SHA1_ctx* ctx, const uint8_t* data, size_t len)
+{
+  return tc_hmac32_update(&tc_hmac_sha1_info, ctx, data, len);
+}
+
+TC_status TC_HMAC_SHA1_final(struct TC_HMAC_SHA1_ctx* ctx, uint8_t* tag)
+{
+  return tc_hmac32_final(&tc_hmac_sha1_info, ctx, tag);
+}
+
+void TC_HMAC_SHA1_ctx_clear(struct TC_HMAC_SHA1_ctx* ctx)
+{
+  tc_hmac32_clear(&tc_hmac_sha1_info, ctx);
+}
+
+TC_status TC_HMAC_SHA1_digest(const uint8_t* key, size_t keylen,
+    const uint8_t* msg, size_t msg_len, uint8_t* tag, size_t tag_len)
+{
+  struct TC_HMAC_SHA1_ctx ctx;
+  return tc_hmac32_digest(&tc_hmac_sha1_info, &ctx, key, keylen, msg, msg_len, tag, tag_len);
+}
+
+TC_status TC_HMAC_SHA1_verify(const uint8_t* key, size_t keylen,
+    const uint8_t* msg, size_t msg_len, const uint8_t* tag, size_t tag_len)
+{
+  struct TC_HMAC_SHA1_ctx ctx;
+  return tc_hmac32_verify(&tc_hmac_sha1_info, &ctx, key, keylen, msg, msg_len, tag, tag_len);
 }
 
 #endif /* TC_ENABLE_SHA1 */
 
 #if TC_ENABLE_SHA224
 
+TC_HMAC32_INFO(tc_hmac_sha224_info, TC_HMAC_SHA224_ctx, tc_sha224_info);
+
 TC_status TC_HMAC_SHA224_init(struct TC_HMAC_SHA224_ctx* ctx, const uint8_t* key, size_t keylen)
 {
-  if (ctx == NULL)
-    return TC_ERROR;
-  TC_secure_zero(ctx, sizeof(*ctx));
-  if (keylen != 0 && key == NULL)
-    return TC_ERROR;
-  /* state_words only sizes H(K) for over-long keys: a 28-byte SHA-224 digest. */
-  if (tc_hash_hmac_init_common(ctx->Inner.State, &ctx->Inner.Count,
-                          &ctx->Inner.BufLen, ctx->Inner.Buf, ctx->OuterState,
-                          7, key, keylen,
-                          tc_hash_sha224_state_init, tc_hash_sha256_compress_secret) != TC_OK) {
-    TC_secure_zero(ctx, sizeof(*ctx));
-    return TC_ERROR;
-  }
-  ctx->Inner.active = 1;
-  return TC_OK;
+  return tc_hmac32_init(&tc_hmac_sha224_info, ctx, key, keylen);
 }
 
 TC_status TC_HMAC_SHA224_update(struct TC_HMAC_SHA224_ctx* ctx, const uint8_t* data, size_t len)
 {
-  if (ctx == NULL)
-    return TC_ERROR;
-  return TC_SHA224_update(&ctx->Inner, data, len);
+  return tc_hmac32_update(&tc_hmac_sha224_info, ctx, data, len);
 }
 
 TC_status TC_HMAC_SHA224_final(struct TC_HMAC_SHA224_ctx* ctx, uint8_t* tag)
 {
-  uint8_t inner[TC_SHA224_DIGESTLEN];
-
-  if (ctx == NULL || tag == NULL)
-    return TC_ERROR;
-
-  if (TC_SHA224_final(&ctx->Inner, inner) != TC_OK)
-  {
-    TC_HMAC_SHA224_ctx_clear(ctx);
-    return TC_ERROR;
-  }
-  tc_hash_hmac_outer_final(ctx->OuterState, 7, TC_SHA224_DIGESTLEN, inner, tag,
-                   tc_hash_sha256_compress_secret);
-
-#if TC_ZEROIZE
-  TC_secure_zero(inner, sizeof(inner));
-  TC_secure_zero(ctx, sizeof(*ctx));
-#endif
-  return TC_OK;
+  return tc_hmac32_final(&tc_hmac_sha224_info, ctx, tag);
 }
 
 void TC_HMAC_SHA224_ctx_clear(struct TC_HMAC_SHA224_ctx* ctx)
 {
-  if (ctx == NULL)
-    return;
-  TC_secure_zero(ctx, sizeof(*ctx));
+  tc_hmac32_clear(&tc_hmac_sha224_info, ctx);
 }
 
 TC_status TC_HMAC_SHA224_digest(const uint8_t* key, size_t keylen,
-                    const uint8_t* msg, size_t msg_len,
-                uint8_t* tag, size_t tag_len)
+    const uint8_t* msg, size_t msg_len, uint8_t* tag, size_t tag_len)
 {
   struct TC_HMAC_SHA224_ctx ctx;
-  uint8_t full[TC_SHA224_DIGESTLEN];
-
-  if (tag == NULL ||
-      tag_len < TC_HMAC_MIN_TAG_LEN || tag_len > TC_SHA224_DIGESTLEN ||
-      (msg_len != 0 && msg == NULL))
-  {
-    return TC_ERROR;
-  }
-  if (TC_HMAC_SHA224_init(&ctx, key, keylen) != TC_OK)
-    return TC_ERROR;
-
-  if (TC_HMAC_SHA224_update(&ctx, msg, msg_len) != TC_OK ||
-      TC_HMAC_SHA224_final(&ctx, full) != TC_OK)
-  {
-    TC_HMAC_SHA224_ctx_clear(&ctx);
-    TC_secure_zero(full, sizeof(full));
-    return TC_ERROR;
-  }
-  memcpy(tag, full, tag_len);
-
-#if TC_ZEROIZE
-  TC_secure_zero(full, sizeof(full));
-#endif
-  return TC_OK;
+  return tc_hmac32_digest(&tc_hmac_sha224_info, &ctx, key, keylen, msg, msg_len, tag, tag_len);
 }
 
-TC_status TC_HMAC_SHA224_verify(const uint8_t* key, size_t keylen, const uint8_t* msg, size_t msg_len,
-                       const uint8_t* tag, size_t tag_len)
+TC_status TC_HMAC_SHA224_verify(const uint8_t* key, size_t keylen,
+    const uint8_t* msg, size_t msg_len, const uint8_t* tag, size_t tag_len)
 {
-  uint8_t computed[TC_SHA224_DIGESTLEN];
-  int rc;
-
-  if (tag == NULL ||
-      tag_len < TC_HMAC_MIN_TAG_LEN || tag_len > TC_SHA224_DIGESTLEN)
-  {
-    return TC_ERROR;
-  }
-  if (TC_HMAC_SHA224_digest(key, keylen, msg, msg_len, computed, tag_len) != TC_OK)
-    return TC_ERROR;
-
-  rc = TC_ct_equal(computed, tag, tag_len);
-#if TC_ZEROIZE
-  TC_secure_zero(computed, sizeof(computed));
-#endif
-  return rc;
+  struct TC_HMAC_SHA224_ctx ctx;
+  return tc_hmac32_verify(&tc_hmac_sha224_info, &ctx, key, keylen, msg, msg_len, tag, tag_len);
 }
 
 #endif /* TC_ENABLE_SHA224 */
 
 #if TC_ENABLE_SHA256
 
+TC_HMAC32_INFO(tc_hmac_sha256_info, TC_HMAC_SHA256_ctx, tc_sha256_info);
+
 TC_status TC_HMAC_SHA256_init(struct TC_HMAC_SHA256_ctx* ctx, const uint8_t* key, size_t keylen)
 {
-  if (ctx == NULL)
-    return TC_ERROR;
-  TC_secure_zero(ctx, sizeof(*ctx));
-  if (keylen != 0 && key == NULL)
-    return TC_ERROR;
-  if (tc_hash_hmac_init_common(ctx->Inner.State, &ctx->Inner.Count,
-                          &ctx->Inner.BufLen, ctx->Inner.Buf, ctx->OuterState,
-                          8, key, keylen,
-                          tc_hash_sha256_state_init, tc_hash_sha256_compress_secret) != TC_OK) {
-    TC_secure_zero(ctx, sizeof(*ctx));
-    return TC_ERROR;
-  }
-  ctx->Inner.active = 1;
-  return TC_OK;
+  return tc_hmac32_init(&tc_hmac_sha256_info, ctx, key, keylen);
 }
 
 TC_status TC_HMAC_SHA256_update(struct TC_HMAC_SHA256_ctx* ctx, const uint8_t* data, size_t len)
 {
-  if (ctx == NULL)
-    return TC_ERROR;
-  return TC_SHA256_update(&ctx->Inner, data, len);
+  return tc_hmac32_update(&tc_hmac_sha256_info, ctx, data, len);
 }
 
 TC_status TC_HMAC_SHA256_final(struct TC_HMAC_SHA256_ctx* ctx, uint8_t* tag)
 {
-  uint8_t inner[TC_SHA256_DIGESTLEN];
-
-  if (ctx == NULL || tag == NULL)
-    return TC_ERROR;
-
-  /* One-shot: TC_ZEROIZE wipes the context; call TC_HMAC_SHA256_init to reuse. */
-  if (TC_SHA256_final(&ctx->Inner, inner) != TC_OK)
-  {
-    TC_HMAC_SHA256_ctx_clear(ctx);
-    return TC_ERROR;
-  }
-  tc_hash_hmac_outer_final(ctx->OuterState, 8, TC_SHA256_DIGESTLEN, inner, tag,
-                   tc_hash_sha256_compress_secret);
-
-#if TC_ZEROIZE
-  TC_secure_zero(inner, sizeof(inner));
-  TC_secure_zero(ctx, sizeof(*ctx));
-#endif
-  return TC_OK;
+  return tc_hmac32_final(&tc_hmac_sha256_info, ctx, tag);
 }
 
 void TC_HMAC_SHA256_ctx_clear(struct TC_HMAC_SHA256_ctx* ctx)
 {
-  if (ctx == NULL)
-    return;
-  TC_secure_zero(ctx, sizeof(*ctx));
+  tc_hmac32_clear(&tc_hmac_sha256_info, ctx);
 }
 
 TC_status TC_HMAC_SHA256_digest(const uint8_t* key, size_t keylen,
-                    const uint8_t* msg, size_t msg_len,
-                uint8_t* tag, size_t tag_len)
+    const uint8_t* msg, size_t msg_len, uint8_t* tag, size_t tag_len)
 {
   struct TC_HMAC_SHA256_ctx ctx;
-  uint8_t full[TC_SHA256_DIGESTLEN];
-
-  if (tag == NULL ||
-      tag_len < TC_HMAC_MIN_TAG_LEN || tag_len > TC_SHA256_DIGESTLEN ||
-      (msg_len != 0 && msg == NULL))
-  {
-    return TC_ERROR;
-  }
-  if (TC_HMAC_SHA256_init(&ctx, key, keylen) != TC_OK)
-    return TC_ERROR;
-
-  if (TC_HMAC_SHA256_update(&ctx, msg, msg_len) != TC_OK ||
-      TC_HMAC_SHA256_final(&ctx, full) != TC_OK)
-  {
-    TC_HMAC_SHA256_ctx_clear(&ctx);
-    TC_secure_zero(full, sizeof(full));
-    return TC_ERROR;
-  }
-  memcpy(tag, full, tag_len);
-
-#if TC_ZEROIZE
-  TC_secure_zero(full, sizeof(full));
-#endif
-  return TC_OK;
+  return tc_hmac32_digest(&tc_hmac_sha256_info, &ctx, key, keylen, msg, msg_len, tag, tag_len);
 }
 
-TC_status TC_HMAC_SHA256_verify(const uint8_t* key, size_t keylen, const uint8_t* msg, size_t msg_len,
-                       const uint8_t* tag, size_t tag_len)
+TC_status TC_HMAC_SHA256_verify(const uint8_t* key, size_t keylen,
+    const uint8_t* msg, size_t msg_len, const uint8_t* tag, size_t tag_len)
 {
-  uint8_t computed[TC_SHA256_DIGESTLEN];
-  int rc;
-
-  if (tag == NULL ||
-      tag_len < TC_HMAC_MIN_TAG_LEN || tag_len > TC_SHA256_DIGESTLEN)
-  {
-    return TC_ERROR;
-  }
-  if (TC_HMAC_SHA256_digest(key, keylen, msg, msg_len, computed, tag_len) != TC_OK)
-    return TC_ERROR;
-
-  /* TC_MISMATCH vs TC_ERROR: a well-formed miss is not a programming error. */
-  rc = TC_ct_equal(computed, tag, tag_len);
-#if TC_ZEROIZE
-  TC_secure_zero(computed, sizeof(computed));
-#endif
-  return rc;
+  struct TC_HMAC_SHA256_ctx ctx;
+  return tc_hmac32_verify(&tc_hmac_sha256_info, &ctx, key, keylen, msg, msg_len, tag, tag_len);
 }
 
 #endif /* TC_ENABLE_SHA256 */

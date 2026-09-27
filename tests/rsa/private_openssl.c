@@ -424,6 +424,31 @@ static MunitResult signing(const MunitParameter params[], void* user)
       munit_assert_int(verify_v15(&private_key.public_key,hash,
           (TC_bytes){digest,digest_length},(TC_bytes){signature,width},&workspace,
           WORK_BUDGET), ==, TC_RSA_OK);
+      if (scenario == 0) {
+        TC_RSA_prepared_public_key prepared = {0};
+        TC_RSA_word cache_words[TC_RSA_RAW_PUBLIC_WORKSPACE_WORDS(3072)];
+        TC_RSA_workspace cache = {cache_words,width / sizeof *cache_words};
+        TC_work_budget setup_work = {(uint32_t)(16 * width + 1)};
+        munit_assert_int(TC_RSA_prepare_public_key(&prepared,&private_key.public_key,
+            &cache,&workspace,&setup_work), ==, TC_RSA_OK);
+        munit_assert_uint(setup_work.remaining, ==, 0);
+        for (unsigned repeat = 0; repeat < 2; ++repeat) {
+          TC_work_budget verify_work = {(uint32_t)(width + 16 * sizeof exponent + 4)};
+          munit_assert_int(TC_RSA_verify_v15_prepared(&prepared,
+              &(TC_RSA_v15_options){hash},(TC_bytes){digest,digest_length},
+              (TC_bytes){signature,width},&workspace,&verify_work), ==, TC_RSA_OK);
+          munit_assert_uint(verify_work.remaining, ==, 0);
+        }
+        signature[width - 1] ^= 1;
+        TC_work_budget invalid_work = {WORK_BUDGET};
+        munit_assert_int(TC_RSA_verify_v15_prepared(&prepared,
+            &(TC_RSA_v15_options){hash},(TC_bytes){digest,digest_length},
+            (TC_bytes){signature,width},&workspace,&invalid_work), ==, TC_RSA_INVALID);
+        signature[width - 1] ^= 1;
+        TC_RSA_prepared_public_key_clear(&prepared);
+        munit_assert_true(tc_test_all_zero(&prepared,sizeof prepared));
+        munit_assert_true(tc_test_all_zero(cache_words,width));
+      }
     } else {
       for (size_t i = 0; i < sizeof signature; ++i)
         munit_assert_uint(signature[i], ==, 0xa5);

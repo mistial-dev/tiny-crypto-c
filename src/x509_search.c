@@ -16,6 +16,47 @@ static TC_TLV_result search_read(TC_bytes encoded, const TC_X509_path_options* o
   return TC_X509_read(encoded.data, encoded.length, &options->parsing, &parser, out);
 }
 
+/* Read only the fixed TBSCertificate prefix needed to locate the subject.
+ * Any framing error falls back to the full parser, which owns error status. */
+static TC_TLV_result search_subject(TC_bytes encoded, const TC_TLV_limits* limits,
+    TC_bytes* subject)
+{
+  TC_TLV_element element;
+  TC_TLV_reader outer, tbs;
+  TC_TLV_result result;
+  if (limits->max_depth < 3 || limits->max_elements < 8) return TC_TLV_LIMIT;
+  result = TC_TLV_read(encoded.data, encoded.length, TC_TLV_DER, limits, &element);
+  if (result != TC_TLV_OK) return result;
+  if (element.header.tag_length != 1 || element.header.tag[0] != 0x30 ||
+      element.encoded.length != encoded.length) return TC_TLV_INVALID;
+  result = TC_TLV_reader_init(&outer, element.value.data, element.value.length,
+      TC_TLV_DER, limits);
+  if (result != TC_TLV_OK) return result;
+  result = TC_TLV_next(&outer, &element);
+  if (result != TC_TLV_OK) return result;
+  if (element.header.tag_length != 1 || element.header.tag[0] != 0x30)
+    return TC_TLV_INVALID;
+  result = TC_TLV_reader_init(&tbs, element.value.data, element.value.length,
+      TC_TLV_DER, limits);
+  if (result != TC_TLV_OK) return result;
+  result = TC_TLV_next(&tbs, &element);
+  if (result != TC_TLV_OK) return result;
+  if (element.header.tag_length == 1 && element.header.tag[0] == 0xa0) {
+    result = TC_TLV_next(&tbs, &element);
+    if (result != TC_TLV_OK) return result;
+  }
+  if (element.header.tag_length != 1 || element.header.tag[0] != 0x02)
+    return TC_TLV_INVALID;
+  for (unsigned field = 0; field < 4; ++field) {
+    result = TC_TLV_next(&tbs, &element);
+    if (result != TC_TLV_OK) return result;
+    if (element.header.tag_length != 1 || element.header.tag[0] != 0x30)
+      return TC_TLV_INVALID;
+  }
+  *subject = element.encoded;
+  return TC_TLV_OK;
+}
+
 static TC_X509_path_status source_status(TC_TLV_result status, size_t before, size_t* work)
 {
   if (*work > before) { *work = 0; return TC_X509_PATH_ERROR; }
@@ -80,6 +121,8 @@ TC_X509_path_status tc_x509_path_search_source(TC_bytes target,
       tc_x509_path_remember(status, &failure);
     } else if (frame->candidate < source->candidate_count) {
       TC_bytes candidate = {NULL,0};
+      TC_bytes subject;
+      int subject_checked = 0;
       size_t i, before = *work;
       parsed = source->candidate(source->context, frame->candidate++, work, &candidate);
       status = source_status(parsed, before, work);
@@ -93,20 +136,33 @@ TC_X509_path_status tc_x509_path_search_source(TC_bytes target,
         if (!candidate.length || !memcmp(candidate.data, path[i].data, candidate.length)) break;
       }
       if (i != depth) continue;
+      if (search_subject(candidate, &options->parsing, &subject) == TC_TLV_OK) {
+        parsed = TC_X509_name_equal(frame->issuer, subject,
+            &options->parsing, &validation->names, work, &equal);
+        if (parsed != TC_TLV_OK) {
+          if (parsed == TC_TLV_ARGUMENT) return TC_X509_PATH_ERROR;
+          tc_x509_path_remember(tc_x509_path_status(parsed), &failure);
+          continue;
+        }
+        if (!equal) continue;
+        subject_checked = 1;
+      }
       parsed = search_read(candidate, options, validation, work, &issuer);
       if (parsed != TC_TLV_OK) {
         if (parsed == TC_TLV_ARGUMENT) return TC_X509_PATH_ERROR;
         tc_x509_path_remember(tc_x509_path_status(parsed), &failure);
         continue;
       }
-      parsed = TC_X509_name_equal(frame->issuer, issuer.subject,
-          &options->parsing, &validation->names, work, &equal);
-      if (parsed != TC_TLV_OK) {
-        if (parsed == TC_TLV_ARGUMENT) return TC_X509_PATH_ERROR;
-        tc_x509_path_remember(tc_x509_path_status(parsed), &failure);
-        continue;
+      if (!subject_checked) {
+        parsed = TC_X509_name_equal(frame->issuer, issuer.subject,
+            &options->parsing, &validation->names, work, &equal);
+        if (parsed != TC_TLV_OK) {
+          if (parsed == TC_TLV_ARGUMENT) return TC_X509_PATH_ERROR;
+          tc_x509_path_remember(tc_x509_path_status(parsed), &failure);
+          continue;
+        }
+        if (!equal) continue;
       }
-      if (!equal) continue;
       if (depth == capacity || candidate.length > options->max_input - frame->bytes) {
         failure = TC_X509_PATH_LIMIT;
         continue;

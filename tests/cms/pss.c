@@ -57,9 +57,11 @@ static void check_envelope_path(TC_bytes signer, EVP_PKEY* key, TC_RSA_workspace
   ExampleX509SearchWorkspace storage;
   TC_bytes index[1];
   TC_ECDSA_workspace ec;
+  uint8_t signed_digest[TC_CMS_SIGNED_DIGEST_BYTES];
   TC_X509_native_workspace native = {&ec,rsa,TC_X509_NATIVE_DEFAULT_SIGNATURE_WORK};
   TC_CMS_path_workspace workspace = {example_x509_workspace(&storage.validation),
-    example_x509_search_workspace(&storage),index,1,NULL,0};
+    example_x509_search_workspace(&storage),index,1,NULL,0,
+    signed_digest,sizeof signed_digest};
   TC_X509_workspace parser = {workspace.validation.frames,workspace.validation.frame_capacity,
     workspace.validation.oids,workspace.validation.oid_capacity};
   TC_CMS_path_options options = {0};

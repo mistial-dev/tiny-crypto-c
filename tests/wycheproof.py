@@ -169,24 +169,155 @@ def rsa_signature_records(document, exclusions=None):
     return "\n".join(records) + ("\n" if records else ""), counts
 
 
+def rsa_generation_records(document, exclusions=None):
+    """PKCS#1 v1.5 signatures have a fixed encoded message and signature."""
+    if document["algorithm"] != "RSASSA-PKCS1-v1_5" or document["schema"] != "rsassa_pkcs1_generate_schema_v1.json":
+        raise AssertionError("Unexpected RSA generation document")
+    hashes = {"SHA-1", "SHA-224", "SHA-256", "SHA-384", "SHA-512"}
+    counts, records, excluded = Counter(), [], Counter()
+    for group in document["testGroups"]:
+        if group["type"] != "RsassaPkcs1Generate":
+            raise AssertionError("Unexpected RSA generation group")
+        bits, sha = group["keySize"], group["sha"]
+        for case in group["tests"]:
+            if case["result"] not in ("valid", "acceptable"):
+                raise AssertionError("Unexpected RSA generation verdict")
+        if bits not in (1024, 2048, 3072) or sha not in hashes:
+            if exclusions is None:
+                raise AssertionError("Unsupported RSA generation parameters")
+            excluded[(bits,sha)] += len(group["tests"])
+            continue
+        key = group["privateKey"]
+        values = [int(key[field],16) for field in ("modulus","publicExponent","privateExponent")]
+        if any(value <= 0 or value.bit_length() > bits for value in values) or values[0].bit_length() != bits:
+            raise AssertionError("Invalid RSA generation key")
+        width = bits // 8
+        components = [values[0].to_bytes(width,"big").hex()]
+        components += [value.to_bytes((value.bit_length() + 7) // 8,"big").hex() for value in values[1:]]
+        for case in group["tests"]:
+            signature = bytes.fromhex(case["sig"])
+            if len(signature) != width:
+                raise AssertionError("Invalid RSA generation signature length")
+            digest = hashlib.new(sha.lower().replace("-",""),bytes.fromhex(case["msg"])).hexdigest()
+            records.append(" ".join(components + [sha,digest,signature.hex(),"match",str(case["tcId"])]))
+            counts[case["result"]] += 1
+    if sum(counts.values()) + sum(excluded.values()) != document["numberOfTests"]:
+        raise AssertionError("Incomplete RSA generation coverage")
+    if exclusions is not None:
+        exclusions.update(excluded)
+    return "\n".join(records) + ("\n" if records else ""), counts
+
+
+def probable_prime_magnitude(value):
+    """Independent deterministic test oracle for signed vector byte magnitudes."""
+    n = int.from_bytes(value,"big")
+    if n < 2:
+        return False
+    if n in (2,3):
+        return True
+    if n % 2 == 0:
+        return False
+    odd, twos = n - 1, 0
+    while odd % 2 == 0:
+        odd //= 2
+        twos += 1
+    for round_number in range(65):
+        seed = hashlib.sha256(value + round_number.to_bytes(2,"big")).digest()
+        base = 2 + int.from_bytes(seed,"big") % (n - 3)
+        x = pow(base,odd,n)
+        if x in (1,n - 1):
+            continue
+        for _ in range(twos - 1):
+            x = pow(x,2,n)
+            if x == n - 1:
+                break
+        else:
+            return False
+    return True
+
+
+def primality_records(document):
+    """Exercise odd RSA candidates and separately classify signed byte magnitudes."""
+    if document["algorithm"] != "PrimalityTest" or document["schema"] != "primality_test_schema_v1.json":
+        raise AssertionError("Unexpected primality document")
+    counts, exclusions, derived, records = Counter(), Counter(), Counter(), []
+    for group in document["testGroups"]:
+        if group["type"] != "PrimalityTest":
+            raise AssertionError("Unexpected primality group")
+        for case in group["tests"]:
+            verdict = case["result"]
+            if verdict not in ("valid", "invalid", "acceptable"):
+                raise AssertionError("Unexpected primality verdict")
+            value = bytes.fromhex(case["value"])
+            if not value or len(value) > 384:
+                exclusions["candidate-length"] += 1
+            elif value == b"\x02" and verdict == "valid":
+                # RSA key generation tests odd candidate factors only.
+                exclusions["even-prime"] += 1
+            elif value[0] & 0x80:
+                # Wycheproof interprets these as signed negatives. The RSA
+                # candidate API sees their positive magnitude instead.
+                result = "valid" if probable_prime_magnitude(value) else "invalid"
+                records.append(f"{value.hex()} {result} {case['tcId']}")
+                derived[result] += 1
+            else:
+                records.append(f"{value.hex()} {verdict} {case['tcId']}")
+                counts[verdict] += 1
+    if sum(counts.values()) + sum(derived.values()) + sum(exclusions.values()) != document["numberOfTests"]:
+        raise AssertionError("Incomplete primality coverage")
+    if not counts["valid"] or not counts["invalid"]:
+        raise AssertionError("Missing primality positive or negative vectors")
+    return "\n".join(records) + "\n", counts, derived, exclusions
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--archive", type=Path, required=True)
     parser.add_argument("--ec-reader", type=Path, action="append", default=[])
     parser.add_argument("--ecdsa-reader", type=Path, action="append", default=[])
     parser.add_argument("--rsa-signature-reader", type=Path, action="append", default=[])
+    parser.add_argument("--rsa-generation-reader", type=Path, action="append", default=[])
+    parser.add_argument("--primality-reader", type=Path, action="append", default=[])
     parser.add_argument("--rsa-oaep-reader", type=Path, action="append", default=[])
     parser.add_argument("--kmac-reader", type=Path, action="append", default=[])
     parser.add_argument("--cmac-reader", type=Path, action="append", default=[])
     parser.add_argument("--hmac-reader", type=Path, action="append", default=[])
     parser.add_argument("--aead-reader", action="append", default=[], metavar="BITS:PATH")
     args = parser.parse_args()
-    if not any((args.ec_reader, args.ecdsa_reader, args.rsa_signature_reader, args.rsa_oaep_reader,
+    if not any((args.ec_reader, args.ecdsa_reader, args.rsa_signature_reader, args.rsa_generation_reader, args.primality_reader, args.rsa_oaep_reader,
                 args.kmac_reader, args.cmac_reader, args.hmac_reader, args.aead_reader)):
         parser.error("At least one reader is required")
     if hashlib.sha256(args.archive.read_bytes()).hexdigest() != ARCHIVE_SHA256:
         raise AssertionError("Unexpected Wycheproof archive digest")
     with zipfile.ZipFile(args.archive) as archive, tempfile.TemporaryDirectory(prefix="tiny-crypto-wycheproof-") as temporary:
+        if args.primality_reader:
+            name = f"wycheproof-{REVISION}/testvectors_v1/primality_test.json"
+            records, counts, derived, exclusions = primality_records(json.loads(archive.read(name)))
+            fixture = Path(temporary) / "primality.txt"
+            fixture.write_text(records)
+            for reader in args.primality_reader:
+                run_reader([reader,"--primality-vectors",fixture])
+            print(f"Primality tested: {dict(counts)}; signed-byte magnitudes with derived oracle: "
+                  f"{dict(derived)}; out-of-scope: {dict(exclusions)}",flush=True)
+        if args.rsa_generation_reader:
+            totals, exclusions = Counter(), Counter()
+            prefix = f"wycheproof-{REVISION}/testvectors_v1/rsa_pkcs1_"
+            names = [name for name in sorted(archive.namelist())
+                     if name.startswith(prefix) and name.endswith("_sig_gen_test.json")]
+            if not names:
+                raise AssertionError("Missing RSA generation corpus")
+            for name in names:
+                records, counts = rsa_generation_records(json.loads(archive.read(name)),exclusions)
+                if records:
+                    fixture = Path(temporary) / "rsa-generation.txt"
+                    fixture.write_text(records)
+                    for reader in args.rsa_generation_reader:
+                        run_reader([reader,"--generation-vectors",fixture])
+                totals.update(counts)
+                print(f"{name.rsplit('/',1)[-1]}: {dict(counts)}",flush=True)
+            if not totals["valid"] or not totals["acceptable"]:
+                raise AssertionError("Incomplete RSA generation verdict coverage")
+            print(f"RSA generation tested: {dict(totals)}; out-of-scope parameters: {dict(exclusions)}",flush=True)
         if args.rsa_signature_reader:
             totals, exclusions = Counter(), Counter()
             prefixes = tuple(f"wycheproof-{REVISION}/testvectors_v1/{name}" for name in ("rsa_pss_", "rsa_signature_"))

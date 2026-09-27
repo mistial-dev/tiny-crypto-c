@@ -118,11 +118,32 @@ static MunitResult failures(const MunitParameter params[], void *user) {
     munit_assert_memory_equal(sizeof out, &out, &unchanged);
   }
   fixture twic = printed(TC_PIV_PRINTED_PROFILE_TWIC);
+  fixture mixed_case = piv;
+  mixed_case.bytes[find(&mixed_case, 0x04) + 2 + 5] = 'e';
+  out = unchanged;
+  munit_assert_int(TC_PIV_printed_read(
+      (TC_bytes){mixed_case.bytes, mixed_case.length},
+      TC_PIV_PRINTED_CONTENTS, TC_PIV_PRINTED_PROFILE_PIV, &out),
+      ==, TC_TLV_INVALID);
+  munit_assert_memory_equal(sizeof out, &out, &unchanged);
   twic.bytes[find(&twic, 0x05) + 2] = 'X';
   munit_assert_int(TC_PIV_printed_read((TC_bytes){twic.bytes, twic.length},
                                        TC_PIV_PRINTED_CONTENTS,
                                        TC_PIV_PRINTED_PROFILE_TWIC, &out),
                    ==, TC_TLV_INVALID);
+  fixture wrapped = {{0}, 0};
+  append(&wrapped, 0x53, piv.bytes, piv.length);
+  const size_t complete = wrapped.length;
+  wrapped.bytes[0] = 0x54;
+  out = unchanged;
+  munit_assert_int(TC_PIV_printed_read((TC_bytes){wrapped.bytes,complete},
+      TC_PIV_PRINTED_CONTAINER,TC_PIV_PRINTED_PROFILE_PIV,&out), ==, TC_TLV_INVALID);
+  munit_assert_memory_equal(sizeof out,&out,&unchanged);
+  wrapped.bytes[0] = 0x53;
+  wrapped.bytes[complete] = 0;
+  munit_assert_int(TC_PIV_printed_read((TC_bytes){wrapped.bytes,complete + 1},
+      TC_PIV_PRINTED_CONTAINER,TC_PIV_PRINTED_PROFILE_PIV,&out), ==, TC_TLV_INVALID);
+  munit_assert_memory_equal(sizeof out,&out,&unchanged);
   twic = printed(TC_PIV_PRINTED_PROFILE_TWIC);
   twic.bytes[find(&twic, 0x06) + 2] = '8';
   munit_assert_int(TC_PIV_printed_read((TC_bytes){twic.bytes, twic.length},

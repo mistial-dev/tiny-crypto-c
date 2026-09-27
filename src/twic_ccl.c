@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/twic_ccl.h>
 #if TC_ENABLE_TWIC_CCL
+#include "credential_text_internal.h"
 #include "pki_internal.h"
 #include "pki_storage_internal.h"
 #include "snapshot_internal.h"
@@ -9,24 +10,16 @@
 
 enum { CCL_HEX_BYTES = 2 * TC_TWIC_CCL_FASCN_BYTES, CCL_DATE_OFFSET = CCL_HEX_BYTES + 1 };
 
-static int hex_digit(uint8_t c)
-{
-  if (c >= '0' && c <= '9') return c - '0';
-  if (c >= 'A' && c <= 'F') return c - 'A' + 10;
-  if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-  return -1;
-}
-
 TC_TWIC_CCL_result TC_TWIC_CCL_read(TC_bytes line, TC_TWIC_CCL_record* out)
 {
-  static const char months[] = "JanFebMarAprMayJunJulAugSepOctNovDec";
   TC_TWIC_CCL_record record = {{0},0,0,0};
   unsigned year = 0, day;
   if (!out || (!line.data && line.length)) return TC_TWIC_CCL_ARGUMENT;
   if (line.length != TC_TWIC_CCL_RECORD_BYTES) return TC_TWIC_CCL_INVALID;
   if (line.data[CCL_HEX_BYTES] != ',') return TC_TWIC_CCL_INVALID;
   for (size_t i = 0; i < TC_TWIC_CCL_FASCN_BYTES; ++i) {
-    int high = hex_digit(line.data[2 * i]), low = hex_digit(line.data[2 * i + 1]);
+    int high = tc_credential_hex_digit(line.data[2 * i]);
+    int low = tc_credential_hex_digit(line.data[2 * i + 1]);
     if (high < 0 || low < 0) return TC_TWIC_CCL_INVALID;
     record.fascn[i] = (uint8_t)(high * 16 + low);
   }
@@ -38,8 +31,7 @@ TC_TWIC_CCL_result TC_TWIC_CCL_read(TC_bytes line, TC_TWIC_CCL_record* out)
     if (date[i] < '0' || date[i] > '9') return TC_TWIC_CCL_INVALID;
     year = year * 10 + (unsigned)(date[i] - '0');
   }
-  for (unsigned month = 1; month <= 12; ++month)
-    if (!memcmp(date + 2, months + 3 * (month - 1), 3)) record.month = (uint8_t)month;
+  record.month = (uint8_t)tc_credential_month3(date + 2, 1);
   if (!tc_pki_date(year, record.month, day)) return TC_TWIC_CCL_INVALID;
   record.year = (uint16_t)year;
   record.day = (uint8_t)day;

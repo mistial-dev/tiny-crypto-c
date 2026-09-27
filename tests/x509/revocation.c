@@ -117,6 +117,67 @@ static MunitResult dependencies(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+static MunitResult indexed_dependencies(const MunitParameter params[], void* user)
+{
+  static const uint8_t bytes[] = {0,1,2,3,0};
+  TC_X509_revocation_node nodes[4] = {0};
+  size_t count = 0, index = SIZE_MAX, work = 100;
+  (void)params; (void)user;
+  for (size_t i = 0; i < 4; ++i) {
+    if (i == 3) work = 2;
+    munit_assert_int(tc_x509_crl_dependency_find_indexed(nodes,4,&count,
+        (TC_bytes){bytes + i,1},&work,&index), ==, TC_TLV_OK);
+    munit_assert_size(index, ==, i);
+  }
+  munit_assert_size(count, ==, 4);
+  work = 10;
+  munit_assert_int(tc_x509_crl_dependency_find_indexed(nodes,4,&count,
+      (TC_bytes){bytes + 4,1},&work,&index), ==, TC_TLV_OK);
+  munit_assert_size(index, ==, 0);
+  count = 0; work = 100;
+  static const uint8_t collision[] = {0,4,8,12};
+  for (size_t i = 0; i < sizeof collision; ++i) {
+    munit_assert_int(tc_x509_crl_dependency_find_indexed(nodes,4,&count,
+        (TC_bytes){collision + i,1},&work,&index), ==, TC_TLV_OK);
+    munit_assert_size(index, ==, i);
+  }
+  work = 10;
+  munit_assert_int(tc_x509_crl_dependency_find_indexed(nodes,4,&count,
+      (TC_bytes){collision + 1,1},&work,&index), ==, TC_TLV_OK);
+  munit_assert_size(index, ==, 1);
+  return MUNIT_OK;
+}
+
+static MunitResult indexed_scopes(const MunitParameter params[], void* user)
+{
+  const uint8_t issuer[] = {0x30,12,0x31,10,0x30,8,6,3,0x55,4,3,0x0c,1,'A'};
+  const uint8_t other[] = {0x30,12,0x31,10,0x30,8,6,3,0x55,4,3,0x0c,1,'B'};
+  const uint8_t distribution[] = {1,2}, different[] = {5,2};
+  TC_X509_crl_record records[4] = {0};
+  TC_X509_revocation_scope slots[4] = {0};
+  TC_TLV_frame frames[16]; uint32_t left[16], right[16]; uint8_t used[2];
+  const TC_X509_name_workspace names = {left,right,16,used,2};
+  const TC_TLV_limits limits = {128,128,16,16};
+  size_t work = 1000;
+  const tc_pki_tree_workspace tree = {frames,16,&work};
+  const TC_X509_crl_index index = {records,4,0};
+  (void)params; (void)user;
+  for (size_t i = 0; i < 4; ++i) {
+    records[i].crl.issuer = (TC_bytes){issuer,sizeof issuer};
+    records[i].extensions.present = TC_CRL_EXT_DISTRIBUTION;
+    records[i].extensions.distribution_encoded = (TC_bytes){distribution,sizeof distribution};
+  }
+  records[2].crl.issuer = (TC_bytes){other,sizeof other};
+  records[3].extensions.distribution_encoded = (TC_bytes){different,sizeof different};
+  munit_assert_int(tc_x509_crl_scopes_index(&index,&limits,&tree,&names,slots,3), ==, TC_TLV_LIMIT);
+  munit_assert_int(tc_x509_crl_scopes_index(&index,&limits,&tree,&names,slots,4), ==, TC_TLV_OK);
+  munit_assert_size(slots[0].representative, ==, 0);
+  munit_assert_size(slots[1].representative, ==, 0);
+  munit_assert_size(slots[2].representative, ==, 2);
+  munit_assert_size(slots[3].representative, ==, 3);
+  return MUNIT_OK;
+}
+
 static MunitResult dependency_status(const MunitParameter params[], void* user)
 {
   static const uint8_t encoded[] = {1,2};
@@ -127,7 +188,7 @@ static MunitResult dependency_status(const MunitParameter params[], void* user)
     TC_X509_PATH_UNSUPPORTED,TC_X509_PATH_ERROR};
   TC_X509_search_result path = {0};
   path.path = &certificate; path.count = 1;
-  TC_X509_revocation_node node = {certificate,TC_X509_CRL_UNDETERMINED};
+  TC_X509_revocation_node node = {.certificate = certificate,.status = TC_X509_CRL_UNDETERMINED};
   tc_x509_crl_resolution_workspace workspace = {0};
   workspace.nodes = &node; workspace.node_capacity = 1;
   (void)params; (void)user;
@@ -154,7 +215,7 @@ static MunitResult dependency_failures(const MunitParameter params[], void* user
   const TC_bytes certificate = {encoded,sizeof encoded};
   (void)params; (void)user;
   for (unsigned scenario = 0; scenario < CASE_COUNT; ++scenario) {
-    TC_X509_revocation_node node = {certificate,TC_X509_CRL_UNREVOKED}, saved;
+    TC_X509_revocation_node node = {.certificate = certificate,.status = TC_X509_CRL_UNREVOKED}, saved;
     memcpy(&saved,&node,sizeof node);
     TC_X509_search_result path = {0};
     path.path = scenario == PATH_BYTES ? NULL : &certificate; path.count = 1;
@@ -551,7 +612,8 @@ static MunitResult dependency_read(const MunitParameter params[], void* user)
   for (unsigned scenario = TRUNCATED; scenario < CASE_COUNT; ++scenario) {
     size_t work = scenario == NO_WORK ? 0 : WORK_BUDGET;
     const tc_pki_tree_workspace tree = {frames,FRAME_CAPACITY,&work};
-    TC_X509_revocation_node node = {{encoded,sizeof encoded},TC_X509_CRL_UNDETERMINED};
+    TC_X509_revocation_node node = {.certificate = {encoded,sizeof encoded},
+        .status = TC_X509_CRL_UNDETERMINED};
     tc_x509_crl_resolution_workspace workspace = {0};
     workspace.tree = &tree; workspace.validation = &validation;
     workspace.nodes = &node; workspace.node_capacity = 1;
@@ -618,7 +680,8 @@ static MunitResult resolve_dependencies(const MunitParameter params[], void* use
   (void)params; (void)user;
   for (unsigned scenario = NEW_CHAIN; scenario < CASE_COUNT; ++scenario) {
     TC_X509_revocation_node nodes[2] = {
-      {target,TC_X509_CRL_UNDETERMINED},{{second,sizeof second},TC_X509_CRL_UNDETERMINED}};
+      {.certificate = target,.status = TC_X509_CRL_UNDETERMINED},
+      {.certificate = {second,sizeof second},.status = TC_X509_CRL_UNDETERMINED}};
     size_t work = scenario == NO_WORK ? 0 : 100;
     const tc_pki_tree_workspace tree = {NULL,0,&work};
     tc_x509_crl_resolution_workspace workspace = {0};
@@ -673,7 +736,7 @@ static MunitResult scope_arguments(const MunitParameter params[], void* user)
     tc_x509_crl_evidence evidence = {0};
     uint8_t state = 0;
     tc_x509_crl_scope_processing processing = {&index,0,TC_X509_CRL_COMPLETE_ONLY,
-      TC_X509_CRL_ORDER_NUMBER,&query,&state,1,&evidence,NULL,NULL,NULL};
+      TC_X509_CRL_ORDER_NUMBER,&query,&state,1,&evidence,NULL,NULL,NULL,NULL,NULL};
     TC_TLV_result expected = TC_TLV_ARGUMENT;
     switch (scenario) {
       case VALID: expected = TC_TLV_OK; break;
@@ -868,7 +931,7 @@ static MunitResult scope_operation(const MunitParameter params[], void* user)
     const tc_x509_crl_evidence initial = evidence;
     uint8_t state = 0;
     const tc_x509_crl_scope_processing processing = {&index,0,TC_X509_CRL_COMPLETE_ONLY,
-      TC_X509_CRL_ORDER_NUMBER,&query,&state,1,&evidence,NULL,NULL,NULL};
+      TC_X509_CRL_ORDER_NUMBER,&query,&state,1,&evidence,NULL,NULL,NULL,NULL,NULL};
     TC_bytes metadata[] = {
       scenario == OVERLAP ? (TC_bytes){&state,sizeof state} :
         (TC_bytes){(const uint8_t*)&external,sizeof external},
@@ -897,6 +960,8 @@ int main(int argc, char** argv)
     {"/trust-arguments",trust_arguments,NULL,NULL,MUNIT_TEST_OPTION_NONE,NULL},
     {"/signer-search",signer_search,NULL,NULL,MUNIT_TEST_OPTION_NONE,NULL},
     {"/dependencies",dependencies,NULL,NULL,MUNIT_TEST_OPTION_NONE,NULL},
+    {"/indexed_dependencies",indexed_dependencies,NULL,NULL,MUNIT_TEST_OPTION_NONE,NULL},
+    {"/indexed_scopes",indexed_scopes,NULL,NULL,MUNIT_TEST_OPTION_NONE,NULL},
     {"/dependency-status",dependency_status,NULL,NULL,MUNIT_TEST_OPTION_NONE,NULL},
     {"/dependency-failures",dependency_failures,NULL,NULL,MUNIT_TEST_OPTION_NONE,NULL},
     {"/resolution",resolution,NULL,NULL,MUNIT_TEST_OPTION_NONE,NULL},

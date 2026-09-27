@@ -9,6 +9,14 @@
 #include "pki_identifier_internal.h"
 #include "pki_extensions_internal.h"
 
+static uint32_t tc_x509_crl_bytes_hash(TC_bytes bytes)
+{
+  uint32_t hash = UINT32_C(2166136261);
+  for (size_t i = 0; i < bytes.length; ++i)
+    hash = (hash ^ bytes.data[i]) * UINT32_C(16777619);
+  return hash;
+}
+
 TC_TLV_result tc_x509_crl_scope_run(const tc_x509_crl_candidate_source* candidates,
     const tc_x509_crl_scope_processing* processing, const tc_x509_crl_trust* trust,
     const TC_bytes* points, int from_certificate, int all_scopes,
@@ -248,6 +256,9 @@ TC_TLV_result tc_x509_crl_dependency_add(tc_x509_crl_dependencies* dependencies,
   const tc_x509_crl_resolution_workspace* workspace = dependencies->workspace;
   TC_TLV_result result = tc_pki_storage_input(dependencies->writes,dependencies->write_count,certificate,work);
   if (result != TC_TLV_OK) return result;
+  if (workspace->indexed_dependencies)
+    return tc_x509_crl_dependency_find_indexed(workspace->nodes,workspace->node_capacity,
+        &dependencies->count,certificate,work,index);
   return tc_x509_crl_dependency_find(workspace->nodes,workspace->node_capacity,
       &dependencies->count,certificate,work,index);
 }
@@ -383,14 +394,18 @@ TC_TLV_result tc_x509_crl_scopes(const void* candidates, tc_x509_crl_search sear
         result = tc_x509_crl_scope_reasons(&record->crl,distribution,current_query.point,
             query->certificate->issuer,current_query.certificate_ca,&options->parsing,tree,&validation->names,&reasons);
         if (result == TC_TLV_OK && !(reasons & ~pending.reasons)) result = TC_TLV_END;
+        if (result == TC_TLV_OK && all_scopes && processing.scopes &&
+            processing.scopes[i].representative != i) result = TC_TLV_END;
         if (result == TC_TLV_OK && all_scopes) {
-          for (size_t previous = 0; previous < i; ++previous) {
-            if (index->records[previous].policy != TC_TLV_OK) continue;
-            int same;
-            result = tc_x509_crl_same_scope(&processing,previous,trust,&same);
-            if (result != TC_TLV_OK || same) {
-              if (result == TC_TLV_OK) result = TC_TLV_END;
-              break;
+          if (!processing.scopes) {
+            for (size_t previous = 0; previous < i; ++previous) {
+              if (index->records[previous].policy != TC_TLV_OK) continue;
+              int same;
+              result = tc_x509_crl_same_scope(&processing,previous,trust,&same);
+              if (result != TC_TLV_OK || same) {
+                if (result == TC_TLV_OK) result = TC_TLV_END;
+                break;
+              }
             }
           }
           if (result == TC_TLV_OK) {
@@ -589,6 +604,13 @@ TC_TLV_result tc_x509_crl_scope_storage_writes(const tc_x509_crl_scope_processin
   CRL_ARRAY(processing->evidence,1,CRL_SCOPE_EVIDENCE);
   CRL_ARRAY(out,1,CRL_SCOPE_RESULT);
   CRL_ARRAY(trust->tree->work,1,CRL_SCOPE_WORK);
+  CRL_ARRAY(processing->scopes,processing->scopes ? processing->index->count : 0,CRL_SCOPE_SCOPES);
+  const tc_x509_crl_signer_cache* signer_cache = processing->signer_cache;
+  CRL_ARRAY(signer_cache,signer_cache ? 1 : 0,CRL_SCOPE_SIGNER_CACHE);
+  CRL_ARRAY(signer_cache ? signer_cache->path : NULL,
+      signer_cache ? signer_cache->path_capacity : 0,CRL_SCOPE_SIGNER_PATH);
+  CRL_ARRAY(signer_cache ? signer_cache->policies : NULL,
+      signer_cache ? signer_cache->policy_capacity : 0,CRL_SCOPE_SIGNER_POLICIES);
 #undef CRL_ARRAY
   return TC_TLV_OK;
 }
@@ -677,7 +699,7 @@ static TC_TLV_result x509_crl_node_evaluate(void* context, size_t index,
   TC_X509_search_result scratch;
   tc_x509_crl_scope_processing processing = {resolution->index,0,resolution->delta_policy,
     resolution->order_policy,&query,workspace->states,workspace->state_capacity,
-    &pending,node->check,NULL,NULL};
+    &pending,node->check,NULL,NULL,workspace->scopes,workspace->signer_cache};
   node->extra->count = node->dependencies->count;
   result = tc_x509_crl_scope_execute(resolution->candidates,&processing,
       &(tc_x509_crl_trust){resolution->source,resolution->anchor_index,resolution->options,
@@ -704,11 +726,14 @@ TC_TLV_result tc_x509_crl_resolve(const TC_X509_certificate* target,
       !x509_crl_order_policy_valid(resolution->order_policy)) return TC_TLV_ARGUMENT;
   if (!workspace->node_capacity || workspace->state_capacity < resolution->index->count)
     return TC_TLV_LIMIT;
+  if (workspace->scopes && workspace->scope_capacity < resolution->index->count)
+    return TC_TLV_LIMIT;
+  TC_TLV_result result;
   int source_failed = 0;
   tc_x509_crl_extra_storage extra = {0};
   extra.count = path ? path->dependency_count : 0;
   if (extra.count > workspace->node_capacity) return TC_TLV_ARGUMENT;
-  TC_TLV_result result = tc_pki_storage_span(workspace->nodes,workspace->node_capacity,
+  result = tc_pki_storage_span(workspace->nodes,workspace->node_capacity,
       sizeof *workspace->nodes,&extra.nodes_storage);
   if (result != TC_TLV_OK) return result;
   result = tc_pki_storage_span(out,1,sizeof *out,&extra.output_storage);
@@ -725,10 +750,16 @@ TC_TLV_result tc_x509_crl_resolve(const TC_X509_certificate* target,
   const tc_x509_crl_path_check check = {&dependencies,tc_x509_crl_dependencies_check};
   const tc_x509_crl_scope_processing processing = {resolution->index,0,
     resolution->delta_policy,resolution->order_policy,&query,workspace->states,
-    workspace->state_capacity,&pending,&check,NULL,NULL};
+    workspace->state_capacity,&pending,&check,NULL,NULL,workspace->scopes,workspace->signer_cache};
   result = x509_crl_scope_prepare(resolution->candidates,&processing,&trust,NULL,
       &extra,path,&scratch,writes);
   if (result != TC_TLV_OK) return result;
+  if (workspace->scopes) {
+    result = tc_x509_crl_scopes_index(resolution->index,&resolution->options->parsing,
+        workspace->tree,&workspace->validation->names,
+        workspace->scopes,workspace->scope_capacity);
+    if (result != TC_TLV_OK) return result;
+  }
   const tc_pki_source_guard source_guard = {resolution->source,writes,CRL_SCOPE_WRITES};
   result = tc_pki_source_guard_anchor((void*)&source_guard,resolution->anchor_index,
       workspace->tree->work,&anchor);
@@ -767,7 +798,11 @@ TC_TLV_result TC_X509_path_check_revocation(const TC_bytes* chain, size_t count,
     size_t* work, TC_X509_revocation_result* out)
 {
   if (!options || !options->source || !options->signer_policy || !workspace ||
-      !workspace->validation || !work) return TC_TLV_ARGUMENT;
+      !workspace->validation || !workspace->search || !workspace->scopes ||
+      !workspace->signer_path || !workspace->signer_policies || !work) return TC_TLV_ARGUMENT;
+  if (workspace->signer_path_capacity < workspace->search->capacity ||
+      workspace->signer_policy_capacity < workspace->validation->policy_capacity)
+    return TC_TLV_LIMIT;
   const tc_pki_tree_workspace tree = {workspace->validation->frames,
     workspace->validation->frame_capacity,work};
   tc_pki_store_candidates cursor = {options->source,options->signer_policy->parsing,
@@ -781,9 +816,12 @@ TC_TLV_result TC_X509_path_check_revocation(const TC_bytes* chain, size_t count,
   };
   const tc_x509_crl_resolution resolution = {&candidates,options->index,options->source,
     options->signer_policy,options->anchor_index,options->delta_policy,options->order_policy};
+  tc_x509_crl_signer_cache signer_cache = {{0}, {0},workspace->signer_path,
+    workspace->signer_path_capacity,workspace->signer_policies,workspace->signer_policy_capacity,0};
   const tc_x509_crl_resolution_workspace scratch = {&tree,workspace->validation,
     workspace->search,workspace->states,workspace->state_capacity,
-    workspace->nodes,workspace->node_capacity};
+    workspace->nodes,workspace->node_capacity,1,workspace->scopes,workspace->scope_capacity,
+    &signer_cache};
   tc_x509_crl_held_path held = {0};
   held.chain = chain;
   held.count = count;
@@ -805,8 +843,11 @@ TC_X509_path_status tc_x509_crl_dependencies_path(const TC_X509_search_result* p
     size_t index;
     TC_TLV_result result = tc_pki_storage_input(writes,write_count,path->path[i],work);
     if (result != TC_TLV_OK) return tc_x509_path_status(result);
-    result = tc_x509_crl_dependency_find(workspace->nodes,workspace->node_capacity,
-        count,path->path[i],work,&index);
+    result = workspace->indexed_dependencies ?
+        tc_x509_crl_dependency_find_indexed(workspace->nodes,workspace->node_capacity,
+            count,path->path[i],work,&index) :
+        tc_x509_crl_dependency_find(workspace->nodes,workspace->node_capacity,
+            count,path->path[i],work,&index);
     if (result != TC_TLV_OK) return tc_x509_path_status(result);
     switch (workspace->nodes[index].status) {
       case TC_X509_CRL_REVOKED: return TC_X509_PATH_INVALID;
@@ -848,7 +889,38 @@ TC_TLV_result tc_x509_crl_dependency_find(TC_X509_revocation_node* nodes,
     if (tc_pki_equal(previous,certificate)) { *index = i; return TC_TLV_OK; }
   }
   if (*count == capacity) return TC_TLV_LIMIT;
-  nodes[*count] = (TC_X509_revocation_node){certificate,TC_X509_CRL_UNDETERMINED};
+  nodes[*count] = (TC_X509_revocation_node){.certificate = certificate,
+      .status = TC_X509_CRL_UNDETERMINED};
+  *index = (*count)++;
+  return TC_TLV_OK;
+}
+
+TC_TLV_result tc_x509_crl_dependency_find_indexed(TC_X509_revocation_node* nodes,
+    size_t capacity, size_t* count, TC_bytes certificate, size_t* work, size_t* index)
+{
+  size_t cursor, bucket;
+  if (!nodes || !count || !work || !index || *count > capacity ||
+      !certificate.data || !certificate.length) return TC_TLV_ARGUMENT;
+  if (!capacity) return TC_TLV_LIMIT;
+  if (!*count) {
+    if (tc_x509_path_charge(work,capacity) != TC_TLV_OK) return TC_TLV_LIMIT;
+    for (size_t i = 0; i < capacity; ++i) nodes[i].hash_head = SIZE_MAX;
+  }
+  if (tc_x509_path_charge(work,certificate.length) != TC_TLV_OK) return TC_TLV_LIMIT;
+  bucket = (size_t)tc_x509_crl_bytes_hash(certificate) % capacity;
+  for (cursor = nodes[bucket].hash_head; cursor != SIZE_MAX; cursor = nodes[cursor].hash_next) {
+    if (cursor >= *count) return TC_TLV_ARGUMENT;
+    const TC_bytes previous = nodes[cursor].certificate;
+    if (tc_x509_path_charge(work,1) != TC_TLV_OK) return TC_TLV_LIMIT;
+    if (previous.length != certificate.length) continue;
+    if (tc_x509_path_charge(work,certificate.length) != TC_TLV_OK) return TC_TLV_LIMIT;
+    if (tc_pki_equal(previous,certificate)) { *index = cursor; return TC_TLV_OK; }
+  }
+  if (*count == capacity) return TC_TLV_LIMIT;
+  nodes[*count].certificate = certificate;
+  nodes[*count].status = TC_X509_CRL_UNDETERMINED;
+  nodes[*count].hash_next = nodes[bucket].hash_head;
+  nodes[bucket].hash_head = *count;
   *index = (*count)++;
   return TC_TLV_OK;
 }
@@ -882,6 +954,45 @@ TC_TLV_result tc_x509_crl_certificate_extension(void* context, const TC_X509_ext
   }
 }
 
+TC_TLV_result tc_x509_crl_scopes_index(const TC_X509_crl_index* index,
+    const TC_TLV_limits* limits, const tc_pki_tree_workspace* tree,
+    const TC_X509_name_workspace* names, TC_X509_revocation_scope* slots,
+    size_t capacity)
+{
+  if (!index || (index->count && !index->records) || !limits || !tree ||
+      !tree->work || !names || (capacity && !slots)) return TC_TLV_ARGUMENT;
+  if (capacity < index->count) return TC_TLV_LIMIT;
+  if (tc_x509_path_charge(tree->work,index->count) != TC_TLV_OK) return TC_TLV_LIMIT;
+  for (size_t i = 0; i < index->count; ++i) slots[i].head = SIZE_MAX;
+  for (size_t i = 0; i < index->count; ++i) {
+    const TC_X509_crl_record* record = &index->records[i];
+    slots[i].representative = SIZE_MAX;
+    slots[i].next = SIZE_MAX;
+    if (record->policy != TC_TLV_OK) continue;
+    const TC_bytes distribution = record->extensions.distribution_encoded;
+    if (distribution.length && !distribution.data) return TC_TLV_ARGUMENT;
+    if (tc_x509_path_charge(tree->work,distribution.length) != TC_TLV_OK) return TC_TLV_LIMIT;
+    uint32_t hash = tc_x509_crl_bytes_hash(distribution);
+    hash = (hash ^ !!(record->extensions.present & TC_CRL_EXT_DISTRIBUTION)) * UINT32_C(16777619);
+    const size_t bucket = (size_t)hash % index->count;
+    for (size_t cursor = slots[bucket].head; cursor != SIZE_MAX; cursor = slots[cursor].next) {
+      const TC_X509_crl_record* previous = &index->records[cursor];
+      int same;
+      if (tc_x509_path_charge(tree->work,1) != TC_TLV_OK) return TC_TLV_LIMIT;
+      TC_TLV_result result = tc_x509_crl_scope_equal(&record->crl,&record->extensions,
+          &previous->crl,&previous->extensions,limits,tree,names,&same);
+      if (result != TC_TLV_OK) return result;
+      if (same) { slots[i].representative = cursor; break; }
+    }
+    if (slots[i].representative == SIZE_MAX) {
+      slots[i].representative = i;
+      slots[i].next = slots[bucket].head;
+      slots[bucket].head = i;
+    }
+  }
+  return TC_TLV_OK;
+}
+
 TC_TLV_result tc_x509_crl_same_scope(const tc_x509_crl_scope_processing* processing,
     size_t other, const tc_x509_crl_trust* trust, int* same)
 {
@@ -905,8 +1016,12 @@ TC_TLV_result tc_x509_crl_group(const void* candidates, tc_x509_crl_search searc
     const TC_X509_crl_record* record = &processing->index->records[i];
     if (record->policy != TC_TLV_OK) continue;
     int same;
-    result = tc_x509_crl_same_scope(processing,i,trust,&same);
-    if (result != TC_TLV_OK) return result;
+    if (processing->scopes) same = processing->scopes[i].representative ==
+        processing->scopes[processing->reference].representative;
+    else {
+      result = tc_x509_crl_same_scope(processing,i,trust,&same);
+      if (result != TC_TLV_OK) return result;
+    }
     if (!same) continue;
     tc_x509_crl_evidence empty = {0};
     tc_x509_crl_proposal candidate = {0}, unresolved = {0};
@@ -947,16 +1062,52 @@ TC_TLV_result tc_x509_crl_scope_attempt(const void* context,
   const tc_x509_crl_scope_processing* processing = context;
   tc_x509_crl_signature_cache cache;
   TC_X509_search_result found;
-  TC_TLV_result result = tc_x509_crl_signature_cache_init(processing->index,signer,
-      &trust->options->signatures,&trust->options->parsing,&trust->validation->names,
-      processing->states,processing->capacity,trust->tree->work,&cache);
-  if (result != TC_TLV_OK) return result;
-  result = tc_x509_path_result_status(tc_x509_crl_signer_validate(
-      &processing->index->records[processing->reference].crl,signer,trust->source,
-      trust->anchor_index,trust->options,trust->validation,trust->search,trust->tree->work,&found));
-  if (result != TC_TLV_OK) return result;
-  /* Signer validation already checked this signature with the cache's provider. */
-  cache.states[processing->reference] = CRL_SIGNATURE_VALID;
+  tc_x509_crl_signer_cache* saved = processing->signer_cache;
+  int reuse = 0;
+  if (saved && saved->valid && saved->signer.length == signer->encoded.length) {
+    if (tc_x509_path_charge(trust->tree->work,signer->encoded.length) != TC_TLV_OK)
+      return TC_TLV_LIMIT;
+    reuse = tc_pki_equal(saved->signer,signer->encoded);
+  }
+  TC_TLV_result result;
+  if (reuse) {
+    cache = (tc_x509_crl_signature_cache){processing->index,signer,&trust->options->signatures,
+        &trust->options->parsing,&trust->validation->names,processing->states,
+        processing->capacity,processing->scopes};
+    result = tc_x509_crl_signature_cached(&cache,processing->reference,trust->tree->work);
+    if (result != TC_TLV_OK) return result;
+    found = saved->result;
+    found.validation.work_used = 0;
+  } else {
+    if (saved) saved->valid = 0;
+    result = tc_x509_crl_signature_cache_init(processing->index,signer,
+        &trust->options->signatures,&trust->options->parsing,&trust->validation->names,
+        processing->states,processing->capacity,trust->tree->work,&cache);
+    if (result != TC_TLV_OK) return result;
+    result = tc_x509_path_result_status(tc_x509_crl_signer_validate(
+        &processing->index->records[processing->reference].crl,signer,trust->source,
+        trust->anchor_index,trust->options,trust->validation,trust->search,trust->tree->work,&found));
+    if (result != TC_TLV_OK) return result;
+    /* Signer validation already checked this signature with the cache's provider. */
+    cache.states[processing->reference] = CRL_SIGNATURE_VALID;
+    if (saved) {
+      if (found.count > saved->path_capacity ||
+          found.validation.policy_count > saved->policy_capacity) return TC_TLV_LIMIT;
+      if (tc_x509_path_charge(trust->tree->work,found.count) != TC_TLV_OK ||
+          tc_x509_path_charge(trust->tree->work,found.validation.policy_count) != TC_TLV_OK)
+        return TC_TLV_LIMIT;
+      if (found.count) memcpy(saved->path,found.path,found.count * sizeof *saved->path);
+      if (found.validation.policy_count)
+        memcpy(saved->policies,found.validation.policies,
+            found.validation.policy_count * sizeof *saved->policies);
+      found.path = saved->path;
+      found.validation.policies = saved->policies;
+      saved->result = found;
+      saved->signer = signer->encoded;
+      saved->valid = 1;
+    }
+  }
+  cache.scopes = processing->scopes;
   tc_x509_crl_evidence pending = *processing->evidence;
   tc_x509_crl_selected selected = {0};
   result = tc_x509_crl_scope_evaluate(&cache,processing->reference,processing->delta_policy,
@@ -1137,7 +1288,7 @@ TC_TLV_result tc_x509_crl_signature_cache_init(const TC_X509_crl_index* index,
   TC_TLV_result result = tc_x509_path_charge(work,index->count);
   if (result != TC_TLV_OK) return result;
   if (index->count) memset(states,CRL_SIGNATURE_UNCHECKED,index->count);
-  *out = (tc_x509_crl_signature_cache){index,signer,provider,limits,names,states,capacity};
+  *out = (tc_x509_crl_signature_cache){index,signer,provider,limits,names,states,capacity,NULL};
   return TC_TLV_OK;
 }
 
@@ -1253,9 +1404,13 @@ static TC_TLV_result x509_crl_effective_next(const tc_x509_crl_signature_cache* 
     const TC_X509_crl_record* base = &cache->index->records[i];
     if (base->policy != TC_TLV_OK || (base->extensions.present & TC_CRL_EXT_DELTA)) continue;
     int same_scope;
-    result = tc_x509_crl_scope_equal(&scope->crl,&scope->extensions,&base->crl,&base->extensions,
-        cache->limits,tree,cache->names,&same_scope);
-    if (result != TC_TLV_OK) return result;
+    if (cache->scopes) same_scope = cache->scopes[i].representative ==
+        cache->scopes[reference].representative;
+    else {
+      result = tc_x509_crl_scope_equal(&scope->crl,&scope->extensions,&base->crl,&base->extensions,
+          cache->limits,tree,cache->names,&same_scope);
+      if (result != TC_TLV_OK) return result;
+    }
     if (!same_scope) continue;
     tc_x509_crl_freshness freshness;
     result = tc_x509_crl_fresh_at(&base->crl,at,&freshness);

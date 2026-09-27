@@ -333,7 +333,9 @@ TC_PIV_CHUID_validation_request request = {
 TC_CMS_path_workspace path_workspace = /* caller-owned arrays and capacities */;
 TC_CMS_credential_workspace workspace = {
     &path_workspace, held_path, path_capacity,
-    crl_states, crl_capacity, revocation_nodes, node_capacity
+    crl_states, crl_capacity, revocation_nodes, node_capacity,
+    crl_scopes, crl_capacity, signer_path, path_capacity,
+    signer_policies, policy_capacity
 };
 TC_validation_trust trust = { &snapshot->source, &crl_index };
 TC_validation_context context;
@@ -376,8 +378,9 @@ active-card authentication and access authorization require their own checks.
 
 These examples call `TC_CMS_credential_validate`, which combines signature,
 path and revocation validation. Its workspace adds a retained path-span array,
-one cache byte per CRL and a caller-sized revocation-node array to the CMS path
-workspace. It checks both phases' input and scratch ranges before processing,
+one cache byte and one scope slot per CRL, a caller-sized revocation-node array,
+and signer path/policy span arrays to the CMS path workspace. It checks both
+phases' input and scratch ranges before processing,
 and checks borrowed source records as callbacks return them. Only
 `TC_CREDENTIAL_VALID` establishes a valid, unrevoked signer path;
 `TC_CREDENTIAL_REVOKED` distinguishes certificate revocation from other failures.
@@ -487,11 +490,13 @@ collection framing. The supplied work counter covers indexing and all candidate
 attempts; `path.max_work` is not used by this call.
 
 `TC_CMS_path_workspace` combines validation/search scratch, a certificate-span
-index and optional fragmented-signature storage. Size the index for every X.509
+index, 64 bytes of signed-attribute digest scratch, and optional fragmented-signature
+storage. Size the index for every X.509
 candidate, not just the expected signer. Other certificate formats consume the
 record and byte limits but need no index slot. The index borrows bytes; external
 candidates are fetched once. Parsing frames and name scratch are reused between
-CMS and path processing. Keep all writable arrays separate from input bytes,
+CMS and path processing. The signed digest is reused only while checking candidates
+for one signer and cleared when the search ends. Keep all writable arrays separate from input bytes,
 metadata, provider state and each other.
 
 The compiled `example_find_cms_signer_path` in

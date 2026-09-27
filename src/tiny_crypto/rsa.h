@@ -26,6 +26,13 @@ typedef struct {
 } TC_RSA_private_key;
 typedef struct { TC_buffer dp, dq, q_inverse; } TC_RSA_crt_output;
 typedef struct { TC_RSA_word* words; size_t capacity; } TC_RSA_workspace;
+/* Optional setup for repeated verification with an unchanged borrowed key.
+ * Initialize with TC_RSA_prepare_public_key and clear before releasing the key. */
+typedef struct {
+  TC_RSA_public_key key;
+  TC_RSA_workspace r2;
+  uint32_t marker;
+} TC_RSA_prepared_public_key;
 typedef int (*TC_RSA_cancel_fn)(void* user);
 typedef struct {
   TC_buffer modulus, exponent, d, p, q;
@@ -91,6 +98,16 @@ size_t TC_RSA_encrypt_workspace_words(size_t bits);
 size_t TC_RSA_raw_public_workspace_words(size_t bits);
 size_t TC_RSA_raw_private_workspace_words(size_t bits);
 size_t TC_RSA_keygen_workspace_words(size_t bits);
+
+/* Prepare a borrowed public key for repeated v1.5 or PSS verification.
+ * Cache needs one modulus width of limbs and scratch needs two; scratch is
+ * wiped on return. Keep the cache and borrowed key bytes unchanged and alive
+ * until clear. Setup, key, cache, scratch, and work must be disjoint. */
+TC_RSA_result TC_RSA_prepare_public_key(TC_RSA_prepared_public_key* setup,
+    const TC_RSA_public_key* key, const TC_RSA_workspace* cache,
+    const TC_RSA_workspace* workspace,
+    TC_work_budget* work);
+void TC_RSA_prepared_public_key_clear(TC_RSA_prepared_public_key* setup);
 
 /* Generate a two-prime RSA key with e=65537. Output capacities must be at
  * least bits/8 for modulus and d, bits/16 for p and q, and three bytes for e.
@@ -227,11 +244,20 @@ TC_RSA_result TC_RSA_derive_crt(const TC_RSA_private_key* key,
 TC_RSA_result TC_RSA_verify_v15_digest(const TC_RSA_public_key* key,
     const TC_RSA_v15_options* options, TC_bytes digest, TC_bytes signature,
     const TC_RSA_workspace* workspace, TC_work_budget* work);
+/* Use an initialized setup with unchanged borrowed key and cache storage.
+ * Verification workspace and all inputs must be separate from that setup. */
+TC_RSA_result TC_RSA_verify_v15_prepared(const TC_RSA_prepared_public_key* setup,
+    const TC_RSA_v15_options* options, TC_bytes digest, TC_bytes signature,
+    const TC_RSA_workspace* workspace, TC_work_budget* work);
 
 /* PSS uses explicit message/MGF hashes and salt length, with the same key and
  * workspace rules. Both hashes must be enabled. No automatic salt detection.
  * Additional stack storage holds one hash context and a 64-byte digest buffer. */
 TC_RSA_result TC_RSA_verify_pss_digest(const TC_RSA_public_key* key,
+    const TC_RSA_pss_options* options, TC_bytes digest, TC_bytes signature,
+    const TC_RSA_workspace* workspace, TC_work_budget* work);
+/* Same PSS checks as the one-shot verifier, reusing the setup's R² cache. */
+TC_RSA_result TC_RSA_verify_pss_prepared(const TC_RSA_prepared_public_key* setup,
     const TC_RSA_pss_options* options, TC_bytes digest, TC_bytes signature,
     const TC_RSA_workspace* workspace, TC_work_budget* work);
 #ifdef __cplusplus

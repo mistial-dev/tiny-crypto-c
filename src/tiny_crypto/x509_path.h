@@ -34,12 +34,15 @@ typedef struct {
   size_t mapping_capacity;
   TC_bytes* policies;
   size_t policy_capacity;
+  /* One parsed view per path entry. Views borrow the input DER. */
+  TC_X509_certificate* certificates;
+  size_t certificate_capacity;
 } TC_X509_path_workspace;
 
 /* Array arguments only, not pointers. The shorter name buffer sets the limit.
  * Use as an initializer in C or C++: TC_X509_path_workspace w = ...; */
 #define TC_X509_PATH_ARRAY_COUNT_(a) (sizeof(a) / sizeof((a)[0]))
-#define TC_X509_PATH_WORKSPACE_INIT(frames_, oids_, left_, right_, matched_, nodes_, edges_, expected_, mappings_, policies_) \
+#define TC_X509_PATH_WORKSPACE_INIT(frames_, oids_, left_, right_, matched_, nodes_, edges_, expected_, mappings_, policies_, certificates_) \
   { (frames_), TC_X509_PATH_ARRAY_COUNT_(frames_), (oids_), TC_X509_PATH_ARRAY_COUNT_(oids_), \
     { (left_), (right_), \
       TC_X509_PATH_ARRAY_COUNT_(left_) < TC_X509_PATH_ARRAY_COUNT_(right_) \
@@ -47,7 +50,8 @@ typedef struct {
       (matched_), TC_X509_PATH_ARRAY_COUNT_(matched_) }, \
     (nodes_), TC_X509_PATH_ARRAY_COUNT_(nodes_), (edges_), TC_X509_PATH_ARRAY_COUNT_(edges_), \
     (expected_), TC_X509_PATH_ARRAY_COUNT_(expected_), (mappings_), TC_X509_PATH_ARRAY_COUNT_(mappings_), \
-    (policies_), TC_X509_PATH_ARRAY_COUNT_(policies_) }
+    (policies_), TC_X509_PATH_ARRAY_COUNT_(policies_), \
+    (certificates_), TC_X509_PATH_ARRAY_COUNT_(certificates_) }
 
 enum {
   TC_X509_PATH_REQUIRE_EXPLICIT_POLICY = 1u,
@@ -102,6 +106,8 @@ typedef struct {
  * limits as ordered validation. Source callbacks must keep returned records stable
  * and separate from both workspaces and out. Hold the source snapshot until all
  * result use finishes. No network fetching or revocation checking is performed.
+ * validation.certificates needs one entry per attempted path certificate;
+ * options.max_certificates covers every permitted path.
  *
  * On VALID, path borrows a suffix of search.path, anchor-issued first, target last.
  * anchor_index identifies the selected source anchor. Key and policy lifetimes
@@ -122,6 +128,8 @@ TC_X509_path_status TC_X509_path_build(TC_bytes target,
  * DER and option spans are borrowed and must remain unchanged during the call.
  * Result key bytes borrow target DER; policy spans also borrow issuer DER or
  * initial_policies. Keep those buffers and workspace.policies alive while used.
+ * The certificate workspace array needs at least count entries and keeps
+ * parsed views during validation. Its entries borrow DER and change on reuse.
  * Workspace arrays must be mutually disjoint and disjoint from inputs/out.
  * Provider context must also be separate from workspace and out.
  * Workspace/provider state may change on any result; out changes only on VALID. */

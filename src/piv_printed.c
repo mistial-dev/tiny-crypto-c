@@ -2,8 +2,10 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/common.h>
 #if TC_ENABLE_PIV_OBJECTS
+#include "credential_text_internal.h"
 #include "internal.h"
 #include "pki_internal.h"
+#include "piv_container_internal.h"
 #include <string.h>
 #include <tiny_crypto/piv_printed.h>
 
@@ -16,7 +18,6 @@ enum {
   PRINTED_ORGANIZATION_1_TAG = 0x07,
   PRINTED_ORGANIZATION_2_TAG = 0x08,
   PRINTED_ERROR_TAG = 0xfe,
-  PRINTED_CONTAINER_TAG = 0x53,
   PRINTED_NAME_MAX = 125,
   PRINTED_AFFILIATION_MAX = 20,
   PRINTED_DATE_LENGTH = 9,
@@ -50,14 +51,6 @@ static unsigned number(const uint8_t *value, size_t length) {
   return result;
 }
 
-static unsigned month(const uint8_t *value) {
-  static const char names[] = "JANFEBMARAPRMAYJUNJULAUGSEPOCTNOVDEC";
-  for (unsigned i = 0; i < 12; ++i)
-    if (!memcmp(value, names + i * 3, 3))
-      return i + 1;
-  return 0;
-}
-
 static int twic_issuer(TC_bytes value) {
   static const uint8_t prefix[] = {'7', '0', '9', '9'};
   return value.length == TWIC_ISSUER_LENGTH && decimal(value) &&
@@ -74,14 +67,14 @@ static int date(TC_bytes value, TC_PIV_printed_profile profile,
         !decimal((TC_bytes){value.data + 7, 2}))
       return 0;
     year = number(value.data, 4);
-    parsed_month = month(value.data + 4);
+    parsed_month = tc_credential_month3(value.data + 4, 0);
     day = number(value.data + 7, 2);
   } else {
     if (!decimal((TC_bytes){value.data, 2}) ||
         !decimal((TC_bytes){value.data + 5, 4}))
       return 0;
     day = number(value.data, 2);
-    parsed_month = month(value.data + 2);
+    parsed_month = tc_credential_month3(value.data + 2, 0);
     year = number(value.data + 5, 4);
   }
   if (!parsed_month || !tc_pki_date(year, parsed_month, day))
@@ -132,15 +125,9 @@ TC_TLV_result TC_PIV_printed_read(TC_bytes input,
   if (!tc_internal_ranges_disjoint(input.data, input.length, out, sizeof *out))
     return TC_TLV_ARGUMENT;
   if (encoding == TC_PIV_PRINTED_CONTAINER) {
-    result = TC_TLV_read(input.data, input.length, TC_TLV_ISO7816, &limits,
-                         &element);
+    result = tc_piv_container_contents(input, &limits, &input);
     if (result != TC_TLV_OK)
       return result;
-    if (element.header.tag_length != 1 ||
-        element.header.tag[0] != PRINTED_CONTAINER_TAG ||
-        element.encoded.length != input.length)
-      return TC_TLV_INVALID;
-    input = element.value;
   }
   if (profile == TC_PIV_PRINTED_PROFILE_TWIC &&
       input.length > TWIC_CONTENTS_MAX)
@@ -219,12 +206,9 @@ TC_TLV_result TC_PIV_printed_expiration_check(const TC_PIV_printed *printed,
   if (!printed || !at || !valid || !chuid_expiration.data ||
       chuid_expiration.length != 8)
     return TC_TLV_ARGUMENT;
-  if (!decimal(chuid_expiration))
-    return TC_TLV_INVALID;
-  const unsigned year = number(chuid_expiration.data, 4);
-  const unsigned parsed_month = number(chuid_expiration.data + 4, 2);
-  const unsigned day = number(chuid_expiration.data + 6, 2);
-  if (!tc_pki_date(year, parsed_month, day))
+  unsigned year, parsed_month, day;
+  if (!tc_credential_yyyymmdd(chuid_expiration.data,
+      chuid_expiration.length, &year, &parsed_month, &day))
     return TC_TLV_INVALID;
   TC_X509_time expires = printed->expiration;
   expires.hour = 23;

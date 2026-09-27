@@ -116,7 +116,7 @@ static TC_X509_signature_result cms_verify_digest(const TC_CMS_signer_info* sign
     const TC_X509_public_key* key, const TC_X509_signature_provider* provider,
     const TC_TLV_limits* limits, const TC_CMS_signature_workspace* workspace, size_t* work,
     const tc_cms_signature_algorithm* algorithm, tc_hash_workspace* hash_workspace, uint8_t* scratch,
-    TC_bytes* signer_name)
+    TC_bytes* signer_name, tc_cms_signed_attrs_cache* cache)
 {
   TC_CMS_signed_attributes attributes;
   tc_hash_info hash;
@@ -125,23 +125,35 @@ static TC_X509_signature_result cms_verify_digest(const TC_CMS_signer_info* sign
   int matched;
   if (signer_name) *signer_name = (TC_bytes){NULL,0};
   if (signer->signed_attributes.length) {
-    checked = TC_CMS_signed_attributes_read(signer->signed_attributes,encoding,limits,
+    if (cache && cache->valid && cache->hash == algorithm->signature.hash) {
+      if (signer_name) *signer_name = cache->signer_name;
+      signed_digest = (TC_bytes){cache->digest,cache->digest_length};
+    } else {
+      checked = TC_CMS_signed_attributes_read(signer->signed_attributes,encoding,limits,
         workspace->frames,workspace->frame_capacity,work,&attributes);
-    if (checked != TC_TLV_OK) return tc_pki_signature_error(checked);
-    if (signer_name) *signer_name = attributes.signer_name;
-    checked = tc_cms_content_digest_check(&attributes,content_type,algorithm->content_hash,digest,work,&matched);
-    if (checked != TC_TLV_OK) return tc_pki_signature_error(checked);
-    if (!matched) return TC_X509_SIGNATURE_INVALID;
-    if (!tc_hash_available(algorithm->signature.hash) || !tc_hash_info_get(algorithm->signature.hash,&hash))
-      return TC_X509_SIGNATURE_UNSUPPORTED;
-    for (size_t i = 0; i < sizeof attributes.signature_input / sizeof *attributes.signature_input; ++i)
-      if (tc_x509_path_charge(work,attributes.signature_input[i].length) != TC_TLV_OK)
-        return TC_X509_SIGNATURE_LIMIT;
-    /* Binding is complete; the content digest buffer can now be reused. */
-    if (tc_hash_digest_parts(algorithm->signature.hash,attributes.signature_input,
+      if (checked != TC_TLV_OK) return tc_pki_signature_error(checked);
+      if (signer_name) *signer_name = attributes.signer_name;
+      checked = tc_cms_content_digest_check(&attributes,content_type,algorithm->content_hash,digest,work,&matched);
+      if (checked != TC_TLV_OK) return tc_pki_signature_error(checked);
+      if (!matched) return TC_X509_SIGNATURE_INVALID;
+      if (!tc_hash_available(algorithm->signature.hash) || !tc_hash_info_get(algorithm->signature.hash,&hash))
+        return TC_X509_SIGNATURE_UNSUPPORTED;
+      for (size_t i = 0; i < sizeof attributes.signature_input / sizeof *attributes.signature_input; ++i)
+        if (tc_x509_path_charge(work,attributes.signature_input[i].length) != TC_TLV_OK)
+          return TC_X509_SIGNATURE_LIMIT;
+      /* Binding is complete; the content digest buffer can now be reused. */
+      if (tc_hash_digest_parts(algorithm->signature.hash,attributes.signature_input,
         sizeof attributes.signature_input / sizeof *attributes.signature_input,scratch,hash_workspace) != TC_OK)
-      return TC_X509_SIGNATURE_ERROR;
-    signed_digest = (TC_bytes){scratch,hash.digest_length};
+        return TC_X509_SIGNATURE_ERROR;
+      signed_digest = (TC_bytes){scratch,hash.digest_length};
+      if (cache && cache->digest && cache->capacity >= hash.digest_length) {
+        memcpy(cache->digest,scratch,hash.digest_length);
+        cache->digest_length = hash.digest_length;
+        cache->hash = algorithm->signature.hash;
+        cache->signer_name = attributes.signer_name;
+        cache->valid = 1;
+      }
+    }
   } else {
     /* RFC 5652 section 5.3 requires signed attributes for other content types. */
     if (tc_x509_path_charge(work,content_type.length) != TC_TLV_OK) return TC_X509_SIGNATURE_LIMIT;
@@ -167,11 +179,12 @@ TC_TLV_result tc_cms_hash_content(TC_bytes input, TC_CMS_content_encoding encodi
   return tc_pki_hash_parts(&input,1,algorithm,limits,tree,scratch,digest);
 }
 
-TC_X509_signature_result tc_cms_signer_verify(const TC_CMS_signer_info* signer,
+TC_X509_signature_result tc_cms_signer_verify_cached(const TC_CMS_signer_info* signer,
     TC_bytes content_type, TC_bytes input, tc_cms_verify_input input_kind,
     TC_CMS_verification_policy policy, const TC_X509_public_key* key,
     const TC_X509_signature_provider* provider, const TC_TLV_limits* limits,
-    const TC_CMS_signature_workspace* workspace, size_t* work, TC_bytes* signer_name)
+    const TC_CMS_signature_workspace* workspace, size_t* work, TC_bytes* signer_name,
+    tc_cms_signed_attrs_cache* cache)
 {
   enum { MAX_DIGEST_BYTES = 64 };
   tc_cms_signature_algorithm algorithm;
@@ -205,11 +218,21 @@ TC_X509_signature_result tc_cms_signer_verify(const TC_CMS_signer_info* signer,
     digest = (TC_bytes){scratch,hash.digest_length};
   }
   result = cms_verify_digest(signer,content_type,digest,policy.attributes,key,provider,limits,
-      workspace,work,&algorithm,&hash_workspace,scratch,signer_name);
+      workspace,work,&algorithm,&hash_workspace,scratch,signer_name,cache);
 done:
   TC_secure_zero(scratch,sizeof scratch);
   TC_secure_zero(&hash_workspace,sizeof hash_workspace);
   return result;
+}
+
+TC_X509_signature_result tc_cms_signer_verify(const TC_CMS_signer_info* signer,
+    TC_bytes content_type, TC_bytes input, tc_cms_verify_input input_kind,
+    TC_CMS_verification_policy policy, const TC_X509_public_key* key,
+    const TC_X509_signature_provider* provider, const TC_TLV_limits* limits,
+    const TC_CMS_signature_workspace* workspace, size_t* work, TC_bytes* signer_name)
+{
+  return tc_cms_signer_verify_cached(signer,content_type,input,input_kind,policy,key,
+      provider,limits,workspace,work,signer_name,NULL);
 }
 
 TC_X509_signature_result TC_CMS_signer_verify_digest(const TC_CMS_signer_info* signer,

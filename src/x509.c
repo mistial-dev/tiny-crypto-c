@@ -10,6 +10,8 @@
 #include "internal.h"
 #include "pki_storage_internal.h"
 #include "hash_info_internal.h"
+#include "pki_signature_oid_internal.h"
+#include "der_bits_internal.h"
 #include <string.h>
 
 static const TC_TLV_limits unlimited = {SIZE_MAX, SIZE_MAX, SIZE_MAX, SIZE_MAX};
@@ -373,30 +375,29 @@ static TC_TLV_result validity(TC_bytes contents, TC_X509_certificate* certificat
 
 static TC_TLV_result signature_format(const TC_X509_certificate* certificate)
 {
-  static const uint8_t ecdsa[] = {0x2a,0x86,0x48,0xce,0x3d,4};
-  static const uint8_t dsa[] = {0x2a,0x86,0x48,0xce,0x38,4,3};
-  static const uint8_t rsa[] = {0x2a,0x86,0x48,0x86,0xf7,0x0d,1,1};
-  TC_bytes oid = certificate->signature_algorithm.oid;
+  tc_pki_signature_oid_info info = tc_pki_signature_oid_classify(certificate->signature_algorithm.oid);
   TC_bytes parameters = certificate->signature_algorithm.parameters;
-  if (oid.length == 9 && !memcmp(oid.data, rsa, sizeof rsa) && oid.data[8] == 10)
-    return tc_x509_pss_parameters(parameters);
-  int pair = (oid.length == 7 && !memcmp(oid.data, dsa, sizeof dsa)) ||
-    ((oid.length == 7 || oid.length == 8) && !memcmp(oid.data, ecdsa, sizeof ecdsa) &&
-     ((oid.length == 7 && oid.data[6] == 1) ||
-      (oid.length == 8 && oid.data[6] == 3 && oid.data[7] >= 1 && oid.data[7] <= 4)));
-  if (pair) {
-    TC_DER_signature_pair value;
-    if (parameters.length) return TC_TLV_INVALID;
-    return TC_DER_ecdsa_signature(certificate->signature.data, certificate->signature.length, &value);
-  }
-  if (oid.length == 3 && oid.data[0] == 0x2b && oid.data[1] == 0x65 &&
-      (oid.data[2] == 112 || oid.data[2] == 113)) {
-    if (parameters.length || certificate->signature.length != (oid.data[2] == 112 ? 64u : 114u)) return TC_TLV_INVALID;
-  } else if (oid.length == 9 && !memcmp(oid.data, rsa, sizeof rsa) &&
-             (oid.data[8] == 2 || oid.data[8] == 4 || oid.data[8] == 5 ||
-              (oid.data[8] >= 11 && oid.data[8] <= 16))) {
-    /* RFC 4055 requires readers to accept absent RSA signature parameters. */
-    if (parameters.length && TC_DER_null(parameters.data, parameters.length) != TC_TLV_OK) return TC_TLV_INVALID;
+  switch (info.kind) {
+    case TC_PKI_SIGNATURE_RSA_PSS:
+      return tc_x509_pss_parameters(parameters);
+    case TC_PKI_SIGNATURE_ECDSA:
+    case TC_PKI_SIGNATURE_DSA: {
+      TC_DER_signature_pair value;
+      if (parameters.length) return TC_TLV_INVALID;
+      return TC_DER_ecdsa_signature(certificate->signature.data,certificate->signature.length,&value);
+    }
+    case TC_PKI_SIGNATURE_ED25519:
+    case TC_PKI_SIGNATURE_ED448:
+      if (parameters.length || certificate->signature.length !=
+          (info.kind == TC_PKI_SIGNATURE_ED25519 ? 64u : 114u)) return TC_TLV_INVALID;
+      break;
+    case TC_PKI_SIGNATURE_RSA_V15:
+      /* RFC 4055 requires readers to accept absent RSA signature parameters. */
+      if (parameters.length && TC_DER_null(parameters.data,parameters.length) != TC_TLV_OK)
+        return TC_TLV_INVALID;
+      break;
+    case TC_PKI_SIGNATURE_UNKNOWN:
+      break;
   }
   return TC_TLV_OK;
 }
@@ -455,10 +456,10 @@ TC_TLV_result TC_X509_read(const uint8_t* data, size_t length,
     if (TC_TLV_next(&tbs, &element) != TC_TLV_OK || element.header.tag_length != 1) return TC_TLV_INVALID;
     tag = element.header.tag[0];
     if (tag == 0x81 || tag == 0x82) {
+      TC_bytes unique_id;
       if (certificate.version < 2 || last >= tag || !element.value.length) return TC_TLV_INVALID;
-      unused = element.value.data[0];
-      if (unused > 7 || (element.value.length == 1 && unused) ||
-          (unused && (element.value.data[element.value.length - 1] & ((1u << unused) - 1)))) return TC_TLV_INVALID;
+      if (tc_der_bit_string_contents(element.value, &unique_id, &unused) != TC_TLV_OK)
+        return TC_TLV_INVALID;
     } else if (tag == 0xa3) {
       if (certificate.version != 3 || last >= tag) return TC_TLV_INVALID;
       certificate.extensions = element.value;

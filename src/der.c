@@ -3,6 +3,7 @@
 #include <tiny_crypto/common.h>
 #if TC_ENABLE_DER
 #include <tiny_crypto/der.h>
+#include "der_bits_internal.h"
 
 static TC_TLV_result value(const uint8_t* data, size_t length,
                            uint8_t tag, TC_bytes* out)
@@ -69,26 +70,13 @@ TC_TLV_result TC_DER_uint32_contents(const uint8_t* data, size_t length, uint32_
   return TC_TLV_OK;
 }
 
-static TC_TLV_result bit_string_contents(TC_bytes v,
-                                         TC_bytes* out, unsigned* unused)
-{
-  unsigned n;
-  if (!v.length) return TC_TLV_INVALID;
-  n = v.data[0];
-  if (n > 7 || (v.length == 1 && n) ||
-      (n && (v.data[v.length - 1] & ((1u << n) - 1)))) return TC_TLV_INVALID;
-  ++v.data; --v.length;
-  *out = v; *unused = n;
-  return TC_TLV_OK;
-}
-
 TC_TLV_result TC_DER_bit_string(const uint8_t* data, size_t length,
                               TC_bytes* out, unsigned* unused)
 {
   TC_bytes v;
   if (!out || !unused) return TC_TLV_ARGUMENT;
   TC_TLV_result result = value(data,length,3,&v);
-  return result == TC_TLV_OK ? bit_string_contents(v,out,unused) : result;
+  return result == TC_TLV_OK ? tc_der_bit_string_contents(v,out,unused) : result;
 }
 
 TC_TLV_result TC_DER_oid(const uint8_t* data, size_t length, TC_bytes* out)
@@ -304,7 +292,7 @@ TC_TLV_result TC_DER_private_key_info(const uint8_t* data, size_t length,
     if (version != WITH_PUBLIC_KEY) return TC_TLV_INVALID;
     result = value(fields[next].data,fields[next].length,IMPLICIT_PUBLIC_KEY,&bits);
     if (result != TC_TLV_OK) return result;
-    result = bit_string_contents(bits,&key.public_key,&key.public_key_unused);
+    result = tc_der_bit_string_contents(bits,&key.public_key,&key.public_key_unused);
     if (result != TC_TLV_OK) return result;
     ++next;
   } else if (version != PRIVATE_ONLY) {

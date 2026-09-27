@@ -222,15 +222,8 @@ static TC_RSA_result tc_rsa_keygen_step(TC_RSA_keygen_state* state,
       if (status != TC_RSA_OK)
         TC_RSA_KEYGEN_RETURN(tc_rsa_keygen_stop(state,status));
       const uint8_t* candidate_bytes = state->phase == TC_RSA_KEYGEN_P_ROUND ? p : q;
-      unsigned seen = 0;
       uint8_t* bytes = (uint8_t*)temporary;
-      for (size_t i = 0; i < prime_length; ++i) {
-        unsigned mask = candidate_bytes[i];
-        mask |= mask >> 1; mask |= mask >> 2; mask |= mask >> 4;
-        mask |= 0u - seen;
-        bytes[i] &= (uint8_t)mask;
-        seen |= (unsigned)(candidate_bytes[i] != 0);
-      }
+      tc_rsa_mask_candidate_width(bytes,candidate_bytes,prime_length,prime_length);
       tc_mp_from_be(base,bytes,prime_length);
       TC_RSA_word* last = scratch + 7 * h;
       memcpy(last,scratch,prime_length); --last[0];
@@ -404,7 +397,7 @@ TC_RSA_result TC_RSA_raw_public(const TC_RSA_public_key* key, TC_bytes input,
   size_t available = work->remaining;
   result = tc_rsa_public_operation(key->modulus.data,length,key->exponent.data,
       key->exponent.length,input.data,output.data,workspace->words,
-      workspace->capacity,&available);
+      workspace->capacity,&available,NULL);
   work->remaining = (uint32_t)available;
   return result;
 }
@@ -793,7 +786,7 @@ static TC_RSA_result tc_rsa_encrypt_oaep(const TC_RSA_public_key* key,
         (TC_bytes){seed,info.digest_length},block,&hash_workspace,&max_work);
     if (status == TC_RSA_OK)
       status = tc_rsa_public_operation(key->modulus.data,length,key->exponent.data,
-          key->exponent.length,encoded,ciphertext,workspace->words,arithmetic_words,&max_work);
+          key->exponent.length,encoded,ciphertext,workspace->words,arithmetic_words,&max_work,NULL);
   }
   TC_secure_zero(workspace->words,required * sizeof(TC_RSA_word));
   TC_secure_zero(block,sizeof block);
@@ -902,9 +895,97 @@ TC_RSA_result TC_RSA_decrypt_oaep(const TC_RSA_private_key* key,
   return result;
 }
 
-TC_RSA_result TC_RSA_verify_v15_digest(const TC_RSA_public_key* key,
+enum { TC_RSA_PUBLIC_SETUP_MARKER = 0x52533250u };
+
+TC_RSA_result TC_RSA_prepare_public_key(TC_RSA_prepared_public_key* setup,
+    const TC_RSA_public_key* key, const TC_RSA_workspace* cache,
+    const TC_RSA_workspace* workspace,
+    TC_work_budget* work)
+{
+  if (!setup || !key || !cache || !workspace || !work) return TC_RSA_ARGUMENT;
+  TC_RSA_result status = tc_rsa_public_key_check(key->modulus.data,
+      key->modulus.length,key->exponent.data,key->exponent.length);
+  if (status != TC_RSA_OK) return status;
+  const size_t length = key->modulus.length;
+  const size_t n = length / sizeof(TC_RSA_word);
+  const TC_bytes inputs[] = {
+    {(const uint8_t*)setup,sizeof *setup},
+    {(const uint8_t*)key,sizeof *key},
+    {(const uint8_t*)work,sizeof *work},
+    {(const uint8_t*)cache,sizeof *cache},
+    key->modulus,key->exponent
+  };
+  status = tc_rsa_workspace_inputs(workspace,inputs,sizeof inputs / sizeof *inputs);
+  if (status != TC_RSA_OK) return status;
+  for (size_t i = 1; i < sizeof inputs / sizeof *inputs; ++i)
+    if (!tc_internal_ranges_disjoint(setup,sizeof *setup,inputs[i].data,inputs[i].length))
+      return TC_RSA_ARGUMENT;
+  if (!tc_internal_ranges_disjoint(setup,sizeof *setup,workspace,sizeof *workspace))
+    return TC_RSA_ARGUMENT;
+  status = tc_rsa_workspace_inputs(cache,inputs,sizeof inputs / sizeof *inputs);
+  if (status != TC_RSA_OK) return status;
+  if (!tc_internal_ranges_disjoint(cache->words,cache->capacity * sizeof *cache->words,
+        workspace->words,workspace->capacity * sizeof *workspace->words) ||
+      !tc_internal_ranges_disjoint(cache->words,cache->capacity * sizeof *cache->words,
+        workspace,sizeof *workspace)) return TC_RSA_ARGUMENT;
+  if (cache->capacity < n || workspace->capacity < 2 * n ||
+      work->remaining < 16 * length + 1)
+    return TC_RSA_LIMIT;
+  work->remaining -= (uint32_t)(16 * length + 1);
+  tc_mp_word* modulus_words = workspace->words;
+  tc_mp_from_be(modulus_words,key->modulus.data,length);
+  tc_mp_montgomery_r2(cache->words,modulus_words,n,workspace->words + n);
+  setup->key = *key;
+  setup->r2 = *cache;
+  setup->marker = TC_RSA_PUBLIC_SETUP_MARKER;
+  TC_secure_zero(workspace->words,2 * length);
+  return TC_RSA_OK;
+}
+
+void TC_RSA_prepared_public_key_clear(TC_RSA_prepared_public_key* setup)
+{
+  if (!setup) return;
+  if (setup->marker == TC_RSA_PUBLIC_SETUP_MARKER && setup->r2.words &&
+      setup->key.modulus.length <= 384)
+    TC_secure_zero(setup->r2.words,setup->key.modulus.length);
+  TC_secure_zero(setup,sizeof *setup);
+}
+
+static TC_RSA_result tc_rsa_prepared_inputs(const TC_RSA_prepared_public_key* setup,
+    const void* options, size_t options_size, TC_bytes digest, TC_bytes signature,
+    const TC_RSA_workspace* workspace, const TC_work_budget* work)
+{
+  if (!setup || setup->marker != TC_RSA_PUBLIC_SETUP_MARKER || !workspace || !work)
+    return TC_RSA_ARGUMENT;
+  const TC_bytes inputs[] = {
+    {(const uint8_t*)options,options_size},digest,signature,
+    {(const uint8_t*)workspace,sizeof *workspace},
+    {(const uint8_t*)work,sizeof *work},setup->key.modulus,setup->key.exponent
+  };
+  for (size_t i = 0; i < sizeof inputs / sizeof *inputs; ++i)
+    if (!tc_internal_ranges_disjoint(setup,sizeof *setup,inputs[i].data,inputs[i].length))
+      return TC_RSA_ARGUMENT;
+  if (workspace->capacity > SIZE_MAX / sizeof *workspace->words ||
+      !tc_internal_ranges_disjoint(setup,sizeof *setup,workspace->words,
+        workspace->capacity * sizeof *workspace->words)) return TC_RSA_ARGUMENT;
+  if (!setup->r2.words || setup->r2.capacity <
+        setup->key.modulus.length / sizeof(TC_RSA_word) ||
+      setup->r2.capacity > SIZE_MAX / sizeof(TC_RSA_word)) return TC_RSA_ARGUMENT;
+  const size_t cache_bytes = setup->r2.capacity * sizeof(TC_RSA_word);
+  for (size_t i = 0; i < sizeof inputs / sizeof *inputs; ++i)
+    if (!tc_internal_ranges_disjoint(setup->r2.words,cache_bytes,
+          inputs[i].data,inputs[i].length)) return TC_RSA_ARGUMENT;
+  if (!tc_internal_ranges_disjoint(setup->r2.words,cache_bytes,
+        workspace->words,workspace->capacity * sizeof *workspace->words) ||
+      !tc_internal_ranges_disjoint(setup->r2.words,cache_bytes,setup,
+        sizeof *setup)) return TC_RSA_ARGUMENT;
+  return TC_RSA_OK;
+}
+
+static TC_RSA_result tc_rsa_verify_v15_digest_impl(const TC_RSA_public_key* key,
     const TC_RSA_v15_options* options, TC_bytes digest, TC_bytes signature,
-    const TC_RSA_workspace* workspace, TC_work_budget* work)
+    const TC_RSA_workspace* workspace, TC_work_budget* work,
+    const tc_mp_word* prepared_r2)
 {
   if (!options || !work) return TC_RSA_ARGUMENT;
   TC_RSA_result result = tc_rsa_control_inputs(workspace,(TC_bytes){NULL,0},
@@ -915,14 +996,34 @@ TC_RSA_result TC_RSA_verify_v15_digest(const TC_RSA_public_key* key,
   size_t available = work->remaining;
   result = tc_rsa_verify_v15(key->modulus.data,key->modulus.length,
       key->exponent.data,key->exponent.length,signature.data,signature.length,
-      options->hash,digest.data,digest.length,workspace->words,workspace->capacity,&available);
+      options->hash,digest.data,digest.length,workspace->words,workspace->capacity,
+      &available,prepared_r2);
   work->remaining = (uint32_t)available;
   return result;
 }
 
-TC_RSA_result TC_RSA_verify_pss_digest(const TC_RSA_public_key* key,
-    const TC_RSA_pss_options* options, TC_bytes digest, TC_bytes signature,
+TC_RSA_result TC_RSA_verify_v15_digest(const TC_RSA_public_key* key,
+    const TC_RSA_v15_options* options, TC_bytes digest, TC_bytes signature,
     const TC_RSA_workspace* workspace, TC_work_budget* work)
+{
+  return tc_rsa_verify_v15_digest_impl(key,options,digest,signature,workspace,work,NULL);
+}
+
+TC_RSA_result TC_RSA_verify_v15_prepared(const TC_RSA_prepared_public_key* setup,
+    const TC_RSA_v15_options* options, TC_bytes digest, TC_bytes signature,
+    const TC_RSA_workspace* workspace, TC_work_budget* work)
+{
+  TC_RSA_result status = tc_rsa_prepared_inputs(setup,options,sizeof *options,
+      digest,signature,workspace,work);
+  if (status != TC_RSA_OK) return status;
+  return tc_rsa_verify_v15_digest_impl(&setup->key,options,digest,signature,
+      workspace,work,setup->r2.words);
+}
+
+static TC_RSA_result tc_rsa_verify_pss_digest_impl(const TC_RSA_public_key* key,
+    const TC_RSA_pss_options* options, TC_bytes digest, TC_bytes signature,
+    const TC_RSA_workspace* workspace, TC_work_budget* work,
+    const tc_mp_word* prepared_r2)
 {
   tc_hash_workspace hash_workspace;
   uint8_t block[64];
@@ -949,7 +1050,8 @@ TC_RSA_result TC_RSA_verify_pss_digest(const TC_RSA_public_key* key,
   if (workspace->capacity < needed) return TC_RSA_LIMIT;
   encoded = (uint8_t*)(workspace->words + 8 * words + 2);
   result = tc_rsa_public_operation(key->modulus.data,length,key->exponent.data,
-      key->exponent.length,signature.data,encoded,workspace->words,8 * words + 2,&max_work);
+      key->exponent.length,signature.data,encoded,workspace->words,8 * words + 2,
+      &max_work,prepared_r2);
   if (result == TC_RSA_OK)
     result = tc_rsa_pss_check(encoded,length,length * 8 - 1,options->hash,
         options->mgf_hash,digest,options->salt_length,block,&hash_workspace,&max_work);
@@ -958,5 +1060,23 @@ TC_RSA_result TC_RSA_verify_pss_digest(const TC_RSA_public_key* key,
   TC_secure_zero(&hash_workspace,sizeof hash_workspace);
   work->remaining = (uint32_t)max_work;
   return result;
+}
+
+TC_RSA_result TC_RSA_verify_pss_digest(const TC_RSA_public_key* key,
+    const TC_RSA_pss_options* options, TC_bytes digest, TC_bytes signature,
+    const TC_RSA_workspace* workspace, TC_work_budget* work)
+{
+  return tc_rsa_verify_pss_digest_impl(key,options,digest,signature,workspace,work,NULL);
+}
+
+TC_RSA_result TC_RSA_verify_pss_prepared(const TC_RSA_prepared_public_key* setup,
+    const TC_RSA_pss_options* options, TC_bytes digest, TC_bytes signature,
+    const TC_RSA_workspace* workspace, TC_work_budget* work)
+{
+  TC_RSA_result status = tc_rsa_prepared_inputs(setup,options,sizeof *options,
+      digest,signature,workspace,work);
+  if (status != TC_RSA_OK) return status;
+  return tc_rsa_verify_pss_digest_impl(&setup->key,options,digest,signature,
+      workspace,work,setup->r2.words);
 }
 #endif

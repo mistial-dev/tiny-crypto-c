@@ -28,6 +28,9 @@ signature or public key, and `TC_ERROR` for invalid arguments or an
 unavailable curve. Both high and low values of `s` are accepted.
 Verification establishes the signature's validity, not the key's identity
 or trustworthiness.
+Its point multiplication branches on public signature and digest values.
+Private-key derivation, ECDH and signing retain constant-work multiplication
+for secret scalars.
 
 All operations use caller-owned scratch memory. Keep it separate from
 input and output buffers, and give concurrent calls separate workspaces.

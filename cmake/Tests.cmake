@@ -100,7 +100,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
       set(sm_suffix "-${sm_profile}")
     endif()
   tc_add_test_library(tiny-crypto-c-test-piv-sm${sm_suffix} src/common.c ${tc_aes_sources}
-    src/hash.c src/sha512.c src/sskdf.c src/ec.c src/tlv.c src/der.c src/piv_cvc.c
+    src/hash.c src/sha512.c src/hash_adapter.c src/sskdf.c src/ec.c src/tlv.c src/der.c src/piv_cvc.c
     src/piv_sm.c src/piv_sm_message.c examples/piv_sm_wire.c)
   target_compile_definitions(tiny-crypto-c-test-piv-sm${sm_suffix} PUBLIC
     TC_RESOURCE_PROFILE=$<IF:$<STREQUAL:${sm_profile},micro>,1,$<IF:$<STREQUAL:${sm_profile},mini>,2,0>>
@@ -133,6 +133,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
       TC_ENABLE_TLV=1 TC_ENABLE_DER=1 TC_ENABLE_X509=1)
     tc_add_c_test(test_ec_${small} tiny-crypto-c-test-ec-${small} tests/ec/test.c)
     tc_add_c_test(test_ecdsa_reader_${small} tiny-crypto-c-test-ec-${small} tests/ec/signature_reader.c)
+    tc_add_c_test(test_nist_dss_ec_reader_${small} tiny-crypto-c-test-ec-${small} tests/ec/nist_dss_reader.c)
     tc_add_c_test(test_arithmetic_${small} tiny-crypto-c-test-ec-${small} tests/ec/arithmetic.c)
   endforeach()
   foreach(small 0 1)
@@ -157,7 +158,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
       TC_EC_ENABLE_P256=$<STREQUAL:${curve},256> TC_EC_ENABLE_P384=$<STREQUAL:${curve},384>)
     tc_add_c_test(test_ec_p${curve} tiny-crypto-c-test-ec-p${curve} tests/ec/test.c)
   endforeach()
-  tc_add_test_library(tiny-crypto-c-test-sskdf src/common.c src/hash.c src/sha512.c src/sskdf.c)
+  tc_add_test_library(tiny-crypto-c-test-sskdf src/common.c src/hash.c src/sha512.c src/hash_adapter.c src/sskdf.c)
   option(TINY_CRYPTO_TEST_EC_ORACLE "Compare EC with Python cryptography" OFF)
   set(TINY_CRYPTO_TEST_WYCHEPROOF_ARCHIVE "" CACHE FILEPATH "Pinned C2SP Wycheproof archive")
   if(Python3_Interpreter_FOUND)
@@ -177,6 +178,14 @@ if(TINY_CRYPTO_BUILD_TESTS)
         --archive ${TINY_CRYPTO_TEST_WYCHEPROOF_ARCHIVE}
         --rsa-signature-reader $<TARGET_FILE:test_rsa_signature_reader>
         --rsa-signature-reader $<TARGET_FILE:test_rsa_signature_reader_small>)
+    add_test(NAME test_wycheproof_rsa_generation
+      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/wycheproof.py
+        --archive ${TINY_CRYPTO_TEST_WYCHEPROOF_ARCHIVE}
+        --rsa-generation-reader $<TARGET_FILE:test_rsa_generation_reader>)
+    add_test(NAME test_wycheproof_primality
+      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/wycheproof.py
+        --archive ${TINY_CRYPTO_TEST_WYCHEPROOF_ARCHIVE}
+        --primality-reader $<TARGET_FILE:test_rsa_prime_0>)
     add_test(NAME test_wycheproof_rsa_oaep
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/wycheproof.py
         --archive ${TINY_CRYPTO_TEST_WYCHEPROOF_ARCHIVE}
@@ -189,6 +198,35 @@ if(TINY_CRYPTO_BUILD_TESTS)
         --ecdsa-reader $<TARGET_FILE:test_ecdsa_reader_1>)
   endif()
   set(TINY_CRYPTO_TEST_EC_CAVP_ARCHIVE "" CACHE FILEPATH "NIST ECCCDH component test archive")
+  set(TINY_CRYPTO_TEST_ECDSA_DSS_ARCHIVE "" CACHE FILEPATH "Pinned NIST FIPS 186-4 ECDSA test archive")
+  set(TINY_CRYPTO_TEST_RSA_DSS_ARCHIVE "" CACHE FILEPATH "Pinned NIST FIPS 186-3 RSA test archive")
+  if(TINY_CRYPTO_TEST_ECDSA_DSS_ARCHIVE OR TINY_CRYPTO_TEST_RSA_DSS_ARCHIVE)
+    if(NOT Python3_Interpreter_FOUND)
+      message(FATAL_ERROR "NIST DSS archive tests require Python 3")
+    endif()
+    if(TINY_CRYPTO_TEST_ECDSA_DSS_ARCHIVE)
+      foreach(small 0 1)
+        add_test(NAME test_nist_dss_ec_${small}
+          COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/nist_dss.py
+            --ecdsa-archive ${TINY_CRYPTO_TEST_ECDSA_DSS_ARCHIVE}
+            --ecdsa-reader $<TARGET_FILE:test_nist_dss_ec_reader_${small}>)
+        add_test(NAME test_nist_dss_ecdsa_signatures_${small}
+          COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/nist_dss.py
+            --ecdsa-archive ${TINY_CRYPTO_TEST_ECDSA_DSS_ARCHIVE}
+            --ecdsa-signature-reader $<TARGET_FILE:test_ecdsa_reader_${small}>)
+      endforeach()
+    endif()
+    if(TINY_CRYPTO_TEST_RSA_DSS_ARCHIVE)
+      add_test(NAME test_nist_dss_rsa_generation
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/nist_dss.py
+          --rsa-archive ${TINY_CRYPTO_TEST_RSA_DSS_ARCHIVE}
+          --rsa-generation-reader $<TARGET_FILE:test_rsa_generation_reader>)
+      add_test(NAME test_nist_dss_rsa_signatures
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/nist_dss.py
+          --rsa-archive ${TINY_CRYPTO_TEST_RSA_DSS_ARCHIVE}
+          --rsa-signature-reader $<TARGET_FILE:test_rsa_signature_reader>)
+    endif()
+  endif()
   if(TINY_CRYPTO_TEST_EC_CAVP_ARCHIVE)
     if(NOT Python3_Interpreter_FOUND)
       message(FATAL_ERROR "ECCCDH corpus tests require Python 3")
@@ -256,10 +294,12 @@ if(TINY_CRYPTO_BUILD_TESTS)
   target_compile_definitions(test_rsa_signature_reader PRIVATE TC_ENABLE_RSA=1)
   tc_add_c_test(test_rsa_signature_reader_small tiny-crypto-c-test tests/rsa/signature_reader.c src/rsa.c)
   target_compile_definitions(test_rsa_signature_reader_small PRIVATE TC_ENABLE_RSA=1 TC_RSA_SMALL=1)
+  tc_add_c_test(test_rsa_generation_reader tiny-crypto-c-test tests/rsa/generation_reader.c src/rsa.c)
+  target_compile_definitions(test_rsa_generation_reader PRIVATE TC_ENABLE_RSA=1)
   target_compile_definitions(test_idf_signed_rsa PRIVATE TC_ENABLE_RSA=1)
   target_include_directories(test_idf_signed_rsa PRIVATE tests/esp_idf/include
     ports/esp-idf/vendor/bootloader_support/src/secure_boot_v2)
-  tc_add_test_library(tiny-crypto-c-test-idf-ec src/common.c src/hash.c src/ec.c)
+  tc_add_test_library(tiny-crypto-c-test-idf-ec src/common.c src/hash.c src/hash_adapter.c src/ec.c)
   target_compile_definitions(tiny-crypto-c-test-idf-ec PUBLIC
     TC_ENABLE_EC=1 TC_EC_ENABLE_P192=1 TC_ENABLE_SHA256=1 TC_ENABLE_AES=0)
   tc_add_c_test(test_idf_ecdsa_image tiny-crypto-c-test-idf-ec
@@ -369,7 +409,8 @@ if(TINY_CRYPTO_BUILD_TESTS)
     TC_ENABLE_TLV=1 TC_ENABLE_DER=1 TC_TLV_ENABLE_BER=0)
   tc_add_c_test(test_rsa_import tiny-crypto-c-test-key-import tests/rsa/import.c)
 
-  tc_add_c_test(test_aamva tiny-crypto-c-test-tlv-full tests/twic/aamva.c src/twic_tpk.c src/common.c)
+  tc_add_c_test(test_aamva tiny-crypto-c-test-tlv-full tests/twic/aamva.c
+    src/twic_tpk.c src/credential_text_internal.c src/common.c)
   target_compile_definitions(test_aamva PRIVATE TC_ENABLE_TWIC_TPK=1)
   tc_add_test_library(tiny-crypto-c-test-twic-cipher src/common.c ${tc_aes_sources} src/twic_cipher.c)
   target_compile_definitions(tiny-crypto-c-test-twic-cipher PUBLIC
@@ -404,8 +445,8 @@ if(TINY_CRYPTO_BUILD_TESTS)
     tc_add_c_test(test_twic_cipher_${profile}
       tiny-crypto-c-test-twic-cipher-${profile} tests/twic/cipher.c)
   endforeach()
-  set(tc_pki_sources src/common.c src/tlv.c src/tlv_walk.c src/der.c src/x509_crl.c src/piv_oid.c src/piv_cms.c src/piv_biometric.c src/piv_certificate.c src/piv_card.c src/piv_printed.c src/key_challenge.c src/lds.c src/piv_security.c src/fascn.c src/twic_uuid.c
-    src/piv_cvc.c src/piv_cvc_verify.c src/piv_chuid.c src/credential.c src/validation.c src/x509.c src/x509_crypto.c src/x509_time.c src/x509_key.c src/pki_key.c src/x509_ext.c src/x509_name.c src/x509_path.c src/x509_search.c src/x509_store.c src/cms.c src/cms_validation.c src/x509_revocation.c src/x509_policy.c src/asn1_string.c src/unicode.c src/eac_cvc.c)
+  set(tc_pki_sources src/common.c src/tlv.c src/tlv_walk.c src/der.c src/x509_crl.c src/piv_oid.c src/piv_container_internal.c src/credential_text_internal.c src/piv_cms.c src/piv_biometric.c src/piv_certificate.c src/piv_card.c src/piv_printed.c src/key_challenge.c src/lds.c src/piv_security.c src/fascn.c src/twic_uuid.c
+    src/piv_cvc.c src/piv_cvc_verify.c src/piv_chuid.c src/credential.c src/validation.c src/x509.c src/x509_crypto.c src/x509_time.c src/x509_key.c src/pki_key.c src/pki_signature_oid.c src/x509_ext.c src/x509_name.c src/x509_path.c src/x509_search.c src/x509_store.c src/cms.c src/cms_validation.c src/x509_revocation.c src/x509_policy.c src/asn1_string.c src/unicode.c src/eac_cvc.c)
   list(APPEND tc_pki_sources src/source.c src/source_der.c src/x509_crl_source.c src/x509_crl_prepare.c)
   tc_add_test_library(tiny-crypto-c-test-pki ${tc_pki_sources})
   target_compile_definitions(tiny-crypto-c-test-pki PUBLIC
@@ -467,7 +508,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   target_link_libraries(test_credential_workflow_entry PRIVATE tiny-crypto-c-test-pki)
   tc_warnings(test_credential_workflow_entry)
   tc_use_test_sanitizers(test_credential_workflow_entry)
-  tc_add_test_library(tiny-crypto-c-test-ccl src/twic_ccl.c)
+  tc_add_test_library(tiny-crypto-c-test-ccl src/twic_ccl.c src/credential_text_internal.c)
   target_compile_definitions(tiny-crypto-c-test-ccl PUBLIC
     TC_ENABLE_TWIC_CCL=1 TC_ENABLE_AES=0 TC_ENABLE_SHA256=0)
   tc_add_c_test(test_twic_ccl tiny-crypto-c-test-ccl tests/twic/ccl.c)
@@ -517,7 +558,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   tc_add_c_test(test_cms_reader tiny-crypto-c-test-pki tests/cms/reader.c examples/cms_reader.c)
   get_target_property(tc_native_pki_sources tiny-crypto-c-test-pki SOURCES)
   tc_add_test_library(tiny-crypto-c-test-pki-native ${tc_native_pki_sources}
-    src/hash.c src/sha512.c src/ec.c src/rsa.c ${tc_aes_sources} src/sskdf.c
+    src/hash.c src/sha512.c src/hash_adapter.c src/ec.c src/rsa.c ${tc_aes_sources} src/sskdf.c
     src/piv_sm.c src/piv_sm_message.c src/piv_sm_authenticate.c
     src/twic_cipher.c src/twic_tpk.c
     examples/piv_sm_wire.c)
@@ -556,7 +597,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   tc_add_c_test(test_hash_algorithm tiny-crypto-c-test-pki tests/hash/algorithm.c)
   get_target_property(tc_cms_pki_sources tiny-crypto-c-test-pki SOURCES)
   tc_add_test_library(tiny-crypto-c-test-cms-crypto
-    ${tc_cms_pki_sources} src/hash.c src/sha512.c)
+    ${tc_cms_pki_sources} src/hash.c src/sha512.c src/hash_adapter.c)
   target_compile_definitions(tiny-crypto-c-test-cms-crypto PUBLIC
     TC_ENABLE_AES=0 TC_ENABLE_TLV=1 TC_TLV_ENABLE_BER=1 TC_ENABLE_DER=1 TC_ENABLE_X509=1
     TC_ENABLE_KEY_CHALLENGE=1
@@ -825,7 +866,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
     get_target_property(pki_fuzz_sources tiny-crypto-c-test-pki SOURCES)
     get_target_property(pki_fuzz_definitions tiny-crypto-c-test-pki COMPILE_DEFINITIONS)
     list(REMOVE_ITEM pki_fuzz_definitions TC_ENABLE_SHA256=0)
-    add_executable(fuzz_pki tests/x509/fuzz.c src/hash.c ${pki_fuzz_sources})
+    add_executable(fuzz_pki tests/x509/fuzz.c src/hash.c src/hash_adapter.c ${pki_fuzz_sources})
     target_include_directories(fuzz_pki PRIVATE src)
     target_compile_definitions(fuzz_pki PRIVATE ${pki_fuzz_definitions}
       TC_ENABLE_SHA256=1 TC_STRICT=0)
@@ -843,6 +884,11 @@ if(TINY_CRYPTO_BUILD_TESTS)
   endif()
 
   tc_add_c_test(test_kmac tiny-crypto-c-test tests/kmac/test.c)
+  if(TINY_CRYPTO_TEST_FULL)
+    tc_add_c_test(test_kmac_acvp tiny-crypto-c-test tests/kmac/acvp.c)
+    target_compile_definitions(test_kmac_acvp PRIVATE
+      KMAC_ACVP_FILE="${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/kmac/acvp_kmac256_aft.tsv")
+  endif()
   tc_add_test_library(tiny-crypto-c-test-kmac-relaxed src/common.c src/kmac.c)
   target_compile_definitions(tiny-crypto-c-test-kmac-relaxed PUBLIC
     TC_ENABLE_KMAC256=1 TC_ENABLE_AES=0 TC_ENABLE_SHA256=0
@@ -883,6 +929,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   endfunction()
 
   tc_add_aes_test(test_aes tiny-crypto-c-test)
+  tc_add_c_test(test_mac_core tiny-crypto-c-test tests/aes/mac_core.c)
   tc_add_aes_test(test_aes_192 tiny-crypto-c-test-aes192)
   tc_add_aes_test(test_aes_256 tiny-crypto-c-test-aes256)
 
@@ -893,6 +940,20 @@ if(TINY_CRYPTO_BUILD_TESTS)
     CAVP_VECTOR_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/des/cavp")
 
   if(TINY_CRYPTO_TEST_FULL)
+    tc_add_test_library(tiny-crypto-c-test-des-cmac-cavp
+      src/common.c src/des.c src/mac_core.c)
+    target_compile_definitions(tiny-crypto-c-test-des-cmac-cavp PUBLIC
+      TC_ENABLE_AES=0 TC_ENABLE_SHA256=0 TC_ENABLE_DES=1
+      TC_DES_ENABLE_TDES=1 TC_DES_ENABLE_CMAC=1
+      TC_DES_CMAC_MIN_TAG_LEN=1 TC_DES_REJECT_WEAK_KEYS=0)
+    tc_add_c_test(test_des_cmac_cavp tiny-crypto-c-test-des-cmac-cavp
+      tests/des/cmac_cavp.c)
+    target_compile_definitions(test_des_cmac_cavp PRIVATE
+      CMAC_TDES_CAVP_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/des/cmac")
+    if(Python3_Interpreter_FOUND)
+      add_test(NAME test_des_cmac_corpus
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_des_cmac_corpus.py)
+    endif()
     add_executable(test_des_cavp
       tests/des/cavp_main.c tests/des/cavp.c
       tests/support/cavp.c tests/support/munit.c)

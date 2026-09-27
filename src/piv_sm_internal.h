@@ -16,7 +16,7 @@ typedef struct {
 const tc_sm_suite* tc_sm_suite_get(unsigned suite);
 int tc_sm_disjoint(const TC_bytes* writable, size_t count, const TC_bytes* input, size_t inputs);
 TC_status tc_sm_mac(TC_PIV_SM_workspace* w, const uint8_t* key, size_t key_len,
-    const TC_bytes* input, size_t count, uint8_t output[16]);
+    TC_bytes prefix, const TC_bytes* input, size_t count, uint8_t output[16]);
 
 #define TC_SM_SYM(w) ((w)->operation.symmetric)
 #endif

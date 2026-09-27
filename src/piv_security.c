@@ -5,6 +5,7 @@
 #include <tiny_crypto/piv_security.h>
 #include <tiny_crypto/lds.h>
 #include "internal.h"
+#include "piv_container_internal.h"
 
 enum { MAPPING_RECORD_BYTES = 3 };
 
@@ -35,7 +36,7 @@ static TC_TLV_result security_mapping(TC_bytes mapping, uint16_t container,
 TC_TLV_result TC_PIV_security_read(TC_bytes encoded,
     TC_PIV_security_encoding encoding, TC_PIV_security_object* out)
 {
-  enum { RESPONSE_TAG = 0x53, MAPPING_TAG = 0xba, CMS_TAG = 0xbb,
+  enum { MAPPING_TAG = 0xba, CMS_TAG = 0xbb,
     CHECK_TAG = 0xfe, FIELD_COUNT = 3 };
   static const uint8_t tags[FIELD_COUNT] = {MAPPING_TAG,CMS_TAG,CHECK_TAG};
   const TC_TLV_limits limits = {SIZE_MAX,SIZE_MAX,FIELD_COUNT,1};
@@ -48,11 +49,8 @@ TC_TLV_result TC_PIV_security_read(TC_bytes encoded,
     return TC_TLV_ARGUMENT;
   TC_TLV_result result;
   if (encoding == TC_PIV_SECURITY_CONTAINER) {
-    result = TC_TLV_read(encoded.data,encoded.length,TC_TLV_ISO7816,&limits,&field);
+    result = tc_piv_container_contents(encoded,&limits,&encoded);
     if (result != TC_TLV_OK) return result;
-    if (field.header.tag_length != 1 || field.header.tag[0] != RESPONSE_TAG ||
-        field.encoded.length != encoded.length) return TC_TLV_INVALID;
-    encoded = field.value;
   }
   result = TC_TLV_reader_init(&reader,encoded.data,encoded.length,TC_TLV_ISO7816,&limits);
   if (result != TC_TLV_OK) return result;

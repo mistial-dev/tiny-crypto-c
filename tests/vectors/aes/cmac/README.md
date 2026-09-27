@@ -27,8 +27,8 @@ archive (`cmactestvectors.zip`, CAVS 11.0), unchanged:
 | `CMACVerAES192.rsp` | 360 |
 | `CMACVerAES256.rsp` | 240 |
 
-Includes short tags (`Tlen` 4/5) and 64 KiB messages. TDES rsp files from the
-zip are not used because DES CMAC has its own test suite.
+Includes short tags (`Tlen` 4/5) and 64 KiB messages. The TDES files from the
+same archive are in `tests/vectors/des/cmac/`.
 
 CMAC unit-test builds set `TC_AES_CMAC_MIN_TAG_LEN=4` so every CAVP row can
 exercise

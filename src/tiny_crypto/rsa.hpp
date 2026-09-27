@@ -20,6 +20,7 @@ typedef ::TC_RSA_oaep_options rsa_oaep_options;
 typedef ::TC_RSA_keygen_output rsa_keygen_output;
 typedef ::TC_RSA_keygen_limits rsa_keygen_limits;
 typedef ::TC_RSA_keygen_state rsa_keygen_state;
+typedef ::TC_RSA_prepared_public_key rsa_prepared_public_key;
 
 /* The returned view borrows the caller's array. */
 template<size_t N>
@@ -48,6 +49,23 @@ inline rsa_result rsa_verify_v15_digest(const rsa_public_key& key,
     const rsa_v15_options& options, bytes digest, bytes signature,
     const rsa_workspace& workspace, TC_work_budget& work) noexcept {
     return ::TC_RSA_verify_v15_digest(&key, &options, digest, signature,
+        &workspace, &work);
+}
+
+inline rsa_result rsa_prepare_public_key(rsa_prepared_public_key& setup,
+    const rsa_public_key& key, const rsa_workspace& cache,
+    const rsa_workspace& scratch, TC_work_budget& work) noexcept {
+    return ::TC_RSA_prepare_public_key(&setup, &key, &cache, &scratch, &work);
+}
+
+inline void rsa_prepared_public_key_clear(rsa_prepared_public_key& setup) noexcept {
+    ::TC_RSA_prepared_public_key_clear(&setup);
+}
+
+inline rsa_result rsa_verify_v15_prepared(const rsa_prepared_public_key& setup,
+    const rsa_v15_options& options, bytes digest, bytes signature,
+    const rsa_workspace& workspace, TC_work_budget& work) noexcept {
+    return ::TC_RSA_verify_v15_prepared(&setup, &options, digest, signature,
         &workspace, &work);
 }
 
@@ -84,6 +102,13 @@ inline rsa_result rsa_verify_pss_digest(const rsa_public_key& key,
     const rsa_pss_options& options, bytes digest, bytes signature,
     const rsa_workspace& workspace, TC_work_budget& work) noexcept {
     return ::TC_RSA_verify_pss_digest(&key, &options, digest, signature,
+        &workspace, &work);
+}
+
+inline rsa_result rsa_verify_pss_prepared(const rsa_prepared_public_key& setup,
+    const rsa_pss_options& options, bytes digest, bytes signature,
+    const rsa_workspace& workspace, TC_work_budget& work) noexcept {
+    return ::TC_RSA_verify_pss_prepared(&setup, &options, digest, signature,
         &workspace, &work);
 }
 

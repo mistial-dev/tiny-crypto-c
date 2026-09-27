@@ -37,6 +37,19 @@ path-sorted manifest whose UTF-8 lines are
 NIST states that these vectors provide informal correctness checks and do not
 replace CAVP validation.
 
+## NIST TDES CMAC
+
+The four `cmac/CMAC*TDES*.rsp` files are unchanged entries from NIST CAVP
+`cmactestvectors.zip`, CAVS 11.0, also used for the AES CMAC tests. The archive
+SHA-256 is `bdda4edade394c9a2ae74d9cd0921caa120c911a5e735e37abf39d0d5f062be1`.
+The checked-in AES file `CMACGenAES128.rsp` matches its archive entry after
+normalizing CRLF to LF. Tests cover 96 generation and 360 verification cases
+for two-key TDES, plus 96 generation and 240 verification cases for three-key
+TDES. Seventy-two two-key verification rows alter Key3, violating the two-key
+bundle K3=K1; the runner checks their failure result and counts them separately.
+The remaining 720 rows exercise the CMAC calculation or verification. The
+test-only profile allows one-byte tags so every CAVP row runs.
+
 ## Generated edge cases
 
 `edge_cases.json` contains 16 valid DES and TDES cases covering weak keys,
