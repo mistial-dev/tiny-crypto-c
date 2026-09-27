@@ -5,6 +5,7 @@
 
 [![CI](https://github.com/mistial-dev/tiny-crypto-c/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/mistial-dev/tiny-crypto-c/actions/workflows/ci.yml)
 [![License: GPL v2+](https://img.shields.io/badge/license-GPL--2.0--or--later-blue.svg)](LICENSE)
+[![CLA assistant](https://cla-assistant.io/readme/badge/mistial-dev/tiny-crypto-c)](https://cla-assistant.io/mistial-dev/tiny-crypto-c)
 
 tiny-crypto-c provides small, portable cryptographic primitives for embedded C
 and C++. Callers supply all memory. The C++11 wrappers use pointer-length pairs
@@ -409,7 +410,10 @@ Keep its writable corpus and failure artifacts outside the source tree.
 
 ## License
 
-Project code is licensed under [GPL-2.0-or-later](LICENSE). Unicode normalization
+Project code is licensed under [GPL-2.0-or-later](LICENSE), with an additional
+permission to link substantially unmodified Espressif ESP-IDF libraries,
+including by static linking. The exception text is at the top of
+[LICENSE](LICENSE). Unicode normalization
 tables use the [Unicode License v3](LICENSES/Unicode-3.0.txt). Bundled test
 materials retain their own terms. [µunit][munit] (`tests/support/munit.h`) and
 [doctest][doctest] (`tests/support/doctest.h`) use the MIT license.
@@ -419,6 +423,9 @@ the source, license, transformations, and checksums for each collection. Test
 corpora are excluded from installed packages and embedded library images.
 The adapted contribution policy retains its upstream
 [MIT license](LICENSES/BoundedContributionPolicy-MIT.txt).
+
+Individuals and corporations that require alternate licensing terms may contact
+[licensing@mistial.dev](mailto:licensing@mistial.dev) by email.
 
 [doctest]: https://github.com/doctest/doctest
 [munit]: https://nemequ.github.io/munit/

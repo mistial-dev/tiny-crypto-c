@@ -3,7 +3,30 @@
 
 # Contributing to tiny-crypto-c
 
-Contributions are welcome under GPL-2.0-or-later.
+Contributions are welcome. The project is distributed under GPL-2.0-or-later
+with the ESP-IDF linking exception at the top of [LICENSE](LICENSE).
+
+## Contributor agreement
+
+tiny-crypto-c adopts the
+[Mistial Developer Contributor Copyright Assignment, version 1.0](https://gist.github.com/mistial-dev/d3697027c54c3c8c3545a580287a6912).
+Every contributor must accept it before a contribution can be merged.
+
+Accept the agreement through [CLA Assistant](https://cla-assistant.io/mistial-dev/tiny-crypto-c),
+the service provided by SAP. When you open your first pull request, the CLA
+Assistant check links to the agreement and records your acceptance. The check
+must pass before the pull request is merged. One acceptance covers later pull
+requests under the same agreement version.
+
+- If an employer or other organization owns your contribution, an authorized
+  signer must accept the agreement for that organization.
+- Identify third-party material and its license in the pull request.
+- Identify any substantial part of the contribution that an AI tool generated.
+- To contribute outside GitHub, email
+  [opensource@mistial.dev](mailto:opensource@mistial.dev) before sending the
+  change.
+
+## Development checks
 
 Run the fast checks while developing:
 
