@@ -745,6 +745,30 @@ static TC_credential_status cms_credential_error(TC_TLV_result result)
   return TC_CREDENTIAL_ERROR;
 }
 
+TC_credential_status tc_cms_path_revocation_check(const TC_X509_search_result* path,
+    const TC_X509_store_source* source, const TC_CMS_revocation_policy* revocation,
+    const TC_CMS_credential_workspace* workspace, size_t* work)
+{
+  for (size_t i = 0; i < path->count; ++i) workspace->held_path[i] = path->path[i];
+  const TC_X509_revocation_options policy = {
+    revocation->index,source,revocation->signer_policy,path->anchor_index,
+    revocation->max_candidate_bytes,revocation->delta_policy,revocation->order_policy
+  };
+  const TC_X509_revocation_workspace scratch = {
+    &workspace->path->validation,&workspace->path->search,
+    workspace->crl_states,workspace->crl_capacity,workspace->nodes,workspace->node_capacity,
+    workspace->scopes,workspace->scope_capacity,
+    workspace->signer_path,workspace->signer_path_capacity,
+    workspace->signer_policies,workspace->signer_policy_capacity
+  };
+  TC_X509_revocation_result checked;
+  TC_TLV_result result = TC_X509_path_check_revocation(workspace->held_path,path->count,
+      &policy,&scratch,work,&checked);
+  if (result != TC_TLV_OK) return cms_credential_error(result);
+  if (checked.status == TC_X509_CRL_REVOKED) return TC_CREDENTIAL_REVOKED;
+  return checked.status == TC_X509_CRL_UNREVOKED ? TC_CREDENTIAL_VALID : TC_CREDENTIAL_UNSUPPORTED;
+}
+
 static TC_credential_status cms_credential_validate_impl(
     const TC_CMS_validation_request* request,
     const TC_X509_store_source* source, const TC_CMS_path_options* options,
@@ -851,21 +875,7 @@ static TC_credential_status cms_credential_validate_impl(
     case TC_X509_PATH_LIMIT: return TC_CREDENTIAL_LIMIT;
     default: return TC_CREDENTIAL_ERROR;
   }
-  for (size_t i = 0; i < path.count; ++i) workspace->held_path[i] = path.path[i];
-  const TC_X509_revocation_options policy = {
-    revocation->index, &guarded, revocation->signer_policy, path.anchor_index,
-    revocation->max_candidate_bytes, revocation->delta_policy,
-    revocation->order_policy
-  };
-  const TC_X509_revocation_workspace scratch = {&workspace->path->validation,&workspace->path->search,
-      workspace->crl_states,workspace->crl_capacity,workspace->nodes,workspace->node_capacity,
-      workspace->scopes,workspace->scope_capacity,workspace->signer_path,workspace->signer_path_capacity,
-      workspace->signer_policies,workspace->signer_policy_capacity};
-  TC_X509_revocation_result checked;
-  result = TC_X509_path_check_revocation(workspace->held_path,path.count,&policy,&scratch,work,&checked);
-  if (result != TC_TLV_OK) return cms_credential_error(result);
-  if (checked.status == TC_X509_CRL_REVOKED) return TC_CREDENTIAL_REVOKED;
-  return checked.status == TC_X509_CRL_UNREVOKED ? TC_CREDENTIAL_VALID : TC_CREDENTIAL_UNSUPPORTED;
+  return tc_cms_path_revocation_check(&path,&guarded,revocation,workspace,work);
 }
 
 TC_credential_status tc_cms_credential_validate_with_metadata(

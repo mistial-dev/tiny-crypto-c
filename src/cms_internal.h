@@ -49,6 +49,10 @@ typedef struct {
   const TC_CMS_signed_data* data;
   const TC_CMS_signer_info* signer;
 } tc_cms_prepared_signed_data;
+
+TC_credential_status tc_cms_path_revocation_check(const TC_X509_search_result* path,
+    const TC_X509_store_source* source, const TC_CMS_revocation_policy* revocation,
+    const TC_CMS_credential_workspace* workspace, size_t* work);
 TC_credential_status tc_cms_credential_validate_prepared(
     const TC_CMS_validation_request* request,
     const TC_X509_store_source* source, const TC_CMS_path_options* options,

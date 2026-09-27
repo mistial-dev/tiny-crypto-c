@@ -345,34 +345,13 @@ TC_credential_status TC_X509_validate(TC_bytes encoded,
   if (found != TC_X509_PATH_VALID)
     return tc_validation_status(tc_x509_path_result_status(found));
 
-  /* Preserve the selected chain's descriptors while CRL signer searches reuse
-   * the path workspace. Certificate encodings remain in their source buffers. */
-  for (size_t i = 0; i < path.count; ++i) workspace->held_path[i] = path.path[i];
-  const TC_X509_revocation_options path_revocation = {revocation.index,&source,
-    revocation.signer_policy,path.anchor_index,revocation.max_candidate_bytes,
-    revocation.delta_policy,revocation.order_policy};
-  const TC_X509_revocation_workspace scratch = {
-    &workspace->path->validation,&workspace->path->search,
-    workspace->crl_states,workspace->crl_capacity,workspace->nodes,workspace->node_capacity,
-    workspace->scopes,workspace->scope_capacity,
-    workspace->signer_path,workspace->signer_path_capacity,
-    workspace->signer_policies,workspace->signer_policy_capacity
-  };
-  TC_X509_revocation_result checked;
-  status = TC_X509_path_check_revocation(workspace->held_path,path.count,
-      &path_revocation,&scratch,work,&checked);
-  if (status != TC_TLV_OK) return tc_validation_status(status);
-  if (checked.status == TC_X509_CRL_REVOKED) return TC_CREDENTIAL_REVOKED;
-  if (checked.status != TC_X509_CRL_UNREVOKED) return TC_CREDENTIAL_UNSUPPORTED;
-  if (encoded.length > *work) return TC_CREDENTIAL_LIMIT;
-  *work -= encoded.length;
-  const TC_X509_path_workspace* storage = &workspace->path->validation;
-  TC_X509_workspace parser = {storage->frames,storage->frame_capacity,
-    storage->oids,storage->oid_capacity};
   TC_X509_validation_result result;
-  status = TC_X509_read(encoded.data,encoded.length,&cms.path.parsing,
-      &parser,&result.certificate);
-  if (status != TC_TLV_OK) return tc_validation_status(status);
+  /* Revocation signer searches reuse the certificate cache. Hold the target
+   * descriptor while its encoded bytes remain owned by the caller. */
+  result.certificate = workspace->path->validation.certificates[path.count - 1];
+  TC_credential_status revocation_status = tc_cms_path_revocation_check(&path,&source,
+      &revocation,workspace,work);
+  if (revocation_status != TC_CREDENTIAL_VALID) return revocation_status;
   result.at = context->options->at;
   result.anchor_index = path.anchor_index;
   *out = result;

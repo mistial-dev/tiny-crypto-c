@@ -5,6 +5,7 @@
 #include <tiny_crypto/x509.h>
 #include "pki_internal.h"
 #include "pki_spans_internal.h"
+#include "pki_extensions_internal.h"
 #include "string_internal.h"
 #include "x509_time_internal.h"
 #include "internal.h"
@@ -227,16 +228,17 @@ static TC_TLV_result general_name(const TC_TLV_element* element, int constraint)
   return TC_TLV_OK;
 }
 
-static TC_TLV_result general_names(TC_bytes encoded)
+static TC_TLV_result general_names(TC_bytes encoded, TC_X509_workspace* workspace)
 {
   TC_bytes contents;
   TC_TLV_reader reader;
-  TC_TLV_element element;
+  TC_X509_general_name parsed;
+  TC_TLV_result result;
   if (TC_DER_sequence(encoded.data, encoded.length, &contents) != TC_TLV_OK || !contents.length ||
       open(contents, &reader) != TC_TLV_OK) return TC_TLV_INVALID;
-  while (!tc_pki_end(&reader))
-    if (TC_TLV_next(&reader, &element) != TC_TLV_OK || general_name(&element, 0) != TC_TLV_OK)
-      return TC_TLV_INVALID;
+  while ((result = TC_X509_general_name_next(&reader, workspace->frames,
+      workspace->frame_capacity, &parsed)) == TC_TLV_OK) {}
+  if (result != TC_TLV_END) return result;
   return TC_TLV_OK;
 }
 
@@ -343,18 +345,20 @@ static TC_TLV_result extensions(TC_bytes encoded, TC_X509_workspace* workspace,
     result = TC_TLV_walk(extension.value.data, extension.value.length, TC_TLV_DER, budget,
                          workspace->frames, workspace->frame_capacity, count_node, &budget->max_elements);
     if (result != TC_TLV_OK) return result;
-    if (extension.oid.length == 3 && extension.oid.data[0] == 0x55 && extension.oid.data[1] == 0x1d) {
-      if (extension.oid.data[2] == 19) {
+    {
+      const unsigned id = tc_pki_extension_id(&extension);
+      if (id == 19) {
         TC_X509_basic_constraints constraints;
         result = TC_X509_basic_constraints_read(extension.value.data, extension.value.length, &constraints);
         if (result != TC_TLV_OK) return result == TC_TLV_MORE ? TC_TLV_INVALID : result;
-      } else if (extension.oid.data[2] == 15) {
+      } else if (id == 15) {
         uint16_t usage;
         result = TC_X509_key_usage_read(extension.value.data, extension.value.length, &usage);
         if (result != TC_TLV_OK) return result == TC_TLV_MORE ? TC_TLV_INVALID : result;
-      } else if (extension.oid.data[2] == 17 || extension.oid.data[2] == 18) {
-        if (general_names(extension.value) != TC_TLV_OK) return TC_TLV_INVALID;
-        if (extension.oid.data[2] == 17 && extension.critical) *critical_san = 1;
+      } else if (id == 17 || id == 18) {
+        result = general_names(extension.value, workspace);
+        if (result != TC_TLV_OK) return result;
+        if (id == 17 && extension.critical) *critical_san = 1;
       }
     }
     workspace->extension_oids[count++] = extension.oid;

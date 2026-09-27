@@ -684,14 +684,31 @@ TC_TLV_result tc_x509_crl_find(const tc_x509_crl* crl,
   return TC_TLV_OK;
 }
 
+/* A NULL query asks whether any directoryName is present. */
+static TC_TLV_result entry_issuer_directory_name(TC_bytes names, TC_bytes query,
+    const TC_TLV_limits* limits, const tc_pki_tree_workspace* tree, int* found)
+{
+  enum { DIRECTORY_NAME = 0xa4 };
+  TC_TLV_reader reader;
+  TC_TLV_element element;
+  TC_TLV_result result = TC_TLV_reader_init(&reader,names.data,names.length,TC_TLV_DER,limits);
+  if (result != TC_TLV_OK) return result;
+  while (!tc_pki_end(&reader)) {
+    result = tc_pki_tree_next(&reader,tree,&element);
+    if (result != TC_TLV_OK) return result;
+    if (!tc_pki_tag(&element,DIRECTORY_NAME)) continue;
+    if (!query.data) { *found = 1; return TC_TLV_OK; }
+    if (tc_x509_path_charge(tree->work,element.value.length) != TC_TLV_OK) return TC_TLV_LIMIT;
+    if (tc_pki_equal(element.value,query)) { *found = 1; return TC_TLV_OK; }
+  }
+  *found = 0;
+  return TC_TLV_OK;
+}
+
 static TC_TLV_result crl_query_matches(const tc_x509_crl_revoked_entry* entry,
     const tc_x509_crl_serial_query* certificate, const TC_TLV_limits* limits,
     const tc_pki_tree_workspace* tree, const TC_X509_name_workspace* names, int* matched)
 {
-  enum { DIRECTORY_NAME = 0xa4 };
-  TC_TLV_reader issuers;
-  TC_TLV_element element;
-  TC_TLV_result result;
   if (!entry || !certificate || !tree || !tree->work || !matched ||
       !entry->entry.serial.length || !certificate->serial.length) return TC_TLV_ARGUMENT;
   /* Serial contents retain DER sign padding, so equality needs no conversion. */
@@ -699,17 +716,8 @@ static TC_TLV_result crl_query_matches(const tc_x509_crl_revoked_entry* entry,
   if (!tc_pki_equal(entry->entry.serial,certificate->serial)) { *matched = 0; return TC_TLV_OK; }
   if (!entry->issuer.names.length)
     return TC_X509_name_equal(entry->issuer.name,certificate->issuer,limits,names,tree->work,matched);
-  result = TC_TLV_reader_init(&issuers,entry->issuer.names.data,entry->issuer.names.length,TC_TLV_DER,limits);
-  if (result != TC_TLV_OK) return result;
-  while (!tc_pki_end(&issuers)) {
-    result = tc_pki_tree_next(&issuers,tree,&element);
-    if (result != TC_TLV_OK) return result;
-    if (!tc_pki_tag(&element,DIRECTORY_NAME)) continue;
-    if (tc_x509_path_charge(tree->work,element.value.length) != TC_TLV_OK) return TC_TLV_LIMIT;
-    if (tc_pki_equal(element.value,certificate->issuer)) { *matched = 1; return TC_TLV_OK; }
-  }
-  *matched = 0;
-  return TC_TLV_OK;
+  return entry_issuer_directory_name(entry->issuer.names,certificate->issuer,
+      limits,tree,matched);
 }
 
 TC_TLV_result tc_x509_crl_entry_matches(const tc_x509_crl_revoked_entry* entry,
@@ -761,17 +769,10 @@ TC_TLV_result tc_x509_crl_revoked_init(const tc_x509_crl* crl,
 static TC_TLV_result entry_issuer_has_dn(TC_bytes names,
     const TC_TLV_limits* limits, const tc_pki_tree_workspace* tree)
 {
-  enum { DIRECTORY_NAME = 0xa4 };
-  TC_TLV_reader reader;
-  TC_TLV_element element;
-  TC_TLV_result result = TC_TLV_reader_init(&reader,names.data,names.length,TC_TLV_DER,limits);
-  if (result != TC_TLV_OK) return result;
-  while (!tc_pki_end(&reader)) {
-    result = tc_pki_tree_next(&reader,tree,&element);
-    if (result != TC_TLV_OK) return result;
-    if (tc_pki_tag(&element,DIRECTORY_NAME)) return TC_TLV_OK;
-  }
-  return TC_TLV_INVALID;
+  int found;
+  TC_TLV_result result = entry_issuer_directory_name(names,(TC_bytes){NULL,0},
+      limits,tree,&found);
+  return result == TC_TLV_OK && !found ? TC_TLV_INVALID : result;
 }
 
 TC_TLV_result tc_x509_crl_entry_resolve(const tc_x509_crl_entry* entry,

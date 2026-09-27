@@ -37,6 +37,21 @@ static TC_TLV_result path_certificate(const tc_x509_path_input* input, size_t in
   return TC_TLV_OK;
 }
 
+static TC_TLV_result path_ca_extension(const TC_X509_extension* extension,
+    TC_X509_basic_constraints* basic, int* has_basic,
+    uint16_t* usage, int* has_usage)
+{
+  unsigned id = tc_pki_extension_id(extension);
+  if (id == 19) {
+    if (*has_basic) return TC_TLV_INVALID;
+    *has_basic = 1;
+    return TC_X509_basic_constraints_read(extension->value.data,
+        extension->value.length,basic);
+  }
+  if (id == 15) return tc_pki_key_usage_value(extension->value,has_usage,usage);
+  return TC_TLV_OK;
+}
+
 static TC_TLV_result ca_extensions(const TC_X509_certificate* certificate,
     const TC_TLV_limits* limits, size_t* work, TC_X509_basic_constraints* basic, int* authorized)
 {
@@ -49,16 +64,8 @@ static TC_TLV_result ca_extensions(const TC_X509_certificate* certificate,
   result = tc_pki_extensions_init(&reader, certificate, limits, work);
   if (result != TC_TLV_OK) return result;
   while ((result = tc_pki_extension_next(&reader, work, &extension)) == TC_TLV_OK) {
-    unsigned id = tc_pki_extension_id(&extension);
-    if (id == 19) {
-      if (has_basic) return TC_TLV_INVALID;
-      has_basic = 1;
-      result = TC_X509_basic_constraints_read(extension.value.data, extension.value.length, basic);
-      if (result != TC_TLV_OK) return result;
-    } else if (id == 15) {
-      result = tc_pki_key_usage_value(extension.value,&has_usage,&usage);
-      if (result != TC_TLV_OK) return result;
-    }
+    result = path_ca_extension(&extension,basic,&has_basic,&usage,&has_usage);
+    if (result != TC_TLV_OK) return result;
   }
   if (result != TC_TLV_END) return result;
   *authorized = has_basic && basic->ca && (!has_usage || (usage & TC_KEY_USAGE_CERT_SIGN));
@@ -151,6 +158,22 @@ static TC_TLV_result constraint_distances(const TC_X509_name_constraints* constr
   return TC_TLV_OK;
 }
 
+static TC_TLV_result path_constraint_target(const TC_X509_certificate* certificate,
+    int is_target, int charge_step, const TC_X509_name_constraints* constraints,
+    const TC_TLV_limits* limits, const TC_X509_constraint_workspace* workspace,
+    size_t* work, int* accepted)
+{
+  TC_TLV_result result;
+  if (charge_step && tc_x509_path_charge(work,1) != TC_TLV_OK) return TC_TLV_LIMIT;
+  /* A self-issued intermediate may carry old names through key rollover. */
+  if (!is_target) {
+    result = TC_X509_name_equal(certificate->subject,certificate->issuer,
+        limits,workspace->names,work,accepted);
+    if (result != TC_TLV_OK || *accepted) return result;
+  }
+  return TC_X509_certificate_names_check(certificate,constraints,limits,workspace,work,accepted);
+}
+
 TC_TLV_result tc_x509_path_names(const tc_x509_path_input* input,
     const TC_X509_constraint_workspace* workspace, size_t* work, int* accepted)
 {
@@ -186,16 +209,8 @@ TC_TLV_result tc_x509_path_names(const tc_x509_path_input* input,
       /* Constraint spans borrow the issuer DER throughout this pass. */
       result = path_certificate(input, j, work, &certificate);
       if (result != TC_TLV_OK) return result;
-      if (tc_x509_path_charge(work, 1) != TC_TLV_OK) return TC_TLV_LIMIT;
-      /* Key rollover may retain the issuer name. The target never gets this exception. */
-      if (j + 1 < input->count) {
-        result = TC_X509_name_equal(certificate->subject, certificate->issuer,
-          input->limits, workspace->names, work, &valid);
-        if (result != TC_TLV_OK) return result;
-        if (valid) continue;
-      }
-      result = TC_X509_certificate_names_check(certificate, &constraints,
-        input->limits, workspace, work, &valid);
+      result = path_constraint_target(certificate,j + 1 == input->count,1,
+          &constraints,input->limits,workspace,work,&valid);
       if (result != TC_TLV_OK) return result;
       if (!valid) { *accepted = 0; return TC_TLV_OK; }
     }
@@ -203,6 +218,24 @@ TC_TLV_result tc_x509_path_names(const tc_x509_path_input* input,
   *accepted = 1;
   return TC_TLV_OK;
 }
+static TC_TLV_result policy_controls_extension(const TC_X509_extension* extension,
+    tc_x509_policy_controls* controls, int* has_constraints)
+{
+  unsigned id = tc_pki_extension_id(extension);
+  if (id == 36) {
+    if (*has_constraints) return TC_TLV_INVALID;
+    *has_constraints = 1;
+    return TC_X509_policy_constraints_read(extension->value.data,
+        extension->value.length,&controls->constraints);
+  }
+  if (id == 54) {
+    if (controls->has_inhibit_any) return TC_TLV_INVALID;
+    controls->has_inhibit_any = 1;
+    return TC_DER_uint32(extension->value.data,extension->value.length,&controls->inhibit_any);
+  }
+  return TC_TLV_OK;
+}
+
 TC_TLV_result tc_x509_policy_controls_read(const TC_X509_certificate* certificate,
     const TC_TLV_limits* limits, size_t* work, tc_x509_policy_controls* out)
 {
@@ -216,18 +249,8 @@ TC_TLV_result tc_x509_policy_controls_read(const TC_X509_certificate* certificat
   result = tc_pki_extensions_init(&reader, certificate, limits, work);
   if (result != TC_TLV_OK) return result;
   while ((result = tc_pki_extension_next(&reader, work, &extension)) == TC_TLV_OK) {
-    unsigned id = tc_pki_extension_id(&extension);
-    if (id == 36) {
-      if (has_constraints) return TC_TLV_INVALID;
-      has_constraints = 1;
-      result = TC_X509_policy_constraints_read(extension.value.data, extension.value.length, &controls.constraints);
-      if (result != TC_TLV_OK) return result;
-    } else if (id == 54) {
-      if (controls.has_inhibit_any) return TC_TLV_INVALID;
-      controls.has_inhibit_any = 1;
-      result = TC_DER_uint32(extension.value.data, extension.value.length, &controls.inhibit_any);
-      if (result != TC_TLV_OK) return result;
-    }
+    result = policy_controls_extension(&extension,&controls,&has_constraints);
+    if (result != TC_TLV_OK) return result;
   }
   if (result != TC_TLV_END) return result;
   *out = controls;
@@ -259,13 +282,15 @@ void tc_x509_policy_counters_advance(tc_x509_policy_counters* counters,
 }
 static TC_TLV_result certificate_policies(const TC_X509_certificate* certificate,
     int target, const TC_TLV_limits* limits, const tc_x509_policy_workspace* workspace,
-    size_t* work, size_t* policy_count, size_t* mapping_count)
+    size_t* work, size_t* policy_count, size_t* mapping_count,
+    tc_x509_policy_controls* controls)
 {
   TC_TLV_reader reader;
   TC_X509_extension extension;
   TC_TLV_result result;
-  int has_policies = 0, has_mappings = 0;
+  int has_policies = 0, has_mappings = 0, has_constraints = 0;
   *policy_count = *mapping_count = 0;
+  memset(controls,0,sizeof *controls);
   result = tc_pki_extensions_init(&reader, certificate, limits, work);
   if (result != TC_TLV_OK) return result;
   while ((result = tc_pki_extension_next(&reader, work, &extension)) == TC_TLV_OK) {
@@ -303,6 +328,9 @@ static TC_TLV_result certificate_policies(const TC_X509_certificate* certificate
         workspace->mappings[(*mapping_count)++] = mapping;
       }
       if (result != TC_TLV_END) return result;
+    } else {
+      result = policy_controls_extension(&extension,controls,&has_constraints);
+      if (result != TC_TLV_OK) return result;
     }
   }
   return result == TC_TLV_END ? TC_TLV_OK : result;
@@ -338,9 +366,7 @@ TC_TLV_result tc_x509_path_policies(const tc_x509_path_input* input,
       input->limits, workspace->names, work, &self_issued);
     if (result != TC_TLV_OK) return result;
     result = certificate_policies(certificate, target, input->limits, workspace,
-                                  work, &policy_count, &mapping_count);
-    if (result != TC_TLV_OK) return result;
-    result = tc_x509_policy_controls_read(certificate, input->limits, work, &controls);
+                                  work, &policy_count, &mapping_count,&controls);
     if (result != TC_TLV_OK) return result;
     result = tc_x509_policy_graph_step(workspace->graph, workspace->policies, policy_count,
       NULL, 0, counters.any > 0 || (self_issued && !target), 0, work);
@@ -401,14 +427,8 @@ TC_TLV_result tc_x509_path_extensions(const tc_x509_path_input* input,
         if (result != TC_TLV_OK) return result;
       }
       switch (id) {
-        case 19:
-          if (has_basic) return TC_TLV_INVALID;
-          has_basic = 1;
-          result = TC_X509_basic_constraints_read(extension.value.data, extension.value.length, &basic);
-          if (result != TC_TLV_OK) return result;
-          break;
-        case 15:
-          result = tc_pki_key_usage_value(extension.value,&has_usage,&key_usage);
+        case 19: case 15:
+          result = path_ca_extension(&extension,&basic,&has_basic,&key_usage,&has_usage);
           if (result != TC_TLV_OK) return result;
           break;
         case 37: {
@@ -600,12 +620,8 @@ TC_X509_path_status tc_x509_path_validate_anchor(const TC_bytes* chain, size_t c
     for (i = 0; i < count; ++i) {
       result = path_certificate(&input, i, work, &target);
       if (result != TC_TLV_OK) return tc_x509_path_status(result);
-      if (i + 1 < count) {
-        result = TC_X509_name_equal(target->subject, target->issuer, input.limits, &workspace->names, work, &accepted);
-        if (result != TC_TLV_OK) return tc_x509_path_status(result);
-        if (accepted) continue;
-      }
-      result = TC_X509_certificate_names_check(target, constraints, input.limits, &names, work, &accepted);
+      result = path_constraint_target(target,i + 1 == count,0,constraints,
+          input.limits,&names,work,&accepted);
       if (result != TC_TLV_OK) return tc_x509_path_status(result);
       if (!accepted) return TC_X509_PATH_INVALID;
     }
