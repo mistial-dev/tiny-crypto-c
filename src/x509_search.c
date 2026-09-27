@@ -109,7 +109,7 @@ TC_X509_path_status tc_x509_path_search_source(TC_bytes target,
         continue;
       }
       if (!equal) continue;
-      status = tc_x509_path_validate_anchor(path, depth, &trust.trust, &trust.names, options,
+      status = tc_x509_path_validate_anchor(path, depth, &trust, options,
           validation, work, &found.validation);
       if (status == TC_X509_PATH_VALID) {
         found.path = path; found.count = depth; found.anchor_index = anchor;

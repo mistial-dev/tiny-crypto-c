@@ -250,17 +250,71 @@ static TC_TLV_result append_policy(TC_bytes oid, TC_bytes* output,
   return TC_TLV_OK;
 }
 
+/* RFC 5914 stores each acceptable OID in a PolicyInformation with no qualifiers. */
+static TC_TLV_result anchor_policy_next(TC_TLV_reader* reader,
+    const TC_TLV_limits* limits, size_t* work, TC_bytes* oid)
+{
+  TC_TLV_reader fields;
+  TC_TLV_element element;
+  TC_bytes contents;
+  TC_TLV_result result;
+  if (tc_pki_work_charge(work, 1) != TC_TLV_OK) return TC_TLV_LIMIT;
+  result = TC_TLV_next(reader, &element);
+  if (result != TC_TLV_OK) return result;
+  result = TC_DER_sequence(element.encoded.data, element.encoded.length, &contents);
+  if (result != TC_TLV_OK) return result;
+  result = TC_TLV_reader_init(&fields, contents.data, contents.length, TC_TLV_DER, limits);
+  if (result != TC_TLV_OK) return result;
+  result = TC_TLV_next(&fields, &element);
+  if (result != TC_TLV_OK) return result == TC_TLV_END ? TC_TLV_INVALID : result;
+  result = TC_DER_oid(element.encoded.data, element.encoded.length, oid);
+  if (result != TC_TLV_OK) return result;
+  result = TC_TLV_next(&fields, &element);
+  if (result == TC_TLV_END) return TC_TLV_OK;
+  if (result != TC_TLV_OK) return result;
+  result = TC_DER_sequence(element.encoded.data, element.encoded.length, &contents);
+  if (result != TC_TLV_OK || !contents.length) return TC_TLV_INVALID;
+  return TC_TLV_next(&fields, &element) == TC_TLV_END ? TC_TLV_OK : TC_TLV_INVALID;
+}
+
+static TC_TLV_result anchor_policy_contains(TC_bytes set, const TC_TLV_limits* limits,
+    TC_bytes wanted, size_t* work, int* found)
+{
+  TC_TLV_reader reader;
+  TC_TLV_result result;
+  TC_bytes oid;
+  *found = 0;
+  if (!set.length) return TC_TLV_INVALID;
+  result = TC_TLV_reader_init(&reader, set.data, set.length, TC_TLV_DER, limits);
+  if (result != TC_TLV_OK) return result;
+  while ((result = anchor_policy_next(&reader, limits, work, &oid)) == TC_TLV_OK) {
+    int same;
+    result = equal(oid, wanted, work, &same);
+    if (result != TC_TLV_OK) return result;
+    *found |= same;
+  }
+  return result == TC_TLV_END ? TC_TLV_OK : result;
+}
+
 TC_TLV_result tc_x509_policy_graph_output(const tc_x509_policy_graph* graph,
-    const TC_bytes* initial, size_t initial_count, TC_bytes* output,
+    const TC_bytes* initial, size_t initial_count, TC_bytes anchor_set,
+    const TC_TLV_limits* limits, TC_bytes* output,
     size_t capacity, size_t* work, size_t* count)
 {
   size_t i, j, used = 0;
-  int unrestricted = 0;
-  if (!graph || !work || !count || (initial_count && !initial) || (capacity && !output)) return TC_TLV_ARGUMENT;
+  int unrestricted = 0, anchor_unrestricted = !anchor_set.data;
+  if (!graph || !work || !count || !limits || (initial_count && !initial) ||
+      (capacity && !output) || (!anchor_set.data && anchor_set.length)) return TC_TLV_ARGUMENT;
   for (i = 0; i < initial_count; ++i) {
     if (!initial[i].data || !initial[i].length) return TC_TLV_ARGUMENT;
     if (tc_pki_work_charge(work, 1) != TC_TLV_OK) return TC_TLV_LIMIT;
     if (is_any(initial[i])) unrestricted = 1;
+  }
+  if (anchor_set.data) {
+    const TC_bytes any = {any_oid, sizeof any_oid};
+    TC_TLV_result result = anchor_policy_contains(anchor_set, limits, any, work, &anchor_unrestricted);
+    if (result != TC_TLV_OK) return result;
+    if (!initial_count) unrestricted = 1;
   }
   for (i = 0; i < graph->node_count; ++i) {
     const tc_x509_policy_node* node = &graph->nodes[i];
@@ -277,11 +331,18 @@ TC_TLV_result tc_x509_policy_graph_output(const tc_x509_policy_graph* graph,
       }
     }
     if (!authority) continue;
-    if (unrestricted) {
+    if (unrestricted && anchor_unrestricted) {
       result = append_policy(node->oid, output, capacity, &used, work);
       if (result != TC_TLV_OK) return result;
-    } else for (j = 0; j < initial_count; ++j) {
+    } else if (!unrestricted) for (j = 0; j < initial_count; ++j) {
       int same = wildcard;
+      int allowed = anchor_unrestricted;
+      if (is_any(initial[j])) continue;
+      if (!allowed) {
+        result = anchor_policy_contains(anchor_set, limits, initial[j], work, &allowed);
+        if (result != TC_TLV_OK) return result;
+      }
+      if (!allowed) continue;
       if (!wildcard) {
         result = equal(node->oid, initial[j], work, &same);
         if (result != TC_TLV_OK) return result;
@@ -289,6 +350,23 @@ TC_TLV_result tc_x509_policy_graph_output(const tc_x509_policy_graph* graph,
       if (!same) continue;
       result = append_policy(initial[j], output, capacity, &used, work);
       if (result != TC_TLV_OK) return result;
+    } else {
+      TC_TLV_reader reader;
+      TC_bytes oid;
+      result = TC_TLV_reader_init(&reader, anchor_set.data, anchor_set.length, TC_TLV_DER, limits);
+      if (result != TC_TLV_OK) return result;
+      while ((result = anchor_policy_next(&reader, limits, work, &oid)) == TC_TLV_OK) {
+        int same = wildcard;
+        if (is_any(oid)) continue;
+        if (!wildcard) {
+          result = equal(node->oid, oid, work, &same);
+          if (result != TC_TLV_OK) return result;
+        }
+        if (!same) continue;
+        result = append_policy(oid, output, capacity, &used, work);
+        if (result != TC_TLV_OK) return result;
+      }
+      if (result != TC_TLV_END) return result;
     }
   }
   *count = used;

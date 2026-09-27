@@ -11,7 +11,24 @@ extern "C" {
 typedef struct {
   TC_X509_trust_anchor trust;
   TC_X509_name_constraints names;
+  /* Borrowed DER spans. Policy and extension spans contain SEQUENCE contents. */
+  TC_bytes key_id, title, title_language;
+  TC_bytes policy_set, extensions, certificate_extensions;
+  unsigned policy_flags;
+  size_t path_len;
+  uint8_t has_path_len;
+  /* A TrustAnchorInfo without certPath is valid data, but has no X.509 name. */
+  uint8_t x509_unusable;
 } TC_X509_store_anchor;
+
+/* Array-backed source for a fixed, caller-owned snapshot. All records and
+ * their borrowed DER must remain stable until readers release the snapshot. */
+typedef struct {
+  const TC_bytes* candidates;
+  size_t candidate_count;
+  const TC_X509_store_anchor* anchors;
+  size_t anchor_count;
+} TC_X509_store_array;
 
 /* Candidates are untrusted certificates. Anchors carry explicit local trust.
  * Callbacks return borrowed records, consume work without increasing it, and
@@ -24,6 +41,8 @@ typedef struct {
   TC_TLV_result (*candidate)(void* context, size_t index, size_t* work, TC_bytes* out);
   TC_TLV_result (*anchor)(void* context, size_t index, size_t* work, TC_X509_store_anchor* out);
 } TC_X509_store_source;
+TC_TLV_result TC_X509_store_array_source(const TC_X509_store_array* array,
+    TC_X509_store_source* out);
 
 typedef TC_snapshot_state TC_X509_snapshot_state;
 #define TC_X509_SNAPSHOT_FREE TC_SNAPSHOT_FREE

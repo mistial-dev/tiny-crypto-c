@@ -30,7 +30,8 @@ TC_TLV_result tc_x509_policy_graph_map(tc_x509_policy_graph* graph,
 /* Output contains OIDs in the caller's initial policy namespace, not mapped
  * leaf OIDs. Output storage is scratch; count changes only on success. */
 TC_TLV_result tc_x509_policy_graph_output(const tc_x509_policy_graph* graph,
-    const TC_bytes* initial, size_t initial_count, TC_bytes* output,
+    const TC_bytes* initial, size_t initial_count, TC_bytes anchor_set,
+    const TC_TLV_limits* limits, TC_bytes* output,
     size_t capacity, size_t* work, size_t* count);
 /* Qualifiers are checked but not included in the policy-set output. */
 TC_TLV_result tc_x509_policy_qualifiers_check(const TC_X509_policy* policy,

@@ -13,6 +13,49 @@ static void recycle(TC_X509_store_snapshot* slot)
   slot->state = TC_X509_SNAPSHOT_FREE;
 }
 
+static TC_TLV_result array_candidate(void* context, size_t index,
+    size_t* work, TC_bytes* out)
+{
+  const TC_X509_store_array* array = (const TC_X509_store_array*)context;
+  if (!array || !work || !out || index >= array->candidate_count ||
+      !tc_pki_storage_separate(out,sizeof *out,&array->candidates[index],
+          sizeof array->candidates[index])) return TC_TLV_ARGUMENT;
+  if (!*work) return TC_TLV_LIMIT;
+  --*work;
+  *out = array->candidates[index];
+  return TC_TLV_OK;
+}
+
+static TC_TLV_result array_anchor(void* context, size_t index,
+    size_t* work, TC_X509_store_anchor* out)
+{
+  const TC_X509_store_array* array = (const TC_X509_store_array*)context;
+  if (!array || !work || !out || index >= array->anchor_count ||
+      !tc_pki_storage_separate(out,sizeof *out,&array->anchors[index],
+          sizeof array->anchors[index])) return TC_TLV_ARGUMENT;
+  if (!*work) return TC_TLV_LIMIT;
+  --*work;
+  *out = array->anchors[index];
+  return TC_TLV_OK;
+}
+
+TC_TLV_result TC_X509_store_array_source(const TC_X509_store_array* array,
+    TC_X509_store_source* out)
+{
+  TC_X509_store_source source;
+  if (!array || !out || (array->candidate_count && !array->candidates) ||
+      (array->anchor_count && !array->anchors) ||
+      !tc_pki_storage_separate(array,sizeof *array,out,sizeof *out))
+    return TC_TLV_ARGUMENT;
+  source.context = (void*)array;
+  source.candidate_count = array->candidate_count;
+  source.anchor_count = array->anchor_count;
+  source.candidate = array_candidate;
+  source.anchor = array_anchor;
+  *out = source;
+  return TC_TLV_OK;
+}
+
 TC_TLV_result TC_X509_store_prepare(TC_X509_store_snapshot* slot, const TC_X509_store_source* source)
 {
   if (!slot || !source || !tc_pki_storage_separate(slot,sizeof *slot,source,sizeof *source) ||

@@ -113,8 +113,10 @@ ExampleCardResult example_twic_inventory_read(ExampleCardIO* io, ExampleCardMode
       result = framing == TC_TLV_LIMIT ? EXAMPLE_CARD_LIMIT : EXAMPLE_CARD_PROTOCOL;
       goto failure;
     }
+    const int optional_empty = i >= REQUIRED_NEXGEN && i < count;
     if (field.header.tag_length != 1 || field.header.tag[0] != RESPONSE_TAG ||
-        field.encoded.length != response.length || !field.value.length) {
+        field.encoded.length != response.length ||
+        (!field.value.length && !optional_empty)) {
       result = EXAMPLE_CARD_PROTOCOL; goto failure;
     }
     if (i == count) parsed.security = field.encoded;

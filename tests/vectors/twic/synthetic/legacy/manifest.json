@@ -1,0 +1,196 @@
+{
+  "material": "synthetic",
+  "profile": "legacy",
+  "structure_provenance": "Observed on a Legacy credential over contact PC/SC; payloads and all private values are synthetic",
+  "twic_aid": "A000000367200000010101",
+  "piv_aid": "A000000308000010000100",
+  "interfaces": {
+    "contact": "observed",
+    "contactless": "observed",
+    "contactless_twic_readable": [
+      "signed-chuid",
+      "unsigned-chuid",
+      "fingerprint",
+      "security"
+    ],
+    "contactless_twic_denied_6a81": [
+      "tpk"
+    ],
+    "contactless_twic_absent_6a82": [
+      "card-auth-cert",
+      "discovery",
+      "face",
+      "printed",
+      "personal",
+      "handwritten",
+      "iris",
+      "stickers"
+    ],
+    "contactless_piv_readable": [
+      "piv-signed-chuid",
+      "piv-card-auth-cert"
+    ],
+    "contactless_piv_denied_6a81": [
+      "piv-auth-cert",
+      "piv-discovery",
+      "piv-sign-cert",
+      "piv-key-management-cert"
+    ]
+  },
+  "objects": {
+    "present": [
+      "signed-chuid",
+      "unsigned-chuid",
+      "tpk",
+      "fingerprint",
+      "security"
+    ],
+    "absent_6a82": [
+      "card-auth-cert",
+      "discovery",
+      "face",
+      "printed",
+      "personal",
+      "handwritten",
+      "iris",
+      "stickers"
+    ],
+    "piv_present_synthetic": [
+      "piv-signed-chuid",
+      "piv-card-auth-cert",
+      "piv-auth-cert",
+      "piv-discovery",
+      "piv-sign-cert",
+      "piv-key-management-cert",
+      "piv-fingerprint",
+      "piv-face",
+      "piv-printed",
+      "piv-security"
+    ],
+    "observed_lengths": {
+      "signed-chuid": 2229,
+      "unsigned-chuid": 59,
+      "tpk": 26,
+      "fingerprint": 1336,
+      "security": 639
+    },
+    "synthetic_lengths": {
+      "signed-chuid": 1601,
+      "unsigned-chuid": 59,
+      "tpk": 26,
+      "fingerprint": 1240,
+      "security": 585
+    }
+  },
+  "certificates": {
+    "signer": {
+      "eku": [
+        "2.16.840.1.101.3.6.7",
+        "1.3.6.1.4.1.29138.6.7"
+      ],
+      "policies": [
+        "2.16.840.1.101.3.6.7"
+      ]
+    },
+    "card": {
+      "eku": [
+        "1.3.6.1.4.1.29138.6.8"
+      ],
+      "policies": [
+        "1.3.6.1.4.1.29138.2.1.3.17"
+      ]
+    },
+    "piv-auth": {
+      "eku": [
+        "2.5.29.37.0",
+        "1.3.6.1.5.5.7.3.2",
+        "1.3.6.1.4.1.311.20.2.2"
+      ],
+      "policies": [
+        "1.3.6.1.4.1.29138.2.1.3.13"
+      ]
+    },
+    "piv-sign": {
+      "eku": [
+        "2.5.29.37.0",
+        "1.3.6.1.5.5.7.3.2"
+      ],
+      "policies": [
+        "1.3.6.1.4.1.29138.2.1.3.5"
+      ]
+    },
+    "piv-key-management": {
+      "eku": [
+        "2.5.29.37.0",
+        "1.3.6.1.5.5.7.3.4",
+        "1.3.6.1.4.1.311.10.3.4"
+      ],
+      "policies": [
+        "1.3.6.1.4.1.29138.2.1.3.6"
+      ]
+    }
+  },
+  "security_mapping": [
+    {
+      "group": 9,
+      "container": "3002",
+      "object": "unsigned-chuid"
+    },
+    {
+      "group": 2,
+      "container": "3000",
+      "object": "signed-chuid"
+    },
+    {
+      "group": 4,
+      "container": "2003",
+      "object": "fingerprint"
+    }
+  ],
+  "security_digest": "sha1",
+  "encryption": "AES-128-ECB with PKCS#7 padding",
+  "notes": [
+    "All observed TWIC inventory objects and the identity-bound Legacy PIV CHUID, certificates, discovery, biometric, printed and Security objects have synthetic payloads.",
+    "Fixture certificates use new test identities and preserve observed relevant extension OID and criticality sets; DER lengths may differ from the captured cards."
+  ],
+  "piv_security_mapping": [
+    {
+      "group": 2,
+      "container": "3000",
+      "object": "piv-signed-chuid"
+    },
+    {
+      "group": 4,
+      "container": "6010",
+      "object": "piv-fingerprint"
+    },
+    {
+      "group": 1,
+      "container": "DB00",
+      "object": "piv-discovery"
+    },
+    {
+      "group": 7,
+      "container": "6030",
+      "object": "piv-face"
+    },
+    {
+      "group": 6,
+      "container": "3001",
+      "object": "piv-printed"
+    }
+  ],
+  "trust_anchors": {
+    "format": "RFC 5914 TrustAnchorList",
+    "positive": [
+      "trust-anchors.der",
+      "trust-anchor-certificate.der"
+    ],
+    "negative": [
+      "trust-anchor-bad-keyid.der",
+      "trust-anchor-bad-name.der",
+      "trust-anchor-bad-key.der",
+      "trust-anchor-bad-certsign.der"
+    ]
+  }
+}

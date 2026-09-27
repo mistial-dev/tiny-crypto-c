@@ -29,6 +29,13 @@ if(TINY_CRYPTO_BUILD_TESTS)
   add_test(NAME test_resource_profiles COMMAND ${CMAKE_COMMAND}
     -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR} -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/resource-profiles
     -DC_COMPILER=${CMAKE_C_COMPILER} -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/resource_profiles.cmake)
+  if(NOT MSVC)
+    add_test(NAME test_trust_anchor_options COMMAND ${CMAKE_COMMAND}
+      -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+      -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/trust-anchor-options
+      -DC_COMPILER=${CMAKE_C_COMPILER}
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/trust_anchor_options.cmake)
+  endif()
   find_package(Python3 COMPONENTS Interpreter QUIET)
   if(Python3_Interpreter_FOUND)
     add_test(NAME test_benchmark_report
@@ -435,6 +442,14 @@ if(TINY_CRYPTO_BUILD_TESTS)
   tc_add_c_test(test_twic_reader tiny-crypto-c-test-twic-cipher
     tests/twic/reader.c examples/credential_io.c src/tlv.c src/tlv_walk.c)
   target_compile_definitions(test_twic_reader PRIVATE TC_ENABLE_TLV=1)
+  tc_add_c_test(test_twic_apdu_replay tiny-crypto-c-test-twic-cipher
+    tests/twic/apdu_replay.c examples/credential_io.c src/tlv.c src/tlv_walk.c)
+  target_compile_definitions(test_twic_apdu_replay PRIVATE TC_ENABLE_TLV=1
+    TC_TWIC_VECTOR_DIR="${PROJECT_SOURCE_DIR}/tests/vectors/twic/synthetic")
+  if(Python3_Interpreter_FOUND)
+    add_test(NAME test_twic_apdu_corpus COMMAND ${Python3_EXECUTABLE}
+      ${PROJECT_SOURCE_DIR}/tests/twic/apdu_replay.py --check)
+  endif()
   if(APPLE)
     tc_add_c_test(test_twic_pcsc tiny-crypto-c-test-twic-cipher
       tests/twic/pcsc.c examples/credential_pcsc.c)
@@ -557,6 +572,10 @@ if(TINY_CRYPTO_BUILD_TESTS)
   tc_add_c_test(test_x509_crl tiny-crypto-c-test-pki tests/x509/crl.c)
   tc_add_c_test(test_source tiny-crypto-c-test-pki tests/x509/source.c)
   tc_add_c_test(test_x509_path tiny-crypto-c-test-pki tests/x509/path.c)
+  tc_add_c_test(test_x509_anchor_constraints tiny-crypto-c-test-pki-native
+    tests/x509/anchor_constraints.c)
+  target_compile_definitions(test_x509_anchor_constraints PRIVATE
+    TC_TWIC_SYNTHETIC_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/twic/synthetic")
   tc_add_c_test(test_x509_store tiny-crypto-c-test-pki tests/x509/store.c)
   tc_add_c_test(test_x509_candidate tiny-crypto-c-test-pki tests/x509/candidate.c)
   target_compile_definitions(test_x509_candidate PRIVATE
@@ -573,6 +592,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   tc_add_c_test(test_cms_reader tiny-crypto-c-test-pki tests/cms/reader.c examples/cms_reader.c)
   get_target_property(tc_native_pki_sources tiny-crypto-c-test-pki SOURCES)
   tc_add_test_library(tiny-crypto-c-test-pki-native ${tc_native_pki_sources}
+    src/x509_trust_anchor.c
     src/hash.c src/sha512.c src/hash_core.c src/hash_adapter.c src/ec.c ${tc_rsa_sources} src/pki_storage.c ${tc_aes_sources} src/sskdf.c
     src/piv_sm.c src/piv_sm_message.c src/piv_sm_authenticate.c
     src/twic_cipher.c src/twic_tpk.c
@@ -583,6 +603,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
     TC_ENABLE_PIV_CHUID=1 TC_ENABLE_PIV_CVC=1
     TC_ENABLE_FASCN=1 TC_ENABLE_TWIC_UUID=1 TC_ENABLE_TWIC_TPK=1 TC_ENABLE_PIV_OIDS=1
     TC_ENABLE_TWIC_OBJECT_CRYPTO=1 TC_ENABLE_X509_PATH=1
+    TC_ENABLE_TRUST_ANCHOR_FORMAT=1
     TC_ENABLE_X509_REVOCATION=1 TC_ENABLE_CMS=1
     TC_ENABLE_CMS_VALIDATION=1 TC_ENABLE_PIV_OBJECTS=1
     TC_ENABLE_CREDENTIAL=1
@@ -596,6 +617,18 @@ if(TINY_CRYPTO_BUILD_TESTS)
     target_include_directories(test_cpp_credential PRIVATE tests/support)
   endif()
   tc_add_c_test(test_source_hash tiny-crypto-c-test-pki-native tests/x509/source_hash.c)
+  tc_add_c_test(test_twic_synthetic_fixture tiny-crypto-c-test-pki-native
+    tests/twic/synthetic_fixture.c)
+  target_compile_definitions(test_twic_synthetic_fixture PRIVATE
+    TC_TWIC_SYNTHETIC_ROOT="${PROJECT_SOURCE_DIR}/tests/vectors/twic/synthetic")
+  tc_add_c_test(test_twic_synthetic_validation tiny-crypto-c-test-pki-native
+    tests/twic/synthetic_validation.c)
+  target_compile_definitions(test_twic_synthetic_validation PRIVATE
+    TC_TWIC_SYNTHETIC_ROOT="${PROJECT_SOURCE_DIR}/tests/vectors/twic/synthetic")
+  tc_add_c_test(test_x509_trust_anchor tiny-crypto-c-test-pki-native
+    tests/x509/trust_anchor.c)
+  target_compile_definitions(test_x509_trust_anchor PRIVATE
+    TC_TWIC_SYNTHETIC_ROOT="${PROJECT_SOURCE_DIR}/tests/vectors/twic/synthetic")
   tc_add_c_test(test_piv_sm_authenticate tiny-crypto-c-test-pki-native tests/piv/sm_authenticate.c)
   tc_sm_fixture_header(test_piv_sm_authenticate)
   add_executable(test_piv_cvc_corpus_reader tests/piv/cvc_corpus.c tests/support/munit.c)

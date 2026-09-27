@@ -51,6 +51,9 @@
 #include <tiny_crypto/x509_path.h>
 #include <tiny_crypto/x509_store.h>
 #endif
+#if TC_ENABLE_TRUST_ANCHOR_FORMAT
+#include <tiny_crypto/x509_trust_anchor.h>
+#endif
 #if TC_ENABLE_X509_REVOCATION
 #include <tiny_crypto/x509_crl.h>
 #include <tiny_crypto/x509_crl_source.h>

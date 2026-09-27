@@ -45,7 +45,7 @@ TC_X509_path_status tc_x509_path_validate_budget(const TC_bytes* chain, size_t c
     const TC_X509_path_workspace* workspace, size_t* work, TC_X509_path_result* out);
 /* Additional borrowed constraints are disjoint from scratch and all outputs. */
 TC_X509_path_status tc_x509_path_validate_anchor(const TC_bytes* chain, size_t count,
-    const TC_X509_trust_anchor* anchor, const TC_X509_name_constraints* anchor_names,
+    const TC_X509_store_anchor* anchor,
     const TC_X509_path_options* options, const TC_X509_path_workspace* workspace,
     size_t* work, TC_X509_path_result* out);
 
@@ -103,6 +103,8 @@ typedef struct {
   TC_X509_certificate* cache;
   /* Optional per-entry extension summaries, one per certificate. */
   TC_X509_extension_summary* summaries;
+  size_t anchor_path_len;
+  int has_anchor_path_len;
 } tc_x509_path_input;
 
 int tc_x509_path_source_valid(const tc_x509_path_input* input);
@@ -188,7 +190,8 @@ typedef struct {
 /* Run after signature and CA checks. Workspace is scratch and disjoint from
  * all inputs and result pointers. count and accepted change only on OK. */
 TC_TLV_result tc_x509_path_policies(const tc_x509_path_input* input,
-    const tc_x509_policy_options* options, const tc_x509_policy_workspace* workspace,
+    const tc_x509_policy_options* options, TC_bytes anchor_policy_set,
+    const tc_x509_policy_workspace* workspace,
     size_t* work, size_t* count, int* accepted);
 typedef struct {
   TC_bytes purpose;

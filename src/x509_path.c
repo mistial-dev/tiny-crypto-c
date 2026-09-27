@@ -56,11 +56,12 @@ TC_TLV_result tc_x509_path_summary(const tc_x509_path_input* input, size_t index
 TC_TLV_result tc_x509_path_basic(const tc_x509_path_input* input,
     const TC_X509_name_workspace* workspace, size_t* work, int* accepted)
 {
-  size_t i, j, total = 0, remaining;
+  size_t i, j, total = 0, remaining, anchor_remaining;
   TC_bytes issuer_name;
   TC_X509_public_key issuer_key;
   if (!tc_x509_path_source_valid(input) || !workspace || !work || !accepted || !input->anchor
       || !input->at || !input->limits || !input->count) return TC_TLV_ARGUMENT;
+  anchor_remaining = input->anchor_path_len;
   if (input->count > input->max_certificates) return TC_TLV_LIMIT;
   for (i = 0; i < input->count; ++i) {
     const TC_bytes encoded = path_encoded(input, i);
@@ -115,6 +116,10 @@ TC_TLV_result tc_x509_path_basic(const tc_x509_path_input* input,
       if (!self_issued) {
         if (!remaining) { *accepted = 0; return TC_TLV_OK; }
         --remaining;
+        if (input->has_anchor_path_len) {
+          if (!anchor_remaining) { *accepted = 0; return TC_TLV_OK; }
+          --anchor_remaining;
+        }
       }
       if (basic.has_path_length && basic.path_length < remaining) remaining = basic.path_length;
     }
@@ -270,7 +275,8 @@ static TC_TLV_result certificate_policies(const TC_X509_extension_summary* exten
 }
 
 TC_TLV_result tc_x509_path_policies(const tc_x509_path_input* input,
-    const tc_x509_policy_options* options, const tc_x509_policy_workspace* workspace,
+    const tc_x509_policy_options* options, TC_bytes anchor_policy_set,
+    const tc_x509_policy_workspace* workspace,
     size_t* work, size_t* count, int* accepted)
 {
   tc_x509_policy_counters counters;
@@ -319,7 +325,7 @@ TC_TLV_result tc_x509_path_policies(const tc_x509_path_input* input,
     tc_x509_policy_counters_advance(&counters, &controls, self_issued, target);
   }
   result = tc_x509_policy_graph_output(workspace->graph, options->initial, options->initial_count,
-    workspace->output, workspace->output_capacity, work, &output_count);
+    anchor_policy_set, input->limits, workspace->output, workspace->output_capacity, work, &output_count);
   if (result != TC_TLV_OK) return result;
   *count = output_count;
   *accepted = counters.explicit_policy > 0 || output_count > 0;
@@ -361,14 +367,16 @@ void tc_x509_path_options_plan_inputs(tc_pki_storage_plan* plan,
 /* Validation consumes the caller's work directly: storage checks are part of
  * the operation's cost, and work is one of the checked writes. */
 static TC_TLV_result path_storage(const TC_bytes* chain, size_t count,
-    const TC_X509_trust_anchor* anchor, const TC_X509_path_options* options,
+    const TC_X509_store_anchor* anchor, const TC_X509_path_options* options,
     const TC_X509_path_workspace* workspace, TC_X509_path_result* out, size_t* work)
 {
   TC_bytes writes[TC_X509_PATH_STORAGE_COUNT + 1];
   const TC_bytes anchor_fields[] = {
-    anchor->name, anchor->public_key.algorithm.oid, anchor->public_key.algorithm.parameters,
-    anchor->public_key.key, anchor->public_key.modulus, anchor->public_key.exponent,
-    anchor->public_key.curve_oid
+    anchor->trust.name, anchor->trust.public_key.algorithm.oid,
+    anchor->trust.public_key.algorithm.parameters, anchor->trust.public_key.key,
+    anchor->trust.public_key.modulus, anchor->trust.public_key.exponent,
+    anchor->trust.public_key.curve_oid, anchor->names.permitted, anchor->names.excluded,
+    anchor->key_id, anchor->policy_set, anchor->extensions, anchor->certificate_extensions
   };
   tc_pki_storage_plan plan;
   TC_TLV_result result;
@@ -389,8 +397,28 @@ static TC_TLV_result path_storage(const TC_bytes* chain, size_t count,
   return result;
 }
 
+/* Anchor controls are normalized by the TrustAnchorInfo reader. Reject critical
+ * extensions whose path semantics this validator does not implement. */
+static TC_TLV_result anchor_extensions_check(TC_bytes contents,
+    const TC_TLV_limits* limits, size_t* work)
+{
+  TC_TLV_reader reader;
+  TC_X509_extension extension;
+  TC_TLV_result result;
+  if (!contents.data) return contents.length ? TC_TLV_ARGUMENT : TC_TLV_OK;
+  result = TC_TLV_reader_init(&reader, contents.data, contents.length, TC_TLV_DER, limits);
+  if (result != TC_TLV_OK) return result;
+  while ((result = tc_pki_extension_next(&reader, work, &extension)) == TC_TLV_OK) {
+    unsigned id = tc_pki_extension_id(&extension);
+    if (extension.critical && id != 14 && id != 15 && id != 19 && id != 30 &&
+        id != 32 && id != 36 && id != 54)
+      return TC_TLV_UNSUPPORTED;
+  }
+  return result == TC_TLV_END ? TC_TLV_OK : result;
+}
+
 TC_X509_path_status tc_x509_path_validate_anchor(const TC_bytes* chain, size_t count,
-    const TC_X509_trust_anchor* anchor, const TC_X509_name_constraints* anchor_names,
+    const TC_X509_store_anchor* anchor,
     const TC_X509_path_options* options,
     const TC_X509_path_workspace* workspace, size_t* work, TC_X509_path_result* out)
 {
@@ -409,6 +437,9 @@ TC_X509_path_status tc_x509_path_validate_anchor(const TC_bytes* chain, size_t c
   int accepted;
   if (!chain || !anchor || !options || !workspace || !work || !out ||
       (options->flags & ~(unsigned)TC_X509_PATH_SUPPORTED_FLAGS)) return TC_X509_PATH_ERROR;
+  if (anchor->x509_unusable) return TC_X509_PATH_INVALID;
+  if (anchor->policy_flags & ~(unsigned)(TC_X509_PATH_REQUIRE_EXPLICIT_POLICY |
+      TC_X509_PATH_INHIBIT_MAPPING | TC_X509_PATH_INHIBIT_ANY_POLICY)) return TC_X509_PATH_ERROR;
   if (!count) return TC_X509_PATH_INVALID;
   if (count > options->max_certificates || count > SIZE_MAX / sizeof *chain
       || options->initial_policy_count > options->parsing.max_elements) return TC_X509_PATH_LIMIT;
@@ -416,6 +447,10 @@ TC_X509_path_status tc_x509_path_validate_anchor(const TC_bytes* chain, size_t c
     return TC_X509_PATH_LIMIT;
   initial_work = *work;
   result = path_storage(chain, count, anchor, options, workspace, out, work);
+  if (result != TC_TLV_OK) return tc_x509_path_status(result);
+  result = anchor_extensions_check(anchor->extensions, &options->parsing, work);
+  if (result != TC_TLV_OK) return tc_x509_path_status(result);
+  result = anchor_extensions_check(anchor->certificate_extensions, &options->parsing, work);
   if (result != TC_TLV_OK) return tc_x509_path_status(result);
   if (TC_X509_time_compare(&options->at, &options->at, &accepted) != TC_TLV_OK) return TC_X509_PATH_ERROR;
   for (i = 0; i < count; ++i) {
@@ -438,7 +473,9 @@ TC_X509_path_status tc_x509_path_validate_anchor(const TC_bytes* chain, size_t c
   names.frames = workspace->frames; names.frame_capacity = workspace->frame_capacity; names.names = &workspace->names;
   memset(&input, 0, sizeof input);
   input.count = count; input.max_certificates = options->max_certificates; input.max_input = options->max_input;
-  input.anchor = anchor; input.at = &options->at; input.signatures = &options->signatures;
+  input.anchor = &anchor->trust; input.at = &options->at; input.signatures = &options->signatures;
+  input.anchor_path_len = anchor->path_len;
+  input.has_anchor_path_len = anchor->has_path_len;
   input.limits = &options->parsing; input.encoded = chain; input.parser = &parser;
   input.cache = workspace->certificates;
   /* Each validation fills the summary cache afresh, so clear stale entries. */
@@ -455,7 +492,7 @@ TC_X509_path_status tc_x509_path_validate_anchor(const TC_bytes* chain, size_t c
   if (!accepted) return TC_X509_PATH_INVALID;
   /* Apply application and stored-anchor constraints independently. */
   for (set = 0; set < 2; ++set) {
-    const TC_X509_name_constraints* constraints = set ? anchor_names : &options->anchor_names;
+    const TC_X509_name_constraints* constraints = set ? &anchor->names : &options->anchor_names;
     if (!constraints || (!constraints->permitted.length && !constraints->excluded.length)) continue;
     for (i = 0; i < count; ++i) {
       result = tc_x509_path_certificate(&input, i, work, &target);
@@ -471,14 +508,15 @@ TC_X509_path_status tc_x509_path_validate_anchor(const TC_bytes* chain, size_t c
   graph.edges = workspace->edges; graph.edge_capacity = workspace->edge_capacity;
   graph.expected = workspace->expected; graph.expected_capacity = workspace->expected_capacity;
   policy_options.initial = options->initial_policies; policy_options.initial_count = options->initial_policy_count;
-  policy_options.require_explicit = (options->flags & TC_X509_PATH_REQUIRE_EXPLICIT_POLICY) != 0;
-  policy_options.inhibit_mapping = (options->flags & TC_X509_PATH_INHIBIT_MAPPING) != 0;
-  policy_options.inhibit_any = (options->flags & TC_X509_PATH_INHIBIT_ANY_POLICY) != 0;
+  policy_options.require_explicit = ((options->flags | anchor->policy_flags) & TC_X509_PATH_REQUIRE_EXPLICIT_POLICY) != 0;
+  policy_options.inhibit_mapping = ((options->flags | anchor->policy_flags) & TC_X509_PATH_INHIBIT_MAPPING) != 0;
+  policy_options.inhibit_any = ((options->flags | anchor->policy_flags) & TC_X509_PATH_INHIBIT_ANY_POLICY) != 0;
   policy_workspace.graph = &graph; policy_workspace.policies = workspace->oids; policy_workspace.policy_capacity = workspace->oid_capacity;
   policy_workspace.mappings = workspace->mappings; policy_workspace.mapping_capacity = workspace->mapping_capacity;
   policy_workspace.output = workspace->policies; policy_workspace.output_capacity = workspace->policy_capacity;
   policy_workspace.names = &workspace->names; policy_workspace.frames = workspace->frames; policy_workspace.frame_capacity = workspace->frame_capacity;
-  result = tc_x509_path_policies(&input, &policy_options, &policy_workspace, work, &policy_count, &accepted);
+  result = tc_x509_path_policies(&input, &policy_options, anchor->policy_set,
+      &policy_workspace, work, &policy_count, &accepted);
   if (result != TC_TLV_OK) return tc_x509_path_status(result);
   if (!accepted) return TC_X509_PATH_INVALID;
   usage.purpose = options->purpose; usage.key_usage = options->key_usage;
@@ -502,7 +540,20 @@ TC_X509_path_status tc_x509_path_validate_budget(const TC_bytes* chain, size_t c
     const TC_X509_trust_anchor* anchor, const TC_X509_path_options* options,
     const TC_X509_path_workspace* workspace, size_t* work, TC_X509_path_result* out)
 {
-  return tc_x509_path_validate_anchor(chain,count,anchor,NULL,options,workspace,work,out);
+  TC_X509_store_anchor stored = {0};
+  if (!anchor) return TC_X509_PATH_ERROR;
+  stored.trust = *anchor;
+  return tc_x509_path_validate_anchor(chain,count,&stored,options,workspace,work,out);
+}
+
+TC_X509_path_status TC_X509_path_validate_with_anchor(const TC_bytes* chain, size_t count,
+    const TC_X509_store_anchor* anchor, const TC_X509_path_options* options,
+    const TC_X509_path_workspace* workspace, TC_X509_path_result* out)
+{
+  size_t work;
+  if (!options) return TC_X509_PATH_ERROR;
+  work = options->max_work;
+  return tc_x509_path_validate_anchor(chain,count,anchor,options,workspace,&work,out);
 }
 
 TC_X509_path_status TC_X509_path_validate(const TC_bytes* chain, size_t count,

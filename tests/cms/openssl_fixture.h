@@ -250,11 +250,11 @@ static inline void add_cms_octet_attribute(CMS_ContentInfo *cms,
   ASN1_OBJECT_free(oid);
 }
 
-static inline size_t encode_biometric_record_parameters(
+static inline size_t encode_biometric_record_parameters_flags(
     X509 *certificate, EVP_PKEY *key, int include_certificate,
     int omit_rsa_parameters, TC_bytes fascn, TC_bytes guid, TC_bytes record,
     uint16_t format_type, uint32_t biometric_type, uint8_t data_type,
-    uint8_t *out, size_t capacity) {
+    uint8_t *out, size_t capacity, unsigned extra_flags) {
   enum {
     HEADER_BYTES = 88,
     P256_SIGNATURE_BYTES = 72,
@@ -262,7 +262,8 @@ static inline size_t encode_biometric_record_parameters(
   };
   const size_t signed_bytes = HEADER_BYTES + record.length;
   const unsigned flags = CMS_BINARY | CMS_NOSMIMECAP | CMS_DETACHED |
-                         (include_certificate ? 0 : CMS_NOCERTS);
+                         (include_certificate ? 0 : CMS_NOCERTS) |
+                         extra_flags;
   const size_t target_signature_length = EVP_PKEY_is_a(key, "RSA")
                                              ? (size_t)EVP_PKEY_get_size(key)
                                              : P256_SIGNATURE_BYTES;
@@ -338,6 +339,16 @@ static inline size_t encode_biometric_record_parameters(
   }
   munit_error("could not encode fixed-length biometric signature");
   return 0;
+}
+
+static inline size_t encode_biometric_record_parameters(
+    X509 *certificate, EVP_PKEY *key, int include_certificate,
+    int omit_rsa_parameters, TC_bytes fascn, TC_bytes guid, TC_bytes record,
+    uint16_t format_type, uint32_t biometric_type, uint8_t data_type,
+    uint8_t *out, size_t capacity) {
+  return encode_biometric_record_parameters_flags(certificate,key,
+      include_certificate,omit_rsa_parameters,fascn,guid,record,format_type,
+      biometric_type,data_type,out,capacity,0);
 }
 
 static inline size_t

@@ -1,0 +1,213 @@
+{
+  "material": "synthetic",
+  "profile": "nexgen",
+  "structure_provenance": "Observed on a NEXGEN credential over contact PC/SC; payloads and all private values are synthetic",
+  "twic_aid": "A000000367200000010103",
+  "piv_aid": "A000000308000010000100",
+  "interfaces": {
+    "contact": "observed",
+    "contactless": "observed",
+    "contactless_twic_readable": [
+      "card-auth-cert",
+      "signed-chuid",
+      "unsigned-chuid",
+      "discovery",
+      "fingerprint",
+      "face",
+      "printed",
+      "security",
+      "personal",
+      "handwritten",
+      "iris"
+    ],
+    "contactless_twic_denied_6982": [
+      "tpk"
+    ],
+    "contactless_piv_readable": [
+      "piv-signed-chuid",
+      "piv-card-auth-cert",
+      "piv-twic-discovery"
+    ],
+    "contactless_piv_denied_6982": [
+      "piv-auth-cert",
+      "piv-discovery",
+      "piv-5fc10a",
+      "piv-5fc10b",
+      "piv-5fc10c",
+      "piv-5fc10d",
+      "piv-5fc10e",
+      "piv-5fc10f"
+    ]
+  },
+  "objects": {
+    "present": [
+      "card-auth-cert",
+      "signed-chuid",
+      "unsigned-chuid",
+      "discovery",
+      "tpk",
+      "fingerprint",
+      "face",
+      "printed",
+      "security",
+      "personal",
+      "handwritten",
+      "iris"
+    ],
+    "absent_6a82": [
+      "stickers"
+    ],
+    "empty_5300": [
+      "personal",
+      "handwritten",
+      "iris"
+    ],
+    "piv_present_synthetic": [
+      "piv-signed-chuid",
+      "piv-card-auth-cert",
+      "piv-auth-cert",
+      "piv-discovery",
+      "piv-twic-discovery",
+      "piv-fingerprint",
+      "piv-face",
+      "piv-printed",
+      "piv-security",
+      "piv-5fc10a",
+      "piv-5fc10b",
+      "piv-5fc10c",
+      "piv-5fc10d",
+      "piv-5fc10e",
+      "piv-5fc10f"
+    ],
+    "observed_lengths": {
+      "card-auth-cert": 1551,
+      "signed-chuid": 2258,
+      "unsigned-chuid": 59,
+      "discovery": 20,
+      "tpk": 26,
+      "fingerprint": 1352,
+      "face": 10520,
+      "printed": 150,
+      "security": 788,
+      "personal": 2,
+      "handwritten": 2,
+      "iris": 2
+    },
+    "synthetic_lengths": {
+      "card-auth-cert": 1033,
+      "signed-chuid": 1601,
+      "unsigned-chuid": 59,
+      "discovery": 20,
+      "tpk": 26,
+      "fingerprint": 1240,
+      "face": 10424,
+      "printed": 150,
+      "security": 714,
+      "personal": 2,
+      "handwritten": 2,
+      "iris": 2
+    }
+  },
+  "certificates": {
+    "signer": {
+      "eku": [
+        "2.16.840.1.101.3.6.7",
+        "1.3.6.1.4.1.29138.6.7"
+      ],
+      "policies": [
+        "2.16.840.1.101.3.6.7"
+      ]
+    },
+    "card": {
+      "eku": [
+        "1.3.6.1.4.1.29138.6.8"
+      ],
+      "policies": [
+        "1.3.6.1.4.1.29138.2.1.3.17"
+      ]
+    },
+    "piv-auth": {
+      "eku": [
+        "2.5.29.37.0",
+        "1.3.6.1.5.5.7.3.2",
+        "1.3.6.1.4.1.311.20.2.2"
+      ],
+      "policies": [
+        "1.3.6.1.4.1.29138.2.1.3.13"
+      ]
+    }
+  },
+  "security_mapping": [
+    {
+      "group": 9,
+      "container": "3002",
+      "object": "unsigned-chuid"
+    },
+    {
+      "group": 2,
+      "container": "3000",
+      "object": "signed-chuid"
+    },
+    {
+      "group": 7,
+      "container": "6030",
+      "object": "face"
+    },
+    {
+      "group": 6,
+      "container": "3001",
+      "object": "printed"
+    },
+    {
+      "group": 4,
+      "container": "2003",
+      "object": "fingerprint"
+    }
+  ],
+  "security_digest": "sha256",
+  "piv_security_mapping": [
+    {
+      "group": 2,
+      "container": "3000",
+      "object": "piv-signed-chuid"
+    },
+    {
+      "group": 4,
+      "container": "6010",
+      "object": "piv-fingerprint"
+    },
+    {
+      "group": 1,
+      "container": "DB00",
+      "object": "piv-discovery"
+    },
+    {
+      "group": 7,
+      "container": "6030",
+      "object": "piv-face"
+    },
+    {
+      "group": 6,
+      "container": "3001",
+      "object": "piv-printed"
+    }
+  ],
+  "encryption": "AES-128-ECB with PKCS#7 padding",
+  "notes": [
+    "All observed TWIC objects and the observed PIV CHUID, certificates, discovery, biometric, printed, security and empty objects have synthetic payloads.",
+    "Fixture certificates use new test identities and preserve observed relevant extension OID and criticality sets; DER lengths may differ from the captured cards."
+  ],
+  "trust_anchors": {
+    "format": "RFC 5914 TrustAnchorList",
+    "positive": [
+      "trust-anchors.der",
+      "trust-anchor-certificate.der"
+    ],
+    "negative": [
+      "trust-anchor-bad-keyid.der",
+      "trust-anchor-bad-name.der",
+      "trust-anchor-bad-key.der",
+      "trust-anchor-bad-certsign.der"
+    ]
+  }
+}

@@ -50,6 +50,11 @@ set(tc_module_requires_TC_ENABLE_X509_PATH TINY_CRYPTO_ENABLE_X509)
 set(tc_module_sources_TC_ENABLE_X509_PATH
   src/x509_path.c src/x509_path_extensions.c src/x509_search.c src/x509_store.c src/x509_policy.c)
 
+tc_module_feature(TINY_CRYPTO_ENABLE_TRUST_ANCHOR_FORMAT TC_ENABLE_TRUST_ANCHOR_FORMAT
+  "Build RFC 5914 trust-anchor format reader")
+set(tc_module_requires_TC_ENABLE_TRUST_ANCHOR_FORMAT TINY_CRYPTO_ENABLE_X509_PATH)
+set(tc_module_sources_TC_ENABLE_TRUST_ANCHOR_FORMAT src/x509_trust_anchor.c)
+
 tc_module_feature(TINY_CRYPTO_ENABLE_X509_REVOCATION TC_ENABLE_X509_REVOCATION
   "Build X.509 CRL and revocation validation")
 set(tc_module_requires_TC_ENABLE_X509_REVOCATION TINY_CRYPTO_ENABLE_X509_PATH)

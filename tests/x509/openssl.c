@@ -663,7 +663,7 @@ static MunitResult paths(const MunitParameter params[], void* user)
   TC_X509_trust_anchor anchor;
   unsigned group, scenario, source, i, calls = 0;
   TC_X509_signature_provider provider = {verify,&calls,NULL};
-  tc_x509_path_input input = {parsed + 1, 3, 3, 6144, &anchor, &at, &provider, &limits, encoded_path, &parse_workspace, parsed + 1};
+  tc_x509_path_input input = {parsed + 1, 3, 3, 6144, &anchor, &at, &provider, &limits, encoded_path, &parse_workspace, parsed + 1, NULL, 0, 0};
   (void)params;
   (void)user;
   for (group = 0; group < 2; ++group) {
@@ -777,11 +777,11 @@ static MunitResult paths(const MunitParameter params[], void* user)
           if (scenario < USAGE_VALID)
             munit_assert_int(verify_chain(certs, scenario == 11 ? "1.2.3.5" : "1.2.3.4", flags, 0), ==, wanted);
           if (scenario == TARGET_CRITICAL_MAPPING) {
-            munit_assert_int(tc_x509_path_policies(&input, &options,
+            munit_assert_int(tc_x509_path_policies(&input, &options, (TC_bytes){NULL,0},
                 &policy_workspace, &work, &count, &accepted), ==, TC_TLV_INVALID);
             continue;
           }
-          munit_assert_int(tc_x509_path_policies(&input, &options, &policy_workspace, &work, &count, &accepted), ==,
+          munit_assert_int(tc_x509_path_policies(&input, &options, (TC_bytes){NULL,0}, &policy_workspace, &work, &count, &accepted), ==,
                            TC_TLV_OK);
           munit_assert_int(accepted, ==, wanted);
           munit_assert_size(count, ==, wanted ? 1 : 0);
@@ -844,6 +844,81 @@ static MunitResult paths(const MunitParameter params[], void* user)
         if (scenario == UNKNOWN_CRITICAL) wanted = TC_X509_PATH_UNSUPPORTED;
         memset(&result, 0xa5, sizeof result); memcpy(&unchanged, &result, sizeof result);
         munit_assert_int(TC_X509_path_validate(encoded_path,3,&anchor,&options,&workspace,&result), ==, wanted);
+        if (scenario == 8) {
+          static const uint8_t anchor_policy_a[] = {0x30,5,6,3,0x2a,3,4};
+          static const uint8_t anchor_policy_b[] = {0x30,5,6,3,0x2a,3,5};
+          static const uint8_t unknown_critical[] = {
+            0x30,12,6,3,0x2a,3,99,1,1,0xff,4,2,5,0
+          };
+          static const uint8_t cert_sign_critical[] = {
+            0x30,14,6,3,0x55,0x1d,15,1,1,0xff,4,4,3,2,2,4
+          };
+          TC_X509_store_anchor controlled = {0};
+          controlled.trust = anchor;
+          munit_assert_int(TC_X509_path_validate_with_anchor(encoded_path,3,&controlled,
+              &options,&workspace,&result), ==, TC_X509_PATH_VALID);
+          controlled.policy_set = (TC_bytes){anchor_policy_a,sizeof anchor_policy_a};
+          munit_assert_int(TC_X509_path_validate_with_anchor(encoded_path,3,&controlled,
+              &options,&workspace,&result), ==, TC_X509_PATH_VALID);
+          controlled.policy_flags = TC_X509_PATH_REQUIRE_EXPLICIT_POLICY;
+          munit_assert_int(TC_X509_path_validate_with_anchor(encoded_path,3,&controlled,
+              &options,&workspace,&result), ==, TC_X509_PATH_VALID);
+          controlled.has_path_len = 1;
+          controlled.path_len = 2;
+          munit_assert_int(TC_X509_path_validate_with_anchor(encoded_path,3,&controlled,
+              &options,&workspace,&result), ==, TC_X509_PATH_VALID);
+          controlled.policy_set = (TC_bytes){anchor_policy_b,sizeof anchor_policy_b};
+          munit_assert_int(TC_X509_path_validate_with_anchor(encoded_path,3,&controlled,
+              &options,&workspace,&result), ==, TC_X509_PATH_INVALID);
+          controlled.policy_set = (TC_bytes){anchor_policy_a,sizeof anchor_policy_a};
+          controlled.path_len = 0;
+          munit_assert_int(TC_X509_path_validate_with_anchor(encoded_path,3,&controlled,
+              &options,&workspace,&result), ==, TC_X509_PATH_INVALID);
+          controlled.path_len = 2;
+          controlled.extensions = (TC_bytes){unknown_critical,sizeof unknown_critical};
+          munit_assert_int(TC_X509_path_validate_with_anchor(encoded_path,3,&controlled,
+              &options,&workspace,&result), ==, TC_X509_PATH_UNSUPPORTED);
+          controlled.extensions = (TC_bytes){NULL,0};
+          controlled.certificate_extensions = (TC_bytes){unknown_critical,sizeof unknown_critical};
+          munit_assert_int(TC_X509_path_validate_with_anchor(encoded_path,3,&controlled,
+              &options,&workspace,&result), ==, TC_X509_PATH_UNSUPPORTED);
+          controlled.certificate_extensions = (TC_bytes){NULL,0};
+          controlled.certificate_extensions = (TC_bytes){cert_sign_critical,sizeof cert_sign_critical};
+          munit_assert_int(TC_X509_path_validate_with_anchor(encoded_path,3,&controlled,
+              &options,&workspace,&result), ==, TC_X509_PATH_VALID);
+          controlled.certificate_extensions = (TC_bytes){NULL,0};
+          {
+            static const uint8_t any_policy[] = {0x55,0x1d,0x20,0};
+            TC_bytes both[] = {{any_policy,sizeof any_policy},{policy_b,3}};
+            options.initial_policies = both; options.initial_policy_count = 2;
+            munit_assert_int(TC_X509_path_validate_with_anchor(encoded_path,3,&controlled,
+                &options,&workspace,&result), ==, TC_X509_PATH_VALID);
+            options.initial_policies = &initial; options.initial_policy_count = 1;
+          }
+          {
+            TC_X509_store_anchor anchors[2] = {controlled,controlled};
+            TC_bytes candidates[] = {encoded_path[1],encoded_path[0]};
+            TC_bytes discovered[3];
+            TC_X509_search_frame search_frames[3];
+            TC_X509_search_workspace search = {discovered,search_frames,3};
+            TC_X509_store_array array = {candidates,2,anchors,2};
+            TC_X509_store_source source;
+            TC_X509_search_result found;
+            anchors[0].policy_set = (TC_bytes){anchor_policy_b,sizeof anchor_policy_b};
+            munit_assert_int(TC_X509_store_array_source(&array,&source), ==, TC_TLV_OK);
+            munit_assert_int(TC_X509_path_build(encoded_path[2],&source,&options,
+                &workspace,&search,&found), ==, TC_X509_PATH_VALID);
+            munit_assert_size(found.anchor_index, ==, 1);
+            anchors[1].policy_set = (TC_bytes){anchor_policy_b,sizeof anchor_policy_b};
+            munit_assert_int(TC_X509_path_build(encoded_path[2],&source,&options,
+                &workspace,&search,&found), ==, TC_X509_PATH_INVALID);
+          }
+          controlled.x509_unusable = 1;
+          munit_assert_int(TC_X509_path_validate_with_anchor(encoded_path,3,&controlled,
+              &options,&workspace,&result), ==, TC_X509_PATH_INVALID);
+          munit_assert_int(TC_X509_path_validate(encoded_path,3,&anchor,&options,
+              &workspace,&result), ==, TC_X509_PATH_VALID);
+        }
         if (wanted == TC_X509_PATH_VALID) {
           TC_X509_path_workspace short_cache = workspace;
           short_cache.certificate_capacity = 2;

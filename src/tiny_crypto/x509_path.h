@@ -165,6 +165,11 @@ TC_X509_path_status TC_X509_path_build(TC_bytes target,
 TC_X509_path_status TC_X509_path_validate(const TC_bytes* chain, size_t count,
     const TC_X509_trust_anchor* anchor, const TC_X509_path_options* options,
     const TC_X509_path_workspace* workspace, TC_X509_path_result* out);
+/* Validate against one explicit store anchor, including its path controls.
+ * The anchor and its borrowed spans remain stable throughout validation. */
+TC_X509_path_status TC_X509_path_validate_with_anchor(const TC_bytes* chain, size_t count,
+    const TC_X509_store_anchor* anchor, const TC_X509_path_options* options,
+    const TC_X509_path_workspace* workspace, TC_X509_path_result* out);
 #ifdef __cplusplus
 }
 #endif

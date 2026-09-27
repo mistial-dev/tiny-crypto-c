@@ -111,6 +111,25 @@ tc_profile_option(TINY_CRYPTO_DES_REJECT_WEAK_KEYS TC_DES_REJECT_WEAK_KEYS "Reje
 
 include(cmake/Features.cmake)
 
+function(tc_taf_choice_option name description)
+  set(${name} AUTO CACHE STRING "${description} (AUTO follows trust-anchor format)")
+  set_property(CACHE ${name} PROPERTY STRINGS AUTO ON OFF)
+  string(TOUPPER "${${name}}" choice)
+  if(choice STREQUAL "AUTO")
+    set(value ${TINY_CRYPTO_ENABLE_TRUST_ANCHOR_FORMAT})
+  elseif(choice MATCHES "^(ON|TRUE|YES|1)$")
+    set(value 1)
+  elseif(choice MATCHES "^(OFF|FALSE|NO|0)$")
+    set(value 0)
+  else()
+    message(FATAL_ERROR "${name} must be AUTO, ON, or OFF")
+  endif()
+  set(${name} ${value} PARENT_SCOPE)
+endfunction()
+tc_taf_choice_option(TINY_CRYPTO_TAF_CERTIFICATE "Accept RFC 5914 Certificate choices")
+tc_taf_choice_option(TINY_CRYPTO_TAF_TBS_CERTIFICATE "Accept RFC 5914 TBSCertificate choices")
+tc_taf_choice_option(TINY_CRYPTO_TAF_TRUST_ANCHOR_INFO "Accept RFC 5914 TrustAnchorInfo choices")
+
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
   option(TINY_CRYPTO_BUILD_TESTS "Build host tests" ON)
 else()
@@ -167,6 +186,16 @@ if(NOT TINY_CRYPTO_AES_KEY_BITS MATCHES "^(128|192|256)$")
   message(FATAL_ERROR "TINY_CRYPTO_AES_KEY_BITS must be 128, 192, or 256")
 endif()
 tc_validate_module_features()
+if(TINY_CRYPTO_ENABLE_TRUST_ANCHOR_FORMAT AND
+   NOT TINY_CRYPTO_TAF_CERTIFICATE AND NOT TINY_CRYPTO_TAF_TBS_CERTIFICATE AND
+   NOT TINY_CRYPTO_TAF_TRUST_ANCHOR_INFO)
+  message(FATAL_ERROR "Trust-anchor format requires at least one choice")
+endif()
+if(NOT TINY_CRYPTO_ENABLE_TRUST_ANCHOR_FORMAT AND
+   (TINY_CRYPTO_TAF_CERTIFICATE OR TINY_CRYPTO_TAF_TBS_CERTIFICATE OR
+    TINY_CRYPTO_TAF_TRUST_ANCHOR_INFO))
+  message(FATAL_ERROR "Trust-anchor choices require trust-anchor format")
+endif()
 
 tc_profile_option(TINY_CRYPTO_ENABLE_PIV_SM TC_ENABLE_PIV_SM "Build PIV secure messaging for the client")
 tc_profile_option(TINY_CRYPTO_PIV_SM_CS2 TC_PIV_SM_ENABLE_CS2 "Enable PIV SM cipher suite 2")
@@ -216,6 +245,9 @@ foreach(pair
     "TINY_CRYPTO_ENABLE_TLV;TC_ENABLE_TLV"
     "TINY_CRYPTO_ENABLE_DER;TC_ENABLE_DER"
     "TINY_CRYPTO_ENABLE_X509;TC_ENABLE_X509"
+    "TINY_CRYPTO_TAF_CERTIFICATE;TC_TAF_ENABLE_CERTIFICATE"
+    "TINY_CRYPTO_TAF_TBS_CERTIFICATE;TC_TAF_ENABLE_TBS_CERTIFICATE"
+    "TINY_CRYPTO_TAF_TRUST_ANCHOR_INFO;TC_TAF_ENABLE_TRUST_ANCHOR_INFO"
     "TINY_CRYPTO_ENABLE_EAC_CVC;TC_ENABLE_EAC_CVC"
     "TINY_CRYPTO_ENABLE_PIV_CVC;TC_ENABLE_PIV_CVC"
     "TINY_CRYPTO_ENABLE_PIV_CHUID;TC_ENABLE_PIV_CHUID"
