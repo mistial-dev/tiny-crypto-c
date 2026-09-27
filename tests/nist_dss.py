@@ -16,7 +16,8 @@ HASHES = {"SHA1": "SHA-1", "SHA224": "SHA-224", "SHA256": "SHA-256",
 EXPECTED = {"ecdsa pkv": 180, "ecdsa keypair": 150,
             "ecdsa siggen": 720, "ecdsa sigver": 1125,
             "rsa siggen15": 80, "rsa siggenpss": 80,
-            "rsa sigver v15": 270, "rsa sigver pss": 270}
+            "rsa sigver v15": 270, "rsa sigver pss": 270,
+            "rsa keygen": 2200}
 
 
 def records(contents):
@@ -141,6 +142,32 @@ def rsa_siggenpss_vectors(archive):
     return selected, skipped
 
 
+def rsa_keygen_vectors(archive):
+    """Sample public key validation across the 2048/3072-bit KeyGen records."""
+    groups = {2048: [], 3072: []}
+    skipped = {}
+    for index, (_, item) in enumerate(records(archive.read("KeyGen_186-3.rsp"))):
+        if not {"e", "p", "q", "n", "d"} <= item.keys():
+            continue
+        bits = len(item["n"]) * 4
+        if bits not in groups:
+            skipped[str(bits)] = skipped.get(str(bits), 0) + 1
+            continue
+        groups[bits].append((index, item))
+    selected = []
+    total_supported = sum(map(len, groups.values()))
+    for bits, entries in groups.items():
+        if not entries:
+            raise ValueError(f"RSA KeyGen: no {bits}-bit records")
+        for position in (0, len(entries) // 2, len(entries) - 1):
+            index, item = entries[position]
+            selected.append(" ".join((item["n"], item["e"], item["d"],
+                                      item["p"], item["q"], str(index))))
+    # Unselected supported records are explicitly sampled out, not executed.
+    skipped["supported records sampled out"] = total_supported - len(selected)
+    return selected, skipped
+
+
 def ecdsa_signature_vectors(archive, kind):
     member = f"186-4ecdsatestvectors/{'SigGen' if kind == 'siggen' else 'SigVer'}.rsp"
     selected, skipped = [], {}
@@ -201,9 +228,10 @@ def run_reader(reader, lines, skip, label, mode=None):
         path.write_text("\n".join(lines) + "\n", encoding="ascii")
         subprocess.run([reader, mode or ("--vectors" if label.startswith("ecdsa") else "--generation-vectors"),
                         str(path)], check=True)
-    print(f"{label}: executed {len(lines)}, unsupported {sum(skip.values())}")
+    skipped_label = "sampled out" if label == "rsa keygen" else "unsupported"
+    print(f"{label}: executed {len(lines)}, {skipped_label} {sum(skip.values())}")
     if skip:
-        print("  unsupported:", ", ".join(f"{key}={value}" for key, value in sorted(skip.items())))
+        print("  omitted:", ", ".join(f"{key}={value}" for key, value in sorted(skip.items())))
 
 
 def check_count(label, lines, skip):
@@ -220,6 +248,7 @@ if __name__ == "__main__":
     parser.add_argument("--ecdsa-signature-reader")
     parser.add_argument("--rsa-generation-reader")
     parser.add_argument("--rsa-signature-reader")
+    parser.add_argument("--rsa-keygen-reader")
     args = parser.parse_args()
     if args.ecdsa_archive:
         archive = check_archive(args.ecdsa_archive, ECDSA_SHA256)
@@ -258,3 +287,9 @@ if __name__ == "__main__":
             run_reader(args.rsa_generation_reader, lines, skip, "rsa siggenpss")
         else:
             print(f"rsa siggenpss: selected {len(lines)}, unsupported {sum(skip.values())}")
+        lines, skip = rsa_keygen_vectors(archive)
+        check_count("rsa keygen", lines, skip)
+        if args.rsa_keygen_reader:
+            run_reader(args.rsa_keygen_reader, lines, skip, "rsa keygen", "--vectors")
+        else:
+            print(f"rsa keygen: selected {len(lines)}, sampled out {sum(skip.values())}")

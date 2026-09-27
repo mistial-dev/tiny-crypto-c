@@ -225,6 +225,10 @@ if(TINY_CRYPTO_BUILD_TESTS)
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/nist_dss.py
           --rsa-archive ${TINY_CRYPTO_TEST_RSA_DSS_ARCHIVE}
           --rsa-signature-reader $<TARGET_FILE:test_rsa_signature_reader>)
+      add_test(NAME test_nist_dss_rsa_keygen_validation
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/nist_dss.py
+          --rsa-archive ${TINY_CRYPTO_TEST_RSA_DSS_ARCHIVE}
+          --rsa-keygen-reader $<TARGET_FILE:test_rsa_keygen_reader>)
     endif()
   endif()
   if(TINY_CRYPTO_TEST_EC_CAVP_ARCHIVE)
@@ -296,6 +300,8 @@ if(TINY_CRYPTO_BUILD_TESTS)
   target_compile_definitions(test_rsa_signature_reader_small PRIVATE TC_ENABLE_RSA=1 TC_RSA_SMALL=1)
   tc_add_c_test(test_rsa_generation_reader tiny-crypto-c-test tests/rsa/generation_reader.c src/rsa.c)
   target_compile_definitions(test_rsa_generation_reader PRIVATE TC_ENABLE_RSA=1)
+  tc_add_c_test(test_rsa_keygen_reader tiny-crypto-c-test tests/rsa/keygen_reader.c src/rsa.c)
+  target_compile_definitions(test_rsa_keygen_reader PRIVATE TC_ENABLE_RSA=1)
   target_compile_definitions(test_idf_signed_rsa PRIVATE TC_ENABLE_RSA=1)
   target_include_directories(test_idf_signed_rsa PRIVATE tests/esp_idf/include
     ports/esp-idf/vendor/bootloader_support/src/secure_boot_v2)

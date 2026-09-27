@@ -18,7 +18,9 @@ with leading zero padding; the test adapter passes their minimal magnitude
 to the public API. CAVP's `SaltVal = 00` denotes an empty PSS salt in its
 3072-bit zero-salt groups.
 
-RSA KeyGen's recorded seeds target NIST's own prime-generation methods. The
-library's generator uses a different candidate stream, so exact key output
-cannot be compared from those seeds. Key material in KeyGen remains a candidate
-for independent key-validation coverage.
+RSA KeyGen's recorded seeds target the CAVP `ProvRP`, conditioned-prime and
+probable-prime methods. The library's generator samples its own random
+candidates, so those seeds cannot reproduce the recorded keys. The optional
+runner validates six recorded private keys through the public API: the first,
+middle and last 2048-bit and 3072-bit record among 2,200 keys. The other
+2,194 records are sampled out to keep this primality-heavy test bounded.
