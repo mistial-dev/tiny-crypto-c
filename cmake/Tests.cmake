@@ -160,7 +160,9 @@ if(TINY_CRYPTO_BUILD_TESTS)
   endforeach()
   tc_add_test_library(tiny-crypto-c-test-sskdf src/common.c src/hash.c src/sha512.c src/hash_adapter.c src/sskdf.c)
   option(TINY_CRYPTO_TEST_EC_ORACLE "Compare EC with Python cryptography" OFF)
-  set(TINY_CRYPTO_TEST_WYCHEPROOF_ARCHIVE "" CACHE FILEPATH "Pinned C2SP Wycheproof archive")
+  set(TINY_CRYPTO_TEST_WYCHEPROOF_ARCHIVE
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/wycheproof.zip"
+    CACHE FILEPATH "Pinned C2SP Wycheproof archive")
   if(Python3_Interpreter_FOUND)
     add_test(NAME test_wycheproof_runner
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/wycheproof_test.py)
@@ -197,9 +199,15 @@ if(TINY_CRYPTO_BUILD_TESTS)
         --ecdsa-reader $<TARGET_FILE:test_ecdsa_reader_0>
         --ecdsa-reader $<TARGET_FILE:test_ecdsa_reader_1>)
   endif()
-  set(TINY_CRYPTO_TEST_EC_CAVP_ARCHIVE "" CACHE FILEPATH "NIST ECCCDH component test archive")
-  set(TINY_CRYPTO_TEST_ECDSA_DSS_ARCHIVE "" CACHE FILEPATH "Pinned NIST FIPS 186-4 ECDSA test archive")
-  set(TINY_CRYPTO_TEST_RSA_DSS_ARCHIVE "" CACHE FILEPATH "Pinned NIST FIPS 186-3 RSA test archive")
+  set(TINY_CRYPTO_TEST_EC_CAVP_ARCHIVE
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/nist_ecccdh.zip"
+    CACHE FILEPATH "NIST ECCCDH component test archive")
+  set(TINY_CRYPTO_TEST_ECDSA_DSS_ARCHIVE
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/nist_dss/186-4ecdsatestvectors.zip"
+    CACHE FILEPATH "Pinned NIST FIPS 186-4 ECDSA test archive")
+  set(TINY_CRYPTO_TEST_RSA_DSS_ARCHIVE
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/nist_dss/186-3rsatestvectors.zip"
+    CACHE FILEPATH "Pinned NIST FIPS 186-3 RSA test archive")
   if(TINY_CRYPTO_TEST_ECDSA_DSS_ARCHIVE OR TINY_CRYPTO_TEST_RSA_DSS_ARCHIVE)
     if(NOT Python3_Interpreter_FOUND)
       message(FATAL_ERROR "NIST DSS archive tests require Python 3")
@@ -890,11 +898,9 @@ if(TINY_CRYPTO_BUILD_TESTS)
   endif()
 
   tc_add_c_test(test_kmac tiny-crypto-c-test tests/kmac/test.c)
-  if(TINY_CRYPTO_TEST_FULL)
-    tc_add_c_test(test_kmac_acvp tiny-crypto-c-test tests/kmac/acvp.c)
-    target_compile_definitions(test_kmac_acvp PRIVATE
-      KMAC_ACVP_FILE="${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/kmac/acvp_kmac256_aft.tsv")
-  endif()
+  tc_add_c_test(test_kmac_acvp tiny-crypto-c-test tests/kmac/acvp.c)
+  target_compile_definitions(test_kmac_acvp PRIVATE
+    KMAC_ACVP_FILE="${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/kmac/acvp_kmac256_aft.tsv")
   tc_add_test_library(tiny-crypto-c-test-kmac-relaxed src/common.c src/kmac.c)
   target_compile_definitions(tiny-crypto-c-test-kmac-relaxed PUBLIC
     TC_ENABLE_KMAC256=1 TC_ENABLE_AES=0 TC_ENABLE_SHA256=0
@@ -1173,6 +1179,13 @@ if(TINY_CRYPTO_BUILD_TESTS)
 
   set(tc_extended_tests
     test_rsa_validation_1
+    test_nist_dss_ec_0
+    test_nist_dss_ec_1
+    test_nist_dss_ecdsa_signatures_0
+    test_nist_dss_ecdsa_signatures_1
+    test_nist_dss_rsa_generation
+    test_nist_dss_rsa_signatures
+    test_nist_dss_rsa_keygen_validation
     test_wycheproof_ec
     test_wycheproof_rsa_signatures
     test_wycheproof_rsa_oaep

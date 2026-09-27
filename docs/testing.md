@@ -52,14 +52,15 @@ make test-msan CC=clang CXX=clang++
 make test-msan-full CC=clang CXX=clang++ TINY_CRYPTO_TEST_FULL=ON
 ```
 
-`test-full` includes the checked-in NIST CAVP and Wycheproof vectors. External
-corpora below require their pinned archives. `test-sanitize` runs the core suite
+`test-full` includes the checked-in NIST CAVP, DSS, ECCCDH and Wycheproof
+vectors. External parser and capture corpora below require their own paths.
+`test-sanitize` runs the core suite
 with AddressSanitizer and UndefinedBehaviorSanitizer. `test-sanitize-full` also
 runs tests labelled `extended`, including exhaustive RSA and corpus cases. The
 MemorySanitizer targets use the same core and full split on Linux with Clang.
 
 Push CI runs the core sanitizer suite with GCC and Clang. The **Full test suite**
-GitHub Actions workflow runs the pinned Wycheproof and NIST ECDH archives in
+GitHub Actions workflow runs the vendored Wycheproof and NIST archives in
 release and sanitizer builds when started through `workflow_dispatch`.
 
 Use `act` to run the push sanitizer checks in Linux. `--bind` includes current
@@ -655,17 +656,11 @@ python3 tools/unicode_tables.py --data-dir "$unicode_dir" \
 
 ### Cryptographic vectors
 
-Keep downloads outside the repository. These adapters check the archive
-digests, so use the pinned Wycheproof revision rather than its main branch.
+The cryptographic archives live under `tests/vectors/` and their adapters
+check pinned digests. External parser corpora stay outside the repository.
 
 ```sh
 vector_dir=$(mktemp -d /tmp/tiny-crypto-vectors.XXXXXX)
-curl --fail --location \
-  https://codeload.github.com/C2SP/wycheproof/zip/3fa63dd0344abb611f1fb1d77e119938603ea230 \
-  -o "$vector_dir/wycheproof.zip"
-curl --fail --location \
-  https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/components/ecccdhtestvectors.zip \
-  -o "$vector_dir/ecccdh.zip"
 curl --fail --location \
   https://raw.githubusercontent.com/Mbed-TLS/mbedtls/091fd1b18806098d74bd58ace7aacb7f171bcb42/tests/suites/test_suite_asn1parse.data \
   -o "$vector_dir/asn1parse.data"
@@ -682,8 +677,6 @@ cmake -S . -B /tmp/tiny-crypto-full \
   -DTINY_CRYPTO_TEST_FULL=ON \
   -DTINY_CRYPTO_TEST_OPENSSL=ON \
   -DTINY_CRYPTO_SANITIZE=address,undefined \
-  -DTINY_CRYPTO_TEST_WYCHEPROOF_ARCHIVE="$vector_dir/wycheproof.zip" \
-  -DTINY_CRYPTO_TEST_EC_CAVP_ARCHIVE="$vector_dir/ecccdh.zip" \
   -DTINY_CRYPTO_TLV_MBEDTLS_SUITE="$vector_dir/asn1parse.data" \
   -DTINY_CRYPTO_TLV_CORPUS="/absolute/path/to/parser-corpus" \
   -DTINY_CRYPTO_TEST_SM_CAPTURE_DIR="/absolute/path/to/sm_vci_vectors"
@@ -701,6 +694,22 @@ Also check for `test_wycheproof_ecdsa`, `test_wycheproof_rsa_signatures`,
 `test_wycheproof_rsa_generation`, `test_wycheproof_primality`,
 `test_wycheproof_rsa_oaep`, `test_cms_native`, and the OpenSSL RSA private-operation
 tests. On macOS, this configuration includes `test_twic_authenticate_command`.
+
+The vendored FIPS 186 archives enable `test_nist_dss_*`. ECDSA tests cover
+supported public-key, signature, and key-pair records;
+RSA tests cover signature generation and verification. The default RSA KeyGen
+test validates a fixed- and a varying-exponent key in each of 14 supported
+method and modulus groups, for 28 records. Run
+`python3 tests/nist_dss.py --rsa-archive tests/vectors/nist_dss/186-3rsatestvectors.zip
+--rsa-keygen-reader /absolute/path/to/build/test_rsa_keygen_reader --rsa-keygen-all`
+to validate all 2,200 recorded keys; this takes hours. CAVP's seed-to-key
+candidate methods differ from the library's generator, so these records check
+private-key validation rather than deterministic replay.
+
+The default `test_sskdf` includes 18 NIST KAS SHA-256/384 single-step answers.
+`test_kmac_acvp` includes the byte-aligned NIST ACVP case and six independently
+computed OpenSSL answers with customization and odd byte output lengths. The
+public KMAC API measures output in bytes and cannot represent bit-length tags.
 
 To repeat a configured suite, including its external vectors:
 
@@ -732,8 +741,9 @@ The even prime 2 is outside that API's odd-candidate domain.
 KMAC256 runs the no-customization suite in strict and relaxed builds. Valid
 tags must match the digest; invalid tags must differ. These are digest
 comparisons, not tests of a tag-verification API.
-`test_kmac_acvp` checks a separate fixed-output, byte-aligned NIST ACVP-Server
-sample with a 512-byte key and nonempty customization.
+`test_kmac_acvp` checks one fixed-output, byte-aligned NIST ACVP-Server sample
+with a 512-byte key and six independent OpenSSL answers with customization and
+odd byte output lengths.
 
 Dynamic AES-CMAC runs all three key sizes, checks invalid-key rejection, and
 compares valid and invalid tags. HMAC runs SHA-1/224/256/384/512 through the
