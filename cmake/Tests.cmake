@@ -6,6 +6,11 @@ if(TINY_CRYPTO_BUILD_TESTS)
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
   set(CMAKE_CXX_EXTENSIONS OFF)
   enable_testing()
+  if(CMAKE_NM AND NOT MSVC)
+    add_test(NAME test_heap_free COMMAND ${CMAKE_COMMAND}
+      -DNM=${CMAKE_NM} -DARCHIVE=$<TARGET_FILE:tiny-crypto-c>
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/heap_free.cmake)
+  endif()
   # Direct-source consumers compile disabled translation units too.
   file(GLOB tc_direct_sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c")
   foreach(feature AES TLV EC RSA)
