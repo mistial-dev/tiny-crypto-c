@@ -142,28 +142,46 @@ def rsa_siggenpss_vectors(archive):
     return selected, skipped
 
 
-def rsa_keygen_vectors(archive):
-    """Sample public key validation across the 2048/3072-bit KeyGen records."""
-    groups = {2048: [], 3072: []}
+def rsa_keygen_vectors(archive, exhaustive=False):
+    """Validate fixed and varying exponents in each group, or every key."""
+    groups = {}
     skipped = {}
-    for index, (_, item) in enumerate(records(archive.read("KeyGen_186-3.rsp"))):
+    for index, (section, item) in enumerate(records(archive.read("KeyGen_186-3.rsp"))):
         if not {"e", "p", "q", "n", "d"} <= item.keys():
-            continue
+            raise ValueError(f"RSA KeyGen record {index}: missing key material")
         bits = len(item["n"]) * 4
-        if bits not in groups:
+        if bits not in (2048, 3072):
             skipped[str(bits)] = skipped.get(str(bits), 0) + 1
             continue
-        groups[bits].append((index, item))
+        if section not in {"hash = SHA1", "hash = SHA224", "hash = SHA256",
+                           "hash = SHA384", "hash = SHA512",
+                           "Table for M-R Test = C.2", "Table for M-R Test = C.3"}:
+            raise ValueError(f"RSA KeyGen record {index}: unknown method {section}")
+        groups.setdefault((bits, section), []).append((index, item))
+    if len(groups) != 14:
+        raise ValueError(f"RSA KeyGen: expected 14 supported groups, found {len(groups)}")
     selected = []
     total_supported = sum(map(len, groups.values()))
-    for bits, entries in groups.items():
-        if not entries:
-            raise ValueError(f"RSA KeyGen: no {bits}-bit records")
-        for position in (0, len(entries) // 2, len(entries) - 1):
+    for (bits, section), entries in groups.items():
+        expected_group_size = 300 if section.startswith("Table for M-R Test") else 100
+        if len(entries) != expected_group_size:
+            raise ValueError(f"RSA KeyGen: {bits}, {section} has {len(entries)} records")
+        if exhaustive:
+            positions = range(len(entries))
+        else:
+            # CAVP interleaves fixed- and varying-exponent blocks.
+            fixed_exponent = entries[0][1]["e"]
+            if int(fixed_exponent, 16) != 0x100000001:
+                raise ValueError(f"RSA KeyGen: unexpected fixed exponent in {bits}, {section}")
+            varying = next((position for position, (_, item) in enumerate(entries)
+                            if item["e"] != fixed_exponent), None)
+            if varying is None:
+                raise ValueError(f"RSA KeyGen: no varying exponent in {bits}, {section}")
+            positions = (0, varying)
+        for position in positions:
             index, item = entries[position]
             selected.append(" ".join((item["n"], item["e"], item["d"],
                                       item["p"], item["q"], str(index))))
-    # Unselected supported records are explicitly sampled out, not executed.
     skipped["supported records sampled out"] = total_supported - len(selected)
     return selected, skipped
 
@@ -249,6 +267,8 @@ if __name__ == "__main__":
     parser.add_argument("--rsa-generation-reader")
     parser.add_argument("--rsa-signature-reader")
     parser.add_argument("--rsa-keygen-reader")
+    parser.add_argument("--rsa-keygen-all", action="store_true",
+                        help="validate all 2,200 CAVP KeyGen private keys (takes hours)")
     args = parser.parse_args()
     if args.ecdsa_archive:
         archive = check_archive(args.ecdsa_archive, ECDSA_SHA256)
@@ -287,7 +307,7 @@ if __name__ == "__main__":
             run_reader(args.rsa_generation_reader, lines, skip, "rsa siggenpss")
         else:
             print(f"rsa siggenpss: selected {len(lines)}, unsupported {sum(skip.values())}")
-        lines, skip = rsa_keygen_vectors(archive)
+        lines, skip = rsa_keygen_vectors(archive, args.rsa_keygen_all)
         check_count("rsa keygen", lines, skip)
         if args.rsa_keygen_reader:
             run_reader(args.rsa_keygen_reader, lines, skip, "rsa keygen", "--vectors")

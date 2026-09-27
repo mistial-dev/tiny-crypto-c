@@ -863,6 +863,32 @@ static MunitResult test_des_secure_zero_and_clear(const MunitParameter params[],
 
 /* --- Test Suite Setup --- */
 
+#if TC_DES_ENABLE_CBC && TC_DES_ENABLE_ISO9797
+#include "../vectors/des/iso9797/annex_b_algorithm1.h"
+static MunitResult test_iso9797_annex_b_algorithm1(const MunitParameter params[], void* data)
+{
+  static const uint8_t key[8] = {0x01,0x23,0x45,0x67,0x89,0xab,0xcd,0xef};
+  static const uint8_t zero_iv[8] = {0};
+  (void)params; (void)data;
+  for (size_t i = 0; i < sizeof iso9797_annex_b_alg1 / sizeof iso9797_annex_b_alg1[0]; ++i) {
+    uint8_t blocks[32] = {0};
+    struct TC_DES_ctx ctx;
+    size_t offset = iso9797_annex_b_alg1[i].padding == 3 ? 8 : 0;
+    size_t length = iso9797_annex_b_alg1[i].padding == 3 ||
+        (iso9797_annex_b_alg1[i].padding == 2 && iso9797_annex_b_alg1[i].message_length == 24) ? 32 : 24;
+    if (offset) blocks[7] = (uint8_t)(iso9797_annex_b_alg1[i].message_length * 8);
+    memcpy(blocks + offset,iso9797_annex_b_alg1[i].message,iso9797_annex_b_alg1[i].message_length);
+    if (iso9797_annex_b_alg1[i].padding == 2)
+      blocks[offset + iso9797_annex_b_alg1[i].message_length] = 0x80;
+    munit_assert_int(TC_DES_init_ctx_iv(&ctx,key,zero_iv),==,TC_OK);
+    munit_assert_int(TC_DES_CBC_encrypt(&ctx,blocks,length),==,TC_OK);
+    munit_assert_memory_equal(8,blocks + length - 8,iso9797_annex_b_alg1[i].chaining_value);
+    TC_DES_ctx_clear(&ctx);
+  }
+  return MUNIT_OK;
+}
+#endif
+
 #if TC_DES_ENABLE_ISO9797
 static MunitResult test_des_iso9797(const MunitParameter params[], void* data)
 {
@@ -1026,6 +1052,9 @@ static MunitTest test_suite_tests[] = {
 #endif
 #if TC_DES_ENABLE_ISO9797
   { "/des_iso9797",                       test_des_iso9797,                       NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL },
+#endif
+#if TC_DES_ENABLE_CBC && TC_DES_ENABLE_ISO9797
+  { "/iso9797_annex_b_algorithm1",        test_iso9797_annex_b_algorithm1,        NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL },
 #endif
   { "/des_api_errors",                    test_des_api_errors,                    NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL },
   { "/des_secure_zero_and_clear",         test_des_secure_zero_and_clear,         NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL },

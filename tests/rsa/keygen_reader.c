@@ -61,6 +61,12 @@ static MunitResult vectors(const MunitParameter params[], void* data)
     TC_RSA_result result = TC_RSA_validate_private_key(&key,&workspace,&execution);
     if (result != TC_RSA_OK)
       munit_errorf("NIST RSA KeyGen record %s: status %d",fields[5],result);
+    if (count == 0) {
+      p[pl - 1] ^= 1u;
+      result = TC_RSA_validate_private_key(&key,&workspace,&execution);
+      munit_assert_int(result,!=,TC_RSA_OK);
+      p[pl - 1] ^= 1u;
+    }
     ++count;
   }
   munit_assert_int(ferror(file),==,0);

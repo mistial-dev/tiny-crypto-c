@@ -9,6 +9,44 @@ typedef TC_status (*derive_fn)(const uint8_t*, size_t, const TC_bytes*, size_t, 
 static const derive_fn functions[] = {TC_SSKDF_SHA256, TC_SSKDF_SHA384};
 static char** capture;
 
+typedef struct {
+  unsigned hash_bits;
+  const char* z;
+  const char* other_info;
+  const char* dkm;
+} nist_kas_vector;
+
+static const nist_kas_vector nist_kas_vectors[] = {
+#include "../vectors/kda/nist_kas_2014.inc"
+};
+
+static MunitResult nist_kas_answers(const MunitParameter params[], void* user)
+{
+  uint8_t z[512], other[256], expected[64], output[65];
+  size_t i;
+  (void)params; (void)user;
+  for (i = 0; i < sizeof nist_kas_vectors / sizeof nist_kas_vectors[0]; ++i) {
+    const nist_kas_vector* vector = &nist_kas_vectors[i];
+    size_t z_len = tc_test_decode_hex(vector->z, z, sizeof z);
+    size_t info_len = tc_test_decode_hex(vector->other_info, other, sizeof other);
+    size_t output_len = tc_test_decode_hex(vector->dkm, expected, sizeof expected);
+    size_t hash = vector->hash_bits == 256 ? 0 : 1;
+    TC_bytes info[] = {{other, info_len / 2}, {other + info_len / 2, info_len - info_len / 2}};
+    munit_assert_true(vector->hash_bits == 256 || vector->hash_bits == 384);
+    munit_assert_size(z_len, >, 0);
+    munit_assert_size(z_len, <=, sizeof z);
+    munit_assert_size(info_len, >, 0);
+    munit_assert_size(info_len, <=, sizeof other);
+    munit_assert_size(output_len, >, 0);
+    munit_assert_size(output_len, <, sizeof output);
+    memset(output, 0xa5, sizeof output);
+    munit_assert_int(functions[hash](z, z_len, info, 2, output, output_len), ==, TC_OK);
+    munit_assert_memory_equal(output_len, output, expected);
+    munit_assert_uint8(output[output_len], ==, 0xa5);
+  }
+  return MUNIT_OK;
+}
+
 static MunitResult captured_answer(const MunitParameter params[], void* user)
 {
   uint8_t z[48], other[256], expected[192], output[192];
@@ -94,6 +132,7 @@ static MunitResult invalid_arguments(const MunitParameter params[], void* user)
 }
 
 static MunitTest tests[] = {
+  {"/nist-kas-2014", nist_kas_answers, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {"/captured-answer", captured_answer, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {"/known-answers", known_answers, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {"/invalid-arguments", invalid_arguments, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

@@ -1,6 +1,6 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
-/* NIST ACVP-Server KMAC-256 fixed-output AFT, tgId 4, tcId 307. */
+/* Pinned NIST ACVP and independently computed OpenSSL KMAC-256 answers. */
 #include <tiny_crypto/kmac.h>
 #include "munit.h"
 #include "test_util.h"
@@ -11,37 +11,51 @@
 #error "KMAC_ACVP_FILE is required"
 #endif
 
+static size_t read_hex(const char* field, uint8_t* output, size_t capacity)
+{
+  return strcmp(field,"-") == 0 ? 0 : tc_test_decode_hex(field,output,capacity);
+}
+
 static MunitResult fixed_output(const MunitParameter params[], void* user)
 {
-  char line[2048];
-  uint8_t key[512], message[64], custom[128], expected[32], actual[32];
+  char line[4096];
+  uint8_t key[512], message[512], custom[128], expected[512], actual[512];
   FILE* file = fopen(KMAC_ACVP_FILE,"r");
+  unsigned cases = 0, odd_output_lengths = 0, customized = 0;
   (void)params; (void)user;
   munit_assert_not_null(file);
-  munit_assert_not_null(fgets(line,sizeof line,file));
-  munit_assert_null(fgets(line,sizeof line,file));
+  while (fgets(line,sizeof line,file)) {
+    char* fields[5];
+    char* token;
+    size_t key_length, message_length, custom_length, tag_length;
+    if (line[0] == '#' || line[0] == '\n') continue;
+    munit_assert_not_null(strchr(line,'\n'));
+    token = strtok(line," \t\r\n");
+    for (size_t i = 0; i < 5; ++i) {
+      munit_assert_not_null(token);
+      fields[i] = token;
+      token = strtok(NULL," \t\r\n");
+    }
+    munit_assert_null(token);
+    key_length = read_hex(fields[0],key,sizeof key);
+    message_length = read_hex(fields[1],message,sizeof message);
+    custom_length = read_hex(fields[2],custom,sizeof custom);
+    tag_length = read_hex(fields[3],expected,sizeof expected);
+    munit_assert_size(key_length,>,0);
+    munit_assert_size(tag_length,>,0);
+    munit_assert_int(TC_KMAC256_digest(key,key_length,message,message_length,
+        custom,custom_length,actual,tag_length),==,TC_OK);
+    if (memcmp(actual,expected,tag_length))
+      munit_errorf("KMAC-256 vector %s: incorrect tag",fields[4]);
+    ++cases;
+    odd_output_lengths += (unsigned)(tag_length % 2 != 0);
+    customized += (unsigned)(custom_length != 0);
+  }
   munit_assert_int(ferror(file),==,0);
   munit_assert_int(fclose(file),==,0);
-  char* fields[5];
-  char* token = strtok(line," \t\r\n");
-  for (size_t i = 0; i < 5; ++i) {
-    munit_assert_not_null(token);
-    fields[i] = token;
-    token = strtok(NULL," \t\r\n");
-  }
-  munit_assert_null(token);
-  munit_assert_string_equal(fields[4],"307");
-  const size_t key_length = tc_test_decode_hex(fields[0],key,sizeof key);
-  const size_t message_length = tc_test_decode_hex(fields[1],message,sizeof message);
-  const size_t custom_length = tc_test_decode_hex(fields[2],custom,sizeof custom);
-  const size_t tag_length = tc_test_decode_hex(fields[3],expected,sizeof expected);
-  munit_assert_size(key_length,==,512);
-  munit_assert_size(message_length,==,8);
-  munit_assert_size(custom_length,==,41);
-  munit_assert_size(tag_length,==,32);
-  munit_assert_int(TC_KMAC256_digest(key,key_length,message,message_length,
-      custom,custom_length,actual,tag_length),==,TC_OK);
-  munit_assert_memory_equal(tag_length,actual,expected);
+  munit_assert_uint(cases,==,7);
+  munit_assert_uint(odd_output_lengths,==,6);
+  munit_assert_uint(customized,==,6);
   return MUNIT_OK;
 }
 
