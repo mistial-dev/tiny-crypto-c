@@ -741,7 +741,9 @@ static int cavp_run_gcm_decrypt_record(
   if (ct_len != 0)
     memcpy(output, ct, ct_len);
   cavp_initialize_sbox();
-  init_result = TC_AES_GCM_init(&ctx, key, iv, iv_len, tag_len);
+  init_result = tag_len < 12 ?
+                TC_AES_GCM_init_short_tag(&ctx, key, iv, iv_len, tag_len) :
+                TC_AES_GCM_init(&ctx, key, iv, iv_len, tag_len);
   aad_result = init_result == TC_OK ?
                TC_AES_GCM_aad_update(&ctx, aad, aad_len) : TC_ERROR;
   update_result = aad_result == TC_OK ?
@@ -846,7 +848,9 @@ static int cavp_run_gcm_file(const char* filename)
         if (pt_len != 0)
           memcpy(output, pt, pt_len);
         cavp_initialize_sbox();
-        result = TC_AES_GCM_init(&ctx, key, iv, iv_len, tag_len);
+        result = tag_len < 12 ?
+                 TC_AES_GCM_init_short_tag(&ctx, key, iv, iv_len, tag_len) :
+                 TC_AES_GCM_init(&ctx, key, iv, iv_len, tag_len);
         if (result == TC_OK) result = TC_AES_GCM_aad_update(&ctx, aad, aad_len);
         if (result == TC_OK) result = TC_AES_GCM_encrypt_update(&ctx, output, pt_len);
         if (result == TC_OK) result = TC_AES_GCM_encrypt_finish(&ctx, actual_tag);

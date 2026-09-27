@@ -5,6 +5,7 @@
 #error "Use kmac.h in C projects"
 #endif
 #include <tiny_crypto/kmac.h>
+#include <tiny_crypto/common.hpp>
 #if TC_ENABLE_KMAC256
 namespace tiny_crypto {
 class KMAC256 {
@@ -14,7 +15,7 @@ public:
   KMAC256(const KMAC256&) = delete;
   KMAC256& operator=(const KMAC256&) = delete;
   ~KMAC256() { clear(); }
-  TC_status init(const uint8_t* key, size_t key_len,
+  TC_CPP_NODISCARD TC_status init(const uint8_t* key, size_t key_len,
                  const uint8_t* custom = nullptr, size_t custom_len = 0) {
     return TC_KMAC256_init(&ctx_, key, key_len, custom, custom_len);
   }

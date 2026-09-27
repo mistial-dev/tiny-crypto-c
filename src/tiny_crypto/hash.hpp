@@ -180,13 +180,13 @@ public:
     basic_hmac(const basic_hmac&) = delete;
     basic_hmac& operator=(const basic_hmac&) = delete;
 
-    TC_status init(const uint8_t* key, size_t key_len) {
+    TC_CPP_NODISCARD TC_status init(const uint8_t* key, size_t key_len) {
         const TC_status status = Traits::init(&ctx_, key, key_len);
         active_ = status == TC_OK;
         return status;
     }
     template <size_t N>
-    TC_status init(const uint8_t (&key)[N]) { return init(key, N); }
+    TC_CPP_NODISCARD TC_status init(const uint8_t (&key)[N]) { return init(key, N); }
 
     TC_status update(const uint8_t* data, size_t length) {
         return active_ ? Traits::update(&ctx_, data, length) : TC_ERROR;

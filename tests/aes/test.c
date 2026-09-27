@@ -121,6 +121,48 @@ static MunitResult test_key_schedule(const MunitParameter params[], void* data)
   return MUNIT_OK;
 }
 
+static MunitResult test_invalid_key_state(const MunitParameter params[], void* data)
+{
+  struct TC_AES_ctx ctx = {0};
+  struct TC_AES_key_ctx key = {0};
+  uint8_t block[TC_AES_BLOCKLEN] = {1};
+  uint8_t saved[TC_AES_BLOCKLEN];
+  (void)params;
+  (void)data;
+  test_initialize_sbox();
+  memcpy(saved, block, sizeof block);
+#if TC_AES_ENABLE_ECB
+  munit_assert_int(TC_AES_ECB_encrypt(&key, block), ==, TC_ERROR);
+  munit_assert_memory_equal(sizeof block, block, saved);
+#endif
+#if TC_AES_ENABLE_CBC
+  munit_assert_int(TC_AES_CBC_encrypt(&ctx, block, sizeof block), ==, TC_ERROR);
+  munit_assert_int(TC_AES_CBC_encrypt(&ctx, NULL, 0), ==, TC_ERROR);
+#endif
+#if TC_AES_ENABLE_CTR
+  munit_assert_int(TC_AES_CTR_crypt(&ctx, block, sizeof block), ==, TC_ERROR);
+#endif
+#if TC_AES_ENABLE_OFB
+  munit_assert_int(TC_AES_OFB_crypt(&ctx, block, sizeof block), ==, TC_ERROR);
+#endif
+  munit_assert_memory_equal(sizeof block, block, saved);
+  munit_assert_int(TC_AES_key_init(&key, TEST_KEY), ==, TC_OK);
+  TC_AES_key_ctx_clear(&key);
+#if TC_AES_ENABLE_ECB
+  munit_assert_int(TC_AES_ECB_encrypt(&key, block), ==, TC_ERROR);
+#endif
+  munit_assert_int(TC_AES_init_ctx(&ctx, TEST_KEY), ==, TC_OK);
+  TC_AES_ctx_clear(&ctx);
+#if TC_AES_ENABLE_CTR
+  munit_assert_int(TC_AES_CTR_crypt(&ctx, block, 1), ==, TC_ERROR);
+#endif
+  munit_assert_int(TC_AES_init_ctx(&ctx, NULL), ==, TC_ERROR);
+#if TC_AES_ENABLE_CBC
+  munit_assert_int(TC_AES_CBC_decrypt(&ctx, block, sizeof block), ==, TC_ERROR);
+#endif
+  return MUNIT_OK;
+}
+
 static MunitResult test_secure_zero_and_clear(const MunitParameter params[],
                                               void* data)
 {
@@ -619,6 +661,17 @@ static MunitResult test_gcm(const MunitParameter params[], void* data)
   (void) data;
 
   test_initialize_sbox();
+  memset(&ctx, 0, sizeof ctx);
+  memcpy(buffer, vector->ciphertext, vector->length);
+  munit_assert_int(TC_AES_GCM_decrypt_update(&ctx, buffer, vector->length), ==, TC_ERROR);
+  munit_assert_int(TC_AES_GCM_decrypt_finish(&ctx, vector->tag), ==, TC_ERROR);
+  munit_assert_memory_equal(vector->length, buffer, vector->ciphertext);
+  TC_AES_GCM_clear(&ctx);
+  munit_assert_int(TC_AES_GCM_decrypt_finish(&ctx, vector->tag), ==, TC_ERROR);
+  munit_assert_int(TC_AES_GCM_init(&ctx, vector->key, vector->iv, 0,
+                                   vector->tag_len), ==, TC_ERROR);
+  munit_assert_int(TC_AES_GCM_decrypt_finish(&ctx, vector->tag), ==, TC_ERROR);
+
   memcpy(buffer, vector->plaintext, vector->length);
   munit_assert_int(TC_AES_GCM_init(&ctx, vector->key, vector->iv, vector->iv_len,
                                 vector->tag_len), ==, TC_OK);
@@ -631,18 +684,43 @@ static MunitResult test_gcm(const MunitParameter params[], void* data)
   munit_assert_memory_equal(vector->tag_len, tag, vector->tag);
 
   /* Fixed t=4 for this key/context; MSBt of the 128-bit tag. */
-  munit_assert_int(TC_AES_GCM_init(&ctx, vector->key, vector->iv, vector->iv_len, 4),
+  munit_assert_int(TC_AES_GCM_init_short_tag(&ctx, vector->key, vector->iv,
+                                             vector->iv_len, 4),
                    ==, TC_OK);
   munit_assert_int(TC_AES_GCM_aad_update(&ctx, vector->aad, vector->aad_len), ==, TC_OK);
   memcpy(buffer, vector->plaintext, vector->length);
   munit_assert_int(TC_AES_GCM_encrypt_update(&ctx, buffer, vector->length), ==, TC_OK);
   munit_assert_int(TC_AES_GCM_encrypt_finish(&ctx, short_tag), ==, TC_OK);
   munit_assert_memory_equal(sizeof(short_tag), short_tag, vector->tag);
+  munit_assert_int(TC_AES_GCM_init(&ctx, vector->key, vector->iv,
+                                   vector->iv_len, 4), ==, TC_ERROR);
+  munit_assert_int(TC_AES_GCM_encrypt(vector->key, vector->iv, vector->iv_len,
+                                      vector->aad, vector->aad_len,
+                                      vector->plaintext, vector->length,
+                                      buffer, short_tag, 4), ==, TC_ERROR);
+  munit_assert_int(TC_AES_GCM_encrypt_short_tag(vector->key, vector->iv,
+                                                vector->iv_len, vector->aad,
+                                                vector->aad_len, vector->plaintext,
+                                                vector->length, buffer,
+                                                short_tag, 4), ==, TC_OK);
+  munit_assert_memory_equal(vector->length, buffer, vector->ciphertext);
+  munit_assert_int(TC_AES_GCM_decrypt(vector->key, vector->iv, vector->iv_len,
+                                      vector->aad, vector->aad_len,
+                                      buffer, vector->length, short_tag, 4,
+                                      buffer), ==, TC_ERROR);
+  munit_assert_int(TC_AES_GCM_decrypt_short_tag(vector->key, vector->iv,
+                                                vector->iv_len, vector->aad,
+                                                vector->aad_len, buffer,
+                                                vector->length, short_tag, 4,
+                                                buffer), ==, TC_OK);
+  munit_assert_memory_equal(vector->length, buffer, vector->plaintext);
+  memcpy(buffer, vector->ciphertext, vector->length);
 
   munit_assert_int(TC_AES_GCM_init(&ctx, vector->key, vector->iv, vector->iv_len,
                                 vector->tag_len), ==, TC_OK);
   munit_assert_int(TC_AES_GCM_aad_update(&ctx, vector->aad, vector->aad_len), ==, TC_OK);
   munit_assert_int(TC_AES_GCM_decrypt_update(&ctx, buffer, vector->length), ==, TC_OK);
+  munit_assert_memory_equal(vector->length, buffer, vector->ciphertext);
   munit_assert_int(TC_AES_GCM_decrypt_finish(&ctx, tag), ==, TC_OK);
   munit_assert_memory_equal(vector->length, buffer, vector->plaintext);
 
@@ -654,6 +732,7 @@ static MunitResult test_gcm(const MunitParameter params[], void* data)
   munit_assert_int(TC_AES_GCM_aad_update(&ctx, vector->aad, vector->aad_len), ==, TC_OK);
   munit_assert_int(TC_AES_GCM_decrypt_update(&ctx, buffer, vector->length), ==, TC_OK);
   munit_assert_int(TC_AES_GCM_decrypt_finish(&ctx, bad_tag), ==, TC_MISMATCH);
+  munit_assert_memory_equal(vector->length, buffer, vector->ciphertext);
   munit_assert_int(TC_AES_GCM_aad_update(&ctx, vector->aad, 1), ==, TC_ERROR);
 
   /* Reject invalid tag lengths at init (SP 800-38D). */
@@ -661,6 +740,8 @@ static MunitResult test_gcm(const MunitParameter params[], void* data)
                    ==, TC_ERROR);
   munit_assert_int(TC_AES_GCM_init(&ctx, vector->key, vector->iv, vector->iv_len, 5),
                    ==, TC_ERROR);
+  munit_assert_int(TC_AES_GCM_init(&ctx, vector->key, vector->iv,
+                                  vector->iv_len, 4), ==, TC_ERROR);
   munit_assert_int(TC_AES_GCM_init(&ctx, vector->key, vector->iv, vector->iv_len, 17),
                    ==, TC_ERROR);
 
@@ -882,6 +963,7 @@ static MunitTest test_suite_tests[] = {
 #endif
   { "/secure-zero-clear", test_secure_zero_and_clear, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL },
   { "/key-schedule", test_key_schedule, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL },
+  { "/invalid-key-state", test_invalid_key_state, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL },
 #if defined(TC_AES_ENABLE_ECB) && (TC_AES_ENABLE_ECB == 1)
   { "/ecb", test_ecb, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL },
 #endif

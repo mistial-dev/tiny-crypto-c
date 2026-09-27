@@ -33,7 +33,6 @@ static MunitResult failures(const MunitParameter params[], void* user)
   (void)params; (void)user;
   memset(expected, 0x5a, sizeof expected);
   memset(&failed_fixed, 0, sizeof failed_fixed);
-  failed_fixed.buf_len = 17;
   for (stage = 1; stage <= 4; ++stage) {
     TC_status status;
     calls = 0; fail_at = stage;
@@ -266,6 +265,7 @@ static MunitResult gcm_failures(const MunitParameter params[], void* user)
     calls = 0;
     memcpy(output, ciphertext, sizeof output);
     status = TC_AES_GCM_init(&ctx, key, iv, sizeof iv, sizeof tag);
+    if (status == TC_OK) status = TC_AES_GCM_aad_update(&ctx, plain, sizeof plain);
     if (status == TC_OK) status = TC_AES_GCM_decrypt_update(&ctx, output, 1);
     if (status == TC_OK) status = TC_AES_GCM_decrypt_update(&ctx, output + 1, sizeof output - 1);
     if (status == TC_OK) status = TC_AES_GCM_decrypt_finish(&ctx, tag);

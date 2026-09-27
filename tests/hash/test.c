@@ -159,10 +159,14 @@ MunitResult test_cavp_hmac(const MunitParameter params[], void* data);
     munit_assert_int(TC_SHA##N##_final(&ctx, out), ==, TC_OK); \
     munit_assert_memory_equal(TC_SHA##N##_DIGESTLEN, out, fips_abc_sha##N); \
     TC_SHA_ASSERT_CLEARED(ctx); \
+    munit_assert_int(TC_SHA##N##_update(&ctx, fips_abc_msg, 1), ==, TC_ERROR); \
+    munit_assert_int(TC_SHA##N##_final(&ctx, out), ==, TC_ERROR); \
     TC_SHA##N##_init(&ctx); \
     munit_assert_int(TC_SHA##N##_update(&ctx, fips_abc_msg, FIPS_ABC_LEN), ==, TC_OK); \
     TC_SHA##N##_ctx_clear(&ctx); \
     munit_assert_true(tc_test_all_zero(&ctx, sizeof(ctx))); \
+    munit_assert_int(TC_SHA##N##_update(&ctx, fips_abc_msg, 1), ==, TC_ERROR); \
+    munit_assert_int(TC_SHA##N##_final(&ctx, out), ==, TC_ERROR); \
     TC_SHA##N##_ctx_clear(NULL); \
     munit_assert_int(TC_SHA##N##_digest(NULL, 1, out), ==, TC_ERROR); \
     munit_assert_int(TC_SHA##N##_digest(fips_abc_msg, 1, NULL), ==, TC_ERROR); \

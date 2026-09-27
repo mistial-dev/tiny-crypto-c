@@ -551,14 +551,24 @@ MunitResult test_hmac_streaming(const MunitParameter params[], void* data)
     munit_assert_int(TC_HMAC_SHA256_update(&ctx, msg + split, sizeof(msg) - split), ==, TC_OK);
     munit_assert_int(TC_HMAC_SHA256_final(&ctx, tag), ==, TC_OK);
     munit_assert_memory_equal(TC_SHA256_DIGESTLEN, tag, expected);
+    munit_assert_int(TC_HMAC_SHA256_update(&ctx, msg, 1), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA256_final(&ctx, tag), ==, TC_ERROR);
   }
   {
     struct TC_HMAC_SHA256_ctx ctx;
+    memset(&ctx, 0, sizeof ctx);
+    munit_assert_int(TC_HMAC_SHA256_update(&ctx, msg, 1), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA256_final(&ctx, tag), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA256_init(&ctx, NULL, 1), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA256_final(&ctx, tag), ==, TC_ERROR);
     munit_assert_int(TC_HMAC_SHA256_digest(key, sizeof(key), NULL, 0, expected, TC_SHA256_DIGESTLEN), ==, TC_OK);
     munit_assert_int(TC_HMAC_SHA256_init(&ctx, key, sizeof(key)), ==, TC_OK);
     munit_assert_int(TC_HMAC_SHA256_update(&ctx, NULL, 0), ==, TC_OK);
     munit_assert_int(TC_HMAC_SHA256_final(&ctx, tag), ==, TC_OK);
     munit_assert_memory_equal(TC_SHA256_DIGESTLEN, tag, expected);
+    TC_HMAC_SHA256_ctx_clear(&ctx);
+    munit_assert_int(TC_HMAC_SHA256_update(&ctx, msg, 1), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA256_final(&ctx, tag), ==, TC_ERROR);
 #if TC_STRICT
     munit_assert_int(TC_HMAC_SHA256_update(NULL, msg, 1), ==, TC_ERROR);
     munit_assert_int(TC_HMAC_SHA256_update(&ctx, NULL, 1), ==, TC_ERROR);

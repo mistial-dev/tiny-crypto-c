@@ -3,9 +3,10 @@
 
 #if defined(TC_AES_ENABLE_GCM) && (TC_AES_ENABLE_GCM == 1)
 
-#define TC_AES_GCM_PHASE_AAD   0u
-#define TC_AES_GCM_PHASE_TEXT  1u
-#define TC_AES_GCM_PHASE_FINAL 2u
+#define TC_AES_GCM_PHASE_UNINIT 0u
+#define TC_AES_GCM_PHASE_AAD    1u
+#define TC_AES_GCM_PHASE_TEXT   2u
+#define TC_AES_GCM_PHASE_FINAL  3u
 #define TC_AES_GCM_DIRECTION_NONE    0u
 #define TC_AES_GCM_DIRECTION_ENCRYPT 1u
 #define TC_AES_GCM_DIRECTION_DECRYPT 2u
@@ -267,15 +268,11 @@ static void tc_aes_gcm_finish_ghash(struct TC_AES_GCM_ctx* ctx)
   tc_aes_gcm_ghash_block(ctx, length_block);
 }
 
-/*
- * SP 800-38D §5.2.1.2: t ∈ {128,120,112,104,96,64,32} bits only.
- * Fixed for the key for the life of the context (set at init).
- */
-static int tc_aes_gcm_tag_length_is_valid(size_t tag_len)
+/* SP 800-38D §5.2.1.2 permits these lengths. Short tags need explicit use. */
+static int tc_aes_gcm_tag_length_is_allowed(size_t tag_len, int short_tag)
 {
-  return tag_len == 16 || tag_len == 15 || tag_len == 14 ||
-         tag_len == 13 || tag_len == 12 || tag_len == 8 ||
-         tag_len == 4;
+  return short_tag ? (tag_len == 4 || tag_len == 8) :
+                     (tag_len >= 12 && tag_len <= 16);
 }
 
 /*
@@ -331,14 +328,26 @@ done:
   return status;
 }
 
-TC_status TC_AES_GCM_init(struct TC_AES_GCM_ctx* ctx, const uint8_t* key,
-                 const uint8_t* iv, size_t iv_len, size_t tag_len)
+static TC_status tc_aes_gcm_init_impl(struct TC_AES_GCM_ctx* ctx,
+                 const uint8_t* key, const uint8_t* iv,
+                 size_t iv_len, size_t tag_len, int short_tag)
 {
   uint8_t zero[TC_AES_BLOCKLEN] = { 0 };
 
-  if (ctx == NULL || key == NULL || iv == NULL || iv_len == 0 ||
+  if (ctx == NULL)
+    return TC_ERROR;
+  if ((key != NULL && !tc_internal_ranges_disjoint(
+          ctx, sizeof(*ctx), key, TC_AES_KEYLEN)) ||
+      (iv != NULL && iv_len <= TC_AES_GCM_MAX_IV_BYTES &&
+       !tc_internal_ranges_disjoint(ctx, sizeof(*ctx), iv, iv_len)))
+  {
+    TC_AES_GCM_clear(ctx);
+    return TC_ERROR;
+  }
+  TC_AES_GCM_clear(ctx);
+  if (key == NULL || iv == NULL || iv_len == 0 ||
       (uint64_t)iv_len > TC_AES_GCM_MAX_IV_BYTES ||
-      !tc_aes_gcm_tag_length_is_valid(tag_len))
+      !tc_aes_gcm_tag_length_is_allowed(tag_len, short_tag))
     return TC_ERROR;
 
   if (TC_AES_key_init(&ctx->key, key) != TC_OK)
@@ -362,7 +371,22 @@ TC_status TC_AES_GCM_init(struct TC_AES_GCM_ctx* ctx, const uint8_t* key,
   ctx->tag_len = (uint8_t)tag_len;
   ctx->phase = TC_AES_GCM_PHASE_AAD;
   ctx->direction = TC_AES_GCM_DIRECTION_NONE;
+  ctx->decrypt_buffer = NULL;
+  ctx->decrypt_length = 0;
   return TC_OK;
+}
+
+TC_status TC_AES_GCM_init(struct TC_AES_GCM_ctx* ctx, const uint8_t* key,
+                 const uint8_t* iv, size_t iv_len, size_t tag_len)
+{
+  return tc_aes_gcm_init_impl(ctx, key, iv, iv_len, tag_len, 0);
+}
+
+TC_status TC_AES_GCM_init_short_tag(struct TC_AES_GCM_ctx* ctx,
+                 const uint8_t* key, const uint8_t* iv,
+                 size_t iv_len, size_t tag_len)
+{
+  return tc_aes_gcm_init_impl(ctx, key, iv, iv_len, tag_len, 1);
 }
 
 TC_status TC_AES_GCM_aad_update(struct TC_AES_GCM_ctx* ctx, const uint8_t* aad,
@@ -370,6 +394,7 @@ TC_status TC_AES_GCM_aad_update(struct TC_AES_GCM_ctx* ctx, const uint8_t* aad,
 {
   if (ctx == NULL || ctx->phase != TC_AES_GCM_PHASE_AAD ||
       (length != 0 && aad == NULL) ||
+      !tc_internal_ranges_disjoint(ctx, sizeof(*ctx), aad, length) ||
       !tc_aes_gcm_length_is_valid(ctx->aad_len, length, TC_AES_GCM_MAX_AAD_BYTES))
     return TC_ERROR;
 
@@ -381,25 +406,23 @@ TC_status TC_AES_GCM_aad_update(struct TC_AES_GCM_ctx* ctx, const uint8_t* aad,
   return TC_OK;
 }
 
-static int tc_aes_gcm_update(struct TC_AES_GCM_ctx* ctx, uint8_t* buf, size_t length,
-                      int decrypt)
+static int tc_aes_gcm_encrypt_update_impl(struct TC_AES_GCM_ctx* ctx,
+                                         uint8_t* buf, size_t length)
 {
   size_t i;
   const size_t total_length = length;
   uint8_t* const output = buf;
-  const uint8_t direction = decrypt ? TC_AES_GCM_DIRECTION_DECRYPT :
-                                     TC_AES_GCM_DIRECTION_ENCRYPT;
 
-  if (ctx == NULL || ctx->phase == TC_AES_GCM_PHASE_FINAL ||
+  if (ctx == NULL || ctx->phase == TC_AES_GCM_PHASE_UNINIT ||
+      ctx->phase == TC_AES_GCM_PHASE_FINAL ||
       (length != 0 && buf == NULL) ||
+      !tc_internal_ranges_disjoint(ctx, sizeof(*ctx), buf, length) ||
       !tc_aes_gcm_length_is_valid(ctx->text_len, length, TC_AES_GCM_MAX_PLAINTEXT_BYTES) ||
       !tc_aes_gcm_packet_length_ok(ctx, (uint64_t)length))
     return TC_ERROR;
-  if (ctx->direction != TC_AES_GCM_DIRECTION_NONE &&
-      ctx->direction != direction)
+  if (ctx->direction == TC_AES_GCM_DIRECTION_DECRYPT)
     return TC_ERROR;
-  if (ctx->direction == TC_AES_GCM_DIRECTION_NONE)
-    ctx->direction = direction;
+  ctx->direction = TC_AES_GCM_DIRECTION_ENCRYPT;
 
   if (ctx->phase == TC_AES_GCM_PHASE_AAD)
   {
@@ -415,12 +438,9 @@ static int tc_aes_gcm_update(struct TC_AES_GCM_ctx* ctx, uint8_t* buf, size_t le
     tc_aes_gcm_increment_counter(ctx->counter);
     tc_aes_copy_bytes(ctx->stream, ctx->counter, TC_AES_BLOCKLEN);
     if (tc_aes_cipher((state_t*)ctx->stream, ctx->key.round_key) != TC_OK) goto failed;
-    if (decrypt)
-      tc_aes_gcm_absorb(ctx, buf, TC_AES_BLOCKLEN);
     for (j = 0; j < TC_AES_BLOCKLEN; ++j)
       buf[j] ^= ctx->stream[j];
-    if (!decrypt)
-      tc_aes_gcm_absorb(ctx, buf, TC_AES_BLOCKLEN);
+    tc_aes_gcm_absorb(ctx, buf, TC_AES_BLOCKLEN);
     buf += TC_AES_BLOCKLEN;
     length -= TC_AES_BLOCKLEN;
   }
@@ -440,12 +460,9 @@ static int tc_aes_gcm_update(struct TC_AES_GCM_ctx* ctx, uint8_t* buf, size_t le
 
     available = TC_AES_BLOCKLEN - ctx->stream_pos;
     count = length < available ? length : available;
-    if (decrypt)
-      tc_aes_gcm_absorb(ctx, buf, count);
     for (i = 0; i < count; ++i)
       buf[i] ^= ctx->stream[ctx->stream_pos + i];
-    if (!decrypt)
-      tc_aes_gcm_absorb(ctx, buf, count);
+    tc_aes_gcm_absorb(ctx, buf, count);
     buf += count;
     length -= count;
     ctx->stream_pos = (uint8_t)(ctx->stream_pos + count);
@@ -461,18 +478,74 @@ failed:
 TC_status TC_AES_GCM_encrypt_update(struct TC_AES_GCM_ctx* ctx, uint8_t* buf,
                            size_t length)
 {
-  return tc_aes_gcm_update(ctx, buf, length, 0);
+  return tc_aes_gcm_encrypt_update_impl(ctx, buf, length);
 }
 
 TC_status TC_AES_GCM_decrypt_update(struct TC_AES_GCM_ctx* ctx, uint8_t* buf,
                            size_t length)
 {
-  return tc_aes_gcm_update(ctx, buf, length, 1);
+  if (ctx == NULL || ctx->phase == TC_AES_GCM_PHASE_UNINIT ||
+      ctx->phase == TC_AES_GCM_PHASE_FINAL ||
+      (length != 0 && buf == NULL) ||
+      !tc_internal_ranges_disjoint(ctx, sizeof(*ctx), buf, length) ||
+      ctx->direction == TC_AES_GCM_DIRECTION_ENCRYPT ||
+      length > SIZE_MAX - ctx->decrypt_length ||
+      !tc_aes_gcm_length_is_valid(ctx->text_len, length,
+                                  TC_AES_GCM_MAX_PLAINTEXT_BYTES) ||
+      !tc_aes_gcm_packet_length_ok(ctx, (uint64_t)length))
+    return TC_ERROR;
+  if (length != 0 && ctx->decrypt_buffer != NULL &&
+      ((uintptr_t)ctx->decrypt_buffer > UINTPTR_MAX - ctx->decrypt_length ||
+       (uintptr_t)buf != (uintptr_t)ctx->decrypt_buffer + ctx->decrypt_length))
+    return TC_ERROR;
+  if (ctx->phase == TC_AES_GCM_PHASE_AAD) {
+    tc_aes_gcm_pad_ghash(ctx);
+    ctx->phase = TC_AES_GCM_PHASE_TEXT;
+  }
+  if (length != 0 && ctx->decrypt_buffer == NULL)
+    ctx->decrypt_buffer = buf;
+  ctx->direction = TC_AES_GCM_DIRECTION_DECRYPT;
+  tc_aes_gcm_absorb(ctx, buf, length);
+  ctx->decrypt_length += length;
+  ctx->text_len += (uint64_t)length;
+  return TC_OK;
+}
+
+static TC_status tc_aes_gcm_decrypt_verified(const struct TC_AES_GCM_ctx* ctx,
+    const uint8_t* ciphertext, uint8_t* plaintext, size_t length)
+{
+  uint8_t counter[TC_AES_BLOCKLEN];
+  uint8_t stream[TC_AES_BLOCKLEN];
+  size_t offset = 0;
+  TC_status status = TC_OK;
+
+  tc_aes_copy_bytes(counter, ctx->J0, TC_AES_BLOCKLEN);
+  while (offset < length) {
+    const size_t count = length - offset < TC_AES_BLOCKLEN ?
+                         length - offset : TC_AES_BLOCKLEN;
+    uint8_t j;
+    tc_aes_gcm_increment_counter(counter);
+    tc_aes_copy_bytes(stream, counter, TC_AES_BLOCKLEN);
+    status = tc_aes_cipher((state_t*)stream, ctx->key.round_key);
+    if (status != TC_OK) break;
+    for (j = 0; j < (uint8_t)count; ++j)
+      plaintext[offset + j] = (uint8_t)(ciphertext[offset + j] ^ stream[j]);
+    offset += count;
+  }
+  if (status != TC_OK && length != 0)
+    TC_secure_zero(plaintext, length);
+#if TC_ZEROIZE
+  TC_secure_zero(counter, sizeof counter);
+  TC_secure_zero(stream, sizeof stream);
+#endif
+  return status;
 }
 
 TC_status TC_AES_GCM_encrypt_finish(struct TC_AES_GCM_ctx* ctx, uint8_t* tag)
 {
-  if (ctx == NULL || tag == NULL || ctx->phase == TC_AES_GCM_PHASE_FINAL ||
+  if (ctx == NULL || tag == NULL || ctx->phase == TC_AES_GCM_PHASE_UNINIT ||
+      ctx->phase == TC_AES_GCM_PHASE_FINAL ||
+      !tc_internal_ranges_disjoint(ctx, sizeof(*ctx), tag, ctx->tag_len) ||
       !tc_aes_gcm_packet_length_ok(ctx, 0))
     return TC_ERROR;
   if (ctx->direction == TC_AES_GCM_DIRECTION_DECRYPT)
@@ -488,6 +561,9 @@ TC_status TC_AES_GCM_encrypt_finish(struct TC_AES_GCM_ctx* ctx, uint8_t* tag)
     return TC_ERROR;
   }
   ctx->phase = TC_AES_GCM_PHASE_FINAL;
+#if TC_ZEROIZE
+  tc_aes_gcm_invalidate(ctx);
+#endif
   return TC_OK;
 }
 
@@ -496,7 +572,9 @@ TC_status TC_AES_GCM_decrypt_finish(struct TC_AES_GCM_ctx* ctx, const uint8_t* t
   uint8_t expected[TC_AES_BLOCKLEN];
   TC_status status;
 
-  if (ctx == NULL || tag == NULL || ctx->phase == TC_AES_GCM_PHASE_FINAL ||
+  if (ctx == NULL || tag == NULL || ctx->phase == TC_AES_GCM_PHASE_UNINIT ||
+      ctx->phase == TC_AES_GCM_PHASE_FINAL ||
+      !tc_internal_ranges_disjoint(ctx, sizeof(*ctx), tag, ctx->tag_len) ||
       !tc_aes_gcm_packet_length_ok(ctx, 0))
     return TC_ERROR;
   if (ctx->direction == TC_AES_GCM_DIRECTION_ENCRYPT)
@@ -510,10 +588,18 @@ TC_status TC_AES_GCM_decrypt_finish(struct TC_AES_GCM_ctx* ctx, const uint8_t* t
   status = tc_aes_gcm_make_tag(ctx, expected);
   /* Authentication tags contain secrets, so comparison time must not reveal
    * the first byte that differs. */
-  if (status == TC_OK) {
+  if (status == TC_OK)
     status = TC_ct_equal(expected, tag, ctx->tag_len);
+  if (status == TC_OK)
+    status = tc_aes_gcm_decrypt_verified(ctx, ctx->decrypt_buffer,
+                                         ctx->decrypt_buffer, ctx->decrypt_length);
+  if (status != TC_OK || TC_ZEROIZE)
+    tc_aes_gcm_invalidate(ctx);
+  else {
     ctx->phase = TC_AES_GCM_PHASE_FINAL;
-  } else tc_aes_gcm_invalidate(ctx);
+    ctx->decrypt_buffer = NULL;
+    ctx->decrypt_length = 0;
+  }
 #if TC_ZEROIZE
   TC_secure_zero(expected, sizeof(expected));
 #endif
@@ -527,11 +613,12 @@ void TC_AES_GCM_clear(struct TC_AES_GCM_ctx* ctx)
   TC_secure_zero(ctx, sizeof(*ctx));
 }
 
-TC_status TC_AES_GCM_encrypt(const uint8_t* key,
+static TC_status tc_aes_gcm_encrypt_impl(const uint8_t* key,
                     const uint8_t* iv, size_t iv_len,
                     const uint8_t* aad, size_t aad_len,
                     const uint8_t* plaintext, size_t plaintext_len,
-                    uint8_t* ciphertext, uint8_t* tag, size_t tag_len)
+                    uint8_t* ciphertext, uint8_t* tag, size_t tag_len,
+                    int short_tag)
 {
   struct TC_AES_GCM_ctx ctx;
   int status;
@@ -540,7 +627,7 @@ TC_status TC_AES_GCM_encrypt(const uint8_t* key,
       (aad_len != 0 && aad == NULL) ||
       (plaintext_len != 0 && (plaintext == NULL || ciphertext == NULL)) ||
       tag == NULL ||
-      !tc_aes_gcm_tag_length_is_valid(tag_len) ||
+      !tc_aes_gcm_tag_length_is_allowed(tag_len, short_tag) ||
       (uint64_t)iv_len > TC_AES_GCM_MAX_IV_BYTES ||
       (uint64_t)aad_len > TC_AES_GCM_MAX_AAD_BYTES ||
       (uint64_t)plaintext_len > TC_AES_GCM_MAX_PLAINTEXT_BYTES ||
@@ -558,7 +645,7 @@ TC_status TC_AES_GCM_encrypt(const uint8_t* key,
       return TC_ERROR;
   }
 
-  if (TC_AES_GCM_init(&ctx, key, iv, iv_len, tag_len) != TC_OK)
+  if (tc_aes_gcm_init_impl(&ctx, key, iv, iv_len, tag_len, short_tag) != TC_OK)
     return TC_ERROR;
   if (TC_AES_GCM_aad_update(&ctx, aad, aad_len) != TC_OK)
   {
@@ -584,12 +671,12 @@ TC_status TC_AES_GCM_encrypt(const uint8_t* key,
   return status;
 }
 
-TC_status TC_AES_GCM_decrypt(const uint8_t* key,
+static TC_status tc_aes_gcm_decrypt_impl(const uint8_t* key,
                     const uint8_t* iv, size_t iv_len,
                     const uint8_t* aad, size_t aad_len,
                     const uint8_t* ciphertext, size_t ciphertext_len,
                     const uint8_t* tag, size_t tag_len,
-                    uint8_t* plaintext)
+                    uint8_t* plaintext, int short_tag)
 {
   struct TC_AES_GCM_ctx ctx;
   uint8_t expected[TC_AES_BLOCKLEN] = { 0 };
@@ -599,7 +686,7 @@ TC_status TC_AES_GCM_decrypt(const uint8_t* key,
       (aad_len != 0 && aad == NULL) ||
       (ciphertext_len != 0 && (ciphertext == NULL || plaintext == NULL)) ||
       tag == NULL ||
-      !tc_aes_gcm_tag_length_is_valid(tag_len) ||
+      !tc_aes_gcm_tag_length_is_allowed(tag_len, short_tag) ||
       (uint64_t)iv_len > TC_AES_GCM_MAX_IV_BYTES ||
       (uint64_t)aad_len > TC_AES_GCM_MAX_AAD_BYTES ||
       (uint64_t)ciphertext_len > TC_AES_GCM_MAX_PLAINTEXT_BYTES ||
@@ -616,7 +703,7 @@ TC_status TC_AES_GCM_decrypt(const uint8_t* key,
       return TC_ERROR;
   }
 
-  if (TC_AES_GCM_init(&ctx, key, iv, iv_len, tag_len) != TC_OK)
+  if (tc_aes_gcm_init_impl(&ctx, key, iv, iv_len, tag_len, short_tag) != TC_OK)
     return TC_ERROR;
   if (TC_AES_GCM_aad_update(&ctx, aad, aad_len) != TC_OK)
     goto done;
@@ -649,35 +736,8 @@ TC_status TC_AES_GCM_decrypt(const uint8_t* key,
     goto done;
   }
 
-  /* Tag OK: produce keystream and decrypt. Reset counter path from J0. */
-  {
-    uint8_t counter[TC_AES_BLOCKLEN];
-    uint8_t stream[TC_AES_BLOCKLEN];
-    size_t offset = 0;
-
-    tc_aes_copy_bytes(counter, ctx.J0, TC_AES_BLOCKLEN);
-    while (offset < ciphertext_len)
-    {
-      const size_t count = ciphertext_len - offset < TC_AES_BLOCKLEN ?
-                           ciphertext_len - offset : TC_AES_BLOCKLEN;
-      uint8_t j;
-
-      tc_aes_gcm_increment_counter(counter);
-      tc_aes_copy_bytes(stream, counter, TC_AES_BLOCKLEN);
-      status = tc_aes_cipher((state_t*)stream, ctx.key.round_key);
-      if (status != TC_OK) break;
-      for (j = 0; j < (uint8_t)count; ++j)
-        plaintext[offset + j] =
-          (uint8_t)(ciphertext[offset + j] ^ stream[j]);
-      offset += count;
-    }
-#if TC_ZEROIZE
-    TC_secure_zero(counter, sizeof(counter));
-    TC_secure_zero(stream, sizeof(stream));
-#endif
-  }
-  if (status != TC_OK && ciphertext_len != 0)
-    TC_secure_zero(plaintext, ciphertext_len);
+  status = tc_aes_gcm_decrypt_verified(&ctx, ciphertext, plaintext,
+                                       ciphertext_len);
 
 done:
 #if TC_ZEROIZE
@@ -685,6 +745,46 @@ done:
   TC_secure_zero(expected, sizeof(expected));
 #endif
   return status;
+}
+
+TC_status TC_AES_GCM_encrypt(const uint8_t* key,
+                    const uint8_t* iv, size_t iv_len,
+                    const uint8_t* aad, size_t aad_len,
+                    const uint8_t* plaintext, size_t plaintext_len,
+                    uint8_t* ciphertext, uint8_t* tag, size_t tag_len)
+{
+  return tc_aes_gcm_encrypt_impl(key, iv, iv_len, aad, aad_len, plaintext,
+                                  plaintext_len, ciphertext, tag, tag_len, 0);
+}
+
+TC_status TC_AES_GCM_encrypt_short_tag(const uint8_t* key,
+                    const uint8_t* iv, size_t iv_len,
+                    const uint8_t* aad, size_t aad_len,
+                    const uint8_t* plaintext, size_t plaintext_len,
+                    uint8_t* ciphertext, uint8_t* tag, size_t tag_len)
+{
+  return tc_aes_gcm_encrypt_impl(key, iv, iv_len, aad, aad_len, plaintext,
+                                  plaintext_len, ciphertext, tag, tag_len, 1);
+}
+
+TC_status TC_AES_GCM_decrypt(const uint8_t* key,
+                    const uint8_t* iv, size_t iv_len,
+                    const uint8_t* aad, size_t aad_len,
+                    const uint8_t* ciphertext, size_t ciphertext_len,
+                    const uint8_t* tag, size_t tag_len, uint8_t* plaintext)
+{
+  return tc_aes_gcm_decrypt_impl(key, iv, iv_len, aad, aad_len, ciphertext,
+                                  ciphertext_len, tag, tag_len, plaintext, 0);
+}
+
+TC_status TC_AES_GCM_decrypt_short_tag(const uint8_t* key,
+                    const uint8_t* iv, size_t iv_len,
+                    const uint8_t* aad, size_t aad_len,
+                    const uint8_t* ciphertext, size_t ciphertext_len,
+                    const uint8_t* tag, size_t tag_len, uint8_t* plaintext)
+{
+  return tc_aes_gcm_decrypt_impl(key, iv, iv_len, aad, aad_len, ciphertext,
+                                  ciphertext_len, tag, tag_len, plaintext, 1);
 }
 
 #endif

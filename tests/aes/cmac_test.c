@@ -317,6 +317,15 @@ static MunitResult test_cmac_streaming(const MunitParameter params[], void* data
 
   munit_assert_int(TC_AES_CMAC_init(NULL, key), ==, TC_ERROR);
   munit_assert_int(TC_AES_CMAC_init(&ctx, NULL), ==, TC_ERROR);
+  memset(&ctx, 0, sizeof ctx);
+  munit_assert_int(TC_AES_CMAC_update(&ctx, msg, 1), ==, TC_ERROR);
+  munit_assert_int(TC_AES_CMAC_final(&ctx, tag), ==, TC_ERROR);
+  munit_assert_int(TC_AES_CMAC_init(&ctx, key), ==, TC_OK);
+  munit_assert_int(TC_AES_CMAC_final(&ctx, tag), ==, TC_OK);
+  munit_assert_int(TC_AES_CMAC_update(&ctx, msg, 1), ==, TC_ERROR);
+  munit_assert_int(TC_AES_CMAC_final(&ctx, tag), ==, TC_ERROR);
+  TC_AES_CMAC_ctx_clear(&ctx);
+  munit_assert_int(TC_AES_CMAC_final(&ctx, tag), ==, TC_ERROR);
 #if TC_STRICT
   munit_assert_int(TC_AES_CMAC_init(&ctx, key), ==, TC_OK);
   munit_assert_int(TC_AES_CMAC_update(&ctx, NULL, 1), ==, TC_ERROR);

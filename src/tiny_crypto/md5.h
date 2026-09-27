@@ -16,6 +16,7 @@ struct TC_MD5_ctx {
   uint64_t Count;
   uint32_t State[4];
   uint8_t BufLen;
+  uint8_t active;
   uint8_t Buf[TC_MD5_BLOCKLEN];
 };
 

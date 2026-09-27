@@ -300,19 +300,34 @@ static void tc_aes_key_expansion(uint8_t* round_key, const uint8_t* key, unsigne
 
 TC_status TC_AES_key_init(struct TC_AES_key_ctx* ctx, const uint8_t* key)
 {
-  if (ctx == NULL || key == NULL)
+  if (ctx == NULL)
     return TC_ERROR;
+  if (key == NULL || !tc_internal_ranges_disjoint(ctx, sizeof *ctx,
+                                                   key, TC_AES_KEYLEN)) {
+    TC_AES_key_ctx_clear(ctx);
+    return TC_ERROR;
+  }
+  TC_AES_key_ctx_clear(ctx);
 #if TC_AES_SBOX_MODE == TC_AES_SBOX_MODE_RUNTIME
   if (!sbox_ready)
     return TC_ERROR;
 #endif
   tc_aes_key_expansion(ctx->round_key, key, Nk);
+  ctx->active = 1;
   return TC_OK;
 }
 
 TC_status TC_AES_init_ctx(struct TC_AES_ctx* ctx, const uint8_t* key)
 {
-  if (ctx == NULL || TC_AES_key_init(&ctx->key, key) != TC_OK)
+  if (ctx == NULL)
+    return TC_ERROR;
+  if (key == NULL || !tc_internal_ranges_disjoint(ctx, sizeof *ctx,
+                                                   key, TC_AES_KEYLEN)) {
+    TC_AES_ctx_clear(ctx);
+    return TC_ERROR;
+  }
+  TC_AES_ctx_clear(ctx);
+  if (TC_AES_key_init(&ctx->key, key) != TC_OK)
     return TC_ERROR;
 #if (defined(TC_AES_ENABLE_CBC) && (TC_AES_ENABLE_CBC == 1)) || \
     (defined(TC_AES_ENABLE_CTR) && (TC_AES_ENABLE_CTR == 1)) || \
@@ -333,7 +348,14 @@ TC_status TC_AES_init_ctx(struct TC_AES_ctx* ctx, const uint8_t* key)
 TC_status TC_AES_init_ctx_iv(struct TC_AES_ctx* ctx, const uint8_t* key,
                             const uint8_t* iv)
 {
-  if (iv == NULL || TC_AES_init_ctx(ctx, key) != TC_OK)
+  if (ctx == NULL)
+    return TC_ERROR;
+  if (iv == NULL || !tc_internal_ranges_disjoint(ctx, sizeof *ctx,
+                                                 iv, TC_AES_BLOCKLEN)) {
+    TC_AES_ctx_clear(ctx);
+    return TC_ERROR;
+  }
+  if (TC_AES_init_ctx(ctx, key) != TC_OK)
     return TC_ERROR;
   tc_aes_copy_bytes(ctx->iv, iv, TC_AES_BLOCKLEN);
 #if defined(TC_AES_ENABLE_CTR) && (TC_AES_ENABLE_CTR == 1)
@@ -346,7 +368,7 @@ TC_status TC_AES_init_ctx_iv(struct TC_AES_ctx* ctx, const uint8_t* key,
 }
 TC_status TC_AES_ctx_set_iv(struct TC_AES_ctx* ctx, const uint8_t* iv)
 {
-  if (ctx == NULL || iv == NULL)
+  if (ctx == NULL || ctx->key.active != 1 || iv == NULL)
     return TC_ERROR;
   tc_aes_copy_bytes(ctx->iv, iv, TC_AES_BLOCKLEN);
 #if defined(TC_AES_ENABLE_CTR) && (TC_AES_ENABLE_CTR == 1)
@@ -642,14 +664,14 @@ void TC_AES_CAVP_decrypt_block(const uint8_t* key, uint8_t block[TC_AES_BLOCKLEN
 
 TC_status TC_AES_ECB_encrypt(const struct TC_AES_key_ctx* ctx, uint8_t* buf)
 {
-  if (ctx == NULL || buf == NULL)
+  if (ctx == NULL || ctx->active != 1 || buf == NULL)
     return TC_ERROR;
   return tc_aes_cipher((state_t*)buf, ctx->round_key);
 }
 
 TC_status TC_AES_ECB_decrypt(const struct TC_AES_key_ctx* ctx, uint8_t* buf)
 {
-  if (ctx == NULL || buf == NULL)
+  if (ctx == NULL || ctx->active != 1 || buf == NULL)
     return TC_ERROR;
   return tc_aes_inverse_cipher((state_t*)buf, ctx->round_key);
 }
@@ -698,18 +720,14 @@ static TC_status tc_aes_cbc_decrypt(const uint8_t* key, uint8_t rounds, uint8_t 
 #if TC_AES_ENABLE_CBC
 TC_status TC_AES_CBC_encrypt(struct TC_AES_ctx* ctx, uint8_t* buffer, size_t length)
 {
-#if TC_STRICT
-  if (!ctx || (!buffer && length)) return TC_ERROR;
-#endif
+  if (!ctx || ctx->key.active != 1 || (!buffer && length)) return TC_ERROR;
   if (length % 16) return TC_ERROR;
   return tc_aes_cbc_encrypt(ctx->key.round_key, Nr, ctx->iv, buffer, length);
 }
 
 TC_status TC_AES_CBC_decrypt(struct TC_AES_ctx* ctx, uint8_t* buffer, size_t length)
 {
-#if TC_STRICT
-  if (!ctx || (!buffer && length)) return TC_ERROR;
-#endif
+  if (!ctx || ctx->key.active != 1 || (!buffer && length)) return TC_ERROR;
   if (length % 16) return TC_ERROR;
   return tc_aes_cbc_decrypt(ctx->key.round_key, Nr, ctx->iv, buffer, length);
 }
@@ -726,10 +744,9 @@ TC_status TC_AES_CTR_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length)
   size_t uncached_length;
   size_t blocks_needed;
 
-#if TC_STRICT
-  if (ctx == NULL || (length != 0 && buf == NULL))
+  if (ctx == NULL || ctx->key.active != 1 || ctx->ctr_pos > TC_AES_BLOCKLEN ||
+      (length != 0 && buf == NULL))
     return TC_ERROR;
-#endif
   if (length == 0)
     return TC_OK;
 
@@ -778,10 +795,9 @@ TC_status TC_AES_OFB_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length)
 {
   uint8_t pos;
 
-#if TC_STRICT
-  if (ctx == NULL || (length != 0 && buf == NULL))
+  if (ctx == NULL || ctx->key.active != 1 || ctx->ofb_pos > TC_AES_BLOCKLEN ||
+      (length != 0 && buf == NULL))
     return TC_ERROR;
-#endif
 
   pos = ctx->ofb_pos;
   while (length-- != 0)

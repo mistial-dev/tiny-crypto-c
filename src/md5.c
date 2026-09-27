@@ -67,12 +67,13 @@ TC_status TC_MD5_init(struct TC_MD5_ctx* ctx)
   memset(ctx,0,sizeof *ctx);
   ctx->State[0] = 0x67452301u; ctx->State[1] = 0xefcdab89u;
   ctx->State[2] = 0x98badcfeu; ctx->State[3] = 0x10325476u;
+  ctx->active = 1;
   return TC_OK;
 }
 
 TC_status TC_MD5_update(struct TC_MD5_ctx* ctx, const uint8_t* data, size_t length)
 {
-  if (!ctx || (!data && length) || ctx->BufLen >= TC_MD5_BLOCKLEN ||
+  if (!ctx || ctx->active != 1 || (!data && length) || ctx->BufLen >= TC_MD5_BLOCKLEN ||
       length > UINTPTR_MAX - (uintptr_t)data ||
       !tc_internal_ranges_disjoint(ctx,sizeof *ctx,data,length)) return TC_ERROR;
   /* RFC 1321 uses the low 64 bits of the encoded bit count. */
@@ -83,7 +84,7 @@ TC_status TC_MD5_update(struct TC_MD5_ctx* ctx, const uint8_t* data, size_t leng
 
 TC_status TC_MD5_final(struct TC_MD5_ctx* ctx, uint8_t digest[TC_MD5_DIGESTLEN])
 {
-  if (!ctx || !digest || ctx->BufLen >= TC_MD5_BLOCKLEN ||
+  if (!ctx || ctx->active != 1 || !digest || ctx->BufLen >= TC_MD5_BLOCKLEN ||
       !tc_internal_ranges_disjoint(ctx,sizeof *ctx,digest,TC_MD5_DIGESTLEN)) return TC_ERROR;
   tc_hash64_finish(ctx->State,ctx->Count,&ctx->BufLen,ctx->Buf,compress,TC_HASH_LENGTH_LITTLE_ENDIAN);
   for (unsigned word = 0; word < 4; ++word)
@@ -91,6 +92,8 @@ TC_status TC_MD5_final(struct TC_MD5_ctx* ctx, uint8_t digest[TC_MD5_DIGESTLEN])
       digest[4 * word + byte] = (uint8_t)(ctx->State[word] >> (8 * byte));
 #if TC_ZEROIZE
   TC_secure_zero(ctx,sizeof *ctx);
+#else
+  ctx->active = 0;
 #endif
   return TC_OK;
 }

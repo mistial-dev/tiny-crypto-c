@@ -14,7 +14,7 @@ public:
     ~AES_dynamic() { clear(); }
     AES_dynamic(const AES_dynamic&) = delete;
     AES_dynamic& operator=(const AES_dynamic&) = delete;
-    TC_status init(const uint8_t* key, size_t length) noexcept {
+    TC_CPP_NODISCARD TC_status init(const uint8_t* key, size_t length) noexcept {
         return ::TC_AES_dynamic_key_init(&ctx_, key, length);
     }
     void clear() noexcept { ::TC_AES_dynamic_key_clear(&ctx_); }
@@ -39,7 +39,7 @@ public:
     ~AES_dynamic_CMAC() { clear(); }
     AES_dynamic_CMAC(const AES_dynamic_CMAC&) = delete;
     AES_dynamic_CMAC& operator=(const AES_dynamic_CMAC&) = delete;
-    TC_status init(const uint8_t* key, size_t length) noexcept {
+    TC_CPP_NODISCARD TC_status init(const uint8_t* key, size_t length) noexcept {
         return ::TC_AES_dynamic_CMAC_init(&ctx_, key, length);
     }
     TC_status update(const uint8_t* data, size_t length) noexcept {

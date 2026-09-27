@@ -613,7 +613,6 @@ void TC_AES_dynamic_CMAC_clear(TC_AES_dynamic_CMAC* ctx)
 static void tc_aes_cmac_invalidate(struct TC_AES_CMAC_ctx* ctx)
 {
   TC_AES_CMAC_ctx_clear(ctx);
-  ctx->buf_len = 17; /* Reject further use until initialization succeeds. */
 }
 
 TC_status TC_AES_CMAC(const uint8_t* key, const uint8_t* msg, size_t msg_len,
@@ -667,18 +666,22 @@ TC_status TC_AES_CMAC_verify(const uint8_t* key, const uint8_t* msg, size_t msg_
 /* Absorb one full block from ctx->buf into the CBC-MAC chain. */
 TC_status TC_AES_CMAC_init(struct TC_AES_CMAC_ctx* ctx, const uint8_t* key)
 {
-  if (!ctx || TC_AES_key_init(&ctx->key, key) != TC_OK) return TC_ERROR;
+  if (!ctx) return TC_ERROR;
+  TC_AES_CMAC_ctx_clear(ctx);
+  if (TC_AES_key_init(&ctx->key, key) != TC_OK) return TC_ERROR;
   if (tc_aes_cmac_generate_subkeys(ctx->key.round_key, TC_AES_FIXED_ROUNDS, ctx->k1, ctx->k2) != TC_OK) {
     tc_aes_cmac_invalidate(ctx);
     return TC_ERROR;
   }
   memset(ctx->mac, 0, 16); memset(ctx->buf, 0, 16); ctx->buf_len = 0;
+  ctx->active = 1;
   return TC_OK;
 }
 
 TC_status TC_AES_CMAC_update(struct TC_AES_CMAC_ctx* ctx, const uint8_t* data, size_t length)
 {
-  if (!ctx || (!data && length) || ctx->buf_len > 16) return TC_ERROR;
+  if (!ctx || ctx->active != 1 || (!data && length) || ctx->buf_len > 16)
+    return TC_ERROR;
   if (tc_aes_cmac_update(ctx->key.round_key, TC_AES_FIXED_ROUNDS, ctx->mac, ctx->buf,
                        &ctx->buf_len, data, length) != TC_OK) {
     tc_aes_cmac_invalidate(ctx);
@@ -690,7 +693,7 @@ TC_status TC_AES_CMAC_update(struct TC_AES_CMAC_ctx* ctx, const uint8_t* data, s
 TC_status TC_AES_CMAC_final(struct TC_AES_CMAC_ctx* ctx, uint8_t tag[16])
 {
   TC_status status;
-  if (!ctx || !tag || ctx->buf_len > 16) return TC_ERROR;
+  if (!ctx || ctx->active != 1 || !tag || ctx->buf_len > 16) return TC_ERROR;
   status = tc_aes_cmac_final(ctx->key.round_key, TC_AES_FIXED_ROUNDS, ctx->mac, ctx->buf,
                            ctx->buf_len, ctx->k1, ctx->k2, tag);
   if (status != TC_OK) {
@@ -699,6 +702,8 @@ TC_status TC_AES_CMAC_final(struct TC_AES_CMAC_ctx* ctx, uint8_t tag[16])
   }
 #if TC_ZEROIZE
   TC_secure_zero(ctx, sizeof *ctx);
+#else
+  ctx->active = 0;
 #endif
   return TC_OK;
 }

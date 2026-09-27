@@ -211,11 +211,9 @@ static void tc_sha512_compress_impl(uint64_t state[8],
   state[7] += h;
 
 #if TC_ZEROIZE
-  if (wipe_schedule)
-    TC_secure_zero(W, sizeof(W));
-#else
-  (void)wipe_schedule;
+  TC_secure_zero(W, sizeof(W));
 #endif
+  (void)wipe_schedule;
 }
 
 static void tc_sha512_compress(uint64_t state[8],
@@ -260,6 +258,7 @@ TC_status TC_SHA512_init(struct TC_SHA512_ctx* ctx)
      leave the previous partial block (HMAC pad residue or message) in RAM. */
   TC_secure_zero(ctx, sizeof(*ctx));
   tc_sha512_state_init(ctx->State);
+  ctx->active = 1;
   return TC_OK;
 }
 
@@ -269,6 +268,9 @@ TC_status TC_SHA512_update(struct TC_SHA512_ctx* ctx, const uint8_t* data, size_
   if (ctx == NULL || (len != 0 && data == NULL))
     return TC_ERROR;
 #endif
+  if (ctx == NULL || ctx->active != 1 ||
+      (len != 0 && data == NULL) || ctx->BufLen >= TC_SHA512_BLOCKLEN)
+    return TC_ERROR;
   return tc_sha512_stream_update(ctx->State, &ctx->Count, &ctx->BufLen, ctx->Buf,
                                  data, len, tc_sha512_compress);
 }
@@ -279,11 +281,16 @@ TC_status TC_SHA512_final(struct TC_SHA512_ctx* ctx, uint8_t* digest)
   if (ctx == NULL || digest == NULL)
     return TC_ERROR;
 #endif
+  if (ctx == NULL || ctx->active != 1 || digest == NULL ||
+      ctx->BufLen >= TC_SHA512_BLOCKLEN)
+    return TC_ERROR;
   tc_sha512_stream_final(ctx->State, 8, ctx->Count, &ctx->BufLen, ctx->Buf,
                          digest, tc_sha512_compress);
 
 #if TC_ZEROIZE
   TC_secure_zero(ctx, sizeof(*ctx));
+#else
+  ctx->active = 0;
 #endif
   return TC_OK;
 }
@@ -339,6 +346,7 @@ TC_status TC_SHA384_init(struct TC_SHA384_ctx* ctx)
     return TC_ERROR;
   TC_secure_zero(ctx, sizeof(*ctx));
   tc_sha384_state_init(ctx->State);
+  ctx->active = 1;
   return TC_OK;
 }
 
@@ -348,6 +356,9 @@ TC_status TC_SHA384_update(struct TC_SHA384_ctx* ctx, const uint8_t* data, size_
   if (ctx == NULL || (len != 0 && data == NULL))
     return TC_ERROR;
 #endif
+  if (ctx == NULL || ctx->active != 1 ||
+      (len != 0 && data == NULL) || ctx->BufLen >= TC_SHA384_BLOCKLEN)
+    return TC_ERROR;
   return tc_sha512_stream_update(ctx->State, &ctx->Count, &ctx->BufLen, ctx->Buf,
                                  data, len, tc_sha512_compress);
 }
@@ -358,12 +369,17 @@ TC_status TC_SHA384_final(struct TC_SHA384_ctx* ctx, uint8_t* digest)
   if (ctx == NULL || digest == NULL)
     return TC_ERROR;
 #endif
+  if (ctx == NULL || ctx->active != 1 || digest == NULL ||
+      ctx->BufLen >= TC_SHA384_BLOCKLEN)
+    return TC_ERROR;
   /* Emit the leftmost six state words (384 bits). */
   tc_sha512_stream_final(ctx->State, 6, ctx->Count, &ctx->BufLen, ctx->Buf,
                          digest, tc_sha512_compress);
 
 #if TC_ZEROIZE
   TC_secure_zero(ctx, sizeof(*ctx));
+#else
+  ctx->active = 0;
 #endif
   return TC_OK;
 }
@@ -481,12 +497,20 @@ static void tc_sha512_hmac_outer_final(uint64_t* state, size_t state_words,
 
 TC_status TC_HMAC_SHA384_init(struct TC_HMAC_SHA384_ctx* ctx, const uint8_t* key, size_t keylen)
 {
-  if (ctx == NULL || (keylen != 0 && key == NULL))
+  if (ctx == NULL)
     return TC_ERROR;
-  return tc_sha512_hmac_init_common(ctx->Inner.State, &ctx->Inner.Count,
+  TC_secure_zero(ctx, sizeof(*ctx));
+  if (keylen != 0 && key == NULL)
+    return TC_ERROR;
+  if (tc_sha512_hmac_init_common(ctx->Inner.State, &ctx->Inner.Count,
                                     &ctx->Inner.BufLen, ctx->Inner.Buf, ctx->OuterState,
                                     6, key, keylen,
-                                    tc_sha384_state_init, tc_sha512_compress_secret);
+                                    tc_sha384_state_init, tc_sha512_compress_secret) != TC_OK) {
+    TC_secure_zero(ctx, sizeof(*ctx));
+    return TC_ERROR;
+  }
+  ctx->Inner.active = 1;
+  return TC_OK;
 }
 
 TC_status TC_HMAC_SHA384_update(struct TC_HMAC_SHA384_ctx* ctx, const uint8_t* data, size_t len)
@@ -495,6 +519,8 @@ TC_status TC_HMAC_SHA384_update(struct TC_HMAC_SHA384_ctx* ctx, const uint8_t* d
   if (ctx == NULL)
     return TC_ERROR;
 #endif
+  if (ctx == NULL)
+    return TC_ERROR;
   return TC_SHA384_update(&ctx->Inner, data, len);
 }
 
@@ -506,6 +532,8 @@ TC_status TC_HMAC_SHA384_final(struct TC_HMAC_SHA384_ctx* ctx, uint8_t* tag)
   if (ctx == NULL || tag == NULL)
     return TC_ERROR;
 #endif
+  if (ctx == NULL || tag == NULL)
+    return TC_ERROR;
 
   /* One-shot: TC_ZEROIZE wipes the context; call TC_HMAC_SHA384_init to reuse. */
   if (TC_SHA384_final(&ctx->Inner, inner) != TC_OK)
@@ -589,12 +617,20 @@ TC_status TC_HMAC_SHA384_verify(const uint8_t* key, size_t keylen, const uint8_t
 
 TC_status TC_HMAC_SHA512_init(struct TC_HMAC_SHA512_ctx* ctx, const uint8_t* key, size_t keylen)
 {
-  if (ctx == NULL || (keylen != 0 && key == NULL))
+  if (ctx == NULL)
     return TC_ERROR;
-  return tc_sha512_hmac_init_common(ctx->Inner.State, &ctx->Inner.Count,
+  TC_secure_zero(ctx, sizeof(*ctx));
+  if (keylen != 0 && key == NULL)
+    return TC_ERROR;
+  if (tc_sha512_hmac_init_common(ctx->Inner.State, &ctx->Inner.Count,
                                     &ctx->Inner.BufLen, ctx->Inner.Buf, ctx->OuterState,
                                     8, key, keylen,
-                                    tc_sha512_state_init, tc_sha512_compress_secret);
+                                    tc_sha512_state_init, tc_sha512_compress_secret) != TC_OK) {
+    TC_secure_zero(ctx, sizeof(*ctx));
+    return TC_ERROR;
+  }
+  ctx->Inner.active = 1;
+  return TC_OK;
 }
 
 TC_status TC_HMAC_SHA512_update(struct TC_HMAC_SHA512_ctx* ctx, const uint8_t* data, size_t len)
@@ -603,6 +639,8 @@ TC_status TC_HMAC_SHA512_update(struct TC_HMAC_SHA512_ctx* ctx, const uint8_t* d
   if (ctx == NULL)
     return TC_ERROR;
 #endif
+  if (ctx == NULL)
+    return TC_ERROR;
   return TC_SHA512_update(&ctx->Inner, data, len);
 }
 
@@ -614,6 +652,8 @@ TC_status TC_HMAC_SHA512_final(struct TC_HMAC_SHA512_ctx* ctx, uint8_t* tag)
   if (ctx == NULL || tag == NULL)
     return TC_ERROR;
 #endif
+  if (ctx == NULL || tag == NULL)
+    return TC_ERROR;
 
   /* One-shot: TC_ZEROIZE wipes the context; call TC_HMAC_SHA512_init to reuse. */
   if (TC_SHA512_final(&ctx->Inner, inner) != TC_OK)

@@ -106,6 +106,7 @@ struct TC_SHA1_ctx
   uint64_t Count;
   uint32_t State[5];
   uint8_t BufLen;
+  uint8_t active;
   uint8_t Buf[TC_SHA1_BLOCKLEN];
 };
 #endif
@@ -122,6 +123,7 @@ struct TC_SHA224_ctx
   uint64_t Count;
   uint32_t State[8];
   uint8_t BufLen;
+  uint8_t active;
   uint8_t Buf[TC_SHA224_BLOCKLEN];
 };
 #endif
@@ -138,6 +140,7 @@ struct TC_SHA256_ctx
   uint64_t Count;
   uint32_t State[8];
   uint8_t BufLen;
+  uint8_t active;
   uint8_t Buf[TC_SHA256_BLOCKLEN];
 };
 #endif
@@ -155,6 +158,7 @@ struct TC_SHA384_ctx
   uint64_t Count;
   uint64_t State[8];
   uint8_t BufLen;
+  uint8_t active;
   uint8_t Buf[TC_SHA384_BLOCKLEN];
 };
 #endif
@@ -171,6 +175,7 @@ struct TC_SHA512_ctx
   uint64_t Count;
   uint64_t State[8];
   uint8_t BufLen;
+  uint8_t active;
   uint8_t Buf[TC_SHA512_BLOCKLEN];
 };
 #endif

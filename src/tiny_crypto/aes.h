@@ -103,6 +103,7 @@ void TC_AES_GCM_hardware_multiply(uint8_t result[16],
 struct TC_AES_key_ctx
 {
   uint8_t round_key[TC_AES_KEY_EXP_SIZE];
+  uint8_t active;
 };
 
 struct TC_AES_ctx
@@ -219,21 +220,28 @@ struct TC_AES_GCM_ctx
   uint8_t tag_len; /* fixed for this key/context; SP 800-38D §5.2.1.2 */
   uint8_t phase;
   uint8_t direction;
+  /* Streaming decryption authenticates contiguous caller-owned ciphertext. */
+  uint8_t* decrypt_buffer;
+  size_t decrypt_length;
 };
 
 /*
- * Initialize GCM. tag_len is the SP 800-38D tag length t in bytes
- * (4, 8, or 12–16) and is fixed for this context. IV may be any supported
+ * Initialize GCM with a 12–16-byte tag. The explicit short-tag initializer
+ * accepts 4 or 8 bytes under the SP 800-38D Appendix C packet limits.
+ * Tag length is fixed for this context. IV may be any supported
  * non-zero byte length; 12 bytes (96 bits) is the recommended fast path.
  */
 TC_status TC_AES_GCM_init(struct TC_AES_GCM_ctx* ctx, const uint8_t* key,
                  const uint8_t* iv, size_t iv_len, size_t tag_len);
+TC_status TC_AES_GCM_init_short_tag(struct TC_AES_GCM_ctx* ctx,
+                 const uint8_t* key, const uint8_t* iv,
+                 size_t iv_len, size_t tag_len);
 
 /* AAD must be supplied before the first encrypt/decrypt update. A context is
  * single-direction; reinitialize before switching direction. Check every
- * return value. Streaming decryption writes provisional plaintext during
- * update; do not use it until decrypt_finish returns TC_OK. On any failure,
- * discard and wipe plaintext from all preceding updates. */
+ * return value. Decrypt updates authenticate contiguous slices of one mutable
+ * ciphertext buffer. Keep that buffer unchanged until decrypt_finish verifies
+ * the tag and decrypts it in place. A bad tag leaves ciphertext unchanged. */
 TC_status TC_AES_GCM_aad_update(struct TC_AES_GCM_ctx* ctx, const uint8_t* aad,
                        size_t length);
 TC_status TC_AES_GCM_encrypt_update(struct TC_AES_GCM_ctx* ctx, uint8_t* buf,
@@ -259,6 +267,17 @@ TC_status TC_AES_GCM_encrypt(const uint8_t* key,
                     const uint8_t* plaintext, size_t plaintext_len,
                     uint8_t* ciphertext, uint8_t* tag, size_t tag_len);
 TC_status TC_AES_GCM_decrypt(const uint8_t* key,
+                    const uint8_t* iv, size_t iv_len,
+                    const uint8_t* aad, size_t aad_len,
+                    const uint8_t* ciphertext, size_t ciphertext_len,
+                    const uint8_t* tag, size_t tag_len,
+                    uint8_t* plaintext);
+TC_status TC_AES_GCM_encrypt_short_tag(const uint8_t* key,
+                    const uint8_t* iv, size_t iv_len,
+                    const uint8_t* aad, size_t aad_len,
+                    const uint8_t* plaintext, size_t plaintext_len,
+                    uint8_t* ciphertext, uint8_t* tag, size_t tag_len);
+TC_status TC_AES_GCM_decrypt_short_tag(const uint8_t* key,
                     const uint8_t* iv, size_t iv_len,
                     const uint8_t* aad, size_t aad_len,
                     const uint8_t* ciphertext, size_t ciphertext_len,
@@ -351,6 +370,7 @@ struct TC_AES_CMAC_ctx
   uint8_t mac[TC_AES_BLOCKLEN];
   uint8_t buf[TC_AES_BLOCKLEN];
   uint8_t buf_len;
+  uint8_t active;
 };
 
 TC_status TC_AES_CMAC_init(struct TC_AES_CMAC_ctx* ctx, const uint8_t* key);

@@ -11,6 +11,14 @@
 
 #include <tiny_crypto/common.h>
 
+#if __cplusplus >= 201703L
+#define TC_CPP_NODISCARD [[nodiscard]]
+#elif defined(__GNUC__) || defined(__clang__)
+#define TC_CPP_NODISCARD __attribute__((warn_unused_result))
+#else
+#define TC_CPP_NODISCARD
+#endif
+
 namespace tiny_crypto {
 
 typedef ::TC_bytes bytes;
