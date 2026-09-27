@@ -150,6 +150,47 @@ work counters may change. Secret-producing operations also specify wiping
 behavior. Clear application-held keys and plaintext with `TC_secure_zero` when
 their lifetime ends. Release acquired snapshots on every exit path.
 
+## DES message authentication
+
+Enable both `TINY_CRYPTO_ENABLE_DES=ON` and `TINY_CRYPTO_DES_ISO9797=ON` to use
+ISO/IEC 9797-1 MAC algorithms 1 and 3. Include `<tiny_crypto/des.h>`.
+Algorithm 1 accepts 8, 16, or 24-byte keys. Algorithm 3, the retail MAC,
+accepts 16 or 24-byte keys. Choose no padding for block-aligned input, method 1
+for zero padding of a partial block, or method 2 for an `0x80` byte followed by
+zeroes. No padding and method 1 require a nonempty message. The protocol must
+fix or authenticate the message length when using either of those choices.
+
+`TC_DES_ISO9797_MAC` and `TC_DES_ISO9797_verify` accept the leading 4 to 8
+bytes of the full MAC. Verification returns `TC_MISMATCH` for a different tag.
+For incremental input, call `TC_DES_ISO9797_init`, `update`, and `final` in
+order. Successful finalization consumes and clears the context; clear it
+explicitly after an update error. Keep the input, key, and tag buffers disjoint
+from the context.
+
+```c
+#include <tiny_crypto/des.h>
+
+int main(void)
+{
+    const uint8_t key[16] = {
+        0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+        0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10
+    };
+    const uint8_t message[] = "Now is the time for all ";
+    uint8_t tag[TC_DES_BLOCKLEN];
+
+    if (TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3,
+                           TC_DES_ISO9797_PAD2, key, sizeof key,
+                           message, sizeof message - 1,
+                           tag, sizeof tag) != TC_OK)
+        return 1;
+
+    /* Use tag with the message in the application protocol. */
+    TC_secure_zero(tag, sizeof tag);
+    return 0;
+}
+```
+
 ## Complete workflows
 
 - [Validation setup](validation.md) covers arenas, shared contexts, and
