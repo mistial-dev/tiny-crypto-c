@@ -83,7 +83,7 @@ tc_module_feature(TINY_CRYPTO_ENABLE_CREDENTIAL TC_ENABLE_CREDENTIAL
 set(tc_module_requires_TC_ENABLE_CREDENTIAL
   TINY_CRYPTO_ENABLE_PIV_OBJECTS TINY_CRYPTO_ENABLE_PIV_CHUID
   TINY_CRYPTO_ENABLE_CMS_VALIDATION)
-set(tc_module_sources_TC_ENABLE_CREDENTIAL src/credential.c)
+set(tc_module_sources_TC_ENABLE_CREDENTIAL src/credential.c src/credential_policy.c)
 
 function(tc_validate_module_features)
   foreach(macro_name IN LISTS tc_module_features)
