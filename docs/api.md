@@ -154,14 +154,18 @@ their lifetime ends. Release acquired snapshots on every exit path.
 
 Enable both `TINY_CRYPTO_ENABLE_DES=ON` and `TINY_CRYPTO_DES_ISO9797=ON` to use
 ISO/IEC 9797-1 MAC algorithms 1 and 3. Include `<tiny_crypto/des.h>`.
-Algorithm 1 accepts 8, 16, or 24-byte keys. Algorithm 3, the retail MAC,
-accepts 16 or 24-byte keys. Choose no padding for block-aligned input, method 1
+Algorithm 1 accepts 16 or 24-byte TDEA keys. Algorithm 3, the retail MAC,
+accepts a 16-byte two-key input. The separate `TC_DES_RETAIL3_*` functions
+provide the three-key retail extension with final encryption under K3.
+Choose no padding for block-aligned input, method 1
 for zero padding of a partial block, or method 2 for an `0x80` byte followed by
-zeroes. No padding and method 1 require a nonempty message. The protocol must
+zeroes. Method 1 processes an empty message as one zero block. No padding
+requires a nonempty message. The protocol must
 fix or authenticate the message length when using either of those choices.
 
-`TC_DES_ISO9797_MAC` and `TC_DES_ISO9797_verify` accept the leading 4 to 8
-bytes of the full MAC. Verification returns `TC_MISMATCH` for a different tag.
+`TC_DES_ISO9797_MAC` and `TC_DES_ISO9797_verify` require the full 8-byte MAC.
+Use the explicit `_short_tag` forms for 4 to 7 leading bytes when a protocol
+requires truncation. Verification returns `TC_MISMATCH` for a different tag.
 For incremental input, call `TC_DES_ISO9797_init`, `update`, and `final` in
 order. Successful finalization consumes and clears the context; clear it
 explicitly after an update error. Keep the input, key, and tag buffers disjoint

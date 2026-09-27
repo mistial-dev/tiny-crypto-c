@@ -159,17 +159,20 @@ public:
     basic_des(const basic_des&) = delete;
     basic_des& operator=(const basic_des&) = delete;
 
-    TC_status init(const uint8_t* key, size_t key_len) noexcept {
+    TC_CPP_NODISCARD TC_status init(const uint8_t* key, size_t key_len) noexcept {
         return Traits::init(&ctx_, key, key_len);
     }
-    template <size_t N> TC_status init(const uint8_t (&key)[N]) noexcept {
+    template <size_t N> TC_CPP_NODISCARD TC_status init(const uint8_t (&key)[N]) noexcept {
         return init(key, N);
     }
 #if TC_DES_NEEDS_IV
-    TC_status init(const uint8_t* key, size_t key_len,
+    TC_CPP_NODISCARD TC_status init(const uint8_t* key, size_t key_len,
                    const uint8_t* iv, size_t iv_len) noexcept {
-        return iv_len == TC_DES_BLOCKLEN ?
-               Traits::init_iv(&ctx_, key, key_len, iv) : TC_ERROR;
+        if (iv_len != TC_DES_BLOCKLEN) {
+            Traits::clear(&ctx_);
+            return TC_ERROR;
+        }
+        return Traits::init_iv(&ctx_, key, key_len, iv);
     }
     TC_status set_iv(const uint8_t* iv, size_t iv_len) noexcept {
         return iv_len == TC_DES_BLOCKLEN ? Traits::set_iv(&ctx_, iv) : TC_ERROR;
@@ -215,12 +218,14 @@ public:
 #if TC_DES_ENABLE_CFB1
     TC_status encrypt_cfb1(uint8_t* data, size_t data_len,
                            size_t bits) noexcept {
-        return bits <= 8u * data_len ?
+        return (bits / 8u < data_len ||
+                (bits / 8u == data_len && bits % 8u == 0)) ?
                Traits::encrypt_cfb1(&ctx_, data, bits) : TC_ERROR;
     }
     TC_status decrypt_cfb1(uint8_t* data, size_t data_len,
                            size_t bits) noexcept {
-        return bits <= 8u * data_len ?
+        return (bits / 8u < data_len ||
+                (bits / 8u == data_len && bits % 8u == 0)) ?
                Traits::decrypt_cfb1(&ctx_, data, bits) : TC_ERROR;
     }
     template <size_t N>

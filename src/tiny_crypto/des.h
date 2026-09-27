@@ -83,6 +83,7 @@
 struct TC_DES_ctx
 {
   uint8_t Sk[16][6];
+  uint8_t active;
 #if TC_DES_NEEDS_IV
   uint8_t Iv[TC_DES_BLOCKLEN];
 #endif
@@ -102,6 +103,7 @@ struct TC_DES_ctx
 struct TC_DES3_ctx
 {
   uint8_t Sk[48][6];
+  uint8_t active;
 #if TC_DES_NEEDS_IV
   uint8_t Iv[TC_DES_BLOCKLEN];
 #endif
@@ -482,6 +484,7 @@ struct TC_DES_CMAC_ctx
   uint8_t buf[TC_DES_BLOCKLEN];
   uint8_t buf_len;
   uint8_t triple;
+  uint8_t active;
 };
 
 /* keylen must be 8, 16 (K1,K2,K1) or 24. */
@@ -494,11 +497,12 @@ void TC_DES_CMAC_ctx_clear(struct TC_DES_CMAC_ctx* ctx);
 
 #if TC_DES_ENABLE_ISO9797
 /* ISO/IEC 9797-1 MAC algorithm 1 (CBC-MAC) or 3 (retail MAC).
- * Algorithm 1 accepts DES or 2/3-key TDEA. Algorithm 3 accepts 2/3-key TDEA;
- * CBC iteration uses K1 and the output transform uses D(K2), E(K3).
+ * Algorithm 1 uses 2/3-key TDEA. Algorithm 3 uses two DES keys;
+ * CBC iteration uses K1 and the output transform uses D(K2), E(K1).
  * Padding 1 adds zero bytes only to a partial block. Padding 2 always adds
  * 0x80 followed by zeroes. NONE requires block alignment. NONE and padding 1
- * require a nonempty message.
+ * require a nonempty message for NONE. Padding 1 on an empty message
+ * processes one zero block.
  * The caller must authenticate a fixed or separately authenticated length
  * when using NONE or padding 1. Context is caller-owned and final consumes it.
  * Input, key, and tag buffers must not overlap the context. A failed final
@@ -524,7 +528,7 @@ struct TC_DES_ISO9797_ctx {
   uint8_t algorithm;
   uint8_t padding;
   uint8_t active;
-  size_t total;
+  uint8_t nonempty;
 };
 
 TC_status TC_DES_ISO9797_init(struct TC_DES_ISO9797_ctx* ctx,
@@ -541,13 +545,38 @@ TC_status TC_DES_ISO9797_MAC(TC_DES_ISO9797_algorithm algorithm,
                              const uint8_t* key, size_t keylen,
                              const uint8_t* msg, size_t msg_len,
                              uint8_t* tag, size_t tag_len);
-/* One-shot and verify accept the leading 4..8 bytes of the full MAC.
- * MAC leaves tag untouched on error. Verify returns TC_MISMATCH for a bad tag. */
+/* The default one-shot API requires the full 8-byte MAC. MAC leaves tag
+ * untouched on error. Verify returns TC_MISMATCH for a bad tag. */
 TC_status TC_DES_ISO9797_verify(TC_DES_ISO9797_algorithm algorithm,
                                 TC_DES_ISO9797_padding padding,
                                 const uint8_t* key, size_t keylen,
                                 const uint8_t* msg, size_t msg_len,
                                 const uint8_t* tag, size_t tag_len);
+/* Explicit truncated-MAC API. Accepts the leading 4..7 bytes. */
+TC_status TC_DES_ISO9797_MAC_short_tag(TC_DES_ISO9797_algorithm algorithm,
+                                       TC_DES_ISO9797_padding padding,
+                                       const uint8_t* key, size_t keylen,
+                                       const uint8_t* msg, size_t msg_len,
+                                       uint8_t* tag, size_t tag_len);
+TC_status TC_DES_ISO9797_verify_short_tag(TC_DES_ISO9797_algorithm algorithm,
+                                          TC_DES_ISO9797_padding padding,
+                                          const uint8_t* key, size_t keylen,
+                                          const uint8_t* msg, size_t msg_len,
+                                          const uint8_t* tag, size_t tag_len);
+
+/* Explicit three-key retail-MAC extension: DES-CBC under K1, then
+ * D(K2) and E(K3). Use the standard Algorithm 3 API for two-key MACs. */
+TC_status TC_DES_RETAIL3_init(struct TC_DES_ISO9797_ctx* ctx,
+                             TC_DES_ISO9797_padding padding,
+                             const uint8_t key[24]);
+TC_status TC_DES_RETAIL3_MAC(TC_DES_ISO9797_padding padding,
+                            const uint8_t key[24],
+                            const uint8_t* msg, size_t msg_len,
+                            uint8_t* tag, size_t tag_len);
+TC_status TC_DES_RETAIL3_verify(TC_DES_ISO9797_padding padding,
+                               const uint8_t key[24],
+                               const uint8_t* msg, size_t msg_len,
+                               const uint8_t* tag, size_t tag_len);
 #endif /* TC_DES_ENABLE_ISO9797 */
 
 #ifdef __cplusplus

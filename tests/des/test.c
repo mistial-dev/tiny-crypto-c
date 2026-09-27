@@ -697,6 +697,14 @@ static MunitResult test_des_cmac_streaming(const MunitParameter params[], void* 
   munit_assert_int(TC_ERROR, ==, TC_DES_CMAC_init(NULL, des_test_key, 8));
   munit_assert_int(TC_ERROR, ==, TC_DES_CMAC_init(&ctx, NULL, 8));
   munit_assert_int(TC_ERROR, ==, TC_DES_CMAC_init(&ctx, des_test_key, 12));
+  memset(&ctx, 0, sizeof ctx);
+  munit_assert_int(TC_DES_CMAC_update(&ctx, msg, 1), ==, TC_ERROR);
+  munit_assert_int(TC_DES_CMAC_final(&ctx, tag), ==, TC_ERROR);
+  munit_assert_int(TC_DES_CMAC_init(&ctx, des_test_key, 8), ==, TC_OK);
+  munit_assert_int(TC_DES_CMAC_final(&ctx, tag), ==, TC_OK);
+  munit_assert_int(TC_DES_CMAC_final(&ctx, tag), ==, TC_ERROR);
+  TC_DES_CMAC_ctx_clear(&ctx);
+  munit_assert_int(TC_DES_CMAC_update(&ctx, msg, 1), ==, TC_ERROR);
   TC_DES_CMAC_ctx_clear(NULL);
 
   return MUNIT_OK;
@@ -731,6 +739,32 @@ static MunitResult test_des_api_errors(const MunitParameter params[], void* data
 {
   (void) params;
   (void) data;
+
+  {
+    struct TC_DES_ctx ctx = {0};
+    uint8_t block[TC_DES_BLOCKLEN] = {1};
+    uint8_t saved[TC_DES_BLOCKLEN];
+    memcpy(saved, block, sizeof block);
+#if TC_DES_ENABLE_ECB
+    munit_assert_int(TC_DES_ECB_encrypt(&ctx, block), ==, TC_ERROR);
+#endif
+#if TC_DES_ENABLE_CBC
+    munit_assert_int(TC_DES_CBC_encrypt(&ctx, block, sizeof block), ==, TC_ERROR);
+#endif
+#if TC_DES_ENABLE_CTR
+    munit_assert_int(TC_DES_CTR_crypt(&ctx, block, sizeof block), ==, TC_ERROR);
+#endif
+#if TC_DES_ENABLE_OFB
+    munit_assert_int(TC_DES_OFB_crypt(&ctx, block, sizeof block), ==, TC_ERROR);
+#endif
+    munit_assert_memory_equal(sizeof block, block, saved);
+    munit_assert_int(TC_DES_init_ctx(&ctx, des_test_key), ==, TC_OK);
+    TC_DES_ctx_clear(&ctx);
+#if TC_DES_ENABLE_ECB
+    munit_assert_int(TC_DES_ECB_encrypt(&ctx, block), ==, TC_ERROR);
+#endif
+    munit_assert_int(TC_DES_init_ctx(&ctx, NULL), ==, TC_ERROR);
+  }
 
 #if TC_DES_ENABLE_CBC
   {
@@ -869,7 +903,9 @@ static MunitResult test_des_iso9797(const MunitParameter params[], void* data)
   munit_assert_memory_equal(8, tag, alg1_3key_pad1);
   munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3,
       TC_DES_ISO9797_PAD2, key3, sizeof key3, msg, sizeof msg - 2,
-      tag, sizeof tag), ==, TC_OK);
+      tag, sizeof tag), ==, TC_ERROR);
+  munit_assert_int(TC_DES_RETAIL3_MAC(TC_DES_ISO9797_PAD2, key3,
+      msg, sizeof msg - 2, tag, sizeof tag), ==, TC_OK);
   munit_assert_memory_equal(8, tag, alg3_3key_pad2);
 
   munit_assert_int(TC_DES_ISO9797_init(&ctx, TC_DES_ISO9797_ALG3,
@@ -897,7 +933,11 @@ static MunitResult test_des_iso9797(const MunitParameter params[], void* data)
   munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG1,
       TC_DES_ISO9797_PAD_NONE, key2, sizeof key2, NULL, 0, guard, 8), ==, TC_ERROR);
   munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3,
-      TC_DES_ISO9797_PAD1, key2, sizeof key2, NULL, 0, guard, 8), ==, TC_ERROR);
+      TC_DES_ISO9797_PAD1, key2, sizeof key2, NULL, 0, guard, 8), ==, TC_OK);
+  munit_assert_int(TC_DES_ISO9797_verify(TC_DES_ISO9797_ALG3,
+      TC_DES_ISO9797_PAD1, key2, sizeof key2, NULL, 0, guard, 8), ==, TC_OK);
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG1,
+      TC_DES_ISO9797_PAD2, key2, 8, msg, 8, guard, 8), ==, TC_ERROR);
   munit_assert_int(TC_DES_ISO9797_init(&ctx, (TC_DES_ISO9797_algorithm)2,
       TC_DES_ISO9797_PAD2, key2, sizeof key2), ==, TC_ERROR);
   munit_assert_int(TC_DES_ISO9797_init(&ctx, TC_DES_ISO9797_ALG3,
@@ -908,7 +948,17 @@ static MunitResult test_des_iso9797(const MunitParameter params[], void* data)
   TC_DES_ISO9797_clear(&ctx);
   munit_assert_int(TC_DES_ISO9797_verify(TC_DES_ISO9797_ALG3,
       TC_DES_ISO9797_PAD_NONE, key2, sizeof key2, msg, sizeof msg - 1,
+      retail_none, 4), ==, TC_ERROR);
+  munit_assert_int(TC_DES_ISO9797_verify_short_tag(TC_DES_ISO9797_ALG3,
+      TC_DES_ISO9797_PAD_NONE, key2, sizeof key2, msg, sizeof msg - 1,
       retail_none, 4), ==, TC_OK);
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3,
+      TC_DES_ISO9797_PAD_NONE, key2, sizeof key2, msg, sizeof msg - 1,
+      tag, 4), ==, TC_ERROR);
+  munit_assert_int(TC_DES_ISO9797_MAC_short_tag(TC_DES_ISO9797_ALG3,
+      TC_DES_ISO9797_PAD_NONE, key2, sizeof key2, msg, sizeof msg - 1,
+      tag, 4), ==, TC_OK);
+  munit_assert_memory_equal(4, tag, retail_none);
   tag[0] = (uint8_t)(retail_none[0] ^ 1);
   memcpy(tag + 1, retail_none + 1, 7);
   munit_assert_int(TC_DES_ISO9797_verify(TC_DES_ISO9797_ALG3,
