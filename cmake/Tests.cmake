@@ -362,10 +362,11 @@ if(TINY_CRYPTO_BUILD_TESTS)
     add_test(NAME test_idf_rsa_image_policy COMMAND test_idf_image_policy_rsa
       --image "${TINY_CRYPTO_TEST_ESP_SIGNED_IMAGE}")
   endif()
-  tc_add_c_test(test_aes_platform tiny-crypto-c-test-aes-dynamic tests/aes/platform.c src/aes.c)
+  tc_add_c_test(test_aes_platform tiny-crypto-c-test-aes-dynamic tests/aes/platform.c src/aes.c src/aes_modes.c)
   target_compile_definitions(test_aes_platform PRIVATE TC_AES_PLATFORM=1)
   tc_add_c_test(test_aes_backend_failure tiny-crypto-c-test-aes-dynamic
-    tests/aes/backend_failure.c src/aes_mac.c src/aes_ccm.c src/aes_gcm.c)
+    tests/aes/backend_failure.c src/aes_mac.c src/aes_cmac.c src/aes_eax.c src/aes_siv.c
+    src/aes_ccm.c src/aes_ghash.c src/aes_gcm.c)
   target_compile_definitions(test_aes_backend_failure PRIVATE
     TC_AES_ENABLE_CMAC=1 TC_AES_ENABLE_SIV=1 TC_AES_ENABLE_EAX=1 TC_AES_ENABLE_EAX_PRIME=1
     TC_AES_ENABLE_CCM=1 TC_AES_ENABLE_GCM=1

@@ -1,5 +1,12 @@
-/* SPDX-License-Identifier: GPL-2.0-or-later */
+/* SPDX-FileCopyrightText: Mistial Dev
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
+ * AES-GCM authenticated encryption (NIST SP 800-38D): streaming and one-shot
+ * encryption and decryption, short-tag packet limits (appendix C) and the
+ * decrypt-side recheck that keeps ciphertext unchanged on a bad tag.
+ * GHASH lives in aes_ghash.c. */
 #include "aes_internal.h"
+#include "aes_ghash_internal.h"
 
 #if defined(TC_AES_ENABLE_GCM) && (TC_AES_ENABLE_GCM == 1)
 
@@ -10,176 +17,6 @@
 #define TC_AES_GCM_DIRECTION_NONE    0u
 #define TC_AES_GCM_DIRECTION_ENCRYPT 1u
 #define TC_AES_GCM_DIRECTION_DECRYPT 2u
-
-#if (TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_BITWISE) || \
-    (TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_AUTO && \
-     (!TC_AES_WIDE_OPS || !defined(UINT64_MAX))) || \
-    (TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_FAST_TABLE) || \
-    (TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_WIDE && !defined(UINT64_MAX))
-static void tc_aes_gcm_multiply_x(uint8_t value[TC_AES_BLOCKLEN])
-{
-  uint8_t carry = 0;
-  unsigned i;
-
-  for (i = 0; i < TC_AES_BLOCKLEN; ++i)
-  {
-    const uint8_t next_carry = (uint8_t)(value[i] & 1u);
-    value[i] = (uint8_t)((value[i] >> 1) | (carry << 7));
-    carry = next_carry;
-  }
-  value[0] ^= (uint8_t)(0xe1u & (uint8_t)(0u - carry));
-}
-
-/* Constant-time bytewise multiplication in GF(2^128). */
-static void tc_aes_gcm_multiply_bitwise(uint8_t* result, const uint8_t* left,
-                                 const uint8_t* right)
-{
-  uint8_t z[TC_AES_BLOCKLEN] = { 0 };
-  uint8_t v[TC_AES_BLOCKLEN];
-  unsigned bit;
-
-  tc_aes_copy_bytes(v, right, TC_AES_BLOCKLEN);
-  for (bit = 0; bit < 128; ++bit)
-  {
-    const uint8_t bit_mask = (uint8_t)(0u -
-      (uint8_t)((left[bit / 8u] >> (7u - (bit % 8u))) & 1u));
-    unsigned i;
-
-    for (i = 0; i < TC_AES_BLOCKLEN; ++i)
-      z[i] ^= (uint8_t)(v[i] & bit_mask);
-
-    tc_aes_gcm_multiply_x(v);
-  }
-  tc_aes_copy_bytes(result, z, TC_AES_BLOCKLEN);
-#if TC_ZEROIZE
-  TC_secure_zero(z, sizeof(z));
-  TC_secure_zero(v, sizeof(v));
-#endif
-}
-#endif
-
-#if TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_WIDE || \
-    ((TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_AUTO) && TC_AES_WIDE_OPS)
-#if defined(UINT64_MAX)
-static void tc_aes_gcm_multiply_wide(uint8_t* result, const uint8_t* left,
-                              const uint8_t* right)
-{
-  uint64_t xh = tc_internal_load_be64(left);
-  uint64_t xl = tc_internal_load_be64(left + 8);
-  uint64_t zh = 0;
-  uint64_t zl = 0;
-  uint64_t vh = tc_internal_load_be64(right);
-  uint64_t vl = tc_internal_load_be64(right + 8);
-  unsigned bit;
-
-  for (bit = 0; bit < 128; ++bit)
-  {
-    const uint64_t bit_mask = 0u - (xh >> 63);
-    const uint64_t reduction = 0xe100000000000000ULL & (0u - (vl & 1u));
-    zh ^= vh & bit_mask;
-    zl ^= vl & bit_mask;
-    vl = (vl >> 1) | (vh << 63);
-    vh = (vh >> 1) ^ reduction;
-    xh = (xh << 1) | (xl >> 63);
-    xl <<= 1;
-  }
-  tc_internal_store_be64(result, zh);
-  tc_internal_store_be64(result + 8, zl);
-}
-#endif
-#endif
-
-#if TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_FAST_TABLE
-static void tc_aes_gcm_init_table(struct TC_AES_GCM_ctx* ctx)
-{
-  uint8_t input[TC_AES_BLOCKLEN] = { 0 };
-  uint8_t entry;
-
-  for (entry = 0; entry < 16; ++entry)
-  {
-    input[0] = (uint8_t)(entry << 4);
-    tc_aes_gcm_multiply_bitwise(ctx->ghash_table[entry], input, ctx->H);
-  }
-#if TC_ZEROIZE
-  TC_secure_zero(input, sizeof(input));
-#endif
-}
-
-static void tc_aes_gcm_multiply_fast_table(uint8_t* result, const uint8_t* left,
-                                    const struct TC_AES_GCM_ctx* ctx)
-{
-  uint8_t value[TC_AES_BLOCKLEN] = { 0 };
-  uint8_t position = 32;
-  uint8_t i;
-
-  /* Horner evaluation runs from the least-significant nibble toward the
-   * most-significant one. Each x^4 step advances the accumulated field power. */
-  while (position > 0)
-  {
-    const uint8_t nibble_position = (uint8_t)(--position);
-    const uint8_t nibble = (uint8_t)((nibble_position & 1u) == 0u ?
-      left[nibble_position / 2u] >> 4 :
-      left[nibble_position / 2u] & 0x0fu);
-    tc_aes_gcm_multiply_x(value);
-    tc_aes_gcm_multiply_x(value);
-    tc_aes_gcm_multiply_x(value);
-    tc_aes_gcm_multiply_x(value);
-    for (i = 0; i < TC_AES_BLOCKLEN; ++i)
-      value[i] ^= ctx->ghash_table[nibble][i];
-  }
-  tc_aes_copy_bytes(result, value, TC_AES_BLOCKLEN);
-#if TC_ZEROIZE
-  TC_secure_zero(value, sizeof(value));
-#endif
-}
-#endif
-
-static void tc_aes_gcm_multiply(uint8_t* result, const uint8_t* left,
-                         const struct TC_AES_GCM_ctx* ctx)
-{
-#if TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_HARDWARE
-  TC_AES_GCM_hardware_multiply(result, left, ctx->H);
-#elif TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_FAST_TABLE
-  tc_aes_gcm_multiply_fast_table(result, left, ctx);
-#elif TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_WIDE || \
-      ((TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_AUTO) && TC_AES_WIDE_OPS)
-#if defined(UINT64_MAX)
-  tc_aes_gcm_multiply_wide(result, left, ctx->H);
-#else
-  tc_aes_gcm_multiply_bitwise(result, left, ctx->H);
-#endif
-#else
-  tc_aes_gcm_multiply_bitwise(result, left, ctx->H);
-#endif
-}
-
-static void tc_aes_gcm_ghash_block(struct TC_AES_GCM_ctx* ctx, const uint8_t* block)
-{
-  uint8_t value[TC_AES_BLOCKLEN];
-  unsigned i;
-
-  for (i = 0; i < TC_AES_BLOCKLEN; ++i)
-    value[i] = (uint8_t)(ctx->S[i] ^ block[i]);
-  tc_aes_gcm_multiply(ctx->S, value, ctx);
-}
-
-static void tc_aes_gcm_hash_bytes(struct TC_AES_GCM_ctx* ctx, const uint8_t* data,
-                           size_t length)
-{
-  uint8_t block[TC_AES_BLOCKLEN] = { 0 };
-
-  while (length >= TC_AES_BLOCKLEN)
-  {
-    tc_aes_gcm_ghash_block(ctx, data);
-    data += TC_AES_BLOCKLEN;
-    length -= TC_AES_BLOCKLEN;
-  }
-  if (length != 0)
-  {
-    tc_aes_copy_bytes(block, data, length);
-    tc_aes_gcm_ghash_block(ctx, block);
-  }
-}
 
 static void tc_aes_gcm_make_j0(struct TC_AES_GCM_ctx* ctx, const uint8_t* iv,
                         size_t iv_len)

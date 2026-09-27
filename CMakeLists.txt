@@ -299,7 +299,8 @@ list(APPEND TC_PUBLIC_DEFINITIONS
   TC_AES_SBOX_MODE=${sbox_value}
   TC_AES_GCM_GHASH_MODE=${ghash_value})
 
-set(tc_aes_sources src/aes.c src/aes_gcm.c src/aes_ccm.c src/aes_mac.c src/mac_core.c)
+set(tc_aes_sources src/aes.c src/aes_modes.c src/aes_ghash.c src/aes_gcm.c src/aes_ccm.c
+  src/aes_mac.c src/aes_cmac.c src/aes_eax.c src/aes_siv.c src/mac_core.c)
 set(tc_des_sources src/des.c src/des_modes.c src/des_mac.c)
 
 # One utility translation unit keeps zeroization and constant-time comparison
