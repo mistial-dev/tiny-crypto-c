@@ -114,6 +114,30 @@ static MunitResult matching(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+static MunitResult binary_attributes(const MunitParameter params[], void* user)
+{
+  static const uint8_t email[] = {0x30,18,0x31,16,0x30,14,0x06,9,
+      0x2a,0x86,0x48,0x86,0xf7,0x0d,1,9,1,0x16,1,'A'};
+  uint8_t changed[sizeof email];
+  uint32_t first[32], second[32];
+  uint8_t used[2];
+  TC_X509_name_workspace workspace = {first,second,32,used,2};
+  size_t work = 10000;
+  int equal = 99;
+  (void)params; (void)user;
+  memcpy(changed,email,sizeof email);
+  munit_assert_int(TC_X509_name_equal((TC_bytes){email,sizeof email},
+      (TC_bytes){changed,sizeof changed},&bounds,&workspace,&work,&equal), ==,
+      TC_TLV_OK);
+  munit_assert_int(equal, ==, 1);
+  changed[19] = 'a'; work = 10000;
+  munit_assert_int(TC_X509_name_equal((TC_bytes){email,sizeof email},
+      (TC_bytes){changed,sizeof changed},&bounds,&workspace,&work,&equal), ==,
+      TC_TLV_OK);
+  munit_assert_int(equal, ==, 0);
+  return MUNIT_OK;
+}
+
 static MunitResult subtree(const MunitParameter params[], void* user)
 {
   const uint8_t parent[] = {0x30,12,0x31,10,0x30,8,6,3,0x55,4,3,0x0c,1,'A'};
@@ -186,10 +210,11 @@ static MunitResult matching_rules(const MunitParameter params[], void* user)
   size_t work = 10000;
   int equal = 99;
   (void)params; (void)user;
-  munit_assert_int(TC_X509_name_equal(left, right, &bounds, &workspace, &work, &equal), ==, TC_TLV_UNSUPPORTED);
-  munit_assert_int(equal, ==, 99);
+  munit_assert_int(TC_X509_name_equal(left, right, &bounds, &workspace, &work, &equal), ==, TC_TLV_OK);
+  munit_assert_int(equal, ==, 1);
   name[11] = 0x0c; name[10] = 99; work = 10000;
-  munit_assert_int(TC_X509_name_equal(left, right, &bounds, &workspace, &work, &equal), ==, TC_TLV_UNSUPPORTED);
+  munit_assert_int(TC_X509_name_equal(left, right, &bounds, &workspace, &work, &equal), ==, TC_TLV_OK);
+  munit_assert_int(equal, ==, 1);
   memcpy(lower, domain, sizeof lower); lower[20] = 'a';
   left.data = domain; left.length = sizeof domain;
   right.data = lower; right.length = sizeof lower;
@@ -717,6 +742,7 @@ int main(int argc, char** argv)
     {"/limits", limits, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/invalid", invalid, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/matching", matching, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/binary-attributes", binary_attributes, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/subtree", subtree, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/match-limits", match_limits, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/matching-rules", matching_rules, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

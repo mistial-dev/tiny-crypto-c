@@ -259,7 +259,7 @@ void tc_x509_policy_counters_advance(tc_x509_policy_counters* counters,
     counters->any = controls->inhibit_any;
 }
 static TC_TLV_result certificate_policies(const TC_X509_certificate* certificate,
-    const TC_TLV_limits* limits, const tc_x509_policy_workspace* workspace,
+    int target, const TC_TLV_limits* limits, const tc_x509_policy_workspace* workspace,
     size_t* work, size_t* policy_count, size_t* mapping_count)
 {
   TC_TLV_reader reader;
@@ -293,6 +293,7 @@ static TC_TLV_result certificate_policies(const TC_X509_certificate* certificate
     } else if (id == 33) {
       TC_TLV_reader mappings;
       TC_X509_policy_mapping mapping;
+      if (target && extension.critical) return TC_TLV_INVALID;
       if (has_mappings) return TC_TLV_INVALID;
       has_mappings = 1;
       result = TC_X509_policy_mappings_init(&mappings, extension.value.data, extension.value.length, limits);
@@ -338,7 +339,8 @@ TC_TLV_result tc_x509_path_policies(const tc_x509_path_input* input,
     result = TC_X509_name_equal(certificate->subject, certificate->issuer,
       input->limits, workspace->names, work, &self_issued);
     if (result != TC_TLV_OK) return result;
-    result = certificate_policies(certificate, input->limits, workspace, work, &policy_count, &mapping_count);
+    result = certificate_policies(certificate, target, input->limits, workspace,
+                                  work, &policy_count, &mapping_count);
     if (result != TC_TLV_OK) return result;
     result = tc_x509_policy_controls_read(certificate, input->limits, work, &controls);
     if (result != TC_TLV_OK) return result;

@@ -254,7 +254,7 @@ static MunitResult issuer(const MunitParameter params[], void* user)
   munit_assert_int(TC_X509_issuer_check(&certificate, anchor.name, &anchor.public_key, &provider, &bounds, &workspace, &work), ==, TC_X509_SIGNATURE_INVALID);
   munit_assert_uint(state.calls, ==, 0);
   memcpy(other, name, sizeof other); other[11] = 0x14; work = 10000;
-  munit_assert_int(TC_X509_issuer_check(&certificate, anchor.name, &anchor.public_key, &provider, &bounds, &workspace, &work), ==, TC_X509_SIGNATURE_UNSUPPORTED);
+  munit_assert_int(TC_X509_issuer_check(&certificate, anchor.name, &anchor.public_key, &provider, &bounds, &workspace, &work), ==, TC_X509_SIGNATURE_INVALID);
   munit_assert_uint(state.calls, ==, 0);
   return MUNIT_OK;
 }

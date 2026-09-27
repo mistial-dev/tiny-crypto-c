@@ -440,8 +440,8 @@ static MunitResult constructed_names(const MunitParameter params[], void* user)
         &limits,&tree), ==, TC_TLV_OK);
     work = WORK_BUDGET; matched = -1;
     munit_assert_int(tc_pki_name_equal((TC_bytes){encoded,length},TC_TLV_BER,
-        (TC_bytes){encoded,length},TC_TLV_BER,&limits,&names,&tree,&matched), ==, TC_TLV_UNSUPPORTED);
-    munit_assert_int(matched, ==, -1);
+        (TC_bytes){encoded,length},TC_TLV_BER,&limits,&names,&tree,&matched), ==, TC_TLV_OK);
+    munit_assert_int(matched, ==, 1);
   }
   {
     static const uint8_t domain_der[] = {

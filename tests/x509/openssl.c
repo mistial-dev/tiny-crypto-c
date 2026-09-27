@@ -643,7 +643,8 @@ static void cross_signed_issuer(X509* const certs[4], const char* group, const E
 
 static MunitResult paths(const MunitParameter params[], void* user)
 {
-  enum { USAGE_VALID = 15, LEAF_EKU, ISSUER_EKU, LEAF_KU, UNKNOWN_CRITICAL, UNKNOWN_NONCRITICAL, PATH_CASE_COUNT };
+  enum { USAGE_VALID = 15, LEAF_EKU, ISSUER_EKU, LEAF_KU, UNKNOWN_CRITICAL,
+         UNKNOWN_NONCRITICAL, TARGET_CRITICAL_MAPPING, PATH_CASE_COUNT };
   static const char* groups[] = {"prime256v1", "secp384r1"};
   static const char* subjects[] = {"Anchor", "Issuing CA", "Intermediate CA", "Target"};
   const EVP_MD* digests[] = {EVP_sha256(), EVP_sha384()};
@@ -695,13 +696,16 @@ static MunitResult paths(const MunitParameter params[], void* user)
           add_extension(certs[i], NID_ext_key_usage, "critical,clientAuth");
         if (i && scenario >= 8 && scenario != 12) {
           const char* policy = "1.2.3.4";
-          if (scenario >= 13)
+          if (scenario >= 13 && scenario != TARGET_CRITICAL_MAPPING)
             policy = "2.5.29.32.0";
           else if (scenario >= 9 && scenario <= 11 && i > 1)
             policy = "1.2.3.5";
           add_extension(certs[i], NID_certificate_policies, policy);
           if (i == 1 && scenario >= 9 && scenario <= 11)
             add_extension(certs[i], NID_policy_mappings, "1.2.3.4:1.2.3.5");
+          if (i == 3 && scenario == TARGET_CRITICAL_MAPPING)
+            add_extension(certs[i], NID_policy_mappings,
+                          "critical,1.2.3.4:1.2.3.5");
         }
         if (i == 3) {
           if (scenario >= USAGE_VALID) {
@@ -772,6 +776,11 @@ static MunitResult paths(const MunitParameter params[], void* user)
           unsigned long flags = scenario == 10 ? X509_V_FLAG_INHIBIT_MAP : scenario == 13 ? X509_V_FLAG_INHIBIT_ANY : 0;
           if (scenario < USAGE_VALID)
             munit_assert_int(verify_chain(certs, scenario == 11 ? "1.2.3.5" : "1.2.3.4", flags, 0), ==, wanted);
+          if (scenario == TARGET_CRITICAL_MAPPING) {
+            munit_assert_int(tc_x509_path_policies(&input, &options,
+                &policy_workspace, &work, &count, &accepted), ==, TC_TLV_INVALID);
+            continue;
+          }
           munit_assert_int(tc_x509_path_policies(&input, &options, &policy_workspace, &work, &count, &accepted), ==,
                            TC_TLV_OK);
           munit_assert_int(accepted, ==, wanted);

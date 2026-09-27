@@ -796,6 +796,10 @@ static MunitResult signer_usage(const MunitParameter params[], void* user)
   size_t work = WORK_BUDGET; int authorized = 99;
   munit_assert_int(tc_x509_crl_signer_usage(&signer,&limits,&work,&authorized), ==, TC_TLV_OK);
   munit_assert_int(authorized, ==, 1);
+  signer.version = 3;
+  work = WORK_BUDGET; authorized = 99;
+  munit_assert_int(tc_x509_crl_signer_usage(&signer,&limits,&work,&authorized), ==, TC_TLV_OK);
+  munit_assert_int(authorized, ==, 0);
   for (size_t i = 0; i < sizeof cases / sizeof cases[0]; ++i)
     for (int critical = 0; critical <= 1; ++critical) {
       fixture input = {0};

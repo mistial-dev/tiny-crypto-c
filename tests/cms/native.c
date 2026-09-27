@@ -1061,6 +1061,7 @@ static MunitResult revocations(const MunitParameter params[], void *user) {
   munit_assert_int(ASN1_TIME_set_string(date, "260101000000Z"), ==, 1);
   certificate = make_certificate(generated, "CRL issuer", NULL);
   add_extension(certificate, NID_subject_key_identifier, "hash");
+  add_extension(certificate, NID_key_usage, "critical,cRLSign");
   munit_assert_int(X509_sign(certificate, generated, EVP_sha256()), >, 0);
   int signer_length = i2d_X509(certificate, NULL);
   munit_assert_int(signer_length, >, 0);
@@ -1072,6 +1073,10 @@ static MunitResult revocations(const MunitParameter params[], void *user) {
                    ==, TC_TLV_OK);
   X509 *denied_certificate = X509_dup(certificate);
   munit_assert_not_null(denied_certificate);
+  const int denied_usage = X509_get_ext_by_NID(denied_certificate,
+                                               NID_key_usage, -1);
+  munit_assert_int(denied_usage, >=, 0);
+  X509_EXTENSION_free(X509_delete_ext(denied_certificate, denied_usage));
   add_extension(denied_certificate, NID_key_usage, "critical,digitalSignature");
   size_t denied_length =
       encode_certificate(denied_certificate, generated, EVP_sha256(),
@@ -1365,8 +1370,10 @@ static MunitResult revocations(const MunitParameter params[], void *user) {
           anchor_index = 0;
         if (failure == 1)
           rejected.at.year = 2029;
-        if (failure == 2)
+        if (failure == 2) {
           rejected.flags |= TC_X509_PATH_REQUIRE_KEY_USAGE;
+          rejected.key_usage = TC_KEY_USAGE_CERT_SIGN;
+        }
         if (failure == 3)
           work = required - 1;
         if (failure == 4)
@@ -3899,8 +3906,10 @@ static MunitResult revocations(const MunitParameter params[], void *user) {
             work = required - 1;
             expected_result = TC_TLV_LIMIT;
           }
-          if (failure == REQUIRE_KU)
+          if (failure == REQUIRE_KU) {
             rejected_options.flags = TC_X509_PATH_REQUIRE_KEY_USAGE;
+            rejected_options.key_usage = TC_KEY_USAGE_CERT_SIGN;
+          }
           if (failure == CRITICAL) {
             info.unknown_critical_oid = target.serial;
             expected_result = TC_TLV_UNSUPPORTED;
@@ -5527,6 +5536,8 @@ static MunitResult embedded_path(const MunitParameter params[], void *user) {
   X509 *root = make_certificate(root_key, "Root", NULL);
   X509 *intermediate = make_certificate(intermediate_key, "Intermediate", root);
   X509 *leaf = make_certificate(leaf_key, "Leaf", intermediate);
+  add_extension(root, NID_basic_constraints, "critical,CA:TRUE");
+  add_extension(root, NID_key_usage, "critical,keyCertSign,cRLSign");
   add_extension(intermediate, NID_basic_constraints,
                 "critical,CA:TRUE,pathlen:0");
   add_extension(intermediate, NID_key_usage, "critical,keyCertSign,cRLSign");
@@ -5856,9 +5867,24 @@ static MunitResult embedded_path(const MunitParameter params[], void *user) {
                                             &parser,
                                             &target_certificates[target]),
                                ==, TC_TLV_OK);
+              size_t usage_work = WORK_BUDGET;
+              int authorized = 0;
+              munit_assert_int(tc_x509_crl_signer_usage(
+                  &target_certificates[target], &limits, &usage_work,
+                  &authorized), ==, TC_TLV_OK);
+              munit_assert_int(authorized, ==, 1);
               targets[target] =
                   (TC_X509_crl_target){target_certificates[target].serial,
                                        target_certificates[target].issuer};
+            }
+            for (size_t record = 0; record < 2; ++record) {
+              TC_X509_search_result trusted_signer;
+              work = WORK_BUDGET;
+              TC_X509_path_status signer_status = tc_x509_crl_signer_validate(
+                  &records[record].crl, &target_certificates[record + 1],
+                  &held->source, 0, &options, &validation, &search,
+                  &work, &trusted_signer);
+              munit_assert_int(signer_status, ==, TC_X509_PATH_VALID);
             }
             TC_X509_crl_storage job_storage[2][256];
             TC_X509_crl_job *jobs[2];
@@ -5897,6 +5923,7 @@ static MunitResult embedded_path(const MunitParameter params[], void *user) {
               munit_assert_int(TC_X509_crl_prepare_finish(
                                    jobs[record], &prepared_records[record]),
                                ==, TC_TLV_OK);
+              munit_assert_int(prepared_records[record].policy, ==, TC_TLV_OK);
             }
             const TC_X509_crl_index prepared_index = {prepared_records, 2, 0};
             TC_CMS_revocation_policy prepared_policy = revocation;
@@ -7330,10 +7357,12 @@ static MunitResult chuid_signature(const MunitParameter params[], void *user) {
   add_extension(certificate, NID_key_usage, "critical,digitalSignature");
   const char *signer_profile = munit_parameters_get(params, "signer-profile");
   const int twic_purpose = !strcmp(signer_profile, "twic");
+  const int both_purposes = !strcmp(signer_profile, "both");
   const int wrong_signer_name = !strcmp(signer_profile, "wrong-name");
   add_extension(certificate, NID_ext_key_usage,
-                twic_purpose ? "1.3.6.1.4.1.29138.6.7"
-                             : "2.16.840.1.101.3.6.7");
+                both_purposes ? "2.16.840.1.101.3.6.7,1.3.6.1.4.1.29138.6.7"
+                : twic_purpose ? "1.3.6.1.4.1.29138.6.7"
+                               : "2.16.840.1.101.3.6.7");
   const char *signing_policy = munit_parameters_get(params, "policy");
   if (strcmp(signing_policy, "absent"))
     add_extension(certificate, NID_certificate_policies,
@@ -7556,6 +7585,15 @@ static MunitResult chuid_signature(const MunitParameter params[], void *user) {
                          : variant == CLEAR   ? TC_CREDENTIAL_VALID
                          : variant == REVOKED ? TC_CREDENTIAL_REVOKED
                                               : TC_CREDENTIAL_INVALID);
+        if (variant == CLEAR && profile == TC_CHUID_PROFILE_PIV &&
+            !strcmp(signing_policy, "absent") && !twic_purpose &&
+            !wrong_signer_name && strcmp(fascn_namespace, "twic")) {
+          TC_PIV_CHUID_validation_request twic_reader = object_request;
+          twic_reader.twic_reader_policy = 1;
+          work = TRUST_WORK;
+          munit_assert_int(TC_PIV_CHUID_validate(&twic_reader, &object_context,
+              &work, &accepted_chuid), ==, TC_CREDENTIAL_INVALID);
+        }
         if (purpose_rejected)
           munit_assert_size(work, ==, TRUST_WORK);
         if (!purpose_rejected && !profile_rejected && !wrong_signer_name &&
@@ -8597,7 +8635,7 @@ int main(int argc, char **argv) {
   static char *uuid_presence[] = {"absent", "present", NULL};
   static char *signing_policies[] = {"required", "absent", "any", "other",
                                      NULL};
-  static char *signer_profiles[] = {"piv", "wrong-name", "twic", NULL};
+  static char *signer_profiles[] = {"piv", "wrong-name", "twic", "both", NULL};
   static MunitParameterEnum fascn_params[] = {
       {"fascn", fascn_namespaces},
       {"uuid", uuid_presence},

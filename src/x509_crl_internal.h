@@ -63,7 +63,7 @@ TC_X509_signature_result tc_x509_crl_signer_digest_check(const tc_x509_crl* crl,
 /* Verify the CRL signature and build its signer's path to the selected anchor
  * from the same held source snapshot as the certificate path. options contain
  * signer policy, not the certificate holder's EKU/purpose. cRLSign is added to
- * required usage; absent KU remains allowed unless explicitly required.
+ * required usage. Version 3 signers require explicit cRLSign (RFC 10007).
  * No CRL scope/freshness or signer revocation check. Parsed signer metadata
  * must match its unchanged encoded bytes. All inputs, scratch, work and output
  * are disjoint. Work is shared/consumed on failure; out changes only on VALID.

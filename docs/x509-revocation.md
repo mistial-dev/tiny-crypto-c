@@ -27,6 +27,7 @@ Build a [CRL index](x509-crl.md#indexing-a-collection) and set
 - `anchor_index`: the same source anchor used to validate the target path.
 - `signer_policy`: validation options for CRL signers at the same time. Do not
   reuse a holder-specific EKU or key-usage requirement; cRLSign is added internally.
+  Version 3 CRL signers must carry keyUsage with cRLSign set.
 - `max_candidate_bytes`: the total encoded-byte limit for the candidate collection.
 
 `delta_policy` selects complete CRLs only, deltas when available, or required

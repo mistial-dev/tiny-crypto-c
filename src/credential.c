@@ -46,7 +46,7 @@ signing_policy_present(TC_bytes encoded_extensions, TC_bytes required,
 }
 
 static TC_TLV_result
-content_signing_purpose(TC_bytes extensions, int piv,
+content_signing_purpose(TC_bytes extensions, int twic_compatible,
                         TC_X509_path_options *policy,
                         const TC_X509_path_workspace *storage) {
   static const uint8_t eku_oid[] = {0x55, 0x1d, 37};
@@ -68,13 +68,12 @@ content_signing_purpose(TC_bytes extensions, int piv,
       return status;
     for (size_t i = 0; i < count; ++i) {
       if (TC_PIV_oid_identify(storage->oids[i],
-                              piv ? TC_PIV_OIDS_ONLY
-                                  : TC_PIV_OIDS_TWIC_COMPATIBLE) !=
+                              twic_compatible ? TC_PIV_OIDS_TWIC_COMPATIBLE
+                                              : TC_PIV_OIDS_ONLY) !=
           TC_PIV_OID_CONTENT_SIGNING)
         continue;
-      if (policy->purpose.length)
-        return TC_TLV_INVALID;
-      policy->purpose = storage->oids[i];
+      if (!policy->purpose.length)
+        policy->purpose = storage->oids[i];
     }
   }
   if (status != TC_TLV_END)
@@ -108,7 +107,7 @@ static TC_TLV_result piv_content_signer_policy(
 }
 
 static TC_TLV_result
-content_signer_policy(TC_bytes certificate, int piv,
+content_signer_policy(TC_bytes certificate, int piv, int twic_compatible,
                       const TC_X509_time *card_expiration,
                       TC_X509_path_options *policy,
                       const TC_X509_path_workspace *storage, size_t *work) {
@@ -126,7 +125,8 @@ content_signer_policy(TC_bytes certificate, int piv,
     if (status != TC_TLV_OK)
       return status;
     if (!policy->purpose.length) {
-      status = content_signing_purpose(signer.extensions, piv, policy, storage);
+      status = content_signing_purpose(signer.extensions, twic_compatible,
+                                       policy, storage);
       if (status != TC_TLV_OK)
         return status;
     }
@@ -335,7 +335,8 @@ TC_PIV_CHUID_validate(const TC_PIV_CHUID_validation_request *request,
     return tc_validation_status(parsed);
   if (!matched)
     return TC_CREDENTIAL_INVALID;
-  parsed = content_signer_policy(object.certificate, strict_piv,
+  parsed = content_signer_policy(object.certificate, piv,
+                                 request->twic_reader_policy || !piv,
                                  request->card_expiration, &policy.path,
                                  storage, work);
   if (parsed != TC_TLV_OK)
@@ -462,7 +463,7 @@ TC_PIV_biometric_validate(const TC_PIV_biometric_validation_request *request,
   }
   const TC_bytes certificate =
       object.certificate.length ? object.certificate : request->chuid_signer;
-  parsed = content_signer_policy(certificate, piv, request->card_expiration,
+  parsed = content_signer_policy(certificate, piv, !piv, request->card_expiration,
                                  &policy.path, storage, work);
   if (parsed != TC_TLV_OK)
     return tc_validation_status(parsed);
@@ -575,7 +576,7 @@ TC_PIV_security_validate(const TC_PIV_security_validation_request *request,
                            storage->frame_capacity, work, &object);
   if (parsed != TC_TLV_OK)
     return tc_validation_status(parsed);
-  parsed = content_signer_policy(request->chuid_signer, piv,
+  parsed = content_signer_policy(request->chuid_signer, piv, !piv,
                                  request->card_expiration, &policy.path,
                                  storage, work);
   if (parsed != TC_TLV_OK)
@@ -780,7 +781,7 @@ TC_PIV_CVC_validate(const TC_PIV_CVC_validation_request *request,
                             work, out, sizeof *out, writes);
   if (checked != TC_TLV_OK)
     return tc_validation_status(checked);
-  checked = content_signer_policy(request->signer_certificate, piv, NULL,
+  checked = content_signer_policy(request->signer_certificate, piv, !piv, NULL,
                                   &policy.path,
                                   &context->workspace->path->validation, work);
   if (checked != TC_TLV_OK)

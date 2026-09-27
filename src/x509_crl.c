@@ -315,7 +315,9 @@ TC_TLV_result tc_x509_crl_signer_usage(const TC_X509_certificate* signer,
     if (result != TC_TLV_OK) return result;
   }
   if (result != TC_TLV_END) return result;
-  *authorized = !present || !!(usage & TC_KEY_USAGE_CRL_SIGN);
+  /* RFC 10007 requires explicit cRLSign for a version 3 CRL signer. */
+  *authorized = (signer->version < 3 && !present) ||
+                (present && !!(usage & TC_KEY_USAGE_CRL_SIGN));
   return TC_TLV_OK;
 }
 

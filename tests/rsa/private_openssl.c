@@ -354,13 +354,13 @@ static MunitResult composite_components(const MunitParameter params[], void* use
   munit_assert_int(BN_bn2binpad(other,q,(int)width), ==, (int)width);
   size_t work = WORK_BUDGET;
   munit_assert_int(tc_rsa_private_key_consistent(modulus,width,exponent,sizeof exponent,
-      d,p,q,scratch,words,&work), ==, TC_RSA_OK);
+      d,p,q,scratch,words,&work), ==, TC_RSA_INVALID);
   seed[width - 1] = 2;
   random_source random = {seed,seed,width,0,TC_OK};
   uint32_t validation_work = WORK_BUDGET;
   munit_assert_int(tc_rsa_private_key_check(modulus,width,exponent,sizeof exponent,
       d,p,q,1,random_bytes,&random,1,scratch,words,&validation_work), ==, TC_RSA_INVALID);
-  munit_assert_size(random.calls, ==, 1);
+  munit_assert_size(random.calls, ==, 0);
   munit_assert_true(tc_test_all_zero(scratch,words * sizeof *scratch));
   BN_CTX_end(context); BN_CTX_free(context);
   return MUNIT_OK;

@@ -51,13 +51,8 @@ TC_credential_status TC_PIV_SM_authenticate_response(TC_PIV_SM* session,
     TC_secure_zero(workspace,sizeof *workspace);
     return TC_CREDENTIAL_UNSUPPORTED;
   }
-  TC_PIV_CVC response;
   if (authentication->peer.nonce.length != settings->nonce_bytes ||
-      authentication->peer.cryptogram.length != 16 ||
-      TC_PIV_CVC_read(authentication->peer.certificate.data,
-        authentication->peer.certificate.length,&response) != TC_TLV_OK ||
-      response.key_bits != settings->coordinate_bytes * 8 ||
-      response.role != TC_PIV_CVC_CARD_APPLICATION) {
+      authentication->peer.cryptogram.length != 16) {
     TC_PIV_SM_clear(session);
     TC_secure_zero(workspace,sizeof *workspace);
     return TC_CREDENTIAL_INVALID;

@@ -25,7 +25,7 @@ LIMBO_CASES = {
         ("valid", "unrevoked", "same-serial-different-issuer"),
     "crl::crlnumber-critical": ("valid", "invalid", "critical-crl-number"),
     "crl::issuer-missing-crlsign": ("valid", "invalid", "missing-crl-sign-usage"),
-    "crl::issuer-no-keyusage-extension": ("valid", "unrevoked", "absent-key-usage"),
+    "crl::issuer-no-keyusage-extension": ("valid", "invalid", "absent-key-usage"),
     "crl::issuer-valid-crlsign-and-keycertsign":
         ("valid", "unrevoked", "valid-crl-sign-usage"),
     "cve::cve-2024-0567": ("valid", None, "cross-sign-cycle"),

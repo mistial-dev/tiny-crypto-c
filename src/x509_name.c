@@ -144,19 +144,48 @@ static TC_TLV_result rdn_equal(TC_bytes left, TC_bytes right,
   result = TC_TLV_reader_init(&a, left.data, left.length, left_profile, limits);
   if (result != TC_TLV_OK) return result;
   while ((result = next_attribute(&a, work, &first, tree)) == TC_TLV_OK) {
-    size_t length, index = 0;
-    int found = 0;
+    size_t length = 0, index = 0;
+    int found = 0, prepared = 0;
+    int binary_only = !matching_rule(first.oid);
     if (++seen > count) { *equal = 0; return TC_TLV_OK; }
-    result = prepare(&first, left_profile, workspace->left, workspace->scalar_capacity,
-        &length, work, limits, tree);
-    if (result != TC_TLV_OK) return result;
     result = TC_TLV_reader_init(&b, right.data, right.length, right_profile, limits);
     if (result != TC_TLV_OK) return result;
     while ((result = next_attribute(&b, work, &second, tree)) == TC_TLV_OK) {
       if (!workspace->matched[index] && tc_pki_equal(first.oid, second.oid)) {
         size_t other_length;
+        if (!prepared && !binary_only) {
+          result = prepare(&first, left_profile, workspace->left,
+              workspace->scalar_capacity, &length, work, limits, tree);
+          if (result == TC_TLV_UNSUPPORTED) {
+            binary_only = 1;
+            result = TC_TLV_OK;
+          } else if (result != TC_TLV_OK)
+            return result;
+          prepared = 1;
+        }
+        if (binary_only) {
+          if (charge(work, first.value.length) != TC_TLV_OK) return TC_TLV_LIMIT;
+          if (tc_pki_equal(first.value, second.value)) {
+            workspace->matched[index] = 1;
+            found = 1;
+            break;
+          }
+          ++index;
+          continue;
+        }
         result = prepare(&second, right_profile, workspace->right, workspace->scalar_capacity,
             &other_length, work, limits, tree);
+        if (result == TC_TLV_UNSUPPORTED) {
+          result = TC_TLV_OK;
+          if (charge(work, first.value.length) != TC_TLV_OK) return TC_TLV_LIMIT;
+          if (tc_pki_equal(first.value, second.value)) {
+            workspace->matched[index] = 1;
+            found = 1;
+            break;
+          }
+          ++index;
+          continue;
+        }
         if (result != TC_TLV_OK) return result;
         if (charge(work, length) != TC_TLV_OK) return TC_TLV_LIMIT;
         if (length == other_length && !memcmp(workspace->left, workspace->right, length * sizeof(uint32_t))) {

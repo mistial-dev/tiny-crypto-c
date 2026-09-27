@@ -15,6 +15,16 @@ static inline int tc_rsa_private_exponent_check(const tc_mp_word* d,
   return (nonzero != 0) & (d[0] & 1u) & below_modulus;
 }
 
+/* FIPS 186-5 A.1.3: each prime has half the modulus bit length. */
+static inline int tc_rsa_factor_has_half_bits(TC_bytes factor, size_t modulus_bytes)
+{
+  size_t first = 0;
+  while (first < factor.length && factor.data[first] == 0)
+    ++first;
+  return factor.length - first == modulus_bytes / 2 &&
+         (factor.data[first] & 0x80u) != 0;
+}
+
 /* Check n=p*q and e*d=1 modulo both p-1 and q-1, with distinct odd factors.
  * Full key validation also requires primality testing. Magnitudes fit length
  * bytes. All ranges and work are disjoint. Scratch has 8n
@@ -46,6 +56,8 @@ static inline TC_RSA_result tc_rsa_private_magnitudes_consistent(const uint8_t* 
   tc_mp_from_be_padded(d,d_bytes.data,d_bytes.length,length);
   tc_mp_from_be(remainder,modulus,length);
   status = TC_RSA_INVALID;
+  if (!tc_rsa_factor_has_half_bits(p_bytes, length) ||
+      !tc_rsa_factor_has_half_bits(q_bytes, length)) goto cleanup;
   if (!tc_rsa_private_exponent_check(d,remainder,n,temporary)) goto cleanup;
   tc_mp_word p_above_one = (tc_mp_word)(p[0] & ~1u);
   tc_mp_word q_above_one = (tc_mp_word)(q[0] & ~1u);
