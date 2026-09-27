@@ -829,6 +829,95 @@ static MunitResult test_des_secure_zero_and_clear(const MunitParameter params[],
 
 /* --- Test Suite Setup --- */
 
+#if TC_DES_ENABLE_ISO9797
+static MunitResult test_des_iso9797(const MunitParameter params[], void* data)
+{
+  static const uint8_t key2[16] = {
+    0x01,0x23,0x45,0x67,0x89,0xab,0xcd,0xef,
+    0xfe,0xdc,0xba,0x98,0x76,0x54,0x32,0x10
+  };
+  static const uint8_t key3[24] = {
+    0x01,0x23,0x45,0x67,0x89,0xab,0xcd,0xef,
+    0xfe,0xdc,0xba,0x98,0x76,0x54,0x32,0x10,
+    0x00,0x11,0x22,0x33,0x44,0x55,0x66,0x77
+  };
+  static const uint8_t msg[] = "Now is the time for all ";
+  static const uint8_t retail_none[8] = {0xa1,0xc7,0x2e,0x74,0xea,0x3f,0xa9,0xb6};
+  static const uint8_t retail_pad2[8] = {0xe9,0x08,0x62,0x30,0xca,0x3b,0xe7,0x96};
+  static const uint8_t alg1_3key_pad1[8] = {0x44,0x07,0xa0,0x1f,0xa8,0x7c,0x18,0xe2};
+  static const uint8_t alg3_3key_pad2[8] = {0x5c,0xcd,0x8f,0x7a,0x05,0xc8,0x05,0x22};
+  struct TC_DES_ISO9797_ctx ctx;
+  uint8_t tag[8];
+  uint8_t guard[8];
+  size_t i;
+  (void)params;
+  (void)data;
+
+  /* ANSI X9.19's published "Now is the time for all " retail-MAC vector.
+   * Other expected values were generated independently with OpenSSL DES/TDEA. */
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3,
+      TC_DES_ISO9797_PAD_NONE, key2, sizeof key2, msg, sizeof msg - 1,
+      tag, sizeof tag), ==, TC_OK);
+  munit_assert_memory_equal(8, tag, retail_none);
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3,
+      TC_DES_ISO9797_PAD2, key2, sizeof key2, msg, sizeof msg - 1,
+      tag, sizeof tag), ==, TC_OK);
+  munit_assert_memory_equal(8, tag, retail_pad2);
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG1,
+      TC_DES_ISO9797_PAD1, key3, sizeof key3, msg, sizeof msg - 2,
+      tag, sizeof tag), ==, TC_OK);
+  munit_assert_memory_equal(8, tag, alg1_3key_pad1);
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3,
+      TC_DES_ISO9797_PAD2, key3, sizeof key3, msg, sizeof msg - 2,
+      tag, sizeof tag), ==, TC_OK);
+  munit_assert_memory_equal(8, tag, alg3_3key_pad2);
+
+  munit_assert_int(TC_DES_ISO9797_init(&ctx, TC_DES_ISO9797_ALG3,
+      TC_DES_ISO9797_PAD2, key2, sizeof key2), ==, TC_OK);
+  for (i = 0; i < sizeof msg - 1; ++i)
+    munit_assert_int(TC_DES_ISO9797_update(&ctx, msg + i, 1), ==, TC_OK);
+  munit_assert_int(TC_DES_ISO9797_update(&ctx, NULL, 0), ==, TC_OK);
+  munit_assert_int(TC_DES_ISO9797_final(&ctx, tag), ==, TC_OK);
+  munit_assert_memory_equal(8, tag, retail_pad2);
+  munit_assert_int(TC_DES_ISO9797_update(&ctx, msg, 1), ==, TC_ERROR);
+  munit_assert_int(TC_DES_ISO9797_final(&ctx, tag), ==, TC_ERROR);
+
+  memset(guard, 0xa5, sizeof guard);
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3,
+      TC_DES_ISO9797_PAD_NONE, key2, sizeof key2, msg, 3,
+      guard, sizeof guard), ==, TC_ERROR);
+  for (i = 0; i < sizeof guard; ++i)
+    munit_assert_uint8(guard[i], ==, 0xa5);
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3,
+      TC_DES_ISO9797_PAD2, key2, 8, msg, 8, guard, 8), ==, TC_ERROR);
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG1,
+      TC_DES_ISO9797_PAD2, key2, sizeof key2, NULL, 1, guard, 8), ==, TC_ERROR);
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3,
+      TC_DES_ISO9797_PAD2, key2, sizeof key2, msg, 8, guard, 3), ==, TC_ERROR);
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG1,
+      TC_DES_ISO9797_PAD_NONE, key2, sizeof key2, NULL, 0, guard, 8), ==, TC_ERROR);
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3,
+      TC_DES_ISO9797_PAD1, key2, sizeof key2, NULL, 0, guard, 8), ==, TC_ERROR);
+  munit_assert_int(TC_DES_ISO9797_init(&ctx, (TC_DES_ISO9797_algorithm)2,
+      TC_DES_ISO9797_PAD2, key2, sizeof key2), ==, TC_ERROR);
+  munit_assert_int(TC_DES_ISO9797_init(&ctx, TC_DES_ISO9797_ALG3,
+      (TC_DES_ISO9797_padding)3, key2, sizeof key2), ==, TC_ERROR);
+  munit_assert_int(TC_DES_ISO9797_init(&ctx, TC_DES_ISO9797_ALG3,
+      TC_DES_ISO9797_PAD2, key2, sizeof key2), ==, TC_OK);
+  munit_assert_int(TC_DES_ISO9797_update(&ctx, NULL, 1), ==, TC_ERROR);
+  TC_DES_ISO9797_clear(&ctx);
+  munit_assert_int(TC_DES_ISO9797_verify(TC_DES_ISO9797_ALG3,
+      TC_DES_ISO9797_PAD_NONE, key2, sizeof key2, msg, sizeof msg - 1,
+      retail_none, 4), ==, TC_OK);
+  tag[0] = (uint8_t)(retail_none[0] ^ 1);
+  memcpy(tag + 1, retail_none + 1, 7);
+  munit_assert_int(TC_DES_ISO9797_verify(TC_DES_ISO9797_ALG3,
+      TC_DES_ISO9797_PAD_NONE, key2, sizeof key2, msg, sizeof msg - 1,
+      tag, 8), ==, TC_MISMATCH);
+  return MUNIT_OK;
+}
+#endif
+
 static MunitTest test_suite_tests[] = {
 #if TC_DES_ENABLE_ECB
   { "/des_ecb",                           test_des_ecb,                           NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL },
@@ -874,6 +963,9 @@ static MunitTest test_suite_tests[] = {
   { "/des_cmac",                          test_des_cmac,                          NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL },
   { "/des_cmac_streaming",                test_des_cmac_streaming,             NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL },
   { "/des_cmac_single_des_degenerate",    test_des_cmac_single_des_matches_2k3des_degenerate, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL },
+#endif
+#if TC_DES_ENABLE_ISO9797
+  { "/des_iso9797",                       test_des_iso9797,                       NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL },
 #endif
   { "/des_api_errors",                    test_des_api_errors,                    NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL },
   { "/des_secure_zero_and_clear",         test_des_secure_zero_and_clear,         NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL },

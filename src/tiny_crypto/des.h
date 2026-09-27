@@ -49,13 +49,17 @@
 #if (TC_DES_ENABLE_CMAC != 0) && (TC_DES_ENABLE_CMAC != 1)
   #error "TC_DES_ENABLE_CMAC must be 0 or 1"
 #endif
+#if (TC_DES_ENABLE_ISO9797 != 0) && (TC_DES_ENABLE_ISO9797 != 1)
+  #error "TC_DES_ENABLE_ISO9797 must be 0 or 1"
+#endif
 #if (TC_DES_REJECT_WEAK_KEYS != 0) && (TC_DES_REJECT_WEAK_KEYS != 1)
   #error "TC_DES_REJECT_WEAK_KEYS must be 0 or 1"
 #endif
 
 #if TC_ENABLE_DES && !TC_DES_ENABLE_ECB && !TC_DES_ENABLE_CBC && \
     !TC_DES_ENABLE_CTR && !TC_DES_ENABLE_OFB && !TC_DES_ENABLE_CFB1 && \
-    !TC_DES_ENABLE_CFB8 && !TC_DES_ENABLE_CFB64 && !TC_DES_ENABLE_CMAC
+    !TC_DES_ENABLE_CFB8 && !TC_DES_ENABLE_CFB64 && !TC_DES_ENABLE_CMAC && \
+    !TC_DES_ENABLE_ISO9797
   #error "DES requires at least one enabled mode or CMAC"
 #endif
 
@@ -487,6 +491,64 @@ TC_status TC_DES_CMAC_final(struct TC_DES_CMAC_ctx* ctx, uint8_t tag[TC_DES_CMAC
 void TC_DES_CMAC_ctx_clear(struct TC_DES_CMAC_ctx* ctx);
 
 #endif /* TC_DES_ENABLE_CMAC */
+
+#if TC_DES_ENABLE_ISO9797
+/* ISO/IEC 9797-1 MAC algorithm 1 (CBC-MAC) or 3 (retail MAC).
+ * Algorithm 1 accepts DES or 2/3-key TDEA. Algorithm 3 accepts 2/3-key TDEA;
+ * CBC iteration uses K1 and the output transform uses D(K2), E(K3).
+ * Padding 1 adds zero bytes only to a partial block. Padding 2 always adds
+ * 0x80 followed by zeroes. NONE requires block alignment. NONE and padding 1
+ * require a nonempty message.
+ * The caller must authenticate a fixed or separately authenticated length
+ * when using NONE or padding 1. Context is caller-owned and final consumes it.
+ * Input, key, and tag buffers must not overlap the context. A failed final
+ * leaves the tag untouched; clear the context after a failed update.
+ */
+typedef enum TC_DES_ISO9797_algorithm {
+  TC_DES_ISO9797_ALG1 = 1,
+  TC_DES_ISO9797_ALG3 = 3
+} TC_DES_ISO9797_algorithm;
+
+typedef enum TC_DES_ISO9797_padding {
+  TC_DES_ISO9797_PAD_NONE = 0,
+  TC_DES_ISO9797_PAD1 = 1,
+  TC_DES_ISO9797_PAD2 = 2
+} TC_DES_ISO9797_padding;
+
+struct TC_DES_ISO9797_ctx {
+  uint8_t sk[48][6];
+  uint8_t mac[TC_DES_BLOCKLEN];
+  uint8_t buf[TC_DES_BLOCKLEN];
+  uint8_t used;
+  uint8_t keylen;
+  uint8_t algorithm;
+  uint8_t padding;
+  uint8_t active;
+  size_t total;
+};
+
+TC_status TC_DES_ISO9797_init(struct TC_DES_ISO9797_ctx* ctx,
+                              TC_DES_ISO9797_algorithm algorithm,
+                              TC_DES_ISO9797_padding padding,
+                              const uint8_t* key, size_t keylen);
+TC_status TC_DES_ISO9797_update(struct TC_DES_ISO9797_ctx* ctx,
+                                const uint8_t* msg, size_t msg_len);
+TC_status TC_DES_ISO9797_final(struct TC_DES_ISO9797_ctx* ctx,
+                               uint8_t tag[TC_DES_BLOCKLEN]);
+void TC_DES_ISO9797_clear(struct TC_DES_ISO9797_ctx* ctx);
+TC_status TC_DES_ISO9797_MAC(TC_DES_ISO9797_algorithm algorithm,
+                             TC_DES_ISO9797_padding padding,
+                             const uint8_t* key, size_t keylen,
+                             const uint8_t* msg, size_t msg_len,
+                             uint8_t* tag, size_t tag_len);
+/* One-shot and verify accept the leading 4..8 bytes of the full MAC.
+ * MAC leaves tag untouched on error. Verify returns TC_MISMATCH for a bad tag. */
+TC_status TC_DES_ISO9797_verify(TC_DES_ISO9797_algorithm algorithm,
+                                TC_DES_ISO9797_padding padding,
+                                const uint8_t* key, size_t keylen,
+                                const uint8_t* msg, size_t msg_len,
+                                const uint8_t* tag, size_t tag_len);
+#endif /* TC_DES_ENABLE_ISO9797 */
 
 #ifdef __cplusplus
 }

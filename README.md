@@ -129,12 +129,34 @@ Small MCUs can keep `TINY_CRYPTO_AES_TINY=ON` or use `auto`, `bitwise`, or
 `wide` to avoid that RAM cost.
 
 Enabling `TINY_CRYPTO_ENABLE_DES` also enables CTR and 3DES. `DES_ECB`, `DES_CBC`,
-`DES_OFB`, `DES_CFB1`, `DES_CFB8`, `DES_CFB64`, and `DES_CMAC` select the
+`DES_OFB`, `DES_CFB1`, `DES_CFB8`, `DES_CFB64`, `DES_CMAC`, and `DES_ISO9797` select the
 remaining modes when prefixed with `TINY_CRYPTO_`.
 `TINY_CRYPTO_DES_REJECT_WEAK_KEYS=ON` rejects weak or semi-weak DES component
 keys and TDEA bundles that collapse to single DES. It is off by default for
 legacy-vector compatibility; firmware builds may instead define
 `TC_DES_REJECT_WEAK_KEYS=1` directly.
+
+`TINY_CRYPTO_DES_ISO9797=ON` enables ISO/IEC 9797-1 algorithms 1 and 3 with
+no padding, zero padding (method 1), or `0x80` padding (method 2). Algorithm 3
+is the two/three-key retail MAC. The API accepts 8, 16, or 24-byte keys for
+algorithm 1 and 16 or 24-byte keys for algorithm 3. Tags are 4 to 8 bytes,
+taken from the start of the full MAC. With no padding or method 1, the message
+length must be fixed by the protocol or authenticated separately.
+
+```c
+uint8_t mac[8];
+const uint8_t key[16] = {
+    0x01,0x23,0x45,0x67,0x89,0xab,0xcd,0xef,
+    0xfe,0xdc,0xba,0x98,0x76,0x54,0x32,0x10
+};
+const uint8_t message[] = "Now is the time for all ";
+TC_status status = TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3,
+    TC_DES_ISO9797_PAD2, key, sizeof key,
+    message, sizeof message - 1, mac, sizeof mac);
+if (status != TC_OK) {
+    /* Handle invalid input or unavailable MAC. */
+}
+```
 
 SHA-1, SHA-224, and SHA-256 are implemented in `hash.c`. SHA-384 and SHA-512
 share a 64-bit core in `sha512.c`. SHA-224 and SHA-384 reuse the compression

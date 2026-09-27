@@ -1253,3 +1253,162 @@ TC_status TC_DES_CMAC_verify(const uint8_t* key, size_t keylen, const uint8_t* m
 }
 
 #endif /* TC_DES_ENABLE_CMAC */
+
+#if TC_DES_ENABLE_ISO9797
+static void tc_des_iso9797_encrypt(const struct TC_DES_ISO9797_ctx* ctx,
+                                   uint8_t block[TC_DES_BLOCKLEN])
+{
+  tc_des_cipher_block(&ctx->sk[0], block, 0);
+  if (ctx->algorithm == TC_DES_ISO9797_ALG1 && ctx->keylen != 8)
+  {
+    tc_des_cipher_block(&ctx->sk[16], block, 1);
+    tc_des_cipher_block(&ctx->sk[32], block, 0);
+  }
+}
+
+static void tc_des_iso9797_absorb(struct TC_DES_ISO9797_ctx* ctx,
+                                  const uint8_t block[TC_DES_BLOCKLEN])
+{
+  size_t i;
+  for (i = 0; i < TC_DES_BLOCKLEN; ++i)
+    ctx->mac[i] ^= block[i];
+  tc_des_iso9797_encrypt(ctx, ctx->mac);
+}
+
+TC_status TC_DES_ISO9797_init(struct TC_DES_ISO9797_ctx* ctx,
+                              TC_DES_ISO9797_algorithm algorithm,
+                              TC_DES_ISO9797_padding padding,
+                              const uint8_t* key, size_t keylen)
+{
+  if (ctx == NULL || key == NULL ||
+      (algorithm != TC_DES_ISO9797_ALG1 && algorithm != TC_DES_ISO9797_ALG3) ||
+      (padding != TC_DES_ISO9797_PAD_NONE && padding != TC_DES_ISO9797_PAD1 &&
+       padding != TC_DES_ISO9797_PAD2) ||
+      (keylen != 8 && keylen != 16 && keylen != 24) ||
+      (algorithm == TC_DES_ISO9797_ALG3 && keylen == 8))
+    return TC_ERROR;
+#if TC_DES_REJECT_WEAK_KEYS
+  if (tc_des_bundle_is_rejected(key, keylen))
+    return TC_ERROR;
+#endif
+  memset(ctx, 0, sizeof(*ctx));
+  tc_des_key_schedule(&ctx->sk[0], key);
+  if (keylen != 8)
+  {
+    tc_des_key_schedule(&ctx->sk[16], key + 8);
+    tc_des_key_schedule(&ctx->sk[32], keylen == 16 ? key : key + 16);
+  }
+  ctx->keylen = (uint8_t)keylen;
+  ctx->algorithm = (uint8_t)algorithm;
+  ctx->padding = (uint8_t)padding;
+  ctx->active = 1;
+  return TC_OK;
+}
+
+TC_status TC_DES_ISO9797_update(struct TC_DES_ISO9797_ctx* ctx,
+                                const uint8_t* msg, size_t msg_len)
+{
+  if (ctx == NULL || !ctx->active || (msg_len && msg == NULL) ||
+      msg_len > SIZE_MAX - ctx->total)
+    return TC_ERROR;
+  ctx->total += msg_len;
+  while (msg_len)
+  {
+    size_t take = TC_DES_BLOCKLEN - ctx->used;
+    if (take > msg_len)
+      take = msg_len;
+    memcpy(ctx->buf + ctx->used, msg, take);
+    ctx->used = (uint8_t)(ctx->used + take);
+    msg += take;
+    msg_len -= take;
+    if (ctx->used == TC_DES_BLOCKLEN)
+    {
+      tc_des_iso9797_absorb(ctx, ctx->buf);
+      ctx->used = 0;
+    }
+  }
+  return TC_OK;
+}
+
+TC_status TC_DES_ISO9797_final(struct TC_DES_ISO9797_ctx* ctx,
+                               uint8_t tag[TC_DES_BLOCKLEN])
+{
+  if (ctx == NULL || tag == NULL || !ctx->active)
+    return TC_ERROR;
+  if ((ctx->padding == TC_DES_ISO9797_PAD_NONE && ctx->used != 0) ||
+      (ctx->padding != TC_DES_ISO9797_PAD2 && ctx->total == 0))
+  {
+    TC_DES_ISO9797_clear(ctx);
+    return TC_ERROR;
+  }
+  if (ctx->padding == TC_DES_ISO9797_PAD1 && ctx->used)
+  {
+    memset(ctx->buf + ctx->used, 0, TC_DES_BLOCKLEN - ctx->used);
+    tc_des_iso9797_absorb(ctx, ctx->buf);
+  }
+  if (ctx->padding == TC_DES_ISO9797_PAD2)
+  {
+    ctx->buf[ctx->used] = 0x80;
+    memset(ctx->buf + ctx->used + 1, 0,
+           TC_DES_BLOCKLEN - ctx->used - 1);
+    tc_des_iso9797_absorb(ctx, ctx->buf);
+  }
+  if (ctx->algorithm == TC_DES_ISO9797_ALG3)
+  {
+    tc_des_cipher_block(&ctx->sk[16], ctx->mac, 1);
+    tc_des_cipher_block(&ctx->sk[32], ctx->mac, 0);
+  }
+  memcpy(tag, ctx->mac, TC_DES_BLOCKLEN);
+  TC_DES_ISO9797_clear(ctx);
+  return TC_OK;
+}
+
+void TC_DES_ISO9797_clear(struct TC_DES_ISO9797_ctx* ctx)
+{
+  if (ctx != NULL)
+    TC_secure_zero(ctx, sizeof(*ctx));
+}
+
+TC_status TC_DES_ISO9797_MAC(TC_DES_ISO9797_algorithm algorithm,
+                             TC_DES_ISO9797_padding padding,
+                             const uint8_t* key, size_t keylen,
+                             const uint8_t* msg, size_t msg_len,
+                             uint8_t* tag, size_t tag_len)
+{
+  struct TC_DES_ISO9797_ctx ctx;
+  uint8_t full[TC_DES_BLOCKLEN];
+  TC_status status;
+  if (tag == NULL || tag_len < 4 || tag_len > TC_DES_BLOCKLEN ||
+      (msg_len && msg == NULL))
+    return TC_ERROR;
+  if (TC_DES_ISO9797_init(&ctx, algorithm, padding, key, keylen) != TC_OK)
+    return TC_ERROR;
+  status = TC_DES_ISO9797_update(&ctx, msg, msg_len);
+  if (status == TC_OK)
+    status = TC_DES_ISO9797_final(&ctx, full);
+  else
+    TC_DES_ISO9797_clear(&ctx);
+  if (status == TC_OK)
+    memcpy(tag, full, tag_len);
+  TC_secure_zero(full, sizeof(full));
+  return status;
+}
+
+TC_status TC_DES_ISO9797_verify(TC_DES_ISO9797_algorithm algorithm,
+                                TC_DES_ISO9797_padding padding,
+                                const uint8_t* key, size_t keylen,
+                                const uint8_t* msg, size_t msg_len,
+                                const uint8_t* tag, size_t tag_len)
+{
+  uint8_t full[TC_DES_BLOCKLEN];
+  TC_status status;
+  if (tag == NULL || tag_len < 4 || tag_len > TC_DES_BLOCKLEN)
+    return TC_ERROR;
+  status = TC_DES_ISO9797_MAC(algorithm, padding, key, keylen,
+                              msg, msg_len, full, tag_len);
+  if (status == TC_OK)
+    status = TC_ct_equal(full, tag, tag_len);
+  TC_secure_zero(full, sizeof(full));
+  return status;
+}
+#endif /* TC_DES_ENABLE_ISO9797 */
