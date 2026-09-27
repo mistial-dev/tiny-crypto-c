@@ -17,6 +17,13 @@ CORPUS_SHA256 = "b9ad397ffefd3622dbf420fac3d45d156fabed69f5fabaa391c3b8bb91aae31
 MAX_CERTIFICATES = 16
 MAX_CRLS = 16
 DEFAULT_VALIDATION_TIME = "2024-01-01T00:00:00+00:00"
+# Cases where this library deliberately disagrees with x509-limbo, with the
+# upstream verdict each one is reviewed against.
+LIMBO_DEVIATIONS = {
+    # RFC 10007 requires keyUsage with cRLSign on a v3 CRL issuer certificate.
+    "crl::issuer-no-keyusage-extension": "valid",
+}
+
 LIMBO_CASES = {
     "crl::revoked-certificate-with-crl": ("valid", "revoked", "direct-anchor-revoked"),
     "crl::crlnumber-missing": ("valid", "unsupported", "missing-crl-number"),
@@ -145,7 +152,8 @@ def main():
         combined = "invalid" if expected[0] == "limit" or expected[1] in (
             "revoked", "invalid", "unsupported") else expected[0]
         upstream = "valid" if case["expected_result"] == "SUCCESS" else "invalid"
-        if upstream != combined:
+        reviewed = LIMBO_DEVIATIONS.get(case_id, combined)
+        if upstream != reviewed:
             raise AssertionError(f"Changed upstream verdict: {case_id}")
         try:
             with tempfile.TemporaryDirectory(prefix="tiny-crypto-path-corpus-") as temporary:
