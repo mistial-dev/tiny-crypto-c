@@ -302,6 +302,7 @@ list(APPEND TC_PUBLIC_DEFINITIONS
 set(tc_aes_sources src/aes.c src/aes_modes.c src/aes_ghash.c src/aes_gcm.c src/aes_ccm.c
   src/aes_mac.c src/aes_cmac.c src/aes_eax.c src/aes_siv.c src/mac_core.c)
 set(tc_des_sources src/des.c src/des_modes.c src/des_mac.c)
+set(tc_rsa_sources src/rsa_workspace.c src/rsa_keygen.c src/rsa_private.c src/rsa_public.c src/rsa_oaep.c)
 
 # One utility translation unit keeps zeroization and constant-time comparison
 # consistent across algorithms, and avoids duplicate code in firmware images.
@@ -373,7 +374,7 @@ if(TINY_CRYPTO_ENABLE_EC)
   list(APPEND tc_sources src/ec.c)
 endif()
 if(TINY_CRYPTO_ENABLE_RSA)
-  list(APPEND tc_sources src/rsa.c)
+  list(APPEND tc_sources ${tc_rsa_sources})
 endif()
 if(TINY_CRYPTO_ENABLE_PIV_SM)
   list(APPEND tc_sources src/piv_sm.c src/piv_sm_message.c)
