@@ -185,7 +185,8 @@ match. Streaming GCM decryption authenticates a contiguous caller-owned
 ciphertext buffer during `TC_AES_GCM_decrypt_update`. The buffer remains
 ciphertext until `TC_AES_GCM_decrypt_finish` verifies the tag and decrypts it
 in place. Keep the buffer writable through finish. A tag mismatch leaves the
-ciphertext unchanged.
+ciphertext unchanged. Finish rechecks the ciphertext it decrypts; a buffer
+change after update returns `TC_MISMATCH` and wipes the buffer.
 GCM requires a 12 to 16-byte tag by default. Use the explicit
 `TC_AES_GCM_init_short_tag` or one-shot `_short_tag` functions when a protocol
 requires a 4 or 8-byte tag; the GCM packet limits still apply.

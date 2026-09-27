@@ -228,6 +228,13 @@ static void tc_aes_gcm_absorb(struct TC_AES_GCM_ctx* ctx, const uint8_t* data,
 {
   while (length != 0)
   {
+    if (ctx->ghash_len == 0 && length >= TC_AES_BLOCKLEN)
+    {
+      tc_aes_gcm_ghash_block(ctx, data);
+      data += TC_AES_BLOCKLEN;
+      length -= TC_AES_BLOCKLEN;
+      continue;
+    }
     const size_t available = TC_AES_BLOCKLEN - ctx->ghash_len;
     const size_t count = length < available ? length : available;
     tc_aes_copy_bytes(ctx->ghash + ctx->ghash_len, data, count);
@@ -500,6 +507,7 @@ TC_status TC_AES_GCM_decrypt_update(struct TC_AES_GCM_ctx* ctx, uint8_t* buf,
     return TC_ERROR;
   if (ctx->phase == TC_AES_GCM_PHASE_AAD) {
     tc_aes_gcm_pad_ghash(ctx);
+    tc_aes_copy_bytes(ctx->aad_state, ctx->S, TC_AES_BLOCKLEN);
     ctx->phase = TC_AES_GCM_PHASE_TEXT;
   }
   if (length != 0 && ctx->decrypt_buffer == NULL)
@@ -511,32 +519,52 @@ TC_status TC_AES_GCM_decrypt_update(struct TC_AES_GCM_ctx* ctx, uint8_t* buf,
   return TC_OK;
 }
 
-static TC_status tc_aes_gcm_decrypt_verified(const struct TC_AES_GCM_ctx* ctx,
-    const uint8_t* ciphertext, uint8_t* plaintext, size_t length)
+/* Rehash the same local ciphertext blocks used for decryption. A caller may
+ * change the receive buffer after update or while finish is running. */
+static TC_status tc_aes_gcm_decrypt_recheck(struct TC_AES_GCM_ctx* ctx,
+    const uint8_t* ciphertext, uint8_t* plaintext, size_t length,
+    const uint8_t* tag)
 {
   uint8_t counter[TC_AES_BLOCKLEN];
+  uint8_t block[TC_AES_BLOCKLEN];
   uint8_t stream[TC_AES_BLOCKLEN];
+  uint8_t expected[TC_AES_BLOCKLEN];
   size_t offset = 0;
   TC_status status = TC_OK;
 
+  tc_aes_copy_bytes(ctx->S, ctx->aad_state, TC_AES_BLOCKLEN);
+  ctx->ghash_len = 0;
   tc_aes_copy_bytes(counter, ctx->J0, TC_AES_BLOCKLEN);
-  while (offset < length) {
-    const size_t count = length - offset < TC_AES_BLOCKLEN ?
-                         length - offset : TC_AES_BLOCKLEN;
-    uint8_t j;
+  while (offset < length)
+  {
+    const size_t remaining = length - offset;
+    const size_t count = remaining < TC_AES_BLOCKLEN ? remaining : TC_AES_BLOCKLEN;
+    size_t i;
+    tc_aes_copy_bytes(block, ciphertext + offset, count);
+    tc_aes_gcm_absorb(ctx, block, count);
     tc_aes_gcm_increment_counter(counter);
     tc_aes_copy_bytes(stream, counter, TC_AES_BLOCKLEN);
-    status = tc_aes_cipher((state_t*)stream, ctx->key.round_key);
-    if (status != TC_OK) break;
-    for (j = 0; j < (uint8_t)count; ++j)
-      plaintext[offset + j] = (uint8_t)(ciphertext[offset + j] ^ stream[j]);
+    if (tc_aes_cipher((state_t*)stream, ctx->key.round_key) != TC_OK) {
+      status = TC_ERROR;
+      break;
+    }
+    for (i = 0; i < count; ++i)
+      plaintext[offset + i] = (uint8_t)(block[i] ^ stream[i]);
     offset += count;
   }
-  if (status != TC_OK && length != 0)
+  if (status == TC_OK) {
+    tc_aes_gcm_finish_ghash(ctx);
+    status = tc_aes_gcm_make_tag(ctx, expected);
+    if (status == TC_OK)
+      status = TC_ct_equal(expected, tag, ctx->tag_len);
+  }
+  if (status != TC_OK)
     TC_secure_zero(plaintext, length);
 #if TC_ZEROIZE
   TC_secure_zero(counter, sizeof counter);
+  TC_secure_zero(block, sizeof block);
   TC_secure_zero(stream, sizeof stream);
+  TC_secure_zero(expected, sizeof expected);
 #endif
   return status;
 }
@@ -575,6 +603,8 @@ TC_status TC_AES_GCM_decrypt_finish(struct TC_AES_GCM_ctx* ctx, const uint8_t* t
   if (ctx == NULL || tag == NULL || ctx->phase == TC_AES_GCM_PHASE_UNINIT ||
       ctx->phase == TC_AES_GCM_PHASE_FINAL ||
       !tc_internal_ranges_disjoint(ctx, sizeof(*ctx), tag, ctx->tag_len) ||
+      !tc_aes_buffers_disjoint(ctx->decrypt_buffer, ctx->decrypt_length,
+                               tag, ctx->tag_len) ||
       !tc_aes_gcm_packet_length_ok(ctx, 0))
     return TC_ERROR;
   if (ctx->direction == TC_AES_GCM_DIRECTION_ENCRYPT)
@@ -590,9 +620,10 @@ TC_status TC_AES_GCM_decrypt_finish(struct TC_AES_GCM_ctx* ctx, const uint8_t* t
    * the first byte that differs. */
   if (status == TC_OK)
     status = TC_ct_equal(expected, tag, ctx->tag_len);
-  if (status == TC_OK)
-    status = tc_aes_gcm_decrypt_verified(ctx, ctx->decrypt_buffer,
-                                         ctx->decrypt_buffer, ctx->decrypt_length);
+  if (status == TC_OK && ctx->decrypt_length != 0)
+    status = tc_aes_gcm_decrypt_recheck(ctx, ctx->decrypt_buffer,
+                                        ctx->decrypt_buffer,
+                                        ctx->decrypt_length, tag);
   if (status != TC_OK || TC_ZEROIZE)
     tc_aes_gcm_invalidate(ctx);
   else {
@@ -712,6 +743,7 @@ static TC_status tc_aes_gcm_decrypt_impl(const uint8_t* key,
   if (ctx.phase == TC_AES_GCM_PHASE_AAD)
   {
     tc_aes_gcm_pad_ghash(&ctx);
+    tc_aes_copy_bytes(ctx.aad_state, ctx.S, TC_AES_BLOCKLEN);
     ctx.phase = TC_AES_GCM_PHASE_TEXT;
   }
   if (!tc_aes_gcm_length_is_valid(ctx.text_len, ciphertext_len,
@@ -736,8 +768,9 @@ static TC_status tc_aes_gcm_decrypt_impl(const uint8_t* key,
     goto done;
   }
 
-  status = tc_aes_gcm_decrypt_verified(&ctx, ciphertext, plaintext,
-                                       ciphertext_len);
+  if (ciphertext_len != 0)
+    status = tc_aes_gcm_decrypt_recheck(&ctx, ciphertext, plaintext,
+                                        ciphertext_len, tag);
 
 done:
 #if TC_ZEROIZE

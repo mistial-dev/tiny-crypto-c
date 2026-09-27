@@ -221,6 +221,7 @@ struct TC_AES_GCM_ctx
   uint8_t phase;
   uint8_t direction;
   /* Streaming decryption authenticates contiguous caller-owned ciphertext. */
+  uint8_t aad_state[TC_AES_BLOCKLEN];
   uint8_t* decrypt_buffer;
   size_t decrypt_length;
 };
@@ -240,8 +241,9 @@ TC_status TC_AES_GCM_init_short_tag(struct TC_AES_GCM_ctx* ctx,
 /* AAD must be supplied before the first encrypt/decrypt update. A context is
  * single-direction; reinitialize before switching direction. Check every
  * return value. Decrypt updates authenticate contiguous slices of one mutable
- * ciphertext buffer. Keep that buffer unchanged until decrypt_finish verifies
- * the tag and decrypts it in place. A bad tag leaves ciphertext unchanged. */
+ * ciphertext buffer. Keep it writable through finish. Finish rechecks each
+ * ciphertext block before replacing it with plaintext; a changed buffer
+ * returns TC_MISMATCH and is wiped. A bad tag leaves ciphertext unchanged. */
 TC_status TC_AES_GCM_aad_update(struct TC_AES_GCM_ctx* ctx, const uint8_t* aad,
                        size_t length);
 TC_status TC_AES_GCM_encrypt_update(struct TC_AES_GCM_ctx* ctx, uint8_t* buf,

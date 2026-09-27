@@ -7,11 +7,17 @@
 #undef tc_aes_cipher_rounds
 TC_status tc_aes_cipher_rounds(state_t*, const uint8_t*, uint8_t);
 
-static unsigned calls, fail_at;
+static unsigned calls, fail_at, mutate_at;
+static uint8_t* mutate_buffer;
 
 TC_status tc_test_cipher_rounds(state_t* state, const uint8_t* key, uint8_t rounds)
 {
-  if (++calls == fail_at) {
+  ++calls;
+  if (calls == mutate_at && mutate_buffer != NULL) {
+    mutate_buffer[0] ^= 1;
+    mutate_buffer = NULL;
+  }
+  if (calls == fail_at) {
     memset(state, 0xa5, sizeof *state); /* A failed device may modify scratch. */
     return TC_ERROR;
   }
@@ -275,6 +281,24 @@ static MunitResult gcm_failures(const MunitParameter params[], void* user)
     munit_assert_int(TC_AES_GCM_decrypt_finish(&ctx, tag), ==, TC_ERROR);
   }
   fail_at = 0;
+  calls = 0;
+  mutate_at = 2;
+  memcpy(output, ciphertext, sizeof output);
+  mutate_buffer = output;
+  munit_assert_int(TC_AES_GCM_init(&ctx, key, iv, sizeof iv, sizeof tag), ==, TC_OK);
+  munit_assert_int(TC_AES_GCM_aad_update(&ctx, plain, sizeof plain), ==, TC_OK);
+  munit_assert_int(TC_AES_GCM_decrypt_update(&ctx, output, sizeof output), ==, TC_OK);
+  munit_assert_int(TC_AES_GCM_decrypt_finish(&ctx, tag), ==, TC_MISMATCH);
+  munit_assert_true(tc_test_all_zero(output, sizeof output));
+  calls = 0;
+  memcpy(output, ciphertext, sizeof output);
+  mutate_buffer = output;
+  munit_assert_int(TC_AES_GCM_decrypt(key, iv, sizeof iv, plain,
+      sizeof plain, output, sizeof output, tag, sizeof tag, output),
+      ==, TC_MISMATCH);
+  munit_assert_true(tc_test_all_zero(output, sizeof output));
+  mutate_at = 0;
+  mutate_buffer = NULL;
   return MUNIT_OK;
 }
 

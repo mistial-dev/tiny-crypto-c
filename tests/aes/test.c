@@ -725,6 +725,18 @@ static MunitResult test_gcm(const MunitParameter params[], void* data)
   munit_assert_memory_equal(vector->length, buffer, vector->plaintext);
 
   memcpy(buffer, vector->ciphertext, vector->length);
+  munit_assert_int(TC_AES_GCM_init(&ctx, vector->key, vector->iv,
+                                   vector->iv_len, vector->tag_len), ==, TC_OK);
+  munit_assert_int(TC_AES_GCM_aad_update(&ctx, vector->aad,
+                                         vector->aad_len), ==, TC_OK);
+  munit_assert_int(TC_AES_GCM_decrypt_update(&ctx, buffer,
+                                             vector->length), ==, TC_OK);
+  buffer[0] ^= 1;
+  munit_assert_int(TC_AES_GCM_decrypt_finish(&ctx, vector->tag), ==, TC_MISMATCH);
+  for (size_t i = 0; i < vector->length; ++i)
+    munit_assert_uint8(buffer[i], ==, 0);
+
+  memcpy(buffer, vector->ciphertext, vector->length);
   memcpy(bad_tag, tag, sizeof(bad_tag));
   bad_tag[0] ^= 1;
   munit_assert_int(TC_AES_GCM_init(&ctx, vector->key, vector->iv, vector->iv_len,
