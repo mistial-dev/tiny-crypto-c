@@ -5,6 +5,7 @@
 #include <tiny_crypto/x509.h>
 #include <tiny_crypto/x509_store.h>
 #include "x509_policy_internal.h"
+#include "pki_budget_internal.h"
 
 /* An unevaluated branch prevents a definitive no-path result. */
 static inline void tc_x509_path_remember(TC_X509_path_status status, TC_X509_path_status* failure)
@@ -15,9 +16,7 @@ static inline void tc_x509_path_remember(TC_X509_path_status status, TC_X509_pat
 
 static inline TC_TLV_result tc_x509_path_charge(size_t* work, size_t amount)
 {
-  if (amount > *work) { *work = 0; return TC_TLV_LIMIT; }
-  *work -= amount;
-  return TC_TLV_OK;
+  return tc_pki_work_charge(work, amount);
 }
 
 static inline TC_X509_path_status tc_x509_path_status(TC_TLV_result result)

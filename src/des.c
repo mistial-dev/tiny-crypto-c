@@ -398,6 +398,30 @@ static void tc_des_cipher_block(const uint8_t (*sk)[6], uint8_t* buf, int decryp
   buf[7] = (uint8_t)(L);
 }
 
+#if TC_DES_ENABLE_TDES || TC_DES_ENABLE_CMAC || TC_DES_ENABLE_ISO9797
+/* Run one DES stage or the EDE bundle selected by the mode. */
+static void tc_des_encrypt_scheduled(const uint8_t (*sk)[6],
+                                     uint8_t block[TC_DES_BLOCKLEN], int triple)
+{
+  tc_des_cipher_block(&sk[0], block, 0);
+  if (triple) {
+    tc_des_cipher_block(&sk[16], block, 1);
+    tc_des_cipher_block(&sk[32], block, 0);
+  }
+}
+#endif
+
+#if TC_DES_ENABLE_CMAC || TC_DES_ENABLE_ISO9797
+static void tc_des_mac_absorb(uint8_t mac[TC_DES_BLOCKLEN],
+                              const uint8_t block[TC_DES_BLOCKLEN],
+                              const uint8_t (*sk)[6], int triple)
+{
+  for (size_t i = 0; i < TC_DES_BLOCKLEN; ++i)
+    mac[i] ^= block[i];
+  tc_des_encrypt_scheduled(sk, mac, triple);
+}
+#endif
+
 typedef void (*tc_des_mode_block_fn)(const void* cipher, uint8_t* block);
 
 /* Public wrappers must check before taking addresses of context members. */
@@ -929,9 +953,7 @@ TC_status TC_DES3_ctx_set_iv(struct TC_DES3_ctx* ctx, const uint8_t* iv)
     TC_DES_ENABLE_CFB64
 static void tc_des3_encrypt_block(const struct TC_DES3_ctx* ctx, uint8_t* buf)
 {
-  tc_des_cipher_block(&ctx->Sk[0],  buf, 0); /* Encrypt K1 */
-  tc_des_cipher_block(&ctx->Sk[16], buf, 1); /* Decrypt K2 */
-  tc_des_cipher_block(&ctx->Sk[32], buf, 0); /* Encrypt K3 */
+  tc_des_encrypt_scheduled(ctx->Sk, buf, 1);
 }
 #endif
 
@@ -1080,24 +1102,13 @@ static void tc_des_cmac_shift_left(const uint8_t* input, uint8_t* output)
 /* CMAC needs only the raw block cipher, so the context schedules keys and
    chains blocks itself; it must keep working with the optional ECB/CBC/TDES
    mode gates compiled out. */
-static void tc_des_cmac_encrypt_block(const struct TC_DES_CMAC_ctx* ctx,
-                                      uint8_t* buf)
-{
-  tc_des_cipher_block(&ctx->sk[0], buf, 0);
-  if (ctx->triple)
-  {
-    tc_des_cipher_block(&ctx->sk[16], buf, 1);
-    tc_des_cipher_block(&ctx->sk[32], buf, 0);
-  }
-}
-
 static void tc_des_cmac_generate_subkeys(const struct TC_DES_CMAC_ctx* ctx,
                                          uint8_t* k1, uint8_t* k2)
 {
   static const uint8_t const_Rb = 0x1BU;
   uint8_t L[TC_DES_BLOCKLEN] = {0};
 
-  tc_des_cmac_encrypt_block(ctx, L);
+  tc_des_encrypt_scheduled(ctx->sk, L, ctx->triple);
 
   tc_des_cmac_shift_left(L, k1);
   k1[7] ^= (uint8_t)(const_Rb & (uint8_t)(0U - (uint8_t)(L[0] >> 7)));
@@ -1111,14 +1122,6 @@ static void tc_des_cmac_generate_subkeys(const struct TC_DES_CMAC_ctx* ctx,
 }
 
 /* Absorb one full block into the CBC-MAC chain (zero IV, SP 800-38B). */
-static void tc_des_cmac_absorb(struct TC_DES_CMAC_ctx* ctx, const uint8_t* block)
-{
-  size_t i;
-  for (i = 0; i < TC_DES_BLOCKLEN; ++i)
-    ctx->mac[i] ^= block[i];
-  tc_des_cmac_encrypt_block(ctx, ctx->mac);
-}
-
 TC_status TC_DES_CMAC_init(struct TC_DES_CMAC_ctx* ctx, const uint8_t* key, size_t keylen)
 {
   if (ctx == NULL)
@@ -1159,7 +1162,7 @@ TC_status TC_DES_CMAC_update(struct TC_DES_CMAC_ctx* ctx, const uint8_t* data, s
      last block of the message stays available to *_final. */
   if (ctx->buf_len == TC_DES_BLOCKLEN)
   {
-    tc_des_cmac_absorb(ctx, ctx->buf);
+    tc_des_mac_absorb(ctx->mac, ctx->buf, ctx->sk, ctx->triple);
     ctx->buf_len = 0;
   }
   if (ctx->buf_len != 0)
@@ -1172,12 +1175,12 @@ TC_status TC_DES_CMAC_update(struct TC_DES_CMAC_ctx* ctx, const uint8_t* data, s
     len -= take;
     if (len == 0)
       return TC_OK;
-    tc_des_cmac_absorb(ctx, ctx->buf);
+    tc_des_mac_absorb(ctx->mac, ctx->buf, ctx->sk, ctx->triple);
     ctx->buf_len = 0;
   }
   while (len > TC_DES_BLOCKLEN)
   {
-    tc_des_cmac_absorb(ctx, data);
+    tc_des_mac_absorb(ctx->mac, data, ctx->sk, ctx->triple);
     data += TC_DES_BLOCKLEN;
     len -= TC_DES_BLOCKLEN;
   }
@@ -1205,7 +1208,7 @@ TC_status TC_DES_CMAC_final(struct TC_DES_CMAC_ctx* ctx, uint8_t tag[TC_DES_CMAC
     for (i = 0; i < TC_DES_BLOCKLEN; ++i)
       ctx->buf[i] ^= ctx->k2[i];
   }
-  tc_des_cmac_absorb(ctx, ctx->buf);
+  tc_des_mac_absorb(ctx->mac, ctx->buf, ctx->sk, ctx->triple);
   memcpy(tag, ctx->mac, TC_DES_BLOCKLEN);
 
 #if TC_ZEROIZE
@@ -1280,31 +1283,11 @@ TC_status TC_DES_CMAC_verify(const uint8_t* key, size_t keylen, const uint8_t* m
 #endif /* TC_DES_ENABLE_CMAC */
 
 #if TC_DES_ENABLE_ISO9797
-static void tc_des_iso9797_encrypt(const struct TC_DES_ISO9797_ctx* ctx,
-                                   uint8_t block[TC_DES_BLOCKLEN])
-{
-  tc_des_cipher_block(&ctx->sk[0], block, 0);
-  if (ctx->algorithm == TC_DES_ISO9797_ALG1 && ctx->keylen != 8)
-  {
-    tc_des_cipher_block(&ctx->sk[16], block, 1);
-    tc_des_cipher_block(&ctx->sk[32], block, 0);
-  }
-}
-
 static void tc_des_iso9797_finish_alg3(const struct TC_DES_ISO9797_ctx* ctx,
                                        uint8_t block[TC_DES_BLOCKLEN])
 {
   tc_des_cipher_block(&ctx->sk[16], block, 1);
   tc_des_cipher_block(&ctx->sk[ctx->algorithm == 4 ? 32 : 0], block, 0);
-}
-
-static void tc_des_iso9797_absorb(struct TC_DES_ISO9797_ctx* ctx,
-                                  const uint8_t block[TC_DES_BLOCKLEN])
-{
-  size_t i;
-  for (i = 0; i < TC_DES_BLOCKLEN; ++i)
-    ctx->mac[i] ^= block[i];
-  tc_des_iso9797_encrypt(ctx, ctx->mac);
 }
 
 TC_status TC_DES_ISO9797_init(struct TC_DES_ISO9797_ctx* ctx,
@@ -1369,7 +1352,8 @@ TC_status TC_DES_ISO9797_update(struct TC_DES_ISO9797_ctx* ctx,
     msg_len -= take;
     if (ctx->used == TC_DES_BLOCKLEN)
     {
-      tc_des_iso9797_absorb(ctx, ctx->buf);
+      tc_des_mac_absorb(ctx->mac, ctx->buf, ctx->sk,
+                        ctx->algorithm == TC_DES_ISO9797_ALG1);
       ctx->used = 0;
     }
   }
@@ -1394,14 +1378,16 @@ TC_status TC_DES_ISO9797_final(struct TC_DES_ISO9797_ctx* ctx,
       (ctx->used || !ctx->nonempty))
   {
     memset(ctx->buf + ctx->used, 0, TC_DES_BLOCKLEN - ctx->used);
-    tc_des_iso9797_absorb(ctx, ctx->buf);
+    tc_des_mac_absorb(ctx->mac, ctx->buf, ctx->sk,
+                      ctx->algorithm == TC_DES_ISO9797_ALG1);
   }
   if (ctx->padding == TC_DES_ISO9797_PAD2)
   {
     ctx->buf[ctx->used] = 0x80;
     memset(ctx->buf + ctx->used + 1, 0,
            TC_DES_BLOCKLEN - ctx->used - 1);
-    tc_des_iso9797_absorb(ctx, ctx->buf);
+    tc_des_mac_absorb(ctx->mac, ctx->buf, ctx->sk,
+                      ctx->algorithm == TC_DES_ISO9797_ALG1);
   }
   if (ctx->algorithm == TC_DES_ISO9797_ALG3 ||
       ctx->algorithm == TC_DES_ISO9797_ALG_RETAIL3)

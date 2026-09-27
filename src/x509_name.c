@@ -8,14 +8,13 @@
 #include "pki_extensions_internal.h"
 #include "pki_names_internal.h"
 #include "pki_status_internal.h"
+#include "pki_budget_internal.h"
 #include "unicode_internal.h"
 #include "string_internal.h"
 
 static TC_TLV_result charge(size_t* work, size_t amount)
 {
-  if (*work < amount) { *work = 0; return TC_TLV_LIMIT; }
-  *work -= amount;
-  return TC_TLV_OK;
+  return tc_pki_work_charge(work, amount);
 }
 
 static uint8_t ascii_fold(uint8_t c)
