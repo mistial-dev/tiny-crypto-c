@@ -5,6 +5,7 @@
 #if TC_ENABLE_EC
 #define TC_MP_WORD_BITS TC_EC_WORD_BITS
 #include "mp_internal.h"
+#include "mp_inverse_internal.h"
 #if defined(__AVR__) && TC_AVR_PROGMEM
 #include <avr/pgmspace.h>
 #define EC_STORAGE PROGMEM
@@ -134,15 +135,7 @@ static void add(ec_state* s, word* out, const word* a, const word* b)
 
 static void sub(ec_state* s, word* out, const word* a, const word* b)
 {
-  word mask = (word)(0u - (unsigned)subtract(out, a, b, s->words));
-  ec_wide carry = 0;
-  size_t i;
-  mask = (word)tc_internal_mask_barrier(mask);
-  for (i = 0; i < s->words; ++i) {
-    carry += (ec_wide)out[i] + (F(s, EC_P)[i] & mask);
-    out[i] = (word)carry;
-    carry >>= TC_EC_WORD_BITS;
-  }
+  tc_mp_sub_mod(out, a, b, F(s, EC_P), s->words);
 }
 
 /* Montgomery multiplication. The low word of either prime is -1, so

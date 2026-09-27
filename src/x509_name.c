@@ -12,11 +12,6 @@
 #include "unicode_internal.h"
 #include "string_internal.h"
 
-static TC_TLV_result charge(size_t* work, size_t amount)
-{
-  return tc_pki_work_charge(work, amount);
-}
-
 static uint8_t ascii_fold(uint8_t c)
 { return c >= 'A' && c <= 'Z' ? (uint8_t)(c + ('a' - 'A')) : c; }
 
@@ -27,7 +22,7 @@ static TC_TLV_result validate_name(TC_bytes input, const TC_TLV_limits* limits,
   TC_bytes rdn;
   TC_TLV_result result;
   /* Reserve both traversals: schema validation and RDN matching. */
-  if (charge(work, input.length) != TC_TLV_OK || charge(work, input.length) != TC_TLV_OK)
+  if (tc_pki_work_charge(work, input.length) != TC_TLV_OK || tc_pki_work_charge(work, input.length) != TC_TLV_OK)
     return TC_TLV_LIMIT;
   result = TC_X509_name_init(reader, input, limits);
   if (result != TC_TLV_OK) return result;
@@ -43,11 +38,11 @@ static TC_TLV_result next_attribute(TC_TLV_reader* reader, size_t* work,
   TC_TLV_result result;
   if (tree) return tc_pki_tree_attribute(reader,tree,attribute);
   if (reader->offset == reader->input.length) return TC_TLV_END;
-  if (charge(work, 1) != TC_TLV_OK) return TC_TLV_LIMIT;
+  if (tc_pki_work_charge(work, 1) != TC_TLV_OK) return TC_TLV_LIMIT;
   result = TC_TLV_read(reader->input.data + reader->offset,
       reader->input.length - reader->offset, TC_TLV_DER, &reader->limits, &element);
   if (result != TC_TLV_OK) return result;
-  if (charge(work, element.encoded.length) != TC_TLV_OK) return TC_TLV_LIMIT;
+  if (tc_pki_work_charge(work, element.encoded.length) != TC_TLV_OK) return TC_TLV_LIMIT;
   return TC_X509_attribute_next(reader, attribute);
 }
 
@@ -72,7 +67,7 @@ typedef struct {
 static TC_TLV_result prepare_point(void* context, uint32_t point)
 {
   name_preparation* state = context;
-  TC_TLV_result result = charge(state->work,1);
+  TC_TLV_result result = tc_pki_work_charge(state->work,1);
   if (result != TC_TLV_OK) return result;
   if (state->rule == 1)
     return tc_unicode_prepare_point(point,state->buffer,state->capacity,&state->used,state->work);
@@ -114,7 +109,7 @@ static TC_TLV_result prepare(const TC_X509_name_attribute* attribute,
   }
   if (value.header.tag[0] != 0x16) return TC_TLV_INVALID;
   if (value.value.length > capacity) return TC_TLV_LIMIT;
-  if (charge(work, value.value.length) != TC_TLV_OK) return TC_TLV_LIMIT;
+  if (tc_pki_work_charge(work, value.value.length) != TC_TLV_OK) return TC_TLV_LIMIT;
   for (i = 0; i < value.value.length; ++i) {
     uint8_t c = value.value.data[i];
     if (c > 127) return TC_TLV_INVALID;
@@ -151,7 +146,7 @@ static TC_TLV_result rdn_equal(TC_bytes left, TC_bytes right,
     if (result != TC_TLV_OK) return result;
     while ((result = next_attribute(&b, work, &second, tree)) == TC_TLV_OK) {
       if (!workspace->matched[index] && tc_pki_equal(first.oid, second.oid)) {
-        size_t other_length;
+        size_t other_length = 0;
         int binary_pair;
         if (!prepared && !binary_only) {
           result = prepare(&first, left_profile, workspace->left,
@@ -173,7 +168,7 @@ static TC_TLV_result rdn_equal(TC_bytes left, TC_bytes right,
           } else if (result != TC_TLV_OK) return result;
         }
         if (binary_pair) {
-          if (charge(work, first.value.length) != TC_TLV_OK) return TC_TLV_LIMIT;
+          if (tc_pki_work_charge(work, first.value.length) != TC_TLV_OK) return TC_TLV_LIMIT;
           if (tc_pki_equal(first.value, second.value)) {
             workspace->matched[index] = 1;
             found = 1;
@@ -182,7 +177,7 @@ static TC_TLV_result rdn_equal(TC_bytes left, TC_bytes right,
           ++index;
           continue;
         }
-        if (charge(work, length) != TC_TLV_OK) return TC_TLV_LIMIT;
+        if (tc_pki_work_charge(work, length) != TC_TLV_OK) return TC_TLV_LIMIT;
         if (length == other_length && !memcmp(workspace->left, workspace->right, length * sizeof(uint32_t))) {
           workspace->matched[index] = 1;
           found = 1;
@@ -364,7 +359,7 @@ static TC_TLV_result dns_syntax(TC_bytes name, size_t* work, int escaped, size_t
   size_t i = 0, label = 0, count = 0;
   int previous = 0;
   if (!name.length) return TC_TLV_INVALID;
-  if (charge(work, name.length) != TC_TLV_OK) return TC_TLV_LIMIT;
+  if (tc_pki_work_charge(work, name.length) != TC_TLV_OK) return TC_TLV_LIMIT;
   while (i < name.length) {
     const int c = domain_next(name, &i, escaped);
     if (c < 0 || ++count > 253) return TC_TLV_INVALID;
@@ -401,7 +396,7 @@ static TC_TLV_result domain_within(TC_bytes name, TC_bytes base,
     *matched = 0; return TC_TLV_OK;
   }
   offset = length - base_length;
-  if (charge(work, name.length) != TC_TLV_OK) return TC_TLV_LIMIT;
+  if (tc_pki_work_charge(work, name.length) != TC_TLV_OK) return TC_TLV_LIMIT;
   for (i = 0; i < offset; ++i) previous = domain_next(name, &position, escaped);
   if (offset && previous != '.') { *matched = 0; return TC_TLV_OK; }
   for (i = 0; i < base_length; ++i)
@@ -437,7 +432,7 @@ static TC_TLV_result mail_domain(TC_bytes name, TC_bytes* domain, size_t* work, 
   size_t i = 0;
   int nonascii = 0;
   if (!name.length) return TC_TLV_INVALID;
-  if (charge(work, name.length) != TC_TLV_OK) return TC_TLV_LIMIT;
+  if (tc_pki_work_charge(work, name.length) != TC_TLV_OK) return TC_TLV_LIMIT;
   /* A quoted local part may contain @, including a backslash-quoted one. */
   if (name.data[0] == '"') {
     i = 1;
@@ -496,7 +491,7 @@ static TC_TLV_result mail_within(TC_bytes name, TC_bytes base, size_t* work, int
   TC_bytes domain;
   TC_TLV_result result;
   size_t i;
-  if (charge(work, base.length) != TC_TLV_OK) return TC_TLV_LIMIT;
+  if (tc_pki_work_charge(work, base.length) != TC_TLV_OK) return TC_TLV_LIMIT;
   /* RFC 9549 removed mailbox-specific constraints. Do not widen them to hosts. */
   for (i = 0; i < base.length; ++i)
     if (base.data[i] == '@') return TC_TLV_UNSUPPORTED;
@@ -513,7 +508,7 @@ static TC_TLV_result smtp_utf8(TC_bytes contents, const TC_TLV_limits* limits,
   TC_TLV_element oid, wrapper, value;
   TC_TLV_result result;
   if (limits->max_elements < 3 || limits->max_depth < 2) return TC_TLV_LIMIT;
-  if (charge(work, contents.length) != TC_TLV_OK) return TC_TLV_LIMIT;
+  if (tc_pki_work_charge(work, contents.length) != TC_TLV_OK) return TC_TLV_LIMIT;
   result = TC_TLV_reader_init(&reader, contents.data, contents.length, TC_TLV_DER, limits);
   if (result != TC_TLV_OK) return result;
   result = tc_pki_next(&reader, 6, &oid);
@@ -570,7 +565,7 @@ static TC_TLV_result uri_domain(TC_bytes name, TC_bytes* domain, size_t* work)
   unsigned section = 0;
   int userinfo = 0;
   if (!name.length) return TC_TLV_INVALID;
-  if (charge(work, name.length) != TC_TLV_OK) return TC_TLV_LIMIT;
+  if (tc_pki_work_charge(work, name.length) != TC_TLV_OK) return TC_TLV_LIMIT;
   if (ascii_fold(name.data[0]) < 'a' || ascii_fold(name.data[0]) > 'z') return TC_TLV_INVALID;
   for (i = 1; i < name.length && name.data[i] != ':'; ++i) {
     uint8_t c = ascii_fold(name.data[i]);
@@ -631,7 +626,7 @@ static TC_TLV_result ip_within(TC_bytes name, TC_bytes base, size_t* work, int* 
   if ((name.length != 4 && name.length != 16) || (base.length != 8 && base.length != 32))
     return TC_TLV_INVALID;
   width = base.length / 2;
-  if (charge(work, width) != TC_TLV_OK) return TC_TLV_LIMIT;
+  if (tc_pki_work_charge(work, width) != TC_TLV_OK) return TC_TLV_LIMIT;
   for (i = 0; i < width; ++i) {
     const uint8_t mask = base.data[width + i];
     unsigned bit;
@@ -667,7 +662,7 @@ TC_TLV_result TC_X509_general_name_within(const TC_X509_general_name* name,
   if (name->value.length > limits->max_input || subtree->base.value.length > limits->max_input
       || name->value.length > limits->max_value || subtree->base.value.length > limits->max_value)
     return TC_TLV_LIMIT;
-  if (charge(work, 1) != TC_TLV_OK) return TC_TLV_LIMIT;
+  if (tc_pki_work_charge(work, 1) != TC_TLV_OK) return TC_TLV_LIMIT;
   if (name->type == 0 && subtree->base.type == 1) {
     TC_bytes mailbox;
     TC_TLV_result result = smtp_utf8(name->value, limits, work, &mailbox);
@@ -776,7 +771,7 @@ TC_TLV_result TC_X509_name_constraints_check(const TC_X509_general_name* name,
   if (name->value.length > limits->max_input || name->value.length > limits->max_value
       || lists[0].length > limits->max_input || lists[1].length > limits->max_input - lists[0].length)
     return TC_TLV_LIMIT;
-  if (charge(work, lists[0].length) != TC_TLV_OK || charge(work, lists[1].length) != TC_TLV_OK)
+  if (tc_pki_work_charge(work, lists[0].length) != TC_TLV_OK || tc_pki_work_charge(work, lists[1].length) != TC_TLV_OK)
     return TC_TLV_LIMIT;
   form = name->type;
   if (!form && (lists[0].length || lists[1].length)) {
@@ -792,7 +787,7 @@ TC_TLV_result TC_X509_name_constraints_check(const TC_X509_general_name* name,
     while ((result = TC_X509_general_subtree_next(&reader, workspace->frames,
         workspace->frame_capacity, &subtree)) == TC_TLV_OK) {
       int matched;
-      if (charge(work, 1) != TC_TLV_OK) return TC_TLV_LIMIT;
+      if (tc_pki_work_charge(work, 1) != TC_TLV_OK) return TC_TLV_LIMIT;
       if (subtree.base.type != form && subtree.base.type != name->type) continue;
       result = TC_X509_general_name_within(name, &subtree, limits, workspace->names, work, &matched);
       if (result != TC_TLV_OK) return result;
@@ -842,11 +837,11 @@ TC_TLV_result TC_X509_certificate_names_check(const TC_X509_certificate* certifi
     allowed &= current;
   } else if (!has_san) return TC_TLV_INVALID;
   if (has_san) {
-    if (charge(work, san.length) != TC_TLV_OK) return TC_TLV_LIMIT;
+    if (tc_pki_work_charge(work, san.length) != TC_TLV_OK) return TC_TLV_LIMIT;
     result = TC_X509_general_names_init(&reader, san.data, san.length, limits);
     if (result != TC_TLV_OK) return result;
     while ((result = TC_X509_general_name_next(&reader, workspace->frames, workspace->frame_capacity, &name)) == TC_TLV_OK) {
-      if (charge(work, 1) != TC_TLV_OK) return TC_TLV_LIMIT;
+      if (tc_pki_work_charge(work, 1) != TC_TLV_OK) return TC_TLV_LIMIT;
       result = TC_X509_name_constraints_check(&name, constraints, limits, workspace, work, &current);
       if (result != TC_TLV_OK) return result;
       allowed &= current;
