@@ -133,9 +133,9 @@ The non-constant-time `fast-table` mode adds 256 bytes to each GCM context.
 Small MCUs can keep `TINY_CRYPTO_AES_TINY=ON` or use `auto`, `bitwise`, or
 `wide` to avoid that RAM cost.
 
-Enabling `TINY_CRYPTO_ENABLE_DES` also enables CTR and 3DES. `DES_ECB`, `DES_CBC`,
-`DES_OFB`, `DES_CFB1`, `DES_CFB8`, `DES_CFB64`, `DES_CMAC`, and `DES_ISO9797` select the
-remaining modes when prefixed with `TINY_CRYPTO_`.
+Enabling `TINY_CRYPTO_ENABLE_DES` also enables CTR and 3DES. `DES_ECB`,
+`DES_CBC`, `DES_OFB`, `DES_CFB1`, `DES_CFB8`, `DES_CFB64`, `DES_CMAC`, and
+`DES_ISO9797` select the remaining modes when prefixed with `TINY_CRYPTO_`.
 ISO 9797-1 MAC stays off in every resource profile; enable it explicitly.
 See [DES message authentication](docs/api.md#des-message-authentication) for
 algorithm, padding, and tag requirements.
@@ -180,10 +180,14 @@ TC_ERROR     /* malformed argument or invalid state */
 Authentication checks examine the entire tag. One-shot GCM, CCM, and EAX
 decryptors authenticate before writing plaintext. SIV writes candidate
 plaintext to recompute its synthetic IV and wipes the output if it does not
-match. Streaming GCM decryption writes
-plaintext before `TC_AES_GCM_decrypt_finish` checks the tag. Do not use that
-plaintext until the call returns `TC_OK`, and wipe it if any other status is
-returned.
+match. Streaming GCM decryption authenticates a contiguous caller-owned
+ciphertext buffer during `TC_AES_GCM_decrypt_update`. The buffer remains
+ciphertext until `TC_AES_GCM_decrypt_finish` verifies the tag and decrypts it
+in place. Keep the buffer writable through finish. A tag mismatch leaves the
+ciphertext unchanged.
+GCM requires a 12 to 16-byte tag by default. Use the explicit
+`TC_AES_GCM_init_short_tag` or one-shot `_short_tag` functions when a protocol
+requires a 4 or 8-byte tag; the GCM packet limits still apply.
 
 CTR, CBC, ECB, OFB, and CFB provide no authentication. Pair them with a MAC or
 use an authenticated mode such as GCM, CCM, EAX, or SIV. Never reuse a CTR,
