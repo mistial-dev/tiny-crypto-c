@@ -2,9 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/md5.h>
 #if TC_ENABLE_MD5
-#include "hash64_internal.h"
-#include "internal.h"
-#include "hash_validation_internal.h"
+#include "hash_core_internal.h"
 
 #if defined(__AVR__) && TC_AVR_PROGMEM
 #include <avr/pgmspace.h>
@@ -43,8 +41,9 @@ static uint32_t load_word(const uint8_t* data)
       (uint32_t)data[2] << 16 | (uint32_t)data[3] << 24;
 }
 
-static void compress(uint32_t* state, const uint8_t* block)
+static void compress(void* chaining, const uint8_t* block)
 {
+  uint32_t* state = (uint32_t*)chaining;
   static const uint8_t shifts[4][4] MD5_TABLE_STORAGE = {{7,12,17,22},{5,9,14,20},{4,11,16,23},{6,10,15,21}};
   uint32_t a = state[0], b = state[1], c = state[2], d = state[3];
   for (unsigned round = 0; round < 64; ++round) {
@@ -62,53 +61,42 @@ static void compress(uint32_t* state, const uint8_t* block)
   state[0] += a; state[1] += b; state[2] += c; state[3] += d;
 }
 
+static void state_init(void* chaining)
+{
+  uint32_t* state = (uint32_t*)chaining;
+  state[0] = 0x67452301u; state[1] = 0xefcdab89u;
+  state[2] = 0x98badcfeu; state[3] = 0x10325476u;
+}
+
+static void digest_out(const void* state, uint8_t* digest)
+{
+  tc_hash_store_le32_words(digest, state, 4);
+}
+
+static tc_hash_view view(void* context)
+{
+  struct TC_MD5_ctx* ctx = (struct TC_MD5_ctx*)context;
+  return TC_HASH_VIEW(ctx);
+}
+
+/* RFC 1321 encodes the low 64 bits of the bit count, so the 64-bit byte
+ * count sets the message limit. MD5 has no HMAC API. */
+static const tc_hash_algorithm_info tc_md5_info TC_HASH_INFO_STORAGE = {
+  TC_MD5_BLOCKLEN, 8u, TC_MD5_DIGESTLEN, TC_HASH_LENGTH_LITTLE_ENDIAN,
+  UINT64_MAX, state_init, compress, digest_out, view, NULL
+};
+
 TC_status TC_MD5_init(struct TC_MD5_ctx* ctx)
-{
-  if (!ctx) return TC_ERROR;
-  memset(ctx,0,sizeof *ctx);
-  ctx->State[0] = 0x67452301u; ctx->State[1] = 0xefcdab89u;
-  ctx->State[2] = 0x98badcfeu; ctx->State[3] = 0x10325476u;
-  ctx->active = 1;
-  return TC_OK;
-}
-
+{ return tc_hash_core_init(&tc_md5_info, ctx); }
 TC_status TC_MD5_update(struct TC_MD5_ctx* ctx, const uint8_t* data, size_t length)
-{
-  if (!tc_hash_update_args(ctx, sizeof *ctx, data, length) ||
-      ctx->active != 1 || ctx->BufLen >= TC_MD5_BLOCKLEN) return TC_ERROR;
-  /* RFC 1321 uses the low 64 bits of the encoded bit count. */
-  ctx->Count += (uint64_t)length;
-  tc_hash64_absorb(ctx->State,&ctx->BufLen,ctx->Buf,data,length,compress);
-  return TC_OK;
-}
-
+{ return tc_hash_core_update(&tc_md5_info, ctx, data, length); }
 TC_status TC_MD5_final(struct TC_MD5_ctx* ctx, uint8_t digest[TC_MD5_DIGESTLEN])
-{
-  if (!tc_hash_final_args(ctx, sizeof *ctx, digest, TC_MD5_DIGESTLEN) ||
-      ctx->active != 1 || ctx->BufLen >= TC_MD5_BLOCKLEN) return TC_ERROR;
-  tc_hash64_finish(ctx->State,ctx->Count,&ctx->BufLen,ctx->Buf,compress,TC_HASH_LENGTH_LITTLE_ENDIAN);
-  for (unsigned word = 0; word < 4; ++word)
-    for (unsigned byte = 0; byte < 4; ++byte)
-      digest[4 * word + byte] = (uint8_t)(ctx->State[word] >> (8 * byte));
-#if TC_ZEROIZE
-  TC_secure_zero(ctx,sizeof *ctx);
-#else
-  ctx->active = 0;
-#endif
-  return TC_OK;
-}
-
+{ return tc_hash_core_final(&tc_md5_info, ctx, digest); }
 void TC_MD5_ctx_clear(struct TC_MD5_ctx* ctx)
-{ if (ctx) TC_secure_zero(ctx,sizeof *ctx); }
-
+{ tc_hash_core_clear(&tc_md5_info, ctx); }
 TC_status TC_MD5_digest(const uint8_t* data, size_t length, uint8_t digest[TC_MD5_DIGESTLEN])
 {
   struct TC_MD5_ctx ctx;
-  if (!digest || (!data && length)) return TC_ERROR;
-  TC_MD5_init(&ctx);
-  TC_status status = TC_MD5_update(&ctx,data,length);
-  if (status == TC_OK) status = TC_MD5_final(&ctx,digest);
-  TC_MD5_ctx_clear(&ctx);
-  return status;
+  return tc_hash_core_digest(&tc_md5_info, &ctx, data, length, digest);
 }
 #endif

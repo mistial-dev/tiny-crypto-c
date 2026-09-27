@@ -100,7 +100,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
       set(sm_suffix "-${sm_profile}")
     endif()
   tc_add_test_library(tiny-crypto-c-test-piv-sm${sm_suffix} src/common.c ${tc_aes_sources}
-    src/hash.c src/sha512.c src/hash_adapter.c src/sskdf.c src/ec.c src/tlv.c src/der.c src/piv_cvc.c
+    src/hash.c src/sha512.c src/hash_core.c src/hash_adapter.c src/sskdf.c src/ec.c src/tlv.c src/der.c src/piv_cvc.c
     src/piv_sm.c src/piv_sm_message.c examples/piv_sm_wire.c)
   target_compile_definitions(tiny-crypto-c-test-piv-sm${sm_suffix} PUBLIC
     TC_RESOURCE_PROFILE=$<IF:$<STREQUAL:${sm_profile},micro>,1,$<IF:$<STREQUAL:${sm_profile},mini>,2,0>>
@@ -158,7 +158,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
       TC_EC_ENABLE_P256=$<STREQUAL:${curve},256> TC_EC_ENABLE_P384=$<STREQUAL:${curve},384>)
     tc_add_c_test(test_ec_p${curve} tiny-crypto-c-test-ec-p${curve} tests/ec/test.c)
   endforeach()
-  tc_add_test_library(tiny-crypto-c-test-sskdf src/common.c src/hash.c src/sha512.c src/hash_adapter.c src/sskdf.c)
+  tc_add_test_library(tiny-crypto-c-test-sskdf src/common.c src/hash.c src/sha512.c src/hash_core.c src/hash_adapter.c src/sskdf.c)
   option(TINY_CRYPTO_TEST_EC_ORACLE "Compare EC with Python cryptography" OFF)
   set(TINY_CRYPTO_TEST_WYCHEPROOF_ARCHIVE
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/wycheproof.zip"
@@ -313,7 +313,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   target_compile_definitions(test_idf_signed_rsa PRIVATE TC_ENABLE_RSA=1)
   target_include_directories(test_idf_signed_rsa PRIVATE tests/esp_idf/include
     ports/esp-idf/vendor/bootloader_support/src/secure_boot_v2)
-  tc_add_test_library(tiny-crypto-c-test-idf-ec src/common.c src/hash.c src/hash_adapter.c src/ec.c)
+  tc_add_test_library(tiny-crypto-c-test-idf-ec src/common.c src/hash.c src/hash_core.c src/hash_adapter.c src/ec.c)
   target_compile_definitions(tiny-crypto-c-test-idf-ec PUBLIC
     TC_ENABLE_EC=1 TC_EC_ENABLE_P192=1 TC_ENABLE_SHA256=1 TC_ENABLE_AES=0)
   tc_add_c_test(test_idf_ecdsa_image tiny-crypto-c-test-idf-ec
@@ -528,7 +528,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   tc_add_c_test(test_twic_ccl tiny-crypto-c-test-ccl tests/twic/ccl.c)
   target_sources(test_twic_ccl PRIVATE examples/twic_ccl_storage.c examples/twic_ccl_import.c)
   foreach(zeroize IN ITEMS 0 1)
-    tc_add_test_library(tiny-crypto-c-test-md5-${zeroize} src/common.c src/md5.c)
+    tc_add_test_library(tiny-crypto-c-test-md5-${zeroize} src/common.c src/md5.c src/hash_core.c)
     target_compile_definitions(tiny-crypto-c-test-md5-${zeroize} PUBLIC
       TC_ENABLE_MD5=1 TC_ENABLE_AES=0 TC_ENABLE_SHA256=0 TC_ZEROIZE=${zeroize})
     tc_add_c_test(test_md5_${zeroize} tiny-crypto-c-test-md5-${zeroize} tests/hash/md5.c)
@@ -572,7 +572,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   tc_add_c_test(test_cms_reader tiny-crypto-c-test-pki tests/cms/reader.c examples/cms_reader.c)
   get_target_property(tc_native_pki_sources tiny-crypto-c-test-pki SOURCES)
   tc_add_test_library(tiny-crypto-c-test-pki-native ${tc_native_pki_sources}
-    src/hash.c src/sha512.c src/hash_adapter.c src/ec.c src/rsa.c ${tc_aes_sources} src/sskdf.c
+    src/hash.c src/sha512.c src/hash_core.c src/hash_adapter.c src/ec.c src/rsa.c ${tc_aes_sources} src/sskdf.c
     src/piv_sm.c src/piv_sm_message.c src/piv_sm_authenticate.c
     src/twic_cipher.c src/twic_tpk.c
     examples/piv_sm_wire.c)
@@ -611,7 +611,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   tc_add_c_test(test_hash_algorithm tiny-crypto-c-test-pki tests/hash/algorithm.c)
   get_target_property(tc_cms_pki_sources tiny-crypto-c-test-pki SOURCES)
   tc_add_test_library(tiny-crypto-c-test-cms-crypto
-    ${tc_cms_pki_sources} src/hash.c src/sha512.c src/hash_adapter.c)
+    ${tc_cms_pki_sources} src/hash.c src/sha512.c src/hash_core.c src/hash_adapter.c)
   target_compile_definitions(tiny-crypto-c-test-cms-crypto PUBLIC
     TC_ENABLE_AES=0 TC_ENABLE_TLV=1 TC_TLV_ENABLE_BER=1 TC_ENABLE_DER=1 TC_ENABLE_X509=1
     TC_ENABLE_KEY_CHALLENGE=1
@@ -880,7 +880,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
     get_target_property(pki_fuzz_sources tiny-crypto-c-test-pki SOURCES)
     get_target_property(pki_fuzz_definitions tiny-crypto-c-test-pki COMPILE_DEFINITIONS)
     list(REMOVE_ITEM pki_fuzz_definitions TC_ENABLE_SHA256=0)
-    add_executable(fuzz_pki tests/x509/fuzz.c src/hash.c src/hash_adapter.c ${pki_fuzz_sources})
+    add_executable(fuzz_pki tests/x509/fuzz.c src/hash.c src/hash_core.c src/hash_adapter.c ${pki_fuzz_sources})
     target_include_directories(fuzz_pki PRIVATE src)
     target_compile_definitions(fuzz_pki PRIVATE ${pki_fuzz_definitions}
       TC_ENABLE_SHA256=1 TC_STRICT=0)
@@ -1153,6 +1153,16 @@ if(TINY_CRYPTO_BUILD_TESTS)
           -I${CMAKE_CURRENT_SOURCE_DIR}/src
           -c ${CMAKE_CURRENT_SOURCE_DIR}/src/${sm_source}.c
           -o ${CMAKE_CURRENT_BINARY_DIR}/tiny-crypto-c-${sm_source}-compile.o)
+    endforeach()
+    # Hash descriptors live in flash on AVR; build every hash source with all
+    # digests and HMAC enabled so program-memory access stays covered.
+    foreach(hash_source hash_core hash sha512 md5)
+      add_test(NAME test_${hash_source}_compile_avr
+        COMMAND ${TC_AVR_CC} -std=c99 -Wall -Wextra -Werror -Os -mmcu=atmega2560
+          -DTC_ENABLE_HMAC=1 -DTC_ENABLE_MD5=1 -DTC_ENABLE_SHA1=1 -DTC_ENABLE_SHA224=1
+          -DTC_ENABLE_SHA384=1 -DTC_ENABLE_SHA512=1 -I${CMAKE_CURRENT_SOURCE_DIR}/src
+          -c ${CMAKE_CURRENT_SOURCE_DIR}/src/${hash_source}.c
+          -o ${CMAKE_CURRENT_BINARY_DIR}/tiny-crypto-c-${hash_source}-compile.o)
     endforeach()
     add_test(NAME test_ec_compile_avr
       COMMAND ${TC_AVR_CC} -std=c99 -Wall -Wextra -Werror -Os -mmcu=atmega328p
