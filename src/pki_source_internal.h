@@ -115,6 +115,19 @@ static inline TC_TLV_result tc_pki_source_guard_anchor(void* context,
   return TC_TLV_OK;
 }
 
+/* The returned source borrows guard and its writable spans for the call.
+ * Keep all three objects alive until candidate and anchor reads finish. */
+static inline TC_X509_store_source tc_pki_source_guard_bind(tc_pki_source_guard* guard)
+{
+  const TC_X509_store_source* source = guard->source;
+  /* The typed initializer checks both callback signatures at compile time. */
+  const TC_X509_store_source guarded = {
+    guard, source->candidate_count, source->anchor_count,
+    tc_pki_source_guard_candidate, tc_pki_source_guard_anchor
+  };
+  return guarded;
+}
+
 typedef struct {
   const TC_X509_store_source* source;
   size_t anchor_index;

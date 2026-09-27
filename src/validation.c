@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/validation.h>
 #include "cms_internal.h"
+#include "credential_status_internal.h"
 #include "internal.h"
 #include "validation_internal.h"
 #include "pki_storage_internal.h"
@@ -310,13 +311,7 @@ TC_credential_status TC_CMS_validate(const TC_CMS_validation_request* request,
 
 TC_credential_status tc_validation_status(TC_TLV_result status)
 {
-  switch (status) {
-    case TC_TLV_OK: return TC_CREDENTIAL_VALID;
-    case TC_TLV_LIMIT: return TC_CREDENTIAL_LIMIT;
-    case TC_TLV_UNSUPPORTED: return TC_CREDENTIAL_UNSUPPORTED;
-    case TC_TLV_ARGUMENT: return TC_CREDENTIAL_ERROR;
-    default: return TC_CREDENTIAL_INVALID;
-  }
+  return tc_credential_tlv_status(status,&tc_credential_tlv_validation);
 }
 
 TC_credential_status TC_X509_validate(TC_bytes encoded,
@@ -336,8 +331,7 @@ TC_credential_status TC_X509_validate(TC_bytes encoded,
       out,sizeof *out,writes);
   if (status != TC_TLV_OK) return tc_validation_status(status);
   tc_pki_source_guard guard = {context->trust.certificates,writes,TC_VALIDATION_WRITES};
-  const TC_X509_store_source source = {&guard,guard.source->candidate_count,
-    guard.source->anchor_count,tc_pki_source_guard_candidate,tc_pki_source_guard_anchor};
+  const TC_X509_store_source source = tc_pki_source_guard_bind(&guard);
   const TC_CMS_credential_workspace* workspace = context->workspace;
   TC_X509_search_result path;
   const TC_X509_path_status found = tc_x509_path_build_work(encoded,&source,

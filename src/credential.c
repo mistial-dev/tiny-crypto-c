@@ -4,6 +4,7 @@
 #include "pki_source_internal.h"
 #include "validation_internal.h"
 #include "cms_internal.h"
+#include "credential_status_internal.h"
 #include <string.h>
 #include <tiny_crypto/credential.h>
 #include <tiny_crypto/piv_biometric.h>
@@ -288,9 +289,7 @@ TC_PIV_CHUID_validate(const TC_PIV_CHUID_validation_request *request,
     return tc_validation_status(checked);
   tc_pki_source_guard guard = {context->trust.certificates, writes,
                                TC_VALIDATION_WRITES};
-  const TC_X509_store_source source = {
-      &guard, guard.source->candidate_count, guard.source->anchor_count,
-      tc_pki_source_guard_candidate, tc_pki_source_guard_anchor};
+  const TC_X509_store_source source = tc_pki_source_guard_bind(&guard);
 
   const TC_TLV_limits *limits = &policy.path.parsing;
   const TC_X509_path_workspace *storage = &workspace->path->validation;
@@ -397,9 +396,7 @@ TC_PIV_biometric_validate(const TC_PIV_biometric_validation_request *request,
     return tc_validation_status(checked);
   tc_pki_source_guard guard = {context->trust.certificates, writes,
                                TC_VALIDATION_WRITES};
-  const TC_X509_store_source source = {
-      &guard, guard.source->candidate_count, guard.source->anchor_count,
-      tc_pki_source_guard_candidate, tc_pki_source_guard_anchor};
+  const TC_X509_store_source source = tc_pki_source_guard_bind(&guard);
   const TC_TLV_limits *limits = &policy.path.parsing;
   const TC_X509_path_workspace *storage = &context->workspace->path->validation;
   if (request->encoded.length > limits->max_input ||
@@ -557,9 +554,7 @@ TC_PIV_security_validate(const TC_PIV_security_validation_request *request,
   *work = budget;
   tc_pki_source_guard guard = {context->trust.certificates, writes,
                                SECURITY_WRITES};
-  const TC_X509_store_source source = {
-      &guard, guard.source->candidate_count, guard.source->anchor_count,
-      tc_pki_source_guard_candidate, tc_pki_source_guard_anchor};
+  const TC_X509_store_source source = tc_pki_source_guard_bind(&guard);
   const TC_TLV_limits *limits = &policy.path.parsing;
   const TC_X509_path_workspace *storage = &context->workspace->path->validation;
   if (request->encoded.length > limits->max_input ||
@@ -797,9 +792,7 @@ TC_PIV_CVC_validate(const TC_PIV_CVC_validation_request *request,
       policy.path.key_usage,        policy.path.flags};
   tc_pki_source_guard guard = {context->trust.certificates, writes,
                                TC_VALIDATION_WRITES};
-  const TC_X509_store_source source = {
-      &guard, guard.source->candidate_count, guard.source->anchor_count,
-      tc_pki_source_guard_candidate, tc_pki_source_guard_anchor};
+  const TC_X509_store_source source = tc_pki_source_guard_bind(&guard);
   TC_validation_context signer_context = *context;
   signer_context.options = &options;
   signer_context.trust.certificates = &source;
@@ -811,19 +804,8 @@ TC_PIV_CVC_validate(const TC_PIV_CVC_validation_request *request,
   const TC_PIV_CVC_chain_request chain = {request->card, request->intermediate,
                                           request->expected_uuid,
                                           request->curve, &signer.certificate};
-  switch (TC_PIV_CVC_chain_verify(&chain, &options.parsing, &options.signatures,
-                                  point, work, out)) {
-  case TC_X509_SIGNATURE_VALID:
-    return TC_CREDENTIAL_VALID;
-  case TC_X509_SIGNATURE_INVALID:
-    return TC_CREDENTIAL_INVALID;
-  case TC_X509_SIGNATURE_LIMIT:
-    return TC_CREDENTIAL_LIMIT;
-  case TC_X509_SIGNATURE_UNSUPPORTED:
-    return TC_CREDENTIAL_UNSUPPORTED;
-  default:
-    return TC_CREDENTIAL_ERROR;
-  }
+  return tc_credential_signature_status(TC_PIV_CVC_chain_verify(&chain,
+      &options.parsing, &options.signatures, point, work, out));
 }
 #endif
 #endif

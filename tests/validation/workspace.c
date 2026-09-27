@@ -1,11 +1,29 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/validation.h>
+#include "../../src/credential_status_internal.h"
 #include "munit.h"
 #include <string.h>
 
 enum { ARENA_UNITS = 4096 };
 static TC_validation_storage arena[ARENA_UNITS];
+
+static MunitResult status_mapping(const MunitParameter params[], void* context)
+{
+  munit_assert_int(tc_credential_signature_status(TC_X509_SIGNATURE_VALID),==,TC_CREDENTIAL_VALID);
+  munit_assert_int(tc_credential_signature_status(TC_X509_SIGNATURE_INVALID),==,TC_CREDENTIAL_INVALID);
+  munit_assert_int(tc_credential_signature_status(TC_X509_SIGNATURE_LIMIT),==,TC_CREDENTIAL_LIMIT);
+  munit_assert_int(tc_credential_signature_status(TC_X509_SIGNATURE_UNSUPPORTED),==,TC_CREDENTIAL_UNSUPPORTED);
+  munit_assert_int(tc_credential_signature_status((TC_X509_signature_result)127),==,TC_CREDENTIAL_ERROR);
+  munit_assert_int(tc_credential_tlv_status(TC_TLV_OK,&tc_credential_tlv_validation),==,TC_CREDENTIAL_VALID);
+  munit_assert_int(tc_credential_tlv_status(TC_TLV_IO,&tc_credential_tlv_validation),==,TC_CREDENTIAL_INVALID);
+  munit_assert_int(tc_credential_tlv_status((TC_TLV_result)127,&tc_credential_tlv_validation),==,TC_CREDENTIAL_INVALID);
+  munit_assert_int(tc_credential_tlv_status(TC_TLV_OK,&tc_credential_tlv_cms),==,TC_CREDENTIAL_ERROR);
+  munit_assert_int(tc_credential_tlv_status(TC_TLV_IO,&tc_credential_tlv_cms),==,TC_CREDENTIAL_ERROR);
+  munit_assert_int(tc_credential_tlv_status((TC_TLV_result)127,&tc_credential_tlv_cms),==,TC_CREDENTIAL_ERROR);
+  (void)params; (void)context;
+  return MUNIT_OK;
+}
 
 static MunitResult profiles(const MunitParameter params[], void* context)
 {
@@ -173,6 +191,7 @@ static MunitResult context_setup(const MunitParameter params[], void* user)
 int main(int argc, char** argv)
 {
   MunitTest tests[] = {
+    {"/status-mapping",status_mapping,NULL,NULL,MUNIT_TEST_OPTION_NONE,NULL},
     {"/profiles",profiles,NULL,NULL,MUNIT_TEST_OPTION_NONE,NULL},
     {"/invalid-storage",invalid_storage,NULL,NULL,MUNIT_TEST_OPTION_NONE,NULL},
     {"/context",context_setup,NULL,NULL,MUNIT_TEST_OPTION_NONE,NULL},

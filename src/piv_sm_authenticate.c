@@ -1,20 +1,10 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "piv_sm_internal.h"
+#include "credential_status_internal.h"
 #include <tiny_crypto/piv_sm_authenticate.h>
 
 #if TC_ENABLE_PIV_SM && TC_ENABLE_X509 && TC_ENABLE_PIV_CVC
-static TC_credential_status signature_status(TC_X509_signature_result result)
-{
-  switch (result) {
-    case TC_X509_SIGNATURE_VALID: return TC_CREDENTIAL_VALID;
-    case TC_X509_SIGNATURE_INVALID: return TC_CREDENTIAL_INVALID;
-    case TC_X509_SIGNATURE_UNSUPPORTED: return TC_CREDENTIAL_UNSUPPORTED;
-    case TC_X509_SIGNATURE_LIMIT: return TC_CREDENTIAL_LIMIT;
-    default: return TC_CREDENTIAL_ERROR;
-  }
-}
-
 TC_credential_status TC_PIV_SM_authenticate_response(TC_PIV_SM* session,
     const TC_PIV_SM_authentication* authentication, size_t* work,
     TC_PIV_SM_authentication_workspace* workspace)
@@ -64,7 +54,7 @@ TC_credential_status TC_PIV_SM_authenticate_response(TC_PIV_SM* session,
   TC_PIV_CVC verified;
   TC_X509_signature_result checked = TC_PIV_CVC_chain_verify(&chain,
       authentication->limits,authentication->signatures,&workspace->point,work,&verified);
-  TC_credential_status result = signature_status(checked);
+  TC_credential_status result = tc_credential_signature_status(checked);
   if (result == TC_CREDENTIAL_VALID) {
     TC_status finished = TC_PIV_SM_finish(session,&authentication->peer,
       verified.public_key,&workspace->session);

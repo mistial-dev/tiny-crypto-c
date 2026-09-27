@@ -5,6 +5,7 @@
 #if TC_ENABLE_CMS_VALIDATION
 #include "cms_base_internal.h"
 #include "cms_internal.h"
+#include "credential_status_internal.h"
 #include "x509_revocation_internal.h"
 #include "x509_path_internal.h"
 #include "x509_time_internal.h"
@@ -592,8 +593,7 @@ static TC_X509_path_status cms_signer_path_build(const TC_CMS_signer_info* signe
   TC_X509_store_source indexed;
   TC_TLV_result result;
   tc_pki_source_guard guard = {source,writes,CMS_PATH_WRITE_COUNT};
-  TC_X509_store_source guarded = {&guard,source->candidate_count,source->anchor_count,
-    tc_pki_source_guard_candidate,tc_pki_source_guard_anchor};
+  TC_X509_store_source guarded = tc_pki_source_guard_bind(&guard);
   const tc_pki_tree_workspace tree = {workspace->validation.frames,workspace->validation.frame_capacity,work};
   const TC_CMS_signature_workspace signature = {workspace->validation.frames,
     workspace->validation.frame_capacity,workspace->signature,workspace->signature_capacity};
@@ -739,10 +739,7 @@ TC_X509_path_status TC_CMS_signed_data_path_build(TC_bytes encoded, size_t signe
 
 static TC_credential_status cms_credential_error(TC_TLV_result result)
 {
-  if (result == TC_TLV_LIMIT) return TC_CREDENTIAL_LIMIT;
-  if (result == TC_TLV_UNSUPPORTED) return TC_CREDENTIAL_UNSUPPORTED;
-  if (result == TC_TLV_INVALID) return TC_CREDENTIAL_INVALID;
-  return TC_CREDENTIAL_ERROR;
+  return tc_credential_tlv_status(result,&tc_credential_tlv_cms);
 }
 
 TC_credential_status tc_cms_path_revocation_check(const TC_X509_search_result* path,
@@ -864,8 +861,7 @@ static TC_credential_status cms_credential_validate_impl(
   result = tc_x509_crl_index_storage_bytes(revocation->index,writes,WRITE_COUNT,&budget);
   if (result != TC_TLV_OK) return cms_credential_error(result);
   tc_pki_source_guard guard = {source,writes,WRITE_COUNT};
-  const TC_X509_store_source guarded = {&guard,source->candidate_count,source->anchor_count,
-    tc_pki_source_guard_candidate,tc_pki_source_guard_anchor};
+  const TC_X509_store_source guarded = tc_pki_source_guard_bind(&guard);
   *work = budget;
   switch (cms_signed_data_path_build_parts(encoded,signer_index,expected_type,
       detached_content,detached_count,selected,prepared,&guarded,options,workspace->path,work,&path)) {

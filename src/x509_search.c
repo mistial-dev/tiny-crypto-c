@@ -241,8 +241,7 @@ TC_X509_path_status tc_x509_path_build_work(TC_bytes target,
       if (result != TC_TLV_OK) return tc_x509_path_status(result);
     }
   }
-  guarded = (TC_X509_store_source){&checked,source->candidate_count,source->anchor_count,
-                                  tc_pki_source_guard_candidate,tc_pki_source_guard_anchor};
+  guarded = tc_pki_source_guard_bind(&checked);
   *work = budget;
   {
     TC_X509_path_status status = tc_x509_path_search_source(target,&guarded,options,validation,search,work,out);
