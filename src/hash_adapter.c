@@ -71,6 +71,8 @@ TC_HASH_ADAPTER_DEFINE(512, sha512)
 
 int tc_hash_adapter_get(TC_hash_algorithm algorithm, tc_hash_adapter* out)
 {
+#if TC_ENABLE_SHA1 || TC_ENABLE_SHA224 || TC_ENABLE_SHA256 || \
+    TC_ENABLE_SHA384 || TC_ENABLE_SHA512
   const tc_hash_adapter* selected;
   switch (algorithm) {
 #if TC_ENABLE_SHA1
@@ -92,4 +94,9 @@ int tc_hash_adapter_get(TC_hash_algorithm algorithm, tc_hash_adapter* out)
   }
   if (out) TC_HASH_ADAPTER_COPY(out, selected);
   return 1;
+#else
+  (void)algorithm;
+  (void)out;
+  return 0;
+#endif
 }
