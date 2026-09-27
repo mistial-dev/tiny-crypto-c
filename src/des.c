@@ -902,7 +902,7 @@ TC_status TC_DES3_init_ctx(struct TC_DES3_ctx* ctx, const uint8_t* key, size_t k
     return TC_ERROR;
 #endif
 
-  tc_des_bundle_schedule(ctx->Sk, key, keylen);
+  tc_des_bundle_schedule(ctx->keys.schedule, key, keylen);
 #if TC_DES_NEEDS_IV
   memset(ctx->Iv, 0, TC_DES_BLOCKLEN);
 #endif
@@ -960,7 +960,7 @@ TC_status TC_DES3_ctx_set_iv(struct TC_DES3_ctx* ctx, const uint8_t* iv)
     TC_DES_ENABLE_CFB64
 static void tc_des3_encrypt_block(const struct TC_DES3_ctx* ctx, uint8_t* buf)
 {
-  tc_des_encrypt_scheduled(ctx->Sk, buf, 1);
+  tc_des_encrypt_scheduled(ctx->keys.schedule, buf, 1);
 }
 #endif
 
@@ -968,9 +968,9 @@ static void tc_des3_encrypt_block(const struct TC_DES3_ctx* ctx, uint8_t* buf)
 /* 3DES Core Decryption: D(K1) -> E(K2) -> D(K3) */
 static void tc_des3_decrypt_block(const struct TC_DES3_ctx* ctx, uint8_t* buf)
 {
-  tc_des_cipher_block(&ctx->Sk[32], buf, 1); /* Decrypt K3 */
-  tc_des_cipher_block(&ctx->Sk[16], buf, 0); /* Encrypt K2 */
-  tc_des_cipher_block(&ctx->Sk[0],  buf, 1); /* Decrypt K1 */
+  tc_des_cipher_block(&ctx->keys.schedule[32], buf, 1); /* Decrypt K3 */
+  tc_des_cipher_block(&ctx->keys.schedule[16], buf, 0); /* Encrypt K2 */
+  tc_des_cipher_block(&ctx->keys.schedule[0], buf, 1); /* Decrypt K1 */
 }
 #endif
 
@@ -1104,7 +1104,7 @@ static void tc_des_cmac_generate_subkeys(const struct TC_DES_CMAC_ctx* ctx,
 {
   uint8_t L[TC_DES_BLOCKLEN] = {0};
 
-  tc_des_encrypt_scheduled(ctx->sk, L, ctx->triple);
+  tc_des_encrypt_scheduled(ctx->keys.schedule, L, ctx->triple);
 
   tc_mac_gf_double(k1, L, TC_DES_BLOCKLEN, 0x1b);
   tc_mac_gf_double(k2, k1, TC_DES_BLOCKLEN, 0x1b);
@@ -1132,9 +1132,9 @@ TC_status TC_DES_CMAC_init(struct TC_DES_CMAC_ctx* ctx, const uint8_t* key, size
 
   ctx->triple = (uint8_t)(keylen != 8);
   if (keylen == 8)
-    tc_des_key_schedule(&ctx->sk[0], key);
+    tc_des_key_schedule(&ctx->keys.schedule[0], key);
   else
-    tc_des_bundle_schedule(ctx->sk, key, keylen);
+    tc_des_bundle_schedule(ctx->keys.schedule, key, keylen);
   tc_des_cmac_generate_subkeys(ctx, ctx->k1, ctx->k2);
   memset(ctx->mac, 0, TC_DES_BLOCKLEN);
   memset(ctx->buf, 0, TC_DES_BLOCKLEN);
@@ -1154,7 +1154,7 @@ TC_status TC_DES_CMAC_update(struct TC_DES_CMAC_ctx* ctx, const uint8_t* data, s
     return TC_ERROR;
   if (len == 0)
     return TC_OK;
-  key.schedule = ctx->sk;
+  key.schedule = ctx->keys.schedule;
   key.triple = ctx->triple;
   cipher = tc_des_mac_cipher(&key);
   used = ctx->buf_len;
@@ -1172,7 +1172,7 @@ TC_status TC_DES_CMAC_final(struct TC_DES_CMAC_ctx* ctx, uint8_t tag[TC_DES_CMAC
   if (ctx == NULL || ctx->active != 1 || tag == NULL ||
       ctx->buf_len > TC_DES_BLOCKLEN)
     return TC_ERROR;
-  key.schedule = ctx->sk;
+  key.schedule = ctx->keys.schedule;
   key.triple = ctx->triple;
   cipher = tc_des_mac_cipher(&key);
   status = tc_mac_cmac_final(&cipher, ctx->mac, ctx->buf, ctx->buf_len,
@@ -1253,8 +1253,8 @@ TC_status TC_DES_CMAC_verify(const uint8_t* key, size_t keylen, const uint8_t* m
 static void tc_des_iso9797_finish_alg3(const struct TC_DES_ISO9797_ctx* ctx,
                                        uint8_t block[TC_DES_BLOCKLEN])
 {
-  tc_des_cipher_block(&ctx->sk[16], block, 1);
-  tc_des_cipher_block(&ctx->sk[ctx->algorithm == 4 ? 32 : 0], block, 0);
+  tc_des_cipher_block(&ctx->keys.schedule[16], block, 1);
+  tc_des_cipher_block(&ctx->keys.schedule[ctx->algorithm == 4 ? 32 : 0], block, 0);
 }
 
 TC_status TC_DES_ISO9797_init(struct TC_DES_ISO9797_ctx* ctx,
@@ -1288,7 +1288,7 @@ TC_status TC_DES_ISO9797_init(struct TC_DES_ISO9797_ctx* ctx,
   }
 #endif
   ctx->active = 0;
-  tc_des_bundle_schedule(ctx->sk, key, keylen);
+  tc_des_bundle_schedule(ctx->keys.schedule, key, keylen);
   memset(ctx->mac, 0, sizeof ctx->mac);
   memset(ctx->buf, 0, sizeof ctx->buf);
   ctx->used = 0;
@@ -1312,7 +1312,7 @@ TC_status TC_DES_ISO9797_update(struct TC_DES_ISO9797_ctx* ctx,
     return TC_ERROR;
   if (msg_len)
     ctx->nonempty = 1;
-  key.schedule = ctx->sk;
+  key.schedule = ctx->keys.schedule;
   key.triple = ctx->algorithm == TC_DES_ISO9797_ALG1;
   cipher = tc_des_mac_cipher(&key);
   used = ctx->used;
@@ -1338,7 +1338,7 @@ TC_status TC_DES_ISO9797_final(struct TC_DES_ISO9797_ctx* ctx,
     TC_DES_ISO9797_clear(ctx);
     return TC_ERROR;
   }
-  key.schedule = ctx->sk;
+  key.schedule = ctx->keys.schedule;
   key.triple = ctx->algorithm == TC_DES_ISO9797_ALG1;
   cipher = tc_des_mac_cipher(&key);
   if (ctx->padding == TC_DES_ISO9797_PAD1 &&

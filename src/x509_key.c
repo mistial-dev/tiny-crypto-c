@@ -10,10 +10,6 @@
 
 static const TC_TLV_limits limits = {SIZE_MAX, SIZE_MAX, 4, 1};
 
-static int equals(TC_bytes oid, const uint8_t* bytes, size_t length)
-{ return oid.length == length && !memcmp(oid.data, bytes, length); }
-
-
 static TC_TLV_result integer(TC_TLV_reader* reader, TC_bytes* out)
 {
   TC_TLV_element element;
@@ -80,10 +76,10 @@ TC_TLV_result TC_X509_subject_public_key(const uint8_t* data, size_t length, TC_
   if (result != TC_TLV_OK) return result;
   if (key.type == TC_KEY_RSA || key.type == TC_KEY_RSA_PSS) {
     result = rsa(&key);
-  } else if (equals(key.algorithm.oid, ec_oid.data, ec_oid.length)) {
+  } else if (tc_pki_equal(key.algorithm.oid, ec_oid)) {
     key.type = TC_KEY_EC;
     result = ec(&key);
-  } else if (equals(key.algorithm.oid, dsa_oid, sizeof dsa_oid)) {
+  } else if (tc_pki_equal(key.algorithm.oid, (TC_bytes){dsa_oid, sizeof dsa_oid})) {
     TC_TLV_reader reader;
     TC_bytes value;
     key.type = TC_KEY_DSA;

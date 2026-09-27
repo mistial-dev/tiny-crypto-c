@@ -99,8 +99,8 @@ alone do not establish that a complete validation fits on the board.
 | EAC CVC RSA-2048 | 8,116 | 24.77% | 786 | 38.38% | 0 / 0 |
 | EAC CVC explicit EC-256 | 7,864 | 24.00% | 534 | 26.07% | 0 / 0 |
 | EAC CVC inherited EC with encoding checks | 8,196 | 25.01% | 614 | 29.98% | 0 / 0 |
-| X.509 RSA-2048 certificate reader | 17,610 | 53.74% | 720 | 35.16% | 0 / 0 |
-| X.509 EC-256 certificate reader | 17,408 | 53.12% | 516 | 25.20% | 0 / 0 |
+| X.509 RSA-2048 certificate reader | 17,716 | 54.06% | 736 | 35.94% | 0 / 0 |
+| X.509 EC-256 certificate reader | 17,514 | 53.45% | 532 | 25.98% | 0 / 0 |
 
 ## Raspberry Pi Pico 2
 

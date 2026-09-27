@@ -77,6 +77,11 @@
 #define TC_DES3_KEYLEN_2KEY 16 /**< 2-Key Triple DES key length in bytes (128 bits total, 112 bits effective) */
 #define TC_DES3_KEYLEN_3KEY 24 /**< 3-Key Triple DES key length in bytes (192 bits total, 168 bits effective) */
 
+/* Three DES schedules in encrypt, decrypt, encrypt order. */
+typedef struct TC_DES_key_bundle {
+  uint8_t schedule[48][6];
+} TC_DES_key_bundle;
+
 /**
  * @brief Single DES Context Structure
  */
@@ -102,7 +107,7 @@ struct TC_DES_ctx
  */
 struct TC_DES3_ctx
 {
-  uint8_t Sk[48][6];
+  TC_DES_key_bundle keys;
   uint8_t active;
 #if TC_DES_NEEDS_IV
   uint8_t Iv[TC_DES_BLOCKLEN];
@@ -477,7 +482,7 @@ TC_status TC_DES_CMAC_verify(const uint8_t* key, size_t keylen, const uint8_t* m
  */
 struct TC_DES_CMAC_ctx
 {
-  uint8_t sk[48][6];
+  TC_DES_key_bundle keys;
   uint8_t k1[TC_DES_BLOCKLEN];
   uint8_t k2[TC_DES_BLOCKLEN];
   uint8_t mac[TC_DES_BLOCKLEN];
@@ -520,7 +525,7 @@ typedef enum TC_DES_ISO9797_padding {
 } TC_DES_ISO9797_padding;
 
 struct TC_DES_ISO9797_ctx {
-  uint8_t sk[48][6];
+  TC_DES_key_bundle keys;
   uint8_t mac[TC_DES_BLOCKLEN];
   uint8_t buf[TC_DES_BLOCKLEN];
   uint8_t used;
