@@ -329,12 +329,12 @@ static MunitResult replay_profile(const char* profile, const char* interface)
         munit_assert_memory_equal(length,buffer,expected);
       }
       for (unsigned last = 0x0a; last <= 0x0f; ++last) {
-        char name[] = "piv-5fc100.bin";
+        char object_file[] = "piv-5fc100.bin";
         const char digits[] = "0123456789abcdef";
-        name[8] = digits[last >> 4];
-        name[9] = digits[last & 15];
+        object_file[8] = digits[last >> 4];
+        object_file[9] = digits[last & 15];
         uint8_t expected[MAX_OBJECT];
-        const size_t length = fixture_read(profile,name,expected,sizeof expected);
+        const size_t length = fixture_read(profile,object_file,expected,sizeof expected);
         const uint8_t tag[] = {0x5f,0xc1,(uint8_t)last};
         munit_assert_int(example_card_object_read(&io,EXAMPLE_CARD_READ_SHORT,
             tag,sizeof tag,buffer,sizeof buffer,&response), ==, EXAMPLE_CARD_OK);
