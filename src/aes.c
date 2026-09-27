@@ -740,8 +740,6 @@ TC_status TC_AES_CBC_decrypt(struct TC_AES_ctx* ctx, uint8_t* buffer, size_t len
 TC_status TC_AES_CTR_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length)
 {
   size_t offset = 0;
-  size_t available;
-  size_t uncached_length;
   size_t blocks_needed;
 
   if (ctx == NULL || ctx->key.active != 1 || ctx->ctr_pos > TC_AES_BLOCKLEN ||
@@ -750,11 +748,8 @@ TC_status TC_AES_CTR_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length)
   if (length == 0)
     return TC_OK;
 
-  available = ctx->ctr_pos < TC_AES_BLOCKLEN ?
-                  TC_AES_BLOCKLEN - ctx->ctr_pos : 0;
-  uncached_length = length > available ? length - available : 0;
-  blocks_needed = uncached_length / TC_AES_BLOCKLEN +
-                  ((uncached_length % TC_AES_BLOCKLEN) != 0 ? 1u : 0u);
+  blocks_needed = tc_internal_counter_blocks_needed(length, TC_AES_BLOCKLEN,
+                                                      ctx->ctr_pos);
   if (!tc_internal_counter_has_blocks(ctx->iv, TC_AES_BLOCKLEN,
                                       blocks_needed))
     return TC_ERROR;

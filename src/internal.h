@@ -111,6 +111,15 @@ static inline void tc_internal_increment_be(uint8_t* counter, size_t length)
   }
 }
 
+/* Callers validate position <= block_length before counting new blocks. */
+static inline size_t tc_internal_counter_blocks_needed(size_t length,
+    size_t block_length, size_t position)
+{
+  const size_t available = position < block_length ? block_length - position : 0;
+  const size_t uncached = length > available ? length - available : 0;
+  return uncached / block_length + (uncached % block_length != 0);
+}
+
 /* A zero counter has the full 2^(8*length) block space remaining, which may
  * exceed size_t. Other counters use (2^n - counter) as the available count. */
 static inline int tc_internal_counter_has_blocks(const uint8_t* counter,

@@ -478,8 +478,6 @@ static TC_status tc_des_mode_ctr(const void* cipher,
                                  uint8_t* buf, size_t length,
                                  tc_des_mode_block_fn encrypt_block)
 {
-  size_t available;
-  size_t uncached_length;
   size_t blocks_needed;
   size_t i;
 
@@ -492,10 +490,8 @@ static TC_status tc_des_mode_ctr(const void* cipher,
   if (length == 0)
     return TC_OK;
 
-  available = *pos < TC_DES_BLOCKLEN ? TC_DES_BLOCKLEN - *pos : 0;
-  uncached_length = length > available ? length - available : 0;
-  blocks_needed = uncached_length / TC_DES_BLOCKLEN +
-                  ((uncached_length % TC_DES_BLOCKLEN) != 0 ? 1u : 0u);
+  blocks_needed = tc_internal_counter_blocks_needed(length, TC_DES_BLOCKLEN,
+                                                      *pos);
   if (!tc_internal_counter_has_blocks(iv, TC_DES_BLOCKLEN, blocks_needed))
     return TC_ERROR;
 
