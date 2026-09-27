@@ -78,4 +78,14 @@ static inline TC_TLV_result tc_pki_distribution_name_read(TC_bytes encoded,
   *out = parsed;
   return TC_TLV_OK;
 }
+/* Charge two passes over a Name, check that it is a SEQUENCE of RDNs and
+ * open reader at its first RDN. The second pass pays for the RDN matching
+ * that follows. reader changes only on OK. */
+TC_TLV_result tc_x509_name_validate(TC_bytes input, const TC_TLV_limits* limits,
+    size_t* work, TC_TLV_reader* reader);
+/* Read the next AttributeTypeAndValue from an RDN reader. With tree set, the
+ * BER-tolerant tree walker reads it and charges tree work. Without tree, each
+ * DER element costs one unit plus its encoded length from work. */
+TC_TLV_result tc_x509_name_next_attribute(TC_TLV_reader* reader, size_t* work,
+    TC_X509_name_attribute* attribute, const tc_pki_tree_workspace* tree);
 #endif

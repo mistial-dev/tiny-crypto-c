@@ -315,7 +315,7 @@ if(TINY_CRYPTO_ENABLE_DER)
 endif()
 if(TINY_CRYPTO_ENABLE_X509)
   list(APPEND tc_sources src/x509.c src/x509_crypto.c src/x509_time.c
-    src/x509_key.c src/x509_ext.c src/x509_name.c src/pki_signature_oid.c
+    src/x509_key.c src/x509_ext.c src/x509_name.c src/x509_name_constraints.c src/pki_signature_oid.c
     src/asn1_string.c src/unicode.c)
 endif()
 if(TINY_CRYPTO_ENABLE_EAC_CVC)

@@ -4,6 +4,7 @@
 #include <tiny_crypto/twic_uuid.h>
 #if TC_ENABLE_PIV_OBJECTS
 #include "credential_text_internal.h"
+#include "string_internal.h"
 #include "pki_reader_internal.h"
 #include "pki_tree_internal.h"
 
@@ -23,16 +24,12 @@ typedef enum {
   IDENTIFIERS_TWIC_PIV_AUTHENTICATION
 } identifiers_policy;
 
-static unsigned ascii_lower(unsigned value) {
-  return value >= 'A' && value <= 'Z' ? value + ('a' - 'A') : value;
-}
-
 static int uuid_prefix(TC_bytes text) {
   static const uint8_t prefix[] = "urn:uuid:";
   if (text.length < UUID_PREFIX_BYTES)
     return 0;
   for (size_t i = 0; i < UUID_PREFIX_BYTES; ++i)
-    if (ascii_lower(text.data[i]) != prefix[i])
+    if (tc_ascii_fold(text.data[i]) != prefix[i])
       return 0;
   return 1;
 }
