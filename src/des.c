@@ -1266,6 +1266,13 @@ static void tc_des_iso9797_encrypt(const struct TC_DES_ISO9797_ctx* ctx,
   }
 }
 
+static void tc_des_iso9797_finish_alg3(const struct TC_DES_ISO9797_ctx* ctx,
+                                       uint8_t block[TC_DES_BLOCKLEN])
+{
+  tc_des_cipher_block(&ctx->sk[16], block, 1);
+  tc_des_cipher_block(&ctx->sk[32], block, 0);
+}
+
 static void tc_des_iso9797_absorb(struct TC_DES_ISO9797_ctx* ctx,
                                   const uint8_t block[TC_DES_BLOCKLEN])
 {
@@ -1354,10 +1361,7 @@ TC_status TC_DES_ISO9797_final(struct TC_DES_ISO9797_ctx* ctx,
     tc_des_iso9797_absorb(ctx, ctx->buf);
   }
   if (ctx->algorithm == TC_DES_ISO9797_ALG3)
-  {
-    tc_des_cipher_block(&ctx->sk[16], ctx->mac, 1);
-    tc_des_cipher_block(&ctx->sk[32], ctx->mac, 0);
-  }
+    tc_des_iso9797_finish_alg3(ctx, ctx->mac);
   memcpy(tag, ctx->mac, TC_DES_BLOCKLEN);
   TC_DES_ISO9797_clear(ctx);
   return TC_OK;
