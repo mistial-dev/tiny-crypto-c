@@ -953,7 +953,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
 
   if(TINY_CRYPTO_TEST_FULL)
     tc_add_test_library(tiny-crypto-c-test-des-cmac-cavp
-      src/common.c src/des.c src/mac_core.c)
+      src/common.c ${tc_des_sources} src/mac_core.c)
     target_compile_definitions(tiny-crypto-c-test-des-cmac-cavp PUBLIC
       TC_ENABLE_AES=0 TC_ENABLE_SHA256=0 TC_ENABLE_DES=1
       TC_DES_ENABLE_TDES=1 TC_DES_ENABLE_CMAC=1

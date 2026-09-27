@@ -300,6 +300,7 @@ list(APPEND TC_PUBLIC_DEFINITIONS
   TC_AES_GCM_GHASH_MODE=${ghash_value})
 
 set(tc_aes_sources src/aes.c src/aes_gcm.c src/aes_ccm.c src/aes_mac.c src/mac_core.c)
+set(tc_des_sources src/des.c src/des_modes.c src/des_mac.c)
 
 # One utility translation unit keeps zeroization and constant-time comparison
 # consistent across algorithms, and avoids duplicate code in firmware images.
@@ -349,7 +350,7 @@ if(TINY_CRYPTO_ENABLE_AES)
   list(APPEND tc_sources ${tc_aes_sources})
 endif()
 if(TINY_CRYPTO_ENABLE_DES)
-  list(APPEND tc_sources src/des.c)
+  list(APPEND tc_sources ${tc_des_sources})
   if((TINY_CRYPTO_DES_CMAC OR TINY_CRYPTO_DES_ISO9797) AND NOT TINY_CRYPTO_ENABLE_AES)
     list(APPEND tc_sources src/mac_core.c)
   endif()

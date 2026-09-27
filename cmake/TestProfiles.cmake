@@ -63,7 +63,7 @@ function(tc_add_c_test target library)
   target_include_directories(${target} PRIVATE tests/support)
 endfunction()
 
-set(tc_test_sources src/common.c ${tc_aes_sources} src/des.c src/hash.c src/sha512.c src/hash_core.c src/hash_adapter.c
+set(tc_test_sources src/common.c ${tc_aes_sources} ${tc_des_sources} src/hash.c src/sha512.c src/hash_core.c src/hash_adapter.c
     src/kdf.c src/kmac.c)
 tc_add_test_library(tiny-crypto-c-test ${tc_test_sources})
 target_compile_definitions(tiny-crypto-c-test PUBLIC
@@ -90,7 +90,7 @@ foreach(key_bits 192 256)
 endforeach()
 
 tc_add_test_library(tiny-crypto-c-test-des-reject-weak
-  src/common.c src/des.c src/mac_core.c)
+  src/common.c ${tc_des_sources} src/mac_core.c)
 target_compile_definitions(tiny-crypto-c-test-des-reject-weak PUBLIC
   TC_ENABLE_AES=0 TC_ENABLE_DES=1 TC_ENABLE_SHA1=0 TC_ENABLE_SHA224=0
   TC_ENABLE_SHA256=0 TC_ENABLE_SHA384=0 TC_ENABLE_SHA512=0
@@ -115,21 +115,21 @@ function(tc_add_compile_profile name)
   endif()
 endfunction()
 
-tc_add_compile_profile(tiny-crypto-c-profile-des-ecb src/des.c)
+tc_add_compile_profile(tiny-crypto-c-profile-des-ecb ${tc_des_sources})
 target_compile_definitions(tiny-crypto-c-profile-des-ecb PRIVATE
   TC_ENABLE_AES=0 TC_ENABLE_DES=1 TC_ENABLE_SHA256=0 TC_ZEROIZE=0 TC_STRICT=0
   TC_DES_ENABLE_ECB=1 TC_DES_ENABLE_CBC=0 TC_DES_ENABLE_CTR=0
   TC_DES_ENABLE_OFB=0 TC_DES_ENABLE_CFB1=0 TC_DES_ENABLE_CFB8=0
   TC_DES_ENABLE_CFB64=0 TC_DES_ENABLE_TDES=0 TC_DES_ENABLE_CMAC=0)
 
-tc_add_compile_profile(tiny-crypto-c-profile-des-cmac src/des.c src/mac_core.c)
+tc_add_compile_profile(tiny-crypto-c-profile-des-cmac ${tc_des_sources} src/mac_core.c)
 target_compile_definitions(tiny-crypto-c-profile-des-cmac PRIVATE
   TC_ENABLE_AES=0 TC_ENABLE_DES=1 TC_ENABLE_SHA256=0
   TC_DES_ENABLE_ECB=0 TC_DES_ENABLE_CBC=0 TC_DES_ENABLE_CTR=0
   TC_DES_ENABLE_OFB=0 TC_DES_ENABLE_CFB1=0 TC_DES_ENABLE_CFB8=0
   TC_DES_ENABLE_CFB64=0 TC_DES_ENABLE_TDES=1 TC_DES_ENABLE_CMAC=1)
 
-tc_add_compile_profile(tiny-crypto-c-profile-des-all-no-cmac src/des.c)
+tc_add_compile_profile(tiny-crypto-c-profile-des-all-no-cmac ${tc_des_sources})
 target_compile_definitions(tiny-crypto-c-profile-des-all-no-cmac PRIVATE
   TC_ENABLE_AES=0 TC_ENABLE_DES=1 TC_ENABLE_SHA256=0 TC_ZEROIZE=1 TC_STRICT=1
   TC_DES_ENABLE_ECB=1 TC_DES_ENABLE_CBC=1 TC_DES_ENABLE_CTR=1
