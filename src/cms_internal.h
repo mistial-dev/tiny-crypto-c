@@ -166,6 +166,25 @@ TC_TLV_result tc_cms_crl_signer_candidate_next(tc_cms_candidates* reader,
     const tc_x509_crl* crl, const tc_x509_crl_extension_info* extensions,
     const TC_X509_name_workspace* names, const tc_pki_tree_workspace* tree,
     TC_X509_workspace* parser, TC_X509_certificate* scratch, TC_bytes* out);
+/* Candidate searches over a collection and its external store. Each search owns
+ * its cursor, and certificate and CRL bytes stay borrowed from the source.
+ * tc_cms_store_cursor views the external store from the collection position. */
+tc_pki_store_candidates tc_cms_store_cursor(const tc_cms_candidates* source);
+TC_TLV_result tc_cms_certificate_search(const tc_cms_candidates* candidates,
+    tc_pki_candidate_filter filter, const void* filter_context,
+    const TC_TLV_limits* limits, const tc_pki_tree_workspace* tree,
+    const TC_X509_path_workspace* validation, tc_pki_candidate_attempt attempt, const void* context,
+    TC_X509_search_result* out, int* source_failed);
+/* CRL signer search with an explicit external store. */
+TC_TLV_result tc_cms_crl_source_search(const void* candidates, const TC_X509_store_source* external,
+    const tc_x509_crl* crl, const tc_x509_crl_extension_info* extensions,
+    const tc_x509_crl_trust* trust, tc_x509_crl_attempt attempt, const void* context,
+    TC_X509_search_result* out, int* source_failed);
+/* tc_x509_crl_search callback: candidates is a tc_cms_candidates. */
+TC_TLV_result tc_cms_crl_search(const void* candidates,
+    const tc_x509_crl* crl, const tc_x509_crl_extension_info* extensions,
+    const tc_x509_crl_trust* trust, tc_x509_crl_attempt attempt, const void* context,
+    TC_X509_search_result* out, int* source_failed);
 /* Find a candidate with a valid CRL signature and path to the selected anchor.
  * Candidates remain unchanged; failed candidate paths do not end the search.
  * Unresolved limits/algorithms are retained if no candidate succeeds. Malformed
