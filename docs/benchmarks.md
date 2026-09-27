@@ -51,13 +51,13 @@ EAC certificate and public-key objects use 90 and 46 bytes.
 X.509 needs another 4 bytes of scratch space per extension,
 plus the nesting frames above. Input buffers must remain available while
 using the parsed fields.
-The path workspace descriptor uses 38 bytes, excluding its arrays.
+The path workspace descriptor uses 42 bytes, excluding its arrays.
 Policy array entries use 10 bytes per node, 4 per edge,
 6 per expected policy, and 8 per mapping.
 Name comparison also needs two caller-sized Unicode scalar arrays (4 bytes per scalar)
 and an attribute-match array (1 byte per entry). See [path validation](x509-path.md)
 for workspace setup and buffer lifetimes.
-The largest compiler-reported PKI stack frame is 299 bytes
+The largest compiler-reported PKI stack frame is 284 bytes
 at `-Os` without LTO. This includes name and path processing, but excludes
 called functions and the application's signature verifier. Object and frame sizes
 alone do not establish that a complete validation fits on the board.
@@ -65,27 +65,27 @@ alone do not establish that a complete validation fits on the board.
 | Feature | Flash bytes | Flash % | Static RAM bytes | RAM % | Reserved stack / heap bytes |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Empty firmware | 510 | 1.56% | 122 | 5.96% | 0 / 0 |
-| AES-128 CTR | 1,642 | 5.01% | 122 | 5.96% | 0 / 0 |
-| AES-128 CBC | 1,992 | 6.08% | 122 | 5.96% | 0 / 0 |
-| AES-128 GCM, bitwise GHASH | 4,658 | 14.22% | 186 | 9.08% | 0 / 0 |
-| AES-128 CCM | 2,850 | 8.70% | 186 | 9.08% | 0 / 0 |
-| AES-128 EAX | 2,596 | 7.92% | 186 | 9.08% | 0 / 0 |
-| AES-128 CMAC | 2,100 | 6.41% | 186 | 9.08% | 0 / 0 |
-| DES CTR | 5,050 | 15.41% | 122 | 5.96% | 0 / 0 |
-| 3DES CTR | 5,194 | 15.85% | 122 | 5.96% | 0 / 0 |
-| TDEA CMAC | 5,446 | 16.62% | 186 | 9.08% | 0 / 0 |
-| SHA-1 | 4,178 | 12.75% | 186 | 9.08% | 0 / 0 |
-| SHA-224 | 5,034 | 15.36% | 186 | 9.08% | 0 / 0 |
-| SHA-256 | 5,034 | 15.36% | 186 | 9.08% | 0 / 0 |
-| SHA-384 | 14,788 | 45.13% | 122 | 5.96% | 0 / 0 |
-| SHA-512 | 14,788 | 45.13% | 122 | 5.96% | 0 / 0 |
-| HMAC-SHA-1 | 4,704 | 14.36% | 186 | 9.08% | 0 / 0 |
-| HMAC-SHA-256 | 5,656 | 17.26% | 186 | 9.08% | 0 / 0 |
-| HMAC-SHA-512 | 15,400 | 47.00% | 122 | 5.96% | 0 / 0 |
-| KBKDF counter mode, HMAC-SHA-1 | 6,312 | 19.26% | 186 | 9.08% | 0 / 0 |
-| KBKDF counter mode, HMAC-SHA-256 | 7,134 | 21.77% | 186 | 9.08% | 0 / 0 |
-| KBKDF feedback mode, HMAC-SHA-256 | 7,574 | 23.11% | 190 | 9.28% | 0 / 0 |
-| KBKDF counter mode, AES-128 CMAC | 3,046 | 9.30% | 186 | 9.08% | 0 / 0 |
+| AES-128 CTR | 1,868 | 5.70% | 122 | 5.96% | 0 / 0 |
+| AES-128 CBC | 2,436 | 7.43% | 122 | 5.96% | 0 / 0 |
+| AES-128 GCM, bitwise GHASH | 5,250 | 16.02% | 186 | 9.08% | 0 / 0 |
+| AES-128 CCM | 3,118 | 9.52% | 186 | 9.08% | 0 / 0 |
+| AES-128 EAX | 2,746 | 8.38% | 186 | 9.08% | 0 / 0 |
+| AES-128 CMAC | 2,462 | 7.51% | 186 | 9.08% | 0 / 0 |
+| DES CTR | 5,562 | 16.97% | 122 | 5.96% | 0 / 0 |
+| 3DES CTR | 5,502 | 16.79% | 122 | 5.96% | 0 / 0 |
+| TDEA CMAC | 6,078 | 18.55% | 186 | 9.08% | 0 / 0 |
+| SHA-1 | 4,484 | 13.68% | 186 | 9.08% | 0 / 0 |
+| SHA-224 | 5,318 | 16.23% | 186 | 9.08% | 0 / 0 |
+| SHA-256 | 5,318 | 16.23% | 186 | 9.08% | 0 / 0 |
+| SHA-384 | 15,328 | 46.78% | 122 | 5.96% | 0 / 0 |
+| SHA-512 | 15,406 | 47.02% | 122 | 5.96% | 0 / 0 |
+| HMAC-SHA-1 | 4,948 | 15.10% | 186 | 9.08% | 0 / 0 |
+| HMAC-SHA-256 | 5,908 | 18.03% | 186 | 9.08% | 0 / 0 |
+| HMAC-SHA-512 | 16,040 | 48.95% | 122 | 5.96% | 0 / 0 |
+| KBKDF counter mode, HMAC-SHA-1 | 6,816 | 20.80% | 186 | 9.08% | 0 / 0 |
+| KBKDF counter mode, HMAC-SHA-256 | 7,772 | 23.72% | 186 | 9.08% | 0 / 0 |
+| KBKDF feedback mode, HMAC-SHA-256 | 8,364 | 25.52% | 190 | 9.28% | 0 / 0 |
+| KBKDF counter mode, AES-128 CMAC | 3,348 | 10.22% | 186 | 9.08% | 0 / 0 |
 | KMAC256, 32-byte output | 3,884 | 11.85% | 186 | 9.08% | 0 / 0 |
 | KMAC256, 48-byte output | 3,884 | 11.85% | 186 | 9.08% | 0 / 0 |
 | PIV Auto KMAC256 derivation | 4,628 | 14.12% | 380 | 18.55% | 0 / 0 |
@@ -93,14 +93,14 @@ alone do not establish that a complete validation fits on the board.
 | TLV bounded tree walk | 2,348 | 7.17% | 136 | 6.64% | 0 / 0 |
 | TLV BER incremental reader | 2,662 | 8.12% | 138 | 6.74% | 0 / 0 |
 | DER integer and OID readers | 1,890 | 5.77% | 130 | 6.35% | 0 / 0 |
-| PIV CHUID reader | 3,348 | 10.22% | 218 | 10.64% | 0 / 0 |
-| PIV secure messaging CVC reader | 5,556 | 16.96% | 332 | 16.21% | 0 / 0 |
-| TWIC unsigned CHUID reader | 3,262 | 9.95% | 196 | 9.57% | 0 / 0 |
+| PIV CHUID reader | 3,358 | 10.25% | 218 | 10.64% | 0 / 0 |
+| PIV secure messaging CVC reader | 5,562 | 16.97% | 332 | 16.21% | 0 / 0 |
+| TWIC unsigned CHUID reader | 3,238 | 9.88% | 196 | 9.57% | 0 / 0 |
 | EAC CVC RSA-2048 | 8,116 | 24.77% | 786 | 38.38% | 0 / 0 |
 | EAC CVC explicit EC-256 | 7,864 | 24.00% | 534 | 26.07% | 0 / 0 |
 | EAC CVC inherited EC with encoding checks | 8,196 | 25.01% | 614 | 29.98% | 0 / 0 |
-| X.509 RSA-2048 certificate reader | 17,166 | 52.39% | 742 | 36.23% | 0 / 0 |
-| X.509 EC-256 certificate reader | 16,964 | 51.77% | 536 | 26.17% | 0 / 0 |
+| X.509 RSA-2048 certificate reader | 17,610 | 53.74% | 720 | 35.16% | 0 / 0 |
+| X.509 EC-256 certificate reader | 17,408 | 53.12% | 516 | 25.20% | 0 / 0 |
 
 ## Raspberry Pi Pico 2
 
@@ -123,13 +123,13 @@ EAC certificate and public-key objects use 176 and 92 bytes.
 X.509 needs another 8 bytes of scratch space per extension,
 plus the nesting frames above. Input buffers must remain available while
 using the parsed fields.
-The path workspace descriptor uses 76 bytes, excluding its arrays.
+The path workspace descriptor uses 84 bytes, excluding its arrays.
 Policy array entries use 20 bytes per node, 8 per edge,
 12 per expected policy, and 16 per mapping.
 Name comparison also needs two caller-sized Unicode scalar arrays (4 bytes per scalar)
 and an attribute-match array (1 byte per entry). See [path validation](x509-path.md)
 for workspace setup and buffer lifetimes.
-The largest compiler-reported PKI stack frame is 560 bytes
+The largest compiler-reported PKI stack frame is 536 bytes
 at `-Os` without LTO. This includes name and path processing, but excludes
 called functions and the application's signature verifier. Object and frame sizes
 alone do not establish that a complete validation fits on the board.
@@ -137,27 +137,27 @@ alone do not establish that a complete validation fits on the board.
 | Feature | Flash bytes | Flash % | Static RAM bytes | RAM % | Reserved stack / heap bytes |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Empty firmware | 5,320 | 0.13% | 1,284 | 0.24% | 2,048 / 2,048 |
-| AES-128 CTR | 6,552 | 0.16% | 1,284 | 0.24% | 2,048 / 2,048 |
-| AES-128 CBC | 6,672 | 0.16% | 1,284 | 0.24% | 2,048 / 2,048 |
-| AES-128 GCM, bitwise GHASH | 8,136 | 0.19% | 1,348 | 0.25% | 2,048 / 2,048 |
-| AES-128 CCM | 7,400 | 0.18% | 1,348 | 0.25% | 2,048 / 2,048 |
-| AES-128 EAX | 7,296 | 0.17% | 1,348 | 0.25% | 2,048 / 2,048 |
-| AES-128 CMAC | 6,696 | 0.16% | 1,348 | 0.25% | 2,048 / 2,048 |
-| DES CTR | 8,624 | 0.21% | 1,284 | 0.24% | 2,048 / 2,048 |
-| 3DES CTR | 8,792 | 0.21% | 1,284 | 0.24% | 2,048 / 2,048 |
-| TDEA CMAC | 9,064 | 0.22% | 1,348 | 0.25% | 2,048 / 2,048 |
-| SHA-1 | 6,496 | 0.15% | 1,348 | 0.25% | 2,048 / 2,048 |
-| SHA-224 | 6,624 | 0.16% | 1,348 | 0.25% | 2,048 / 2,048 |
-| SHA-256 | 6,616 | 0.16% | 1,348 | 0.25% | 2,048 / 2,048 |
-| SHA-384 | 7,768 | 0.19% | 1,284 | 0.24% | 2,048 / 2,048 |
-| SHA-512 | 7,768 | 0.19% | 1,284 | 0.24% | 2,048 / 2,048 |
-| HMAC-SHA-1 | 7,136 | 0.17% | 1,348 | 0.25% | 2,048 / 2,048 |
-| HMAC-SHA-256 | 7,256 | 0.17% | 1,348 | 0.25% | 2,048 / 2,048 |
-| HMAC-SHA-512 | 8,368 | 0.20% | 1,284 | 0.24% | 2,048 / 2,048 |
-| KBKDF counter mode, HMAC-SHA-1 | 7,832 | 0.19% | 1,348 | 0.25% | 2,048 / 2,048 |
-| KBKDF counter mode, HMAC-SHA-256 | 7,968 | 0.19% | 1,348 | 0.25% | 2,048 / 2,048 |
-| KBKDF feedback mode, HMAC-SHA-256 | 7,980 | 0.19% | 1,348 | 0.25% | 2,048 / 2,048 |
-| KBKDF counter mode, AES-128 CMAC | 7,384 | 0.18% | 1,348 | 0.25% | 2,048 / 2,048 |
+| AES-128 CTR | 6,672 | 0.16% | 1,284 | 0.24% | 2,048 / 2,048 |
+| AES-128 CBC | 6,800 | 0.16% | 1,284 | 0.24% | 2,048 / 2,048 |
+| AES-128 GCM, bitwise GHASH | 8,456 | 0.20% | 1,348 | 0.25% | 2,048 / 2,048 |
+| AES-128 CCM | 7,624 | 0.18% | 1,348 | 0.25% | 2,048 / 2,048 |
+| AES-128 EAX | 7,472 | 0.18% | 1,348 | 0.25% | 2,048 / 2,048 |
+| AES-128 CMAC | 6,928 | 0.17% | 1,348 | 0.25% | 2,048 / 2,048 |
+| DES CTR | 8,760 | 0.21% | 1,284 | 0.24% | 2,048 / 2,048 |
+| 3DES CTR | 8,928 | 0.21% | 1,284 | 0.24% | 2,048 / 2,048 |
+| TDEA CMAC | 9,264 | 0.22% | 1,348 | 0.25% | 2,048 / 2,048 |
+| SHA-1 | 6,616 | 0.16% | 1,348 | 0.25% | 2,048 / 2,048 |
+| SHA-224 | 6,752 | 0.16% | 1,348 | 0.25% | 2,048 / 2,048 |
+| SHA-256 | 6,752 | 0.16% | 1,348 | 0.25% | 2,048 / 2,048 |
+| SHA-384 | 7,968 | 0.19% | 1,284 | 0.24% | 2,048 / 2,048 |
+| SHA-512 | 7,968 | 0.19% | 1,284 | 0.24% | 2,048 / 2,048 |
+| HMAC-SHA-1 | 7,360 | 0.18% | 1,348 | 0.25% | 2,048 / 2,048 |
+| HMAC-SHA-256 | 7,472 | 0.18% | 1,348 | 0.25% | 2,048 / 2,048 |
+| HMAC-SHA-512 | 8,728 | 0.21% | 1,284 | 0.24% | 2,048 / 2,048 |
+| KBKDF counter mode, HMAC-SHA-1 | 8,240 | 0.20% | 1,348 | 0.25% | 2,048 / 2,048 |
+| KBKDF counter mode, HMAC-SHA-256 | 8,352 | 0.20% | 1,348 | 0.25% | 2,048 / 2,048 |
+| KBKDF feedback mode, HMAC-SHA-256 | 8,420 | 0.20% | 1,348 | 0.25% | 2,048 / 2,048 |
+| KBKDF counter mode, AES-128 CMAC | 7,764 | 0.19% | 1,348 | 0.25% | 2,048 / 2,048 |
 | KMAC256, 32-byte output | 6,928 | 0.17% | 1,348 | 0.25% | 2,048 / 2,048 |
 | KMAC256, 48-byte output | 6,928 | 0.17% | 1,348 | 0.25% | 2,048 / 2,048 |
 | PIV Auto KMAC256 derivation | 7,216 | 0.17% | 1,348 | 0.25% | 2,048 / 2,048 |
@@ -165,20 +165,20 @@ alone do not establish that a complete validation fits on the board.
 | TLV bounded tree walk | 6,888 | 0.16% | 1,284 | 0.24% | 2,048 / 2,048 |
 | TLV BER incremental reader | 7,064 | 0.17% | 1,284 | 0.24% | 2,048 / 2,048 |
 | DER integer and OID readers | 6,456 | 0.15% | 1,284 | 0.24% | 2,048 / 2,048 |
-| PIV CHUID reader | 7,144 | 0.17% | 1,284 | 0.24% | 2,048 / 2,048 |
-| PIV secure messaging CVC reader | 8,336 | 0.20% | 1,284 | 0.24% | 2,048 / 2,048 |
-| TWIC unsigned CHUID reader | 7,120 | 0.17% | 1,284 | 0.24% | 2,048 / 2,048 |
+| PIV CHUID reader | 7,216 | 0.17% | 1,284 | 0.24% | 2,048 / 2,048 |
+| PIV secure messaging CVC reader | 8,360 | 0.20% | 1,284 | 0.24% | 2,048 / 2,048 |
+| TWIC unsigned CHUID reader | 7,192 | 0.17% | 1,284 | 0.24% | 2,048 / 2,048 |
 | EAC CVC RSA-2048 | 10,476 | 0.25% | 1,284 | 0.24% | 2,048 / 2,048 |
 | EAC CVC explicit EC-256 | 10,224 | 0.24% | 1,284 | 0.24% | 2,048 / 2,048 |
 | EAC CVC inherited EC with encoding checks | 10,632 | 0.25% | 1,284 | 0.24% | 2,048 / 2,048 |
-| X.509 RSA-2048 certificate reader | 16,604 | 0.40% | 1,284 | 0.24% | 2,048 / 2,048 |
-| X.509 EC-256 certificate reader | 16,400 | 0.39% | 1,284 | 0.24% | 2,048 / 2,048 |
-| ECDH P-256, byte limbs | 8,632 | 0.21% | 2,344 | 0.44% | 2,048 / 2,048 |
-| ECDH P-256, native limbs | 8,608 | 0.21% | 2,348 | 0.44% | 2,048 / 2,048 |
-| ECDH P-384, byte limbs | 8,744 | 0.21% | 2,872 | 0.54% | 2,048 / 2,048 |
-| ECDH P-384, native limbs | 8,720 | 0.21% | 2,876 | 0.54% | 2,048 / 2,048 |
-| PIV SM CS2 handshake and message | 20,300 | 0.48% | 2,380 | 0.45% | 2,048 / 2,048 |
-| PIV SM CS7 handshake and message | 23,008 | 0.55% | 2,924 | 0.55% | 2,048 / 2,048 |
+| X.509 RSA-2048 certificate reader | 17,020 | 0.41% | 1,284 | 0.24% | 2,048 / 2,048 |
+| X.509 EC-256 certificate reader | 16,816 | 0.40% | 1,284 | 0.24% | 2,048 / 2,048 |
+| ECDH P-256, byte limbs | 8,808 | 0.21% | 2,344 | 0.44% | 2,048 / 2,048 |
+| ECDH P-256, native limbs | 8,800 | 0.21% | 2,348 | 0.44% | 2,048 / 2,048 |
+| ECDH P-384, byte limbs | 8,936 | 0.21% | 2,872 | 0.54% | 2,048 / 2,048 |
+| ECDH P-384, native limbs | 8,928 | 0.21% | 2,876 | 0.54% | 2,048 / 2,048 |
+| PIV SM CS2 handshake and message | 20,812 | 0.50% | 2,380 | 0.45% | 2,048 / 2,048 |
+| PIV SM CS7 handshake and message | 23,672 | 0.56% | 2,924 | 0.55% | 2,048 / 2,048 |
 
 ## Feature definitions
 
