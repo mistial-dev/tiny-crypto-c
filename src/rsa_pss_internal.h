@@ -94,7 +94,7 @@ static inline TC_RSA_result tc_rsa_pss_encode(uint8_t* encoded, size_t length, s
   db_length = length - info.digest_length - 1;
   padding = db_length - salt.length - 1;
   if (tc_rsa_pss_hash(hash, digest, salt, encoded + db_length, workspace) != TC_OK)
-    return TC_RSA_ARGUMENT;
+    return TC_RSA_ERROR;
   memset(encoded, 0, padding);
   encoded[padding] = 1;
   if (salt.length)
@@ -146,7 +146,7 @@ static inline TC_RSA_result tc_rsa_pss_check(uint8_t* encoded, size_t length, si
   if (tc_rsa_pss_hash(hash, digest, (TC_bytes){encoded + padding + 1, salt_length}, block,
                       workspace) != TC_OK) {
     TC_secure_zero(block, info.digest_length);
-    return TC_RSA_ARGUMENT;
+    return TC_RSA_ERROR;
   }
   for (size_t i = 0; i < info.digest_length; ++i)
     difference |= block[i] ^ h.data[i];

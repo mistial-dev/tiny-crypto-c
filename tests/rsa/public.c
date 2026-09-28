@@ -81,6 +81,41 @@ static MunitResult arguments(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+/* A well-formed key of a size the library does not implement is
+ * UNSUPPORTED, so X.509 reports it as unsupported rather than as a bad
+ * signature. No work is charged. */
+static MunitResult unsupported_sizes(const MunitParameter params[], void* user)
+{
+  static uint8_t modulus[520], data[520], out[520];
+  static TC_RSA_word scratch[9 * 4160 / TC_RSA_WORD_BITS + 2];
+  const uint8_t exponent[] = {1, 0, 1};
+  const size_t lengths[] = {96, 192, 520};
+  uint8_t digest[32] = {0};
+  (void)params;
+  (void)user;
+  memset(modulus, 0xff, sizeof modulus);
+  for (size_t i = 0; i < sizeof lengths / sizeof *lengths; ++i) {
+    const size_t length = lengths[i];
+    const TC_RSA_public_key key = {{modulus, length}, {exponent, sizeof exponent}};
+    const TC_RSA_workspace workspace = {scratch, sizeof scratch / sizeof *scratch};
+    const TC_bytes signature = {data, length};
+    const TC_RSA_v15_options v15 = {TC_HASH_SHA256};
+    const TC_RSA_pss_options pss = {TC_HASH_SHA256, TC_HASH_SHA256, 32};
+    TC_work_budget work = {100000};
+    munit_assert_int(TC_RSA_verify_v15_digest(&key, &v15, (TC_bytes){digest, sizeof digest},
+                                              signature, &workspace, &work),
+                     ==, TC_RSA_UNSUPPORTED);
+    munit_assert_int(TC_RSA_verify_pss_digest(&key, &pss, (TC_bytes){digest, sizeof digest},
+                                              signature, &workspace, &work),
+                     ==, TC_RSA_UNSUPPORTED);
+    munit_assert_int(
+        TC_RSA_raw_public(&key, signature, &workspace, (TC_buffer){out, sizeof out}, &work), ==,
+        TC_RSA_UNSUPPORTED);
+    munit_assert_uint32(work.remaining, ==, 100000);
+  }
+  return MUNIT_OK;
+}
+
 static MunitResult ranges(const MunitParameter params[], void* user)
 {
   enum { WORDS = 9 * 1024 / TC_RSA_WORD_BITS + 2 };
@@ -133,9 +168,11 @@ static MunitResult ranges(const MunitParameter params[], void* user)
 
 int main(int argc, char** argv)
 {
-  MunitTest tests[] = {{"/arguments", arguments, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-                       {"/ranges", ranges, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-                       {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
+  MunitTest tests[] = {
+      {"/arguments", arguments, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/ranges", ranges, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/unsupported-sizes", unsupported_sizes, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
   MunitSuite suite = {"/rsa/public", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};
   return munit_suite_main(&suite, NULL, argc, argv);
 }

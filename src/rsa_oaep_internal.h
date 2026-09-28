@@ -45,7 +45,7 @@ static inline TC_RSA_result tc_rsa_oaep_encode(uint8_t* encoded, size_t length,
     return TC_RSA_INVALID;
   uint8_t* db = encoded + h + 1;
   if (tc_hash_digest_parts(hash, &label, 1, db, workspace) != TC_OK)
-    return TC_RSA_ARGUMENT;
+    return TC_RSA_ERROR;
   const size_t padding = db_length - h - message.length - 1;
   memset(db + h, 0, padding);
   db[h + padding] = 1;
@@ -87,7 +87,7 @@ static inline TC_RSA_result tc_rsa_oaep_decode(uint8_t* encoded, size_t length,
   if (result != TC_RSA_OK)
     return result;
   if (tc_hash_digest_parts(hash, &label, 1, block, workspace) != TC_OK)
-    return TC_RSA_ARGUMENT;
+    return TC_RSA_ERROR;
   unsigned difference = encoded[0];
   for (size_t i = 0; i < h; ++i)
     difference |= db[i] ^ block[i];

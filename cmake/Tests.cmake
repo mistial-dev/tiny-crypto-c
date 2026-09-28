@@ -643,6 +643,7 @@ add_test(NAME test_package_boundaries
     TC_ENABLE_SHA256=1 TC_ENABLE_SHA384=1 TC_ENABLE_SHA512=1)
   tc_add_c_test(test_key_challenge_rsa tiny-crypto-c-test-pki-native
     tests/x509/key_challenge_rsa.c)
+  tc_add_c_test(test_x509_native_sizes tiny-crypto-c-test-pki-native tests/x509/native_sizes.c)
   tc_add_c_test(test_x509_ocsp_sd33 tiny-crypto-c-test-pki-native tests/x509/ocsp_sd33.c)
   target_compile_definitions(test_x509_ocsp_sd33 PRIVATE
     TC_SD33_OCSP_ROOT="${PROJECT_SOURCE_DIR}/tests/vectors/x509/ocsp/sd33"

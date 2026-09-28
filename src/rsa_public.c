@@ -191,7 +191,7 @@ static TC_RSA_result tc_rsa_verify_pss_digest_impl(const TC_RSA_public_key* key,
     return result;
   length = key->modulus.length;
   if (!tc_rsa_supported_modulus_size(length))
-    return TC_RSA_INVALID;
+    return TC_RSA_UNSUPPORTED;
   if (signature.length != length)
     return TC_RSA_INVALID;
   if (!digest.data)

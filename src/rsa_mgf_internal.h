@@ -64,7 +64,7 @@ static inline TC_RSA_result tc_rsa_mgf1_xor(TC_hash_algorithm hash, TC_bytes see
       take = info.digest_length;
     if (tc_hash_digest_parts(hash, parts, 2, block, workspace) != TC_OK) {
       TC_secure_zero(block, info.digest_length);
-      return TC_RSA_ARGUMENT;
+      return TC_RSA_ERROR;
     }
     for (size_t j = 0; j < take; ++j)
       output[offset + j] ^= block[j];

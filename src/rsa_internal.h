@@ -24,8 +24,9 @@ static inline tc_rsa_result tc_rsa_public_key_check(const uint8_t* modulus, size
 {
   if (!modulus || !exponent)
     return TC_RSA_ARGUMENT;
+  /* A size outside the supported set is well formed but not implemented. */
   if (!tc_rsa_supported_modulus_size(length))
-    return TC_RSA_INVALID;
+    return TC_RSA_UNSUPPORTED;
   if (!exponent_length || exponent_length > length || !exponent[0] ||
       !(exponent[exponent_length - 1] & 1) || (exponent_length == 1 && exponent[0] < 3) ||
       !(modulus[0] & 0x80) || !(modulus[length - 1] & 1) ||
@@ -112,7 +113,9 @@ static inline tc_rsa_result tc_rsa_verify_v15(const uint8_t* modulus, size_t len
     return TC_RSA_UNSUPPORTED;
   if (digest_length != info.digest_length)
     return TC_RSA_ARGUMENT;
-  if (!tc_rsa_supported_modulus_size(length) || signature_length != length ||
+  if (!tc_rsa_supported_modulus_size(length))
+    return TC_RSA_UNSUPPORTED;
+  if (signature_length != length ||
       !tc_rsa_v15_size(length, info.digest_info.length, digest_length))
     return TC_RSA_INVALID;
   n = length / sizeof(tc_mp_word);

@@ -23,7 +23,7 @@ typedef enum {
   TC_RSA_LIMIT,
   TC_RSA_ARGUMENT,
   TC_RSA_UNSUPPORTED,
-  TC_RSA_ERROR, /* Random-source or private-operation verification failure. */
+  TC_RSA_ERROR, /* Random-source, hash or private-operation verification failure. */
   TC_RSA_IN_PROGRESS,
   TC_RSA_CANCELLED
 } TC_RSA_result;
