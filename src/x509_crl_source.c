@@ -188,8 +188,8 @@ TC_TLV_result tc_x509_crl_source_entry_next(tc_source_reader* reader,
 }
 
 TC_TLV_result tc_x509_crl_source_revoked_init(tc_source_reader* reader, tc_source_span encoded,
-                                              const tc_x509_crl* metadata,
-                                              const tc_x509_crl_extension_info* extensions,
+                                              const TC_X509_crl* metadata,
+                                              const TC_X509_crl_extensions* extensions,
                                               uint64_t max_entries, TC_buffer issuer_storage,
                                               tc_x509_crl_source_revoked* out)
 {
@@ -247,8 +247,8 @@ TC_TLV_result tc_x509_crl_source_revoked_next(tc_source_reader* reader,
 
 TC_TLV_result tc_x509_crl_source_scan_init(tc_source_reader* reader,
                                            const tc_x509_crl_source_revoked* revoked,
-                                           const tc_x509_crl_serial_query* queries, size_t count,
-                                           tc_x509_crl_match* matches, size_t capacity,
+                                           const TC_X509_crl_target* queries, size_t count,
+                                           TC_X509_crl_match* matches, size_t capacity,
                                            tc_x509_crl_source_scan* out)
 {
   if (!reader || !revoked || !out || (count && (!queries || !matches)) ||
@@ -303,7 +303,7 @@ TC_TLV_result tc_x509_crl_source_scan_step(tc_x509_crl_source_scan* scan, size_t
 }
 
 TC_TLV_result tc_x509_crl_source_scan_finish(const tc_x509_crl_source_scan* scan,
-                                             tc_x509_crl_match* out, size_t capacity)
+                                             TC_X509_crl_match* out, size_t capacity)
 {
   if (!scan || scan->phase != TC_CRL_SCAN_COMPLETE || (scan->count && !out))
     return TC_TLV_ARGUMENT;
@@ -317,7 +317,7 @@ TC_TLV_result tc_x509_crl_source_scan_finish(const tc_x509_crl_source_scan* scan
 TC_TLV_result tc_x509_crl_source_metadata(tc_source_reader* reader,
                                           const tc_x509_crl_layout* layout, TC_buffer storage,
                                           const TC_TLV_limits* limits,
-                                          const tc_pki_tree_workspace* tree, tc_x509_crl* out)
+                                          const tc_pki_tree_workspace* tree, TC_X509_crl* out)
 {
   if (!reader || !layout || !storage.data || !out || !limits || !tree || !tree->work)
     return TC_TLV_ARGUMENT;

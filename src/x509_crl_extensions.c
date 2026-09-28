@@ -8,17 +8,8 @@
 #include "x509_crl_internal.h"
 #include "x509_time_internal.h"
 #include "pki_extensions_internal.h"
-#include "pki_names_internal.h"
-#include "pki_bits_internal.h"
-#include "pki_distribution_internal.h"
-#include "pki_status_internal.h"
-#include "pki_source_internal.h"
-#include "pki_reader_internal.h"
-#include "x509_crl_source_internal.h"
-#include "pki_signature_internal.h"
-#include "hash_dispatch_internal.h"
 
-TC_TLV_result tc_x509_crl_entry_policy(const tc_x509_crl_extension_info* crl,
+TC_TLV_result tc_x509_crl_entry_policy(const TC_X509_crl_extensions* crl,
                                        const tc_x509_crl_entry_info* entry)
 {
   const unsigned known = TC_CRL_ENTRY_REASON | TC_CRL_ENTRY_INVALIDITY | TC_CRL_ENTRY_ISSUER;
@@ -29,21 +20,22 @@ TC_TLV_result tc_x509_crl_entry_policy(const tc_x509_crl_extension_info* crl,
   if (entry->critical & (TC_CRL_ENTRY_REASON | TC_CRL_ENTRY_INVALIDITY))
     return TC_TLV_INVALID;
   if ((entry->present & TC_CRL_ENTRY_ISSUER) &&
-      (!(entry->critical & TC_CRL_ENTRY_ISSUER) || !(crl->present & TC_CRL_EXT_DISTRIBUTION) ||
+      (!(entry->critical & TC_CRL_ENTRY_ISSUER) || !(crl->present & TC_X509_CRL_EXT_DISTRIBUTION) ||
        !crl->distribution.indirect))
     return TC_TLV_INVALID;
   if ((entry->present & TC_CRL_ENTRY_REASON) && entry->reason == CRL_REASON_REMOVE &&
-      !(crl->present & TC_CRL_EXT_DELTA))
+      !(crl->present & TC_X509_CRL_EXT_DELTA))
     return TC_TLV_INVALID;
   return TC_TLV_OK;
 }
 
-TC_TLV_result tc_x509_crl_extension_policy(const tc_x509_crl_extension_info* info)
+TC_TLV_result tc_x509_crl_extension_policy(const TC_X509_crl_extensions* info)
 {
-  const unsigned known = TC_CRL_EXT_NUMBER | TC_CRL_EXT_DELTA | TC_CRL_EXT_AUTHORITY |
-                         TC_CRL_EXT_DISTRIBUTION | TC_CRL_EXT_FRESHEST | TC_CRL_EXT_ISSUER_ALT;
-  const unsigned must_be_critical = TC_CRL_EXT_DELTA | TC_CRL_EXT_DISTRIBUTION;
-  const unsigned must_be_noncritical = TC_CRL_EXT_NUMBER | TC_CRL_EXT_FRESHEST;
+  const unsigned known = TC_X509_CRL_EXT_NUMBER | TC_X509_CRL_EXT_DELTA |
+                         TC_X509_CRL_EXT_AUTHORITY | TC_X509_CRL_EXT_DISTRIBUTION |
+                         TC_X509_CRL_EXT_FRESHEST | TC_X509_CRL_EXT_ISSUER_ALT;
+  const unsigned must_be_critical = TC_X509_CRL_EXT_DELTA | TC_X509_CRL_EXT_DISTRIBUTION;
+  const unsigned must_be_noncritical = TC_X509_CRL_EXT_NUMBER | TC_X509_CRL_EXT_FRESHEST;
   if (!info || (info->present & ~known) || (info->critical & ~info->present))
     return TC_TLV_ARGUMENT;
   if (info->unknown_critical_oid.length)
@@ -51,13 +43,13 @@ TC_TLV_result tc_x509_crl_extension_policy(const tc_x509_crl_extension_info* inf
   if ((info->critical & must_be_noncritical) ||
       ((info->present & must_be_critical) != (info->critical & must_be_critical)))
     return TC_TLV_INVALID;
-  if ((info->present & (TC_CRL_EXT_DELTA | TC_CRL_EXT_FRESHEST)) ==
-      (TC_CRL_EXT_DELTA | TC_CRL_EXT_FRESHEST))
+  if ((info->present & (TC_X509_CRL_EXT_DELTA | TC_X509_CRL_EXT_FRESHEST)) ==
+      (TC_X509_CRL_EXT_DELTA | TC_X509_CRL_EXT_FRESHEST))
     return TC_TLV_INVALID;
   return TC_TLV_OK;
 }
 
-TC_TLV_result tc_x509_crl_fresh_at(const tc_x509_crl* crl, const TC_X509_time* at,
+TC_TLV_result tc_x509_crl_fresh_at(const TC_X509_crl* crl, const TC_X509_time* at,
                                    tc_x509_crl_freshness* out)
 {
   TC_TLV_result result;
@@ -87,7 +79,7 @@ TC_TLV_result tc_x509_crl_fresh_at(const tc_x509_crl* crl, const TC_X509_time* a
 }
 
 TC_TLV_result
-tc_x509_crl_coverage_at(const tc_x509_crl* crl, const tc_x509_crl_extension_info* extensions,
+tc_x509_crl_coverage_at(const TC_X509_crl* crl, const TC_X509_crl_extensions* extensions,
                         const TC_X509_time* at, const tc_pki_distribution_point* point,
                         TC_bytes certificate_issuer, int certificate_ca,
                         const TC_TLV_limits* limits, const tc_pki_tree_workspace* tree,
@@ -107,8 +99,8 @@ tc_x509_crl_coverage_at(const tc_x509_crl* crl, const tc_x509_crl_extension_info
   if (result != TC_TLV_OK)
     return result;
   if (coverage.freshness == TC_X509_CRL_CURRENT) {
-    const tc_x509_crl_distribution* idp =
-        extensions->present & TC_CRL_EXT_DISTRIBUTION ? &extensions->distribution : NULL;
+    const TC_X509_crl_distribution* idp =
+        extensions->present & TC_X509_CRL_EXT_DISTRIBUTION ? &extensions->distribution : NULL;
     result = tc_x509_crl_scope_reasons(crl, idp, point, certificate_issuer, certificate_ca, limits,
                                        tree, names, &coverage.reasons);
     if (result != TC_TLV_OK)
@@ -118,7 +110,7 @@ tc_x509_crl_coverage_at(const tc_x509_crl* crl, const tc_x509_crl_extension_info
   return TC_TLV_OK;
 }
 
-TC_TLV_result tc_x509_crl_scope_reasons(const tc_x509_crl* crl, const tc_x509_crl_distribution* idp,
+TC_TLV_result tc_x509_crl_scope_reasons(const TC_X509_crl* crl, const TC_X509_crl_distribution* idp,
                                         const tc_pki_distribution_point* point,
                                         TC_bytes certificate_issuer, int certificate_ca,
                                         const TC_TLV_limits* limits,
@@ -170,7 +162,7 @@ typedef struct {
   TC_bytes encoded, value, suffix;
 } distribution_identity;
 
-static TC_TLV_result distribution_cursor_init(const tc_pki_distribution_name* name, TC_bytes base,
+static TC_TLV_result distribution_cursor_init(const TC_X509_distribution_name* name, TC_bytes base,
                                               const TC_TLV_limits* limits,
                                               const tc_pki_tree_workspace* tree,
                                               distribution_cursor* out)
@@ -227,7 +219,7 @@ static TC_TLV_result distribution_cursor_next(distribution_cursor* cursor,
   return TC_TLV_OK;
 }
 
-TC_TLV_result tc_x509_crl_name_matches(const tc_x509_crl* crl, const tc_x509_crl_distribution* idp,
+TC_TLV_result tc_x509_crl_name_matches(const TC_X509_crl* crl, const TC_X509_crl_distribution* idp,
                                        const tc_pki_distribution_point* point,
                                        TC_bytes certificate_issuer, const TC_TLV_limits* limits,
                                        const tc_pki_tree_workspace* tree,
@@ -237,7 +229,7 @@ TC_TLV_result tc_x509_crl_name_matches(const tc_x509_crl* crl, const tc_x509_crl
   distribution_cursor left, right, right_start;
   distribution_identity a, b;
   TC_bytes base = certificate_issuer;
-  tc_pki_distribution_name target;
+  TC_X509_distribution_name target;
   TC_TLV_result result;
   if (!crl || !point || !tree || !tree->work || !matched)
     return TC_TLV_ARGUMENT;
@@ -247,7 +239,7 @@ TC_TLV_result tc_x509_crl_name_matches(const tc_x509_crl* crl, const tc_x509_crl
   }
   target = point->name;
   if (!target.encoded.length) {
-    target = (tc_pki_distribution_name){{NULL, 0}, point->issuer, 0};
+    target = (TC_X509_distribution_name){{NULL, 0}, point->issuer, 0};
   } else if (target.relative && point->issuer.length) {
     result = tc_pki_distribution_issuer_name(point->issuer, limits, tree, &base);
     if (result != TC_TLV_OK)
@@ -297,8 +289,8 @@ TC_TLV_result tc_x509_crl_name_matches(const tc_x509_crl* crl, const tc_x509_crl
   return TC_TLV_OK;
 }
 
-TC_TLV_result tc_x509_crl_issuer_matches(const tc_x509_crl* crl,
-                                         const tc_x509_crl_distribution* idp,
+TC_TLV_result tc_x509_crl_issuer_matches(const TC_X509_crl* crl,
+                                         const TC_X509_crl_distribution* idp,
                                          const tc_pki_distribution_point* point,
                                          TC_bytes certificate_issuer, const TC_TLV_limits* limits,
                                          const tc_pki_tree_workspace* tree,
@@ -326,7 +318,7 @@ TC_TLV_result tc_x509_crl_issuer_matches(const tc_x509_crl* crl,
 
 TC_TLV_result tc_x509_crl_distribution_read(TC_bytes encoded, const TC_TLV_limits* limits,
                                             const tc_pki_tree_workspace* tree,
-                                            tc_x509_crl_distribution* out)
+                                            TC_X509_crl_distribution* out)
 {
   enum {
     NAME = 0xa0,
@@ -337,7 +329,7 @@ TC_TLV_result tc_x509_crl_distribution_read(TC_bytes encoded, const TC_TLV_limit
     ATTRIBUTE_ONLY = 0x85,
     FIELD_MASK = 0x1f
   };
-  tc_x509_crl_distribution parsed = {0};
+  TC_X509_crl_distribution parsed = {0};
   TC_TLV_reader fields;
   TC_TLV_element element;
   TC_TLV_result result;
@@ -455,7 +447,7 @@ typedef struct {
   int entry;
   const TC_TLV_limits* limits;
   const tc_pki_tree_workspace* tree;
-  tc_x509_crl_extension_info* info;
+  TC_X509_crl_extensions* info;
   tc_x509_crl_entry_info* entry_info;
 } crl_extension_context;
 
@@ -477,7 +469,7 @@ static TC_TLV_result crl_extension_value(void* context, const TC_X509_extension*
   const int number = !state->entry && (id == CRL_NUMBER || id == DELTA_CRL);
   const int authority = !state->entry && id == AUTHORITY_KEY_IDENTIFIER;
   const int names = state->entry ? id == CERTIFICATE_ISSUER : id == ISSUER_ALT_NAME;
-  tc_x509_crl_extension_info* info = state->info;
+  TC_X509_crl_extensions* info = state->info;
   tc_x509_crl_entry_info* entry_info = state->entry_info;
   if (entry_info) {
     unsigned flag = 0;
@@ -504,22 +496,22 @@ static TC_TLV_result crl_extension_value(void* context, const TC_X509_extension*
     unsigned flag = 0;
     switch (id) {
     case CRL_NUMBER:
-      flag = TC_CRL_EXT_NUMBER;
+      flag = TC_X509_CRL_EXT_NUMBER;
       break;
     case DELTA_CRL:
-      flag = TC_CRL_EXT_DELTA;
+      flag = TC_X509_CRL_EXT_DELTA;
       break;
     case AUTHORITY_KEY_IDENTIFIER:
-      flag = TC_CRL_EXT_AUTHORITY;
+      flag = TC_X509_CRL_EXT_AUTHORITY;
       break;
     case ISSUING_DISTRIBUTION_POINT:
-      flag = TC_CRL_EXT_DISTRIBUTION;
+      flag = TC_X509_CRL_EXT_DISTRIBUTION;
       break;
     case FRESHEST_CRL:
-      flag = TC_CRL_EXT_FRESHEST;
+      flag = TC_X509_CRL_EXT_FRESHEST;
       break;
     case ISSUER_ALT_NAME:
-      flag = TC_CRL_EXT_ISSUER_ALT;
+      flag = TC_X509_CRL_EXT_ISSUER_ALT;
       break;
     default:
       if (extension->critical && !info->unknown_critical_oid.length)
@@ -550,7 +542,7 @@ static TC_TLV_result crl_extension_value(void* context, const TC_X509_extension*
     return TC_TLV_OK;
   }
   if (!state->entry && id == ISSUING_DISTRIBUTION_POINT) {
-    tc_x509_crl_distribution distribution;
+    TC_X509_crl_distribution distribution;
     TC_TLV_result result =
         tc_x509_crl_distribution_read(extension->value, state->limits, state->tree, &distribution);
     if (result == TC_TLV_OK && info) {
@@ -636,9 +628,9 @@ TC_TLV_result tc_x509_crl_entry_info_read(TC_bytes encoded, const TC_TLV_limits*
 
 TC_TLV_result tc_x509_crl_extension_info_read(TC_bytes encoded, const TC_TLV_limits* limits,
                                               const tc_pki_tree_workspace* tree, TC_bytes* oids,
-                                              size_t capacity, tc_x509_crl_extension_info* out)
+                                              size_t capacity, TC_X509_crl_extensions* out)
 {
-  tc_x509_crl_extension_info parsed = {0};
+  TC_X509_crl_extensions parsed = {0};
   crl_extension_context context = {0, limits, tree, &parsed, NULL};
   TC_TLV_result result;
   if (!out)
@@ -650,7 +642,7 @@ TC_TLV_result tc_x509_crl_extension_info_read(TC_bytes encoded, const TC_TLV_lim
   *out = parsed;
   return TC_TLV_OK;
 }
-TC_TLV_result tc_x509_crl_extensions_check(const tc_x509_crl* crl, const TC_TLV_limits* limits,
+TC_TLV_result tc_x509_crl_extensions_check(const TC_X509_crl* crl, const TC_TLV_limits* limits,
                                            const tc_pki_tree_workspace* tree, TC_bytes* oids,
                                            size_t capacity)
 {

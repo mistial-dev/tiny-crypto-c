@@ -8,8 +8,8 @@
 #if TC_ENABLE_CMS_VALIDATION
 #include "cms_internal.h"
 
-TC_TLV_result tc_cms_crl_signer_candidate_next(tc_cms_candidates* reader, const tc_x509_crl* crl,
-                                               const tc_x509_crl_extension_info* extensions,
+TC_TLV_result tc_cms_crl_signer_candidate_next(tc_cms_candidates* reader, const TC_X509_crl* crl,
+                                               const TC_X509_crl_extensions* extensions,
                                                const TC_X509_name_workspace* names,
                                                const tc_pki_tree_workspace* tree,
                                                TC_X509_workspace* parser,
@@ -23,8 +23,8 @@ TC_TLV_result tc_cms_crl_signer_candidate_next(tc_cms_candidates* reader, const 
 }
 
 TC_X509_path_status
-tc_cms_crl_signer_find(const tc_cms_candidates* candidates, const tc_x509_crl* crl,
-                       const tc_x509_crl_extension_info* extensions,
+tc_cms_crl_signer_find(const tc_cms_candidates* candidates, const TC_X509_crl* crl,
+                       const TC_X509_crl_extensions* extensions,
                        const TC_X509_store_source* path_source, size_t anchor_index,
                        const TC_X509_path_options* options, const tc_pki_tree_workspace* tree,
                        const TC_X509_path_workspace* validation,
@@ -40,10 +40,10 @@ tc_cms_crl_process(const tc_cms_candidates* candidates, const tc_x509_crl_select
                    const tc_x509_crl_query* query, const TC_X509_store_source* path_source,
                    size_t anchor_index, const TC_X509_path_options* options,
                    const tc_pki_tree_workspace* tree, const TC_X509_path_workspace* validation,
-                   const TC_X509_search_workspace* search, tc_x509_crl_evidence* evidence,
+                   const TC_X509_search_workspace* search, TC_X509_crl_evidence* evidence,
                    TC_X509_search_result* out)
 {
-  tc_x509_crl_status status;
+  TC_X509_revocation_status status;
   TC_TLV_result result;
   const tc_x509_crl_trust trust = {path_source, anchor_index, options, tree, validation, search};
   if (!candidates || !tc_x509_crl_trust_valid(&trust) || !selected || !selected->base ||
@@ -67,17 +67,17 @@ TC_TLV_result tc_cms_crl_index_process(
     const TC_X509_store_source* path_source, size_t anchor_index,
     const TC_X509_path_options* options, const tc_pki_tree_workspace* tree,
     const TC_X509_path_workspace* validation, const TC_X509_search_workspace* search,
-    tc_x509_crl_evidence* evidence, TC_X509_search_result* out)
+    TC_X509_crl_evidence* evidence, TC_X509_search_result* out)
 {
   const tc_x509_crl_trust trust = {path_source, anchor_index, options, tree, validation, search};
-  tc_x509_crl_status status;
+  TC_X509_revocation_status status;
   if (!candidates || !tc_x509_crl_index_arguments(index, query, &trust, out) ||
       base >= index->count || !x509_crl_delta_policy_valid(delta_policy))
     return TC_TLV_ARGUMENT;
   const TC_X509_crl_record* record = &index->records[base];
   if (record->policy != TC_TLV_OK)
     return record->policy;
-  if (record->extensions.present & TC_CRL_EXT_DELTA)
+  if (record->extensions.present & TC_X509_CRL_EXT_DELTA)
     return TC_TLV_ARGUMENT;
   TC_TLV_result result = tc_x509_crl_evidence_status(evidence, &status);
   if (result != TC_TLV_OK)
@@ -101,7 +101,7 @@ static TC_TLV_result cms_crl_scope_run(
     const TC_X509_path_workspace* validation, const TC_X509_search_workspace* search,
     uint8_t* states, size_t capacity, const tc_x509_crl_path_check* check, int all_scopes,
     const TC_bytes* points, int from_certificate, const tc_x509_crl_extra_storage* extra,
-    const tc_x509_crl_held_path* path, tc_x509_crl_evidence* evidence, TC_X509_search_result* out)
+    const tc_x509_crl_held_path* path, TC_X509_crl_evidence* evidence, TC_X509_search_result* out)
 {
   const tc_x509_crl_trust trust = {path_source, anchor_index, options, tree, validation, search};
   if (!candidates)
@@ -125,7 +125,7 @@ TC_TLV_result tc_cms_crl_scope_process(
     const tc_x509_crl_query* query, const TC_X509_store_source* path_source, size_t anchor_index,
     const TC_X509_path_options* options, const tc_pki_tree_workspace* tree,
     const TC_X509_path_workspace* validation, const TC_X509_search_workspace* search,
-    uint8_t* states, size_t capacity, tc_x509_crl_evidence* evidence, TC_X509_search_result* out)
+    uint8_t* states, size_t capacity, TC_X509_crl_evidence* evidence, TC_X509_search_result* out)
 {
   return cms_crl_scope_run(candidates, index, reference, delta_policy, order_policy, query,
                            path_source, anchor_index, options, tree, validation, search, states,
@@ -140,7 +140,7 @@ tc_cms_crl_point_process(const tc_cms_candidates* candidates, const TC_X509_crl_
                          const TC_X509_path_options* options, const tc_pki_tree_workspace* tree,
                          const TC_X509_path_workspace* validation,
                          const TC_X509_search_workspace* search, uint8_t* states, size_t capacity,
-                         const tc_x509_crl_path_check* check, tc_x509_crl_evidence* evidence)
+                         const tc_x509_crl_path_check* check, TC_X509_crl_evidence* evidence)
 {
   TC_X509_search_result scratch;
   if (!check || !check->verify)
@@ -157,7 +157,7 @@ TC_TLV_result tc_cms_crl_points_process(
     size_t anchor_index, const TC_X509_path_options* options, const tc_pki_tree_workspace* tree,
     const TC_X509_path_workspace* validation, const TC_X509_search_workspace* search,
     uint8_t* states, size_t capacity, const tc_x509_crl_path_check* check,
-    tc_x509_crl_evidence* evidence)
+    TC_X509_crl_evidence* evidence)
 {
   TC_X509_search_result scratch;
   if (!check || !check->verify)
@@ -174,7 +174,7 @@ TC_TLV_result tc_cms_crl_certificate_process(
     size_t anchor_index, const TC_X509_path_options* options, const tc_pki_tree_workspace* tree,
     const TC_X509_path_workspace* validation, const TC_X509_search_workspace* search,
     uint8_t* states, size_t capacity, const tc_x509_crl_path_check* check,
-    tc_x509_crl_evidence* evidence)
+    TC_X509_crl_evidence* evidence)
 {
   TC_X509_search_result scratch;
   const tc_pki_distribution_point fallback = {0};
@@ -237,7 +237,7 @@ static TC_TLV_result cms_crl_resolution_init(const tc_cms_crl_resolution* input,
 TC_TLV_result tc_cms_crl_resolve(const TC_X509_certificate* target,
                                  const tc_cms_crl_resolution* resolution,
                                  const tc_x509_crl_resolution_workspace* workspace,
-                                 tc_x509_crl_evidence* out)
+                                 TC_X509_crl_evidence* out)
 {
   tc_pki_store_candidates store;
   TC_bytes metadata[3];

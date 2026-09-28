@@ -14,7 +14,7 @@
 #include "pki_hash_parts_internal.h"
 
 typedef struct {
-  const tc_cms_signer_info* signer;
+  const TC_CMS_signer_info* signer;
   TC_TLV_profile profile;
   const TC_X509_name_workspace* names;
 } cms_signer_filter;
@@ -28,7 +28,7 @@ static TC_TLV_result cms_signer_candidate(const void* context, const TC_X509_cer
 }
 
 TC_TLV_result tc_cms_signer_candidate_next(tc_cms_candidates* reader,
-                                           const tc_cms_signer_info* signer, TC_TLV_profile profile,
+                                           const TC_CMS_signer_info* signer, TC_TLV_profile profile,
                                            const TC_X509_name_workspace* names,
                                            const tc_pki_tree_workspace* tree,
                                            TC_X509_workspace* parser, TC_X509_certificate* scratch,
@@ -562,7 +562,7 @@ TC_credential_status TC_CMS_credential_validate(const TC_CMS_validation_request*
                                                   work, NULL, 0);
 }
 
-TC_TLV_result tc_cms_signer_matches(const tc_cms_signer_info* signer, TC_TLV_profile profile,
+TC_TLV_result tc_cms_signer_matches(const TC_CMS_signer_info* signer, TC_TLV_profile profile,
                                     const TC_X509_certificate* certificate,
                                     const TC_TLV_limits* limits,
                                     const TC_X509_name_workspace* names,

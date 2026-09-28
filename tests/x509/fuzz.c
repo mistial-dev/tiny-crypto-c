@@ -350,9 +350,9 @@ static void fuzz_path(const uint8_t* data, size_t length, const TC_X509_certific
     TC_TLV_reader objects;
     TC_TLV_element element;
     TC_bytes candidates[4], path[4];
-    tc_x509_search_frame search_frames[4];
-    tc_x509_search_workspace search = {path, search_frames, 4};
-    tc_x509_search_result found, unchanged;
+    TC_X509_search_frame search_frames[4];
+    TC_X509_search_workspace search = {path, search_frames, 4};
+    TC_X509_search_result found, unchanged;
     TC_X509_workspace parser = {frames, 16, oids, 16};
     TC_X509_certificate selected;
     size_t count = 0, work;
@@ -451,8 +451,8 @@ static void fuzz_cms(const uint8_t* data, size_t length)
   const TC_TLV_limits limits = {MAX_BYTES, MAX_BYTES, MAX_ELEMENTS, FRAME_CAPACITY};
   const TC_TLV_profile profiles[] = {TC_TLV_DER, TC_TLV_BER};
   TC_TLV_frame frames[FRAME_CAPACITY];
-  tc_cms_signer_info signer, saved;
-  tc_cms_signed_data container, saved_container;
+  TC_CMS_signer_info signer, saved;
+  TC_CMS_signed_data container, saved_container;
   TC_TLV_result result;
   size_t work = WORK_BUDGET;
   fuzz_cms_path(data, length);
@@ -576,7 +576,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
       abort();
   }
   {
-    tc_x509_crl crl, previous;
+    TC_X509_crl crl, previous;
     size_t work;
     const tc_pki_tree_workspace tree = {frames, sizeof frames / sizeof frames[0], &work};
     const size_t budgets[] = {200000, length ? data[0] : 0};
@@ -599,7 +599,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
         if (work > budgets[i])
           abort();
       }
-      tc_x509_crl_distribution distribution, saved_distribution;
+      TC_X509_crl_distribution distribution, saved_distribution;
       memset(&distribution, 0xa5, sizeof distribution);
       saved_distribution = distribution;
       work = budgets[i];
@@ -612,7 +612,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
       if (result == TC_TLV_OK &&
           distribution.user_only + distribution.ca_only + distribution.attribute_only > 1)
         abort();
-      tc_x509_crl_extension_info info, saved_info;
+      TC_X509_crl_extensions info, saved_info;
       memset(&info, 0xa5, sizeof info);
       saved_info = info;
       work = budgets[i];

@@ -6,19 +6,9 @@
 #include <tiny_crypto/common.h>
 #if TC_ENABLE_X509_REVOCATION
 #include "x509_crl_internal.h"
-#include "x509_time_internal.h"
 #include "pki_extensions_internal.h"
-#include "pki_names_internal.h"
-#include "pki_bits_internal.h"
-#include "pki_distribution_internal.h"
-#include "pki_status_internal.h"
-#include "pki_source_internal.h"
-#include "pki_reader_internal.h"
-#include "x509_crl_source_internal.h"
-#include "pki_signature_internal.h"
-#include "hash_dispatch_internal.h"
 
-static int crl_effective_match_valid(const tc_x509_crl_match* match)
+static int crl_effective_match_valid(const TC_X509_crl_match* match)
 {
   return (match->found == 0 || match->found == 1) &&
          (match->has_invalidity_date == 0 || match->has_invalidity_date == 1) &&
@@ -26,8 +16,8 @@ static int crl_effective_match_valid(const tc_x509_crl_match* match)
           (tc_x509_crl_reason_known(match->reason) && match->reason != CRL_REASON_REMOVE));
 }
 
-TC_TLV_result tc_x509_crl_evidence_status(const tc_x509_crl_evidence* evidence,
-                                          tc_x509_crl_status* out)
+TC_TLV_result tc_x509_crl_evidence_status(const TC_X509_crl_evidence* evidence,
+                                          TC_X509_revocation_status* out)
 {
   if (!evidence || !out || (evidence->reasons & ~TC_X509_CRL_ALL_REASONS) ||
       !crl_effective_match_valid(&evidence->revocation) ||
@@ -39,10 +29,10 @@ TC_TLV_result tc_x509_crl_evidence_status(const tc_x509_crl_evidence* evidence,
   return TC_TLV_OK;
 }
 
-TC_TLV_result tc_x509_crl_evidence_equal(const tc_x509_crl_evidence* left,
-                                         const tc_x509_crl_evidence* right, int* equal)
+TC_TLV_result tc_x509_crl_evidence_equal(const TC_X509_crl_evidence* left,
+                                         const TC_X509_crl_evidence* right, int* equal)
 {
-  tc_x509_crl_status a, b;
+  TC_X509_revocation_status a, b;
   int order;
   if (!equal)
     return TC_TLV_ARGUMENT;
@@ -57,8 +47,8 @@ TC_TLV_result tc_x509_crl_evidence_equal(const tc_x509_crl_evidence* left,
     return TC_TLV_OK;
   }
   if (a == TC_X509_CRL_REVOKED) {
-    const tc_x509_crl_match* x = &left->revocation;
-    const tc_x509_crl_match* y = &right->revocation;
+    const TC_X509_crl_match* x = &left->revocation;
+    const TC_X509_crl_match* y = &right->revocation;
     if (x->reason != y->reason || x->has_invalidity_date != y->has_invalidity_date) {
       *equal = 0;
       return TC_TLV_OK;
@@ -84,10 +74,10 @@ TC_TLV_result tc_x509_crl_evidence_equal(const tc_x509_crl_evidence* left,
   return TC_TLV_OK;
 }
 
-TC_TLV_result tc_x509_crl_evidence_add(tc_x509_crl_evidence* evidence, uint16_t reasons,
-                                       const tc_x509_crl_match* match)
+TC_TLV_result tc_x509_crl_evidence_add(TC_X509_crl_evidence* evidence, uint16_t reasons,
+                                       const TC_X509_crl_match* match)
 {
-  tc_x509_crl_status status;
+  TC_X509_revocation_status status;
   TC_TLV_result result;
   if (!match || (reasons & ~TC_X509_CRL_ALL_REASONS))
     return TC_TLV_ARGUMENT;
@@ -106,10 +96,10 @@ TC_TLV_result tc_x509_crl_evidence_add(tc_x509_crl_evidence* evidence, uint16_t 
   return TC_TLV_OK;
 }
 
-TC_TLV_result tc_x509_crl_combine(const tc_x509_crl_match* base, const tc_x509_crl_match* delta,
-                                  tc_x509_crl_match* out)
+TC_TLV_result tc_x509_crl_combine(const TC_X509_crl_match* base, const TC_X509_crl_match* delta,
+                                  TC_X509_crl_match* out)
 {
-  tc_x509_crl_match result;
+  TC_X509_crl_match result;
   if (!base || !out || (base->found != 0 && base->found != 1) ||
       (delta && delta->found != 0 && delta->found != 1))
     return TC_TLV_ARGUMENT;
@@ -119,7 +109,7 @@ TC_TLV_result tc_x509_crl_combine(const tc_x509_crl_match* base, const tc_x509_c
     return TC_TLV_INVALID;
   result = delta && delta->found ? *delta : *base;
   if (!result.found || result.reason == CRL_REASON_REMOVE)
-    result = (tc_x509_crl_match){0};
+    result = (TC_X509_crl_match){0};
   *out = result;
   return TC_TLV_OK;
 }
@@ -147,8 +137,8 @@ TC_TLV_result tc_x509_crl_number_compare(TC_bytes left, TC_bytes right, size_t* 
 }
 
 TC_TLV_result
-tc_x509_crl_scope_equal(const tc_x509_crl* left, const tc_x509_crl_extension_info* left_info,
-                        const tc_x509_crl* right, const tc_x509_crl_extension_info* right_info,
+tc_x509_crl_scope_equal(const TC_X509_crl* left, const TC_X509_crl_extensions* left_info,
+                        const TC_X509_crl* right, const TC_X509_crl_extensions* right_info,
                         const TC_TLV_limits* limits, const tc_pki_tree_workspace* tree,
                         const TC_X509_name_workspace* names, int* equal)
 {
@@ -156,7 +146,7 @@ tc_x509_crl_scope_equal(const tc_x509_crl* left, const tc_x509_crl_extension_inf
   if (!left || !left_info || !right || !right_info || !limits || !tree || !tree->work || !names ||
       !equal)
     return TC_TLV_ARGUMENT;
-  if ((left_info->present ^ right_info->present) & TC_CRL_EXT_DISTRIBUTION) {
+  if ((left_info->present ^ right_info->present) & TC_X509_CRL_EXT_DISTRIBUTION) {
     *equal = 0;
     return TC_TLV_OK;
   }
@@ -177,13 +167,13 @@ tc_x509_crl_scope_equal(const tc_x509_crl* left, const tc_x509_crl_extension_inf
 }
 
 TC_TLV_result
-tc_x509_crl_delta_compatible(const tc_x509_crl* base, const tc_x509_crl_extension_info* base_info,
-                             const tc_x509_crl* delta, const tc_x509_crl_extension_info* delta_info,
+tc_x509_crl_delta_compatible(const TC_X509_crl* base, const TC_X509_crl_extensions* base_info,
+                             const TC_X509_crl* delta, const TC_X509_crl_extensions* delta_info,
                              const TC_TLV_limits* limits, const tc_pki_tree_workspace* tree,
                              const TC_X509_name_workspace* names, int* compatible)
 {
-  const unsigned shared = TC_CRL_EXT_DISTRIBUTION | TC_CRL_EXT_AUTHORITY;
-  const unsigned delta_required = TC_CRL_EXT_NUMBER | TC_CRL_EXT_DELTA;
+  const unsigned shared = TC_X509_CRL_EXT_DISTRIBUTION | TC_X509_CRL_EXT_AUTHORITY;
+  const unsigned delta_required = TC_X509_CRL_EXT_NUMBER | TC_X509_CRL_EXT_DELTA;
   TC_TLV_result result;
   int order, equal;
   if (!base || !delta || !base_info || !delta_info || !tree || !tree->work || !compatible)
@@ -194,7 +184,8 @@ tc_x509_crl_delta_compatible(const tc_x509_crl* base, const tc_x509_crl_extensio
   result = tc_x509_crl_extension_policy(delta_info);
   if (result != TC_TLV_OK)
     return result;
-  if ((base_info->present & TC_CRL_EXT_DELTA) || !(base_info->present & TC_CRL_EXT_NUMBER) ||
+  if ((base_info->present & TC_X509_CRL_EXT_DELTA) ||
+      !(base_info->present & TC_X509_CRL_EXT_NUMBER) ||
       (delta_info->present & delta_required) != delta_required ||
       (base_info->present & shared) != (delta_info->present & shared)) {
     *compatible = 0;

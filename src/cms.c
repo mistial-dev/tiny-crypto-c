@@ -465,13 +465,13 @@ TC_TLV_result TC_CMS_signer_next(TC_TLV_reader* reader, TC_TLV_frame* frames, si
 
 TC_TLV_result tc_cms_signed_data_read(TC_bytes encoded, const TC_TLV_limits* limits,
                                       TC_TLV_frame* frames, size_t frame_capacity, size_t* work,
-                                      tc_cms_signed_data* out)
+                                      TC_CMS_signed_data* out)
 {
   static const uint8_t signed_data_oid[] = {0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 1, 7, 2};
   enum { SIGNED_DATA_FIELDS = 6 };
   TC_TLV_element fields[SIGNED_DATA_FIELDS];
   TC_bytes encap;
-  tc_cms_signed_data parsed = {0};
+  TC_CMS_signed_data parsed = {0};
   size_t count, index;
   TC_TLV_result result;
   if (!out)
@@ -622,7 +622,7 @@ TC_TLV_result tc_cms_signed_data_check(const TC_CMS_signed_data* input, const TC
   if (result != TC_TLV_OK)
     return result;
   while (!tc_pki_end(&reader)) {
-    tc_cms_signer_info signer;
+    TC_CMS_signer_info signer;
     result = tc_pki_tree_next(&reader, tree, &element);
     if (result != TC_TLV_OK)
       return result;
@@ -644,7 +644,7 @@ TC_TLV_result tc_cms_signed_data_check(const TC_CMS_signed_data* input, const TC
   return input->version == required && (!selected || found) ? TC_TLV_OK : TC_TLV_INVALID;
 }
 
-TC_TLV_result tc_cms_signed_data_version_check(const tc_cms_signed_data* input,
+TC_TLV_result tc_cms_signed_data_version_check(const TC_CMS_signed_data* input,
                                                const TC_TLV_limits* limits,
                                                const tc_pki_tree_workspace* tree)
 {
@@ -685,9 +685,9 @@ static TC_TLV_result cms_octet_count(void* context, TC_bytes bytes)
 
 TC_TLV_result tc_cms_signer_info_read(TC_bytes encoded, TC_TLV_profile profile,
                                       const TC_TLV_limits* limits, TC_TLV_frame* frames,
-                                      size_t frame_capacity, size_t* work, tc_cms_signer_info* out)
+                                      size_t frame_capacity, size_t* work, TC_CMS_signer_info* out)
 {
-  tc_cms_signer_info parsed = {0};
+  TC_CMS_signer_info parsed = {0};
   const tc_pki_tree_workspace workspace = {frames, frame_capacity, work};
   TC_TLV_element element;
   TC_TLV_reader fields, identifier;

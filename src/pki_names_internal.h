@@ -33,7 +33,6 @@ static inline TC_TLV_result tc_pki_general_names_contents_check(TC_bytes content
   }
   return TC_TLV_OK;
 }
-typedef TC_X509_distribution_name tc_pki_distribution_name;
 
 /* Validate an RDN without its SET wrapper, including nested DER values. */
 static inline TC_TLV_result tc_pki_rdn_contents_check(TC_bytes contents,
@@ -67,11 +66,11 @@ static inline TC_TLV_result tc_pki_rdn_contents_check(TC_bytes contents,
 static inline TC_TLV_result tc_pki_distribution_name_read(TC_bytes encoded,
                                                           const TC_TLV_limits* limits,
                                                           const tc_pki_tree_workspace* tree,
-                                                          tc_pki_distribution_name* out)
+                                                          TC_X509_distribution_name* out)
 {
   enum { FULL_NAME = 0xa0, RELATIVE_NAME = 0xa1 };
   TC_TLV_element element;
-  tc_pki_distribution_name parsed;
+  TC_X509_distribution_name parsed;
   TC_TLV_result result;
   if (!out)
     return TC_TLV_ARGUMENT;

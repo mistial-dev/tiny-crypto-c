@@ -8,17 +8,11 @@
 #include "x509_crl_internal.h"
 #include "x509_time_internal.h"
 #include "pki_extensions_internal.h"
-#include "pki_names_internal.h"
-#include "pki_bits_internal.h"
-#include "pki_distribution_internal.h"
-#include "pki_status_internal.h"
-#include "pki_source_internal.h"
 #include "pki_reader_internal.h"
 #include "x509_crl_source_internal.h"
-#include "pki_signature_internal.h"
 #include "hash_dispatch_internal.h"
 
-TC_TLV_result tc_x509_crl_content_equal(const tc_x509_crl* left, const tc_x509_crl* right,
+TC_TLV_result tc_x509_crl_content_equal(const TC_X509_crl* left, const TC_X509_crl* right,
                                         size_t* work, int* equal)
 {
   if (!left || !right || !work || !equal)
@@ -29,7 +23,7 @@ TC_TLV_result tc_x509_crl_content_equal(const tc_x509_crl* left, const tc_x509_c
     result = tc_pki_span_compare(left->tbs, right->tbs, work, &order);
   } else {
     if (!left->prepared) {
-      const tc_x509_crl* swap = left;
+      const TC_X509_crl* swap = left;
       left = right;
       right = swap;
     }
@@ -215,10 +209,10 @@ TC_TLV_result tc_x509_crl_entry_next(TC_TLV_reader* reader, unsigned version,
 
 TC_TLV_result tc_x509_crl_metadata_read(const tc_x509_crl_fields* fields,
                                         const TC_TLV_limits* limits,
-                                        const tc_pki_tree_workspace* tree, tc_x509_crl* out)
+                                        const tc_pki_tree_workspace* tree, TC_X509_crl* out)
 {
   TC_TLV_element element;
-  tc_x509_crl parsed = {0};
+  TC_X509_crl parsed = {0};
   unsigned unused;
   if (!fields || !out || !tree || !tree->work)
     return TC_TLV_ARGUMENT;
@@ -300,10 +294,10 @@ static TC_bytes crl_borrow_field(TC_bytes input, tc_source_span span)
 }
 
 TC_TLV_result tc_x509_crl_read(TC_bytes input, const TC_TLV_limits* limits,
-                               const tc_pki_tree_workspace* tree, tc_x509_crl* out)
+                               const tc_pki_tree_workspace* tree, TC_X509_crl* out)
 {
   TC_TLV_reader outer, entries;
-  tc_x509_crl parsed;
+  TC_X509_crl parsed;
   if (!out || !tree || !tree->work)
     return TC_TLV_ARGUMENT;
   TC_TLV_result result = tc_pki_tree_open(input, 0x30, TC_TLV_DER, limits, tree, &outer);

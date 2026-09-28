@@ -25,7 +25,7 @@ TC_TLV_result tc_cms_other_format_read(TC_bytes encoded, tc_cms_other_kind kind,
  * schema readers. A match identifies a candidate. Trust validation is separate.
  * Missing SKI is a mismatch. Callers preflight disjoint input metadata/spans,
  * name/tree scratch and matched. matched changes only on OK. */
-TC_TLV_result tc_cms_signer_matches(const tc_cms_signer_info* signer, TC_TLV_profile profile,
+TC_TLV_result tc_cms_signer_matches(const TC_CMS_signer_info* signer, TC_TLV_profile profile,
                                     const TC_X509_certificate* certificate,
                                     const TC_TLV_limits* limits,
                                     const TC_X509_name_workspace* names,
@@ -139,7 +139,7 @@ TC_TLV_result tc_cms_path_source_init(const tc_cms_candidates* candidates,
  * Reader advances on OK/END; out changes only on OK. Other failures preserve
  * reader/out, but consume work and may change callback state. */
 TC_TLV_result tc_cms_signer_candidate_next(tc_cms_candidates* reader,
-                                           const tc_cms_signer_info* signer, TC_TLV_profile profile,
+                                           const TC_CMS_signer_info* signer, TC_TLV_profile profile,
                                            const TC_X509_name_workspace* names,
                                            const tc_pki_tree_workspace* tree,
                                            TC_X509_workspace* parser, TC_X509_certificate* scratch,
@@ -171,8 +171,8 @@ TC_TLV_result tc_cms_x509_candidate_next(tc_cms_candidates* reader, tc_pki_candi
 /* Select CRL signer candidates by subject, authority hints and cRLSign usage.
  * Same iterator/storage contract as above. Signature, path, scope and freshness
  * checks remain separate. Unsupported authority-name matching is reported. */
-TC_TLV_result tc_cms_crl_signer_candidate_next(tc_cms_candidates* reader, const tc_x509_crl* crl,
-                                               const tc_x509_crl_extension_info* extensions,
+TC_TLV_result tc_cms_crl_signer_candidate_next(tc_cms_candidates* reader, const TC_X509_crl* crl,
+                                               const TC_X509_crl_extensions* extensions,
                                                const TC_X509_name_workspace* names,
                                                const tc_pki_tree_workspace* tree,
                                                TC_X509_workspace* parser,
@@ -190,14 +190,14 @@ TC_TLV_result tc_cms_certificate_search(const tc_cms_candidates* candidates,
                                         TC_X509_search_result* out, int* source_failed);
 /* CRL signer search with an explicit external store. */
 TC_TLV_result tc_cms_crl_source_search(const void* candidates, const TC_X509_store_source* external,
-                                       const tc_x509_crl* crl,
-                                       const tc_x509_crl_extension_info* extensions,
+                                       const TC_X509_crl* crl,
+                                       const TC_X509_crl_extensions* extensions,
                                        const tc_x509_crl_trust* trust, tc_x509_crl_attempt attempt,
                                        const void* context, TC_X509_search_result* out,
                                        int* source_failed);
 /* tc_x509_crl_search callback: candidates is a tc_cms_candidates. */
-TC_TLV_result tc_cms_crl_search(const void* candidates, const tc_x509_crl* crl,
-                                const tc_x509_crl_extension_info* extensions,
+TC_TLV_result tc_cms_crl_search(const void* candidates, const TC_X509_crl* crl,
+                                const TC_X509_crl_extensions* extensions,
                                 const tc_x509_crl_trust* trust, tc_x509_crl_attempt attempt,
                                 const void* context, TC_X509_search_result* out,
                                 int* source_failed);
@@ -211,8 +211,8 @@ TC_TLV_result tc_cms_crl_search(const void* candidates, const tc_x509_crl* crl,
  * from all scratch/work/out. Tree and validation may share frame storage.
  * Work covers all attempts, out changes only on VALID and borrows path storage. */
 TC_X509_path_status
-tc_cms_crl_signer_find(const tc_cms_candidates* candidates, const tc_x509_crl* crl,
-                       const tc_x509_crl_extension_info* extensions,
+tc_cms_crl_signer_find(const tc_cms_candidates* candidates, const TC_X509_crl* crl,
+                       const TC_X509_crl_extensions* extensions,
                        const TC_X509_store_source* path_source, size_t anchor_index,
                        const TC_X509_path_options* options, const tc_pki_tree_workspace* tree,
                        const TC_X509_path_workspace* validation,
@@ -230,7 +230,7 @@ tc_cms_crl_process(const tc_cms_candidates* candidates, const tc_x509_crl_select
                    const tc_x509_crl_query* query, const TC_X509_store_source* path_source,
                    size_t anchor_index, const TC_X509_path_options* options,
                    const tc_pki_tree_workspace* tree, const TC_X509_path_workspace* validation,
-                   const TC_X509_search_workspace* search, tc_x509_crl_evidence* evidence,
+                   const TC_X509_search_workspace* search, TC_X509_crl_evidence* evidence,
                    TC_X509_search_result* out);
 /* Process one indexed complete CRL with signer retry and explicit delta policy.
  * Authenticate the base/path once per signer attempt, choose a current signed
@@ -244,7 +244,7 @@ TC_TLV_result tc_cms_crl_index_process(
     const TC_X509_store_source* path_source, size_t anchor_index,
     const TC_X509_path_options* options, const tc_pki_tree_workspace* tree,
     const TC_X509_path_workspace* validation, const TC_X509_search_workspace* search,
-    tc_x509_crl_evidence* evidence, TC_X509_search_result* out);
+    TC_X509_crl_evidence* evidence, TC_X509_search_result* out);
 /* Process all indexed scopes for one distribution point. check is required.
  * OK publishes new evidence, which may still have incomplete reason coverage.
  * END means no contribution or terminal input evidence. Failures preserve
@@ -261,7 +261,7 @@ tc_cms_crl_point_process(const tc_cms_candidates* candidates, const TC_X509_crl_
                          const TC_X509_path_options* options, const tc_pki_tree_workspace* tree,
                          const TC_X509_path_workspace* validation,
                          const TC_X509_search_workspace* search, uint8_t* states, size_t capacity,
-                         const tc_x509_crl_path_check* check, tc_x509_crl_evidence* evidence);
+                         const tc_x509_crl_path_check* check, TC_X509_crl_evidence* evidence);
 /* Process an encoded CRLDistributionPoints value, then query->point as fallback
  * if coverage is incomplete. An absent value uses only the fallback. The caller
  * supplies the target's validated CA flag and an issuer-wide fallback point.
@@ -274,7 +274,7 @@ TC_TLV_result tc_cms_crl_points_process(
     size_t anchor_index, const TC_X509_path_options* options, const tc_pki_tree_workspace* tree,
     const TC_X509_path_workspace* validation, const TC_X509_search_workspace* search,
     uint8_t* states, size_t capacity, const tc_x509_crl_path_check* check,
-    tc_x509_crl_evidence* evidence);
+    TC_X509_crl_evidence* evidence);
 /* Read BasicConstraints, CRLDistributionPoints and issuerAltName from a target
  * whose path has already been validated to anchor_index. Try listed points,
  * then issuer DN and alternative names while coverage remains incomplete.
@@ -287,7 +287,7 @@ TC_TLV_result tc_cms_crl_certificate_process(
     size_t anchor_index, const TC_X509_path_options* options, const tc_pki_tree_workspace* tree,
     const TC_X509_path_workspace* validation, const TC_X509_search_workspace* search,
     uint8_t* states, size_t capacity, const tc_x509_crl_path_check* check,
-    tc_x509_crl_evidence* evidence);
+    TC_X509_crl_evidence* evidence);
 typedef struct {
   const tc_cms_candidates* candidates;
   const TC_X509_crl_index* index;
@@ -306,7 +306,7 @@ typedef struct {
 TC_TLV_result tc_cms_crl_resolve(const TC_X509_certificate* target,
                                  const tc_cms_crl_resolution* resolution,
                                  const tc_x509_crl_resolution_workspace* workspace,
-                                 tc_x509_crl_evidence* out);
+                                 TC_X509_crl_evidence* out);
 /* Check a previously validated path, anchor-issued first, target last.
  * The anchor is excluded. Hold chain spans outside search/validation scratch.
  * A revoked member supplies its index and evidence; an unrevoked path reports
@@ -335,5 +335,5 @@ TC_TLV_result tc_cms_crl_scope_process(
     const tc_x509_crl_query* query, const TC_X509_store_source* path_source, size_t anchor_index,
     const TC_X509_path_options* options, const tc_pki_tree_workspace* tree,
     const TC_X509_path_workspace* validation, const TC_X509_search_workspace* search,
-    uint8_t* states, size_t capacity, tc_x509_crl_evidence* evidence, TC_X509_search_result* out);
+    uint8_t* states, size_t capacity, TC_X509_crl_evidence* evidence, TC_X509_search_result* out);
 #endif

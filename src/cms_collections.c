@@ -402,8 +402,8 @@ TC_TLV_result tc_cms_certificate_search(const tc_cms_candidates* candidates,
 }
 
 TC_TLV_result tc_cms_crl_source_search(const void* candidates, const TC_X509_store_source* external,
-                                       const tc_x509_crl* crl,
-                                       const tc_x509_crl_extension_info* extensions,
+                                       const TC_X509_crl* crl,
+                                       const TC_X509_crl_extensions* extensions,
                                        const tc_x509_crl_trust* trust, tc_x509_crl_attempt attempt,
                                        const void* context, TC_X509_search_result* out,
                                        int* source_failed)
@@ -421,8 +421,8 @@ TC_TLV_result tc_cms_crl_source_search(const void* candidates, const TC_X509_sto
                                        source_failed);
 }
 
-TC_TLV_result tc_cms_crl_search(const void* candidates, const tc_x509_crl* crl,
-                                const tc_x509_crl_extension_info* extensions,
+TC_TLV_result tc_cms_crl_search(const void* candidates, const TC_X509_crl* crl,
+                                const TC_X509_crl_extensions* extensions,
                                 const tc_x509_crl_trust* trust, tc_x509_crl_attempt attempt,
                                 const void* context, TC_X509_search_result* out, int* source_failed)
 {

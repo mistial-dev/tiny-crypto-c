@@ -3,7 +3,8 @@
 #ifndef TC_PKI_READER_INTERNAL_H_
 #define TC_PKI_READER_INTERNAL_H_
 #include "pki_storage_internal.h"
-#include "x509_path_internal.h"
+#include "pki_budget_internal.h"
+#include <tiny_crypto/x509.h>
 
 enum {
   TC_PKI_READER_RANGES = 5,

@@ -4,7 +4,8 @@
 #define TC_PKI_HASH_PARTS_INTERNAL_H_
 #include "hash_dispatch_internal.h"
 #include "pki_tree_internal.h"
-#include "x509_path_internal.h"
+#include "pki_budget_internal.h"
+#include "pki_storage_internal.h"
 
 /* Callers preflight storage. Bounds and hashes borrowed parts in order. */
 static inline TC_TLV_result tc_pki_hash_parts(const TC_bytes* parts, size_t count,

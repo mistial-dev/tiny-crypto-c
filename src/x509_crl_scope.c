@@ -120,8 +120,8 @@ TC_TLV_result tc_x509_crl_scope_execute(const tc_x509_crl_operation_source* cand
   return result;
 }
 
-TC_TLV_result tc_x509_crl_source_search(const void* candidates, const tc_x509_crl* crl,
-                                        const tc_x509_crl_extension_info* extensions,
+TC_TLV_result tc_x509_crl_source_search(const void* candidates, const TC_X509_crl* crl,
+                                        const TC_X509_crl_extensions* extensions,
                                         const tc_x509_crl_trust* trust, tc_x509_crl_attempt attempt,
                                         const void* context, TC_X509_search_result* out,
                                         int* source_failed)
@@ -133,13 +133,11 @@ TC_TLV_result tc_x509_crl_source_search(const void* candidates, const tc_x509_cr
                         out, source_failed);
 }
 
-TC_TLV_result tc_x509_crl_store_source_search(const void* candidates,
-                                              const TC_X509_store_source* external,
-                                              const tc_x509_crl* crl,
-                                              const tc_x509_crl_extension_info* extensions,
-                                              const tc_x509_crl_trust* trust,
-                                              tc_x509_crl_attempt attempt, const void* context,
-                                              TC_X509_search_result* out, int* source_failed)
+TC_TLV_result
+tc_x509_crl_store_source_search(const void* candidates, const TC_X509_store_source* external,
+                                const TC_X509_crl* crl, const TC_X509_crl_extensions* extensions,
+                                const tc_x509_crl_trust* trust, tc_x509_crl_attempt attempt,
+                                const void* context, TC_X509_search_result* out, int* source_failed)
 {
   if (!candidates)
     return TC_TLV_ARGUMENT;
@@ -149,8 +147,8 @@ TC_TLV_result tc_x509_crl_store_source_search(const void* candidates,
                                        attempt, context, out, source_failed);
 }
 
-TC_TLV_result tc_x509_crl_store_search(const void* candidates, const tc_x509_crl* crl,
-                                       const tc_x509_crl_extension_info* extensions,
+TC_TLV_result tc_x509_crl_store_search(const void* candidates, const TC_X509_crl* crl,
+                                       const TC_X509_crl_extensions* extensions,
                                        const tc_x509_crl_trust* trust, tc_x509_crl_attempt attempt,
                                        const void* context, TC_X509_search_result* out,
                                        int* source_failed)
@@ -188,8 +186,8 @@ static TC_TLV_result x509_crl_attempt_candidate(const void* context,
 }
 
 TC_TLV_result tc_x509_crl_search_candidates(void* cursor, tc_pki_candidate_next next,
-                                            const tc_x509_crl* crl,
-                                            const tc_x509_crl_extension_info* extensions,
+                                            const TC_X509_crl* crl,
+                                            const TC_X509_crl_extensions* extensions,
                                             const tc_x509_crl_trust* trust,
                                             tc_x509_crl_attempt attempt, const void* context,
                                             TC_X509_search_result* out, int* source_failed)
@@ -217,8 +215,8 @@ TC_TLV_result tc_x509_crl_scopes(const void* candidates, tc_x509_crl_search sear
   const size_t reference = input->reference;
   if (reference > index->count || (!all_scopes && reference == index->count))
     return TC_TLV_ARGUMENT;
-  tc_x509_crl_status status;
-  tc_x509_crl_evidence* evidence = input->evidence;
+  TC_X509_revocation_status status;
+  TC_X509_crl_evidence* evidence = input->evidence;
   TC_TLV_result result = tc_x509_crl_evidence_status(evidence, &status);
   if (result != TC_TLV_OK)
     return result;
@@ -233,7 +231,7 @@ TC_TLV_result tc_x509_crl_scopes(const void* candidates, tc_x509_crl_search sear
   const TC_X509_path_workspace* validation = trust->validation;
   const size_t initial_work = *tree->work;
   tc_pki_distribution_point point;
-  tc_x509_crl_evidence pending = *evidence;
+  TC_X509_crl_evidence pending = *evidence;
   TC_X509_search_result found;
   TC_TLV_result failure = TC_TLV_END;
   int contributed = 0;
@@ -262,9 +260,10 @@ TC_TLV_result tc_x509_crl_scopes(const void* candidates, tc_x509_crl_search sear
         return result;
       result = record->policy;
       if (result == TC_TLV_OK) {
-        const tc_x509_crl_distribution* distribution =
-            record->extensions.present & TC_CRL_EXT_DISTRIBUTION ? &record->extensions.distribution
-                                                                 : NULL;
+        const TC_X509_crl_distribution* distribution =
+            record->extensions.present & TC_X509_CRL_EXT_DISTRIBUTION
+                ? &record->extensions.distribution
+                : NULL;
         /* Defer freshness checks until a delta has been selected. */
         result = tc_x509_crl_scope_reasons(&record->crl, distribution, current_query.point,
                                            query->certificate->issuer, current_query.certificate_ca,
@@ -361,7 +360,7 @@ TC_TLV_result tc_x509_crl_certificate_extension(void* context, const TC_X509_ext
     if (result != TC_TLV_OK)
       return result;
     /* fullName and issuerAltName carry the same GeneralNames contents. */
-    fields->alternative.name = (tc_pki_distribution_name){extension->value, contents, 0};
+    fields->alternative.name = (TC_X509_distribution_name){extension->value, contents, 0};
     return TC_TLV_OK;
   }
   default:
@@ -395,7 +394,8 @@ TC_TLV_result tc_x509_crl_scopes_index(const TC_X509_crl_index* index, const TC_
     if (tc_pki_work_charge(tree->work, distribution.length) != TC_TLV_OK)
       return TC_TLV_LIMIT;
     uint32_t hash = tc_x509_crl_bytes_hash(distribution);
-    hash = (hash ^ !!(record->extensions.present & TC_CRL_EXT_DISTRIBUTION)) * UINT32_C(16777619);
+    hash =
+        (hash ^ !!(record->extensions.present & TC_X509_CRL_EXT_DISTRIBUTION)) * UINT32_C(16777619);
     const size_t bucket = (size_t)hash % index->count;
     for (size_t cursor = slots[bucket].head; cursor != SIZE_MAX; cursor = slots[cursor].next) {
       const TC_X509_crl_record* previous = &index->records[cursor];
@@ -458,7 +458,7 @@ TC_TLV_result tc_x509_crl_group(const void* candidates, tc_x509_crl_search searc
     }
     if (!same)
       continue;
-    tc_x509_crl_evidence empty = {0};
+    TC_X509_crl_evidence empty = {0};
     tc_x509_crl_proposal candidate = {0}, unresolved = {0};
     TC_X509_search_result path;
     tc_x509_crl_scope_processing attempt = *processing;
@@ -563,7 +563,7 @@ TC_TLV_result tc_x509_crl_scope_attempt(const void* context, const TC_X509_certi
     }
   }
   cache.scopes = processing->scopes;
-  tc_x509_crl_evidence pending = *processing->evidence;
+  TC_X509_crl_evidence pending = *processing->evidence;
   tc_x509_crl_selected selected = {0};
   result = tc_x509_crl_scope_evaluate(&cache, processing->reference, processing->delta_policy,
                                       processing->order_policy, processing->query,
@@ -645,9 +645,9 @@ TC_TLV_result tc_x509_crl_proposal_merge(tc_x509_crl_proposal* chosen,
                          : TC_TLV_INVALID;
     return TC_TLV_OK;
   }
-  const tc_x509_crl* a =
+  const TC_X509_crl* a =
       candidate->selected.delta ? candidate->selected.delta : candidate->selected.base;
-  const tc_x509_crl* b = chosen->selected.delta ? chosen->selected.delta : chosen->selected.base;
+  const TC_X509_crl* b = chosen->selected.delta ? chosen->selected.delta : chosen->selected.base;
   result = tc_pki_work_charge(tree->work, 1);
   if (result != TC_TLV_OK)
     return result;
@@ -714,8 +714,8 @@ TC_TLV_result tc_x509_crl_index_attempt(const void* context, const TC_X509_certi
   return TC_TLV_OK;
 }
 
-TC_TLV_result tc_x509_crl_candidate_matches(const tc_x509_crl* crl,
-                                            const tc_x509_crl_extension_info* extensions,
+TC_TLV_result tc_x509_crl_candidate_matches(const TC_X509_crl* crl,
+                                            const TC_X509_crl_extensions* extensions,
                                             const TC_X509_certificate* candidate,
                                             const TC_TLV_limits* limits,
                                             const TC_X509_name_workspace* names,
@@ -728,7 +728,7 @@ TC_TLV_result tc_x509_crl_candidate_matches(const tc_x509_crl* crl,
       TC_X509_name_equal(crl->issuer, candidate->subject, limits, names, tree->work, &accepted);
   if (result != TC_TLV_OK)
     return result;
-  if (accepted && (extensions->present & TC_CRL_EXT_AUTHORITY)) {
+  if (accepted && (extensions->present & TC_X509_CRL_EXT_AUTHORITY)) {
     result =
         tc_pki_authority_matches(&extensions->authority, candidate, limits, tree, names, &accepted);
     if (result != TC_TLV_OK)

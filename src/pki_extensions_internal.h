@@ -3,7 +3,7 @@
 #ifndef TC_PKI_EXTENSIONS_INTERNAL_H_
 #define TC_PKI_EXTENSIONS_INTERNAL_H_
 #include "pki_internal.h"
-#include "x509_path_internal.h"
+#include "pki_budget_internal.h"
 #include "pki_tree_internal.h"
 #include "pki_spans_internal.h"
 

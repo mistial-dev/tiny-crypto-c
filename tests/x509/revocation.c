@@ -95,8 +95,8 @@ static MunitResult signer_search(const MunitParameter params[], void* user)
   const TC_X509_path_workspace validation = {0};
   const TC_X509_search_workspace search = {0};
   const TC_X509_store_source source = {NULL, 0, 1, NULL, tc_pki_source_guard_anchor};
-  const tc_x509_crl crl = {0};
-  const tc_x509_crl_extension_info extensions = {0};
+  const TC_X509_crl crl = {0};
+  const TC_X509_crl_extensions extensions = {0};
   const TC_TLV_result results[] = {TC_TLV_END, TC_TLV_INVALID, TC_TLV_LIMIT, TC_TLV_ARGUMENT};
   TC_X509_search_result out, saved;
   memset(&saved, 0xa5, sizeof saved);
@@ -283,7 +283,7 @@ static MunitResult indexed_scopes(const MunitParameter params[], void* user)
   (void)user;
   for (size_t i = 0; i < 4; ++i) {
     records[i].crl.issuer = (TC_bytes){issuer, sizeof issuer};
-    records[i].extensions.present = TC_CRL_EXT_DISTRIBUTION;
+    records[i].extensions.present = TC_X509_CRL_EXT_DISTRIBUTION;
     records[i].extensions.distribution_encoded = (TC_bytes){distribution, sizeof distribution};
   }
   records[2].crl.issuer = (TC_bytes){other, sizeof other};
@@ -303,8 +303,9 @@ static MunitResult dependency_status(const MunitParameter params[], void* user)
 {
   static const uint8_t encoded[] = {1, 2};
   const TC_bytes certificate = {encoded, sizeof encoded};
-  const tc_x509_crl_status statuses[] = {TC_X509_CRL_UNREVOKED, TC_X509_CRL_REVOKED,
-                                         TC_X509_CRL_UNDETERMINED, (tc_x509_crl_status)-1};
+  const TC_X509_revocation_status statuses[] = {TC_X509_CRL_UNREVOKED, TC_X509_CRL_REVOKED,
+                                                TC_X509_CRL_UNDETERMINED,
+                                                (TC_X509_revocation_status)-1};
   const TC_X509_path_status expected[] = {TC_X509_PATH_VALID, TC_X509_PATH_INVALID,
                                           TC_X509_PATH_UNSUPPORTED, TC_X509_PATH_ERROR};
   TC_X509_search_result path = {0};
@@ -399,7 +400,7 @@ typedef struct {
   unsigned scenario, calls;
 } resolution_fixture;
 
-static TC_TLV_result evaluate_node(void* context, size_t index, tc_x509_crl_evidence* evidence,
+static TC_TLV_result evaluate_node(void* context, size_t index, TC_X509_crl_evidence* evidence,
                                    int* stop)
 {
   resolution_fixture* state = context;
@@ -458,7 +459,7 @@ static MunitResult resolution(const MunitParameter params[], void* user)
     TC_X509_revocation_node nodes[2] = {0};
     size_t count = 1, work = 100;
     resolution_fixture state = {nodes, &count, &work, scenario, 0};
-    tc_x509_crl_evidence out, saved;
+    TC_X509_crl_evidence out, saved;
     memset(&out, 0xa5, sizeof out);
     memcpy(&saved, &out, sizeof out);
     munit_assert_int(
@@ -484,7 +485,7 @@ typedef struct {
 } path_fixture;
 
 static TC_TLV_result resolve_certificate(void* context, TC_bytes certificate,
-                                         tc_x509_crl_evidence* evidence)
+                                         TC_X509_crl_evidence* evidence)
 {
   path_fixture* state = context;
   munit_assert_size(certificate.length, ==, 1);
@@ -556,7 +557,7 @@ static MunitResult storage_spans(const MunitParameter params[], void* user)
     if (scenario == FRAME_OVERFLOW)
       tree.capacity = SIZE_MAX;
     const tc_x509_crl_trust trust = {&source, 0, &options, &tree, &validation, &search};
-    tc_x509_crl_evidence evidence = {0};
+    TC_X509_crl_evidence evidence = {0};
     tc_x509_crl_scope_processing processing = {0};
     processing.states = scenario == MISSING_STATES ? NULL : states;
     processing.capacity = sizeof states;
@@ -682,8 +683,8 @@ static MunitResult scope_inputs(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static TC_TLV_result unexpected_search(const void* candidates, const tc_x509_crl* crl,
-                                       const tc_x509_crl_extension_info* extensions,
+static TC_TLV_result unexpected_search(const void* candidates, const TC_X509_crl* crl,
+                                       const TC_X509_crl_extensions* extensions,
                                        const tc_x509_crl_trust* trust, tc_x509_crl_attempt attempt,
                                        const void* context, TC_X509_search_result* out, int* failed)
 {
@@ -731,8 +732,8 @@ static MunitResult scope_traversal(const MunitParameter params[], void* user)
     TC_X509_crl_index index = {0};
     index.records = &record;
     index.count = 1;
-    tc_x509_crl_evidence evidence = {0};
-    const tc_x509_crl_evidence before = evidence;
+    TC_X509_crl_evidence evidence = {0};
+    const TC_X509_crl_evidence before = evidence;
     tc_x509_crl_scope_processing processing = {0};
     processing.index = &index;
     processing.query = &query;
@@ -1045,7 +1046,7 @@ static MunitResult resolve_dependencies(const MunitParameter params[], void* use
     const size_t initial_count = path.dependency_count;
     resolution_fixture state = {nodes, &dependencies.count, &work,
                                 scenario == CYCLE ? RESOLVE_CYCLE : RESOLVE_CHAIN, 0};
-    tc_x509_crl_evidence out, saved;
+    TC_X509_crl_evidence out, saved;
     memset(&saved, 0xa5, sizeof saved);
     out = saved;
     const TC_TLV_result expected = scenario == CYCLE     ? TC_TLV_UNSUPPORTED
@@ -1106,7 +1107,7 @@ static MunitResult scope_arguments(const MunitParameter params[], void* user)
     index.records = &record;
     index.count = 1;
     tc_x509_crl_query query = {&certificate, &point, 0};
-    tc_x509_crl_evidence evidence = {0};
+    TC_X509_crl_evidence evidence = {0};
     uint8_t state = 0;
     tc_x509_crl_scope_processing processing = {&index,
                                                0,
@@ -1276,8 +1277,8 @@ static MunitResult store_search(const MunitParameter params[], void* user)
   const TC_TLV_result expected[] = {TC_TLV_INVALID,  TC_TLV_LIMIT, TC_TLV_LIMIT,    TC_TLV_LIMIT,
                                     TC_TLV_ARGUMENT, TC_TLV_MORE,  TC_TLV_ARGUMENT, TC_TLV_LIMIT};
   const uint8_t encoded[] = {0x30};
-  const tc_x509_crl crl = {0};
-  const tc_x509_crl_extension_info extensions = {0};
+  const TC_X509_crl crl = {0};
+  const TC_X509_crl_extensions extensions = {0};
   TC_TLV_frame frames[FRAME_CAPACITY];
   TC_X509_path_options options = {0};
   options.parsing = (TC_TLV_limits){WORK_BUDGET, WORK_BUDGET, ELEMENT_LIMIT, FRAME_CAPACITY};
@@ -1364,7 +1365,7 @@ static MunitResult store_search(const MunitParameter params[], void* user)
 
 static TC_TLV_result
 guarded_scope_search(const void* candidates, const TC_X509_store_source* external,
-                     const tc_x509_crl* crl, const tc_x509_crl_extension_info* extensions,
+                     const TC_X509_crl* crl, const TC_X509_crl_extensions* extensions,
                      const tc_x509_crl_trust* trust, tc_x509_crl_attempt attempt,
                      const void* context, TC_X509_search_result* out, int* source_failed)
 {
@@ -1415,8 +1416,8 @@ static MunitResult scope_operation(const MunitParameter params[], void* user)
     TC_X509_crl_index index = {0};
     index.records = &record;
     index.count = 1;
-    tc_x509_crl_evidence evidence = {0};
-    const tc_x509_crl_evidence initial = evidence;
+    TC_X509_crl_evidence evidence = {0};
+    const TC_X509_crl_evidence initial = evidence;
     uint8_t state = 0;
     const tc_x509_crl_scope_processing processing = {&index,
                                                      0,

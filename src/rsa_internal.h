@@ -7,8 +7,6 @@
 #include "hash_info_internal.h"
 #include <tiny_crypto/rsa.h>
 
-typedef TC_RSA_result tc_rsa_result;
-
 static inline int tc_rsa_supported_modulus_size(size_t length)
 {
   return length == 128 || length == 256 || length == 384 || length == TC_RSA_MAX_MODULUS_BYTES;
@@ -19,7 +17,7 @@ static inline int tc_rsa_supported_bits(size_t bits)
   return bits % 8 == 0 && tc_rsa_supported_modulus_size(bits / 8);
 }
 
-static inline tc_rsa_result tc_rsa_public_key_check(const uint8_t* modulus, size_t length,
+static inline TC_RSA_result tc_rsa_public_key_check(const uint8_t* modulus, size_t length,
                                                     const uint8_t* exponent, size_t exponent_length)
 {
   if (!modulus || !exponent)
@@ -43,7 +41,7 @@ static inline tc_rsa_result tc_rsa_public_key_check(const uint8_t* modulus, size
  * is computed here; each has a size-bounded loop. Prepared R² belongs to the
  * same unchanged modulus and stays outside scratch.
  * Output changes only on OK. Validation covers encodings and numeric bounds. */
-static inline tc_rsa_result tc_rsa_public_operation(const uint8_t* modulus, size_t length,
+static inline TC_RSA_result tc_rsa_public_operation(const uint8_t* modulus, size_t length,
                                                     const uint8_t* exponent, size_t exponent_length,
                                                     const uint8_t* input, uint8_t* out,
                                                     tc_mp_word* scratch, size_t scratch_words,
@@ -53,7 +51,7 @@ static inline tc_rsa_result tc_rsa_public_operation(const uint8_t* modulus, size
   tc_mp_word *p, *base, *one, *result, *temporary, *reduced, *product, factor;
   if (!modulus || !exponent || !input || !out || !scratch || !work)
     return TC_RSA_ARGUMENT;
-  tc_rsa_result checked = tc_rsa_public_key_check(modulus, length, exponent, exponent_length);
+  TC_RSA_result checked = tc_rsa_public_key_check(modulus, length, exponent, exponent_length);
   if (checked != TC_RSA_OK)
     return checked;
   if (memcmp(input, modulus, length) >= 0)
@@ -94,7 +92,7 @@ static inline tc_rsa_result tc_rsa_public_operation(const uint8_t* modulus, size
 /* digest is a precomputed hash. No key-size acceptance policy
  * is implied. Scratch needs 9n+2 limbs, including the recovered representative.
  * Other storage preconditions match tc_rsa_public_operation. */
-static inline tc_rsa_result tc_rsa_verify_v15(const uint8_t* modulus, size_t length,
+static inline TC_RSA_result tc_rsa_verify_v15(const uint8_t* modulus, size_t length,
                                               const uint8_t* exponent, size_t exponent_length,
                                               const uint8_t* signature, size_t signature_length,
                                               TC_hash_algorithm hash, const uint8_t* digest,
@@ -104,7 +102,7 @@ static inline tc_rsa_result tc_rsa_verify_v15(const uint8_t* modulus, size_t len
 {
   size_t n, arithmetic_words;
   uint8_t* encoded;
-  tc_rsa_result result;
+  TC_RSA_result result;
   TC_status checked;
   tc_hash_info info;
   if (!modulus || !exponent || !signature || !digest || !scratch || !work)

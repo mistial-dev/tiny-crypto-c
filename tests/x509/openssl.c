@@ -264,7 +264,7 @@ static TC_TLV_result store_candidate(void* context, size_t index, size_t* work, 
 }
 
 static TC_TLV_result store_anchor(void* context, size_t index, size_t* work,
-                                  tc_x509_search_anchor* out)
+                                  TC_X509_store_anchor* out)
 {
   test_search_store* store = context;
   TC_TLV_result result = store_read(store, 1, work);
@@ -297,17 +297,17 @@ static TC_TLV_result store_indexed_anchor(void* context, size_t index, size_t* w
   return result;
 }
 
-static void snapshot_discovery(TC_bytes target, const tc_x509_search_source* source,
+static void snapshot_discovery(TC_bytes target, const TC_X509_store_source* source,
                                const TC_X509_path_options* options,
                                const TC_X509_path_workspace* workspace)
 {
   TC_X509_store trust_store = {0};
   TC_X509_store_snapshot slots[2] = {0}, *held, *current;
-  tc_x509_search_source untrusted = *source;
+  TC_X509_store_source untrusted = *source;
   TC_bytes paths[3], retained_key;
-  tc_x509_search_frame frames[3];
-  tc_x509_search_workspace search = {paths, frames, 3};
-  tc_x509_search_result result, saved;
+  TC_X509_search_frame frames[3];
+  TC_X509_search_workspace search = {paths, frames, 3};
+  TC_X509_search_result result, saved;
   TC_X509_path_options bounded = *options;
   bounded.max_work = 2000000;
   untrusted.anchor_count = 0;
@@ -375,9 +375,9 @@ static void alternate_issuers(X509* const certs[4], EVP_PKEY* const keys[4], con
   X509* wrong = X509_dup(certs[2]);
   X509* wrong_chain[4] = {certs[0], certs[1], wrong, certs[3]};
   TC_bytes candidates[3], slots[3];
-  tc_x509_search_frame frames[3];
-  tc_x509_search_workspace search = {slots, frames, 3};
-  tc_x509_search_result found, saved;
+  TC_X509_search_frame frames[3];
+  TC_X509_search_workspace search = {slots, frames, 3};
+  TC_X509_search_result found, saved;
   TC_X509_trust_anchor anchors[2] = {*anchor, *anchor};
   TC_X509_path_options bounded = *options;
   TC_X509_certificate wrong_parsed;
@@ -526,7 +526,7 @@ static void alternate_issuers(X509* const certs[4], EVP_PKEY* const keys[4], con
   munit_assert_memory_equal(sizeof found, &found, &saved);
   {
     test_search_store store = {candidates, anchor, TC_TLV_OK, 0, 0, 0, 0, {{NULL, 0}, {NULL, 0}}};
-    tc_x509_search_source source = {&store, 3, 1, store_candidate, store_anchor};
+    TC_X509_store_source source = {&store, 3, 1, store_candidate, store_anchor};
     snapshot_discovery(encoded_path[2], &source, options, workspace);
     static const TC_TLV_result failures[] = {TC_TLV_ARGUMENT, TC_TLV_END, TC_TLV_LIMIT,
                                              TC_TLV_UNSUPPORTED};
@@ -675,9 +675,9 @@ static void cross_signed_issuer(X509* const certs[4], const char* group, const E
   X509* oracle[4];
   uint8_t root_der[2048], cross_der[2048];
   TC_bytes candidates[3], slots[3];
-  tc_x509_search_frame frames[3];
-  tc_x509_search_workspace search = {slots, frames, 3};
-  tc_x509_search_result found, saved;
+  TC_X509_search_frame frames[3];
+  TC_X509_search_workspace search = {slots, frames, 3};
+  TC_X509_search_result found, saved;
   TC_X509_certificate root;
   TC_X509_trust_anchor foreign_anchor;
   TC_X509_workspace parser = {workspace->frames, workspace->frame_capacity, workspace->oids,
@@ -868,9 +868,9 @@ static MunitResult paths(const MunitParameter params[], void* user)
           const uint8_t initial_oid[] = {0x2a, 3, 4}, wrong_oid[] = {0x2a, 3, 5};
           TC_bytes initial = {scenario == 11 ? wrong_oid : initial_oid, 3};
           tc_x509_policy_options options = {&initial, 1, 1, scenario == 10, scenario == 13};
-          tc_x509_policy_node nodes[16];
-          tc_x509_policy_edge edges[32];
-          tc_x509_policy_expected expected[16];
+          TC_X509_policy_node nodes[16];
+          TC_X509_policy_edge edges[32];
+          TC_X509_policy_expected expected[16];
           tc_x509_policy_graph graph = {nodes, 16, 0, edges, 32, 0, expected, 16, 0, 0};
           TC_bytes policies[8], output[8];
           TC_X509_policy_mapping mappings[8];
@@ -1090,9 +1090,9 @@ static MunitResult paths(const MunitParameter params[], void* user)
           if (wanted != TC_X509_PATH_VALID)
             munit_assert_memory_equal(sizeof explicit_result, &explicit_result, &unchanged);
           TC_bytes discovered[3], candidates[2] = {encoded_path[1], encoded_path[0]};
-          tc_x509_search_frame search_frames[3];
-          tc_x509_search_workspace search = {discovered, search_frames, 3};
-          tc_x509_search_result found, preserved;
+          TC_X509_search_frame search_frames[3];
+          TC_X509_search_workspace search = {discovered, search_frames, 3};
+          TC_X509_search_result found, preserved;
           size_t budget = 2000000;
           memset(&preserved, 0xa5, sizeof preserved);
           memcpy(&found, &preserved, sizeof found);
@@ -1168,9 +1168,9 @@ static MunitResult paths(const MunitParameter params[], void* user)
                                 &options, &workspace);
             TC_bytes path_slots[4],
                 candidates[3] = {encoded_path[1], encoded_path[2], encoded_path[0]};
-            tc_x509_search_frame search_frames[4];
-            tc_x509_search_workspace search = {path_slots, search_frames, 4};
-            tc_x509_search_result found, saved;
+            TC_X509_search_frame search_frames[4];
+            TC_X509_search_workspace search = {path_slots, search_frames, 4};
+            TC_X509_search_result found, saved;
             size_t budget = 2000000, consumed;
             memset(&found, 0xa5, sizeof found);
             memcpy(&saved, &found, sizeof saved);

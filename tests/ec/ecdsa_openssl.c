@@ -1,7 +1,6 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/ec.h>
-#include "../../src/pki_verify_internal.h"
 #include "munit.h"
 #include <openssl/evp.h>
 #include <openssl/ec.h>
@@ -44,31 +43,6 @@ static MunitResult verify(const MunitParameter params[], void* data)
       munit_assert_int(TC_ECDSA_verify_digest(curves[c], public_key, public_len, digest, digest_len,
                                               signature, 2 * bytes, &workspace),
                        ==, TC_OK);
-      {
-        TC_X509_public_key issuer = {0};
-        TC_signature_algorithm algorithm = {TC_SIGNATURE_ECDSA, TC_HASH_SHA256, TC_HASH_UNKNOWN, 0};
-        algorithm.hash = j == 0   ? TC_HASH_SHA1
-                         : j == 1 ? TC_HASH_SHA256
-                         : j == 2 ? TC_HASH_SHA384
-                                  : TC_HASH_SHA512;
-        issuer.type = TC_KEY_EC;
-        issuer.curve = curves[c];
-        issuer.key = (TC_bytes){public_key, public_len};
-        munit_assert_int(tc_pki_verify_digest(&algorithm, &issuer, (TC_bytes){digest, digest_len},
-                                              (TC_bytes){encoded, encoded_len}, &workspace, NULL,
-                                              32768),
-                         ==, TC_X509_SIGNATURE_VALID);
-        munit_assert_int(tc_pki_verify_digest(&algorithm, &issuer, (TC_bytes){digest, digest_len},
-                                              (TC_bytes){encoded, encoded_len}, &workspace, NULL,
-                                              0),
-                         ==, TC_X509_SIGNATURE_LIMIT);
-        digest[0] ^= 1;
-        munit_assert_int(tc_pki_verify_digest(&algorithm, &issuer, (TC_bytes){digest, digest_len},
-                                              (TC_bytes){encoded, encoded_len}, &workspace, NULL,
-                                              32768),
-                         ==, TC_X509_SIGNATURE_INVALID);
-        digest[0] ^= 1;
-      }
       for (size_t k = 0; k < sizeof workspace; ++k)
         munit_assert_uint8(((uint8_t*)&workspace)[k], ==, 0);
       digest[0] ^= 1;

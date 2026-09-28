@@ -17,7 +17,7 @@ static MunitResult identifiers(const MunitParameter params[], void* user)
                                       0x55, 4,  3,    0x0c, 1,    'A', 2,    1, 1};
   const TC_TLV_limits limits = {256, 256, 64, 8};
   TC_TLV_frame frames[8];
-  tc_cms_signer_info result, saved;
+  TC_CMS_signer_info result, saved;
   uint8_t input[64];
   size_t work = 1000;
   (void)params;
@@ -70,7 +70,7 @@ static MunitResult attributes(const MunitParameter params[], void* user)
   static const uint8_t attribute[] = {0xa0, 11, 0x30, 9, 6, 2, 0x2a, 3, 0x31, 3, 4, 1, 0xcc};
   const TC_TLV_limits limits = {256, 256, 64, 8};
   TC_TLV_frame frames[8];
-  tc_cms_signer_info result, saved;
+  TC_CMS_signer_info result, saved;
   uint8_t input[64];
   (void)params;
   (void)user;
@@ -133,7 +133,7 @@ static MunitResult malformed(const MunitParameter params[], void* user)
   static const uint8_t replacements[] = {1, 0xa0, 0x31, 0x31, 3};
   const TC_TLV_limits limits = {256, 256, 64, 8};
   TC_TLV_frame frames[8];
-  tc_cms_signer_info result, saved;
+  TC_CMS_signer_info result, saved;
   uint8_t input[sizeof signer];
   size_t work;
   (void)params;
@@ -156,7 +156,7 @@ static MunitResult malformed(const MunitParameter params[], void* user)
                      !=, TC_TLV_OK);
     munit_assert_memory_equal(sizeof result, &result, &saved);
   }
-  tc_cms_signer_info valid;
+  TC_CMS_signer_info valid;
   work = WORK_BUDGET;
   munit_assert_int(TC_CMS_signer_info_read((TC_bytes){signer, sizeof signer}, TC_TLV_DER, &limits,
                                            frames, 8, &work, &valid),
@@ -189,7 +189,7 @@ static MunitResult ber_fields(const MunitParameter params[], void* user)
       0x2a, 3,    0,   0, 0x30, 0x80, 6,    2,    0x2a, 3,    0,    0,    4,    1, 0xbb, 0,    0};
   const TC_TLV_limits limits = {WORK_BUDGET, WORK_BUDGET, 64, FRAME_CAPACITY};
   TC_TLV_frame frames[FRAME_CAPACITY];
-  tc_cms_signer_info result, saved;
+  TC_CMS_signer_info result, saved;
   size_t work = WORK_BUDGET;
   (void)params;
   (void)user;
@@ -645,7 +645,7 @@ static MunitResult certificate_identifiers(const MunitParameter params[], void* 
   size_t work = WORK_BUDGET;
   const tc_pki_tree_workspace tree = {frames, FRAME_CAPACITY, &work};
   TC_X509_certificate certificate = {0};
-  tc_cms_signer_info info = {0};
+  TC_CMS_signer_info info = {0};
   int matched;
   (void)params;
   (void)user;

@@ -22,14 +22,15 @@ TC_TLV_result tc_x509_crl_delta_next(const TC_X509_crl_index* index, size_t base
   const TC_X509_crl_record* complete = &index->records[base];
   if (complete->policy != TC_TLV_OK)
     return complete->policy;
-  if (complete->extensions.present & TC_CRL_EXT_DELTA)
+  if (complete->extensions.present & TC_X509_CRL_EXT_DELTA)
     return TC_TLV_ARGUMENT;
   for (size_t i = *cursor; i < index->count; ++i) {
     TC_TLV_result result = tc_pki_work_charge(tree->work, 1);
     if (result != TC_TLV_OK)
       return result;
     const TC_X509_crl_record* delta = &index->records[i];
-    if (i == base || delta->policy != TC_TLV_OK || !(delta->extensions.present & TC_CRL_EXT_DELTA))
+    if (i == base || delta->policy != TC_TLV_OK ||
+        !(delta->extensions.present & TC_X509_CRL_EXT_DELTA))
       continue;
     int compatible;
     result = tc_x509_crl_delta_compatible(&complete->crl, &complete->extensions, &delta->crl,
@@ -211,7 +212,7 @@ x509_crl_effective_next(const tc_x509_crl_signature_cache* cache, size_t referen
     if (result != TC_TLV_OK)
       return result;
     const TC_X509_crl_record* base = &cache->index->records[i];
-    if (base->policy != TC_TLV_OK || (base->extensions.present & TC_CRL_EXT_DELTA))
+    if (base->policy != TC_TLV_OK || (base->extensions.present & TC_X509_CRL_EXT_DELTA))
       continue;
     int same_scope;
     if (cache->scopes)
@@ -328,12 +329,12 @@ TC_TLV_result tc_x509_crl_scope_evaluate(const tc_x509_crl_signature_cache* cach
                                          TC_X509_crl_order_policy order_policy,
                                          const tc_x509_crl_query* query, const TC_X509_time* at,
                                          const tc_pki_tree_workspace* tree, TC_bytes* oids,
-                                         size_t oid_capacity, tc_x509_crl_evidence* evidence,
+                                         size_t oid_capacity, TC_X509_crl_evidence* evidence,
                                          tc_x509_crl_selected* preference)
 {
-  tc_x509_crl_status status;
+  TC_X509_revocation_status status;
   tc_x509_crl_selected selected;
-  tc_x509_crl_evidence chosen = {0};
+  TC_X509_crl_evidence chosen = {0};
   const TC_X509_time* update = NULL;
   tc_x509_crl_selected latest;
   size_t cursor = 0;
@@ -359,7 +360,7 @@ TC_TLV_result tc_x509_crl_scope_evaluate(const tc_x509_crl_signature_cache* cach
     return TC_TLV_INVALID;
   while ((result = x509_crl_effective_next(cache, reference, &cursor, delta_policy, at, tree,
                                            &conflict, &selected)) == TC_TLV_OK) {
-    const tc_x509_crl* effective = selected.delta ? selected.delta : selected.base;
+    const TC_X509_crl* effective = selected.delta ? selected.delta : selected.base;
     int order, equal;
     result = x509_crl_order(&selected, &latest, order_policy, tree->work, &order);
     if (result != TC_TLV_OK)
@@ -368,7 +369,7 @@ TC_TLV_result tc_x509_crl_scope_evaluate(const tc_x509_crl_signature_cache* cach
       continue;
     if (conflict)
       return TC_TLV_INVALID;
-    tc_x509_crl_evidence candidate = {0};
+    TC_X509_crl_evidence candidate = {0};
     result = tc_x509_crl_apply(&selected, query, at, cache->limits, tree, cache->names, oids,
                                oid_capacity, &candidate);
     if (result == TC_TLV_END)
@@ -403,7 +404,7 @@ TC_TLV_result tc_x509_crl_scope_apply(const tc_x509_crl_signature_cache* cache, 
                                       TC_X509_crl_order_policy order_policy,
                                       const tc_x509_crl_query* query, const TC_X509_time* at,
                                       const tc_pki_tree_workspace* tree, TC_bytes* oids,
-                                      size_t oid_capacity, tc_x509_crl_evidence* evidence)
+                                      size_t oid_capacity, TC_X509_crl_evidence* evidence)
 {
   return tc_x509_crl_scope_evaluate(cache, reference, delta_policy, order_policy, query, at, tree,
                                     oids, oid_capacity, evidence, NULL);

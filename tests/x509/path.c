@@ -329,9 +329,9 @@ static MunitResult policy_graph(const MunitParameter params[], void* user)
   TC_bytes policies[] = {{oid_bytes[0], 2}, {oid_bytes[1], 2}, {oid_bytes[2], 2}};
   TC_bytes any = {any_bytes, sizeof any_bytes};
   TC_X509_policy_mapping mappings[] = {{policies[0], policies[2]}, {policies[1], policies[2]}};
-  tc_x509_policy_node nodes[32];
-  tc_x509_policy_edge edges[64];
-  tc_x509_policy_expected expected[64];
+  TC_X509_policy_node nodes[32];
+  TC_X509_policy_edge edges[64];
+  TC_X509_policy_expected expected[64];
   tc_x509_policy_graph graph = {nodes, 32, 0, edges, 64, 0, expected, 64, 0, 0};
   size_t work = 100000, required, budget, i;
   (void)params;
@@ -457,9 +457,9 @@ static MunitResult policies(const MunitParameter params[], void* user)
   uint32_t left[32], right[32];
   uint8_t used[4];
   TC_X509_name_workspace names = {left, right, 32, used, 4};
-  tc_x509_policy_node nodes[8];
-  tc_x509_policy_edge edges[8];
-  tc_x509_policy_expected expected[8];
+  TC_X509_policy_node nodes[8];
+  TC_X509_policy_edge edges[8];
+  TC_X509_policy_expected expected[8];
   tc_x509_policy_graph graph = {nodes, 8, 0, edges, 8, 0, expected, 8, 0, 0};
   TC_bytes policy_scratch[4], output[4];
   TC_X509_policy_mapping mappings[4];

@@ -4,15 +4,12 @@
 #define TC_X509_POLICY_INTERNAL_H_
 #include <tiny_crypto/x509_path.h>
 
-typedef TC_X509_policy_node tc_x509_policy_node;
-typedef TC_X509_policy_edge tc_x509_policy_edge;
-typedef TC_X509_policy_expected tc_x509_policy_expected;
 typedef struct {
-  tc_x509_policy_node* nodes;
+  TC_X509_policy_node* nodes;
   size_t node_capacity, node_count;
-  tc_x509_policy_edge* edges;
+  TC_X509_policy_edge* edges;
   size_t edge_capacity, edge_count;
-  tc_x509_policy_expected* expected;
+  TC_X509_policy_expected* expected;
   size_t expected_capacity, expected_count;
   size_t depth;
 } tc_x509_policy_graph;

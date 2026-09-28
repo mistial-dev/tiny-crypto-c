@@ -6,7 +6,7 @@
 #include "pki_bits_internal.h"
 
 typedef struct {
-  tc_pki_distribution_name name;
+  TC_X509_distribution_name name;
   TC_bytes issuer;
   uint16_t reasons;
   int has_reasons;

@@ -62,9 +62,6 @@ TC_X509_path_status tc_x509_path_validate_anchor(const TC_bytes* chain, size_t c
                                                  const TC_X509_path_workspace* workspace,
                                                  size_t* work, TC_X509_path_result* out);
 
-typedef TC_X509_search_frame tc_x509_search_frame;
-typedef TC_X509_search_workspace tc_x509_search_workspace;
-typedef TC_X509_search_result tc_x509_search_result;
 enum {
   TC_X509_PATH_STORAGE_FRAMES,
   TC_X509_PATH_STORAGE_OIDS,
@@ -90,15 +87,13 @@ void tc_x509_policy_plan_inputs(tc_pki_storage_plan* plan, const TC_bytes* initi
                                 const TC_X509_name_constraints* anchor_names);
 void tc_x509_path_options_plan_inputs(tc_pki_storage_plan* plan,
                                       const TC_X509_path_options* options);
-typedef TC_X509_store_anchor tc_x509_search_anchor;
-typedef TC_X509_store_source tc_x509_search_source;
 /* Callbacks consume work without increasing it. Returned spans reference a stable
  * snapshot through validation and result use. Read errors terminate the search. */
-TC_X509_path_status tc_x509_path_search_source(TC_bytes target, const tc_x509_search_source* source,
+TC_X509_path_status tc_x509_path_search_source(TC_bytes target, const TC_X509_store_source* source,
                                                const TC_X509_path_options* options,
                                                const TC_X509_path_workspace* validation,
-                                               const tc_x509_search_workspace* search, size_t* work,
-                                               tc_x509_search_result* out);
+                                               const TC_X509_search_workspace* search, size_t* work,
+                                               TC_X509_search_result* out);
 /* Internal engine: caller validates storage ranges and keeps input/store records
  * stable and disjoint from both workspaces, work, and out. Path storage is scratch.
  * Successful output borrows its suffix in anchor-issued-first order. */
@@ -106,8 +101,8 @@ TC_X509_path_status tc_x509_path_search(TC_bytes target, const TC_bytes* candida
                                         size_t candidate_count, const TC_X509_trust_anchor* anchors,
                                         size_t anchor_count, const TC_X509_path_options* options,
                                         const TC_X509_path_workspace* validation,
-                                        const tc_x509_search_workspace* search, size_t* work,
-                                        tc_x509_search_result* out);
+                                        const TC_X509_search_workspace* search, size_t* work,
+                                        TC_X509_search_result* out);
 
 typedef struct {
   /* Anchor-issued certificate first, target last. Optional parsed-view cache. */

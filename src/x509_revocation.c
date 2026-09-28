@@ -16,7 +16,7 @@ TC_TLV_result tc_x509_crl_resolve_dependencies(TC_bytes target,
                                                tc_x509_crl_dependencies* dependencies,
                                                tc_x509_crl_node_evaluate evaluate, void* context,
                                                tc_x509_crl_held_path* path,
-                                               tc_x509_crl_evidence* out)
+                                               TC_X509_crl_evidence* out)
 {
   if (!dependencies || !dependencies->workspace || !dependencies->workspace->tree ||
       !dependencies->workspace->tree->work || !evaluate || !out)
@@ -29,7 +29,7 @@ TC_TLV_result tc_x509_crl_resolve_dependencies(TC_bytes target,
     return result;
   if (workspace->nodes[root].status == TC_X509_CRL_UNREVOKED) {
     /* A proven node already covers every revocation reason. */
-    tc_x509_crl_evidence evidence = {0};
+    TC_X509_crl_evidence evidence = {0};
     evidence.reasons = TC_X509_CRL_ALL_REASONS;
     *out = evidence;
     return TC_TLV_OK;
@@ -116,11 +116,11 @@ TC_TLV_result tc_x509_crl_path_resolve(const TC_bytes* chain, size_t count,
     return result;
   TC_X509_revocation_result proposed = {TC_X509_CRL_UNREVOKED, SIZE_MAX, {0}};
   for (size_t i = 0; i < count; ++i) {
-    tc_x509_crl_evidence evidence = {0};
+    TC_X509_crl_evidence evidence = {0};
     result = resolve(context, chain[i], &evidence);
     if (result != TC_TLV_OK)
       return result;
-    tc_x509_crl_status status;
+    TC_X509_revocation_status status;
     result = tc_x509_crl_evidence_status(&evidence, &status);
     if (result != TC_TLV_OK)
       return result;
@@ -140,7 +140,7 @@ TC_TLV_result tc_x509_crl_path_resolve(const TC_bytes* chain, size_t count,
 TC_TLV_result tc_x509_crl_nodes_resolve(TC_X509_revocation_node* nodes, size_t capacity,
                                         size_t* count, size_t root, size_t* work,
                                         tc_x509_crl_node_evaluate evaluate, void* context,
-                                        tc_x509_crl_evidence* out)
+                                        TC_X509_crl_evidence* out)
 {
   if (!nodes || !count || !work || !evaluate || !out || *count > capacity || root >= *count)
     return TC_TLV_ARGUMENT;
@@ -152,7 +152,7 @@ TC_TLV_result tc_x509_crl_nodes_resolve(TC_X509_revocation_node* nodes, size_t c
       /* Re-evaluate the root to recover its revocation reason and date. */
       if (i != root && nodes[i].status != TC_X509_CRL_UNDETERMINED)
         continue;
-      tc_x509_crl_evidence evidence = {0};
+      TC_X509_crl_evidence evidence = {0};
       int stop = 0;
       const size_t before_work = *work, before_count = *count;
       TC_TLV_result result = evaluate(context, i, &evidence, &stop);
@@ -170,7 +170,7 @@ TC_TLV_result tc_x509_crl_nodes_resolve(TC_X509_revocation_node* nodes, size_t c
         root_result = result;
       if (result != TC_TLV_OK)
         continue;
-      tc_x509_crl_status status;
+      TC_X509_revocation_status status;
       result = tc_x509_crl_evidence_status(&evidence, &status);
       if (result != TC_TLV_OK)
         return result;
@@ -197,7 +197,7 @@ typedef struct {
 } x509_crl_node_context;
 
 static TC_TLV_result x509_crl_node_evaluate(void* context, size_t index,
-                                            tc_x509_crl_evidence* evidence, int* stop)
+                                            TC_X509_crl_evidence* evidence, int* stop)
 {
   const x509_crl_node_context* node = context;
   const tc_x509_crl_resolution* resolution = node->resolution;
@@ -210,7 +210,7 @@ static TC_TLV_result x509_crl_node_evaluate(void* context, size_t index,
   }
   const tc_pki_distribution_point fallback = {0};
   const tc_x509_crl_query query = {&certificate, &fallback, 0};
-  tc_x509_crl_evidence pending = {0};
+  TC_X509_crl_evidence pending = {0};
   TC_X509_search_result scratch;
   tc_x509_crl_scope_processing processing = {resolution->index,
                                              0,
@@ -240,7 +240,7 @@ static TC_TLV_result x509_crl_node_evaluate(void* context, size_t index,
 TC_TLV_result tc_x509_crl_resolve(const TC_X509_certificate* target,
                                   const tc_x509_crl_resolution* resolution,
                                   const tc_x509_crl_resolution_workspace* workspace,
-                                  tc_x509_crl_held_path* path, tc_x509_crl_evidence* out)
+                                  tc_x509_crl_held_path* path, TC_X509_crl_evidence* out)
 {
   if (!target || !resolution || !workspace || !out || !target->encoded.data ||
       !target->encoded.length || !resolution->candidates)
@@ -278,7 +278,7 @@ TC_TLV_result tc_x509_crl_resolve(const TC_X509_certificate* target,
   extra.source_failed = &source_failed;
   TC_bytes writes[CRL_SCOPE_WRITES];
   TC_X509_store_anchor anchor;
-  tc_x509_crl_evidence pending = {0};
+  TC_X509_crl_evidence pending = {0};
   tc_x509_crl_dependencies dependencies = {resolution->options,
                                            resolution->anchor_index,
                                            workspace,
@@ -328,7 +328,7 @@ typedef struct {
 } x509_crl_path_context;
 
 static TC_TLV_result x509_crl_path_certificate(void* context, TC_bytes encoded,
-                                               tc_x509_crl_evidence* evidence)
+                                               TC_X509_crl_evidence* evidence)
 {
   const x509_crl_path_context* path = context;
   TC_X509_certificate certificate = {0};
@@ -442,7 +442,7 @@ TC_X509_signature_result tc_x509_crl_selected_anchor_check(
 {
   if (!selected || !selected->base || !anchor || !provider || !limits || !names || !work)
     return TC_X509_SIGNATURE_ERROR;
-  const tc_x509_crl* records[] = {selected->base, selected->delta};
+  const TC_X509_crl* records[] = {selected->base, selected->delta};
   for (size_t i = 0; i < sizeof records / sizeof *records; ++i) {
     if (!records[i])
       continue;

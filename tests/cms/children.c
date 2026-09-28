@@ -54,7 +54,7 @@ static MunitResult envelope(const MunitParameter params[], void* user)
                        0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 1,    7,    1,    0x31, 0,  0, 0};
   TC_TLV_limits limits = {128, 128, 32, 8};
   TC_TLV_frame frames[8];
-  tc_cms_signed_data result, saved;
+  TC_CMS_signed_data result, saved;
   size_t work;
   (void)params;
   (void)user;
@@ -153,7 +153,7 @@ static MunitResult versions(const MunitParameter params[], void* user)
   TC_TLV_frame frames[FRAME_CAPACITY];
   size_t work;
   const tc_pki_tree_workspace tree = {frames, FRAME_CAPACITY, &work};
-  tc_cms_signed_data input = {0};
+  TC_CMS_signed_data input = {0};
   (void)params;
   (void)user;
   input.content_type = (TC_bytes){content_type, sizeof content_type};

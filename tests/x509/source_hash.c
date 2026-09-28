@@ -216,7 +216,7 @@ static MunitResult public_crl(const MunitParameter params[], void* user)
                                          UINT64_MAX, UINT64_MAX),
                    ==, TC_RESULT_OK);
   tc_x509_crl_layout layout;
-  tc_x509_crl crl;
+  TC_X509_crl crl;
   size_t work = 1000000;
   const tc_pki_tree_workspace tree = {frames, FRAME_COUNT, &work};
   munit_assert_int(tc_x509_crl_source_layout(&reader, &layout), ==, TC_TLV_OK);
@@ -224,7 +224,7 @@ static MunitResult public_crl(const MunitParameter params[], void* user)
                                                (TC_buffer){metadata, sizeof metadata}, &limits,
                                                &tree, &crl),
                    ==, TC_TLV_OK);
-  tc_x509_crl_extension_info extensions;
+  TC_X509_crl_extensions extensions;
   munit_assert_int(
       tc_x509_crl_extension_info_read(crl.extensions, &limits, &tree, oids, OID_COUNT, &extensions),
       ==, TC_TLV_OK);

@@ -52,7 +52,7 @@ static TC_TLV_result node(tc_x509_policy_graph* graph, size_t depth, TC_bytes oi
                           size_t* index)
 {
   TC_TLV_result result = tc_pki_work_charge(work, 1);
-  tc_x509_policy_node* added;
+  TC_X509_policy_node* added;
   if (result != TC_TLV_OK)
     return result;
   if (graph->node_count == graph->node_capacity)
@@ -419,7 +419,7 @@ TC_TLV_result tc_x509_policy_graph_output(const tc_x509_policy_graph* graph,
       return result;
   }
   for (i = 0; i < graph->node_count; ++i) {
-    const tc_x509_policy_node* node = &graph->nodes[i];
+    const TC_X509_policy_node* node = &graph->nodes[i];
     TC_TLV_result result;
     int authority = 0, wildcard;
     if (tc_pki_work_charge(work, 1) != TC_TLV_OK)

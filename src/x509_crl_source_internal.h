@@ -27,7 +27,7 @@ TC_TLV_result tc_x509_crl_source_layout(tc_source_reader* reader, tc_x509_crl_la
 TC_TLV_result tc_x509_crl_source_metadata(tc_source_reader* reader,
                                           const tc_x509_crl_layout* layout, TC_buffer storage,
                                           const TC_TLV_limits* limits,
-                                          const tc_pki_tree_workspace* tree, tc_x509_crl* out);
+                                          const tc_pki_tree_workspace* tree, TC_X509_crl* out);
 
 typedef struct {
   uint64_t cursor, end, remaining;
@@ -49,7 +49,7 @@ TC_TLV_result tc_x509_crl_source_entry_next(tc_source_reader* reader,
 
 typedef struct {
   tc_x509_crl_source_entries entries;
-  const tc_x509_crl_extension_info* extensions;
+  const TC_X509_crl_extensions* extensions;
   tc_x509_crl_entry_issuer issuer;
   TC_buffer issuer_storage;
 } tc_x509_crl_source_revoked;
@@ -58,8 +58,8 @@ typedef struct {
  * issuer storage retains GeneralNames across read-window and entry-scratch reuse.
  * All input, state, output and scratch regions are disjoint. */
 TC_TLV_result tc_x509_crl_source_revoked_init(tc_source_reader* reader, tc_source_span encoded,
-                                              const tc_x509_crl* metadata,
-                                              const tc_x509_crl_extension_info* extensions,
+                                              const TC_X509_crl* metadata,
+                                              const TC_X509_crl_extensions* extensions,
                                               uint64_t max_entries, TC_buffer issuer_storage,
                                               tc_x509_crl_source_revoked* out);
 TC_TLV_result tc_x509_crl_source_revoked_next(tc_source_reader* reader,
@@ -72,8 +72,8 @@ typedef enum { TC_CRL_SCAN_ACTIVE, TC_CRL_SCAN_COMPLETE, TC_CRL_SCAN_FAILED } tc
 typedef struct {
   tc_source_reader* reader;
   tc_x509_crl_source_revoked revoked;
-  const tc_x509_crl_serial_query* queries;
-  tc_x509_crl_match* matches;
+  const TC_X509_crl_target* queries;
+  TC_X509_crl_match* matches;
   size_t count;
   tc_crl_scan_phase phase;
 } tc_x509_crl_source_scan;
@@ -83,8 +83,8 @@ typedef struct {
  * An empty query batch still validates every entry. */
 TC_TLV_result tc_x509_crl_source_scan_init(tc_source_reader* reader,
                                            const tc_x509_crl_source_revoked* revoked,
-                                           const tc_x509_crl_serial_query* queries, size_t count,
-                                           tc_x509_crl_match* matches, size_t capacity,
+                                           const TC_X509_crl_target* queries, size_t count,
+                                           TC_X509_crl_match* matches, size_t capacity,
                                            tc_x509_crl_source_scan* out);
 /* Process at most max_entries; work and I/O limits bound each call further.
  * Failure makes the scan terminal. complete changes only on success. */
@@ -96,5 +96,5 @@ TC_TLV_result tc_x509_crl_source_scan_step(tc_x509_crl_source_scan* scan, size_t
 /* Copy matches after the complete entry scan. Signature, signer trust, freshness
  * and CRL applicability must also succeed before a credential verdict is issued. */
 TC_TLV_result tc_x509_crl_source_scan_finish(const tc_x509_crl_source_scan* scan,
-                                             tc_x509_crl_match* out, size_t capacity);
+                                             TC_X509_crl_match* out, size_t capacity);
 #endif

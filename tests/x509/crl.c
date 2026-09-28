@@ -239,7 +239,7 @@ static MunitResult fields(const MunitParameter params[], void* user)
   TC_TLV_frame frames[FRAME_CAPACITY];
   size_t work;
   const tc_pki_tree_workspace tree = {frames, FRAME_CAPACITY, &work};
-  tc_x509_crl parsed, saved;
+  TC_X509_crl parsed, saved;
   (void)params;
   (void)user;
   memset(&saved, 0xa5, sizeof saved);
@@ -328,7 +328,7 @@ static MunitResult malformed(const MunitParameter params[], void* user)
   TC_TLV_frame frames[FRAME_CAPACITY];
   size_t work;
   const tc_pki_tree_workspace tree = {frames, FRAME_CAPACITY, &work};
-  tc_x509_crl parsed, saved;
+  TC_X509_crl parsed, saved;
   (void)params;
   (void)user;
   memset(&saved, 0xa5, sizeof saved);
@@ -511,7 +511,7 @@ static MunitResult extension_values(const MunitParameter params[], void* user)
     TC_TLV_frame frames[FRAME_CAPACITY];
     TC_bytes oids[1];
     TC_TLV_limits limits = {FIXTURE_CAPACITY, FIXTURE_CAPACITY, 128, FRAME_CAPACITY};
-    tc_x509_crl crl = {0};
+    TC_X509_crl crl = {0};
     size_t work = WORK_BUDGET;
     const tc_pki_tree_workspace tree = {frames, FRAME_CAPACITY, &work};
     list[1] = (uint8_t)(list_length - 2);
@@ -569,7 +569,7 @@ static TC_status source_memory_read(void* context, uint64_t offset, uint8_t* des
   return TC_OK;
 }
 
-static void check_source_layout(TC_bytes bytes, const tc_x509_crl* parsed)
+static void check_source_layout(TC_bytes bytes, const TC_X509_crl* parsed)
 {
   uint8_t window[64];
   TC_source source = {source_memory_read, &bytes, bytes.length};
@@ -593,7 +593,7 @@ static void check_source_layout(TC_bytes bytes, const tc_x509_crl* parsed)
     size_t work = 100000;
     const TC_TLV_limits limits = {sizeof metadata, sizeof metadata, 1024, FRAME_CAPACITY};
     const tc_pki_tree_workspace tree = {frames, FRAME_CAPACITY, &work};
-    tc_x509_crl loaded;
+    TC_X509_crl loaded;
     munit_assert_int(tc_x509_crl_source_metadata(&reader, &layout,
                                                  (TC_buffer){metadata, sizeof metadata}, &limits,
                                                  &tree, &loaded),
@@ -611,7 +611,7 @@ static void check_source_layout(TC_bytes bytes, const tc_x509_crl* parsed)
                                 parsed->extensions.data);
     munit_assert_size(loaded.tbs.length, ==, 0);
     munit_assert_size(loaded.revoked.length, ==, 0);
-    tc_x509_crl saved = loaded;
+    TC_X509_crl saved = loaded;
     munit_assert_int(tc_x509_crl_source_metadata(&reader, &layout, (TC_buffer){metadata, 1},
                                                  &limits, &tree, &loaded),
                      ==, TC_TLV_LIMIT);
@@ -663,7 +663,7 @@ static MunitResult source_layout(const MunitParameter params[], void* user)
         continue;
       fixture input = make_crl(version, flags);
       size_t work = WORK_BUDGET;
-      tc_x509_crl parsed;
+      TC_X509_crl parsed;
       munit_assert_int(TC_X509_crl_read((TC_bytes){input.bytes, input.length}, &limits, frames,
                                         FRAME_CAPACITY, &work, &parsed),
                        ==, TC_TLV_OK);
@@ -736,9 +736,9 @@ static MunitResult source_batch(const MunitParameter params[], void* user)
   (void)user;
   const uint8_t issuer[] = {0x30, 12, 0x31, 10, 0x30, 8, 6, 3, 0x55, 4, 3, 0x0c, 1, 'A'};
   const uint8_t serials[] = {1, 3, 99};
-  tc_x509_crl_serial_query queries[3];
+  TC_X509_crl_target queries[3];
   for (size_t i = 0; i < 3; ++i)
-    queries[i] = (tc_x509_crl_serial_query){{serials + i, 1}, {issuer, sizeof issuer}};
+    queries[i] = (TC_X509_crl_target){{serials + i, 1}, {issuer, sizeof issuer}};
   for (unsigned failure = 0; failure < 4; ++failure) {
     fixture list = {{0x30, 0}, 2, 0, 0, 0, 0, 0, 0};
     for (unsigned i = 0; i < 3; ++i) {
@@ -757,13 +757,13 @@ static MunitResult source_batch(const MunitParameter params[], void* user)
     TC_source source = {source_memory_read, &bytes, bytes.length};
     uint8_t window[8], scratch[FIXTURE_CAPACITY];
     tc_source_reader reader;
-    tc_x509_crl crl = {0};
+    TC_X509_crl crl = {0};
     crl.version = 2;
     crl.issuer = (TC_bytes){issuer, sizeof issuer};
-    tc_x509_crl_extension_info extensions = {0};
+    TC_X509_crl_extensions extensions = {0};
     tc_x509_crl_source_revoked revoked;
     tc_x509_crl_source_scan scan;
-    tc_x509_crl_match provisional[3], output[3], saved[3];
+    TC_X509_crl_match provisional[3], output[3], saved[3];
     memset(output, 0xa5, sizeof output);
     memcpy(saved, output, sizeof saved);
     munit_assert_int(
@@ -809,7 +809,7 @@ static MunitResult source_batch(const MunitParameter params[], void* user)
         TC_X509_certificate certificate = {0};
         certificate.serial = queries[i].serial;
         certificate.issuer = queries[i].issuer;
-        tc_x509_crl_match found;
+        TC_X509_crl_match found;
         work = WORK_BUDGET;
         munit_assert_int(tc_x509_crl_find(&crl, &extensions, &certificate, &limits, &tree, &names,
                                           oids, 2, &found),
@@ -820,7 +820,7 @@ static MunitResult source_batch(const MunitParameter params[], void* user)
       TC_X509_certificate missing = {0};
       missing.serial = (TC_bytes){&missing_serial, 1};
       missing.issuer = queries[0].issuer;
-      tc_x509_crl_match found, before;
+      TC_X509_crl_match found, before;
       memset(&found, 0xa5, sizeof found);
       memcpy(&before, &found, sizeof before);
       work = WORK_BUDGET;
@@ -856,7 +856,7 @@ static MunitResult corpus_file(const MunitParameter params[], void* user)
   TC_bytes oids[MAX_EXTENSIONS];
   size_t work, length;
   const tc_pki_tree_workspace tree = {frames, MAX_DEPTH, &work};
-  tc_x509_crl parsed, saved;
+  TC_X509_crl parsed, saved;
   FILE* file;
   (void)params;
   (void)user;
@@ -1093,10 +1093,10 @@ static MunitResult signer_usage(const MunitParameter params[], void* user)
 
 static MunitResult evidence_status(const MunitParameter params[], void* user)
 {
-  const tc_x509_crl_match absent = {0};
-  tc_x509_crl_match revoked = {0};
-  tc_x509_crl_evidence evidence, saved;
-  tc_x509_crl_status status;
+  const TC_X509_crl_match absent = {0};
+  TC_X509_crl_match revoked = {0};
+  TC_X509_crl_evidence evidence, saved;
+  TC_X509_revocation_status status;
   (void)params;
   (void)user;
   revoked.found = 1;
@@ -1104,7 +1104,7 @@ static MunitResult evidence_status(const MunitParameter params[], void* user)
   revoked.revoked_at = (TC_X509_time){2026, 1, 1, 0, 0, 0};
   for (unsigned subset = 0; subset < 256; ++subset) {
     const uint16_t reasons = (uint16_t)(subset << 1);
-    evidence = (tc_x509_crl_evidence){0};
+    evidence = (TC_X509_crl_evidence){0};
     munit_assert_int(tc_x509_crl_evidence_status(&evidence, &status), ==, TC_TLV_OK);
     munit_assert_int(status, ==, TC_X509_CRL_UNDETERMINED);
     munit_assert_int(tc_x509_crl_evidence_add(&evidence, reasons, &absent), ==, TC_TLV_OK);
@@ -1124,7 +1124,7 @@ static MunitResult evidence_status(const MunitParameter params[], void* user)
     munit_assert_int(tc_x509_crl_evidence_status(&evidence, &status), ==, TC_TLV_OK);
     munit_assert_int(status, ==, TC_X509_CRL_UNREVOKED);
   }
-  evidence = (tc_x509_crl_evidence){0};
+  evidence = (TC_X509_crl_evidence){0};
   munit_assert_int(tc_x509_crl_evidence_add(&evidence, 2, &revoked), ==, TC_TLV_OK);
   munit_assert_int(tc_x509_crl_evidence_status(&evidence, &status), ==, TC_TLV_OK);
   munit_assert_int(status, ==, TC_X509_CRL_REVOKED);
@@ -1135,7 +1135,7 @@ static MunitResult evidence_status(const MunitParameter params[], void* user)
   munit_assert_memory_equal(sizeof evidence, &evidence, &saved);
   for (unsigned reason = 0; reason < 256; ++reason) {
     const int valid = reason <= 10 && reason != 7 && reason != 8;
-    evidence = (tc_x509_crl_evidence){0};
+    evidence = (TC_X509_crl_evidence){0};
     revoked.reason = reason;
     memcpy(&saved, &evidence, sizeof saved);
     munit_assert_int(tc_x509_crl_evidence_add(&evidence, TC_X509_CRL_ALL_REASONS, &revoked), ==,
@@ -1144,11 +1144,11 @@ static MunitResult evidence_status(const MunitParameter params[], void* user)
       munit_assert_memory_equal(sizeof evidence, &evidence, &saved);
   }
   {
-    tc_x509_crl_match base = revoked, delta = revoked, combined;
+    TC_X509_crl_match base = revoked, delta = revoked, combined;
     base.reason = 6;
     delta.reason = 8;
     munit_assert_int(tc_x509_crl_combine(&base, &delta, &combined), ==, TC_TLV_OK);
-    evidence = (tc_x509_crl_evidence){0};
+    evidence = (TC_X509_crl_evidence){0};
     munit_assert_int(tc_x509_crl_evidence_add(&evidence, TC_X509_CRL_ALL_REASONS, &combined), ==,
                      TC_TLV_OK);
     munit_assert_int(tc_x509_crl_evidence_status(&evidence, &status), ==, TC_TLV_OK);
@@ -1156,7 +1156,7 @@ static MunitResult evidence_status(const MunitParameter params[], void* user)
   }
   const uint16_t invalid_masks[] = {1, 1u << 9, 1u << 15};
   for (size_t i = 0; i < sizeof invalid_masks / sizeof invalid_masks[0]; ++i) {
-    evidence = (tc_x509_crl_evidence){0};
+    evidence = (TC_X509_crl_evidence){0};
     memcpy(&saved, &evidence, sizeof saved);
     munit_assert_int(tc_x509_crl_evidence_add(&evidence, invalid_masks[i], &absent), ==,
                      TC_TLV_ARGUMENT);
@@ -1167,13 +1167,13 @@ static MunitResult evidence_status(const MunitParameter params[], void* user)
     munit_assert_int(status, ==, TC_X509_CRL_REVOKED);
   }
   for (unsigned field = 0; field < 2; ++field) {
-    tc_x509_crl_match invalid = revoked;
+    TC_X509_crl_match invalid = revoked;
     invalid.reason = 1;
     if (field)
       invalid.has_invalidity_date = 2;
     else
       invalid.found = 2;
-    evidence = (tc_x509_crl_evidence){0};
+    evidence = (TC_X509_crl_evidence){0};
     memcpy(&saved, &evidence, sizeof saved);
     munit_assert_int(tc_x509_crl_evidence_add(&evidence, 2, &invalid), ==, TC_TLV_INVALID);
     munit_assert_memory_equal(sizeof evidence, &evidence, &saved);
@@ -1183,7 +1183,7 @@ static MunitResult evidence_status(const MunitParameter params[], void* user)
     munit_assert_int(tc_x509_crl_evidence_status(&evidence, &status), ==, TC_TLV_ARGUMENT);
     munit_assert_int(status, ==, TC_X509_CRL_UNREVOKED);
   }
-  evidence = (tc_x509_crl_evidence){0};
+  evidence = (TC_X509_crl_evidence){0};
   munit_assert_int(tc_x509_crl_evidence_add(&evidence, 2, &evidence.revocation), ==, TC_TLV_OK);
   munit_assert_uint(evidence.reasons, ==, 2);
   munit_assert_false(evidence.revocation.found);
@@ -1192,7 +1192,7 @@ static MunitResult evidence_status(const MunitParameter params[], void* user)
 
 static MunitResult evidence_equality(const MunitParameter params[], void* user)
 {
-  tc_x509_crl_evidence left = {0}, right;
+  TC_X509_crl_evidence left = {0}, right;
   (void)params;
   (void)user;
   left.reasons = TC_X509_CRL_ALL_REASONS;
@@ -1235,7 +1235,7 @@ static MunitResult evidence_equality(const MunitParameter params[], void* user)
   right.reasons = 1;
   munit_assert_int(tc_x509_crl_evidence_equal(&left, &right, &equal), ==, TC_TLV_ARGUMENT);
   munit_assert_int(equal, ==, -1);
-  left = (tc_x509_crl_evidence){0};
+  left = (TC_X509_crl_evidence){0};
   right = left;
   right.revocation.revoked_at.year = 2026;
   munit_assert_int(tc_x509_crl_evidence_equal(&left, &right, &equal), ==, TC_TLV_OK);
@@ -1247,7 +1247,7 @@ static MunitResult combine_status(const MunitParameter params[], void* user)
 {
   (void)params;
   (void)user;
-  tc_x509_crl_match base = {0}, delta = {0}, combined, saved;
+  TC_X509_crl_match base = {0}, delta = {0}, combined, saved;
   memset(&saved, 0xa5, sizeof saved);
   base.reason = 6;
   base.revoked_at = (TC_X509_time){2024, 1, 1, 0, 0, 0};
@@ -1301,7 +1301,7 @@ static MunitResult scope_groups(const MunitParameter params[], void* user)
   const uint8_t issuer[] = {0x30, 12, 0x31, 10, 0x30, 8, 6, 3, 0x55, 4, 3, 0x0c, 1, 'A'};
   uint8_t other[sizeof issuer];
   const uint8_t idp[] = {0x30, 3, 0x84, 1, 0xff}, different[] = {0x30, 3, 0x81, 1, 0xff};
-  tc_x509_crl a = {0}, b = {0};
+  TC_X509_crl a = {0}, b = {0};
   a.issuer = (TC_bytes){issuer, sizeof issuer};
   b.issuer = (TC_bytes){other, sizeof other};
   TC_TLV_frame frames[FRAME_CAPACITY];
@@ -1316,14 +1316,14 @@ static MunitResult scope_groups(const MunitParameter params[], void* user)
   enum { SAME, NORMALIZED_NAME, OTHER_ISSUER, ONE_IDP, SAME_IDP, OTHER_IDP, AUTHORITY_HINT };
   const int expected[] = {1, 1, 0, 0, 1, 0, 1};
   for (unsigned scenario = SAME; scenario <= AUTHORITY_HINT; ++scenario) {
-    tc_x509_crl_extension_info ai = {0}, bi = {0};
+    TC_X509_crl_extensions ai = {0}, bi = {0};
     memcpy(other, issuer, sizeof other);
     if (scenario == NORMALIZED_NAME)
       other[sizeof other - 1] = 'a';
     if (scenario == OTHER_ISSUER)
       other[sizeof other - 1] = 'B';
     if (scenario >= ONE_IDP && scenario <= OTHER_IDP) {
-      ai.present = TC_CRL_EXT_DISTRIBUTION;
+      ai.present = TC_X509_CRL_EXT_DISTRIBUTION;
       ai.distribution_encoded = (TC_bytes){idp, sizeof idp};
       if (scenario != ONE_IDP) {
         bi = ai;
@@ -1332,7 +1332,7 @@ static MunitResult scope_groups(const MunitParameter params[], void* user)
       }
     }
     if (scenario == AUTHORITY_HINT)
-      ai.present = TC_CRL_EXT_AUTHORITY;
+      ai.present = TC_X509_CRL_EXT_AUTHORITY;
     int equal = -1;
     work = WORK_BUDGET;
     munit_assert_int(tc_x509_crl_scope_equal(&a, &ai, &b, &bi, &limits, &tree, &names, &equal), ==,
@@ -1360,13 +1360,13 @@ static MunitResult delta_pairing(const MunitParameter params[], void* user)
   uint8_t delta_issuer[sizeof issuer];
   memcpy(delta_issuer, issuer, sizeof issuer);
   uint8_t number = 5, minimum = 3, newer = 7;
-  tc_x509_crl base = {0}, delta = {0};
+  TC_X509_crl base = {0}, delta = {0};
   base.issuer = (TC_bytes){issuer, sizeof issuer};
   delta.issuer = (TC_bytes){delta_issuer, sizeof delta_issuer};
-  tc_x509_crl_extension_info base_info = {0}, delta_info = {0};
-  base_info.present = TC_CRL_EXT_NUMBER;
-  delta_info.present = TC_CRL_EXT_NUMBER | TC_CRL_EXT_DELTA;
-  delta_info.critical = TC_CRL_EXT_DELTA;
+  TC_X509_crl_extensions base_info = {0}, delta_info = {0};
+  base_info.present = TC_X509_CRL_EXT_NUMBER;
+  delta_info.present = TC_X509_CRL_EXT_NUMBER | TC_X509_CRL_EXT_DELTA;
+  delta_info.critical = TC_X509_CRL_EXT_DELTA;
   base_info.number = (TC_bytes){&number, 1};
   delta_info.number = (TC_bytes){&newer, 1};
   delta_info.base_number = (TC_bytes){&minimum, 1};
@@ -1418,7 +1418,7 @@ static MunitResult delta_pairing(const MunitParameter params[], void* user)
   const uint8_t idp[] = {0x30, 3, 0x84, 1, 0xff}, other_idp[] = {0x30, 3, 0x81, 1, 0xff};
   const uint8_t key[] = {1}, other_key[] = {2}, unknown[] = {0x55, 0x1d, 127};
   for (unsigned change = ISSUER_DIFFERENT; change <= UNKNOWN_CRITICAL; ++change) {
-    tc_x509_crl_extension_info a = base_info, b = delta_info;
+    TC_X509_crl_extensions a = base_info, b = delta_info;
     delta_issuer[sizeof delta_issuer - 1] = 'A';
     switch (change) {
     case ISSUER_DIFFERENT:
@@ -1428,22 +1428,22 @@ static MunitResult delta_pairing(const MunitParameter params[], void* user)
       delta_issuer[sizeof delta_issuer - 1] = 'a';
       break;
     case NOT_DELTA:
-      b.present &= ~TC_CRL_EXT_DELTA;
+      b.present &= ~TC_X509_CRL_EXT_DELTA;
       b.critical = 0;
       break;
     case BASE_IS_DELTA:
-      a.present |= TC_CRL_EXT_DELTA;
-      a.critical |= TC_CRL_EXT_DELTA;
+      a.present |= TC_X509_CRL_EXT_DELTA;
+      a.critical |= TC_X509_CRL_EXT_DELTA;
       break;
     case IDP_MISSING:
     case IDP_SAME:
     case IDP_DIFFERENT:
-      a.present |= TC_CRL_EXT_DISTRIBUTION;
-      a.critical |= TC_CRL_EXT_DISTRIBUTION;
+      a.present |= TC_X509_CRL_EXT_DISTRIBUTION;
+      a.critical |= TC_X509_CRL_EXT_DISTRIBUTION;
       a.distribution_encoded = (TC_bytes){idp, sizeof idp};
       if (change != IDP_MISSING) {
-        b.present |= TC_CRL_EXT_DISTRIBUTION;
-        b.critical |= TC_CRL_EXT_DISTRIBUTION;
+        b.present |= TC_X509_CRL_EXT_DISTRIBUTION;
+        b.critical |= TC_X509_CRL_EXT_DISTRIBUTION;
         b.distribution_encoded =
             change == IDP_SAME ? a.distribution_encoded : (TC_bytes){other_idp, sizeof other_idp};
       }
@@ -1451,11 +1451,11 @@ static MunitResult delta_pairing(const MunitParameter params[], void* user)
     case AKID_MISSING:
     case AKID_SAME:
     case AKID_DIFFERENT:
-      a.present |= TC_CRL_EXT_AUTHORITY;
+      a.present |= TC_X509_CRL_EXT_AUTHORITY;
       a.authority.has_key_identifier = 1;
       a.authority.key_identifier = (TC_bytes){key, sizeof key};
       if (change != AKID_MISSING) {
-        b.present |= TC_CRL_EXT_AUTHORITY;
+        b.present |= TC_X509_CRL_EXT_AUTHORITY;
         b.authority.has_key_identifier = 1;
         b.authority.key_identifier = change == AKID_SAME ? a.authority.key_identifier
                                                          : (TC_bytes){other_key, sizeof other_key};
@@ -1517,12 +1517,12 @@ static MunitResult issuer_inheritance(const MunitParameter params[], void* user)
   }
   munit_assert_size(list.length - 3, >=, 128);
   list.bytes[2] = (uint8_t)(list.length - 3);
-  tc_x509_crl crl = {0};
-  tc_x509_crl_extension_info info = {0};
+  TC_X509_crl crl = {0};
+  TC_X509_crl_extensions info = {0};
   crl.version = 2;
   crl.issuer = (TC_bytes){issuer, sizeof issuer};
   crl.revoked = (TC_bytes){list.bytes, list.length};
-  info.present = info.critical = TC_CRL_EXT_DISTRIBUTION;
+  info.present = info.critical = TC_X509_CRL_EXT_DISTRIBUTION;
   info.distribution.indirect = 1;
   TC_TLV_frame frames[FRAME_CAPACITY];
   TC_bytes oids[2];
@@ -1674,7 +1674,7 @@ static MunitResult issuer_inheritance(const MunitParameter params[], void* user)
   uint32_t scan_left[32], scan_right[32];
   uint8_t scan_used[2];
   const TC_X509_name_workspace scan_names = {scan_left, scan_right, 32, scan_used, 2};
-  tc_x509_crl_match found, unchanged;
+  TC_X509_crl_match found, unchanged;
   memset(&unchanged, 0xa5, sizeof unchanged);
   for (unsigned query = 0; query < 7; ++query) {
     uint8_t query_name[sizeof issuer];
@@ -1757,13 +1757,13 @@ static MunitResult entry_policy(const MunitParameter params[], void* user)
 {
   (void)params;
   (void)user;
-  tc_x509_crl_extension_info crl = {0};
+  TC_X509_crl_extensions crl = {0};
   tc_x509_crl_entry_info entry = {0};
   munit_assert_int(tc_x509_crl_entry_policy(&crl, &entry), ==, TC_TLV_OK);
   entry.present = TC_CRL_ENTRY_REASON;
   entry.reason = 8;
   munit_assert_int(tc_x509_crl_entry_policy(&crl, &entry), ==, TC_TLV_INVALID);
-  crl.present = TC_CRL_EXT_DELTA;
+  crl.present = TC_X509_CRL_EXT_DELTA;
   munit_assert_int(tc_x509_crl_entry_policy(&crl, &entry), ==, TC_TLV_OK);
   entry.critical = TC_CRL_ENTRY_REASON;
   munit_assert_int(tc_x509_crl_entry_policy(&crl, &entry), ==, TC_TLV_INVALID);
@@ -1775,7 +1775,7 @@ static MunitResult entry_policy(const MunitParameter params[], void* user)
   for (unsigned idp = 0; idp < 2; ++idp)
     for (int indirect = 0; indirect < 2; ++indirect)
       for (unsigned critical = 0; critical < 2; ++critical) {
-        crl.present = idp ? TC_CRL_EXT_DISTRIBUTION : 0;
+        crl.present = idp ? TC_X509_CRL_EXT_DISTRIBUTION : 0;
         crl.distribution.indirect = indirect;
         entry.critical = critical ? TC_CRL_ENTRY_ISSUER : 0;
         munit_assert_int(tc_x509_crl_entry_policy(&crl, &entry), ==,
@@ -1870,31 +1870,32 @@ static MunitResult extension_policy(const MunitParameter params[], void* user)
   static const struct {
     unsigned present, critical;
     TC_TLV_result result;
-  } cases[] = {{0, 0, TC_TLV_OK},
-               {TC_CRL_EXT_NUMBER, 0, TC_TLV_OK},
-               {TC_CRL_EXT_NUMBER, TC_CRL_EXT_NUMBER, TC_TLV_INVALID},
-               {TC_CRL_EXT_DELTA, 0, TC_TLV_INVALID},
-               {TC_CRL_EXT_DELTA, TC_CRL_EXT_DELTA, TC_TLV_OK},
-               {TC_CRL_EXT_DISTRIBUTION, 0, TC_TLV_INVALID},
-               {TC_CRL_EXT_DISTRIBUTION, TC_CRL_EXT_DISTRIBUTION, TC_TLV_OK},
-               {TC_CRL_EXT_FRESHEST, 0, TC_TLV_OK},
-               {TC_CRL_EXT_FRESHEST, TC_CRL_EXT_FRESHEST, TC_TLV_INVALID},
-               {TC_CRL_EXT_ISSUER_ALT, TC_CRL_EXT_ISSUER_ALT, TC_TLV_OK},
-               {TC_CRL_EXT_AUTHORITY, TC_CRL_EXT_AUTHORITY, TC_TLV_OK},
-               {TC_CRL_EXT_DELTA | TC_CRL_EXT_FRESHEST, TC_CRL_EXT_DELTA, TC_TLV_INVALID},
-               {TC_CRL_EXT_NUMBER | TC_CRL_EXT_DELTA | TC_CRL_EXT_DISTRIBUTION,
-                TC_CRL_EXT_DELTA | TC_CRL_EXT_DISTRIBUTION, TC_TLV_OK},
-               {0, TC_CRL_EXT_NUMBER, TC_TLV_ARGUMENT}};
+  } cases[] = {
+      {0, 0, TC_TLV_OK},
+      {TC_X509_CRL_EXT_NUMBER, 0, TC_TLV_OK},
+      {TC_X509_CRL_EXT_NUMBER, TC_X509_CRL_EXT_NUMBER, TC_TLV_INVALID},
+      {TC_X509_CRL_EXT_DELTA, 0, TC_TLV_INVALID},
+      {TC_X509_CRL_EXT_DELTA, TC_X509_CRL_EXT_DELTA, TC_TLV_OK},
+      {TC_X509_CRL_EXT_DISTRIBUTION, 0, TC_TLV_INVALID},
+      {TC_X509_CRL_EXT_DISTRIBUTION, TC_X509_CRL_EXT_DISTRIBUTION, TC_TLV_OK},
+      {TC_X509_CRL_EXT_FRESHEST, 0, TC_TLV_OK},
+      {TC_X509_CRL_EXT_FRESHEST, TC_X509_CRL_EXT_FRESHEST, TC_TLV_INVALID},
+      {TC_X509_CRL_EXT_ISSUER_ALT, TC_X509_CRL_EXT_ISSUER_ALT, TC_TLV_OK},
+      {TC_X509_CRL_EXT_AUTHORITY, TC_X509_CRL_EXT_AUTHORITY, TC_TLV_OK},
+      {TC_X509_CRL_EXT_DELTA | TC_X509_CRL_EXT_FRESHEST, TC_X509_CRL_EXT_DELTA, TC_TLV_INVALID},
+      {TC_X509_CRL_EXT_NUMBER | TC_X509_CRL_EXT_DELTA | TC_X509_CRL_EXT_DISTRIBUTION,
+       TC_X509_CRL_EXT_DELTA | TC_X509_CRL_EXT_DISTRIBUTION, TC_TLV_OK},
+      {0, TC_X509_CRL_EXT_NUMBER, TC_TLV_ARGUMENT}};
   for (size_t i = 0; i < sizeof cases / sizeof cases[0]; ++i) {
-    tc_x509_crl_extension_info info = {0};
+    TC_X509_crl_extensions info = {0};
     info.present = cases[i].present;
     info.critical = cases[i].critical;
-    const tc_x509_crl_extension_info saved = info;
+    const TC_X509_crl_extensions saved = info;
     munit_assert_int(tc_x509_crl_extension_policy(&info), ==, cases[i].result);
     munit_assert_memory_equal(sizeof info, &info, &saved);
   }
   const uint8_t unknown[] = {0x55, 0x1d, 127};
-  tc_x509_crl_extension_info info = {0};
+  TC_X509_crl_extensions info = {0};
   info.unknown_critical_oid = (TC_bytes){unknown, sizeof unknown};
   munit_assert_int(tc_x509_crl_extension_policy(&info), ==, TC_TLV_UNSUPPORTED);
   munit_assert_int(tc_x509_crl_extension_policy(NULL), ==, TC_TLV_ARGUMENT);
@@ -2014,7 +2015,7 @@ static MunitResult freshness(const MunitParameter params[], void* user)
 {
   (void)params;
   (void)user;
-  tc_x509_crl crl = {0};
+  TC_X509_crl crl = {0};
   crl.this_update = (TC_X509_time){2049, 12, 31, 23, 59, 59};
   crl.next_update = (TC_X509_time){2050, 1, 1, 0, 0, 1};
   crl.has_next_update = 1;
@@ -2051,7 +2052,7 @@ static MunitResult freshness(const MunitParameter params[], void* user)
   munit_assert_int(state, ==, TC_X509_CRL_CURRENT);
   TC_X509_time invalid = {2023, 2, 29, 0, 0, 0};
   for (unsigned field = 0; field < 3; ++field) {
-    tc_x509_crl bad = crl;
+    TC_X509_crl bad = crl;
     const TC_X509_time* at = &crl.this_update;
     if (field == 0)
       at = &invalid;
@@ -2080,13 +2081,13 @@ static MunitResult scope_reasons(const MunitParameter params[], void* user)
   const TC_X509_name_workspace names = {left, right, 32, used, 2};
   size_t work;
   const tc_pki_tree_workspace tree = {frames, FRAME_CAPACITY, &work};
-  tc_x509_crl crl = {0};
+  TC_X509_crl crl = {0};
   crl.issuer = (TC_bytes){issuer, sizeof issuer};
   enum { UNRESTRICTED, USER_ONLY, CA_ONLY, ATTRIBUTE_ONLY, SENTINEL = 0xdead };
   for (unsigned type = UNRESTRICTED; type <= ATTRIBUTE_ONLY; ++type)
     for (int ca = 0; ca <= 1; ++ca)
       for (unsigned mask = 0; mask < 4; ++mask) {
-        tc_x509_crl_distribution idp = {0};
+        TC_X509_crl_distribution idp = {0};
         tc_pki_distribution_point point = {0};
         idp.user_only = type == USER_ONLY;
         idp.ca_only = type == CA_ONLY;
@@ -2118,7 +2119,7 @@ static MunitResult scope_reasons(const MunitParameter params[], void* user)
         munit_assert_size(work, ==, 0);
       }
   tc_pki_distribution_point point = {0};
-  tc_x509_crl_distribution idp = {0};
+  TC_X509_crl_distribution idp = {0};
   uint16_t reasons = SENTINEL;
   work = WORK_BUDGET;
   munit_assert_int(tc_x509_crl_scope_reasons(&crl, NULL, &point, crl.issuer, 0, &limits, &tree,
@@ -2147,7 +2148,7 @@ static MunitResult scope_reasons(const MunitParameter params[], void* user)
                    ==, TC_TLV_ARGUMENT);
   munit_assert_uint(reasons, ==, SENTINEL);
   {
-    tc_x509_crl_extension_info info = {0};
+    TC_X509_crl_extensions info = {0};
     tc_x509_crl_coverage coverage, saved;
     memset(&saved, 0xa5, sizeof saved);
     crl.this_update = (TC_X509_time){2026, 1, 1, 0, 0, 0};
@@ -2169,7 +2170,7 @@ static MunitResult scope_reasons(const MunitParameter params[], void* user)
           if (states[state] == TC_X509_CRL_STALE)
             ++at.year;
           crl.has_next_update = states[state] != TC_X509_CRL_NO_NEXT_UPDATE;
-          info.present = info.critical = restricted ? TC_CRL_EXT_DISTRIBUTION : 0;
+          info.present = info.critical = restricted ? TC_X509_CRL_EXT_DISTRIBUTION : 0;
           const uint16_t wanted = states[state] != TC_X509_CRL_CURRENT ? 0
                                   : !restricted                        ? point.reasons
                                   : ca                                 ? 2
@@ -2202,7 +2203,7 @@ static MunitResult scope_reasons(const MunitParameter params[], void* user)
                                              &limits, &tree, &names, &coverage),
                      ==, TC_TLV_INVALID);
     munit_assert_memory_equal(sizeof coverage, &coverage, &saved);
-    info = (tc_x509_crl_extension_info){0};
+    info = (TC_X509_crl_extensions){0};
     static const uint8_t unknown_oid[] = {0x2a, 3};
     info.unknown_critical_oid = (TC_bytes){unknown_oid, sizeof unknown_oid};
     work = WORK_BUDGET;
@@ -2252,7 +2253,7 @@ static MunitResult name_scope(const MunitParameter params[], void* user)
   const TC_X509_name_workspace names = {left, right, 32, used, 2};
   size_t work;
   const tc_pki_tree_workspace tree = {frames, FRAME_CAPACITY, &work};
-  tc_pki_distribution_name decoded[sizeof encodings / sizeof encodings[0]];
+  TC_X509_distribution_name decoded[sizeof encodings / sizeof encodings[0]];
   for (size_t i = 0; i < sizeof encodings / sizeof encodings[0]; ++i) {
     work = WORK_BUDGET;
     munit_assert_int(
@@ -2260,10 +2261,10 @@ static MunitResult name_scope(const MunitParameter params[], void* user)
                                       &tree, &decoded[i]),
         ==, TC_TLV_OK);
   }
-  tc_x509_crl crl = {0};
+  TC_X509_crl crl = {0};
   crl.issuer = (TC_bytes){encodings[ISSUER_DN].bytes + 4, encodings[ISSUER_DN].length - 4};
   for (size_t i = 0; i < sizeof cases / sizeof cases[0]; ++i) {
-    tc_x509_crl_distribution idp = {0};
+    TC_X509_crl_distribution idp = {0};
     tc_pki_distribution_point point = {0};
     idp.name = decoded[cases[i].idp];
     if (cases[i].dp != ISSUER_FALLBACK)
@@ -2295,7 +2296,7 @@ static MunitResult name_scope(const MunitParameter params[], void* user)
                      ==, TC_TLV_OK);
     munit_assert_uint(coverage, ==, cases[i].match ? TC_X509_CRL_ALL_REASONS : 0);
   }
-  tc_x509_crl_distribution idp = {0};
+  TC_X509_crl_distribution idp = {0};
   tc_pki_distribution_point point = {0};
   point.issuer = decoded[ISSUER_DN].contents;
   idp.name = decoded[ISSUER_DN];
@@ -2420,7 +2421,7 @@ static MunitResult issuer_linkage(const MunitParameter params[], void* user)
   const TC_X509_name_workspace names = {left, right, 32, used, 2};
   size_t work;
   const tc_pki_tree_workspace tree = {frames, FRAME_CAPACITY, &work};
-  tc_x509_crl crl = {0};
+  TC_X509_crl crl = {0};
   crl.issuer = (TC_bytes){crl_name, sizeof crl_name};
   static const struct {
     int explicit_issuer, idp, indirect;
@@ -2430,13 +2431,13 @@ static MunitResult issuer_linkage(const MunitParameter params[], void* user)
                {1, 1, 0, 'A', 0}, {1, 1, 1, 'A', 1}, {1, 1, 1, 'a', 0}, {1, 1, 1, 'B', 0}};
   for (size_t i = 0; i < sizeof cases / sizeof cases[0]; ++i) {
     tc_pki_distribution_point point = {0};
-    tc_x509_crl_distribution idp = {0};
+    TC_X509_crl_distribution idp = {0};
     memcpy(crl_name, certificate_issuer.data, sizeof crl_name);
     crl_name[sizeof crl_name - 1] = cases[i].common_name;
     if (cases[i].explicit_issuer)
       point.issuer = (TC_bytes){directory, sizeof directory};
     idp.indirect = cases[i].indirect;
-    const tc_x509_crl_distribution* scope = cases[i].idp ? &idp : NULL;
+    const TC_X509_crl_distribution* scope = cases[i].idp ? &idp : NULL;
     int matched = 99;
     work = WORK_BUDGET;
     munit_assert_int(tc_x509_crl_issuer_matches(&crl, scope, &point, certificate_issuer, &limits,
@@ -2566,7 +2567,7 @@ static MunitResult distribution_points(const MunitParameter params[], void* user
     extensions[3] = (uint8_t)(7 + list_length);
     extensions[10] = (uint8_t)list_length;
     memcpy(extensions + 11, list, list_length);
-    tc_x509_crl crl = {0};
+    TC_X509_crl crl = {0};
     TC_bytes oids[1];
     crl.version = 2;
     crl.extensions = (TC_bytes){extensions, 11 + list_length};
@@ -2663,7 +2664,7 @@ static MunitResult distribution(const MunitParameter params[], void* user)
   TC_TLV_limits limits = {FIXTURE_CAPACITY, FIXTURE_CAPACITY, 128, FRAME_CAPACITY};
   size_t work;
   const tc_pki_tree_workspace tree = {frames, FRAME_CAPACITY, &work};
-  tc_x509_crl_distribution parsed, saved;
+  TC_X509_crl_distribution parsed, saved;
   memset(&saved, 0xa5, sizeof saved);
   for (size_t i = 0; i < sizeof valid / sizeof valid[0]; ++i) {
     const TC_bytes input = {valid[i].bytes, valid[i].length};
@@ -2938,8 +2939,8 @@ static MunitResult indexed_deltas(const MunitParameter params[], void* user)
   memset(&saved, 0xa5, sizeof saved);
   for (size_t i = 0; i < index.count; ++i) {
     rows[i].crl.issuer = (TC_bytes){issuer, sizeof issuer};
-    rows[i].extensions.present = TC_CRL_EXT_NUMBER | (i ? TC_CRL_EXT_DELTA : 0);
-    rows[i].extensions.critical = i ? TC_CRL_EXT_DELTA : 0;
+    rows[i].extensions.present = TC_X509_CRL_EXT_NUMBER | (i ? TC_X509_CRL_EXT_DELTA : 0);
+    rows[i].extensions.critical = i ? TC_X509_CRL_EXT_DELTA : 0;
     rows[i].extensions.number = (TC_bytes){numbers + i, 1};
     rows[i].extensions.base_number = (TC_bytes){numbers + 2, 1};
     rows[i].policy = TC_TLV_OK;
@@ -3063,8 +3064,8 @@ static MunitResult record_index_failures(const MunitParameter params[], void* us
 static MunitResult candidate_arguments(const MunitParameter params[], void* user)
 {
   enum { CRL, EXTENSIONS, CANDIDATE, LIMITS, NAMES, TREE, WORK, MATCHED, CASE_COUNT };
-  tc_x509_crl crl = {0};
-  tc_x509_crl_extension_info extensions = {0};
+  TC_X509_crl crl = {0};
+  TC_X509_crl_extensions extensions = {0};
   TC_X509_certificate candidate = {0};
   TC_TLV_limits limits = {0};
   TC_X509_name_workspace names = {0};

@@ -6,7 +6,7 @@
 static const uint8_t rsa_oid[] = {0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 1, 1, 1};
 static const uint8_t null_parameters[] = {5, 0};
 
-static void digest_algorithm(tc_cms_signer_info* signer, TC_hash_algorithm hash)
+static void digest_algorithm(TC_CMS_signer_info* signer, TC_hash_algorithm hash)
 {
   tc_hash_info info;
   munit_assert_true(tc_hash_info_get(hash, &info));
@@ -16,7 +16,7 @@ static void digest_algorithm(tc_cms_signer_info* signer, TC_hash_algorithm hash)
 static MunitResult rsa_selection(const MunitParameter params[], void* user)
 {
   static const uint8_t invalid_parameters[] = {4, 0};
-  tc_cms_signer_info signer = {0};
+  TC_CMS_signer_info signer = {0};
   TC_X509_public_key key = {0};
   tc_cms_signature_algorithm parsed, saved;
   (void)params;
@@ -57,7 +57,7 @@ static MunitResult rsa_parameter_policy(const MunitParameter params[], void* use
   static const size_t lengths[] = {2, 3, 2, 3, 4, 2};
   const TC_TLV_limits limits = {WORK, WORK, 32, FRAME_COUNT};
   TC_TLV_frame frames[FRAME_COUNT];
-  tc_cms_signer_info signer = {0};
+  TC_CMS_signer_info signer = {0};
   TC_X509_public_key key = {0};
   tc_cms_signature_algorithm parsed, saved;
   (void)params;
@@ -112,7 +112,7 @@ static MunitResult hash_selection(const MunitParameter params[], void* user)
   static const uint8_t defaults[] = {0x30, 0};
   static const uint8_t sha256_parameters[] = {0x30, 17, 0xa0, 15, 0x30, 13, 6, 9, 0x60, 0x86,
                                               0x48, 1,  0x65, 3,  4,    2,  1, 5, 0};
-  tc_cms_signer_info signer = {0};
+  TC_CMS_signer_info signer = {0};
   TC_X509_public_key key = {0};
   tc_cms_signature_algorithm parsed, saved;
   (void)params;
@@ -179,7 +179,7 @@ static MunitResult ber_parameters(const MunitParameter params[], void* user)
   TC_TLV_frame frames[FRAME_CAPACITY];
   size_t work = WORK_BUDGET;
   const tc_pki_tree_workspace tree = {frames, FRAME_CAPACITY, &work};
-  tc_cms_signer_info signer = {0};
+  TC_CMS_signer_info signer = {0};
   TC_X509_public_key key = {0};
   tc_cms_signature_algorithm parsed, saved;
   (void)params;

@@ -16,7 +16,7 @@ TC_TLV_result tc_x509_crl_scope_arguments(const tc_x509_crl_scope_processing* pr
                                           TC_X509_search_result* out)
 {
   TC_bytes storage;
-  tc_x509_crl_status status;
+  TC_X509_revocation_status status;
   if (!processing ||
       !tc_x509_crl_index_arguments(processing->index, processing->query, trust, out) ||
       (!all_scopes && processing->reference >= processing->index->count) ||

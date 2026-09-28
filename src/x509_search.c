@@ -66,6 +66,8 @@ static TC_TLV_result search_subject(TC_bytes encoded, const TC_TLV_limits* limit
   return TC_TLV_OK;
 }
 
+/* Map a caller-supplied source's result. A source must not add work, and
+ * its failures are errors: they say nothing about the certificates. */
 static TC_X509_path_status source_status(TC_TLV_result status, size_t before, size_t* work)
 {
   if (*work > before) {
@@ -81,11 +83,11 @@ static TC_X509_path_status source_status(TC_TLV_result status, size_t before, si
   return TC_X509_PATH_ERROR;
 }
 
-TC_X509_path_status tc_x509_path_search_source(TC_bytes target, const tc_x509_search_source* source,
+TC_X509_path_status tc_x509_path_search_source(TC_bytes target, const TC_X509_store_source* source,
                                                const TC_X509_path_options* options,
                                                const TC_X509_path_workspace* validation,
-                                               const tc_x509_search_workspace* search, size_t* work,
-                                               tc_x509_search_result* out)
+                                               const TC_X509_search_workspace* search, size_t* work,
+                                               TC_X509_search_result* out)
 {
   TC_X509_certificate issuer;
   TC_X509_path_status failure = TC_X509_PATH_INVALID, status;
@@ -109,9 +111,9 @@ TC_X509_path_status tc_x509_path_search_source(TC_bytes target, const tc_x509_se
   if (parsed != TC_TLV_OK)
     return tc_x509_path_status(parsed);
   search->path[capacity - 1] = target;
-  search->frames[0] = (tc_x509_search_frame){0, 0, target.length, issuer.issuer};
+  search->frames[0] = (TC_X509_search_frame){0, 0, target.length, issuer.issuer};
   while (depth) {
-    tc_x509_search_frame* frame = &search->frames[depth - 1];
+    TC_X509_search_frame* frame = &search->frames[depth - 1];
     TC_bytes* path = search->path + capacity - depth;
     int equal;
     if (tc_pki_work_charge(work, 1) != TC_TLV_OK)
@@ -119,8 +121,8 @@ TC_X509_path_status tc_x509_path_search_source(TC_bytes target, const tc_x509_se
     if (frame->anchor < source->anchor_count) {
       size_t anchor = frame->anchor++;
       size_t before = *work;
-      tc_x509_search_anchor trust = {0};
-      tc_x509_search_result found;
+      TC_X509_store_anchor trust = {0};
+      TC_X509_search_result found;
       parsed = source->anchor(source->context, anchor, work, &trust);
       status = source_status(parsed, before, work);
       if (status != TC_X509_PATH_VALID)
@@ -212,7 +214,7 @@ TC_X509_path_status tc_x509_path_search_source(TC_bytes target, const tc_x509_se
       }
       path[-1] = candidate;
       search->frames[depth++] =
-          (tc_x509_search_frame){0, 0, frame->bytes + candidate.length, issuer.issuer};
+          (TC_X509_search_frame){0, 0, frame->bytes + candidate.length, issuer.issuer};
     } else {
       --depth;
     }
@@ -300,7 +302,7 @@ static TC_TLV_result array_candidate(void* context, size_t index, size_t* work, 
 }
 
 static TC_TLV_result array_anchor(void* context, size_t index, size_t* work,
-                                  tc_x509_search_anchor* out)
+                                  TC_X509_store_anchor* out)
 {
   const array_source* source = context;
   (void)work;
@@ -313,12 +315,12 @@ TC_X509_path_status tc_x509_path_search(TC_bytes target, const TC_bytes* candida
                                         size_t candidate_count, const TC_X509_trust_anchor* anchors,
                                         size_t anchor_count, const TC_X509_path_options* options,
                                         const TC_X509_path_workspace* validation,
-                                        const tc_x509_search_workspace* search, size_t* work,
-                                        tc_x509_search_result* out)
+                                        const TC_X509_search_workspace* search, size_t* work,
+                                        TC_X509_search_result* out)
 {
   array_source arrays = {candidates, anchors};
-  tc_x509_search_source source = {&arrays, candidate_count, anchor_count, array_candidate,
-                                  array_anchor};
+  TC_X509_store_source source = {&arrays, candidate_count, anchor_count, array_candidate,
+                                 array_anchor};
   if ((candidate_count && !candidates) || (anchor_count && !anchors))
     return TC_X509_PATH_ERROR;
   return tc_x509_path_search_source(target, &source, options, validation, search, work, out);

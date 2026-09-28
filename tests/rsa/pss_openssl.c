@@ -1,6 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/rsa.h>
-#include "../../src/pki_verify_internal.h"
 #include "munit.h"
 #include "test_util.h"
 #include <openssl/evp.h>
@@ -27,7 +26,8 @@ static TC_status random_bytes(void* context, uint8_t* output, size_t length)
 
 static TC_RSA_result verify_pss(const TC_RSA_public_key* key, TC_hash_algorithm hash,
                                 TC_hash_algorithm mgf_hash, size_t salt_length, TC_bytes digest,
-                                TC_bytes signature, const TC_RSA_workspace* workspace, uint32_t work)
+                                TC_bytes signature, const TC_RSA_workspace* workspace,
+                                uint32_t work)
 {
   const TC_RSA_pss_options options = {hash, mgf_hash, salt_length};
   TC_work_budget budget = {work > UINT32_MAX ? UINT32_MAX : (uint32_t)work};
@@ -147,58 +147,6 @@ static MunitResult signatures(const MunitParameter params[], void* user)
                                   (TC_bytes){digest, digest_length}, (TC_bytes){signature, length},
                                   &workspace, 0),
                        ==, TC_RSA_LIMIT);
-      {
-        TC_X509_public_key issuer = {0};
-        TC_signature_algorithm algorithm = {TC_SIGNATURE_RSA_PSS, hash, mgf_hash,
-                                            (uint32_t)salts[i]};
-        issuer.type = TC_KEY_RSA;
-        issuer.modulus = key.modulus;
-        issuer.exponent = key.exponent;
-        munit_assert_int(
-            tc_pki_verify_digest(&algorithm, &issuer, (TC_bytes){digest, digest_length},
-                                 (TC_bytes){signature, length}, NULL, &workspace, 32768),
-            ==, TC_X509_SIGNATURE_VALID);
-        munit_assert_int(tc_pki_verify_digest(&algorithm, &issuer,
-                                              (TC_bytes){digest, digest_length},
-                                              (TC_bytes){signature, length}, NULL, &workspace, 0),
-                         ==, TC_X509_SIGNATURE_LIMIT);
-        ++algorithm.salt_length;
-        munit_assert_int(
-            tc_pki_verify_digest(&algorithm, &issuer, (TC_bytes){digest, digest_length},
-                                 (TC_bytes){signature, length}, NULL, &workspace, 32768),
-            ==, TC_X509_SIGNATURE_INVALID);
-        --algorithm.salt_length;
-        signature[length - 1] ^= 1;
-        munit_assert_int(
-            tc_pki_verify_digest(&algorithm, &issuer, (TC_bytes){digest, digest_length},
-                                 (TC_bytes){signature, length}, NULL, &workspace, 32768),
-            ==, TC_X509_SIGNATURE_INVALID);
-        signature[length - 1] ^= 1;
-        if (i == 0) {
-          munit_assert_int(EVP_PKEY_CTX_set_rsa_padding(signer, RSA_PKCS1_PADDING), ==, 1);
-          length = sizeof signature;
-          munit_assert_int(EVP_PKEY_sign(signer, signature, &length, digest, digest_length), ==, 1);
-          algorithm.scheme = TC_SIGNATURE_RSA_V15;
-          munit_assert_int(
-              tc_pki_verify_digest(&algorithm, &issuer, (TC_bytes){digest, digest_length},
-                                   (TC_bytes){signature, length}, NULL, &workspace, 32768),
-              ==, TC_X509_SIGNATURE_VALID);
-          digest[0] ^= 1;
-          munit_assert_int(
-              tc_pki_verify_digest(&algorithm, &issuer, (TC_bytes){digest, digest_length},
-                                   (TC_bytes){signature, length}, NULL, &workspace, 32768),
-              ==, TC_X509_SIGNATURE_INVALID);
-          digest[0] ^= 1;
-          munit_assert_int(
-              tc_pki_verify_digest(&algorithm, &issuer, (TC_bytes){digest, digest_length - 1},
-                                   (TC_bytes){signature, length}, NULL, &workspace, 32768),
-              ==, TC_X509_SIGNATURE_ERROR);
-          munit_assert_int(tc_pki_verify_digest(&algorithm, &issuer,
-                                                (TC_bytes){digest, digest_length},
-                                                (TC_bytes){signature, length}, NULL, NULL, 32768),
-                           ==, TC_X509_SIGNATURE_ERROR);
-        }
-      }
       EVP_PKEY_CTX_free(signer);
       random_source random = {0, 0};
       munit_assert_int(sign_pss(&private_key, hash, mgf_hash, (size_t)salts[i],

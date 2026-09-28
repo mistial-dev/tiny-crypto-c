@@ -26,7 +26,7 @@ static inline int tc_cms_verification_policy_valid(TC_CMS_verification_policy po
 /* Resolve parsed SignerInfo algorithms. Hashing and signature validation follow.
  * Input spans are valid and disjoint from out. out changes only on success. */
 static inline TC_TLV_result tc_cms_signature_resolve_policy(
-    const tc_cms_signer_info* signer, const TC_X509_public_key* key, TC_TLV_profile profile,
+    const TC_CMS_signer_info* signer, const TC_X509_public_key* key, TC_TLV_profile profile,
     const TC_TLV_limits* limits, const tc_pki_tree_workspace* tree,
     TC_CMS_rsa_parameters rsa_parameters, tc_cms_signature_algorithm* out)
 {
@@ -72,14 +72,14 @@ static inline TC_TLV_result tc_cms_signature_resolve_policy(
   return result;
 }
 static inline TC_TLV_result
-tc_cms_signature_resolve_profile(const tc_cms_signer_info* signer, const TC_X509_public_key* key,
+tc_cms_signature_resolve_profile(const TC_CMS_signer_info* signer, const TC_X509_public_key* key,
                                  TC_TLV_profile profile, const TC_TLV_limits* limits,
                                  const tc_pki_tree_workspace* tree, tc_cms_signature_algorithm* out)
 {
   return tc_cms_signature_resolve_policy(signer, key, profile, limits, tree,
                                          TC_CMS_RSA_PARAMETERS_NULL, out);
 }
-static inline TC_TLV_result tc_cms_signature_resolve(const tc_cms_signer_info* signer,
+static inline TC_TLV_result tc_cms_signature_resolve(const TC_CMS_signer_info* signer,
                                                      const TC_X509_public_key* key,
                                                      tc_cms_signature_algorithm* out)
 {

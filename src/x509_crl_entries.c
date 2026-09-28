@@ -6,21 +6,10 @@
 #include <tiny_crypto/common.h>
 #if TC_ENABLE_X509_REVOCATION
 #include "x509_crl_internal.h"
-#include "x509_time_internal.h"
-#include "pki_extensions_internal.h"
-#include "pki_names_internal.h"
-#include "pki_bits_internal.h"
-#include "pki_distribution_internal.h"
-#include "pki_status_internal.h"
-#include "pki_source_internal.h"
-#include "pki_reader_internal.h"
-#include "x509_crl_source_internal.h"
-#include "pki_signature_internal.h"
-#include "hash_dispatch_internal.h"
 
 static TC_TLV_result crl_prepared_find(const TC_X509_crl_prepared* prepared,
                                        const TC_X509_certificate* certificate, size_t* work,
-                                       tc_x509_crl_match* out)
+                                       TC_X509_crl_match* out)
 {
   if (!work || (prepared->count && (!prepared->targets || !prepared->matches)) ||
       prepared->count > SIZE_MAX / sizeof *prepared->targets ||
@@ -46,15 +35,15 @@ static TC_TLV_result crl_prepared_find(const TC_X509_crl_prepared* prepared,
   return TC_TLV_UNSUPPORTED;
 }
 
-TC_TLV_result tc_x509_crl_find(const tc_x509_crl* crl, const tc_x509_crl_extension_info* extensions,
+TC_TLV_result tc_x509_crl_find(const TC_X509_crl* crl, const TC_X509_crl_extensions* extensions,
                                const TC_X509_certificate* certificate, const TC_TLV_limits* limits,
                                const tc_pki_tree_workspace* tree,
                                const TC_X509_name_workspace* names, TC_bytes* oids, size_t capacity,
-                               tc_x509_crl_match* out)
+                               TC_X509_crl_match* out)
 {
   tc_x509_crl_revoked_reader reader;
   tc_x509_crl_revoked_entry entry;
-  tc_x509_crl_match parsed = {0};
+  TC_X509_crl_match parsed = {0};
   TC_TLV_result result;
   if (!certificate || !out || !certificate->serial.data || !certificate->serial.length ||
       !certificate->issuer.data || !certificate->issuer.length)
@@ -68,7 +57,7 @@ TC_TLV_result tc_x509_crl_find(const tc_x509_crl* crl, const tc_x509_crl_extensi
       return result;
     return crl_prepared_find(crl->prepared, certificate, tree->work, out);
   }
-  const tc_x509_crl_serial_query query = {certificate->serial, certificate->issuer};
+  const TC_X509_crl_target query = {certificate->serial, certificate->issuer};
   result = tc_x509_crl_revoked_init(crl, extensions, limits, tree, &reader);
   if (result != TC_TLV_OK)
     return result;
@@ -116,7 +105,7 @@ static TC_TLV_result entry_issuer_directory_name(TC_bytes names, TC_bytes query,
 }
 
 static TC_TLV_result crl_query_matches(const tc_x509_crl_revoked_entry* entry,
-                                       const tc_x509_crl_serial_query* certificate,
+                                       const TC_X509_crl_target* certificate,
                                        const TC_TLV_limits* limits,
                                        const tc_pki_tree_workspace* tree,
                                        const TC_X509_name_workspace* names, int* matched)
@@ -146,16 +135,15 @@ TC_TLV_result tc_x509_crl_entry_matches(const tc_x509_crl_revoked_entry* entry,
 {
   if (!certificate)
     return TC_TLV_ARGUMENT;
-  const tc_x509_crl_serial_query query = {certificate->serial, certificate->issuer};
+  const TC_X509_crl_target query = {certificate->serial, certificate->issuer};
   return crl_query_matches(entry, &query, limits, tree, names, matched);
 }
 
 TC_TLV_result tc_x509_crl_match_update(const tc_x509_crl_revoked_entry* entry,
-                                       const tc_x509_crl_serial_query* query,
-                                       const TC_TLV_limits* limits,
+                                       const TC_X509_crl_target* query, const TC_TLV_limits* limits,
                                        const tc_pki_tree_workspace* tree,
                                        const TC_X509_name_workspace* names,
-                                       tc_x509_crl_match* match)
+                                       TC_X509_crl_match* match)
 {
   if (!match)
     return TC_TLV_ARGUMENT;
@@ -173,8 +161,8 @@ TC_TLV_result tc_x509_crl_match_update(const tc_x509_crl_revoked_entry* entry,
   return TC_TLV_OK;
 }
 
-TC_TLV_result tc_x509_crl_revoked_init(const tc_x509_crl* crl,
-                                       const tc_x509_crl_extension_info* extensions,
+TC_TLV_result tc_x509_crl_revoked_init(const TC_X509_crl* crl,
+                                       const TC_X509_crl_extensions* extensions,
                                        const TC_TLV_limits* limits,
                                        const tc_pki_tree_workspace* tree,
                                        tc_x509_crl_revoked_reader* out)
@@ -208,7 +196,7 @@ static TC_TLV_result entry_issuer_has_dn(TC_bytes names, const TC_TLV_limits* li
 }
 
 TC_TLV_result tc_x509_crl_entry_resolve(const tc_x509_crl_entry* entry,
-                                        const tc_x509_crl_extension_info* extensions,
+                                        const TC_X509_crl_extensions* extensions,
                                         const tc_x509_crl_entry_issuer* issuer,
                                         const TC_TLV_limits* limits,
                                         const tc_pki_tree_workspace* tree, TC_bytes* oids,
