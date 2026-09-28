@@ -9,10 +9,7 @@
 extern "C" {
 #endif
 
-typedef enum {
-  TC_PIV_CVC_CARD_APPLICATION = 0x00,
-  TC_PIV_CVC_INTERMEDIATE = 0x12
-} TC_PIV_CVC_role;
+typedef enum { TC_PIV_CVC_CARD_APPLICATION = 0x00, TC_PIV_CVC_INTERMEDIATE = 0x12 } TC_PIV_CVC_role;
 
 typedef struct {
   TC_bytes signed_data, issuer, subject, curve_oid, public_key;
@@ -50,8 +47,10 @@ typedef struct {
  * CVC chain under signer; secure messaging also requires key confirmation.
  * Requires X509, PIV_CVC and the selected EC curve; intermediates require SHA-1. */
 TC_X509_signature_result TC_PIV_CVC_chain_verify(const TC_PIV_CVC_chain_request* request,
-    const TC_TLV_limits* limits, const TC_X509_signature_provider* provider,
-    TC_EC_workspace* point_workspace, size_t* work, TC_PIV_CVC* out);
+                                                 const TC_TLV_limits* limits,
+                                                 const TC_X509_signature_provider* provider,
+                                                 TC_EC_workspace* point_workspace, size_t* work,
+                                                 TC_PIV_CVC* out);
 
 #ifdef __cplusplus
 }

@@ -1,4 +1,5 @@
 <!-- SPDX-FileCopyrightText: Mistial Dev -->
+
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 
 # Credential validation
@@ -16,9 +17,9 @@ adjustable before sizing the arena.
 
 | Profile | Path certificates | CMS candidates | CRL records |
 | :------ | ----------------: | -------------: | ----------: |
-| Micro | 4 | 8 | 4 |
-| Mini | 8 | 16 | 16 |
-| Desktop | 16 | 128 | 128 |
+| Micro   |                 4 |              8 |           4 |
+| Mini    |                 8 |             16 |          16 |
+| Desktop |                16 |            128 |         128 |
 
 Profiles select resource capacities. Build options select algorithms. Choose
 capacities for your provisioned trust set and the credentials you accept; a
@@ -87,9 +88,9 @@ card's CVC chain. Secure-messaging key confirmation completes session setup.
 For signed card objects:
 
 1. Validate the card certificate and read its identifiers.
-2. Pass the identifiers and card expiration to `TC_PIV_CHUID_validate`.
-3. Use the returned CHUID and signer for biometric and Security Object requests.
-4. Pass a successful `TC_PIV_security_result` to
+1. Pass the identifiers and card expiration to `TC_PIV_CHUID_validate`.
+1. Use the returned CHUID and signer for biometric and Security Object requests.
+1. Pass a successful `TC_PIV_security_result` to
    `TC_TWIC_unsigned_CHUID_validate` to check container 3002.
 
 CHUID and Security Object results borrow original buffers and inventory

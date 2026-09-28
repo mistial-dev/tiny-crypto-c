@@ -10,10 +10,14 @@
 extern "C" {
 #endif
 enum { TC_TWIC_TPK_BYTES = 16 };
-typedef struct { uint8_t key[TC_TWIC_TPK_BYTES]; } TC_TWIC_tpk;
+typedef struct {
+  uint8_t key[TC_TWIC_TPK_BYTES];
+} TC_TWIC_tpk;
 #if TC_ENABLE_TWIC_TPK
 typedef enum {
-  TC_TWIC_TPK_CARD, TC_TWIC_TPK_BARCODE_HEX, TC_TWIC_TPK_CONTENTS
+  TC_TWIC_TPK_CARD,
+  TC_TWIC_TPK_BARCODE_HEX,
+  TC_TWIC_TPK_CONTENTS
 } TC_TWIC_tpk_encoding;
 
 /* Read a complete DFC101 container or its hexadecimal ZTA field value.
@@ -31,15 +35,15 @@ TC_TLV_result TC_TWIC_tpk_read(TC_bytes input, TC_TWIC_tpk_encoding encoding, TC
  * Bad arguments preserve buffers. Processing failures wipe the padded region
  * and preserve ciphertext_length. Key, buffer capacity and output-length
  * storage must be disjoint. Bytes beyond the padded region remain unchanged. */
-TC_status TC_TWIC_object_encrypt(const TC_TWIC_tpk* key, uint8_t* buffer,
-    size_t length, size_t capacity, size_t* ciphertext_length);
+TC_status TC_TWIC_object_encrypt(const TC_TWIC_tpk* key, uint8_t* buffer, size_t length,
+                                 size_t capacity, size_t* ciphertext_length);
 /* Decrypt a complete enciphered BC value in place and check PKCS#7 padding.
  * On OK, plaintext_length excludes padding; removed padding bytes are wiped.
  * Bad arguments preserve buffers. Processing failures wipe the entire buffer
  * and preserve plaintext_length. All buffers and key storage must be disjoint.
  * Authenticate the recovered object's signature before using its contents. */
-TC_status TC_TWIC_object_decrypt(const TC_TWIC_tpk* key, uint8_t* buffer,
-    size_t length, size_t* plaintext_length);
+TC_status TC_TWIC_object_decrypt(const TC_TWIC_tpk* key, uint8_t* buffer, size_t length,
+                                 size_t* plaintext_length);
 #endif
 #ifdef __cplusplus
 }

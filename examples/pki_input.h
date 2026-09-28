@@ -19,8 +19,8 @@ int example_read_file(const char* path, uint8_t* buffer, size_t capacity, TC_byt
  * Returns 1 on success; out borrows buffer. Both outputs stay unchanged on
  * failure. Missing timestamps fail the read. Read/close failures clear buffer;
  * invalid arguments and open failures leave it unchanged. */
-int example_read_created_file(const char* path, uint8_t* buffer, size_t capacity,
-    TC_bytes* out, uint64_t* created);
+int example_read_created_file(const char* path, uint8_t* buffer, size_t capacity, TC_bytes* out,
+                              uint64_t* created);
 
 /* Borrow a seekable binary stream for bounded source reads. Keep the file open
  * and immutable until processing finishes; serialize access to its seek position.

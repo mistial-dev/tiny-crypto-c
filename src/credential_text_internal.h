@@ -11,7 +11,7 @@ int tc_credential_hex_digit(uint8_t value);
 unsigned tc_credential_month3(const uint8_t value[3], int title_case);
 
 /* Parse a full Gregorian YYYYMMDD date. Output pointers may be null. */
-int tc_credential_yyyymmdd(const uint8_t* value, size_t length,
-    unsigned* year, unsigned* month, unsigned* day);
+int tc_credential_yyyymmdd(const uint8_t* value, size_t length, unsigned* year, unsigned* month,
+                           unsigned* day);
 
 #endif

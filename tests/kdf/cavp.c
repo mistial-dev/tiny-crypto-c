@@ -28,16 +28,15 @@
 #if defined(TC_KDF_CAVP) && (TC_KDF_CAVP == 1) && TC_ENABLE_KDF
 
 typedef TC_status (*kdf_counter_fn)(const uint8_t*, size_t, const struct TC_KBKDF_params*,
-                                    const uint8_t*, size_t, const uint8_t*, size_t,
-                                    uint8_t*, size_t);
+                                    const uint8_t*, size_t, const uint8_t*, size_t, uint8_t*,
+                                    size_t);
 typedef TC_status (*kdf_feedback_fn)(const uint8_t*, size_t, const struct TC_KBKDF_params*,
-                                     const uint8_t*, size_t, const uint8_t*, size_t,
-                                     uint8_t*, size_t);
+                                     const uint8_t*, size_t, const uint8_t*, size_t, uint8_t*,
+                                     size_t);
 typedef TC_status (*kdf_pipeline_fn)(const uint8_t*, size_t, const struct TC_KBKDF_params*,
                                      const uint8_t*, size_t, uint8_t*, size_t);
 
-struct kdf_cavp_prf
-{
+struct kdf_cavp_prf {
   const char* name;
   size_t h;
   kdf_counter_fn counter;
@@ -48,45 +47,44 @@ struct kdf_cavp_prf
 
 static const struct kdf_cavp_prf kdf_cavp_prfs[] = {
 #if TC_KBKDF_HAVE_HMAC_SHA1
-  { "HMAC_SHA1", TC_SHA1_DIGESTLEN, TC_KBKDF_HMAC_SHA1_counter,
-    TC_KBKDF_HMAC_SHA1_feedback, TC_KBKDF_HMAC_SHA1_pipeline, 0 },
+    {"HMAC_SHA1", TC_SHA1_DIGESTLEN, TC_KBKDF_HMAC_SHA1_counter, TC_KBKDF_HMAC_SHA1_feedback,
+     TC_KBKDF_HMAC_SHA1_pipeline, 0},
 #endif
 #if TC_KBKDF_HAVE_HMAC_SHA224
-  { "HMAC_SHA224", TC_SHA224_DIGESTLEN, TC_KBKDF_HMAC_SHA224_counter,
-    TC_KBKDF_HMAC_SHA224_feedback, TC_KBKDF_HMAC_SHA224_pipeline, 0 },
+    {"HMAC_SHA224", TC_SHA224_DIGESTLEN, TC_KBKDF_HMAC_SHA224_counter,
+     TC_KBKDF_HMAC_SHA224_feedback, TC_KBKDF_HMAC_SHA224_pipeline, 0},
 #endif
 #if TC_KBKDF_HAVE_HMAC_SHA256
-  { "HMAC_SHA256", TC_SHA256_DIGESTLEN, TC_KBKDF_HMAC_SHA256_counter,
-    TC_KBKDF_HMAC_SHA256_feedback, TC_KBKDF_HMAC_SHA256_pipeline, 0 },
+    {"HMAC_SHA256", TC_SHA256_DIGESTLEN, TC_KBKDF_HMAC_SHA256_counter,
+     TC_KBKDF_HMAC_SHA256_feedback, TC_KBKDF_HMAC_SHA256_pipeline, 0},
 #endif
 #if TC_KBKDF_HAVE_HMAC_SHA384
-  { "HMAC_SHA384", TC_SHA384_DIGESTLEN, TC_KBKDF_HMAC_SHA384_counter,
-    TC_KBKDF_HMAC_SHA384_feedback, TC_KBKDF_HMAC_SHA384_pipeline, 0 },
+    {"HMAC_SHA384", TC_SHA384_DIGESTLEN, TC_KBKDF_HMAC_SHA384_counter,
+     TC_KBKDF_HMAC_SHA384_feedback, TC_KBKDF_HMAC_SHA384_pipeline, 0},
 #endif
 #if TC_KBKDF_HAVE_HMAC_SHA512
-  { "HMAC_SHA512", TC_SHA512_DIGESTLEN, TC_KBKDF_HMAC_SHA512_counter,
-    TC_KBKDF_HMAC_SHA512_feedback, TC_KBKDF_HMAC_SHA512_pipeline, 0 },
+    {"HMAC_SHA512", TC_SHA512_DIGESTLEN, TC_KBKDF_HMAC_SHA512_counter,
+     TC_KBKDF_HMAC_SHA512_feedback, TC_KBKDF_HMAC_SHA512_pipeline, 0},
 #endif
 #if TC_KBKDF_HAVE_AES_CMAC
-  { "CMAC_AES128", TC_AES_CMAC_TAG_MAX, TC_KBKDF_AES_CMAC_counter,
-    TC_KBKDF_AES_CMAC_feedback, TC_KBKDF_AES_CMAC_pipeline, 128 },
-  { "CMAC_AES192", TC_AES_CMAC_TAG_MAX, TC_KBKDF_AES_CMAC_counter,
-    TC_KBKDF_AES_CMAC_feedback, TC_KBKDF_AES_CMAC_pipeline, 192 },
-  { "CMAC_AES256", TC_AES_CMAC_TAG_MAX, TC_KBKDF_AES_CMAC_counter,
-    TC_KBKDF_AES_CMAC_feedback, TC_KBKDF_AES_CMAC_pipeline, 256 },
+    {"CMAC_AES128", TC_AES_CMAC_TAG_MAX, TC_KBKDF_AES_CMAC_counter, TC_KBKDF_AES_CMAC_feedback,
+     TC_KBKDF_AES_CMAC_pipeline, 128},
+    {"CMAC_AES192", TC_AES_CMAC_TAG_MAX, TC_KBKDF_AES_CMAC_counter, TC_KBKDF_AES_CMAC_feedback,
+     TC_KBKDF_AES_CMAC_pipeline, 192},
+    {"CMAC_AES256", TC_AES_CMAC_TAG_MAX, TC_KBKDF_AES_CMAC_counter, TC_KBKDF_AES_CMAC_feedback,
+     TC_KBKDF_AES_CMAC_pipeline, 256},
 #endif
 #if TC_KBKDF_HAVE_DES_CMAC
-  { "CMAC_TDES2", TC_DES_CMAC_TAG_MAX, TC_KBKDF_DES_CMAC_counter,
-    TC_KBKDF_DES_CMAC_feedback, TC_KBKDF_DES_CMAC_pipeline, 0 },
-  { "CMAC_TDES3", TC_DES_CMAC_TAG_MAX, TC_KBKDF_DES_CMAC_counter,
-    TC_KBKDF_DES_CMAC_feedback, TC_KBKDF_DES_CMAC_pipeline, 0 },
+    {"CMAC_TDES2", TC_DES_CMAC_TAG_MAX, TC_KBKDF_DES_CMAC_counter, TC_KBKDF_DES_CMAC_feedback,
+     TC_KBKDF_DES_CMAC_pipeline, 0},
+    {"CMAC_TDES3", TC_DES_CMAC_TAG_MAX, TC_KBKDF_DES_CMAC_counter, TC_KBKDF_DES_CMAC_feedback,
+     TC_KBKDF_DES_CMAC_pipeline, 0},
 #endif
-  { NULL, 0, NULL, NULL, NULL, 0 }
-};
+    {NULL, 0, NULL, NULL, NULL, 0}};
 
 /* PRF sections this binary runs: 480 (or 40) vectors each. */
-#define KDF_CAVP_NON_AES_PRFS \
-  (TC_KBKDF_HAVE_HMAC_SHA1 + TC_KBKDF_HAVE_HMAC_SHA224 + TC_KBKDF_HAVE_HMAC_SHA256 + \
+#define KDF_CAVP_NON_AES_PRFS                                                                      \
+  (TC_KBKDF_HAVE_HMAC_SHA1 + TC_KBKDF_HAVE_HMAC_SHA224 + TC_KBKDF_HAVE_HMAC_SHA256 +               \
    TC_KBKDF_HAVE_HMAC_SHA384 + TC_KBKDF_HAVE_HMAC_SHA512 + 2 * TC_KBKDF_HAVE_DES_CMAC)
 #if TC_AES_KEY_BITS == 128
 #define KDF_CAVP_ACTIVE_PRFS (KDF_CAVP_NON_AES_PRFS + TC_KBKDF_HAVE_AES_CMAC)
@@ -98,8 +96,7 @@ static const struct kdf_cavp_prf kdf_cavp_prfs[] = {
 static const struct kdf_cavp_prf* kdf_cavp_lookup(const char* name)
 {
   const struct kdf_cavp_prf* p;
-  for (p = kdf_cavp_prfs; p->name != NULL; ++p)
-  {
+  for (p = kdf_cavp_prfs; p->name != NULL; ++p) {
     if (strcmp(p->name, name) != 0)
       continue;
     if (p->aes_bits == 0)
@@ -109,18 +106,26 @@ static const struct kdf_cavp_prf* kdf_cavp_lookup(const char* name)
   return NULL;
 }
 
-#define KDF_CAVP_MODE_COUNTER  0
+#define KDF_CAVP_MODE_COUNTER 0
 #define KDF_CAVP_MODE_FEEDBACK 1
 #define KDF_CAVP_MODE_PIPELINE 2
 
 /* Field maxima in the corpus: KI/IV <= 64, fixed <= 60, KO <= 300 bytes. */
-struct kdf_cavp_record
-{
-  uint8_t ki[64];   long ki_len;
-  uint8_t iv[64];   long iv_len;   long iv_bits;
-  uint8_t fixed[64]; long fixed_len; long fixed_bytes;
-  uint8_t before[64]; long before_len; long before_bytes;
-  uint8_t after[64];  long after_len;  long after_bytes;
+struct kdf_cavp_record {
+  uint8_t ki[64];
+  long ki_len;
+  uint8_t iv[64];
+  long iv_len;
+  long iv_bits;
+  uint8_t fixed[64];
+  long fixed_len;
+  long fixed_bytes;
+  uint8_t before[64];
+  long before_len;
+  long before_bytes;
+  uint8_t after[64];
+  long after_len;
+  long after_bytes;
   long l_bits;
   long count;
 };
@@ -131,8 +136,7 @@ static void cavp_open(tc_cavp_reader* reader, const char* relative, char* line, 
     munit_errorf("cannot open CAVP file %s/%s", KDF_CAVP_DIR, relative);
 }
 
-struct kdf_cavp_stats
-{
+struct kdf_cavp_stats {
   long total;
   long ran;
   long empty_iv;
@@ -156,28 +160,24 @@ static void cavp_run_file(const char* relative, int mode, int has_counter,
   memset(&rec, 0, sizeof(rec));
 
   cavp_open(&reader, relative, line, sizeof line);
-  while ((event = tc_cavp_next(&reader)) != TC_CAVP_END)
-  {
+  while ((event = tc_cavp_next(&reader)) != TC_CAVP_END) {
     const char* v = reader.value;
 
     if (event == TC_CAVP_FAILURE)
       munit_errorf("%s: unreadable line %lu", relative, reader.line_number);
     if (event == TC_CAVP_RECORD_END)
       continue;
-    if (event == TC_CAVP_HEADER)
-    {
+    if (event == TC_CAVP_HEADER) {
       /* Settings persist until a later group names them again. */
       char value[32];
       if (strncmp(reader.name, "PRF", 3) != 0 && strncmp(reader.name, "CTRLOCATION", 11) != 0 &&
           strncmp(reader.name, "RLEN", 4) != 0)
         munit_errorf("%s: unknown section header [%s]", relative, reader.name);
-      if (tc_cavp_header_value(&reader, "PRF", value, sizeof value) != NULL)
-      {
+      if (tc_cavp_header_value(&reader, "PRF", value, sizeof value) != NULL) {
         prf = kdf_cavp_lookup(value);
         active = (prf != NULL);
       }
-      if (tc_cavp_header_value(&reader, "CTRLOCATION", value, sizeof value) != NULL)
-      {
+      if (tc_cavp_header_value(&reader, "CTRLOCATION", value, sizeof value) != NULL) {
         if (strlen(value) >= sizeof location)
           munit_errorf("%s: CTRLOCATION %s too long", relative, value);
         strcpy(location, value);
@@ -187,8 +187,7 @@ static void cavp_run_file(const char* relative, int mode, int has_counter,
       continue;
     }
 
-    if (tc_cavp_is(&reader, "COUNT"))
-    {
+    if (tc_cavp_is(&reader, "COUNT")) {
       memset(&rec, 0, sizeof(rec));
       rec.ki_len = rec.iv_len = rec.fixed_len = rec.before_len = rec.after_len = -1;
       rec.iv_bits = rec.fixed_bytes = rec.before_bytes = rec.after_bytes = -1;
@@ -216,8 +215,7 @@ static void cavp_run_file(const char* relative, int mode, int has_counter,
       rec.after_bytes = strtol(v, NULL, 10);
     else if (tc_cavp_is(&reader, "DataAfterCtrData"))
       rec.after_len = tc_cavp_parse_hex(v, rec.after, sizeof(rec.after));
-    else if (tc_cavp_is(&reader, "KO"))
-    {
+    else if (tc_cavp_is(&reader, "KO")) {
       long ko_len = tc_cavp_parse_hex(v, ko, sizeof(ko));
       struct TC_KBKDF_params p;
       TC_status rc;
@@ -244,37 +242,27 @@ static void cavp_run_file(const char* relative, int mode, int has_counter,
       p.counter_location = 0;
       p.use_counter = (uint8_t)has_counter;
 
-      if (mode == KDF_CAVP_MODE_COUNTER)
-      {
+      if (mode == KDF_CAVP_MODE_COUNTER) {
         const uint8_t* before = NULL;
         const uint8_t* after = NULL;
         size_t before_len = 0, after_len = 0;
-        if (strcmp(location, "BEFORE_FIXED") == 0)
-        {
+        if (strcmp(location, "BEFORE_FIXED") == 0) {
           after = rec.fixed;
           after_len = (size_t)rec.fixed_len;
-        }
-        else if (strcmp(location, "AFTER_FIXED") == 0)
-        {
+        } else if (strcmp(location, "AFTER_FIXED") == 0) {
           before = rec.fixed;
           before_len = (size_t)rec.fixed_len;
-        }
-        else if (strcmp(location, "MIDDLE_FIXED") == 0)
-        {
+        } else if (strcmp(location, "MIDDLE_FIXED") == 0) {
           before = rec.before;
           before_len = (size_t)rec.before_len;
           after = rec.after;
           after_len = (size_t)rec.after_len;
-        }
-        else
+        } else
           munit_errorf("%s: unknown CTRLOCATION %s", relative, location);
-        rc = prf->counter(rec.ki, (size_t)rec.ki_len, &p, before, before_len,
-                          after, after_len, actual, (size_t)ko_len);
-      }
-      else
-      {
-        if (has_counter)
-        {
+        rc = prf->counter(rec.ki, (size_t)rec.ki_len, &p, before, before_len, after, after_len,
+                          actual, (size_t)ko_len);
+      } else {
+        if (has_counter) {
           if (strcmp(location, "BEFORE_ITER") == 0)
             p.counter_location = TC_KBKDF_CTR_BEFORE_ITER;
           else if (strcmp(location, "AFTER_ITER") == 0)
@@ -285,18 +273,17 @@ static void cavp_run_file(const char* relative, int mode, int has_counter,
             munit_errorf("%s: unknown CTRLOCATION %s", relative, location);
         }
         if (mode == KDF_CAVP_MODE_FEEDBACK)
-          rc = prf->feedback(rec.ki, (size_t)rec.ki_len, &p, rec.iv, (size_t)rec.iv_len,
-                             rec.fixed, (size_t)rec.fixed_len, actual, (size_t)ko_len);
+          rc = prf->feedback(rec.ki, (size_t)rec.ki_len, &p, rec.iv, (size_t)rec.iv_len, rec.fixed,
+                             (size_t)rec.fixed_len, actual, (size_t)ko_len);
         else
-          rc = prf->pipeline(rec.ki, (size_t)rec.ki_len, &p,
-                             rec.fixed, (size_t)rec.fixed_len, actual, (size_t)ko_len);
+          rc = prf->pipeline(rec.ki, (size_t)rec.ki_len, &p, rec.fixed, (size_t)rec.fixed_len,
+                             actual, (size_t)ko_len);
       }
 
       if (rc != TC_OK)
-        munit_errorf("%s [PRF=%s][CTRLOCATION=%s][RLEN=%ld] COUNT=%ld: derivation failed",
-                     relative, prf->name, location, rlen, rec.count);
-      if (memcmp(actual, ko, (size_t)ko_len) != 0)
-      {
+        munit_errorf("%s [PRF=%s][CTRLOCATION=%s][RLEN=%ld] COUNT=%ld: derivation failed", relative,
+                     prf->name, location, rlen, rec.count);
+      if (memcmp(actual, ko, (size_t)ko_len) != 0) {
         fprintf(stderr, "KBKDF CAVP mismatch in %s [PRF=%s][CTRLOCATION=%s][RLEN=%ld] COUNT=%ld\n",
                 relative, prf->name, location, rlen, rec.count);
         tc_cavp_print_bytes("expected", ko, (size_t)ko_len);
@@ -318,8 +305,8 @@ static void cavp_check_counts(const struct kdf_cavp_stats* stats, long total, lo
 MunitResult test_kbkdf_cavp_counter(const MunitParameter params[], void* data)
 {
   struct kdf_cavp_stats stats;
-  (void) params;
-  (void) data;
+  (void)params;
+  (void)data;
 
   cavp_run_file("KDFCTR_gen.rsp", KDF_CAVP_MODE_COUNTER, 1, &stats);
   cavp_check_counts(&stats, 4800, 480);
@@ -329,8 +316,8 @@ MunitResult test_kbkdf_cavp_counter(const MunitParameter params[], void* data)
 MunitResult test_kbkdf_cavp_feedback(const MunitParameter params[], void* data)
 {
   struct kdf_cavp_stats stats;
-  (void) params;
-  (void) data;
+  (void)params;
+  (void)data;
 
   cavp_run_file("KDFFeedbackWithZeroIV_gen.rsp", KDF_CAVP_MODE_FEEDBACK, 1, &stats);
   cavp_check_counts(&stats, 4800, 480);
@@ -349,8 +336,8 @@ MunitResult test_kbkdf_cavp_feedback(const MunitParameter params[], void* data)
 MunitResult test_kbkdf_cavp_pipeline(const MunitParameter params[], void* data)
 {
   struct kdf_cavp_stats stats;
-  (void) params;
-  (void) data;
+  (void)params;
+  (void)data;
 
   cavp_run_file("KDFDblPipelineWithCtr_gen.rsp", KDF_CAVP_MODE_PIPELINE, 1, &stats);
   cavp_check_counts(&stats, 4800, 480);
@@ -363,10 +350,22 @@ MunitResult test_kbkdf_cavp_pipeline(const MunitParameter params[], void* data)
 #else /* !TC_KDF_CAVP */
 
 MunitResult test_kbkdf_cavp_counter(const MunitParameter params[], void* data)
-{ (void) params; (void) data; return MUNIT_SKIP; }
+{
+  (void)params;
+  (void)data;
+  return MUNIT_SKIP;
+}
 MunitResult test_kbkdf_cavp_feedback(const MunitParameter params[], void* data)
-{ (void) params; (void) data; return MUNIT_SKIP; }
+{
+  (void)params;
+  (void)data;
+  return MUNIT_SKIP;
+}
 MunitResult test_kbkdf_cavp_pipeline(const MunitParameter params[], void* data)
-{ (void) params; (void) data; return MUNIT_SKIP; }
+{
+  (void)params;
+  (void)data;
+  return MUNIT_SKIP;
+}
 
 #endif /* TC_KDF_CAVP */

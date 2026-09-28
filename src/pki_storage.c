@@ -4,8 +4,8 @@
  * Storage preflight shared by operations that write caller-owned buffers. */
 #include "pki_storage_internal.h"
 
-void tc_pki_storage_plan_begin(tc_pki_storage_plan* plan, TC_bytes* writes,
-    size_t capacity, size_t budget)
+void tc_pki_storage_plan_begin(tc_pki_storage_plan* plan, TC_bytes* writes, size_t capacity,
+                               size_t budget)
 {
   plan->writes = writes;
   plan->count = 0;
@@ -16,8 +16,8 @@ void tc_pki_storage_plan_begin(tc_pki_storage_plan* plan, TC_bytes* writes,
   plan->status = writes || !capacity ? TC_TLV_OK : TC_TLV_ARGUMENT;
 }
 
-void tc_pki_storage_plan_write(tc_pki_storage_plan* plan, const void* data,
-    size_t count, size_t width)
+void tc_pki_storage_plan_write(tc_pki_storage_plan* plan, const void* data, size_t count,
+                               size_t width)
 {
   if (plan->status != TC_TLV_OK)
     return;
@@ -62,8 +62,8 @@ void tc_pki_storage_plan_input_span(tc_pki_storage_plan* plan, TC_bytes input)
   plan->status = tc_pki_storage_input(plan->writes, plan->count, input, &plan->budget);
 }
 
-void tc_pki_storage_plan_input(tc_pki_storage_plan* plan, const void* data,
-    size_t count, size_t width)
+void tc_pki_storage_plan_input(tc_pki_storage_plan* plan, const void* data, size_t count,
+                               size_t width)
 {
   TC_bytes input;
   if (plan->status != TC_TLV_OK)
@@ -72,8 +72,8 @@ void tc_pki_storage_plan_input(tc_pki_storage_plan* plan, const void* data,
   tc_pki_storage_plan_input_span(plan, input);
 }
 
-void tc_pki_storage_plan_input_spans(tc_pki_storage_plan* plan,
-    const TC_bytes* inputs, size_t count)
+void tc_pki_storage_plan_input_spans(tc_pki_storage_plan* plan, const TC_bytes* inputs,
+                                     size_t count)
 {
   size_t i;
   for (i = 0; i < count && plan->status == TC_TLV_OK; ++i)

@@ -20,20 +20,22 @@ typedef struct {
 /* Internal scratch storage. Inputs are decoded OIDs and must not overlap it.
  * On failure discard the graph. OID bytes remain borrowed from certificates. */
 TC_TLV_result tc_x509_policy_graph_init(tc_x509_policy_graph* graph);
-TC_TLV_result tc_x509_policy_graph_step(tc_x509_policy_graph* graph,
-    const TC_bytes* policies, size_t policy_count,
-    const TC_X509_policy_mapping* mappings, size_t mapping_count,
-    int allow_any, int allow_mapping, size_t* work);
+TC_TLV_result tc_x509_policy_graph_step(tc_x509_policy_graph* graph, const TC_bytes* policies,
+                                        size_t policy_count, const TC_X509_policy_mapping* mappings,
+                                        size_t mapping_count, int allow_any, int allow_mapping,
+                                        size_t* work);
 TC_TLV_result tc_x509_policy_graph_map(tc_x509_policy_graph* graph,
-    const TC_X509_policy_mapping* mappings, size_t mapping_count,
-    int allow_mapping, size_t* work);
+                                       const TC_X509_policy_mapping* mappings, size_t mapping_count,
+                                       int allow_mapping, size_t* work);
 /* Output contains OIDs in the caller's initial policy namespace, not mapped
  * leaf OIDs. Output storage is scratch; count changes only on success. */
 TC_TLV_result tc_x509_policy_graph_output(const tc_x509_policy_graph* graph,
-    const TC_bytes* initial, size_t initial_count, TC_bytes anchor_set,
-    const TC_TLV_limits* limits, TC_bytes* output,
-    size_t capacity, size_t* work, size_t* count);
+                                          const TC_bytes* initial, size_t initial_count,
+                                          TC_bytes anchor_set, const TC_TLV_limits* limits,
+                                          TC_bytes* output, size_t capacity, size_t* work,
+                                          size_t* count);
 /* Qualifiers are checked but not included in the policy-set output. */
-TC_TLV_result tc_x509_policy_qualifiers_check(const TC_X509_policy* policy,
-    int critical, const TC_TLV_limits* limits, TC_TLV_frame* frames, size_t capacity, size_t* work);
+TC_TLV_result tc_x509_policy_qualifiers_check(const TC_X509_policy* policy, int critical,
+                                              const TC_TLV_limits* limits, TC_TLV_frame* frames,
+                                              size_t capacity, size_t* work);
 #endif

@@ -25,23 +25,33 @@ typedef enum {
   EXAMPLE_CARD_KEY_CARD_AUTHENTICATION = 0x9e
 } ExampleCardKeyReference;
 typedef enum {
-  EXAMPLE_CARD_OK, EXAMPLE_CARD_STATUS, EXAMPLE_CARD_LIMIT,
-  EXAMPLE_CARD_TRANSPORT, EXAMPLE_CARD_PROTOCOL, EXAMPLE_CARD_ARGUMENT, EXAMPLE_CARD_REFUSED
+  EXAMPLE_CARD_OK,
+  EXAMPLE_CARD_STATUS,
+  EXAMPLE_CARD_LIMIT,
+  EXAMPLE_CARD_TRANSPORT,
+  EXAMPLE_CARD_PROTOCOL,
+  EXAMPLE_CARD_ARGUMENT,
+  EXAMPLE_CARD_REFUSED
 } ExampleCardResult;
 
 /* Return nonzero only for a complete response, including its two status bytes.
  * Write at most capacity bytes and set length only after a successful transfer.
  * The callback must finish synchronously and keep command/response bytes private. */
-typedef int (*ExampleCardTransmit)(void* context, const uint8_t* command,
-    size_t command_length, uint8_t* response, size_t capacity, size_t* length);
+typedef int (*ExampleCardTransmit)(void* context, const uint8_t* command, size_t command_length,
+                                   uint8_t* response, size_t capacity, size_t* length);
 typedef struct {
   ExampleCardTransmit transmit;
   void* context;
   size_t exchanges_left;
   int stopped;
 } ExampleCardIO;
-typedef struct { size_t length; uint16_t status; } ExampleCardResponse;
-typedef struct { int used; } ExampleCardPIN;
+typedef struct {
+  size_t length;
+  uint16_t status;
+} ExampleCardResponse;
+typedef struct {
+  int used;
+} ExampleCardPIN;
 
 /* Initialize guard to zero once per utility run, retaining it across reconnects.
  * Requires a validated PIV selection on a contact reader and a held transaction.
@@ -51,17 +61,19 @@ typedef struct { int used; } ExampleCardPIN;
  * transport failures stop the session. No length correction or retry is used.
  * status changes only when a complete card status is received. */
 ExampleCardResult example_card_verify_pin(ExampleCardIO* io, ExampleCardPIN* guard,
-    const uint8_t* digits, size_t length, uint16_t* status);
+                                          const uint8_t* digits, size_t length, uint16_t* status);
 typedef enum {
-  EXAMPLE_CARD_MODEL_PIV, EXAMPLE_CARD_MODEL_TWIC_LEGACY, EXAMPLE_CARD_MODEL_TWIC_NEXGEN
+  EXAMPLE_CARD_MODEL_PIV,
+  EXAMPLE_CARD_MODEL_TWIC_LEGACY,
+  EXAMPLE_CARD_MODEL_TWIC_NEXGEN
 } ExampleCardModel;
 
 /* Check SELECT response framing and the unique 61/4F application identity.
  * Supports PIV 1.0 and production TWIC 1.1/1.3. Optional properties retain
  * their own schemas. Input and out must be disjoint; out changes only on OK.
  * Limits: 4096 response bytes, 64 elements and four constructed levels. */
-TC_TLV_result example_card_identity(TC_bytes response,
-    ExampleCardApplication expected, ExampleCardModel* out);
+TC_TLV_result example_card_identity(TC_bytes response, ExampleCardApplication expected,
+                                    ExampleCardModel* out);
 
 /* Hold the reader transaction for the whole operation. Buffer, io, out and
  * callback state must occupy separate storage. Responses accumulate in buffer;
@@ -70,9 +82,9 @@ TC_TLV_result example_card_identity(TC_bytes response,
  * bytes and stop this IO session. Argument errors preserve all storage.
  * Parse and validate the returned object before using its contents. */
 ExampleCardResult example_card_select(ExampleCardIO* io, ExampleCardApplication application,
-    uint8_t* buffer, size_t capacity, ExampleCardResponse* out);
-ExampleCardResult example_card_read(ExampleCardIO* io, const uint8_t* tag,
-    size_t tag_length, uint8_t* buffer, size_t capacity, ExampleCardResponse* out);
+                                      uint8_t* buffer, size_t capacity, ExampleCardResponse* out);
+ExampleCardResult example_card_read(ExampleCardIO* io, const uint8_t* tag, size_t tag_length,
+                                    uint8_t* buffer, size_t capacity, ExampleCardResponse* out);
 
 /* Select explicitly when the card and reader support extended APDUs.
  * Requests min(capacity - 2, 65535) bytes, following 61xx with GET RESPONSE.
@@ -81,24 +93,32 @@ ExampleCardResult example_card_read(ExampleCardIO* io, const uint8_t* tag,
  * GET DATA length errors stop the session; GET RESPONSE allows one correction.
  * Requires capacity >= 3. The ownership and failure rules above also apply. */
 ExampleCardResult example_card_read_extended(ExampleCardIO* io, const uint8_t* tag,
-    size_t tag_length, uint8_t* buffer, size_t capacity, ExampleCardResponse* out);
+                                             size_t tag_length, uint8_t* buffer, size_t capacity,
+                                             ExampleCardResponse* out);
 
 /* Read one complete 53 object envelope using the selected APDU format.
  * Accepts 9000 or 6282 only after checking exact outer framing. The returned
  * status retains the card's value. Contents still require schema and signature
  * validation. Framing failures wipe buffer and stop the session. */
 ExampleCardResult example_card_object_read(ExampleCardIO* io, ExampleCardReadMode mode,
-    const uint8_t* tag, size_t tag_length, uint8_t* buffer, size_t capacity,
-    ExampleCardResponse* out);
+                                           const uint8_t* tag, size_t tag_length, uint8_t* buffer,
+                                           size_t capacity, ExampleCardResponse* out);
 
 enum { EXAMPLE_TWIC_OBJECTS = 8 };
 enum {
-  EXAMPLE_TWIC_CHUID = 0x3000, EXAMPLE_TWIC_UNSIGNED_CHUID = 0x3002,
-  EXAMPLE_TWIC_FINGERPRINTS = 0x2003, EXAMPLE_TWIC_FACE = 0x6030,
-  EXAMPLE_TWIC_PRINTED = 0x3001, EXAMPLE_TWIC_IRIS = 0x1015,
-  EXAMPLE_TWIC_PERSONAL = 0x6011, EXAMPLE_TWIC_HANDWRITTEN = 0x6012
+  EXAMPLE_TWIC_CHUID = 0x3000,
+  EXAMPLE_TWIC_UNSIGNED_CHUID = 0x3002,
+  EXAMPLE_TWIC_FINGERPRINTS = 0x2003,
+  EXAMPLE_TWIC_FACE = 0x6030,
+  EXAMPLE_TWIC_PRINTED = 0x3001,
+  EXAMPLE_TWIC_IRIS = 0x1015,
+  EXAMPLE_TWIC_PERSONAL = 0x6011,
+  EXAMPLE_TWIC_HANDWRITTEN = 0x6012
 };
-typedef struct { uint16_t container; TC_bytes contents; } ExampleTWICObject;
+typedef struct {
+  uint16_t container;
+  TC_bytes contents;
+} ExampleTWICObject;
 typedef struct {
   ExampleTWICObject objects[EXAMPLE_TWIC_OBJECTS];
   size_t count;
@@ -115,8 +135,10 @@ typedef struct {
  * Work bounds parsing bytes; io bounds exchanges. Inputs and writable ranges
  * are disjoint. Only OK writes out. Processing failures wipe the pool and stop
  * the session. This collects data; authenticate it before making decisions. */
-ExampleCardResult example_twic_inventory_read(ExampleCardIO* io, ExampleCardModel model, ExampleCardReadMode mode,
-    uint8_t* pool, size_t capacity, size_t max_object, size_t* work, ExampleTWICInventory* out);
+ExampleCardResult example_twic_inventory_read(ExampleCardIO* io, ExampleCardModel model,
+                                              ExampleCardReadMode mode, uint8_t* pool,
+                                              size_t capacity, size_t max_object, size_t* work,
+                                              ExampleTWICInventory* out);
 
 /* PIV/card-authentication key (9A/9E), SP 800-73-5 Part 2 Appendix A.4.
  * Supply the complete RSA representative or EC digest for the selected algorithm.
@@ -128,8 +150,9 @@ ExampleCardResult example_twic_inventory_read(ExampleCardIO* io, ExampleCardMode
  * is submitted once per chain; failures stop the session. Input, buffer, io,
  * callback state and out are disjoint. Argument errors preserve caller state. */
 ExampleCardResult example_card_authenticate(ExampleCardIO* io, ExampleCardAlgorithm algorithm,
-    ExampleCardKeyReference reference, TC_bytes challenge,
-    uint8_t* buffer, size_t capacity, ExampleCardResponse* out);
+                                            ExampleCardKeyReference reference, TC_bytes challenge,
+                                            uint8_t* buffer, size_t capacity,
+                                            ExampleCardResponse* out);
 #ifdef __cplusplus
 }
 #endif

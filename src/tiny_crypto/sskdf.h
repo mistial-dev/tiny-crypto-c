@@ -12,12 +12,12 @@ extern "C" {
  * Output must not overlap inputs or the span array. Invalid arguments leave
  * output unchanged; a hash failure wipes output. All lengths are bytes. */
 #if TC_ENABLE_SHA256
-TC_status TC_SSKDF_SHA256(const uint8_t* z, size_t z_len,
-    const TC_bytes* info, size_t count, uint8_t* output, size_t output_len);
+TC_status TC_SSKDF_SHA256(const uint8_t* z, size_t z_len, const TC_bytes* info, size_t count,
+                          uint8_t* output, size_t output_len);
 #endif
 #if TC_ENABLE_SHA384
-TC_status TC_SSKDF_SHA384(const uint8_t* z, size_t z_len,
-    const TC_bytes* info, size_t count, uint8_t* output, size_t output_len);
+TC_status TC_SSKDF_SHA384(const uint8_t* z, size_t z_len, const TC_bytes* info, size_t count,
+                          uint8_t* output, size_t output_len);
 #endif
 #ifdef __cplusplus
 }

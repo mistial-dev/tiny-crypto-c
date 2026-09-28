@@ -10,7 +10,9 @@ extern "C" {
 #endif
 
 typedef enum {
-  TC_VALIDATION_MICRO, TC_VALIDATION_MINI, TC_VALIDATION_DESKTOP
+  TC_VALIDATION_MICRO,
+  TC_VALIDATION_MINI,
+  TC_VALIDATION_DESKTOP
 } TC_validation_profile;
 
 /* Element counts, except signature_bytes. Adjust these to the held trust set
@@ -39,21 +41,19 @@ typedef struct {
 
 /* Presets select storage capacities only. Algorithms and trust policy are
  * configured separately. out changes only on OK. */
-TC_result TC_validation_capacity_init(TC_validation_profile profile,
-    TC_validation_capacity* out);
+TC_result TC_validation_capacity_init(TC_validation_profile profile, TC_validation_capacity* out);
 size_t TC_validation_workspace_alignment(void);
 /* Calculate arena bytes, including alignment padding between arrays.
  * bytes changes only on OK. Invalid capacities and size overflow fail. */
-TC_result TC_validation_workspace_size(const TC_validation_capacity* capacity,
-    size_t* bytes);
+TC_result TC_validation_workspace_size(const TC_validation_capacity* capacity, size_t* bytes);
 
 /* arena must have the reported size and alignment. Metadata and arena are
  * disjoint. Keep out at the same address until its last use; its credential
  * view refers to out->path. Arena bytes are scratch for one operation at a time.
  * Failure leaves out and arena unchanged. Initialization leaves arena untouched.
  * Typed-array workspace initializers remain available for fixed layouts. */
-TC_result TC_validation_workspace_init(const TC_validation_capacity* capacity,
-    TC_buffer arena, TC_validation_workspace* out);
+TC_result TC_validation_workspace_init(const TC_validation_capacity* capacity, TC_buffer arena,
+                                       TC_validation_workspace* out);
 
 typedef struct {
   const TC_bytes* initial_policies;
@@ -94,14 +94,15 @@ typedef struct {
  * Keep the referenced objects alive and unchanged while using the context.
  * out must be separate from those objects and changes only on OK. */
 TC_result TC_validation_context_init(const TC_validation_trust* trust,
-    const TC_validation_options* options,
-    const TC_CMS_credential_workspace* workspace, TC_validation_context* out);
+                                     const TC_validation_options* options,
+                                     const TC_CMS_credential_workspace* workspace,
+                                     TC_validation_context* out);
 
 /* Validate CMS content, signer path and revocation under one time and provider.
  * work is the remaining byte/operation budget, consumed across the sequence.
  * Inputs and source bytes remain borrowed; workspace is reusable on return. */
 TC_credential_status TC_CMS_validate(const TC_CMS_validation_request* request,
-    const TC_validation_context* context, size_t* work);
+                                     const TC_validation_context* context, size_t* work);
 
 typedef struct {
   TC_X509_certificate certificate;
@@ -112,9 +113,8 @@ typedef struct {
 /* Build a trusted path and require current CRL evidence for every member.
  * out changes only on VALID. Its certificate spans borrow encoded and survive
  * scratch reuse. Keep encoded and the held trust snapshot stable through use. */
-TC_credential_status TC_X509_validate(TC_bytes encoded,
-    const TC_validation_context* context, size_t* work,
-    TC_X509_validation_result* out);
+TC_credential_status TC_X509_validate(TC_bytes encoded, const TC_validation_context* context,
+                                      size_t* work, TC_X509_validation_result* out);
 
 #ifdef __cplusplus
 }

@@ -4,7 +4,7 @@
 #include <string.h>
 
 TC_DRBG_result example_random_start(ExampleRandom* random, TC_random_source entropy,
-    TC_bytes device_id)
+                                    TC_bytes device_id)
 {
   const TC_bytes drawn_nonce = {NULL, 0};
   TC_DRBG_config config;
@@ -17,8 +17,7 @@ TC_DRBG_result example_random_start(ExampleRandom* random, TC_random_source entr
   return TC_DRBG_instantiate(&random->drbg, &config, entropy, drawn_nonce, device_id);
 }
 
-TC_DRBG_result example_random_session_key(ExampleRandom* random, TC_bytes label,
-    uint8_t key[32])
+TC_DRBG_result example_random_session_key(ExampleRandom* random, TC_bytes label, uint8_t key[32])
 {
   TC_DRBG_result result;
   if (random == NULL || key == NULL)

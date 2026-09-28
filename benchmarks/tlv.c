@@ -35,20 +35,34 @@ int main(void)
 #if TC_ENABLE_TLV
   {
     size_t i;
-    printf("TLV reader=%lu stream=%lu frame=%lu bytes\n",
-           (unsigned long)sizeof(TC_TLV_reader), (unsigned long)sizeof(TC_TLV_stream),
-           (unsigned long)sizeof(TC_TLV_frame));
-    for (i = 0; i < sizeof input; i += 2) { input[i] = 4; input[i+1] = 0; }
+    printf("TLV reader=%lu stream=%lu frame=%lu bytes\n", (unsigned long)sizeof(TC_TLV_reader),
+           (unsigned long)sizeof(TC_TLV_stream), (unsigned long)sizeof(TC_TLV_frame));
+    for (i = 0; i < sizeof input; i += 2) {
+      input[i] = 4;
+      input[i + 1] = 0;
+    }
     input_size = sizeof input;
-    if (tc_benchmark_run("TLV empty siblings", input_size, walk)) return 1;
+    if (tc_benchmark_run("TLV empty siblings", input_size, walk))
+      return 1;
     memset(input, 0, sizeof input);
-    input[0] = 4; input[1] = 0x82; input[2] = 0x0f; input[3] = 0xfc;
-    if (tc_benchmark_run("TLV skip primitive payload", input_size, walk)) return 1;
-    for (i = 0; i < 16; ++i) { input[2*i] = 0x30; input[2*i+1] = (uint8_t)(32-2*i); }
-    input[32] = 4; input[33] = 0; input_size = 34;
-    if (tc_benchmark_run("TLV nested containers", input_size, walk)) return 1;
+    input[0] = 4;
+    input[1] = 0x82;
+    input[2] = 0x0f;
+    input[3] = 0xfc;
+    if (tc_benchmark_run("TLV skip primitive payload", input_size, walk))
+      return 1;
+    for (i = 0; i < 16; ++i) {
+      input[2 * i] = 0x30;
+      input[2 * i + 1] = (uint8_t)(32 - 2 * i);
+    }
+    input[32] = 4;
+    input[33] = 0;
+    input_size = 34;
+    if (tc_benchmark_run("TLV nested containers", input_size, walk))
+      return 1;
     --input_size;
-    if (tc_benchmark_run("TLV truncated container", input_size, reject)) return 1;
+    if (tc_benchmark_run("TLV truncated container", input_size, reject))
+      return 1;
   }
 #else
   puts("TLV parsing disabled");

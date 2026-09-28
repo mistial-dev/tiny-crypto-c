@@ -1,4 +1,5 @@
 <!-- SPDX-FileCopyrightText: Mistial Dev -->
+
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 
 # Certificate store
@@ -19,10 +20,10 @@ Zero-initialize the store and snapshot slots. Serialize store calls with the
 application's lock.
 
 1. Build an immutable source in unused storage.
-2. Call `TC_X509_store_prepare` with a free slot and that source.
-3. Validate the proposed records, authorize the trust change, and persist it.
-4. Call `TC_X509_store_publish` with the revision used to prepare the update.
-5. If the update is abandoned, call `TC_X509_store_discard` on the prepared slot.
+1. Call `TC_X509_store_prepare` with a free slot and that source.
+1. Validate the proposed records, authorize the trust change, and persist it.
+1. Call `TC_X509_store_publish` with the revision used to prepare the update.
+1. If the update is abandoned, call `TC_X509_store_discard` on the prepared slot.
 
 Preparation checks callback configuration only. It does not parse certificates,
 grant trust, or write flash. Publication rejects a stale revision without changing

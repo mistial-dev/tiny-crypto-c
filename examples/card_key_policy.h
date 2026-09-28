@@ -6,8 +6,10 @@
 #include <tiny_crypto/piv_card.h>
 
 typedef enum {
-  EXAMPLE_CARD_KEY_POLICY_OK, EXAMPLE_CARD_KEY_POLICY_INVALID,
-  EXAMPLE_CARD_KEY_POLICY_UNSUPPORTED, EXAMPLE_CARD_KEY_POLICY_ERROR
+  EXAMPLE_CARD_KEY_POLICY_OK,
+  EXAMPLE_CARD_KEY_POLICY_INVALID,
+  EXAMPLE_CARD_KEY_POLICY_UNSUPPORTED,
+  EXAMPLE_CARD_KEY_POLICY_ERROR
 } ExampleCardKeyPolicyResult;
 
 typedef enum { EXAMPLE_CARD_RSA_V15, EXAMPLE_CARD_RSA_PSS } ExampleCardRSAPadding;
@@ -25,8 +27,8 @@ typedef struct {
 
 /* Apply PIV/TWIC certificate-use and subject-key policy without card command
  * identifiers or transport behavior. */
-ExampleCardKeyPolicyResult example_card_key_parameters_select(
-    const TC_X509_public_key* key, const ExampleCardKeyPolicy* policy,
-    ExampleCardKeyParameters* out);
+ExampleCardKeyPolicyResult example_card_key_parameters_select(const TC_X509_public_key* key,
+                                                              const ExampleCardKeyPolicy* policy,
+                                                              ExampleCardKeyParameters* out);
 
 #endif

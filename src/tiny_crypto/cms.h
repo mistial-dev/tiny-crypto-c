@@ -30,7 +30,8 @@ typedef struct {
  * unchanged; parsing may consume work and frames. out changes only on OK.
  * Limits bound framing; work covers storage checks and all parsing passes. */
 TC_TLV_result TC_CMS_signed_data_read(TC_bytes encoded, const TC_TLV_limits* limits,
-    TC_TLV_frame* frames, size_t frame_capacity, size_t* work, TC_CMS_signed_data* out);
+                                      TC_TLV_frame* frames, size_t frame_capacity, size_t* work,
+                                      TC_CMS_signed_data* out);
 
 typedef struct {
   TC_bytes encoded;
@@ -53,21 +54,22 @@ typedef struct {
  * Spans borrow input. Storage, work and output rules match signed_data_read;
  * requires TC_ENABLE_X509, plus TC_TLV_ENABLE_BER for the BER profile. */
 TC_TLV_result TC_CMS_signer_info_read(TC_bytes encoded, TC_TLV_profile profile,
-    const TC_TLV_limits* limits, TC_TLV_frame* frames, size_t frame_capacity,
-    size_t* work, TC_CMS_signer_info* out);
+                                      const TC_TLV_limits* limits, TC_TLV_frame* frames,
+                                      size_t frame_capacity, size_t* work, TC_CMS_signer_info* out);
 
 /* Initialize from SignedData.signers, including its SET tag. Checks BER tree
  * framing; next performs each member's schema checks. Empty sets are valid.
  * Input, limits, frames, work and out are disjoint; out changes only on OK.
  * Keep the encoded bytes stable and treat the returned reader as managed state. */
 TC_TLV_result TC_CMS_signers_init(TC_bytes encoded, const TC_TLV_limits* limits,
-    TC_TLV_frame* frames, size_t frame_capacity, size_t* work, TC_TLV_reader* out);
+                                  TC_TLV_frame* frames, size_t frame_capacity, size_t* work,
+                                  TC_TLV_reader* out);
 /* Reader and out change only on OK; frames/work are provisional on failure.
  * END leaves all storage unchanged, even with zero work remaining. Reuse one
  * budget across init/next calls. Reader, its input, frames, work and out must be
  * disjoint. Output spans borrow input, not scratch or reader state. */
-TC_TLV_result TC_CMS_signer_next(TC_TLV_reader* reader, TC_TLV_frame* frames,
-    size_t frame_capacity, size_t* work, TC_CMS_signer_info* out);
+TC_TLV_result TC_CMS_signer_next(TC_TLV_reader* reader, TC_TLV_frame* frames, size_t frame_capacity,
+                                 size_t* work, TC_CMS_signer_info* out);
 
 typedef enum {
   /* RFC 5652 signed attributes, including DER SET OF ordering. */
@@ -123,9 +125,10 @@ typedef struct {
  *
  * This parses attributes only. The caller must check content type and digest,
  * verify the signature over signature_input, and validate the signer's trust. */
-TC_TLV_result TC_CMS_signed_attributes_read(TC_bytes encoded,
-    TC_CMS_attribute_encoding encoding, const TC_TLV_limits* limits,
-    TC_TLV_frame* frames, size_t frame_capacity, size_t* work, TC_CMS_signed_attributes* out);
+TC_TLV_result TC_CMS_signed_attributes_read(TC_bytes encoded, TC_CMS_attribute_encoding encoding,
+                                            const TC_TLV_limits* limits, TC_TLV_frame* frames,
+                                            size_t frame_capacity, size_t* work,
+                                            TC_CMS_signed_attributes* out);
 
 /* Hash SignedData.content, including its complete OCTET STRING encoding.
  * BER chunk headers and end markers are excluded from the digest. For detached
@@ -139,8 +142,9 @@ TC_TLV_result TC_CMS_signed_attributes_read(TC_bytes encoded,
  * preserve digest. Work covers storage checks, encoded bytes and hashed bytes.
  * Uses one temporary hash context on the stack; content is never flattened. */
 TC_TLV_result TC_CMS_content_digest(TC_bytes encoded, TC_hash_algorithm algorithm,
-    const TC_TLV_limits* limits, TC_TLV_frame* frames, size_t frame_capacity,
-    size_t* work, uint8_t* digest, size_t digest_capacity);
+                                    const TC_TLV_limits* limits, TC_TLV_frame* frames,
+                                    size_t frame_capacity, size_t* work, uint8_t* digest,
+                                    size_t digest_capacity);
 
 /* Compare parsed signed attributes with the content type OID contents and a
  * computed digest. Hash content value bytes, excluding OCTET STRING framing.
@@ -154,8 +158,8 @@ TC_TLV_result TC_CMS_content_digest(TC_bytes encoded, TC_hash_algorithm algorith
  * both unchanged; otherwise work covers storage checks and compared bytes.
  * Requires TC_ENABLE_X509. */
 TC_TLV_result TC_CMS_content_digest_check(const TC_CMS_signed_attributes* attributes,
-    TC_bytes expected_type, TC_hash_algorithm algorithm, TC_bytes digest,
-    size_t* work, int* matched);
+                                          TC_bytes expected_type, TC_hash_algorithm algorithm,
+                                          TC_bytes digest, size_t* work, int* matched);
 
 typedef struct {
   TC_TLV_frame* frames;
@@ -185,15 +189,14 @@ typedef struct {
  * Bad storage leaves caller state unchanged; other failures may consume scratch
  * and work. Uses a temporary hash context/digest for signed attributes. Requires
  * X509, BER, a digest provider, and the signed-attribute hash when attributes exist. */
-TC_X509_signature_result TC_CMS_signer_verify_digest(const TC_CMS_signer_info* signer,
-    TC_bytes content_type, TC_bytes digest, TC_CMS_attribute_encoding encoding,
-    const TC_X509_public_key* key, const TC_X509_signature_provider* provider,
-    const TC_TLV_limits* limits, const TC_CMS_signature_workspace* workspace, size_t* work);
+TC_X509_signature_result
+TC_CMS_signer_verify_digest(const TC_CMS_signer_info* signer, TC_bytes content_type,
+                            TC_bytes digest, TC_CMS_attribute_encoding encoding,
+                            const TC_X509_public_key* key,
+                            const TC_X509_signature_provider* provider, const TC_TLV_limits* limits,
+                            const TC_CMS_signature_workspace* workspace, size_t* work);
 
-typedef enum {
-  TC_CMS_CONTENT_RAW,
-  TC_CMS_CONTENT_BER_OCTETS
-} TC_CMS_content_encoding;
+typedef enum { TC_CMS_CONTENT_RAW, TC_CMS_CONTENT_BER_OCTETS } TC_CMS_content_encoding;
 
 /* Hash content and verify one parsed signer, resolving its hash internally.
  * RAW accepts application content, including NULL/0 for an empty message.
@@ -204,26 +207,27 @@ typedef enum {
  * Storage, provider and trust rules match signer_verify_digest. The content hash
  * must be enabled. Hash scratch is reused for signed attributes, without copying
  * the message. For cached or externally computed digests, use the digest API. */
-TC_X509_signature_result TC_CMS_signer_verify_content(const TC_CMS_signer_info* signer,
-    TC_bytes content_type, TC_bytes content, TC_CMS_content_encoding content_encoding,
-    TC_CMS_attribute_encoding attribute_encoding, const TC_X509_public_key* key,
-    const TC_X509_signature_provider* provider, const TC_TLV_limits* limits,
-    const TC_CMS_signature_workspace* workspace, size_t* work);
+TC_X509_signature_result TC_CMS_signer_verify_content(
+    const TC_CMS_signer_info* signer, TC_bytes content_type, TC_bytes content,
+    TC_CMS_content_encoding content_encoding, TC_CMS_attribute_encoding attribute_encoding,
+    const TC_X509_public_key* key, const TC_X509_signature_provider* provider,
+    const TC_TLV_limits* limits, const TC_CMS_signature_workspace* workspace, size_t* work);
 
 /* Explicit compatibility policy for captured CMS signatures. ALLOW_ABSENT applies
  * only to rsaEncryption in SignerInfo; present parameters must encode NULL.
  * Certificate algorithms and RSA DigestInfo retain their own validation rules.
  * The ordinary verify functions use RSA_PARAMETERS_NULL (RFC 3370 section 3.2).
  * Storage, hashing and trust requirements match the corresponding functions above. */
-TC_X509_signature_result TC_CMS_signer_verify_digest_with_policy(const TC_CMS_signer_info* signer,
-    TC_bytes content_type, TC_bytes digest, TC_CMS_verification_policy policy,
-    const TC_X509_public_key* key, const TC_X509_signature_provider* provider,
-    const TC_TLV_limits* limits, const TC_CMS_signature_workspace* workspace, size_t* work);
-TC_X509_signature_result TC_CMS_signer_verify_content_with_policy(const TC_CMS_signer_info* signer,
-    TC_bytes content_type, TC_bytes content, TC_CMS_content_encoding content_encoding,
+TC_X509_signature_result TC_CMS_signer_verify_digest_with_policy(
+    const TC_CMS_signer_info* signer, TC_bytes content_type, TC_bytes digest,
     TC_CMS_verification_policy policy, const TC_X509_public_key* key,
     const TC_X509_signature_provider* provider, const TC_TLV_limits* limits,
     const TC_CMS_signature_workspace* workspace, size_t* work);
+TC_X509_signature_result TC_CMS_signer_verify_content_with_policy(
+    const TC_CMS_signer_info* signer, TC_bytes content_type, TC_bytes content,
+    TC_CMS_content_encoding content_encoding, TC_CMS_verification_policy policy,
+    const TC_X509_public_key* key, const TC_X509_signature_provider* provider,
+    const TC_TLV_limits* limits, const TC_CMS_signature_workspace* workspace, size_t* work);
 
 #ifdef __cplusplus
 }

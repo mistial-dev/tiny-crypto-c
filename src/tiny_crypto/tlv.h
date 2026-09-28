@@ -10,16 +10,23 @@ extern "C" {
 #endif
 
 typedef enum {
-  TC_TLV_OK = 0, TC_TLV_END = 1, TC_TLV_MORE = 2,
-  TC_TLV_INVALID = -1, TC_TLV_LIMIT = -2,
-  TC_TLV_UNSUPPORTED = -3, TC_TLV_ARGUMENT = -4,
+  TC_TLV_OK = 0,
+  TC_TLV_END = 1,
+  TC_TLV_MORE = 2,
+  TC_TLV_INVALID = -1,
+  TC_TLV_LIMIT = -2,
+  TC_TLV_UNSUPPORTED = -3,
+  TC_TLV_ARGUMENT = -4,
   TC_TLV_IO = -5 /* Backing storage could not supply the requested bytes. */
 } TC_TLV_result;
 
 typedef enum {
-  TC_TLV_DER = 0, TC_TLV_ISO7816 = 1, TC_TLV_BER = 2,
+  TC_TLV_DER = 0,
+  TC_TLV_ISO7816 = 1,
+  TC_TLV_BER = 2,
   /* Padding is accepted only between root objects, never inside a template. */
-  TC_TLV_ISO7816_PAD_ZERO = 3, TC_TLV_ISO7816_PAD_ZERO_FF = 4
+  TC_TLV_ISO7816_PAD_ZERO = 3,
+  TC_TLV_ISO7816_PAD_ZERO_FF = 4
 } TC_TLV_profile;
 
 typedef struct {
@@ -50,11 +57,11 @@ typedef struct {
  * No output is changed on failure. Header parsing does not read the value.
  * MORE requests additional bytes. At the end of a message, it means truncation.
  * DER here checks framing only; typed/schema checks are separate. */
-TC_TLV_result TC_TLV_header_read(const uint8_t* data, size_t length,
-    TC_TLV_profile profile, const TC_TLV_limits* limits, TC_TLV_header* out);
+TC_TLV_result TC_TLV_header_read(const uint8_t* data, size_t length, TC_TLV_profile profile,
+                                 const TC_TLV_limits* limits, TC_TLV_header* out);
 /* A shallow, definite-length read. Use walk/stream for indefinite BER. */
-TC_TLV_result TC_TLV_read(const uint8_t* data, size_t length,
-    TC_TLV_profile profile, const TC_TLV_limits* limits, TC_TLV_element* out);
+TC_TLV_result TC_TLV_read(const uint8_t* data, size_t length, TC_TLV_profile profile,
+                          const TC_TLV_limits* limits, TC_TLV_element* out);
 
 typedef struct {
   TC_bytes input;
@@ -62,9 +69,8 @@ typedef struct {
   size_t offset, elements;
   TC_TLV_profile profile;
 } TC_TLV_reader;
-TC_TLV_result TC_TLV_reader_init(TC_TLV_reader* reader,
-    const uint8_t* data, size_t length, TC_TLV_profile profile,
-    const TC_TLV_limits* limits);
+TC_TLV_result TC_TLV_reader_init(TC_TLV_reader* reader, const uint8_t* data, size_t length,
+                                 TC_TLV_profile profile, const TC_TLV_limits* limits);
 /* END means no more siblings. Neither reader nor out changes on failure.
  * A child reader can be initialized from an element's bounded value span.
  * Use walk to enforce a shared budget across an entire tree. */
@@ -101,33 +107,33 @@ typedef struct {
 } TC_TLV_stream;
 
 #if TC_TLV_ENABLE_STREAM
-TC_TLV_result TC_TLV_stream_init(TC_TLV_stream* stream,
-    TC_TLV_profile profile, const TC_TLV_limits* limits,
-    TC_TLV_frame* frames, size_t capacity);
+TC_TLV_result TC_TLV_stream_init(TC_TLV_stream* stream, TC_TLV_profile profile,
+                                 const TC_TLV_limits* limits, TC_TLV_frame* frames,
+                                 size_t capacity);
 /* Consumes a chunk without retaining its address. Callbacks borrow spans only
  * for their duration. After an error, call init before reusing the stream.
  * Unlike shallow reads, already emitted events cannot be rolled back.
  * OK/MORE both consume the entire chunk; MORE means an object is unfinished.
  * Discard the message on error. */
-TC_TLV_result TC_TLV_stream_feed(TC_TLV_stream* stream,
-    const uint8_t* data, size_t length, TC_TLV_visit visit, void* user);
+TC_TLV_result TC_TLV_stream_feed(TC_TLV_stream* stream, const uint8_t* data, size_t length,
+                                 TC_TLV_visit visit, void* user);
 TC_TLV_result TC_TLV_stream_finish(TC_TLV_stream* stream);
 #endif
 /* Walk checks all constructed boundaries with one shared element/depth budget.
  * A sequence of root objects is accepted. A schema needing exactly one root
  * must check that separately. NULL visit validates framing without callbacks. */
-TC_TLV_result TC_TLV_walk(const uint8_t* data, size_t length,
-    TC_TLV_profile profile, const TC_TLV_limits* limits,
-    TC_TLV_frame* frames, size_t capacity, TC_TLV_visit visit, void* user);
+TC_TLV_result TC_TLV_walk(const uint8_t* data, size_t length, TC_TLV_profile profile,
+                          const TC_TLV_limits* limits, TC_TLV_frame* frames, size_t capacity,
+                          TC_TLV_visit visit, void* user);
 
 /* Read one complete object and validate its constructed boundaries. Supports
  * indefinite BER and leaves following siblings unread. Returned spans borrow
  * input; encoded includes EOC, value excludes it. MORE means truncation.
  * Frames may change on failure; out changes only on OK. Input, limits, frames
  * and out must be disjoint. Unlike walk, root padding is not consumed. */
-TC_TLV_result TC_TLV_read_tree(const uint8_t* data, size_t length,
-    TC_TLV_profile profile, const TC_TLV_limits* limits,
-    TC_TLV_frame* frames, size_t capacity, TC_TLV_element* out);
+TC_TLV_result TC_TLV_read_tree(const uint8_t* data, size_t length, TC_TLV_profile profile,
+                               const TC_TLV_limits* limits, TC_TLV_frame* frames, size_t capacity,
+                               TC_TLV_element* out);
 
 #ifdef __cplusplus
 }

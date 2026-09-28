@@ -23,59 +23,60 @@
  */
 
 #if (TC_DES_ENABLE_ECB != 0) && (TC_DES_ENABLE_ECB != 1)
-  #error "TC_DES_ENABLE_ECB must be 0 or 1"
+#error "TC_DES_ENABLE_ECB must be 0 or 1"
 #endif
 #if (TC_DES_ENABLE_CBC != 0) && (TC_DES_ENABLE_CBC != 1)
-  #error "TC_DES_ENABLE_CBC must be 0 or 1"
+#error "TC_DES_ENABLE_CBC must be 0 or 1"
 #endif
 #if (TC_DES_ENABLE_CTR != 0) && (TC_DES_ENABLE_CTR != 1)
-  #error "TC_DES_ENABLE_CTR must be 0 or 1"
+#error "TC_DES_ENABLE_CTR must be 0 or 1"
 #endif
 #if (TC_DES_ENABLE_OFB != 0) && (TC_DES_ENABLE_OFB != 1)
-  #error "TC_DES_ENABLE_OFB must be 0 or 1"
+#error "TC_DES_ENABLE_OFB must be 0 or 1"
 #endif
 #if (TC_DES_ENABLE_CFB1 != 0) && (TC_DES_ENABLE_CFB1 != 1)
-  #error "TC_DES_ENABLE_CFB1 must be 0 or 1"
+#error "TC_DES_ENABLE_CFB1 must be 0 or 1"
 #endif
 #if (TC_DES_ENABLE_CFB8 != 0) && (TC_DES_ENABLE_CFB8 != 1)
-  #error "TC_DES_ENABLE_CFB8 must be 0 or 1"
+#error "TC_DES_ENABLE_CFB8 must be 0 or 1"
 #endif
 #if (TC_DES_ENABLE_CFB64 != 0) && (TC_DES_ENABLE_CFB64 != 1)
-  #error "TC_DES_ENABLE_CFB64 must be 0 or 1"
+#error "TC_DES_ENABLE_CFB64 must be 0 or 1"
 #endif
 #if (TC_DES_ENABLE_TDES != 0) && (TC_DES_ENABLE_TDES != 1)
-  #error "TC_DES_ENABLE_TDES must be 0 or 1"
+#error "TC_DES_ENABLE_TDES must be 0 or 1"
 #endif
 #if (TC_DES_ENABLE_CMAC != 0) && (TC_DES_ENABLE_CMAC != 1)
-  #error "TC_DES_ENABLE_CMAC must be 0 or 1"
+#error "TC_DES_ENABLE_CMAC must be 0 or 1"
 #endif
 #if (TC_DES_ENABLE_ISO9797 != 0) && (TC_DES_ENABLE_ISO9797 != 1)
-  #error "TC_DES_ENABLE_ISO9797 must be 0 or 1"
+#error "TC_DES_ENABLE_ISO9797 must be 0 or 1"
 #endif
 #if (TC_DES_REJECT_WEAK_KEYS != 0) && (TC_DES_REJECT_WEAK_KEYS != 1)
-  #error "TC_DES_REJECT_WEAK_KEYS must be 0 or 1"
+#error "TC_DES_REJECT_WEAK_KEYS must be 0 or 1"
 #endif
 
-#if TC_ENABLE_DES && !TC_DES_ENABLE_ECB && !TC_DES_ENABLE_CBC && \
-    !TC_DES_ENABLE_CTR && !TC_DES_ENABLE_OFB && !TC_DES_ENABLE_CFB1 && \
-    !TC_DES_ENABLE_CFB8 && !TC_DES_ENABLE_CFB64 && !TC_DES_ENABLE_CMAC && \
-    !TC_DES_ENABLE_ISO9797
-  #error "DES requires at least one enabled mode or CMAC"
+#if TC_ENABLE_DES && !TC_DES_ENABLE_ECB && !TC_DES_ENABLE_CBC && !TC_DES_ENABLE_CTR &&             \
+    !TC_DES_ENABLE_OFB && !TC_DES_ENABLE_CFB1 && !TC_DES_ENABLE_CFB8 && !TC_DES_ENABLE_CFB64 &&    \
+    !TC_DES_ENABLE_CMAC && !TC_DES_ENABLE_ISO9797
+#error "DES requires at least one enabled mode or CMAC"
 #endif
 
 /* Modes that keep chaining state in ctx->Iv */
-#if (TC_DES_ENABLE_CBC == 1) || (TC_DES_ENABLE_CTR == 1) || (TC_DES_ENABLE_CFB1 == 1) || \
+#if (TC_DES_ENABLE_CBC == 1) || (TC_DES_ENABLE_CTR == 1) || (TC_DES_ENABLE_CFB1 == 1) ||           \
     (TC_DES_ENABLE_CFB8 == 1) || (TC_DES_ENABLE_CFB64 == 1) || (TC_DES_ENABLE_OFB == 1)
-  #define TC_DES_NEEDS_IV 1
+#define TC_DES_NEEDS_IV 1
 #else
-  #define TC_DES_NEEDS_IV 0
+#define TC_DES_NEEDS_IV 0
 #endif
 
-#define TC_DES_BLOCKLEN     8  /**< Block length in bytes - DES is a 64-bit (8 bytes) block cipher */
-#define TC_DES_KEYLEN       8  /**< Single DES key length in bytes (64 bits total, 56 bits effective) */
+#define TC_DES_BLOCKLEN 8 /**< Block length in bytes - DES is a 64-bit (8 bytes) block cipher */
+#define TC_DES_KEYLEN 8   /**< Single DES key length in bytes (64 bits total, 56 bits effective) */
 
-#define TC_DES3_KEYLEN_2KEY 16 /**< 2-Key Triple DES key length in bytes (128 bits total, 112 bits effective) */
-#define TC_DES3_KEYLEN_3KEY 24 /**< 3-Key Triple DES key length in bytes (192 bits total, 168 bits effective) */
+#define TC_DES3_KEYLEN_2KEY                                                                        \
+  16 /**< 2-Key Triple DES key length in bytes (128 bits total, 112 bits effective) */
+#define TC_DES3_KEYLEN_3KEY                                                                        \
+  24 /**< 3-Key Triple DES key length in bytes (192 bits total, 168 bits effective) */
 
 /* Three DES schedules in encrypt, decrypt, encrypt order. */
 typedef struct TC_DES_key_bundle {
@@ -85,8 +86,7 @@ typedef struct TC_DES_key_bundle {
 /**
  * @brief Single DES Context Structure
  */
-struct TC_DES_ctx
-{
+struct TC_DES_ctx {
   uint8_t Sk[16][6];
   uint8_t active;
 #if TC_DES_NEEDS_IV
@@ -105,8 +105,7 @@ struct TC_DES_ctx
 /**
  * @brief Triple DES (3DES / TDES) Context Structure
  */
-struct TC_DES3_ctx
-{
+struct TC_DES3_ctx {
   TC_DES_key_bundle keys;
   uint8_t active;
 #if TC_DES_NEEDS_IV
@@ -152,8 +151,7 @@ TC_status TC_DES_init_ctx(struct TC_DES_ctx* ctx, const uint8_t* key);
  * @param key Pointer to 8-byte key buffer.
  * @param iv Pointer to 8-byte Initialization Vector.
  */
-TC_status TC_DES_init_ctx_iv(struct TC_DES_ctx* ctx, const uint8_t* key,
-                            const uint8_t* iv);
+TC_status TC_DES_init_ctx_iv(struct TC_DES_ctx* ctx, const uint8_t* key, const uint8_t* iv);
 
 /**
  * @brief Set or update the Initialization Vector (IV) in Single DES context.
@@ -285,7 +283,6 @@ TC_status TC_DES_CFB1_decrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t bit_l
 TC_status TC_DES_OFB_crypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
 #endif
 
-
 /* --- Triple DES (3DES / TDES) API --- */
 #if TC_DES_ENABLE_TDES
 
@@ -310,7 +307,8 @@ TC_status TC_DES3_init_ctx(struct TC_DES3_ctx* ctx, const uint8_t* key, size_t k
  * @param iv Pointer to 8-byte Initialization Vector.
  * @return TC_OK on success, TC_ERROR if keylen is not 16 or 24.
  */
-TC_status TC_DES3_init_ctx_iv(struct TC_DES3_ctx* ctx, const uint8_t* key, size_t keylen, const uint8_t* iv);
+TC_status TC_DES3_init_ctx_iv(struct TC_DES3_ctx* ctx, const uint8_t* key, size_t keylen,
+                              const uint8_t* iv);
 
 /**
  * @brief Set or update the Initialization Vector (IV) in 3DES context.
@@ -439,7 +437,6 @@ TC_status TC_DES3_OFB_crypt(struct TC_DES3_ctx* ctx, uint8_t* buf, size_t length
 
 #endif /* #if TC_DES_ENABLE_TDES */
 
-
 /* --- DES / 3DES CMAC (NIST SP 800-38B) --- */
 #if TC_DES_ENABLE_CMAC
 
@@ -452,11 +449,11 @@ TC_status TC_DES3_OFB_crypt(struct TC_DES3_ctx* ctx, uint8_t* buf, size_t length
  * DES block). Override only for exotic vectors.
  */
 #ifndef TC_DES_CMAC_MIN_TAG_LEN
-  #define TC_DES_CMAC_MIN_TAG_LEN 8
+#define TC_DES_CMAC_MIN_TAG_LEN 8
 #endif
 
 #if (TC_DES_CMAC_MIN_TAG_LEN < 1) || (TC_DES_CMAC_MIN_TAG_LEN > TC_DES_BLOCKLEN)
-  #error "TC_DES_CMAC_MIN_TAG_LEN must be in 1..8"
+#error "TC_DES_CMAC_MIN_TAG_LEN must be in 1..8"
 #endif
 
 /*
@@ -467,11 +464,11 @@ TC_status TC_DES3_OFB_crypt(struct TC_DES3_ctx* ctx, uint8_t* buf, size_t length
  * Stack secrets wiped when TC_ZEROIZE=1.
  */
 TC_status TC_DES_CMAC(const uint8_t* key, size_t keylen, const uint8_t* msg, size_t msg_len,
-             uint8_t* tag, size_t tag_len);
+                      uint8_t* tag, size_t tag_len);
 
 /* Constant-time verify of a (possibly truncated) tag. */
 TC_status TC_DES_CMAC_verify(const uint8_t* key, size_t keylen, const uint8_t* msg, size_t msg_len,
-                    const uint8_t* tag, size_t tag_len);
+                             const uint8_t* tag, size_t tag_len);
 
 /*
  * Streaming DES/3DES-CMAC. Holds its own key schedules so it works with the
@@ -480,8 +477,7 @@ TC_status TC_DES_CMAC_verify(const uint8_t* key, size_t keylen, const uint8_t* m
  * block. *_final always emits the full TC_DES_CMAC_TAG_MAX bytes, consumes the
  * context and wipes it when TC_ZEROIZE is 1; call *_init again before reuse.
  */
-struct TC_DES_CMAC_ctx
-{
+struct TC_DES_CMAC_ctx {
   TC_DES_key_bundle keys;
   uint8_t k1[TC_DES_BLOCKLEN];
   uint8_t k2[TC_DES_BLOCKLEN];
@@ -536,52 +532,38 @@ struct TC_DES_ISO9797_ctx {
   uint8_t nonempty;
 };
 
-TC_status TC_DES_ISO9797_init(struct TC_DES_ISO9797_ctx* ctx,
-                              TC_DES_ISO9797_algorithm algorithm,
-                              TC_DES_ISO9797_padding padding,
-                              const uint8_t* key, size_t keylen);
-TC_status TC_DES_ISO9797_update(struct TC_DES_ISO9797_ctx* ctx,
-                                const uint8_t* msg, size_t msg_len);
-TC_status TC_DES_ISO9797_final(struct TC_DES_ISO9797_ctx* ctx,
-                               uint8_t tag[TC_DES_BLOCKLEN]);
+TC_status TC_DES_ISO9797_init(struct TC_DES_ISO9797_ctx* ctx, TC_DES_ISO9797_algorithm algorithm,
+                              TC_DES_ISO9797_padding padding, const uint8_t* key, size_t keylen);
+TC_status TC_DES_ISO9797_update(struct TC_DES_ISO9797_ctx* ctx, const uint8_t* msg, size_t msg_len);
+TC_status TC_DES_ISO9797_final(struct TC_DES_ISO9797_ctx* ctx, uint8_t tag[TC_DES_BLOCKLEN]);
 void TC_DES_ISO9797_clear(struct TC_DES_ISO9797_ctx* ctx);
-TC_status TC_DES_ISO9797_MAC(TC_DES_ISO9797_algorithm algorithm,
-                             TC_DES_ISO9797_padding padding,
-                             const uint8_t* key, size_t keylen,
-                             const uint8_t* msg, size_t msg_len,
+TC_status TC_DES_ISO9797_MAC(TC_DES_ISO9797_algorithm algorithm, TC_DES_ISO9797_padding padding,
+                             const uint8_t* key, size_t keylen, const uint8_t* msg, size_t msg_len,
                              uint8_t* tag, size_t tag_len);
 /* The default one-shot API requires the full 8-byte MAC. MAC leaves tag
  * untouched on error. Verify returns TC_MISMATCH for a bad tag. */
-TC_status TC_DES_ISO9797_verify(TC_DES_ISO9797_algorithm algorithm,
-                                TC_DES_ISO9797_padding padding,
-                                const uint8_t* key, size_t keylen,
-                                const uint8_t* msg, size_t msg_len,
-                                const uint8_t* tag, size_t tag_len);
+TC_status TC_DES_ISO9797_verify(TC_DES_ISO9797_algorithm algorithm, TC_DES_ISO9797_padding padding,
+                                const uint8_t* key, size_t keylen, const uint8_t* msg,
+                                size_t msg_len, const uint8_t* tag, size_t tag_len);
 /* Explicit truncated-MAC API. Accepts the leading 4..7 bytes. */
 TC_status TC_DES_ISO9797_MAC_short_tag(TC_DES_ISO9797_algorithm algorithm,
-                                       TC_DES_ISO9797_padding padding,
-                                       const uint8_t* key, size_t keylen,
-                                       const uint8_t* msg, size_t msg_len,
+                                       TC_DES_ISO9797_padding padding, const uint8_t* key,
+                                       size_t keylen, const uint8_t* msg, size_t msg_len,
                                        uint8_t* tag, size_t tag_len);
 TC_status TC_DES_ISO9797_verify_short_tag(TC_DES_ISO9797_algorithm algorithm,
-                                          TC_DES_ISO9797_padding padding,
-                                          const uint8_t* key, size_t keylen,
-                                          const uint8_t* msg, size_t msg_len,
+                                          TC_DES_ISO9797_padding padding, const uint8_t* key,
+                                          size_t keylen, const uint8_t* msg, size_t msg_len,
                                           const uint8_t* tag, size_t tag_len);
 
 /* Explicit three-key retail-MAC extension: DES-CBC under K1, then
  * D(K2) and E(K3). Use the standard Algorithm 3 API for two-key MACs. */
-TC_status TC_DES_RETAIL3_init(struct TC_DES_ISO9797_ctx* ctx,
-                             TC_DES_ISO9797_padding padding,
-                             const uint8_t key[24]);
-TC_status TC_DES_RETAIL3_MAC(TC_DES_ISO9797_padding padding,
-                            const uint8_t key[24],
-                            const uint8_t* msg, size_t msg_len,
-                            uint8_t* tag, size_t tag_len);
-TC_status TC_DES_RETAIL3_verify(TC_DES_ISO9797_padding padding,
-                               const uint8_t key[24],
-                               const uint8_t* msg, size_t msg_len,
-                               const uint8_t* tag, size_t tag_len);
+TC_status TC_DES_RETAIL3_init(struct TC_DES_ISO9797_ctx* ctx, TC_DES_ISO9797_padding padding,
+                              const uint8_t key[24]);
+TC_status TC_DES_RETAIL3_MAC(TC_DES_ISO9797_padding padding, const uint8_t key[24],
+                             const uint8_t* msg, size_t msg_len, uint8_t* tag, size_t tag_len);
+TC_status TC_DES_RETAIL3_verify(TC_DES_ISO9797_padding padding, const uint8_t key[24],
+                                const uint8_t* msg, size_t msg_len, const uint8_t* tag,
+                                size_t tag_len);
 #endif /* TC_DES_ENABLE_ISO9797 */
 
 #ifdef __cplusplus

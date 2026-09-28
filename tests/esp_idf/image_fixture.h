@@ -6,7 +6,7 @@
 #include <stdio.h>
 
 static void read_image_fixture(const char* path, ets_secure_boot_signature_t* signatures,
-    uint8_t digest[32])
+                               uint8_t digest[32])
 {
   struct TC_SHA256_ctx hash;
   uint8_t buffer[1024];

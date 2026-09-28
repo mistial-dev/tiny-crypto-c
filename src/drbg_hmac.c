@@ -31,12 +31,12 @@ TC_DRBG_result tc_drbg_hmac_parameters(TC_hash_algorithm hash, tc_drbg_parameter
 /* result = HMAC(Key, parts...). result may be Key or V, because every part
  * is read before the tag is written. */
 static TC_DRBG_result hmac_parts(TC_DRBG* drbg, const TC_bytes* parts, size_t count,
-    uint8_t* result)
+                                 uint8_t* result)
 {
   const tc_hash_algorithm_info* info = tc_hash_core_lookup((TC_hash_algorithm)drbg->hash);
   uint8_t tag[TC_DRBG_HMAC_OUTPUT_BYTES];
-  TC_status status = tc_hmac_core_init(info, &drbg->scratch.hmac, drbg->state.hmac.key,
-                                       drbg->output_bytes);
+  TC_status status =
+      tc_hmac_core_init(info, &drbg->scratch.hmac, drbg->state.hmac.key, drbg->output_bytes);
   size_t i;
   for (i = 0; status == TC_OK && i < count; ++i)
     status = tc_hmac_core_update(info, &drbg->scratch.hmac, parts[i].data, parts[i].length);
@@ -76,8 +76,7 @@ static TC_DRBG_result update(TC_DRBG* drbg, const TC_bytes* provided, size_t cou
 /* Instantiate (10.1.2.3): Key = 0x00..00, V = 0x01..01, then
  * Update(entropy || nonce || personalization). Reseed (10.1.2.4) runs
  * Update(entropy || additional) on the current state. */
-TC_DRBG_result tc_drbg_hmac_seed(TC_DRBG* drbg, const TC_bytes* parts, size_t count,
-    int reseed)
+TC_DRBG_result tc_drbg_hmac_seed(TC_DRBG* drbg, const TC_bytes* parts, size_t count, int reseed)
 {
   if (!reseed) {
     memset(drbg->state.hmac.key, 0x00, drbg->output_bytes);
@@ -88,7 +87,7 @@ TC_DRBG_result tc_drbg_hmac_seed(TC_DRBG* drbg, const TC_bytes* parts, size_t co
 
 /* Generate (10.1.2.5). */
 TC_DRBG_result tc_drbg_hmac_generate(TC_DRBG* drbg, uint8_t* output, size_t length,
-    TC_bytes additional)
+                                     TC_bytes additional)
 {
   const TC_bytes v = {drbg->state.hmac.v, drbg->output_bytes};
   size_t offset = 0;

@@ -44,15 +44,15 @@ typedef enum {
  * failure. The wrapper enforces the profile's key algorithm policy before the
  * callback and supplies the selected key reference and challenge policy. The
  * callback must consume no validation scratch. */
-typedef TC_status (*ExampleCredentialProof)(
-    void *context, TC_PIV_card_profile profile,
-    ExampleCredentialCardKey key_reference, const TC_X509_public_key *card_key,
-    const TC_key_challenge_options *challenge);
+typedef TC_status (*ExampleCredentialProof)(void* context, TC_PIV_card_profile profile,
+                                            ExampleCredentialCardKey key_reference,
+                                            const TC_X509_public_key* card_key,
+                                            const TC_key_challenge_options* challenge);
 
 typedef struct {
   TC_bytes encoded;
   TC_PIV_security_encoding encoding;
-  const TC_PIV_security_data *objects;
+  const TC_PIV_security_data* objects;
   size_t count;
   /* Optional exact unsigned CHUID represented by container 3002. */
   TC_bytes unsigned_chuid;
@@ -79,20 +79,20 @@ typedef struct {
   /* Select the signed CHUID schema used by this application. */
   TC_PIV_CHUID_profile chuid_profile;
   /* TWIC requires a held CCL and freshness policy. PIV leaves these zero. */
-  const TC_TWIC_CCL_snapshot *ccl;
+  const TC_TWIC_CCL_snapshot* ccl;
   TC_TWIC_CCL_freshness_policy freshness;
   size_t ccl_reads;
   int allow_legacy_rsa1024;
   /* RSA representative encoding for the fresh proof. EC ignores this field. */
   ExampleCardRSAPadding rsa_padding;
   ExampleCredentialProof proof;
-  void *proof_context;
+  void* proof_context;
   /* Application policy for evidence that must be present in this decision. */
   unsigned required_objects;
   /* Empty encoded spans omit these dependent objects. */
   ExampleCredentialSecurityInput security;
   /* Each format may appear once. The list is bounded to three modalities. */
-  const ExampleCredentialBiometricInput *biometrics;
+  const ExampleCredentialBiometricInput* biometrics;
   size_t biometric_count;
 } ExampleCredentialValidationRequest;
 
@@ -112,11 +112,10 @@ typedef struct {
  * time. A successful result borrows request and trust bytes. Repeat validation
  * with current policy and evidence before a later access decision. */
 ExampleCredentialVerdict
-example_credential_validate(const ExampleCredentialValidationRequest *request,
-                            const TC_validation_context *card_context,
-                            const TC_validation_context *content_context,
-                            size_t *work,
-                            ExampleCredentialValidationResult *out);
+example_credential_validate(const ExampleCredentialValidationRequest* request,
+                            const TC_validation_context* card_context,
+                            const TC_validation_context* content_context, size_t* work,
+                            ExampleCredentialValidationResult* out);
 
 #ifdef __cplusplus
 }

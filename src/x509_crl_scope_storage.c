@@ -11,38 +11,42 @@
 #include "pki_identifier_internal.h"
 #include "pki_extensions_internal.h"
 
-
-
 TC_TLV_result tc_x509_crl_scope_arguments(const tc_x509_crl_scope_processing* processing,
-    const tc_x509_crl_trust* trust, int all_scopes, TC_X509_search_result* out)
+                                          const tc_x509_crl_trust* trust, int all_scopes,
+                                          TC_X509_search_result* out)
 {
   TC_bytes storage;
   tc_x509_crl_status status;
-  if (!processing || !tc_x509_crl_index_arguments(processing->index,processing->query,trust,out) ||
+  if (!processing ||
+      !tc_x509_crl_index_arguments(processing->index, processing->query, trust, out) ||
       (!all_scopes && processing->reference >= processing->index->count) ||
       (processing->check && !processing->check->verify) ||
       !x509_crl_delta_policy_valid(processing->delta_policy) ||
       !x509_crl_order_policy_valid(processing->order_policy) ||
-      tc_pki_storage_span(processing->states,processing->capacity,sizeof *processing->states,&storage) != TC_TLV_OK)
+      tc_pki_storage_span(processing->states, processing->capacity, sizeof *processing->states,
+                          &storage) != TC_TLV_OK)
     return TC_TLV_ARGUMENT;
-  if (processing->capacity < processing->index->count) return TC_TLV_LIMIT;
+  if (processing->capacity < processing->index->count)
+    return TC_TLV_LIMIT;
   if (!all_scopes && processing->index->records[processing->reference].policy != TC_TLV_OK)
     return processing->index->records[processing->reference].policy;
-  TC_TLV_result result = tc_x509_crl_evidence_status(processing->evidence,&status);
-  if (result != TC_TLV_OK) return result;
+  TC_TLV_result result = tc_x509_crl_evidence_status(processing->evidence, &status);
+  if (result != TC_TLV_OK)
+    return result;
   return status == TC_X509_CRL_UNDETERMINED ? TC_TLV_OK : TC_TLV_END;
 }
 
 void tc_x509_crl_scope_plan_outputs(tc_pki_storage_plan* plan,
-    const tc_x509_crl_extra_storage* extra, const tc_x509_crl_held_path* path)
+                                    const tc_x509_crl_extra_storage* extra,
+                                    const tc_x509_crl_held_path* path)
 {
-  tc_pki_storage_plan_write_span(plan, extra ? extra->nodes_storage : (TC_bytes){NULL,0});
-  tc_pki_storage_plan_write_span(plan, extra ? extra->output_storage : (TC_bytes){NULL,0});
+  tc_pki_storage_plan_write_span(plan, extra ? extra->nodes_storage : (TC_bytes){NULL, 0});
+  tc_pki_storage_plan_write_span(plan, extra ? extra->output_storage : (TC_bytes){NULL, 0});
   TC_PKI_PLAN_WRITE(plan, path ? path->out : NULL, path ? 1 : 0);
 }
 
 void tc_x509_crl_extra_plan_inputs(tc_pki_storage_plan* plan,
-    const tc_x509_crl_extra_storage* extra)
+                                   const tc_x509_crl_extra_storage* extra)
 {
   if (extra->count && !extra->nodes) {
     tc_pki_storage_plan_fail(plan, TC_TLV_ARGUMENT);
@@ -53,13 +57,14 @@ void tc_x509_crl_extra_plan_inputs(tc_pki_storage_plan* plan,
     tc_pki_storage_plan_input_span(plan, extra->nodes[i].certificate);
 }
 
-void tc_x509_crl_path_plan_inputs(tc_pki_storage_plan* plan,
-    const tc_x509_crl_held_path* path)
+void tc_x509_crl_path_plan_inputs(tc_pki_storage_plan* plan, const tc_x509_crl_held_path* path)
 {
   TC_PKI_PLAN_INPUT(plan, path->chain, path->count);
-  if (plan->status != TC_TLV_OK) return;
+  if (plan->status != TC_TLV_OK)
+    return;
   for (size_t i = 0; i < CRL_PATH_METADATA_COUNT; ++i)
-    if (path->metadata[i].length) tc_pki_storage_plan_input_span(plan, path->metadata[i]);
+    if (path->metadata[i].length)
+      tc_pki_storage_plan_input_span(plan, path->metadata[i]);
   for (size_t i = 0; plan->status == TC_TLV_OK && i < path->count; ++i) {
     if (!path->chain[i].data || !path->chain[i].length) {
       tc_pki_storage_plan_fail(plan, TC_TLV_ARGUMENT);
@@ -69,13 +74,13 @@ void tc_x509_crl_path_plan_inputs(tc_pki_storage_plan* plan,
   }
 }
 
-
 TC_TLV_result tc_x509_crl_points_init(tc_x509_crl_certificate_fields* fields,
-    const TC_X509_certificate* certificate, TC_bytes* oids, size_t oid_capacity,
-    TC_TLV_reader* reader)
+                                      const TC_X509_certificate* certificate, TC_bytes* oids,
+                                      size_t oid_capacity, TC_TLV_reader* reader)
 {
   if (!fields || !fields->limits || !fields->tree || !fields->tree->work || !reader ||
-      (oid_capacity && !oids)) return TC_TLV_ARGUMENT;
+      (oid_capacity && !oids))
+    return TC_TLV_ARGUMENT;
   tc_x509_crl_certificate_fields pending = *fields;
   TC_TLV_reader next = {0};
   TC_TLV_result result;
@@ -83,18 +88,22 @@ TC_TLV_result tc_x509_crl_points_init(tc_x509_crl_certificate_fields* fields,
     pending = (tc_x509_crl_certificate_fields){0};
     pending.limits = fields->limits;
     pending.tree = fields->tree;
-    result = tc_pki_extensions_visit(certificate->extensions,pending.limits,pending.tree,
-        oids,oid_capacity,tc_x509_crl_certificate_extension,&pending);
-    if (result != TC_TLV_OK) return result;
+    result = tc_pki_extensions_visit(certificate->extensions, pending.limits, pending.tree, oids,
+                                     oid_capacity, tc_x509_crl_certificate_extension, &pending);
+    if (result != TC_TLV_OK)
+      return result;
   }
   if (pending.points.length) {
-    result = tc_pki_distribution_points_init(pending.points,pending.limits,pending.tree,&next);
-    if (result != TC_TLV_OK) return result;
+    result = tc_pki_distribution_points_init(pending.points, pending.limits, pending.tree, &next);
+    if (result != TC_TLV_OK)
+      return result;
     /* Reject malformed later points before revocation can stop the search. */
     TC_TLV_reader check = next;
     tc_pki_distribution_point point;
-    while ((result = tc_pki_distribution_point_next(&check,pending.tree,&point)) == TC_TLV_OK) {}
-    if (result != TC_TLV_END) return result;
+    while ((result = tc_pki_distribution_point_next(&check, pending.tree, &point)) == TC_TLV_OK) {
+    }
+    if (result != TC_TLV_END)
+      return result;
   }
   *fields = pending;
   *reader = next;
@@ -102,7 +111,8 @@ TC_TLV_result tc_x509_crl_points_init(tc_x509_crl_certificate_fields* fields,
 }
 
 void tc_x509_crl_scope_plan_inputs(tc_pki_storage_plan* plan,
-    const tc_x509_crl_scope_processing* processing, const tc_x509_crl_trust* trust)
+                                   const tc_x509_crl_scope_processing* processing,
+                                   const tc_x509_crl_trust* trust)
 {
   if (!processing || !processing->index || !processing->query || !processing->query->certificate ||
       !processing->query->point || !tc_x509_crl_trust_valid(trust)) {
@@ -111,16 +121,16 @@ void tc_x509_crl_scope_plan_inputs(tc_pki_storage_plan* plan,
   }
   const TC_X509_certificate* certificate = processing->query->certificate;
   const tc_pki_distribution_point* point = processing->query->point;
-  const TC_bytes fields[] = {
-    certificate->encoded, certificate->extensions, certificate->issuer, certificate->serial,
-    point->name.encoded, point->name.contents, point->issuer
-  };
+  const TC_bytes fields[] = {certificate->encoded, certificate->extensions, certificate->issuer,
+                             certificate->serial,  point->name.encoded,     point->name.contents,
+                             point->issuer};
   TC_PKI_PLAN_INPUT(plan, processing->index, 1);
   TC_PKI_PLAN_INPUT(plan, processing->index->records, processing->index->count);
   TC_PKI_PLAN_INPUT(plan, processing->query, 1);
   TC_PKI_PLAN_INPUT(plan, certificate, 1);
   TC_PKI_PLAN_INPUT(plan, point, 1);
-  if (processing->check) TC_PKI_PLAN_INPUT(plan, processing->check, 1);
+  if (processing->check)
+    TC_PKI_PLAN_INPUT(plan, processing->check, 1);
   TC_PKI_PLAN_INPUT(plan, trust->source, 1);
   TC_PKI_PLAN_INPUT(plan, trust->options, 1);
   TC_PKI_PLAN_INPUT(plan, trust->validation, 1);
@@ -173,8 +183,8 @@ void tc_x509_crl_index_plan_inputs(tc_pki_storage_plan* plan, const TC_X509_crl_
 }
 
 void tc_x509_crl_scope_plan_writes(tc_pki_storage_plan* plan,
-    const tc_x509_crl_scope_processing* processing, const tc_x509_crl_trust* trust,
-    TC_X509_search_result* out)
+                                   const tc_x509_crl_scope_processing* processing,
+                                   const tc_x509_crl_trust* trust, TC_X509_search_result* out)
 {
   if (!processing || !tc_x509_crl_trust_valid(trust) || !out) {
     tc_pki_storage_plan_fail(plan, TC_TLV_ARGUMENT);
@@ -189,7 +199,7 @@ void tc_x509_crl_scope_plan_writes(tc_pki_storage_plan* plan,
   if (plan->status == TC_TLV_OK && trust->tree->frames == trust->validation->frames) {
     if (plan->writes[CRL_SCOPE_TREE].length > plan->writes[TC_X509_PATH_STORAGE_FRAMES].length)
       plan->writes[TC_X509_PATH_STORAGE_FRAMES] = plan->writes[CRL_SCOPE_TREE];
-    plan->writes[CRL_SCOPE_TREE] = (TC_bytes){NULL,0};
+    plan->writes[CRL_SCOPE_TREE] = (TC_bytes){NULL, 0};
   }
   TC_PKI_PLAN_WRITE(plan, processing->states, processing->capacity);
   TC_PKI_PLAN_WRITE(plan, processing->evidence, 1);
@@ -198,8 +208,8 @@ void tc_x509_crl_scope_plan_writes(tc_pki_storage_plan* plan,
   TC_PKI_PLAN_WRITE(plan, processing->scopes, processing->scopes ? processing->index->count : 0);
   TC_PKI_PLAN_WRITE(plan, signer_cache, signer_cache ? 1 : 0);
   TC_PKI_PLAN_WRITE(plan, signer_cache ? signer_cache->path : NULL,
-      signer_cache ? signer_cache->path_capacity : 0);
+                    signer_cache ? signer_cache->path_capacity : 0);
   TC_PKI_PLAN_WRITE(plan, signer_cache ? signer_cache->policies : NULL,
-      signer_cache ? signer_cache->policy_capacity : 0);
+                    signer_cache ? signer_cache->policy_capacity : 0);
 }
 #endif

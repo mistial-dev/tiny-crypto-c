@@ -24,8 +24,8 @@ typedef struct {
  * caller state; processing may consume work/scratch. out changes only on OK.
  * Authenticate the containing CMS and bind group numbers to application data
  * before relying on these hashes. Requires X509. */
-TC_TLV_result TC_LDS_read(TC_bytes encoded, const TC_TLV_limits* limits,
-    TC_TLV_frame* frames, size_t frame_capacity, size_t* work, TC_LDS_security_object* out);
+TC_TLV_result TC_LDS_read(TC_bytes encoded, const TC_TLV_limits* limits, TC_TLV_frame* frames,
+                          size_t frame_capacity, size_t* work, TC_LDS_security_object* out);
 
 /* Read CMS eContent from its complete BER OCTET STRING encoding, as returned
  * in TC_CMS_signed_data.content. A single content chunk is borrowed directly;
@@ -38,8 +38,9 @@ TC_TLV_result TC_LDS_read(TC_bytes encoded, const TC_TLV_limits* limits,
  * changes only on OK. LDS schema always uses DER. Authenticate CMS separately.
  * Requires X509 and BER support. */
 TC_TLV_result TC_LDS_read_content(TC_bytes octets, const TC_TLV_limits* limits,
-    TC_TLV_frame* frames, size_t frame_capacity, size_t* work,
-    uint8_t* buffer, size_t buffer_capacity, TC_LDS_security_object* out);
+                                  TC_TLV_frame* frames, size_t frame_capacity, size_t* work,
+                                  uint8_t* buffer, size_t buffer_capacity,
+                                  TC_LDS_security_object* out);
 
 /* Find group 1..16 in a successfully parsed, unchanged object. Scans the
  * borrowed hash sequence; no index or digest copy is allocated. OK writes a
@@ -48,8 +49,8 @@ TC_TLV_result TC_LDS_read_content(TC_bytes octets, const TC_TLV_limits* limits,
  * frames, work and out. Argument errors preserve caller state; processing may
  * consume work and scratch. CMS authentication remains a separate operation. */
 TC_TLV_result TC_LDS_hash_find(const TC_LDS_security_object* object, unsigned number,
-    const TC_TLV_limits* limits, TC_TLV_frame* frames, size_t frame_capacity,
-    size_t* work, TC_bytes* out);
+                               const TC_TLV_limits* limits, TC_TLV_frame* frames,
+                               size_t frame_capacity, size_t* work, TC_bytes* out);
 
 /* Hash parts in order and compare the complete digest with a group's value.
  * Zero parts represent empty content. count is bounded by limits.max_elements;
@@ -61,8 +62,9 @@ TC_TLV_result TC_LDS_hash_find(const TC_LDS_security_object* object, unsigned nu
  * may consume work/scratch. The caller selects the exact bytes for its protocol
  * and authenticates the containing CMS before accepting a matching digest. */
 TC_TLV_result TC_LDS_hash_check(const TC_LDS_security_object* object, unsigned number,
-    const TC_bytes* parts, size_t count, const TC_TLV_limits* limits,
-    TC_TLV_frame* frames, size_t frame_capacity, size_t* work, int* matched);
+                                const TC_bytes* parts, size_t count, const TC_TLV_limits* limits,
+                                TC_TLV_frame* frames, size_t frame_capacity, size_t* work,
+                                int* matched);
 
 #ifdef __cplusplus
 }

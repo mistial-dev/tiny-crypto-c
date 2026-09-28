@@ -109,33 +109,42 @@ static MunitResult test_arguments(const MunitParameter params[], void* data)
 
   munit_assert_int(TC_DRBG_instantiate(NULL, &config, entropy, empty, empty), ==, TC_DRBG_ARGUMENT);
   munit_assert_int(TC_DRBG_instantiate(&drbg, NULL, entropy, empty, empty), ==, TC_DRBG_ARGUMENT);
-  munit_assert_int(TC_DRBG_instantiate(&drbg, &config, missing, empty, empty), ==, TC_DRBG_ARGUMENT);
-  munit_assert_int(TC_DRBG_instantiate(&drbg, &config, entropy, short_nonce, empty), ==, TC_DRBG_ARGUMENT);
+  munit_assert_int(TC_DRBG_instantiate(&drbg, &config, missing, empty, empty), ==,
+                   TC_DRBG_ARGUMENT);
+  munit_assert_int(TC_DRBG_instantiate(&drbg, &config, entropy, short_nonce, empty), ==,
+                   TC_DRBG_ARGUMENT);
   config.entropy_bytes = 31; /* below the 256-bit strength */
-  munit_assert_int(TC_DRBG_instantiate(&drbg, &config, entropy, good_nonce, empty), ==, TC_DRBG_ARGUMENT);
+  munit_assert_int(TC_DRBG_instantiate(&drbg, &config, entropy, good_nonce, empty), ==,
+                   TC_DRBG_ARGUMENT);
   config.entropy_bytes = TC_DRBG_MAX_ENTROPY_BYTES + 1;
-  munit_assert_int(TC_DRBG_instantiate(&drbg, &config, entropy, good_nonce, empty), ==, TC_DRBG_ARGUMENT);
+  munit_assert_int(TC_DRBG_instantiate(&drbg, &config, entropy, good_nonce, empty), ==,
+                   TC_DRBG_ARGUMENT);
   config.entropy_bytes = 0;
   config.reseed_interval = TC_DRBG_MAX_RESEED_INTERVAL + 1;
-  munit_assert_int(TC_DRBG_instantiate(&drbg, &config, entropy, good_nonce, empty), ==, TC_DRBG_ARGUMENT);
+  munit_assert_int(TC_DRBG_instantiate(&drbg, &config, entropy, good_nonce, empty), ==,
+                   TC_DRBG_ARGUMENT);
   config.reseed_interval = 0;
   config.hash = TC_HASH_UNKNOWN;
-  munit_assert_int(TC_DRBG_instantiate(&drbg, &config, entropy, good_nonce, empty), ==, TC_DRBG_ARGUMENT);
+  munit_assert_int(TC_DRBG_instantiate(&drbg, &config, entropy, good_nonce, empty), ==,
+                   TC_DRBG_ARGUMENT);
   config.hash = TC_HASH_SHA256;
   config.mechanism = (TC_DRBG_mechanism)9;
-  munit_assert_int(TC_DRBG_instantiate(&drbg, &config, entropy, good_nonce, empty), ==, TC_DRBG_ARGUMENT);
+  munit_assert_int(TC_DRBG_instantiate(&drbg, &config, entropy, good_nonce, empty), ==,
+                   TC_DRBG_ARGUMENT);
   munit_assert_true(all_zero(&drbg, sizeof drbg));
 
   /* A nonce that overlaps the context is rejected. */
   config.mechanism = TC_DRBG_HMAC;
   {
     const TC_bytes inside = {(const uint8_t*)&drbg, 16};
-    munit_assert_int(TC_DRBG_instantiate(&drbg, &config, entropy, inside, empty), ==, TC_DRBG_ARGUMENT);
+    munit_assert_int(TC_DRBG_instantiate(&drbg, &config, entropy, inside, empty), ==,
+                     TC_DRBG_ARGUMENT);
   }
 
   munit_assert_int(TC_DRBG_instantiate(&drbg, &config, entropy, good_nonce, empty), ==, TC_DRBG_OK);
   /* 65536 bytes is the SP 800-90A maximum per request. */
-  munit_assert_int(TC_DRBG_generate(&drbg, big, TC_DRBG_MAX_REQUEST_BYTES, 0, empty), ==, TC_DRBG_OK);
+  munit_assert_int(TC_DRBG_generate(&drbg, big, TC_DRBG_MAX_REQUEST_BYTES, 0, empty), ==,
+                   TC_DRBG_OK);
   memset(big, 0xa5, sizeof big);
   munit_assert_int(TC_DRBG_generate(&drbg, big, sizeof big, 0, empty), ==, TC_DRBG_LIMIT);
   munit_assert_true(all_zero(big, sizeof big));
@@ -165,10 +174,13 @@ static MunitResult test_ctr_without_df(const MunitParameter params[], void* data
 
   config.derivation_function = 0;
   /* No nonce, inputs at most seedlen, entropy exactly seedlen. */
-  munit_assert_int(TC_DRBG_instantiate(&drbg, &config, entropy, nonce, empty), ==, TC_DRBG_ARGUMENT);
-  munit_assert_int(TC_DRBG_instantiate(&drbg, &config, entropy, empty, too_long), ==, TC_DRBG_ARGUMENT);
+  munit_assert_int(TC_DRBG_instantiate(&drbg, &config, entropy, nonce, empty), ==,
+                   TC_DRBG_ARGUMENT);
+  munit_assert_int(TC_DRBG_instantiate(&drbg, &config, entropy, empty, too_long), ==,
+                   TC_DRBG_ARGUMENT);
   config.entropy_bytes = 49;
-  munit_assert_int(TC_DRBG_instantiate(&drbg, &config, entropy, empty, empty), ==, TC_DRBG_ARGUMENT);
+  munit_assert_int(TC_DRBG_instantiate(&drbg, &config, entropy, empty, empty), ==,
+                   TC_DRBG_ARGUMENT);
   config.entropy_bytes = 0;
   munit_assert_int(TC_DRBG_instantiate(&drbg, &config, entropy, empty, seedlen), ==, TC_DRBG_OK);
   munit_assert_size(source.last_length, ==, 48);
@@ -176,7 +188,8 @@ static MunitResult test_ctr_without_df(const MunitParameter params[], void* data
   munit_assert_int(TC_DRBG_reseed(&drbg, too_long), ==, TC_DRBG_ARGUMENT);
   munit_assert_int(TC_DRBG_generate(&drbg, out, sizeof out, 0, seedlen), ==, TC_DRBG_OK);
   config.aes_key_bytes = 20;
-  munit_assert_int(TC_DRBG_instantiate(&drbg, &config, entropy, empty, empty), ==, TC_DRBG_ARGUMENT);
+  munit_assert_int(TC_DRBG_instantiate(&drbg, &config, entropy, empty, empty), ==,
+                   TC_DRBG_ARGUMENT);
   return MUNIT_OK;
 }
 
@@ -193,7 +206,8 @@ static MunitResult test_entropy_failures(const MunitParameter params[], void* da
     uint8_t out[32];
 
     /* Instantiate: a failed source leaves the context wiped. */
-    munit_assert_int(TC_DRBG_instantiate(&drbg, &config, entropy, empty, empty), ==, TC_DRBG_ENTROPY);
+    munit_assert_int(TC_DRBG_instantiate(&drbg, &config, entropy, empty, empty), ==,
+                     TC_DRBG_ENTROPY);
     munit_assert_true(all_zero(&drbg, sizeof drbg));
 
     /* Reseed and prediction-resistant generate: the state is unchanged and
@@ -268,8 +282,9 @@ static MunitResult test_random_source(const MunitParameter params[], void* data)
   source.calls = 0;
   munit_assert_int(TC_DRBG_instantiate(&drbg, &config, entropy, empty, empty), ==, TC_DRBG_OK);
   for (offset = 0; offset < sizeof reference; offset += TC_DRBG_MAX_REQUEST_BYTES) {
-    const size_t chunk = sizeof reference - offset < TC_DRBG_MAX_REQUEST_BYTES ?
-                         sizeof reference - offset : TC_DRBG_MAX_REQUEST_BYTES;
+    const size_t chunk = sizeof reference - offset < TC_DRBG_MAX_REQUEST_BYTES
+                             ? sizeof reference - offset
+                             : TC_DRBG_MAX_REQUEST_BYTES;
     munit_assert_int(TC_DRBG_generate(&drbg, reference + offset, chunk, 0, empty), ==, TC_DRBG_OK);
   }
   munit_assert_memory_equal(sizeof large, large, reference);
@@ -280,14 +295,13 @@ static MunitResult test_random_source(const MunitParameter params[], void* data)
 }
 
 static MunitTest tests[] = {
-  {"/lifecycle", test_lifecycle, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-  {"/arguments", test_arguments, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-  {"/ctr-without-df", test_ctr_without_df, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-  {"/entropy-failures", test_entropy_failures, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-  {"/reseed-interval", test_reseed_interval, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-  {"/random-source", test_random_source, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-  {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}
-};
+    {"/lifecycle", test_lifecycle, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/arguments", test_arguments, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/ctr-without-df", test_ctr_without_df, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/entropy-failures", test_entropy_failures, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/reseed-interval", test_reseed_interval, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/random-source", test_random_source, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
 
 static const MunitSuite suite = {"/drbg", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};
 

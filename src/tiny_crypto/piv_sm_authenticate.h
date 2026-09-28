@@ -31,8 +31,9 @@ extern "C" {
  * and overlap errors leave it unchanged. Processing consumes work and clears
  * workspace. VALID leaves the session ready for protected requests. */
 TC_credential_status TC_PIV_SM_authenticate_response(TC_PIV_SM* session,
-    const TC_PIV_SM_authentication* authentication, size_t* work,
-    TC_PIV_SM_authentication_workspace* workspace);
+                                                     const TC_PIV_SM_authentication* authentication,
+                                                     size_t* work,
+                                                     TC_PIV_SM_authentication_workspace* workspace);
 
 #ifdef __cplusplus
 }

@@ -11,15 +11,14 @@ extern "C" {
  * Keep it unchanged through validation. Frames and extension OID scratch are
  * caller-owned via workspace. No allocation or network access occurs.
  * Disabled CHOICE variants return UNSUPPORTED from next. */
-TC_TLV_result TC_X509_trust_anchor_list_init(TC_TLV_reader* reader,
-    const uint8_t* data, size_t length, const TC_TLV_limits* limits,
-    TC_X509_workspace* workspace);
+TC_TLV_result TC_X509_trust_anchor_list_init(TC_TLV_reader* reader, const uint8_t* data,
+                                             size_t length, const TC_TLV_limits* limits,
+                                             TC_X509_workspace* workspace);
 /* One choice at a time. A TrustAnchorInfo lacking certPath is returned with
  * x509_unusable=1; its public key remains available for non-path purposes.
  * On END or error, reader and out remain unchanged. */
-TC_TLV_result TC_X509_trust_anchor_next(TC_TLV_reader* reader,
-    const TC_TLV_limits* limits, TC_X509_workspace* workspace,
-    TC_X509_store_anchor* out);
+TC_TLV_result TC_X509_trust_anchor_next(TC_TLV_reader* reader, const TC_TLV_limits* limits,
+                                        TC_X509_workspace* workspace, TC_X509_store_anchor* out);
 
 #ifdef __cplusplus
 }

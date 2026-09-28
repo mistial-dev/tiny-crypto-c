@@ -16,12 +16,11 @@ typedef struct {
  * the platform's conditioned entropy source, and device_id personalizes the
  * instance. The nonce is drawn from the entropy source. */
 TC_DRBG_result example_random_start(ExampleRandom* random, TC_random_source entropy,
-    TC_bytes device_id);
+                                    TC_bytes device_id);
 
 /* Write a 32-byte session key. The session label is additional input, which
  * separates keys for different purposes. */
-TC_DRBG_result example_random_session_key(ExampleRandom* random, TC_bytes label,
-    uint8_t key[32]);
+TC_DRBG_result example_random_session_key(ExampleRandom* random, TC_bytes label, uint8_t key[32]);
 
 /* Reseed after a platform event, such as wake from sleep. */
 TC_DRBG_result example_random_refresh(ExampleRandom* random);

@@ -28,7 +28,8 @@ enum {
   TWIC_CONTENTS_MAX = 200
 };
 
-static int printable(TC_bytes value, size_t maximum, int empty) {
+static int printable(TC_bytes value, size_t maximum, int empty)
+{
   if (value.length > maximum || (!empty && !value.length))
     return 0;
   for (size_t i = 0; i < value.length; ++i)
@@ -37,41 +38,42 @@ static int printable(TC_bytes value, size_t maximum, int empty) {
   return 1;
 }
 
-static int decimal(TC_bytes value) {
+static int decimal(TC_bytes value)
+{
   for (size_t i = 0; i < value.length; ++i)
     if (value.data[i] < '0' || value.data[i] > '9')
       return 0;
   return 1;
 }
 
-static unsigned number(const uint8_t *value, size_t length) {
+static unsigned number(const uint8_t* value, size_t length)
+{
   unsigned result = 0;
   for (size_t i = 0; i < length; ++i)
     result = result * 10 + value[i] - '0';
   return result;
 }
 
-static int twic_issuer(TC_bytes value) {
+static int twic_issuer(TC_bytes value)
+{
   static const uint8_t prefix[] = {'7', '0', '9', '9'};
   return value.length == TWIC_ISSUER_LENGTH && decimal(value) &&
          !memcmp(value.data, prefix, sizeof prefix);
 }
 
-static int date(TC_bytes value, TC_PIV_printed_profile profile,
-                TC_X509_time *out) {
+static int date(TC_bytes value, TC_PIV_printed_profile profile, TC_X509_time* out)
+{
   if (value.length != PRINTED_DATE_LENGTH)
     return 0;
   unsigned year, day, parsed_month;
   if (profile == TC_PIV_PRINTED_PROFILE_PIV) {
-    if (!decimal((TC_bytes){value.data, 4}) ||
-        !decimal((TC_bytes){value.data + 7, 2}))
+    if (!decimal((TC_bytes){value.data, 4}) || !decimal((TC_bytes){value.data + 7, 2}))
       return 0;
     year = number(value.data, 4);
     parsed_month = tc_credential_month3(value.data + 4, 0);
     day = number(value.data + 7, 2);
   } else {
-    if (!decimal((TC_bytes){value.data, 2}) ||
-        !decimal((TC_bytes){value.data + 5, 4}))
+    if (!decimal((TC_bytes){value.data, 2}) || !decimal((TC_bytes){value.data + 5, 4}))
       return 0;
     day = number(value.data, 2);
     parsed_month = tc_credential_month3(value.data + 2, 0);
@@ -83,20 +85,19 @@ static int date(TC_bytes value, TC_PIV_printed_profile profile,
   return 1;
 }
 
-static TC_TLV_result field(TC_TLV_reader *reader, unsigned tag,
-                           TC_TLV_element *out) {
+static TC_TLV_result field(TC_TLV_reader* reader, unsigned tag, TC_TLV_element* out)
+{
   TC_TLV_result result = TC_TLV_next(reader, out);
   if (result == TC_TLV_END)
     return TC_TLV_INVALID;
   if (result != TC_TLV_OK)
     return result;
-  return out->header.tag_length == 1 && out->header.tag[0] == tag
-             ? TC_TLV_OK
-             : TC_TLV_INVALID;
+  return out->header.tag_length == 1 && out->header.tag[0] == tag ? TC_TLV_OK : TC_TLV_INVALID;
 }
 
-static TC_TLV_result text_field(TC_TLV_reader *reader, unsigned tag,
-                                size_t maximum, int empty, TC_bytes *out) {
+static TC_TLV_result text_field(TC_TLV_reader* reader, unsigned tag, size_t maximum, int empty,
+                                TC_bytes* out)
+{
   TC_TLV_element element;
   TC_TLV_result result = field(reader, tag, &element);
   if (result != TC_TLV_OK)
@@ -107,20 +108,17 @@ static TC_TLV_result text_field(TC_TLV_reader *reader, unsigned tag,
   return TC_TLV_OK;
 }
 
-TC_TLV_result TC_PIV_printed_read(TC_bytes input,
-                                  TC_PIV_printed_encoding encoding,
-                                  TC_PIV_printed_profile profile,
-                                  TC_PIV_printed *out) {
+TC_TLV_result TC_PIV_printed_read(TC_bytes input, TC_PIV_printed_encoding encoding,
+                                  TC_PIV_printed_profile profile, TC_PIV_printed* out)
+{
   const TC_TLV_limits limits = {SIZE_MAX, SIZE_MAX, 8, 1};
   TC_PIV_printed parsed = {0};
   TC_TLV_element element;
   TC_TLV_reader reader;
   TC_TLV_result result;
   if (!out || (!input.data && input.length) ||
-      (encoding != TC_PIV_PRINTED_CONTENTS &&
-       encoding != TC_PIV_PRINTED_CONTAINER) ||
-      (profile != TC_PIV_PRINTED_PROFILE_PIV &&
-       profile != TC_PIV_PRINTED_PROFILE_TWIC))
+      (encoding != TC_PIV_PRINTED_CONTENTS && encoding != TC_PIV_PRINTED_CONTAINER) ||
+      (profile != TC_PIV_PRINTED_PROFILE_PIV && profile != TC_PIV_PRINTED_PROFILE_TWIC))
     return TC_TLV_ARGUMENT;
   if (!tc_internal_ranges_disjoint(input.data, input.length, out, sizeof *out))
     return TC_TLV_ARGUMENT;
@@ -129,16 +127,13 @@ TC_TLV_result TC_PIV_printed_read(TC_bytes input,
     if (result != TC_TLV_OK)
       return result;
   }
-  if (profile == TC_PIV_PRINTED_PROFILE_TWIC &&
-      input.length > TWIC_CONTENTS_MAX)
+  if (profile == TC_PIV_PRINTED_PROFILE_TWIC && input.length > TWIC_CONTENTS_MAX)
     return TC_TLV_LIMIT;
-  result = TC_TLV_reader_init(&reader, input.data, input.length, TC_TLV_ISO7816,
-                              &limits);
+  result = TC_TLV_reader_init(&reader, input.data, input.length, TC_TLV_ISO7816, &limits);
   if (result != TC_TLV_OK)
     return result;
 
-  result =
-      text_field(&reader, PRINTED_NAME_TAG, PRINTED_NAME_MAX, 0, &parsed.name);
+  result = text_field(&reader, PRINTED_NAME_TAG, PRINTED_NAME_MAX, 0, &parsed.name);
   if (result != TC_TLV_OK)
     return result;
   result = text_field(&reader, PRINTED_EMPLOYEE_TAG, PRINTED_AFFILIATION_MAX, 1,
@@ -171,18 +166,16 @@ TC_TLV_result TC_PIV_printed_read(TC_bytes input,
     return TC_TLV_INVALID;
   parsed.issuer_identification = element.value;
   if (profile == TC_PIV_PRINTED_PROFILE_TWIC ||
-      (reader.offset < input.length &&
-       input.data[reader.offset] == PRINTED_ORGANIZATION_1_TAG)) {
-    result = text_field(&reader, PRINTED_ORGANIZATION_1_TAG,
-                        PRINTED_AFFILIATION_MAX, 1, &parsed.organization_1);
+      (reader.offset < input.length && input.data[reader.offset] == PRINTED_ORGANIZATION_1_TAG)) {
+    result = text_field(&reader, PRINTED_ORGANIZATION_1_TAG, PRINTED_AFFILIATION_MAX, 1,
+                        &parsed.organization_1);
     if (result != TC_TLV_OK)
       return result;
   }
   if (profile == TC_PIV_PRINTED_PROFILE_TWIC ||
-      (reader.offset < input.length &&
-       input.data[reader.offset] == PRINTED_ORGANIZATION_2_TAG)) {
-    result = text_field(&reader, PRINTED_ORGANIZATION_2_TAG,
-                        PRINTED_AFFILIATION_MAX, 1, &parsed.organization_2);
+      (reader.offset < input.length && input.data[reader.offset] == PRINTED_ORGANIZATION_2_TAG)) {
+    result = text_field(&reader, PRINTED_ORGANIZATION_2_TAG, PRINTED_AFFILIATION_MAX, 1,
+                        &parsed.organization_2);
     if (result != TC_TLV_OK)
       return result;
   }
@@ -199,16 +192,15 @@ TC_TLV_result TC_PIV_printed_read(TC_bytes input,
   return TC_TLV_OK;
 }
 
-TC_TLV_result TC_PIV_printed_expiration_check(const TC_PIV_printed *printed,
-                                              TC_bytes chuid_expiration,
-                                              const TC_X509_time *at,
-                                              int *valid) {
-  if (!printed || !at || !valid || !chuid_expiration.data ||
-      chuid_expiration.length != 8)
+TC_TLV_result TC_PIV_printed_expiration_check(const TC_PIV_printed* printed,
+                                              TC_bytes chuid_expiration, const TC_X509_time* at,
+                                              int* valid)
+{
+  if (!printed || !at || !valid || !chuid_expiration.data || chuid_expiration.length != 8)
     return TC_TLV_ARGUMENT;
   unsigned year, parsed_month, day;
-  if (!tc_credential_yyyymmdd(chuid_expiration.data,
-      chuid_expiration.length, &year, &parsed_month, &day))
+  if (!tc_credential_yyyymmdd(chuid_expiration.data, chuid_expiration.length, &year, &parsed_month,
+                              &day))
     return TC_TLV_INVALID;
   TC_X509_time expires = printed->expiration;
   expires.hour = 23;
@@ -218,8 +210,7 @@ TC_TLV_result TC_PIV_printed_expiration_check(const TC_PIV_printed *printed,
   TC_TLV_result result = TC_X509_time_compare(at, &expires, &order);
   if (result != TC_TLV_OK)
     return result;
-  *valid = printed->expiration.year == year &&
-           printed->expiration.month == parsed_month &&
+  *valid = printed->expiration.year == year && printed->expiration.month == parsed_month &&
            printed->expiration.day == day && order <= 0;
   return TC_TLV_OK;
 }

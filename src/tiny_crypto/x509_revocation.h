@@ -9,7 +9,9 @@ extern "C" {
 #endif
 
 typedef enum {
-  TC_X509_CRL_UNDETERMINED, TC_X509_CRL_UNREVOKED, TC_X509_CRL_REVOKED
+  TC_X509_CRL_UNDETERMINED,
+  TC_X509_CRL_UNREVOKED,
+  TC_X509_CRL_REVOKED
 } TC_X509_revocation_status;
 /* ReasonFlags bits 1..8; bit 0 is unused. */
 enum { TC_X509_CRL_ALL_REASONS = 0x1fe };
@@ -30,11 +32,11 @@ typedef struct {
   size_t representative, next, head;
 } TC_X509_revocation_scope;
 typedef enum {
-  TC_X509_CRL_COMPLETE_ONLY, TC_X509_CRL_DELTA_IF_AVAILABLE, TC_X509_CRL_DELTA_REQUIRED
+  TC_X509_CRL_COMPLETE_ONLY,
+  TC_X509_CRL_DELTA_IF_AVAILABLE,
+  TC_X509_CRL_DELTA_REQUIRED
 } TC_X509_crl_delta_policy;
-typedef enum {
-  TC_X509_CRL_ORDER_NUMBER, TC_X509_CRL_ORDER_THIS_UPDATE
-} TC_X509_crl_order_policy;
+typedef enum { TC_X509_CRL_ORDER_NUMBER, TC_X509_CRL_ORDER_THIS_UPDATE } TC_X509_crl_order_policy;
 typedef struct {
   const TC_X509_crl_index* index;
   const TC_X509_store_source* source;
@@ -79,8 +81,9 @@ typedef struct {
  * the member index and evidence; UNREVOKED uses SIZE_MAX and zero evidence.
  * Missing evidence/cycles return UNSUPPORTED; failures leave out unchanged. */
 TC_TLV_result TC_X509_path_check_revocation(const TC_bytes* chain, size_t count,
-    const TC_X509_revocation_options* options, const TC_X509_revocation_workspace* workspace,
-    size_t* work, TC_X509_revocation_result* out);
+                                            const TC_X509_revocation_options* options,
+                                            const TC_X509_revocation_workspace* workspace,
+                                            size_t* work, TC_X509_revocation_result* out);
 
 #ifdef __cplusplus
 }

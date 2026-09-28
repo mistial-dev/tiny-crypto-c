@@ -19,13 +19,9 @@ typedef struct {
 
 /* Validate an INCITS 378-2004 record against the PIV card profile.
  * The encoded span borrows input. out changes only on success. */
-TC_TLV_result TC_PIV_fingerprint_read(TC_bytes input,
-                                      TC_PIV_fingerprint_record *out);
+TC_TLV_result TC_PIV_fingerprint_read(TC_bytes input, TC_PIV_fingerprint_record* out);
 
-typedef enum {
-  TC_PIV_FACE_PROFILE_PIV,
-  TC_PIV_FACE_PROFILE_TWIC
-} TC_PIV_face_profile;
+typedef enum { TC_PIV_FACE_PROFILE_PIV, TC_PIV_FACE_PROFILE_TWIC } TC_PIV_face_profile;
 
 typedef struct {
   TC_bytes encoded;
@@ -49,12 +45,12 @@ typedef struct {
 /* Validate an INCITS 385-2004 record against the PIV card profile.
  * The encoded span borrows input. out changes only on success. */
 TC_TLV_result TC_PIV_face_read(TC_bytes input, TC_PIV_face_profile profile,
-                               TC_PIV_face_record *out);
+                               TC_PIV_face_record* out);
 
 /* Return one validated image from a record accepted by TC_PIV_face_read.
  * The image span borrows the record. out changes only on success. */
-TC_TLV_result TC_PIV_face_image_read(const TC_PIV_face_record *record,
-                                     size_t index, TC_PIV_face_image *out);
+TC_TLV_result TC_PIV_face_image_read(const TC_PIV_face_record* record, size_t index,
+                                     TC_PIV_face_image* out);
 
 #ifdef __cplusplus
 }

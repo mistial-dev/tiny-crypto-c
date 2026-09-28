@@ -29,7 +29,7 @@ TC_DRBG_result tc_drbg_hash_parameters(TC_hash_algorithm hash, tc_drbg_parameter
 
 /* Hash the parts in order into digest. */
 static TC_DRBG_result hash_parts(TC_DRBG* drbg, const TC_bytes* parts, size_t count,
-    uint8_t* digest)
+                                 uint8_t* digest)
 {
   const TC_hash_algorithm hash = (TC_hash_algorithm)drbg->hash;
   TC_status status = tc_hash_init(hash, &drbg->scratch.hash);
@@ -46,8 +46,8 @@ static TC_DRBG_result hash_parts(TC_DRBG* drbg, const TC_bytes* parts, size_t co
  * Hash(1 || bits) || Hash(2 || bits) || ..., each over the input parts. The
  * prefix is the counter byte and the 32-bit big-endian output bit count. At
  * most 4 input parts follow the prefix. out must stay clear of the parts. */
-static TC_DRBG_result hash_df(TC_DRBG* drbg, const TC_bytes* input, size_t count,
-    uint8_t* out, size_t length)
+static TC_DRBG_result hash_df(TC_DRBG* drbg, const TC_bytes* input, size_t count, uint8_t* out,
+                              size_t length)
 {
   uint8_t prefix[5];
   uint8_t digest[64]; /* largest SHA-2 digest */
@@ -73,7 +73,7 @@ static TC_DRBG_result hash_df(TC_DRBG* drbg, const TC_bytes* input, size_t count
 /* value = (value + addend) mod 2^(8 * value_length), big-endian, with addend
  * right-aligned and at most value_length bytes long. */
 static void add_mod(uint8_t* value, size_t value_length, const uint8_t* addend,
-    size_t addend_length)
+                    size_t addend_length)
 {
   unsigned carry = 0;
   size_t i;
@@ -89,8 +89,7 @@ static void add_mod(uint8_t* value, size_t value_length, const uint8_t* addend,
 /* Instantiate (10.1.1.2): seed = Hash_df(entropy || nonce || personalization).
  * Reseed (10.1.1.3): seed = Hash_df(0x01 || V || entropy || additional).
  * Both then set V = seed and C = Hash_df(0x00 || V). */
-TC_DRBG_result tc_drbg_hash_seed(TC_DRBG* drbg, const TC_bytes* parts, size_t count,
-    int reseed)
+TC_DRBG_result tc_drbg_hash_seed(TC_DRBG* drbg, const TC_bytes* parts, size_t count, int reseed)
 {
   static const uint8_t one = 0x01, zero = 0x00;
   uint8_t seed[TC_DRBG_HASH_SEED_BYTES];
@@ -117,7 +116,7 @@ TC_DRBG_result tc_drbg_hash_seed(TC_DRBG* drbg, const TC_bytes* parts, size_t co
 
 /* Generate (10.1.1.4) with Hashgen (10.1.1.4 step 3). */
 TC_DRBG_result tc_drbg_hash_generate(TC_DRBG* drbg, uint8_t* output, size_t length,
-    TC_bytes additional)
+                                     TC_bytes additional)
 {
   static const uint8_t two = 0x02, three = 0x03;
   const size_t seed_bytes = drbg->seed_bytes;

@@ -19,18 +19,20 @@ typedef struct {
 static inline int tc_x509_crl_trust_valid(const tc_x509_crl_trust* trust)
 {
   return trust && trust->source && trust->options && trust->tree && trust->tree->work &&
-      trust->validation && trust->search && trust->source->anchor &&
-      trust->anchor_index < trust->source->anchor_count;
+         trust->validation && trust->search && trust->source->anchor &&
+         trust->anchor_index < trust->source->anchor_count;
 }
 
 typedef TC_TLV_result (*tc_x509_crl_attempt)(const void* context,
-    const TC_X509_certificate* candidate, const tc_x509_crl_trust* trust,
-    TC_X509_search_result* out);
+                                             const TC_X509_certificate* candidate,
+                                             const tc_x509_crl_trust* trust,
+                                             TC_X509_search_result* out);
 
-typedef TC_TLV_result (*tc_x509_crl_source_search_fn)(const void* candidates,
-    const TC_X509_store_source* external, const tc_x509_crl* crl,
+typedef TC_TLV_result (*tc_x509_crl_source_search_fn)(
+    const void* candidates, const TC_X509_store_source* external, const tc_x509_crl* crl,
     const tc_x509_crl_extension_info* extensions, const tc_x509_crl_trust* trust,
-    tc_x509_crl_attempt attempt, const void* context, TC_X509_search_result* out, int* source_failed);
+    tc_x509_crl_attempt attempt, const void* context, TC_X509_search_result* out,
+    int* source_failed);
 
 /* The adapter borrows its cursor snapshot and uses the operation's guarded source. */
 typedef struct {
@@ -47,15 +49,19 @@ typedef struct {
   size_t metadata_count;
 } tc_x509_crl_operation_source;
 
-TC_TLV_result tc_x509_crl_source_search(const void* candidates,
-    const tc_x509_crl* crl, const tc_x509_crl_extension_info* extensions,
-    const tc_x509_crl_trust* trust, tc_x509_crl_attempt attempt, const void* context,
-    TC_X509_search_result* out, int* source_failed);
+TC_TLV_result tc_x509_crl_source_search(const void* candidates, const tc_x509_crl* crl,
+                                        const tc_x509_crl_extension_info* extensions,
+                                        const tc_x509_crl_trust* trust, tc_x509_crl_attempt attempt,
+                                        const void* context, TC_X509_search_result* out,
+                                        int* source_failed);
 
 TC_TLV_result tc_x509_crl_store_source_search(const void* candidates,
-    const TC_X509_store_source* external, const tc_x509_crl* crl,
-    const tc_x509_crl_extension_info* extensions, const tc_x509_crl_trust* trust,
-    tc_x509_crl_attempt attempt, const void* context, TC_X509_search_result* out, int* source_failed);
+                                              const TC_X509_store_source* external,
+                                              const tc_x509_crl* crl,
+                                              const tc_x509_crl_extension_info* extensions,
+                                              const tc_x509_crl_trust* trust,
+                                              tc_x509_crl_attempt attempt, const void* context,
+                                              TC_X509_search_result* out, int* source_failed);
 
 typedef struct {
   const tc_x509_crl* crl;
@@ -63,22 +69,25 @@ typedef struct {
   const TC_X509_name_workspace* names;
 } tc_x509_crl_filter;
 
-TC_TLV_result tc_x509_crl_filter_match(const void* context,
-    const TC_X509_certificate* candidate, const TC_TLV_limits* limits,
-    const tc_pki_tree_workspace* tree, int* matched);
+TC_TLV_result tc_x509_crl_filter_match(const void* context, const TC_X509_certificate* candidate,
+                                       const TC_TLV_limits* limits,
+                                       const tc_pki_tree_workspace* tree, int* matched);
 
 /* Search a guarded cursor for a matching CRL signer and attempt validation.
  * Cursor and scratch are provisional; output is published on success. */
 TC_TLV_result tc_x509_crl_search_candidates(void* cursor, tc_pki_candidate_next next,
-    const tc_x509_crl* crl, const tc_x509_crl_extension_info* extensions,
-    const tc_x509_crl_trust* trust, tc_x509_crl_attempt attempt, const void* context,
-    TC_X509_search_result* out, int* source_failed);
+                                            const tc_x509_crl* crl,
+                                            const tc_x509_crl_extension_info* extensions,
+                                            const tc_x509_crl_trust* trust,
+                                            tc_x509_crl_attempt attempt, const void* context,
+                                            TC_X509_search_result* out, int* source_failed);
 
 /* candidates points to a guarded store cursor snapshot, reused across searches. */
-TC_TLV_result tc_x509_crl_store_search(const void* candidates,
-    const tc_x509_crl* crl, const tc_x509_crl_extension_info* extensions,
-    const tc_x509_crl_trust* trust, tc_x509_crl_attempt attempt, const void* context,
-    TC_X509_search_result* out, int* source_failed);
+TC_TLV_result tc_x509_crl_store_search(const void* candidates, const tc_x509_crl* crl,
+                                       const tc_x509_crl_extension_info* extensions,
+                                       const tc_x509_crl_trust* trust, tc_x509_crl_attempt attempt,
+                                       const void* context, TC_X509_search_result* out,
+                                       int* source_failed);
 
 typedef struct {
   const TC_X509_crl_index* index;
@@ -89,19 +98,19 @@ typedef struct {
 } tc_x509_crl_index_processing;
 
 static inline int tc_x509_crl_index_arguments(const TC_X509_crl_index* index,
-    const tc_x509_crl_query* query, const tc_x509_crl_trust* trust,
-    TC_X509_search_result* out)
+                                              const tc_x509_crl_query* query,
+                                              const tc_x509_crl_trust* trust,
+                                              TC_X509_search_result* out)
 {
-  return index && (!index->count || index->records) && out &&
-      tc_x509_crl_trust_valid(trust) && query && query->certificate && query->point &&
-      (query->certificate_ca == 0 || query->certificate_ca == 1);
+  return index && (!index->count || index->records) && out && tc_x509_crl_trust_valid(trust) &&
+         query && query->certificate && query->point &&
+         (query->certificate_ca == 0 || query->certificate_ca == 1);
 }
 
 /* Caller validates the index, base, query and trust before candidate search.
  * Establish the signer path before selecting and applying a delta CRL. */
-TC_TLV_result tc_x509_crl_index_attempt(const void* context,
-    const TC_X509_certificate* signer, const tc_x509_crl_trust* trust,
-    TC_X509_search_result* out);
+TC_TLV_result tc_x509_crl_index_attempt(const void* context, const TC_X509_certificate* signer,
+                                        const tc_x509_crl_trust* trust, TC_X509_search_result* out);
 
 typedef struct {
   const tc_x509_crl_selected* selected;
@@ -110,12 +119,12 @@ typedef struct {
 } tc_x509_crl_processing;
 
 /* Candidate callbacks borrow validated search state for the whole attempt. */
-TC_TLV_result tc_x509_crl_check_signer(const void* context,
-    const TC_X509_certificate* candidate, const tc_x509_crl_trust* trust,
-    TC_X509_search_result* out);
+TC_TLV_result tc_x509_crl_check_signer(const void* context, const TC_X509_certificate* candidate,
+                                       const tc_x509_crl_trust* trust, TC_X509_search_result* out);
 TC_TLV_result tc_x509_crl_process_candidate(const void* context,
-    const TC_X509_certificate* candidate, const tc_x509_crl_trust* trust,
-    TC_X509_search_result* out);
+                                            const TC_X509_certificate* candidate,
+                                            const tc_x509_crl_trust* trust,
+                                            TC_X509_search_result* out);
 
 typedef struct {
   tc_x509_crl_selected selected;
@@ -126,8 +135,10 @@ typedef struct {
 } tc_x509_crl_proposal;
 
 /* Merge authenticated scope proposals using the configured freshness order. */
-TC_TLV_result tc_x509_crl_proposal_merge(tc_x509_crl_proposal* chosen, const tc_x509_crl_proposal* candidate,
-    TC_X509_crl_order_policy policy, const tc_pki_tree_workspace* tree);
+TC_TLV_result tc_x509_crl_proposal_merge(tc_x509_crl_proposal* chosen,
+                                         const tc_x509_crl_proposal* candidate,
+                                         TC_X509_crl_order_policy policy,
+                                         const tc_pki_tree_workspace* tree);
 
 /* Called after signature/path validation and scope selection, before publication.
  * selected borrows the effective base/delta pair, or is NULL when no pair could
@@ -138,7 +149,7 @@ TC_TLV_result tc_x509_crl_proposal_merge(tc_x509_crl_proposal* chosen, const tc_
 typedef struct {
   void* context;
   TC_X509_path_status (*verify)(void* context, const TC_X509_search_result* path,
-      const tc_x509_crl_selected* selected, size_t* work);
+                                const tc_x509_crl_selected* selected, size_t* work);
 } tc_x509_crl_path_check;
 
 typedef struct {
@@ -169,29 +180,31 @@ typedef struct {
 
 /* Validate scope inputs before describing or using writable storage. */
 TC_TLV_result tc_x509_crl_scope_arguments(const tc_x509_crl_scope_processing* processing,
-    const tc_x509_crl_trust* trust, int all_scopes, TC_X509_search_result* out);
+                                          const tc_x509_crl_trust* trust, int all_scopes,
+                                          TC_X509_search_result* out);
 
 /* Run a signer attempt after the caller validates state and storage separation. */
-TC_TLV_result tc_x509_crl_scope_attempt(const void* context,
-    const TC_X509_certificate* signer, const tc_x509_crl_trust* trust,
-    TC_X509_search_result* out);
+TC_TLV_result tc_x509_crl_scope_attempt(const void* context, const TC_X509_certificate* signer,
+                                        const tc_x509_crl_trust* trust, TC_X509_search_result* out);
 
-typedef TC_TLV_result (*tc_x509_crl_search)(const void* candidates,
-    const tc_x509_crl* crl, const tc_x509_crl_extension_info* extensions,
-    const tc_x509_crl_trust* trust, tc_x509_crl_attempt attempt, const void* context,
-    TC_X509_search_result* out, int* source_failed);
+typedef TC_TLV_result (*tc_x509_crl_search)(const void* candidates, const tc_x509_crl* crl,
+                                            const tc_x509_crl_extension_info* extensions,
+                                            const tc_x509_crl_trust* trust,
+                                            tc_x509_crl_attempt attempt, const void* context,
+                                            TC_X509_search_result* out, int* source_failed);
 
-TC_TLV_result tc_x509_crl_same_scope(const tc_x509_crl_scope_processing* processing,
-    size_t other, const tc_x509_crl_trust* trust, int* same);
-TC_TLV_result tc_x509_crl_scopes_index(const TC_X509_crl_index* index,
-    const TC_TLV_limits* limits, const tc_pki_tree_workspace* tree,
-    const TC_X509_name_workspace* names, TC_X509_revocation_scope* slots,
-    size_t capacity);
+TC_TLV_result tc_x509_crl_same_scope(const tc_x509_crl_scope_processing* processing, size_t other,
+                                     const tc_x509_crl_trust* trust, int* same);
+TC_TLV_result tc_x509_crl_scopes_index(const TC_X509_crl_index* index, const TC_TLV_limits* limits,
+                                       const tc_pki_tree_workspace* tree,
+                                       const TC_X509_name_workspace* names,
+                                       TC_X509_revocation_scope* slots, size_t capacity);
 /* Search each reference key before ranking authenticated scope proposals.
  * Inputs and storage are validated by the caller; search preserves work limits. */
 TC_TLV_result tc_x509_crl_group(const void* candidates, tc_x509_crl_search search,
-    const tc_x509_crl_scope_processing* processing, const tc_x509_crl_trust* trust,
-    int* source_failed, tc_x509_crl_proposal* out);
+                                const tc_x509_crl_scope_processing* processing,
+                                const tc_x509_crl_trust* trust, int* source_failed,
+                                tc_x509_crl_proposal* out);
 
 typedef struct {
   const TC_TLV_limits* limits;
@@ -213,8 +226,7 @@ typedef struct {
 } tc_x509_crl_held_path;
 
 /* Caller guards the path object before this checks its borrowed inputs. */
-void tc_x509_crl_path_plan_inputs(tc_pki_storage_plan* plan,
-    const tc_x509_crl_held_path* path);
+void tc_x509_crl_path_plan_inputs(tc_pki_storage_plan* plan, const tc_x509_crl_held_path* path);
 
 /* Collect borrowed revocation fields through the checked extension visitor.
  * Zero-initialize fields and supply limits/tree before visiting extensions. */
@@ -224,16 +236,18 @@ TC_TLV_result tc_x509_crl_certificate_extension(void* context, const TC_X509_ext
  * certificate replaces the initial fields. Scratch and work are provisional;
  * fields and reader are published on success. Caller checks storage overlap. */
 TC_TLV_result tc_x509_crl_points_init(tc_x509_crl_certificate_fields* fields,
-    const TC_X509_certificate* certificate, TC_bytes* oids, size_t oid_capacity,
-    TC_TLV_reader* reader);
+                                      const TC_X509_certificate* certificate, TC_bytes* oids,
+                                      size_t oid_capacity, TC_TLV_reader* reader);
 
 /* Traverse checked points and issuer fallbacks using guarded candidate sources.
  * Caller validates policies, workspace separation and the complete point list.
  * Evidence and the single-scope path are published on success; scratch is provisional. */
 TC_TLV_result tc_x509_crl_scopes(const void* candidates, tc_x509_crl_search search_candidates,
-    const tc_x509_crl_scope_processing* input, const tc_x509_crl_trust* trust,
-    const tc_x509_crl_certificate_fields* fields, TC_TLV_reader* point_reader,
-    int all_scopes, int* source_failed, TC_X509_search_result* out);
+                                 const tc_x509_crl_scope_processing* input,
+                                 const tc_x509_crl_trust* trust,
+                                 const tc_x509_crl_certificate_fields* fields,
+                                 TC_TLV_reader* point_reader, int all_scopes, int* source_failed,
+                                 TC_X509_search_result* out);
 
 /* Caller-owned scratch reused across signer dependency searches. */
 typedef struct {
@@ -272,7 +286,7 @@ typedef struct {
 
 /* Parse a guarded dependency using the caller's reusable validation scratch. */
 TC_TLV_result tc_x509_crl_dependency_read(const tc_x509_crl_dependencies* dependencies,
-    size_t index, TC_X509_certificate* out);
+                                          size_t index, TC_X509_certificate* out);
 
 enum { CRL_EXTRA_RESOLUTION, CRL_EXTRA_WORKSPACE, CRL_EXTRA_INPUT_COUNT };
 
@@ -286,97 +300,124 @@ typedef struct {
 /* Check the node array and borrowed bytes of extra as plan inputs. The caller
  * records extra itself as a write or input. */
 void tc_x509_crl_extra_plan_inputs(tc_pki_storage_plan* plan,
-    const tc_x509_crl_extra_storage* extra);
+                                   const tc_x509_crl_extra_storage* extra);
 
 /* Guard borrowed certificate bytes before adding a dependency. */
 TC_TLV_result tc_x509_crl_dependency_add(tc_x509_crl_dependencies* dependencies,
-    TC_bytes certificate, size_t* work, size_t* index);
+                                         TC_bytes certificate, size_t* work, size_t* index);
 
 /* Anchor signatures establish a root; other signer paths need resolved dependencies. */
-TC_X509_path_status tc_x509_crl_dependencies_check(void* context,
-    const TC_X509_search_result* path, const tc_x509_crl_selected* selected, size_t* work);
+TC_X509_path_status tc_x509_crl_dependencies_check(void* context, const TC_X509_search_result* path,
+                                                   const tc_x509_crl_selected* selected,
+                                                   size_t* work);
 
 /* Reuse an encoded certificate's node or append a borrowed, undetermined node.
  * Caller guards certificate bytes against writable storage and keeps existing
  * nodes valid. Failures preserve nodes, count and index; work is provisional. */
-TC_TLV_result tc_x509_crl_dependency_find(TC_X509_revocation_node* nodes,
-    size_t capacity, size_t* count, TC_bytes certificate, size_t* work, size_t* index);
+TC_TLV_result tc_x509_crl_dependency_find(TC_X509_revocation_node* nodes, size_t capacity,
+                                          size_t* count, TC_bytes certificate, size_t* work,
+                                          size_t* index);
 /* Production resolver uses the node array as its own hash bucket storage. */
-TC_TLV_result tc_x509_crl_dependency_find_indexed(TC_X509_revocation_node* nodes,
-    size_t capacity, size_t* count, TC_bytes certificate, size_t* work, size_t* index);
+TC_TLV_result tc_x509_crl_dependency_find_indexed(TC_X509_revocation_node* nodes, size_t capacity,
+                                                  size_t* count, TC_bytes certificate, size_t* work,
+                                                  size_t* index);
 
 /* Both effective records must verify with the anchor to bypass signer paths. */
-TC_X509_signature_result tc_x509_crl_selected_anchor_check(const tc_x509_crl_selected* selected,
-    const TC_X509_trust_anchor* anchor, const TC_X509_signature_provider* provider,
-    const TC_TLV_limits* limits, const TC_X509_name_workspace* names, size_t* work);
+TC_X509_signature_result tc_x509_crl_selected_anchor_check(
+    const tc_x509_crl_selected* selected, const TC_X509_trust_anchor* anchor,
+    const TC_X509_signature_provider* provider, const TC_TLV_limits* limits,
+    const TC_X509_name_workspace* names, size_t* work);
 
 /* Extend provisional dependency nodes and check each signer's current status.
  * Caller validates metadata storage; writes covers every writable operation span. */
 TC_X509_path_status tc_x509_crl_dependencies_path(const TC_X509_search_result* path,
-    const tc_x509_crl_resolution_workspace* workspace, size_t* count,
-    const TC_bytes* writes, size_t write_count, size_t* work);
+                                                  const tc_x509_crl_resolution_workspace* workspace,
+                                                  size_t* count, const TC_bytes* writes,
+                                                  size_t write_count, size_t* work);
 
 typedef TC_TLV_result (*tc_x509_crl_node_evaluate)(void* context, size_t index,
-    tc_x509_crl_evidence* evidence, int* stop);
+                                                   tc_x509_crl_evidence* evidence, int* stop);
 /* Retry pending nodes while evaluation discovers dependencies or resolves nodes.
  * Evaluators append within capacity and consume work. Nodes remain provisional;
  * OK publishes determined root evidence. stop marks an operation-wide failure. */
 TC_TLV_result tc_x509_crl_nodes_resolve(TC_X509_revocation_node* nodes, size_t capacity,
-    size_t* count, size_t root, size_t* work, tc_x509_crl_node_evaluate evaluate,
-    void* context, tc_x509_crl_evidence* out);
+                                        size_t* count, size_t root, size_t* work,
+                                        tc_x509_crl_node_evaluate evaluate, void* context,
+                                        tc_x509_crl_evidence* out);
 
 /* Resolve a guarded target, reusing proven dependencies within the held path.
  * Caller prepares the source/anchor and checks operation storage first. */
 TC_TLV_result tc_x509_crl_resolve_dependencies(TC_bytes target,
-    tc_x509_crl_dependencies* dependencies, tc_x509_crl_node_evaluate evaluate,
-    void* context, tc_x509_crl_held_path* path, tc_x509_crl_evidence* out);
+                                               tc_x509_crl_dependencies* dependencies,
+                                               tc_x509_crl_node_evaluate evaluate, void* context,
+                                               tc_x509_crl_held_path* path,
+                                               tc_x509_crl_evidence* out);
 
-typedef TC_TLV_result (*tc_x509_crl_certificate_resolve)(void* context,
-    TC_bytes certificate, tc_x509_crl_evidence* evidence);
+typedef TC_TLV_result (*tc_x509_crl_certificate_resolve)(void* context, TC_bytes certificate,
+                                                         tc_x509_crl_evidence* evidence);
 /* Resolve an anchor-issued-first chain. resolve guards the whole held chain
  * before reading bytes or using scratch. Publish only determined evidence. */
 TC_TLV_result tc_x509_crl_path_resolve(const TC_bytes* chain, size_t count,
-    tc_x509_crl_certificate_resolve resolve, void* context, TC_X509_revocation_result* out);
+                                       tc_x509_crl_certificate_resolve resolve, void* context,
+                                       TC_X509_revocation_result* out);
 
 enum {
-  CRL_SCOPE_PATH = TC_X509_PATH_STORAGE_COUNT, CRL_SCOPE_SEARCH, CRL_SCOPE_TREE,
-  CRL_SCOPE_STATES, CRL_SCOPE_EVIDENCE, CRL_SCOPE_RESULT, CRL_SCOPE_WORK,
-  CRL_SCOPE_SCOPES, CRL_SCOPE_SIGNER_CACHE, CRL_SCOPE_SIGNER_PATH, CRL_SCOPE_SIGNER_POLICIES,
-  CRL_SCOPE_NODES, CRL_SCOPE_OUTPUT, CRL_SCOPE_PATH_OUTPUT, CRL_SCOPE_WRITES
+  CRL_SCOPE_PATH = TC_X509_PATH_STORAGE_COUNT,
+  CRL_SCOPE_SEARCH,
+  CRL_SCOPE_TREE,
+  CRL_SCOPE_STATES,
+  CRL_SCOPE_EVIDENCE,
+  CRL_SCOPE_RESULT,
+  CRL_SCOPE_WORK,
+  CRL_SCOPE_SCOPES,
+  CRL_SCOPE_SIGNER_CACHE,
+  CRL_SCOPE_SIGNER_PATH,
+  CRL_SCOPE_SIGNER_POLICIES,
+  CRL_SCOPE_NODES,
+  CRL_SCOPE_OUTPUT,
+  CRL_SCOPE_PATH_OUTPUT,
+  CRL_SCOPE_WRITES
 };
 
 /* Run a scope operation after storage preflight. Sources and input bytes stay
  * fixed; source_failed accumulates callback failures across dependency searches. */
 TC_TLV_result tc_x509_crl_scope_run(const tc_x509_crl_candidate_source* candidates,
-    const tc_x509_crl_scope_processing* processing, const tc_x509_crl_trust* trust,
-    const TC_bytes* points, int from_certificate, int all_scopes,
-    const TC_bytes writes[CRL_SCOPE_WRITES], int* source_failed, TC_X509_search_result* out);
+                                    const tc_x509_crl_scope_processing* processing,
+                                    const tc_x509_crl_trust* trust, const TC_bytes* points,
+                                    int from_certificate, int all_scopes,
+                                    const TC_bytes writes[CRL_SCOPE_WRITES], int* source_failed,
+                                    TC_X509_search_result* out);
 
 /* Preflight and run one scope through a prepared candidate adapter. */
 TC_TLV_result tc_x509_crl_scope_execute(const tc_x509_crl_operation_source* candidates,
-    const tc_x509_crl_scope_processing* processing, const tc_x509_crl_trust* trust,
-    const TC_bytes* points, int from_certificate, int all_scopes,
-    const tc_x509_crl_extra_storage* extra, const tc_x509_crl_held_path* path,
-    TC_X509_search_result* out);
+                                        const tc_x509_crl_scope_processing* processing,
+                                        const tc_x509_crl_trust* trust, const TC_bytes* points,
+                                        int from_certificate, int all_scopes,
+                                        const tc_x509_crl_extra_storage* extra,
+                                        const tc_x509_crl_held_path* path,
+                                        TC_X509_search_result* out);
 
 /* Resolve a parsed target or held path through the shared, non-recursive
  * dependency operation. The path form reuses proven nodes across members. */
 TC_TLV_result tc_x509_crl_resolve(const TC_X509_certificate* target,
-    const tc_x509_crl_resolution* resolution, const tc_x509_crl_resolution_workspace* workspace,
-    tc_x509_crl_held_path* path, tc_x509_crl_evidence* out);
+                                  const tc_x509_crl_resolution* resolution,
+                                  const tc_x509_crl_resolution_workspace* workspace,
+                                  tc_x509_crl_held_path* path, tc_x509_crl_evidence* out);
 TC_TLV_result tc_x509_crl_path_operation(tc_x509_crl_held_path* held,
-    const tc_x509_crl_resolution* resolution, const tc_x509_crl_resolution_workspace* workspace);
+                                         const tc_x509_crl_resolution* resolution,
+                                         const tc_x509_crl_resolution_workspace* workspace);
 
 /* Record the dependency-node, output and held-path result writes in the
  * CRL_SCOPE_NODES through CRL_SCOPE_PATH_OUTPUT slots. Absent storage records
  * an empty span so slot numbers stay fixed. */
 void tc_x509_crl_scope_plan_outputs(tc_pki_storage_plan* plan,
-    const tc_x509_crl_extra_storage* extra, const tc_x509_crl_held_path* path);
+                                    const tc_x509_crl_extra_storage* extra,
+                                    const tc_x509_crl_held_path* path);
 /* Record validation, search and scope writes in CRL_SCOPE_* slot order through
  * CRL_SCOPE_SIGNER_POLICIES. The caller appends the operation outputs. */
 void tc_x509_crl_scope_plan_writes(tc_pki_storage_plan* plan,
-    const tc_x509_crl_scope_processing* processing, const tc_x509_crl_trust* trust,
-    TC_X509_search_result* out);
+                                   const tc_x509_crl_scope_processing* processing,
+                                   const tc_x509_crl_trust* trust, TC_X509_search_result* out);
 
 /* Check all borrowed record fields against a sealed plan. The caller checks
  * the index object and record array before this visits their byte spans. */
@@ -384,15 +425,18 @@ void tc_x509_crl_index_plan_inputs(tc_pki_storage_plan* plan, const TC_X509_crl_
 
 /* Check shared scope, query and policy metadata and their borrowed bytes. */
 void tc_x509_crl_scope_plan_inputs(tc_pki_storage_plan* plan,
-    const tc_x509_crl_scope_processing* processing, const tc_x509_crl_trust* trust);
+                                   const tc_x509_crl_scope_processing* processing,
+                                   const tc_x509_crl_trust* trust);
 
 /* Match issuer, authority identifiers and cRLSign usage on parsed inputs.
  * Signature and path checks follow candidate selection. matched changes on OK;
  * name/tree scratch and work are separate from inputs and output. */
 TC_TLV_result tc_x509_crl_candidate_matches(const tc_x509_crl* crl,
-    const tc_x509_crl_extension_info* extensions, const TC_X509_certificate* candidate,
-    const TC_TLV_limits* limits, const TC_X509_name_workspace* names,
-    const tc_pki_tree_workspace* tree, int* matched);
+                                            const tc_x509_crl_extension_info* extensions,
+                                            const TC_X509_certificate* candidate,
+                                            const TC_TLV_limits* limits,
+                                            const TC_X509_name_workspace* names,
+                                            const tc_pki_tree_workspace* tree, int* matched);
 
 typedef struct {
   const TC_X509_crl_index* index;
@@ -411,18 +455,22 @@ typedef struct {
  * Caller keeps metadata/record bytes immutable and disjoint from states/work/out
  * and name scratch. Initialization charges one work unit per record. */
 TC_TLV_result tc_x509_crl_signature_cache_init(const TC_X509_crl_index* index,
-    const TC_X509_certificate* signer, const TC_X509_signature_provider* provider,
-    const TC_TLV_limits* limits, const TC_X509_name_workspace* names,
-    uint8_t* states, size_t capacity, size_t* work, tc_x509_crl_signature_cache* out);
-TC_TLV_result tc_x509_crl_signature_cached(const tc_x509_crl_signature_cache* cache,
-    size_t record, size_t* work);
+                                               const TC_X509_certificate* signer,
+                                               const TC_X509_signature_provider* provider,
+                                               const TC_TLV_limits* limits,
+                                               const TC_X509_name_workspace* names, uint8_t* states,
+                                               size_t capacity, size_t* work,
+                                               tc_x509_crl_signature_cache* out);
+TC_TLV_result tc_x509_crl_signature_cached(const tc_x509_crl_signature_cache* cache, size_t record,
+                                           size_t* work);
 /* Enumerate compatible deltas for one complete CRL in source order. Start
  * cursor at zero. Policy-rejected rows are skipped but remain in the index.
  * Each candidate needs authentication, freshness and scope checks before use.
  * Stable parsed index; disjoint scratch/output. Cursor/out change only on OK. */
-TC_TLV_result tc_x509_crl_delta_next(const TC_X509_crl_index* index, size_t base,
-    size_t* cursor, const TC_TLV_limits* limits, const tc_pki_tree_workspace* tree,
-    const TC_X509_name_workspace* names, tc_x509_crl_selected* out);
+TC_TLV_result tc_x509_crl_delta_next(const TC_X509_crl_index* index, size_t base, size_t* cursor,
+                                     const TC_TLV_limits* limits, const tc_pki_tree_workspace* tree,
+                                     const TC_X509_name_workspace* names,
+                                     tc_x509_crl_selected* out);
 /* Select the highest-numbered current delta signed by the validated base's
  * signer. Caller has authenticated the base and established signer trust.
  * Bad signatures are skipped; provider failures and limits stop selection.
@@ -430,31 +478,36 @@ TC_TLV_result tc_x509_crl_delta_next(const TC_X509_crl_index* index, size_t base
  * END means no usable delta. Scope, entries and signer revocation are separate.
  * Stable/disjoint inputs and scratch; out changes only on OK. */
 TC_TLV_result tc_x509_crl_delta_select(const TC_X509_crl_index* index, size_t base,
-    const TC_X509_certificate* signer, const TC_X509_time* at,
-    const TC_X509_signature_provider* provider, const TC_TLV_limits* limits,
-    const tc_pki_tree_workspace* tree, const TC_X509_name_workspace* names,
-    tc_x509_crl_selected* out);
+                                       const TC_X509_certificate* signer, const TC_X509_time* at,
+                                       const TC_X509_signature_provider* provider,
+                                       const TC_TLV_limits* limits,
+                                       const tc_pki_tree_workspace* tree,
+                                       const TC_X509_name_workspace* names,
+                                       tc_x509_crl_selected* out);
 /* Same selection using the cache's signer/provider and parsing workspace. */
-TC_TLV_result tc_x509_crl_delta_select_cached(const tc_x509_crl_signature_cache* cache,
-    size_t base, const TC_X509_time* at, const tc_pki_tree_workspace* tree,
-    tc_x509_crl_selected* out);
+TC_TLV_result tc_x509_crl_delta_select_cached(const tc_x509_crl_signature_cache* cache, size_t base,
+                                              const TC_X509_time* at,
+                                              const tc_pki_tree_workspace* tree,
+                                              tc_x509_crl_selected* out);
 /* Enumerate authenticated effective candidates in one issuer/IDP scope.
  * reference identifies the scope; cursor starts at zero. Signature cache is
  * scoped to the proposed signer, whose trust remains the caller's responsibility.
  * Stale bases need a current delta; future bases are skipped. Entry and target
  * coverage checks follow selection. Cursor/out change only on OK; cache/work
  * and name scratch are provisional. Does not rank candidates across bases. */
-TC_TLV_result tc_x509_crl_effective_next(const tc_x509_crl_signature_cache* cache,
-    size_t reference, size_t* cursor, TC_X509_crl_delta_policy delta_policy,
-    const TC_X509_time* at, const tc_pki_tree_workspace* tree, tc_x509_crl_selected* out);
+TC_TLV_result tc_x509_crl_effective_next(const tc_x509_crl_signature_cache* cache, size_t reference,
+                                         size_t* cursor, TC_X509_crl_delta_policy delta_policy,
+                                         const TC_X509_time* at, const tc_pki_tree_workspace* tree,
+                                         tc_x509_crl_selected* out);
 /* Highest authenticated effective number in this scope. A delta supplies its
  * number, not its base's. Unnumbered candidates return UNSUPPORTED; END means
  * no eligible candidate. Output borrows number contents and changes only on OK.
  * Conflicting deltas return INVALID only at the highest effective number.
  * Tied candidates still need entry consistency checks before evidence is applied. */
-TC_TLV_result tc_x509_crl_latest_number(const tc_x509_crl_signature_cache* cache,
-    size_t reference, TC_X509_crl_delta_policy delta_policy, const TC_X509_time* at,
-    const tc_pki_tree_workspace* tree, TC_bytes* out);
+TC_TLV_result tc_x509_crl_latest_number(const tc_x509_crl_signature_cache* cache, size_t reference,
+                                        TC_X509_crl_delta_policy delta_policy,
+                                        const TC_X509_time* at, const tc_pki_tree_workspace* tree,
+                                        TC_bytes* out);
 /* Apply CRLs from one scope after signer trust has been established.
  * ORDER_NUMBER requires CRLNumber. ORDER_THIS_UPDATE explicitly orders all
  * effective candidates by thisUpdate, including legacy unnumbered complete CRLs.
@@ -463,25 +516,28 @@ TC_TLV_result tc_x509_crl_latest_number(const tc_x509_crl_signature_cache* cache
  * on thisUpdate, reason coverage and the target's revocation information.
  * Evidence changes only on OK; input/cache/scratch storage is disjoint and stable.
  * Signer-path revocation remains separate. Cache/work/scratch are provisional. */
-TC_TLV_result tc_x509_crl_scope_apply(const tc_x509_crl_signature_cache* cache,
-    size_t reference, TC_X509_crl_delta_policy delta_policy, TC_X509_crl_order_policy order_policy,
-    const tc_x509_crl_query* query,
-    const TC_X509_time* at, const tc_pki_tree_workspace* tree, TC_bytes* oids,
-    size_t oid_capacity, tc_x509_crl_evidence* evidence);
+TC_TLV_result tc_x509_crl_scope_apply(const tc_x509_crl_signature_cache* cache, size_t reference,
+                                      TC_X509_crl_delta_policy delta_policy,
+                                      TC_X509_crl_order_policy order_policy,
+                                      const tc_x509_crl_query* query, const TC_X509_time* at,
+                                      const tc_pki_tree_workspace* tree, TC_bytes* oids,
+                                      size_t oid_capacity, tc_x509_crl_evidence* evidence);
 
 /* Apply the newest authenticated CRLs and retain their selection rank. */
-TC_TLV_result tc_x509_crl_scope_evaluate(const tc_x509_crl_signature_cache* cache,
-    size_t reference, TC_X509_crl_delta_policy delta_policy, TC_X509_crl_order_policy order_policy,
-    const tc_x509_crl_query* query,
-    const TC_X509_time* at, const tc_pki_tree_workspace* tree, TC_bytes* oids,
-    size_t oid_capacity, tc_x509_crl_evidence* evidence, tc_x509_crl_selected* preference);
+TC_TLV_result tc_x509_crl_scope_evaluate(const tc_x509_crl_signature_cache* cache, size_t reference,
+                                         TC_X509_crl_delta_policy delta_policy,
+                                         TC_X509_crl_order_policy order_policy,
+                                         const tc_x509_crl_query* query, const TC_X509_time* at,
+                                         const tc_pki_tree_workspace* tree, TC_bytes* oids,
+                                         size_t oid_capacity, tc_x509_crl_evidence* evidence,
+                                         tc_x509_crl_selected* preference);
 
 enum { CRL_SIGNATURE_UNCHECKED, CRL_SIGNATURE_VALID, CRL_SIGNATURE_INVALID };
 
 static inline int x509_crl_delta_policy_valid(TC_X509_crl_delta_policy policy)
 {
   return policy == TC_X509_CRL_COMPLETE_ONLY || policy == TC_X509_CRL_DELTA_IF_AVAILABLE ||
-      policy == TC_X509_CRL_DELTA_REQUIRED;
+         policy == TC_X509_CRL_DELTA_REQUIRED;
 }
 
 static inline int x509_crl_order_policy_valid(TC_X509_crl_order_policy policy)
@@ -491,18 +547,22 @@ static inline int x509_crl_order_policy_valid(TC_X509_crl_order_policy policy)
 
 /* Comparing the first candidate with itself also checks its required number. */
 static inline TC_TLV_result x509_crl_order(const tc_x509_crl_selected* left,
-    const tc_x509_crl_selected* right, TC_X509_crl_order_policy policy, size_t* work, int* order)
+                                           const tc_x509_crl_selected* right,
+                                           TC_X509_crl_order_policy policy, size_t* work,
+                                           int* order)
 {
   if (policy == TC_X509_CRL_ORDER_NUMBER) {
     const tc_x509_crl_extension_info* a = left->delta ? left->delta_info : left->base_info;
     const tc_x509_crl_extension_info* b = right->delta ? right->delta_info : right->base_info;
-    if (!(a->present & TC_CRL_EXT_NUMBER) || !(b->present & TC_CRL_EXT_NUMBER)) return TC_TLV_UNSUPPORTED;
-    return tc_x509_crl_number_compare(a->number,b->number,work,order);
+    if (!(a->present & TC_CRL_EXT_NUMBER) || !(b->present & TC_CRL_EXT_NUMBER))
+      return TC_TLV_UNSUPPORTED;
+    return tc_x509_crl_number_compare(a->number, b->number, work, order);
   }
   const tc_x509_crl* a = left->delta ? left->delta : left->base;
   const tc_x509_crl* b = right->delta ? right->delta : right->base;
-  TC_TLV_result result = tc_pki_work_charge(work,1);
-  return result == TC_TLV_OK ? TC_X509_time_compare(&a->this_update,&b->this_update,order) : result;
+  TC_TLV_result result = tc_pki_work_charge(work, 1);
+  return result == TC_TLV_OK ? TC_X509_time_compare(&a->this_update, &b->this_update, order)
+                             : result;
 }
 
 /* FNV-1a over encoded bytes, used to bucket certificates and CRL scopes. */
@@ -517,9 +577,11 @@ static inline uint32_t tc_x509_crl_bytes_hash(TC_bytes bytes)
 /* Preflight storage for a scope operation, then commit the checked budget.
  * writes receives the CRL_SCOPE_* slots used by source guards. */
 TC_TLV_result tc_x509_crl_scope_prepare(const tc_x509_crl_operation_source* candidates,
-    const tc_x509_crl_scope_processing* processing, const tc_x509_crl_trust* trust,
-    const TC_bytes* points, const tc_x509_crl_extra_storage* extra,
-    const tc_x509_crl_held_path* path, TC_X509_search_result* out,
-    TC_bytes writes[CRL_SCOPE_WRITES]);
+                                        const tc_x509_crl_scope_processing* processing,
+                                        const tc_x509_crl_trust* trust, const TC_bytes* points,
+                                        const tc_x509_crl_extra_storage* extra,
+                                        const tc_x509_crl_held_path* path,
+                                        TC_X509_search_result* out,
+                                        TC_bytes writes[CRL_SCOPE_WRITES]);
 
 #endif

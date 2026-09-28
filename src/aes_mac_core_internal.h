@@ -13,12 +13,12 @@ typedef struct {
 static inline TC_status tc_aes_mac_encrypt(const void* cipher, uint8_t* block)
 {
   const tc_aes_mac_key* key = (const tc_aes_mac_key*)cipher;
-  return tc_aes_cipher_rounds((state_t*)block,key->round_key,key->rounds);
+  return tc_aes_cipher_rounds((state_t*)block, key->round_key, key->rounds);
 }
 
 static inline tc_mac_cipher tc_aes_mac_cipher(const tc_aes_mac_key* key)
 {
-  const tc_mac_cipher cipher = {TC_AES_BLOCKLEN,key,tc_aes_mac_encrypt};
+  const tc_mac_cipher cipher = {TC_AES_BLOCKLEN, key, tc_aes_mac_encrypt};
   return cipher;
 }
 
@@ -37,13 +37,11 @@ typedef struct {
 } tc_aes_mac_ctr_bits;
 
 /* XOR length bytes of AES-CTR keystream from initial into output. */
-TC_status tc_aes_mac_ctr_xor(const uint8_t* round_key,
-                        const uint8_t initial[TC_AES_BLOCKLEN],
-                        const uint8_t* input, uint8_t* output, size_t length,
-                        tc_aes_mac_ctr_bits bits);
+TC_status tc_aes_mac_ctr_xor(const uint8_t* round_key, const uint8_t initial[TC_AES_BLOCKLEN],
+                             const uint8_t* input, uint8_t* output, size_t length,
+                             tc_aes_mac_ctr_bits bits);
 
 /* Derive both final-block CMAC subkeys from AES_K(0). */
 TC_status tc_aes_cmac_generate_subkeys(const uint8_t* round_key, uint8_t rounds,
-                                         uint8_t k1[TC_AES_BLOCKLEN],
-                                         uint8_t k2[TC_AES_BLOCKLEN]);
+                                       uint8_t k1[TC_AES_BLOCKLEN], uint8_t k2[TC_AES_BLOCKLEN]);
 #endif

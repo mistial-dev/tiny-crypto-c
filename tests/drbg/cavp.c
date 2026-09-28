@@ -71,9 +71,14 @@ static void take(value* v, const char* hex)
  * library leaves out: SHA-512/224, SHA-512/256 and TDEA. */
 static int option_config(const char* option, TC_DRBG_mechanism mechanism, TC_DRBG_config* config)
 {
-  static const struct { const char* name; TC_hash_algorithm hash; } hashes[] = {
-    {"SHA-1", TC_HASH_SHA1}, {"SHA-224", TC_HASH_SHA224}, {"SHA-256", TC_HASH_SHA256},
-    {"SHA-384", TC_HASH_SHA384}, {"SHA-512", TC_HASH_SHA512}};
+  static const struct {
+    const char* name;
+    TC_hash_algorithm hash;
+  } hashes[] = {{"SHA-1", TC_HASH_SHA1},
+                {"SHA-224", TC_HASH_SHA224},
+                {"SHA-256", TC_HASH_SHA256},
+                {"SHA-384", TC_HASH_SHA384},
+                {"SHA-512", TC_HASH_SHA512}};
   size_t i;
   memset(config, 0, sizeof *config);
   config->mechanism = mechanism;
@@ -96,8 +101,8 @@ static int option_config(const char* option, TC_DRBG_mechanism mechanism, TC_DRB
 
 typedef enum { VARIANT_PR_TRUE, VARIANT_PR_FALSE, VARIANT_NO_RESEED } variant;
 
-static void run_trial(variant kind, const TC_DRBG_config* config, const trial* t,
-    const char* file, const char* option)
+static void run_trial(variant kind, const TC_DRBG_config* config, const trial* t, const char* file,
+                      const char* option)
 {
   static TC_DRBG drbg;
   uint8_t output[MAX_OUTPUT];
@@ -116,13 +121,15 @@ static void run_trial(variant kind, const TC_DRBG_config* config, const trial* t
     source.queue[1] = &t->entropy_reseed;
     source.count = 2;
   }
-  munit_assert_int(TC_DRBG_instantiate(&drbg, config, entropy, span(&t->nonce),
-                                       span(&t->personalization)), ==, TC_DRBG_OK);
+  munit_assert_int(
+      TC_DRBG_instantiate(&drbg, config, entropy, span(&t->nonce), span(&t->personalization)), ==,
+      TC_DRBG_OK);
   if (kind == VARIANT_PR_FALSE)
     munit_assert_int(TC_DRBG_reseed(&drbg, span(&t->additional_reseed)), ==, TC_DRBG_OK);
   for (call = 0; call < 2; ++call)
-    munit_assert_int(TC_DRBG_generate(&drbg, output, t->returned_length, pr,
-                                      span(&t->additional[call])), ==, TC_DRBG_OK);
+    munit_assert_int(
+        TC_DRBG_generate(&drbg, output, t->returned_length, pr, span(&t->additional[call])), ==,
+        TC_DRBG_OK);
   munit_assert_size(source.used, ==, source.count);
   if (memcmp(output, t->returned, t->returned_length) != 0) {
     fprintf(stderr, "DRBG CAVP mismatch %s [%s] COUNT = %ld\n", file, option, t->count);
@@ -134,7 +141,7 @@ static void run_trial(variant kind, const TC_DRBG_config* config, const trial* t
 }
 
 static void run_file(const char* directory, variant kind, const char* name,
-    TC_DRBG_mechanism mechanism, long expected_run, long expected_skipped)
+                     TC_DRBG_mechanism mechanism, long expected_run, long expected_skipped)
 {
   static char line[4096];
   char relative[128];
@@ -207,12 +214,12 @@ static void run_file(const char* directory, variant kind, const char* name,
 
 static void run_variant(const char* directory, variant kind)
 {
-  run_file(directory, kind, "Hash_DRBG.rsp", TC_DRBG_HASH,
-           5 * TRIALS_PER_OPTION, 2 * TRIALS_PER_OPTION);
-  run_file(directory, kind, "HMAC_DRBG.rsp", TC_DRBG_HMAC,
-           5 * TRIALS_PER_OPTION, 2 * TRIALS_PER_OPTION);
-  run_file(directory, kind, "CTR_DRBG.rsp", TC_DRBG_CTR,
-           6 * TRIALS_PER_OPTION, 2 * TRIALS_PER_OPTION);
+  run_file(directory, kind, "Hash_DRBG.rsp", TC_DRBG_HASH, 5 * TRIALS_PER_OPTION,
+           2 * TRIALS_PER_OPTION);
+  run_file(directory, kind, "HMAC_DRBG.rsp", TC_DRBG_HMAC, 5 * TRIALS_PER_OPTION,
+           2 * TRIALS_PER_OPTION);
+  run_file(directory, kind, "CTR_DRBG.rsp", TC_DRBG_CTR, 6 * TRIALS_PER_OPTION,
+           2 * TRIALS_PER_OPTION);
 }
 
 static MunitResult test_pr_true(const MunitParameter params[], void* data)
@@ -240,11 +247,10 @@ static MunitResult test_no_reseed(const MunitParameter params[], void* data)
 }
 
 static MunitTest tests[] = {
-  {"/prediction-resistance", test_pr_true, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-  {"/reseed", test_pr_false, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-  {"/no-reseed", test_no_reseed, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-  {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}
-};
+    {"/prediction-resistance", test_pr_true, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/reseed", test_pr_false, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/no-reseed", test_no_reseed, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
 
 static const MunitSuite suite = {"/drbg-cavp", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};
 

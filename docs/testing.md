@@ -1,4 +1,5 @@
 <!-- SPDX-FileCopyrightText: Mistial Dev -->
+
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 
 # Running the tests
@@ -716,8 +717,7 @@ supported public-key, signature, and key-pair records;
 RSA tests cover signature generation and verification. The default RSA KeyGen
 test validates a fixed- and a varying-exponent key in each of 14 supported
 method and modulus groups, for 28 records. Run
-`python3 tests/nist_dss.py --rsa-dir tests/vectors/nist_dss/186-3rsa
---rsa-keygen-reader /absolute/path/to/build/test_rsa_keygen_reader --rsa-keygen-all`
+`python3 tests/nist_dss.py --rsa-dir tests/vectors/nist_dss/186-3rsa --rsa-keygen-reader /absolute/path/to/build/test_rsa_keygen_reader --rsa-keygen-all`
 to validate all 2,200 recorded keys; this takes hours. CAVP's seed-to-key
 candidate methods differ from the library's generator, so these records check
 private-key validation rather than deterministic replay.
@@ -734,8 +734,7 @@ cmake --build /tmp/tiny-crypto-full --parallel
 ctest --test-dir /tmp/tiny-crypto-full --output-on-failure
 ```
 
-After a failure, use `ctest --test-dir /tmp/tiny-crypto-full --rerun-failed
---output-on-failure` to retry just the failed tests. CTest keeps detailed output
+After a failure, use `ctest --test-dir /tmp/tiny-crypto-full --rerun-failed --output-on-failure` to retry just the failed tests. CTest keeps detailed output
 in `/tmp/tiny-crypto-full/Testing/Temporary/LastTest.log`. Run the whole suite
 again after fixing the failure.
 
@@ -850,8 +849,7 @@ The [ESP32-P4 target](esp32-p4.md)
 adds ESP-IDF cross-builds for both roles.
 
 On Linux with Clang, `make test-msan CC=clang CXX=clang++` enables
-MemorySanitizer for the core suite. Use `make test-msan-full CC=clang
-CXX=clang++ TINY_CRYPTO_TEST_FULL=ON` for extended tests. It needs a compatible
+MemorySanitizer for the core suite. Use `make test-msan-full CC=clang CXX=clang++ TINY_CRYPTO_TEST_FULL=ON` for extended tests. It needs a compatible
 instrumented runtime; Apple Clang does not provide it.
 
 ## PIV CVC verification

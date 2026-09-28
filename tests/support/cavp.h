@@ -26,35 +26,35 @@
 #include <stdio.h>
 
 enum {
-  TC_CAVP_MAX_HEADERS = 8,     /* headers kept for the current group */
-  TC_CAVP_HEADER_BYTES = 96    /* longest header text, without brackets */
+  TC_CAVP_MAX_HEADERS = 8,  /* headers kept for the current group */
+  TC_CAVP_HEADER_BYTES = 96 /* longest header text, without brackets */
 };
 
 typedef enum {
-  TC_CAVP_FIELD,    /* name and value are set, and value is "" for a bare marker */
-  TC_CAVP_HEADER,   /* name is the header text without brackets */
+  TC_CAVP_FIELD,      /* name and value are set, and value is "" for a bare marker */
+  TC_CAVP_HEADER,     /* name is the header text without brackets */
   TC_CAVP_RECORD_END, /* a blank line or the end of file closed a record */
-  TC_CAVP_END,      /* end of file */
-  TC_CAVP_FAILURE   /* unreadable file or a line longer than the buffer */
+  TC_CAVP_END,        /* end of file */
+  TC_CAVP_FAILURE     /* unreadable file or a line longer than the buffer */
 } tc_cavp_event;
 
 typedef struct {
   FILE* file;
-  char* line;             /* caller buffer, reused for every line */
+  char* line; /* caller buffer, reused for every line */
   size_t capacity;
   unsigned long line_number;
-  const char* name;       /* borrowed from line until the next call */
-  const char* value;      /* borrowed from line until the next call */
+  const char* name;  /* borrowed from line until the next call */
+  const char* value; /* borrowed from line until the next call */
   char headers[TC_CAVP_MAX_HEADERS][TC_CAVP_HEADER_BYTES];
   size_t header_count;
-  int in_header_group;    /* the previous significant line was a header */
-  int record_open;        /* a field arrived since the last record end */
+  int in_header_group; /* the previous significant line was a header */
+  int record_open;     /* a field arrived since the last record end */
 } tc_cavp_reader;
 
 /* Open DIRECTORY/RELATIVE. The line buffer must hold the longest line plus
  * its line ending and terminator. Returns 1 on success and 0 on failure. */
-int tc_cavp_open(tc_cavp_reader* reader, const char* directory,
-                 const char* relative, char* line, size_t capacity);
+int tc_cavp_open(tc_cavp_reader* reader, const char* directory, const char* relative, char* line,
+                 size_t capacity);
 
 /* Read the next field, header or record end. Comments are skipped. A blank
  * line after one or more fields ends a record, and the end of file ends the
@@ -70,8 +70,8 @@ int tc_cavp_is(const tc_cavp_reader* reader, const char* name);
  * value, or return NULL when NAME is absent or its value is too long. Each
  * header is searched as a comma-separated list of NAME = VALUE parameters,
  * and the value runs to the next comma or the end of the header. */
-const char* tc_cavp_header_value(const tc_cavp_reader* reader, const char* name,
-                                 char* value, size_t capacity);
+const char* tc_cavp_header_value(const tc_cavp_reader* reader, const char* name, char* value,
+                                 size_t capacity);
 
 /* True when the current group contains the bare header [label]. */
 int tc_cavp_header_has(const tc_cavp_reader* reader, const char* label);

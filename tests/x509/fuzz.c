@@ -27,7 +27,8 @@ typedef struct {
   size_t count;
 } scalar_digest;
 
-static void check_borrowed_span(TC_bytes input, TC_bytes span) {
+static void check_borrowed_span(TC_bytes input, TC_bytes span)
+{
   if (!span.length)
     return;
   uintptr_t start = (uintptr_t)input.data, borrowed = (uintptr_t)span.data;
@@ -36,33 +37,32 @@ static void check_borrowed_span(TC_bytes input, TC_bytes span) {
     abort();
 }
 
-static void fuzz_certificate_container(const uint8_t *data, size_t length) {
+static void fuzz_certificate_container(const uint8_t* data, size_t length)
+{
   const TC_bytes input = {data, length};
-  for (int profile = TC_PIV_CERTIFICATE_SLOT;
-       profile <= TC_PIV_CERTIFICATE_SM_SIGNER; ++profile) {
+  for (int profile = TC_PIV_CERTIFICATE_SLOT; profile <= TC_PIV_CERTIFICATE_SM_SIGNER; ++profile) {
     TC_PIV_certificate certificate, saved;
     memset(&certificate, 0xa5, sizeof certificate);
     memcpy(&saved, &certificate, sizeof saved);
-    TC_TLV_result result = TC_PIV_certificate_read(
-        input, (TC_PIV_certificate_profile)profile, &certificate);
+    TC_TLV_result result =
+        TC_PIV_certificate_read(input, (TC_PIV_certificate_profile)profile, &certificate);
     if (result != TC_TLV_OK) {
       if (memcmp(&certificate, &saved, sizeof certificate))
         abort();
       continue;
     }
-    if (!certificate.certificate.length ||
-        (certificate.compression != TC_PIV_CERTIFICATE_PLAIN &&
-         certificate.compression != TC_PIV_CERTIFICATE_GZIP))
+    if (!certificate.certificate.length || (certificate.compression != TC_PIV_CERTIFICATE_PLAIN &&
+                                            certificate.compression != TC_PIV_CERTIFICATE_GZIP))
       abort();
     check_borrowed_span(input, certificate.certificate);
     check_borrowed_span(input, certificate.intermediate_cvc);
-    if (profile != TC_PIV_CERTIFICATE_SM_SIGNER &&
-        certificate.intermediate_cvc.length)
+    if (profile != TC_PIV_CERTIFICATE_SM_SIGNER && certificate.intermediate_cvc.length)
       abort();
   }
 }
 
-static void fuzz_card_identifiers(const uint8_t *data, size_t length) {
+static void fuzz_card_identifiers(const uint8_t* data, size_t length)
+{
   enum { FRAMES = 8, MAX_BYTES = 32768, MAX_ELEMENTS = 512, WORK = 200000 };
   const TC_TLV_limits limits = {MAX_BYTES, MAX_BYTES, MAX_ELEMENTS, FRAMES};
   const TC_bytes input = {data, length};
@@ -74,9 +74,8 @@ static void fuzz_card_identifiers(const uint8_t *data, size_t length) {
     for (size_t i = 0; i < sizeof budgets / sizeof *budgets; ++i) {
       size_t work = budgets[i];
       memcpy(&out, &saved, sizeof out);
-      TC_TLV_result result =
-          TC_PIV_card_identifiers_read(input, (TC_PIV_card_profile)profile,
-                                       &limits, frames, FRAMES, &work, &out);
+      TC_TLV_result result = TC_PIV_card_identifiers_read(input, (TC_PIV_card_profile)profile,
+                                                          &limits, frames, FRAMES, &work, &out);
       if (work > budgets[i])
         abort();
       if (result != TC_TLV_OK) {
@@ -89,14 +88,12 @@ static void fuzz_card_identifiers(const uint8_t *data, size_t length) {
       check_borrowed_span(input, out.uuid_urn);
       if (out.cardholder_uuid_urn.data || out.cardholder_uuid_urn.length)
         abort();
-      if (out.fascn.length != 25 ||
-          (out.uuid_urn.length && out.uuid_urn.length != 45))
+      if (out.fascn.length != 25 || (out.uuid_urn.length && out.uuid_urn.length != 45))
         abort();
       uint8_t nil[16] = {0};
       int matched = -1;
       work = WORK;
-      if (TC_PIV_card_identifiers_match(&out, out.fascn,
-                                        (TC_bytes){nil, sizeof nil}, &work,
+      if (TC_PIV_card_identifiers_match(&out, out.fascn, (TC_bytes){nil, sizeof nil}, &work,
                                         &matched) != TC_TLV_OK)
         abort();
       if (matched != (profile == TC_TWIC_LEGACY_CARD))
@@ -106,22 +103,19 @@ static void fuzz_card_identifiers(const uint8_t *data, size_t length) {
   uint8_t expected_guid[16] = {0};
   if (length >= sizeof expected_guid)
     memcpy(expected_guid, data, sizeof expected_guid);
-  typedef TC_TLV_result (*authentication_reader)(
-      TC_bytes, TC_bytes, const TC_TLV_limits *, TC_TLV_frame *, size_t,
-      size_t *, TC_PIV_card_identifiers *);
-  static const authentication_reader readers[] = {
-      TC_PIV_authentication_identifiers_read,
-      TC_TWIC_authentication_identifiers_read};
+  typedef TC_TLV_result (*authentication_reader)(TC_bytes, TC_bytes, const TC_TLV_limits*,
+                                                 TC_TLV_frame*, size_t, size_t*,
+                                                 TC_PIV_card_identifiers*);
+  static const authentication_reader readers[] = {TC_PIV_authentication_identifiers_read,
+                                                  TC_TWIC_authentication_identifiers_read};
   const size_t authentication_budgets[] = {WORK, length ? data[0] : 0};
   for (size_t reader = 0; reader < sizeof readers / sizeof *readers; ++reader) {
-    for (size_t i = 0;
-         i < sizeof authentication_budgets / sizeof *authentication_budgets;
-         ++i) {
+    for (size_t i = 0; i < sizeof authentication_budgets / sizeof *authentication_budgets; ++i) {
       size_t work = authentication_budgets[i];
       memcpy(&out, &saved, sizeof out);
-      const TC_TLV_result result = readers[reader](
-          input, (TC_bytes){expected_guid, sizeof expected_guid}, &limits,
-          frames, FRAMES, &work, &out);
+      const TC_TLV_result result =
+          readers[reader](input, (TC_bytes){expected_guid, sizeof expected_guid}, &limits, frames,
+                          FRAMES, &work, &out);
       if (work > authentication_budgets[i])
         abort();
       if (result != TC_TLV_OK) {
@@ -137,7 +131,8 @@ static void fuzz_card_identifiers(const uint8_t *data, size_t length) {
   }
 }
 
-static void fuzz_identity_codecs(TC_bytes input) {
+static void fuzz_identity_codecs(TC_bytes input)
+{
   TC_FASCN decoded, saved;
   memset(&saved, 0xa5, sizeof saved);
   memcpy(&decoded, &saved, sizeof decoded);
@@ -145,8 +140,7 @@ static void fuzz_identity_codecs(TC_bytes input) {
   if (result == TC_TLV_OK) {
     uint8_t encoded[TC_FASCN_BYTES];
     if (TC_FASCN_write(&decoded, encoded, sizeof encoded) != TC_TLV_OK ||
-        input.length != sizeof encoded ||
-        memcmp(input.data, encoded, sizeof encoded))
+        input.length != sizeof encoded || memcmp(input.data, encoded, sizeof encoded))
       abort();
   } else if (memcmp(&decoded, &saved, sizeof decoded))
     abort();
@@ -156,21 +150,19 @@ static void fuzz_identity_codecs(TC_bytes input) {
   if (result == TC_TLV_OK) {
     uint8_t encoded[TC_TWIC_UUID_BYTES];
     if (TC_TWIC_uuid_write(number, encoded, sizeof encoded) != TC_TLV_OK ||
-        input.length != sizeof encoded ||
-        memcmp(input.data, encoded, sizeof encoded))
+        input.length != sizeof encoded || memcmp(input.data, encoded, sizeof encoded))
       abort();
   } else if (number != UINT64_MAX)
     abort();
 }
 
-static void fuzz_security_container(TC_bytes input) {
-  for (int encoding = TC_PIV_SECURITY_CONTENTS;
-       encoding <= TC_PIV_SECURITY_CONTAINER; ++encoding) {
+static void fuzz_security_container(TC_bytes input)
+{
+  for (int encoding = TC_PIV_SECURITY_CONTENTS; encoding <= TC_PIV_SECURITY_CONTAINER; ++encoding) {
     TC_PIV_security_object object, saved;
     memset(&saved, 0xa5, sizeof saved);
     memcpy(&object, &saved, sizeof object);
-    TC_TLV_result result = TC_PIV_security_read(
-        input, (TC_PIV_security_encoding)encoding, &object);
+    TC_TLV_result result = TC_PIV_security_read(input, (TC_PIV_security_encoding)encoding, &object);
     if (result != TC_TLV_OK) {
       if (memcmp(&object, &saved, sizeof object))
         abort();
@@ -178,19 +170,16 @@ static void fuzz_security_container(TC_bytes input) {
     }
     check_borrowed_span(input, object.mapping);
     check_borrowed_span(input, object.cms);
-    if (!object.mapping.length || object.mapping.length % 3 ||
-        !object.cms.length)
+    if (!object.mapping.length || object.mapping.length % 3 || !object.cms.length)
       abort();
     uint16_t groups = 0;
     for (size_t i = 0; i < object.mapping.length; i += 3) {
       const unsigned expected = object.mapping.data[i];
       const uint16_t container =
-          (uint16_t)((unsigned)object.mapping.data[i + 1] << 8 |
-                     object.mapping.data[i + 2]);
+          (uint16_t)((unsigned)object.mapping.data[i + 1] << 8 | object.mapping.data[i + 2]);
       unsigned number = 0;
       if (expected < 1 || expected > TC_LDS_MAX_GROUPS ||
-          TC_PIV_security_group_find(&object, container, &number) !=
-              TC_TLV_OK ||
+          TC_PIV_security_group_find(&object, container, &number) != TC_TLV_OK ||
           number != expected)
         abort();
       const uint16_t bit = (uint16_t)(1u << (expected - 1));
@@ -203,14 +192,9 @@ static void fuzz_security_container(TC_bytes input) {
   }
 }
 
-static void fuzz_lds(TC_bytes input) {
-  enum {
-    FRAMES = 16,
-    MAX_BYTES = 32768,
-    MAX_ELEMENTS = 512,
-    WORK = 200000,
-    CONTENT_BYTES = 2048
-  };
+static void fuzz_lds(TC_bytes input)
+{
+  enum { FRAMES = 16, MAX_BYTES = 32768, MAX_ELEMENTS = 512, WORK = 200000, CONTENT_BYTES = 2048 };
   const TC_TLV_limits limits = {MAX_BYTES, MAX_BYTES, MAX_ELEMENTS, FRAMES};
   TC_TLV_frame frames[FRAMES];
   uint8_t content[CONTENT_BYTES];
@@ -221,10 +205,9 @@ static void fuzz_lds(TC_bytes input) {
     for (size_t i = 0; i < sizeof budgets / sizeof *budgets; ++i) {
       size_t work = budgets[i];
       memcpy(&object, &saved, sizeof object);
-      TC_TLV_result result =
-          wrapped ? TC_LDS_read_content(input, &limits, frames, FRAMES, &work,
-                                        content, sizeof content, &object)
-                  : TC_LDS_read(input, &limits, frames, FRAMES, &work, &object);
+      TC_TLV_result result = wrapped ? TC_LDS_read_content(input, &limits, frames, FRAMES, &work,
+                                                           content, sizeof content, &object)
+                                     : TC_LDS_read(input, &limits, frames, FRAMES, &work, &object);
       if (work > budgets[i])
         abort();
       if (result != TC_TLV_OK) {
@@ -232,9 +215,8 @@ static void fuzz_lds(TC_bytes input) {
           abort();
         continue;
       }
-      const TC_bytes backing = wrapped && object.encoded.data == content
-                                   ? (TC_bytes){content, sizeof content}
-                                   : input;
+      const TC_bytes backing =
+          wrapped && object.encoded.data == content ? (TC_bytes){content, sizeof content} : input;
       check_borrowed_span(backing, object.encoded);
       check_borrowed_span(object.encoded, object.hashes);
       check_borrowed_span(object.encoded, object.lds_version);
@@ -242,8 +224,7 @@ static void fuzz_lds(TC_bytes input) {
       for (unsigned number = 1; number <= TC_LDS_MAX_GROUPS; ++number) {
         TC_bytes hash = {NULL, 99};
         work = WORK;
-        result = TC_LDS_hash_find(&object, number, &limits, frames, FRAMES,
-                                  &work, &hash);
+        result = TC_LDS_hash_find(&object, number, &limits, frames, FRAMES, &work, &hash);
         if (work > WORK)
           abort();
         if (object.groups & (1u << (number - 1))) {
@@ -257,15 +238,17 @@ static void fuzz_lds(TC_bytes input) {
   }
 }
 
-static TC_TLV_result digest_scalar(void *context, uint32_t point) {
-  scalar_digest *digest = context;
+static TC_TLV_result digest_scalar(void* context, uint32_t point)
+{
+  scalar_digest* digest = context;
   /* Order-sensitive checksum for comparing the two decoder entry points. */
   digest->hash = digest->hash * UINT64_C(65599) + point;
   ++digest->count;
   return TC_TLV_OK;
 }
 
-static void fuzz_string_chunks(unsigned tag, TC_bytes input) {
+static void fuzz_string_chunks(unsigned tag, TC_bytes input)
+{
   tc_asn1_string_state decoder = {tag, {0}, 0};
   scalar_digest contiguous = {0, 0}, chunked = {0, 0};
   TC_TLV_result complete, partial;
@@ -274,15 +257,12 @@ static void fuzz_string_chunks(unsigned tag, TC_bytes input) {
   const size_t split = input.length ? input.data[0] % (input.length + 1) : 0;
   if (tag == 0x14)
     return;
-  while ((complete = tc_asn1_string_next(tag, input, &offset, &point)) ==
-         TC_TLV_OK)
+  while ((complete = tc_asn1_string_next(tag, input, &offset, &point)) == TC_TLV_OK)
     digest_scalar(&contiguous, point);
-  partial = tc_asn1_string_feed(&decoder, (TC_bytes){input.data, split},
-                                digest_scalar, &chunked);
+  partial = tc_asn1_string_feed(&decoder, (TC_bytes){input.data, split}, digest_scalar, &chunked);
   if (partial == TC_TLV_OK)
-    partial = tc_asn1_string_feed(
-        &decoder, (TC_bytes){input.data + split, input.length - split},
-        digest_scalar, &chunked);
+    partial = tc_asn1_string_feed(&decoder, (TC_bytes){input.data + split, input.length - split},
+                                  digest_scalar, &chunked);
   if (partial == TC_TLV_OK && decoder.used)
     partial = TC_TLV_INVALID;
   if (complete == TC_TLV_END) {
@@ -296,9 +276,10 @@ static void fuzz_string_chunks(unsigned tag, TC_bytes input) {
 /* Bypass cryptography here so DER mutations reach the path's structural checks.
  */
 static TC_X509_signature_result
-structural_signature(void *context, const TC_bytes *message, size_t count,
-                     const TC_DER_algorithm *algorithm, TC_bytes signature,
-                     const TC_X509_public_key *issuer_key, size_t *work) {
+structural_signature(void* context, const TC_bytes* message, size_t count,
+                     const TC_DER_algorithm* algorithm, TC_bytes signature,
+                     const TC_X509_public_key* issuer_key, size_t* work)
+{
   (void)context;
   (void)message;
   (void)count;
@@ -311,11 +292,10 @@ structural_signature(void *context, const TC_bytes *message, size_t count,
   return TC_X509_SIGNATURE_VALID;
 }
 
-static void fuzz_path(const uint8_t *data, size_t length,
-                      const TC_X509_certificate *certificate) {
+static void fuzz_path(const uint8_t* data, size_t length, const TC_X509_certificate* certificate)
+{
   static const uint8_t any_policy[] = {0x55, 0x1d, 0x20, 0};
-  const TC_bytes initial = {any_policy, sizeof any_policy},
-                 chain = {data, length};
+  const TC_bytes initial = {any_policy, sizeof any_policy}, chain = {data, length};
   TC_TLV_frame frames[16];
   TC_bytes oids[16], policies[16];
   uint32_t left[64], right[64];
@@ -327,9 +307,8 @@ static void fuzz_path(const uint8_t *data, size_t length,
   TC_X509_certificate certificates[16];
   TC_X509_extension_summary summaries[16];
   TC_X509_path_workspace workspace =
-      TC_X509_PATH_WORKSPACE_INIT(frames, oids, left, right, matched, nodes,
-                                  edges, expected, mappings, policies, certificates,
-                                  summaries);
+      TC_X509_PATH_WORKSPACE_INIT(frames, oids, left, right, matched, nodes, edges, expected,
+                                  mappings, policies, certificates, summaries);
   TC_X509_path_options options = {0};
   TC_X509_trust_anchor anchor = {0};
   TC_X509_path_result output, saved;
@@ -351,11 +330,9 @@ static void fuzz_path(const uint8_t *data, size_t length,
   }
   memset(&output, 0xa5, sizeof output);
   memcpy(&saved, &output, sizeof saved);
-  status =
-      TC_X509_path_validate(&chain, 1, &anchor, &options, &workspace, &output);
+  status = TC_X509_path_validate(&chain, 1, &anchor, &options, &workspace, &output);
   if (status == TC_X509_PATH_VALID) {
-    if (!certificate ||
-        output.public_key.key.data != certificate->public_key.key.data ||
+    if (!certificate || output.public_key.key.data != certificate->public_key.key.data ||
         output.public_key.key.length != certificate->public_key.key.length ||
         output.policies != policies || output.policy_count > 16 ||
         output.work_used > options.max_work)
@@ -366,8 +343,7 @@ static void fuzz_path(const uint8_t *data, size_t length,
    */
   options.max_work = length ? data[length - 1] : 0;
   memcpy(&output, &saved, sizeof output);
-  status =
-      TC_X509_path_validate(&chain, 1, &anchor, &options, &workspace, &output);
+  status = TC_X509_path_validate(&chain, 1, &anchor, &options, &workspace, &output);
   if (status != TC_X509_PATH_VALID && memcmp(&output, &saved, sizeof output))
     abort();
   {
@@ -382,19 +358,18 @@ static void fuzz_path(const uint8_t *data, size_t length,
     size_t count = 0, work;
     options.max_certificates = 4;
     options.max_work = 200000;
-    if (TC_TLV_reader_init(&objects, data, length, TC_TLV_DER,
-                           &options.parsing) != TC_TLV_OK)
+    if (TC_TLV_reader_init(&objects, data, length, TC_TLV_DER, &options.parsing) != TC_TLV_OK)
       return;
     while (count < 4 && TC_TLV_next(&objects, &element) == TC_TLV_OK)
       candidates[count++] = element.encoded;
     if (!count)
       return;
-    if (TC_X509_read(candidates[0].data, candidates[0].length, &options.parsing,
-                     &parser, &selected) != TC_TLV_OK)
+    if (TC_X509_read(candidates[0].data, candidates[0].length, &options.parsing, &parser,
+                     &selected) != TC_TLV_OK)
       return;
     options.at = selected.not_before;
-    if (TC_X509_read(candidates[count - 1].data, candidates[count - 1].length,
-                     &options.parsing, &parser, &selected) != TC_TLV_OK)
+    if (TC_X509_read(candidates[count - 1].data, candidates[count - 1].length, &options.parsing,
+                     &parser, &selected) != TC_TLV_OK)
       return;
     /* The final record supplies the test's trust anchor. */
     anchor.name = selected.subject;
@@ -402,13 +377,12 @@ static void fuzz_path(const uint8_t *data, size_t length,
     memset(&found, 0xa5, sizeof found);
     memcpy(&unchanged, &found, sizeof found);
     work = options.max_work;
-    status = tc_x509_path_search(candidates[0], candidates, count, &anchor, 1,
-                                 &options, &workspace, &search, &work, &found);
+    status = tc_x509_path_search(candidates[0], candidates, count, &anchor, 1, &options, &workspace,
+                                 &search, &work, &found);
     if (status == TC_X509_PATH_VALID) {
       size_t i, j;
-      if (!found.count || found.count > 4 ||
-          found.path != path + 4 - found.count || found.anchor_index ||
-          found.validation.work_used != options.max_work - work ||
+      if (!found.count || found.count > 4 || found.path != path + 4 - found.count ||
+          found.anchor_index || found.validation.work_used != options.max_work - work ||
           found.path[found.count - 1].data != candidates[0].data)
         abort();
       for (i = 0; i < found.count; ++i) {
@@ -423,40 +397,33 @@ static void fuzz_path(const uint8_t *data, size_t length,
       abort();
     memcpy(&found, &unchanged, sizeof found);
     work = data[length - 1];
-    status = tc_x509_path_search(candidates[0], candidates, count, &anchor, 1,
-                                 &options, &workspace, &search, &work, &found);
-    if (status != TC_X509_PATH_VALID &&
-        memcmp(&found, &unchanged, sizeof found))
+    status = tc_x509_path_search(candidates[0], candidates, count, &anchor, 1, &options, &workspace,
+                                 &search, &work, &found);
+    if (status != TC_X509_PATH_VALID && memcmp(&found, &unchanged, sizeof found))
       abort();
   }
 }
 
-static void fuzz_cms_path(const uint8_t *data, size_t length) {
-  enum {
-    MAX_BYTES = 32768,
-    MAX_ELEMENTS = 2048,
-    WORK_BUDGET = 200000,
-    CERTIFICATES = 8
-  };
-  static const uint8_t data_type[] = {0x2a, 0x86, 0x48, 0x86, 0xf7,
-                                      0x0d, 1,    7,    1};
+static void fuzz_cms_path(const uint8_t* data, size_t length)
+{
+  enum { MAX_BYTES = 32768, MAX_ELEMENTS = 2048, WORK_BUDGET = 200000, CERTIFICATES = 8 };
+  static const uint8_t data_type[] = {0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 1, 7, 1};
   ExampleX509SearchWorkspace storage;
   TC_bytes certificates[CERTIFICATES];
   uint8_t signed_digest[TC_CMS_SIGNED_DIGEST_BYTES];
-  TC_CMS_path_workspace workspace = {
-      example_x509_workspace(&storage.validation),
-      example_x509_search_workspace(&storage),
-      certificates,
-      CERTIFICATES,
-      NULL,
-      0,
-      signed_digest,
-      sizeof signed_digest};
+  TC_CMS_path_workspace workspace = {example_x509_workspace(&storage.validation),
+                                     example_x509_search_workspace(&storage),
+                                     certificates,
+                                     CERTIFICATES,
+                                     NULL,
+                                     0,
+                                     signed_digest,
+                                     sizeof signed_digest};
   TC_CMS_path_options options = {0};
   const TC_X509_store_source source = {0};
   TC_X509_search_result found, saved;
-  options.path.parsing = (TC_TLV_limits){MAX_BYTES, MAX_BYTES, MAX_ELEMENTS,
-                                         workspace.validation.frame_capacity};
+  options.path.parsing =
+      (TC_TLV_limits){MAX_BYTES, MAX_BYTES, MAX_ELEMENTS, workspace.validation.frame_capacity};
   options.path.at = (TC_X509_time){2026, 1, 1, 0, 0, 0};
   options.path.max_certificates = workspace.search.capacity;
   options.path.max_input = MAX_BYTES;
@@ -467,28 +434,21 @@ static void fuzz_cms_path(const uint8_t *data, size_t length) {
   for (size_t i = 0; i < sizeof budgets / sizeof *budgets; ++i) {
     size_t work = budgets[i];
     memcpy(&found, &saved, sizeof found);
-    options.attributes =
-        i ? TC_CMS_ATTRIBUTES_BER_DEFINITE_ORDER : TC_CMS_ATTRIBUTES_DER;
+    options.attributes = i ? TC_CMS_ATTRIBUTES_BER_DEFINITE_ORDER : TC_CMS_ATTRIBUTES_DER;
     TC_X509_path_status status = TC_CMS_signed_data_path_build(
-        (TC_bytes){data, length}, 0, (TC_bytes){data_type, sizeof data_type},
-        (TC_bytes){NULL, 0}, &source, &options, &workspace, &work, &found);
+        (TC_bytes){data, length}, 0, (TC_bytes){data_type, sizeof data_type}, (TC_bytes){NULL, 0},
+        &source, &options, &workspace, &work, &found);
     /* No anchor was supplied, even if embedded certificates parse successfully.
      */
-    if (status == TC_X509_PATH_VALID || work > budgets[i] ||
-        memcmp(&found, &saved, sizeof found))
+    if (status == TC_X509_PATH_VALID || work > budgets[i] || memcmp(&found, &saved, sizeof found))
       abort();
   }
 }
 
-static void fuzz_cms(const uint8_t *data, size_t length) {
-  enum {
-    MAX_BYTES = 32768,
-    MAX_ELEMENTS = 2048,
-    FRAME_CAPACITY = 16,
-    WORK_BUDGET = 200000
-  };
-  const TC_TLV_limits limits = {MAX_BYTES, MAX_BYTES, MAX_ELEMENTS,
-                                FRAME_CAPACITY};
+static void fuzz_cms(const uint8_t* data, size_t length)
+{
+  enum { MAX_BYTES = 32768, MAX_ELEMENTS = 2048, FRAME_CAPACITY = 16, WORK_BUDGET = 200000 };
+  const TC_TLV_limits limits = {MAX_BYTES, MAX_BYTES, MAX_ELEMENTS, FRAME_CAPACITY};
   const TC_TLV_profile profiles[] = {TC_TLV_DER, TC_TLV_BER};
   TC_TLV_frame frames[FRAME_CAPACITY];
   tc_cms_signer_info signer, saved;
@@ -498,10 +458,9 @@ static void fuzz_cms(const uint8_t *data, size_t length) {
   fuzz_cms_path(data, length);
   memset(&container, 0xa5, sizeof container);
   memcpy(&saved_container, &container, sizeof container);
-  result = tc_cms_signed_data_read((TC_bytes){data, length}, &limits, frames,
-                                   FRAME_CAPACITY, &work, &container);
-  if (result != TC_TLV_OK &&
-      memcmp(&container, &saved_container, sizeof container))
+  result = tc_cms_signed_data_read((TC_bytes){data, length}, &limits, frames, FRAME_CAPACITY, &work,
+                                   &container);
+  if (result != TC_TLV_OK && memcmp(&container, &saved_container, sizeof container))
     abort();
   if (result == TC_TLV_OK) {
     const tc_pki_tree_workspace tree = {frames, FRAME_CAPACITY, &work};
@@ -509,9 +468,8 @@ static void fuzz_cms(const uint8_t *data, size_t length) {
     result = tc_cms_signed_data_version_check(&container, &limits, &tree);
     if (work > WORK_BUDGET)
       abort();
-    if (result == TC_TLV_OK && container.version != 1 &&
-        container.version != 3 && container.version != 4 &&
-        container.version != 5)
+    if (result == TC_TLV_OK && container.version != 1 && container.version != 3 &&
+        container.version != 4 && container.version != 5)
       abort();
     work = length ? data[0] : 0;
     const size_t budget = work;
@@ -519,8 +477,7 @@ static void fuzz_cms(const uint8_t *data, size_t length) {
     if (work > budget)
       abort();
   }
-  for (unsigned kind = TC_CMS_OTHER_CERTIFICATE;
-       kind <= TC_CMS_OTHER_REVOCATION; ++kind) {
+  for (unsigned kind = TC_CMS_OTHER_CERTIFICATE; kind <= TC_CMS_OTHER_REVOCATION; ++kind) {
     const size_t budgets[] = {WORK_BUDGET, length ? data[0] : 0};
     for (size_t j = 0; j < sizeof budgets / sizeof budgets[0]; ++j) {
       tc_cms_other_format other, previous;
@@ -528,9 +485,8 @@ static void fuzz_cms(const uint8_t *data, size_t length) {
       memset(&other, 0xa5, sizeof other);
       memcpy(&previous, &other, sizeof previous);
       work = budgets[j];
-      result = tc_cms_other_format_read((TC_bytes){data, length},
-                                        (tc_cms_other_kind)kind, &limits, &tree,
-                                        &other);
+      result = tc_cms_other_format_read((TC_bytes){data, length}, (tc_cms_other_kind)kind, &limits,
+                                        &tree, &other);
       if (work > budgets[j])
         abort();
       if (result != TC_TLV_OK && memcmp(&other, &previous, sizeof other))
@@ -545,9 +501,8 @@ static void fuzz_cms(const uint8_t *data, size_t length) {
       work = budgets[j];
       memset(&signer, 0xa5, sizeof signer);
       memcpy(&saved, &signer, sizeof signer);
-      result = tc_cms_signer_info_read((TC_bytes){data, length}, profiles[i],
-                                       &limits, frames, FRAME_CAPACITY, &work,
-                                       &signer);
+      result = tc_cms_signer_info_read((TC_bytes){data, length}, profiles[i], &limits, frames,
+                                       FRAME_CAPACITY, &work, &signer);
       if (work > budgets[j])
         abort();
       if (result != TC_TLV_OK && memcmp(&signer, &saved, sizeof signer))
@@ -560,23 +515,22 @@ static void fuzz_cms(const uint8_t *data, size_t length) {
         memset(&parameters, 0xa5, sizeof parameters);
         memcpy(&previous, &parameters, sizeof previous);
         work = budgets[j];
-        result = tc_pki_pss_read_profile((TC_bytes){data, length}, profiles[i],
-                                         &limits, &tree, &parameters);
+        result = tc_pki_pss_read_profile((TC_bytes){data, length}, profiles[i], &limits, &tree,
+                                         &parameters);
         if (work > budgets[j])
           abort();
-        if (result != TC_TLV_OK &&
-            memcmp(&parameters, &previous, sizeof parameters))
+        if (result != TC_TLV_OK && memcmp(&parameters, &previous, sizeof parameters))
           abort();
-        if (result == TC_TLV_OK &&
-            (!parameters.salt_length.length || !parameters.hash.oid.length ||
-             !parameters.mgf_hash.oid.length))
+        if (result == TC_TLV_OK && (!parameters.salt_length.length || !parameters.hash.oid.length ||
+                                    !parameters.mgf_hash.oid.length))
           abort();
       }
     }
   }
 }
 
-int LLVMFuzzerTestOneInput(const uint8_t *data, size_t length) {
+int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
+{
   TC_TLV_frame frames[16];
   TC_bytes oids[64];
   TC_X509_workspace workspace = {frames, 16, oids, 64};
@@ -624,8 +578,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t length) {
   {
     tc_x509_crl crl, previous;
     size_t work;
-    const tc_pki_tree_workspace tree = {
-        frames, sizeof frames / sizeof frames[0], &work};
+    const tc_pki_tree_workspace tree = {frames, sizeof frames / sizeof frames[0], &work};
     const size_t budgets[] = {200000, length ? data[0] : 0};
     for (size_t i = 0; i < sizeof budgets / sizeof budgets[0]; ++i) {
       work = budgets[i];
@@ -636,9 +589,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t length) {
         abort();
       if (result != TC_TLV_OK && memcmp(&crl, &previous, sizeof crl))
         abort();
-      if (result == TC_TLV_OK &&
-          (crl.version < 1 || crl.version > 2 || !crl.tbs.length ||
-           !crl.issuer.length || !crl.signature.length))
+      if (result == TC_TLV_OK && (crl.version < 1 || crl.version > 2 || !crl.tbs.length ||
+                                  !crl.issuer.length || !crl.signature.length))
         abort();
       if (result == TC_TLV_OK) {
         work = budgets[i];
@@ -651,24 +603,21 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t length) {
       memset(&distribution, 0xa5, sizeof distribution);
       saved_distribution = distribution;
       work = budgets[i];
-      result = tc_x509_crl_distribution_read((TC_bytes){data, length}, &limits,
-                                             &tree, &distribution);
+      result =
+          tc_x509_crl_distribution_read((TC_bytes){data, length}, &limits, &tree, &distribution);
       if (work > budgets[i])
         abort();
-      if (result != TC_TLV_OK &&
-          memcmp(&distribution, &saved_distribution, sizeof distribution))
+      if (result != TC_TLV_OK && memcmp(&distribution, &saved_distribution, sizeof distribution))
         abort();
-      if (result == TC_TLV_OK && distribution.user_only + distribution.ca_only +
-                                         distribution.attribute_only >
-                                     1)
+      if (result == TC_TLV_OK &&
+          distribution.user_only + distribution.ca_only + distribution.attribute_only > 1)
         abort();
       tc_x509_crl_extension_info info, saved_info;
       memset(&info, 0xa5, sizeof info);
       saved_info = info;
       work = budgets[i];
-      result = tc_x509_crl_extension_info_read(
-          (TC_bytes){data, length}, &limits, &tree, oids,
-          sizeof oids / sizeof oids[0], &info);
+      result = tc_x509_crl_extension_info_read((TC_bytes){data, length}, &limits, &tree, oids,
+                                               sizeof oids / sizeof oids[0], &info);
       if (work > budgets[i])
         abort();
       if (result != TC_TLV_OK && memcmp(&info, &saved_info, sizeof info))
@@ -677,8 +626,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t length) {
         abort();
       TC_TLV_reader points;
       work = budgets[i];
-      result = tc_pki_distribution_points_init((TC_bytes){data, length},
-                                               &limits, &tree, &points);
+      result = tc_pki_distribution_points_init((TC_bytes){data, length}, &limits, &tree, &points);
       if (work > budgets[i])
         abort();
       if (result == TC_TLV_OK) {
@@ -690,12 +638,10 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t length) {
           result = tc_pki_distribution_point_next(&points, &tree, &point);
           if (work > budgets[i])
             abort();
-          if (result != TC_TLV_OK &&
-              (memcmp(&points, &saved_points, sizeof points) ||
-               memcmp(&point, &saved_point, sizeof point)))
+          if (result != TC_TLV_OK && (memcmp(&points, &saved_points, sizeof points) ||
+                                      memcmp(&point, &saved_point, sizeof point)))
             abort();
-          if (result == TC_TLV_OK &&
-              (!point.name.encoded.length && !point.issuer.length))
+          if (result == TC_TLV_OK && (!point.name.encoded.length && !point.issuer.length))
             abort();
           if (result == TC_TLV_OK && points.offset <= saved_points.offset)
             abort();
@@ -709,17 +655,15 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t length) {
     TC_TLV_reader names, old_names;
     uint32_t left[128], right[128];
     uint8_t matched_attributes[8];
-    TC_X509_name_workspace comparison = {left, right, 128, matched_attributes,
-                                         8};
+    TC_X509_name_workspace comparison = {left, right, 128, matched_attributes, 8};
     size_t work = 200000;
     int equal = 99;
     {
       static const uint8_t root_name[] = {0x30, 0};
       const TC_bytes root = {root_name, sizeof root_name};
-      const tc_pki_tree_workspace tree = {
-          frames, sizeof frames / sizeof frames[0], &work};
-      result = tc_pki_name_appended_equal(root, input, root, input, &limits,
-                                          &comparison, &tree, &equal);
+      const tc_pki_tree_workspace tree = {frames, sizeof frames / sizeof frames[0], &work};
+      result =
+          tc_pki_name_appended_equal(root, input, root, input, &limits, &comparison, &tree, &equal);
       if (result == TC_TLV_OK) {
         if (equal != 1)
           abort();
@@ -730,8 +674,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t length) {
       work = 200000;
       equal = 99;
     }
-    result =
-        TC_X509_name_equal(input, input, &limits, &comparison, &work, &equal);
+    result = TC_X509_name_equal(input, input, &limits, &comparison, &work, &equal);
     if (result == TC_TLV_OK) {
       if (equal != 1)
         abort();
@@ -739,8 +682,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t length) {
       abort();
     work = 200000;
     equal = 99;
-    result =
-        TC_X509_name_within(input, input, &limits, &comparison, &work, &equal);
+    result = TC_X509_name_within(input, input, &limits, &comparison, &work, &equal);
     if (result == TC_TLV_OK) {
       if (equal != 1)
         abort();
@@ -749,13 +691,12 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t length) {
     {
       enum { NAME_WORK_BUDGET = 200000 };
       const size_t budgets[] = {NAME_WORK_BUDGET, length ? data[0] : 0};
-      const tc_pki_tree_workspace tree = {
-          frames, sizeof frames / sizeof frames[0], &work};
+      const tc_pki_tree_workspace tree = {frames, sizeof frames / sizeof frames[0], &work};
       for (size_t i = 0; i < sizeof budgets / sizeof budgets[0]; ++i) {
         work = budgets[i];
         equal = 99;
-        result = tc_pki_name_equal(input, TC_TLV_BER, input, TC_TLV_BER,
-                                   &limits, &comparison, &tree, &equal);
+        result = tc_pki_name_equal(input, TC_TLV_BER, input, TC_TLV_BER, &limits, &comparison,
+                                   &tree, &equal);
         if (work > budgets[i])
           abort();
         if (result == TC_TLV_OK) {
@@ -774,19 +715,17 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t length) {
           TC_TLV_reader attributes;
           TC_X509_name_attribute attribute;
           TC_TLV_result inner;
-          if (names.offset <= old_names.offset ||
-              names.elements > limits.max_elements)
+          if (names.offset <= old_names.offset || names.elements > limits.max_elements)
             abort();
-          if (TC_TLV_reader_init(&attributes, rdn.data, rdn.length, TC_TLV_DER,
-                                 &limits) != TC_TLV_OK)
+          if (TC_TLV_reader_init(&attributes, rdn.data, rdn.length, TC_TLV_DER, &limits) !=
+              TC_TLV_OK)
             abort();
-          while ((inner = TC_X509_attribute_next(&attributes, &attribute)) ==
-                 TC_TLV_OK) {
+          while ((inner = TC_X509_attribute_next(&attributes, &attribute)) == TC_TLV_OK) {
           }
           if (inner != TC_TLV_END)
             abort();
-        } else if (memcmp(&names, &old_names, sizeof names) ||
-                   rdn.data != old_rdn.data || rdn.length != old_rdn.length)
+        } else if (memcmp(&names, &old_names, sizeof names) || rdn.data != old_rdn.data ||
+                   rdn.length != old_rdn.length)
           abort();
       } while (result == TC_TLV_OK);
     }
@@ -801,8 +740,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t length) {
     result = tc_unicode_prepare(tag, text, prepared, 128, &written, &work);
     if (result == TC_TLV_OK) {
       size_t i;
-      if (written < 2 || written > 128 || prepared[0] != 0x20 ||
-          prepared[written - 1] != 0x20)
+      if (written < 2 || written > 128 || prepared[0] != 0x20 || prepared[written - 1] != 0x20)
         abort();
       for (i = 0; i < written; ++i)
         if (!tc_unicode_allowed(prepared[i]))
@@ -830,29 +768,25 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t length) {
       count = 64;
     for (i = 0; i < count; ++i) {
       uint32_t mapped[4];
-      points[i] = ((uint32_t)data[3 * i] << 16 |
-                   (uint32_t)data[3 * i + 1] << 8 | data[3 * i + 2]) %
+      points[i] = ((uint32_t)data[3 * i] << 16 | (uint32_t)data[3 * i + 1] << 8 | data[3 * i + 2]) %
                   0x110100;
       if (tc_unicode_map(points[i], mapped) > 4)
         abort();
       (void)tc_unicode_allowed(points[i]);
       (void)tc_unicode_mark(points[i]);
     }
-    result =
-        tc_unicode_nfkc(points, count, normalized, capacity, &written, &work);
+    result = tc_unicode_nfkc(points, count, normalized, capacity, &written, &work);
     if (result == TC_TLV_OK) {
       if (written > capacity)
         abort();
       work = 100000;
-      result =
-          tc_unicode_nfkc(normalized, written, again, 256, &repeated, &work);
+      result = tc_unicode_nfkc(normalized, written, again, 256, &repeated, &work);
       if (result != TC_TLV_OK || repeated != written ||
           memcmp(normalized, again, written * sizeof(*normalized)))
         abort();
       work = 100000;
       repeated = 999;
-      result =
-          tc_unicode_finish_name(normalized, written, 128, &repeated, &work);
+      result = tc_unicode_finish_name(normalized, written, 128, &repeated, &work);
       if (result == TC_TLV_OK) {
         if (repeated < 2 || repeated > 128 || normalized[0] != 0x20 ||
             normalized[repeated - 1] != 0x20)
@@ -870,16 +804,13 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t length) {
   result = TC_X509_read(data, length, &limits, &workspace, &certificate);
   fuzz_path(data, length, result == TC_TLV_OK ? &certificate : NULL);
   if (result == TC_TLV_OK) {
-    if (certificate.encoded.data != data ||
-        certificate.encoded.length != length || certificate.version < 1 ||
-        certificate.version > 3)
+    if (certificate.encoded.data != data || certificate.encoded.length != length ||
+        certificate.version < 1 || certificate.version > 3)
       abort();
-    if (TC_X509_extensions_init(&reader, certificate.extensions.data,
-                                certificate.extensions.length,
+    if (TC_X509_extensions_init(&reader, certificate.extensions.data, certificate.extensions.length,
                                 &limits) != TC_TLV_OK)
       abort();
-    while ((result = TC_X509_extension_next(&reader, &extension)) ==
-           TC_TLV_OK) {
+    while ((result = TC_X509_extension_next(&reader, &extension)) == TC_TLV_OK) {
     }
     if (result != TC_TLV_END)
       abort();
@@ -888,8 +819,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t length) {
       TC_X509_constraint_workspace scratch = {frames, 16, NULL};
       size_t work = 200000;
       int permitted = 99;
-      result = TC_X509_certificate_names_check(&certificate, &names, &limits,
-                                               &scratch, &work, &permitted);
+      result = TC_X509_certificate_names_check(&certificate, &names, &limits, &scratch, &work,
+                                               &permitted);
       if (result != TC_TLV_OK && permitted != 99)
         abort();
       if (result == TC_TLV_OK && permitted != 1)
@@ -907,13 +838,10 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t length) {
     memcpy(&old_identifier, &identifier, sizeof identifier);
     memset(&subject, 0xa5, sizeof subject);
     memcpy(&old_subject, &subject, sizeof subject);
-    result = TC_X509_authority_key_identifier_read(data, length, &limits,
-                                                   &identifier);
-    if (result != TC_TLV_OK &&
-        memcmp(&identifier, &old_identifier, sizeof identifier))
+    result = TC_X509_authority_key_identifier_read(data, length, &limits, &identifier);
+    if (result != TC_TLV_OK && memcmp(&identifier, &old_identifier, sizeof identifier))
       abort();
-    result =
-        TC_X509_subject_key_identifier_read(data, length, &limits, &subject);
+    result = TC_X509_subject_key_identifier_read(data, length, &limits, &subject);
     if (result != TC_TLV_OK && memcmp(&subject, &old_subject, sizeof subject))
       abort();
     (void)TC_DER_integer_contents(data, length);
@@ -954,8 +882,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t length) {
       memcpy(&old_general, &general, sizeof general);
       result = TC_X509_general_name_next(&reader, frames, 16, &general);
       if (result == TC_TLV_OK) {
-        if (reader.offset <= old_reader.offset ||
-            reader.elements <= old_reader.elements ||
+        if (reader.offset <= old_reader.offset || reader.elements <= old_reader.elements ||
             reader.elements > limits.max_elements || general.type > 8)
           abort();
       } else if (memcmp(&old_reader, &reader, sizeof reader) ||
@@ -970,19 +897,16 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t length) {
     memset(&constraints, 0xa5, sizeof constraints);
     memcpy(&old_constraints, &constraints, sizeof constraints);
     result = TC_X509_name_constraints_read(data, length, &limits, &constraints);
-    if (result != TC_TLV_OK &&
-        memcmp(&old_constraints, &constraints, sizeof constraints))
+    if (result != TC_TLV_OK && memcmp(&old_constraints, &constraints, sizeof constraints))
       abort();
     memset(&subtree, 0xa5, sizeof subtree);
-    if (TC_TLV_reader_init(&reader, data, length, TC_TLV_DER, &limits) ==
-        TC_TLV_OK) {
+    if (TC_TLV_reader_init(&reader, data, length, TC_TLV_DER, &limits) == TC_TLV_OK) {
       do {
         memcpy(&old_reader, &reader, sizeof reader);
         memcpy(&old_subtree, &subtree, sizeof subtree);
         result = TC_X509_general_subtree_next(&reader, frames, 16, &subtree);
         if (result == TC_TLV_OK) {
-          if (reader.offset <= old_reader.offset ||
-              reader.elements <= old_reader.elements ||
+          if (reader.offset <= old_reader.offset || reader.elements <= old_reader.elements ||
               reader.elements > limits.max_elements || subtree.base.type > 8)
             abort();
         } else if (memcmp(&old_reader, &reader, sizeof reader) ||
@@ -991,8 +915,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t length) {
       } while (result == TC_TLV_OK);
     }
   }
-  if (TC_X509_policy_mappings_init(&reader, data, length, &limits) ==
-      TC_TLV_OK) {
+  if (TC_X509_policy_mappings_init(&reader, data, length, &limits) == TC_TLV_OK) {
     TC_X509_policy_mapping mapping, old_mapping;
     TC_TLV_reader old_reader;
     memset(&mapping, 0xa5, sizeof mapping);
@@ -1001,8 +924,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t length) {
       memcpy(&old_mapping, &mapping, sizeof mapping);
       result = TC_X509_policy_mapping_next(&reader, &mapping);
       if (result == TC_TLV_OK) {
-        if (reader.offset <= old_reader.offset ||
-            !mapping.issuer_policy.length || !mapping.subject_policy.length)
+        if (reader.offset <= old_reader.offset || !mapping.issuer_policy.length ||
+            !mapping.subject_policy.length)
           abort();
       } else if (memcmp(&reader, &old_reader, sizeof reader) ||
                  memcmp(&mapping, &old_mapping, sizeof mapping))
@@ -1016,8 +939,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t length) {
     TC_bytes seen[8], old_seen[8];
     memset(seen, 0xa5, sizeof seen);
     memset(&policy, 0xa5, sizeof policy);
-    if (TC_X509_policies_init(&policies, data, length, &limits, seen, 8) ==
-        TC_TLV_OK) {
+    if (TC_X509_policies_init(&policies, data, length, &limits, seen, 8) == TC_TLV_OK) {
       do {
         memcpy(&old_policies, &policies, sizeof policies);
         memcpy(&old_policy, &policy, sizeof policy);
@@ -1027,11 +949,9 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t length) {
           if (policies.count != old_policies.count + 1 || policies.count > 8 ||
               policies.reader.offset <= old_policies.reader.offset)
             abort();
-          if (TC_X509_policy_qualifiers_init(&reader, policy.qualifiers,
-                                             &limits) != TC_TLV_OK)
+          if (TC_X509_policy_qualifiers_init(&reader, policy.qualifiers, &limits) != TC_TLV_OK)
             abort();
-          while (TC_X509_policy_qualifier_next(&reader, &qualifier) ==
-                 TC_TLV_OK) {
+          while (TC_X509_policy_qualifier_next(&reader, &qualifier) == TC_TLV_OK) {
           }
         } else if (memcmp(&old_policies, &policies, sizeof policies) ||
                    memcmp(&old_policy, &policy, sizeof policy) ||
@@ -1056,14 +976,12 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t length) {
       name.value.length = split;
       base.base.value.data = data + split;
       base.base.value.length = length - split;
-      result = TC_X509_general_name_within(&name, &base, &limits, NULL, &work,
-                                           &matched);
+      result = TC_X509_general_name_within(&name, &base, &limits, NULL, &work, &matched);
       if (result != TC_TLV_OK && matched != 99)
         abort();
       if (result == TC_TLV_OK && matched != 0 && matched != 1)
         abort();
-      retry = TC_X509_general_name_within(&name, &base, &limits, NULL, &small,
-                                          &limited);
+      retry = TC_X509_general_name_within(&name, &base, &limits, NULL, &small, &limited);
       if (retry != TC_TLV_OK && limited != 99)
         abort();
       if (retry == TC_TLV_OK && (result != TC_TLV_OK || limited != matched))
@@ -1073,8 +991,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t length) {
         TC_X509_constraint_workspace workspace = {frames, 16, NULL};
         work = 100000;
         matched = 99;
-        result = TC_X509_name_constraints_check(&name, &constraints, &limits,
-                                                &workspace, &work, &matched);
+        result = TC_X509_name_constraints_check(&name, &constraints, &limits, &workspace, &work,
+                                                &matched);
         if (result != TC_TLV_OK && matched != 99)
           abort();
         if (result == TC_TLV_OK && matched != 0 && matched != 1)
@@ -1087,14 +1005,11 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t length) {
   result = TC_PIV_CVC_read(data, length, &cvc);
   if (result != TC_TLV_OK && memcmp(&cvc, &old_cvc, sizeof cvc))
     abort();
-  for (profile = TC_CHUID_PROFILE_PIV;
-       profile <= TC_CHUID_PROFILE_TWIC_UNSIGNED; ++profile)
-    for (encoding = TC_PIV_CHUID_CONTENTS; encoding <= TC_PIV_CHUID_CONTAINER;
-         ++encoding) {
+  for (profile = TC_CHUID_PROFILE_PIV; profile <= TC_CHUID_PROFILE_TWIC_UNSIGNED; ++profile)
+    for (encoding = TC_PIV_CHUID_CONTENTS; encoding <= TC_PIV_CHUID_CONTAINER; ++encoding) {
       memset(&chuid, 0xa5, sizeof chuid);
       old_chuid = chuid;
-      result = TC_PIV_CHUID_read_profile(data, length,
-                                         (TC_PIV_CHUID_encoding)encoding,
+      result = TC_PIV_CHUID_read_profile(data, length, (TC_PIV_CHUID_encoding)encoding,
                                          (TC_PIV_CHUID_profile)profile, &chuid);
       if (result != TC_TLV_OK && memcmp(&chuid, &old_chuid, sizeof chuid))
         abort();
@@ -1109,8 +1024,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t length) {
     result = TC_EAC_CVC_read(data, length, &limits, &work, &eac);
     if (result == TC_TLV_OK) {
       (void)TC_EAC_CVC_check_encoding(&eac, &eac.public_key, &eac.public_key);
-      if (TC_EAC_CVC_extensions_init(&reader, eac.extensions, &limits) !=
-          TC_TLV_OK)
+      if (TC_EAC_CVC_extensions_init(&reader, eac.extensions, &limits) != TC_TLV_OK)
         abort();
       while ((result = TC_EAC_CVC_extension_next(&reader, &ext)) == TC_TLV_OK) {
       }

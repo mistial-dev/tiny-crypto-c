@@ -14,15 +14,18 @@ struct fixed_entropy {
   bool used;
 };
 
-TC_status fill(void* user, uint8_t* output, size_t length) {
+TC_status fill(void* user, uint8_t* output, size_t length)
+{
   fixed_entropy* source = static_cast<fixed_entropy*>(user);
-  if (source->used || length != source->length) return TC_ERROR;
+  if (source->used || length != source->length)
+    return TC_ERROR;
   std::memcpy(output, source->data, length);
   source->used = true;
   return TC_OK;
 }
 
-void unhex(const char* text, uint8_t* out) {
+void unhex(const char* text, uint8_t* out)
+{
   for (size_t i = 0; text[2 * i]; ++i) {
     unsigned value = 0;
     std::sscanf(text + 2 * i, "%2x", &value);
@@ -31,7 +34,8 @@ void unhex(const char* text, uint8_t* out) {
 }
 } // namespace
 
-TEST_CASE("HMAC_DRBG SHA-256 CAVP answer and lifecycle") {
+TEST_CASE("HMAC_DRBG SHA-256 CAVP answer and lifecycle")
+{
   // tests/vectors/drbg/cavp/no_reseed/HMAC_DRBG.rsp, [SHA-256], COUNT = 0.
   uint8_t entropy[32], nonce[16], expected[128], out[128];
   unhex("ca851911349384bffe89de1cbdc46e6831e44d34a4fb935ee285dd14b71a7488", entropy);
@@ -39,7 +43,8 @@ TEST_CASE("HMAC_DRBG SHA-256 CAVP answer and lifecycle") {
   unhex("e528e9abf2dece54d47c7e75e5fe302149f817ea9fb4bee6f4199697d04d5b89"
         "d54fbb978a15b5c443c9ec21036d2460b6f73ebad0dc2aba6e624abf07745bc1"
         "07694bb7547bb0995f70de25d6b29e2d3011bb19d27676c07162c8b5ccde0668"
-        "961df86803482cb37ed6d5c0bb8d50cf1f50d476aa0458bdaba806f48be9dcb8", expected);
+        "961df86803482cb37ed6d5c0bb8d50cf1f50d476aa0458bdaba806f48be9dcb8",
+        expected);
 
   CHECK_FALSE(std::is_copy_constructible<tiny_crypto::drbg>::value);
   CHECK_FALSE(std::is_move_constructible<tiny_crypto::drbg>::value);

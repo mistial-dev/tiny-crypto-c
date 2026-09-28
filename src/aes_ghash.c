@@ -17,18 +17,17 @@
 
 #if defined(TC_AES_ENABLE_GCM) && (TC_AES_ENABLE_GCM == 1)
 
-#if (TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_BITWISE) || \
-    (TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_AUTO && \
-     (!TC_AES_WIDE_OPS || !defined(UINT64_MAX))) || \
-    (TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_FAST_TABLE) || \
+#if (TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_BITWISE) ||                                    \
+    (TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_AUTO &&                                        \
+     (!TC_AES_WIDE_OPS || !defined(UINT64_MAX))) ||                                                \
+    (TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_FAST_TABLE) ||                                 \
     (TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_WIDE && !defined(UINT64_MAX))
 static void tc_aes_gcm_multiply_x(uint8_t value[TC_AES_BLOCKLEN])
 {
   uint8_t carry = 0;
   unsigned i;
 
-  for (i = 0; i < TC_AES_BLOCKLEN; ++i)
-  {
+  for (i = 0; i < TC_AES_BLOCKLEN; ++i) {
     const uint8_t next_carry = (uint8_t)(value[i] & 1u);
     value[i] = (uint8_t)((value[i] >> 1) | (carry << 7));
     carry = next_carry;
@@ -37,18 +36,15 @@ static void tc_aes_gcm_multiply_x(uint8_t value[TC_AES_BLOCKLEN])
 }
 
 /* Constant-time bytewise multiplication in GF(2^128). */
-static void tc_aes_gcm_multiply_bitwise(uint8_t* result, const uint8_t* left,
-                                 const uint8_t* right)
+static void tc_aes_gcm_multiply_bitwise(uint8_t* result, const uint8_t* left, const uint8_t* right)
 {
-  uint8_t z[TC_AES_BLOCKLEN] = { 0 };
+  uint8_t z[TC_AES_BLOCKLEN] = {0};
   uint8_t v[TC_AES_BLOCKLEN];
   unsigned bit;
 
   tc_aes_copy_bytes(v, right, TC_AES_BLOCKLEN);
-  for (bit = 0; bit < 128; ++bit)
-  {
-    const uint8_t bit_mask = (uint8_t)(0u -
-      (uint8_t)((left[bit / 8u] >> (7u - (bit % 8u))) & 1u));
+  for (bit = 0; bit < 128; ++bit) {
+    const uint8_t bit_mask = (uint8_t)(0u - (uint8_t)((left[bit / 8u] >> (7u - (bit % 8u))) & 1u));
     unsigned i;
 
     for (i = 0; i < TC_AES_BLOCKLEN; ++i)
@@ -64,11 +60,10 @@ static void tc_aes_gcm_multiply_bitwise(uint8_t* result, const uint8_t* left,
 }
 #endif
 
-#if TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_WIDE || \
+#if TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_WIDE ||                                         \
     ((TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_AUTO) && TC_AES_WIDE_OPS)
 #if defined(UINT64_MAX)
-static void tc_aes_gcm_multiply_wide(uint8_t* result, const uint8_t* left,
-                              const uint8_t* right)
+static void tc_aes_gcm_multiply_wide(uint8_t* result, const uint8_t* left, const uint8_t* right)
 {
   uint64_t xh = tc_internal_load_be64(left);
   uint64_t xl = tc_internal_load_be64(left + 8);
@@ -78,8 +73,7 @@ static void tc_aes_gcm_multiply_wide(uint8_t* result, const uint8_t* left,
   uint64_t vl = tc_internal_load_be64(right + 8);
   unsigned bit;
 
-  for (bit = 0; bit < 128; ++bit)
-  {
+  for (bit = 0; bit < 128; ++bit) {
     const uint64_t bit_mask = 0u - (xh >> 63);
     const uint64_t reduction = 0xe100000000000000ULL & (0u - (vl & 1u));
     zh ^= vh & bit_mask;
@@ -98,11 +92,10 @@ static void tc_aes_gcm_multiply_wide(uint8_t* result, const uint8_t* left,
 #if TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_FAST_TABLE
 void tc_aes_gcm_init_table(struct TC_AES_GCM_ctx* ctx)
 {
-  uint8_t input[TC_AES_BLOCKLEN] = { 0 };
+  uint8_t input[TC_AES_BLOCKLEN] = {0};
   uint8_t entry;
 
-  for (entry = 0; entry < 16; ++entry)
-  {
+  for (entry = 0; entry < 16; ++entry) {
     input[0] = (uint8_t)(entry << 4);
     tc_aes_gcm_multiply_bitwise(ctx->ghash_table[entry], input, ctx->H);
   }
@@ -112,20 +105,19 @@ void tc_aes_gcm_init_table(struct TC_AES_GCM_ctx* ctx)
 }
 
 static void tc_aes_gcm_multiply_fast_table(uint8_t* result, const uint8_t* left,
-                                    const struct TC_AES_GCM_ctx* ctx)
+                                           const struct TC_AES_GCM_ctx* ctx)
 {
-  uint8_t value[TC_AES_BLOCKLEN] = { 0 };
+  uint8_t value[TC_AES_BLOCKLEN] = {0};
   uint8_t position = 32;
   uint8_t i;
 
   /* Horner evaluation runs from the least-significant nibble toward the
    * most-significant one. Each x^4 step advances the accumulated field power. */
-  while (position > 0)
-  {
+  while (position > 0) {
     const uint8_t nibble_position = (uint8_t)(--position);
-    const uint8_t nibble = (uint8_t)((nibble_position & 1u) == 0u ?
-      left[nibble_position / 2u] >> 4 :
-      left[nibble_position / 2u] & 0x0fu);
+    const uint8_t nibble =
+        (uint8_t)((nibble_position & 1u) == 0u ? left[nibble_position / 2u] >> 4
+                                               : left[nibble_position / 2u] & 0x0fu);
     tc_aes_gcm_multiply_x(value);
     tc_aes_gcm_multiply_x(value);
     tc_aes_gcm_multiply_x(value);
@@ -141,14 +133,14 @@ static void tc_aes_gcm_multiply_fast_table(uint8_t* result, const uint8_t* left,
 #endif
 
 static void tc_aes_gcm_multiply(uint8_t* result, const uint8_t* left,
-                         const struct TC_AES_GCM_ctx* ctx)
+                                const struct TC_AES_GCM_ctx* ctx)
 {
 #if TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_HARDWARE
   TC_AES_GCM_hardware_multiply(result, left, ctx->H);
 #elif TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_FAST_TABLE
   tc_aes_gcm_multiply_fast_table(result, left, ctx);
-#elif TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_WIDE || \
-      ((TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_AUTO) && TC_AES_WIDE_OPS)
+#elif TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_WIDE ||                                       \
+    ((TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_AUTO) && TC_AES_WIDE_OPS)
 #if defined(UINT64_MAX)
   tc_aes_gcm_multiply_wide(result, left, ctx->H);
 #else
@@ -169,19 +161,16 @@ void tc_aes_gcm_ghash_block(struct TC_AES_GCM_ctx* ctx, const uint8_t* block)
   tc_aes_gcm_multiply(ctx->S, value, ctx);
 }
 
-void tc_aes_gcm_hash_bytes(struct TC_AES_GCM_ctx* ctx, const uint8_t* data,
-                           size_t length)
+void tc_aes_gcm_hash_bytes(struct TC_AES_GCM_ctx* ctx, const uint8_t* data, size_t length)
 {
-  uint8_t block[TC_AES_BLOCKLEN] = { 0 };
+  uint8_t block[TC_AES_BLOCKLEN] = {0};
 
-  while (length >= TC_AES_BLOCKLEN)
-  {
+  while (length >= TC_AES_BLOCKLEN) {
     tc_aes_gcm_ghash_block(ctx, data);
     data += TC_AES_BLOCKLEN;
     length -= TC_AES_BLOCKLEN;
   }
-  if (length != 0)
-  {
+  if (length != 0) {
     tc_aes_copy_bytes(block, data, length);
     tc_aes_gcm_ghash_block(ctx, block);
   }

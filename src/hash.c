@@ -36,12 +36,12 @@
 /* Byte-wise big-endian load with compiler builtin fast paths. */
 static inline uint32_t tc_hash_load_be32(const uint8_t* p)
 {
-#if (defined(__GNUC__) || defined(__clang__)) && defined(__BYTE_ORDER__) && \
+#if (defined(__GNUC__) || defined(__clang__)) && defined(__BYTE_ORDER__) &&                        \
     (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
   uint32_t v;
   memcpy(&v, p, sizeof(v));
   return __builtin_bswap32(v);
-#elif (defined(__GNUC__) || defined(__clang__)) && defined(__BYTE_ORDER__) && \
+#elif (defined(__GNUC__) || defined(__clang__)) && defined(__BYTE_ORDER__) &&                      \
     (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
   uint32_t v;
   memcpy(&v, p, sizeof(v));
@@ -51,8 +51,7 @@ static inline uint32_t tc_hash_load_be32(const uint8_t* p)
   memcpy(&v, p, sizeof(v));
   return _byteswap_ulong(v);
 #else
-  return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) |
-         ((uint32_t)p[2] << 8) | (uint32_t)p[3];
+  return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) | ((uint32_t)p[2] << 8) | (uint32_t)p[3];
 #endif
 }
 
@@ -62,14 +61,15 @@ static inline uint32_t tc_hash_load_be32(const uint8_t* p)
 
 #if TC_ENABLE_SHA1
 
-#define TC_SHA1_STEP(a, b, c, d, e, f, k, w) do { \
-  uint32_t temp = ROTL32(a, 5) + (f) + (e) + (k) + (w); \
-  e = d; \
-  d = c; \
-  c = ROTL32(b, 30); \
-  b = a; \
-  a = temp; \
-} while (0)
+#define TC_SHA1_STEP(a, b, c, d, e, f, k, w)                                                       \
+  do {                                                                                             \
+    uint32_t temp = ROTL32(a, 5) + (f) + (e) + (k) + (w);                                          \
+    e = d;                                                                                         \
+    d = c;                                                                                         \
+    c = ROTL32(b, 30);                                                                             \
+    b = a;                                                                                         \
+    a = temp;                                                                                      \
+  } while (0)
 
 /* One 64-byte block. Rolling 16-word schedule keeps the stack small. The
  * schedule is recoverable input, so TC_ZEROIZE wipes it after every block. */
@@ -90,15 +90,13 @@ static void sha1_compress(void* chaining, const uint8_t* block)
   e = state[4];
 
   /* Rounds 0..15 */
-  for (t = 0; t < 16; ++t)
-  {
+  for (t = 0; t < 16; ++t) {
     uint32_t f = d ^ (b & (c ^ d));
     TC_SHA1_STEP(a, b, c, d, e, f, 0x5A827999U, W[t]);
   }
 
   /* Rounds 16..19 */
-  for (t = 16; t < 20; ++t)
-  {
+  for (t = 16; t < 20; ++t) {
     uint32_t w = ROTL32(W[(t - 3U) & 15U] ^ W[(t - 8U) & 15U] ^ W[(t - 14U) & 15U] ^ W[t & 15U], 1);
     uint32_t f = d ^ (b & (c ^ d));
     W[t & 15U] = w;
@@ -106,8 +104,7 @@ static void sha1_compress(void* chaining, const uint8_t* block)
   }
 
   /* Rounds 20..39 */
-  for (t = 20; t < 40; ++t)
-  {
+  for (t = 20; t < 40; ++t) {
     uint32_t w = ROTL32(W[(t - 3U) & 15U] ^ W[(t - 8U) & 15U] ^ W[(t - 14U) & 15U] ^ W[t & 15U], 1);
     uint32_t f = b ^ c ^ d;
     W[t & 15U] = w;
@@ -115,8 +112,7 @@ static void sha1_compress(void* chaining, const uint8_t* block)
   }
 
   /* Rounds 40..59 */
-  for (t = 40; t < 60; ++t)
-  {
+  for (t = 40; t < 60; ++t) {
     uint32_t w = ROTL32(W[(t - 3U) & 15U] ^ W[(t - 8U) & 15U] ^ W[(t - 14U) & 15U] ^ W[t & 15U], 1);
     uint32_t f = (b & c) | (d & (b ^ c));
     W[t & 15U] = w;
@@ -124,8 +120,7 @@ static void sha1_compress(void* chaining, const uint8_t* block)
   }
 
   /* Rounds 60..79 */
-  for (t = 60; t < 80; ++t)
-  {
+  for (t = 60; t < 80; ++t) {
     uint32_t w = ROTL32(W[(t - 3U) & 15U] ^ W[(t - 8U) & 15U] ^ W[(t - 14U) & 15U] ^ W[t & 15U], 1);
     uint32_t f = b ^ c ^ d;
     W[t & 15U] = w;
@@ -173,10 +168,16 @@ static tc_hmac_view hmac_sha1_view(void* context)
 #endif
 
 const tc_hash_algorithm_info tc_sha1_info TC_HASH_INFO_STORAGE = {
-  TC_SHA1_BLOCKLEN, SHA_LENGTH_BYTES, TC_SHA1_DIGESTLEN, TC_HASH_LENGTH_BIG_ENDIAN,
-  SHA_MAX_MESSAGE_BYTES, sha1_state_init, sha1_compress, sha1_digest, sha1_view,
-  TC_HASH_HMAC_VIEW(hmac_sha1_view)
-};
+    TC_SHA1_BLOCKLEN,
+    SHA_LENGTH_BYTES,
+    TC_SHA1_DIGESTLEN,
+    TC_HASH_LENGTH_BIG_ENDIAN,
+    SHA_MAX_MESSAGE_BYTES,
+    sha1_state_init,
+    sha1_compress,
+    sha1_digest,
+    sha1_view,
+    TC_HASH_HMAC_VIEW(hmac_sha1_view)};
 
 #endif /* TC_ENABLE_SHA1 */
 
@@ -187,45 +188,47 @@ const tc_hash_algorithm_info tc_sha1_info TC_HASH_INFO_STORAGE = {
 #if TC_HASH_SHA256_CORE
 
 #if defined(__AVR__) && TC_AVR_PROGMEM
-  #include <avr/pgmspace.h>
-  #define HASH_K256_STORAGE PROGMEM
-  #define HASH_K256_READ(i) pgm_read_dword(&K256[(i)])
+#include <avr/pgmspace.h>
+#define HASH_K256_STORAGE PROGMEM
+#define HASH_K256_READ(i) pgm_read_dword(&K256[(i)])
 #else
-  #define HASH_K256_STORAGE
-  #define HASH_K256_READ(i) K256[(i)]
+#define HASH_K256_STORAGE
+#define HASH_K256_READ(i) K256[(i)]
 #endif
 
 /* Round constants (ROM/Flash, 256 bytes) */
 static const uint32_t K256[64] HASH_K256_STORAGE = {
-  0x428A2F98U, 0x71374491U, 0xB5C0FBCFU, 0xE9B5DBA5U, 0x3956C25BU, 0x59F111F1U, 0x923F82A4U, 0xAB1C5ED5U,
-  0xD807AA98U, 0x12835B01U, 0x243185BEU, 0x550C7DC3U, 0x72BE5D74U, 0x80DEB1FEU, 0x9BDC06A7U, 0xC19BF174U,
-  0xE49B69C1U, 0xEFBE4786U, 0x0FC19DC6U, 0x240CA1CCU, 0x2DE92C6FU, 0x4A7484AAU, 0x5CB0A9DCU, 0x76F988DAU,
-  0x983E5152U, 0xA831C66DU, 0xB00327C8U, 0xBF597FC7U, 0xC6E00BF3U, 0xD5A79147U, 0x06CA6351U, 0x14292967U,
-  0x27B70A85U, 0x2E1B2138U, 0x4D2C6DFCU, 0x53380D13U, 0x650A7354U, 0x766A0ABBU, 0x81C2C92EU, 0x92722C85U,
-  0xA2BFE8A1U, 0xA81A664BU, 0xC24B8B70U, 0xC76C51A3U, 0xD192E819U, 0xD6990624U, 0xF40E3585U, 0x106AA070U,
-  0x19A4C116U, 0x1E376C08U, 0x2748774CU, 0x34B0BCB5U, 0x391C0CB3U, 0x4ED8AA4AU, 0x5B9CCA4FU, 0x682E6FF3U,
-  0x748F82EEU, 0x78A5636FU, 0x84C87814U, 0x8CC70208U, 0x90BEFFFAU, 0xA4506CEBU, 0xBEF9A3F7U, 0xC67178F2U
-};
+    0x428A2F98U, 0x71374491U, 0xB5C0FBCFU, 0xE9B5DBA5U, 0x3956C25BU, 0x59F111F1U, 0x923F82A4U,
+    0xAB1C5ED5U, 0xD807AA98U, 0x12835B01U, 0x243185BEU, 0x550C7DC3U, 0x72BE5D74U, 0x80DEB1FEU,
+    0x9BDC06A7U, 0xC19BF174U, 0xE49B69C1U, 0xEFBE4786U, 0x0FC19DC6U, 0x240CA1CCU, 0x2DE92C6FU,
+    0x4A7484AAU, 0x5CB0A9DCU, 0x76F988DAU, 0x983E5152U, 0xA831C66DU, 0xB00327C8U, 0xBF597FC7U,
+    0xC6E00BF3U, 0xD5A79147U, 0x06CA6351U, 0x14292967U, 0x27B70A85U, 0x2E1B2138U, 0x4D2C6DFCU,
+    0x53380D13U, 0x650A7354U, 0x766A0ABBU, 0x81C2C92EU, 0x92722C85U, 0xA2BFE8A1U, 0xA81A664BU,
+    0xC24B8B70U, 0xC76C51A3U, 0xD192E819U, 0xD6990624U, 0xF40E3585U, 0x106AA070U, 0x19A4C116U,
+    0x1E376C08U, 0x2748774CU, 0x34B0BCB5U, 0x391C0CB3U, 0x4ED8AA4AU, 0x5B9CCA4FU, 0x682E6FF3U,
+    0x748F82EEU, 0x78A5636FU, 0x84C87814U, 0x8CC70208U, 0x90BEFFFAU, 0xA4506CEBU, 0xBEF9A3F7U,
+    0xC67178F2U};
 
-#define TC_SHA256_CH(x, y, z)  ((z) ^ ((x) & ((y) ^ (z))))
+#define TC_SHA256_CH(x, y, z) ((z) ^ ((x) & ((y) ^ (z))))
 #define TC_SHA256_MAJ(x, y, z) (((x) & (y)) | ((z) & ((x) ^ (y))))
-#define TC_SHA256_BSIG0(x)     (ROTR32(x, 2) ^ ROTR32(x, 13) ^ ROTR32(x, 22))
-#define TC_SHA256_BSIG1(x)     (ROTR32(x, 6) ^ ROTR32(x, 11) ^ ROTR32(x, 25))
-#define TC_SHA256_SSIG0(x)     (ROTR32(x, 7) ^ ROTR32(x, 18) ^ ((x) >> 3))
-#define TC_SHA256_SSIG1(x)     (ROTR32(x, 17) ^ ROTR32(x, 19) ^ ((x) >> 10))
+#define TC_SHA256_BSIG0(x) (ROTR32(x, 2) ^ ROTR32(x, 13) ^ ROTR32(x, 22))
+#define TC_SHA256_BSIG1(x) (ROTR32(x, 6) ^ ROTR32(x, 11) ^ ROTR32(x, 25))
+#define TC_SHA256_SSIG0(x) (ROTR32(x, 7) ^ ROTR32(x, 18) ^ ((x) >> 3))
+#define TC_SHA256_SSIG1(x) (ROTR32(x, 17) ^ ROTR32(x, 19) ^ ((x) >> 10))
 
-#define TC_SHA256_STEP(a, b, c, d, e, f, g, h, k, w) do { \
-  uint32_t t1 = (h) + TC_SHA256_BSIG1(e) + TC_SHA256_CH((e), (f), (g)) + (k) + (w); \
-  uint32_t t2 = TC_SHA256_BSIG0(a) + TC_SHA256_MAJ((a), (b), (c)); \
-  h = g; \
-  g = f; \
-  f = e; \
-  e = d + t1; \
-  d = c; \
-  c = b; \
-  b = a; \
-  a = t1 + t2; \
-} while (0)
+#define TC_SHA256_STEP(a, b, c, d, e, f, g, h, k, w)                                               \
+  do {                                                                                             \
+    uint32_t t1 = (h) + TC_SHA256_BSIG1(e) + TC_SHA256_CH((e), (f), (g)) + (k) + (w);              \
+    uint32_t t2 = TC_SHA256_BSIG0(a) + TC_SHA256_MAJ((a), (b), (c));                               \
+    h = g;                                                                                         \
+    g = f;                                                                                         \
+    f = e;                                                                                         \
+    e = d + t1;                                                                                    \
+    d = c;                                                                                         \
+    c = b;                                                                                         \
+    b = a;                                                                                         \
+    a = t1 + t2;                                                                                   \
+  } while (0)
 
 /* One 64-byte block. Rolling 16-word schedule keeps the stack small. The
  * schedule is recoverable input, so TC_ZEROIZE wipes it after every block. */
@@ -249,14 +252,12 @@ static void sha256_compress(void* chaining, const uint8_t* block)
   h = state[7];
 
   /* Rounds 0..15 */
-  for (t = 0; t < 16; ++t)
-  {
+  for (t = 0; t < 16; ++t) {
     TC_SHA256_STEP(a, b, c, d, e, f, g, h, HASH_K256_READ(t), W[t]);
   }
 
   /* Rounds 16..63 */
-  for (t = 16; t < 64; ++t)
-  {
+  for (t = 16; t < 64; ++t) {
     uint32_t w = TC_SHA256_SSIG1(W[(t - 2U) & 15U]) + W[(t - 7U) & 15U] +
                  TC_SHA256_SSIG0(W[(t - 15U) & 15U]) + W[t & 15U];
     W[t & 15U] = w;
@@ -314,10 +315,11 @@ static tc_hmac_view hmac_sha256_view(void* context)
 #endif
 
 const tc_hash_algorithm_info tc_sha256_info TC_HASH_INFO_STORAGE = {
-  TC_SHA256_BLOCKLEN, SHA_LENGTH_BYTES, TC_SHA256_DIGESTLEN, TC_HASH_LENGTH_BIG_ENDIAN,
-  SHA_MAX_MESSAGE_BYTES, sha256_state_init, sha256_compress, sha256_digest, sha256_view,
-  TC_HASH_HMAC_VIEW(hmac_sha256_view)
-};
+    TC_SHA256_BLOCKLEN,    SHA_LENGTH_BYTES,
+    TC_SHA256_DIGESTLEN,   TC_HASH_LENGTH_BIG_ENDIAN,
+    SHA_MAX_MESSAGE_BYTES, sha256_state_init,
+    sha256_compress,       sha256_digest,
+    sha256_view,           TC_HASH_HMAC_VIEW(hmac_sha256_view)};
 
 #endif /* TC_ENABLE_SHA256 */
 
@@ -359,10 +361,11 @@ static tc_hmac_view hmac_sha224_view(void* context)
 #endif
 
 const tc_hash_algorithm_info tc_sha224_info TC_HASH_INFO_STORAGE = {
-  TC_SHA224_BLOCKLEN, SHA_LENGTH_BYTES, TC_SHA224_DIGESTLEN, TC_HASH_LENGTH_BIG_ENDIAN,
-  SHA_MAX_MESSAGE_BYTES, sha224_state_init, sha256_compress, sha224_digest, sha224_view,
-  TC_HASH_HMAC_VIEW(hmac_sha224_view)
-};
+    TC_SHA224_BLOCKLEN,    SHA_LENGTH_BYTES,
+    TC_SHA224_DIGESTLEN,   TC_HASH_LENGTH_BIG_ENDIAN,
+    SHA_MAX_MESSAGE_BYTES, sha224_state_init,
+    sha256_compress,       sha224_digest,
+    sha224_view,           TC_HASH_HMAC_VIEW(hmac_sha224_view)};
 
 #endif /* TC_ENABLE_SHA224 */
 
@@ -372,13 +375,21 @@ const tc_hash_algorithm_info tc_sha224_info TC_HASH_INFO_STORAGE = {
 
 #if TC_ENABLE_SHA1
 TC_status TC_SHA1_init(struct TC_SHA1_ctx* ctx)
-{ return tc_hash_core_init(&tc_sha1_info, ctx); }
+{
+  return tc_hash_core_init(&tc_sha1_info, ctx);
+}
 TC_status TC_SHA1_update(struct TC_SHA1_ctx* ctx, const uint8_t* data, size_t len)
-{ return tc_hash_core_update(&tc_sha1_info, ctx, data, len); }
+{
+  return tc_hash_core_update(&tc_sha1_info, ctx, data, len);
+}
 TC_status TC_SHA1_final(struct TC_SHA1_ctx* ctx, uint8_t* digest)
-{ return tc_hash_core_final(&tc_sha1_info, ctx, digest); }
+{
+  return tc_hash_core_final(&tc_sha1_info, ctx, digest);
+}
 void TC_SHA1_ctx_clear(struct TC_SHA1_ctx* ctx)
-{ tc_hash_core_clear(&tc_sha1_info, ctx); }
+{
+  tc_hash_core_clear(&tc_sha1_info, ctx);
+}
 TC_status TC_SHA1_digest(const uint8_t* data, size_t len, uint8_t* digest)
 {
   struct TC_SHA1_ctx ctx;
@@ -388,13 +399,21 @@ TC_status TC_SHA1_digest(const uint8_t* data, size_t len, uint8_t* digest)
 
 #if TC_ENABLE_SHA224
 TC_status TC_SHA224_init(struct TC_SHA224_ctx* ctx)
-{ return tc_hash_core_init(&tc_sha224_info, ctx); }
+{
+  return tc_hash_core_init(&tc_sha224_info, ctx);
+}
 TC_status TC_SHA224_update(struct TC_SHA224_ctx* ctx, const uint8_t* data, size_t len)
-{ return tc_hash_core_update(&tc_sha224_info, ctx, data, len); }
+{
+  return tc_hash_core_update(&tc_sha224_info, ctx, data, len);
+}
 TC_status TC_SHA224_final(struct TC_SHA224_ctx* ctx, uint8_t* digest)
-{ return tc_hash_core_final(&tc_sha224_info, ctx, digest); }
+{
+  return tc_hash_core_final(&tc_sha224_info, ctx, digest);
+}
 void TC_SHA224_ctx_clear(struct TC_SHA224_ctx* ctx)
-{ tc_hash_core_clear(&tc_sha224_info, ctx); }
+{
+  tc_hash_core_clear(&tc_sha224_info, ctx);
+}
 TC_status TC_SHA224_digest(const uint8_t* data, size_t len, uint8_t* digest)
 {
   struct TC_SHA224_ctx ctx;
@@ -404,13 +423,21 @@ TC_status TC_SHA224_digest(const uint8_t* data, size_t len, uint8_t* digest)
 
 #if TC_ENABLE_SHA256
 TC_status TC_SHA256_init(struct TC_SHA256_ctx* ctx)
-{ return tc_hash_core_init(&tc_sha256_info, ctx); }
+{
+  return tc_hash_core_init(&tc_sha256_info, ctx);
+}
 TC_status TC_SHA256_update(struct TC_SHA256_ctx* ctx, const uint8_t* data, size_t len)
-{ return tc_hash_core_update(&tc_sha256_info, ctx, data, len); }
+{
+  return tc_hash_core_update(&tc_sha256_info, ctx, data, len);
+}
 TC_status TC_SHA256_final(struct TC_SHA256_ctx* ctx, uint8_t* digest)
-{ return tc_hash_core_final(&tc_sha256_info, ctx, digest); }
+{
+  return tc_hash_core_final(&tc_sha256_info, ctx, digest);
+}
 void TC_SHA256_ctx_clear(struct TC_SHA256_ctx* ctx)
-{ tc_hash_core_clear(&tc_sha256_info, ctx); }
+{
+  tc_hash_core_clear(&tc_sha256_info, ctx);
+}
 TC_status TC_SHA256_digest(const uint8_t* data, size_t len, uint8_t* digest)
 {
   struct TC_SHA256_ctx ctx;
@@ -426,21 +453,29 @@ TC_status TC_SHA256_digest(const uint8_t* data, size_t len, uint8_t* digest)
 
 #if TC_ENABLE_SHA1
 TC_status TC_HMAC_SHA1_init(struct TC_HMAC_SHA1_ctx* ctx, const uint8_t* key, size_t keylen)
-{ return tc_hmac_core_init(&tc_sha1_info, ctx, key, keylen); }
+{
+  return tc_hmac_core_init(&tc_sha1_info, ctx, key, keylen);
+}
 TC_status TC_HMAC_SHA1_update(struct TC_HMAC_SHA1_ctx* ctx, const uint8_t* data, size_t len)
-{ return tc_hmac_core_update(&tc_sha1_info, ctx, data, len); }
+{
+  return tc_hmac_core_update(&tc_sha1_info, ctx, data, len);
+}
 TC_status TC_HMAC_SHA1_final(struct TC_HMAC_SHA1_ctx* ctx, uint8_t* tag)
-{ return tc_hmac_core_final(&tc_sha1_info, ctx, tag); }
+{
+  return tc_hmac_core_final(&tc_sha1_info, ctx, tag);
+}
 void TC_HMAC_SHA1_ctx_clear(struct TC_HMAC_SHA1_ctx* ctx)
-{ tc_hmac_core_clear(&tc_sha1_info, ctx); }
-TC_status TC_HMAC_SHA1_digest(const uint8_t* key, size_t keylen,
-    const uint8_t* msg, size_t msg_len, uint8_t* tag, size_t tag_len)
+{
+  tc_hmac_core_clear(&tc_sha1_info, ctx);
+}
+TC_status TC_HMAC_SHA1_digest(const uint8_t* key, size_t keylen, const uint8_t* msg, size_t msg_len,
+                              uint8_t* tag, size_t tag_len)
 {
   struct TC_HMAC_SHA1_ctx ctx;
   return tc_hmac_core_digest(&tc_sha1_info, &ctx, key, keylen, msg, msg_len, tag, tag_len);
 }
-TC_status TC_HMAC_SHA1_verify(const uint8_t* key, size_t keylen,
-    const uint8_t* msg, size_t msg_len, const uint8_t* tag, size_t tag_len)
+TC_status TC_HMAC_SHA1_verify(const uint8_t* key, size_t keylen, const uint8_t* msg, size_t msg_len,
+                              const uint8_t* tag, size_t tag_len)
 {
   struct TC_HMAC_SHA1_ctx ctx;
   return tc_hmac_core_verify(&tc_sha1_info, &ctx, key, keylen, msg, msg_len, tag, tag_len);
@@ -449,21 +484,29 @@ TC_status TC_HMAC_SHA1_verify(const uint8_t* key, size_t keylen,
 
 #if TC_ENABLE_SHA224
 TC_status TC_HMAC_SHA224_init(struct TC_HMAC_SHA224_ctx* ctx, const uint8_t* key, size_t keylen)
-{ return tc_hmac_core_init(&tc_sha224_info, ctx, key, keylen); }
+{
+  return tc_hmac_core_init(&tc_sha224_info, ctx, key, keylen);
+}
 TC_status TC_HMAC_SHA224_update(struct TC_HMAC_SHA224_ctx* ctx, const uint8_t* data, size_t len)
-{ return tc_hmac_core_update(&tc_sha224_info, ctx, data, len); }
+{
+  return tc_hmac_core_update(&tc_sha224_info, ctx, data, len);
+}
 TC_status TC_HMAC_SHA224_final(struct TC_HMAC_SHA224_ctx* ctx, uint8_t* tag)
-{ return tc_hmac_core_final(&tc_sha224_info, ctx, tag); }
+{
+  return tc_hmac_core_final(&tc_sha224_info, ctx, tag);
+}
 void TC_HMAC_SHA224_ctx_clear(struct TC_HMAC_SHA224_ctx* ctx)
-{ tc_hmac_core_clear(&tc_sha224_info, ctx); }
-TC_status TC_HMAC_SHA224_digest(const uint8_t* key, size_t keylen,
-    const uint8_t* msg, size_t msg_len, uint8_t* tag, size_t tag_len)
+{
+  tc_hmac_core_clear(&tc_sha224_info, ctx);
+}
+TC_status TC_HMAC_SHA224_digest(const uint8_t* key, size_t keylen, const uint8_t* msg,
+                                size_t msg_len, uint8_t* tag, size_t tag_len)
 {
   struct TC_HMAC_SHA224_ctx ctx;
   return tc_hmac_core_digest(&tc_sha224_info, &ctx, key, keylen, msg, msg_len, tag, tag_len);
 }
-TC_status TC_HMAC_SHA224_verify(const uint8_t* key, size_t keylen,
-    const uint8_t* msg, size_t msg_len, const uint8_t* tag, size_t tag_len)
+TC_status TC_HMAC_SHA224_verify(const uint8_t* key, size_t keylen, const uint8_t* msg,
+                                size_t msg_len, const uint8_t* tag, size_t tag_len)
 {
   struct TC_HMAC_SHA224_ctx ctx;
   return tc_hmac_core_verify(&tc_sha224_info, &ctx, key, keylen, msg, msg_len, tag, tag_len);
@@ -472,21 +515,29 @@ TC_status TC_HMAC_SHA224_verify(const uint8_t* key, size_t keylen,
 
 #if TC_ENABLE_SHA256
 TC_status TC_HMAC_SHA256_init(struct TC_HMAC_SHA256_ctx* ctx, const uint8_t* key, size_t keylen)
-{ return tc_hmac_core_init(&tc_sha256_info, ctx, key, keylen); }
+{
+  return tc_hmac_core_init(&tc_sha256_info, ctx, key, keylen);
+}
 TC_status TC_HMAC_SHA256_update(struct TC_HMAC_SHA256_ctx* ctx, const uint8_t* data, size_t len)
-{ return tc_hmac_core_update(&tc_sha256_info, ctx, data, len); }
+{
+  return tc_hmac_core_update(&tc_sha256_info, ctx, data, len);
+}
 TC_status TC_HMAC_SHA256_final(struct TC_HMAC_SHA256_ctx* ctx, uint8_t* tag)
-{ return tc_hmac_core_final(&tc_sha256_info, ctx, tag); }
+{
+  return tc_hmac_core_final(&tc_sha256_info, ctx, tag);
+}
 void TC_HMAC_SHA256_ctx_clear(struct TC_HMAC_SHA256_ctx* ctx)
-{ tc_hmac_core_clear(&tc_sha256_info, ctx); }
-TC_status TC_HMAC_SHA256_digest(const uint8_t* key, size_t keylen,
-    const uint8_t* msg, size_t msg_len, uint8_t* tag, size_t tag_len)
+{
+  tc_hmac_core_clear(&tc_sha256_info, ctx);
+}
+TC_status TC_HMAC_SHA256_digest(const uint8_t* key, size_t keylen, const uint8_t* msg,
+                                size_t msg_len, uint8_t* tag, size_t tag_len)
 {
   struct TC_HMAC_SHA256_ctx ctx;
   return tc_hmac_core_digest(&tc_sha256_info, &ctx, key, keylen, msg, msg_len, tag, tag_len);
 }
-TC_status TC_HMAC_SHA256_verify(const uint8_t* key, size_t keylen,
-    const uint8_t* msg, size_t msg_len, const uint8_t* tag, size_t tag_len)
+TC_status TC_HMAC_SHA256_verify(const uint8_t* key, size_t keylen, const uint8_t* msg,
+                                size_t msg_len, const uint8_t* tag, size_t tag_len)
 {
   struct TC_HMAC_SHA256_ctx ctx;
   return tc_hmac_core_verify(&tc_sha256_info, &ctx, key, keylen, msg, msg_len, tag, tag_len);

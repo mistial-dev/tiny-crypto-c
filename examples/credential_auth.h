@@ -10,8 +10,12 @@ extern "C" {
 #endif
 
 typedef enum {
-  EXAMPLE_CARD_KEY_VERIFIED, EXAMPLE_CARD_KEY_INVALID, EXAMPLE_CARD_KEY_UNSUPPORTED,
-  EXAMPLE_CARD_KEY_LIMIT, EXAMPLE_CARD_KEY_TRANSPORT, EXAMPLE_CARD_KEY_ERROR
+  EXAMPLE_CARD_KEY_VERIFIED,
+  EXAMPLE_CARD_KEY_INVALID,
+  EXAMPLE_CARD_KEY_UNSUPPORTED,
+  EXAMPLE_CARD_KEY_LIMIT,
+  EXAMPLE_CARD_KEY_TRANSPORT,
+  EXAMPLE_CARD_KEY_ERROR
 } ExampleCardKeyResult;
 
 enum { EXAMPLE_CARD_KEY_RESPONSE_BYTES = 514 };
@@ -25,9 +29,11 @@ typedef struct {
  * Keep the transaction held and key bytes stable during the call.
  * The function wipes workspace before returning. */
 ExampleCardKeyResult example_card_check_key(ExampleCardIO* io, ExampleCardKeyReference reference,
-    const TC_X509_public_key* key, const ExampleCardKeyPolicy* policy,
-    const TC_X509_signature_provider* provider, TC_random_fn random, void* random_context,
-    ExampleCardKeyWorkspace* workspace, size_t* work);
+                                            const TC_X509_public_key* key,
+                                            const ExampleCardKeyPolicy* policy,
+                                            const TC_X509_signature_provider* provider,
+                                            TC_random_fn random, void* random_context,
+                                            ExampleCardKeyWorkspace* workspace, size_t* work);
 #ifdef __cplusplus
 }
 #endif

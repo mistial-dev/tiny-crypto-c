@@ -9,8 +9,8 @@
 #include "hash_info_internal.h"
 #include "hash_core_internal.h"
 
-#define TC_HASH_DISPATCH_ENABLED (TC_ENABLE_SHA1 || TC_ENABLE_SHA224 || \
-    TC_ENABLE_SHA256 || TC_ENABLE_SHA384 || TC_ENABLE_SHA512)
+#define TC_HASH_DISPATCH_ENABLED                                                                   \
+  (TC_ENABLE_SHA1 || TC_ENABLE_SHA224 || TC_ENABLE_SHA256 || TC_ENABLE_SHA384 || TC_ENABLE_SHA512)
 
 #if TC_HASH_DISPATCH_ENABLED
 #include <tiny_crypto/hash.h>
@@ -28,21 +28,22 @@ static inline TC_status tc_hash_init(TC_hash_algorithm algorithm, TC_hash_contex
   return info != NULL && context != NULL ? tc_hash_core_init(info, context) : TC_ERROR;
 }
 
-static inline TC_status tc_hash_update(TC_hash_algorithm algorithm,
-    TC_hash_context* context, TC_bytes bytes)
+static inline TC_status tc_hash_update(TC_hash_algorithm algorithm, TC_hash_context* context,
+                                       TC_bytes bytes)
 {
   const tc_hash_algorithm_info* info = tc_hash_core_lookup(algorithm);
-  return info != NULL && context != NULL ?
-         tc_hash_core_update(info, context, bytes.data, bytes.length) : TC_ERROR;
+  return info != NULL && context != NULL
+             ? tc_hash_core_update(info, context, bytes.data, bytes.length)
+             : TC_ERROR;
 }
 
 /* The whole context is wiped on success and failure. */
-static inline TC_status tc_hash_final(TC_hash_algorithm algorithm,
-    TC_hash_context* context, uint8_t* digest)
+static inline TC_status tc_hash_final(TC_hash_algorithm algorithm, TC_hash_context* context,
+                                      uint8_t* digest)
 {
   const tc_hash_algorithm_info* info = tc_hash_core_lookup(algorithm);
-  TC_status status = info != NULL && context != NULL ?
-                     tc_hash_core_final(info, context, digest) : TC_ERROR;
+  TC_status status =
+      info != NULL && context != NULL ? tc_hash_core_final(info, context, digest) : TC_ERROR;
   if (context != NULL)
     TC_secure_zero(context, sizeof *context);
   return status;
@@ -51,16 +52,21 @@ static inline TC_status tc_hash_final(TC_hash_algorithm algorithm,
 /* Hash borrowed parts in order. Caller bounds count/lengths and validates ranges.
  * Context, digest and input storage are disjoint. Digest has the selected
  * hash's full output size. No output is written before all updates succeed. */
-static inline TC_status tc_hash_digest_parts(TC_hash_algorithm algorithm,
-    const TC_bytes* parts, size_t count, uint8_t* digest, TC_hash_context* context)
+static inline TC_status tc_hash_digest_parts(TC_hash_algorithm algorithm, const TC_bytes* parts,
+                                             size_t count, uint8_t* digest,
+                                             TC_hash_context* context)
 {
   TC_status status;
-  if (!context || !digest || (count && !parts) || !tc_hash_available(algorithm)) return TC_ERROR;
-  for (size_t i = 0; i < count; ++i) if (parts[i].length && !parts[i].data) return TC_ERROR;
+  if (!context || !digest || (count && !parts) || !tc_hash_available(algorithm))
+    return TC_ERROR;
+  for (size_t i = 0; i < count; ++i)
+    if (parts[i].length && !parts[i].data)
+      return TC_ERROR;
   status = tc_hash_init(algorithm, context);
   for (size_t i = 0; status == TC_OK && i < count; ++i)
     status = tc_hash_update(algorithm, context, parts[i]);
-  if (status == TC_OK) return tc_hash_final(algorithm, context, digest);
+  if (status == TC_OK)
+    return tc_hash_final(algorithm, context, digest);
   TC_secure_zero(context, sizeof *context);
   return status;
 }
@@ -69,7 +75,9 @@ static inline TC_status tc_hash_digest_parts(TC_hash_algorithm algorithm,
 
 /* Builds without SHA keep the dispatch interface so shared parsers compile.
  * Every operation reports TC_ERROR and the context is a placeholder. */
-typedef union { uint8_t unused; } TC_hash_context;
+typedef union {
+  uint8_t unused;
+} TC_hash_context;
 
 static inline int tc_hash_available(TC_hash_algorithm algorithm)
 {
@@ -84,8 +92,8 @@ static inline TC_status tc_hash_init(TC_hash_algorithm algorithm, TC_hash_contex
   return TC_ERROR;
 }
 
-static inline TC_status tc_hash_update(TC_hash_algorithm algorithm,
-    TC_hash_context* context, TC_bytes bytes)
+static inline TC_status tc_hash_update(TC_hash_algorithm algorithm, TC_hash_context* context,
+                                       TC_bytes bytes)
 {
   (void)algorithm;
   (void)context;
@@ -93,8 +101,8 @@ static inline TC_status tc_hash_update(TC_hash_algorithm algorithm,
   return TC_ERROR;
 }
 
-static inline TC_status tc_hash_final(TC_hash_algorithm algorithm,
-    TC_hash_context* context, uint8_t* digest)
+static inline TC_status tc_hash_final(TC_hash_algorithm algorithm, TC_hash_context* context,
+                                      uint8_t* digest)
 {
   (void)algorithm;
   (void)context;
@@ -102,8 +110,9 @@ static inline TC_status tc_hash_final(TC_hash_algorithm algorithm,
   return TC_ERROR;
 }
 
-static inline TC_status tc_hash_digest_parts(TC_hash_algorithm algorithm,
-    const TC_bytes* parts, size_t count, uint8_t* digest, TC_hash_context* context)
+static inline TC_status tc_hash_digest_parts(TC_hash_algorithm algorithm, const TC_bytes* parts,
+                                             size_t count, uint8_t* digest,
+                                             TC_hash_context* context)
 {
   (void)algorithm;
   (void)parts;

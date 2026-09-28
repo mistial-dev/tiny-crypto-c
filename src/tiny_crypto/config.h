@@ -106,9 +106,9 @@
 #ifndef TC_ENABLE_TWIC_TPK
 #define TC_ENABLE_TWIC_TPK TC_PROFILE_VALUE(0, 0, 0, 1)
 #endif
-#if (TC_ENABLE_AAMVA != 0 && TC_ENABLE_AAMVA != 1) || \
-    (TC_ENABLE_FASCN != 0 && TC_ENABLE_FASCN != 1) || \
-    (TC_ENABLE_TWIC_UUID != 0 && TC_ENABLE_TWIC_UUID != 1) || \
+#if (TC_ENABLE_AAMVA != 0 && TC_ENABLE_AAMVA != 1) ||                                              \
+    (TC_ENABLE_FASCN != 0 && TC_ENABLE_FASCN != 1) ||                                              \
+    (TC_ENABLE_TWIC_UUID != 0 && TC_ENABLE_TWIC_UUID != 1) ||                                      \
     (TC_ENABLE_TWIC_TPK != 0 && TC_ENABLE_TWIC_TPK != 1)
 #error "Standalone credential format switches must be 0 or 1"
 #endif
@@ -140,9 +140,8 @@
 #ifndef TC_TLV_ENABLE_STREAM
 #define TC_TLV_ENABLE_STREAM TC_PROFILE_VALUE(0, 0, 0, 1)
 #endif
-#if (TC_ENABLE_TLV != 0 && TC_ENABLE_TLV != 1) || \
-    (TC_ENABLE_DER != 0 && TC_ENABLE_DER != 1) || \
-    (TC_TLV_ENABLE_BER != 0 && TC_TLV_ENABLE_BER != 1) || \
+#if (TC_ENABLE_TLV != 0 && TC_ENABLE_TLV != 1) || (TC_ENABLE_DER != 0 && TC_ENABLE_DER != 1) ||    \
+    (TC_TLV_ENABLE_BER != 0 && TC_TLV_ENABLE_BER != 1) ||                                          \
     (TC_TLV_ENABLE_STREAM != 0 && TC_TLV_ENABLE_STREAM != 1)
 #error "TLV feature switches must be 0 or 1"
 #endif
@@ -171,21 +170,22 @@
 #ifndef TC_TAF_ENABLE_TRUST_ANCHOR_INFO
 #define TC_TAF_ENABLE_TRUST_ANCHOR_INFO TC_ENABLE_TRUST_ANCHOR_FORMAT
 #endif
-#if (TC_ENABLE_TRUST_ANCHOR_FORMAT != 0 && TC_ENABLE_TRUST_ANCHOR_FORMAT != 1) || \
-    (TC_TAF_ENABLE_CERTIFICATE != 0 && TC_TAF_ENABLE_CERTIFICATE != 1) || \
-    (TC_TAF_ENABLE_TBS_CERTIFICATE != 0 && TC_TAF_ENABLE_TBS_CERTIFICATE != 1) || \
+#if (TC_ENABLE_TRUST_ANCHOR_FORMAT != 0 && TC_ENABLE_TRUST_ANCHOR_FORMAT != 1) ||                  \
+    (TC_TAF_ENABLE_CERTIFICATE != 0 && TC_TAF_ENABLE_CERTIFICATE != 1) ||                          \
+    (TC_TAF_ENABLE_TBS_CERTIFICATE != 0 && TC_TAF_ENABLE_TBS_CERTIFICATE != 1) ||                  \
     (TC_TAF_ENABLE_TRUST_ANCHOR_INFO != 0 && TC_TAF_ENABLE_TRUST_ANCHOR_INFO != 1)
 #error "Trust-anchor format switches must be 0 or 1"
 #endif
 #if TC_ENABLE_TRUST_ANCHOR_FORMAT && !TC_ENABLE_X509_PATH
 #error "Trust-anchor format requires X.509 path support"
 #endif
-#if TC_ENABLE_TRUST_ANCHOR_FORMAT && !TC_TAF_ENABLE_CERTIFICATE && \
+#if TC_ENABLE_TRUST_ANCHOR_FORMAT && !TC_TAF_ENABLE_CERTIFICATE &&                                 \
     !TC_TAF_ENABLE_TBS_CERTIFICATE && !TC_TAF_ENABLE_TRUST_ANCHOR_INFO
 #error "Trust-anchor format requires at least one choice"
 #endif
-#if !TC_ENABLE_TRUST_ANCHOR_FORMAT && (TC_TAF_ENABLE_CERTIFICATE || \
-    TC_TAF_ENABLE_TBS_CERTIFICATE || TC_TAF_ENABLE_TRUST_ANCHOR_INFO)
+#if !TC_ENABLE_TRUST_ANCHOR_FORMAT &&                                                              \
+    (TC_TAF_ENABLE_CERTIFICATE || TC_TAF_ENABLE_TBS_CERTIFICATE ||                                 \
+     TC_TAF_ENABLE_TRUST_ANCHOR_INFO)
 #error "Trust-anchor choices require trust-anchor format"
 #endif
 #ifndef TC_ENABLE_X509_REVOCATION
@@ -203,12 +203,12 @@
 #ifndef TC_ENABLE_CREDENTIAL
 #define TC_ENABLE_CREDENTIAL TC_PROFILE_VALUE(0, 0, 0, 1)
 #endif
-#if (TC_ENABLE_PIV_OIDS != 0 && TC_ENABLE_PIV_OIDS != 1) || \
-    (TC_ENABLE_X509_PATH != 0 && TC_ENABLE_X509_PATH != 1) || \
-    (TC_ENABLE_X509_REVOCATION != 0 && TC_ENABLE_X509_REVOCATION != 1) || \
-    (TC_ENABLE_CMS != 0 && TC_ENABLE_CMS != 1) || \
-    (TC_ENABLE_CMS_VALIDATION != 0 && TC_ENABLE_CMS_VALIDATION != 1) || \
-    (TC_ENABLE_PIV_OBJECTS != 0 && TC_ENABLE_PIV_OBJECTS != 1) || \
+#if (TC_ENABLE_PIV_OIDS != 0 && TC_ENABLE_PIV_OIDS != 1) ||                                        \
+    (TC_ENABLE_X509_PATH != 0 && TC_ENABLE_X509_PATH != 1) ||                                      \
+    (TC_ENABLE_X509_REVOCATION != 0 && TC_ENABLE_X509_REVOCATION != 1) ||                          \
+    (TC_ENABLE_CMS != 0 && TC_ENABLE_CMS != 1) ||                                                  \
+    (TC_ENABLE_CMS_VALIDATION != 0 && TC_ENABLE_CMS_VALIDATION != 1) ||                            \
+    (TC_ENABLE_PIV_OBJECTS != 0 && TC_ENABLE_PIV_OBJECTS != 1) ||                                  \
     (TC_ENABLE_CREDENTIAL != 0 && TC_ENABLE_CREDENTIAL != 1)
 #error "Certificate layer switches must be 0 or 1"
 #endif
@@ -224,11 +224,10 @@
 #if TC_ENABLE_CMS_VALIDATION && (!TC_ENABLE_CMS || !TC_ENABLE_X509_REVOCATION)
 #error "CMS validation requires CMS and X.509 revocation support"
 #endif
-#if TC_ENABLE_PIV_OBJECTS && \
-    (!TC_ENABLE_CMS || !TC_ENABLE_TWIC_UUID || !TC_ENABLE_PIV_OIDS)
+#if TC_ENABLE_PIV_OBJECTS && (!TC_ENABLE_CMS || !TC_ENABLE_TWIC_UUID || !TC_ENABLE_PIV_OIDS)
 #error "PIV object readers require CMS, TWIC UUID, and PIV/TWIC identifiers"
 #endif
-#if TC_ENABLE_CREDENTIAL && \
+#if TC_ENABLE_CREDENTIAL &&                                                                        \
     (!TC_ENABLE_PIV_OBJECTS || !TC_ENABLE_PIV_CHUID || !TC_ENABLE_CMS_VALIDATION)
 #error "Credential composition requires PIV objects, CHUID, and CMS validation"
 #endif
@@ -261,11 +260,10 @@
 #ifndef TC_EC_SMALL
 #define TC_EC_SMALL TC_PROFILE_VALUE(0, 1, 0, 0)
 #endif
-#if (TC_ENABLE_EC != 0 && TC_ENABLE_EC != 1) || \
-    (TC_EC_ENABLE_P192 != 0 && TC_EC_ENABLE_P192 != 1) || \
-    (TC_EC_ENABLE_P256 != 0 && TC_EC_ENABLE_P256 != 1) || \
-    (TC_EC_ENABLE_P384 != 0 && TC_EC_ENABLE_P384 != 1) || \
-    (TC_EC_SMALL != 0 && TC_EC_SMALL != 1)
+#if (TC_ENABLE_EC != 0 && TC_ENABLE_EC != 1) ||                                                    \
+    (TC_EC_ENABLE_P192 != 0 && TC_EC_ENABLE_P192 != 1) ||                                          \
+    (TC_EC_ENABLE_P256 != 0 && TC_EC_ENABLE_P256 != 1) ||                                          \
+    (TC_EC_ENABLE_P384 != 0 && TC_EC_ENABLE_P384 != 1) || (TC_EC_SMALL != 0 && TC_EC_SMALL != 1)
 #error "EC switches must be 0 or 1"
 #endif
 #if TC_ENABLE_EC && !TC_EC_ENABLE_P192 && !TC_EC_ENABLE_P256 && !TC_EC_ENABLE_P384
@@ -296,9 +294,9 @@
 #ifndef TC_DRBG_ENABLE_CTR
 #define TC_DRBG_ENABLE_CTR TC_PROFILE_VALUE(0, 0, 0, 1)
 #endif
-#if (TC_ENABLE_DRBG != 0 && TC_ENABLE_DRBG != 1) || \
-    (TC_DRBG_ENABLE_HASH != 0 && TC_DRBG_ENABLE_HASH != 1) || \
-    (TC_DRBG_ENABLE_HMAC != 0 && TC_DRBG_ENABLE_HMAC != 1) || \
+#if (TC_ENABLE_DRBG != 0 && TC_ENABLE_DRBG != 1) ||                                                \
+    (TC_DRBG_ENABLE_HASH != 0 && TC_DRBG_ENABLE_HASH != 1) ||                                      \
+    (TC_DRBG_ENABLE_HMAC != 0 && TC_DRBG_ENABLE_HMAC != 1) ||                                      \
     (TC_DRBG_ENABLE_CTR != 0 && TC_DRBG_ENABLE_CTR != 1)
 #error "DRBG switches must be 0 or 1"
 #endif
@@ -395,8 +393,7 @@
 #if TC_ENABLE_TWIC_OBJECT_CRYPTO != 0 && TC_ENABLE_TWIC_OBJECT_CRYPTO != 1
 #error "TC_ENABLE_TWIC_OBJECT_CRYPTO must be 0 or 1"
 #endif
-#if TC_ENABLE_TWIC_OBJECT_CRYPTO && \
-    (!TC_ENABLE_AES || !TC_AES_ENABLE_ECB || TC_AES_KEY_BITS != 128)
+#if TC_ENABLE_TWIC_OBJECT_CRYPTO && (!TC_ENABLE_AES || !TC_AES_ENABLE_ECB || TC_AES_KEY_BITS != 128)
 #error "TWIC object encryption requires AES-128 ECB"
 #endif
 
@@ -445,14 +442,14 @@
 #ifndef TC_PIV_SM_ENABLE_CS7
 #define TC_PIV_SM_ENABLE_CS7 TC_PROFILE_VALUE(1, 1, 1, 1)
 #endif
-#if (TC_ENABLE_PIV_SM != 0 && TC_ENABLE_PIV_SM != 1) || \
-    (TC_PIV_SM_ENABLE_CS2 != 0 && TC_PIV_SM_ENABLE_CS2 != 1) || \
+#if (TC_ENABLE_PIV_SM != 0 && TC_ENABLE_PIV_SM != 1) ||                                            \
+    (TC_PIV_SM_ENABLE_CS2 != 0 && TC_PIV_SM_ENABLE_CS2 != 1) ||                                    \
     (TC_PIV_SM_ENABLE_CS7 != 0 && TC_PIV_SM_ENABLE_CS7 != 1)
 #error "PIV SM switches must be 0 or 1"
 #endif
 #if TC_ENABLE_PIV_SM
-#if !TC_ENABLE_AES || !TC_AES_ENABLE_DYNAMIC || !TC_ENABLE_SHA256 || \
-    !TC_ENABLE_SSKDF || !TC_ENABLE_EC
+#if !TC_ENABLE_AES || !TC_AES_ENABLE_DYNAMIC || !TC_ENABLE_SHA256 || !TC_ENABLE_SSKDF ||           \
+    !TC_ENABLE_EC
 #error "PIV SM requires dynamic AES, SHA-256, single-step KDF, and EC"
 #endif
 #if !TC_PIV_SM_ENABLE_CS2 && !TC_PIV_SM_ENABLE_CS7
@@ -471,8 +468,8 @@
 #if !TC_DRBG_ENABLE_HASH && !TC_DRBG_ENABLE_HMAC && !TC_DRBG_ENABLE_CTR
 #error "DRBG requires at least one mechanism"
 #endif
-#if TC_DRBG_ENABLE_HASH && !TC_ENABLE_SHA1 && !TC_ENABLE_SHA224 && \
-    !TC_ENABLE_SHA256 && !TC_ENABLE_SHA384 && !TC_ENABLE_SHA512
+#if TC_DRBG_ENABLE_HASH && !TC_ENABLE_SHA1 && !TC_ENABLE_SHA224 && !TC_ENABLE_SHA256 &&            \
+    !TC_ENABLE_SHA384 && !TC_ENABLE_SHA512
 #error "Hash_DRBG requires a SHA algorithm"
 #endif
 #if TC_DRBG_ENABLE_HMAC && !TC_ENABLE_HMAC

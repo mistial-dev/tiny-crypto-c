@@ -16,12 +16,13 @@ TC_status TC_DRBG_random(void* user, uint8_t* output, size_t length)
   /* A zero-length request still checks that the DRBG is instantiated. */
   do {
 #if SIZE_MAX > TC_DRBG_MAX_REQUEST_BYTES
-    const size_t chunk = length - offset < TC_DRBG_MAX_REQUEST_BYTES ?
-                         length - offset : TC_DRBG_MAX_REQUEST_BYTES;
+    const size_t chunk =
+        length - offset < TC_DRBG_MAX_REQUEST_BYTES ? length - offset : TC_DRBG_MAX_REQUEST_BYTES;
 #else
     const size_t chunk = length - offset; /* size_t cannot exceed a request */
 #endif
-    if (TC_DRBG_generate(drbg, output == NULL ? NULL : output + offset, chunk, 0, empty) != TC_DRBG_OK) {
+    if (TC_DRBG_generate(drbg, output == NULL ? NULL : output + offset, chunk, 0, empty) !=
+        TC_DRBG_OK) {
       if (output != NULL)
         TC_secure_zero(output, length);
       return TC_ERROR;

@@ -43,8 +43,8 @@ static int measure(TC_EC_curve selected, size_t bytes)
   memset(scalar, 0x42, width);
   if (TC_EC_public_key(curve, scalar, width, peer, 2 * width + 1, &workspace) != TC_OK)
     return 1;
-  printf("EC curve=P-%lu small=%d workspace=%lu bytes\n",
-         (unsigned long)(8 * width), TC_EC_SMALL, (unsigned long)sizeof workspace);
+  printf("EC curve=P-%lu small=%d workspace=%lu bytes\n", (unsigned long)(8 * width), TC_EC_SMALL,
+         (unsigned long)sizeof workspace);
   return tc_benchmark_run("EC public key", width, public_key) ||
          tc_benchmark_run("EC point validation", 2 * width + 1, validate) ||
          tc_benchmark_run("ECDH shared secret", width, shared_secret);
@@ -56,10 +56,12 @@ int main(void)
   tc_benchmark_profile();
 #if TC_ENABLE_EC
 #if TC_EC_ENABLE_P256
-  if (measure(TC_EC_P256, 32)) return 1;
+  if (measure(TC_EC_P256, 32))
+    return 1;
 #endif
 #if TC_EC_ENABLE_P384
-  if (measure(TC_EC_P384, 48)) return 1;
+  if (measure(TC_EC_P384, 48))
+    return 1;
 #endif
 #else
   puts("EC disabled");

@@ -12,6 +12,6 @@ typedef struct {
 
 /* Read one header within [offset,end). Validate the complete value's bounds
  * without loading its contents. Output changes only on success. */
-TC_TLV_result tc_source_der_read(tc_source_reader* reader, uint64_t offset,
-    uint64_t end, uint64_t max_value, tc_source_der_element* out);
+TC_TLV_result tc_source_der_read(tc_source_reader* reader, uint64_t offset, uint64_t end,
+                                 uint64_t max_value, tc_source_der_element* out);
 #endif

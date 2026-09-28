@@ -81,10 +81,10 @@ typedef struct {
  * Input, limits, frames, work and out must be disjoint. Bad storage preserves
  * caller state. Other errors may consume work/scratch; out changes only on OK.
  * Requires X509 and BER support. */
-TC_TLV_result TC_PIV_CMS_read(TC_bytes encoded, TC_PIV_CMS_kind kind,
-    TC_PIV_oid_profile oids, TC_CMS_attribute_encoding attributes,
-    const TC_TLV_limits* limits, TC_TLV_frame* frames, size_t frame_capacity,
-    size_t* work, TC_PIV_CMS_object* out);
+TC_TLV_result TC_PIV_CMS_read(TC_bytes encoded, TC_PIV_CMS_kind kind, TC_PIV_oid_profile oids,
+                              TC_CMS_attribute_encoding attributes, const TC_TLV_limits* limits,
+                              TC_TLV_frame* frames, size_t frame_capacity, size_t* work,
+                              TC_PIV_CMS_object* out);
 
 /* Match signed attributes against a credential's 25-byte FASC-N and
  * 16-byte CHUID GUID. object must come from TC_PIV_CMS_read with stable buffers.
@@ -97,9 +97,10 @@ TC_TLV_result TC_PIV_CMS_read(TC_bytes encoded, TC_PIV_CMS_kind kind,
  * signature and signer trust before accepting an identifier match.
  * Inputs may overlap each other; frames, work and matched must be disjoint from
  * each other and every input. Bad storage preserves work and output. */
-TC_TLV_result TC_PIV_CMS_identifiers_match(const TC_PIV_CMS_object* object,
-    TC_PIV_CMS_kind kind, TC_bytes fascn, TC_bytes uuid, const TC_TLV_limits* limits,
-    TC_TLV_frame* frames, size_t frame_capacity, size_t* work, int* matched);
+TC_TLV_result TC_PIV_CMS_identifiers_match(const TC_PIV_CMS_object* object, TC_PIV_CMS_kind kind,
+                                           TC_bytes fascn, TC_bytes uuid,
+                                           const TC_TLV_limits* limits, TC_TLV_frame* frames,
+                                           size_t frame_capacity, size_t* work, int* matched);
 
 #ifdef __cplusplus
 }

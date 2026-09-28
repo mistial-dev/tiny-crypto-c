@@ -23,134 +23,150 @@ typedef ::TC_RSA_keygen_state rsa_keygen_state;
 typedef ::TC_RSA_prepared_public_key rsa_prepared_public_key;
 
 /* The returned view borrows the caller's array. */
-template<size_t N>
-inline rsa_workspace rsa_workspace_for(TC_RSA_word (&words)[N]) noexcept {
-    rsa_workspace workspace = {words, N};
-    return workspace;
+template <size_t N> inline rsa_workspace rsa_workspace_for(TC_RSA_word (&words)[N]) noexcept
+{
+  rsa_workspace workspace = {words, N};
+  return workspace;
 }
 
 inline rsa_result rsa_keygen_init(rsa_keygen_state& state, size_t bits,
-    const rsa_keygen_output& output, rsa_keygen_limits limits,
-    const rsa_workspace& workspace) noexcept {
-    return ::TC_RSA_keygen_init(&state, bits, &output, limits, &workspace);
+                                  const rsa_keygen_output& output, rsa_keygen_limits limits,
+                                  const rsa_workspace& workspace) noexcept
+{
+  return ::TC_RSA_keygen_init(&state, bits, &output, limits, &workspace);
 }
 
-inline rsa_result rsa_keygen_step(rsa_keygen_state& state,
-    TC_random_source random, TC_RSA_cancel_fn cancel, void* cancel_context,
-    TC_work_budget& work) noexcept {
-    return ::TC_RSA_keygen_step(&state, random, cancel, cancel_context, &work);
+inline rsa_result rsa_keygen_step(rsa_keygen_state& state, TC_random_source random,
+                                  TC_RSA_cancel_fn cancel, void* cancel_context,
+                                  TC_work_budget& work) noexcept
+{
+  return ::TC_RSA_keygen_step(&state, random, cancel, cancel_context, &work);
 }
 
-inline void rsa_keygen_clear(rsa_keygen_state& state) noexcept {
-    ::TC_RSA_keygen_clear(&state);
+inline void rsa_keygen_clear(rsa_keygen_state& state) noexcept
+{
+  ::TC_RSA_keygen_clear(&state);
 }
 
-inline rsa_result rsa_verify_v15_digest(const rsa_public_key& key,
-    const rsa_v15_options& options, bytes digest, bytes signature,
-    const rsa_workspace& workspace, TC_work_budget& work) noexcept {
-    return ::TC_RSA_verify_v15_digest(&key, &options, digest, signature,
-        &workspace, &work);
+inline rsa_result rsa_verify_v15_digest(const rsa_public_key& key, const rsa_v15_options& options,
+                                        bytes digest, bytes signature,
+                                        const rsa_workspace& workspace,
+                                        TC_work_budget& work) noexcept
+{
+  return ::TC_RSA_verify_v15_digest(&key, &options, digest, signature, &workspace, &work);
 }
 
-inline rsa_result rsa_prepare_public_key(rsa_prepared_public_key& setup,
-    const rsa_public_key& key, const rsa_workspace& cache,
-    const rsa_workspace& scratch, TC_work_budget& work) noexcept {
-    return ::TC_RSA_prepare_public_key(&setup, &key, &cache, &scratch, &work);
+inline rsa_result rsa_prepare_public_key(rsa_prepared_public_key& setup, const rsa_public_key& key,
+                                         const rsa_workspace& cache, const rsa_workspace& scratch,
+                                         TC_work_budget& work) noexcept
+{
+  return ::TC_RSA_prepare_public_key(&setup, &key, &cache, &scratch, &work);
 }
 
-inline void rsa_prepared_public_key_clear(rsa_prepared_public_key& setup) noexcept {
-    ::TC_RSA_prepared_public_key_clear(&setup);
+inline void rsa_prepared_public_key_clear(rsa_prepared_public_key& setup) noexcept
+{
+  ::TC_RSA_prepared_public_key_clear(&setup);
 }
 
 inline rsa_result rsa_verify_v15_prepared(const rsa_prepared_public_key& setup,
-    const rsa_v15_options& options, bytes digest, bytes signature,
-    const rsa_workspace& workspace, TC_work_budget& work) noexcept {
-    return ::TC_RSA_verify_v15_prepared(&setup, &options, digest, signature,
-        &workspace, &work);
+                                          const rsa_v15_options& options, bytes digest,
+                                          bytes signature, const rsa_workspace& workspace,
+                                          TC_work_budget& work) noexcept
+{
+  return ::TC_RSA_verify_v15_prepared(&setup, &options, digest, signature, &workspace, &work);
 }
 
-inline rsa_result rsa_encode_v15_digest(const rsa_v15_options& options,
-    bytes digest, buffer encoded, TC_work_budget& work) noexcept {
-    return ::TC_RSA_encode_v15_digest(&options, digest, encoded, &work);
+inline rsa_result rsa_encode_v15_digest(const rsa_v15_options& options, bytes digest,
+                                        buffer encoded, TC_work_budget& work) noexcept
+{
+  return ::TC_RSA_encode_v15_digest(&options, digest, encoded, &work);
 }
 
-template<size_t N>
-inline rsa_result rsa_encode_v15_digest(const rsa_v15_options& options,
-    bytes digest, uint8_t (&encoded)[N], TC_work_budget& work) noexcept {
-    buffer output = {encoded, N};
-    return rsa_encode_v15_digest(options, digest, output, work);
+template <size_t N>
+inline rsa_result rsa_encode_v15_digest(const rsa_v15_options& options, bytes digest,
+                                        uint8_t (&encoded)[N], TC_work_budget& work) noexcept
+{
+  buffer output = {encoded, N};
+  return rsa_encode_v15_digest(options, digest, output, work);
 }
 
-inline rsa_result rsa_encode_pss_digest(const rsa_pss_options& options,
-    bytes digest, bytes salt, buffer encoded, TC_work_budget& work) noexcept {
-    return ::TC_RSA_encode_pss_digest(&options, digest, salt, encoded, &work);
+inline rsa_result rsa_encode_pss_digest(const rsa_pss_options& options, bytes digest, bytes salt,
+                                        buffer encoded, TC_work_budget& work) noexcept
+{
+  return ::TC_RSA_encode_pss_digest(&options, digest, salt, encoded, &work);
 }
 
-template<size_t N>
-inline rsa_result rsa_encode_pss_digest(const rsa_pss_options& options,
-    bytes digest, bytes salt, uint8_t (&encoded)[N], TC_work_budget& work) noexcept {
-    buffer output = {encoded, N};
-    return rsa_encode_pss_digest(options, digest, salt, output, work);
+template <size_t N>
+inline rsa_result rsa_encode_pss_digest(const rsa_pss_options& options, bytes digest, bytes salt,
+                                        uint8_t (&encoded)[N], TC_work_budget& work) noexcept
+{
+  buffer output = {encoded, N};
+  return rsa_encode_pss_digest(options, digest, salt, output, work);
 }
 
 inline rsa_result rsa_validate_private_key(const rsa_private_key& key,
-    const rsa_workspace& workspace, rsa_execution& execution) noexcept {
-    return ::TC_RSA_validate_private_key(&key, &workspace, &execution);
+                                           const rsa_workspace& workspace,
+                                           rsa_execution& execution) noexcept
+{
+  return ::TC_RSA_validate_private_key(&key, &workspace, &execution);
 }
 
-inline rsa_result rsa_verify_pss_digest(const rsa_public_key& key,
-    const rsa_pss_options& options, bytes digest, bytes signature,
-    const rsa_workspace& workspace, TC_work_budget& work) noexcept {
-    return ::TC_RSA_verify_pss_digest(&key, &options, digest, signature,
-        &workspace, &work);
+inline rsa_result rsa_verify_pss_digest(const rsa_public_key& key, const rsa_pss_options& options,
+                                        bytes digest, bytes signature,
+                                        const rsa_workspace& workspace,
+                                        TC_work_budget& work) noexcept
+{
+  return ::TC_RSA_verify_pss_digest(&key, &options, digest, signature, &workspace, &work);
 }
 
 inline rsa_result rsa_verify_pss_prepared(const rsa_prepared_public_key& setup,
-    const rsa_pss_options& options, bytes digest, bytes signature,
-    const rsa_workspace& workspace, TC_work_budget& work) noexcept {
-    return ::TC_RSA_verify_pss_prepared(&setup, &options, digest, signature,
-        &workspace, &work);
+                                          const rsa_pss_options& options, bytes digest,
+                                          bytes signature, const rsa_workspace& workspace,
+                                          TC_work_budget& work) noexcept
+{
+  return ::TC_RSA_verify_pss_prepared(&setup, &options, digest, signature, &workspace, &work);
 }
 
 inline rsa_result rsa_validate_crt(const rsa_private_key& key, const rsa_crt& crt,
-    const rsa_workspace& workspace, TC_work_budget& work) noexcept {
-    return ::TC_RSA_validate_crt(&key, &crt, &workspace, &work);
+                                   const rsa_workspace& workspace, TC_work_budget& work) noexcept
+{
+  return ::TC_RSA_validate_crt(&key, &crt, &workspace, &work);
 }
 
-inline rsa_result rsa_derive_crt(const rsa_private_key& key,
-    const rsa_crt_output& output, const rsa_workspace& workspace,
-    TC_work_budget& work) noexcept {
-    return ::TC_RSA_derive_crt(&key, &output, &workspace, &work);
+inline rsa_result rsa_derive_crt(const rsa_private_key& key, const rsa_crt_output& output,
+                                 const rsa_workspace& workspace, TC_work_budget& work) noexcept
+{
+  return ::TC_RSA_derive_crt(&key, &output, &workspace, &work);
 }
 
-inline rsa_result rsa_sign_v15_digest(const rsa_private_key& key,
-    const rsa_v15_options& options, bytes digest, const rsa_workspace& workspace,
-    buffer signature, rsa_execution& execution) noexcept {
-    return ::TC_RSA_sign_v15_digest(&key, &options, digest, &workspace,
-        signature, &execution);
+inline rsa_result rsa_sign_v15_digest(const rsa_private_key& key, const rsa_v15_options& options,
+                                      bytes digest, const rsa_workspace& workspace,
+                                      buffer signature, rsa_execution& execution) noexcept
+{
+  return ::TC_RSA_sign_v15_digest(&key, &options, digest, &workspace, signature, &execution);
 }
 
-inline rsa_result rsa_sign_pss_digest(const rsa_private_key& key,
-    const rsa_pss_options& options, bytes digest, const rsa_workspace& workspace,
-    buffer signature, rsa_execution& execution) noexcept {
-    return ::TC_RSA_sign_pss_digest(&key, &options, digest, &workspace,
-        signature, &execution);
+inline rsa_result rsa_sign_pss_digest(const rsa_private_key& key, const rsa_pss_options& options,
+                                      bytes digest, const rsa_workspace& workspace,
+                                      buffer signature, rsa_execution& execution) noexcept
+{
+  return ::TC_RSA_sign_pss_digest(&key, &options, digest, &workspace, signature, &execution);
 }
 
-inline rsa_result rsa_encrypt_oaep(const rsa_public_key& key,
-    const rsa_oaep_options& options, bytes plaintext,
-    const rsa_workspace& workspace, buffer ciphertext,
-    rsa_execution& execution) noexcept {
-    return ::TC_RSA_encrypt_oaep(&key, &options, plaintext, &workspace,
-        ciphertext, &execution);
+inline rsa_result rsa_encrypt_oaep(const rsa_public_key& key, const rsa_oaep_options& options,
+                                   bytes plaintext, const rsa_workspace& workspace,
+                                   buffer ciphertext, rsa_execution& execution) noexcept
+{
+  return ::TC_RSA_encrypt_oaep(&key, &options, plaintext, &workspace, ciphertext, &execution);
 }
 
-inline rsa_result rsa_decrypt_oaep(const rsa_private_key& key,
-    const rsa_oaep_options& options, bytes ciphertext,
-    const rsa_workspace& workspace, buffer plaintext, size_t& plaintext_length,
-    rsa_execution& execution) noexcept {
-    return ::TC_RSA_decrypt_oaep(&key, &options, ciphertext, &workspace,
-        plaintext, &plaintext_length, &execution);
+inline rsa_result rsa_decrypt_oaep(const rsa_private_key& key, const rsa_oaep_options& options,
+                                   bytes ciphertext, const rsa_workspace& workspace,
+                                   buffer plaintext, size_t& plaintext_length,
+                                   rsa_execution& execution) noexcept
+{
+  return ::TC_RSA_decrypt_oaep(&key, &options, ciphertext, &workspace, plaintext, &plaintext_length,
+                               &execution);
 }
 } // namespace tiny_crypto
 #endif

@@ -32,21 +32,27 @@ const tc_hash_algorithm_info* tc_hash_core_lookup(TC_hash_algorithm algorithm)
 {
   switch (algorithm) {
 #if TC_ENABLE_SHA1
-    case TC_HASH_SHA1: return &tc_sha1_info;
+  case TC_HASH_SHA1:
+    return &tc_sha1_info;
 #endif
 #if TC_ENABLE_SHA224
-    case TC_HASH_SHA224: return &tc_sha224_info;
+  case TC_HASH_SHA224:
+    return &tc_sha224_info;
 #endif
 #if TC_ENABLE_SHA256
-    case TC_HASH_SHA256: return &tc_sha256_info;
+  case TC_HASH_SHA256:
+    return &tc_sha256_info;
 #endif
 #if TC_ENABLE_SHA384
-    case TC_HASH_SHA384: return &tc_sha384_info;
+  case TC_HASH_SHA384:
+    return &tc_sha384_info;
 #endif
 #if TC_ENABLE_SHA512
-    case TC_HASH_SHA512: return &tc_sha512_info;
+  case TC_HASH_SHA512:
+    return &tc_sha512_info;
 #endif
-    default: return NULL;
+  default:
+    return NULL;
   }
 }
 
@@ -114,19 +120,17 @@ static TC_status view_absorb(const tc_hash_algorithm_info* info, tc_hash_view vi
       (uint64_t)length > info->max_message_bytes - *view.count)
     return TC_ERROR;
   *view.count += (uint64_t)length;
-  tc_hash_stream_absorb(view.state, view.used, view.buffer, data, length,
-                        info->block_bytes, info->compress);
+  tc_hash_stream_absorb(view.state, view.used, view.buffer, data, length, info->block_bytes,
+                        info->compress);
   return TC_OK;
 }
 
 /* Pad, compress the tail and serialize the digest. The view stays live, and
  * the caller ends or wipes it. */
-static void view_finish(const tc_hash_algorithm_info* info, tc_hash_view view,
-                        uint8_t* digest)
+static void view_finish(const tc_hash_algorithm_info* info, tc_hash_view view, uint8_t* digest)
 {
-  tc_hash_stream_finish(view.state, *view.count, view.used, view.buffer,
-                        info->block_bytes, info->length_bytes,
-                        (tc_hash_length_encoding)info->length_encoding,
+  tc_hash_stream_finish(view.state, *view.count, view.used, view.buffer, info->block_bytes,
+                        info->length_bytes, (tc_hash_length_encoding)info->length_encoding,
                         info->compress);
   info->digest_out(view.state, digest);
 }
@@ -161,14 +165,12 @@ TC_status tc_hash_core_update(const tc_hash_algorithm_info* stored, void* contex
   if (context == NULL)
     return TC_ERROR;
   view = info->view(context);
-  if (!tc_hash_update_args(view.context, view.size, data, length) ||
-      !view_is_live(info, view))
+  if (!tc_hash_update_args(view.context, view.size, data, length) || !view_is_live(info, view))
     return TC_ERROR;
   return view_absorb(info, view, data, length);
 }
 
-TC_status tc_hash_core_final(const tc_hash_algorithm_info* stored, void* context,
-                             uint8_t* digest)
+TC_status tc_hash_core_final(const tc_hash_algorithm_info* stored, void* context, uint8_t* digest)
 {
   tc_hash_algorithm_info local;
   const tc_hash_algorithm_info* info = load_info(stored, &local);
@@ -236,8 +238,8 @@ static TC_status hmac_key_block(const tc_hash_algorithm_info* info, tc_hash_view
   return TC_OK;
 }
 
-TC_status tc_hmac_core_init(const tc_hash_algorithm_info* stored, void* context,
-                            const uint8_t* key, size_t key_length)
+TC_status tc_hmac_core_init(const tc_hash_algorithm_info* stored, void* context, const uint8_t* key,
+                            size_t key_length)
 {
   tc_hash_algorithm_info local;
   const tc_hash_algorithm_info* info = load_info(stored, &local);
@@ -288,8 +290,7 @@ TC_status tc_hmac_core_update(const tc_hash_algorithm_info* stored, void* contex
   return view_absorb(info, hmac.inner, data, length);
 }
 
-TC_status tc_hmac_core_final(const tc_hash_algorithm_info* stored, void* context,
-                             uint8_t* tag)
+TC_status tc_hmac_core_final(const tc_hash_algorithm_info* stored, void* context, uint8_t* tag)
 {
   tc_hash_algorithm_info local;
   const tc_hash_algorithm_info* info = load_info(stored, &local);
@@ -310,11 +311,9 @@ TC_status tc_hmac_core_final(const tc_hash_algorithm_info* stored, void* context
    * the only remaining message block. */
   memcpy(block, inner_digest, info->digest_bytes);
   used = info->digest_bytes;
-  tc_hash_stream_finish(hmac.outer_state,
-                        (uint64_t)info->block_bytes + info->digest_bytes, &used,
+  tc_hash_stream_finish(hmac.outer_state, (uint64_t)info->block_bytes + info->digest_bytes, &used,
                         block, info->block_bytes, info->length_bytes,
-                        (tc_hash_length_encoding)info->length_encoding,
-                        info->compress);
+                        (tc_hash_length_encoding)info->length_encoding, info->compress);
   info->digest_out(hmac.outer_state, tag);
 
   TC_secure_zero(inner_digest, sizeof inner_digest);
@@ -340,16 +339,16 @@ void tc_hmac_core_clear(const tc_hash_algorithm_info* stored, void* context)
 
 /* One-shot HMAC with an optional truncated tag of at least TC_HMAC_MIN_TAG_LEN. */
 TC_status tc_hmac_core_digest(const tc_hash_algorithm_info* stored, void* workspace,
-    const uint8_t* key, size_t key_length, const uint8_t* message,
-    size_t message_length, uint8_t* tag, size_t tag_length)
+                              const uint8_t* key, size_t key_length, const uint8_t* message,
+                              size_t message_length, uint8_t* tag, size_t tag_length)
 {
   tc_hash_algorithm_info local;
   const tc_hash_algorithm_info* info = load_info(stored, &local);
   uint8_t full[TC_HASH_CORE_MAX_DIGEST];
   TC_status status;
 
-  if (tag == NULL || tag_length < TC_HMAC_MIN_TAG_LEN ||
-      tag_length > info->digest_bytes || (message_length != 0 && message == NULL))
+  if (tag == NULL || tag_length < TC_HMAC_MIN_TAG_LEN || tag_length > info->digest_bytes ||
+      (message_length != 0 && message == NULL))
     return TC_ERROR;
   status = tc_hmac_core_init(stored, workspace, key, key_length);
   if (status == TC_OK)
@@ -364,15 +363,15 @@ TC_status tc_hmac_core_digest(const tc_hash_algorithm_info* stored, void* worksp
 }
 
 TC_status tc_hmac_core_verify(const tc_hash_algorithm_info* stored, void* workspace,
-    const uint8_t* key, size_t key_length, const uint8_t* message,
-    size_t message_length, const uint8_t* tag, size_t tag_length)
+                              const uint8_t* key, size_t key_length, const uint8_t* message,
+                              size_t message_length, const uint8_t* tag, size_t tag_length)
 {
   uint8_t computed[TC_HASH_CORE_MAX_DIGEST];
   TC_status status;
   if (tag == NULL)
     return TC_ERROR;
-  status = tc_hmac_core_digest(stored, workspace, key, key_length, message,
-                               message_length, computed, tag_length);
+  status = tc_hmac_core_digest(stored, workspace, key, key_length, message, message_length,
+                               computed, tag_length);
   if (status == TC_OK)
     status = TC_ct_equal(computed, tag, tag_length);
   TC_secure_zero(computed, sizeof computed);

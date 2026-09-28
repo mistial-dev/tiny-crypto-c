@@ -7,10 +7,7 @@
 extern "C" {
 #endif
 
-typedef enum {
-  TC_PIV_SECURITY_CONTENTS,
-  TC_PIV_SECURITY_CONTAINER
-} TC_PIV_security_encoding;
+typedef enum { TC_PIV_SECURITY_CONTENTS, TC_PIV_SECURITY_CONTAINER } TC_PIV_security_encoding;
 
 typedef struct {
   TC_bytes mapping, cms;
@@ -24,15 +21,15 @@ typedef struct {
  * Input and out must be disjoint. Only OK writes out. This checks the container
  * schema; authenticate CMS and reconcile its LDS groups before using the map.
  * Requires X509. */
-TC_TLV_result TC_PIV_security_read(TC_bytes encoded,
-    TC_PIV_security_encoding encoding, TC_PIV_security_object* out);
+TC_TLV_result TC_PIV_security_read(TC_bytes encoded, TC_PIV_security_encoding encoding,
+                                   TC_PIV_security_object* out);
 
 /* Find a container ID in a successfully parsed, unchanged object. Scans at
  * most 16 mapping records and writes its group number only on OK. END means
  * absent. Keep number disjoint from object and its borrowed spans. Compare
  * object.groups with the authenticated LDS groups before checking hashes. */
-TC_TLV_result TC_PIV_security_group_find(const TC_PIV_security_object* object,
-    uint16_t container, unsigned* number);
+TC_TLV_result TC_PIV_security_group_find(const TC_PIV_security_object* object, uint16_t container,
+                                         unsigned* number);
 
 #ifdef __cplusplus
 }

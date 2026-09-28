@@ -51,8 +51,7 @@ void setup(void)
 }
 
 void loop(void)
-{
-}
+{}
 #else
 /* AVR, STM32duino, and similar cores resolve C-linkage setup()/loop(). */
 extern "C" void setup(void)
@@ -61,8 +60,7 @@ extern "C" void setup(void)
 }
 
 extern "C" void loop(void)
-{
-}
+{}
 #endif
 
 #else /* !ARDUINO */

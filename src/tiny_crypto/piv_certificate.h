@@ -7,7 +7,9 @@
 extern "C" {
 #endif
 typedef enum {
-  TC_PIV_CERTIFICATE_SLOT, TC_PIV_CERTIFICATE_TWIC, TC_PIV_CERTIFICATE_SM_SIGNER
+  TC_PIV_CERTIFICATE_SLOT,
+  TC_PIV_CERTIFICATE_TWIC,
+  TC_PIV_CERTIFICATE_SM_SIGNER
 } TC_PIV_certificate_profile;
 typedef enum { TC_PIV_CERTIFICATE_PLAIN, TC_PIV_CERTIFICATE_GZIP } TC_PIV_certificate_compression;
 typedef struct {
@@ -22,8 +24,8 @@ typedef struct {
  * This checks container fields. Decompress GZIP before parsing X.509; parse
  * and authenticate each certificate separately. out changes only on OK and
  * must be disjoint from input. Keep input unchanged while using returned spans. */
-TC_TLV_result TC_PIV_certificate_read(TC_bytes input,
-    TC_PIV_certificate_profile profile, TC_PIV_certificate* out);
+TC_TLV_result TC_PIV_certificate_read(TC_bytes input, TC_PIV_certificate_profile profile,
+                                      TC_PIV_certificate* out);
 #ifdef __cplusplus
 }
 #endif

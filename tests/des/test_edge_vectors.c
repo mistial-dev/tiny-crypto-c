@@ -8,25 +8,23 @@
 #include <tiny_crypto/des.h>
 #include "munit.h"
 
-#if TC_DES_ENABLE_ECB && TC_DES_ENABLE_CBC && TC_DES_ENABLE_CFB1 && TC_DES_ENABLE_CFB8 && \
+#if TC_DES_ENABLE_ECB && TC_DES_ENABLE_CBC && TC_DES_ENABLE_CFB1 && TC_DES_ENABLE_CFB8 &&          \
     TC_DES_ENABLE_CFB64 && TC_DES_ENABLE_OFB && TC_DES_ENABLE_TDES
 
 #include "edge_vectors.h"
 
 static MunitResult test_edge_vectors(const MunitParameter params[], void* data)
 {
-  (void) params;
-  (void) data;
+  (void)params;
+  (void)data;
 
-  for (size_t i = 0; i < EDGE_VECTOR_COUNT; ++i)
-  {
+  for (size_t i = 0; i < EDGE_VECTOR_COUNT; ++i) {
     const struct edge_vector* vector = &edge_vectors[i];
     uint8_t buffer[32];
     munit_assert(vector->len <= sizeof(buffer));
     memcpy(buffer, vector->msg, vector->len);
 
-    if (vector->key_len == 8)
-    {
+    if (vector->key_len == 8) {
       struct TC_DES_ctx ctx;
       TC_DES_init_ctx_iv(&ctx, vector->key, vector->iv);
 
@@ -44,9 +42,7 @@ static MunitResult test_edge_vectors(const MunitParameter params[], void* data)
         TC_DES_OFB_crypt(&ctx, buffer, vector->len);
       else
         munit_errorf("unknown DES edge-vector mode: %s", vector->mode);
-    }
-    else
-    {
+    } else {
       struct TC_DES3_ctx ctx;
       TC_DES3_init_ctx_iv(&ctx, vector->key, vector->key_len, vector->iv);
 
@@ -83,8 +79,8 @@ MunitResult test_edge_vectors_suite(const MunitParameter params[], void* data)
 
 MunitResult test_edge_vectors_suite(const MunitParameter params[], void* data)
 {
-  (void) params;
-  (void) data;
+  (void)params;
+  (void)data;
   return MUNIT_SKIP;
 }
 

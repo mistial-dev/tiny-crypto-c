@@ -16,7 +16,7 @@
 enum { BLOCK = 16, MAX_SEED = 48 };
 
 TC_DRBG_result tc_drbg_ctr_parameters(uint8_t key_bytes, int derivation_function,
-    tc_drbg_parameters* out)
+                                      tc_drbg_parameters* out)
 {
   if (key_bytes != 16 && key_bytes != 24 && key_bytes != 32)
     return TC_DRBG_ARGUMENT;
@@ -61,7 +61,7 @@ static TC_DRBG_result update(TC_DRBG* drbg, const uint8_t* provided)
 /* BCC (10.3.3) of IV || S, where S = L || N || input || 0x80 || zero padding,
  * into chain. The shared CBC-MAC core zero-pads the final block. */
 static int bcc(const tc_mac_cipher* cipher, uint32_t index, const uint8_t header[8],
-    const TC_bytes* parts, size_t count, uint8_t chain[BLOCK])
+               const TC_bytes* parts, size_t count, uint8_t chain[BLOCK])
 {
   static const uint8_t marker = 0x80;
   uint8_t iv[BLOCK] = {0};
@@ -84,7 +84,7 @@ static int bcc(const tc_mac_cipher* cipher, uint32_t index, const uint8_t header
 /* Block_Cipher_df (10.3.2): out = seedlen bytes derived from the parts, using
  * the scratch key schedule for its fixed and derived keys. */
 static TC_DRBG_result block_cipher_df(TC_DRBG* drbg, const TC_bytes* parts, size_t count,
-    uint8_t* out)
+                                      uint8_t* out)
 {
   const size_t seed_bytes = drbg->seed_bytes, key_bytes = drbg->key_bytes;
   const size_t input_length = tc_drbg_parts_length(parts, count);
@@ -132,7 +132,7 @@ static TC_DRBG_result block_cipher_df(TC_DRBG* drbg, const TC_bytes* parts, size
  * input and the remaining parts, right-padded with zeros, are XORed into it.
  * The envelope bounds those parts to seedlen. */
 static TC_DRBG_result seed_material(TC_DRBG* drbg, const TC_bytes* parts, size_t count,
-    uint8_t out[MAX_SEED])
+                                    uint8_t out[MAX_SEED])
 {
   size_t offset = 0, i, j;
   if (drbg->derivation_function)
@@ -148,8 +148,7 @@ static TC_DRBG_result seed_material(TC_DRBG* drbg, const TC_bytes* parts, size_t
 
 /* Instantiate (10.2.1.3) starts from Key = 0 and V = 0. Reseed (10.2.1.4)
  * keeps the state. Both then run Update(seed_material). */
-TC_DRBG_result tc_drbg_ctr_seed(TC_DRBG* drbg, const TC_bytes* parts, size_t count,
-    int reseed)
+TC_DRBG_result tc_drbg_ctr_seed(TC_DRBG* drbg, const TC_bytes* parts, size_t count, int reseed)
 {
   static const uint8_t zero_key[32] = {0};
   uint8_t seed[MAX_SEED];
@@ -169,7 +168,7 @@ TC_DRBG_result tc_drbg_ctr_seed(TC_DRBG* drbg, const TC_bytes* parts, size_t cou
  * derivation function or by zero padding, and is used before and after the
  * output. Empty additional input is seedlen zero bytes for the final Update. */
 TC_DRBG_result tc_drbg_ctr_generate(TC_DRBG* drbg, uint8_t* output, size_t length,
-    TC_bytes additional)
+                                    TC_bytes additional)
 {
   uint8_t adjusted[MAX_SEED] = {0};
   uint8_t block[BLOCK];

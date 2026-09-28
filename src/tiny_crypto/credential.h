@@ -27,8 +27,8 @@ typedef struct {
    */
   int twic_reader_policy;
   /* Identifiers and expiration from the already validated card certificate. */
-  const TC_PIV_card_identifiers *card;
-  const TC_X509_time *card_expiration;
+  const TC_PIV_card_identifiers* card;
+  const TC_X509_time* card_expiration;
 } TC_PIV_CHUID_validation_request;
 
 typedef struct {
@@ -42,10 +42,9 @@ typedef struct {
  * Choose the card OID policy and CHUID schema explicitly. Expiration includes
  * the final second of its UTC date. On VALID, out borrows CHUID and signer
  * bytes. Keep writable state disjoint from inputs. */
-TC_credential_status
-TC_PIV_CHUID_validate(const TC_PIV_CHUID_validation_request *request,
-                      const TC_validation_context *context, size_t *work,
-                      TC_PIV_CHUID_result *out);
+TC_credential_status TC_PIV_CHUID_validate(const TC_PIV_CHUID_validation_request* request,
+                                           const TC_validation_context* context, size_t* work,
+                                           TC_PIV_CHUID_result* out);
 
 typedef struct {
   /* Complete BC value, after any outer TWIC privacy-key decryption. */
@@ -53,7 +52,7 @@ typedef struct {
   TC_PIV_card_profile profile;
   /* Borrowed from the authenticated CHUID and its signing certificate. */
   TC_bytes fascn, guid, chuid_signer;
-  const TC_X509_time *card_expiration;
+  const TC_X509_time* card_expiration;
   /* Select the current or legacy biometric CMS profile explicitly. */
   TC_PIV_CMS_kind signature_profile;
   TC_PIV_CBEFF_format format;
@@ -65,13 +64,12 @@ typedef struct {
  * identifiers to an authenticated CHUID. An omitted CMS certificate selects
  * chuid_signer. Inputs remain borrowed. VALID covers object authentication and
  * identifier binding and the selected record profile. */
-TC_credential_status
-TC_PIV_biometric_validate(const TC_PIV_biometric_validation_request *request,
-                          const TC_validation_context *context, size_t *work);
+TC_credential_status TC_PIV_biometric_validate(const TC_PIV_biometric_validation_request* request,
+                                               const TC_validation_context* context, size_t* work);
 
 typedef struct {
   uint16_t container;
-  const TC_bytes *parts;
+  const TC_bytes* parts;
   size_t count;
 } TC_PIV_security_data;
 
@@ -80,22 +78,22 @@ typedef struct {
   TC_PIV_security_encoding encoding;
   TC_PIV_card_profile profile;
   TC_bytes chuid_signer;
-  const TC_X509_time *card_expiration;
+  const TC_X509_time* card_expiration;
   /* Complete inventory. Container IDs must be unique; each object has parts. */
-  const TC_PIV_security_data *objects;
+  const TC_PIV_security_data* objects;
   size_t count;
 } TC_PIV_security_validation_request;
 
 typedef struct {
   /* Decoded LDS content scratch. Capacity is bounded by the application. */
-  uint8_t *content;
+  uint8_t* content;
   size_t content_capacity;
 } TC_PIV_security_validation_workspace;
 
 /* Inventory descriptors and their bytes remain borrowed and immutable through
  * subsequent checks. This result survives reuse of the validation workspace. */
 typedef struct {
-  const TC_PIV_security_data *objects;
+  const TC_PIV_security_data* objects;
   size_t count;
   TC_bytes signer;
   TC_PIV_card_profile profile;
@@ -106,11 +104,10 @@ typedef struct {
  * inventory against signed LDS digests. Parts supply each object's bytes in
  * hash order. All buffers remain caller-owned; content is disjoint mutable
  * scratch. On VALID, out borrows the inventory and signer bytes. */
-TC_credential_status
-TC_PIV_security_validate(const TC_PIV_security_validation_request *request,
-                         const TC_validation_context *context,
-                         const TC_PIV_security_validation_workspace *workspace,
-                         size_t *work, TC_PIV_security_result *out);
+TC_credential_status TC_PIV_security_validate(const TC_PIV_security_validation_request* request,
+                                              const TC_validation_context* context,
+                                              const TC_PIV_security_validation_workspace* workspace,
+                                              size_t* work, TC_PIV_security_result* out);
 
 enum { TC_TWIC_UNSIGNED_CHUID_CONTAINER = 0x3002 };
 
@@ -118,16 +115,16 @@ typedef struct {
   TC_bytes encoded;
   TC_PIV_CHUID_encoding encoding;
   TC_PIV_card_profile profile;
-  const TC_PIV_card_identifiers *card;
+  const TC_PIV_card_identifiers* card;
 } TC_TWIC_unsigned_CHUID_validation_request;
 
 /* Check an unsigned CHUID against a previously authenticated inventory at the
  * same evaluation time. Container 3002 must match encoded byte for byte.
  * The inventory and inputs remain borrowed. Keep work disjoint from them. */
-TC_credential_status TC_TWIC_unsigned_CHUID_validate(
-    const TC_TWIC_unsigned_CHUID_validation_request *chuid,
-    const TC_PIV_security_result *security,
-    const TC_validation_context *context, size_t *work);
+TC_credential_status
+TC_TWIC_unsigned_CHUID_validate(const TC_TWIC_unsigned_CHUID_validation_request* chuid,
+                                const TC_PIV_security_result* security,
+                                const TC_validation_context* context, size_t* work);
 
 #if TC_ENABLE_PIV_CVC
 typedef struct {
@@ -139,10 +136,9 @@ typedef struct {
 /* Validate the X.509 signer's path and CRLs, then authenticate the CVC chain.
  * The card profile selects compatible OIDs. On VALID, out borrows card bytes.
  * Keep point scratch disjoint from inputs, provider state, work and out. */
-TC_credential_status
-TC_PIV_CVC_validate(const TC_PIV_CVC_validation_request *request,
-                    const TC_validation_context *context,
-                    TC_EC_workspace *point, size_t *work, TC_PIV_CVC *out);
+TC_credential_status TC_PIV_CVC_validate(const TC_PIV_CVC_validation_request* request,
+                                         const TC_validation_context* context,
+                                         TC_EC_workspace* point, size_t* work, TC_PIV_CVC* out);
 #endif
 
 #ifdef __cplusplus

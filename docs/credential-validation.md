@@ -1,4 +1,5 @@
 <!-- SPDX-FileCopyrightText: Mistial Dev -->
+
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 
 # Composing PIV and TWIC validation
@@ -37,15 +38,15 @@ result exposes borrowed printed fields through `result.printed` and sets
 The shared sequence is:
 
 1. Validate the selected card-key certificate under card-key trust.
-2. Read and bind the certificate identifiers.
-3. For TWIC, check the held canceled-card-list snapshot and its freshness metadata.
-4. Ask the application to perform a fresh proof with the accepted public key.
-5. Validate the signed CHUID under separate content-signer trust.
-6. When supplied, validate the Security Object and its retained object inventory,
+1. Read and bind the certificate identifiers.
+1. For TWIC, check the held canceled-card-list snapshot and its freshness metadata.
+1. Ask the application to perform a fresh proof with the accepted public key.
+1. Validate the signed CHUID under separate content-signer trust.
+1. When supplied, validate the Security Object and its retained object inventory,
    then bind the unsigned CHUID to that accepted inventory.
-7. When supplied, parse authenticated printed information and check its
+1. When supplied, parse authenticated printed information and check its
    expiration against the signed CHUID.
-8. When supplied, check each biometric format and authenticate every biometric
+1. When supplied, check each biometric format and authenticate every biometric
    object against the accepted CHUID.
 
 The request selects PIV, TWIC Legacy, or TWIC NEXGEN and its signed CHUID

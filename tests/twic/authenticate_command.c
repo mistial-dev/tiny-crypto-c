@@ -7,7 +7,7 @@
 #include <sys/resource.h>
 #include <zlib.h>
 
-int example_twic_command_main(int argc, char **argv);
+int example_twic_command_main(int argc, char** argv);
 enum {
   SUCCESS,
   LEGACY,
@@ -104,19 +104,18 @@ enum {
   SECURITY_PRINTED_CHANGED,
   CASES
 };
-static unsigned scenario, opened, closed, commands, clocks, locked, unlocked,
-    selected_twic, ccl_checks;
+static unsigned scenario, opened, closed, commands, clocks, locked, unlocked, selected_twic,
+    ccl_checks;
 static unsigned marsec_level;
 static int extended_reads, extended_chunks, piv_envelope;
 static SyntheticCard card;
 static Entropy entropy;
-static uint8_t root_der[BUFFER_CAPACITY], issuer_der[BUFFER_CAPACITY],
-    leaf_der[BUFFER_CAPACITY], object[2048];
-static size_t root_length, issuer_length, leaf_length, object_length,
-    object_offset;
+static uint8_t root_der[BUFFER_CAPACITY], issuer_der[BUFFER_CAPACITY], leaf_der[BUFFER_CAPACITY],
+    object[2048];
+static size_t root_length, issuer_length, leaf_length, object_length, object_offset;
 static uint8_t compressed[2048];
 static TC_bytes wire_certificate;
-static void *protected_buffer;
+static void* protected_buffer;
 static size_t protected_length;
 static uint8_t chuid_bytes[2048], content_root_der[BUFFER_CAPACITY],
     issuer_crl_der[BUFFER_CAPACITY];
@@ -129,19 +128,17 @@ static size_t security_length, unsigned_chuid_length;
 static const uint8_t extra_object[] = {0x53, 3, 0xbc, 1, 0x42};
 static uint8_t printed_object[96];
 static size_t printed_length;
-static const uint8_t printed_tlvs[] = {
-    0x01, 4,   'T', 'E', 'S', 'T', 0x02, 0,    0x04, 9,   '0',
-    '9',  'S', 'E', 'P', '2', '0', '2',  '6',  0x05, 8,   '1',
-    '2',  '3', '4', '5', '6', '7', '8',  0x06, 8,    '7', '0',
-    '9',  '9', '1', '2', '3', '4', 0x07, 0,    0x08, 0};
+static const uint8_t printed_tlvs[] = {0x01, 4,   'T', 'E', 'S', 'T', 0x02, 0,    0x04, 9,   '0',
+                                       '9',  'S', 'E', 'P', '2', '0', '2',  '6',  0x05, 8,   '1',
+                                       '2',  '3', '4', '5', '6', '7', '8',  0x06, 8,    '7', '0',
+                                       '9',  '9', '1', '2', '3', '4', 0x07, 0,    0x08, 0};
 
-static void sha256_hex(const uint8_t *input, size_t length, char out[65]) {
+static void sha256_hex(const uint8_t* input, size_t length, char out[65])
+{
   static const char digits[] = "0123456789abcdef";
   uint8_t digest[32];
   unsigned digest_length;
-  munit_assert_int(
-      EVP_Digest(input, length, digest, &digest_length, EVP_sha256(), NULL), ==,
-      1);
+  munit_assert_int(EVP_Digest(input, length, digest, &digest_length, EVP_sha256(), NULL), ==, 1);
   munit_assert_uint(digest_length, ==, sizeof digest);
   for (size_t i = 0; i < sizeof digest; ++i) {
     out[i * 2] = digits[digest[i] >> 4];
@@ -150,32 +147,29 @@ static void sha256_hex(const uint8_t *input, size_t length, char out[65]) {
   out[64] = 0;
 }
 
-ExampleTWICResult example_twic_command_cancellation_check(
-    const TC_TWIC_CCL_snapshot *ccl,
-    const TC_TWIC_CCL_freshness_policy *freshness, size_t max_reads,
-    TC_bytes fascn) {
+ExampleTWICResult
+example_twic_command_cancellation_check(const TC_TWIC_CCL_snapshot* ccl,
+                                        const TC_TWIC_CCL_freshness_policy* freshness,
+                                        size_t max_reads, TC_bytes fascn)
+{
   ++ccl_checks;
   if (scenario == FINAL_CCL_SUPERSEDED)
     return EXAMPLE_TWIC_STALE;
   return example_twic_cancellation_check(ccl, freshness, max_reads, fascn);
 }
 
-static size_t encrypt_biometric(const uint8_t *plaintext,
-                                size_t plaintext_length, uint8_t *out,
-                                size_t capacity) {
-  static const uint8_t key[] = {0, 1, 2,  3,  4,  5,  6,  7,
-                                8, 9, 10, 11, 12, 13, 14, 15};
-  EVP_CIPHER_CTX *cipher = EVP_CIPHER_CTX_new();
+static size_t encrypt_biometric(const uint8_t* plaintext, size_t plaintext_length, uint8_t* out,
+                                size_t capacity)
+{
+  static const uint8_t key[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+  EVP_CIPHER_CTX* cipher = EVP_CIPHER_CTX_new();
   munit_assert_not_null(cipher);
-  munit_assert_int(
-      EVP_EncryptInit_ex(cipher, EVP_aes_128_ecb(), NULL, key, NULL), ==, 1);
+  munit_assert_int(EVP_EncryptInit_ex(cipher, EVP_aes_128_ecb(), NULL, key, NULL), ==, 1);
   munit_assert_size(plaintext_length + 24, <=, capacity);
   int written, tail;
-  munit_assert_int(EVP_EncryptUpdate(cipher, out + 8, &written, plaintext,
-                                     (int)plaintext_length),
+  munit_assert_int(EVP_EncryptUpdate(cipher, out + 8, &written, plaintext, (int)plaintext_length),
                    ==, 1);
-  munit_assert_int(EVP_EncryptFinal_ex(cipher, out + 8 + written, &tail), ==,
-                   1);
+  munit_assert_int(EVP_EncryptFinal_ex(cipher, out + 8 + written, &tail), ==, 1);
   EVP_CIPHER_CTX_free(cipher);
   const size_t ciphertext_length = (size_t)written + (size_t)tail;
   out[0] = 0x53;
@@ -189,13 +183,14 @@ static size_t encrypt_biometric(const uint8_t *plaintext,
   return ciphertext_length + 8;
 }
 
-FILE *example_twic_fopen(const char *path, const char *mode) {
+FILE* example_twic_fopen(const char* path, const char* mode)
+{
   munit_assert_string_equal(mode, "rb");
   const int intermediate = !strcmp(path, "content-issuer-crl");
   munit_assert_true(intermediate || !strcmp(path, "content-crl"));
-  const uint8_t *bytes = intermediate ? issuer_crl_der : crl_der;
+  const uint8_t* bytes = intermediate ? issuer_crl_der : crl_der;
   const size_t length = intermediate ? issuer_crl_length : crl_length;
-  FILE *file = tmpfile();
+  FILE* file = tmpfile();
   munit_assert_not_null(file);
   if (scenario == CHUID_BAD_CRL) {
     const uint8_t invalid = 0;
@@ -206,73 +201,83 @@ FILE *example_twic_fopen(const char *path, const char *mode) {
   return file;
 }
 
-static int legacy(void) {
-  return scenario == LEGACY || scenario == CHUID_LEGACY ||
-         scenario == BIO_LEGACY || scenario == BIO_LEGACY_SIGNATURE ||
-         scenario == BIO_LEGACY_SIGNATURE_REQUIRED ||
+static int legacy(void)
+{
+  return scenario == LEGACY || scenario == CHUID_LEGACY || scenario == BIO_LEGACY ||
+         scenario == BIO_LEGACY_SIGNATURE || scenario == BIO_LEGACY_SIGNATURE_REQUIRED ||
          scenario == SECURITY_LEGACY;
 }
-static int with_chuid(void) { return scenario >= CHUID_VALID; }
-static int with_biometric(void) { return scenario >= BIO_VALID; }
-static int with_security(void) { return scenario >= SECURITY_VALID; }
-static int optional_objects(void) {
+static int with_chuid(void)
+{
+  return scenario >= CHUID_VALID;
+}
+static int with_biometric(void)
+{
+  return scenario >= BIO_VALID;
+}
+static int with_security(void)
+{
+  return scenario >= SECURITY_VALID;
+}
+static int optional_objects(void)
+{
   return scenario == SECURITY_OPTIONAL || scenario == SECURITY_OMITTED_OPTIONAL;
 }
 
-int example_twic_setrlimit(int resource, const struct rlimit *limit) {
+int example_twic_setrlimit(int resource, const struct rlimit* limit)
+{
   munit_assert_int(resource, ==, RLIMIT_CORE);
   munit_assert_uint(limit->rlim_cur, ==, 0);
   munit_assert_uint(limit->rlim_max, ==, 0);
   return scenario == CORE_LIMIT_FAILURE ? -1 : 0;
 }
 
-int example_twic_mlock(const void *buffer, size_t length) {
+int example_twic_mlock(const void* buffer, size_t length)
+{
   ++locked;
-  protected_buffer = (void *)buffer;
+  protected_buffer = (void*)buffer;
   protected_length = length;
   return scenario == LOCK_FAILURE ? -1 : 0;
 }
 
-int example_twic_munlock(const void *buffer, size_t length) {
+int example_twic_munlock(const void* buffer, size_t length)
+{
   ++unlocked;
   munit_assert_ptr_equal(buffer, protected_buffer);
   munit_assert_size(length, ==, protected_length);
   for (size_t i = 0; i < length; ++i)
-    munit_assert_uint(((const uint8_t *)buffer)[i], ==, 0);
+    munit_assert_uint(((const uint8_t*)buffer)[i], ==, 0);
   return scenario == UNLOCK_FAILURE ? -1 : 0;
 }
 
-int example_twic_read_file(const char *path, uint8_t *buffer, size_t capacity,
-                           TC_bytes *out);
+int example_twic_read_file(const char* path, uint8_t* buffer, size_t capacity, TC_bytes* out);
 
-int example_twic_read_created_file(const char *path, uint8_t *buffer,
-                                   size_t capacity, TC_bytes *out,
-                                   uint64_t *created) {
+int example_twic_read_created_file(const char* path, uint8_t* buffer, size_t capacity,
+                                   TC_bytes* out, uint64_t* created)
+{
   const uint64_t max_age = (marsec_level == 1 ? 7u : 1u) * 24u * 60u * 60u;
   if (scenario == CCL_NO_TIMESTAMP) {
     TC_secure_zero(buffer, capacity);
     return 0;
   }
-  *created = scenario == STALE ? 1788912000 - max_age - 1
-             : (scenario == CCL_EXPIRES || scenario == CCL_AGE_BOUNDARY)
-                 ? 1788912000 - max_age
-             : scenario == CCL_FUTURE ? 1788912001
-                                      : 1788911950;
+  *created = scenario == STALE                                           ? 1788912000 - max_age - 1
+             : (scenario == CCL_EXPIRES || scenario == CCL_AGE_BOUNDARY) ? 1788912000 - max_age
+             : scenario == CCL_FUTURE                                    ? 1788912001
+                                                                         : 1788911950;
   if (scenario == CHUID_DATE_EXPIRES || scenario == SECURITY_FINAL_DATE)
     *created = 1788912000;
   return example_twic_read_file(path, buffer, capacity, out);
 }
 
-int example_twic_read_file(const char *path, uint8_t *buffer, size_t capacity,
-                           TC_bytes *out) {
+int example_twic_read_file(const char* path, uint8_t* buffer, size_t capacity, TC_bytes* out)
+{
   if (scenario == FILE_FAILURE) {
     TC_secure_zero(buffer, capacity);
     return 0;
   }
   size_t length;
   if (!strcmp(path, "tpk")) {
-    static const char hex[] =
-        "DFC10118C010000102030405060708090A0B0C0D0E0FC10108C20100\n";
+    static const char hex[] = "DFC10118C010000102030405060708090A0B0C0D0E0FC10108C20100\n";
     length = sizeof hex - 1;
     munit_assert_size(length, <=, capacity);
     memcpy(buffer, hex, length);
@@ -290,8 +295,7 @@ int example_twic_read_file(const char *path, uint8_t *buffer, size_t capacity,
     length = content_root_length;
     munit_assert_size(length, <=, capacity);
     memcpy(buffer, content_root_der, length);
-  } else if (!strcmp(path, "content-crl") ||
-             !strcmp(path, "content-issuer-crl")) {
+  } else if (!strcmp(path, "content-crl") || !strcmp(path, "content-issuer-crl")) {
     const int intermediate = !strcmp(path, "content-issuer-crl");
     length = intermediate ? issuer_crl_length : crl_length;
     munit_assert_size(length, <=, capacity);
@@ -314,12 +318,13 @@ int example_twic_read_file(const char *path, uint8_t *buffer, size_t capacity,
   return 1;
 }
 
-int example_card_now(TC_X509_time *out) {
+int example_card_now(TC_X509_time* out)
+{
   ++clocks;
   if (clocks > 1 && with_biometric()) {
     /* The final acceptance check still has the complete encrypted response. */
     munit_assert_size(biometric_length, <=, protected_length);
-    const uint8_t *bytes = protected_buffer;
+    const uint8_t* bytes = protected_buffer;
     int retained = 0;
     for (size_t i = 0; i <= protected_length - biometric_length; ++i)
       if (!memcmp(bytes + i, biometric_bytes, biometric_length)) {
@@ -335,14 +340,13 @@ int example_card_now(TC_X509_time *out) {
     out->second = 31;
   if (clocks > 1 && scenario == BACKWARD_CLOCK)
     out->year = 2025;
-  if (clocks > 1 &&
-      (scenario == CCL_EXPIRES || scenario == CERTIFICATE_EXPIRES))
+  if (clocks > 1 && (scenario == CCL_EXPIRES || scenario == CERTIFICATE_EXPIRES))
     out->second = 1;
   if (scenario == CHUID_DATE_EXPIRES || scenario == SECURITY_FINAL_DATE)
-    *out = clocks > 1 ? (TC_X509_time){2026, 9, 10, 0, 0, 0}
-                      : (TC_X509_time){2026, 9, 9, 23, 59, 59};
+    *out =
+        clocks > 1 ? (TC_X509_time){2026, 9, 10, 0, 0, 0} : (TC_X509_time){2026, 9, 9, 23, 59, 59};
   if (clocks > 1 && scenario == SECURITY_FINAL_MAPPING) {
-    uint8_t *bytes = protected_buffer;
+    uint8_t* bytes = protected_buffer;
     int changed = 0;
     munit_assert_uint(security_bytes[1], ==, 0x82);
     enum { OUTER_HEADER_BYTES = 4, MAPPING_HEADER_BYTES = 2 };
@@ -358,12 +362,14 @@ int example_card_now(TC_X509_time *out) {
   return 1;
 }
 
-TC_status example_card_random(void *context, uint8_t *out, size_t length) {
+TC_status example_card_random(void* context, uint8_t* out, size_t length)
+{
   (void)context;
   return random_digest(&entropy, out, length);
 }
 
-int example_card_pcsc_open(ExampleCardPCSC *connection, const char *reader) {
+int example_card_pcsc_open(ExampleCardPCSC* connection, const char* reader)
+{
   munit_assert_string_equal(reader, "synthetic");
   munit_assert_uint(locked, ==, 1);
   ++opened;
@@ -371,13 +377,15 @@ int example_card_pcsc_open(ExampleCardPCSC *connection, const char *reader) {
   return connection->transaction;
 }
 
-int example_card_pcsc_close(ExampleCardPCSC *connection) {
+int example_card_pcsc_close(ExampleCardPCSC* connection)
+{
   ++closed;
   connection->transaction = 0;
   return scenario != CLOSE_FAILURE;
 }
 
-static void object_reply(uint8_t *response, size_t capacity, size_t *length) {
+static void object_reply(uint8_t* response, size_t capacity, size_t* length)
+{
   size_t chunk = object_length - object_offset;
   if ((!extended_reads || extended_chunks) && chunk > 200)
     chunk = 200;
@@ -394,10 +402,10 @@ static void object_reply(uint8_t *response, size_t capacity, size_t *length) {
   *length = chunk + 2;
 }
 
-int example_card_pcsc_transmit(void *context, const uint8_t *command,
-                               size_t length, uint8_t *response,
-                               size_t capacity, size_t *out) {
-  munit_assert_int(((ExampleCardPCSC *)context)->transaction, ==, 1);
+int example_card_pcsc_transmit(void* context, const uint8_t* command, size_t length,
+                               uint8_t* response, size_t capacity, size_t* out)
+{
+  munit_assert_int(((ExampleCardPCSC*)context)->transaction, ==, 1);
   ++commands;
   if (command[1] == 0xa4) {
     if (scenario == SELECT_FAILURE)
@@ -438,9 +446,8 @@ int example_card_pcsc_transmit(void *context, const uint8_t *command,
       length = sizeof short_command;
     }
     munit_assert_size(length, ==, 11);
-    if (with_security() &&
-        (command[9] == 4 || command[9] == 8 || command[9] == 9 ||
-         command[9] == 0x0f || command[9] == 0x21 || command[8] == 0xc0)) {
+    if (with_security() && (command[9] == 4 || command[9] == 8 || command[9] == 9 ||
+                            command[9] == 0x0f || command[9] == 0x21 || command[8] == 0xc0)) {
       munit_assert_uint(selected_twic, ==, 1);
       const int optional = command[9] == 0x21 || command[8] == 0xc0;
       if (optional && scenario == SECURITY_OPTIONAL_DENIED) {
@@ -449,14 +456,13 @@ int example_card_pcsc_transmit(void *context, const uint8_t *command,
         *out = 2;
         return 1;
       }
-      if ((optional && !optional_objects()) ||
-          (scenario == SECURITY_MISSING && command[9] == 8)) {
+      if ((optional && !optional_objects()) || (scenario == SECURITY_MISSING && command[9] == 8)) {
         response[0] = 0x6a;
         response[1] = 0x82;
         *out = 2;
         return 1;
       }
-      const uint8_t *bytes = command[9] == 4      ? unsigned_chuid_bytes
+      const uint8_t* bytes = command[9] == 4      ? unsigned_chuid_bytes
                              : command[9] == 8    ? face_bytes
                              : command[9] == 0x0f ? security_bytes
                                                   : extra_object;
@@ -478,12 +484,11 @@ int example_card_pcsc_transmit(void *context, const uint8_t *command,
       munit_assert_true(with_biometric());
       munit_assert_uint(selected_twic, ==, 1);
       const uint8_t biometric_tag[] = {0xdf, 0xc1, command[9]};
-      munit_assert_memory_equal(sizeof biometric_tag, command + 7,
-                                biometric_tag);
+      munit_assert_memory_equal(sizeof biometric_tag, command + 7, biometric_tag);
       ++biometric_reads;
       if (scenario == BIO_READ_FAILURE)
         return 0;
-      const uint8_t *bytes = command[9] == 3 ? biometric_bytes : face_bytes;
+      const uint8_t* bytes = command[9] == 3 ? biometric_bytes : face_bytes;
       object_length = command[9] == 3 ? biometric_length : face_length;
       munit_assert_size(object_length, <=, sizeof object);
       memcpy(object, bytes, object_length);
@@ -507,8 +512,7 @@ int example_card_pcsc_transmit(void *context, const uint8_t *command,
     static const uint8_t tag[] = {0x5f, 0xc1, 1};
     munit_assert_memory_equal(sizeof tag, command + 7, tag);
     const size_t wire_length = wire_certificate.length;
-    const size_t payload =
-        4 + wire_length + 3 + (legacy() || piv_envelope ? 2 : 0);
+    const size_t payload = 4 + wire_length + 3 + (legacy() || piv_envelope ? 2 : 0);
     object[0] = 0x53;
     object[1] = 0x82;
     object[2] = (uint8_t)(payload >> 8);
@@ -523,8 +527,7 @@ int example_card_pcsc_transmit(void *context, const uint8_t *command,
     size_t used = 8 + wire_length;
     object[used++] = 0x71;
     object[used++] = 1;
-    object[used++] =
-        scenario >= GZIP_VALID && scenario <= GZIP_TRUNCATED ? 1 : 0;
+    object[used++] = scenario >= GZIP_VALID && scenario <= GZIP_TRUNCATED ? 1 : 0;
     if (legacy() || piv_envelope) {
       object[used++] = 0xfe;
       object[used++] = 0;
@@ -541,49 +544,44 @@ int example_card_pcsc_transmit(void *context, const uint8_t *command,
   return transmit(&card, command, length, response, capacity, out);
 }
 
-static void make_chuid(X509 *root, EVP_PKEY *root_key, X509 *issuer,
-                       EVP_PKEY *issuer_key, EVP_PKEY *signing_key,
-                       X509 *card_certificate) {
+static void make_chuid(X509* root, EVP_PKEY* root_key, X509* issuer, EVP_PKEY* issuer_key,
+                       EVP_PKEY* signing_key, X509* card_certificate)
+{
   enum { PREFIX_BYTES = 55, OUTER_HEADER = 4, CMS_HEADER = 4 };
   const int intermediate = scenario == CHUID_INTERMEDIATE;
-  X509 *signing = make_certificate(signing_key, "Synthetic contents signer",
-                                   intermediate ? issuer : root);
+  X509* signing =
+      make_certificate(signing_key, "Synthetic contents signer", intermediate ? issuer : root);
   add_extension(signing, NID_key_usage, "critical,digitalSignature");
   add_extension(signing, NID_ext_key_usage,
-                scenario == CHUID_TWIC_PURPOSE ? "1.3.6.1.4.1.29138.6.7"
-                                               : "2.16.840.1.101.3.6.7");
-  munit_assert_int(
-      X509_sign(signing, intermediate ? issuer_key : root_key, EVP_sha256()), >,
-      0);
-  X509 *provisioned = X509_dup(root);
+                scenario == CHUID_TWIC_PURPOSE ? "1.3.6.1.4.1.29138.6.7" : "2.16.840.1.101.3.6.7");
+  munit_assert_int(X509_sign(signing, intermediate ? issuer_key : root_key, EVP_sha256()), >, 0);
+  X509* provisioned = X509_dup(root);
   munit_assert_not_null(provisioned);
   if (scenario == CHUID_UNTRUSTED_ROOT)
     munit_assert_int(X509_set_pubkey(provisioned, issuer_key), ==, 1);
-  content_root_length = encode_certificate(
-      provisioned, scenario == CHUID_UNTRUSTED_ROOT ? issuer_key : root_key,
-      EVP_sha256(), content_root_der, sizeof content_root_der);
+  content_root_length =
+      encode_certificate(provisioned, scenario == CHUID_UNTRUSTED_ROOT ? issuer_key : root_key,
+                         EVP_sha256(), content_root_der, sizeof content_root_der);
   X509_free(provisioned);
-  const int large_crl =
-      scenario == CHUID_LARGE_CRL || scenario == CHUID_LARGE_REVOKED;
+  const int large_crl = scenario == CHUID_LARGE_CRL || scenario == CHUID_LARGE_REVOKED;
   crl_length = encode_issuer_crl_entries(
       root, root_key,
-      scenario == CHUID_CARD_REVOKED ? card_certificate
+      scenario == CHUID_CARD_REVOKED                                 ? card_certificate
       : scenario == CHUID_REVOKED || scenario == CHUID_LARGE_REVOKED ? signing
                                                                      : NULL,
       large_crl ? 2048 : 0, crl_der, sizeof crl_der);
   if (large_crl)
     munit_assert_size(crl_length, >, 16 * 1024);
-  issuer_crl_length = encode_issuer_crl(issuer, issuer_key, NULL,
-                                        issuer_crl_der, sizeof issuer_crl_der);
+  issuer_crl_length =
+      encode_issuer_crl(issuer, issuer_key, NULL, issuer_crl_der, sizeof issuer_crl_der);
   uint8_t content[PREFIX_BYTES + 2] = {0x30, 25};
   memcpy(content + 2, test_card_fascn, sizeof test_card_fascn);
   if (scenario == CHUID_WRONG_CARD)
     content[2] ^= 1;
   content[27] = 0x34;
   content[28] = 16;
-  static const uint8_t guid[] = {0x91, 0xbe, 0x20, 0x94, 0xf6, 0xdc,
-                                 0x53, 0x49, 0x80, 0,    0x40, 0x90,
-                                 0xe4, 0x9e, 0x50, 0x5c};
+  static const uint8_t guid[] = {0x91, 0xbe, 0x20, 0x94, 0xf6, 0xdc, 0x53, 0x49,
+                                 0x80, 0,    0x40, 0x90, 0xe4, 0x9e, 0x50, 0x5c};
   if (!legacy())
     memcpy(content + 29, guid, sizeof guid);
   content[45] = 0x35;
@@ -594,40 +592,34 @@ static void make_chuid(X509 *root, EVP_PKEY *root_key, X509 *issuer,
   size_t used = OUTER_HEADER + PREFIX_BYTES;
   if (scenario != CHUID_UNSIGNED) {
     const unsigned flags = CMS_BINARY | CMS_NOSMIMECAP | CMS_DETACHED;
-    CMS_ContentInfo *cms =
-        CMS_sign(signing, signing_key, NULL, NULL, flags | CMS_PARTIAL);
-    BIO *input = BIO_new_mem_buf(content, sizeof content);
-    ASN1_OBJECT *type = OBJ_txt2obj("2.16.840.1.101.3.6.1", 1);
+    CMS_ContentInfo* cms = CMS_sign(signing, signing_key, NULL, NULL, flags | CMS_PARTIAL);
+    BIO* input = BIO_new_mem_buf(content, sizeof content);
+    ASN1_OBJECT* type = OBJ_txt2obj("2.16.840.1.101.3.6.1", 1);
     munit_assert_not_null(cms);
     munit_assert_not_null(input);
     munit_assert_not_null(type);
     munit_assert_int(CMS_set1_eContentType(cms, type), ==, 1);
-    set_cms_signer_name(
-        cms,
-        X509_get_subject_name(scenario == CHUID_WRONG_SIGNER ? root : signing));
+    set_cms_signer_name(cms,
+                        X509_get_subject_name(scenario == CHUID_WRONG_SIGNER ? root : signing));
     munit_assert_int(CMS_final(cms, input, NULL, flags), ==, 1);
     int length = i2d_CMS_ContentInfo(cms, NULL);
     munit_assert_int(length, >, 0);
-    munit_assert_size((size_t)length + used + CMS_HEADER + 2, <=,
-                      sizeof chuid_bytes);
+    munit_assert_size((size_t)length + used + CMS_HEADER + 2, <=, sizeof chuid_bytes);
     chuid_bytes[used++] = 0x3e;
     chuid_bytes[used++] = 0x82;
     chuid_bytes[used++] = (uint8_t)((unsigned)length >> 8);
     chuid_bytes[used++] = (uint8_t)length;
-    unsigned char *cursor = chuid_bytes + used;
+    unsigned char* cursor = chuid_bytes + used;
     munit_assert_int(i2d_CMS_ContentInfo(cms, &cursor), ==, length);
     if (scenario >= CHUID_RSA_ABSENT && scenario <= CHUID_RSA_ABSENT_TAMPERED) {
-      length = (int)omit_cms_rsa_parameters(
-          (TC_bytes){chuid_bytes + used, (size_t)length}, chuid_bytes + used,
-          sizeof chuid_bytes - used - 2);
+      length = (int)omit_cms_rsa_parameters((TC_bytes){chuid_bytes + used, (size_t)length},
+                                            chuid_bytes + used, sizeof chuid_bytes - used - 2);
       chuid_bytes[used - 2] = (uint8_t)((unsigned)length >> 8);
       chuid_bytes[used - 1] = (uint8_t)length;
     }
-    if (scenario == CHUID_BER || scenario == CHUID_BER_REQUIRED ||
-        scenario == CHUID_BER_TAMPERED) {
-      length = (int)cms_fixture_reverse_attributes(
-          chuid_bytes + used, (size_t)length, sizeof chuid_bytes - used - 2,
-          signing_key);
+    if (scenario == CHUID_BER || scenario == CHUID_BER_REQUIRED || scenario == CHUID_BER_TAMPERED) {
+      length = (int)cms_fixture_reverse_attributes(chuid_bytes + used, (size_t)length,
+                                                   sizeof chuid_bytes - used - 2, signing_key);
       chuid_bytes[used - 2] = (uint8_t)((unsigned)length >> 8);
       chuid_bytes[used - 1] = (uint8_t)length;
     }
@@ -655,23 +647,20 @@ static void make_chuid(X509 *root, EVP_PKEY *root_key, X509 *issuer,
   if (with_biometric()) {
     uint8_t plaintext[2048];
     const TC_bytes signed_guid =
-        scenario == BIO_LEGACY_SIGNATURE ||
-                scenario == BIO_LEGACY_SIGNATURE_REQUIRED
+        scenario == BIO_LEGACY_SIGNATURE || scenario == BIO_LEGACY_SIGNATURE_REQUIRED
             ? (TC_bytes){NULL, 0}
             : (TC_bytes){content + 29, 16};
     const size_t plaintext_length = encode_biometric_parameters(
-        signing, signing_key, 0,
-        scenario >= BIO_RSA_ABSENT && scenario <= BIO_RSA_ABSENT_TAMPERED,
+        signing, signing_key, 0, scenario >= BIO_RSA_ABSENT && scenario <= BIO_RSA_ABSENT_TAMPERED,
         (TC_bytes){content + 2, 25}, signed_guid, plaintext, sizeof plaintext);
     if (scenario == BIO_TAMPERED || scenario == BIO_RSA_ABSENT_TAMPERED)
       plaintext[88] ^= 1;
-    biometric_length = encrypt_biometric(
-        plaintext, plaintext_length, biometric_bytes, sizeof biometric_bytes);
+    biometric_length =
+        encrypt_biometric(plaintext, plaintext_length, biometric_bytes, sizeof biometric_bytes);
     static const uint8_t piv_face[] = {
-        'F',  'A', 'C', 0, '0', '1', '0', 0,    0,    0,    0,   50,   0,
-        1,    0,   0,   0, 36,  0,   0,   0,    0,    0,    0,   0,    0,
-        0,    1,   0,   0, 0,   0,   0,   0,    1,    0,    1,   0xa5, 2,
-        0x58, 1,   2,   0, 0,   0,   0,   0xff, 0xd8, 0xff, 0xd9};
+        'F', 'A', 'C', 0,    '0', '1',  '0', 0, 0, 0, 0, 50, 0,    1,    0,    0,   0,
+        36,  0,   0,   0,    0,   0,    0,   0, 0, 0, 1, 0,  0,    0,    0,    0,   0,
+        1,   0,   1,   0xa5, 2,   0x58, 1,   2, 0, 0, 0, 0,  0xff, 0xd8, 0xff, 0xd9};
     uint8_t face_record[sizeof piv_face];
     memcpy(face_record, piv_face, sizeof face_record);
     face_record[26] = face_record[27] = 0;
@@ -679,48 +668,38 @@ static void make_chuid(X509 *root, EVP_PKEY *root_key, X509 *issuer,
     face_record[36] = 1;
     face_record[37] = 18;
     const size_t face_plaintext_length = encode_biometric_record_parameters(
-        signing, signing_key, 0,
-        scenario >= BIO_RSA_ABSENT && scenario <= BIO_RSA_ABSENT_TAMPERED,
-        (TC_bytes){content + 2, 25}, signed_guid,
-        (TC_bytes){face_record, sizeof face_record}, 0x0501, 2, 0x20, plaintext,
-        sizeof plaintext);
-    face_length = encrypt_biometric(plaintext, face_plaintext_length,
-                                    face_bytes, sizeof face_bytes);
+        signing, signing_key, 0, scenario >= BIO_RSA_ABSENT && scenario <= BIO_RSA_ABSENT_TAMPERED,
+        (TC_bytes){content + 2, 25}, signed_guid, (TC_bytes){face_record, sizeof face_record},
+        0x0501, 2, 0x20, plaintext, sizeof plaintext);
+    face_length =
+        encrypt_biometric(plaintext, face_plaintext_length, face_bytes, sizeof face_bytes);
   }
   if (with_security()) {
-    unsigned_chuid_length =
-        cms_fixture_field(unsigned_chuid_bytes, sizeof unsigned_chuid_bytes,
-                          0x53, content, sizeof content);
+    unsigned_chuid_length = cms_fixture_field(unsigned_chuid_bytes, sizeof unsigned_chuid_bytes,
+                                              0x53, content, sizeof content);
     static const uint16_t containers[] = {0x3000, 0x3002, 0x2003, 0x6030,
                                           0x3001, 0x1015, 0x6011, 0x6012};
-    TC_bytes contents[] = {{chuid_bytes + 4, chuid_length - 4},
-                           {content, sizeof content},
-                           {biometric_bytes + 4, biometric_length - 4},
-                           {face_bytes + 4, face_length - 4},
-                           {extra_object + 2, sizeof extra_object - 2},
-                           {extra_object + 2, sizeof extra_object - 2},
-                           {extra_object + 2, sizeof extra_object - 2},
-                           {extra_object + 2, sizeof extra_object - 2}};
+    TC_bytes contents[] = {
+        {chuid_bytes + 4, chuid_length - 4},         {content, sizeof content},
+        {biometric_bytes + 4, biometric_length - 4}, {face_bytes + 4, face_length - 4},
+        {extra_object + 2, sizeof extra_object - 2}, {extra_object + 2, sizeof extra_object - 2},
+        {extra_object + 2, sizeof extra_object - 2}, {extra_object + 2, sizeof extra_object - 2}};
     if (scenario >= SECURITY_PRINTED) {
-      static const uint8_t key[] = {0, 1, 2,  3,  4,  5,  6,  7,
-                                    8, 9, 10, 11, 12, 13, 14, 15};
+      static const uint8_t key[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
       uint8_t ciphertext[80], field[88];
-      EVP_CIPHER_CTX *cipher = EVP_CIPHER_CTX_new();
+      EVP_CIPHER_CTX* cipher = EVP_CIPHER_CTX_new();
       munit_assert_not_null(cipher);
-      munit_assert_int(
-          EVP_EncryptInit_ex(cipher, EVP_aes_128_ecb(), NULL, key, NULL), ==,
-          1);
+      munit_assert_int(EVP_EncryptInit_ex(cipher, EVP_aes_128_ecb(), NULL, key, NULL), ==, 1);
       int written, tail;
-      munit_assert_int(EVP_EncryptUpdate(cipher, ciphertext, &written,
-                                         printed_tlvs, sizeof printed_tlvs),
-                       ==, 1);
-      munit_assert_int(EVP_EncryptFinal_ex(cipher, ciphertext + written, &tail),
-                       ==, 1);
+      munit_assert_int(
+          EVP_EncryptUpdate(cipher, ciphertext, &written, printed_tlvs, sizeof printed_tlvs), ==,
+          1);
+      munit_assert_int(EVP_EncryptFinal_ex(cipher, ciphertext + written, &tail), ==, 1);
       EVP_CIPHER_CTX_free(cipher);
-      const size_t field_length = cms_fixture_field(
-          field, sizeof field, 0xbc, ciphertext, (size_t)(written + tail));
-      printed_length = cms_fixture_field(printed_object, sizeof printed_object,
-                                         0x53, field, field_length);
+      const size_t field_length =
+          cms_fixture_field(field, sizeof field, 0xbc, ciphertext, (size_t)(written + tail));
+      printed_length =
+          cms_fixture_field(printed_object, sizeof printed_object, 0x53, field, field_length);
       contents[4] = (TC_bytes){printed_tlvs, sizeof printed_tlvs};
       if (scenario == SECURITY_PRINTED_CHANGED)
         printed_object[printed_length - 1] ^= 1;
@@ -728,9 +707,8 @@ static void make_chuid(X509 *root, EVP_PKEY *root_key, X509 *issuer,
     uint8_t body[2048];
     const size_t length = encode_security_inventory_parameters(
         signing, signing_key,
-        scenario >= SECURITY_RSA_ABSENT &&
-            scenario <= SECURITY_RSA_ABSENT_TAMPERED,
-        containers, contents,
+        scenario >= SECURITY_RSA_ABSENT && scenario <= SECURITY_RSA_ABSENT_TAMPERED, containers,
+        contents,
         legacy()             ? 3
         : optional_objects() ? (scenario == SECURITY_OMITTED_OPTIONAL ? 7 : 8)
                              : 5,
@@ -739,121 +717,105 @@ static void make_chuid(X509 *root, EVP_PKEY *root_key, X509 *issuer,
       body[2] = 2;
     if (scenario == SECURITY_RSA_ABSENT_TAMPERED)
       body[length - 3] ^= 1;
-    security_length = cms_fixture_field(security_bytes, sizeof security_bytes,
-                                        0x53, body, length);
+    security_length = cms_fixture_field(security_bytes, sizeof security_bytes, 0x53, body, length);
     if (scenario == SECURITY_CHANGED)
       unsigned_chuid_bytes[31] ^= 1;
   }
   X509_free(signing);
 }
 
-static MunitResult command_workflow(const MunitParameter params[],
-                                    void *context) {
-  const char *mode = munit_parameters_get(params, "transport");
+static MunitResult command_workflow(const MunitParameter params[], void* context)
+{
+  const char* mode = munit_parameters_get(params, "transport");
   extended_reads = strcmp(mode, "short") != 0;
   extended_chunks = !strcmp(mode, "extended-chained");
   piv_envelope = !strcmp(mode, "extended-piv-envelope");
   marsec_level = !extended_reads ? 1 : piv_envelope ? 3 : 2;
-  EVP_PKEY *root_key = EVP_EC_gen("prime256v1");
-  EVP_PKEY *card_key = EVP_RSA_gen(2048);
-  EVP_PKEY *other_card_key = EVP_RSA_gen(2048);
-  EVP_PKEY *signing_key = EVP_EC_gen("prime256v1");
+  EVP_PKEY* root_key = EVP_EC_gen("prime256v1");
+  EVP_PKEY* card_key = EVP_RSA_gen(2048);
+  EVP_PKEY* other_card_key = EVP_RSA_gen(2048);
+  EVP_PKEY* signing_key = EVP_EC_gen("prime256v1");
   munit_assert_not_null(root_key);
   munit_assert_not_null(card_key);
   munit_assert_not_null(other_card_key);
   munit_assert_not_null(signing_key);
-  X509 *root = make_certificate(root_key, "Synthetic command root", NULL);
+  X509* root = make_certificate(root_key, "Synthetic command root", NULL);
   add_extension(root, NID_basic_constraints, "critical,CA:TRUE");
   add_extension(root, NID_key_usage, "critical,keyCertSign,cRLSign");
-  root_length = encode_certificate(root, root_key, EVP_sha256(), root_der,
-                                   sizeof root_der);
-  EVP_PKEY *issuer_key = EVP_EC_gen("prime256v1");
+  root_length = encode_certificate(root, root_key, EVP_sha256(), root_der, sizeof root_der);
+  EVP_PKEY* issuer_key = EVP_EC_gen("prime256v1");
   munit_assert_not_null(issuer_key);
-  X509 *issuer = make_certificate(issuer_key, "Synthetic command issuer", root);
+  X509* issuer = make_certificate(issuer_key, "Synthetic command issuer", root);
   add_extension(issuer, NID_basic_constraints, "critical,CA:TRUE,pathlen:0");
   add_extension(issuer, NID_key_usage, "critical,keyCertSign,cRLSign");
-  issuer_length = encode_certificate(issuer, root_key, EVP_sha256(), issuer_der,
-                                     sizeof issuer_der);
+  issuer_length = encode_certificate(issuer, root_key, EVP_sha256(), issuer_der, sizeof issuer_der);
   for (scenario = 0; scenario < CASES; ++scenario) {
-    X509 *provisioned = X509_dup(root);
+    X509* provisioned = X509_dup(root);
     munit_assert_not_null(provisioned);
     if (scenario == ROOT_NOT_CA || scenario == ROOT_PATH_LIMIT) {
       X509_EXTENSION_free(X509_delete_ext(
-          provisioned,
-          X509_get_ext_by_NID(provisioned, NID_basic_constraints, -1)));
+          provisioned, X509_get_ext_by_NID(provisioned, NID_basic_constraints, -1)));
       add_extension(provisioned, NID_basic_constraints,
-                    scenario == ROOT_NOT_CA ? "critical,CA:FALSE"
-                                            : "critical,CA:TRUE,pathlen:0");
+                    scenario == ROOT_NOT_CA ? "critical,CA:FALSE" : "critical,CA:TRUE,pathlen:0");
     }
     if (scenario == ROOT_WRONG_USAGE) {
-      X509_EXTENSION_free(X509_delete_ext(
-          provisioned, X509_get_ext_by_NID(provisioned, NID_key_usage, -1)));
+      X509_EXTENSION_free(
+          X509_delete_ext(provisioned, X509_get_ext_by_NID(provisioned, NID_key_usage, -1)));
       add_extension(provisioned, NID_key_usage, "critical,digitalSignature");
     }
     if (scenario == ROOT_NAME_ALLOWED || scenario == ROOT_NAME_DENIED)
-      add_extension(provisioned, NID_name_constraints,
-                    "critical,permitted;DNS:.allowed.invalid");
+      add_extension(provisioned, NID_name_constraints, "critical,permitted;DNS:.allowed.invalid");
     if (scenario == ROOT_UNKNOWN_CRITICAL)
       add_extension(provisioned, NID_ext_key_usage, "critical,clientAuth");
     /* Matching issuer names alone cannot establish a certificate path. */
     if (scenario == UNRELATED_ROOT)
       munit_assert_int(X509_set_pubkey(provisioned, issuer_key), ==, 1);
-    root_length = encode_certificate(
-        provisioned, scenario == UNRELATED_ROOT ? issuer_key : root_key,
-        EVP_sha256(), root_der, sizeof root_der);
+    root_length =
+        encode_certificate(provisioned, scenario == UNRELATED_ROOT ? issuer_key : root_key,
+                           EVP_sha256(), root_der, sizeof root_der);
     X509_free(provisioned);
-    const int issued = scenario == INTERMEDIATE || scenario == MISSING_ISSUER ||
-                       scenario == ROOT_PATH_LIMIT;
-    X509 *leaf = make_certificate(card_key, "Synthetic command card",
-                                  issued ? issuer : root);
+    const int issued =
+        scenario == INTERMEDIATE || scenario == MISSING_ISSUER || scenario == ROOT_PATH_LIMIT;
+    X509* leaf = make_certificate(card_key, "Synthetic command card", issued ? issuer : root);
     if (scenario == CERTIFICATE_EXPIRES)
-      munit_assert_int(
-          ASN1_TIME_set_string(X509_getm_notAfter(leaf), "20260909000000Z"), ==,
-          1);
+      munit_assert_int(ASN1_TIME_set_string(X509_getm_notAfter(leaf), "20260909000000Z"), ==, 1);
     add_extension(leaf, NID_basic_constraints, "critical,CA:FALSE");
     add_extension(leaf, NID_key_usage, "critical,digitalSignature");
     add_extension(leaf, NID_ext_key_usage,
-                  scenario == TWIC_PURPOSE ? "1.3.6.1.4.1.29138.6.8"
-                                           : "2.16.840.1.101.3.6.8");
+                  scenario == TWIC_PURPOSE ? "1.3.6.1.4.1.29138.6.8" : "2.16.840.1.101.3.6.8");
     uint8_t fascn[25];
     memcpy(fascn, test_card_fascn, sizeof fascn);
     if (scenario == INVALID_FASCN)
       fascn[0] ^= 1;
     add_card_identifiers(leaf, (TC_bytes){fascn, sizeof fascn},
                          scenario == ABSENT_UUID ? NULL
-                         : legacy()
-                             ? "urn:uuid:00000000-0000-0000-0000-000000000000"
+                         : legacy()              ? "urn:uuid:00000000-0000-0000-0000-000000000000"
                          : scenario == UUID_NUMBER_MISMATCH
                              ? "urn:uuid:91be2094-f6dc-5349-8000-4090e49e505d"
                              : "urn:uuid:91be2094-f6dc-5349-8000-4090e49e505c");
     if (scenario == ROOT_NAME_ALLOWED || scenario == ROOT_NAME_DENIED) {
-      GENERAL_NAMES *names =
-          X509_get_ext_d2i(leaf, NID_subject_alt_name, NULL, NULL);
-      GENERAL_NAME *name = GENERAL_NAME_new();
-      ASN1_IA5STRING *dns = ASN1_IA5STRING_new();
+      GENERAL_NAMES* names = X509_get_ext_d2i(leaf, NID_subject_alt_name, NULL, NULL);
+      GENERAL_NAME* name = GENERAL_NAME_new();
+      ASN1_IA5STRING* dns = ASN1_IA5STRING_new();
       munit_assert_not_null(names);
       munit_assert_not_null(name);
       munit_assert_not_null(dns);
-      const char *text = scenario == ROOT_NAME_ALLOWED ? "card.allowed.invalid"
-                                                       : "card.blocked.invalid";
+      const char* text =
+          scenario == ROOT_NAME_ALLOWED ? "card.allowed.invalid" : "card.blocked.invalid";
       munit_assert_int(ASN1_STRING_set(dns, text, (int)strlen(text)), ==, 1);
       GENERAL_NAME_set0_value(name, GEN_DNS, dns);
       munit_assert_int(sk_GENERAL_NAME_push(names, name), >, 0);
-      munit_assert_int(X509_add1_ext_i2d(leaf, NID_subject_alt_name, names, 0,
-                                         X509V3_ADD_REPLACE),
+      munit_assert_int(X509_add1_ext_i2d(leaf, NID_subject_alt_name, names, 0, X509V3_ADD_REPLACE),
                        ==, 1);
       GENERAL_NAMES_free(names);
     }
-    leaf_length = encode_certificate(leaf, issued ? issuer_key : root_key,
-                                     EVP_sha256(), leaf_der, sizeof leaf_der);
+    leaf_length = encode_certificate(leaf, issued ? issuer_key : root_key, EVP_sha256(), leaf_der,
+                                     sizeof leaf_der);
     if (with_chuid())
       make_chuid(root, root_key, issuer, issuer_key,
-                 ((scenario >= CHUID_RSA_ABSENT &&
-                   scenario <= CHUID_RSA_ABSENT_TAMPERED) ||
-                  (scenario >= BIO_RSA_ABSENT &&
-                   scenario <= BIO_RSA_ABSENT_TAMPERED) ||
-                  (scenario >= SECURITY_RSA_ABSENT &&
-                   scenario <= SECURITY_RSA_ABSENT_TAMPERED))
+                 ((scenario >= CHUID_RSA_ABSENT && scenario <= CHUID_RSA_ABSENT_TAMPERED) ||
+                  (scenario >= BIO_RSA_ABSENT && scenario <= BIO_RSA_ABSENT_TAMPERED) ||
+                  (scenario >= SECURITY_RSA_ABSENT && scenario <= SECURITY_RSA_ABSENT_TAMPERED))
                      ? other_card_key
                      : signing_key,
                  leaf);
@@ -862,9 +824,8 @@ static MunitResult command_workflow(const MunitParameter params[],
     if (scenario >= GZIP_VALID && scenario <= GZIP_TRUNCATED) {
       enum { GZIP_WINDOW_BITS = 31, DEFLATE_MEMORY_LEVEL = 8 };
       z_stream stream = {0};
-      munit_assert_int(deflateInit2(&stream, Z_DEFAULT_COMPRESSION, Z_DEFLATED,
-                                    GZIP_WINDOW_BITS, DEFLATE_MEMORY_LEVEL,
-                                    Z_DEFAULT_STRATEGY),
+      munit_assert_int(deflateInit2(&stream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, GZIP_WINDOW_BITS,
+                                    DEFLATE_MEMORY_LEVEL, Z_DEFAULT_STRATEGY),
                        ==, Z_OK);
       stream.next_in = leaf_der;
       stream.avail_in = (uInt)leaf_length;
@@ -895,18 +856,9 @@ static MunitResult command_workflow(const MunitParameter params[],
       sha256_hex(content_root_der, content_root_length, content_root_digest);
     if (scenario == CHUID_ROOT_DIGEST_MISMATCH)
       content_root_digest[0] = content_root_digest[0] == '0' ? '1' : '0';
-    char *argv[40] = {"twic_authenticate",
-                      "--reader",
-                      "synthetic",
-                      "--root",
-                      "root",
-                      "--root-sha256",
-                      root_digest,
-                      "--ccl",
-                      "ccl",
-                      "--issuer",
-                      "issuer",
-                      NULL};
+    char* argv[40] = {
+        "twic_authenticate", "--reader", "synthetic", "--root",   "root",   "--root-sha256",
+        root_digest,         "--ccl",    "ccl",       "--issuer", "issuer", NULL};
     int argc = issued && scenario != MISSING_ISSUER ? 11 : 9;
     if (card.pss) {
       argv[argc++] = "--rsa-padding";
@@ -925,11 +877,9 @@ static MunitResult command_workflow(const MunitParameter params[],
       argv[argc++] = "content-crl";
       if (scenario == CHUID_BER || scenario == CHUID_BER_TAMPERED)
         argv[argc++] = "--chuid-ber";
-      if (scenario == CHUID_RSA_ABSENT ||
-          scenario == CHUID_RSA_ABSENT_TAMPERED || scenario == BIO_RSA_ABSENT ||
-          scenario == BIO_RSA_ABSENT_TAMPERED ||
-          scenario == SECURITY_RSA_ABSENT ||
-          scenario == SECURITY_RSA_ABSENT_TAMPERED) {
+      if (scenario == CHUID_RSA_ABSENT || scenario == CHUID_RSA_ABSENT_TAMPERED ||
+          scenario == BIO_RSA_ABSENT || scenario == BIO_RSA_ABSENT_TAMPERED ||
+          scenario == SECURITY_RSA_ABSENT || scenario == SECURITY_RSA_ABSENT_TAMPERED) {
         argv[argc++] = "--cms-rsa-parameters";
         argv[argc++] = "allow-absent";
       }
@@ -955,23 +905,19 @@ static MunitResult command_workflow(const MunitParameter params[],
     if (piv_envelope)
       argv[argc++] = "--piv-certificate-envelope";
     const int expected =
-        scenario == SUCCESS || scenario == CCL_AGE_BOUNDARY ||
-        scenario == LEGACY || scenario == TWIC_PURPOSE ||
-        scenario == ABSENT_UUID || scenario == CHUID_LARGE_CRL ||
-        scenario == CHUID_RSA_ABSENT || scenario == INTERMEDIATE ||
-        scenario == GZIP_VALID || scenario == ROOT_NAME_ALLOWED ||
-        (scenario >= CHUID_VALID && scenario <= CHUID_INTERMEDIATE) ||
-        scenario == BIO_VALID || scenario == BIO_LEGACY ||
-        scenario == BIO_LEGACY_SIGNATURE || scenario == BIO_RSA_ABSENT ||
+        scenario == SUCCESS || scenario == CCL_AGE_BOUNDARY || scenario == LEGACY ||
+        scenario == TWIC_PURPOSE || scenario == ABSENT_UUID || scenario == CHUID_LARGE_CRL ||
+        scenario == CHUID_RSA_ABSENT || scenario == INTERMEDIATE || scenario == GZIP_VALID ||
+        scenario == ROOT_NAME_ALLOWED ||
+        (scenario >= CHUID_VALID && scenario <= CHUID_INTERMEDIATE) || scenario == BIO_VALID ||
+        scenario == BIO_LEGACY || scenario == BIO_LEGACY_SIGNATURE || scenario == BIO_RSA_ABSENT ||
         scenario == SECURITY_VALID || scenario == SECURITY_LEGACY ||
         scenario == SECURITY_OPTIONAL || scenario == SECURITY_RSA_ABSENT ||
         scenario == SECURITY_PRINTED;
-    munit_assert_int(example_twic_command_main(argc, argv), ==,
-                     expected ? 0 : 1);
+    munit_assert_int(example_twic_command_main(argc, argv), ==, expected ? 0 : 1);
     if (expected || scenario == FINAL_CCL_SUPERSEDED)
       munit_assert_uint(ccl_checks, ==, 1);
-    const int protected =
-        scenario != LOCK_FAILURE && scenario != CORE_LIMIT_FAILURE;
+    const int protected = scenario != LOCK_FAILURE && scenario != CORE_LIMIT_FAILURE;
     munit_assert_uint(unlocked, ==, protected ? 1 : 0);
     munit_assert_uint(closed, ==, protected ? 1 : 0);
     if (scenario == CORE_LIMIT_FAILURE)
@@ -980,16 +926,13 @@ static MunitResult command_workflow(const MunitParameter params[],
       munit_assert_uint(opened, ==, 0);
       munit_assert_uint(commands, ==, 0);
     }
-    if (scenario == CANCELLED || scenario == BAD_CERTIFICATE ||
-        scenario == STALE || scenario == CCL_FUTURE ||
-        scenario == CCL_NO_TIMESTAMP || scenario == INVALID_FASCN ||
+    if (scenario == CANCELLED || scenario == BAD_CERTIFICATE || scenario == STALE ||
+        scenario == CCL_FUTURE || scenario == CCL_NO_TIMESTAMP || scenario == INVALID_FASCN ||
         scenario == UUID_NUMBER_MISMATCH || scenario == BAD_ROOT ||
-        scenario == ROOT_DIGEST_MISMATCH || scenario == FILE_FAILURE ||
-        scenario == CLOCK_FAILURE || scenario == LOCK_FAILURE ||
-        scenario == OPEN_FAILURE || scenario == SELECT_FAILURE ||
-        scenario == READ_FAILURE || scenario == MISSING_ISSUER ||
-        scenario == GZIP_BAD_CRC || scenario == GZIP_TRUNCATED ||
-        scenario == ROOT_NOT_CA || scenario == ROOT_WRONG_USAGE ||
+        scenario == ROOT_DIGEST_MISMATCH || scenario == FILE_FAILURE || scenario == CLOCK_FAILURE ||
+        scenario == LOCK_FAILURE || scenario == OPEN_FAILURE || scenario == SELECT_FAILURE ||
+        scenario == READ_FAILURE || scenario == MISSING_ISSUER || scenario == GZIP_BAD_CRC ||
+        scenario == GZIP_TRUNCATED || scenario == ROOT_NOT_CA || scenario == ROOT_WRONG_USAGE ||
         scenario == ROOT_PATH_LIMIT || scenario == ROOT_NAME_DENIED ||
         scenario == ROOT_UNKNOWN_CRITICAL || scenario == UNRELATED_ROOT ||
         scenario == CORE_LIMIT_FAILURE || scenario == BIO_BAD_KEY ||
@@ -997,10 +940,9 @@ static MunitResult command_workflow(const MunitParameter params[],
       munit_assert_size(entropy.calls, ==, 0);
     if (scenario == INVALID_FASCN || scenario == UUID_NUMBER_MISMATCH)
       munit_assert_size(card.signatures, ==, 0);
-    if (expected || scenario == FINAL_CCL_SUPERSEDED ||
-        scenario == WRONG_CARD_KEY || scenario == UNLOCK_FAILURE ||
-        (with_chuid() && scenario != BIO_BAD_KEY &&
-         scenario != CHUID_ROOT_DIGEST_MISMATCH))
+    if (expected || scenario == FINAL_CCL_SUPERSEDED || scenario == WRONG_CARD_KEY ||
+        scenario == UNLOCK_FAILURE ||
+        (with_chuid() && scenario != BIO_BAD_KEY && scenario != CHUID_ROOT_DIGEST_MISMATCH))
       munit_assert_size(card.signatures, ==, 1);
     if (with_biometric()) {
       if (scenario == BIO_BAD_KEY)
@@ -1023,23 +965,14 @@ static MunitResult command_workflow(const MunitParameter params[],
   return MUNIT_OK;
 }
 
-static MunitResult command_arguments(const MunitParameter params[],
-                                     void *context) {
-  char *argv[32] = {"twic_authenticate",
-                    "--reader",
-                    "synthetic",
-                    "--root",
-                    "root",
-                    "--ccl",
-                    "ccl",
-                    "--marsec-level",
-                    "1",
-                    NULL};
-  static const char *bad_numbers[] = {
-      "", "-1", "+1", " 1", "1x", "18446744073709551616", "0", "4"};
+static MunitResult command_arguments(const MunitParameter params[], void* context)
+{
+  char* argv[32] = {"twic_authenticate", "--reader", "synthetic", "--root", "root", "--ccl", "ccl",
+                    "--marsec-level",    "1",        NULL};
+  static const char* bad_numbers[] = {"", "-1", "+1", " 1", "1x", "18446744073709551616", "0", "4"};
   opened = locked = commands = 0;
   for (size_t i = 0; i < sizeof bad_numbers / sizeof *bad_numbers; ++i) {
-    argv[8] = (char *)bad_numbers[i];
+    argv[8] = (char*)bad_numbers[i];
     munit_assert_int(example_twic_command_main(9, argv), ==, 2);
   }
   argv[8] = "1";
@@ -1076,10 +1009,9 @@ static MunitResult command_arguments(const MunitParameter params[],
   munit_assert_int(example_twic_command_main(9, argv), ==, 2);
   argv[7] = "--marsec-level";
   munit_assert_int(example_twic_command_main(8, argv), ==, 2);
-  static const char *incomplete[] = {"--chuid-root", "--chuid-crl",
-                                     "--chuid-issuer", "--tpk-hex"};
+  static const char* incomplete[] = {"--chuid-root", "--chuid-crl", "--chuid-issuer", "--tpk-hex"};
   for (size_t i = 0; i < sizeof incomplete / sizeof *incomplete; ++i) {
-    argv[9] = (char *)incomplete[i];
+    argv[9] = (char*)incomplete[i];
     argv[10] = "unused";
     munit_assert_int(example_twic_command_main(11, argv), ==, 2);
   }
@@ -1116,16 +1048,15 @@ static MunitResult command_arguments(const MunitParameter params[],
   return MUNIT_OK;
 }
 
-int main(int argc, char **argv) {
-  static char *transports[] = {"short", "extended", "extended-chained",
-                               "extended-piv-envelope", NULL};
-  static MunitParameterEnum workflow_parameters[] = {{"transport", transports},
-                                                     {NULL, NULL}};
-  MunitTest tests[] = {{"/workflow", command_workflow, NULL, NULL,
-                        MUNIT_TEST_OPTION_NONE, workflow_parameters},
-                       {"/arguments", command_arguments, NULL, NULL,
-                        MUNIT_TEST_OPTION_NONE, NULL},
-                       {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
+int main(int argc, char** argv)
+{
+  static char* transports[] = {"short", "extended", "extended-chained", "extended-piv-envelope",
+                               NULL};
+  static MunitParameterEnum workflow_parameters[] = {{"transport", transports}, {NULL, NULL}};
+  MunitTest tests[] = {
+      {"/workflow", command_workflow, NULL, NULL, MUNIT_TEST_OPTION_NONE, workflow_parameters},
+      {"/arguments", command_arguments, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
   MunitSuite suite = {"/twic/command", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};
   return munit_suite_main(&suite, NULL, argc, argv);
 }

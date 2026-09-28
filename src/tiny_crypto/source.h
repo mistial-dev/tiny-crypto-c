@@ -11,8 +11,8 @@ extern "C" {
 
 /* Fill the entire destination and return TC_OK. Short reads and storage failures
  * return TC_ERROR. Offsets address the source independently of CPU address size. */
-typedef TC_status (*TC_source_read_fn)(void* context, uint64_t offset,
-    uint8_t* destination, size_t length);
+typedef TC_status (*TC_source_read_fn)(void* context, uint64_t offset, uint8_t* destination,
+                                       size_t length);
 
 /* The caller holds storage alive and immutable throughout an operation, including
  * pauses. Callbacks may use files or flash; they must preserve parser workspace.

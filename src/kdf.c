@@ -31,8 +31,7 @@
 /* A CMAC PRF names the streaming CMAC functions of its block cipher. Only
  * that cipher's KBKDF family references the descriptor, so an unused family
  * and its cipher drop out at link time. */
-struct tc_kdf_cmac
-{
+struct tc_kdf_cmac {
   int (*key_ok)(size_t key_len);
   TC_status (*init)(void* ctx, const uint8_t* key, size_t key_len);
   TC_status (*update)(void* ctx, const uint8_t* data, size_t len);
@@ -41,34 +40,28 @@ struct tc_kdf_cmac
 };
 #endif
 
-enum tc_kdf_prf_kind
-{
-  TC_KDF_PRF_HMAC,
-  TC_KDF_PRF_CMAC
-};
+enum tc_kdf_prf_kind { TC_KDF_PRF_HMAC, TC_KDF_PRF_CMAC };
 
 /* A PRF is its kind plus the typed descriptor of that kind. The per-family
  * wrappers own context storage of the matching type, and ctx_size bytes of
  * it are copied and wiped by the core. */
-struct tc_kdf_prf
-{
+struct tc_kdf_prf {
   enum tc_kdf_prf_kind kind;
   uint8_t out_len; /* h, the PRF output length in bytes */
   size_t ctx_size;
-  union
-  {
+  union {
 #if TC_KBKDF_HAVE_HMAC
     const tc_hash_algorithm_info* hash; /* TC_KDF_PRF_HMAC */
 #endif
 #if TC_KDF_HAVE_CMAC
-    const struct tc_kdf_cmac* cmac;     /* TC_KDF_PRF_CMAC */
+    const struct tc_kdf_cmac* cmac; /* TC_KDF_PRF_CMAC */
 #endif
   } mac;
 };
 
 #if TC_KBKDF_HAVE_HMAC
-static struct tc_kdf_prf tc_kdf_hmac_prf(const tc_hash_algorithm_info* hash,
-                                         size_t ctx_size, uint8_t out_len)
+static struct tc_kdf_prf tc_kdf_hmac_prf(const tc_hash_algorithm_info* hash, size_t ctx_size,
+                                         uint8_t out_len)
 {
   struct tc_kdf_prf prf;
   prf.kind = TC_KDF_PRF_HMAC;
@@ -102,14 +95,13 @@ static void tc_kdf_aes_cmac_clear(void* ctx)
 {
   TC_AES_CMAC_ctx_clear((struct TC_AES_CMAC_ctx*)ctx);
 }
-static const struct tc_kdf_cmac tc_kdf_aes_cmac = {
-  tc_kdf_aes_key_ok, tc_kdf_aes_cmac_init, tc_kdf_aes_cmac_update,
-  tc_kdf_aes_cmac_final, tc_kdf_aes_cmac_clear
-};
-static const struct tc_kdf_prf tc_kdf_prf_aes_cmac = {
-  TC_KDF_PRF_CMAC, TC_AES_CMAC_TAG_MAX, sizeof(struct TC_AES_CMAC_ctx),
-  {.cmac = &tc_kdf_aes_cmac}
-};
+static const struct tc_kdf_cmac tc_kdf_aes_cmac = {tc_kdf_aes_key_ok, tc_kdf_aes_cmac_init,
+                                                   tc_kdf_aes_cmac_update, tc_kdf_aes_cmac_final,
+                                                   tc_kdf_aes_cmac_clear};
+static const struct tc_kdf_prf tc_kdf_prf_aes_cmac = {TC_KDF_PRF_CMAC,
+                                                      TC_AES_CMAC_TAG_MAX,
+                                                      sizeof(struct TC_AES_CMAC_ctx),
+                                                      {.cmac = &tc_kdf_aes_cmac}};
 #endif /* TC_KBKDF_HAVE_AES_CMAC */
 
 #if TC_KBKDF_HAVE_DES_CMAC
@@ -133,14 +125,13 @@ static void tc_kdf_des_cmac_clear(void* ctx)
 {
   TC_DES_CMAC_ctx_clear((struct TC_DES_CMAC_ctx*)ctx);
 }
-static const struct tc_kdf_cmac tc_kdf_des_cmac = {
-  tc_kdf_des_key_ok, tc_kdf_des_cmac_init, tc_kdf_des_cmac_update,
-  tc_kdf_des_cmac_final, tc_kdf_des_cmac_clear
-};
-static const struct tc_kdf_prf tc_kdf_prf_des_cmac = {
-  TC_KDF_PRF_CMAC, TC_DES_CMAC_TAG_MAX, sizeof(struct TC_DES_CMAC_ctx),
-  {.cmac = &tc_kdf_des_cmac}
-};
+static const struct tc_kdf_cmac tc_kdf_des_cmac = {tc_kdf_des_key_ok, tc_kdf_des_cmac_init,
+                                                   tc_kdf_des_cmac_update, tc_kdf_des_cmac_final,
+                                                   tc_kdf_des_cmac_clear};
+static const struct tc_kdf_prf tc_kdf_prf_des_cmac = {TC_KDF_PRF_CMAC,
+                                                      TC_DES_CMAC_TAG_MAX,
+                                                      sizeof(struct TC_DES_CMAC_ctx),
+                                                      {.cmac = &tc_kdf_des_cmac}};
 #endif /* TC_KBKDF_HAVE_DES_CMAC */
 
 /* HMAC PRFs run through the hash core with their typed hash descriptor, and
@@ -159,8 +150,8 @@ static int tc_kdf_key_ok(const struct tc_kdf_prf* prf, size_t key_len)
 #endif
 }
 
-static TC_status tc_kdf_mac_init(const struct tc_kdf_prf* prf, void* ctx,
-                                 const uint8_t* key, size_t key_len)
+static TC_status tc_kdf_mac_init(const struct tc_kdf_prf* prf, void* ctx, const uint8_t* key,
+                                 size_t key_len)
 {
 #if TC_KBKDF_HAVE_HMAC
   if (prf->kind == TC_KDF_PRF_HMAC)
@@ -176,8 +167,8 @@ static TC_status tc_kdf_mac_init(const struct tc_kdf_prf* prf, void* ctx,
 #endif
 }
 
-static TC_status tc_kdf_mac_update(const struct tc_kdf_prf* prf, void* ctx,
-                                   const uint8_t* data, size_t len)
+static TC_status tc_kdf_mac_update(const struct tc_kdf_prf* prf, void* ctx, const uint8_t* data,
+                                   size_t len)
 {
 #if TC_KBKDF_HAVE_HMAC
   if (prf->kind == TC_KDF_PRF_HMAC)
@@ -227,20 +218,18 @@ static void tc_kdf_mac_clear(const struct tc_kdf_prf* prf, void* ctx)
 /* Shared derivation core                                                    */
 /*****************************************************************************/
 
-#define TC_KDF_MODE_COUNTER  0
+#define TC_KDF_MODE_COUNTER 0
 #define TC_KDF_MODE_FEEDBACK 1
 #define TC_KDF_MODE_PIPELINE 2
 
-struct tc_kdf_segment
-{
+struct tc_kdf_segment {
   const uint8_t* data;
   size_t len;
 };
 
 /* Any overlap, including an exact alias, is an error: later PRF blocks
    re-read the inputs after earlier output bytes were written. */
-static int tc_kdf_overlaps(const uint8_t* out, size_t out_len,
-                           const uint8_t* in, size_t in_len)
+static int tc_kdf_overlaps(const uint8_t* out, size_t out_len, const uint8_t* in, size_t in_len)
 {
   if (in == NULL || in_len == 0)
     return 0;
@@ -249,24 +238,19 @@ static int tc_kdf_overlaps(const uint8_t* out, size_t out_len,
 
 static int tc_kdf_counter_bits_ok(unsigned bits)
 {
-  return bits == TC_KBKDF_COUNTER_8 || bits == TC_KBKDF_COUNTER_16 ||
-         bits == TC_KBKDF_COUNTER_24 || bits == TC_KBKDF_COUNTER_32;
+  return bits == TC_KBKDF_COUNTER_8 || bits == TC_KBKDF_COUNTER_16 || bits == TC_KBKDF_COUNTER_24 ||
+         bits == TC_KBKDF_COUNTER_32;
 }
 
 /* Run the PRF over an ordered list of segments into block. */
-static TC_status tc_kdf_prf_run(const struct tc_kdf_prf* prf,
-                                const void* initialized,
-                                void* ctx,
-                                const struct tc_kdf_segment* seg, unsigned count,
-                                uint8_t* block)
+static TC_status tc_kdf_prf_run(const struct tc_kdf_prf* prf, const void* initialized, void* ctx,
+                                const struct tc_kdf_segment* seg, unsigned count, uint8_t* block)
 {
   unsigned s;
 
   memcpy(ctx, initialized, prf->ctx_size);
-  for (s = 0; s < count; ++s)
-  {
-    if (seg[s].len != 0 && tc_kdf_mac_update(prf, ctx, seg[s].data, seg[s].len) != TC_OK)
-    {
+  for (s = 0; s < count; ++s) {
+    if (seg[s].len != 0 && tc_kdf_mac_update(prf, ctx, seg[s].data, seg[s].len) != TC_OK) {
       tc_kdf_mac_clear(prf, ctx);
       return TC_ERROR;
     }
@@ -280,14 +264,11 @@ static TC_status tc_kdf_prf_run(const struct tc_kdf_prf* prf,
  *   feedback  : in1 = IV (K(0)),               in2 = fixed input
  *   pipeline  : in1 unused,                     in2 = fixed input (= A(0))
  */
-static TC_status tc_kdf_derive(const struct tc_kdf_prf* prf, int mode,
-                               const uint8_t* key, size_t key_len,
-                               const struct TC_KBKDF_params* params,
-                               const uint8_t* in1, size_t in1_len,
-                               const uint8_t* in2, size_t in2_len,
-                               uint8_t* out, size_t out_len,
-                               void* initialized, void* ctx,
-                               uint8_t* chain, uint8_t* block)
+static TC_status tc_kdf_derive(const struct tc_kdf_prf* prf, int mode, const uint8_t* key,
+                               size_t key_len, const struct TC_KBKDF_params* params,
+                               const uint8_t* in1, size_t in1_len, const uint8_t* in2,
+                               size_t in2_len, uint8_t* out, size_t out_len, void* initialized,
+                               void* ctx, uint8_t* chain, uint8_t* block)
 {
   uint8_t ctr[4];
   struct tc_kdf_segment seg[3];
@@ -298,25 +279,21 @@ static TC_status tc_kdf_derive(const struct tc_kdf_prf* prf, int mode,
   int use_ctr;
   uint32_t i;
 
-  if (key == NULL || key_len == 0 || !tc_kdf_key_ok(prf, key_len) ||
-      params == NULL || out == NULL || out_len == 0 ||
-      (in1_len != 0 && in1 == NULL) || (in2_len != 0 && in2 == NULL))
+  if (key == NULL || key_len == 0 || !tc_kdf_key_ok(prf, key_len) || params == NULL ||
+      out == NULL || out_len == 0 || (in1_len != 0 && in1 == NULL) || (in2_len != 0 && in2 == NULL))
     return TC_ERROR;
-  if (tc_kdf_overlaps(out, out_len, key, key_len) ||
-      tc_kdf_overlaps(out, out_len, in1, in1_len) ||
+  if (tc_kdf_overlaps(out, out_len, key, key_len) || tc_kdf_overlaps(out, out_len, in1, in1_len) ||
       tc_kdf_overlaps(out, out_len, in2, in2_len))
     return TC_ERROR;
 
   use_ctr = (mode == TC_KDF_MODE_COUNTER) ? 1 : (params->use_counter != 0);
-  if (use_ctr)
-  {
+  if (use_ctr) {
     r = params->counter_bits;
     if (!tc_kdf_counter_bits_ok(r))
       return TC_ERROR;
     ctr_len = r / 8u;
-    if (mode != TC_KDF_MODE_COUNTER &&
-        (params->counter_location < TC_KBKDF_CTR_BEFORE_ITER ||
-         params->counter_location > TC_KBKDF_CTR_AFTER_FIXED))
+    if (mode != TC_KDF_MODE_COUNTER && (params->counter_location < TC_KBKDF_CTR_BEFORE_ITER ||
+                                        params->counter_location > TC_KBKDF_CTR_AFTER_FIXED))
       return TC_ERROR;
   }
 
@@ -336,32 +313,26 @@ static TC_status tc_kdf_derive(const struct tc_kdf_prf* prf, int mode,
   if (tc_kdf_mac_init(prf, initialized, key, key_len) != TC_OK)
     return TC_ERROR;
 
-  if (mode == TC_KDF_MODE_FEEDBACK)
-  {
+  if (mode == TC_KDF_MODE_FEEDBACK) {
     chain_p = in1;
     chain_n = in1_len;
-  }
-  else if (mode == TC_KDF_MODE_PIPELINE)
-  {
+  } else if (mode == TC_KDF_MODE_PIPELINE) {
     chain_p = in2;
     chain_n = in2_len;
   }
 
   pos = 0;
-  for (i = 1; pos < out_len; ++i)
-  {
+  for (i = 1; pos < out_len; ++i) {
     unsigned count;
     size_t take;
 
-    if (use_ctr)
-    {
+    if (use_ctr) {
       unsigned k;
       for (k = 0; k < ctr_len; ++k)
         ctr[k] = (uint8_t)(i >> (8u * (ctr_len - 1u - k)));
     }
 
-    if (mode == TC_KDF_MODE_PIPELINE)
-    {
+    if (mode == TC_KDF_MODE_PIPELINE) {
       /* A(i) = PRF(KDK, A(i-1)); A(0) is the fixed input itself. */
       seg[0].data = chain_p;
       seg[0].len = chain_n;
@@ -371,46 +342,51 @@ static TC_status tc_kdf_derive(const struct tc_kdf_prf* prf, int mode,
       chain_n = h;
     }
 
-    if (mode == TC_KDF_MODE_COUNTER)
-    {
-      seg[0].data = in1;  seg[0].len = in1_len;
-      seg[1].data = ctr;  seg[1].len = ctr_len;
-      seg[2].data = in2;  seg[2].len = in2_len;
+    if (mode == TC_KDF_MODE_COUNTER) {
+      seg[0].data = in1;
+      seg[0].len = in1_len;
+      seg[1].data = ctr;
+      seg[1].len = ctr_len;
+      seg[2].data = in2;
+      seg[2].len = in2_len;
       count = 3;
-    }
-    else if (!use_ctr)
-    {
-      seg[0].data = chain_p; seg[0].len = chain_n;
-      seg[1].data = in2;     seg[1].len = in2_len;
+    } else if (!use_ctr) {
+      seg[0].data = chain_p;
+      seg[0].len = chain_n;
+      seg[1].data = in2;
+      seg[1].len = in2_len;
       count = 2;
-    }
-    else if (params->counter_location == TC_KBKDF_CTR_BEFORE_ITER)
-    {
-      seg[0].data = ctr;     seg[0].len = ctr_len;
-      seg[1].data = chain_p; seg[1].len = chain_n;
-      seg[2].data = in2;     seg[2].len = in2_len;
+    } else if (params->counter_location == TC_KBKDF_CTR_BEFORE_ITER) {
+      seg[0].data = ctr;
+      seg[0].len = ctr_len;
+      seg[1].data = chain_p;
+      seg[1].len = chain_n;
+      seg[2].data = in2;
+      seg[2].len = in2_len;
       count = 3;
-    }
-    else if (params->counter_location == TC_KBKDF_CTR_AFTER_ITER)
-    {
-      seg[0].data = chain_p; seg[0].len = chain_n;
-      seg[1].data = ctr;     seg[1].len = ctr_len;
-      seg[2].data = in2;     seg[2].len = in2_len;
+    } else if (params->counter_location == TC_KBKDF_CTR_AFTER_ITER) {
+      seg[0].data = chain_p;
+      seg[0].len = chain_n;
+      seg[1].data = ctr;
+      seg[1].len = ctr_len;
+      seg[2].data = in2;
+      seg[2].len = in2_len;
       count = 3;
-    }
-    else /* TC_KBKDF_CTR_AFTER_FIXED */
+    } else /* TC_KBKDF_CTR_AFTER_FIXED */
     {
-      seg[0].data = chain_p; seg[0].len = chain_n;
-      seg[1].data = in2;     seg[1].len = in2_len;
-      seg[2].data = ctr;     seg[2].len = ctr_len;
+      seg[0].data = chain_p;
+      seg[0].len = chain_n;
+      seg[1].data = in2;
+      seg[1].len = in2_len;
+      seg[2].data = ctr;
+      seg[2].len = ctr_len;
       count = 3;
     }
 
     if (tc_kdf_prf_run(prf, initialized, ctx, seg, count, block) != TC_OK)
       goto fail;
 
-    if (mode == TC_KDF_MODE_FEEDBACK)
-    {
+    if (mode == TC_KDF_MODE_FEEDBACK) {
       memcpy(chain, block, h);
       chain_p = chain;
       chain_n = h;
@@ -426,7 +402,8 @@ static TC_status tc_kdf_derive(const struct tc_kdf_prf* prf, int mode,
 #if TC_ZEROIZE
   tc_kdf_mac_clear(prf, initialized);
   tc_kdf_mac_clear(prf, ctx);
-  if (chain != NULL) TC_secure_zero(chain, h);
+  if (chain != NULL)
+    TC_secure_zero(chain, h);
   TC_secure_zero(block, h);
 #endif
   return TC_OK;
@@ -435,7 +412,8 @@ fail:
   tc_kdf_mac_clear(prf, initialized);
   tc_kdf_mac_clear(prf, ctx);
   TC_secure_zero(out, out_len);
-  if (chain != NULL) TC_secure_zero(chain, h);
+  if (chain != NULL)
+    TC_secure_zero(chain, h);
   TC_secure_zero(block, h);
   return TC_ERROR;
 }
@@ -444,14 +422,12 @@ fail:
 /* Fixed-input helper                                                        */
 /*****************************************************************************/
 
-TC_status TC_KBKDF_fixed_input(const uint8_t* label, size_t label_len,
-                               const uint8_t* context, size_t context_len,
-                               size_t out_len, uint8_t* buf, size_t buf_len)
+TC_status TC_KBKDF_fixed_input(const uint8_t* label, size_t label_len, const uint8_t* context,
+                               size_t context_len, size_t out_len, uint8_t* buf, size_t buf_len)
 {
   size_t needed;
 
-  if (buf == NULL || (label_len != 0 && label == NULL) ||
-      (context_len != 0 && context == NULL))
+  if (buf == NULL || (label_len != 0 && label == NULL) || (context_len != 0 && context == NULL))
     return TC_ERROR;
   /* [L]_32 is a bit count, so out_len must stay below 2^29 bytes. */
   if (out_len == 0 || out_len > 0x1FFFFFFFu)
@@ -472,8 +448,7 @@ TC_status TC_KBKDF_fixed_input(const uint8_t* label, size_t label_len,
   buf[label_len] = 0x00;
   if (context_len != 0)
     memcpy(buf + label_len + 1u, context, context_len);
-  tc_internal_store_be32(buf + label_len + 1u + context_len,
-                         (uint32_t)out_len << 3);
+  tc_internal_store_be32(buf + label_len + 1u + context_len, (uint32_t)out_len << 3);
   return TC_OK;
 }
 
@@ -482,83 +457,79 @@ TC_status TC_KBKDF_fixed_input(const uint8_t* label, size_t label_len,
 /*****************************************************************************/
 
 /* Typed storage keeps unrelated enabled PRFs out of this call's stack budget. */
-#define TC_KDF_DEFINE_FAMILY(NAME, PRF, CTX, DIGESTLEN) \
-  static TC_status tc_kdf_##NAME(int mode, const uint8_t* key, size_t key_len, \
-                                  const struct TC_KBKDF_params* params, \
-                                  const uint8_t* in1, size_t in1_len, \
-                                  const uint8_t* in2, size_t in2_len, \
-                                  uint8_t* out, size_t out_len) \
-  { \
-    CTX initialized, ctx; \
-    const struct tc_kdf_prf prf = PRF; \
-    uint8_t chain[DIGESTLEN], block[DIGESTLEN]; \
-    return tc_kdf_derive(&prf, mode, key, key_len, params, \
-                         in1, in1_len, in2, in2_len, out, out_len, \
-                         &initialized, &ctx, chain, block); \
-  } \
-  TC_status TC_KBKDF_##NAME##_counter(const uint8_t* key, size_t key_len, \
-                                      const struct TC_KBKDF_params* params, \
-                                      const uint8_t* before, size_t before_len, \
-                                      const uint8_t* after, size_t after_len, \
-                                      uint8_t* out, size_t out_len) \
-  { \
-    CTX initialized, ctx; \
-    const struct tc_kdf_prf prf = PRF; \
-    uint8_t block[DIGESTLEN]; \
-    return tc_kdf_derive(&prf, TC_KDF_MODE_COUNTER, key, key_len, params, \
-                         before, before_len, after, after_len, out, out_len, \
-                         &initialized, &ctx, NULL, block); \
-  } \
-  TC_status TC_KBKDF_##NAME##_feedback(const uint8_t* key, size_t key_len, \
-                                       const struct TC_KBKDF_params* params, \
-                                       const uint8_t* iv, size_t iv_len, \
-                                       const uint8_t* fixed, size_t fixed_len, \
-                                       uint8_t* out, size_t out_len) \
-  { \
-    return tc_kdf_##NAME(TC_KDF_MODE_FEEDBACK, key, key_len, params, \
-                         iv, iv_len, fixed, fixed_len, out, out_len); \
-  } \
-  TC_status TC_KBKDF_##NAME##_pipeline(const uint8_t* key, size_t key_len, \
-                                       const struct TC_KBKDF_params* params, \
-                                       const uint8_t* fixed, size_t fixed_len, \
-                                       uint8_t* out, size_t out_len) \
-  { \
-    return tc_kdf_##NAME(TC_KDF_MODE_PIPELINE, key, key_len, params, \
-                         NULL, 0, fixed, fixed_len, out, out_len); \
+#define TC_KDF_DEFINE_FAMILY(NAME, PRF, CTX, DIGESTLEN)                                            \
+  static TC_status tc_kdf_##NAME(int mode, const uint8_t* key, size_t key_len,                     \
+                                 const struct TC_KBKDF_params* params, const uint8_t* in1,         \
+                                 size_t in1_len, const uint8_t* in2, size_t in2_len, uint8_t* out, \
+                                 size_t out_len)                                                   \
+  {                                                                                                \
+    CTX initialized, ctx;                                                                          \
+    const struct tc_kdf_prf prf = PRF;                                                             \
+    uint8_t chain[DIGESTLEN], block[DIGESTLEN];                                                    \
+    return tc_kdf_derive(&prf, mode, key, key_len, params, in1, in1_len, in2, in2_len, out,        \
+                         out_len, &initialized, &ctx, chain, block);                               \
+  }                                                                                                \
+  TC_status TC_KBKDF_##NAME##_counter(const uint8_t* key, size_t key_len,                          \
+                                      const struct TC_KBKDF_params* params, const uint8_t* before, \
+                                      size_t before_len, const uint8_t* after, size_t after_len,   \
+                                      uint8_t* out, size_t out_len)                                \
+  {                                                                                                \
+    CTX initialized, ctx;                                                                          \
+    const struct tc_kdf_prf prf = PRF;                                                             \
+    uint8_t block[DIGESTLEN];                                                                      \
+    return tc_kdf_derive(&prf, TC_KDF_MODE_COUNTER, key, key_len, params, before, before_len,      \
+                         after, after_len, out, out_len, &initialized, &ctx, NULL, block);         \
+  }                                                                                                \
+  TC_status TC_KBKDF_##NAME##_feedback(                                                            \
+      const uint8_t* key, size_t key_len, const struct TC_KBKDF_params* params, const uint8_t* iv, \
+      size_t iv_len, const uint8_t* fixed, size_t fixed_len, uint8_t* out, size_t out_len)         \
+  {                                                                                                \
+    return tc_kdf_##NAME(TC_KDF_MODE_FEEDBACK, key, key_len, params, iv, iv_len, fixed, fixed_len, \
+                         out, out_len);                                                            \
+  }                                                                                                \
+  TC_status TC_KBKDF_##NAME##_pipeline(const uint8_t* key, size_t key_len,                         \
+                                       const struct TC_KBKDF_params* params, const uint8_t* fixed, \
+                                       size_t fixed_len, uint8_t* out, size_t out_len)             \
+  {                                                                                                \
+    return tc_kdf_##NAME(TC_KDF_MODE_PIPELINE, key, key_len, params, NULL, 0, fixed, fixed_len,    \
+                         out, out_len);                                                            \
   }
 
 #if TC_KBKDF_HAVE_HMAC_SHA1
 TC_KDF_DEFINE_FAMILY(HMAC_SHA1,
-                     tc_kdf_hmac_prf(&tc_sha1_info, sizeof(struct TC_HMAC_SHA1_ctx), TC_SHA1_DIGESTLEN),
+                     tc_kdf_hmac_prf(&tc_sha1_info, sizeof(struct TC_HMAC_SHA1_ctx),
+                                     TC_SHA1_DIGESTLEN),
                      struct TC_HMAC_SHA1_ctx, TC_SHA1_DIGESTLEN)
 #endif
 #if TC_KBKDF_HAVE_HMAC_SHA224
 TC_KDF_DEFINE_FAMILY(HMAC_SHA224,
-                     tc_kdf_hmac_prf(&tc_sha224_info, sizeof(struct TC_HMAC_SHA224_ctx), TC_SHA224_DIGESTLEN),
+                     tc_kdf_hmac_prf(&tc_sha224_info, sizeof(struct TC_HMAC_SHA224_ctx),
+                                     TC_SHA224_DIGESTLEN),
                      struct TC_HMAC_SHA224_ctx, TC_SHA224_DIGESTLEN)
 #endif
 #if TC_KBKDF_HAVE_HMAC_SHA256
 TC_KDF_DEFINE_FAMILY(HMAC_SHA256,
-                     tc_kdf_hmac_prf(&tc_sha256_info, sizeof(struct TC_HMAC_SHA256_ctx), TC_SHA256_DIGESTLEN),
+                     tc_kdf_hmac_prf(&tc_sha256_info, sizeof(struct TC_HMAC_SHA256_ctx),
+                                     TC_SHA256_DIGESTLEN),
                      struct TC_HMAC_SHA256_ctx, TC_SHA256_DIGESTLEN)
 #endif
 #if TC_KBKDF_HAVE_HMAC_SHA384
 TC_KDF_DEFINE_FAMILY(HMAC_SHA384,
-                     tc_kdf_hmac_prf(&tc_sha384_info, sizeof(struct TC_HMAC_SHA384_ctx), TC_SHA384_DIGESTLEN),
+                     tc_kdf_hmac_prf(&tc_sha384_info, sizeof(struct TC_HMAC_SHA384_ctx),
+                                     TC_SHA384_DIGESTLEN),
                      struct TC_HMAC_SHA384_ctx, TC_SHA384_DIGESTLEN)
 #endif
 #if TC_KBKDF_HAVE_HMAC_SHA512
 TC_KDF_DEFINE_FAMILY(HMAC_SHA512,
-                     tc_kdf_hmac_prf(&tc_sha512_info, sizeof(struct TC_HMAC_SHA512_ctx), TC_SHA512_DIGESTLEN),
+                     tc_kdf_hmac_prf(&tc_sha512_info, sizeof(struct TC_HMAC_SHA512_ctx),
+                                     TC_SHA512_DIGESTLEN),
                      struct TC_HMAC_SHA512_ctx, TC_SHA512_DIGESTLEN)
 #endif
 #if TC_KBKDF_HAVE_AES_CMAC
-TC_KDF_DEFINE_FAMILY(AES_CMAC, tc_kdf_prf_aes_cmac,
-                     struct TC_AES_CMAC_ctx, TC_AES_CMAC_TAG_MAX)
+TC_KDF_DEFINE_FAMILY(AES_CMAC, tc_kdf_prf_aes_cmac, struct TC_AES_CMAC_ctx, TC_AES_CMAC_TAG_MAX)
 #endif
 #if TC_KBKDF_HAVE_DES_CMAC
-TC_KDF_DEFINE_FAMILY(DES_CMAC, tc_kdf_prf_des_cmac,
-                     struct TC_DES_CMAC_ctx, TC_DES_CMAC_TAG_MAX)
+TC_KDF_DEFINE_FAMILY(DES_CMAC, tc_kdf_prf_des_cmac, struct TC_DES_CMAC_ctx, TC_DES_CMAC_TAG_MAX)
 #endif
 
 #endif /* TC_ENABLE_KDF */

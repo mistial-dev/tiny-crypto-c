@@ -12,7 +12,9 @@ typedef struct {
   unsigned reason;
   int found, has_invalidity_date;
 } TC_X509_crl_match;
-typedef struct { TC_bytes serial, issuer; } TC_X509_crl_target;
+typedef struct {
+  TC_bytes serial, issuer;
+} TC_X509_crl_target;
 
 /* Library-managed source results. Targets, matches and digest stay unchanged
  * while the prepared CRL is used. A lookup covers an exact serial/issuer pair.
@@ -42,9 +44,12 @@ typedef struct {
   int has_reasons, user_only, ca_only, indirect, attribute_only;
 } TC_X509_crl_distribution;
 enum {
-  TC_X509_CRL_EXT_NUMBER = 1u << 0, TC_X509_CRL_EXT_DELTA = 1u << 1,
-  TC_X509_CRL_EXT_AUTHORITY = 1u << 2, TC_X509_CRL_EXT_DISTRIBUTION = 1u << 3,
-  TC_X509_CRL_EXT_FRESHEST = 1u << 4, TC_X509_CRL_EXT_ISSUER_ALT = 1u << 5
+  TC_X509_CRL_EXT_NUMBER = 1u << 0,
+  TC_X509_CRL_EXT_DELTA = 1u << 1,
+  TC_X509_CRL_EXT_AUTHORITY = 1u << 2,
+  TC_X509_CRL_EXT_DISTRIBUTION = 1u << 3,
+  TC_X509_CRL_EXT_FRESHEST = 1u << 4,
+  TC_X509_CRL_EXT_ISSUER_ALT = 1u << 5
 };
 typedef struct {
   TC_bytes number, base_number, distribution_encoded, freshest, issuer_alt;
@@ -72,8 +77,8 @@ typedef struct {
  * interpretation. Parsing does not verify signatures, freshness or trust.
  * Input, limits, frames, work and out must be disjoint. Frames and work may
  * change on failure; out changes only on OK. Frame capacity counts elements. */
-TC_TLV_result TC_X509_crl_read(TC_bytes encoded, const TC_TLV_limits* limits,
-    TC_TLV_frame* frames, size_t frame_capacity, size_t* work, TC_X509_crl* out);
+TC_TLV_result TC_X509_crl_read(TC_bytes encoded, const TC_TLV_limits* limits, TC_TLV_frame* frames,
+                               size_t frame_capacity, size_t* work, TC_X509_crl* out);
 
 /* Read crl.extensions, or {NULL,0} when absent. present/critical use EXT masks.
  * Number spans contain INTEGER contents; all spans borrow unchanged input.
@@ -82,7 +87,8 @@ TC_TLV_result TC_X509_crl_read(TC_bytes encoded, const TC_TLV_limits* limits,
  * Input, limits, workspace metadata/arrays, work and out must be disjoint.
  * Scratch/work are provisional; out changes only on OK. */
 TC_TLV_result TC_X509_crl_extensions_read(TC_bytes encoded, const TC_TLV_limits* limits,
-    const TC_X509_workspace* workspace, size_t* work, TC_X509_crl_extensions* out);
+                                          const TC_X509_workspace* workspace, size_t* work,
+                                          TC_X509_crl_extensions* out);
 
 /* Index DER CRLs once into caller-owned records. Limits apply to each CRL;
  * one work budget covers the collection. capacity counts record slots.
@@ -91,8 +97,10 @@ TC_TLV_result TC_X509_crl_extensions_read(TC_bytes encoded, const TC_TLV_limits*
  * Records and scratch are provisional on failure; out changes only on OK.
  * Empty input accepts NULL/0 arrays. No signatures or trust are checked. */
 TC_TLV_result TC_X509_crl_index_init(const TC_bytes* encoded, size_t count,
-    const TC_TLV_limits* limits, const TC_X509_workspace* workspace, size_t* work,
-    TC_X509_crl_record* records, size_t capacity, TC_X509_crl_index* out);
+                                     const TC_TLV_limits* limits,
+                                     const TC_X509_workspace* workspace, size_t* work,
+                                     TC_X509_crl_record* records, size_t capacity,
+                                     TC_X509_crl_index* out);
 
 #ifdef __cplusplus
 }

@@ -42,7 +42,7 @@ typedef struct {
   TC_TLV_result (*anchor)(void* context, size_t index, size_t* work, TC_X509_store_anchor* out);
 } TC_X509_store_source;
 TC_TLV_result TC_X509_store_array_source(const TC_X509_store_array* array,
-    TC_X509_store_source* out);
+                                         TC_X509_store_source* out);
 
 typedef TC_snapshot_state TC_X509_snapshot_state;
 #define TC_X509_SNAPSHOT_FREE TC_SNAPSHOT_FREE
@@ -67,14 +67,16 @@ typedef struct {
 
 /* Copy the callback configuration into a FREE slot. Retains borrowed context
  * and record storage. A busy slot returns LIMIT unchanged. */
-TC_TLV_result TC_X509_store_prepare(TC_X509_store_snapshot* slot, const TC_X509_store_source* source);
+TC_TLV_result TC_X509_store_prepare(TC_X509_store_snapshot* slot,
+                                    const TC_X509_store_source* source);
 /* Return a PREPARED slot to FREE and clear its source descriptor. Other states
  * return ARGUMENT unchanged. The caller owns the underlying record storage. */
 TC_TLV_result TC_X509_store_discard(TC_X509_store_snapshot* slot);
 /* Authorize and persist changes before publication. A stale revision returns
  * INVALID; exhausted revision space returns LIMIT. Neither changes the store.
  * Publishing an empty source removes all anchors for subsequent readers. */
-TC_TLV_result TC_X509_store_publish(TC_X509_store* store, size_t revision, TC_X509_store_snapshot* slot);
+TC_TLV_result TC_X509_store_publish(TC_X509_store* store, size_t revision,
+                                    TC_X509_store_snapshot* slot);
 /* Acquire returns END without changing out when no snapshot is published.
  * Each successful acquire needs one release, after all borrowed results expire.
  * Old readers retain the old trust configuration across publication. Applications

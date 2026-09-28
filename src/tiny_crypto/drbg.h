@@ -108,13 +108,20 @@ typedef struct {
   union {
     uint8_t unused;
 #if TC_DRBG_HAVE_HASH
-    struct { uint8_t v[TC_DRBG_HASH_SEED_BYTES], c[TC_DRBG_HASH_SEED_BYTES]; } hash;
+    struct {
+      uint8_t v[TC_DRBG_HASH_SEED_BYTES], c[TC_DRBG_HASH_SEED_BYTES];
+    } hash;
 #endif
 #if TC_DRBG_HAVE_HMAC
-    struct { uint8_t key[TC_DRBG_HMAC_OUTPUT_BYTES], v[TC_DRBG_HMAC_OUTPUT_BYTES]; } hmac;
+    struct {
+      uint8_t key[TC_DRBG_HMAC_OUTPUT_BYTES], v[TC_DRBG_HMAC_OUTPUT_BYTES];
+    } hmac;
 #endif
 #if TC_DRBG_HAVE_CTR
-    struct { TC_AES_dynamic_key key; uint8_t v[16]; } ctr;
+    struct {
+      TC_AES_dynamic_key key;
+      uint8_t v[16];
+    } ctr;
 #endif
   } state;
   union {
@@ -139,7 +146,8 @@ typedef struct {
  * whole context is wiped and left uninstantiated. The nonce and
  * personalization must stay clear of drbg. */
 TC_DRBG_result TC_DRBG_instantiate(TC_DRBG* drbg, const TC_DRBG_config* config,
-    TC_random_source entropy, TC_bytes nonce, TC_bytes personalization);
+                                   TC_random_source entropy, TC_bytes nonce,
+                                   TC_bytes personalization);
 
 /* Reseed with fresh entropy and optional additional input (section 9.2).
  * TC_DRBG_ENTROPY leaves the state unchanged. */
@@ -151,7 +159,7 @@ TC_DRBG_result TC_DRBG_reseed(TC_DRBG* drbg, TC_bytes additional);
  * entropy source. Output, additional input and drbg must be disjoint. On
  * any failure the output is wiped. */
 TC_DRBG_result TC_DRBG_generate(TC_DRBG* drbg, uint8_t* output, size_t length,
-    int prediction_resistance, TC_bytes additional);
+                                int prediction_resistance, TC_bytes additional);
 
 /* Wipe the whole context (section 9.4). NULL is accepted. */
 void TC_DRBG_uninstantiate(TC_DRBG* drbg);

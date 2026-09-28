@@ -15,9 +15,8 @@
  * Legacy and NEXGEN. Returns 1 when options->certificate.purpose is empty or
  * names a content-signing OID accepted by that profile. Returns 0 for an
  * unknown profile, NULL arguments or any other requested purpose. */
-int tc_credential_profile(TC_PIV_card_profile profile,
-                          const TC_validation_options *options, int *piv,
-                          TC_PIV_oid_profile *oids);
+int tc_credential_profile(TC_PIV_card_profile profile, const TC_validation_options* options,
+                          int* piv, TC_PIV_oid_profile* oids);
 
 /* Configure policy for a content signer. When policy->purpose is empty, the
  * first content-signing EKU in the signer certificate becomes the purpose.
@@ -34,18 +33,17 @@ int tc_credential_profile(TC_PIV_card_profile profile,
  * too small. policy->purpose and policy->initial_policies may borrow storage
  * OIDs, the certificate or static data. Keep those alive while policy is used.
  * Returns TC_TLV_INVALID when the signer lacks the required EKU or policy. */
-TC_TLV_result tc_credential_signer_policy(TC_bytes certificate, int piv,
-                      int twic_compatible, const TC_X509_time *card_expiration,
-                      TC_X509_path_options *policy,
-                      const TC_X509_path_workspace *storage, size_t *work);
+TC_TLV_result tc_credential_signer_policy(TC_bytes certificate, int piv, int twic_compatible,
+                                          const TC_X509_time* card_expiration,
+                                          TC_X509_path_options* policy,
+                                          const TC_X509_path_workspace* storage, size_t* work);
 
 /* Compare a CHUID expiration date (YYYYMMDD) with at. The card is valid
  * through 23:59:59 UTC on that day, so *valid is 1 when at is on or before
  * that time. Returns TC_TLV_ARGUMENT for NULL arguments or a length other
  * than 8, and TC_TLV_INVALID for an invalid Gregorian calendar date.
  * *valid changes only on TC_TLV_OK. */
-TC_TLV_result tc_credential_chuid_expiration_check(TC_bytes expiration,
-                                                   const TC_X509_time *at,
-                                                   int *valid);
+TC_TLV_result tc_credential_chuid_expiration_check(TC_bytes expiration, const TC_X509_time* at,
+                                                   int* valid);
 
 #endif

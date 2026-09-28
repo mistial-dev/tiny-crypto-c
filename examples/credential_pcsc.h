@@ -27,6 +27,6 @@ int example_card_pcsc_open(ExampleCardPCSC* state, const char* reader);
 int example_card_pcsc_close(ExampleCardPCSC* state);
 /* Use as ExampleCardIO.transmit with state as its context. A failed transfer
  * disables further transfers on this connection. No reconnect is attempted. */
-int example_card_pcsc_transmit(void* context, const uint8_t* command,
-    size_t command_length, uint8_t* response, size_t capacity, size_t* length);
+int example_card_pcsc_transmit(void* context, const uint8_t* command, size_t command_length,
+                               uint8_t* response, size_t capacity, size_t* length);
 #endif

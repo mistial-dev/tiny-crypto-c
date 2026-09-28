@@ -1,4 +1,5 @@
 <!-- SPDX-FileCopyrightText: Mistial Dev -->
+
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 
 # Deterministic random bit generators
@@ -6,11 +7,11 @@
 Include `<tiny_crypto/drbg.h>` and enable `TINY_CRYPTO_ENABLE_DRBG=ON`. The
 library provides the three NIST SP 800-90A Rev. 1 mechanisms:
 
-| Mechanism | Option | Primitives | Security strength |
-| --- | --- | --- | --- |
+| Mechanism | Option                  | Primitives                                  | Security strength    |
+| --------- | ----------------------- | ------------------------------------------- | -------------------- |
 | Hash_DRBG | `TINY_CRYPTO_DRBG_HASH` | SHA-1, SHA-224, SHA-256, SHA-384 or SHA-512 | 128, 192 or 256 bits |
-| HMAC_DRBG | `TINY_CRYPTO_DRBG_HMAC` | HMAC with the same hashes | 128, 192 or 256 bits |
-| CTR_DRBG | `TINY_CRYPTO_DRBG_CTR` | AES-128, AES-192 or AES-256 | the AES key size |
+| HMAC_DRBG | `TINY_CRYPTO_DRBG_HMAC` | HMAC with the same hashes                   | 128, 192 or 256 bits |
+| CTR_DRBG  | `TINY_CRYPTO_DRBG_CTR`  | AES-128, AES-192 or AES-256                 | the AES key size     |
 
 The desktop profile enables all three. A mechanism needs its primitives:
 HMAC_DRBG needs `TINY_CRYPTO_ENABLE_HMAC`, and CTR_DRBG needs
@@ -76,14 +77,14 @@ from a DRBG instantiated without it returns `TC_DRBG_ARGUMENT`.
 
 ## Results and failures
 
-| Result | Meaning | State afterwards |
-| --- | --- | --- |
-| `TC_DRBG_OK` | Success | Usable |
-| `TC_DRBG_ARGUMENT` | Invalid argument, overlap, state or configuration | Unchanged, and a failed instantiate leaves it wiped |
-| `TC_DRBG_UNSUPPORTED` | Mechanism or hash compiled out of this build | Wiped |
-| `TC_DRBG_LIMIT` | Request larger than `TC_DRBG_MAX_REQUEST_BYTES` | Unchanged |
-| `TC_DRBG_ENTROPY` | The entropy source failed | Unchanged, and a failed instantiate leaves it wiped |
-| `TC_DRBG_ERROR` | A hash, HMAC or AES operation failed | Unusable until uninstantiated |
+| Result                | Meaning                                           | State afterwards                                    |
+| --------------------- | ------------------------------------------------- | --------------------------------------------------- |
+| `TC_DRBG_OK`          | Success                                           | Usable                                              |
+| `TC_DRBG_ARGUMENT`    | Invalid argument, overlap, state or configuration | Unchanged, and a failed instantiate leaves it wiped |
+| `TC_DRBG_UNSUPPORTED` | Mechanism or hash compiled out of this build      | Wiped                                               |
+| `TC_DRBG_LIMIT`       | Request larger than `TC_DRBG_MAX_REQUEST_BYTES`   | Unchanged                                           |
+| `TC_DRBG_ENTROPY`     | The entropy source failed                         | Unchanged, and a failed instantiate leaves it wiped |
+| `TC_DRBG_ERROR`       | A hash, HMAC or AES operation failed              | Unusable until uninstantiated                       |
 
 Every failed generate call wipes its output buffer. An entropy failure during
 a reseed or a prediction-resistant request leaves the generator usable, so
@@ -98,12 +99,12 @@ of `TC_DRBG_MAX_ENTROPY_BYTES` (64 by default) and scratch space for the
 largest enabled hash, HMAC or AES key schedule, so each call uses little
 stack. Place it in static or long-lived storage. Its fields are private.
 
-| Configuration | `sizeof(TC_DRBG)` on a 64-bit host | On AVR (ATmega2560) |
-| --- | ---: | ---: |
-| HMAC_DRBG, SHA-256 only | 328 | 302 |
-| Hash_DRBG, SHA-256 only | 344 | |
-| CTR_DRBG only | 624 | 598 |
-| All mechanisms and hashes | 656 | |
+| Configuration             | `sizeof(TC_DRBG)` on a 64-bit host | On AVR (ATmega2560) |
+| ------------------------- | ---------------------------------: | ------------------: |
+| HMAC_DRBG, SHA-256 only   |                                328 |                 302 |
+| Hash_DRBG, SHA-256 only   |                                344 |                     |
+| CTR_DRBG only             |                                624 |                 598 |
+| All mechanisms and hashes |                                656 |                     |
 
 ## Random sources for other APIs
 

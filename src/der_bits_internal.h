@@ -6,8 +6,8 @@
 #include <tiny_crypto/der.h>
 
 /* Validate the contents octets of a DER BIT STRING, including unused bits. */
-static inline TC_TLV_result tc_der_bit_string_contents(TC_bytes contents,
-    TC_bytes* bits, unsigned* unused)
+static inline TC_TLV_result tc_der_bit_string_contents(TC_bytes contents, TC_bytes* bits,
+                                                       unsigned* unused)
 {
   unsigned count;
   if (!bits || !unused || (!contents.data && contents.length))

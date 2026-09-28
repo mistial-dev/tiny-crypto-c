@@ -19,7 +19,7 @@
 
 enum { FILE_CAPACITY = 4096, CHAIN = 2 };
 
-static const TC_TLV_limits limits = {FILE_CAPACITY,FILE_CAPACITY,512,16};
+static const TC_TLV_limits limits = {FILE_CAPACITY, FILE_CAPACITY, 512, 16};
 static uint8_t anchor_der[FILE_CAPACITY], chain_der[CHAIN][FILE_CAPACITY];
 static TC_validation_storage arena[40000];
 static TC_validation_workspace storage;
@@ -28,37 +28,37 @@ static TC_ECDSA_workspace ec;
 static TC_X509_native_workspace native;
 static TC_TLV_frame parse_frames[32];
 static TC_bytes parse_oids[32];
-static TC_X509_workspace parser = {parse_frames,32,parse_oids,32};
+static TC_X509_workspace parser = {parse_frames, 32, parse_oids, 32};
 
 /* NIST-test-policy-1 and -2 (2.16.840.1.101.3.2.1.48.1, .2) and anyPolicy. */
-static const uint8_t policy1[] = {0x60,0x86,0x48,0x01,0x65,0x03,0x02,0x01,0x30,0x01};
-static const uint8_t policy2[] = {0x60,0x86,0x48,0x01,0x65,0x03,0x02,0x01,0x30,0x02};
-static const uint8_t any_policy[] = {0x55,0x1d,0x20,0x00};
+static const uint8_t policy1[] = {0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x02, 0x01, 0x30, 0x01};
+static const uint8_t policy2[] = {0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x02, 0x01, 0x30, 0x02};
+static const uint8_t any_policy[] = {0x55, 0x1d, 0x20, 0x00};
 
 /* The first two RDNs of every PKITS name: C=US, O=Test Certificates 2011. */
 static const uint8_t pkits_rdns[] = {
-  0x31,0x0b,0x30,0x09,0x06,0x03,0x55,0x04,0x06,0x13,0x02,0x55,0x53,
-  0x31,0x1f,0x30,0x1d,0x06,0x03,0x55,0x04,0x0a,0x13,0x16,
-  'T','e','s','t',' ','C','e','r','t','i','f','i','c','a','t','e','s',' ','2','0','1','1'};
+    0x31, 0x0b, 0x30, 0x09, 0x06, 0x03, 0x55, 0x04, 0x06, 0x13, 0x02, 0x55, 0x53, 0x31, 0x1f, 0x30,
+    0x1d, 0x06, 0x03, 0x55, 0x04, 0x0a, 0x13, 0x16, 'T',  'e',  's',  't',  ' ',  'C',  'e',  'r',
+    't',  'i',  'f',  'i',  'c',  'a',  't',  'e',  's',  ' ',  '2',  '0',  '1',  '1'};
 /* C=US, O=Other Certificates. */
 static const uint8_t other_rdns[] = {
-  0x31,0x0b,0x30,0x09,0x06,0x03,0x55,0x04,0x06,0x13,0x02,0x55,0x53,
-  0x31,0x1b,0x30,0x19,0x06,0x03,0x55,0x04,0x0a,0x13,0x12,
-  'O','t','h','e','r',' ','C','e','r','t','i','f','i','c','a','t','e','s'};
+    0x31, 0x0b, 0x30, 0x09, 0x06, 0x03, 0x55, 0x04, 0x06, 0x13, 0x02, 0x55, 0x53, 0x31,
+    0x1b, 0x30, 0x19, 0x06, 0x03, 0x55, 0x04, 0x0a, 0x13, 0x12, 'O',  't',  'h',  'e',
+    'r',  ' ',  'C',  'e',  'r',  't',  'i',  'f',  'i',  'c',  'a',  't',  'e',  's'};
 
 static TC_bytes load(const char* name, uint8_t* buffer)
 {
   char path[512];
   FILE* file;
   size_t length;
-  munit_assert_int(snprintf(path,sizeof path,"%s/%s",TC_PKITS_DIR,name), >, 0);
-  file = fopen(path,"rb");
+  munit_assert_int(snprintf(path, sizeof path, "%s/%s", TC_PKITS_DIR, name), >, 0);
+  file = fopen(path, "rb");
   munit_assert_not_null(file);
-  length = fread(buffer,1,FILE_CAPACITY,file);
+  length = fread(buffer, 1, FILE_CAPACITY, file);
   munit_assert_int(ferror(file), ==, 0);
   munit_assert_int(fgetc(file), ==, EOF);
   munit_assert_int(fclose(file), ==, 0);
-  return (TC_bytes){buffer,length};
+  return (TC_bytes){buffer, length};
 }
 
 /* DER tag and length, with one or two length bytes, followed by value. */
@@ -69,12 +69,17 @@ static size_t der(uint8_t* out, unsigned tag, const uint8_t* value, size_t lengt
   if (length < 128) {
     out[1] = (uint8_t)length;
   } else if (length < 256) {
-    out[1] = 0x81; out[2] = (uint8_t)length; header = 3;
+    out[1] = 0x81;
+    out[2] = (uint8_t)length;
+    header = 3;
   } else {
     munit_assert_size(length, <, 65536);
-    out[1] = 0x82; out[2] = (uint8_t)(length >> 8); out[3] = (uint8_t)length; header = 4;
+    out[1] = 0x82;
+    out[2] = (uint8_t)(length >> 8);
+    out[3] = (uint8_t)length;
+    header = 4;
   }
-  memmove(out + header,value,length);
+  memmove(out + header, value, length);
   return header + length;
 }
 
@@ -82,15 +87,15 @@ static size_t der(uint8_t* out, unsigned tag, const uint8_t* value, size_t lengt
 static size_t directory_subtree(uint8_t* out, const uint8_t* rdns, size_t length)
 {
   uint8_t name[128], base[132];
-  const size_t name_length = der(name,0x30,rdns,length);
-  const size_t base_length = der(base,0xa4,name,name_length);
-  return der(out,0x30,base,base_length);
+  const size_t name_length = der(name, 0x30, rdns, length);
+  const size_t base_length = der(base, 0xa4, name, name_length);
+  return der(out, 0x30, base, base_length);
 }
 
 static TC_X509_path_options path_options(unsigned flags)
 {
   TC_X509_path_options options = {0};
-  options.at = (TC_X509_time){2020,1,1,0,0,0};
+  options.at = (TC_X509_time){2020, 1, 1, 0, 0, 0};
   options.parsing = limits;
   options.max_certificates = 4;
   options.max_input = 2 * FILE_CAPACITY;
@@ -105,20 +110,22 @@ static TC_X509_store_anchor pkits_anchor(void)
 {
   TC_X509_certificate certificate;
   TC_X509_store_anchor anchor = {0};
-  const TC_bytes encoded = load("TrustAnchorRootCertificate.crt",anchor_der);
-  munit_assert_int(TC_X509_read(encoded.data,encoded.length,&limits,&parser,&certificate), ==, TC_TLV_OK);
+  const TC_bytes encoded = load("TrustAnchorRootCertificate.crt", anchor_der);
+  munit_assert_int(TC_X509_read(encoded.data, encoded.length, &limits, &parser, &certificate), ==,
+                   TC_TLV_OK);
   anchor.trust.name = certificate.subject;
   anchor.trust.public_key = certificate.public_key;
   return anchor;
 }
 
 static TC_X509_path_status validate(const char* ca, const char* ee,
-    const TC_X509_store_anchor* anchor, const TC_X509_path_options* options,
-    TC_X509_path_result* result)
+                                    const TC_X509_store_anchor* anchor,
+                                    const TC_X509_path_options* options,
+                                    TC_X509_path_result* result)
 {
-  const TC_bytes chain[CHAIN] = {load(ca,chain_der[0]),load(ee,chain_der[1])};
-  return TC_X509_path_validate_with_anchor(chain,CHAIN,anchor,options,
-      &storage.path.validation,result);
+  const TC_bytes chain[CHAIN] = {load(ca, chain_der[0]), load(ee, chain_der[1])};
+  return TC_X509_path_validate_with_anchor(chain, CHAIN, anchor, options, &storage.path.validation,
+                                           result);
 }
 
 static void setup_workspace(void)
@@ -126,13 +133,14 @@ static void setup_workspace(void)
   static TC_RSA_workspace rsa;
   TC_validation_capacity capacity;
   size_t bytes;
-  rsa = (TC_RSA_workspace){rsa_words,sizeof rsa_words / sizeof *rsa_words};
-  native = (TC_X509_native_workspace){&ec,&rsa,TC_X509_NATIVE_DEFAULT_SIGNATURE_WORK};
-  munit_assert_int(TC_validation_capacity_init(TC_VALIDATION_DESKTOP,&capacity), ==, TC_RESULT_OK);
-  munit_assert_int(TC_validation_workspace_size(&capacity,&bytes), ==, TC_RESULT_OK);
+  rsa = (TC_RSA_workspace){rsa_words, sizeof rsa_words / sizeof *rsa_words};
+  native = (TC_X509_native_workspace){&ec, &rsa, TC_X509_NATIVE_DEFAULT_SIGNATURE_WORK};
+  munit_assert_int(TC_validation_capacity_init(TC_VALIDATION_DESKTOP, &capacity), ==, TC_RESULT_OK);
+  munit_assert_int(TC_validation_workspace_size(&capacity, &bytes), ==, TC_RESULT_OK);
   munit_assert_size(bytes, <=, sizeof arena);
-  munit_assert_int(TC_validation_workspace_init(&capacity,
-      (TC_buffer){(uint8_t*)arena,sizeof arena},&storage), ==, TC_RESULT_OK);
+  munit_assert_int(
+      TC_validation_workspace_init(&capacity, (TC_buffer){(uint8_t*)arena, sizeof arena}, &storage),
+      ==, TC_RESULT_OK);
 }
 
 /* CertificatePolicies contents with one PolicyInformation for oid. This is
@@ -141,196 +149,226 @@ static void setup_workspace(void)
 static size_t policy_set(uint8_t* out, const uint8_t* oid, size_t length)
 {
   uint8_t element[32];
-  const size_t element_length = der(element,0x06,oid,length);
-  return der(out,0x30,element,element_length);
+  const size_t element_length = der(element, 0x06, oid, length);
+  return der(out, 0x30, element, element_length);
 }
 
 static MunitResult policies(const MunitParameter params[], void* user)
 {
   static uint8_t set1[64], set2[64], set_any[64];
-  const TC_bytes initial1[] = {{policy1,sizeof policy1}};
+  const TC_bytes initial1[] = {{policy1, sizeof policy1}};
   TC_X509_store_anchor anchor = pkits_anchor();
   TC_X509_path_options options = path_options(0);
   TC_X509_path_result result;
-  (void)params; (void)user;
+  (void)params;
+  (void)user;
   setup_workspace();
 
   /* 4.1.1: the unconstrained anchor accepts the path. */
-  munit_assert_int(validate("GoodCACert.crt","ValidCertificatePathTest1EE.crt",
-      &anchor,&options,&result), ==, TC_X509_PATH_VALID);
+  munit_assert_int(
+      validate("GoodCACert.crt", "ValidCertificatePathTest1EE.crt", &anchor, &options, &result), ==,
+      TC_X509_PATH_VALID);
 
   /* The anchor's policy set limits the acceptable policies. */
   anchor.policy_flags = TC_X509_PATH_REQUIRE_EXPLICIT_POLICY;
-  anchor.policy_set = (TC_bytes){set1,policy_set(set1,policy1,sizeof policy1)};
-  munit_assert_int(validate("GoodCACert.crt","ValidCertificatePathTest1EE.crt",
-      &anchor,&options,&result), ==, TC_X509_PATH_VALID);
+  anchor.policy_set = (TC_bytes){set1, policy_set(set1, policy1, sizeof policy1)};
+  munit_assert_int(
+      validate("GoodCACert.crt", "ValidCertificatePathTest1EE.crt", &anchor, &options, &result), ==,
+      TC_X509_PATH_VALID);
   munit_assert_size(result.policy_count, ==, 1);
-  munit_assert_memory_equal(sizeof policy1,result.policies[0].data,policy1);
-  anchor.policy_set = (TC_bytes){set2,policy_set(set2,policy2,sizeof policy2)};
-  munit_assert_int(validate("GoodCACert.crt","ValidCertificatePathTest1EE.crt",
-      &anchor,&options,&result), ==, TC_X509_PATH_INVALID);
-  anchor.policy_set = (TC_bytes){set_any,policy_set(set_any,any_policy,sizeof any_policy)};
-  munit_assert_int(validate("GoodCACert.crt","ValidCertificatePathTest1EE.crt",
-      &anchor,&options,&result), ==, TC_X509_PATH_VALID);
+  munit_assert_memory_equal(sizeof policy1, result.policies[0].data, policy1);
+  anchor.policy_set = (TC_bytes){set2, policy_set(set2, policy2, sizeof policy2)};
+  munit_assert_int(
+      validate("GoodCACert.crt", "ValidCertificatePathTest1EE.crt", &anchor, &options, &result), ==,
+      TC_X509_PATH_INVALID);
+  anchor.policy_set = (TC_bytes){set_any, policy_set(set_any, any_policy, sizeof any_policy)};
+  munit_assert_int(
+      validate("GoodCACert.crt", "ValidCertificatePathTest1EE.crt", &anchor, &options, &result), ==,
+      TC_X509_PATH_VALID);
 
   /* The anchor set intersects the application's initial set. */
-  anchor.policy_set = (TC_bytes){set2,policy_set(set2,policy2,sizeof policy2)};
+  anchor.policy_set = (TC_bytes){set2, policy_set(set2, policy2, sizeof policy2)};
   anchor.policy_flags = 0;
   options.initial_policies = initial1;
   options.initial_policy_count = 1;
-  munit_assert_int(validate("GoodCACert.crt","ValidCertificatePathTest1EE.crt",
-      &anchor,&options,&result), ==, TC_X509_PATH_VALID);
+  munit_assert_int(
+      validate("GoodCACert.crt", "ValidCertificatePathTest1EE.crt", &anchor, &options, &result), ==,
+      TC_X509_PATH_VALID);
   munit_assert_size(result.policy_count, ==, 0);
   options.flags = TC_X509_PATH_REQUIRE_EXPLICIT_POLICY;
-  munit_assert_int(validate("GoodCACert.crt","ValidCertificatePathTest1EE.crt",
-      &anchor,&options,&result), ==, TC_X509_PATH_INVALID);
+  munit_assert_int(
+      validate("GoodCACert.crt", "ValidCertificatePathTest1EE.crt", &anchor, &options, &result), ==,
+      TC_X509_PATH_INVALID);
   options = path_options(0);
 
   /* 4.10.1: the path relies on mapping policy1 to policy2, which the
    * anchor's inhibitPolicyMapping flag forbids. */
-  anchor.policy_set = (TC_bytes){set1,policy_set(set1,policy1,sizeof policy1)};
+  anchor.policy_set = (TC_bytes){set1, policy_set(set1, policy1, sizeof policy1)};
   anchor.policy_flags = TC_X509_PATH_REQUIRE_EXPLICIT_POLICY;
-  munit_assert_int(validate("Mapping1to2CACert.crt","ValidPolicyMappingTest1EE.crt",
-      &anchor,&options,&result), ==, TC_X509_PATH_VALID);
+  munit_assert_int(validate("Mapping1to2CACert.crt", "ValidPolicyMappingTest1EE.crt", &anchor,
+                            &options, &result),
+                   ==, TC_X509_PATH_VALID);
   anchor.policy_flags |= TC_X509_PATH_INHIBIT_MAPPING;
-  munit_assert_int(validate("Mapping1to2CACert.crt","ValidPolicyMappingTest1EE.crt",
-      &anchor,&options,&result), ==, TC_X509_PATH_INVALID);
+  munit_assert_int(validate("Mapping1to2CACert.crt", "ValidPolicyMappingTest1EE.crt", &anchor,
+                            &options, &result),
+                   ==, TC_X509_PATH_INVALID);
 
   /* 4.8.14: the CA asserts only anyPolicy and requires an explicit policy.
    * With initial-policy-set = {policy1} the path validates, and the anchor's
    * inhibitAnyPolicy flag leaves no valid policy. */
-  anchor.policy_set = (TC_bytes){NULL,0};
+  anchor.policy_set = (TC_bytes){NULL, 0};
   anchor.policy_flags = 0;
   options.initial_policies = initial1;
   options.initial_policy_count = 1;
-  munit_assert_int(validate("anyPolicyCACert.crt","AnyPolicyTest14EE.crt",
-      &anchor,&options,&result), ==, TC_X509_PATH_VALID);
+  munit_assert_int(
+      validate("anyPolicyCACert.crt", "AnyPolicyTest14EE.crt", &anchor, &options, &result), ==,
+      TC_X509_PATH_VALID);
   anchor.policy_flags = TC_X509_PATH_INHIBIT_ANY_POLICY;
-  munit_assert_int(validate("anyPolicyCACert.crt","AnyPolicyTest14EE.crt",
-      &anchor,&options,&result), ==, TC_X509_PATH_INVALID);
+  munit_assert_int(
+      validate("anyPolicyCACert.crt", "AnyPolicyTest14EE.crt", &anchor, &options, &result), ==,
+      TC_X509_PATH_INVALID);
   return MUNIT_OK;
 }
 
 static MunitResult names(const MunitParameter params[], void* user)
 {
   static uint8_t pkits[80], other[80];
-  const TC_bytes pkits_subtree = {pkits,directory_subtree(pkits,pkits_rdns,sizeof pkits_rdns)};
-  const TC_bytes other_subtree = {other,directory_subtree(other,other_rdns,sizeof other_rdns)};
+  const TC_bytes pkits_subtree = {pkits, directory_subtree(pkits, pkits_rdns, sizeof pkits_rdns)};
+  const TC_bytes other_subtree = {other, directory_subtree(other, other_rdns, sizeof other_rdns)};
   TC_X509_store_anchor anchor = pkits_anchor();
   TC_X509_path_options options = path_options(0);
   TC_X509_path_result result;
-  (void)params; (void)user;
+  (void)params;
+  (void)user;
   setup_workspace();
 
   /* Permitted and excluded subtrees from the anchor apply to every
    * certificate in the path. */
   anchor.names.permitted = pkits_subtree;
-  munit_assert_int(validate("GoodCACert.crt","ValidCertificatePathTest1EE.crt",
-      &anchor,&options,&result), ==, TC_X509_PATH_VALID);
+  munit_assert_int(
+      validate("GoodCACert.crt", "ValidCertificatePathTest1EE.crt", &anchor, &options, &result), ==,
+      TC_X509_PATH_VALID);
   anchor.names.permitted = other_subtree;
-  munit_assert_int(validate("GoodCACert.crt","ValidCertificatePathTest1EE.crt",
-      &anchor,&options,&result), ==, TC_X509_PATH_INVALID);
-  anchor.names.permitted = (TC_bytes){NULL,0};
+  munit_assert_int(
+      validate("GoodCACert.crt", "ValidCertificatePathTest1EE.crt", &anchor, &options, &result), ==,
+      TC_X509_PATH_INVALID);
+  anchor.names.permitted = (TC_bytes){NULL, 0};
   anchor.names.excluded = pkits_subtree;
-  munit_assert_int(validate("GoodCACert.crt","ValidCertificatePathTest1EE.crt",
-      &anchor,&options,&result), ==, TC_X509_PATH_INVALID);
+  munit_assert_int(
+      validate("GoodCACert.crt", "ValidCertificatePathTest1EE.crt", &anchor, &options, &result), ==,
+      TC_X509_PATH_INVALID);
 
   /* Anchor and application constraints both apply. */
-  anchor.names.excluded = (TC_bytes){NULL,0};
+  anchor.names.excluded = (TC_bytes){NULL, 0};
   anchor.names.permitted = pkits_subtree;
   options.anchor_names.permitted = other_subtree;
-  munit_assert_int(validate("GoodCACert.crt","ValidCertificatePathTest1EE.crt",
-      &anchor,&options,&result), ==, TC_X509_PATH_INVALID);
+  munit_assert_int(
+      validate("GoodCACert.crt", "ValidCertificatePathTest1EE.crt", &anchor, &options, &result), ==,
+      TC_X509_PATH_INVALID);
   options.anchor_names.permitted = pkits_subtree;
-  munit_assert_int(validate("GoodCACert.crt","ValidCertificatePathTest1EE.crt",
-      &anchor,&options,&result), ==, TC_X509_PATH_VALID);
+  munit_assert_int(
+      validate("GoodCACert.crt", "ValidCertificatePathTest1EE.crt", &anchor, &options, &result), ==,
+      TC_X509_PATH_VALID);
   return MUNIT_OK;
 }
 
 /* A TrustAnchorList holding one TrustAnchorInfo for the PKITS Trust Anchor,
  * with CertPathControls built from the given fields. */
 static size_t trust_anchor_info(uint8_t* out, const TC_X509_certificate* root,
-    const uint8_t* policy, size_t policy_length, const uint8_t* flags, size_t flag_length,
-    const uint8_t* subtree, size_t subtree_length, int path_length)
+                                const uint8_t* policy, size_t policy_length, const uint8_t* flags,
+                                size_t flag_length, const uint8_t* subtree, size_t subtree_length,
+                                int path_length)
 {
-  static const uint8_t key_id[] = {0x04,0x04,1,2,3,4};
+  static const uint8_t key_id[] = {0x04, 0x04, 1, 2, 3, 4};
   static uint8_t controls[1024], info[2048], work[2048];
   size_t n = 0, m = 0, length;
-  memcpy(controls,root->subject.data,root->subject.length);
+  memcpy(controls, root->subject.data, root->subject.length);
   n = root->subject.length;
   if (policy) {
     uint8_t set[64];
-    const size_t set_length = policy_set(set,policy,policy_length);
-    n += der(controls + n,0xa1,set,set_length);
+    const size_t set_length = policy_set(set, policy, policy_length);
+    n += der(controls + n, 0xa1, set, set_length);
   }
-  if (flags) n += der(controls + n,0x82,flags,flag_length);
+  if (flags)
+    n += der(controls + n, 0x82, flags, flag_length);
   if (subtree) {
     uint8_t permitted[128];
-    const size_t permitted_length = der(permitted,0xa0,subtree,subtree_length);
-    n += der(controls + n,0xa3,permitted,permitted_length);
+    const size_t permitted_length = der(permitted, 0xa0, subtree, subtree_length);
+    n += der(controls + n, 0xa3, permitted, permitted_length);
   }
   if (path_length >= 0) {
     const uint8_t value = (uint8_t)path_length;
-    n += der(controls + n,0x84,&value,1);
+    n += der(controls + n, 0x84, &value, 1);
   }
-  memcpy(info,root->spki.data,root->spki.length);
+  memcpy(info, root->spki.data, root->spki.length);
   m = root->spki.length;
-  memcpy(info + m,key_id,sizeof key_id);
+  memcpy(info + m, key_id, sizeof key_id);
   m += sizeof key_id;
-  m += der(info + m,0x30,controls,n);
-  length = der(work,0x30,info,m);
-  length = der(info,0xa2,work,length);
-  return der(out,0x30,info,length);
+  m += der(info + m, 0x30, controls, n);
+  length = der(work, 0x30, info, m);
+  length = der(info, 0xa2, work, length);
+  return der(out, 0x30, info, length);
 }
 
 static MunitResult parsed_info(const MunitParameter params[], void* user)
 {
-  static const uint8_t explicit_policy[] = {0x06,0x40};
+  static const uint8_t explicit_policy[] = {0x06, 0x40};
   static uint8_t list[4096], subtree[80];
-  const size_t subtree_length = directory_subtree(subtree,pkits_rdns,sizeof pkits_rdns);
+  const size_t subtree_length = directory_subtree(subtree, pkits_rdns, sizeof pkits_rdns);
   TC_X509_certificate root;
   TC_X509_store_anchor anchor;
   TC_TLV_reader reader;
   TC_X509_path_options options = path_options(0);
   TC_X509_path_result result;
-  const TC_bytes encoded = load("TrustAnchorRootCertificate.crt",anchor_der);
+  const TC_bytes encoded = load("TrustAnchorRootCertificate.crt", anchor_der);
   size_t length;
-  (void)params; (void)user;
+  (void)params;
+  (void)user;
   setup_workspace();
-  munit_assert_int(TC_X509_read(encoded.data,encoded.length,&limits,&parser,&root), ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_read(encoded.data, encoded.length, &limits, &parser, &root), ==,
+                   TC_TLV_OK);
 
   /* Decoded controls: policy1 required explicitly, PKITS names permitted and
    * one intermediate allowed. */
-  length = trust_anchor_info(list,&root,policy1,sizeof policy1,explicit_policy,
-      sizeof explicit_policy,subtree,subtree_length,1);
-  munit_assert_int(TC_X509_trust_anchor_list_init(&reader,list,length,&limits,&parser), ==, TC_TLV_OK);
-  munit_assert_int(TC_X509_trust_anchor_next(&reader,&limits,&parser,&anchor), ==, TC_TLV_OK);
+  length = trust_anchor_info(list, &root, policy1, sizeof policy1, explicit_policy,
+                             sizeof explicit_policy, subtree, subtree_length, 1);
+  munit_assert_int(TC_X509_trust_anchor_list_init(&reader, list, length, &limits, &parser), ==,
+                   TC_TLV_OK);
+  munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &parser, &anchor), ==, TC_TLV_OK);
   munit_assert_int(anchor.x509_unusable, ==, 0);
   munit_assert_uint(anchor.policy_flags, ==, TC_X509_PATH_REQUIRE_EXPLICIT_POLICY);
   munit_assert_int(anchor.has_path_len, ==, 1);
   munit_assert_not_null(anchor.names.permitted.data);
-  munit_assert_int(validate("GoodCACert.crt","ValidCertificatePathTest1EE.crt",
-      &anchor,&options,&result), ==, TC_X509_PATH_VALID);
+  munit_assert_int(
+      validate("GoodCACert.crt", "ValidCertificatePathTest1EE.crt", &anchor, &options, &result), ==,
+      TC_X509_PATH_VALID);
 
   /* A policy set the path lacks. */
-  length = trust_anchor_info(list,&root,policy2,sizeof policy2,explicit_policy,
-      sizeof explicit_policy,NULL,0,-1);
-  munit_assert_int(TC_X509_trust_anchor_list_init(&reader,list,length,&limits,&parser), ==, TC_TLV_OK);
-  munit_assert_int(TC_X509_trust_anchor_next(&reader,&limits,&parser,&anchor), ==, TC_TLV_OK);
-  munit_assert_int(validate("GoodCACert.crt","ValidCertificatePathTest1EE.crt",
-      &anchor,&options,&result), ==, TC_X509_PATH_INVALID);
+  length = trust_anchor_info(list, &root, policy2, sizeof policy2, explicit_policy,
+                             sizeof explicit_policy, NULL, 0, -1);
+  munit_assert_int(TC_X509_trust_anchor_list_init(&reader, list, length, &limits, &parser), ==,
+                   TC_TLV_OK);
+  munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &parser, &anchor), ==, TC_TLV_OK);
+  munit_assert_int(
+      validate("GoodCACert.crt", "ValidCertificatePathTest1EE.crt", &anchor, &options, &result), ==,
+      TC_X509_PATH_INVALID);
 
   /* pathLenConstraint 0 forbids the intermediate CA. */
-  length = trust_anchor_info(list,&root,NULL,0,NULL,0,NULL,0,0);
-  munit_assert_int(TC_X509_trust_anchor_list_init(&reader,list,length,&limits,&parser), ==, TC_TLV_OK);
-  munit_assert_int(TC_X509_trust_anchor_next(&reader,&limits,&parser,&anchor), ==, TC_TLV_OK);
-  munit_assert_int(validate("GoodCACert.crt","ValidCertificatePathTest1EE.crt",
-      &anchor,&options,&result), ==, TC_X509_PATH_INVALID);
+  length = trust_anchor_info(list, &root, NULL, 0, NULL, 0, NULL, 0, 0);
+  munit_assert_int(TC_X509_trust_anchor_list_init(&reader, list, length, &limits, &parser), ==,
+                   TC_TLV_OK);
+  munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &parser, &anchor), ==, TC_TLV_OK);
+  munit_assert_int(
+      validate("GoodCACert.crt", "ValidCertificatePathTest1EE.crt", &anchor, &options, &result), ==,
+      TC_X509_PATH_INVALID);
 
   /* requireExplicitPolicy without a policySet is malformed (RFC 5914). */
-  length = trust_anchor_info(list,&root,NULL,0,explicit_policy,sizeof explicit_policy,NULL,0,-1);
-  munit_assert_int(TC_X509_trust_anchor_list_init(&reader,list,length,&limits,&parser), ==, TC_TLV_OK);
-  munit_assert_int(TC_X509_trust_anchor_next(&reader,&limits,&parser,&anchor), ==, TC_TLV_INVALID);
+  length =
+      trust_anchor_info(list, &root, NULL, 0, explicit_policy, sizeof explicit_policy, NULL, 0, -1);
+  munit_assert_int(TC_X509_trust_anchor_list_init(&reader, list, length, &limits, &parser), ==,
+                   TC_TLV_OK);
+  munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &parser, &anchor), ==,
+                   TC_TLV_INVALID);
   return MUNIT_OK;
 }
 
@@ -339,33 +377,38 @@ static MunitResult workspace_limits(const MunitParameter params[], void* user)
   static uint8_t list[4096];
   TC_TLV_frame frames[2];
   TC_bytes oids[1];
-  TC_X509_workspace small_frames = {frames,2,parse_oids,32};
-  TC_X509_workspace small_oids = {parse_frames,32,oids,1};
+  TC_X509_workspace small_frames = {frames, 2, parse_oids, 32};
+  TC_X509_workspace small_oids = {parse_frames, 32, oids, 1};
   TC_TLV_reader reader;
   TC_X509_store_anchor anchor;
-  const TC_bytes encoded = load("TrustAnchorRootCertificate.crt",anchor_der);
+  const TC_bytes encoded = load("TrustAnchorRootCertificate.crt", anchor_der);
   size_t length;
-  (void)params; (void)user;
+  (void)params;
+  (void)user;
 
   /* A certificate choice: the list wraps the PKITS root certificate. */
-  length = der(list,0x30,encoded.data,encoded.length);
-  munit_assert_int(TC_X509_trust_anchor_list_init(&reader,list,length,&limits,&small_frames),
-      ==, TC_TLV_LIMIT);
-  munit_assert_int(TC_X509_trust_anchor_list_init(&reader,list,length,&limits,&small_oids),
-      ==, TC_TLV_OK);
-  munit_assert_int(TC_X509_trust_anchor_next(&reader,&limits,&small_oids,&anchor), ==, TC_TLV_LIMIT);
-  munit_assert_int(TC_X509_trust_anchor_list_init(&reader,list,length,&limits,&parser), ==, TC_TLV_OK);
-  munit_assert_int(TC_X509_trust_anchor_next(&reader,&limits,&parser,&anchor), ==, TC_TLV_OK);
-  munit_assert_int(TC_X509_trust_anchor_next(&reader,&limits,&parser,&anchor), ==, TC_TLV_END);
+  length = der(list, 0x30, encoded.data, encoded.length);
+  munit_assert_int(TC_X509_trust_anchor_list_init(&reader, list, length, &limits, &small_frames),
+                   ==, TC_TLV_LIMIT);
+  munit_assert_int(TC_X509_trust_anchor_list_init(&reader, list, length, &limits, &small_oids), ==,
+                   TC_TLV_OK);
+  munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &small_oids, &anchor), ==,
+                   TC_TLV_LIMIT);
+  munit_assert_int(TC_X509_trust_anchor_list_init(&reader, list, length, &limits, &parser), ==,
+                   TC_TLV_OK);
+  munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &parser, &anchor), ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &parser, &anchor), ==, TC_TLV_END);
   return MUNIT_OK;
 }
 
 static MunitTest tests[] = {
-  {"/policies",policies,NULL,NULL,MUNIT_TEST_OPTION_NONE,NULL},
-  {"/names",names,NULL,NULL,MUNIT_TEST_OPTION_NONE,NULL},
-  {"/parsed-info",parsed_info,NULL,NULL,MUNIT_TEST_OPTION_NONE,NULL},
-  {"/workspace-limits",workspace_limits,NULL,NULL,MUNIT_TEST_OPTION_NONE,NULL},
-  {NULL,NULL,NULL,NULL,0,NULL}
-};
-static const MunitSuite suite = {"/x509-anchor-controls",tests,NULL,1,MUNIT_SUITE_OPTION_NONE};
-int main(int argc, char* argv[]) { return munit_suite_main(&suite,NULL,argc,argv); }
+    {"/policies", policies, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/names", names, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/parsed-info", parsed_info, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/workspace-limits", workspace_limits, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {NULL, NULL, NULL, NULL, 0, NULL}};
+static const MunitSuite suite = {"/x509-anchor-controls", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};
+int main(int argc, char* argv[])
+{
+  return munit_suite_main(&suite, NULL, argc, argv);
+}

@@ -21,8 +21,9 @@ typedef struct {
 
 /* The path is already validated and held separately from this scratch. */
 TC_TLV_result example_check_path_revocation(const TC_bytes* chain, size_t count,
-    const TC_X509_revocation_options* options, size_t* work,
-    ExampleX509RevocationWorkspace* storage, TC_X509_revocation_result* result);
+                                            const TC_X509_revocation_options* options, size_t* work,
+                                            ExampleX509RevocationWorkspace* storage,
+                                            TC_X509_revocation_result* result);
 #ifdef __cplusplus
 }
 #endif

@@ -17,7 +17,10 @@
 
 typedef enum { TC_PIV_SM_CS2 = 0x27, TC_PIV_SM_CS7 = 0x2e } TC_PIV_SM_suite;
 typedef enum {
-  TC_PIV_SM_IDLE = 0, TC_PIV_SM_ESTABLISHING, TC_PIV_SM_READY, TC_PIV_SM_PENDING
+  TC_PIV_SM_IDLE = 0,
+  TC_PIV_SM_ESTABLISHING,
+  TC_PIV_SM_READY,
+  TC_PIV_SM_PENDING
 } TC_PIV_SM_state;
 
 /* Zero-initialize before first use. Treat members as private; copying a live
@@ -30,7 +33,8 @@ typedef struct {
       uint8_t public_key[1 + 2 * TC_PIV_SM_COORDINATE_BYTES], host_id[8];
     } handshake;
     struct {
-      uint8_t mac_key[TC_PIV_SM_KEY_BYTES], enc_key[TC_PIV_SM_KEY_BYTES], rmac_key[TC_PIV_SM_KEY_BYTES];
+      uint8_t mac_key[TC_PIV_SM_KEY_BYTES], enc_key[TC_PIV_SM_KEY_BYTES],
+          rmac_key[TC_PIV_SM_KEY_BYTES];
       uint8_t counter[16], command_mcv[16], response_mcv[16];
     } traffic;
   } data;
@@ -41,7 +45,10 @@ typedef struct {
   union {
     TC_EC_workspace ec;
     struct {
-      union { TC_AES_dynamic_key aes; TC_AES_dynamic_CMAC cmac; } cipher;
+      union {
+        TC_AES_dynamic_key aes;
+        TC_AES_dynamic_CMAC cmac;
+      } cipher;
       uint8_t material[4 * TC_PIV_SM_KEY_BYTES], digest[32], block[16];
     } symmetric;
   } operation;
@@ -93,15 +100,15 @@ void TC_PIV_SM_clear(TC_PIV_SM* session);
 /* Starts a new session and returns the fields needed by a protocol handshake.
  * Valid arguments discard any previous session. A failed RNG or 16 rejected
  * scalars leaves the session cleared. */
-TC_status TC_PIV_SM_begin(TC_PIV_SM* session, TC_PIV_SM_suite suite,
-    const uint8_t host_id[8], TC_random_fn random, void* random_user,
-    TC_PIV_SM_handshake* handshake, TC_PIV_SM_workspace* workspace);
+TC_status TC_PIV_SM_begin(TC_PIV_SM* session, TC_PIV_SM_suite suite, const uint8_t host_id[8],
+                          TC_random_fn random, void* random_user, TC_PIV_SM_handshake* handshake,
+                          TC_PIV_SM_workspace* workspace);
 
 /* Authenticate the peer key through the application's trust workflow, then
  * pass that key and the unchanged decoded peer fields here. A key-confirmation
  * mismatch returns TC_MISMATCH and clears the session. */
 TC_status TC_PIV_SM_finish(TC_PIV_SM* session, const TC_PIV_SM_peer* peer,
-    TC_bytes authenticated_key, TC_PIV_SM_workspace* workspace);
+                           TC_bytes authenticated_key, TC_PIV_SM_workspace* workspace);
 
 /* Return the padded ciphertext size for plaintext_length, or TC_ERROR on
  * overflow. Empty plaintext has an empty ciphertext. */
@@ -111,16 +118,16 @@ TC_status TC_PIV_SM_ciphertext_size(size_t plaintext_length, size_t* ciphertext_
  * owns all protocol framing and places the ciphertext span in authenticated
  * where its protocol requires it. Only one protected request may be pending.
  * Ciphertext storage may overlap authenticated spans; keep plaintext separate. */
-TC_status TC_PIV_SM_protect(TC_PIV_SM* session,
-    const TC_PIV_SM_protect_request* request, size_t* ciphertext_length,
-    uint8_t tag[8], TC_PIV_SM_workspace* workspace);
+TC_status TC_PIV_SM_protect(TC_PIV_SM* session, const TC_PIV_SM_protect_request* request,
+                            size_t* ciphertext_length, uint8_t tag[8],
+                            TC_PIV_SM_workspace* workspace);
 
 /* Authenticate ordered response spans, then decrypt and check padding.
  * Plaintext is released only after authentication. Insufficient capacity
  * leaves the request pending so the same response can be retried. */
-TC_status TC_PIV_SM_unprotect(TC_PIV_SM* session,
-    const TC_PIV_SM_unprotect_request* request, uint8_t* plaintext,
-    size_t capacity, size_t* plaintext_length, TC_PIV_SM_workspace* workspace);
+TC_status TC_PIV_SM_unprotect(TC_PIV_SM* session, const TC_PIV_SM_unprotect_request* request,
+                              uint8_t* plaintext, size_t capacity, size_t* plaintext_length,
+                              TC_PIV_SM_workspace* workspace);
 
 #ifdef __cplusplus
 }

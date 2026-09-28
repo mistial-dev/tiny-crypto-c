@@ -9,7 +9,9 @@
 #include "internal.h"
 #if TC_AES_ENABLE_DYNAMIC
 static inline int tc_aes_dynamic_key_valid(const TC_AES_dynamic_key* ctx)
-{ return ctx && (ctx->rounds == 10 || ctx->rounds == 12 || ctx->rounds == 14); }
+{
+  return ctx && (ctx->rounds == 10 || ctx->rounds == 12 || ctx->rounds == 14);
+}
 #endif
 
 typedef uint8_t state_t[4][4];
@@ -24,8 +26,10 @@ static inline void tc_aes_copy_bytes(uint8_t* dst, const uint8_t* src, size_t le
   memcpy(dst, src, length);
 }
 
-#if (defined(TC_AES_ENABLE_GCM) && (TC_AES_ENABLE_GCM == 1)) || (defined(TC_AES_ENABLE_CCM) && (TC_AES_ENABLE_CCM == 1)) || \
-    (defined(TC_AES_ENABLE_EAX) && (TC_AES_ENABLE_EAX == 1)) || (defined(TC_AES_ENABLE_EAX_PRIME) && (TC_AES_ENABLE_EAX_PRIME == 1)) || \
+#if (defined(TC_AES_ENABLE_GCM) && (TC_AES_ENABLE_GCM == 1)) ||                                    \
+    (defined(TC_AES_ENABLE_CCM) && (TC_AES_ENABLE_CCM == 1)) ||                                    \
+    (defined(TC_AES_ENABLE_EAX) && (TC_AES_ENABLE_EAX == 1)) ||                                    \
+    (defined(TC_AES_ENABLE_EAX_PRIME) && (TC_AES_ENABLE_EAX_PRIME == 1)) ||                        \
     (defined(TC_AES_ENABLE_SIV) && (TC_AES_ENABLE_SIV == 1))
 /*
  * Completely disjoint buffers (exact alias is not disjoint).
@@ -34,8 +38,7 @@ static inline void tc_aes_copy_bytes(uint8_t* dst, const uint8_t* src, size_t le
  * Uses uintptr_t subtraction (not relational pointer compares or
  * pa+len) for C portability across unrelated objects / MCU ABIs.
  */
-static inline int tc_aes_buffers_disjoint(const void* a, size_t a_len,
-                                const void* b, size_t b_len)
+static inline int tc_aes_buffers_disjoint(const void* a, size_t a_len, const void* b, size_t b_len)
 {
   return tc_internal_ranges_disjoint(a, a_len, b, b_len);
 }
@@ -47,8 +50,7 @@ static inline int tc_aes_buffers_disjoint(const void* a, size_t a_len,
  *   partial overlap — not OK (TC_ERROR)
  * Empty lengths are always OK.
  */
-static inline int tc_aes_buffers_ok(const void* a, size_t a_len,
-                          const void* b, size_t b_len)
+static inline int tc_aes_buffers_ok(const void* a, size_t a_len, const void* b, size_t b_len)
 {
   const uintptr_t pa = (uintptr_t)a;
   const uintptr_t pb = (uintptr_t)b;

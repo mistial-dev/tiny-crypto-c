@@ -43,8 +43,8 @@
 #include <tiny_crypto/des.hpp>
 #endif
 
-#if TC_ENABLE_MD5 || TC_ENABLE_SHA1 || TC_ENABLE_SHA224 || TC_ENABLE_SHA256 || \
-    TC_ENABLE_SHA384 || TC_ENABLE_SHA512
+#if TC_ENABLE_MD5 || TC_ENABLE_SHA1 || TC_ENABLE_SHA224 || TC_ENABLE_SHA256 || TC_ENABLE_SHA384 || \
+    TC_ENABLE_SHA512
 #include <tiny_crypto/hash.hpp>
 #endif
 

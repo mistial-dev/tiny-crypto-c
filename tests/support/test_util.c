@@ -6,8 +6,7 @@
 
 #include <stdint.h>
 
-void tc_test_fill_bytes(uint8_t* output, size_t length,
-                        uint8_t seed, uint8_t stride)
+void tc_test_fill_bytes(uint8_t* output, size_t length, uint8_t seed, uint8_t stride)
 {
   size_t i;
   for (i = 0; i < length; ++i)
@@ -38,12 +37,10 @@ size_t tc_test_decode_hex(const char* text, uint8_t* output, size_t capacity)
 {
   size_t length = 0;
 
-  while (*text != '\0' && *text != '"' && *text != '\r' && *text != '\n')
-  {
+  while (*text != '\0' && *text != '"' && *text != '\r' && *text != '\n') {
     const int high = tc_cavp_hex_nibble((unsigned char)*text++);
     int low;
-    if (high < 0 || *text == '\0' || *text == '"' ||
-        *text == '\r' || *text == '\n')
+    if (high < 0 || *text == '\0' || *text == '"' || *text == '\r' || *text == '\n')
       return SIZE_MAX;
     low = tc_cavp_hex_nibble((unsigned char)*text++);
     if (low < 0 || length == capacity)
@@ -53,13 +50,11 @@ size_t tc_test_decode_hex(const char* text, uint8_t* output, size_t capacity)
   return length;
 }
 
-size_t tc_test_decode_hex_relaxed(const char* text, uint8_t* output,
-                                  size_t capacity)
+size_t tc_test_decode_hex_relaxed(const char* text, uint8_t* output, size_t capacity)
 {
   size_t length = 0;
 
-  while (*text != '\0')
-  {
+  while (*text != '\0') {
     const int high = tc_cavp_hex_nibble((unsigned char)*text++);
     int low;
     if (high < 0)

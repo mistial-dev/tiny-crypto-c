@@ -45,32 +45,50 @@ typedef struct {
 
 /* Setup and resource-management results. */
 typedef enum {
-  TC_RESULT_OK, TC_RESULT_ARGUMENT, TC_RESULT_LIMIT,
-  TC_RESULT_UNSUPPORTED, TC_RESULT_ERROR
+  TC_RESULT_OK,
+  TC_RESULT_ARGUMENT,
+  TC_RESULT_LIMIT,
+  TC_RESULT_UNSUPPORTED,
+  TC_RESULT_ERROR
 } TC_result;
 
 /* Credential validation combines signatures, trust policy and status evidence. */
 typedef enum {
-  TC_CREDENTIAL_VALID, TC_CREDENTIAL_INVALID, TC_CREDENTIAL_REVOKED,
-  TC_CREDENTIAL_UNSUPPORTED, TC_CREDENTIAL_LIMIT, TC_CREDENTIAL_ERROR,
+  TC_CREDENTIAL_VALID,
+  TC_CREDENTIAL_INVALID,
+  TC_CREDENTIAL_REVOKED,
+  TC_CREDENTIAL_UNSUPPORTED,
+  TC_CREDENTIAL_LIMIT,
+  TC_CREDENTIAL_ERROR,
   /* A required trust or evidence source is unavailable. */
   TC_CREDENTIAL_UNAVAILABLE
 } TC_credential_status;
 
 /* Identifiers do not imply that the corresponding hash is enabled. */
 typedef enum {
-  TC_HASH_UNKNOWN, TC_HASH_SHA1, TC_HASH_SHA224, TC_HASH_SHA256,
-  TC_HASH_SHA384, TC_HASH_SHA512
+  TC_HASH_UNKNOWN,
+  TC_HASH_SHA1,
+  TC_HASH_SHA224,
+  TC_HASH_SHA256,
+  TC_HASH_SHA384,
+  TC_HASH_SHA512
 } TC_hash_algorithm;
 
 typedef enum {
-  TC_EC_UNKNOWN, TC_EC_P256, TC_EC_P384, TC_EC_P521, TC_EC_P224,
-  TC_EC_SECP256K1, TC_EC_BRAINPOOL_P256, TC_EC_BRAINPOOL_P384, TC_EC_BRAINPOOL_P512,
+  TC_EC_UNKNOWN,
+  TC_EC_P256,
+  TC_EC_P384,
+  TC_EC_P521,
+  TC_EC_P224,
+  TC_EC_SECP256K1,
+  TC_EC_BRAINPOOL_P256,
+  TC_EC_BRAINPOOL_P384,
+  TC_EC_BRAINPOOL_P512,
   TC_EC_P192
 } TC_EC_curve;
 
-#define TC_ERROR    (-1)
-#define TC_OK       0
+#define TC_ERROR (-1)
+#define TC_OK 0
 #define TC_MISMATCH 1
 
 #if (TC_ZEROIZE != 0) && (TC_ZEROIZE != 1)

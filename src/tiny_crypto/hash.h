@@ -32,39 +32,39 @@
  */
 
 #if (TC_ENABLE_SHA1 != 0) && (TC_ENABLE_SHA1 != 1)
-  #error "TC_ENABLE_SHA1 must be 0 or 1"
+#error "TC_ENABLE_SHA1 must be 0 or 1"
 #endif
 #if (TC_ENABLE_SHA224 != 0) && (TC_ENABLE_SHA224 != 1)
-  #error "TC_ENABLE_SHA224 must be 0 or 1"
+#error "TC_ENABLE_SHA224 must be 0 or 1"
 #endif
 #if (TC_ENABLE_SHA256 != 0) && (TC_ENABLE_SHA256 != 1)
-  #error "TC_ENABLE_SHA256 must be 0 or 1"
+#error "TC_ENABLE_SHA256 must be 0 or 1"
 #endif
 #if (TC_ENABLE_SHA384 != 0) && (TC_ENABLE_SHA384 != 1)
-  #error "TC_ENABLE_SHA384 must be 0 or 1"
+#error "TC_ENABLE_SHA384 must be 0 or 1"
 #endif
 #if (TC_ENABLE_SHA512 != 0) && (TC_ENABLE_SHA512 != 1)
-  #error "TC_ENABLE_SHA512 must be 0 or 1"
+#error "TC_ENABLE_SHA512 must be 0 or 1"
 #endif
 #if (TC_ENABLE_HMAC != 0) && (TC_ENABLE_HMAC != 1)
-  #error "TC_ENABLE_HMAC must be 0 or 1"
+#error "TC_ENABLE_HMAC must be 0 or 1"
 #endif
 
-#if (TC_ENABLE_SHA1 == 0) && (TC_ENABLE_SHA224 == 0) && \
-    (TC_ENABLE_SHA256 == 0) && (TC_ENABLE_SHA384 == 0) && (TC_ENABLE_SHA512 == 0)
-  #error "at least one of TC_ENABLE_SHA1 / SHA224 / SHA256 / SHA384 / SHA512 must be 1"
+#if (TC_ENABLE_SHA1 == 0) && (TC_ENABLE_SHA224 == 0) && (TC_ENABLE_SHA256 == 0) &&                 \
+    (TC_ENABLE_SHA384 == 0) && (TC_ENABLE_SHA512 == 0)
+#error "at least one of TC_ENABLE_SHA1 / SHA224 / SHA256 / SHA384 / SHA512 must be 1"
 #endif
 
-#define TC_SHA1_DIGESTLEN   20  /**< SHA-1 digest length in bytes (160 bits) */
-#define TC_SHA1_BLOCKLEN    64  /**< SHA-1 block length in bytes (512 bits) */
-#define TC_SHA224_DIGESTLEN 28  /**< SHA-224 digest length in bytes (224 bits) */
-#define TC_SHA224_BLOCKLEN  64  /**< SHA-224 block length in bytes (512 bits) */
-#define TC_SHA256_DIGESTLEN 32  /**< SHA-256 digest length in bytes (256 bits) */
-#define TC_SHA256_BLOCKLEN  64  /**< SHA-256 block length in bytes (512 bits) */
-#define TC_SHA384_DIGESTLEN 48  /**< SHA-384 digest length in bytes (384 bits) */
-#define TC_SHA384_BLOCKLEN  128 /**< SHA-384 block length in bytes (1024 bits) */
-#define TC_SHA512_DIGESTLEN 64  /**< SHA-512 digest length in bytes (512 bits) */
-#define TC_SHA512_BLOCKLEN  128 /**< SHA-512 block length in bytes (1024 bits) */
+#define TC_SHA1_DIGESTLEN 20   /**< SHA-1 digest length in bytes (160 bits) */
+#define TC_SHA1_BLOCKLEN 64    /**< SHA-1 block length in bytes (512 bits) */
+#define TC_SHA224_DIGESTLEN 28 /**< SHA-224 digest length in bytes (224 bits) */
+#define TC_SHA224_BLOCKLEN 64  /**< SHA-224 block length in bytes (512 bits) */
+#define TC_SHA256_DIGESTLEN 32 /**< SHA-256 digest length in bytes (256 bits) */
+#define TC_SHA256_BLOCKLEN 64  /**< SHA-256 block length in bytes (512 bits) */
+#define TC_SHA384_DIGESTLEN 48 /**< SHA-384 digest length in bytes (384 bits) */
+#define TC_SHA384_BLOCKLEN 128 /**< SHA-384 block length in bytes (1024 bits) */
+#define TC_SHA512_DIGESTLEN 64 /**< SHA-512 digest length in bytes (512 bits) */
+#define TC_SHA512_BLOCKLEN 128 /**< SHA-512 block length in bytes (1024 bits) */
 
 #if TC_ENABLE_HMAC
 /*
@@ -75,22 +75,22 @@
  */
 
 #if (TC_HMAC_MIN_TAG_LEN < 1)
-  #error "TC_HMAC_MIN_TAG_LEN must be at least 1"
+#error "TC_HMAC_MIN_TAG_LEN must be at least 1"
 #endif
 #if TC_ENABLE_SHA1 && (TC_HMAC_MIN_TAG_LEN > TC_SHA1_DIGESTLEN)
-  #error "TC_HMAC_MIN_TAG_LEN must not exceed TC_SHA1_DIGESTLEN when SHA-1 is enabled"
+#error "TC_HMAC_MIN_TAG_LEN must not exceed TC_SHA1_DIGESTLEN when SHA-1 is enabled"
 #endif
 #if TC_ENABLE_SHA224 && (TC_HMAC_MIN_TAG_LEN > TC_SHA224_DIGESTLEN)
-  #error "TC_HMAC_MIN_TAG_LEN must not exceed TC_SHA224_DIGESTLEN when SHA-224 is enabled"
+#error "TC_HMAC_MIN_TAG_LEN must not exceed TC_SHA224_DIGESTLEN when SHA-224 is enabled"
 #endif
 #if TC_ENABLE_SHA256 && (TC_HMAC_MIN_TAG_LEN > TC_SHA256_DIGESTLEN)
-  #error "TC_HMAC_MIN_TAG_LEN must not exceed TC_SHA256_DIGESTLEN"
+#error "TC_HMAC_MIN_TAG_LEN must not exceed TC_SHA256_DIGESTLEN"
 #endif
 #if TC_ENABLE_SHA384 && (TC_HMAC_MIN_TAG_LEN > TC_SHA384_DIGESTLEN)
-  #error "TC_HMAC_MIN_TAG_LEN must not exceed TC_SHA384_DIGESTLEN"
+#error "TC_HMAC_MIN_TAG_LEN must not exceed TC_SHA384_DIGESTLEN"
 #endif
 #if TC_ENABLE_SHA512 && (TC_HMAC_MIN_TAG_LEN > TC_SHA512_DIGESTLEN)
-  #error "TC_HMAC_MIN_TAG_LEN must not exceed TC_SHA512_DIGESTLEN"
+#error "TC_HMAC_MIN_TAG_LEN must not exceed TC_SHA512_DIGESTLEN"
 #endif
 #endif /* TC_ENABLE_HMAC */
 
@@ -101,8 +101,7 @@
  * Count is the number of message bytes absorbed so far. Buf holds the
  * partial block awaiting compression; BufLen is its fill level (< 64).
  */
-struct TC_SHA1_ctx
-{
+struct TC_SHA1_ctx {
   uint64_t Count;
   uint32_t State[5];
   uint8_t BufLen;
@@ -118,8 +117,7 @@ struct TC_SHA1_ctx
  * Same layout as SHA-256 (SHA-224 is SHA-256 with a different IV and a
  * 28-byte output). A distinct type keeps the two APIs from being mixed.
  */
-struct TC_SHA224_ctx
-{
+struct TC_SHA224_ctx {
   uint64_t Count;
   uint32_t State[8];
   uint8_t BufLen;
@@ -135,8 +133,7 @@ struct TC_SHA224_ctx
  * Count is the number of message bytes absorbed so far. Buf holds the
  * partial block awaiting compression; BufLen is its fill level (< 64).
  */
-struct TC_SHA256_ctx
-{
+struct TC_SHA256_ctx {
   uint64_t Count;
   uint32_t State[8];
   uint8_t BufLen;
@@ -153,8 +150,7 @@ struct TC_SHA256_ctx
  * 48-byte output). Count is the number of message bytes absorbed so far;
  * Buf holds the partial 128-byte block awaiting compression.
  */
-struct TC_SHA384_ctx
-{
+struct TC_SHA384_ctx {
   uint64_t Count;
   uint64_t State[8];
   uint8_t BufLen;
@@ -170,8 +166,7 @@ struct TC_SHA384_ctx
  * Count is the number of message bytes absorbed so far. Buf holds the
  * partial block awaiting compression; BufLen is its fill level (< 128).
  */
-struct TC_SHA512_ctx
-{
+struct TC_SHA512_ctx {
   uint64_t Count;
   uint64_t State[8];
   uint8_t BufLen;
@@ -188,8 +183,7 @@ struct TC_SHA512_ctx
  * Inner absorbs (key ^ ipad) || message. OuterState is the compact hash state
  * after absorbing (key ^ opad), so the key is never retained after init.
  */
-struct TC_HMAC_SHA1_ctx
-{
+struct TC_HMAC_SHA1_ctx {
   struct TC_SHA1_ctx Inner;
   uint32_t OuterState[5];
 };
@@ -197,8 +191,7 @@ struct TC_HMAC_SHA1_ctx
 
 #if TC_ENABLE_SHA224
 /** @brief HMAC-SHA-224 Context Structure (same shape as HMAC-SHA-256). */
-struct TC_HMAC_SHA224_ctx
-{
+struct TC_HMAC_SHA224_ctx {
   struct TC_SHA224_ctx Inner;
   uint32_t OuterState[8];
 };
@@ -211,8 +204,7 @@ struct TC_HMAC_SHA224_ctx
  * Inner absorbs (key ^ ipad) || message. OuterState is the compact hash state
  * after absorbing (key ^ opad). The key is not retained after init.
  */
-struct TC_HMAC_SHA256_ctx
-{
+struct TC_HMAC_SHA256_ctx {
   struct TC_SHA256_ctx Inner;
   uint32_t OuterState[8];
 };
@@ -220,8 +212,7 @@ struct TC_HMAC_SHA256_ctx
 
 #if TC_ENABLE_SHA384
 /** @brief HMAC-SHA-384 Context Structure (64-bit outer state). */
-struct TC_HMAC_SHA384_ctx
-{
+struct TC_HMAC_SHA384_ctx {
   struct TC_SHA384_ctx Inner;
   uint64_t OuterState[8];
 };
@@ -229,8 +220,7 @@ struct TC_HMAC_SHA384_ctx
 
 #if TC_ENABLE_SHA512
 /** @brief HMAC-SHA-512 Context Structure (64-bit outer state). */
-struct TC_HMAC_SHA512_ctx
-{
+struct TC_HMAC_SHA512_ctx {
   struct TC_SHA512_ctx Inner;
   uint64_t OuterState[8];
 };
@@ -546,9 +536,8 @@ void TC_HMAC_SHA1_ctx_clear(struct TC_HMAC_SHA1_ctx* ctx);
  * @param tag_len Tag length; TC_HMAC_MIN_TAG_LEN..TC_SHA1_DIGESTLEN.
  * @return TC_OK, or TC_ERROR on invalid arguments.
  */
-TC_status TC_HMAC_SHA1_digest(const uint8_t* key, size_t keylen,
-                     const uint8_t* msg, size_t msg_len,
-                     uint8_t* tag, size_t tag_len);
+TC_status TC_HMAC_SHA1_digest(const uint8_t* key, size_t keylen, const uint8_t* msg, size_t msg_len,
+                              uint8_t* tag, size_t tag_len);
 
 /**
  * @brief Verify an HMAC-SHA-1 tag via TC_ct_equal (constant-time in the tag bytes).
@@ -556,7 +545,7 @@ TC_status TC_HMAC_SHA1_digest(const uint8_t* key, size_t keylen,
  *         on invalid arguments (NULL tag, tag_len out of range, …).
  */
 TC_status TC_HMAC_SHA1_verify(const uint8_t* key, size_t keylen, const uint8_t* msg, size_t msg_len,
-                     const uint8_t* tag, size_t tag_len);
+                              const uint8_t* tag, size_t tag_len);
 #endif /* TC_ENABLE_SHA1 */
 
 #if TC_ENABLE_SHA224
@@ -588,17 +577,16 @@ void TC_HMAC_SHA224_ctx_clear(struct TC_HMAC_SHA224_ctx* ctx);
  * @param tag_len Tag length; TC_HMAC_MIN_TAG_LEN..TC_SHA224_DIGESTLEN.
  * @return TC_OK, or TC_ERROR on invalid arguments.
  */
-TC_status TC_HMAC_SHA224_digest(const uint8_t* key, size_t keylen,
-                       const uint8_t* msg, size_t msg_len,
-                       uint8_t* tag, size_t tag_len);
+TC_status TC_HMAC_SHA224_digest(const uint8_t* key, size_t keylen, const uint8_t* msg,
+                                size_t msg_len, uint8_t* tag, size_t tag_len);
 
 /**
  * @brief Verify an HMAC-SHA-224 tag via TC_ct_equal (constant-time in the tag bytes).
  * @return TC_OK on match, TC_MISMATCH on a well-formed miss, TC_ERROR
  *         on invalid arguments (NULL tag, tag_len out of range, …).
  */
-TC_status TC_HMAC_SHA224_verify(const uint8_t* key, size_t keylen, const uint8_t* msg, size_t msg_len,
-                       const uint8_t* tag, size_t tag_len);
+TC_status TC_HMAC_SHA224_verify(const uint8_t* key, size_t keylen, const uint8_t* msg,
+                                size_t msg_len, const uint8_t* tag, size_t tag_len);
 #endif /* TC_ENABLE_SHA224 */
 
 #if TC_ENABLE_SHA256
@@ -644,17 +632,16 @@ void TC_HMAC_SHA256_ctx_clear(struct TC_HMAC_SHA256_ctx* ctx);
  * @param tag_len Tag length; TC_HMAC_MIN_TAG_LEN..TC_SHA256_DIGESTLEN.
  * @return TC_OK, or TC_ERROR on invalid arguments.
  */
-TC_status TC_HMAC_SHA256_digest(const uint8_t* key, size_t keylen,
-                       const uint8_t* msg, size_t msg_len,
-                       uint8_t* tag, size_t tag_len);
+TC_status TC_HMAC_SHA256_digest(const uint8_t* key, size_t keylen, const uint8_t* msg,
+                                size_t msg_len, uint8_t* tag, size_t tag_len);
 
 /**
  * @brief Verify an HMAC-SHA-256 tag via TC_ct_equal (constant-time in the tag bytes).
  * @return TC_OK on match, TC_MISMATCH on a well-formed miss, TC_ERROR
  *         on invalid arguments (NULL tag, tag_len out of range, …).
  */
-TC_status TC_HMAC_SHA256_verify(const uint8_t* key, size_t keylen, const uint8_t* msg, size_t msg_len,
-                       const uint8_t* tag, size_t tag_len);
+TC_status TC_HMAC_SHA256_verify(const uint8_t* key, size_t keylen, const uint8_t* msg,
+                                size_t msg_len, const uint8_t* tag, size_t tag_len);
 #endif /* TC_ENABLE_SHA256 */
 
 #if TC_ENABLE_SHA384
@@ -686,17 +673,16 @@ void TC_HMAC_SHA384_ctx_clear(struct TC_HMAC_SHA384_ctx* ctx);
  * @param tag_len Tag length; TC_HMAC_MIN_TAG_LEN..TC_SHA384_DIGESTLEN.
  * @return TC_OK, or TC_ERROR on invalid arguments.
  */
-TC_status TC_HMAC_SHA384_digest(const uint8_t* key, size_t keylen,
-                       const uint8_t* msg, size_t msg_len,
-                       uint8_t* tag, size_t tag_len);
+TC_status TC_HMAC_SHA384_digest(const uint8_t* key, size_t keylen, const uint8_t* msg,
+                                size_t msg_len, uint8_t* tag, size_t tag_len);
 
 /**
  * @brief Verify an HMAC-SHA-384 tag via TC_ct_equal (constant-time in the tag bytes).
  * @return TC_OK on match, TC_MISMATCH on a well-formed miss, TC_ERROR
  *         on invalid arguments (NULL tag, tag_len out of range, …).
  */
-TC_status TC_HMAC_SHA384_verify(const uint8_t* key, size_t keylen, const uint8_t* msg, size_t msg_len,
-                       const uint8_t* tag, size_t tag_len);
+TC_status TC_HMAC_SHA384_verify(const uint8_t* key, size_t keylen, const uint8_t* msg,
+                                size_t msg_len, const uint8_t* tag, size_t tag_len);
 #endif /* TC_ENABLE_SHA384 */
 
 #if TC_ENABLE_SHA512
@@ -728,17 +714,16 @@ void TC_HMAC_SHA512_ctx_clear(struct TC_HMAC_SHA512_ctx* ctx);
  * @param tag_len Tag length; TC_HMAC_MIN_TAG_LEN..TC_SHA512_DIGESTLEN.
  * @return TC_OK, or TC_ERROR on invalid arguments.
  */
-TC_status TC_HMAC_SHA512_digest(const uint8_t* key, size_t keylen,
-                       const uint8_t* msg, size_t msg_len,
-                       uint8_t* tag, size_t tag_len);
+TC_status TC_HMAC_SHA512_digest(const uint8_t* key, size_t keylen, const uint8_t* msg,
+                                size_t msg_len, uint8_t* tag, size_t tag_len);
 
 /**
  * @brief Verify an HMAC-SHA-512 tag via TC_ct_equal (constant-time in the tag bytes).
  * @return TC_OK on match, TC_MISMATCH on a well-formed miss, TC_ERROR
  *         on invalid arguments (NULL tag, tag_len out of range, …).
  */
-TC_status TC_HMAC_SHA512_verify(const uint8_t* key, size_t keylen, const uint8_t* msg, size_t msg_len,
-                       const uint8_t* tag, size_t tag_len);
+TC_status TC_HMAC_SHA512_verify(const uint8_t* key, size_t keylen, const uint8_t* msg,
+                                size_t msg_len, const uint8_t* tag, size_t tag_len);
 #endif /* TC_ENABLE_SHA512 */
 
 #endif /* TC_ENABLE_HMAC */

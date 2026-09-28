@@ -22,27 +22,25 @@
 
 #if TC_ENABLE_CREDENTIAL
 
-static TC_TLV_result
-signing_policy_present(TC_bytes encoded_extensions, TC_bytes required,
-                       const TC_TLV_limits *limits,
-                       const TC_X509_path_workspace *storage) {
+static TC_TLV_result signing_policy_present(TC_bytes encoded_extensions, TC_bytes required,
+                                            const TC_TLV_limits* limits,
+                                            const TC_X509_path_workspace* storage)
+{
   static const uint8_t policies_oid[] = {0x55, 0x1d, 0x20};
   TC_TLV_reader extensions;
   TC_X509_extension extension;
-  TC_TLV_result status = TC_X509_extensions_init(
-      &extensions, encoded_extensions.data, encoded_extensions.length, limits);
+  TC_TLV_result status = TC_X509_extensions_init(&extensions, encoded_extensions.data,
+                                                 encoded_extensions.length, limits);
   if (status != TC_TLV_OK)
     return status;
   int found = 0;
-  while ((status = TC_X509_extension_next(&extensions, &extension)) ==
-         TC_TLV_OK) {
+  while ((status = TC_X509_extension_next(&extensions, &extension)) == TC_TLV_OK) {
     if (extension.oid.length != sizeof policies_oid ||
         memcmp(extension.oid.data, policies_oid, sizeof policies_oid))
       continue;
     TC_X509_policy_reader policies;
     TC_X509_policy policy;
-    status = TC_X509_policies_init(&policies, extension.value.data,
-                                   extension.value.length, limits,
+    status = TC_X509_policies_init(&policies, extension.value.data, extension.value.length, limits,
                                    storage->oids, storage->oid_capacity);
     if (status != TC_TLV_OK)
       return status;
@@ -57,14 +55,14 @@ signing_policy_present(TC_bytes encoded_extensions, TC_bytes required,
   return status == TC_TLV_END ? (found ? TC_TLV_OK : TC_TLV_INVALID) : status;
 }
 
-static TC_TLV_result
-content_signing_purpose(TC_bytes extensions, int twic_compatible,
-                        TC_X509_path_options *policy,
-                        const TC_X509_path_workspace *storage) {
+static TC_TLV_result content_signing_purpose(TC_bytes extensions, int twic_compatible,
+                                             TC_X509_path_options* policy,
+                                             const TC_X509_path_workspace* storage)
+{
   static const uint8_t eku_oid[] = {0x55, 0x1d, 37};
   TC_TLV_reader reader;
-  TC_TLV_result status = TC_X509_extensions_init(
-      &reader, extensions.data, extensions.length, &policy->parsing);
+  TC_TLV_result status =
+      TC_X509_extensions_init(&reader, extensions.data, extensions.length, &policy->parsing);
   if (status != TC_TLV_OK)
     return status;
   TC_X509_extension extension;
@@ -73,15 +71,13 @@ content_signing_purpose(TC_bytes extensions, int twic_compatible,
         memcmp(extension.oid.data, eku_oid, sizeof eku_oid))
       continue;
     size_t count;
-    status = TC_X509_extended_key_usage_read(
-        extension.value.data, extension.value.length, storage->oids,
-        storage->oid_capacity, &count);
+    status = TC_X509_extended_key_usage_read(extension.value.data, extension.value.length,
+                                             storage->oids, storage->oid_capacity, &count);
     if (status != TC_TLV_OK)
       return status;
     for (size_t i = 0; i < count; ++i) {
       if (TC_PIV_oid_identify(storage->oids[i],
-                              twic_compatible ? TC_PIV_OIDS_TWIC_COMPATIBLE
-                                              : TC_PIV_OIDS_ONLY) !=
+                              twic_compatible ? TC_PIV_OIDS_TWIC_COMPATIBLE : TC_PIV_OIDS_ONLY) !=
           TC_PIV_OID_CONTENT_SIGNING)
         continue;
       if (!policy->purpose.length)
@@ -93,15 +89,15 @@ content_signing_purpose(TC_bytes extensions, int twic_compatible,
   return policy->purpose.length ? TC_TLV_OK : TC_TLV_INVALID;
 }
 
-static TC_TLV_result piv_content_signer_policy(
-    const TC_X509_certificate *signer, const TC_X509_time *card_expiration,
-    TC_X509_path_options *policy, const TC_X509_path_workspace *storage) {
-  static const uint8_t signing_policy[] = {0x60, 0x86, 0x48, 1, 0x65,
-                                           3,    2,    1,    3, 39};
-  static const TC_bytes required_policy = {signing_policy,
-                                           sizeof signing_policy};
-  TC_TLV_result status = signing_policy_present(
-      signer->extensions, required_policy, &policy->parsing, storage);
+static TC_TLV_result piv_content_signer_policy(const TC_X509_certificate* signer,
+                                               const TC_X509_time* card_expiration,
+                                               TC_X509_path_options* policy,
+                                               const TC_X509_path_workspace* storage)
+{
+  static const uint8_t signing_policy[] = {0x60, 0x86, 0x48, 1, 0x65, 3, 2, 1, 3, 39};
+  static const TC_bytes required_policy = {signing_policy, sizeof signing_policy};
+  TC_TLV_result status =
+      signing_policy_present(signer->extensions, required_policy, &policy->parsing, storage);
   if (status != TC_TLV_OK)
     return status;
   if (card_expiration) {
@@ -118,52 +114,48 @@ static TC_TLV_result piv_content_signer_policy(
   return TC_TLV_OK;
 }
 
-TC_TLV_result
-tc_credential_signer_policy(TC_bytes certificate, int piv, int twic_compatible,
-                      const TC_X509_time *card_expiration,
-                      TC_X509_path_options *policy,
-                      const TC_X509_path_workspace *storage, size_t *work) {
+TC_TLV_result tc_credential_signer_policy(TC_bytes certificate, int piv, int twic_compatible,
+                                          const TC_X509_time* card_expiration,
+                                          TC_X509_path_options* policy,
+                                          const TC_X509_path_workspace* storage, size_t* work)
+{
   if (!piv && policy->purpose.length)
     policy->purpose = (TC_bytes){NULL, 0};
   if (piv || !policy->purpose.length) {
     if (certificate.length > *work / 3)
       return TC_TLV_LIMIT;
     *work -= certificate.length * 3;
-    TC_X509_workspace parser = {storage->frames, storage->frame_capacity,
-                                storage->oids, storage->oid_capacity};
+    TC_X509_workspace parser = {storage->frames, storage->frame_capacity, storage->oids,
+                                storage->oid_capacity};
     TC_X509_certificate signer;
-    TC_TLV_result status = TC_X509_read(certificate.data, certificate.length,
-                                        &policy->parsing, &parser, &signer);
+    TC_TLV_result status =
+        TC_X509_read(certificate.data, certificate.length, &policy->parsing, &parser, &signer);
     if (status != TC_TLV_OK)
       return status;
     if (!policy->purpose.length) {
-      status = content_signing_purpose(signer.extensions, twic_compatible,
-                                       policy, storage);
+      status = content_signing_purpose(signer.extensions, twic_compatible, policy, storage);
       if (status != TC_TLV_OK)
         return status;
     }
     if (piv) {
-      status =
-          piv_content_signer_policy(&signer, card_expiration, policy, storage);
+      status = piv_content_signer_policy(&signer, card_expiration, policy, storage);
       if (status != TC_TLV_OK)
         return status;
     }
   }
   policy->key_usage |= TC_KEY_USAGE_DIGITAL_SIGNATURE;
-  policy->flags |= TC_X509_PATH_REQUIRE_KEY_USAGE |
-                   TC_X509_PATH_REQUIRE_EXTENDED_KEY_USAGE |
+  policy->flags |= TC_X509_PATH_REQUIRE_KEY_USAGE | TC_X509_PATH_REQUIRE_EXTENDED_KEY_USAGE |
                    TC_X509_PATH_INHIBIT_ANY_PURPOSE;
   return TC_TLV_OK;
 }
 
-TC_TLV_result tc_credential_chuid_expiration_check(TC_bytes expiration,
-                                                   const TC_X509_time *at,
-                                                   int *valid) {
+TC_TLV_result tc_credential_chuid_expiration_check(TC_bytes expiration, const TC_X509_time* at,
+                                                   int* valid)
+{
   if (!at || !valid || !expiration.data || expiration.length != 8)
     return TC_TLV_ARGUMENT;
   unsigned year, month, day;
-  if (!tc_credential_yyyymmdd(expiration.data, expiration.length, &year,
-                              &month, &day))
+  if (!tc_credential_yyyymmdd(expiration.data, expiration.length, &year, &month, &day))
     return TC_TLV_INVALID;
   /* The card remains valid through the last second of its expiration day. */
   const TC_X509_time expires = {year, (uint8_t)month, (uint8_t)day, 23, 59, 59};
@@ -174,19 +166,16 @@ TC_TLV_result tc_credential_chuid_expiration_check(TC_bytes expiration,
   return result;
 }
 
-int tc_credential_profile(TC_PIV_card_profile profile,
-                              const TC_validation_options *options, int *piv,
-                              TC_PIV_oid_profile *oids) {
+int tc_credential_profile(TC_PIV_card_profile profile, const TC_validation_options* options,
+                          int* piv, TC_PIV_oid_profile* oids)
+{
   if (!options || !piv || !oids ||
-      (profile != TC_PIV_CARD && profile != TC_TWIC_LEGACY_CARD &&
-       profile != TC_TWIC_NEXGEN_CARD))
+      (profile != TC_PIV_CARD && profile != TC_TWIC_LEGACY_CARD && profile != TC_TWIC_NEXGEN_CARD))
     return 0;
   *piv = profile == TC_PIV_CARD;
   *oids = *piv ? TC_PIV_OIDS_ONLY : TC_PIV_OIDS_TWIC_COMPATIBLE;
-  return (!options->certificate.purpose.data &&
-          !options->certificate.purpose.length) ||
-         TC_PIV_oid_identify(options->certificate.purpose, *oids) ==
-             TC_PIV_OID_CONTENT_SIGNING;
+  return (!options->certificate.purpose.data && !options->certificate.purpose.length) ||
+         TC_PIV_oid_identify(options->certificate.purpose, *oids) == TC_PIV_OID_CONTENT_SIGNING;
 }
 
 #endif

@@ -10,7 +10,11 @@ extern "C" {
 
 typedef struct TC_X509_crl_job TC_X509_crl_job;
 /* Alignment for statically allocated job storage. */
-typedef union { uint64_t integer; void* pointer; long double real; } TC_X509_crl_storage;
+typedef union {
+  uint64_t integer;
+  void* pointer;
+  long double real;
+} TC_X509_crl_storage;
 typedef struct {
   TC_TLV_limits parsing;
   uint64_t max_input, max_read_bytes, max_reads, max_entries;
@@ -33,17 +37,17 @@ size_t TC_X509_crl_prepare_alignment(void);
  * Other scratch can be reused after completion. All regions are disjoint.
  * parsing limits bound individual metadata/entry objects; max_input bounds the
  * complete CRL. Work and scratch may change on failure; out changes only on OK. */
-TC_TLV_result TC_X509_crl_prepare_begin(const TC_source* source,
-    const TC_X509_crl_target* targets, size_t count,
-    const TC_X509_crl_prepare_options* options,
-    const TC_X509_crl_prepare_workspace* workspace, size_t* work, TC_X509_crl_job** out);
+TC_TLV_result TC_X509_crl_prepare_begin(const TC_source* source, const TC_X509_crl_target* targets,
+                                        size_t count, const TC_X509_crl_prepare_options* options,
+                                        const TC_X509_crl_prepare_workspace* workspace,
+                                        size_t* work, TC_X509_crl_job** out);
 /* Each call processes at most max_entries records and max_bytes hash input.
  * Both limits must be nonzero. OK sets complete to 0 for more work or 1 when
  * finish can return the prepared record. Failure leaves complete unchanged.
  * Refill the per-call work budget between calls. The source I/O budget spans
  * the entire job. Any processing failure requires a new job. */
-TC_TLV_result TC_X509_crl_prepare_step(TC_X509_crl_job* job, size_t max_entries,
-    size_t max_bytes, size_t* work, int* complete);
+TC_TLV_result TC_X509_crl_prepare_step(TC_X509_crl_job* job, size_t max_entries, size_t max_bytes,
+                                       size_t* work, int* complete);
 /* Return a record suitable for TC_X509_crl_index after the complete scan/hash.
  * The resolver verifies its signature and applies trust, scope and time policy.
  * Unqueried targets return UNSUPPORTED during lookup. out borrows job storage

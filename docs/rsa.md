@@ -1,4 +1,5 @@
 <!-- SPDX-FileCopyrightText: Mistial Dev -->
+
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 
 # RSA
@@ -214,8 +215,6 @@ as an incomplete validation and accept the components only on `TC_RSA_OK`.
 The private-operation tests compile this example and exercise its successful
 validation path using OpenSSL-generated keys.
 
-[fips1865]: https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-5.pdf
-
 ## Signing a digest
 
 For imported CRT components, first validate the private key, then call
@@ -357,3 +356,5 @@ and arithmetic selection avoids secret-indexed memory. RNG rejection sampling
 has a variable attempt count, and component encodings expose their public byte
 lengths. This implementation has not been independently certified as a
 constant-time implementation on every compiler and target.
+
+[fips1865]: https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-5.pdf

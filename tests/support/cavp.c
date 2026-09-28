@@ -22,8 +22,8 @@ static char* trim(char* start, char* end)
   return start;
 }
 
-int tc_cavp_open(tc_cavp_reader* reader, const char* directory,
-                 const char* relative, char* line, size_t capacity)
+int tc_cavp_open(tc_cavp_reader* reader, const char* directory, const char* relative, char* line,
+                 size_t capacity)
 {
   char path[1024];
 
@@ -110,8 +110,8 @@ int tc_cavp_is(const tc_cavp_reader* reader, const char* name)
   return reader->name != NULL && strcmp(reader->name, name) == 0;
 }
 
-const char* tc_cavp_header_value(const tc_cavp_reader* reader, const char* name,
-                                 char* value, size_t capacity)
+const char* tc_cavp_header_value(const tc_cavp_reader* reader, const char* name, char* value,
+                                 size_t capacity)
 {
   const size_t name_length = strlen(name);
   size_t i;
@@ -128,8 +128,7 @@ const char* tc_cavp_header_value(const tc_cavp_reader* reader, const char* name,
       while (parameter < end && (*parameter == ' ' || *parameter == '\t'))
         ++parameter;
       cursor = parameter + name_length;
-      if (end - parameter > (ptrdiff_t)name_length &&
-          strncmp(parameter, name, name_length) == 0) {
+      if (end - parameter > (ptrdiff_t)name_length && strncmp(parameter, name, name_length) == 0) {
         while (cursor < end && (*cursor == ' ' || *cursor == '\t'))
           ++cursor;
         if (cursor < end && *cursor == '=') {
@@ -184,9 +183,7 @@ long tc_cavp_parse_hex(const char* text, uint8_t* output, size_t capacity)
 {
   size_t length = 0;
 
-  while (text[0] != '\0' && text[0] != '\r' && text[0] != '\n' &&
-         text[0] != ' ')
-  {
+  while (text[0] != '\0' && text[0] != '\r' && text[0] != '\n' && text[0] != ' ') {
     const int high = tc_cavp_hex_nibble((unsigned char)text[0]);
     const int low = tc_cavp_hex_nibble((unsigned char)text[1]);
     if (high < 0 || low < 0 || length >= capacity)

@@ -9,7 +9,7 @@
 #include <string.h>
 
 #if defined(_MSC_VER)
-  #include <stdlib.h>
+#include <stdlib.h>
 #endif
 
 /* Keep mask selection as arithmetic. Otherwise an optimizer may replace it
@@ -27,8 +27,8 @@ static inline uint32_t tc_internal_mask_barrier(uint32_t mask)
 
 /* Test whether two byte ranges are disjoint without forming end pointers.
  * Subtraction avoids wrap when a range begins near UINTPTR_MAX. */
-static inline int tc_internal_ranges_disjoint(const void* a, size_t a_len,
-                                              const void* b, size_t b_len)
+static inline int tc_internal_ranges_disjoint(const void* a, size_t a_len, const void* b,
+                                              size_t b_len)
 {
   const uintptr_t pa = (uintptr_t)a;
   const uintptr_t pb = (uintptr_t)b;
@@ -51,20 +51,19 @@ static inline void tc_internal_store_be32(uint8_t* dst, uint32_t value)
 static inline uint64_t tc_internal_load_be64(const uint8_t* src)
 {
 #if defined(__GNUC__) || defined(__clang__)
-  #if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
+#if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
   uint64_t value;
   memcpy(&value, src, sizeof(value));
   return __builtin_bswap64(value);
-  #elif defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+#elif defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
   uint64_t value;
   memcpy(&value, src, sizeof(value));
   return value;
-  #else
-  return ((uint64_t)src[0] << 56) | ((uint64_t)src[1] << 48) |
-         ((uint64_t)src[2] << 40) | ((uint64_t)src[3] << 32) |
-         ((uint64_t)src[4] << 24) | ((uint64_t)src[5] << 16) |
+#else
+  return ((uint64_t)src[0] << 56) | ((uint64_t)src[1] << 48) | ((uint64_t)src[2] << 40) |
+         ((uint64_t)src[3] << 32) | ((uint64_t)src[4] << 24) | ((uint64_t)src[5] << 16) |
          ((uint64_t)src[6] << 8) | (uint64_t)src[7];
-  #endif
+#endif
 #elif defined(_MSC_VER)
   uint64_t value;
   memcpy(&value, src, sizeof(value));
@@ -81,16 +80,16 @@ static inline uint64_t tc_internal_load_be64(const uint8_t* src)
 static inline void tc_internal_store_be64(uint8_t* dst, uint64_t value)
 {
 #if defined(__GNUC__) || defined(__clang__)
-  #if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
+#if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
   const uint64_t swapped = __builtin_bswap64(value);
   memcpy(dst, &swapped, sizeof(swapped));
-  #elif defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+#elif defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
   memcpy(dst, &value, sizeof(value));
-  #else
+#else
   unsigned i;
   for (i = 0; i < 8; ++i)
     dst[i] = (uint8_t)(value >> (56u - 8u * i));
-  #endif
+#endif
 #elif defined(_MSC_VER)
   const uint64_t swapped = _byteswap_uint64(value);
   memcpy(dst, &swapped, sizeof(swapped));
@@ -103,8 +102,7 @@ static inline void tc_internal_store_be64(uint8_t* dst, uint64_t value)
 
 static inline void tc_internal_increment_be(uint8_t* counter, size_t length)
 {
-  while (length != 0)
-  {
+  while (length != 0) {
     --length;
     if (++counter[length] != 0)
       break;
@@ -112,8 +110,8 @@ static inline void tc_internal_increment_be(uint8_t* counter, size_t length)
 }
 
 /* Callers validate position <= block_length before counting new blocks. */
-static inline size_t tc_internal_counter_blocks_needed(size_t length,
-    size_t block_length, size_t position)
+static inline size_t tc_internal_counter_blocks_needed(size_t length, size_t block_length,
+                                                       size_t position)
 {
   const size_t available = position < block_length ? block_length - position : 0;
   const size_t uncached = length > available ? length - available : 0;
@@ -122,8 +120,8 @@ static inline size_t tc_internal_counter_blocks_needed(size_t length,
 
 /* A zero counter has the full 2^(8*length) block space remaining, which may
  * exceed size_t. Other counters use (2^n - counter) as the available count. */
-static inline int tc_internal_counter_has_blocks(const uint8_t* counter,
-                                                 size_t length, size_t needed)
+static inline int tc_internal_counter_has_blocks(const uint8_t* counter, size_t length,
+                                                 size_t needed)
 {
   uint8_t remaining[16];
   size_t i;
@@ -134,11 +132,9 @@ static inline int tc_internal_counter_has_blocks(const uint8_t* counter,
 
   if (length > sizeof(remaining))
     return 0;
-  for (i = length; i > 0; --i)
-  {
+  for (i = length; i > 0; --i) {
     const size_t index = i - 1u;
-    const unsigned diff =
-        (unsigned)(0u - (unsigned)counter[index] - (unsigned)carry);
+    const unsigned diff = (unsigned)(0u - (unsigned)counter[index] - (unsigned)carry);
     remaining[index] = (uint8_t)diff;
     carry = (uint8_t)(counter[index] != 0 || carry != 0);
     all_zero &= (uint8_t)(counter[index] == 0);
@@ -155,8 +151,7 @@ static inline int tc_internal_counter_has_blocks(const uint8_t* counter,
   return blocks >= needed;
 }
 
-static inline void tc_internal_xor(uint8_t* dst, const uint8_t* src,
-                                   size_t length)
+static inline void tc_internal_xor(uint8_t* dst, const uint8_t* src, size_t length)
 {
   size_t i;
   for (i = 0; i < length; ++i)

@@ -25,7 +25,8 @@ TC_validation_storage arena[40000];
 TC_RSA_word rsa_words[TC_RSA_VERIFY_WORKSPACE_WORDS(3072)];
 TC_ECDSA_workspace ec;
 
-TC_bytes fixture(const char* name, uint8_t* buffer) {
+TC_bytes fixture(const char* name, uint8_t* buffer)
+{
   char path[512];
   std::snprintf(path, sizeof path, "%s/legacy/%s", TC_TWIC_SYNTHETIC_ROOT, name);
   std::FILE* file = std::fopen(path, "rb");
@@ -37,7 +38,8 @@ TC_bytes fixture(const char* name, uint8_t* buffer) {
 }
 } // namespace
 
-TEST_CASE("Constrained trust anchor from C++") {
+TEST_CASE("Constrained trust anchor from C++")
+{
   const TC_TLV_limits limits = {capacity, capacity, 512, 16};
   TC_TLV_frame frames[32];
   TC_bytes oids[32];
@@ -46,7 +48,8 @@ TEST_CASE("Constrained trust anchor from C++") {
   const TC_bytes chain[] = {fixture("issuer.der", issuer_der), fixture("card.der", card_der)};
   TC_TLV_reader reader;
   TC_X509_store_anchor anchor = {};
-  REQUIRE(TC_X509_trust_anchor_list_init(&reader, list.data, list.length, &limits, &parser) == TC_TLV_OK);
+  REQUIRE(TC_X509_trust_anchor_list_init(&reader, list.data, list.length, &limits, &parser) ==
+          TC_TLV_OK);
   REQUIRE(TC_X509_trust_anchor_next(&reader, &limits, &parser, &anchor) == TC_TLV_OK);
   CHECK(TC_X509_trust_anchor_next(&reader, &limits, &parser, &anchor) == TC_TLV_END);
 
@@ -57,7 +60,8 @@ TEST_CASE("Constrained trust anchor from C++") {
   REQUIRE(TC_validation_workspace_size(&sizes, &bytes) == TC_RESULT_OK);
   REQUIRE(bytes <= sizeof arena);
   REQUIRE(TC_validation_workspace_init(&sizes,
-      TC_buffer{reinterpret_cast<uint8_t*>(arena), sizeof arena}, &storage) == TC_RESULT_OK);
+                                       TC_buffer{reinterpret_cast<uint8_t*>(arena), sizeof arena},
+                                       &storage) == TC_RESULT_OK);
   TC_RSA_workspace rsa = {rsa_words, sizeof rsa_words / sizeof *rsa_words};
   TC_X509_native_workspace native = {&ec, &rsa, TC_X509_NATIVE_DEFAULT_SIGNATURE_WORK};
   TC_X509_path_options options = {};
@@ -68,13 +72,14 @@ TEST_CASE("Constrained trust anchor from C++") {
   options.max_work = 2000000;
   options.signatures = TC_X509_native_provider(&native);
   TC_X509_path_result result;
-  CHECK(TC_X509_path_validate_with_anchor(chain, 2, &anchor, &options,
-        &storage.path.validation, &result) == TC_X509_PATH_VALID);
+  CHECK(TC_X509_path_validate_with_anchor(chain, 2, &anchor, &options, &storage.path.validation,
+                                          &result) == TC_X509_PATH_VALID);
 
   // A path length of 0 from the anchor forbids the issuing CA.
   TC_X509_store_anchor constrained = anchor;
   constrained.has_path_len = 1;
   constrained.path_len = 0;
   CHECK(TC_X509_path_validate_with_anchor(chain, 2, &constrained, &options,
-        &storage.path.validation, &result) == TC_X509_PATH_INVALID);
+                                          &storage.path.validation,
+                                          &result) == TC_X509_PATH_INVALID);
 }

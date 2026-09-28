@@ -1,4 +1,5 @@
 <!-- SPDX-FileCopyrightText: Mistial Dev -->
+
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 
 # tiny-crypto-c
@@ -81,74 +82,74 @@ selected.
 
 ### Cryptography
 
-| Option | Default | Purpose |
-| --- | ---: | --- |
-| `TINY_CRYPTO_ENABLE_AES` | ON | AES implementation |
-| `TINY_CRYPTO_AES_DYNAMIC` | OFF | Per-context AES-128/192/256 keys, CBC, and CMAC |
-| `TINY_CRYPTO_ENABLE_DES` | OFF | DES and 3DES implementation |
-| `TINY_CRYPTO_DES_ISO9797` | OFF | ISO/IEC 9797-1 DES MAC algorithms 1 and 3; requires DES |
-| `TINY_CRYPTO_ENABLE_EC` | OFF | P-256/P-384 ECDH, key generation, and ECDSA |
-| `TINY_CRYPTO_ENABLE_RSA` | OFF | RSA public and private-key operations |
-| `TINY_CRYPTO_ENABLE_SHA1` | OFF | SHA-1 implementation |
-| `TINY_CRYPTO_ENABLE_SHA224` | OFF | SHA-224; shares the SHA-256 core |
-| `TINY_CRYPTO_ENABLE_SHA256` | ON | SHA-256 implementation |
-| `TINY_CRYPTO_ENABLE_SHA384` | OFF | SHA-384; shares the SHA-512 core |
-| `TINY_CRYPTO_ENABLE_SHA512` | OFF | SHA-512 implementation |
-| `TINY_CRYPTO_ENABLE_MD5` | OFF | MD5 checksums for legacy data |
-| `TINY_CRYPTO_ENABLE_HMAC` | OFF | HMAC for enabled hashes |
-| `TINY_CRYPTO_ENABLE_KMAC256` | OFF | Fixed-output KMAC256 with customization |
-| `TINY_CRYPTO_ENABLE_KDF` | OFF | SP 800-108 KBKDF over enabled HMAC and CMAC PRFs |
-| `TINY_CRYPTO_ENABLE_SSKDF` | OFF | Single-step hash KDF with SHA-256 or SHA-384 |
-| `TINY_CRYPTO_ENABLE_DRBG` | OFF | [SP 800-90A DRBGs](docs/drbg.md): Hash_DRBG, HMAC_DRBG and CTR_DRBG |
-| `TINY_CRYPTO_DRBG_HASH` | OFF | Hash_DRBG over the enabled SHA algorithms |
-| `TINY_CRYPTO_DRBG_HMAC` | OFF | HMAC_DRBG, which requires `TINY_CRYPTO_ENABLE_HMAC` |
-| `TINY_CRYPTO_DRBG_CTR` | OFF | CTR_DRBG, which requires AES with `TINY_CRYPTO_AES_DYNAMIC` |
+| Option                       | Default | Purpose                                                             |
+| ---------------------------- | ------: | ------------------------------------------------------------------- |
+| `TINY_CRYPTO_ENABLE_AES`     |      ON | AES implementation                                                  |
+| `TINY_CRYPTO_AES_DYNAMIC`    |     OFF | Per-context AES-128/192/256 keys, CBC, and CMAC                     |
+| `TINY_CRYPTO_ENABLE_DES`     |     OFF | DES and 3DES implementation                                         |
+| `TINY_CRYPTO_DES_ISO9797`    |     OFF | ISO/IEC 9797-1 DES MAC algorithms 1 and 3; requires DES             |
+| `TINY_CRYPTO_ENABLE_EC`      |     OFF | P-256/P-384 ECDH, key generation, and ECDSA                         |
+| `TINY_CRYPTO_ENABLE_RSA`     |     OFF | RSA public and private-key operations                               |
+| `TINY_CRYPTO_ENABLE_SHA1`    |     OFF | SHA-1 implementation                                                |
+| `TINY_CRYPTO_ENABLE_SHA224`  |     OFF | SHA-224; shares the SHA-256 core                                    |
+| `TINY_CRYPTO_ENABLE_SHA256`  |      ON | SHA-256 implementation                                              |
+| `TINY_CRYPTO_ENABLE_SHA384`  |     OFF | SHA-384; shares the SHA-512 core                                    |
+| `TINY_CRYPTO_ENABLE_SHA512`  |     OFF | SHA-512 implementation                                              |
+| `TINY_CRYPTO_ENABLE_MD5`     |     OFF | MD5 checksums for legacy data                                       |
+| `TINY_CRYPTO_ENABLE_HMAC`    |     OFF | HMAC for enabled hashes                                             |
+| `TINY_CRYPTO_ENABLE_KMAC256` |     OFF | Fixed-output KMAC256 with customization                             |
+| `TINY_CRYPTO_ENABLE_KDF`     |     OFF | SP 800-108 KBKDF over enabled HMAC and CMAC PRFs                    |
+| `TINY_CRYPTO_ENABLE_SSKDF`   |     OFF | Single-step hash KDF with SHA-256 or SHA-384                        |
+| `TINY_CRYPTO_ENABLE_DRBG`    |     OFF | [SP 800-90A DRBGs](docs/drbg.md): Hash_DRBG, HMAC_DRBG and CTR_DRBG |
+| `TINY_CRYPTO_DRBG_HASH`      |     OFF | Hash_DRBG over the enabled SHA algorithms                           |
+| `TINY_CRYPTO_DRBG_HMAC`      |     OFF | HMAC_DRBG, which requires `TINY_CRYPTO_ENABLE_HMAC`                 |
+| `TINY_CRYPTO_DRBG_CTR`       |     OFF | CTR_DRBG, which requires AES with `TINY_CRYPTO_AES_DYNAMIC`         |
 
 ### Formats, compression, and trust
 
-| Option | Default | Purpose |
-| --- | ---: | --- |
-| `TINY_CRYPTO_ENABLE_TLV` | OFF | Bounded TLV readers and tree traversal |
-| `TINY_CRYPTO_TLV_BER` | OFF | ASN.1 BER, including indefinite lengths; requires TLV |
-| `TINY_CRYPTO_TLV_STREAM` | OFF | Incremental TLV reader; requires TLV |
-| `TINY_CRYPTO_ENABLE_DER` | OFF | DER value helpers; requires TLV |
-| `TINY_CRYPTO_ENABLE_X509` | OFF | X.509 certificate and public-key readers; requires DER |
-| `TINY_CRYPTO_ENABLE_X509_PATH` | OFF | Path validation and stores; requires X.509 |
-| `TINY_CRYPTO_ENABLE_TRUST_ANCHOR_FORMAT` | OFF | RFC 5914 lists; requires X.509 path validation |
-| `TINY_CRYPTO_TAF_CERTIFICATE` | OFF | Certificate choice in RFC 5914 lists |
-| `TINY_CRYPTO_TAF_TBS_CERTIFICATE` | OFF | TBS certificate choice in RFC 5914 lists |
-| `TINY_CRYPTO_TAF_TRUST_ANCHOR_INFO` | OFF | TrustAnchorInfo choice in RFC 5914 lists |
-| `TINY_CRYPTO_ENABLE_X509_REVOCATION` | OFF | CRL parsing and path revocation; requires X.509 path support |
-| `TINY_CRYPTO_ENABLE_KEY_CHALLENGE` | OFF | Key proof-of-possession challenge; requires X.509 |
-| `TINY_CRYPTO_ENABLE_GZIP` | OFF | Bounded GZIP decompression |
+| Option                                   | Default | Purpose                                                      |
+| ---------------------------------------- | ------: | ------------------------------------------------------------ |
+| `TINY_CRYPTO_ENABLE_TLV`                 |     OFF | Bounded TLV readers and tree traversal                       |
+| `TINY_CRYPTO_TLV_BER`                    |     OFF | ASN.1 BER, including indefinite lengths; requires TLV        |
+| `TINY_CRYPTO_TLV_STREAM`                 |     OFF | Incremental TLV reader; requires TLV                         |
+| `TINY_CRYPTO_ENABLE_DER`                 |     OFF | DER value helpers; requires TLV                              |
+| `TINY_CRYPTO_ENABLE_X509`                |     OFF | X.509 certificate and public-key readers; requires DER       |
+| `TINY_CRYPTO_ENABLE_X509_PATH`           |     OFF | Path validation and stores; requires X.509                   |
+| `TINY_CRYPTO_ENABLE_TRUST_ANCHOR_FORMAT` |     OFF | RFC 5914 lists; requires X.509 path validation               |
+| `TINY_CRYPTO_TAF_CERTIFICATE`            |     OFF | Certificate choice in RFC 5914 lists                         |
+| `TINY_CRYPTO_TAF_TBS_CERTIFICATE`        |     OFF | TBS certificate choice in RFC 5914 lists                     |
+| `TINY_CRYPTO_TAF_TRUST_ANCHOR_INFO`      |     OFF | TrustAnchorInfo choice in RFC 5914 lists                     |
+| `TINY_CRYPTO_ENABLE_X509_REVOCATION`     |     OFF | CRL parsing and path revocation; requires X.509 path support |
+| `TINY_CRYPTO_ENABLE_KEY_CHALLENGE`       |     OFF | Key proof-of-possession challenge; requires X.509            |
+| `TINY_CRYPTO_ENABLE_GZIP`                |     OFF | Bounded GZIP decompression                                   |
 
 ### PIV, TWIC, and credentials
 
-| Option | Default | Purpose |
-| --- | ---: | --- |
-| `TINY_CRYPTO_ENABLE_PIV_OIDS` | OFF | PIV and TWIC identifier classification |
-| `TINY_CRYPTO_ENABLE_CMS` | OFF | CMS parsing and verification; requires X.509, BER, and identifiers |
-| `TINY_CRYPTO_ENABLE_CMS_VALIDATION` | OFF | CMS signer paths and revocation; requires CMS and X.509 revocation |
-| `TINY_CRYPTO_ENABLE_PIV_OBJECTS` | OFF | PIV and TWIC object readers; requires CMS, TWIC UUID, and identifiers |
-| `TINY_CRYPTO_ENABLE_CREDENTIAL` | OFF | Credential validation; requires PIV objects, CHUID, and CMS validation |
-| `TINY_CRYPTO_ENABLE_PIV_CHUID` | OFF | PIV CHUID reader; requires TLV |
-| `TINY_CRYPTO_ENABLE_PIV_CVC` | OFF | PIV secure messaging CVC reader; requires DER |
-| `TINY_CRYPTO_ENABLE_EAC_CVC` | OFF | TR-03110 EAC CVC reader; requires DER |
-| `TINY_CRYPTO_ENABLE_PIV_SM` | OFF | PD-side PIV secure messaging, CS2 and CS7 |
-| `TINY_CRYPTO_ENABLE_FASCN` | OFF | FASC-N readers and writers |
-| `TINY_CRYPTO_ENABLE_TWIC_UUID` | OFF | TWIC NEXGEN UUID helpers; requires FASC-N |
-| `TINY_CRYPTO_ENABLE_TWIC_CCL` | OFF | TWIC canceled card list reader |
-| `TINY_CRYPTO_ENABLE_TWIC_TPK` | OFF | TWIC privacy-key container reader; requires TLV |
-| `TINY_CRYPTO_ENABLE_TWIC_OBJECT_CRYPTO` | OFF | TWIC private-object encryption; requires AES-128 ECB |
-| `TINY_CRYPTO_ENABLE_AAMVA` | OFF | ANSI AAMVA payload readers |
+| Option                                  | Default | Purpose                                                                |
+| --------------------------------------- | ------: | ---------------------------------------------------------------------- |
+| `TINY_CRYPTO_ENABLE_PIV_OIDS`           |     OFF | PIV and TWIC identifier classification                                 |
+| `TINY_CRYPTO_ENABLE_CMS`                |     OFF | CMS parsing and verification; requires X.509, BER, and identifiers     |
+| `TINY_CRYPTO_ENABLE_CMS_VALIDATION`     |     OFF | CMS signer paths and revocation; requires CMS and X.509 revocation     |
+| `TINY_CRYPTO_ENABLE_PIV_OBJECTS`        |     OFF | PIV and TWIC object readers; requires CMS, TWIC UUID, and identifiers  |
+| `TINY_CRYPTO_ENABLE_CREDENTIAL`         |     OFF | Credential validation; requires PIV objects, CHUID, and CMS validation |
+| `TINY_CRYPTO_ENABLE_PIV_CHUID`          |     OFF | PIV CHUID reader; requires TLV                                         |
+| `TINY_CRYPTO_ENABLE_PIV_CVC`            |     OFF | PIV secure messaging CVC reader; requires DER                          |
+| `TINY_CRYPTO_ENABLE_EAC_CVC`            |     OFF | TR-03110 EAC CVC reader; requires DER                                  |
+| `TINY_CRYPTO_ENABLE_PIV_SM`             |     OFF | PD-side PIV secure messaging, CS2 and CS7                              |
+| `TINY_CRYPTO_ENABLE_FASCN`              |     OFF | FASC-N readers and writers                                             |
+| `TINY_CRYPTO_ENABLE_TWIC_UUID`          |     OFF | TWIC NEXGEN UUID helpers; requires FASC-N                              |
+| `TINY_CRYPTO_ENABLE_TWIC_CCL`           |     OFF | TWIC canceled card list reader                                         |
+| `TINY_CRYPTO_ENABLE_TWIC_TPK`           |     OFF | TWIC privacy-key container reader; requires TLV                        |
+| `TINY_CRYPTO_ENABLE_TWIC_OBJECT_CRYPTO` |     OFF | TWIC private-object encryption; requires AES-128 ECB                   |
+| `TINY_CRYPTO_ENABLE_AAMVA`              |     OFF | ANSI AAMVA payload readers                                             |
 
 ### Safety and target storage
 
-| Option | Default | Purpose |
-| --- | ---: | --- |
-| `TINY_CRYPTO_ZEROIZE` | ON | Wipe contexts and stack secrets |
-| `TINY_CRYPTO_STRICT` | ON | Validate public API pointers |
-| `TINY_CRYPTO_AVR_PROGMEM` | ON | Keep constant tables out of AVR SRAM |
+| Option                    | Default | Purpose                              |
+| ------------------------- | ------: | ------------------------------------ |
+| `TINY_CRYPTO_ZEROIZE`     |      ON | Wipe contexts and stack secrets      |
+| `TINY_CRYPTO_STRICT`      |      ON | Validate public API pointers         |
+| `TINY_CRYPTO_AVR_PROGMEM` |      ON | Keep constant tables out of AVR SRAM |
 
 The three `TINY_CRYPTO_TAF_*` choices follow the trust-anchor-format switch
 under `AUTO`. At least one choice must be enabled when the format is enabled.
@@ -421,13 +422,13 @@ weak-key rejection, runtime S-box, and GHASH profiles. Each configuration is
 compiled once and reused by its tests.
 
 The fast suite covers all C modes and C++ wrappers. C tests use [µunit][munit],
-and C++ tests use [doctest][doctest]. You can filter the C++ tests with doctest's
+and C++ tests use [doctest]. You can filter the C++ tests with doctest's
 command-line options, for example `./build/test_cpp_hash -tc="*HMAC*"`.
 
 `make test-full` adds the tests labelled `extended`: the checked-in
 [NIST CAVP][cavp] response files including the SP 800-90A DRBG answers,
 FIPS 186 signature and key-generation vectors, and
-[Wycheproof][wycheproof] vectors,
+[Wycheproof] vectors,
 including the complete 20,000-vector SP 800-108 KBKDF corpus split across
 `test_kdf` (128-bit AES and every other PRF), `test_kdf_192` and
 `test_kdf_256`.
@@ -457,8 +458,8 @@ including by static linking. The exception text is at the top of
 [LICENSE](LICENSE). Unicode normalization
 tables use the [Unicode License v3](LICENSES/Unicode-3.0.txt). Bundled test
 materials retain their own terms. [µunit][munit] (`tests/support/munit.h`) and
-[doctest][doctest] (`tests/support/doctest.h`) use the MIT license.
-[Wycheproof][wycheproof] vectors use Apache-2.0. [NIST CAVP][cavp] response
+[doctest] (`tests/support/doctest.h`) use the MIT license.
+[Wycheproof] vectors use Apache-2.0. [NIST CAVP][cavp] response
 files are U.S. Government works. Corpus READMEs under `tests/vectors/` record
 the source, license, transformations, and checksums for each collection. Test
 corpora are excluded from installed packages and embedded library images.
@@ -468,7 +469,7 @@ The adapted contribution policy retains its upstream
 Individuals and corporations that require alternate licensing terms may contact
 [licensing@mistial.dev](mailto:licensing@mistial.dev) by email.
 
+[cavp]: https://csrc.nist.gov/projects/cryptographic-algorithm-validation-program
 [doctest]: https://github.com/doctest/doctest
 [munit]: https://nemequ.github.io/munit/
-[cavp]: https://csrc.nist.gov/projects/cryptographic-algorithm-validation-program
 [wycheproof]: https://github.com/C2SP/wycheproof

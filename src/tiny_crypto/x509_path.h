@@ -14,8 +14,13 @@ typedef struct {
   size_t depth;
   int alive, mapped;
 } TC_X509_policy_node;
-typedef struct { size_t parent, child; } TC_X509_policy_edge;
-typedef struct { size_t node; TC_bytes oid; } TC_X509_policy_expected;
+typedef struct {
+  size_t parent, child;
+} TC_X509_policy_edge;
+typedef struct {
+  size_t node;
+  TC_bytes oid;
+} TC_X509_policy_expected;
 
 /* One path certificate's validation-relevant extensions. The validator fills
  * a summary with one metered walk over the certificate's extensions, and every
@@ -33,7 +38,7 @@ typedef struct {
   /* Decoded fixed-form values, valid when the matching slot is present. */
   TC_X509_basic_constraints basic;
   TC_X509_policy_constraints policy_constraints;
-  uint32_t inhibit_any;      /* SkipCerts */
+  uint32_t inhibit_any;       /* SkipCerts */
   uint16_t present, critical; /* one bit per slot */
   uint16_t key_usage;         /* TC_KEY_USAGE_* bits */
   uint8_t unknown_critical;   /* a critical extension outside the slots */
@@ -70,17 +75,31 @@ typedef struct {
 /* Array arguments only, not pointers. The shorter name buffer sets the limit.
  * Use as an initializer in C or C++: TC_X509_path_workspace w = ...; */
 #define TC_X509_PATH_ARRAY_COUNT_(a) (sizeof(a) / sizeof((a)[0]))
-#define TC_X509_PATH_WORKSPACE_INIT(frames_, oids_, left_, right_, matched_, nodes_, edges_, expected_, mappings_, policies_, certificates_, summaries_) \
-  { (frames_), TC_X509_PATH_ARRAY_COUNT_(frames_), (oids_), TC_X509_PATH_ARRAY_COUNT_(oids_), \
-    { (left_), (right_), \
-      TC_X509_PATH_ARRAY_COUNT_(left_) < TC_X509_PATH_ARRAY_COUNT_(right_) \
-        ? TC_X509_PATH_ARRAY_COUNT_(left_) : TC_X509_PATH_ARRAY_COUNT_(right_), \
-      (matched_), TC_X509_PATH_ARRAY_COUNT_(matched_) }, \
-    (nodes_), TC_X509_PATH_ARRAY_COUNT_(nodes_), (edges_), TC_X509_PATH_ARRAY_COUNT_(edges_), \
-    (expected_), TC_X509_PATH_ARRAY_COUNT_(expected_), (mappings_), TC_X509_PATH_ARRAY_COUNT_(mappings_), \
-    (policies_), TC_X509_PATH_ARRAY_COUNT_(policies_), \
-    (certificates_), TC_X509_PATH_ARRAY_COUNT_(certificates_), \
-    (summaries_), TC_X509_PATH_ARRAY_COUNT_(summaries_) }
+#define TC_X509_PATH_WORKSPACE_INIT(frames_, oids_, left_, right_, matched_, nodes_, edges_,       \
+                                    expected_, mappings_, policies_, certificates_, summaries_)    \
+  {(frames_),                                                                                      \
+   TC_X509_PATH_ARRAY_COUNT_(frames_),                                                             \
+   (oids_),                                                                                        \
+   TC_X509_PATH_ARRAY_COUNT_(oids_),                                                               \
+   {(left_), (right_),                                                                             \
+    TC_X509_PATH_ARRAY_COUNT_(left_) < TC_X509_PATH_ARRAY_COUNT_(right_)                           \
+        ? TC_X509_PATH_ARRAY_COUNT_(left_)                                                         \
+        : TC_X509_PATH_ARRAY_COUNT_(right_),                                                       \
+    (matched_), TC_X509_PATH_ARRAY_COUNT_(matched_)},                                              \
+   (nodes_),                                                                                       \
+   TC_X509_PATH_ARRAY_COUNT_(nodes_),                                                              \
+   (edges_),                                                                                       \
+   TC_X509_PATH_ARRAY_COUNT_(edges_),                                                              \
+   (expected_),                                                                                    \
+   TC_X509_PATH_ARRAY_COUNT_(expected_),                                                           \
+   (mappings_),                                                                                    \
+   TC_X509_PATH_ARRAY_COUNT_(mappings_),                                                           \
+   (policies_),                                                                                    \
+   TC_X509_PATH_ARRAY_COUNT_(policies_),                                                           \
+   (certificates_),                                                                                \
+   TC_X509_PATH_ARRAY_COUNT_(certificates_),                                                       \
+   (summaries_),                                                                                   \
+   TC_X509_PATH_ARRAY_COUNT_(summaries_)}
 
 enum {
   TC_X509_PATH_REQUIRE_EXPLICIT_POLICY = 1u,
@@ -105,8 +124,11 @@ typedef struct {
 } TC_X509_path_options;
 
 typedef enum {
-  TC_X509_PATH_VALID, TC_X509_PATH_INVALID, TC_X509_PATH_UNSUPPORTED,
-  TC_X509_PATH_LIMIT, TC_X509_PATH_ERROR
+  TC_X509_PATH_VALID,
+  TC_X509_PATH_INVALID,
+  TC_X509_PATH_UNSUPPORTED,
+  TC_X509_PATH_LIMIT,
+  TC_X509_PATH_ERROR
 } TC_X509_path_status;
 typedef struct {
   TC_X509_public_key public_key;
@@ -144,10 +166,11 @@ typedef struct {
  * Copy path and policy span arrays before reusing their workspaces. Copying the
  * result alone retains pointers into scratch; DER bytes need not be copied.
  * Workspace arrays must be mutually disjoint and separate from input storage. */
-TC_X509_path_status TC_X509_path_build(TC_bytes target,
-    const TC_X509_store_source* source, const TC_X509_path_options* options,
-    const TC_X509_path_workspace* validation, const TC_X509_search_workspace* search,
-    TC_X509_search_result* out);
+TC_X509_path_status TC_X509_path_build(TC_bytes target, const TC_X509_store_source* source,
+                                       const TC_X509_path_options* options,
+                                       const TC_X509_path_workspace* validation,
+                                       const TC_X509_search_workspace* search,
+                                       TC_X509_search_result* out);
 
 /* Anchor-issued certificate first, target last; the anchor is not in chain.
  * Checks signatures, time, CA/usage, names, policies and critical extensions.
@@ -163,13 +186,17 @@ TC_X509_path_status TC_X509_path_build(TC_bytes target,
  * Provider context must also be separate from workspace and out.
  * Workspace/provider state may change on any result; out changes only on VALID. */
 TC_X509_path_status TC_X509_path_validate(const TC_bytes* chain, size_t count,
-    const TC_X509_trust_anchor* anchor, const TC_X509_path_options* options,
-    const TC_X509_path_workspace* workspace, TC_X509_path_result* out);
+                                          const TC_X509_trust_anchor* anchor,
+                                          const TC_X509_path_options* options,
+                                          const TC_X509_path_workspace* workspace,
+                                          TC_X509_path_result* out);
 /* Validate against one explicit store anchor, including its path controls.
  * The anchor and its borrowed spans remain stable throughout validation. */
 TC_X509_path_status TC_X509_path_validate_with_anchor(const TC_bytes* chain, size_t count,
-    const TC_X509_store_anchor* anchor, const TC_X509_path_options* options,
-    const TC_X509_path_workspace* workspace, TC_X509_path_result* out);
+                                                      const TC_X509_store_anchor* anchor,
+                                                      const TC_X509_path_options* options,
+                                                      const TC_X509_path_workspace* workspace,
+                                                      TC_X509_path_result* out);
 #ifdef __cplusplus
 }
 #endif

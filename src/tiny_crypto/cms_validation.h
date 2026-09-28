@@ -36,21 +36,25 @@ typedef struct {
  * Embedded certificates precede external candidates; only source anchors
  * establish trust. The result borrows all certificate and source bytes. */
 TC_X509_path_status TC_CMS_signer_path_build(const TC_CMS_signer_info* signer,
-    TC_bytes content_type, TC_bytes digest, TC_bytes embedded,
-    const TC_X509_store_source* source, const TC_CMS_path_options* options,
-    const TC_CMS_path_workspace* workspace, size_t* work, TC_X509_search_result* out);
+                                             TC_bytes content_type, TC_bytes digest,
+                                             TC_bytes embedded, const TC_X509_store_source* source,
+                                             const TC_CMS_path_options* options,
+                                             const TC_CMS_path_workspace* workspace, size_t* work,
+                                             TC_X509_search_result* out);
 
 /* Parse SignedData, bind its content, verify the selected signer and build its
  * path. Attached content requires an empty detached input. */
 TC_X509_path_status TC_CMS_signed_data_path_build(TC_bytes encoded, size_t signer_index,
-    TC_bytes expected_type, TC_bytes detached_content,
-    const TC_X509_store_source* source, const TC_CMS_path_options* options,
-    const TC_CMS_path_workspace* workspace, size_t* work, TC_X509_search_result* out);
+                                                  TC_bytes expected_type, TC_bytes detached_content,
+                                                  const TC_X509_store_source* source,
+                                                  const TC_CMS_path_options* options,
+                                                  const TC_CMS_path_workspace* workspace,
+                                                  size_t* work, TC_X509_search_result* out);
 
 /* Detached content spans are hashed in array order. Empty parts are allowed. */
-TC_X509_path_status TC_CMS_signed_data_path_build_parts(TC_bytes encoded, size_t signer_index,
-    TC_bytes expected_type, const TC_bytes* detached_content, size_t detached_count,
-    const TC_X509_store_source* source, const TC_CMS_path_options* options,
+TC_X509_path_status TC_CMS_signed_data_path_build_parts(
+    TC_bytes encoded, size_t signer_index, TC_bytes expected_type, const TC_bytes* detached_content,
+    size_t detached_count, const TC_X509_store_source* source, const TC_CMS_path_options* options,
     const TC_CMS_path_workspace* workspace, size_t* work, TC_X509_search_result* out);
 
 typedef struct {
@@ -92,9 +96,11 @@ typedef struct {
  * signer validation internally, so every supplied policy field affects the
  * result. VALID requires an unrevoked path. */
 TC_credential_status TC_CMS_credential_validate(const TC_CMS_validation_request* request,
-    const TC_X509_store_source* source, const TC_CMS_path_options* options,
-    const TC_CMS_revocation_policy* revocation,
-    const TC_CMS_credential_workspace* workspace, size_t* work);
+                                                const TC_X509_store_source* source,
+                                                const TC_CMS_path_options* options,
+                                                const TC_CMS_revocation_policy* revocation,
+                                                const TC_CMS_credential_workspace* workspace,
+                                                size_t* work);
 
 #ifdef __cplusplus
 }

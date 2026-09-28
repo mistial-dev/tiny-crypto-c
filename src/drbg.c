@@ -29,69 +29,77 @@ static int span_valid(TC_bytes span)
   return span.data != NULL || span.length == 0;
 }
 
-static TC_DRBG_result mechanism_parameters(const TC_DRBG_config* config,
-    tc_drbg_parameters* out)
+static TC_DRBG_result mechanism_parameters(const TC_DRBG_config* config, tc_drbg_parameters* out)
 {
   switch (config->mechanism) {
 #if TC_DRBG_HAVE_HASH
-    case TC_DRBG_HASH: return tc_drbg_hash_parameters(config->hash, out);
+  case TC_DRBG_HASH:
+    return tc_drbg_hash_parameters(config->hash, out);
 #endif
 #if TC_DRBG_HAVE_HMAC
-    case TC_DRBG_HMAC: return tc_drbg_hmac_parameters(config->hash, out);
+  case TC_DRBG_HMAC:
+    return tc_drbg_hmac_parameters(config->hash, out);
 #endif
 #if TC_DRBG_HAVE_CTR
-    case TC_DRBG_CTR:
-      return tc_drbg_ctr_parameters(config->aes_key_bytes, config->derivation_function, out);
+  case TC_DRBG_CTR:
+    return tc_drbg_ctr_parameters(config->aes_key_bytes, config->derivation_function, out);
 #endif
     /* Known mechanisms compiled out of this build. */
 #if !TC_DRBG_HAVE_HASH
-    case TC_DRBG_HASH:
+  case TC_DRBG_HASH:
 #endif
 #if !TC_DRBG_HAVE_HMAC
-    case TC_DRBG_HMAC:
+  case TC_DRBG_HMAC:
 #endif
 #if !TC_DRBG_HAVE_CTR
-    case TC_DRBG_CTR:
+  case TC_DRBG_CTR:
 #endif
 #if !TC_DRBG_HAVE_HASH || !TC_DRBG_HAVE_HMAC || !TC_DRBG_HAVE_CTR
-      return TC_DRBG_UNSUPPORTED;
+    return TC_DRBG_UNSUPPORTED;
 #endif
-    default:
-      return TC_DRBG_ARGUMENT;
+  default:
+    return TC_DRBG_ARGUMENT;
   }
 }
 
-static TC_DRBG_result mechanism_seed(TC_DRBG* drbg, const TC_bytes* parts, size_t count,
-    int reseed)
+static TC_DRBG_result mechanism_seed(TC_DRBG* drbg, const TC_bytes* parts, size_t count, int reseed)
 {
   switch (drbg->mechanism) {
 #if TC_DRBG_HAVE_HASH
-    case TC_DRBG_HASH: return tc_drbg_hash_seed(drbg, parts, count, reseed);
+  case TC_DRBG_HASH:
+    return tc_drbg_hash_seed(drbg, parts, count, reseed);
 #endif
 #if TC_DRBG_HAVE_HMAC
-    case TC_DRBG_HMAC: return tc_drbg_hmac_seed(drbg, parts, count, reseed);
+  case TC_DRBG_HMAC:
+    return tc_drbg_hmac_seed(drbg, parts, count, reseed);
 #endif
 #if TC_DRBG_HAVE_CTR
-    case TC_DRBG_CTR: return tc_drbg_ctr_seed(drbg, parts, count, reseed);
+  case TC_DRBG_CTR:
+    return tc_drbg_ctr_seed(drbg, parts, count, reseed);
 #endif
-    default: return TC_DRBG_ERROR;
+  default:
+    return TC_DRBG_ERROR;
   }
 }
 
 static TC_DRBG_result mechanism_generate(TC_DRBG* drbg, uint8_t* output, size_t length,
-    TC_bytes additional)
+                                         TC_bytes additional)
 {
   switch (drbg->mechanism) {
 #if TC_DRBG_HAVE_HASH
-    case TC_DRBG_HASH: return tc_drbg_hash_generate(drbg, output, length, additional);
+  case TC_DRBG_HASH:
+    return tc_drbg_hash_generate(drbg, output, length, additional);
 #endif
 #if TC_DRBG_HAVE_HMAC
-    case TC_DRBG_HMAC: return tc_drbg_hmac_generate(drbg, output, length, additional);
+  case TC_DRBG_HMAC:
+    return tc_drbg_hmac_generate(drbg, output, length, additional);
 #endif
 #if TC_DRBG_HAVE_CTR
-    case TC_DRBG_CTR: return tc_drbg_ctr_generate(drbg, output, length, additional);
+  case TC_DRBG_CTR:
+    return tc_drbg_ctr_generate(drbg, output, length, additional);
 #endif
-    default: return TC_DRBG_ERROR;
+  default:
+    return TC_DRBG_ERROR;
   }
 }
 
@@ -99,8 +107,7 @@ static TC_DRBG_result mechanism_generate(TC_DRBG* drbg, uint8_t* output, size_t 
  * are at most seedlen. Other mechanisms hash their inputs. */
 static int input_length_valid(const TC_DRBG* drbg, size_t length)
 {
-  return drbg->mechanism != TC_DRBG_CTR || drbg->derivation_function ||
-         length <= drbg->seed_bytes;
+  return drbg->mechanism != TC_DRBG_CTR || drbg->derivation_function || length <= drbg->seed_bytes;
 }
 
 /* Read length bytes from the entropy source into drbg->input. */
@@ -122,7 +129,8 @@ static TC_DRBG_result record(TC_DRBG* drbg, TC_DRBG_result result)
 }
 
 TC_DRBG_result TC_DRBG_instantiate(TC_DRBG* drbg, const TC_DRBG_config* config,
-    TC_random_source entropy, TC_bytes nonce, TC_bytes personalization)
+                                   TC_random_source entropy, TC_bytes nonce,
+                                   TC_bytes personalization)
 {
   tc_drbg_parameters parameters;
   TC_bytes parts[3];
@@ -153,7 +161,8 @@ TC_DRBG_result TC_DRBG_instantiate(TC_DRBG* drbg, const TC_DRBG_config* config,
   if (entropy_bytes < minimum || (parameters.input_is_seed && entropy_bytes != minimum) ||
       entropy_bytes > TC_DRBG_MAX_ENTROPY_BYTES - nonce_bytes ||
       (!parameters.uses_nonce && nonce.length != 0) ||
-      (parameters.uses_nonce && nonce.length != 0 && nonce.length < parameters.strength_bits / 16u) ||
+      (parameters.uses_nonce && nonce.length != 0 &&
+       nonce.length < parameters.strength_bits / 16u) ||
       (parameters.input_is_seed && personalization.length > parameters.seed_bytes))
     return TC_DRBG_ARGUMENT;
 
@@ -166,8 +175,8 @@ TC_DRBG_result TC_DRBG_instantiate(TC_DRBG* drbg, const TC_DRBG_config* config,
   drbg->prediction_resistance = config->prediction_resistance;
   drbg->strength_bits = parameters.strength_bits;
   drbg->entropy_bytes = entropy_bytes;
-  drbg->reseed_interval = config->reseed_interval == 0 ?
-                          TC_DRBG_MAX_RESEED_INTERVAL : config->reseed_interval;
+  drbg->reseed_interval =
+      config->reseed_interval == 0 ? TC_DRBG_MAX_RESEED_INTERVAL : config->reseed_interval;
   drbg->entropy = entropy;
 
   result = read_entropy(drbg, entropy_bytes + nonce_bytes);
@@ -205,14 +214,15 @@ static TC_DRBG_result reseed(TC_DRBG* drbg, TC_bytes additional)
 
 TC_DRBG_result TC_DRBG_reseed(TC_DRBG* drbg, TC_bytes additional)
 {
-  if (!live(drbg) || !span_valid(additional) || !outside(drbg, additional.data, additional.length) ||
+  if (!live(drbg) || !span_valid(additional) ||
+      !outside(drbg, additional.data, additional.length) ||
       !input_length_valid(drbg, additional.length))
     return TC_DRBG_ARGUMENT;
   return reseed(drbg, additional);
 }
 
 TC_DRBG_result TC_DRBG_generate(TC_DRBG* drbg, uint8_t* output, size_t length,
-    int prediction_resistance, TC_bytes additional)
+                                int prediction_resistance, TC_bytes additional)
 {
   TC_DRBG_result result;
 

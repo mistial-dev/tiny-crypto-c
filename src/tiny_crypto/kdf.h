@@ -32,25 +32,25 @@
  */
 
 #if (TC_ENABLE_KDF != 0) && (TC_ENABLE_KDF != 1)
-  #error "TC_ENABLE_KDF must be 0 or 1"
+#error "TC_ENABLE_KDF must be 0 or 1"
 #endif
 
 /* PRF availability, resolved once so kdf.c, kdf.hpp and tests share it. */
-#define TC_KBKDF_HAVE_HMAC_SHA1   (TC_ENABLE_HMAC && TC_ENABLE_SHA1)
+#define TC_KBKDF_HAVE_HMAC_SHA1 (TC_ENABLE_HMAC && TC_ENABLE_SHA1)
 #define TC_KBKDF_HAVE_HMAC_SHA224 (TC_ENABLE_HMAC && TC_ENABLE_SHA224)
 #define TC_KBKDF_HAVE_HMAC_SHA256 (TC_ENABLE_HMAC && TC_ENABLE_SHA256)
 #define TC_KBKDF_HAVE_HMAC_SHA384 (TC_ENABLE_HMAC && TC_ENABLE_SHA384)
 #define TC_KBKDF_HAVE_HMAC_SHA512 (TC_ENABLE_HMAC && TC_ENABLE_SHA512)
-#define TC_KBKDF_HAVE_AES_CMAC    (TC_ENABLE_AES && TC_AES_ENABLE_CMAC)
-#define TC_KBKDF_HAVE_DES_CMAC    (TC_ENABLE_DES && TC_DES_ENABLE_CMAC)
+#define TC_KBKDF_HAVE_AES_CMAC (TC_ENABLE_AES && TC_AES_ENABLE_CMAC)
+#define TC_KBKDF_HAVE_DES_CMAC (TC_ENABLE_DES && TC_DES_ENABLE_CMAC)
 
-#define TC_KBKDF_HAVE_HMAC \
-  (TC_KBKDF_HAVE_HMAC_SHA1 || TC_KBKDF_HAVE_HMAC_SHA224 || TC_KBKDF_HAVE_HMAC_SHA256 || \
+#define TC_KBKDF_HAVE_HMAC                                                                         \
+  (TC_KBKDF_HAVE_HMAC_SHA1 || TC_KBKDF_HAVE_HMAC_SHA224 || TC_KBKDF_HAVE_HMAC_SHA256 ||            \
    TC_KBKDF_HAVE_HMAC_SHA384 || TC_KBKDF_HAVE_HMAC_SHA512)
 
-#if TC_ENABLE_KDF && \
-    !(TC_KBKDF_HAVE_HMAC || TC_KBKDF_HAVE_AES_CMAC || TC_KBKDF_HAVE_DES_CMAC)
-  #error "TC_ENABLE_KDF needs a PRF: HMAC with an enabled SHA, TC_AES_ENABLE_CMAC or TC_DES_ENABLE_CMAC"
+#if TC_ENABLE_KDF && !(TC_KBKDF_HAVE_HMAC || TC_KBKDF_HAVE_AES_CMAC || TC_KBKDF_HAVE_DES_CMAC)
+#error                                                                                             \
+    "TC_ENABLE_KDF needs a PRF: HMAC with an enabled SHA, TC_AES_ENABLE_CMAC or TC_DES_ENABLE_CMAC"
 #endif
 
 #if TC_KBKDF_HAVE_HMAC
@@ -68,23 +68,23 @@
  * chaining buffers so small profiles do not pay for SHA-512.
  */
 #if TC_KBKDF_HAVE_HMAC_SHA512
-  #define TC_KBKDF_PRF_MAX 64
+#define TC_KBKDF_PRF_MAX 64
 #elif TC_KBKDF_HAVE_HMAC_SHA384
-  #define TC_KBKDF_PRF_MAX 48
+#define TC_KBKDF_PRF_MAX 48
 #elif TC_KBKDF_HAVE_HMAC_SHA256
-  #define TC_KBKDF_PRF_MAX 32
+#define TC_KBKDF_PRF_MAX 32
 #elif TC_KBKDF_HAVE_HMAC_SHA224
-  #define TC_KBKDF_PRF_MAX 28
+#define TC_KBKDF_PRF_MAX 28
 #elif TC_KBKDF_HAVE_HMAC_SHA1
-  #define TC_KBKDF_PRF_MAX 20
+#define TC_KBKDF_PRF_MAX 20
 #elif TC_KBKDF_HAVE_AES_CMAC
-  #define TC_KBKDF_PRF_MAX 16
+#define TC_KBKDF_PRF_MAX 16
 #else
-  #define TC_KBKDF_PRF_MAX 8
+#define TC_KBKDF_PRF_MAX 8
 #endif
 
 /* Counter width r in bits. SP 800-108 allows 8, 16, 24 or 32. */
-#define TC_KBKDF_COUNTER_8  8
+#define TC_KBKDF_COUNTER_8 8
 #define TC_KBKDF_COUNTER_16 16
 #define TC_KBKDF_COUNTER_24 24
 #define TC_KBKDF_COUNTER_32 32
@@ -96,7 +96,7 @@
  * with use_counter set is rejected instead of silently picking a layout.
  */
 #define TC_KBKDF_CTR_BEFORE_ITER 1 /**< [i]_r || iter || FixedInput */
-#define TC_KBKDF_CTR_AFTER_ITER  2 /**< iter || [i]_r || FixedInput */
+#define TC_KBKDF_CTR_AFTER_ITER 2  /**< iter || [i]_r || FixedInput */
 #define TC_KBKDF_CTR_AFTER_FIXED 3 /**< iter || FixedInput || [i]_r */
 
 /**
@@ -108,15 +108,14 @@
  * non-zero, counter_bits and counter_location as well. Ignored fields may
  * hold any value.
  */
-struct TC_KBKDF_params
-{
+struct TC_KBKDF_params {
   uint8_t counter_bits;     /**< TC_KBKDF_COUNTER_8 / 16 / 24 / 32 */
   uint8_t counter_location; /**< TC_KBKDF_CTR_* (feedback / pipeline with counter) */
   uint8_t use_counter;      /**< 0 or 1 (feedback / pipeline only) */
 };
 
 /* Exact size of the buffer TC_KBKDF_fixed_input writes. */
-#define TC_KBKDF_FIXED_INPUT_LEN(label_len, context_len) \
+#define TC_KBKDF_FIXED_INPUT_LEN(label_len, context_len)                                           \
   ((size_t)(label_len) + 1u + (size_t)(context_len) + 4u)
 
 #ifdef __cplusplus
@@ -144,9 +143,8 @@ extern "C" {
  * @return TC_OK, or TC_ERROR on a NULL/length violation, an overlapping buf,
  *         or a zero byte inside label.
  */
-TC_status TC_KBKDF_fixed_input(const uint8_t* label, size_t label_len,
-                               const uint8_t* context, size_t context_len,
-                               size_t out_len, uint8_t* buf, size_t buf_len);
+TC_status TC_KBKDF_fixed_input(const uint8_t* label, size_t label_len, const uint8_t* context,
+                               size_t context_len, size_t out_len, uint8_t* buf, size_t buf_len);
 
 /*
  * Common contract for every TC_KBKDF_<PRF>_<mode> function below.
@@ -192,121 +190,103 @@ TC_status TC_KBKDF_fixed_input(const uint8_t* label, size_t label_len,
 #if TC_KBKDF_HAVE_HMAC_SHA1
 /** @brief KBKDF counter mode with HMAC-SHA-1 (h = 20). */
 TC_status TC_KBKDF_HMAC_SHA1_counter(const uint8_t* key, size_t key_len,
-                                     const struct TC_KBKDF_params* params,
-                                     const uint8_t* before, size_t before_len,
-                                     const uint8_t* after, size_t after_len,
+                                     const struct TC_KBKDF_params* params, const uint8_t* before,
+                                     size_t before_len, const uint8_t* after, size_t after_len,
                                      uint8_t* out, size_t out_len);
 /** @brief KBKDF feedback mode with HMAC-SHA-1 (h = 20). */
 TC_status TC_KBKDF_HMAC_SHA1_feedback(const uint8_t* key, size_t key_len,
-                                      const struct TC_KBKDF_params* params,
-                                      const uint8_t* iv, size_t iv_len,
-                                      const uint8_t* fixed, size_t fixed_len,
+                                      const struct TC_KBKDF_params* params, const uint8_t* iv,
+                                      size_t iv_len, const uint8_t* fixed, size_t fixed_len,
                                       uint8_t* out, size_t out_len);
 /** @brief KBKDF double-pipeline mode with HMAC-SHA-1 (h = 20). */
 TC_status TC_KBKDF_HMAC_SHA1_pipeline(const uint8_t* key, size_t key_len,
-                                      const struct TC_KBKDF_params* params,
-                                      const uint8_t* fixed, size_t fixed_len,
-                                      uint8_t* out, size_t out_len);
+                                      const struct TC_KBKDF_params* params, const uint8_t* fixed,
+                                      size_t fixed_len, uint8_t* out, size_t out_len);
 #endif /* TC_KBKDF_HAVE_HMAC_SHA1 */
 
 #if TC_KBKDF_HAVE_HMAC_SHA224
 /** @brief KBKDF counter mode with HMAC-SHA-224 (h = 28). */
 TC_status TC_KBKDF_HMAC_SHA224_counter(const uint8_t* key, size_t key_len,
-                                       const struct TC_KBKDF_params* params,
-                                       const uint8_t* before, size_t before_len,
-                                       const uint8_t* after, size_t after_len,
+                                       const struct TC_KBKDF_params* params, const uint8_t* before,
+                                       size_t before_len, const uint8_t* after, size_t after_len,
                                        uint8_t* out, size_t out_len);
 /** @brief KBKDF feedback mode with HMAC-SHA-224 (h = 28). */
 TC_status TC_KBKDF_HMAC_SHA224_feedback(const uint8_t* key, size_t key_len,
-                                        const struct TC_KBKDF_params* params,
-                                        const uint8_t* iv, size_t iv_len,
-                                        const uint8_t* fixed, size_t fixed_len,
+                                        const struct TC_KBKDF_params* params, const uint8_t* iv,
+                                        size_t iv_len, const uint8_t* fixed, size_t fixed_len,
                                         uint8_t* out, size_t out_len);
 /** @brief KBKDF double-pipeline mode with HMAC-SHA-224 (h = 28). */
 TC_status TC_KBKDF_HMAC_SHA224_pipeline(const uint8_t* key, size_t key_len,
-                                        const struct TC_KBKDF_params* params,
-                                        const uint8_t* fixed, size_t fixed_len,
-                                        uint8_t* out, size_t out_len);
+                                        const struct TC_KBKDF_params* params, const uint8_t* fixed,
+                                        size_t fixed_len, uint8_t* out, size_t out_len);
 #endif /* TC_KBKDF_HAVE_HMAC_SHA224 */
 
 #if TC_KBKDF_HAVE_HMAC_SHA256
 /** @brief KBKDF counter mode with HMAC-SHA-256 (h = 32). */
 TC_status TC_KBKDF_HMAC_SHA256_counter(const uint8_t* key, size_t key_len,
-                                       const struct TC_KBKDF_params* params,
-                                       const uint8_t* before, size_t before_len,
-                                       const uint8_t* after, size_t after_len,
+                                       const struct TC_KBKDF_params* params, const uint8_t* before,
+                                       size_t before_len, const uint8_t* after, size_t after_len,
                                        uint8_t* out, size_t out_len);
 /** @brief KBKDF feedback mode with HMAC-SHA-256 (h = 32). */
 TC_status TC_KBKDF_HMAC_SHA256_feedback(const uint8_t* key, size_t key_len,
-                                        const struct TC_KBKDF_params* params,
-                                        const uint8_t* iv, size_t iv_len,
-                                        const uint8_t* fixed, size_t fixed_len,
+                                        const struct TC_KBKDF_params* params, const uint8_t* iv,
+                                        size_t iv_len, const uint8_t* fixed, size_t fixed_len,
                                         uint8_t* out, size_t out_len);
 /** @brief KBKDF double-pipeline mode with HMAC-SHA-256 (h = 32). */
 TC_status TC_KBKDF_HMAC_SHA256_pipeline(const uint8_t* key, size_t key_len,
-                                        const struct TC_KBKDF_params* params,
-                                        const uint8_t* fixed, size_t fixed_len,
-                                        uint8_t* out, size_t out_len);
+                                        const struct TC_KBKDF_params* params, const uint8_t* fixed,
+                                        size_t fixed_len, uint8_t* out, size_t out_len);
 #endif /* TC_KBKDF_HAVE_HMAC_SHA256 */
 
 #if TC_KBKDF_HAVE_HMAC_SHA384
 /** @brief KBKDF counter mode with HMAC-SHA-384 (h = 48). */
 TC_status TC_KBKDF_HMAC_SHA384_counter(const uint8_t* key, size_t key_len,
-                                       const struct TC_KBKDF_params* params,
-                                       const uint8_t* before, size_t before_len,
-                                       const uint8_t* after, size_t after_len,
+                                       const struct TC_KBKDF_params* params, const uint8_t* before,
+                                       size_t before_len, const uint8_t* after, size_t after_len,
                                        uint8_t* out, size_t out_len);
 /** @brief KBKDF feedback mode with HMAC-SHA-384 (h = 48). */
 TC_status TC_KBKDF_HMAC_SHA384_feedback(const uint8_t* key, size_t key_len,
-                                        const struct TC_KBKDF_params* params,
-                                        const uint8_t* iv, size_t iv_len,
-                                        const uint8_t* fixed, size_t fixed_len,
+                                        const struct TC_KBKDF_params* params, const uint8_t* iv,
+                                        size_t iv_len, const uint8_t* fixed, size_t fixed_len,
                                         uint8_t* out, size_t out_len);
 /** @brief KBKDF double-pipeline mode with HMAC-SHA-384 (h = 48). */
 TC_status TC_KBKDF_HMAC_SHA384_pipeline(const uint8_t* key, size_t key_len,
-                                        const struct TC_KBKDF_params* params,
-                                        const uint8_t* fixed, size_t fixed_len,
-                                        uint8_t* out, size_t out_len);
+                                        const struct TC_KBKDF_params* params, const uint8_t* fixed,
+                                        size_t fixed_len, uint8_t* out, size_t out_len);
 #endif /* TC_KBKDF_HAVE_HMAC_SHA384 */
 
 #if TC_KBKDF_HAVE_HMAC_SHA512
 /** @brief KBKDF counter mode with HMAC-SHA-512 (h = 64). */
 TC_status TC_KBKDF_HMAC_SHA512_counter(const uint8_t* key, size_t key_len,
-                                       const struct TC_KBKDF_params* params,
-                                       const uint8_t* before, size_t before_len,
-                                       const uint8_t* after, size_t after_len,
+                                       const struct TC_KBKDF_params* params, const uint8_t* before,
+                                       size_t before_len, const uint8_t* after, size_t after_len,
                                        uint8_t* out, size_t out_len);
 /** @brief KBKDF feedback mode with HMAC-SHA-512 (h = 64). */
 TC_status TC_KBKDF_HMAC_SHA512_feedback(const uint8_t* key, size_t key_len,
-                                        const struct TC_KBKDF_params* params,
-                                        const uint8_t* iv, size_t iv_len,
-                                        const uint8_t* fixed, size_t fixed_len,
+                                        const struct TC_KBKDF_params* params, const uint8_t* iv,
+                                        size_t iv_len, const uint8_t* fixed, size_t fixed_len,
                                         uint8_t* out, size_t out_len);
 /** @brief KBKDF double-pipeline mode with HMAC-SHA-512 (h = 64). */
 TC_status TC_KBKDF_HMAC_SHA512_pipeline(const uint8_t* key, size_t key_len,
-                                        const struct TC_KBKDF_params* params,
-                                        const uint8_t* fixed, size_t fixed_len,
-                                        uint8_t* out, size_t out_len);
+                                        const struct TC_KBKDF_params* params, const uint8_t* fixed,
+                                        size_t fixed_len, uint8_t* out, size_t out_len);
 #endif /* TC_KBKDF_HAVE_HMAC_SHA512 */
 
 #if TC_KBKDF_HAVE_AES_CMAC
 /** @brief KBKDF counter mode with AES-CMAC (h = 16; key_len must be TC_AES_KEYLEN). */
 TC_status TC_KBKDF_AES_CMAC_counter(const uint8_t* key, size_t key_len,
-                                    const struct TC_KBKDF_params* params,
-                                    const uint8_t* before, size_t before_len,
-                                    const uint8_t* after, size_t after_len,
+                                    const struct TC_KBKDF_params* params, const uint8_t* before,
+                                    size_t before_len, const uint8_t* after, size_t after_len,
                                     uint8_t* out, size_t out_len);
 /** @brief KBKDF feedback mode with AES-CMAC (h = 16; key_len must be TC_AES_KEYLEN). */
 TC_status TC_KBKDF_AES_CMAC_feedback(const uint8_t* key, size_t key_len,
-                                     const struct TC_KBKDF_params* params,
-                                     const uint8_t* iv, size_t iv_len,
-                                     const uint8_t* fixed, size_t fixed_len,
+                                     const struct TC_KBKDF_params* params, const uint8_t* iv,
+                                     size_t iv_len, const uint8_t* fixed, size_t fixed_len,
                                      uint8_t* out, size_t out_len);
 /** @brief KBKDF double-pipeline mode with AES-CMAC (h = 16; key_len must be TC_AES_KEYLEN). */
 TC_status TC_KBKDF_AES_CMAC_pipeline(const uint8_t* key, size_t key_len,
-                                     const struct TC_KBKDF_params* params,
-                                     const uint8_t* fixed, size_t fixed_len,
-                                     uint8_t* out, size_t out_len);
+                                     const struct TC_KBKDF_params* params, const uint8_t* fixed,
+                                     size_t fixed_len, uint8_t* out, size_t out_len);
 #endif /* TC_KBKDF_HAVE_AES_CMAC */
 
 #if TC_KBKDF_HAVE_DES_CMAC
@@ -316,21 +296,18 @@ TC_status TC_KBKDF_AES_CMAC_pipeline(const uint8_t* key, size_t key_len,
  */
 /** @brief KBKDF counter mode with DES/TDEA-CMAC (h = 8). */
 TC_status TC_KBKDF_DES_CMAC_counter(const uint8_t* key, size_t key_len,
-                                    const struct TC_KBKDF_params* params,
-                                    const uint8_t* before, size_t before_len,
-                                    const uint8_t* after, size_t after_len,
+                                    const struct TC_KBKDF_params* params, const uint8_t* before,
+                                    size_t before_len, const uint8_t* after, size_t after_len,
                                     uint8_t* out, size_t out_len);
 /** @brief KBKDF feedback mode with DES/TDEA-CMAC (h = 8). */
 TC_status TC_KBKDF_DES_CMAC_feedback(const uint8_t* key, size_t key_len,
-                                     const struct TC_KBKDF_params* params,
-                                     const uint8_t* iv, size_t iv_len,
-                                     const uint8_t* fixed, size_t fixed_len,
+                                     const struct TC_KBKDF_params* params, const uint8_t* iv,
+                                     size_t iv_len, const uint8_t* fixed, size_t fixed_len,
                                      uint8_t* out, size_t out_len);
 /** @brief KBKDF double-pipeline mode with DES/TDEA-CMAC (h = 8). */
 TC_status TC_KBKDF_DES_CMAC_pipeline(const uint8_t* key, size_t key_len,
-                                     const struct TC_KBKDF_params* params,
-                                     const uint8_t* fixed, size_t fixed_len,
-                                     uint8_t* out, size_t out_len);
+                                     const struct TC_KBKDF_params* params, const uint8_t* fixed,
+                                     size_t fixed_len, uint8_t* out, size_t out_len);
 #endif /* TC_KBKDF_HAVE_DES_CMAC */
 
 #ifdef __cplusplus

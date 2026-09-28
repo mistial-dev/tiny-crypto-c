@@ -14,31 +14,44 @@ typedef ::TC_DRBG_config drbg_config;
 
 // Copying or moving would duplicate the generator state and repeat output.
 class drbg {
-    ::TC_DRBG state_;
-public:
-    drbg() noexcept : state_{} {}
-    ~drbg() noexcept { uninstantiate(); }
-    drbg(const drbg&) = delete;
-    drbg& operator=(const drbg&) = delete;
-    drbg(drbg&&) = delete;
-    drbg& operator=(drbg&&) = delete;
+  ::TC_DRBG state_;
 
-    TC_CPP_NODISCARD TC_DRBG_result instantiate(const drbg_config& config,
-            TC_random_source entropy, bytes nonce, bytes personalization) noexcept {
-        return ::TC_DRBG_instantiate(&state_, &config, entropy, nonce, personalization);
-    }
-    TC_CPP_NODISCARD TC_DRBG_result reseed(bytes additional = bytes{nullptr, 0}) noexcept {
-        return ::TC_DRBG_reseed(&state_, additional);
-    }
-    TC_CPP_NODISCARD TC_DRBG_result generate(uint8_t* output, size_t length,
-            bool prediction_resistance = false,
-            bytes additional = bytes{nullptr, 0}) noexcept {
-        return ::TC_DRBG_generate(&state_, output, length, prediction_resistance ? 1 : 0,
-                                  additional);
-    }
-    void uninstantiate() noexcept { ::TC_DRBG_uninstantiate(&state_); }
-    // A TC_random_source for the C APIs. This object must outlive it.
-    TC_random_source random_source() noexcept { return ::TC_DRBG_random_source(&state_); }
+public:
+  drbg() noexcept : state_{}
+  {}
+  ~drbg() noexcept
+  {
+    uninstantiate();
+  }
+  drbg(const drbg&) = delete;
+  drbg& operator=(const drbg&) = delete;
+  drbg(drbg&&) = delete;
+  drbg& operator=(drbg&&) = delete;
+
+  TC_CPP_NODISCARD TC_DRBG_result instantiate(const drbg_config& config, TC_random_source entropy,
+                                              bytes nonce, bytes personalization) noexcept
+  {
+    return ::TC_DRBG_instantiate(&state_, &config, entropy, nonce, personalization);
+  }
+  TC_CPP_NODISCARD TC_DRBG_result reseed(bytes additional = bytes{nullptr, 0}) noexcept
+  {
+    return ::TC_DRBG_reseed(&state_, additional);
+  }
+  TC_CPP_NODISCARD TC_DRBG_result generate(uint8_t* output, size_t length,
+                                           bool prediction_resistance = false,
+                                           bytes additional = bytes{nullptr, 0}) noexcept
+  {
+    return ::TC_DRBG_generate(&state_, output, length, prediction_resistance ? 1 : 0, additional);
+  }
+  void uninstantiate() noexcept
+  {
+    ::TC_DRBG_uninstantiate(&state_);
+  }
+  // A TC_random_source for the C APIs. This object must outlive it.
+  TC_random_source random_source() noexcept
+  {
+    return ::TC_DRBG_random_source(&state_);
+  }
 };
 } // namespace tiny_crypto
 #endif

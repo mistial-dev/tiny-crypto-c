@@ -19,42 +19,37 @@ namespace tiny_crypto {
 typedef ::TC_KBKDF_params kbkdf_params;
 
 /* Label || 0x00 || Context || [8 * out_len]_32; see TC_KBKDF_fixed_input. */
-inline TC_status kbkdf_fixed_input(const uint8_t* label, size_t label_len,
-                                   const uint8_t* context, size_t context_len,
-                                   size_t out_len, uint8_t* buf,
-                                   size_t buf_len) {
-    return TC_KBKDF_fixed_input(label, label_len, context, context_len, out_len,
-                                buf, buf_len);
+inline TC_status kbkdf_fixed_input(const uint8_t* label, size_t label_len, const uint8_t* context,
+                                   size_t context_len, size_t out_len, uint8_t* buf, size_t buf_len)
+{
+  return TC_KBKDF_fixed_input(label, label_len, context, context_len, out_len, buf, buf_len);
 }
 
 /*
  * One family per PRF. Status values and contracts come directly from kdf.h.
  * The macro is file-local and undefined at the end of this header.
  */
-#define TINY_CRYPTO_KBKDF_FAMILY(cpp_name, C_NAME) \
-    inline TC_status cpp_name##_counter(const uint8_t* key, size_t key_len, \
-                                   const kbkdf_params& params, \
-                                   const uint8_t* before, size_t before_len, \
-                                   const uint8_t* after, size_t after_len, \
-                                   uint8_t* out, size_t out_len) { \
-        return TC_KBKDF_##C_NAME##_counter(key, key_len, &params, before, before_len, \
-                                           after, after_len, out, out_len); \
-    } \
-    inline TC_status cpp_name##_feedback(const uint8_t* key, size_t key_len, \
-                                    const kbkdf_params& params, \
-                                    const uint8_t* iv, size_t iv_len, \
-                                    const uint8_t* fixed, size_t fixed_len, \
-                                    uint8_t* out, size_t out_len) { \
-        return TC_KBKDF_##C_NAME##_feedback(key, key_len, &params, iv, iv_len, fixed, \
-                                            fixed_len, out, out_len); \
-    } \
-    inline TC_status cpp_name##_pipeline(const uint8_t* key, size_t key_len, \
-                                    const kbkdf_params& params, \
-                                    const uint8_t* fixed, size_t fixed_len, \
-                                    uint8_t* out, size_t out_len) { \
-        return TC_KBKDF_##C_NAME##_pipeline(key, key_len, &params, fixed, fixed_len, \
-                                            out, out_len); \
-    }
+#define TINY_CRYPTO_KBKDF_FAMILY(cpp_name, C_NAME)                                                 \
+  inline TC_status cpp_name##_counter(                                                             \
+      const uint8_t* key, size_t key_len, const kbkdf_params& params, const uint8_t* before,       \
+      size_t before_len, const uint8_t* after, size_t after_len, uint8_t* out, size_t out_len)     \
+  {                                                                                                \
+    return TC_KBKDF_##C_NAME##_counter(key, key_len, &params, before, before_len, after,           \
+                                       after_len, out, out_len);                                   \
+  }                                                                                                \
+  inline TC_status cpp_name##_feedback(                                                            \
+      const uint8_t* key, size_t key_len, const kbkdf_params& params, const uint8_t* iv,           \
+      size_t iv_len, const uint8_t* fixed, size_t fixed_len, uint8_t* out, size_t out_len)         \
+  {                                                                                                \
+    return TC_KBKDF_##C_NAME##_feedback(key, key_len, &params, iv, iv_len, fixed, fixed_len, out,  \
+                                        out_len);                                                  \
+  }                                                                                                \
+  inline TC_status cpp_name##_pipeline(const uint8_t* key, size_t key_len,                         \
+                                       const kbkdf_params& params, const uint8_t* fixed,           \
+                                       size_t fixed_len, uint8_t* out, size_t out_len)             \
+  {                                                                                                \
+    return TC_KBKDF_##C_NAME##_pipeline(key, key_len, &params, fixed, fixed_len, out, out_len);    \
+  }
 
 #if TC_KBKDF_HAVE_HMAC_SHA1
 TINY_CRYPTO_KBKDF_FAMILY(kbkdf_hmac_sha1, HMAC_SHA1)

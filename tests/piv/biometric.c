@@ -7,17 +7,16 @@
 enum { RECORD_BYTES = 44 };
 
 static const uint8_t valid_record[RECORD_BYTES] = {
-    'F', 'M', 'R',  0, ' ', '2', '0',  0,  0, RECORD_BYTES, 0,  1,
-    0,   2,   0x80, 1, 1,   0,   1,    0,  0, 197,          0,  197,
-    2,   0,   2,    0, 100, 1,   0x40, 10, 0, 20,           90, 80,
-    0,   0,   7,    2, 100, 0,   0,    0};
+    'F', 'M', 'R', 0, ' ', '2', '0', 0, 0, RECORD_BYTES, 0, 1,    0,  2, 0x80, 1,  1,  0, 1,
+    0,   0,   197, 0, 197, 2,   0,   2, 0, 100,          1, 0x40, 10, 0, 20,   90, 80, 0, 0,
+    7,   2,   100, 0, 0,   0};
 
-static MunitResult valid(const MunitParameter params[], void *user) {
+static MunitResult valid(const MunitParameter params[], void* user)
+{
   (void)params;
   (void)user;
   TC_PIV_fingerprint_record record;
-  munit_assert_int(TC_PIV_fingerprint_read(
-                       (TC_bytes){valid_record, sizeof valid_record}, &record),
+  munit_assert_int(TC_PIV_fingerprint_read((TC_bytes){valid_record, sizeof valid_record}, &record),
                    ==, TC_TLV_OK);
   munit_assert_ptr_equal(record.encoded.data, valid_record);
   munit_assert_uint(record.product_owner, ==, 1);
@@ -29,7 +28,8 @@ static MunitResult valid(const MunitParameter params[], void *user) {
   return MUNIT_OK;
 }
 
-static MunitResult invalid(const MunitParameter params[], void *user) {
+static MunitResult invalid(const MunitParameter params[], void* user)
+{
   (void)params;
   (void)user;
   enum {
@@ -143,38 +143,35 @@ static MunitResult invalid(const MunitParameter params[], void *user) {
       break;
     }
     out = unchanged;
-    munit_assert_int(
-        TC_PIV_fingerprint_read((TC_bytes){changed, sizeof changed}, &out), !=,
-        TC_TLV_OK);
+    munit_assert_int(TC_PIV_fingerprint_read((TC_bytes){changed, sizeof changed}, &out), !=,
+                     TC_TLV_OK);
     munit_assert_memory_equal(sizeof out, &out, &unchanged);
   }
   for (size_t length = 0; length < sizeof valid_record; ++length) {
     out = unchanged;
-    munit_assert_int(
-        TC_PIV_fingerprint_read((TC_bytes){valid_record, length}, &out), !=,
-        TC_TLV_OK);
+    munit_assert_int(TC_PIV_fingerprint_read((TC_bytes){valid_record, length}, &out), !=,
+                     TC_TLV_OK);
     munit_assert_memory_equal(sizeof out, &out, &unchanged);
   }
-  munit_assert_int(
-      TC_PIV_fingerprint_read((TC_bytes){valid_record, sizeof valid_record},
-                              (TC_PIV_fingerprint_record *)valid_record),
-      ==, TC_TLV_ARGUMENT);
+  munit_assert_int(TC_PIV_fingerprint_read((TC_bytes){valid_record, sizeof valid_record},
+                                           (TC_PIV_fingerprint_record*)valid_record),
+                   ==, TC_TLV_ARGUMENT);
   return MUNIT_OK;
 }
 
-static MunitResult face(const MunitParameter params[], void *user) {
+static MunitResult face(const MunitParameter params[], void* user)
+{
   (void)params;
   (void)user;
   static const uint8_t encoded[] = {
-      'F',  'A', 'C', 0, '0', '1', '0', 0,    0,    0,    0,   50,   0,
-      1,    0,   0,   0, 36,  0,   0,   0,    0,    0,    0,   0,    0,
-      0,    1,   0,   0, 0,   0,   0,   0,    1,    0,    1,   0xa5, 2,
-      0x58, 1,   2,   0, 0,   0,   0,   0xff, 0xd8, 0xff, 0xd9};
+      'F', 'A', 'C', 0,    '0', '1',  '0', 0, 0, 0, 0, 50, 0,    1,    0,    0,   0,
+      36,  0,   0,   0,    0,   0,    0,   0, 0, 0, 1, 0,  0,    0,    0,    0,   0,
+      1,   0,   1,   0xa5, 2,   0x58, 1,   2, 0, 0, 0, 0,  0xff, 0xd8, 0xff, 0xd9};
   TC_PIV_face_record record;
   TC_PIV_face_image image;
-  munit_assert_int(TC_PIV_face_read((TC_bytes){encoded, sizeof encoded},
-                                    TC_PIV_FACE_PROFILE_PIV, &record),
-                   ==, TC_TLV_OK);
+  munit_assert_int(
+      TC_PIV_face_read((TC_bytes){encoded, sizeof encoded}, TC_PIV_FACE_PROFILE_PIV, &record), ==,
+      TC_TLV_OK);
   munit_assert_uint(record.image_count, ==, 1);
   munit_assert_int(TC_PIV_face_image_read(&record, 0, &image), ==, TC_TLV_OK);
   munit_assert_uint(image.width, ==, 421);
@@ -188,48 +185,43 @@ static MunitResult face(const MunitParameter params[], void *user) {
   twic[34] = 0;
   twic[36] = 1;
   twic[37] = 18;
-  munit_assert_int(TC_PIV_face_read((TC_bytes){twic, sizeof twic},
-                                    TC_PIV_FACE_PROFILE_PIV, &record),
-                   ==, TC_TLV_INVALID);
-  munit_assert_int(TC_PIV_face_read((TC_bytes){twic, sizeof twic},
-                                    TC_PIV_FACE_PROFILE_TWIC, &record),
-                   ==, TC_TLV_OK);
+  munit_assert_int(
+      TC_PIV_face_read((TC_bytes){twic, sizeof twic}, TC_PIV_FACE_PROFILE_PIV, &record), ==,
+      TC_TLV_INVALID);
+  munit_assert_int(
+      TC_PIV_face_read((TC_bytes){twic, sizeof twic}, TC_PIV_FACE_PROFILE_TWIC, &record), ==,
+      TC_TLV_OK);
 
-  static const size_t invalid_offsets[] = {0,  4,  11, 13, 17, 26, 34,
-                                           35, 40, 41, 45, 46, 49};
-  for (size_t i = 0; i < sizeof invalid_offsets / sizeof *invalid_offsets;
-       ++i) {
+  static const size_t invalid_offsets[] = {0, 4, 11, 13, 17, 26, 34, 35, 40, 41, 45, 46, 49};
+  for (size_t i = 0; i < sizeof invalid_offsets / sizeof *invalid_offsets; ++i) {
     uint8_t changed[sizeof encoded];
     memcpy(changed, encoded, sizeof changed);
     changed[invalid_offsets[i]] ^= 0xff;
-    munit_assert_int(TC_PIV_face_read((TC_bytes){changed, sizeof changed},
-                                      TC_PIV_FACE_PROFILE_PIV, &record),
-                     !=, TC_TLV_OK);
+    munit_assert_int(
+        TC_PIV_face_read((TC_bytes){changed, sizeof changed}, TC_PIV_FACE_PROFILE_PIV, &record), !=,
+        TC_TLV_OK);
   }
   for (size_t offset = 36; offset <= 38; offset += 2) {
     uint8_t changed[sizeof encoded];
     memcpy(changed, encoded, sizeof changed);
     changed[offset] = changed[offset + 1] = 0;
-    munit_assert_int(TC_PIV_face_read((TC_bytes){changed, sizeof changed},
-                                      TC_PIV_FACE_PROFILE_PIV, &record),
-                     !=, TC_TLV_OK);
+    munit_assert_int(
+        TC_PIV_face_read((TC_bytes){changed, sizeof changed}, TC_PIV_FACE_PROFILE_PIV, &record), !=,
+        TC_TLV_OK);
   }
-  munit_assert_int(TC_PIV_face_image_read(&record, 1, &image), ==,
-                   TC_TLV_ARGUMENT);
+  munit_assert_int(TC_PIV_face_image_read(&record, 1, &image), ==, TC_TLV_ARGUMENT);
   record.profile = (TC_PIV_face_profile)99;
-  munit_assert_int(TC_PIV_face_image_read(&record, 0, &image), ==,
-                   TC_TLV_ARGUMENT);
+  munit_assert_int(TC_PIV_face_image_read(&record, 0, &image), ==, TC_TLV_ARGUMENT);
   return MUNIT_OK;
 }
 
-static MunitTest tests[] = {
-    {"/valid", valid, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-    {"/invalid", invalid, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-    {"/face", face, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-    {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
+static MunitTest tests[] = {{"/valid", valid, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+                            {"/invalid", invalid, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+                            {"/face", face, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+                            {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
 
-int main(int argc, char **argv) {
-  MunitSuite suite = {"/piv/fingerprint", tests, NULL, 1,
-                      MUNIT_SUITE_OPTION_NONE};
+int main(int argc, char** argv)
+{
+  MunitSuite suite = {"/piv/fingerprint", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};
   return munit_suite_main(&suite, NULL, argc, argv);
 }
