@@ -76,12 +76,17 @@ int main(int argc, char** argv)
   size_t ikm_len, salt_len, info_len, auxiliary_len = 0;
   unsigned long output_len;
   char* end;
-  derive_fn derive;
-  hybrid_fn hybrid;
+  derive_fn derive = NULL;
+  hybrid_fn hybrid = NULL;
+  TC_status status;
 
-  if ((argc != 6 && argc != 7) || (argc == 6 && (derive = select_hash(argv[1])) == NULL) ||
-      (argc == 7 && (hybrid = select_hybrid(argv[1])) == NULL) ||
-      !read_hex(argv[2], ikm, sizeof ikm, &ikm_len) ||
+  if (argc == 6)
+    derive = select_hash(argv[1]);
+  else if (argc == 7)
+    hybrid = select_hybrid(argv[1]);
+  else
+    return 2;
+  if ((derive == NULL && hybrid == NULL) || !read_hex(argv[2], ikm, sizeof ikm, &ikm_len) ||
       !read_hex(argv[3], salt, sizeof salt, &salt_len) ||
       !read_hex(argv[4], info, sizeof info, &info_len) ||
       (argc == 7 && !read_hex(argv[6], auxiliary, sizeof auxiliary, &auxiliary_len)))
@@ -90,12 +95,14 @@ int main(int argc, char** argv)
   output_len = strtoul(argv[5], &end, 10);
   if (errno != 0 || *end != '\0' || output_len > sizeof output)
     return 2;
-  if ((argc == 6 &&
-       derive(salt_len ? salt : NULL, salt_len, ikm_len ? ikm : NULL, ikm_len,
-              info_len ? info : NULL, info_len, output, (size_t)output_len) != TC_OK) ||
-      (argc == 7 && hybrid(salt_len ? salt : NULL, salt_len, ikm_len ? ikm : NULL, ikm_len,
-                           auxiliary_len ? auxiliary : NULL, auxiliary_len, info_len ? info : NULL,
-                           info_len, output, (size_t)output_len) != TC_OK))
+  if (derive != NULL)
+    status = derive(salt_len ? salt : NULL, salt_len, ikm_len ? ikm : NULL, ikm_len,
+                    info_len ? info : NULL, info_len, output, (size_t)output_len);
+  else
+    status = hybrid(salt_len ? salt : NULL, salt_len, ikm_len ? ikm : NULL, ikm_len,
+                    auxiliary_len ? auxiliary : NULL, auxiliary_len, info_len ? info : NULL,
+                    info_len, output, (size_t)output_len);
+  if (status != TC_OK)
     return 1;
   if (fwrite(output, 1, (size_t)output_len, stdout) != (size_t)output_len)
     return 2;
