@@ -20,10 +20,10 @@ TC_TLV_result TC_DER_uint32(const uint8_t* data, size_t length, uint32_t* out);
 TC_TLV_result TC_DER_uint32_contents(const uint8_t* data, size_t length, uint32_t* out);
 TC_TLV_result TC_DER_bit_string(const uint8_t* data, size_t length, TC_bytes* bits,
                                 unsigned* unused);
+/* OID contents remain encoded, so arcs of any size need no integer conversion. */
 TC_TLV_result TC_DER_oid(const uint8_t* data, size_t length, TC_bytes* oid);
 /* Contents-only form for an IMPLICIT-tagged OBJECT IDENTIFIER. */
 TC_TLV_result TC_DER_oid_contents(const uint8_t* data, size_t length);
-/* OID contents remain encoded, so arcs of any size need no integer conversion. */
 TC_TLV_result TC_DER_boolean(const uint8_t* data, size_t length, int* out);
 TC_TLV_result TC_DER_null(const uint8_t* data, size_t length);
 TC_TLV_result TC_DER_sequence(const uint8_t* data, size_t length, TC_bytes* contents);

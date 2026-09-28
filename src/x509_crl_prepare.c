@@ -120,7 +120,7 @@ TC_TLV_result TC_X509_crl_prepare_begin(const TC_source* source, const TC_X509_c
   TC_result hash = tc_source_hash_init(&job->hash, &job->reader, algorithm.hash, layout.tbs.offset,
                                        layout.tbs.length);
   if (hash != TC_RESULT_OK)
-    return hash == TC_RESULT_UNSUPPORTED ? TC_TLV_UNSUPPORTED : TC_TLV_ARGUMENT;
+    return tc_source_status(hash);
   tc_x509_crl_source_revoked revoked;
   result = tc_x509_crl_source_revoked_init(&job->reader, layout.revoked, &job->record.crl,
                                            &job->record.extensions, options->max_entries,
@@ -199,7 +199,7 @@ TC_TLV_result TC_X509_crl_prepare_step(TC_X509_crl_job* job, size_t max_entries,
     if (result == TC_TLV_OK)
       hashed = tc_source_hash_step(&job->hash, max_bytes, &done);
     if (hashed != TC_RESULT_OK)
-      result = hashed == TC_RESULT_LIMIT ? TC_TLV_LIMIT : TC_TLV_IO;
+      result = tc_source_status(hashed);
     if (result == TC_TLV_OK && done) {
       tc_hash_info info;
       if (!tc_hash_info_get(job->prepared.hash, &info) ||

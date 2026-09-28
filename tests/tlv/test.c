@@ -468,6 +468,10 @@ static MunitResult der(const MunitParameter params[], void* user)
     extra[1] += 3;
     munit_assert(TC_DER_rsa_private(extra, sizeof extra, &key) == TC_TLV_INVALID);
     munit_assert_memory_equal(sizeof key, &key, &saved);
+    /* A multi-prime key (version 1) with otherPrimeInfos is unsupported. */
+    extra[4] = 1;
+    munit_assert(TC_DER_rsa_private(extra, sizeof extra, &key) == TC_TLV_UNSUPPORTED);
+    munit_assert_memory_equal(sizeof key, &key, &saved);
     munit_assert(TC_DER_rsa_private(encoded, sizeof encoded, NULL) == TC_TLV_ARGUMENT);
     encoded[4] = 1;
     munit_assert(TC_DER_rsa_private(encoded, sizeof encoded, &key) == TC_TLV_UNSUPPORTED);

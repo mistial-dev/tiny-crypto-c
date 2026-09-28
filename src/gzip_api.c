@@ -26,18 +26,12 @@ TC_GZIP_result TC_GZIP_decode(const uint8_t* input, size_t input_length, uint8_t
         return TC_GZIP_ARGUMENT;
   const TC_bytes encoded = {input, input_length};
   tc_inflate_output decoded = {output, capacity, 0};
-  TC_TLV_result result = tc_gzip_decode(encoded, workspace, &decoded, work);
+  const TC_GZIP_result result = tc_gzip_decode(encoded, workspace, &decoded, work);
   TC_secure_zero(workspace, sizeof *workspace);
-  if (result == TC_TLV_OK) {
+  if (result == TC_GZIP_OK)
     *output_length = decoded.length;
-    return TC_GZIP_OK;
-  }
-  if (capacity)
+  else if (capacity)
     TC_secure_zero(output, capacity);
-  if (result == TC_TLV_LIMIT)
-    return TC_GZIP_LIMIT;
-  if (result == TC_TLV_UNSUPPORTED)
-    return TC_GZIP_UNSUPPORTED;
-  return TC_GZIP_INVALID;
+  return result;
 }
 #endif

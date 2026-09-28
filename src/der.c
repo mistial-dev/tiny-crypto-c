@@ -243,44 +243,34 @@ TC_TLV_result TC_DER_rsa_public(const uint8_t* data, size_t length, TC_DER_rsa_p
   return TC_TLV_OK;
 }
 
+/* RFC 8017 appendix A.1.2 RSAPrivateKey. Version 1 (multi-prime, with an
+ * optional otherPrimeInfos tenth field) is UNSUPPORTED. */
 TC_TLV_result TC_DER_rsa_private(const uint8_t* data, size_t length, TC_DER_rsa_private_key* out)
 {
-  enum { FIELD_COUNT = 9, TWO_PRIME = 0, MULTI_PRIME = 1 };
-  TC_TLV_limits limits = {SIZE_MAX, SIZE_MAX, FIELD_COUNT, 1};
-  TC_bytes contents;
-  TC_TLV_reader reader;
-  TC_TLV_element field;
+  enum { TWO_PRIME = 0, MULTI_PRIME = 1 };
+  TC_bytes fields[10];
   TC_DER_rsa_private_key key;
   uint32_t version;
   if (!out)
     return TC_TLV_ARGUMENT;
-  TC_TLV_result result = TC_DER_sequence(data, length, &contents);
+  TC_TLV_result result = sequence_fields(data, length, fields, 9, 10);
   if (result != TC_TLV_OK)
     return result;
-  result = TC_TLV_reader_init(&reader, contents.data, contents.length, TC_TLV_DER, &limits);
-  if (result != TC_TLV_OK)
-    return result;
-  if (TC_TLV_next(&reader, &field) != TC_TLV_OK)
-    return TC_TLV_INVALID;
-  result = TC_DER_uint32(field.encoded.data, field.encoded.length, &version);
+  result = TC_DER_uint32(fields[0].data, fields[0].length, &version);
   if (result != TC_TLV_OK)
     return result;
   if (version == MULTI_PRIME)
     return TC_TLV_UNSUPPORTED;
-  if (version != TWO_PRIME)
+  if (version != TWO_PRIME || fields[9].data)
     return TC_TLV_INVALID;
   TC_bytes* components[] = {&key.modulus,   &key.public_exponent, &key.private_exponent,
                             &key.prime1,    &key.prime2,          &key.exponent1,
                             &key.exponent2, &key.coefficient};
   for (size_t i = 0; i < sizeof components / sizeof *components; ++i) {
-    if (TC_TLV_next(&reader, &field) != TC_TLV_OK)
-      return TC_TLV_INVALID;
-    result = TC_DER_positive_integer(field.encoded.data, field.encoded.length, components[i]);
+    result = TC_DER_positive_integer(fields[i + 1].data, fields[i + 1].length, components[i]);
     if (result != TC_TLV_OK)
       return result;
   }
-  if (reader.offset != contents.length)
-    return TC_TLV_INVALID;
   *out = key;
   return TC_TLV_OK;
 }

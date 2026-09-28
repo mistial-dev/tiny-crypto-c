@@ -160,28 +160,17 @@ TC_TLV_result tc_x509_crl_source_entry_next(tc_source_reader* reader,
   const uint64_t size = element.end - element.offset;
   if (size > limits->max_input || size > SIZE_MAX)
     return TC_TLV_LIMIT;
+  /* Borrow the entry when one cache window holds it; otherwise copy it. */
   TC_bytes encoded;
-  TC_result read = tc_source_reader_view(reader, element.offset, (size_t)size, &encoded);
-  if (read != TC_RESULT_OK)
-    return read == TC_RESULT_LIMIT      ? TC_TLV_LIMIT
-           : read == TC_RESULT_ARGUMENT ? TC_TLV_ARGUMENT
-                                        : TC_TLV_IO;
+  result = tc_source_status(tc_source_reader_view(reader, element.offset, (size_t)size, &encoded));
+  if (result != TC_TLV_OK)
+    return result;
   if (encoded.length != size) {
     if (size > scratch.capacity)
       return TC_TLV_LIMIT;
-    size_t copied = 0;
-    for (;;) {
-      memcpy(scratch.data + copied, encoded.data, encoded.length);
-      copied += encoded.length;
-      if (copied == size)
-        break;
-      read =
-          tc_source_reader_view(reader, element.offset + copied, (size_t)size - copied, &encoded);
-      if (read != TC_RESULT_OK)
-        return read == TC_RESULT_LIMIT      ? TC_TLV_LIMIT
-               : read == TC_RESULT_ARGUMENT ? TC_TLV_ARGUMENT
-                                            : TC_TLV_IO;
-    }
+    result = tc_source_reader_copy(reader, element.offset, (size_t)size, scratch.data);
+    if (result != TC_TLV_OK)
+      return result;
     encoded = (TC_bytes){scratch.data, (size_t)size};
   }
   TC_TLV_reader bounded;
@@ -354,19 +343,10 @@ TC_TLV_result tc_x509_crl_source_metadata(tc_source_reader* reader,
     if (!length)
       continue;
     *views[i] = (TC_bytes){storage.data + used, length};
-    size_t copied = 0;
-    while (copied < length) {
-      TC_bytes chunk;
-      TC_result result =
-          tc_source_reader_view(reader, spans[i].offset + copied, length - copied, &chunk);
-      if (result != TC_RESULT_OK) {
-        if (result == TC_RESULT_LIMIT)
-          return TC_TLV_LIMIT;
-        return result == TC_RESULT_ARGUMENT ? TC_TLV_ARGUMENT : TC_TLV_IO;
-      }
-      memcpy(storage.data + used + copied, chunk.data, chunk.length);
-      copied += chunk.length;
-    }
+    const TC_TLV_result copied =
+        tc_source_reader_copy(reader, spans[i].offset, length, storage.data + used);
+    if (copied != TC_TLV_OK)
+      return copied;
     used += length;
   }
   return tc_x509_crl_metadata_read(&fields, limits, tree, out);
