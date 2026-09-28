@@ -13,6 +13,7 @@
 
 enum { FILE_CAPACITY = 20000 };
 static uint8_t issuer_der[FILE_CAPACITY], card_der[FILE_CAPACITY], anchors_der[FILE_CAPACITY];
+static uint8_t piv_der[FILE_CAPACITY];
 static TC_validation_storage arena[40000];
 static TC_RSA_word rsa_words[TC_RSA_VERIFY_WORKSPACE_WORDS(3072)];
 static TC_ECDSA_workspace ec;
@@ -86,6 +87,15 @@ static void check_profile(const char* profile)
   options_anchor[0].path_len = 0;
   munit_assert_int(TC_X509_path_validate_with_anchor(chain,2,options_anchor,&options,
       &storage.path.validation,&result), ==, TC_X509_PATH_INVALID);
+  /* The card's PIV Authentication certificate chains to the same constrained
+   * anchor, and the anchor's path length applies to it too. */
+  {
+    const TC_bytes piv_chain[] = {issuer,fixture(profile,"piv-auth.der",piv_der)};
+    munit_assert_int(TC_X509_path_validate_with_anchor(piv_chain,2,&anchor,&options,
+        &storage.path.validation,&result), ==, TC_X509_PATH_VALID);
+    munit_assert_int(TC_X509_path_validate_with_anchor(piv_chain,2,options_anchor,&options,
+        &storage.path.validation,&result), ==, TC_X509_PATH_INVALID);
+  }
   options_anchor[0] = anchor;
   options_anchor[0].extensions = (TC_bytes){unknown_critical,sizeof unknown_critical};
   munit_assert_int(TC_X509_path_validate_with_anchor(chain,2,options_anchor,&options,

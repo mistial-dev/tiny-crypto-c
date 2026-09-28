@@ -594,6 +594,10 @@ if(TINY_CRYPTO_BUILD_TESTS)
     tests/x509/anchor_constraints.c)
   target_compile_definitions(test_x509_anchor_constraints PRIVATE
     TC_TWIC_SYNTHETIC_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/twic/synthetic")
+  tc_add_c_test(test_x509_anchor_controls tiny-crypto-c-test-pki-native
+    tests/x509/anchor_controls.c)
+  target_compile_definitions(test_x509_anchor_controls PRIVATE
+    TC_PKITS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/x509/nist/pkits/certs")
   tc_add_c_test(test_x509_store tiny-crypto-c-test-pki tests/x509/store.c)
   tc_add_c_test(test_x509_candidate tiny-crypto-c-test-pki tests/x509/candidate.c)
   target_compile_definitions(test_x509_candidate PRIVATE
@@ -633,6 +637,11 @@ if(TINY_CRYPTO_BUILD_TESTS)
     tc_add_linked_test(test_cpp_credential tiny-crypto-c-test-pki-native
       tests/cpp/credential.cpp tests/cpp/main.cpp)
     target_include_directories(test_cpp_credential PRIVATE tests/support)
+    tc_add_linked_test(test_cpp_trust_anchor tiny-crypto-c-test-pki-native
+      tests/cpp/trust_anchor.cpp tests/cpp/main.cpp)
+    target_include_directories(test_cpp_trust_anchor PRIVATE tests/support)
+    target_compile_definitions(test_cpp_trust_anchor PRIVATE
+      TC_TWIC_SYNTHETIC_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/twic/synthetic")
   endif()
   tc_add_c_test(test_source_hash tiny-crypto-c-test-pki-native tests/x509/source_hash.c)
   tc_add_c_test(test_twic_synthetic_fixture tiny-crypto-c-test-pki-native
