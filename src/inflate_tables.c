@@ -21,7 +21,9 @@ static TC_TLV_result dynamic_lengths(tc_inflate_bits* bits, tc_inflate_tables* t
   *literal_count += 257;
   ++*distance_count;
   code_count += 4;
-  if (*literal_count > 286)
+  /* Literal/length codes 286-287 and distance codes 30-31 never occur
+   * (RFC 1951 section 3.2.6). Reject headers that declare them, as zlib does. */
+  if (*literal_count > 286 || *distance_count > 30)
     return TC_TLV_INVALID;
   if (*bits->work < sizeof order)
     return TC_TLV_LIMIT;
