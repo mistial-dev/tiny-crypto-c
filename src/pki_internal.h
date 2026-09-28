@@ -115,6 +115,9 @@ TC_TLV_result tc_x509_pss_parameters(TC_bytes encoded);
  * TC_X509_read. */
 TC_TLV_result tc_x509_certificate_read(TC_bytes encoded, unsigned tag, const TC_TLV_limits* limits,
                                        TC_X509_workspace* workspace, TC_X509_certificate* out);
+/* One RFC 5280 PolicyInformation. qualifiers keeps the complete SEQUENCE
+ * encoding and is {NULL, 0} when absent. out changes only on OK. */
+TC_TLV_result tc_x509_policy_information_read(TC_bytes encoded, TC_X509_policy* out);
 /* Parse a bare DER TBSCertificate with the TC_X509_read field rules. encoded,
  * signature and the outer signatureAlgorithm stay empty. The TBS signature
  * field is returned in signature_algorithm. */

@@ -51,7 +51,10 @@ publication, and path validation against a constrained anchor.
 
 ## Path controls
 
-An anchor's policies intersect the application's initial policies. Its
+An anchor's policies intersect the application's initial policies. A
+`TrustAnchorInfo` policySet lists unique policy identifiers without
+policyQualifiers (RFC 5914 section 2.5), and an anchor certificate's
+certificatePolicies extension must also list unique identifiers. Its
 permitted names intersect the application's permitted names, and excluded
 names from both sources apply. Restrictive policy flags combine with the
 application flags. An anchor path-length limit counts non-self-issued

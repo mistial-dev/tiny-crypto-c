@@ -408,6 +408,50 @@ static TC_TLV_result read_with_exts(const uint8_t* list, size_t list_length)
   return TC_X509_trust_anchor_next(&reader, &limits, &workspace, &anchor);
 }
 
+/* Read a TrustAnchorInfo whose CertPathControls holds taName and a policySet
+ * [1] with the given CertificatePolicies contents. */
+static TC_TLV_result read_with_policy_set(const uint8_t* policies, size_t policies_length)
+{
+  static const uint8_t spki[] = {0x30, 12, 0x30, 5, 6, 3, 0x2a, 3, 4, 3, 3, 0, 1, 2};
+  static const uint8_t key_id[] = {4, 1, 1};
+  static const uint8_t name[] = {0x30, 12, 0x31, 10, 0x30, 8, 6, 3, 0x55, 4, 3, 0x0c, 1, 'A'};
+  uint8_t controls[128], list[200];
+  size_t c = 0, n = 0;
+  memcpy(controls, name, sizeof name);
+  c += sizeof name;
+  c += wrap(controls + c, 0xa1, policies, policies_length);
+  memcpy(list, spki, sizeof spki);
+  n += sizeof spki;
+  memcpy(list + n, key_id, sizeof key_id);
+  n += sizeof key_id;
+  n += wrap(list + n, 0x30, controls, c);
+  n = wrap(list, 0x30, list, n);
+  return read_anchor(list, wrap(list, 0xa2, list, n));
+}
+
+/* RFC 5914 section 2.5: a policySet lists unique identifiers without
+ * policyQualifiers. */
+static MunitResult policy_sets(const MunitParameter params[], void* user)
+{
+  static const uint8_t first[] = {0x30, 5, 6, 3, 0x2a, 3, 4};
+  static const uint8_t second[] = {0x30, 5, 6, 3, 0x2a, 3, 5};
+  /* PolicyQualifierInfo { id-qt-cps, IA5String "a" } */
+  static const uint8_t qualified[] = {0x30, 22, 6,    3,    0x2a, 3,    4,    0x30,
+                                      15,   0x30, 13, 6,    8,    0x2b, 6,    1,
+                                      5,    5,    7,  2,    1,    0x16, 1,    'a'};
+  uint8_t set[64];
+  (void)params;
+  (void)user;
+  memcpy(set, first, sizeof first);
+  memcpy(set + sizeof first, second, sizeof second);
+  munit_assert_int(read_with_policy_set(set, sizeof first + sizeof second), ==, TC_TLV_OK);
+  memcpy(set + sizeof first, first, sizeof first);
+  munit_assert_int(read_with_policy_set(set, 2 * sizeof first), ==, TC_TLV_INVALID);
+  munit_assert_int(read_with_policy_set(qualified, sizeof qualified), ==, TC_TLV_INVALID);
+  munit_assert_int(read_with_policy_set(set, 0), ==, TC_TLV_INVALID);
+  return MUNIT_OK;
+}
+
 /* RFC 5914 section 2.6 forbids these extensions in TrustAnchorInfo exts. */
 static MunitResult forbidden_exts(const MunitParameter params[], void* user)
 {
@@ -448,6 +492,7 @@ static MunitTest tests[] = {
     {"/malformed", malformed, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/choices", choices, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/certificate-rules", certificate_rules, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/policy-sets", policy_sets, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/precedence", precedence, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {NULL, NULL, NULL, NULL, 0, NULL}};
 static const MunitSuite suite = {"/x509-trust-anchor", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};

@@ -238,11 +238,39 @@ TC_TLV_result TC_X509_policies_init(TC_X509_policy_reader* reader, const uint8_t
   return TC_TLV_OK;
 }
 
-TC_TLV_result TC_X509_policy_next(TC_X509_policy_reader* reader, TC_X509_policy* out)
+TC_TLV_result tc_x509_policy_information_read(TC_bytes encoded, TC_X509_policy* out)
 {
-  TC_TLV_reader next, fields, qualifiers;
+  TC_TLV_reader fields, qualifiers;
   TC_TLV_element element;
   TC_X509_policy policy = {{NULL, 0}, {NULL, 0}};
+  TC_TLV_result result = sequence_reader(&fields, encoded.data, encoded.length, &limits);
+  if (result != TC_TLV_OK)
+    return result;
+  if (TC_TLV_next(&fields, &element) != TC_TLV_OK)
+    return TC_TLV_INVALID;
+  result = TC_DER_oid(element.encoded.data, element.encoded.length, &policy.oid);
+  if (result != TC_TLV_OK)
+    return result;
+  result = TC_TLV_next(&fields, &element);
+  if (result == TC_TLV_OK) {
+    /* policyQualifiers SEQUENCE SIZE (1..MAX) OF PolicyQualifierInfo. */
+    result = sequence_reader(&qualifiers, element.encoded.data, element.encoded.length, &limits);
+    if (result != TC_TLV_OK)
+      return result;
+    if (!tc_pki_end(&fields))
+      return TC_TLV_INVALID;
+    policy.qualifiers = element.encoded;
+  } else if (result != TC_TLV_END)
+    return result;
+  *out = policy;
+  return TC_TLV_OK;
+}
+
+TC_TLV_result TC_X509_policy_next(TC_X509_policy_reader* reader, TC_X509_policy* out)
+{
+  TC_TLV_reader next;
+  TC_TLV_element element;
+  TC_X509_policy policy;
   TC_TLV_result result;
   size_t i;
   if (!reader || !out)
@@ -260,23 +288,8 @@ TC_TLV_result TC_X509_policy_next(TC_X509_policy_reader* reader, TC_X509_policy*
     return result;
   if (reader->count >= reader->capacity)
     return TC_TLV_LIMIT;
-  result = sequence_reader(&fields, element.encoded.data, element.encoded.length, &limits);
+  result = tc_x509_policy_information_read(element.encoded, &policy);
   if (result != TC_TLV_OK)
-    return result;
-  if (TC_TLV_next(&fields, &element) != TC_TLV_OK)
-    return TC_TLV_INVALID;
-  result = TC_DER_oid(element.encoded.data, element.encoded.length, &policy.oid);
-  if (result != TC_TLV_OK)
-    return result;
-  result = TC_TLV_next(&fields, &element);
-  if (result == TC_TLV_OK) {
-    result = sequence_reader(&qualifiers, element.encoded.data, element.encoded.length, &limits);
-    if (result != TC_TLV_OK)
-      return result;
-    policy.qualifiers = element.encoded;
-    if (fields.offset != fields.input.length)
-      return TC_TLV_INVALID;
-  } else if (result != TC_TLV_END)
     return result;
   for (i = 0; i < reader->count; ++i)
     if (reader->seen[i].length == policy.oid.length &&

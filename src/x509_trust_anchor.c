@@ -44,29 +44,34 @@ static TC_TLV_result encoded_name(TC_bytes name, const TC_TLV_limits* limits)
   return result == TC_TLV_END ? TC_TLV_OK : result;
 }
 
-static TC_TLV_result policy_set(TC_bytes contents, const TC_TLV_limits* limits)
+/* CertificatePolicies contents with unique identifiers. RFC 5914 section 2.5
+ * forbids policyQualifiers in a TrustAnchorInfo policySet. An anchor
+ * certificate's extension may carry them. Uses the extension OID scratch. */
+static TC_TLV_result policy_set(TC_bytes contents, const TC_TLV_limits* limits,
+                                TC_X509_workspace* workspace, int qualifiers_allowed)
 {
-  TC_TLV_reader policies, fields;
-  TC_TLV_element item, oid;
+  TC_TLV_reader policies;
+  TC_TLV_element item;
+  TC_X509_policy policy;
+  size_t count = 0;
   TC_TLV_result result = contents_reader(&policies, contents, limits);
   if (result != TC_TLV_OK)
     return result;
   if (!contents.length)
     return TC_TLV_INVALID;
   while ((result = TC_TLV_next(&policies, &item)) == TC_TLV_OK) {
-    if (!tc_pki_tag(&item, 0x30))
-      return TC_TLV_INVALID;
-    result = contents_reader(&fields, item.value, limits);
+    if (count == workspace->extension_capacity)
+      return TC_TLV_LIMIT;
+    result = tc_x509_policy_information_read(item.encoded, &policy);
     if (result != TC_TLV_OK)
       return result;
-    result = tc_pki_field(&fields, 6, &oid);
-    if (result != TC_TLV_OK)
-      return result;
-    result = TC_DER_oid_contents(oid.value.data, oid.value.length);
-    if (result != TC_TLV_OK || !tc_pki_end(&fields))
+    if (policy.qualifiers.data && !qualifiers_allowed)
       return TC_TLV_INVALID;
+    workspace->extension_oids[count++] = policy.oid;
   }
-  return result == TC_TLV_END ? TC_TLV_OK : result;
+  if (result != TC_TLV_END)
+    return result;
+  return tc_pki_spans_unique(workspace->extension_oids, count, NULL);
 }
 
 static TC_TLV_result policy_flags(TC_bytes contents, unsigned* flags)
@@ -175,8 +180,9 @@ static TC_TLV_result extensions(TC_bytes encoded, const TC_TLV_limits* limits,
       result =
           TC_TLV_read(extension.value.data, extension.value.length, TC_TLV_DER, limits, &value);
       if (result != TC_TLV_OK || !tc_pki_tag(&value, 0x30) ||
-          value.encoded.length != extension.value.length || !value.value.length)
+          value.encoded.length != extension.value.length)
         return TC_TLV_INVALID;
+      /* Checked after the loop, which owns the OID scratch until then. */
       out->policy_set = value.value;
       break;
     }
@@ -243,7 +249,10 @@ static TC_TLV_result extensions(TC_bytes encoded, const TC_TLV_limits* limits,
   }
   if (result != TC_TLV_END)
     return result;
-  return tc_pki_spans_unique(workspace->extension_oids, count, NULL);
+  result = tc_pki_spans_unique(workspace->extension_oids, count, NULL);
+  if (result != TC_TLV_OK || !out->policy_set.data)
+    return result;
+  return policy_set(out->policy_set, limits, workspace, 1);
 }
 
 /* Anchor fields from a parsed Certificate or TBSCertificate. An anchor
@@ -316,7 +325,7 @@ static TC_TLV_result cert_path_controls(TC_bytes contents, const TC_TLV_limits* 
       break;
     }
     case 1:
-      result = policy_set(element.value, limits);
+      result = policy_set(element.value, limits, workspace, 0);
       if (result != TC_TLV_OK)
         return result;
       out->policy_set = element.value;

@@ -330,40 +330,22 @@ static TC_TLV_result append_policy(TC_bytes oid, TC_bytes* output, size_t capaci
   return TC_TLV_OK;
 }
 
-/* RFC 5914 stores each acceptable OID in a PolicyInformation with no qualifiers. */
-static TC_TLV_result anchor_policy_next(TC_TLV_reader* reader, const TC_TLV_limits* limits,
-                                        size_t* work, TC_bytes* oid)
+/* Anchor policy sets are CertificatePolicies from a TrustAnchorInfo policySet
+ * or an anchor certificate's extension. Only the identifiers are inputs. */
+static TC_TLV_result anchor_policy_next(TC_TLV_reader* reader, size_t* work, TC_bytes* oid)
 {
-  TC_TLV_reader fields;
   TC_TLV_element element;
-  TC_bytes contents;
+  TC_X509_policy policy;
   TC_TLV_result result;
   if (tc_pki_work_charge(work, 1) != TC_TLV_OK)
     return TC_TLV_LIMIT;
   result = TC_TLV_next(reader, &element);
   if (result != TC_TLV_OK)
     return result;
-  result = TC_DER_sequence(element.encoded.data, element.encoded.length, &contents);
-  if (result != TC_TLV_OK)
-    return result;
-  result = TC_TLV_reader_init(&fields, contents.data, contents.length, TC_TLV_DER, limits);
-  if (result != TC_TLV_OK)
-    return result;
-  result = TC_TLV_next(&fields, &element);
-  if (result != TC_TLV_OK)
-    return result == TC_TLV_END ? TC_TLV_INVALID : result;
-  result = TC_DER_oid(element.encoded.data, element.encoded.length, oid);
-  if (result != TC_TLV_OK)
-    return result;
-  result = TC_TLV_next(&fields, &element);
-  if (result == TC_TLV_END)
-    return TC_TLV_OK;
-  if (result != TC_TLV_OK)
-    return result;
-  result = TC_DER_sequence(element.encoded.data, element.encoded.length, &contents);
-  if (result != TC_TLV_OK || !contents.length)
-    return TC_TLV_INVALID;
-  return TC_TLV_next(&fields, &element) == TC_TLV_END ? TC_TLV_OK : TC_TLV_INVALID;
+  result = tc_x509_policy_information_read(element.encoded, &policy);
+  if (result == TC_TLV_OK)
+    *oid = policy.oid;
+  return result;
 }
 
 static TC_TLV_result anchor_policy_contains(TC_bytes set, const TC_TLV_limits* limits,
@@ -378,7 +360,7 @@ static TC_TLV_result anchor_policy_contains(TC_bytes set, const TC_TLV_limits* l
   result = TC_TLV_reader_init(&reader, set.data, set.length, TC_TLV_DER, limits);
   if (result != TC_TLV_OK)
     return result;
-  while ((result = anchor_policy_next(&reader, limits, work, &oid)) == TC_TLV_OK) {
+  while ((result = anchor_policy_next(&reader, work, &oid)) == TC_TLV_OK) {
     int same;
     result = equal(oid, wanted, work, &same);
     if (result != TC_TLV_OK)
@@ -474,7 +456,7 @@ TC_TLV_result tc_x509_policy_graph_output(const tc_x509_policy_graph* graph,
       result = TC_TLV_reader_init(&reader, anchor_set.data, anchor_set.length, TC_TLV_DER, limits);
       if (result != TC_TLV_OK)
         return result;
-      while ((result = anchor_policy_next(&reader, limits, work, &oid)) == TC_TLV_OK) {
+      while ((result = anchor_policy_next(&reader, work, &oid)) == TC_TLV_OK) {
         int same = wildcard;
         if (is_any(oid))
           continue;
