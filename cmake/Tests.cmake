@@ -1289,6 +1289,13 @@ add_test(NAME test_package_boundaries
           -c ${CMAKE_CURRENT_SOURCE_DIR}/src/${drbg_source}.c
           -o ${CMAKE_CURRENT_BINARY_DIR}/tiny-crypto-c-${drbg_source}-compile.o)
     endforeach()
+    # The key challenge carries a 32-bit work budget across size_t PKI code.
+    add_test(NAME test_key_challenge_compile_avr
+      COMMAND ${TC_AVR_CC} -std=c99 -Wall -Wextra -Werror -Os -mmcu=atmega2560
+        -DTC_ENABLE_KEY_CHALLENGE=1 -DTC_ENABLE_X509=1 -DTC_ENABLE_TLV=1 -DTC_ENABLE_DER=1
+        -DTC_ENABLE_RSA=1 -DTC_ENABLE_EC=1 -I${CMAKE_CURRENT_SOURCE_DIR}/src
+        -c ${CMAKE_CURRENT_SOURCE_DIR}/src/key_challenge.c
+        -o ${CMAKE_CURRENT_BINARY_DIR}/tiny-crypto-c-key_challenge-compile.o)
     add_test(NAME test_sskdf_compile_avr
       COMMAND ${TC_AVR_CC} -std=c99 -Wall -Wextra -Werror -mmcu=atmega328p
         -DTC_ENABLE_SSKDF=1 -DTC_ENABLE_SHA384=1 -I${CMAKE_CURRENT_SOURCE_DIR}/src
