@@ -12,27 +12,28 @@
 extern "C" {
 #endif
 
-/* RFC 5869 HKDF over each enabled HMAC-SHA family. Extract writes exactly
- * TC_SHA*_DIGESTLEN bytes to prk. Expand accepts a PRK at least that long.
- * output_len must be 1..255*HashLen. Derive performs both steps and clears
- * its intermediate PRK. A NULL salt, IKM or info is valid when its length is
- * zero. Hybrid functions process Z followed by T without copying either.
- * Output must be disjoint from every input. Invalid arguments leave output
- * unchanged. A processing failure clears it. All lengths are bytes. */
+/* RFC 5869 HKDF over each enabled HMAC-SHA family.
+ *
+ * extract computes PRK = HMAC(salt, IKM) and writes exactly
+ * TC_SHA*_DIGESTLEN bytes to prk. The input keying material is the
+ * concatenation of ikm_count spans, read in order without copying; pass one
+ * span for an ordinary secret, or Z and T for an SP 800-56C revision 2 hybrid
+ * secret Z || T. An empty or NULL salt is the RFC's all-zero salt.
+ *
+ * expand accepts a PRK at least one digest long and writes output_len bytes,
+ * 1..255*HashLen. derive runs extract then expand and wipes its PRK.
+ *
+ * A NULL pointer is valid for an empty span. Output must be disjoint from
+ * every input. Argument errors return TC_ERROR and leave output unchanged. A
+ * failure after processing begins wipes output. */
 #define TC_HKDF_DECLARE(N)                                                                         \
-  TC_status TC_HKDF_SHA##N##_extract(const uint8_t* salt, size_t salt_len, const uint8_t* ikm,     \
-                                     size_t ikm_len, uint8_t* prk);                                \
+  TC_status TC_HKDF_SHA##N##_extract(const uint8_t* salt, size_t salt_len, const TC_bytes* ikm,    \
+                                     size_t ikm_count, uint8_t* prk);                              \
   TC_status TC_HKDF_SHA##N##_expand(const uint8_t* prk, size_t prk_len, const uint8_t* info,       \
                                     size_t info_len, uint8_t* output, size_t output_len);          \
-  TC_status TC_HKDF_SHA##N##_derive(const uint8_t* salt, size_t salt_len, const uint8_t* ikm,      \
-                                    size_t ikm_len, const uint8_t* info, size_t info_len,          \
-                                    uint8_t* output, size_t output_len);                           \
-  TC_status TC_HKDF_SHA##N##_extract_hybrid(const uint8_t* salt, size_t salt_len,                  \
-                                            const uint8_t* z, size_t z_len, const uint8_t* t,      \
-                                            size_t t_len, uint8_t* prk);                           \
-  TC_status TC_HKDF_SHA##N##_derive_hybrid(                                                        \
-      const uint8_t* salt, size_t salt_len, const uint8_t* z, size_t z_len, const uint8_t* t,      \
-      size_t t_len, const uint8_t* info, size_t info_len, uint8_t* output, size_t output_len)
+  TC_status TC_HKDF_SHA##N##_derive(const uint8_t* salt, size_t salt_len, const TC_bytes* ikm,     \
+                                    size_t ikm_count, const uint8_t* info, size_t info_len,        \
+                                    uint8_t* output, size_t output_len)
 
 #if TC_ENABLE_SHA1
 TC_HKDF_DECLARE(1);

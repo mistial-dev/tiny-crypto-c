@@ -8,10 +8,8 @@
 #include <tiny_crypto/hkdf.h>
 #include "test_util.h"
 
-typedef TC_status (*derive_fn)(const uint8_t*, size_t, const uint8_t*, size_t, const uint8_t*,
+typedef TC_status (*derive_fn)(const uint8_t*, size_t, const TC_bytes*, size_t, const uint8_t*,
                                size_t, uint8_t*, size_t);
-typedef TC_status (*hybrid_fn)(const uint8_t*, size_t, const uint8_t*, size_t, const uint8_t*,
-                               size_t, const uint8_t*, size_t, uint8_t*, size_t);
 
 static derive_fn select_hash(const char* name)
 {
@@ -38,27 +36,6 @@ static derive_fn select_hash(const char* name)
   return NULL;
 }
 
-static hybrid_fn select_hybrid(const char* name)
-{
-#if TC_ENABLE_SHA224
-  if (strcmp(name, "sha224") == 0)
-    return TC_HKDF_SHA224_derive_hybrid;
-#endif
-#if TC_ENABLE_SHA256
-  if (strcmp(name, "sha256") == 0)
-    return TC_HKDF_SHA256_derive_hybrid;
-#endif
-#if TC_ENABLE_SHA384
-  if (strcmp(name, "sha384") == 0)
-    return TC_HKDF_SHA384_derive_hybrid;
-#endif
-#if TC_ENABLE_SHA512
-  if (strcmp(name, "sha512") == 0)
-    return TC_HKDF_SHA512_derive_hybrid;
-#endif
-  return NULL;
-}
-
 static int read_hex(const char* text, uint8_t* bytes, size_t capacity, size_t* length)
 {
   size_t digits = strlen(text);
@@ -77,16 +54,14 @@ int main(int argc, char** argv)
   unsigned long output_len;
   char* end;
   derive_fn derive = NULL;
-  hybrid_fn hybrid = NULL;
   TC_status status;
 
-  if (argc == 6)
-    derive = select_hash(argv[1]);
-  else if (argc == 7)
-    hybrid = select_hybrid(argv[1]);
-  else
+  /* argv: hash ikm salt info length [auxiliary]. A sixth argument is the
+   * SP 800-56C revision 2 hybrid secret T, which follows Z as a second part. */
+  if (argc != 6 && argc != 7)
     return 2;
-  if ((derive == NULL && hybrid == NULL) || !read_hex(argv[2], ikm, sizeof ikm, &ikm_len) ||
+  derive = select_hash(argv[1]);
+  if (derive == NULL || !read_hex(argv[2], ikm, sizeof ikm, &ikm_len) ||
       !read_hex(argv[3], salt, sizeof salt, &salt_len) ||
       !read_hex(argv[4], info, sizeof info, &info_len) ||
       (argc == 7 && !read_hex(argv[6], auxiliary, sizeof auxiliary, &auxiliary_len)))
@@ -95,13 +70,10 @@ int main(int argc, char** argv)
   output_len = strtoul(argv[5], &end, 10);
   if (errno != 0 || *end != '\0' || output_len > sizeof output)
     return 2;
-  if (derive != NULL)
-    status = derive(salt_len ? salt : NULL, salt_len, ikm_len ? ikm : NULL, ikm_len,
-                    info_len ? info : NULL, info_len, output, (size_t)output_len);
-  else
-    status = hybrid(salt_len ? salt : NULL, salt_len, ikm_len ? ikm : NULL, ikm_len,
-                    auxiliary_len ? auxiliary : NULL, auxiliary_len, info_len ? info : NULL,
-                    info_len, output, (size_t)output_len);
+  const TC_bytes parts[] = {{ikm_len ? ikm : NULL, ikm_len},
+                            {auxiliary_len ? auxiliary : NULL, auxiliary_len}};
+  status = derive(salt_len ? salt : NULL, salt_len, parts, argc == 7 ? 2 : 1,
+                  info_len ? info : NULL, info_len, output, (size_t)output_len);
   if (status != TC_OK)
     return 1;
   if (fwrite(output, 1, (size_t)output_len, stdout) != (size_t)output_len)

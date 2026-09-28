@@ -7,41 +7,40 @@
 #error Do not include hkdf.hpp in a C project, include hkdf.h instead
 #endif
 
+#include <tiny_crypto/common.hpp>
 #include <tiny_crypto/hkdf.h>
 
 namespace tiny_crypto {
 
 #if TC_ENABLE_HKDF
+/* RFC 5869 HKDF. Inputs are borrowed byte spans; the input keying material
+ * is the concatenation of ikm_count spans. extract writes one digest into a
+ * digest-sized array. The C functions document the argument and failure
+ * rules. */
 #define TINY_CRYPTO_HKDF_FAMILY(N)                                                                 \
-  inline TC_status hkdf_sha##N##_extract(const uint8_t* salt, size_t salt_len, const uint8_t* ikm, \
-                                         size_t ikm_len, uint8_t* prk)                             \
+  TC_CPP_NODISCARD inline TC_status hkdf_sha##N##_extract(                                         \
+      bytes salt, const bytes* ikm, size_t ikm_count,                                              \
+      uint8_t (&prk)[TC_SHA##N##_DIGESTLEN]) noexcept                                              \
   {                                                                                                \
-    return TC_HKDF_SHA##N##_extract(salt, salt_len, ikm, ikm_len, prk);                            \
+    return ::TC_HKDF_SHA##N##_extract(salt.data, salt.length, ikm, ikm_count, prk);                \
   }                                                                                                \
-  inline TC_status hkdf_sha##N##_expand(const uint8_t* prk, size_t prk_len, const uint8_t* info,   \
-                                        size_t info_len, uint8_t* output, size_t output_len)       \
+  TC_CPP_NODISCARD inline TC_status hkdf_sha##N##_expand(bytes prk, bytes info, uint8_t* output,   \
+                                                         size_t output_len) noexcept               \
   {                                                                                                \
-    return TC_HKDF_SHA##N##_expand(prk, prk_len, info, info_len, output, output_len);              \
+    return ::TC_HKDF_SHA##N##_expand(prk.data, prk.length, info.data, info.length, output,         \
+                                     output_len);                                                  \
   }                                                                                                \
-  inline TC_status hkdf_sha##N##_derive(const uint8_t* salt, size_t salt_len, const uint8_t* ikm,  \
-                                        size_t ikm_len, const uint8_t* info, size_t info_len,      \
-                                        uint8_t* output, size_t output_len)                        \
+  TC_CPP_NODISCARD inline TC_status hkdf_sha##N##_derive(                                          \
+      bytes salt, const bytes* ikm, size_t ikm_count, bytes info, uint8_t* output,                 \
+      size_t output_len) noexcept                                                                  \
   {                                                                                                \
-    return TC_HKDF_SHA##N##_derive(salt, salt_len, ikm, ikm_len, info, info_len, output,           \
-                                   output_len);                                                    \
+    return ::TC_HKDF_SHA##N##_derive(salt.data, salt.length, ikm, ikm_count, info.data,            \
+                                     info.length, output, output_len);                             \
   }                                                                                                \
-  inline TC_status hkdf_sha##N##_extract_hybrid(const uint8_t* salt, size_t salt_len,              \
-                                                const uint8_t* z, size_t z_len, const uint8_t* t,  \
-                                                size_t t_len, uint8_t* prk)                        \
+  TC_CPP_NODISCARD inline TC_status hkdf_sha##N##_derive(                                          \
+      bytes salt, bytes ikm, bytes info, uint8_t* output, size_t output_len) noexcept              \
   {                                                                                                \
-    return TC_HKDF_SHA##N##_extract_hybrid(salt, salt_len, z, z_len, t, t_len, prk);               \
-  }                                                                                                \
-  inline TC_status hkdf_sha##N##_derive_hybrid(                                                    \
-      const uint8_t* salt, size_t salt_len, const uint8_t* z, size_t z_len, const uint8_t* t,      \
-      size_t t_len, const uint8_t* info, size_t info_len, uint8_t* output, size_t output_len)      \
-  {                                                                                                \
-    return TC_HKDF_SHA##N##_derive_hybrid(salt, salt_len, z, z_len, t, t_len, info, info_len,      \
-                                          output, output_len);                                     \
+    return hkdf_sha##N##_derive(salt, &ikm, 1, info, output, output_len);                          \
   }
 
 #if TC_ENABLE_SHA1

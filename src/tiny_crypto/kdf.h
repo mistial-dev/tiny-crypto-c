@@ -54,10 +54,8 @@
 #include <tiny_crypto/des.h>
 #endif
 
-/*
- * Largest PRF output (h) in this profile. Sizes the feedback / pipeline
- * chaining buffers to the largest PRF enabled in the profile.
- */
+/* Largest PRF output h in bytes over the PRFs enabled in this profile, for
+ * sizing caller buffers such as a feedback-mode IV. */
 #if TC_KBKDF_HAVE_HMAC_SHA512
 #define TC_KBKDF_PRF_MAX 64
 #elif TC_KBKDF_HAVE_HMAC_SHA384

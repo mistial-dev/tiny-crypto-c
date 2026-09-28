@@ -153,6 +153,12 @@ void tc_hmac_core_clear(const tc_hash_algorithm_info* info, void* context);
  * context is wiped before return, and tag is unchanged on failure. */
 TC_status tc_hmac_core_parts(const tc_hash_algorithm_info* info, void* context, const uint8_t* key,
                              size_t key_length, const TC_bytes* parts, size_t count, uint8_t* tag);
+/* Continue from a keyed context: copy keyed into context, absorb the parts
+ * and write the full tag. keyed is unchanged, so one key schedule serves
+ * many messages. context is wiped before return. */
+TC_status tc_hmac_core_resume_parts(const tc_hash_algorithm_info* info, const void* keyed,
+                                    void* context, const TC_bytes* parts, size_t count,
+                                    uint8_t* tag);
 /* One-shot HMAC truncated to tag_length bytes, which must be at least
  * TC_HMAC_MIN_TAG_LEN and at most digest_bytes (SP 800-107). workspace is the
  * caller's HMAC context. Once the arguments pass their checks, workspace is

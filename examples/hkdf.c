@@ -17,9 +17,12 @@ int main(void)
   uint8_t key[42];
   int success;
 
+  /* The input keying material is a list of spans. A hybrid secret Z || T
+   * from SP 800-56C revision 2 passes as two entries. */
+  const TC_bytes secret[] = {{ikm, sizeof ikm}};
   memset(ikm, 0x0b, sizeof ikm);
-  if (TC_HKDF_SHA256_derive(salt, sizeof salt, ikm, sizeof ikm, info, sizeof info, key,
-                            sizeof key) != TC_OK) {
+  if (TC_HKDF_SHA256_derive(salt, sizeof salt, secret, 1, info, sizeof info, key, sizeof key) !=
+      TC_OK) {
     TC_secure_zero(ikm, sizeof ikm);
     return 1;
   }

@@ -19,36 +19,31 @@ struct hkdf_vector {
 struct hkdf_family {
   int hash;
   size_t hash_len;
-  TC_status (*extract)(const uint8_t*, size_t, const uint8_t*, size_t, uint8_t*);
+  TC_status (*extract)(const uint8_t*, size_t, const TC_bytes*, size_t, uint8_t*);
   TC_status (*expand)(const uint8_t*, size_t, const uint8_t*, size_t, uint8_t*, size_t);
-  TC_status (*derive)(const uint8_t*, size_t, const uint8_t*, size_t, const uint8_t*, size_t,
+  TC_status (*derive)(const uint8_t*, size_t, const TC_bytes*, size_t, const uint8_t*, size_t,
                       uint8_t*, size_t);
-  TC_status (*extract_hybrid)(const uint8_t*, size_t, const uint8_t*, size_t, const uint8_t*,
-                              size_t, uint8_t*);
-  TC_status (*derive_hybrid)(const uint8_t*, size_t, const uint8_t*, size_t, const uint8_t*, size_t,
-                             const uint8_t*, size_t, uint8_t*, size_t);
 };
 
 static const struct hkdf_family families[] = {
 #if TC_ENABLE_SHA1
-    {1, TC_SHA1_DIGESTLEN, TC_HKDF_SHA1_extract, TC_HKDF_SHA1_expand, TC_HKDF_SHA1_derive,
-     TC_HKDF_SHA1_extract_hybrid, TC_HKDF_SHA1_derive_hybrid},
+    {1, TC_SHA1_DIGESTLEN, TC_HKDF_SHA1_extract, TC_HKDF_SHA1_expand, TC_HKDF_SHA1_derive},
 #endif
 #if TC_ENABLE_SHA224
-    {224, TC_SHA224_DIGESTLEN, TC_HKDF_SHA224_extract, TC_HKDF_SHA224_expand, TC_HKDF_SHA224_derive,
-     TC_HKDF_SHA224_extract_hybrid, TC_HKDF_SHA224_derive_hybrid},
+    {224, TC_SHA224_DIGESTLEN, TC_HKDF_SHA224_extract, TC_HKDF_SHA224_expand,
+     TC_HKDF_SHA224_derive},
 #endif
 #if TC_ENABLE_SHA256
-    {256, TC_SHA256_DIGESTLEN, TC_HKDF_SHA256_extract, TC_HKDF_SHA256_expand, TC_HKDF_SHA256_derive,
-     TC_HKDF_SHA256_extract_hybrid, TC_HKDF_SHA256_derive_hybrid},
+    {256, TC_SHA256_DIGESTLEN, TC_HKDF_SHA256_extract, TC_HKDF_SHA256_expand,
+     TC_HKDF_SHA256_derive},
 #endif
 #if TC_ENABLE_SHA384
-    {384, TC_SHA384_DIGESTLEN, TC_HKDF_SHA384_extract, TC_HKDF_SHA384_expand, TC_HKDF_SHA384_derive,
-     TC_HKDF_SHA384_extract_hybrid, TC_HKDF_SHA384_derive_hybrid},
+    {384, TC_SHA384_DIGESTLEN, TC_HKDF_SHA384_extract, TC_HKDF_SHA384_expand,
+     TC_HKDF_SHA384_derive},
 #endif
 #if TC_ENABLE_SHA512
-    {512, TC_SHA512_DIGESTLEN, TC_HKDF_SHA512_extract, TC_HKDF_SHA512_expand, TC_HKDF_SHA512_derive,
-     TC_HKDF_SHA512_extract_hybrid, TC_HKDF_SHA512_derive_hybrid},
+    {512, TC_SHA512_DIGESTLEN, TC_HKDF_SHA512_extract, TC_HKDF_SHA512_expand,
+     TC_HKDF_SHA512_derive},
 #endif
 };
 
@@ -86,15 +81,14 @@ static MunitResult test_hkdf_vectors(const MunitParameter params[], void* data)
     prk_len = decode(v->prk, expected_prk, sizeof expected_prk);
     output_len = decode(v->okm, expected, sizeof expected);
     munit_assert_size(prk_len, ==, f->hash_len);
-    munit_assert_int(
-        f->extract(salt_len ? salt : NULL, salt_len, ikm_len ? ikm : NULL, ikm_len, prk), ==,
-        TC_OK);
+    const TC_bytes ikm_part = {ikm_len ? ikm : NULL, ikm_len};
+    munit_assert_int(f->extract(salt_len ? salt : NULL, salt_len, &ikm_part, 1, prk), ==, TC_OK);
     munit_assert_memory_equal(prk_len, prk, expected_prk);
     munit_assert_int(f->expand(prk, prk_len, info_len ? info : NULL, info_len, output, output_len),
                      ==, TC_OK);
     munit_assert_memory_equal(output_len, output, expected);
     memset(output, 0, sizeof output);
-    munit_assert_int(f->derive(salt_len ? salt : NULL, salt_len, ikm_len ? ikm : NULL, ikm_len,
+    munit_assert_int(f->derive(salt_len ? salt : NULL, salt_len, &ikm_part, 1,
                                info_len ? info : NULL, info_len, output, output_len),
                      ==, TC_OK);
     munit_assert_memory_equal(output_len, output, expected);
@@ -135,44 +129,42 @@ static MunitResult test_hkdf_arguments(const MunitParameter params[], void* data
   (void)data;
   memset(input, 0x11, sizeof input);
   memset(prk, 0x22, sizeof prk);
+  const TC_bytes one = {input, 1}, missing = {NULL, 1}, empty = {NULL, 0};
+  const TC_bytes aliases_output[] = {{output, 1}};
   for (i = 0; i < sizeof families / sizeof families[0]; ++i) {
     const struct hkdf_family* f = &families[i];
     memset(output, 0xa5, sizeof output);
-    munit_assert_int(f->extract(NULL, 1, input, 1, output), ==, TC_ERROR);
+    munit_assert_int(f->extract(NULL, 1, &one, 1, output), ==, TC_ERROR);
     munit_assert_uchar(output[0], ==, 0xa5);
+    munit_assert_int(f->extract(input, 1, &missing, 1, output), ==, TC_ERROR);
     munit_assert_int(f->extract(input, 1, NULL, 1, output), ==, TC_ERROR);
-    munit_assert_int(f->extract(input, 1, input, 1, input), ==, TC_ERROR);
+    munit_assert_int(f->extract(input, 1, &one, 1, input), ==, TC_ERROR);
+    munit_assert_int(f->extract(NULL, 0, aliases_output, 1, output), ==, TC_ERROR);
+    munit_assert_uchar(output[0], ==, 0xa5);
     munit_assert_int(f->extract(NULL, 0, NULL, 0, output), ==, TC_OK);
+    munit_assert_int(f->extract(NULL, 0, &empty, 1, output), ==, TC_OK);
     munit_assert_int(f->expand(prk, f->hash_len - 1u, NULL, 0, output, 1), ==, TC_ERROR);
     munit_assert_int(f->expand(prk, f->hash_len, NULL, 1, output, 1), ==, TC_ERROR);
     munit_assert_int(f->expand(prk, f->hash_len, NULL, 0, output, 0), ==, TC_ERROR);
     munit_assert_int(f->expand(prk, f->hash_len, input, 1, input, 1), ==, TC_ERROR);
     munit_assert_int(f->expand(prk, f->hash_len, NULL, 0, prk, 1), ==, TC_ERROR);
     memset(output, 0xa5, sizeof output);
-    munit_assert_int(f->derive(input, 1, input, 1, input, 1, input, 1), ==, TC_ERROR);
+    munit_assert_int(f->derive(input, 1, &one, 1, input, 1, input, 1), ==, TC_ERROR);
+    munit_assert_int(f->derive(NULL, 0, aliases_output, 1, NULL, 0, output, 1), ==, TC_ERROR);
     munit_assert_int(f->derive(NULL, 0, NULL, 0, NULL, 0, output, 0), ==, TC_ERROR);
     munit_assert_uchar(output[0], ==, 0xa5);
     munit_assert_int(f->derive(NULL, 0, NULL, 0, NULL, 0, output, f->hash_len), ==, TC_OK);
     munit_assert_int(f->expand(prk, f->hash_len + 1u, NULL, 0, output, 1), ==, TC_OK);
-    memset(output, 0xa5, sizeof output);
-    munit_assert_int(f->extract_hybrid(NULL, 0, input, 1, NULL, 1, output), ==, TC_ERROR);
-    munit_assert_uchar(output[0], ==, 0xa5);
-    munit_assert_int(f->extract_hybrid(NULL, 0, input, 1, input, 1, input), ==, TC_ERROR);
-    munit_assert_int(f->derive_hybrid(NULL, 0, input, 1, NULL, 1, NULL, 0, output, 1), ==,
-                     TC_ERROR);
-    munit_assert_uchar(output[0], ==, 0xa5);
-    munit_assert_int(f->derive_hybrid(NULL, 0, input, 1, input, 1, NULL, 0, input, 1), ==,
-                     TC_ERROR);
   }
   return MUNIT_OK;
 }
 
-static MunitResult test_hkdf_hybrid_and_multiple_expansions(const MunitParameter params[],
-                                                            void* data)
+/* SP 800-56C revision 2 hybrid secrets: extracting Z || T from separate
+ * parts equals extracting the concatenation, for every split point. */
+static MunitResult test_hkdf_parts_and_multiple_expansions(const MunitParameter params[],
+                                                           void* data)
 {
   const uint8_t salt[] = {1, 2, 3, 4};
-  const uint8_t z[] = {5, 6, 7};
-  const uint8_t t[] = {8, 9};
   const uint8_t combined[] = {5, 6, 7, 8, 9};
   const uint8_t first_info[] = {0x10};
   const uint8_t second_info[] = {0x20};
@@ -181,24 +173,28 @@ static MunitResult test_hkdf_hybrid_and_multiple_expansions(const MunitParameter
   (void)data;
   for (i = 0; i < sizeof families / sizeof families[0]; ++i) {
     const struct hkdf_family* f = &families[i];
+    const TC_bytes whole = {combined, sizeof combined};
     uint8_t prk[64], ordinary_prk[64], first[77], second[77], expected[77];
-    munit_assert_int(f->extract_hybrid(salt, sizeof salt, z, sizeof z, t, sizeof t, prk), ==,
-                     TC_OK);
-    munit_assert_int(f->extract(salt, sizeof salt, combined, sizeof combined, ordinary_prk), ==,
-                     TC_OK);
-    munit_assert_memory_equal(f->hash_len, prk, ordinary_prk);
+    munit_assert_int(f->extract(salt, sizeof salt, &whole, 1, ordinary_prk), ==, TC_OK);
+    for (size_t split = 0; split <= sizeof combined; ++split) {
+      const TC_bytes three[] = {
+          {combined, split}, {NULL, 0}, {combined + split, sizeof combined - split}};
+      munit_assert_int(f->extract(salt, sizeof salt, three, 3, prk), ==, TC_OK);
+      munit_assert_memory_equal(f->hash_len, prk, ordinary_prk);
+    }
     munit_assert_int(
         f->expand(prk, f->hash_len, first_info, sizeof first_info, first, sizeof first), ==, TC_OK);
     munit_assert_int(
         f->expand(prk, f->hash_len, second_info, sizeof second_info, second, sizeof second), ==,
         TC_OK);
     munit_assert_memory_not_equal(sizeof first, first, second);
-    munit_assert_int(f->derive_hybrid(salt, sizeof salt, z, sizeof z, t, sizeof t, first_info,
-                                      sizeof first_info, expected, sizeof expected),
+    const TC_bytes hybrid[] = {{combined, 3}, {combined + 3, 2}};
+    munit_assert_int(f->derive(salt, sizeof salt, hybrid, 2, first_info, sizeof first_info,
+                               expected, sizeof expected),
                      ==, TC_OK);
     munit_assert_memory_equal(sizeof first, first, expected);
-    munit_assert_int(f->derive_hybrid(salt, sizeof salt, z, sizeof z, t, sizeof t, second_info,
-                                      sizeof second_info, expected, sizeof expected),
+    munit_assert_int(f->derive(salt, sizeof salt, hybrid, 2, second_info, sizeof second_info,
+                               expected, sizeof expected),
                      ==, TC_OK);
     munit_assert_memory_equal(sizeof second, second, expected);
   }
@@ -209,7 +205,7 @@ static MunitTest tests[] = {
     {"/vectors", test_hkdf_vectors, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/limits", test_hkdf_limits, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/arguments", test_hkdf_arguments, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-    {"/hybrid-and-multiple-expansions", test_hkdf_hybrid_and_multiple_expansions, NULL, NULL,
+    {"/parts-and-multiple-expansions", test_hkdf_parts_and_multiple_expansions, NULL, NULL,
      MUNIT_TEST_OPTION_NONE, NULL},
     {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
 

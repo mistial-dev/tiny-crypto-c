@@ -18,7 +18,152 @@
 #include "internal.h"
 
 #if TC_ENABLE_KDF
-#include "kdf_prf_internal.h"
+#include "hash_core_internal.h"
+
+/* A later PRF block may reread each input after output bytes are written. */
+static inline int tc_kdf_output_disjoint(const uint8_t* output, size_t output_len,
+                                         const uint8_t* input, size_t input_len)
+{
+  return input_len == 0 || tc_internal_ranges_disjoint(output, output_len, input, input_len);
+}
+
+#define TC_KDF_HAVE_CMAC (TC_KBKDF_HAVE_AES_CMAC || TC_KBKDF_HAVE_DES_CMAC)
+
+#if TC_KDF_HAVE_CMAC
+struct tc_kdf_cmac {
+  int (*key_ok)(size_t key_len);
+  TC_status (*init)(void* ctx, const uint8_t* key, size_t key_len);
+  TC_status (*update)(void* ctx, const uint8_t* data, size_t len);
+  TC_status (*final)(void* ctx, uint8_t* out);
+  void (*clear)(void* ctx);
+};
+#endif
+
+enum tc_kdf_prf_kind { TC_KDF_PRF_HMAC, TC_KDF_PRF_CMAC };
+
+/* Typed wrappers own the matching context storage. The core copies only
+ * ctx_size bytes and reads only the selected descriptor arm. */
+struct tc_kdf_prf {
+  enum tc_kdf_prf_kind kind;
+  uint8_t out_len;
+  size_t ctx_size;
+  union {
+#if TC_KBKDF_HAVE_HMAC
+    const tc_hash_algorithm_info* hash;
+#endif
+#if TC_KDF_HAVE_CMAC
+    const struct tc_kdf_cmac* cmac;
+#endif
+  } mac;
+};
+
+#if TC_KBKDF_HAVE_HMAC
+static inline struct tc_kdf_prf tc_kdf_hmac_prf(const tc_hash_algorithm_info* hash, size_t ctx_size,
+                                                uint8_t out_len)
+{
+  struct tc_kdf_prf prf;
+  prf.kind = TC_KDF_PRF_HMAC;
+  prf.out_len = out_len;
+  prf.ctx_size = ctx_size;
+  prf.mac.hash = hash;
+  return prf;
+}
+#endif
+
+static inline int tc_kdf_key_ok(const struct tc_kdf_prf* prf, size_t key_len)
+{
+#if TC_KBKDF_HAVE_HMAC
+  if (prf->kind == TC_KDF_PRF_HMAC)
+    return 1;
+#endif
+#if TC_KDF_HAVE_CMAC
+  return prf->mac.cmac->key_ok(key_len);
+#else
+  (void)key_len;
+  return 0;
+#endif
+}
+
+static inline TC_status tc_kdf_mac_init(const struct tc_kdf_prf* prf, void* ctx, const uint8_t* key,
+                                        size_t key_len)
+{
+#if TC_KBKDF_HAVE_HMAC
+  if (prf->kind == TC_KDF_PRF_HMAC)
+    return tc_hmac_core_init(prf->mac.hash, ctx, key, key_len);
+#endif
+#if TC_KDF_HAVE_CMAC
+  return prf->mac.cmac->init(ctx, key, key_len);
+#else
+  (void)ctx;
+  (void)key;
+  (void)key_len;
+  return TC_ERROR;
+#endif
+}
+
+static inline TC_status tc_kdf_mac_update(const struct tc_kdf_prf* prf, void* ctx,
+                                          const uint8_t* data, size_t len)
+{
+#if TC_KBKDF_HAVE_HMAC
+  if (prf->kind == TC_KDF_PRF_HMAC)
+    return tc_hmac_core_update(prf->mac.hash, ctx, data, len);
+#endif
+#if TC_KDF_HAVE_CMAC
+  return prf->mac.cmac->update(ctx, data, len);
+#else
+  (void)ctx;
+  (void)data;
+  (void)len;
+  return TC_ERROR;
+#endif
+}
+
+static inline TC_status tc_kdf_mac_final(const struct tc_kdf_prf* prf, void* ctx, uint8_t* out)
+{
+#if TC_KBKDF_HAVE_HMAC
+  if (prf->kind == TC_KDF_PRF_HMAC)
+    return tc_hmac_core_final(prf->mac.hash, ctx, out);
+#endif
+#if TC_KDF_HAVE_CMAC
+  return prf->mac.cmac->final(ctx, out);
+#else
+  (void)ctx;
+  (void)out;
+  return TC_ERROR;
+#endif
+}
+
+static inline void tc_kdf_mac_clear(const struct tc_kdf_prf* prf, void* ctx)
+{
+#if TC_KBKDF_HAVE_HMAC
+  if (prf->kind == TC_KDF_PRF_HMAC) {
+    tc_hmac_core_clear(prf->mac.hash, ctx);
+    return;
+  }
+#endif
+#if TC_KDF_HAVE_CMAC
+  prf->mac.cmac->clear(ctx);
+#else
+  TC_secure_zero(ctx, prf->ctx_size);
+#endif
+}
+
+/* Begin from a cached keyed context and feed each segment in order. */
+static inline TC_status tc_kdf_prf_run(const struct tc_kdf_prf* prf, const void* initialized,
+                                       void* ctx, const TC_bytes* segments, unsigned count,
+                                       uint8_t* block)
+{
+  unsigned i;
+  memcpy(ctx, initialized, prf->ctx_size);
+  for (i = 0; i < count; ++i) {
+    if (segments[i].length != 0 &&
+        tc_kdf_mac_update(prf, ctx, segments[i].data, segments[i].length) != TC_OK) {
+      tc_kdf_mac_clear(prf, ctx);
+      return TC_ERROR;
+    }
+  }
+  return tc_kdf_mac_final(prf, ctx, block);
+}
 
 /*****************************************************************************/
 /* PRF descriptors                                                           */
@@ -113,7 +258,7 @@ static TC_status tc_kdf_derive(const struct tc_kdf_prf* prf, int mode, const uin
                                void* ctx, uint8_t* chain, uint8_t* block)
 {
   uint8_t ctr[4];
-  struct tc_kdf_segment seg[3];
+  TC_bytes seg[3];
   const uint8_t* chain_p = NULL;
   size_t chain_n = 0;
   size_t h, reps, pos;
@@ -179,7 +324,7 @@ static TC_status tc_kdf_derive(const struct tc_kdf_prf* prf, int mode, const uin
     if (mode == TC_KDF_MODE_PIPELINE) {
       /* A(i) = PRF(KDK, A(i-1)). A(0) is the fixed input itself. */
       seg[0].data = chain_p;
-      seg[0].len = chain_n;
+      seg[0].length = chain_n;
       if (tc_kdf_prf_run(prf, initialized, ctx, seg, 1, chain) != TC_OK)
         goto fail;
       chain_p = chain;
@@ -188,42 +333,42 @@ static TC_status tc_kdf_derive(const struct tc_kdf_prf* prf, int mode, const uin
 
     if (mode == TC_KDF_MODE_COUNTER) {
       seg[0].data = in1;
-      seg[0].len = in1_len;
+      seg[0].length = in1_len;
       seg[1].data = ctr;
-      seg[1].len = ctr_len;
+      seg[1].length = ctr_len;
       seg[2].data = in2;
-      seg[2].len = in2_len;
+      seg[2].length = in2_len;
       count = 3;
     } else if (!use_ctr) {
       seg[0].data = chain_p;
-      seg[0].len = chain_n;
+      seg[0].length = chain_n;
       seg[1].data = in2;
-      seg[1].len = in2_len;
+      seg[1].length = in2_len;
       count = 2;
     } else if (params->counter_location == TC_KBKDF_CTR_BEFORE_ITER) {
       seg[0].data = ctr;
-      seg[0].len = ctr_len;
+      seg[0].length = ctr_len;
       seg[1].data = chain_p;
-      seg[1].len = chain_n;
+      seg[1].length = chain_n;
       seg[2].data = in2;
-      seg[2].len = in2_len;
+      seg[2].length = in2_len;
       count = 3;
     } else if (params->counter_location == TC_KBKDF_CTR_AFTER_ITER) {
       seg[0].data = chain_p;
-      seg[0].len = chain_n;
+      seg[0].length = chain_n;
       seg[1].data = ctr;
-      seg[1].len = ctr_len;
+      seg[1].length = ctr_len;
       seg[2].data = in2;
-      seg[2].len = in2_len;
+      seg[2].length = in2_len;
       count = 3;
     } else /* TC_KBKDF_CTR_AFTER_FIXED */
     {
       seg[0].data = chain_p;
-      seg[0].len = chain_n;
+      seg[0].length = chain_n;
       seg[1].data = in2;
-      seg[1].len = in2_len;
+      seg[1].length = in2_len;
       seg[2].data = ctr;
-      seg[2].len = ctr_len;
+      seg[2].length = ctr_len;
       count = 3;
     }
 
@@ -243,13 +388,13 @@ static TC_status tc_kdf_derive(const struct tc_kdf_prf* prf, int mode, const uin
     pos += take;
   }
 
-#if TC_ZEROIZE
+  /* The keyed contexts hold the KDK's ipad/opad state; wipe them on success
+   * as on failure. */
   tc_kdf_mac_clear(prf, initialized);
   tc_kdf_mac_clear(prf, ctx);
   if (chain != NULL)
     TC_secure_zero(chain, h);
   TC_secure_zero(block, h);
-#endif
   return TC_OK;
 
 fail:

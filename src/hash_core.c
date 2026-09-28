@@ -357,6 +357,28 @@ TC_status tc_hmac_core_parts(const tc_hash_algorithm_info* info, void* context, 
   return status;
 }
 
+TC_status tc_hmac_core_resume_parts(const tc_hash_algorithm_info* stored, const void* keyed,
+                                    void* context, const TC_bytes* parts, size_t count,
+                                    uint8_t* tag)
+{
+  tc_hash_algorithm_info local;
+  const tc_hash_algorithm_info* info = load_info(stored, &local);
+  uint8_t full[TC_HASH_CORE_MAX_DIGEST];
+  if (keyed == NULL || context == NULL)
+    return TC_ERROR;
+  memcpy(context, keyed, info->hmac_view(context).size);
+  TC_status status = TC_OK;
+  for (size_t i = 0; status == TC_OK && i < count; ++i)
+    status = tc_hmac_core_update(stored, context, parts[i].data, parts[i].length);
+  if (status == TC_OK)
+    status = tc_hmac_core_final(stored, context, full);
+  if (status == TC_OK)
+    memcpy(tag, full, info->digest_bytes);
+  tc_hmac_core_clear(stored, context);
+  TC_secure_zero(full, sizeof full);
+  return status;
+}
+
 void tc_hmac_core_clear(const tc_hash_algorithm_info* stored, void* context)
 {
   tc_hash_algorithm_info local;
