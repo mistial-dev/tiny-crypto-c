@@ -150,13 +150,120 @@ static MunitResult binary_attributes(const MunitParameter params[], void* user)
                                       &work, &equal),
                    ==, TC_TLV_OK);
   munit_assert_int(equal, ==, 1);
+  /* RFC 2985 section 5.2.1: emailAddress uses pkcs9CaseIgnoreMatch. */
   changed[19] = 'a';
   work = 10000;
   munit_assert_int(TC_X509_name_equal((TC_bytes){email, sizeof email},
                                       (TC_bytes){changed, sizeof changed}, &bounds, &workspace,
                                       &work, &equal),
                    ==, TC_TLV_OK);
+  munit_assert_int(equal, ==, 1);
+  changed[19] = 'b';
+  work = 10000;
+  munit_assert_int(TC_X509_name_equal((TC_bytes){email, sizeof email},
+                                      (TC_bytes){changed, sizeof changed}, &bounds, &workspace,
+                                      &work, &equal),
+                   ==, TC_TLV_OK);
   munit_assert_int(equal, ==, 0);
+  return MUNIT_OK;
+}
+
+/* Values the library cannot prepare compare by exact encoding. Identical
+ * encodings match. Different encodings are undetermined, because the
+ * matching rule could still equate them, and return UNSUPPORTED unless
+ * another attribute already decides the comparison. */
+static MunitResult undetermined_values(const MunitParameter params[], void* user)
+{
+  /* O=abc as PrintableString, and O as TeletexString. */
+  static const uint8_t printable[] = {0x30, 14, 0x31, 12,   0x30, 10,  6,   3,
+                                      0x55, 4,  10,   0x13, 3,    'a', 'b', 'c'};
+  static const uint8_t teletex_upper[] = {0x30, 14, 0x31, 12,   0x30, 10,  6,   3,
+                                          0x55, 4,  10,   0x14, 3,    'A', 'B', 'C'};
+  static const uint8_t teletex_lower[] = {0x30, 14, 0x31, 12,   0x30, 10,  6,   3,
+                                          0x55, 4,  10,   0x14, 3,    'a', 'b', 'c'};
+  /* An attribute type without a known matching rule (2.5.4.99). */
+  static const uint8_t unknown_a[] = {0x30, 12, 0x31, 10, 0x30, 8, 6, 3, 0x55, 4, 99, 0x0c, 1, 'A'};
+  static const uint8_t unknown_b[] = {0x30, 12, 0x31, 10, 0x30, 8, 6, 3, 0x55, 4, 99, 0x0c, 1, 'B'};
+  /* CN=A, O=<Teletex ABC> against CN=B, O=<Teletex abc>: CN decides. */
+  static const uint8_t decided_left[] = {0x30, 26,   0x31, 10,   0x30, 8,   6,    3,  0x55, 4,
+                                         3,    0x0c, 1,    'A',  0x31, 12,  0x30, 10, 6,    3,
+                                         0x55, 4,    10,   0x14, 3,    'A', 'B',  'C'};
+  static const uint8_t decided_right[] = {0x30, 26,   0x31, 10,   0x30, 8,   6,    3,  0x55, 4,
+                                          3,    0x0c, 1,    'B',  0x31, 12,  0x30, 10, 6,    3,
+                                          0x55, 4,    10,   0x14, 3,    'a', 'b',  'c'};
+  static const struct {
+    const uint8_t *left, *right;
+    size_t left_length, right_length;
+    TC_TLV_result status;
+    int equal;
+  } cases[] = {
+      {printable, teletex_upper, sizeof printable, sizeof teletex_upper, TC_TLV_UNSUPPORTED, 99},
+      {teletex_lower, teletex_upper, sizeof teletex_lower, sizeof teletex_upper, TC_TLV_UNSUPPORTED,
+       99},
+      {teletex_upper, teletex_upper, sizeof teletex_upper, sizeof teletex_upper, TC_TLV_OK, 1},
+      {unknown_a, unknown_b, sizeof unknown_a, sizeof unknown_b, TC_TLV_UNSUPPORTED, 99},
+      {unknown_a, unknown_a, sizeof unknown_a, sizeof unknown_a, TC_TLV_OK, 1},
+      {decided_left, decided_right, sizeof decided_left, sizeof decided_right, TC_TLV_OK, 0},
+  };
+  uint32_t first[32], second[32];
+  uint8_t used[2];
+  TC_X509_name_workspace workspace = {first, second, 32, used, 2};
+  (void)params;
+  (void)user;
+  for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
+    const TC_bytes left = {cases[i].left, cases[i].left_length};
+    const TC_bytes right = {cases[i].right, cases[i].right_length};
+    size_t work = 10000;
+    int equal = 99;
+    munit_assert_int(TC_X509_name_equal(left, right, &bounds, &workspace, &work, &equal), ==,
+                     cases[i].status);
+    munit_assert_int(equal, ==, cases[i].equal);
+    work = 10000;
+    equal = 99;
+    munit_assert_int(TC_X509_name_within(left, right, &bounds, &workspace, &work, &equal), ==,
+                     cases[i].status);
+    munit_assert_int(equal, ==, cases[i].equal);
+  }
+  return MUNIT_OK;
+}
+
+/* An excluded directoryName subtree that the library cannot compare must
+ * fail closed. Reporting "outside the subtree" would admit the name. */
+static MunitResult undetermined_excluded_subtree(const MunitParameter params[], void* user)
+{
+  static const uint8_t subject[] = {0x30, 14, 0x31, 12,   0x30, 10,  6,   3,
+                                    0x55, 4,  10,   0x13, 3,    'a', 'b', 'c'};
+  static const uint8_t excluded[] = {0x30, 14, 0x31, 12,   0x30, 10,  6,   3,
+                                     0x55, 4,  10,   0x14, 3,    'A', 'B', 'C'};
+  uint32_t first[32], second[32];
+  uint8_t used[2];
+  TC_X509_name_workspace workspace = {first, second, 32, used, 2};
+  TC_X509_general_name name = {4, {subject, sizeof subject}, {subject, sizeof subject}};
+  TC_X509_general_subtree base;
+  size_t work = 10000;
+  int matched = 99;
+  (void)params;
+  (void)user;
+  memset(&base, 0, sizeof base);
+  base.base.type = 4;
+  base.base.value = (TC_bytes){excluded, sizeof excluded};
+  munit_assert_int(TC_X509_general_name_within(&name, &base, &bounds, &workspace, &work, &matched),
+                   ==, TC_TLV_UNSUPPORTED);
+  munit_assert_int(matched, ==, 99);
+
+  /* The same subtree as the excluded list of a NameConstraints extension. */
+  uint8_t list[4 + sizeof excluded] = {0x30, 2 + sizeof excluded, 0xa4, sizeof excluded};
+  memcpy(list + 4, excluded, sizeof excluded);
+  TC_TLV_frame frames[8];
+  const TC_X509_constraint_workspace constraint_workspace = {frames, 8, &workspace};
+  const TC_X509_name_constraints constraints = {{NULL, 0}, {list, sizeof list}};
+  const TC_TLV_limits deep = {1024, 1024, 32, 8};
+  int allowed = 99;
+  work = 10000;
+  munit_assert_int(TC_X509_name_constraints_check(&name, &constraints, &deep, &constraint_workspace,
+                                                  &work, &allowed),
+                   ==, TC_TLV_UNSUPPORTED);
+  munit_assert_int(allowed, ==, 99);
   return MUNIT_OK;
 }
 
@@ -971,6 +1078,9 @@ int main(int argc, char** argv)
       {"/invalid", invalid, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/matching", matching, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/binary-attributes", binary_attributes, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/undetermined-values", undetermined_values, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/undetermined-excluded-subtree", undetermined_excluded_subtree, NULL, NULL,
+       MUNIT_TEST_OPTION_NONE, NULL},
       {"/subtree", subtree, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/match-limits", match_limits, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/matching-rules", matching_rules, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

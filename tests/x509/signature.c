@@ -329,12 +329,14 @@ static MunitResult issuer(const MunitParameter params[], void* user)
                                         &bounds, &workspace, &work),
                    ==, TC_X509_SIGNATURE_INVALID);
   munit_assert_uint(state.calls, ==, 0);
+  /* A TeletexString issuer value cannot be prepared, so its link to the
+   * certificate's issuer name is undetermined. */
   memcpy(other, name, sizeof other);
   other[11] = 0x14;
   work = 10000;
   munit_assert_int(TC_X509_issuer_check(&certificate, anchor.name, &anchor.public_key, &provider,
                                         &bounds, &workspace, &work),
-                   ==, TC_X509_SIGNATURE_INVALID);
+                   ==, TC_X509_SIGNATURE_UNSUPPORTED);
   munit_assert_uint(state.calls, ==, 0);
   return MUNIT_OK;
 }

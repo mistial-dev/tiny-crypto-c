@@ -144,9 +144,14 @@ typedef struct {
   size_t attribute_capacity;
 } TC_X509_name_workspace;
 /* Compare DER Names using RFC 5280 section 7.1. Standard X.520 case-ignore
- * attributes and userId use RFC 4518 preparation. domainComponent uses ASCII
- * case-insensitive comparison. Other matching rules and TeletexString return
- * UNSUPPORTED. Domain label validity beyond ASCII is a separate check.
+ * attributes and userId use RFC 4518 preparation. domainComponent and
+ * emailAddress (RFC 2985 section 5.2.1) use ASCII case-insensitive
+ * comparison. Values without a supported preparation, such as TeletexString
+ * or an attribute type with no known matching rule, match only when their
+ * encodings are identical. When such a difference is all that separates the
+ * names, the result is UNSUPPORTED and matched is unchanged. A difference in
+ * any other attribute or in the RDN structure still returns OK with matched
+ * zero. Domain label validity beyond ASCII is a separate check.
  * Workspace holds two prepared attributes and one byte per RDN attribute.
  * Work covers traversed bytes, scalar processing and ordering moves. All
  * writable ranges must be disjoint from each other and from the inputs.
