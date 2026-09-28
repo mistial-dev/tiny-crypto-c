@@ -5,10 +5,9 @@
 #include <tiny_crypto/rsa.h>
 #if TC_ENABLE_RSA
 #define TC_MP_WORD_BITS TC_RSA_WORD_BITS
-#include "rsa_crt_internal.h"
-#include "rsa_oaep_internal.h"
-#include "rsa_keygen_internal.h"
-#include "rsa_inputs_internal.h"
+#include "rsa_private_internal.h"
+#include "rsa_padding_internal.h"
+#include "rsa_internal.h"
 
 /* Additional output metadata uses the same disjoint-range rules as bytes. */
 static TC_RSA_result tc_rsa_decrypt_inputs(const TC_RSA_private_key* key, TC_bytes ciphertext,

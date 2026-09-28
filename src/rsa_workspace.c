@@ -5,7 +5,6 @@
 #include <tiny_crypto/rsa.h>
 #if TC_ENABLE_RSA
 #define TC_MP_WORD_BITS TC_RSA_WORD_BITS
-#include "rsa_inputs_internal.h"
 #include "rsa_internal.h"
 
 int TC_RSA_modulus_supported(size_t bits)

@@ -6,10 +6,9 @@
 #include <tiny_crypto/rsa.h>
 #if TC_ENABLE_RSA
 #define TC_MP_WORD_BITS TC_RSA_WORD_BITS
-#include "rsa_pss_internal.h"
-#include "rsa_crt_internal.h"
-#include "rsa_keygen_internal.h"
-#include "rsa_inputs_internal.h"
+#include "rsa_padding_internal.h"
+#include "rsa_private_internal.h"
+#include "rsa_internal.h"
 
 uint32_t TC_RSA_encode_v15_work(const TC_RSA_v15_options* options, size_t modulus_bytes)
 {

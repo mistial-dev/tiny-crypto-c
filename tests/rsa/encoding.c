@@ -1,6 +1,8 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
-#include "../../src/rsa_encoding_internal.h"
+#include <tiny_crypto/rsa.h>
+#define TC_MP_WORD_BITS TC_RSA_WORD_BITS
+#include "../../src/rsa_internal.h"
 #include "munit.h"
 #include <string.h>
 

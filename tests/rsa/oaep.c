@@ -1,6 +1,6 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
-#include "../../src/rsa_oaep_internal.h"
+#include "../../src/rsa_padding_internal.h"
 #include "munit.h"
 
 enum { MAX_BYTES = 384, MAX_DIGEST = 64, WORK_BUDGET = 100000 };

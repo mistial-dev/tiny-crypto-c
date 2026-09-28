@@ -3,7 +3,6 @@
 #include <tiny_crypto/rsa.h>
 #define TC_MP_WORD_BITS TC_RSA_WORD_BITS
 #include "../../src/rsa_private_internal.h"
-#include "../../src/rsa_crt_internal.h"
 #include "../../examples/rsa_validate.h"
 #include "../../examples/rsa_sign.h"
 #include "munit.h"

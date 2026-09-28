@@ -6,9 +6,9 @@
 #include <tiny_crypto/rsa.h>
 #if TC_ENABLE_RSA
 #define TC_MP_WORD_BITS TC_RSA_WORD_BITS
-#include "rsa_pss_internal.h"
-#include "rsa_keygen_internal.h"
-#include "rsa_inputs_internal.h"
+#include "rsa_padding_internal.h"
+#include "rsa_private_internal.h"
+#include "rsa_internal.h"
 
 TC_RSA_result TC_RSA_raw_public(const TC_RSA_public_key* key, TC_bytes input,
                                 const TC_RSA_workspace* workspace, TC_buffer output,

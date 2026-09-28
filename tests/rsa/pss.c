@@ -1,6 +1,6 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
-#include "../../src/rsa_pss_internal.h"
+#include "../../src/rsa_padding_internal.h"
 #include "munit.h"
 #include <string.h>
 

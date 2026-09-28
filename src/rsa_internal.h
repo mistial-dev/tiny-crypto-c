@@ -2,10 +2,65 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #ifndef TC_RSA_INTERNAL_H_
 #define TC_RSA_INTERNAL_H_
-#include "mp_internal.h"
-#include "rsa_encoding_internal.h"
-#include "hash_info_internal.h"
+#include <tiny_crypto/common.h>
 #include <tiny_crypto/rsa.h>
+#include "mp_internal.h"
+#include "hash_info_internal.h"
+#include "pki_storage_internal.h"
+
+/* prefix is the canonical DER DigestInfo header for the selected hash.
+ * The caller supplies its matching fixed-length digest. */
+static inline uint8_t tc_rsa_v15_byte(size_t index, size_t separator, const uint8_t* prefix,
+                                      size_t prefix_length, const uint8_t* digest)
+{
+  if (!index || index == separator)
+    return 0;
+  if (index == 1)
+    return 1;
+  if (index < separator)
+    return 0xff;
+  index -= separator + 1;
+  return index < prefix_length ? prefix[index] : digest[index - prefix_length];
+}
+
+static inline int tc_rsa_v15_size(size_t length, size_t prefix_length, size_t digest_length)
+{
+  return prefix_length && digest_length && length >= 11 && prefix_length <= length - 11 &&
+         digest_length <= length - 11 - prefix_length;
+}
+
+/* RFC 8017 section 9.2 encoding step. Inputs and output are disjoint, and pointers
+ * cover the stated lengths. Invalid sizing leaves output unchanged. */
+static inline TC_status tc_rsa_v15_encode(uint8_t* out, size_t length, const uint8_t* prefix,
+                                          size_t prefix_length, const uint8_t* digest,
+                                          size_t digest_length)
+{
+  size_t separator;
+  if (!out || !prefix || !digest || !tc_rsa_v15_size(length, prefix_length, digest_length))
+    return TC_ERROR;
+  separator = length - prefix_length - digest_length - 1;
+  for (size_t i = 0; i < length; ++i)
+    out[i] = tc_rsa_v15_byte(i, separator, prefix, prefix_length, digest);
+  return TC_OK;
+}
+
+/* Compare the full representative, including padding and exact DER header.
+ * Recovered representatives with invalid lengths or bytes return MISMATCH. */
+static inline TC_status tc_rsa_v15_check(const uint8_t* encoded, size_t length,
+                                         const uint8_t* prefix, size_t prefix_length,
+                                         const uint8_t* digest, size_t digest_length)
+{
+  size_t separator;
+  unsigned difference = 0;
+  if (!encoded || !prefix || !digest)
+    return TC_ERROR;
+  if (!tc_rsa_v15_size(length, prefix_length, digest_length))
+    return TC_MISMATCH;
+  separator = length - prefix_length - digest_length - 1;
+  for (size_t i = 0; i < length; ++i)
+    difference |= encoded[i] ^ tc_rsa_v15_byte(i, separator, prefix, prefix_length, digest);
+  return difference ? TC_MISMATCH : TC_OK;
+}
 
 static inline int tc_rsa_supported_modulus_size(size_t length)
 {
@@ -131,4 +186,36 @@ static inline TC_RSA_result tc_rsa_verify_v15(const uint8_t* modulus, size_t len
   TC_secure_zero(encoded, length);
   return checked == TC_OK ? TC_RSA_OK : TC_RSA_INVALID;
 }
+
+/* Shared RSA argument checks. Each helper checks that workspace words are
+ * aligned, that scratch and output are disjoint from each other and from the
+ * borrowed inputs, and returns TC_RSA_ARGUMENT for invalid storage. */
+
+/* Maps a sealed plan's final status to an RSA result. */
+TC_RSA_result tc_rsa_storage_status(const tc_pki_storage_plan* plan);
+
+/* Workspace only. Inputs must stay clear of scratch. */
+TC_RSA_result tc_rsa_workspace_inputs(const TC_RSA_workspace* workspace, const TC_bytes* inputs,
+                                      size_t count);
+
+/* Workspace and output: both are written, so neither may overlap an input. */
+TC_RSA_result tc_rsa_output_inputs(const TC_RSA_workspace* workspace, const TC_bytes* inputs,
+                                   size_t count, TC_bytes output);
+
+/* Two caller control structures (key, options) against workspace and output. */
+TC_RSA_result tc_rsa_control_inputs(const TC_RSA_workspace* workspace, TC_bytes output,
+                                    const void* first, size_t first_size, const void* second,
+                                    size_t second_size);
+
+/* Public key plus up to two message spans. */
+TC_RSA_result tc_rsa_public_inputs(const TC_RSA_public_key* key, TC_bytes first, TC_bytes second,
+                                   TC_bytes output, const TC_RSA_workspace* workspace);
+
+/* Private key and digest. Also rejects empty or oversized d, p and q. */
+TC_RSA_result tc_rsa_private_inputs(const TC_RSA_private_key* key, TC_bytes digest, TC_bytes output,
+                                    const TC_RSA_workspace* workspace);
+
+/* CRT parameters. Rejects values longer than a prime after leading zeros. */
+TC_RSA_result tc_rsa_crt_inputs(const TC_RSA_private_key* key, const TC_RSA_crt* crt,
+                                TC_bytes output, const TC_RSA_workspace* workspace);
 #endif
