@@ -10,9 +10,9 @@ options are enabled. The format reader returns views that borrow the original DE
 
 RFC 5914 defines the encoded anchor and its path controls. RFC 5937 describes
 how those controls constrain X.509 path validation. The implementation always
-enforces constraints on a selected anchor. See the copies in the local
-reference library and the [RFC 5914](https://www.rfc-editor.org/info/rfc5914/)
-and [RFC 5937](https://www.rfc-editor.org/info/rfc5937/) publications.
+enforces constraints on a selected anchor. See the
+[RFC 5914](https://www.rfc-editor.org/info/rfc5914/) and
+[RFC 5937](https://www.rfc-editor.org/info/rfc5937/) publications.
 
 ## Read and publish a list
 

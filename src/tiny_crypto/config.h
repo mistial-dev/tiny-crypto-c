@@ -282,6 +282,27 @@
 #error "Single-step KDF requires SHA-256 or SHA-384"
 #endif
 
+/* NIST SP 800-90A deterministic random bit generators. Each mechanism is
+ * compiled only when TC_ENABLE_DRBG is set. */
+#ifndef TC_ENABLE_DRBG
+#define TC_ENABLE_DRBG TC_PROFILE_VALUE(0, 0, 0, 1)
+#endif
+#ifndef TC_DRBG_ENABLE_HASH
+#define TC_DRBG_ENABLE_HASH TC_PROFILE_VALUE(0, 0, 0, 1)
+#endif
+#ifndef TC_DRBG_ENABLE_HMAC
+#define TC_DRBG_ENABLE_HMAC TC_PROFILE_VALUE(0, 0, 0, 1)
+#endif
+#ifndef TC_DRBG_ENABLE_CTR
+#define TC_DRBG_ENABLE_CTR TC_PROFILE_VALUE(0, 0, 0, 1)
+#endif
+#if (TC_ENABLE_DRBG != 0 && TC_ENABLE_DRBG != 1) || \
+    (TC_DRBG_ENABLE_HASH != 0 && TC_DRBG_ENABLE_HASH != 1) || \
+    (TC_DRBG_ENABLE_HMAC != 0 && TC_DRBG_ENABLE_HMAC != 1) || \
+    (TC_DRBG_ENABLE_CTR != 0 && TC_DRBG_ENABLE_CTR != 1)
+#error "DRBG switches must be 0 or 1"
+#endif
+
 /* Cross-algorithm security and embedded-storage policy.
  * TC_ZEROIZE: finalization wipes contexts and HMAC key-derived schedules,
  *   pads, and tags. Public-data hash schedules are not wiped on every block.
@@ -442,6 +463,23 @@
 #endif
 #if TC_PIV_SM_ENABLE_CS7 && (!TC_EC_ENABLE_P384 || !TC_ENABLE_SHA384)
 #error "CS7 requires P-384 and SHA-384"
+#endif
+#endif
+
+/* DRBG mechanism dependencies, checked after every option is defined. */
+#if TC_ENABLE_DRBG
+#if !TC_DRBG_ENABLE_HASH && !TC_DRBG_ENABLE_HMAC && !TC_DRBG_ENABLE_CTR
+#error "DRBG requires at least one mechanism"
+#endif
+#if TC_DRBG_ENABLE_HASH && !TC_ENABLE_SHA1 && !TC_ENABLE_SHA224 && \
+    !TC_ENABLE_SHA256 && !TC_ENABLE_SHA384 && !TC_ENABLE_SHA512
+#error "Hash_DRBG requires a SHA algorithm"
+#endif
+#if TC_DRBG_ENABLE_HMAC && !TC_ENABLE_HMAC
+#error "HMAC_DRBG requires TC_ENABLE_HMAC"
+#endif
+#if TC_DRBG_ENABLE_CTR && (!TC_ENABLE_AES || !TC_AES_ENABLE_DYNAMIC)
+#error "CTR_DRBG requires TC_ENABLE_AES and TC_AES_ENABLE_DYNAMIC"
 #endif
 #endif
 

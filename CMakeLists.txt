@@ -54,6 +54,10 @@ if((TINY_CRYPTO_ENABLE_DER OR TINY_CRYPTO_TLV_BER OR TINY_CRYPTO_TLV_STREAM)
 endif()
 tc_profile_option(TINY_CRYPTO_ENABLE_KDF TC_ENABLE_KDF "Build SP 800-108 KBKDF over the enabled HMAC/CMAC PRFs")
 tc_profile_option(TINY_CRYPTO_ENABLE_SSKDF TC_ENABLE_SSKDF "Build the single-step hash KDF")
+tc_profile_option(TINY_CRYPTO_ENABLE_DRBG TC_ENABLE_DRBG "Build NIST SP 800-90A DRBGs")
+tc_profile_option(TINY_CRYPTO_DRBG_HASH TC_DRBG_ENABLE_HASH "Build Hash_DRBG")
+tc_profile_option(TINY_CRYPTO_DRBG_HMAC TC_DRBG_ENABLE_HMAC "Build HMAC_DRBG")
+tc_profile_option(TINY_CRYPTO_DRBG_CTR TC_DRBG_ENABLE_CTR "Build CTR_DRBG over dynamic AES")
 tc_profile_option(TINY_CRYPTO_ENABLE_EC TC_ENABLE_EC "Build elliptic-curve key agreement")
 tc_profile_option(TINY_CRYPTO_ENABLE_RSA TC_ENABLE_RSA "Build RSA signature verification")
 tc_profile_option(TINY_CRYPTO_RSA_SMALL TC_RSA_SMALL "Use byte limbs for RSA arithmetic")
@@ -182,6 +186,20 @@ endif()
 if(TINY_CRYPTO_ENABLE_KDF AND NOT tc_kdf_prf)
   message(FATAL_ERROR "KDF requires a PRF: HMAC with a SHA, AES-CMAC, or TDEA-CMAC")
 endif()
+if(TINY_CRYPTO_ENABLE_DRBG)
+  if(NOT TINY_CRYPTO_DRBG_HASH AND NOT TINY_CRYPTO_DRBG_HMAC AND NOT TINY_CRYPTO_DRBG_CTR)
+    message(FATAL_ERROR "DRBG requires at least one mechanism")
+  endif()
+  if(TINY_CRYPTO_DRBG_HASH AND NOT tc_any_sha)
+    message(FATAL_ERROR "Hash_DRBG requires a SHA algorithm")
+  endif()
+  if(TINY_CRYPTO_DRBG_HMAC AND NOT TINY_CRYPTO_ENABLE_HMAC)
+    message(FATAL_ERROR "HMAC_DRBG requires TINY_CRYPTO_ENABLE_HMAC")
+  endif()
+  if(TINY_CRYPTO_DRBG_CTR AND (NOT TINY_CRYPTO_ENABLE_AES OR NOT TINY_CRYPTO_AES_DYNAMIC))
+    message(FATAL_ERROR "CTR_DRBG requires TINY_CRYPTO_ENABLE_AES and TINY_CRYPTO_AES_DYNAMIC")
+  endif()
+endif()
 if(NOT TINY_CRYPTO_AES_KEY_BITS MATCHES "^(128|192|256)$")
   message(FATAL_ERROR "TINY_CRYPTO_AES_KEY_BITS must be 128, 192, or 256")
 endif()
@@ -258,6 +276,10 @@ foreach(pair
     "TINY_CRYPTO_TLV_STREAM;TC_TLV_ENABLE_STREAM"
     "TINY_CRYPTO_ENABLE_KDF;TC_ENABLE_KDF"
     "TINY_CRYPTO_ENABLE_SSKDF;TC_ENABLE_SSKDF"
+    "TINY_CRYPTO_ENABLE_DRBG;TC_ENABLE_DRBG"
+    "TINY_CRYPTO_DRBG_HASH;TC_DRBG_ENABLE_HASH"
+    "TINY_CRYPTO_DRBG_HMAC;TC_DRBG_ENABLE_HMAC"
+    "TINY_CRYPTO_DRBG_CTR;TC_DRBG_ENABLE_CTR"
     "TINY_CRYPTO_ENABLE_PIV_SM;TC_ENABLE_PIV_SM"
     "TINY_CRYPTO_PIV_SM_CS2;TC_PIV_SM_ENABLE_CS2"
     "TINY_CRYPTO_PIV_SM_CS7;TC_PIV_SM_ENABLE_CS7"
@@ -335,6 +357,7 @@ set(tc_aes_sources src/aes.c src/aes_modes.c src/aes_ghash.c src/aes_gcm.c src/a
   src/aes_mac.c src/aes_cmac.c src/aes_eax.c src/aes_siv.c src/mac_core.c)
 set(tc_des_sources src/des.c src/des_modes.c src/des_mac.c)
 set(tc_hash_sources src/hash.c src/sha512.c src/hash_core.c)
+set(tc_drbg_sources src/drbg.c src/drbg_hash.c src/drbg_hmac.c src/drbg_ctr.c src/drbg_random.c)
 set(tc_rsa_sources src/rsa_workspace.c src/rsa_keygen.c src/rsa_private.c src/rsa_public.c src/rsa_oaep.c)
 
 # One utility translation unit keeps zeroization and constant-time comparison
@@ -399,6 +422,9 @@ endif()
 list(APPEND tc_sources src/hash_core.c src/pki_storage.c)
 if(TINY_CRYPTO_ENABLE_KDF)
   list(APPEND tc_sources src/kdf.c)
+endif()
+if(TINY_CRYPTO_ENABLE_DRBG)
+  list(APPEND tc_sources ${tc_drbg_sources})
 endif()
 if(TINY_CRYPTO_ENABLE_SSKDF)
   list(APPEND tc_sources src/sskdf.c)

@@ -269,6 +269,21 @@ if(TINY_CRYPTO_BUILD_TESTS)
   target_compile_definitions(tiny-crypto-c-test-sskdf PUBLIC
     TC_ENABLE_AES=0 TC_ENABLE_SSKDF=1 TC_ENABLE_SHA256=1 TC_ENABLE_SHA384=1)
   tc_add_c_test(test_sskdf tiny-crypto-c-test-sskdf tests/kdf/sskdf_test.c)
+  # SP 800-90A DRBGs with every mechanism, hash and AES key size available.
+  tc_add_test_library(tiny-crypto-c-test-drbg
+    src/common.c ${tc_aes_sources} ${tc_hash_sources} ${tc_drbg_sources})
+  target_compile_definitions(tiny-crypto-c-test-drbg PUBLIC
+    TC_ENABLE_DRBG=1 TC_DRBG_ENABLE_HASH=1 TC_DRBG_ENABLE_HMAC=1 TC_DRBG_ENABLE_CTR=1
+    TC_ENABLE_AES=1 TC_AES_ENABLE_DYNAMIC=1 TC_ENABLE_DES=0 TC_ENABLE_HMAC=1
+    TC_ENABLE_SHA1=1 TC_ENABLE_SHA224=1 TC_ENABLE_SHA256=1 TC_ENABLE_SHA384=1
+    TC_ENABLE_SHA512=1)
+  tc_add_c_test(test_drbg tiny-crypto-c-test-drbg tests/drbg/test.c)
+  tc_add_c_test(test_drbg_cavp tiny-crypto-c-test-drbg tests/drbg/cavp.c)
+  tc_add_c_test(test_drbg_example tiny-crypto-c-test-drbg
+    tests/drbg/example_test.c examples/drbg.c)
+  target_include_directories(test_drbg_example PRIVATE examples)
+  target_compile_definitions(test_drbg_cavp PRIVATE
+    DRBG_CAVP_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/drbg/cavp")
   set(TINY_CRYPTO_TEST_SM_CAPTURE_DIR "" CACHE PATH "PIV secure messaging capture directory")
   if(Python3_Interpreter_FOUND)
     add_test(NAME test_sm_capture_adapter
@@ -1054,6 +1069,9 @@ if(TINY_CRYPTO_BUILD_TESTS)
       target_include_directories(test_cpp_${algorithm} PRIVATE
         tests/support tests/${algorithm})
     endforeach()
+    tc_add_linked_test(test_cpp_drbg tiny-crypto-c-test-drbg
+      tests/cpp/drbg.cpp tests/cpp/main.cpp)
+    target_include_directories(test_cpp_drbg PRIVATE tests/support)
 
     foreach(key_bits 192 256)
       foreach(algorithm aes kdf)
@@ -1202,6 +1220,18 @@ if(TINY_CRYPTO_BUILD_TESTS)
         -DTC_ENABLE_EC=1 -I${CMAKE_CURRENT_SOURCE_DIR}/src
         -c ${CMAKE_CURRENT_SOURCE_DIR}/src/ec.c
         -o ${CMAKE_CURRENT_BINARY_DIR}/tiny-crypto-c-ec-compile.o)
+    # CTR_DRBG needs dynamic AES; every hash is on so HMAC and Hash_DRBG
+    # compile with both seed lengths.
+    foreach(drbg_source drbg drbg_hash drbg_hmac drbg_ctr drbg_random)
+      add_test(NAME test_${drbg_source}_compile_avr
+        COMMAND ${TC_AVR_CC} -std=c99 -Wall -Wextra -Werror -Os -mmcu=atmega2560
+          -DTC_ENABLE_DRBG=1 -DTC_DRBG_ENABLE_HASH=1 -DTC_DRBG_ENABLE_HMAC=1
+          -DTC_DRBG_ENABLE_CTR=1 -DTC_ENABLE_HMAC=1 -DTC_AES_ENABLE_DYNAMIC=1
+          -DTC_ENABLE_SHA1=1 -DTC_ENABLE_SHA384=1 -DTC_ENABLE_SHA512=1
+          -I${CMAKE_CURRENT_SOURCE_DIR}/src
+          -c ${CMAKE_CURRENT_SOURCE_DIR}/src/${drbg_source}.c
+          -o ${CMAKE_CURRENT_BINARY_DIR}/tiny-crypto-c-${drbg_source}-compile.o)
+    endforeach()
     add_test(NAME test_sskdf_compile_avr
       COMMAND ${TC_AVR_CC} -std=c99 -Wall -Wextra -Werror -mmcu=atmega328p
         -DTC_ENABLE_SSKDF=1 -DTC_ENABLE_SHA384=1 -I${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -1243,6 +1273,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
     test_piv_targets
     test_benchmark_fast
     test_benchmark_runtime
+    test_drbg_cavp
     test_rsa_key_openssl
     test_rsa_oaep_openssl
     test_rsa_oaep_openssl_small

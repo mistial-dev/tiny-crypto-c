@@ -5,7 +5,8 @@
 Uses compiler stack reports and emitted assembly, including possible indirect
 callees whose addresses are taken in each translation unit. Tail calls are
 counted as nested calls, so the estimate can overcount. libc/compiler helpers,
-interrupts and the application caller are excluded and listed explicitly.
+interrupts, the application caller and application callbacks such as a DRBG
+entropy source are excluded and listed explicitly.
 This is a regression measurement, not a whole-firmware stack-safety proof.
 """
 import argparse
@@ -41,12 +42,28 @@ PROFILES = {
       return TC_KBKDF_HMAC_SHA256_counter(key, sizeof(key), &p,
           0, 0, iv, sizeof(iv), out, sizeof(out)) != TC_OK;
     """, "TC_KBKDF_HMAC_SHA256_counter"),
+    "drbg_hmac_sha256": ([
+        "TC_ENABLE_HMAC=1", "TC_ENABLE_DRBG=1", "TC_DRBG_ENABLE_HASH=0",
+        "TC_DRBG_ENABLE_HMAC=1", "TC_DRBG_ENABLE_CTR=0",
+    ], """
+      static TC_DRBG drbg;
+      const TC_bytes empty = {0, 0};
+      TC_DRBG_config config = {TC_DRBG_HMAC, TC_HASH_SHA256, 0, 0, 0, 0, 0};
+      TC_random_source source = {entropy, 0};
+      if (TC_DRBG_instantiate(&drbg, &config, source, empty, empty) != TC_DRBG_OK) return 1;
+      return TC_DRBG_generate(&drbg, out, sizeof(out), 0, empty) != TC_DRBG_OK;
+    """, "TC_DRBG_generate"),
 }
+# Functions whose indirect call reaches an application-supplied callback. The
+# callback frame belongs to the application and is listed as excluded.
+APPLICATION_CALLBACK_SITES = {"read_entropy": "TC_random_source entropy callback"}
 MAC_CIPHER_CALLBACKS = {"tc_aes_mac_encrypt", "tc_des_mac_encrypt"}
 SOURCE = """
 #include <tiny_crypto/tiny_crypto.h>
 static uint8_t key[32], iv[16], out[32];
 static volatile uint8_t sink;
+static TC_status entropy(void* user, uint8_t* output, size_t length)
+{ (void)user; while (length--) output[length] = key[length %% sizeof(key)]; return TC_OK; }
 static int feature(void) { %s }
 int main(void) { int status = feature(); sink = out[0]; return status; }
 """
@@ -164,7 +181,9 @@ def measure(directory, definitions, body, entry):
                 raise RuntimeError("Missing project stack frame: " + name)
             unknown.add(name)
             return 0, []
-        if name in unknown_indirect and name != "tc_mac_cbc_block":
+        if name in APPLICATION_CALLBACK_SITES:
+            unknown.add(APPLICATION_CALLBACK_SITES[name])
+        elif name in unknown_indirect and name != "tc_mac_cbc_block":
             raise RuntimeError("Unresolved indirect call: " + name)
         if name == "tc_mac_cbc_block" and name in unknown_indirect and not mac_targets:
             raise RuntimeError("Unresolved MAC descriptor call: " + name)

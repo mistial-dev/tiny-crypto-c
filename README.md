@@ -15,7 +15,8 @@ modes are left out of the build.
 
 The default profile enables **AES-128 CTR and SHA-256**. DES, 3DES, SHA-1,
 SHA-224, SHA-384, SHA-512, HMAC, KMAC256, the NIST SP 800-108 key-based KDF,
-and other block-cipher modes can be enabled as needed.
+[SP 800-90A DRBGs](docs/drbg.md) and other block-cipher modes can be enabled
+as needed.
 
 ## Build
 
@@ -98,6 +99,10 @@ selected.
 | `TINY_CRYPTO_ENABLE_KMAC256` | OFF | Fixed-output KMAC256 with customization |
 | `TINY_CRYPTO_ENABLE_KDF` | OFF | SP 800-108 KBKDF over enabled HMAC and CMAC PRFs |
 | `TINY_CRYPTO_ENABLE_SSKDF` | OFF | Single-step hash KDF with SHA-256 or SHA-384 |
+| `TINY_CRYPTO_ENABLE_DRBG` | OFF | [SP 800-90A DRBGs](docs/drbg.md): Hash_DRBG, HMAC_DRBG and CTR_DRBG |
+| `TINY_CRYPTO_DRBG_HASH` | OFF | Hash_DRBG over the enabled SHA algorithms |
+| `TINY_CRYPTO_DRBG_HMAC` | OFF | HMAC_DRBG, which requires `TINY_CRYPTO_ENABLE_HMAC` |
+| `TINY_CRYPTO_DRBG_CTR` | OFF | CTR_DRBG, which requires AES with `TINY_CRYPTO_AES_DYNAMIC` |
 
 ### Formats, compression, and trust
 
@@ -420,7 +425,7 @@ and C++ tests use [doctest][doctest]. You can filter the C++ tests with doctest'
 command-line options, for example `./build/test_cpp_hash -tc="*HMAC*"`.
 
 `make test-full` adds the tests labelled `extended`: the checked-in
-[NIST CAVP][cavp] response files,
+[NIST CAVP][cavp] response files including the SP 800-90A DRBG answers,
 FIPS 186 signature and key-generation vectors, and
 [Wycheproof][wycheproof] vectors,
 including the complete 20,000-vector SP 800-108 KBKDF corpus split across

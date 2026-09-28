@@ -3,6 +3,7 @@
   "profiles": {
     "aes_ctr": {"flash": 2200, "static_ram": 100, "project_stack_estimate": 90},
     "kdf_sha256": {"flash": 9300, "static_ram": 110, "project_stack_estimate": 850, "kdf_workspace_frame": 450},
-    "kdf_mixed": {"flash": 9500, "static_ram": 120, "project_stack_estimate": 1150, "kdf_workspace_frame": 420}
+    "kdf_mixed": {"flash": 9500, "static_ram": 120, "project_stack_estimate": 1150, "kdf_workspace_frame": 420},
+    "drbg_hmac_sha256": {"flash": 10800, "static_ram": 400, "project_stack_estimate": 620}
   }
 }

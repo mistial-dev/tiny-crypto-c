@@ -126,5 +126,8 @@
 #if TC_ENABLE_SSKDF
 #include <tiny_crypto/sskdf.h>
 #endif
+#if TC_ENABLE_DRBG
+#include <tiny_crypto/drbg.h>
+#endif
 
 #endif

@@ -69,7 +69,7 @@ NIST test suites are US Government works, public domain.
 * `pkits/certs`, `pkits/crls`, `pkits/certpairs` are the archive's directories
   as-is (`.cp` files are X.509 `crossCertificatePair` structures, not
   PKCS#7). The PKCS#12 and S/MIME directories were left out. The 4.x test
-  descriptions are in the PKITS PDF in the Reference Library.
+  descriptions are in the NIST PKITS document.
 * `pdts/`: `End Entity Certs` and `Trust Anchor Certs` renamed to
   `end_entity_certs` / `trust_anchor_certs`; the file names are unchanged.
 * `x509tests_2001/testNN/`: the `.crt`/`.crl` files of each test with spaces

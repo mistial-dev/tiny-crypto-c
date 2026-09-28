@@ -159,3 +159,17 @@ foreach(ghash_mode 1 2 3 4)
     TC_AES_KEY_BITS=128 TC_AES_ENABLE_GCM=1
     TC_AES_GCM_GHASH_MODE=${ghash_mode})
 endforeach()
+
+# Each DRBG mechanism alone, with only the primitives it needs.
+tc_add_compile_profile(tiny-crypto-c-profile-drbg-hash ${tc_hash_sources} ${tc_drbg_sources})
+target_compile_definitions(tiny-crypto-c-profile-drbg-hash PRIVATE
+  TC_ENABLE_AES=0 TC_ENABLE_DES=0 TC_ENABLE_SHA1=1 TC_ENABLE_SHA256=0
+  TC_ENABLE_DRBG=1 TC_DRBG_ENABLE_HASH=1 TC_DRBG_ENABLE_HMAC=0 TC_DRBG_ENABLE_CTR=0)
+tc_add_compile_profile(tiny-crypto-c-profile-drbg-hmac ${tc_hash_sources} ${tc_drbg_sources})
+target_compile_definitions(tiny-crypto-c-profile-drbg-hmac PRIVATE
+  TC_ENABLE_AES=0 TC_ENABLE_DES=0 TC_ENABLE_SHA256=1 TC_ENABLE_HMAC=1
+  TC_ENABLE_DRBG=1 TC_DRBG_ENABLE_HASH=0 TC_DRBG_ENABLE_HMAC=1 TC_DRBG_ENABLE_CTR=0)
+tc_add_compile_profile(tiny-crypto-c-profile-drbg-ctr ${tc_aes_sources} ${tc_drbg_sources})
+target_compile_definitions(tiny-crypto-c-profile-drbg-ctr PRIVATE
+  TC_ENABLE_AES=1 TC_AES_ENABLE_DYNAMIC=1 TC_ENABLE_DES=0 TC_ENABLE_SHA256=0
+  TC_ENABLE_DRBG=1 TC_DRBG_ENABLE_HASH=0 TC_DRBG_ENABLE_HMAC=0 TC_DRBG_ENABLE_CTR=1)

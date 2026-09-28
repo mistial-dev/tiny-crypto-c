@@ -56,4 +56,8 @@
 #include <tiny_crypto/sskdf.hpp>
 #endif
 
+#if TC_ENABLE_DRBG
+#include <tiny_crypto/drbg.hpp>
+#endif
+
 #endif
