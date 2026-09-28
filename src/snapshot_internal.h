@@ -23,19 +23,28 @@ static inline TC_TLV_result tc_snapshot_discard(TC_snapshot_state* state, size_t
   return TC_TLV_OK;
 }
 
+/* A publish needs a prepared, unread slot and a current previous slot.
+ * Callers with domain checks that must follow these run it first. */
+static inline TC_TLV_result tc_snapshot_publish_check(TC_snapshot_state next, size_t readers,
+                                                      const TC_snapshot_state* previous)
+{
+  if (next != TC_SNAPSHOT_PREPARED || readers || (previous && *previous != TC_SNAPSHOT_CURRENT))
+    return TC_TLV_ARGUMENT;
+  return TC_TLV_OK;
+}
+
 static inline TC_TLV_result tc_snapshot_publish(TC_snapshot_state* next, size_t readers,
                                                 TC_snapshot_state* previous,
                                                 size_t previous_readers, size_t expected,
                                                 size_t* revision)
 {
-  if (*next != TC_SNAPSHOT_PREPARED || readers)
-    return TC_TLV_ARGUMENT;
+  const TC_TLV_result state = tc_snapshot_publish_check(*next, readers, previous);
+  if (state != TC_TLV_OK)
+    return state;
   if (expected != *revision)
     return TC_TLV_INVALID;
   if (*revision == SIZE_MAX)
     return TC_TLV_LIMIT;
-  if (previous && *previous != TC_SNAPSHOT_CURRENT)
-    return TC_TLV_ARGUMENT;
   *next = TC_SNAPSHOT_CURRENT;
   ++*revision;
   if (previous)

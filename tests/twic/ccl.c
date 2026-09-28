@@ -651,6 +651,10 @@ static MunitResult test_snapshots(const MunitParameter params[], void* user)
                    TC_TWIC_CCL_OK);
   munit_assert_int(TC_TWIC_CCL_store_publish(&store, 2, &slots[0]), ==, TC_TWIC_CCL_STALE);
   munit_assert_ptr_equal(store.current, &slots[1]);
+  /* A slot that is not prepared is an argument error before any staleness
+   * comparison, here the current slot republished over itself. */
+  munit_assert_int(TC_TWIC_CCL_store_publish(&store, 2, &slots[1]), ==, TC_TWIC_CCL_ARGUMENT);
+  munit_assert_int(slots[1].state, ==, TC_SNAPSHOT_CURRENT);
   munit_assert_int(TC_TWIC_CCL_store_discard(&slots[0]), ==, TC_TWIC_CCL_OK);
   munit_assert_int(slots[0].state, ==, TC_SNAPSHOT_FREE);
   new_metadata.published_at = new_metadata.received_at = policy.now;

@@ -317,13 +317,15 @@ TC_TWIC_CCL_result TC_TWIC_CCL_store_publish(TC_TWIC_CCL_store* store, size_t re
                                              TC_TWIC_CCL_snapshot* slot)
 {
   TC_TWIC_CCL_snapshot* previous;
-  if (!store || !slot || !tc_pki_storage_separate(store, sizeof *store, slot, sizeof *slot) ||
-      slot->state != TC_SNAPSHOT_PREPARED || slot->readers)
+  if (!store || !slot || !tc_pki_storage_separate(store, sizeof *store, slot, sizeof *slot))
     return TC_TWIC_CCL_ARGUMENT;
   previous = store->current;
-  if (previous && (previous->state != TC_SNAPSHOT_CURRENT ||
-                   !tc_pki_storage_separate(previous, sizeof *previous, store, sizeof *store) ||
+  if (previous && (!tc_pki_storage_separate(previous, sizeof *previous, store, sizeof *store) ||
                    !tc_pki_storage_separate(previous, sizeof *previous, slot, sizeof *slot)))
+    return TC_TWIC_CCL_ARGUMENT;
+  /* State errors outrank staleness. */
+  if (tc_snapshot_publish_check(slot->state, slot->readers, previous ? &previous->state : NULL) !=
+      TC_TLV_OK)
     return TC_TWIC_CCL_ARGUMENT;
   if (previous && slot->metadata.published_at < previous->metadata.published_at)
     return TC_TWIC_CCL_STALE;

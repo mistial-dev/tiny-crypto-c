@@ -87,8 +87,7 @@ TC_TLV_result TC_X509_store_publish(TC_X509_store* store, size_t revision,
                                     TC_X509_store_snapshot* slot)
 {
   TC_X509_store_snapshot* previous;
-  if (!store || !slot || !tc_pki_storage_separate(store, sizeof *store, slot, sizeof *slot) ||
-      slot->state != TC_X509_SNAPSHOT_PREPARED || slot->readers)
+  if (!store || !slot || !tc_pki_storage_separate(store, sizeof *store, slot, sizeof *slot))
     return TC_TLV_ARGUMENT;
   previous = store->current;
   TC_TLV_result result =
