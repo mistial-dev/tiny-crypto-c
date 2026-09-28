@@ -5,10 +5,10 @@
  * encryption. */
 #include "aes_mac_core_internal.h"
 
-#if (defined(TC_AES_ENABLE_EAX) && (TC_AES_ENABLE_EAX == 1)) ||                                    \
-    (defined(TC_AES_ENABLE_EAX_PRIME) && (TC_AES_ENABLE_EAX_PRIME == 1))
+#if TC_AES_ENABLE_EAX ||                                    \
+    TC_AES_ENABLE_EAX_PRIME
 
-#if defined(TC_AES_ENABLE_EAX_PRIME) && (TC_AES_ENABLE_EAX_PRIME == 1)
+#if TC_AES_ENABLE_EAX_PRIME
 /* C12.22 defines EAX' field values in the reference implementation's
  * little-endian byte order, so its doubling shifts toward higher indexes and
  * applies the reduction constant to byte zero. */
@@ -26,8 +26,8 @@ static void tc_aes_eax_prime_double(uint8_t value[TC_AES_BLOCKLEN])
 }
 #endif
 
-#if (defined(TC_AES_ENABLE_EAX) && (TC_AES_ENABLE_EAX == 1)) ||                                    \
-    (defined(TC_AES_ENABLE_EAX_PRIME) && (TC_AES_ENABLE_EAX_PRIME == 1))
+#if TC_AES_ENABLE_EAX ||                                    \
+    TC_AES_ENABLE_EAX_PRIME
 static TC_status tc_aes_eax_constants(const struct TC_AES_key_ctx* aes, uint8_t d[TC_AES_BLOCKLEN],
                                       uint8_t q[TC_AES_BLOCKLEN],
                                       void (*double_subkey)(uint8_t[TC_AES_BLOCKLEN]))
@@ -48,7 +48,7 @@ done:
 }
 #endif
 
-#if defined(TC_AES_ENABLE_EAX) && (TC_AES_ENABLE_EAX == 1)
+#if TC_AES_ENABLE_EAX
 static TC_status tc_aes_eax_key_constants(const struct TC_AES_key_ctx* aes,
                                           uint8_t d[TC_AES_BLOCKLEN], uint8_t q[TC_AES_BLOCKLEN])
 {
@@ -56,7 +56,7 @@ static TC_status tc_aes_eax_key_constants(const struct TC_AES_key_ctx* aes,
 }
 #endif
 
-#if defined(TC_AES_ENABLE_EAX_PRIME) && (TC_AES_ENABLE_EAX_PRIME == 1)
+#if TC_AES_ENABLE_EAX_PRIME
 static TC_status tc_aes_eax_prime_key_constants(const struct TC_AES_key_ctx* aes,
                                                 uint8_t d[TC_AES_BLOCKLEN],
                                                 uint8_t q[TC_AES_BLOCKLEN])
@@ -96,7 +96,7 @@ static TC_status tc_aes_eax_cmac(const struct TC_AES_key_ctx* aes,
   return status;
 }
 
-#if defined(TC_AES_ENABLE_EAX) && (TC_AES_ENABLE_EAX == 1)
+#if TC_AES_ENABLE_EAX
 static TC_status tc_aes_eax_omac(const struct TC_AES_key_ctx* aes, const uint8_t d[TC_AES_BLOCKLEN],
                                  const uint8_t q[TC_AES_BLOCKLEN], uint8_t domain,
                                  const uint8_t* data, size_t length,
@@ -115,7 +115,7 @@ static TC_status tc_aes_eax_ctr_xor(const struct TC_AES_key_ctx* aes,
                             (tc_aes_mac_ctr_bits){1u, 3u, (uint8_t)prime});
 }
 
-#if defined(TC_AES_ENABLE_EAX) && (TC_AES_ENABLE_EAX == 1)
+#if TC_AES_ENABLE_EAX
 
 static TC_status tc_aes_eax_crypt(const uint8_t* key, const uint8_t* nonce, size_t nonce_len,
                                   const uint8_t* aad, size_t aad_len, const uint8_t* input,
@@ -203,7 +203,7 @@ TC_status TC_AES_EAX_decrypt(const uint8_t* key, const uint8_t* nonce, size_t no
 
 #endif /* EAX */
 
-#if defined(TC_AES_ENABLE_EAX_PRIME) && (TC_AES_ENABLE_EAX_PRIME == 1)
+#if TC_AES_ENABLE_EAX_PRIME
 
 static TC_status tc_aes_eax_prime_crypt(const uint8_t* key, const uint8_t* cleartext,
                                         size_t cleartext_len, const uint8_t* input,

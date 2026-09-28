@@ -31,10 +31,6 @@
  *   TC_KBKDF_DES_CMAC_*     TC_ENABLE_DES && TC_DES_ENABLE_CMAC (legacy, 64-bit PRF)
  */
 
-#if (TC_ENABLE_KDF != 0) && (TC_ENABLE_KDF != 1)
-#error "TC_ENABLE_KDF must be 0 or 1"
-#endif
-
 /* PRF availability, resolved once so kdf.c, kdf.hpp and tests share it. */
 #define TC_KBKDF_HAVE_HMAC_SHA1 (TC_ENABLE_HMAC && TC_ENABLE_SHA1)
 #define TC_KBKDF_HAVE_HMAC_SHA224 (TC_ENABLE_HMAC && TC_ENABLE_SHA224)
@@ -47,11 +43,6 @@
 #define TC_KBKDF_HAVE_HMAC                                                                         \
   (TC_KBKDF_HAVE_HMAC_SHA1 || TC_KBKDF_HAVE_HMAC_SHA224 || TC_KBKDF_HAVE_HMAC_SHA256 ||            \
    TC_KBKDF_HAVE_HMAC_SHA384 || TC_KBKDF_HAVE_HMAC_SHA512)
-
-#if TC_ENABLE_KDF && !(TC_KBKDF_HAVE_HMAC || TC_KBKDF_HAVE_AES_CMAC || TC_KBKDF_HAVE_DES_CMAC)
-#error                                                                                             \
-    "TC_ENABLE_KDF needs a PRF: HMAC with an enabled SHA, TC_AES_ENABLE_CMAC or TC_DES_ENABLE_CMAC"
-#endif
 
 #if TC_KBKDF_HAVE_HMAC
 #include <tiny_crypto/hash.h>

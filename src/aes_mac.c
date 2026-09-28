@@ -5,9 +5,9 @@
  * and CMAC subkey derivation (NIST SP 800-38B). */
 #include "aes_mac_core_internal.h"
 
-#if (defined(TC_AES_ENABLE_EAX) && (TC_AES_ENABLE_EAX == 1)) ||                                    \
-    (defined(TC_AES_ENABLE_EAX_PRIME) && (TC_AES_ENABLE_EAX_PRIME == 1)) ||                        \
-    (defined(TC_AES_ENABLE_SIV) && (TC_AES_ENABLE_SIV == 1))
+#if TC_AES_ENABLE_EAX ||                                    \
+    TC_AES_ENABLE_EAX_PRIME ||                        \
+    TC_AES_ENABLE_SIV
 TC_status tc_aes_mac_ctr_xor(const uint8_t* round_key, const uint8_t initial[TC_AES_BLOCKLEN],
                              const uint8_t* input, uint8_t* output, size_t length,
                              tc_aes_mac_ctr_bits bits)

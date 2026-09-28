@@ -18,71 +18,10 @@ extern "C" {
  * the modes it enables.
  */
 
-/*
- * Minimum CMAC tag length in bytes. SP 800-38B recommends Tlen >= 64 bits for
- * most applications. Shorter tags need careful risk analysis. Default matches
- * TC_AES_EAX_MIN_TAG_LEN. Override only for exotic vectors / CAVP short-tag rows.
- */
-
-#if (TC_AES_CMAC_MIN_TAG_LEN < 1) || (TC_AES_CMAC_MIN_TAG_LEN > 16)
-#error "TC_AES_CMAC_MIN_TAG_LEN must be in 1..16"
-#endif
-
-/*
- * TC_AES_TINY=1 rejects the 256-byte fast GHASH table. Prefer bitwise/auto/wide
- * GHASH on small MCUs. The table is per-context because it depends on the key.
- */
-
-#if (TC_AES_TINY != 0) && (TC_AES_TINY != 1)
-#error "TC_AES_TINY must be 0 or 1"
-#endif
-
-/* GCM GHASH implementation profiles. */
-#define TC_AES_GCM_GHASH_MODE_AUTO 0
-#define TC_AES_GCM_GHASH_MODE_BITWISE 1
-#define TC_AES_GCM_GHASH_MODE_WIDE 2
-#define TC_AES_GCM_GHASH_MODE_FAST_TABLE 3
-#define TC_AES_GCM_GHASH_MODE_HARDWARE 4
-
-#if (TC_AES_GCM_GHASH_MODE < TC_AES_GCM_GHASH_MODE_AUTO) ||                                        \
-    (TC_AES_GCM_GHASH_MODE > TC_AES_GCM_GHASH_MODE_HARDWARE)
-#error "TC_AES_GCM_GHASH_MODE is invalid"
-#endif
-
-#if (TC_AES_TINY == 1) && (TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_FAST_TABLE)
-#error "TC_AES_TINY forbids the 256-byte fast GHASH table"
-#endif
-
 #if TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_HARDWARE
 /* Platform hook required by the hardware GHASH profile. */
 void TC_AES_GCM_hardware_multiply(uint8_t result[16], const uint8_t left[16],
                                   const uint8_t right[16]);
-#endif
-
-/*
- * S-box implementation modes:
- *   TC_AES_SBOX_MODE_CONSTANT_TIME - algebraic inversion (default)
- *   TC_AES_SBOX_MODE_RUNTIME       - generated in RAM, then masked scan
- *   TC_AES_SBOX_MODE_FAST          - direct lookup, not constant-time
- */
-#define TC_AES_SBOX_MODE_CONSTANT_TIME 1
-#define TC_AES_SBOX_MODE_RUNTIME 2
-#define TC_AES_SBOX_MODE_FAST 3
-
-#if (TC_AES_SBOX_MODE < TC_AES_SBOX_MODE_CONSTANT_TIME) ||                                         \
-    (TC_AES_SBOX_MODE > TC_AES_SBOX_MODE_FAST)
-#error                                                                                             \
-    "TC_AES_SBOX_MODE must be TC_AES_SBOX_MODE_CONSTANT_TIME, TC_AES_SBOX_MODE_RUNTIME, or TC_AES_SBOX_MODE_FAST"
-#endif
-
-/* 0 keeps byte-safe operations. 1 enables portable native-width helpers. */
-#if (TC_AES_WIDE_OPS != 0) && (TC_AES_WIDE_OPS != 1)
-#error "TC_AES_WIDE_OPS must be 0 or 1"
-#endif
-
-/* Compile exactly one AES key schedule size into a library profile. */
-#if (TC_AES_KEY_BITS != 128) && (TC_AES_KEY_BITS != 192) && (TC_AES_KEY_BITS != 256)
-#error "TC_AES_KEY_BITS must be 128, 192, or 256"
 #endif
 
 #define TC_AES_BLOCKLEN 16 /* AES block length in bytes (128-bit block only). */
@@ -105,16 +44,14 @@ struct TC_AES_key_ctx {
 
 struct TC_AES_ctx {
   struct TC_AES_key_ctx key;
-#if (defined(TC_AES_ENABLE_CBC) && (TC_AES_ENABLE_CBC == 1)) ||                                    \
-    (defined(TC_AES_ENABLE_CTR) && (TC_AES_ENABLE_CTR == 1)) ||                                    \
-    (defined(TC_AES_ENABLE_OFB) && (TC_AES_ENABLE_OFB == 1))
+#if TC_AES_ENABLE_CBC || TC_AES_ENABLE_CTR || TC_AES_ENABLE_OFB
   uint8_t iv[TC_AES_BLOCKLEN];
-#if defined(TC_AES_ENABLE_CTR) && (TC_AES_ENABLE_CTR == 1)
+#if TC_AES_ENABLE_CTR
   uint8_t ctr_stream[TC_AES_BLOCKLEN];
   uint8_t ctr_pos;
   uint8_t ctr_exhausted; /* The counter wrapped; set a new IV to continue. */
 #endif
-#if defined(TC_AES_ENABLE_OFB) && (TC_AES_ENABLE_OFB == 1)
+#if TC_AES_ENABLE_OFB
   uint8_t ofb_pos;
 #endif
 #endif
@@ -128,7 +65,7 @@ void TC_AES_ctx_clear(struct TC_AES_ctx* ctx);
 
 /* Initialize an expanded key schedule. Both pointers must be non-NULL. */
 TC_status TC_AES_init_ctx(struct TC_AES_ctx* ctx, const uint8_t* key);
-#if defined(TC_AES_CAVP) && (TC_AES_CAVP == 1)
+#if TC_AES_CAVP
 /* Test-only forward-cipher hook used by the AESAVS Monte Carlo harness. */
 void TC_AES_CAVP_encrypt_block(const uint8_t* key, uint8_t block[TC_AES_BLOCKLEN]);
 void TC_AES_CAVP_decrypt_block(const uint8_t* key, uint8_t block[TC_AES_BLOCKLEN]);
@@ -137,20 +74,18 @@ void TC_AES_CAVP_decrypt_block(const uint8_t* key, uint8_t block[TC_AES_BLOCKLEN
 /* Must be called once before TC_AES_init_ctx(), TC_AES_init_ctx_iv(), or encryption. */
 void TC_AES_init_sbox(void);
 #endif
-#if (defined(TC_AES_ENABLE_CBC) && (TC_AES_ENABLE_CBC == 1)) ||                                    \
-    (defined(TC_AES_ENABLE_CTR) && (TC_AES_ENABLE_CTR == 1)) ||                                    \
-    (defined(TC_AES_ENABLE_OFB) && (TC_AES_ENABLE_OFB == 1))
+#if TC_AES_ENABLE_CBC || TC_AES_ENABLE_CTR || TC_AES_ENABLE_OFB
 TC_status TC_AES_init_ctx_iv(struct TC_AES_ctx* ctx, const uint8_t* key, const uint8_t* iv);
 TC_status TC_AES_ctx_set_iv(struct TC_AES_ctx* ctx, const uint8_t* iv);
 #endif
 
-#if defined(TC_AES_ENABLE_ECB) && (TC_AES_ENABLE_ECB == 1)
+#if TC_AES_ENABLE_ECB
 /* Buffer must be exactly TC_AES_BLOCKLEN bytes. ECB is insecure for most uses. */
 TC_status TC_AES_ECB_encrypt(const struct TC_AES_key_ctx* ctx, uint8_t* buf);
 TC_status TC_AES_ECB_decrypt(const struct TC_AES_key_ctx* ctx, uint8_t* buf);
 #endif
 
-#if defined(TC_AES_ENABLE_CBC) && (TC_AES_ENABLE_CBC == 1)
+#if TC_AES_ENABLE_CBC
 /*
  * Buffer length must be a multiple of TC_AES_BLOCKLEN. The caller applies padding.
  * Returns TC_ERROR if length is not block-aligned. Set IV via TC_AES_init_ctx_iv()
@@ -163,7 +98,7 @@ TC_status TC_AES_CBC_encrypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length
 TC_status TC_AES_CBC_decrypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length);
 #endif
 
-#if defined(TC_AES_ENABLE_CTR) && (TC_AES_ENABLE_CTR == 1)
+#if TC_AES_ENABLE_CTR
 /*
  * Encrypt and decrypt are the same operation (SP 800-38A section 6.5). The IV
  * is incremented for every block, and one IV covers at most 2^128 blocks
@@ -175,7 +110,7 @@ TC_status TC_AES_CBC_decrypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length
 TC_status TC_AES_CTR_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length);
 #endif
 
-#if defined(TC_AES_ENABLE_OFB) && (TC_AES_ENABLE_OFB == 1)
+#if TC_AES_ENABLE_OFB
 /*
  * Encrypt and decrypt are the same operation. Never reuse an IV with the same
  * key. OFB provides confidentiality only.
@@ -183,7 +118,7 @@ TC_status TC_AES_CTR_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length);
 TC_status TC_AES_OFB_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length);
 #endif
 
-#if defined(TC_AES_ENABLE_GCM) && (TC_AES_ENABLE_GCM == 1)
+#if TC_AES_ENABLE_GCM
 
 /*
  * NIST SP 800-38D length limits (bit lengths converted to bytes):
@@ -284,7 +219,7 @@ void TC_AES_GCM_clear(struct TC_AES_GCM_ctx* ctx);
 
 #endif /* TC_AES_ENABLE_GCM */
 
-#if defined(TC_AES_ENABLE_CCM) && (TC_AES_ENABLE_CCM == 1)
+#if TC_AES_ENABLE_CCM
 
 /* CCM is a packet mode: payload and AAD lengths are known at entry. */
 TC_status TC_AES_CCM_encrypt(const uint8_t* key, const uint8_t* nonce, size_t nonce_len,
@@ -298,7 +233,7 @@ TC_status TC_AES_CCM_decrypt(const uint8_t* key, const uint8_t* nonce, size_t no
 
 #endif
 
-#if defined(TC_AES_ENABLE_EAX) && (TC_AES_ENABLE_EAX == 1)
+#if TC_AES_ENABLE_EAX
 
 /* EAX one-shot AEAD. Tags must be TC_AES_EAX_MIN_TAG_LEN..16. Auth failure
  * leaves plaintext untouched. */
@@ -313,7 +248,7 @@ TC_status TC_AES_EAX_decrypt(const uint8_t* key, const uint8_t* nonce, size_t no
 
 #endif
 
-#if defined(TC_AES_ENABLE_EAX_PRIME) && (TC_AES_ENABLE_EAX_PRIME == 1)
+#if TC_AES_ENABLE_EAX_PRIME
 
 #define TC_AES_EAX_PRIME_TAG_LEN 4
 
@@ -329,7 +264,7 @@ TC_status TC_AES_EAX_PRIME_decrypt(const uint8_t* key, const uint8_t* cleartext,
 
 #endif
 
-#if defined(TC_AES_ENABLE_CMAC) && (TC_AES_ENABLE_CMAC == 1)
+#if TC_AES_ENABLE_CMAC
 
 /* Full CMAC tag is one AES block. Shorter tags are the leading tag_len bytes. */
 #define TC_AES_CMAC_TAG_MAX TC_AES_BLOCKLEN
@@ -372,7 +307,7 @@ void TC_AES_CMAC_ctx_clear(struct TC_AES_CMAC_ctx* ctx);
 
 #endif
 
-#if defined(TC_AES_ENABLE_SIV) && (TC_AES_ENABLE_SIV == 1)
+#if TC_AES_ENABLE_SIV
 
 /* RFC 5297 SIV-AES: key is two equal AES keys concatenated (CMAC || CTR). */
 #define TC_AES_SIV_KEYLEN (TC_AES_KEYLEN * 2)

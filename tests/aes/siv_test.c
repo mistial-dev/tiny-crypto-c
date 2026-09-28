@@ -19,7 +19,7 @@
 #define SIV_VECTOR_FILE "tests/vectors/wycheproof/testvectors_v1/aead_aes_siv_cmac_test.json"
 #endif
 
-#if defined(TC_AES_ENABLE_SIV) && (TC_AES_ENABLE_SIV == 1)
+#if TC_AES_ENABLE_SIV
 
 #if TC_AES_SBOX_MODE == TC_AES_SBOX_MODE_RUNTIME
 static void siv_initialize_sbox(void)

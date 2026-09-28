@@ -85,7 +85,7 @@ void TC_AES_dynamic_CMAC_clear(TC_AES_dynamic_CMAC* ctx)
 }
 #endif
 
-#if defined(TC_AES_ENABLE_CMAC) && (TC_AES_ENABLE_CMAC == 1)
+#if TC_AES_ENABLE_CMAC
 static void tc_aes_cmac_invalidate(struct TC_AES_CMAC_ctx* ctx)
 {
   TC_AES_CMAC_ctx_clear(ctx);

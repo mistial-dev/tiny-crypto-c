@@ -35,6 +35,37 @@
 #ifndef TC_ENABLE_KMAC256
 #define TC_ENABLE_KMAC256 TC_PROFILE_VALUE(0, 0, 0, 1)
 #endif
+#if TC_ENABLE_AES != 0 && TC_ENABLE_AES != 1
+#error "TC_ENABLE_AES must be 0 or 1"
+#endif
+#if TC_ENABLE_DES != 0 && TC_ENABLE_DES != 1
+#error "TC_ENABLE_DES must be 0 or 1"
+#endif
+#if TC_ENABLE_SHA1 != 0 && TC_ENABLE_SHA1 != 1
+#error "TC_ENABLE_SHA1 must be 0 or 1"
+#endif
+#if TC_ENABLE_SHA224 != 0 && TC_ENABLE_SHA224 != 1
+#error "TC_ENABLE_SHA224 must be 0 or 1"
+#endif
+#if TC_ENABLE_SHA256 != 0 && TC_ENABLE_SHA256 != 1
+#error "TC_ENABLE_SHA256 must be 0 or 1"
+#endif
+#if TC_ENABLE_SHA384 != 0 && TC_ENABLE_SHA384 != 1
+#error "TC_ENABLE_SHA384 must be 0 or 1"
+#endif
+#if TC_ENABLE_SHA512 != 0 && TC_ENABLE_SHA512 != 1
+#error "TC_ENABLE_SHA512 must be 0 or 1"
+#endif
+#if TC_ENABLE_HMAC != 0 && TC_ENABLE_HMAC != 1
+#error "TC_ENABLE_HMAC must be 0 or 1"
+#endif
+#if TC_ENABLE_KMAC256 != 0 && TC_ENABLE_KMAC256 != 1
+#error "TC_ENABLE_KMAC256 must be 0 or 1"
+#endif
+#if TC_ENABLE_HMAC && !(TC_ENABLE_SHA1 || TC_ENABLE_SHA224 || TC_ENABLE_SHA256 ||                  \
+                        TC_ENABLE_SHA384 || TC_ENABLE_SHA512)
+#error "HMAC requires an enabled SHA algorithm"
+#endif
 /* TLV framing is independent of the cryptographic algorithms. DER adds typed
  * value checks; BER and incremental entry points are optional. Parser bounds
  * checks cannot be disabled with TC_STRICT. */
@@ -55,6 +86,12 @@
 #endif
 #ifndef TC_ENABLE_PIV_CVC
 #define TC_ENABLE_PIV_CVC TC_PROFILE_VALUE(0, 0, 0, 1)
+#endif
+#if TC_ENABLE_PIV_CVC != 0 && TC_ENABLE_PIV_CVC != 1
+#error "TC_ENABLE_PIV_CVC must be 0 or 1"
+#endif
+#if TC_ENABLE_PIV_CVC && !TC_ENABLE_DER
+#error "PIV CVC parsing requires DER"
 #endif
 #ifndef TC_ENABLE_X509
 #define TC_ENABLE_X509 TC_PROFILE_VALUE(0, 0, 0, 1)
@@ -127,12 +164,6 @@
 #endif
 #if TC_ENABLE_PIV_CHUID && !TC_ENABLE_TLV
 #error "CHUID parsing requires TLV"
-#endif
-#if TC_ENABLE_PIV_CVC != 0 && TC_ENABLE_PIV_CVC != 1
-#error "TC_ENABLE_PIV_CVC must be 0 or 1"
-#endif
-#if TC_ENABLE_PIV_CVC && !TC_ENABLE_DER
-#error "PIV CVC parsing requires DER"
 #endif
 #ifndef TC_TLV_ENABLE_BER
 #define TC_TLV_ENABLE_BER TC_PROFILE_VALUE(0, 0, 0, 1)
@@ -245,6 +276,9 @@
 #ifndef TC_ENABLE_KDF
 #define TC_ENABLE_KDF TC_PROFILE_VALUE(0, 0, 0, 1)
 #endif
+#if TC_ENABLE_KDF != 0 && TC_ENABLE_KDF != 1
+#error "TC_ENABLE_KDF must be 0 or 1"
+#endif
 /* RFC 5869 HKDF over the enabled HMAC-SHA algorithms. */
 #ifndef TC_ENABLE_HKDF
 #define TC_ENABLE_HKDF TC_PROFILE_VALUE(0, 0, 0, 1)
@@ -339,11 +373,27 @@
 #ifndef TC_AVR_PROGMEM
 #define TC_AVR_PROGMEM TC_PROFILE_VALUE(1, 1, 1, 1)
 #endif
-#if (TC_AVR_PROGMEM != 0) && (TC_AVR_PROGMEM != 1)
+#if TC_ZEROIZE != 0 && TC_ZEROIZE != 1
+#error "TC_ZEROIZE must be 0 or 1"
+#endif
+#if TC_STRICT != 0 && TC_STRICT != 1
+#error "TC_STRICT must be 0 or 1"
+#endif
+#if TC_AVR_PROGMEM != 0 && TC_AVR_PROGMEM != 1
 #error "TC_AVR_PROGMEM must be 0 or 1"
 #endif
+/* Minimum accepted HMAC tag length for the one-shot HMAC and verify APIs.
+ * RFC 2104 section 5 asks for at least half the digest and at least 80 bits.
+ * It may not exceed the digest length of any enabled SHA. */
 #ifndef TC_HMAC_MIN_TAG_LEN
 #define TC_HMAC_MIN_TAG_LEN 16
+#endif
+#if TC_ENABLE_HMAC && (TC_HMAC_MIN_TAG_LEN < 1 || (TC_ENABLE_SHA1 && TC_HMAC_MIN_TAG_LEN > 20) ||  \
+                       (TC_ENABLE_SHA224 && TC_HMAC_MIN_TAG_LEN > 28) ||                           \
+                       (TC_ENABLE_SHA256 && TC_HMAC_MIN_TAG_LEN > 32) ||                           \
+                       (TC_ENABLE_SHA384 && TC_HMAC_MIN_TAG_LEN > 48) ||                           \
+                       (TC_ENABLE_SHA512 && TC_HMAC_MIN_TAG_LEN > 64))
+#error "TC_HMAC_MIN_TAG_LEN must be at least 1 and at most every enabled SHA digest length"
 #endif
 
 /* AES defaults favor small constant-time firmware: one key schedule size,
@@ -399,14 +449,100 @@
 #ifndef TC_AES_TINY
 #define TC_AES_TINY TC_PROFILE_VALUE(0, 1, 0, 0)
 #endif
+/* Known-answer test entry points (single-block AES/DES, raw hash and KDF
+ * hooks) used by the CAVP harness. Production builds leave them off. */
+#ifndef TC_AES_CAVP
+#define TC_AES_CAVP 0
+#endif
+#ifndef TC_DES_CAVP
+#define TC_DES_CAVP 0
+#endif
+#ifndef TC_HASH_CAVP
+#define TC_HASH_CAVP 0
+#endif
+#ifndef TC_KDF_CAVP
+#define TC_KDF_CAVP 0
+#endif
+#if (TC_AES_CAVP != 0 && TC_AES_CAVP != 1) || (TC_DES_CAVP != 0 && TC_DES_CAVP != 1) ||            \
+    (TC_HASH_CAVP != 0 && TC_HASH_CAVP != 1) || (TC_KDF_CAVP != 0 && TC_KDF_CAVP != 1)
+#error "CAVP test hooks must be 0 or 1"
+#endif
+/* GCM GHASH implementation profiles. */
+#define TC_AES_GCM_GHASH_MODE_AUTO 0
+#define TC_AES_GCM_GHASH_MODE_BITWISE 1
+#define TC_AES_GCM_GHASH_MODE_WIDE 2
+#define TC_AES_GCM_GHASH_MODE_FAST_TABLE 3
+#define TC_AES_GCM_GHASH_MODE_HARDWARE 4
 #ifndef TC_AES_GCM_GHASH_MODE
 #define TC_AES_GCM_GHASH_MODE TC_PROFILE_VALUE(0, 1, 0, 2)
 #endif
+/* S-box implementations:
+ *   TC_AES_SBOX_MODE_CONSTANT_TIME - algebraic inversion (default)
+ *   TC_AES_SBOX_MODE_RUNTIME       - generated in RAM, then masked scan
+ *   TC_AES_SBOX_MODE_FAST          - direct lookup, not constant-time */
+#define TC_AES_SBOX_MODE_CONSTANT_TIME 1
+#define TC_AES_SBOX_MODE_RUNTIME 2
+#define TC_AES_SBOX_MODE_FAST 3
 #ifndef TC_AES_SBOX_MODE
-#define TC_AES_SBOX_MODE 1
+#define TC_AES_SBOX_MODE TC_AES_SBOX_MODE_CONSTANT_TIME
 #endif
+/* 0 keeps byte-safe operations. 1 enables portable native-width helpers. */
 #ifndef TC_AES_WIDE_OPS
 #define TC_AES_WIDE_OPS TC_PROFILE_VALUE(0, 0, 1, 1)
+#endif
+#if TC_AES_ENABLE_CBC != 0 && TC_AES_ENABLE_CBC != 1
+#error "TC_AES_ENABLE_CBC must be 0 or 1"
+#endif
+#if TC_AES_ENABLE_ECB != 0 && TC_AES_ENABLE_ECB != 1
+#error "TC_AES_ENABLE_ECB must be 0 or 1"
+#endif
+#if TC_AES_ENABLE_CTR != 0 && TC_AES_ENABLE_CTR != 1
+#error "TC_AES_ENABLE_CTR must be 0 or 1"
+#endif
+#if TC_AES_ENABLE_OFB != 0 && TC_AES_ENABLE_OFB != 1
+#error "TC_AES_ENABLE_OFB must be 0 or 1"
+#endif
+#if TC_AES_ENABLE_GCM != 0 && TC_AES_ENABLE_GCM != 1
+#error "TC_AES_ENABLE_GCM must be 0 or 1"
+#endif
+#if TC_AES_ENABLE_CCM != 0 && TC_AES_ENABLE_CCM != 1
+#error "TC_AES_ENABLE_CCM must be 0 or 1"
+#endif
+#if TC_AES_ENABLE_EAX != 0 && TC_AES_ENABLE_EAX != 1
+#error "TC_AES_ENABLE_EAX must be 0 or 1"
+#endif
+#if TC_AES_ENABLE_EAX_PRIME != 0 && TC_AES_ENABLE_EAX_PRIME != 1
+#error "TC_AES_ENABLE_EAX_PRIME must be 0 or 1"
+#endif
+#if TC_AES_ENABLE_SIV != 0 && TC_AES_ENABLE_SIV != 1
+#error "TC_AES_ENABLE_SIV must be 0 or 1"
+#endif
+#if TC_AES_ENABLE_CMAC != 0 && TC_AES_ENABLE_CMAC != 1
+#error "TC_AES_ENABLE_CMAC must be 0 or 1"
+#endif
+#if TC_AES_TINY != 0 && TC_AES_TINY != 1
+#error "TC_AES_TINY must be 0 or 1"
+#endif
+#if TC_AES_WIDE_OPS != 0 && TC_AES_WIDE_OPS != 1
+#error "TC_AES_WIDE_OPS must be 0 or 1"
+#endif
+/* Exactly one AES key schedule size per library profile. */
+#if TC_AES_KEY_BITS != 128 && TC_AES_KEY_BITS != 192 && TC_AES_KEY_BITS != 256
+#error "TC_AES_KEY_BITS must be 128, 192, or 256"
+#endif
+#if TC_AES_CMAC_MIN_TAG_LEN < 1 || TC_AES_CMAC_MIN_TAG_LEN > 16
+#error "TC_AES_CMAC_MIN_TAG_LEN must be in 1..16"
+#endif
+#if TC_AES_GCM_GHASH_MODE < TC_AES_GCM_GHASH_MODE_AUTO ||                                          \
+    TC_AES_GCM_GHASH_MODE > TC_AES_GCM_GHASH_MODE_HARDWARE
+#error "TC_AES_GCM_GHASH_MODE is invalid"
+#endif
+/* TC_AES_TINY rejects the per-key 256-byte fast GHASH table. */
+#if TC_AES_TINY && TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_FAST_TABLE
+#error "TC_AES_TINY forbids the 256-byte fast GHASH table"
+#endif
+#if TC_AES_SBOX_MODE < TC_AES_SBOX_MODE_CONSTANT_TIME || TC_AES_SBOX_MODE > TC_AES_SBOX_MODE_FAST
+#error "TC_AES_SBOX_MODE must be TC_AES_SBOX_MODE_CONSTANT_TIME, _RUNTIME, or _FAST"
 #endif
 
 #ifndef TC_ENABLE_TWIC_OBJECT_CRYPTO
@@ -419,8 +555,8 @@
 #error "TWIC object encryption requires AES-128 ECB"
 #endif
 
-/* DES defaults preserve the imported project's CTR and 3DES behavior. DES has
- * a 56-bit effective key and should only be used for legacy interoperability. */
+/* DES defaults enable CTR and Triple DES only. DES has a 56-bit effective
+ * key; use it only for legacy interoperability. */
 #ifndef TC_DES_ENABLE_ECB
 #define TC_DES_ENABLE_ECB TC_PROFILE_VALUE(0, 0, 0, 1)
 #endif
@@ -453,6 +589,58 @@
 #endif
 #ifndef TC_DES_REJECT_WEAK_KEYS
 #define TC_DES_REJECT_WEAK_KEYS TC_PROFILE_VALUE(0, 0, 0, 0)
+#endif
+/* Minimum DES CMAC tag length in bytes (SP 800-38B recommends at least 64
+ * bits). */
+#ifndef TC_DES_CMAC_MIN_TAG_LEN
+#define TC_DES_CMAC_MIN_TAG_LEN 8
+#endif
+#if TC_DES_ENABLE_ECB != 0 && TC_DES_ENABLE_ECB != 1
+#error "TC_DES_ENABLE_ECB must be 0 or 1"
+#endif
+#if TC_DES_ENABLE_CBC != 0 && TC_DES_ENABLE_CBC != 1
+#error "TC_DES_ENABLE_CBC must be 0 or 1"
+#endif
+#if TC_DES_ENABLE_CTR != 0 && TC_DES_ENABLE_CTR != 1
+#error "TC_DES_ENABLE_CTR must be 0 or 1"
+#endif
+#if TC_DES_ENABLE_OFB != 0 && TC_DES_ENABLE_OFB != 1
+#error "TC_DES_ENABLE_OFB must be 0 or 1"
+#endif
+#if TC_DES_ENABLE_CFB1 != 0 && TC_DES_ENABLE_CFB1 != 1
+#error "TC_DES_ENABLE_CFB1 must be 0 or 1"
+#endif
+#if TC_DES_ENABLE_CFB8 != 0 && TC_DES_ENABLE_CFB8 != 1
+#error "TC_DES_ENABLE_CFB8 must be 0 or 1"
+#endif
+#if TC_DES_ENABLE_CFB64 != 0 && TC_DES_ENABLE_CFB64 != 1
+#error "TC_DES_ENABLE_CFB64 must be 0 or 1"
+#endif
+#if TC_DES_ENABLE_TDES != 0 && TC_DES_ENABLE_TDES != 1
+#error "TC_DES_ENABLE_TDES must be 0 or 1"
+#endif
+#if TC_DES_ENABLE_CMAC != 0 && TC_DES_ENABLE_CMAC != 1
+#error "TC_DES_ENABLE_CMAC must be 0 or 1"
+#endif
+#if TC_DES_ENABLE_ISO9797 != 0 && TC_DES_ENABLE_ISO9797 != 1
+#error "TC_DES_ENABLE_ISO9797 must be 0 or 1"
+#endif
+#if TC_DES_REJECT_WEAK_KEYS != 0 && TC_DES_REJECT_WEAK_KEYS != 1
+#error "TC_DES_REJECT_WEAK_KEYS must be 0 or 1"
+#endif
+#if TC_ENABLE_DES && !TC_DES_ENABLE_ECB && !TC_DES_ENABLE_CBC && !TC_DES_ENABLE_CTR &&             \
+    !TC_DES_ENABLE_OFB && !TC_DES_ENABLE_CFB1 && !TC_DES_ENABLE_CFB8 && !TC_DES_ENABLE_CFB64 &&    \
+    !TC_DES_ENABLE_CMAC && !TC_DES_ENABLE_ISO9797
+#error "DES requires at least one enabled mode or MAC"
+#endif
+#if TC_DES_CMAC_MIN_TAG_LEN < 1 || TC_DES_CMAC_MIN_TAG_LEN > 8
+#error "TC_DES_CMAC_MIN_TAG_LEN must be in 1..8"
+#endif
+/* KBKDF needs a PRF: HMAC with an enabled SHA, AES-CMAC or DES-CMAC. */
+#if TC_ENABLE_KDF && !TC_ENABLE_HMAC && !(TC_ENABLE_AES && TC_AES_ENABLE_CMAC) &&                  \
+    !(TC_ENABLE_DES && TC_DES_ENABLE_CMAC)
+#error                                                                                             \
+    "TC_ENABLE_KDF needs a PRF: HMAC with an enabled SHA, TC_AES_ENABLE_CMAC or TC_DES_ENABLE_CMAC"
 #endif
 
 #ifndef TC_ENABLE_PIV_SM

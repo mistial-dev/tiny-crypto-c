@@ -24,7 +24,7 @@
 #define KDF_CAVP_DIR "tests/vectors/kdf/cavp"
 #endif
 
-#if defined(TC_KDF_CAVP) && (TC_KDF_CAVP == 1) && TC_ENABLE_KDF
+#if TC_KDF_CAVP && TC_ENABLE_KDF
 
 typedef TC_status (*kdf_counter_fn)(const uint8_t*, size_t, const struct TC_KBKDF_params*,
                                     const uint8_t*, size_t, const uint8_t*, size_t, uint8_t*,

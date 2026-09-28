@@ -18,13 +18,13 @@
 #define CAVP_VECTOR_DIR "tests/vectors/aes/cavp"
 #endif
 
-#if defined(TC_AES_CAVP) && (TC_AES_CAVP == 1)
+#if TC_AES_CAVP
 
-#if (defined(TC_AES_ENABLE_ECB) && (TC_AES_ENABLE_ECB == 1)) ||                                    \
-    (defined(TC_AES_ENABLE_CBC) && (TC_AES_ENABLE_CBC == 1)) ||                                    \
-    (defined(TC_AES_ENABLE_OFB) && (TC_AES_ENABLE_OFB == 1)) ||                                    \
-    (defined(TC_AES_ENABLE_GCM) && (TC_AES_ENABLE_GCM == 1)) ||                                    \
-    (defined(TC_AES_ENABLE_CCM) && (TC_AES_ENABLE_CCM == 1))
+#if TC_AES_ENABLE_ECB ||                                    \
+    TC_AES_ENABLE_CBC ||                                    \
+    TC_AES_ENABLE_OFB ||                                    \
+    TC_AES_ENABLE_GCM ||                                    \
+    TC_AES_ENABLE_CCM
 #if TC_AES_SBOX_MODE == TC_AES_SBOX_MODE_RUNTIME
 static void cavp_initialize_sbox(void)
 {
@@ -110,9 +110,9 @@ static int cavp_compare(const char* file, size_t count, const char* field, const
   return 0;
 }
 
-#if (defined(TC_AES_ENABLE_ECB) && (TC_AES_ENABLE_ECB == 1)) ||                                    \
-    (defined(TC_AES_ENABLE_CBC) && (TC_AES_ENABLE_CBC == 1)) ||                                    \
-    (defined(TC_AES_ENABLE_OFB) && (TC_AES_ENABLE_OFB == 1))
+#if TC_AES_ENABLE_ECB ||                                    \
+    TC_AES_ENABLE_CBC ||                                    \
+    TC_AES_ENABLE_OFB
 static void cavp_xor(uint8_t* dst, const uint8_t* src, size_t length)
 {
   size_t i;
@@ -156,7 +156,7 @@ static int cavp_standard_case(enum cavp_mode mode, const char* file, int encrypt
     memcpy(actual, input, input_len);
 
   if (mode == CAVP_ECB) {
-#if defined(TC_AES_ENABLE_ECB) && (TC_AES_ENABLE_ECB == 1)
+#if TC_AES_ENABLE_ECB
     struct TC_AES_ctx ctx;
     size_t offset;
     TC_AES_init_ctx(&ctx, record->key);
@@ -174,7 +174,7 @@ static int cavp_standard_case(enum cavp_mode mode, const char* file, int encrypt
     return 0;
 #endif
   } else if (mode == CAVP_CBC) {
-#if defined(TC_AES_ENABLE_CBC) && (TC_AES_ENABLE_CBC == 1)
+#if TC_AES_ENABLE_CBC
     struct TC_AES_ctx ctx;
     TC_AES_init_ctx_iv(&ctx, record->key, record->iv);
     if (encrypt)
@@ -186,7 +186,7 @@ static int cavp_standard_case(enum cavp_mode mode, const char* file, int encrypt
     return 0;
 #endif
   } else {
-#if defined(TC_AES_ENABLE_OFB) && (TC_AES_ENABLE_OFB == 1)
+#if TC_AES_ENABLE_OFB
     struct TC_AES_ctx ctx;
     TC_AES_init_ctx_iv(&ctx, record->key, record->iv);
     TC_AES_OFB_crypt(&ctx, actual, input_len);
@@ -408,7 +408,7 @@ static int cavp_run_block_file(enum cavp_mode mode, const char* directory, const
 }
 #endif
 
-#if defined(TC_AES_ENABLE_CCM) && (TC_AES_ENABLE_CCM == 1)
+#if TC_AES_ENABLE_CCM
 struct cavp_ccm_record {
   uint8_t *key, *nonce, *aad, *payload, *ct;
   size_t key_len, nonce_len, aad_len, payload_len, ct_len;
@@ -568,7 +568,7 @@ static int cavp_run_ccm_file(const char* filename)
 }
 #endif
 
-#if defined(TC_AES_ENABLE_GCM) && (TC_AES_ENABLE_GCM == 1)
+#if TC_AES_ENABLE_GCM
 static int cavp_run_gcm_decrypt_record(const char* filename, size_t count, const uint8_t* key,
                                        const uint8_t* iv, size_t iv_len, const uint8_t* aad,
                                        size_t aad_len, const uint8_t* ct, size_t ct_len,
@@ -728,7 +728,7 @@ static int cavp_run_gcm_file(const char* filename)
 
 static int cavp_run_all(void)
 {
-#if defined(TC_AES_ENABLE_ECB) && (TC_AES_ENABLE_ECB == 1)
+#if TC_AES_ENABLE_ECB
   static const char* const ecb[] = {"ECBGFSbox128.rsp",  "ECBGFSbox192.rsp",  "ECBGFSbox256.rsp",
                                     "ECBKeySbox128.rsp", "ECBKeySbox192.rsp", "ECBKeySbox256.rsp",
                                     "ECBVarKey128.rsp",  "ECBVarKey192.rsp",  "ECBVarKey256.rsp",
@@ -736,7 +736,7 @@ static int cavp_run_all(void)
                                     "ECBMCT128.rsp",     "ECBMCT192.rsp",     "ECBMCT256.rsp",
                                     "ECBMMT128.rsp",     "ECBMMT192.rsp",     "ECBMMT256.rsp"};
 #endif
-#if defined(TC_AES_ENABLE_CBC) && (TC_AES_ENABLE_CBC == 1)
+#if TC_AES_ENABLE_CBC
   static const char* const cbc[] = {"CBCGFSbox128.rsp",  "CBCGFSbox192.rsp",  "CBCGFSbox256.rsp",
                                     "CBCKeySbox128.rsp", "CBCKeySbox192.rsp", "CBCKeySbox256.rsp",
                                     "CBCVarKey128.rsp",  "CBCVarKey192.rsp",  "CBCVarKey256.rsp",
@@ -744,7 +744,7 @@ static int cavp_run_all(void)
                                     "CBCMCT128.rsp",     "CBCMCT192.rsp",     "CBCMCT256.rsp",
                                     "CBCMMT128.rsp",     "CBCMMT192.rsp",     "CBCMMT256.rsp"};
 #endif
-#if defined(TC_AES_ENABLE_OFB) && (TC_AES_ENABLE_OFB == 1)
+#if TC_AES_ENABLE_OFB
   static const char* const ofb[] = {"OFBGFSbox128.rsp",  "OFBGFSbox192.rsp",  "OFBGFSbox256.rsp",
                                     "OFBKeySbox128.rsp", "OFBKeySbox192.rsp", "OFBKeySbox256.rsp",
                                     "OFBVarKey128.rsp",  "OFBVarKey192.rsp",  "OFBVarKey256.rsp",
@@ -752,26 +752,26 @@ static int cavp_run_all(void)
                                     "OFBMCT128.rsp",     "OFBMCT192.rsp",     "OFBMCT256.rsp",
                                     "OFBMMT128.rsp",     "OFBMMT192.rsp",     "OFBMMT256.rsp"};
 #endif
-#if defined(TC_AES_ENABLE_CCM) && (TC_AES_ENABLE_CCM == 1)
+#if TC_AES_ENABLE_CCM
   static const char* const ccm[] = {"DVPT128.rsp", "DVPT192.rsp", "DVPT256.rsp", "VADT128.rsp",
                                     "VADT192.rsp", "VADT256.rsp", "VNT128.rsp",  "VNT192.rsp",
                                     "VNT256.rsp",  "VPT128.rsp",  "VPT192.rsp",  "VPT256.rsp",
                                     "VTT128.rsp",  "VTT192.rsp",  "VTT256.rsp"};
 #endif
-#if (defined(TC_AES_ENABLE_ECB) && (TC_AES_ENABLE_ECB == 1)) ||                                    \
-    (defined(TC_AES_ENABLE_CBC) && (TC_AES_ENABLE_CBC == 1)) ||                                    \
-    (defined(TC_AES_ENABLE_OFB) && (TC_AES_ENABLE_OFB == 1)) ||                                    \
-    (defined(TC_AES_ENABLE_GCM) && (TC_AES_ENABLE_GCM == 1)) ||                                    \
-    (defined(TC_AES_ENABLE_CCM) && (TC_AES_ENABLE_CCM == 1))
+#if TC_AES_ENABLE_ECB ||                                    \
+    TC_AES_ENABLE_CBC ||                                    \
+    TC_AES_ENABLE_OFB ||                                    \
+    TC_AES_ENABLE_GCM ||                                    \
+    TC_AES_ENABLE_CCM
   size_t i;
 #endif
   int ok = 1;
 
-#if (defined(TC_AES_ENABLE_ECB) && (TC_AES_ENABLE_ECB == 1)) ||                                    \
-    (defined(TC_AES_ENABLE_CBC) && (TC_AES_ENABLE_CBC == 1)) ||                                    \
-    (defined(TC_AES_ENABLE_OFB) && (TC_AES_ENABLE_OFB == 1)) ||                                    \
-    (defined(TC_AES_ENABLE_GCM) && (TC_AES_ENABLE_GCM == 1)) ||                                    \
-    (defined(TC_AES_ENABLE_CCM) && (TC_AES_ENABLE_CCM == 1))
+#if TC_AES_ENABLE_ECB ||                                    \
+    TC_AES_ENABLE_CBC ||                                    \
+    TC_AES_ENABLE_OFB ||                                    \
+    TC_AES_ENABLE_GCM ||                                    \
+    TC_AES_ENABLE_CCM
 #if TC_AES_KEY_BITS == 256
   const char* key_suffix = "256";
 #elif TC_AES_KEY_BITS == 192
@@ -781,22 +781,22 @@ static int cavp_run_all(void)
 #endif
 #endif
 
-#if defined(TC_AES_ENABLE_ECB) && (TC_AES_ENABLE_ECB == 1)
+#if TC_AES_ENABLE_ECB
   for (i = 0; ok && i < sizeof(ecb) / sizeof(ecb[0]); ++i)
     if (strstr(ecb[i], key_suffix) != NULL)
       ok = cavp_run_block_file(CAVP_ECB, "ecb", ecb[i]);
 #endif
-#if defined(TC_AES_ENABLE_CBC) && (TC_AES_ENABLE_CBC == 1)
+#if TC_AES_ENABLE_CBC
   for (i = 0; ok && i < sizeof(cbc) / sizeof(cbc[0]); ++i)
     if (strstr(cbc[i], key_suffix) != NULL)
       ok = cavp_run_block_file(CAVP_CBC, "cbc", cbc[i]);
 #endif
-#if defined(TC_AES_ENABLE_OFB) && (TC_AES_ENABLE_OFB == 1)
+#if TC_AES_ENABLE_OFB
   for (i = 0; ok && i < sizeof(ofb) / sizeof(ofb[0]); ++i)
     if (strstr(ofb[i], key_suffix) != NULL)
       ok = cavp_run_block_file(CAVP_OFB, "ofb", ofb[i]);
 #endif
-#if defined(TC_AES_ENABLE_GCM) && (TC_AES_ENABLE_GCM == 1)
+#if TC_AES_ENABLE_GCM
   {
     static const char* const gcm[] = {"gcmDecrypt128.rsp",      "gcmDecrypt192.rsp",
                                       "gcmDecrypt256.rsp",      "gcmEncryptExtIV128.rsp",
@@ -806,7 +806,7 @@ static int cavp_run_all(void)
         ok = cavp_run_gcm_file(gcm[i]);
   }
 #endif
-#if defined(TC_AES_ENABLE_CCM) && (TC_AES_ENABLE_CCM == 1)
+#if TC_AES_ENABLE_CCM
   for (i = 0; ok && i < sizeof(ccm) / sizeof(ccm[0]); ++i)
     if (strstr(ccm[i], key_suffix) != NULL)
       ok = cavp_run_ccm_file(ccm[i]);
@@ -818,11 +818,11 @@ MunitResult test_cavp(const MunitParameter params[], void* data)
 {
   (void)params;
   (void)data;
-#if (defined(TC_AES_ENABLE_ECB) && (TC_AES_ENABLE_ECB == 1)) ||                                    \
-    (defined(TC_AES_ENABLE_CBC) && (TC_AES_ENABLE_CBC == 1)) ||                                    \
-    (defined(TC_AES_ENABLE_OFB) && (TC_AES_ENABLE_OFB == 1)) ||                                    \
-    (defined(TC_AES_ENABLE_GCM) && (TC_AES_ENABLE_GCM == 1)) ||                                    \
-    (defined(TC_AES_ENABLE_CCM) && (TC_AES_ENABLE_CCM == 1))
+#if TC_AES_ENABLE_ECB ||                                    \
+    TC_AES_ENABLE_CBC ||                                    \
+    TC_AES_ENABLE_OFB ||                                    \
+    TC_AES_ENABLE_GCM ||                                    \
+    TC_AES_ENABLE_CCM
   cavp_initialize_sbox();
 #endif
   return cavp_run_all() ? MUNIT_OK : MUNIT_FAIL;

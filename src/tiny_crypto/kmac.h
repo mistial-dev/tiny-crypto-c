@@ -4,10 +4,6 @@
 
 #include <tiny_crypto/common.h>
 
-#if (TC_ENABLE_KMAC256 != 0) && (TC_ENABLE_KMAC256 != 1)
-#error "TC_ENABLE_KMAC256 must be 0 or 1"
-#endif
-
 #if TC_ENABLE_KMAC256
 /* KMAC256 state (SP 800-185). Initialize through TC_KMAC256_init.
  * Members are private to the implementation. */

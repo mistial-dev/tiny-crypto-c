@@ -23,7 +23,7 @@
 #endif
 
 /* The corpus needs every mode and TDES. Skip the whole TU otherwise. */
-#if defined(TC_DES_CAVP) && (TC_DES_CAVP == 1) && (TC_DES_ENABLE_ECB == 1) &&                      \
+#if TC_DES_CAVP && (TC_DES_ENABLE_ECB == 1) &&                      \
     (TC_DES_ENABLE_CBC == 1) && (TC_DES_ENABLE_CFB1 == 1) && (TC_DES_ENABLE_CFB8 == 1) &&          \
     (TC_DES_ENABLE_CFB64 == 1) && (TC_DES_ENABLE_OFB == 1) && (TC_DES_ENABLE_TDES == 1)
 

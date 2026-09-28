@@ -4,7 +4,7 @@
  * AES-SIV deterministic authenticated encryption (RFC 5297). */
 #include "aes_mac_core_internal.h"
 
-#if defined(TC_AES_ENABLE_SIV) && (TC_AES_ENABLE_SIV == 1)
+#if TC_AES_ENABLE_SIV
 static TC_status tc_aes_cmac_concat(const uint8_t* round_key, const uint8_t k1[TC_AES_BLOCKLEN],
                                     const uint8_t k2[TC_AES_BLOCKLEN], const uint8_t* a,
                                     size_t a_len, const uint8_t* b, size_t b_len,
@@ -28,7 +28,7 @@ static TC_status tc_aes_cmac_concat(const uint8_t* round_key, const uint8_t k1[T
 }
 #endif
 
-#if defined(TC_AES_ENABLE_SIV) && (TC_AES_ENABLE_SIV == 1)
+#if TC_AES_ENABLE_SIV
 static TC_status tc_aes_cmac_with_subkeys(const uint8_t* round_key,
                                           const uint8_t k1[TC_AES_BLOCKLEN],
                                           const uint8_t k2[TC_AES_BLOCKLEN], const uint8_t* data,
@@ -38,7 +38,7 @@ static TC_status tc_aes_cmac_with_subkeys(const uint8_t* round_key,
 }
 #endif
 
-#if defined(TC_AES_ENABLE_SIV) && (TC_AES_ENABLE_SIV == 1)
+#if TC_AES_ENABLE_SIV
 
 static TC_status tc_aes_siv_s2v(const uint8_t* k1_round, const uint8_t* const* ad,
                                 const size_t* ad_lens, size_t ad_count, const uint8_t* last,

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "aes_mac_core_internal.h"
 
-#if defined(TC_AES_ENABLE_CCM) && (TC_AES_ENABLE_CCM == 1)
+#if TC_AES_ENABLE_CCM
 
 #define TC_AES_CCM_MIN_NONCE_LEN 7u
 #define TC_AES_CCM_MAX_NONCE_LEN 13u

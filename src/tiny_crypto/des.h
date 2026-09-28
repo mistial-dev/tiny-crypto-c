@@ -21,46 +21,6 @@
  * Only TC_DES_ENABLE_* names are used so this header can co-exist with aes.h.
  */
 
-#if (TC_DES_ENABLE_ECB != 0) && (TC_DES_ENABLE_ECB != 1)
-#error "TC_DES_ENABLE_ECB must be 0 or 1"
-#endif
-#if (TC_DES_ENABLE_CBC != 0) && (TC_DES_ENABLE_CBC != 1)
-#error "TC_DES_ENABLE_CBC must be 0 or 1"
-#endif
-#if (TC_DES_ENABLE_CTR != 0) && (TC_DES_ENABLE_CTR != 1)
-#error "TC_DES_ENABLE_CTR must be 0 or 1"
-#endif
-#if (TC_DES_ENABLE_OFB != 0) && (TC_DES_ENABLE_OFB != 1)
-#error "TC_DES_ENABLE_OFB must be 0 or 1"
-#endif
-#if (TC_DES_ENABLE_CFB1 != 0) && (TC_DES_ENABLE_CFB1 != 1)
-#error "TC_DES_ENABLE_CFB1 must be 0 or 1"
-#endif
-#if (TC_DES_ENABLE_CFB8 != 0) && (TC_DES_ENABLE_CFB8 != 1)
-#error "TC_DES_ENABLE_CFB8 must be 0 or 1"
-#endif
-#if (TC_DES_ENABLE_CFB64 != 0) && (TC_DES_ENABLE_CFB64 != 1)
-#error "TC_DES_ENABLE_CFB64 must be 0 or 1"
-#endif
-#if (TC_DES_ENABLE_TDES != 0) && (TC_DES_ENABLE_TDES != 1)
-#error "TC_DES_ENABLE_TDES must be 0 or 1"
-#endif
-#if (TC_DES_ENABLE_CMAC != 0) && (TC_DES_ENABLE_CMAC != 1)
-#error "TC_DES_ENABLE_CMAC must be 0 or 1"
-#endif
-#if (TC_DES_ENABLE_ISO9797 != 0) && (TC_DES_ENABLE_ISO9797 != 1)
-#error "TC_DES_ENABLE_ISO9797 must be 0 or 1"
-#endif
-#if (TC_DES_REJECT_WEAK_KEYS != 0) && (TC_DES_REJECT_WEAK_KEYS != 1)
-#error "TC_DES_REJECT_WEAK_KEYS must be 0 or 1"
-#endif
-
-#if TC_ENABLE_DES && !TC_DES_ENABLE_ECB && !TC_DES_ENABLE_CBC && !TC_DES_ENABLE_CTR &&             \
-    !TC_DES_ENABLE_OFB && !TC_DES_ENABLE_CFB1 && !TC_DES_ENABLE_CFB8 && !TC_DES_ENABLE_CFB64 &&    \
-    !TC_DES_ENABLE_CMAC && !TC_DES_ENABLE_ISO9797
-#error "DES requires at least one enabled mode or CMAC"
-#endif
-
 /* Modes that keep chaining state in ctx->Iv */
 #if (TC_DES_ENABLE_CBC == 1) || (TC_DES_ENABLE_CTR == 1) || (TC_DES_ENABLE_CFB1 == 1) ||           \
     (TC_DES_ENABLE_CFB8 == 1) || (TC_DES_ENABLE_CFB64 == 1) || (TC_DES_ENABLE_OFB == 1)
@@ -453,13 +413,6 @@ TC_status TC_DES3_OFB_crypt(struct TC_DES3_ctx* ctx, uint8_t* buf, size_t length
  * most applications. Shorter tags need careful risk analysis. Default 8 (full
  * DES block). Override only for exotic vectors.
  */
-#ifndef TC_DES_CMAC_MIN_TAG_LEN
-#define TC_DES_CMAC_MIN_TAG_LEN 8
-#endif
-
-#if (TC_DES_CMAC_MIN_TAG_LEN < 1) || (TC_DES_CMAC_MIN_TAG_LEN > TC_DES_BLOCKLEN)
-#error "TC_DES_CMAC_MIN_TAG_LEN must be in 1..8"
-#endif
 
 /*
  * DES/3DES-CMAC (NIST SP 800-38B). One-shot.

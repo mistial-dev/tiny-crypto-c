@@ -24,7 +24,7 @@
 #define CMAC_CAVP_DIR "tests/vectors/aes/cmac"
 #endif
 
-#if defined(TC_AES_ENABLE_CMAC) && (TC_AES_ENABLE_CMAC == 1)
+#if TC_AES_ENABLE_CMAC
 
 #if TC_AES_SBOX_MODE == TC_AES_SBOX_MODE_RUNTIME
 static void cmac_initialize_sbox(void)
@@ -419,7 +419,7 @@ static MunitResult test_cmac_wycheproof(const MunitParameter params[], void* dat
   return MUNIT_OK;
 }
 
-#if defined(TC_AES_CAVP) && (TC_AES_CAVP == 1)
+#if TC_AES_CAVP
 /* CAVP CMAC max message is 65536 bytes (hex line ~131 KiB). Host-test BSS only. */
 #define CMAC_CAVP_MSG_MAX 65536u
 #define CMAC_CAVP_LINE_MAX (CMAC_CAVP_MSG_MAX * 2u + 64u)
@@ -588,7 +588,7 @@ MunitResult test_cmac(const MunitParameter params[], void* data)
     return MUNIT_FAIL;
   if (test_cmac_wycheproof(params, data) != MUNIT_OK)
     return MUNIT_FAIL;
-#if defined(TC_AES_CAVP) && (TC_AES_CAVP == 1)
+#if TC_AES_CAVP
   if (test_cmac_cavp_gen(params, data) != MUNIT_OK || test_cmac_cavp_ver(params, data) != MUNIT_OK)
     return MUNIT_FAIL;
 #endif

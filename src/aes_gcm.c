@@ -8,7 +8,7 @@
 #include "aes_internal.h"
 #include "aes_ghash_internal.h"
 
-#if defined(TC_AES_ENABLE_GCM) && (TC_AES_ENABLE_GCM == 1)
+#if TC_AES_ENABLE_GCM
 
 #define TC_AES_GCM_PHASE_UNINIT 0u
 #define TC_AES_GCM_PHASE_AAD 1u

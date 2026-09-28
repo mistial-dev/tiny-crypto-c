@@ -26,7 +26,7 @@
 #define CAVP_VECTOR_DIR "tests/vectors/hash/cavp"
 #endif
 
-#if defined(TC_HASH_CAVP) && (TC_HASH_CAVP == 1)
+#if TC_HASH_CAVP
 
 /* SHA-384/512 LongMsg lines carry up to 12800 message bytes (25600 hex
    characters plus the "Msg = " prefix and CRLF). */

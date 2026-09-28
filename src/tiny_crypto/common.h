@@ -91,14 +91,6 @@ typedef enum {
 #define TC_OK 0
 #define TC_MISMATCH 1
 
-#if (TC_ZEROIZE != 0) && (TC_ZEROIZE != 1)
-#error "TC_ZEROIZE must be 0 or 1"
-#endif
-
-#if (TC_STRICT != 0) && (TC_STRICT != 1)
-#error "TC_STRICT must be 0 or 1"
-#endif
-
 /* Best-effort secret wipe. memory must be valid for length bytes. NULL is
  * accepted only when length is zero. The compiler barrier prevents common
  * dead-store removal. Copies already held in CPU registers remain. */

@@ -31,25 +31,6 @@
  * aes.h / des.h in the same translation unit.
  */
 
-#if (TC_ENABLE_SHA1 != 0) && (TC_ENABLE_SHA1 != 1)
-#error "TC_ENABLE_SHA1 must be 0 or 1"
-#endif
-#if (TC_ENABLE_SHA224 != 0) && (TC_ENABLE_SHA224 != 1)
-#error "TC_ENABLE_SHA224 must be 0 or 1"
-#endif
-#if (TC_ENABLE_SHA256 != 0) && (TC_ENABLE_SHA256 != 1)
-#error "TC_ENABLE_SHA256 must be 0 or 1"
-#endif
-#if (TC_ENABLE_SHA384 != 0) && (TC_ENABLE_SHA384 != 1)
-#error "TC_ENABLE_SHA384 must be 0 or 1"
-#endif
-#if (TC_ENABLE_SHA512 != 0) && (TC_ENABLE_SHA512 != 1)
-#error "TC_ENABLE_SHA512 must be 0 or 1"
-#endif
-#if (TC_ENABLE_HMAC != 0) && (TC_ENABLE_HMAC != 1)
-#error "TC_ENABLE_HMAC must be 0 or 1"
-#endif
-
 #if (TC_ENABLE_SHA1 == 0) && (TC_ENABLE_SHA224 == 0) && (TC_ENABLE_SHA256 == 0) &&                 \
     (TC_ENABLE_SHA384 == 0) && (TC_ENABLE_SHA512 == 0)
 #error "at least one of TC_ENABLE_SHA1 / SHA224 / SHA256 / SHA384 / SHA512 must be 1"
@@ -65,34 +46,6 @@
 #define TC_SHA384_BLOCKLEN 128 /**< SHA-384 block length in bytes (1024 bits) */
 #define TC_SHA512_DIGESTLEN 64 /**< SHA-512 digest length in bytes (512 bits) */
 #define TC_SHA512_BLOCKLEN 128 /**< SHA-512 block length in bytes (1024 bits) */
-
-#if TC_ENABLE_HMAC
-/*
- * Minimum accepted HMAC tag length in bytes for the one-shot HMAC_* / *_verify
- * APIs. Shorter truncations need a risk analysis (RFC 2104 section 5 asks for
- * at least half the digest length and at least 80 bits). The streaming
- * *_final API always emits the full tag and is unaffected.
- */
-
-#if (TC_HMAC_MIN_TAG_LEN < 1)
-#error "TC_HMAC_MIN_TAG_LEN must be at least 1"
-#endif
-#if TC_ENABLE_SHA1 && (TC_HMAC_MIN_TAG_LEN > TC_SHA1_DIGESTLEN)
-#error "TC_HMAC_MIN_TAG_LEN must not exceed TC_SHA1_DIGESTLEN when SHA-1 is enabled"
-#endif
-#if TC_ENABLE_SHA224 && (TC_HMAC_MIN_TAG_LEN > TC_SHA224_DIGESTLEN)
-#error "TC_HMAC_MIN_TAG_LEN must not exceed TC_SHA224_DIGESTLEN when SHA-224 is enabled"
-#endif
-#if TC_ENABLE_SHA256 && (TC_HMAC_MIN_TAG_LEN > TC_SHA256_DIGESTLEN)
-#error "TC_HMAC_MIN_TAG_LEN must not exceed TC_SHA256_DIGESTLEN"
-#endif
-#if TC_ENABLE_SHA384 && (TC_HMAC_MIN_TAG_LEN > TC_SHA384_DIGESTLEN)
-#error "TC_HMAC_MIN_TAG_LEN must not exceed TC_SHA384_DIGESTLEN"
-#endif
-#if TC_ENABLE_SHA512 && (TC_HMAC_MIN_TAG_LEN > TC_SHA512_DIGESTLEN)
-#error "TC_HMAC_MIN_TAG_LEN must not exceed TC_SHA512_DIGESTLEN"
-#endif
-#endif /* TC_ENABLE_HMAC */
 
 #if TC_ENABLE_SHA1
 /**

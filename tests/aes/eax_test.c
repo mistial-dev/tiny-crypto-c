@@ -21,10 +21,10 @@
 #define EAX_VECTOR_FILE "tests/vectors/wycheproof/testvectors_v1/aes_eax_test.json"
 #endif
 
-#if (defined(TC_AES_ENABLE_EAX) && (TC_AES_ENABLE_EAX == 1)) ||                                    \
-    (defined(TC_AES_ENABLE_EAX_PRIME) && (TC_AES_ENABLE_EAX_PRIME == 1))
+#if TC_AES_ENABLE_EAX ||                                    \
+    TC_AES_ENABLE_EAX_PRIME
 
-#if defined(TC_AES_ENABLE_EAX) && (TC_AES_ENABLE_EAX == 1)
+#if TC_AES_ENABLE_EAX
 
 #if TC_AES_KEY_BITS == 128
 struct eax_rfc_vector {
@@ -343,7 +343,7 @@ MunitResult test_eax(const MunitParameter params[], void* data)
 
 #endif /* EAX */
 
-#if defined(TC_AES_ENABLE_EAX_PRIME) && (TC_AES_ENABLE_EAX_PRIME == 1)
+#if TC_AES_ENABLE_EAX_PRIME
 
 static MunitResult test_eax_prime_worked(const MunitParameter params[], void* data)
 {

@@ -9,7 +9,7 @@
 /*****************************************************************************/
 /* Public functions:                                                         */
 /*****************************************************************************/
-#if defined(TC_AES_ENABLE_ECB) && (TC_AES_ENABLE_ECB == 1)
+#if TC_AES_ENABLE_ECB
 
 TC_status TC_AES_ECB_encrypt(const struct TC_AES_key_ctx* ctx, uint8_t* buf)
 {
@@ -100,7 +100,7 @@ TC_status TC_AES_CBC_decrypt(struct TC_AES_ctx* ctx, uint8_t* buffer, size_t len
 }
 #endif /* CBC */
 
-#if defined(TC_AES_ENABLE_CTR) && (TC_AES_ENABLE_CTR == 1)
+#if TC_AES_ENABLE_CTR
 
 TC_status TC_AES_CTR_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length)
 {
@@ -142,7 +142,7 @@ TC_status TC_AES_CTR_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length)
 
 #endif /* CTR */
 
-#if defined(TC_AES_ENABLE_OFB) && (TC_AES_ENABLE_OFB == 1)
+#if TC_AES_ENABLE_OFB
 
 TC_status TC_AES_OFB_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length)
 {

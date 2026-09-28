@@ -26,11 +26,11 @@ static inline void tc_aes_copy_bytes(uint8_t* dst, const uint8_t* src, size_t le
   memcpy(dst, src, length);
 }
 
-#if (defined(TC_AES_ENABLE_GCM) && (TC_AES_ENABLE_GCM == 1)) ||                                    \
-    (defined(TC_AES_ENABLE_CCM) && (TC_AES_ENABLE_CCM == 1)) ||                                    \
-    (defined(TC_AES_ENABLE_EAX) && (TC_AES_ENABLE_EAX == 1)) ||                                    \
-    (defined(TC_AES_ENABLE_EAX_PRIME) && (TC_AES_ENABLE_EAX_PRIME == 1)) ||                        \
-    (defined(TC_AES_ENABLE_SIV) && (TC_AES_ENABLE_SIV == 1))
+#if TC_AES_ENABLE_GCM ||                                    \
+    TC_AES_ENABLE_CCM ||                                    \
+    TC_AES_ENABLE_EAX ||                                    \
+    TC_AES_ENABLE_EAX_PRIME ||                        \
+    TC_AES_ENABLE_SIV
 /*
  * Completely disjoint buffers. An exact alias counts as overlap.
  * Empty lengths are always treated as disjoint.

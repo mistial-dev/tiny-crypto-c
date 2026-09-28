@@ -75,9 +75,9 @@ static const uint8_t sbox[256] TC_AES_TABLE_STORAGE = {
     0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16};
 #endif
 
-#if (defined(TC_AES_ENABLE_CBC) && TC_AES_ENABLE_CBC == 1) ||                                      \
-    (defined(TC_AES_ENABLE_ECB) && TC_AES_ENABLE_ECB == 1) ||                                      \
-    (defined(TC_AES_CAVP) && TC_AES_CAVP == 1) || TC_AES_ENABLE_DYNAMIC
+#if TC_AES_ENABLE_CBC ||                                      \
+    TC_AES_ENABLE_ECB ||                                      \
+    TC_AES_CAVP || TC_AES_ENABLE_DYNAMIC
 #if TC_AES_SBOX_MODE == TC_AES_SBOX_MODE_RUNTIME
 static uint8_t rsbox[256];
 #elif TC_AES_SBOX_MODE == TC_AES_SBOX_MODE_FAST
@@ -156,9 +156,9 @@ void TC_AES_init_sbox(void)
                         tc_aes_sbox_rotate_left(inverse, 4) ^ 0x63);
   }
 
-#if (defined(TC_AES_ENABLE_CBC) && TC_AES_ENABLE_CBC == 1) ||                                      \
-    (defined(TC_AES_ENABLE_ECB) && TC_AES_ENABLE_ECB == 1) ||                                      \
-    (defined(TC_AES_CAVP) && TC_AES_CAVP == 1) || TC_AES_ENABLE_DYNAMIC
+#if TC_AES_ENABLE_CBC ||                                      \
+    TC_AES_ENABLE_ECB ||                                      \
+    TC_AES_CAVP || TC_AES_ENABLE_DYNAMIC
   for (i = 0; i < 256; ++i)
     rsbox[sbox[i]] = (uint8_t)i;
 #endif
@@ -315,24 +315,24 @@ TC_status TC_AES_init_ctx(struct TC_AES_ctx* ctx, const uint8_t* key)
   TC_AES_ctx_clear(ctx);
   if (TC_AES_key_init(&ctx->key, key) != TC_OK)
     return TC_ERROR;
-#if (defined(TC_AES_ENABLE_CBC) && (TC_AES_ENABLE_CBC == 1)) ||                                    \
-    (defined(TC_AES_ENABLE_CTR) && (TC_AES_ENABLE_CTR == 1)) ||                                    \
-    (defined(TC_AES_ENABLE_OFB) && (TC_AES_ENABLE_OFB == 1))
+#if TC_AES_ENABLE_CBC ||                                    \
+    TC_AES_ENABLE_CTR ||                                    \
+    TC_AES_ENABLE_OFB
   memset(ctx->iv, 0, TC_AES_BLOCKLEN);
 #endif
-#if defined(TC_AES_ENABLE_CTR) && (TC_AES_ENABLE_CTR == 1)
+#if TC_AES_ENABLE_CTR
   memset(ctx->ctr_stream, 0, TC_AES_BLOCKLEN);
   ctx->ctr_pos = TC_AES_BLOCKLEN;
   ctx->ctr_exhausted = 0;
 #endif
-#if defined(TC_AES_ENABLE_OFB) && (TC_AES_ENABLE_OFB == 1)
+#if TC_AES_ENABLE_OFB
   ctx->ofb_pos = TC_AES_BLOCKLEN;
 #endif
   return TC_OK;
 }
-#if (defined(TC_AES_ENABLE_CBC) && (TC_AES_ENABLE_CBC == 1)) ||                                    \
-    (defined(TC_AES_ENABLE_CTR) && (TC_AES_ENABLE_CTR == 1)) ||                                    \
-    (defined(TC_AES_ENABLE_OFB) && (TC_AES_ENABLE_OFB == 1))
+#if TC_AES_ENABLE_CBC ||                                    \
+    TC_AES_ENABLE_CTR ||                                    \
+    TC_AES_ENABLE_OFB
 TC_status TC_AES_init_ctx_iv(struct TC_AES_ctx* ctx, const uint8_t* key, const uint8_t* iv)
 {
   if (ctx == NULL)
@@ -344,11 +344,11 @@ TC_status TC_AES_init_ctx_iv(struct TC_AES_ctx* ctx, const uint8_t* key, const u
   if (TC_AES_init_ctx(ctx, key) != TC_OK)
     return TC_ERROR;
   tc_aes_copy_bytes(ctx->iv, iv, TC_AES_BLOCKLEN);
-#if defined(TC_AES_ENABLE_CTR) && (TC_AES_ENABLE_CTR == 1)
+#if TC_AES_ENABLE_CTR
   ctx->ctr_pos = TC_AES_BLOCKLEN;
   ctx->ctr_exhausted = 0;
 #endif
-#if defined(TC_AES_ENABLE_OFB) && (TC_AES_ENABLE_OFB == 1)
+#if TC_AES_ENABLE_OFB
   ctx->ofb_pos = TC_AES_BLOCKLEN;
 #endif
   return TC_OK;
@@ -358,28 +358,28 @@ TC_status TC_AES_ctx_set_iv(struct TC_AES_ctx* ctx, const uint8_t* iv)
   if (ctx == NULL || ctx->key.active != 1 || iv == NULL)
     return TC_ERROR;
   tc_aes_copy_bytes(ctx->iv, iv, TC_AES_BLOCKLEN);
-#if defined(TC_AES_ENABLE_CTR) && (TC_AES_ENABLE_CTR == 1)
+#if TC_AES_ENABLE_CTR
   ctx->ctr_pos = TC_AES_BLOCKLEN;
   ctx->ctr_exhausted = 0;
 #endif
-#if defined(TC_AES_ENABLE_OFB) && (TC_AES_ENABLE_OFB == 1)
+#if TC_AES_ENABLE_OFB
   ctx->ofb_pos = TC_AES_BLOCKLEN;
 #endif
   return TC_OK;
 }
 #endif
 
-#if (defined(TC_AES_ENABLE_CBC) && TC_AES_ENABLE_CBC == 1) ||                                      \
-    (defined(TC_AES_ENABLE_ECB) && TC_AES_ENABLE_ECB == 1) ||                                      \
-    (defined(TC_AES_ENABLE_CTR) && TC_AES_ENABLE_CTR == 1) ||                                      \
-    (defined(TC_AES_ENABLE_OFB) && TC_AES_ENABLE_OFB == 1) ||                                      \
-    (defined(TC_AES_ENABLE_GCM) && TC_AES_ENABLE_GCM == 1) ||                                      \
-    (defined(TC_AES_ENABLE_CCM) && TC_AES_ENABLE_CCM == 1) ||                                      \
-    (defined(TC_AES_ENABLE_EAX) && TC_AES_ENABLE_EAX == 1) ||                                      \
-    (defined(TC_AES_ENABLE_EAX_PRIME) && TC_AES_ENABLE_EAX_PRIME == 1) ||                          \
-    (defined(TC_AES_ENABLE_SIV) && TC_AES_ENABLE_SIV == 1) ||                                      \
-    (defined(TC_AES_ENABLE_CMAC) && TC_AES_ENABLE_CMAC == 1) ||                                    \
-    (defined(TC_AES_CAVP) && TC_AES_CAVP == 1) || TC_AES_ENABLE_DYNAMIC
+#if TC_AES_ENABLE_CBC ||                                      \
+    TC_AES_ENABLE_ECB ||                                      \
+    TC_AES_ENABLE_CTR ||                                      \
+    TC_AES_ENABLE_OFB ||                                      \
+    TC_AES_ENABLE_GCM ||                                      \
+    TC_AES_ENABLE_CCM ||                                      \
+    TC_AES_ENABLE_EAX ||                                      \
+    TC_AES_ENABLE_EAX_PRIME ||                          \
+    TC_AES_ENABLE_SIV ||                                      \
+    TC_AES_ENABLE_CMAC ||                                    \
+    TC_AES_CAVP || TC_AES_ENABLE_DYNAMIC
 
 /* Add the selected round key to the state. */
 static void tc_aes_add_round_key(uint8_t round, state_t* state, const uint8_t* round_key)
@@ -450,9 +450,9 @@ static void tc_aes_mix_columns(state_t* state)
   }
 }
 
-#if (defined(TC_AES_ENABLE_CBC) && TC_AES_ENABLE_CBC == 1) ||                                      \
-    (defined(TC_AES_ENABLE_ECB) && TC_AES_ENABLE_ECB == 1) ||                                      \
-    (defined(TC_AES_CAVP) && TC_AES_CAVP == 1) || TC_AES_ENABLE_DYNAMIC
+#if TC_AES_ENABLE_CBC ||                                      \
+    TC_AES_ENABLE_ECB ||                                      \
+    TC_AES_CAVP || TC_AES_ENABLE_DYNAMIC
 static uint8_t tc_aes_inverse_sbox_value(uint8_t num)
 {
 #if TC_AES_SBOX_MODE == TC_AES_SBOX_MODE_FAST
@@ -584,7 +584,7 @@ TC_status tc_aes_cipher(state_t* state, const uint8_t* round_key)
 }
 #endif
 
-#if defined(TC_AES_CAVP) && (TC_AES_CAVP == 1)
+#if TC_AES_CAVP
 void TC_AES_CAVP_encrypt_block(const uint8_t* key, uint8_t block[TC_AES_BLOCKLEN])
 {
   struct TC_AES_ctx ctx;
@@ -599,9 +599,9 @@ void TC_AES_CAVP_encrypt_block(const uint8_t* key, uint8_t block[TC_AES_BLOCKLEN
 
 #endif
 
-#if (defined(TC_AES_ENABLE_CBC) && TC_AES_ENABLE_CBC == 1) ||                                      \
-    (defined(TC_AES_ENABLE_ECB) && TC_AES_ENABLE_ECB == 1) ||                                      \
-    (defined(TC_AES_CAVP) && TC_AES_CAVP == 1) || TC_AES_ENABLE_DYNAMIC
+#if TC_AES_ENABLE_CBC ||                                      \
+    TC_AES_ENABLE_ECB ||                                      \
+    TC_AES_CAVP || TC_AES_ENABLE_DYNAMIC
 TC_status tc_aes_inverse_rounds(state_t* state, const uint8_t* round_key, uint8_t rounds)
 {
   uint8_t round = 0;
@@ -625,7 +625,7 @@ TC_status tc_aes_inverse_rounds(state_t* state, const uint8_t* round_key, uint8_
   return TC_OK;
 }
 
-#if defined(TC_AES_CAVP) && TC_AES_CAVP == 1
+#if TC_AES_CAVP
 static TC_status tc_aes_inverse_cipher(state_t* state, const uint8_t* round_key)
 {
   return tc_aes_inverse_rounds(state, round_key, Nr);
@@ -633,7 +633,7 @@ static TC_status tc_aes_inverse_cipher(state_t* state, const uint8_t* round_key)
 #endif
 #endif
 
-#if defined(TC_AES_CAVP) && (TC_AES_CAVP == 1)
+#if TC_AES_CAVP
 void TC_AES_CAVP_decrypt_block(const uint8_t* key, uint8_t block[TC_AES_BLOCKLEN])
 {
   struct TC_AES_ctx ctx;

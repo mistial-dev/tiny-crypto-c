@@ -9,7 +9,7 @@
 #define TC_AES_GHASH_INTERNAL_H
 #include "aes_internal.h"
 
-#if defined(TC_AES_ENABLE_GCM) && (TC_AES_ENABLE_GCM == 1)
+#if TC_AES_ENABLE_GCM
 #if TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_FAST_TABLE
 /* Build ghash_table[n] = n * H for each 4-bit n. The table depends on the key
  * and is wiped with the context. */

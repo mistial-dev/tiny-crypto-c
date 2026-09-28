@@ -14,7 +14,7 @@
 #include "cavp.h"
 #include "munit.h"
 #include "test_vectors.h"
-#if defined(TC_AES_ENABLE_GCM) && (TC_AES_ENABLE_GCM == 1)
+#if TC_AES_ENABLE_GCM
 #include "gcm_test_vectors.h"
 #endif
 
@@ -52,19 +52,19 @@ static void test_initialize_sbox(void)
 {}
 #endif
 
-#if defined(TC_AES_CAVP) && (TC_AES_CAVP == 1)
+#if TC_AES_CAVP
 MunitResult test_cavp(const MunitParameter params[], void* data);
 #endif
-#if defined(TC_AES_ENABLE_EAX) && (TC_AES_ENABLE_EAX == 1)
+#if TC_AES_ENABLE_EAX
 MunitResult test_eax(const MunitParameter params[], void* data);
 #endif
-#if defined(TC_AES_ENABLE_EAX_PRIME) && (TC_AES_ENABLE_EAX_PRIME == 1)
+#if TC_AES_ENABLE_EAX_PRIME
 MunitResult test_eax_prime(const MunitParameter params[], void* data);
 #endif
-#if defined(TC_AES_ENABLE_SIV) && (TC_AES_ENABLE_SIV == 1)
+#if TC_AES_ENABLE_SIV
 MunitResult test_siv(const MunitParameter params[], void* data);
 #endif
-#if defined(TC_AES_ENABLE_CMAC) && (TC_AES_ENABLE_CMAC == 1)
+#if TC_AES_ENABLE_CMAC
 MunitResult test_cmac(const MunitParameter params[], void* data);
 #endif
 
@@ -185,7 +185,7 @@ static MunitResult test_secure_zero_and_clear(const MunitParameter params[], voi
   return MUNIT_OK;
 }
 
-#if defined(TC_AES_ENABLE_GCM) && (TC_AES_ENABLE_GCM == 1)
+#if TC_AES_ENABLE_GCM
 #if TC_AES_KEY_BITS == 256
 #define TEST_GCM_VECTOR gcm_test_vectors[2]
 #elif TC_AES_KEY_BITS == 192
@@ -195,7 +195,7 @@ static MunitResult test_secure_zero_and_clear(const MunitParameter params[], voi
 #endif
 #endif
 
-#if defined(TC_AES_ENABLE_ECB) && (TC_AES_ENABLE_ECB == 1)
+#if TC_AES_ENABLE_ECB
 static MunitResult test_ecb(const MunitParameter params[], void* data)
 {
   struct TC_AES_ctx ctx;
@@ -217,7 +217,7 @@ static MunitResult test_ecb(const MunitParameter params[], void* data)
 }
 #endif
 
-#if defined(TC_AES_ENABLE_CBC) && (TC_AES_ENABLE_CBC == 1)
+#if TC_AES_ENABLE_CBC
 static MunitResult test_cbc(const MunitParameter params[], void* data)
 {
   struct TC_AES_ctx ctx;
@@ -258,7 +258,7 @@ static MunitResult test_cbc_alignment(const MunitParameter params[], void* data)
 }
 #endif
 
-#if defined(TC_AES_ENABLE_CTR) && (TC_AES_ENABLE_CTR == 1)
+#if TC_AES_ENABLE_CTR
 static MunitResult test_ctr(const MunitParameter params[], void* data)
 {
   struct TC_AES_ctx ctx;
@@ -355,7 +355,7 @@ static MunitResult test_ctr_wrap(const MunitParameter params[], void* data)
 }
 #endif
 
-#if defined(TC_AES_ENABLE_OFB) && (TC_AES_ENABLE_OFB == 1)
+#if TC_AES_ENABLE_OFB
 static MunitResult test_ofb(const MunitParameter params[], void* data)
 {
   static const size_t encrypt_chunks[] = {1, 15, 17, 31};
@@ -413,7 +413,7 @@ static MunitResult test_ofb(const MunitParameter params[], void* data)
 }
 #endif
 
-#if defined(TC_AES_ENABLE_CCM) && (TC_AES_ENABLE_CCM == 1)
+#if TC_AES_ENABLE_CCM
 #if TC_AES_KEY_BITS == 128
 static void test_ccm_vector(const uint8_t* key, const uint8_t* nonce, size_t nonce_len,
                             const uint8_t* aad, size_t aad_len, const uint8_t* plaintext,
@@ -629,7 +629,7 @@ static MunitResult test_ccm_api(const MunitParameter params[], void* data)
 
 #endif
 
-#if defined(TC_AES_ENABLE_GCM) && (TC_AES_ENABLE_GCM == 1)
+#if TC_AES_ENABLE_GCM
 static MunitResult test_gcm(const MunitParameter params[], void* data)
 {
   const struct gcm_test_vector* vector = &TEST_GCM_VECTOR;
@@ -926,51 +926,51 @@ static MunitTest test_suite_tests[] = {
    * missing TC_AES_init_sbox() in a later test. On Unix, each test is forked and
    * gets a fresh BSS, so the same bug fails there immediately.
    */
-#if defined(TC_AES_ENABLE_SIV) && (TC_AES_ENABLE_SIV == 1)
+#if TC_AES_ENABLE_SIV
     {"/siv", test_siv, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
 #endif
-#if defined(TC_AES_ENABLE_CMAC) && (TC_AES_ENABLE_CMAC == 1)
+#if TC_AES_ENABLE_CMAC
     {"/cmac", test_cmac, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
 #endif
-#if defined(TC_AES_ENABLE_EAX) && (TC_AES_ENABLE_EAX == 1)
+#if TC_AES_ENABLE_EAX
     {"/eax", test_eax, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
 #endif
-#if defined(TC_AES_ENABLE_EAX_PRIME) && (TC_AES_ENABLE_EAX_PRIME == 1)
+#if TC_AES_ENABLE_EAX_PRIME
     {"/eax-prime", test_eax_prime, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
 #endif
     {"/secure-zero-clear", test_secure_zero_and_clear, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/key-schedule", test_key_schedule, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/invalid-key-state", test_invalid_key_state, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-#if defined(TC_AES_ENABLE_ECB) && (TC_AES_ENABLE_ECB == 1)
+#if TC_AES_ENABLE_ECB
     {"/ecb", test_ecb, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
 #endif
-#if defined(TC_AES_ENABLE_CBC) && (TC_AES_ENABLE_CBC == 1)
+#if TC_AES_ENABLE_CBC
     {"/cbc", test_cbc, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/cbc-alignment", test_cbc_alignment, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
 #endif
-#if defined(TC_AES_ENABLE_CTR) && (TC_AES_ENABLE_CTR == 1)
+#if TC_AES_ENABLE_CTR
     {"/ctr", test_ctr, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/ctr-unaligned", test_ctr_unaligned, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/ctr-wrap", test_ctr_wrap, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
 #endif
-#if defined(TC_AES_ENABLE_OFB) && (TC_AES_ENABLE_OFB == 1)
+#if TC_AES_ENABLE_OFB
     {"/ofb", test_ofb, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
 #endif
-#if defined(TC_AES_CAVP) && (TC_AES_CAVP == 1) &&                                                  \
-    ((defined(TC_AES_ENABLE_ECB) && (TC_AES_ENABLE_ECB == 1)) ||                                   \
-     (defined(TC_AES_ENABLE_CBC) && (TC_AES_ENABLE_CBC == 1)) ||                                   \
-     (defined(TC_AES_ENABLE_OFB) && (TC_AES_ENABLE_OFB == 1)) ||                                   \
-     (defined(TC_AES_ENABLE_GCM) && (TC_AES_ENABLE_GCM == 1)) ||                                   \
-     (defined(TC_AES_ENABLE_CCM) && (TC_AES_ENABLE_CCM == 1)))
+#if TC_AES_CAVP &&                                                  \
+    (TC_AES_ENABLE_ECB ||                                   \
+     TC_AES_ENABLE_CBC ||                                   \
+     TC_AES_ENABLE_OFB ||                                   \
+     TC_AES_ENABLE_GCM ||                                   \
+     TC_AES_ENABLE_CCM)
     {"/cavp", test_cavp, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
 #endif
-#if defined(TC_AES_ENABLE_CCM) && (TC_AES_ENABLE_CCM == 1)
+#if TC_AES_ENABLE_CCM
 #if TC_AES_KEY_BITS == 128
     {"/ccm", test_ccm, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/ccm-api", test_ccm_api, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
 #endif
 #endif
-#if defined(TC_AES_ENABLE_GCM) && (TC_AES_ENABLE_GCM == 1)
+#if TC_AES_ENABLE_GCM
     {"/gcm", test_gcm, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/gcm-direction", test_gcm_direction, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/gcm-oneshot", test_gcm_oneshot, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
