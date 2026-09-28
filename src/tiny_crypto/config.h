@@ -191,6 +191,9 @@
 #ifndef TC_ENABLE_X509_REVOCATION
 #define TC_ENABLE_X509_REVOCATION TC_PROFILE_VALUE(0, 0, 0, 1)
 #endif
+#ifndef TC_ENABLE_X509_OCSP
+#define TC_ENABLE_X509_OCSP TC_PROFILE_VALUE(0, 0, 0, 1)
+#endif
 #ifndef TC_ENABLE_CMS
 #define TC_ENABLE_CMS TC_PROFILE_VALUE(0, 0, 0, 1)
 #endif
@@ -206,6 +209,7 @@
 #if (TC_ENABLE_PIV_OIDS != 0 && TC_ENABLE_PIV_OIDS != 1) ||                                        \
     (TC_ENABLE_X509_PATH != 0 && TC_ENABLE_X509_PATH != 1) ||                                      \
     (TC_ENABLE_X509_REVOCATION != 0 && TC_ENABLE_X509_REVOCATION != 1) ||                          \
+    (TC_ENABLE_X509_OCSP != 0 && TC_ENABLE_X509_OCSP != 1) ||                                      \
     (TC_ENABLE_CMS != 0 && TC_ENABLE_CMS != 1) ||                                                  \
     (TC_ENABLE_CMS_VALIDATION != 0 && TC_ENABLE_CMS_VALIDATION != 1) ||                            \
     (TC_ENABLE_PIV_OBJECTS != 0 && TC_ENABLE_PIV_OBJECTS != 1) ||                                  \
@@ -217,6 +221,12 @@
 #endif
 #if TC_ENABLE_X509_REVOCATION && !TC_ENABLE_X509_PATH
 #error "X.509 revocation requires path validation"
+#endif
+#if TC_ENABLE_X509_OCSP && !TC_ENABLE_X509_PATH
+#error "X.509 OCSP requires path validation"
+#endif
+#if TC_ENABLE_X509_OCSP && !TC_ENABLE_SHA1 && !TC_ENABLE_SHA256
+#error "X.509 OCSP requires SHA-1 or SHA-256"
 #endif
 #if TC_ENABLE_CMS && (!TC_ENABLE_X509 || !TC_TLV_ENABLE_BER || !TC_ENABLE_PIV_OIDS)
 #error "CMS requires X.509, BER parsing, and PIV/TWIC identifier classification"

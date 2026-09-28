@@ -158,14 +158,14 @@ TC_RSA_result TC_RSA_raw_private(const TC_RSA_public_key* key, TC_bytes private_
 
 /* Encode a precomputed SHA digest using EMSA-PKCS1-v1_5 (RFC 8017 section 9.2).
  * Used when a card or hardware provider performs the RSA private operation.
- * encoded.capacity is the modulus size: 128, 256 or 384 bytes. No hashing or key
+ * encoded.capacity is the modulus size: 128, 256, 384 or 512 bytes. No hashing or key
  * operation is performed. Input and output must be disjoint. All failures
  * preserve output; the work budget must cover encoded.capacity bytes. */
 TC_RSA_result TC_RSA_encode_v15_digest(const TC_RSA_v15_options* options, TC_bytes digest,
                                        TC_buffer encoded, TC_work_budget* work);
 
 /* Encode a digest and caller-supplied salt using EMSA-PSS (RFC 8017 section 9.1.1).
- * encoded.capacity is the modulus size: 128, 256 or 384 bytes; emBits is one
+ * encoded.capacity is the modulus size: 128, 256, 384 or 512 bytes; emBits is one
  * less than that size in bits. salt.length must equal options->salt_length.
  * Generate salt with a cryptographic RNG. Inputs may share storage; encoded
  * and work are disjoint from every input and each other. Preflight failures
@@ -212,7 +212,7 @@ TC_RSA_result TC_RSA_sign_pss_digest(const TC_RSA_private_key* key,
                                      const TC_RSA_workspace* workspace, TC_buffer signature,
                                      TC_RSA_execution* execution);
 
-/* Validate two-prime RSA components at 1024, 2048 or 3072 bits. Public components
+/* Validate two-prime RSA components at 1024, 2048, 3072 or 4096 bits. Public components
  * use minimal unsigned encodings. d, p and q are nonempty unsigned magnitudes,
  * at most the modulus length; leading zero bytes are accepted.
  * All key bytes are borrowed and must remain stable throughout the call.
@@ -244,7 +244,7 @@ TC_RSA_result TC_RSA_derive_crt(const TC_RSA_private_key* key, const TC_RSA_crt_
 
 /* Verify a precomputed SHA-1/224/256/384/512 digest with PKCS#1 v1.5.
  * Modulus and exponent are unsigned, minimal big-endian encodings, without DER
- * sign padding. Modulus size is exactly 1024, 2048 or 3072 bits. Signature size
+ * sign padding. Modulus size is exactly 1024, 2048, 3072 or 4096 bits. Signature size
  * must equal the modulus size in bytes. Acceptance policy belongs to the caller.
  *
  * All bytes are borrowed for this call. Workspace must be aligned, separate from

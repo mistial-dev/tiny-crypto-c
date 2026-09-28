@@ -64,7 +64,7 @@ static MunitResult decrypt(const MunitParameter params[], void* user)
   memcpy(wrong_label, label_bytes, sizeof wrong_label);
   wrong_label[label_length ? label_length - 1 : 0] ^= 1;
   uint8_t components[5][MAX_BYTES], input[MAX_BYTES], ciphertext[MAX_BYTES], output[MAX_BYTES];
-  TC_RSA_word words[TC_RSA_DECRYPT_WORKSPACE_WORDS(3072)];
+  TC_RSA_word words[TC_RSA_DECRYPT_WORKSPACE_WORDS(4096)];
   TC_RSA_workspace workspace = {words, TC_RSA_decrypt_workspace_words(bits)};
   EVP_PKEY* generated = EVP_RSA_gen(bits);
   (void)user;
@@ -207,7 +207,7 @@ static MunitResult decrypt(const MunitParameter params[], void* user)
 
 int main(int argc, char** argv)
 {
-  char* sizes[] = {"1024", "2048", "3072", NULL};
+  char* sizes[] = {"1024", "2048", "3072", "4096", NULL};
   char* labels[] = {"0", "1", "256", NULL};
   char* hashes[] = {"SHA1", "SHA224", "SHA256", "SHA384", "SHA512", NULL};
   MunitParameterEnum parameters[] = {

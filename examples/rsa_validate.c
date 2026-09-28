@@ -6,7 +6,7 @@ TC_RSA_result example_validate_rsa_key(const TC_RSA_private_key* key, TC_random_
                                        void* random_context, TC_RSA_word* scratch,
                                        size_t scratch_words)
 {
-  enum { MAX_KEY_BITS = 3072, REQUESTS_PER_FACTOR = 4 * TC_RSA_VALIDATION_ROUNDS };
+  enum { MAX_KEY_BITS = 4096, REQUESTS_PER_FACTOR = 4 * TC_RSA_VALIDATION_ROUNDS };
   if (!key)
     return TC_RSA_ARGUMENT;
   const size_t length = key->public_key.modulus.length;

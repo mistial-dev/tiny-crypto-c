@@ -25,6 +25,7 @@ static MunitResult arguments(const MunitParameter params[], void* user)
   munit_assert_size(TC_RSA_verify_workspace_words(1024), ==, workspace.capacity);
   munit_assert_size(TC_RSA_verify_workspace_words(2048), ==, 9 * 2048 / TC_RSA_WORD_BITS + 2);
   munit_assert_size(TC_RSA_verify_workspace_words(3072), ==, 9 * 3072 / TC_RSA_WORD_BITS + 2);
+  munit_assert_size(TC_RSA_verify_workspace_words(4096), ==, 9 * 4096 / TC_RSA_WORD_BITS + 2);
   munit_assert_size(TC_RSA_verify_workspace_words(SIZE_MAX), ==, 0);
   const TC_RSA_v15_options options = {TC_HASH_SHA256};
   TC_work_budget work = {10000};

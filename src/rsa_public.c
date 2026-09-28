@@ -93,7 +93,7 @@ void TC_RSA_prepared_public_key_clear(TC_RSA_prepared_public_key* setup)
   if (!setup)
     return;
   if (setup->marker == TC_RSA_PUBLIC_SETUP_MARKER && setup->r2.words &&
-      setup->key.modulus.length <= 384)
+      setup->key.modulus.length <= 512)
     TC_secure_zero(setup->r2.words, setup->key.modulus.length);
   TC_secure_zero(setup, sizeof *setup);
 }
@@ -197,7 +197,7 @@ static TC_RSA_result tc_rsa_verify_pss_digest_impl(const TC_RSA_public_key* key,
   if (result != TC_RSA_OK)
     return result;
   length = key->modulus.length;
-  if (length != 128 && length != 256 && length != 384)
+  if (!tc_rsa_supported_modulus_size(length))
     return TC_RSA_INVALID;
   if (signature.length != length)
     return TC_RSA_INVALID;

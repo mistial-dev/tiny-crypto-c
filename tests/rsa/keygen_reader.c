@@ -23,8 +23,8 @@ static TC_status draw(void* context, uint8_t* output, size_t length)
 static MunitResult vectors(const MunitParameter params[], void* data)
 {
   char line[4096];
-  uint8_t n[384], e[384], d[384], p[192], q[192];
-  TC_RSA_word words[TC_RSA_VALIDATE_WORKSPACE_WORDS(3072)];
+  uint8_t n[512], e[512], d[512], p[256], q[256];
+  TC_RSA_word words[TC_RSA_VALIDATE_WORKSPACE_WORDS(4096)];
   TC_RSA_workspace workspace = {words, sizeof words / sizeof words[0]};
   uint32_t random_state = 0x12345678u;
   FILE* file;

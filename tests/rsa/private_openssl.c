@@ -81,7 +81,7 @@ static void component(EVP_PKEY* key, const char* name, uint8_t* output, size_t l
 static MunitResult private_operation(const MunitParameter params[], void* user)
 {
   const unsigned bits = (unsigned)strtoul(munit_parameters_get(params, "bits"), NULL, 10);
-  munit_assert_true(bits == 1024 || bits == 2048 || bits == 3072);
+  munit_assert_true(bits == 1024 || bits == 2048 || bits == 3072 || bits == 4096);
 #if TC_RSA_SMALL
   if (bits > 1024)
     return MUNIT_SKIP;
@@ -224,7 +224,8 @@ static MunitResult private_operation(const MunitParameter params[], void* user)
                                           NULL};
   TC_RSA_workspace public_workspace = {scratch, validation_words};
   munit_assert_size(TC_RSA_validate_workspace_words(bits), ==, validation_words);
-  munit_assert_size(TC_RSA_validate_workspace_words(4096), ==, 0);
+  munit_assert_size(TC_RSA_validate_workspace_words(4096), ==,
+                    TC_RSA_VALIDATE_WORKSPACE_WORDS(4096));
   {
     random_source source = {seed, seed, width, 0, TC_OK};
     munit_assert_int(example_validate_rsa_key(&public_components, random_bytes, &source, scratch,
@@ -522,7 +523,7 @@ static MunitResult signing(const MunitParameter params[], void* user)
   for (size_t i = 0; i < sizeof digest; ++i)
     digest[i] = (uint8_t)i;
   static const uint8_t exponent[] = {1, 0, 1};
-  TC_RSA_word scratch[TC_RSA_SIGN_WORKSPACE_WORDS(3072) + 1];
+  TC_RSA_word scratch[TC_RSA_SIGN_WORKSPACE_WORDS(4096) + 1];
   TC_RSA_workspace workspace = {scratch, TC_RSA_sign_workspace_words(bits)};
   EVP_PKEY* key = EVP_RSA_gen(bits);
   (void)user;
@@ -570,7 +571,7 @@ static MunitResult signing(const MunitParameter params[], void* user)
                        ==, TC_RSA_OK);
       if (scenario == 0) {
         TC_RSA_prepared_public_key prepared = {0};
-        TC_RSA_word cache_words[TC_RSA_RAW_PUBLIC_WORKSPACE_WORDS(3072)];
+        TC_RSA_word cache_words[TC_RSA_RAW_PUBLIC_WORKSPACE_WORDS(4096)];
         TC_RSA_workspace cache = {cache_words, width / sizeof *cache_words};
         TC_work_budget setup_work = {(uint32_t)(16 * width + 1)};
         munit_assert_int(TC_RSA_prepare_public_key(&prepared, &private_key.public_key, &cache,
@@ -778,7 +779,7 @@ static MunitResult crt_components(const MunitParameter params[], void* user)
 
 int main(int argc, char** argv)
 {
-  static char* sizes[] = {"1024", "2048", "3072", NULL};
+  static char* sizes[] = {"1024", "2048", "3072", "4096", NULL};
   static MunitParameterEnum parameters[] = {{"bits", sizes}, {NULL, NULL}};
   static char* hashes[] = {"SHA1", "SHA224", "SHA256", "SHA384", "SHA512", NULL};
   static MunitParameterEnum signing_parameters[] = {

@@ -50,10 +50,10 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(fields[6:], ["match", "1"])
         self.assertEqual(fields[4], wycheproof.signature_digest("SHA-256", b""))
         excluded = copy.deepcopy(document)
-        excluded["testGroups"][0]["keySize"] = 4096
+        excluded["testGroups"][0]["keySize"] = 8192
         reasons = wycheproof.Counter()
         self.assertEqual(wycheproof.rsa_generation_records(excluded,reasons), ("", {}))
-        self.assertEqual(reasons, {(4096,"SHA-256"): 2})
+        self.assertEqual(reasons, {(8192,"SHA-256"): 2})
         invalid = copy.deepcopy(document)
         invalid["testGroups"][0]["tests"][0]["result"] = "invalid"
         with self.assertRaises(AssertionError):
@@ -110,7 +110,7 @@ class ReaderTests(unittest.TestCase):
         for excluded in (False, True):
             bad = copy.deepcopy(document)
             if excluded:
-                bad["testGroups"][0]["keySize"] = 4096
+                bad["testGroups"][0]["keySize"] = 8192
             bad["testGroups"][0]["tests"][0]["result"] = "unknown"
             with self.assertRaises(AssertionError):
                 wycheproof.rsa_signature_records(bad, wycheproof.Counter())
@@ -123,7 +123,7 @@ class ReaderTests(unittest.TestCase):
         group["tests"][1]["flags"] = ["Unknown"]
         with self.assertRaises(AssertionError):
             wycheproof.rsa_signature_records(v15)
-        for field, value in (("keySize", 4096), ("sha", "SHA-512/256"), ("mgfSha", "SHA3-256")):
+        for field, value in (("keySize", 8192), ("sha", "SHA-512/256"), ("mgfSha", "SHA3-256")):
             bad = copy.deepcopy(document)
             bad["testGroups"][0][field] = value
             with self.assertRaises(AssertionError):
@@ -151,12 +151,12 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(fields[7:], ["-", "0001", "00", "valid", "1"])
         mixed = copy.deepcopy(document)
         extra = copy.deepcopy(document["testGroups"][0])
-        extra["keySize"] = 4096
+        extra["keySize"] = 8192
         mixed["testGroups"].append(extra)
         mixed["numberOfTests"] = 4
         exclusions = wycheproof.Counter()
         self.assertEqual(wycheproof.oaep_records(mixed, exclusions), (records, counts))
-        self.assertEqual(exclusions, {(4096, "SHA-256", "SHA-1"): 2})
+        self.assertEqual(exclusions, {(8192, "SHA-256", "SHA-1"): 2})
         excluded_only = copy.deepcopy(document)
         excluded_only["testGroups"] = [extra]
         excluded_only["testGroups"][0]["tests"][0]["result"] = "acceptable"
@@ -168,7 +168,7 @@ class ReaderTests(unittest.TestCase):
             wycheproof.oaep_records(excluded_only, wycheproof.Counter())
         with self.assertRaises(AssertionError):
             wycheproof.oaep_records(mixed)
-        for field, value in (("keySize", 4096), ("sha", "SHA-512/224"),
+        for field, value in (("keySize", 8192), ("sha", "SHA-512/224"),
                              ("mgf", "other"), ("type", "other")):
             bad = copy.deepcopy(document)
             bad["testGroups"][0][field] = value

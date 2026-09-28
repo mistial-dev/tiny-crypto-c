@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 
-enum { MAX_BYTES = 384, MAX_LINE = 8192 };
+enum { MAX_BYTES = 512, MAX_LINE = 12288 };
 static const char* path;
 
 static TC_status random_two(void* context, uint8_t* output, size_t length)
@@ -24,7 +24,7 @@ static MunitResult vectors(const MunitParameter params[], void* data)
   char line[MAX_LINE];
   uint8_t modulus[MAX_BYTES], exponent[MAX_BYTES], private_exponent[MAX_BYTES];
   uint8_t digest[64], salt[64], encoded[MAX_BYTES], signature[MAX_BYTES], expected[MAX_BYTES];
-  TC_RSA_word words[TC_RSA_RAW_PRIVATE_WORKSPACE_WORDS(3072)];
+  TC_RSA_word words[TC_RSA_RAW_PRIVATE_WORKSPACE_WORDS(4096)];
   const TC_RSA_workspace workspace = {words, sizeof words / sizeof words[0]};
   size_t count = 0;
   FILE* file;

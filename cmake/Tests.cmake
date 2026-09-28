@@ -614,7 +614,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   tc_add_c_test(test_cms_reader tiny-crypto-c-test-pki tests/cms/reader.c examples/cms_reader.c)
   get_target_property(tc_native_pki_sources tiny-crypto-c-test-pki SOURCES)
   tc_add_test_library(tiny-crypto-c-test-pki-native ${tc_native_pki_sources}
-    src/x509_trust_anchor.c
+    src/x509_trust_anchor.c src/x509_ocsp.c
     ${tc_hash_sources} src/ec.c ${tc_rsa_sources} src/pki_storage.c ${tc_aes_sources} src/sskdf.c
     src/piv_sm.c src/piv_sm_message.c src/piv_sm_authenticate.c
     src/twic_cipher.c src/twic_tpk.c
@@ -626,13 +626,18 @@ if(TINY_CRYPTO_BUILD_TESTS)
     TC_ENABLE_FASCN=1 TC_ENABLE_TWIC_UUID=1 TC_ENABLE_TWIC_TPK=1 TC_ENABLE_PIV_OIDS=1
     TC_ENABLE_TWIC_OBJECT_CRYPTO=1 TC_ENABLE_X509_PATH=1
     TC_ENABLE_TRUST_ANCHOR_FORMAT=1
-    TC_ENABLE_X509_REVOCATION=1 TC_ENABLE_CMS=1
+    TC_ENABLE_X509_REVOCATION=1 TC_ENABLE_X509_OCSP=1 TC_ENABLE_CMS=1
     TC_ENABLE_CMS_VALIDATION=1 TC_ENABLE_PIV_OBJECTS=1
     TC_ENABLE_CREDENTIAL=1
     TC_AES_ENABLE_DYNAMIC=1 TC_ENABLE_SSKDF=1 TC_ENABLE_PIV_SM=1
     TC_PIV_SM_ENABLE_CS2=1 TC_PIV_SM_ENABLE_CS7=1 TC_EC_ENABLE_P256=1 TC_EC_ENABLE_P384=1
     TC_ENABLE_EC=1 TC_ENABLE_RSA=1 TC_ENABLE_SHA1=1 TC_ENABLE_SHA224=1
     TC_ENABLE_SHA256=1 TC_ENABLE_SHA384=1 TC_ENABLE_SHA512=1)
+  tc_add_c_test(test_x509_ocsp_sd33 tiny-crypto-c-test-pki-native tests/x509/ocsp_sd33.c)
+  target_compile_definitions(test_x509_ocsp_sd33 PRIVATE
+    TC_SD33_OCSP_ROOT="${PROJECT_SOURCE_DIR}/tests/vectors/x509/ocsp/sd33"
+    TC_SD33_CERT_ROOT="${PROJECT_SOURCE_DIR}/tests/vectors/x509/piv/sd33"
+    TC_ICAM_OCSP_ROOT="${PROJECT_SOURCE_DIR}/tests/vectors/x509/ocsp/icam")
   if(tc_build_cpp_tests)
     tc_add_linked_test(test_cpp_credential tiny-crypto-c-test-pki-native
       tests/cpp/credential.cpp tests/cpp/main.cpp)
@@ -1118,7 +1123,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   # Compile both umbrellas with each feature family's smallest legal profile.
   # This catches accidental feature coupling and keeps their C API surface equal.
   foreach(header_profile rsa tlv aamva fascn twic_uuid twic_tpk twic_object hkdf
-      piv_oids x509 key_challenge x509_path x509_revocation cms cms_validation piv_objects credential piv_cvc piv_chuid
+      piv_oids x509 key_challenge x509_path x509_revocation x509_ocsp cms cms_validation piv_objects credential piv_cvc piv_chuid
       piv_sm twic_ccl)
     set(header_profile_definitions TC_ENABLE_AES=0 TC_ENABLE_SHA256=0)
     if(header_profile STREQUAL "hkdf")
@@ -1163,6 +1168,11 @@ if(TINY_CRYPTO_BUILD_TESTS)
       list(APPEND header_profile_definitions
         TC_ENABLE_TLV=1 TC_ENABLE_DER=1 TC_ENABLE_X509=1 TC_ENABLE_X509_PATH=1
         TC_ENABLE_X509_REVOCATION=1 TC_TEST_HEADER_X509_REVOCATION=1)
+    elseif(header_profile STREQUAL "x509_ocsp")
+      list(REMOVE_ITEM header_profile_definitions TC_ENABLE_SHA256=0)
+      list(APPEND header_profile_definitions
+        TC_ENABLE_TLV=1 TC_ENABLE_DER=1 TC_ENABLE_X509=1 TC_ENABLE_X509_PATH=1
+        TC_ENABLE_SHA256=1 TC_ENABLE_X509_OCSP=1 TC_TEST_HEADER_X509_OCSP=1)
     elseif(header_profile STREQUAL "cms")
       list(APPEND header_profile_definitions
         TC_ENABLE_TLV=1 TC_ENABLE_DER=1 TC_TLV_ENABLE_BER=1 TC_ENABLE_X509=1 TC_ENABLE_PIV_OIDS=1

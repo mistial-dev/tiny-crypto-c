@@ -73,6 +73,14 @@ revocation are part of the application. `<tiny_crypto/validation.h>` adds the
 shared arena and policy context for complete CMS and X.509 validation. Both
 validation headers are selected by `TINY_CRYPTO_ENABLE_CMS_VALIDATION`.
 
+`<tiny_crypto/x509_ocsp.h>` encodes bounded OCSP requests and verifies complete
+DER OCSP responses, including stapled responses. Supply the certificate and its
+issuer from a validated path, a signature provider, evaluation time, freshness
+limits, and caller-owned scratch. A verified `TC_OCSP_UNKNOWN` or
+`TC_OCSP_UNAVAILABLE` result requires an application policy decision; neither
+establishes a valid certificate. The composed validation APIs currently require
+CRL evidence.
+
 PIV/TWIC object policy and the final access decision require their own checks.
 Select compatibility options explicitly, including TWIC signed/unsigned CHUID
 profiles and CMS signed-attribute encoding.

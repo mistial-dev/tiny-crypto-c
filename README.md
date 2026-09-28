@@ -132,21 +132,22 @@ selected.
 
 ### Formats, compression, and trust
 
-| Option                                   | Default | Purpose                                                      |
-| ---------------------------------------- | ------: | ------------------------------------------------------------ |
-| `TINY_CRYPTO_ENABLE_TLV`                 |     OFF | Bounded TLV readers and tree traversal                       |
-| `TINY_CRYPTO_TLV_BER`                    |     OFF | ASN.1 BER, including indefinite lengths, requires TLV        |
-| `TINY_CRYPTO_TLV_STREAM`                 |     OFF | Incremental TLV reader, requires TLV                         |
-| `TINY_CRYPTO_ENABLE_DER`                 |     OFF | DER value helpers, requires TLV                              |
-| `TINY_CRYPTO_ENABLE_X509`                |     OFF | X.509 certificate and public-key readers, requires DER       |
-| `TINY_CRYPTO_ENABLE_X509_PATH`           |     OFF | Path validation and stores, requires X.509                   |
-| `TINY_CRYPTO_ENABLE_TRUST_ANCHOR_FORMAT` |     OFF | RFC 5914 lists, requires X.509 path validation               |
-| `TINY_CRYPTO_TAF_CERTIFICATE`            |     OFF | Certificate choice in RFC 5914 lists                         |
-| `TINY_CRYPTO_TAF_TBS_CERTIFICATE`        |     OFF | TBS certificate choice in RFC 5914 lists                     |
-| `TINY_CRYPTO_TAF_TRUST_ANCHOR_INFO`      |     OFF | TrustAnchorInfo choice in RFC 5914 lists                     |
-| `TINY_CRYPTO_ENABLE_X509_REVOCATION`     |     OFF | CRL parsing and path revocation, requires X.509 path support |
-| `TINY_CRYPTO_ENABLE_KEY_CHALLENGE`       |     OFF | Key proof-of-possession challenge, requires X.509            |
-| `TINY_CRYPTO_ENABLE_GZIP`                |     OFF | Bounded GZIP decompression                                   |
+| Option                                   | Default | Purpose                                                       |
+| ---------------------------------------- | ------: | ------------------------------------------------------------- |
+| `TINY_CRYPTO_ENABLE_TLV`                 |     OFF | Bounded TLV readers and tree traversal                        |
+| `TINY_CRYPTO_TLV_BER`                    |     OFF | ASN.1 BER, including indefinite lengths, requires TLV         |
+| `TINY_CRYPTO_TLV_STREAM`                 |     OFF | Incremental TLV reader, requires TLV                          |
+| `TINY_CRYPTO_ENABLE_DER`                 |     OFF | DER value helpers, requires TLV                               |
+| `TINY_CRYPTO_ENABLE_X509`                |     OFF | X.509 certificate and public-key readers, requires DER        |
+| `TINY_CRYPTO_ENABLE_X509_PATH`           |     OFF | Path validation and stores, requires X.509                    |
+| `TINY_CRYPTO_ENABLE_TRUST_ANCHOR_FORMAT` |     OFF | RFC 5914 lists, requires X.509 path validation                |
+| `TINY_CRYPTO_TAF_CERTIFICATE`            |     OFF | Certificate choice in RFC 5914 lists                          |
+| `TINY_CRYPTO_TAF_TBS_CERTIFICATE`        |     OFF | TBS certificate choice in RFC 5914 lists                      |
+| `TINY_CRYPTO_TAF_TRUST_ANCHOR_INFO`      |     OFF | TrustAnchorInfo choice in RFC 5914 lists                      |
+| `TINY_CRYPTO_ENABLE_X509_REVOCATION`     |     OFF | CRL parsing and path revocation, requires X.509 path support  |
+| `TINY_CRYPTO_ENABLE_X509_OCSP`           |     OFF | OCSP requests and response verification, requires X.509 paths |
+| `TINY_CRYPTO_ENABLE_KEY_CHALLENGE`       |     OFF | Key proof-of-possession challenge, requires X.509             |
+| `TINY_CRYPTO_ENABLE_GZIP`                |     OFF | Bounded GZIP decompression                                    |
 
 ### PIV, TWIC, and credentials
 

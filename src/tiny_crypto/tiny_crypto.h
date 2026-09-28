@@ -59,6 +59,9 @@
 #include <tiny_crypto/x509_crl_source.h>
 #include <tiny_crypto/x509_revocation.h>
 #endif
+#if TC_ENABLE_X509_OCSP
+#include <tiny_crypto/x509_ocsp.h>
+#endif
 #if TC_ENABLE_PIV_OIDS
 #include <tiny_crypto/piv_oid.h>
 #endif

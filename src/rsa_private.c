@@ -24,7 +24,7 @@ TC_RSA_result TC_RSA_encode_v15_digest(const TC_RSA_v15_options* options, TC_byt
     return TC_RSA_UNSUPPORTED;
   if (digest.length != info.digest_length)
     return TC_RSA_ARGUMENT;
-  if (encoded.capacity != 128 && encoded.capacity != 256 && encoded.capacity != 384)
+  if (!tc_rsa_supported_modulus_size(encoded.capacity))
     return TC_RSA_UNSUPPORTED;
   if (work->remaining < encoded.capacity)
     return TC_RSA_LIMIT;
@@ -51,7 +51,7 @@ TC_RSA_result TC_RSA_encode_pss_digest(const TC_RSA_pss_options* options, TC_byt
   }
   if (salt.length != options->salt_length)
     return TC_RSA_ARGUMENT;
-  if (encoded.capacity != 128 && encoded.capacity != 256 && encoded.capacity != 384)
+  if (!tc_rsa_supported_modulus_size(encoded.capacity))
     return TC_RSA_UNSUPPORTED;
   tc_hash_info info;
   size_t remaining = work->remaining;

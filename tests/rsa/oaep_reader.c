@@ -28,11 +28,11 @@ static TC_bytes decode(const char* text, uint8_t* output, size_t capacity)
 
 static MunitResult vectors(const MunitParameter params[], void* data)
 {
-  enum { KEY_BYTES = 384, PAYLOAD_BYTES = 8192, FIELD_COUNT = 12 };
+  enum { KEY_BYTES = 512, PAYLOAD_BYTES = 8192, FIELD_COUNT = 12 };
   char line[65536];
   uint8_t components[5][KEY_BYTES], label[PAYLOAD_BYTES], ciphertext[PAYLOAD_BYTES];
   uint8_t expected[PAYLOAD_BYTES], output[KEY_BYTES];
-  TC_RSA_word words[TC_RSA_DECRYPT_WORKSPACE_WORDS(3072)];
+  TC_RSA_word words[TC_RSA_DECRYPT_WORKSPACE_WORDS(4096)];
   size_t count = 0;
   (void)params;
   (void)data;
@@ -51,6 +51,14 @@ static MunitResult vectors(const MunitParameter params[], void* data)
     TC_bytes key_parts[5];
     for (size_t i = 0; i < 5; ++i)
       key_parts[i] = decode(fields[i], components[i], KEY_BYTES);
+#if TC_RSA_SMALL
+    /* The byte-limb profile uses focused 4096-bit tests; the complete corpus
+     * would make this bounded extended test prohibitively slow. */
+    if (key_parts[0].length > 384) {
+      ++count;
+      continue;
+    }
+#endif
     TC_RSA_private_key key = {
         {key_parts[0], key_parts[1]}, key_parts[2], key_parts[3], key_parts[4], NULL};
     TC_bytes associated = decode(fields[7], label, sizeof label);

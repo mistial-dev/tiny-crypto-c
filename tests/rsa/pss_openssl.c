@@ -69,7 +69,7 @@ static MunitResult signatures(const MunitParameter params[], void* user)
     EVP_PKEY* generated = EVP_RSA_gen(bits);
     uint8_t components[5][TC_TEST_RSA_MAX_BYTES], signature[TC_TEST_RSA_MAX_BYTES],
         digest[64] = {0};
-    TC_RSA_word scratch[TC_RSA_SIGN_WORKSPACE_WORDS(3072)];
+    TC_RSA_word scratch[TC_RSA_SIGN_WORKSPACE_WORDS(4096)];
     TC_RSA_workspace workspace = {scratch, sizeof scratch / sizeof scratch[0]};
     TC_RSA_public_key key;
     const int salts[] = {0, 1, 32, (int)(bits / 8 - digest_length - 2)};
@@ -100,7 +100,7 @@ static MunitResult signatures(const MunitParameter params[], void* user)
                        ==, TC_RSA_OK);
       if (i == 0) {
         TC_RSA_prepared_public_key prepared = {0};
-        TC_RSA_word cache_words[TC_RSA_RAW_PUBLIC_WORKSPACE_WORDS(3072)];
+        TC_RSA_word cache_words[TC_RSA_RAW_PUBLIC_WORKSPACE_WORDS(4096)];
         TC_RSA_workspace cache = {cache_words, key.modulus.length / sizeof *cache_words};
         TC_work_budget setup_work = {(uint32_t)(16 * key.modulus.length + 1)};
         TC_RSA_pss_options options = {hash, mgf_hash, (size_t)salts[i]};
@@ -292,7 +292,7 @@ static MunitResult signatures(const MunitParameter params[], void* user)
   }
   return MUNIT_OK;
 }
-static char* sizes[] = {"1024", "2048", "3072", NULL};
+static char* sizes[] = {"1024", "2048", "3072", "4096", NULL};
 static char* hash_names[] = {"SHA1", "SHA224", "SHA256", "SHA384", "SHA512", NULL};
 static MunitParameterEnum parameters[] = {
     {"bits", sizes}, {"hash", hash_names}, {"mgf", hash_names}, {NULL, NULL}};

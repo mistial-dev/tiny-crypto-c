@@ -8,12 +8,12 @@ static MunitResult v15(const MunitParameter params[], void* user)
 {
   static const uint8_t prefix[] = {0x30, 0x31, 0x30, 0x0d, 6, 9, 0x60, 0x86, 0x48, 1,
                                    0x65, 3,    4,    2,    1, 5, 0,    4,    32};
-  uint8_t digest[32], encoded[384], expected[384], saved[384];
+  uint8_t digest[32], encoded[512], expected[512], saved[512];
   (void)params;
   (void)user;
   for (size_t i = 0; i < sizeof digest; ++i)
     digest[i] = (uint8_t)i;
-  for (size_t length = 128; length <= 384; length += 128) {
+  for (size_t length = 128; length <= 512; length += 128) {
     size_t separator = length - sizeof prefix - sizeof digest - 1;
     memset(expected, 0xff, length);
     expected[0] = 0;

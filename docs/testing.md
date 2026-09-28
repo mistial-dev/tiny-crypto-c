@@ -747,9 +747,9 @@ Its acceptable cases are rejected under the API's strict DER, named-curve,
 uncompressed-point policy. Other applicable Wycheproof algorithms remain
 outside this adapter.
 
-The pinned RSA PKCS#1 v1.5 generation files supply 102 supported signatures at
-1024, 2048, and 3072 bits. The test compares every generated signature byte
-for byte. 1536-bit and 4096-bit groups are reported as unsupported sizes.
+The pinned RSA PKCS#1 v1.5 generation files supply 126 supported signatures at
+1024, 2048, 3072, and 4096 bits. The test compares every generated signature
+byte for byte. The 1536-bit groups are reported as an unsupported size.
 The primality file supplies 302 positive and negative verdicts for the RSA
 odd-candidate test. Fourteen signed negative encodings are also tested as
 unsigned byte magnitudes against a separate Python probable-prime oracle.
@@ -932,8 +932,9 @@ empty, one-byte and maximum messages. Failure cases use the maximum message
 length. SHA-256 with MGF1-SHA-256 also checks RNG failure, zero work, zero
 ciphertext and the RSA input boundary. The `label` parameter selects empty,
 one-byte or 256-byte binary labels. Native limbs cover the complete parameter
-matrix. Byte limbs cover every RSA-1024 combination plus the SHA-256
-configuration at RSA-2048 and RSA-3072.
+matrix through RSA-4096. Byte limbs cover every RSA-1024 combination plus the
+SHA-256 configuration at RSA-2048 and RSA-3072; focused tests cover RSA-4096
+with byte limbs to keep the extended corpus bounded.
 
 With `TINY_CRYPTO_TEST_WYCHEPROOF_DIR` configured, run
 `ctest --test-dir build -R '^test_wycheproof_rsa_oaep$' --output-on-failure`
@@ -948,7 +949,7 @@ decryption wrappers with RSA-1024 keys. They check digest mismatch rejection,
 decrypt OpenSSL ciphertexts and check workspace cleanup.
 
 `test_rsa_key_openssl` parses OpenSSL-generated PKCS #1 DER private keys at
-1024, 2048 and 3072 bits, including their PKCS #8 containers.
+1024, 2048, 3072, and 4096 bits, including their PKCS #8 containers.
 It compares all eight borrowed components with OpenSSL
 and runs the key-loading example to validate the key and sign a SHA-256 digest.
 The `format` parameter selects `pkcs1`, `pkcs8` or `pkcs8-pss`.
@@ -990,7 +991,7 @@ ctest --test-dir build -R '^test_(rsa(_validate|_sign)?_compile_avr|cpp_headers_
 ```
 
 `test_rsa_private_openssl_0` and `test_rsa_private_openssl_1` compare the internal
-blinded private operation against OpenSSL at 1024, 2048, and 3072 bits. Cases
+blinded private operation against OpenSSL at 1024, 2048, 3072, and 4096 bits. Cases
 cover rejected blinding factors, RNG failures, work and storage limits, invalid
 private inputs, output preservation, and scratch cleanup. A changed private
 exponent exercises the final public-exponent check. Key-consistency cases check
@@ -1015,15 +1016,15 @@ libraries have hash implementations disabled. It also checks exact work,
 exhausted work, RNG failure,
 output preservation and scratch cleanup.
 
-Native limbs run the complete private-operation matrix at RSA-1024, RSA-2048 and
-RSA-3072. Byte limbs run that matrix at RSA-1024. OAEP and PSS exercise the same
+Native limbs run the complete private-operation matrix at RSA-1024, RSA-2048,
+RSA-3072, and RSA-4096. Byte limbs run that matrix at RSA-1024. OAEP and PSS exercise the same
 private arithmetic at the larger sizes. Byte-limb v1.5 signing uses every hash at
-RSA-1024 and SHA-256 at RSA-2048 and RSA-3072.
+RSA-1024 and SHA-256 at RSA-2048, RSA-3072, and RSA-4096.
 
 `test_rsa_pss_openssl` and `test_rsa_pss_openssl_small` cross-check PSS signing
 and verification with OpenSSL. Native limbs cover every combination of RSA size,
 message hash, MGF hash and supported salt length. Byte limbs cover the complete
-RSA-1024 matrix plus SHA-256 with MGF1-SHA-256 at RSA-2048 and RSA-3072. The
+RSA-1024 matrix plus SHA-256 with MGF1-SHA-256 at RSA-2048, RSA-3072, and RSA-4096. The
 SHA-256 cases also check oversized salts, RNG failures, zero-work preflight,
 exact budgets, output preservation and scratch cleanup.
 
@@ -1137,7 +1138,7 @@ ctest --test-dir build -R '^test_wycheproof_rsa_signatures$' --output-on-failure
 ```
 
 With the OpenSSL test option enabled, `test_rsa_pss_openssl` and
-`test_rsa_pss_openssl_small` check RSA-1024/2048/3072 against generated
+`test_rsa_pss_openssl_small` check RSA-1024/2048/3072/4096 against generated
 OpenSSL signatures. Both limb widths exercise PSS and the internal PKI
 verification dispatch, including v1.5 signatures and negative cases.
 

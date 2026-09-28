@@ -31,8 +31,7 @@ static TC_key_challenge_result challenge_parameters(const TC_X509_public_key* ke
 #if !TC_ENABLE_RSA
     return TC_KEY_CHALLENGE_UNSUPPORTED;
 #else
-    if (key->modulus.length != key->bits / 8u ||
-        (key->bits != 1024 && key->bits != 2048 && key->bits != 3072))
+    if (key->modulus.length != key->bits / 8u || !TC_RSA_verify_workspace_words(key->bits))
       return TC_KEY_CHALLENGE_UNSUPPORTED;
     *challenge_length = key->modulus.length;
     if (pss && (!challenge_digest_length(signature->mgf_hash) ||

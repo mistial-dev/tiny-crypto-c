@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "rsa_sign.h"
 
-enum { MAX_KEY_BITS = 3072, BLINDING_ATTEMPTS = 4, SHA256_BYTES = EXAMPLE_RSA_PSS_SHA256_BYTES };
+enum { MAX_KEY_BITS = 4096, BLINDING_ATTEMPTS = 4, SHA256_BYTES = EXAMPLE_RSA_PSS_SHA256_BYTES };
 
 static TC_RSA_result private_budget(const TC_RSA_private_key* key, uint32_t* work)
 {

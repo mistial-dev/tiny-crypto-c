@@ -70,7 +70,7 @@ def rsa_siggen15_vectors(directory):
         if "S" not in response:
             continue
         bits = int(section.removeprefix("mod = "))
-        if bits not in (1024, 2048, 3072):
+        if bits not in (1024, 2048, 3072, 4096):
             skipped[str(bits)] = skipped.get(str(bits), 0) + 1
             continue
         algorithm = HASHES.get(request["SHAAlg"])
@@ -99,8 +99,8 @@ def rsa_siggenpss_vectors(directory):
         if "S" not in response:
             continue
         bits = int(section.removeprefix("mod = "))
-        if bits not in (1024, 2048, 3072) or request["SHAAlg"] not in HASHES:
-            label = str(bits) if bits not in (1024, 2048, 3072) else request["SHAAlg"]
+        if bits not in (1024, 2048, 3072, 4096) or request["SHAAlg"] not in HASHES:
+            label = str(bits) if bits not in (1024, 2048, 3072, 4096) else request["SHAAlg"]
             skipped[label] = skipped.get(label, 0) + 1
             continue
         algorithm = HASHES[request["SHAAlg"]]
@@ -120,7 +120,7 @@ def rsa_keygen_vectors(directory, exhaustive=False):
         if not {"e", "p", "q", "n", "d"} <= item.keys():
             raise ValueError(f"RSA KeyGen record {index}: missing key material")
         bits = len(item["n"]) * 4
-        if bits not in (2048, 3072):
+        if bits not in (2048, 3072, 4096):
             skipped[str(bits)] = skipped.get(str(bits), 0) + 1
             continue
         if section not in {"hash = SHA1", "hash = SHA224", "hash = SHA256",
@@ -186,8 +186,8 @@ def rsa_signature_vectors(directory, kind):
         if not {"n", "e", "SHAAlg", "Msg", "S", "Result"} <= item.keys():
             continue
         bits = int(section.removeprefix("mod = "))
-        if bits not in (1024, 2048, 3072) or item["SHAAlg"] not in HASHES:
-            label = str(bits) if bits not in (1024, 2048, 3072) else item["SHAAlg"]
+        if bits not in (1024, 2048, 3072, 4096) or item["SHAAlg"] not in HASHES:
+            label = str(bits) if bits not in (1024, 2048, 3072, 4096) else item["SHAAlg"]
             skipped[label] = skipped.get(label, 0) + 1
             continue
         if len(item["Msg"]) % 2 or len(item["S"]) % 2:

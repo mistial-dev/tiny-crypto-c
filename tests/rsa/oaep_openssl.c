@@ -8,7 +8,7 @@
 #include "openssl_key.h"
 #include "../../examples/rsa_encrypt.h"
 
-enum { MAX_BYTES = 384, MAX_DIGEST = 64, WORK_BUDGET = 100000 };
+enum { MAX_BYTES = 512, MAX_DIGEST = 64, WORK_BUDGET = 100000 };
 
 static TC_status fixed_seed(void* context, uint8_t* output, size_t length)
 {
@@ -62,7 +62,7 @@ static MunitResult interoperability(const MunitParameter params[], void* user)
   uint8_t encoded[MAX_BYTES], ciphertext[MAX_BYTES], plaintext[MAX_BYTES];
   uint8_t input[MAX_BYTES], seed[MAX_DIGEST], block[MAX_DIGEST], saved[MAX_BYTES];
   TC_hash_context workspace;
-  munit_assert_true(bits == 1024 || bits == 2048 || bits == 3072);
+  munit_assert_true(bits == 1024 || bits == 2048 || bits == 3072 || bits == 4096);
   EVP_PKEY* key = EVP_RSA_gen(bits);
   (void)user;
   munit_assert_not_null(key);
@@ -72,7 +72,7 @@ static MunitResult interoperability(const MunitParameter params[], void* user)
   const size_t exponent_length =
       tc_test_rsa_component(key, OSSL_PKEY_PARAM_RSA_E, exponent, sizeof exponent, 0);
   const TC_RSA_public_key public_key = {{modulus, modulus_length}, {exponent, exponent_length}};
-  TC_RSA_word words[TC_RSA_ENCRYPT_WORKSPACE_WORDS(3072) + 1];
+  TC_RSA_word words[TC_RSA_ENCRYPT_WORKSPACE_WORDS(4096) + 1];
   const size_t required = TC_RSA_encrypt_workspace_words(bits);
   const TC_RSA_workspace arithmetic = {words, required};
   munit_assert_size(required, ==, TC_RSA_ENCRYPT_WORKSPACE_WORDS(bits));
@@ -244,7 +244,7 @@ static MunitResult interoperability(const MunitParameter params[], void* user)
 
 int main(int argc, char** argv)
 {
-  static char* sizes[] = {"1024", "2048", "3072", NULL};
+  static char* sizes[] = {"1024", "2048", "3072", "4096", NULL};
   static MunitParameterEnum parameters[] = {{"bits", sizes}, {NULL, NULL}};
   MunitTest tests[] = {
       {"/interoperability", interoperability, NULL, NULL, MUNIT_TEST_OPTION_NONE, parameters},

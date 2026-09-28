@@ -10,8 +10,8 @@ static const char* path;
 static MunitResult vectors(const MunitParameter params[], void* data)
 {
   char line[32768];
-  uint8_t modulus[384], exponent[384], digest[64], signature[8192];
-  TC_RSA_word words[9 * (3072 / TC_RSA_WORD_BITS) + 2];
+  uint8_t modulus[512], exponent[512], digest[64], signature[8192];
+  TC_RSA_word words[TC_RSA_VERIFY_WORKSPACE_WORDS(4096)];
   TC_RSA_workspace workspace = {words, sizeof words / sizeof words[0]};
   size_t count = 0;
   FILE* file;

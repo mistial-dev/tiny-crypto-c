@@ -51,9 +51,9 @@ hash implementation when the caller supplies the digest.
 ## Encoding for card and hardware signing
 
 For card or hardware signing, `TC_RSA_encode_v15_digest` produces the complete
-EMSA-PKCS1-v1_5 representative from a precomputed digest. Supply 128, 256 or
-384 or 512 output bytes for RSA-1024, RSA-2048, RSA-3072 or RSA-4096 and a work budget covering
-that length. Input and output must be disjoint. Failures preserve the output.
+EMSA-PKCS1-v1_5 representative from a precomputed digest. Supply 128, 256,
+384, or 512 output bytes for RSA-1024, RSA-2048, RSA-3072, or RSA-4096 and a work budget
+covering that length. Input and output must be disjoint. Failures preserve the output.
 The function shares the software signer's encoding implementation and requires
 no hash context or RSA workspace. See [card-key authentication](credential-reader.md#card-key-authentication)
 for an example that submits this representative to a card.
@@ -61,7 +61,7 @@ for an example that submits this representative to a card.
 `TC_RSA_encode_pss_digest` builds an EMSA-PSS representative with explicit
 message and MGF hashes and caller-supplied salt. Enable both hashes and obtain
 the salt from a cryptographic random source. The salt length must match the
-options. Output capacity is 128, 256, 384 or 512 bytes, with `emBits` one less than
+options. Output capacity is 128, 256, 384, or 512 bytes, with `emBits` one less than
 the modulus width in bits. Keep output and the work budget separate from all
 inputs. Preflight errors preserve both. A failure during encoding wipes the
 output and consumes work. The card transport submits the resulting bytes to
@@ -105,7 +105,7 @@ certificates and CMS. See [testing](testing.md) for the OpenSSL cross-checks.
 ## Key generation
 
 `TC_RSA_keygen_init` and `TC_RSA_keygen_step` generate two-prime RSA-1024,
-RSA-2048, RSA-3072 or RSA-4096 keys with public exponent 65537. The operation uses no
+RSA-2048, RSA-3072, or RSA-4096 keys with public exponent 65537. The operation uses no
 heap storage. Supply `TC_RSA_KEYGEN_WORKSPACE_WORDS(bits)` aligned limbs, or
 query `TC_RSA_keygen_workspace_words(bits)`, plus caller-owned output buffers.
 The modulus and private exponent need `bits/8` bytes, each prime needs

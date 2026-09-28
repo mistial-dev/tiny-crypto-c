@@ -6,7 +6,7 @@
 #include <openssl/evp.h>
 #include <openssl/core_names.h>
 
-enum { TC_TEST_RSA_MAX_BYTES = 384 };
+enum { TC_TEST_RSA_MAX_BYTES = 512 };
 
 /* A zero width selects the minimal unsigned encoding. */
 static inline size_t tc_test_rsa_component(EVP_PKEY* key, const char* name, uint8_t* output,

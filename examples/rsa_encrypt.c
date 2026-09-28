@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "rsa_encrypt.h"
 
-enum { MAX_KEY_BITS = 3072, SHA256_BYTES = 32 };
+enum { MAX_KEY_BITS = 4096, SHA256_BYTES = 32 };
 
 TC_RSA_result example_encrypt_rsa_oaep_sha256(const TC_RSA_public_key* key, TC_bytes label,
                                               TC_bytes plaintext, uint8_t* ciphertext,

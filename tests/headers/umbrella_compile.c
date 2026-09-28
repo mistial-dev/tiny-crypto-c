@@ -64,6 +64,10 @@ static TC_PIV_card_identifiers tc_header_card_identifiers;
 #error "The C umbrella must expose the X.509 revocation headers"
 #endif
 
+#if defined(TC_TEST_HEADER_X509_OCSP) && !defined(TINY_CRYPTO_X509_OCSP_H_)
+#error "The C umbrella must expose the X.509 OCSP header"
+#endif
+
 #if defined(TC_TEST_HEADER_CMS) && !defined(TINY_CRYPTO_CMS_H_)
 #error "The C umbrella must expose the CMS header"
 #endif

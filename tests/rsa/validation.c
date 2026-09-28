@@ -118,7 +118,7 @@ static MunitResult key_generation(const MunitParameter params[], void* user)
   munit_assert_size(TC_RSA_keygen_workspace_words(BITS), ==, WORDS);
   munit_assert_size(TC_RSA_keygen_workspace_words(2048), ==, TC_RSA_KEYGEN_WORKSPACE_WORDS(2048));
   munit_assert_size(TC_RSA_keygen_workspace_words(3072), ==, TC_RSA_KEYGEN_WORKSPACE_WORDS(3072));
-  munit_assert_size(TC_RSA_keygen_workspace_words(4096), ==, 0);
+  munit_assert_size(TC_RSA_keygen_workspace_words(4096), ==, TC_RSA_KEYGEN_WORKSPACE_WORDS(4096));
   munit_assert_int(TC_RSA_keygen_init(&generation, BITS, &output,
                                       (TC_RSA_keygen_limits){4096, 16384}, &workspace),
                    ==, TC_RSA_OK);

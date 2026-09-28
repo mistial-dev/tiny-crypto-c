@@ -6,38 +6,39 @@
 #if TC_ENABLE_RSA
 #define TC_MP_WORD_BITS TC_RSA_WORD_BITS
 #include "rsa_inputs_internal.h"
+#include "rsa_internal.h"
 
 size_t TC_RSA_verify_workspace_words(size_t bits)
 {
-  if (bits != 1024 && bits != 2048 && bits != 3072)
+  if (!tc_rsa_supported_modulus_size(bits / 8) || bits % 8)
     return 0;
   return TC_RSA_VERIFY_WORKSPACE_WORDS(bits);
 }
 
 size_t TC_RSA_validate_workspace_words(size_t bits)
 {
-  if (bits != 1024 && bits != 2048 && bits != 3072)
+  if (!tc_rsa_supported_modulus_size(bits / 8) || bits % 8)
     return 0;
   return TC_RSA_VALIDATE_WORKSPACE_WORDS(bits);
 }
 
 size_t TC_RSA_crt_workspace_words(size_t bits)
 {
-  if (bits != 1024 && bits != 2048 && bits != 3072)
+  if (!tc_rsa_supported_modulus_size(bits / 8) || bits % 8)
     return 0;
   return TC_RSA_CRT_WORKSPACE_WORDS(bits);
 }
 
 size_t TC_RSA_sign_workspace_words(size_t bits)
 {
-  if (bits != 1024 && bits != 2048 && bits != 3072)
+  if (!tc_rsa_supported_modulus_size(bits / 8) || bits % 8)
     return 0;
   return TC_RSA_SIGN_WORKSPACE_WORDS(bits);
 }
 
 size_t TC_RSA_decrypt_workspace_words(size_t bits)
 {
-  if (bits != 1024 && bits != 2048 && bits != 3072)
+  if (!tc_rsa_supported_modulus_size(bits / 8) || bits % 8)
     return 0;
   return TC_RSA_DECRYPT_WORKSPACE_WORDS(bits);
 }
@@ -49,14 +50,14 @@ size_t TC_RSA_encrypt_workspace_words(size_t bits)
 
 size_t TC_RSA_raw_public_workspace_words(size_t bits)
 {
-  if (bits != 1024 && bits != 2048 && bits != 3072)
+  if (!tc_rsa_supported_modulus_size(bits / 8) || bits % 8)
     return 0;
   return TC_RSA_RAW_PUBLIC_WORKSPACE_WORDS(bits);
 }
 
 size_t TC_RSA_raw_private_workspace_words(size_t bits)
 {
-  if (bits != 1024 && bits != 2048 && bits != 3072)
+  if (!tc_rsa_supported_modulus_size(bits / 8) || bits % 8)
     return 0;
   return TC_RSA_RAW_PRIVATE_WORKSPACE_WORDS(bits);
 }

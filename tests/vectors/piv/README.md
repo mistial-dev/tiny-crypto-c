@@ -67,6 +67,14 @@ wrapper, so they are exactly what GET DATA returned. Per card:
 JSON files in `cvc/` carry the card identifiers. Nine of the ten vector cards
 are distinct physical cards (card09 and card10 are the same card).
 
+The later `nist_sd_33_vectors_v2` captures for physical cards 2, 3, 4, 5,
+and 16 contain the same PIV Authentication and Card Authentication certificate
+objects already stored here as `card01`, `card02`, `card03`, `card04`, and
+`card10`, respectively. Their CHUID, Security Object, facial image, printed
+information, and key history objects also match the corresponding files byte
+for byte. The full v2 JSON captures contain PIN and pairing code material and
+are not part of this corpus. Those captures contain no OCSP responses.
+
 ## `cvc/`
 
 `sd33_cardNN_sm_cvc_7f21.bin` is the Secure Messaging CVC (`7F21`) returned in

@@ -24,7 +24,7 @@ static TC_status failed_random(void* context, uint8_t* output, size_t length)
 static void rejected_key(TC_bytes der, size_t signature_length, size_t scratch_words,
                          TC_RSA_result expected, size_t expected_calls)
 {
-  TC_RSA_word words[TC_RSA_SIGN_WORKSPACE_WORDS(3072)];
+  TC_RSA_word words[TC_RSA_SIGN_WORKSPACE_WORDS(4096)];
   uint8_t digest[32] = {0}, signature[TC_TEST_RSA_MAX_BYTES];
   uint8_t unchanged[sizeof signature];
   size_t calls = 0;
@@ -55,8 +55,8 @@ static MunitResult generated_key(const MunitParameter params[], void* data)
 {
   const size_t bits = strtoul(munit_parameters_get(params, "bits"), NULL, 10);
   const size_t length = bits / 8, prime_length = length / 2;
-  TC_RSA_word words[TC_RSA_KEYGEN_WORKSPACE_WORDS(3072)];
-  uint8_t modulus[384], exponent[3], d[384], p[192], q[192];
+  TC_RSA_word words[TC_RSA_KEYGEN_WORKSPACE_WORDS(4096)];
+  uint8_t modulus[512], exponent[3], d[512], p[256], q[256];
   TC_RSA_keygen_output output = {{modulus, length},
                                  {exponent, sizeof exponent},
                                  {d, length},
@@ -205,7 +205,7 @@ static MunitResult private_key(const MunitParameter params[], void* data)
     munit_assert_true((uintptr_t)components[i].data >= (uintptr_t)encoded);
     munit_assert_true((uintptr_t)components[i].data + size <= (uintptr_t)encoded + (size_t)length);
   }
-  TC_RSA_word words[TC_RSA_SIGN_WORKSPACE_WORDS(3072)];
+  TC_RSA_word words[TC_RSA_SIGN_WORKSPACE_WORDS(4096)];
   uint8_t digest[32] = {0}, signature[TC_TEST_RSA_MAX_BYTES];
   /* A PSS-only container must reject v1.5 before requesting entropy. */
   const size_t oid_last =
@@ -314,7 +314,7 @@ static MunitResult restricted_pss(const MunitParameter params[], void* data)
   munit_assert_int(TC_KEY_rsa_private_signature_check(&key, &operation), ==, TC_TLV_OK);
   --operation.salt_length;
   munit_assert_int(TC_KEY_rsa_private_signature_check(&key, &operation), ==, TC_TLV_INVALID);
-  TC_RSA_word words[TC_RSA_SIGN_WORKSPACE_WORDS(3072)];
+  TC_RSA_word words[TC_RSA_SIGN_WORKSPACE_WORDS(4096)];
   uint8_t digest[DIGEST_BYTES] = {0}, signature[TC_TEST_RSA_MAX_BYTES];
   size_t calls = 0;
   memset(signature, 0xa5, sizeof signature);
@@ -359,7 +359,7 @@ static MunitResult restricted_pss(const MunitParameter params[], void* data)
 
 int main(int argc, char** argv)
 {
-  char* bits[] = {"1024", "2048", "3072", NULL};
+  char* bits[] = {"1024", "2048", "3072", "4096", NULL};
   char* formats[] = {"pkcs1", "pkcs8", "pkcs8-pss", NULL};
   MunitParameterEnum parameters[] = {{"bits", bits}, {"format", formats}, {NULL, NULL}};
   MunitParameterEnum restricted_parameters[] = {{"bits", bits}, {NULL, NULL}};

@@ -61,6 +61,11 @@ set(tc_module_requires_TC_ENABLE_X509_REVOCATION TINY_CRYPTO_ENABLE_X509_PATH)
 set(tc_module_sources_TC_ENABLE_X509_REVOCATION
   src/x509_crl.c src/x509_crl_extensions.c src/x509_crl_selected.c src/x509_crl_evidence.c src/x509_crl_entries.c src/x509_revocation.c src/x509_crl_scope.c src/x509_crl_scope_storage.c src/x509_crl_delta.c src/source.c src/source_der.c src/x509_crl_source.c src/x509_crl_prepare.c)
 
+tc_module_feature(TINY_CRYPTO_ENABLE_X509_OCSP TC_ENABLE_X509_OCSP
+  "Build X.509 OCSP request and response processing")
+set(tc_module_requires_TC_ENABLE_X509_OCSP TINY_CRYPTO_ENABLE_X509_PATH)
+set(tc_module_sources_TC_ENABLE_X509_OCSP src/x509_ocsp.c)
+
 tc_module_feature(TINY_CRYPTO_ENABLE_CMS TC_ENABLE_CMS
   "Build CMS parsing and signature verification")
 set(tc_module_requires_TC_ENABLE_CMS
@@ -105,6 +110,10 @@ function(tc_validate_module_features)
      NOT TINY_CRYPTO_AES_KEY_BITS EQUAL 128)
     message(FATAL_ERROR
       "TINY_CRYPTO_ENABLE_TWIC_OBJECT_CRYPTO requires 128-bit AES keys")
+  endif()
+  if(TINY_CRYPTO_ENABLE_X509_OCSP AND
+     NOT TINY_CRYPTO_ENABLE_SHA1 AND NOT TINY_CRYPTO_ENABLE_SHA256)
+    message(FATAL_ERROR "TINY_CRYPTO_ENABLE_X509_OCSP requires SHA-1 or SHA-256")
   endif()
 endfunction()
 

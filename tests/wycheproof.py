@@ -82,7 +82,7 @@ def oaep_records(document, exclusions=None):
         bits = group["keySize"]
         if group["type"] != "RsaesOaepDecrypt" or group["mgf"] != "MGF1":
             raise AssertionError("Unsupported OAEP group")
-        if (bits not in (1024, 2048, 3072) or group["sha"] not in hashes
+        if (bits not in (1024, 2048, 3072, 4096) or group["sha"] not in hashes
                 or group["mgfSha"] not in hashes):
             if exclusions is None:
                 raise AssertionError("Unsupported OAEP group")
@@ -132,7 +132,7 @@ def rsa_signature_records(document, exclusions=None):
         for case in group["tests"]:
             if case["result"] not in ("valid", "invalid", "acceptable"):
                 raise AssertionError("Unexpected RSA signature verdict")
-        if bits not in (1024, 2048, 3072) or sha not in hashes or mgf != "MGF1" or mgf_sha not in hashes:
+        if bits not in (1024, 2048, 3072, 4096) or sha not in hashes or mgf != "MGF1" or mgf_sha not in hashes:
             if exclusions is None:
                 raise AssertionError("Unsupported RSA signature parameters")
             amount = len(group["tests"])
@@ -180,7 +180,7 @@ def rsa_generation_records(document, exclusions=None):
         for case in group["tests"]:
             if case["result"] not in ("valid", "acceptable"):
                 raise AssertionError("Unexpected RSA generation verdict")
-        if bits not in (1024, 2048, 3072) or sha not in hashes:
+        if bits not in (1024, 2048, 3072, 4096) or sha not in hashes:
             if exclusions is None:
                 raise AssertionError("Unsupported RSA generation parameters")
             excluded[(bits,sha)] += len(group["tests"])

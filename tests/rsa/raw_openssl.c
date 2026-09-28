@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-enum { MAX_BYTES = 256, MAX_WORDS = 13 * 2048 / TC_RSA_WORD_BITS };
+enum { MAX_BYTES = 512, MAX_WORDS = 13 * 4096 / TC_RSA_WORD_BITS };
 
 typedef struct {
   int fail;
@@ -56,7 +56,8 @@ static MunitResult raw_operations(const MunitParameter params[], void* user)
   representative[width - 1] = 42;
   munit_assert_size(TC_RSA_raw_public_workspace_words(bits), ==, 8 * bits / TC_RSA_WORD_BITS + 2);
   munit_assert_size(TC_RSA_raw_private_workspace_words(bits), ==, 13 * bits / TC_RSA_WORD_BITS);
-  munit_assert_size(TC_RSA_raw_private_workspace_words(4096), ==, 0);
+  munit_assert_size(TC_RSA_raw_private_workspace_words(4096), ==,
+                    TC_RSA_RAW_PRIVATE_WORKSPACE_WORDS(4096));
 
   private_context = EVP_PKEY_CTX_new(generated, NULL);
   public_context = EVP_PKEY_CTX_new(generated, NULL);
@@ -138,7 +139,7 @@ static MunitResult raw_operations(const MunitParameter params[], void* user)
 
 int main(int argc, char** argv)
 {
-  MunitParameterEnum sizes[] = {{"bits", (char*[]){"1024", "2048", NULL}}, {NULL, NULL}};
+  MunitParameterEnum sizes[] = {{"bits", (char*[]){"1024", "2048", "4096", NULL}}, {NULL, NULL}};
   MunitTest tests[] = {{"/operations", raw_operations, NULL, NULL, MUNIT_TEST_OPTION_NONE, sizes},
                        {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
   MunitSuite suite = {"/rsa/raw", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};
