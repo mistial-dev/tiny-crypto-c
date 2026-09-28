@@ -24,11 +24,6 @@ static int outside(const TC_DRBG* drbg, const void* data, size_t length)
   return tc_internal_ranges_disjoint(drbg, sizeof *drbg, data, length);
 }
 
-static int span_valid(TC_bytes span)
-{
-  return span.data != NULL || span.length == 0;
-}
-
 static TC_DRBG_result mechanism_parameters(const TC_DRBG_config* config, tc_drbg_parameters* out)
 {
   switch (config->mechanism) {
@@ -152,9 +147,9 @@ TC_DRBG_result TC_DRBG_instantiate(TC_DRBG* drbg, const TC_DRBG_config* config,
   if (drbg == NULL)
     return TC_DRBG_ARGUMENT;
   TC_DRBG_uninstantiate(drbg);
-  if (config == NULL || entropy.fill == NULL || !span_valid(nonce) ||
-      !span_valid(personalization) || !input_within_limit(nonce.length) ||
-      !input_within_limit(personalization.length) ||
+  if (config == NULL || entropy.fill == NULL || !tc_internal_span_valid(nonce.data, nonce.length) ||
+      !tc_internal_span_valid(personalization.data, personalization.length) ||
+      !input_within_limit(nonce.length) || !input_within_limit(personalization.length) ||
       personalization.length > TC_DRBG_MAX_INPUT_BYTES - nonce.length ||
       config->prediction_resistance > 1 || config->derivation_function > 1 ||
       config->reseed_interval > TC_DRBG_MAX_RESEED_INTERVAL ||
@@ -229,7 +224,7 @@ static TC_DRBG_result reseed(TC_DRBG* drbg, TC_bytes additional)
 
 TC_DRBG_result TC_DRBG_reseed(TC_DRBG* drbg, TC_bytes additional)
 {
-  if (!live(drbg) || !span_valid(additional) ||
+  if (!live(drbg) || !tc_internal_span_valid(additional.data, additional.length) ||
       !outside(drbg, additional.data, additional.length) ||
       !input_length_valid(drbg, additional.length))
     return TC_DRBG_ARGUMENT;
@@ -249,8 +244,8 @@ TC_DRBG_result TC_DRBG_generate(TC_DRBG* drbg, uint8_t* output, size_t length,
     return TC_DRBG_LIMIT;
   }
 #endif
-  if (!live(drbg) || !span_valid(additional) || !outside(drbg, output, length) ||
-      !outside(drbg, additional.data, additional.length) ||
+  if (!live(drbg) || !tc_internal_span_valid(additional.data, additional.length) ||
+      !outside(drbg, output, length) || !outside(drbg, additional.data, additional.length) ||
       !tc_internal_ranges_disjoint(output, length, additional.data, additional.length) ||
       !input_length_valid(drbg, additional.length) ||
       (prediction_resistance && !drbg->prediction_resistance)) {

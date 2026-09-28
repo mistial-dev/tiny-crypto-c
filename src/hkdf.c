@@ -18,8 +18,8 @@ static TC_status tc_hkdf_extract(const tc_hash_algorithm_info* hash, void* ctx, 
 {
   const struct tc_kdf_prf prf = tc_kdf_hmac_prf(hash, ctx_size, (uint8_t)hash_len);
   TC_status status;
-  if (!prk || !tc_kdf_input_ok(salt, salt_len) || !tc_kdf_input_ok(ikm, ikm_len) ||
-      !tc_kdf_input_ok(auxiliary, auxiliary_len) ||
+  if (!prk || !tc_internal_span_valid(salt, salt_len) || !tc_internal_span_valid(ikm, ikm_len) ||
+      !tc_internal_span_valid(auxiliary, auxiliary_len) ||
       !tc_kdf_output_disjoint(prk, hash_len, salt, salt_len) ||
       !tc_kdf_output_disjoint(prk, hash_len, ikm, ikm_len) ||
       !tc_kdf_output_disjoint(prk, hash_len, auxiliary, auxiliary_len))
@@ -50,7 +50,7 @@ static TC_status tc_hkdf_expand(const tc_hash_algorithm_info* hash, void* initia
   size_t offset = 0;
   uint8_t counter = 1;
 
-  if (!prk || prk_len < hash_len || !tc_kdf_input_ok(info, info_len) || !output ||
+  if (!prk || prk_len < hash_len || !tc_internal_span_valid(info, info_len) || !output ||
       !tc_hkdf_length_ok(hash_len, output_len) ||
       !tc_kdf_output_disjoint(output, output_len, prk, prk_len) ||
       !tc_kdf_output_disjoint(output, output_len, info, info_len))
@@ -121,9 +121,10 @@ static TC_status tc_hkdf_expand(const tc_hash_algorithm_info* hash, void* initia
   {                                                                                                \
     uint8_t prk[DIGESTLEN];                                                                        \
     TC_status status;                                                                              \
-    if (!tc_kdf_input_ok(salt, salt_len) || !tc_kdf_input_ok(ikm, ikm_len) ||                      \
-        !tc_kdf_input_ok(auxiliary, auxiliary_len) || !tc_kdf_input_ok(info, info_len) ||          \
-        !output || !tc_hkdf_length_ok(DIGESTLEN, output_len) ||                                    \
+    if (!tc_internal_span_valid(salt, salt_len) || !tc_internal_span_valid(ikm, ikm_len) ||        \
+        !tc_internal_span_valid(auxiliary, auxiliary_len) ||                                       \
+        !tc_internal_span_valid(info, info_len) || !output ||                                      \
+        !tc_hkdf_length_ok(DIGESTLEN, output_len) ||                                               \
         !tc_kdf_output_disjoint(output, output_len, salt, salt_len) ||                             \
         !tc_kdf_output_disjoint(output, output_len, ikm, ikm_len) ||                               \
         !tc_kdf_output_disjoint(output, output_len, auxiliary, auxiliary_len) ||                   \

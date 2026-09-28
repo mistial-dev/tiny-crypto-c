@@ -122,8 +122,8 @@ static TC_status tc_kdf_derive(const struct tc_kdf_prf* prf, int mode, const uin
   uint32_t i;
 
   if (key == NULL || key_len == 0 || !tc_kdf_key_ok(prf, key_len) || params == NULL ||
-      out == NULL || out_len == 0 || !tc_kdf_input_ok(in1, in1_len) ||
-      !tc_kdf_input_ok(in2, in2_len))
+      out == NULL || out_len == 0 || !tc_internal_span_valid(in1, in1_len) ||
+      !tc_internal_span_valid(in2, in2_len))
     return TC_ERROR;
   if (!tc_kdf_output_disjoint(out, out_len, key, key_len) ||
       !tc_kdf_output_disjoint(out, out_len, in1, in1_len) ||
@@ -271,7 +271,8 @@ TC_status TC_KBKDF_fixed_input(const uint8_t* label, size_t label_len, const uin
 {
   size_t needed;
 
-  if (buf == NULL || !tc_kdf_input_ok(label, label_len) || !tc_kdf_input_ok(context, context_len))
+  if (buf == NULL || !tc_internal_span_valid(label, label_len) ||
+      !tc_internal_span_valid(context, context_len))
     return TC_ERROR;
   /* [L]_32 is a bit count, so out_len must stay below 2^29 bytes. */
   if (out_len == 0 || out_len > 0x1FFFFFFFu)

@@ -331,10 +331,8 @@ static inline void tc_des_final_permutation(uint32_t* pL, uint32_t* pR)
 /* Single DES block cipher core */
 void tc_des_cipher_block(const uint8_t (*sk)[6], uint8_t* buf, int decrypt)
 {
-  uint32_t L =
-      ((uint32_t)buf[0] << 24) | ((uint32_t)buf[1] << 16) | ((uint32_t)buf[2] << 8) | buf[3];
-  uint32_t R =
-      ((uint32_t)buf[4] << 24) | ((uint32_t)buf[5] << 16) | ((uint32_t)buf[6] << 8) | buf[7];
+  uint32_t L = tc_internal_load_be32(buf);
+  uint32_t R = tc_internal_load_be32(buf + 4);
 
   tc_des_initial_permutation(&L, &R);
 

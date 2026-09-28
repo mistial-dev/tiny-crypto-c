@@ -86,17 +86,11 @@ static void tc_aes_gcm_absorb(struct TC_AES_GCM_ctx* ctx, const uint8_t* data, s
   }
 }
 
-static void tc_aes_gcm_increment_counter(uint8_t* counter)
+/* inc32 (SP 800-38D section 6.2): only the low 32 bits of the counter block
+ * change, and they wrap. */
+static void tc_aes_gcm_increment32(uint8_t* counter)
 {
-  unsigned i;
-  for (i = 0; i < 4; ++i) {
-    const unsigned offset = 15u - i;
-    if (counter[offset] != 0xffu) {
-      ++counter[offset];
-      break;
-    }
-    counter[offset] = 0;
-  }
+  (void)tc_internal_increment_be(counter + 12, 4);
 }
 
 static void tc_aes_gcm_finish_ghash(struct TC_AES_GCM_ctx* ctx)
@@ -262,7 +256,7 @@ static int tc_aes_gcm_encrypt_update_impl(struct TC_AES_GCM_ctx* ctx, uint8_t* b
   while (length >= TC_AES_BLOCKLEN && ctx->stream_pos == TC_AES_BLOCKLEN && ctx->ghash_len == 0) {
     uint8_t j;
 
-    tc_aes_gcm_increment_counter(ctx->counter);
+    tc_aes_gcm_increment32(ctx->counter);
     tc_aes_copy_bytes(ctx->stream, ctx->counter, TC_AES_BLOCKLEN);
     if (tc_aes_cipher((state_t*)ctx->stream, ctx->key.round_key) != TC_OK)
       goto failed;
@@ -278,7 +272,7 @@ static int tc_aes_gcm_encrypt_update_impl(struct TC_AES_GCM_ctx* ctx, uint8_t* b
     size_t count;
 
     if (ctx->stream_pos == TC_AES_BLOCKLEN) {
-      tc_aes_gcm_increment_counter(ctx->counter);
+      tc_aes_gcm_increment32(ctx->counter);
       tc_aes_copy_bytes(ctx->stream, ctx->counter, TC_AES_BLOCKLEN);
       if (tc_aes_cipher((state_t*)ctx->stream, ctx->key.round_key) != TC_OK)
         goto failed;
@@ -361,7 +355,7 @@ static TC_status tc_aes_gcm_decrypt_recheck(struct TC_AES_GCM_ctx* ctx, const ui
     size_t i;
     tc_aes_copy_bytes(block, ciphertext + offset, count);
     tc_aes_gcm_absorb(ctx, block, count);
-    tc_aes_gcm_increment_counter(counter);
+    tc_aes_gcm_increment32(counter);
     tc_aes_copy_bytes(stream, counter, TC_AES_BLOCKLEN);
     if (tc_aes_cipher((state_t*)stream, ctx->key.round_key) != TC_OK) {
       status = TC_ERROR;

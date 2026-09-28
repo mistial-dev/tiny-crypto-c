@@ -279,6 +279,7 @@ add_test(NAME test_package_boundaries
     TC_ENABLE_AES=1 TC_AES_ENABLE_DYNAMIC=1 TC_ENABLE_DES=0 TC_ENABLE_HMAC=1
     TC_ENABLE_SHA1=1 TC_ENABLE_SHA224=1 TC_ENABLE_SHA256=1 TC_ENABLE_SHA384=1
     TC_ENABLE_SHA512=1)
+  tc_add_c_test(test_internal tiny-crypto-c-test tests/support/internal_test.c)
   tc_add_c_test(test_drbg tiny-crypto-c-test-drbg tests/drbg/test.c)
   tc_add_c_test(test_drbg_cavp tiny-crypto-c-test-drbg tests/drbg/cavp.c)
   tc_add_c_test(test_drbg_example tiny-crypto-c-test-drbg

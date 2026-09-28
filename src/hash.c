@@ -33,28 +33,6 @@
 #define ROTL32(x, n) (((x) << (n)) | ((x) >> (32 - (n))))
 #define ROTR32(x, n) (((x) >> (n)) | ((x) << (32 - (n))))
 
-/* Byte-wise big-endian load with compiler builtin fast paths. */
-static inline uint32_t tc_hash_load_be32(const uint8_t* p)
-{
-#if (defined(__GNUC__) || defined(__clang__)) && defined(__BYTE_ORDER__) &&                        \
-    (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
-  uint32_t v;
-  memcpy(&v, p, sizeof(v));
-  return __builtin_bswap32(v);
-#elif (defined(__GNUC__) || defined(__clang__)) && defined(__BYTE_ORDER__) &&                      \
-    (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
-  uint32_t v;
-  memcpy(&v, p, sizeof(v));
-  return v;
-#elif defined(_MSC_VER)
-  uint32_t v;
-  memcpy(&v, p, sizeof(v));
-  return _byteswap_ulong(v);
-#else
-  return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) | ((uint32_t)p[2] << 8) | (uint32_t)p[3];
-#endif
-}
-
 /*****************************************************************************/
 /* SHA-1                                                                     */
 /*****************************************************************************/
@@ -81,7 +59,7 @@ static void sha1_compress(void* chaining, const uint8_t* block)
   unsigned t;
 
   for (t = 0; t < 16; ++t)
-    W[t] = tc_hash_load_be32(block + 4U * t);
+    W[t] = tc_internal_load_be32(block + 4U * t);
 
   a = state[0];
   b = state[1];
@@ -240,7 +218,7 @@ static void sha256_compress(void* chaining, const uint8_t* block)
   unsigned t;
 
   for (t = 0; t < 16; ++t)
-    W[t] = tc_hash_load_be32(block + 4U * t);
+    W[t] = tc_internal_load_be32(block + 4U * t);
 
   a = state[0];
   b = state[1];

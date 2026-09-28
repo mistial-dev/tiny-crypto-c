@@ -8,6 +8,7 @@
 #include <tiny_crypto/common.h>
 #include "hash_info_internal.h"
 #include "hash_core_internal.h"
+#include "internal.h"
 
 #define TC_HASH_DISPATCH_ENABLED                                                                   \
   (TC_ENABLE_SHA1 || TC_ENABLE_SHA224 || TC_ENABLE_SHA256 || TC_ENABLE_SHA384 || TC_ENABLE_SHA512)
@@ -60,7 +61,7 @@ static inline TC_status tc_hash_digest_parts(TC_hash_algorithm algorithm, const 
   if (!context || !digest || (count && !parts) || !tc_hash_available(algorithm))
     return TC_ERROR;
   for (size_t i = 0; i < count; ++i)
-    if (parts[i].length && !parts[i].data)
+    if (!tc_internal_span_valid(parts[i].data, parts[i].length))
       return TC_ERROR;
   status = tc_hash_init(algorithm, context);
   for (size_t i = 0; status == TC_OK && i < count; ++i)

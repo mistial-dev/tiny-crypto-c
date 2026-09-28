@@ -30,12 +30,6 @@ static int finger_quality(uint8_t quality)
          quality == 254 || quality == 255;
 }
 
-static uint32_t read_u32(const uint8_t* value)
-{
-  return ((uint32_t)value[0] << 24) | ((uint32_t)value[1] << 16) | ((uint32_t)value[2] << 8) |
-         value[3];
-}
-
 TC_TLV_result TC_PIV_fingerprint_read(TC_bytes input, TC_PIV_fingerprint_record* out)
 {
   static const uint8_t format[] = {'F', 'M', 'R', 0};
@@ -122,7 +116,7 @@ static TC_TLV_result face_image(TC_bytes input, TC_PIV_face_profile profile, siz
   if (input.length - offset < FACE_INFORMATION_BYTES)
     return TC_TLV_INVALID;
   const uint8_t* bytes = input.data + offset;
-  const uint32_t block_length = read_u32(bytes);
+  const uint32_t block_length = tc_internal_load_be32(bytes);
   const uint16_t features = read_u16(bytes + 4);
   if (block_length < FACE_IMAGE_MIN_BYTES || block_length > input.length - offset ||
       features > (block_length - FACE_IMAGE_MIN_BYTES) / FACE_FEATURE_BYTES)
@@ -185,7 +179,8 @@ TC_TLV_result TC_PIV_face_read(TC_bytes input, TC_PIV_face_profile profile, TC_P
       !tc_internal_ranges_disjoint(input.data, input.length, out, sizeof *out))
     return TC_TLV_ARGUMENT;
   if (input.length < FACE_HEADER_BYTES || memcmp(input.data, format, sizeof format) ||
-      memcmp(input.data + 4, version, sizeof version) || read_u32(input.data + 8) != input.length)
+      memcmp(input.data + 4, version, sizeof version) ||
+      tc_internal_load_be32(input.data + 8) != input.length)
     return TC_TLV_INVALID;
   const uint16_t count = read_u16(input.data + 12);
   if (!count)

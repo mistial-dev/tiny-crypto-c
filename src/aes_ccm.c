@@ -44,15 +44,10 @@ static void tc_aes_ccm_make_counter(uint8_t* counter, const uint8_t* nonce, size
   tc_aes_ccm_store_length(counter + 1 + nonce_len, value, q);
 }
 
+/* The counter occupies the low q bytes of the block (SP 800-38C A.3). */
 static void tc_aes_ccm_increment_counter(uint8_t* counter, unsigned q)
 {
-  unsigned i;
-
-  for (i = TC_AES_BLOCKLEN; i > TC_AES_BLOCKLEN - q; --i) {
-    const unsigned offset = i - 1u;
-    if (++counter[offset] != 0)
-      break;
-  }
+  (void)tc_internal_increment_be(counter + TC_AES_BLOCKLEN - q, q);
 }
 
 static TC_status tc_aes_ccm_xor_block(uint8_t* dst, size_t length, uint8_t* counter,

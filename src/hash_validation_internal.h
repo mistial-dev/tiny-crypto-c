@@ -7,7 +7,7 @@
 static inline int tc_hash_update_args(const void* ctx, size_t ctx_len, const uint8_t* data,
                                       size_t data_len)
 {
-  return ctx != NULL && (data != NULL || data_len == 0) &&
+  return ctx != NULL && tc_internal_span_valid(data, data_len) &&
          data_len <= UINTPTR_MAX - (uintptr_t)data &&
          tc_internal_ranges_disjoint(ctx, ctx_len, data, data_len);
 }

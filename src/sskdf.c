@@ -23,7 +23,8 @@ static TC_status derive(const tc_hash_algorithm_info* hash, void* ctx, size_t ct
     return TC_ERROR;
   total = 4 + z_len;
   for (i = 0; i < count; ++i) {
-    if ((!info[i].data && info[i].length) || info[i].length > SIZE_MAX - total ||
+    if (!tc_internal_span_valid(info[i].data, info[i].length) ||
+        info[i].length > SIZE_MAX - total ||
         !tc_internal_ranges_disjoint(info[i].data, info[i].length, output, output_len))
       return TC_ERROR;
     total += info[i].length;
@@ -40,10 +41,7 @@ static TC_status derive(const tc_hash_algorithm_info* hash, void* ctx, size_t ct
   }
 #endif
   while (offset < output_len) {
-    counter[0] = (uint8_t)(round >> 24);
-    counter[1] = (uint8_t)(round >> 16);
-    counter[2] = (uint8_t)(round >> 8);
-    counter[3] = (uint8_t)round;
+    tc_internal_store_be32(counter, round);
     if (tc_hash_core_init(hash, ctx) != TC_OK ||
         tc_hash_core_update(hash, ctx, counter, 4) != TC_OK ||
         tc_hash_core_update(hash, ctx, z, z_len) != TC_OK)

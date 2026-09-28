@@ -40,6 +40,34 @@ static inline int tc_internal_ranges_disjoint(const void* a, size_t a_len, const
   return b_len <= (size_t)(pa - pb);
 }
 
+/* A span is valid when it has storage or is empty. */
+static inline int tc_internal_span_valid(const void* data, size_t length)
+{
+  return data != NULL || length == 0;
+}
+
+static inline uint32_t tc_internal_load_be32(const uint8_t* src)
+{
+#if (defined(__GNUC__) || defined(__clang__)) && defined(__BYTE_ORDER__) &&                        \
+    (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
+  uint32_t value;
+  memcpy(&value, src, sizeof(value));
+  return __builtin_bswap32(value);
+#elif (defined(__GNUC__) || defined(__clang__)) && defined(__BYTE_ORDER__) &&                      \
+    (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+  uint32_t value;
+  memcpy(&value, src, sizeof(value));
+  return value;
+#elif defined(_MSC_VER)
+  uint32_t value;
+  memcpy(&value, src, sizeof(value));
+  return _byteswap_ulong(value);
+#else
+  return ((uint32_t)src[0] << 24) | ((uint32_t)src[1] << 16) | ((uint32_t)src[2] << 8) |
+         (uint32_t)src[3];
+#endif
+}
+
 static inline void tc_internal_store_be32(uint8_t* dst, uint32_t value)
 {
   dst[0] = (uint8_t)(value >> 24);

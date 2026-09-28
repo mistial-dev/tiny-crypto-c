@@ -9,11 +9,6 @@
 #include "hash_core_internal.h"
 #include "internal.h"
 
-static inline int tc_kdf_input_ok(const uint8_t* input, size_t length)
-{
-  return input != NULL || length == 0;
-}
-
 /* A later PRF block may reread each input after output bytes are written. */
 static inline int tc_kdf_output_disjoint(const uint8_t* output, size_t output_len,
                                          const uint8_t* input, size_t input_len)
