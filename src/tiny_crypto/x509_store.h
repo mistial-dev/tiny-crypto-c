@@ -11,7 +11,11 @@ extern "C" {
 typedef struct {
   TC_X509_trust_anchor trust;
   TC_X509_name_constraints names;
-  /* Borrowed DER spans. Policy and extension spans contain SEQUENCE contents. */
+  /* Borrowed DER spans. Policy and extension spans contain SEQUENCE contents.
+   * extensions holds TrustAnchorInfo exts, which must not contain
+   * certificatePolicies, policyConstraints, inhibitAnyPolicy or
+   * nameConstraints (RFC 5914 section 2.6). certificate_extensions holds the
+   * anchor certificate's own extensions. */
   TC_bytes key_id, title, title_language;
   TC_bytes policy_set, extensions, certificate_extensions;
   unsigned policy_flags;

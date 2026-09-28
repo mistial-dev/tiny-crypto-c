@@ -522,7 +522,34 @@ static MunitResult key_identifiers(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+#include <stdio.h>
+
+/* max_elements covers every element TC_X509_read parses, including the
+ * DER inside each extnValue. fcpcag2.crt has 70 elements in its outer
+ * structure and 8 more inside its extension values. */
+static MunitResult element_accounting(const MunitParameter params[], void* user)
+{
+  static uint8_t der[4096];
+  TC_TLV_frame frames[32];
+  TC_bytes oids[32];
+  TC_X509_workspace workspace = {frames, 32, oids, 32};
+  TC_X509_certificate certificate;
+  FILE* file = fopen(TC_FPKI_CERTIFICATE, "rb");
+  (void)params;
+  (void)user;
+  munit_assert_not_null(file);
+  const size_t length = fread(der, 1, sizeof der, file);
+  munit_assert_int(fclose(file), ==, 0);
+  munit_assert_size(length, >, 0);
+  TC_TLV_limits limits = {sizeof der, sizeof der, 78, 32};
+  munit_assert_int(TC_X509_read(der, length, &limits, &workspace, &certificate), ==, TC_TLV_OK);
+  limits.max_elements = 77;
+  munit_assert_int(TC_X509_read(der, length, &limits, &workspace, &certificate), ==, TC_TLV_LIMIT);
+  return MUNIT_OK;
+}
+
 static MunitTest tests[] = {
+    {"/element-accounting", element_accounting, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/key-identifiers", key_identifiers, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/subtree-limits", subtree_limits, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/name-constraints", name_constraints, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

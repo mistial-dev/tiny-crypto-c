@@ -53,9 +53,10 @@ the target must carry EKU. Certificate-profile rules such as criticality and
 exclusive use of one EKU require separate profile checks.
 
 `initial_policies` contains the acceptable policy OIDs, also as DER contents.
-Use `anyPolicy` (`55 1d 20 00`) to accept the authority-constrained policy set.
-An empty initial set produces no selected policies. Set
-`TC_X509_PATH_REQUIRE_EXPLICIT_POLICY` when a nonempty selected set is required.
+An empty list is the RFC 5280 default user-initial-policy-set, `{anyPolicy}`,
+and accepts the authority-constrained policy set. Listing `anyPolicy`
+(`55 1d 20 00`) has the same effect. Set `TC_X509_PATH_REQUIRE_EXPLICIT_POLICY`
+when a nonempty selected set is required.
 The mapping and any-policy inhibition flags apply independently.
 
 `anchor_names` supplies additional permitted/excluded subtrees from trusted

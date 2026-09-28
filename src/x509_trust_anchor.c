@@ -179,9 +179,12 @@ static TC_TLV_result extensions(TC_bytes encoded, const TC_TLV_limits* limits,
     workspace->extension_oids[count++] = oid;
     if (oid.length != 3 || oid.data[0] != 0x55 || oid.data[1] != 0x1d)
       continue;
+    /* RFC 5914 section 2.6: these duplicate CertPathControls and must not
+     * appear in TrustAnchorInfo exts. Reject them so a constraint is never
+     * silently dropped. */
     if (tai_ext &&
         (oid.data[2] == 30 || oid.data[2] == 32 || oid.data[2] == 36 || oid.data[2] == 54))
-      continue;
+      return TC_TLV_INVALID;
     switch (oid.data[2]) {
     case 32: {
       TC_TLV_element value;

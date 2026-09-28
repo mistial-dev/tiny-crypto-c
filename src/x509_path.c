@@ -497,8 +497,12 @@ static TC_TLV_result path_storage(const TC_bytes* chain, size_t count,
 
 /* Anchor controls are normalized by the TrustAnchorInfo reader. Reject critical
  * extensions whose path semantics this validator does not implement. */
-static TC_TLV_result anchor_extensions_check(TC_bytes contents, const TC_TLV_limits* limits,
-                                             size_t* work)
+/* Check a trust anchor's extensions. The certificate's own extensions may
+ * carry the path controls the validator applies. TrustAnchorInfo exts must
+ * not carry them (RFC 5914 section 2.6), so any such extension there is
+ * INVALID. Other critical extensions are UNSUPPORTED. */
+static TC_TLV_result anchor_extensions_check(TC_bytes contents, int trust_anchor_info,
+                                             const TC_TLV_limits* limits, size_t* work)
 {
   TC_TLV_reader reader;
   TC_X509_extension extension;
@@ -509,9 +513,11 @@ static TC_TLV_result anchor_extensions_check(TC_bytes contents, const TC_TLV_lim
   if (result != TC_TLV_OK)
     return result;
   while ((result = tc_pki_extension_next(&reader, work, &extension)) == TC_TLV_OK) {
-    unsigned id = tc_pki_extension_id(&extension);
-    if (extension.critical && id != 14 && id != 15 && id != 19 && id != 30 && id != 32 &&
-        id != 36 && id != 54)
+    const unsigned id = tc_pki_extension_id(&extension);
+    const int path_control = id == 30 || id == 32 || id == 36 || id == 54;
+    if (trust_anchor_info && path_control)
+      return TC_TLV_INVALID;
+    if (extension.critical && id != 14 && id != 15 && id != 19 && !path_control)
       return TC_TLV_UNSUPPORTED;
   }
   return result == TC_TLV_END ? TC_TLV_OK : result;
@@ -556,10 +562,10 @@ TC_X509_path_status tc_x509_path_validate_anchor(const TC_bytes* chain, size_t c
   result = path_storage(chain, count, anchor, options, workspace, out, work);
   if (result != TC_TLV_OK)
     return tc_x509_path_status(result);
-  result = anchor_extensions_check(anchor->extensions, &options->parsing, work);
+  result = anchor_extensions_check(anchor->extensions, 1, &options->parsing, work);
   if (result != TC_TLV_OK)
     return tc_x509_path_status(result);
-  result = anchor_extensions_check(anchor->certificate_extensions, &options->parsing, work);
+  result = anchor_extensions_check(anchor->certificate_extensions, 0, &options->parsing, work);
   if (result != TC_TLV_OK)
     return tc_x509_path_status(result);
   if (TC_X509_time_compare(&options->at, &options->at, &accepted) != TC_TLV_OK)
@@ -628,6 +634,9 @@ TC_X509_path_status tc_x509_path_validate_anchor(const TC_bytes* chain, size_t c
     const TC_X509_name_constraints* constraints = set ? &anchor->names : &options->anchor_names;
     if (!constraints || (!constraints->permitted.length && !constraints->excluded.length))
       continue;
+    result = tc_x509_path_constraint_distances(constraints, input.limits, &names, work);
+    if (result != TC_TLV_OK)
+      return tc_x509_path_status(result);
     for (i = 0; i < count; ++i) {
       result = tc_x509_path_certificate(&input, i, work, &target);
       if (result != TC_TLV_OK)

@@ -575,6 +575,8 @@ if(TINY_CRYPTO_BUILD_TESTS)
   target_link_libraries(test_twic_ccl PRIVATE tiny-crypto-c-test-md5-1)
   tc_add_c_test(test_x509_key tiny-crypto-c-test-pki tests/x509/key.c)
   tc_add_c_test(test_x509_extensions tiny-crypto-c-test-pki tests/x509/extensions.c)
+  target_compile_definitions(test_x509_extensions PRIVATE
+    TC_FPKI_CERTIFICATE="${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/x509/fpki/fcpcag2.crt")
   tc_add_c_test(test_x509_name tiny-crypto-c-test-pki tests/x509/name.c)
   tc_add_c_test(test_x509_signature tiny-crypto-c-test-pki tests/x509/signature.c)
   tc_add_c_test(test_x509_time tiny-crypto-c-test-pki tests/x509/time.c)

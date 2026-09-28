@@ -51,7 +51,11 @@ application flags. An anchor path-length limit counts non-self-issued
 intermediate CAs. Unknown critical anchor extensions prevent validation.
 
 For `TrustAnchorInfo`, its path-control fields take precedence over matching
-extensions in its embedded certificate. Its embedded certificate must match
+extensions in its embedded certificate. RFC 5914 section 2.6 forbids
+certificatePolicies, policyConstraints, inhibitAnyPolicy and nameConstraints
+in the `exts` field, because `CertPathControls` carries them. Such an
+extension makes the anchor `TC_TLV_INVALID` when parsed and
+`TC_X509_PATH_INVALID` when a caller-built anchor carries it in `extensions`. Its embedded certificate must match
 the stated name and public key, and any subject key identifier must match the
 anchor key identifier. The anchor record selected by path search applies only
 to that attempted path. Another anchor cannot relax its controls.

@@ -45,6 +45,8 @@ typedef struct {
 /* Parse one DER certificate. Returned spans borrow data.
  * Validate signatures, paths, revocation and time before accepting the certificate.
  * Interpret extension values according to their OIDs.
+ * limits->max_elements counts every element parsed, including the DER inside
+ * each extension value. A certificate needing more returns LIMIT.
  * Workspace may change on failure. out remains unchanged. */
 TC_TLV_result TC_X509_read(const uint8_t* data, size_t length, const TC_TLV_limits* limits,
                            TC_X509_workspace* workspace, TC_X509_certificate* out);

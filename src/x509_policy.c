@@ -407,14 +407,16 @@ TC_TLV_result tc_x509_policy_graph_output(const tc_x509_policy_graph* graph,
     if (is_any(initial[i]))
       unrestricted = 1;
   }
+  /* RFC 5280 section 6.1.1 (c): an absent user-initial-policy-set is
+   * {anyPolicy}. */
+  if (!initial_count)
+    unrestricted = 1;
   if (anchor_set.data) {
     const TC_bytes any = {any_oid, sizeof any_oid};
     TC_TLV_result result =
         anchor_policy_contains(anchor_set, limits, any, work, &anchor_unrestricted);
     if (result != TC_TLV_OK)
       return result;
-    if (!initial_count)
-      unrestricted = 1;
   }
   for (i = 0; i < graph->node_count; ++i) {
     const tc_x509_policy_node* node = &graph->nodes[i];

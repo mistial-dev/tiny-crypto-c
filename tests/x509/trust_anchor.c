@@ -260,7 +260,45 @@ static MunitResult choices(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+/* RFC 5914 section 2.6 forbids these extensions in TrustAnchorInfo exts. */
+static MunitResult forbidden_exts(const MunitParameter params[], void* user)
+{
+  static const uint8_t spki[] = {0x30, 12, 0x30, 5, 6, 3, 0x2a, 3, 4, 3, 3, 0, 1, 2};
+  static const uint8_t key_id[] = {4, 1, 1};
+  static const uint8_t name[] = {0x30, 12, 0x31, 10, 0x30, 8, 6, 3, 0x55, 4, 3, 0x0c, 1, 'A'};
+  static const unsigned ids[] = {30, 32, 36, 54, 19};
+  (void)params;
+  (void)user;
+  for (size_t i = 0; i < sizeof ids / sizeof *ids; ++i) {
+    /* basicConstraints (19) is permitted and parses; the others are not. */
+    uint8_t extension[] = {0x30, 9, 6, 3, 0x55, 0x1d, (uint8_t)ids[i], 4, 2, 0x30, 0};
+    uint8_t extensions[2 + sizeof extension], exts[4 + sizeof extension];
+    uint8_t info[128], info_tlv[130], choice[132], encoded[134];
+    size_t n = 0;
+    add(extensions, 0x30, extension, sizeof extension);
+    add(exts, 0xa1, extensions, sizeof extensions);
+    memcpy(info + n, spki, sizeof spki);
+    n += sizeof spki;
+    memcpy(info + n, key_id, sizeof key_id);
+    n += sizeof key_id;
+    n += add(info + n, 0x30, name, sizeof name); /* CertPathControls with taName only */
+    memcpy(info + n, exts, sizeof exts);
+    n += sizeof exts;
+    size_t info_length = add(info_tlv, 0x30, info, n);
+    size_t choice_length = add(choice, 0xa2, info_tlv, info_length);
+    size_t length = add(encoded, 0x30, choice, choice_length);
+    TC_TLV_reader reader;
+    TC_X509_store_anchor anchor;
+    munit_assert_int(TC_X509_trust_anchor_list_init(&reader, encoded, length, &limits, &workspace),
+                     ==, TC_TLV_OK);
+    munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &workspace, &anchor), ==,
+                     (ids[i] == 19 ? TC_TLV_OK : TC_TLV_INVALID));
+  }
+  return MUNIT_OK;
+}
+
 static MunitTest tests[] = {
+    {"/forbidden-exts", forbidden_exts, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/flags-and-unusable", flags_and_unusable, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/malformed", malformed, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/choices", choices, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

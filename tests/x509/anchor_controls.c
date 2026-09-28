@@ -164,10 +164,21 @@ static MunitResult policies(const MunitParameter params[], void* user)
   (void)user;
   setup_workspace();
 
-  /* 4.1.1: the unconstrained anchor accepts the path. */
+  /* 4.1.1: the unconstrained anchor accepts the path. With no initial
+   * policies the user-initial-policy-set is {anyPolicy} (RFC 5280 section
+   * 6.1.1 (c)), so the path's policy is selected and an explicit policy
+   * requirement is met. */
   munit_assert_int(
       validate("GoodCACert.crt", "ValidCertificatePathTest1EE.crt", &anchor, &options, &result), ==,
       TC_X509_PATH_VALID);
+  munit_assert_size(result.policy_count, ==, 1);
+  munit_assert_memory_equal(sizeof policy1, result.policies[0].data, policy1);
+  options.flags = TC_X509_PATH_REQUIRE_EXPLICIT_POLICY;
+  munit_assert_int(
+      validate("GoodCACert.crt", "ValidCertificatePathTest1EE.crt", &anchor, &options, &result), ==,
+      TC_X509_PATH_VALID);
+  munit_assert_size(result.policy_count, ==, 1);
+  options = path_options(0);
 
   /* The anchor's policy set limits the acceptable policies. */
   anchor.policy_flags = TC_X509_PATH_REQUIRE_EXPLICIT_POLICY;

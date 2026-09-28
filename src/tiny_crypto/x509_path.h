@@ -115,6 +115,8 @@ typedef struct {
   TC_TLV_limits parsing;
   size_t max_certificates, max_input, max_work;
   TC_X509_signature_provider signatures;
+  /* Acceptable policy OIDs as DER contents. An empty list is the RFC 5280
+   * default user-initial-policy-set, {anyPolicy}. */
   const TC_bytes* initial_policies;
   size_t initial_policy_count;
   TC_X509_name_constraints anchor_names;

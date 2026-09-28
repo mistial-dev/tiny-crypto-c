@@ -105,6 +105,47 @@ static void check_profile(const char* profile)
   munit_assert_int(TC_X509_path_validate_with_anchor(chain, 2, options_anchor, &options,
                                                      &storage.path.validation, &result),
                    ==, TC_X509_PATH_UNSUPPORTED);
+  /* RFC 5914 section 2.6: nameConstraints, certificatePolicies,
+   * policyConstraints and inhibitAnyPolicy must not appear in
+   * TrustAnchorInfo exts. A caller-built anchor carrying one is rejected, so
+   * a constraint is never silently dropped. */
+  {
+    static const uint8_t ids[] = {30, 32, 36, 54};
+    for (size_t i = 0; i < sizeof ids; ++i)
+      for (int critical = 0; critical < 2; ++critical) {
+        uint8_t forbidden[] = {0x30, 12, 6, 3, 0x55, 0x1d, 0, 1, 1, 0xff, 4, 2, 0x30, 0};
+        size_t length = sizeof forbidden;
+        forbidden[6] = ids[i];
+        if (!critical) {
+          memmove(forbidden + 7, forbidden + 10, 4);
+          forbidden[1] = 9;
+          length -= 3;
+        }
+        options_anchor[0] = anchor;
+        options_anchor[0].extensions = (TC_bytes){forbidden, length};
+        munit_assert_int(TC_X509_path_validate_with_anchor(chain, 2, options_anchor, &options,
+                                                           &storage.path.validation, &result),
+                         ==, TC_X509_PATH_INVALID);
+      }
+  }
+  /* RFC 5280 section 4.2.1.10 requires minimum zero and no maximum. The
+   * validator does not implement distances, so a subtree that sets one is
+   * UNSUPPORTED wherever it comes from, even when its name form does not
+   * occur in the path. */
+  {
+    static const uint8_t distant[] = {0x30, 6, 0x82, 1, 'x', 0x80, 1, 1};
+    const TC_X509_name_constraints distance = {{NULL, 0}, {distant, sizeof distant}};
+    options.anchor_names = distance;
+    munit_assert_int(TC_X509_path_validate_with_anchor(chain, 2, &anchor, &options,
+                                                       &storage.path.validation, &result),
+                     ==, TC_X509_PATH_UNSUPPORTED);
+    memset(&options.anchor_names, 0, sizeof options.anchor_names);
+    options_anchor[0] = anchor;
+    options_anchor[0].names = distance;
+    munit_assert_int(TC_X509_path_validate_with_anchor(chain, 2, options_anchor, &options,
+                                                       &storage.path.validation, &result),
+                     ==, TC_X509_PATH_UNSUPPORTED);
+  }
   options_anchor[0] = anchor;
   options_anchor[0].certificate_extensions = (TC_bytes){unknown_critical, sizeof unknown_critical};
   munit_assert_int(TC_X509_path_validate_with_anchor(chain, 2, options_anchor, &options,
