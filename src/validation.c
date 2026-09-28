@@ -192,11 +192,10 @@ TC_result TC_validation_context_init(const TC_validation_trust* trust,
                                      const TC_CMS_credential_workspace* workspace,
                                      TC_validation_context* out)
 {
-  int order;
   if (!trust || !trust->certificates || !trust->crls || !options || !workspace ||
       !workspace->path || !out || !options->max_certificates || !options->max_input ||
       !options->max_candidates || !options->max_candidate_bytes ||
-      TC_X509_time_compare(&options->at, &options->at, &order) != TC_TLV_OK ||
+      TC_X509_time_check(&options->at) != TC_TLV_OK ||
       (options->attributes != TC_CMS_ATTRIBUTES_DER &&
        options->attributes != TC_CMS_ATTRIBUTES_BER_DEFINITE_ORDER) ||
       (options->rsa_parameters != TC_CMS_RSA_PARAMETERS_NULL &&

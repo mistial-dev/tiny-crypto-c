@@ -411,6 +411,27 @@ static MunitResult workspace_limits(const MunitParameter params[], void* user)
                    TC_TLV_OK);
   munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &parser, &anchor), ==, TC_TLV_OK);
   munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &parser, &anchor), ==, TC_TLV_END);
+
+  /* Path validation needs one extension summary per certificate. */
+  setup_workspace();
+  anchor = pkits_anchor();
+  const TC_X509_path_options options = path_options(0);
+  TC_X509_path_result result;
+  TC_X509_path_workspace* validation = &storage.path.validation;
+  TC_X509_extension_summary* summaries = validation->summaries;
+  munit_assert_int(
+      validate("GoodCACert.crt", "ValidCertificatePathTest1EE.crt", &anchor, &options, &result), ==,
+      TC_X509_PATH_VALID);
+  validation->summary_capacity = CHAIN - 1;
+  munit_assert_int(
+      validate("GoodCACert.crt", "ValidCertificatePathTest1EE.crt", &anchor, &options, &result), ==,
+      TC_X509_PATH_LIMIT);
+  validation->summaries = NULL;
+  validation->summary_capacity = CHAIN;
+  munit_assert_int(
+      validate("GoodCACert.crt", "ValidCertificatePathTest1EE.crt", &anchor, &options, &result), ==,
+      TC_X509_PATH_LIMIT);
+  validation->summaries = summaries;
   return MUNIT_OK;
 }
 

@@ -11,6 +11,7 @@
 #include "cms_internal.h"
 #include "credential_status_internal.h"
 #include "credential_policy_internal.h"
+#include "x509_time_internal.h"
 #include <string.h>
 #include <tiny_crypto/credential.h>
 #include <tiny_crypto/piv_biometric.h>
@@ -232,11 +233,10 @@ TC_credential_status TC_PIV_biometric_validate(const TC_PIV_biometric_validation
   if (format != request->format)
     return TC_CREDENTIAL_INVALID;
   if (request->require_current) {
-    int order;
-    if (TC_X509_time_compare(&context->options->at, &metadata.valid_from, &order) != TC_TLV_OK ||
-        order < 0 ||
-        TC_X509_time_compare(&context->options->at, &metadata.valid_until, &order) != TC_TLV_OK ||
-        order > 0)
+    int current;
+    if (tc_x509_time_window(&context->options->at, 0, &metadata.valid_from,
+                            &metadata.valid_until, &current) != TC_TLV_OK ||
+        !current)
       return TC_CREDENTIAL_INVALID;
   }
   if (format == TC_PIV_CBEFF_FINGERPRINT_TEMPLATE) {

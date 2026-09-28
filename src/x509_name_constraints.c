@@ -692,18 +692,19 @@ TC_TLV_result TC_X509_name_constraints_check(const TC_X509_general_name* name,
   *permitted = (!restricted || included) && !excluded;
   return TC_TLV_OK;
 }
-TC_TLV_result TC_X509_certificate_names_check(const TC_X509_certificate* certificate,
-                                              const TC_X509_name_constraints* constraints,
-                                              const TC_TLV_limits* limits,
-                                              const TC_X509_constraint_workspace* workspace,
-                                              size_t* work, int* permitted)
+TC_TLV_result tc_x509_certificate_names_check_san(const TC_X509_certificate* certificate,
+                                                  TC_bytes san,
+                                                  const TC_X509_name_constraints* constraints,
+                                                  const TC_TLV_limits* limits,
+                                                  const TC_X509_constraint_workspace* workspace,
+                                                  size_t* work, int* permitted)
 {
-  TC_bytes inputs[7], san = {NULL, 0};
+  TC_bytes inputs[7];
   TC_TLV_reader reader, subject;
-  TC_X509_extension extension;
   TC_X509_general_name name = {0, {NULL, 0}, {NULL, 0}};
   TC_TLV_result result;
-  int allowed = 1, current, has_san = 0;
+  const int has_san = san.data != NULL;
+  int allowed = 1, current;
   if (!certificate || !constraints)
     return TC_TLV_ARGUMENT;
   inputs[0] = certificate->encoded;
@@ -720,19 +721,6 @@ TC_TLV_result TC_X509_certificate_names_check(const TC_X509_certificate* certifi
     return result;
   if (certificate->encoded.length > limits->max_input)
     return TC_TLV_LIMIT;
-  result = tc_pki_extensions_init(&reader, certificate, limits, work);
-  if (result != TC_TLV_OK)
-    return result;
-  while ((result = tc_pki_extension_next(&reader, work, &extension)) == TC_TLV_OK) {
-    if (tc_pki_extension_id(&extension) == TC_PKI_EXT_SUBJECT_ALT_NAME) {
-      if (has_san)
-        return TC_TLV_INVALID;
-      has_san = 1;
-      san = extension.value;
-    }
-  }
-  if (result != TC_TLV_END)
-    return result;
   result = tc_x509_name_validate(certificate->subject, limits, work, &subject);
   if (result != TC_TLV_OK)
     return result;
@@ -795,5 +783,33 @@ TC_TLV_result TC_X509_certificate_names_check(const TC_X509_certificate* certifi
     return result;
   *permitted = allowed;
   return TC_TLV_OK;
+}
+
+TC_TLV_result TC_X509_certificate_names_check(const TC_X509_certificate* certificate,
+                                              const TC_X509_name_constraints* constraints,
+                                              const TC_TLV_limits* limits,
+                                              const TC_X509_constraint_workspace* workspace,
+                                              size_t* work, int* permitted)
+{
+  TC_bytes san = {NULL, 0};
+  TC_TLV_reader reader;
+  TC_X509_extension extension;
+  TC_TLV_result result;
+  if (!certificate || !constraints || !limits || !work)
+    return TC_TLV_ARGUMENT;
+  result = tc_pki_extensions_init(&reader, certificate, limits, work);
+  if (result != TC_TLV_OK)
+    return result;
+  while ((result = tc_pki_extension_next(&reader, work, &extension)) == TC_TLV_OK) {
+    if (tc_pki_extension_id(&extension) == TC_PKI_EXT_SUBJECT_ALT_NAME) {
+      if (san.data)
+        return TC_TLV_INVALID;
+      san = extension.value;
+    }
+  }
+  if (result != TC_TLV_END)
+    return result;
+  return tc_x509_certificate_names_check_san(certificate, san, constraints, limits, workspace,
+                                             work, permitted);
 }
 #endif

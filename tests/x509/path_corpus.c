@@ -179,19 +179,17 @@ static MunitResult corpus_case(const MunitParameter params[], void* user)
   munit_assert_size(records.candidate_calls, <=, WORK_BUDGET);
   munit_assert_size(records.anchor_calls, <=, WORK_BUDGET);
 
-  /* Without extension summaries each pass rescans extensions: the result is
-   * identical and the cached run never costs more work. */
+  /* Validation needs one extension summary per path certificate. */
   if (path_status == TC_X509_PATH_VALID) {
-    TC_X509_path_workspace uncached = validation;
-    TC_X509_search_result rescanned;
-    uncached.summaries = NULL;
-    uncached.summary_capacity = 0;
-    munit_assert_int(TC_X509_path_build(target, &source, &options, &uncached, &search, &rescanned),
-                     ==, TC_X509_PATH_VALID);
-    munit_assert_size(rescanned.count, ==, result.count);
-    munit_assert_size(rescanned.anchor_index, ==, result.anchor_index);
-    munit_assert_size(rescanned.validation.policy_count, ==, result.validation.policy_count);
-    munit_assert_size(result.validation.work_used, <=, rescanned.validation.work_used);
+    TC_X509_path_workspace short_cache = validation;
+    TC_X509_search_result limited;
+    short_cache.summary_capacity = result.count - 1;
+    munit_assert_int(TC_X509_path_build(target, &source, &options, &short_cache, &search, &limited),
+                     ==, TC_X509_PATH_LIMIT);
+    short_cache.summaries = NULL;
+    short_cache.summary_capacity = 0;
+    munit_assert_int(TC_X509_path_build(target, &source, &options, &short_cache, &search, &limited),
+                     ==, TC_X509_PATH_LIMIT);
   }
 
   if (path_status == TC_X509_PATH_VALID && getenv("TC_X509_EXPECT_REVOCATION")) {

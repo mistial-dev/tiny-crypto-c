@@ -7,11 +7,13 @@
 #include "pki_internal.h"
 #include "pki_storage_internal.h"
 #include "pki_extensions_internal.h"
+#include "x509_time_internal.h"
 #include "internal.h"
 
 int tc_x509_path_source_valid(const tc_x509_path_input* input)
 {
-  return input && (input->certificates || (input->encoded && input->parser && input->cache));
+  return input && input->summaries &&
+         (input->certificates || (input->encoded && input->parser && input->cache));
 }
 
 static TC_bytes path_encoded(const tc_x509_path_input* input, size_t index)
@@ -39,20 +41,27 @@ TC_TLV_result tc_x509_path_certificate(const tc_x509_path_input* input, size_t i
   return TC_TLV_OK;
 }
 
-TC_TLV_result tc_x509_path_summary(const tc_x509_path_input* input, size_t index, size_t* work,
-                                   TC_X509_extension_summary* storage,
+TC_TLV_result tc_x509_path_summary(const tc_x509_path_input* input, size_t index,
+                                   const TC_X509_name_workspace* names, size_t* work,
                                    const TC_X509_extension_summary** out)
 {
-  TC_X509_extension_summary* summary = input->summaries ? &input->summaries[index] : storage;
-  const TC_X509_certificate* certificate;
-  TC_TLV_result result;
+  TC_X509_extension_summary* summary = &input->summaries[index];
   if (!summary->ready) {
-    result = tc_x509_path_certificate(input, index, work, &certificate);
+    TC_X509_extension_summary filled;
+    const TC_X509_certificate* certificate;
+    int self_issued = 0;
+    TC_TLV_result result = tc_x509_path_certificate(input, index, work, &certificate);
+    if (result == TC_TLV_OK)
+      result = tc_x509_extensions_summarize(certificate, input->limits, work, &filled);
+    /* Path length, name constraints and policy counters treat self-issued
+     * intermediates specially (RFC 5280 section 6.1). */
+    if (result == TC_TLV_OK && index + 1 < input->count)
+      result = TC_X509_name_equal(certificate->subject, certificate->issuer, input->limits, names,
+                                  work, &self_issued);
     if (result != TC_TLV_OK)
       return result;
-    result = tc_x509_extensions_summarize(certificate, input->limits, work, summary);
-    if (result != TC_TLV_OK)
-      return result;
+    filled.self_issued = (uint8_t)self_issued;
+    *summary = filled;
   }
   *out = summary;
   return TC_TLV_OK;
@@ -107,7 +116,8 @@ TC_TLV_result tc_x509_path_basic(const tc_x509_path_input* input,
       return result;
     if (tc_pki_work_charge(work, 1) != TC_TLV_OK)
       return TC_TLV_LIMIT;
-    result = TC_X509_valid_at(certificate, input->at, &valid);
+    result = tc_x509_time_window(input->at, input->clock_skew_seconds, &certificate->not_before,
+                                 &certificate->not_after, &valid);
     if (result != TC_TLV_OK)
       return result;
     if (!valid) {
@@ -124,11 +134,9 @@ TC_TLV_result tc_x509_path_basic(const tc_x509_path_input* input,
     if (result != TC_TLV_OK)
       return result;
     if (i + 1 < input->count) {
-      TC_X509_extension_summary storage = {0};
       const TC_X509_extension_summary* extensions;
       TC_X509_basic_constraints basic;
-      int self_issued;
-      result = tc_x509_path_summary(input, i, work, &storage, &extensions);
+      result = tc_x509_path_summary(input, i, workspace, work, &extensions);
       if (result != TC_TLV_OK)
         return result;
       basic = extensions->basic;
@@ -139,11 +147,7 @@ TC_TLV_result tc_x509_path_basic(const tc_x509_path_input* input,
         *accepted = 0;
         return TC_TLV_OK;
       }
-      result = TC_X509_name_equal(certificate->subject, certificate->issuer, input->limits,
-                                  workspace, work, &self_issued);
-      if (result != TC_TLV_OK)
-        return result;
-      if (!self_issued) {
+      if (!extensions->self_issued) {
         if (!remaining) {
           *accepted = 0;
           return TC_TLV_OK;
@@ -197,23 +201,34 @@ TC_TLV_result tc_x509_path_constraint_distances(const TC_X509_name_constraints* 
   return TC_TLV_OK;
 }
 
-static TC_TLV_result
-path_constraint_target(const TC_X509_certificate* certificate, int is_target, int charge_step,
-                       const TC_X509_name_constraints* constraints, const TC_TLV_limits* limits,
-                       const TC_X509_constraint_workspace* workspace, size_t* work, int* accepted)
+/* Apply one constraint set to path entry index after the basic pass. RFC 5280
+ * section 6.1.3(b) exempts a self-issued intermediate, which may carry old
+ * names through key rollover. */
+static TC_TLV_result path_constraint_target(const tc_x509_path_input* input, size_t index,
+                                            int charge_step,
+                                            const TC_X509_name_constraints* constraints,
+                                            const TC_X509_constraint_workspace* workspace,
+                                            size_t* work, int* accepted)
 {
+  const TC_X509_extension_summary* extensions;
+  const TC_X509_certificate* certificate;
+  TC_bytes san = {NULL, 0};
   TC_TLV_result result;
   if (charge_step && tc_pki_work_charge(work, 1) != TC_TLV_OK)
     return TC_TLV_LIMIT;
-  /* A self-issued intermediate may carry old names through key rollover. */
-  if (!is_target) {
-    result = TC_X509_name_equal(certificate->subject, certificate->issuer, limits, workspace->names,
-                                work, accepted);
-    if (result != TC_TLV_OK || *accepted)
-      return result;
+  result = tc_x509_path_certificate(input, index, work, &certificate);
+  if (result == TC_TLV_OK)
+    result = tc_x509_path_summary(input, index, workspace->names, work, &extensions);
+  if (result != TC_TLV_OK)
+    return result;
+  if (index + 1 < input->count && extensions->self_issued) {
+    *accepted = 1;
+    return TC_TLV_OK;
   }
-  return TC_X509_certificate_names_check(certificate, constraints, limits, workspace, work,
-                                         accepted);
+  if (tc_x509_summary_has(extensions, TC_X509_SUMMARY_SUBJECT_ALT_NAME))
+    san = extensions->values[TC_X509_SUMMARY_SUBJECT_ALT_NAME];
+  return tc_x509_certificate_names_check_san(certificate, san, constraints, input->limits,
+                                             workspace, work, accepted);
 }
 
 TC_TLV_result tc_x509_path_names(const tc_x509_path_input* input,
@@ -227,11 +242,10 @@ TC_TLV_result tc_x509_path_names(const tc_x509_path_input* input,
   if (input->count > input->max_certificates)
     return TC_TLV_LIMIT;
   for (i = 0; i + 1 < input->count; ++i) {
-    TC_X509_extension_summary storage = {0};
     const TC_X509_extension_summary* extensions;
     TC_X509_name_constraints constraints;
     TC_TLV_result result;
-    result = tc_x509_path_summary(input, i, work, &storage, &extensions);
+    result = tc_x509_path_summary(input, i, workspace->names, work, &extensions);
     if (result != TC_TLV_OK)
       return result;
     if (!tc_x509_summary_has(extensions, TC_X509_SUMMARY_NAME_CONSTRAINTS))
@@ -244,14 +258,9 @@ TC_TLV_result tc_x509_path_names(const tc_x509_path_input* input,
     if (result != TC_TLV_OK)
       return result;
     for (j = i + 1; j < input->count; ++j) {
-      const TC_X509_certificate* certificate;
       int valid;
       /* Constraint spans borrow the issuer DER throughout this pass. */
-      result = tc_x509_path_certificate(input, j, work, &certificate);
-      if (result != TC_TLV_OK)
-        return result;
-      result = path_constraint_target(certificate, j + 1 == input->count, 1, &constraints,
-                                      input->limits, workspace, work, &valid);
+      result = path_constraint_target(input, j, 1, &constraints, workspace, work, &valid);
       if (result != TC_TLV_OK)
         return result;
       if (!valid) {
@@ -374,22 +383,15 @@ TC_TLV_result tc_x509_path_policies(const tc_x509_path_input* input,
   if (result != TC_TLV_OK)
     return result;
   for (i = 0; i < input->count; ++i) {
-    const TC_X509_certificate* certificate;
+    const TC_X509_extension_summary* extensions;
     tc_x509_policy_controls controls;
     size_t policy_count, mapping_count;
-    int self_issued, target = i + 1 == input->count;
-    result = tc_x509_path_certificate(input, i, work, &certificate);
+    const int target = i + 1 == input->count;
+    int self_issued;
+    result = tc_x509_path_summary(input, i, workspace->names, work, &extensions);
     if (result != TC_TLV_OK)
       return result;
-    result = TC_X509_name_equal(certificate->subject, certificate->issuer, input->limits,
-                                workspace->names, work, &self_issued);
-    if (result != TC_TLV_OK)
-      return result;
-    TC_X509_extension_summary storage = {0};
-    const TC_X509_extension_summary* extensions;
-    result = tc_x509_path_summary(input, i, work, &storage, &extensions);
-    if (result != TC_TLV_OK)
-      return result;
+    self_issued = !target && extensions->self_issued;
     result = certificate_policies(extensions, target, input->limits, workspace, work, &policy_count,
                                   &mapping_count, &controls);
     if (result != TC_TLV_OK)
@@ -557,7 +559,8 @@ TC_X509_path_status tc_x509_path_validate_anchor(const TC_bytes* chain, size_t c
   if (count > options->max_certificates || count > SIZE_MAX / sizeof *chain ||
       options->initial_policy_count > options->parsing.max_elements)
     return TC_X509_PATH_LIMIT;
-  if (!workspace->certificates || count > workspace->certificate_capacity)
+  if (!workspace->certificates || count > workspace->certificate_capacity ||
+      !workspace->summaries || count > workspace->summary_capacity)
     return TC_X509_PATH_LIMIT;
   initial_work = *work;
   result = path_storage(chain, count, anchor, options, workspace, out, work);
@@ -569,7 +572,7 @@ TC_X509_path_status tc_x509_path_validate_anchor(const TC_bytes* chain, size_t c
   result = anchor_extensions_check(anchor->certificate_extensions, 0, &options->parsing, work);
   if (result != TC_TLV_OK)
     return tc_x509_path_status(result);
-  if (TC_X509_time_compare(&options->at, &options->at, &accepted) != TC_TLV_OK)
+  if (TC_X509_time_check(&options->at) != TC_TLV_OK)
     return TC_X509_PATH_ERROR;
   for (i = 0; i < count; ++i) {
     if (tc_pki_work_charge(work, 1) != TC_TLV_OK)
@@ -606,6 +609,7 @@ TC_X509_path_status tc_x509_path_validate_anchor(const TC_bytes* chain, size_t c
   input.max_input = options->max_input;
   input.anchor = &anchor->trust;
   input.at = &options->at;
+  input.clock_skew_seconds = options->clock_skew_seconds;
   input.signatures = &options->signatures;
   input.anchor_path_len = anchor->path_len;
   input.has_anchor_path_len = anchor->has_path_len;
@@ -614,11 +618,9 @@ TC_X509_path_status tc_x509_path_validate_anchor(const TC_bytes* chain, size_t c
   input.parser = &parser;
   input.cache = workspace->certificates;
   /* Each validation fills the summary cache afresh, so clear stale entries. */
-  if (workspace->summaries && workspace->summary_capacity >= count) {
-    for (i = 0; i < count; ++i)
-      workspace->summaries[i].ready = 0;
-    input.summaries = workspace->summaries;
-  }
+  for (i = 0; i < count; ++i)
+    workspace->summaries[i].ready = 0;
+  input.summaries = workspace->summaries;
   result = tc_x509_path_basic(&input, &workspace->names, work, &accepted);
   if (result != TC_TLV_OK)
     return tc_x509_path_status(result);
@@ -639,11 +641,7 @@ TC_X509_path_status tc_x509_path_validate_anchor(const TC_bytes* chain, size_t c
     if (result != TC_TLV_OK)
       return tc_x509_path_status(result);
     for (i = 0; i < count; ++i) {
-      result = tc_x509_path_certificate(&input, i, work, &target);
-      if (result != TC_TLV_OK)
-        return tc_x509_path_status(result);
-      result = path_constraint_target(target, i + 1 == count, 0, constraints, input.limits, &names,
-                                      work, &accepted);
+      result = path_constraint_target(&input, i, 0, constraints, &names, work, &accepted);
       if (result != TC_TLV_OK)
         return tc_x509_path_status(result);
       if (!accepted)

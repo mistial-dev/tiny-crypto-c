@@ -117,10 +117,11 @@ typedef struct {
   TC_X509_workspace* parser;
   /* Filled in order by the basic pass, then exposed through certificates. */
   TC_X509_certificate* cache;
-  /* Optional per-entry extension summaries, one per certificate. */
+  /* One extension summary per certificate, filled on first use. */
   TC_X509_extension_summary* summaries;
   size_t anchor_path_len;
   int has_anchor_path_len;
+  uint32_t clock_skew_seconds;
 } tc_x509_path_input;
 
 int tc_x509_path_source_valid(const tc_x509_path_input* input);
@@ -157,10 +158,10 @@ static inline int tc_x509_summary_critical(const TC_X509_extension_summary* summ
 TC_TLV_result tc_x509_extensions_summarize(const TC_X509_certificate* certificate,
                                            const TC_TLV_limits* limits, size_t* work,
                                            TC_X509_extension_summary* out);
-/* Summary of path entry index: the cached one when input->summaries is set,
- * otherwise a fresh one in storage. */
-TC_TLV_result tc_x509_path_summary(const tc_x509_path_input* input, size_t index, size_t* work,
-                                   TC_X509_extension_summary* storage,
+/* Summary of path entry index, filled on first use together with the
+ * self-issued flag of an intermediate. */
+TC_TLV_result tc_x509_path_summary(const tc_x509_path_input* input, size_t index,
+                                   const TC_X509_name_workspace* names, size_t* work,
                                    const TC_X509_extension_summary** out);
 /* Charge and reject unsupported subtree distances in name constraints. */
 TC_TLV_result tc_x509_path_constraint_distances(const TC_X509_name_constraints* constraints,

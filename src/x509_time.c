@@ -62,6 +62,28 @@ TC_TLV_result TC_X509_time_compare(const TC_X509_time* left, const TC_X509_time*
   return TC_TLV_OK;
 }
 
+TC_TLV_result TC_X509_time_check(const TC_X509_time* value)
+{
+  if (!value)
+    return TC_TLV_ARGUMENT;
+  return time_valid(value) ? TC_TLV_OK : TC_TLV_INVALID;
+}
+
+TC_TLV_result tc_x509_time_window(const TC_X509_time* at, uint32_t skew_seconds,
+                                  const TC_X509_time* not_before, const TC_X509_time* not_after,
+                                  int* within)
+{
+  int64_t now, start, end;
+  /* Years 1..9999 span about 3.2e11 seconds, so adding a 32-bit skew cannot
+   * overflow. */
+  if (TC_X509_time_to_unix(at, &now) != TC_TLV_OK ||
+      TC_X509_time_to_unix(not_before, &start) != TC_TLV_OK ||
+      TC_X509_time_to_unix(not_after, &end) != TC_TLV_OK || start > end)
+    return TC_TLV_INVALID;
+  *within = start - (int64_t)skew_seconds <= now && now <= end + (int64_t)skew_seconds;
+  return TC_TLV_OK;
+}
+
 TC_TLV_result TC_X509_valid_at(const TC_X509_certificate* certificate, const TC_X509_time* at,
                                int* valid)
 {
@@ -71,13 +93,7 @@ TC_TLV_result TC_X509_valid_at(const TC_X509_certificate* certificate, const TC_
       !tc_internal_ranges_disjoint(valid, sizeof(*valid), certificate->encoded.data,
                                    certificate->encoded.length))
     return TC_TLV_ARGUMENT;
-  if (!time_valid(at) || !time_valid(&certificate->not_before) ||
-      !time_valid(&certificate->not_after) ||
-      time_compare(&certificate->not_before, &certificate->not_after) > 0)
-    return TC_TLV_INVALID;
-  *valid = time_compare(&certificate->not_before, at) <= 0 &&
-           time_compare(at, &certificate->not_after) <= 0;
-  return TC_TLV_OK;
+  return tc_x509_time_window(at, 0, &certificate->not_before, &certificate->not_after, valid);
 }
 
 TC_TLV_result tc_x509_time_value(const TC_TLV_element* element, TC_X509_time* out)

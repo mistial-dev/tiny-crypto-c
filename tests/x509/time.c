@@ -146,12 +146,31 @@ static MunitResult invalid(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+static MunitResult time_check(const MunitParameter params[], void* user)
+{
+  static const TC_X509_time valid[] = {
+      {1, 1, 1, 0, 0, 0}, {2024, 2, 29, 23, 59, 59}, {9999, 12, 31, 23, 59, 59}};
+  static const TC_X509_time invalid[] = {{0, 1, 1, 0, 0, 0},     {10000, 1, 1, 0, 0, 0},
+                                         {2023, 2, 29, 0, 0, 0}, {2024, 13, 1, 0, 0, 0},
+                                         {2024, 1, 1, 24, 0, 0}, {2024, 1, 1, 0, 60, 0},
+                                         {2024, 1, 1, 0, 0, 60}};
+  (void)params;
+  (void)user;
+  for (size_t i = 0; i < sizeof valid / sizeof *valid; ++i)
+    munit_assert_int(TC_X509_time_check(&valid[i]), ==, TC_TLV_OK);
+  for (size_t i = 0; i < sizeof invalid / sizeof *invalid; ++i)
+    munit_assert_int(TC_X509_time_check(&invalid[i]), ==, TC_TLV_INVALID);
+  munit_assert_int(TC_X509_time_check(NULL), ==, TC_TLV_ARGUMENT);
+  return MUNIT_OK;
+}
+
 int main(int argc, char** argv)
 {
   MunitTest tests[] = {{"/unix", unix_time, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
                        {"/ordering", ordering, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
                        {"/validity", validity, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
                        {"/invalid", invalid, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+                       {"/check", time_check, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
                        {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
   MunitSuite suite = {"/x509/time", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};
   return munit_suite_main(&suite, NULL, argc, argv);

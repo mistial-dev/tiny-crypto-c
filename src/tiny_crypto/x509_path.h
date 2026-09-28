@@ -42,6 +42,7 @@ typedef struct {
   uint16_t present, critical; /* one bit per slot */
   uint16_t key_usage;         /* TC_KEY_USAGE_* bits */
   uint8_t unknown_critical;   /* a critical extension outside the slots */
+  uint8_t self_issued;        /* intermediate whose subject matches its issuer */
   uint8_t ready;              /* set once the walk completes */
 } TC_X509_extension_summary;
 
@@ -65,9 +66,8 @@ typedef struct {
   /* One parsed view per path entry. Views borrow the input DER. */
   TC_X509_certificate* certificates;
   size_t certificate_capacity;
-  /* Optional: one extension summary per path entry. With a NULL array or
-   * fewer entries than the path, each validation pass summarizes the
-   * certificate again. Results match, and the work used is higher. */
+  /* One extension summary per path entry, filled by the first pass and
+   * read by the later ones. Fewer entries than the path returns LIMIT. */
   TC_X509_extension_summary* summaries;
   size_t summary_capacity;
 } TC_X509_path_workspace;
@@ -111,7 +111,10 @@ enum {
   TC_X509_PATH_INHIBIT_ANY_PURPOSE = 32u
 };
 typedef struct {
+  /* Validation time. Certificate validity periods are widened by
+   * clock_skew_seconds on both sides to tolerate clock differences. */
   TC_X509_time at;
+  uint32_t clock_skew_seconds;
   TC_TLV_limits parsing;
   size_t max_certificates, max_input, max_work;
   TC_X509_signature_provider signatures;

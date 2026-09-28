@@ -55,6 +55,9 @@ TC_TLV_result TC_X509_read(const uint8_t* data, size_t length, const TC_TLV_limi
  * Outputs must be disjoint from inputs and change only on OK. valid_at checks
  * only the validity interval. */
 TC_TLV_result TC_X509_time_compare(const TC_X509_time* left, const TC_X509_time* right, int* order);
+/* OK when value is a valid UTC calendar time in years 1..9999, INVALID
+ * otherwise, and ARGUMENT for NULL. */
+TC_TLV_result TC_X509_time_check(const TC_X509_time* value);
 /* Convert UTC years 1..9999 to seconds since 1970-01-01, excluding leap seconds.
  * Earlier dates produce negative values. Output changes only on OK and must be
  * disjoint from the input. The result is independent of platform time_t and timezone state. */

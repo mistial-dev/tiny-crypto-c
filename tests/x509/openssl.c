@@ -16,6 +16,14 @@
 #include <openssl/x509v3.h>
 #include <string.h>
 
+/* Each validation clears the summary cache. Direct pass calls do the same so
+ * every call summarizes the current certificate views. */
+static tc_x509_path_input* fresh(tc_x509_path_input* input)
+{
+  memset(input->summaries, 0, input->count * sizeof *input->summaries);
+  return input;
+}
+
 static TC_X509_signature_result verify(void* context, const TC_bytes* message, size_t count,
                                        const TC_DER_algorithm* algorithm, TC_bytes signature,
                                        const TC_X509_public_key* issuer, size_t* work)
@@ -756,9 +764,10 @@ static MunitResult paths(const MunitParameter params[], void* user)
   TC_X509_trust_anchor anchor;
   unsigned group, scenario, source, i, calls = 0;
   TC_X509_signature_provider provider = {verify, &calls, NULL};
+  TC_X509_extension_summary summaries[3];
   tc_x509_path_input input = {
       parsed + 1,       3,          3,    6144, &anchor, &at, &provider, &limits, encoded_path,
-      &parse_workspace, parsed + 1, NULL, 0,    0};
+      &parse_workspace, parsed + 1, summaries, 0, 0, 0};
   (void)params;
   (void)user;
   for (group = 0; group < 2; ++group) {
@@ -838,29 +847,29 @@ static MunitResult paths(const MunitParameter params[], void* user)
         if (scenario < 8)
           munit_assert_int(verify_chain(certs, NULL, 0, 0), ==, scenario == 0);
         calls = 0;
-        munit_assert_int(tc_x509_path_basic(&input, &names, &work, &accepted), ==, TC_TLV_OK);
+        munit_assert_int(tc_x509_path_basic(fresh(&input), &names, &work, &accepted), ==, TC_TLV_OK);
         munit_assert_int(accepted, ==, scenario < 2 || scenario >= 8);
         if (accepted) {
           munit_assert_uint(calls, ==, 3);
           if (source && scenario == 0) {
             size_t required = 1000000 - work, budget = required - 1;
             int checked = 99;
-            munit_assert_int(tc_x509_path_basic(&input, &names, &budget, &checked), ==,
+            munit_assert_int(tc_x509_path_basic(fresh(&input), &names, &budget, &checked), ==,
                              TC_TLV_LIMIT);
             munit_assert_int(checked, ==, 99);
             budget = required;
-            munit_assert_int(tc_x509_path_basic(&input, &names, &budget, &checked), ==, TC_TLV_OK);
+            munit_assert_int(tc_x509_path_basic(fresh(&input), &names, &budget, &checked), ==, TC_TLV_OK);
             munit_assert_int(checked, ==, 1);
             munit_assert_size(budget, ==, 0);
             parse_workspace.frame_capacity = 0;
             budget = 1000000;
             checked = 99;
-            munit_assert_int(tc_x509_path_basic(&input, &names, &budget, &checked), ==,
+            munit_assert_int(tc_x509_path_basic(fresh(&input), &names, &budget, &checked), ==,
                              TC_TLV_LIMIT);
             munit_assert_int(checked, ==, 99);
             parse_workspace.frame_capacity = 16;
           }
-          munit_assert_int(tc_x509_path_names(&input, &constraints, &work, &accepted), ==,
+          munit_assert_int(tc_x509_path_names(fresh(&input), &constraints, &work, &accepted), ==,
                            TC_TLV_OK);
           munit_assert_int(accepted, ==, scenario != 1);
         }
@@ -885,12 +894,12 @@ static MunitResult paths(const MunitParameter params[], void* user)
             munit_assert_int(verify_chain(certs, scenario == 11 ? "1.2.3.5" : "1.2.3.4", flags, 0),
                              ==, wanted);
           if (scenario == TARGET_CRITICAL_MAPPING) {
-            munit_assert_int(tc_x509_path_policies(&input, &options, (TC_bytes){NULL, 0},
+            munit_assert_int(tc_x509_path_policies(fresh(&input), &options, (TC_bytes){NULL, 0},
                                                    &policy_workspace, &work, &count, &accepted),
                              ==, TC_TLV_INVALID);
             continue;
           }
-          munit_assert_int(tc_x509_path_policies(&input, &options, (TC_bytes){NULL, 0},
+          munit_assert_int(tc_x509_path_policies(fresh(&input), &options, (TC_bytes){NULL, 0},
                                                  &policy_workspace, &work, &count, &accepted),
                            ==, TC_TLV_OK);
           munit_assert_int(accepted, ==, wanted);
@@ -912,7 +921,7 @@ static MunitResult paths(const MunitParameter params[], void* user)
             munit_assert_memory_equal(sizeof initial_oid, output[0].data, initial_oid);
             accepted = 99;
             result =
-                tc_x509_path_extensions(&input, &usage, &extension_workspace, &work, &accepted);
+                tc_x509_path_extensions(fresh(&input), &usage, &extension_workspace, &work, &accepted);
             if (scenario == UNKNOWN_CRITICAL) {
               munit_assert_int(result, ==, TC_TLV_UNSUPPORTED);
               munit_assert_int(accepted, ==, 99);

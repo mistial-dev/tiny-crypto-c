@@ -35,6 +35,10 @@ carries no trust.
 Initialize `TC_X509_path_options` to zero, then set:
 
 - `at`: the validation time in UTC, supplied by the caller's clock.
+- `clock_skew_seconds`: tolerance for clock differences. Each certificate's
+  validity period is widened by this amount on both sides. Zero requires
+  `notBefore <= at <= notAfter` exactly. `TC_X509_time_check` validates a
+  caller-built time.
 - `parsing`: the input, value, element and nesting limits for a certificate.
 - `max_certificates`, `max_input`: the chain length and total DER-byte limits.
 - `max_work`: a shared processing budget, including the signature provider.
@@ -85,12 +89,12 @@ array. Later passes reuse those views. Each view borrows its DER, key bytes and
 extension values from the original buffers. Workspace limits bound the policy
 graph. The work budget also bounds scanning and comparison work.
 
-The optional summary array holds one `TC_X509_extension_summary` per path
-certificate. Each certificate's extensions are then scanned once per
-validation and every pass reads the summary. With a NULL or shorter summary
-array, each pass scans the extensions again: results are the same, and the
-work used is higher. The validator owns the summary fields. Size the array like
-the certificate array. `TC_X509_PATH_WORKSPACE_INIT` takes it as the last
+The summary array holds one `TC_X509_extension_summary` per path
+certificate. Each certificate's extensions are scanned once per validation,
+and the subject and issuer of each intermediate are compared once. Every pass
+reads the summary. A NULL or shorter summary array returns
+`TC_X509_PATH_LIMIT`. The validator owns the summary fields. Size the array
+like the certificate array. `TC_X509_PATH_WORKSPACE_INIT` takes it as the last
 argument.
 
 Workspace arrays must not overlap each other, the inputs or the result object.

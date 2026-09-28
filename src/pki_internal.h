@@ -115,6 +115,14 @@ TC_TLV_result tc_x509_pss_parameters(TC_bytes encoded);
  * TC_X509_read. */
 TC_TLV_result tc_x509_certificate_read(TC_bytes encoded, unsigned tag, const TC_TLV_limits* limits,
                                        TC_X509_workspace* workspace, TC_X509_certificate* out);
+/* TC_X509_certificate_names_check with the subjectAltName value supplied.
+ * san.data is NULL when the certificate has no subjectAltName. */
+TC_TLV_result tc_x509_certificate_names_check_san(const TC_X509_certificate* certificate,
+                                                  TC_bytes san,
+                                                  const TC_X509_name_constraints* constraints,
+                                                  const TC_TLV_limits* limits,
+                                                  const TC_X509_constraint_workspace* workspace,
+                                                  size_t* work, int* permitted);
 /* One RFC 5280 PolicyInformation. qualifiers keeps the complete SEQUENCE
  * encoding and is {NULL, 0} when absent. out changes only on OK. */
 TC_TLV_result tc_x509_policy_information_read(TC_bytes encoded, TC_X509_policy* out);

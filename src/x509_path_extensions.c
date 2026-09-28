@@ -90,27 +90,6 @@ TC_TLV_result tc_x509_extensions_summarize(const TC_X509_certificate* certificat
   return TC_TLV_OK;
 }
 
-/* Structural DER check over every recorded value, charged by length. */
-static TC_TLV_result summary_values_check(const TC_X509_extension_summary* extensions,
-                                          const TC_TLV_limits* limits,
-                                          const TC_X509_constraint_workspace* names, size_t* work)
-{
-  unsigned slot;
-  for (slot = 0; slot < TC_X509_EXTENSION_SUMMARY_SLOTS; ++slot) {
-    const TC_bytes value = extensions->values[slot];
-    TC_TLV_result result;
-    if (!tc_x509_summary_has(extensions, slot))
-      continue;
-    if (tc_pki_work_charge(work, value.length) != TC_TLV_OK)
-      return TC_TLV_LIMIT;
-    result = TC_TLV_walk(value.data, value.length, TC_TLV_DER, limits, names->frames,
-                         names->frame_capacity, NULL, NULL);
-    if (result != TC_TLV_OK)
-      return result;
-  }
-  return TC_TLV_OK;
-}
-
 /* An EKU permits the requested purpose, or anyExtendedKeyUsage unless inhibited. */
 static TC_TLV_result extended_key_usage_permits(TC_bytes value, const tc_x509_path_usage* usage,
                                                 const tc_x509_extension_workspace* workspace,
@@ -157,29 +136,27 @@ TC_TLV_result tc_x509_path_extensions(const tc_x509_path_input* input,
   if (input->count > input->max_certificates)
     return TC_TLV_LIMIT;
   for (i = 0; i < input->count; ++i) {
-    TC_X509_extension_summary storage = {0};
     const TC_X509_extension_summary* extensions;
     const TC_X509_certificate* certificate;
+    TC_bytes san = {NULL, 0};
     TC_TLV_result result;
     int valid, has_usage, has_eku, has_constraints;
     result = tc_x509_path_certificate(input, i, work, &certificate);
+    if (result == TC_TLV_OK)
+      result = tc_x509_path_summary(input, i, workspace->names.names, work, &extensions);
     if (result != TC_TLV_OK)
       return result;
     /* Subject names are checked on every path, including unconstrained ones. */
-    result = TC_X509_certificate_names_check(certificate, &unrestricted, input->limits,
-                                             &workspace->names, work, &valid);
+    if (tc_x509_summary_has(extensions, TC_X509_SUMMARY_SUBJECT_ALT_NAME))
+      san = extensions->values[TC_X509_SUMMARY_SUBJECT_ALT_NAME];
+    result = tc_x509_certificate_names_check_san(certificate, san, &unrestricted, input->limits,
+                                                 &workspace->names, work, &valid);
     if (result != TC_TLV_OK)
       return result;
     if (!valid) {
       *accepted = 0;
       return TC_TLV_OK;
     }
-    result = tc_x509_path_summary(input, i, work, &storage, &extensions);
-    if (result != TC_TLV_OK)
-      return result;
-    result = summary_values_check(extensions, input->limits, &workspace->names, work);
-    if (result != TC_TLV_OK)
-      return result;
     if (extensions->unknown_critical)
       return TC_TLV_UNSUPPORTED;
     has_usage = tc_x509_summary_has(extensions, TC_X509_SUMMARY_KEY_USAGE);
@@ -202,10 +179,14 @@ TC_TLV_result tc_x509_path_extensions(const tc_x509_path_input* input,
       result = TC_X509_name_constraints_read(value.data, value.length, input->limits, &constraints);
       if (result != TC_TLV_OK)
         return result;
-      result =
-          tc_x509_path_constraint_distances(&constraints, input->limits, &workspace->names, work);
-      if (result != TC_TLV_OK)
-        return result;
+      /* The names pass checked issuer distances. The target's constraints
+       * are never applied but must still be supported. */
+      if (i + 1 == input->count) {
+        result =
+            tc_x509_path_constraint_distances(&constraints, input->limits, &workspace->names, work);
+        if (result != TC_TLV_OK)
+          return result;
+      }
     }
     /* nameConstraints and keyCertSign are CA-only (RFC 5280 4.2.1.9, 4.2.1.3). */
     if ((has_constraints || (has_usage && (extensions->key_usage & TC_KEY_USAGE_CERT_SIGN))) &&
