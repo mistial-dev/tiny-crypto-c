@@ -305,7 +305,7 @@ static MunitResult other_formats(const MunitParameter params[], void* user)
 static MunitResult revocation_records(const MunitParameter params[], void* user)
 {
   enum { WORK_BUDGET = 4096, FRAME_CAPACITY = 8, RECORD_COUNT = 3 };
-  /* Choice framing only; typed CRL processing must reject the empty SEQUENCE. */
+  /* This checks choice framing. Typed CRL processing must reject the empty SEQUENCE. */
   static const uint8_t embedded[] = {0xa1, 0x80, 0x30, 0, 0xa1, 5, 6, 1, 42, 5, 0, 0, 0};
   static const uint8_t external_bytes[] = {0x30, 0};
   static const uint8_t bad_choice[] = {0xa1, 2, 0x31, 0};

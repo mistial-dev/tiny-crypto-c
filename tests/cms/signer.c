@@ -66,7 +66,7 @@ static MunitResult identifiers(const MunitParameter params[], void* user)
 
 static MunitResult attributes(const MunitParameter params[], void* user)
 {
-  /* Unknown attributes are retained here; their semantics are checked separately. */
+  /* Unknown attributes are retained here. Their semantics are checked separately. */
   static const uint8_t attribute[] = {0xa0, 11, 0x30, 9, 6, 2, 0x2a, 3, 0x31, 3, 4, 1, 0xcc};
   const TC_TLV_limits limits = {256, 256, 64, 8};
   TC_TLV_frame frames[8];

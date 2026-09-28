@@ -9,8 +9,7 @@
  * matching TC_AES_KEY_BITS; the 128-bit binary also runs every non-AES PRF.
  * Each file asserts the exact number of vectors run and skipped.
  *
- * Test-only translation unit; never linked into the library. Enable with
- * TC_KDF_CAVP=1.
+ * Test-only translation unit. Enable with TC_KDF_CAVP=1.
  */
 
 #include <stdio.h>

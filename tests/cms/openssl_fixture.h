@@ -253,8 +253,8 @@ static inline size_t encode_biometric_record_parameters_flags(
   memcpy(out + 59, fascn.data, fascn.length);
   memcpy(out + HEADER_BYTES, record.data, record.length);
   size_t expected = 0;
-  /* The signed header contains the CMS length. RSA has fixed-width signatures;
-   * choose the usual 72-byte length for P-256 with bounded retries. */
+  /* The signed header contains the CMS length. RSA has fixed-width signatures.
+   * Choose the usual 72-byte length for P-256 with bounded retries. */
   for (unsigned attempt = 0; attempt < MAX_SIGNATURE_ATTEMPTS; ++attempt) {
     out[6] = (uint8_t)(expected >> 8);
     out[7] = (uint8_t)expected;

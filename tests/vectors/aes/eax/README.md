@@ -15,8 +15,8 @@ the C12.22 Annex I algorithm. The C implementation checks ciphertext and tag
 against these values as a cross-implementation regression set.
 
 Run `python3 verify_eax_prime.py` to verify the same corpus with OpenSSL's
-AES-128 implementation. This is a separate third-party cross-check from the
-Python implementation used to generate the values.
+AES-128 implementation. This third-party cross-check is independent of the
+Python implementation that generated the values.
 
 The EAX' vector in `c12-22-eax-prime.txt` is transcribed from ANSI C12.22-2008,
 Example 9 and Annex I.4.

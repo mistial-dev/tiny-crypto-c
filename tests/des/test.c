@@ -481,7 +481,7 @@ static MunitResult test_tdes3_feedback_modes(const MunitParameter params[], void
   TC_DES3_CFB8_decrypt(&ctx, buffer, 16);
   munit_assert_memory_equal(16, buffer, tdes3_pt);
 
-  /* CFB1 roundtrip (no host-generated KAT available; CAVP files cover KAT) */
+  /* CFB1 roundtrip. The CAVP files cover the CFB1 KAT. */
   uint8_t stream[2] = {0x5a, 0xc0};
   uint8_t original[2];
   memcpy(original, stream, 2);
@@ -834,7 +834,7 @@ static MunitResult test_des_secure_zero_and_clear(const MunitParameter params[],
       munit_assert_uint8(p[i], ==, 0);
   }
 
-  TC_DES_ctx_clear(NULL); /* must not crash */
+  TC_DES_ctx_clear(NULL); /* NULL is a no-op */
 
 #if TC_DES_ENABLE_TDES
   {

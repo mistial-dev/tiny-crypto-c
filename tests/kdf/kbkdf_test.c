@@ -4,7 +4,7 @@
  *
  * SP 800-108 KBKDF tests: Kdf108 cross-check vector, counter encodings pinned
  * against hand-composed HMAC / CMAC calls, a generated CAVP subset, and API
- * edge cases. Test-only translation unit; never linked into the library.
+ * edge cases. Test-only translation unit.
  */
 
 #include <tiny_crypto/kdf.h>
@@ -257,7 +257,7 @@ MunitResult test_kbkdf_counter_encoding(const MunitParameter params[], void* dat
     munit_assert_memory_equal(TC_SHA256_DIGESTLEN, out, k1);
   }
 
-  /* Feedback without counter: K(1) = HMAC(IV || F), K(2) = HMAC(K(1) || F);
+  /* Feedback without counter: K(1) = HMAC(IV || F), K(2) = HMAC(K(1) || F).
      counter_bits and counter_location are ignored. */
   p.counter_bits = 7;
   p.counter_location = 9;
@@ -432,7 +432,7 @@ MunitResult test_kbkdf_fixed_input(const MunitParameter params[], void* data)
   munit_assert_uint8(buf[8], ==, 0x01); /* 32 bytes = 256 bits = 0x00000100 */
   munit_assert_uint8(buf[9], ==, 0x00);
 
-  /* A larger buffer is fine; only the exact length is written. */
+  /* A larger buffer is accepted. The builder writes the exact encoded length. */
   memset(buf, 0xA5, sizeof(buf));
   munit_assert_int(TC_KBKDF_fixed_input(label, 3, context, 2, 1, buf, sizeof(buf)), ==, TC_OK);
   munit_assert_uint8(buf[9], ==, 0x08);

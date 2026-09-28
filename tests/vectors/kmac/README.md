@@ -22,8 +22,8 @@ The other six rows are independent answers from OpenSSL 3.6.3 `KMAC256`, using
 `openssl mac -macopt hexkey:<key> -macopt hexcustom:<custom> -macopt size:<bytes>
 KMAC256` with the message on stdin. They cover empty and nonempty customization,
 empty and multi-block messages, and 33-, 35-, 47-, 49-, 63-, and 65-byte MACs.
-The TSV columns are key, message, customization, expected MAC, and case ID;
-binary values are hex, and `-` represents an empty value.
+The TSV columns are key, message, customization, expected MAC, and case ID.
+Binary values are hex, and `-` represents an empty value.
 
 ## Checksums
 

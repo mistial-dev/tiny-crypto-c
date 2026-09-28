@@ -367,8 +367,8 @@ static MunitResult generation_answers(const MunitParameter params[], void* user)
 static MunitResult signing_rfc6979(const MunitParameter params[], void* user)
 {
   /* RFC 6979 A.2.5 and A.2.6, SHA-256/P-256 and SHA-384/P-384, "sample".
-   * The API accepts injected randomness; these fixed nonces test the ECDSA
-   * operation, not an RFC 6979 nonce generator. */
+   * The API takes the nonce from injected randomness, so these answers check
+   * the ECDSA operation with the RFC 6979 nonces supplied directly. */
   static const struct {
     TC_EC_curve curve;
     size_t bytes;

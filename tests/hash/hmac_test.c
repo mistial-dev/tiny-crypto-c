@@ -4,7 +4,7 @@
  *
  * HMAC tests for SHA-1/224/256/384/512: RFC 2202 / RFC 4231 KATs, API edge
  * cases, Wycheproof. Digest dispatch uses the digest length (20/28/32/48/64).
- * Test-only translation unit; never linked into the library.
+ * Test-only translation unit.
  */
 
 #include <tiny_crypto/hash.h>
@@ -23,7 +23,7 @@
 
 #if TC_ENABLE_HMAC
 
-/* Full-tag streaming MAC; alg is the digest length in bytes (20/28/32/48/64). */
+/* Full-tag streaming MAC. alg is the digest length in bytes (20/28/32/48/64). */
 #define HMAC_FULL_TAG_CASE(N)                                                                      \
   {                                                                                                \
     struct TC_HMAC_SHA##N##_ctx ctx;                                                               \
@@ -61,7 +61,7 @@ static void full_tag(int alg, const uint8_t* key, size_t key_len, const uint8_t*
   }
 }
 
-/* Public verify API for the same dispatch; TC_ERROR when alg is compiled out. */
+/* Public verify API for the same dispatch. TC_ERROR when alg is compiled out. */
 static TC_status hmac_verify(int alg, const uint8_t* key, size_t key_len, const uint8_t* msg,
                              size_t msg_len, const uint8_t* tag, size_t tag_len)
 {
@@ -285,8 +285,8 @@ MunitResult test_hmac_key_lengths(const MunitParameter params[], void* data)
 #endif
 
 #if SIZE_MAX > (UINT64_MAX >> 3)
-  /* A length rejected by the digest must propagate through HMAC. The pointer
-     is never read because the length check happens before compression. */
+  /* A length rejected by the digest must propagate through HMAC. The length
+     check precedes compression, so the pointer stays unread. */
   {
     const size_t excessive = (size_t)(UINT64_MAX >> 3) + 1U;
 #if TC_ENABLE_SHA256

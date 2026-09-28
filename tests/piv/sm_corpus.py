@@ -136,7 +136,7 @@ def apdu(hex_string):
     if not length or start + length > len(raw):
         raise AssertionError("Invalid APDU Lc")
     le = raw[start + length:]
-    # Extended APDUs encode Le=256 as 0100 rather than short-form 00.
+    # Extended APDUs encode Le=256 as 0100. Short-form APDUs use 00.
     allowed_le = (b"", b"\0") if start == 5 else (b"", b"\0\0", b"\x01\0")
     if le not in allowed_le:
         raise AssertionError("Unexpected APDU Le")

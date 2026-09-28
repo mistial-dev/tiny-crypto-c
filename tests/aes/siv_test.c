@@ -378,20 +378,20 @@ static MunitResult test_siv_api(const MunitParameter params[], void* data)
                    TC_ERROR);
   munit_assert_memory_equal(sizeof(buf), buf, saved);
 
-  /* v may alias plaintext when ciphertext is distinct (staged); succeeds */
+  /* v may alias plaintext when ciphertext is distinct (staged) */
   memcpy(buf, pt, sizeof(pt));
   munit_assert_int(TC_AES_SIV_encrypt(key, NULL, NULL, 0, buf, sizeof(pt), buf, ct), ==, TC_OK);
-  /* first 16 bytes of buf are now V; decrypt with that V into pt-sized tail */
+  /* The first 16 bytes of buf hold V. Decrypt with that V into a pt-sized buffer. */
   {
     uint8_t rec[16];
     munit_assert_int(TC_AES_SIV_decrypt(key, NULL, NULL, 0, buf, ct, sizeof(pt), rec), ==, TC_OK);
     munit_assert_memory_equal(sizeof(pt), rec, pt);
   }
 
-  /* Exact v == ciphertext rejected; neither buffer written */
+  /* Exact v == ciphertext rejected. Neither buffer is written. */
   memcpy(buf, pt, sizeof(pt));
   memcpy(saved, buf, sizeof(buf));
-  memcpy(ct, pt, sizeof(pt)); /* sentinel; must stay if encrypt is rejected */
+  memcpy(ct, pt, sizeof(pt)); /* sentinel that survives a rejected encrypt */
   {
     uint8_t ct_saved[16];
     memcpy(ct_saved, ct, sizeof(ct));

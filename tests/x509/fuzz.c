@@ -438,8 +438,8 @@ static void fuzz_cms_path(const uint8_t* data, size_t length)
     TC_X509_path_status status = TC_CMS_signed_data_path_build(
         (TC_bytes){data, length}, 0, (TC_bytes){data_type, sizeof data_type}, (TC_bytes){NULL, 0},
         &source, &options, &workspace, &work, &found);
-    /* No anchor was supplied, even if embedded certificates parse successfully.
-     */
+    /* Without a supplied anchor the path never validates, even when embedded
+     * certificates parse. */
     if (status == TC_X509_PATH_VALID || work > budgets[i] || memcmp(&found, &saved, sizeof found))
       abort();
   }

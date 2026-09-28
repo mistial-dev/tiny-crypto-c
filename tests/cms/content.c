@@ -107,7 +107,7 @@ static MunitResult binding_storage(const MunitParameter params[], void* user)
   uint8_t saved[sizeof slots];
   (void)params;
   (void)user;
-  /* Read-only ranges may alias; neither writable range may alias anything. */
+  /* Read-only ranges may alias each other. Writable ranges must not alias any range. */
   for (unsigned output = WORK; output <= MATCHED; ++output)
     for (unsigned input = 0; input < output; ++input) {
       void* pointers[SLOT_COUNT];

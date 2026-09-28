@@ -647,7 +647,7 @@ static MunitResult test_gcm(const MunitParameter params[], void* data)
   munit_assert_memory_equal(vector->length, buffer, vector->ciphertext);
   munit_assert_memory_equal(vector->tag_len, tag, vector->tag);
 
-  /* Fixed t=4 for this key/context; MSBt of the 128-bit tag. */
+  /* Fixed t=4 for this key/context. MSBt of the 128-bit tag. */
   munit_assert_int(TC_AES_GCM_init_short_tag(&ctx, vector->key, vector->iv, vector->iv_len, 4), ==,
                    TC_OK);
   munit_assert_int(TC_AES_GCM_aad_update(&ctx, vector->aad, vector->aad_len), ==, TC_OK);

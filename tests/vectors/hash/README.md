@@ -14,8 +14,8 @@ SHA-256 of every file, and `tests/test_vector_manifests.py` checks them.
 Source: `shabytetestvectors.zip` from the
 [NIST Cryptographic Algorithm Validation Program](https://csrc.nist.gov/projects/cryptographic-algorithm-validation-program/secure-hashing)
 (CAVS 11.0/11.1, generated 2011-05-11). The SHA-1, SHA-224, SHA-256, SHA-384
-and SHA-512 files are kept; the SHA-512/224 and SHA-512/256 files are not
-because those digests are not implemented. Run them with `make test-full`.
+and SHA-512 files are kept. The SHA-512/224 and SHA-512/256 files are omitted
+because the library does not implement those digests. Run them with `make test-full`.
 
 | File | Cases |
 | --- | ---: |
@@ -54,8 +54,8 @@ Wycheproof tree in `../wycheproof/testvectors_v1/`, described in
 `../wycheproof/README.md`. They run in `make test` when HMAC is enabled.
 
 Wycheproof tags shorter than `TC_HMAC_MIN_TAG_LEN` are checked against the
-prefix of the full streaming tag; the public one-shot and verify APIs are only
-exercised for tag lengths they accept.
+prefix of the full streaming tag. The public one-shot and verify APIs are
+exercised for the tag lengths they accept.
 
 ## Generated known-answer tests, `../../hash/test_vectors.h`
 

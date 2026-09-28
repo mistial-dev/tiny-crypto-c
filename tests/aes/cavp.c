@@ -2,8 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  * SPDX-FileCopyrightText: Mistial Dev
  *
- * Opt-in CAVP response-file validation. This translation unit is part of the
- * test executable only; it is never linked into the library.
+ * Opt-in CAVP response-file validation. Test-only translation unit.
  */
 
 #include <tiny_crypto/aes.h>

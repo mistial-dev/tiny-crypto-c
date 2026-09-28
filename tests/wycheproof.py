@@ -24,7 +24,7 @@ def ec_records(document, bits):
             verdict = case["result"]
             if verdict not in ("valid", "invalid", "acceptable"):
                 raise AssertionError(f"Unknown verdict {verdict}")
-            # BigInt is a scalar value, not the library's fixed-width encoding.
+            # BigInt is a scalar value. Encode it at the curve's fixed width.
             scalar = int(case["private"], 16)
             width = max(bits // 8, (scalar.bit_length() + 7) // 8)
             private = scalar.to_bytes(width, "big").hex()

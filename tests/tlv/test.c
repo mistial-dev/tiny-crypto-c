@@ -9,7 +9,7 @@
 #include "munit.h"
 static const TC_TLV_limits limits = {SIZE_MAX, SIZE_MAX, 4096, 16};
 
-/* X.690 sections 8/10; ISO 7816-4 section 6. */
+/* X.690 sections 8 and 10, ISO 7816-4 section 6. */
 static MunitResult headers(const MunitParameter params[], void* user)
 {
   (void)params;
@@ -138,7 +138,7 @@ static void visit(void* user, const TC_TLV_event* e)
     ++v->closes;
   if (v->max_depth < e->depth)
     v->max_depth = e->depth;
-  /* Hash original bytes, not chunk boundaries: every partition must agree. */
+  /* Hash the original bytes so every chunk partition produces the same value. */
   for (i = 0; i < e->bytes.length; ++i)
     v->bytes = v->bytes * 33 + e->bytes.data[i];
 }

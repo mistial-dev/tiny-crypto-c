@@ -1,6 +1,6 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later
- * RFC 5869 Appendix A cases 1-7; remaining SHA variants are independent
+ * RFC 5869 Appendix A cases 1-7. The remaining SHA variants are independent
  * Python hashlib/hmac answers, cross-checked with OpenSSL EVP_KDF.
  */
 static const struct hkdf_vector hkdf_vectors[] = {

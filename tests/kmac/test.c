@@ -108,7 +108,7 @@ static MunitResult test_profile(const MunitParameter params[], void* user)
   munit_assert(memcmp(&saved, &ctx, sizeof(ctx)) == 0);
 
   /* From the kdf section of osdp-piv-latex's PIV Auto test report.
-   * These are test session keys, not card private keys. */
+   * The fixture holds test session keys only. */
   n = unhex(key, "00112233445566778899AABBCCDDEEFF102132435465768798A9BACBDCEDFE0FFFEEDDCCBBAA99887"
                  "766554433221100");
   munit_assert(TC_KMAC256_digest(key, n, NULL, 0, (const uint8_t*)"OSDP-PIV-AUTO-KDK-v1", 20, out,

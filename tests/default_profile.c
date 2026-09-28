@@ -2,7 +2,7 @@
  * SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * Test the configured library target instead of recompiling its sources.
+ * Test the configured tiny-crypto-c library target as a consumer links it.
  */
 #include "munit.h"
 

@@ -549,7 +549,7 @@ static MunitResult extension_values(const MunitParameter params[], void* user)
     if (i == 5 || i == 6 || i == 7) {
       uint8_t* encoded_value = entry ? entries + 22 + 11 : list + 11;
       memcpy(encoded_value, values[i].data, values[i].length);
-      /* EdiPartyName is constructed, not a primitive [5] value. */
+      /* EdiPartyName requires a constructed [5] encoding. */
       encoded_value[i == 7 ? 4 : 2] = 0x85;
       work = WORK_BUDGET;
       munit_assert_int(tc_x509_crl_extensions_check(&crl, &limits, &tree, oids, 1), ==,

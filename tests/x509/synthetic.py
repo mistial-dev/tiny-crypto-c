@@ -20,7 +20,7 @@ PARSEABLE = {
     "subject_cn_universalstring", "tbs_serial_changed_signature_stale",
     "uids_issuer_and_subject_unique_id", "utctime_for_2050",
 }
-# sigalg_oid_arc_overflow changes only the outer algorithm; its inner/outer
+# sigalg_oid_arc_overflow changes only the outer algorithm. Its inner/outer
 # mismatch is rejected independently of the large OID arc.
 
 

@@ -10,6 +10,6 @@ The HKDF ACVP test runs every SHA2-224, SHA2-256, SHA2-384 and SHA2-512 case:
 400 revision 1 cases and 800 revision 2 cases. This includes default and random
 salts, hybrid `Z || T` secrets, multi-expansion, and validation cases with
 incorrect supplied output. Other SHA-2 variants and SHA-3 cases remain in the
-corpus, but are skipped because those hashes are not implemented by this library.
+corpus and are skipped because this library does not implement those hashes.
 The ACVP JSON adapter is test-only; applications construct their protocol's
 `fixedInfo` and pass it as HKDF `info`.

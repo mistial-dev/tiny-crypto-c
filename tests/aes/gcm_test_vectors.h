@@ -5,8 +5,8 @@
  * Compact samples from the NIST CAVP AES-GCM vectors distributed with:
  * https://github.com/mko-x/SharedAES-GCM/tree/master/Sources/gcm_test_vectors
  *
- * The complete suite is intentionally not vendored here: it is several
- * megabytes of test-only data. These vectors cover all AES key sizes, the
+ * The complete suite is several megabytes, so this file keeps a sample.
+ * These vectors cover all AES key sizes, the
  * normal 96-bit IV path, and a non-96-bit IV construction.
  */
 #ifndef GCM_TEST_VECTORS_H

@@ -19,7 +19,7 @@ The files came from the NIST CAVP
 - [`tdesmct.zip`](https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/des/tdesmct.zip)
 - [`tdesmmt.zip`](https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/des/tdesmmt.zip)
 
-The KAT and MCT files identify themselves as CAVS 11.1; the MMT files identify
+The KAT and MCT files identify themselves as CAVS 11.1. The MMT files identify
 themselves as CAVS 18.0. The retained files cover ECB, CBC, CFB1, CFB8, CFB64,
 and OFB with DES plus two-key and three-key TDES. Unused MCT
 intermediate-debug files are omitted.

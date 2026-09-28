@@ -47,7 +47,7 @@ static MunitResult oracle(const MunitParameter params[], void* user)
     for (unsigned sample = 0; sample < 2; ++sample) {
       tc_mp_word factor;
       size_t exponent_length = sample ? (TC_MP_WORD_BITS == 8 ? 16 : length) : 3;
-      /* Fixed test data, not a key-generation RNG. */
+      /* Deterministic LCG test data. */
       for (size_t i = 0; i < length; ++i) {
         state = state * 1664525u + 1013904223u;
         modulus[i] = (uint8_t)(state >> 24);

@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Mistial Dev
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Original RFC 5280 encoding fixtures; signatures are placeholders."""
+"""Original RFC 5280 encoding fixtures. Signatures are placeholders."""
 import argparse
 from pathlib import Path
 import subprocess

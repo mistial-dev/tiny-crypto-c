@@ -4070,7 +4070,7 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                 munit_assert_not_null(newer_update);
                 munit_assert_int(ASN1_TIME_set_string(newer_update, "270101000001Z"), ==, 1);
                 munit_assert_int(X509_CRL_set1_lastUpdate(current_base, newer_update), ==, 1);
-                /* Two signed deltas disagree at number 2; complete number 3
+                /* Two signed deltas disagree at number 2. Complete number 3
                  * supersedes both. */
                 X509_CRL* conflicting = X509_CRL_dup(delta_crl);
                 munit_assert_not_null(conflicting);
@@ -4517,7 +4517,7 @@ static MunitResult revocations(const MunitParameter params[], void* user)
               munit_assert_int(status, ==,
                                revoked && reasons[i] != 8 ? TC_X509_CRL_REVOKED
                                                           : TC_X509_CRL_UNREVOKED);
-              /* The complete CRL is stale; the current delta supplies its
+              /* The complete CRL is stale. The current delta supplies its
                * update interval. */
               tc_x509_crl_freshness freshness;
               munit_assert_int(tc_x509_crl_fresh_at(&parsed, &updated.at, &freshness), ==,

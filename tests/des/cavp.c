@@ -8,8 +8,7 @@
  *   mmt/  - Multi-block Message Tests (keying options 2 and 3)
  *   mct/  - Monte Carlo Tests per NIST SP 800-20 (keying options 2 and 3)
  *
- * This translation unit is part of the test executable only; it is never
- * linked into the library. Enable with TC_DES_CAVP=1.
+ * Test-only translation unit. Enable with TC_DES_CAVP=1.
  */
 
 #include <stdio.h>
@@ -23,7 +22,7 @@
 #define CAVP_VECTOR_DIR "tests/vectors/des/cavp"
 #endif
 
-/* The corpus needs every mode and TDES; skip the whole TU otherwise */
+/* The corpus needs every mode and TDES. Skip the whole TU otherwise. */
 #if defined(TC_DES_CAVP) && (TC_DES_CAVP == 1) && (TC_DES_ENABLE_ECB == 1) &&                      \
     (TC_DES_ENABLE_CBC == 1) && (TC_DES_ENABLE_CFB1 == 1) && (TC_DES_ENABLE_CFB8 == 1) &&          \
     (TC_DES_ENABLE_CFB64 == 1) && (TC_DES_ENABLE_OFB == 1) && (TC_DES_ENABLE_TDES == 1)
@@ -55,8 +54,8 @@ static void cavp_record_reset(struct cavp_record* r)
   r->pt_len = r->ct_len = 0;
 }
 
-/* Parse a binary digit string (CFB1 payloads) into MSB-first packed bits;
-   returns bit count or -1 */
+/* Parse a binary digit string (CFB1 payloads) into MSB-first packed bits.
+   Returns the bit count or -1. */
 static int cavp_parse_bits(const char* s, uint8_t* out, size_t max_bytes)
 {
   size_t n = 0;
@@ -74,9 +73,6 @@ static int cavp_parse_bits(const char* s, uint8_t* out, size_t max_bytes)
   return (int)n;
 }
 
-/* If line begins with "name" followed by optional spaces and '=', return the
-   value (trailing whitespace stripped in place is not needed; parsers stop at
-   CR/LF). Otherwise NULL. */
 /* ------------------------------------------------------------------------- */
 /* KAT / MMT execution                                                       */
 /* ------------------------------------------------------------------------- */

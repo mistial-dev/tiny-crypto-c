@@ -18,18 +18,18 @@ unsupported curve families and malformed hex separately.
 Supported ECDSA records are P-192, P-256 and P-384. P-224, P-521 and binary
 curves are skipped because the library does not implement them. RSA records
 use supported 1024, 2048 and 3072-bit moduli. CAVP encodes public exponents
-with leading zero padding; the test adapter passes their minimal magnitude
+with leading zero padding. The test adapter passes their minimal magnitude
 to the public API. CAVP's `SaltVal = 00` denotes an empty PSS salt in its
 3072-bit zero-salt groups.
 
 RSA KeyGen's recorded seeds target the CAVP `ProvRP`, conditioned-prime and
 probable-prime methods. The library's generator samples its own random
 candidates, so these tests validate the recorded private keys through the
-public API rather than claim seed-to-key replay. The default test validates
+public API without seed-to-key replay. The default test validates
 two keys from each of the 14 supported size and generation-method groups:
 one with CAVP's fixed public exponent and one with a varying exponent. It
 reports the remaining 2,172 records as sampled out. The exhaustive mode
-validates all 2,200 keys;
-run `tests/nist_dss.py --rsa-dir tests/vectors/nist_dss/186-3rsa
+validates all 2,200 keys.
+Run `tests/nist_dss.py --rsa-dir tests/vectors/nist_dss/186-3rsa
 --rsa-keygen-reader BUILD/test_rsa_keygen_reader --rsa-keygen-all`. It can take
 hours because each key receives full primality and private-key validation.

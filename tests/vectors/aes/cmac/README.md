@@ -31,9 +31,8 @@ Includes short tags (`Tlen` 4/5) and 64 KiB messages. The TDES files from the
 same archive are in `tests/vectors/des/cmac/`.
 
 CMAC unit-test builds set `TC_AES_CMAC_MIN_TAG_LEN=4` so every CAVP row can
-exercise
-the public API. The **product default** remains 8 (SP 800-38B ≥ 64-bit
-guidance; same floor style as EAX).
+exercise the public API. The product default is 8, following the SP 800-38B
+≥ 64-bit guidance and the EAX tag floor.
 
 ## Wycheproof
 

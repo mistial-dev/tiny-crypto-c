@@ -7,7 +7,7 @@ SPDX-License-Identifier: GPL-2.0-or-later
 
 These files are unmodified NIST Cryptographic Algorithm Validation Program
 (CAVP) vectors. Original CRLF line endings are preserved by `.gitattributes`.
-They run under `make test-full`; the ordinary test suite uses smaller generated
+They run under `make test-full`. The ordinary test suite uses smaller generated
 known-answer sets.
 
 ## Provenance and retained scope

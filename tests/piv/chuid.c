@@ -28,7 +28,7 @@ static MunitResult test_profiles(const MunitParameter params[], void* user)
   data[58] = 16;
   for (i = 0; i < 16; ++i)
     data[59 + i] = (uint8_t)(i + 64);
-  /* Nonempty signature placeholder; this test does not decode CMS. */
+  /* Nonempty signature placeholder. CMS decoding is outside this test. */
   data[75] = 0x3e;
   data[76] = 2;
   data[77] = 0x30;

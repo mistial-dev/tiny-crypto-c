@@ -126,7 +126,7 @@ static MunitResult hash_selection(const MunitParameter params[], void* user)
   memcpy(&saved, &parsed, sizeof saved);
   digest_algorithm(&signer, TC_HASH_SHA384);
   munit_assert_int(tc_cms_signature_resolve(&signer, &key, &parsed), ==, TC_TLV_INVALID);
-  /* Attribute framing is checked separately; this stage uses presence only. */
+  /* Attribute framing is checked separately. This stage uses presence only. */
   signer.signed_attributes = (TC_bytes){defaults, sizeof defaults};
   munit_assert_int(tc_cms_signature_resolve(&signer, &key, &parsed), ==, TC_TLV_INVALID);
   munit_assert_memory_equal(sizeof parsed, &parsed, &saved);

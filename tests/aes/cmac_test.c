@@ -195,7 +195,7 @@ static MunitResult test_cmac_api(const MunitParameter params[], void* data)
   munit_assert_int(TC_AES_CMAC_verify(key, msg, sizeof(msg), tag, 16), ==, TC_MISMATCH);
   tag[0] ^= 1u;
 
-  /* Truncation at TC_AES_CMAC_MIN_TAG_LEN (product default 8; CAVP builds use 4). */
+  /* Truncation at TC_AES_CMAC_MIN_TAG_LEN (product default 8, CAVP builds use 4). */
   munit_assert_int(TC_AES_CMAC(key, msg, sizeof(msg), tag2, TC_AES_CMAC_MIN_TAG_LEN), ==, TC_OK);
   munit_assert_memory_equal(TC_AES_CMAC_MIN_TAG_LEN, tag2, tag);
   munit_assert_int(TC_AES_CMAC_verify(key, msg, sizeof(msg), tag2, TC_AES_CMAC_MIN_TAG_LEN), ==,

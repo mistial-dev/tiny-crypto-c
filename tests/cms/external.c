@@ -9,7 +9,7 @@ static MunitResult external_collections(const MunitParameter params[], void* use
   (void)params;
   (void)user;
   enum { FRAME_CAPACITY = 4, WORK_BUDGET = 128 };
-  /* Collection iteration returns records; schema parsing follows separately. */
+  /* Collection iteration returns records. Schema parsing is a separate step. */
   const uint8_t sequence[] = {0x30, 0};
   const TC_bytes inputs[] = {{sequence, sizeof sequence}};
   candidate_source records = {inputs, 1, 0, TC_TLV_OK, 0};
