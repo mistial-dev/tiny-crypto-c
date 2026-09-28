@@ -31,7 +31,7 @@ takes linear time in the input size.
 For chunked input, use `TC_TWIC_CCL_stream_init`, `stream_update` and
 `stream_finish`. Initialization takes maximum byte and record counts, a callback,
 and its context. Zero limits permit zero work. Complete rows are parsed directly
-from input chunks; a split row uses at most 61 bytes of retained input. The
+from input chunks. A split row uses at most 61 bytes of retained input. The
 callback receives a decoded record valid for that call. Store records in staging
 storage when building a persistent list.
 
@@ -54,16 +54,16 @@ throughout that decision. Preserve the previous active list when an update
 fails.
 
 The TSA download page also supplies an MD5 checksum. It can detect download
-corruption; authenticated retrieval or trusted provisioning establishes the
+corruption. Authenticated retrieval or trusted provisioning establishes the
 list's origin. Track publication and retrieval metadata separately from the
 per-record cancellation dates.
 
 `TC_TWIC_CCL_check_freshness` checks trusted publication/retrieval timestamps
 against an application policy in Unix seconds. Set `now`, the maximum permitted
 publication age, and a persisted `minimum_publication` floor. The age limit is
-inclusive; a zero limit requires publication at the current instant. A later
+inclusive. A zero limit requires publication at the current instant. A later
 download of the same list retains the original publication age. Future receipt
-times and receipt preceding publication return `TC_TWIC_CCL_INVALID`; expired
+times and receipt preceding publication return `TC_TWIC_CCL_INVALID`. Expired
 or older-than-permitted publications return `TC_TWIC_CCL_STALE`. Call this helper
 at the application's chosen policy boundary and handle its result according to
 the deployment's warning and access rules. Store operations perform no age check.
@@ -80,18 +80,18 @@ Levels 2 and 3. An increase in MARSEC level requires an update within twelve
 hours. Card validity checks must use the most recently obtained list. Configure
 age limits, update triggers and warning handling in the application for its
 deployment. Publication timestamps supplied to the helper require their own
-trusted provenance; CSV cancellation dates describe individual records.
+trusted provenance. CSV cancellation dates describe individual records.
 
 The visual list, VCCL, uses the printed card identification number (CIN).
 Electronic CCL queries use the full FASC-N. TWIC certificate revocation and
-credential cancellation are separate checks; suspended credentials can appear
+credential cancellation are separate checks. Suspended credentials can appear
 on the CCL while their certificates remain unrevoked. See the
 [TWIC Reader Specification, Part 3, sections 4.4.3 and 4.4.4](https://www.tsa.gov/sites/default/files/5c.-twic-nexgen-legacy-part-3-reader-specification-v4.pdf).
 
 ## Indexed storage
 
 For repeated checks, provision a packed array of 25-byte FASC-Ns sorted in
-unsigned byte order. Retain every identifier from the validated CSV; duplicate
+unsigned byte order. Retain every identifier from the validated CSV. Duplicate
 keys may be retained or deduplicated. Sorting can take place during provisioning
 on the host. The resulting image uses 25 bytes per retained key and can reside
 in external flash or a file.
@@ -104,8 +104,8 @@ metadata before making it available to credential checks.
 
 For an image already held in stable memory, `TC_TWIC_CCL_index_from_memory`
 accepts a pointer to its `TC_bytes` descriptor and the maximum record count.
-It checks record boundaries and ordering through the same preparation path;
-indexed reads borrow keys directly from the image. Keep the descriptor and
+It checks record boundaries and ordering through the same preparation path.
+Indexed reads borrow keys directly from the image. Keep the descriptor and
 bytes unchanged until all indexes and snapshots using them have been released.
 Lookup output storage must be separate from that image and descriptor.
 
@@ -117,7 +117,7 @@ image and its publication metadata together through a trusted channel.
 `TC_TWIC_CCL_index_contains` performs exact binary search. It takes the same
 FASC-N span as the CSV lookup, plus a maximum read count. An index of `n` keys
 requires at most `floor(log2(n)) + 1` reads per query. A failed read produces
-`TC_TWIC_CCL_SOURCE_ERROR`; a wrong-length key produces `TC_TWIC_CCL_INVALID`.
+`TC_TWIC_CCL_SOURCE_ERROR`. A wrong-length key produces `TC_TWIC_CCL_INVALID`.
 Exhausting the read budget produces `TC_TWIC_CCL_LIMIT`. All leave the membership
 output unchanged.
 
@@ -130,7 +130,7 @@ buffers with application locking, or give concurrent readers separate buffers.
 storage callback to this API. Its caller-owned `ExampleTwicCclStorage` retains
 the read buffer. Set `context`, `read_at` and the provisioned image's `length`,
 then call `example_twic_ccl_open`. A successful result supplies an index for
-`TC_TWIC_CCL_index_contains`; pass the CHUID reader's `fascn` field as the query.
+`TC_TWIC_CCL_index_contains`. Pass the CHUID reader's `fascn` field as the query.
 Keep the storage object and image alive until all checks using that index end.
 
 ## Snapshots
@@ -153,11 +153,11 @@ Serialize these operations and the final validity decision with application
 locking. That boundary prevents an update from superseding a successful lookup
 before the application consumes it. Source buffers need the same protection.
 Apply warning/age policy explicitly using the held metadata. Persist rollback
-state and the completed image before publishing; restore both after restart.
+state and the completed image before publishing. Restore both after restart.
 
 `example_check_twic_cancellation` in the storage example combines acquisition,
 an explicitly supplied age policy, lookup and release. Its `listed` output is
-the membership result; `age_warning` reports a separate caller-selected warning
+the membership result. `age_warning` reports a separate caller-selected warning
 threshold. The example treats `policy.max_age` as an acceptance limit. Both
 outputs remain unchanged on failure, and every acquired snapshot is released.
 Use it as the cancellation step of a credential workflow with separate card

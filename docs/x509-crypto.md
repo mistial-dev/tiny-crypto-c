@@ -29,24 +29,24 @@ and MGF hash must match them, and the salt length must meet the key's minimum.
 
 For content already hashed, use `TC_X509_signature_verify_digest` with a
 `TC_signature_algorithm`. Specify the signature scheme, digest hash, and, for
-PSS, its MGF hash and salt length in bytes. The function verifies the digest
-directly, not a hash of the digest. PSS still needs its signature and MGF hash
+PSS, its MGF hash and salt length in bytes. The function verifies the supplied
+digest without hashing it again. PSS still needs its signature and MGF hash
 implementations to check the encoding. ECDSA and v1.5 can use externally computed
 hashes without enabling the corresponding hash implementation.
 
 Custom providers can supply `verify`, `verify_digest`, or both. Initialize unused
-callbacks to NULL. A missing operation returns `UNSUPPORTED`; digest verification
+callbacks to NULL. A missing operation returns `UNSUPPORTED`. Digest verification
 never falls back to the message callback. Both callbacks must enforce key
 restrictions, perform cryptographic verification, and never increase `work`.
 
 `signature_work` is reserved from the shared work budget for each crypto
 attempt. Parsing, input checks and hashing also consume work. The value
 `TC_X509_NATIVE_DEFAULT_SIGNATURE_WORK` accommodates supported curves and RSA
-sizes with ordinary public exponents. This is an operation budget, not a time measurement.
+sizes with ordinary public exponents. The budget counts operations.
 
-A valid signature does not establish certificate trust. Path validation and
-application rules still determine trusted issuers, permitted uses, validity,
-and accepted algorithms. Missing compiled algorithms return `UNSUPPORTED`.
+Path validation and application rules determine trusted issuers, permitted
+uses, validity, and accepted algorithms. Missing compiled algorithms return
+`UNSUPPORTED`.
 
 With OpenSSL tests enabled, run the provider's comparison tests with:
 

@@ -33,7 +33,7 @@ typedef struct {
   const TC_TWIC_CCL_snapshot* ccl;
   uint64_t ccl_max_age, ccl_minimum_publication;
   size_t ccl_reads;
-  /* RSA challenge encoding; EC keys use their curve's hash policy. */
+  /* RSA challenge encoding. EC keys use their curve's hash policy. */
   ExampleCardRSAPadding rsa_padding;
 } ExampleTWICRequest;
 
@@ -72,11 +72,11 @@ TC_TLV_result example_read_card_identity(TC_bytes encoded, TC_PIV_card_profile p
  * duration and access authorization. AUTHENTICATED applies to this evaluation
  * instant.
  *
- * Work is shared across certificate validation, identifier reading and proof;
+ * Work is shared across certificate validation, identifier reading and proof.
  * ccl_reads bounds each of the two index lookups separately. A failure ends the
  * operation. Cancellation/status failures before proof send no card command.
  * Workspace, work, mutable contexts and inputs must be disjoint. Keep scratch
- * outside small task stacks; it is cleared after processing. No PIN is used. */
+ * outside small task stacks. It is cleared after processing. No PIN is used. */
 ExampleTWICResult example_twic_authenticate(ExampleCardIO* io, const ExampleTWICRequest* request,
                                             TC_random_fn random, void* random_context,
                                             ExampleTWICWorkspace* workspace, size_t* work);

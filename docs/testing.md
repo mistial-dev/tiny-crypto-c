@@ -94,7 +94,7 @@ runner tests supply the vectors: `test_wycheproof_ecdsa`,
 is configured and passes before treating a standalone reader skip as expected.
 The Wycheproof runners report accepted input categories and excluded parameters.
 
-C tests use [µunit](https://nemequ.github.io/munit/); C++ tests use
+C tests use [µunit](https://nemequ.github.io/munit/). C++ tests use
 [doctest](https://github.com/doctest/doctest). CTest also checks installed
 consumers, package boundaries, and resource-profile configuration.
 The installed-consumer check builds a separate Release library, installs it,
@@ -112,7 +112,7 @@ source copies byte for byte.
 Direct-source checks compile and link every product `.c` file in AES-only,
 TLV-only, and EC-only builds, with SHA-256 disabled.
 
-To run just the installation checks after configuring a build:
+To run the installation checks after configuring a build:
 
 ```sh
 ctest --test-dir build -R '^test_installed_consumer' --output-on-failure
@@ -149,9 +149,9 @@ Objects and 111 biometric objects, then checks envelope versions, content types,
 signer identifiers and
 signed attributes through the public readers. Both explicit attribute encoding
 modes are exercised, along with every truncated envelope prefix. These checks
-cover syntax; captured tampered signatures still require cryptographic checks.
+cover syntax. Detecting tampered signatures requires the cryptographic checks below.
 The biometric adapter uses the CBEFF lengths from SP 800-76-2 Table 14.
-Card 55's face signature contains an empty `entryUUID`; both encoding modes
+Card 55's face signature contains an empty `entryUUID`. Both encoding modes
 must reject its signed attributes and leave the output unchanged.
 The biometric signature group checks the original CBEFF header and record with
 the library's native crypto and each card's CHUID signer certificate. It covers
@@ -166,7 +166,7 @@ Installed C99 and C++11 consumers also call `TC_PIV_CMS_read`.
 Captured biometric FASC-N/UUID attributes are compared with each card's CHUID:
 98 pairs match, 12 differ, and one UUID is malformed. Signature and identifier
 verdicts are recorded separately, including signed objects with mismatched IDs.
-Header FASC-N values match the CMS attributes in the captures; eight differ from
+Header FASC-N values match the CMS attributes in the captures. Eight differ from
 the CHUID. These comparisons use the CBEFF reader's borrowed header span.
 Native path fixtures use EC and RSA signers with issuer/serial and key identifiers,
 attached and detached content, and empty messages. RSA fixtures also omit the CMS
@@ -242,8 +242,8 @@ revocation formats, content types and signer versions. Certificate and CRL
 body validation is separate from these version tests.
 The same suite checks OtherCertificateFormat and OtherRevocationInfoFormat:
 required OID/value pairs, nested BER values, missing or extra fields, truncation,
-and work limits. Values remain borrowed; their format-specific contents are not
-interpreted by these readers.
+and work limits. These readers return borrowed values and leave their format-specific contents
+to the caller.
 
 ```sh
 ctest --test-dir build -R '^test_cms_(reader|attributes|algorithm|signer_info|children|octets|content|verify|verify_content|pss|native)$' --output-on-failure
@@ -262,7 +262,7 @@ It also checks CMS `rsaEncryption` signatures with 1024-, 2048-, and 3072-bit
 keys against OpenSSL. `test_cms_algorithm` covers digest selection, PSS key
 restrictions and mismatched algorithm identifiers. It checks BER NULL and PSS
 parameters, malformed encodings, and parser budgets. ECDSA requires matching
-content/signature hashes; PSS allows distinct hashes when signed attributes
+content/signature hashes. PSS allows distinct hashes when signed attributes
 are present. See [RFC 5753 section 2.1.1](https://www.rfc-editor.org/rfc/rfc5753.html#section-2.1.1)
 and [RFC 4056 section 3](https://www.rfc-editor.org/rfc/rfc4056.html#section-3).
 `test_cms_pss` runs the public SignerInfo parser and verifier against OpenSSL
@@ -270,7 +270,7 @@ PSS signatures at all three RSA sizes. Cases include matching hashes, SHA-256
 content with SHA-384 signed attributes, different MGF/signature hashes, and
 signatures without attributes. PSS-restricted SPKIs exercise hash, MGF and
 minimum-salt constraints. Negative cases change the content digest, signature,
-hash, MGF hash or salt length; exact and short work budgets are checked too.
+hash, MGF hash or salt length. Exact and short work budgets are also checked.
 The generated CMS cases connect envelope and SignerInfo parsing to certificate
 identifier matching, content binding and signature verification. They cover
 issuer/serial and key-ID identifiers, nonmatching certificates and repeated
@@ -287,7 +287,7 @@ unsupported/limit results and stop on provider errors. Public checks cover exact
 and short budgets, index/record/byte capacities, all writable ranges overlapping
 input, and source records overlapping the certificate index. The compiled example
 is exercised with a valid chain and by installed C/C++ consumers.
-Complete SignedData policy and revocation validation remain separate.
+Complete SignedData policy and revocation validation remain separate steps.
 
 The combined credential example is exercised by `/cms/native/embedded-path`.
 It uses a held trust snapshot and signed issuer/root CRLs for clear chains,
@@ -355,8 +355,8 @@ trailing names. Combined scope tests cover CA/user/attribute restrictions,
 all four reason-mask combinations, disjoint reasons and the unused bit.
 
 Freshness tests cover both update boundaries, missing deadlines, reversed
-intervals, leap days and the 2049/2050 transition. Refresh is due at nextUpdate;
-there is no implicit clock-skew allowance.
+intervals, leap days and the 2049/2050 transition. Refresh is due at nextUpdate,
+with no implicit clock-skew allowance.
 Extension metadata tests cover every criticality combination for the supported
 CRL fields, unknown critical OIDs, duplicate rejection and output preservation.
 Entry metadata checks cover reason codes, invalidity dates and issuer names,
@@ -367,9 +367,9 @@ FreshestCRL, and reject FreshestCRL on a delta. Entry-policy tests require
 noncritical reason/invalidity-date extensions, critical certificateIssuer on
 indirect CRLs, and delta CRLs for removeFromCRL. Inheritance tests scan five
 entries through the default issuer, two replacements and inherited issuers,
-checking that errors and work limits preserve iterator state. Signature and
-trust integration remain unfinished. Entry matching checks serials first,
-then normalized default issuer names or exact explicit issuer encodings; the
+checking that errors and work limits preserve iterator state. `test_x509_revocation`
+covers CRL signatures and signer trust. Entry matching checks serials first,
+then normalized default issuer names or exact explicit issuer encodings. The
 tests exercise each inherited issuer, mismatches and work limits.
 Whole-CRL lookup tests cover missing matches, duplicate matches and malformed
 entries after a match, with output preserved on failure.
@@ -388,13 +388,14 @@ duplicate coverage, terminal results, revocation precedence and invalid state.
 They reject raw removeFromCRL entries and accept the resolved base/delta result.
 Authority-identifier tests cover SKI and issuer/serial hints, absent identifiers,
 name normalization, conflicting hints, alternative issuer names and malformed
-tails. Directory names are supported; unresolved other name forms return
-`TC_TLV_UNSUPPORTED`. Candidate matching does not establish trust.
+tails. Directory names are supported. Other unresolved name forms return
+`TC_TLV_UNSUPPORTED`. Candidate matching identifies possible issuers, and trust
+comes from path validation.
 `test_cms_native` extracts OpenSSL-generated CRLs from CMS,
 reads their entries, and verifies their signatures with the native provider.
 Signer checks cover subject linkage, cRLSign permission, altered signatures,
 missing providers and short work budgets. These checks use the signer
-certificate's public key; they do not establish its trust path.
+certificate's public key. Its trust path is validated separately.
 Selected-CRL lookup tests verify complete and delta signatures with the same
 signer key, then check entry overrides and removals. They reject a delta signed
 by another key despite matching authority identifiers, incompatible numbers,
@@ -431,7 +432,7 @@ work runs out. Terminal evidence returns without another search.
 Already-covered reasons and unrelated issuers skip signer discovery without
 changing cache states. Current deltas remain usable with stale base CRLs.
 Signed reason-partition tests combine two scopes under one work budget in both
-source orders. Partial coverage stays undetermined; a bad signature cannot fill
+source orders. Partial coverage stays undetermined. A bad signature cannot fill
 the missing reasons. A valid revocation remains decisive in either order.
 Key-rollover fixtures use two trusted signer keys with the same issuer and IDP.
 They check both source orders, conflicting CRL numbers, a damaged newer signature,
@@ -497,7 +498,7 @@ resolution, and held-path results. Run the signed native revocation cases with:
 ```
 
 The `group` parameter selects `signer`, `discovery`, or `selection` checks.
-The `outcome` parameter selects `clear` or `revoked`; omit it to run both.
+The `outcome` parameter selects `clear` or `revoked`. Omit it to run both.
 For example, to check signer handling with a CRL containing no revoked entries:
 
 ```sh
@@ -507,7 +508,7 @@ For example, to check signer handling with a CRL containing no revoked entries:
 Source errors injected after an issuer is resolved preserve the target output
 and stop further source reads.
 Tests reject a missing check, callback failures and increasing work, including
-failure after one partition succeeds. Source failures stop the run; rejected
+failure after one partition succeeds. Source failures stop the run. Rejected
 alternatives cannot leave partially published evidence. Empty indexes and partial
 coverage are tested separately from a determined revocation status.
 The shared failure cases cover provider retries, source errors, malformed
@@ -552,8 +553,8 @@ records stop the search. Terminal evidence needs no further candidate reads.
 Delta processing also finds its signer in the CMS certificate collection.
 Certificate-index tests combine embedded and external candidates, fetch each
 external record once, and check capacity, record, byte and work limits. The
-native path test needs an intermediate available only inside the CMS object;
-its successful path borrows that certificate from the original buffer.
+native path test needs an intermediate available only inside the CMS object.
+Its successful path borrows that certificate from the original buffer.
 The same fixture exercises CRL signer discovery through that embedded chain
 and rejects an altered intermediate signature.
 
@@ -572,7 +573,7 @@ The CRL corpus suite covers 439 fixtures: 12 synthetic, 173 PKITS, 199 from
 NIST's 2001 suite, and 55 ICAM CRLs. It rejects the synthetic algorithm mismatch
 and a PKITS RSA signature with a nonzero unused-bit count. Other bad signatures
 can remain structurally parseable. The file named `crl_v1_no_extensions.pem`
-encodes v2; the test follows its bytes, not its name. Fixture hashes and group
+encodes v2, and the test follows its bytes. Fixture hashes and group
 counts are checked before running the reference cases.
 
 ```sh
@@ -620,12 +621,13 @@ make test-sanitize TINY_CRYPTO_TEST_OPENSSL=ON
 ```
 
 The test provider checks P-256 and P-384 certificate signatures with SHA-256
-and SHA-384, plus wrong keys and altered signed bytes. This exercises the
-library's provider interface; it does not provide a native signature verifier.
+and SHA-384, plus wrong keys and altered signed bytes. These cases exercise
+the library's provider interface through a test-only provider.
 Signed-chain tests compare issuer, validity, CA, path-length, DNS constraint and
 policy verdicts with OpenSSL. Policy cases cover required policies, mappings,
 mapping inhibition and `anyPolicy`. Each chain has a trust anchor, two
-intermediate CAs and a target certificate. Revocation is not exercised here.
+intermediate CAs and a target certificate. `test_x509_revocation` covers
+revocation.
 If CMake cannot find OpenSSL, pass `CMAKE_ARGS=-DOPENSSL_ROOT_DIR=/path/to/openssl`.
 
 This option also enables `test_arithmetic_openssl_0` and
@@ -635,8 +637,8 @@ Both limb widths test exponent 65537. Additional cases use full-width exponents
 with 32-bit limbs and 128-bit exponents with byte limbs. They also check the
 internal PKCS#1 v1.5 verifier against SHA-1/224/256/384/512 signatures made by
 OpenSSL at all three key sizes, including altered digests/signatures, short
-signatures and work limits. They do not test library key generation or
-private-key protection.
+signatures and work limits. The NIST DSS KeyGen readers and
+`test_rsa_private_openssl_*` cover key generation and private-key operations.
 
 ### Unicode normalization
 
@@ -713,14 +715,14 @@ Also check for `test_wycheproof_ecdsa`, `test_wycheproof_rsa_signatures`,
 tests. On macOS, this configuration includes `test_twic_authenticate_command`.
 
 The vendored FIPS 186 vectors enable `test_nist_dss_*`. ECDSA tests cover
-supported public-key, signature, and key-pair records;
+supported public-key, signature, and key-pair records.
 RSA tests cover signature generation and verification. The default RSA KeyGen
 test validates a fixed- and a varying-exponent key in each of 14 supported
 method and modulus groups, for 28 records. Run
 `python3 tests/nist_dss.py --rsa-dir tests/vectors/nist_dss/186-3rsa --rsa-keygen-reader /absolute/path/to/build/test_rsa_keygen_reader --rsa-keygen-all`
-to validate all 2,200 recorded keys; this takes hours. CAVP's seed-to-key
+to validate all 2,200 recorded keys. This takes hours. CAVP's seed-to-key
 candidate methods differ from the library's generator, so these records check
-private-key validation rather than deterministic replay.
+private-key validation.
 
 The default `test_sskdf` includes 18 NIST KAS SHA-256/384 single-step answers.
 `test_kmac_acvp` includes the byte-aligned NIST ACVP case and six independently
@@ -734,28 +736,28 @@ cmake --build /tmp/tiny-crypto-full --parallel
 ctest --test-dir /tmp/tiny-crypto-full --output-on-failure
 ```
 
-After a failure, use `ctest --test-dir /tmp/tiny-crypto-full --rerun-failed --output-on-failure` to retry just the failed tests. CTest keeps detailed output
+After a failure, use `ctest --test-dir /tmp/tiny-crypto-full --rerun-failed --output-on-failure` to retry the failed tests. CTest keeps detailed output
 in `/tmp/tiny-crypto-full/Testing/Temporary/LastTest.log`. Run the whole suite
 again after fixing the failure.
 
-The external Wycheproof adapter currently covers P-256 and P-384 ECDH, with
+The external Wycheproof adapter covers P-256 and P-384 ECDH, with
 raw points and DER public keys, on both EC arithmetic implementations.
 Valid cases must produce the expected secret; invalid cases must be rejected.
 Its acceptable cases are rejected under the API's strict DER, named-curve,
-uncompressed-point policy. This is not yet coverage of every applicable
-Wycheproof algorithm.
+uncompressed-point policy. Other applicable Wycheproof algorithms remain
+outside this adapter.
 
 The pinned RSA PKCS#1 v1.5 generation files supply 102 supported signatures at
 1024, 2048, and 3072 bits. The test compares every generated signature byte
-for byte; 1536-bit and 4096-bit groups are reported as unsupported sizes.
+for byte. 1536-bit and 4096-bit groups are reported as unsupported sizes.
 The primality file supplies 302 positive and negative verdicts for the RSA
 odd-candidate test. Fourteen signed negative encodings are also tested as
 unsigned byte magnitudes against a separate Python probable-prime oracle.
 The even prime 2 is outside that API's odd-candidate domain.
 
 KMAC256 runs the no-customization suite in strict and relaxed builds. Valid
-tags must match the digest; invalid tags must differ. These are digest
-comparisons, not tests of a tag-verification API.
+tags must match the digest; invalid tags must differ. The KMAC API has
+no tag-verification function, so these tests compare digests.
 `test_kmac_acvp` checks one fixed-output, byte-aligned NIST ACVP-Server sample
 with a 512-byte key and six independent OpenSSL answers with customization and
 odd byte output lengths.
@@ -770,7 +772,7 @@ AES-GCM, CCM, GMAC, EAX, and both AES-SIV formats run at all three AES key
 sizes. Valid cases check
 encryption and decryption. Invalid cases must fail without changing a separate
 output buffer. GCM and CCM authentication mismatches must wipe an in-place
-buffer; EAX must leave its ciphertext unchanged.
+buffer. EAX must leave its ciphertext unchanged.
 SIV follows its separate API contract: an authentication mismatch wipes the
 output, whether separate or in-place. The two SIV formats differ in their
 associated-data components and whether the synthetic IV prefixes the ciphertext.
@@ -783,14 +785,14 @@ hash families in the original ACVP files are skipped explicitly.
 
 The pinned Wycheproof tree also contains algorithms and formats outside this API:
 PKCS#5-padded CBC, AES key wrap, XTS, FF1, GCM-SIV, chunked encryption,
-PBKDF2, KMAC128, SHA-3 HMAC, and signature operations. Those are not counted.
+PBKDF2, KMAC128, SHA-3 HMAC, and signature operations. The adapter excludes them from its counts.
 Raw CBC has no padding-validation API to test against PKCS#5 rejection cases.
-ECDH PEM and WebCrypto import formats are also outside the API; the raw-point
+ECDH PEM and WebCrypto import formats are also outside the API. The raw-point
 and DER suites exercise the supported key inputs.
 
 Capture replay checks key derivation, handshake messages, protected commands,
-responses, and session state. Parser corpus tests check structure and fields,
-not certificate signatures or trust.
+responses, and session state. Parser corpus tests check structure and fields.
+Signature and trust checks have separate suites.
 
 Some event-based captures retain derivation data for only their last session.
 The adapter fails if an earlier session lacks that data. To inspect the
@@ -805,7 +807,7 @@ python3 tests/piv/sm_corpus.py \
 ```
 
 This prints the missing session IDs. A partial replay does not count as a
-passing full capture suite; CTest does not enable this option.
+passing full capture suite. CTest leaves this option disabled.
 
 `test_piv_sm_synthetic` and its CS2-only and CS7-only variants run generated
 sessions without external captures. They check the handshake and a protected
@@ -814,7 +816,7 @@ exchange, including the malformed-handshake cases in the C replay test.
 For an independent EC comparison, install Python's `cryptography` package in
 a virtual environment and configure with `TINY_CRYPTO_TEST_EC_ORACLE=ON` and
 `Python3_EXECUTABLE` pointing to that environment's Python. This adds
-`test_ec_oracle`; the NIST archive test does not need that package.
+`test_ec_oracle`. The NIST archive test runs without that package.
 With the OpenSSL host tests available, it also adds `test_cms_command`, which
 generates certificates, SignedData and CRLs using Python `cryptography` and
 runs the CMS command-line example. It covers valid and revoked paths, expired
@@ -856,7 +858,7 @@ adds ESP-IDF cross-builds for both roles.
 
 On Linux with Clang, `make test-msan CC=clang CXX=clang++` enables
 MemorySanitizer for the core suite. Use `make test-msan-full CC=clang CXX=clang++ TINY_CRYPTO_TEST_FULL=ON` for extended tests. It needs a compatible
-instrumented runtime; Apple Clang does not provide it.
+instrumented runtime, which Apple Clang lacks.
 
 ## PIV CVC verification
 
@@ -888,8 +890,8 @@ Fuzzing runs separately from CTest. Use Clang with libFuzzer support and keep
 the writable corpus and crash artifacts outside the source tree.
 CI builds all four harnesses and runs each for 60 seconds with an 8192-byte input
 limit and a two-second per-input timeout.
-On macOS, use Homebrew LLVM if the Apple toolchain lacks the libFuzzer runtime;
-set the C and C++ compiler paths to its `clang` and `clang++` executables.
+On macOS, use Homebrew LLVM if the Apple toolchain lacks the libFuzzer runtime.
+Set the C and C++ compiler paths to its `clang` and `clang++` executables.
 The SM harness tests raw malformed responses and builds authenticated CS2/CS7
 responses from fuzz input to exercise decryption, invalid padding, and
 output-buffer retries.
@@ -902,7 +904,7 @@ FASC-N and TWIC UUID decode/encode round trips. Seed it with synthetic DER
 GeneralNames, packed 25-byte FASC-Ns and 16-byte UUIDs to reach those checks.
 Security-object checks cover BA/BB/FE mappings and LDS hash lookup, including
 absent groups and output preservation. LDS input can be plain DER or a complete
-BER OCTET STRING; fragmented content exercises caller-buffer assembly.
+BER OCTET STRING. Fragmented content exercises caller-buffer assembly.
 
 ```sh
 cmake -S . -B /tmp/tiny-crypto-fuzz \
@@ -927,7 +929,7 @@ mkdir "$fuzz_dir/tlv" "$fuzz_dir/pki" "$fuzz_dir/sm" "$fuzz_dir/gzip"
 decryption against OpenSSL ciphertexts at each RSA size. Independent `hash` and
 `mgf` parameters select SHA-1, SHA-224, SHA-256, SHA-384 or SHA-512. Cases cover
 empty, one-byte and maximum messages. Failure cases use the maximum message
-length; SHA-256 with MGF1-SHA-256 also checks RNG failure, zero work, zero
+length. SHA-256 with MGF1-SHA-256 also checks RNG failure, zero work, zero
 ciphertext and the RSA input boundary. The `label` parameter selects empty,
 one-byte or 256-byte binary labels. Native limbs cover the complete parameter
 matrix. Byte limbs cover every RSA-1024 combination plus the SHA-256
@@ -937,7 +939,7 @@ With `TINY_CRYPTO_TEST_WYCHEPROOF_DIR` configured, run
 `ctest --test-dir build -R '^test_wycheproof_rsa_oaep$' --output-on-failure`
 to check the pinned OAEP corpus with both limb profiles. The runner includes
 supported groups from mixed-parameter files and reports excluded parameter
-combinations. Coverage uses RSA-1024/2048/3072 and SHA-1/224/256/384/512;
+combinations. Coverage uses RSA-1024/2048/3072 and SHA-1/224/256/384/512.
 SHA-512/224, SHA-512/256 and other RSA sizes are counted separately.
 
 With OpenSSL tests enabled, `test_cpp_rsa_openssl_0` and
@@ -949,8 +951,8 @@ decrypt OpenSSL ciphertexts and check workspace cleanup.
 1024, 2048 and 3072 bits, including their PKCS #8 containers.
 It compares all eight borrowed components with OpenSSL
 and runs the key-loading example to validate the key and sign a SHA-256 digest.
-The `format` parameter selects `pkcs1`, `pkcs8` or `pkcs8-pss`;
-all run by default. PSS uses SHA-256/MGF1-SHA-256 and a 32-byte salt.
+The `format` parameter selects `pkcs1`, `pkcs8` or `pkcs8-pss`.
+All run by default. PSS uses SHA-256/MGF1-SHA-256 and a 32-byte salt.
 PSS-only key containers must reject v1.5 signing before requesting entropy.
 The `/rsa/key/restricted-pss` case generates restricted RSA-PSS keys with OpenSSL,
 imports their PKCS #8 containers and verifies signatures from the PSS example.
@@ -981,7 +983,7 @@ failure. Run it with `./build/test_rsa_import`.
 When `avr-gcc` is available, CMake adds compile checks for the RSA implementation
 and validation/signing examples. They use ATmega2560's 16-bit `size_t` with warnings
 treated as errors. The AVR C++ header check also checks the validation API's
-32-bit work parameter. These checks require the compiler, with no connected board.
+32-bit work parameter. These checks require only the compiler.
 
 ```sh
 ctest --test-dir build -R '^test_(rsa(_validate|_sign)?_compile_avr|cpp_headers_avr)$' --output-on-failure
@@ -997,7 +999,7 @@ factors, invalid factor shapes, exact work limits, and scratch cleanup.
 Combined component/primality tests cover both factors, RNG errors, exact and
 exhausted work, short scratch, and cleanup. A composite-factor fixture satisfies
 the component equations and must fail primality testing. These orchestration
-tests use one round per factor; the sampler tests cover multiple rounds.
+tests use one round per factor. The sampler tests cover multiple rounds.
 The public API cases check all 65 rounds per factor at each key size, workspace
 sizing, component lengths, metadata overlap, and preflight limits.
 The `bits` parameter selects one key size for a focused run:
@@ -1014,7 +1016,7 @@ exhausted work, RNG failure,
 output preservation and scratch cleanup.
 
 Native limbs run the complete private-operation matrix at RSA-1024, RSA-2048 and
-RSA-3072. Byte limbs run that matrix at RSA-1024; OAEP and PSS exercise the same
+RSA-3072. Byte limbs run that matrix at RSA-1024. OAEP and PSS exercise the same
 private arithmetic at the larger sizes. Byte-limb v1.5 signing uses every hash at
 RSA-1024 and SHA-256 at RSA-2048 and RSA-3072.
 
@@ -1084,8 +1086,8 @@ ctest --test-dir build -R '^test_rsa_prime(_openssl)?_[01]$' --output-on-failure
 RSA arithmetic. It covers a SHA-256 known answer, every message length for
 128-, 256-, and 384-byte encodings with supported SHA hashes and MGF1-SHA-256,
 oversized messages, malformed padding, and exact/short work budgets. Failed
-decodes must leave the message view unchanged. These tests do not establish
-private-key operation or timing resistance.
+decodes must leave the message view unchanged. Private-key operations and timing
+resistance are outside these encoding tests.
 
 `test_rsa_oaep_arguments` checks algorithm selection, missing storage, seed width,
 length overflow, and the SHA-256 label limit. `test_rsa_oaep_disabled` uses the
@@ -1112,11 +1114,11 @@ ctest --test-dir build -R '^test_rsa_(oaep.*|pss|mgf)$' --output-on-failure
 `test_wycheproof_ecdsa` reads every fixed-width and DER ECDSA dataset for
 implemented P-192, P-256 and P-384 curves from the pinned archive. Both limb
 widths receive positive and negative cases. Other curves are counted separately.
-The host computes SHA-2, SHA-3 and SHAKE digests; the C reader decodes DER
+The host computes SHA-2, SHA-3 and SHAKE digests. The C reader decodes DER
 signatures with `TC_DER_ecdsa_signature` when needed, then calls
 `TC_ECDSA_verify_digest`. SHAKE128 and SHAKE256 use 32-byte and 64-byte outputs
 as specified by [RFC 8692 section 3.2](https://www.rfc-editor.org/rfc/rfc8692.html#section-3.2).
-This checks prehashed signature verification; CMS algorithm selection and hash
+This checks prehashed signature verification. CMS algorithm selection and hash
 implementation availability have separate tests.
 
 ```sh
@@ -1128,7 +1130,7 @@ RSA-PSS and PKCS #1 v1.5 signature file on both limb widths. It covers enabled
 SHA-1/SHA-2 digests, distinct MGF1 hashes and explicit salt lengths. Missing-NULL
 DigestInfo cases use strict rejection. Unsupported hashes and key sizes are
 counted separately. Parameters are passed directly to the digest verification
-APIs; DER-encoded PSS parameter parsing has separate CMS and key-import tests.
+APIs. DER-encoded PSS parameter parsing has separate CMS and key-import tests.
 
 ```sh
 ctest --test-dir build -R '^test_wycheproof_rsa_signatures$' --output-on-failure
@@ -1165,15 +1167,15 @@ ctest --test-dir build -R '^test_idf_(ecdsa192_image|ecdsa256_image|signed_rsa_i
 
 These tests recompute the image digest and exercise the application crypto
 adapters with valid signatures, changed digests, changed signatures and
-invalid key parameters. They do not exercise IDF's trusted-key selection,
-signature-block CRC checks, anti-rollback or flash writes. Run the same tests
+invalid key parameters. The policy tests below cover IDF's trusted-key selection
+and signature-block CRC checks. Anti-rollback and flash writes are outside both. Run the same tests
 in a sanitizer build to check memory access and undefined behavior.
 
 The `test_idf_signature_policy_*` targets compile the vendored IDF verifier
 for RSA and ECDSA, with eFuse and single-signature configurations. These check
 eFuse and running-image trust selection, signature-block CRC and scheme,
 missing keys, explicit digest revocation, read failures and crypto error
-propagation. Crypto results are stubbed in these policy tests; use the image
+propagation. Crypto results are stubbed in these policy tests. Use the image
 tests above for the actual signature calculations. Run both with:
 
 ```sh
@@ -1198,5 +1200,4 @@ make benchmark-report-check
 
 The first command measures host throughput. The second checks the generated
 Uno and RP2350 resource report and needs their cross-compilers. See
-[benchmarks](benchmarks.md) for the measured configurations. Neither replaces
-the correctness suites above.
+[benchmarks](benchmarks.md) for the measured configurations.

@@ -485,7 +485,7 @@ include(cmake/Tests.cmake)
 include(cmake/Benchmarks.cmake)
 
 if(ESP_PLATFORM)
-  # ESP-IDF components link SDK targets that are not standalone CMake packages.
+  # ESP-IDF components link SDK targets that exist only inside an ESP-IDF build.
   return()
 endif()
 

@@ -115,7 +115,7 @@ ExampleTWICResult example_twic_authenticate(ExampleCardIO* io, const ExampleTWIC
   const TC_X509_path_status checked = TC_X509_path_build(request->certificate, request->trust,
                                                          &options, &validation, &search, &path);
   if (checked != TC_X509_PATH_VALID) {
-    /* Failed path validation does not expose its consumed-work count. */
+    /* Failed path validation reports no work count, so charge the full budget. */
     *work -= options.max_work;
     switch (checked) {
     case TC_X509_PATH_INVALID:

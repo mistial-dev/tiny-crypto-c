@@ -57,7 +57,7 @@ static struct {
   uint8_t inventory_bytes[INVENTORY_BYTES];
   ExampleTWICInventory inventory;
   TC_TWIC_tpk tpk;
-  /* Sequential phases share scratch; borrowed results point into input buffers.
+  /* Sequential phases share scratch. Borrowed results point into input buffers.
    */
   union {
     TC_GZIP_workspace gzip;
@@ -502,7 +502,7 @@ static int content_crls_prepare(const Options* options, TC_bytes encoded,
   if (TC_CMS_signed_data_read(chuid.signature, limits, parser.frames, parser.frame_capacity, work,
                               &cms) != TC_TLV_OK)
     return 0;
-  /* Collect candidate serials before authentication; validation checks their
+  /* Collect candidate serials before authentication. Validation checks their
    * trust. */
   if (cms.certificates.length) {
     TC_TLV_element certificates;
@@ -567,8 +567,8 @@ static int content_crls_prepare(const Options* options, TC_bytes encoded,
 
 #if TC_ENABLE_AES && TC_AES_ENABLE_ECB && TC_AES_KEY_BITS == 128
 /* Decrypt one BC field with the loaded TPK and remove PKCS #7 padding.
- * Input and output must be separate. plaintext borrows output on success;
- * the caller wipes output during cleanup. Parsing and copying consume work. */
+ * Input and output must be separate. plaintext borrows output on success.
+ * The caller wipes output during cleanup. Parsing and copying consume work. */
 static int encrypted_object_decode(TC_bytes encoded, TC_buffer output, TC_bytes* plaintext,
                                    size_t* work)
 {

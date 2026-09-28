@@ -9,7 +9,7 @@
 [![CLA assistant](https://cla-assistant.io/readme/badge/mistial-dev/tiny-crypto-c)](https://cla-assistant.io/mistial-dev/tiny-crypto-c)
 
 tiny-crypto-c provides small, portable cryptographic primitives for embedded C
-and C++. Library code is heap free; callers supply all memory. The C++11 wrappers
+and C++. Library code is heap free. Callers supply all memory. The C++11 wrappers
 use pointer-length pairs and C arrays, work without the standard library or
 exceptions, and preserve the C API's result types. Disabled algorithms and
 modes are left out of the build.
@@ -38,7 +38,7 @@ compatible functionality. A patch version contains compatible fixes.
 
 The public API comprises installed headers, documented behavior and status
 values, build options, and the installed CMake target. Applications should
-rebuild the library with their toolchain when upgrading; binary compatibility
+rebuild the library with their toolchain when upgrading. Binary compatibility
 across different toolchains is outside this versioning policy. Version
 **2.0.0** includes public API changes that require callers upgrading from 1.x
 to review and update their code.
@@ -99,7 +99,7 @@ set independently of resource tuning. See [PIV targets and ESP32-P4](docs/esp32-
 for the role requirements and ESP-IDF builds.
 
 Feature options accept `AUTO`, `ON`, or `OFF`. `AUTO` follows the selected
-profile; explicit settings survive a profile change. Direct-source builds
+profile. Explicit settings survive a profile change. Direct-source builds
 select `TC_RESOURCE_PROFILE=TC_RESOURCE_MICRO`, `TC_RESOURCE_MINI`, or
 `TC_RESOURCE_DESKTOP`. The defaults below describe a build with no profile
 selected.
@@ -111,13 +111,13 @@ selected.
 | `TINY_CRYPTO_ENABLE_AES`     |      ON | AES implementation                                                  |
 | `TINY_CRYPTO_AES_DYNAMIC`    |     OFF | Per-context AES-128/192/256 keys, CBC, and CMAC                     |
 | `TINY_CRYPTO_ENABLE_DES`     |     OFF | DES and 3DES implementation                                         |
-| `TINY_CRYPTO_DES_ISO9797`    |     OFF | ISO/IEC 9797-1 DES MAC algorithms 1 and 3; requires DES             |
+| `TINY_CRYPTO_DES_ISO9797`    |     OFF | ISO/IEC 9797-1 DES MAC algorithms 1 and 3, requires DES             |
 | `TINY_CRYPTO_ENABLE_EC`      |     OFF | P-256/P-384 ECDH, key generation, and ECDSA                         |
 | `TINY_CRYPTO_ENABLE_RSA`     |     OFF | RSA public and private-key operations                               |
 | `TINY_CRYPTO_ENABLE_SHA1`    |     OFF | SHA-1 implementation                                                |
-| `TINY_CRYPTO_ENABLE_SHA224`  |     OFF | SHA-224; shares the SHA-256 core                                    |
+| `TINY_CRYPTO_ENABLE_SHA224`  |     OFF | SHA-224 using the SHA-256 core                                      |
 | `TINY_CRYPTO_ENABLE_SHA256`  |      ON | SHA-256 implementation                                              |
-| `TINY_CRYPTO_ENABLE_SHA384`  |     OFF | SHA-384; shares the SHA-512 core                                    |
+| `TINY_CRYPTO_ENABLE_SHA384`  |     OFF | SHA-384 using the SHA-512 core                                      |
 | `TINY_CRYPTO_ENABLE_SHA512`  |     OFF | SHA-512 implementation                                              |
 | `TINY_CRYPTO_ENABLE_MD5`     |     OFF | MD5 checksums for legacy data                                       |
 | `TINY_CRYPTO_ENABLE_HMAC`    |     OFF | HMAC for enabled hashes                                             |
@@ -135,17 +135,17 @@ selected.
 | Option                                   | Default | Purpose                                                      |
 | ---------------------------------------- | ------: | ------------------------------------------------------------ |
 | `TINY_CRYPTO_ENABLE_TLV`                 |     OFF | Bounded TLV readers and tree traversal                       |
-| `TINY_CRYPTO_TLV_BER`                    |     OFF | ASN.1 BER, including indefinite lengths; requires TLV        |
-| `TINY_CRYPTO_TLV_STREAM`                 |     OFF | Incremental TLV reader; requires TLV                         |
-| `TINY_CRYPTO_ENABLE_DER`                 |     OFF | DER value helpers; requires TLV                              |
-| `TINY_CRYPTO_ENABLE_X509`                |     OFF | X.509 certificate and public-key readers; requires DER       |
-| `TINY_CRYPTO_ENABLE_X509_PATH`           |     OFF | Path validation and stores; requires X.509                   |
-| `TINY_CRYPTO_ENABLE_TRUST_ANCHOR_FORMAT` |     OFF | RFC 5914 lists; requires X.509 path validation               |
+| `TINY_CRYPTO_TLV_BER`                    |     OFF | ASN.1 BER, including indefinite lengths, requires TLV        |
+| `TINY_CRYPTO_TLV_STREAM`                 |     OFF | Incremental TLV reader, requires TLV                         |
+| `TINY_CRYPTO_ENABLE_DER`                 |     OFF | DER value helpers, requires TLV                              |
+| `TINY_CRYPTO_ENABLE_X509`                |     OFF | X.509 certificate and public-key readers, requires DER       |
+| `TINY_CRYPTO_ENABLE_X509_PATH`           |     OFF | Path validation and stores, requires X.509                   |
+| `TINY_CRYPTO_ENABLE_TRUST_ANCHOR_FORMAT` |     OFF | RFC 5914 lists, requires X.509 path validation               |
 | `TINY_CRYPTO_TAF_CERTIFICATE`            |     OFF | Certificate choice in RFC 5914 lists                         |
 | `TINY_CRYPTO_TAF_TBS_CERTIFICATE`        |     OFF | TBS certificate choice in RFC 5914 lists                     |
 | `TINY_CRYPTO_TAF_TRUST_ANCHOR_INFO`      |     OFF | TrustAnchorInfo choice in RFC 5914 lists                     |
-| `TINY_CRYPTO_ENABLE_X509_REVOCATION`     |     OFF | CRL parsing and path revocation; requires X.509 path support |
-| `TINY_CRYPTO_ENABLE_KEY_CHALLENGE`       |     OFF | Key proof-of-possession challenge; requires X.509            |
+| `TINY_CRYPTO_ENABLE_X509_REVOCATION`     |     OFF | CRL parsing and path revocation, requires X.509 path support |
+| `TINY_CRYPTO_ENABLE_KEY_CHALLENGE`       |     OFF | Key proof-of-possession challenge, requires X.509            |
 | `TINY_CRYPTO_ENABLE_GZIP`                |     OFF | Bounded GZIP decompression                                   |
 
 ### PIV, TWIC, and credentials
@@ -153,19 +153,19 @@ selected.
 | Option                                  | Default | Purpose                                                                |
 | --------------------------------------- | ------: | ---------------------------------------------------------------------- |
 | `TINY_CRYPTO_ENABLE_PIV_OIDS`           |     OFF | PIV and TWIC identifier classification                                 |
-| `TINY_CRYPTO_ENABLE_CMS`                |     OFF | CMS parsing and verification; requires X.509, BER, and identifiers     |
-| `TINY_CRYPTO_ENABLE_CMS_VALIDATION`     |     OFF | CMS signer paths and revocation; requires CMS and X.509 revocation     |
-| `TINY_CRYPTO_ENABLE_PIV_OBJECTS`        |     OFF | PIV and TWIC object readers; requires CMS, TWIC UUID, and identifiers  |
-| `TINY_CRYPTO_ENABLE_CREDENTIAL`         |     OFF | Credential validation; requires PIV objects, CHUID, and CMS validation |
-| `TINY_CRYPTO_ENABLE_PIV_CHUID`          |     OFF | PIV CHUID reader; requires TLV                                         |
-| `TINY_CRYPTO_ENABLE_PIV_CVC`            |     OFF | PIV secure messaging CVC reader; requires DER                          |
-| `TINY_CRYPTO_ENABLE_EAC_CVC`            |     OFF | TR-03110 EAC CVC reader; requires DER                                  |
+| `TINY_CRYPTO_ENABLE_CMS`                |     OFF | CMS parsing and verification, requires X.509, BER, and identifiers     |
+| `TINY_CRYPTO_ENABLE_CMS_VALIDATION`     |     OFF | CMS signer paths and revocation, requires CMS and X.509 revocation     |
+| `TINY_CRYPTO_ENABLE_PIV_OBJECTS`        |     OFF | PIV and TWIC object readers, requires CMS, TWIC UUID, and identifiers  |
+| `TINY_CRYPTO_ENABLE_CREDENTIAL`         |     OFF | Credential validation, requires PIV objects, CHUID, and CMS validation |
+| `TINY_CRYPTO_ENABLE_PIV_CHUID`          |     OFF | PIV CHUID reader, requires TLV                                         |
+| `TINY_CRYPTO_ENABLE_PIV_CVC`            |     OFF | PIV secure messaging CVC reader, requires DER                          |
+| `TINY_CRYPTO_ENABLE_EAC_CVC`            |     OFF | TR-03110 EAC CVC reader, requires DER                                  |
 | `TINY_CRYPTO_ENABLE_PIV_SM`             |     OFF | PD-side PIV secure messaging, CS2 and CS7                              |
 | `TINY_CRYPTO_ENABLE_FASCN`              |     OFF | FASC-N readers and writers                                             |
-| `TINY_CRYPTO_ENABLE_TWIC_UUID`          |     OFF | TWIC NEXGEN UUID helpers; requires FASC-N                              |
+| `TINY_CRYPTO_ENABLE_TWIC_UUID`          |     OFF | TWIC NEXGEN UUID helpers, requires FASC-N                              |
 | `TINY_CRYPTO_ENABLE_TWIC_CCL`           |     OFF | TWIC canceled card list reader                                         |
-| `TINY_CRYPTO_ENABLE_TWIC_TPK`           |     OFF | TWIC privacy-key container reader; requires TLV                        |
-| `TINY_CRYPTO_ENABLE_TWIC_OBJECT_CRYPTO` |     OFF | TWIC private-object encryption; requires AES-128 ECB                   |
+| `TINY_CRYPTO_ENABLE_TWIC_TPK`           |     OFF | TWIC privacy-key container reader, requires TLV                        |
+| `TINY_CRYPTO_ENABLE_TWIC_OBJECT_CRYPTO` |     OFF | TWIC private-object encryption, requires AES-128 ECB                   |
 | `TINY_CRYPTO_ENABLE_AAMVA`              |     OFF | ANSI AAMVA payload readers                                             |
 
 ### Safety and target storage
@@ -197,12 +197,12 @@ Small MCUs can keep `TINY_CRYPTO_AES_TINY=ON` or use `auto`, `bitwise`, or
 Enabling `TINY_CRYPTO_ENABLE_DES` also enables CTR and 3DES. `DES_ECB`,
 `DES_CBC`, `DES_OFB`, `DES_CFB1`, `DES_CFB8`, `DES_CFB64`, `DES_CMAC`, and
 `DES_ISO9797` select the remaining modes when prefixed with `TINY_CRYPTO_`.
-ISO 9797-1 MAC stays off in every resource profile; enable it explicitly.
+ISO 9797-1 MAC stays off in every resource profile. Enable it explicitly.
 See [DES message authentication](docs/api.md#des-message-authentication) for
 algorithm, padding, and tag requirements.
 `TINY_CRYPTO_DES_REJECT_WEAK_KEYS=ON` rejects weak or semi-weak DES component
 keys and TDEA bundles that collapse to single DES. It is off by default for
-legacy-vector compatibility; firmware builds may instead define
+legacy-vector compatibility. Firmware builds may instead define
 `TC_DES_REJECT_WEAK_KEYS=1` directly.
 
 SHA-1, SHA-224, and SHA-256 are implemented in `hash.c`. SHA-384 and SHA-512
@@ -215,7 +215,7 @@ function in counter, feedback and double-pipeline mode. It needs at least one
 PRF: HMAC with an enabled SHA digest, `TINY_CRYPTO_AES_CMAC`, or
 `TINY_CRYPTO_DES_CMAC`. Each PRF gets its own function family
 (`TC_KBKDF_HMAC_SHA256_counter`, `TC_KBKDF_AES_CMAC_feedback`, ...), so unused
-PRFs compile out. AES-CMAC keys follow `TINY_CRYPTO_AES_KEY_BITS`; TDEA-CMAC is
+PRFs compile out. AES-CMAC keys follow `TINY_CRYPTO_AES_KEY_BITS`. TDEA-CMAC is
 kept for legacy interoperability only.
 
 `TINY_CRYPTO_ENABLE_HKDF` needs HMAC and at least one enabled SHA family.
@@ -241,41 +241,41 @@ TC_ERROR     /* malformed argument or invalid state */
 
 Authentication checks examine the entire tag. One-shot GCM, CCM, and EAX
 decryptors authenticate before writing plaintext. SIV writes candidate
-plaintext to recompute its synthetic IV and wipes the output if it does not
-match. Streaming GCM decryption authenticates a contiguous caller-owned
+plaintext to recompute its synthetic IV and wipes the output on a mismatch.
+Streaming GCM decryption authenticates a contiguous caller-owned
 ciphertext buffer during `TC_AES_GCM_decrypt_update`. The buffer remains
 ciphertext until `TC_AES_GCM_decrypt_finish` verifies the tag and decrypts it
 in place. Keep the buffer writable through finish. A tag mismatch leaves the
-ciphertext unchanged. Finish rechecks the ciphertext it decrypts; a buffer
+ciphertext unchanged. Finish rechecks the ciphertext it decrypts. A buffer
 change after update returns `TC_MISMATCH` and wipes the buffer.
 GCM requires a 12 to 16-byte tag by default. Use the explicit
 `TC_AES_GCM_init_short_tag` or one-shot `_short_tag` functions when a protocol
-requires a 4 or 8-byte tag; the GCM packet limits still apply.
+requires a 4 or 8-byte tag. The GCM packet limits still apply.
 
 CTR, CBC, ECB, OFB, and CFB provide no authentication. Pair them with a MAC or
 use an authenticated mode such as GCM, CCM, EAX, or SIV. Never reuse a CTR,
 GCM, CCM, EAX, or OFB nonce with the same key.
 
 DES has only a 56-bit effective key and exists for legacy interoperability.
-Its table lookups are not designed to resist cache-timing attacks. 3DES also
-belongs in compatibility code rather than new protocols.
+Its table lookups have no cache-timing protection. Limit 3DES to compatibility
+code as well.
 
 SHA-1 remains available for compatibility. Do not use it for new
 collision-resistant signatures or content identity. HMAC-SHA-1 is a separate
-construction whose security does not rest on collision resistance; it remains
+construction whose security is independent of collision resistance. It remains
 an acceptable MAC and KBKDF PRF, and is the smallest HMAC option on AVR.
 
 For KBKDF, include the purpose, parties, and requested length in the fixed input
-to distinguish keys derived for different uses. You can construct this input
-with `TC_KBKDF_fixed_input` (`Label || 0x00 || Context || [L]_32`), and never
-reuse a key-derivation key as a derived key. Output lengths are in bytes; a
+to distinguish keys derived for different uses. `TC_KBKDF_fixed_input` builds
+this input as `Label || 0x00 || Context || [L]_32`. Never reuse a
+key-derivation key as a derived key. Output lengths are in bytes. A
 derivation of `n = ceil(out_len / h)` PRF blocks needs `n <= 2^r - 1` for an
 `r`-bit counter. Output buffers must not overlap any input, and `TC_ERROR`
 wipes the output when derivation had already started.
 
 HKDF output lengths are in bytes and must be from 1 to `255 * HashLen`.
 Pass purpose and protocol context as `info`. Extracted keys are cleared by the
-one-shot derive functions; callers using extract and expand clear their PRK
+one-shot derive functions. Callers using extract and expand clear their PRK
 after the final expansion.
 
 ## TLV parsing
@@ -296,13 +296,14 @@ if (result == TC_TLV_OK) {
 ```
 
 The limits are input bytes, value bytes, element count, and nesting depth.
-Zero means zero, not unlimited. The reader advances through siblings without
-descending into their values. `TC_TLV_walk` checks nested containers using a
-caller-provided frame array and one shared budget for the whole input.
+A zero limit permits zero bytes or elements. The reader advances through
+siblings without descending into their values. `TC_TLV_walk` checks nested
+containers using a caller-provided frame array and one shared budget for the
+whole input.
 
 Choose DER, ISO 7816, or optional ASN.1 BER explicitly. ISO padding has separate
 profiles and is accepted only between root objects. `TC_TLV_read` and the
-sibling reader handle definite lengths; use the walker or incremental reader
+sibling reader handle definite lengths. Use the walker or incremental reader
 for indefinite BER. `TC_TLV_read_tree` reads one definite or indefinite object,
 checks its constructed boundaries, and leaves following siblings unread.
 See [TLV parsing](docs/tlv.md) for workspace setup and borrowed-span usage.
@@ -313,15 +314,15 @@ more input. Other results distinguish malformed input, resource
 limits, unsupported features, and invalid arguments. Bounds checks remain on
 with `TC_STRICT=0`.
 
-Returned spans borrow the input. Don't reuse or modify that buffer while using
-them. Incremental callbacks borrow bytes only during the callback; call
+Returned spans borrow the input. Keep that buffer unchanged while using
+them. Incremental callbacks borrow bytes only during the callback. Call
 `TC_TLV_stream_finish` when the message ends to detect truncation. Discard a
 stream after an error or reinitialize it for a new message.
 
 `<tiny_crypto/der.h>` adds INTEGER, BIT STRING, OID, BOOLEAN, NULL, SEQUENCE,
-and SET helpers. They take complete encoded values. Framing checks do not
-validate an ASN.1 schema, a certificate, or its signature. C++11 code can use
-`tiny_crypto::TLVReader` from `<tiny_crypto/tlv.hpp>`.
+and SET helpers. They take complete encoded values. Framing checks cover
+encoding structure. Schema, certificate, and signature validation are separate
+steps. C++11 code can use `tiny_crypto::TLVReader` from `<tiny_crypto/tlv.hpp>`.
 
 ## Certificates and PIV objects
 
@@ -339,18 +340,18 @@ TC_TLV_result result = TC_X509_read(data, length, &limits, &workspace,
                                    &certificate);
 ```
 
-Choose the limits for your application. Each extension needs one OID slot;
-exceeding a limit returns `TC_TLV_LIMIT`. Results borrow the input buffer, so
+Choose the limits for your application. Each extension needs one OID slot.
+Exceeding a limit returns `TC_TLV_LIMIT`. Results borrow the input buffer, so
 keep it alive while using them. The workspace can be reused after the call.
 
 `certificate.public_key` identifies the subject's algorithm, key size, and
 named curve. `TC_X509_subject_public_key` also reads a standalone
 SubjectPublicKeyInfo. The extension iterator exposes OIDs, critical flags,
-and values; helpers decode Basic Constraints and Key Usage.
+and values. Helpers decode Basic Constraints and Key Usage.
 
 `<tiny_crypto/key_challenge.h>` prepares and verifies a fresh proof-of-possession
-challenge from a validated public key and explicit signature parameters. It
-contains no card commands or slot policy. Protocol code selects its algorithm,
+challenge from a validated public key and explicit signature parameters. Card
+commands and slot policy stay in protocol code, which selects its algorithm,
 key usage and transport identifiers before issuing a challenge.
 
 `TC_PIV_CHUID_read` returns the FASC-N, card UUID (GUID), optional cardholder
@@ -360,7 +361,7 @@ The default reader enforces the PIV field order and requires a nonempty
 signature field. `TC_PIV_CHUID_read_profile` also accepts explicit
 `TC_CHUID_PROFILE_TWIC_SIGNED` and `TC_CHUID_PROFILE_TWIC_UNSIGNED` profiles.
 Unsigned TWIC omits the signature and cardholder UUID fields. Choose the
-profile from the requested card object, not from the returned contents.
+profile from the requested card object before reading its contents.
 
 `TC_PIV_CVC_read` reads card and intermediate secure messaging CVCs as defined
 in SP 800-73-5 Part 2, section 4.1.5. Its `signed_data` span contains the
@@ -374,13 +375,13 @@ EAC certificates use a different schema. `<tiny_crypto/eac_cvc.h>` provides
 The certificate reader takes `TC_TLV_limits` and a `TC_EAC_CVC_workspace`
 containing caller-owned nesting frames. Returned fields borrow the input.
 Its signed span includes the complete `7F4E` body, including tag and length.
-Unknown extensions are preserved; unsupported key or authorization OIDs return
+Unknown extensions are preserved. Unsupported key or authorization OIDs return
 `TC_TLV_UNSUPPORTED`.
 
 Call `TC_EAC_CVC_check_encoding` with the resolved issuer key and, for an EC
 subject without explicit parameters, its inherited domain parameters. It
-checks coordinate and signature widths; missing context returns
-`TC_TLV_ARGUMENT`. Signature width comes from the issuer key, not the subject.
+checks coordinate and signature widths. Missing context returns
+`TC_TLV_ARGUMENT`. Signature width comes from the issuer key.
 The standalone reader also accepts RI-ECDH public-key templates, but these
 cannot be used as certificate-signing keys.
 
@@ -392,13 +393,13 @@ key validity, certificate trust, and expiration before using a credential.
 We measure flash and static RAM usage for Arduino Uno and Raspberry Pi Pico 2
 (RP2350, Arm Cortex-M33) builds. [docs/benchmarks.md](docs/benchmarks.md) lists
 the sizes in bytes and as percentages of each board's flash and RAM capacity.
-These are linked firmware sizes, not peak runtime memory measurements.
+The figures are linked firmware sizes and exclude peak runtime stack use.
 
 Run `make benchmark-report` to regenerate the report, or
 `make benchmark-report-check` to check that it is up to date. Neither command
 needs a connected board. Use `make benchmark` to measure throughput on the host
 with the current build configuration. PR CI uploads a fresh resource report and
-enforces flash and stack budgets; the checked-in report is refreshed for releases.
+enforces flash and stack budgets. The checked-in report is refreshed for releases.
 
 ## PIV secure messaging
 
@@ -410,7 +411,7 @@ their trust, policy, time, and revocation checks.
 
 The desktop profile enables its dependencies. For a smaller build, enable
 AES with `TINY_CRYPTO_AES_DYNAMIC`, SHA-256, EC, SSKDF, TLV, DER, and PIV CVC
-parsing. CS7 also needs SHA-384 and P-384; CS2 needs P-256. Disable a suite with
+parsing. CS7 also needs SHA-384 and P-384. CS2 needs P-256. Disable a suite with
 `TINY_CRYPTO_PIV_SM_CS2=OFF` or `TINY_CRYPTO_PIV_SM_CS7=OFF` and disable its
 unused curve separately with `TINY_CRYPTO_EC_P256` or `TINY_CRYPTO_EC_P384`.
 
@@ -426,7 +427,7 @@ expected card UUID, parsing limits, signature provider, and transport result.
 `TC_PIV_SM_wrap` produces a protected command data field. Fragment it afterward
 if the transport requires chaining. Pass the reassembled response data and
 outer status separately to `TC_PIV_SM_unwrap`. Only one command may be pending.
-Peer authentication or framing errors clear the session; a short output buffer
+Peer authentication or framing errors clear the session. A short output buffer
 allows the same response to be retried. Clear the session when the card is
 removed or command delivery is uncertain.
 

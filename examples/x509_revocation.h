@@ -9,7 +9,7 @@ extern "C" {
 #endif
 
 enum { EXAMPLE_CRL_CAPACITY = 4, EXAMPLE_REVOCATION_NODES = 8 };
-/* Caller-owned storage; keep this outside a small task stack. */
+/* Caller-owned storage. Keep this outside a small task stack. */
 typedef struct {
   ExampleX509SearchWorkspace search;
   uint8_t states[EXAMPLE_CRL_CAPACITY];

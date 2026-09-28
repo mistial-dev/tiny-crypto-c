@@ -34,9 +34,9 @@ independent bootstrap trust context before passing the extracted DER list to
 this reader.
 
 The store retains borrowed source configuration. Follow the snapshot lifetime
-rules in [Certificate store](x509-store.md); the backing DER may be reclaimed
-only after the last reader releases its snapshot. The library performs no
-network retrieval or persistent-storage update.
+rules in [Certificate store](x509-store.md). The backing DER may be reclaimed
+only after the last reader releases its snapshot. Network retrieval and
+persistent-storage updates belong to the application.
 
 [Synthetic TWIC validation](../tests/twic/synthetic_validation.c) is an
 executable example of bounded parsing, caller-owned records, explicit store
@@ -54,9 +54,9 @@ For `TrustAnchorInfo`, its path-control fields take precedence over matching
 extensions in its embedded certificate. Its embedded certificate must match
 the stated name and public key, and any subject key identifier must match the
 anchor key identifier. The anchor record selected by path search applies only
-to that attempted path; another anchor cannot relax its controls.
+to that attempted path. Another anchor cannot relax its controls.
 
-Validation still requires a signature provider, an application-supplied UTC
+Validation also requires a signature provider, an application-supplied UTC
 time, and bounded path workspaces. Revocation is a separate check. A root
 certificate present only among untrusted candidates never becomes an anchor.
 
@@ -64,10 +64,10 @@ certificate present only among untrusted candidates never becomes an anchor.
 
 The three choice options can be disabled independently to remove their
 decoders. At least one must be enabled when the format module is enabled.
-The default resource profile leaves the format module disabled; the desktop
+The default resource profile leaves the format module disabled. The desktop
 profile includes all choices. Invalid feature combinations fail at compile
 time and in CMake configuration.
 
 Run the vendored parser, path, and TWIC tests with `ctest --output-on-failure`
 from a configured build directory. The mandatory tests use the committed DER
-fixtures and do not need OpenSSL.
+fixtures and run without OpenSSL.

@@ -19,7 +19,7 @@ Encrypted biometric objects use their stored BC field, including its tag and
 length. For a printed-plaintext policy, container `0x3001` uses the decrypted
 printed-information TLVs. Keep that buffer stable until inventory validation
 finishes, then wipe it. The outer GET DATA `53` wrapper is excluded in both cases.
-The library hashes the supplied spans directly; it performs no decryption or
+The library hashes the supplied spans directly, with no decryption or
 representation fallback during inventory validation.
 
 In the reader utility, supply `--printed-plaintext`, `--security-object` and
@@ -55,7 +55,7 @@ the historical `3D` field. PIV uses strict PIV
 identifier and OID rules. TWIC identity binding follows Part 3 section 4.4.4:
 the signed certificate FASC-N identifies the credential. The certificate may
 omit its UUID URI. A present UUID must satisfy the selected profile and match
-the CHUID GUID; the complete FASC-N must match across both authenticated objects.
+the CHUID GUID. The complete FASC-N must match across both authenticated objects.
 `TC_TWIC_card_identifiers_read` and `TC_TWIC_card_identifiers_match` implement
 this reader policy. `TC_PIV_card_identifiers_read` performs the PIV profile check.
 For TWIC, the workflow accepts the registered PIV or TWIC card-authentication
@@ -77,7 +77,7 @@ biometric modality independently. Missing required evidence returns
 
 The two `TC_validation_context` values may share one initialized validation arena
 because the operations are sequential. They use the same evaluation time. TWIC
-also requires that time to equal `TC_TWIC_CCL_freshness_policy.now`; PIV leaves
+also requires that time to equal `TC_TWIC_CCL_freshness_policy.now`. PIV leaves
 the CCL and freshness fields zero. The proof callback receives
 the selected profile and public key from the accepted card certificate. It owns
 the transport and challenge exchange. It also receives the selected signature
@@ -98,7 +98,7 @@ retains borrowed views into those inputs.
 `example_credential_validate` returns a typed verdict for invalid credentials,
 revocation, cancellation, stale data, unavailable evidence, unsupported
 algorithms, exhausted limits and failed key possession. Treat
-`EXAMPLE_CREDENTIAL_VALID` as authentication evidence. The application still
+`EXAMPLE_CREDENTIAL_VALID` as authentication evidence. The application
 applies site authorization, live biometric matching and any required-object policy.
 
 For a later access decision, initialize fresh card and content contexts with the

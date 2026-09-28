@@ -7,7 +7,7 @@
 Enable `TINY_CRYPTO_ENABLE_RSA=ON` and include `<tiny_crypto/rsa.h>`.
 `TC_RSA_verify_v15_digest` verifies a precomputed SHA-1, SHA-224, SHA-256,
 SHA-384 or SHA-512 digest using PKCS#1 v1.5. Supported modulus sizes are
-1024, 2048 and 3072 bits. The caller decides which sizes and hashes its protocol
+1024, 2048, 3072 and 4096 bits. The caller decides which sizes and hashes its protocol
 accepts and applies its trust policy separately.
 
 Pass modulus and exponent as unsigned big-endian bytes, without ASN.1 INTEGER
@@ -23,7 +23,7 @@ the RSA API to check arithmetic constraints. X.509 key parsing uses this reader.
 Allocate `TC_RSA_word` storage using the limb count returned by
 `TC_RSA_verify_workspace_words(bits)`. The function returns zero for unsupported
 sizes. Keep the workspace separate from input bytes and metadata. Verification
-wipes used scratch; failures before arithmetic leave scratch unused.
+wipes used scratch. Failures before arithmetic leave scratch unused.
 
 Pass the hash in `TC_RSA_v15_options`. `TC_work_budget.remaining` bounds the
 count of modular operations and encoding comparisons and is reduced by work
@@ -45,14 +45,14 @@ verification workspace. Each prepared v1.5 verification needs at least
 remain useful when the key is used only once.
 
 `TINY_CRYPTO_RSA_SMALL=ON` selects byte limbs. Native builds otherwise use
-32-bit limbs; AVR uses byte limbs. RSA verification does not require EC or a
+32-bit limbs. AVR uses byte limbs. RSA verification needs neither EC nor a
 hash implementation when the caller supplies the digest.
 
 ## Encoding for card and hardware signing
 
 For card or hardware signing, `TC_RSA_encode_v15_digest` produces the complete
 EMSA-PKCS1-v1_5 representative from a precomputed digest. Supply 128, 256 or
-384 output bytes for RSA-1024, RSA-2048 or RSA-3072 and a work budget covering
+384 or 512 output bytes for RSA-1024, RSA-2048, RSA-3072 or RSA-4096 and a work budget covering
 that length. Input and output must be disjoint. Failures preserve the output.
 The function shares the software signer's encoding implementation and requires
 no hash context or RSA workspace. See [card-key authentication](credential-reader.md#card-key-authentication)
@@ -61,9 +61,9 @@ for an example that submits this representative to a card.
 `TC_RSA_encode_pss_digest` builds an EMSA-PSS representative with explicit
 message and MGF hashes and caller-supplied salt. Enable both hashes and obtain
 the salt from a cryptographic random source. The salt length must match the
-options. Output capacity is 128, 256 or 384 bytes, with `emBits` one less than
+options. Output capacity is 128, 256, 384 or 512 bytes, with `emBits` one less than
 the modulus width in bits. Keep output and the work budget separate from all
-inputs. Preflight errors preserve both; a failure during encoding wipes the
+inputs. Preflight errors preserve both. A failure during encoding wipes the
 output and consumes work. The card transport submits the resulting bytes to
 the private-key operation.
 
@@ -78,7 +78,7 @@ Include `<tiny_crypto/rsa.hpp>`. `tiny_crypto::rsa_verify_v15_digest` calls the
 same C verifier and returns `TC_RSA_result`. `rsa_workspace_for(words)` builds
 a borrowed workspace view from a `TC_RSA_word` array, inferring its capacity.
 Neither helper allocates memory or throws exceptions. Keep the array alive and
-exclusive to the operation; copying a view does not create independent scratch.
+exclusive to the operation. Copies of a view share the same scratch.
 The `rsa_prepare_public_key`, `rsa_verify_v15_prepared`,
 `rsa_verify_pss_prepared`, and `rsa_prepared_public_key_clear` wrappers expose
 the same caller-owned cache and borrowed-key lifetime as the C API.
@@ -95,7 +95,7 @@ memory and do not throw.
 and MGF hashes and salt length. Both hash implementations must be enabled.
 It uses the same caller-owned limb workspace as v1.5 verification, plus a local
 hash context and 64-byte digest buffer. Its work budget also covers PSS hashing
-and mask generation; the v1.5 budget formula does not apply to PSS.
+and mask generation. The v1.5 budget formula covers v1.5 only.
 
 The public RSA API provides v1.5 and PSS signing and signature verification,
 OAEP encryption/decryption, and private-key component validation. The
@@ -105,7 +105,7 @@ certificates and CMS. See [testing](testing.md) for the OpenSSL cross-checks.
 ## Key generation
 
 `TC_RSA_keygen_init` and `TC_RSA_keygen_step` generate two-prime RSA-1024,
-RSA-2048 or RSA-3072 keys with public exponent 65537. The operation uses no
+RSA-2048, RSA-3072 or RSA-4096 keys with public exponent 65537. The operation uses no
 heap storage. Supply `TC_RSA_KEYGEN_WORKSPACE_WORDS(bits)` aligned limbs, or
 query `TC_RSA_keygen_workspace_words(bits)`, plus caller-owned output buffers.
 The modulus and private exponent need `bits/8` bytes, each prime needs
@@ -115,7 +115,7 @@ Initialize `TC_RSA_keygen_state` to zero before its first use. State, scratch,
 output metadata and output buffers must be mutually disjoint and remain alive
 across steps. `TC_RSA_keygen_init` takes cumulative candidate and RNG-request
 limits. Each `TC_RSA_keygen_step` also takes a work allowance. It returns
-`TC_RSA_IN_PROGRESS` before exceeding that allowance; call it again with the
+`TC_RSA_IN_PROGRESS` before exceeding that allowance. Call it again with the
 same state and callbacks. `TC_RSA_KEYGEN_STEP_WORK(bits)` is enough for any one
 pending unit to make progress. A cancellation callback is checked between
 bounded candidate, setup and Miller-Rabin units. Cancellation returns
@@ -137,21 +137,21 @@ test the generated key before provisioning it to persistent storage.
 ## Private-key validation
 
 Include `<tiny_crypto/key.h>` for PKCS #8 RSA import. Enable
-`TINY_CRYPTO_ENABLE_DER=ON`; the import reader also works with X.509 disabled.
+`TINY_CRYPTO_ENABLE_DER=ON`. The import reader also works with X.509 disabled.
 `TC_KEY_rsa_private_read` returns a `TC_KEY_rsa_private_key` containing borrowed
 components, attributes and algorithm parameters. An optional public key must
 match the private key's modulus and exponent.
 
 Before signing, pass the selected `TC_signature_algorithm` to
-`TC_KEY_rsa_private_signature_check`. A `TC_KEY_RSA_PSS` key permits PSS only;
-encoded restrictions also constrain the digest, mask digest and minimum salt
+`TC_KEY_rsa_private_signature_check`. A `TC_KEY_RSA_PSS` key permits PSS only.
+Encoded restrictions also constrain the digest, mask digest and minimum salt
 length. A `TC_KEY_RSA` key permits both RSA signature schemes. Apply application
 policy and check compiled algorithm support separately. Keep the imported view
 and its source bytes unchanged throughout validation and use.
 
 `TC_DER_private_key_info` reads DER PKCS #8 containers, including the optional
 public key in [RFC 5958](https://www.rfc-editor.org/rfc/rfc5958.html#section-2).
-Version 0 carries the private key; version 1 also carries a public key.
+Version 0 carries the private key. Version 1 also carries a public key.
 It returns borrowed algorithm, key and optional attribute spans. Check the algorithm
 OID and its parameters before passing the key span to an algorithm-specific
 reader. Validate public/private key consistency before use. Attribute contents
@@ -161,8 +161,8 @@ container buffer protected and stable while using these views.
 `TC_DER_rsa_private` in `<tiny_crypto/der.h>` reads a DER-encoded PKCS #1
 two-prime private key. It returns borrowed magnitudes for all eight components,
 including the CRT exponents and coefficient. Keep the encoded buffer stable and
-the output object separate from it. Parsing checks structure and integer encoding;
-mathematical validation is a separate step. Multi-prime version 1 returns
+the output object separate from it. Parsing checks structure and integer encoding.
+Mathematical validation is a separate step. Multi-prime version 1 returns
 `TC_TLV_UNSUPPORTED`. The format is defined in
 [RFC 8017, Appendix A.1.2](https://www.rfc-editor.org/rfc/rfc8017.html#appendix-A.1.2).
 
@@ -186,10 +186,10 @@ validation runs. Allocate `TC_RSA_VALIDATE_WORKSPACE_WORDS(bits)` limbs, or use
 
 Validation checks `n = p*q`, distinct odd factors, the private-exponent range,
 and `e*d = 1` modulo each factor minus one. Each factor receives 65 Miller-Rabin
-rounds; three is handled exactly. Supply an independent cryptographically secure
+rounds. Three is handled exactly. Supply an independent cryptographically secure
 random source and a request limit of at least `TC_RSA_VALIDATION_ROUNDS` per
 factor. Rejection sampling can require extra requests. `TC_RSA_LIMIT` reports
-exhausted requests, work, or storage; `TC_RSA_ERROR` reports RNG failure.
+exhausted requests, work, or storage. `TC_RSA_ERROR` reports RNG failure.
 
 For a fixed composite candidate, the Miller-Rabin bound is `4^-rounds`.
 The 65-round policy gives a conservative combined bound of `2^-129` across two
@@ -222,7 +222,7 @@ For imported CRT components, first validate the private key, then call
 The check compares the reduced exponents and verifies the coefficient and its
 range. Allocate `TC_RSA_CRT_WORKSPACE_WORDS(bits)` limbs or query
 `TC_RSA_crt_workspace_words(bits)`. Existing validation workspace can be reused.
-Keep it separate from key bytes and metadata; used scratch is wiped.
+Keep it separate from key bytes and metadata. Used scratch is wiped.
 A sufficient work budget is `32*modulus_bytes+1`.
 The C++ wrapper is `tiny_crypto::rsa_validate_crt`.
 
@@ -242,8 +242,8 @@ the modulus length and be separate from the key, digest, metadata and workspace.
 Supply a `TC_RSA_execution` containing a cryptographically secure random source,
 a blinding-attempt limit, and a work budget. The operation checks its result
 using the public exponent
-before publishing signature bytes. Failures preserve the signature buffer;
-used workspace is wiped. A sufficient work budget for `A` attempts is
+before publishing signature bytes. Failures preserve the signature buffer.
+Used workspace is wiped. A sufficient work budget for `A` attempts is
 `33*modulus_bytes + 32*exponent_bytes + 8 + A*(16*modulus_bytes + 1)`.
 Use overflow-checked arithmetic for application-selected limits.
 
@@ -270,7 +270,7 @@ v1.5 budget is
 length. Both hash implementations
 must be enabled. They use the same signing workspace. Salt occupies temporary
 scratch while the encoded message is built, then that storage is reused for
-blinded exponentiation. A nonempty salt adds one RNG request;
+blinded exponentiation. A nonempty salt adds one RNG request.
 `execution.random_attempts` bounds blinding requests. PSS hashing and mask
 generation also consume work,
 so the v1.5 budget formula covers only v1.5 signing.
@@ -327,12 +327,12 @@ D = L - H - 1
 
 The terms cover the RNG request, encoding, two masks and exponentiation.
 Use overflow-checked arithmetic when calculating the budget. A smaller budget
-can return `TC_RSA_LIMIT` after consuming randomness; ciphertext remains unchanged.
+can return `TC_RSA_LIMIT` after consuming randomness. Ciphertext remains unchanged.
 
 ## OAEP decryption
 
 `TC_RSA_decrypt_oaep` decrypts with a validated, unchanged private key. Supply
-the message hash, MGF hash, and label in `TC_RSA_oaep_options`; both hashes must
+the message hash, MGF hash, and label in `TC_RSA_oaep_options`. Both hashes must
 be enabled.
 An empty label is `{NULL, 0}`. Ciphertext length must equal the modulus length.
 Provide `TC_RSA_DECRYPT_WORKSPACE_WORDS(bits)` limbs, or query
@@ -340,7 +340,7 @@ Provide `TC_RSA_DECRYPT_WORKSPACE_WORDS(bits)` limbs, or query
 
 Plaintext is checked in scratch and copied to the output after OAEP decoding
 succeeds. The plaintext buffer and returned length change only on `TC_RSA_OK`.
-Wrong labels and invalid padding return `TC_RSA_INVALID`; insufficient plaintext
+Wrong labels and invalid padding return `TC_RSA_INVALID`. Insufficient plaintext
 capacity returns `TC_RSA_LIMIT`. Temporary plaintext and arithmetic scratch are
 wiped on return. Allocate up to `modulus_bytes - 2*hash_digest_bytes - 2` bytes
 for the output, or use a smaller buffer when the protocol bounds the message.
@@ -348,13 +348,13 @@ for the output, or use a smaller buffer when the protocol bounds the message.
 Keep ciphertext, label, key components and metadata separate from the output,
 length object, workspace and RNG state. The C++ wrapper,
 `tiny_crypto::rsa_decrypt_oaep`, takes the output length by reference.
-Validated CRT values can be borrowed through `TC_RSA_private_key.crt`; OAEP
+Validated CRT values can be borrowed through `TC_RSA_private_key.crt`. OAEP
 decoding and output behavior are shared with the full-width path.
 
 Private exponentiation processes padded exponent widths with fixed loop counts,
 and arithmetic selection avoids secret-indexed memory. RNG rejection sampling
 has a variable attempt count, and component encodings expose their public byte
-lengths. This implementation has not been independently certified as a
-constant-time implementation on every compiler and target.
+lengths. Constant-time behavior depends on the compiler and target and has no
+independent certification.
 
 [fips1865]: https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-5.pdf

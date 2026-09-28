@@ -34,7 +34,7 @@ TC_secure_zero(certificate, sizeof certificate);
 Choose capacity and budget for the application's accepted objects. Work counts
 bounded decoding operations, including input bits, Huffman table entries,
 expanded bytes and checksum bytes. The count is deterministic across processor
-speeds. Cleanup still wipes the caller's output
+speeds. Cleanup wipes the caller's output
 capacity after a processing failure.
 
 `TC_GZIP_LIMIT` reports exhausted output capacity or work. `TC_GZIP_INVALID`
@@ -47,7 +47,7 @@ decoded length and leaves bytes beyond that length unchanged.
 
 The decoder supports stored, fixed-Huffman and dynamic-Huffman DEFLATE blocks,
 optional GZIP headers and concatenated members. Each member gets its own history,
-CRC32 and size checks; output capacity and work apply to the whole input.
+CRC32 and size checks. Output capacity and work apply to the whole input.
 Trailing non-member bytes fail. Decoded output doubles as back-reference history.
 All storage is caller-owned.
 
@@ -66,12 +66,12 @@ TC_GZIP_result result = decoder.decode(compressed, compressed_length,
 For C arrays, `decoder.decode(compressed, decoded, work, length)` infers both sizes.
 
 Keep input, output, decoder storage, work and length disjoint. Each call consumes
-the supplied work budget; refill it before starting another independent operation.
+the supplied work budget. Refill it before starting another independent operation.
 
 For PIV certificate containers, `TC_PIV_certificate_read` identifies compressed
 certificate bytes through `TC_PIV_CERTIFICATE_GZIP`. After decompression, require
 the X.509 parser to consume the entire result. GZIP checksums detect accidental
-corruption; credential authentication requires signature and trust
+corruption. Credential authentication requires signature and trust
 validation.
 
 Run the focused tests with:

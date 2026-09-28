@@ -19,7 +19,7 @@ TC_RSA_result example_encrypt_rsa_oaep_sha256(const TC_RSA_public_key* key, TC_b
   const size_t db = length - SHA256_BYTES - 1;
   const size_t blocks = (db + SHA256_BYTES - 1) / SHA256_BYTES;
   /* RNG, encoding, two masks and exponentiation. Key bounds keep this subtotal
-   * within 16-bit size_t; the caller's label length needs a separate check. */
+   * within 16-bit size_t. The caller's label length needs a separate check. */
   size_t work = 1 + length + 1 + db + blocks * (SHA256_BYTES + 5) + SHA256_BYTES + db + 5 +
                 16 * length + 16 * exponent_length + 4;
   if (label.length > SIZE_MAX - work)

@@ -7,7 +7,7 @@
 Include `<tiny_crypto/x509_crl.h>` and enable
 `TINY_CRYPTO_ENABLE_X509_REVOCATION`.
 `TC_X509_crl_read` reads a DER `CertificateList` into borrowed spans and decoded
-update times. It does not establish whether a certificate is revoked.
+update times. Revocation decisions use the separate path revocation API.
 
 Pass the encoded CRL, parsing limits, a frame array, a work budget and a result:
 
@@ -33,7 +33,7 @@ your issuer's CRLs and keep the frame array outside a small task stack if needed
 The work counter is consumed on parsing failures as well as success.
 
 `encoded` and `tbs` retain the complete CRL and signed TBSCertList. `issuer` is
-the DER Name; `signature` contains the signature bytes without BIT STRING
+the DER Name. `signature` contains the signature bytes without BIT STRING
 framing. `revoked` and `extensions` retain their SEQUENCE wrappers and are empty
 when absent. `version` is 1 or 2. Read `next_update` only when `has_next_update`
 is set.
@@ -66,25 +66,24 @@ if (result != TC_TLV_OK) {
 ```
 
 The OID array needs one slot per extension and is reused to detect duplicates.
-It may be reused after the call; returned spans borrow the CRL, not this array.
+It may be reused after the call because returned spans borrow the CRL.
 An absent extension sequence produces an empty view.
 
 `present` and `critical` use the `TC_X509_CRL_EXT_*` masks. `number` and
 `base_number` contain DER INTEGER contents. `distribution` describes the issuing
 distribution point, including reason and certificate-type restrictions.
-`freshest` retains a CRLDistributionPoints sequence; `issuer_alt` contains
+`freshest` retains a CRLDistributionPoints sequence. `issuer_alt` contains
 GeneralNames fields without their SEQUENCE wrapper.
 
 An unrecognized critical extension is reported in `unknown_critical_oid`.
-Successful decoding does not mean its criticality or scope is acceptable for
-revocation checking. Keep extension parsing separate from that policy decision.
+Revocation policy decides whether decoded criticality and scope are acceptable.
 
 ## Indexing a collection
 
 `TC_X509_crl_index_init` accepts an array of DER spans and fills a caller-owned
 `TC_X509_crl_record` array. Pass the same parsing workspace used above, one work
 budget for the collection, and a `TC_X509_crl_index` result. Record capacity must
-cover the number of input spans; parsing limits apply separately to each CRL.
+cover the number of input spans. Parsing limits apply separately to each CRL.
 
 ```c
 const TC_bytes inputs[] = {encoded};
@@ -102,10 +101,10 @@ The index borrows the record array, and each record borrows its original CRL
 bytes. Keep both unchanged while using the index. Frame and OID scratch may be
 reused after initialization. Empty input accepts NULL/0 input and record arrays.
 
-Malformed CRLs stop initialization without changing the index result; record
+Malformed CRLs stop initialization without changing the index result. Record
 storage may be partially populated. Extension-policy failures are retained in
-records so later selection can evaluate alternatives. Indexing success does
-not establish signature validity, freshness or trust.
+records so later selection can evaluate alternatives. The revocation resolver
+checks signature validity, freshness and trust.
 
 ## File and flash sources
 
@@ -135,7 +134,7 @@ batch produces `TC_TLV_UNSUPPORTED`.
 
 The certificate source must include the CRL signer certificates, including a
 root certificate when that root signs a CRL. Trust anchors supply trusted names
-and keys; signer certificates supply the extensions used in signer selection.
+and keys. Signer certificates supply the extensions used in signer selection.
 Equal-number delta CRLs with different retained hash algorithms produce
 `TC_TLV_UNSUPPORTED` when their signed contents must be compared.
 

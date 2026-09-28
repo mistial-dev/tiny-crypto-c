@@ -11,7 +11,7 @@ a previously validated content-signing certificate.
 
 Validate that certificate's trust path, content-signing usage, certificate policy,
 time and revocation first. Hold the certificate bytes and trust inputs stable
-through the operation. [X.509 validation](x509-path.md) describes path validation;
+through the operation. [X.509 validation](x509-path.md) describes path validation.
 [CMS credential validation](cms.md) describes the content-signing workflows.
 
 The chain verifier applies SP 800-73-5 Part 2, section 4.1.5:
@@ -21,7 +21,7 @@ The chain verifier applies SP 800-73-5 Part 2, section 4.1.5:
 - An intermediate uses that same issuer link. Its subject identifier is the
   first eight bytes of SHA-1 over its public-key object, `04 || X || Y`.
 - The card CVC identifies its intermediate by that intermediate's subject ID.
-  The intermediate signature uses RSA/SHA-256; card signatures use ECDSA/SHA-256
+  The intermediate signature uses RSA/SHA-256. Card signatures use ECDSA/SHA-256
   for CS2 or ECDSA/SHA-384 for CS7.
 
 The selected curve must match the CVC public keys. Both points are checked for
@@ -59,14 +59,14 @@ signature provider's scratch. Inputs, result, work and point scratch must be
 disjoint. The verifier retains no storage and clears point scratch after use.
 On `TC_X509_SIGNATURE_VALID`, the result borrows the card CVC's original bytes.
 All other outcomes preserve the result. Handle `INVALID`, `UNSUPPORTED`, `LIMIT`
-and `ERROR` explicitly; each ends this validation attempt.
+and `ERROR` explicitly. Each ends this validation attempt.
 
 ## Signer trust and revocation
 
 `TC_PIV_CVC_validate` in `<tiny_crypto/credential.h>` combines signer path
 discovery, content-signing policy, revocation and CVC verification through a
 `TC_validation_context`. `example_validate_cvc` adapts the focused example's
-older path and CRL policy inputs to that public operation.
+path and CRL policy inputs to that public operation.
 
 For PIV, the helper requires `id-fpki-common-piv-contentSigning`, digitalSignature
 key usage and the content-signing EKU. The signer must be valid at the evaluation
@@ -87,5 +87,5 @@ application layer, preserving the exact CVC bytes. `TC_PIV_SM_authenticate_respo
 accepts those decoded peer fields and the validated signer, verifies the response
 CVC chain, and completes key confirmation. Its point and session scratch share a
 caller-owned union because the phases run sequentially. EAC certificates use their
-own profile. Include `tiny_crypto/piv_sm_authenticate.h` for this combined helper;
-`tiny_crypto/piv_sm.h` remains usable without the CVC and X.509 modules.
+own profile. Include `tiny_crypto/piv_sm_authenticate.h` for this combined helper.
+`tiny_crypto/piv_sm.h` builds independently of the CVC and X.509 modules.

@@ -7,7 +7,7 @@
 Include `<tiny_crypto/x509_revocation.h>` and enable
 `TINY_CRYPTO_ENABLE_X509_REVOCATION`.
 `TC_X509_path_check_revocation` checks CRLs for a previously validated certificate
-path. It does not replace path validation or fetch certificates and CRLs.
+path. Path validation and certificate and CRL retrieval stay with the caller.
 The path operation, candidate-source guards, storage preflight and dependency
 resolution are implemented by the X.509 revocation layer. CMS validation uses
 the same operation with an adapter for embedded certificate collections.
@@ -26,15 +26,15 @@ Build a [CRL index](x509-crl.md#indexing-a-collection) and set
 - `index`: the parsed CRL collection, kept unchanged throughout the call.
 - `source`: the held source with CRL signer certificates, intermediates and anchors.
 - `anchor_index`: the same source anchor used to validate the target path.
-- `signer_policy`: validation options for CRL signers at the same time. Do not
-  reuse a holder-specific EKU or key-usage requirement; cRLSign is added internally.
+- `signer_policy`: validation options for CRL signers at the same time. Omit
+  holder-specific EKU and key-usage requirements. cRLSign is added internally.
   Version 3 CRL signers must carry keyUsage with cRLSign set.
 - `max_candidate_bytes`: the total encoded-byte limit for the candidate collection.
 
 `delta_policy` selects complete CRLs only, deltas when available, or required
 deltas. `order_policy` normally uses CRL numbers. `TC_X509_CRL_ORDER_THIS_UPDATE`
-explicitly enables time ordering for legacy unnumbered CRLs; there is no automatic
-fallback, and delta pairing still requires numbers.
+explicitly enables time ordering for legacy unnumbered CRLs. It is never selected
+automatically, and delta pairing still requires numbers.
 
 ## Workspace and results
 
@@ -43,7 +43,7 @@ fallback, and delta pairing still requires numbers.
 indexed CRL. Its node array must cover all distinct path certificates and signer
 dependencies visited during the call. Each node carries two `size_t` lookup
 links, and each scope slot carries three `size_t` links. `signer_path` needs
-`search.capacity` spans; `signer_policies` needs
+`search.capacity` spans. `signer_policies` needs
 `validation.policy_capacity` spans. The signer arrays hold borrowed views into
 the fixed source snapshot. Keep those source bytes unchanged through the call.
 Insufficient storage or work returns `TC_TLV_LIMIT`.
@@ -51,13 +51,12 @@ Insufficient storage or work returns `TC_TLV_LIMIT`.
 Scope groups are reused across point scans for each target. The most recently
 validated signer path and its per-CRL signature results are reused when the
 same signer appears again. Verified dependencies are shared across path members.
-These results are not retained as trusted results across calls.
+Each call starts with no trusted cached results.
 Cycles without independent evidence
 and missing CRLs return `TC_TLV_UNSUPPORTED`. Input bytes, options, source records
 and workspace metadata must remain stable while the call runs.
 
-`TC_TLV_OK` means a decision is available, not that authorization succeeded.
-Check `result.status`:
+`TC_TLV_OK` means a decision is available in `result.status`:
 
 - `TC_X509_CRL_UNREVOKED`: every path member has complete reason coverage.
 - `TC_X509_CRL_REVOKED`: `certificate_index` identifies the member and `evidence`

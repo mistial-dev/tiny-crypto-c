@@ -14,7 +14,7 @@ linker. Measure peak runtime use in your application.
 
 The Pico 2 builds use one Cortex-M33 core and run code from flash,
 with the RTOS and USB/UART output disabled. The report measures memory
-use; run host throughput tests with `make benchmark`.
+use. Run host throughput tests with `make benchmark`.
 
 ## Updating the numbers
 
@@ -37,11 +37,11 @@ Build: -Os; section GC; LTO enabled.
 Physical flash: 32,768 bytes. SRAM: 2,048 bytes.
 Application flash limit: 32,256 bytes.
 
-The bootloader takes another 512 bytes, not included in the table.
+The bootloader takes another 512 bytes outside the table figures.
 
 TLV object sizes: reader 18, stream 36,
 element 25, and nesting frame 8 bytes.
-Frame storage is caller-owned; multiply its size by the allowed depth.
+Frame storage is caller-owned. Multiply its size by the allowed depth.
 The largest compiler-reported TLV/DER stack frame is 119 bytes
 at `-Os` without LTO. Called functions and callbacks need additional stack.
 
@@ -113,7 +113,7 @@ Application flash limit: 4,194,304 bytes.
 
 TLV object sizes: reader 36, stream 56,
 element 36, and nesting frame 16 bytes.
-Frame storage is caller-owned; multiply its size by the allowed depth.
+Frame storage is caller-owned. Multiply its size by the allowed depth.
 The largest compiler-reported TLV/DER stack frame is 240 bytes
 at `-Os` without LTO. Called functions and callbacks need additional stack.
 

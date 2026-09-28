@@ -26,7 +26,7 @@ TC_TWIC_CCL_result example_twic_ccl_import_init(ExampleTwicCclImport* state,
 TC_TWIC_CCL_result example_twic_ccl_import_update(ExampleTwicCclImport* state, TC_bytes chunk);
 /* After download completion, sort the staged keys and expose the immutable
  * source. Retain duplicates so its count equals the parsed record count.
- * Metadata must describe this download. Only success prepares slot; publication
+ * Metadata must describe this download. Only success prepares slot. Publication
  * follows application persistence and policy checks under the store lock.
  * Failures are sticky and leave slot unchanged. Discard staging and warn on
  * download, parse, checksum or storage failure, keeping the active list. */

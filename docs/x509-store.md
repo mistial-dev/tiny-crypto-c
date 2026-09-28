@@ -5,8 +5,8 @@
 # Certificate store
 
 Include `<tiny_crypto/x509_store.h>`. The store publishes caller-owned certificate
-sources and keeps old sources alive while readers use them. It does not copy
-certificate bytes.
+sources and keeps old sources alive while readers use them. Certificate bytes
+stay in caller storage.
 
 A source provides separate callbacks for untrusted candidate certificates and
 explicit trust anchors. Each anchor can carry path constraints. Source callbacks
@@ -25,9 +25,9 @@ application's lock.
 1. Call `TC_X509_store_publish` with the revision used to prepare the update.
 1. If the update is abandoned, call `TC_X509_store_discard` on the prepared slot.
 
-Preparation checks callback configuration only. It does not parse certificates,
-grant trust, or write flash. Publication rejects a stale revision without changing
-the current source. The application owns persistent storage and recovery after
+Preparation checks callback configuration only. Certificate parsing, trust
+decisions, and flash writes belong to the application. Publication rejects a
+stale revision without changing the current source. The application owns persistent storage and recovery after
 power loss.
 
 ## Reader lifetimes
@@ -49,7 +49,7 @@ or revalidate those operations before using their results.
 Pass the acquired snapshot's `source` to `TC_X509_path_build`, along with the target
 certificate, validation options, and caller-owned validation and search workspaces.
 The builder tries candidate issuers and explicit anchors, then validates each
-complete path. It returns the first valid path; candidate ordering affects search
+complete path. It returns the first valid path. Candidate ordering affects search
 cost and which valid path is selected.
 
 Search needs a `TC_bytes` array and a `TC_X509_search_frame` array with the same

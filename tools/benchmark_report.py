@@ -307,7 +307,7 @@ def render(report):
              "linker. Measure peak runtime use in your application.", "",
              "The Pico 2 builds use one Cortex-M33 core and run code from flash,",
              "with the RTOS and USB/UART output disabled. The report measures memory",
-             "use; run host throughput tests with `make benchmark`.", "",
+             "use. Run host throughput tests with `make benchmark`.", "",
              "## Updating the numbers", "",
              "Run `make benchmark-report` to rebuild this page, or",
              "`make benchmark-report-check` to check that it's up to date.",
@@ -329,14 +329,14 @@ def render(report):
                   f"Physical flash: {cap['flash']:,} bytes. SRAM: {cap['ram']:,} bytes.",
                   f"Application flash limit: {cap['application_flash']:,} bytes.", ""]
         if board == "uno":
-            lines += ["The bootloader takes another 512 bytes, not included in the table.", ""]
+            lines += ["The bootloader takes another 512 bytes outside the table figures.", ""]
         storage = data["tlv"]
         for field in ("reader", "stream", "frame", "element", "largest_stack_frame"):
             if type(storage[field]) is not int or storage[field] <= 0:
                 raise ValueError("Invalid TLV storage measurement")
         lines += [f"TLV object sizes: reader {storage['reader']}, stream {storage['stream']},",
                   f"element {storage['element']}, and nesting frame {storage['frame']} bytes.",
-                  "Frame storage is caller-owned; multiply its size by the allowed depth.",
+                  "Frame storage is caller-owned. Multiply its size by the allowed depth.",
                   f"The largest compiler-reported TLV/DER stack frame is {storage['largest_stack_frame']} bytes",
                   "at `-Os` without LTO. Called functions and callbacks need additional stack.", ""]
         pki = data["pki"]

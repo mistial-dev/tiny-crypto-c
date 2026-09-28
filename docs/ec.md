@@ -8,34 +8,34 @@ Include `<tiny_crypto/ec.h>` for P-192, P-256 and P-384 public-key derivation,
 ECDH and ECDSA verification. Each curve must be enabled in the build.
 Public keys use SEC 1 uncompressed encoding: `04 || X || Y`. Coordinates
 and private scalars are fixed-width big-endian values, 32 bytes for P-256
-and 48 bytes for P-384. P-192 uses 24 bytes and is disabled by default;
-enable `TINY_CRYPTO_EC_P192` for protocols that require it.
+and 48 bytes for P-384. P-192 uses 24 bytes and is disabled by default.
+Enable `TINY_CRYPTO_EC_P192` for protocols that require it.
 
 `TC_EC_public_key` derives a public key from a private scalar. `TC_ECDH`
-returns the shared point's X coordinate; pass it through the protocol's
+returns the shared point's X coordinate. Pass it through the protocol's
 key derivation function before using it as a symmetric key. Both calls
 take a `TC_EC_workspace` and leave output unchanged on failure.
 
 ## ECDSA verification
 
 `TC_ECDSA_verify_digest` takes the public key, a precomputed digest, a
-fixed-width `r || s` signature and a `TC_ECDSA_workspace`. It does not
-accept DER-encoded signatures. Hash the message using the algorithm
+fixed-width `r || s` signature and a `TC_ECDSA_workspace`. Convert
+DER-encoded signatures to this form first. Hash the message using the algorithm
 required by the protocol. A digest longer than the curve order is
-truncated to its leftmost bytes; a shorter digest is zero-extended.
+truncated to its leftmost bytes. A shorter digest is zero-extended.
 
 The result is `TC_OK` for a valid signature, `TC_MISMATCH` for an invalid
 signature or public key, and `TC_ERROR` for invalid arguments or an
 unavailable curve. Both high and low values of `s` are accepted.
-Verification establishes the signature's validity, not the key's identity
-or trustworthiness.
+Verification establishes signature validity only. Key identity and trust
+come from certificate validation.
 Its point multiplication branches on public signature and digest values.
 Private-key derivation, ECDH and signing retain constant-work multiplication
 for secret scalars.
 
 All operations use caller-owned scratch memory. Keep it separate from
 input and output buffers, and give concurrent calls separate workspaces.
-Scratch is wiped after use; argument rejection leaves it untouched.
+Scratch is wiped after use. Argument rejection leaves it untouched.
 Use `sizeof(TC_EC_workspace)` or `sizeof(TC_ECDSA_workspace)` to size it
 for the configured curves and limb width.
 

@@ -22,7 +22,7 @@ adjustable before sizing the arena.
 | Desktop |                16 |            128 |         128 |
 
 Profiles select resource capacities. Build options select algorithms. Choose
-capacities for your provisioned trust set and the credentials you accept; a
+capacities for your provisioned trust set and the credentials you accept. A
 limit result requires an application decision about additional resources.
 The path capacity allocates one parsed certificate view per path entry. Views
 borrow the original certificate DER during validation.
@@ -47,7 +47,7 @@ TC_result prepare_validation(TC_buffer arena,
 
 Call `TC_validation_workspace_size` to obtain the required bytes.
 `TC_validation_workspace_alignment` reports the alignment. An array of
-`TC_validation_storage` provides suitable alignment for static storage; check
+`TC_validation_storage` provides suitable alignment for static storage. Check
 its byte capacity against the reported size. Typed-array workspace initializers
 remain useful when each array has a fixed application-defined location.
 
@@ -96,12 +96,12 @@ For signed card objects:
 CHUID and Security Object results borrow original buffers and inventory
 descriptors. Keep those buffers unchanged while using the results. Encrypted
 biometric entries use their stored ciphertext for inventory hashes. TWIC printed
-information can require decrypted TLVs; select the representation required by
+information can require decrypted TLVs. Select the representation required by
 the card profile and retain those bytes through validation. See
 [inventory hash inputs](credential-validation.md#inventory-hash-inputs).
 
 Share a remaining-work counter across the sequence. Accept only
-`TC_CREDENTIAL_VALID`; handle invalid signatures, revocation, unavailable
+`TC_CREDENTIAL_VALID`. Handle invalid signatures, revocation, unavailable
 evidence, unsupported algorithms, and exhausted limits explicitly.
 
 ## TWIC example

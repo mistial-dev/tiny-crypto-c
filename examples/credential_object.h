@@ -21,7 +21,7 @@ typedef struct {
 typedef TC_PIV_biometric_validation_request ExampleBiometricRequest;
 typedef TC_PIV_security_data ExampleSecurityData;
 typedef TC_PIV_security_validation_request ExampleSecurityRequest;
-/* Adapt the older path/revocation option pair used by focused examples. The
+/* Adapt the path/revocation option pair used by focused examples. The
  * generic API requires one evaluation time and signature provider. */
 TC_result example_validation_options(const TC_CMS_path_options* path,
                                      const TC_CMS_revocation_policy* revocation,

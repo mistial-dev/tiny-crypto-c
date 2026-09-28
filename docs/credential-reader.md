@@ -8,8 +8,8 @@
 their CHUID and card-authentication certificate containers. It checks application
 identity, CHUID fields, certificate-container fields and X.509 certificate structure.
 GZIP certificates are decoded with bounded output and work. Signature and trust
-verification are separate;
-the command's exit status must never be used as a credential acceptance decision.
+verification are separate steps. The command's exit status must never be used as
+a credential acceptance decision.
 
 Build against an installed tiny-crypto-c package. The `desktop` resource profile
 enables the algorithms and parsers used by both commands, including legacy SHA-1.
@@ -55,7 +55,7 @@ trusted provisioning channel as the root approval. A changed root file fails
 before card access.
 
 Provision the latest obtained list. Copying or rebuilding a file can reset its
-creation time; preserve the acquisition date when preparing the packed image.
+creation time. Preserve the acquisition date when preparing the packed image.
 The operator must also refresh the list within 12 hours of a MARSEC increase.
 Track level changes in the system that supplies the CCL. See
 [33 CFR 101.525](https://www.law.cornell.edu/cfr/text/33/101.525).
@@ -67,8 +67,8 @@ GET RESPONSE. A `6282` end-of-object warning is accepted only with a complete
 
 Use `--piv-certificate-envelope` when the TWIC application's card-authentication
 certificate uses the PIV `70`, `71`, empty `FE` envelope. The default TWIC
-envelope contains `70` and `71`. This option selects container framing;
-certificate, signature and trust checks remain in effect.
+envelope contains `70` and `71`. This option selects container framing.
+Certificate, signature and trust checks remain in effect.
 
 `--rsa-padding pss` selects an RSA-PSS card challenge with SHA-256, MGF1-SHA-256,
 and a fresh 32-byte salt. The default is `v15` (PKCS #1 v1.5 with SHA-256).
@@ -92,7 +92,7 @@ a completed import. See [CCL provisioning](twic-ccl.md#indexed-storage). The
 command reads the image into its own buffer and closes the file before opening
 the card. It performs no network retrieval.
 
-The root file assigns local trust. It must be an approved CA certificate; its
+The root file assigns local trust. It must be an approved CA certificate. Its
 subject, public key and name constraints define the anchor. CA key usage and
 path-length constraints are applied when present. Other critical root extensions
 cause an input failure. Omit `--issuer` for a directly issued credential, or repeat
@@ -103,7 +103,7 @@ The command selects the TWIC application and reads slot 9E. Legacy TWIC switches
 to its PIV application for that operation. It accepts either registered PIV/TWIC
 card-authentication purpose OID, validates the certificate path and identifiers,
 checks the CCL, and verifies a fresh card challenge using native crypto. RSA-1024
-requires `--allow-rsa1024`; NEXGEN requires RSA-2048. No PIN command is sent.
+requires `--allow-rsa1024`. NEXGEN requires RSA-2048. No PIN command is sent.
 
 The system UTC clock supplies the evaluation time. After the card exchange, the
 command checks CCL freshness and the certificate path again. Clock rollback or
@@ -114,7 +114,7 @@ for invalid arguments. Apply access authorization separately.
 
 The host command reserves a 16 MiB CCL image and 8 KiB per provisioned
 certificate. Its card-response, decompression and crypto workspaces are locked
-in memory and cleared during cleanup; failure to lock them aborts the command.
+in memory and cleared during cleanup. Failure to lock them aborts the command.
 Reader access is exclusive. Cleanup releases the transaction using
 `SCARD_LEAVE_CARD`. Encrypted fingerprint-object authentication is optional.
 
@@ -139,7 +139,7 @@ build/credential-check/twic_authenticate \
 Provision the content root and its SHA-256 fingerprint for this signing purpose.
 The command keeps card-key
 and content-signer trust separate. Omit `--chuid-issuer` for a directly issued
-content signer; repeat it for up to three issuer candidates. Supply up to four
+content signer. Repeat it for up to three issuer candidates. Supply up to four
 CRLs covering both the content signer's and card certificate's paths. Each path
 uses its own configured trust source. The card path's revocation status is
 checked with the final evaluation time. Missing, stale or unverifiable revocation
@@ -147,7 +147,7 @@ evidence fails validation. Certificates and the CCL are loaded before reader
 access. CRLs are scanned after the CHUID supplies its signer candidates, using
 bounded windows and a 64 MiB limit per file. Keep these files immutable during
 the operation. The command retains parsed metadata and queried serial results
-through its final time check; CRL signatures and signer trust are checked during
+through its final time check. CRL signatures and signer trust are checked during
 validation. Unsupported or oversized entries fail the operation.
 
 After proving the card key, the command reads the CHUID from the selected
@@ -179,7 +179,7 @@ CMS workspace during cleanup.
 
 Add `--tpk-hex /path/to/ZTA.txt` to the signed-CHUID command.
 The file contains the hexadecimal ZTA field from an already-decoded TWIC
-barcode; a trailing newline is accepted. It contains a privacy key, so keep it
+barcode. A trailing newline is accepted. It contains a privacy key, so keep it
 outside the repository with access restricted to the reader application.
 Enable `TINY_CRYPTO_ENABLE_AES=ON` and `TINY_CRYPTO_AES_ECB=ON` with a 128-bit
 AES build. The option requires the content-signer trust and CRL inputs above.
@@ -199,7 +199,7 @@ SP 800-76-2. Signed entryUUID is required by default.
 `--legacy-biometric-signature` explicitly selects the FIPS 201-1 section 4.4.2
 signature profile referenced by the older TWIC biometric specification. It
 permits an absent signed entryUUID. Signed FASC-N remains mandatory and must
-match CHUID and the CBEFF header; a present entryUUID must match CHUID too.
+match CHUID and the CBEFF header. A present entryUUID must match CHUID too.
 Card application selection and BER compatibility are configured independently.
 
 Each plaintext and stored response has a dedicated 16 KiB locked buffer
@@ -242,7 +242,7 @@ Set `max_object` to the largest accepted response and provide enough pool space
 for retained responses plus transfer/status headroom. The returned inventory
 borrows inner object contents from the pool, including ciphertext and TLV fields.
 Its `security` span retains the complete `53` response. Only success writes the
-inventory; processing failures wipe the pool and stop the IO session. Keep the
+inventory. Processing failures wipe the pool and stop the IO session. Keep the
 pool stable while passing its entries to `TC_PIV_security_validate`. Validate
 the collected signed CHUID against the card identity before selecting its signer.
 Use `TC_TWIC_unsigned_CHUID_validate` when container `3002` must also bind the
@@ -253,14 +253,14 @@ unsigned CHUID's identifiers and expiration through the authenticated inventory.
 TWIC CHUIDs use the signed profile by default. Append `--twic-unsigned-chuid`
 to select the unsigned TWIC schema explicitly. The command reports those objects
 as unsigned. PIV always requires its signed CHUID schema. Parsing exposes borrowed
-identifier spans internally; the command prints no credential identifiers.
+identifier spans internally. The command prints no credential identifiers.
 
 The example builds on macOS with the system PC/SC framework. Linux builds require
 the PC/SC development package and `pkg-config`. The command disables core files
 and locks its 16 KiB response buffer, 8 KiB decoded-certificate buffer and GZIP
 workspace before opening the reader. Memory-locking
-failure aborts the command. Output contains fixed object labels and status;
-credential bytes are cleared after each object and before exit.
+failure aborts the command. Output contains fixed object labels and status.
+Credential bytes are cleared after each object and before exit.
 
 The connection is exclusive, with a transaction held across the operation.
 Transport failures end processing. Responses share one exchange budget, and
@@ -268,10 +268,10 @@ partial objects stay within the response buffer. An oversized object fails with
 a resource limit. Cleanup requests `SCARD_LEAVE_CARD`.
 
 APDU construction and PC/SC access live in `examples/credential_io.c` and
-`examples/credential_pcsc.c`. The command currently performs SELECT and GET DATA,
+`examples/credential_pcsc.c`. The command performs SELECT and GET DATA,
 including GET RESPONSE and read-length correction. The separate PIN helper
 requires a validated contact/PIV selection and a per-run guard retained across
-connections; the command does not invoke it.
+connections. The command leaves it unused.
 
 `test_twic_reader` exercises synthetic command/response scripts. On macOS,
 `test_twic_pcsc` replaces the PC/SC service calls to test cleanup and transport
@@ -295,7 +295,7 @@ cryptographically secure RNG. A failed RNG request ends processing before any
 card command is sent.
 
 PIV selection supports RSA-2048/3072 and P-256/P-384. RSA-1024 requires the
-explicit `allow_rsa1024` policy. TWIC NEXGEN selects RSA-2048; TWIC Legacy uses
+explicit `allow_rsa1024` policy. TWIC NEXGEN selects RSA-2048. TWIC Legacy uses
 its separate PIV application for this operation. The application retains control
 of certificate validity, legacy-algorithm policy, cancellation and authorization.
 
@@ -339,7 +339,7 @@ nil UUID.
 
 Pass the borrowed 25-byte `fascn` directly to `TC_TWIC_CCL_contains`, or use
 `TC_PIV_card_identifiers_match` to compare the identifiers with a CHUID's
-FASC-N and GUID. The latter returns its comparison through `matched`; check
+FASC-N and GUID. The latter returns its comparison through `matched`. Check
 both the operation status and that value. An absent legacy UUID matches a nil
 GUID. Certificate trust, object signatures and CCL freshness remain separate
 workflow decisions.
@@ -374,13 +374,13 @@ Use `TC_TWIC_NEXGEN_CARD` after selecting the NEXGEN TWIC application. Use
 reader transaction and acquired snapshot held until the operation returns, then
 release the snapshot. Store operations need the application's usual locking.
 
-The helper converts the path's evaluation time to Unix seconds for CCL freshness;
-this workflow accepts evaluation dates from 1970 onward.
+The helper converts the path's evaluation time to Unix seconds for CCL freshness.
+This workflow accepts evaluation dates from 1970 onward.
 Supply `ccl_max_age` in seconds and the persisted `ccl_minimum_publication` floor.
 Apply the application's maximum transaction
 duration and clock policy before acting on a result. CCL publication metadata
-must come from trusted provisioning. Each lookup has its own `ccl_reads` bound;
-certificate processing and key proof share the supplied work budget.
+must come from trusted provisioning. Each lookup has its own `ccl_reads` bound.
+Certificate processing and key proof share the supplied work budget.
 
 `EXAMPLE_TWIC_AUTHENTICATED` reports successful active-card authentication at that
 instant. Other outcomes distinguish cancellation, stale or unavailable status,
@@ -406,7 +406,7 @@ that buffer. `example_read_stream` provides the same checks for an open stream.
 Use `example_x509_source` with separate arrays of issuer candidates and locally
 authorized anchors. Keep the arrays, encoded certificates and adapter context
 unchanged during validation. Populate anchors through the application's trusted
-provisioning process; loading an issuer candidate gives it no anchor authority.
+provisioning process. Loading an issuer candidate grants no anchor authority.
 The CMS executable uses these same helpers.
 
 ### Synthetic authentication tests
@@ -424,8 +424,8 @@ reads its FASC-N and UUID, checks identifier binding and exercises synthetic CCL
 lookup, then verifies replies signed by an OpenSSL-backed synthetic card. Test cases
 cover all five key sizes/curves, altered and replayed signatures, malformed
 responses, failed command chains, transport failure at each exchange, exhausted
-exchange budgets and partial RNG failure. The fixtures contain no live-card data;
-generated private keys are freed at the end of each test.
+exchange budgets and partial RNG failure. The fixtures contain no live-card data.
+Generated private keys are freed at the end of each test.
 
 The combined TWIC workflow runs with both registered card-authentication purpose
 OIDs. Cases cover cancellation, stale and missing lists, source errors, exhausted

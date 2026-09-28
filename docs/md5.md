@@ -18,7 +18,7 @@ download bytes, including line endings.
 Initialize a context before use and before reuse after finalization. Context
 storage must be disjoint from input and output. One-shot input and output may
 overlap. Argument failures preserve output and context. With `TC_ZEROIZE=1`,
-finalization clears the context; `TC_MD5_ctx_clear` always clears it.
+finalization clears the context. `TC_MD5_ctx_clear` always clears it.
 
 For C++11, include `<tiny_crypto/hash.hpp>` and use `tiny_crypto::MD5`.
 It provides `update`, `finish`, `reset` and static `digest` methods with
@@ -27,7 +27,7 @@ for another message. Destruction clears its context.
 
 The implementation follows the [RFC 1321 algorithm](https://www.rfc-editor.org/rfc/rfc1321.html).
 It shares 64-byte buffering and padding with the SHA-1/SHA-224/SHA-256 core.
-Complete blocks are read directly from input; the context retains partial
+Complete blocks are read directly from input. The context retains partial
 blocks. Length encoding uses the low 64 bits of the bit count. AVR constant
 tables use program memory when `TC_AVR_PROGMEM` is enabled.
 

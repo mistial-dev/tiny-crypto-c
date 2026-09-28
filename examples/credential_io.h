@@ -76,8 +76,8 @@ TC_TLV_result example_card_identity(TC_bytes response, ExampleCardApplication ex
                                     ExampleCardModel* out);
 
 /* Hold the reader transaction for the whole operation. Buffer, io, out and
- * callback state must occupy separate storage. Responses accumulate in buffer;
- * reserve two extra bytes for status and enough space for each requested chunk.
+ * callback state must occupy separate storage. Responses accumulate in buffer.
+ * Reserve two extra bytes for status and enough space for each requested chunk.
  * out changes only on OK or STATUS. Other processing failures wipe capacity
  * bytes and stop this IO session. Argument errors preserve all storage.
  * Parse and validate the returned object before using its contents. */
@@ -90,7 +90,7 @@ ExampleCardResult example_card_read(ExampleCardIO* io, const uint8_t* tag, size_
  * Requests min(capacity - 2, 65535) bytes, following 61xx with GET RESPONSE.
  * A 6282 end-of-object warning returns STATUS with the received bytes intact.
  * The caller must check complete object framing before accepting that warning.
- * GET DATA length errors stop the session; GET RESPONSE allows one correction.
+ * GET DATA length errors stop the session. GET RESPONSE allows one correction.
  * Requires capacity >= 3. The ownership and failure rules above also apply. */
 ExampleCardResult example_card_read_extended(ExampleCardIO* io, const uint8_t* tag,
                                              size_t tag_length, uint8_t* buffer, size_t capacity,
@@ -128,13 +128,13 @@ typedef struct {
 /* Select and confirm the expected TWIC application, then collect its security
  * object and stored data objects. Legacy requires CHUID, unsigned CHUID and
  * fingerprints. NEXGEN also requires face/printed objects and probes optional
- * iris/personal/handwritten objects; only an empty 6A82 response means absent.
+ * iris/personal/handwritten objects. Only an empty 6A82 response means absent.
  * Contents borrow the pool and preserve inner TLVs and encrypted bytes. security
  * includes its outer 53. Keep the pool unchanged through signature/hash checks.
  * max_object bounds each response; capacity includes transfer/status headroom.
  * Work bounds parsing bytes; io bounds exchanges. Inputs and writable ranges
  * are disjoint. Only OK writes out. Processing failures wipe the pool and stop
- * the session. This collects data; authenticate it before making decisions. */
+ * the session. Authenticate the collected data before making decisions. */
 ExampleCardResult example_twic_inventory_read(ExampleCardIO* io, ExampleCardModel model,
                                               ExampleCardReadMode mode, uint8_t* pool,
                                               size_t capacity, size_t max_object, size_t* work,
@@ -147,7 +147,7 @@ ExampleCardResult example_twic_inventory_read(ExampleCardIO* io, ExampleCardMode
  * permit legacy keys before selecting RSA 1024. Buffer retains the complete
  * 7C/82 response for parsing and verification. Reserve at least 514 bytes.
  * Command chaining and GET RESPONSE share io's budget. GENERAL AUTHENTICATE
- * is submitted once per chain; failures stop the session. Input, buffer, io,
+ * is submitted once per chain. Failures stop the session. Input, buffer, io,
  * callback state and out are disjoint. Argument errors preserve caller state. */
 ExampleCardResult example_card_authenticate(ExampleCardIO* io, ExampleCardAlgorithm algorithm,
                                             ExampleCardKeyReference reference, TC_bytes challenge,

@@ -10,7 +10,7 @@ It checks the start/end sentinels, field separators, decimal digits, odd parity
 and longitudinal checksum defined in
 [PACS TIG v2.3, sections 6.1–6.3](https://www.idmanagement.gov/docs/pacs-tig-scepacs.pdf).
 
-Agency, system and organization have four decimal digits; credential has six,
+Agency, system and organization have four decimal digits. Credential has six,
 and person has ten. Series, issue, category and association each have one.
 The structure stores their numeric values. `TC_FASCN_write` restores leading
 zeros and writes exactly `TC_FASCN_BYTES`, including parity and checksum.

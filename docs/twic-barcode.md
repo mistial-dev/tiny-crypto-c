@@ -32,7 +32,7 @@ separate from input buffers.
 The AAMVA reader checks ANSI directory framing and printable-ASCII text fields.
 It accepts an optional LF after a subfile designator and empty field values.
 It leaves date, name and jurisdiction-specific interpretation to the caller.
-Version 00 headers return `TC_TLV_UNSUPPORTED`; historical-version conformance
+Version 00 headers return `TC_TLV_UNSUPPORTED`. Historical-version conformance
 and non-ASCII field decoding have separate requirements.
 
 A decoded barcode supplies key material. Authenticate the decrypted object's
@@ -49,12 +49,12 @@ untrusted until its signature and credential checks succeed.
 
 `TC_TWIC_object_encrypt` pads and encrypts an object in place. Reserve up to
 `TC_AES_BLOCKLEN` extra bytes, including a full padding block for aligned input.
-Pass the plaintext length and buffer capacity separately; the output length
+Pass the plaintext length and buffer capacity separately. The output length
 includes padding. Empty plaintext is supported. Bad arguments preserve the
 buffer and output length. Processing failures wipe the padded region.
 For signed object types, build and sign the object before encrypting it.
-TWIC enciphered printed information (`DFC109`) has no signature block; its
-decrypted fields do not provide an authenticated identity.
+TWIC enciphered printed information (`DFC109`) has no signature block. Its
+decrypted fields carry no authenticated identity.
 
 With the runtime S-box profile, call `TC_AES_init_sbox()` once during startup,
 before any TWIC encryption or decryption. Complete initialization before starting

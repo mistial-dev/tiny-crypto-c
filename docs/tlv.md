@@ -27,22 +27,22 @@ TC_TLV_result read_ber_object(TC_bytes input, TC_TLV_element* object)
 }
 ```
 
-Use `object` only after `TC_TLV_OK`. `TC_TLV_MORE` means the object is truncated;
-request more input or reject an incomplete message. `TC_TLV_INVALID` means bad
+Use `object` only after `TC_TLV_OK`. `TC_TLV_MORE` means the object is truncated.
+Request more input or reject an incomplete message. `TC_TLV_INVALID` means bad
 framing, and `TC_TLV_LIMIT` means a configured resource bound was exceeded.
 Errors leave `object` unchanged. Frame scratch may change.
 
 `object.encoded` includes the whole object, including its end-of-contents bytes
 when present. `object.value` excludes the outer header and end-of-contents bytes.
-For an indefinite object, use `value.length`, not `header.length`, to find its
-content size. To require exactly one object, also check that `encoded.length`
-equals the input length.
+For an indefinite object, take its content size from `value.length`.
+`header.length` holds the encoded length field, which the indefinite form omits. To require exactly one object, also check that
+`encoded.length` equals the input length.
 
 Use `TC_TLV_walk` for a whole tree or sequence of roots. It visits borrowed
 primitive chunks and applies one element/depth budget across the input. The
 incremental stream API provides the same traversal for fragmented input when
 `TINY_CRYPTO_TLV_STREAM=ON` is enabled. Neither requires heap allocation.
 
-These APIs check framing, not a schema. A DER-framed object can still contain
+These APIs check framing only. A DER-framed object can still contain
 an invalid INTEGER, unordered SET, or missing certificate field. Use typed DER
 and object parsers for those checks.

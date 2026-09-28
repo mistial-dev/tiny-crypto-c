@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
-# Full-API tests link a test library compiled once per ABI
-# instead of recompiling the cores into every executable. The shipped
+# Full-API tests link a test library compiled once per ABI and shared by
+# every executable. The shipped
 # tiny-crypto-c target stays on the configured firmware profile and is
 # exercised by test_default_profile.
 set(tc_full_definitions
@@ -26,7 +26,7 @@ else()
        TC_KDF_CAVP=0)
 endif()
 
-# MSan needs an instrumented C++ standard library; skip the C++ suites.
+# MSan needs an instrumented C++ standard library. Skip the C++ suites.
 if(TINY_CRYPTO_SANITIZE MATCHES "memory")
   set(tc_build_cpp_tests OFF)
 else()
@@ -70,8 +70,8 @@ target_compile_definitions(tiny-crypto-c-test PUBLIC
   ${tc_full_definitions} TC_AES_KEY_BITS=128 TC_AES_ENABLE_EAX_PRIME=1
   TC_DES_REJECT_WEAK_KEYS=0)
 
-# AES-192/256 variants only need AES and its CMAC-backed KDF. Do not compile
-# unrelated SHA, HMAC and DES cores once per AES key size.
+# AES-192/256 variants compile only AES and its CMAC-backed KDF, which keeps
+# SHA, HMAC and DES cores out of the per-key-size libraries.
 foreach(key_bits 192 256)
   tc_add_test_library(tiny-crypto-c-test-aes${key_bits}
     src/common.c ${tc_aes_sources} src/kdf.c)

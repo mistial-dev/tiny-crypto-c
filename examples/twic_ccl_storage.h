@@ -27,7 +27,7 @@ typedef struct {
 
 /* Caller holds the store/source lock through this call and its validity decision.
  * policy.max_age is the application's acceptance limit. warn_age is a separate
- * publication-age warning threshold in seconds; UINT64_MAX disables it.
+ * publication-age warning threshold in seconds. UINT64_MAX disables it.
  * Store, policy, query and output storage must be disjoint. Outputs change only
  * on OK. Card authentication, expiration and access rights are checked by the
  * calling credential workflow. Every acquired snapshot is released. */

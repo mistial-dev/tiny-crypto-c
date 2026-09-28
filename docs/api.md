@@ -5,7 +5,7 @@
 # Working with the API
 
 Include the public header for the operation you need. The C headers support
-C99 and C++11; C++ wrappers live in `tiny_crypto`. Build options determine which
+C99 and C++11. C++ wrappers live in `tiny_crypto`. Build options determine which
 implementations are linked. See the [configuration options](../README.md#configuration)
 and [installed examples](testing.md).
 
@@ -26,7 +26,7 @@ views. Finish operations that consume the views before receiving another object,
 or copy the specific bytes your application needs to retain.
 
 Output arrays use explicit capacities. A returned length describes the bytes
-written; spare capacity remains governed by the operation's documented contract.
+written. Spare capacity follows the operation's documented contract.
 Check each declaration for permitted in-place use and overlap restrictions.
 For key derivation, see the [HKDF guide](hkdf.md) for PRK lifetime, output
 limits, and hybrid shared-secret inputs.
@@ -55,7 +55,7 @@ Parsing limits bound input size, value size, element count and nesting depth.
 Where an operation takes a work counter, initialize it before the operation and
 reuse it across the related calls. A limit result requires an explicit application
 decision about retrying with additional resources. Work units follow the API's
-accounting rules; they do not measure elapsed time.
+accounting rules and are independent of elapsed time.
 
 ## Parsing, signatures and trust
 
@@ -80,7 +80,7 @@ profiles and CMS signed-attribute encoding.
 `TC_PIV_printed_read` parses PIV printed information or decrypted TWIC DFC109
 contents. Select the profile and whether the input includes the outer `53`
 container. The returned text fields borrow the input buffer. PIV dates use
-`YYYYMMMDD`; TWIC dates use `DDMMMYYYY`.
+`YYYYMMMDD`. TWIC dates use `DDMMMYYYY`.
 
 `TC_PIV_fingerprint_read` validates an INCITS 378-2004 minutiae record against
 the PIV card profile. It checks the fixed header, two finger views, minutiae,
@@ -98,13 +98,14 @@ source, pose, feature-point, and length checks. Use
 to its expected modality and record type. Set `require_current` when the CBEFF
 validity period is part of the credential decision. The comparison uses the
 shared validation-context time, including both boundary instants.
-Iris credential validation requires an ISO/IEC 19794-6 record reader and
-currently reports unsupported.
+Iris credential validation reports unsupported because the library has no
+ISO/IEC 19794-6 record reader.
 
 After authenticating the Security Object and signed CHUID, call
 `TC_PIV_printed_expiration_check`. It requires the printed date to match the
 CHUID date and checks the application evaluation time through the end of that
-day. A successful parse alone carries no authentication or freshness decision.
+day. A successful parse supplies structure only. Authentication and freshness
+come from the validation calls.
 
 The [credential validation example](credential-validation.md) composes certificate trust,
 identifier checks, cancellation, fresh key possession, signed objects and a
@@ -136,10 +137,10 @@ for transport, cancellation status, and authorization.
 
 Use the named results for the operation you called. `TC_status`, parser results,
 signature results and credential verdicts have distinct contracts. Compare
-against the exact success or acceptance enumerator; avoid treating a result as
+against the exact success or acceptance enumerator. Avoid treating a result as
 a Boolean or converting between enums numerically.
 
-Setup helpers return `TC_result`; successful setup is `TC_RESULT_OK`.
+Setup helpers return `TC_result`. Successful setup returns `TC_RESULT_OK`.
 
 Handle malformed input, unsupported algorithms, exhausted limits and unavailable
 evidence explicitly. A successful parse supplies structure for later checks.
@@ -171,7 +172,7 @@ fix or authenticate the message length when using either of those choices.
 Use the explicit `_short_tag` forms for 4 to 7 leading bytes when a protocol
 requires truncation. Verification returns `TC_MISMATCH` for a different tag.
 For incremental input, call `TC_DES_ISO9797_init`, `update`, and `final` in
-order. Successful finalization consumes and clears the context; clear it
+order. Successful finalization consumes and clears the context. Clear it
 explicitly after an update error. Keep the input, key, and tag buffers disjoint
 from the context.
 

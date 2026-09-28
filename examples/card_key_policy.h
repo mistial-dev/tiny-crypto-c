@@ -25,8 +25,8 @@ typedef struct {
   TC_key_challenge_options challenge;
 } ExampleCardKeyParameters;
 
-/* Apply PIV/TWIC certificate-use and subject-key policy without card command
- * identifiers or transport behavior. */
+/* Apply PIV/TWIC certificate-use and subject-key policy. Card commands and
+ * transport stay with the caller. */
 ExampleCardKeyPolicyResult example_card_key_parameters_select(const TC_X509_public_key* key,
                                                               const ExampleCardKeyPolicy* policy,
                                                               ExampleCardKeyParameters* out);

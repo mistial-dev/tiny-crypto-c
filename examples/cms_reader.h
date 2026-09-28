@@ -18,12 +18,12 @@ typedef struct {
   uint8_t signature[EXAMPLE_CMS_SIGNATURE_CAPACITY];
 } ExampleCMSVerifyWorkspace;
 
-/* Inspect an envelope up to 16 KiB. The result borrows input, not workspace.
- * Return parsing/limit errors to the caller; OK does not authenticate content. */
+/* Inspect an envelope up to 16 KiB. The result borrows input only.
+ * Return parsing/limit errors to the caller. Authenticate content separately. */
 TC_TLV_result example_read_cms(TC_bytes input, size_t work_limit, ExampleCMSWorkspace* workspace,
                                TC_CMS_signed_data* out);
 
-/* Read one SignerInfo, not the surrounding signerInfos SET. Same lifetime rules. */
+/* Read one bare SignerInfo element. Same lifetime rules. */
 TC_TLV_result example_read_cms_signer(TC_bytes input, size_t work_limit,
                                       ExampleCMSWorkspace* workspace, TC_CMS_signer_info* out);
 
@@ -32,7 +32,7 @@ TC_TLV_result example_parse_cms_signers(TC_bytes encoded_set, size_t work_limit,
                                         ExampleCMSWorkspace* workspace);
 
 /* Verify a parsed signer with a digest computed by the application. The key
- * must already be selected for that signer. This does not validate key trust.
+ * must already be selected for that signer. Key trust is validated separately.
  * Scratch accommodates fragmented RSA signatures through 3072 bits and ECDSA. */
 TC_X509_signature_result
 example_verify_cms_digest(const TC_CMS_signer_info* signer, TC_bytes content_type, TC_bytes digest,
