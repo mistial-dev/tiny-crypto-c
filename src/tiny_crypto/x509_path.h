@@ -72,7 +72,7 @@ typedef struct {
   size_t summary_capacity;
 } TC_X509_path_workspace;
 
-/* Array arguments only, not pointers. The shorter name buffer sets the limit.
+/* Arguments must be arrays. The shorter name buffer sets the limit.
  * Use as an initializer in C or C++: TC_X509_path_workspace w = ...; */
 #define TC_X509_PATH_ARRAY_COUNT_(a) (sizeof(a) / sizeof((a)[0]))
 #define TC_X509_PATH_WORKSPACE_INIT(frames_, oids_, left_, right_, matched_, nodes_, edges_,       \
@@ -153,18 +153,18 @@ typedef struct {
 } TC_X509_search_result;
 
 /* Construct and validate a path to an explicit source anchor. Search consumes
- * options.max_work across all branches; depth and total chain bytes use the same
+ * options.max_work across all branches. Depth and total chain bytes use the same
  * limits as ordered validation. Source callbacks must keep returned records stable
  * and separate from both workspaces and out. Hold the source snapshot until all
- * result use finishes. No network fetching or revocation checking is performed.
- * validation.certificates needs one entry per attempted path certificate;
- * options.max_certificates covers every permitted path.
+ * result use finishes. Candidates come only from source. Check revocation
+ * separately. validation.certificates needs one entry per attempted path
+ * certificate, and options.max_certificates covers every permitted path.
  *
  * On VALID, path borrows a suffix of search.path, anchor-issued first, target last.
  * anchor_index identifies the selected source anchor. Key and policy lifetimes
- * match TC_X509_path_validate. Scratch may change on any result; out only on VALID.
- * Copy path and policy span arrays before reusing their workspaces. Copying the
- * result alone retains pointers into scratch; DER bytes need not be copied.
+ * match TC_X509_path_validate. Scratch may change on any result. out changes only
+ * on VALID. Copy path and policy span arrays before reusing their workspaces.
+ * Copying the result alone retains pointers into scratch. DER bytes can stay in place.
  * Workspace arrays must be mutually disjoint and separate from input storage. */
 TC_X509_path_status TC_X509_path_build(TC_bytes target, const TC_X509_store_source* source,
                                        const TC_X509_path_options* options,
@@ -172,19 +172,19 @@ TC_X509_path_status TC_X509_path_build(TC_bytes target, const TC_X509_store_sour
                                        const TC_X509_search_workspace* search,
                                        TC_X509_search_result* out);
 
-/* Anchor-issued certificate first, target last; the anchor is not in chain.
+/* Anchor-issued certificate first, target last. chain excludes the anchor.
  * Checks signatures, time, CA/usage, names, policies and critical extensions.
- * Does not discover paths or check revocation. No native verifier is selected
- * implicitly: options.signatures must provide one for the algorithms in use.
+ * Path discovery and revocation checks are separate steps. options.signatures
+ * must provide a verifier for the algorithms in use.
  *
  * DER and option spans are borrowed and must remain unchanged during the call.
- * Result key bytes borrow target DER; policy spans also borrow issuer DER or
+ * Result key bytes borrow target DER. Policy spans also borrow issuer DER or
  * initial_policies. Keep those buffers and workspace.policies alive while used.
  * The certificate workspace array needs at least count entries and keeps
  * parsed views during validation. Its entries borrow DER and change on reuse.
  * Workspace arrays must be mutually disjoint and disjoint from inputs/out.
  * Provider context must also be separate from workspace and out.
- * Workspace/provider state may change on any result; out changes only on VALID. */
+ * Workspace/provider state may change on any result. out changes only on VALID. */
 TC_X509_path_status TC_X509_path_validate(const TC_bytes* chain, size_t count,
                                           const TC_X509_trust_anchor* anchor,
                                           const TC_X509_path_options* options,

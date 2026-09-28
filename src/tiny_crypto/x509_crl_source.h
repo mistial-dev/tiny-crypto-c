@@ -35,8 +35,8 @@ size_t TC_X509_crl_prepare_alignment(void);
  * Hold the source immutable until preparation finishes. Retain state, metadata,
  * targets, their issuer/serial bytes and matches until the last record use.
  * Other scratch can be reused after completion. All regions are disjoint.
- * parsing limits bound individual metadata/entry objects; max_input bounds the
- * complete CRL. Work and scratch may change on failure; out changes only on OK. */
+ * parsing limits bound individual metadata/entry objects. max_input bounds the
+ * complete CRL. Work and scratch may change on failure. out changes only on OK. */
 TC_TLV_result TC_X509_crl_prepare_begin(const TC_source* source, const TC_X509_crl_target* targets,
                                         size_t count, const TC_X509_crl_prepare_options* options,
                                         const TC_X509_crl_prepare_workspace* workspace,

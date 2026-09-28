@@ -38,8 +38,8 @@ static void tc_pki_children_visit(void* user, const TC_TLV_event* event)
 }
 
 /* Collect immediate fields while validating the whole constructed value.
- * BER EOC belongs to encoded, not value. fields/frames are caller scratch and
- * may change on failure; count changes only on OK. All storage is disjoint. */
+ * BER EOC belongs to encoded and is excluded from value. fields/frames are caller
+ * scratch and may change on failure. count changes only on OK. All storage is disjoint. */
 static inline TC_TLV_result tc_pki_children(TC_bytes encoded, unsigned tag, TC_TLV_profile profile,
                                             const TC_TLV_limits* limits, TC_TLV_frame* frames,
                                             size_t frame_capacity, size_t* work,

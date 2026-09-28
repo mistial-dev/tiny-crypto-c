@@ -26,7 +26,7 @@
 #ifdef pgm_read_qword
 #define HASH_K512_READ(i) pgm_read_qword(&K512[(i)])
 #else
-/* avr-libc < 2.0 has no 64-bit flash read; assemble two little-endian
+/* avr-libc < 2.0 has no 64-bit flash read. Assemble two little-endian
        dwords the way the compiler laid the constant out. */
 #define HASH_K512_READ(i)                                                                          \
   (((uint64_t)pgm_read_dword((const uint32_t*)&K512[(i)] + 1) << 32) |                             \

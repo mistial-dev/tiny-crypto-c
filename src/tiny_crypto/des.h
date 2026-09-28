@@ -11,14 +11,13 @@
 /**
  * @file des.h
  * @brief Portable C implementation of DES and Triple-DES (3DES / TDEA).
- *
- * Designed for microcontrollers and embedded devices.
  */
 
 /*
  * Mode selection (define to 1/0 before including this header, or via -D).
  * Default build enables CTR and Triple-DES only. ECB, CBC, CFB*, OFB, and
- * CMAC are opt-in so unused modes do not contribute code or context fields.
+ * CMAC are opt-in so a build contains code and context fields only for the
+ * modes it enables.
  * Only TC_DES_ENABLE_* names are used so this header can co-exist with aes.h.
  */
 
@@ -213,7 +212,7 @@ TC_status TC_DES_CTR_crypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
 /**
  * @brief Encrypt buffer in 64-bit Cipher Feedback (CFB64) mode using Single DES.
  * @param ctx Pointer to initialized Single DES context (IV holds chaining state).
- * @param buf Data buffer (arbitrary length; final segment may be shorter than 8).
+ * @param buf Data buffer (arbitrary length, final segment may be shorter than 8).
  * @param length Data length in bytes.
  * @return TC_OK, or TC_ERROR under TC_STRICT NULL checks.
  */
@@ -222,7 +221,7 @@ TC_status TC_DES_CFB64_encrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t leng
 /**
  * @brief Decrypt buffer in 64-bit Cipher Feedback (CFB64) mode using Single DES.
  * @param ctx Pointer to initialized Single DES context (IV holds chaining state).
- * @param buf Data buffer (arbitrary length; final segment may be shorter than 8).
+ * @param buf Data buffer (arbitrary length, final segment may be shorter than 8).
  * @param length Data length in bytes.
  * @return TC_OK, or TC_ERROR under TC_STRICT NULL checks.
  */
@@ -440,12 +439,12 @@ TC_status TC_DES3_OFB_crypt(struct TC_DES3_ctx* ctx, uint8_t* buf, size_t length
 /* --- DES / 3DES CMAC (NIST SP 800-38B) --- */
 #if TC_DES_ENABLE_CMAC
 
-/* Full CMAC tag is one DES block; shorter tags are the leading tag_len bytes. */
+/* Full CMAC tag is one DES block. Shorter tags are the leading tag_len bytes. */
 #define TC_DES_CMAC_TAG_MAX TC_DES_BLOCKLEN
 
 /*
  * Minimum CMAC tag length in bytes. SP 800-38B recommends Tlen >= 64 bits for
- * most applications; shorter tags need careful risk analysis. Default 8 (full
+ * most applications. Shorter tags need careful risk analysis. Default 8 (full
  * DES block). Override only for exotic vectors.
  */
 #ifndef TC_DES_CMAC_MIN_TAG_LEN
@@ -475,7 +474,7 @@ TC_status TC_DES_CMAC_verify(const uint8_t* key, size_t keylen, const uint8_t* m
  * ECB/CBC/TDES mode gates compiled out. The most recent block is held back in
  * buf so *_final can apply K1 (complete) or K2 (padded) to the true last
  * block. *_final always emits the full TC_DES_CMAC_TAG_MAX bytes, consumes the
- * context and wipes it when TC_ZEROIZE is 1; call *_init again before reuse.
+ * context and wipes it when TC_ZEROIZE is 1. Call *_init again before reuse.
  */
 struct TC_DES_CMAC_ctx {
   TC_DES_key_bundle keys;
@@ -498,16 +497,15 @@ void TC_DES_CMAC_ctx_clear(struct TC_DES_CMAC_ctx* ctx);
 
 #if TC_DES_ENABLE_ISO9797
 /* ISO/IEC 9797-1 MAC algorithm 1 (CBC-MAC) or 3 (retail MAC).
- * Algorithm 1 uses 2/3-key TDEA. Algorithm 3 uses two DES keys;
+ * Algorithm 1 uses 2/3-key TDEA. Algorithm 3 uses two DES keys.
  * CBC iteration uses K1 and the output transform uses D(K2), E(K1).
  * Padding 1 adds zero bytes only to a partial block. Padding 2 always adds
- * 0x80 followed by zeroes. NONE requires block alignment. NONE and padding 1
- * require a nonempty message for NONE. Padding 1 on an empty message
- * processes one zero block.
+ * 0x80 followed by zeroes. NONE requires block alignment and a nonempty
+ * message. Padding 1 on an empty message processes one zero block.
  * The caller must authenticate a fixed or separately authenticated length
  * when using NONE or padding 1. Context is caller-owned and final consumes it.
  * Input, key, and tag buffers must not overlap the context. A failed final
- * leaves the tag untouched; clear the context after a failed update.
+ * leaves the tag untouched. Clear the context after a failed update.
  */
 typedef enum TC_DES_ISO9797_algorithm {
   TC_DES_ISO9797_ALG1 = 1,

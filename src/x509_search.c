@@ -161,7 +161,7 @@ TC_X509_path_status tc_x509_path_search_source(TC_bytes target, const tc_x509_se
         return status;
       if (!candidate.data || !candidate.length)
         return TC_X509_PATH_ERROR;
-      /* Compare encodings, not entry IDs: duplicate records must not form cycles. */
+      /* Compare encodings so duplicate records under distinct entry IDs cannot form cycles. */
       for (i = 0; i < depth; ++i) {
         if (tc_pki_work_charge(work, 1) != TC_TLV_OK)
           return TC_X509_PATH_LIMIT;

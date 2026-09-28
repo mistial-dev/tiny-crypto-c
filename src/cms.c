@@ -25,7 +25,7 @@ TC_TLV_result tc_cms_signed_data_check(const TC_CMS_signed_data* input, const TC
                                        TC_CMS_signer_info* selected);
 
 /* Unknown hashes may belong to unused signers. When selecting a hash, compare
- * its OID and validate parameters rather than comparing BER encodings. */
+ * its OID and validate parameters. Equal parameters may have distinct BER encodings. */
 TC_TLV_result tc_cms_digest_algorithms(TC_bytes encoded, const TC_DER_algorithm* required,
                                        const TC_TLV_limits* limits,
                                        const tc_pki_tree_workspace* tree, TC_hash_algorithm* out)
@@ -165,7 +165,7 @@ cms_verify_digest(const TC_CMS_signer_info* signer, TC_bytes content_type, TC_by
            ++i)
         if (tc_pki_work_charge(work, attributes.signature_input[i].length) != TC_TLV_OK)
           return TC_X509_SIGNATURE_LIMIT;
-      /* Binding is complete; the content digest buffer can now be reused. */
+      /* Binding is complete, so the content digest buffer can be reused. */
       if (tc_hash_digest_parts(algorithm->signature.hash, attributes.signature_input,
                                sizeof attributes.signature_input /
                                    sizeof *attributes.signature_input,
@@ -913,7 +913,8 @@ TC_TLV_result TC_CMS_signed_attributes_read(TC_bytes encoded, TC_CMS_attribute_e
     return result;
   if (!parsed.content_type.data || !parsed.message_digest.data)
     return TC_TLV_INVALID;
-  /* RFC 5652 section 5.4 signs SET OF, not the wire's implicit [0] tag. */
+  /* RFC 5652 section 5.4 signs the attributes under a SET OF tag in place of the wire's
+   * implicit [0] tag. */
   parsed.signature_input[0] = (TC_bytes){&set_tag, 1};
   parsed.signature_input[1] = (TC_bytes){encoded.data + 1, encoded.length - 1};
   *out = parsed;

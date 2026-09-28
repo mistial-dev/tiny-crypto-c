@@ -87,8 +87,8 @@ static inline unsigned tc_pki_extension_id(const TC_X509_extension* extension)
     return 0;
   return extension->oid.data[2];
 }
-/* Borrow the certificate's SKI. A NULL span means absent; an empty OCTET
- * STRING remains distinguishable. Output changes only on OK; work is
+/* Borrow the certificate's SKI. A NULL span means absent. An empty OCTET
+ * STRING remains distinguishable. Output changes only on OK. Work is
  * provisional. Parsed inputs and output/work are disjoint. */
 static inline TC_TLV_result tc_pki_subject_key_identifier(const TC_X509_certificate* certificate,
                                                           const TC_TLV_limits* limits, size_t* work,

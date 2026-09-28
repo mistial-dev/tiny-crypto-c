@@ -20,7 +20,7 @@ typedef struct {
   uint8_t role;
 } TC_PIV_CVC;
 
-/* Pass one complete 7F21 object. All spans borrow input; input and out must be
+/* Pass one complete 7F21 object. All spans borrow input. Input and out must be
  * disjoint. Errors preserve out. signed_data is the original signed byte range.
  * Signature verification and curve-membership checks are separate operations. */
 TC_TLV_result TC_PIV_CVC_read(const uint8_t* data, size_t length, TC_PIV_CVC* out);
@@ -36,16 +36,16 @@ typedef struct {
  * Check the signer's path, content-signing usage, policy, time and revocation
  * before calling. The issuer links use its subjectKeyIdentifier. curve selects
  * P-256 (CS2) or P-384 (CS7). A supplied card_uuid binds the 16-byte card
- * identifier; an empty span discovers the identifier from the verified CVC.
+ * identifier. An empty span discovers the identifier from the verified CVC.
  * The intermediate's subject is checked against its public-key SHA-1 prefix.
  * Both signatures use the original signed TLVs. Subject points are validated.
  *
  * Inputs remain borrowed and stable. work, point_workspace and out are disjoint
  * from each other and all inputs. Provider context has separate scratch.
- * Argument failures preserve caller state; processing consumes bounded work.
+ * Argument failures preserve caller state. Processing consumes bounded work.
  * Only VALID writes out. Point scratch is cleared after use. VALID covers this
- * CVC chain under signer; secure messaging also requires key confirmation.
- * Requires X509, PIV_CVC and the selected EC curve; intermediates require SHA-1. */
+ * CVC chain under signer. Secure messaging also requires key confirmation.
+ * Requires X509, PIV_CVC and the selected EC curve. Intermediates require SHA-1. */
 TC_X509_signature_result TC_PIV_CVC_chain_verify(const TC_PIV_CVC_chain_request* request,
                                                  const TC_TLV_limits* limits,
                                                  const TC_X509_signature_provider* provider,

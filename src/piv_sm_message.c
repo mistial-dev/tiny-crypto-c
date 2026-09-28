@@ -146,7 +146,7 @@ done:
   return status;
 }
 
-/* Scan the full final block for ISO 7816 padding; return zero if malformed. */
+/* Scan the full final block for ISO 7816 padding. Return zero if malformed. */
 static size_t padding_length(const uint8_t block[16])
 {
   unsigned seen = 0, bad = 0, count = 0, i;

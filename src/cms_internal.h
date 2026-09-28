@@ -14,7 +14,7 @@ typedef struct {
   TC_bytes format, value;
 } tc_cms_other_format;
 /* RFC 5652 OtherCertificateFormat/OtherRevocationInfoFormat, implicitly tagged.
- * The value is required and retained verbatim; format-specific validation is
+ * The value is required and retained verbatim. Format-specific validation is
  * the application's responsibility. Input/scratch/out must be disjoint;
  * spans borrow input and out changes only on OK. */
 TC_TLV_result tc_cms_other_format_read(TC_bytes encoded, tc_cms_other_kind kind,
@@ -22,7 +22,7 @@ TC_TLV_result tc_cms_other_format_read(TC_bytes encoded, tc_cms_other_kind kind,
                                        const tc_pki_tree_workspace* tree, tc_cms_other_format* out);
 
 /* Match parsed SignerInfo and certificate views. Inputs must come from their
- * schema readers. A match identifies a candidate, not a trusted signer.
+ * schema readers. A match identifies a candidate. Trust validation is separate.
  * Missing SKI is a mismatch. Callers preflight disjoint input metadata/spans,
  * name/tree scratch and matched. matched changes only on OK. */
 TC_TLV_result tc_cms_signer_matches(const tc_cms_signer_info* signer, TC_TLV_profile profile,
@@ -95,7 +95,7 @@ typedef struct {
  * signature, scope, freshness and trust checks follow selection.
  * Shared record/byte/work bounds and borrowed-storage rules match candidates.
  * Source snapshots and bytes remain stable. Callers check source-record overlap
- * with scratch before parsing. Reader/out change only on OK; work is provisional. */
+ * with scratch before parsing. Reader/out change only on OK. Work is provisional. */
 TC_TLV_result tc_cms_revocations_init(TC_bytes embedded, const tc_pki_record_source* external,
                                       size_t max_records, size_t max_bytes,
                                       const TC_TLV_limits* limits,
@@ -106,12 +106,13 @@ TC_TLV_result tc_cms_revocations_next(tc_cms_revocations* reader, const tc_pki_t
 /* Decode CRL headers and CRL-level extensions once into caller-owned records.
  * Other revocation formats consume traversal bounds and increment other_count.
  * Retain policy failures for selection; malformed schemas/source errors stop
- * indexing. Entry extensions are checked later during authenticated processing.
+ * indexing. Entry extensions and signatures are checked later during authenticated
+ * processing.
  * Index spans borrow stable record bytes. Checks disjoint records, OID/tree
  * scratch, work and output against input/metadata and returned source records.
  * Callers guard any additional writable storage used by subsequent stages.
- * Index/OID scratch and work are provisional; reader and out remain unchanged
- * on failure. Empty input permits NULL/0 storage. No signatures are checked. */
+ * Index/OID scratch and work are provisional. Reader and out remain unchanged
+ * on failure. Empty input permits NULL/0 storage. */
 TC_TLV_result tc_cms_crl_index_init(const tc_cms_revocations* reader,
                                     const tc_pki_tree_workspace* tree, TC_bytes* oids,
                                     size_t oid_capacity, TC_X509_crl_record* records,
@@ -128,15 +129,15 @@ typedef struct {
  * Index spans borrow record bytes; keep them, context and external snapshot
  * stable until all path results expire. Inputs, index, context and outputs are
  * disjoint from each other and tree scratch/work. Index is provisional on
- * failure; candidates/context/out remain unchanged. */
+ * failure. Candidates/context/out remain unchanged. */
 TC_TLV_result tc_cms_path_source_init(const tc_cms_candidates* candidates,
                                       const tc_pki_tree_workspace* tree, TC_bytes* index,
                                       size_t capacity, tc_cms_path_source* context,
                                       TC_X509_store_source* out);
-/* Yield each matching X.509 candidate; other certificate formats are skipped.
+/* Yield each matching X.509 candidate. Other certificate formats are skipped.
  * scratch holds the parsed candidate on OK and may change on any result.
  * Reader advances on OK/END; out changes only on OK. Other failures preserve
- * reader/out, but consume work and may change callback state. No trust checks. */
+ * reader/out, but consume work and may change callback state. */
 TC_TLV_result tc_cms_signer_candidate_next(tc_cms_candidates* reader,
                                            const tc_cms_signer_info* signer, TC_TLV_profile profile,
                                            const TC_X509_name_workspace* names,
@@ -146,12 +147,12 @@ TC_TLV_result tc_cms_signer_candidate_next(tc_cms_candidates* reader,
 /* Match the signer ID, authenticate the supplied content digest, and find a
  * valid path to an explicit source anchor. Reuse one digest across candidates.
  * Path options control time, usage, policies and signature providers. Embedded
- * intermediates must be present in path_source; revocation is separate.
+ * intermediates must be present in path_source. Revocation is separate.
  * Caller checks all input/metadata/source spans against scratch, work and out.
  * Tree, signature and validation may share frames across processing phases.
  * Candidate/source bytes stay stable through result use. Search scratch may
- * change on failure; out changes only on VALID and borrows the selected path.
- * Work includes all candidate attempts; the candidate iterator is unchanged. */
+ * change on failure. out changes only on VALID and borrows the selected path.
+ * Work includes all candidate attempts. The candidate iterator is unchanged. */
 TC_X509_path_status
 tc_cms_signer_find(const tc_cms_candidates* candidates, const TC_CMS_signer_info* signer,
                    TC_bytes content_type, TC_bytes digest, TC_CMS_attribute_encoding encoding,
@@ -201,13 +202,13 @@ TC_TLV_result tc_cms_crl_search(const void* candidates, const tc_x509_crl* crl,
                                 const void* context, TC_X509_search_result* out,
                                 int* source_failed);
 /* Find a candidate with a valid CRL signature and path to the selected anchor.
- * Candidates remain unchanged; failed candidate paths do not end the search.
+ * Candidates remain unchanged. Failed candidate paths do not end the search.
  * Unresolved limits/algorithms are retained if no candidate succeeds. Malformed
  * candidate records and source read errors stop iteration.
  * path_source must provide needed intermediates, including embedded ones, and
  * retain the target certificate's anchor snapshot. Scope/freshness and signer
  * revocation are separate. Parsed inputs/source data are stable and disjoint
- * from all scratch/work/out; tree and validation may share frame storage.
+ * from all scratch/work/out. Tree and validation may share frame storage.
  * Work covers all attempts, out changes only on VALID and borrows path storage. */
 TC_X509_path_status
 tc_cms_crl_signer_find(const tc_cms_candidates* candidates, const tc_x509_crl* crl,
@@ -219,9 +220,9 @@ tc_cms_crl_signer_find(const tc_cms_candidates* candidates, const tc_x509_crl* c
 /* Process selected CRLs, retrying proposed signers with the same bounded search.
  * Subject, authority hints and cRLSign filter candidates before full processing.
  * END means terminal evidence or no new eligible reasons. INVALID means no
- * candidate succeeded; unresolved limits/algorithms retain their own status.
- * Source/record errors stop search. Evidence/out change only on OK; candidates
- * stay unchanged, work covers all attempts. Same disjoint/stable storage rules
+ * candidate succeeded. Unresolved limits/algorithms retain their own status.
+ * Source/record errors stop search. Evidence/out change only on OK. Candidates
+ * stay unchanged and work covers all attempts. Same disjoint/stable storage rules
  * as signer_find, with evidence also separate from inputs and scratch.
  * CRL selection and signer-path revocation remain separate. */
 TC_TLV_result
@@ -233,7 +234,7 @@ tc_cms_crl_process(const tc_cms_candidates* candidates, const tc_x509_crl_select
                    TC_X509_search_result* out);
 /* Process one indexed complete CRL with signer retry and explicit delta policy.
  * Authenticate the base/path once per signer attempt, choose a current signed
- * delta, then apply entries. REQUIRED returns END if no usable delta is found;
+ * delta, then apply entries. REQUIRED returns END if no usable delta is found.
  * IF_AVAILABLE falls back to the complete CRL, which must itself be current.
  * Same borrowed/disjoint storage and result rules as crl_process. Index and
  * candidates stay unchanged. Signer-path revocation remains separate. */
@@ -247,11 +248,11 @@ TC_TLV_result tc_cms_crl_index_process(
 /* Process all indexed scopes for one distribution point. check is required.
  * OK publishes new evidence, which may still have incomplete reason coverage.
  * END means no contribution or terminal input evidence. Failures preserve
- * evidence; scratch is provisional. Invalid/unsupported alternatives are tried
+ * evidence. Scratch is provisional. Invalid/unsupported alternatives are tried
  * until status is determined, otherwise their failure is returned. LIMIT and
  * source errors stop processing. Inputs/source snapshot remain stable.
  * Records sharing issuer and IDP are ranked across validated signer keys.
- * This internal runner does not itself implement the callback's revocation work. */
+ * The check callback performs the signer revocation work. */
 TC_TLV_result
 tc_cms_crl_point_process(const tc_cms_candidates* candidates, const TC_X509_crl_index* index,
                          TC_X509_crl_delta_policy delta_policy,
@@ -265,7 +266,7 @@ tc_cms_crl_point_process(const tc_cms_candidates* candidates, const TC_X509_crl_
  * if coverage is incomplete. An absent value uses only the fallback. The caller
  * supplies the target's validated CA flag and an issuer-wide fallback point.
  * The whole list is checked before processing. Same storage, callback and
- * transactional evidence rules as point_process; one budget covers all points. */
+ * transactional evidence rules as point_process. One budget covers all points. */
 TC_TLV_result tc_cms_crl_points_process(
     const tc_cms_candidates* candidates, const TC_X509_crl_index* index,
     TC_X509_crl_delta_policy delta_policy, TC_X509_crl_order_policy order_policy,
@@ -297,9 +298,9 @@ typedef struct {
   TC_X509_crl_order_policy order_policy;
 } tc_cms_crl_resolution;
 /* Resolve a previously validated target's revocation and signer dependencies.
- * options specify CRL signer policy, not the target holder's EKU/purpose.
+ * options specify CRL signer policy, including the signer's EKU/purpose.
  * Sources, policy and time stay fixed. Nodes borrow certificate encodings and
- * are provisional scratch. One shared budget covers all retries; no recursion.
+ * are provisional scratch. One shared budget covers all retries without recursion.
  * OK publishes a determined status. Ungrounded cycles/missing evidence return
  * UNSUPPORTED. Every failure preserves out. All input/output/scratch disjoint. */
 TC_TLV_result tc_cms_crl_resolve(const TC_X509_certificate* target,
@@ -310,7 +311,7 @@ TC_TLV_result tc_cms_crl_resolve(const TC_X509_certificate* target,
  * The anchor is excluded. Hold chain spans outside search/validation scratch.
  * A revoked member supplies its index and evidence; an unrevoked path reports
  * SIZE_MAX and zero evidence. All members share one budget and source snapshot.
- * Nodes retain proven dependencies across members, but not across calls; capacity
+ * Nodes retain proven dependencies across the members of one call. Capacity
  * must cover the path and all distinct signer dependencies visited during it.
  * Resolution policy and disjoint storage rules match tc_cms_crl_resolve.
  * Failure preserves out; OK reports REVOKED or UNREVOKED, never UNDETERMINED. */
@@ -323,10 +324,10 @@ TC_TLV_result tc_cms_crl_path_resolve(const TC_bytes* chain, size_t count,
  * Scopes with no new reason coverage return END before signer discovery.
  * State storage needs one byte per indexed CRL and is reset for each signer.
  * Reference verification is reused during selection. Evidence/out change only
- * on OK; states and other scratch are provisional. Preflight checks metadata,
- * used input spans and writable ranges; source records are guarded on return.
+ * on OK. States and other scratch are provisional. Preflight checks metadata,
+ * used input spans and writable ranges. Source records are guarded on return.
  * Opaque source/provider contexts must remain separate from writable storage.
- * Tree/path frames may share an array; partial overlaps are rejected.
+ * Tree/path frames may share an array. Partial overlaps are rejected.
  * Candidate/index views stay unchanged. Signer-path revocation is separate. */
 TC_TLV_result tc_cms_crl_scope_process(
     const tc_cms_candidates* candidates, const TC_X509_crl_index* index, size_t reference,

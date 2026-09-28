@@ -64,7 +64,7 @@ typedef enum {
   TC_CREDENTIAL_UNAVAILABLE
 } TC_credential_status;
 
-/* Identifiers do not imply that the corresponding hash is enabled. */
+/* Each identifier exists whether or not its hash is enabled. */
 typedef enum {
   TC_HASH_UNKNOWN,
   TC_HASH_SHA1,
@@ -99,9 +99,9 @@ typedef enum {
 #error "TC_STRICT must be 0 or 1"
 #endif
 
-/* Best-effort secret wipe. memory must be valid for length bytes; NULL is
+/* Best-effort secret wipe. memory must be valid for length bytes. NULL is
  * accepted only when length is zero. The compiler barrier prevents common
- * dead-store removal, but cannot clear copies already held in CPU registers. */
+ * dead-store removal. Copies already held in CPU registers remain. */
 void TC_secure_zero(void* memory, size_t length);
 
 /* Compare all public-length bytes without returning at the first mismatch. */

@@ -26,8 +26,8 @@ typedef struct {
   word order_factor;
 } ec_state;
 
-/* SEC 2 v2.0 parameters. Rows are p, n, b, R^2 mod p, GxR mod p, GyR mod p;
- * R = 2^(8 * coordinate_bytes). These curves have a = -3, h = 1. */
+/* SEC 2 v2.0 parameters. Rows are p, n, b, R^2 mod p, GxR mod p, GyR mod p,
+ * with R = 2^(8 * coordinate_bytes). These curves have a = -3, h = 1. */
 #if TC_EC_ENABLE_P192
 static const uint8_t params_192[6][24] EC_STORAGE = {
     {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
@@ -151,7 +151,7 @@ static void copy(ec_state* s, word* out, const word* in)
     memcpy(out, in, s->bytes);
 }
 
-/* Jacobian coordinates: affine x = X/Z^2, y = Y/Z^3; Z = 0 is infinity.
+/* Jacobian coordinates: affine x = X/Z^2, y = Y/Z^3. Z = 0 is infinity.
  * a = -3 lets the doubling slope use 3(X-Z^2)(X+Z^2). */
 static void point_double(ec_state* s, unsigned out, unsigned in)
 {

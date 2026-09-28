@@ -171,7 +171,7 @@ TC_TLV_result TC_LDS_read_content(TC_bytes octets, const TC_TLV_limits* limits,
     result = tc_pki_work_charge(work, tc_pki_storage_plan_used(&plan));
   if (result != TC_TLV_OK)
     return result;
-  /* CMS permits nested BER chunks; the reconstructed LDS remains DER. */
+  /* CMS permits nested BER chunks. The reconstructed LDS remains DER. */
   result = tc_pki_octets_contiguous(octets, 4, TC_TLV_BER, limits, frames, frame_capacity, work,
                                     buffer, buffer_capacity, &content);
   if (result != TC_TLV_OK)

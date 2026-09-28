@@ -28,7 +28,7 @@ typedef struct {
 } tc_inflate_output;
 /* Decode one DEFLATE stream and advance to the next byte boundary.
  * Input, tables and output are disjoint. Output and cursors are scratch on
- * failure; a public wrapper must clear provisional output before returning.
+ * failure. A public wrapper must clear provisional output before returning.
  * Existing output before the initial length is excluded from stream history. */
 TC_TLV_result tc_inflate_decode(tc_inflate_bits* bits, tc_inflate_tables* tables,
                                 tc_inflate_output* output);
@@ -45,7 +45,7 @@ TC_TLV_result tc_inflate_tables_read(tc_inflate_bits* bits, unsigned type,
 TC_TLV_result tc_inflate_bits_read(tc_inflate_bits* bits, unsigned count, unsigned* out);
 TC_TLV_result tc_inflate_symbol(tc_inflate_bits* bits, const tc_inflate_tree* tree, unsigned* out);
 
-/* Internal storage is disjoint and writable; count is the alphabet size.
+/* Internal storage is disjoint and writable. count is the alphabet size.
  * Output is scratch and may change on failure. Work is charged before loops. */
 TC_TLV_result tc_inflate_tree_build(const uint8_t* lengths, size_t count, tc_inflate_tree_kind kind,
                                     tc_inflate_tree* tree, size_t* work);

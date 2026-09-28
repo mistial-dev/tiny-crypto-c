@@ -71,7 +71,7 @@ TC_result TC_validation_capacity_init(TC_validation_profile profile, TC_validati
   return TC_RESULT_OK;
 }
 
-/* Reserve an aligned array in the arena; reject size arithmetic overflow. */
+/* Reserve an aligned array in the arena. Reject size arithmetic overflow. */
 static int reserve(size_t* offset, size_t count, size_t width, size_t* start)
 {
   const size_t alignment = TC_validation_workspace_alignment();

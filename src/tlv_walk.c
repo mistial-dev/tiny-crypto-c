@@ -84,8 +84,8 @@ static TC_TLV_result feed(TC_TLV_stream* s, const uint8_t* data, size_t length, 
     if (s->offset >= ceiling)
       return fail(s, boundary_error(s));
     if (s->primitive) {
-      /* Primitive contents are opaque. In particular, 00 00 here is data,
-       * not the end of an enclosing indefinite-length container. */
+      /* Primitive contents are opaque, so 00 00 here is data and cannot end
+       * an enclosing indefinite-length container. */
       size_t n = length - p;
       if (n > s->remaining)
         n = s->remaining;
@@ -112,7 +112,7 @@ static TC_TLV_result feed(TC_TLV_stream* s, const uint8_t* data, size_t length, 
     s->header[s->used++] = data[p++];
     ++s->offset;
 #if TC_TLV_ENABLE_BER
-    /* EOC is framing, not an ordinary tag, and is legal only at the top
+    /* EOC is framing and is legal only at the top
      * of an indefinite frame. Primitive contents never reach this branch. */
     if (s->header[0] == 0) {
       if (s->profile != TC_TLV_BER || !s->depth || !s->frames[s->depth - 1].indefinite)

@@ -9,7 +9,7 @@
 
 /* Bind signedAttrs to a computed content digest. Hash content once per algorithm,
  * then reuse the digest across signers. Inputs are borrowed and disjoint from
- * work and matched. A match establishes neither a valid signature nor trust. */
+ * work and matched. Signature and trust validation are separate steps. */
 static inline TC_TLV_result tc_cms_content_digest_check(const TC_CMS_signed_attributes* attributes,
                                                         TC_bytes expected_type,
                                                         TC_hash_algorithm algorithm,

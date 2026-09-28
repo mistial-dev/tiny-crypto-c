@@ -183,7 +183,7 @@ TC_X509_signature_result TC_PIV_CVC_chain_verify(const TC_PIV_CVC_chain_request*
       return result;
     intermediate_key.type = TC_KEY_EC;
     intermediate_key.algorithm.oid = tc_pki_ec_public_key_oid();
-    /* The signature provider accepts DER curve parameters; CVC framing is BER. */
+    /* The signature provider accepts DER curve parameters. CVC framing is BER. */
     curve_parameters[0] = 6;
     curve_parameters[1] = (uint8_t)intermediate.curve_oid.length;
     memcpy(curve_parameters + DER_OID_HEADER_BYTES, intermediate.curve_oid.data,

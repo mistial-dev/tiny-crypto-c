@@ -21,16 +21,17 @@ typedef struct {
 
 /* Native ECDSA and RSA v1.5/PSS provider for message and digest verification.
  * Enable the required EC/RSA and hash implementations in the build. A missing
- * algorithm returns UNSUPPORTED; a missing required workspace returns ERROR.
+ * algorithm returns UNSUPPORTED. A missing required workspace returns ERROR.
  * Either workspace may be NULL when its algorithm is not used.
  *
  * Keep workspace metadata alive while using the provider. Crypto scratch must
  * be separate from metadata, message/key/signature bytes and the work counter.
  * Calls sharing scratch must be serialized. The provider hashes borrowed
  * segments without allocation, using one temporary hash context and digest.
- * The digest operation does not rehash the message; PSS still needs its
+ * The digest operation uses the supplied digest as-is. PSS still needs its
  * signature and MGF hashes to check the encoded signature.
- * This verifies signatures, not certificate trust or application policy. */
+ * This verifies signatures. Certificate trust and application policy are
+ * separate steps. */
 TC_X509_signature_provider TC_X509_native_provider(const TC_X509_native_workspace* workspace);
 
 #ifdef __cplusplus

@@ -13,12 +13,12 @@ extern "C" {
 #endif
 
 /* RFC 5869 HKDF over each enabled HMAC-SHA family. Extract writes exactly
- * TC_SHA*_DIGESTLEN bytes to prk. Expand accepts a PRK at least that long;
+ * TC_SHA*_DIGESTLEN bytes to prk. Expand accepts a PRK at least that long.
  * output_len must be 1..255*HashLen. Derive performs both steps and clears
  * its intermediate PRK. A NULL salt, IKM or info is valid when its length is
  * zero. Hybrid functions process Z followed by T without copying either.
  * Output must be disjoint from every input. Invalid arguments leave output
- * unchanged; a processing failure clears it. All lengths are bytes. */
+ * unchanged. A processing failure clears it. All lengths are bytes. */
 #define TC_HKDF_DECLARE(N)                                                                         \
   TC_status TC_HKDF_SHA##N##_extract(const uint8_t* salt, size_t salt_len, const uint8_t* ikm,     \
                                      size_t ikm_len, uint8_t* prk);                                \

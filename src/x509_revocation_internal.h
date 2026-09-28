@@ -142,10 +142,10 @@ TC_TLV_result tc_x509_crl_proposal_merge(tc_x509_crl_proposal* chosen,
 
 /* Called after signature/path validation and scope selection, before publication.
  * selected borrows the effective base/delta pair, or is NULL when no pair could
- * be ranked. A ranked pair can still have failed scope/entry checks; callback
+ * be ranked. A ranked pair can still have failed scope/entry checks. Callback
  * success does not override those failures. The views remain live for this call.
  * VALID must include the signer's revocation dependencies. The callback keeps
- * path bytes unchanged and uses separate scratch; work may only decrease. */
+ * path bytes unchanged and uses separate scratch. work may only decrease. */
 typedef struct {
   void* context;
   TC_X509_path_status (*verify)(void* context, const TC_X509_search_result* path,
@@ -200,7 +200,7 @@ TC_TLV_result tc_x509_crl_scopes_index(const TC_X509_crl_index* index, const TC_
                                        const TC_X509_name_workspace* names,
                                        TC_X509_revocation_scope* slots, size_t capacity);
 /* Search each reference key before ranking authenticated scope proposals.
- * Inputs and storage are validated by the caller; search preserves work limits. */
+ * Inputs and storage are validated by the caller. Search preserves work limits. */
 TC_TLV_result tc_x509_crl_group(const void* candidates, tc_x509_crl_search search,
                                 const tc_x509_crl_scope_processing* processing,
                                 const tc_x509_crl_trust* trust, int* source_failed,
@@ -233,15 +233,15 @@ void tc_x509_crl_path_plan_inputs(tc_pki_storage_plan* plan, const tc_x509_crl_h
 TC_TLV_result tc_x509_crl_certificate_extension(void* context, const TC_X509_extension* extension);
 
 /* Initialize a borrowed point reader after checking the whole list. A supplied
- * certificate replaces the initial fields. Scratch and work are provisional;
- * fields and reader are published on success. Caller checks storage overlap. */
+ * certificate replaces the initial fields. Scratch and work are provisional.
+ * Fields and reader are published on success. Caller checks storage overlap. */
 TC_TLV_result tc_x509_crl_points_init(tc_x509_crl_certificate_fields* fields,
                                       const TC_X509_certificate* certificate, TC_bytes* oids,
                                       size_t oid_capacity, TC_TLV_reader* reader);
 
 /* Traverse checked points and issuer fallbacks using guarded candidate sources.
  * Caller validates policies, workspace separation and the complete point list.
- * Evidence and the single-scope path are published on success; scratch is provisional. */
+ * Evidence and the single-scope path are published on success. Scratch is provisional. */
 TC_TLV_result tc_x509_crl_scopes(const void* candidates, tc_x509_crl_search search_candidates,
                                  const tc_x509_crl_scope_processing* input,
                                  const tc_x509_crl_trust* trust,
@@ -313,7 +313,7 @@ TC_X509_path_status tc_x509_crl_dependencies_check(void* context, const TC_X509_
 
 /* Reuse an encoded certificate's node or append a borrowed, undetermined node.
  * Caller guards certificate bytes against writable storage and keeps existing
- * nodes valid. Failures preserve nodes, count and index; work is provisional. */
+ * nodes valid. Failures preserve nodes, count and index. Work is provisional. */
 TC_TLV_result tc_x509_crl_dependency_find(TC_X509_revocation_node* nodes, size_t capacity,
                                           size_t* count, TC_bytes certificate, size_t* work,
                                           size_t* index);
@@ -329,7 +329,7 @@ TC_X509_signature_result tc_x509_crl_selected_anchor_check(
     const TC_X509_name_workspace* names, size_t* work);
 
 /* Extend provisional dependency nodes and check each signer's current status.
- * Caller validates metadata storage; writes covers every writable operation span. */
+ * Caller validates metadata storage. writes covers every writable operation span. */
 TC_X509_path_status tc_x509_crl_dependencies_path(const TC_X509_search_result* path,
                                                   const tc_x509_crl_resolution_workspace* workspace,
                                                   size_t* count, const TC_bytes* writes,
@@ -380,7 +380,7 @@ enum {
 };
 
 /* Run a scope operation after storage preflight. Sources and input bytes stay
- * fixed; source_failed accumulates callback failures across dependency searches. */
+ * fixed. source_failed accumulates callback failures across dependency searches. */
 TC_TLV_result tc_x509_crl_scope_run(const tc_x509_crl_candidate_source* candidates,
                                     const tc_x509_crl_scope_processing* processing,
                                     const tc_x509_crl_trust* trust, const TC_bytes* points,
@@ -429,8 +429,8 @@ void tc_x509_crl_scope_plan_inputs(tc_pki_storage_plan* plan,
                                    const tc_x509_crl_trust* trust);
 
 /* Match issuer, authority identifiers and cRLSign usage on parsed inputs.
- * Signature and path checks follow candidate selection. matched changes on OK;
- * name/tree scratch and work are separate from inputs and output. */
+ * Signature and path checks follow candidate selection. matched changes on OK.
+ * Name/tree scratch and work are separate from inputs and output. */
 TC_TLV_result tc_x509_crl_candidate_matches(const tc_x509_crl* crl,
                                             const tc_x509_crl_extension_info* extensions,
                                             const TC_X509_certificate* candidate,
@@ -449,8 +449,8 @@ typedef struct {
   const TC_X509_revocation_scope* scopes;
 } tc_x509_crl_signature_cache;
 /* One byte per indexed record, scoped to this signer/provider and stable input
- * snapshot. Cache valid/invalid signatures only; limits and provider errors can
- * be retried. This does not cache signer trust, CRL policy or freshness.
+ * snapshot. Cache valid/invalid signatures only. Limits and provider errors can
+ * be retried.
  * Reinitialize when the signer, provider policy or indexed records change.
  * Caller keeps metadata/record bytes immutable and disjoint from states/work/out
  * and name scratch. Initialization charges one work unit per record. */
@@ -466,7 +466,7 @@ TC_TLV_result tc_x509_crl_signature_cached(const tc_x509_crl_signature_cache* ca
 /* Enumerate compatible deltas for one complete CRL in source order. Start
  * cursor at zero. Policy-rejected rows are skipped but remain in the index.
  * Each candidate needs authentication, freshness and scope checks before use.
- * Stable parsed index; disjoint scratch/output. Cursor/out change only on OK. */
+ * Stable parsed index and disjoint scratch/output. Cursor/out change only on OK. */
 TC_TLV_result tc_x509_crl_delta_next(const TC_X509_crl_index* index, size_t base, size_t* cursor,
                                      const TC_TLV_limits* limits, const tc_pki_tree_workspace* tree,
                                      const TC_X509_name_workspace* names,
@@ -476,7 +476,7 @@ TC_TLV_result tc_x509_crl_delta_next(const TC_X509_crl_index* index, size_t base
  * Bad signatures are skipped; provider failures and limits stop selection.
  * Conflicting TBS bytes at the highest authenticated number are INVALID.
  * END means no usable delta. Scope, entries and signer revocation are separate.
- * Stable/disjoint inputs and scratch; out changes only on OK. */
+ * Stable/disjoint inputs and scratch. out changes only on OK. */
 TC_TLV_result tc_x509_crl_delta_select(const TC_X509_crl_index* index, size_t base,
                                        const TC_X509_certificate* signer, const TC_X509_time* at,
                                        const TC_X509_signature_provider* provider,
@@ -490,17 +490,17 @@ TC_TLV_result tc_x509_crl_delta_select_cached(const tc_x509_crl_signature_cache*
                                               const tc_pki_tree_workspace* tree,
                                               tc_x509_crl_selected* out);
 /* Enumerate authenticated effective candidates in one issuer/IDP scope.
- * reference identifies the scope; cursor starts at zero. Signature cache is
+ * reference identifies the scope. cursor starts at zero. Signature cache is
  * scoped to the proposed signer, whose trust remains the caller's responsibility.
  * Stale bases need a current delta; future bases are skipped. Entry and target
- * coverage checks follow selection. Cursor/out change only on OK; cache/work
- * and name scratch are provisional. Does not rank candidates across bases. */
+ * coverage checks follow selection. Cursor/out change only on OK. Cache/work
+ * and name scratch are provisional. Ranking across bases is a separate step. */
 TC_TLV_result tc_x509_crl_effective_next(const tc_x509_crl_signature_cache* cache, size_t reference,
                                          size_t* cursor, TC_X509_crl_delta_policy delta_policy,
                                          const TC_X509_time* at, const tc_pki_tree_workspace* tree,
                                          tc_x509_crl_selected* out);
 /* Highest authenticated effective number in this scope. A delta supplies its
- * number, not its base's. Unnumbered candidates return UNSUPPORTED; END means
+ * own number. Unnumbered candidates return UNSUPPORTED. END means
  * no eligible candidate. Output borrows number contents and changes only on OK.
  * Conflicting deltas return INVALID only at the highest effective number.
  * Tied candidates still need entry consistency checks before evidence is applied. */
@@ -514,7 +514,7 @@ TC_TLV_result tc_x509_crl_latest_number(const tc_x509_crl_signature_cache* cache
  * Delta pairing still requires numbers. There is no automatic ordering fallback.
  * First find the latest candidate, then require tied candidates to agree
  * on thisUpdate, reason coverage and the target's revocation information.
- * Evidence changes only on OK; input/cache/scratch storage is disjoint and stable.
+ * Evidence changes only on OK. Input/cache/scratch storage is disjoint and stable.
  * Signer-path revocation remains separate. Cache/work/scratch are provisional. */
 TC_TLV_result tc_x509_crl_scope_apply(const tc_x509_crl_signature_cache* cache, size_t reference,
                                       TC_X509_crl_delta_policy delta_policy,

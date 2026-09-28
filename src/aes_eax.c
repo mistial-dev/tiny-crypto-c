@@ -158,8 +158,8 @@ static TC_status tc_aes_eax_crypt(const uint8_t* key, const uint8_t* nonce, size
       st.full_tag[i] = (uint8_t)(st.nonce_mac[i] ^ st.header_mac[i] ^ st.message_mac[i]);
     status = TC_ct_equal(st.full_tag, expected_tag, tag_len);
     if (status == TC_OK) {
-      /* EAX verifies before CTR decryption, so unauthenticated plaintext is
-       * never written to the caller's buffer. */
+      /* EAX verifies before CTR decryption, so the caller's buffer receives
+       * only authenticated plaintext. */
       output_started = 1;
       status = tc_aes_eax_ctr_xor(&st.aes, st.nonce_mac, input, output, input_len, 0);
     }

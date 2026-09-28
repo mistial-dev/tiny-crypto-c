@@ -14,11 +14,11 @@
 
 namespace tiny_crypto {
 
-/* Plain aggregate; brace-initialize as {counter_bits, counter_location,
+/* Plain aggregate. Brace-initialize as {counter_bits, counter_location,
  * use_counter}, e.g. kbkdf_params{TC_KBKDF_COUNTER_32, 0, 0} for counter mode. */
 typedef ::TC_KBKDF_params kbkdf_params;
 
-/* Label || 0x00 || Context || [8 * out_len]_32; see TC_KBKDF_fixed_input. */
+/* Label || 0x00 || Context || [8 * out_len]_32. See TC_KBKDF_fixed_input. */
 inline TC_status kbkdf_fixed_input(const uint8_t* label, size_t label_len, const uint8_t* context,
                                    size_t context_len, size_t out_len, uint8_t* buf, size_t buf_len)
 {
@@ -67,7 +67,7 @@ TINY_CRYPTO_KBKDF_FAMILY(kbkdf_hmac_sha384, HMAC_SHA384)
 TINY_CRYPTO_KBKDF_FAMILY(kbkdf_hmac_sha512, HMAC_SHA512)
 #endif
 #if TC_KBKDF_HAVE_AES_CMAC
-/* The AES key size is fixed per build; a wrong key_len returns TC_ERROR. */
+/* The AES key size is fixed per build. A wrong key_len returns TC_ERROR. */
 TINY_CRYPTO_KBKDF_FAMILY(kbkdf_aes_cmac, AES_CMAC)
 #endif
 #if TC_KBKDF_HAVE_DES_CMAC

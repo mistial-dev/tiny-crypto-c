@@ -100,8 +100,8 @@ TC_X509_path_status tc_x509_path_search_source(TC_bytes target, const tc_x509_se
                                                const tc_x509_search_workspace* search, size_t* work,
                                                tc_x509_search_result* out);
 /* Internal engine: caller validates storage ranges and keeps input/store records
- * stable and disjoint from both workspaces, work, and out. Path storage is scratch;
- * successful output borrows its suffix in anchor-issued-first order. */
+ * stable and disjoint from both workspaces, work, and out. Path storage is scratch.
+ * Successful output borrows its suffix in anchor-issued-first order. */
 TC_X509_path_status tc_x509_path_search(TC_bytes target, const TC_bytes* candidates,
                                         size_t candidate_count, const TC_X509_trust_anchor* anchors,
                                         size_t anchor_count, const TC_X509_path_options* options,
@@ -173,8 +173,8 @@ TC_TLV_result tc_x509_path_constraint_distances(const TC_X509_name_constraints* 
                                                 const TC_X509_constraint_workspace* workspace,
                                                 size_t* work);
 
-/* Basic certificate pass. Does not process policies, name constraints,
- * application usage, critical extensions or revocation. Caller keeps input
+/* Basic certificate pass. Policies, name constraints, application usage,
+ * critical extensions and revocation are separate passes. Caller keeps input
  * and provider state disjoint from workspace, work and accepted. */
 TC_TLV_result tc_x509_path_basic(const tc_x509_path_input* input,
                                  const TC_X509_name_workspace* workspace, size_t* work,

@@ -16,7 +16,7 @@ typedef struct {
 
 /* Read the DER GeneralNames value of a card-authentication certificate's SAN.
  * The profile selects accepted OIDs and UUID rules. Spans borrow the input.
- * Parsing can consume frames and work; out changes only on OK. Keep writable
+ * Parsing can consume frames and work. out changes only on OK. Keep writable
  * storage disjoint from the input. */
 TC_TLV_result TC_PIV_card_identifiers_read(TC_bytes subject_alt_name, TC_PIV_card_profile profile,
                                            const TC_TLV_limits* limits, TC_TLV_frame* frames,
@@ -25,7 +25,7 @@ TC_TLV_result TC_PIV_card_identifiers_read(TC_bytes subject_alt_name, TC_PIV_car
 
 /* Compare a successfully read identifier view with a CHUID's FASC-N and GUID.
  * Inputs may overlap. Keep work and matched disjoint from all inputs and each
- * other. Errors preserve matched; storage errors also preserve work. */
+ * other. Errors preserve matched. Storage errors also preserve work. */
 TC_TLV_result TC_PIV_card_identifiers_match(const TC_PIV_card_identifiers* identifiers,
                                             TC_bytes fascn, TC_bytes guid, size_t* work,
                                             int* matched);
@@ -47,7 +47,7 @@ TC_TLV_result TC_PIV_authentication_identifiers_read(TC_bytes subject_alt_name, 
                                                      size_t* work, TC_PIV_card_identifiers* out);
 
 /* Apply TWIC reader policy to a PIV Authentication certificate. Registered PIV
- * and TWIC FASC-N OIDs are accepted. The Card UUID may be absent; any UUIDs
+ * and TWIC FASC-N OIDs are accepted. The Card UUID may be absent. Any UUIDs
  * present follow the PIV Authentication selection rules above. */
 TC_TLV_result TC_TWIC_authentication_identifiers_read(TC_bytes subject_alt_name, TC_bytes card_guid,
                                                       const TC_TLV_limits* limits,

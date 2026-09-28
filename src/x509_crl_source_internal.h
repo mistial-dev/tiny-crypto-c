@@ -22,8 +22,8 @@ TC_TLV_result tc_x509_crl_source_layout(tc_source_reader* reader, tc_x509_crl_la
 
 /* Copy bounded metadata into stable caller storage, then apply shared typed
  * checks. Layout comes from this immutable source. All writable storage and
- * inputs are disjoint. Scratch is provisional; out changes only on success.
- * encoded/tbs/revoked remain empty; their source offsets stay in layout. */
+ * inputs are disjoint. Scratch is provisional. out changes only on success.
+ * encoded/tbs/revoked remain empty. Their source offsets stay in layout. */
 TC_TLV_result tc_x509_crl_source_metadata(tc_source_reader* reader,
                                           const tc_x509_crl_layout* layout, TC_buffer storage,
                                           const TC_TLV_limits* limits,
@@ -37,9 +37,9 @@ typedef struct {
 TC_TLV_result tc_x509_crl_source_entries_init(tc_source_reader* reader, tc_source_span encoded,
                                               unsigned version, uint64_t max_entries,
                                               tc_x509_crl_source_entries* out);
-/* Borrow an entry from the read window when it fits; copy fragmented entries to
+/* Borrow an entry from the read window when it fits. Copy fragmented entries to
  * scratch. Returned spans last until the next reader/scratch operation. Cursor
- * and out change only on success; scratch and I/O budgets are provisional.
+ * and out change only on success. Scratch and I/O budgets are provisional.
  * Entry extension policy and indirect issuer inheritance are separate steps. */
 TC_TLV_result tc_x509_crl_source_entry_next(tc_source_reader* reader,
                                             tc_x509_crl_source_entries* entries, TC_buffer scratch,

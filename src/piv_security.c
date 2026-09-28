@@ -25,7 +25,7 @@ static TC_TLV_result security_mapping(TC_bytes mapping, uint16_t container, uint
     if (present & bit)
       return TC_TLV_INVALID;
     present |= bit;
-    /* At most 16 records; rescanning avoids a separate container index. */
+    /* At most 16 records. Rescanning avoids a separate container index. */
     for (size_t j = 0; j < i; j += MAPPING_RECORD_BYTES)
       if (record[1] == mapping.data[j + 1] && record[2] == mapping.data[j + 2])
         return TC_TLV_INVALID;

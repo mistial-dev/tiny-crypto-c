@@ -41,8 +41,8 @@ static inline void tc_mp_shift_right(tc_mp_word* value, size_t n, tc_mp_word hig
   }
 }
 
-/* Fixed-width unsigned big-endian bytes; length is a multiple of limb width. */
-/* Input fits width bytes; width is a whole number of limbs. Buffers are disjoint. */
+/* Fixed-width unsigned big-endian bytes. length is a multiple of limb width. */
+/* Input fits width bytes. width is a whole number of limbs. Buffers are disjoint. */
 static inline void tc_mp_from_be_padded(tc_mp_word* out, const uint8_t* bytes, size_t length,
                                         size_t width)
 {
@@ -84,7 +84,7 @@ static inline void tc_mp_reduce(tc_mp_word* out, const tc_mp_word* low, tc_mp_wo
   tc_mp_select(out, scratch, low, mask, n);
 }
 
-/* a,b < p. out may equal either input; scratch is separate and has n limbs. */
+/* a,b < p. out may equal either input. scratch is separate and has n limbs. */
 static inline void tc_mp_add_mod(tc_mp_word* out, const tc_mp_word* a, const tc_mp_word* b,
                                  const tc_mp_word* p, size_t n, tc_mp_word* scratch)
 {
@@ -134,7 +134,7 @@ static inline void tc_mp_multiply(tc_mp_word* out, const tc_mp_word* a, const tc
 }
 
 /* Reduce a little-endian limb array modulo p > 1, including even p. out and
- * scratch have n limbs; all arrays are disjoint. Loop bounds use input_words/n. */
+ * scratch have n limbs. All arrays are disjoint. Loop bounds use input_words/n. */
 static inline void tc_mp_reduce_words(tc_mp_word* out, const tc_mp_word* input, size_t input_words,
                                       const tc_mp_word* p, size_t n, tc_mp_word* scratch)
 {
@@ -181,12 +181,12 @@ static inline void tc_mp_montgomery(tc_mp_word* out, const tc_mp_word* a, const 
   tc_mp_reduce(out, t + n, t[2 * n], p, n, reduced);
 }
 
-/* Base and one are Montgomery residues below p. Exponent bytes are big-endian;
- * leading zero bytes are processed too. out, temporary (n limbs), product and
- * reduced are mutually disjoint and separate from every input. Two multiplies
- * per exponent bit; selection does not index memory with exponent bits.
+/* Base and one are Montgomery residues below p. Exponent bytes are big-endian,
+ * and leading zero bytes are processed too. out, temporary (n limbs), product
+ * and reduced are mutually disjoint and separate from every input. Each
+ * exponent bit costs two multiplies. Selection never indexes memory by exponent bits.
  * RSA callers must supply blinding, fault checks and secret cleanup. */
-/* exponent_length <= width; leading zero bytes are supplied without a copy. */
+/* exponent_length <= width. Leading zero bytes are supplied without a copy. */
 static inline void tc_mp_power_padded(tc_mp_word* out, const tc_mp_word* base,
                                       const uint8_t* exponent, size_t exponent_length, size_t width,
                                       const tc_mp_word* one, const tc_mp_word* p, size_t n,
@@ -216,7 +216,7 @@ static inline void tc_mp_power(tc_mp_word* out, const tc_mp_word* base, const ui
 }
 
 /* Public exponents may select multiplies by bit. Secret exponents use
- * tc_mp_power_padded so their bit pattern does not control the work. */
+ * tc_mp_power_padded so the work is independent of their bit pattern. */
 static inline void tc_mp_power_public(tc_mp_word* out, const tc_mp_word* base,
                                       const uint8_t* exponent, size_t exponent_length,
                                       const tc_mp_word* one, const tc_mp_word* p, size_t n,

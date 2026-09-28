@@ -17,8 +17,8 @@ TC_TLV_result TC_AAMVA_subfile_find(TC_bytes encoded, const char designator[2], 
 /* Find a three-letter field in a complete text subfile returned above.
  * Accepts LF-separated printable ASCII values, an optional LF after the subfile
  * type, and a final CR. Empty values are valid. Duplicate requested fields and
- * malformed fields return INVALID. OK borrows the value without separators;
- * END means absent. out must be separate from subfile and identifier; it changes
+ * malformed fields return INVALID. OK borrows the value without separators.
+ * END means absent. out must be separate from subfile and identifier. It changes
  * only on OK. */
 TC_TLV_result TC_AAMVA_field_find(TC_bytes subfile, const char identifier[3], TC_bytes* out);
 

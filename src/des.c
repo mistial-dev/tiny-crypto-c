@@ -2,11 +2,10 @@
  * SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * DES and Triple-DES implementation for tiny-crypto-c.
- * Portable C implementation of DES and Triple-DES (3DES / TDES)
- * optimized for small embedded devices and microcontrollers.
+ * Portable DES and Triple-DES (3DES / TDES) block cipher and key schedule for
+ * small embedded devices and microcontrollers. Modes live in des_modes.c.
  *
- * Inspired by and created in the design style of kokke's tiny-AES-c:
+ * The compact implementation style follows kokke's tiny-AES-c:
  * https://github.com/kokke/tiny-AES-c
  *
  */

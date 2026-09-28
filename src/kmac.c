@@ -12,7 +12,7 @@ static uint64_t tc_kmac_rotate(uint64_t value, unsigned shift)
 }
 
 /* Rearrange lanes in place to save 200 bytes of stack. Generate the round
- * constants with an LFSR so AVR builds don't need a table in RAM. */
+ * constants with an LFSR so AVR builds need no table in RAM. */
 static void tc_kmac_permute(uint64_t* a)
 {
   uint64_t c[5], t, d;

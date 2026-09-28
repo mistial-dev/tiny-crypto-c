@@ -125,7 +125,7 @@ TC_status TC_AES_CMAC_verify(const uint8_t* key, const uint8_t* msg, size_t msg_
   if (TC_AES_CMAC(key, msg, msg_len, computed, tag_len) != TC_OK)
     return TC_ERROR;
 
-  /* A mismatch is data, not malformed input. Report it distinctly. */
+  /* Report a tag mismatch as TC_MISMATCH, separate from argument errors. */
   status = TC_ct_equal(computed, tag, tag_len);
 
 #if TC_ZEROIZE

@@ -85,7 +85,7 @@ static TC_TLV_result tc_pki_octets_compare_chunk(void* context, TC_bytes bytes)
 }
 
 /* Compare chunk contents without flattening them. Complete framing is checked
- * even after a mismatch. Identifiers are public, so comparison is not constant-time.
+ * even after a mismatch. Identifiers are public, so comparison is variable-time.
  * Callers preflight disjoint inputs and writable ranges. */
 static inline TC_TLV_result tc_pki_octets_equal(TC_bytes encoded, unsigned root_tag,
                                                 TC_bytes expected, TC_TLV_profile profile,
@@ -133,9 +133,9 @@ static TC_TLV_result tc_pki_octets_store_chunk(void* context, TC_bytes bytes)
   return TC_TLV_OK;
 }
 
-/* Borrow a single chunk; join multiple chunks in caller storage. Input must
+/* Borrow a single chunk. Join multiple chunks in caller storage. Input must
  * stay unchanged across both passes. All writable ranges must be disjoint.
- * Output changes only on success; scratch contents are provisional on error. */
+ * Output changes only on success. Scratch contents are provisional on error. */
 static inline TC_TLV_result
 tc_pki_octets_contiguous(TC_bytes encoded, unsigned root_tag, TC_TLV_profile profile,
                          const TC_TLV_limits* limits, TC_TLV_frame* frames, size_t capacity,

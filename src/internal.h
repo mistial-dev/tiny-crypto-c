@@ -1,6 +1,6 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later
- * Private cross-algorithm helpers. Not installed as part of the public API. */
+ * Private cross-algorithm helpers for library sources. */
 #ifndef TINY_CRYPTO_INTERNAL_H_
 #define TINY_CRYPTO_INTERNAL_H_
 

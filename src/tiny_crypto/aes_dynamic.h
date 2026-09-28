@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-/* Key length is selected per context. The fixed-size AES API is unchanged. */
+/* Key length is selected per context. aes.h provides the fixed-size AES API. */
 typedef struct {
   uint8_t round_key[240];
   uint8_t rounds;
@@ -33,7 +33,7 @@ TC_status TC_AES_dynamic_CBC_decrypt(const TC_AES_dynamic_key* ctx, uint8_t iv[1
 
 TC_status TC_AES_dynamic_CMAC_init(TC_AES_dynamic_CMAC* ctx, const uint8_t* key, size_t key_len);
 TC_status TC_AES_dynamic_CMAC_update(TC_AES_dynamic_CMAC* ctx, const uint8_t* data, size_t length);
-/* Produces the full tag and clears the context. Truncation is the caller's choice. */
+/* Produces the full tag and clears the context. Callers may truncate the tag. */
 TC_status TC_AES_dynamic_CMAC_final(TC_AES_dynamic_CMAC* ctx, uint8_t tag[16]);
 void TC_AES_dynamic_CMAC_clear(TC_AES_dynamic_CMAC* ctx);
 #ifdef __cplusplus

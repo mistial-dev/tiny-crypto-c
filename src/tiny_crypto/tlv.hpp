@@ -5,7 +5,7 @@
 #include <tiny_crypto/tlv.h>
 
 namespace tiny_crypto {
-/* This wrapper owns the cursor only, not the bytes it reads. Explicit init
+/* This wrapper owns the cursor. The caller owns the bytes it reads. Explicit init
  * keeps initialization failures visible without exceptions or allocations. */
 class TLVReader {
 public:

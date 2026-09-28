@@ -42,8 +42,8 @@ static inline void tc_mp_swap(tc_mp_word* a, tc_mp_word* b, tc_mp_word mask, siz
 }
 
 /* Binary extended GCD for odd p > 1 and a < p. n > 0, and 2*n*word_bits fits
- * size_t. Every iteration halves one nonzero GCD operand until one reaches zero;
- * their combined bit lengths bound the iteration count. r*a=u and s*a=v mod p.
+ * size_t. Every iteration halves one nonzero GCD operand until one reaches zero.
+ * Their combined bit lengths bound the iteration count. r*a=u and s*a=v mod p.
  * Inputs, out and scratch (6n limbs) are disjoint. Failure preserves out.
  * The caller wipes scratch, which contains input-dependent coefficients. */
 static inline int tc_mp_inverse(tc_mp_word* out, const tc_mp_word* a, const tc_mp_word* p, size_t n,
@@ -64,7 +64,7 @@ static inline int tc_mp_inverse(tc_mp_word* out, const tc_mp_word* a, const tc_m
     const tc_mp_word borrow = tc_mp_subtract(difference, u, v, n);
     const unsigned u_odd = u[0] & 1u, v_odd = v[0] & 1u;
     const tc_mp_word swap = (tc_mp_word)(0u - (u_odd & ((v_odd ^ 1u) | borrow)));
-    /* Put an even operand first; for two odd operands, put the larger first. */
+    /* Put an even operand first. For two odd operands, put the larger first. */
     tc_mp_swap(u, v, swap, n);
     tc_mp_swap(r, s, swap, n);
     const tc_mp_word odd = (tc_mp_word)(0u - (u[0] & 1u));

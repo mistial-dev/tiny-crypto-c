@@ -14,13 +14,13 @@ extern "C" {
 /*
  * Mode selection (define to 1/0 before including this header, or via -D).
  * Default build enables CTR only. CBC, ECB, OFB, CCM, EAX, EAX_PRIME, GCM,
- * SIV, and CMAC are opt-in so unused modes do not contribute code or context
- * fields.
+ * SIV, and CMAC are opt-in so a build contains code and context fields only for
+ * the modes it enables.
  */
 
 /*
  * Minimum CMAC tag length in bytes. SP 800-38B recommends Tlen >= 64 bits for
- * most applications; shorter tags need careful risk analysis. Default matches
+ * most applications. Shorter tags need careful risk analysis. Default matches
  * TC_AES_EAX_MIN_TAG_LEN. Override only for exotic vectors / CAVP short-tag rows.
  */
 
@@ -63,7 +63,7 @@ void TC_AES_GCM_hardware_multiply(uint8_t result[16], const uint8_t left[16],
  * S-box implementation modes:
  *   TC_AES_SBOX_MODE_CONSTANT_TIME - algebraic inversion (default)
  *   TC_AES_SBOX_MODE_RUNTIME       - generated in RAM, then masked scan
- *   TC_AES_SBOX_MODE_FAST          - direct lookup; not constant-time
+ *   TC_AES_SBOX_MODE_FAST          - direct lookup, not constant-time
  */
 #define TC_AES_SBOX_MODE_CONSTANT_TIME 1
 #define TC_AES_SBOX_MODE_RUNTIME 2
@@ -75,7 +75,7 @@ void TC_AES_GCM_hardware_multiply(uint8_t result[16], const uint8_t left[16],
     "TC_AES_SBOX_MODE must be TC_AES_SBOX_MODE_CONSTANT_TIME, TC_AES_SBOX_MODE_RUNTIME, or TC_AES_SBOX_MODE_FAST"
 #endif
 
-/* 0 keeps byte-safe operations; 1 enables portable native-width helpers. */
+/* 0 keeps byte-safe operations. 1 enables portable native-width helpers. */
 #if (TC_AES_WIDE_OPS != 0) && (TC_AES_WIDE_OPS != 1)
 #error "TC_AES_WIDE_OPS must be 0 or 1"
 #endif
@@ -151,7 +151,7 @@ TC_status TC_AES_ECB_decrypt(const struct TC_AES_key_ctx* ctx, uint8_t* buf);
 
 #if defined(TC_AES_ENABLE_CBC) && (TC_AES_ENABLE_CBC == 1)
 /*
- * Buffer length must be a multiple of TC_AES_BLOCKLEN (no padding is applied).
+ * Buffer length must be a multiple of TC_AES_BLOCKLEN. The caller applies padding.
  * Returns TC_ERROR if length is not block-aligned. Set IV via TC_AES_init_ctx_iv()
  * or TC_AES_ctx_set_iv(). Never reuse an IV with the same key.
  */
@@ -213,7 +213,7 @@ struct TC_AES_GCM_ctx {
   uint64_t text_len;
   uint8_t stream_pos;
   uint8_t ghash_len;
-  uint8_t tag_len; /* fixed for this key/context; SP 800-38D §5.2.1.2 */
+  uint8_t tag_len; /* fixed for this key/context (SP 800-38D §5.2.1.2) */
   uint8_t phase;
   uint8_t direction;
   /* Streaming decryption authenticates contiguous caller-owned ciphertext. */
@@ -226,7 +226,7 @@ struct TC_AES_GCM_ctx {
  * Initialize GCM with a 12–16-byte tag. The explicit short-tag initializer
  * accepts 4 or 8 bytes under the SP 800-38D Appendix C packet limits.
  * Tag length is fixed for this context. IV may be any supported
- * non-zero byte length; 12 bytes (96 bits) is the recommended fast path.
+ * non-zero byte length. 12 bytes (96 bits) is the recommended fast path.
  */
 TC_status TC_AES_GCM_init(struct TC_AES_GCM_ctx* ctx, const uint8_t* key, const uint8_t* iv,
                           size_t iv_len, size_t tag_len);
@@ -234,10 +234,10 @@ TC_status TC_AES_GCM_init_short_tag(struct TC_AES_GCM_ctx* ctx, const uint8_t* k
                                     const uint8_t* iv, size_t iv_len, size_t tag_len);
 
 /* AAD must be supplied before the first encrypt/decrypt update. A context is
- * single-direction; reinitialize before switching direction. Check every
+ * single-direction. Reinitialize before switching direction. Check every
  * return value. Decrypt updates authenticate contiguous slices of one mutable
  * ciphertext buffer. Keep it writable through finish. Finish rechecks each
- * ciphertext block before replacing it with plaintext; a changed buffer
+ * ciphertext block before replacing it with plaintext. A changed buffer
  * returns TC_MISMATCH and is wiped. A bad tag leaves ciphertext unchanged. */
 TC_status TC_AES_GCM_aad_update(struct TC_AES_GCM_ctx* ctx, const uint8_t* aad, size_t length);
 TC_status TC_AES_GCM_encrypt_update(struct TC_AES_GCM_ctx* ctx, uint8_t* buf, size_t length);
@@ -249,8 +249,8 @@ TC_status TC_AES_GCM_decrypt_finish(struct TC_AES_GCM_ctx* ctx, const uint8_t* t
 
 /*
  * One-shot GCM. tag_len is fixed for this key use (SP 800-38D).
- * Buffer contract (all one-shot AEAD): exact alias of in/out is OK; fully
- * disjoint is OK; partial overlap returns TC_ERROR.
+ * Buffer contract (all one-shot AEAD): in and out may be exact aliases or fully
+ * disjoint. Partial overlap returns TC_ERROR.
  * Decrypt authenticates before releasing plaintext. GCM and CCM leave a
  * separate output untouched and wipe in-place ciphertext on a tag mismatch.
  * EAX leaves both kinds of output untouched on authentication failure.
@@ -324,14 +324,14 @@ TC_status TC_AES_EAX_PRIME_decrypt(const uint8_t* key, const uint8_t* cleartext,
 
 #if defined(TC_AES_ENABLE_CMAC) && (TC_AES_ENABLE_CMAC == 1)
 
-/* Full CMAC tag is one AES block; shorter tags are the leading tag_len bytes. */
+/* Full CMAC tag is one AES block. Shorter tags are the leading tag_len bytes. */
 #define TC_AES_CMAC_TAG_MAX TC_AES_BLOCKLEN
 
 /*
  * AES-CMAC (NIST SP 800-38B). One-shot.
- * tag_len must be in TC_AES_CMAC_MIN_TAG_LEN..TC_AES_CMAC_TAG_MAX (default min 8;
- * SP 800-38B truncation: most significant octets of the full T). Empty
- * message: msg may be NULL when msg_len is 0. Stack secrets wiped when
+ * tag_len must be in TC_AES_CMAC_MIN_TAG_LEN..TC_AES_CMAC_TAG_MAX (default min 8).
+ * Truncation keeps the most significant octets of the full T (SP 800-38B).
+ * msg may be NULL when msg_len is 0. Stack secrets wiped when
  * TC_ZEROIZE=1.
  */
 TC_status TC_AES_CMAC(const uint8_t* key, const uint8_t* msg, size_t msg_len, uint8_t* tag,
@@ -344,9 +344,9 @@ TC_status TC_AES_CMAC_verify(const uint8_t* key, const uint8_t* msg, size_t msg_
 /*
  * Streaming AES-CMAC. The most recent block is held back in buf so that
  * *_final can apply K1 (complete) or K2 (padded) to the true last block.
- * *_final always emits the full TC_AES_CMAC_TAG_MAX bytes; truncate at the
- * call site if required. The context is consumed by *_final and wiped when
- * TC_ZEROIZE is 1; call *_init again before reuse.
+ * *_final always emits the full TC_AES_CMAC_TAG_MAX bytes. Callers may truncate
+ * the tag. *_final consumes the context and wipes it when TC_ZEROIZE is 1.
+ * Call *_init again before reuse.
  */
 struct TC_AES_CMAC_ctx {
   struct TC_AES_key_ctx key;
@@ -379,8 +379,8 @@ void TC_AES_CMAC_ctx_clear(struct TC_AES_CMAC_ctx* ctx);
  * plaintext length. pt/ct must be exact aliases or fully disjoint (partial
  * overlap returns TC_ERROR). v may alias plaintext when ciphertext is
  * distinct, but must be disjoint from ciphertext (exact or partial overlap
- * with ct returns TC_ERROR). Decrypt writes candidate plaintext then
- * verifies; on authentication failure the output is wiped.
+ * with ct returns TC_ERROR). Decrypt writes candidate plaintext, then
+ * verifies. Authentication failure wipes the output.
  */
 TC_status TC_AES_SIV_encrypt(const uint8_t* key, const uint8_t* const* ad, const size_t* ad_lens,
                              size_t ad_count, const uint8_t* plaintext, size_t plaintext_len,

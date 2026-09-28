@@ -10,7 +10,7 @@ typedef struct {
   TC_credential_status on_unmapped;
 } tc_credential_tlv_policy;
 
-/* Validation accepts OK; CMS calls this mapper only for errors. */
+/* Validation accepts OK. CMS calls this mapper only for errors. */
 static const tc_credential_tlv_policy tc_credential_tlv_validation = {TC_CREDENTIAL_VALID,
                                                                       TC_CREDENTIAL_INVALID};
 static const tc_credential_tlv_policy tc_credential_tlv_cms = {TC_CREDENTIAL_ERROR,

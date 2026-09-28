@@ -6,7 +6,7 @@
 #include "pki_internal.h"
 
 /* RFC 3370/5754 digest identifiers accept absent or NULL parameters.
- * This rule does not apply to signature-algorithm parameters. */
+ * Signature-algorithm parameters follow their own rules. */
 static inline TC_TLV_result tc_pki_hash_parameters_profile(const TC_DER_algorithm* algorithm,
                                                            TC_TLV_profile profile)
 {

@@ -38,7 +38,7 @@ TC_TLV_result TC_DER_integer(const uint8_t* data, size_t length, TC_bytes* out, 
   if (result != TC_TLV_OK)
     return result;
   /* A sign octet is allowed only when removing it would change the sign.
-   * Keep it in the returned two's-complement span; do not normalize signed data. */
+   * Keep it in the returned two's-complement span. Signed data stays byte-exact. */
   result = TC_DER_integer_contents(v.data, v.length);
   if (result != TC_TLV_OK)
     return result;
@@ -112,7 +112,7 @@ TC_TLV_result TC_DER_oid_contents(const uint8_t* data, size_t length)
   if (!length)
     return TC_TLV_INVALID;
   /* The first combined OID arc uses the same base-128 encoding as later arcs.
-   * Validate the encoding without limiting arc values to a machine integer. */
+   * Validate the encoding. Arc values may exceed a machine integer. */
   for (i = 0; i < length; ++i) {
     if (first && data[i] == 128)
       return TC_TLV_INVALID;

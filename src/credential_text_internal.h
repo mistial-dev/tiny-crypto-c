@@ -7,7 +7,7 @@
 
 int tc_credential_hex_digit(uint8_t value);
 
-/* title_case selects Jan rather than JAN. Both formats require exact case. */
+/* title_case selects Jan, otherwise JAN. Both formats require exact case. */
 unsigned tc_credential_month3(const uint8_t value[3], int title_case);
 
 /* Parse a full Gregorian YYYYMMDD date. Output pointers may be null. */

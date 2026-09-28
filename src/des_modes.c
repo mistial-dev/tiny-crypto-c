@@ -381,7 +381,7 @@ TC_status TC_DES_CFB64_encrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t leng
 TC_status TC_DES_CFB64_decrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length)
 {
   DES_MODE_REQUIRE_CTX(ctx);
-  /* CFB decryption still uses the cipher's forward direction. */
+  /* CFB decryption uses the cipher's forward direction. */
   return tc_des_mode_cfb64(ctx, ctx->Iv, buf, length, tc_des_encrypt_mode_block, 1);
 }
 #endif

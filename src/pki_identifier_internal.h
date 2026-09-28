@@ -5,9 +5,9 @@
 #include "pki_extensions_internal.h"
 #include "pki_names_internal.h"
 
-/* Candidate selection, not signature or trust validation. Every supplied
+/* Candidate selection. Signature and trust validation are separate. Every supplied
  * identifier must match. An absent SKI cannot match a keyIdentifier hint.
- * Issuer alternatives currently support directoryName; unresolved other name
+ * Issuer alternatives support directoryName. Unresolved other name
  * forms return UNSUPPORTED. Inputs are parsed, borrowed and disjoint from
  * scratch/output. Output changes only on OK; scratch/work are provisional. */
 static inline TC_TLV_result
@@ -74,7 +74,7 @@ tc_pki_authority_matches(const TC_X509_authority_key_identifier* authority,
         unsupported = 1;
         continue;
       }
-      /* authorityCertIssuer names the candidate's issuer, not its subject. */
+      /* authorityCertIssuer names the candidate's issuer. */
       result = TC_X509_name_equal(name.value, candidate->issuer, limits, names, tree->work, &equal);
       if (result == TC_TLV_UNSUPPORTED) {
         unsupported = 1;

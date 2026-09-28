@@ -59,7 +59,7 @@ typedef struct {
   unsigned present, critical;
 } TC_X509_crl_extensions;
 
-/* Library-managed index storage. policy describes extension support, not trust. */
+/* Library-managed index storage. policy describes extension support only. */
 typedef struct {
   TC_X509_crl crl;
   TC_X509_crl_extensions extensions;
@@ -68,34 +68,34 @@ typedef struct {
 typedef struct {
   const TC_X509_crl_record* records;
   size_t count;
-  /* Non-CRL records omitted by collection adapters; zero for DER-only input. */
+  /* Non-CRL records omitted by collection adapters. Zero for DER-only input. */
   size_t other_count;
 } TC_X509_crl_index;
 
-/* Read a DER CertificateList. Spans borrow the unchanged input; revoked and
+/* Read a DER CertificateList. Spans borrow the unchanged input. revoked and
  * extensions retain their SEQUENCE wrappers. Extension values need separate
- * interpretation. Parsing does not verify signatures, freshness or trust.
+ * interpretation. Signature, freshness and trust checks are separate steps.
  * Input, limits, frames, work and out must be disjoint. Frames and work may
- * change on failure; out changes only on OK. Frame capacity counts elements. */
+ * change on failure. out changes only on OK. Frame capacity counts elements. */
 TC_TLV_result TC_X509_crl_read(TC_bytes encoded, const TC_TLV_limits* limits, TC_TLV_frame* frames,
                                size_t frame_capacity, size_t* work, TC_X509_crl* out);
 
 /* Read crl.extensions, or {NULL,0} when absent. present/critical use EXT masks.
- * Number spans contain INTEGER contents; all spans borrow unchanged input.
- * An unknown critical OID is reported, not accepted as an understood extension.
- * This checks syntax and uniqueness, not criticality policy or applicability.
- * Input, limits, workspace metadata/arrays, work and out must be disjoint.
- * Scratch/work are provisional; out changes only on OK. */
+ * Number spans contain INTEGER contents. All spans borrow unchanged input.
+ * An unknown critical OID is reported in unknown_critical_oid.
+ * This checks syntax and uniqueness. The caller applies criticality policy and
+ * applicability. Input, limits, workspace metadata/arrays, work and out must be
+ * disjoint. Scratch/work are provisional. out changes only on OK. */
 TC_TLV_result TC_X509_crl_extensions_read(TC_bytes encoded, const TC_TLV_limits* limits,
                                           const TC_X509_workspace* workspace, size_t* work,
                                           TC_X509_crl_extensions* out);
 
-/* Index DER CRLs once into caller-owned records. Limits apply to each CRL;
- * one work budget covers the collection. capacity counts record slots.
+/* Index DER CRLs once into caller-owned records. Limits apply to each CRL.
+ * One work budget covers the collection. capacity counts record slots.
  * Keep encodings and indexed records unchanged while using the index.
  * Inputs/metadata, workspace arrays, records, work and out must be disjoint.
- * Records and scratch are provisional on failure; out changes only on OK.
- * Empty input accepts NULL/0 arrays. No signatures or trust are checked. */
+ * Records and scratch are provisional on failure. out changes only on OK.
+ * Empty input accepts NULL/0 arrays. Signature and trust checks are separate steps. */
 TC_TLV_result TC_X509_crl_index_init(const TC_bytes* encoded, size_t count,
                                      const TC_TLV_limits* limits,
                                      const TC_X509_workspace* workspace, size_t* work,

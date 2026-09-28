@@ -23,8 +23,8 @@ static inline int tc_cms_verification_policy_valid(TC_CMS_verification_policy po
          tc_cms_rsa_parameters_valid(policy.rsa_parameters);
 }
 
-/* Resolve parsed SignerInfo algorithms without hashing or signature validation.
- * Input spans are valid and disjoint from out; out changes only on success. */
+/* Resolve parsed SignerInfo algorithms. Hashing and signature validation follow.
+ * Input spans are valid and disjoint from out. out changes only on success. */
 static inline TC_TLV_result tc_cms_signature_resolve_policy(
     const tc_cms_signer_info* signer, const TC_X509_public_key* key, TC_TLV_profile profile,
     const TC_TLV_limits* limits, const tc_pki_tree_workspace* tree,

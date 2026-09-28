@@ -23,9 +23,9 @@ typedef enum {
   TC_PIV_SM_PENDING
 } TC_PIV_SM_state;
 
-/* Zero-initialize before first use. Treat members as private; copying a live
- * session would reuse keys and counters. Clear when the card is removed or
- * transport delivery becomes uncertain. */
+/* Zero-initialize before first use. Treat members as private. Never copy a live
+ * session, because the copy would reuse keys and counters. Clear when the card
+ * is removed or transport delivery becomes uncertain. */
 typedef struct {
   union {
     struct {
@@ -117,7 +117,7 @@ TC_status TC_PIV_SM_ciphertext_size(size_t plaintext_length, size_t* ciphertext_
 /* Encrypt plaintext and authenticate the supplied ordered spans. The caller
  * owns all protocol framing and places the ciphertext span in authenticated
  * where its protocol requires it. Only one protected request may be pending.
- * Ciphertext storage may overlap authenticated spans; keep plaintext separate. */
+ * Ciphertext storage may overlap authenticated spans. Keep plaintext separate. */
 TC_status TC_PIV_SM_protect(TC_PIV_SM* session, const TC_PIV_SM_protect_request* request,
                             size_t* ciphertext_length, uint8_t tag[8],
                             TC_PIV_SM_workspace* workspace);

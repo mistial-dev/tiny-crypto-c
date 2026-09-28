@@ -13,20 +13,20 @@
  * @brief Portable C implementation of SHA-1, SHA-224, SHA-256, SHA-384,
  *        SHA-512 and HMAC.
  *
- * Designed for microcontrollers and embedded devices. After *_final the
- * context is zeroed when TC_ZEROIZE is 1; call *_init before reuse.
+ * After *_final the context is zeroed when TC_ZEROIZE is 1. Call *_init
+ * before reuse.
  *
- * SHA-1, SHA-224 and SHA-256 live in hash.c; SHA-384 and SHA-512 share a
+ * SHA-1, SHA-224 and SHA-256 live in hash.c. SHA-384 and SHA-512 share a
  * 64-bit core in sha512.c. SHA-224 pulls in the SHA-256 compression function
- * and SHA-384 the SHA-512 one; the other digest's public API stays out of the
- * build unless it is enabled itself.
+ * and SHA-384 the SHA-512 one. Each digest's public API is built only when
+ * that digest is enabled.
  */
 
 /*
  * Algorithm selection (define to 1/0 before including this header, or via -D).
  *
  * Default build enables SHA-256. SHA-1, SHA-224, SHA-384, SHA-512 and HMAC are
- * opt-in so unused code does not contribute to the binary. Only TC_ENABLE_*
+ * opt-in so a build contains only the algorithms it enables. Only TC_ENABLE_*
  * names are used, so this header can coexist with vendor headers and with
  * aes.h / des.h in the same translation unit.
  */
@@ -99,7 +99,7 @@
  * @brief SHA-1 Context Structure
  *
  * Count is the number of message bytes absorbed so far. Buf holds the
- * partial block awaiting compression; BufLen is its fill level (< 64).
+ * partial block awaiting compression, and BufLen is its fill level (< 64).
  */
 struct TC_SHA1_ctx {
   uint64_t Count;
@@ -131,7 +131,7 @@ struct TC_SHA224_ctx {
  * @brief SHA-256 Context Structure
  *
  * Count is the number of message bytes absorbed so far. Buf holds the
- * partial block awaiting compression; BufLen is its fill level (< 64).
+ * partial block awaiting compression, and BufLen is its fill level (< 64).
  */
 struct TC_SHA256_ctx {
   uint64_t Count;
@@ -147,7 +147,7 @@ struct TC_SHA256_ctx {
  * @brief SHA-384 Context Structure
  *
  * Same layout as SHA-512 (SHA-384 is SHA-512 with a different IV and a
- * 48-byte output). Count is the number of message bytes absorbed so far;
+ * 48-byte output). Count is the number of message bytes absorbed so far.
  * Buf holds the partial 128-byte block awaiting compression.
  */
 struct TC_SHA384_ctx {
@@ -164,7 +164,7 @@ struct TC_SHA384_ctx {
  * @brief SHA-512 Context Structure
  *
  * Count is the number of message bytes absorbed so far. Buf holds the
- * partial block awaiting compression; BufLen is its fill level (< 128).
+ * partial block awaiting compression, and BufLen is its fill level (< 128).
  */
 struct TC_SHA512_ctx {
   uint64_t Count;
@@ -181,7 +181,7 @@ struct TC_SHA512_ctx {
  * @brief HMAC-SHA-1 Context Structure
  *
  * Inner absorbs (key ^ ipad) || message. OuterState is the compact hash state
- * after absorbing (key ^ opad), so the key is never retained after init.
+ * after absorbing (key ^ opad), so the context holds no copy of the key after init.
  */
 struct TC_HMAC_SHA1_ctx {
   struct TC_SHA1_ctx Inner;
@@ -202,7 +202,7 @@ struct TC_HMAC_SHA224_ctx {
  * @brief HMAC-SHA-256 Context Structure
  *
  * Inner absorbs (key ^ ipad) || message. OuterState is the compact hash state
- * after absorbing (key ^ opad). The key is not retained after init.
+ * after absorbing (key ^ opad). The context holds no copy of the key after init.
  */
 struct TC_HMAC_SHA256_ctx {
   struct TC_SHA256_ctx Inner;
@@ -497,7 +497,7 @@ TC_status TC_SHA512_digest(const uint8_t* data, size_t len, uint8_t* digest);
 /**
  * @brief Initialize an HMAC-SHA-1 context with a key.
  *
- * Keys longer than TC_SHA1_BLOCKLEN are hashed first; shorter keys are
+ * Keys longer than TC_SHA1_BLOCKLEN are hashed first. Shorter keys are
  * zero-padded. A zero-length key is accepted (key may then be NULL).
  * @param ctx Pointer to HMAC-SHA-1 context structure.
  * @param key Pointer to key bytes.
@@ -533,7 +533,7 @@ void TC_HMAC_SHA1_ctx_clear(struct TC_HMAC_SHA1_ctx* ctx);
  * @param msg Pointer to message bytes (may be NULL when msg_len is 0).
  * @param msg_len Message length in bytes.
  * @param tag Output buffer of tag_len bytes.
- * @param tag_len Tag length; TC_HMAC_MIN_TAG_LEN..TC_SHA1_DIGESTLEN.
+ * @param tag_len Tag length, TC_HMAC_MIN_TAG_LEN..TC_SHA1_DIGESTLEN.
  * @return TC_OK, or TC_ERROR on invalid arguments.
  */
 TC_status TC_HMAC_SHA1_digest(const uint8_t* key, size_t keylen, const uint8_t* msg, size_t msg_len,
@@ -552,13 +552,13 @@ TC_status TC_HMAC_SHA1_verify(const uint8_t* key, size_t keylen, const uint8_t* 
 /**
  * @brief Initialize an HMAC-SHA-224 context with a key.
  *
- * Keys longer than TC_SHA224_BLOCKLEN are hashed first; shorter keys are
+ * Keys longer than TC_SHA224_BLOCKLEN are hashed first. Shorter keys are
  * zero-padded. A zero-length key is accepted (key may then be NULL).
  * @return TC_OK, or TC_ERROR on invalid arguments.
  */
 TC_status TC_HMAC_SHA224_init(struct TC_HMAC_SHA224_ctx* ctx, const uint8_t* key, size_t keylen);
 
-/** @brief Absorb message bytes; TC_ERROR only on a TC_STRICT NULL failure. */
+/** @brief Absorb message bytes. Returns TC_ERROR only on a TC_STRICT NULL failure. */
 TC_status TC_HMAC_SHA224_update(struct TC_HMAC_SHA224_ctx* ctx, const uint8_t* data, size_t len);
 
 /**
@@ -574,7 +574,7 @@ void TC_HMAC_SHA224_ctx_clear(struct TC_HMAC_SHA224_ctx* ctx);
 
 /**
  * @brief One-shot HMAC-SHA-224 with optional truncation.
- * @param tag_len Tag length; TC_HMAC_MIN_TAG_LEN..TC_SHA224_DIGESTLEN.
+ * @param tag_len Tag length, TC_HMAC_MIN_TAG_LEN..TC_SHA224_DIGESTLEN.
  * @return TC_OK, or TC_ERROR on invalid arguments.
  */
 TC_status TC_HMAC_SHA224_digest(const uint8_t* key, size_t keylen, const uint8_t* msg,
@@ -593,7 +593,7 @@ TC_status TC_HMAC_SHA224_verify(const uint8_t* key, size_t keylen, const uint8_t
 /**
  * @brief Initialize an HMAC-SHA-256 context with a key.
  *
- * Keys longer than TC_SHA256_BLOCKLEN are hashed first; shorter keys are
+ * Keys longer than TC_SHA256_BLOCKLEN are hashed first. Shorter keys are
  * zero-padded. A zero-length key is accepted (key may then be NULL).
  * @param ctx Pointer to HMAC-SHA-256 context structure.
  * @param key Pointer to key bytes.
@@ -629,7 +629,7 @@ void TC_HMAC_SHA256_ctx_clear(struct TC_HMAC_SHA256_ctx* ctx);
  * @param msg Pointer to message bytes (may be NULL when msg_len is 0).
  * @param msg_len Message length in bytes.
  * @param tag Output buffer of tag_len bytes.
- * @param tag_len Tag length; TC_HMAC_MIN_TAG_LEN..TC_SHA256_DIGESTLEN.
+ * @param tag_len Tag length, TC_HMAC_MIN_TAG_LEN..TC_SHA256_DIGESTLEN.
  * @return TC_OK, or TC_ERROR on invalid arguments.
  */
 TC_status TC_HMAC_SHA256_digest(const uint8_t* key, size_t keylen, const uint8_t* msg,
@@ -648,13 +648,13 @@ TC_status TC_HMAC_SHA256_verify(const uint8_t* key, size_t keylen, const uint8_t
 /**
  * @brief Initialize an HMAC-SHA-384 context with a key.
  *
- * Keys longer than TC_SHA384_BLOCKLEN are hashed first; shorter keys are
+ * Keys longer than TC_SHA384_BLOCKLEN are hashed first. Shorter keys are
  * zero-padded. A zero-length key is accepted (key may then be NULL).
  * @return TC_OK, or TC_ERROR on invalid arguments.
  */
 TC_status TC_HMAC_SHA384_init(struct TC_HMAC_SHA384_ctx* ctx, const uint8_t* key, size_t keylen);
 
-/** @brief Absorb message bytes; TC_ERROR only on a TC_STRICT NULL failure. */
+/** @brief Absorb message bytes. Returns TC_ERROR only on a TC_STRICT NULL failure. */
 TC_status TC_HMAC_SHA384_update(struct TC_HMAC_SHA384_ctx* ctx, const uint8_t* data, size_t len);
 
 /**
@@ -670,7 +670,7 @@ void TC_HMAC_SHA384_ctx_clear(struct TC_HMAC_SHA384_ctx* ctx);
 
 /**
  * @brief One-shot HMAC-SHA-384 with optional truncation.
- * @param tag_len Tag length; TC_HMAC_MIN_TAG_LEN..TC_SHA384_DIGESTLEN.
+ * @param tag_len Tag length, TC_HMAC_MIN_TAG_LEN..TC_SHA384_DIGESTLEN.
  * @return TC_OK, or TC_ERROR on invalid arguments.
  */
 TC_status TC_HMAC_SHA384_digest(const uint8_t* key, size_t keylen, const uint8_t* msg,
@@ -689,13 +689,13 @@ TC_status TC_HMAC_SHA384_verify(const uint8_t* key, size_t keylen, const uint8_t
 /**
  * @brief Initialize an HMAC-SHA-512 context with a key.
  *
- * Keys longer than TC_SHA512_BLOCKLEN are hashed first; shorter keys are
+ * Keys longer than TC_SHA512_BLOCKLEN are hashed first. Shorter keys are
  * zero-padded. A zero-length key is accepted (key may then be NULL).
  * @return TC_OK, or TC_ERROR on invalid arguments.
  */
 TC_status TC_HMAC_SHA512_init(struct TC_HMAC_SHA512_ctx* ctx, const uint8_t* key, size_t keylen);
 
-/** @brief Absorb message bytes; TC_ERROR only on a TC_STRICT NULL failure. */
+/** @brief Absorb message bytes. Returns TC_ERROR only on a TC_STRICT NULL failure. */
 TC_status TC_HMAC_SHA512_update(struct TC_HMAC_SHA512_ctx* ctx, const uint8_t* data, size_t len);
 
 /**
@@ -711,7 +711,7 @@ void TC_HMAC_SHA512_ctx_clear(struct TC_HMAC_SHA512_ctx* ctx);
 
 /**
  * @brief One-shot HMAC-SHA-512 with optional truncation.
- * @param tag_len Tag length; TC_HMAC_MIN_TAG_LEN..TC_SHA512_DIGESTLEN.
+ * @param tag_len Tag length, TC_HMAC_MIN_TAG_LEN..TC_SHA512_DIGESTLEN.
  * @return TC_OK, or TC_ERROR on invalid arguments.
  */
 TC_status TC_HMAC_SHA512_digest(const uint8_t* key, size_t keylen, const uint8_t* msg,

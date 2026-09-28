@@ -48,7 +48,7 @@ size_t TC_validation_workspace_alignment(void);
 TC_result TC_validation_workspace_size(const TC_validation_capacity* capacity, size_t* bytes);
 
 /* arena must have the reported size and alignment. Metadata and arena are
- * disjoint. Keep out at the same address until its last use; its credential
+ * disjoint. Keep out at the same address until its last use. Its credential
  * view refers to out->path. Arena bytes are scratch for one operation at a time.
  * Failure leaves out and arena unchanged. Initialization leaves arena untouched.
  * Typed-array workspace initializers remain available for fixed layouts. */
@@ -100,7 +100,7 @@ TC_result TC_validation_context_init(const TC_validation_trust* trust,
 
 /* Validate CMS content, signer path and revocation under one time and provider.
  * work is the remaining byte/operation budget, consumed across the sequence.
- * Inputs and source bytes remain borrowed; workspace is reusable on return. */
+ * Inputs and source bytes remain borrowed. Workspace is reusable on return. */
 TC_credential_status TC_CMS_validate(const TC_CMS_validation_request* request,
                                      const TC_validation_context* context, size_t* work);
 

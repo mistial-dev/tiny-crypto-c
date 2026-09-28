@@ -20,8 +20,8 @@ TC_TLV_result TC_TWIC_uuid_write(uint64_t number, uint8_t* out, size_t capacity)
 
 /* Compare a NEXGEN UUID with a decoded FASC-N's first three fields. The other
  * fields do not occur in the UUID. Select this policy for TWIC application
- * identifiers; PIV-I placeholder FASC-Ns require separate application handling.
- * All inputs must be disjoint from matched. OK writes 0 or 1; errors preserve it. */
+ * identifiers. PIV-I placeholder FASC-Ns require separate application handling.
+ * All inputs must be disjoint from matched. OK writes 0 or 1. Errors preserve it. */
 TC_TLV_result TC_TWIC_uuid_match(TC_bytes encoded, const TC_FASCN* fascn, int* matched);
 
 #ifdef __cplusplus

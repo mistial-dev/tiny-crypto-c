@@ -79,7 +79,7 @@ static inline TC_TLV_result tc_pki_signature_key_check(const TC_signature_algori
 }
 
 /* Decode signature and hash parameters before selecting a signer. Inputs have
- * validated spans and are disjoint from out; out changes only on OK. */
+ * validated spans and are disjoint from out. out changes only on OK. */
 static inline TC_TLV_result tc_pki_signature_algorithm_read(const TC_DER_algorithm* algorithm,
                                                             TC_TLV_profile profile,
                                                             const TC_TLV_limits* limits,

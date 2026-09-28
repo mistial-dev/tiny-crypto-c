@@ -4,7 +4,7 @@
 #define TC_MP_PRIME_INTERNAL_H_
 #include "mp_internal.h"
 
-/* Candidate setup for FIPS 186-5 B.3.1. Odd p >3; n >0 and n*word_bits
+/* Candidate setup for FIPS 186-5 B.3.1. Odd p > 3. n > 0 and n*word_bits
  * fits size_t. Scratch has 10n+2 limbs, disjoint from p. Its first four rows
  * retain R^2, the odd exponent, Montgomery one and minus one across rounds.
  * Return the trailing-zero count of p-1. Caller bounds work and wipes scratch. */

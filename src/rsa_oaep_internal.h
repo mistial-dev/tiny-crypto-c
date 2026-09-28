@@ -23,7 +23,7 @@ static inline TC_RSA_result tc_rsa_oaep_prepare(size_t length, TC_hash_algorithm
 }
 
 /* RFC 8017 7.1.1. Seed is hLen bytes from a cryptographic RNG. Caller validates
- * disjoint ranges; block holds the larger hash digest. Encoded bytes are
+ * disjoint ranges. block holds the larger hash digest. Encoded bytes are
  * provisional on failure. Message and seed are copied into their fields only. */
 static inline TC_RSA_result tc_rsa_oaep_encode(uint8_t* encoded, size_t length,
                                                TC_hash_algorithm hash, TC_hash_algorithm mgf_hash,

@@ -35,7 +35,7 @@ static inline TC_status tc_rsa_pss_hash(TC_hash_algorithm hash, TC_bytes digest,
 }
 
 /* Salt bytes come from the caller's cryptographic RNG. Output may change on
- * failure; callers must discard it. Inputs, output, block and workspace are
+ * failure, and callers must discard it. Inputs, output, block and workspace are
  * disjoint. Salt is copied only into its encoded-message field. */
 static inline TC_RSA_result tc_rsa_pss_encode(uint8_t* encoded, size_t length, size_t bits,
                                               TC_hash_algorithm hash, TC_hash_algorithm mgf_hash,
@@ -70,7 +70,7 @@ static inline TC_RSA_result tc_rsa_pss_encode(uint8_t* encoded, size_t length, s
 }
 
 /* RFC 8017 section 9.1.2, with an explicit salt length and precomputed digest.
- * encoded is mutable scratch; it may change even on failure. Other inputs,
+ * encoded is mutable scratch and may change on failure. Other inputs,
  * hash workspace, block and work are disjoint from it and each other. block
  * holds the larger of the message-hash and MGF-hash digests. */
 static inline TC_RSA_result tc_rsa_pss_check(uint8_t* encoded, size_t length, size_t bits,

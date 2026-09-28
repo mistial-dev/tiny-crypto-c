@@ -23,12 +23,12 @@ TC_TLV_result TC_DER_bit_string(const uint8_t* data, size_t length, TC_bytes* bi
 TC_TLV_result TC_DER_oid(const uint8_t* data, size_t length, TC_bytes* oid);
 /* Contents-only form for an IMPLICIT-tagged OBJECT IDENTIFIER. */
 TC_TLV_result TC_DER_oid_contents(const uint8_t* data, size_t length);
-/* OID contents remain encoded; arbitrary-sized arcs need no integer conversion. */
+/* OID contents remain encoded, so arcs of any size need no integer conversion. */
 TC_TLV_result TC_DER_boolean(const uint8_t* data, size_t length, int* out);
 TC_TLV_result TC_DER_null(const uint8_t* data, size_t length);
 TC_TLV_result TC_DER_sequence(const uint8_t* data, size_t length, TC_bytes* contents);
 TC_TLV_result TC_DER_set(const uint8_t* data, size_t length, TC_bytes* contents);
-/* SET OF sorting and schema-dependent SET/DEFAULT rules are not checked here. */
+/* The caller checks SET OF sorting and schema-dependent SET/DEFAULT rules. */
 
 typedef struct {
   TC_bytes oid;
@@ -55,9 +55,9 @@ typedef struct {
   unsigned public_key_unused;
 } TC_DER_private_key;
 /* DER PKCS #8 PrivateKeyInfo / RFC 5958 OneAsymmetricKey.
- * Version 0 carries a private key; version 1 also carries its public key.
+ * Version 0 carries a private key. Version 1 also carries its public key.
  * All spans borrow the encoded input.
- * Checks the container fields; callers validate algorithm parameters, key
+ * Checks the container fields. Callers validate algorithm parameters, key
  * contents, public/private consistency and attribute schemas.
  * Other versions return UNSUPPORTED.
  * Keep the output object separate from input and protect the key bytes. */
@@ -77,7 +77,7 @@ typedef struct {
   TC_bytes prime1, prime2, exponent1, exponent2, coefficient;
 } TC_DER_rsa_private_key;
 /* PKCS #1 two-prime RSAPrivateKey. Components borrow the input buffer.
- * Checks DER structure and positive integers; validate key mathematics before use.
+ * Checks DER structure and positive integers. Validate key mathematics before use.
  * Version 1 returns UNSUPPORTED. Keep the output object separate from input. */
 TC_TLV_result TC_DER_rsa_private(const uint8_t* data, size_t length, TC_DER_rsa_private_key* out);
 /* Positive INTEGERs as unsigned magnitudes, with any sign octet removed.

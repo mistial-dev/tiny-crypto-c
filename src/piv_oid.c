@@ -36,7 +36,7 @@ TC_PIV_oid TC_PIV_oid_identify(TC_bytes oid, TC_PIV_oid_profile profile)
       return TC_PIV_OID_POLICY_AUTHENTICATION;
     case 17:
       return TC_PIV_OID_POLICY_CARD_AUTHENTICATION;
-    /* Common Policy section 1.2; TWIC section 6 defines no paired alias. */
+    /* Common Policy section 1.2. TWIC section 6 defines no paired alias. */
     case 39:
       return twic ? TC_PIV_OID_UNKNOWN : TC_PIV_OID_POLICY_CONTENT_SIGNING;
     default:

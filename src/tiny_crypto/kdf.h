@@ -14,7 +14,7 @@
  *
  * Every derivation is a one-shot: it expands a key-derivation key
  * (KDK) and caller-supplied fixed input into out_len bytes of keying material.
- * The library never interprets the fixed input; TC_KBKDF_fixed_input builds
+ * The fixed input is opaque to the library. TC_KBKDF_fixed_input builds
  * the conventional Label || 0x00 || Context || [L]_32 encoding. A cached
  * keyed PRF context, a working copy and chaining values live on the stack and
  * are wiped when TC_ZEROIZE is 1.
@@ -65,7 +65,7 @@
 
 /*
  * Largest PRF output (h) in this profile. Sizes the feedback / pipeline
- * chaining buffers so small profiles do not pay for SHA-512.
+ * chaining buffers to the largest PRF enabled in the profile.
  */
 #if TC_KBKDF_HAVE_HMAC_SHA512
 #define TC_KBKDF_PRF_MAX 64
@@ -93,7 +93,7 @@
  * Counter placement for feedback and double-pipeline mode (the CAVP
  * CTRLOCATION values). "iter" is K(i-1) in feedback mode and A(i) in
  * double-pipeline mode. Values start at 1 so a zero-initialized params struct
- * with use_counter set is rejected instead of silently picking a layout.
+ * with use_counter set is rejected.
  */
 #define TC_KBKDF_CTR_BEFORE_ITER 1 /**< [i]_r || iter || FixedInput */
 #define TC_KBKDF_CTR_AFTER_ITER 2  /**< iter || [i]_r || FixedInput */
@@ -102,7 +102,7 @@
 /**
  * @brief Derivation parameters shared by every PRF family.
  *
- * Counter mode reads only counter_bits; the counter position is expressed by
+ * Counter mode reads only counter_bits. The counter position is expressed by
  * the before/after split of the fixed input (see the *_counter contract).
  * Feedback and double-pipeline mode read use_counter and, when it is
  * non-zero, counter_bits and counter_location as well. Ignored fields may
@@ -129,16 +129,16 @@ extern "C" {
  * requested length in bits, big-endian, as SP 800-108 section 4 recommends.
  * The 0x00 separator only delimits unambiguously when label contains no zero
  * byte, so such labels are rejected.
- * @param label Label bytes in the application's encoding (typically ASCII);
- *              may be NULL when label_len is 0.
- * @param context Context bytes; may be NULL when context_len is 0.
+ * @param label Label bytes in the application's encoding (typically ASCII).
+ *              May be NULL when label_len is 0.
+ * @param context Context bytes. May be NULL when context_len is 0.
  * @param out_len Byte length of the keying material the caller will derive
- *                with this fixed input; 1..2^29 - 1 so that 8 * out_len fits
+ *                with this fixed input, 1..2^29 - 1 so that 8 * out_len fits
  *                in 32 bits.
- * @param buf Output buffer; must not overlap label or context.
- * @param buf_len Capacity of buf; at least
+ * @param buf Output buffer. Must not overlap label or context.
+ * @param buf_len Capacity of buf, at least
  *                TC_KBKDF_FIXED_INPUT_LEN(label_len, context_len). Exactly that
- *                many bytes are written; pass that value as the fixed-input
+ *                many bytes are written. Pass that value as the fixed-input
  *                length to the derivation.
  * @return TC_OK, or TC_ERROR on a NULL/length violation, an overlapping buf,
  *         or a zero byte inside label.
@@ -153,7 +153,7 @@ TC_status TC_KBKDF_fixed_input(const uint8_t* label, size_t label_len, const uin
  *                 AES-CMAC requires key_len == TC_AES_KEYLEN (the key size is
  *                 fixed by TC_AES_KEY_BITS). DES-CMAC accepts 8, 16 (2-key
  *                 TDEA, K1 || K2 used as K1, K2, K1) or 24. HMAC accepts any
- *                 non-zero length; keys longer than a block are hashed.
+ *                 non-zero length. Keys longer than a block are hashed.
  * params          Non-NULL. counter_bits must be 8, 16, 24 or 32 whenever a
  *                 counter is used. counter_location must be a TC_KBKDF_CTR_*
  *                 value for feedback / pipeline mode with a counter.
@@ -161,7 +161,7 @@ TC_status TC_KBKDF_fixed_input(const uint8_t* label, size_t label_len, const uin
  *                 An empty fixed input and an empty IV are valid.
  * out / out_len   Exactly out_len bytes are written. out_len must be non-zero
  *                 and out must not overlap key, the IV or any fixed-input
- *                 buffer (TC_ERROR otherwise; later blocks re-read the inputs).
+ *                 buffer (TC_ERROR otherwise, because later blocks re-read the inputs).
  *                 n = ceil(out_len / h) PRF blocks are computed and the last
  *                 one is truncated. n must not exceed 2^r - 1 when a counter of
  *                 r bits is used, nor 2^32 - 1 without one.
@@ -273,17 +273,17 @@ TC_status TC_KBKDF_HMAC_SHA512_pipeline(const uint8_t* key, size_t key_len,
 #endif /* TC_KBKDF_HAVE_HMAC_SHA512 */
 
 #if TC_KBKDF_HAVE_AES_CMAC
-/** @brief KBKDF counter mode with AES-CMAC (h = 16; key_len must be TC_AES_KEYLEN). */
+/** @brief KBKDF counter mode with AES-CMAC (h = 16, key_len must be TC_AES_KEYLEN). */
 TC_status TC_KBKDF_AES_CMAC_counter(const uint8_t* key, size_t key_len,
                                     const struct TC_KBKDF_params* params, const uint8_t* before,
                                     size_t before_len, const uint8_t* after, size_t after_len,
                                     uint8_t* out, size_t out_len);
-/** @brief KBKDF feedback mode with AES-CMAC (h = 16; key_len must be TC_AES_KEYLEN). */
+/** @brief KBKDF feedback mode with AES-CMAC (h = 16, key_len must be TC_AES_KEYLEN). */
 TC_status TC_KBKDF_AES_CMAC_feedback(const uint8_t* key, size_t key_len,
                                      const struct TC_KBKDF_params* params, const uint8_t* iv,
                                      size_t iv_len, const uint8_t* fixed, size_t fixed_len,
                                      uint8_t* out, size_t out_len);
-/** @brief KBKDF double-pipeline mode with AES-CMAC (h = 16; key_len must be TC_AES_KEYLEN). */
+/** @brief KBKDF double-pipeline mode with AES-CMAC (h = 16, key_len must be TC_AES_KEYLEN). */
 TC_status TC_KBKDF_AES_CMAC_pipeline(const uint8_t* key, size_t key_len,
                                      const struct TC_KBKDF_params* params, const uint8_t* fixed,
                                      size_t fixed_len, uint8_t* out, size_t out_len);
@@ -292,7 +292,7 @@ TC_status TC_KBKDF_AES_CMAC_pipeline(const uint8_t* key, size_t key_len,
 #if TC_KBKDF_HAVE_DES_CMAC
 /*
  * TDEA-CMAC is a 64-bit-block PRF kept for CAVP and legacy interoperability
- * (SP 800-131A deprecates it); key_len is 8, 16 or 24.
+ * (SP 800-131A deprecates it). key_len is 8, 16 or 24.
  */
 /** @brief KBKDF counter mode with DES/TDEA-CMAC (h = 8). */
 TC_status TC_KBKDF_DES_CMAC_counter(const uint8_t* key, size_t key_len,

@@ -89,7 +89,7 @@ TC_TWIC_CCL_result TC_TWIC_CCL_stream_update(TC_TWIC_CCL_stream* stream, TC_byte
     return stream->error = TC_TWIC_CCL_LIMIT;
   stream->bytes_left -= chunk.length;
   while (chunk.length) {
-    /* Bound even the newline search when a hostile input contains a long row. */
+    /* Bound the newline search so a hostile long row stays within limits. */
     size_t available = sizeof stream->pending - stream->used;
     size_t scan = chunk.length < available + 1 ? chunk.length : available + 1;
     const uint8_t* newline = memchr(chunk.data, '\n', scan);

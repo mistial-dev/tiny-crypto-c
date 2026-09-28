@@ -6,7 +6,7 @@
 #include "pki_tree_internal.h"
 #include "x509_path_internal.h"
 
-/* Callers preflight storage; this bounds and hashes borrowed parts in order. */
+/* Callers preflight storage. Bounds and hashes borrowed parts in order. */
 static inline TC_TLV_result tc_pki_hash_parts(const TC_bytes* parts, size_t count,
                                               TC_hash_algorithm algorithm,
                                               const TC_TLV_limits* limits,

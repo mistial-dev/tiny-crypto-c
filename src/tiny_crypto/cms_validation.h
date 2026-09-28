@@ -33,8 +33,8 @@ typedef struct {
 } TC_CMS_path_workspace;
 
 /* Find a signer certificate, verify its signature, and build a trusted path.
- * Embedded certificates precede external candidates; only source anchors
- * establish trust. The result borrows all certificate and source bytes. */
+ * Embedded certificates precede external candidates. Trust comes from source
+ * anchors alone. The result borrows all certificate and source bytes. */
 TC_X509_path_status TC_CMS_signer_path_build(const TC_CMS_signer_info* signer,
                                              TC_bytes content_type, TC_bytes digest,
                                              TC_bytes embedded, const TC_X509_store_source* source,
@@ -75,7 +75,7 @@ typedef struct {
   size_t node_capacity;
   TC_X509_revocation_scope* scopes;
   size_t scope_capacity;
-  /* Borrowed signer path and policy views; capacity matches path scratch. */
+  /* Borrowed signer path and policy views. Capacity matches path scratch. */
   TC_bytes* signer_path;
   size_t signer_path_capacity;
   TC_bytes* signer_policies;

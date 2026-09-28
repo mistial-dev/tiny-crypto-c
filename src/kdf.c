@@ -7,11 +7,10 @@
  *
  * One generic core drives every mode. A PRF is a tagged, typed descriptor:
  * HMAC PRFs name a hash-core descriptor, and CMAC PRFs name their cipher's
- * CMAC functions. Per-PRF wrappers provide typed context storage without
- * allocating on the heap. Each block
- * is fed to the MAC as an ordered list of segments (counter, chaining value,
- * fixed input) and never copied into a scratch buffer, which keeps the stack
- * bounded by two contexts of the selected MAC plus two h-byte blocks.
+ * CMAC functions. Per-PRF wrappers provide typed context storage with no heap
+ * allocation. The MAC reads each block as an ordered list of borrowed segments
+ * (counter, chaining value, fixed input), which bounds the stack to two
+ * contexts of the selected MAC plus two h-byte blocks.
  */
 
 #include <string.h>
@@ -178,7 +177,7 @@ static TC_status tc_kdf_derive(const struct tc_kdf_prf* prf, int mode, const uin
     }
 
     if (mode == TC_KDF_MODE_PIPELINE) {
-      /* A(i) = PRF(KDK, A(i-1)); A(0) is the fixed input itself. */
+      /* A(i) = PRF(KDK, A(i-1)). A(0) is the fixed input itself. */
       seg[0].data = chain_p;
       seg[0].len = chain_n;
       if (tc_kdf_prf_run(prf, initialized, ctx, seg, 1, chain) != TC_OK)

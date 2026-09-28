@@ -25,8 +25,8 @@ static inline int tc_rsa_v15_size(size_t length, size_t prefix_length, size_t di
          digest_length <= length - 11 - prefix_length;
 }
 
-/* RFC 8017 section 9.2. Inputs and output are disjoint; pointers cover the stated
- * lengths. Invalid sizing leaves output unchanged. No hash or RSA operation. */
+/* RFC 8017 section 9.2 encoding step. Inputs and output are disjoint, and pointers
+ * cover the stated lengths. Invalid sizing leaves output unchanged. */
 static inline TC_status tc_rsa_v15_encode(uint8_t* out, size_t length, const uint8_t* prefix,
                                           size_t prefix_length, const uint8_t* digest,
                                           size_t digest_length)

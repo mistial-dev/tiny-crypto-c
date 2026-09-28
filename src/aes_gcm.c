@@ -118,8 +118,8 @@ static int tc_aes_gcm_tag_length_is_allowed(size_t tag_len, int short_tag)
 /*
  * Appendix C packet bound for short tags only (most permissive table row).
  * 96–128 bit tags have no Appendix C size cap. Overflow-safe for MCU math.
- * Lifetime decryption-invocation limits are not tracked here (no NVRAM/key
- * store); the application must rotate keys per Appendix C.
+ * The application tracks lifetime decryption-invocation limits and rotates
+ * keys per Appendix C. The library has no NVRAM or key store.
  */
 static int tc_aes_gcm_packet_lengths_ok(size_t tag_len, uint64_t aad_len, uint64_t text_len,
                                         uint64_t extra_text)

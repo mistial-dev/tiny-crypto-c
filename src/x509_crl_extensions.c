@@ -370,7 +370,7 @@ TC_TLV_result tc_x509_crl_distribution_read(TC_bytes encoded, const TC_TLV_limit
         return result;
       parsed.has_reasons = 1;
     } else {
-      /* DEFAULT FALSE is omitted in DER; present booleans must be TRUE. */
+      /* DEFAULT FALSE is omitted in DER. Present booleans must be TRUE. */
       if (element.value.length != 1 || element.value.data[0] != 0xff)
         return TC_TLV_INVALID;
       switch (tag) {

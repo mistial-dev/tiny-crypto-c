@@ -51,7 +51,7 @@ static inline TC_status tc_hash_final(TC_hash_algorithm algorithm, TC_hash_conte
 
 /* Hash borrowed parts in order. Caller bounds count/lengths and validates ranges.
  * Context, digest and input storage are disjoint. Digest has the selected
- * hash's full output size. No output is written before all updates succeed. */
+ * hash's full output size. Digest is written only after all updates succeed. */
 static inline TC_status tc_hash_digest_parts(TC_hash_algorithm algorithm, const TC_bytes* parts,
                                              size_t count, uint8_t* digest,
                                              TC_hash_context* context)

@@ -25,7 +25,7 @@ static inline TC_TLV_result tc_pki_string_chunk(void* context, TC_bytes bytes)
 }
 
 /* X.690 8.23.3 encodes restricted strings as implicit OCTET STRINGs. Child
- * tags are 04/24; character boundaries need not coincide with chunk boundaries.
+ * tags are 04/24. Character boundaries need not coincide with chunk boundaries.
  * Callers preflight disjoint input/scratch. Callback output is provisional. */
 static inline TC_TLV_result tc_pki_string_walk(TC_bytes encoded, unsigned tag,
                                                TC_TLV_profile profile, const TC_TLV_limits* limits,

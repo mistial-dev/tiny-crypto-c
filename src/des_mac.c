@@ -38,7 +38,7 @@ static tc_mac_cipher tc_des_mac_cipher(const tc_des_mac_key* key)
 #if TC_DES_ENABLE_CMAC
 
 /* CMAC needs only the raw block cipher, so the context schedules keys and
-   chains blocks itself; it must keep working with the optional ECB/CBC/TDES
+   chains blocks itself. CMAC must keep working with the optional ECB/CBC/TDES
    mode gates compiled out. */
 static void tc_des_cmac_generate_subkeys(const struct TC_DES_CMAC_ctx* ctx, uint8_t* k1,
                                          uint8_t* k2)
@@ -144,7 +144,7 @@ TC_status TC_DES_CMAC(const uint8_t* key, size_t keylen, const uint8_t* msg, siz
   }
   if (TC_DES_CMAC_init(&ctx, key, keylen) != TC_OK)
     return TC_ERROR;
-  /* Empty message: msg may be NULL; update only reads when msg_len > 0. */
+  /* Empty message: msg may be NULL. update reads msg only when msg_len > 0. */
   if (TC_DES_CMAC_update(&ctx, msg, msg_len) != TC_OK || TC_DES_CMAC_final(&ctx, full) != TC_OK) {
     TC_DES_CMAC_ctx_clear(&ctx);
     return TC_ERROR;

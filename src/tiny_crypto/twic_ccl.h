@@ -35,7 +35,7 @@ typedef struct {
 TC_TWIC_CCL_result TC_TWIC_CCL_read(TC_bytes line, TC_TWIC_CCL_record* out);
 
 /* The record is valid during the call. Copy it into staging storage as needed.
- * Return TC_OK after accepting it; any other value aborts the import. */
+ * Return TC_OK after accepting it. Any other value aborts the import. */
 typedef TC_status (*TC_TWIC_CCL_visit)(void* context, const TC_TWIC_CCL_record* record);
 
 /* Caller-owned state. Treat members as private after initialization. */
@@ -48,7 +48,7 @@ typedef struct {
   uint8_t finished;
 } TC_TWIC_CCL_stream;
 
-/* Limits are inclusive; zero permits no bytes or records. The callback must
+/* Limits are inclusive. Zero permits no bytes or records. The callback must
  * avoid reentering or modifying the stream. Its storage and all input chunks
  * must be disjoint from the stream. init leaves state unchanged on failure. */
 TC_TWIC_CCL_result TC_TWIC_CCL_stream_init(TC_TWIC_CCL_stream* stream, size_t max_bytes,
@@ -63,14 +63,14 @@ TC_TWIC_CCL_result TC_TWIC_CCL_stream_finish(TC_TWIC_CCL_stream* stream);
 
 /* Scan a complete borrowed CSV buffer for a 25-byte FASC-N (e.g. chuid.fascn).
  * Validate every row, including rows after a match. listed changes only on OK.
- * A zero result reports absence from this input; callers apply freshness,
+ * A zero result reports absence from this input. Callers apply freshness,
  * credential authentication and access policy separately. */
 TC_TWIC_CCL_result TC_TWIC_CCL_contains(TC_bytes csv, TC_bytes fascn, size_t max_records,
                                         int* listed);
 
 /* Keys are sorted by unsigned byte order. A successful read returns exactly
  * 25 bytes, borrowed until the next read. The callback may reuse a read buffer.
- * It returns TC_OK only after setting out; other results become SOURCE_ERROR.
+ * It returns TC_OK only after setting out. Other results become SOURCE_ERROR.
  * Keep the key values, count and ordering stable throughout index use. */
 typedef struct {
   void* context;
@@ -92,18 +92,18 @@ TC_TWIC_CCL_result TC_TWIC_CCL_index_prepare(const TC_TWIC_CCL_source* source, s
  * Checks complete records and ordering through index_prepare. Keys are borrowed
  * directly from the image. Keep both the span descriptor and its bytes unchanged
  * until the index and every derived snapshot are released. out must be disjoint
- * from the descriptor and image; failures preserve out. The application binds
+ * from the descriptor and image. Failures preserve out. The application binds
  * the image to its trusted import metadata before publishing a snapshot. */
 TC_TWIC_CCL_result TC_TWIC_CCL_index_from_memory(const TC_bytes* image, size_t max_records,
                                                  TC_TWIC_CCL_index* out);
-/* Exact binary search over a prepared index. max_reads bounds callback calls;
- * zero allows none. listed changes only on OK. Query bytes are copied before
+/* Exact binary search over a prepared index. max_reads bounds callback calls.
+ * Zero allows none. listed changes only on OK. Query bytes are copied before
  * the first read so a query may borrow the source's reusable read buffer. */
 TC_TWIC_CCL_result TC_TWIC_CCL_index_contains(const TC_TWIC_CCL_index* index, TC_bytes fascn,
                                               size_t max_reads, int* listed);
 
 /* Unix seconds from trusted provisioning metadata and the local clock.
- * published_at describes the list; received_at records completed retrieval. */
+ * published_at describes the list. received_at records completed retrieval. */
 typedef struct {
   uint64_t published_at, received_at;
 } TC_TWIC_CCL_metadata;
@@ -116,7 +116,7 @@ typedef struct {
 /* Age is measured from publication, inclusive of max_age. Zero permits only
  * publication at now. Future timestamps or receipt before publication return
  * INVALID. Old publications return STALE. Metadata authenticity is supplied
- * by the application; per-record cancellation dates cannot supply it. */
+ * by the application. Per-record cancellation dates cannot supply it. */
 TC_TWIC_CCL_result TC_TWIC_CCL_check_freshness(const TC_TWIC_CCL_metadata* metadata,
                                                const TC_TWIC_CCL_freshness_policy* policy);
 
@@ -146,13 +146,13 @@ TC_TWIC_CCL_result TC_TWIC_CCL_store_discard(TC_TWIC_CCL_snapshot* slot);
 TC_TWIC_CCL_result TC_TWIC_CCL_store_publish(TC_TWIC_CCL_store* store, size_t revision,
                                              TC_TWIC_CCL_snapshot* slot);
 /* Acquire returns UNAVAILABLE when no list is published. Each successful
- * acquire needs one release. Existing readers retain storage across updates;
- * a superseded snapshot returns STALE from snapshot_contains. */
+ * acquire needs one release. Existing readers retain storage across updates.
+ * A superseded snapshot returns STALE from snapshot_contains. */
 TC_TWIC_CCL_result TC_TWIC_CCL_store_acquire(TC_TWIC_CCL_store* store, TC_TWIC_CCL_snapshot** out);
 TC_TWIC_CCL_result TC_TWIC_CCL_store_release(TC_TWIC_CCL_snapshot* slot);
 /* Query the current held snapshot. On STALE, acquire the new current list and
  * repeat the check. The application evaluates age and update policy explicitly.
- * listed changes only on OK; release the snapshot after borrowed results expire. */
+ * listed changes only on OK. Release the snapshot after borrowed results expire. */
 TC_TWIC_CCL_result TC_TWIC_CCL_snapshot_contains(const TC_TWIC_CCL_snapshot* slot, TC_bytes fascn,
                                                  size_t max_reads, int* listed);
 

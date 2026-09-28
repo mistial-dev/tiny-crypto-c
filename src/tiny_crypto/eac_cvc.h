@@ -33,8 +33,8 @@ typedef struct {
   size_t frame_capacity;
 } TC_EAC_CVC_workspace;
 
-/* One TR-03110 certificate. Spans borrow input; out is unchanged on failure.
- * No signature, trust-chain, or current-time verification is performed. */
+/* Parse and bounds-check one TR-03110 certificate. Spans borrow input. out is
+ * unchanged on failure. The caller verifies the signature, chain and dates. */
 TC_TLV_result TC_EAC_CVC_read(const uint8_t* data, size_t length, const TC_TLV_limits* limits,
                               TC_EAC_CVC_workspace* workspace, TC_EAC_CVC* out);
 TC_TLV_result TC_EAC_CVC_public_key_read(const uint8_t* data, size_t length,
@@ -42,7 +42,8 @@ TC_TLV_result TC_EAC_CVC_public_key_read(const uint8_t* data, size_t length,
 
 /* issuer must have resolved parameters. inherited supplies the subject's EC
  * domain when absent from its certificate. Missing context is ARGUMENT.
- * Checks encoding widths, not curve membership or signature mathematics. */
+ * Checks field encoding widths. The caller verifies curve membership and the
+ * signature. */
 TC_TLV_result TC_EAC_CVC_check_encoding(const TC_EAC_CVC* certificate,
                                         const TC_EAC_CVC_public_key* issuer,
                                         const TC_EAC_CVC_public_key* inherited);
@@ -52,7 +53,7 @@ typedef struct {
 } TC_EAC_CVC_extension;
 /* Pass certificate.extensions, or {NULL,0} when absent. The iterator counts
  * templates, OIDs, and immediate fields against max_elements. Field contents
- * remain opaque; read checks the full tree's depth and element budgets. */
+ * remain opaque. read checks the full tree's depth and element budgets. */
 TC_TLV_result TC_EAC_CVC_extensions_init(TC_TLV_reader* reader, TC_bytes encoded,
                                          const TC_TLV_limits* limits);
 TC_TLV_result TC_EAC_CVC_extension_next(TC_TLV_reader* reader, TC_EAC_CVC_extension* out);

@@ -38,7 +38,7 @@ TC_TLV_result TC_TWIC_tpk_read(TC_bytes input, TC_TWIC_tpk_encoding encoding, TC
 TC_status TC_TWIC_object_encrypt(const TC_TWIC_tpk* key, uint8_t* buffer, size_t length,
                                  size_t capacity, size_t* ciphertext_length);
 /* Decrypt a complete enciphered BC value in place and check PKCS#7 padding.
- * On OK, plaintext_length excludes padding; removed padding bytes are wiped.
+ * On OK, plaintext_length excludes padding and removed padding bytes are wiped.
  * Bad arguments preserve buffers. Processing failures wipe the entire buffer
  * and preserve plaintext_length. All buffers and key storage must be disjoint.
  * Authenticate the recovered object's signature before using its contents. */

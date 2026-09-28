@@ -32,11 +32,11 @@ static inline void tc_aes_copy_bytes(uint8_t* dst, const uint8_t* src, size_t le
     (defined(TC_AES_ENABLE_EAX_PRIME) && (TC_AES_ENABLE_EAX_PRIME == 1)) ||                        \
     (defined(TC_AES_ENABLE_SIV) && (TC_AES_ENABLE_SIV == 1))
 /*
- * Completely disjoint buffers (exact alias is not disjoint).
+ * Completely disjoint buffers. An exact alias counts as overlap.
  * Empty lengths are always treated as disjoint.
  *
- * Uses uintptr_t subtraction (not relational pointer compares or
- * pa+len) for C portability across unrelated objects / MCU ABIs.
+ * The range test uses uintptr_t subtraction, which stays portable across
+ * unrelated objects and MCU ABIs where relational compares and pa+len do not.
  */
 static inline int tc_aes_buffers_disjoint(const void* a, size_t a_len, const void* b, size_t b_len)
 {
@@ -47,7 +47,7 @@ static inline int tc_aes_buffers_disjoint(const void* a, size_t a_len, const voi
  * Buffer relationship for one-shot in/out pairs:
  *   exact alias (same pointer) — OK
  *   completely disjoint — OK
- *   partial overlap — not OK (TC_ERROR)
+ *   partial overlap — rejected (TC_ERROR)
  * Empty lengths are always OK.
  */
 static inline int tc_aes_buffers_ok(const void* a, size_t a_len, const void* b, size_t b_len)

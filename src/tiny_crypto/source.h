@@ -15,7 +15,7 @@ typedef TC_status (*TC_source_read_fn)(void* context, uint64_t offset, uint8_t* 
                                        size_t length);
 
 /* The caller holds storage alive and immutable throughout an operation, including
- * pauses. Callbacks may use files or flash; they must preserve parser workspace.
+ * pauses. Callbacks may use files or flash. They must preserve parser workspace.
  * Publish storage updates separately while existing readers retain their snapshot. */
 typedef struct {
   TC_source_read_fn read;

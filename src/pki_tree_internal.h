@@ -237,7 +237,7 @@ static inline TC_TLV_result tc_pki_tree_name(TC_bytes input, TC_TLV_profile prof
 }
 
 /* Compare complete Names with independent framing profiles. Scratch is shared
- * across the two inputs; all writable storage must be disjoint.
+ * across the two inputs. All writable storage must be disjoint.
  * matched changes only on OK. */
 TC_TLV_result tc_pki_name_equal(TC_bytes left, TC_TLV_profile left_profile, TC_bytes right,
                                 TC_TLV_profile right_profile, const TC_TLV_limits* limits,

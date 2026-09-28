@@ -19,7 +19,7 @@ TC_status TC_DRBG_random(void* user, uint8_t* output, size_t length)
     const size_t chunk =
         length - offset < TC_DRBG_MAX_REQUEST_BYTES ? length - offset : TC_DRBG_MAX_REQUEST_BYTES;
 #else
-    const size_t chunk = length - offset; /* size_t cannot exceed a request */
+    const size_t chunk = length - offset; /* every size_t length fits one request */
 #endif
     if (TC_DRBG_generate(drbg, output == NULL ? NULL : output + offset, chunk, 0, empty) !=
         TC_DRBG_OK) {

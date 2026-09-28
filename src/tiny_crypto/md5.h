@@ -10,7 +10,7 @@ extern "C" {
 #define TC_MD5_DIGESTLEN 16
 #define TC_MD5_BLOCKLEN 64
 
-/* Legacy download checksums. MD5 has broken collision resistance; establish
+/* Legacy download checksums. MD5 has broken collision resistance. Establish
  * download authenticity through trusted transport or provisioning. */
 struct TC_MD5_ctx {
   uint64_t Count;

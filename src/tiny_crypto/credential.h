@@ -79,7 +79,7 @@ typedef struct {
   TC_PIV_card_profile profile;
   TC_bytes chuid_signer;
   const TC_X509_time* card_expiration;
-  /* Complete inventory. Container IDs must be unique; each object has parts. */
+  /* Complete inventory. Container IDs must be unique, and each object has parts. */
   const TC_PIV_security_data* objects;
   size_t count;
 } TC_PIV_security_validation_request;
@@ -102,7 +102,7 @@ typedef struct {
 
 /* Authenticate a Security Object with the CHUID signer, then check the exact
  * inventory against signed LDS digests. Parts supply each object's bytes in
- * hash order. All buffers remain caller-owned; content is disjoint mutable
+ * hash order. All buffers remain caller-owned. content is disjoint mutable
  * scratch. On VALID, out borrows the inventory and signer bytes. */
 TC_credential_status TC_PIV_security_validate(const TC_PIV_security_validation_request* request,
                                               const TC_validation_context* context,

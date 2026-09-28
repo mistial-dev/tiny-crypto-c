@@ -6,7 +6,7 @@
 #include "der_bits_internal.h"
 
 /* DER named bits, excluding the unused-bit count octet. Bit zero maps to 1.
- * Empty sets are valid here; extension-specific requirements belong to callers. */
+ * Empty sets are valid here. Extension-specific requirements belong to callers. */
 static inline TC_TLV_result tc_pki_named_bits(TC_bytes bits, unsigned unused, unsigned max_bits,
                                               uint16_t* out)
 {

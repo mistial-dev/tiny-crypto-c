@@ -6,7 +6,7 @@
 #include <tiny_crypto/ec.h>
 #include <tiny_crypto/rsa.h>
 
-/* Covers two scalar multiplies and inversions; not a cycle count. */
+/* Abstract work units for two scalar multiplies and inversions. */
 enum { TC_PKI_ECDSA_WORK_PER_BIT = 64 };
 
 /* Inputs/metadata are stable and disjoint from both workspaces. The caller

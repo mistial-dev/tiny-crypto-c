@@ -47,7 +47,7 @@ TC_status TC_EC_public_key(TC_EC_curve curve, const uint8_t* scalar, size_t scal
  * cryptographically secure and fill the whole request. Invalid scalar draws
  * are retried up to max_attempts (1..16). Outputs remain unchanged on failure.
  * After input validation, temporary scalar and public-key storage are wiped
- * on return when TC_ZEROIZE=1. Outputs and workspace must be disjoint; the
+ * on return when TC_ZEROIZE=1. Outputs and workspace must be disjoint. The
  * RNG context must not overlap them. */
 TC_status TC_EC_generate_key_pair(TC_EC_curve curve, uint8_t* private_key, size_t private_key_len,
                                   uint8_t* public_key, size_t public_key_len,
@@ -62,12 +62,12 @@ TC_status TC_ECDH(TC_EC_curve curve, const uint8_t* scalar, size_t scalar_len,
                   size_t output_len, TC_EC_workspace* workspace);
 
 /* Verify a precomputed digest with a SEC 1 uncompressed public key.
- * Signature encoding is fixed-width big-endian r || s, not DER. Digests
- * longer than the curve order are truncated to their leftmost bytes.
- * TC_MISMATCH means the signature or public key is invalid; TC_ERROR means
+ * Signature encoding is fixed-width big-endian r || s. Convert DER signatures
+ * first. Digests longer than the curve order are truncated to their leftmost
+ * bytes. TC_MISMATCH means the signature or public key is invalid. TC_ERROR means
  * an invalid argument or unsupported curve. Workspace must be disjoint
  * from all inputs and is wiped after use. Both high and low s are accepted.
- * Verification branches on public scalar bits; private-scalar operations use
+ * Verification branches on public scalar bits. Private-scalar operations use
  * constant-work point multiplication. */
 TC_status TC_ECDSA_verify_digest(TC_EC_curve curve, const uint8_t* public_key,
                                  size_t public_key_len, const uint8_t* digest, size_t digest_len,
@@ -75,7 +75,7 @@ TC_status TC_ECDSA_verify_digest(TC_EC_curve curve, const uint8_t* public_key,
                                  TC_ECDSA_workspace* workspace);
 
 /* Sign a precomputed digest with a fixed-width private scalar. The RNG supplies
- * an independent secret nonce on each attempt; it must be cryptographically
+ * an independent secret nonce on each attempt. It must be cryptographically
  * secure and fill the entire request. At most 16 attempts are allowed. Signature
  * encoding is fixed-width big-endian r || s. Digests longer than the order are
  * truncated to their leftmost bytes. Output remains unchanged on failure.

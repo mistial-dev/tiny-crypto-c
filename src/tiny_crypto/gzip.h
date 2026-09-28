@@ -29,7 +29,7 @@ typedef enum {
  * share capacity and the remaining work budget. Trailing non-member bytes fail.
  * Input, output capacity, workspace, work and output_length must be disjoint.
  * NULL output is allowed for zero capacity. Bad arguments preserve storage.
- * Processing failures wipe output capacity; output_length changes only on OK.
+ * Processing failures wipe output capacity. output_length changes only on OK.
  * Workspace is wiped after processing. Work measures bounded decoding steps,
  * including bits, table entries and output/checksum bytes. Requires GZIP support. */
 TC_GZIP_result TC_GZIP_decode(const uint8_t* input, size_t input_length, uint8_t* output,

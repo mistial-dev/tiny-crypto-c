@@ -17,7 +17,7 @@ static inline TC_TLV_result tc_pki_general_names_contents_check(TC_bytes content
     return TC_TLV_ARGUMENT;
   if (!contents.length)
     return TC_TLV_INVALID;
-  /* The existing reader scans framing and then the name's value. */
+  /* The reader scans framing and then the name's value. */
   if (tc_pki_work_charge(tree->work, contents.length) != TC_TLV_OK ||
       tc_pki_work_charge(tree->work, contents.length) != TC_TLV_OK)
     return TC_TLV_LIMIT;
@@ -63,7 +63,7 @@ static inline TC_TLV_result tc_pki_rdn_contents_check(TC_bytes contents,
 }
 
 /* DistributionPointName CHOICE, without the enclosing explicit [0].
- * The relative form borrows RDN contents; it does not append the issuer Name. */
+ * The relative form borrows RDN contents. Callers resolve it against the issuer Name. */
 static inline TC_TLV_result tc_pki_distribution_name_read(TC_bytes encoded,
                                                           const TC_TLV_limits* limits,
                                                           const tc_pki_tree_workspace* tree,

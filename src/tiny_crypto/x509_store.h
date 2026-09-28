@@ -17,7 +17,7 @@ typedef struct {
   unsigned policy_flags;
   size_t path_len;
   uint8_t has_path_len;
-  /* A TrustAnchorInfo without certPath is valid data, but has no X.509 name. */
+  /* A TrustAnchorInfo without certPath is valid data with no X.509 name. */
   uint8_t x509_unusable;
 } TC_X509_store_anchor;
 
@@ -33,7 +33,7 @@ typedef struct {
 /* Candidates are untrusted certificates. Anchors carry explicit local trust.
  * Callbacks return borrowed records, consume work without increasing it, and
  * return OK only after writing out. An unavailable record is a read error.
- * Reads propagate LIMIT and UNSUPPORTED; other failure codes become ARGUMENT.
+ * Reads propagate LIMIT and UNSUPPORTED. Other failure codes become ARGUMENT.
  * Record bytes and ordering remain stable while the source is in use. */
 typedef struct {
   void* context;
@@ -73,7 +73,7 @@ TC_TLV_result TC_X509_store_prepare(TC_X509_store_snapshot* slot,
  * return ARGUMENT unchanged. The caller owns the underlying record storage. */
 TC_TLV_result TC_X509_store_discard(TC_X509_store_snapshot* slot);
 /* Authorize and persist changes before publication. A stale revision returns
- * INVALID; exhausted revision space returns LIMIT. Neither changes the store.
+ * INVALID. Exhausted revision space returns LIMIT. Neither changes the store.
  * Publishing an empty source removes all anchors for subsequent readers. */
 TC_TLV_result TC_X509_store_publish(TC_X509_store* store, size_t revision,
                                     TC_X509_store_snapshot* slot);

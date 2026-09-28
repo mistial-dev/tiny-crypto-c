@@ -14,8 +14,8 @@
 #include "aes_internal.h"
 #include "aes_platform_internal.h"
 
-/* Keep fixed S-boxes in AVR flash. Runtime S-box mode remains writable SRAM
- * by design and therefore bypasses these accessors. */
+/* Keep fixed S-boxes in AVR flash. Runtime S-box mode keeps a writable SRAM
+ * table and bypasses these accessors. */
 #if defined(__AVR__) && TC_AVR_PROGMEM
 #include <avr/pgmspace.h>
 #define TC_AES_TABLE_STORAGE PROGMEM
@@ -194,7 +194,7 @@ static uint8_t tc_aes_xtime(uint8_t x)
 }
 
 /* Constant-time mode computes the S-box. Runtime mode scans its generated
- * RAM table; fast mode opts into a secret-indexed lookup. */
+ * RAM table. Fast mode opts into a secret-indexed lookup. */
 static uint8_t tc_aes_sbox_value(uint8_t num)
 {
 #if TC_AES_SBOX_MODE == TC_AES_SBOX_MODE_FAST

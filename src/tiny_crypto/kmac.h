@@ -29,8 +29,8 @@ TC_status TC_KMAC256_init(struct TC_KMAC256_ctx* ctx, const uint8_t* key, size_t
 /* Absorb len bytes into an active context. data may be NULL when len is zero.
  * Input must be separate from ctx. Rejected calls leave ctx unchanged. */
 TC_status TC_KMAC256_update(struct TC_KMAC256_ctx* ctx, const uint8_t* data, size_t len);
-/* Produce out_len bytes. The requested length is part of the KMAC computation;
- * changing it changes the output, including the common prefix.
+/* Produce out_len bytes. The requested length is part of the KMAC computation.
+ * Changing it changes the output, including the common prefix.
  * Call init again after final. TC_ZEROIZE=1 also wipes the context.
  * Output must be nonempty and separate from ctx. On error, neither changes. */
 TC_status TC_KMAC256_final(struct TC_KMAC256_ctx* ctx, uint8_t* out, size_t out_len);

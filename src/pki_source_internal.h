@@ -83,7 +83,7 @@ static inline TC_TLV_result tc_pki_source_guard_input(const tc_pki_source_guard*
 }
 
 /* Returned records must remain separate from every consumer's scratch/output.
- * Failed checks preserve out; callback state and work are provisional. */
+ * Failed checks preserve out. Callback state and work are provisional. */
 static inline TC_TLV_result tc_pki_source_guard_candidate(void* context, size_t index, size_t* work,
                                                           TC_bytes* out)
 {

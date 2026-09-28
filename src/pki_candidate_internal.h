@@ -13,8 +13,8 @@ typedef struct {
 } tc_pki_store_candidates;
 
 /* The source guards returned bytes against the operation's writable storage.
- * Keep its snapshot stable. Advance the cursor only after a successful parse;
- * callback state, parser scratch and work remain provisional on failure. */
+ * Keep its snapshot stable. Advance the cursor only after a successful parse.
+ * Callback state, parser scratch and work remain provisional on failure. */
 static inline TC_TLV_result tc_pki_store_candidate_next(void* context,
                                                         const tc_pki_tree_workspace* tree,
                                                         TC_X509_workspace* parser,

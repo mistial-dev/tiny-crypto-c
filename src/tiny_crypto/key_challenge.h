@@ -33,7 +33,7 @@ typedef struct {
 } TC_key_challenge_workspace;
 
 /* Generate a fresh random digest and prepare the input for a private-key
- * operation. RSA returns an encoded representative; ECDSA returns the digest.
+ * operation. RSA returns an encoded representative. ECDSA returns the digest.
  * Preflight failures preserve workspace and out. Failures after RNG use wipe
  * workspace. Work includes entropy and encoding. Keep all storage disjoint. */
 TC_key_challenge_result TC_key_challenge_prepare(const TC_X509_public_key* key,
@@ -43,7 +43,7 @@ TC_key_challenge_result TC_key_challenge_prepare(const TC_X509_public_key* key,
                                                  TC_work_budget* work, TC_bytes* out);
 
 /* Verify the private operation's result against the retained digest. This
- * clears every initialized challenge. A bad proof returns INVALID; exhausted
+ * clears every initialized challenge. A bad proof returns INVALID. Exhausted
  * work returns LIMIT. Keep borrowed inputs and provider state disjoint from
  * workspace. */
 TC_key_challenge_result TC_key_challenge_verify(const TC_X509_public_key* key, TC_bytes signature,

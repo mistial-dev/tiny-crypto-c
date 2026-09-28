@@ -7,8 +7,8 @@
 
 /* RFC 8017 B.2.1. XOR into an existing mask buffer. Seed, output, block,
  * workspace and work are disjoint. block holds the selected digest size.
- * Caller validates address ranges. Preflight failures leave output unchanged;
- * an unexpected hash failure may leave a partially masked buffer. */
+ * Caller validates address ranges. Preflight failures leave output unchanged.
+ * An unexpected hash failure may leave a partially masked buffer. */
 static inline TC_RSA_result tc_rsa_mgf1_xor(TC_hash_algorithm hash, TC_bytes seed, uint8_t* output,
                                             size_t length, uint8_t* block,
                                             TC_hash_context* workspace, size_t* work)

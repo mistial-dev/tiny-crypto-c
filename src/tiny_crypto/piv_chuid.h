@@ -23,10 +23,10 @@ typedef struct {
   TC_bytes signed_content[2];
 } TC_PIV_CHUID;
 
-/* CONTAINER includes the outer 53 object; CONTENTS starts with its first field.
- * Spans borrow the input; input and out must be disjoint. out is unchanged on
+/* CONTAINER includes the outer 53 object. CONTENTS starts with its first field.
+ * Spans borrow the input. Input and out must be disjoint. out is unchanged on
  * failure. An absent optional cardholder UUID has a NULL pointer.
- * The CMS signature is returned unverified. */
+ * The caller verifies the CMS signature. */
 TC_TLV_result TC_PIV_CHUID_read(const uint8_t* data, size_t length, TC_PIV_CHUID_encoding encoding,
                                 TC_PIV_CHUID* out);
 /* Select the profile according to the application's card-object policy.

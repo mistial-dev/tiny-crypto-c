@@ -15,11 +15,11 @@ typedef struct {
 } TC_PIV_security_object;
 
 /* Read the BA/BB/FE fields of a PIV or TWIC security object. CONTAINER includes
- * the outer 53 TLV; CONTENTS starts at BA. The mapping contains three-byte
+ * the outer 53 TLV. CONTENTS starts at BA. The mapping contains three-byte
  * records: group number followed by a big-endian container ID. Group numbers
  * and container IDs must be unique. cms and mapping borrow the unchanged input.
  * Input and out must be disjoint. Only OK writes out. This checks the container
- * schema; authenticate CMS and reconcile its LDS groups before using the map.
+ * schema. Authenticate CMS and reconcile its LDS groups before using the map.
  * Requires X509. */
 TC_TLV_result TC_PIV_security_read(TC_bytes encoded, TC_PIV_security_encoding encoding,
                                    TC_PIV_security_object* out);

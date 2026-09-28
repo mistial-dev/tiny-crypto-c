@@ -13,18 +13,18 @@ typedef enum {
   TC_X509_CRL_UNREVOKED,
   TC_X509_CRL_REVOKED
 } TC_X509_revocation_status;
-/* ReasonFlags bits 1..8; bit 0 is unused. */
+/* ReasonFlags bits 1..8. Bit 0 is unused. */
 enum { TC_X509_CRL_ALL_REASONS = 0x1fe };
 typedef struct {
   uint16_t reasons;
   TC_X509_crl_match revocation;
 } TC_X509_crl_evidence;
-/* Provisional workspace entries; fields are managed by the resolver. Each
+/* Provisional workspace entries. Fields are managed by the resolver. Each
  * entry uses two size_t links for bounded dependency lookup. */
 typedef struct {
   TC_bytes certificate;
   TC_X509_revocation_status status;
-  /* Internal hash chains; keep all entries until the operation completes. */
+  /* Internal hash chains. Keep all entries until the operation completes. */
   size_t hash_next, hash_head;
 } TC_X509_revocation_node;
 /* One caller-owned slot per indexed CRL, managed during revocation checks. */
@@ -67,19 +67,19 @@ typedef struct {
 
 /* Check a previously validated path, anchor-issued first, anchor excluded.
  * Keep the selected anchor, time, CRL index and source snapshot fixed. Source
- * candidates supply CRL signers and their paths; signer_policy is distinct from
+ * candidates supply CRL signers and their paths. signer_policy is distinct from
  * the holder's purpose/usage policy. max_candidate_bytes bounds their collection.
- * states needs one byte per indexed CRL; nodes covers the path and distinct
+ * states needs one byte per indexed CRL. nodes covers the path and distinct
  * signer dependencies. Each node is 2 size_t larger for lookup links.
  * scopes needs one slot per indexed CRL. Verified nodes and scope groups are
- * reused only within this call. signer_path needs search->capacity entries;
+ * reused only within this call. signer_path needs search->capacity entries.
  * signer_policies needs validation->policy_capacity entries. Their spans borrow
  * stable source bytes and stay in scratch until this call returns.
  * Input/metadata, workspace arrays, work and out must be disjoint. Save path
  * spans outside search scratch before calling. Work and scratch are provisional.
  * OK means a determined result: callers must inspect status. REVOKED includes
- * the member index and evidence; UNREVOKED uses SIZE_MAX and zero evidence.
- * Missing evidence/cycles return UNSUPPORTED; failures leave out unchanged. */
+ * the member index and evidence. UNREVOKED uses SIZE_MAX and zero evidence.
+ * Missing evidence/cycles return UNSUPPORTED. Failures leave out unchanged. */
 TC_TLV_result TC_X509_path_check_revocation(const TC_bytes* chain, size_t count,
                                             const TC_X509_revocation_options* options,
                                             const TC_X509_revocation_workspace* workspace,

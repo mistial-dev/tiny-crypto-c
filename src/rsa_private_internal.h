@@ -157,8 +157,8 @@ tc_rsa_private_key_check(const uint8_t* modulus, size_t length, const uint8_t* e
 }
 
 /* Full-width private operation for an already validated RSA key. d fits length
- * bytes; input and output have length bytes. Input, output, scratch and work ranges are
- * disjoint; the caller checks ranges and random-source context ownership.
+ * bytes. Input and output have length bytes. Input, output, scratch and work ranges are
+ * disjoint. The caller checks ranges and random-source context ownership.
  * Scratch uses 13n limbs, n=length/sizeof(word), and is wiped after use.
  * Work counts size-bounded modular operations, inverse steps and RNG requests.
  * max_attempts bounds rejection sampling. Output changes only after verification. */
