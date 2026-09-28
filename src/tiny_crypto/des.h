@@ -94,6 +94,7 @@ struct TC_DES_ctx {
 #if TC_DES_ENABLE_CTR
   uint8_t ctr_stream[TC_DES_BLOCKLEN];
   uint8_t ctr_pos;
+  uint8_t ctr_exhausted; /* The counter wrapped; set a new IV to continue. */
 #endif
 #if TC_DES_ENABLE_OFB
   uint8_t ofb_pos;
@@ -113,6 +114,7 @@ struct TC_DES3_ctx {
 #if TC_DES_ENABLE_CTR
   uint8_t ctr_stream[TC_DES_BLOCKLEN];
   uint8_t ctr_pos;
+  uint8_t ctr_exhausted; /* The counter wrapped; set a new IV to continue. */
 #endif
 #if TC_DES_ENABLE_OFB
   uint8_t ofb_pos;
@@ -202,8 +204,9 @@ TC_status TC_DES_CBC_decrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length
  * @param ctx Pointer to initialized Single DES context.
  * @param buf Data buffer (arbitrary length). Transformed in-place.
  * @param length Data length in bytes.
- * @return TC_OK, or TC_ERROR if the request would wrap the 64-bit counter
- *         (buffer and IV left unchanged).
+ * @return TC_OK, or TC_ERROR if the request would need a block beyond the
+ *         2^64-block space of one IV (buffer and IV left unchanged). After the
+ *         counter wraps, calls fail until a new IV is set.
  */
 TC_status TC_DES_CTR_crypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
 #endif
@@ -358,6 +361,9 @@ TC_status TC_DES3_CBC_decrypt(struct TC_DES3_ctx* ctx, uint8_t* buf, size_t leng
  * @param ctx Pointer to initialized 3DES context.
  * @param buf Data buffer (arbitrary length). Transformed in-place.
  * @param length Data length in bytes.
+ * @return TC_OK, or TC_ERROR if the request would need a block beyond the
+ *         2^64-block space of one IV (buffer and IV left unchanged). After the
+ *         counter wraps, calls fail until a new IV is set.
  */
 TC_status TC_DES3_CTR_crypt(struct TC_DES3_ctx* ctx, uint8_t* buf, size_t length);
 #endif

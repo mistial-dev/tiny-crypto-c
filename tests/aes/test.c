@@ -333,6 +333,24 @@ static MunitResult test_ctr_wrap(const MunitParameter params[], void* data)
   for (i = 0; i < TC_AES_BLOCKLEN; ++i)
     munit_assert_uint8(ctx.iv[i], ==, 0);
 
+  /* The wrapped counter is exhausted. A later call must not restart the
+   * counter at zero, which would reuse the IV=0 keystream. */
+  memcpy(saved_buffer, buffer, sizeof(buffer));
+  munit_assert_int(TC_AES_CTR_crypt(&ctx, buffer, TC_AES_BLOCKLEN), ==, TC_ERROR);
+  munit_assert_int(TC_AES_CTR_crypt(&ctx, buffer, 1), ==, TC_ERROR);
+  munit_assert_memory_equal(sizeof(buffer), buffer, saved_buffer);
+
+  /* Bytes still cached from the last block remain usable. */
+  TC_AES_init_ctx_iv(&ctx, TEST_KEY, iv);
+  munit_assert_int(TC_AES_CTR_crypt(&ctx, buffer, 8), ==, TC_OK);
+  munit_assert_int(TC_AES_CTR_crypt(&ctx, buffer + 8, 8), ==, TC_OK);
+  munit_assert_int(TC_AES_CTR_crypt(&ctx, buffer + 16, 1), ==, TC_ERROR);
+
+  /* A new IV restores the full counter space. */
+  memset(iv, 0, sizeof(iv));
+  munit_assert_int(TC_AES_ctx_set_iv(&ctx, iv), ==, TC_OK);
+  munit_assert_int(TC_AES_CTR_crypt(&ctx, buffer, sizeof(buffer)), ==, TC_OK);
+
   return MUNIT_OK;
 }
 #endif

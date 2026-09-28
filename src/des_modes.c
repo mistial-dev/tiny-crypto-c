@@ -58,8 +58,8 @@ static TC_status tc_des_mode_cbc(const void* cipher, uint8_t iv[TC_DES_BLOCKLEN]
 
 #if TC_DES_ENABLE_CTR
 static TC_status tc_des_mode_ctr(const void* cipher, uint8_t iv[TC_DES_BLOCKLEN],
-                                 uint8_t stream[TC_DES_BLOCKLEN], uint8_t* pos, uint8_t* buf,
-                                 size_t length, tc_des_mode_block_fn encrypt_block)
+                                 uint8_t stream[TC_DES_BLOCKLEN], uint8_t* pos, uint8_t* exhausted,
+                                 uint8_t* buf, size_t length, tc_des_mode_block_fn encrypt_block)
 {
   size_t blocks_needed;
   size_t i;
@@ -74,14 +74,14 @@ static TC_status tc_des_mode_ctr(const void* cipher, uint8_t iv[TC_DES_BLOCKLEN]
     return TC_OK;
 
   blocks_needed = tc_internal_counter_blocks_needed(length, TC_DES_BLOCKLEN, *pos);
-  if (!tc_internal_counter_has_blocks(iv, TC_DES_BLOCKLEN, blocks_needed))
+  if (!tc_internal_counter_has_blocks(iv, TC_DES_BLOCKLEN, blocks_needed, *exhausted))
     return TC_ERROR;
 
   for (i = 0; i < length; ++i) {
     if (*pos == TC_DES_BLOCKLEN) {
       memcpy(stream, iv, TC_DES_BLOCKLEN);
       encrypt_block(cipher, stream);
-      tc_internal_increment_be(iv, TC_DES_BLOCKLEN);
+      *exhausted |= tc_internal_increment_be(iv, TC_DES_BLOCKLEN);
       *pos = 0;
     }
     buf[i] ^= stream[(*pos)++];
@@ -286,6 +286,7 @@ TC_status TC_DES_init_ctx(struct TC_DES_ctx* ctx, const uint8_t* key)
 #if TC_DES_ENABLE_CTR
   memset(ctx->ctr_stream, 0, TC_DES_BLOCKLEN);
   ctx->ctr_pos = TC_DES_BLOCKLEN;
+  ctx->ctr_exhausted = 0;
 #endif
 #if TC_DES_ENABLE_OFB
   ctx->ofb_pos = TC_DES_BLOCKLEN;
@@ -308,6 +309,7 @@ TC_status TC_DES_init_ctx_iv(struct TC_DES_ctx* ctx, const uint8_t* key, const u
   memcpy(ctx->Iv, iv, TC_DES_BLOCKLEN);
 #if TC_DES_ENABLE_CTR
   ctx->ctr_pos = TC_DES_BLOCKLEN;
+  ctx->ctr_exhausted = 0;
 #endif
 #if TC_DES_ENABLE_OFB
   ctx->ofb_pos = TC_DES_BLOCKLEN;
@@ -322,6 +324,7 @@ TC_status TC_DES_ctx_set_iv(struct TC_DES_ctx* ctx, const uint8_t* iv)
   memcpy(ctx->Iv, iv, TC_DES_BLOCKLEN);
 #if TC_DES_ENABLE_CTR
   ctx->ctr_pos = TC_DES_BLOCKLEN;
+  ctx->ctr_exhausted = 0;
 #endif
 #if TC_DES_ENABLE_OFB
   ctx->ofb_pos = TC_DES_BLOCKLEN;
@@ -366,8 +369,8 @@ TC_status TC_DES_CBC_decrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length
 TC_status TC_DES_CTR_crypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length)
 {
   DES_MODE_REQUIRE_CTX(ctx);
-  return tc_des_mode_ctr(ctx, ctx->Iv, ctx->ctr_stream, &ctx->ctr_pos, buf, length,
-                         tc_des_encrypt_mode_block);
+  return tc_des_mode_ctr(ctx, ctx->Iv, ctx->ctr_stream, &ctx->ctr_pos, &ctx->ctr_exhausted, buf,
+                         length, tc_des_encrypt_mode_block);
 }
 #endif
 
@@ -450,6 +453,7 @@ TC_status TC_DES3_init_ctx(struct TC_DES3_ctx* ctx, const uint8_t* key, size_t k
 #if TC_DES_ENABLE_CTR
   memset(ctx->ctr_stream, 0, TC_DES_BLOCKLEN);
   ctx->ctr_pos = TC_DES_BLOCKLEN;
+  ctx->ctr_exhausted = 0;
 #endif
 #if TC_DES_ENABLE_OFB
   ctx->ofb_pos = TC_DES_BLOCKLEN;
@@ -473,6 +477,7 @@ TC_status TC_DES3_init_ctx_iv(struct TC_DES3_ctx* ctx, const uint8_t* key, size_
   memcpy(ctx->Iv, iv, TC_DES_BLOCKLEN);
 #if TC_DES_ENABLE_CTR
   ctx->ctr_pos = TC_DES_BLOCKLEN;
+  ctx->ctr_exhausted = 0;
 #endif
 #if TC_DES_ENABLE_OFB
   ctx->ofb_pos = TC_DES_BLOCKLEN;
@@ -487,6 +492,7 @@ TC_status TC_DES3_ctx_set_iv(struct TC_DES3_ctx* ctx, const uint8_t* iv)
   memcpy(ctx->Iv, iv, TC_DES_BLOCKLEN);
 #if TC_DES_ENABLE_CTR
   ctx->ctr_pos = TC_DES_BLOCKLEN;
+  ctx->ctr_exhausted = 0;
 #endif
 #if TC_DES_ENABLE_OFB
   ctx->ofb_pos = TC_DES_BLOCKLEN;
@@ -565,8 +571,8 @@ TC_status TC_DES3_CBC_decrypt(struct TC_DES3_ctx* ctx, uint8_t* buf, size_t leng
 TC_status TC_DES3_CTR_crypt(struct TC_DES3_ctx* ctx, uint8_t* buf, size_t length)
 {
   DES_MODE_REQUIRE_CTX(ctx);
-  return tc_des_mode_ctr(ctx, ctx->Iv, ctx->ctr_stream, &ctx->ctr_pos, buf, length,
-                         tc_des3_encrypt_mode_block);
+  return tc_des_mode_ctr(ctx, ctx->Iv, ctx->ctr_stream, &ctx->ctr_pos, &ctx->ctr_exhausted, buf,
+                         length, tc_des3_encrypt_mode_block);
 }
 #endif
 

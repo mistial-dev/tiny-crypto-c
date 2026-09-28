@@ -100,13 +100,15 @@ static inline void tc_internal_store_be64(uint8_t* dst, uint64_t value)
 #endif
 }
 
-static inline void tc_internal_increment_be(uint8_t* counter, size_t length)
+/* Increment a big-endian counter. Returns 1 when it wraps to zero. */
+static inline uint8_t tc_internal_increment_be(uint8_t* counter, size_t length)
 {
   while (length != 0) {
     --length;
     if (++counter[length] != 0)
-      break;
+      return 0;
   }
+  return 1;
 }
 
 /* Callers validate position <= block_length before counting new blocks. */
@@ -118,11 +120,15 @@ static inline size_t tc_internal_counter_blocks_needed(size_t length, size_t blo
   return uncached / block_length + (uncached % block_length != 0);
 }
 
-/* A zero counter has the full 2^(8*length) block space remaining, which may
- * exceed size_t. Other counters use (2^n - counter) as the available count. */
+/* A fresh zero counter has the full 2^(8*length) block space remaining,
+ * which may exceed size_t. Other counters use (2^n - counter) as the
+ * available count. exhausted is set once the counter has wrapped, so a zero
+ * counter left by a wrap has no blocks remaining. */
 static inline int tc_internal_counter_has_blocks(const uint8_t* counter, size_t length,
-                                                 size_t needed)
+                                                 size_t needed, uint8_t exhausted)
 {
+  if (exhausted)
+    return needed == 0;
   uint8_t remaining[16];
   size_t i;
   size_t first_size_byte;

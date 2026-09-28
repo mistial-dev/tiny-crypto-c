@@ -323,6 +323,7 @@ TC_status TC_AES_init_ctx(struct TC_AES_ctx* ctx, const uint8_t* key)
 #if defined(TC_AES_ENABLE_CTR) && (TC_AES_ENABLE_CTR == 1)
   memset(ctx->ctr_stream, 0, TC_AES_BLOCKLEN);
   ctx->ctr_pos = TC_AES_BLOCKLEN;
+  ctx->ctr_exhausted = 0;
 #endif
 #if defined(TC_AES_ENABLE_OFB) && (TC_AES_ENABLE_OFB == 1)
   ctx->ofb_pos = TC_AES_BLOCKLEN;
@@ -345,6 +346,7 @@ TC_status TC_AES_init_ctx_iv(struct TC_AES_ctx* ctx, const uint8_t* key, const u
   tc_aes_copy_bytes(ctx->iv, iv, TC_AES_BLOCKLEN);
 #if defined(TC_AES_ENABLE_CTR) && (TC_AES_ENABLE_CTR == 1)
   ctx->ctr_pos = TC_AES_BLOCKLEN;
+  ctx->ctr_exhausted = 0;
 #endif
 #if defined(TC_AES_ENABLE_OFB) && (TC_AES_ENABLE_OFB == 1)
   ctx->ofb_pos = TC_AES_BLOCKLEN;
@@ -358,6 +360,7 @@ TC_status TC_AES_ctx_set_iv(struct TC_AES_ctx* ctx, const uint8_t* iv)
   tc_aes_copy_bytes(ctx->iv, iv, TC_AES_BLOCKLEN);
 #if defined(TC_AES_ENABLE_CTR) && (TC_AES_ENABLE_CTR == 1)
   ctx->ctr_pos = TC_AES_BLOCKLEN;
+  ctx->ctr_exhausted = 0;
 #endif
 #if defined(TC_AES_ENABLE_OFB) && (TC_AES_ENABLE_OFB == 1)
   ctx->ofb_pos = TC_AES_BLOCKLEN;

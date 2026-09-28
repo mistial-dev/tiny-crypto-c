@@ -112,6 +112,7 @@ struct TC_AES_ctx {
 #if defined(TC_AES_ENABLE_CTR) && (TC_AES_ENABLE_CTR == 1)
   uint8_t ctr_stream[TC_AES_BLOCKLEN];
   uint8_t ctr_pos;
+  uint8_t ctr_exhausted; /* The counter wrapped; set a new IV to continue. */
 #endif
 #if defined(TC_AES_ENABLE_OFB) && (TC_AES_ENABLE_OFB == 1)
   uint8_t ofb_pos;
@@ -161,9 +162,12 @@ TC_status TC_AES_CBC_decrypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length
 
 #if defined(TC_AES_ENABLE_CTR) && (TC_AES_ENABLE_CTR == 1)
 /*
- * Encrypt and decrypt are the same operation. The IV is incremented for every
- * block. Returns TC_ERROR if the request would wrap the 128-bit counter (buf
- * and IV are left unchanged). Never reuse an IV with the same key.
+ * Encrypt and decrypt are the same operation (SP 800-38A section 6.5). The IV
+ * is incremented for every block, and one IV covers at most 2^128 blocks
+ * across all calls. Returns TC_ERROR, leaving buf and IV unchanged, when the
+ * request would need a block beyond that space. Once the counter wraps,
+ * further calls fail until TC_AES_ctx_set_iv or TC_AES_init_ctx_iv supplies a
+ * new IV. Never reuse an IV with the same key.
  */
 TC_status TC_AES_CTR_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length);
 #endif

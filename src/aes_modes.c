@@ -96,30 +96,25 @@ TC_status TC_AES_CTR_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length)
     return TC_OK;
 
   blocks_needed = tc_internal_counter_blocks_needed(length, TC_AES_BLOCKLEN, ctx->ctr_pos);
-  if (!tc_internal_counter_has_blocks(ctx->iv, TC_AES_BLOCKLEN, blocks_needed))
+  if (!tc_internal_counter_has_blocks(ctx->iv, TC_AES_BLOCKLEN, blocks_needed, ctx->ctr_exhausted))
     return TC_ERROR;
 
-  while (offset < length && ctx->ctr_pos < TC_AES_BLOCKLEN)
-    buf[offset++] ^= ctx->ctr_stream[ctx->ctr_pos++];
-
-  while (length - offset >= TC_AES_BLOCKLEN) {
-    tc_aes_copy_bytes(ctx->ctr_stream, ctx->iv, TC_AES_BLOCKLEN);
-    if (tc_aes_cipher((state_t*)ctx->ctr_stream, ctx->key.round_key) != TC_OK)
-      return TC_ERROR;
-    tc_internal_increment_be(ctx->iv, TC_AES_BLOCKLEN);
-    tc_internal_xor(buf + offset, ctx->ctr_stream, TC_AES_BLOCKLEN);
-    offset += TC_AES_BLOCKLEN;
-    ctx->ctr_pos = TC_AES_BLOCKLEN;
-  }
-
-  if (offset < length) {
-    tc_aes_copy_bytes(ctx->ctr_stream, ctx->iv, TC_AES_BLOCKLEN);
-    if (tc_aes_cipher((state_t*)ctx->ctr_stream, ctx->key.round_key) != TC_OK)
-      return TC_ERROR;
-    tc_internal_increment_be(ctx->iv, TC_AES_BLOCKLEN);
-    ctx->ctr_pos = 0;
-    while (offset < length)
-      buf[offset++] ^= ctx->ctr_stream[ctx->ctr_pos++];
+  /* One keystream block serves cached bytes, whole blocks and the tail. */
+  while (offset < length) {
+    size_t take;
+    if (ctx->ctr_pos == TC_AES_BLOCKLEN) {
+      tc_aes_copy_bytes(ctx->ctr_stream, ctx->iv, TC_AES_BLOCKLEN);
+      if (tc_aes_cipher((state_t*)ctx->ctr_stream, ctx->key.round_key) != TC_OK)
+        return TC_ERROR;
+      ctx->ctr_exhausted |= tc_internal_increment_be(ctx->iv, TC_AES_BLOCKLEN);
+      ctx->ctr_pos = 0;
+    }
+    take = TC_AES_BLOCKLEN - ctx->ctr_pos;
+    if (take > length - offset)
+      take = length - offset;
+    tc_internal_xor(buf + offset, ctx->ctr_stream + ctx->ctr_pos, take);
+    offset += take;
+    ctx->ctr_pos = (uint8_t)(ctx->ctr_pos + take);
   }
   return TC_OK;
 }

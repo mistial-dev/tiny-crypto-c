@@ -85,6 +85,43 @@ static MunitResult test_des_cbc(const MunitParameter params[], void* data)
 
 /* 1C. Single DES CTR Stream Mode */
 #if TC_DES_ENABLE_CTR
+/* A counter that wraps past 2^64 is exhausted until a new IV is set. */
+static MunitResult test_des_ctr_exhaustion(const MunitParameter params[], void* data)
+{
+  uint8_t iv[TC_DES_BLOCKLEN], buffer[2 * TC_DES_BLOCKLEN], saved[sizeof buffer];
+  struct TC_DES_ctx ctx;
+  (void)params;
+  (void)data;
+  memset(iv, 0xff, sizeof iv);
+  memset(buffer, 0x11, sizeof buffer);
+  munit_assert_int(TC_DES_init_ctx_iv(&ctx, des_test_key, iv), ==, TC_OK);
+  munit_assert_int(TC_DES_CTR_crypt(&ctx, buffer, sizeof buffer), ==, TC_ERROR);
+  munit_assert_int(TC_DES_CTR_crypt(&ctx, buffer, 4), ==, TC_OK);
+  munit_assert_int(TC_DES_CTR_crypt(&ctx, buffer + 4, 4), ==, TC_OK);
+  memcpy(saved, buffer, sizeof saved);
+  munit_assert_int(TC_DES_CTR_crypt(&ctx, buffer, 1), ==, TC_ERROR);
+  munit_assert_memory_equal(sizeof buffer, buffer, saved);
+  memset(iv, 0, sizeof iv);
+  munit_assert_int(TC_DES_ctx_set_iv(&ctx, iv), ==, TC_OK);
+  munit_assert_int(TC_DES_CTR_crypt(&ctx, buffer, sizeof buffer), ==, TC_OK);
+  TC_DES_ctx_clear(&ctx);
+#if TC_DES_ENABLE_TDES
+  {
+    struct TC_DES3_ctx ctx3;
+    uint8_t key3[24];
+    memset(key3, 0x5a, sizeof key3);
+    key3[8] = 0xa5;
+    key3[16] = 0x3c;
+    memset(iv, 0xff, sizeof iv);
+    munit_assert_int(TC_DES3_init_ctx_iv(&ctx3, key3, sizeof key3, iv), ==, TC_OK);
+    munit_assert_int(TC_DES3_CTR_crypt(&ctx3, buffer, TC_DES_BLOCKLEN), ==, TC_OK);
+    munit_assert_int(TC_DES3_CTR_crypt(&ctx3, buffer, 1), ==, TC_ERROR);
+    TC_DES3_ctx_clear(&ctx3);
+  }
+#endif
+  return MUNIT_OK;
+}
+
 static MunitResult test_des_ctr(const MunitParameter params[], void* data)
 {
   (void)params;
@@ -1023,6 +1060,7 @@ static MunitTest test_suite_tests[] = {
 #endif
 #if TC_DES_ENABLE_CTR
     {"/des_ctr", test_des_ctr, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/des_ctr_exhaustion", test_des_ctr_exhaustion, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
 #endif
 #if TC_DES_ENABLE_TDES && TC_DES_ENABLE_ECB
     {"/tdes2_ecb", test_tdes2_ecb, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
