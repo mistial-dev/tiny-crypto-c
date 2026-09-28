@@ -19,6 +19,30 @@ SHA-224, SHA-384, SHA-512, HMAC, KMAC256, the NIST SP 800-108 key-based KDF,
 [SP 800-90A DRBGs](docs/drbg.md) and other block-cipher modes can be enabled
 as needed.
 
+## Uses
+
+Use the primitives in firmware that needs bounded AES, hashing, MACs, key
+derivation, or caller-seeded random-bit generation. The optional credential
+modules support PIV and TWIC reader workflows: parsing card data, checking
+CMS signatures and X.509 paths, applying credential policy, and checking CRLs.
+Feature gates let a small device link only the algorithms its application uses.
+See the [credential reader guide](docs/credential-reader.md) and
+[API guide](docs/api.md) for the supported workflows and buffer requirements.
+
+## Versioning
+
+Releases follow [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html)
+using `MAJOR.MINOR.PATCH`. A major version can change public C or C++ calls or
+documented behavior in ways that require caller changes. A minor version adds
+compatible functionality. A patch version contains compatible fixes.
+
+The public API comprises installed headers, documented behavior and status
+values, build options, and the installed CMake target. Applications should
+rebuild the library with their toolchain when upgrading; binary compatibility
+across different toolchains is outside this versioning policy. Version
+**2.0.0** includes public API changes that require callers upgrading from 1.x
+to review and update their code.
+
 ## Build
 
 ```sh

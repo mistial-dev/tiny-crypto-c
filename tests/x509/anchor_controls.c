@@ -293,6 +293,8 @@ static size_t trust_anchor_info(uint8_t* out, const TC_X509_certificate* root,
     n += der(controls + n, 0x82, flags, flag_length);
   if (subtree) {
     uint8_t permitted[128];
+    if (subtree_length > sizeof permitted - 4u)
+      return 0;
     const size_t permitted_length = der(permitted, 0xa0, subtree, subtree_length);
     n += der(controls + n, 0xa3, permitted, permitted_length);
   }

@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
 cmake_minimum_required(VERSION 3.24)
-project(tiny-crypto-c VERSION 1.0.1 LANGUAGES C)
+project(tiny-crypto-c VERSION 2.0.0 LANGUAGES C)
 include(GNUInstallDirs)
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR AND
