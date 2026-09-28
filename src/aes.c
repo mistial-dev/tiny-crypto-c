@@ -75,9 +75,7 @@ static const uint8_t sbox[256] TC_AES_TABLE_STORAGE = {
     0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16};
 #endif
 
-#if TC_AES_ENABLE_CBC ||                                      \
-    TC_AES_ENABLE_ECB ||                                      \
-    TC_AES_CAVP || TC_AES_ENABLE_DYNAMIC
+#if TC_AES_NEED_INVERSE
 #if TC_AES_SBOX_MODE == TC_AES_SBOX_MODE_RUNTIME
 static uint8_t rsbox[256];
 #elif TC_AES_SBOX_MODE == TC_AES_SBOX_MODE_FAST
@@ -156,9 +154,7 @@ void TC_AES_init_sbox(void)
                         tc_aes_sbox_rotate_left(inverse, 4) ^ 0x63);
   }
 
-#if TC_AES_ENABLE_CBC ||                                      \
-    TC_AES_ENABLE_ECB ||                                      \
-    TC_AES_CAVP || TC_AES_ENABLE_DYNAMIC
+#if TC_AES_NEED_INVERSE
   for (i = 0; i < 256; ++i)
     rsbox[sbox[i]] = (uint8_t)i;
 #endif
@@ -171,6 +167,18 @@ static uint8_t tc_aes_ct_eq_mask_u8(uint8_t a, uint8_t b)
 {
   const uint16_t difference = (uint16_t)(a ^ b);
   return (uint8_t)((difference - 1U) >> 8);
+}
+
+/* Read table[index] by scanning all 256 entries under a mask, so the access
+ * pattern does not depend on index. Runtime-mode tables live in SRAM on
+ * every target, so the scan reads them directly. */
+static uint8_t tc_aes_table_scan(const uint8_t table[256], uint8_t index)
+{
+  const volatile uint8_t* entries = table;
+  uint8_t value = 0;
+  for (unsigned i = 0; i < 256; ++i)
+    value |= entries[i] & tc_aes_ct_eq_mask_u8((uint8_t)i, index);
+  return value;
 }
 #endif
 
@@ -205,26 +213,7 @@ static uint8_t tc_aes_sbox_value(uint8_t num)
                    tc_aes_sbox_rotate_left(inverse, 2) ^ tc_aes_sbox_rotate_left(inverse, 3) ^
                    tc_aes_sbox_rotate_left(inverse, 4) ^ 0x63u);
 #else
-#if defined(__AVR__) && TC_AVR_PROGMEM
-  uint8_t value = 0;
-  unsigned i;
-
-  for (i = 0; i < 256; ++i) {
-    const uint8_t mask = tc_aes_ct_eq_mask_u8((uint8_t)i, num);
-    value |= TC_AES_READ_TABLE(sbox, i) & mask;
-  }
-#else
-  const volatile uint8_t* table = sbox;
-  uint8_t value = 0;
-  unsigned i;
-
-  for (i = 0; i < 256; ++i) {
-    const uint8_t mask = tc_aes_ct_eq_mask_u8((uint8_t)i, num);
-    value |= table[i] & mask;
-  }
-#endif
-
-  return value;
+  return tc_aes_table_scan(sbox, num);
 #endif
 }
 
@@ -234,7 +223,7 @@ static void tc_aes_key_expansion(uint8_t* round_key, const uint8_t* key, unsigne
   uint8_t tempa[4];
   uint8_t rcon = 0x01;
 
-  tc_aes_copy_bytes(round_key, key, words * 4);
+  memcpy(round_key, key, words * 4);
 
   for (i = words; i < Nb * ((words + 6) + 1); ++i) {
     {
@@ -315,9 +304,7 @@ TC_status TC_AES_init_ctx(struct TC_AES_ctx* ctx, const uint8_t* key)
   TC_AES_ctx_clear(ctx);
   if (TC_AES_key_init(&ctx->key, key) != TC_OK)
     return TC_ERROR;
-#if TC_AES_ENABLE_CBC ||                                    \
-    TC_AES_ENABLE_CTR ||                                    \
-    TC_AES_ENABLE_OFB
+#if TC_AES_HAVE_IV
   memset(ctx->iv, 0, TC_AES_BLOCKLEN);
 #endif
 #if TC_AES_ENABLE_CTR
@@ -330,9 +317,7 @@ TC_status TC_AES_init_ctx(struct TC_AES_ctx* ctx, const uint8_t* key)
 #endif
   return TC_OK;
 }
-#if TC_AES_ENABLE_CBC ||                                    \
-    TC_AES_ENABLE_CTR ||                                    \
-    TC_AES_ENABLE_OFB
+#if TC_AES_HAVE_IV
 TC_status TC_AES_init_ctx_iv(struct TC_AES_ctx* ctx, const uint8_t* key, const uint8_t* iv)
 {
   if (ctx == NULL)
@@ -343,7 +328,7 @@ TC_status TC_AES_init_ctx_iv(struct TC_AES_ctx* ctx, const uint8_t* key, const u
   }
   if (TC_AES_init_ctx(ctx, key) != TC_OK)
     return TC_ERROR;
-  tc_aes_copy_bytes(ctx->iv, iv, TC_AES_BLOCKLEN);
+  memcpy(ctx->iv, iv, TC_AES_BLOCKLEN);
 #if TC_AES_ENABLE_CTR
   ctx->ctr_pos = TC_AES_BLOCKLEN;
   ctx->ctr_exhausted = 0;
@@ -357,7 +342,7 @@ TC_status TC_AES_ctx_set_iv(struct TC_AES_ctx* ctx, const uint8_t* iv)
 {
   if (ctx == NULL || ctx->key.active != 1 || iv == NULL)
     return TC_ERROR;
-  tc_aes_copy_bytes(ctx->iv, iv, TC_AES_BLOCKLEN);
+  memcpy(ctx->iv, iv, TC_AES_BLOCKLEN);
 #if TC_AES_ENABLE_CTR
   ctx->ctr_pos = TC_AES_BLOCKLEN;
   ctx->ctr_exhausted = 0;
@@ -369,17 +354,7 @@ TC_status TC_AES_ctx_set_iv(struct TC_AES_ctx* ctx, const uint8_t* iv)
 }
 #endif
 
-#if TC_AES_ENABLE_CBC ||                                      \
-    TC_AES_ENABLE_ECB ||                                      \
-    TC_AES_ENABLE_CTR ||                                      \
-    TC_AES_ENABLE_OFB ||                                      \
-    TC_AES_ENABLE_GCM ||                                      \
-    TC_AES_ENABLE_CCM ||                                      \
-    TC_AES_ENABLE_EAX ||                                      \
-    TC_AES_ENABLE_EAX_PRIME ||                          \
-    TC_AES_ENABLE_SIV ||                                      \
-    TC_AES_ENABLE_CMAC ||                                    \
-    TC_AES_CAVP || TC_AES_ENABLE_DYNAMIC
+#if TC_AES_NEED_FORWARD
 
 /* Add the selected round key to the state. */
 static void tc_aes_add_round_key(uint8_t round, state_t* state, const uint8_t* round_key)
@@ -450,9 +425,7 @@ static void tc_aes_mix_columns(state_t* state)
   }
 }
 
-#if TC_AES_ENABLE_CBC ||                                      \
-    TC_AES_ENABLE_ECB ||                                      \
-    TC_AES_CAVP || TC_AES_ENABLE_DYNAMIC
+#if TC_AES_NEED_INVERSE
 static uint8_t tc_aes_inverse_sbox_value(uint8_t num)
 {
 #if TC_AES_SBOX_MODE == TC_AES_SBOX_MODE_FAST
@@ -463,26 +436,7 @@ static uint8_t tc_aes_inverse_sbox_value(uint8_t num)
                 tc_aes_sbox_rotate_left(num, 6) ^ 0x05u);
   return tc_aes_sbox_inverse(affine_inverse);
 #else
-#if defined(__AVR__) && TC_AVR_PROGMEM
-  uint8_t value = 0;
-  unsigned i;
-
-  for (i = 0; i < 256; ++i) {
-    const uint8_t mask = tc_aes_ct_eq_mask_u8((uint8_t)i, num);
-    value |= TC_AES_READ_TABLE(rsbox, i) & mask;
-  }
-#else
-  const volatile uint8_t* table = rsbox;
-  uint8_t value = 0;
-  unsigned i;
-
-  for (i = 0; i < 256; ++i) {
-    const uint8_t mask = tc_aes_ct_eq_mask_u8((uint8_t)i, num);
-    value |= table[i] & mask;
-  }
-#endif
-
-  return value;
+  return tc_aes_table_scan(rsbox, num);
 #endif
 }
 
@@ -585,23 +539,19 @@ TC_status tc_aes_cipher(state_t* state, const uint8_t* round_key)
 #endif
 
 #if TC_AES_CAVP
-void TC_AES_CAVP_encrypt_block(const uint8_t* key, uint8_t block[TC_AES_BLOCKLEN])
+TC_status TC_AES_CAVP_encrypt_block(const uint8_t* key, uint8_t block[TC_AES_BLOCKLEN])
 {
-  struct TC_AES_ctx ctx;
-
-  if (TC_AES_init_ctx(&ctx, key) != TC_OK)
-    return;
-  tc_aes_cipher((state_t*)block, ctx.key.round_key);
-#if TC_ZEROIZE
-  TC_AES_ctx_clear(&ctx);
-#endif
+  struct TC_AES_key_ctx schedule;
+  TC_status status = TC_AES_key_init(&schedule, key);
+  if (status == TC_OK)
+    status = tc_aes_cipher((state_t*)block, schedule.round_key);
+  TC_AES_key_ctx_clear(&schedule);
+  return status;
 }
 
 #endif
 
-#if TC_AES_ENABLE_CBC ||                                      \
-    TC_AES_ENABLE_ECB ||                                      \
-    TC_AES_CAVP || TC_AES_ENABLE_DYNAMIC
+#if TC_AES_NEED_INVERSE
 TC_status tc_aes_inverse_rounds(state_t* state, const uint8_t* round_key, uint8_t rounds)
 {
   uint8_t round = 0;
@@ -625,25 +575,17 @@ TC_status tc_aes_inverse_rounds(state_t* state, const uint8_t* round_key, uint8_
   return TC_OK;
 }
 
-#if TC_AES_CAVP
-static TC_status tc_aes_inverse_cipher(state_t* state, const uint8_t* round_key)
-{
-  return tc_aes_inverse_rounds(state, round_key, Nr);
-}
-#endif
 #endif
 
 #if TC_AES_CAVP
-void TC_AES_CAVP_decrypt_block(const uint8_t* key, uint8_t block[TC_AES_BLOCKLEN])
+TC_status TC_AES_CAVP_decrypt_block(const uint8_t* key, uint8_t block[TC_AES_BLOCKLEN])
 {
-  struct TC_AES_ctx ctx;
-
-  if (TC_AES_init_ctx(&ctx, key) != TC_OK)
-    return;
-  tc_aes_inverse_cipher((state_t*)block, ctx.key.round_key);
-#if TC_ZEROIZE
-  TC_AES_ctx_clear(&ctx);
-#endif
+  struct TC_AES_key_ctx schedule;
+  TC_status status = TC_AES_key_init(&schedule, key);
+  if (status == TC_OK)
+    status = tc_aes_inverse_rounds((state_t*)block, schedule.round_key, Nr);
+  TC_AES_key_ctx_clear(&schedule);
+  return status;
 }
 #endif
 #if TC_AES_ENABLE_DYNAMIC

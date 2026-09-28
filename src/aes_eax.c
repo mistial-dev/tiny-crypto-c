@@ -72,7 +72,7 @@ static TC_status tc_aes_eax_crypt(const uint8_t* key, const uint8_t* nonce, size
       (input_len != 0 && (input == NULL || output == NULL)) ||
       (decrypt ? expected_tag == NULL : output_tag == NULL) || tag_len < TC_AES_EAX_MIN_TAG_LEN ||
       tag_len > TC_AES_BLOCKLEN || !tc_aes_buffers_ok(input, input_len, output, input_len) ||
-      !tc_aes_buffers_disjoint(output, input_len,
+      !tc_internal_ranges_disjoint(output, input_len,
                                decrypt ? (const void*)expected_tag : (const void*)output_tag,
                                tag_len))
     return TC_ERROR;
@@ -103,7 +103,7 @@ static TC_status tc_aes_eax_crypt(const uint8_t* key, const uint8_t* nonce, size
       goto done;
     for (i = 0; i < TC_AES_BLOCKLEN; ++i)
       st.full_tag[i] = (uint8_t)(st.nonce_mac[i] ^ st.header_mac[i] ^ st.message_mac[i]);
-    tc_aes_copy_bytes(output_tag, st.full_tag, tag_len);
+    memcpy(output_tag, st.full_tag, tag_len);
     status = TC_OK;
   }
 
@@ -160,7 +160,7 @@ static TC_status tc_aes_eax_prime_crypt(const uint8_t* key, const uint8_t* clear
       (input_len != 0 && (input == NULL || output == NULL)) ||
       (decrypt ? expected_tag == NULL : output_tag == NULL) ||
       !tc_aes_buffers_ok(input, input_len, output, input_len) ||
-      !tc_aes_buffers_disjoint(output, input_len,
+      !tc_internal_ranges_disjoint(output, input_len,
                                decrypt ? (const void*)expected_tag : (const void*)output_tag,
                                TC_AES_EAX_PRIME_TAG_LEN))
     return TC_ERROR;

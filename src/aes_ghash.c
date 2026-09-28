@@ -42,7 +42,7 @@ static void tc_aes_gcm_multiply_bitwise(uint8_t* result, const uint8_t* left, co
   uint8_t v[TC_AES_BLOCKLEN];
   unsigned bit;
 
-  tc_aes_copy_bytes(v, right, TC_AES_BLOCKLEN);
+  memcpy(v, right, TC_AES_BLOCKLEN);
   for (bit = 0; bit < 128; ++bit) {
     const uint8_t bit_mask = (uint8_t)(0u - (uint8_t)((left[bit / 8u] >> (7u - (bit % 8u))) & 1u));
     unsigned i;
@@ -52,7 +52,7 @@ static void tc_aes_gcm_multiply_bitwise(uint8_t* result, const uint8_t* left, co
 
     tc_aes_gcm_multiply_x(v);
   }
-  tc_aes_copy_bytes(result, z, TC_AES_BLOCKLEN);
+  memcpy(result, z, TC_AES_BLOCKLEN);
 #if TC_ZEROIZE
   TC_secure_zero(z, sizeof(z));
   TC_secure_zero(v, sizeof(v));
@@ -125,7 +125,7 @@ static void tc_aes_gcm_multiply_fast_table(uint8_t* result, const uint8_t* left,
     for (i = 0; i < TC_AES_BLOCKLEN; ++i)
       value[i] ^= ctx->ghash_table[nibble][i];
   }
-  tc_aes_copy_bytes(result, value, TC_AES_BLOCKLEN);
+  memcpy(result, value, TC_AES_BLOCKLEN);
 #if TC_ZEROIZE
   TC_secure_zero(value, sizeof(value));
 #endif
@@ -171,7 +171,7 @@ void tc_aes_gcm_hash_bytes(struct TC_AES_GCM_ctx* ctx, const uint8_t* data, size
     length -= TC_AES_BLOCKLEN;
   }
   if (length != 0) {
-    tc_aes_copy_bytes(block, data, length);
+    memcpy(block, data, length);
     tc_aes_gcm_ghash_block(ctx, block);
   }
 }

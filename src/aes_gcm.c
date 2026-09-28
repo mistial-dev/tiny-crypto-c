@@ -26,13 +26,13 @@ static void tc_aes_gcm_make_j0(struct TC_AES_GCM_ctx* ctx, const uint8_t* iv, si
   memset(ctx->ghash, 0, TC_AES_BLOCKLEN);
   if (iv_len == 12) {
     memset(ctx->J0, 0, TC_AES_BLOCKLEN);
-    tc_aes_copy_bytes(ctx->J0, iv, iv_len);
+    memcpy(ctx->J0, iv, iv_len);
     ctx->J0[15] = 1;
   } else {
     tc_aes_gcm_hash_bytes(ctx, iv, iv_len);
     tc_internal_store_be64(length_block + 8, (uint64_t)iv_len * 8u);
     tc_aes_gcm_ghash_block(ctx, length_block);
-    tc_aes_copy_bytes(ctx->J0, ctx->S, TC_AES_BLOCKLEN);
+    memcpy(ctx->J0, ctx->S, TC_AES_BLOCKLEN);
   }
   memset(ctx->S, 0, TC_AES_BLOCKLEN);
   memset(ctx->ghash, 0, TC_AES_BLOCKLEN);
@@ -59,7 +59,7 @@ static void tc_aes_gcm_start_text(struct TC_AES_GCM_ctx* ctx, int decrypt)
     return;
   tc_aes_gcm_pad_ghash(ctx);
   if (decrypt)
-    tc_aes_copy_bytes(ctx->aad_state, ctx->S, TC_AES_BLOCKLEN);
+    memcpy(ctx->aad_state, ctx->S, TC_AES_BLOCKLEN);
   ctx->phase = TC_AES_GCM_PHASE_TEXT;
 }
 
@@ -74,7 +74,7 @@ static void tc_aes_gcm_absorb(struct TC_AES_GCM_ctx* ctx, const uint8_t* data, s
     }
     const size_t available = TC_AES_BLOCKLEN - ctx->ghash_len;
     const size_t count = length < available ? length : available;
-    tc_aes_copy_bytes(ctx->ghash + ctx->ghash_len, data, count);
+    memcpy(ctx->ghash + ctx->ghash_len, data, count);
     ctx->ghash_len = (uint8_t)(ctx->ghash_len + count);
     data += count;
     length -= count;
@@ -147,11 +147,11 @@ static TC_status tc_aes_gcm_make_tag(const struct TC_AES_GCM_ctx* ctx, uint8_t* 
   uint8_t i;
   TC_status status;
 
-  tc_aes_copy_bytes(mask, ctx->J0, TC_AES_BLOCKLEN);
+  memcpy(mask, ctx->J0, TC_AES_BLOCKLEN);
   status = tc_aes_cipher((state_t*)mask, ctx->key.round_key);
   if (status != TC_OK)
     goto done;
-  tc_aes_copy_bytes(hash, ctx->S, TC_AES_BLOCKLEN);
+  memcpy(hash, ctx->S, TC_AES_BLOCKLEN);
   /* MSBt truncation: leading tag_len bytes of the 128-bit block. */
   for (i = 0; i < ctx->tag_len; ++i)
     tag[i] = (uint8_t)(mask[i] ^ hash[i]);
@@ -184,7 +184,7 @@ static TC_status tc_aes_gcm_init_impl(struct TC_AES_GCM_ctx* ctx, const uint8_t*
 
   if (TC_AES_key_init(&ctx->key, key) != TC_OK)
     return TC_ERROR;
-  tc_aes_copy_bytes(ctx->H, zero, TC_AES_BLOCKLEN);
+  memcpy(ctx->H, zero, TC_AES_BLOCKLEN);
   if (tc_aes_cipher((state_t*)ctx->H, ctx->key.round_key) != TC_OK) {
     tc_aes_gcm_invalidate(ctx);
     return TC_ERROR;
@@ -193,9 +193,9 @@ static TC_status tc_aes_gcm_init_impl(struct TC_AES_GCM_ctx* ctx, const uint8_t*
   tc_aes_gcm_init_table(ctx);
 #endif
   tc_aes_gcm_make_j0(ctx, iv, iv_len);
-  tc_aes_copy_bytes(ctx->counter, ctx->J0, TC_AES_BLOCKLEN);
-  tc_aes_copy_bytes(ctx->S, zero, TC_AES_BLOCKLEN);
-  tc_aes_copy_bytes(ctx->ghash, zero, TC_AES_BLOCKLEN);
+  memcpy(ctx->counter, ctx->J0, TC_AES_BLOCKLEN);
+  memcpy(ctx->S, zero, TC_AES_BLOCKLEN);
+  memcpy(ctx->ghash, zero, TC_AES_BLOCKLEN);
   ctx->aad_len = 0;
   ctx->text_len = 0;
   ctx->stream_pos = TC_AES_BLOCKLEN;
@@ -235,7 +235,7 @@ TC_status TC_AES_GCM_aad_update(struct TC_AES_GCM_ctx* ctx, const uint8_t* aad, 
   return TC_OK;
 }
 
-static int tc_aes_gcm_encrypt_update_impl(struct TC_AES_GCM_ctx* ctx, uint8_t* buf, size_t length)
+TC_status TC_AES_GCM_encrypt_update(struct TC_AES_GCM_ctx* ctx, uint8_t* buf, size_t length)
 {
   size_t i;
   const size_t total_length = length;
@@ -257,7 +257,7 @@ static int tc_aes_gcm_encrypt_update_impl(struct TC_AES_GCM_ctx* ctx, uint8_t* b
     uint8_t j;
 
     tc_aes_gcm_increment32(ctx->counter);
-    tc_aes_copy_bytes(ctx->stream, ctx->counter, TC_AES_BLOCKLEN);
+    memcpy(ctx->stream, ctx->counter, TC_AES_BLOCKLEN);
     if (tc_aes_cipher((state_t*)ctx->stream, ctx->key.round_key) != TC_OK)
       goto failed;
     for (j = 0; j < TC_AES_BLOCKLEN; ++j)
@@ -273,7 +273,7 @@ static int tc_aes_gcm_encrypt_update_impl(struct TC_AES_GCM_ctx* ctx, uint8_t* b
 
     if (ctx->stream_pos == TC_AES_BLOCKLEN) {
       tc_aes_gcm_increment32(ctx->counter);
-      tc_aes_copy_bytes(ctx->stream, ctx->counter, TC_AES_BLOCKLEN);
+      memcpy(ctx->stream, ctx->counter, TC_AES_BLOCKLEN);
       if (tc_aes_cipher((state_t*)ctx->stream, ctx->key.round_key) != TC_OK)
         goto failed;
       ctx->stream_pos = 0;
@@ -294,11 +294,6 @@ failed:
   TC_secure_zero(output, total_length);
   tc_aes_gcm_invalidate(ctx);
   return TC_ERROR;
-}
-
-TC_status TC_AES_GCM_encrypt_update(struct TC_AES_GCM_ctx* ctx, uint8_t* buf, size_t length)
-{
-  return tc_aes_gcm_encrypt_update_impl(ctx, buf, length);
 }
 
 static TC_status tc_aes_gcm_decrypt_absorb(struct TC_AES_GCM_ctx* ctx, const uint8_t* ciphertext,
@@ -346,17 +341,17 @@ static TC_status tc_aes_gcm_decrypt_recheck(struct TC_AES_GCM_ctx* ctx, const ui
   size_t offset = 0;
   TC_status status = TC_OK;
 
-  tc_aes_copy_bytes(ctx->S, ctx->aad_state, TC_AES_BLOCKLEN);
+  memcpy(ctx->S, ctx->aad_state, TC_AES_BLOCKLEN);
   ctx->ghash_len = 0;
-  tc_aes_copy_bytes(counter, ctx->J0, TC_AES_BLOCKLEN);
+  memcpy(counter, ctx->J0, TC_AES_BLOCKLEN);
   while (offset < length) {
     const size_t remaining = length - offset;
     const size_t count = remaining < TC_AES_BLOCKLEN ? remaining : TC_AES_BLOCKLEN;
     size_t i;
-    tc_aes_copy_bytes(block, ciphertext + offset, count);
+    memcpy(block, ciphertext + offset, count);
     tc_aes_gcm_absorb(ctx, block, count);
     tc_aes_gcm_increment32(counter);
-    tc_aes_copy_bytes(stream, counter, TC_AES_BLOCKLEN);
+    memcpy(stream, counter, TC_AES_BLOCKLEN);
     if (tc_aes_cipher((state_t*)stream, ctx->key.round_key) != TC_OK) {
       status = TC_ERROR;
       break;
@@ -412,7 +407,7 @@ TC_status TC_AES_GCM_decrypt_finish(struct TC_AES_GCM_ctx* ctx, const uint8_t* t
   if (ctx == NULL || tag == NULL || ctx->phase == TC_AES_GCM_PHASE_UNINIT ||
       ctx->phase == TC_AES_GCM_PHASE_FINAL ||
       !tc_internal_ranges_disjoint(ctx, sizeof(*ctx), tag, ctx->tag_len) ||
-      !tc_aes_buffers_disjoint(ctx->decrypt_buffer, ctx->decrypt_length, tag, ctx->tag_len) ||
+      !tc_internal_ranges_disjoint(ctx->decrypt_buffer, ctx->decrypt_length, tag, ctx->tag_len) ||
       !tc_aes_gcm_packet_length_ok(ctx, 0))
     return TC_ERROR;
   if (ctx->direction == TC_AES_GCM_DIRECTION_ENCRYPT)
@@ -459,7 +454,7 @@ static int tc_aes_gcm_oneshot_args_ok(const uint8_t* key, const uint8_t* iv, siz
          (uint64_t)aad_len <= TC_AES_GCM_MAX_AAD_BYTES &&
          (uint64_t)input_len <= TC_AES_GCM_MAX_PLAINTEXT_BYTES &&
          tc_aes_buffers_ok(input, input_len, output, input_len) &&
-         tc_aes_buffers_disjoint(output, input_len, tag, tag_len) &&
+         tc_internal_ranges_disjoint(output, input_len, tag, tag_len) &&
          tc_aes_gcm_packet_lengths_ok(tag_len, (uint64_t)aad_len, (uint64_t)input_len, 0);
 }
 
@@ -470,7 +465,7 @@ static TC_status tc_aes_gcm_encrypt_impl(const uint8_t* key, const uint8_t* iv, 
                                          int short_tag)
 {
   struct TC_AES_GCM_ctx ctx;
-  int status;
+  TC_status status;
 
   if (!tc_aes_gcm_oneshot_args_ok(key, iv, iv_len, aad, aad_len, plaintext, plaintext_len,
                                   ciphertext, tag, tag_len, short_tag))
@@ -487,7 +482,7 @@ static TC_status tc_aes_gcm_encrypt_impl(const uint8_t* key, const uint8_t* iv, 
 
   /* Copy only after all length/overlap checks and AAD accept. */
   if (plaintext != ciphertext && plaintext_len != 0)
-    tc_aes_copy_bytes(ciphertext, plaintext, plaintext_len);
+    memcpy(ciphertext, plaintext, plaintext_len);
 
   status = TC_AES_GCM_encrypt_update(&ctx, ciphertext, plaintext_len);
   if (status == TC_OK)

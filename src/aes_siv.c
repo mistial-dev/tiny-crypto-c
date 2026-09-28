@@ -48,7 +48,7 @@ static TC_status tc_aes_siv_s2v(const uint8_t* k1_round, const uint8_t* const* a
 
   if (last_len >= TC_AES_BLOCKLEN) {
     /* T = last xorend D = prefix || (suffix xor D); CMAC(T). */
-    tc_aes_copy_bytes(last_block, last + (last_len - TC_AES_BLOCKLEN), TC_AES_BLOCKLEN);
+    memcpy(last_block, last + (last_len - TC_AES_BLOCKLEN), TC_AES_BLOCKLEN);
     for (i = 0; i < TC_AES_BLOCKLEN; ++i)
       last_block[i] ^= d[i];
     const TC_bytes parts[] = {{last, last_len - TC_AES_BLOCKLEN}, {last_block, TC_AES_BLOCKLEN}};
@@ -57,11 +57,11 @@ static TC_status tc_aes_siv_s2v(const uint8_t* k1_round, const uint8_t* const* a
     /* T = dbl(D) xor pad(last); single-block CMAC input. */
     uint8_t t[TC_AES_BLOCKLEN];
     uint8_t j;
-    tc_aes_copy_bytes(t, d, TC_AES_BLOCKLEN);
+    memcpy(t, d, TC_AES_BLOCKLEN);
     tc_aes_gf128_double(t);
     memset(tmp, 0, TC_AES_BLOCKLEN);
     if (last_len != 0 && last != NULL)
-      tc_aes_copy_bytes(tmp, last, last_len);
+      memcpy(tmp, last, last_len);
     tmp[last_len] = 0x80;
     for (j = 0; j < TC_AES_BLOCKLEN; ++j)
       t[j] ^= tmp[j];
@@ -149,7 +149,7 @@ TC_status TC_AES_SIV_encrypt(const uint8_t* key, const uint8_t* const* ad, const
                              uint8_t v[TC_AES_SIV_V_LEN], uint8_t* ciphertext)
 {
   uint8_t local_v[TC_AES_SIV_V_LEN];
-  int status;
+  TC_status status;
 
   if (v == NULL)
     return TC_ERROR;
@@ -157,12 +157,12 @@ TC_status TC_AES_SIV_encrypt(const uint8_t* key, const uint8_t* const* ad, const
    * V is written after ciphertext. If they overlap, the post-encrypt copy
    * would clobber ciphertext (exact or partial). Stage V for pt alias only.
    */
-  if (!tc_aes_buffers_disjoint(v, TC_AES_SIV_V_LEN, ciphertext, plaintext_len))
+  if (!tc_internal_ranges_disjoint(v, TC_AES_SIV_V_LEN, ciphertext, plaintext_len))
     return TC_ERROR;
   status = tc_aes_siv_crypt(key, ad, ad_lens, ad_count, plaintext, plaintext_len, ciphertext,
                             local_v, 0);
   if (status == TC_OK)
-    tc_aes_copy_bytes(v, local_v, TC_AES_SIV_V_LEN);
+    memcpy(v, local_v, TC_AES_SIV_V_LEN);
 #if TC_ZEROIZE
   TC_secure_zero(local_v, sizeof(local_v));
 #endif
@@ -174,13 +174,13 @@ TC_status TC_AES_SIV_decrypt(const uint8_t* key, const uint8_t* const* ad, const
                              const uint8_t* ciphertext, size_t ciphertext_len, uint8_t* plaintext)
 {
   uint8_t local_v[TC_AES_SIV_V_LEN];
-  int status;
+  TC_status status;
 
   if (v == NULL)
     return TC_ERROR;
-  if (!tc_aes_buffers_disjoint(v, TC_AES_SIV_V_LEN, plaintext, ciphertext_len))
+  if (!tc_internal_ranges_disjoint(v, TC_AES_SIV_V_LEN, plaintext, ciphertext_len))
     return TC_ERROR;
-  tc_aes_copy_bytes(local_v, v, TC_AES_SIV_V_LEN);
+  memcpy(local_v, v, TC_AES_SIV_V_LEN);
   status = tc_aes_siv_crypt(key, ad, ad_lens, ad_count, ciphertext, ciphertext_len, plaintext,
                             local_v, 1);
 #if TC_ZEROIZE

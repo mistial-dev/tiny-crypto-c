@@ -81,9 +81,9 @@ jobs:
       CXX: ${{ matrix.cxx }}
     steps:
       - uses: actions/checkout@v4
-      - name: Install AVR compiler
+      - name: Install AVR compiler and emulator
         if: matrix.compiler == 'gcc'
-        run: sudo apt-get update && sudo apt-get install -y gcc-avr avr-libc
+        run: sudo apt-get update && sudo apt-get install -y gcc-avr avr-libc qemu-system-misc
       - name: Install OpenSSL development files
         run: sudo apt-get update && sudo apt-get install -y libssl-dev
       - name: Fetch Unicode reference data

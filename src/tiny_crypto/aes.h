@@ -24,6 +24,9 @@ void TC_AES_GCM_hardware_multiply(uint8_t result[16], const uint8_t left[16],
                                   const uint8_t right[16]);
 #endif
 
+/* Modes that keep an IV in TC_AES_ctx. */
+#define TC_AES_HAVE_IV (TC_AES_ENABLE_CBC || TC_AES_ENABLE_CTR || TC_AES_ENABLE_OFB)
+
 #define TC_AES_BLOCKLEN 16 /* AES block length in bytes (128-bit block only). */
 
 #if TC_AES_KEY_BITS == 256
@@ -44,7 +47,7 @@ struct TC_AES_key_ctx {
 
 struct TC_AES_ctx {
   struct TC_AES_key_ctx key;
-#if TC_AES_ENABLE_CBC || TC_AES_ENABLE_CTR || TC_AES_ENABLE_OFB
+#if TC_AES_HAVE_IV
   uint8_t iv[TC_AES_BLOCKLEN];
 #if TC_AES_ENABLE_CTR
   uint8_t ctr_stream[TC_AES_BLOCKLEN];
@@ -66,15 +69,16 @@ void TC_AES_ctx_clear(struct TC_AES_ctx* ctx);
 /* Initialize an expanded key schedule. Both pointers must be non-NULL. */
 TC_status TC_AES_init_ctx(struct TC_AES_ctx* ctx, const uint8_t* key);
 #if TC_AES_CAVP
-/* Test-only forward-cipher hook used by the AESAVS Monte Carlo harness. */
-void TC_AES_CAVP_encrypt_block(const uint8_t* key, uint8_t block[TC_AES_BLOCKLEN]);
-void TC_AES_CAVP_decrypt_block(const uint8_t* key, uint8_t block[TC_AES_BLOCKLEN]);
+/* Test-only single-block hooks used by the AESAVS harness. They return
+ * TC_ERROR, leaving block unchanged, when the key cannot be scheduled. */
+TC_status TC_AES_CAVP_encrypt_block(const uint8_t* key, uint8_t block[TC_AES_BLOCKLEN]);
+TC_status TC_AES_CAVP_decrypt_block(const uint8_t* key, uint8_t block[TC_AES_BLOCKLEN]);
 #endif
 #if TC_AES_SBOX_MODE == TC_AES_SBOX_MODE_RUNTIME
 /* Must be called once before TC_AES_init_ctx(), TC_AES_init_ctx_iv(), or encryption. */
 void TC_AES_init_sbox(void);
 #endif
-#if TC_AES_ENABLE_CBC || TC_AES_ENABLE_CTR || TC_AES_ENABLE_OFB
+#if TC_AES_HAVE_IV
 TC_status TC_AES_init_ctx_iv(struct TC_AES_ctx* ctx, const uint8_t* key, const uint8_t* iv);
 TC_status TC_AES_ctx_set_iv(struct TC_AES_ctx* ctx, const uint8_t* iv);
 #endif

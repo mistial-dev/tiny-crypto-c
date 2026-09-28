@@ -15,14 +15,14 @@ TC_status tc_aes_mac_ctr_xor(const uint8_t* round_key, const uint8_t initial[TC_
   size_t offset = 0;
   TC_status status = TC_OK;
 
-  tc_aes_copy_bytes(counter, initial, TC_AES_BLOCKLEN);
+  memcpy(counter, initial, TC_AES_BLOCKLEN);
   if (bits.enabled) {
     counter[bits.first_clear_bit] &= 0x7fu;
     counter[bits.second_clear_bit] &= 0x7fu;
   }
   while (offset < length) {
     const size_t count = length - offset < TC_AES_BLOCKLEN ? length - offset : TC_AES_BLOCKLEN;
-    tc_aes_copy_bytes(stream, counter, TC_AES_BLOCKLEN);
+    memcpy(stream, counter, TC_AES_BLOCKLEN);
     status = tc_aes_cipher((state_t*)stream, round_key);
     if (status != TC_OK)
       break;

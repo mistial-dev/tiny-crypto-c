@@ -1297,6 +1297,21 @@ add_test(NAME test_package_boundaries
           -c ${CMAKE_CURRENT_SOURCE_DIR}/src/${drbg_source}.c
           -o ${CMAKE_CURRENT_BINARY_DIR}/tiny-crypto-c-${drbg_source}-compile.o)
     endforeach()
+    # Run AES on an emulated ATmega328P in each S-box mode. Flash-resident
+    # tables and the runtime SRAM table use different read paths on AVR.
+    find_program(TC_QEMU_AVR NAMES qemu-system-avr)
+    if(TC_QEMU_AVR AND Python3_Interpreter_FOUND)
+      foreach(sbox_mode 1 2 3)
+        add_test(NAME test_aes_sbox_${sbox_mode}_qemu_avr
+          COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/avr/run_qemu.py
+            --cc ${TC_AVR_CC} --qemu ${TC_QEMU_AVR} --expect AES-OK
+            --include ${CMAKE_CURRENT_SOURCE_DIR}/src
+            --define TC_AES_SBOX_MODE=${sbox_mode} --define TC_AES_ENABLE_ECB=1
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/avr/aes_known_answer.c
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/aes.c ${CMAKE_CURRENT_SOURCE_DIR}/src/aes_modes.c
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/common.c)
+      endforeach()
+    endif()
     # The key challenge carries a 32-bit work budget across size_t PKI code.
     add_test(NAME test_key_challenge_compile_avr
       COMMAND ${TC_AVR_CC} -std=c99 -Wall -Wextra -Werror -Os -mmcu=atmega2560

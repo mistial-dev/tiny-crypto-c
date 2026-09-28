@@ -40,7 +40,7 @@ static void tc_aes_ccm_make_counter(uint8_t* counter, const uint8_t* nonce, size
 
   memset(counter, 0, TC_AES_BLOCKLEN);
   counter[0] = (uint8_t)(q - 1u);
-  tc_aes_copy_bytes(counter + 1, nonce, nonce_len);
+  memcpy(counter + 1, nonce, nonce_len);
   tc_aes_ccm_store_length(counter + 1 + nonce_len, value, q);
 }
 
@@ -57,7 +57,7 @@ static TC_status tc_aes_ccm_xor_block(uint8_t* dst, size_t length, uint8_t* coun
   size_t i;
   TC_status status;
 
-  tc_aes_copy_bytes(stream, counter, TC_AES_BLOCKLEN);
+  memcpy(stream, counter, TC_AES_BLOCKLEN);
   status = tc_aes_cipher((state_t*)stream, round_key);
   if (status != TC_OK)
     goto done;
@@ -100,7 +100,7 @@ static TC_status tc_aes_ccm_crypt(const uint8_t* key, const uint8_t* nonce, size
       !tc_aes_ccm_tag_length_is_valid(tag_len) ||
       !tc_aes_ccm_payload_length_is_valid(nonce_len, input_len) ||
       !tc_aes_buffers_ok(input, input_len, output, input_len) ||
-      !tc_aes_buffers_disjoint(output, input_len,
+      !tc_internal_ranges_disjoint(output, input_len,
                                decrypt ? (const void*)expected_tag : (const void*)output_tag,
                                tag_len))
     return TC_ERROR;
@@ -109,7 +109,7 @@ static TC_status tc_aes_ccm_crypt(const uint8_t* key, const uint8_t* nonce, size
   q = tc_aes_ccm_length_field_size(nonce_len);
   st.work[0] = (uint8_t)((aad_len != 0 ? 0x40u : 0u) | (uint8_t)(((tag_len - 2u) / 2u) << 3) |
                          (uint8_t)(q - 1u));
-  tc_aes_copy_bytes(st.work + 1, nonce, nonce_len);
+  memcpy(st.work + 1, nonce, nonce_len);
   tc_aes_ccm_store_length(st.work + 1 + nonce_len, (uint64_t)input_len, q);
 
   if (TC_AES_key_init(&st.aes, key) != TC_OK)
@@ -143,7 +143,7 @@ static TC_status tc_aes_ccm_crypt(const uint8_t* key, const uint8_t* nonce, size
   }
 
   tc_aes_ccm_make_counter(st.counter, nonce, nonce_len, 0);
-  tc_aes_copy_bytes(st.s0, st.counter, TC_AES_BLOCKLEN);
+  memcpy(st.s0, st.counter, TC_AES_BLOCKLEN);
   if (tc_aes_cipher((state_t*)st.s0, st.aes.round_key) != TC_OK)
     goto done;
   tc_aes_ccm_increment_counter(st.counter, q);
@@ -156,7 +156,7 @@ static TC_status tc_aes_ccm_crypt(const uint8_t* key, const uint8_t* nonce, size
         tc_mac_cbc_update(&mac_cipher, st.mac, st.block, &used, input + offset, length, 0) != TC_OK)
       goto done;
     memset(st.plain, 0, TC_AES_BLOCKLEN);
-    tc_aes_copy_bytes(st.plain, input + offset, length);
+    memcpy(st.plain, input + offset, length);
     if (decrypt && tc_aes_ccm_xor_block(st.plain, length, st.counter, st.aes.round_key) != TC_OK)
       goto done;
     if (decrypt &&
@@ -166,7 +166,7 @@ static TC_status tc_aes_ccm_crypt(const uint8_t* key, const uint8_t* nonce, size
       if (tc_aes_ccm_xor_block(st.plain, length, st.counter, st.aes.round_key) != TC_OK)
         goto done;
       output_started = 1;
-      tc_aes_copy_bytes(output + offset, st.plain, length);
+      memcpy(output + offset, st.plain, length);
     }
     tc_aes_ccm_increment_counter(st.counter, q);
     offset += length;
@@ -188,7 +188,7 @@ static TC_status tc_aes_ccm_crypt(const uint8_t* key, const uint8_t* nonce, size
         const size_t length =
             input_len - offset < TC_AES_BLOCKLEN ? input_len - offset : TC_AES_BLOCKLEN;
         output_started = 1;
-        tc_aes_copy_bytes(output + offset, input + offset, length);
+        memcpy(output + offset, input + offset, length);
         status = tc_aes_ccm_xor_block(output + offset, length, st.counter, st.aes.round_key);
         if (status != TC_OK)
           goto done;
@@ -200,7 +200,7 @@ static TC_status tc_aes_ccm_crypt(const uint8_t* key, const uint8_t* nonce, size
         TC_secure_zero(output, input_len);
     }
   } else {
-    tc_aes_copy_bytes(output_tag, st.work, tag_len);
+    memcpy(output_tag, st.work, tag_len);
     status = TC_OK;
   }
 done:

@@ -121,7 +121,7 @@ TC_status TC_AES_CTR_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length)
   while (offset < length) {
     size_t take;
     if (ctx->ctr_pos == TC_AES_BLOCKLEN) {
-      tc_aes_copy_bytes(ctx->ctr_stream, ctx->iv, TC_AES_BLOCKLEN);
+      memcpy(ctx->ctr_stream, ctx->iv, TC_AES_BLOCKLEN);
       if (tc_aes_cipher((state_t*)ctx->ctr_stream, ctx->key.round_key) != TC_OK) {
         TC_secure_zero(buf, length);
         TC_AES_ctx_clear(ctx);

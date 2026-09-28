@@ -20,10 +20,7 @@
 
 #if TC_AES_CAVP
 
-#if TC_AES_ENABLE_ECB ||                                    \
-    TC_AES_ENABLE_CBC ||                                    \
-    TC_AES_ENABLE_OFB ||                                    \
-    TC_AES_ENABLE_GCM ||                                    \
+#if TC_AES_ENABLE_ECB || TC_AES_ENABLE_CBC || TC_AES_ENABLE_OFB || TC_AES_ENABLE_GCM ||            \
     TC_AES_ENABLE_CCM
 #if TC_AES_SBOX_MODE == TC_AES_SBOX_MODE_RUNTIME
 static void cavp_initialize_sbox(void)
@@ -110,9 +107,7 @@ static int cavp_compare(const char* file, size_t count, const char* field, const
   return 0;
 }
 
-#if TC_AES_ENABLE_ECB ||                                    \
-    TC_AES_ENABLE_CBC ||                                    \
-    TC_AES_ENABLE_OFB
+#if TC_AES_ENABLE_ECB || TC_AES_ENABLE_CBC || TC_AES_ENABLE_OFB
 static void cavp_xor(uint8_t* dst, const uint8_t* src, size_t length)
 {
   size_t i;
@@ -127,10 +122,9 @@ static void cavp_ecb_block(const uint8_t* key, size_t key_len, int encrypt,
 
   (void)key_len;
   memcpy(block, input, sizeof(block));
-  if (encrypt)
-    TC_AES_CAVP_encrypt_block(key, block);
-  else
-    TC_AES_CAVP_decrypt_block(key, block);
+  munit_assert_int(encrypt ? TC_AES_CAVP_encrypt_block(key, block)
+                           : TC_AES_CAVP_decrypt_block(key, block),
+                   ==, TC_OK);
   memcpy(output, block, sizeof(block));
 }
 
@@ -324,7 +318,7 @@ static int cavp_mct_case(enum cavp_mode mode, const char* file, int encrypt,
   for (j = 0; j < 1000; ++j) {
     const int first = j == 0;
     if (mode == CAVP_OFB) {
-      TC_AES_CAVP_encrypt_block(key, ofb_state);
+      munit_assert_int(TC_AES_CAVP_encrypt_block(key, ofb_state), ==, TC_OK);
       memcpy(output, input, TC_AES_BLOCKLEN);
       cavp_xor(output, ofb_state, TC_AES_BLOCKLEN);
     } else
@@ -758,19 +752,13 @@ static int cavp_run_all(void)
                                     "VNT256.rsp",  "VPT128.rsp",  "VPT192.rsp",  "VPT256.rsp",
                                     "VTT128.rsp",  "VTT192.rsp",  "VTT256.rsp"};
 #endif
-#if TC_AES_ENABLE_ECB ||                                    \
-    TC_AES_ENABLE_CBC ||                                    \
-    TC_AES_ENABLE_OFB ||                                    \
-    TC_AES_ENABLE_GCM ||                                    \
+#if TC_AES_ENABLE_ECB || TC_AES_ENABLE_CBC || TC_AES_ENABLE_OFB || TC_AES_ENABLE_GCM ||            \
     TC_AES_ENABLE_CCM
   size_t i;
 #endif
   int ok = 1;
 
-#if TC_AES_ENABLE_ECB ||                                    \
-    TC_AES_ENABLE_CBC ||                                    \
-    TC_AES_ENABLE_OFB ||                                    \
-    TC_AES_ENABLE_GCM ||                                    \
+#if TC_AES_ENABLE_ECB || TC_AES_ENABLE_CBC || TC_AES_ENABLE_OFB || TC_AES_ENABLE_GCM ||            \
     TC_AES_ENABLE_CCM
 #if TC_AES_KEY_BITS == 256
   const char* key_suffix = "256";
@@ -818,13 +806,18 @@ MunitResult test_cavp(const MunitParameter params[], void* data)
 {
   (void)params;
   (void)data;
-#if TC_AES_ENABLE_ECB ||                                    \
-    TC_AES_ENABLE_CBC ||                                    \
-    TC_AES_ENABLE_OFB ||                                    \
-    TC_AES_ENABLE_GCM ||                                    \
+#if TC_AES_ENABLE_ECB || TC_AES_ENABLE_CBC || TC_AES_ENABLE_OFB || TC_AES_ENABLE_GCM ||            \
     TC_AES_ENABLE_CCM
   cavp_initialize_sbox();
 #endif
+  /* A missing key fails and leaves the block unchanged. */
+  {
+    uint8_t block[TC_AES_BLOCKLEN] = {1, 2, 3}, saved[TC_AES_BLOCKLEN];
+    memcpy(saved, block, sizeof block);
+    munit_assert_int(TC_AES_CAVP_encrypt_block(NULL, block), ==, TC_ERROR);
+    munit_assert_int(TC_AES_CAVP_decrypt_block(NULL, block), ==, TC_ERROR);
+    munit_assert_memory_equal(sizeof block, block, saved);
+  }
   return cavp_run_all() ? MUNIT_OK : MUNIT_FAIL;
 }
 
