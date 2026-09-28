@@ -100,7 +100,7 @@ def mac(algorithm, key, data):
 
 def c_array(name, data):
     if len(data) == 0:
-        return f"static const uint8_t {name}[1] = {{ 0x00 }}; /* empty; length 0 */\n"
+        return f"static const uint8_t {name}[1] = {{ 0x00 }}; /* empty, length 0 */\n"
     lines = []
     for offset in range(0, len(data), 12):
         chunk = data[offset:offset + 12]

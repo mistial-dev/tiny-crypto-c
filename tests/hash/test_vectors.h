@@ -11,7 +11,7 @@
 #include <stddef.h>
 
 /* --- FIPS 180-4 examples --- */
-static const uint8_t fips_empty_msg[1] = { 0x00 }; /* empty; length 0 */
+static const uint8_t fips_empty_msg[1] = { 0x00 }; /* empty, length 0 */
 #define FIPS_EMPTY_LEN 0
 static const uint8_t fips_empty_sha1[20] = {
   0xda, 0x39, 0xa3, 0xee, 0x5e, 0x6b, 0x4b, 0x0d, 0x32, 0x55, 0xbf, 0xef,

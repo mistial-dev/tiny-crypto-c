@@ -262,7 +262,7 @@ def check_and_convert(filename, mode, has_counter, section, record):
 
 def c_array(name, data):
     if len(data) == 0:
-        return f"static const uint8_t {name}[1] = {{ 0x00 }}; /* empty; length 0 */\n"
+        return f"static const uint8_t {name}[1] = {{ 0x00 }}; /* empty, length 0 */\n"
     lines = []
     for offset in range(0, len(data), 12):
         chunk = data[offset:offset + 12]
@@ -313,7 +313,7 @@ def main():
         out.append(f"#define KBKDF_MODE_{name.upper()} {value}\n")
     out.append("/* location: 0 for counter mode (position is the in1/in2 split), otherwise\n"
                "   1 = BEFORE_ITER, 2 = AFTER_ITER, 3 = AFTER_FIXED (TC_KBKDF_CTR_*).\n"
-               "   in1/in2: counter mode = before/after the counter; other modes = unused/fixed. */\n")
+               "   in1/in2: counter mode = before/after the counter. Other modes = unused/fixed. */\n")
     out.append("struct kbkdf_vector {\n"
                "  uint8_t prf; uint8_t mode; uint8_t use_counter; uint8_t counter_bits; uint8_t location;\n"
                "  const uint8_t* key; size_t key_len;\n"
