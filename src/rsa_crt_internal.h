@@ -10,7 +10,7 @@
 
 /* d/p/q have passed private-key validation. Check dP=d mod(p-1),
  * dQ=d mod(q-1), and the least positive q^-1 mod p.
- * Magnitudes fit a limb-aligned width of at most 512 bytes. Inputs, work and
+ * Magnitudes fit a limb-aligned width of at most TC_RSA_MAX_MODULUS_BYTES. Inputs, work and
  * scratch are disjoint. Scratch needs 8n limbs and is wiped after use. */
 static inline TC_RSA_result tc_rsa_crt_consistent(size_t length, TC_bytes d_bytes, TC_bytes p_bytes,
                                                   TC_bytes q_bytes, TC_bytes dp_bytes,
@@ -18,7 +18,7 @@ static inline TC_RSA_result tc_rsa_crt_consistent(size_t length, TC_bytes d_byte
                                                   tc_mp_word* scratch, size_t scratch_words,
                                                   size_t* work)
 {
-  enum { MAX_BYTES = 512 };
+  enum { MAX_BYTES = TC_RSA_MAX_MODULUS_BYTES };
   const TC_bytes inputs[] = {d_bytes, p_bytes, q_bytes, dp_bytes, dq_bytes, inverse_bytes};
   if (!scratch || !work)
     return TC_RSA_ARGUMENT;

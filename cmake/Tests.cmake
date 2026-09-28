@@ -633,6 +633,8 @@ if(TINY_CRYPTO_BUILD_TESTS)
     TC_PIV_SM_ENABLE_CS2=1 TC_PIV_SM_ENABLE_CS7=1 TC_EC_ENABLE_P256=1 TC_EC_ENABLE_P384=1
     TC_ENABLE_EC=1 TC_ENABLE_RSA=1 TC_ENABLE_SHA1=1 TC_ENABLE_SHA224=1
     TC_ENABLE_SHA256=1 TC_ENABLE_SHA384=1 TC_ENABLE_SHA512=1)
+  tc_add_c_test(test_key_challenge_rsa tiny-crypto-c-test-pki-native
+    tests/x509/key_challenge_rsa.c)
   tc_add_c_test(test_x509_ocsp_sd33 tiny-crypto-c-test-pki-native tests/x509/ocsp_sd33.c)
   target_compile_definitions(test_x509_ocsp_sd33 PRIVATE
     TC_SD33_OCSP_ROOT="${PROJECT_SOURCE_DIR}/tests/vectors/x509/ocsp/sd33"

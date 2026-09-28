@@ -11,6 +11,29 @@
 #include "rsa_keygen_internal.h"
 #include "rsa_inputs_internal.h"
 
+uint32_t TC_RSA_encode_v15_work(const TC_RSA_v15_options* options, size_t modulus_bytes)
+{
+  tc_hash_info info;
+  if (!options || !tc_hash_info_get(options->hash, &info) ||
+      !tc_rsa_supported_modulus_size(modulus_bytes))
+    return 0;
+  return (uint32_t)modulus_bytes;
+}
+
+uint32_t TC_RSA_encode_pss_work(const TC_RSA_pss_options* options, size_t modulus_bytes)
+{
+  size_t cost;
+  if (!options || !tc_rsa_supported_modulus_size(modulus_bytes) ||
+      tc_rsa_pss_cost(modulus_bytes, modulus_bytes * 8 - 1, options->hash, options->mgf_hash,
+                      options->salt_length, &cost) != TC_RSA_OK)
+    return 0;
+#if SIZE_MAX > UINT32_MAX
+  if (cost > UINT32_MAX)
+    return 0;
+#endif
+  return (uint32_t)cost;
+}
+
 TC_RSA_result TC_RSA_encode_v15_digest(const TC_RSA_v15_options* options, TC_bytes digest,
                                        TC_buffer encoded, TC_work_budget* work)
 {

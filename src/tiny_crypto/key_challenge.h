@@ -3,6 +3,7 @@
 #ifndef TINY_CRYPTO_KEY_CHALLENGE_H_
 #define TINY_CRYPTO_KEY_CHALLENGE_H_
 #include <tiny_crypto/x509.h>
+#include <tiny_crypto/rsa.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -19,7 +20,18 @@ typedef struct {
   TC_signature_algorithm signature;
 } TC_key_challenge_options;
 
-enum { TC_KEY_CHALLENGE_MAX_DIGEST_BYTES = 64, TC_KEY_CHALLENGE_MAX_INPUT_BYTES = 384 };
+/* Storage bounds for one challenge. The input holds an RSA encoded message
+ * of the modulus length, or an ECDSA digest. PSS salts are at most one
+ * SHA-512 digest long. */
+enum {
+  TC_KEY_CHALLENGE_MAX_DIGEST_BYTES = 64,
+  TC_KEY_CHALLENGE_MAX_SALT_BYTES = 64,
+#if TC_ENABLE_RSA
+  TC_KEY_CHALLENGE_MAX_INPUT_BYTES = TC_RSA_MAX_MODULUS_BYTES
+#else
+  TC_KEY_CHALLENGE_MAX_INPUT_BYTES = TC_KEY_CHALLENGE_MAX_DIGEST_BYTES
+#endif
+};
 
 /* Caller-owned state for one proof-of-possession challenge. Keep key and
  * provider inputs alive and unchanged until verify or clear. The returned
@@ -33,9 +45,19 @@ typedef struct {
 } TC_key_challenge_workspace;
 
 /* Generate a fresh random digest and prepare the input for a private-key
- * operation. RSA returns an encoded representative. ECDSA returns the digest.
- * Preflight failures preserve workspace and out. Failures after RNG use wipe
- * workspace. Work includes entropy and encoding. Keep all storage disjoint. */
+ * operation. RSA returns an encoded representative of the modulus length.
+ * ECDSA returns the digest.
+ *
+ * Supported keys are RSA moduli accepted by TC_RSA_modulus_supported, with
+ * PKCS #1 v1.5 or PSS and a salt of at most TC_KEY_CHALLENGE_MAX_SALT_BYTES,
+ * and ECDSA keys. Other keys, schemes and sizes return UNSUPPORTED.
+ *
+ * Work is the digest length, plus the salt length for PSS, plus
+ * TC_RSA_encode_v15_work or TC_RSA_encode_pss_work for RSA. A smaller budget
+ * returns LIMIT before any RNG use.
+ *
+ * Preflight failures preserve workspace, out and work. Failures after RNG use
+ * wipe workspace. Keep all storage disjoint. */
 TC_key_challenge_result TC_key_challenge_prepare(const TC_X509_public_key* key,
                                                  const TC_key_challenge_options* options,
                                                  TC_random_source random,

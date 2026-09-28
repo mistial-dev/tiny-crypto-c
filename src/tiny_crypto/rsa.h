@@ -11,6 +11,12 @@ typedef uint32_t TC_RSA_word;
 #define TC_RSA_WORD_BITS 32
 #endif
 
+/* Supported moduli are 1024, 2048, 3072 and 4096 bits. Size caller storage
+ * that holds a modulus-length value, such as an encoded message or a
+ * signature, from TC_RSA_MAX_MODULUS_BYTES. */
+#define TC_RSA_MAX_MODULUS_BITS 4096u
+#define TC_RSA_MAX_MODULUS_BYTES (TC_RSA_MAX_MODULUS_BITS / 8u)
+
 typedef enum {
   TC_RSA_OK,
   TC_RSA_INVALID,
@@ -155,6 +161,17 @@ TC_RSA_result TC_RSA_raw_public(const TC_RSA_public_key* key, TC_bytes input,
 TC_RSA_result TC_RSA_raw_private(const TC_RSA_public_key* key, TC_bytes private_exponent,
                                  TC_bytes input, const TC_RSA_workspace* workspace,
                                  TC_buffer output, TC_RSA_execution* execution);
+
+/* Return 1 when bits names a supported modulus size, otherwise 0. */
+int TC_RSA_modulus_supported(size_t bits);
+
+/* Work units consumed by a successful TC_RSA_encode_v15_digest or
+ * TC_RSA_encode_pss_digest call for a modulus of modulus_bytes. Callers that
+ * must preflight a budget before drawing random input use these values.
+ * Returns 0 when the options name a disabled or unknown hash, the size is
+ * unsupported, or the PSS salt does not fit the encoded message. */
+uint32_t TC_RSA_encode_v15_work(const TC_RSA_v15_options* options, size_t modulus_bytes);
+uint32_t TC_RSA_encode_pss_work(const TC_RSA_pss_options* options, size_t modulus_bytes);
 
 /* Encode a precomputed SHA digest using EMSA-PKCS1-v1_5 (RFC 8017 section 9.2).
  * Used when a card or hardware provider performs the RSA private operation.

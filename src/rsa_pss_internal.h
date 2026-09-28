@@ -5,24 +5,63 @@
 #include "rsa_mgf_internal.h"
 #include <string.h>
 
+/* Validate EMSA-PSS parameters (RFC 8017 section 9.1) and return the work
+ * charged before MGF1: the encoded message, salt, digest and the fixed
+ * 8-byte prefix plus one hash invocation. */
+static inline TC_RSA_result tc_rsa_pss_parameters(size_t length, size_t bits,
+                                                  TC_hash_algorithm hash,
+                                                  TC_hash_algorithm mgf_hash, size_t salt_length,
+                                                  tc_hash_info* info, size_t* cost)
+{
+  if (!tc_hash_info_get(hash, info) || !tc_hash_available(hash) || !tc_hash_available(mgf_hash))
+    return TC_RSA_UNSUPPORTED;
+  if (!bits || length != bits / 8 + (bits % 8 != 0) || length < info->digest_length + 2 ||
+      salt_length > length - info->digest_length - 2)
+    return TC_RSA_INVALID;
+  if (salt_length > SIZE_MAX - info->digest_length - 9 ||
+      length > SIZE_MAX - salt_length - info->digest_length - 9)
+    return TC_RSA_LIMIT;
+  *cost = length + salt_length + info->digest_length + 9;
+  return TC_RSA_OK;
+}
+
+/* Total work of a successful tc_rsa_pss_encode or tc_rsa_pss_check. */
+static inline TC_RSA_result tc_rsa_pss_cost(size_t length, size_t bits, TC_hash_algorithm hash,
+                                            TC_hash_algorithm mgf_hash, size_t salt_length,
+                                            size_t* cost)
+{
+  tc_hash_info info;
+  size_t mask_cost;
+  TC_RSA_result result =
+      tc_rsa_pss_parameters(length, bits, hash, mgf_hash, salt_length, &info, cost);
+  if (result != TC_RSA_OK)
+    return result;
+  result =
+      tc_rsa_mgf1_cost(mgf_hash, info.digest_length, length - info.digest_length - 1, &mask_cost);
+  if (result != TC_RSA_OK)
+    return result;
+  if (mask_cost > SIZE_MAX - *cost)
+    return TC_RSA_LIMIT;
+  *cost += mask_cost;
+  return TC_RSA_OK;
+}
+
 static inline TC_RSA_result tc_rsa_pss_prepare(size_t length, size_t bits, TC_hash_algorithm hash,
                                                TC_hash_algorithm mgf_hash, size_t digest_length,
                                                size_t salt_length, size_t* work, tc_hash_info* info)
 {
   size_t cost;
-  if (!tc_hash_info_get(hash, info) || !tc_hash_available(hash) || !tc_hash_available(mgf_hash))
-    return TC_RSA_UNSUPPORTED;
-  if (digest_length != info->digest_length)
+  TC_RSA_result result =
+      tc_rsa_pss_parameters(length, bits, hash, mgf_hash, salt_length, info, &cost);
+  /* A digest of the wrong size is a caller error and outranks parameter
+   * problems in the encoded-message shape. */
+  if (result != TC_RSA_UNSUPPORTED && digest_length != info->digest_length)
     return TC_RSA_ARGUMENT;
-  if (!bits || length != bits / 8 + (bits % 8 != 0) || length < info->digest_length + 2 ||
-      salt_length > length - info->digest_length - 2)
-    return TC_RSA_INVALID;
-  if (salt_length > SIZE_MAX - info->digest_length - 9)
+  if (result != TC_RSA_OK)
+    return result;
+  if (cost > *work)
     return TC_RSA_LIMIT;
-  cost = salt_length + info->digest_length + 9;
-  if (length > *work || cost > *work - length)
-    return TC_RSA_LIMIT;
-  *work -= length + cost;
+  *work -= cost;
   return TC_RSA_OK;
 }
 

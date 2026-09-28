@@ -93,7 +93,7 @@ void TC_RSA_prepared_public_key_clear(TC_RSA_prepared_public_key* setup)
   if (!setup)
     return;
   if (setup->marker == TC_RSA_PUBLIC_SETUP_MARKER && setup->r2.words &&
-      setup->key.modulus.length <= 512)
+      setup->key.modulus.length <= TC_RSA_MAX_MODULUS_BYTES)
     TC_secure_zero(setup->r2.words, setup->key.modulus.length);
   TC_secure_zero(setup, sizeof *setup);
 }

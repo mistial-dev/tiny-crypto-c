@@ -25,7 +25,7 @@ static inline void tc_rsa_mask_candidate_width(uint8_t* sampled, const uint8_t* 
 }
 
 /* Test an odd candidate using independent uniformly random bases.
- * length selects the working width, a limb multiple at most 512 bytes.
+ * length selects the working width, a limb multiple at most TC_RSA_MAX_MODULUS_BYTES.
  * The candidate fits that width; leading zero bytes are accepted.
  * Caller selects rounds and bounds total RNG requests with max_attempts.
  * Inputs, scratch (12n+2 limbs), work and RNG state are disjoint.
@@ -38,7 +38,7 @@ tc_rsa_probable_prime_magnitude(TC_bytes candidate, size_t length, size_t rounds
 {
   if (!candidate.data || !random || !scratch || !work || !rounds)
     return TC_RSA_ARGUMENT;
-  if (!length || length > 512 || length % sizeof(tc_mp_word) || !candidate.length ||
+  if (!length || length > TC_RSA_MAX_MODULUS_BYTES || length % sizeof(tc_mp_word) || !candidate.length ||
       candidate.length > length || !(candidate.data[candidate.length - 1] & 1u))
     return TC_RSA_INVALID;
   unsigned above_three = candidate.data[candidate.length - 1] & ~3u;

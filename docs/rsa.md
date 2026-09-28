@@ -20,6 +20,11 @@ and returns borrowed modulus and exponent magnitudes with sign padding removed.
 It checks integer encoding and positivity. Apply key-strength policy and use
 the RSA API to check arithmetic constraints. X.509 key parsing uses this reader.
 
+Supported moduli are 1024, 2048, 3072 and 4096 bits. `TC_RSA_modulus_supported(bits)`
+reports whether a size is supported, and `TC_RSA_MAX_MODULUS_BYTES` (512) sizes
+caller storage that holds one modulus-length value, such as a signature or an
+encoded message.
+
 Allocate `TC_RSA_word` storage using the limb count returned by
 `TC_RSA_verify_workspace_words(bits)`. The function returns zero for unsupported
 sizes. Keep the workspace separate from input bytes and metadata. Verification
@@ -66,6 +71,12 @@ the modulus width in bits. Keep output and the work budget separate from all
 inputs. Preflight errors preserve both. A failure during encoding wipes the
 output and consumes work. The card transport submits the resulting bytes to
 the private-key operation.
+
+`TC_RSA_encode_v15_work` and `TC_RSA_encode_pss_work` return the exact work a
+successful encoding consumes for given options and modulus size, or zero when
+the options or size are unsupported. Use them to preflight a budget before
+drawing digest or salt bytes from a random source. `TC_key_challenge_prepare`
+does this so that a short budget fails before any RNG use.
 
 ## C++11
 

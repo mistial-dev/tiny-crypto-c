@@ -3,9 +3,6 @@
 #include <tiny_crypto/common.h>
 #if TC_ENABLE_KEY_CHALLENGE
 #include <tiny_crypto/key_challenge.h>
-#if TC_ENABLE_RSA
-#include <tiny_crypto/rsa.h>
-#endif
 #include "internal.h"
 #include "hash_info_internal.h"
 
@@ -17,12 +14,16 @@ static size_t challenge_digest_length(TC_hash_algorithm hash)
   return tc_hash_info_get(hash, &info) ? info.digest_length : 0;
 }
 
+/* Resolve the digest and challenge sizes and the RSA encoding work. Every
+ * returned size fits the workspace. */
 static TC_key_challenge_result challenge_parameters(const TC_X509_public_key* key,
                                                     const TC_key_challenge_options* options,
-                                                    size_t* digest_length, size_t* challenge_length)
+                                                    size_t* digest_length, size_t* challenge_length,
+                                                    uint32_t* encoding_work)
 {
   const TC_signature_algorithm* signature = &options->signature;
   *digest_length = challenge_digest_length(signature->hash);
+  *encoding_work = 0;
   const int pss = signature->scheme == TC_SIGNATURE_RSA_PSS;
   if (!*digest_length ||
       (!pss && (signature->mgf_hash != TC_HASH_UNKNOWN || signature->salt_length)))
@@ -31,14 +32,21 @@ static TC_key_challenge_result challenge_parameters(const TC_X509_public_key* ke
 #if !TC_ENABLE_RSA
     return TC_KEY_CHALLENGE_UNSUPPORTED;
 #else
-    if (key->modulus.length != key->bits / 8u || !TC_RSA_verify_workspace_words(key->bits))
+    if (key->modulus.length != key->bits / 8u || !TC_RSA_modulus_supported(key->bits) ||
+        key->modulus.length > TC_KEY_CHALLENGE_MAX_INPUT_BYTES)
       return TC_KEY_CHALLENGE_UNSUPPORTED;
     *challenge_length = key->modulus.length;
-    if (pss && (!challenge_digest_length(signature->mgf_hash) ||
-                signature->salt_length > TC_KEY_CHALLENGE_MAX_DIGEST_BYTES ||
-                signature->salt_length > *challenge_length - *digest_length - 2))
-      return TC_KEY_CHALLENGE_UNSUPPORTED;
-    return TC_KEY_CHALLENGE_OK;
+    if (pss) {
+      if (signature->salt_length > TC_KEY_CHALLENGE_MAX_SALT_BYTES)
+        return TC_KEY_CHALLENGE_UNSUPPORTED;
+      const TC_RSA_pss_options rsa_options = {signature->hash, signature->mgf_hash,
+                                              signature->salt_length};
+      *encoding_work = TC_RSA_encode_pss_work(&rsa_options, *challenge_length);
+    } else {
+      const TC_RSA_v15_options rsa_options = {signature->hash};
+      *encoding_work = TC_RSA_encode_v15_work(&rsa_options, *challenge_length);
+    }
+    return *encoding_work ? TC_KEY_CHALLENGE_OK : TC_KEY_CHALLENGE_UNSUPPORTED;
 #endif
   }
   if (key->type == TC_KEY_EC && signature->scheme == TC_SIGNATURE_ECDSA) {
@@ -91,15 +99,15 @@ TC_key_challenge_result TC_key_challenge_prepare(const TC_X509_public_key* key,
                                                  TC_work_budget* work, TC_bytes* out)
 {
   size_t digest_length, challenge_length;
+  uint32_t encoding_work;
   TC_bytes challenge;
   if (!key || !options || !random.fill || !workspace || !work || !out ||
       !prepare_storage_valid(key, options, random, workspace, work, out))
     return TC_KEY_CHALLENGE_ERROR;
   TC_key_challenge_result result =
-      challenge_parameters(key, options, &digest_length, &challenge_length);
+      challenge_parameters(key, options, &digest_length, &challenge_length, &encoding_work);
   if (result != TC_KEY_CHALLENGE_OK)
     return result;
-  const uint32_t encoding_work = key->type == TC_KEY_RSA ? (uint32_t)challenge_length : 0;
   const size_t salt_length =
       options->signature.scheme == TC_SIGNATURE_RSA_PSS ? options->signature.salt_length : 0;
   const uint32_t random_work = (uint32_t)(digest_length + salt_length);
@@ -116,7 +124,7 @@ TC_key_challenge_result TC_key_challenge_prepare(const TC_X509_public_key* key,
 #if TC_ENABLE_RSA
     TC_RSA_result encoded;
     if (options->signature.scheme == TC_SIGNATURE_RSA_PSS) {
-      uint8_t salt[TC_KEY_CHALLENGE_MAX_DIGEST_BYTES];
+      uint8_t salt[TC_KEY_CHALLENGE_MAX_SALT_BYTES];
       work->remaining -= (uint32_t)salt_length;
       if (salt_length && random.fill(random.context, salt, salt_length) != TC_OK) {
         TC_secure_zero(salt, sizeof salt);

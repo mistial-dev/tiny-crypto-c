@@ -11,7 +11,12 @@ typedef TC_RSA_result tc_rsa_result;
 
 static inline int tc_rsa_supported_modulus_size(size_t length)
 {
-  return length == 128 || length == 256 || length == 384 || length == 512;
+  return length == 128 || length == 256 || length == 384 || length == TC_RSA_MAX_MODULUS_BYTES;
+}
+
+static inline int tc_rsa_supported_bits(size_t bits)
+{
+  return bits % 8 == 0 && tc_rsa_supported_modulus_size(bits / 8);
 }
 
 static inline tc_rsa_result tc_rsa_public_key_check(const uint8_t* modulus, size_t length,

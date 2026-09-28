@@ -11,7 +11,7 @@
 
 size_t TC_RSA_keygen_workspace_words(size_t bits)
 {
-  if (!tc_rsa_supported_modulus_size(bits / 8) || bits % 8)
+  if (!tc_rsa_supported_bits(bits))
     return 0;
   return TC_RSA_KEYGEN_WORKSPACE_WORDS(bits);
 }
