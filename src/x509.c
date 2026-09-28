@@ -498,101 +498,150 @@ static TC_TLV_result signature_format(const TC_X509_certificate* certificate)
   }
 }
 
-TC_TLV_result TC_X509_read(const uint8_t* data, size_t length, const TC_TLV_limits* limits,
-                           TC_X509_workspace* workspace, TC_X509_certificate* out)
+/* TBSCertificate fields after the SEQUENCE header (RFC 5280 section 4.1).
+ * budget holds the elements left after the caller's walk. Sub-readers are
+ * unlimited because that walk bounded depth and element count. */
+static TC_TLV_result tbs_fields(TC_bytes contents, TC_X509_workspace* workspace,
+                                TC_TLV_limits* budget, TC_X509_certificate* certificate)
 {
-  TC_X509_certificate certificate;
+  /* issuerUniqueID [1], subjectUniqueID [2], extensions [3]. */
+  static const uint8_t optional_tags[] = {0x81, 0x82, 0xa3};
+  size_t previous = 0, index;
   TC_TLV_element element;
-  TC_TLV_reader outer, tbs;
-  TC_bytes inner_algorithm;
+  TC_TLV_reader tbs;
   TC_TLV_result result;
-  TC_TLV_limits budget;
   uint32_t version;
-  unsigned unused, last = 0;
-  int empty_subject, critical_san = 0;
-  if (!out || !workspace || (!workspace->extension_oids && workspace->extension_capacity))
-    return TC_TLV_ARGUMENT;
-  result = TC_TLV_read(data, length, TC_TLV_DER, limits, &element);
-  if (result != TC_TLV_OK)
-    return result;
-  if (!tc_pki_tag(&element, 0x30) || element.encoded.length != length)
+  unsigned unused;
+  int critical_san = 0;
+  if (open(contents, &tbs) != TC_TLV_OK || TC_TLV_next(&tbs, &element) != TC_TLV_OK)
     return TC_TLV_INVALID;
-  budget = *limits;
-  result = TC_TLV_walk(data, length, TC_TLV_DER, limits, workspace->frames,
-                       workspace->frame_capacity, count_node, &budget.max_elements);
+  certificate->version = 1;
+  if (tc_pki_tag(&element, 0xa0)) {
+    /* DER omits the DEFAULT v1 value. */
+    if (TC_DER_uint32(element.value.data, element.value.length, &version) != TC_TLV_OK ||
+        version == 0 || version > 2)
+      return TC_TLV_INVALID;
+    certificate->version = version + 1;
+    if (TC_TLV_next(&tbs, &element) != TC_TLV_OK)
+      return TC_TLV_INVALID;
+  }
+  if (TC_DER_integer(element.encoded.data, element.encoded.length, &certificate->serial,
+                     &certificate->serial_negative) != TC_TLV_OK)
+    return TC_TLV_INVALID;
+  if (tc_pki_field(&tbs, 0x30, &element) != TC_TLV_OK ||
+      TC_DER_algorithm_identifier(element.encoded.data, element.encoded.length,
+                                  &certificate->signature_algorithm) != TC_TLV_OK)
+    return TC_TLV_INVALID;
+  if (tc_pki_field(&tbs, 0x30, &element) != TC_TLV_OK || name(element.value, 0) != TC_TLV_OK)
+    return TC_TLV_INVALID;
+  certificate->issuer = element.encoded;
+  if (tc_pki_field(&tbs, 0x30, &element) != TC_TLV_OK ||
+      validity(element.value, certificate) != TC_TLV_OK)
+    return TC_TLV_INVALID;
+  if (tc_pki_field(&tbs, 0x30, &element) != TC_TLV_OK || name(element.value, 1) != TC_TLV_OK)
+    return TC_TLV_INVALID;
+  certificate->subject = element.encoded;
+  if (tc_pki_field(&tbs, 0x30, &element) != TC_TLV_OK)
+    return TC_TLV_INVALID;
+  certificate->spki = element.encoded;
+  result = TC_X509_subject_public_key(element.encoded.data, element.encoded.length,
+                                      &certificate->public_key);
+  if (result != TC_TLV_OK)
+    return result == TC_TLV_MORE ? TC_TLV_INVALID : result;
+  while (!tc_pki_end(&tbs)) {
+    if (TC_TLV_next(&tbs, &element) != TC_TLV_OK ||
+        tc_pki_context_order(&element, optional_tags, sizeof optional_tags, &previous, &index) !=
+            TC_TLV_OK)
+      return TC_TLV_INVALID;
+    if (index < 2) {
+      TC_bytes unique_id;
+      /* Unique identifiers require v2 or v3. */
+      if (certificate->version < 2 ||
+          tc_der_bit_string_contents(element.value, &unique_id, &unused) != TC_TLV_OK)
+        return TC_TLV_INVALID;
+    } else {
+      if (certificate->version != 3)
+        return TC_TLV_INVALID;
+      certificate->extensions = element.value;
+      result = extensions(element.value, workspace, budget, &critical_san);
+      if (result != TC_TLV_OK)
+        return result;
+    }
+  }
+  /* RFC 5280 section 4.1.2.6: an empty subject requires a critical SAN. */
+  if (certificate->subject.length == 2 && !critical_san)
+    return TC_TLV_INVALID;
+  return TC_TLV_OK;
+}
+
+/* Read one constructed element with the given tag, walk its tree to bound
+ * depth and elements, and return its contents with the remaining budget. */
+static TC_TLV_result read_bounded(TC_bytes encoded, unsigned tag, const TC_TLV_limits* limits,
+                                  TC_X509_workspace* workspace, TC_TLV_limits* budget,
+                                  TC_TLV_element* out)
+{
+  TC_TLV_result result;
+  if (!limits || !out || !workspace || (!workspace->extension_oids && workspace->extension_capacity))
+    return TC_TLV_ARGUMENT;
+  result = TC_TLV_read(encoded.data, encoded.length, TC_TLV_DER, limits, out);
   if (result != TC_TLV_OK)
     return result;
-  memset(&certificate, 0, sizeof certificate);
+  if (!tc_pki_tag(out, tag) || !out->header.constructed || out->encoded.length != encoded.length)
+    return TC_TLV_INVALID;
+  *budget = *limits;
+  return TC_TLV_walk(encoded.data, encoded.length, TC_TLV_DER, limits, workspace->frames,
+                     workspace->frame_capacity, count_node, &budget->max_elements);
+}
+
+TC_TLV_result tc_x509_tbs_read(TC_bytes encoded, const TC_TLV_limits* limits,
+                               TC_X509_workspace* workspace, TC_X509_certificate* out)
+{
+  TC_X509_certificate certificate = {0};
+  TC_TLV_element element;
+  TC_TLV_limits budget;
+  TC_TLV_result result;
+  if (!out)
+    return TC_TLV_ARGUMENT;
+  result = read_bounded(encoded, 0x30, limits, workspace, &budget, &element);
+  if (result != TC_TLV_OK)
+    return result;
+  certificate.tbs = element.encoded;
+  result = tbs_fields(element.value, workspace, &budget, &certificate);
+  if (result != TC_TLV_OK)
+    return result;
+  *out = certificate;
+  return TC_TLV_OK;
+}
+
+TC_TLV_result tc_x509_certificate_read(TC_bytes encoded, unsigned tag, const TC_TLV_limits* limits,
+                                       TC_X509_workspace* workspace, TC_X509_certificate* out)
+{
+  TC_X509_certificate certificate = {0};
+  TC_DER_algorithm outer_algorithm;
+  TC_TLV_element element;
+  TC_TLV_reader outer;
+  TC_TLV_limits budget;
+  TC_TLV_result result;
+  unsigned unused;
+  if (!out)
+    return TC_TLV_ARGUMENT;
+  result = read_bounded(encoded, tag, limits, workspace, &budget, &element);
+  if (result != TC_TLV_OK)
+    return result;
   certificate.encoded = element.encoded;
   if (open(element.value, &outer) != TC_TLV_OK || tc_pki_field(&outer, 0x30, &element) != TC_TLV_OK)
     return TC_TLV_INVALID;
   certificate.tbs = element.encoded;
-  if (open(element.value, &tbs) != TC_TLV_OK || TC_TLV_next(&tbs, &element) != TC_TLV_OK)
-    return TC_TLV_INVALID;
-  certificate.version = 1;
-  if (tc_pki_tag(&element, 0xa0)) {
-    if (TC_DER_uint32(element.value.data, element.value.length, &version) != TC_TLV_OK ||
-        version == 0 || version > 2)
-      return TC_TLV_INVALID;
-    certificate.version = version + 1;
-    if (TC_TLV_next(&tbs, &element) != TC_TLV_OK)
-      return TC_TLV_INVALID;
-  }
-  if (TC_DER_integer(element.encoded.data, element.encoded.length, &certificate.serial,
-                     &certificate.serial_negative) != TC_TLV_OK)
-    return TC_TLV_INVALID;
-  if (tc_pki_field(&tbs, 0x30, &element) != TC_TLV_OK)
-    return TC_TLV_INVALID;
-  inner_algorithm = element.encoded;
-  if (tc_pki_field(&tbs, 0x30, &element) != TC_TLV_OK)
-    return TC_TLV_INVALID;
-  certificate.issuer = element.encoded;
-  if (name(element.value, 0) != TC_TLV_OK)
-    return TC_TLV_INVALID;
-  if (tc_pki_field(&tbs, 0x30, &element) != TC_TLV_OK ||
-      validity(element.value, &certificate) != TC_TLV_OK)
-    return TC_TLV_INVALID;
-  if (tc_pki_field(&tbs, 0x30, &element) != TC_TLV_OK)
-    return TC_TLV_INVALID;
-  certificate.subject = element.encoded;
-  empty_subject = !element.value.length;
-  if (name(element.value, 1) != TC_TLV_OK)
-    return TC_TLV_INVALID;
-  if (tc_pki_field(&tbs, 0x30, &element) != TC_TLV_OK)
-    return TC_TLV_INVALID;
-  certificate.spki = element.encoded;
-  result = TC_X509_subject_public_key(element.encoded.data, element.encoded.length,
-                                      &certificate.public_key);
+  result = tbs_fields(element.value, workspace, &budget, &certificate);
   if (result != TC_TLV_OK)
-    return result == TC_TLV_MORE ? TC_TLV_INVALID : result;
-  while (!tc_pki_end(&tbs)) {
-    unsigned tag;
-    if (TC_TLV_next(&tbs, &element) != TC_TLV_OK || element.header.tag_length != 1)
-      return TC_TLV_INVALID;
-    tag = element.header.tag[0];
-    if (tag == 0x81 || tag == 0x82) {
-      TC_bytes unique_id;
-      if (certificate.version < 2 || last >= tag || !element.value.length)
-        return TC_TLV_INVALID;
-      if (tc_der_bit_string_contents(element.value, &unique_id, &unused) != TC_TLV_OK)
-        return TC_TLV_INVALID;
-    } else if (tag == 0xa3) {
-      if (certificate.version != 3 || last >= tag)
-        return TC_TLV_INVALID;
-      certificate.extensions = element.value;
-      result = extensions(element.value, workspace, &budget, &critical_san);
-      if (result != TC_TLV_OK)
-        return result;
-    } else
-      return TC_TLV_INVALID;
-    last = tag;
-  }
-  if (empty_subject && !critical_san)
-    return TC_TLV_INVALID;
+    return result;
+  /* RFC 5280 section 4.1.1.2: signatureAlgorithm matches the TBS signature
+   * field. Equal DER fields have equal encodings. */
   if (tc_pki_field(&outer, 0x30, &element) != TC_TLV_OK ||
-      tc_pki_compare(inner_algorithm, element.encoded) ||
       TC_DER_algorithm_identifier(element.encoded.data, element.encoded.length,
-                                  &certificate.signature_algorithm) != TC_TLV_OK)
+                                  &outer_algorithm) != TC_TLV_OK ||
+      !tc_pki_equal(outer_algorithm.oid, certificate.signature_algorithm.oid) ||
+      !tc_pki_equal(outer_algorithm.parameters, certificate.signature_algorithm.parameters))
     return TC_TLV_INVALID;
   if (tc_pki_field(&outer, 3, &element) != TC_TLV_OK || !tc_pki_end(&outer) ||
       TC_DER_bit_string(element.encoded.data, element.encoded.length, &certificate.signature,
@@ -605,6 +654,13 @@ TC_TLV_result TC_X509_read(const uint8_t* data, size_t length, const TC_TLV_limi
   *out = certificate;
   return TC_TLV_OK;
 }
+
+TC_TLV_result TC_X509_read(const uint8_t* data, size_t length, const TC_TLV_limits* limits,
+                           TC_X509_workspace* workspace, TC_X509_certificate* out)
+{
+  return tc_x509_certificate_read((TC_bytes){data, length}, 0x30, limits, workspace, out);
+}
+
 static TC_X509_signature_result signature_callback_result(TC_X509_signature_result result,
                                                           size_t available, size_t* work)
 {

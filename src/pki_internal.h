@@ -3,6 +3,7 @@
 #ifndef TC_PKI_INTERNAL_H_
 #define TC_PKI_INTERNAL_H_
 #include <tiny_crypto/der.h>
+#include <tiny_crypto/x509.h>
 #include <string.h>
 
 /* Final arc of the RFC 5280 id-ce extensions (2.5.29.n), as returned by
@@ -109,6 +110,16 @@ static inline int tc_pki_compare(TC_bytes a, TC_bytes b)
 }
 
 TC_TLV_result tc_x509_pss_parameters(TC_bytes encoded);
+/* Parse a DER Certificate whose outer element has the given tag: 0x30, or a
+ * context tag for an IMPLICIT Certificate. Rules and output match
+ * TC_X509_read. */
+TC_TLV_result tc_x509_certificate_read(TC_bytes encoded, unsigned tag, const TC_TLV_limits* limits,
+                                       TC_X509_workspace* workspace, TC_X509_certificate* out);
+/* Parse a bare DER TBSCertificate with the TC_X509_read field rules. encoded,
+ * signature and the outer signatureAlgorithm stay empty. The TBS signature
+ * field is returned in signature_algorithm. */
+TC_TLV_result tc_x509_tbs_read(TC_bytes encoded, const TC_TLV_limits* limits,
+                               TC_X509_workspace* workspace, TC_X509_certificate* out);
 typedef struct {
   TC_DER_algorithm hash, mgf_hash;
   /* Nonnegative INTEGER contents, retaining sign padding. Default is 20.

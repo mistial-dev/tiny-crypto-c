@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/x509_path.h>
 #if TC_ENABLE_X509_PATH
+#include "pki_internal.h"
 #include "x509_path_internal.h"
 #include "pki_storage_internal.h"
 #include "pki_source_internal.h"
@@ -18,8 +19,9 @@ static TC_TLV_result search_read(TC_bytes encoded, const TC_X509_path_options* o
   return TC_X509_read(encoded.data, encoded.length, &options->parsing, &parser, out);
 }
 
-/* Read only the fixed TBSCertificate prefix needed to locate the subject.
- * Any framing error falls back to the full parser, which owns error status. */
+/* Read only the fixed TBSCertificate prefix needed to locate the subject,
+ * so name matching can skip a full parse. Any framing error falls back to
+ * tc_x509_certificate_read, which owns error status. */
 static TC_TLV_result search_subject(TC_bytes encoded, const TC_TLV_limits* limits,
                                     TC_bytes* subject)
 {
@@ -31,37 +33,24 @@ static TC_TLV_result search_subject(TC_bytes encoded, const TC_TLV_limits* limit
   result = TC_TLV_read(encoded.data, encoded.length, TC_TLV_DER, limits, &element);
   if (result != TC_TLV_OK)
     return result;
-  if (element.header.tag_length != 1 || element.header.tag[0] != 0x30 ||
-      element.encoded.length != encoded.length)
+  if (!tc_pki_tag(&element, 0x30) || element.encoded.length != encoded.length)
     return TC_TLV_INVALID;
-  result = TC_TLV_reader_init(&outer, element.value.data, element.value.length, TC_TLV_DER, limits);
-  if (result != TC_TLV_OK)
+  if ((result = TC_TLV_reader_init(&outer, element.value.data, element.value.length, TC_TLV_DER,
+                                   limits)) != TC_TLV_OK ||
+      (result = tc_pki_field(&outer, 0x30, &element)) != TC_TLV_OK ||
+      (result = TC_TLV_reader_init(&tbs, element.value.data, element.value.length, TC_TLV_DER,
+                                   limits)) != TC_TLV_OK ||
+      (result = TC_TLV_next(&tbs, &element)) != TC_TLV_OK)
     return result;
-  result = TC_TLV_next(&outer, &element);
-  if (result != TC_TLV_OK)
+  /* Skip the optional version, then serialNumber. */
+  if (tc_pki_tag(&element, 0xa0) && (result = TC_TLV_next(&tbs, &element)) != TC_TLV_OK)
     return result;
-  if (element.header.tag_length != 1 || element.header.tag[0] != 0x30)
+  if (!tc_pki_tag(&element, 2))
     return TC_TLV_INVALID;
-  result = TC_TLV_reader_init(&tbs, element.value.data, element.value.length, TC_TLV_DER, limits);
-  if (result != TC_TLV_OK)
-    return result;
-  result = TC_TLV_next(&tbs, &element);
-  if (result != TC_TLV_OK)
-    return result;
-  if (element.header.tag_length == 1 && element.header.tag[0] == 0xa0) {
-    result = TC_TLV_next(&tbs, &element);
-    if (result != TC_TLV_OK)
+  /* signature, issuer, validity, subject. */
+  for (unsigned field = 0; field < 4; ++field)
+    if ((result = tc_pki_field(&tbs, 0x30, &element)) != TC_TLV_OK)
       return result;
-  }
-  if (element.header.tag_length != 1 || element.header.tag[0] != 0x02)
-    return TC_TLV_INVALID;
-  for (unsigned field = 0; field < 4; ++field) {
-    result = TC_TLV_next(&tbs, &element);
-    if (result != TC_TLV_OK)
-      return result;
-    if (element.header.tag_length != 1 || element.header.tag[0] != 0x30)
-      return TC_TLV_INVALID;
-  }
   *subject = element.encoded;
   return TC_TLV_OK;
 }
@@ -89,7 +78,7 @@ TC_X509_path_status tc_x509_path_search_source(TC_bytes target, const TC_X509_st
                                                const TC_X509_search_workspace* search, size_t* work,
                                                TC_X509_search_result* out)
 {
-  TC_X509_certificate issuer;
+  TC_X509_certificate certificate;
   TC_X509_path_status failure = TC_X509_PATH_INVALID, status;
   TC_TLV_result parsed;
   size_t depth = 1, capacity, initial_work;
@@ -107,11 +96,11 @@ TC_X509_path_status tc_x509_path_search_source(TC_bytes target, const TC_X509_st
   initial_work = *work;
   if (target.length > options->max_input)
     return TC_X509_PATH_LIMIT;
-  parsed = search_read(target, options, validation, work, &issuer);
+  parsed = search_read(target, options, validation, work, &certificate);
   if (parsed != TC_TLV_OK)
     return tc_x509_path_status(parsed);
   search->path[capacity - 1] = target;
-  search->frames[0] = (TC_X509_search_frame){0, 0, target.length, issuer.issuer};
+  search->frames[0] = (TC_X509_search_frame){0, 0, target.length, certificate.issuer};
   while (depth) {
     TC_X509_search_frame* frame = &search->frames[depth - 1];
     TC_bytes* path = search->path + capacity - depth;
@@ -189,7 +178,7 @@ TC_X509_path_status tc_x509_path_search_source(TC_bytes target, const TC_X509_st
           continue;
         subject_checked = 1;
       }
-      parsed = search_read(candidate, options, validation, work, &issuer);
+      parsed = search_read(candidate, options, validation, work, &certificate);
       if (parsed != TC_TLV_OK) {
         if (parsed == TC_TLV_ARGUMENT)
           return TC_X509_PATH_ERROR;
@@ -197,7 +186,7 @@ TC_X509_path_status tc_x509_path_search_source(TC_bytes target, const TC_X509_st
         continue;
       }
       if (!subject_checked) {
-        parsed = TC_X509_name_equal(frame->issuer, issuer.subject, &options->parsing,
+        parsed = TC_X509_name_equal(frame->issuer, certificate.subject, &options->parsing,
                                     &validation->names, work, &equal);
         if (parsed != TC_TLV_OK) {
           if (parsed == TC_TLV_ARGUMENT)
@@ -214,7 +203,7 @@ TC_X509_path_status tc_x509_path_search_source(TC_bytes target, const TC_X509_st
       }
       path[-1] = candidate;
       search->frames[depth++] =
-          (TC_X509_search_frame){0, 0, frame->bytes + candidate.length, issuer.issuer};
+          (TC_X509_search_frame){0, 0, frame->bytes + candidate.length, certificate.issuer};
     } else {
       --depth;
     }

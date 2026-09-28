@@ -260,6 +260,125 @@ static MunitResult choices(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+/* DER element with a short or one-octet long length. out may alias value. */
+static size_t wrap(uint8_t* out, unsigned tag, const uint8_t* value, size_t length)
+{
+  size_t header = length < 128 ? 2 : 3;
+  munit_assert_size(length, <, 256);
+  memmove(out + header, value, length);
+  out[0] = (uint8_t)tag;
+  if (header == 3)
+    out[1] = 0x81;
+  out[header - 1] = (uint8_t)length;
+  return header + length;
+}
+
+/* A v3 certificate with a 12-bit RSA placeholder key. An empty subject gets
+ * the critical subjectAltName that RFC 5280 section 4.1.2.6 requires. */
+static size_t make_certificate(uint8_t* out, int reversed_validity, int empty_subject,
+                               TC_bytes* tbs)
+{
+  static const uint8_t version[] = {0xa0, 3, 2, 1, 2};
+  static const uint8_t serial[] = {2, 1, 1};
+  static const uint8_t algorithm[] = {0x30, 13, 6, 9, 0x2a, 0x86, 0x48, 0x86, 0xf7,
+                                      0x0d, 1,  1, 11,   5,    0};
+  static const uint8_t name[] = {0x30, 12, 0x31, 10, 0x30, 8, 6, 3, 0x55, 4, 3, 0x0c, 1, 'A'};
+  static const uint8_t empty_name[] = {0x30, 0};
+  static const uint8_t early[] = {0x17, 13, '2', '4', '0', '1', '0', '1',
+                                  '0',  '0', '0', '0', '0', '0', 'Z'};
+  static const uint8_t late[] = {0x17, 13, '3', '0', '0', '1', '0', '1',
+                                 '0',  '0', '0', '0', '0', '0', 'Z'};
+  static const uint8_t spki[] = {0x30, 0x1b, 0x30, 13,   6,    9, 0x2a, 0x86, 0x48, 0x86,
+                                 0xf7, 0x0d, 1,    1,    1,    5, 0,    3,    10,   0,
+                                 0x30, 7,    2,    2,    0x0c, 0xa1, 2,   1,    0x11};
+  /* Extension { subjectAltName, critical, dNSName "a" } */
+  static const uint8_t san[] = {0xa3, 19, 0x30, 17,   0x30, 15,   6, 3, 0x55, 0x1d, 17,
+                                1,    1,  0xff, 4,    5,    0x30, 3, 0x82, 1, 'a'};
+  static const uint8_t signature[] = {3, 2, 0, 1};
+  uint8_t body[256];
+  size_t n = 0;
+#define APPEND(bytes)                                                                              \
+  (memcpy(body + n, bytes, sizeof bytes), n += sizeof bytes)
+  APPEND(version);
+  APPEND(serial);
+  APPEND(algorithm);
+  APPEND(name);
+  memcpy(body + n, reversed_validity ? late : early, sizeof early);
+  n += sizeof early;
+  memcpy(body + n, reversed_validity ? early : late, sizeof late);
+  n += sizeof late;
+  n = n - 2 * sizeof early + wrap(body + n - 2 * sizeof early, 0x30, body + n - 2 * sizeof early,
+                                  2 * sizeof early);
+  if (empty_subject)
+    APPEND(empty_name);
+  else
+    APPEND(name);
+  APPEND(spki);
+  if (empty_subject)
+    APPEND(san);
+  size_t tbs_length = wrap(out, 0x30, body, n);
+  memcpy(body, out, tbs_length);
+  n = tbs_length;
+  APPEND(algorithm);
+  APPEND(signature);
+#undef APPEND
+  size_t length = wrap(out, 0x30, body, n);
+  *tbs = (TC_bytes){out + length - n, tbs_length};
+  return length;
+}
+
+static TC_TLV_result read_anchor(uint8_t* list, size_t choice_length)
+{
+  TC_TLV_reader reader;
+  TC_X509_store_anchor anchor;
+  size_t length = wrap(list, 0x30, list, choice_length);
+  munit_assert_int(TC_X509_trust_anchor_list_init(&reader, list, length, &limits, &workspace), ==,
+                   TC_TLV_OK);
+  return TC_X509_trust_anchor_next(&reader, &limits, &workspace, &anchor);
+}
+
+/* Every anchor choice applies the same certificate rules: a non-empty
+ * subject and a validity period that is not reversed. */
+static MunitResult certificate_rules(const MunitParameter params[], void* user)
+{
+  static const uint8_t spki_and_key_id[] = {4, 1, 1};
+  (void)params;
+  (void)user;
+  for (int variant = 0; variant < 3; ++variant) {
+    const int reversed = variant == 1, empty = variant == 2;
+    const TC_TLV_result expected = variant ? TC_TLV_INVALID : TC_TLV_OK;
+    uint8_t certificate[256], list[256];
+    TC_X509_certificate parsed;
+    TC_bytes tbs;
+    size_t length = make_certificate(certificate, reversed, empty, &tbs);
+    munit_assert_int(TC_X509_read(certificate, length, &limits, &workspace, &parsed), ==,
+                     TC_TLV_OK);
+    /* Certificate choice. */
+    memcpy(list, certificate, length);
+    munit_assert_int(read_anchor(list, length), ==, expected);
+    /* tbsCert [1] EXPLICIT TBSCertificate. */
+    munit_assert_int(read_anchor(list, wrap(list, 0xa1, tbs.data, tbs.length)), ==, expected);
+    if (empty)
+      continue;
+    /* TrustAnchorInfo with certificate [0] IMPLICIT Certificate. */
+    uint8_t info[256];
+    size_t n = 0;
+    memcpy(info, parsed.spki.data, parsed.spki.length);
+    n += parsed.spki.length;
+    memcpy(info + n, spki_and_key_id, sizeof spki_and_key_id);
+    n += sizeof spki_and_key_id;
+    uint8_t controls[256];
+    size_t c = 0;
+    memcpy(controls, parsed.subject.data, parsed.subject.length);
+    c += parsed.subject.length;
+    c += wrap(controls + c, 0xa0, certificate + 3, length - 3);
+    n += wrap(info + n, 0x30, controls, c);
+    n = wrap(info, 0x30, info, n);
+    munit_assert_int(read_anchor(list, wrap(list, 0xa2, info, n)), ==, expected);
+  }
+  return MUNIT_OK;
+}
+
 /* Read a TrustAnchorInfo whose exts [1] holds the given Extension list
  * contents. */
 static TC_TLV_result read_with_exts(const uint8_t* list, size_t list_length)
@@ -328,6 +447,7 @@ static MunitTest tests[] = {
     {"/flags-and-unusable", flags_and_unusable, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/malformed", malformed, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/choices", choices, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/certificate-rules", certificate_rules, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/precedence", precedence, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {NULL, NULL, NULL, NULL, 0, NULL}};
 static const MunitSuite suite = {"/x509-trust-anchor", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};
