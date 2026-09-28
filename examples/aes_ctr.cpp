@@ -2,13 +2,15 @@
  * SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * Arduino sketch: AES-128-CTR encrypt then decrypt a buffer. The key and IV
+ * PlatformIO / Arduino example: AES-128-CTR encrypt then decrypt a buffer. The key and IV
  * are fixed demonstration values. A real application uses a secret key and a
  * counter block that is never reused with that key.
  */
 #include <tiny_crypto/aes.h>
 #include <stdint.h>
 #include <string.h>
+
+#include "arduino_main.h"
 
 static int aes_ctr_roundtrip(void)
 {
@@ -32,13 +34,4 @@ static int aes_ctr_roundtrip(void)
   return failed || memcmp(data, original, sizeof(data)) != 0;
 }
 
-void setup(void)
-{
-  if (aes_ctr_roundtrip() != 0)
-    for (;;) {
-      /* Stop on failure. */
-    }
-}
-
-void loop(void)
-{}
+TC_EXAMPLE_ENTRY(aes_ctr_roundtrip)

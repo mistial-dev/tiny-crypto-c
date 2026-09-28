@@ -286,18 +286,10 @@ add_test(NAME test_package_boundaries
   target_include_directories(test_drbg_example PRIVATE examples)
   # The PlatformIO examples also build and run on the host through main().
   if(tc_build_cpp_tests)
-    foreach(example sha256 des_ctr kbkdf)
+    foreach(example aes_ctr sha256 des_ctr kbkdf)
       tc_add_linked_test(test_example_${example} tiny-crypto-c-test examples/${example}.cpp)
       target_include_directories(test_example_${example} PRIVATE examples)
     endforeach()
-    # The Arduino sketch has no main(); compile it as C++ to keep it building.
-    if(NOT MSVC)
-      set_source_files_properties(examples/aes_ctr.ino PROPERTIES LANGUAGE CXX)
-      add_library(test_example_aes_ctr_sketch OBJECT examples/aes_ctr.ino)
-      target_compile_options(test_example_aes_ctr_sketch PRIVATE -x c++)
-      target_link_libraries(test_example_aes_ctr_sketch PRIVATE tiny-crypto-c-test)
-      tc_warnings(test_example_aes_ctr_sketch)
-    endif()
   endif()
   target_compile_definitions(test_drbg_cavp PRIVATE
     DRBG_CAVP_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/drbg/cavp")
