@@ -92,16 +92,24 @@ typedef struct {
   TC_bytes name;
   TC_X509_public_key public_key;
 } TC_X509_trust_anchor;
-/* Verify a parsed certificate's signature using an application-supplied
+/* Signature work: before the callback, each verification charges one unit
+ * plus the byte length of every signed-data span (message segment or
+ * digest), the signature, the DER algorithm oid and parameters (message
+ * forms), and the issuer key's algorithm oid, parameters and key. The key's
+ * modulus, exponent and curve_oid are parts of key and are not charged again.
+ * A budget exhausted before the callback returns LIMIT with *work set to 0.
+ * The callback then consumes its own work. A callback that returns more work
+ * than it received makes the result ERROR with *work set to 0.
+ *
+ * Verify a parsed certificate's signature using an application-supplied
  * provider. The callback receives one message segment containing the original
- * DER TBSCertificate, including its header, the signature bytes without the BIT STRING header/unused count,
- * and unmodified algorithm parameters. It must check algorithm/key compatibility
- * and return VALID only after cryptographic verification. Missing callbacks
- * return UNSUPPORTED. Issuer identity, validity and trust are separate checks.
- * work is disjoint from all inputs. Input byte lengths are charged before the
- * callback. The callback consumes its own bounded work and must not increase it.
- * Provider context and work may change on failure. Inputs must remain unchanged
- * throughout the call. */
+ * DER TBSCertificate, including its header, the signature bytes without the
+ * BIT STRING header and unused-bits count, and unmodified algorithm
+ * parameters. It must check algorithm/key compatibility and return VALID only
+ * after cryptographic verification. Missing callbacks return UNSUPPORTED.
+ * Issuer identity, validity and trust are separate checks. work is disjoint
+ * from all inputs. Provider context and work may change on failure. Inputs
+ * must remain unchanged throughout the call. */
 TC_X509_signature_result TC_X509_signature_verify(const TC_X509_certificate* certificate,
                                                   const TC_X509_public_key* issuer_key,
                                                   const TC_X509_signature_provider* provider,

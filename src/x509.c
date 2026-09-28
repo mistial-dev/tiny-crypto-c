@@ -680,14 +680,51 @@ static TC_X509_signature_result signature_callback_result(TC_X509_signature_resu
   }
 }
 
+/* Shared preflight for both verification forms. Every input range, the
+ * signed data included, must be disjoint from work. Work is charged one unit
+ * plus the length of each signed-data span and each charged field. The key's
+ * modulus, exponent and curve_oid are sub-spans of key and are only checked
+ * for overlap. LIMIT sets *work to 0. */
+static TC_X509_signature_result signature_prepare(const TC_bytes* data, size_t data_count,
+                                                  const TC_bytes* objects, size_t object_count,
+                                                  const TC_bytes* charged, size_t charged_count,
+                                                  const TC_X509_public_key* issuer_key,
+                                                  size_t* work)
+{
+  const TC_bytes key_parts[] = {issuer_key->modulus, issuer_key->exponent, issuer_key->curve_oid};
+  const TC_bytes* groups[] = {data, charged};
+  const size_t counts[] = {data_count, charged_count};
+  tc_pki_storage_plan plan;
+  TC_bytes output;
+  if (data_count > SIZE_MAX / sizeof *data)
+    return TC_X509_SIGNATURE_ERROR;
+  tc_pki_storage_plan_begin(&plan, &output, 1, SIZE_MAX);
+  TC_PKI_PLAN_WRITE(&plan, work, 1);
+  tc_pki_storage_plan_seal(&plan);
+  tc_pki_storage_plan_input_spans(&plan, objects, object_count);
+  TC_PKI_PLAN_INPUT(&plan, data, data_count);
+  tc_pki_storage_plan_input_spans(&plan, data, data_count);
+  tc_pki_storage_plan_input_spans(&plan, charged, charged_count);
+  tc_pki_storage_plan_input_spans(&plan, key_parts, sizeof key_parts / sizeof *key_parts);
+  if (tc_pki_storage_plan_finish(&plan, NULL) != TC_TLV_OK)
+    return TC_X509_SIGNATURE_ERROR;
+  for (size_t group = 0; group < 2; ++group)
+    for (size_t i = 0; i < counts[group]; ++i) {
+      const size_t length = groups[group][i].length;
+      if (*work < 1 || *work - 1 < length) {
+        *work = 0;
+        return TC_X509_SIGNATURE_LIMIT;
+      }
+      *work -= 1 + length;
+    }
+  return TC_X509_SIGNATURE_VALID;
+}
+
 TC_X509_signature_result
 TC_X509_signature_verify_digest(TC_bytes digest, const TC_signature_algorithm* algorithm,
                                 TC_bytes signature, const TC_X509_public_key* issuer_key,
                                 const TC_X509_signature_provider* provider, size_t* work)
 {
-  enum { INPUT_COUNT = 11 };
-  TC_bytes output;
-  tc_pki_storage_plan plan;
   tc_hash_info hash;
   size_t available;
   TC_X509_signature_result result;
@@ -695,41 +732,21 @@ TC_X509_signature_verify_digest(TC_bytes digest, const TC_signature_algorithm* a
     return TC_X509_SIGNATURE_ERROR;
   if (!provider || !provider->verify_digest)
     return TC_X509_SIGNATURE_UNSUPPORTED;
-  const TC_bytes inputs[] = {{(const uint8_t*)algorithm, sizeof *algorithm},
-                             {(const uint8_t*)issuer_key, sizeof *issuer_key},
-                             {(const uint8_t*)provider, sizeof *provider},
-                             digest,
-                             signature,
-                             issuer_key->algorithm.oid,
-                             issuer_key->algorithm.parameters,
-                             issuer_key->key,
-                             issuer_key->modulus,
-                             issuer_key->exponent,
-                             issuer_key->curve_oid};
-  tc_pki_storage_plan_begin(&plan, &output, 1, SIZE_MAX);
-  TC_PKI_PLAN_WRITE(&plan, work, 1);
-  tc_pki_storage_plan_seal(&plan);
-  tc_pki_storage_plan_input_spans(&plan, inputs, INPUT_COUNT);
-  if (tc_pki_storage_plan_finish(&plan, NULL) != TC_TLV_OK)
-    return TC_X509_SIGNATURE_ERROR;
+  const TC_bytes objects[] = {{(const uint8_t*)algorithm, sizeof *algorithm},
+                              {(const uint8_t*)issuer_key, sizeof *issuer_key},
+                              {(const uint8_t*)provider, sizeof *provider}};
+  const TC_bytes charged[] = {signature, issuer_key->algorithm.oid,
+                              issuer_key->algorithm.parameters, issuer_key->key};
   if (!signature.length || !issuer_key->key.length || !issuer_key->algorithm.oid.length)
     return TC_X509_SIGNATURE_ERROR;
   if (!tc_hash_info_get(algorithm->hash, &hash))
     return TC_X509_SIGNATURE_UNSUPPORTED;
   if (digest.length != hash.digest_length)
     return TC_X509_SIGNATURE_ERROR;
-  if (*work < INPUT_COUNT) {
-    *work = 0;
-    return TC_X509_SIGNATURE_LIMIT;
-  }
-  *work -= INPUT_COUNT;
-  for (size_t i = 3; i < INPUT_COUNT; ++i) {
-    if (*work < inputs[i].length) {
-      *work = 0;
-      return TC_X509_SIGNATURE_LIMIT;
-    }
-    *work -= inputs[i].length;
-  }
+  result = signature_prepare(&digest, 1, objects, sizeof objects / sizeof *objects, charged,
+                             sizeof charged / sizeof *charged, issuer_key, work);
+  if (result != TC_X509_SIGNATURE_VALID)
+    return result;
   available = *work;
   result =
       provider->verify_digest(provider->context, digest, algorithm, signature, issuer_key, work);
@@ -740,56 +757,28 @@ TC_X509_signature_result TC_X509_signature_verify_message(
     const TC_bytes* message, size_t count, const TC_DER_algorithm* algorithm, TC_bytes signature,
     const TC_X509_public_key* issuer_key, const TC_X509_signature_provider* provider, size_t* work)
 {
-  TC_bytes inputs[13];
-  size_t i, available;
+  size_t available;
   TC_X509_signature_result result;
-  if (!algorithm || !issuer_key || !work || (count && !message) ||
-      count > SIZE_MAX / sizeof(*message))
+  if (!algorithm || !issuer_key || !work || (count && !message))
     return TC_X509_SIGNATURE_ERROR;
   if (!provider || !provider->verify)
     return TC_X509_SIGNATURE_UNSUPPORTED;
-  inputs[0] = signature;
-  inputs[1] = algorithm->oid;
-  inputs[2] = algorithm->parameters;
-  inputs[3] = issuer_key->algorithm.oid;
-  inputs[4] = issuer_key->algorithm.parameters;
-  inputs[5] = issuer_key->key;
-  inputs[6] = issuer_key->modulus;
-  inputs[7] = issuer_key->exponent;
-  inputs[8] = issuer_key->curve_oid;
-  inputs[9] = (TC_bytes){(const uint8_t*)algorithm, sizeof(*algorithm)};
-  inputs[10] = (TC_bytes){(const uint8_t*)issuer_key, sizeof(*issuer_key)};
-  inputs[11] = (TC_bytes){(const uint8_t*)provider, sizeof(*provider)};
-  inputs[12] = (TC_bytes){(const uint8_t*)message, count * sizeof(*message)};
+  const TC_bytes objects[] = {{(const uint8_t*)algorithm, sizeof *algorithm},
+                              {(const uint8_t*)issuer_key, sizeof *issuer_key},
+                              {(const uint8_t*)provider, sizeof *provider}};
+  const TC_bytes charged[] = {signature,
+                              algorithm->oid,
+                              algorithm->parameters,
+                              issuer_key->algorithm.oid,
+                              issuer_key->algorithm.parameters,
+                              issuer_key->key};
   if (!signature.length || !algorithm->oid.length || !issuer_key->algorithm.oid.length ||
       !issuer_key->key.length)
     return TC_X509_SIGNATURE_ERROR;
-  for (i = 0; i < 13; ++i)
-    if ((!inputs[i].data && inputs[i].length) ||
-        !tc_internal_ranges_disjoint(work, sizeof(*work), inputs[i].data, inputs[i].length))
-      return TC_X509_SIGNATURE_ERROR;
-  /* Check every segment before writing work; a later segment may alias it. */
-  if (count > *work)
-    return TC_X509_SIGNATURE_LIMIT;
-  for (i = 0; i < count; ++i)
-    if ((!message[i].data && message[i].length) ||
-        !tc_internal_ranges_disjoint(work, sizeof(*work), message[i].data, message[i].length))
-      return TC_X509_SIGNATURE_ERROR;
-  *work -= count;
-  for (i = 0; i < count; ++i) {
-    if (*work < message[i].length) {
-      *work = 0;
-      return TC_X509_SIGNATURE_LIMIT;
-    }
-    *work -= message[i].length;
-  }
-  for (i = 0; i < 6; ++i) {
-    if (*work < inputs[i].length) {
-      *work = 0;
-      return TC_X509_SIGNATURE_LIMIT;
-    }
-    *work -= inputs[i].length;
-  }
+  result = signature_prepare(message, count, objects, sizeof objects / sizeof *objects, charged,
+                             sizeof charged / sizeof *charged, issuer_key, work);
+  if (result != TC_X509_SIGNATURE_VALID)
+    return result;
   available = *work;
   result =
       provider->verify(provider->context, message, count, algorithm, signature, issuer_key, work);

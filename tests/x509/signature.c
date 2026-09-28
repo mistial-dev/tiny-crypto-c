@@ -341,6 +341,58 @@ static MunitResult issuer(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+/* Both forms charge one unit plus the length of each signed-data span, the
+ * signature, the algorithm spans and the issuer key. Key sub-spans are not
+ * charged again, and a preflight LIMIT leaves no work. */
+static MunitResult metering(const MunitParameter params[], void* user)
+{
+  enum { BUDGET = 1000, PROVIDER = 1 };
+  uint8_t bytes[SHA256_DIGEST_BYTES] = {0};
+  const TC_bytes digest = {bytes, sizeof bytes};
+  TC_signature_algorithm algorithm = {TC_SIGNATURE_ECDSA, TC_HASH_SHA256, TC_HASH_UNKNOWN, 0};
+  TC_X509_certificate certificate;
+  TC_X509_public_key key;
+  ProviderState state = {&certificate, &key, TC_X509_SIGNATURE_VALID, 0, 0};
+  TC_X509_signature_provider provider = {verify, &state, verify_digest};
+  size_t work;
+  (void)params;
+  (void)user;
+  fixture(&certificate, &key);
+  const size_t key_cost = 3 * 1 + key.algorithm.oid.length + key.algorithm.parameters.length +
+                          key.key.length;
+  const size_t message_cost = 1 + certificate.tbs.length + 1 + certificate.signature.length + 2 +
+                              certificate.signature_algorithm.oid.length +
+                              certificate.signature_algorithm.parameters.length + key_cost;
+  const size_t digest_cost = 1 + digest.length + 1 + certificate.signature.length + key_cost;
+  for (int split = 0; split < 2; ++split) {
+    if (split) {
+      key.modulus = (TC_bytes){key.key.data, 1};
+      key.exponent = (TC_bytes){key.key.data + 1, 2};
+    }
+    work = BUDGET;
+    munit_assert_int(TC_X509_signature_verify(&certificate, &key, &provider, &work), ==,
+                     TC_X509_SIGNATURE_VALID);
+    munit_assert_size(BUDGET - work, ==, message_cost + PROVIDER);
+    work = BUDGET;
+    munit_assert_int(TC_X509_signature_verify_digest(digest, &algorithm, certificate.signature,
+                                                     &key, &provider, &work),
+                     ==, TC_X509_SIGNATURE_VALID);
+    munit_assert_size(BUDGET - work, ==, digest_cost + PROVIDER);
+  }
+  work = message_cost - 1;
+  state.calls = 0;
+  munit_assert_int(TC_X509_signature_verify(&certificate, &key, &provider, &work), ==,
+                   TC_X509_SIGNATURE_LIMIT);
+  munit_assert_size(work, ==, 0);
+  work = digest_cost - 1;
+  munit_assert_int(TC_X509_signature_verify_digest(digest, &algorithm, certificate.signature, &key,
+                                                   &provider, &work),
+                   ==, TC_X509_SIGNATURE_LIMIT);
+  munit_assert_size(work, ==, 0);
+  munit_assert_uint(state.calls, ==, 0);
+  return MUNIT_OK;
+}
+
 int main(int argc, char** argv)
 {
   MunitTest tests[] = {{"/dispatch", dispatch, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
@@ -348,6 +400,7 @@ int main(int argc, char** argv)
                        {"/segments", segments, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
                        {"/digests", digests, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
                        {"/issuer", issuer, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+                       {"/metering", metering, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
                        {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
   MunitSuite suite = {"/x509/signature", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};
   return munit_suite_main(&suite, NULL, argc, argv);
