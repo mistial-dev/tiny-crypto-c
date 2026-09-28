@@ -70,6 +70,9 @@ int main()
   if (tiny_crypto::sskdf_sha256({scalar, sizeof scalar}, nullptr, 0, derived, sizeof derived) !=
       TC_OK)
     return 1;
+  if (tiny_crypto::hkdf_sha256_derive(nullptr, 0, scalar, sizeof scalar, nullptr, 0, derived,
+                                      sizeof derived) != TC_OK)
+    return 1;
   session.clear();
   return session.state() != TC_PIV_SM_IDLE;
 }

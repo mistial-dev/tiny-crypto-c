@@ -17,60 +17,13 @@
 #include <string.h>
 #include <tiny_crypto/kdf.h>
 #include "internal.h"
-#include "hash_dispatch_internal.h"
 
 #if TC_ENABLE_KDF
+#include "kdf_prf_internal.h"
 
 /*****************************************************************************/
 /* PRF descriptors                                                           */
 /*****************************************************************************/
-
-#define TC_KDF_HAVE_CMAC (TC_KBKDF_HAVE_AES_CMAC || TC_KBKDF_HAVE_DES_CMAC)
-
-#if TC_KDF_HAVE_CMAC
-/* A CMAC PRF names the streaming CMAC functions of its block cipher. Only
- * that cipher's KBKDF family references the descriptor, so an unused family
- * and its cipher drop out at link time. */
-struct tc_kdf_cmac {
-  int (*key_ok)(size_t key_len);
-  TC_status (*init)(void* ctx, const uint8_t* key, size_t key_len);
-  TC_status (*update)(void* ctx, const uint8_t* data, size_t len);
-  TC_status (*final)(void* ctx, uint8_t* out);
-  void (*clear)(void* ctx);
-};
-#endif
-
-enum tc_kdf_prf_kind { TC_KDF_PRF_HMAC, TC_KDF_PRF_CMAC };
-
-/* A PRF is its kind plus the typed descriptor of that kind. The per-family
- * wrappers own context storage of the matching type, and ctx_size bytes of
- * it are copied and wiped by the core. */
-struct tc_kdf_prf {
-  enum tc_kdf_prf_kind kind;
-  uint8_t out_len; /* h, the PRF output length in bytes */
-  size_t ctx_size;
-  union {
-#if TC_KBKDF_HAVE_HMAC
-    const tc_hash_algorithm_info* hash; /* TC_KDF_PRF_HMAC */
-#endif
-#if TC_KDF_HAVE_CMAC
-    const struct tc_kdf_cmac* cmac; /* TC_KDF_PRF_CMAC */
-#endif
-  } mac;
-};
-
-#if TC_KBKDF_HAVE_HMAC
-static struct tc_kdf_prf tc_kdf_hmac_prf(const tc_hash_algorithm_info* hash, size_t ctx_size,
-                                         uint8_t out_len)
-{
-  struct tc_kdf_prf prf;
-  prf.kind = TC_KDF_PRF_HMAC;
-  prf.out_len = out_len;
-  prf.ctx_size = ctx_size;
-  prf.mac.hash = hash;
-  return prf;
-}
-#endif
 
 #if TC_KBKDF_HAVE_AES_CMAC
 /* The AES key size is fixed per build, so the KDK must match it exactly. */
@@ -134,86 +87,6 @@ static const struct tc_kdf_prf tc_kdf_prf_des_cmac = {TC_KDF_PRF_CMAC,
                                                       {.cmac = &tc_kdf_des_cmac}};
 #endif /* TC_KBKDF_HAVE_DES_CMAC */
 
-/* HMAC PRFs run through the hash core with their typed hash descriptor, and
- * CMAC PRFs through their cipher's CMAC descriptor. */
-static int tc_kdf_key_ok(const struct tc_kdf_prf* prf, size_t key_len)
-{
-#if TC_KBKDF_HAVE_HMAC
-  if (prf->kind == TC_KDF_PRF_HMAC)
-    return 1;
-#endif
-#if TC_KDF_HAVE_CMAC
-  return prf->mac.cmac->key_ok(key_len);
-#else
-  (void)key_len;
-  return 0;
-#endif
-}
-
-static TC_status tc_kdf_mac_init(const struct tc_kdf_prf* prf, void* ctx, const uint8_t* key,
-                                 size_t key_len)
-{
-#if TC_KBKDF_HAVE_HMAC
-  if (prf->kind == TC_KDF_PRF_HMAC)
-    return tc_hmac_core_init(prf->mac.hash, ctx, key, key_len);
-#endif
-#if TC_KDF_HAVE_CMAC
-  return prf->mac.cmac->init(ctx, key, key_len);
-#else
-  (void)ctx;
-  (void)key;
-  (void)key_len;
-  return TC_ERROR;
-#endif
-}
-
-static TC_status tc_kdf_mac_update(const struct tc_kdf_prf* prf, void* ctx, const uint8_t* data,
-                                   size_t len)
-{
-#if TC_KBKDF_HAVE_HMAC
-  if (prf->kind == TC_KDF_PRF_HMAC)
-    return tc_hmac_core_update(prf->mac.hash, ctx, data, len);
-#endif
-#if TC_KDF_HAVE_CMAC
-  return prf->mac.cmac->update(ctx, data, len);
-#else
-  (void)ctx;
-  (void)data;
-  (void)len;
-  return TC_ERROR;
-#endif
-}
-
-static TC_status tc_kdf_mac_final(const struct tc_kdf_prf* prf, void* ctx, uint8_t* out)
-{
-#if TC_KBKDF_HAVE_HMAC
-  if (prf->kind == TC_KDF_PRF_HMAC)
-    return tc_hmac_core_final(prf->mac.hash, ctx, out);
-#endif
-#if TC_KDF_HAVE_CMAC
-  return prf->mac.cmac->final(ctx, out);
-#else
-  (void)ctx;
-  (void)out;
-  return TC_ERROR;
-#endif
-}
-
-static void tc_kdf_mac_clear(const struct tc_kdf_prf* prf, void* ctx)
-{
-#if TC_KBKDF_HAVE_HMAC
-  if (prf->kind == TC_KDF_PRF_HMAC) {
-    tc_hmac_core_clear(prf->mac.hash, ctx);
-    return;
-  }
-#endif
-#if TC_KDF_HAVE_CMAC
-  prf->mac.cmac->clear(ctx);
-#else
-  TC_secure_zero(ctx, prf->ctx_size);
-#endif
-}
-
 /*****************************************************************************/
 /* Shared derivation core                                                    */
 /*****************************************************************************/
@@ -222,40 +95,10 @@ static void tc_kdf_mac_clear(const struct tc_kdf_prf* prf, void* ctx)
 #define TC_KDF_MODE_FEEDBACK 1
 #define TC_KDF_MODE_PIPELINE 2
 
-struct tc_kdf_segment {
-  const uint8_t* data;
-  size_t len;
-};
-
-/* Any overlap, including an exact alias, is an error: later PRF blocks
-   re-read the inputs after earlier output bytes were written. */
-static int tc_kdf_overlaps(const uint8_t* out, size_t out_len, const uint8_t* in, size_t in_len)
-{
-  if (in == NULL || in_len == 0)
-    return 0;
-  return !tc_internal_ranges_disjoint(out, out_len, in, in_len);
-}
-
 static int tc_kdf_counter_bits_ok(unsigned bits)
 {
   return bits == TC_KBKDF_COUNTER_8 || bits == TC_KBKDF_COUNTER_16 || bits == TC_KBKDF_COUNTER_24 ||
          bits == TC_KBKDF_COUNTER_32;
-}
-
-/* Run the PRF over an ordered list of segments into block. */
-static TC_status tc_kdf_prf_run(const struct tc_kdf_prf* prf, const void* initialized, void* ctx,
-                                const struct tc_kdf_segment* seg, unsigned count, uint8_t* block)
-{
-  unsigned s;
-
-  memcpy(ctx, initialized, prf->ctx_size);
-  for (s = 0; s < count; ++s) {
-    if (seg[s].len != 0 && tc_kdf_mac_update(prf, ctx, seg[s].data, seg[s].len) != TC_OK) {
-      tc_kdf_mac_clear(prf, ctx);
-      return TC_ERROR;
-    }
-  }
-  return tc_kdf_mac_final(prf, ctx, block);
 }
 
 /*
@@ -280,10 +123,12 @@ static TC_status tc_kdf_derive(const struct tc_kdf_prf* prf, int mode, const uin
   uint32_t i;
 
   if (key == NULL || key_len == 0 || !tc_kdf_key_ok(prf, key_len) || params == NULL ||
-      out == NULL || out_len == 0 || (in1_len != 0 && in1 == NULL) || (in2_len != 0 && in2 == NULL))
+      out == NULL || out_len == 0 || !tc_kdf_input_ok(in1, in1_len) ||
+      !tc_kdf_input_ok(in2, in2_len))
     return TC_ERROR;
-  if (tc_kdf_overlaps(out, out_len, key, key_len) || tc_kdf_overlaps(out, out_len, in1, in1_len) ||
-      tc_kdf_overlaps(out, out_len, in2, in2_len))
+  if (!tc_kdf_output_disjoint(out, out_len, key, key_len) ||
+      !tc_kdf_output_disjoint(out, out_len, in1, in1_len) ||
+      !tc_kdf_output_disjoint(out, out_len, in2, in2_len))
     return TC_ERROR;
 
   use_ctr = (mode == TC_KDF_MODE_COUNTER) ? 1 : (params->use_counter != 0);
@@ -427,7 +272,7 @@ TC_status TC_KBKDF_fixed_input(const uint8_t* label, size_t label_len, const uin
 {
   size_t needed;
 
-  if (buf == NULL || (label_len != 0 && label == NULL) || (context_len != 0 && context == NULL))
+  if (buf == NULL || !tc_kdf_input_ok(label, label_len) || !tc_kdf_input_ok(context, context_len))
     return TC_ERROR;
   /* [L]_32 is a bit count, so out_len must stay below 2^29 bytes. */
   if (out_len == 0 || out_len > 0x1FFFFFFFu)
@@ -437,8 +282,8 @@ TC_status TC_KBKDF_fixed_input(const uint8_t* label, size_t label_len, const uin
   needed = TC_KBKDF_FIXED_INPUT_LEN(label_len, context_len);
   if (buf_len < needed)
     return TC_ERROR;
-  if (tc_kdf_overlaps(buf, needed, label, label_len) ||
-      tc_kdf_overlaps(buf, needed, context, context_len))
+  if (!tc_kdf_output_disjoint(buf, needed, label, label_len) ||
+      !tc_kdf_output_disjoint(buf, needed, context, context_len))
     return TC_ERROR;
   if (label_len != 0 && memchr(label, 0, label_len) != NULL)
     return TC_ERROR;

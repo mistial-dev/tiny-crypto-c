@@ -28,6 +28,8 @@ or copy the specific bytes your application needs to retain.
 Output arrays use explicit capacities. A returned length describes the bytes
 written; spare capacity remains governed by the operation's documented contract.
 Check each declaration for permitted in-place use and overlap restrictions.
+For key derivation, see the [HKDF guide](hkdf.md) for PRK lifetime, output
+limits, and hybrid shared-secret inputs.
 
 `TC_buffer` pairs writable `data` with byte `capacity`. `TC_random_source` pairs
 a random-fill callback with its context. Random callbacks must fill the entire

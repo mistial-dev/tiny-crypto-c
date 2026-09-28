@@ -19,9 +19,9 @@
 #error "Card Secure Messaging must follow the PD role"
 #endif
 #if TC_ENABLE_DES || TC_ENABLE_SHA224 || TC_ENABLE_SHA512 || TC_ENABLE_HMAC || TC_ENABLE_KDF ||    \
-    TC_ENABLE_EAC_CVC || TC_AES_ENABLE_CTR || TC_AES_ENABLE_GCM || TC_AES_ENABLE_CCM ||            \
-    TC_AES_ENABLE_CMAC || TC_AES_ENABLE_OFB || TC_AES_ENABLE_EAX || TC_AES_ENABLE_EAX_PRIME ||     \
-    TC_AES_ENABLE_SIV || TC_TLV_ENABLE_STREAM
+    TC_ENABLE_HKDF || TC_ENABLE_EAC_CVC || TC_AES_ENABLE_CTR || TC_AES_ENABLE_GCM ||               \
+    TC_AES_ENABLE_CCM || TC_AES_ENABLE_CMAC || TC_AES_ENABLE_OFB || TC_AES_ENABLE_EAX ||           \
+    TC_AES_ENABLE_EAX_PRIME || TC_AES_ENABLE_SIV || TC_TLV_ENABLE_STREAM
 #error "Unrelated algorithm enabled in a PIV role"
 #endif
 

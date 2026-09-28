@@ -7,7 +7,7 @@
 set(tc_full_definitions
   TC_ENABLE_AES=1 TC_ENABLE_DES=1 TC_ENABLE_SHA1=1 TC_ENABLE_SHA224=1
   TC_ENABLE_SHA256=1 TC_ENABLE_SHA384=1 TC_ENABLE_SHA512=1
-  TC_ENABLE_HMAC=1 TC_ENABLE_KDF=1 TC_ENABLE_KMAC256=1 TC_ZEROIZE=1 TC_STRICT=1 TC_AVR_PROGMEM=1
+  TC_ENABLE_HMAC=1 TC_ENABLE_KDF=1 TC_ENABLE_HKDF=1 TC_ENABLE_KMAC256=1 TC_ZEROIZE=1 TC_STRICT=1 TC_AVR_PROGMEM=1
   TC_AES_ENABLE_CBC=1 TC_AES_ENABLE_ECB=1 TC_AES_ENABLE_CTR=1
   TC_AES_ENABLE_OFB=1 TC_AES_ENABLE_GCM=1
   TC_AES_ENABLE_CCM=1 TC_AES_ENABLE_EAX=1
@@ -64,7 +64,7 @@ function(tc_add_c_test target library)
 endfunction()
 
 set(tc_test_sources src/common.c ${tc_aes_sources} ${tc_des_sources} ${tc_hash_sources}
-    src/kdf.c src/kmac.c)
+    src/kdf.c src/hkdf.c src/kmac.c)
 tc_add_test_library(tiny-crypto-c-test ${tc_test_sources})
 target_compile_definitions(tiny-crypto-c-test PUBLIC
   ${tc_full_definitions} TC_AES_KEY_BITS=128 TC_AES_ENABLE_EAX_PRIME=1
@@ -151,6 +151,20 @@ target_compile_definitions(tiny-crypto-c-profile-aes-cmac-minimal PRIVATE
   TC_AES_ENABLE_OFB=0 TC_AES_ENABLE_GCM=0 TC_AES_ENABLE_CCM=0
   TC_AES_ENABLE_EAX=0 TC_AES_ENABLE_EAX_PRIME=0 TC_AES_ENABLE_SIV=0
   TC_AES_ENABLE_CMAC=1)
+
+# HKDF remains available without KBKDF, AES or DES, with only one HMAC hash.
+tc_add_compile_profile(tiny-crypto-c-profile-hkdf-sha256
+  src/hash.c src/hash_core.c src/hkdf.c)
+target_compile_definitions(tiny-crypto-c-profile-hkdf-sha256 PRIVATE
+  TC_ENABLE_AES=0 TC_ENABLE_DES=0 TC_ENABLE_SHA1=0 TC_ENABLE_SHA224=0
+  TC_ENABLE_SHA256=1 TC_ENABLE_SHA384=0 TC_ENABLE_SHA512=0
+  TC_ENABLE_HMAC=1 TC_ENABLE_KDF=0 TC_ENABLE_HKDF=1)
+tc_add_compile_profile(tiny-crypto-c-profile-hkdf-sha384
+  src/sha512.c src/hash_core.c src/hkdf.c)
+target_compile_definitions(tiny-crypto-c-profile-hkdf-sha384 PRIVATE
+  TC_ENABLE_AES=0 TC_ENABLE_DES=0 TC_ENABLE_SHA1=0 TC_ENABLE_SHA224=0
+  TC_ENABLE_SHA256=0 TC_ENABLE_SHA384=1 TC_ENABLE_SHA512=0
+  TC_ENABLE_HMAC=1 TC_ENABLE_KDF=0 TC_ENABLE_HKDF=1)
 
 foreach(ghash_mode 1 2 3 4)
   tc_add_test_library(tiny-crypto-c-test-gcm-${ghash_mode}

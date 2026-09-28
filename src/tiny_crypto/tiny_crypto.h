@@ -122,6 +122,9 @@
 #if TC_ENABLE_KDF
 #include <tiny_crypto/kdf.h>
 #endif
+#if TC_ENABLE_HKDF
+#include <tiny_crypto/hkdf.h>
+#endif
 #if TC_ENABLE_SSKDF
 #include <tiny_crypto/sskdf.h>
 #endif

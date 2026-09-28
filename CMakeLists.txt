@@ -53,6 +53,7 @@ if((TINY_CRYPTO_ENABLE_DER OR TINY_CRYPTO_TLV_BER OR TINY_CRYPTO_TLV_STREAM)
   message(FATAL_ERROR "DER, BER, and incremental parsing require TINY_CRYPTO_ENABLE_TLV")
 endif()
 tc_profile_option(TINY_CRYPTO_ENABLE_KDF TC_ENABLE_KDF "Build SP 800-108 KBKDF over the enabled HMAC/CMAC PRFs")
+tc_profile_option(TINY_CRYPTO_ENABLE_HKDF TC_ENABLE_HKDF "Build RFC 5869 HKDF over enabled HMAC-SHA algorithms")
 tc_profile_option(TINY_CRYPTO_ENABLE_SSKDF TC_ENABLE_SSKDF "Build the single-step hash KDF")
 tc_profile_option(TINY_CRYPTO_ENABLE_DRBG TC_ENABLE_DRBG "Build NIST SP 800-90A DRBGs")
 tc_profile_option(TINY_CRYPTO_DRBG_HASH TC_DRBG_ENABLE_HASH "Build Hash_DRBG")
@@ -186,6 +187,9 @@ endif()
 if(TINY_CRYPTO_ENABLE_KDF AND NOT tc_kdf_prf)
   message(FATAL_ERROR "KDF requires a PRF: HMAC with a SHA, AES-CMAC, or TDEA-CMAC")
 endif()
+if(TINY_CRYPTO_ENABLE_HKDF AND (NOT TINY_CRYPTO_ENABLE_HMAC OR NOT tc_any_sha))
+  message(FATAL_ERROR "HKDF requires HMAC and an enabled SHA algorithm")
+endif()
 if(TINY_CRYPTO_ENABLE_DRBG)
   if(NOT TINY_CRYPTO_DRBG_HASH AND NOT TINY_CRYPTO_DRBG_HMAC AND NOT TINY_CRYPTO_DRBG_CTR)
     message(FATAL_ERROR "DRBG requires at least one mechanism")
@@ -275,6 +279,7 @@ foreach(pair
     "TINY_CRYPTO_TLV_BER;TC_TLV_ENABLE_BER"
     "TINY_CRYPTO_TLV_STREAM;TC_TLV_ENABLE_STREAM"
     "TINY_CRYPTO_ENABLE_KDF;TC_ENABLE_KDF"
+    "TINY_CRYPTO_ENABLE_HKDF;TC_ENABLE_HKDF"
     "TINY_CRYPTO_ENABLE_SSKDF;TC_ENABLE_SSKDF"
     "TINY_CRYPTO_ENABLE_DRBG;TC_ENABLE_DRBG"
     "TINY_CRYPTO_DRBG_HASH;TC_DRBG_ENABLE_HASH"
@@ -422,6 +427,9 @@ endif()
 list(APPEND tc_sources src/hash_core.c src/pki_storage.c)
 if(TINY_CRYPTO_ENABLE_KDF)
   list(APPEND tc_sources src/kdf.c)
+endif()
+if(TINY_CRYPTO_ENABLE_HKDF)
+  list(APPEND tc_sources src/hkdf.c)
 endif()
 if(TINY_CRYPTO_ENABLE_DRBG)
   list(APPEND tc_sources ${tc_drbg_sources})

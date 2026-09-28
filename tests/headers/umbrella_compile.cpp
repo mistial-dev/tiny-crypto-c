@@ -1,6 +1,11 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/tiny_crypto.hpp>
 
+#if defined(TC_TEST_HEADER_HKDF) &&                                                                \
+    (!defined(TINY_CRYPTO_HKDF_H_) || !defined(TINY_CRYPTO_HKDF_HPP_))
+#error "The C++ umbrella must expose the enabled HKDF wrapper"
+#endif
+
 #if defined(TC_TEST_HEADER_RSA)
 #if !defined(TINY_CRYPTO_RSA_H_) || !defined(TINY_CRYPTO_RSA_HPP_)
 #error "The C++ umbrella must expose the enabled C and C++ RSA declarations"

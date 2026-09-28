@@ -150,6 +150,8 @@ int main(void)
     return 1;
   if (TC_SSKDF_SHA256(key, sizeof key, NULL, 0, result, sizeof result) != TC_OK)
     return 1;
+  if (TC_HKDF_SHA256_derive(NULL, 0, key, sizeof key, NULL, 0, result, sizeof result) != TC_OK)
+    return 1;
   key[31] = 1;
   if (TC_EC_public_key(TC_EC_P256, key, sizeof key, point, sizeof point, &workspace) != TC_OK)
     return 1;

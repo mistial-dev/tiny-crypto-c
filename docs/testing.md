@@ -775,8 +775,14 @@ SIV follows its separate API contract: an authentication mismatch wipes the
 output, whether separate or in-place. The two SIV formats differ in their
 associated-data components and whether the synthetic IV prefixes the ciphertext.
 
+HKDF checks all four pinned Wycheproof SHA-1/256/384/512 JSON suites, the seven
+RFC 5869 vectors, and additional SHA-224/384/512 vectors. The NIST ACVP HKDF
+corpus covers SP 800-56C revisions 1 and 2 for SHA2-224/256/384/512, including
+hybrid secrets, multi-expansion, and invalid validation outputs. The other
+hash families in the original ACVP files are skipped explicitly.
+
 The pinned Wycheproof tree also contains algorithms and formats outside this API:
-PKCS#5-padded CBC, AES key wrap, XTS, FF1, GCM-SIV, chunked encryption, HKDF,
+PKCS#5-padded CBC, AES key wrap, XTS, FF1, GCM-SIV, chunked encryption,
 PBKDF2, KMAC128, SHA-3 HMAC, and signature operations. Those are not counted.
 Raw CBC has no padding-validation API to test against PKCS#5 rejection cases.
 ECDH PEM and WebCrypto import formats are also outside the API; the raw-point

@@ -99,6 +99,7 @@ selected.
 | `TINY_CRYPTO_ENABLE_HMAC`    |     OFF | HMAC for enabled hashes                                             |
 | `TINY_CRYPTO_ENABLE_KMAC256` |     OFF | Fixed-output KMAC256 with customization                             |
 | `TINY_CRYPTO_ENABLE_KDF`     |     OFF | SP 800-108 KBKDF over enabled HMAC and CMAC PRFs                    |
+| `TINY_CRYPTO_ENABLE_HKDF`    |     OFF | RFC 5869 HKDF over enabled HMAC-SHA algorithms                      |
 | `TINY_CRYPTO_ENABLE_SSKDF`   |     OFF | Single-step hash KDF with SHA-256 or SHA-384                        |
 | `TINY_CRYPTO_ENABLE_DRBG`    |     OFF | [SP 800-90A DRBGs](docs/drbg.md): Hash_DRBG, HMAC_DRBG and CTR_DRBG |
 | `TINY_CRYPTO_DRBG_HASH`      |     OFF | Hash_DRBG over the enabled SHA algorithms                           |
@@ -193,6 +194,11 @@ PRF: HMAC with an enabled SHA digest, `TINY_CRYPTO_AES_CMAC`, or
 PRFs compile out. AES-CMAC keys follow `TINY_CRYPTO_AES_KEY_BITS`; TDEA-CMAC is
 kept for legacy interoperability only.
 
+`TINY_CRYPTO_ENABLE_HKDF` needs HMAC and at least one enabled SHA family.
+The C and C++ APIs provide extract, expand, and one-shot derive operations.
+They also accept a revision 2 hybrid secret as separate `Z` and `T` spans.
+See [HKDF usage](docs/hkdf.md) and the [C example](examples/hkdf.c).
+
 Projects that compile the C files directly can define the corresponding
 `TC_*` macros documented in [`config.h`](src/tiny_crypto/config.h).
 
@@ -242,6 +248,11 @@ reuse a key-derivation key as a derived key. Output lengths are in bytes; a
 derivation of `n = ceil(out_len / h)` PRF blocks needs `n <= 2^r - 1` for an
 `r`-bit counter. Output buffers must not overlap any input, and `TC_ERROR`
 wipes the output when derivation had already started.
+
+HKDF output lengths are in bytes and must be from 1 to `255 * HashLen`.
+Pass purpose and protocol context as `info`. Extracted keys are cleared by the
+one-shot derive functions; callers using extract and expand clear their PRK
+after the final expansion.
 
 ## TLV parsing
 
@@ -403,7 +414,8 @@ The underlying `TC_ECDH`, `TC_EC_public_key`, and `TC_EC_validate_public_key`
 APIs take fixed-width scalars and uncompressed SEC1 public keys. They support
 P-256 and P-384. `TC_SSKDF_SHA256` and
 `TC_SSKDF_SHA384` accept OtherInfo as spans, avoiding a concatenation buffer.
-They implement the single-step KDF, not SP 800-108 KBKDF or HKDF.
+These APIs implement the single-step KDF. SP 800-108 KBKDF and HKDF have
+separate APIs.
 
 ## Testing
 

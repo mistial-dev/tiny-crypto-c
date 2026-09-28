@@ -235,6 +235,18 @@
 #ifndef TC_ENABLE_KDF
 #define TC_ENABLE_KDF TC_PROFILE_VALUE(0, 0, 0, 1)
 #endif
+/* RFC 5869 HKDF over the enabled HMAC-SHA algorithms. */
+#ifndef TC_ENABLE_HKDF
+#define TC_ENABLE_HKDF TC_PROFILE_VALUE(0, 0, 0, 1)
+#endif
+#if TC_ENABLE_HKDF != 0 && TC_ENABLE_HKDF != 1
+#error "TC_ENABLE_HKDF must be 0 or 1"
+#endif
+#if TC_ENABLE_HKDF &&                                                                              \
+    (!TC_ENABLE_HMAC || !(TC_ENABLE_SHA1 || TC_ENABLE_SHA224 || TC_ENABLE_SHA256 ||                \
+                          TC_ENABLE_SHA384 || TC_ENABLE_SHA512))
+#error "HKDF requires HMAC and an enabled SHA algorithm"
+#endif
 #ifndef TC_ENABLE_RSA
 #define TC_ENABLE_RSA TC_PROFILE_VALUE(0, 0, 0, 1)
 #endif

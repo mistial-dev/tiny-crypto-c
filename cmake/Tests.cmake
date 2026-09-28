@@ -1051,6 +1051,25 @@ if(TINY_CRYPTO_BUILD_TESTS)
   tc_add_kdf_test(test_kdf tiny-crypto-c-test)
   tc_add_kdf_test(test_kdf_192 tiny-crypto-c-test-aes192)
   tc_add_kdf_test(test_kdf_256 tiny-crypto-c-test-aes256)
+  tc_add_c_test(test_hkdf tiny-crypto-c-test tests/kdf/hkdf_test.c)
+  target_include_directories(test_hkdf PRIVATE tests/kdf)
+  tc_add_linked_test(test_hkdf_example tiny-crypto-c-test examples/hkdf.c)
+  if(Python3_Interpreter_FOUND)
+    tc_add_test_executable(test_hkdf_reader tests/kdf/hkdf_reader.c
+      tests/support/test_util.c tests/support/cavp.c)
+    target_link_libraries(test_hkdf_reader PRIVATE tiny-crypto-c-test)
+    target_include_directories(test_hkdf_reader PRIVATE tests/support)
+    add_test(NAME test_hkdf_wycheproof
+      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/kdf/hkdf_wycheproof.py
+        $<TARGET_FILE:test_hkdf_reader>
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/wycheproof/testvectors_v1)
+    set_tests_properties(test_hkdf_wycheproof PROPERTIES LABELS extended)
+    add_test(NAME test_hkdf_acvp
+      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/kdf/hkdf_acvp.py
+        $<TARGET_FILE:test_hkdf_reader>
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/kdf/acvp_hkdf)
+    set_tests_properties(test_hkdf_acvp PROPERTIES LABELS extended)
+  endif()
 
   tc_add_c_test(test_des_weak_keys_allowed tiny-crypto-c-test
     tests/des/weak_keys_test.c)
@@ -1078,6 +1097,9 @@ if(TINY_CRYPTO_BUILD_TESTS)
       target_include_directories(test_cpp_${algorithm} PRIVATE
         tests/support tests/${algorithm})
     endforeach()
+    tc_add_linked_test(test_cpp_hkdf tiny-crypto-c-test
+      tests/cpp/hkdf.cpp tests/cpp/main.cpp)
+    target_include_directories(test_cpp_hkdf PRIVATE tests/support)
     tc_add_linked_test(test_cpp_drbg tiny-crypto-c-test-drbg
       tests/cpp/drbg.cpp tests/cpp/main.cpp)
     target_include_directories(test_cpp_drbg PRIVATE tests/support)
@@ -1095,11 +1117,16 @@ if(TINY_CRYPTO_BUILD_TESTS)
 
   # Compile both umbrellas with each feature family's smallest legal profile.
   # This catches accidental feature coupling and keeps their C API surface equal.
-  foreach(header_profile rsa tlv aamva fascn twic_uuid twic_tpk twic_object
+  foreach(header_profile rsa tlv aamva fascn twic_uuid twic_tpk twic_object hkdf
       piv_oids x509 key_challenge x509_path x509_revocation cms cms_validation piv_objects credential piv_cvc piv_chuid
       piv_sm twic_ccl)
     set(header_profile_definitions TC_ENABLE_AES=0 TC_ENABLE_SHA256=0)
-    if(header_profile STREQUAL "rsa")
+    if(header_profile STREQUAL "hkdf")
+      list(REMOVE_ITEM header_profile_definitions TC_ENABLE_SHA256=0)
+      list(APPEND header_profile_definitions
+        TC_ENABLE_SHA256=1 TC_ENABLE_HMAC=1 TC_ENABLE_HKDF=1 TC_ENABLE_KDF=0
+        TC_TEST_HEADER_HKDF=1)
+    elseif(header_profile STREQUAL "rsa")
       list(APPEND header_profile_definitions TC_ENABLE_RSA=1 TC_TEST_HEADER_RSA=1)
     elseif(header_profile STREQUAL "tlv")
       list(APPEND header_profile_definitions TC_ENABLE_TLV=1 TC_TEST_HEADER_TLV=1)
