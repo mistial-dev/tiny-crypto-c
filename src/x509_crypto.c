@@ -80,7 +80,7 @@ static TC_X509_signature_result native_verify(void* context, const TC_bytes* mes
 {
   const TC_X509_native_workspace* workspace = context;
   TC_signature_algorithm selected;
-  tc_hash_workspace hash_workspace;
+  TC_hash_context hash_workspace;
   tc_hash_info hash;
   enum { MAX_DIGEST_BYTES = 64 };
   uint8_t digest[MAX_DIGEST_BYTES];

@@ -84,6 +84,32 @@ typedef struct {
   #define TC_HASH_CORE_MAX_DIGEST 32u
 #endif
 
+/* Descriptors for the enabled SHA algorithms, defined in hash.c and sha512.c. */
+#if TC_ENABLE_SHA1
+extern const tc_hash_algorithm_info tc_sha1_info TC_HASH_INFO_STORAGE;
+#endif
+#if TC_ENABLE_SHA224
+extern const tc_hash_algorithm_info tc_sha224_info TC_HASH_INFO_STORAGE;
+#endif
+#if TC_ENABLE_SHA256
+extern const tc_hash_algorithm_info tc_sha256_info TC_HASH_INFO_STORAGE;
+#endif
+#if TC_ENABLE_SHA384
+extern const tc_hash_algorithm_info tc_sha384_info TC_HASH_INFO_STORAGE;
+#endif
+#if TC_ENABLE_SHA512
+extern const tc_hash_algorithm_info tc_sha512_info TC_HASH_INFO_STORAGE;
+#endif
+
+/* Descriptor for a run-time selected SHA algorithm, or NULL when the
+ * algorithm is unknown or disabled. Pass the result to the core functions
+ * below with a TC_hash_context or TC_HMAC_context. */
+const tc_hash_algorithm_info* tc_hash_core_lookup(TC_hash_algorithm algorithm);
+
+/* Sizes read from a stored descriptor. */
+size_t tc_hash_core_digest_bytes(const tc_hash_algorithm_info* info);
+size_t tc_hash_core_block_bytes(const tc_hash_algorithm_info* info);
+
 /* Plain hashes. info points at a TC_HASH_INFO_STORAGE descriptor and context
  * at the matching public context type.
  *

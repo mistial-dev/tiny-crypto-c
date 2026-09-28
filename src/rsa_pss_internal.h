@@ -23,7 +23,7 @@ static inline TC_RSA_result tc_rsa_pss_prepare(size_t length, size_t bits,
 }
 
 static inline TC_status tc_rsa_pss_hash(TC_hash_algorithm hash, TC_bytes digest,
-    TC_bytes salt, uint8_t* output, tc_hash_workspace* workspace)
+    TC_bytes salt, uint8_t* output, TC_hash_context* workspace)
 {
   static const uint8_t zeros[8] = {0};
   TC_bytes parts[] = {{zeros,sizeof zeros},digest,salt};
@@ -35,7 +35,7 @@ static inline TC_status tc_rsa_pss_hash(TC_hash_algorithm hash, TC_bytes digest,
  * disjoint. Salt is copied only into its encoded-message field. */
 static inline TC_RSA_result tc_rsa_pss_encode(uint8_t* encoded, size_t length,
     size_t bits, TC_hash_algorithm hash, TC_hash_algorithm mgf_hash, TC_bytes digest,
-    TC_bytes salt, uint8_t* block, tc_hash_workspace* workspace, size_t* work)
+    TC_bytes salt, uint8_t* block, TC_hash_context* workspace, size_t* work)
 {
   tc_hash_info info;
   TC_bytes h;
@@ -64,7 +64,7 @@ static inline TC_RSA_result tc_rsa_pss_encode(uint8_t* encoded, size_t length,
  * holds the larger of the message-hash and MGF-hash digests. */
 static inline TC_RSA_result tc_rsa_pss_check(uint8_t* encoded, size_t length,
     size_t bits, TC_hash_algorithm hash, TC_hash_algorithm mgf_hash, TC_bytes digest,
-    size_t salt_length, uint8_t* block, tc_hash_workspace* workspace, size_t* work)
+    size_t salt_length, uint8_t* block, TC_hash_context* workspace, size_t* work)
 {
   tc_hash_info info;
   TC_RSA_result result;

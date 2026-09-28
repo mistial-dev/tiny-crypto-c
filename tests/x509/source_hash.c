@@ -120,7 +120,7 @@ static MunitResult preparation(const MunitParameter params[], void* user)
   munit_assert_int(TC_X509_crl_prepare_finish(job,(TC_X509_crl_record*)job),==,TC_TLV_ARGUMENT);
   munit_assert_int(TC_X509_crl_prepare_finish(job,&record),==,TC_TLV_OK);
   const TC_bytes tbs = {encoded + 2,49};
-  uint8_t expected[32]; tc_hash_workspace hash;
+  uint8_t expected[32]; TC_hash_context hash;
   munit_assert_int(tc_hash_digest_parts(TC_HASH_SHA256,&tbs,1,expected,&hash),==,TC_OK);
   munit_assert_memory_equal(sizeof expected,expected,record.crl.prepared->digest.data);
   TC_X509_crl_prepare_clear(job);
@@ -290,7 +290,7 @@ static MunitResult content_comparison(const MunitParameter params[], void* user)
   (void)params; (void)user;
   const TC_bytes bytes = {(const uint8_t*)"abc",3};
   uint8_t digest[TC_SHA256_DIGESTLEN], different[TC_SHA256_DIGESTLEN];
-  tc_hash_workspace hash;
+  TC_hash_context hash;
   munit_assert_int(tc_hash_digest_parts(TC_HASH_SHA256,&bytes,1,digest,&hash),==,TC_OK);
   memcpy(different,digest,sizeof digest); different[0] ^= 1;
   TC_X509_crl_prepared a = {NULL,NULL,0,{digest,sizeof digest},TC_HASH_SHA256};

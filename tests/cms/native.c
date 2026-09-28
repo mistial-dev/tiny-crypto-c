@@ -264,7 +264,7 @@ static MunitResult content_signature(const MunitParameter params[],
   const TC_DER_algorithm algorithm = {{signature_oid, sizeof signature_oid},
                                       {NULL, 0}};
   TC_X509_public_key key;
-  tc_hash_workspace hash_workspace;
+  TC_hash_context hash_workspace;
   EVP_PKEY *generated = EVP_EC_gen("prime256v1");
   EVP_MD_CTX *signer = EVP_MD_CTX_new();
   unsigned char *cursor = spki;
@@ -475,7 +475,7 @@ static MunitResult rsa_signature(const MunitParameter params[], void *user) {
   tc_cms_signer_info info = {0};
   tc_cms_signature_algorithm algorithm;
   tc_hash_info hash;
-  tc_hash_workspace hash_workspace;
+  TC_hash_context hash_workspace;
   TC_RSA_word words[TC_RSA_VERIFY_WORKSPACE_WORDS(MAX_RSA_BITS)];
   TC_RSA_workspace workspace = {words, sizeof words / sizeof *words};
   uint8_t spki[SPKI_CAPACITY], signature[MAX_RSA_BITS / 8],
@@ -606,7 +606,7 @@ static MunitResult signed_data(const MunitParameter params[], void *user) {
   TC_X509_certificate parsed_certificate;
   const TC_TLV_limits limits = {ENCODED_CAPACITY, ENCODED_CAPACITY,
                                 ELEMENT_LIMIT, FRAME_CAPACITY};
-  tc_hash_workspace hash_workspace;
+  TC_hash_context hash_workspace;
   TC_ECDSA_workspace ec;
   const TC_X509_native_workspace native = {
       &ec, NULL, TC_X509_NATIVE_DEFAULT_SIGNATURE_WORK};

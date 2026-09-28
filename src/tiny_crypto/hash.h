@@ -237,6 +237,50 @@ struct TC_HMAC_SHA512_ctx
 #endif
 #endif /* TC_ENABLE_HMAC */
 
+/* Storage for any enabled SHA-1 or SHA-2 context, for code that selects the
+ * hash at run time. Its size is the largest enabled context. A pointer to the
+ * union converts to a pointer to each member. */
+typedef union {
+  uint8_t unused;
+#if TC_ENABLE_SHA1
+  struct TC_SHA1_ctx sha1;
+#endif
+#if TC_ENABLE_SHA224
+  struct TC_SHA224_ctx sha224;
+#endif
+#if TC_ENABLE_SHA256
+  struct TC_SHA256_ctx sha256;
+#endif
+#if TC_ENABLE_SHA384
+  struct TC_SHA384_ctx sha384;
+#endif
+#if TC_ENABLE_SHA512
+  struct TC_SHA512_ctx sha512;
+#endif
+} TC_hash_context;
+
+#if TC_ENABLE_HMAC
+/* Storage for any enabled HMAC context, sized like TC_hash_context. */
+typedef union {
+  uint8_t unused;
+#if TC_ENABLE_SHA1
+  struct TC_HMAC_SHA1_ctx sha1;
+#endif
+#if TC_ENABLE_SHA224
+  struct TC_HMAC_SHA224_ctx sha224;
+#endif
+#if TC_ENABLE_SHA256
+  struct TC_HMAC_SHA256_ctx sha256;
+#endif
+#if TC_ENABLE_SHA384
+  struct TC_HMAC_SHA384_ctx sha384;
+#endif
+#if TC_ENABLE_SHA512
+  struct TC_HMAC_SHA512_ctx sha512;
+#endif
+} TC_HMAC_context;
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif

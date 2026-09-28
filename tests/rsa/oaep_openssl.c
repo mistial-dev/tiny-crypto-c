@@ -55,7 +55,7 @@ static MunitResult interoperability(const MunitParameter params[], void* user)
   const TC_bytes labels[] = {{NULL,0},{label_bytes,sizeof label_bytes}};
   uint8_t encoded[MAX_BYTES], ciphertext[MAX_BYTES], plaintext[MAX_BYTES];
   uint8_t input[MAX_BYTES], seed[MAX_DIGEST], block[MAX_DIGEST], saved[MAX_BYTES];
-  tc_hash_workspace workspace;
+  TC_hash_context workspace;
   munit_assert_true(bits == 1024 || bits == 2048 || bits == 3072);
   EVP_PKEY* key = EVP_RSA_gen(bits);
   (void)user;

@@ -248,7 +248,7 @@ static TC_TLV_result cms_signed_content_digest(const TC_CMS_signed_data* data,
     TC_hash_algorithm algorithm, const TC_TLV_limits* limits,
     const tc_pki_tree_workspace* tree, uint8_t* digest)
 {
-  tc_hash_workspace scratch;
+  TC_hash_context scratch;
   TC_TLV_result result = data->has_content ?
       tc_cms_hash_content(data->content,TC_CMS_CONTENT_BER_OCTETS,algorithm,limits,tree,&scratch,digest) :
       tc_pki_hash_parts(detached,detached_count,algorithm,limits,tree,&scratch,digest);

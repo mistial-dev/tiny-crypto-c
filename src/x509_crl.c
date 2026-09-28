@@ -45,7 +45,7 @@ TC_TLV_result tc_x509_crl_content_equal(const tc_x509_crl* left,
       if (!tc_hash_available(prepared->hash)) return TC_TLV_UNSUPPORTED;
       result = tc_pki_work_charge(work,right->tbs.length);
       if (result != TC_TLV_OK) return result;
-      tc_hash_workspace hash;
+      TC_hash_context hash;
       if (tc_hash_digest_parts(prepared->hash,&right->tbs,1,computed,&hash) != TC_OK)
         return TC_TLV_ARGUMENT;
       digest = (TC_bytes){computed,info.digest_length};

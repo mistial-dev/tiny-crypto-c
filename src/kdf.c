@@ -5,9 +5,10 @@
  * NIST SP 800-108 KBKDF for tiny-crypto-c: counter, feedback and
  * double-pipeline mode over the HMAC and CMAC PRFs compiled into the profile.
  *
- * One generic core drives every mode. A PRF is a small descriptor of function
- * pointers over typed streaming MAC contexts. Per-PRF wrappers provide scratch
- * storage without changing the public API or allocating on the heap. Each block
+ * One generic core drives every mode. A PRF is a tagged, typed descriptor:
+ * HMAC PRFs name a hash-core descriptor, and CMAC PRFs name their cipher's
+ * CMAC functions. Per-PRF wrappers provide typed context storage without
+ * allocating on the heap. Each block
  * is fed to the MAC as an ordered list of segments (counter, chaining value,
  * fixed input) and never copied into a scratch buffer, which keeps the stack
  * bounded by two contexts of the selected MAC plus two h-byte blocks.
@@ -16,7 +17,7 @@
 #include <string.h>
 #include <tiny_crypto/kdf.h>
 #include "internal.h"
-#include "hash_adapter_internal.h"
+#include "hash_dispatch_internal.h"
 
 #if TC_ENABLE_KDF
 
@@ -24,50 +25,58 @@
 /* PRF descriptors                                                           */
 /*****************************************************************************/
 
-struct tc_kdf_prf
+#define TC_KDF_HAVE_CMAC (TC_KBKDF_HAVE_AES_CMAC || TC_KBKDF_HAVE_DES_CMAC)
+
+#if TC_KDF_HAVE_CMAC
+/* A CMAC PRF names the streaming CMAC functions of its block cipher. Only
+ * that cipher's KBKDF family references the descriptor, so an unused family
+ * and its cipher drop out at link time. */
+struct tc_kdf_cmac
 {
-  uint8_t out_len; /* h, the PRF output length in bytes */
-  size_t ctx_size;
   int (*key_ok)(size_t key_len);
   TC_status (*init)(void* ctx, const uint8_t* key, size_t key_len);
   TC_status (*update)(void* ctx, const uint8_t* data, size_t len);
   TC_status (*final)(void* ctx, uint8_t* out);
   void (*clear)(void* ctx);
 };
+#endif
+
+enum tc_kdf_prf_kind
+{
+  TC_KDF_PRF_HMAC,
+  TC_KDF_PRF_CMAC
+};
+
+/* A PRF is its kind plus the typed descriptor of that kind. The per-family
+ * wrappers own context storage of the matching type, and ctx_size bytes of
+ * it are copied and wiped by the core. */
+struct tc_kdf_prf
+{
+  enum tc_kdf_prf_kind kind;
+  uint8_t out_len; /* h, the PRF output length in bytes */
+  size_t ctx_size;
+  union
+  {
+#if TC_KBKDF_HAVE_HMAC
+    const tc_hash_algorithm_info* hash; /* TC_KDF_PRF_HMAC */
+#endif
+#if TC_KDF_HAVE_CMAC
+    const struct tc_kdf_cmac* cmac;     /* TC_KDF_PRF_CMAC */
+#endif
+  } mac;
+};
 
 #if TC_KBKDF_HAVE_HMAC
-static int tc_kdf_key_any(size_t key_len)
+static struct tc_kdf_prf tc_kdf_hmac_prf(const tc_hash_algorithm_info* hash,
+                                         size_t ctx_size, uint8_t out_len)
 {
-  (void)key_len;
-  return 1;
+  struct tc_kdf_prf prf;
+  prf.kind = TC_KDF_PRF_HMAC;
+  prf.out_len = out_len;
+  prf.ctx_size = ctx_size;
+  prf.mac.hash = hash;
+  return prf;
 }
-
-#define TC_KDF_HMAC_PRF(N) \
-  static struct tc_kdf_prf tc_kdf_hmac_prf_sha##N(void) \
-  { \
-    tc_hmac_adapter hash; \
-    tc_hmac_adapter_load_##N(&hash); \
-    struct tc_kdf_prf prf = { \
-      hash.digest_length, hash.hmac_context_size, tc_kdf_key_any, \
-      hash.hmac_init, hash.hmac_update, hash.hmac_final, hash.hmac_clear \
-    }; \
-    return prf; \
-  }
-#if TC_KBKDF_HAVE_HMAC_SHA1
-TC_KDF_HMAC_PRF(1)
-#endif
-#if TC_KBKDF_HAVE_HMAC_SHA224
-TC_KDF_HMAC_PRF(224)
-#endif
-#if TC_KBKDF_HAVE_HMAC_SHA256
-TC_KDF_HMAC_PRF(256)
-#endif
-#if TC_KBKDF_HAVE_HMAC_SHA384
-TC_KDF_HMAC_PRF(384)
-#endif
-#if TC_KBKDF_HAVE_HMAC_SHA512
-TC_KDF_HMAC_PRF(512)
-#endif
 #endif
 
 #if TC_KBKDF_HAVE_AES_CMAC
@@ -76,14 +85,12 @@ static int tc_kdf_aes_key_ok(size_t key_len)
 {
   return key_len == TC_AES_KEYLEN;
 }
-static TC_status tc_kdf_aes_cmac_init(void* ctx, const uint8_t* key,
-                                      size_t key_len)
+static TC_status tc_kdf_aes_cmac_init(void* ctx, const uint8_t* key, size_t key_len)
 {
   (void)key_len;
   return TC_AES_CMAC_init((struct TC_AES_CMAC_ctx*)ctx, key);
 }
-static TC_status tc_kdf_aes_cmac_update(void* ctx, const uint8_t* data,
-                                        size_t len)
+static TC_status tc_kdf_aes_cmac_update(void* ctx, const uint8_t* data, size_t len)
 {
   return TC_AES_CMAC_update((struct TC_AES_CMAC_ctx*)ctx, data, len);
 }
@@ -95,10 +102,13 @@ static void tc_kdf_aes_cmac_clear(void* ctx)
 {
   TC_AES_CMAC_ctx_clear((struct TC_AES_CMAC_ctx*)ctx);
 }
-static const struct tc_kdf_prf tc_kdf_prf_aes_cmac = {
-  TC_AES_CMAC_TAG_MAX, sizeof(struct TC_AES_CMAC_ctx), tc_kdf_aes_key_ok,
-  tc_kdf_aes_cmac_init, tc_kdf_aes_cmac_update,
+static const struct tc_kdf_cmac tc_kdf_aes_cmac = {
+  tc_kdf_aes_key_ok, tc_kdf_aes_cmac_init, tc_kdf_aes_cmac_update,
   tc_kdf_aes_cmac_final, tc_kdf_aes_cmac_clear
+};
+static const struct tc_kdf_prf tc_kdf_prf_aes_cmac = {
+  TC_KDF_PRF_CMAC, TC_AES_CMAC_TAG_MAX, sizeof(struct TC_AES_CMAC_ctx),
+  {.cmac = &tc_kdf_aes_cmac}
 };
 #endif /* TC_KBKDF_HAVE_AES_CMAC */
 
@@ -107,13 +117,11 @@ static int tc_kdf_des_key_ok(size_t key_len)
 {
   return key_len == 8 || key_len == 16 || key_len == 24;
 }
-static TC_status tc_kdf_des_cmac_init(void* ctx, const uint8_t* key,
-                                      size_t key_len)
+static TC_status tc_kdf_des_cmac_init(void* ctx, const uint8_t* key, size_t key_len)
 {
   return TC_DES_CMAC_init((struct TC_DES_CMAC_ctx*)ctx, key, key_len);
 }
-static TC_status tc_kdf_des_cmac_update(void* ctx, const uint8_t* data,
-                                        size_t len)
+static TC_status tc_kdf_des_cmac_update(void* ctx, const uint8_t* data, size_t len)
 {
   return TC_DES_CMAC_update((struct TC_DES_CMAC_ctx*)ctx, data, len);
 }
@@ -125,12 +133,95 @@ static void tc_kdf_des_cmac_clear(void* ctx)
 {
   TC_DES_CMAC_ctx_clear((struct TC_DES_CMAC_ctx*)ctx);
 }
-static const struct tc_kdf_prf tc_kdf_prf_des_cmac = {
-  TC_DES_CMAC_TAG_MAX, sizeof(struct TC_DES_CMAC_ctx), tc_kdf_des_key_ok,
-  tc_kdf_des_cmac_init, tc_kdf_des_cmac_update,
+static const struct tc_kdf_cmac tc_kdf_des_cmac = {
+  tc_kdf_des_key_ok, tc_kdf_des_cmac_init, tc_kdf_des_cmac_update,
   tc_kdf_des_cmac_final, tc_kdf_des_cmac_clear
 };
+static const struct tc_kdf_prf tc_kdf_prf_des_cmac = {
+  TC_KDF_PRF_CMAC, TC_DES_CMAC_TAG_MAX, sizeof(struct TC_DES_CMAC_ctx),
+  {.cmac = &tc_kdf_des_cmac}
+};
 #endif /* TC_KBKDF_HAVE_DES_CMAC */
+
+/* HMAC PRFs run through the hash core with their typed hash descriptor, and
+ * CMAC PRFs through their cipher's CMAC descriptor. */
+static int tc_kdf_key_ok(const struct tc_kdf_prf* prf, size_t key_len)
+{
+#if TC_KBKDF_HAVE_HMAC
+  if (prf->kind == TC_KDF_PRF_HMAC)
+    return 1;
+#endif
+#if TC_KDF_HAVE_CMAC
+  return prf->mac.cmac->key_ok(key_len);
+#else
+  (void)key_len;
+  return 0;
+#endif
+}
+
+static TC_status tc_kdf_mac_init(const struct tc_kdf_prf* prf, void* ctx,
+                                 const uint8_t* key, size_t key_len)
+{
+#if TC_KBKDF_HAVE_HMAC
+  if (prf->kind == TC_KDF_PRF_HMAC)
+    return tc_hmac_core_init(prf->mac.hash, ctx, key, key_len);
+#endif
+#if TC_KDF_HAVE_CMAC
+  return prf->mac.cmac->init(ctx, key, key_len);
+#else
+  (void)ctx;
+  (void)key;
+  (void)key_len;
+  return TC_ERROR;
+#endif
+}
+
+static TC_status tc_kdf_mac_update(const struct tc_kdf_prf* prf, void* ctx,
+                                   const uint8_t* data, size_t len)
+{
+#if TC_KBKDF_HAVE_HMAC
+  if (prf->kind == TC_KDF_PRF_HMAC)
+    return tc_hmac_core_update(prf->mac.hash, ctx, data, len);
+#endif
+#if TC_KDF_HAVE_CMAC
+  return prf->mac.cmac->update(ctx, data, len);
+#else
+  (void)ctx;
+  (void)data;
+  (void)len;
+  return TC_ERROR;
+#endif
+}
+
+static TC_status tc_kdf_mac_final(const struct tc_kdf_prf* prf, void* ctx, uint8_t* out)
+{
+#if TC_KBKDF_HAVE_HMAC
+  if (prf->kind == TC_KDF_PRF_HMAC)
+    return tc_hmac_core_final(prf->mac.hash, ctx, out);
+#endif
+#if TC_KDF_HAVE_CMAC
+  return prf->mac.cmac->final(ctx, out);
+#else
+  (void)ctx;
+  (void)out;
+  return TC_ERROR;
+#endif
+}
+
+static void tc_kdf_mac_clear(const struct tc_kdf_prf* prf, void* ctx)
+{
+#if TC_KBKDF_HAVE_HMAC
+  if (prf->kind == TC_KDF_PRF_HMAC) {
+    tc_hmac_core_clear(prf->mac.hash, ctx);
+    return;
+  }
+#endif
+#if TC_KDF_HAVE_CMAC
+  prf->mac.cmac->clear(ctx);
+#else
+  TC_secure_zero(ctx, prf->ctx_size);
+#endif
+}
 
 /*****************************************************************************/
 /* Shared derivation core                                                    */
@@ -174,13 +265,13 @@ static TC_status tc_kdf_prf_run(const struct tc_kdf_prf* prf,
   memcpy(ctx, initialized, prf->ctx_size);
   for (s = 0; s < count; ++s)
   {
-    if (seg[s].len != 0 && prf->update(ctx, seg[s].data, seg[s].len) != TC_OK)
+    if (seg[s].len != 0 && tc_kdf_mac_update(prf, ctx, seg[s].data, seg[s].len) != TC_OK)
     {
-      prf->clear(ctx);
+      tc_kdf_mac_clear(prf, ctx);
       return TC_ERROR;
     }
   }
-  return prf->final(ctx, block);
+  return tc_kdf_mac_final(prf, ctx, block);
 }
 
 /*
@@ -207,7 +298,7 @@ static TC_status tc_kdf_derive(const struct tc_kdf_prf* prf, int mode,
   int use_ctr;
   uint32_t i;
 
-  if (key == NULL || key_len == 0 || !prf->key_ok(key_len) ||
+  if (key == NULL || key_len == 0 || !tc_kdf_key_ok(prf, key_len) ||
       params == NULL || out == NULL || out_len == 0 ||
       (in1_len != 0 && in1 == NULL) || (in2_len != 0 && in2 == NULL))
     return TC_ERROR;
@@ -242,7 +333,7 @@ static TC_status tc_kdf_derive(const struct tc_kdf_prf* prf, int mode,
 
   /* Cache the keyed PRF state once. Each block starts from a small context
      copy, avoiding repeated HMAC key hashing and CMAC key expansion. */
-  if (prf->init(initialized, key, key_len) != TC_OK)
+  if (tc_kdf_mac_init(prf, initialized, key, key_len) != TC_OK)
     return TC_ERROR;
 
   if (mode == TC_KDF_MODE_FEEDBACK)
@@ -333,16 +424,16 @@ static TC_status tc_kdf_derive(const struct tc_kdf_prf* prf, int mode,
   }
 
 #if TC_ZEROIZE
-  prf->clear(initialized);
-  prf->clear(ctx);
+  tc_kdf_mac_clear(prf, initialized);
+  tc_kdf_mac_clear(prf, ctx);
   if (chain != NULL) TC_secure_zero(chain, h);
   TC_secure_zero(block, h);
 #endif
   return TC_OK;
 
 fail:
-  prf->clear(initialized);
-  prf->clear(ctx);
+  tc_kdf_mac_clear(prf, initialized);
+  tc_kdf_mac_clear(prf, ctx);
   TC_secure_zero(out, out_len);
   if (chain != NULL) TC_secure_zero(chain, h);
   TC_secure_zero(block, h);
@@ -437,23 +528,28 @@ TC_status TC_KBKDF_fixed_input(const uint8_t* label, size_t label_len,
   }
 
 #if TC_KBKDF_HAVE_HMAC_SHA1
-TC_KDF_DEFINE_FAMILY(HMAC_SHA1, tc_kdf_hmac_prf_sha1(),
+TC_KDF_DEFINE_FAMILY(HMAC_SHA1,
+                     tc_kdf_hmac_prf(&tc_sha1_info, sizeof(struct TC_HMAC_SHA1_ctx), TC_SHA1_DIGESTLEN),
                      struct TC_HMAC_SHA1_ctx, TC_SHA1_DIGESTLEN)
 #endif
 #if TC_KBKDF_HAVE_HMAC_SHA224
-TC_KDF_DEFINE_FAMILY(HMAC_SHA224, tc_kdf_hmac_prf_sha224(),
+TC_KDF_DEFINE_FAMILY(HMAC_SHA224,
+                     tc_kdf_hmac_prf(&tc_sha224_info, sizeof(struct TC_HMAC_SHA224_ctx), TC_SHA224_DIGESTLEN),
                      struct TC_HMAC_SHA224_ctx, TC_SHA224_DIGESTLEN)
 #endif
 #if TC_KBKDF_HAVE_HMAC_SHA256
-TC_KDF_DEFINE_FAMILY(HMAC_SHA256, tc_kdf_hmac_prf_sha256(),
+TC_KDF_DEFINE_FAMILY(HMAC_SHA256,
+                     tc_kdf_hmac_prf(&tc_sha256_info, sizeof(struct TC_HMAC_SHA256_ctx), TC_SHA256_DIGESTLEN),
                      struct TC_HMAC_SHA256_ctx, TC_SHA256_DIGESTLEN)
 #endif
 #if TC_KBKDF_HAVE_HMAC_SHA384
-TC_KDF_DEFINE_FAMILY(HMAC_SHA384, tc_kdf_hmac_prf_sha384(),
+TC_KDF_DEFINE_FAMILY(HMAC_SHA384,
+                     tc_kdf_hmac_prf(&tc_sha384_info, sizeof(struct TC_HMAC_SHA384_ctx), TC_SHA384_DIGESTLEN),
                      struct TC_HMAC_SHA384_ctx, TC_SHA384_DIGESTLEN)
 #endif
 #if TC_KBKDF_HAVE_HMAC_SHA512
-TC_KDF_DEFINE_FAMILY(HMAC_SHA512, tc_kdf_hmac_prf_sha512(),
+TC_KDF_DEFINE_FAMILY(HMAC_SHA512,
+                     tc_kdf_hmac_prf(&tc_sha512_info, sizeof(struct TC_HMAC_SHA512_ctx), TC_SHA512_DIGESTLEN),
                      struct TC_HMAC_SHA512_ctx, TC_SHA512_DIGESTLEN)
 #endif
 #if TC_KBKDF_HAVE_AES_CMAC

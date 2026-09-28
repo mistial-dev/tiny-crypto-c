@@ -197,7 +197,7 @@ TC_TLV_result TC_LDS_hash_check(const TC_LDS_security_object* object, unsigned n
   if (!tc_hash_available(object->hash)) return TC_TLV_UNSUPPORTED;
   result = tc_pki_work_charge(work,expected.length);
   if (result != TC_TLV_OK) return result;
-  tc_hash_workspace scratch;
+  TC_hash_context scratch;
   uint8_t digest[MAX_DIGEST_BYTES];
   const tc_pki_tree_workspace tree = {frames,frame_capacity,work};
   result = tc_pki_hash_parts(parts,count,object->hash,limits,&tree,&scratch,digest);

@@ -8,7 +8,7 @@
 
 typedef struct {
   tc_source_reader* reader;
-  tc_hash_workspace hash;
+  TC_hash_context hash;
   uint64_t offset, end;
   TC_hash_algorithm algorithm;
   int active;

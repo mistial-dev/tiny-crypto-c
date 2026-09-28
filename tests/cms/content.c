@@ -10,7 +10,7 @@ static MunitResult content_binding(const MunitParameter params[], void* user)
   static const uint8_t type[] = {42,3};
   static const uint8_t message[] = {'a','b','c'};
   TC_CMS_signed_attributes attributes = {0};
-  tc_hash_workspace scratch;
+  TC_hash_context scratch;
   uint8_t digest[TC_SHA512_DIGESTLEN], actual[TC_SHA512_DIGESTLEN];
   (void)params; (void)user;
   attributes.content_type = (TC_bytes){type,sizeof type};
@@ -137,7 +137,7 @@ static MunitResult encoded_content(const MunitParameter params[], void* user)
   };
   TC_TLV_limits limits = {WORK_BUDGET,WORK_BUDGET,32,FRAME_CAPACITY};
   TC_TLV_frame frames[FRAME_CAPACITY];
-  tc_hash_workspace scratch;
+  TC_hash_context scratch;
   uint8_t expected[TC_SHA512_DIGESTLEN], actual[TC_SHA512_DIGESTLEN];
   const uint8_t zero_scratch[sizeof scratch] = {0};
   uint8_t untouched[sizeof actual];

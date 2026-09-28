@@ -9,7 +9,7 @@
 /* Callers preflight storage; this bounds and hashes borrowed parts in order. */
 static inline TC_TLV_result tc_pki_hash_parts(const TC_bytes* parts, size_t count,
     TC_hash_algorithm algorithm, const TC_TLV_limits* limits,
-    const tc_pki_tree_workspace* tree, tc_hash_workspace* scratch, uint8_t* digest)
+    const tc_pki_tree_workspace* tree, TC_hash_context* scratch, uint8_t* digest)
 {
   size_t length = 0;
   if (!tc_hash_available(algorithm)) return TC_TLV_UNSUPPORTED;

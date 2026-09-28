@@ -7,7 +7,7 @@
 
 typedef struct {
   TC_hash_algorithm algorithm;
-  tc_hash_workspace* workspace;
+  TC_hash_context* workspace;
   size_t* work;
 } tc_pki_octets_hash_state;
 
@@ -23,7 +23,7 @@ static TC_TLV_result tc_pki_octets_hash_update(void* context, TC_bytes bytes)
  * All writable storage is disjoint from inputs and other writable storage. */
 static inline TC_TLV_result tc_pki_octets_hash(TC_bytes encoded,
     TC_TLV_profile profile, const TC_TLV_limits* limits, TC_TLV_frame* frames,
-    size_t capacity, TC_hash_algorithm algorithm, tc_hash_workspace* workspace,
+    size_t capacity, TC_hash_algorithm algorithm, TC_hash_context* workspace,
     size_t* work, uint8_t* digest)
 {
   tc_pki_octets_hash_state state = {algorithm,workspace,work};

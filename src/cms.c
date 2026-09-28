@@ -107,7 +107,7 @@ static TC_X509_signature_result cms_verify_digest(const TC_CMS_signer_info* sign
     TC_bytes content_type, TC_bytes digest, TC_CMS_attribute_encoding encoding,
     const TC_X509_public_key* key, const TC_X509_signature_provider* provider,
     const TC_TLV_limits* limits, const TC_CMS_signature_workspace* workspace, size_t* work,
-    const tc_cms_signature_algorithm* algorithm, tc_hash_workspace* hash_workspace, uint8_t* scratch,
+    const tc_cms_signature_algorithm* algorithm, TC_hash_context* hash_workspace, uint8_t* scratch,
     TC_bytes* signer_name, tc_cms_signed_attrs_cache* cache)
 {
   TC_CMS_signed_attributes attributes;
@@ -161,7 +161,7 @@ static TC_X509_signature_result cms_verify_digest(const TC_CMS_signer_info* sign
 
 TC_TLV_result tc_cms_hash_content(TC_bytes input, TC_CMS_content_encoding encoding,
     TC_hash_algorithm algorithm, const TC_TLV_limits* limits, const tc_pki_tree_workspace* tree,
-    tc_hash_workspace* scratch, uint8_t* digest)
+    TC_hash_context* scratch, uint8_t* digest)
 {
   if (!tc_hash_available(algorithm)) return TC_TLV_UNSUPPORTED;
   if (encoding == TC_CMS_CONTENT_BER_OCTETS)
@@ -180,7 +180,7 @@ TC_X509_signature_result tc_cms_signer_verify_cached(const TC_CMS_signer_info* s
 {
   enum { MAX_DIGEST_BYTES = 64 };
   tc_cms_signature_algorithm algorithm;
-  tc_hash_workspace hash_workspace;
+  TC_hash_context hash_workspace;
   tc_hash_info hash;
   uint8_t scratch[MAX_DIGEST_BYTES];
   TC_bytes digest = input;
@@ -298,7 +298,7 @@ TC_TLV_result TC_CMS_content_digest(TC_bytes encoded, TC_hash_algorithm algorith
     const TC_TLV_limits* limits, TC_TLV_frame* frames, size_t frame_capacity,
     size_t* work, uint8_t* digest, size_t digest_capacity)
 {
-  tc_hash_workspace scratch;
+  TC_hash_context scratch;
   tc_hash_info info;
   TC_TLV_result result = tc_pki_reader_storage(encoded,limits,frames,frame_capacity,
       work,digest,digest_capacity);

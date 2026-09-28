@@ -10,7 +10,7 @@
  * Caller validates address ranges. Preflight failures leave output unchanged;
  * an unexpected hash failure may leave a partially masked buffer. */
 static inline TC_RSA_result tc_rsa_mgf1_xor(TC_hash_algorithm hash, TC_bytes seed,
-    uint8_t* output, size_t length, uint8_t* block, tc_hash_workspace* workspace,
+    uint8_t* output, size_t length, uint8_t* block, TC_hash_context* workspace,
     size_t* work)
 {
   tc_hash_info info;

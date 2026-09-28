@@ -73,9 +73,26 @@ def mac_cipher_callbacks():
     return found
 
 
+def hash_descriptor_callbacks():
+    """Functions named in tc_hash_algorithm_info descriptors.
+
+    hash_core.c calls them through the descriptor, while their addresses are
+    taken in the per-algorithm files."""
+    found = set()
+    for source in (ROOT / "src").glob("*.c"):
+        for block in re.findall(
+                r"const\s+tc_hash_algorithm_info\s+\w+\s+TC_HASH_INFO_STORAGE\s*=\s*\{(.*?)\};",
+                source.read_text(), re.S):
+            found.update(re.findall(r"\b([a-z_][a-z0-9_]*)\b", block))
+    if not found:
+        raise RuntimeError("No hash descriptors found")
+    return found
+
+
 def measure(directory, definitions, body, entry):
     flags = BASE + ["-D" + item for item in definitions]
     frames, edges, objects, unknown_indirect = {}, {}, [], []
+    hash_core_sites = set()
     all_address_taken = set()
     for source in sorted((ROOT / "src").glob("*.c")):
         assembly = directory / (source.stem + ".s")
@@ -92,6 +109,13 @@ def measure(directory, definitions, body, entry):
         all_address_taken.update(address_taken)
         current = None
         for line in text.splitlines():
+            # Identical code folding aliases one function to another.
+            match = re.match(r"\s*\.set\s+([A-Za-z_][\w.]*)\s*,\s*([A-Za-z_][\w.]*)\s*$", line)
+            if match:
+                alias, target = normalize(match[1]), normalize(match[2])
+                frames.setdefault(alias, 0)
+                edges.setdefault(alias, set()).add(target)
+                continue
             match = re.search(r"\.type\s+([^,]+),\s*@function", line)
             if match:
                 current = normalize(match[1])
@@ -102,7 +126,9 @@ def measure(directory, definitions, body, entry):
             if match:
                 edges[current].add(normalize(match[1]))
             if re.match(r"\s*(?:icall|eicall|ijmp|eijmp)\s*$", line):
-                if not address_taken:
+                if source.stem == "hash_core":
+                    hash_core_sites.add(current)
+                elif not address_taken:
                     unknown_indirect.append(current)
                 edges[current].update(address_taken)
             if re.match(r"\s*\.size\s", line):
@@ -126,6 +152,9 @@ def measure(directory, definitions, body, entry):
         raise RuntimeError("Missing linked .text section")
     unknown = set()
     mac_targets = mac_cipher_callbacks() & all_address_taken
+    hash_targets = hash_descriptor_callbacks() & set(frames)
+    for site in hash_core_sites:
+        edges[site].update(hash_targets)
 
     def chain(name, active):
         if name in active:

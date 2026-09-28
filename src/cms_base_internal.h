@@ -51,7 +51,7 @@ void tc_cms_signer_spans(const TC_CMS_signer_info* signer, TC_bytes* spans);
 TC_TLV_result tc_cms_hash_content(TC_bytes input,
     TC_CMS_content_encoding encoding, TC_hash_algorithm algorithm,
     const TC_TLV_limits* limits, const tc_pki_tree_workspace* tree,
-    tc_hash_workspace* scratch, uint8_t* digest);
+    TC_hash_context* scratch, uint8_t* digest);
 TC_X509_signature_result tc_cms_signer_verify(
     const TC_CMS_signer_info* signer, TC_bytes content_type, TC_bytes input,
     tc_cms_verify_input input_kind, TC_CMS_verification_policy policy,

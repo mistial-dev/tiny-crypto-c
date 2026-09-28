@@ -8,7 +8,7 @@ enum { WIDTH = 256, MAX_DIGEST = 64, WORK_BUDGET = 100000 };
 static MunitResult algorithms(const MunitParameter params[], void* user)
 {
   uint8_t encoded[WIDTH], saved[WIDTH], seed[MAX_DIGEST] = {0}, block[MAX_DIGEST];
-  tc_hash_workspace workspace;
+  TC_hash_context workspace;
   const TC_bytes empty = {NULL,0};
   (void)params; (void)user;
   for (unsigned h = TC_HASH_UNKNOWN; h <= TC_HASH_SHA512; ++h) {
@@ -45,7 +45,7 @@ static MunitResult missing_storage(const MunitParameter params[], void* user)
 {
   enum { ENCODED, LABEL, SEED, BLOCK, WORKSPACE, WORK, OUTPUT, MESSAGE, CASE_COUNT };
   uint8_t encoded[WIDTH], saved[WIDTH], seed[32] = {0}, block[MAX_DIGEST];
-  tc_hash_workspace workspace;
+  TC_hash_context workspace;
   (void)params; (void)user;
   for (unsigned missing = 0; missing < CASE_COUNT; ++missing) {
     size_t work = WORK_BUDGET;
@@ -75,7 +75,7 @@ static MunitResult missing_storage(const MunitParameter params[], void* user)
 static MunitResult limits(const MunitParameter params[], void* user)
 {
   uint8_t encoded[WIDTH], seed[32] = {0}, block[MAX_DIGEST];
-  tc_hash_workspace workspace;
+  TC_hash_context workspace;
   const TC_bytes empty = {NULL,0};
   TC_bytes message = empty;
   (void)params; (void)user;

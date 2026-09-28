@@ -24,7 +24,7 @@ static inline TC_RSA_result tc_rsa_oaep_prepare(size_t length,
  * provisional on failure. Message and seed are copied into their fields only. */
 static inline TC_RSA_result tc_rsa_oaep_encode(uint8_t* encoded, size_t length,
     TC_hash_algorithm hash, TC_hash_algorithm mgf_hash, TC_bytes label,
-    TC_bytes message, TC_bytes seed, uint8_t* block, tc_hash_workspace* workspace,
+    TC_bytes message, TC_bytes seed, uint8_t* block, TC_hash_context* workspace,
     size_t* work)
 {
   tc_hash_info info;
@@ -51,7 +51,7 @@ static inline TC_RSA_result tc_rsa_oaep_encode(uint8_t* encoded, size_t length,
  * failure. Invalid padding takes the same scan and returns one error status. */
 static inline TC_RSA_result tc_rsa_oaep_decode(uint8_t* encoded, size_t length,
     TC_hash_algorithm hash, TC_hash_algorithm mgf_hash, TC_bytes label,
-    uint8_t* block, tc_hash_workspace* workspace, size_t* work, TC_bytes* message)
+    uint8_t* block, TC_hash_context* workspace, size_t* work, TC_bytes* message)
 {
   tc_hash_info info;
   if (!encoded || (label.length && !label.data) || !block || !workspace || !work || !message)

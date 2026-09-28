@@ -13,7 +13,7 @@ static MunitResult mask(const MunitParameter params[], void* user)
     0xb5,0xa3,0x65,0xcc,0x1d,0x0d,0x86,0xf5,0xf9,0x41,0xdf,0x82,0x26,0xf0,0x66,0x3d,0xa2
   };
   static const uint8_t seed[] = {'f','o','o'};
-  tc_hash_workspace workspace;
+  TC_hash_context workspace;
   uint8_t output[sizeof expected], block[64];
   size_t work;
   (void)params; (void)user;

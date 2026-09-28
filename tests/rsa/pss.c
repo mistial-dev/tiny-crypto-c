@@ -22,7 +22,7 @@ static MunitResult representative(const MunitParameter params[], void* user)
     "ed433755b4ca3334b687b956fa90fe34e73da8b534135330802af1bd1a25d714"
     "2ce8c3b19f7131ab5c8feb70499418391d35af24aa0f39e508139f58291e93bc";
   uint8_t fixture[128], encoded[128], digest[32], block[64];
-  tc_hash_workspace workspace;
+  TC_hash_context workspace;
   size_t work = 10000, required;
   (void)params; (void)user;
   decode_hex(fixture,sizeof fixture,hex);
@@ -70,7 +70,7 @@ static MunitResult salt_boundaries(const MunitParameter params[], void* user)
     "8b8a586faca1433394a0742feebb3e4e4f2cae1c88b5086f36e52650583b13bc"
   };
   uint8_t expected[128], encoded[128], digest[32], salt[94], block[64];
-  tc_hash_workspace workspace;
+  TC_hash_context workspace;
   (void)params; (void)user;
   for (size_t i = 0; i < sizeof digest; ++i) digest[i] = (uint8_t)i;
   for (size_t i = 0; i < sizeof salt; ++i) salt[i] = (uint8_t)i;

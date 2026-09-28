@@ -334,6 +334,7 @@ list(APPEND TC_PUBLIC_DEFINITIONS
 set(tc_aes_sources src/aes.c src/aes_modes.c src/aes_ghash.c src/aes_gcm.c src/aes_ccm.c
   src/aes_mac.c src/aes_cmac.c src/aes_eax.c src/aes_siv.c src/mac_core.c)
 set(tc_des_sources src/des.c src/des_modes.c src/des_mac.c)
+set(tc_hash_sources src/hash.c src/sha512.c src/hash_core.c)
 set(tc_rsa_sources src/rsa_workspace.c src/rsa_keygen.c src/rsa_private.c src/rsa_public.c src/rsa_oaep.c)
 
 # One utility translation unit keeps zeroization and constant-time comparison
@@ -395,7 +396,7 @@ endif()
 if(TINY_CRYPTO_ENABLE_SHA384 OR TINY_CRYPTO_ENABLE_SHA512)
   list(APPEND tc_sources src/sha512.c)
 endif()
-list(APPEND tc_sources src/hash_core.c src/hash_adapter.c src/pki_storage.c)
+list(APPEND tc_sources src/hash_core.c src/pki_storage.c)
 if(TINY_CRYPTO_ENABLE_KDF)
   list(APPEND tc_sources src/kdf.c)
 endif()

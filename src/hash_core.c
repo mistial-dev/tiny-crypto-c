@@ -28,6 +28,40 @@ static const tc_hash_algorithm_info* load_info(const tc_hash_algorithm_info* sto
 #endif
 }
 
+const tc_hash_algorithm_info* tc_hash_core_lookup(TC_hash_algorithm algorithm)
+{
+  switch (algorithm) {
+#if TC_ENABLE_SHA1
+    case TC_HASH_SHA1: return &tc_sha1_info;
+#endif
+#if TC_ENABLE_SHA224
+    case TC_HASH_SHA224: return &tc_sha224_info;
+#endif
+#if TC_ENABLE_SHA256
+    case TC_HASH_SHA256: return &tc_sha256_info;
+#endif
+#if TC_ENABLE_SHA384
+    case TC_HASH_SHA384: return &tc_sha384_info;
+#endif
+#if TC_ENABLE_SHA512
+    case TC_HASH_SHA512: return &tc_sha512_info;
+#endif
+    default: return NULL;
+  }
+}
+
+size_t tc_hash_core_digest_bytes(const tc_hash_algorithm_info* stored)
+{
+  tc_hash_algorithm_info local;
+  return load_info(stored, &local)->digest_bytes;
+}
+
+size_t tc_hash_core_block_bytes(const tc_hash_algorithm_info* stored)
+{
+  tc_hash_algorithm_info local;
+  return load_info(stored, &local)->block_bytes;
+}
+
 void tc_hash_store_be32_words(uint8_t* digest, const void* state, size_t words)
 {
   const uint32_t* value = (const uint32_t*)state;

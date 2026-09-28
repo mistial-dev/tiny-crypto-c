@@ -157,7 +157,7 @@ static TC_RSA_result tc_rsa_verify_pss_digest_impl(const TC_RSA_public_key* key,
     const TC_RSA_workspace* workspace, TC_work_budget* work,
     const tc_mp_word* prepared_r2)
 {
-  tc_hash_workspace hash_workspace;
+  TC_hash_context hash_workspace;
   uint8_t block[64];
   uint8_t* encoded;
   size_t length, words, needed;

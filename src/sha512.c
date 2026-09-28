@@ -172,7 +172,7 @@ static tc_hmac_view hmac_sha512_view(void* context)
 }
 #endif
 
-static const tc_hash_algorithm_info tc_sha512_info TC_HASH_INFO_STORAGE = {
+const tc_hash_algorithm_info tc_sha512_info TC_HASH_INFO_STORAGE = {
   TC_SHA512_BLOCKLEN, SHA512_LENGTH_BYTES, TC_SHA512_DIGESTLEN, TC_HASH_LENGTH_BIG_ENDIAN,
   SHA512_MAX_MESSAGE_BYTES, sha512_state_init, sha512_compress, sha512_digest, sha512_view,
   TC_HASH_HMAC_VIEW(hmac_sha512_view)
@@ -221,7 +221,7 @@ static tc_hmac_view hmac_sha384_view(void* context)
 }
 #endif
 
-static const tc_hash_algorithm_info tc_sha384_info TC_HASH_INFO_STORAGE = {
+const tc_hash_algorithm_info tc_sha384_info TC_HASH_INFO_STORAGE = {
   TC_SHA384_BLOCKLEN, SHA512_LENGTH_BYTES, TC_SHA384_DIGESTLEN, TC_HASH_LENGTH_BIG_ENDIAN,
   SHA512_MAX_MESSAGE_BYTES, sha384_state_init, sha512_compress, sha384_digest, sha384_view,
   TC_HASH_HMAC_VIEW(hmac_sha384_view)

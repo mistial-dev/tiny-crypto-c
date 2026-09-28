@@ -8,7 +8,7 @@ static MunitResult parts(const MunitParameter params[], void* user)
 {
   const uint8_t input[] = {'a','b','c'};
   const TC_bytes whole = {input,sizeof input};
-  tc_hash_workspace workspace;
+  TC_hash_context workspace;
   uint8_t expected[64], actual[64], saved[64];
   tc_hash_info info;
   (void)params; (void)user;

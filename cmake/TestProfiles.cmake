@@ -63,7 +63,7 @@ function(tc_add_c_test target library)
   target_include_directories(${target} PRIVATE tests/support)
 endfunction()
 
-set(tc_test_sources src/common.c ${tc_aes_sources} ${tc_des_sources} src/hash.c src/sha512.c src/hash_core.c src/hash_adapter.c
+set(tc_test_sources src/common.c ${tc_aes_sources} ${tc_des_sources} ${tc_hash_sources}
     src/kdf.c src/kmac.c)
 tc_add_test_library(tiny-crypto-c-test ${tc_test_sources})
 target_compile_definitions(tiny-crypto-c-test PUBLIC

@@ -57,7 +57,7 @@ static TC_RSA_result tc_rsa_encrypt_oaep(const TC_RSA_public_key* key,
   const size_t required = arithmetic_words + n;
   if (workspace->capacity < required || max_work <= SIZE_MAX - validation_work)
     return TC_RSA_LIMIT;
-  tc_hash_workspace hash_workspace;
+  TC_hash_context hash_workspace;
   uint8_t block[64];
   /* Seed storage is reused by the modular operation after OAEP encoding. */
   uint8_t* seed = (uint8_t*)workspace->words;
@@ -125,7 +125,7 @@ static TC_RSA_result tc_rsa_decrypt_oaep(const TC_RSA_private_key* key,
   const size_t n = length / sizeof(TC_RSA_word), required = 14 * n;
   if (!max_attempts || workspace->capacity < required || max_work < SIZE_MAX - validation_work)
     return TC_RSA_LIMIT;
-  tc_hash_workspace hash_workspace;
+  TC_hash_context hash_workspace;
   uint8_t block[64];
   uint8_t* encoded = (uint8_t*)(workspace->words + 13 * n);
   TC_bytes message = {0};

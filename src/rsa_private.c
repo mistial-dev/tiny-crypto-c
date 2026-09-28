@@ -51,7 +51,7 @@ TC_RSA_result TC_RSA_encode_pss_digest(const TC_RSA_pss_options* options,
   TC_RSA_result result = tc_rsa_pss_prepare(encoded.capacity,encoded.capacity * 8 - 1,
       options->hash,options->mgf_hash,digest.length,salt.length,&remaining,&info);
   if (result != TC_RSA_OK) return result;
-  tc_hash_workspace workspace;
+  TC_hash_context workspace;
   uint8_t block[64];
   remaining = work->remaining;
   result = tc_rsa_pss_encode(encoded.data,encoded.capacity,encoded.capacity * 8 - 1,
@@ -302,7 +302,7 @@ static TC_RSA_result tc_rsa_sign_pss_digest(const TC_RSA_private_key* key,
   if (status != TC_RSA_OK) return status;
   if (!digest.data) return TC_RSA_ARGUMENT;
   if (max_work < SIZE_MAX - validation_work + (salt_length != 0)) return TC_RSA_LIMIT;
-  tc_hash_workspace hash_workspace;
+  TC_hash_context hash_workspace;
   uint8_t block[64];
   uint8_t* salt = (uint8_t*)workspace->words;
   uint8_t* encoded = (uint8_t*)(workspace->words + 13 * n);

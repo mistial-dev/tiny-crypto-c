@@ -172,7 +172,7 @@ static tc_hmac_view hmac_sha1_view(void* context)
 }
 #endif
 
-static const tc_hash_algorithm_info tc_sha1_info TC_HASH_INFO_STORAGE = {
+const tc_hash_algorithm_info tc_sha1_info TC_HASH_INFO_STORAGE = {
   TC_SHA1_BLOCKLEN, SHA_LENGTH_BYTES, TC_SHA1_DIGESTLEN, TC_HASH_LENGTH_BIG_ENDIAN,
   SHA_MAX_MESSAGE_BYTES, sha1_state_init, sha1_compress, sha1_digest, sha1_view,
   TC_HASH_HMAC_VIEW(hmac_sha1_view)
@@ -313,7 +313,7 @@ static tc_hmac_view hmac_sha256_view(void* context)
 }
 #endif
 
-static const tc_hash_algorithm_info tc_sha256_info TC_HASH_INFO_STORAGE = {
+const tc_hash_algorithm_info tc_sha256_info TC_HASH_INFO_STORAGE = {
   TC_SHA256_BLOCKLEN, SHA_LENGTH_BYTES, TC_SHA256_DIGESTLEN, TC_HASH_LENGTH_BIG_ENDIAN,
   SHA_MAX_MESSAGE_BYTES, sha256_state_init, sha256_compress, sha256_digest, sha256_view,
   TC_HASH_HMAC_VIEW(hmac_sha256_view)
@@ -358,7 +358,7 @@ static tc_hmac_view hmac_sha224_view(void* context)
 }
 #endif
 
-static const tc_hash_algorithm_info tc_sha224_info TC_HASH_INFO_STORAGE = {
+const tc_hash_algorithm_info tc_sha224_info TC_HASH_INFO_STORAGE = {
   TC_SHA224_BLOCKLEN, SHA_LENGTH_BYTES, TC_SHA224_DIGESTLEN, TC_HASH_LENGTH_BIG_ENDIAN,
   SHA_MAX_MESSAGE_BYTES, sha224_state_init, sha256_compress, sha224_digest, sha224_view,
   TC_HASH_HMAC_VIEW(hmac_sha224_view)
