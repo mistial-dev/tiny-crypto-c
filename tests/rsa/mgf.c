@@ -15,7 +15,7 @@ static MunitResult mask(const MunitParameter params[], void* user)
   static const uint8_t seed[] = {'f', 'o', 'o'};
   TC_hash_context workspace;
   uint8_t output[sizeof expected], block[64];
-  size_t work;
+  uint32_t work;
   (void)params;
   (void)user;
   for (size_t length = 0; length <= sizeof output; ++length) {
@@ -42,7 +42,7 @@ static MunitResult mask(const MunitParameter params[], void* user)
         munit_assert_uint(output[i], ==, 0);
     }
   }
-  work = SIZE_MAX;
+  work = UINT32_MAX;
   munit_assert_int(tc_rsa_mgf1_xor(TC_HASH_SHA256, (TC_bytes){seed, SIZE_MAX}, output, 1, block,
                                    &workspace, &work),
                    ==, TC_RSA_LIMIT);

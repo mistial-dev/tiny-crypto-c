@@ -30,12 +30,9 @@ TC_RSA_result TC_RSA_raw_public(const TC_RSA_public_key* key, TC_bytes input,
   if (output.capacity < length ||
       workspace->capacity < TC_RSA_raw_public_workspace_words(length * 8))
     return TC_RSA_LIMIT;
-  size_t available = work->remaining;
-  result = tc_rsa_public_operation(key->modulus.data, length, key->exponent.data,
-                                   key->exponent.length, input.data, output.data, workspace->words,
-                                   workspace->capacity, &available, NULL);
-  work->remaining = (uint32_t)available;
-  return result;
+  return tc_rsa_public_operation(key->modulus.data, length, key->exponent.data,
+                                 key->exponent.length, input.data, output.data, workspace->words,
+                                 workspace->capacity, &work->remaining, NULL);
 }
 
 enum { TC_RSA_PUBLIC_SETUP_MARKER = 0x52533250u };
@@ -143,13 +140,10 @@ static TC_RSA_result tc_rsa_verify_v15_digest_impl(const TC_RSA_public_key* key,
   result = tc_rsa_public_inputs(key, digest, signature, (TC_bytes){NULL, 0}, workspace);
   if (result != TC_RSA_OK)
     return result;
-  size_t available = work->remaining;
-  result = tc_rsa_verify_v15(key->modulus.data, key->modulus.length, key->exponent.data,
-                             key->exponent.length, signature.data, signature.length, options->hash,
-                             digest.data, digest.length, workspace->words, workspace->capacity,
-                             &available, prepared_r2);
-  work->remaining = (uint32_t)available;
-  return result;
+  return tc_rsa_verify_v15(key->modulus.data, key->modulus.length, key->exponent.data,
+                           key->exponent.length, signature.data, signature.length, options->hash,
+                           digest.data, digest.length, workspace->words, workspace->capacity,
+                           &work->remaining, prepared_r2);
 }
 
 TC_RSA_result TC_RSA_verify_v15_digest(const TC_RSA_public_key* key,
@@ -184,7 +178,7 @@ static TC_RSA_result tc_rsa_verify_pss_digest_impl(const TC_RSA_public_key* key,
   uint8_t block[64];
   uint8_t* encoded;
   size_t length, words, needed;
-  size_t validation_work = SIZE_MAX;
+  uint32_t validation_work = UINT32_MAX;
   tc_hash_info info;
   if (!options || !work)
     return TC_RSA_ARGUMENT;
@@ -192,7 +186,6 @@ static TC_RSA_result tc_rsa_verify_pss_digest_impl(const TC_RSA_public_key* key,
                                                sizeof *options, work, sizeof *work);
   if (result != TC_RSA_OK)
     return result;
-  size_t max_work = work->remaining;
   result = tc_rsa_public_inputs(key, digest, signature, (TC_bytes){NULL, 0}, workspace);
   if (result != TC_RSA_OK)
     return result;
@@ -214,14 +207,14 @@ static TC_RSA_result tc_rsa_verify_pss_digest_impl(const TC_RSA_public_key* key,
   encoded = (uint8_t*)(workspace->words + 8 * words + 2);
   result = tc_rsa_public_operation(key->modulus.data, length, key->exponent.data,
                                    key->exponent.length, signature.data, encoded, workspace->words,
-                                   8 * words + 2, &max_work, prepared_r2);
+                                   8 * words + 2, &work->remaining, prepared_r2);
   if (result == TC_RSA_OK)
     result = tc_rsa_pss_check(encoded, length, length * 8 - 1, options->hash, options->mgf_hash,
-                              digest, options->salt_length, block, &hash_workspace, &max_work);
+                              digest, options->salt_length, block, &hash_workspace,
+                              &work->remaining);
   TC_secure_zero(workspace->words, needed * sizeof(TC_RSA_word));
   TC_secure_zero(block, sizeof block);
   TC_secure_zero(&hash_workspace, sizeof hash_workspace);
-  work->remaining = (uint32_t)max_work;
   return result;
 }
 

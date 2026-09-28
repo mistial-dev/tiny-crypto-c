@@ -55,7 +55,7 @@ static TC_RSA_result validate_private_key(const TC_RSA_private_key* key, TC_rand
 static TC_RSA_result sign_v15(const TC_RSA_private_key* key, TC_hash_algorithm hash,
                               TC_bytes digest, uint8_t* output, size_t length, TC_random_fn random,
                               void* context, size_t attempts, const TC_RSA_workspace* workspace,
-                              size_t work)
+                              uint32_t work)
 {
   const TC_RSA_v15_options options = {hash};
   TC_RSA_execution execution = {
@@ -67,7 +67,7 @@ static TC_RSA_result sign_v15(const TC_RSA_private_key* key, TC_hash_algorithm h
 static TC_RSA_result sign_pss(const TC_RSA_private_key* key, TC_hash_algorithm hash,
                               TC_hash_algorithm mgf_hash, size_t salt_length, TC_bytes digest,
                               uint8_t* output, size_t length, TC_random_fn random, void* context,
-                              size_t attempts, const TC_RSA_workspace* workspace, size_t work)
+                              size_t attempts, const TC_RSA_workspace* workspace, uint32_t work)
 {
   const TC_RSA_pss_options options = {hash, mgf_hash, salt_length};
   TC_RSA_execution execution = {
@@ -80,7 +80,7 @@ static TC_RSA_result decrypt_oaep(const TC_RSA_private_key* key, TC_hash_algorit
                                   TC_hash_algorithm mgf_hash, TC_bytes label, TC_bytes ciphertext,
                                   uint8_t* output, size_t capacity, size_t* length,
                                   TC_random_fn random, void* context, size_t attempts,
-                                  const TC_RSA_workspace* workspace, size_t work)
+                                  const TC_RSA_workspace* workspace, uint32_t work)
 {
   const TC_RSA_oaep_options options = {hash, mgf_hash, label};
   TC_RSA_execution execution = {
@@ -228,15 +228,15 @@ static MunitResult ranges(const MunitParameter params[], void* user)
                                             &workspace, UINT32_MAX),
                        ==, TC_RSA_INVALID);
       munit_assert_int(sign_v15(&key, TC_HASH_SHA256, (TC_bytes){digest, sizeof digest}, output,
-                                sizeof output, random_bytes, &calls, 1, &workspace, SIZE_MAX),
+                                sizeof output, random_bytes, &calls, 1, &workspace, UINT32_MAX),
                        ==, TC_RSA_INVALID);
       munit_assert_int(sign_pss(&key, TC_HASH_SHA256, TC_HASH_SHA256, sizeof digest,
                                 (TC_bytes){digest, sizeof digest}, output, sizeof output,
-                                random_bytes, &calls, 1, &workspace, SIZE_MAX),
+                                random_bytes, &calls, 1, &workspace, UINT32_MAX),
                        ==, TC_RSA_INVALID);
       munit_assert_int(decrypt_oaep(&key, TC_HASH_SHA256, TC_HASH_SHA256, (TC_bytes){NULL, 0},
                                     (TC_bytes){modulus, sizeof modulus}, output, sizeof output,
-                                    &recovered, random_bytes, &calls, 1, &workspace, SIZE_MAX),
+                                    &recovered, random_bytes, &calls, 1, &workspace, UINT32_MAX),
                        ==, TC_RSA_INVALID);
       munit_assert_size(recovered, ==, SIZE_MAX);
       munit_assert_memory_equal(sizeof shared, &shared, saved);

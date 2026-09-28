@@ -34,7 +34,7 @@ static inline TC_RSA_result
 tc_rsa_private_magnitudes_consistent(const uint8_t* modulus, size_t length, const uint8_t* exponent,
                                      size_t exponent_length, TC_bytes d_bytes, TC_bytes p_bytes,
                                      TC_bytes q_bytes, tc_mp_word* scratch, size_t scratch_words,
-                                     size_t* work)
+                                     uint32_t* work)
 {
   if (!d_bytes.data || !p_bytes.data || !q_bytes.data || !scratch || !work)
     return TC_RSA_ARGUMENT;
@@ -105,7 +105,7 @@ static inline TC_RSA_result tc_rsa_private_key_consistent(const uint8_t* modulus
                                                           size_t exponent_length, const uint8_t* d,
                                                           const uint8_t* p, const uint8_t* q,
                                                           tc_mp_word* scratch, size_t scratch_words,
-                                                          size_t* work)
+                                                          uint32_t* work)
 {
   return tc_rsa_private_magnitudes_consistent(modulus, length, exponent, exponent_length,
                                               (TC_bytes){d, length}, (TC_bytes){p, length},
@@ -130,11 +130,8 @@ static inline TC_RSA_result tc_rsa_private_magnitudes_check(
   const size_t component_cost = 32 * length + 2;
   if (scratch_words < required || max_attempts < rounds || *work < component_cost)
     return TC_RSA_LIMIT;
-  /* The component check's bounded cost fits a 16-bit size_t. */
-  size_t component_work = component_cost;
   status = tc_rsa_private_magnitudes_consistent(modulus, length, exponent, exponent_length, d, p, q,
-                                                scratch, scratch_words, &component_work);
-  *work -= (uint32_t)(component_cost - component_work);
+                                                scratch, scratch_words, work);
   const TC_bytes factors[] = {p, q};
   for (size_t i = 0; status == TC_RSA_OK && i < 2; ++i)
     status = tc_rsa_probable_prime_magnitude(factors[i], length, rounds, random, random_context,
@@ -165,7 +162,7 @@ tc_rsa_private_key_check(const uint8_t* modulus, size_t length, const uint8_t* e
 static inline TC_RSA_result tc_rsa_private_operation_magnitude(
     const uint8_t* modulus, size_t length, const uint8_t* exponent, size_t exponent_length,
     TC_bytes d, const uint8_t* input, uint8_t* output, TC_random_fn random, void* random_context,
-    size_t max_attempts, tc_mp_word* scratch, size_t scratch_words, size_t* work)
+    size_t max_attempts, tc_mp_word* scratch, size_t scratch_words, uint32_t* work)
 {
   if (!d.data || !input || !output || !random || !scratch || !work)
     return TC_RSA_ARGUMENT;
@@ -238,7 +235,7 @@ static inline TC_RSA_result tc_rsa_private_operation(const uint8_t* modulus, siz
                                                      const uint8_t* input, uint8_t* output,
                                                      TC_random_fn random, void* random_context,
                                                      size_t max_attempts, tc_mp_word* scratch,
-                                                     size_t scratch_words, size_t* work)
+                                                     size_t scratch_words, uint32_t* work)
 {
   return tc_rsa_private_operation_magnitude(
       modulus, length, exponent, exponent_length, (TC_bytes){d, length}, input, output, random,

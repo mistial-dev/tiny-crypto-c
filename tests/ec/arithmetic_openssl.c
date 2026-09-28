@@ -89,7 +89,7 @@ static MunitResult oracle(const MunitParameter params[], void* user)
       if (!sample) {
         tc_mp_word scratch[8 * MAX_WORDS + 2];
         uint8_t output[MAX_BYTES], expected_bytes[MAX_BYTES];
-        size_t work = 16 * length + 16 * exponent_length + 4;
+        uint32_t work = 16 * length + 16 * exponent_length + 4;
         memset(scratch, 0xa5, sizeof scratch);
         munit_assert_int(tc_rsa_public_operation(modulus, length, exponent, exponent_length, input,
                                                  output, scratch, sizeof scratch / sizeof *scratch,
@@ -123,7 +123,8 @@ static MunitResult signatures(const MunitParameter params[], void* user)
     EVP_PKEY* key = EVP_RSA_gen((unsigned)(length * 8));
     EVP_PKEY_CTX* context;
     BIGNUM *n = NULL, *e = NULL;
-    size_t signature_length = sizeof signature, exponent_length, work, cost;
+    size_t signature_length = sizeof signature, exponent_length, cost;
+    uint32_t work;
     munit_assert_not_null(key);
     munit_assert_int(EVP_PKEY_get_bn_param(key, OSSL_PKEY_PARAM_RSA_N, &n), ==, 1);
     munit_assert_int(EVP_PKEY_get_bn_param(key, OSSL_PKEY_PARAM_RSA_E, &e), ==, 1);

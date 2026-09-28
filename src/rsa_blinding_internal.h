@@ -11,7 +11,7 @@
 static inline TC_RSA_result tc_rsa_sample_blinding(const tc_mp_word* modulus, tc_mp_word* blind,
                                                    tc_mp_word* inverse, tc_mp_word* arena, size_t n,
                                                    TC_random_fn random, void* random_context,
-                                                   size_t max_attempts, size_t* work)
+                                                   size_t max_attempts, uint32_t* work)
 {
   const size_t length = n * sizeof(tc_mp_word);
   const size_t attempt_work = 16 * length + 1;

@@ -164,7 +164,8 @@ static MunitResult interoperability(const MunitParameter params[], void* user)
             operation(key, 0, hashes[h].digest(), hashes[mgf].digest(), labels[l]);
         for (size_t m = 0; m < sizeof lengths / sizeof *lengths; ++m) {
           const TC_bytes message = {input, lengths[m]};
-          size_t work = WORK_BUDGET, size = sizeof ciphertext, recovered = sizeof plaintext;
+          uint32_t work = WORK_BUDGET;
+          size_t size = sizeof ciphertext, recovered = sizeof plaintext;
           munit_assert_int(tc_rsa_oaep_encode(encoded, width, hashes[h].algorithm,
                                               hashes[mgf].algorithm, labels[l], message,
                                               (TC_bytes){seed, info.digest_length}, block,

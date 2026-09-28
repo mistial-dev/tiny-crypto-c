@@ -41,9 +41,9 @@ static TC_RSA_result tc_rsa_encrypt_oaep(const TC_RSA_public_key* key, TC_hash_a
                                          TC_bytes plaintext, uint8_t* ciphertext,
                                          size_t ciphertext_length, TC_random_fn random,
                                          void* random_context, const TC_RSA_workspace* workspace,
-                                         size_t* work)
+                                         uint32_t* work)
 {
-  size_t max_work = *work;
+  uint32_t max_work = *work;
   if (!random || !ciphertext)
     return TC_RSA_ARGUMENT;
   TC_RSA_result status = tc_rsa_public_inputs(key, plaintext, label,
@@ -58,7 +58,7 @@ static TC_RSA_result tc_rsa_encrypt_oaep(const TC_RSA_public_key* key, TC_hash_a
   if (ciphertext_length != length)
     return TC_RSA_INVALID;
   tc_hash_info info;
-  size_t validation_work = SIZE_MAX;
+  uint32_t validation_work = UINT32_MAX;
   status = tc_rsa_oaep_prepare(length, hash, mgf_hash, label, &validation_work, &info);
   if (status != TC_RSA_OK)
     return status;
@@ -66,7 +66,7 @@ static TC_RSA_result tc_rsa_encrypt_oaep(const TC_RSA_public_key* key, TC_hash_a
     return TC_RSA_INVALID;
   const size_t n = length / sizeof(TC_RSA_word), arithmetic_words = 8 * n + 2;
   const size_t required = arithmetic_words + n;
-  if (workspace->capacity < required || max_work <= SIZE_MAX - validation_work)
+  if (workspace->capacity < required || max_work <= UINT32_MAX - validation_work)
     return TC_RSA_LIMIT;
   TC_hash_context hash_workspace;
   uint8_t block[64];
@@ -103,11 +103,9 @@ TC_RSA_result TC_RSA_encrypt_oaep(const TC_RSA_public_key* key, const TC_RSA_oae
                             sizeof *options, execution, sizeof *execution);
   if (result != TC_RSA_OK)
     return result;
-  size_t work = execution->work.remaining;
   result = tc_rsa_encrypt_oaep(key, options->hash, options->mgf_hash, options->label, plaintext,
                                ciphertext.data, ciphertext.capacity, execution->random.fill,
-                               execution->random.context, workspace, &work);
-  execution->work.remaining = (uint32_t)work;
+                               execution->random.context, workspace, &execution->work.remaining);
   return result;
 }
 
@@ -117,11 +115,11 @@ static TC_RSA_result tc_rsa_decrypt_oaep(const TC_RSA_private_key* key, const TC
                                          size_t plaintext_capacity, size_t* plaintext_length,
                                          TC_random_fn random, void* random_context,
                                          size_t max_attempts, const TC_RSA_workspace* workspace,
-                                         size_t* work)
+                                         uint32_t* work)
 {
-  size_t max_work = *work;
+  uint32_t max_work = *work;
   tc_hash_info info;
-  size_t validation_work = SIZE_MAX;
+  uint32_t validation_work = UINT32_MAX;
   if (!random)
     return TC_RSA_ARGUMENT;
   TC_RSA_result status = tc_rsa_decrypt_inputs(key, ciphertext, label, plaintext,
@@ -144,7 +142,7 @@ static TC_RSA_result tc_rsa_decrypt_oaep(const TC_RSA_private_key* key, const TC
   if (status != TC_RSA_OK)
     return status;
   const size_t n = length / sizeof(TC_RSA_word), required = 14 * n;
-  if (!max_attempts || workspace->capacity < required || max_work < SIZE_MAX - validation_work)
+  if (!max_attempts || workspace->capacity < required || max_work < UINT32_MAX - validation_work)
     return TC_RSA_LIMIT;
   TC_hash_context hash_workspace;
   uint8_t block[64];
@@ -197,12 +195,10 @@ TC_RSA_result TC_RSA_decrypt_oaep(const TC_RSA_private_key* key, const TC_RSA_oa
       !tc_internal_ranges_disjoint(execution, sizeof *execution, plaintext_length,
                                    sizeof *plaintext_length))
     return TC_RSA_ARGUMENT;
-  size_t work = execution->work.remaining;
   result = tc_rsa_decrypt_oaep(key, key->crt, options->hash, options->mgf_hash, options->label,
                                ciphertext, plaintext.data, plaintext.capacity, plaintext_length,
                                execution->random.fill, execution->random.context,
-                               execution->random_attempts, workspace, &work);
-  execution->work.remaining = (uint32_t)work;
+                               execution->random_attempts, workspace, &execution->work.remaining);
   return result;
 }
 #endif

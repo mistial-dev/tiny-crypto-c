@@ -48,7 +48,7 @@ static inline TC_RSA_result tc_rsa_pss_cost(size_t length, size_t bits, TC_hash_
 
 static inline TC_RSA_result tc_rsa_pss_prepare(size_t length, size_t bits, TC_hash_algorithm hash,
                                                TC_hash_algorithm mgf_hash, size_t digest_length,
-                                               size_t salt_length, size_t* work, tc_hash_info* info)
+                                               size_t salt_length, uint32_t* work, tc_hash_info* info)
 {
   size_t cost;
   TC_RSA_result result =
@@ -79,7 +79,7 @@ static inline TC_status tc_rsa_pss_hash(TC_hash_algorithm hash, TC_bytes digest,
 static inline TC_RSA_result tc_rsa_pss_encode(uint8_t* encoded, size_t length, size_t bits,
                                               TC_hash_algorithm hash, TC_hash_algorithm mgf_hash,
                                               TC_bytes digest, TC_bytes salt, uint8_t* block,
-                                              TC_hash_context* workspace, size_t* work)
+                                              TC_hash_context* workspace, uint32_t* work)
 {
   tc_hash_info info;
   TC_bytes h;
@@ -115,7 +115,7 @@ static inline TC_RSA_result tc_rsa_pss_encode(uint8_t* encoded, size_t length, s
 static inline TC_RSA_result tc_rsa_pss_check(uint8_t* encoded, size_t length, size_t bits,
                                              TC_hash_algorithm hash, TC_hash_algorithm mgf_hash,
                                              TC_bytes digest, size_t salt_length, uint8_t* block,
-                                             TC_hash_context* workspace, size_t* work)
+                                             TC_hash_context* workspace, uint32_t* work)
 {
   tc_hash_info info;
   TC_RSA_result result;

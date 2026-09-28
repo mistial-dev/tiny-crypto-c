@@ -46,7 +46,7 @@ static inline tc_rsa_result tc_rsa_public_operation(const uint8_t* modulus, size
                                                     const uint8_t* exponent, size_t exponent_length,
                                                     const uint8_t* input, uint8_t* out,
                                                     tc_mp_word* scratch, size_t scratch_words,
-                                                    size_t* work, const tc_mp_word* prepared_r2)
+                                                    uint32_t* work, const tc_mp_word* prepared_r2)
 {
   size_t n, required, cost;
   tc_mp_word *p, *base, *one, *result, *temporary, *reduced, *product, factor;
@@ -98,7 +98,7 @@ static inline tc_rsa_result tc_rsa_verify_v15(const uint8_t* modulus, size_t len
                                               const uint8_t* signature, size_t signature_length,
                                               TC_hash_algorithm hash, const uint8_t* digest,
                                               size_t digest_length, tc_mp_word* scratch,
-                                              size_t scratch_words, size_t* work,
+                                              size_t scratch_words, uint32_t* work,
                                               const tc_mp_word* prepared_r2)
 {
   size_t n, arithmetic_words;

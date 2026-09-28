@@ -16,7 +16,7 @@ static inline TC_RSA_result tc_rsa_crt_consistent(size_t length, TC_bytes d_byte
                                                   TC_bytes q_bytes, TC_bytes dp_bytes,
                                                   TC_bytes dq_bytes, TC_bytes inverse_bytes,
                                                   tc_mp_word* scratch, size_t scratch_words,
-                                                  size_t* work)
+                                                  uint32_t* work)
 {
   enum { MAX_BYTES = TC_RSA_MAX_MODULUS_BYTES };
   const TC_bytes inputs[] = {d_bytes, p_bytes, q_bytes, dp_bytes, dq_bytes, inverse_bytes};
@@ -73,7 +73,7 @@ static inline TC_RSA_result tc_rsa_crt_consistent(size_t length, TC_bytes d_byte
  * needs 8n limbs. Results stay in scratch until the caller publishes all three. */
 static inline TC_RSA_result tc_rsa_crt_derive(size_t length, TC_bytes d_bytes, TC_bytes p_bytes,
                                               TC_bytes q_bytes, tc_mp_word* scratch,
-                                              size_t scratch_words, size_t* work,
+                                              size_t scratch_words, uint32_t* work,
                                               tc_mp_word** dp_out, tc_mp_word** dq_out,
                                               tc_mp_word** inverse_out)
 {
@@ -138,7 +138,7 @@ tc_rsa_crt_private_operation(const uint8_t* modulus, size_t length, const uint8_
                              size_t exponent_length, TC_bytes p_bytes, TC_bytes q_bytes,
                              const TC_RSA_crt* crt, const uint8_t* input, uint8_t* output,
                              TC_random_fn random, void* random_context, size_t max_attempts,
-                             tc_mp_word* scratch, size_t scratch_words, size_t* work)
+                             tc_mp_word* scratch, size_t scratch_words, uint32_t* work)
 {
   if (!crt || !p_bytes.data || !q_bytes.data || !crt->dp.data || !crt->dq.data ||
       !crt->q_inverse.data || !input || !output || !random || !scratch || !work)

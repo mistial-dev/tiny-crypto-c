@@ -5,6 +5,7 @@
 #include <tiny_crypto/key_challenge.h>
 #include "internal.h"
 #include "hash_info_internal.h"
+#include "pki_budget_internal.h"
 
 enum { KEY_CHALLENGE_ACTIVE = 0x4b455943u };
 
@@ -178,11 +179,12 @@ TC_key_challenge_result TC_key_challenge_verify(const TC_X509_public_key* key, T
       !tc_internal_ranges_disjoint(workspace, sizeof *workspace, work, sizeof *work) ||
       !tc_internal_ranges_disjoint(workspace, sizeof *workspace, signature.data, signature.length))
     goto cleanup;
-  size_t available = work->remaining;
+  const size_t lent = tc_pki_work_lend(work);
+  size_t left = lent;
   const TC_X509_signature_result verified =
       TC_X509_signature_verify_digest((TC_bytes){workspace->digest, workspace->digest_length},
-                                      &workspace->signature, signature, key, provider, &available);
-  work->remaining = (uint32_t)available;
+                                      &workspace->signature, signature, key, provider, &left);
+  tc_pki_work_settle(work, lent, left);
   switch (verified) {
   case TC_X509_SIGNATURE_VALID:
     result = TC_KEY_CHALLENGE_OK;

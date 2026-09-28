@@ -22,7 +22,7 @@ static MunitResult representative(const MunitParameter params[], void* user)
                             "2ce8c3b19f7131ab5c8feb70499418391d35af24aa0f39e508139f58291e93bc";
   uint8_t fixture[128], encoded[128], digest[32], block[64];
   TC_hash_context workspace;
-  size_t work = 10000, required;
+  uint32_t work = 10000, required;
   (void)params;
   (void)user;
   decode_hex(fixture, sizeof fixture, hex);
@@ -100,7 +100,8 @@ static MunitResult salt_boundaries(const MunitParameter params[], void* user)
   for (size_t i = 0; i < sizeof salt; ++i)
     salt[i] = (uint8_t)i;
   for (size_t i = 0; i < 2; ++i) {
-    size_t salt_length = i ? sizeof salt : 0, work = 10000;
+    size_t salt_length = i ? sizeof salt : 0;
+    uint32_t work = 10000;
     decode_hex(expected, sizeof expected, fixtures[i]);
     munit_assert_int(tc_rsa_pss_encode(encoded, sizeof encoded, 1023, TC_HASH_SHA256,
                                        TC_HASH_SHA256, (TC_bytes){digest, sizeof digest},

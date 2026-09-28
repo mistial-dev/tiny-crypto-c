@@ -77,19 +77,17 @@ TC_RSA_result TC_RSA_encode_pss_digest(const TC_RSA_pss_options* options, TC_byt
   if (!tc_rsa_supported_modulus_size(encoded.capacity))
     return TC_RSA_UNSUPPORTED;
   tc_hash_info info;
-  size_t remaining = work->remaining;
+  uint32_t preflight = work->remaining;
   TC_RSA_result result =
       tc_rsa_pss_prepare(encoded.capacity, encoded.capacity * 8 - 1, options->hash,
-                         options->mgf_hash, digest.length, salt.length, &remaining, &info);
+                         options->mgf_hash, digest.length, salt.length, &preflight, &info);
   if (result != TC_RSA_OK)
     return result;
   TC_hash_context workspace;
   uint8_t block[64];
-  remaining = work->remaining;
   result =
       tc_rsa_pss_encode(encoded.data, encoded.capacity, encoded.capacity * 8 - 1, options->hash,
-                        options->mgf_hash, digest, salt, block, &workspace, &remaining);
-  work->remaining = (uint32_t)remaining;
+                        options->mgf_hash, digest, salt, block, &workspace, &work->remaining);
   if (result != TC_RSA_OK)
     TC_secure_zero(encoded.data, encoded.capacity);
   TC_secure_zero(block, sizeof block);
@@ -121,12 +119,10 @@ TC_RSA_result TC_RSA_raw_private(const TC_RSA_public_key* key, TC_bytes private_
   if (output.capacity < length ||
       workspace->capacity < TC_RSA_raw_private_workspace_words(length * 8))
     return TC_RSA_LIMIT;
-  size_t available = execution->work.remaining;
   result = tc_rsa_private_operation_magnitude(
       key->modulus.data, length, key->exponent.data, key->exponent.length, private_exponent,
       input.data, output.data, execution->random.fill, execution->random.context,
-      execution->random_attempts, workspace->words, workspace->capacity, &available);
-  execution->work.remaining = (uint32_t)available;
+      execution->random_attempts, workspace->words, workspace->capacity, &execution->work.remaining);
   return result;
 }
 
@@ -153,11 +149,9 @@ TC_RSA_result TC_RSA_validate_crt(const TC_RSA_private_key* key, const TC_RSA_cr
                                    key->public_key.exponent.data, key->public_key.exponent.length);
   if (result != TC_RSA_OK)
     return result;
-  size_t available = work->remaining;
   result = tc_rsa_crt_consistent(key->public_key.modulus.length, key->d, key->p, key->q, crt->dp,
                                  crt->dq, crt->q_inverse, workspace->words, workspace->capacity,
-                                 &available);
-  work->remaining = (uint32_t)available;
+                                 &work->remaining);
   return result;
 }
 
@@ -201,10 +195,8 @@ TC_RSA_result TC_RSA_derive_crt(const TC_RSA_private_key* key, const TC_RSA_crt_
         return TC_RSA_ARGUMENT;
   }
   tc_mp_word *dp, *dq, *inverse;
-  size_t available = work->remaining;
   status = tc_rsa_crt_derive(length, key->d, key->p, key->q, workspace->words, workspace->capacity,
-                             &available, &dp, &dq, &inverse);
-  work->remaining = (uint32_t)available;
+                             &work->remaining, &dp, &dq, &inverse);
   if (status == TC_RSA_OK) {
     tc_mp_to_be(output->dp.data, dp, prime_length);
     tc_mp_to_be(output->dq.data, dq, prime_length);
@@ -274,7 +266,7 @@ static TC_RSA_result tc_rsa_sign_inputs(const TC_RSA_private_key* key, TC_bytes 
 static TC_RSA_result tc_rsa_sign_encoded(const TC_RSA_private_key* key, const TC_RSA_crt* crt,
                                          uint8_t* signature, TC_random_fn random,
                                          void* random_context, size_t max_attempts,
-                                         const TC_RSA_workspace* workspace, size_t* work)
+                                         const TC_RSA_workspace* workspace, uint32_t* work)
 {
   const size_t length = key->public_key.modulus.length, n = length / sizeof(TC_RSA_word);
   if (crt)
@@ -294,9 +286,9 @@ static TC_RSA_result tc_rsa_sign_v15_digest(const TC_RSA_private_key* key, const
                                             uint8_t* signature, size_t signature_length,
                                             TC_random_fn random, void* random_context,
                                             size_t max_attempts, const TC_RSA_workspace* workspace,
-                                            size_t* work)
+                                            uint32_t* work)
 {
-  size_t max_work = *work;
+  uint32_t max_work = *work;
   tc_hash_info info;
   TC_RSA_result status =
       tc_rsa_sign_inputs(key, digest, signature, signature_length, random, max_attempts, workspace);
@@ -342,13 +334,10 @@ TC_RSA_result TC_RSA_sign_v15_digest(const TC_RSA_private_key* key,
                             sizeof *options, execution, sizeof *execution);
   if (result != TC_RSA_OK)
     return result;
-  size_t work = execution->work.remaining;
-  result =
-      tc_rsa_sign_v15_digest(key, key->crt, options->hash, digest, signature.data,
-                             signature.capacity, execution->random.fill, execution->random.context,
-                             execution->random_attempts, workspace, &work);
-  execution->work.remaining = (uint32_t)work;
-  return result;
+  return tc_rsa_sign_v15_digest(key, key->crt, options->hash, digest, signature.data,
+                                signature.capacity, execution->random.fill,
+                                execution->random.context, execution->random_attempts, workspace,
+                                &execution->work.remaining);
 }
 
 static TC_RSA_result tc_rsa_sign_pss_digest(const TC_RSA_private_key* key, const TC_RSA_crt* crt,
@@ -356,11 +345,11 @@ static TC_RSA_result tc_rsa_sign_pss_digest(const TC_RSA_private_key* key, const
                                             size_t salt_length, TC_bytes digest, uint8_t* signature,
                                             size_t signature_length, TC_random_fn random,
                                             void* random_context, size_t max_attempts,
-                                            const TC_RSA_workspace* workspace, size_t* work)
+                                            const TC_RSA_workspace* workspace, uint32_t* work)
 {
-  size_t max_work = *work;
+  uint32_t max_work = *work;
   tc_hash_info info;
-  size_t validation_work = SIZE_MAX;
+  uint32_t validation_work = UINT32_MAX;
   TC_RSA_result status =
       tc_rsa_sign_inputs(key, digest, signature, signature_length, random, max_attempts, workspace);
   if (status != TC_RSA_OK)
@@ -377,7 +366,7 @@ static TC_RSA_result tc_rsa_sign_pss_digest(const TC_RSA_private_key* key, const
     return status;
   if (!digest.data)
     return TC_RSA_ARGUMENT;
-  if (max_work < SIZE_MAX - validation_work + (salt_length != 0))
+  if (max_work < UINT32_MAX - validation_work + (salt_length != 0))
     return TC_RSA_LIMIT;
   TC_hash_context hash_workspace;
   uint8_t block[64];
@@ -415,12 +404,9 @@ TC_RSA_result TC_RSA_sign_pss_digest(const TC_RSA_private_key* key,
                             sizeof *options, execution, sizeof *execution);
   if (result != TC_RSA_OK)
     return result;
-  size_t work = execution->work.remaining;
-  result = tc_rsa_sign_pss_digest(key, key->crt, options->hash, options->mgf_hash,
-                                  options->salt_length, digest, signature.data, signature.capacity,
-                                  execution->random.fill, execution->random.context,
-                                  execution->random_attempts, workspace, &work);
-  execution->work.remaining = (uint32_t)work;
-  return result;
+  return tc_rsa_sign_pss_digest(key, key->crt, options->hash, options->mgf_hash,
+                                options->salt_length, digest, signature.data, signature.capacity,
+                                execution->random.fill, execution->random.context,
+                                execution->random_attempts, workspace, &execution->work.remaining);
 }
 #endif

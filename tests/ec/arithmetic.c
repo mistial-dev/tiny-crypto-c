@@ -153,7 +153,7 @@ static MunitResult public_operation(const MunitParameter params[], void* user)
   uint8_t modulus[128], input[128] = {0}, output[128], saved[128], exponent[] = {3};
   tc_mp_word scratch[8 * 128 / sizeof(tc_mp_word) + 2];
   const size_t capacity = sizeof scratch / sizeof *scratch, cost = 16 * 128 + 16 + 4;
-  size_t work;
+  uint32_t work;
   (void)params;
   (void)user;
   memset(modulus, 0xff, sizeof modulus);

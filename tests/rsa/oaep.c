@@ -22,7 +22,7 @@ static MunitResult known_answer(const MunitParameter params[], void* user)
   const TC_bytes sentinel = {expected, sizeof expected};
   TC_bytes message = sentinel;
   TC_hash_context workspace;
-  size_t work = WORK_BUDGET;
+  uint32_t work = WORK_BUDGET;
   (void)params;
   (void)user;
   for (size_t i = 0; i < sizeof seed; ++i)
@@ -93,7 +93,7 @@ static MunitResult boundaries(const MunitParameter params[], void* user)
     munit_assert_true(tc_hash_info_get(hashes[h], &info));
     for (size_t k = 0; k < sizeof lengths / sizeof *lengths; ++k) {
       const size_t length = lengths[k];
-      size_t work = WORK_BUDGET;
+      uint32_t work = WORK_BUDGET;
       if (length < 2 * info.digest_length + 2) {
         munit_assert_int(tc_rsa_oaep_encode(encoded, length, hashes[h], TC_HASH_SHA256, empty,
                                             empty, (TC_bytes){seed, info.digest_length}, block,
@@ -138,7 +138,7 @@ static MunitResult padding(const MunitParameter params[], void* user)
   (void)params;
   (void)user;
   for (unsigned scenario = 0; scenario < CASE_COUNT; ++scenario) {
-    size_t work = WORK_BUDGET;
+    uint32_t work = WORK_BUDGET;
     TC_bytes decoded = empty;
     munit_assert_int(tc_rsa_oaep_encode(encoded, sizeof encoded, TC_HASH_SHA256, TC_HASH_SHA256,
                                         empty, input, (TC_bytes){seed, sizeof seed}, block,

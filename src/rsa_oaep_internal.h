@@ -7,7 +7,7 @@
 
 static inline TC_RSA_result tc_rsa_oaep_prepare(size_t length, TC_hash_algorithm hash,
                                                 TC_hash_algorithm mgf_hash, TC_bytes label,
-                                                size_t* work, tc_hash_info* info)
+                                                uint32_t* work, tc_hash_info* info)
 {
   if (!tc_hash_info_get(hash, info) || !tc_hash_available(hash) || !tc_hash_available(mgf_hash))
     return TC_RSA_UNSUPPORTED;
@@ -29,7 +29,7 @@ static inline TC_RSA_result tc_rsa_oaep_encode(uint8_t* encoded, size_t length,
                                                TC_hash_algorithm hash, TC_hash_algorithm mgf_hash,
                                                TC_bytes label, TC_bytes message, TC_bytes seed,
                                                uint8_t* block, TC_hash_context* workspace,
-                                               size_t* work)
+                                               uint32_t* work)
 {
   tc_hash_info info;
   if (!encoded || (label.length && !label.data) || (message.length && !message.data) ||
@@ -67,7 +67,7 @@ static inline TC_RSA_result tc_rsa_oaep_encode(uint8_t* encoded, size_t length,
 static inline TC_RSA_result tc_rsa_oaep_decode(uint8_t* encoded, size_t length,
                                                TC_hash_algorithm hash, TC_hash_algorithm mgf_hash,
                                                TC_bytes label, uint8_t* block,
-                                               TC_hash_context* workspace, size_t* work,
+                                               TC_hash_context* workspace, uint32_t* work,
                                                TC_bytes* message)
 {
   tc_hash_info info;
