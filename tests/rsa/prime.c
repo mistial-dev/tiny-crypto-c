@@ -8,6 +8,23 @@
 #include "test_util.h"
 #include <stdio.h>
 
+/* One Miller-Rabin round with its own preparation. */
+static int miller_rabin(const tc_mp_word* p, const tc_mp_word* base, size_t n, tc_mp_word* scratch)
+{
+  const size_t twos = tc_mp_miller_rabin_prepare(p, n, scratch);
+  return tc_mp_miller_rabin_round(p, base, n, twos, scratch);
+}
+
+static TC_RSA_result probable_prime(const uint8_t* candidate, size_t length, size_t rounds,
+                                    TC_random_fn random, void* random_context,
+                                    size_t max_attempts, tc_mp_word* scratch,
+                                    size_t scratch_words, uint32_t* work)
+{
+  return tc_rsa_probable_prime_magnitude((TC_bytes){candidate, length}, length, rounds, random,
+                                         random_context, max_attempts, scratch, scratch_words,
+                                         work);
+}
+
 static const char* primality_path;
 
 static uint32_t power(uint32_t base, uint32_t exponent, uint32_t modulus)
@@ -54,7 +71,7 @@ static int check(uint32_t candidate, uint32_t witness)
   }
   tc_mp_from_be(p, p_bytes, sizeof p_bytes);
   tc_mp_from_be(base, base_bytes, sizeof base_bytes);
-  int result = tc_mp_miller_rabin(p, base, WORDS, scratch);
+  int result = miller_rabin(p, base, WORDS, scratch);
   munit_assert_int(result, ==, reference(candidate, witness));
   return result;
 }
@@ -140,7 +157,7 @@ static MunitResult sampling(const MunitParameter params[], void* user)
                             scenario == 3 ? TC_ERROR : TC_OK};
     uint32_t work = (uint32_t)two_round_work + 1;
     memset(scratch, 0xa5, sizeof scratch);
-    TC_RSA_result result = tc_rsa_probable_prime(scenario == 4 ? composite : prime, BYTES, 2,
+    TC_RSA_result result = probable_prime(scenario == 4 ? composite : prime, BYTES, 2,
                                                  random_base, &source, 3, scratch, REQUIRED, &work);
     munit_assert_int(result, ==,
                      scenario == 2   ? TC_RSA_LIMIT
@@ -159,7 +176,7 @@ static MunitResult sampling(const MunitParameter params[], void* user)
     uint32_t work = (uint32_t)round_work + short_work;
     memset(scratch, 0xa5, sizeof scratch);
     munit_assert_int(
-        tc_rsa_probable_prime(prime, BYTES, 1, random_base, &source, 1, scratch, REQUIRED, &work),
+        probable_prime(prime, BYTES, 1, random_base, &source, 1, scratch, REQUIRED, &work),
         ==, short_work ? TC_RSA_OK : TC_RSA_LIMIT);
     munit_assert_uint(source.calls, ==, short_work);
     if (short_work)
@@ -174,7 +191,7 @@ static MunitResult sampling(const MunitParameter params[], void* user)
     random_source source = {0, 0, TC_OK};
     uint32_t work = (uint32_t)two_round_work - (scenario == 3);
     memset(scratch, 0xa5, sizeof scratch);
-    TC_RSA_result result = tc_rsa_probable_prime(prime, BYTES, scenario == 0 ? 0 : 2, random_base,
+    TC_RSA_result result = probable_prime(prime, BYTES, scenario == 0 ? 0 : 2, random_base,
                                                  &source, scenario == 1 ? 1 : 2, scratch,
                                                  scenario == 2 ? REQUIRED - 1 : REQUIRED, &work);
     munit_assert_int(result, ==, scenario == 0 ? TC_RSA_ARGUMENT : TC_RSA_LIMIT);
@@ -221,7 +238,7 @@ static MunitResult padded_sampling(const MunitParameter params[], void* user)
       TC_RSA_result expected = selected < 2 || selected >= p - 1 ? TC_RSA_LIMIT
                                : reference(p, selected)          ? TC_RSA_OK
                                                                  : TC_RSA_INVALID;
-      munit_assert_int(tc_rsa_probable_prime(candidate, BYTES, 1, fixed_base, bytes, 1, scratch,
+      munit_assert_int(probable_prime(candidate, BYTES, 1, fixed_base, bytes, 1, scratch,
                                              REQUIRED, &work),
                        ==, expected);
       for (size_t i = 0; i < REQUIRED; ++i)
@@ -248,7 +265,7 @@ static MunitResult padded_sampling(const MunitParameter params[], void* user)
     random_source source = {0, 0, TC_OK};
     uint32_t work = 1000;
     memset(scratch, 0xa5, sizeof scratch);
-    munit_assert_int(tc_rsa_probable_prime(candidate, BYTES, 1, random_base, &source, 1, scratch,
+    munit_assert_int(probable_prime(candidate, BYTES, 1, random_base, &source, 1, scratch,
                                            REQUIRED, &work),
                      ==, p == 3 ? TC_RSA_OK : TC_RSA_INVALID);
     munit_assert_uint(source.calls, ==, 0);

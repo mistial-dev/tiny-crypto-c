@@ -128,18 +128,6 @@ cleanup:
   return status;
 }
 
-static inline TC_RSA_result tc_rsa_private_key_consistent(const uint8_t* modulus, size_t length,
-                                                          const uint8_t* exponent,
-                                                          size_t exponent_length, const uint8_t* d,
-                                                          const uint8_t* p, const uint8_t* q,
-                                                          tc_mp_word* scratch, size_t scratch_words,
-                                                          uint32_t* work)
-{
-  return tc_rsa_private_magnitudes_consistent(modulus, length, exponent, exponent_length,
-                                              (TC_bytes){d, length}, (TC_bytes){p, length},
-                                              (TC_bytes){q, length}, scratch, scratch_words, work);
-}
-
 /* Validate two-prime components and test each factor with the selected rounds.
  * Factors and d fit length bytes. max_attempts applies per factor.
  * Storage ownership matches the component check; scratch needs 12n+2 limbs.
@@ -166,19 +154,6 @@ static inline TC_RSA_result tc_rsa_private_magnitudes_check(
                                              max_attempts, scratch, scratch_words, work);
   TC_secure_zero(scratch, required * sizeof *scratch);
   return status;
-}
-
-static inline TC_RSA_result
-tc_rsa_private_key_check(const uint8_t* modulus, size_t length, const uint8_t* exponent,
-                         size_t exponent_length, const uint8_t* d, const uint8_t* p,
-                         const uint8_t* q, size_t rounds, TC_random_fn random, void* random_context,
-                         size_t max_attempts, tc_mp_word* scratch, size_t scratch_words,
-                         uint32_t* work)
-{
-  return tc_rsa_private_magnitudes_check(modulus, length, exponent, exponent_length,
-                                         (TC_bytes){d, length}, (TC_bytes){p, length},
-                                         (TC_bytes){q, length}, rounds, random, random_context,
-                                         max_attempts, scratch, scratch_words, work);
 }
 
 /* Full-width private operation for an already validated RSA key. d fits length
@@ -256,18 +231,6 @@ static inline TC_RSA_result tc_rsa_private_operation_magnitude(
 cleanup:
   TC_secure_zero(scratch, required * sizeof *scratch);
   return status;
-}
-static inline TC_RSA_result tc_rsa_private_operation(const uint8_t* modulus, size_t length,
-                                                     const uint8_t* exponent,
-                                                     size_t exponent_length, const uint8_t* d,
-                                                     const uint8_t* input, uint8_t* output,
-                                                     TC_random_fn random, void* random_context,
-                                                     size_t max_attempts, tc_mp_word* scratch,
-                                                     size_t scratch_words, uint32_t* work)
-{
-  return tc_rsa_private_operation_magnitude(
-      modulus, length, exponent, exponent_length, (TC_bytes){d, length}, input, output, random,
-      random_context, max_attempts, scratch, scratch_words, work);
 }
 
 /* d/p/q have passed private-key validation. Check dP=d mod(p-1),

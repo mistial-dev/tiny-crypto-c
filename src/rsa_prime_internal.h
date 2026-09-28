@@ -94,14 +94,4 @@ tc_rsa_probable_prime_magnitude(TC_bytes candidate, size_t length, size_t rounds
   TC_secure_zero(scratch, required * sizeof *scratch);
   return status;
 }
-static inline TC_RSA_result tc_rsa_probable_prime(const uint8_t* candidate, size_t length,
-                                                  size_t rounds, TC_random_fn random,
-                                                  void* random_context, size_t max_attempts,
-                                                  tc_mp_word* scratch, size_t scratch_words,
-                                                  uint32_t* work)
-{
-  return tc_rsa_probable_prime_magnitude((TC_bytes){candidate, length}, length, rounds, random,
-                                         random_context, max_attempts, scratch, scratch_words,
-                                         work);
-}
 #endif

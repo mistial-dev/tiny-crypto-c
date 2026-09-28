@@ -75,10 +75,4 @@ static inline int tc_mp_miller_rabin_round(const tc_mp_word* p, const tc_mp_word
   return (int)passed;
 }
 
-static inline int tc_mp_miller_rabin(const tc_mp_word* p, const tc_mp_word* base, size_t n,
-                                     tc_mp_word* scratch)
-{
-  size_t twos = tc_mp_miller_rabin_prepare(p, n, scratch);
-  return tc_mp_miller_rabin_round(p, base, n, twos, scratch);
-}
 #endif
