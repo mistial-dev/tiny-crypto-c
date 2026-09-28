@@ -21,8 +21,8 @@ and other block-cipher modes can be enabled as needed.
 
 ```sh
 make
-make test
-make test-full       # NIST CAVP and Wycheproof corpora
+make test            # quick suite, skips tests labelled extended
+make test-full       # every test, including NIST CAVP and Wycheproof corpora
 make test-sanitize   # address + undefined behavior sanitizers
 make benchmark
 make size
@@ -419,8 +419,9 @@ The fast suite covers all C modes and C++ wrappers. C tests use [µunit][munit],
 and C++ tests use [doctest][doctest]. You can filter the C++ tests with doctest's
 command-line options, for example `./build/test_cpp_hash -tc="*HMAC*"`.
 
-`make test-full` adds the checked-in [NIST CAVP][cavp] response files,
-FIPS 186 signature and key-generation archives, and
+`make test-full` adds the tests labelled `extended`: the checked-in
+[NIST CAVP][cavp] response files,
+FIPS 186 signature and key-generation vectors, and
 [Wycheproof][wycheproof] vectors,
 including the complete 20,000-vector SP 800-108 KBKDF corpus split across
 `test_kdf` (128-bit AES and every other PRF), `test_kdf_192` and
@@ -428,7 +429,7 @@ including the complete 20,000-vector SP 800-108 KBKDF corpus split across
 CI tests with GCC, Clang, Apple Clang, and MSVC, runs sanitizers, and checks
 Arduino Uno and RP2350 build sizes. The manually triggered
 [Full test suite](.github/workflows/full-tests.yml) runs the vendored cryptographic
-archives and optional external parser corpora.
+vectors and optional external parser corpora.
 
 TLV tests cover framing, DER values, resource limits, and split input. The
 optional corpus adapter compares CVC fields with the supplied metadata and

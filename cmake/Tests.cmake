@@ -1231,8 +1231,18 @@ if(TINY_CRYPTO_BUILD_TESTS)
     test_nist_dss_rsa_keygen_validation
     test_wycheproof_ec
     test_wycheproof_rsa_signatures
+    test_wycheproof_rsa_generation
+    test_wycheproof_primality
     test_wycheproof_rsa_oaep
     test_wycheproof_ecdsa
+    test_ec_cavp
+    test_trust_anchor_options
+    test_installed_consumer
+    test_installed_consumer_debug_environment
+    test_resource_profiles
+    test_piv_targets
+    test_benchmark_fast
+    test_benchmark_runtime
     test_rsa_key_openssl
     test_rsa_oaep_openssl
     test_rsa_oaep_openssl_small

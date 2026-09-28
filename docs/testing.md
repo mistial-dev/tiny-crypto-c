@@ -61,8 +61,13 @@ make test-msan CC=clang CXX=clang++
 make test-msan-full CC=clang CXX=clang++ TINY_CRYPTO_TEST_FULL=ON
 ```
 
-`test-full` includes the checked-in NIST CAVP, DSS, ECCCDH and Wycheproof
-vectors. External parser and capture corpora below require their own paths.
+Slow corpus, oracle, packaging and exhaustive tests carry the CTest label
+`extended`. `make test`, `make test-sanitize` and `make test-msan` skip them for
+quick local runs. Run the `-full` targets after completing a major change and
+before a release. They run every test, including the checked-in NIST CAVP,
+DSS, ECCCDH and Wycheproof vectors. Push CI runs the whole CTest suite, and
+the **Full test suite** workflow runs the `-full` targets. External parser and
+capture corpora below require their own paths.
 `test-sanitize` runs the core suite
 with AddressSanitizer and UndefinedBehaviorSanitizer. `test-sanitize-full` also
 runs tests labelled `extended`, including exhaustive RSA and corpus cases. The

@@ -27,8 +27,12 @@ configure:
 	$(CMAKE) -S . -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=$(CMAKE_BUILD_TYPE) \
 		$(TINY_CRYPTO_CACHE_ARGS) $(CMAKE_ARGS)
 
+# Slow corpus, oracle and packaging tests carry the "extended" label. Local
+# `make test` skips them. The -full targets and CI run every test.
+CTEST_LABELS ?= -LE extended
+
 test: all
-	$(CTEST) --test-dir $(BUILD_DIR) --output-on-failure
+	$(CTEST) --test-dir $(BUILD_DIR) --output-on-failure $(CTEST_LABELS)
 
 test-compilers:
 	@tested=0; failed=0; \
@@ -45,7 +49,7 @@ test-compilers:
 	test $$tested -gt 0 && test $$failed -eq 0
 
 test-full:
-	$(MAKE) test BUILD_DIR=$(BUILD_DIR)-full TINY_CRYPTO_TEST_FULL=ON
+	$(MAKE) test BUILD_DIR=$(BUILD_DIR)-full TINY_CRYPTO_TEST_FULL=ON CTEST_LABELS=
 
 test-sanitize:
 	$(MAKE) all BUILD_DIR=$(BUILD_DIR)-sanitize \
@@ -53,7 +57,7 @@ test-sanitize:
 	$(CTEST) --test-dir $(BUILD_DIR)-sanitize --output-on-failure -LE extended
 
 test-sanitize-full:
-	$(MAKE) test BUILD_DIR=$(BUILD_DIR)-sanitize-full \
+	$(MAKE) test BUILD_DIR=$(BUILD_DIR)-sanitize-full CTEST_LABELS= \
 		TINY_CRYPTO_SANITIZE=address,undefined CMAKE_BUILD_TYPE=Debug
 
 # MemorySanitizer needs clang on Linux; macOS clang does not offer it.
@@ -63,7 +67,7 @@ test-msan:
 	$(CTEST) --test-dir $(BUILD_DIR)-msan --output-on-failure -LE extended
 
 test-msan-full:
-	$(MAKE) test BUILD_DIR=$(BUILD_DIR)-msan-full \
+	$(MAKE) test BUILD_DIR=$(BUILD_DIR)-msan-full CTEST_LABELS= \
 		TINY_CRYPTO_SANITIZE=memory CMAKE_BUILD_TYPE=Debug
 
 test-cpp: all
