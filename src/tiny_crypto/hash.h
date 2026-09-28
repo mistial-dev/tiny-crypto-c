@@ -501,8 +501,9 @@ TC_status TC_SHA512_digest(const uint8_t* data, size_t len, uint8_t* digest);
  * zero-padded. A zero-length key is accepted (key may then be NULL).
  * @param ctx Pointer to HMAC-SHA-1 context structure.
  * @param key Pointer to key bytes.
- * @param keylen Key length in bytes.
- * @return TC_OK, or TC_ERROR on invalid arguments.
+ * @param keylen Key length in bytes. The key must not overlap ctx.
+ * @return TC_OK, or TC_ERROR on invalid arguments, including a key that
+ *         overlaps ctx. On failure ctx is wiped and inactive.
  */
 TC_status TC_HMAC_SHA1_init(struct TC_HMAC_SHA1_ctx* ctx, const uint8_t* key, size_t keylen);
 
@@ -553,8 +554,10 @@ TC_status TC_HMAC_SHA1_verify(const uint8_t* key, size_t keylen, const uint8_t* 
  * @brief Initialize an HMAC-SHA-224 context with a key.
  *
  * Keys longer than TC_SHA224_BLOCKLEN are hashed first. Shorter keys are
- * zero-padded. A zero-length key is accepted (key may then be NULL).
- * @return TC_OK, or TC_ERROR on invalid arguments.
+ * zero-padded. A zero-length key is accepted (key may then be NULL). The key
+ * must not overlap ctx.
+ * @return TC_OK, or TC_ERROR on invalid arguments, including a key that
+ *         overlaps ctx. On failure ctx is wiped and inactive.
  */
 TC_status TC_HMAC_SHA224_init(struct TC_HMAC_SHA224_ctx* ctx, const uint8_t* key, size_t keylen);
 
@@ -597,8 +600,9 @@ TC_status TC_HMAC_SHA224_verify(const uint8_t* key, size_t keylen, const uint8_t
  * zero-padded. A zero-length key is accepted (key may then be NULL).
  * @param ctx Pointer to HMAC-SHA-256 context structure.
  * @param key Pointer to key bytes.
- * @param keylen Key length in bytes.
- * @return TC_OK, or TC_ERROR on invalid arguments.
+ * @param keylen Key length in bytes. The key must not overlap ctx.
+ * @return TC_OK, or TC_ERROR on invalid arguments, including a key that
+ *         overlaps ctx. On failure ctx is wiped and inactive.
  */
 TC_status TC_HMAC_SHA256_init(struct TC_HMAC_SHA256_ctx* ctx, const uint8_t* key, size_t keylen);
 
@@ -649,8 +653,10 @@ TC_status TC_HMAC_SHA256_verify(const uint8_t* key, size_t keylen, const uint8_t
  * @brief Initialize an HMAC-SHA-384 context with a key.
  *
  * Keys longer than TC_SHA384_BLOCKLEN are hashed first. Shorter keys are
- * zero-padded. A zero-length key is accepted (key may then be NULL).
- * @return TC_OK, or TC_ERROR on invalid arguments.
+ * zero-padded. A zero-length key is accepted (key may then be NULL). The key
+ * must not overlap ctx.
+ * @return TC_OK, or TC_ERROR on invalid arguments, including a key that
+ *         overlaps ctx. On failure ctx is wiped and inactive.
  */
 TC_status TC_HMAC_SHA384_init(struct TC_HMAC_SHA384_ctx* ctx, const uint8_t* key, size_t keylen);
 
@@ -690,8 +696,10 @@ TC_status TC_HMAC_SHA384_verify(const uint8_t* key, size_t keylen, const uint8_t
  * @brief Initialize an HMAC-SHA-512 context with a key.
  *
  * Keys longer than TC_SHA512_BLOCKLEN are hashed first. Shorter keys are
- * zero-padded. A zero-length key is accepted (key may then be NULL).
- * @return TC_OK, or TC_ERROR on invalid arguments.
+ * zero-padded. A zero-length key is accepted (key may then be NULL). The key
+ * must not overlap ctx.
+ * @return TC_OK, or TC_ERROR on invalid arguments, including a key that
+ *         overlaps ctx. On failure ctx is wiped and inactive.
  */
 TC_status TC_HMAC_SHA512_init(struct TC_HMAC_SHA512_ctx* ctx, const uint8_t* key, size_t keylen);
 

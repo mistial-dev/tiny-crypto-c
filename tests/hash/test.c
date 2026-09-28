@@ -60,6 +60,7 @@ MunitResult test_hmac_truncation(const MunitParameter params[], void* data);
 MunitResult test_hmac_verify(const MunitParameter params[], void* data);
 MunitResult test_hmac_streaming(const MunitParameter params[], void* data);
 MunitResult test_hmac_zeroize(const MunitParameter params[], void* data);
+MunitResult test_hmac_key_overlap(const MunitParameter params[], void* data);
 MunitResult test_hmac_wycheproof(const MunitParameter params[], void* data);
 
 /* Provided by cavp.c (returns MUNIT_SKIP when TC_HASH_CAVP is 0). */
@@ -332,6 +333,7 @@ static MunitTest test_suite_tests[] = {
     {"/hmac/verify", test_hmac_verify, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/hmac/streaming", test_hmac_streaming, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/hmac/zeroize", test_hmac_zeroize, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/hmac/key-overlap", test_hmac_key_overlap, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/hmac/wycheproof", test_hmac_wycheproof, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/cavp/sha", test_cavp_sha, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/cavp/hmac", test_cavp_hmac, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

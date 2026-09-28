@@ -1111,6 +1111,42 @@ static void run_wycheproof_file(int alg, const char* path)
   munit_assert_long(ran, ==, expected_total);
 }
 
+/* The key is read after init wipes the context, so a key stored inside the
+ * context must be rejected. Accepting it would key the MAC with zeros. */
+MunitResult test_hmac_key_overlap(const MunitParameter params[], void* data)
+{
+  (void)params;
+  (void)data;
+#if TC_ENABLE_SHA256
+  struct {
+    struct TC_HMAC_SHA256_ctx ctx;
+    uint8_t after[32];
+  } storage;
+  uint8_t* const base = (uint8_t*)&storage.ctx;
+  const size_t offsets[] = {0, sizeof storage.ctx / 2, sizeof storage.ctx - 1};
+  const uint8_t message = 'm';
+  uint8_t tag[TC_SHA256_DIGESTLEN], expected[TC_SHA256_DIGESTLEN];
+  for (size_t i = 0; i < sizeof offsets / sizeof *offsets; ++i) {
+    memset(&storage, 0xab, sizeof storage);
+    munit_assert_int(TC_HMAC_SHA256_init(&storage.ctx, base + offsets[i], 16), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA256_update(&storage.ctx, &message, 1), ==, TC_ERROR);
+    munit_assert_int(TC_HMAC_SHA256_final(&storage.ctx, tag), ==, TC_ERROR);
+  }
+  /* A key directly after the context is disjoint and accepted. */
+  memset(&storage, 0xab, sizeof storage);
+  munit_assert_int(TC_HMAC_SHA256_init(&storage.ctx, storage.after, sizeof storage.after), ==,
+                   TC_OK);
+  munit_assert_int(TC_HMAC_SHA256_update(&storage.ctx, &message, 1), ==, TC_OK);
+  munit_assert_int(TC_HMAC_SHA256_final(&storage.ctx, tag), ==, TC_OK);
+  memset(storage.after, 0xab, sizeof storage.after);
+  munit_assert_int(TC_HMAC_SHA256_digest(storage.after, sizeof storage.after, &message, 1, expected,
+                                         sizeof expected),
+                   ==, TC_OK);
+  munit_assert_memory_equal(sizeof tag, tag, expected);
+#endif
+  return MUNIT_OK;
+}
+
 MunitResult test_hmac_wycheproof(const MunitParameter params[], void* data)
 {
   (void)params;
@@ -1166,6 +1202,12 @@ MunitResult test_hmac_streaming(const MunitParameter params[], void* data)
   return MUNIT_SKIP;
 }
 MunitResult test_hmac_zeroize(const MunitParameter params[], void* data)
+{
+  (void)params;
+  (void)data;
+  return MUNIT_SKIP;
+}
+MunitResult test_hmac_key_overlap(const MunitParameter params[], void* data)
 {
   (void)params;
   (void)data;

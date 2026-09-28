@@ -251,8 +251,13 @@ TC_status tc_hmac_core_init(const tc_hash_algorithm_info* stored, void* context,
   if (context == NULL)
     return TC_ERROR;
   hmac = info->hmac_view(context);
+  /* The key is read after the context is wiped, so it must lie outside it.
+   * Every failure leaves the context wiped and inactive. */
+  const int key_valid =
+      key_length == 0 ||
+      (key != NULL && tc_internal_ranges_disjoint(hmac.context, hmac.size, key, key_length));
   TC_secure_zero(hmac.context, hmac.size);
-  if (key_length != 0 && key == NULL)
+  if (!key_valid)
     return TC_ERROR;
   status = hmac_key_block(info, hmac.inner, key, key_length, block);
   if (status == TC_OK) {
