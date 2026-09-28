@@ -18,7 +18,7 @@
 #include <string.h>
 
 #ifndef HMAC_WYCHEPROOF_DIR
-#define HMAC_WYCHEPROOF_DIR "tests/vectors/hash/wycheproof"
+#define HMAC_WYCHEPROOF_DIR "tests/vectors/wycheproof/testvectors_v1"
 #endif
 
 #if TC_ENABLE_HMAC

@@ -24,3 +24,8 @@ KMAC256` with the message on stdin. They cover empty and nonempty customization,
 empty and multi-block messages, and 33-, 35-, 47-, 49-, 63-, and 65-byte MACs.
 The TSV columns are key, message, customization, expected MAC, and case ID;
 binary values are hex, and `-` represents an empty value.
+
+## Checksums
+
+`SHA256SUMS` lists the SHA-256 of every file here, and
+`tests/test_vector_manifests.py` checks them.

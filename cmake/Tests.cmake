@@ -44,6 +44,8 @@ if(TINY_CRYPTO_BUILD_TESTS)
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_unicode_tables.py)
     add_test(NAME test_package_boundaries
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_package_boundaries.py)
+    add_test(NAME test_vector_manifests
+      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_vector_manifests.py)
   endif()
 
   add_test(NAME test_installed_consumer
@@ -167,93 +169,94 @@ if(TINY_CRYPTO_BUILD_TESTS)
   endforeach()
   tc_add_test_library(tiny-crypto-c-test-sskdf src/common.c src/hash.c src/sha512.c src/hash_core.c src/hash_adapter.c src/sskdf.c)
   option(TINY_CRYPTO_TEST_EC_ORACLE "Compare EC with Python cryptography" OFF)
-  set(TINY_CRYPTO_TEST_WYCHEPROOF_ARCHIVE
-    "${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/wycheproof.zip"
-    CACHE FILEPATH "Pinned C2SP Wycheproof archive")
+  set(TINY_CRYPTO_TEST_WYCHEPROOF_DIR
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/wycheproof"
+    CACHE PATH "Pinned C2SP Wycheproof vectors (contains testvectors_v1)")
+  set(tc_wycheproof_vectors "${TINY_CRYPTO_TEST_WYCHEPROOF_DIR}/testvectors_v1")
   if(Python3_Interpreter_FOUND)
     add_test(NAME test_wycheproof_runner
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/wycheproof_test.py)
   endif()
-  if(TINY_CRYPTO_TEST_WYCHEPROOF_ARCHIVE)
+  if(TINY_CRYPTO_TEST_WYCHEPROOF_DIR)
     if(NOT Python3_Interpreter_FOUND)
-      message(FATAL_ERROR "Wycheproof archive tests require Python 3")
+      message(FATAL_ERROR "Wycheproof tests require Python 3")
     endif()
     add_test(NAME test_wycheproof_ec
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/wycheproof.py
-        --archive ${TINY_CRYPTO_TEST_WYCHEPROOF_ARCHIVE}
+        --vectors ${TINY_CRYPTO_TEST_WYCHEPROOF_DIR}
         --ec-reader $<TARGET_FILE:test_ec_0> --ec-reader $<TARGET_FILE:test_ec_1>)
     add_test(NAME test_wycheproof_rsa_signatures
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/wycheproof.py
-        --archive ${TINY_CRYPTO_TEST_WYCHEPROOF_ARCHIVE}
+        --vectors ${TINY_CRYPTO_TEST_WYCHEPROOF_DIR}
         --rsa-signature-reader $<TARGET_FILE:test_rsa_signature_reader>
         --rsa-signature-reader $<TARGET_FILE:test_rsa_signature_reader_small>)
     add_test(NAME test_wycheproof_rsa_generation
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/wycheproof.py
-        --archive ${TINY_CRYPTO_TEST_WYCHEPROOF_ARCHIVE}
+        --vectors ${TINY_CRYPTO_TEST_WYCHEPROOF_DIR}
         --rsa-generation-reader $<TARGET_FILE:test_rsa_generation_reader>)
     add_test(NAME test_wycheproof_primality
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/wycheproof.py
-        --archive ${TINY_CRYPTO_TEST_WYCHEPROOF_ARCHIVE}
+        --vectors ${TINY_CRYPTO_TEST_WYCHEPROOF_DIR}
         --primality-reader $<TARGET_FILE:test_rsa_prime_0>)
     add_test(NAME test_wycheproof_rsa_oaep
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/wycheproof.py
-        --archive ${TINY_CRYPTO_TEST_WYCHEPROOF_ARCHIVE}
+        --vectors ${TINY_CRYPTO_TEST_WYCHEPROOF_DIR}
         --rsa-oaep-reader $<TARGET_FILE:test_rsa_oaep_reader_0>
         --rsa-oaep-reader $<TARGET_FILE:test_rsa_oaep_reader_1>)
     add_test(NAME test_wycheproof_ecdsa
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/wycheproof.py
-        --archive ${TINY_CRYPTO_TEST_WYCHEPROOF_ARCHIVE}
+        --vectors ${TINY_CRYPTO_TEST_WYCHEPROOF_DIR}
         --ecdsa-reader $<TARGET_FILE:test_ecdsa_reader_0>
         --ecdsa-reader $<TARGET_FILE:test_ecdsa_reader_1>)
   endif()
-  set(TINY_CRYPTO_TEST_EC_CAVP_ARCHIVE
-    "${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/nist_ecccdh.zip"
-    CACHE FILEPATH "NIST ECCCDH component test archive")
-  set(TINY_CRYPTO_TEST_ECDSA_DSS_ARCHIVE
-    "${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/nist_dss/186-4ecdsatestvectors.zip"
-    CACHE FILEPATH "Pinned NIST FIPS 186-4 ECDSA test archive")
-  set(TINY_CRYPTO_TEST_RSA_DSS_ARCHIVE
-    "${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/nist_dss/186-3rsatestvectors.zip"
-    CACHE FILEPATH "Pinned NIST FIPS 186-3 RSA test archive")
-  if(TINY_CRYPTO_TEST_ECDSA_DSS_ARCHIVE OR TINY_CRYPTO_TEST_RSA_DSS_ARCHIVE)
+  set(TINY_CRYPTO_TEST_EC_CAVP_DIR
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/nist_ecccdh"
+    CACHE PATH "NIST ECCCDH component test vectors")
+  set(TINY_CRYPTO_TEST_ECDSA_DSS_DIR
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/nist_dss/186-4ecdsa"
+    CACHE PATH "Pinned NIST FIPS 186-4 ECDSA test vectors")
+  set(TINY_CRYPTO_TEST_RSA_DSS_DIR
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/nist_dss/186-3rsa"
+    CACHE PATH "Pinned NIST FIPS 186-3 RSA test vectors")
+  if(TINY_CRYPTO_TEST_ECDSA_DSS_DIR OR TINY_CRYPTO_TEST_RSA_DSS_DIR)
     if(NOT Python3_Interpreter_FOUND)
-      message(FATAL_ERROR "NIST DSS archive tests require Python 3")
+      message(FATAL_ERROR "NIST DSS tests require Python 3")
     endif()
-    if(TINY_CRYPTO_TEST_ECDSA_DSS_ARCHIVE)
+    if(TINY_CRYPTO_TEST_ECDSA_DSS_DIR)
       foreach(small 0 1)
         add_test(NAME test_nist_dss_ec_${small}
           COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/nist_dss.py
-            --ecdsa-archive ${TINY_CRYPTO_TEST_ECDSA_DSS_ARCHIVE}
+            --ecdsa-dir ${TINY_CRYPTO_TEST_ECDSA_DSS_DIR}
             --ecdsa-reader $<TARGET_FILE:test_nist_dss_ec_reader_${small}>)
         add_test(NAME test_nist_dss_ecdsa_signatures_${small}
           COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/nist_dss.py
-            --ecdsa-archive ${TINY_CRYPTO_TEST_ECDSA_DSS_ARCHIVE}
+            --ecdsa-dir ${TINY_CRYPTO_TEST_ECDSA_DSS_DIR}
             --ecdsa-signature-reader $<TARGET_FILE:test_ecdsa_reader_${small}>)
       endforeach()
     endif()
-    if(TINY_CRYPTO_TEST_RSA_DSS_ARCHIVE)
+    if(TINY_CRYPTO_TEST_RSA_DSS_DIR)
       add_test(NAME test_nist_dss_rsa_generation
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/nist_dss.py
-          --rsa-archive ${TINY_CRYPTO_TEST_RSA_DSS_ARCHIVE}
+          --rsa-dir ${TINY_CRYPTO_TEST_RSA_DSS_DIR}
           --rsa-generation-reader $<TARGET_FILE:test_rsa_generation_reader>)
       add_test(NAME test_nist_dss_rsa_signatures
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/nist_dss.py
-          --rsa-archive ${TINY_CRYPTO_TEST_RSA_DSS_ARCHIVE}
+          --rsa-dir ${TINY_CRYPTO_TEST_RSA_DSS_DIR}
           --rsa-signature-reader $<TARGET_FILE:test_rsa_signature_reader>)
       add_test(NAME test_nist_dss_rsa_keygen_validation
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/nist_dss.py
-          --rsa-archive ${TINY_CRYPTO_TEST_RSA_DSS_ARCHIVE}
+          --rsa-dir ${TINY_CRYPTO_TEST_RSA_DSS_DIR}
           --rsa-keygen-reader $<TARGET_FILE:test_rsa_keygen_reader>)
     endif()
   endif()
-  if(TINY_CRYPTO_TEST_EC_CAVP_ARCHIVE)
+  if(TINY_CRYPTO_TEST_EC_CAVP_DIR)
     if(NOT Python3_Interpreter_FOUND)
       message(FATAL_ERROR "ECCCDH corpus tests require Python 3")
     endif()
     add_test(NAME test_ec_cavp
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/ec/oracle.py
         --reader $<TARGET_FILE:test_ec_0> --reader $<TARGET_FILE:test_ec_1>
-        --cavp-archive ${TINY_CRYPTO_TEST_EC_CAVP_ARCHIVE})
+        --cavp-dir ${TINY_CRYPTO_TEST_EC_CAVP_DIR})
   endif()
   if(TINY_CRYPTO_TEST_EC_ORACLE)
     if(NOT Python3_Interpreter_FOUND)
@@ -393,10 +396,10 @@ if(TINY_CRYPTO_BUILD_TESTS)
     test_rsa_oaep_reader_0 test_rsa_oaep_reader_1
     test_wycheproof_aead_128 test_wycheproof_aead_192 test_wycheproof_aead_256
     PROPERTIES SKIP_REGULAR_EXPRESSION "No tests run, 1 .* skipped")
-  if(TINY_CRYPTO_TEST_WYCHEPROOF_ARCHIVE)
+  if(TINY_CRYPTO_TEST_WYCHEPROOF_DIR)
     add_test(NAME test_wycheproof_aead
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/wycheproof.py
-        --archive ${TINY_CRYPTO_TEST_WYCHEPROOF_ARCHIVE}
+        --vectors ${TINY_CRYPTO_TEST_WYCHEPROOF_DIR}
         --aead-reader 128:$<TARGET_FILE:test_wycheproof_aead_128>
         --aead-reader 192:$<TARGET_FILE:test_wycheproof_aead_192>
         --aead-reader 256:$<TARGET_FILE:test_wycheproof_aead_256>)
@@ -940,18 +943,18 @@ if(TINY_CRYPTO_BUILD_TESTS)
     TC_ENABLE_KMAC256=1 TC_ENABLE_AES=0 TC_ENABLE_SHA256=0
     TC_ZEROIZE=0 TC_STRICT=0)
   tc_add_c_test(test_kmac_relaxed tiny-crypto-c-test-kmac-relaxed tests/kmac/test.c)
-  if(TINY_CRYPTO_TEST_WYCHEPROOF_ARCHIVE)
+  if(TINY_CRYPTO_TEST_WYCHEPROOF_DIR)
     add_test(NAME test_wycheproof_kmac
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/wycheproof.py
-        --archive ${TINY_CRYPTO_TEST_WYCHEPROOF_ARCHIVE}
+        --vectors ${TINY_CRYPTO_TEST_WYCHEPROOF_DIR}
         --kmac-reader $<TARGET_FILE:test_kmac> --kmac-reader $<TARGET_FILE:test_kmac_relaxed>)
     add_test(NAME test_wycheproof_dynamic_cmac
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/wycheproof.py
-        --archive ${TINY_CRYPTO_TEST_WYCHEPROOF_ARCHIVE}
+        --vectors ${TINY_CRYPTO_TEST_WYCHEPROOF_DIR}
         --cmac-reader $<TARGET_FILE:test_aes_dynamic>)
     add_test(NAME test_wycheproof_hmac
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/wycheproof.py
-        --archive ${TINY_CRYPTO_TEST_WYCHEPROOF_ARCHIVE}
+        --vectors ${TINY_CRYPTO_TEST_WYCHEPROOF_DIR}
         --hmac-reader $<TARGET_FILE:test_hash>)
   endif()
 
@@ -960,7 +963,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   target_include_directories(test_hash PRIVATE tests/hash)
   target_compile_definitions(test_hash PRIVATE
     CAVP_VECTOR_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/hash/cavp"
-    HMAC_WYCHEPROOF_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/hash/wycheproof")
+    HMAC_WYCHEPROOF_DIR="${tc_wycheproof_vectors}")
 
   function(tc_add_aes_test target library)
     tc_add_c_test(${target} ${library} tests/aes/test.c tests/aes/cavp.c
@@ -968,9 +971,9 @@ if(TINY_CRYPTO_BUILD_TESTS)
     target_include_directories(${target} PRIVATE tests/aes)
     target_compile_definitions(${target} PRIVATE
       CAVP_VECTOR_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/aes/cavp"
-      EAX_VECTOR_FILE="${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/aes/eax/aes_eax_test.json"
-      SIV_VECTOR_FILE="${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/aes/siv/aead_aes_siv_cmac_test.json"
-      CMAC_WYCHEPROOF_FILE="${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/aes/cmac/aes_cmac_test.json"
+      EAX_VECTOR_FILE="${tc_wycheproof_vectors}/aes_eax_test.json"
+      SIV_VECTOR_FILE="${tc_wycheproof_vectors}/aead_aes_siv_cmac_test.json"
+      CMAC_WYCHEPROOF_FILE="${tc_wycheproof_vectors}/aes_cmac_test.json"
       CMAC_CAVP_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/aes/cmac")
   endfunction()
 
@@ -996,10 +999,6 @@ if(TINY_CRYPTO_BUILD_TESTS)
       tests/des/cmac_cavp.c)
     target_compile_definitions(test_des_cmac_cavp PRIVATE
       CMAC_TDES_CAVP_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/des/cmac")
-    if(Python3_Interpreter_FOUND)
-      add_test(NAME test_des_cmac_corpus
-        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_des_cmac_corpus.py)
-    endif()
     add_executable(test_des_cavp
       tests/des/cavp_main.c tests/des/cavp.c
       tests/support/cavp.c tests/support/munit.c)

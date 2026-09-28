@@ -23,3 +23,8 @@ SHA2-256 or SHA2-384 groups. The KAS records provide NIST-produced SHA-256 and
 SHA-384 expected outputs for the exact construction implemented here. Their
 outputs range from 14 to 32 bytes. The separate SSKDF tests cover longer
 outputs and multiple counter blocks with a Python `hashlib` oracle.
+
+## Checksums
+
+`SHA256SUMS` lists the SHA-256 of every file here, and
+`tests/test_vector_manifests.py` checks them.

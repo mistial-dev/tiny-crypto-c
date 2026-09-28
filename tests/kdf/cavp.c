@@ -20,7 +20,6 @@
 #include <tiny_crypto/kdf.h>
 #include "cavp.h"
 #include "munit.h"
-#include "test_io.h"
 
 #ifndef KDF_CAVP_DIR
 #define KDF_CAVP_DIR "tests/vectors/kdf/cavp"
@@ -126,35 +125,10 @@ struct kdf_cavp_record
   long count;
 };
 
-/* "[NAME=VALUE]" header: copies VALUE (without the bracket) into out. */
-static int cavp_header(const char* line, const char* name, char* out, size_t out_len)
+static void cavp_open(tc_cavp_reader* reader, const char* relative, char* line, size_t capacity)
 {
-  size_t n = strlen(name);
-  const char* end;
-  size_t len;
-  if (line[0] != '[' || strncmp(line + 1, name, n) != 0 || line[1 + n] != '=')
-    return 0;
-  line += 2 + n;
-  end = strchr(line, ']');
-  if (end == NULL)
-    return 0;
-  len = (size_t)(end - line);
-  if (len + 1 > out_len)
-    return 0;
-  memcpy(out, line, len);
-  out[len] = '\0';
-  return 1;
-}
-
-static FILE* cavp_open(const char* relative)
-{
-  char path[512];
-  FILE* file;
-  snprintf(path, sizeof(path), "%s/%s", KDF_CAVP_DIR, relative);
-  file = tc_test_fopen(path, "r");
-  if (file == NULL)
-    munit_errorf("cannot open CAVP file %s", path);
-  return file;
+  if (!tc_cavp_open(reader, KDF_CAVP_DIR, relative, line, capacity))
+    munit_errorf("cannot open CAVP file %s/%s", KDF_CAVP_DIR, relative);
 }
 
 struct kdf_cavp_stats
@@ -167,9 +141,8 @@ struct kdf_cavp_stats
 static void cavp_run_file(const char* relative, int mode, int has_counter,
                           struct kdf_cavp_stats* stats)
 {
-  FILE* file = cavp_open(relative);
+  tc_cavp_reader reader;
   static char line[1024];
-  char value[32];
   const struct kdf_cavp_prf* prf = NULL;
   int active = 0;
   char location[16] = "";
@@ -177,33 +150,44 @@ static void cavp_run_file(const char* relative, int mode, int has_counter,
   struct kdf_cavp_record rec;
   uint8_t ko[320];
   uint8_t actual[320];
+  tc_cavp_event event;
 
   memset(stats, 0, sizeof(*stats));
   memset(&rec, 0, sizeof(rec));
 
-  while (fgets(line, sizeof(line), file) != NULL)
+  cavp_open(&reader, relative, line, sizeof line);
+  while ((event = tc_cavp_next(&reader)) != TC_CAVP_END)
   {
-    const char* v;
+    const char* v = reader.value;
 
-    if (line[0] == '#' || line[0] == '\r' || line[0] == '\n')
+    if (event == TC_CAVP_FAILURE)
+      munit_errorf("%s: unreadable line %lu", relative, reader.line_number);
+    if (event == TC_CAVP_RECORD_END)
       continue;
-    if (cavp_header(line, "PRF", value, sizeof(value)))
+    if (event == TC_CAVP_HEADER)
     {
-      prf = kdf_cavp_lookup(value);
-      active = (prf != NULL);
+      /* Settings persist until a later group names them again. */
+      char value[32];
+      if (strncmp(reader.name, "PRF", 3) != 0 && strncmp(reader.name, "CTRLOCATION", 11) != 0 &&
+          strncmp(reader.name, "RLEN", 4) != 0)
+        munit_errorf("%s: unknown section header [%s]", relative, reader.name);
+      if (tc_cavp_header_value(&reader, "PRF", value, sizeof value) != NULL)
+      {
+        prf = kdf_cavp_lookup(value);
+        active = (prf != NULL);
+      }
+      if (tc_cavp_header_value(&reader, "CTRLOCATION", value, sizeof value) != NULL)
+      {
+        if (strlen(value) >= sizeof location)
+          munit_errorf("%s: CTRLOCATION %s too long", relative, value);
+        strcpy(location, value);
+      }
+      if (tc_cavp_header_value(&reader, "RLEN", value, sizeof value) != NULL)
+        rlen = strtol(value, NULL, 10);
       continue;
     }
-    if (cavp_header(line, "CTRLOCATION", location, sizeof(location)))
-      continue;
-    if (cavp_header(line, "RLEN", value, sizeof(value)))
-    {
-      rlen = strtol(value, NULL, 10);
-      continue;
-    }
-    if (line[0] == '[')
-      munit_errorf("%s: unknown section header %s", relative, line);
 
-    if ((v = tc_cavp_field_value(line, "COUNT")) != NULL)
+    if (tc_cavp_is(&reader, "COUNT"))
     {
       memset(&rec, 0, sizeof(rec));
       rec.ki_len = rec.iv_len = rec.fixed_len = rec.before_len = rec.after_len = -1;
@@ -212,27 +196,27 @@ static void cavp_run_file(const char* relative, int mode, int has_counter,
       stats->total++;
       continue;
     }
-    if ((v = tc_cavp_field_value(line, "L")) != NULL)
+    if (tc_cavp_is(&reader, "L"))
       rec.l_bits = strtol(v, NULL, 10);
-    else if ((v = tc_cavp_field_value(line, "KI")) != NULL)
+    else if (tc_cavp_is(&reader, "KI"))
       rec.ki_len = tc_cavp_parse_hex(v, rec.ki, sizeof(rec.ki));
-    else if ((v = tc_cavp_field_value(line, "IVlen")) != NULL)
+    else if (tc_cavp_is(&reader, "IVlen"))
       rec.iv_bits = strtol(v, NULL, 10);
-    else if ((v = tc_cavp_field_value(line, "IV")) != NULL)
+    else if (tc_cavp_is(&reader, "IV"))
       rec.iv_len = tc_cavp_parse_hex(v, rec.iv, sizeof(rec.iv));
-    else if ((v = tc_cavp_field_value(line, "FixedInputDataByteLen")) != NULL)
+    else if (tc_cavp_is(&reader, "FixedInputDataByteLen"))
       rec.fixed_bytes = strtol(v, NULL, 10);
-    else if ((v = tc_cavp_field_value(line, "FixedInputData")) != NULL)
+    else if (tc_cavp_is(&reader, "FixedInputData"))
       rec.fixed_len = tc_cavp_parse_hex(v, rec.fixed, sizeof(rec.fixed));
-    else if ((v = tc_cavp_field_value(line, "DataBeforeCtrLen")) != NULL)
+    else if (tc_cavp_is(&reader, "DataBeforeCtrLen"))
       rec.before_bytes = strtol(v, NULL, 10);
-    else if ((v = tc_cavp_field_value(line, "DataBeforeCtrData")) != NULL)
+    else if (tc_cavp_is(&reader, "DataBeforeCtrData"))
       rec.before_len = tc_cavp_parse_hex(v, rec.before, sizeof(rec.before));
-    else if ((v = tc_cavp_field_value(line, "DataAfterCtrLen")) != NULL)
+    else if (tc_cavp_is(&reader, "DataAfterCtrLen"))
       rec.after_bytes = strtol(v, NULL, 10);
-    else if ((v = tc_cavp_field_value(line, "DataAfterCtrData")) != NULL)
+    else if (tc_cavp_is(&reader, "DataAfterCtrData"))
       rec.after_len = tc_cavp_parse_hex(v, rec.after, sizeof(rec.after));
-    else if ((v = tc_cavp_field_value(line, "KO")) != NULL)
+    else if (tc_cavp_is(&reader, "KO"))
     {
       long ko_len = tc_cavp_parse_hex(v, ko, sizeof(ko));
       struct TC_KBKDF_params p;
@@ -322,7 +306,7 @@ static void cavp_run_file(const char* relative, int mode, int has_counter,
       stats->ran++;
     }
   }
-  fclose(file);
+  tc_cavp_close(&reader);
 }
 
 static void cavp_check_counts(const struct kdf_cavp_stats* stats, long total, long per_prf)

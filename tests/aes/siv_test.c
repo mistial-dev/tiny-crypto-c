@@ -16,7 +16,7 @@
 #include <string.h>
 
 #ifndef SIV_VECTOR_FILE
-#define SIV_VECTOR_FILE "tests/vectors/aes/siv/aead_aes_siv_cmac_test.json"
+#define SIV_VECTOR_FILE "tests/vectors/wycheproof/testvectors_v1/aead_aes_siv_cmac_test.json"
 #endif
 
 #if defined(TC_AES_ENABLE_SIV) && (TC_AES_ENABLE_SIV == 1)

@@ -10,7 +10,7 @@ SPDX-License-Identifier: GPL-2.0-or-later
 The four AES-128 / AES-192 / AES-256 examples for empty, one-block, multi-block
 partial, and multi-block full messages are transcribed into `cmac_test.c` from
 [NIST SP 800-38B](https://csrc.nist.gov/publications/detail/sp/800-38b/final)
-Appendix D. Used only for interoperability testing.
+Appendix D.
 
 ## NIST CAVP (CMAC Gen / Ver), full AES corpora
 
@@ -35,15 +35,15 @@ exercise
 the public API. The **product default** remains 8 (SP 800-38B ≥ 64-bit
 guidance; same floor style as EAX).
 
-## Wycheproof, full file
+## Wycheproof
 
-`aes_cmac_test.json` is the complete vendored file from
-[C2SP Project Wycheproof](https://github.com/C2SP/wycheproof),
-`testvectors_v1/aes_cmac_test.json`, version 0.9 (311 cases). Copyright Google
-and contributors; **Apache License, Version 2.0**
-(<https://www.apache.org/licenses/LICENSE-2.0>).
+The AES-CMAC tests read `aes_cmac_test.json` (311 cases) from the shared
+Wycheproof tree in `../../wycheproof/testvectors_v1/`, described in
+`../../wycheproof/README.md`. Each AES key-size test binary runs the 102 cases
+for its key size plus the 5 `InvalidKeySize` cases, which the fixed-length API
+rejects.
 
-Each AES key-size test binary runs the 102 cases for that key size plus the 5
-`InvalidKeySize` cases (fixed-length API rejects wrong key lengths).
+## Checksums
 
-These files are test inputs only and are not linked into embedded library builds.
+`SHA256SUMS` lists the SHA-256 of every file here, and
+`tests/test_vector_manifests.py` checks them.

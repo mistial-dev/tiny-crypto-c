@@ -18,7 +18,6 @@
 #include <tiny_crypto/des.h>
 #include "cavp.h"
 #include "munit.h"
-#include "test_io.h"
 
 #ifndef CAVP_VECTOR_DIR
 #define CAVP_VECTOR_DIR "tests/vectors/des/cavp"
@@ -521,9 +520,10 @@ static int cavp_mode_from_name(const char* name)
 
 static int cavp_run_file(const char* subdir, const char* filename)
 {
-  char path[512];
+  char relative[512];
   char line[512];
-  FILE* f;
+  tc_cavp_reader reader;
+  tc_cavp_event event;
   struct cavp_record rec;
   struct mct_chain chain;
   int mode = cavp_mode_from_name(filename);
@@ -540,11 +540,10 @@ static int cavp_run_file(const char* subdir, const char* filename)
     return 0;
   }
 
-  snprintf(path, sizeof(path), "%s/%s/%s", CAVP_VECTOR_DIR, subdir, filename);
-  f = tc_test_fopen(path, "r");
-  if (f == NULL)
+  snprintf(relative, sizeof(relative), "%s/%s", subdir, filename);
+  if (!tc_cavp_open(&reader, CAVP_VECTOR_DIR, relative, line, sizeof line))
   {
-    fprintf(stderr, "CAVP file not found: %s\n", path);
+    fprintf(stderr, "CAVP file not found: %s/%s\n", CAVP_VECTOR_DIR, relative);
     return 0;
   }
 
@@ -552,36 +551,41 @@ static int cavp_run_file(const char* subdir, const char* filename)
   rec.count = -1;
   chain.active = 0;
 
-  while (fgets(line, sizeof(line), f) != NULL)
+  while ((event = tc_cavp_next(&reader)) != TC_CAVP_END)
   {
-    const char* v;
+    const char* v = reader.value;
     int n;
 
-    if (line[0] == '#' || line[0] == '\r' || line[0] == '\n')
-      continue;
-    if (line[0] == '[')
+    if (event == TC_CAVP_FAILURE)
     {
-      if (strncmp(line, "[ENCRYPT]", 9) == 0)
+      ok = 0;
+      break;
+    }
+    if (event == TC_CAVP_HEADER)
+    {
+      if (tc_cavp_is(&reader, "ENCRYPT"))
       {
         encrypt = 1;
         chain.active = 0;
       }
-      else if (strncmp(line, "[DECRYPT]", 9) == 0)
+      else if (tc_cavp_is(&reader, "DECRYPT"))
       {
         encrypt = 0;
         chain.active = 0;
       }
       continue;
     }
+    if (event != TC_CAVP_FIELD)
+      continue;
 
-    if ((v = tc_cavp_field_value(line, "COUNT")) != NULL)
+    if (tc_cavp_is(&reader, "COUNT"))
     {
       rec.count = 0;
       while (*v >= '0' && *v <= '9')
         rec.count = rec.count * 10 + (*v++ - '0');
       continue;
     }
-    if ((v = tc_cavp_field_value(line, "KEYs")) != NULL)
+    if (tc_cavp_is(&reader, "KEYs"))
     {
       if (tc_cavp_parse_hex(v, rec.key, 8) != 8)
       {
@@ -593,29 +597,29 @@ static int cavp_run_file(const char* subdir, const char* filename)
       rec.have_key = 1;
       continue;
     }
-    if ((v = tc_cavp_field_value(line, "KEY1")) != NULL)
+    if (tc_cavp_is(&reader, "KEY1"))
     {
       ok &= tc_cavp_parse_hex(v, rec.key, 8) == 8;
       rec.have_key = 1;
       continue;
     }
-    if ((v = tc_cavp_field_value(line, "KEY2")) != NULL)
+    if (tc_cavp_is(&reader, "KEY2"))
     {
       ok &= tc_cavp_parse_hex(v, rec.key + 8, 8) == 8;
       continue;
     }
-    if ((v = tc_cavp_field_value(line, "KEY3")) != NULL)
+    if (tc_cavp_is(&reader, "KEY3"))
     {
       ok &= tc_cavp_parse_hex(v, rec.key + 16, 8) == 8;
       continue;
     }
-    if ((v = tc_cavp_field_value(line, "IV")) != NULL)
+    if (tc_cavp_is(&reader, "IV"))
     {
       ok &= tc_cavp_parse_hex(v, rec.iv, 8) == 8;
       rec.have_iv = 1;
       continue;
     }
-    if ((v = tc_cavp_field_value(line, "PLAINTEXT")) != NULL)
+    if (tc_cavp_is(&reader, "PLAINTEXT"))
     {
       n = bitmode ? cavp_parse_bits(v, rec.pt, sizeof(rec.pt))
                   : tc_cavp_parse_hex(v, rec.pt, sizeof(rec.pt));
@@ -627,7 +631,7 @@ static int cavp_run_file(const char* subdir, const char* filename)
       rec.pt_len = (size_t)n;
       rec.have_pt = 1;
     }
-    else if ((v = tc_cavp_field_value(line, "CIPHERTEXT")) != NULL)
+    else if (tc_cavp_is(&reader, "CIPHERTEXT"))
     {
       n = bitmode ? cavp_parse_bits(v, rec.ct, sizeof(rec.ct))
                   : tc_cavp_parse_hex(v, rec.ct, sizeof(rec.ct));
@@ -657,10 +661,10 @@ static int cavp_run_file(const char* subdir, const char* filename)
     }
   }
 
-  fclose(f);
+  tc_cavp_close(&reader);
   if (cases == 0)
   {
-    fprintf(stderr, "CAVP no cases parsed: %s\n", path);
+    fprintf(stderr, "CAVP no cases parsed: %s/%s\n", CAVP_VECTOR_DIR, relative);
     return 0;
   }
   return ok;

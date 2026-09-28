@@ -18,7 +18,7 @@
 #include <string.h>
 
 #ifndef EAX_VECTOR_FILE
-#define EAX_VECTOR_FILE "tests/vectors/aes/eax/aes_eax_test.json"
+#define EAX_VECTOR_FILE "tests/vectors/wycheproof/testvectors_v1/aes_eax_test.json"
 #endif
 
 #if (defined(TC_AES_ENABLE_EAX) && (TC_AES_ENABLE_EAX == 1)) || \

@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 /* Full NIST CAVP CMACGen/CMACVer TDES2 and TDES3 response files. */
 #include <tiny_crypto/des.h>
+#include "cavp.h"
 #include "munit.h"
 #include "test_util.h"
 #include <stdio.h>
@@ -23,17 +24,10 @@ typedef struct {
   int have_count, have_key1, have_key2, have_key3, have_message, have_mac;
 } response;
 
-static void field_hex(char* value, uint8_t* output, size_t capacity, size_t expected)
+static void field_hex(const char* value, uint8_t* output, size_t capacity, size_t expected)
 {
   const size_t length = tc_test_decode_hex_relaxed(value,output,capacity);
   munit_assert_size(length,==,expected);
-}
-
-static char* field_value(char* entry)
-{
-  char* equals = strchr(entry,'=');
-  munit_assert_not_null(equals);
-  return equals + 1;
 }
 
 static void run_case(const response* record, int verify, int pass,
@@ -71,61 +65,57 @@ static void run_case(const response* record, int verify, int pass,
 static void run_file(const char* name, size_t keys, int verify,
                      unsigned expected, unsigned expected_invalid_bundle)
 {
-  char path[512];
+  tc_cavp_reader reader;
+  tc_cavp_event event;
   response record = {0};
   unsigned cases = 0, cryptographic = 0, invalid_bundle = 0;
-  snprintf(path,sizeof path,"%s/%s",CMAC_TDES_CAVP_DIR,name);
-  FILE* file = fopen(path,"rb");
-  munit_assert_not_null(file);
-  while (fgets(line,sizeof line,file)) {
-    char* entry = line;
-    while (*entry == ' ' || *entry == '\t') ++entry;
-    if (*entry == '#' || *entry == '\r' || *entry == '\n' || !*entry) continue;
-    if (!strncmp(entry,"Count",5)) {
+  munit_assert_true(tc_cavp_open(&reader,CMAC_TDES_CAVP_DIR,name,line,sizeof line));
+  while ((event = tc_cavp_next(&reader)) != TC_CAVP_END) {
+    const char* value = reader.value;
+    munit_assert_int(event,!=,TC_CAVP_FAILURE);
+    if (event != TC_CAVP_FIELD) continue;
+    if (tc_cavp_is(&reader,"Count")) {
       memset(&record,0,sizeof record);
-      record.count = (unsigned)strtoul(field_value(entry),NULL,10);
+      record.count = (unsigned)strtoul(value,NULL,10);
       munit_assert_uint(record.count,==,cases);
       record.have_count = 1;
-    } else if (!strncmp(entry,"Klen",4)) {
-      record.key_count = strtoul(field_value(entry),NULL,10);
+    } else if (tc_cavp_is(&reader,"Klen")) {
+      record.key_count = strtoul(value,NULL,10);
       munit_assert_size(record.key_count,==,keys);
-    } else if (!strncmp(entry,"Mlen",4)) {
-      record.message_length = strtoul(field_value(entry),NULL,10);
+    } else if (tc_cavp_is(&reader,"Mlen")) {
+      record.message_length = strtoul(value,NULL,10);
       munit_assert_size(record.message_length,<=,MAX_MESSAGE);
-    } else if (!strncmp(entry,"Tlen",4)) {
-      record.tag_length = strtoul(field_value(entry),NULL,10);
-    } else if (!strncmp(entry,"Key1",4)) {
-      field_hex(field_value(entry),record.key,8,8);
+    } else if (tc_cavp_is(&reader,"Tlen")) {
+      record.tag_length = strtoul(value,NULL,10);
+    } else if (tc_cavp_is(&reader,"Key1")) {
+      field_hex(value,record.key,8,8);
       record.have_key1 = 1;
-    } else if (!strncmp(entry,"Key2",4)) {
-      field_hex(field_value(entry),record.key + 8,8,8);
+    } else if (tc_cavp_is(&reader,"Key2")) {
+      field_hex(value,record.key + 8,8,8);
       record.have_key2 = 1;
-    } else if (!strncmp(entry,"Key3",4)) {
-      field_hex(field_value(entry),record.key3,8,8);
+    } else if (tc_cavp_is(&reader,"Key3")) {
+      field_hex(value,record.key3,8,8);
       if (keys == 3) memcpy(record.key + 16,record.key3,8);
       record.have_key3 = 1;
-    } else if (!strncmp(entry,"Msg",3)) {
+    } else if (tc_cavp_is(&reader,"Msg")) {
       if (record.message_length)
-        field_hex(field_value(entry),message,sizeof message,record.message_length);
+        field_hex(value,message,sizeof message,record.message_length);
       record.have_message = 1;
-    } else if (!strncmp(entry,"Mac",3)) {
-      field_hex(field_value(entry),record.mac,sizeof record.mac,record.tag_length);
+    } else if (tc_cavp_is(&reader,"Mac")) {
+      field_hex(value,record.mac,sizeof record.mac,record.tag_length);
       record.have_mac = 1;
       if (!verify) {
         run_case(&record,0,1,&cryptographic,&invalid_bundle);
         ++cases;
       }
-    } else if (!strncmp(entry,"Result",6)) {
+    } else if (tc_cavp_is(&reader,"Result")) {
       munit_assert_true(verify);
-      char* value = field_value(entry);
-      while (*value == ' ') ++value;
       munit_assert_true(*value == 'P' || *value == 'F');
       run_case(&record,1,*value == 'P',&cryptographic,&invalid_bundle);
       ++cases;
     }
   }
-  munit_assert_int(ferror(file),==,0);
-  munit_assert_int(fclose(file),==,0);
+  tc_cavp_close(&reader);
   munit_assert_uint(cases,==,expected);
   munit_assert_uint(invalid_bundle,==,expected_invalid_bundle);
   munit_assert_uint(cryptographic,==,expected - expected_invalid_bundle);

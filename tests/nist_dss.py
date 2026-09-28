@@ -6,10 +6,9 @@ import hashlib
 import pathlib
 import subprocess
 import tempfile
-import zipfile
 
-ECDSA_SHA256 = "fe47cc92b4cee418236125c9ffbcd9bb01c8c34e74a4ba195d954bcb72824752"
-RSA_SHA256 = "8405aeb3572a4f98ed4b1a3ccb3f2f49e725462dd28ec4759d6a15d88855d19c"
+from cavp_rsp import records
+
 CURVES = {"P-192": 192, "P-256": 256, "P-384": 384}
 HASHES = {"SHA1": "SHA-1", "SHA224": "SHA-224", "SHA256": "SHA-256",
           "SHA384": "SHA-384", "SHA512": "SHA-512"}
@@ -20,39 +19,10 @@ EXPECTED = {"ecdsa pkv": 180, "ecdsa keypair": 150,
             "rsa keygen": 2200}
 
 
-def records(contents):
-    """Yield section, record; section and long-lived keys persist across blank lines."""
-    section = ""
-    context = {}
-    record = {}
-    for raw in contents.decode("ascii").splitlines() + [""]:
-        line = raw.strip()
-        if line.startswith("#"):
-            continue
-        if line.startswith("[") and line.endswith("]") and not line.startswith("[B."):
-            if record:
-                yield section, context | record
-                record = {}
-            section = line[1:-1]
-            context = {}
-            continue
-        if not line:
-            if record:
-                yield section, context | record
-                context.update({key: value for key, value in record.items()
-                                if key in ("n", "e", "d")})
-                record = {}
-            continue
-        if " = " in line:
-            key, value = line.split(" = ", 1)
-            record[key] = value
-
-
-def check_archive(path, expected):
-    actual = hashlib.sha256(path.read_bytes()).hexdigest()
-    if actual != expected:
-        raise ValueError(f"{path}: SHA-256 {actual}, expected {expected}")
-    return zipfile.ZipFile(path)
+def rsp(directory, name):
+    """Yield (section, record) from one response file in a vector directory."""
+    return records((directory / name).read_text(encoding="ascii"), carry=("n", "e", "d"),
+                   is_header=lambda header: not header.startswith("B."))
 
 
 def fixed_hex(value, width, allow_oversize=False):
@@ -61,11 +31,11 @@ def fixed_hex(value, width, allow_oversize=False):
     return value.zfill(max(2 * width, len(value) + len(value) % 2)).lower()
 
 
-def ec_vectors(archive, kind):
-    member = f"186-4ecdsatestvectors/{'PKV' if kind == 'pkv' else 'KeyPair'}.rsp"
+def ec_vectors(directory, kind):
+    member = f"{'PKV' if kind == 'pkv' else 'KeyPair'}.rsp"
     selected = []
     skipped = {}
-    for section, item in records(archive.read(member)):
+    for section, item in rsp(directory, member):
         curve = section.split(",", 1)[0]
         if not {"Qx", "Qy"} <= item.keys():
             continue
@@ -83,10 +53,10 @@ def ec_vectors(archive, kind):
     return selected, skipped
 
 
-def rsa_siggen15_vectors(archive):
+def rsa_siggen15_vectors(directory):
     """The .txt prompt has private d; the .rsp has matching public answers."""
-    prompt = list(records(archive.read("SigGen15_186-3.txt")))
-    answer = list(records(archive.read("SigGen15_186-3.rsp")))
+    prompt = list(rsp(directory, "SigGen15_186-3.txt"))
+    answer = list(rsp(directory, "SigGen15_186-3.rsp"))
     if len(prompt) != len(answer):
         raise ValueError("RSA prompt and answer record counts differ")
     selected = []
@@ -114,9 +84,9 @@ def rsa_siggen15_vectors(archive):
     return selected, skipped
 
 
-def rsa_siggenpss_vectors(archive):
-    prompt = list(records(archive.read("SigGenPSS_186-3.txt")))
-    answer = list(records(archive.read("SigGenPSS_186-3.rsp")))
+def rsa_siggenpss_vectors(directory):
+    prompt = list(rsp(directory, "SigGenPSS_186-3.txt"))
+    answer = list(rsp(directory, "SigGenPSS_186-3.rsp"))
     if len(prompt) != len(answer):
         raise ValueError("RSA PSS prompt and answer record counts differ")
     selected, skipped = [], {}
@@ -142,11 +112,11 @@ def rsa_siggenpss_vectors(archive):
     return selected, skipped
 
 
-def rsa_keygen_vectors(archive, exhaustive=False):
+def rsa_keygen_vectors(directory, exhaustive=False):
     """Validate fixed and varying exponents in each group, or every key."""
     groups = {}
     skipped = {}
-    for index, (section, item) in enumerate(records(archive.read("KeyGen_186-3.rsp"))):
+    for index, (section, item) in enumerate(rsp(directory, "KeyGen_186-3.rsp")):
         if not {"e", "p", "q", "n", "d"} <= item.keys():
             raise ValueError(f"RSA KeyGen record {index}: missing key material")
         bits = len(item["n"]) * 4
@@ -186,10 +156,10 @@ def rsa_keygen_vectors(archive, exhaustive=False):
     return selected, skipped
 
 
-def ecdsa_signature_vectors(archive, kind):
-    member = f"186-4ecdsatestvectors/{'SigGen' if kind == 'siggen' else 'SigVer'}.rsp"
+def ecdsa_signature_vectors(directory, kind):
+    member = f"{'SigGen' if kind == 'siggen' else 'SigVer'}.rsp"
     selected, skipped = [], {}
-    for index, (section, item) in enumerate(records(archive.read(member))):
+    for index, (section, item) in enumerate(rsp(directory, member)):
         if not {"Msg", "Qx", "Qy", "R", "S"} <= item.keys():
             continue
         curve, hash_name = section.split(",", 1)
@@ -209,10 +179,10 @@ def ecdsa_signature_vectors(archive, kind):
     return selected, skipped
 
 
-def rsa_signature_vectors(archive, kind):
+def rsa_signature_vectors(directory, kind):
     member = "SigVer15_186-3.rsp" if kind == "v15" else "SigVerPSS_186-3.rsp"
     selected, skipped = [], {}
-    for index, (section, item) in enumerate(records(archive.read(member))):
+    for index, (section, item) in enumerate(rsp(directory, member)):
         if not {"n", "e", "SHAAlg", "Msg", "S", "Result"} <= item.keys():
             continue
         bits = int(section.removeprefix("mod = "))
@@ -260,8 +230,8 @@ def check_count(label, lines, skip):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--ecdsa-archive", type=pathlib.Path)
-    parser.add_argument("--rsa-archive", type=pathlib.Path)
+    parser.add_argument("--ecdsa-dir", type=pathlib.Path)
+    parser.add_argument("--rsa-dir", type=pathlib.Path)
     parser.add_argument("--ecdsa-reader")
     parser.add_argument("--ecdsa-signature-reader")
     parser.add_argument("--rsa-generation-reader")
@@ -270,44 +240,44 @@ if __name__ == "__main__":
     parser.add_argument("--rsa-keygen-all", action="store_true",
                         help="validate all 2,200 CAVP KeyGen private keys (takes hours)")
     args = parser.parse_args()
-    if args.ecdsa_archive:
-        archive = check_archive(args.ecdsa_archive, ECDSA_SHA256)
+    if args.ecdsa_dir:
+        directory = args.ecdsa_dir
         for kind in ("pkv", "keypair"):
-            lines, skip = ec_vectors(archive, kind)
+            lines, skip = ec_vectors(directory, kind)
             check_count(f"ecdsa {kind}", lines, skip)
             if args.ecdsa_reader:
                 run_reader(args.ecdsa_reader, lines, skip, f"ecdsa {kind}")
             else:
                 print(f"ecdsa {kind}: selected {len(lines)}, unsupported {sum(skip.values())}")
         for kind in ("siggen", "sigver"):
-            lines, skip = ecdsa_signature_vectors(archive, kind)
+            lines, skip = ecdsa_signature_vectors(directory, kind)
             check_count(f"ecdsa {kind}", lines, skip)
             if args.ecdsa_signature_reader:
                 run_reader(args.ecdsa_signature_reader, lines, skip, f"ecdsa {kind}")
             else:
                 print(f"ecdsa {kind}: selected {len(lines)}, unsupported {sum(skip.values())}")
-    if args.rsa_archive:
-        archive = check_archive(args.rsa_archive, RSA_SHA256)
-        lines, skip = rsa_siggen15_vectors(archive)
+    if args.rsa_dir:
+        directory = args.rsa_dir
+        lines, skip = rsa_siggen15_vectors(directory)
         check_count("rsa siggen15", lines, skip)
         if args.rsa_generation_reader:
             run_reader(args.rsa_generation_reader, lines, skip, "rsa siggen15")
         else:
             print(f"rsa siggen15: selected {len(lines)}, unsupported {sum(skip.values())}")
         for kind in ("v15", "pss"):
-            lines, skip = rsa_signature_vectors(archive, kind)
+            lines, skip = rsa_signature_vectors(directory, kind)
             check_count(f"rsa sigver {kind}", lines, skip)
             if args.rsa_signature_reader:
                 run_reader(args.rsa_signature_reader, lines, skip, f"rsa sigver {kind}", "--signature-vectors")
             else:
                 print(f"rsa sigver {kind}: selected {len(lines)}, unsupported {sum(skip.values())}")
-        lines, skip = rsa_siggenpss_vectors(archive)
+        lines, skip = rsa_siggenpss_vectors(directory)
         check_count("rsa siggenpss", lines, skip)
         if args.rsa_generation_reader:
             run_reader(args.rsa_generation_reader, lines, skip, "rsa siggenpss")
         else:
             print(f"rsa siggenpss: selected {len(lines)}, unsupported {sum(skip.values())}")
-        lines, skip = rsa_keygen_vectors(archive, args.rsa_keygen_all)
+        lines, skip = rsa_keygen_vectors(directory, args.rsa_keygen_all)
         check_count("rsa keygen", lines, skip)
         if args.rsa_keygen_reader:
             run_reader(args.rsa_keygen_reader, lines, skip, "rsa keygen", "--vectors")

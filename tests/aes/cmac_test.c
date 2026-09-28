@@ -8,6 +8,7 @@
 
 #include <tiny_crypto/aes.h>
 #include "munit.h"
+#include "cavp.h"
 #include "test_io.h"
 #include "test_util.h"
 
@@ -16,7 +17,7 @@
 #include <string.h>
 
 #ifndef CMAC_WYCHEPROOF_FILE
-#define CMAC_WYCHEPROOF_FILE "tests/vectors/aes/cmac/aes_cmac_test.json"
+#define CMAC_WYCHEPROOF_FILE "tests/vectors/wycheproof/testvectors_v1/aes_cmac_test.json"
 #endif
 
 #ifndef CMAC_CAVP_DIR
@@ -491,10 +492,11 @@ static MunitResult test_cmac_wycheproof(const MunitParameter params[], void* dat
 #define CMAC_CAVP_LINE_MAX (CMAC_CAVP_MSG_MAX * 2u + 64u)
 
 /* Parse one full CAVP .rsp for the active TC_AES_KEYLEN. Mlen=0 → empty message. */
-static MunitResult cmac_run_cavp_file(const char* path, int is_verify,
+static MunitResult cmac_run_cavp_file(const char* name, int is_verify,
                                       unsigned* ran_out)
 {
-  FILE* file;
+  tc_cavp_reader reader;
+  tc_cavp_event event;
   static char line[CMAC_CAVP_LINE_MAX];
   static uint8_t msg[CMAC_CAVP_MSG_MAX];
   uint8_t key[32];
@@ -510,78 +512,53 @@ static MunitResult cmac_run_cavp_file(const char* path, int is_verify,
   unsigned ran = 0;
   unsigned failed = 0;
 
-  file = tc_test_fopen(path, "rb");
-  if (file == NULL)
+  if (!tc_cavp_open(&reader, CMAC_CAVP_DIR, name, line, sizeof line))
     return MUNIT_ERROR;
 
-  while (fgets(line, (int)sizeof(line), file) != NULL)
+  while ((event = tc_cavp_next(&reader)) != TC_CAVP_END)
   {
-    char* p = line;
-    while (*p == ' ' || *p == '\t')
-      ++p;
-    if (*p == '#' || *p == '\0' || *p == '\n' || *p == '\r')
+    const char* value = reader.value;
+    if (event == TC_CAVP_FAILURE)
+    {
+      tc_cavp_close(&reader);
+      return MUNIT_ERROR;
+    }
+    if (event != TC_CAVP_FIELD)
       continue;
 
-    if (strncmp(p, "Count", 5) == 0)
+    if (tc_cavp_is(&reader, "Count"))
     {
       have_key = have_msg = have_mac = have_result = 0;
       key_len = msg_len = mac_len = mlen = tlen = 0;
-      continue;
     }
-    if (strncmp(p, "Mlen", 4) == 0)
+    else if (tc_cavp_is(&reader, "Mlen"))
+      mlen = (size_t)strtoul(value, NULL, 10);
+    else if (tc_cavp_is(&reader, "Tlen"))
+      tlen = (size_t)strtoul(value, NULL, 10);
+    else if (tc_cavp_is(&reader, "Key"))
     {
-      char* eq = strchr(p, '=');
-      if (eq != NULL)
-        mlen = (size_t)strtoul(eq + 1, NULL, 10);
-      continue;
+      key_len = tc_test_decode_hex_relaxed(value, key, sizeof(key));
+      have_key = (key_len != SIZE_MAX);
     }
-    if (strncmp(p, "Tlen", 4) == 0)
+    else if (tc_cavp_is(&reader, "Msg"))
     {
-      char* eq = strchr(p, '=');
-      if (eq != NULL)
-        tlen = (size_t)strtoul(eq + 1, NULL, 10);
-      continue;
-    }
-    if (strncmp(p, "Key", 3) == 0)
-    {
-      char* eq = strchr(p, '=');
-      if (eq != NULL)
+      if (mlen == 0)
       {
-        key_len = tc_test_decode_hex_relaxed(eq + 1, key, sizeof(key));
-        have_key = (key_len != SIZE_MAX);
+        msg_len = 0;
+        have_msg = 1;
       }
-      continue;
-    }
-    if (strncmp(p, "Msg", 3) == 0)
-    {
-      char* eq = strchr(p, '=');
-      if (eq != NULL)
+      else if (mlen > CMAC_CAVP_MSG_MAX)
+        have_msg = 0;
+      else
       {
-        if (mlen == 0)
-        {
-          msg_len = 0;
-          have_msg = 1;
-        }
-        else if (mlen > CMAC_CAVP_MSG_MAX)
-        {
-          have_msg = 0;
-        }
-        else
-        {
-          msg_len = tc_test_decode_hex_relaxed(eq + 1, msg, CMAC_CAVP_MSG_MAX);
-          have_msg = (msg_len != SIZE_MAX && msg_len == mlen);
-        }
+        msg_len = tc_test_decode_hex_relaxed(value, msg, CMAC_CAVP_MSG_MAX);
+        have_msg = (msg_len != SIZE_MAX && msg_len == mlen);
       }
-      continue;
     }
-    if (strncmp(p, "Mac", 3) == 0)
+    else if (tc_cavp_is(&reader, "Mac"))
     {
-      char* eq = strchr(p, '=');
-      if (eq != NULL)
-      {
-        mac_len = tc_test_decode_hex_relaxed(eq + 1, mac, sizeof(mac));
-        have_mac = (mac_len != SIZE_MAX && tlen != 0 && mac_len == tlen);
-      }
+      mac_len = tc_test_decode_hex_relaxed(value, mac, sizeof(mac));
+      have_mac = (mac_len != SIZE_MAX && tlen != 0 && mac_len == tlen);
       if (!is_verify && have_key && have_msg && have_mac &&
           key_len == TC_AES_KEYLEN)
       {
@@ -591,18 +568,10 @@ static MunitResult cmac_run_cavp_file(const char* path, int is_verify,
           ++failed;
         have_key = have_msg = have_mac = 0;
       }
-      continue;
     }
-    if (strncmp(p, "Result", 6) == 0)
+    else if (tc_cavp_is(&reader, "Result"))
     {
-      char* eq = strchr(p, '=');
-      result_pass = 0;
-      if (eq != NULL)
-      {
-        while (*eq == '=' || *eq == ' ')
-          ++eq;
-        result_pass = (*eq == 'P' || *eq == 'p');
-      }
+      result_pass = (*value == 'P' || *value == 'p');
       have_result = 1;
       if (is_verify && have_key && have_msg && have_mac && have_result &&
           key_len == TC_AES_KEYLEN)
@@ -619,11 +588,10 @@ static MunitResult cmac_run_cavp_file(const char* path, int is_verify,
           ++failed;
         have_key = have_msg = have_mac = have_result = 0;
       }
-      continue;
     }
   }
 
-  fclose(file);
+  tc_cavp_close(&reader);
   if (ran_out != NULL)
     *ran_out = ran;
   munit_assert_uint(failed, ==, 0);
@@ -633,7 +601,7 @@ static MunitResult cmac_run_cavp_file(const char* path, int is_verify,
 
 static MunitResult test_cmac_cavp_gen(const MunitParameter params[], void* data)
 {
-  char path[256];
+  const char* name;
   unsigned ran = 0;
   MunitResult r;
 
@@ -641,13 +609,13 @@ static MunitResult test_cmac_cavp_gen(const MunitParameter params[], void* data)
   (void) data;
 
 #if TC_AES_KEY_BITS == 128
-  snprintf(path, sizeof(path), "%s/CMACGenAES128.rsp", CMAC_CAVP_DIR);
+  name = "CMACGenAES128.rsp";
 #elif TC_AES_KEY_BITS == 192
-  snprintf(path, sizeof(path), "%s/CMACGenAES192.rsp", CMAC_CAVP_DIR);
+  name = "CMACGenAES192.rsp";
 #else
-  snprintf(path, sizeof(path), "%s/CMACGenAES256.rsp", CMAC_CAVP_DIR);
+  name = "CMACGenAES256.rsp";
 #endif
-  r = cmac_run_cavp_file(path, 0, &ran);
+  r = cmac_run_cavp_file(name, 0, &ran);
   if (r != MUNIT_OK)
     return r;
   /* Full NIST CAVS 11.0 CMAC Gen AES counts. */
@@ -663,7 +631,7 @@ static MunitResult test_cmac_cavp_gen(const MunitParameter params[], void* data)
 
 static MunitResult test_cmac_cavp_ver(const MunitParameter params[], void* data)
 {
-  char path[256];
+  const char* name;
   unsigned ran = 0;
   MunitResult r;
 
@@ -671,13 +639,13 @@ static MunitResult test_cmac_cavp_ver(const MunitParameter params[], void* data)
   (void) data;
 
 #if TC_AES_KEY_BITS == 128
-  snprintf(path, sizeof(path), "%s/CMACVerAES128.rsp", CMAC_CAVP_DIR);
+  name = "CMACVerAES128.rsp";
 #elif TC_AES_KEY_BITS == 192
-  snprintf(path, sizeof(path), "%s/CMACVerAES192.rsp", CMAC_CAVP_DIR);
+  name = "CMACVerAES192.rsp";
 #else
-  snprintf(path, sizeof(path), "%s/CMACVerAES256.rsp", CMAC_CAVP_DIR);
+  name = "CMACVerAES256.rsp";
 #endif
-  r = cmac_run_cavp_file(path, 1, &ran);
+  r = cmac_run_cavp_file(name, 1, &ran);
   if (r != MUNIT_OK)
     return r;
   /* Full NIST CAVS 11.0 CMAC Ver AES counts. */

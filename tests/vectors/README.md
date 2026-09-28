@@ -1,17 +1,23 @@
 # Vendored test vectors
 
-These files are test inputs. They are excluded from the installed library.
+These files are test inputs. They are excluded from the installed library and
+from source archives. Each directory's README records the source, version,
+license and retained scope, and its `SHA256SUMS` lists every file's digest.
+`tests/test_vector_manifests.py` checks the manifests.
 
-`wycheproof.zip` is the C2SP Wycheproof archive at commit
-`3fa63dd0344abb611f1fb1d77e119938603ea230` (Apache-2.0). Its SHA-256 is
-`5dc00fae83575135c3147bfd4a04ee8889b1f0482ac6ca21aa486a8abccf2260`.
-The runner verifies that digest before reading any vectors.
+| Directory | Contents |
+| --- | --- |
+| `aes/cavp/` | NIST CAVP AES ECB, CBC, OFB, GCM and CCM response files |
+| `aes/cmac/` | NIST CAVP AES CMAC response files |
+| `aes/eax/` | EAX paper vectors and EAX' worked examples |
+| `des/` | NIST CAVP TDES KAT, MMT, MCT and CMAC files, and generated edge cases |
+| `hash/` | NIST CAVP SHA and HMAC response files |
+| `kda/` | NIST KAS 2014 single-step KDF answers |
+| `kdf/cavp/` | NIST CAVP SP 800-108 KBKDF response files |
+| `kmac/` | NIST ACVP and OpenSSL KMAC256 answers |
+| `nist_dss/` | NIST CAVP FIPS 186-3 RSA and FIPS 186-4 ECDSA files |
+| `nist_ecccdh/` | NIST CAVP ECC CDH primitive vectors |
+| `wycheproof/` | C2SP Wycheproof `testvectors_v1` at a pinned commit |
 
-The NIST DSS archives and their checksums are documented in
-`nist_dss/README.md`.
-
-`nist_ecccdh.zip` is NIST's ECCCDH Primitive Test Vectors archive from the
-[CAVP component-testing page](https://csrc.nist.gov/projects/cryptographic-algorithm-validation-program/component-testing).
-Its SHA-256 is
-`5fff092551f2d72e89a3d9362711878708f9a14b502f0dfae819649105b0ea39`.
-The runner checks that digest before using the 50 supported answers.
+The PIV, TWIC, X.509 and EAC corpora document their sources in their own
+READMEs.

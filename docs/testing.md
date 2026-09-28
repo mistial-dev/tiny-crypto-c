@@ -10,7 +10,7 @@ development headers and libraries.
 
 Start with `make test`. Use [checked-in suites](#checked-in-suites) for full vector
 and sanitizer runs, or [external vectors](#cryptographic-vectors) to include the
-pinned archives and capture corpora. The sections below describe focused suites.
+pinned vectors and capture corpora. The sections below describe focused suites.
 
 The OpenSSL-enabled `test_card_authentication` target exercises synthetic
 card-certificate validation followed by a fresh 9E challenge and native signature
@@ -69,7 +69,7 @@ runs tests labelled `extended`, including exhaustive RSA and corpus cases. The
 MemorySanitizer targets use the same core and full split on Linux with Clang.
 
 Push CI runs the core sanitizer suite with GCC and Clang. The **Full test suite**
-GitHub Actions workflow runs the vendored Wycheproof and NIST archives in
+GitHub Actions workflow runs the vendored Wycheproof and NIST vectors in
 release and sanitizer builds when started through `workflow_dispatch`.
 
 Use `act` to run the push sanitizer checks in Linux. `--bind` includes current
@@ -665,8 +665,10 @@ python3 tools/unicode_tables.py --data-dir "$unicode_dir" \
 
 ### Cryptographic vectors
 
-The cryptographic archives live under `tests/vectors/` and their adapters
-check pinned digests. External parser corpora stay outside the repository.
+The cryptographic vectors live under `tests/vectors/` as unmodified files.
+Each directory's README records the source and retained scope, and
+`test_vector_manifests` checks every file against the directory's
+`SHA256SUMS`. External parser corpora stay outside the repository.
 
 ```sh
 vector_dir=$(mktemp -d /tmp/tiny-crypto-vectors.XXXXXX)
@@ -704,12 +706,12 @@ Also check for `test_wycheproof_ecdsa`, `test_wycheproof_rsa_signatures`,
 `test_wycheproof_rsa_oaep`, `test_cms_native`, and the OpenSSL RSA private-operation
 tests. On macOS, this configuration includes `test_twic_authenticate_command`.
 
-The vendored FIPS 186 archives enable `test_nist_dss_*`. ECDSA tests cover
+The vendored FIPS 186 vectors enable `test_nist_dss_*`. ECDSA tests cover
 supported public-key, signature, and key-pair records;
 RSA tests cover signature generation and verification. The default RSA KeyGen
 test validates a fixed- and a varying-exponent key in each of 14 supported
 method and modulus groups, for 28 records. Run
-`python3 tests/nist_dss.py --rsa-archive tests/vectors/nist_dss/186-3rsatestvectors.zip
+`python3 tests/nist_dss.py --rsa-dir tests/vectors/nist_dss/186-3rsa
 --rsa-keygen-reader /absolute/path/to/build/test_rsa_keygen_reader --rsa-keygen-all`
 to validate all 2,200 recorded keys; this takes hours. CAVP's seed-to-key
 candidate methods differ from the library's generator, so these records check
@@ -769,7 +771,7 @@ SIV follows its separate API contract: an authentication mismatch wipes the
 output, whether separate or in-place. The two SIV formats differ in their
 associated-data components and whether the synthetic IV prefixes the ciphertext.
 
-The pinned archive also contains algorithms and formats outside this API:
+The pinned Wycheproof tree also contains algorithms and formats outside this API:
 PKCS#5-padded CBC, AES key wrap, XTS, FF1, GCM-SIV, chunked encryption, HKDF,
 PBKDF2, KMAC128, SHA-3 HMAC, and signature operations. Those are not counted.
 Raw CBC has no padding-validation API to test against PKCS#5 rejection cases.
@@ -922,7 +924,7 @@ one-byte or 256-byte binary labels. Native limbs cover the complete parameter
 matrix. Byte limbs cover every RSA-1024 combination plus the SHA-256
 configuration at RSA-2048 and RSA-3072.
 
-With `TINY_CRYPTO_TEST_WYCHEPROOF_ARCHIVE` configured, run
+With `TINY_CRYPTO_TEST_WYCHEPROOF_DIR` configured, run
 `ctest --test-dir build -R '^test_wycheproof_rsa_oaep$' --output-on-failure`
 to check the pinned OAEP corpus with both limb profiles. The runner includes
 supported groups from mixed-parameter files and reports excluded parameter

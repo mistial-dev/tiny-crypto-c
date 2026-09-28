@@ -8,12 +8,10 @@ import json
 import os
 from pathlib import Path
 import tempfile
-import zipfile
 from munit_runner import run_reader
 
-REVISION = "3fa63dd0344abb611f1fb1d77e119938603ea230"
-ARCHIVE_SHA256 = "5dc00fae83575135c3147bfd4a04ee8889b1f0482ac6ca21aa486a8abccf2260"
-# https://github.com/C2SP/wycheproof, testvectors_v1, Apache-2.0.
+# tests/vectors/wycheproof holds the pinned C2SP Wycheproof testvectors_v1
+# tree. Its README records the source commit, and SHA256SUMS the file digests.
 
 
 def ec_records(document, bits):
@@ -272,7 +270,8 @@ def primality_records(document):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--archive", type=Path, required=True)
+    parser.add_argument("--vectors", type=Path, required=True,
+                        help="Wycheproof directory containing testvectors_v1")
     parser.add_argument("--ec-reader", type=Path, action="append", default=[])
     parser.add_argument("--ecdsa-reader", type=Path, action="append", default=[])
     parser.add_argument("--rsa-signature-reader", type=Path, action="append", default=[])
@@ -287,12 +286,16 @@ def main():
     if not any((args.ec_reader, args.ecdsa_reader, args.rsa_signature_reader, args.rsa_generation_reader, args.primality_reader, args.rsa_oaep_reader,
                 args.kmac_reader, args.cmac_reader, args.hmac_reader, args.aead_reader)):
         parser.error("At least one reader is required")
-    if hashlib.sha256(args.archive.read_bytes()).hexdigest() != ARCHIVE_SHA256:
-        raise AssertionError("Unexpected Wycheproof archive digest")
-    with zipfile.ZipFile(args.archive) as archive, tempfile.TemporaryDirectory(prefix="tiny-crypto-wycheproof-") as temporary:
+    vectors = args.vectors / "testvectors_v1"
+    names_all = sorted(path.name for path in vectors.iterdir())
+
+    def read(name):
+        return (vectors / name).read_bytes()
+
+    with tempfile.TemporaryDirectory(prefix="tiny-crypto-wycheproof-") as temporary:
         if args.primality_reader:
-            name = f"wycheproof-{REVISION}/testvectors_v1/primality_test.json"
-            records, counts, derived, exclusions = primality_records(json.loads(archive.read(name)))
+            name = "primality_test.json"
+            records, counts, derived, exclusions = primality_records(json.loads(read(name)))
             fixture = Path(temporary) / "primality.txt"
             fixture.write_text(records)
             for reader in args.primality_reader:
@@ -301,65 +304,65 @@ def main():
                   f"{dict(derived)}; out-of-scope: {dict(exclusions)}",flush=True)
         if args.rsa_generation_reader:
             totals, exclusions = Counter(), Counter()
-            prefix = f"wycheproof-{REVISION}/testvectors_v1/rsa_pkcs1_"
-            names = [name for name in sorted(archive.namelist())
+            prefix = "rsa_pkcs1_"
+            names = [name for name in names_all
                      if name.startswith(prefix) and name.endswith("_sig_gen_test.json")]
             if not names:
                 raise AssertionError("Missing RSA generation corpus")
             for name in names:
-                records, counts = rsa_generation_records(json.loads(archive.read(name)),exclusions)
+                records, counts = rsa_generation_records(json.loads(read(name)),exclusions)
                 if records:
                     fixture = Path(temporary) / "rsa-generation.txt"
                     fixture.write_text(records)
                     for reader in args.rsa_generation_reader:
                         run_reader([reader,"--generation-vectors",fixture])
                 totals.update(counts)
-                print(f"{name.rsplit('/',1)[-1]}: {dict(counts)}",flush=True)
+                print(f"{name}: {dict(counts)}",flush=True)
             if not totals["valid"] or not totals["acceptable"]:
                 raise AssertionError("Incomplete RSA generation verdict coverage")
             print(f"RSA generation tested: {dict(totals)}; out-of-scope parameters: {dict(exclusions)}",flush=True)
         if args.rsa_signature_reader:
             totals, exclusions = Counter(), Counter()
-            prefixes = tuple(f"wycheproof-{REVISION}/testvectors_v1/{name}" for name in ("rsa_pss_", "rsa_signature_"))
-            for name in sorted(archive.namelist()):
+            prefixes = ("rsa_pss_", "rsa_signature_")
+            for name in names_all:
                 if not name.startswith(prefixes) or not name.endswith("_test.json"):
                     continue
-                records, counts = rsa_signature_records(json.loads(archive.read(name)), exclusions)
+                records, counts = rsa_signature_records(json.loads(read(name)), exclusions)
                 if records:
                     fixture = Path(temporary) / "rsa-signatures.txt"
                     fixture.write_text(records)
                     for reader in args.rsa_signature_reader:
                         run_reader([reader, "--signature-vectors", fixture])
                 totals.update(counts)
-                print(f"{name.rsplit('/', 1)[-1]}: {dict(counts)}", flush=True)
+                print(f"{name}: {dict(counts)}", flush=True)
             if not totals["valid"] or not totals["invalid"]:
                 raise AssertionError("Incomplete RSA signature positive/negative coverage")
             print(f"RSA signatures tested: {dict(totals)}; out-of-scope parameters: {dict(exclusions)}", flush=True)
         if args.rsa_oaep_reader:
             totals, exclusions = Counter(), Counter()
-            prefix = f"wycheproof-{REVISION}/testvectors_v1/rsa_oaep_"
-            for name in sorted(archive.namelist()):
+            prefix = "rsa_oaep_"
+            for name in names_all:
                 if not name.startswith(prefix) or not name.endswith("_test.json"):
                     continue
-                records, counts = oaep_records(json.loads(archive.read(name)), exclusions)
+                records, counts = oaep_records(json.loads(read(name)), exclusions)
                 if records:
                     fixture = Path(temporary) / "rsa-oaep.txt"
                     fixture.write_text(records)
                     for reader in args.rsa_oaep_reader:
                         run_reader([reader, "--vectors", fixture])
                 totals.update(counts)
-                print(f"{name.rsplit('/', 1)[-1]}: {dict(counts)}", flush=True)
+                print(f"{name}: {dict(counts)}", flush=True)
             if not totals["valid"] or not totals["invalid"]:
                 raise AssertionError("Incomplete OAEP positive/negative coverage")
             print(f"OAEP tested: {dict(totals)}; out-of-scope parameters: {dict(exclusions)}", flush=True)
         if args.ecdsa_reader:
             curves = {f"secp{bits}r1": bits for bits in (192, 256, 384)}
             totals, exclusions = Counter(), Counter()
-            prefix = f"wycheproof-{REVISION}/testvectors_v1/ecdsa_"
-            for name in sorted(archive.namelist()):
+            prefix = "ecdsa_"
+            for name in names_all:
                 if not name.startswith(prefix) or not name.endswith("_test.json"):
                     continue
-                document = json.loads(archive.read(name))
+                document = json.loads(read(name))
                 groups = document["testGroups"]
                 if not groups or sum(len(g["tests"]) for g in groups) != document["numberOfTests"]:
                     raise AssertionError("Incomplete ECDSA document")
@@ -383,7 +386,7 @@ def main():
                 for reader in args.ecdsa_reader:
                     run_reader([reader, option, fixture])
                 totals.update(counts)
-                print(f"{name.rsplit('/', 1)[-1]}: {dict(counts)}", flush=True)
+                print(f"{name}: {dict(counts)}", flush=True)
             if not totals["valid"] or not totals["invalid"]:
                 raise AssertionError("Incomplete ECDSA positive/negative coverage")
             print(f"ECDSA tested: {dict(totals)}; out-of-scope curves: {dict(exclusions)}", flush=True)
@@ -396,7 +399,7 @@ def main():
                 name = ("aes_siv_cmac_test.json" if algorithm == "siv" else
                         "aead_aes_siv_cmac_test.json" if algorithm == "siv-aead" else
                         f"aes_{algorithm}_test.json")
-                document = json.loads(archive.read(f"wycheproof-{REVISION}/testvectors_v1/{name}"))
+                document = json.loads(read(name))
                 records = {bits: [] for bits in readers}
                 counts = Counter()
                 for group in document["testGroups"]:
@@ -432,20 +435,18 @@ def main():
         if args.hmac_reader:
             for bits in (1, 224, 256, 384, 512):
                 name = f"hmac_sha{bits}_test.json"
-                raw = archive.read(f"wycheproof-{REVISION}/testvectors_v1/{name}")
-                document = json.loads(raw)
+                document = json.loads(read(name))
                 counts = Counter(case["result"] for group in document["testGroups"] for case in group["tests"])
                 if set(counts) != {"valid", "invalid"} or sum(counts.values()) != document["numberOfTests"]:
                     raise AssertionError(f"Incomplete HMAC coverage: {name}")
-                (Path(temporary) / name).write_bytes(raw)
                 print(f"{name}: {counts['valid']} valid, {counts['invalid']} invalid", flush=True)
-            environment = dict(os.environ, TC_TEST_HMAC_WYCHEPROOF_DIR=temporary)
+            environment = dict(os.environ, TC_TEST_HMAC_WYCHEPROOF_DIR=str(vectors))
             for reader in args.hmac_reader:
                 run_reader([reader, "/tiny-crypto-c/hmac/wycheproof"], environment)
         for bits in ((256, 384) if args.ec_reader else ()):
             for suffix in ("_ecpoint", ""):
                 name = f"ecdh_secp{bits}r1{suffix}_test.json"
-                document = json.loads(archive.read(f"wycheproof-{REVISION}/testvectors_v1/{name}"))
+                document = json.loads(read(name))
                 records, counts = ec_records(document, bits)
                 fixture = Path(temporary) / "vectors.txt"
                 fixture.write_text(records)
@@ -457,7 +458,7 @@ def main():
                               ("aes_cmac_test.json", args.cmac_reader)):
             if not readers:
                 continue
-            document = json.loads(archive.read(f"wycheproof-{REVISION}/testvectors_v1/{name}"))
+            document = json.loads(read(name))
             counts = Counter()
             records = []
             for group in document["testGroups"]:

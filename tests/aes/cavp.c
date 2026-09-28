@@ -9,7 +9,6 @@
 #include <tiny_crypto/aes.h>
 #include "cavp.h"
 #include "munit.h"
-#include "test_io.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -61,97 +60,45 @@ static void cavp_record_clear(struct cavp_record* record)
   memset(record, 0, sizeof(*record));
 }
 
+/* Decode a whole hex value into a new allocation. An empty value yields NULL
+ * with length 0. */
 static int cavp_decode_hex(const char* text, uint8_t** output, size_t* length)
 {
-  const char* p = text;
-  size_t digits = 0;
-  size_t i = 0;
-  uint8_t* result;
+  const size_t digits = strlen(text);
+  uint8_t* result = digits == 0 ? NULL : (uint8_t*)malloc(digits / 2u);
+  long decoded;
 
-  while (*p != '\0' && *p != '\n' && *p != '\r')
-  {
-    if (tc_cavp_hex_nibble((unsigned char)*p) >= 0)
-      ++digits;
-    ++p;
-  }
-  if ((digits & 1u) != 0)
-    return 0;
-
-  result = digits == 0 ? NULL : (uint8_t*)malloc(digits / 2u);
   if (digits != 0 && result == NULL)
     return 0;
-  p = text;
-  while (*p != '\0' && *p != '\n' && *p != '\r')
+  decoded = tc_cavp_parse_hex(text, result, digits / 2u);
+  if (decoded < 0 || (size_t)decoded * 2u != digits)
   {
-    const int high = tc_cavp_hex_nibble((unsigned char)*p);
-    if (high >= 0)
-    {
-      const char* q = p + 1;
-      int low;
-      while (*q != '\0' && *q != '\n' && *q != '\r' &&
-             tc_cavp_hex_nibble((unsigned char)*q) < 0)
-        ++q;
-      if (*q == '\0' || *q == '\n' || *q == '\r')
-      {
-        free(result);
-        return 0;
-      }
-      low = tc_cavp_hex_nibble((unsigned char)*q);
-      result[i++] = (uint8_t)((high << 4) | low);
-      p = q;
-    }
-    ++p;
+    free(result);
+    return 0;
   }
   *output = result;
-  *length = i;
+  *length = (size_t)decoded;
   return 1;
 }
 
-static const char* cavp_value(const char* line)
+/* Replace *output with the current field's decoded value. */
+static int cavp_take(const tc_cavp_reader* reader, uint8_t** output, size_t* length)
 {
-  const char* p = strchr(line, '=');
-  return p == NULL ? NULL : p + 1;
+  free(*output);
+  *output = NULL;
+  *length = 0;
+  return cavp_decode_hex(reader->value, output, length);
 }
 
-static int cavp_field(const char* line, const char* name,
-                      uint8_t** output, size_t* length)
+/* One line buffer serves every file. GCM and CCM lines reach 1 MiB. */
+static char cavp_line[1024 * 1024];
+
+static int cavp_open(tc_cavp_reader* reader, const char* relative)
 {
-  const size_t name_len = strlen(name);
-  const char* value;
-
-  if (strncmp(line, name, name_len) != 0 ||
-      (line[name_len] != ' ' && line[name_len] != '='))
-    return 0;
-  value = cavp_value(line);
-  return value != NULL && cavp_decode_hex(value, output, length);
-}
-
-static int cavp_append(uint8_t** target, size_t* target_len,
-                       const char* text)
-{
-  uint8_t* part = NULL;
-  size_t part_len = 0;
-  uint8_t* resized;
-
-  if (!cavp_decode_hex(text, &part, &part_len))
-    return 0;
-  if (part_len > SIZE_MAX - *target_len)
-  {
-    free(part);
-    return 0;
-  }
-  resized = (uint8_t*)realloc(*target, *target_len + part_len);
-  if (part_len != 0 && resized == NULL)
-  {
-    free(part);
-    return 0;
-  }
-  if (part_len != 0)
-    memcpy(resized + *target_len, part, part_len);
-  free(part);
-  *target = resized;
-  *target_len += part_len;
-  return 1;
+  if (tc_cavp_open(reader, CAVP_VECTOR_DIR, relative, cavp_line, sizeof cavp_line))
+    return 1;
+  fprintf(stderr, "CAVP file not found: %s/%s\n", CAVP_VECTOR_DIR, relative);
+  return 0;
 }
 
 static int cavp_compare(const char* file, size_t count, const char* field,
@@ -317,9 +264,9 @@ static int cavp_mct_intermediates(const char* response_file, size_t count,
                                   int encrypt,
                                   uint8_t expected[5][TC_AES_BLOCKLEN])
 {
-  char path[512];
-  char* line;
-  FILE* file;
+  char relative[512];
+  tc_cavp_reader reader;
+  tc_cavp_event event;
   size_t name_len = strlen(response_file);
   size_t current = (size_t)-1;
   size_t found = 0;
@@ -327,38 +274,28 @@ static int cavp_mct_intermediates(const char* response_file, size_t count,
 
   if (name_len < 4 || strcmp(response_file + name_len - 4, ".rsp") != 0)
     return 0;
-  snprintf(path, sizeof(path), "%s/%.*s.txt", CAVP_VECTOR_DIR,
-           (int)(name_len - 4), response_file);
-  file = tc_test_fopen(path, "r");
-  if (file == NULL)
+  snprintf(relative, sizeof(relative), "%.*s.txt", (int)(name_len - 4), response_file);
+  if (!cavp_open(&reader, relative))
     return 0;
-  line = (char*)malloc(4096);
-  if (line == NULL)
-  {
-    fclose(file);
-    return 0;
-  }
 
-  while (fgets(line, 4096, file) != NULL)
+  while ((event = tc_cavp_next(&reader)) != TC_CAVP_END && event != TC_CAVP_FAILURE)
   {
-    const char* value;
     uint8_t* decoded = NULL;
     size_t decoded_len = 0;
 
-    if (strstr(line, "[ENCRYPT]") != NULL)
+    if (event == TC_CAVP_HEADER)
     {
-      section_encrypt = 1;
+      if (tc_cavp_is(&reader, "ENCRYPT"))
+        section_encrypt = 1;
+      else if (tc_cavp_is(&reader, "DECRYPT"))
+        section_encrypt = 0;
       continue;
     }
-    if (strstr(line, "[DECRYPT]") != NULL)
-    {
-      section_encrypt = 0;
+    if (event != TC_CAVP_FIELD)
       continue;
-    }
-    if (strncmp(line, "COUNT", 5) == 0)
+    if (tc_cavp_is(&reader, "COUNT"))
     {
-      value = cavp_value(line);
-      current = value == NULL ? (size_t)-1 : (size_t)strtoull(value, NULL, 10);
+      current = (size_t)strtoull(reader.value, NULL, 10);
       if (section_encrypt == encrypt && current == count)
         found = 0;
       else if (section_encrypt == encrypt && current > count && found == 5)
@@ -366,11 +303,10 @@ static int cavp_mct_intermediates(const char* response_file, size_t count,
       continue;
     }
     if (section_encrypt != encrypt || current != count ||
-        strstr(line, "Intermediate") == NULL ||
-        strstr(line, encrypt ? "CIPHERTEXT" : "PLAINTEXT") == NULL)
+        strstr(reader.name, "Intermediate") == NULL ||
+        strstr(reader.name, encrypt ? "CIPHERTEXT" : "PLAINTEXT") == NULL)
       continue;
-    value = cavp_value(line);
-    if (value == NULL || !cavp_decode_hex(value, &decoded, &decoded_len) ||
+    if (!cavp_decode_hex(reader.value, &decoded, &decoded_len) ||
         decoded_len != TC_AES_BLOCKLEN || found == 5)
     {
       free(decoded);
@@ -379,8 +315,7 @@ static int cavp_mct_intermediates(const char* response_file, size_t count,
     memcpy(expected[found++], decoded, TC_AES_BLOCKLEN);
     free(decoded);
   }
-  free(line);
-  fclose(file);
+  tc_cavp_close(&reader);
   return found == 5;
 }
 
@@ -461,101 +396,59 @@ static int cavp_mct_case(enum cavp_mode mode, const char* file, int encrypt,
 static int cavp_run_block_file(enum cavp_mode mode, const char* directory,
                                const char* filename)
 {
-  char path[512];
-  char* line;
-  FILE* file;
+  char relative[512];
+  tc_cavp_reader reader;
+  tc_cavp_event event;
   struct cavp_record record;
   int encrypt = 1;
   int mct;
-  enum { FIELD_NONE, FIELD_KEY, FIELD_IV, FIELD_PT, FIELD_CT } active = FIELD_NONE;
   int ok = 1;
 
-  snprintf(path, sizeof(path), "%s/%s/%s", CAVP_VECTOR_DIR, directory,
-           filename);
-  file = tc_test_fopen(path, "r");
-  if (file == NULL)
-  {
-    fprintf(stderr, "CAVP file not found: %s\n", path);
+  snprintf(relative, sizeof(relative), "%s/%s", directory, filename);
+  if (!cavp_open(&reader, relative))
     return 0;
-  }
-  line = (char*)malloc(1024 * 1024);
-  if (line == NULL)
-  {
-    fclose(file);
-    return 0;
-  }
   memset(&record, 0, sizeof(record));
   mct = strstr(filename, "MCT") != NULL;
 
-  while (ok && fgets(line, 1024 * 1024, file) != NULL)
+  while (ok && (event = tc_cavp_next(&reader)) != TC_CAVP_END)
   {
-    const char* value;
-    if (strstr(line, "[DECRYPT]") != NULL)
+    if (event == TC_CAVP_FAILURE)
     {
-      encrypt = 0;
+      ok = 0;
+      break;
+    }
+    if (event == TC_CAVP_HEADER)
+    {
+      if (tc_cavp_is(&reader, "DECRYPT"))
+        encrypt = 0;
+      else if (tc_cavp_is(&reader, "ENCRYPT"))
+        encrypt = 1;
       continue;
     }
-    if (strstr(line, "[ENCRYPT]") != NULL)
-    {
-      encrypt = 1;
+    if (event != TC_CAVP_FIELD)
       continue;
-    }
-    if (strncmp(line, "COUNT", 5) == 0)
+    if (tc_cavp_is(&reader, "COUNT"))
+      record.count = (size_t)strtoull(reader.value, NULL, 10);
+    else if (tc_cavp_is(&reader, "KEY"))
+      ok = cavp_take(&reader, &record.key, &record.key_len);
+    else if (tc_cavp_is(&reader, "IV"))
+      ok = cavp_take(&reader, &record.iv, &record.iv_len);
+    else if (tc_cavp_is(&reader, "PLAINTEXT") || tc_cavp_is(&reader, "CIPHERTEXT"))
     {
-      value = cavp_value(line);
-      record.count = value == NULL ? 0 : (size_t)strtoull(value, NULL, 10);
-      active = FIELD_NONE;
-      continue;
-    }
-    if (cavp_field(line, "KEY", &record.key, &record.key_len))
-    {
-      active = FIELD_KEY;
-      continue;
-    }
-    if (cavp_field(line, "IV", &record.iv, &record.iv_len))
-    {
-      active = FIELD_IV;
-      continue;
-    }
-    if (cavp_field(line, "PLAINTEXT", &record.plaintext,
-                   &record.plaintext_len))
-    {
-      active = FIELD_PT;
-      if (!encrypt)
+      const int plaintext = tc_cavp_is(&reader, "PLAINTEXT");
+      ok = plaintext ? cavp_take(&reader, &record.plaintext, &record.plaintext_len)
+                     : cavp_take(&reader, &record.ciphertext, &record.ciphertext_len);
+      /* The second of the two texts completes a record. */
+      if (ok && plaintext != encrypt)
       {
         ok = mct ? cavp_mct_case(mode, filename, encrypt, &record) :
                    cavp_standard_case(mode, filename, encrypt, &record);
         cavp_record_clear(&record);
-        active = FIELD_NONE;
       }
-      continue;
-    }
-    if (cavp_field(line, "CIPHERTEXT", &record.ciphertext,
-                   &record.ciphertext_len))
-    {
-      active = FIELD_CT;
-      if (encrypt)
-      {
-        ok = mct ? cavp_mct_case(mode, filename, encrypt, &record) :
-                   cavp_standard_case(mode, filename, encrypt, &record);
-        cavp_record_clear(&record);
-        active = FIELD_NONE;
-      }
-      continue;
-    }
-    if (line[0] == ' ' || line[0] == '\t')
-    {
-      uint8_t** target = NULL;
-      size_t* target_len = NULL;
-      if (active == FIELD_PT) { target = &record.plaintext; target_len = &record.plaintext_len; }
-      if (active == FIELD_CT) { target = &record.ciphertext; target_len = &record.ciphertext_len; }
-      if (target != NULL && !cavp_append(target, target_len, line))
-        ok = 0;
     }
   }
   cavp_record_clear(&record);
-  free(line);
-  fclose(file);
+  tc_cavp_close(&reader);
   return ok;
 }
 #endif
@@ -568,13 +461,6 @@ struct cavp_ccm_record
   size_t count, tag_len;
   int expected_fail;
 };
-
-static size_t cavp_ccm_number(const char* line, const char* name)
-{
-  const char* p = strstr(line, name);
-  return p == NULL || (p = strchr(p, '=')) == NULL ? 0 :
-         (size_t)strtoull(p + 1, NULL, 10);
-}
 
 static void cavp_ccm_clear(struct cavp_ccm_record* record)
 {
@@ -633,69 +519,54 @@ static int cavp_run_ccm_case(const char* file,
   return ok;
 }
 
+/* CCM parameters appear as file-level fields (Plen = 24) and in headers,
+ * alone ([Alen = 0]) or together ([Alen = 0, Plen = 0, Nlen = 7, Tlen = 4]). */
+static void cavp_ccm_parameter(const char* name, const char* value, size_t* aad_len,
+                               size_t* payload_len, size_t* nonce_len, size_t* tag_len)
+{
+  const size_t number = (size_t)strtoull(value, NULL, 10);
+  if (strcmp(name, "Alen") == 0) *aad_len = number;
+  else if (strcmp(name, "Plen") == 0) *payload_len = number;
+  else if (strcmp(name, "Nlen") == 0) *nonce_len = number;
+  else if (strcmp(name, "Tlen") == 0) *tag_len = number;
+}
+
 static int cavp_run_ccm_file(const char* filename)
 {
-  char path[512];
-  char* line;
-  FILE* file;
+  static const char* const parameters[] = { "Alen", "Plen", "Nlen", "Tlen" };
+  char relative[512];
+  tc_cavp_reader reader;
+  tc_cavp_event event;
   struct cavp_ccm_record record;
   size_t configured_aad_len = 0, configured_payload_len = 0;
   size_t configured_nonce_len = 0, configured_tag_len = 0;
   const int decrypt = strstr(filename, "DVPT") != NULL;
+  size_t records_seen = 0, records_executed = 0;
   int ok = 1;
+  size_t i;
 
-  snprintf(path, sizeof(path), "%s/ccm/%s", CAVP_VECTOR_DIR, filename);
-  file = tc_test_fopen(path, "r");
-  if (file == NULL)
-  {
-    fprintf(stderr, "CAVP file not found: %s\n", path);
+  snprintf(relative, sizeof(relative), "ccm/%s", filename);
+  if (!cavp_open(&reader, relative))
     return 0;
-  }
-  line = (char*)malloc(1024 * 1024);
-  if (line == NULL) { fclose(file); return 0; }
   memset(&record, 0, sizeof(record));
-  while (ok && fgets(line, 1024 * 1024, file) != NULL)
+  while (ok && (event = tc_cavp_next(&reader)) != TC_CAVP_END)
   {
-    const char* value;
-    if (strstr(line, "Alen =") != NULL || strstr(line, "Plen =") != NULL ||
-        strstr(line, "Nlen =") != NULL || strstr(line, "Tlen =") != NULL)
+    if (event == TC_CAVP_FAILURE)
     {
-      if (strstr(line, "Alen =") != NULL)
-        configured_aad_len = cavp_ccm_number(line, "Alen =");
-      if (strstr(line, "Plen =") != NULL)
-        configured_payload_len = cavp_ccm_number(line, "Plen =");
-      if (strstr(line, "Nlen =") != NULL)
-        configured_nonce_len = cavp_ccm_number(line, "Nlen =");
-      if (strstr(line, "Tlen =") != NULL)
-        configured_tag_len = cavp_ccm_number(line, "Tlen =");
+      ok = 0;
+      break;
+    }
+    if (event == TC_CAVP_HEADER)
+    {
+      char value[32];
+      for (i = 0; i < sizeof parameters / sizeof parameters[0]; ++i)
+        if (tc_cavp_header_value(&reader, parameters[i], value, sizeof value) != NULL)
+          cavp_ccm_parameter(parameters[i], value, &configured_aad_len,
+                             &configured_payload_len, &configured_nonce_len,
+                             &configured_tag_len);
       continue;
     }
-    if (strncmp(line, "Count", 5) == 0)
-    {
-      free(record.aad); free(record.payload); free(record.ct);
-      record.aad = record.payload = record.ct = NULL;
-      record.aad_len = record.payload_len = record.ct_len = 0;
-      value = cavp_value(line);
-      record.count = value == NULL ? 0 : (size_t)strtoull(value, NULL, 10);
-      record.expected_fail = 0;
-      record.tag_len = configured_tag_len;
-    }
-    else if (strncmp(line, "Result = Fail", 13) == 0)
-      record.expected_fail = 1;
-    else if (strncmp(line, "Key", 3) == 0)
-    {
-      free(record.key); record.key = NULL; record.key_len = 0;
-      if (!cavp_field(line, "Key", &record.key, &record.key_len)) ok = 0;
-    }
-    else if (strncmp(line, "Nonce", 5) == 0)
-    {
-      free(record.nonce); record.nonce = NULL; record.nonce_len = 0;
-      if (!cavp_field(line, "Nonce", &record.nonce, &record.nonce_len)) ok = 0;
-    }
-    else if (cavp_field(line, "Adata", &record.aad, &record.aad_len)) { }
-    else if (cavp_field(line, "Payload", &record.payload, &record.payload_len)) { }
-    else if (cavp_field(line, "CT", &record.ct, &record.ct_len)) { }
-    else if (line[0] == '\n' || line[0] == '\r')
+    if (event == TC_CAVP_RECORD_END)
     {
       struct cavp_ccm_record effective = record;
       effective.aad_len = configured_aad_len;
@@ -704,15 +575,52 @@ static int cavp_run_ccm_file(const char* filename)
       if (effective.tag_len == 0 && record.ct_len >= effective.payload_len)
         effective.tag_len = record.ct_len - effective.payload_len;
       if (record.key != NULL && record.nonce != NULL && record.ct != NULL)
+      {
         ok = cavp_run_ccm_case(filename, &effective, decrypt);
+        ++records_executed;
+      }
       free(record.aad); free(record.payload); free(record.ct);
       record.aad = record.payload = record.ct = NULL;
       record.aad_len = record.payload_len = record.ct_len = 0;
+      continue;
     }
+    if (tc_cavp_is(&reader, "Alen") || tc_cavp_is(&reader, "Plen") ||
+        tc_cavp_is(&reader, "Nlen") || tc_cavp_is(&reader, "Tlen"))
+      cavp_ccm_parameter(reader.name, reader.value, &configured_aad_len,
+                         &configured_payload_len, &configured_nonce_len,
+                         &configured_tag_len);
+    else if (tc_cavp_is(&reader, "Count"))
+    {
+      free(record.aad); free(record.payload); free(record.ct);
+      record.aad = record.payload = record.ct = NULL;
+      record.aad_len = record.payload_len = record.ct_len = 0;
+      record.count = (size_t)strtoull(reader.value, NULL, 10);
+      record.expected_fail = 0;
+      record.tag_len = configured_tag_len;
+      ++records_seen;
+    }
+    else if (tc_cavp_is(&reader, "Result"))
+      record.expected_fail = strcmp(reader.value, "Fail") == 0;
+    else if (tc_cavp_is(&reader, "Key"))
+      ok = cavp_take(&reader, &record.key, &record.key_len);
+    else if (tc_cavp_is(&reader, "Nonce"))
+      ok = cavp_take(&reader, &record.nonce, &record.nonce_len);
+    else if (tc_cavp_is(&reader, "Adata"))
+      ok = cavp_take(&reader, &record.aad, &record.aad_len);
+    else if (tc_cavp_is(&reader, "Payload"))
+      ok = cavp_take(&reader, &record.payload, &record.payload_len);
+    else if (tc_cavp_is(&reader, "CT"))
+      ok = cavp_take(&reader, &record.ct, &record.ct_len);
   }
   cavp_ccm_clear(&record);
-  free(line);
-  fclose(file);
+  tc_cavp_close(&reader);
+  /* Every Count record runs, including the last one in the file. */
+  if (ok && (records_seen == 0 || records_executed != records_seen))
+  {
+    fprintf(stderr, "CAVP CCM record mismatch: %s seen=%lu executed=%lu\n",
+            filename, (unsigned long)records_seen, (unsigned long)records_executed);
+    ok = 0;
+  }
   return ok;
 }
 #endif
@@ -770,9 +678,9 @@ static int cavp_run_gcm_decrypt_record(
 
 static int cavp_run_gcm_file(const char* filename)
 {
-  char path[512];
-  char* line;
-  FILE* file;
+  char relative[512];
+  tc_cavp_reader reader;
+  tc_cavp_event event;
   uint8_t *key = NULL, *iv = NULL, *pt = NULL, *aad = NULL;
   uint8_t *ct = NULL, *tag = NULL;
   size_t key_len = 0, iv_len = 0, pt_len = 0, aad_len = 0;
@@ -781,40 +689,34 @@ static int cavp_run_gcm_file(const char* filename)
   int decrypt = strstr(filename, "Decrypt") != NULL;
   int ok = 1;
 
-  snprintf(path, sizeof(path), "%s/gcm/%s", CAVP_VECTOR_DIR, filename);
-  file = tc_test_fopen(path, "r");
-  if (file == NULL)
-  {
-    fprintf(stderr, "CAVP file not found: %s\n", path);
+  snprintf(relative, sizeof(relative), "gcm/%s", filename);
+  if (!cavp_open(&reader, relative))
     return 0;
-  }
-  line = (char*)malloc(1024 * 1024);
-  if (line == NULL) { fclose(file); return 0; }
-  while (ok && fgets(line, 1024 * 1024, file) != NULL)
+  while (ok && (event = tc_cavp_next(&reader)) != TC_CAVP_END)
   {
-    const char* value;
-    if (strncmp(line, "Count", 5) == 0)
+    if (event == TC_CAVP_FAILURE)
+    {
+      ok = 0;
+      break;
+    }
+    if (event != TC_CAVP_FIELD)
+      continue;
+    if (tc_cavp_is(&reader, "Count"))
     {
       ++records_seen;
       free(key); free(iv); free(pt); free(aad); free(ct); free(tag);
       key = iv = pt = aad = ct = tag = NULL;
       key_len = iv_len = pt_len = aad_len = ct_len = tag_len = 0;
-      value = cavp_value(line);
-      count = value == NULL ? 0 : (size_t)strtoull(value, NULL, 10);
+      count = (size_t)strtoull(reader.value, NULL, 10);
     }
-    else if (strncmp(line, "Key", 3) == 0)
+    else if (tc_cavp_is(&reader, "Key"))
+      ok = cavp_take(&reader, &key, &key_len);
+    else if (tc_cavp_is(&reader, "IV"))
+      ok = cavp_take(&reader, &iv, &iv_len);
+    else if (tc_cavp_is(&reader, "PT"))
     {
-      free(key); key = NULL; key_len = 0;
-      if (!cavp_field(line, "Key", &key, &key_len)) ok = 0;
-    }
-    else if (strncmp(line, "IV", 2) == 0)
-    {
-      free(iv); iv = NULL; iv_len = 0;
-      if (!cavp_field(line, "IV", &iv, &iv_len)) ok = 0;
-    }
-    else if (cavp_field(line, "PT", &pt, &pt_len))
-    {
-      if (decrypt)
+      ok = cavp_take(&reader, &pt, &pt_len);
+      if (ok && decrypt)
       {
         ++records_executed;
         ok = cavp_run_gcm_decrypt_record(
@@ -822,19 +724,14 @@ static int cavp_run_gcm_file(const char* filename)
           ct, ct_len, tag, tag_len, pt, pt_len, 0);
       }
     }
-    else if (strncmp(line, "AAD", 3) == 0)
+    else if (tc_cavp_is(&reader, "AAD"))
+      ok = cavp_take(&reader, &aad, &aad_len);
+    else if (tc_cavp_is(&reader, "CT"))
+      ok = cavp_take(&reader, &ct, &ct_len);
+    else if (tc_cavp_is(&reader, "Tag"))
     {
-      free(aad); aad = NULL; aad_len = 0;
-      if (!cavp_field(line, "AAD", &aad, &aad_len)) ok = 0;
-    }
-    else if (strncmp(line, "CT", 2) == 0)
-    {
-      free(ct); ct = NULL; ct_len = 0;
-      if (!cavp_field(line, "CT", &ct, &ct_len)) ok = 0;
-    }
-    else if (cavp_field(line, "Tag", &tag, &tag_len))
-    {
-      if (!decrypt)
+      ok = cavp_take(&reader, &tag, &tag_len);
+      if (ok && !decrypt)
       {
         struct TC_AES_GCM_ctx ctx;
         uint8_t* output = pt_len == 0 ? NULL : (uint8_t*)malloc(pt_len);
@@ -861,7 +758,7 @@ static int cavp_run_gcm_file(const char* filename)
         ++records_executed;
       }
     }
-    else if (strncmp(line, "FAIL", 4) == 0)
+    else if (tc_cavp_is(&reader, "FAIL"))
     {
       ++failed_records;
       if (decrypt)
@@ -874,8 +771,7 @@ static int cavp_run_gcm_file(const char* filename)
     }
   }
   free(key); free(iv); free(pt); free(aad); free(ct); free(tag);
-  free(line);
-  fclose(file);
+  tc_cavp_close(&reader);
   if (records_seen == 0 || records_executed != records_seen)
   {
     fprintf(stderr, "CAVP GCM record mismatch: %s seen=%lu executed=%lu\n",

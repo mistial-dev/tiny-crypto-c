@@ -22,7 +22,6 @@
 #include <tiny_crypto/hash.h>
 #include "cavp.h"
 #include "munit.h"
-#include "test_io.h"
 
 #ifndef CAVP_VECTOR_DIR
 #define CAVP_VECTOR_DIR "tests/vectors/hash/cavp"
@@ -74,15 +73,20 @@ static size_t cavp_digest(int alg, const uint8_t* msg, size_t len, uint8_t* out)
   return 0;
 }
 
-static FILE* cavp_open(const char* relative)
+static void cavp_open(tc_cavp_reader* reader, const char* relative)
 {
-  char path[512];
-  FILE* file;
-  snprintf(path, sizeof(path), "%s/%s", CAVP_VECTOR_DIR, relative);
-  file = tc_test_fopen(path, "r");
-  if (file == NULL)
-    munit_errorf("cannot open CAVP file %s", path);
-  return file;
+  if (!tc_cavp_open(reader, CAVP_VECTOR_DIR, relative, cavp_line, sizeof cavp_line))
+    munit_errorf("cannot open CAVP file %s/%s", CAVP_VECTOR_DIR, relative);
+}
+
+/* Next field, skipping headers and record ends. Returns 0 at the end of the file. */
+static int cavp_next_field(tc_cavp_reader* reader, const char* relative)
+{
+  tc_cavp_event event;
+  while ((event = tc_cavp_next(reader)) == TC_CAVP_HEADER || event == TC_CAVP_RECORD_END) {}
+  if (event == TC_CAVP_FAILURE)
+    munit_errorf("unreadable CAVP line %lu in %s", reader->line_number, relative);
+  return event == TC_CAVP_FIELD;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -91,24 +95,25 @@ static FILE* cavp_open(const char* relative)
 
 static long cavp_run_msg_file(int alg, const char* relative)
 {
-  FILE* file = cavp_open(relative);
+  tc_cavp_reader reader;
   long len_bits = -1;
   long msg_len = -1;
   uint8_t expected[TC_SHA512_DIGESTLEN];
   long expected_len = -1;
   long cases = 0;
 
-  while (fgets(cavp_line, sizeof(cavp_line), file) != NULL)
+  cavp_open(&reader, relative);
+  while (cavp_next_field(&reader, relative))
   {
-    const char* v;
-    if ((v = tc_cavp_field_value(cavp_line, "Len")) != NULL)
+    const char* v = reader.value;
+    if (tc_cavp_is(&reader, "Len"))
     {
       len_bits = strtol(v, NULL, 10);
       munit_assert_long(len_bits % 8, ==, 0);
       msg_len = -1;
       expected_len = -1;
     }
-    else if ((v = tc_cavp_field_value(cavp_line, "Msg")) != NULL)
+    else if (tc_cavp_is(&reader, "Msg"))
     {
       msg_len = tc_cavp_parse_hex(v, cavp_msg, sizeof(cavp_msg));
       munit_assert_long(msg_len, >=, 0);
@@ -117,7 +122,7 @@ static long cavp_run_msg_file(int alg, const char* relative)
         msg_len = 0;
       munit_assert_long(msg_len, ==, len_bits / 8);
     }
-    else if ((v = tc_cavp_field_value(cavp_line, "MD")) != NULL)
+    else if (tc_cavp_is(&reader, "MD"))
     {
       uint8_t actual[TC_SHA512_DIGESTLEN];
       size_t actual_len;
@@ -137,7 +142,7 @@ static long cavp_run_msg_file(int alg, const char* relative)
       cases++;
     }
   }
-  fclose(file);
+  tc_cavp_close(&reader);
   return cases;
 }
 
@@ -152,7 +157,7 @@ static long cavp_run_msg_file(int alg, const char* relative)
 
 static long cavp_run_monte_file(int alg, const char* relative)
 {
-  FILE* file = cavp_open(relative);
+  tc_cavp_reader reader;
   const size_t n = (size_t)alg;
   uint8_t seed[TC_SHA512_DIGESTLEN];
   uint8_t md[3][TC_SHA512_DIGESTLEN];
@@ -162,19 +167,20 @@ static long cavp_run_monte_file(int alg, const char* relative)
   long count = -1;
   long cases = 0;
 
-  while (fgets(cavp_line, sizeof(cavp_line), file) != NULL)
+  cavp_open(&reader, relative);
+  while (cavp_next_field(&reader, relative))
   {
-    const char* v;
-    if ((v = tc_cavp_field_value(cavp_line, "Seed")) != NULL)
+    const char* v = reader.value;
+    if (tc_cavp_is(&reader, "Seed"))
     {
       munit_assert_long(tc_cavp_parse_hex(v, seed, sizeof(seed)), ==, (long)n);
       have_seed = 1;
     }
-    else if ((v = tc_cavp_field_value(cavp_line, "COUNT")) != NULL)
+    else if (tc_cavp_is(&reader, "COUNT"))
     {
       count = strtol(v, NULL, 10);
     }
-    else if ((v = tc_cavp_field_value(cavp_line, "MD")) != NULL)
+    else if (tc_cavp_is(&reader, "MD"))
     {
       uint8_t expected[TC_SHA512_DIGESTLEN];
       int i;
@@ -208,7 +214,7 @@ static long cavp_run_monte_file(int alg, const char* relative)
       cases++;
     }
   }
-  fclose(file);
+  tc_cavp_close(&reader);
   munit_assert_long(cases, ==, 100);
   return cases;
 }
@@ -325,7 +331,7 @@ static TC_status cavp_hmac_verify(int alg, const uint8_t* key, size_t klen,
 
 MunitResult test_cavp_hmac(const MunitParameter params[], void* data)
 {
-  FILE* file = cavp_open("hmac/HMAC.rsp");
+  tc_cavp_reader reader;
   long group_len = -1;   /* [L=20] / [L=28] / [L=32] / [L=48] / [L=64] */
   int active = 0;
   long count = -1, klen = -1, tlen = -1;
@@ -333,18 +339,23 @@ MunitResult test_cavp_hmac(const MunitParameter params[], void* data)
   static uint8_t msg[512];
   long key_len = -1, msg_len = -1;
   long cases = 0;
+  tc_cavp_event event;
   (void) params;
   (void) data;
 
-  while (fgets(cavp_line, sizeof(cavp_line), file) != NULL)
+  cavp_open(&reader, "hmac/HMAC.rsp");
+  while ((event = tc_cavp_next(&reader)) != TC_CAVP_END)
   {
-    const char* v;
-    if (cavp_line[0] == '[')
+    const char* v = reader.value;
+    if (event == TC_CAVP_FAILURE)
+      munit_errorf("unreadable HMAC.rsp line %lu", reader.line_number);
+    if (event == TC_CAVP_RECORD_END)
+      continue;
+    if (event == TC_CAVP_HEADER)
     {
-      const char* p = cavp_line + 1;
-      while (*p == ' ' || *p == 'L' || *p == '=')
-        p++;
-      group_len = strtol(p, NULL, 10);
+      char text[16];
+      const char* l = tc_cavp_header_value(&reader, "L", text, sizeof text);
+      group_len = l == NULL ? -1 : strtol(l, NULL, 10);
       active = 0;
 #if TC_ENABLE_SHA1
       if (group_len == TC_SHA1_DIGESTLEN)
@@ -371,26 +382,26 @@ MunitResult test_cavp_hmac(const MunitParameter params[], void* data)
     if (!active)
       continue;
 
-    if ((v = tc_cavp_field_value(cavp_line, "Count")) != NULL)
+    if (tc_cavp_is(&reader, "Count"))
     {
       count = strtol(v, NULL, 10);
       key_len = msg_len = -1;
     }
-    else if ((v = tc_cavp_field_value(cavp_line, "Klen")) != NULL)
+    else if (tc_cavp_is(&reader, "Klen"))
       klen = strtol(v, NULL, 10);
-    else if ((v = tc_cavp_field_value(cavp_line, "Tlen")) != NULL)
+    else if (tc_cavp_is(&reader, "Tlen"))
       tlen = strtol(v, NULL, 10);
-    else if ((v = tc_cavp_field_value(cavp_line, "Key")) != NULL)
+    else if (tc_cavp_is(&reader, "Key"))
     {
       key_len = tc_cavp_parse_hex(v, key, sizeof(key));
       munit_assert_long(key_len, ==, klen);
     }
-    else if ((v = tc_cavp_field_value(cavp_line, "Msg")) != NULL)
+    else if (tc_cavp_is(&reader, "Msg"))
     {
       msg_len = tc_cavp_parse_hex(v, msg, sizeof(msg));
       munit_assert_long(msg_len, >=, 0);
     }
-    else if ((v = tc_cavp_field_value(cavp_line, "Mac")) != NULL)
+    else if (tc_cavp_is(&reader, "Mac"))
     {
       uint8_t expected[TC_SHA512_DIGESTLEN];
       uint8_t actual[TC_SHA512_DIGESTLEN];
@@ -420,7 +431,7 @@ MunitResult test_cavp_hmac(const MunitParameter params[], void* data)
       cases++;
     }
   }
-  fclose(file);
+  tc_cavp_close(&reader);
   munit_assert_long(cases, ==, CAVP_HMAC_CASES);
   return MUNIT_OK;
 }
