@@ -1,4 +1,5 @@
 <!-- SPDX-FileCopyrightText: Mistial Dev -->
+
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 
 # Contributing to tiny-crypto-c
@@ -27,6 +28,30 @@ requests under the same agreement version.
   change.
 
 ## Development checks
+
+Install the formatting hook once in each clone:
+
+```sh
+python3 -m pip install pre-commit==4.6.2
+pre-commit install
+```
+
+The hook formats staged first-party C and C++ files with clang-format 22.1.8,
+formats Markdown with mdformat 1.0.0 and its GitHub Flavored Markdown plugin,
+and fixes trailing whitespace and final newlines in project text files. Stage
+its edits and commit again. To format C or C++ files manually, use the same
+version:
+
+```sh
+python3 -m pip install clang-format==22.1.8
+clang-format -i path/to/file.c
+```
+
+To check all files without changing them, run the same check as CI:
+
+```sh
+pre-commit run --all-files --hook-stage manual
+```
 
 Run the fast checks while developing:
 

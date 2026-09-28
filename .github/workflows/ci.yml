@@ -11,6 +11,19 @@ on:
   workflow_dispatch:
 
 jobs:
+  format:
+    name: Formatting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pre-commit
+        run: python -m pip install pre-commit==4.6.2
+      - name: Check formatting and text files without modifying them
+        run: pre-commit run --all-files --hook-stage manual
+
   esp32p4:
     name: ESP32-P4 ${{ matrix.role }}
     runs-on: ubuntu-latest
