@@ -62,6 +62,13 @@ key length plus 16 bytes), it takes no nonce, and personalization and
 additional input are at most the seed length. With `derivation_function = 1`,
 CTR_DRBG accepts the same inputs as the hash mechanisms.
 
+Every mechanism limits a nonce, personalization string or additional input to
+`TC_DRBG_MAX_INPUT_BYTES`, and a nonce plus personalization string to the same
+total. This stays within the 2^35-bit limit of SP 800-90A Tables 2 and 3 and
+the 32-bit length field of the CTR_DRBG derivation function. A larger input
+returns `TC_DRBG_ARGUMENT` before any entropy is drawn, and the DRBG stays
+usable.
+
 ## Reseeding and prediction resistance
 
 Each generate call counts toward `reseed_interval`, which defaults to 2^48

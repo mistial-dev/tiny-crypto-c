@@ -294,7 +294,49 @@ static MunitResult test_random_source(const MunitParameter params[], void* data)
   return MUNIT_OK;
 }
 
+/* SP 800-90A Table 2 and Table 3 bound personalization, nonce and
+ * additional input at 2^35 bits. An oversized input is a caller error: it is
+ * rejected before any entropy is drawn and the DRBG stays usable. */
+static MunitResult test_input_limits(const MunitParameter params[], void* data)
+{
+#if SIZE_MAX > UINT32_MAX
+  static TC_DRBG drbg[2];
+  /* The span starts after the DRBG, so only its length can reject it. It is
+   * never read: the length check comes first. */
+  const TC_bytes oversized = {(const uint8_t*)&drbg[1], (size_t)TC_DRBG_MAX_INPUT_BYTES + 1u};
+  uint8_t out[16];
+  size_t m;
+  (void)params;
+  (void)data;
+  for (m = 0; m < sizeof mechanisms / sizeof mechanisms[0]; ++m) {
+    counter_source source = {0, 0, 0};
+    TC_random_source entropy = {counter_fill, &source};
+    TC_DRBG_config config = config_for(mechanisms[m]);
+    config.prediction_resistance = 1;
+    munit_assert_int(TC_DRBG_instantiate(&drbg[0], &config, entropy, empty, oversized), ==,
+                     TC_DRBG_ARGUMENT);
+    munit_assert_uint(source.calls, ==, 0);
+    munit_assert_int(TC_DRBG_instantiate(&drbg[0], &config, entropy, empty, empty), ==, TC_DRBG_OK);
+    source.calls = 0;
+    munit_assert_int(TC_DRBG_reseed(&drbg[0], oversized), ==, TC_DRBG_ARGUMENT);
+    munit_assert_int(TC_DRBG_generate(&drbg[0], out, sizeof out, 1, oversized), ==,
+                     TC_DRBG_ARGUMENT);
+    munit_assert_int(TC_DRBG_generate(&drbg[0], out, sizeof out, 0, oversized), ==,
+                     TC_DRBG_ARGUMENT);
+    munit_assert_uint(source.calls, ==, 0);
+    munit_assert_int(TC_DRBG_generate(&drbg[0], out, sizeof out, 0, empty), ==, TC_DRBG_OK);
+    TC_DRBG_uninstantiate(&drbg[0]);
+  }
+  return MUNIT_OK;
+#else
+  (void)params;
+  (void)data;
+  return MUNIT_SKIP;
+#endif
+}
+
 static MunitTest tests[] = {
+    {"/input-limits", test_input_limits, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/lifecycle", test_lifecycle, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/arguments", test_arguments, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/ctr-without-df", test_ctr_without_df, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

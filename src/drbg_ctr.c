@@ -93,11 +93,9 @@ static TC_DRBG_result block_cipher_df(TC_DRBG* drbg, const TC_bytes* parts, size
   tc_mac_cipher cipher;
   size_t offset;
   uint32_t index;
-#if SIZE_MAX > UINT32_MAX
-  int ok = input_length <= UINT32_MAX; /* L is a 32-bit field */
-#else
+  /* The envelope bounds every input by TC_DRBG_MAX_INPUT_BYTES, so L fits
+   * its 32-bit field. */
   int ok = 1;
-#endif
 
   /* Step 8: K = leftmost keylen bits of 0x00 0x01 ... 0x1F. */
   for (offset = 0; offset < sizeof key; ++offset)

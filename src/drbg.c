@@ -103,11 +103,23 @@ static TC_DRBG_result mechanism_generate(TC_DRBG* drbg, uint8_t* output, size_t 
   }
 }
 
+/* Every input is at most TC_DRBG_MAX_INPUT_BYTES. */
+static int input_within_limit(size_t length)
+{
+#if SIZE_MAX > TC_DRBG_MAX_INPUT_BYTES
+  return length <= TC_DRBG_MAX_INPUT_BYTES;
+#else
+  (void)length;
+  return 1;
+#endif
+}
+
 /* CTR_DRBG without a derivation function XORs inputs into the seed, so they
  * are at most seedlen. Other mechanisms hash their inputs. */
 static int input_length_valid(const TC_DRBG* drbg, size_t length)
 {
-  return drbg->mechanism != TC_DRBG_CTR || drbg->derivation_function || length <= drbg->seed_bytes;
+  return input_within_limit(length) && (drbg->mechanism != TC_DRBG_CTR ||
+                                        drbg->derivation_function || length <= drbg->seed_bytes);
 }
 
 /* Read length bytes from the entropy source into drbg->input. */
@@ -141,8 +153,11 @@ TC_DRBG_result TC_DRBG_instantiate(TC_DRBG* drbg, const TC_DRBG_config* config,
     return TC_DRBG_ARGUMENT;
   TC_DRBG_uninstantiate(drbg);
   if (config == NULL || entropy.fill == NULL || !span_valid(nonce) ||
-      !span_valid(personalization) || config->prediction_resistance > 1 ||
-      config->derivation_function > 1 || config->reseed_interval > TC_DRBG_MAX_RESEED_INTERVAL ||
+      !span_valid(personalization) || !input_within_limit(nonce.length) ||
+      !input_within_limit(personalization.length) ||
+      personalization.length > TC_DRBG_MAX_INPUT_BYTES - nonce.length ||
+      config->prediction_resistance > 1 || config->derivation_function > 1 ||
+      config->reseed_interval > TC_DRBG_MAX_RESEED_INTERVAL ||
       !outside(drbg, nonce.data, nonce.length) ||
       !outside(drbg, personalization.data, personalization.length) ||
       !outside(drbg, config, sizeof *config))

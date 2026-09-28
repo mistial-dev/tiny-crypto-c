@@ -49,6 +49,13 @@ extern "C" {
 #error "TC_DRBG_MAX_ENTROPY_BYTES must hold a CTR_DRBG seed (48 bytes)"
 #endif
 
+/* Largest personalization string, nonce or additional input. SP 800-90A
+ * Tables 2 and 3 allow 2^35 bits. This bound also leaves room for the entropy
+ * input within the 32-bit length field of the CTR_DRBG derivation function
+ * (section 10.3.2). Instantiate also bounds nonce plus personalization.
+ * Larger inputs return TC_DRBG_ARGUMENT before any entropy is drawn. */
+#define TC_DRBG_MAX_INPUT_BYTES (0xffffffffu - TC_DRBG_MAX_ENTROPY_BYTES)
+
 /* Hash_DRBG seed length: 440 bits for SHA-1 and SHA-224/256, 888 bits for
  * SHA-384/512 (SP 800-90A Table 2). */
 #if TC_ENABLE_SHA384 || TC_ENABLE_SHA512
