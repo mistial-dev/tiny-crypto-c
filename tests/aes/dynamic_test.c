@@ -87,13 +87,14 @@ static MunitResult invalid_arguments(const MunitParameter params[], void* user)
   size_t i;
   (void)params;
   (void)user;
-  memset(&key, 0xa5, sizeof key);
-  saved = key;
+  /* A failed init clears the context, like TC_AES_key_init, so no earlier
+   * key stays usable. */
   for (i = 0; i <= 33; ++i) {
     if (i == 16 || i == 24 || i == 32)
       continue;
+    memset(&key, 0xa5, sizeof key);
     munit_assert_int(TC_AES_dynamic_key_init(&key, raw, i), ==, TC_ERROR);
-    munit_assert_memory_equal(sizeof key, &key, &saved);
+    munit_assert_true(tc_test_all_zero(&key, sizeof key));
   }
   munit_assert_int(TC_AES_dynamic_key_init(&key, key.round_key, 16), ==, TC_ERROR);
   munit_assert_int(TC_AES_dynamic_key_init(&key, NULL, 16), ==, TC_ERROR);
@@ -113,6 +114,14 @@ static MunitResult invalid_arguments(const MunitParameter params[], void* user)
   munit_assert_int(TC_AES_dynamic_CMAC_update(&mac, mac.buffer, 1), ==, TC_ERROR);
   munit_assert_int(TC_AES_dynamic_CMAC_final(&mac, mac.buffer), ==, TC_ERROR);
   munit_assert_memory_equal(sizeof mac, &mac, &saved_mac);
+  /* A failed re-init ends the previous session. */
+  munit_assert_int(TC_AES_dynamic_CMAC_update(&mac, raw, 3), ==, TC_OK);
+  munit_assert_int(TC_AES_dynamic_CMAC_init(&mac, raw, 15), ==, TC_ERROR);
+  munit_assert_int(TC_AES_dynamic_CMAC_update(&mac, raw, 1), ==, TC_ERROR);
+  munit_assert_int(TC_AES_dynamic_CMAC_final(&mac, block), ==, TC_ERROR);
+  munit_assert_int(TC_AES_dynamic_CMAC_init(&mac, raw, 16), ==, TC_OK);
+  munit_assert_int(TC_AES_dynamic_CMAC_init(&mac, mac.buffer, 16), ==, TC_ERROR);
+  munit_assert_int(TC_AES_dynamic_CMAC_update(&mac, raw, 1), ==, TC_ERROR);
   return MUNIT_OK;
 }
 

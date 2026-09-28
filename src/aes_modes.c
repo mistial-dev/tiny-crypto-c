@@ -28,14 +28,19 @@ TC_status TC_AES_ECB_decrypt(const struct TC_AES_key_ctx* ctx, uint8_t* buf)
 #endif
 
 #if TC_AES_ENABLE_CBC || TC_AES_ENABLE_DYNAMIC
+/* A cipher failure wipes the whole buffer and the chaining value, so no
+ * partly transformed output or broken IV survives. */
 static TC_status tc_aes_cbc_encrypt(const uint8_t* key, uint8_t rounds, uint8_t iv[16],
                                     uint8_t* buffer, size_t length)
 {
   size_t offset;
   for (offset = 0; offset < length; offset += 16) {
     tc_internal_xor(buffer + offset, iv, 16);
-    if (tc_aes_cipher_rounds((state_t*)(buffer + offset), key, rounds) != TC_OK)
+    if (tc_aes_cipher_rounds((state_t*)(buffer + offset), key, rounds) != TC_OK) {
+      TC_secure_zero(buffer, length);
+      TC_secure_zero(iv, 16);
       return TC_ERROR;
+    }
     memcpy(iv, buffer + offset, 16);
   }
   return TC_OK;
@@ -50,8 +55,11 @@ static TC_status tc_aes_cbc_decrypt(const uint8_t* key, uint8_t rounds, uint8_t 
   for (offset = 0; offset < length; offset += 16) {
     memcpy(previous, buffer + offset, 16);
     status = tc_aes_inverse_rounds((state_t*)(buffer + offset), key, rounds);
-    if (status != TC_OK)
+    if (status != TC_OK) {
+      TC_secure_zero(buffer, length);
+      TC_secure_zero(iv, 16);
       break;
+    }
     tc_internal_xor(buffer + offset, iv, 16);
     memcpy(iv, previous, 16);
   }
@@ -69,7 +77,12 @@ TC_status TC_AES_CBC_encrypt(struct TC_AES_ctx* ctx, uint8_t* buffer, size_t len
     return TC_ERROR;
   if (length % 16)
     return TC_ERROR;
-  return tc_aes_cbc_encrypt(ctx->key.round_key, TC_AES_FIXED_ROUNDS, ctx->iv, buffer, length);
+  if (tc_aes_cbc_encrypt(ctx->key.round_key, TC_AES_FIXED_ROUNDS, ctx->iv, buffer, length) !=
+      TC_OK) {
+    TC_AES_ctx_clear(ctx);
+    return TC_ERROR;
+  }
+  return TC_OK;
 }
 
 TC_status TC_AES_CBC_decrypt(struct TC_AES_ctx* ctx, uint8_t* buffer, size_t length)
@@ -78,7 +91,12 @@ TC_status TC_AES_CBC_decrypt(struct TC_AES_ctx* ctx, uint8_t* buffer, size_t len
     return TC_ERROR;
   if (length % 16)
     return TC_ERROR;
-  return tc_aes_cbc_decrypt(ctx->key.round_key, TC_AES_FIXED_ROUNDS, ctx->iv, buffer, length);
+  if (tc_aes_cbc_decrypt(ctx->key.round_key, TC_AES_FIXED_ROUNDS, ctx->iv, buffer, length) !=
+      TC_OK) {
+    TC_AES_ctx_clear(ctx);
+    return TC_ERROR;
+  }
+  return TC_OK;
 }
 #endif /* CBC */
 
@@ -104,8 +122,11 @@ TC_status TC_AES_CTR_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length)
     size_t take;
     if (ctx->ctr_pos == TC_AES_BLOCKLEN) {
       tc_aes_copy_bytes(ctx->ctr_stream, ctx->iv, TC_AES_BLOCKLEN);
-      if (tc_aes_cipher((state_t*)ctx->ctr_stream, ctx->key.round_key) != TC_OK)
+      if (tc_aes_cipher((state_t*)ctx->ctr_stream, ctx->key.round_key) != TC_OK) {
+        TC_secure_zero(buf, length);
+        TC_AES_ctx_clear(ctx);
         return TC_ERROR;
+      }
       ctx->ctr_exhausted |= tc_internal_increment_be(ctx->iv, TC_AES_BLOCKLEN);
       ctx->ctr_pos = 0;
     }
@@ -131,11 +152,14 @@ TC_status TC_AES_OFB_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length)
       (length != 0 && buf == NULL))
     return TC_ERROR;
 
+  uint8_t* const start = buf;
+  const size_t total = length;
   pos = ctx->ofb_pos;
   while (length-- != 0) {
     if (pos == TC_AES_BLOCKLEN) {
       if (tc_aes_cipher((state_t*)ctx->iv, ctx->key.round_key) != TC_OK) {
-        ctx->ofb_pos = pos;
+        TC_secure_zero(start, total);
+        TC_AES_ctx_clear(ctx);
         return TC_ERROR;
       }
       pos = 0;

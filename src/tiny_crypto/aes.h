@@ -155,6 +155,9 @@ TC_status TC_AES_ECB_decrypt(const struct TC_AES_key_ctx* ctx, uint8_t* buf);
  * Buffer length must be a multiple of TC_AES_BLOCKLEN. The caller applies padding.
  * Returns TC_ERROR if length is not block-aligned. Set IV via TC_AES_init_ctx_iv()
  * or TC_AES_ctx_set_iv(). Never reuse an IV with the same key.
+ * The mode functions below share one failure rule: an argument error leaves
+ * buf and ctx unchanged, and a cipher failure part way through wipes buf and
+ * clears ctx, so neither partial output nor a broken chaining value survives.
  */
 TC_status TC_AES_CBC_encrypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length);
 TC_status TC_AES_CBC_decrypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length);

@@ -30,8 +30,11 @@ static TC_status tc_aes_cmac_final(const uint8_t* key, uint8_t rounds, uint8_t m
 #if TC_AES_ENABLE_DYNAMIC
 TC_status TC_AES_dynamic_CMAC_init(TC_AES_dynamic_CMAC* ctx, const uint8_t* key, size_t length)
 {
-  if (!ctx || !tc_internal_ranges_disjoint(ctx, sizeof *ctx, key, length) ||
-      TC_AES_dynamic_key_init(&ctx->key, key, length) != TC_OK)
+  if (!ctx)
+    return TC_ERROR;
+  const int disjoint = tc_internal_ranges_disjoint(ctx, sizeof *ctx, key, length);
+  TC_AES_dynamic_CMAC_clear(ctx);
+  if (!disjoint || TC_AES_dynamic_key_init(&ctx->key, key, length) != TC_OK)
     return TC_ERROR;
   if (tc_aes_cmac_generate_subkeys(ctx->key.round_key, ctx->key.rounds, ctx->k1, ctx->k2) !=
       TC_OK) {

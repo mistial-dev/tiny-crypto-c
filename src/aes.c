@@ -649,8 +649,12 @@ void TC_AES_CAVP_decrypt_block(const uint8_t* key, uint8_t block[TC_AES_BLOCKLEN
 #if TC_AES_ENABLE_DYNAMIC
 TC_status TC_AES_dynamic_key_init(TC_AES_dynamic_key* ctx, const uint8_t* key, size_t length)
 {
-  if (!ctx || !key || (length != 16 && length != 24 && length != 32) ||
-      !tc_internal_ranges_disjoint(ctx, sizeof *ctx, key, length))
+  if (!ctx)
+    return TC_ERROR;
+  const int valid = key && (length == 16 || length == 24 || length == 32) &&
+                    tc_internal_ranges_disjoint(ctx, sizeof *ctx, key, length);
+  TC_AES_dynamic_key_clear(ctx);
+  if (!valid)
     return TC_ERROR;
 #if TC_AES_SBOX_MODE == TC_AES_SBOX_MODE_RUNTIME
   if (!sbox_ready)

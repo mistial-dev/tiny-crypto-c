@@ -389,6 +389,10 @@ if(TINY_CRYPTO_BUILD_TESTS)
   endif()
   tc_add_c_test(test_aes_platform tiny-crypto-c-test-aes-dynamic tests/aes/platform.c src/aes.c src/aes_modes.c)
   target_compile_definitions(test_aes_platform PRIVATE TC_AES_PLATFORM=1)
+  tc_add_c_test(test_aes_mode_failure tiny-crypto-c-test tests/aes/mode_failure.c src/aes.c
+    src/aes_modes.c)
+  target_compile_definitions(test_aes_mode_failure PRIVATE TC_AES_PLATFORM=1
+    TC_AES_ENABLE_DYNAMIC=1)
   tc_add_c_test(test_aes_backend_failure tiny-crypto-c-test-aes-dynamic
     tests/aes/backend_failure.c src/aes_mac.c src/aes_cmac.c src/aes_eax.c src/aes_siv.c
     src/aes_ccm.c src/aes_ghash.c src/aes_gcm.c)

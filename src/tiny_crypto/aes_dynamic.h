@@ -18,14 +18,16 @@ typedef struct {
 } TC_AES_dynamic_CMAC;
 
 /* Keys are 16, 24, or 32 bytes. Input keys must not overlap the context.
- * Failure leaves the context unchanged. Clear is unconditional. */
+ * Any init failure clears the context, so no earlier key or MAC session stays
+ * usable. Clear is unconditional. */
 TC_status TC_AES_dynamic_key_init(TC_AES_dynamic_key* ctx, const uint8_t* key, size_t key_len);
 void TC_AES_dynamic_key_clear(TC_AES_dynamic_key* ctx);
 TC_status TC_AES_dynamic_encrypt(const TC_AES_dynamic_key* ctx, uint8_t block[16]);
 TC_status TC_AES_dynamic_decrypt(const TC_AES_dynamic_key* ctx, uint8_t block[16]);
 
 /* CBC operates in place, without padding, and updates iv for the next call.
- * ctx, iv, and buffer must be disjoint. A zero-length buffer may be NULL. */
+ * ctx, iv, and buffer must be disjoint. A zero-length buffer may be NULL.
+ * A cipher failure part way through wipes buffer and iv. */
 TC_status TC_AES_dynamic_CBC_encrypt(const TC_AES_dynamic_key* ctx, uint8_t iv[16], uint8_t* buffer,
                                      size_t length);
 TC_status TC_AES_dynamic_CBC_decrypt(const TC_AES_dynamic_key* ctx, uint8_t iv[16], uint8_t* buffer,
