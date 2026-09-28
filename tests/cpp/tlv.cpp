@@ -16,3 +16,15 @@ TEST_CASE("TLV reader borrows input and reports incomplete values")
   CHECK(reader.init(bytes, 2, TC_TLV_DER, limits) == TC_TLV_OK);
   CHECK(reader.next(element) == TC_TLV_MORE);
 }
+
+TEST_CASE("A failed re-init leaves the TLV reader unusable")
+{
+  const uint8_t bytes[] = {4, 1, 42, 4, 1, 43};
+  const TC_TLV_limits limits = {32, 16, 4, 2};
+  tiny_crypto::TLVReader reader;
+  TC_TLV_element element;
+  CHECK(reader.init(bytes, sizeof bytes, TC_TLV_DER, limits) == TC_TLV_OK);
+  CHECK(reader.next(element) == TC_TLV_OK);
+  CHECK(reader.init(NULL, 3, TC_TLV_DER, limits) != TC_TLV_OK);
+  CHECK(reader.next(element) == TC_TLV_ARGUMENT);
+}

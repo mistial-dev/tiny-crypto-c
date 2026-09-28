@@ -14,6 +14,8 @@ public:
   TC_TLV_result init(const uint8_t* data, size_t length, TC_TLV_profile profile,
                      const TC_TLV_limits& limits)
   {
+    /* A failed init must not leave the previous cursor usable. */
+    ready_ = false;
     TC_TLV_result result = TC_TLV_reader_init(&reader_, data, length, profile, &limits);
     if (result == TC_TLV_OK)
       ready_ = true;
