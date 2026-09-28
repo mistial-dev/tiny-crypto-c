@@ -26,7 +26,7 @@ static TC_TLV_result signing_policy_present(TC_bytes encoded_extensions, TC_byte
                                             const TC_TLV_limits* limits,
                                             const TC_X509_path_workspace* storage)
 {
-  static const uint8_t policies_oid[] = {0x55, 0x1d, 0x20};
+  static const uint8_t policies_oid[] = {0x55, 0x1d, TC_PKI_EXT_CERTIFICATE_POLICIES};
   TC_TLV_reader extensions;
   TC_X509_extension extension;
   TC_TLV_result status = TC_X509_extensions_init(&extensions, encoded_extensions.data,
@@ -59,7 +59,7 @@ static TC_TLV_result content_signing_purpose(TC_bytes extensions, int twic_compa
                                              TC_X509_path_options* policy,
                                              const TC_X509_path_workspace* storage)
 {
-  static const uint8_t eku_oid[] = {0x55, 0x1d, 37};
+  static const uint8_t eku_oid[] = {0x55, 0x1d, TC_PKI_EXT_EXTENDED_KEY_USAGE};
   TC_TLV_reader reader;
   TC_TLV_result status =
       TC_X509_extensions_init(&reader, extensions.data, extensions.length, &policy->parsing);

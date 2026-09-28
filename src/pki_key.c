@@ -43,7 +43,10 @@ TC_TLV_result tc_pki_pss_read_profile(TC_bytes encoded, TC_TLV_profile profile,
   TC_TLV_reader reader;
   TC_TLV_element field;
   TC_TLV_result result;
-  unsigned previous = 0;
+  /* RFC 4055 RSASSA-PSS-params: hashAlgorithm [0], maskGenAlgorithm [1],
+   * saltLength [2], trailerField [3]. */
+  static const uint8_t pss_tags[] = {0xa0, 0xa1, 0xa2, 0xa3};
+  size_t previous = 0, index;
   if (!out || !bounds || (profile != TC_TLV_DER && profile != TC_TLV_BER) ||
       (profile == TC_TLV_BER && !tree))
     return TC_TLV_ARGUMENT;
@@ -62,15 +65,13 @@ TC_TLV_result tc_pki_pss_read_profile(TC_bytes encoded, TC_TLV_profile profile,
     return result;
   while ((result = tree ? tc_pki_tree_next(&reader, tree, &field) : TC_TLV_next(&reader, &field)) ==
          TC_TLV_OK) {
-    unsigned tag = field.header.tag[0];
-    if (field.header.tag_length != 1 || tag < 0xa0 || tag > 0xa3 || tag <= previous)
+    if (tc_pki_context_order(&field, pss_tags, sizeof pss_tags, &previous, &index) != TC_TLV_OK)
       return TC_TLV_INVALID;
-    previous = tag;
-    if (tag == 0xa0) {
+    if (index == 0) {
       result = hash_algorithm(field.value, profile, bounds, tree, &parsed.hash);
       if (result != TC_TLV_OK)
         return result;
-    } else if (tag == 0xa1) {
+    } else if (index == 1) {
       TC_DER_algorithm mask;
       result = parameter_algorithm(field.value, profile, bounds, tree, &mask);
       if (result != TC_TLV_OK)
@@ -101,9 +102,9 @@ TC_TLV_result tc_pki_pss_read_profile(TC_bytes encoded, TC_TLV_profile profile,
       }
       if (negative)
         return TC_TLV_INVALID;
-      if (tag == 0xa3 && (value.length != 1 || value.data[0] != 1))
+      if (index == 3 && (value.length != 1 || value.data[0] != 1))
         return TC_TLV_INVALID;
-      if (tag == 0xa2)
+      if (index == 2)
         parsed.salt_length = value;
     }
   }

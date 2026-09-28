@@ -337,21 +337,20 @@ TC_TLV_result tc_x509_crl_scopes(const void* candidates, tc_x509_crl_search sear
 
 TC_TLV_result tc_x509_crl_certificate_extension(void* context, const TC_X509_extension* extension)
 {
-  enum { ISSUER_ALT_NAME = 18, BASIC_CONSTRAINTS = 19, DISTRIBUTION_POINTS = 31 };
   tc_x509_crl_certificate_fields* fields = context;
   TC_TLV_result result;
   switch (tc_pki_extension_id(extension)) {
-  case BASIC_CONSTRAINTS: {
+  case TC_PKI_EXT_BASIC_CONSTRAINTS: {
     TC_X509_basic_constraints basic;
     result = TC_X509_basic_constraints_read(extension->value.data, extension->value.length, &basic);
     if (result == TC_TLV_OK)
       fields->ca = basic.ca;
     return result;
   }
-  case DISTRIBUTION_POINTS:
+  case TC_PKI_EXT_CRL_DISTRIBUTION_POINTS:
     fields->points = extension->value;
     return TC_TLV_OK;
-  case ISSUER_ALT_NAME: {
+  case TC_PKI_EXT_ISSUER_ALT_NAME: {
     TC_bytes contents;
     result = TC_DER_sequence(extension->value.data, extension->value.length, &contents);
     if (result != TC_TLV_OK)

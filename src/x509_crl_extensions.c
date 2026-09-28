@@ -453,34 +453,23 @@ typedef struct {
 
 static TC_TLV_result crl_extension_value(void* context, const TC_X509_extension* extension)
 {
-  enum {
-    ISSUER_ALT_NAME = 18,
-    CRL_NUMBER = 20,
-    REASON_CODE = 21,
-    INVALIDITY_DATE = 24,
-    DELTA_CRL = 27,
-    ISSUING_DISTRIBUTION_POINT = 28,
-    CERTIFICATE_ISSUER = 29,
-    AUTHORITY_KEY_IDENTIFIER = 35,
-    FRESHEST_CRL = 46
-  };
   crl_extension_context* state = context;
   const unsigned id = tc_pki_extension_id(extension);
-  const int number = !state->entry && (id == CRL_NUMBER || id == DELTA_CRL);
-  const int authority = !state->entry && id == AUTHORITY_KEY_IDENTIFIER;
-  const int names = state->entry ? id == CERTIFICATE_ISSUER : id == ISSUER_ALT_NAME;
+  const int number = !state->entry && (id == TC_PKI_EXT_CRL_NUMBER || id == TC_PKI_EXT_DELTA_CRL_INDICATOR);
+  const int authority = !state->entry && id == TC_PKI_EXT_AUTHORITY_KEY_IDENTIFIER;
+  const int names = state->entry ? id == TC_PKI_EXT_CERTIFICATE_ISSUER : id == TC_PKI_EXT_ISSUER_ALT_NAME;
   TC_X509_crl_extensions* info = state->info;
   tc_x509_crl_entry_info* entry_info = state->entry_info;
   if (entry_info) {
     unsigned flag = 0;
     switch (id) {
-    case REASON_CODE:
+    case TC_PKI_EXT_REASON_CODE:
       flag = TC_CRL_ENTRY_REASON;
       break;
-    case INVALIDITY_DATE:
+    case TC_PKI_EXT_INVALIDITY_DATE:
       flag = TC_CRL_ENTRY_INVALIDITY;
       break;
-    case CERTIFICATE_ISSUER:
+    case TC_PKI_EXT_CERTIFICATE_ISSUER:
       flag = TC_CRL_ENTRY_ISSUER;
       break;
     default:
@@ -495,22 +484,22 @@ static TC_TLV_result crl_extension_value(void* context, const TC_X509_extension*
   if (info) {
     unsigned flag = 0;
     switch (id) {
-    case CRL_NUMBER:
+    case TC_PKI_EXT_CRL_NUMBER:
       flag = TC_X509_CRL_EXT_NUMBER;
       break;
-    case DELTA_CRL:
+    case TC_PKI_EXT_DELTA_CRL_INDICATOR:
       flag = TC_X509_CRL_EXT_DELTA;
       break;
-    case AUTHORITY_KEY_IDENTIFIER:
+    case TC_PKI_EXT_AUTHORITY_KEY_IDENTIFIER:
       flag = TC_X509_CRL_EXT_AUTHORITY;
       break;
-    case ISSUING_DISTRIBUTION_POINT:
+    case TC_PKI_EXT_ISSUING_DISTRIBUTION_POINT:
       flag = TC_X509_CRL_EXT_DISTRIBUTION;
       break;
-    case FRESHEST_CRL:
+    case TC_PKI_EXT_FRESHEST_CRL:
       flag = TC_X509_CRL_EXT_FRESHEST;
       break;
-    case ISSUER_ALT_NAME:
+    case TC_PKI_EXT_ISSUER_ALT_NAME:
       flag = TC_X509_CRL_EXT_ISSUER_ALT;
       break;
     default:
@@ -522,7 +511,7 @@ static TC_TLV_result crl_extension_value(void* context, const TC_X509_extension*
     if (extension->critical)
       info->critical |= flag;
   }
-  if (!state->entry && id == FRESHEST_CRL) {
+  if (!state->entry && id == TC_PKI_EXT_FRESHEST_CRL) {
     TC_TLV_reader points;
     tc_pki_distribution_point point;
     TC_TLV_result result =
@@ -541,7 +530,7 @@ static TC_TLV_result crl_extension_value(void* context, const TC_X509_extension*
       info->freshest = extension->value;
     return TC_TLV_OK;
   }
-  if (!state->entry && id == ISSUING_DISTRIBUTION_POINT) {
+  if (!state->entry && id == TC_PKI_EXT_ISSUING_DISTRIBUTION_POINT) {
     TC_X509_crl_distribution distribution;
     TC_TLV_result result =
         tc_x509_crl_distribution_read(extension->value, state->limits, state->tree, &distribution);
@@ -552,7 +541,7 @@ static TC_TLV_result crl_extension_value(void* context, const TC_X509_extension*
     return result;
   }
   if (!number && !authority && !names &&
-      (!state->entry || (id != REASON_CODE && id != INVALIDITY_DATE)))
+      (!state->entry || (id != TC_PKI_EXT_REASON_CODE && id != TC_PKI_EXT_INVALIDITY_DATE)))
     return TC_TLV_OK;
   if (tc_pki_work_charge(state->tree->work, extension->value.length) != TC_TLV_OK)
     return TC_TLV_LIMIT;
@@ -588,14 +577,14 @@ static TC_TLV_result crl_extension_value(void* context, const TC_X509_extension*
     TC_bytes value;
     TC_TLV_result result = tc_x509_crl_number_read(extension->value, &value);
     if (result == TC_TLV_OK && info) {
-      if (id == CRL_NUMBER)
+      if (id == TC_PKI_EXT_CRL_NUMBER)
         info->number = value;
       else
         info->base_number = value;
     }
     return result;
   }
-  if (id == REASON_CODE) {
+  if (id == TC_PKI_EXT_REASON_CODE) {
     unsigned reason;
     TC_TLV_result result = tc_x509_crl_reason_read(extension->value, &reason);
     if (result == TC_TLV_OK && entry_info)

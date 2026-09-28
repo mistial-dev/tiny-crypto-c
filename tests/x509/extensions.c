@@ -548,7 +548,51 @@ static MunitResult element_accounting(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+/* Optional context-tagged fields must appear once each, in schema order. */
+static MunitResult optional_field_order(const MunitParameter params[], void* user)
+{
+  const TC_TLV_limits bounds = {256, 256, 32, 8};
+  (void)params;
+  (void)user;
+  /* AuthorityKeyIdentifier: [0] keyIdentifier, [1] issuer, [2] serial. */
+  static const uint8_t key_id_only[] = {0x30, 3, 0x80, 1, 1};
+  static const uint8_t key_id_twice[] = {0x30, 6, 0x80, 1, 1, 0x80, 1, 2};
+  static const uint8_t serial_first[] = {0x30, 6, 0x82, 1, 1, 0x80, 1, 1};
+  static const uint8_t unknown_tag[] = {0x30, 3, 0x83, 1, 1};
+  TC_X509_authority_key_identifier akid;
+  munit_assert_int(
+      TC_X509_authority_key_identifier_read(key_id_only, sizeof key_id_only, &bounds, &akid), ==,
+      TC_TLV_OK);
+  munit_assert_int(
+      TC_X509_authority_key_identifier_read(key_id_twice, sizeof key_id_twice, &bounds, &akid), ==,
+      TC_TLV_INVALID);
+  munit_assert_int(
+      TC_X509_authority_key_identifier_read(serial_first, sizeof serial_first, &bounds, &akid), ==,
+      TC_TLV_INVALID);
+  munit_assert_int(
+      TC_X509_authority_key_identifier_read(unknown_tag, sizeof unknown_tag, &bounds, &akid), ==,
+      TC_TLV_INVALID);
+  /* NameConstraints: [0] permitted before [1] excluded. */
+  static const uint8_t excluded_first[] = {0x30, 16,   0xa1, 6,    0x30, 4,    0x82, 2,   'a',
+                                           'b',  0xa0, 6,    0x30, 4,    0x82, 2,    'c', 'd'};
+  TC_X509_name_constraints constraints;
+  munit_assert_int(
+      TC_X509_name_constraints_read(excluded_first, sizeof excluded_first, &bounds, &constraints),
+      ==, TC_TLV_INVALID);
+  /* PolicyConstraints: [0] requireExplicitPolicy before [1] inhibitMapping. */
+  static const uint8_t mapping_first[] = {0x30, 6, 0x81, 1, 1, 0x80, 1, 1};
+  static const uint8_t in_order[] = {0x30, 6, 0x80, 1, 1, 0x81, 1, 2};
+  TC_X509_policy_constraints policy;
+  munit_assert_int(TC_X509_policy_constraints_read(in_order, sizeof in_order, &policy), ==,
+                   TC_TLV_OK);
+  munit_assert_uint32(policy.inhibit_policy_mapping, ==, 2);
+  munit_assert_int(TC_X509_policy_constraints_read(mapping_first, sizeof mapping_first, &policy),
+                   ==, TC_TLV_INVALID);
+  return MUNIT_OK;
+}
+
 static MunitTest tests[] = {
+    {"/optional-field-order", optional_field_order, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/element-accounting", element_accounting, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/key-identifiers", key_identifiers, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/subtree-limits", subtree_limits, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

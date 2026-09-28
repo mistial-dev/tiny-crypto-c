@@ -514,10 +514,11 @@ static TC_TLV_result anchor_extensions_check(TC_bytes contents, int trust_anchor
     return result;
   while ((result = tc_pki_extension_next(&reader, work, &extension)) == TC_TLV_OK) {
     const unsigned id = tc_pki_extension_id(&extension);
-    const int path_control = id == 30 || id == 32 || id == 36 || id == 54;
+    const int path_control = tc_pki_extension_path_control(id);
     if (trust_anchor_info && path_control)
       return TC_TLV_INVALID;
-    if (extension.critical && id != 14 && id != 15 && id != 19 && !path_control)
+    if (extension.critical && id != TC_PKI_EXT_SUBJECT_KEY_IDENTIFIER && id != TC_PKI_EXT_KEY_USAGE &&
+        id != TC_PKI_EXT_BASIC_CONSTRAINTS && !path_control)
       return TC_TLV_UNSUPPORTED;
   }
   return result == TC_TLV_END ? TC_TLV_OK : result;

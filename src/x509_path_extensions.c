@@ -9,40 +9,28 @@
 #include "pki_extensions_internal.h"
 #include "internal.h"
 
-enum {
-  EXTENSION_KEY_USAGE = 15,
-  EXTENSION_SUBJECT_ALT_NAME = 17,
-  EXTENSION_BASIC_CONSTRAINTS = 19,
-  EXTENSION_NAME_CONSTRAINTS = 30,
-  EXTENSION_POLICIES = 32,
-  EXTENSION_POLICY_MAPPINGS = 33,
-  EXTENSION_POLICY_CONSTRAINTS = 36,
-  EXTENSION_EXTENDED_KEY_USAGE = 37,
-  EXTENSION_INHIBIT_ANY = 54
-};
-
 /* Map an id-ce extension number to its summary slot. Extensions outside the
  * summary map to -1. */
 static int summary_slot(unsigned id)
 {
   switch (id) {
-  case EXTENSION_KEY_USAGE:
+  case TC_PKI_EXT_KEY_USAGE:
     return TC_X509_SUMMARY_KEY_USAGE;
-  case EXTENSION_SUBJECT_ALT_NAME:
+  case TC_PKI_EXT_SUBJECT_ALT_NAME:
     return TC_X509_SUMMARY_SUBJECT_ALT_NAME;
-  case EXTENSION_BASIC_CONSTRAINTS:
+  case TC_PKI_EXT_BASIC_CONSTRAINTS:
     return TC_X509_SUMMARY_BASIC_CONSTRAINTS;
-  case EXTENSION_NAME_CONSTRAINTS:
+  case TC_PKI_EXT_NAME_CONSTRAINTS:
     return TC_X509_SUMMARY_NAME_CONSTRAINTS;
-  case EXTENSION_POLICIES:
+  case TC_PKI_EXT_CERTIFICATE_POLICIES:
     return TC_X509_SUMMARY_POLICIES;
-  case EXTENSION_POLICY_MAPPINGS:
+  case TC_PKI_EXT_POLICY_MAPPINGS:
     return TC_X509_SUMMARY_POLICY_MAPPINGS;
-  case EXTENSION_POLICY_CONSTRAINTS:
+  case TC_PKI_EXT_POLICY_CONSTRAINTS:
     return TC_X509_SUMMARY_POLICY_CONSTRAINTS;
-  case EXTENSION_EXTENDED_KEY_USAGE:
+  case TC_PKI_EXT_EXTENDED_KEY_USAGE:
     return TC_X509_SUMMARY_EXTENDED_KEY_USAGE;
-  case EXTENSION_INHIBIT_ANY:
+  case TC_PKI_EXT_INHIBIT_ANY_POLICY:
     return TC_X509_SUMMARY_INHIBIT_ANY;
   default:
     return -1;
@@ -129,7 +117,7 @@ static TC_TLV_result extended_key_usage_permits(TC_bytes value, const tc_x509_pa
                                                 const TC_TLV_limits* limits, size_t* work,
                                                 int* permitted)
 {
-  static const uint8_t any_eku[] = {0x55, 0x1d, 0x25, 0};
+  static const uint8_t any_eku[] = {0x55, 0x1d, TC_PKI_EXT_EXTENDED_KEY_USAGE, 0};
   size_t i, count;
   TC_TLV_result result;
   *permitted = !usage->purpose.length;

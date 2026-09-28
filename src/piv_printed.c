@@ -85,21 +85,11 @@ static int date(TC_bytes value, TC_PIV_printed_profile profile, TC_X509_time* ou
   return 1;
 }
 
-static TC_TLV_result field(TC_TLV_reader* reader, unsigned tag, TC_TLV_element* out)
-{
-  TC_TLV_result result = TC_TLV_next(reader, out);
-  if (result == TC_TLV_END)
-    return TC_TLV_INVALID;
-  if (result != TC_TLV_OK)
-    return result;
-  return out->header.tag_length == 1 && out->header.tag[0] == tag ? TC_TLV_OK : TC_TLV_INVALID;
-}
-
 static TC_TLV_result text_field(TC_TLV_reader* reader, unsigned tag, size_t maximum, int empty,
                                 TC_bytes* out)
 {
   TC_TLV_element element;
-  TC_TLV_result result = field(reader, tag, &element);
+  TC_TLV_result result = tc_pki_field(reader, tag, &element);
   if (result != TC_TLV_OK)
     return result;
   if (!printable(element.value, maximum, empty))
@@ -140,13 +130,13 @@ TC_TLV_result TC_PIV_printed_read(TC_bytes input, TC_PIV_printed_encoding encodi
                       &parsed.employee_affiliation);
   if (result != TC_TLV_OK)
     return result;
-  result = field(&reader, PRINTED_EXPIRATION_TAG, &element);
+  result = tc_pki_field(&reader, PRINTED_EXPIRATION_TAG, &element);
   if (result != TC_TLV_OK)
     return result;
   if (!date(element.value, profile, &parsed.expiration))
     return TC_TLV_INVALID;
   parsed.expiration_text = element.value;
-  result = field(&reader, PRINTED_SERIAL_TAG, &element);
+  result = tc_pki_field(&reader, PRINTED_SERIAL_TAG, &element);
   if (result != TC_TLV_OK)
     return result;
   if (profile == TC_PIV_PRINTED_PROFILE_TWIC) {
@@ -155,7 +145,7 @@ TC_TLV_result TC_PIV_printed_read(TC_bytes input, TC_PIV_printed_encoding encodi
   } else if (!printable(element.value, PRINTED_SERIAL_MAX, 0))
     return TC_TLV_INVALID;
   parsed.card_serial_number = element.value;
-  result = field(&reader, PRINTED_ISSUER_TAG, &element);
+  result = tc_pki_field(&reader, PRINTED_ISSUER_TAG, &element);
   if (result != TC_TLV_OK)
     return result;
   if (profile == TC_PIV_PRINTED_PROFILE_TWIC) {
@@ -180,7 +170,7 @@ TC_TLV_result TC_PIV_printed_read(TC_bytes input, TC_PIV_printed_encoding encodi
       return result;
   }
   if (profile == TC_PIV_PRINTED_PROFILE_PIV) {
-    result = field(&reader, PRINTED_ERROR_TAG, &element);
+    result = tc_pki_field(&reader, PRINTED_ERROR_TAG, &element);
     if (result != TC_TLV_OK)
       return result;
     if (element.value.length)

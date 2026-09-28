@@ -5,6 +5,31 @@
 #include <tiny_crypto/der.h>
 #include <string.h>
 
+/* Final arc of the RFC 5280 id-ce extensions (2.5.29.n), as returned by
+ * tc_pki_extension_id. Encoded OIDs are 55 1D n. */
+enum {
+  TC_PKI_EXT_SUBJECT_KEY_IDENTIFIER = 14,
+  TC_PKI_EXT_KEY_USAGE = 15,
+  TC_PKI_EXT_SUBJECT_ALT_NAME = 17,
+  TC_PKI_EXT_ISSUER_ALT_NAME = 18,
+  TC_PKI_EXT_BASIC_CONSTRAINTS = 19,
+  TC_PKI_EXT_CRL_NUMBER = 20,
+  TC_PKI_EXT_REASON_CODE = 21,
+  TC_PKI_EXT_INVALIDITY_DATE = 24,
+  TC_PKI_EXT_DELTA_CRL_INDICATOR = 27,
+  TC_PKI_EXT_ISSUING_DISTRIBUTION_POINT = 28,
+  TC_PKI_EXT_CERTIFICATE_ISSUER = 29,
+  TC_PKI_EXT_NAME_CONSTRAINTS = 30,
+  TC_PKI_EXT_CRL_DISTRIBUTION_POINTS = 31,
+  TC_PKI_EXT_CERTIFICATE_POLICIES = 32,
+  TC_PKI_EXT_POLICY_MAPPINGS = 33,
+  TC_PKI_EXT_AUTHORITY_KEY_IDENTIFIER = 35,
+  TC_PKI_EXT_POLICY_CONSTRAINTS = 36,
+  TC_PKI_EXT_EXTENDED_KEY_USAGE = 37,
+  TC_PKI_EXT_FRESHEST_CRL = 46,
+  TC_PKI_EXT_INHIBIT_ANY_POLICY = 54
+};
+
 static inline int tc_pki_tag(const TC_TLV_element* element, unsigned tag)
 {
   return tag <= 255 ? element->header.tag_length == 1 && element->header.tag[0] == tag
@@ -19,6 +44,33 @@ static inline TC_TLV_result tc_pki_next(TC_TLV_reader* reader, unsigned tag,
   if (result != TC_TLV_OK)
     return result;
   return tc_pki_tag(element, tag) ? TC_TLV_OK : TC_TLV_INVALID;
+}
+
+/* Read a required child with the given tag. A missing (END) or truncated
+ * (MORE) child inside a complete parent is INVALID. */
+static inline TC_TLV_result tc_pki_field(TC_TLV_reader* reader, unsigned tag,
+                                         TC_TLV_element* element)
+{
+  TC_TLV_result result = tc_pki_next(reader, tag, element);
+  return result == TC_TLV_END || result == TC_TLV_MORE ? TC_TLV_INVALID : result;
+}
+
+/* Optional context-specific fields in a SEQUENCE use one of the allowed
+ * single-byte tags, each at most once and in the listed order. *previous is
+ * the position after the last accepted field (0 before the first); *index
+ * receives the new field's position in allowed. Any other tag is INVALID. */
+static inline TC_TLV_result tc_pki_context_order(const TC_TLV_element* element,
+                                                 const uint8_t* allowed, size_t count,
+                                                 size_t* previous, size_t* index)
+{
+  if (element->header.tag_length == 1)
+    for (size_t i = *previous; i < count; ++i)
+      if (element->header.tag[0] == allowed[i]) {
+        *index = i;
+        *previous = i + 1;
+        return TC_TLV_OK;
+      }
+  return TC_TLV_INVALID;
 }
 
 static inline int tc_pki_end(const TC_TLV_reader* reader)

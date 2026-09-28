@@ -87,6 +87,14 @@ static inline unsigned tc_pki_extension_id(const TC_X509_extension* extension)
     return 0;
   return extension->oid.data[2];
 }
+
+/* RFC 5914 section 2.6: extensions duplicated by TrustAnchorInfo
+ * CertPathControls. */
+static inline int tc_pki_extension_path_control(unsigned id)
+{
+  return id == TC_PKI_EXT_NAME_CONSTRAINTS || id == TC_PKI_EXT_CERTIFICATE_POLICIES ||
+         id == TC_PKI_EXT_POLICY_CONSTRAINTS || id == TC_PKI_EXT_INHIBIT_ANY_POLICY;
+}
 /* Borrow the certificate's SKI. A NULL span means absent. An empty OCTET
  * STRING remains distinguishable. Output changes only on OK. Work is
  * provisional. Parsed inputs and output/work are disjoint. */
@@ -94,7 +102,6 @@ static inline TC_TLV_result tc_pki_subject_key_identifier(const TC_X509_certific
                                                           const TC_TLV_limits* limits, size_t* work,
                                                           TC_bytes* out)
 {
-  enum { SUBJECT_KEY_IDENTIFIER = 14 };
   TC_TLV_reader reader;
   TC_X509_extension extension;
   TC_bytes identifier = {NULL, 0};
@@ -105,7 +112,7 @@ static inline TC_TLV_result tc_pki_subject_key_identifier(const TC_X509_certific
   if (result != TC_TLV_OK)
     return result;
   while ((result = tc_pki_extension_next(&reader, work, &extension)) == TC_TLV_OK) {
-    if (tc_pki_extension_id(&extension) != SUBJECT_KEY_IDENTIFIER)
+    if (tc_pki_extension_id(&extension) != TC_PKI_EXT_SUBJECT_KEY_IDENTIFIER)
       continue;
     if (identifier.data)
       return TC_TLV_INVALID;

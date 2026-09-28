@@ -5,6 +5,7 @@
 #include <tiny_crypto/x509.h>
 #include "internal.h"
 #include "pki_bits_internal.h"
+#include "pki_internal.h"
 #include <string.h>
 
 static const TC_TLV_limits limits = {SIZE_MAX, SIZE_MAX, 4, 1};
@@ -34,7 +35,9 @@ TC_TLV_result TC_X509_authority_key_identifier_read(const uint8_t* data, size_t 
   TC_TLV_reader reader;
   TC_TLV_element element;
   TC_TLV_result result;
-  unsigned previous = 0;
+  /* keyIdentifier [0], authorityCertIssuer [1], authorityCertSerialNumber [2] */
+  static const uint8_t key_id_tags[] = {0x80, 0xa1, 0x82};
+  size_t previous = 0;
   if (!out)
     return TC_TLV_ARGUMENT;
   result = TC_TLV_read(data, length, TC_TLV_DER, bounds, &element);
@@ -48,28 +51,14 @@ TC_TLV_result TC_X509_authority_key_identifier_read(const uint8_t* data, size_t 
   if (result != TC_TLV_OK)
     return result;
   while ((result = TC_TLV_next(&reader, &element)) == TC_TLV_OK) {
-    unsigned field;
-    if (element.header.tag_length != 1)
+    size_t field;
+    if (tc_pki_context_order(&element, key_id_tags, sizeof key_id_tags, &previous, &field) !=
+        TC_TLV_OK)
       return TC_TLV_INVALID;
-    switch (element.header.tag[0]) {
-    case 0x80:
-      field = 1;
-      break;
-    case 0xa1:
-      field = 2;
-      break;
-    case 0x82:
-      field = 3;
-      break;
-    default:
-      return TC_TLV_INVALID;
-    }
-    if (field <= previous)
-      return TC_TLV_INVALID;
-    if (field == 1) {
+    if (field == 0) {
       parsed.has_key_identifier = 1;
       parsed.key_identifier = element.value;
-    } else if (field == 2) {
+    } else if (field == 1) {
       if (!element.value.length)
         return TC_TLV_INVALID;
       parsed.issuer = element.value;
@@ -80,7 +69,6 @@ TC_TLV_result TC_X509_authority_key_identifier_read(const uint8_t* data, size_t 
       parsed.serial = element.value;
       parsed.serial_negative = (element.value.data[0] & 128) != 0;
     }
-    previous = field;
   }
   if (result != TC_TLV_END)
     return result;
@@ -132,22 +120,23 @@ TC_TLV_result TC_X509_name_constraints_read(const uint8_t* data, size_t length,
   TC_TLV_reader reader;
   TC_TLV_element element;
   TC_TLV_result result;
-  unsigned previous = 0;
+  static const uint8_t subtree_tags[] = {0xa0, 0xa1}; /* permitted, excluded */
+  size_t previous = 0;
   if (!out)
     return TC_TLV_ARGUMENT;
   result = sequence_reader(&reader, data, length, bounds);
   if (result != TC_TLV_OK)
     return result;
   while ((result = TC_TLV_next(&reader, &element)) == TC_TLV_OK) {
-    unsigned tag = element.header.tag[0];
-    if (element.header.tag_length != 1 || (tag != 0xa0 && tag != 0xa1) || tag <= previous ||
+    size_t index;
+    if (tc_pki_context_order(&element, subtree_tags, sizeof subtree_tags, &previous, &index) !=
+            TC_TLV_OK ||
         !element.value.length)
       return TC_TLV_INVALID;
-    if (tag == 0xa0)
+    if (index == 0)
       parsed.permitted = element.value;
     else
       parsed.excluded = element.value;
-    previous = tag;
   }
   if (result != TC_TLV_END)
     return result;
@@ -157,7 +146,7 @@ TC_TLV_result TC_X509_name_constraints_read(const uint8_t* data, size_t length,
 
 TC_TLV_result TC_X509_policy_mapping_next(TC_TLV_reader* reader, TC_X509_policy_mapping* out)
 {
-  static const uint8_t any_policy[] = {0x55, 0x1d, 0x20, 0};
+  static const uint8_t any_policy[] = {0x55, 0x1d, TC_PKI_EXT_CERTIFICATE_POLICIES, 0};
   TC_TLV_reader next, fields;
   TC_TLV_element element;
   TC_bytes oids[2];
@@ -433,7 +422,9 @@ TC_TLV_result TC_X509_policy_constraints_read(const uint8_t* data, size_t length
   TC_TLV_reader reader;
   TC_TLV_element element;
   TC_TLV_result result;
-  unsigned previous = 0;
+  /* requireExplicitPolicy [0], inhibitPolicyMapping [1] */
+  static const uint8_t skip_tags[] = {0x80, 0x81};
+  size_t previous = 0;
   if (!out)
     return TC_TLV_ARGUMENT;
   result = TC_DER_sequence(data, length, &contents);
@@ -445,21 +436,20 @@ TC_TLV_result TC_X509_policy_constraints_read(const uint8_t* data, size_t length
   if (result != TC_TLV_OK)
     return result;
   while ((result = TC_TLV_next(&reader, &element)) == TC_TLV_OK) {
-    unsigned tag = element.header.tag[0];
+    size_t index;
     uint32_t count;
-    if (element.header.tag_length != 1 || (tag != 0x80 && tag != 0x81) || tag <= previous)
+    if (tc_pki_context_order(&element, skip_tags, sizeof skip_tags, &previous, &index) != TC_TLV_OK)
       return TC_TLV_INVALID;
     result = TC_DER_uint32_contents(element.value.data, element.value.length, &count);
     if (result != TC_TLV_OK)
       return result;
-    if (tag == 0x80) {
+    if (index == 0) {
       parsed.has_require_explicit_policy = 1;
       parsed.require_explicit_policy = count;
     } else {
       parsed.has_inhibit_policy_mapping = 1;
       parsed.inhibit_policy_mapping = count;
     }
-    previous = tag;
   }
   if (result != TC_TLV_END)
     return TC_TLV_INVALID;

@@ -6,6 +6,7 @@
 #include "pki_internal.h"
 #include "pki_spans_internal.h"
 #include "pki_extensions_internal.h"
+#include "pki_names_internal.h"
 #include "string_internal.h"
 #include "x509_time_internal.h"
 #include "internal.h"
@@ -20,11 +21,6 @@ static const TC_TLV_limits unlimited = {SIZE_MAX, SIZE_MAX, SIZE_MAX, SIZE_MAX};
 static TC_TLV_result open(TC_bytes contents, TC_TLV_reader* reader)
 {
   return TC_TLV_reader_init(reader, contents.data, contents.length, TC_TLV_DER, &unlimited);
-}
-
-static TC_TLV_result field(TC_TLV_reader* reader, unsigned tag, TC_TLV_element* element)
-{
-  return tc_pki_next(reader, tag, element) == TC_TLV_OK ? TC_TLV_OK : TC_TLV_INVALID;
 }
 
 static int string_value(const TC_TLV_element* element)
@@ -281,9 +277,9 @@ static TC_TLV_result general_name(const TC_TLV_element* element, int constraint)
       return TC_TLV_INVALID;
     break;
   case 0xa0:
-    if (open(element->value, &fields) != TC_TLV_OK || field(&fields, 6, &value) != TC_TLV_OK ||
+    if (open(element->value, &fields) != TC_TLV_OK || tc_pki_field(&fields, 6, &value) != TC_TLV_OK ||
         TC_DER_oid(value.encoded.data, value.encoded.length, &contents) != TC_TLV_OK ||
-        field(&fields, 0xa0, &value) != TC_TLV_OK || !tc_pki_end(&fields))
+        tc_pki_field(&fields, 0xa0, &value) != TC_TLV_OK || !tc_pki_end(&fields))
       return TC_TLV_INVALID;
     contents = value.value;
     if (TC_TLV_read(contents.data, contents.length, TC_TLV_DER, &unlimited, &value) != TC_TLV_OK ||
@@ -301,21 +297,16 @@ static TC_TLV_result general_name(const TC_TLV_element* element, int constraint)
   return TC_TLV_OK;
 }
 
+/* Certificate parsing is bounded by its element budget, so the name scan is
+ * unmetered. */
 static TC_TLV_result general_names(TC_bytes encoded, TC_X509_workspace* workspace)
 {
+  size_t work = SIZE_MAX;
+  const tc_pki_tree_workspace tree = {workspace->frames, workspace->frame_capacity, &work};
   TC_bytes contents;
-  TC_TLV_reader reader;
-  TC_X509_general_name parsed;
-  TC_TLV_result result;
-  if (TC_DER_sequence(encoded.data, encoded.length, &contents) != TC_TLV_OK || !contents.length ||
-      open(contents, &reader) != TC_TLV_OK)
+  if (TC_DER_sequence(encoded.data, encoded.length, &contents) != TC_TLV_OK)
     return TC_TLV_INVALID;
-  while ((result = TC_X509_general_name_next(&reader, workspace->frames, workspace->frame_capacity,
-                                             &parsed)) == TC_TLV_OK) {
-  }
-  if (result != TC_TLV_END)
-    return result;
-  return TC_TLV_OK;
+  return tc_pki_general_names_contents_check(contents, &unlimited, &tree);
 }
 
 static void count_node(void* user, const TC_TLV_event* event)
@@ -377,7 +368,8 @@ TC_TLV_result TC_X509_general_subtree_next(TC_TLV_reader* reader, TC_TLV_frame* 
   TC_TLV_element element;
   TC_X509_general_subtree parsed = {{0, {NULL, 0}, {NULL, 0}}, 0, 0, 0};
   TC_TLV_result result;
-  unsigned previous = 0;
+  static const uint8_t distance_tags[] = {0x80, 0x81}; /* minimum, maximum */
+  size_t previous = 0, index;
   if (!reader || !out)
     return TC_TLV_ARGUMENT;
   next = *reader;
@@ -391,14 +383,14 @@ TC_TLV_result TC_X509_general_subtree_next(TC_TLV_reader* reader, TC_TLV_frame* 
   parsed.base.encoded = element.encoded;
   parsed.base.value = element.value;
   while ((result = TC_TLV_next(&fields, &element)) == TC_TLV_OK) {
-    unsigned tag = element.header.tag[0];
     uint32_t distance;
-    if (element.header.tag_length != 1 || (tag != 0x80 && tag != 0x81) || tag <= previous)
+    if (tc_pki_context_order(&element, distance_tags, sizeof distance_tags, &previous, &index) !=
+        TC_TLV_OK)
       return TC_TLV_INVALID;
     result = TC_DER_uint32_contents(element.value.data, element.value.length, &distance);
     if (result != TC_TLV_OK)
       return result;
-    if (tag == 0x80) {
+    if (index == 0) {
       if (!distance)
         return TC_TLV_INVALID; /* DER omits DEFAULT zero. */
       parsed.minimum = distance;
@@ -406,7 +398,6 @@ TC_TLV_result TC_X509_general_subtree_next(TC_TLV_reader* reader, TC_TLV_frame* 
       parsed.has_maximum = 1;
       parsed.maximum = distance;
     }
-    previous = tag;
   }
   if (result != TC_TLV_END)
     return result;
@@ -447,22 +438,22 @@ static TC_TLV_result extensions(TC_bytes encoded, TC_X509_workspace* workspace,
       return result;
     {
       const unsigned id = tc_pki_extension_id(&extension);
-      if (id == 19) {
+      if (id == TC_PKI_EXT_BASIC_CONSTRAINTS) {
         TC_X509_basic_constraints constraints;
         result = TC_X509_basic_constraints_read(extension.value.data, extension.value.length,
                                                 &constraints);
         if (result != TC_TLV_OK)
           return result == TC_TLV_MORE ? TC_TLV_INVALID : result;
-      } else if (id == 15) {
+      } else if (id == TC_PKI_EXT_KEY_USAGE) {
         uint16_t usage;
         result = TC_X509_key_usage_read(extension.value.data, extension.value.length, &usage);
         if (result != TC_TLV_OK)
           return result == TC_TLV_MORE ? TC_TLV_INVALID : result;
-      } else if (id == 17 || id == 18) {
+      } else if (id == TC_PKI_EXT_SUBJECT_ALT_NAME || id == TC_PKI_EXT_ISSUER_ALT_NAME) {
         result = general_names(extension.value, workspace);
         if (result != TC_TLV_OK)
           return result;
-        if (id == 17 && extension.critical)
+        if (id == TC_PKI_EXT_SUBJECT_ALT_NAME && extension.critical)
           *critical_san = 1;
       }
     }
@@ -488,32 +479,23 @@ static TC_TLV_result signature_format(const TC_X509_certificate* certificate)
   tc_pki_signature_oid_info info =
       tc_pki_signature_oid_classify(certificate->signature_algorithm.oid);
   TC_bytes parameters = certificate->signature_algorithm.parameters;
-  switch (info.kind) {
-  case TC_PKI_SIGNATURE_RSA_PSS:
+  TC_DER_signature_pair value;
+  if (info.kind == TC_PKI_SIGNATURE_RSA_PSS)
     return tc_x509_pss_parameters(parameters);
+  if (tc_pki_signature_parameters_check(info.kind, parameters, TC_TLV_DER) != TC_TLV_OK)
+    return TC_TLV_INVALID;
+  switch (info.kind) {
   case TC_PKI_SIGNATURE_ECDSA:
-  case TC_PKI_SIGNATURE_DSA: {
-    TC_DER_signature_pair value;
-    if (parameters.length)
-      return TC_TLV_INVALID;
+  case TC_PKI_SIGNATURE_DSA:
     return TC_DER_ecdsa_signature(certificate->signature.data, certificate->signature.length,
                                   &value);
-  }
   case TC_PKI_SIGNATURE_ED25519:
+    return certificate->signature.length == 64 ? TC_TLV_OK : TC_TLV_INVALID;
   case TC_PKI_SIGNATURE_ED448:
-    if (parameters.length ||
-        certificate->signature.length != (info.kind == TC_PKI_SIGNATURE_ED25519 ? 64u : 114u))
-      return TC_TLV_INVALID;
-    break;
-  case TC_PKI_SIGNATURE_RSA_V15:
-    /* RFC 4055 requires readers to accept absent RSA signature parameters. */
-    if (parameters.length && TC_DER_null(parameters.data, parameters.length) != TC_TLV_OK)
-      return TC_TLV_INVALID;
-    break;
-  case TC_PKI_SIGNATURE_UNKNOWN:
-    break;
+    return certificate->signature.length == 114 ? TC_TLV_OK : TC_TLV_INVALID;
+  default:
+    return TC_TLV_OK;
   }
-  return TC_TLV_OK;
 }
 
 TC_TLV_result TC_X509_read(const uint8_t* data, size_t length, const TC_TLV_limits* limits,
@@ -542,7 +524,7 @@ TC_TLV_result TC_X509_read(const uint8_t* data, size_t length, const TC_TLV_limi
     return result;
   memset(&certificate, 0, sizeof certificate);
   certificate.encoded = element.encoded;
-  if (open(element.value, &outer) != TC_TLV_OK || field(&outer, 0x30, &element) != TC_TLV_OK)
+  if (open(element.value, &outer) != TC_TLV_OK || tc_pki_field(&outer, 0x30, &element) != TC_TLV_OK)
     return TC_TLV_INVALID;
   certificate.tbs = element.encoded;
   if (open(element.value, &tbs) != TC_TLV_OK || TC_TLV_next(&tbs, &element) != TC_TLV_OK)
@@ -559,24 +541,24 @@ TC_TLV_result TC_X509_read(const uint8_t* data, size_t length, const TC_TLV_limi
   if (TC_DER_integer(element.encoded.data, element.encoded.length, &certificate.serial,
                      &certificate.serial_negative) != TC_TLV_OK)
     return TC_TLV_INVALID;
-  if (field(&tbs, 0x30, &element) != TC_TLV_OK)
+  if (tc_pki_field(&tbs, 0x30, &element) != TC_TLV_OK)
     return TC_TLV_INVALID;
   inner_algorithm = element.encoded;
-  if (field(&tbs, 0x30, &element) != TC_TLV_OK)
+  if (tc_pki_field(&tbs, 0x30, &element) != TC_TLV_OK)
     return TC_TLV_INVALID;
   certificate.issuer = element.encoded;
   if (name(element.value, 0) != TC_TLV_OK)
     return TC_TLV_INVALID;
-  if (field(&tbs, 0x30, &element) != TC_TLV_OK ||
+  if (tc_pki_field(&tbs, 0x30, &element) != TC_TLV_OK ||
       validity(element.value, &certificate) != TC_TLV_OK)
     return TC_TLV_INVALID;
-  if (field(&tbs, 0x30, &element) != TC_TLV_OK)
+  if (tc_pki_field(&tbs, 0x30, &element) != TC_TLV_OK)
     return TC_TLV_INVALID;
   certificate.subject = element.encoded;
   empty_subject = !element.value.length;
   if (name(element.value, 1) != TC_TLV_OK)
     return TC_TLV_INVALID;
-  if (field(&tbs, 0x30, &element) != TC_TLV_OK)
+  if (tc_pki_field(&tbs, 0x30, &element) != TC_TLV_OK)
     return TC_TLV_INVALID;
   certificate.spki = element.encoded;
   result = TC_X509_subject_public_key(element.encoded.data, element.encoded.length,
@@ -607,12 +589,12 @@ TC_TLV_result TC_X509_read(const uint8_t* data, size_t length, const TC_TLV_limi
   }
   if (empty_subject && !critical_san)
     return TC_TLV_INVALID;
-  if (field(&outer, 0x30, &element) != TC_TLV_OK ||
+  if (tc_pki_field(&outer, 0x30, &element) != TC_TLV_OK ||
       tc_pki_compare(inner_algorithm, element.encoded) ||
       TC_DER_algorithm_identifier(element.encoded.data, element.encoded.length,
                                   &certificate.signature_algorithm) != TC_TLV_OK)
     return TC_TLV_INVALID;
-  if (field(&outer, 3, &element) != TC_TLV_OK || !tc_pki_end(&outer) ||
+  if (tc_pki_field(&outer, 3, &element) != TC_TLV_OK || !tc_pki_end(&outer) ||
       TC_DER_bit_string(element.encoded.data, element.encoded.length, &certificate.signature,
                         &unused) != TC_TLV_OK ||
       unused || !certificate.signature.length)

@@ -7,7 +7,7 @@
 #include "pki_budget_internal.h"
 #include "string_internal.h"
 
-static const uint8_t any_oid[] = {0x55, 0x1d, 0x20, 0};
+static const uint8_t any_oid[] = {0x55, 0x1d, TC_PKI_EXT_CERTIFICATE_POLICIES, 0};
 static int is_any(TC_bytes oid)
 {
   return oid.length == sizeof any_oid && memcmp(oid.data, any_oid, sizeof any_oid) == 0;

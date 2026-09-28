@@ -260,45 +260,71 @@ static MunitResult choices(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-/* RFC 5914 section 2.6 forbids these extensions in TrustAnchorInfo exts. */
-static MunitResult forbidden_exts(const MunitParameter params[], void* user)
+/* Read a TrustAnchorInfo whose exts [1] holds the given Extension list
+ * contents. */
+static TC_TLV_result read_with_exts(const uint8_t* list, size_t list_length)
 {
   static const uint8_t spki[] = {0x30, 12, 0x30, 5, 6, 3, 0x2a, 3, 4, 3, 3, 0, 1, 2};
   static const uint8_t key_id[] = {4, 1, 1};
   static const uint8_t name[] = {0x30, 12, 0x31, 10, 0x30, 8, 6, 3, 0x55, 4, 3, 0x0c, 1, 'A'};
+  uint8_t extensions[64], exts[66], info[128], info_tlv[130], choice[132], encoded[134];
+  size_t n = 0;
+  TC_TLV_reader reader;
+  TC_X509_store_anchor anchor;
+  munit_assert_size(list_length, <=, 60);
+  size_t extensions_length = add(extensions, 0x30, list, list_length);
+  size_t exts_length = add(exts, 0xa1, extensions, extensions_length);
+  memcpy(info + n, spki, sizeof spki);
+  n += sizeof spki;
+  memcpy(info + n, key_id, sizeof key_id);
+  n += sizeof key_id;
+  n += add(info + n, 0x30, name, sizeof name); /* CertPathControls with taName only */
+  memcpy(info + n, exts, exts_length);
+  n += exts_length;
+  size_t info_length = add(info_tlv, 0x30, info, n);
+  size_t choice_length = add(choice, 0xa2, info_tlv, info_length);
+  size_t length = add(encoded, 0x30, choice, choice_length);
+  munit_assert_int(TC_X509_trust_anchor_list_init(&reader, encoded, length, &limits, &workspace),
+                   ==, TC_TLV_OK);
+  return TC_X509_trust_anchor_next(&reader, &limits, &workspace, &anchor);
+}
+
+/* RFC 5914 section 2.6 forbids these extensions in TrustAnchorInfo exts. */
+static MunitResult forbidden_exts(const MunitParameter params[], void* user)
+{
   static const unsigned ids[] = {30, 32, 36, 54, 19};
   (void)params;
   (void)user;
   for (size_t i = 0; i < sizeof ids / sizeof *ids; ++i) {
     /* basicConstraints (19) is permitted and parses; the others are not. */
     uint8_t extension[] = {0x30, 9, 6, 3, 0x55, 0x1d, (uint8_t)ids[i], 4, 2, 0x30, 0};
-    uint8_t extensions[2 + sizeof extension], exts[4 + sizeof extension];
-    uint8_t info[128], info_tlv[130], choice[132], encoded[134];
-    size_t n = 0;
-    add(extensions, 0x30, extension, sizeof extension);
-    add(exts, 0xa1, extensions, sizeof extensions);
-    memcpy(info + n, spki, sizeof spki);
-    n += sizeof spki;
-    memcpy(info + n, key_id, sizeof key_id);
-    n += sizeof key_id;
-    n += add(info + n, 0x30, name, sizeof name); /* CertPathControls with taName only */
-    memcpy(info + n, exts, sizeof exts);
-    n += sizeof exts;
-    size_t info_length = add(info_tlv, 0x30, info, n);
-    size_t choice_length = add(choice, 0xa2, info_tlv, info_length);
-    size_t length = add(encoded, 0x30, choice, choice_length);
-    TC_TLV_reader reader;
-    TC_X509_store_anchor anchor;
-    munit_assert_int(TC_X509_trust_anchor_list_init(&reader, encoded, length, &limits, &workspace),
-                     ==, TC_TLV_OK);
-    munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &workspace, &anchor), ==,
+    munit_assert_int(read_with_exts(extension, sizeof extension), ==,
                      (ids[i] == 19 ? TC_TLV_OK : TC_TLV_INVALID));
   }
   return MUNIT_OK;
 }
 
+/* RFC 5280 section 4.2: an extension OID appears at most once. */
+static MunitResult duplicate_exts(const MunitParameter params[], void* user)
+{
+  static const uint8_t basic[] = {0x30, 9, 6, 3, 0x55, 0x1d, 19, 4, 2, 0x30, 0};
+  static const uint8_t other[] = {0x30, 9, 6, 3, 0x2a, 3, 5, 4, 2, 5, 0};
+  uint8_t list[3 * sizeof basic];
+  (void)params;
+  (void)user;
+  memcpy(list, basic, sizeof basic);
+  memcpy(list + sizeof basic, other, sizeof other);
+  munit_assert_int(read_with_exts(list, 2 * sizeof basic), ==, TC_TLV_OK);
+  memcpy(list + 2 * sizeof basic, basic, sizeof basic);
+  munit_assert_int(read_with_exts(list, sizeof list), ==, TC_TLV_INVALID);
+  memcpy(list + 2 * sizeof basic, other, sizeof other);
+  munit_assert_int(read_with_exts(list + sizeof basic, 2 * sizeof other), ==, TC_TLV_INVALID);
+  return MUNIT_OK;
+}
+
 static MunitTest tests[] = {
     {"/forbidden-exts", forbidden_exts, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/duplicate-exts", duplicate_exts, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/flags-and-unusable", flags_and_unusable, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/malformed", malformed, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/choices", choices, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

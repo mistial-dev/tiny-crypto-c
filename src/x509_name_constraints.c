@@ -698,7 +698,6 @@ TC_TLV_result TC_X509_certificate_names_check(const TC_X509_certificate* certifi
                                               const TC_X509_constraint_workspace* workspace,
                                               size_t* work, int* permitted)
 {
-  enum { SUBJECT_ALT_NAME = 17 };
   TC_bytes inputs[7], san = {NULL, 0};
   TC_TLV_reader reader, subject;
   TC_X509_extension extension;
@@ -725,7 +724,7 @@ TC_TLV_result TC_X509_certificate_names_check(const TC_X509_certificate* certifi
   if (result != TC_TLV_OK)
     return result;
   while ((result = tc_pki_extension_next(&reader, work, &extension)) == TC_TLV_OK) {
-    if (tc_pki_extension_id(&extension) == SUBJECT_ALT_NAME) {
+    if (tc_pki_extension_id(&extension) == TC_PKI_EXT_SUBJECT_ALT_NAME) {
       if (has_san)
         return TC_TLV_INVALID;
       has_san = 1;
