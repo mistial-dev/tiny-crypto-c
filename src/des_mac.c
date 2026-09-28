@@ -260,14 +260,19 @@ TC_status TC_DES_ISO9797_final(struct TC_DES_ISO9797_ctx* ctx, uint8_t tag[TC_DE
   key.schedule = ctx->keys.schedule;
   key.triple = ctx->algorithm == TC_DES_ISO9797_ALG1;
   cipher = tc_des_mac_cipher(&key);
+  TC_status status = TC_OK;
   if (ctx->padding == TC_DES_ISO9797_PAD1 && (ctx->used || !ctx->nonempty)) {
     memset(ctx->buf + ctx->used, 0, TC_DES_BLOCKLEN - ctx->used);
-    tc_mac_cbc_block(&cipher, ctx->mac, ctx->buf);
+    status = tc_mac_cbc_block(&cipher, ctx->mac, ctx->buf);
   }
   if (ctx->padding == TC_DES_ISO9797_PAD2) {
     ctx->buf[ctx->used] = 0x80;
     memset(ctx->buf + ctx->used + 1, 0, TC_DES_BLOCKLEN - ctx->used - 1);
-    tc_mac_cbc_block(&cipher, ctx->mac, ctx->buf);
+    status = tc_mac_cbc_block(&cipher, ctx->mac, ctx->buf);
+  }
+  if (status != TC_OK) {
+    TC_DES_ISO9797_clear(ctx);
+    return TC_ERROR;
   }
   if (ctx->algorithm == TC_DES_ISO9797_ALG3 || ctx->algorithm == TC_DES_ISO9797_ALG_RETAIL3)
     tc_des_iso9797_finish_alg3(ctx, ctx->mac);
