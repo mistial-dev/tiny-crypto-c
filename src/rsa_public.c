@@ -28,7 +28,7 @@ TC_RSA_result TC_RSA_raw_public(const TC_RSA_public_key* key, TC_bytes input,
   if (input.length != length)
     return TC_RSA_INVALID;
   if (output.capacity < length ||
-      workspace->capacity < TC_RSA_raw_public_workspace_words(length * 8))
+      workspace->capacity < TC_RSA_workspace_words(TC_RSA_OPERATION_RAW_PUBLIC, length * 8))
     return TC_RSA_LIMIT;
   return tc_rsa_public_operation(key->modulus.data, length, key->exponent.data,
                                  key->exponent.length, input.data, output.data, workspace->words,

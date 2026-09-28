@@ -73,7 +73,7 @@ static MunitResult interoperability(const MunitParameter params[], void* user)
       tc_test_rsa_component(key, OSSL_PKEY_PARAM_RSA_E, exponent, sizeof exponent, 0);
   const TC_RSA_public_key public_key = {{modulus, modulus_length}, {exponent, exponent_length}};
   TC_RSA_word words[TC_RSA_ENCRYPT_WORKSPACE_WORDS(4096) + 1];
-  const size_t required = TC_RSA_encrypt_workspace_words(bits);
+  const size_t required = TC_RSA_workspace_words(TC_RSA_OPERATION_ENCRYPT, bits);
   const TC_RSA_workspace arithmetic = {words, required};
   munit_assert_size(required, ==, TC_RSA_ENCRYPT_WORKSPACE_WORDS(bits));
   munit_assert_size(width, <=, MAX_BYTES);

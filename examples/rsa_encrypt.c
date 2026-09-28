@@ -13,7 +13,7 @@ TC_RSA_result example_encrypt_rsa_oaep_sha256(const TC_RSA_public_key* key, TC_b
   if (!key)
     return TC_RSA_ARGUMENT;
   const size_t length = key->modulus.length, exponent_length = key->exponent.length;
-  if (length > MAX_KEY_BITS / 8 || !TC_RSA_encrypt_workspace_words(length * 8) ||
+  if (length > MAX_KEY_BITS / 8 || !TC_RSA_workspace_words(TC_RSA_OPERATION_ENCRYPT, length * 8) ||
       exponent_length > length)
     return TC_RSA_INVALID;
   const size_t db = length - SHA256_BYTES - 1;

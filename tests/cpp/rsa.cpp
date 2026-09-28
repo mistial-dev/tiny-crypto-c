@@ -71,7 +71,7 @@ TEST_CASE("RSA workspace view and verification")
   TC_RSA_word words[9 * 1024 / TC_RSA_WORD_BITS + 2];
   auto workspace = tiny_crypto::rsa_workspace_for(words);
   CHECK(workspace.words == words);
-  CHECK(workspace.capacity == TC_RSA_verify_workspace_words(1024));
+  CHECK(workspace.capacity == TC_RSA_workspace_words(TC_RSA_OPERATION_VERIFY, 1024));
   uint8_t modulus[128], exponent[] = {3}, digest[32] = {}, signature[128] = {};
   std::memset(modulus, 0xff, sizeof modulus);
   tiny_crypto::rsa_public_key key = {{modulus, sizeof modulus}, {exponent, sizeof exponent}};
@@ -120,7 +120,7 @@ TEST_CASE("RSA CRT wrapper argument checks")
   tiny_crypto::rsa_private_key key = {};
   tiny_crypto::rsa_crt crt = {};
   tiny_crypto::rsa_crt_output output = {};
-  CHECK(workspace.capacity == TC_RSA_crt_workspace_words(1024));
+  CHECK(workspace.capacity == TC_RSA_workspace_words(TC_RSA_OPERATION_CRT, 1024));
   TC_work_budget work = {0};
   CHECK(tiny_crypto::rsa_validate_crt(key, crt, workspace, work) == TC_RSA_INVALID);
   CHECK(tiny_crypto::rsa_derive_crt(key, output, workspace, work) == TC_RSA_INVALID);
@@ -135,8 +135,8 @@ TEST_CASE("RSA encryption wrapper argument checks")
   tiny_crypto::rsa_public_key key = {};
   uint8_t ciphertext[128] = {};
   unsigned calls = 0;
-  CHECK(workspace.capacity == TC_RSA_encrypt_workspace_words(1024));
-  CHECK(TC_RSA_encrypt_workspace_words(1536) == 0);
+  CHECK(workspace.capacity == TC_RSA_workspace_words(TC_RSA_OPERATION_ENCRYPT, 1024));
+  CHECK(TC_RSA_workspace_words(TC_RSA_OPERATION_ENCRYPT, 1536) == 0);
   tiny_crypto::rsa_oaep_options options = {TC_HASH_SHA256, TC_HASH_SHA256, {nullptr, 0}};
   tiny_crypto::rsa_execution execution = {{nullptr, &calls}, 0, {10000}};
   CHECK(tiny_crypto::rsa_encrypt_oaep(key, options, {nullptr, 0}, workspace,
@@ -153,7 +153,7 @@ TEST_CASE("RSA private validation wrapper")
 {
   TC_RSA_word words[TC_RSA_VALIDATE_WORKSPACE_WORDS(1024)];
   auto workspace = tiny_crypto::rsa_workspace_for(words);
-  CHECK(workspace.capacity == TC_RSA_validate_workspace_words(1024));
+  CHECK(workspace.capacity == TC_RSA_workspace_words(TC_RSA_OPERATION_VALIDATE, 1024));
   uint8_t modulus[128], exponent[] = {3}, d[128] = {}, p[128] = {}, q[128] = {};
   std::memset(modulus, 0xff, sizeof modulus);
   d[sizeof d - 1] = 3;
@@ -176,7 +176,7 @@ TEST_CASE("RSA private validation wrapper")
     CHECK(word == 0);
   uint8_t digest[32] = {}, signature[128];
   std::memset(signature, 0xa5, sizeof signature);
-  CHECK(TC_RSA_sign_workspace_words(1024) == TC_RSA_SIGN_WORKSPACE_WORDS(1024));
+  CHECK(TC_RSA_workspace_words(TC_RSA_OPERATION_SIGN, 1024) == TC_RSA_SIGN_WORKSPACE_WORDS(1024));
   tiny_crypto::rsa_v15_options v15 = {TC_HASH_SHA256};
   execution = {{unavailable_random, &calls}, 1, {10000}};
   CHECK(tiny_crypto::rsa_sign_v15_digest(key, v15, {digest, sizeof digest}, workspace,

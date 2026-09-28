@@ -131,8 +131,8 @@ static MunitResult signatures(const MunitParameter params[], void* user)
         TC_RSA_prepared_public_key_clear(&prepared);
         munit_assert_true(tc_test_all_zero(cache_words, key.modulus.length));
       }
-      munit_assert_true(
-          tc_test_all_zero(scratch, TC_RSA_verify_workspace_words(bits) * sizeof scratch[0]));
+      munit_assert_true(tc_test_all_zero(
+          scratch, TC_RSA_workspace_words(TC_RSA_OPERATION_VERIFY, bits) * sizeof scratch[0]));
       munit_assert_int(verify_pss(&key, hash, mgf_hash, (size_t)salts[i] + 1,
                                   (TC_bytes){digest, digest_length}, (TC_bytes){signature, length},
                                   &workspace, UINT32_MAX),
@@ -154,8 +154,8 @@ static MunitResult signatures(const MunitParameter params[], void* user)
                                 random_bytes, &random, 1, &workspace, UINT32_MAX),
                        ==, TC_RSA_OK);
       munit_assert_uint(random.calls, ==, salts[i] ? 2 : 1);
-      munit_assert_true(
-          tc_test_all_zero(scratch, TC_RSA_sign_workspace_words(bits) * sizeof *scratch));
+      munit_assert_true(tc_test_all_zero(
+          scratch, TC_RSA_workspace_words(TC_RSA_OPERATION_SIGN, bits) * sizeof *scratch));
       EVP_PKEY_CTX* verifier = EVP_PKEY_CTX_new(generated, NULL);
       munit_assert_not_null(verifier);
       munit_assert_int(EVP_PKEY_verify_init(verifier), ==, 1);
@@ -179,7 +179,7 @@ static MunitResult signatures(const MunitParameter params[], void* user)
         munit_assert_uint(random.calls, ==, fail_at);
         for (size_t j = 0; j < sizeof signature; ++j)
           munit_assert_uint(signature[j], ==, 0xa5);
-        const size_t used = TC_RSA_sign_workspace_words(bits) * sizeof *scratch;
+        const size_t used = TC_RSA_workspace_words(TC_RSA_OPERATION_SIGN, bits) * sizeof *scratch;
         munit_assert_true(tc_test_all_zero(scratch, used));
         for (size_t j = used; j < sizeof scratch; ++j)
           munit_assert_uint(((uint8_t*)scratch)[j], ==, 0xa5);
@@ -223,8 +223,8 @@ static MunitResult signatures(const MunitParameter params[], void* user)
                                   random_bytes, &random, 1, &workspace, exact_work - short_work),
                          ==, short_work ? TC_RSA_LIMIT : TC_RSA_OK);
         munit_assert_uint(random.calls, ==, (salts[i] != 0) + !short_work);
-        munit_assert_true(
-            tc_test_all_zero(scratch, TC_RSA_sign_workspace_words(bits) * sizeof *scratch));
+        munit_assert_true(tc_test_all_zero(
+            scratch, TC_RSA_workspace_words(TC_RSA_OPERATION_SIGN, bits) * sizeof *scratch));
         if (short_work) {
           for (size_t j = 0; j < sizeof signature; ++j)
             munit_assert_uint(signature[j], ==, 0xa5);

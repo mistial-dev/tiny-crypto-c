@@ -258,8 +258,8 @@ static MunitResult private_operation(const MunitParameter params[], void* user)
                                           magnitudes[2],
                                           NULL};
   TC_RSA_workspace public_workspace = {scratch, validation_words};
-  munit_assert_size(TC_RSA_validate_workspace_words(bits), ==, validation_words);
-  munit_assert_size(TC_RSA_validate_workspace_words(4096), ==,
+  munit_assert_size(TC_RSA_workspace_words(TC_RSA_OPERATION_VALIDATE, bits), ==, validation_words);
+  munit_assert_size(TC_RSA_workspace_words(TC_RSA_OPERATION_VALIDATE, 4096), ==,
                     TC_RSA_VALIDATE_WORKSPACE_WORDS(4096));
   {
     random_source source = {seed, seed, width, 0, TC_OK};
@@ -559,7 +559,7 @@ static MunitResult signing(const MunitParameter params[], void* user)
     digest[i] = (uint8_t)i;
   static const uint8_t exponent[] = {1, 0, 1};
   TC_RSA_word scratch[TC_RSA_SIGN_WORKSPACE_WORDS(4096) + 1];
-  TC_RSA_workspace workspace = {scratch, TC_RSA_sign_workspace_words(bits)};
+  TC_RSA_workspace workspace = {scratch, TC_RSA_workspace_words(TC_RSA_OPERATION_SIGN, bits)};
   EVP_PKEY* key = EVP_RSA_gen(bits);
   (void)user;
   munit_assert_not_null(key);
@@ -687,8 +687,8 @@ static MunitResult crt_components(const MunitParameter params[], void* user)
       values[2],
       NULL};
   TC_RSA_workspace workspace = {scratch, required};
-  munit_assert_size(TC_RSA_crt_workspace_words(bits), ==, required);
-  munit_assert_size(TC_RSA_crt_workspace_words(1536), ==, 0);
+  munit_assert_size(TC_RSA_workspace_words(TC_RSA_OPERATION_CRT, bits), ==, required);
+  munit_assert_size(TC_RSA_workspace_words(TC_RSA_OPERATION_CRT, 1536), ==, 0);
   {
     uint8_t derived[3][MAX_BYTES / 2];
     TC_RSA_crt_output output = {

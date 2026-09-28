@@ -67,7 +67,8 @@ static MunitResult vectors(const MunitParameter params[], void* data)
     munit_assert_true(!strcmp(fields[10], "valid") || !strcmp(fields[10], "invalid"));
     const int valid = !strcmp(fields[10], "valid");
     TC_RSA_workspace workspace = {
-        words, TC_RSA_decrypt_workspace_words((unsigned)(key_parts[0].length * 8))};
+        words,
+        TC_RSA_workspace_words(TC_RSA_OPERATION_DECRYPT, (unsigned)(key_parts[0].length * 8))};
     munit_assert_size(workspace.capacity, >, 0);
     memset(words, 0xa5, sizeof words);
     memset(output, 0xa5, sizeof output);

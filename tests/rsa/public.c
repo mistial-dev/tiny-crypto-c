@@ -22,11 +22,14 @@ static MunitResult arguments(const MunitParameter params[], void* user)
   (void)params;
   (void)user;
   memset(modulus, 0xff, sizeof modulus);
-  munit_assert_size(TC_RSA_verify_workspace_words(1024), ==, workspace.capacity);
-  munit_assert_size(TC_RSA_verify_workspace_words(2048), ==, 9 * 2048 / TC_RSA_WORD_BITS + 2);
-  munit_assert_size(TC_RSA_verify_workspace_words(3072), ==, 9 * 3072 / TC_RSA_WORD_BITS + 2);
-  munit_assert_size(TC_RSA_verify_workspace_words(4096), ==, 9 * 4096 / TC_RSA_WORD_BITS + 2);
-  munit_assert_size(TC_RSA_verify_workspace_words(SIZE_MAX), ==, 0);
+  munit_assert_size(TC_RSA_workspace_words(TC_RSA_OPERATION_VERIFY, 1024), ==, workspace.capacity);
+  munit_assert_size(TC_RSA_workspace_words(TC_RSA_OPERATION_VERIFY, 2048), ==,
+                    9 * 2048 / TC_RSA_WORD_BITS + 2);
+  munit_assert_size(TC_RSA_workspace_words(TC_RSA_OPERATION_VERIFY, 3072), ==,
+                    9 * 3072 / TC_RSA_WORD_BITS + 2);
+  munit_assert_size(TC_RSA_workspace_words(TC_RSA_OPERATION_VERIFY, 4096), ==,
+                    9 * 4096 / TC_RSA_WORD_BITS + 2);
+  munit_assert_size(TC_RSA_workspace_words(TC_RSA_OPERATION_VERIFY, SIZE_MAX), ==, 0);
   const TC_RSA_v15_options options = {TC_HASH_SHA256};
   TC_work_budget work = {10000};
   munit_assert_int(
@@ -166,12 +169,38 @@ static MunitResult ranges(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+/* One sizing function covers every operation and matches the static macros. */
+static MunitResult workspace_sizes(const MunitParameter params[], void* user)
+{
+  static const size_t sizes[] = {1024, 2048, 3072, 4096};
+  (void)params;
+  (void)user;
+  for (size_t i = 0; i < sizeof sizes / sizeof *sizes; ++i) {
+    const size_t bits = sizes[i];
+    const size_t expected[] = {
+        TC_RSA_VERIFY_WORKSPACE_WORDS(bits),     TC_RSA_ENCRYPT_WORKSPACE_WORDS(bits),
+        TC_RSA_RAW_PUBLIC_WORKSPACE_WORDS(bits), TC_RSA_VALIDATE_WORKSPACE_WORDS(bits),
+        TC_RSA_CRT_WORKSPACE_WORDS(bits),        TC_RSA_SIGN_WORKSPACE_WORDS(bits),
+        TC_RSA_DECRYPT_WORKSPACE_WORDS(bits),    TC_RSA_RAW_PRIVATE_WORKSPACE_WORDS(bits),
+        TC_RSA_KEYGEN_WORKSPACE_WORDS(bits)};
+    for (unsigned op = TC_RSA_OPERATION_VERIFY; op <= TC_RSA_OPERATION_KEYGEN; ++op) {
+      munit_assert_size(TC_RSA_workspace_words((TC_RSA_operation)op, bits), ==, expected[op]);
+      munit_assert_size(TC_RSA_workspace_words((TC_RSA_operation)op, bits + 8), ==, 0);
+    }
+    munit_assert_size(TC_RSA_workspace_words((TC_RSA_operation)(TC_RSA_OPERATION_KEYGEN + 1), bits),
+                      ==, 0);
+  }
+  munit_assert_size(TC_RSA_workspace_words(TC_RSA_OPERATION_SIGN, 8192), ==, 0);
+  return MUNIT_OK;
+}
+
 int main(int argc, char** argv)
 {
   MunitTest tests[] = {
       {"/arguments", arguments, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/ranges", ranges, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/unsupported-sizes", unsupported_sizes, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/workspace-sizes", workspace_sizes, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
   MunitSuite suite = {"/rsa/public", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};
   return munit_suite_main(&suite, NULL, argc, argv);

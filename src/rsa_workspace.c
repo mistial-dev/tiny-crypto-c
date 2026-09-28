@@ -12,58 +12,31 @@ int TC_RSA_modulus_supported(size_t bits)
   return tc_rsa_supported_bits(bits);
 }
 
-size_t TC_RSA_verify_workspace_words(size_t bits)
+size_t TC_RSA_workspace_words(TC_RSA_operation operation, size_t bits)
 {
   if (!tc_rsa_supported_bits(bits))
     return 0;
-  return TC_RSA_VERIFY_WORKSPACE_WORDS(bits);
-}
-
-size_t TC_RSA_validate_workspace_words(size_t bits)
-{
-  if (!tc_rsa_supported_bits(bits))
-    return 0;
-  return TC_RSA_VALIDATE_WORKSPACE_WORDS(bits);
-}
-
-size_t TC_RSA_crt_workspace_words(size_t bits)
-{
-  if (!tc_rsa_supported_bits(bits))
-    return 0;
-  return TC_RSA_CRT_WORKSPACE_WORDS(bits);
-}
-
-size_t TC_RSA_sign_workspace_words(size_t bits)
-{
-  if (!tc_rsa_supported_bits(bits))
-    return 0;
-  return TC_RSA_SIGN_WORKSPACE_WORDS(bits);
-}
-
-size_t TC_RSA_decrypt_workspace_words(size_t bits)
-{
-  if (!tc_rsa_supported_bits(bits))
-    return 0;
-  return TC_RSA_DECRYPT_WORKSPACE_WORDS(bits);
-}
-
-size_t TC_RSA_encrypt_workspace_words(size_t bits)
-{
-  return TC_RSA_verify_workspace_words(bits);
-}
-
-size_t TC_RSA_raw_public_workspace_words(size_t bits)
-{
-  if (!tc_rsa_supported_bits(bits))
-    return 0;
-  return TC_RSA_RAW_PUBLIC_WORKSPACE_WORDS(bits);
-}
-
-size_t TC_RSA_raw_private_workspace_words(size_t bits)
-{
-  if (!tc_rsa_supported_bits(bits))
-    return 0;
-  return TC_RSA_RAW_PRIVATE_WORKSPACE_WORDS(bits);
+  switch (operation) {
+  case TC_RSA_OPERATION_VERIFY:
+    return TC_RSA_VERIFY_WORKSPACE_WORDS(bits);
+  case TC_RSA_OPERATION_ENCRYPT:
+    return TC_RSA_ENCRYPT_WORKSPACE_WORDS(bits);
+  case TC_RSA_OPERATION_RAW_PUBLIC:
+    return TC_RSA_RAW_PUBLIC_WORKSPACE_WORDS(bits);
+  case TC_RSA_OPERATION_VALIDATE:
+    return TC_RSA_VALIDATE_WORKSPACE_WORDS(bits);
+  case TC_RSA_OPERATION_CRT:
+    return TC_RSA_CRT_WORKSPACE_WORDS(bits);
+  case TC_RSA_OPERATION_SIGN:
+    return TC_RSA_SIGN_WORKSPACE_WORDS(bits);
+  case TC_RSA_OPERATION_DECRYPT:
+    return TC_RSA_DECRYPT_WORKSPACE_WORDS(bits);
+  case TC_RSA_OPERATION_RAW_PRIVATE:
+    return TC_RSA_RAW_PRIVATE_WORKSPACE_WORDS(bits);
+  case TC_RSA_OPERATION_KEYGEN:
+    return TC_RSA_KEYGEN_WORKSPACE_WORDS(bits);
+  }
+  return 0;
 }
 
 TC_RSA_result tc_rsa_storage_status(const tc_pki_storage_plan* plan)

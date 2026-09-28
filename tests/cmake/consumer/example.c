@@ -335,7 +335,8 @@ int main(void)
                                         unavailable_random, &calls, scratch,
                                         sizeof scratch / sizeof *scratch) != TC_RSA_ERROR)
       return 1;
-    if (calls != 1 || TC_RSA_encrypt_workspace_words(KEY_BITS) != sizeof scratch / sizeof *scratch)
+    if (calls != 1 || TC_RSA_workspace_words(TC_RSA_OPERATION_ENCRYPT, KEY_BITS) !=
+                          sizeof scratch / sizeof *scratch)
       return 1;
     for (size_t i = 0; i < sizeof ciphertext; ++i)
       if (ciphertext[i] != 0xa5)

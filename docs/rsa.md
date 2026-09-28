@@ -26,9 +26,11 @@ caller storage that holds one modulus-length value, such as a signature or an
 encoded message.
 
 Allocate `TC_RSA_word` storage using the limb count returned by
-`TC_RSA_verify_workspace_words(bits)`. The function returns zero for unsupported
-sizes. Keep the workspace separate from input bytes and metadata. Verification
-wipes used scratch. Failures before arithmetic leave scratch unused.
+`TC_RSA_workspace_words(TC_RSA_OPERATION_VERIFY, bits)`, or the matching
+`TC_RSA_*_WORKSPACE_WORDS(bits)` macro for a static array. The function
+returns zero for unsupported sizes. Keep the workspace separate from input
+bytes and metadata. Verification wipes used scratch. Failures before
+arithmetic leave scratch unused.
 
 Pass the hash in `TC_RSA_v15_options`. `TC_work_budget.remaining` bounds the
 count of modular operations and encoding comparisons and is reduced by work
@@ -118,7 +120,7 @@ certificates and CMS. See [testing](testing.md) for the OpenSSL cross-checks.
 `TC_RSA_keygen_init` and `TC_RSA_keygen_step` generate two-prime RSA-1024,
 RSA-2048, RSA-3072, or RSA-4096 keys with public exponent 65537. The operation uses no
 heap storage. Supply `TC_RSA_KEYGEN_WORKSPACE_WORDS(bits)` aligned limbs, or
-query `TC_RSA_keygen_workspace_words(bits)`, plus caller-owned output buffers.
+query `TC_RSA_workspace_words(TC_RSA_OPERATION_KEYGEN, bits)`, plus caller-owned output buffers.
 The modulus and private exponent need `bits/8` bytes, each prime needs
 `bits/16` bytes, and the exponent needs three bytes.
 
@@ -193,7 +195,7 @@ modulus and exponent use the encodings described above. `d`, `p`, and `q` are
 nonempty unsigned magnitudes of at most the modulus length. Leading zeros are
 accepted. Keep all five components stable while
 validation runs. Allocate `TC_RSA_VALIDATE_WORKSPACE_WORDS(bits)` limbs, or use
-`TC_RSA_validate_workspace_words(bits)` for a runtime size.
+`TC_RSA_workspace_words(TC_RSA_OPERATION_VALIDATE, bits)` for a runtime size.
 
 Validation checks `n = p*q`, distinct odd factors, the private-exponent range,
 and `e*d = 1` modulo each factor minus one. Each factor receives 65 Miller-Rabin
@@ -232,7 +234,7 @@ For imported CRT components, first validate the private key, then call
 `TC_RSA_validate_crt` with `TC_RSA_crt` containing `dp`, `dq` and `q_inverse`.
 The check compares the reduced exponents and verifies the coefficient and its
 range. Allocate `TC_RSA_CRT_WORKSPACE_WORDS(bits)` limbs or query
-`TC_RSA_crt_workspace_words(bits)`. Existing validation workspace can be reused.
+`TC_RSA_workspace_words(TC_RSA_OPERATION_CRT, bits)`. Existing validation workspace can be reused.
 Keep it separate from key bytes and metadata. Used scratch is wiped.
 A sufficient work budget is `32*modulus_bytes+1`.
 The C++ wrapper is `tiny_crypto::rsa_validate_crt`.
@@ -247,7 +249,7 @@ The CRT validation workspace can be reused, and a sufficient work budget is
 `TC_RSA_sign_v15_digest` signs a precomputed SHA digest using PKCS#1 v1.5.
 Validate the private components before signing and keep them unchanged while
 in use. Allocate `TC_RSA_SIGN_WORKSPACE_WORDS(bits)` limbs or query
-`TC_RSA_sign_workspace_words(bits)`. The signature buffer must have exactly
+`TC_RSA_workspace_words(TC_RSA_OPERATION_SIGN, bits)`. The signature buffer must have exactly
 the modulus length and be separate from the key, digest, metadata and workspace.
 
 Supply a `TC_RSA_execution` containing a cryptographically secure random source,
@@ -310,7 +312,7 @@ must be enabled. The message can contain up to
 message or label.
 
 Allocate `TC_RSA_ENCRYPT_WORKSPACE_WORDS(bits)` limbs, or query
-`TC_RSA_encrypt_workspace_words(bits)`. `TC_RSA_execution` supplies the RNG and
+`TC_RSA_workspace_words(TC_RSA_OPERATION_ENCRYPT, bits)`. `TC_RSA_execution` supplies the RNG and
 shared work budget. Its `random_attempts` field is unused because OAEP encryption
 requests one seed.
 Ciphertext storage must have exactly the modulus length and changes only on
@@ -347,7 +349,7 @@ the message hash, MGF hash, and label in `TC_RSA_oaep_options`. Both hashes must
 be enabled.
 An empty label is `{NULL, 0}`. Ciphertext length must equal the modulus length.
 Provide `TC_RSA_DECRYPT_WORKSPACE_WORDS(bits)` limbs, or query
-`TC_RSA_decrypt_workspace_words(bits)`.
+`TC_RSA_workspace_words(TC_RSA_OPERATION_DECRYPT, bits)`.
 
 Plaintext is checked in scratch and copied to the output after OAEP decoding
 succeeds. The plaintext buffer and returned length change only on `TC_RSA_OK`.

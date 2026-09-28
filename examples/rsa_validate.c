@@ -10,7 +10,7 @@ TC_RSA_result example_validate_rsa_key(const TC_RSA_private_key* key, TC_random_
   if (!key)
     return TC_RSA_ARGUMENT;
   const size_t length = key->public_key.modulus.length;
-  if (length > MAX_KEY_BITS / 8 || !TC_RSA_validate_workspace_words(length * 8))
+  if (length > MAX_KEY_BITS / 8 || !TC_RSA_workspace_words(TC_RSA_OPERATION_VALIDATE, length * 8))
     return TC_RSA_INVALID;
   TC_RSA_workspace workspace = {scratch, scratch_words};
   /* Use wide operands throughout, including on targets with 16-bit size_t. */

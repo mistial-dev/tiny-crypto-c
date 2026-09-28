@@ -154,7 +154,8 @@ static MunitResult signatures(const MunitParameter params[], void* user)
         munit_assert_uint(scratch[i], ==, 0);
       {
         TC_RSA_public_key public_key = {{modulus, length}, {exponent, exponent_length}};
-        TC_RSA_workspace workspace = {scratch, TC_RSA_verify_workspace_words(length * 8)};
+        TC_RSA_workspace workspace = {scratch,
+                                      TC_RSA_workspace_words(TC_RSA_OPERATION_VERIFY, length * 8)};
         TC_bytes hashed = {digest, digest_length}, signed_bytes = {signature, signature_length};
         TC_RSA_v15_options options = {hash};
         TC_work_budget budget = {(uint32_t)cost};

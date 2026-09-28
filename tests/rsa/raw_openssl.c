@@ -54,9 +54,11 @@ static MunitResult raw_operations(const MunitParameter params[], void* user)
   TC_RSA_public_key key = {{modulus, width}, {exponent, sizeof exponent}};
   TC_bytes input = {representative, width};
   representative[width - 1] = 42;
-  munit_assert_size(TC_RSA_raw_public_workspace_words(bits), ==, 8 * bits / TC_RSA_WORD_BITS + 2);
-  munit_assert_size(TC_RSA_raw_private_workspace_words(bits), ==, 13 * bits / TC_RSA_WORD_BITS);
-  munit_assert_size(TC_RSA_raw_private_workspace_words(4096), ==,
+  munit_assert_size(TC_RSA_workspace_words(TC_RSA_OPERATION_RAW_PUBLIC, bits), ==,
+                    8 * bits / TC_RSA_WORD_BITS + 2);
+  munit_assert_size(TC_RSA_workspace_words(TC_RSA_OPERATION_RAW_PRIVATE, bits), ==,
+                    13 * bits / TC_RSA_WORD_BITS);
+  munit_assert_size(TC_RSA_workspace_words(TC_RSA_OPERATION_RAW_PRIVATE, 4096), ==,
                     TC_RSA_RAW_PRIVATE_WORKSPACE_WORDS(4096));
 
   private_context = EVP_PKEY_CTX_new(generated, NULL);
@@ -80,7 +82,7 @@ static MunitResult raw_operations(const MunitParameter params[], void* user)
                    ==, TC_RSA_OK);
   munit_assert_memory_equal(width, transformed, expected);
   munit_assert_size(source.calls, ==, 1);
-  for (size_t i = 0; i < TC_RSA_raw_private_workspace_words(bits); ++i)
+  for (size_t i = 0; i < TC_RSA_workspace_words(TC_RSA_OPERATION_RAW_PRIVATE, bits); ++i)
     munit_assert_uint(scratch[i], ==, 0);
 
   TC_work_budget public_work = {100000};

@@ -65,7 +65,7 @@ static MunitResult decrypt(const MunitParameter params[], void* user)
   wrong_label[label_length ? label_length - 1 : 0] ^= 1;
   uint8_t components[5][MAX_BYTES], input[MAX_BYTES], ciphertext[MAX_BYTES], output[MAX_BYTES];
   TC_RSA_word words[TC_RSA_DECRYPT_WORKSPACE_WORDS(4096)];
-  TC_RSA_workspace workspace = {words, TC_RSA_decrypt_workspace_words(bits)};
+  TC_RSA_workspace workspace = {words, TC_RSA_workspace_words(TC_RSA_OPERATION_DECRYPT, bits)};
   EVP_PKEY* generated = EVP_RSA_gen(bits);
   (void)user;
   munit_assert_not_null(generated);

@@ -10,7 +10,7 @@ static TC_RSA_result private_budget(const TC_RSA_private_key* key, uint32_t* wor
     return TC_RSA_ARGUMENT;
   const size_t length = key->public_key.modulus.length;
   const size_t exponent_length = key->public_key.exponent.length;
-  if (length > MAX_KEY_BITS / 8 || !TC_RSA_sign_workspace_words(length * 8) ||
+  if (length > MAX_KEY_BITS / 8 || !TC_RSA_workspace_words(TC_RSA_OPERATION_SIGN, length * 8) ||
       exponent_length > length)
     return TC_RSA_INVALID;
   *work = UINT32_C(32) * length + UINT32_C(32) * exponent_length + 8 +

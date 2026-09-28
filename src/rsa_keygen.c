@@ -145,13 +145,6 @@ static inline void tc_rsa_keygen_derive(const uint8_t* p_bytes, const uint8_t* q
 
 #define TC_RSA_KEYGEN_MARKER UINT32_C(0x524b4731)
 
-size_t TC_RSA_keygen_workspace_words(size_t bits)
-{
-  if (!tc_rsa_supported_bits(bits))
-    return 0;
-  return TC_RSA_KEYGEN_WORKSPACE_WORDS(bits);
-}
-
 static int tc_rsa_keygen_output_check(const TC_RSA_keygen_state* state,
                                       const TC_RSA_keygen_output* output,
                                       const TC_RSA_workspace* workspace, size_t bits)
@@ -192,7 +185,7 @@ TC_RSA_result TC_RSA_keygen_init(TC_RSA_keygen_state* state, size_t bits,
     return TC_RSA_ARGUMENT;
   if (state->marker == TC_RSA_KEYGEN_MARKER)
     return TC_RSA_ARGUMENT;
-  if (!TC_RSA_keygen_workspace_words(bits))
+  if (!TC_RSA_workspace_words(TC_RSA_OPERATION_KEYGEN, bits))
     return TC_RSA_UNSUPPORTED;
   if (!limits.candidate_attempts || !limits.random_requests)
     return TC_RSA_LIMIT;
@@ -222,8 +215,8 @@ void TC_RSA_keygen_clear(TC_RSA_keygen_state* state)
 {
   if (!state)
     return;
-  if (state->marker == TC_RSA_KEYGEN_MARKER && TC_RSA_keygen_workspace_words(state->bits) &&
-      state->workspace.words &&
+  if (state->marker == TC_RSA_KEYGEN_MARKER &&
+      TC_RSA_workspace_words(TC_RSA_OPERATION_KEYGEN, state->bits) && state->workspace.words &&
       state->workspace.capacity >= TC_RSA_KEYGEN_WORKSPACE_WORDS(state->bits))
     TC_secure_zero(state->workspace.words,
                    TC_RSA_KEYGEN_WORKSPACE_WORDS(state->bits) * sizeof *state->workspace.words);
@@ -259,7 +252,7 @@ static TC_RSA_result tc_rsa_keygen_step(TC_RSA_keygen_state* state, TC_random_fn
     return tc_rsa_keygen_result;                                                                   \
   } while (0)
   if (!state || !random || state->marker != TC_RSA_KEYGEN_MARKER ||
-      !TC_RSA_keygen_workspace_words(state->bits))
+      !TC_RSA_workspace_words(TC_RSA_OPERATION_KEYGEN, state->bits))
     TC_RSA_KEYGEN_RETURN(TC_RSA_ARGUMENT);
   if (state->phase < TC_RSA_KEYGEN_P_NEW || state->phase > TC_RSA_KEYGEN_Q_ROUND)
     TC_RSA_KEYGEN_RETURN(tc_rsa_keygen_stop(state, TC_RSA_ARGUMENT));

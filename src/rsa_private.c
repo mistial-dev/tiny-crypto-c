@@ -116,7 +116,7 @@ TC_RSA_result TC_RSA_raw_private(const TC_RSA_public_key* key, TC_bytes private_
   if (input.length != length || !private_exponent.length || private_exponent.length > length)
     return TC_RSA_INVALID;
   if (output.capacity < length ||
-      workspace->capacity < TC_RSA_raw_private_workspace_words(length * 8))
+      workspace->capacity < TC_RSA_workspace_words(TC_RSA_OPERATION_RAW_PRIVATE, length * 8))
     return TC_RSA_LIMIT;
   result = tc_rsa_private_operation_magnitude(
       key->modulus.data, length, key->exponent.data, key->exponent.length, private_exponent,

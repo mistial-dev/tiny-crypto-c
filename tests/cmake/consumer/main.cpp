@@ -6,7 +6,7 @@
 
 int main()
 {
-  if (!TC_RSA_verify_workspace_words(3072))
+  if (!TC_RSA_workspace_words(TC_RSA_OPERATION_VERIFY, 3072))
     return 1;
   TC_X509_native_workspace native_scratch = {nullptr, nullptr,
                                              TC_X509_NATIVE_DEFAULT_SIGNATURE_WORK};

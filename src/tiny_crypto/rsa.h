@@ -89,8 +89,9 @@ typedef struct {
   uint16_t reserved;
 } TC_RSA_keygen_state;
 
-/* Static verification storage for a supported, constant key size in bits.
- * Nine limb arrays and two carry words. Use the function below for runtime sizes. */
+/* Workspace limbs per operation for a supported, constant key size in bits,
+ * for static arrays. TC_RSA_workspace_words gives the same values at run
+ * time. Verification uses nine limb arrays and two carry words. */
 #define TC_RSA_VERIFY_WORKSPACE_WORDS(bits) (9u * ((bits) / TC_RSA_WORD_BITS) + 2u)
 #define TC_RSA_VALIDATE_WORKSPACE_WORDS(bits) (12u * ((bits) / TC_RSA_WORD_BITS) + 2u)
 #define TC_RSA_CRT_WORKSPACE_WORDS(bits) (8u * ((bits) / TC_RSA_WORD_BITS))
@@ -107,16 +108,21 @@ typedef struct {
 #ifdef __cplusplus
 extern "C" {
 #endif
-/* Number of workspace limbs for verification; zero for unsupported key sizes. */
-size_t TC_RSA_verify_workspace_words(size_t bits);
-size_t TC_RSA_validate_workspace_words(size_t bits);
-size_t TC_RSA_crt_workspace_words(size_t bits);
-size_t TC_RSA_sign_workspace_words(size_t bits);
-size_t TC_RSA_decrypt_workspace_words(size_t bits);
-size_t TC_RSA_encrypt_workspace_words(size_t bits);
-size_t TC_RSA_raw_public_workspace_words(size_t bits);
-size_t TC_RSA_raw_private_workspace_words(size_t bits);
-size_t TC_RSA_keygen_workspace_words(size_t bits);
+/* Operations with distinct workspace requirements. */
+typedef enum {
+  TC_RSA_OPERATION_VERIFY,      /* PKCS #1 v1.5 and PSS verification */
+  TC_RSA_OPERATION_ENCRYPT,     /* OAEP encryption */
+  TC_RSA_OPERATION_RAW_PUBLIC,  /* TC_RSA_raw_public */
+  TC_RSA_OPERATION_VALIDATE,    /* TC_RSA_validate_private_key */
+  TC_RSA_OPERATION_CRT,         /* TC_RSA_validate_crt and TC_RSA_derive_crt */
+  TC_RSA_OPERATION_SIGN,        /* PKCS #1 v1.5 and PSS signing */
+  TC_RSA_OPERATION_DECRYPT,     /* OAEP decryption */
+  TC_RSA_OPERATION_RAW_PRIVATE, /* TC_RSA_raw_private */
+  TC_RSA_OPERATION_KEYGEN       /* TC_RSA_keygen_init */
+} TC_RSA_operation;
+/* Workspace limbs for operation at a key size in bits. Zero for an
+ * unsupported key size or an unknown operation. */
+size_t TC_RSA_workspace_words(TC_RSA_operation operation, size_t bits);
 
 /* Prepare a borrowed public key for repeated v1.5 or PSS verification.
  * Cache needs one modulus width of limbs and scratch needs two; scratch is

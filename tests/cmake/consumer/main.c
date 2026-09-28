@@ -3,7 +3,8 @@
 #include <string.h>
 int main(void)
 {
-  if (!TC_RSA_verify_workspace_words(3072) || !TC_RSA_keygen_workspace_words(3072))
+  if (!TC_RSA_workspace_words(TC_RSA_OPERATION_VERIFY, 3072) ||
+      !TC_RSA_workspace_words(TC_RSA_OPERATION_KEYGEN, 3072))
     return 1;
   {
     static TC_RSA_word words[TC_RSA_KEYGEN_WORKSPACE_WORDS(1024)];

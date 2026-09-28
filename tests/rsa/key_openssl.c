@@ -38,7 +38,8 @@ static void rejected_key(TC_bytes der, size_t signature_length, size_t scratch_w
   munit_assert_size(calls, ==, expected_calls);
   munit_assert_memory_equal(sizeof signature, signature, unchanged);
   if (calls) {
-    const size_t used_bytes = TC_RSA_validate_workspace_words(signature_length * 8) * sizeof *words;
+    const size_t used_bytes =
+        TC_RSA_workspace_words(TC_RSA_OPERATION_VALIDATE, signature_length * 8) * sizeof *words;
     const uint8_t* bytes = (const uint8_t*)words;
     for (size_t i = 0; i < sizeof words; ++i)
       munit_assert_uint(bytes[i], ==, i < used_bytes ? 0 : 0xa5);
@@ -62,7 +63,7 @@ static MunitResult generated_key(const MunitParameter params[], void* data)
                                  {d, length},
                                  {p, prime_length},
                                  {q, prime_length}};
-  TC_RSA_workspace workspace = {words, TC_RSA_keygen_workspace_words(bits)};
+  TC_RSA_workspace workspace = {words, TC_RSA_workspace_words(TC_RSA_OPERATION_KEYGEN, bits)};
   TC_RSA_keygen_state state = {0};
   (void)data;
   munit_assert_int(
@@ -240,7 +241,7 @@ static MunitResult private_key(const MunitParameter params[], void* data)
   for (size_t end = 0; end < (size_t)length; ++end)
     rejected_key((TC_bytes){encoded, end}, bits / 8, scratch_words, TC_RSA_INVALID, 0);
   rejected_key((TC_bytes){encoded, (size_t)length}, bits / 8,
-               TC_RSA_validate_workspace_words(bits) - 1, TC_RSA_LIMIT, 0);
+               TC_RSA_workspace_words(TC_RSA_OPERATION_VALIDATE, bits) - 1, TC_RSA_LIMIT, 0);
   rejected_key((TC_bytes){encoded, (size_t)length}, bits / 8, scratch_words, TC_RSA_ERROR, 1);
   /* Change the modulus while preserving the INTEGER encoding. */
   const size_t last_modulus = (size_t)(parsed.modulus.data - encoded) + parsed.modulus.length - 1;
@@ -347,7 +348,7 @@ static MunitResult restricted_pss(const MunitParameter params[], void* data)
   munit_assert_size(fault.calls, >, 2 * TC_RSA_VALIDATION_ROUNDS);
   for (size_t i = 0; i < sizeof signature; ++i)
     munit_assert_uint(signature[i], ==, 0xa5);
-  const size_t used = TC_RSA_sign_workspace_words(bits) * sizeof *words;
+  const size_t used = TC_RSA_workspace_words(TC_RSA_OPERATION_SIGN, bits) * sizeof *words;
   const uint8_t* scratch = (const uint8_t*)words;
   for (size_t i = 0; i < sizeof words; ++i)
     munit_assert_uint(scratch[i], ==, i < used ? 0 : 0xa5);
