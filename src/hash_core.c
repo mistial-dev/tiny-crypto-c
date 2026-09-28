@@ -377,10 +377,7 @@ TC_status tc_hmac_core_verify(const tc_hash_algorithm_info* stored, void* worksp
     return TC_ERROR;
   status = tc_hmac_core_digest(stored, workspace, key, key_length, message, message_length,
                                computed, tag_length);
-  if (status == TC_OK)
-    status = TC_ct_equal(computed, tag, tag_length);
-  TC_secure_zero(computed, sizeof computed);
-  return status;
+  return tc_internal_verify_tag(status, computed, sizeof computed, tag, tag_length);
 }
 
 #endif /* TC_ENABLE_HMAC */

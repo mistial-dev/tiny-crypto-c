@@ -87,7 +87,7 @@ static TC_status tc_aes_ccm_crypt(const uint8_t* key, const uint8_t* nonce, size
   } st;
   const tc_aes_mac_key mac_key = {st.aes.round_key, TC_AES_FIXED_ROUNDS};
   const tc_mac_cipher mac_cipher = tc_aes_mac_cipher(&mac_key);
-  size_t used = 0;
+  uint8_t used = 0;
   size_t offset = 0;
   unsigned q;
   uint8_t i;

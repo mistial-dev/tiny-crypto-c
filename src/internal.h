@@ -4,6 +4,7 @@
 #ifndef TINY_CRYPTO_INTERNAL_H_
 #define TINY_CRYPTO_INTERNAL_H_
 
+#include <tiny_crypto/common.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -38,6 +39,18 @@ static inline int tc_internal_ranges_disjoint(const void* a, size_t a_len, const
   if (pa < pb)
     return a_len <= (size_t)(pb - pa);
   return b_len <= (size_t)(pa - pb);
+}
+
+/* Compare a computed MAC with a received tag in constant time and wipe the
+ * computed value. A failed computation reports TC_ERROR; a mismatch reports
+ * TC_MISMATCH. */
+static inline TC_status tc_internal_verify_tag(TC_status computed_status, uint8_t* computed,
+                                               size_t computed_size, const uint8_t* tag,
+                                               size_t tag_length)
+{
+  TC_status status = computed_status == TC_OK ? TC_ct_equal(computed, tag, tag_length) : TC_ERROR;
+  TC_secure_zero(computed, computed_size);
+  return status;
 }
 
 /* A span is valid when it has storage or is empty. */

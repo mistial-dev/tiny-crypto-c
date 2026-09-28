@@ -66,7 +66,8 @@ static int bcc(const tc_mac_cipher* cipher, uint32_t index, const uint8_t header
   static const uint8_t marker = 0x80;
   uint8_t iv[BLOCK] = {0};
   uint8_t block[BLOCK];
-  size_t used = 0, i;
+  uint8_t used = 0;
+  size_t i;
   int ok;
 
   tc_internal_store_be32(iv, index);

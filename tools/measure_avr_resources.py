@@ -58,6 +58,9 @@ PROFILES = {
 # callback frame belongs to the application and is listed as excluded.
 APPLICATION_CALLBACK_SITES = {"read_entropy": "TC_random_source entropy callback"}
 MAC_CIPHER_CALLBACKS = {"tc_aes_mac_encrypt", "tc_des_mac_encrypt"}
+# MAC core functions that call the block cipher through a tc_mac_cipher
+# descriptor. Their indirect call resolves to MAC_CIPHER_CALLBACKS.
+MAC_DESCRIPTOR_SITES = {"tc_mac_cbc_block", "tc_mac_derive_subkeys"}
 SOURCE = """
 #include <tiny_crypto/tiny_crypto.h>
 static uint8_t key[32], iv[16], out[32];
@@ -183,12 +186,12 @@ def measure(directory, definitions, body, entry):
             return 0, []
         if name in APPLICATION_CALLBACK_SITES:
             unknown.add(APPLICATION_CALLBACK_SITES[name])
-        elif name in unknown_indirect and name != "tc_mac_cbc_block":
+        elif name in unknown_indirect and name not in MAC_DESCRIPTOR_SITES:
             raise RuntimeError("Unresolved indirect call: " + name)
-        if name == "tc_mac_cbc_block" and name in unknown_indirect and not mac_targets:
+        if name in MAC_DESCRIPTOR_SITES and name in unknown_indirect and not mac_targets:
             raise RuntimeError("Unresolved MAC descriptor call: " + name)
         callees = set(edges.get(name, ()))
-        if name == "tc_mac_cbc_block":
+        if name in MAC_DESCRIPTOR_SITES:
             callees.update(mac_targets)
         children = [chain(child, active | {name}) for child in sorted(callees)]
         size, path = max(children, default=(0, []), key=lambda item: item[0])

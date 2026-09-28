@@ -5,9 +5,7 @@
  * and CMAC subkey derivation (NIST SP 800-38B). */
 #include "aes_mac_core_internal.h"
 
-#if TC_AES_ENABLE_EAX ||                                    \
-    TC_AES_ENABLE_EAX_PRIME ||                        \
-    TC_AES_ENABLE_SIV
+#if TC_AES_ENABLE_EAX || TC_AES_ENABLE_EAX_PRIME || TC_AES_ENABLE_SIV
 TC_status tc_aes_mac_ctr_xor(const uint8_t* round_key, const uint8_t initial[TC_AES_BLOCKLEN],
                              const uint8_t* input, uint8_t* output, size_t length,
                              tc_aes_mac_ctr_bits bits)
@@ -47,19 +45,8 @@ TC_status tc_aes_mac_ctr_xor(const uint8_t* round_key, const uint8_t initial[TC_
 TC_status tc_aes_cmac_generate_subkeys(const uint8_t* round_key, uint8_t rounds,
                                        uint8_t k1[TC_AES_BLOCKLEN], uint8_t k2[TC_AES_BLOCKLEN])
 {
-  uint8_t l[TC_AES_BLOCKLEN] = {0};
-
-  TC_status status = tc_aes_cipher_rounds((state_t*)l, round_key, rounds);
-  if (status != TC_OK)
-    goto done;
-  tc_aes_copy_bytes(k1, l, TC_AES_BLOCKLEN);
-  tc_aes_gf128_double(k1);
-  tc_aes_copy_bytes(k2, k1, TC_AES_BLOCKLEN);
-  tc_aes_gf128_double(k2);
-done:
-#if TC_ZEROIZE
-  TC_secure_zero(l, sizeof(l));
-#endif
-  return status;
+  const tc_aes_mac_key key = {round_key, rounds};
+  const tc_mac_cipher cipher = tc_aes_mac_cipher(&key);
+  return tc_mac_derive_subkeys(&cipher, 0x87, 0, k1, k2);
 }
 #endif

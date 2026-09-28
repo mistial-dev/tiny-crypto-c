@@ -40,22 +40,13 @@ static tc_mac_cipher tc_des_mac_cipher(const tc_des_mac_key* key)
 /* CMAC needs only the raw block cipher, so the context schedules keys and
    chains blocks itself. CMAC must keep working with the optional ECB/CBC/TDES
    mode gates compiled out. */
-static void tc_des_cmac_generate_subkeys(const struct TC_DES_CMAC_ctx* ctx, uint8_t* k1,
-                                         uint8_t* k2)
+static tc_mac_cipher tc_des_cmac_cipher(const struct TC_DES_CMAC_ctx* ctx, tc_des_mac_key* key)
 {
-  uint8_t L[TC_DES_BLOCKLEN] = {0};
-
-  tc_des_encrypt_scheduled(ctx->keys.schedule, L, ctx->triple);
-
-  tc_mac_gf_double(k1, L, TC_DES_BLOCKLEN, 0x1b);
-  tc_mac_gf_double(k2, k1, TC_DES_BLOCKLEN, 0x1b);
-
-#if TC_ZEROIZE
-  TC_secure_zero(L, sizeof(L));
-#endif
+  key->schedule = ctx->keys.schedule;
+  key->triple = ctx->triple;
+  return tc_des_mac_cipher(key);
 }
 
-/* Absorb one full block into the CBC-MAC chain (zero IV, SP 800-38B). */
 TC_status TC_DES_CMAC_init(struct TC_DES_CMAC_ctx* ctx, const uint8_t* key, size_t keylen)
 {
   if (ctx == NULL)
@@ -76,10 +67,12 @@ TC_status TC_DES_CMAC_init(struct TC_DES_CMAC_ctx* ctx, const uint8_t* key, size
     tc_des_key_schedule(&ctx->keys.schedule[0], key);
   else
     tc_des_bundle_schedule(ctx->keys.schedule, key, keylen);
-  tc_des_cmac_generate_subkeys(ctx, ctx->k1, ctx->k2);
-  memset(ctx->mac, 0, TC_DES_BLOCKLEN);
-  memset(ctx->buf, 0, TC_DES_BLOCKLEN);
-  ctx->buf_len = 0;
+  tc_des_mac_key mac_key;
+  const tc_mac_cipher cipher = tc_des_cmac_cipher(ctx, &mac_key);
+  if (tc_mac_derive_subkeys(&cipher, 0x1b, 0, ctx->k1, ctx->k2) != TC_OK) {
+    TC_DES_CMAC_ctx_clear(ctx);
+    return TC_ERROR;
+  }
   ctx->active = 1;
   return TC_OK;
 }
@@ -87,41 +80,27 @@ TC_status TC_DES_CMAC_init(struct TC_DES_CMAC_ctx* ctx, const uint8_t* key, size
 TC_status TC_DES_CMAC_update(struct TC_DES_CMAC_ctx* ctx, const uint8_t* data, size_t len)
 {
   tc_des_mac_key key;
-  tc_mac_cipher cipher;
-  size_t used;
-  TC_status status;
   if (ctx == NULL || ctx->active != 1 || ctx->buf_len > TC_DES_BLOCKLEN ||
-      (len != 0 && data == NULL))
+      !tc_internal_span_valid(data, len))
     return TC_ERROR;
-  if (len == 0)
-    return TC_OK;
-  key.schedule = ctx->keys.schedule;
-  key.triple = ctx->triple;
-  cipher = tc_des_mac_cipher(&key);
-  used = ctx->buf_len;
-  status = tc_mac_cbc_update(&cipher, ctx->mac, ctx->buf, &used, data, len, 1);
-  ctx->buf_len = (uint8_t)used;
-  return status;
+  const tc_mac_cipher cipher = tc_des_cmac_cipher(ctx, &key);
+  if (tc_mac_cbc_update(&cipher, ctx->mac, ctx->buf, &ctx->buf_len, data, len, 1) != TC_OK) {
+    TC_DES_CMAC_ctx_clear(ctx);
+    return TC_ERROR;
+  }
+  return TC_OK;
 }
 
 TC_status TC_DES_CMAC_final(struct TC_DES_CMAC_ctx* ctx, uint8_t tag[TC_DES_CMAC_TAG_MAX])
 {
   tc_des_mac_key key;
-  tc_mac_cipher cipher;
-  TC_status status;
-
   if (ctx == NULL || ctx->active != 1 || tag == NULL || ctx->buf_len > TC_DES_BLOCKLEN)
     return TC_ERROR;
-  key.schedule = ctx->keys.schedule;
-  key.triple = ctx->triple;
-  cipher = tc_des_mac_cipher(&key);
-  status = tc_mac_cmac_final(&cipher, ctx->mac, ctx->buf, ctx->buf_len, ctx->k1, ctx->k2, tag);
-
-#if TC_ZEROIZE
-  TC_secure_zero(ctx, sizeof(*ctx));
-#else
-  ctx->active = 0;
-#endif
+  const tc_mac_cipher cipher = tc_des_cmac_cipher(ctx, &key);
+  const TC_status status =
+      tc_mac_cmac_final(&cipher, ctx->mac, ctx->buf, ctx->buf_len, ctx->k1, ctx->k2, tag);
+  /* The context is one-shot: it is cleared after success and failure. */
+  TC_DES_CMAC_ctx_clear(ctx);
   return status;
 }
 
@@ -161,22 +140,10 @@ TC_status TC_DES_CMAC_verify(const uint8_t* key, size_t keylen, const uint8_t* m
                              const uint8_t* tag, size_t tag_len)
 {
   uint8_t computed[TC_DES_CMAC_TAG_MAX];
-  TC_status status;
-
-  if (tag == NULL || tag_len < TC_DES_CMAC_MIN_TAG_LEN || tag_len > TC_DES_CMAC_TAG_MAX) {
+  if (tag == NULL || tag_len < TC_DES_CMAC_MIN_TAG_LEN || tag_len > TC_DES_CMAC_TAG_MAX)
     return TC_ERROR;
-  }
-  if (TC_DES_CMAC(key, keylen, msg, msg_len, computed, tag_len) != TC_OK) {
-    return TC_ERROR;
-  }
-
-  /* Keep tag verification independent of the first mismatching byte. */
-  status = TC_ct_equal(computed, tag, tag_len);
-
-#if TC_ZEROIZE
-  TC_secure_zero(computed, sizeof(computed));
-#endif
-  return status;
+  return tc_internal_verify_tag(TC_DES_CMAC(key, keylen, msg, msg_len, computed, tag_len), computed,
+                                sizeof computed, tag, tag_len);
 }
 
 #endif /* TC_DES_ENABLE_CMAC */
@@ -228,20 +195,19 @@ TC_status TC_DES_ISO9797_init(struct TC_DES_ISO9797_ctx* ctx, TC_DES_ISO9797_alg
 TC_status TC_DES_ISO9797_update(struct TC_DES_ISO9797_ctx* ctx, const uint8_t* msg, size_t msg_len)
 {
   tc_des_mac_key key;
-  tc_mac_cipher cipher;
-  size_t used;
-  TC_status status;
-  if (ctx == NULL || ctx->active != 1 || ctx->used >= TC_DES_BLOCKLEN || (msg_len && msg == NULL))
+  if (ctx == NULL || ctx->active != 1 || ctx->used >= TC_DES_BLOCKLEN ||
+      !tc_internal_span_valid(msg, msg_len))
     return TC_ERROR;
   if (msg_len)
     ctx->nonempty = 1;
   key.schedule = ctx->keys.schedule;
   key.triple = ctx->algorithm == TC_DES_ISO9797_ALG1;
-  cipher = tc_des_mac_cipher(&key);
-  used = ctx->used;
-  status = tc_mac_cbc_update(&cipher, ctx->mac, ctx->buf, &used, msg, msg_len, 0);
-  ctx->used = (uint8_t)used;
-  return status;
+  const tc_mac_cipher cipher = tc_des_mac_cipher(&key);
+  if (tc_mac_cbc_update(&cipher, ctx->mac, ctx->buf, &ctx->used, msg, msg_len, 0) != TC_OK) {
+    TC_DES_ISO9797_clear(ctx);
+    return TC_ERROR;
+  }
+  return TC_OK;
 }
 
 #define TC_DES_ISO9797_ALG_RETAIL3 4u
@@ -351,14 +317,11 @@ TC_status TC_DES_ISO9797_verify(TC_DES_ISO9797_algorithm algorithm, TC_DES_ISO97
                                 size_t msg_len, const uint8_t* tag, size_t tag_len)
 {
   uint8_t full[TC_DES_BLOCKLEN];
-  TC_status status;
   if (tag == NULL || tag_len != TC_DES_BLOCKLEN)
     return TC_ERROR;
-  status = TC_DES_ISO9797_MAC(algorithm, padding, key, keylen, msg, msg_len, full, tag_len);
-  if (status == TC_OK)
-    status = TC_ct_equal(full, tag, tag_len);
-  TC_secure_zero(full, sizeof(full));
-  return status;
+  return tc_internal_verify_tag(
+      TC_DES_ISO9797_MAC(algorithm, padding, key, keylen, msg, msg_len, full, tag_len), full,
+      sizeof full, tag, tag_len);
 }
 
 TC_status TC_DES_ISO9797_verify_short_tag(TC_DES_ISO9797_algorithm algorithm,
@@ -367,15 +330,11 @@ TC_status TC_DES_ISO9797_verify_short_tag(TC_DES_ISO9797_algorithm algorithm,
                                           const uint8_t* tag, size_t tag_len)
 {
   uint8_t full[TC_DES_BLOCKLEN];
-  TC_status status;
   if (tag == NULL || tag_len < 4 || tag_len >= TC_DES_BLOCKLEN)
     return TC_ERROR;
-  status =
-      TC_DES_ISO9797_MAC_short_tag(algorithm, padding, key, keylen, msg, msg_len, full, tag_len);
-  if (status == TC_OK)
-    status = TC_ct_equal(full, tag, tag_len);
-  TC_secure_zero(full, sizeof(full));
-  return status;
+  return tc_internal_verify_tag(
+      TC_DES_ISO9797_MAC_short_tag(algorithm, padding, key, keylen, msg, msg_len, full, tag_len),
+      full, sizeof full, tag, tag_len);
 }
 
 TC_status TC_DES_RETAIL3_verify(TC_DES_ISO9797_padding padding, const uint8_t key[24],
@@ -383,13 +342,9 @@ TC_status TC_DES_RETAIL3_verify(TC_DES_ISO9797_padding padding, const uint8_t ke
                                 size_t tag_len)
 {
   uint8_t full[TC_DES_BLOCKLEN];
-  TC_status status;
   if (tag == NULL || tag_len != TC_DES_BLOCKLEN)
     return TC_ERROR;
-  status = TC_DES_RETAIL3_MAC(padding, key, msg, msg_len, full, tag_len);
-  if (status == TC_OK)
-    status = TC_ct_equal(full, tag, tag_len);
-  TC_secure_zero(full, sizeof(full));
-  return status;
+  return tc_internal_verify_tag(TC_DES_RETAIL3_MAC(padding, key, msg, msg_len, full, tag_len), full,
+                                sizeof full, tag, tag_len);
 }
 #endif /* TC_DES_ENABLE_ISO9797 */

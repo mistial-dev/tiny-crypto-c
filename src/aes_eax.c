@@ -5,68 +5,23 @@
  * encryption. */
 #include "aes_mac_core_internal.h"
 
-#if TC_AES_ENABLE_EAX ||                                    \
-    TC_AES_ENABLE_EAX_PRIME
+#if TC_AES_ENABLE_EAX || TC_AES_ENABLE_EAX_PRIME
 
-#if TC_AES_ENABLE_EAX_PRIME
-/* C12.22 defines EAX' field values in the reference implementation's
- * little-endian byte order, so its doubling shifts toward higher indexes and
- * applies the reduction constant to byte zero. */
-static void tc_aes_eax_prime_double(uint8_t value[TC_AES_BLOCKLEN])
+/* EAX constants D = dbl(L) and Q = dbl(D) with L = E_K(0), which are the
+ * CMAC subkeys. EAX' (ANSI C12.22) defines its field values in the
+ * reference implementation's little-endian byte order, so it uses the
+ * byte-reversed doubling. */
+static TC_status tc_aes_eax_constants(const struct TC_AES_key_ctx* aes, int prime,
+                                      uint8_t d[TC_AES_BLOCKLEN], uint8_t q[TC_AES_BLOCKLEN])
 {
-  uint8_t carry = 0;
-  unsigned i;
-
-  for (i = 0; i < TC_AES_BLOCKLEN; ++i) {
-    const uint8_t next = (uint8_t)(value[i] >> 7);
-    value[i] = (uint8_t)((value[i] << 1) | carry);
-    carry = next;
-  }
-  value[0] ^= (uint8_t)(0x87u & (uint8_t)(0u - carry));
+  const tc_aes_mac_key key = {aes->round_key, TC_AES_FIXED_ROUNDS};
+  const tc_mac_cipher cipher = tc_aes_mac_cipher(&key);
+  return tc_mac_derive_subkeys(&cipher, 0x87, prime, d, q);
 }
-#endif
 
-#if TC_AES_ENABLE_EAX ||                                    \
-    TC_AES_ENABLE_EAX_PRIME
-static TC_status tc_aes_eax_constants(const struct TC_AES_key_ctx* aes, uint8_t d[TC_AES_BLOCKLEN],
-                                      uint8_t q[TC_AES_BLOCKLEN],
-                                      void (*double_subkey)(uint8_t[TC_AES_BLOCKLEN]))
-{
-  uint8_t l[TC_AES_BLOCKLEN] = {0};
-  TC_status status = tc_aes_cipher((state_t*)l, aes->round_key);
-  if (status != TC_OK)
-    goto done;
-  tc_aes_copy_bytes(d, l, TC_AES_BLOCKLEN);
-  double_subkey(d);
-  tc_aes_copy_bytes(q, d, TC_AES_BLOCKLEN);
-  double_subkey(q);
-done:
-#if TC_ZEROIZE
-  TC_secure_zero(l, sizeof(l));
-#endif
-  return status;
-}
-#endif
-
-#if TC_AES_ENABLE_EAX
-static TC_status tc_aes_eax_key_constants(const struct TC_AES_key_ctx* aes,
-                                          uint8_t d[TC_AES_BLOCKLEN], uint8_t q[TC_AES_BLOCKLEN])
-{
-  return tc_aes_eax_constants(aes, d, q, tc_aes_gf128_double);
-}
-#endif
-
-#if TC_AES_ENABLE_EAX_PRIME
-static TC_status tc_aes_eax_prime_key_constants(const struct TC_AES_key_ctx* aes,
-                                                uint8_t d[TC_AES_BLOCKLEN],
-                                                uint8_t q[TC_AES_BLOCKLEN])
-{
-  return tc_aes_eax_constants(aes, d, q, tc_aes_eax_prime_double);
-}
-#endif
-
-/* CMAC with an optional EAX domain prefix. Passing domain < 0 implements the
- * C12.22 CMAC' form, whose CBC initial value is D or Q. */
+/* EAX OMAC with domain prefix [domain]_n when domain >= 0. A negative domain
+ * selects the C12.22 CMAC' form, whose CBC chain starts from initial (D or
+ * Q) without a prefix. */
 static TC_status tc_aes_eax_cmac(const struct TC_AES_key_ctx* aes,
                                  const uint8_t initial[TC_AES_BLOCKLEN], int domain,
                                  const uint8_t* data, size_t length,
@@ -74,38 +29,16 @@ static TC_status tc_aes_eax_cmac(const struct TC_AES_key_ctx* aes,
                                  const uint8_t partial_subkey[TC_AES_BLOCKLEN],
                                  uint8_t result[TC_AES_BLOCKLEN])
 {
-  uint8_t mac[TC_AES_BLOCKLEN];
-  uint8_t block[TC_AES_BLOCKLEN] = {0};
-  size_t used = 0;
-  const tc_aes_mac_key mac_key = {aes->round_key, TC_AES_FIXED_ROUNDS};
-  const tc_mac_cipher cipher = tc_aes_mac_cipher(&mac_key);
-  TC_status status = TC_OK;
-
-  tc_aes_copy_bytes(mac, initial, TC_AES_BLOCKLEN);
-  if (domain >= 0) {
-    block[TC_AES_BLOCKLEN - 1u] = (uint8_t)domain;
-    used = TC_AES_BLOCKLEN;
-  }
-  status = tc_mac_cbc_update(&cipher, mac, block, &used, data, length, 1);
-  if (status == TC_OK)
-    status = tc_mac_cmac_final(&cipher, mac, block, used, complete_subkey, partial_subkey, result);
-#if TC_ZEROIZE
-  TC_secure_zero(mac, sizeof(mac));
-  TC_secure_zero(block, sizeof(block));
-#endif
-  return status;
+  uint8_t prefix[TC_AES_BLOCKLEN] = {0};
+  const TC_bytes parts[] = {{prefix, TC_AES_BLOCKLEN}, {data, length}};
+  const tc_aes_mac_key key = {aes->round_key, TC_AES_FIXED_ROUNDS};
+  const tc_mac_cipher cipher = tc_aes_mac_cipher(&key);
+  prefix[TC_AES_BLOCKLEN - 1u] = (uint8_t)domain;
+  return domain >= 0
+             ? tc_mac_cmac_parts(&cipher, NULL, parts, 2, complete_subkey, partial_subkey, result)
+             : tc_mac_cmac_parts(&cipher, initial, parts + 1, 1, complete_subkey, partial_subkey,
+                                 result);
 }
-
-#if TC_AES_ENABLE_EAX
-static TC_status tc_aes_eax_omac(const struct TC_AES_key_ctx* aes, const uint8_t d[TC_AES_BLOCKLEN],
-                                 const uint8_t q[TC_AES_BLOCKLEN], uint8_t domain,
-                                 const uint8_t* data, size_t length,
-                                 uint8_t result[TC_AES_BLOCKLEN])
-{
-  uint8_t initial[TC_AES_BLOCKLEN] = {0};
-  return tc_aes_eax_cmac(aes, initial, domain, data, length, d, q, result);
-}
-#endif
 
 static TC_status tc_aes_eax_ctr_xor(const struct TC_AES_key_ctx* aes,
                                     const uint8_t initial[TC_AES_BLOCKLEN], const uint8_t* input,
@@ -146,13 +79,13 @@ static TC_status tc_aes_eax_crypt(const uint8_t* key, const uint8_t* nonce, size
 
   if (TC_AES_key_init(&st.aes, key) != TC_OK)
     goto done;
-  if (tc_aes_eax_key_constants(&st.aes, st.d, st.q) != TC_OK ||
-      tc_aes_eax_omac(&st.aes, st.d, st.q, 0, nonce, nonce_len, st.nonce_mac) != TC_OK ||
-      tc_aes_eax_omac(&st.aes, st.d, st.q, 1, aad, aad_len, st.header_mac) != TC_OK)
+  if (tc_aes_eax_constants(&st.aes, 0, st.d, st.q) != TC_OK ||
+      tc_aes_eax_cmac(&st.aes, NULL, 0, nonce, nonce_len, st.d, st.q, st.nonce_mac) != TC_OK ||
+      tc_aes_eax_cmac(&st.aes, NULL, 1, aad, aad_len, st.d, st.q, st.header_mac) != TC_OK)
     goto done;
 
   if (decrypt) {
-    if (tc_aes_eax_omac(&st.aes, st.d, st.q, 2, input, input_len, st.message_mac) != TC_OK)
+    if (tc_aes_eax_cmac(&st.aes, NULL, 2, input, input_len, st.d, st.q, st.message_mac) != TC_OK)
       goto done;
     for (i = 0; i < TC_AES_BLOCKLEN; ++i)
       st.full_tag[i] = (uint8_t)(st.nonce_mac[i] ^ st.header_mac[i] ^ st.message_mac[i]);
@@ -166,7 +99,7 @@ static TC_status tc_aes_eax_crypt(const uint8_t* key, const uint8_t* nonce, size
   } else {
     output_started = 1;
     if (tc_aes_eax_ctr_xor(&st.aes, st.nonce_mac, input, output, input_len, 0) != TC_OK ||
-        tc_aes_eax_omac(&st.aes, st.d, st.q, 2, output, input_len, st.message_mac) != TC_OK)
+        tc_aes_eax_cmac(&st.aes, NULL, 2, output, input_len, st.d, st.q, st.message_mac) != TC_OK)
       goto done;
     for (i = 0; i < TC_AES_BLOCKLEN; ++i)
       st.full_tag[i] = (uint8_t)(st.nonce_mac[i] ^ st.header_mac[i] ^ st.message_mac[i]);
@@ -234,7 +167,7 @@ static TC_status tc_aes_eax_prime_crypt(const uint8_t* key, const uint8_t* clear
 
   if (TC_AES_key_init(&st.aes, key) != TC_OK)
     goto done;
-  if (tc_aes_eax_prime_key_constants(&st.aes, st.d, st.q) != TC_OK ||
+  if (tc_aes_eax_constants(&st.aes, 1, st.d, st.q) != TC_OK ||
       tc_aes_eax_cmac(&st.aes, st.d, -1, cleartext, cleartext_len, st.d, st.q, st.nonce_mac) !=
           TC_OK)
     goto done;

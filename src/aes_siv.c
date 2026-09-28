@@ -5,40 +5,15 @@
 #include "aes_mac_core_internal.h"
 
 #if TC_AES_ENABLE_SIV
-static TC_status tc_aes_cmac_concat(const uint8_t* round_key, const uint8_t k1[TC_AES_BLOCKLEN],
-                                    const uint8_t k2[TC_AES_BLOCKLEN], const uint8_t* a,
-                                    size_t a_len, const uint8_t* b, size_t b_len,
-                                    uint8_t out[TC_AES_BLOCKLEN])
+/* AES-CMAC under the S2V key over one or two concatenated parts. */
+static TC_status tc_aes_siv_cmac(const uint8_t* round_key, const uint8_t k1[TC_AES_BLOCKLEN],
+                                 const uint8_t k2[TC_AES_BLOCKLEN], const TC_bytes* parts,
+                                 size_t count, uint8_t out[TC_AES_BLOCKLEN])
 {
-  uint8_t mac[TC_AES_BLOCKLEN] = {0};
-  uint8_t block[TC_AES_BLOCKLEN] = {0};
-  size_t used = 0;
-  const tc_aes_mac_key mac_key = {round_key, TC_AES_FIXED_ROUNDS};
-  const tc_mac_cipher cipher = tc_aes_mac_cipher(&mac_key);
-  TC_status status = tc_mac_cbc_update(&cipher, mac, block, &used, a, a_len, 1);
-  if (status == TC_OK)
-    status = tc_mac_cbc_update(&cipher, mac, block, &used, b, b_len, 1);
-  if (status == TC_OK)
-    status = tc_mac_cmac_final(&cipher, mac, block, used, k1, k2, out);
-#if TC_ZEROIZE
-  TC_secure_zero(mac, sizeof(mac));
-  TC_secure_zero(block, sizeof(block));
-#endif
-  return status;
+  const tc_aes_mac_key key = {round_key, TC_AES_FIXED_ROUNDS};
+  const tc_mac_cipher cipher = tc_aes_mac_cipher(&key);
+  return tc_mac_cmac_parts(&cipher, NULL, parts, count, k1, k2, out);
 }
-#endif
-
-#if TC_AES_ENABLE_SIV
-static TC_status tc_aes_cmac_with_subkeys(const uint8_t* round_key,
-                                          const uint8_t k1[TC_AES_BLOCKLEN],
-                                          const uint8_t k2[TC_AES_BLOCKLEN], const uint8_t* data,
-                                          size_t length, uint8_t out[TC_AES_BLOCKLEN])
-{
-  return tc_aes_cmac_concat(round_key, k1, k2, data, length, NULL, 0, out);
-}
-#endif
-
-#if TC_AES_ENABLE_SIV
 
 static TC_status tc_aes_siv_s2v(const uint8_t* k1_round, const uint8_t* const* ad,
                                 const size_t* ad_lens, size_t ad_count, const uint8_t* last,
@@ -57,13 +32,13 @@ static TC_status tc_aes_siv_s2v(const uint8_t* k1_round, const uint8_t* const* a
   status = tc_aes_cmac_generate_subkeys(k1_round, TC_AES_FIXED_ROUNDS, k1, k2);
   if (status != TC_OK)
     goto done;
-  status = tc_aes_cmac_with_subkeys(k1_round, k1, k2, zero, TC_AES_BLOCKLEN, d);
+  status = tc_aes_siv_cmac(k1_round, k1, k2, &(TC_bytes){zero, TC_AES_BLOCKLEN}, 1, d);
   if (status != TC_OK)
     goto done;
   for (i = 0; i < ad_count; ++i) {
     uint8_t j;
-    status =
-        tc_aes_cmac_with_subkeys(k1_round, k1, k2, ad[i] != NULL ? ad[i] : zero, ad_lens[i], tmp);
+    status = tc_aes_siv_cmac(k1_round, k1, k2,
+                             &(TC_bytes){ad[i] != NULL ? ad[i] : zero, ad_lens[i]}, 1, tmp);
     if (status != TC_OK)
       goto done;
     tc_aes_gf128_double(d);
@@ -76,8 +51,8 @@ static TC_status tc_aes_siv_s2v(const uint8_t* k1_round, const uint8_t* const* a
     tc_aes_copy_bytes(last_block, last + (last_len - TC_AES_BLOCKLEN), TC_AES_BLOCKLEN);
     for (i = 0; i < TC_AES_BLOCKLEN; ++i)
       last_block[i] ^= d[i];
-    status = tc_aes_cmac_concat(k1_round, k1, k2, last, last_len - TC_AES_BLOCKLEN, last_block,
-                                TC_AES_BLOCKLEN, v);
+    const TC_bytes parts[] = {{last, last_len - TC_AES_BLOCKLEN}, {last_block, TC_AES_BLOCKLEN}};
+    status = tc_aes_siv_cmac(k1_round, k1, k2, parts, 2, v);
   } else {
     /* T = dbl(D) xor pad(last); single-block CMAC input. */
     uint8_t t[TC_AES_BLOCKLEN];
@@ -90,7 +65,7 @@ static TC_status tc_aes_siv_s2v(const uint8_t* k1_round, const uint8_t* const* a
     tmp[last_len] = 0x80;
     for (j = 0; j < TC_AES_BLOCKLEN; ++j)
       t[j] ^= tmp[j];
-    status = tc_aes_cmac_with_subkeys(k1_round, k1, k2, t, TC_AES_BLOCKLEN, v);
+    status = tc_aes_siv_cmac(k1_round, k1, k2, &(TC_bytes){t, TC_AES_BLOCKLEN}, 1, v);
 #if TC_ZEROIZE
     TC_secure_zero(t, sizeof(t));
 #endif
