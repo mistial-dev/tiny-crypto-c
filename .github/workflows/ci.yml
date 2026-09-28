@@ -125,7 +125,9 @@ jobs:
         run: |
           pip install --upgrade platformio
           pio ci --lib="." --board=uno --board=esp32dev --board=nucleo_f401re examples/aes_ctr.ino
-          pio ci --lib="." --board=uno examples/kbkdf.cpp --project-option="build_flags=-DTC_ENABLE_HMAC=1 -DTC_ENABLE_KDF=1"
+          pio ci --lib="." --board=uno examples/kbkdf.cpp examples/arduino_main.h --project-option="build_flags=-DTC_ENABLE_HMAC=1 -DTC_ENABLE_KDF=1"
+          pio ci --lib="." --board=uno --board=esp32dev examples/sha256.cpp examples/arduino_main.h
+          pio ci --lib="." --board=uno examples/des_ctr.cpp examples/arduino_main.h --project-option="build_flags=-DTC_ENABLE_DES=1"
 
   resources:
     name: Embedded resource reports

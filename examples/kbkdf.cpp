@@ -5,17 +5,14 @@
  * PlatformIO / Arduino example: SP 800-108 KBKDF in counter mode
  * over HMAC-SHA-256, checked against the Kdf108 cross-check vector. Build
  * with -DTC_ENABLE_HMAC=1 -DTC_ENABLE_KDF=1.
- *
- * Arduino cores differ on setup()/loop() linkage:
- *   - ESP32 Arduino looks for C++-mangled symbols
- *   - AVR / STM32duino look for C linkage (extern "C")
- * Host builds (no ARDUINO) use main().
  */
 
 #include <tiny_crypto/kdf.h>
 #include <string.h>
 
-static int test_kbkdf_known_answer(void)
+#include "arduino_main.h"
+
+static int kbkdf_known_answer(void)
 {
   static const uint8_t kdk[16] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
                                   0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
@@ -35,43 +32,9 @@ static int test_kbkdf_known_answer(void)
   if (TC_KBKDF_HMAC_SHA256_counter(kdk, sizeof(kdk), &params, NULL, 0, fixed, sizeof(fixed), out,
                                    sizeof(out)) != TC_OK)
     return 1;
-  return memcmp(out, expected, sizeof(out)) == 0 ? 0 : 1;
+  const int matched = memcmp(out, expected, sizeof(out)) == 0;
+  TC_secure_zero(out, sizeof(out)); /* Derived keys are secret. */
+  return matched ? 0 : 1;
 }
 
-#if defined(ARDUINO)
-
-static void run_example(void)
-{
-  if (test_kbkdf_known_answer() != 0) {
-    for (;;) {
-      /* hang on failure */
-    }
-  }
-}
-
-#if defined(ESP32) || defined(ARDUINO_ARCH_ESP32) || defined(ARDUINO_ARCH_ESP8266)
-void setup(void)
-{
-  run_example();
-}
-
-void loop(void)
-{}
-#else
-extern "C" void setup(void)
-{
-  run_example();
-}
-
-extern "C" void loop(void)
-{}
-#endif
-
-#else
-
-int main(void)
-{
-  return test_kbkdf_known_answer();
-}
-
-#endif
+TC_EXAMPLE_ENTRY(kbkdf_known_answer)
