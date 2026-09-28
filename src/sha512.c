@@ -244,51 +244,11 @@ const tc_hash_algorithm_info tc_sha384_info TC_HASH_INFO_STORAGE = {
 /*****************************************************************************/
 
 #if TC_ENABLE_SHA384
-TC_status TC_SHA384_init(struct TC_SHA384_ctx* ctx)
-{
-  return tc_hash_core_init(&tc_sha384_info, ctx);
-}
-TC_status TC_SHA384_update(struct TC_SHA384_ctx* ctx, const uint8_t* data, size_t len)
-{
-  return tc_hash_core_update(&tc_sha384_info, ctx, data, len);
-}
-TC_status TC_SHA384_final(struct TC_SHA384_ctx* ctx, uint8_t* digest)
-{
-  return tc_hash_core_final(&tc_sha384_info, ctx, digest);
-}
-void TC_SHA384_ctx_clear(struct TC_SHA384_ctx* ctx)
-{
-  tc_hash_core_clear(&tc_sha384_info, ctx);
-}
-TC_status TC_SHA384_digest(const uint8_t* data, size_t len, uint8_t* digest)
-{
-  struct TC_SHA384_ctx ctx;
-  return tc_hash_core_digest(&tc_sha384_info, &ctx, data, len, digest);
-}
+TC_HASH_DEFINE(SHA384, sha384)
 #endif
 
 #if TC_ENABLE_SHA512
-TC_status TC_SHA512_init(struct TC_SHA512_ctx* ctx)
-{
-  return tc_hash_core_init(&tc_sha512_info, ctx);
-}
-TC_status TC_SHA512_update(struct TC_SHA512_ctx* ctx, const uint8_t* data, size_t len)
-{
-  return tc_hash_core_update(&tc_sha512_info, ctx, data, len);
-}
-TC_status TC_SHA512_final(struct TC_SHA512_ctx* ctx, uint8_t* digest)
-{
-  return tc_hash_core_final(&tc_sha512_info, ctx, digest);
-}
-void TC_SHA512_ctx_clear(struct TC_SHA512_ctx* ctx)
-{
-  tc_hash_core_clear(&tc_sha512_info, ctx);
-}
-TC_status TC_SHA512_digest(const uint8_t* data, size_t len, uint8_t* digest)
-{
-  struct TC_SHA512_ctx ctx;
-  return tc_hash_core_digest(&tc_sha512_info, &ctx, data, len, digest);
-}
+TC_HASH_DEFINE(SHA512, sha512)
 #endif
 
 /*****************************************************************************/
@@ -298,65 +258,11 @@ TC_status TC_SHA512_digest(const uint8_t* data, size_t len, uint8_t* digest)
 #if TC_ENABLE_HMAC
 
 #if TC_ENABLE_SHA384
-TC_status TC_HMAC_SHA384_init(struct TC_HMAC_SHA384_ctx* ctx, const uint8_t* key, size_t keylen)
-{
-  return tc_hmac_core_init(&tc_sha384_info, ctx, key, keylen);
-}
-TC_status TC_HMAC_SHA384_update(struct TC_HMAC_SHA384_ctx* ctx, const uint8_t* data, size_t len)
-{
-  return tc_hmac_core_update(&tc_sha384_info, ctx, data, len);
-}
-TC_status TC_HMAC_SHA384_final(struct TC_HMAC_SHA384_ctx* ctx, uint8_t* tag)
-{
-  return tc_hmac_core_final(&tc_sha384_info, ctx, tag);
-}
-void TC_HMAC_SHA384_ctx_clear(struct TC_HMAC_SHA384_ctx* ctx)
-{
-  tc_hmac_core_clear(&tc_sha384_info, ctx);
-}
-TC_status TC_HMAC_SHA384_digest(const uint8_t* key, size_t keylen, const uint8_t* msg,
-                                size_t msg_len, uint8_t* tag, size_t tag_len)
-{
-  struct TC_HMAC_SHA384_ctx ctx;
-  return tc_hmac_core_digest(&tc_sha384_info, &ctx, key, keylen, msg, msg_len, tag, tag_len);
-}
-TC_status TC_HMAC_SHA384_verify(const uint8_t* key, size_t keylen, const uint8_t* msg,
-                                size_t msg_len, const uint8_t* tag, size_t tag_len)
-{
-  struct TC_HMAC_SHA384_ctx ctx;
-  return tc_hmac_core_verify(&tc_sha384_info, &ctx, key, keylen, msg, msg_len, tag, tag_len);
-}
+TC_HMAC_DEFINE(SHA384, sha384)
 #endif
 
 #if TC_ENABLE_SHA512
-TC_status TC_HMAC_SHA512_init(struct TC_HMAC_SHA512_ctx* ctx, const uint8_t* key, size_t keylen)
-{
-  return tc_hmac_core_init(&tc_sha512_info, ctx, key, keylen);
-}
-TC_status TC_HMAC_SHA512_update(struct TC_HMAC_SHA512_ctx* ctx, const uint8_t* data, size_t len)
-{
-  return tc_hmac_core_update(&tc_sha512_info, ctx, data, len);
-}
-TC_status TC_HMAC_SHA512_final(struct TC_HMAC_SHA512_ctx* ctx, uint8_t* tag)
-{
-  return tc_hmac_core_final(&tc_sha512_info, ctx, tag);
-}
-void TC_HMAC_SHA512_ctx_clear(struct TC_HMAC_SHA512_ctx* ctx)
-{
-  tc_hmac_core_clear(&tc_sha512_info, ctx);
-}
-TC_status TC_HMAC_SHA512_digest(const uint8_t* key, size_t keylen, const uint8_t* msg,
-                                size_t msg_len, uint8_t* tag, size_t tag_len)
-{
-  struct TC_HMAC_SHA512_ctx ctx;
-  return tc_hmac_core_digest(&tc_sha512_info, &ctx, key, keylen, msg, msg_len, tag, tag_len);
-}
-TC_status TC_HMAC_SHA512_verify(const uint8_t* key, size_t keylen, const uint8_t* msg,
-                                size_t msg_len, const uint8_t* tag, size_t tag_len)
-{
-  struct TC_HMAC_SHA512_ctx ctx;
-  return tc_hmac_core_verify(&tc_sha512_info, &ctx, key, keylen, msg, msg_len, tag, tag_len);
-}
+TC_HMAC_DEFINE(SHA512, sha512)
 #endif
 
 #endif /* TC_ENABLE_HMAC */

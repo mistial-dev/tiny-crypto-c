@@ -103,25 +103,5 @@ static const tc_hash_algorithm_info tc_md5_info TC_HASH_INFO_STORAGE = {
     view,
     NULL};
 
-TC_status TC_MD5_init(struct TC_MD5_ctx* ctx)
-{
-  return tc_hash_core_init(&tc_md5_info, ctx);
-}
-TC_status TC_MD5_update(struct TC_MD5_ctx* ctx, const uint8_t* data, size_t length)
-{
-  return tc_hash_core_update(&tc_md5_info, ctx, data, length);
-}
-TC_status TC_MD5_final(struct TC_MD5_ctx* ctx, uint8_t digest[TC_MD5_DIGESTLEN])
-{
-  return tc_hash_core_final(&tc_md5_info, ctx, digest);
-}
-void TC_MD5_ctx_clear(struct TC_MD5_ctx* ctx)
-{
-  tc_hash_core_clear(&tc_md5_info, ctx);
-}
-TC_status TC_MD5_digest(const uint8_t* data, size_t length, uint8_t digest[TC_MD5_DIGESTLEN])
-{
-  struct TC_MD5_ctx ctx;
-  return tc_hash_core_digest(&tc_md5_info, &ctx, data, length, digest);
-}
+TC_HASH_DEFINE(MD5, md5)
 #endif

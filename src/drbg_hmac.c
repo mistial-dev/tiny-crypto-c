@@ -34,19 +34,10 @@ static TC_DRBG_result hmac_parts(TC_DRBG* drbg, const TC_bytes* parts, size_t co
                                  uint8_t* result)
 {
   const tc_hash_algorithm_info* info = tc_hash_core_lookup((TC_hash_algorithm)drbg->hash);
-  uint8_t tag[TC_DRBG_HMAC_OUTPUT_BYTES];
-  TC_status status =
-      tc_hmac_core_init(info, &drbg->scratch.hmac, drbg->state.hmac.key, drbg->output_bytes);
-  size_t i;
-  for (i = 0; status == TC_OK && i < count; ++i)
-    status = tc_hmac_core_update(info, &drbg->scratch.hmac, parts[i].data, parts[i].length);
-  if (status == TC_OK)
-    status = tc_hmac_core_final(info, &drbg->scratch.hmac, tag);
-  if (status == TC_OK)
-    memcpy(result, tag, drbg->output_bytes);
-  tc_hmac_core_clear(info, &drbg->scratch.hmac);
-  TC_secure_zero(tag, sizeof tag);
-  return status == TC_OK ? TC_DRBG_OK : TC_DRBG_ERROR;
+  return tc_hmac_core_parts(info, &drbg->scratch.hmac, drbg->state.hmac.key, drbg->output_bytes,
+                            parts, count, result) == TC_OK
+             ? TC_DRBG_OK
+             : TC_DRBG_ERROR;
 }
 
 /* HMAC_DRBG_Update (10.1.2.2) over provided_data given as up to 3 parts:

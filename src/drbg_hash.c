@@ -15,14 +15,15 @@
 TC_DRBG_result tc_drbg_hash_parameters(TC_hash_algorithm hash, tc_drbg_parameters* out)
 {
   const uint16_t strength = tc_drbg_hash_strength(hash);
+  const tc_hash_algorithm_info* info = tc_hash_core_lookup(hash);
   if (strength == 0)
     return TC_DRBG_ARGUMENT;
-  if (!tc_hash_available(hash))
+  if (info == NULL)
     return TC_DRBG_UNSUPPORTED;
   memset(out, 0, sizeof *out);
   out->strength_bits = strength;
   out->seed_bytes = hash == TC_HASH_SHA384 || hash == TC_HASH_SHA512 ? 111u : 55u;
-  out->output_bytes = (uint8_t)tc_hash_core_digest_bytes(tc_hash_core_lookup(hash));
+  out->output_bytes = (uint8_t)tc_hash_core_digest_bytes(info);
   out->uses_nonce = 1;
   return TC_DRBG_OK;
 }
@@ -31,15 +32,10 @@ TC_DRBG_result tc_drbg_hash_parameters(TC_hash_algorithm hash, tc_drbg_parameter
 static TC_DRBG_result hash_parts(TC_DRBG* drbg, const TC_bytes* parts, size_t count,
                                  uint8_t* digest)
 {
-  const TC_hash_algorithm hash = (TC_hash_algorithm)drbg->hash;
-  TC_status status = tc_hash_init(hash, &drbg->scratch.hash);
-  size_t i;
-  for (i = 0; status == TC_OK && i < count; ++i)
-    status = tc_hash_update(hash, &drbg->scratch.hash, parts[i]);
-  if (status == TC_OK)
-    return tc_hash_final(hash, &drbg->scratch.hash, digest) == TC_OK ? TC_DRBG_OK : TC_DRBG_ERROR;
-  TC_secure_zero(&drbg->scratch.hash, sizeof drbg->scratch.hash);
-  return TC_DRBG_ERROR;
+  return tc_hash_digest_parts((TC_hash_algorithm)drbg->hash, parts, count, digest,
+                              &drbg->scratch.hash) == TC_OK
+             ? TC_DRBG_OK
+             : TC_DRBG_ERROR;
 }
 
 /* Hash_df: out = leftmost length bytes of

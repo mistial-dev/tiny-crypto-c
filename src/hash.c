@@ -352,75 +352,15 @@ const tc_hash_algorithm_info tc_sha224_info TC_HASH_INFO_STORAGE = {
 /*****************************************************************************/
 
 #if TC_ENABLE_SHA1
-TC_status TC_SHA1_init(struct TC_SHA1_ctx* ctx)
-{
-  return tc_hash_core_init(&tc_sha1_info, ctx);
-}
-TC_status TC_SHA1_update(struct TC_SHA1_ctx* ctx, const uint8_t* data, size_t len)
-{
-  return tc_hash_core_update(&tc_sha1_info, ctx, data, len);
-}
-TC_status TC_SHA1_final(struct TC_SHA1_ctx* ctx, uint8_t* digest)
-{
-  return tc_hash_core_final(&tc_sha1_info, ctx, digest);
-}
-void TC_SHA1_ctx_clear(struct TC_SHA1_ctx* ctx)
-{
-  tc_hash_core_clear(&tc_sha1_info, ctx);
-}
-TC_status TC_SHA1_digest(const uint8_t* data, size_t len, uint8_t* digest)
-{
-  struct TC_SHA1_ctx ctx;
-  return tc_hash_core_digest(&tc_sha1_info, &ctx, data, len, digest);
-}
+TC_HASH_DEFINE(SHA1, sha1)
 #endif
 
 #if TC_ENABLE_SHA224
-TC_status TC_SHA224_init(struct TC_SHA224_ctx* ctx)
-{
-  return tc_hash_core_init(&tc_sha224_info, ctx);
-}
-TC_status TC_SHA224_update(struct TC_SHA224_ctx* ctx, const uint8_t* data, size_t len)
-{
-  return tc_hash_core_update(&tc_sha224_info, ctx, data, len);
-}
-TC_status TC_SHA224_final(struct TC_SHA224_ctx* ctx, uint8_t* digest)
-{
-  return tc_hash_core_final(&tc_sha224_info, ctx, digest);
-}
-void TC_SHA224_ctx_clear(struct TC_SHA224_ctx* ctx)
-{
-  tc_hash_core_clear(&tc_sha224_info, ctx);
-}
-TC_status TC_SHA224_digest(const uint8_t* data, size_t len, uint8_t* digest)
-{
-  struct TC_SHA224_ctx ctx;
-  return tc_hash_core_digest(&tc_sha224_info, &ctx, data, len, digest);
-}
+TC_HASH_DEFINE(SHA224, sha224)
 #endif
 
 #if TC_ENABLE_SHA256
-TC_status TC_SHA256_init(struct TC_SHA256_ctx* ctx)
-{
-  return tc_hash_core_init(&tc_sha256_info, ctx);
-}
-TC_status TC_SHA256_update(struct TC_SHA256_ctx* ctx, const uint8_t* data, size_t len)
-{
-  return tc_hash_core_update(&tc_sha256_info, ctx, data, len);
-}
-TC_status TC_SHA256_final(struct TC_SHA256_ctx* ctx, uint8_t* digest)
-{
-  return tc_hash_core_final(&tc_sha256_info, ctx, digest);
-}
-void TC_SHA256_ctx_clear(struct TC_SHA256_ctx* ctx)
-{
-  tc_hash_core_clear(&tc_sha256_info, ctx);
-}
-TC_status TC_SHA256_digest(const uint8_t* data, size_t len, uint8_t* digest)
-{
-  struct TC_SHA256_ctx ctx;
-  return tc_hash_core_digest(&tc_sha256_info, &ctx, data, len, digest);
-}
+TC_HASH_DEFINE(SHA256, sha256)
 #endif
 
 /*****************************************************************************/
@@ -430,96 +370,15 @@ TC_status TC_SHA256_digest(const uint8_t* data, size_t len, uint8_t* digest)
 #if TC_ENABLE_HMAC
 
 #if TC_ENABLE_SHA1
-TC_status TC_HMAC_SHA1_init(struct TC_HMAC_SHA1_ctx* ctx, const uint8_t* key, size_t keylen)
-{
-  return tc_hmac_core_init(&tc_sha1_info, ctx, key, keylen);
-}
-TC_status TC_HMAC_SHA1_update(struct TC_HMAC_SHA1_ctx* ctx, const uint8_t* data, size_t len)
-{
-  return tc_hmac_core_update(&tc_sha1_info, ctx, data, len);
-}
-TC_status TC_HMAC_SHA1_final(struct TC_HMAC_SHA1_ctx* ctx, uint8_t* tag)
-{
-  return tc_hmac_core_final(&tc_sha1_info, ctx, tag);
-}
-void TC_HMAC_SHA1_ctx_clear(struct TC_HMAC_SHA1_ctx* ctx)
-{
-  tc_hmac_core_clear(&tc_sha1_info, ctx);
-}
-TC_status TC_HMAC_SHA1_digest(const uint8_t* key, size_t keylen, const uint8_t* msg, size_t msg_len,
-                              uint8_t* tag, size_t tag_len)
-{
-  struct TC_HMAC_SHA1_ctx ctx;
-  return tc_hmac_core_digest(&tc_sha1_info, &ctx, key, keylen, msg, msg_len, tag, tag_len);
-}
-TC_status TC_HMAC_SHA1_verify(const uint8_t* key, size_t keylen, const uint8_t* msg, size_t msg_len,
-                              const uint8_t* tag, size_t tag_len)
-{
-  struct TC_HMAC_SHA1_ctx ctx;
-  return tc_hmac_core_verify(&tc_sha1_info, &ctx, key, keylen, msg, msg_len, tag, tag_len);
-}
+TC_HMAC_DEFINE(SHA1, sha1)
 #endif
 
 #if TC_ENABLE_SHA224
-TC_status TC_HMAC_SHA224_init(struct TC_HMAC_SHA224_ctx* ctx, const uint8_t* key, size_t keylen)
-{
-  return tc_hmac_core_init(&tc_sha224_info, ctx, key, keylen);
-}
-TC_status TC_HMAC_SHA224_update(struct TC_HMAC_SHA224_ctx* ctx, const uint8_t* data, size_t len)
-{
-  return tc_hmac_core_update(&tc_sha224_info, ctx, data, len);
-}
-TC_status TC_HMAC_SHA224_final(struct TC_HMAC_SHA224_ctx* ctx, uint8_t* tag)
-{
-  return tc_hmac_core_final(&tc_sha224_info, ctx, tag);
-}
-void TC_HMAC_SHA224_ctx_clear(struct TC_HMAC_SHA224_ctx* ctx)
-{
-  tc_hmac_core_clear(&tc_sha224_info, ctx);
-}
-TC_status TC_HMAC_SHA224_digest(const uint8_t* key, size_t keylen, const uint8_t* msg,
-                                size_t msg_len, uint8_t* tag, size_t tag_len)
-{
-  struct TC_HMAC_SHA224_ctx ctx;
-  return tc_hmac_core_digest(&tc_sha224_info, &ctx, key, keylen, msg, msg_len, tag, tag_len);
-}
-TC_status TC_HMAC_SHA224_verify(const uint8_t* key, size_t keylen, const uint8_t* msg,
-                                size_t msg_len, const uint8_t* tag, size_t tag_len)
-{
-  struct TC_HMAC_SHA224_ctx ctx;
-  return tc_hmac_core_verify(&tc_sha224_info, &ctx, key, keylen, msg, msg_len, tag, tag_len);
-}
+TC_HMAC_DEFINE(SHA224, sha224)
 #endif
 
 #if TC_ENABLE_SHA256
-TC_status TC_HMAC_SHA256_init(struct TC_HMAC_SHA256_ctx* ctx, const uint8_t* key, size_t keylen)
-{
-  return tc_hmac_core_init(&tc_sha256_info, ctx, key, keylen);
-}
-TC_status TC_HMAC_SHA256_update(struct TC_HMAC_SHA256_ctx* ctx, const uint8_t* data, size_t len)
-{
-  return tc_hmac_core_update(&tc_sha256_info, ctx, data, len);
-}
-TC_status TC_HMAC_SHA256_final(struct TC_HMAC_SHA256_ctx* ctx, uint8_t* tag)
-{
-  return tc_hmac_core_final(&tc_sha256_info, ctx, tag);
-}
-void TC_HMAC_SHA256_ctx_clear(struct TC_HMAC_SHA256_ctx* ctx)
-{
-  tc_hmac_core_clear(&tc_sha256_info, ctx);
-}
-TC_status TC_HMAC_SHA256_digest(const uint8_t* key, size_t keylen, const uint8_t* msg,
-                                size_t msg_len, uint8_t* tag, size_t tag_len)
-{
-  struct TC_HMAC_SHA256_ctx ctx;
-  return tc_hmac_core_digest(&tc_sha256_info, &ctx, key, keylen, msg, msg_len, tag, tag_len);
-}
-TC_status TC_HMAC_SHA256_verify(const uint8_t* key, size_t keylen, const uint8_t* msg,
-                                size_t msg_len, const uint8_t* tag, size_t tag_len)
-{
-  struct TC_HMAC_SHA256_ctx ctx;
-  return tc_hmac_core_verify(&tc_sha256_info, &ctx, key, keylen, msg, msg_len, tag, tag_len);
-}
+TC_HMAC_DEFINE(SHA256, sha256)
 #endif
 
 #endif /* TC_ENABLE_HMAC */

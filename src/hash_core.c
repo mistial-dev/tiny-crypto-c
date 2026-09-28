@@ -8,7 +8,23 @@
 #if TC_HASH_CORE_ENABLED
 #include <string.h>
 #include "internal.h"
-#include "hash_validation_internal.h"
+
+/* Streaming arguments: a live context and a data or digest span that does not
+ * overlap it or wrap the address space. */
+static inline int tc_hash_update_args(const void* ctx, size_t ctx_len, const uint8_t* data,
+                                      size_t data_len)
+{
+  return ctx != NULL && tc_internal_span_valid(data, data_len) &&
+         data_len <= UINTPTR_MAX - (uintptr_t)data &&
+         tc_internal_ranges_disjoint(ctx, ctx_len, data, data_len);
+}
+
+static inline int tc_hash_final_args(const void* ctx, size_t ctx_len, const uint8_t* digest,
+                                     size_t digest_len)
+{
+  return ctx != NULL && digest != NULL && digest_len <= UINTPTR_MAX - (uintptr_t)digest &&
+         tc_internal_ranges_disjoint(ctx, ctx_len, digest, digest_len);
+}
 
 #define HMAC_IPAD 0x36u
 #define HMAC_OPAD 0x5Cu
@@ -60,12 +76,6 @@ size_t tc_hash_core_digest_bytes(const tc_hash_algorithm_info* stored)
 {
   tc_hash_algorithm_info local;
   return load_info(stored, &local)->digest_bytes;
-}
-
-size_t tc_hash_core_block_bytes(const tc_hash_algorithm_info* stored)
-{
-  tc_hash_algorithm_info local;
-  return load_info(stored, &local)->block_bytes;
 }
 
 void tc_hash_store_be32_words(uint8_t* digest, const void* state, size_t words)
@@ -329,6 +339,22 @@ TC_status tc_hmac_core_final(const tc_hash_algorithm_info* stored, void* context
   *hmac.inner.active = 0;
 #endif
   return TC_OK;
+}
+
+TC_status tc_hmac_core_parts(const tc_hash_algorithm_info* info, void* context, const uint8_t* key,
+                             size_t key_length, const TC_bytes* parts, size_t count, uint8_t* tag)
+{
+  uint8_t full[TC_HASH_CORE_MAX_DIGEST];
+  TC_status status = tc_hmac_core_init(info, context, key, key_length);
+  for (size_t i = 0; status == TC_OK && i < count; ++i)
+    status = tc_hmac_core_update(info, context, parts[i].data, parts[i].length);
+  if (status == TC_OK)
+    status = tc_hmac_core_final(info, context, full);
+  if (status == TC_OK)
+    memcpy(tag, full, tc_hash_core_digest_bytes(info));
+  tc_hmac_core_clear(info, context);
+  TC_secure_zero(full, sizeof full);
+  return status;
 }
 
 void tc_hmac_core_clear(const tc_hash_algorithm_info* stored, void* context)

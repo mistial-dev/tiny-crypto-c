@@ -71,8 +71,7 @@ static inline TC_result tc_source_hash_step(tc_source_hash* state, size_t max_by
 /* Finalize only after the complete source range has been consumed. */
 static inline TC_result tc_source_hash_final(tc_source_hash* state, TC_buffer output)
 {
-  enum { MAX_DIGEST_BYTES = 64 };
-  uint8_t digest[MAX_DIGEST_BYTES];
+  uint8_t digest[TC_HASH_CORE_MAX_DIGEST];
   tc_hash_info info;
   if (!state || !state->active || state->offset != state->end || !output.data ||
       !tc_hash_info_get(state->algorithm, &info))
