@@ -120,7 +120,8 @@ certificates and CMS. See [testing](testing.md) for the OpenSSL cross-checks.
 `TC_RSA_keygen_init` and `TC_RSA_keygen_step` generate two-prime RSA-1024,
 RSA-2048, RSA-3072, or RSA-4096 keys with public exponent 65537. The operation uses no
 heap storage. Supply `TC_RSA_KEYGEN_WORKSPACE_WORDS(bits)` aligned limbs, or
-query `TC_RSA_workspace_words(TC_RSA_OPERATION_KEYGEN, bits)`, plus caller-owned output buffers.
+query `TC_RSA_workspace_words(TC_RSA_OPERATION_KEYGEN, bits)`, plus
+caller-owned output buffers.
 The modulus and private exponent need `bits/8` bytes, each prime needs
 `bits/16` bytes, and the exponent needs three bytes.
 
@@ -130,15 +131,27 @@ across steps. `TC_RSA_keygen_init` takes cumulative candidate and RNG-request
 limits. Each `TC_RSA_keygen_step` also takes a work allowance. It returns
 `TC_RSA_IN_PROGRESS` before exceeding that allowance. Call it again with the
 same state and callbacks. `TC_RSA_KEYGEN_STEP_WORK(bits)` is enough for any one
-pending unit to make progress. A cancellation callback is checked between
-bounded candidate, setup and Miller-Rabin units. Cancellation returns
+pending unit to make progress. The units are a candidate, a Miller-Rabin
+setup, a Miller-Rabin round and the final derivation of `n` and `d`. A
+cancellation callback is checked between units. Cancellation returns
 `TC_RSA_CANCELLED` and wipes retained secrets.
 
-The generator sets the top two bits of each prime, rejects small-prime factors,
-checks compatibility with exponent 65537, enforces the FIPS 186-5 prime-distance
-condition, and performs 65 independent Miller-Rabin rounds on each accepted
-candidate. Candidate search has variable running time. Supply a cryptographic
-RNG whose callback returns `TC_OK` only after filling the complete request.
+The generator follows FIPS 186-5 appendix A.1.1:
+
+- it sets the top two bits of each prime, which exceeds the
+  `sqrt(2) * 2^(nlen/2 - 1)` lower bound;
+- it rejects small-prime factors and any prime with `p - 1` divisible by
+  65537;
+- it requires `|p - q| > 2^(nlen/2 - 100)`;
+- it performs 65 independent Miller-Rabin rounds on each accepted candidate;
+- it sets `d = e^-1 mod LCM(p - 1, q - 1)` and generates new primes in the
+  rare case `d <= 2^(nlen/2)`.
+
+Residue checks on candidates, the prime-distance comparison, the GCD, the LCM
+and the derivation of `d` run in time that depends only on the key size.
+Candidate search itself has variable running time, which reveals only how
+many candidates were rejected. Supply a cryptographic RNG whose callback
+returns `TC_OK` only after filling the complete request.
 
 Output is published only after both primes and `n`, `d` have been derived.
 RNG errors and terminal limits preserve every output buffer and wipe retained

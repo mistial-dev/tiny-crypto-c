@@ -45,6 +45,26 @@ static inline int tc_rsa_private_exponent_check(const tc_mp_word* d, const tc_mp
   return (nonzero != 0) & (d[0] & 1u) & below_modulus;
 }
 
+/* FIPS 186-5 A.1.1 2(d): |p - q| > 2^(k-100) for k-bit primes held in h
+ * limbs. scratch has 3h limbs. The comparison runs in time that depends only
+ * on h. */
+static inline int tc_rsa_factors_far_apart(const tc_mp_word* p, const tc_mp_word* q, size_t h,
+                                           tc_mp_word* scratch)
+{
+  const size_t threshold = h * TC_MP_WORD_BITS - 100;
+  tc_mp_word* difference = scratch;
+  tc_mp_word* other = difference + h;
+  tc_mp_word* bound = other + h;
+  const tc_mp_word below = tc_mp_subtract(difference, p, q, h);
+  tc_mp_subtract(other, q, p, h);
+  tc_mp_select(difference, other, difference, (tc_mp_word)(0u - below), h);
+  /* |p - q| > 2^threshold exactly when |p - q| - (2^threshold + 1) does not borrow. */
+  memset(bound, 0, h * sizeof *bound);
+  bound[threshold / TC_MP_WORD_BITS] = (tc_mp_word)((tc_mp_word)1u << (threshold % TC_MP_WORD_BITS));
+  bound[0] |= 1u;
+  return tc_mp_subtract(other, difference, bound, h) == 0;
+}
+
 /* FIPS 186-5 A.1.3: each prime has half the modulus bit length. */
 static inline int tc_rsa_factor_has_half_bits(TC_bytes factor, size_t modulus_bytes)
 {

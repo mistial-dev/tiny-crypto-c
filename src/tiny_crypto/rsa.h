@@ -133,15 +133,16 @@ TC_RSA_result TC_RSA_prepare_public_key(TC_RSA_prepared_public_key* setup,
                                         const TC_RSA_workspace* workspace, TC_work_budget* work);
 void TC_RSA_prepared_public_key_clear(TC_RSA_prepared_public_key* setup);
 
-/* Generate a two-prime RSA key with e=65537. Output capacities must be at
+/* Generate a two-prime RSA key with e=65537 and d = e^-1 mod LCM(p-1, q-1)
+ * under FIPS 186-5 appendix A.1.1. Output capacities must be at
  * least bits/8 for modulus and d, bits/16 for p and q, and three bytes for e.
  * Output buffers remain unchanged until a complete key is published. Scratch,
  * state, outputs and their metadata must be mutually disjoint.
  *
  * Each step performs at most work->remaining units and returns
  * TC_RSA_IN_PROGRESS when more work is needed. The configured limits bound
- * candidate generation and every RNG request across all steps. Cancellation and terminal failures wipe
- * retained candidates. TC_RSA_KEYGEN_STEP_WORK(bits) lets every pending unit
+ * candidate generation and every RNG request across all steps. Cancellation
+ * and terminal failures wipe retained candidates. TC_RSA_KEYGEN_STEP_WORK(bits) lets every pending unit
  * make progress. The RNG must fill each request completely. Callback contexts
  * must be separate from state, scratch and outputs. Call clear after success or
  * whenever abandoning an in-progress operation. */

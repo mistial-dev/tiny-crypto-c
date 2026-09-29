@@ -75,27 +75,53 @@ static MunitResult generated_key(const MunitParameter params[], void* data)
     result = TC_RSA_keygen_step(&state, (TC_random_source){random_bytes, NULL}, NULL, NULL, &work);
   } while (result == TC_RSA_IN_PROGRESS);
   munit_assert_int(result, ==, TC_RSA_OK);
+  /* FIPS 186-5 A.1.1: e = 65537, p and q prime with sqrt(2) 2^(k-1) <= p, q,
+   * |p - q| > 2^(k-100), d = e^-1 mod LCM(p-1, q-1) and 2^(nlen/2) < d < LCM. */
   BN_CTX* context = BN_CTX_new();
   BIGNUM* n = BN_bin2bn(modulus, (int)length, NULL);
   BIGNUM* e = BN_bin2bn(exponent, sizeof exponent, NULL);
   BIGNUM* private_exponent = BN_bin2bn(d, (int)length, NULL);
   BIGNUM* prime1 = BN_bin2bn(p, (int)prime_length, NULL);
   BIGNUM* prime2 = BN_bin2bn(q, (int)prime_length, NULL);
-  BIGNUM* product = BN_new();
-  BIGNUM* phi = BN_new();
-  BIGNUM* check = BN_new();
+  BIGNUM *product = BN_new(), *phi = BN_new(), *gcd = BN_new(), *lambda = BN_new();
+  BIGNUM *check = BN_new(), *bound = BN_new(), *difference = BN_new();
   munit_assert_not_null(context);
-  munit_assert_not_null(check);
+  munit_assert_not_null(difference);
+  munit_assert_true(BN_is_word(e, 65537));
   munit_assert_int(BN_check_prime(prime1, context, NULL), ==, 1);
   munit_assert_int(BN_check_prime(prime2, context, NULL), ==, 1);
   munit_assert_int(BN_mul(product, prime1, prime2, context), ==, 1);
   munit_assert_int(BN_cmp(product, n), ==, 0);
+  const int k = (int)(bits / 2);
+  /* p^2 >= 2^(2k-1) is the exact form of p >= sqrt(2) 2^(k-1). */
+  munit_assert_int(BN_set_word(bound, 1), ==, 1);
+  munit_assert_int(BN_lshift(bound, bound, 2 * k - 1), ==, 1);
+  const BIGNUM* primes[] = {prime1, prime2};
+  for (size_t i = 0; i < 2; ++i) {
+    munit_assert_int(BN_sqr(check, primes[i], context), ==, 1);
+    munit_assert_int(BN_cmp(check, bound), >=, 0);
+  }
+  munit_assert_int(BN_sub(difference, prime1, prime2), ==, 1);
+  BN_set_negative(difference, 0);
+  munit_assert_int(BN_set_word(bound, 1), ==, 1);
+  munit_assert_int(BN_lshift(bound, bound, k - 100), ==, 1);
+  munit_assert_int(BN_cmp(difference, bound), >, 0);
   munit_assert_int(BN_sub_word(prime1, 1), ==, 1);
   munit_assert_int(BN_sub_word(prime2, 1), ==, 1);
   munit_assert_int(BN_mul(phi, prime1, prime2, context), ==, 1);
-  munit_assert_int(BN_mod_mul(check, e, private_exponent, phi, context), ==, 1);
+  munit_assert_int(BN_gcd(gcd, prime1, prime2, context), ==, 1);
+  munit_assert_int(BN_div(lambda, NULL, phi, gcd, context), ==, 1);
+  munit_assert_int(BN_mod_mul(check, e, private_exponent, lambda, context), ==, 1);
   munit_assert_true(BN_is_one(check));
+  munit_assert_int(BN_cmp(private_exponent, lambda), <, 0);
+  munit_assert_int(BN_set_word(bound, 1), ==, 1);
+  munit_assert_int(BN_lshift(bound, bound, k), ==, 1);
+  munit_assert_int(BN_cmp(private_exponent, bound), >, 0);
+  BN_clear_free(difference);
+  BN_clear_free(bound);
   BN_clear_free(check);
+  BN_clear_free(lambda);
+  BN_clear_free(gcd);
   BN_clear_free(phi);
   BN_clear_free(product);
   BN_clear_free(prime2);
