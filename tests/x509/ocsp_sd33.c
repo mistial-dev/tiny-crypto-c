@@ -79,10 +79,11 @@ static MunitResult captured_responses(const MunitParameter params[], void* user)
         for (size_t j = 0; j < 2; ++j) {
           TC_bytes expected = read_fixture(TC_SD33_OCSP_ROOT, card, names[j], expected_bytes);
           size_t request_work = 20000000, request_length = 0;
-          munit_assert_int(TC_OCSP_request_encode(
-                               certificate, &anchor, hashes[j], (TC_bytes){NULL, 0}, &limits,
-                               &scratch, &request_work,
-                               (TC_buffer){request_bytes, sizeof request_bytes}, &request_length),
+          const TC_OCSP_encode_request encode = {certificate, &anchor, hashes[j],
+                                                 (TC_bytes){NULL, 0}, &limits};
+          munit_assert_int(TC_OCSP_request_encode(&encode, &scratch, &request_work,
+                                                  (TC_buffer){request_bytes, sizeof request_bytes},
+                                                  &request_length),
                            ==, TC_TLV_OK);
           munit_assert_size(request_length, ==, expected.length);
           munit_assert_memory_equal(request_length, request_bytes, expected.data);

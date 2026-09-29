@@ -668,12 +668,17 @@ static uint8_t* der_bytes(uint8_t* out, uint8_t tag, TC_bytes bytes)
   return out + bytes.length;
 }
 
-TC_TLV_result TC_OCSP_request_encode(TC_bytes certificate, const TC_X509_trust_anchor* issuer,
-                                     TC_hash_algorithm hash, TC_bytes nonce,
-                                     const TC_TLV_limits* parsing,
+TC_TLV_result TC_OCSP_request_encode(const TC_OCSP_encode_request* request,
                                      const TC_OCSP_workspace* workspace, size_t* work,
                                      TC_buffer encoded, size_t* length)
 {
+  if (!request)
+    return TC_TLV_ARGUMENT;
+  const TC_bytes certificate = request->certificate;
+  const TC_X509_trust_anchor* issuer = request->issuer;
+  const TC_hash_algorithm hash = request->hash;
+  const TC_bytes nonce = request->nonce;
+  const TC_TLV_limits* parsing = request->parsing;
   tc_hash_info info;
   if (!certificate.data || !issuer || !issuer->name.data || !issuer->public_key.key.data ||
       !parsing || !workspace || !workspace->frames || !workspace->extension_oids || !work ||
@@ -691,6 +696,7 @@ TC_TLV_result TC_OCSP_request_encode(TC_bytes certificate, const TC_X509_trust_a
       !tc_internal_ranges_disjoint(encoded.data, encoded.capacity, issuer->public_key.key.data,
                                    issuer->public_key.key.length) ||
       !tc_internal_ranges_disjoint(encoded.data, encoded.capacity, nonce.data, nonce.length) ||
+      !tc_internal_ranges_disjoint(encoded.data, encoded.capacity, request, sizeof *request) ||
       !tc_internal_ranges_disjoint(encoded.data, encoded.capacity, length, sizeof *length) ||
       !tc_internal_ranges_disjoint(encoded.data, encoded.capacity, work, sizeof *work))
     return TC_TLV_ARGUMENT;
