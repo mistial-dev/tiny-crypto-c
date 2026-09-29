@@ -4,6 +4,8 @@
 #define TC_TEST_OCSP_FIXTURE_H_
 
 #include <tiny_crypto/x509_ocsp.h>
+#include <tiny_crypto/x509_revocation.h>
+#include <tiny_crypto/x509_store.h>
 #include <tiny_crypto/x509_crypto.h>
 #include "munit.h"
 #include <stdio.h>
@@ -108,10 +110,107 @@ static inline void ocsp_assert_wiped(const TC_X509_ocsp_result* result)
   munit_assert_memory_equal(sizeof *result, result, &zero);
 }
 
+/* Entry argument errors leave a result filled with 0x5a unchanged. The
+ * check reads bytes, so padding needs no struct copy. */
+static inline void ocsp_assert_untouched(const TC_X509_ocsp_result* result)
+{
+  const uint8_t* bytes = (const uint8_t*)result;
+  for (size_t i = 0; i < sizeof *result; ++i)
+    munit_assert_uint8(bytes[i], ==, 0x5a);
+}
+
 static inline int ocsp_span_within(TC_bytes inner, TC_bytes outer)
 {
   return inner.data && inner.length && inner.data >= outer.data && inner.length <= outer.length &&
          (size_t)(inner.data - outer.data) <= outer.length - inner.length;
+}
+
+enum { OCSP_CRL_CAPACITY = 2, OCSP_REVOCATION_NODES = 8 };
+
+/* Storage for TC_X509_path_check_revocation. The anchor comes from one
+ * certificate. CRL signers and OCSP delegates are found among the
+ * candidates. The spans borrow caller bytes that stay unchanged. */
+typedef struct {
+  TC_bytes crls[OCSP_CRL_CAPACITY];
+  TC_X509_crl_record records[OCSP_CRL_CAPACITY];
+  TC_X509_crl_index index;
+  TC_X509_store_anchor anchor;
+  TC_bytes candidates[OCSP_PATH_CAPACITY];
+  TC_X509_store_array array;
+  TC_X509_store_source source;
+  TC_X509_path_options signer;
+  TC_bytes search_path[OCSP_PATH_CAPACITY];
+  TC_X509_search_frame search_frames[OCSP_PATH_CAPACITY];
+  TC_X509_search_workspace search;
+  uint8_t states[OCSP_CRL_CAPACITY];
+  TC_X509_revocation_node nodes[OCSP_REVOCATION_NODES];
+  TC_X509_revocation_scope scopes[OCSP_CRL_CAPACITY];
+  TC_bytes signer_path[OCSP_PATH_CAPACITY];
+  TC_bytes signer_policies[OCSP_POLICY_CAPACITY];
+  TC_X509_revocation_workspace workspace;
+} ocsp_revocation;
+
+/* Index crls, publish the anchor and candidates and set a CRL signer policy
+ * at the evaluation time. fixture must already be initialized. */
+static inline void ocsp_revocation_init(ocsp_revocation* revocation, ocsp_fixture* fixture,
+                                        TC_bytes anchor, const TC_bytes* candidates,
+                                        size_t candidate_count, const TC_bytes* crls,
+                                        size_t crl_count, TC_X509_time at)
+{
+  munit_assert_size(candidate_count, <=, OCSP_PATH_CAPACITY);
+  munit_assert_size(crl_count, <=, OCSP_CRL_CAPACITY);
+  memset(revocation, 0, sizeof *revocation);
+  TC_X509_certificate anchor_view;
+  munit_assert_int(TC_X509_read(anchor, &fixture->limits, &fixture->parser, &anchor_view), ==,
+                   TC_TLV_OK);
+  munit_assert_int(TC_X509_store_anchor_from_certificate(&anchor_view, &fixture->limits,
+                                                         &fixture->parser, &revocation->anchor),
+                   ==, TC_TLV_OK);
+  for (size_t i = 0; i < crl_count; ++i)
+    revocation->crls[i] = crls[i];
+  size_t work = 20000000;
+  munit_assert_int(TC_X509_crl_index_init(revocation->crls, crl_count, &fixture->limits,
+                                          &fixture->parser, &work, revocation->records,
+                                          OCSP_CRL_CAPACITY, &revocation->index),
+                   ==, TC_TLV_OK);
+  for (size_t i = 0; i < candidate_count; ++i)
+    revocation->candidates[i] = candidates[i];
+  revocation->array =
+      (TC_X509_store_array){revocation->candidates, candidate_count, &revocation->anchor, 1};
+  munit_assert_int(TC_X509_store_array_source(&revocation->array, &revocation->source), ==,
+                   TC_TLV_OK);
+  revocation->signer.at = at;
+  revocation->signer.parsing = fixture->limits;
+  revocation->signer.max_certificates = OCSP_PATH_CAPACITY;
+  revocation->signer.max_input = OCSP_PATH_CAPACITY * OCSP_FILE_CAPACITY;
+  revocation->signer.max_work = 20000000;
+  revocation->signer.signatures = fixture->signatures;
+  revocation->search = (TC_X509_search_workspace){revocation->search_path,
+                                                  revocation->search_frames, OCSP_PATH_CAPACITY};
+  revocation->workspace = (TC_X509_revocation_workspace){
+      &fixture->workspace, &revocation->search,         revocation->states,
+      OCSP_CRL_CAPACITY,   revocation->nodes,           OCSP_REVOCATION_NODES,
+      revocation->scopes,  OCSP_CRL_CAPACITY,           revocation->signer_path,
+      OCSP_PATH_CAPACITY,  revocation->signer_policies, OCSP_POLICY_CAPACITY};
+}
+
+/* Complete CRLs in thisUpdate order, 300 s of skew and one OCSP span per
+ * path member. responses may be NULL for CRLs only. */
+static inline TC_X509_revocation_options ocsp_revocation_options(const ocsp_revocation* revocation,
+                                                                 TC_X509_time at,
+                                                                 const TC_bytes* responses,
+                                                                 size_t count)
+{
+  const TC_X509_revocation_options options = {&revocation->index,
+                                              &revocation->source,
+                                              &revocation->signer,
+                                              0,
+                                              4 * OCSP_FILE_CAPACITY,
+                                              TC_X509_CRL_COMPLETE_ONLY,
+                                              TC_X509_CRL_ORDER_THIS_UPDATE,
+                                              {at, 300, 0},
+                                              {responses, responses ? count : 0, 16, 4}};
+  return options;
 }
 
 #endif

@@ -14,7 +14,7 @@ add_library(consumer_example_impl STATIC example/x509_client.c example/cms_reade
   example/cms_validate.c example/credential_object.c
   example/rsa_encrypt.c example/twic_ccl_storage.c example/twic_ccl_import.c
   example/card_key_policy.c example/credential_auth.c example/credential_validate.c
-  example/credential_io.c example/pki_input.c)
+  example/credential_io.c example/pki_input.c example/x509_ocsp.c)
 target_sources(consumer_example_impl PRIVATE example/credential_workflow.c)
 set_target_properties(consumer_example_impl PROPERTIES C_STANDARD 99
   C_STANDARD_REQUIRED ON C_EXTENSIONS OFF)
@@ -23,6 +23,13 @@ target_link_libraries(consumer_example_impl PUBLIC tiny-crypto-c::tiny-crypto-c)
 add_executable(consumer_example example.c)
 target_link_libraries(consumer_example PRIVATE consumer_example_impl)
 add_test(NAME consumer_example COMMAND consumer_example)
+add_executable(consumer_ocsp ocsp.c)
+target_link_libraries(consumer_ocsp PRIVATE consumer_example_impl)
+target_compile_definitions(consumer_ocsp PRIVATE
+  OCSP_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/ocsp")
+set_target_properties(consumer_ocsp PROPERTIES C_STANDARD 99
+  C_STANDARD_REQUIRED ON C_EXTENSIONS OFF)
+add_test(NAME consumer_ocsp COMMAND consumer_ocsp)
 add_executable(cms_check example/cms_check.c)
 target_link_libraries(cms_check PRIVATE consumer_example_impl)
 set_target_properties(cms_check PROPERTIES C_STANDARD 99

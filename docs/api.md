@@ -94,7 +94,8 @@ results share `TC_X509_revocation_status` and the freshness rule of
 response per path member and falls back to CRLs for a member without an
 accepted response. It accepts a delegate without nocheck only when the CRL
 index proves that delegate unrevoked. The CMS and credential validation APIs
-use CRL evidence only.
+use CRL evidence only. See [X.509 OCSP](x509-ocsp.md) for request encoding,
+responder authorization, workspace sizing and the example.
 
 PIV/TWIC object policy and the final access decision require their own checks.
 Select compatibility options explicitly, including TWIC signed/unsigned CHUID

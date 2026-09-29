@@ -19,6 +19,7 @@ run("${CMAKE_COMMAND}" -S "${SOURCE_DIR}" -B "${BINARY_DIR}/library"
   -DTINY_CRYPTO_ENABLE_KEY_CHALLENGE=ON
   -DTINY_CRYPTO_ENABLE_X509_PATH=ON
   -DTINY_CRYPTO_ENABLE_X509_REVOCATION=ON
+  -DTINY_CRYPTO_ENABLE_X509_OCSP=ON -DTINY_CRYPTO_ENABLE_SHA1=ON
   -DTINY_CRYPTO_ENABLE_CMS=ON
   -DTINY_CRYPTO_ENABLE_PIV_OIDS=ON
   -DTINY_CRYPTO_ENABLE_CMS_VALIDATION=ON
@@ -112,7 +113,12 @@ file(COPY "${SOURCE_DIR}/examples/x509_client.c" "${SOURCE_DIR}/examples/x509_cl
   "${SOURCE_DIR}/examples/twic_ccl_storage.c" "${SOURCE_DIR}/examples/twic_ccl_storage.h"
   "${SOURCE_DIR}/examples/twic_ccl_import.c" "${SOURCE_DIR}/examples/twic_ccl_import.h"
   "${SOURCE_DIR}/examples/credential_workflow.c" "${SOURCE_DIR}/examples/credential_workflow.h"
+  "${SOURCE_DIR}/examples/x509_ocsp.c" "${SOURCE_DIR}/examples/x509_ocsp.h"
   DESTINATION "${BINARY_DIR}/consumer-source/example")
+file(COPY "${SOURCE_DIR}/tests/vectors/x509/ocsp/local/ca.der"
+  "${SOURCE_DIR}/tests/vectors/x509/ocsp/local/target.der"
+  "${SOURCE_DIR}/tests/vectors/x509/ocsp/local/revoked_key_compromise.der"
+  DESTINATION "${BINARY_DIR}/consumer-source/ocsp")
 set(consumer_compiler_options)
 if(CXX_COMPILER)
   list(APPEND consumer_compiler_options "-DCMAKE_CXX_COMPILER=${CXX_COMPILER}")

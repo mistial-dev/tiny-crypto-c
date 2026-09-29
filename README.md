@@ -193,6 +193,8 @@ The three `TINY_CRYPTO_TAF_*` choices follow the trust-anchor-format switch
 under `AUTO`. At least one choice must be enabled when the format is enabled.
 See [Trust anchors](docs/x509-trust-anchors.md) for importing authenticated
 lists and applying their constraints.
+See [X.509 OCSP](docs/x509-ocsp.md) for OCSP requests, response verification
+and responder authorization.
 
 ### Modes and implementation choices
 

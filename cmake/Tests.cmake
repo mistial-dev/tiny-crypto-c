@@ -740,7 +740,8 @@ add_test(NAME test_package_boundaries
   tc_add_c_test(test_key_challenge_rsa tiny-crypto-c-test-pki-native
     tests/x509/key_challenge_rsa.c)
   tc_add_c_test(test_x509_native_sizes tiny-crypto-c-test-pki-native tests/x509/native_sizes.c)
-  tc_add_c_test(test_x509_ocsp_sd33 tiny-crypto-c-test-pki-native tests/x509/ocsp_sd33.c)
+  tc_add_c_test(test_x509_ocsp_sd33 tiny-crypto-c-test-pki-native tests/x509/ocsp_sd33.c
+    examples/x509_ocsp.c)
   target_compile_definitions(test_x509_ocsp_sd33 PRIVATE
     TC_SD33_OCSP_ROOT="${PROJECT_SOURCE_DIR}/tests/vectors/x509/ocsp/sd33"
     TC_SD33_CERT_ROOT="${PROJECT_SOURCE_DIR}/tests/vectors/x509/piv/sd33")
@@ -931,6 +932,9 @@ add_test(NAME test_package_boundaries
     target_sources(test_x509_openssl PRIVATE examples/x509_client.c)
     target_link_libraries(test_x509_openssl PRIVATE OpenSSL::Crypto)
     set_property(TARGET test_x509_openssl PROPERTY NO_SYSTEM_FROM_IMPORTED TRUE)
+    tc_add_c_test(test_x509_ocsp_openssl tiny-crypto-c-test-pki-native tests/x509/ocsp_openssl.c)
+    target_link_libraries(test_x509_ocsp_openssl PRIVATE OpenSSL::Crypto)
+    set_property(TARGET test_x509_ocsp_openssl PROPERTY NO_SYSTEM_FROM_IMPORTED TRUE)
   endif()
   tc_add_c_test(test_unicode tiny-crypto-c-test-pki tests/unicode/test.c)
   set(TINY_CRYPTO_TEST_UNICODE_DIR "" CACHE PATH "Unicode 3.2 data and RFC 3454/4518 reference directory")
@@ -1073,6 +1077,20 @@ add_test(NAME test_package_boundaries
     target_compile_options(fuzz_pki PRIVATE -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer)
     target_link_options(fuzz_pki PRIVATE -fsanitize=fuzzer,address,undefined)
     tc_warnings(fuzz_pki)
+    get_target_property(ocsp_fuzz_sources tiny-crypto-c-test-pki-native SOURCES)
+    get_target_property(ocsp_fuzz_definitions tiny-crypto-c-test-pki-native COMPILE_DEFINITIONS)
+    add_executable(fuzz_ocsp tests/x509/fuzz_ocsp.c ${ocsp_fuzz_sources})
+    target_include_directories(fuzz_ocsp PRIVATE src tests/support)
+    target_compile_definitions(fuzz_ocsp PRIVATE ${ocsp_fuzz_definitions}
+      TC_OCSP_FUZZ_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/x509/ocsp/icam")
+    target_compile_options(fuzz_ocsp PRIVATE -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer)
+    target_link_options(fuzz_ocsp PRIVATE -fsanitize=fuzzer,address,undefined)
+    tc_warnings(fuzz_ocsp)
+    # Replay the checked-in OCSP fixtures once as the regression corpus.
+    add_test(NAME test_fuzz_ocsp_fixtures COMMAND fuzz_ocsp -runs=0
+      ${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/x509/ocsp/icam
+      ${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/x509/ocsp/local
+      ${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/x509/ocsp/sd33)
     get_target_property(sm_fuzz_sources tiny-crypto-c-test-piv-sm SOURCES)
     get_target_property(sm_fuzz_definitions tiny-crypto-c-test-piv-sm COMPILE_DEFINITIONS)
     add_executable(fuzz_piv_sm tests/piv/sm_fuzz.c ${sm_fuzz_sources})

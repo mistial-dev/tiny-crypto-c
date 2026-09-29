@@ -59,7 +59,8 @@ Set `ocsp.responses` to an array with one DER OCSPResponse span per path
 member, in chain order, and `ocsp.count` to the path length. An empty span means
 no response for that member. `max_responses` and `max_certificates` bound each
 response as in `TC_X509_ocsp_verify_request`. Leave `ocsp` zeroed to use CRLs
-only.
+only. [X.509 OCSP](x509-ocsp.md) describes response verification and responder
+authorization.
 
 Each response is verified with `TC_X509_ocsp_response_verify` against the
 member's issuer: the selected anchor for the first member and the previous

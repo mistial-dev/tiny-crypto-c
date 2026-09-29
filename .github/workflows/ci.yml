@@ -207,7 +207,7 @@ jobs:
       - name: Build
         run: >-
           cmake --build build-parser --target
-          fuzz_tlv fuzz_pki fuzz_piv_sm fuzz_gzip
+          fuzz_tlv fuzz_pki fuzz_piv_sm fuzz_gzip fuzz_ocsp
           test_tlv_corpus_reader test_x509_reader test_piv_cvc test_piv_chuid
           test_x509_key test_eac_cvc test_eac_reader --parallel 4
       - name: External length cases
@@ -222,3 +222,10 @@ jobs:
         run: build-parser/fuzz_piv_sm -max_total_time=60 -max_len=8192 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"
       - name: Fuzz certificate decompression
         run: build-parser/fuzz_gzip -max_total_time=60 -max_len=8192 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"
+      - name: Replay OCSP fixtures
+        run: ctest --test-dir build-parser -R test_fuzz_ocsp_fixtures --output-on-failure
+      - name: Fuzz OCSP responses and requests
+        run: |
+          mkdir -p "$RUNNER_TEMP/ocsp-corpus"
+          cp tests/vectors/x509/ocsp/*/*.der "$RUNNER_TEMP/ocsp-corpus/"
+          build-parser/fuzz_ocsp "$RUNNER_TEMP/ocsp-corpus" -max_total_time=60 -max_len=8192 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"

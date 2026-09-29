@@ -90,11 +90,11 @@ GitHub Actions runs these configurations:
 | Push `host` (macOS, Windows)       | Release, no OpenSSL                                                                        | every configured test except the OpenSSL cross-checks                       |
 | Push `extended`                    | `make test-sanitize TINY_CRYPTO_TEST_OPENSSL=ON`, `make test-msan` (Clang)                 | tests without the `extended` label                                          |
 | Push `esp32p4`                     | ESP-IDF 5.5.1                                                                              | builds for both roles and for the `signed-rsa` and `signed-ecdsa` fragments |
-| Push `parser`                      | Clang fuzzers                                                                              | fixed fuzzing time for each harness with an empty seed corpus               |
+| Push `parser`                      | Clang fuzzers                                                                              | fixed fuzzing time for each harness, OCSP seeded from its fixtures          |
 | Manual **Full test suite**         | `make test-full` and `make test-sanitize-full` with OpenSSL, `make test-msan-full` (Clang) | every configured test, including CAVP                                       |
 
-Push CI omits the `TINY_CRYPTO_TEST_FULL` CAVP suites, fuzz regression replay,
-and the external capture corpora described below.
+Push CI omits the `TINY_CRYPTO_TEST_FULL` CAVP suites, fuzz regression replay
+other than the OCSP fixtures, and the external capture corpora described below.
 
 Use `act` to run the push sanitizer checks in Linux. `--bind` includes current
 working tree changes:
@@ -530,6 +530,17 @@ response that only OCSP can supply, fallback to CRLs for unknown and stale
 responses, OCSP argument checks, response overlap with scratch, and short work
 budgets. CRL freshness tests pin the clock-skew and max-age boundaries in
 `test_x509_crl` and through the public path check.
+`test_x509_ocsp_sd33` verifies the NIST SD 33 captured responses, compares
+encoded requests with OpenSSL-generated ones and runs `examples/x509_ocsp.c`.
+With `TINY_CRYPTO_TEST_OPENSSL=ON`, `test_x509_ocsp_openssl` generates P-256
+responses at run time. It covers issuer-signed byName and byKey responses,
+embedded and store-supplied delegates with and without nocheck, and delegates
+rejected for a missing or wrong EKU, anyExtendedKeyUsage, another issuer, a
+bad certificate signature, expiry, a key usage without digitalSignature and an
+unknown critical extension. It also covers SHA-256, SHA-384 and SHA-512
+CertIDs, duplicate SingleResponses, critical extensions, nonce round trips
+through OpenSSL and nonce bounds, unsuccessful response statuses, work budgets
+across every verification stage and CRL fallback in the path check.
 
 Run the focused certificate-iterator and revocation-workspace tests with:
 
@@ -955,13 +966,19 @@ ctest --test-dir build -R '^test_piv_(cvc_corpus|sm_authenticate)$' --output-on-
 
 Fuzzing runs separately from CTest. Use Clang with libFuzzer support and keep
 the writable corpus and crash artifacts outside the source tree.
-CI builds all four harnesses and runs each for 60 seconds with an 8192-byte input
-limit and a two-second per-input timeout.
+CI builds all five harnesses and runs each for 60 seconds with an 8192-byte input
+limit and a two-second per-input timeout. The OCSP harness starts from the
+fixtures in `tests/vectors/x509/ocsp`, and `test_fuzz_ocsp_fixtures` replays
+them once under CTest in the fuzzer build.
 On macOS, use Homebrew LLVM if the Apple toolchain lacks the libFuzzer runtime.
 Set the C and C++ compiler paths to its `clang` and `clang++` executables.
 The SM harness tests raw malformed responses and builds authenticated CS2/CS7
 responses from fuzz input to exercise decryption, invalid padding, and
 output-buffer retries.
+The OCSP harness verifies each input as a response for the ICAM fixture
+certificates, with a store delegate and a full and a small work budget. It
+requires zeroed results on failure and borrowed responder spans on success. It
+also encodes a request for each input as a certificate with varied capacity.
 The GZIP harness checks decoding with varied capacity and work limits, including
 failure wiping, workspace cleanup and output boundaries.
 The PKI harness includes all three PIV certificate-container profiles. It checks
@@ -977,9 +994,11 @@ BER OCTET STRING. Fragmented content exercises caller-buffer assembly.
 cmake -S . -B /tmp/tiny-crypto-fuzz \
   -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
   -DTINY_CRYPTO_BUILD_FUZZERS=ON
-cmake --build /tmp/tiny-crypto-fuzz --target fuzz_tlv fuzz_pki fuzz_piv_sm fuzz_gzip --parallel
+cmake --build /tmp/tiny-crypto-fuzz --target fuzz_tlv fuzz_pki fuzz_piv_sm fuzz_gzip \
+  fuzz_ocsp --parallel
 fuzz_dir=$(mktemp -d /tmp/tiny-crypto-fuzz-inputs.XXXXXX)
-mkdir "$fuzz_dir/tlv" "$fuzz_dir/pki" "$fuzz_dir/sm" "$fuzz_dir/gzip"
+mkdir "$fuzz_dir/tlv" "$fuzz_dir/pki" "$fuzz_dir/sm" "$fuzz_dir/gzip" "$fuzz_dir/ocsp"
+cp tests/vectors/x509/ocsp/*/*.der "$fuzz_dir/ocsp/"
 /tmp/tiny-crypto-fuzz/fuzz_tlv "$fuzz_dir/tlv" \
   -artifact_prefix="$fuzz_dir/" -max_total_time=300
 /tmp/tiny-crypto-fuzz/fuzz_pki "$fuzz_dir/pki" \
@@ -987,6 +1006,8 @@ mkdir "$fuzz_dir/tlv" "$fuzz_dir/pki" "$fuzz_dir/sm" "$fuzz_dir/gzip"
 /tmp/tiny-crypto-fuzz/fuzz_piv_sm "$fuzz_dir/sm" \
   -artifact_prefix="$fuzz_dir/" -max_total_time=300
 /tmp/tiny-crypto-fuzz/fuzz_gzip "$fuzz_dir/gzip" \
+  -artifact_prefix="$fuzz_dir/" -max_total_time=300
+/tmp/tiny-crypto-fuzz/fuzz_ocsp "$fuzz_dir/ocsp" \
   -artifact_prefix="$fuzz_dir/" -max_total_time=300
 ```
 

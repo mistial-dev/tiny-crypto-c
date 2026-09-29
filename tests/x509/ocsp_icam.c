@@ -204,11 +204,10 @@ static void verify_argument(const TC_X509_trust_anchor* anchor, const TC_X509_st
   size_t work = 20000000;
   TC_X509_ocsp_result result;
   memset(&result, 0x5a, sizeof result);
-  const TC_X509_ocsp_result saved = result;
   munit_assert_int(TC_X509_ocsp_response_verify(&request, &fixture.workspace, &work, &result), ==,
                    TC_TLV_ARGUMENT);
   if (expected_work) {
-    munit_assert_memory_equal(sizeof result, &result, &saved);
+    ocsp_assert_untouched(&result);
     munit_assert_size(work, ==, expected_work);
   } else
     ocsp_assert_wiped(&result);
@@ -368,32 +367,11 @@ static MunitResult local_responses(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-/* Storage for TC_X509_path_check_revocation over the ICAM path Root CA ->
- * Signing CA (issuer.der) -> member. The Root CA is the anchor. CRL signers
- * are found among the candidates, so both CA certificates are candidates. */
-typedef struct {
-  uint8_t root_bytes[OCSP_FILE_CAPACITY];
-  uint8_t crl_bytes[2][OCSP_FILE_CAPACITY];
-  TC_bytes crls[2];
-  TC_X509_crl_record records[2];
-  TC_X509_crl_index index;
-  TC_X509_store_anchor anchor;
-  TC_bytes candidates[2];
-  TC_X509_store_array array;
-  TC_X509_store_source source;
-  TC_X509_path_options signer;
-  TC_bytes search_path[OCSP_PATH_CAPACITY];
-  TC_X509_search_frame search_frames[OCSP_PATH_CAPACITY];
-  TC_X509_search_workspace search;
-  uint8_t states[2];
-  TC_X509_revocation_node nodes[8];
-  TC_X509_revocation_scope scopes[2];
-  TC_bytes signer_path[OCSP_PATH_CAPACITY];
-  TC_bytes signer_policies[OCSP_POLICY_CAPACITY];
-  TC_X509_revocation_workspace workspace;
-} revocation_fixture;
-
-static revocation_fixture revocation;
+/* The ICAM path is Root CA -> Signing CA (issuer.der) -> member, with the
+ * Root CA as anchor. CRL signers are found among the candidates, so both CA
+ * certificates are candidates. */
+static uint8_t root_bytes[OCSP_FILE_CAPACITY], crl_bytes[2][OCSP_FILE_CAPACITY];
+static ocsp_revocation revocation;
 
 /* The Root CA CRL is always indexed. with_crl adds the Signing CA's Gen3
  * CRL, which is signed by issuer.der, lists no revoked certificates and has
@@ -401,56 +379,18 @@ static revocation_fixture revocation;
 static void revocation_init(int with_crl, TC_X509_time at)
 {
   ocsp_fixture_init(&fixture);
-  memset(&revocation, 0, sizeof revocation);
-  const TC_bytes root = ocsp_read_path(TC_ICAM_ROOT_CA, revocation.root_bytes);
-  const TC_bytes issuer = ocsp_read_path(TC_ICAM_OCSP_ROOT "/issuer.der", issuer_bytes);
-  TC_X509_certificate root_view;
-  munit_assert_int(TC_X509_read(root, &fixture.limits, &fixture.parser, &root_view), ==, TC_TLV_OK);
-  munit_assert_int(TC_X509_store_anchor_from_certificate(&root_view, &fixture.limits,
-                                                         &fixture.parser, &revocation.anchor),
-                   ==, TC_TLV_OK);
-  revocation.crls[0] = ocsp_read_path(TC_ICAM_ROOT_CRL, revocation.crl_bytes[0]);
-  if (with_crl)
-    revocation.crls[1] = ocsp_read_path(TC_ICAM_GEN3_CRL, revocation.crl_bytes[1]);
-  size_t work = 20000000;
-  munit_assert_int(TC_X509_crl_index_init(revocation.crls, with_crl ? 2 : 1, &fixture.limits,
-                                          &fixture.parser, &work, revocation.records, 2,
-                                          &revocation.index),
-                   ==, TC_TLV_OK);
-  revocation.candidates[0] = root;
-  revocation.candidates[1] = issuer;
-  revocation.array = (TC_X509_store_array){revocation.candidates, 2, &revocation.anchor, 1};
-  munit_assert_int(TC_X509_store_array_source(&revocation.array, &revocation.source), ==,
-                   TC_TLV_OK);
-  revocation.signer.at = at;
-  revocation.signer.parsing = fixture.limits;
-  revocation.signer.max_certificates = OCSP_PATH_CAPACITY;
-  revocation.signer.max_input = OCSP_PATH_CAPACITY * OCSP_FILE_CAPACITY;
-  revocation.signer.max_work = 20000000;
-  revocation.signer.signatures = fixture.signatures;
-  revocation.search = (TC_X509_search_workspace){revocation.search_path, revocation.search_frames,
-                                                 OCSP_PATH_CAPACITY};
-  revocation.workspace =
-      (TC_X509_revocation_workspace){&fixture.workspace,         &revocation.search,
-                                     revocation.states,          2,
-                                     revocation.nodes,           8,
-                                     revocation.scopes,          2,
-                                     revocation.signer_path,     OCSP_PATH_CAPACITY,
-                                     revocation.signer_policies, OCSP_POLICY_CAPACITY};
+  const TC_bytes root = ocsp_read_path(TC_ICAM_ROOT_CA, root_bytes);
+  const TC_bytes candidates[] = {root,
+                                 ocsp_read_path(TC_ICAM_OCSP_ROOT "/issuer.der", issuer_bytes)};
+  const TC_bytes crls[] = {ocsp_read_path(TC_ICAM_ROOT_CRL, crl_bytes[0]),
+                           with_crl ? ocsp_read_path(TC_ICAM_GEN3_CRL, crl_bytes[1])
+                                    : (TC_bytes){NULL, 0}};
+  ocsp_revocation_init(&revocation, &fixture, root, candidates, 2, crls, with_crl ? 2 : 1, at);
 }
 
 static TC_X509_revocation_options revocation_options(TC_X509_time at, const TC_bytes* responses)
 {
-  const TC_X509_revocation_options options = {&revocation.index,
-                                              &revocation.source,
-                                              &revocation.signer,
-                                              0,
-                                              4 * OCSP_FILE_CAPACITY,
-                                              TC_X509_CRL_COMPLETE_ONLY,
-                                              TC_X509_CRL_ORDER_THIS_UPDATE,
-                                              {at, 300, 0},
-                                              {responses, responses ? 2 : 0, 16, 4}};
-  return options;
+  return ocsp_revocation_options(&revocation, at, responses, 2);
 }
 
 /* Check the path Signing CA -> member. responses[0] is empty, so the

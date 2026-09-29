@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "ocsp_fixture.h"
+#include "../../examples/x509_ocsp.h"
 
 static const TC_X509_time captured_at = {2026, 9, 28, 6, 0, 0};
 
@@ -122,15 +123,14 @@ static MunitResult time_arguments(const MunitParameter params[], void* user)
       read_fixture(TC_SD33_CERT_ROOT, 1, "piv_auth_cert", certificate_bytes);
   TC_X509_ocsp_verify_request request = ocsp_request(
       &fixture, (TC_bytes){unavailable, sizeof unavailable}, certificate, &anchor, captured_at);
-  TC_X509_ocsp_result result, saved;
+  TC_X509_ocsp_result result;
   memset(&result, 0x5a, sizeof result);
-  saved = result;
   size_t work = 20000000;
 
   request.time.at = (TC_X509_time){2026, 13, 1, 0, 0, 0};
   munit_assert_int(TC_X509_ocsp_response_verify(&request, &fixture.workspace, &work, &result), ==,
                    TC_TLV_ARGUMENT);
-  munit_assert_memory_equal(sizeof result, &result, &saved);
+  ocsp_assert_untouched(&result);
   munit_assert_size(work, ==, 20000000);
   request.time.at = captured_at;
   munit_assert_int(TC_X509_ocsp_response_verify(&request, &fixture.workspace, &work, &result), ==,
@@ -227,12 +227,90 @@ static MunitResult request_sizing(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+static ExampleX509Workspace example_storage;
+
+/* The example encodes a nonce request and maps each verification status. */
+static MunitResult example(const MunitParameter params[], void* user)
+{
+  uint8_t nonce[EXAMPLE_OCSP_NONCE_LENGTH], encoded[EXAMPLE_OCSP_REQUEST_CAPACITY];
+  (void)params;
+  (void)user;
+  ocsp_fixture_init(&fixture);
+  const TC_X509_trust_anchor anchor =
+      ocsp_read_anchor(&fixture, TC_SD33_OCSP_ROOT "/card04_issuer.der", issuer_bytes);
+  const TC_bytes certificate =
+      read_fixture(TC_SD33_CERT_ROOT, 4, "piv_auth_cert", certificate_bytes);
+  for (size_t i = 0; i < sizeof nonce; ++i)
+    nonce[i] = (uint8_t)(0x30 + i);
+  size_t length = 0;
+  munit_assert_int(example_ocsp_request(certificate, &anchor, nonce, &example_storage,
+                                        (TC_buffer){NULL, 0}, &length),
+                   ==, TC_TLV_LIMIT);
+  munit_assert_size(length, >, 0);
+  munit_assert_size(length, <=, sizeof encoded);
+  munit_assert_int(example_ocsp_request(certificate, &anchor, nonce, &example_storage,
+                                        (TC_buffer){encoded, sizeof encoded}, &length),
+                   ==, TC_TLV_OK);
+  munit_assert_memory_equal(sizeof nonce, encoded + length - sizeof nonce, nonce);
+
+  /* The captured responses were produced without a nonce. */
+  ExampleOcspCheck check = {
+      certificate, &anchor,
+      {NULL, 0},   read_fixture(TC_SD33_OCSP_ROOT, 4, "response", response_bytes),
+      captured_at, &fixture.signatures,
+      NULL};
+  TC_X509_ocsp_result result;
+  munit_assert_int(example_ocsp_check(&check, &example_storage, &result), ==, EXAMPLE_OCSP_GOOD);
+  munit_assert_int(result.status, ==, TC_X509_REVOCATION_GOOD);
+  munit_assert_true(result.responder_nocheck);
+  check.nonce = (TC_bytes){nonce, sizeof nonce};
+  munit_assert_int(example_ocsp_check(&check, &example_storage, &result), ==,
+                   EXAMPLE_OCSP_REJECTED);
+  ocsp_assert_wiped(&result);
+  check.nonce = (TC_bytes){NULL, 0};
+  check.at = (TC_X509_time){2027, 1, 1, 0, 0, 0};
+  munit_assert_int(example_ocsp_check(&check, &example_storage, &result), ==,
+                   EXAMPLE_OCSP_REJECTED);
+  static const uint8_t try_later[] = {0x30, 0x03, 0x0a, 0x01, 0x03};
+  check.at = captured_at;
+  check.response = (TC_bytes){try_later, sizeof try_later};
+  munit_assert_int(example_ocsp_check(&check, &example_storage, &result), ==,
+                   EXAMPLE_OCSP_NO_DECISION);
+  check.response = (TC_bytes){NULL, 0};
+  munit_assert_int(example_ocsp_check(&check, &example_storage, &result), ==, EXAMPLE_OCSP_ERROR);
+  ocsp_assert_wiped(&result);
+  memset(&result, 0x5a, sizeof result);
+  munit_assert_int(example_ocsp_check(NULL, &example_storage, &result), ==, EXAMPLE_OCSP_ERROR);
+  ocsp_assert_untouched(&result);
+
+  /* The example storage and work limit cover every SD 33 issuer, including
+   * RSA 4096 (card02). */
+  const unsigned cards[] = {1, 2, 3, 10};
+  for (size_t i = 0; i < sizeof cards / sizeof *cards; ++i) {
+    char path[512];
+    munit_assert_int(
+        snprintf(path, sizeof path, "%s/card%02u_issuer.der", TC_SD33_OCSP_ROOT, cards[i]), >, 0);
+    const TC_X509_trust_anchor issuer = ocsp_read_anchor(&fixture, path, issuer_bytes);
+    check.issuer = &issuer;
+    check.certificate =
+        read_fixture(TC_SD33_CERT_ROOT, cards[i], "piv_auth_cert", certificate_bytes);
+    check.response = read_fixture(TC_SD33_OCSP_ROOT, cards[i], "response", response_bytes);
+    const ExampleOcspStatus status = example_ocsp_check(&check, &example_storage, &result);
+    const int unchecked_delegate = result.responder_certificate.data && !result.responder_nocheck;
+    munit_assert_int(status, ==,
+                     unchecked_delegate ? EXAMPLE_OCSP_CHECK_RESPONDER : EXAMPLE_OCSP_GOOD);
+    munit_assert_int(result.status, ==, TC_X509_REVOCATION_GOOD);
+  }
+  return MUNIT_OK;
+}
+
 int main(int argc, char** argv)
 {
   MunitTest tests[] = {
       {"/captured-responses", captured_responses, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/time-arguments", time_arguments, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/request-sizing", request_sizing, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/example", example, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
   MunitSuite suite = {"/x509/ocsp/sd33", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};
   return munit_suite_main(&suite, NULL, argc, argv);
