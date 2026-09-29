@@ -7,18 +7,113 @@
 #include "cms_base_internal.h"
 #include "pki_internal.h"
 #include "x509_time_internal.h"
-#include "pki_children_internal.h"
+#include "pki_budget_internal.h"
 #include "pki_octets_internal.h"
 #include "pki_tree_internal.h"
 #include "pki_storage_internal.h"
 #include "pki_reader_internal.h"
 #include "cms_digest_internal.h"
-#include "pki_octets_hash_internal.h"
+#include "hash_dispatch_internal.h"
 #include "cms_signature_internal.h"
 #include "pki_status_internal.h"
 #include "pki_hash_parts_internal.h"
 
 static const uint8_t cms_data_oid[] = {0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 1, 7, 1};
+
+typedef struct {
+  TC_bytes input;
+  TC_TLV_element* fields;
+  size_t capacity, count, roots;
+  int overflow;
+} cms_fields_state;
+
+/* Record each depth-1 field. BEGIN fixes the start, CLOSE fixes the end, so
+ * a BER end-of-contents marker belongs to encoded and stays out of value. */
+static void cms_fields_visit(void* user, const TC_TLV_event* event)
+{
+  cms_fields_state* state = user;
+  TC_TLV_element* field;
+  if (event->kind == TC_TLV_BEGIN && event->depth == 0)
+    ++state->roots;
+  if (event->depth != 1 || state->overflow)
+    return;
+  if (event->kind == TC_TLV_BEGIN) {
+    if (state->count == state->capacity) {
+      state->overflow = 1;
+      return;
+    }
+    field = &state->fields[state->count++];
+    field->header = event->header;
+    field->encoded = (TC_bytes){state->input.data + event->offset, 0};
+    field->value = (TC_bytes){field->encoded.data + event->header.header_length, 0};
+  } else if (event->kind == TC_TLV_CLOSE && state->count) {
+    field = &state->fields[state->count - 1];
+    field->value.length = (size_t)(state->input.data + event->offset - field->value.data);
+    field->encoded.length =
+        (size_t)(state->input.data + event->offset - field->encoded.data) + event->bytes.length;
+  }
+}
+
+/* Collect the immediate BER fields of one constructed value with the given
+ * tag while validating the whole value. capacity covers the largest schema
+ * read with it, so more fields are malformed input and return INVALID. fields may
+ * change on failure. count changes only on OK. Spans borrow encoded. */
+static TC_TLV_result cms_fields(TC_bytes encoded, unsigned tag, const TC_TLV_limits* limits,
+                                const tc_pki_tree_workspace* tree, TC_TLV_element* fields,
+                                size_t capacity, size_t* count)
+{
+  TC_TLV_element root;
+  cms_fields_state state = {encoded, fields, capacity, 0, 0, 0};
+  TC_TLV_result result =
+      TC_TLV_header_read(encoded.data, encoded.length, TC_TLV_BER, limits, &root.header);
+  if (result != TC_TLV_OK)
+    return result;
+  if (!root.header.constructed || !tc_pki_tag(&root, tag))
+    return TC_TLV_INVALID;
+  if (tc_pki_work_charge(tree->work, encoded.length) != TC_TLV_OK)
+    return TC_TLV_LIMIT;
+  result = TC_TLV_walk(encoded.data, encoded.length, TC_TLV_BER, limits,
+                       (TC_TLV_frames){tree->frames, tree->capacity}, cms_fields_visit, &state);
+  if (result != TC_TLV_OK)
+    return result;
+  if (state.roots != 1 || state.overflow)
+    return TC_TLV_INVALID;
+  *count = state.count;
+  return TC_TLV_OK;
+}
+
+typedef struct {
+  TC_hash_algorithm algorithm;
+  TC_hash_context* workspace;
+  size_t* work;
+} cms_octets_hash_state;
+
+static TC_TLV_result cms_octets_hash_update(void* context, TC_bytes bytes)
+{
+  cms_octets_hash_state* state = context;
+  if (tc_pki_work_charge(state->work, bytes.length) != TC_TLV_OK)
+    return TC_TLV_LIMIT;
+  return tc_hash_update(state->algorithm, state->workspace, bytes) == TC_OK ? TC_TLV_OK
+                                                                            : TC_TLV_INVALID;
+}
+
+/* Hash BER OCTET STRING value bytes in place, without flattening constructed
+ * content. digest receives the selected hash's output size and is written only
+ * on OK. workspace is wiped on return. Callers check that algorithm is
+ * available. All writable storage is disjoint from encoded and each other. */
+static TC_TLV_result cms_octets_hash(TC_bytes encoded, const TC_TLV_limits* limits,
+                                     const tc_pki_tree_workspace* tree, TC_hash_algorithm algorithm,
+                                     TC_hash_context* workspace, uint8_t* digest)
+{
+  cms_octets_hash_state state = {algorithm, workspace, tree->work};
+  TC_TLV_result result = TC_TLV_INVALID;
+  if (tc_hash_init(algorithm, workspace) == TC_OK)
+    result = tc_pki_octets(encoded, TC_TLV_BER, limits, tree, cms_octets_hash_update, &state);
+  if (result == TC_TLV_OK && tc_hash_final(algorithm, workspace, digest) != TC_OK)
+    result = TC_TLV_INVALID;
+  TC_secure_zero(workspace, sizeof *workspace);
+  return result;
+}
 
 TC_TLV_result tc_cms_signed_data_check(const TC_CMS_signed_data* input, const TC_TLV_limits* limits,
                                        const tc_pki_tree_workspace* tree, size_t signer_index,
@@ -218,7 +313,7 @@ TC_TLV_result tc_cms_hash_content(TC_bytes input, TC_CMS_content_encoding encodi
   if (!tc_hash_available(algorithm))
     return TC_TLV_UNSUPPORTED;
   if (encoding == TC_CMS_CONTENT_BER_OCTETS)
-    return tc_pki_octets_hash(input, TC_TLV_BER, limits, tree, algorithm, scratch, digest);
+    return cms_octets_hash(input, limits, tree, algorithm, scratch, digest);
   if (encoding != TC_CMS_CONTENT_RAW)
     return TC_TLV_ARGUMENT;
   return tc_pki_hash_parts(&input, 1, algorithm, limits, tree, scratch, digest);
@@ -346,9 +441,9 @@ TC_TLV_result TC_CMS_content_digest(TC_bytes encoded, TC_hash_algorithm algorith
     return TC_TLV_UNSUPPORTED;
   if (digest_capacity < info.digest_length)
     return TC_TLV_LIMIT;
-  return tc_pki_octets_hash(encoded, TC_TLV_BER, limits,
-                            &(tc_pki_tree_workspace){frames.data, frames.capacity, work}, algorithm,
-                            &scratch, digest);
+  return cms_octets_hash(encoded, limits,
+                         &(tc_pki_tree_workspace){frames.data, frames.capacity, work}, algorithm,
+                         &scratch, digest);
 }
 
 TC_TLV_result TC_CMS_signed_data_read(TC_bytes encoded, const TC_TLV_limits* limits,
@@ -436,6 +531,8 @@ TC_TLV_result tc_cms_signed_data_read(TC_bytes encoded, const TC_TLV_limits* lim
                                       TC_TLV_frames frames, size_t* work, TC_CMS_signed_data* out)
 {
   static const uint8_t signed_data_oid[] = {0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 1, 7, 2};
+  /* RFC 5652 section 5.1: SignedData has at most six fields. ContentInfo and
+   * EncapsulatedContentInfo have fewer. */
   enum { SIGNED_DATA_FIELDS = 6 };
   TC_TLV_element fields[SIGNED_DATA_FIELDS];
   TC_bytes encap;
@@ -447,7 +544,7 @@ TC_TLV_result tc_cms_signed_data_read(TC_bytes encoded, const TC_TLV_limits* lim
   parsed.encoded = encoded;
   const tc_pki_tree_workspace tree = {frames.data, frames.capacity, work};
 #define CMS_FIELDS(input, tag)                                                                     \
-  tc_pki_children(input, tag, TC_TLV_BER, limits, &tree, fields, SIGNED_DATA_FIELDS, &count)
+  cms_fields(input, tag, limits, &tree, fields, SIGNED_DATA_FIELDS, &count)
   result = CMS_FIELDS(encoded, 0x30);
   if (result != TC_TLV_OK)
     return result;

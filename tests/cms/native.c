@@ -9,7 +9,6 @@
 #include "cms_crl_harness.h"
 #include "../../src/cms_signature_internal.h"
 #include "../../src/pki_identifier_internal.h"
-#include "../../src/pki_octets_hash_internal.h"
 #include "../../src/pki_tree_internal.h"
 #include <tiny_crypto/x509_crypto.h>
 #include "../../src/source_internal.h"
@@ -294,7 +293,6 @@ static MunitResult content_signature(const MunitParameter params[], void* user)
   TC_X509_signature_provider provider = TC_X509_native_provider(&workspace);
   const TC_DER_algorithm algorithm = {{signature_oid, sizeof signature_oid}, {NULL, 0}};
   TC_X509_public_key key;
-  TC_hash_context hash_workspace;
   EVP_PKEY* generated = EVP_EC_gen("prime256v1");
   EVP_MD_CTX* signer = EVP_MD_CTX_new();
   unsigned char* cursor = spki;
@@ -346,9 +344,9 @@ static MunitResult content_signature(const MunitParameter params[], void* user)
                                                    &limits, (TC_TLV_frames){frames, FRAME_CAPACITY},
                                                    &work, &parsed),
                      ==, TC_TLV_OK);
-    munit_assert_int(tc_pki_octets_hash((TC_bytes){content, sizeof content}, TC_TLV_BER, &limits,
-                                        &(tc_pki_tree_workspace){frames, FRAME_CAPACITY, &work},
-                                        TC_HASH_SHA256, &hash_workspace, digest),
+    munit_assert_int(TC_CMS_content_digest((TC_bytes){content, sizeof content}, TC_HASH_SHA256,
+                                           &limits, (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
+                                           digest, sizeof digest),
                      ==, TC_TLV_OK);
     munit_assert_int(TC_CMS_content_digest_check(
                          &parsed, (TC_bytes){content_type, sizeof content_type}, TC_HASH_SHA256,
@@ -460,9 +458,9 @@ static MunitResult content_signature(const MunitParameter params[], void* user)
      */
     content[CONTENT_MUTATION_OFFSET] ^= 1;
     work = WORK_BUDGET;
-    munit_assert_int(tc_pki_octets_hash((TC_bytes){content, sizeof content}, TC_TLV_BER, &limits,
-                                        &(tc_pki_tree_workspace){frames, FRAME_CAPACITY, &work},
-                                        TC_HASH_SHA256, &hash_workspace, digest),
+    munit_assert_int(TC_CMS_content_digest((TC_bytes){content, sizeof content}, TC_HASH_SHA256,
+                                           &limits, (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
+                                           digest, sizeof digest),
                      ==, TC_TLV_OK);
     munit_assert_int(TC_CMS_content_digest_check(
                          &parsed, (TC_bytes){content_type, sizeof content_type}, TC_HASH_SHA256,

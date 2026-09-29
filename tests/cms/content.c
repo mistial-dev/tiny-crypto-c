@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/cms.h>
-#include "../../src/pki_octets_hash_internal.h"
+#include "../../src/hash_dispatch_internal.h"
 #include "munit.h"
 
 static MunitResult content_binding(const MunitParameter params[], void* user)
@@ -165,13 +165,14 @@ static MunitResult encoded_content(const MunitParameter params[], void* user)
                                        4,    2,    'b', 'c', 0,   0,    0,    0};
   static const uint8_t wrong_child[] = {0x24, 3, 2, 1, 0};
   static const uint8_t empty[] = {4, 0};
+  static const uint8_t two_roots[] = {4, 1, 'a', 4, 0};
   const TC_bytes encodings[] = {
       {primitive, sizeof primitive}, {definite, sizeof definite}, {indefinite, sizeof indefinite}};
   TC_TLV_limits limits = {WORK_BUDGET, WORK_BUDGET, 32, FRAME_CAPACITY};
+  const TC_TLV_limits shallow_limits = {WORK_BUDGET, WORK_BUDGET, 32, 1};
   TC_TLV_frame frames[FRAME_CAPACITY];
   TC_hash_context scratch;
   uint8_t expected[TC_SHA512_DIGESTLEN], actual[TC_SHA512_DIGESTLEN];
-  const uint8_t zero_scratch[sizeof scratch] = {0};
   uint8_t untouched[sizeof actual];
   (void)params;
   (void)user;
@@ -236,13 +237,20 @@ static MunitResult encoded_content(const MunitParameter params[], void* user)
                                            actual, sizeof actual),
                      ==, TC_TLV_INVALID);
     munit_assert_memory_equal(sizeof actual, actual, untouched);
+    /* A second root after the OCTET STRING is malformed content. */
     work = WORK_BUDGET;
-    munit_assert_int(tc_pki_octets_hash((TC_bytes){definite, sizeof definite}, TC_TLV_DER, &limits,
-                                        &(tc_pki_tree_workspace){frames, FRAME_CAPACITY, &work},
-                                        hash, &scratch, actual),
+    munit_assert_int(TC_CMS_content_digest((TC_bytes){two_roots, sizeof two_roots}, hash, &limits,
+                                           (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, actual,
+                                           sizeof actual),
                      ==, TC_TLV_INVALID);
     munit_assert_memory_equal(sizeof actual, actual, untouched);
-    munit_assert_memory_equal(sizeof scratch, &scratch, zero_scratch);
+    /* Nested BER chunks need one frame per constructed level. */
+    work = WORK_BUDGET;
+    munit_assert_int(TC_CMS_content_digest((TC_bytes){definite, sizeof definite}, hash,
+                                           &shallow_limits, (TC_TLV_frames){frames, 1}, &work,
+                                           actual, sizeof actual),
+                     ==, TC_TLV_LIMIT);
+    munit_assert_memory_equal(sizeof actual, actual, untouched);
     munit_assert_int(tc_hash_digest_parts(hash, NULL, 0, expected, &scratch), ==, TC_OK);
     work = WORK_BUDGET;
     munit_assert_int(TC_CMS_content_digest((TC_bytes){empty, sizeof empty}, hash, &limits,
@@ -251,6 +259,13 @@ static MunitResult encoded_content(const MunitParameter params[], void* user)
                      ==, TC_TLV_OK);
     munit_assert_memory_equal(info.digest_length, actual, expected);
   }
+  size_t work = WORK_BUDGET;
+  memcpy(actual, untouched, sizeof actual);
+  munit_assert_int(TC_CMS_content_digest((TC_bytes){primitive, sizeof primitive}, TC_HASH_UNKNOWN,
+                                         &limits, (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
+                                         actual, sizeof actual),
+                   ==, TC_TLV_UNSUPPORTED);
+  munit_assert_memory_equal(sizeof actual, actual, untouched);
   return MUNIT_OK;
 }
 

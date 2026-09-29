@@ -28,7 +28,8 @@ typedef struct {
  * All spans borrow input, which must remain alive and unchanged. Input, limits,
  * frames, work and out must be disjoint. Bad storage arguments leave them
  * unchanged. Parsing may consume work and frames. out changes only on OK.
- * Limits bound framing. Work covers storage checks and all parsing passes. */
+ * Limits bound framing. Work covers storage checks and all parsing passes.
+ * Missing or extra fields, wrong tags and trailing bytes return INVALID. */
 TC_TLV_result TC_CMS_signed_data_read(TC_bytes encoded, const TC_TLV_limits* limits,
                                       TC_TLV_frames frames, size_t* work, TC_CMS_signed_data* out);
 
