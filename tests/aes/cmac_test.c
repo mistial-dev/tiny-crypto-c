@@ -287,6 +287,34 @@ static MunitResult test_cmac_streaming(const MunitParameter params[], void* data
     munit_assert_int(TC_AES_CMAC_final(&ctx, tag), ==, TC_ERROR);
   }
 
+  /* Message bytes inside the context change while the MAC reads them, and a
+   * tag inside the context is wiped when final clears it. Both return
+   * TC_ERROR and leave the context usable. */
+  {
+    /* after gives a tag that straddles the context end its storage. */
+    struct {
+      struct TC_AES_CMAC_ctx cmac;
+      uint8_t after[TC_AES_CMAC_TAG_MAX];
+    } frame;
+    struct TC_AES_CMAC_ctx saved;
+    munit_assert_int(TC_AES_CMAC_init(&ctx, key), ==, TC_OK);
+    munit_assert_int(TC_AES_CMAC_update(&ctx, msg, 3), ==, TC_OK);
+    memcpy(&saved, &ctx, sizeof saved);
+    munit_assert_int(TC_AES_CMAC_update(&ctx, ctx.buf, 1), ==, TC_ERROR);
+    munit_assert_int(TC_AES_CMAC_update(&ctx, ctx.k1, sizeof ctx.k1), ==, TC_ERROR);
+    munit_assert_int(TC_AES_CMAC_final(&ctx, ctx.mac), ==, TC_ERROR);
+    memcpy(&frame.cmac, &ctx, sizeof ctx);
+    munit_assert_int(TC_AES_CMAC_final(&frame.cmac, (uint8_t*)&frame + sizeof frame.cmac - 1), ==,
+                     TC_ERROR);
+    munit_assert_uint8(frame.cmac.active, ==, 1);
+    TC_AES_CMAC_ctx_clear(&frame.cmac);
+    munit_assert_memory_equal(sizeof ctx.mac, ctx.mac, saved.mac);
+    munit_assert_memory_equal(sizeof ctx.buf, ctx.buf, saved.buf);
+    munit_assert_uint8(ctx.buf_len, ==, saved.buf_len);
+    munit_assert_uint8(ctx.active, ==, 1);
+    munit_assert_int(TC_AES_CMAC_final(&ctx, tag), ==, TC_OK);
+  }
+
   return MUNIT_OK;
 }
 

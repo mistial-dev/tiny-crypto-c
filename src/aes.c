@@ -12,7 +12,6 @@
 #include <string.h> /* memcpy, memset */
 #include <tiny_crypto/aes.h>
 #include "aes_internal.h"
-#include "aes_platform_internal.h"
 
 /* Keep fixed S-boxes in AVR flash. Runtime S-box mode keeps a writable SRAM
  * table and bypasses these accessors. */
@@ -338,7 +337,8 @@ TC_status TC_AES_init_ctx_iv(struct TC_AES_ctx* ctx, const uint8_t* key, const u
 }
 TC_status TC_AES_ctx_set_iv(struct TC_AES_ctx* ctx, const uint8_t* iv)
 {
-  if (ctx == NULL || ctx->key.active != 1 || iv == NULL)
+  /* An IV inside the context would be an overlapping copy. */
+  if (!tc_block_mode_args(ctx, sizeof *ctx, iv, TC_AES_BLOCKLEN, 1) || ctx->key.active != 1)
     return TC_ERROR;
   memcpy(ctx->iv, iv, TC_AES_BLOCKLEN);
 #if TC_AES_ENABLE_CTR
@@ -509,12 +509,6 @@ static void tc_aes_inverse_shift_rows(state_t* state)
 TC_status tc_aes_cipher_rounds(state_t* state, const uint8_t* round_key, uint8_t rounds)
 {
   uint8_t round = 0;
-#if TC_AES_PLATFORM
-  tc_aes_platform_result result = tc_aes_platform_block(round_key, rounds, (uint8_t*)state, 0);
-  if (result != TC_AES_PLATFORM_UNSUPPORTED)
-    return result == TC_AES_PLATFORM_OK ? TC_OK : TC_ERROR;
-#endif
-
   tc_aes_add_round_key(0, state, round_key);
 
   for (round = 1;; ++round) {
@@ -553,12 +547,6 @@ TC_status TC_AES_CAVP_encrypt_block(const uint8_t* key, uint8_t block[TC_AES_BLO
 TC_status tc_aes_inverse_rounds(state_t* state, const uint8_t* round_key, uint8_t rounds)
 {
   uint8_t round = 0;
-#if TC_AES_PLATFORM
-  tc_aes_platform_result result = tc_aes_platform_block(round_key, rounds, (uint8_t*)state, 1);
-  if (result != TC_AES_PLATFORM_UNSUPPORTED)
-    return result == TC_AES_PLATFORM_OK ? TC_OK : TC_ERROR;
-#endif
-
   tc_aes_add_round_key(rounds, state, round_key);
 
   for (round = (rounds - 1);; --round) {

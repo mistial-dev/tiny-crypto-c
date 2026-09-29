@@ -161,6 +161,98 @@ static MunitResult test_invalid_key_state(const MunitParameter params[], void* d
   return MUNIT_OK;
 }
 
+#if TC_AES_HAVE_IV
+static void assert_aes_ctx_equal(const struct TC_AES_ctx* a, const struct TC_AES_ctx* b)
+{
+  munit_assert_memory_equal(sizeof a->key.round_key, a->key.round_key, b->key.round_key);
+  munit_assert_uint8(a->key.active, ==, b->key.active);
+  munit_assert_memory_equal(sizeof a->iv, a->iv, b->iv);
+#if TC_AES_ENABLE_CTR
+  munit_assert_memory_equal(sizeof a->ctr_stream, a->ctr_stream, b->ctr_stream);
+  munit_assert_uint8(a->ctr_pos, ==, b->ctr_pos);
+  munit_assert_uint8(a->ctr_exhausted, ==, b->ctr_exhausted);
+#endif
+#if TC_AES_ENABLE_OFB
+  munit_assert_uint8(a->ofb_pos, ==, b->ofb_pos);
+#endif
+}
+
+typedef TC_status (*aes_mode_fn)(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length);
+
+/* A buffer that overlaps the context would overwrite the round keys or the
+ * chaining value while the mode reads them. The mode must reject it and leave
+ * both unchanged. The spans lie inside the context or run into its start
+ * from a preceding array. length is at most TC_AES_BLOCKLEN. */
+static void check_mode_overlap(aes_mode_fn mode, size_t length)
+{
+  struct {
+    uint8_t before[TC_AES_BLOCKLEN];
+    struct TC_AES_ctx ctx;
+  } frame;
+  struct TC_AES_ctx saved;
+  uint8_t before[TC_AES_BLOCKLEN];
+  /* The last span ends on the first context byte. */
+  uint8_t* const inside[] = {frame.ctx.iv, frame.ctx.key.round_key,
+                             frame.before + sizeof frame.before + 1 - length};
+  size_t i;
+
+  munit_assert_int(TC_AES_init_ctx_iv(&frame.ctx, TEST_KEY, nist_iv), ==, TC_OK);
+  memset(frame.before, 0x5a, sizeof frame.before);
+  memcpy(before, frame.before, sizeof before);
+  memcpy(&saved, &frame.ctx, sizeof saved);
+  for (i = 0; i < sizeof inside / sizeof inside[0]; ++i) {
+    munit_assert_int(mode(&frame.ctx, inside[i], length), ==, TC_ERROR);
+    assert_aes_ctx_equal(&frame.ctx, &saved);
+    munit_assert_memory_equal(sizeof before, frame.before, before);
+  }
+  TC_AES_ctx_clear(&frame.ctx);
+}
+
+static MunitResult test_mode_overlap(const MunitParameter params[], void* data)
+{
+  struct TC_AES_ctx ctx;
+  struct TC_AES_ctx saved;
+  (void)params;
+  (void)data;
+  test_initialize_sbox();
+#if TC_AES_ENABLE_CBC
+  check_mode_overlap(TC_AES_CBC_encrypt, TC_AES_BLOCKLEN);
+  check_mode_overlap(TC_AES_CBC_decrypt, TC_AES_BLOCKLEN);
+#endif
+#if TC_AES_ENABLE_CTR
+  check_mode_overlap(TC_AES_CTR_crypt, 1);
+  check_mode_overlap(TC_AES_CTR_crypt, TC_AES_BLOCKLEN);
+#endif
+#if TC_AES_ENABLE_OFB
+  check_mode_overlap(TC_AES_OFB_crypt, 1);
+  check_mode_overlap(TC_AES_OFB_crypt, TC_AES_BLOCKLEN);
+#endif
+#if TC_AES_ENABLE_ECB
+  munit_assert_int(TC_AES_init_ctx(&ctx, TEST_KEY), ==, TC_OK);
+  memcpy(&saved, &ctx, sizeof saved);
+  munit_assert_int(TC_AES_ECB_encrypt(&ctx.key, ctx.key.round_key + 8), ==, TC_ERROR);
+  munit_assert_int(TC_AES_ECB_decrypt(&ctx.key, ctx.key.round_key), ==, TC_ERROR);
+  assert_aes_ctx_equal(&ctx, &saved);
+#endif
+
+  /* set_iv copies 16 bytes into ctx->iv. A source inside the context would
+   * be an overlapping memcpy, and one in the round keys would leak key
+   * material into the IV. */
+  munit_assert_int(TC_AES_init_ctx_iv(&ctx, TEST_KEY, nist_iv), ==, TC_OK);
+  memcpy(&saved, &ctx, sizeof saved);
+  munit_assert_int(TC_AES_ctx_set_iv(&ctx, ctx.iv), ==, TC_ERROR);
+  munit_assert_int(TC_AES_ctx_set_iv(&ctx, ctx.iv + 1), ==, TC_ERROR);
+  munit_assert_int(TC_AES_ctx_set_iv(&ctx, ctx.key.round_key), ==, TC_ERROR);
+  assert_aes_ctx_equal(&ctx, &saved);
+  munit_assert_int(TC_AES_ctx_set_iv(&ctx, NULL), ==, TC_ERROR);
+  munit_assert_int(TC_AES_ctx_set_iv(NULL, nist_iv), ==, TC_ERROR);
+  munit_assert_int(TC_AES_ctx_set_iv(&ctx, nist_ctr_iv), ==, TC_OK);
+  munit_assert_memory_equal(sizeof ctx.iv, ctx.iv, nist_ctr_iv);
+  TC_AES_ctx_clear(&ctx);
+  return MUNIT_OK;
+}
+#endif
+
 static MunitResult test_secure_zero_and_clear(const MunitParameter params[], void* data)
 {
   struct TC_AES_ctx ctx;
@@ -1238,6 +1330,9 @@ static MunitTest test_suite_tests[] = {
     {"/secure-zero-clear", test_secure_zero_and_clear, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/key-schedule", test_key_schedule, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/invalid-key-state", test_invalid_key_state, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+#if TC_AES_HAVE_IV
+    {"/mode-overlap", test_mode_overlap, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+#endif
 #if TC_AES_ENABLE_ECB
     {"/ecb", test_ecb, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
 #endif

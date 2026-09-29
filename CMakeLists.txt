@@ -356,9 +356,11 @@ list(APPEND TC_PUBLIC_DEFINITIONS
   TC_AES_SBOX_MODE=${sbox_value}
   TC_AES_GCM_GHASH_MODE=${ghash_value})
 
-set(tc_aes_sources src/aes.c src/aes_modes.c src/aes_ghash.c src/aes_gcm.c src/aes_ccm.c
-  src/aes_mac.c src/aes_cmac.c src/aes_eax.c src/aes_siv.c src/mac_core.c)
-set(tc_des_sources src/des.c src/des_modes.c src/des_mac.c)
+# block_modes.c holds the CBC, CTR and OFB cores shared by AES and DES. A
+# target that lists both families compiles it once.
+set(tc_aes_sources src/aes.c src/aes_modes.c src/block_modes.c src/aes_ghash.c src/aes_gcm.c
+  src/aes_ccm.c src/aes_mac.c src/aes_cmac.c src/aes_eax.c src/aes_siv.c src/mac_core.c)
+set(tc_des_sources src/des.c src/des_modes.c src/block_modes.c src/des_mac.c)
 set(tc_hash_sources src/hash.c src/sha512.c src/hash_core.c)
 set(tc_drbg_sources src/drbg.c src/drbg_hash.c src/drbg_hmac.c src/drbg_ctr.c src/drbg_random.c)
 set(tc_rsa_sources src/rsa_workspace.c src/rsa_keygen.c src/rsa_private.c src/rsa_public.c src/rsa_oaep.c)
@@ -448,6 +450,7 @@ if(TINY_CRYPTO_ENABLE_PIV_SM)
   endif()
 endif()
 tc_append_module_sources(tc_sources)
+list(REMOVE_DUPLICATES tc_sources)
 
 add_library(tiny-crypto-c STATIC ${tc_sources})
 add_library(tiny-crypto-c::tiny-crypto-c ALIAS tiny-crypto-c)

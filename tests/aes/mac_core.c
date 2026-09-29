@@ -14,7 +14,7 @@ static TC_status increment_block(const void* cipher, uint8_t* block)
 static MunitResult block_boundaries(const MunitParameter params[], void* user)
 {
   const size_t width = 8;
-  const tc_mac_cipher cipher = {8, &width, increment_block};
+  const tc_block_cipher cipher = {8, &width, increment_block, NULL};
   const uint8_t input[] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
   const uint8_t k1[8] = {1, 1, 1, 1, 1, 1, 1, 1};
   const uint8_t k2[8] = {2, 2, 2, 2, 2, 2, 2, 2};
@@ -54,7 +54,7 @@ static MunitResult block_boundaries(const MunitParameter params[], void* user)
 static MunitResult eager_padding(const MunitParameter params[], void* user)
 {
   const size_t width = 8;
-  const tc_mac_cipher cipher = {8, &width, increment_block};
+  const tc_block_cipher cipher = {8, &width, increment_block, NULL};
   const uint8_t input[] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
   const uint8_t first_mac[8] = {2, 3, 4, 5, 6, 7, 8, 9};
   const uint8_t padded_mac[8] = {12, 4, 5, 6, 7, 8, 9, 10};
@@ -99,7 +99,7 @@ static MunitResult gf_doubling(const MunitParameter params[], void* user)
 static MunitResult cmac_parts(const MunitParameter params[], void* user)
 {
   const size_t width = 8;
-  const tc_mac_cipher cipher = {8, &width, increment_block};
+  const tc_block_cipher cipher = {8, &width, increment_block, NULL};
   const uint8_t input[19] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19};
   const uint8_t k1[8] = {1, 1, 1, 1, 1, 1, 1, 1};
   const uint8_t k2[8] = {2, 2, 2, 2, 2, 2, 2, 2};
@@ -125,7 +125,7 @@ static MunitResult cmac_parts(const MunitParameter params[], void* user)
 static MunitResult subkeys(const MunitParameter params[], void* user)
 {
   const size_t width = 8;
-  const tc_mac_cipher cipher = {8, &width, increment_block};
+  const tc_block_cipher cipher = {8, &width, increment_block, NULL};
   /* The test cipher adds one to each byte, so L = 01..01. */
   const uint8_t k1[8] = {2, 2, 2, 2, 2, 2, 2, 2}, k2[8] = {4, 4, 4, 4, 4, 4, 4, 4};
   const uint8_t high[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x80};

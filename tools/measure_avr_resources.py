@@ -20,6 +20,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CC = os.environ.get("AVR_CC", "avr-gcc")
 SIZE = os.environ.get("AVR_SIZE", "avr-size")
+NM = os.environ.get("AVR_NM", "avr-nm")
 BASE = ["-std=c99", "-Os", "-mmcu=atmega328p", "-ffunction-sections",
         "-fdata-sections", "-fstack-usage", "-I" + str(ROOT / "src")]
 PROFILES = {
@@ -73,10 +74,13 @@ APPLICATION_CALLBACK_SITES = {
     "read_entropy": "TC_random_source entropy callback",
     "TC_ECDSA_sign_digest": "TC_random_source nonce callback",
 }
-MAC_CIPHER_CALLBACKS = {"tc_aes_mac_encrypt", "tc_des_mac_encrypt"}
-# MAC core functions that call the block cipher through a tc_mac_cipher
-# descriptor. Their indirect call resolves to MAC_CIPHER_CALLBACKS.
-MAC_DESCRIPTOR_SITES = {"tc_mac_cbc_block", "tc_mac_derive_subkeys"}
+BLOCK_CIPHER_CALLBACKS = {"tc_aes_block_encrypt", "tc_aes_block_decrypt",
+                          "tc_des_block_encrypt", "tc_des_block_decrypt"}
+# Mode and MAC cores that call the block cipher through a tc_block_cipher
+# descriptor. Their indirect call resolves to BLOCK_CIPHER_CALLBACKS.
+BLOCK_DESCRIPTOR_SITES = {"tc_mac_cbc_block", "tc_mac_derive_subkeys",
+                          "tc_block_cbc_encrypt", "tc_block_cbc_decrypt",
+                          "tc_block_ctr_crypt", "tc_block_ofb_crypt"}
 SOURCE = """
 #include <tiny_crypto/tiny_crypto.h>
 static uint8_t key[32], iv[16], out[32];
@@ -96,16 +100,19 @@ def normalize(name):
     return re.sub(r"\.(?:constprop|isra|part)(?:\.\d+)?", "", name)
 
 
-def mac_cipher_callbacks():
-    """Keep the stack model in step with concrete MAC cipher descriptors."""
+def block_cipher_callbacks():
+    """Keep the stack model in step with concrete block cipher descriptors.
+
+    Each initializer lists block_size, key, encrypt and decrypt. The callbacks
+    are the lowercase tc_ names after the key."""
     sources = list((ROOT / "src").glob("*.c")) + list((ROOT / "src").glob("*.h"))
     found = set()
     for source in sources:
-        found.update(re.findall(
-            r"tc_mac_cipher\s+\w+\s*=\s*\{[^}]*,\s*(tc_\w+)\s*\}",
-            source.read_text()))
-    if found != MAC_CIPHER_CALLBACKS:
-        raise RuntimeError(f"MAC descriptor callbacks changed: {sorted(found)}")
+        for fields in re.findall(r"tc_block_cipher\s+\w+\s*=\s*\{([^}]*)\}",
+                                 source.read_text()):
+            found.update(re.findall(r"\btc_\w+", fields.split(",", 2)[-1]))
+    if found != BLOCK_CIPHER_CALLBACKS:
+        raise RuntimeError(f"Block cipher descriptor callbacks changed: {sorted(found)}")
     return found
 
 
@@ -204,7 +211,10 @@ def measure(directory, definitions, body, entry, types=None):
     if ".text" not in sections:
         raise RuntimeError("Missing linked .text section")
     unknown = set()
-    mac_targets = mac_cipher_callbacks() & all_address_taken
+    # A descriptor call reaches only callbacks that survive --gc-sections.
+    linked = {normalize(line.split()[-1]) for line in run([NM, str(elf)]).splitlines()
+              if line.strip()}
+    block_targets = block_cipher_callbacks() & all_address_taken & linked
     hash_targets = hash_descriptor_callbacks() & set(frames)
     for site in hash_core_sites:
         edges[site].update(hash_targets)
@@ -219,13 +229,14 @@ def measure(directory, definitions, body, entry, types=None):
             return 0, []
         if name in APPLICATION_CALLBACK_SITES:
             unknown.add(APPLICATION_CALLBACK_SITES[name])
-        elif name in unknown_indirect and name not in MAC_DESCRIPTOR_SITES:
+        elif name in unknown_indirect and name not in BLOCK_DESCRIPTOR_SITES:
             raise RuntimeError("Unresolved indirect call: " + name)
-        if name in MAC_DESCRIPTOR_SITES and name in unknown_indirect and not mac_targets:
-            raise RuntimeError("Unresolved MAC descriptor call: " + name)
+        if (name in BLOCK_DESCRIPTOR_SITES and name in unknown_indirect and name in linked
+                and not block_targets):
+            raise RuntimeError("Unresolved block cipher descriptor call: " + name)
         callees = set(edges.get(name, ()))
-        if name in MAC_DESCRIPTOR_SITES:
-            callees.update(mac_targets)
+        if name in BLOCK_DESCRIPTOR_SITES:
+            callees.update(block_targets)
         children = [chain(child, active | {name}) for child in sorted(callees)]
         size, path = max(children, default=(0, []), key=lambda item: item[0])
         return frames[name] + size, [name] + path

@@ -10,8 +10,8 @@ static TC_status tc_aes_cmac_update(const uint8_t* key, uint8_t rounds, uint8_t 
                                     uint8_t buffer[16], uint8_t* used, const uint8_t* data,
                                     size_t length)
 {
-  const tc_aes_mac_key mac_key = {key, rounds};
-  const tc_mac_cipher cipher = tc_aes_mac_cipher(&mac_key);
+  const tc_aes_block_key mac_key = {key, rounds};
+  const tc_block_cipher cipher = tc_aes_block_cipher(&mac_key);
   return tc_mac_cbc_update(&cipher, mac, buffer, used, data, length, 1);
 }
 
@@ -19,8 +19,8 @@ static TC_status tc_aes_cmac_final(const uint8_t* key, uint8_t rounds, uint8_t m
                                    uint8_t buffer[16], uint8_t used, const uint8_t k1[16],
                                    const uint8_t k2[16], uint8_t tag[16])
 {
-  const tc_aes_mac_key mac_key = {key, rounds};
-  const tc_mac_cipher cipher = tc_aes_mac_cipher(&mac_key);
+  const tc_aes_block_key mac_key = {key, rounds};
+  const tc_block_cipher cipher = tc_aes_block_cipher(&mac_key);
   return tc_mac_cmac_final(&cipher, mac, buffer, used, k1, k2, tag);
 }
 #endif
@@ -44,9 +44,8 @@ TC_status TC_AES_dynamic_CMAC_init(TC_AES_dynamic_CMAC* ctx, const uint8_t* key,
 
 TC_status TC_AES_dynamic_CMAC_update(TC_AES_dynamic_CMAC* ctx, const uint8_t* data, size_t length)
 {
-  if (!tc_aes_dynamic_key_valid(ctx ? &ctx->key : NULL) || ctx->used > 16 ||
-      !tc_internal_span_valid(data, length) ||
-      !tc_internal_ranges_disjoint(ctx, sizeof *ctx, data, length))
+  if (!tc_block_mode_args(ctx, sizeof *ctx, data, length, 1) ||
+      !tc_aes_dynamic_key_valid(&ctx->key) || ctx->used > TC_AES_BLOCKLEN)
     return TC_ERROR;
   if (tc_aes_cmac_update(ctx->key.round_key, ctx->key.rounds, ctx->mac, ctx->buffer, &ctx->used,
                          data, length) != TC_OK) {
@@ -59,8 +58,8 @@ TC_status TC_AES_dynamic_CMAC_update(TC_AES_dynamic_CMAC* ctx, const uint8_t* da
 TC_status TC_AES_dynamic_CMAC_final(TC_AES_dynamic_CMAC* ctx, uint8_t tag[16])
 {
   TC_status status;
-  if (!tc_aes_dynamic_key_valid(ctx ? &ctx->key : NULL) || ctx->used > 16 || !tag ||
-      !tc_internal_ranges_disjoint(ctx, sizeof *ctx, tag, 16))
+  if (!tc_block_mode_args(ctx, sizeof *ctx, tag, TC_AES_BLOCKLEN, 1) ||
+      !tc_aes_dynamic_key_valid(&ctx->key) || ctx->used > TC_AES_BLOCKLEN)
     return TC_ERROR;
   status = tc_aes_cmac_final(ctx->key.round_key, ctx->key.rounds, ctx->mac, ctx->buffer, ctx->used,
                              ctx->k1, ctx->k2, tag);
@@ -130,7 +129,8 @@ TC_status TC_AES_CMAC_init(struct TC_AES_CMAC_ctx* ctx, const uint8_t* key)
 
 TC_status TC_AES_CMAC_update(struct TC_AES_CMAC_ctx* ctx, const uint8_t* data, size_t length)
 {
-  if (!ctx || ctx->active != 1 || !tc_internal_span_valid(data, length) || ctx->buf_len > 16)
+  if (!tc_block_mode_args(ctx, sizeof *ctx, data, length, 1) || ctx->active != 1 ||
+      ctx->buf_len > TC_AES_BLOCKLEN)
     return TC_ERROR;
   if (tc_aes_cmac_update(ctx->key.round_key, TC_AES_FIXED_ROUNDS, ctx->mac, ctx->buf, &ctx->buf_len,
                          data, length) != TC_OK) {
@@ -143,7 +143,8 @@ TC_status TC_AES_CMAC_update(struct TC_AES_CMAC_ctx* ctx, const uint8_t* data, s
 TC_status TC_AES_CMAC_final(struct TC_AES_CMAC_ctx* ctx, uint8_t tag[16])
 {
   TC_status status;
-  if (!ctx || ctx->active != 1 || !tag || ctx->buf_len > 16)
+  if (!tc_block_mode_args(ctx, sizeof *ctx, tag, TC_AES_CMAC_TAG_MAX, 1) || ctx->active != 1 ||
+      ctx->buf_len > TC_AES_BLOCKLEN)
     return TC_ERROR;
   status = tc_aes_cmac_final(ctx->key.round_key, TC_AES_FIXED_ROUNDS, ctx->mac, ctx->buf,
                              ctx->buf_len, ctx->k1, ctx->k2, tag);

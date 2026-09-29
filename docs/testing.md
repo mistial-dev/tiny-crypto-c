@@ -814,6 +814,14 @@ AES-CMAC minimum tag lengths outside 1 to 16.
 The two SIV formats differ in their associated-data components and whether the
 synthetic IV prefixes the ciphertext.
 
+The AES and DES mode suites pass buffers, IVs and tags that lie inside the
+context or run into its first byte. Every mode, `set_iv` and MAC entry must
+return `TC_ERROR` and leave the context unchanged. `test_aes_mode_failure`
+compiles `aes_modes.c` and `block_modes.c` with the block cipher renamed to
+test wrappers that fail a chosen block. Each failure must wipe the buffer and
+the chaining value and clear the context. The library has no runtime cipher
+hook.
+
 HKDF checks all four pinned Wycheproof SHA-1/256/384/512 JSON suites, the seven
 RFC 5869 vectors, and additional SHA-224/384/512 vectors. The NIST ACVP HKDF
 corpus covers SP 800-56C revisions 1 and 2 for SHA2-224/256/384/512, including

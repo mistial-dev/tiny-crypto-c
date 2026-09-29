@@ -60,7 +60,7 @@ static TC_DRBG_result update(TC_DRBG* drbg, const uint8_t* provided)
 
 /* BCC (10.3.3) of IV || S, where S = L || N || input || 0x80 || zero padding,
  * into chain. The shared CBC-MAC core zero-pads the final block. */
-static int bcc(const tc_mac_cipher* cipher, uint32_t index, const uint8_t header[8],
+static int bcc(const tc_block_cipher* cipher, uint32_t index, const uint8_t header[8],
                const TC_bytes* parts, size_t count, uint8_t chain[BLOCK])
 {
   static const uint8_t marker = 0x80;
@@ -90,8 +90,8 @@ static TC_DRBG_result block_cipher_df(TC_DRBG* drbg, const TC_bytes* parts, size
   const size_t seed_bytes = drbg->seed_bytes, key_bytes = drbg->key_bytes;
   const size_t input_length = tc_drbg_parts_length(parts, count);
   uint8_t key[32], header[8], temp[MAX_SEED];
-  tc_aes_mac_key mac_key;
-  tc_mac_cipher cipher;
+  tc_aes_block_key mac_key;
+  tc_block_cipher cipher;
   size_t offset;
   uint32_t index;
   /* The envelope bounds every input by TC_DRBG_MAX_INPUT_BYTES, so L fits
@@ -106,7 +106,7 @@ static TC_DRBG_result block_cipher_df(TC_DRBG* drbg, const TC_bytes* parts, size
   tc_internal_store_be32(header + 4, (uint32_t)seed_bytes);
   mac_key.round_key = drbg->scratch.df_key.round_key;
   mac_key.rounds = drbg->scratch.df_key.rounds;
-  cipher = tc_aes_mac_cipher(&mac_key);
+  cipher = tc_aes_block_cipher(&mac_key);
 
   /* Steps 9 to 11: temp = BCC(K, 0 || S) || BCC(K, 1 || S) || ... */
   for (index = 0, offset = 0; ok && offset < key_bytes + BLOCK; ++index, offset += BLOCK)

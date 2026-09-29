@@ -250,6 +250,24 @@ if (tiny_crypto::ccm_decrypt(key, nonce, aad, ciphertext, tag, plaintext) != TC_
 }
 ```
 
+## Block cipher modes
+
+The AES and DES CBC, CTR, OFB and ECB functions, and the DES CFB functions,
+transform `buf` in place. They share one argument rule:
+
+- The context must be initialized. `buf` may be `NULL` only with length zero.
+- CBC lengths are a multiple of the block size.
+- `buf`, an IV passed to `set_iv`, and CMAC or ISO 9797 input and tags must be
+  disjoint from the context. A span inside the context would change round
+  keys, the feedback register or the MAC state during the call.
+
+An argument error returns `TC_ERROR` and leaves the buffer and context
+unchanged. A block cipher failure part way through a call wipes the buffer and
+clears the context, so neither partial output nor a broken chaining value
+survives. ECB and dynamic-key CBC take a const key, so their failures wipe the
+buffer and, for CBC, the IV. CTR returns `TC_ERROR` without output when a
+request needs a counter block beyond the space of the IV.
+
 ## DES and TDEA
 
 Enable `TINY_CRYPTO_ENABLE_DES=ON` and include `<tiny_crypto/des.h>`. One
@@ -311,8 +329,9 @@ requires truncation. Verification returns `TC_MISMATCH` for a different tag.
 For incremental input, call `TC_DES_ISO9797_init`, `update`, and `final` in
 order. Successful finalization consumes and clears the context. An update with
 invalid arguments leaves the context unchanged, and an update that fails while
-processing clears it. Keep the input, key, and tag buffers disjoint from the
-context.
+processing clears it. Input and tag buffers that overlap the context return
+`TC_ERROR` with the context unchanged. A key that overlaps it returns
+`TC_ERROR` from init.
 
 ```c
 #include <tiny_crypto/des.h>

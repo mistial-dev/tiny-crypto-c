@@ -7,6 +7,7 @@
 #define TC_DES_INTERNAL_H_
 
 #include <tiny_crypto/des.h>
+#include "block_cipher_internal.h"
 
 /* Reject weak and semi-weak component keys and bundles that collapse to
  * single DES. keylen is 8, 16 or 24. */
@@ -22,5 +23,40 @@ void tc_des_cipher_block(const uint8_t (*sk)[6], uint8_t* buf, int decrypt);
 void tc_des_encrypt_scheduled(const void* schedule, uint8_t block[TC_DES_BLOCKLEN], int triple);
 /* Inverse of tc_des_encrypt_scheduled: D(K3), E(K2), D(K1) when triple. */
 void tc_des_decrypt_scheduled(const void* schedule, uint8_t block[TC_DES_BLOCKLEN], int triple);
+
+/* A DES schedule, or a TDEA bundle when triple, borrowed by a descriptor. */
+typedef struct {
+  const void* schedule;
+  int triple;
+} tc_des_block_key;
+
+/* The DES block cipher cannot fail. */
+static inline TC_status tc_des_block_encrypt(const void* key, uint8_t* block)
+{
+  const tc_des_block_key* bundle = (const tc_des_block_key*)key;
+  tc_des_encrypt_scheduled(bundle->schedule, block, bundle->triple);
+  return TC_OK;
+}
+
+static inline TC_status tc_des_block_decrypt(const void* key, uint8_t* block)
+{
+  const tc_des_block_key* bundle = (const tc_des_block_key*)key;
+  tc_des_decrypt_scheduled(bundle->schedule, block, bundle->triple);
+  return TC_OK;
+}
+
+/* Forward-only descriptor for the stream modes, CBC encryption and the MACs. */
+static inline tc_block_cipher tc_des_block_cipher(const tc_des_block_key* key)
+{
+  const tc_block_cipher cipher = {TC_DES_BLOCKLEN, key, tc_des_block_encrypt, NULL};
+  return cipher;
+}
+
+/* Descriptor with the inverse cipher, for CBC decryption. */
+static inline tc_block_cipher tc_des_block_cipher_inverse(const tc_des_block_key* key)
+{
+  const tc_block_cipher cipher = {TC_DES_BLOCKLEN, key, tc_des_block_encrypt, tc_des_block_decrypt};
+  return cipher;
+}
 
 #endif

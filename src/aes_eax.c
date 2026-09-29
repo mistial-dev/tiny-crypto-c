@@ -14,8 +14,8 @@
 static TC_status tc_aes_eax_constants(const struct TC_AES_key_ctx* aes, int prime,
                                       uint8_t d[TC_AES_BLOCKLEN], uint8_t q[TC_AES_BLOCKLEN])
 {
-  const tc_aes_mac_key key = {aes->round_key, TC_AES_FIXED_ROUNDS};
-  const tc_mac_cipher cipher = tc_aes_mac_cipher(&key);
+  const tc_aes_block_key key = {aes->round_key, TC_AES_FIXED_ROUNDS};
+  const tc_block_cipher cipher = tc_aes_block_cipher(&key);
   return tc_mac_derive_subkeys(&cipher, 0x87, prime, d, q);
 }
 
@@ -31,8 +31,8 @@ static TC_status tc_aes_eax_cmac(const struct TC_AES_key_ctx* aes,
 {
   uint8_t prefix[TC_AES_BLOCKLEN] = {0};
   const TC_bytes parts[] = {{prefix, TC_AES_BLOCKLEN}, {data, length}};
-  const tc_aes_mac_key key = {aes->round_key, TC_AES_FIXED_ROUNDS};
-  const tc_mac_cipher cipher = tc_aes_mac_cipher(&key);
+  const tc_aes_block_key key = {aes->round_key, TC_AES_FIXED_ROUNDS};
+  const tc_block_cipher cipher = tc_aes_block_cipher(&key);
   prefix[TC_AES_BLOCKLEN - 1u] = (uint8_t)domain;
   return domain >= 0
              ? tc_mac_cmac_parts(&cipher, NULL, parts, 2, complete_subkey, partial_subkey, result)

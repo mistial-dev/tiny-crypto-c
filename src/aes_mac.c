@@ -43,8 +43,8 @@ TC_status tc_aes_mac_ctr_xor(const uint8_t* round_key, const uint8_t initial[TC_
 TC_status tc_aes_cmac_generate_subkeys(const uint8_t* round_key, uint8_t rounds,
                                        uint8_t k1[TC_AES_BLOCKLEN], uint8_t k2[TC_AES_BLOCKLEN])
 {
-  const tc_aes_mac_key key = {round_key, rounds};
-  const tc_mac_cipher cipher = tc_aes_mac_cipher(&key);
+  const tc_aes_block_key key = {round_key, rounds};
+  const tc_block_cipher cipher = tc_aes_block_cipher(&key);
   return tc_mac_derive_subkeys(&cipher, 0x87, 0, k1, k2);
 }
 #endif

@@ -85,11 +85,11 @@ extern "C" {
 void TC_DES_ctx_clear(struct TC_DES_ctx* ctx);
 
 /*
- * The CBC, CTR, CFB and OFB entry points share one argument contract. They
- * return TC_ERROR for a NULL or uninitialized context, or a NULL buffer with
- * a nonzero length, and leave the context and buffer unchanged. A NULL buffer
- * with length 0 returns TC_OK. Every mode transforms buf in place, and buf
- * must not overlap the context.
+ * The ECB, CBC, CTR, CFB and OFB entry points share one argument contract.
+ * They return TC_ERROR for a NULL or uninitialized context, a NULL buffer with
+ * a nonzero length, or a buffer that overlaps the context, and leave the
+ * context and buffer unchanged. A NULL buffer with length 0 returns TC_OK.
+ * Every mode transforms buf in place. The DES cipher itself cannot fail.
  */
 
 /**
@@ -126,8 +126,9 @@ TC_status TC_DES_init_ctx_iv(struct TC_DES_ctx* ctx, const uint8_t* key, size_t 
  * CFB64 finished flag.
  *
  * @param ctx Initialized context.
- * @param iv 8-byte initialization vector.
- * @return TC_OK, or TC_ERROR for a NULL argument or an inactive context.
+ * @param iv 8-byte initialization vector. It must not overlap ctx.
+ * @return TC_OK, or TC_ERROR for a NULL argument, an inactive context or an
+ *         IV that overlaps ctx. The context is unchanged on error.
  */
 TC_status TC_DES_ctx_set_iv(struct TC_DES_ctx* ctx, const uint8_t* iv);
 #endif
@@ -137,7 +138,7 @@ TC_status TC_DES_ctx_set_iv(struct TC_DES_ctx* ctx, const uint8_t* iv);
  * @brief Encrypt one 8-byte block in ECB mode.
  * @param ctx Initialized context.
  * @param buf 8-byte block, encrypted in place.
- * @return TC_OK, or TC_ERROR for a NULL argument or an inactive context.
+ * @return TC_OK, or TC_ERROR for an argument error.
  */
 TC_status TC_DES_ECB_encrypt(const struct TC_DES_ctx* ctx, uint8_t* buf);
 
@@ -145,7 +146,7 @@ TC_status TC_DES_ECB_encrypt(const struct TC_DES_ctx* ctx, uint8_t* buf);
  * @brief Decrypt one 8-byte block in ECB mode.
  * @param ctx Initialized context.
  * @param buf 8-byte block, decrypted in place.
- * @return TC_OK, or TC_ERROR for a NULL argument or an inactive context.
+ * @return TC_OK, or TC_ERROR for an argument error.
  */
 TC_status TC_DES_ECB_decrypt(const struct TC_DES_ctx* ctx, uint8_t* buf);
 #endif
@@ -156,8 +157,8 @@ TC_status TC_DES_ECB_decrypt(const struct TC_DES_ctx* ctx, uint8_t* buf);
  * @param ctx Initialized context.
  * @param buf Data encrypted in place.
  * @param length Data length in bytes, a multiple of 8.
- * @return TC_OK, or TC_ERROR if length is not block-aligned (context and
- *         buffer unchanged).
+ * @return TC_OK, or TC_ERROR for an argument error or a length that is not
+ *         block-aligned (context and buffer unchanged).
  */
 TC_status TC_DES_CBC_encrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
 
@@ -166,8 +167,8 @@ TC_status TC_DES_CBC_encrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length
  * @param ctx Initialized context.
  * @param buf Data decrypted in place.
  * @param length Data length in bytes, a multiple of 8.
- * @return TC_OK, or TC_ERROR if length is not block-aligned (context and
- *         buffer unchanged).
+ * @return TC_OK, or TC_ERROR for an argument error or a length that is not
+ *         block-aligned (context and buffer unchanged).
  */
 TC_status TC_DES_CBC_decrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
 #endif
@@ -311,7 +312,8 @@ struct TC_DES_CMAC_ctx {
 };
 
 /* keylen must be TC_DES_KEYLEN, TC_DES_KEYLEN_2KEY (K1, K2, K1) or
- * TC_DES_KEYLEN_3KEY. */
+ * TC_DES_KEYLEN_3KEY. The key, update data and final tag must be disjoint
+ * from the context. Overlap is an argument error. */
 TC_status TC_DES_CMAC_init(struct TC_DES_CMAC_ctx* ctx, const uint8_t* key, size_t keylen);
 TC_status TC_DES_CMAC_update(struct TC_DES_CMAC_ctx* ctx, const uint8_t* data, size_t len);
 TC_status TC_DES_CMAC_final(struct TC_DES_CMAC_ctx* ctx, uint8_t tag[TC_DES_CMAC_TAG_MAX]);
@@ -340,10 +342,10 @@ void TC_DES_CMAC_ctx_clear(struct TC_DES_CMAC_ctx* ctx);
  * keys and K1 = K2 or K2 = K3. Clause 7.4 requires independent K and K'.
  *
  * The context is caller-owned and final consumes it. Input, key, and tag
- * buffers must not overlap the context. A failed init wipes the context. A
- * failed final leaves the tag untouched and wipes the context. An update with
- * invalid arguments leaves the context unchanged. An update that fails while
- * processing wipes it.
+ * buffers must not overlap the context. Overlap is an argument error. A
+ * failed init wipes the context. A failed final leaves the tag untouched and
+ * wipes the context. An update with invalid arguments leaves the context
+ * unchanged. An update that fails while processing wipes it.
  */
 typedef enum TC_DES_ISO9797_algorithm {
   TC_DES_ISO9797_ALG1 = 1,

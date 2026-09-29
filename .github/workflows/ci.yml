@@ -180,6 +180,7 @@ jobs:
         run: |
           export AVR_CC="$HOME/.platformio/packages/toolchain-atmelavr/bin/avr-gcc"
           export AVR_SIZE="$HOME/.platformio/packages/toolchain-atmelavr/bin/avr-size"
+          export AVR_NM="$HOME/.platformio/packages/toolchain-atmelavr/bin/avr-nm"
           python3 tools/measure_avr_resources.py --check tests/budgets/avr.json --output avr-resources.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:

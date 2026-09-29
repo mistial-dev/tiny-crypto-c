@@ -1001,6 +1001,155 @@ static MunitResult test_des_null_buffers(const MunitParameter params[], void* da
   }
   return MUNIT_OK;
 }
+
+typedef TC_status (*des_mode_fn)(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
+
+/* A buffer that overlaps the context would overwrite the subkeys or the
+ * feedback register while the mode reads them. Each mode rejects it and
+ * leaves the context and the neighbouring bytes unchanged. length is in the
+ * mode's unit and touches bytes bytes, at most TC_DES_BLOCKLEN. */
+static void check_des_mode_overlap(des_mode_fn mode, size_t length, size_t bytes)
+{
+  static const uint8_t iv[TC_DES_BLOCKLEN] = {1, 2, 3, 4, 5, 6, 7, 8};
+  struct {
+    uint8_t before[TC_DES_BLOCKLEN];
+    struct TC_DES_ctx ctx;
+  } frame;
+  struct TC_DES_ctx saved;
+  uint8_t before[TC_DES_BLOCKLEN];
+  /* The last span ends on the first context byte. */
+  uint8_t* const inside[] = {frame.ctx.Iv, frame.ctx.schedule[0],
+                             frame.before + sizeof frame.before + 1 - bytes};
+  size_t i;
+
+  munit_assert_int(TC_OK, ==, TC_DES_init_ctx_iv(&frame.ctx, des_test_key, TC_DES_KEYLEN, iv));
+  memset(frame.before, 0x5a, sizeof frame.before);
+  memcpy(before, frame.before, sizeof before);
+  memcpy(&saved, &frame.ctx, sizeof saved);
+  for (i = 0; i < sizeof inside / sizeof inside[0]; ++i) {
+    munit_assert_int(TC_ERROR, ==, mode(&frame.ctx, inside[i], length));
+    assert_des_ctx_equal(&frame.ctx, &saved);
+    munit_assert_memory_equal(sizeof before, frame.before, before);
+  }
+  TC_DES_ctx_clear(&frame.ctx);
+}
+
+static MunitResult test_des_mode_overlap(const MunitParameter params[], void* data)
+{
+  static const uint8_t iv[TC_DES_BLOCKLEN] = {8, 7, 6, 5, 4, 3, 2, 1};
+  struct TC_DES_ctx ctx;
+  struct TC_DES_ctx saved;
+  (void)params;
+  (void)data;
+#if TC_DES_ENABLE_CBC
+  check_des_mode_overlap(TC_DES_CBC_encrypt, TC_DES_BLOCKLEN, TC_DES_BLOCKLEN);
+  check_des_mode_overlap(TC_DES_CBC_decrypt, TC_DES_BLOCKLEN, TC_DES_BLOCKLEN);
+#endif
+#if TC_DES_ENABLE_CTR
+  check_des_mode_overlap(TC_DES_CTR_crypt, 1, 1);
+  check_des_mode_overlap(TC_DES_CTR_crypt, TC_DES_BLOCKLEN, TC_DES_BLOCKLEN);
+#endif
+#if TC_DES_ENABLE_CFB64
+  check_des_mode_overlap(TC_DES_CFB64_encrypt, TC_DES_BLOCKLEN, TC_DES_BLOCKLEN);
+  check_des_mode_overlap(TC_DES_CFB64_decrypt, 3, 3);
+#endif
+#if TC_DES_ENABLE_CFB8
+  check_des_mode_overlap(TC_DES_CFB8_encrypt, 1, 1);
+  check_des_mode_overlap(TC_DES_CFB8_decrypt, TC_DES_BLOCKLEN, TC_DES_BLOCKLEN);
+#endif
+#if TC_DES_ENABLE_CFB1
+  /* CFB1 lengths count bits. 57 bits touch 8 bytes. */
+  check_des_mode_overlap(TC_DES_CFB1_encrypt, 1, 1);
+  check_des_mode_overlap(TC_DES_CFB1_decrypt, 57, 8);
+#endif
+#if TC_DES_ENABLE_OFB
+  check_des_mode_overlap(TC_DES_OFB_crypt, 1, 1);
+  check_des_mode_overlap(TC_DES_OFB_crypt, TC_DES_BLOCKLEN, TC_DES_BLOCKLEN);
+#endif
+
+  /* set_iv copies into ctx->Iv. A source inside the context would be an
+   * overlapping memcpy or would copy subkey bytes into the IV. */
+  munit_assert_int(TC_OK, ==, TC_DES_init_ctx_iv(&ctx, des_test_key, TC_DES_KEYLEN, iv));
+  memcpy(&saved, &ctx, sizeof saved);
+  munit_assert_int(TC_ERROR, ==, TC_DES_ctx_set_iv(&ctx, ctx.Iv));
+  munit_assert_int(TC_ERROR, ==, TC_DES_ctx_set_iv(&ctx, ctx.Iv + 1));
+  munit_assert_int(TC_ERROR, ==, TC_DES_ctx_set_iv(&ctx, ctx.schedule[0]));
+#if TC_DES_ENABLE_ECB
+  munit_assert_int(TC_ERROR, ==, TC_DES_ECB_encrypt(&ctx, ctx.schedule[1]));
+  munit_assert_int(TC_ERROR, ==, TC_DES_ECB_decrypt(&ctx, ctx.Iv));
+#endif
+  assert_des_ctx_equal(&ctx, &saved);
+  TC_DES_ctx_clear(&ctx);
+  return MUNIT_OK;
+}
+#endif
+
+#if TC_DES_ENABLE_CMAC
+/* Message or tag bytes inside a MAC context change while the MAC runs, and a
+ * tag inside it is wiped when final clears the context. */
+static MunitResult test_des_cmac_overlap(const MunitParameter params[], void* data)
+{
+  /* after gives a tag that straddles the context end its storage. */
+  struct {
+    struct TC_DES_CMAC_ctx ctx;
+    uint8_t after[TC_DES_CMAC_TAG_MAX];
+  } frame;
+  struct TC_DES_CMAC_ctx* const ctx = &frame.ctx;
+  uint8_t tag[TC_DES_CMAC_TAG_MAX];
+  uint8_t saved_mac[TC_DES_BLOCKLEN];
+  uint8_t saved_buf[TC_DES_BLOCKLEN];
+  (void)params;
+  (void)data;
+  munit_assert_int(TC_OK, ==, TC_DES_CMAC_init(ctx, des_test_key, TC_DES_KEYLEN));
+  munit_assert_int(TC_OK, ==, TC_DES_CMAC_update(ctx, cmac_kat_msg, 3));
+  memcpy(saved_mac, ctx->mac, sizeof saved_mac);
+  memcpy(saved_buf, ctx->buf, sizeof saved_buf);
+  munit_assert_int(TC_ERROR, ==, TC_DES_CMAC_update(ctx, ctx->buf, 1));
+  munit_assert_int(TC_ERROR, ==, TC_DES_CMAC_update(ctx, ctx->k1, sizeof ctx->k1));
+  munit_assert_int(TC_ERROR, ==, TC_DES_CMAC_final(ctx, ctx->mac));
+  munit_assert_int(TC_ERROR, ==, TC_DES_CMAC_final(ctx, (uint8_t*)&frame + sizeof frame.ctx - 1));
+  munit_assert_memory_equal(sizeof saved_mac, ctx->mac, saved_mac);
+  munit_assert_memory_equal(sizeof saved_buf, ctx->buf, saved_buf);
+  munit_assert_uint8(ctx->buf_len, ==, 3);
+  munit_assert_uint8(ctx->active, ==, 1);
+  munit_assert_int(TC_OK, ==, TC_DES_CMAC_final(ctx, tag));
+  return MUNIT_OK;
+}
+#endif
+
+#if TC_DES_ENABLE_ISO9797
+static MunitResult test_des_iso9797_overlap(const MunitParameter params[], void* data)
+{
+  static const uint8_t message[] = "Now is the time for all ";
+  /* after gives a tag that straddles the context end its storage. */
+  struct {
+    struct TC_DES_ISO9797_ctx ctx;
+    uint8_t after[TC_DES_BLOCKLEN];
+  } frame;
+  struct TC_DES_ISO9797_ctx* const ctx = &frame.ctx;
+  uint8_t tag[TC_DES_BLOCKLEN];
+  uint8_t saved_mac[TC_DES_BLOCKLEN];
+  uint8_t saved_buf[TC_DES_BLOCKLEN];
+  (void)params;
+  (void)data;
+  munit_assert_int(TC_OK, ==,
+                   TC_DES_ISO9797_init(ctx, TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, tdes2_key,
+                                       TC_DES_KEYLEN_2KEY));
+  munit_assert_int(TC_OK, ==, TC_DES_ISO9797_update(ctx, message, 3));
+  memcpy(saved_mac, ctx->mac, sizeof saved_mac);
+  memcpy(saved_buf, ctx->buf, sizeof saved_buf);
+  munit_assert_int(TC_ERROR, ==, TC_DES_ISO9797_update(ctx, ctx->buf, 1));
+  munit_assert_int(TC_ERROR, ==, TC_DES_ISO9797_update(ctx, ctx->keys.schedule[0], 6));
+  munit_assert_int(TC_ERROR, ==, TC_DES_ISO9797_final(ctx, ctx->mac));
+  munit_assert_int(TC_ERROR, ==,
+                   TC_DES_ISO9797_final(ctx, (uint8_t*)&frame + sizeof frame.ctx - 1));
+  munit_assert_memory_equal(sizeof saved_mac, ctx->mac, saved_mac);
+  munit_assert_memory_equal(sizeof saved_buf, ctx->buf, saved_buf);
+  munit_assert_uint8(ctx->used, ==, 3);
+  munit_assert_uint8(ctx->active, ==, 1);
+  munit_assert_int(TC_OK, ==, TC_DES_ISO9797_final(ctx, tag));
+  return MUNIT_OK;
+}
 #endif
 
 /* Secure wipe / context clear tests */
@@ -1456,6 +1605,13 @@ static MunitTest test_suite_tests[] = {
 #if TC_DES_ENABLE_CBC || TC_DES_ENABLE_CTR || TC_DES_ENABLE_OFB || TC_DES_ENABLE_CFB1 ||           \
     TC_DES_ENABLE_CFB8 || TC_DES_ENABLE_CFB64
     {"/des_null_buffers", test_des_null_buffers, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/des_mode_overlap", test_des_mode_overlap, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+#endif
+#if TC_DES_ENABLE_CMAC
+    {"/des_cmac_overlap", test_des_cmac_overlap, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+#endif
+#if TC_DES_ENABLE_ISO9797
+    {"/des_iso9797_overlap", test_des_iso9797_overlap, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
 #endif
     {"/des_secure_zero_and_clear", test_des_secure_zero_and_clear, NULL, NULL,
      MUNIT_TEST_OPTION_NONE, NULL},

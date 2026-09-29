@@ -449,12 +449,18 @@ add_test(NAME test_package_boundaries
     add_test(NAME test_idf_rsa_image_policy COMMAND test_idf_image_policy_rsa
       --image "${TINY_CRYPTO_TEST_ESP_SIGNED_IMAGE}")
   endif()
-  tc_add_c_test(test_aes_platform tiny-crypto-c-test-aes-dynamic tests/aes/platform.c src/aes.c src/aes_modes.c)
-  target_compile_definitions(test_aes_platform PRIVATE TC_AES_PLATFORM=1)
-  tc_add_c_test(test_aes_mode_failure tiny-crypto-c-test tests/aes/mode_failure.c src/aes.c
-    src/aes_modes.c)
-  target_compile_definitions(test_aes_mode_failure PRIVATE TC_AES_PLATFORM=1
-    TC_AES_ENABLE_DYNAMIC=1)
+  # The mode sources are compiled into the test with the block cipher
+  # renamed, so the test's wrappers can fail chosen blocks. The library
+  # supplies the real cipher under the same mode configuration.
+  tc_add_test_library(tiny-crypto-c-test-aes-modes src/common.c ${tc_aes_sources})
+  target_compile_definitions(tiny-crypto-c-test-aes-modes PUBLIC
+    TC_ENABLE_DES=0 TC_ENABLE_SHA256=0 TC_AES_ENABLE_DYNAMIC=1 TC_AES_ENABLE_ECB=1
+    TC_AES_ENABLE_CBC=1 TC_AES_ENABLE_CTR=1 TC_AES_ENABLE_OFB=1)
+  tc_add_c_test(test_aes_mode_failure tiny-crypto-c-test-aes-modes tests/aes/mode_failure.c
+    src/aes_modes.c src/block_modes.c)
+  target_compile_definitions(test_aes_mode_failure PRIVATE
+    tc_aes_cipher_rounds=tc_test_cipher_rounds tc_aes_inverse_rounds=tc_test_inverse_rounds
+    tc_aes_cipher=tc_test_cipher)
   tc_add_c_test(test_aes_backend_failure tiny-crypto-c-test-aes-dynamic
     tests/aes/backend_failure.c src/aes_mac.c src/aes_cmac.c src/aes_eax.c src/aes_siv.c
     src/aes_ccm.c src/aes_ghash.c src/aes_gcm.c)
@@ -1421,7 +1427,7 @@ add_test(NAME test_package_boundaries
             --define TC_AES_SBOX_MODE=${sbox_mode} --define TC_AES_ENABLE_ECB=1
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/avr/aes_known_answer.c
             ${CMAKE_CURRENT_SOURCE_DIR}/src/aes.c ${CMAKE_CURRENT_SOURCE_DIR}/src/aes_modes.c
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/common.c)
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/block_modes.c ${CMAKE_CURRENT_SOURCE_DIR}/src/common.c)
       endforeach()
     endif()
     # The key challenge carries a 32-bit work budget across size_t PKI code.

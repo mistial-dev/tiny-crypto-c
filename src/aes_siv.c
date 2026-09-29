@@ -10,8 +10,8 @@ static TC_status tc_aes_siv_cmac(const uint8_t* round_key, const uint8_t k1[TC_A
                                  const uint8_t k2[TC_AES_BLOCKLEN], const TC_bytes* parts,
                                  size_t count, uint8_t out[TC_AES_BLOCKLEN])
 {
-  const tc_aes_mac_key key = {round_key, TC_AES_FIXED_ROUNDS};
-  const tc_mac_cipher cipher = tc_aes_mac_cipher(&key);
+  const tc_aes_block_key key = {round_key, TC_AES_FIXED_ROUNDS};
+  const tc_block_cipher cipher = tc_aes_block_cipher(&key);
   return tc_mac_cmac_parts(&cipher, NULL, parts, count, k1, k2, out);
 }
 

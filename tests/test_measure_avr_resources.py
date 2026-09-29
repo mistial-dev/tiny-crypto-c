@@ -15,21 +15,22 @@ spec.loader.exec_module(resources)
 
 
 class DescriptorCallbacks(unittest.TestCase):
-    def test_current_mac_descriptors_are_accounted_for(self):
-        self.assertEqual(resources.mac_cipher_callbacks(),
-                         {"tc_aes_mac_encrypt", "tc_des_mac_encrypt"})
+    def test_current_block_descriptors_are_accounted_for(self):
+        self.assertEqual(resources.block_cipher_callbacks(),
+                         {"tc_aes_block_encrypt", "tc_aes_block_decrypt",
+                          "tc_des_block_encrypt", "tc_des_block_decrypt"})
 
-    def test_new_mac_callback_requires_stack_model_update(self):
+    def test_new_block_callback_requires_stack_model_update(self):
         with tempfile.TemporaryDirectory() as temporary:
             source = Path(temporary) / "src"
             source.mkdir()
-            (source / "mac.c").write_text(
-                "tc_mac_cipher a = {16, key, tc_aes_mac_encrypt};\n"
-                "tc_mac_cipher b = {8, key, tc_des_mac_encrypt};\n"
-                "tc_mac_cipher c = {16, key, tc_new_mac_encrypt};\n")
+            (source / "block.h").write_text(
+                "tc_block_cipher a = {16, key, tc_aes_block_encrypt, tc_aes_block_decrypt};\n"
+                "tc_block_cipher b = {8, key, tc_des_block_encrypt, tc_des_block_decrypt};\n"
+                "tc_block_cipher c = {16, key, tc_new_block_encrypt, NULL};\n")
             with patch.object(resources, "ROOT", Path(temporary)):
                 with self.assertRaisesRegex(RuntimeError, "callbacks changed"):
-                    resources.mac_cipher_callbacks()
+                    resources.block_cipher_callbacks()
 
 
 if __name__ == "__main__":

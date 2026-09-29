@@ -29,12 +29,12 @@ void tc_mac_gf_double_reversed(uint8_t* output, const uint8_t* input, size_t blo
   output[0] ^= (uint8_t)(reduction & (uint8_t)(0u - carry));
 }
 
-TC_status tc_mac_derive_subkeys(const tc_mac_cipher* cipher, uint8_t reduction, int reversed,
+TC_status tc_mac_derive_subkeys(const tc_block_cipher* cipher, uint8_t reduction, int reversed,
                                 uint8_t* k1, uint8_t* k2)
 {
   const size_t width = cipher->block_size;
-  uint8_t l[TC_MAC_MAX_BLOCK] = {0};
-  TC_status status = cipher->encrypt(cipher->cipher, l);
+  uint8_t l[TC_BLOCK_MAX] = {0};
+  TC_status status = cipher->encrypt(cipher->key, l);
   if (status == TC_OK) {
     if (reversed) {
       tc_mac_gf_double_reversed(k1, l, width, reduction);
@@ -51,14 +51,14 @@ TC_status tc_mac_derive_subkeys(const tc_mac_cipher* cipher, uint8_t reduction, 
   return status;
 }
 
-TC_status tc_mac_cbc_block(const tc_mac_cipher* cipher, uint8_t* mac, const uint8_t* block)
+TC_status tc_mac_cbc_block(const tc_block_cipher* cipher, uint8_t* mac, const uint8_t* block)
 {
   for (size_t i = 0; i < cipher->block_size; ++i)
     mac[i] ^= block[i];
-  return cipher->encrypt(cipher->cipher, mac);
+  return cipher->encrypt(cipher->key, mac);
 }
 
-TC_status tc_mac_cbc_update(const tc_mac_cipher* cipher, uint8_t* mac, uint8_t* block,
+TC_status tc_mac_cbc_update(const tc_block_cipher* cipher, uint8_t* mac, uint8_t* block,
                             uint8_t* used, const uint8_t* data, size_t length, int retain_last)
 {
   const size_t width = cipher->block_size;
@@ -91,7 +91,7 @@ TC_status tc_mac_cbc_update(const tc_mac_cipher* cipher, uint8_t* mac, uint8_t* 
   return TC_OK;
 }
 
-TC_status tc_mac_cbc_pad(const tc_mac_cipher* cipher, uint8_t* mac, uint8_t* block, uint8_t* used)
+TC_status tc_mac_cbc_pad(const tc_block_cipher* cipher, uint8_t* mac, uint8_t* block, uint8_t* used)
 {
   if (*used) {
     memset(block + *used, 0, cipher->block_size - *used);
@@ -103,7 +103,7 @@ TC_status tc_mac_cbc_pad(const tc_mac_cipher* cipher, uint8_t* mac, uint8_t* blo
   return TC_OK;
 }
 
-TC_status tc_mac_cmac_final(const tc_mac_cipher* cipher, uint8_t* mac, uint8_t* block,
+TC_status tc_mac_cmac_final(const tc_block_cipher* cipher, uint8_t* mac, uint8_t* block,
                             uint8_t used, const uint8_t* complete_subkey,
                             const uint8_t* partial_subkey, uint8_t* tag)
 {
@@ -121,11 +121,11 @@ TC_status tc_mac_cmac_final(const tc_mac_cipher* cipher, uint8_t* mac, uint8_t* 
   return TC_OK;
 }
 
-TC_status tc_mac_cmac_parts(const tc_mac_cipher* cipher, const uint8_t* initial,
+TC_status tc_mac_cmac_parts(const tc_block_cipher* cipher, const uint8_t* initial,
                             const TC_bytes* parts, size_t count, const uint8_t* complete_subkey,
                             const uint8_t* partial_subkey, uint8_t* tag)
 {
-  uint8_t mac[TC_MAC_MAX_BLOCK] = {0}, block[TC_MAC_MAX_BLOCK] = {0};
+  uint8_t mac[TC_BLOCK_MAX] = {0}, block[TC_BLOCK_MAX] = {0};
   uint8_t used = 0;
   TC_status status = TC_OK;
   if (initial)

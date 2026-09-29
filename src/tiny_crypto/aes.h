@@ -80,23 +80,32 @@ void TC_AES_init_sbox(void);
 #endif
 #if TC_AES_HAVE_IV
 TC_status TC_AES_init_ctx_iv(struct TC_AES_ctx* ctx, const uint8_t* key, const uint8_t* iv);
+/* Load a new 16-byte IV and reset the CTR and OFB stream state. Returns
+ * TC_ERROR, leaving ctx unchanged, for a NULL argument, an uninitialized
+ * context or an IV that overlaps ctx. */
 TC_status TC_AES_ctx_set_iv(struct TC_AES_ctx* ctx, const uint8_t* iv);
 #endif
 
+/*
+ * The CBC, CTR, OFB and ECB functions below transform buf in place and share
+ * one failure rule. They return TC_ERROR, leaving buf and ctx unchanged, for
+ * an uninitialized context, a NULL buf with a nonzero length, or a buf that
+ * overlaps ctx. A block cipher failure part way through wipes buf and clears
+ * ctx, so neither partial output nor a broken chaining value survives. ECB
+ * takes a const key schedule, so its failure wipes buf only.
+ */
+
 #if TC_AES_ENABLE_ECB
-/* Buffer must be exactly TC_AES_BLOCKLEN bytes. ECB is insecure for most uses. */
+/* buf is exactly TC_AES_BLOCKLEN bytes. ECB is insecure for most uses. */
 TC_status TC_AES_ECB_encrypt(const struct TC_AES_key_ctx* ctx, uint8_t* buf);
 TC_status TC_AES_ECB_decrypt(const struct TC_AES_key_ctx* ctx, uint8_t* buf);
 #endif
 
 #if TC_AES_ENABLE_CBC
 /*
- * Buffer length must be a multiple of TC_AES_BLOCKLEN. The caller applies padding.
- * Returns TC_ERROR if length is not block-aligned. Set IV via TC_AES_init_ctx_iv()
+ * length must be a multiple of TC_AES_BLOCKLEN. The caller applies padding.
+ * An unaligned length is an argument error. Set the IV via TC_AES_init_ctx_iv()
  * or TC_AES_ctx_set_iv(). Never reuse an IV with the same key.
- * The mode functions below share one failure rule: an argument error leaves
- * buf and ctx unchanged, and a cipher failure part way through wipes buf and
- * clears ctx, so neither partial output nor a broken chaining value survives.
  */
 TC_status TC_AES_CBC_encrypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length);
 TC_status TC_AES_CBC_decrypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length);
@@ -311,7 +320,8 @@ struct TC_AES_CMAC_ctx {
 };
 
 /* The key must be disjoint from the whole context. Overlap returns TC_ERROR
- * and leaves the context cleared. */
+ * and leaves the context cleared. Update data and the final tag must also be
+ * disjoint from it. Overlap there is an argument error. */
 TC_status TC_AES_CMAC_init(struct TC_AES_CMAC_ctx* ctx, const uint8_t* key);
 TC_status TC_AES_CMAC_update(struct TC_AES_CMAC_ctx* ctx, const uint8_t* data, size_t len);
 TC_status TC_AES_CMAC_final(struct TC_AES_CMAC_ctx* ctx, uint8_t tag[TC_AES_CMAC_TAG_MAX]);

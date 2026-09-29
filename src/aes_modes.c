@@ -2,81 +2,65 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
  * AES confidentiality modes (NIST SP 800-38A): ECB, CBC, CTR and OFB, plus
- * CBC over dynamic-length keys. */
+ * CBC over dynamic-length keys. CBC, CTR and OFB run on the shared cores in
+ * block_modes.c. */
 #include <tiny_crypto/aes.h>
 #include "aes_internal.h"
+
+/* Every fixed-key entry validates once: tc_block_mode_args on the buffer,
+ * then an active key schedule. An argument error leaves buf and ctx
+ * unchanged. */
+#define AES_MODE_VALID(ctx, key_ctx, buf, length, alignment)                                       \
+  (tc_block_mode_args((ctx), sizeof *(ctx), (buf), (length), (alignment)) && (key_ctx)->active == 1)
+
+#if TC_AES_HAVE_IV
+/* The fixed schedule of an AES context, borrowed for one call. */
+static tc_aes_block_key tc_aes_ctx_key(const struct TC_AES_ctx* ctx)
+{
+  const tc_aes_block_key key = {ctx->key.round_key, TC_AES_FIXED_ROUNDS};
+  return key;
+}
+#endif
 
 /*****************************************************************************/
 /* Public functions:                                                         */
 /*****************************************************************************/
 #if TC_AES_ENABLE_ECB
+/* A cipher failure wipes the block. The key schedule is const and stays. */
+static TC_status tc_aes_ecb_result(TC_status status, uint8_t* buf)
+{
+  if (status != TC_OK)
+    TC_secure_zero(buf, TC_AES_BLOCKLEN);
+  return status;
+}
 
 TC_status TC_AES_ECB_encrypt(const struct TC_AES_key_ctx* ctx, uint8_t* buf)
 {
-  if (ctx == NULL || ctx->active != 1 || buf == NULL)
+  if (!AES_MODE_VALID(ctx, ctx, buf, TC_AES_BLOCKLEN, 1))
     return TC_ERROR;
-  return tc_aes_cipher((state_t*)buf, ctx->round_key);
+  return tc_aes_ecb_result(tc_aes_cipher((state_t*)buf, ctx->round_key), buf);
 }
 
 TC_status TC_AES_ECB_decrypt(const struct TC_AES_key_ctx* ctx, uint8_t* buf)
 {
-  if (ctx == NULL || ctx->active != 1 || buf == NULL)
+  if (!AES_MODE_VALID(ctx, ctx, buf, TC_AES_BLOCKLEN, 1))
     return TC_ERROR;
-  return tc_aes_inverse_rounds((state_t*)buf, ctx->round_key, TC_AES_FIXED_ROUNDS);
+  return tc_aes_ecb_result(
+      tc_aes_inverse_rounds((state_t*)buf, ctx->round_key, TC_AES_FIXED_ROUNDS), buf);
 }
 
 #endif
 
-#if TC_AES_ENABLE_CBC || TC_AES_ENABLE_DYNAMIC
-/* A cipher failure wipes the whole buffer and the chaining value, so no
- * partly transformed output or broken IV survives. */
-static TC_status tc_aes_cbc_encrypt(const uint8_t* key, uint8_t rounds, uint8_t iv[16],
-                                    uint8_t* buffer, size_t length)
-{
-  size_t offset;
-  for (offset = 0; offset < length; offset += 16) {
-    tc_internal_xor(buffer + offset, iv, 16);
-    if (tc_aes_cipher_rounds((state_t*)(buffer + offset), key, rounds) != TC_OK) {
-      TC_secure_zero(buffer, length);
-      TC_secure_zero(iv, 16);
-      return TC_ERROR;
-    }
-    memcpy(iv, buffer + offset, 16);
-  }
-  return TC_OK;
-}
-
-static TC_status tc_aes_cbc_decrypt(const uint8_t* key, uint8_t rounds, uint8_t iv[16],
-                                    uint8_t* buffer, size_t length)
-{
-  uint8_t previous[16];
-  size_t offset;
-  TC_status status = TC_OK;
-  for (offset = 0; offset < length; offset += 16) {
-    memcpy(previous, buffer + offset, 16);
-    status = tc_aes_inverse_rounds((state_t*)(buffer + offset), key, rounds);
-    if (status != TC_OK) {
-      TC_secure_zero(buffer, length);
-      TC_secure_zero(iv, 16);
-      break;
-    }
-    tc_internal_xor(buffer + offset, iv, 16);
-    memcpy(iv, previous, 16);
-  }
-  TC_secure_zero(previous, sizeof previous);
-  return status;
-}
-#endif
-
+/* A cipher failure part way through wipes buf and the chaining value in the
+ * shared core, and clears the context here. */
 #if TC_AES_ENABLE_CBC
 TC_status TC_AES_CBC_encrypt(struct TC_AES_ctx* ctx, uint8_t* buffer, size_t length)
 {
-  if (!ctx || ctx->key.active != 1 || (!buffer && length))
+  if (!AES_MODE_VALID(ctx, &ctx->key, buffer, length, TC_AES_BLOCKLEN))
     return TC_ERROR;
-  if (length % 16)
-    return TC_ERROR;
-  if (tc_aes_cbc_encrypt(ctx->key.round_key, TC_AES_FIXED_ROUNDS, ctx->iv, buffer, length) !=
-      TC_OK) {
+  const tc_aes_block_key key = tc_aes_ctx_key(ctx);
+  const tc_block_cipher cipher = tc_aes_block_cipher(&key);
+  if (tc_block_cbc_encrypt(&cipher, ctx->iv, buffer, length) != TC_OK) {
     TC_AES_ctx_clear(ctx);
     return TC_ERROR;
   }
@@ -85,12 +69,11 @@ TC_status TC_AES_CBC_encrypt(struct TC_AES_ctx* ctx, uint8_t* buffer, size_t len
 
 TC_status TC_AES_CBC_decrypt(struct TC_AES_ctx* ctx, uint8_t* buffer, size_t length)
 {
-  if (!ctx || ctx->key.active != 1 || (!buffer && length))
+  if (!AES_MODE_VALID(ctx, &ctx->key, buffer, length, TC_AES_BLOCKLEN))
     return TC_ERROR;
-  if (length % 16)
-    return TC_ERROR;
-  if (tc_aes_cbc_decrypt(ctx->key.round_key, TC_AES_FIXED_ROUNDS, ctx->iv, buffer, length) !=
-      TC_OK) {
+  const tc_aes_block_key key = tc_aes_ctx_key(ctx);
+  const tc_block_cipher cipher = tc_aes_block_cipher_inverse(&key);
+  if (tc_block_cbc_decrypt(&cipher, ctx->iv, buffer, length) != TC_OK) {
     TC_AES_ctx_clear(ctx);
     return TC_ERROR;
   }
@@ -99,85 +82,47 @@ TC_status TC_AES_CBC_decrypt(struct TC_AES_ctx* ctx, uint8_t* buffer, size_t len
 #endif /* CBC */
 
 #if TC_AES_ENABLE_CTR
-
 TC_status TC_AES_CTR_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length)
 {
-  size_t offset = 0;
-  size_t blocks_needed;
-
-  if (ctx == NULL || ctx->key.active != 1 || ctx->ctr_pos > TC_AES_BLOCKLEN ||
-      (length != 0 && buf == NULL))
+  if (!AES_MODE_VALID(ctx, &ctx->key, buf, length, 1))
     return TC_ERROR;
-  if (length == 0)
-    return TC_OK;
-
-  blocks_needed = tc_internal_counter_blocks_needed(length, TC_AES_BLOCKLEN, ctx->ctr_pos);
-  if (!tc_internal_counter_has_blocks(ctx->iv, TC_AES_BLOCKLEN, blocks_needed, ctx->ctr_exhausted))
+  const tc_block_ctr_state state = {ctx->iv, ctx->ctr_stream, &ctx->ctr_pos, &ctx->ctr_exhausted};
+  if (!tc_block_ctr_request_ok(&state, TC_AES_BLOCKLEN, length))
     return TC_ERROR;
-
-  /* One keystream block serves cached bytes, whole blocks and the tail. */
-  while (offset < length) {
-    size_t take;
-    if (ctx->ctr_pos == TC_AES_BLOCKLEN) {
-      memcpy(ctx->ctr_stream, ctx->iv, TC_AES_BLOCKLEN);
-      if (tc_aes_cipher((state_t*)ctx->ctr_stream, ctx->key.round_key) != TC_OK) {
-        TC_secure_zero(buf, length);
-        TC_AES_ctx_clear(ctx);
-        return TC_ERROR;
-      }
-      ctx->ctr_exhausted |= tc_internal_increment_be(ctx->iv, TC_AES_BLOCKLEN);
-      ctx->ctr_pos = 0;
-    }
-    take = TC_AES_BLOCKLEN - ctx->ctr_pos;
-    if (take > length - offset)
-      take = length - offset;
-    tc_internal_xor(buf + offset, ctx->ctr_stream + ctx->ctr_pos, take);
-    offset += take;
-    ctx->ctr_pos = (uint8_t)(ctx->ctr_pos + take);
+  const tc_aes_block_key key = tc_aes_ctx_key(ctx);
+  const tc_block_cipher cipher = tc_aes_block_cipher(&key);
+  if (tc_block_ctr_crypt(&cipher, &state, buf, length) != TC_OK) {
+    TC_AES_ctx_clear(ctx);
+    return TC_ERROR;
   }
   return TC_OK;
 }
-
 #endif /* CTR */
 
 #if TC_AES_ENABLE_OFB
-
 TC_status TC_AES_OFB_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length)
 {
-  uint8_t pos;
-
-  if (ctx == NULL || ctx->key.active != 1 || ctx->ofb_pos > TC_AES_BLOCKLEN ||
-      (length != 0 && buf == NULL))
+  if (!AES_MODE_VALID(ctx, &ctx->key, buf, length, 1) || ctx->ofb_pos > TC_AES_BLOCKLEN)
     return TC_ERROR;
-
-  uint8_t* const start = buf;
-  const size_t total = length;
-  pos = ctx->ofb_pos;
-  while (length-- != 0) {
-    if (pos == TC_AES_BLOCKLEN) {
-      if (tc_aes_cipher((state_t*)ctx->iv, ctx->key.round_key) != TC_OK) {
-        TC_secure_zero(start, total);
-        TC_AES_ctx_clear(ctx);
-        return TC_ERROR;
-      }
-      pos = 0;
-    }
-    *buf++ ^= ctx->iv[pos++];
+  const tc_aes_block_key key = tc_aes_ctx_key(ctx);
+  const tc_block_cipher cipher = tc_aes_block_cipher(&key);
+  if (tc_block_ofb_crypt(&cipher, ctx->iv, &ctx->ofb_pos, buf, length) != TC_OK) {
+    TC_AES_ctx_clear(ctx);
+    return TC_ERROR;
   }
-  ctx->ofb_pos = pos;
   return TC_OK;
 }
-
 #endif /* OFB */
 
 #if TC_AES_ENABLE_DYNAMIC
+/* The key, IV and buffer are pairwise disjoint. */
 static int tc_aes_dynamic_cbc_valid(const TC_AES_dynamic_key* ctx, const uint8_t* iv,
                                     const uint8_t* buffer, size_t length)
 {
-  return tc_aes_dynamic_key_valid(ctx) && iv && (buffer || !length) && !(length % 16) &&
-         tc_internal_ranges_disjoint(ctx, sizeof *ctx, iv, 16) &&
-         tc_internal_ranges_disjoint(ctx, sizeof *ctx, buffer, length) &&
-         tc_internal_ranges_disjoint(iv, 16, buffer, length);
+  return tc_block_mode_args(ctx, sizeof *ctx, buffer, length, TC_AES_BLOCKLEN) &&
+         tc_block_mode_args(ctx, sizeof *ctx, iv, TC_AES_BLOCKLEN, 1) &&
+         tc_internal_ranges_disjoint(iv, TC_AES_BLOCKLEN, buffer, length) &&
+         tc_aes_dynamic_key_valid(ctx);
 }
 
 TC_status TC_AES_dynamic_CBC_encrypt(const TC_AES_dynamic_key* ctx, uint8_t iv[16], uint8_t* buffer,
@@ -185,7 +130,9 @@ TC_status TC_AES_dynamic_CBC_encrypt(const TC_AES_dynamic_key* ctx, uint8_t iv[1
 {
   if (!tc_aes_dynamic_cbc_valid(ctx, iv, buffer, length))
     return TC_ERROR;
-  return tc_aes_cbc_encrypt(ctx->round_key, ctx->rounds, iv, buffer, length);
+  const tc_aes_block_key key = {ctx->round_key, ctx->rounds};
+  const tc_block_cipher cipher = tc_aes_block_cipher(&key);
+  return tc_block_cbc_encrypt(&cipher, iv, buffer, length);
 }
 
 TC_status TC_AES_dynamic_CBC_decrypt(const TC_AES_dynamic_key* ctx, uint8_t iv[16], uint8_t* buffer,
@@ -193,6 +140,8 @@ TC_status TC_AES_dynamic_CBC_decrypt(const TC_AES_dynamic_key* ctx, uint8_t iv[1
 {
   if (!tc_aes_dynamic_cbc_valid(ctx, iv, buffer, length))
     return TC_ERROR;
-  return tc_aes_cbc_decrypt(ctx->round_key, ctx->rounds, iv, buffer, length);
+  const tc_aes_block_key key = {ctx->round_key, ctx->rounds};
+  const tc_block_cipher cipher = tc_aes_block_cipher_inverse(&key);
+  return tc_block_cbc_decrypt(&cipher, iv, buffer, length);
 }
 #endif

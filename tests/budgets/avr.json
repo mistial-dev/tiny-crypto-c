@@ -1,11 +1,11 @@
 {
   "description":
-      "ATmega328P, avr-gcc 7.3.0, -Os without LTO. Rounded headroom over the recorded baseline. Stack covers project call chains, excluding application/libc/interrupt frames. Figures include the unconditional secret wiping and argument checks, which cost at most 50 bytes of flash and 4 bytes of stack in these profiles.",
+      "ATmega328P, avr-gcc 7.3.0, -Os without LTO. Rounded headroom over the recorded baseline. Stack covers project call chains, excluding application/libc/interrupt frames. Figures include the unconditional secret wiping and argument checks, which cost at most 50 bytes of flash and 4 bytes of stack in these profiles. aes_ctr runs on the CBC/CTR/OFB core shared with DES, so it includes the block cipher descriptor call and the buffer and context overlap check.",
   "profiles": {
     "aes_ctr": {
-      "flash": 2200,
+      "flash": 2400,
       "static_ram": 100,
-      "project_stack_estimate": 90
+      "project_stack_estimate": 100
     },
     "kdf_sha256": {
       "flash": 9300,
