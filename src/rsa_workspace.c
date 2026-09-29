@@ -66,9 +66,10 @@ uint32_t TC_RSA_encode_pss_work(const TC_RSA_pss_options* options, size_t modulu
   size_t cost = 0;
   if (!options || !tc_rsa_supported_modulus_size(modulus_bytes))
     return 0;
-  return tc_rsa_work_value(tc_rsa_pss_cost(modulus_bytes, modulus_bytes * 8 - 1, options->hash,
-                                           options->mgf_hash, options->salt_length, &cost),
-                           cost);
+  /* Sequence the cost call before reading cost: argument order is unspecified. */
+  const TC_RSA_result result = tc_rsa_pss_cost(modulus_bytes, modulus_bytes * 8 - 1, options->hash,
+                                               options->mgf_hash, options->salt_length, &cost);
+  return tc_rsa_work_value(result, cost);
 }
 
 uint32_t TC_RSA_oaep_work(const TC_RSA_oaep_options* options, size_t modulus_bytes)
@@ -76,9 +77,9 @@ uint32_t TC_RSA_oaep_work(const TC_RSA_oaep_options* options, size_t modulus_byt
   size_t cost = 0;
   if (!options || !tc_rsa_supported_modulus_size(modulus_bytes))
     return 0;
-  return tc_rsa_work_value(tc_rsa_oaep_cost(modulus_bytes, options->hash, options->mgf_hash,
-                                            options->label.length, &cost),
-                           cost);
+  const TC_RSA_result result = tc_rsa_oaep_cost(modulus_bytes, options->hash, options->mgf_hash,
+                                                options->label.length, &cost);
+  return tc_rsa_work_value(result, cost);
 }
 
 uint32_t TC_RSA_public_work(const TC_RSA_public_key* key)
