@@ -981,8 +981,9 @@ int main(int argc, char** argv)
                                       options.minimum_publication,
                                       CCL_READS,
                                       options.rsa_padding};
-  const ExampleTWICResult result = example_twic_authenticate(
-      &io, &request, example_card_random, NULL, &sensitive.scratch.validation, &work);
+  const ExampleTWICResult result =
+      example_twic_authenticate(&io, &request, (TC_random_source){example_card_random, NULL},
+                                &sensitive.scratch.validation, &work);
   static const char* results[] = {"Authenticated",
                                   "Certificate or card proof invalid",
                                   "Credential cancelled",

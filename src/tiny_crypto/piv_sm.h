@@ -101,7 +101,7 @@ void TC_PIV_SM_clear(TC_PIV_SM* session);
  * Valid arguments discard any previous session. A failed RNG or 16 rejected
  * scalars leaves the session cleared. */
 TC_status TC_PIV_SM_begin(TC_PIV_SM* session, TC_PIV_SM_suite suite, const uint8_t host_id[8],
-                          TC_random_fn random, void* random_user, TC_PIV_SM_handshake* handshake,
+                          TC_random_source random, TC_PIV_SM_handshake* handshake,
                           TC_PIV_SM_workspace* workspace);
 
 /* Authenticate the peer key through the application's trust workflow, then

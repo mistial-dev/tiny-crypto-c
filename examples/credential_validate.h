@@ -78,7 +78,7 @@ TC_TLV_result example_read_card_identity(TC_bytes encoded, TC_PIV_card_profile p
  * Workspace, work, mutable contexts and inputs must be disjoint. Keep scratch
  * outside small task stacks. It is cleared after processing. No PIN is used. */
 ExampleTWICResult example_twic_authenticate(ExampleCardIO* io, const ExampleTWICRequest* request,
-                                            TC_random_fn random, void* random_context,
+                                            TC_random_source random,
                                             ExampleTWICWorkspace* workspace, size_t* work);
 
 #ifdef __cplusplus

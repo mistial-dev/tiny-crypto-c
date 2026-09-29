@@ -43,10 +43,10 @@ ExampleCardKeyResult example_card_check_key(ExampleCardIO* io, ExampleCardKeyRef
                                             const TC_X509_public_key* key,
                                             const ExampleCardKeyPolicy* policy,
                                             const TC_X509_signature_provider* provider,
-                                            TC_random_fn random, void* random_context,
+                                            TC_random_source random,
                                             ExampleCardKeyWorkspace* workspace, size_t* work)
 {
-  if (!io || !io->transmit || !key || !policy || !provider || !random || !workspace || !work)
+  if (!io || !io->transmit || !key || !policy || !provider || !random.fill || !workspace || !work)
     return EXAMPLE_CARD_KEY_ERROR;
   if (reference != EXAMPLE_CARD_KEY_PIV_AUTHENTICATION &&
       reference != EXAMPLE_CARD_KEY_CARD_AUTHENTICATION)
@@ -76,8 +76,7 @@ ExampleCardKeyResult example_card_check_key(ExampleCardIO* io, ExampleCardKeyRef
   TC_bytes challenge;
   TC_work_budget challenge_work = {*work > UINT32_MAX ? UINT32_MAX : (uint32_t)*work};
   const uint32_t before_prepare = challenge_work.remaining;
-  switch (TC_key_challenge_prepare(key, &parameters.challenge,
-                                   (TC_random_source){random, random_context}, &workspace->key,
+  switch (TC_key_challenge_prepare(key, &parameters.challenge, random, &workspace->key,
                                    &challenge_work, &challenge)) {
   case TC_KEY_CHALLENGE_OK:
     break;

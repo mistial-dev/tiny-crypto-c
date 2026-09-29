@@ -30,12 +30,13 @@ TEST_CASE("PIV SM authenticated exchange")
     const bool enabled =
         fixture.suite == TC_PIV_SM_CS2 ? TC_PIV_SM_ENABLE_CS2 : TC_PIV_SM_ENABLE_CS7;
     if (!enabled) {
-      CHECK(session.begin(fixture.suite, host, scalar_one, nullptr, handshake, workspace) ==
+      CHECK(session.begin(fixture.suite, host, {scalar_one, nullptr}, handshake, workspace) ==
             TC_ERROR);
       CHECK(session.state() == TC_PIV_SM_IDLE);
       continue;
     }
-    REQUIRE(session.begin(fixture.suite, host, scalar_one, nullptr, handshake, workspace) == TC_OK);
+    REQUIRE(session.begin(fixture.suite, host, {scalar_one, nullptr}, handshake, workspace) ==
+            TC_OK);
     CHECK(handshake.suite == fixture.suite);
     CHECK(handshake.host_identifier.length == sizeof host);
     CHECK(handshake.public_key.length == fixture.public_key.length);
@@ -78,11 +79,11 @@ TEST_CASE("PIV SM session lifecycle")
     CHECK(session.state() == TC_PIV_SM_IDLE);
     const bool enabled = suite == TC_PIV_SM_CS2 ? TC_PIV_SM_ENABLE_CS2 : TC_PIV_SM_ENABLE_CS7;
     if (!enabled) {
-      CHECK(session.begin(suite, host, scalar_one, nullptr, handshake, workspace) == TC_ERROR);
+      CHECK(session.begin(suite, host, {scalar_one, nullptr}, handshake, workspace) == TC_ERROR);
       CHECK(session.state() == TC_PIV_SM_IDLE);
       continue;
     }
-    REQUIRE(session.begin(suite, host, scalar_one, nullptr, handshake, workspace) == TC_OK);
+    REQUIRE(session.begin(suite, host, {scalar_one, nullptr}, handshake, workspace) == TC_OK);
     CHECK(handshake.public_key.length == (suite == TC_PIV_SM_CS2 ? 65u : 97u));
     CHECK(session.state() == TC_PIV_SM_ESTABLISHING);
     tiny_crypto::piv_sm_peer peer{};

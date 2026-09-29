@@ -438,7 +438,7 @@ parsing. CS7 also needs SHA-384 and P-384. CS2 needs P-256. Disable a suite with
 unused curve separately with `TINY_CRYPTO_EC_P256` or `TINY_CRYPTO_EC_P384`.
 
 Start with a zero-initialized `TC_PIV_SM` and caller-owned
-`TC_PIV_SM_workspace`. `TC_PIV_SM_begin` takes an RNG callback and returns the
+`TC_PIV_SM_workspace`. `TC_PIV_SM_begin` takes a `TC_random_source` and returns the
 GENERAL AUTHENTICATE APDU. Parse the response with `TC_PIV_SM_response_read`,
 verify that CVC's signature and trust chain, then pass its authenticated public
 key and the unchanged response to `TC_PIV_SM_finish`. With X.509 enabled,

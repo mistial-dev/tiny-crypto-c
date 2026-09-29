@@ -32,7 +32,7 @@ ExampleCardKeyResult example_card_check_key(ExampleCardIO* io, ExampleCardKeyRef
                                             const TC_X509_public_key* key,
                                             const ExampleCardKeyPolicy* policy,
                                             const TC_X509_signature_provider* provider,
-                                            TC_random_fn random, void* random_context,
+                                            TC_random_source random,
                                             ExampleCardKeyWorkspace* workspace, size_t* work);
 #ifdef __cplusplus
 }

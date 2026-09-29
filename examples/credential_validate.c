@@ -83,12 +83,12 @@ TC_TLV_result example_read_card_identity(TC_bytes encoded, TC_PIV_card_profile p
 }
 
 ExampleTWICResult example_twic_authenticate(ExampleCardIO* io, const ExampleTWICRequest* request,
-                                            TC_random_fn random, void* random_context,
+                                            TC_random_source random,
                                             ExampleTWICWorkspace* workspace, size_t* work)
 {
   if (!io || !io->transmit || !request || !request->certificate.data ||
-      !request->certificate.length || !request->trust || !request->path || !random || !workspace ||
-      !work || (request->allow_rsa1024 != 0 && request->allow_rsa1024 != 1) ||
+      !request->certificate.length || !request->trust || !request->path || !random.fill ||
+      !workspace || !work || (request->allow_rsa1024 != 0 && request->allow_rsa1024 != 1) ||
       (request->rsa_padding != EXAMPLE_CARD_RSA_V15 &&
        request->rsa_padding != EXAMPLE_CARD_RSA_PSS))
     return EXAMPLE_TWIC_ERROR;
@@ -155,7 +155,7 @@ ExampleTWICResult example_twic_authenticate(ExampleCardIO* io, const ExampleTWIC
                                        request->allow_rsa1024, request->rsa_padding};
   switch (example_card_check_key(io, EXAMPLE_CARD_KEY_CARD_AUTHENTICATION,
                                  &path.validation.public_key, &policy, &options.signatures, random,
-                                 random_context, &workspace->challenge, work)) {
+                                 &workspace->challenge, work)) {
   case EXAMPLE_CARD_KEY_VERIFIED:
     /* A publication during card I/O supersedes the held cancellation list. */
     result = example_twic_cancellation_check(request->ccl, &freshness, request->ccl_reads,

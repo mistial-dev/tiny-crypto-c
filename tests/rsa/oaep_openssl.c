@@ -125,18 +125,22 @@ static MunitResult interoperability(const MunitParameter params[], void* user)
                         failure == RNG_FAILURE && i < required * sizeof *words ? 0 : 0xa5);
   }
   size_t example_calls = 0;
-  munit_assert_int(example_encrypt_rsa_oaep_sha256(NULL, labels[0], labels[0], ciphertext, width,
-                                                   failed_seed, &example_calls, words, required),
+  munit_assert_int(example_encrypt_rsa_oaep_sha256(NULL, labels[0], labels[0],
+                                                   (TC_buffer){ciphertext, width},
+                                                   (TC_random_source){failed_seed, &example_calls},
+                                                   &(TC_RSA_workspace){words, required}),
                    ==, TC_RSA_ARGUMENT);
   TC_RSA_public_key oversized_key = public_key;
   oversized_key.modulus.length = SIZE_MAX;
-  munit_assert_int(example_encrypt_rsa_oaep_sha256(&oversized_key, labels[0], labels[0], ciphertext,
-                                                   width, failed_seed, &example_calls, words,
-                                                   required),
+  munit_assert_int(example_encrypt_rsa_oaep_sha256(&oversized_key, labels[0], labels[0],
+                                                   (TC_buffer){ciphertext, width},
+                                                   (TC_random_source){failed_seed, &example_calls},
+                                                   &(TC_RSA_workspace){words, required}),
                    ==, TC_RSA_INVALID);
   munit_assert_int(example_encrypt_rsa_oaep_sha256(&public_key, (TC_bytes){input, SIZE_MAX},
-                                                   labels[0], ciphertext, width, failed_seed,
-                                                   &example_calls, words, required),
+                                                   labels[0], (TC_buffer){ciphertext, width},
+                                                   (TC_random_source){failed_seed, &example_calls},
+                                                   &(TC_RSA_workspace){words, required}),
                    ==, TC_RSA_LIMIT);
   munit_assert_size(example_calls, ==, 0);
   for (size_t h = 0; h < sizeof hashes / sizeof *hashes; ++h) {
@@ -197,8 +201,9 @@ static MunitResult interoperability(const MunitParameter params[], void* user)
           if (hashes[h].algorithm == TC_HASH_SHA256 && hashes[mgf].algorithm == TC_HASH_SHA256) {
             memset(ciphertext, 0xa5, sizeof ciphertext);
             munit_assert_int(example_encrypt_rsa_oaep_sha256(&public_key, labels[l], message,
-                                                             ciphertext, width, fixed_seed, seed,
-                                                             words, required),
+                                                             (TC_buffer){ciphertext, width},
+                                                             (TC_random_source){fixed_seed, seed},
+                                                             &(TC_RSA_workspace){words, required}),
                              ==, TC_RSA_OK);
             munit_assert_memory_equal(width, ciphertext, saved);
           }

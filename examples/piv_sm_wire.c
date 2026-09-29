@@ -38,19 +38,18 @@ static size_t encode_length(uint8_t* output, size_t length)
 }
 
 TC_status example_piv_sm_begin(TC_PIV_SM* session, TC_PIV_SM_suite suite,
-                               const uint8_t host_identifier[8], TC_random_fn random,
-                               void* random_context, uint8_t* apdu, size_t capacity,
-                               size_t* written, TC_PIV_SM_workspace* workspace)
+                               const uint8_t host_identifier[8], TC_random_source random,
+                               uint8_t* apdu, size_t capacity, size_t* written,
+                               TC_PIV_SM_workspace* workspace)
 {
   TC_PIV_SM_handshake handshake;
   size_t request_length;
-  if (!session || !host_identifier || !random || !apdu || !written || !workspace)
+  if (!session || !host_identifier || !random.fill || !apdu || !written || !workspace)
     return TC_ERROR;
   request_length = suite == TC_PIV_SM_CS2 ? 86 : suite == TC_PIV_SM_CS7 ? 118 : 0;
   if (!request_length || capacity < request_length)
     return TC_ERROR;
-  if (TC_PIV_SM_begin(session, suite, host_identifier, random, random_context, &handshake,
-                      workspace) != TC_OK)
+  if (TC_PIV_SM_begin(session, suite, host_identifier, random, &handshake, workspace) != TC_OK)
     return TC_ERROR;
   apdu[0] = 0;
   apdu[1] = 0x87;

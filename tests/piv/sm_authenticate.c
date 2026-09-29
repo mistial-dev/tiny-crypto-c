@@ -102,8 +102,9 @@ static void begin_session(const struct tc_sm_fixture* fixture, TC_PIV_SM* sessio
   size_t written = 0;
   static const uint8_t host_id[8] = {0};
   memset(session, 0, sizeof *session);
-  munit_assert_int(example_piv_sm_begin(session, fixture->suite, host_id, fixed_scalar, &random,
-                                        request, sizeof request, &written, &workspace),
+  munit_assert_int(example_piv_sm_begin(session, fixture->suite, host_id,
+                                        (TC_random_source){fixed_scalar, &random}, request,
+                                        sizeof request, &written, &workspace),
                    ==, TC_OK);
   munit_assert_size(written, ==, fixture->request.length);
   munit_assert_memory_equal(written, request, fixture->request.data);

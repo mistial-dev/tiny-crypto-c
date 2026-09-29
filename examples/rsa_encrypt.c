@@ -5,10 +5,9 @@
 enum { MAX_KEY_BITS = 4096, SHA256_BYTES = 32 };
 
 TC_RSA_result example_encrypt_rsa_oaep_sha256(const TC_RSA_public_key* key, TC_bytes label,
-                                              TC_bytes plaintext, uint8_t* ciphertext,
-                                              size_t ciphertext_length, TC_random_fn random,
-                                              void* random_context, TC_RSA_word* scratch,
-                                              size_t scratch_words)
+                                              TC_bytes plaintext, TC_buffer ciphertext,
+                                              TC_random_source random,
+                                              const TC_RSA_workspace* workspace)
 {
   if (!key)
     return TC_RSA_ARGUMENT;
@@ -25,9 +24,7 @@ TC_RSA_result example_encrypt_rsa_oaep_sha256(const TC_RSA_public_key* key, TC_b
   if (label.length > SIZE_MAX - work)
     return TC_RSA_LIMIT;
   work += label.length;
-  const TC_RSA_workspace workspace = {scratch, scratch_words};
   const TC_RSA_oaep_options options = {TC_HASH_SHA256, TC_HASH_SHA256, label};
-  TC_RSA_execution execution = {{random, random_context}, 0, {(uint32_t)work}};
-  return TC_RSA_encrypt_oaep(key, &options, plaintext, &workspace,
-                             (TC_buffer){ciphertext, ciphertext_length}, &execution);
+  TC_RSA_execution execution = {random, 0, {(uint32_t)work}};
+  return TC_RSA_encrypt_oaep(key, &options, plaintext, workspace, ciphertext, &execution);
 }

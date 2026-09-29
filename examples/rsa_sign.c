@@ -19,32 +19,28 @@ static TC_RSA_result private_budget(const TC_RSA_private_key* key, uint32_t* wor
 }
 
 TC_RSA_result example_sign_rsa_v15_digest(const TC_RSA_private_key* key, TC_hash_algorithm hash,
-                                          TC_bytes digest, uint8_t* signature,
-                                          size_t signature_length, TC_random_fn random,
-                                          void* random_context, TC_RSA_word* scratch,
-                                          size_t scratch_words)
+                                          TC_bytes digest, TC_buffer signature,
+                                          TC_random_source random,
+                                          const TC_RSA_workspace* workspace)
 {
   uint32_t work;
   const TC_RSA_result result = private_budget(key, &work);
   if (result != TC_RSA_OK)
     return result;
   work += key->public_key.modulus.length;
-  TC_RSA_workspace workspace = {scratch, scratch_words};
   /* Bound the budget before converting to the platform's work-counter type. */
 #if SIZE_MAX < UINT32_MAX
   if (work > SIZE_MAX)
     return TC_RSA_LIMIT;
 #endif
   const TC_RSA_v15_options options = {hash};
-  TC_RSA_execution execution = {{random, random_context}, BLINDING_ATTEMPTS, {work}};
-  return TC_RSA_sign_v15_digest(key, &options, digest, &workspace,
-                                (TC_buffer){signature, signature_length}, &execution);
+  TC_RSA_execution execution = {random, BLINDING_ATTEMPTS, {work}};
+  return TC_RSA_sign_v15_digest(key, &options, digest, workspace, signature, &execution);
 }
 
 TC_RSA_result example_sign_rsa_pss_sha256_digest(const TC_RSA_private_key* key, TC_bytes digest,
-                                                 uint8_t* signature, size_t signature_length,
-                                                 TC_random_fn random, void* random_context,
-                                                 TC_RSA_word* scratch, size_t scratch_words)
+                                                 TC_buffer signature, TC_random_source random,
+                                                 const TC_RSA_workspace* workspace)
 {
   uint32_t work;
   const TC_RSA_result result = private_budget(key, &work);
@@ -59,9 +55,7 @@ TC_RSA_result example_sign_rsa_pss_sha256_digest(const TC_RSA_private_key* key, 
   if (work > SIZE_MAX)
     return TC_RSA_LIMIT;
 #endif
-  TC_RSA_workspace workspace = {scratch, scratch_words};
   const TC_RSA_pss_options options = {TC_HASH_SHA256, TC_HASH_SHA256, SHA256_BYTES};
-  TC_RSA_execution execution = {{random, random_context}, BLINDING_ATTEMPTS, {work}};
-  return TC_RSA_sign_pss_digest(key, &options, digest, &workspace,
-                                (TC_buffer){signature, signature_length}, &execution);
+  TC_RSA_execution execution = {random, BLINDING_ATTEMPTS, {work}};
+  return TC_RSA_sign_pss_digest(key, &options, digest, workspace, signature, &execution);
 }

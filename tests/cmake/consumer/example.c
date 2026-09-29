@@ -96,7 +96,8 @@ int main(void)
         source.candidate(source.context, 0, &work, &candidate) != TC_TLV_ARGUMENT || work != 1)
       return 1;
   }
-  if (example_twic_authenticate(NULL, NULL, NULL, NULL, NULL, NULL) != EXAMPLE_TWIC_ERROR)
+  const TC_random_source no_random = {NULL, NULL};
+  if (example_twic_authenticate(NULL, NULL, no_random, NULL, NULL) != EXAMPLE_TWIC_ERROR)
     return 1;
   {
     const TC_X509_time at = {2026, 9, 9, 0, 0, 0};
@@ -119,8 +120,8 @@ int main(void)
     if (TC_RSA_encode_pss_digest(&pss, input, salt_bytes, output, &work) != TC_RSA_OK ||
         (encoded[0] & 0x80) || encoded[sizeof encoded - 1] != 0xbc)
       return 1;
-    if (example_card_check_key(NULL, EXAMPLE_CARD_KEY_CARD_AUTHENTICATION, NULL, NULL, NULL, NULL,
-                               NULL, NULL, NULL) != EXAMPLE_CARD_KEY_ERROR)
+    if (example_card_check_key(NULL, EXAMPLE_CARD_KEY_CARD_AUTHENTICATION, NULL, NULL, NULL,
+                               no_random, NULL, NULL) != EXAMPLE_CARD_KEY_ERROR)
       return 1;
   }
   {
@@ -336,9 +337,11 @@ int main(void)
     memset(modulus, 0xff, sizeof modulus);
     memset(ciphertext, 0xa5, sizeof ciphertext);
     memset(scratch, 0xa5, sizeof scratch);
-    if (example_encrypt_rsa_oaep_sha256(&key, empty, empty, ciphertext, sizeof ciphertext,
-                                        unavailable_random, &calls, scratch,
-                                        sizeof scratch / sizeof *scratch) != TC_RSA_ERROR)
+    const TC_buffer ciphertext_buffer = {ciphertext, sizeof ciphertext};
+    const TC_random_source failing_random = {unavailable_random, &calls};
+    const TC_RSA_workspace rsa_workspace = {scratch, sizeof scratch / sizeof *scratch};
+    if (example_encrypt_rsa_oaep_sha256(&key, empty, empty, ciphertext_buffer, failing_random,
+                                        &rsa_workspace) != TC_RSA_ERROR)
       return 1;
     if (calls != 1 || TC_RSA_workspace_words(TC_RSA_OPERATION_ENCRYPT, KEY_BITS) !=
                           sizeof scratch / sizeof *scratch)

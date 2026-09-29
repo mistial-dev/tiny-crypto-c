@@ -136,8 +136,8 @@ static void authentication_workflow(EVP_PKEY* key, TC_bytes leaf,
     memset(&scratch, 0xa5, sizeof scratch);
     Entropy entropy = {1, 0, 0};
     size_t work = scenario == NO_WORK ? 0 : WORK_LIMIT;
-    const ExampleTWICResult result =
-        example_twic_authenticate(&io, &request, random_digest, &entropy, &scratch, &work);
+    const ExampleTWICResult result = example_twic_authenticate(
+        &io, &request, (TC_random_source){random_digest, &entropy}, &scratch, &work);
     if (scenario == BAD_SIGNATURE)
       mutable_leaf[leaf.length - 1] ^= 1;
     munit_assert_int(result, ==, expected[scenario]);
@@ -462,8 +462,9 @@ static MunitResult possession(const MunitParameter params[], void* context)
     size_t work = WORK_LIMIT;
     memset(&scratch, 0x5a, sizeof scratch);
     const size_t signatures = card.signatures;
-    munit_assert_int(example_card_check_key(&io, reference, &key, &policy, &provider, random_digest,
-                                            &entropy, &scratch, &work),
+    munit_assert_int(example_card_check_key(&io, reference, &key, &policy, &provider,
+                                            (TC_random_source){random_digest, &entropy}, &scratch,
+                                            &work),
                      ==, outcomes[i]);
     assert_cleared(&scratch);
     if (modes[i] == NORMAL)
@@ -484,7 +485,8 @@ static MunitResult possession(const MunitParameter params[], void* context)
     ExampleCardIO failed_io = {transmit, &card, 8, 0};
     size_t remaining = WORK_LIMIT;
     munit_assert_int(example_card_check_key(&failed_io, reference, &key, &policy, &provider,
-                                            random_digest, &entropy, &scratch, &remaining),
+                                            (TC_random_source){random_digest, &entropy}, &scratch,
+                                            &remaining),
                      ==, EXAMPLE_CARD_KEY_TRANSPORT);
     munit_assert_int(failed_io.stopped, ==, 1);
     munit_assert_size(card.calls, ==, step);
@@ -497,7 +499,8 @@ static MunitResult possession(const MunitParameter params[], void* context)
     ExampleCardIO limited_io = {transmit, &card, budget, 0};
     size_t remaining = WORK_LIMIT;
     munit_assert_int(example_card_check_key(&limited_io, reference, &key, &policy, &provider,
-                                            random_digest, &entropy, &scratch, &remaining),
+                                            (TC_random_source){random_digest, &entropy}, &scratch,
+                                            &remaining),
                      ==, EXAMPLE_CARD_KEY_LIMIT);
     munit_assert_int(limited_io.stopped, ==, 1);
     munit_assert_size(card.calls, ==, budget);
@@ -509,7 +512,8 @@ static MunitResult possession(const MunitParameter params[], void* context)
     ExampleCardIO failed_io = {transmit, &card, 8, 0};
     size_t remaining = WORK_LIMIT;
     munit_assert_int(example_card_check_key(&failed_io, reference, &key, &policy, &provider,
-                                            random_digest, &entropy, &scratch, &remaining),
+                                            (TC_random_source){random_digest, &entropy}, &scratch,
+                                            &remaining),
                      ==, EXAMPLE_CARD_KEY_INVALID);
     munit_assert_int(failed_io.stopped, ==, 1);
     munit_assert_size(card.calls, ==, 1);
@@ -521,14 +525,16 @@ static MunitResult possession(const MunitParameter params[], void* context)
   size_t work = WORK_LIMIT;
   const size_t entropy_calls = entropy.calls;
   munit_assert_int(example_card_check_key(&io, (ExampleCardKeyReference)0, &key, &policy, &provider,
-                                          random_digest, &entropy, &scratch, &work),
+                                          (TC_random_source){random_digest, &entropy}, &scratch,
+                                          &work),
                    ==, EXAMPLE_CARD_KEY_ERROR);
   munit_assert_size(card.calls, ==, 0);
   munit_assert_size(entropy.calls, ==, entropy_calls);
   munit_assert_size(work, ==, WORK_LIMIT);
   entropy.fail = 1;
-  munit_assert_int(example_card_check_key(&io, reference, &key, &policy, &provider, random_digest,
-                                          &entropy, &scratch, &work),
+  munit_assert_int(example_card_check_key(&io, reference, &key, &policy, &provider,
+                                          (TC_random_source){random_digest, &entropy}, &scratch,
+                                          &work),
                    ==, EXAMPLE_CARD_KEY_ERROR);
   munit_assert_size(card.calls, ==, 0);
   assert_cleared(&scratch);
@@ -536,8 +542,9 @@ static MunitResult possession(const MunitParameter params[], void* context)
   policy.allow_legacy_rsa1024 = 0;
   if (key.type == TC_KEY_RSA && key.bits == 1024) {
     work = WORK_LIMIT;
-    munit_assert_int(example_card_check_key(&io, reference, &key, &policy, &provider, random_digest,
-                                            &entropy, &scratch, &work),
+    munit_assert_int(example_card_check_key(&io, reference, &key, &policy, &provider,
+                                            (TC_random_source){random_digest, &entropy}, &scratch,
+                                            &work),
                      ==, EXAMPLE_CARD_KEY_UNSUPPORTED);
     munit_assert_size(card.calls, ==, 0);
     munit_assert_size(work, ==, WORK_LIMIT);
@@ -547,8 +554,9 @@ static MunitResult possession(const MunitParameter params[], void* context)
   card.request_length = 0;
   work = WORK_LIMIT;
   const int nexgen = key.type == TC_KEY_RSA && key.bits == 2048;
-  munit_assert_int(example_card_check_key(&io, reference, &key, &policy, &provider, random_digest,
-                                          &entropy, &scratch, &work),
+  munit_assert_int(example_card_check_key(&io, reference, &key, &policy, &provider,
+                                          (TC_random_source){random_digest, &entropy}, &scratch,
+                                          &work),
                    ==, nexgen ? EXAMPLE_CARD_KEY_VERIFIED : EXAMPLE_CARD_KEY_UNSUPPORTED);
   if (!nexgen)
     munit_assert_size(card.calls, ==, 0);

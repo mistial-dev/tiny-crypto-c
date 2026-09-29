@@ -138,9 +138,9 @@ static MunitResult decrypt(const MunitParameter params[], void* user)
       const size_t capacity = scenario == SHORT_OUTPUT && lengths[i] ? lengths[i] - 1 : lengths[i];
       random_source random = {0, scenario == RNG_FAILURE ? TC_ERROR : TC_OK};
       const uint32_t work = scenario == ZERO_WORK    ? 0
-                          : scenario == SHORT_WORK ? exact_work - 1
-                          : scenario == EXACT_WORK ? exact_work
-                                                   : UINT32_MAX;
+                            : scenario == SHORT_WORK ? exact_work - 1
+                            : scenario == EXACT_WORK ? exact_work
+                                                     : UINT32_MAX;
       uint8_t zero_ciphertext[MAX_BYTES] = {0};
       const TC_bytes candidate = scenario == ZERO_CIPHERTEXT ? (TC_bytes){zero_ciphertext, width}
                                  : scenario == MODULUS_CIPHERTEXT

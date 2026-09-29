@@ -205,19 +205,17 @@ static MunitResult private_operation(const MunitParameter params[], void* user)
       memcpy(changed_factor, other_factor, width);
     uint32_t key_work = WORK_BUDGET;
     memset(scratch, 0xa5, sizeof scratch);
-    munit_assert_int(
-        key_consistent(modulus, width, exponent, sizeof exponent, bad_d,
-                                      scenario == KEY_SWAPPED ? other_factor : changed_factor,
-                                      scenario == KEY_SWAPPED ? changed_factor : other_factor,
-                                      scratch, key_words, &key_work),
-        ==, scenario <= KEY_SWAPPED ? TC_RSA_OK : TC_RSA_INVALID);
+    munit_assert_int(key_consistent(modulus, width, exponent, sizeof exponent, bad_d,
+                                    scenario == KEY_SWAPPED ? other_factor : changed_factor,
+                                    scenario == KEY_SWAPPED ? changed_factor : other_factor,
+                                    scratch, key_words, &key_work),
+                     ==, scenario <= KEY_SWAPPED ? TC_RSA_OK : TC_RSA_INVALID);
     munit_assert_true(tc_test_all_zero(scratch, key_words * sizeof *scratch));
     munit_assert_uint(((uint8_t*)scratch)[key_words * sizeof *scratch], ==, 0xa5);
   }
   uint32_t key_work = WORK_BUDGET;
-  munit_assert_int(key_consistent(modulus, width, exponent, sizeof exponent, d,
-                                                 factor, other_factor, scratch, key_words,
-                                                 &key_work),
+  munit_assert_int(key_consistent(modulus, width, exponent, sizeof exponent, d, factor,
+                                  other_factor, scratch, key_words, &key_work),
                    ==, TC_RSA_OK);
   const size_t key_cost = WORK_BUDGET - key_work;
   TC_bytes magnitudes[] = {{d, width}, {factor, width}, {other_factor, width}};
@@ -244,9 +242,8 @@ static MunitResult private_operation(const MunitParameter params[], void* user)
   for (unsigned short_work = 0; short_work < 2; ++short_work) {
     key_work = key_cost - short_work;
     memset(scratch, 0xa5, sizeof scratch);
-    munit_assert_int(key_consistent(modulus, width, exponent, sizeof exponent, d,
-                                                   factor, other_factor, scratch, key_words,
-                                                   &key_work),
+    munit_assert_int(key_consistent(modulus, width, exponent, sizeof exponent, d, factor,
+                                    other_factor, scratch, key_words, &key_work),
                      ==, short_work ? TC_RSA_LIMIT : TC_RSA_OK);
     if (!short_work)
       munit_assert_true(tc_test_all_zero(scratch, key_words * sizeof *scratch));
@@ -277,9 +274,9 @@ static MunitResult private_operation(const MunitParameter params[], void* user)
     if (scenario == VALIDATION_D)
       bad_d[width - 1] ^= 2;
     memset(scratch, 0xa5, sizeof scratch);
-    TC_RSA_result result = key_check(
-        modulus, width, exponent, sizeof exponent, bad_d, factor, other_factor, 1, random_bytes,
-        &source, 1, scratch, validation_words - (scenario == VALIDATION_STORAGE), &budget);
+    TC_RSA_result result = key_check(modulus, width, exponent, sizeof exponent, bad_d, factor,
+                                     other_factor, 1, random_bytes, &source, 1, scratch,
+                                     validation_words - (scenario == VALIDATION_STORAGE), &budget);
     munit_assert_int(result, ==,
                      scenario == VALIDATION_OK    ? TC_RSA_OK
                      : scenario == VALIDATION_RNG ? TC_RSA_ERROR
@@ -309,8 +306,9 @@ static MunitResult private_operation(const MunitParameter params[], void* user)
                     TC_RSA_VALIDATE_WORKSPACE_WORDS(4096));
   {
     random_source source = {witness, witness, width / 2, 0, TC_OK};
-    munit_assert_int(example_validate_rsa_key(&public_components, random_bytes, &source, scratch,
-                                              validation_words),
+    munit_assert_int(example_validate_rsa_key(&public_components,
+                                              (TC_random_source){random_bytes, &source},
+                                              &(TC_RSA_workspace){scratch, validation_words}),
                      ==, TC_RSA_OK);
     munit_assert_size(source.calls, ==, 2 * TC_RSA_VALIDATION_ROUNDS);
     munit_assert_true(tc_test_all_zero(scratch, validation_words * sizeof *scratch));
@@ -402,9 +400,8 @@ static MunitResult private_operation(const MunitParameter params[], void* user)
   uint32_t work = WORK_BUDGET;
   memset(scratch, 0xa5, sizeof scratch);
   memset(actual, 0xa5, sizeof actual);
-  munit_assert_int(full_width_private(modulus, width, exponent, sizeof exponent, d, input,
-                                            actual, random_bytes, &random, 2, scratch, words,
-                                            &work),
+  munit_assert_int(full_width_private(modulus, width, exponent, sizeof exponent, d, input, actual,
+                                      random_bytes, &random, 2, scratch, words, &work),
                    ==, TC_RSA_OK);
   munit_assert_memory_equal(width, actual, expected);
   munit_assert_size(random.calls, ==, 1);
@@ -430,9 +427,8 @@ static MunitResult private_operation(const MunitParameter params[], void* user)
     work = required - short_work;
     memset(actual, 0xa5, sizeof actual);
     memset(scratch, 0xa5, sizeof scratch);
-    munit_assert_int(full_width_private(modulus, width, exponent, sizeof exponent, d, input,
-                                              actual, random_bytes, &random, 2, scratch, words,
-                                              &work),
+    munit_assert_int(full_width_private(modulus, width, exponent, sizeof exponent, d, input, actual,
+                                        random_bytes, &random, 2, scratch, words, &work),
                      ==, short_work ? TC_RSA_LIMIT : TC_RSA_OK);
     munit_assert_true(tc_test_all_zero(scratch, words * sizeof *scratch));
     if (!short_work)
@@ -443,9 +439,8 @@ static MunitResult private_operation(const MunitParameter params[], void* user)
   }
   random = (random_source){factor, seed, width, 0, TC_OK};
   work = WORK_BUDGET;
-  munit_assert_int(full_width_private(modulus, width, exponent, sizeof exponent, d, input,
-                                            actual, random_bytes, &random, 2, scratch, words,
-                                            &work),
+  munit_assert_int(full_width_private(modulus, width, exponent, sizeof exponent, d, input, actual,
+                                      random_bytes, &random, 2, scratch, words, &work),
                    ==, TC_RSA_OK);
   munit_assert_size(random.calls, ==, 2);
   munit_assert_memory_equal(width, actual, expected);
@@ -464,9 +459,8 @@ static MunitResult private_operation(const MunitParameter params[], void* user)
     work = WORK_BUDGET;
     memset(actual, 0xa5, sizeof actual);
     memset(scratch, 0xa5, sizeof scratch);
-    munit_assert_int(full_width_private(modulus, width, exponent, sizeof exponent, d, input,
-                                              actual, random_bytes, &random, 2, scratch, words,
-                                              &work),
+    munit_assert_int(full_width_private(modulus, width, exponent, sizeof exponent, d, input, actual,
+                                        random_bytes, &random, 2, scratch, words, &work),
                      ==, failures[failure].expected);
     munit_assert_size(random.calls, ==, failures[failure].random_status == TC_OK ? 2 : 1);
     munit_assert_true(tc_test_all_zero(scratch, words * sizeof *scratch));
@@ -481,8 +475,7 @@ static MunitResult private_operation(const MunitParameter params[], void* user)
   memset(actual, 0xa5, sizeof actual);
   memset(scratch, 0xa5, sizeof scratch);
   munit_assert_int(full_width_private(modulus, width, exponent, sizeof exponent, bad_d, input,
-                                            actual, random_bytes, &random, 2, scratch, words,
-                                            &work),
+                                      actual, random_bytes, &random, 2, scratch, words, &work),
                    ==, TC_RSA_ERROR);
   munit_assert_true(tc_test_all_zero(scratch, words * sizeof *scratch));
   for (size_t i = 0; i < width; ++i)
@@ -526,10 +519,10 @@ static MunitResult private_operation(const MunitParameter params[], void* user)
                                           : scenario < ZERO_D   ? TC_RSA_LIMIT
                                                                 : TC_RSA_INVALID;
     munit_assert_int(full_width_private(modulus, width, exponent, sizeof exponent, checked_d,
-                                              checked_input, actual,
-                                              scenario == NO_RANDOM ? NULL : random_bytes, &random,
-                                              scenario == NO_ATTEMPTS ? 0 : 2, scratch,
-                                              scenario == SHORT_SCRATCH ? words - 1 : words, &work),
+                                        checked_input, actual,
+                                        scenario == NO_RANDOM ? NULL : random_bytes, &random,
+                                        scenario == NO_ATTEMPTS ? 0 : 2, scratch,
+                                        scenario == SHORT_SCRATCH ? words - 1 : words, &work),
                      ==, expected_status);
     munit_assert_size(random.calls, ==, 0);
     for (size_t i = 0; i < width; ++i)
@@ -578,15 +571,14 @@ static MunitResult composite_components(const MunitParameter params[], void* use
   munit_assert_int(BN_bn2binpad(factor, p, (int)width), ==, (int)width);
   munit_assert_int(BN_bn2binpad(other, q, (int)width), ==, (int)width);
   uint32_t work = WORK_BUDGET;
-  munit_assert_int(key_consistent(modulus, width, exponent, sizeof exponent, d, p, q,
-                                                 scratch, words, &work),
-                   ==, TC_RSA_INVALID);
+  munit_assert_int(
+      key_consistent(modulus, width, exponent, sizeof exponent, d, p, q, scratch, words, &work), ==,
+      TC_RSA_INVALID);
   seed[width - 1] = 2;
   random_source random = {seed, seed, width, 0, TC_OK};
   uint32_t validation_work = WORK_BUDGET;
-  munit_assert_int(key_check(modulus, width, exponent, sizeof exponent, d, p, q, 1,
-                                            random_bytes, &random, 1, scratch, words,
-                                            &validation_work),
+  munit_assert_int(key_check(modulus, width, exponent, sizeof exponent, d, p, q, 1, random_bytes,
+                             &random, 1, scratch, words, &validation_work),
                    ==, TC_RSA_INVALID);
   munit_assert_size(random.calls, ==, 0);
   munit_assert_true(tc_test_all_zero(scratch, words * sizeof *scratch));
@@ -639,8 +631,9 @@ static MunitResult signing(const MunitParameter params[], void* user)
     TC_RSA_result result =
         scenario == 3
             ? example_sign_rsa_v15_digest(&private_key, hash, (TC_bytes){digest, digest_length},
-                                          signature, width, random_bytes, &source, scratch,
-                                          workspace.capacity)
+                                          (TC_buffer){signature, width},
+                                          (TC_random_source){random_bytes, &source},
+                                          &(TC_RSA_workspace){scratch, workspace.capacity})
             : sign_v15(&private_key, hash, (TC_bytes){digest, digest_length}, signature, width,
                        random_bytes, &source, 1, &workspace, cost - (scenario == 1));
     munit_assert_int(result, ==,

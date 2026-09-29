@@ -16,9 +16,8 @@ static int miller_rabin(const tc_mp_word* p, const tc_mp_word* base, size_t n, t
 }
 
 static TC_RSA_result probable_prime(const uint8_t* candidate, size_t length, size_t rounds,
-                                    TC_random_fn random, void* random_context,
-                                    size_t max_attempts, tc_mp_word* scratch,
-                                    size_t scratch_words, uint32_t* work)
+                                    TC_random_fn random, void* random_context, size_t max_attempts,
+                                    tc_mp_word* scratch, size_t scratch_words, uint32_t* work)
 {
   return tc_rsa_probable_prime_magnitude((TC_bytes){candidate, length}, length, rounds,
                                          &(tc_rsa_random){{random, random_context}, max_attempts},
@@ -104,8 +103,8 @@ static MunitResult rounds(const MunitParameter params[], void* user)
         munit_assert_uint(tail[i], ==, 0xa5);
       if (b == 2) {
         uint32_t work = UINT32_C(48) * (uint32_t)width + 5;
-        munit_assert_int(probable_prime(candidate_bytes, width, 1, fixed_base, encoded, 1,
-                                               scratch, 12 * words + 2, &work),
+        munit_assert_int(probable_prime(candidate_bytes, width, 1, fixed_base, encoded, 1, scratch,
+                                        12 * words + 2, &work),
                          ==, expected ? TC_RSA_OK : TC_RSA_INVALID);
         munit_assert_size(work, ==, 0);
         for (size_t i = 0; i < 12 * words + 2; ++i)

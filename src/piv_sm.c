@@ -65,7 +65,7 @@ void TC_PIV_SM_clear(TC_PIV_SM* session)
 }
 
 TC_status TC_PIV_SM_begin(TC_PIV_SM* session, TC_PIV_SM_suite suite, const uint8_t host_id[8],
-                          TC_random_fn random, void* random_user, TC_PIV_SM_handshake* handshake,
+                          TC_random_source random, TC_PIV_SM_handshake* handshake,
                           TC_PIV_SM_workspace* workspace)
 {
   const tc_sm_suite* settings = tc_sm_suite_get(suite);
@@ -76,12 +76,13 @@ TC_status TC_PIV_SM_begin(TC_PIV_SM* session, TC_PIV_SM_suite suite, const uint8
   size_t public_length;
   unsigned attempt;
   TC_status status = TC_ERROR;
-  if (!settings || !random || !tc_sm_disjoint(writable, 3, input, 1))
+  if (!settings || !random.fill || !tc_sm_disjoint(writable, 3, input, 1))
     return TC_ERROR;
   public_length = 1 + 2 * settings->coordinate_bytes;
   TC_PIV_SM_clear(session);
   for (attempt = 0; attempt < 16; ++attempt) {
-    if (random(random_user, session->data.handshake.scalar, settings->coordinate_bytes) != TC_OK)
+    if (random.fill(random.context, session->data.handshake.scalar, settings->coordinate_bytes) !=
+        TC_OK)
       break;
     TC_work_budget budget = {TC_EC_operation_work(settings->curve, TC_EC_OPERATION_PUBLIC_KEY)};
     if (TC_EC_public_key(settings->curve,

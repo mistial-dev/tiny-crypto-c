@@ -47,7 +47,8 @@ static MunitResult begin_failures(const MunitParameter params[], void* user)
   memcpy(expected, request, sizeof expected);
   random.scalar[scalar_length - 1] = 1;
   saved = session;
-  munit_assert_int(example_piv_sm_begin(&session, selected, host, fixed_random, &random, request,
+  munit_assert_int(example_piv_sm_begin(&session, selected, host,
+                                        (TC_random_source){fixed_random, &random}, request,
                                         request_length - 1, &written, &w),
                    ==, TC_ERROR);
   munit_assert_uint(random.calls, ==, 0);
@@ -57,7 +58,8 @@ static MunitResult begin_failures(const MunitParameter params[], void* user)
 #if !TC_PIV_SM_ENABLE_CS2 || !TC_PIV_SM_ENABLE_CS7
   {
     const TC_PIV_SM_suite disabled = selected == TC_PIV_SM_CS2 ? TC_PIV_SM_CS7 : TC_PIV_SM_CS2;
-    munit_assert_int(example_piv_sm_begin(&session, disabled, host, fixed_random, &random, request,
+    munit_assert_int(example_piv_sm_begin(&session, disabled, host,
+                                          (TC_random_source){fixed_random, &random}, request,
                                           sizeof request, &written, &w),
                      ==, TC_ERROR);
     munit_assert_uint(random.calls, ==, 0);
@@ -67,7 +69,8 @@ static MunitResult begin_failures(const MunitParameter params[], void* user)
   }
 #endif
   random.zeros = 16;
-  munit_assert_int(example_piv_sm_begin(&session, selected, host, fixed_random, &random, request,
+  munit_assert_int(example_piv_sm_begin(&session, selected, host,
+                                        (TC_random_source){fixed_random, &random}, request,
                                         sizeof request, &written, &w),
                    ==, TC_ERROR);
   munit_assert_uint(random.calls, ==, 16);
@@ -76,14 +79,16 @@ static MunitResult begin_failures(const MunitParameter params[], void* user)
   munit_assert_memory_equal(sizeof request, request, expected);
   random.calls = 0;
   random.zeros = 1;
-  munit_assert_int(example_piv_sm_begin(&session, selected, host, fixed_random, &random, request,
+  munit_assert_int(example_piv_sm_begin(&session, selected, host,
+                                        (TC_random_source){fixed_random, &random}, request,
                                         sizeof request, &written, &w),
                    ==, TC_OK);
   munit_assert_uint(random.calls, ==, 2);
   munit_assert_size(written, ==, request_length);
   munit_assert_uint(session.state, ==, TC_PIV_SM_ESTABLISHING);
   random.fail = 1;
-  munit_assert_int(example_piv_sm_begin(&session, selected, host, fixed_random, &random, request,
+  munit_assert_int(example_piv_sm_begin(&session, selected, host,
+                                        (TC_random_source){fixed_random, &random}, request,
                                         sizeof request, &written, &w),
                    ==, TC_ERROR);
   munit_assert_true(tc_test_all_zero(&session, sizeof session));
@@ -295,7 +300,8 @@ static MunitResult replay(const MunitParameter params[], void* user)
       munit_assert_size(length, ==, suite == TC_PIV_SM_CS2 ? 32 : 48);
       munit_assert_size(decode(fields[3], host, sizeof host), ==, 8);
       expected_length = decode(fields[4], expected, sizeof expected);
-      munit_assert_int(example_piv_sm_begin(&session, suite, host, fixed_random, &random, output,
+      munit_assert_int(example_piv_sm_begin(&session, suite, host,
+                                            (TC_random_source){fixed_random, &random}, output,
                                             sizeof output, &written, &w),
                        ==, TC_OK);
       munit_assert_size(written, ==, expected_length);

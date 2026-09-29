@@ -44,12 +44,10 @@ public:
   {
     return static_cast<TC_PIV_SM_state>(session_.state);
   }
-  TC_status begin(piv_sm_suite suite, const uint8_t (&host_id)[8], TC_random_fn random,
-                  void* random_user, piv_sm_handshake& handshake,
-                  piv_sm_workspace& workspace) noexcept
+  TC_status begin(piv_sm_suite suite, const uint8_t (&host_id)[8], TC_random_source random,
+                  piv_sm_handshake& handshake, piv_sm_workspace& workspace) noexcept
   {
-    return ::TC_PIV_SM_begin(&session_, suite, host_id, random, random_user, &handshake,
-                             &workspace);
+    return ::TC_PIV_SM_begin(&session_, suite, host_id, random, &handshake, &workspace);
   }
   TC_status finish(const piv_sm_peer& peer, bytes authenticated_key,
                    piv_sm_workspace& workspace) noexcept
