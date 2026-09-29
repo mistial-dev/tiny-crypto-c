@@ -53,10 +53,8 @@ static void tc_aes_gcm_multiply_bitwise(uint8_t* result, const uint8_t* left, co
     tc_aes_gcm_multiply_x(v);
   }
   memcpy(result, z, TC_AES_BLOCKLEN);
-#if TC_ZEROIZE
   TC_secure_zero(z, sizeof(z));
   TC_secure_zero(v, sizeof(v));
-#endif
 }
 #endif
 
@@ -99,9 +97,7 @@ void tc_aes_gcm_init_table(struct TC_AES_GCM_ctx* ctx)
     input[0] = (uint8_t)(entry << 4);
     tc_aes_gcm_multiply_bitwise(ctx->ghash_table[entry], input, ctx->H);
   }
-#if TC_ZEROIZE
   TC_secure_zero(input, sizeof(input));
-#endif
 }
 
 static void tc_aes_gcm_multiply_fast_table(uint8_t* result, const uint8_t* left,
@@ -126,9 +122,7 @@ static void tc_aes_gcm_multiply_fast_table(uint8_t* result, const uint8_t* left,
       value[i] ^= ctx->ghash_table[nibble][i];
   }
   memcpy(result, value, TC_AES_BLOCKLEN);
-#if TC_ZEROIZE
   TC_secure_zero(value, sizeof(value));
-#endif
 }
 #endif
 

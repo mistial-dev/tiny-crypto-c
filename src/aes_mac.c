@@ -31,10 +31,8 @@ TC_status tc_aes_mac_ctr_xor(const uint8_t* round_key, const uint8_t initial[TC_
     tc_internal_increment_be(counter, TC_AES_BLOCKLEN);
     offset += count;
   }
-#if TC_ZEROIZE
   TC_secure_zero(counter, sizeof(counter));
   TC_secure_zero(stream, sizeof(stream));
-#endif
   return status;
 }
 #endif

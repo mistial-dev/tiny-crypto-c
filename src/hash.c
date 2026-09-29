@@ -50,7 +50,8 @@
   } while (0)
 
 /* One 64-byte block. Rolling 16-word schedule keeps the stack small. The
- * schedule is recoverable input, so TC_ZEROIZE wipes it after every block. */
+ * schedule can hold secret input such as HMAC key blocks, so it is wiped
+ * after every block. */
 static void sha1_compress(void* chaining, const uint8_t* block)
 {
   uint32_t* state = (uint32_t*)chaining;
@@ -111,9 +112,7 @@ static void sha1_compress(void* chaining, const uint8_t* block)
   state[3] += d;
   state[4] += e;
 
-#if TC_ZEROIZE
   TC_secure_zero(W, sizeof(W));
-#endif
 }
 
 static void sha1_state_init(void* chaining)
@@ -209,7 +208,8 @@ static const uint32_t K256[64] HASH_K256_STORAGE = {
   } while (0)
 
 /* One 64-byte block. Rolling 16-word schedule keeps the stack small. The
- * schedule is recoverable input, so TC_ZEROIZE wipes it after every block. */
+ * schedule can hold secret input such as HMAC key blocks, so it is wiped
+ * after every block. */
 static void sha256_compress(void* chaining, const uint8_t* block)
 {
   uint32_t* state = (uint32_t*)chaining;
@@ -251,9 +251,7 @@ static void sha256_compress(void* chaining, const uint8_t* block)
   state[6] += g;
   state[7] += h;
 
-#if TC_ZEROIZE
   TC_secure_zero(W, sizeof(W));
-#endif
 }
 
 #endif /* TC_HASH_SHA256_CORE */

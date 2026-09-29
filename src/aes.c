@@ -270,9 +270,7 @@ static void tc_aes_key_expansion(uint8_t* round_key, const uint8_t* key, unsigne
     round_key[j + 2] = round_key[k + 2] ^ tempa[2];
     round_key[j + 3] = round_key[k + 3] ^ tempa[3];
   }
-#if TC_ZEROIZE
   TC_secure_zero(tempa, sizeof(tempa));
-#endif
 }
 
 TC_status TC_AES_key_init(struct TC_AES_key_ctx* ctx, const uint8_t* key)

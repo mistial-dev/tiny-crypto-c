@@ -843,6 +843,87 @@ static MunitResult test_des_api_errors(const MunitParameter params[], void* data
   return MUNIT_OK;
 }
 
+/* Every mode entry rejects a NULL buffer with a nonzero length and leaves the
+ * context unchanged. A NULL buffer with length 0 is an empty request. */
+#if TC_DES_ENABLE_CBC || TC_DES_ENABLE_CTR || TC_DES_ENABLE_OFB || TC_DES_ENABLE_CFB1 ||           \
+    TC_DES_ENABLE_CFB8 || TC_DES_ENABLE_CFB64
+static MunitResult test_des_null_buffers(const MunitParameter params[], void* data)
+{
+  static const uint8_t iv[TC_DES_BLOCKLEN] = {1, 2, 3, 4, 5, 6, 7, 8};
+  struct TC_DES_ctx ctx;
+  struct TC_DES_ctx saved;
+  (void)params;
+  (void)data;
+
+  munit_assert_int(TC_OK, ==, TC_DES_init_ctx_iv(&ctx, des_test_key, iv));
+  memcpy(&saved, &ctx, sizeof ctx);
+#if TC_DES_ENABLE_CBC
+  munit_assert_int(TC_ERROR, ==, TC_DES_CBC_encrypt(&ctx, NULL, 8));
+  munit_assert_int(TC_ERROR, ==, TC_DES_CBC_decrypt(&ctx, NULL, 8));
+  munit_assert_int(TC_OK, ==, TC_DES_CBC_encrypt(&ctx, NULL, 0));
+#endif
+#if TC_DES_ENABLE_CTR
+  munit_assert_int(TC_ERROR, ==, TC_DES_CTR_crypt(&ctx, NULL, 1));
+  munit_assert_int(TC_OK, ==, TC_DES_CTR_crypt(&ctx, NULL, 0));
+#endif
+#if TC_DES_ENABLE_CFB64
+  munit_assert_int(TC_ERROR, ==, TC_DES_CFB64_encrypt(&ctx, NULL, 8));
+  munit_assert_int(TC_ERROR, ==, TC_DES_CFB64_decrypt(&ctx, NULL, 3));
+  munit_assert_int(TC_OK, ==, TC_DES_CFB64_encrypt(&ctx, NULL, 0));
+#endif
+#if TC_DES_ENABLE_CFB8
+  munit_assert_int(TC_ERROR, ==, TC_DES_CFB8_encrypt(&ctx, NULL, 1));
+  munit_assert_int(TC_ERROR, ==, TC_DES_CFB8_decrypt(&ctx, NULL, 1));
+  munit_assert_int(TC_OK, ==, TC_DES_CFB8_decrypt(&ctx, NULL, 0));
+#endif
+#if TC_DES_ENABLE_CFB1
+  munit_assert_int(TC_ERROR, ==, TC_DES_CFB1_encrypt(&ctx, NULL, 1));
+  munit_assert_int(TC_ERROR, ==, TC_DES_CFB1_decrypt(&ctx, NULL, 1));
+  munit_assert_int(TC_OK, ==, TC_DES_CFB1_encrypt(&ctx, NULL, 0));
+#endif
+#if TC_DES_ENABLE_OFB
+  munit_assert_int(TC_ERROR, ==, TC_DES_OFB_crypt(&ctx, NULL, 1));
+  munit_assert_int(TC_OK, ==, TC_DES_OFB_crypt(&ctx, NULL, 0));
+#endif
+  munit_assert_memory_equal(sizeof ctx, &ctx, &saved);
+  TC_DES_ctx_clear(&ctx);
+
+#if TC_DES_ENABLE_TDES
+  {
+    struct TC_DES3_ctx ctx3;
+    struct TC_DES3_ctx saved3;
+    munit_assert_int(TC_OK, ==, TC_DES3_init_ctx_iv(&ctx3, tdes3_key, sizeof tdes3_key, iv));
+    memcpy(&saved3, &ctx3, sizeof ctx3);
+#if TC_DES_ENABLE_CBC
+    munit_assert_int(TC_ERROR, ==, TC_DES3_CBC_encrypt(&ctx3, NULL, 8));
+    munit_assert_int(TC_ERROR, ==, TC_DES3_CBC_decrypt(&ctx3, NULL, 8));
+#endif
+#if TC_DES_ENABLE_CTR
+    munit_assert_int(TC_ERROR, ==, TC_DES3_CTR_crypt(&ctx3, NULL, 1));
+#endif
+#if TC_DES_ENABLE_CFB64
+    munit_assert_int(TC_ERROR, ==, TC_DES3_CFB64_encrypt(&ctx3, NULL, 8));
+    munit_assert_int(TC_ERROR, ==, TC_DES3_CFB64_decrypt(&ctx3, NULL, 8));
+#endif
+#if TC_DES_ENABLE_CFB8
+    munit_assert_int(TC_ERROR, ==, TC_DES3_CFB8_encrypt(&ctx3, NULL, 1));
+    munit_assert_int(TC_ERROR, ==, TC_DES3_CFB8_decrypt(&ctx3, NULL, 1));
+#endif
+#if TC_DES_ENABLE_CFB1
+    munit_assert_int(TC_ERROR, ==, TC_DES3_CFB1_encrypt(&ctx3, NULL, 1));
+    munit_assert_int(TC_ERROR, ==, TC_DES3_CFB1_decrypt(&ctx3, NULL, 1));
+#endif
+#if TC_DES_ENABLE_OFB
+    munit_assert_int(TC_ERROR, ==, TC_DES3_OFB_crypt(&ctx3, NULL, 1));
+#endif
+    munit_assert_memory_equal(sizeof ctx3, &ctx3, &saved3);
+    TC_DES3_ctx_clear(&ctx3);
+  }
+#endif
+  return MUNIT_OK;
+}
+#endif
+
 /* Secure wipe / context clear tests */
 static MunitResult test_des_secure_zero_and_clear(const MunitParameter params[], void* data)
 {
@@ -1110,6 +1191,10 @@ static MunitTest test_suite_tests[] = {
      MUNIT_TEST_OPTION_NONE, NULL},
 #endif
     {"/des_api_errors", test_des_api_errors, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+#if TC_DES_ENABLE_CBC || TC_DES_ENABLE_CTR || TC_DES_ENABLE_OFB || TC_DES_ENABLE_CFB1 ||           \
+    TC_DES_ENABLE_CFB8 || TC_DES_ENABLE_CFB64
+    {"/des_null_buffers", test_des_null_buffers, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+#endif
     {"/des_secure_zero_and_clear", test_des_secure_zero_and_clear, NULL, NULL,
      MUNIT_TEST_OPTION_NONE, NULL},
 #if TC_DES_ENABLE_ECB && TC_DES_ENABLE_CBC && TC_DES_ENABLE_CFB1 && TC_DES_ENABLE_CFB8 &&          \

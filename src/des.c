@@ -248,10 +248,8 @@ void tc_des_key_schedule(uint8_t (*sk)[6], const uint8_t* key)
       sk[r][i / 8u] |= (uint8_t)(bit_val << (7u - (i % 8u)));
     }
   }
-#if TC_ZEROIZE
   TC_secure_zero(&C, sizeof C);
   TC_secure_zero(&D, sizeof D);
-#endif
 }
 
 #if TC_DES_ENABLE_TDES || TC_DES_ENABLE_CMAC || TC_DES_ENABLE_ISO9797

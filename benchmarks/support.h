@@ -21,10 +21,9 @@ void tc_benchmark_consume(const void* value);
 static inline void tc_benchmark_profile(void)
 {
   printf("compiler=%s build=%s sanitizer=%s AES=%d key_bits=%d sbox=%d "
-         "ghash=%d wide=%d zeroize=%d strict=%d\n",
+         "ghash=%d wide=%d\n",
          TC_BENCHMARK_COMPILER, TC_BENCHMARK_BUILD_TYPE, TC_BENCHMARK_SANITIZE, TC_ENABLE_AES,
-         TC_AES_KEY_BITS, TC_AES_SBOX_MODE, TC_AES_GCM_GHASH_MODE, TC_AES_WIDE_OPS, TC_ZEROIZE,
-         TC_STRICT);
+         TC_AES_KEY_BITS, TC_AES_SBOX_MODE, TC_AES_GCM_GHASH_MODE, TC_AES_WIDE_OPS);
 #if TC_ENABLE_AES && TC_AES_SBOX_MODE == TC_AES_SBOX_MODE_RUNTIME
   TC_AES_init_sbox();
 #endif

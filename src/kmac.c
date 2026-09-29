@@ -49,9 +49,7 @@ static void tc_kmac_permute(uint64_t* a)
       lfsr = (uint8_t)((lfsr << 1) ^ ((lfsr & 0x80u) ? 0x71u : 0u));
     }
   }
-#if TC_ZEROIZE
   TC_secure_zero(c, sizeof(c));
-#endif
 }
 
 static void tc_kmac_byte(struct TC_KMAC256_ctx* ctx, uint8_t byte)
@@ -103,11 +101,8 @@ static int tc_kmac_length(size_t len)
 TC_status TC_KMAC256_init(struct TC_KMAC256_ctx* ctx, const uint8_t* key, size_t key_len,
                           const uint8_t* custom, size_t custom_len)
 {
-#if TC_STRICT
-  if (!ctx || (!key && key_len) || (!custom && custom_len))
-    return TC_ERROR;
-#endif
-  if (!tc_kmac_length(key_len) || !tc_kmac_length(custom_len) ||
+  if (!ctx || (!key && key_len) || (!custom && custom_len) || !tc_kmac_length(key_len) ||
+      !tc_kmac_length(custom_len) ||
       !tc_internal_ranges_disjoint(ctx, sizeof(*ctx), key, key_len) ||
       !tc_internal_ranges_disjoint(ctx, sizeof(*ctx), custom, custom_len))
     return TC_ERROR;
@@ -132,11 +127,7 @@ TC_status TC_KMAC256_init(struct TC_KMAC256_ctx* ctx, const uint8_t* key, size_t
 
 TC_status TC_KMAC256_update(struct TC_KMAC256_ctx* ctx, const uint8_t* data, size_t len)
 {
-#if TC_STRICT
-  if (!ctx || (!data && len))
-    return TC_ERROR;
-#endif
-  if (ctx->Active != 1 || ctx->Position >= TC_KMAC_RATE ||
+  if (!ctx || (!data && len) || ctx->Active != 1 || ctx->Position >= TC_KMAC_RATE ||
       !tc_internal_ranges_disjoint(ctx, sizeof(*ctx), data, len))
     return TC_ERROR;
   tc_kmac_absorb(ctx, data, len);
@@ -147,11 +138,8 @@ TC_status TC_KMAC256_final(struct TC_KMAC256_ctx* ctx, uint8_t* out, size_t out_
 {
   size_t i;
   unsigned p = 0;
-#if TC_STRICT
-  if (!ctx || !out)
-    return TC_ERROR;
-#endif
-  if (!out_len || !tc_kmac_length(out_len) || ctx->Active != 1 || ctx->Position >= TC_KMAC_RATE ||
+  if (!ctx || !out || !out_len || !tc_kmac_length(out_len) || ctx->Active != 1 ||
+      ctx->Position >= TC_KMAC_RATE ||
       !tc_internal_ranges_disjoint(ctx, sizeof(*ctx), out, out_len))
     return TC_ERROR;
   tc_kmac_encode(ctx, (uint64_t)out_len * 8, 1);
@@ -167,11 +155,7 @@ TC_status TC_KMAC256_final(struct TC_KMAC256_ctx* ctx, uint8_t* out, size_t out_
     out[i] = (uint8_t)(ctx->State[p / 8] >> (8 * (p % 8)));
     ++p;
   }
-#if TC_ZEROIZE
   TC_KMAC256_ctx_clear(ctx);
-#else
-  ctx->Active = 0;
-#endif
   return TC_OK;
 }
 
@@ -189,14 +173,13 @@ TC_status TC_KMAC256_digest(const uint8_t* key, size_t key_len, const uint8_t* d
   if ((!key && key_len) || (!data && len) || (!custom && custom_len) || !out || !out_len ||
       !tc_kmac_length(key_len) || !tc_kmac_length(custom_len) || !tc_kmac_length(out_len))
     return TC_ERROR;
+  /* The local context holds the keyed sponge. It is wiped on every path. */
   status = TC_KMAC256_init(&ctx, key, key_len, custom, custom_len);
   if (status == TC_OK)
     status = TC_KMAC256_update(&ctx, data, len);
   if (status == TC_OK)
     status = TC_KMAC256_final(&ctx, out, out_len);
-#if TC_ZEROIZE
   TC_KMAC256_ctx_clear(&ctx);
-#endif
   return status;
 }
 #endif

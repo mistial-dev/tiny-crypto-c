@@ -213,9 +213,10 @@ fix or authenticate the message length when using either of those choices.
 Use the explicit `_short_tag` forms for 4 to 7 leading bytes when a protocol
 requires truncation. Verification returns `TC_MISMATCH` for a different tag.
 For incremental input, call `TC_DES_ISO9797_init`, `update`, and `final` in
-order. Successful finalization consumes and clears the context. Clear it
-explicitly after an update error. Keep the input, key, and tag buffers disjoint
-from the context.
+order. Successful finalization consumes and clears the context. An update with
+invalid arguments leaves the context unchanged, and an update that fails while
+processing clears it. Keep the input, key, and tag buffers disjoint from the
+context.
 
 ```c
 #include <tiny_crypto/des.h>

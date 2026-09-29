@@ -63,9 +63,7 @@ static TC_status tc_aes_cbc_decrypt(const uint8_t* key, uint8_t rounds, uint8_t 
     tc_internal_xor(buffer + offset, iv, 16);
     memcpy(iv, previous, 16);
   }
-#if TC_ZEROIZE
   TC_secure_zero(previous, sizeof previous);
-#endif
   return status;
 }
 #endif

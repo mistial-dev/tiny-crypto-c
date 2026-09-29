@@ -119,9 +119,7 @@ done:
    * output still holds the rejected ciphertext and is wiped too. */
   if (status != TC_OK && (output_started || (decrypt && output == input)) && input_len != 0)
     TC_secure_zero(output, input_len);
-#if TC_ZEROIZE
   TC_secure_zero(&st, sizeof(st));
-#endif
   return status;
 }
 
@@ -211,9 +209,7 @@ done:
    * output still holds the rejected ciphertext and is wiped too. */
   if (status != TC_OK && (output_started || (decrypt && output == input)) && input_len != 0)
     TC_secure_zero(output, input_len);
-#if TC_ZEROIZE
   TC_secure_zero(&st, sizeof(st));
-#endif
   return status;
 }
 

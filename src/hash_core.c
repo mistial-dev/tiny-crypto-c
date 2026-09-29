@@ -145,15 +145,11 @@ static void view_finish(const tc_hash_algorithm_info* info, tc_hash_view view, u
   info->digest_out(view.state, digest);
 }
 
-/* Final and clear consume the context: TC_ZEROIZE wipes it, otherwise it is
- * marked inactive so reuse fails until the next init. */
+/* Final and clear consume the context by wiping it. The zeroed active flag
+ * makes reuse fail until the next init. */
 static void view_end(tc_hash_view view)
 {
-#if TC_ZEROIZE
   TC_secure_zero(view.context, view.size);
-#else
-  *view.active = 0;
-#endif
 }
 
 TC_status tc_hash_core_init(const tc_hash_algorithm_info* stored, void* context)
@@ -333,11 +329,7 @@ TC_status tc_hmac_core_final(const tc_hash_algorithm_info* stored, void* context
 
   TC_secure_zero(inner_digest, sizeof inner_digest);
   TC_secure_zero(block, sizeof block);
-#if TC_ZEROIZE
   TC_secure_zero(hmac.context, hmac.size);
-#else
-  *hmac.inner.active = 0;
-#endif
   return TC_OK;
 }
 

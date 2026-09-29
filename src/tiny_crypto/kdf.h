@@ -17,7 +17,7 @@
  * The fixed input is opaque to the library. TC_KBKDF_fixed_input builds
  * the conventional Label || 0x00 || Context || [L]_32 encoding. A cached
  * keyed PRF context, a working copy and chaining values live on the stack and
- * are wiped when TC_ZEROIZE is 1.
+ * are wiped before return.
  *
  * Function families exist per PRF, each with _counter, _feedback and
  * _pipeline variants:

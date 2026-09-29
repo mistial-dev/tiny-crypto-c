@@ -204,7 +204,9 @@ TC_status TC_AES_GCM_aad_update(struct TC_AES_GCM_ctx* ctx, const uint8_t* aad, 
 TC_status TC_AES_GCM_encrypt_update(struct TC_AES_GCM_ctx* ctx, uint8_t* buf, size_t length);
 TC_status TC_AES_GCM_decrypt_update(struct TC_AES_GCM_ctx* ctx, uint8_t* buf, size_t length);
 
-/* Tag buffer must hold ctx->tag_len bytes (set at init). */
+/* Tag buffer must hold ctx->tag_len bytes (set at init). Finish consumes the
+ * context and wipes it on success and on failure. Argument errors leave it
+ * unchanged. */
 TC_status TC_AES_GCM_encrypt_finish(struct TC_AES_GCM_ctx* ctx, uint8_t* tag);
 TC_status TC_AES_GCM_decrypt_finish(struct TC_AES_GCM_ctx* ctx, const uint8_t* tag);
 
@@ -271,8 +273,8 @@ TC_status TC_AES_EAX_PRIME_decrypt(const uint8_t* key, TC_bytes cleartext, TC_by
  * AES-CMAC (NIST SP 800-38B). One-shot.
  * tag_len must be in TC_AES_CMAC_MIN_TAG_LEN..TC_AES_CMAC_TAG_MAX (default min 8).
  * Truncation keeps the most significant octets of the full T (SP 800-38B).
- * msg may be NULL when msg_len is 0. Stack secrets wiped when
- * TC_ZEROIZE=1.
+ * msg may be NULL when msg_len is 0. The context and full tag on the stack
+ * are wiped before return.
  */
 TC_status TC_AES_CMAC(const uint8_t* key, const uint8_t* msg, size_t msg_len, uint8_t* tag,
                       size_t tag_len);
@@ -285,7 +287,8 @@ TC_status TC_AES_CMAC_verify(const uint8_t* key, const uint8_t* msg, size_t msg_
  * Streaming AES-CMAC. The most recent block is held back in buf so that
  * *_final can apply K1 (complete) or K2 (padded) to the true last block.
  * *_final always emits the full TC_AES_CMAC_TAG_MAX bytes. Callers may truncate
- * the tag. *_final consumes the context and wipes it when TC_ZEROIZE is 1.
+ * the tag. Argument errors leave the context unchanged. Otherwise *_final
+ * wipes it, on success and on failure.
  * Call *_init again before reuse.
  */
 struct TC_AES_CMAC_ctx {

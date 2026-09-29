@@ -94,6 +94,13 @@ void TC_DES_ctx_clear(struct TC_DES_ctx* ctx);
 void TC_DES3_ctx_clear(struct TC_DES3_ctx* ctx);
 #endif
 
+/*
+ * The CBC, CTR, CFB and OFB entry points share one argument contract. They
+ * return TC_ERROR for a NULL or uninitialized context, or a NULL buffer with
+ * a nonzero length, and leave the context and buffer unchanged. A NULL buffer
+ * with length 0 returns TC_OK.
+ */
+
 /* --- Single DES API --- */
 
 /**
@@ -177,7 +184,8 @@ TC_status TC_DES_CTR_crypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
  * @param ctx Pointer to initialized Single DES context (IV holds chaining state).
  * @param buf Data buffer (arbitrary length, final segment may be shorter than 8).
  * @param length Data length in bytes.
- * @return TC_OK, or TC_ERROR under TC_STRICT NULL checks.
+ * @return TC_OK, or TC_ERROR for an inactive context or a NULL buffer with
+ *         nonzero length. The context is unchanged on error.
  */
 TC_status TC_DES_CFB64_encrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
 
@@ -186,7 +194,8 @@ TC_status TC_DES_CFB64_encrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t leng
  * @param ctx Pointer to initialized Single DES context (IV holds chaining state).
  * @param buf Data buffer (arbitrary length, final segment may be shorter than 8).
  * @param length Data length in bytes.
- * @return TC_OK, or TC_ERROR under TC_STRICT NULL checks.
+ * @return TC_OK, or TC_ERROR for an inactive context or a NULL buffer with
+ *         nonzero length. The context is unchanged on error.
  */
 TC_status TC_DES_CFB64_decrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
 #endif
@@ -409,17 +418,11 @@ TC_status TC_DES3_OFB_crypt(struct TC_DES3_ctx* ctx, uint8_t* buf, size_t length
 #define TC_DES_CMAC_TAG_MAX TC_DES_BLOCKLEN
 
 /*
- * Minimum CMAC tag length in bytes. SP 800-38B recommends Tlen >= 64 bits for
- * most applications. Shorter tags need careful risk analysis. Default 8 (full
- * DES block). Override only for exotic vectors.
- */
-
-/*
  * DES/3DES-CMAC (NIST SP 800-38B). One-shot.
  * keylen must be 8 (single DES), 16 (2-key TDEA), or 24 (3-key TDEA).
  * tag_len must be in TC_DES_CMAC_MIN_TAG_LEN..TC_DES_CMAC_TAG_MAX.
  * Empty message: msg may be NULL when msg_len is 0.
- * Stack secrets wiped when TC_ZEROIZE=1.
+ * The key schedules and the full tag on the stack are wiped before return.
  */
 TC_status TC_DES_CMAC(const uint8_t* key, size_t keylen, const uint8_t* msg, size_t msg_len,
                       uint8_t* tag, size_t tag_len);
@@ -432,8 +435,9 @@ TC_status TC_DES_CMAC_verify(const uint8_t* key, size_t keylen, const uint8_t* m
  * Streaming DES/3DES-CMAC. Holds its own key schedules so it works with the
  * ECB/CBC/TDES mode gates compiled out. The most recent block is held back in
  * buf so *_final can apply K1 (complete) or K2 (padded) to the true last
- * block. *_final always emits the full TC_DES_CMAC_TAG_MAX bytes, consumes the
- * context and wipes it when TC_ZEROIZE is 1. Call *_init again before reuse.
+ * block. *_final always emits the full TC_DES_CMAC_TAG_MAX bytes. Argument
+ * errors leave the context unchanged. Otherwise *_final wipes it, on success
+ * and on failure. Call *_init again before reuse.
  */
 struct TC_DES_CMAC_ctx {
   TC_DES_key_bundle keys;
@@ -464,7 +468,8 @@ void TC_DES_CMAC_ctx_clear(struct TC_DES_CMAC_ctx* ctx);
  * The caller must authenticate a fixed or separately authenticated length
  * when using NONE or padding 1. Context is caller-owned and final consumes it.
  * Input, key, and tag buffers must not overlap the context. A failed final
- * leaves the tag untouched. Clear the context after a failed update.
+ * leaves the tag untouched. An update with invalid arguments leaves the
+ * context unchanged. An update that fails while processing wipes it.
  */
 typedef enum TC_DES_ISO9797_algorithm {
   TC_DES_ISO9797_ALG1 = 1,

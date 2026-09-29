@@ -156,10 +156,8 @@ static TC_status tc_aes_gcm_make_tag(const struct TC_AES_GCM_ctx* ctx, uint8_t* 
   for (i = 0; i < ctx->tag_len; ++i)
     tag[i] = (uint8_t)(mask[i] ^ hash[i]);
 done:
-#if TC_ZEROIZE
   TC_secure_zero(mask, sizeof(mask));
   TC_secure_zero(hash, sizeof(hash));
-#endif
   return status;
 }
 
@@ -369,17 +367,17 @@ static TC_status tc_aes_gcm_decrypt_recheck(struct TC_AES_GCM_ctx* ctx, const ui
   }
   if (status != TC_OK)
     TC_secure_zero(plaintext, length);
-#if TC_ZEROIZE
   TC_secure_zero(counter, sizeof counter);
   TC_secure_zero(block, sizeof block);
   TC_secure_zero(stream, sizeof stream);
   TC_secure_zero(expected, sizeof expected);
-#endif
   return status;
 }
 
 TC_status TC_AES_GCM_encrypt_finish(struct TC_AES_GCM_ctx* ctx, uint8_t* tag)
 {
+  TC_status status;
+
   if (ctx == NULL || tag == NULL || ctx->phase == TC_AES_GCM_PHASE_UNINIT ||
       ctx->phase == TC_AES_GCM_PHASE_FINAL ||
       !tc_internal_ranges_disjoint(ctx, sizeof(*ctx), tag, ctx->tag_len) ||
@@ -389,15 +387,10 @@ TC_status TC_AES_GCM_encrypt_finish(struct TC_AES_GCM_ctx* ctx, uint8_t* tag)
     return TC_ERROR;
   tc_aes_gcm_start_text(ctx, 0);
   tc_aes_gcm_finish_ghash(ctx);
-  if (tc_aes_gcm_make_tag(ctx, tag) != TC_OK) {
-    tc_aes_gcm_invalidate(ctx);
-    return TC_ERROR;
-  }
-  ctx->phase = TC_AES_GCM_PHASE_FINAL;
-#if TC_ZEROIZE
+  /* Finish consumes the context on success and on failure. */
+  status = tc_aes_gcm_make_tag(ctx, tag);
   tc_aes_gcm_invalidate(ctx);
-#endif
-  return TC_OK;
+  return status;
 }
 
 TC_status TC_AES_GCM_decrypt_finish(struct TC_AES_GCM_ctx* ctx, const uint8_t* tag)
@@ -423,16 +416,8 @@ TC_status TC_AES_GCM_decrypt_finish(struct TC_AES_GCM_ctx* ctx, const uint8_t* t
   if (status == TC_OK && ctx->decrypt_length != 0)
     status = tc_aes_gcm_decrypt_recheck(ctx, ctx->decrypt_buffer, ctx->decrypt_buffer,
                                         ctx->decrypt_length, tag);
-  if (status != TC_OK || TC_ZEROIZE)
-    tc_aes_gcm_invalidate(ctx);
-  else {
-    ctx->phase = TC_AES_GCM_PHASE_FINAL;
-    ctx->decrypt_buffer = NULL;
-    ctx->decrypt_length = 0;
-  }
-#if TC_ZEROIZE
+  tc_aes_gcm_invalidate(ctx);
   TC_secure_zero(expected, sizeof(expected));
-#endif
   return status;
 }
 
@@ -473,9 +458,7 @@ static TC_status tc_aes_gcm_encrypt_impl(const uint8_t* key, TC_bytes iv, TC_byt
   if (tc_aes_gcm_init_impl(&ctx, key, iv, tag.capacity, short_tag) != TC_OK)
     return TC_ERROR;
   if (TC_AES_GCM_aad_update(&ctx, aad.data, aad.length) != TC_OK) {
-#if TC_ZEROIZE
     TC_AES_GCM_clear(&ctx);
-#endif
     return TC_ERROR;
   }
 
@@ -489,9 +472,7 @@ static TC_status tc_aes_gcm_encrypt_impl(const uint8_t* key, TC_bytes iv, TC_byt
   if (status != TC_OK && plaintext.length != 0)
     TC_secure_zero(ciphertext.data, plaintext.length);
 
-#if TC_ZEROIZE
   TC_AES_GCM_clear(&ctx);
-#endif
   return status;
 }
 
@@ -534,10 +515,8 @@ static TC_status tc_aes_gcm_decrypt_impl(const uint8_t* key, TC_bytes iv, TC_byt
     status = tc_aes_gcm_decrypt_recheck(&ctx, ciphertext.data, plaintext.data, length, tag.data);
 
 done:
-#if TC_ZEROIZE
   TC_AES_GCM_clear(&ctx);
   TC_secure_zero(expected, sizeof(expected));
-#endif
   return status;
 }
 

@@ -120,9 +120,9 @@ size_t tc_hash_core_digest_bytes(const tc_hash_algorithm_info* info);
  * length 0 with a NULL pointer, and data must stay clear of the context.
  * update returns TC_ERROR for NULL or overlapping arguments, an inactive
  * context, or a total length past max_message_bytes, and leaves the context
- * unchanged in each case. final writes digest_bytes and consumes the context.
- * TC_ZEROIZE builds wipe it, and other builds mark it inactive. The digest
- * must stay clear of the context. clear wipes the context and accepts NULL. */
+ * unchanged in each case. final writes digest_bytes and consumes the context
+ * by wiping it. The digest must stay clear of the context. clear wipes the
+ * context and accepts NULL. */
 TC_status tc_hash_core_init(const tc_hash_algorithm_info* info, void* context);
 TC_status tc_hash_core_update(const tc_hash_algorithm_info* info, void* context,
                               const uint8_t* data, size_t length);

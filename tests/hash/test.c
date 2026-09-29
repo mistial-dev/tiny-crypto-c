@@ -68,11 +68,7 @@ MunitResult test_cavp_sha(const MunitParameter params[], void* data);
 MunitResult test_cavp_hmac(const MunitParameter params[], void* data);
 
 /* The five SHA APIs share one behavioral matrix. */
-#if TC_ZEROIZE
 #define TC_SHA_ASSERT_CLEARED(ctx) munit_assert_true(tc_test_all_zero(&(ctx), sizeof(ctx)))
-#else
-#define TC_SHA_ASSERT_CLEARED(ctx) ((void)0)
-#endif
 
 #define TC_SHA_ARGUMENT_CHECKS(N, ctx, out)                                                        \
   do {                                                                                             \

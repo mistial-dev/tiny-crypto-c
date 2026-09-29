@@ -116,24 +116,23 @@ TC_status TC_DES_CMAC(const uint8_t* key, size_t keylen, const uint8_t* msg, siz
 {
   struct TC_DES_CMAC_ctx ctx;
   uint8_t full[TC_DES_CMAC_TAG_MAX];
+  TC_status status;
 
   if (key == NULL || tag == NULL || tag_len < TC_DES_CMAC_MIN_TAG_LEN ||
       tag_len > TC_DES_CMAC_TAG_MAX || (msg_len != 0 && msg == NULL)) {
     return TC_ERROR;
   }
-  if (TC_DES_CMAC_init(&ctx, key, keylen) != TC_OK)
-    return TC_ERROR;
+  status = TC_DES_CMAC_init(&ctx, key, keylen);
   /* Empty message: msg may be NULL. update reads msg only when msg_len > 0. */
-  if (TC_DES_CMAC_update(&ctx, msg, msg_len) != TC_OK || TC_DES_CMAC_final(&ctx, full) != TC_OK) {
-    TC_DES_CMAC_ctx_clear(&ctx);
-    return TC_ERROR;
-  }
-  memcpy(tag, full, tag_len);
-
-#if TC_ZEROIZE
+  if (status == TC_OK)
+    status = TC_DES_CMAC_update(&ctx, msg, msg_len);
+  if (status == TC_OK)
+    status = TC_DES_CMAC_final(&ctx, full);
+  if (status == TC_OK)
+    memcpy(tag, full, tag_len);
   TC_secure_zero(full, sizeof(full));
-#endif
-  return TC_OK;
+  TC_DES_CMAC_ctx_clear(&ctx);
+  return status;
 }
 
 TC_status TC_DES_CMAC_verify(const uint8_t* key, size_t keylen, const uint8_t* msg, size_t msg_len,

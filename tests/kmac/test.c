@@ -63,10 +63,9 @@ static MunitResult test_profile(const MunitParameter params[], void* user)
     munit_assert(TC_KMAC256_update(&ctx, NULL, 0) == TC_OK);
     munit_assert(TC_KMAC256_final(&ctx, stream, output_len) == TC_OK);
     munit_assert(memcmp(out, stream, output_len) == 0);
-#if TC_ZEROIZE
+    /* Final consumes the context and wipes its key-dependent state. */
     memset(&saved, 0, sizeof(saved));
     munit_assert(memcmp(&ctx, &saved, sizeof(ctx)) == 0);
-#endif
     munit_assert(TC_KMAC256_update(&ctx, NULL, 0) == TC_ERROR);
     munit_assert(TC_KMAC256_final(&ctx, stream, 32) == TC_ERROR);
     munit_assert(TC_KMAC256_digest(key, 32, data, n, data, n, out, 48) == TC_OK);
@@ -88,12 +87,18 @@ static MunitResult test_profile(const MunitParameter params[], void* user)
   munit_assert(TC_KMAC256_init(&ctx, (const uint8_t*)&ctx, 32, NULL, 0) == TC_ERROR);
   munit_assert(memcmp(&saved, &ctx, sizeof(ctx)) == 0);
   munit_assert(memcmp(want, out, sizeof(out)) == 0);
-#if TC_STRICT
+  /* NULL pointers with nonzero lengths are argument errors that leave the
+   * context and output unchanged. */
   munit_assert(TC_KMAC256_init(NULL, key, 32, NULL, 0) == TC_ERROR);
-  munit_assert(TC_KMAC256_init(&ctx, NULL, 32, NULL, 0) == TC_ERROR);
+  munit_assert(TC_KMAC256_update(NULL, data, 1) == TC_ERROR);
+  munit_assert(TC_KMAC256_final(NULL, out, 32) == TC_ERROR);
   munit_assert(TC_KMAC256_update(&ctx, NULL, 1) == TC_ERROR);
   munit_assert(TC_KMAC256_final(&ctx, NULL, 32) == TC_ERROR);
-#endif
+  munit_assert(memcmp(&saved, &ctx, sizeof(ctx)) == 0);
+  munit_assert(TC_KMAC256_init(&ctx, NULL, 32, NULL, 0) == TC_ERROR);
+  munit_assert(TC_KMAC256_init(&ctx, key, 32, NULL, 1) == TC_ERROR);
+  munit_assert(memcmp(&saved, &ctx, sizeof(ctx)) == 0);
+  munit_assert(memcmp(want, out, sizeof(out)) == 0);
   munit_assert(TC_KMAC256_digest(NULL, 1, data, 1, NULL, 0, out, 32) == TC_ERROR);
   munit_assert(TC_KMAC256_digest(key, 32, NULL, 1, NULL, 0, out, 32) == TC_ERROR);
   munit_assert(TC_KMAC256_digest(key, 32, data, 1, NULL, 1, out, 32) == TC_ERROR);

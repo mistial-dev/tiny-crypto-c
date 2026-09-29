@@ -174,9 +174,11 @@ selected.
 
 | Option                    | Default | Purpose                              |
 | ------------------------- | ------: | ------------------------------------ |
-| `TINY_CRYPTO_ZEROIZE`     |      ON | Wipe contexts and stack secrets      |
-| `TINY_CRYPTO_STRICT`      |      ON | Validate public API pointers         |
 | `TINY_CRYPTO_AVR_PROGMEM` |      ON | Keep constant tables out of AVR SRAM |
+
+Secret wiping and public argument checks are always on. Finals, one-shot
+calls and failure paths wipe contexts and stack secrets, and every public
+entry validates its pointers.
 
 The three `TINY_CRYPTO_TAF_*` choices follow the trust-anchor-format switch
 under `AUTO`. At least one choice must be enabled when the format is enabled.
@@ -337,8 +339,7 @@ For SignedData envelopes and signed attributes, see [CMS parsing](docs/cms.md).
 `TC_TLV_END` means the sibling reader is exhausted. `TC_TLV_MORE` means a root
 reader needs more input. A child reader reports truncation as `TC_TLV_INVALID`.
 Other results distinguish malformed input, resource limits, unsupported
-features, and invalid arguments. Bounds checks remain on
-with `TC_STRICT=0`.
+features, and invalid arguments. Bounds checks are always on.
 
 Returned spans borrow the input. Keep that buffer unchanged while using
 them. Incremental callbacks borrow bytes only during the callback. Call

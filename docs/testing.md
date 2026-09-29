@@ -50,8 +50,8 @@ TWIC CCL parsing and lookup use `test_twic_ccl`. See the
 [CCL guide](twic-ccl.md#tests) for testing a downloaded TSA feed. Its external
 file case skips when `TC_TEST_TWIC_CCL` is unset; synthetic cases always run.
 When supplying a file, set `TC_TEST_TWIC_CCL_MD5` to its published 32-digit
-hexadecimal checksum. `test_md5_0` and `test_md5_1` exercise the optional
-[MD5 implementation](md5.md) with both zeroization settings.
+hexadecimal checksum. `test_md5` and `test_cpp_md5` exercise the optional
+[MD5 implementation](md5.md).
 
 ```sh
 make test

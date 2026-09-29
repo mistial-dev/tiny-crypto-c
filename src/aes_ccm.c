@@ -64,9 +64,7 @@ static TC_status tc_aes_ccm_xor_block(uint8_t* dst, size_t length, uint8_t* coun
   for (i = 0; i < length; ++i)
     dst[i] ^= stream[i];
 done:
-#if TC_ZEROIZE
   TC_secure_zero(stream, sizeof(stream));
-#endif
   return status;
 }
 
@@ -214,9 +212,7 @@ static TC_status tc_aes_ccm_crypt(const uint8_t* key, TC_bytes nonce_span, TC_by
 done:
   if (status != TC_OK && output_started && input_len != 0)
     TC_secure_zero(output, input_len);
-#if TC_ZEROIZE
   TC_secure_zero(&st, sizeof(st));
-#endif
   return status;
 }
 

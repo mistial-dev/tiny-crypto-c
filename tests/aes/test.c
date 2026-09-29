@@ -707,6 +707,7 @@ static MunitResult test_gcm(const MunitParameter params[], void* data)
   munit_assert_int(TC_AES_GCM_encrypt_finish(&ctx, tag), ==, TC_OK);
   munit_assert_memory_equal(vector->length, buffer, vector->ciphertext);
   munit_assert_memory_equal(vector->tag_len, tag, vector->tag);
+  munit_assert_int(TC_AES_GCM_encrypt_finish(&ctx, tag), ==, TC_ERROR);
 
   /* Fixed t=4 for this key/context. MSBt of the 128-bit tag. */
   munit_assert_int(
@@ -753,6 +754,16 @@ static MunitResult test_gcm(const MunitParameter params[], void* data)
   munit_assert_memory_equal(vector->length, buffer, vector->ciphertext);
   munit_assert_int(TC_AES_GCM_decrypt_finish(&ctx, tag), ==, TC_OK);
   munit_assert_memory_equal(vector->length, buffer, vector->plaintext);
+  /* Finish consumes the context and wipes its key-dependent state. */
+  {
+    static const struct TC_AES_key_ctx zero_key;
+    static const uint8_t zero_block[TC_AES_BLOCKLEN];
+    munit_assert_memory_equal(sizeof zero_key, &ctx.key, &zero_key);
+    munit_assert_memory_equal(sizeof zero_block, ctx.H, zero_block);
+    munit_assert_memory_equal(sizeof zero_block, ctx.S, zero_block);
+    munit_assert_ptr_null(ctx.decrypt_buffer);
+  }
+  munit_assert_int(TC_AES_GCM_decrypt_finish(&ctx, tag), ==, TC_ERROR);
 
   memcpy(buffer, vector->ciphertext, vector->length);
   munit_assert_int(

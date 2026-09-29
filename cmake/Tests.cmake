@@ -98,6 +98,12 @@ add_test(NAME test_package_boundaries
         -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/tag-length-config
         -DC_COMPILER=${CMAKE_C_COMPILER}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/reject_tag_length_config.cmake)
+    add_test(NAME test_reject_removed_switches
+      COMMAND ${CMAKE_COMMAND}
+        -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+        -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/removed-switches
+        -DC_COMPILER=${CMAKE_C_COMPILER}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/reject_removed_switches.cmake)
   endif()
 
   # µunit uses C11 atomics when Clang exposes them in C99 mode. Keep the
@@ -467,7 +473,7 @@ add_test(NAME test_package_boundaries
         --aead-reader 256:$<TARGET_FILE:test_wycheproof_aead_256>)
   endif()
 
-  foreach(profile full relaxed core)
+  foreach(profile full core)
     tc_add_test_library(tiny-crypto-c-test-tlv-${profile}
       src/tlv.c src/tlv_walk.c src/der.c src/aamva.c)
     target_compile_definitions(tiny-crypto-c-test-tlv-${profile} PUBLIC
@@ -478,9 +484,6 @@ add_test(NAME test_package_boundaries
     else()
       target_compile_definitions(tiny-crypto-c-test-tlv-${profile} PUBLIC
         TC_ENABLE_DER=1 TC_TLV_ENABLE_BER=1 TC_TLV_ENABLE_STREAM=1)
-    endif()
-    if(profile STREQUAL "relaxed")
-      target_compile_definitions(tiny-crypto-c-test-tlv-${profile} PUBLIC TC_STRICT=0 TC_ZEROIZE=0)
     endif()
     tc_add_c_test(test_tlv_${profile} tiny-crypto-c-test-tlv-${profile} tests/tlv/test.c)
   endforeach()
@@ -615,18 +618,15 @@ add_test(NAME test_package_boundaries
     TC_ENABLE_TWIC_CCL=1 TC_ENABLE_AES=0 TC_ENABLE_SHA256=0)
   tc_add_c_test(test_twic_ccl tiny-crypto-c-test-ccl tests/twic/ccl.c)
   target_sources(test_twic_ccl PRIVATE examples/twic_ccl_storage.c examples/twic_ccl_import.c)
-  foreach(zeroize IN ITEMS 0 1)
-    tc_add_test_library(tiny-crypto-c-test-md5-${zeroize} src/common.c src/md5.c src/hash_core.c)
-    target_compile_definitions(tiny-crypto-c-test-md5-${zeroize} PUBLIC
-      TC_ENABLE_MD5=1 TC_ENABLE_AES=0 TC_ENABLE_SHA256=0 TC_ZEROIZE=${zeroize})
-    tc_add_c_test(test_md5_${zeroize} tiny-crypto-c-test-md5-${zeroize} tests/hash/md5.c)
-    if(tc_build_cpp_tests)
-      tc_add_linked_test(test_cpp_md5_${zeroize} tiny-crypto-c-test-md5-${zeroize}
-        tests/cpp/md5.cpp tests/cpp/main.cpp)
-      target_include_directories(test_cpp_md5_${zeroize} PRIVATE tests/support)
-    endif()
-  endforeach()
-  target_link_libraries(test_twic_ccl PRIVATE tiny-crypto-c-test-md5-1)
+  tc_add_test_library(tiny-crypto-c-test-md5 src/common.c src/md5.c src/hash_core.c)
+  target_compile_definitions(tiny-crypto-c-test-md5 PUBLIC
+    TC_ENABLE_MD5=1 TC_ENABLE_AES=0 TC_ENABLE_SHA256=0)
+  tc_add_c_test(test_md5 tiny-crypto-c-test-md5 tests/hash/md5.c)
+  if(tc_build_cpp_tests)
+    tc_add_linked_test(test_cpp_md5 tiny-crypto-c-test-md5 tests/cpp/md5.cpp tests/cpp/main.cpp)
+    target_include_directories(test_cpp_md5 PRIVATE tests/support)
+  endif()
+  target_link_libraries(test_twic_ccl PRIVATE tiny-crypto-c-test-md5)
   tc_add_c_test(test_x509_key tiny-crypto-c-test-pki tests/x509/key.c)
   tc_add_c_test(test_x509_extensions tiny-crypto-c-test-pki tests/x509/extensions.c)
   target_compile_definitions(test_x509_extensions PRIVATE
@@ -1013,7 +1013,7 @@ add_test(NAME test_package_boundaries
     add_executable(fuzz_tlv tests/tlv/fuzz.c src/tlv.c src/tlv_walk.c src/der.c)
     target_include_directories(fuzz_tlv PRIVATE src)
     target_compile_definitions(fuzz_tlv PRIVATE TC_ENABLE_TLV=1 TC_ENABLE_DER=1
-      TC_TLV_ENABLE_BER=1 TC_TLV_ENABLE_STREAM=1 TC_STRICT=0)
+      TC_TLV_ENABLE_BER=1 TC_TLV_ENABLE_STREAM=1)
     target_compile_options(fuzz_tlv PRIVATE -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer)
     target_link_options(fuzz_tlv PRIVATE -fsanitize=fuzzer,address,undefined)
     tc_warnings(fuzz_tlv)
@@ -1023,7 +1023,7 @@ add_test(NAME test_package_boundaries
     add_executable(fuzz_pki tests/x509/fuzz.c tests/support/x509_crl_harness.c ${tc_hash_sources} ${pki_fuzz_sources})
     target_include_directories(fuzz_pki PRIVATE src)
     target_compile_definitions(fuzz_pki PRIVATE ${pki_fuzz_definitions}
-      TC_ENABLE_SHA256=1 TC_STRICT=0)
+      TC_ENABLE_SHA256=1)
     target_compile_options(fuzz_pki PRIVATE -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer)
     target_link_options(fuzz_pki PRIVATE -fsanitize=fuzzer,address,undefined)
     tc_warnings(fuzz_pki)
@@ -1041,16 +1041,16 @@ add_test(NAME test_package_boundaries
   tc_add_c_test(test_kmac_acvp tiny-crypto-c-test tests/kmac/acvp.c)
   target_compile_definitions(test_kmac_acvp PRIVATE
     KMAC_ACVP_FILE="${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/kmac/acvp_kmac256_aft.tsv")
-  tc_add_test_library(tiny-crypto-c-test-kmac-relaxed src/common.c src/kmac.c)
-  target_compile_definitions(tiny-crypto-c-test-kmac-relaxed PUBLIC
-    TC_ENABLE_KMAC256=1 TC_ENABLE_AES=0 TC_ENABLE_SHA256=0
-    TC_ZEROIZE=0 TC_STRICT=0)
-  tc_add_c_test(test_kmac_relaxed tiny-crypto-c-test-kmac-relaxed tests/kmac/test.c)
+  # KMAC alone, without the SHA and AES cores of the full test library.
+  tc_add_test_library(tiny-crypto-c-test-kmac-only src/common.c src/kmac.c)
+  target_compile_definitions(tiny-crypto-c-test-kmac-only PUBLIC
+    TC_ENABLE_KMAC256=1 TC_ENABLE_AES=0 TC_ENABLE_SHA256=0)
+  tc_add_c_test(test_kmac_only tiny-crypto-c-test-kmac-only tests/kmac/test.c)
   if(TINY_CRYPTO_TEST_WYCHEPROOF_DIR)
     add_test(NAME test_wycheproof_kmac
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/wycheproof.py
         --vectors ${TINY_CRYPTO_TEST_WYCHEPROOF_DIR}
-        --kmac-reader $<TARGET_FILE:test_kmac> --kmac-reader $<TARGET_FILE:test_kmac_relaxed>)
+        --kmac-reader $<TARGET_FILE:test_kmac> --kmac-reader $<TARGET_FILE:test_kmac_only>)
     add_test(NAME test_wycheproof_dynamic_cmac
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/wycheproof.py
         --vectors ${TINY_CRYPTO_TEST_WYCHEPROOF_DIR}

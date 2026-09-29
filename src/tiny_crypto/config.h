@@ -68,7 +68,7 @@
 #endif
 /* TLV framing is independent of the cryptographic algorithms. DER adds typed
  * value checks; BER and incremental entry points are optional. Parser bounds
- * checks cannot be disabled with TC_STRICT. */
+ * checks are always on. */
 #ifndef TC_ENABLE_TLV
 #define TC_ENABLE_TLV TC_PROFILE_VALUE(0, 0, 0, 1)
 #endif
@@ -366,27 +366,17 @@
 #error "DRBG switches must be 0 or 1"
 #endif
 
-/* Cross-algorithm security and embedded-storage policy.
- * TC_ZEROIZE: finalization wipes contexts and HMAC key-derived schedules,
- *   pads, and tags. Public-data hash schedules are not wiped on every block.
- *   CPU registers used as round working variables are not wiped.
- * TC_STRICT: streaming APIs reject NULL arguments (compiled out when 0).
- *   One-shot APIs always validate their arguments.
- * TC_AVR_PROGMEM: keep constant tables in AVR flash; 0 copies them into SRAM. */
-#ifndef TC_ZEROIZE
-#define TC_ZEROIZE TC_PROFILE_VALUE(1, 1, 1, 1)
-#endif
-#ifndef TC_STRICT
-#define TC_STRICT TC_PROFILE_VALUE(1, 1, 1, 1)
+/* Secret wiping and public argument checks are always enabled. Every final,
+ * one-shot and failure path wipes key-dependent state, and every public entry
+ * validates its pointers. CPU registers used as round working variables are
+ * not wiped. Defining TC_ZEROIZE or TC_STRICT is an error because neither
+ * behavior can be disabled.
+ * TC_AVR_PROGMEM: keep constant tables in AVR flash. 0 copies them into SRAM. */
+#if defined(TC_ZEROIZE) || defined(TC_STRICT)
+#error "TC_ZEROIZE and TC_STRICT are removed: wiping and argument checks are always on"
 #endif
 #ifndef TC_AVR_PROGMEM
 #define TC_AVR_PROGMEM TC_PROFILE_VALUE(1, 1, 1, 1)
-#endif
-#if TC_ZEROIZE != 0 && TC_ZEROIZE != 1
-#error "TC_ZEROIZE must be 0 or 1"
-#endif
-#if TC_STRICT != 0 && TC_STRICT != 1
-#error "TC_STRICT must be 0 or 1"
 #endif
 #if TC_AVR_PROGMEM != 0 && TC_AVR_PROGMEM != 1
 #error "TC_AVR_PROGMEM must be 0 or 1"

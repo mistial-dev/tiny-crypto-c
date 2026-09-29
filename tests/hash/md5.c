@@ -21,9 +21,7 @@ static void check(const uint8_t* data, size_t length, const char* answer)
     munit_assert_memory_equal(sizeof digest, digest, expected);
     munit_assert_int(TC_MD5_update(&ctx, data, 1), ==, TC_ERROR);
     munit_assert_int(TC_MD5_final(&ctx, digest), ==, TC_ERROR);
-#if TC_ZEROIZE
     munit_assert(tc_test_all_zero(&ctx, sizeof ctx));
-#endif
     TC_MD5_ctx_clear(&ctx);
     munit_assert(tc_test_all_zero(&ctx, sizeof ctx));
     munit_assert_int(TC_MD5_update(&ctx, data, 1), ==, TC_ERROR);

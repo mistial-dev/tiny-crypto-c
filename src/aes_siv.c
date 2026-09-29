@@ -66,19 +66,15 @@ static TC_status tc_aes_siv_s2v(const uint8_t* k1_round, const TC_bytes* ad, siz
     for (j = 0; j < TC_AES_BLOCKLEN; ++j)
       t[j] ^= tmp[j];
     status = tc_aes_siv_cmac(k1_round, k1, k2, &(TC_bytes){t, TC_AES_BLOCKLEN}, 1, v);
-#if TC_ZEROIZE
     TC_secure_zero(t, sizeof(t));
-#endif
   }
 
 done:
-#if TC_ZEROIZE
   TC_secure_zero(d, sizeof(d));
   TC_secure_zero(tmp, sizeof(tmp));
   TC_secure_zero(last_block, sizeof(last_block));
   TC_secure_zero(k1, sizeof(k1));
   TC_secure_zero(k2, sizeof(k2));
-#endif
   return status;
 }
 
@@ -137,9 +133,7 @@ static TC_status tc_aes_siv_crypt(const uint8_t* key, const TC_bytes* ad, size_t
   }
 
 done:
-#if TC_ZEROIZE
   TC_secure_zero(&st, sizeof(st));
-#endif
   return status;
 }
 
@@ -160,9 +154,7 @@ TC_status TC_AES_SIV_encrypt(const uint8_t* key, const TC_bytes* ad, size_t ad_c
   status = tc_aes_siv_crypt(key, ad, ad_count, plaintext, ciphertext, local_v, 0);
   if (status == TC_OK)
     memcpy(v, local_v, TC_AES_SIV_V_LEN);
-#if TC_ZEROIZE
   TC_secure_zero(local_v, sizeof(local_v));
-#endif
   return status;
 }
 
@@ -179,9 +171,7 @@ TC_status TC_AES_SIV_decrypt(const uint8_t* key, const TC_bytes* ad, size_t ad_c
     return TC_ERROR;
   memcpy(local_v, v, TC_AES_SIV_V_LEN);
   status = tc_aes_siv_crypt(key, ad, ad_count, ciphertext, plaintext, local_v, 1);
-#if TC_ZEROIZE
   TC_secure_zero(local_v, sizeof(local_v));
-#endif
   return status;
 }
 

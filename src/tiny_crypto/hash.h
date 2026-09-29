@@ -13,8 +13,10 @@
  * @brief Portable C implementation of SHA-1, SHA-224, SHA-256, SHA-384,
  *        SHA-512 and HMAC.
  *
- * After *_final the context is zeroed when TC_ZEROIZE is 1. Call *_init
- * before reuse.
+ * update and final return TC_ERROR for a NULL context, a NULL buffer with a
+ * nonzero length, a buffer that overlaps the context, or an inactive context.
+ * A rejected update leaves the context unchanged. A successful final consumes
+ * the context and wipes it, so call *_init before reuse.
  *
  * SHA-1, SHA-224 and SHA-256 live in hash.c. SHA-384 and SHA-512 share a
  * 64-bit core in sha512.c. SHA-224 pulls in the SHA-256 compression function
@@ -242,7 +244,7 @@ TC_status TC_SHA1_init(struct TC_SHA1_ctx* ctx);
  * @param ctx Pointer to initialized SHA-1 context.
  * @param data Pointer to message bytes (may be NULL when len is 0).
  * @param len Number of bytes to absorb.
- * @return TC_OK, TC_ERROR on a TC_STRICT NULL failure, or TC_ERROR if
+ * @return TC_OK, TC_ERROR on invalid arguments, or TC_ERROR if
  *         absorbing len would overflow the 64-bit bit counter (2^61 − 1 bytes).
  */
 TC_status TC_SHA1_update(struct TC_SHA1_ctx* ctx, const uint8_t* data, size_t len);
@@ -250,11 +252,10 @@ TC_status TC_SHA1_update(struct TC_SHA1_ctx* ctx, const uint8_t* data, size_t le
 /**
  * @brief Finalize a SHA-1 computation and emit the digest.
  *
- * When TC_ZEROIZE is 1 the context is wiped on return and must be
- * re-initialized before reuse.
+ * The context is wiped on return and must be re-initialized before reuse.
  * @param ctx Pointer to initialized SHA-1 context.
  * @param digest Output buffer of TC_SHA1_DIGESTLEN bytes.
- * @return TC_OK, or TC_ERROR on a TC_STRICT NULL failure.
+ * @return TC_OK, or TC_ERROR on invalid arguments.
  */
 TC_status TC_SHA1_final(struct TC_SHA1_ctx* ctx, uint8_t digest[TC_SHA1_DIGESTLEN]);
 
@@ -285,7 +286,7 @@ TC_status TC_SHA224_init(struct TC_SHA224_ctx* ctx);
  * @param ctx Pointer to initialized SHA-224 context.
  * @param data Pointer to message bytes (may be NULL when len is 0).
  * @param len Number of bytes to absorb.
- * @return TC_OK, TC_ERROR on a TC_STRICT NULL failure, or TC_ERROR if
+ * @return TC_OK, TC_ERROR on invalid arguments, or TC_ERROR if
  *         absorbing len would overflow the 64-bit bit counter (2^61 − 1 bytes).
  */
 TC_status TC_SHA224_update(struct TC_SHA224_ctx* ctx, const uint8_t* data, size_t len);
@@ -293,11 +294,10 @@ TC_status TC_SHA224_update(struct TC_SHA224_ctx* ctx, const uint8_t* data, size_
 /**
  * @brief Finalize a SHA-224 computation and emit the digest.
  *
- * When TC_ZEROIZE is 1 the context is wiped on return and must be
- * re-initialized before reuse.
+ * The context is wiped on return and must be re-initialized before reuse.
  * @param ctx Pointer to initialized SHA-224 context.
  * @param digest Output buffer of TC_SHA224_DIGESTLEN bytes.
- * @return TC_OK, or TC_ERROR on a TC_STRICT NULL failure.
+ * @return TC_OK, or TC_ERROR on invalid arguments.
  */
 TC_status TC_SHA224_final(struct TC_SHA224_ctx* ctx, uint8_t digest[TC_SHA224_DIGESTLEN]);
 
@@ -328,7 +328,7 @@ TC_status TC_SHA256_init(struct TC_SHA256_ctx* ctx);
  * @param ctx Pointer to initialized SHA-256 context.
  * @param data Pointer to message bytes (may be NULL when len is 0).
  * @param len Number of bytes to absorb.
- * @return TC_OK, TC_ERROR on a TC_STRICT NULL failure, or TC_ERROR if
+ * @return TC_OK, TC_ERROR on invalid arguments, or TC_ERROR if
  *         absorbing len would overflow the 64-bit bit counter (2^61 − 1 bytes).
  */
 TC_status TC_SHA256_update(struct TC_SHA256_ctx* ctx, const uint8_t* data, size_t len);
@@ -336,11 +336,10 @@ TC_status TC_SHA256_update(struct TC_SHA256_ctx* ctx, const uint8_t* data, size_
 /**
  * @brief Finalize a SHA-256 computation and emit the digest.
  *
- * When TC_ZEROIZE is 1 the context is wiped on return and must be
- * re-initialized before reuse.
+ * The context is wiped on return and must be re-initialized before reuse.
  * @param ctx Pointer to initialized SHA-256 context.
  * @param digest Output buffer of TC_SHA256_DIGESTLEN bytes.
- * @return TC_OK, or TC_ERROR on a TC_STRICT NULL failure.
+ * @return TC_OK, or TC_ERROR on invalid arguments.
  */
 TC_status TC_SHA256_final(struct TC_SHA256_ctx* ctx, uint8_t digest[TC_SHA256_DIGESTLEN]);
 
@@ -371,7 +370,7 @@ TC_status TC_SHA384_init(struct TC_SHA384_ctx* ctx);
  * @param ctx Pointer to initialized SHA-384 context.
  * @param data Pointer to message bytes (may be NULL when len is 0).
  * @param len Number of bytes to absorb.
- * @return TC_OK, TC_ERROR on a TC_STRICT NULL failure, or TC_ERROR if
+ * @return TC_OK, TC_ERROR on invalid arguments, or TC_ERROR if
  *         absorbing len would overflow the 128-bit bit counter (2^64 − 1 bytes).
  */
 TC_status TC_SHA384_update(struct TC_SHA384_ctx* ctx, const uint8_t* data, size_t len);
@@ -379,11 +378,10 @@ TC_status TC_SHA384_update(struct TC_SHA384_ctx* ctx, const uint8_t* data, size_
 /**
  * @brief Finalize a SHA-384 computation and emit the digest.
  *
- * When TC_ZEROIZE is 1 the context is wiped on return and must be
- * re-initialized before reuse.
+ * The context is wiped on return and must be re-initialized before reuse.
  * @param ctx Pointer to initialized SHA-384 context.
  * @param digest Output buffer of TC_SHA384_DIGESTLEN bytes.
- * @return TC_OK, or TC_ERROR on a TC_STRICT NULL failure.
+ * @return TC_OK, or TC_ERROR on invalid arguments.
  */
 TC_status TC_SHA384_final(struct TC_SHA384_ctx* ctx, uint8_t digest[TC_SHA384_DIGESTLEN]);
 
@@ -414,7 +412,7 @@ TC_status TC_SHA512_init(struct TC_SHA512_ctx* ctx);
  * @param ctx Pointer to initialized SHA-512 context.
  * @param data Pointer to message bytes (may be NULL when len is 0).
  * @param len Number of bytes to absorb.
- * @return TC_OK, TC_ERROR on a TC_STRICT NULL failure, or TC_ERROR if
+ * @return TC_OK, TC_ERROR on invalid arguments, or TC_ERROR if
  *         absorbing len would overflow the 128-bit bit counter (2^64 − 1 bytes).
  */
 TC_status TC_SHA512_update(struct TC_SHA512_ctx* ctx, const uint8_t* data, size_t len);
@@ -422,11 +420,10 @@ TC_status TC_SHA512_update(struct TC_SHA512_ctx* ctx, const uint8_t* data, size_
 /**
  * @brief Finalize a SHA-512 computation and emit the digest.
  *
- * When TC_ZEROIZE is 1 the context is wiped on return and must be
- * re-initialized before reuse.
+ * The context is wiped on return and must be re-initialized before reuse.
  * @param ctx Pointer to initialized SHA-512 context.
  * @param digest Output buffer of TC_SHA512_DIGESTLEN bytes.
- * @return TC_OK, or TC_ERROR on a TC_STRICT NULL failure.
+ * @return TC_OK, or TC_ERROR on invalid arguments.
  */
 TC_status TC_SHA512_final(struct TC_SHA512_ctx* ctx, uint8_t digest[TC_SHA512_DIGESTLEN]);
 
@@ -462,7 +459,7 @@ TC_status TC_HMAC_SHA1_init(struct TC_HMAC_SHA1_ctx* ctx, const uint8_t* key, si
 
 /**
  * @brief Absorb message bytes into an HMAC-SHA-1 context.
- * @return TC_OK, or TC_ERROR on a TC_STRICT NULL failure.
+ * @return TC_OK, or TC_ERROR on invalid arguments.
  */
 TC_status TC_HMAC_SHA1_update(struct TC_HMAC_SHA1_ctx* ctx, const uint8_t* data, size_t len);
 
@@ -470,10 +467,10 @@ TC_status TC_HMAC_SHA1_update(struct TC_HMAC_SHA1_ctx* ctx, const uint8_t* data,
  * @brief Finalize an HMAC-SHA-1 computation and emit the full tag.
  *
  * One-shot: the context is consumed. Call TC_HMAC_SHA1_init with the key
- * before reuse. When TC_ZEROIZE is 1 both inner contexts are wiped.
+ * before reuse. The whole context is wiped on return.
  * @param ctx Pointer to initialized HMAC-SHA-1 context.
  * @param tag Output buffer of TC_SHA1_DIGESTLEN bytes.
- * @return TC_OK, or TC_ERROR on a TC_STRICT NULL failure.
+ * @return TC_OK, or TC_ERROR on invalid arguments.
  */
 TC_status TC_HMAC_SHA1_final(struct TC_HMAC_SHA1_ctx* ctx, uint8_t* tag);
 
@@ -514,14 +511,14 @@ TC_status TC_HMAC_SHA1_verify(const uint8_t* key, size_t keylen, const uint8_t* 
  */
 TC_status TC_HMAC_SHA224_init(struct TC_HMAC_SHA224_ctx* ctx, const uint8_t* key, size_t keylen);
 
-/** @brief Absorb message bytes. Returns TC_ERROR only on a TC_STRICT NULL failure. */
+/** @brief Absorb message bytes. Returns TC_ERROR on invalid arguments. */
 TC_status TC_HMAC_SHA224_update(struct TC_HMAC_SHA224_ctx* ctx, const uint8_t* data, size_t len);
 
 /**
  * @brief Finalize and emit the full TC_SHA224_DIGESTLEN-byte tag.
  *
  * One-shot: the context is consumed. Call TC_HMAC_SHA224_init with the key
- * before reuse. When TC_ZEROIZE is 1 both inner contexts are wiped.
+ * before reuse. The whole context is wiped on return.
  */
 TC_status TC_HMAC_SHA224_final(struct TC_HMAC_SHA224_ctx* ctx, uint8_t* tag);
 
@@ -561,7 +558,7 @@ TC_status TC_HMAC_SHA256_init(struct TC_HMAC_SHA256_ctx* ctx, const uint8_t* key
 
 /**
  * @brief Absorb message bytes into an HMAC-SHA-256 context.
- * @return TC_OK, or TC_ERROR on a TC_STRICT NULL failure.
+ * @return TC_OK, or TC_ERROR on invalid arguments.
  */
 TC_status TC_HMAC_SHA256_update(struct TC_HMAC_SHA256_ctx* ctx, const uint8_t* data, size_t len);
 
@@ -569,10 +566,10 @@ TC_status TC_HMAC_SHA256_update(struct TC_HMAC_SHA256_ctx* ctx, const uint8_t* d
  * @brief Finalize an HMAC-SHA-256 computation and emit the full tag.
  *
  * One-shot: the context is consumed. Call TC_HMAC_SHA256_init with the key
- * before reuse. When TC_ZEROIZE is 1 both inner contexts are wiped.
+ * before reuse. The whole context is wiped on return.
  * @param ctx Pointer to initialized HMAC-SHA-256 context.
  * @param tag Output buffer of TC_SHA256_DIGESTLEN bytes.
- * @return TC_OK, or TC_ERROR on a TC_STRICT NULL failure.
+ * @return TC_OK, or TC_ERROR on invalid arguments.
  */
 TC_status TC_HMAC_SHA256_final(struct TC_HMAC_SHA256_ctx* ctx, uint8_t* tag);
 
@@ -613,14 +610,14 @@ TC_status TC_HMAC_SHA256_verify(const uint8_t* key, size_t keylen, const uint8_t
  */
 TC_status TC_HMAC_SHA384_init(struct TC_HMAC_SHA384_ctx* ctx, const uint8_t* key, size_t keylen);
 
-/** @brief Absorb message bytes. Returns TC_ERROR only on a TC_STRICT NULL failure. */
+/** @brief Absorb message bytes. Returns TC_ERROR on invalid arguments. */
 TC_status TC_HMAC_SHA384_update(struct TC_HMAC_SHA384_ctx* ctx, const uint8_t* data, size_t len);
 
 /**
  * @brief Finalize and emit the full TC_SHA384_DIGESTLEN-byte tag.
  *
  * One-shot: the context is consumed. Call TC_HMAC_SHA384_init with the key
- * before reuse. When TC_ZEROIZE is 1 both inner contexts are wiped.
+ * before reuse. The whole context is wiped on return.
  */
 TC_status TC_HMAC_SHA384_final(struct TC_HMAC_SHA384_ctx* ctx, uint8_t* tag);
 
@@ -656,14 +653,14 @@ TC_status TC_HMAC_SHA384_verify(const uint8_t* key, size_t keylen, const uint8_t
  */
 TC_status TC_HMAC_SHA512_init(struct TC_HMAC_SHA512_ctx* ctx, const uint8_t* key, size_t keylen);
 
-/** @brief Absorb message bytes. Returns TC_ERROR only on a TC_STRICT NULL failure. */
+/** @brief Absorb message bytes. Returns TC_ERROR on invalid arguments. */
 TC_status TC_HMAC_SHA512_update(struct TC_HMAC_SHA512_ctx* ctx, const uint8_t* data, size_t len);
 
 /**
  * @brief Finalize and emit the full TC_SHA512_DIGESTLEN-byte tag.
  *
  * One-shot: the context is consumed. Call TC_HMAC_SHA512_init with the key
- * before reuse. When TC_ZEROIZE is 1 both inner contexts are wiped.
+ * before reuse. The whole context is wiped on return.
  */
 TC_status TC_HMAC_SHA512_final(struct TC_HMAC_SHA512_ctx* ctx, uint8_t* tag);
 

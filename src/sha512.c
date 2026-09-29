@@ -85,7 +85,8 @@ static const uint64_t K512[80] HASH_K512_STORAGE = {
   } while (0)
 
 /* One 128-byte block. Rolling 16-word schedule keeps the stack small. The
- * schedule is recoverable input, so TC_ZEROIZE wipes it after every block. */
+ * schedule can hold secret input such as HMAC key blocks, so it is wiped
+ * after every block. */
 static void sha512_compress(void* chaining, const uint8_t* block)
 {
   uint64_t* state = (uint64_t*)chaining;
@@ -127,9 +128,7 @@ static void sha512_compress(void* chaining, const uint8_t* block)
   state[6] += g;
   state[7] += h;
 
-#if TC_ZEROIZE
   TC_secure_zero(W, sizeof(W));
-#endif
 }
 
 /*****************************************************************************/
