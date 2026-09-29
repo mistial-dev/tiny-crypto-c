@@ -301,9 +301,11 @@ static MunitResult test_eax_api(const MunitParameter params[], void* data)
                        (TC_bytes){ciphertext, sizeof(ciphertext)},
                        (TC_bytes){bad_tag, sizeof(bad_tag)}, (TC_buffer){bad, sizeof(ciphertext)}),
                    ==, TC_MISMATCH);
+  /* A mismatch wipes a separate output. */
+  memset(untouched, 0, sizeof(ciphertext));
   munit_assert_memory_equal(sizeof(bad), bad, untouched);
 
-  /* An in-place mismatch wipes the forged ciphertext, as GCM and CCM do. */
+  /* An in-place mismatch wipes the forged ciphertext. */
   memcpy(bad, ciphertext, sizeof(ciphertext));
   memset(untouched, 0, sizeof(untouched));
   munit_assert_int(TC_AES_EAX_decrypt(key, (TC_bytes){nonce, sizeof(nonce)},
@@ -609,8 +611,7 @@ static MunitResult test_eax_prime_worked(const MunitParameter params[], void* da
                          (TC_bytes){boundary_ciphertext, boundary_plaintext_len}, boundary_tag,
                          (TC_buffer){boundary_output, boundary_plaintext_len}),
                      ==, TC_MISMATCH);
-    for (j = 0; j < boundary_plaintext_len; ++j)
-      munit_assert_uint(boundary_output[j], ==, boundary_plaintext[j]);
+    munit_assert_true(tc_test_all_zero(boundary_output, boundary_plaintext_len));
     boundary_tag[0] ^= 1;
 
     if (boundary_plaintext_len != 0) {
@@ -621,8 +622,7 @@ static MunitResult test_eax_prime_worked(const MunitParameter params[], void* da
                            (TC_bytes){boundary_ciphertext, boundary_plaintext_len}, boundary_tag,
                            (TC_buffer){boundary_output, boundary_plaintext_len}),
                        ==, TC_MISMATCH);
-      for (j = 0; j < boundary_plaintext_len; ++j)
-        munit_assert_uint(boundary_output[j], ==, boundary_plaintext[j]);
+      munit_assert_true(tc_test_all_zero(boundary_output, boundary_plaintext_len));
       boundary_ciphertext[boundary_plaintext_len - 1] ^= 1;
     }
     if (boundary_cleartext_len != 0) {
@@ -633,8 +633,7 @@ static MunitResult test_eax_prime_worked(const MunitParameter params[], void* da
                            (TC_bytes){boundary_ciphertext, boundary_plaintext_len}, boundary_tag,
                            (TC_buffer){boundary_output, boundary_plaintext_len}),
                        ==, TC_MISMATCH);
-      for (j = 0; j < boundary_plaintext_len; ++j)
-        munit_assert_uint(boundary_output[j], ==, boundary_plaintext[j]);
+      munit_assert_true(tc_test_all_zero(boundary_output, boundary_plaintext_len));
       boundary_cleartext[boundary_cleartext_len - 1] ^= 1;
     }
   }
@@ -700,7 +699,7 @@ static MunitResult test_eax_prime_c12_22(const MunitParameter params[], void* da
                                             (TC_buffer){decrypted, sizeof(ciphertext)}),
                    ==, TC_MISMATCH);
   for (size_t i = 0; i < sizeof(decrypted); ++i)
-    munit_assert_uint(decrypted[i], ==, 0xa5);
+    munit_assert_uint(decrypted[i], ==, i < sizeof(ciphertext) ? 0 : 0xa5);
 
   /* An in-place mismatch wipes the forged ciphertext. */
   memcpy(decrypted, ciphertext, sizeof(ciphertext));
@@ -718,7 +717,7 @@ static MunitResult test_eax_prime_c12_22(const MunitParameter params[], void* da
                                             (TC_buffer){decrypted, sizeof(ciphertext)}),
                    ==, TC_MISMATCH);
   for (size_t i = 0; i < sizeof(decrypted); ++i)
-    munit_assert_uint(decrypted[i], ==, 0xa5);
+    munit_assert_uint(decrypted[i], ==, i < sizeof(ciphertext) ? 0 : 0xa5);
   ciphertext[0] ^= 1;
 
   memcpy(bad_cleartext, cleartext, sizeof(cleartext));
@@ -729,7 +728,7 @@ static MunitResult test_eax_prime_c12_22(const MunitParameter params[], void* da
                                             (TC_buffer){decrypted, sizeof(ciphertext)}),
                    ==, TC_MISMATCH);
   for (size_t i = 0; i < sizeof(decrypted); ++i)
-    munit_assert_uint(decrypted[i], ==, 0xa5);
+    munit_assert_uint(decrypted[i], ==, i < sizeof(ciphertext) ? 0 : 0xa5);
 
   munit_assert_int(TC_AES_EAX_PRIME_encrypt(key, (TC_bytes){cleartext, sizeof(cleartext)},
                                             (TC_bytes){plaintext, sizeof(plaintext)},

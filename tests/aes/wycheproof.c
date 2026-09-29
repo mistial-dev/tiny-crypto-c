@@ -105,7 +105,8 @@ static MunitResult vectors(const MunitParameter params[], void* user)
     } else {
       if (status != TC_ERROR && status != TC_MISMATCH)
         munit_errorf("AEAD case %u: invalid decrypt accepted", id);
-      if (siv && status == TC_MISMATCH) {
+      /* A mismatch wipes the text output in every mode. */
+      if (status == TC_MISMATCH) {
         munit_assert_true(tc_test_all_zero(output, length[4]));
         munit_assert_memory_equal(sizeof output - length[4], output + length[4],
                                   expected + length[4]);

@@ -53,8 +53,7 @@ void tiny_crypto_nodiscard_compile(uint8_t* data, size_t length)
   uint8_t synthetic_iv[TC_AES_SIV_V_LEN] = {0};
 
   /* Authentication and verification results. */
-  GCM gcm;
-  gcm.decrypt_finish(data, length);                              /* DISCARDED */
+  gcm_decrypt(in, in, in, in, in, out);                          /* DISCARDED */
   HMAC_SHA256::verify(data, length, data, length, data, length); /* DISCARDED */
   ct_equal(data, data, length);                                  /* DISCARDED */
   ccm_decrypt(in, in, in, in, in, out);                          /* DISCARDED */
@@ -81,9 +80,12 @@ void tiny_crypto_nodiscard_compile(uint8_t* data, size_t length)
 
   /* Cipher, hash and MAC status results. */
   AES aes;
-  aes.xcrypt_ctr(data, length);                       /* DISCARDED */
-  aes.decrypt_cbc(data, length);                      /* DISCARDED */
-  aes.set_iv(block);                                  /* DISCARDED */
+  aes.xcrypt_ctr(data, length);  /* DISCARDED */
+  aes.decrypt_cbc(data, length); /* DISCARDED */
+  aes.set_iv(block);             /* DISCARDED */
+  GCM gcm;
+  gcm.encrypt_update(data, length);                   /* DISCARDED */
+  gcm_encrypt(in, in, in, in, out, out);              /* DISCARDED */
   gcm.encrypt_finish(data, length);                   /* DISCARDED */
   gcm.aad_update(data, length);                       /* DISCARDED */
   aes_cmac(data, length, data, length, data, length); /* DISCARDED */

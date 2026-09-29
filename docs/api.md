@@ -177,6 +177,50 @@ work counters may change. Secret-producing operations also specify wiping
 behavior. Clear application-held keys and plaintext with `TC_secure_zero` when
 their lifetime ends. Release acquired snapshots on every exit path.
 
+## Authenticated encryption
+
+The one-shot AEAD functions in `<tiny_crypto/aes.h>` (GCM, CCM, EAX, EAX' and
+SIV) share one contract.
+
+- Encrypt writes `plaintext.length` bytes of ciphertext and `tag.capacity` tag
+  bytes. Decrypt writes `ciphertext.length` bytes of plaintext and checks
+  `tag.length` tag bytes. EAX' and SIV use fixed-size tag arrays.
+- The text output capacity must be at least the text input length. Bytes past
+  the text length are never written.
+- Text input and output are the same buffer or fully disjoint. The tag is
+  disjoint from the text output. SIV associated data is disjoint from the text
+  output. A violation returns `TC_ERROR` before a write.
+- The key, and the nonce and associated data of GCM, CCM, EAX and EAX', may
+  share storage with the text output. Each is read in full before the first
+  output write.
+- The caller keeps the key, nonce, associated data, text input and received
+  tag stable for the duration of the call. No other thread or DMA transfer may
+  write them. GCM, CCM, EAX and EAX' decrypt read the ciphertext twice, once to
+  authenticate it and once to decrypt it.
+- `TC_ERROR` before any write reports a NULL key or tag, a NULL span with a
+  nonzero length, a short text output, a forbidden overlap, or a nonce, tag or
+  text length outside the mode's range.
+- GCM, CCM, EAX and EAX' verify the tag before writing plaintext. SIV decrypt
+  writes candidate plaintext first and recomputes the synthetic IV over the
+  associated data and that plaintext (RFC 5297 section 2.7).
+- After the argument checks, every failure wipes the text output. A tag that
+  fails to verify returns `TC_MISMATCH`. A cipher backend failure returns
+  `TC_ERROR`. In-place callers lose the input in both cases. The tag output is
+  written only on success.
+
+GCM decryption is one-shot. The streaming `TC_AES_GCM_ctx` API encrypts only.
+Use `TC_AES_GCM_encrypt_short_tag` and `TC_AES_GCM_decrypt_short_tag` for the
+4 and 8-byte tags of SP 800-38D appendix C.
+
+```c
+TC_status status = TC_AES_GCM_decrypt(key, (TC_bytes){iv, 12}, (TC_bytes){aad, aad_length},
+                                      (TC_bytes){packet, packet_length},
+                                      (TC_bytes){tag, 16},
+                                      (TC_buffer){packet, packet_length});
+if (status != TC_OK)
+  return status; /* packet holds no plaintext */
+```
+
 ## C++ wrappers
 
 The C++11 wrappers in `tiny_crypto` return the C result types. Every call that
@@ -193,9 +237,11 @@ successful `init`.
 `basic_hash::finish` starts the next message. `basic_hmac::finish` consumes
 the key.
 
-The one-shot CCM, EAX, EAX' and SIV wrappers take the key as `bytes`. CCM, EAX
-and EAX' need `TC_AES_KEYLEN` bytes and SIV needs `TC_AES_SIV_KEYLEN`. Another
-length returns `TC_ERROR` before any output is written.
+The one-shot GCM, CCM, EAX, EAX' and SIV wrappers take the key as `bytes`.
+GCM, CCM, EAX and EAX' need `TC_AES_KEYLEN` bytes and SIV needs
+`TC_AES_SIV_KEYLEN`. Another length returns `TC_ERROR` before any output is
+written. `GCM` streams encryption only. Decrypt GCM with `gcm_decrypt` or
+`gcm_decrypt_short_tag`.
 
 ```cpp
 const tiny_crypto::bytes key = {key_bytes, sizeof key_bytes};

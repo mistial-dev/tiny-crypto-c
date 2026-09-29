@@ -99,7 +99,6 @@ static TC_status tc_aes_ccm_crypt(const uint8_t* key, TC_bytes nonce_span, TC_by
   unsigned q;
   uint8_t i;
   TC_status status = TC_ERROR;
-  int output_started = 0;
 
   if (key == NULL || nonce == NULL || (expected_tag == NULL && output_tag == NULL) ||
       !tc_internal_span_valid(aad, aad_len) || !tc_aes_text_ok(input_span, output_span) ||
@@ -171,7 +170,6 @@ static TC_status tc_aes_ccm_crypt(const uint8_t* key, TC_bytes nonce_span, TC_by
     if (!decrypt) {
       if (tc_aes_ccm_xor_block(st.plain, length, st.counter, st.aes.round_key) != TC_OK)
         goto done;
-      output_started = 1;
       memcpy(output + offset, st.plain, length);
     }
     tc_aes_ccm_increment_counter(st.counter, q);
@@ -193,7 +191,6 @@ static TC_status tc_aes_ccm_crypt(const uint8_t* key, TC_bytes nonce_span, TC_by
       while (offset < input_len) {
         const size_t length =
             input_len - offset < TC_AES_BLOCKLEN ? input_len - offset : TC_AES_BLOCKLEN;
-        output_started = 1;
         memcpy(output + offset, input + offset, length);
         status = tc_aes_ccm_xor_block(output + offset, length, st.counter, st.aes.round_key);
         if (status != TC_OK)
@@ -201,16 +198,15 @@ static TC_status tc_aes_ccm_crypt(const uint8_t* key, TC_bytes nonce_span, TC_by
         tc_aes_ccm_increment_counter(st.counter, q);
         offset += length;
       }
-    } else {
-      if (output != NULL && output == input)
-        TC_secure_zero(output, input_len);
     }
   } else {
     memcpy(output_tag, st.work, tag_len);
     status = TC_OK;
   }
 done:
-  if (status != TC_OK && output_started && input_len != 0)
+  /* One-shot AEAD failure rule: after the argument checks, any failure wipes
+   * the text output, including in-place ciphertext after a tag mismatch. */
+  if (status != TC_OK && input_len != 0)
     TC_secure_zero(output, input_len);
   TC_secure_zero(&st, sizeof(st));
   return status;

@@ -7,16 +7,11 @@
 #undef tc_aes_cipher_rounds
 TC_status tc_aes_cipher_rounds(state_t*, const uint8_t*, uint8_t);
 
-static unsigned calls, fail_at, mutate_at;
-static uint8_t* mutate_buffer;
+static unsigned calls, fail_at;
 
 TC_status tc_test_cipher_rounds(state_t* state, const uint8_t* key, uint8_t rounds)
 {
   ++calls;
-  if (calls == mutate_at && mutate_buffer != NULL) {
-    mutate_buffer[0] ^= 1;
-    mutate_buffer = NULL;
-  }
   if (calls == fail_at) {
     memset(state, 0xa5, sizeof *state); /* A failed device may modify scratch. */
     return TC_ERROR;
@@ -106,13 +101,7 @@ static MunitResult siv_failures(const MunitParameter params[], void* user)
                                           (TC_buffer){output, length}),
                        ==, TC_ERROR);
       munit_assert_memory_equal(sizeof failed_tag, failed_tag, sentinel);
-      {
-        size_t byte;
-        const unsigned ctr_blocks = (unsigned)((length + 15) / 16);
-        const uint8_t expected = stage <= total - ctr_blocks ? 0x5a : 0;
-        for (byte = 0; byte < length; ++byte)
-          munit_assert_uint8(output[byte], ==, expected);
-      }
+      munit_assert_true(tc_test_all_zero(output, length));
 
       calls = 0;
       memset(output, 0x5a, sizeof output);
@@ -163,7 +152,6 @@ static MunitResult eax_failures(const MunitParameter params[], void* user)
   (void)user;
   memset(sentinel, 0x5a, sizeof sentinel);
   for (prime = 0; prime <= 1; ++prime) {
-    unsigned prefix_calls = 0;
     for (index = 0; index < sizeof lengths / sizeof lengths[0]; ++index) {
       unsigned total, stage;
       size_t length = lengths[index];
@@ -173,11 +161,7 @@ static MunitResult eax_failures(const MunitParameter params[], void* user)
       munit_assert_int(eax_operation(prime, 0, key, plain, plain, length, ciphertext, tag), ==,
                        TC_OK);
       total = calls;
-      if (length == 0)
-        prefix_calls = total - 1; /* Empty message MAC uses one block. */
       for (stage = 1; stage <= total; ++stage) {
-        size_t byte;
-        unsigned ctr_blocks = (unsigned)((length + 15) / 16);
         calls = 0;
         fail_at = stage;
         memset(output, 0x5a, sizeof output);
@@ -185,21 +169,17 @@ static MunitResult eax_failures(const MunitParameter params[], void* user)
         munit_assert_int(eax_operation(prime, 0, key, plain, plain, length, output, failed_tag), ==,
                          TC_ERROR);
         munit_assert_memory_equal(sizeof failed_tag, failed_tag, sentinel);
-        for (byte = 0; byte < length; ++byte)
-          munit_assert_uint8(output[byte], ==, stage <= prefix_calls ? 0x5a : 0);
+        munit_assert_true(tc_test_all_zero(output, length));
         calls = 0;
         memset(output, 0x5a, sizeof output);
         munit_assert_int(eax_operation(prime, 1, key, plain, ciphertext, length, output, tag), ==,
                          TC_ERROR);
-        for (byte = 0; byte < length; ++byte)
-          munit_assert_uint8(output[byte], ==, stage <= total - ctr_blocks ? 0x5a : 0);
+        munit_assert_true(tc_test_all_zero(output, length));
         calls = 0;
         memcpy(output, ciphertext, length);
         munit_assert_int(eax_operation(prime, 1, key, plain, output, length, output, tag), ==,
                          TC_ERROR);
-        /* Any in-place decrypt failure wipes the rejected ciphertext. */
-        for (byte = 0; byte < length; ++byte)
-          munit_assert_uint8(output[byte], ==, 0);
+        munit_assert_true(tc_test_all_zero(output, length));
       }
     }
   }
@@ -231,12 +211,14 @@ static MunitResult ccm_failures(const MunitParameter params[], void* user)
       calls = 0;
       fail_at = stage;
       memcpy(failed_tag, sentinel, sizeof failed_tag);
+      memset(output, 0x5a, sizeof output);
       munit_assert_int(TC_AES_CCM_encrypt(key, (TC_bytes){nonce, sizeof nonce},
                                           (TC_bytes){plain, sizeof plain},
                                           (TC_bytes){plain, length}, (TC_buffer){output, length},
                                           (TC_buffer){failed_tag, sizeof failed_tag}),
                        ==, TC_ERROR);
       munit_assert_memory_equal(sizeof failed_tag, failed_tag, sentinel);
+      munit_assert_true(tc_test_all_zero(output, length));
     }
     calls = 0;
     fail_at = 0;
@@ -247,8 +229,6 @@ static MunitResult ccm_failures(const MunitParameter params[], void* user)
                      ==, TC_OK);
     total = calls;
     for (stage = 1; stage <= total; ++stage) {
-      size_t byte;
-      unsigned ctr_blocks = (unsigned)((length + 15) / 16);
       calls = 0;
       fail_at = stage;
       memset(output, 0x5a, sizeof output);
@@ -257,8 +237,7 @@ static MunitResult ccm_failures(const MunitParameter params[], void* user)
                                           (TC_bytes){ciphertext, length},
                                           (TC_bytes){tag, sizeof tag}, (TC_buffer){output, length}),
                        ==, TC_ERROR);
-      for (byte = 0; byte < length; ++byte)
-        munit_assert_uint8(output[byte], ==, stage <= total - ctr_blocks ? 0x5a : 0);
+      munit_assert_true(tc_test_all_zero(output, length));
       calls = 0;
       memcpy(output, ciphertext, length);
       munit_assert_int(TC_AES_CCM_decrypt(key, (TC_bytes){nonce, sizeof nonce},
@@ -266,8 +245,7 @@ static MunitResult ccm_failures(const MunitParameter params[], void* user)
                                           (TC_bytes){output, length}, (TC_bytes){tag, sizeof tag},
                                           (TC_buffer){output, length}),
                        ==, TC_ERROR);
-      for (byte = 0; byte < length; ++byte)
-        munit_assert_uint8(output[byte], ==, stage <= total - ctr_blocks ? ciphertext[byte] : 0);
+      munit_assert_true(tc_test_all_zero(output, length));
     }
   }
   fail_at = 0;
@@ -290,10 +268,10 @@ static MunitResult gcm_failures(const MunitParameter params[], void* user)
                          (TC_bytes){plain, sizeof plain}, (TC_buffer){ciphertext, sizeof plain},
                          (TC_buffer){tag, sizeof tag}),
       ==, TC_OK);
+  /* H, three counter blocks and the tag mask. */
   munit_assert_uint(calls, ==, 5);
   for (stage = 1; stage <= 5; ++stage) {
     TC_status status;
-    size_t byte;
     calls = 0;
     fail_at = stage;
     memcpy(failed_tag, sentinel, sizeof failed_tag);
@@ -304,8 +282,7 @@ static MunitResult gcm_failures(const MunitParameter params[], void* user)
                            (TC_buffer){failed_tag, sizeof failed_tag}),
         ==, TC_ERROR);
     munit_assert_memory_equal(sizeof failed_tag, failed_tag, sentinel);
-    for (byte = 0; byte < sizeof output; ++byte)
-      munit_assert_uint8(output[byte], ==, stage == 1 ? 0x5a : 0);
+    munit_assert_true(tc_test_all_zero(output, sizeof output));
     calls = 0;
     memset(output, 0x5a, sizeof output);
     munit_assert_int(
@@ -313,8 +290,15 @@ static MunitResult gcm_failures(const MunitParameter params[], void* user)
                            (TC_bytes){ciphertext, sizeof ciphertext}, (TC_bytes){tag, sizeof tag},
                            (TC_buffer){output, sizeof ciphertext}),
         ==, TC_ERROR);
-    for (byte = 0; byte < sizeof output; ++byte)
-      munit_assert_uint8(output[byte], ==, stage <= 2 ? 0x5a : 0);
+    munit_assert_true(tc_test_all_zero(output, sizeof output));
+    calls = 0;
+    memcpy(output, ciphertext, sizeof output);
+    munit_assert_int(
+        TC_AES_GCM_decrypt(key, (TC_bytes){iv, sizeof iv}, (TC_bytes){plain, sizeof plain},
+                           (TC_bytes){output, sizeof output}, (TC_bytes){tag, sizeof tag},
+                           (TC_buffer){output, sizeof output}),
+        ==, TC_ERROR);
+    munit_assert_true(tc_test_all_zero(output, sizeof output));
 
     calls = 0;
     memcpy(output, plain, sizeof output);
@@ -327,47 +311,10 @@ static MunitResult gcm_failures(const MunitParameter params[], void* user)
     munit_assert_true(tc_test_all_zero(&ctx.key, sizeof ctx.key));
     munit_assert_memory_equal(sizeof failed_tag, failed_tag, sentinel);
     munit_assert_int(TC_AES_GCM_encrypt_update(&ctx, output, 1), ==, TC_ERROR);
-    munit_assert_int(TC_AES_GCM_decrypt_update(&ctx, output, 1), ==, TC_ERROR);
     munit_assert_int(TC_AES_GCM_aad_update(&ctx, output, 1), ==, TC_ERROR);
     munit_assert_int(TC_AES_GCM_encrypt_finish(&ctx, failed_tag), ==, TC_ERROR);
-    munit_assert_int(TC_AES_GCM_decrypt_finish(&ctx, tag), ==, TC_ERROR);
-    calls = 0;
-    memcpy(output, ciphertext, sizeof output);
-    status = TC_AES_GCM_init(&ctx, key, (TC_bytes){iv, sizeof iv}, sizeof tag);
-    if (status == TC_OK)
-      status = TC_AES_GCM_aad_update(&ctx, plain, sizeof plain);
-    if (status == TC_OK)
-      status = TC_AES_GCM_decrypt_update(&ctx, output, 1);
-    if (status == TC_OK)
-      status = TC_AES_GCM_decrypt_update(&ctx, output + 1, sizeof output - 1);
-    if (status == TC_OK)
-      status = TC_AES_GCM_decrypt_finish(&ctx, tag);
-    munit_assert_int(status, ==, TC_ERROR);
-    munit_assert_true(tc_test_all_zero(&ctx.key, sizeof ctx.key));
-    munit_assert_int(TC_AES_GCM_decrypt_update(&ctx, output, 1), ==, TC_ERROR);
-    munit_assert_int(TC_AES_GCM_decrypt_finish(&ctx, tag), ==, TC_ERROR);
   }
   fail_at = 0;
-  calls = 0;
-  mutate_at = 2;
-  memcpy(output, ciphertext, sizeof output);
-  mutate_buffer = output;
-  munit_assert_int(TC_AES_GCM_init(&ctx, key, (TC_bytes){iv, sizeof iv}, sizeof tag), ==, TC_OK);
-  munit_assert_int(TC_AES_GCM_aad_update(&ctx, plain, sizeof plain), ==, TC_OK);
-  munit_assert_int(TC_AES_GCM_decrypt_update(&ctx, output, sizeof output), ==, TC_OK);
-  munit_assert_int(TC_AES_GCM_decrypt_finish(&ctx, tag), ==, TC_MISMATCH);
-  munit_assert_true(tc_test_all_zero(output, sizeof output));
-  calls = 0;
-  memcpy(output, ciphertext, sizeof output);
-  mutate_buffer = output;
-  munit_assert_int(
-      TC_AES_GCM_decrypt(key, (TC_bytes){iv, sizeof iv}, (TC_bytes){plain, sizeof plain},
-                         (TC_bytes){output, sizeof output}, (TC_bytes){tag, sizeof tag},
-                         (TC_buffer){output, sizeof output}),
-      ==, TC_MISMATCH);
-  munit_assert_true(tc_test_all_zero(output, sizeof output));
-  mutate_at = 0;
-  mutate_buffer = NULL;
   return MUNIT_OK;
 }
 

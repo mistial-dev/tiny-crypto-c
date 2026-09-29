@@ -442,8 +442,9 @@ static void test_ccm_vector(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC
                                       (TC_bytes){generated_tag, tag.length},
                                       (TC_buffer){buffer, plaintext.length}),
                    ==, TC_MISMATCH);
+  /* A mismatch wipes the text output and leaves spare capacity alone. */
   for (size_t i = 0; i < sizeof(buffer); ++i)
-    munit_assert_uint8(buffer[i], ==, 0xa5);
+    munit_assert_uint8(buffer[i], ==, i < plaintext.length ? 0 : 0xa5);
 }
 
 static MunitResult test_ccm(const MunitParameter params[], void* data)
@@ -582,7 +583,7 @@ static MunitResult test_ccm_api(const MunitParameter params[], void* data)
                                       (TC_buffer){buffer, sizeof(ccm_nist_ciphertext1)}),
                    ==, TC_MISMATCH);
   for (i = 0; i < sizeof(buffer); ++i)
-    munit_assert_uint8(buffer[i], ==, 0xa5);
+    munit_assert_uint8(buffer[i], ==, i < sizeof(ccm_nist_ciphertext1) ? 0 : 0xa5);
 
   bad_tag[0] ^= 1;
   memset(buffer, 0xa5, sizeof(buffer));
@@ -679,22 +680,19 @@ static MunitResult test_gcm(const MunitParameter params[], void* data)
   uint8_t buffer[16];
   uint8_t tag[16];
   uint8_t short_tag[4];
-  uint8_t bad_tag[16];
 
   (void)params;
   (void)data;
 
   test_initialize_sbox();
   memset(&ctx, 0, sizeof ctx);
-  memcpy(buffer, vector->ciphertext, vector->length);
-  munit_assert_int(TC_AES_GCM_decrypt_update(&ctx, buffer, vector->length), ==, TC_ERROR);
-  munit_assert_int(TC_AES_GCM_decrypt_finish(&ctx, vector->tag), ==, TC_ERROR);
-  munit_assert_memory_equal(vector->length, buffer, vector->ciphertext);
-  TC_AES_GCM_clear(&ctx);
-  munit_assert_int(TC_AES_GCM_decrypt_finish(&ctx, vector->tag), ==, TC_ERROR);
+  memcpy(buffer, vector->plaintext, vector->length);
+  munit_assert_int(TC_AES_GCM_encrypt_update(&ctx, buffer, vector->length), ==, TC_ERROR);
+  munit_assert_int(TC_AES_GCM_encrypt_finish(&ctx, tag), ==, TC_ERROR);
+  munit_assert_memory_equal(vector->length, buffer, vector->plaintext);
   munit_assert_int(TC_AES_GCM_init(&ctx, vector->key, (TC_bytes){vector->iv, 0}, vector->tag_len),
                    ==, TC_ERROR);
-  munit_assert_int(TC_AES_GCM_decrypt_finish(&ctx, vector->tag), ==, TC_ERROR);
+  munit_assert_int(TC_AES_GCM_encrypt_finish(&ctx, tag), ==, TC_ERROR);
 
   memcpy(buffer, vector->plaintext, vector->length);
   munit_assert_int(
@@ -707,7 +705,17 @@ static MunitResult test_gcm(const MunitParameter params[], void* data)
   munit_assert_int(TC_AES_GCM_encrypt_finish(&ctx, tag), ==, TC_OK);
   munit_assert_memory_equal(vector->length, buffer, vector->ciphertext);
   munit_assert_memory_equal(vector->tag_len, tag, vector->tag);
+  /* Finish consumes the context and wipes its key-dependent state. */
+  {
+    static const struct TC_AES_key_ctx zero_key;
+    static const uint8_t zero_block[TC_AES_BLOCKLEN];
+    munit_assert_memory_equal(sizeof zero_key, &ctx.key, &zero_key);
+    munit_assert_memory_equal(sizeof zero_block, ctx.H, zero_block);
+    munit_assert_memory_equal(sizeof zero_block, ctx.S, zero_block);
+  }
   munit_assert_int(TC_AES_GCM_encrypt_finish(&ctx, tag), ==, TC_ERROR);
+  munit_assert_int(TC_AES_GCM_encrypt_update(&ctx, buffer, 1), ==, TC_ERROR);
+  munit_assert_int(TC_AES_GCM_aad_update(&ctx, vector->aad, 1), ==, TC_ERROR);
 
   /* Fixed t=4 for this key/context. MSBt of the 128-bit tag. */
   munit_assert_int(
@@ -744,49 +752,6 @@ static MunitResult test_gcm(const MunitParameter params[], void* data)
                        (TC_bytes){short_tag, 4}, (TC_buffer){buffer, vector->length}),
                    ==, TC_OK);
   munit_assert_memory_equal(vector->length, buffer, vector->plaintext);
-  memcpy(buffer, vector->ciphertext, vector->length);
-
-  munit_assert_int(
-      TC_AES_GCM_init(&ctx, vector->key, (TC_bytes){vector->iv, vector->iv_len}, vector->tag_len),
-      ==, TC_OK);
-  munit_assert_int(TC_AES_GCM_aad_update(&ctx, vector->aad, vector->aad_len), ==, TC_OK);
-  munit_assert_int(TC_AES_GCM_decrypt_update(&ctx, buffer, vector->length), ==, TC_OK);
-  munit_assert_memory_equal(vector->length, buffer, vector->ciphertext);
-  munit_assert_int(TC_AES_GCM_decrypt_finish(&ctx, tag), ==, TC_OK);
-  munit_assert_memory_equal(vector->length, buffer, vector->plaintext);
-  /* Finish consumes the context and wipes its key-dependent state. */
-  {
-    static const struct TC_AES_key_ctx zero_key;
-    static const uint8_t zero_block[TC_AES_BLOCKLEN];
-    munit_assert_memory_equal(sizeof zero_key, &ctx.key, &zero_key);
-    munit_assert_memory_equal(sizeof zero_block, ctx.H, zero_block);
-    munit_assert_memory_equal(sizeof zero_block, ctx.S, zero_block);
-    munit_assert_ptr_null(ctx.decrypt_buffer);
-  }
-  munit_assert_int(TC_AES_GCM_decrypt_finish(&ctx, tag), ==, TC_ERROR);
-
-  memcpy(buffer, vector->ciphertext, vector->length);
-  munit_assert_int(
-      TC_AES_GCM_init(&ctx, vector->key, (TC_bytes){vector->iv, vector->iv_len}, vector->tag_len),
-      ==, TC_OK);
-  munit_assert_int(TC_AES_GCM_aad_update(&ctx, vector->aad, vector->aad_len), ==, TC_OK);
-  munit_assert_int(TC_AES_GCM_decrypt_update(&ctx, buffer, vector->length), ==, TC_OK);
-  buffer[0] ^= 1;
-  munit_assert_int(TC_AES_GCM_decrypt_finish(&ctx, vector->tag), ==, TC_MISMATCH);
-  for (size_t i = 0; i < vector->length; ++i)
-    munit_assert_uint8(buffer[i], ==, 0);
-
-  memcpy(buffer, vector->ciphertext, vector->length);
-  memcpy(bad_tag, tag, sizeof(bad_tag));
-  bad_tag[0] ^= 1;
-  munit_assert_int(
-      TC_AES_GCM_init(&ctx, vector->key, (TC_bytes){vector->iv, vector->iv_len}, vector->tag_len),
-      ==, TC_OK);
-  munit_assert_int(TC_AES_GCM_aad_update(&ctx, vector->aad, vector->aad_len), ==, TC_OK);
-  munit_assert_int(TC_AES_GCM_decrypt_update(&ctx, buffer, vector->length), ==, TC_OK);
-  munit_assert_int(TC_AES_GCM_decrypt_finish(&ctx, bad_tag), ==, TC_MISMATCH);
-  munit_assert_memory_equal(vector->length, buffer, vector->ciphertext);
-  munit_assert_int(TC_AES_GCM_aad_update(&ctx, vector->aad, 1), ==, TC_ERROR);
 
   /* Reject invalid tag lengths at init (SP 800-38D). */
   munit_assert_int(TC_AES_GCM_init(&ctx, vector->key, (TC_bytes){vector->iv, vector->iv_len}, 0),
@@ -797,52 +762,6 @@ static MunitResult test_gcm(const MunitParameter params[], void* data)
                    ==, TC_ERROR);
   munit_assert_int(TC_AES_GCM_init(&ctx, vector->key, (TC_bytes){vector->iv, vector->iv_len}, 17),
                    ==, TC_ERROR);
-
-  return MUNIT_OK;
-}
-
-static MunitResult test_gcm_direction(const MunitParameter params[], void* data)
-{
-  const struct gcm_test_vector* vector = &TEST_GCM_VECTOR;
-  struct TC_AES_GCM_ctx ctx;
-  uint8_t buffer[16];
-  uint8_t before[16];
-  uint8_t generated_tag[16];
-
-  (void)params;
-  (void)data;
-
-  test_initialize_sbox();
-  memcpy(buffer, vector->plaintext, vector->length);
-  munit_assert_int(
-      TC_AES_GCM_init(&ctx, vector->key, (TC_bytes){vector->iv, vector->iv_len}, vector->tag_len),
-      ==, TC_OK);
-  munit_assert_int(TC_AES_GCM_encrypt_update(&ctx, buffer, 1), ==, TC_OK);
-  memcpy(before, buffer, sizeof(before));
-  munit_assert_int(TC_AES_GCM_decrypt_update(&ctx, buffer, 1), ==, TC_ERROR);
-  munit_assert_int(TC_AES_GCM_decrypt_finish(&ctx, vector->tag), ==, TC_ERROR);
-  munit_assert_int(TC_AES_GCM_encrypt_finish(&ctx, generated_tag), ==, TC_OK);
-  munit_assert_memory_equal(sizeof(before), buffer, before);
-
-  memcpy(buffer, vector->ciphertext, vector->length);
-  munit_assert_int(
-      TC_AES_GCM_init(&ctx, vector->key, (TC_bytes){vector->iv, vector->iv_len}, vector->tag_len),
-      ==, TC_OK);
-  munit_assert_int(TC_AES_GCM_decrypt_update(&ctx, buffer, 1), ==, TC_OK);
-  memcpy(before, buffer, sizeof(before));
-  munit_assert_int(TC_AES_GCM_encrypt_update(&ctx, buffer, 1), ==, TC_ERROR);
-  munit_assert_int(TC_AES_GCM_encrypt_finish(&ctx, generated_tag), ==, TC_ERROR);
-  munit_assert_int(TC_AES_GCM_decrypt_finish(&ctx, vector->tag), ==, TC_MISMATCH);
-  munit_assert_memory_equal(sizeof(before), buffer, before);
-
-  memcpy(buffer, vector->ciphertext, vector->length);
-  munit_assert_int(
-      TC_AES_GCM_init(&ctx, vector->key, (TC_bytes){vector->iv, vector->iv_len}, vector->tag_len),
-      ==, TC_OK);
-  munit_assert_int(TC_AES_GCM_aad_update(&ctx, vector->aad, vector->aad_len), ==, TC_OK);
-  munit_assert_int(TC_AES_GCM_decrypt_update(&ctx, buffer, vector->length), ==, TC_OK);
-  munit_assert_int(TC_AES_GCM_decrypt_finish(&ctx, (const uint8_t*)vector->tag), ==, TC_OK);
-  munit_assert_memory_equal(vector->length, buffer, vector->plaintext);
 
   return MUNIT_OK;
 }
@@ -908,7 +827,7 @@ static MunitResult test_gcm_oneshot(const MunitParameter params[], void* data)
                    ==, TC_OK);
   munit_assert_memory_equal(vector->length, plaintext, vector->plaintext);
 
-  /* Bad tag must not write plaintext (non-aliasing buffers). */
+  /* A bad tag wipes a separate plaintext output. */
   memcpy(bad_tag, tag, vector->tag_len);
   bad_tag[0] ^= 1u;
   memset(poison, 0x3c, sizeof(poison));
@@ -919,7 +838,7 @@ static MunitResult test_gcm_oneshot(const MunitParameter params[], void* data)
                                       (TC_buffer){poison, vector->length}),
                    ==, TC_MISMATCH);
   for (i = 0; i < vector->length; ++i)
-    munit_assert_uint8(poison[i], ==, 0x3c);
+    munit_assert_uint8(poison[i], ==, 0);
 
   /* In-place decrypt with bad tag zeros the shared buffer. */
   memcpy(ciphertext, vector->ciphertext, vector->length);
@@ -990,9 +909,15 @@ static MunitResult test_gcm_multi_key(const MunitParameter params[], void* data)
   munit_assert_int(TC_AES_GCM_init(&ctx_a, va->key, (TC_bytes){va->iv, va->iv_len}, va->tag_len),
                    ==, TC_OK);
   munit_assert_int(TC_AES_GCM_aad_update(&ctx_a, va->aad, va->aad_len), ==, TC_OK);
-  memcpy(buf_a, va->ciphertext, va->length);
-  munit_assert_int(TC_AES_GCM_decrypt_update(&ctx_a, buf_a, va->length), ==, TC_OK);
-  munit_assert_int(TC_AES_GCM_decrypt_finish(&ctx_a, tag_a), ==, TC_OK);
+  memcpy(buf_a, va->plaintext, va->length);
+  munit_assert_int(TC_AES_GCM_encrypt_update(&ctx_a, buf_a, va->length), ==, TC_OK);
+  munit_assert_int(TC_AES_GCM_encrypt_finish(&ctx_a, tag_a), ==, TC_OK);
+  munit_assert_memory_equal(va->length, buf_a, va->ciphertext);
+  munit_assert_int(TC_AES_GCM_decrypt(va->key, (TC_bytes){va->iv, va->iv_len},
+                                      (TC_bytes){va->aad, va->aad_len},
+                                      (TC_bytes){buf_a, va->length}, (TC_bytes){tag_a, va->tag_len},
+                                      (TC_buffer){buf_a, va->length}),
+                   ==, TC_OK);
   munit_assert_memory_equal(va->length, buf_a, va->plaintext);
   munit_assert_memory_equal(va->length, buf_b, expect_b);
 
@@ -1054,6 +979,240 @@ static MunitResult test_aead_output_capacity(const MunitParameter params[], void
     munit_assert_uint8(tag[i], ==, 0x5a);
   return MUNIT_OK;
 }
+
+#define AEAD_TEXT_LEN 20u
+
+static const uint8_t aead_key[2 * TC_AES_KEYLEN] = {1};
+static const uint8_t aead_nonce[12] = {2};
+static const uint8_t aead_header[8] = {5};
+static const uint8_t aead_plain[AEAD_TEXT_LEN] = {3, 4, 5, 6, 7, 8};
+
+static void assert_filled(const uint8_t* data, size_t length, uint8_t value)
+{
+  for (size_t i = 0; i < length; ++i)
+    munit_assert_uint8(data[i], ==, value);
+}
+
+#if TC_AES_ENABLE_GCM || TC_AES_ENABLE_CCM || TC_AES_ENABLE_EAX
+/* GCM, CCM and EAX share one one-shot signature. */
+typedef TC_status (*aead_encrypt_fn)(const uint8_t* key, TC_bytes nonce, TC_bytes aad,
+                                     TC_bytes plaintext, TC_buffer ciphertext, TC_buffer tag);
+typedef TC_status (*aead_decrypt_fn)(const uint8_t* key, TC_bytes nonce, TC_bytes aad,
+                                     TC_bytes ciphertext, TC_bytes tag, TC_buffer plaintext);
+
+/* A tag mismatch wipes the text output for separate and in-place buffers. */
+static void check_mismatch_wipes(aead_encrypt_fn encrypt, aead_decrypt_fn decrypt)
+{
+  const TC_bytes nonce = {aead_nonce, sizeof aead_nonce};
+  const TC_bytes aad = {aead_header, sizeof aead_header};
+  uint8_t ciphertext[AEAD_TEXT_LEN], output[AEAD_TEXT_LEN], tag[16];
+
+  munit_assert_int(encrypt(aead_key, nonce, aad, (TC_bytes){aead_plain, AEAD_TEXT_LEN},
+                           (TC_buffer){ciphertext, sizeof ciphertext}, (TC_buffer){tag, 16}),
+                   ==, TC_OK);
+  tag[0] ^= 1u;
+  memset(output, 0x5a, sizeof output);
+  munit_assert_int(decrypt(aead_key, nonce, aad, (TC_bytes){ciphertext, sizeof ciphertext},
+                           (TC_bytes){tag, 16}, (TC_buffer){output, sizeof output}),
+                   ==, TC_MISMATCH);
+  assert_filled(output, sizeof output, 0);
+  memcpy(output, ciphertext, sizeof output);
+  munit_assert_int(decrypt(aead_key, nonce, aad, (TC_bytes){output, sizeof output},
+                           (TC_bytes){tag, 16}, (TC_buffer){output, sizeof output}),
+                   ==, TC_MISMATCH);
+  assert_filled(output, sizeof output, 0);
+}
+
+/* A tag that overlaps the text output is an argument error. Nothing is written. */
+static void check_tag_overlap(aead_encrypt_fn encrypt, aead_decrypt_fn decrypt)
+{
+  const TC_bytes nonce = {aead_nonce, sizeof aead_nonce};
+  const TC_bytes aad = {aead_header, sizeof aead_header};
+  uint8_t buffer[AEAD_TEXT_LEN + 16];
+
+  memset(buffer, 0x5a, sizeof buffer);
+  munit_assert_int(encrypt(aead_key, nonce, aad, (TC_bytes){aead_plain, AEAD_TEXT_LEN},
+                           (TC_buffer){buffer, AEAD_TEXT_LEN},
+                           (TC_buffer){buffer + AEAD_TEXT_LEN - 1, 16}),
+                   ==, TC_ERROR);
+  assert_filled(buffer, sizeof buffer, 0x5a);
+  munit_assert_int(decrypt(aead_key, nonce, aad, (TC_bytes){aead_plain, AEAD_TEXT_LEN},
+                           (TC_bytes){buffer + 4, 16}, (TC_buffer){buffer, AEAD_TEXT_LEN}),
+                   ==, TC_ERROR);
+  assert_filled(buffer, sizeof buffer, 0x5a);
+  /* In-place decrypt with the expected tag inside the ciphertext. */
+  munit_assert_int(decrypt(aead_key, nonce, aad, (TC_bytes){buffer, AEAD_TEXT_LEN},
+                           (TC_bytes){buffer + AEAD_TEXT_LEN - 1, 16},
+                           (TC_buffer){buffer, AEAD_TEXT_LEN}),
+                   ==, TC_ERROR);
+  assert_filled(buffer, sizeof buffer, 0x5a);
+}
+
+/* GCM, CCM and EAX read the AAD before the first output write, so AAD may
+ * share storage with in-place text. */
+static void check_aad_in_output(aead_encrypt_fn encrypt, aead_decrypt_fn decrypt)
+{
+  const TC_bytes nonce = {aead_nonce, sizeof aead_nonce};
+  uint8_t expected[AEAD_TEXT_LEN], buffer[AEAD_TEXT_LEN], tag[16], expected_tag[16];
+
+  munit_assert_int(encrypt(aead_key, nonce, (TC_bytes){aead_plain + 4, 8},
+                           (TC_bytes){aead_plain, AEAD_TEXT_LEN},
+                           (TC_buffer){expected, sizeof expected}, (TC_buffer){expected_tag, 16}),
+                   ==, TC_OK);
+  memcpy(buffer, aead_plain, sizeof buffer);
+  munit_assert_int(encrypt(aead_key, nonce, (TC_bytes){buffer + 4, 8},
+                           (TC_bytes){buffer, sizeof buffer}, (TC_buffer){buffer, sizeof buffer},
+                           (TC_buffer){tag, 16}),
+                   ==, TC_OK);
+  munit_assert_memory_equal(sizeof buffer, buffer, expected);
+  munit_assert_memory_equal(sizeof tag, tag, expected_tag);
+
+  /* The ciphertext is independent of the AAD. Authenticate with AAD equal to
+   * ciphertext bytes 4..11, then decrypt in place with the AAD in the buffer. */
+  munit_assert_int(encrypt(aead_key, nonce, (TC_bytes){expected + 4, 8},
+                           (TC_bytes){aead_plain, AEAD_TEXT_LEN},
+                           (TC_buffer){buffer, sizeof buffer}, (TC_buffer){tag, 16}),
+                   ==, TC_OK);
+  munit_assert_memory_equal(sizeof buffer, buffer, expected);
+  munit_assert_int(decrypt(aead_key, nonce, (TC_bytes){buffer + 4, 8},
+                           (TC_bytes){buffer, sizeof buffer}, (TC_bytes){tag, 16},
+                           (TC_buffer){buffer, sizeof buffer}),
+                   ==, TC_OK);
+  munit_assert_memory_equal(sizeof buffer, buffer, aead_plain);
+}
+#endif
+
+static MunitResult test_aead_aad_in_output(const MunitParameter params[], void* data)
+{
+  (void)params;
+  (void)data;
+  test_initialize_sbox();
+#if TC_AES_ENABLE_GCM
+  check_aad_in_output(TC_AES_GCM_encrypt, TC_AES_GCM_decrypt);
+#endif
+#if TC_AES_ENABLE_CCM
+  check_aad_in_output(TC_AES_CCM_encrypt, TC_AES_CCM_decrypt);
+#endif
+#if TC_AES_ENABLE_EAX
+  check_aad_in_output(TC_AES_EAX_encrypt, TC_AES_EAX_decrypt);
+#endif
+  return MUNIT_OK;
+}
+
+static MunitResult test_aead_mismatch_wipes(const MunitParameter params[], void* data)
+{
+  (void)params;
+  (void)data;
+  test_initialize_sbox();
+#if TC_AES_ENABLE_GCM
+  check_mismatch_wipes(TC_AES_GCM_encrypt, TC_AES_GCM_decrypt);
+#endif
+#if TC_AES_ENABLE_CCM
+  check_mismatch_wipes(TC_AES_CCM_encrypt, TC_AES_CCM_decrypt);
+#endif
+#if TC_AES_ENABLE_EAX
+  check_mismatch_wipes(TC_AES_EAX_encrypt, TC_AES_EAX_decrypt);
+#endif
+#if TC_AES_ENABLE_EAX_PRIME
+  {
+    const TC_bytes cleartext = {aead_header, sizeof aead_header};
+    uint8_t ciphertext[AEAD_TEXT_LEN], output[AEAD_TEXT_LEN], tag[TC_AES_EAX_PRIME_TAG_LEN];
+
+    munit_assert_int(TC_AES_EAX_PRIME_encrypt(aead_key, cleartext,
+                                              (TC_bytes){aead_plain, AEAD_TEXT_LEN},
+                                              (TC_buffer){ciphertext, sizeof ciphertext}, tag),
+                     ==, TC_OK);
+    tag[0] ^= 1u;
+    memset(output, 0x5a, sizeof output);
+    munit_assert_int(TC_AES_EAX_PRIME_decrypt(aead_key, cleartext,
+                                              (TC_bytes){ciphertext, sizeof ciphertext}, tag,
+                                              (TC_buffer){output, sizeof output}),
+                     ==, TC_MISMATCH);
+    assert_filled(output, sizeof output, 0);
+    memcpy(output, ciphertext, sizeof output);
+    munit_assert_int(TC_AES_EAX_PRIME_decrypt(aead_key, cleartext,
+                                              (TC_bytes){output, sizeof output}, tag,
+                                              (TC_buffer){output, sizeof output}),
+                     ==, TC_MISMATCH);
+    assert_filled(output, sizeof output, 0);
+  }
+#endif
+#if TC_AES_ENABLE_SIV
+  {
+    const TC_bytes ad = {aead_header, sizeof aead_header};
+    uint8_t ciphertext[AEAD_TEXT_LEN], output[AEAD_TEXT_LEN], v[TC_AES_SIV_V_LEN];
+
+    munit_assert_int(TC_AES_SIV_encrypt(aead_key, &ad, 1, (TC_bytes){aead_plain, AEAD_TEXT_LEN}, v,
+                                        (TC_buffer){ciphertext, sizeof ciphertext}),
+                     ==, TC_OK);
+    v[0] ^= 1u;
+    memset(output, 0x5a, sizeof output);
+    munit_assert_int(TC_AES_SIV_decrypt(aead_key, &ad, 1, v,
+                                        (TC_bytes){ciphertext, sizeof ciphertext},
+                                        (TC_buffer){output, sizeof output}),
+                     ==, TC_MISMATCH);
+    assert_filled(output, sizeof output, 0);
+    memcpy(output, ciphertext, sizeof output);
+    munit_assert_int(TC_AES_SIV_decrypt(aead_key, &ad, 1, v, (TC_bytes){output, sizeof output},
+                                        (TC_buffer){output, sizeof output}),
+                     ==, TC_MISMATCH);
+    assert_filled(output, sizeof output, 0);
+  }
+#endif
+  return MUNIT_OK;
+}
+
+static MunitResult test_aead_tag_overlap(const MunitParameter params[], void* data)
+{
+  (void)params;
+  (void)data;
+  test_initialize_sbox();
+#if TC_AES_ENABLE_GCM
+  check_tag_overlap(TC_AES_GCM_encrypt, TC_AES_GCM_decrypt);
+#endif
+#if TC_AES_ENABLE_CCM
+  check_tag_overlap(TC_AES_CCM_encrypt, TC_AES_CCM_decrypt);
+#endif
+#if TC_AES_ENABLE_EAX
+  check_tag_overlap(TC_AES_EAX_encrypt, TC_AES_EAX_decrypt);
+#endif
+#if TC_AES_ENABLE_EAX_PRIME
+  {
+    const TC_bytes cleartext = {aead_header, sizeof aead_header};
+    uint8_t buffer[AEAD_TEXT_LEN + TC_AES_EAX_PRIME_TAG_LEN];
+
+    memset(buffer, 0x5a, sizeof buffer);
+    munit_assert_int(
+        TC_AES_EAX_PRIME_encrypt(aead_key, cleartext, (TC_bytes){aead_plain, AEAD_TEXT_LEN},
+                                 (TC_buffer){buffer, AEAD_TEXT_LEN}, buffer + AEAD_TEXT_LEN - 1),
+        ==, TC_ERROR);
+    assert_filled(buffer, sizeof buffer, 0x5a);
+    munit_assert_int(TC_AES_EAX_PRIME_decrypt(aead_key, cleartext,
+                                              (TC_bytes){aead_plain, AEAD_TEXT_LEN}, buffer + 4,
+                                              (TC_buffer){buffer, AEAD_TEXT_LEN}),
+                     ==, TC_ERROR);
+    assert_filled(buffer, sizeof buffer, 0x5a);
+  }
+#endif
+#if TC_AES_ENABLE_SIV
+  {
+    uint8_t buffer[AEAD_TEXT_LEN + TC_AES_SIV_V_LEN];
+
+    memset(buffer, 0x5a, sizeof buffer);
+    munit_assert_int(TC_AES_SIV_encrypt(aead_key, NULL, 0, (TC_bytes){aead_plain, AEAD_TEXT_LEN},
+                                        buffer + AEAD_TEXT_LEN - 1,
+                                        (TC_buffer){buffer, AEAD_TEXT_LEN}),
+                     ==, TC_ERROR);
+    assert_filled(buffer, sizeof buffer, 0x5a);
+    munit_assert_int(TC_AES_SIV_decrypt(aead_key, NULL, 0, buffer + 4,
+                                        (TC_bytes){aead_plain, AEAD_TEXT_LEN},
+                                        (TC_buffer){buffer, AEAD_TEXT_LEN}),
+                     ==, TC_ERROR);
+    assert_filled(buffer, sizeof buffer, 0x5a);
+  }
+#endif
+  return MUNIT_OK;
+}
 #endif
 
 static MunitTest test_suite_tests[] = {
@@ -1106,7 +1265,6 @@ static MunitTest test_suite_tests[] = {
 #endif
 #if TC_AES_ENABLE_GCM
     {"/gcm", test_gcm, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-    {"/gcm-direction", test_gcm_direction, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/gcm-oneshot", test_gcm_oneshot, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
 #if TC_AES_KEY_BITS == 128
     {"/gcm-non96-iv", test_gcm_non96_iv, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
@@ -1118,6 +1276,9 @@ static MunitTest test_suite_tests[] = {
 #if TC_AES_ENABLE_GCM || TC_AES_ENABLE_CCM || TC_AES_ENABLE_EAX || TC_AES_ENABLE_EAX_PRIME ||      \
     TC_AES_ENABLE_SIV
     {"/aead-output-capacity", test_aead_output_capacity, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/aead-mismatch-wipes", test_aead_mismatch_wipes, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/aead-tag-overlap", test_aead_tag_overlap, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/aead-aad-in-output", test_aead_aad_in_output, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
 #endif
     {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
 

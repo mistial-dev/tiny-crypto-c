@@ -139,11 +139,18 @@ static void check_gcm_vector(const gcm_test_vector& v)
   CHECK(std::memcmp(data.data(), v.ciphertext, v.length) == 0);
   CHECK(std::memcmp(tag.data(), v.tag, v.tag_len) == 0);
 
-  REQUIRE(gcm.init(v.key, v.key_len, {v.iv, v.iv_len}, v.tag_len) == TC_OK);
-  CHECK(gcm.aad_update(v.aad, v.aad_len) == TC_OK);
-  CHECK(gcm.decrypt_update(data.data(), v.length) == TC_OK);
-  CHECK(gcm.decrypt_finish(tag.data(), tag.size()) == TC_OK);
+  const tiny_crypto::bytes key = {v.key, v.key_len};
+  CHECK(tiny_crypto::gcm_decrypt(key, {v.iv, v.iv_len}, {v.aad, v.aad_len}, {data.data(), v.length},
+                                 {tag.data(), tag.size()}, {data.data(), v.length}) == TC_OK);
   CHECK(std::memcmp(data.data(), v.plaintext, v.length) == 0);
+
+  std::vector<uint8_t> ciphertext(v.length + 1);
+  std::vector<uint8_t> one_shot_tag(v.tag_len);
+  CHECK(tiny_crypto::gcm_encrypt(key, {v.iv, v.iv_len}, {v.aad, v.aad_len}, {v.plaintext, v.length},
+                                 {ciphertext.data(), v.length},
+                                 {one_shot_tag.data(), one_shot_tag.size()}) == TC_OK);
+  CHECK(std::memcmp(ciphertext.data(), v.ciphertext, v.length) == 0);
+  CHECK(std::memcmp(one_shot_tag.data(), v.tag, v.tag_len) == 0);
 }
 
 TEST_CASE("AES GCM known answers and state errors")
@@ -170,18 +177,40 @@ TEST_CASE("AES GCM known answers and state errors")
   REQUIRE(v != nullptr);
   std::vector<uint8_t> data(v->ciphertext, v->ciphertext + v->length);
   std::vector<uint8_t> tag(v->tag, v->tag + v->tag_len);
-  tiny_crypto::GCM gcm;
-  REQUIRE(gcm.init(v->key, v->key_len, {v->iv, v->iv_len}, v->tag_len) == TC_OK);
-  CHECK(gcm.aad_update(v->aad, v->aad_len) == TC_OK);
-  CHECK(gcm.decrypt_update(data.data(), data.size()) == TC_OK);
-  tag[0] ^= 1;
-  CHECK(gcm.decrypt_finish(tag.data(), tag.size()) == TC_MISMATCH);
-  CHECK(gcm.decrypt_finish(tag.data(), tag.size()) == TC_ERROR);
+  std::vector<uint8_t> output(data.size(), 0x5a);
+  const tiny_crypto::bytes key = {v->key, v->key_len};
 
+  /* A wrong key length is rejected before any write. */
+  CHECK(tiny_crypto::gcm_decrypt({v->key, v->key_len - 1}, {v->iv, v->iv_len}, {v->aad, v->aad_len},
+                                 {data.data(), data.size()}, {tag.data(), tag.size()},
+                                 {output.data(), output.size()}) == TC_ERROR);
+  CHECK(output == std::vector<uint8_t>(data.size(), 0x5a));
+
+  /* A tag mismatch wipes the plaintext output. */
+  tag[0] ^= 1;
+  CHECK(tiny_crypto::gcm_decrypt(key, {v->iv, v->iv_len}, {v->aad, v->aad_len},
+                                 {data.data(), data.size()}, {tag.data(), tag.size()},
+                                 {output.data(), output.size()}) == TC_MISMATCH);
+  CHECK(output == std::vector<uint8_t>(data.size(), 0));
+  tag[0] ^= 1;
+
+  /* Four-byte tags need the explicit short-tag form (SP 800-38D appendix C). */
+  uint8_t short_tag[4];
+  CHECK(tiny_crypto::gcm_encrypt(key, {v->iv, v->iv_len}, {v->aad, v->aad_len},
+                                 {v->plaintext, v->length}, {output.data(), output.size()},
+                                 {short_tag, sizeof(short_tag)}) == TC_ERROR);
+  REQUIRE(tiny_crypto::gcm_encrypt_short_tag(
+              key, {v->iv, v->iv_len}, {v->aad, v->aad_len}, {v->plaintext, v->length},
+              {output.data(), output.size()}, {short_tag, sizeof(short_tag)}) == TC_OK);
+  CHECK(tiny_crypto::gcm_decrypt_short_tag(
+            key, {v->iv, v->iv_len}, {v->aad, v->aad_len}, {output.data(), output.size()},
+            {short_tag, sizeof(short_tag)}, {output.data(), output.size()}) == TC_OK);
+  CHECK(std::memcmp(output.data(), v->plaintext, v->length) == 0);
+
+  tiny_crypto::GCM gcm;
   REQUIRE(gcm.init(v->key, v->key_len, {v->iv, v->iv_len}, v->tag_len) == TC_OK);
   CHECK(gcm.encrypt_update(data.data(), data.size()) == TC_OK);
   CHECK(gcm.aad_update(v->aad, v->aad_len) == TC_ERROR);
-  CHECK(gcm.decrypt_update(data.data(), data.size()) == TC_ERROR);
   CHECK(gcm.encrypt_finish(tag.data(), tag.size() - 1) == TC_ERROR);
   CHECK(gcm.init(v->key, v->key_len - 1, {v->iv, v->iv_len}, v->tag_len) == TC_ERROR);
 }

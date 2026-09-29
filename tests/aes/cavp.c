@@ -589,32 +589,27 @@ static int cavp_run_gcm_decrypt_record(const char* filename, size_t count,
   const uint8_t* pt = record->plaintext.data;
   const size_t pt_len = record->plaintext.length;
   const int expected_fail = record->expected_fail;
-  struct TC_AES_GCM_ctx ctx;
   uint8_t* output = ct_len == 0 ? NULL : (uint8_t*)malloc(ct_len);
+  const TC_bytes iv_span = {iv, iv_len}, aad_span = {aad, aad_len};
+  const TC_bytes ct_span = {ct, ct_len}, tag_span = {tag, tag_len};
+  const TC_buffer pt_span = {output, ct_len};
   int result;
-  int init_result, aad_result, update_result, finish_result;
   int ok;
 
   if ((!expected_fail && ct_len != pt_len) || (ct_len != 0 && output == NULL)) {
     free(output);
     return 0;
   }
-  if (ct_len != 0)
-    memcpy(output, ct, ct_len);
   cavp_initialize_sbox();
-  init_result = tag_len < 12 ? TC_AES_GCM_init_short_tag(&ctx, key, (TC_bytes){iv, iv_len}, tag_len)
-                             : TC_AES_GCM_init(&ctx, key, (TC_bytes){iv, iv_len}, tag_len);
-  aad_result = init_result == TC_OK ? TC_AES_GCM_aad_update(&ctx, aad, aad_len) : TC_ERROR;
-  update_result = aad_result == TC_OK ? TC_AES_GCM_decrypt_update(&ctx, output, ct_len) : TC_ERROR;
-  finish_result = update_result == TC_OK ? TC_AES_GCM_decrypt_finish(&ctx, tag) : TC_ERROR;
-  result = finish_result;
+  result = tag_len < 12
+               ? TC_AES_GCM_decrypt_short_tag(key, iv_span, aad_span, ct_span, tag_span, pt_span)
+               : TC_AES_GCM_decrypt(key, iv_span, aad_span, ct_span, tag_span, pt_span);
   ok = expected_fail
            ? result == TC_MISMATCH
            : result == TC_OK && cavp_compare(filename, count, "PT", output, ct_len, pt, pt_len);
   if (!ok) {
-    fprintf(stderr, "CAVP GCM failure: %s Count=%lu result=%d stages=%d/%d/%d/%d expected=%s\n",
-            filename, (unsigned long)count, result, init_result, aad_result, update_result,
-            finish_result, expected_fail ? "FAIL" : "PASS");
+    fprintf(stderr, "CAVP GCM failure: %s Count=%lu result=%d expected=%s\n", filename,
+            (unsigned long)count, result, expected_fail ? "FAIL" : "PASS");
     tc_cavp_print_bytes("key", key, TC_AES_KEYLEN);
     tc_cavp_print_bytes("iv", iv, iv_len);
     tc_cavp_print_bytes("tag", tag, tag_len);

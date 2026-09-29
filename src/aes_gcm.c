@@ -2,9 +2,8 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
  * AES-GCM authenticated encryption (NIST SP 800-38D): streaming and one-shot
- * encryption and decryption, short-tag packet limits (appendix C) and the
- * decrypt-side recheck that keeps ciphertext unchanged on a bad tag.
- * GHASH lives in aes_ghash.c. */
+ * encryption, one-shot decryption and the short-tag packet limits of
+ * appendix C. GHASH lives in aes_ghash.c. */
 #include "aes_internal.h"
 #include "aes_ghash_internal.h"
 
@@ -14,9 +13,6 @@
 #define TC_AES_GCM_PHASE_AAD 1u
 #define TC_AES_GCM_PHASE_TEXT 2u
 #define TC_AES_GCM_PHASE_FINAL 3u
-#define TC_AES_GCM_DIRECTION_NONE 0u
-#define TC_AES_GCM_DIRECTION_ENCRYPT 1u
-#define TC_AES_GCM_DIRECTION_DECRYPT 2u
 
 static void tc_aes_gcm_make_j0(struct TC_AES_GCM_ctx* ctx, const uint8_t* iv, size_t iv_len)
 {
@@ -53,13 +49,11 @@ static void tc_aes_gcm_pad_ghash(struct TC_AES_GCM_ctx* ctx)
   }
 }
 
-static void tc_aes_gcm_start_text(struct TC_AES_GCM_ctx* ctx, int decrypt)
+static void tc_aes_gcm_start_text(struct TC_AES_GCM_ctx* ctx)
 {
   if (ctx->phase != TC_AES_GCM_PHASE_AAD)
     return;
   tc_aes_gcm_pad_ghash(ctx);
-  if (decrypt)
-    memcpy(ctx->aad_state, ctx->S, TC_AES_BLOCKLEN);
   ctx->phase = TC_AES_GCM_PHASE_TEXT;
 }
 
@@ -91,6 +85,33 @@ static void tc_aes_gcm_absorb(struct TC_AES_GCM_ctx* ctx, const uint8_t* data, s
 static void tc_aes_gcm_increment32(uint8_t* counter)
 {
   (void)tc_internal_increment_be(counter + 12, 4);
+}
+
+/* GCTR (SP 800-38D section 6.5): XOR the counter keystream into buf. A
+ * partial keystream block left by the previous call is used first. */
+static TC_status tc_aes_gcm_gctr(struct TC_AES_GCM_ctx* ctx, uint8_t* buf, size_t length)
+{
+  while (length != 0) {
+    size_t available;
+    size_t count;
+    size_t i;
+
+    if (ctx->stream_pos == TC_AES_BLOCKLEN) {
+      tc_aes_gcm_increment32(ctx->counter);
+      memcpy(ctx->stream, ctx->counter, TC_AES_BLOCKLEN);
+      if (tc_aes_cipher((state_t*)ctx->stream, ctx->key.round_key) != TC_OK)
+        return TC_ERROR;
+      ctx->stream_pos = 0;
+    }
+    available = TC_AES_BLOCKLEN - ctx->stream_pos;
+    count = length < available ? length : available;
+    for (i = 0; i < count; ++i)
+      buf[i] ^= ctx->stream[ctx->stream_pos + i];
+    buf += count;
+    length -= count;
+    ctx->stream_pos = (uint8_t)(ctx->stream_pos + count);
+  }
+  return TC_OK;
 }
 
 static void tc_aes_gcm_finish_ghash(struct TC_AES_GCM_ctx* ctx)
@@ -201,9 +222,6 @@ static TC_status tc_aes_gcm_init_impl(struct TC_AES_GCM_ctx* ctx, const uint8_t*
   ctx->ghash_len = 0;
   ctx->tag_len = (uint8_t)tag_len;
   ctx->phase = TC_AES_GCM_PHASE_AAD;
-  ctx->direction = TC_AES_GCM_DIRECTION_NONE;
-  ctx->decrypt_buffer = NULL;
-  ctx->decrypt_length = 0;
   return TC_OK;
 }
 
@@ -236,142 +254,22 @@ TC_status TC_AES_GCM_aad_update(struct TC_AES_GCM_ctx* ctx, const uint8_t* aad, 
 
 TC_status TC_AES_GCM_encrypt_update(struct TC_AES_GCM_ctx* ctx, uint8_t* buf, size_t length)
 {
-  size_t i;
-  const size_t total_length = length;
-  uint8_t* const output = buf;
-
   if (ctx == NULL || ctx->phase == TC_AES_GCM_PHASE_UNINIT ||
       ctx->phase == TC_AES_GCM_PHASE_FINAL || (length != 0 && buf == NULL) ||
       !tc_internal_ranges_disjoint(ctx, sizeof(*ctx), buf, length) ||
       !tc_aes_gcm_length_is_valid(ctx->text_len, length, TC_AES_GCM_MAX_PLAINTEXT_BYTES) ||
       !tc_aes_gcm_packet_length_ok(ctx, (uint64_t)length))
     return TC_ERROR;
-  if (ctx->direction == TC_AES_GCM_DIRECTION_DECRYPT)
+
+  tc_aes_gcm_start_text(ctx);
+  if (tc_aes_gcm_gctr(ctx, buf, length) != TC_OK) {
+    TC_secure_zero(buf, length);
+    tc_aes_gcm_invalidate(ctx);
     return TC_ERROR;
-  ctx->direction = TC_AES_GCM_DIRECTION_ENCRYPT;
-
-  tc_aes_gcm_start_text(ctx, 0);
-
-  while (length >= TC_AES_BLOCKLEN && ctx->stream_pos == TC_AES_BLOCKLEN && ctx->ghash_len == 0) {
-    uint8_t j;
-
-    tc_aes_gcm_increment32(ctx->counter);
-    memcpy(ctx->stream, ctx->counter, TC_AES_BLOCKLEN);
-    if (tc_aes_cipher((state_t*)ctx->stream, ctx->key.round_key) != TC_OK)
-      goto failed;
-    for (j = 0; j < TC_AES_BLOCKLEN; ++j)
-      buf[j] ^= ctx->stream[j];
-    tc_aes_gcm_absorb(ctx, buf, TC_AES_BLOCKLEN);
-    buf += TC_AES_BLOCKLEN;
-    length -= TC_AES_BLOCKLEN;
   }
-
-  while (length != 0) {
-    size_t available;
-    size_t count;
-
-    if (ctx->stream_pos == TC_AES_BLOCKLEN) {
-      tc_aes_gcm_increment32(ctx->counter);
-      memcpy(ctx->stream, ctx->counter, TC_AES_BLOCKLEN);
-      if (tc_aes_cipher((state_t*)ctx->stream, ctx->key.round_key) != TC_OK)
-        goto failed;
-      ctx->stream_pos = 0;
-    }
-
-    available = TC_AES_BLOCKLEN - ctx->stream_pos;
-    count = length < available ? length : available;
-    for (i = 0; i < count; ++i)
-      buf[i] ^= ctx->stream[ctx->stream_pos + i];
-    tc_aes_gcm_absorb(ctx, buf, count);
-    buf += count;
-    length -= count;
-    ctx->stream_pos = (uint8_t)(ctx->stream_pos + count);
-  }
-  ctx->text_len += (uint64_t)total_length;
-  return TC_OK;
-failed:
-  TC_secure_zero(output, total_length);
-  tc_aes_gcm_invalidate(ctx);
-  return TC_ERROR;
-}
-
-static TC_status tc_aes_gcm_decrypt_absorb(struct TC_AES_GCM_ctx* ctx, const uint8_t* ciphertext,
-                                           size_t length)
-{
-  if (ctx->direction == TC_AES_GCM_DIRECTION_ENCRYPT ||
-      !tc_aes_gcm_length_is_valid(ctx->text_len, length, TC_AES_GCM_MAX_PLAINTEXT_BYTES) ||
-      !tc_aes_gcm_packet_length_ok(ctx, (uint64_t)length))
-    return TC_ERROR;
-  tc_aes_gcm_start_text(ctx, 1);
-  ctx->direction = TC_AES_GCM_DIRECTION_DECRYPT;
-  tc_aes_gcm_absorb(ctx, ciphertext, length);
+  tc_aes_gcm_absorb(ctx, buf, length);
   ctx->text_len += (uint64_t)length;
   return TC_OK;
-}
-
-TC_status TC_AES_GCM_decrypt_update(struct TC_AES_GCM_ctx* ctx, uint8_t* buf, size_t length)
-{
-  if (ctx == NULL || ctx->phase == TC_AES_GCM_PHASE_UNINIT ||
-      ctx->phase == TC_AES_GCM_PHASE_FINAL || (length != 0 && buf == NULL) ||
-      !tc_internal_ranges_disjoint(ctx, sizeof(*ctx), buf, length) ||
-      length > SIZE_MAX - ctx->decrypt_length)
-    return TC_ERROR;
-  if (length != 0 && ctx->decrypt_buffer != NULL &&
-      ((uintptr_t)ctx->decrypt_buffer > UINTPTR_MAX - ctx->decrypt_length ||
-       (uintptr_t)buf != (uintptr_t)ctx->decrypt_buffer + ctx->decrypt_length))
-    return TC_ERROR;
-  if (tc_aes_gcm_decrypt_absorb(ctx, buf, length) != TC_OK)
-    return TC_ERROR;
-  if (length != 0 && ctx->decrypt_buffer == NULL)
-    ctx->decrypt_buffer = buf;
-  ctx->decrypt_length += length;
-  return TC_OK;
-}
-
-/* Rehash the same local ciphertext blocks used for decryption. A caller may
- * change the receive buffer after update or while finish is running. */
-static TC_status tc_aes_gcm_decrypt_recheck(struct TC_AES_GCM_ctx* ctx, const uint8_t* ciphertext,
-                                            uint8_t* plaintext, size_t length, const uint8_t* tag)
-{
-  uint8_t counter[TC_AES_BLOCKLEN];
-  uint8_t block[TC_AES_BLOCKLEN];
-  uint8_t stream[TC_AES_BLOCKLEN];
-  uint8_t expected[TC_AES_BLOCKLEN];
-  size_t offset = 0;
-  TC_status status = TC_OK;
-
-  memcpy(ctx->S, ctx->aad_state, TC_AES_BLOCKLEN);
-  ctx->ghash_len = 0;
-  memcpy(counter, ctx->J0, TC_AES_BLOCKLEN);
-  while (offset < length) {
-    const size_t remaining = length - offset;
-    const size_t count = remaining < TC_AES_BLOCKLEN ? remaining : TC_AES_BLOCKLEN;
-    size_t i;
-    memcpy(block, ciphertext + offset, count);
-    tc_aes_gcm_absorb(ctx, block, count);
-    tc_aes_gcm_increment32(counter);
-    memcpy(stream, counter, TC_AES_BLOCKLEN);
-    if (tc_aes_cipher((state_t*)stream, ctx->key.round_key) != TC_OK) {
-      status = TC_ERROR;
-      break;
-    }
-    for (i = 0; i < count; ++i)
-      plaintext[offset + i] = (uint8_t)(block[i] ^ stream[i]);
-    offset += count;
-  }
-  if (status == TC_OK) {
-    tc_aes_gcm_finish_ghash(ctx);
-    status = tc_aes_gcm_make_tag(ctx, expected);
-    if (status == TC_OK)
-      status = TC_ct_equal(expected, tag, ctx->tag_len);
-  }
-  if (status != TC_OK)
-    TC_secure_zero(plaintext, length);
-  TC_secure_zero(counter, sizeof counter);
-  TC_secure_zero(block, sizeof block);
-  TC_secure_zero(stream, sizeof stream);
-  TC_secure_zero(expected, sizeof expected);
-  return status;
 }
 
 TC_status TC_AES_GCM_encrypt_finish(struct TC_AES_GCM_ctx* ctx, uint8_t* tag)
@@ -383,41 +281,11 @@ TC_status TC_AES_GCM_encrypt_finish(struct TC_AES_GCM_ctx* ctx, uint8_t* tag)
       !tc_internal_ranges_disjoint(ctx, sizeof(*ctx), tag, ctx->tag_len) ||
       !tc_aes_gcm_packet_length_ok(ctx, 0))
     return TC_ERROR;
-  if (ctx->direction == TC_AES_GCM_DIRECTION_DECRYPT)
-    return TC_ERROR;
-  tc_aes_gcm_start_text(ctx, 0);
+  tc_aes_gcm_start_text(ctx);
   tc_aes_gcm_finish_ghash(ctx);
   /* Finish consumes the context on success and on failure. */
   status = tc_aes_gcm_make_tag(ctx, tag);
   tc_aes_gcm_invalidate(ctx);
-  return status;
-}
-
-TC_status TC_AES_GCM_decrypt_finish(struct TC_AES_GCM_ctx* ctx, const uint8_t* tag)
-{
-  uint8_t expected[TC_AES_BLOCKLEN];
-  TC_status status;
-
-  if (ctx == NULL || tag == NULL || ctx->phase == TC_AES_GCM_PHASE_UNINIT ||
-      ctx->phase == TC_AES_GCM_PHASE_FINAL ||
-      !tc_internal_ranges_disjoint(ctx, sizeof(*ctx), tag, ctx->tag_len) ||
-      !tc_internal_ranges_disjoint(ctx->decrypt_buffer, ctx->decrypt_length, tag, ctx->tag_len) ||
-      !tc_aes_gcm_packet_length_ok(ctx, 0))
-    return TC_ERROR;
-  if (ctx->direction == TC_AES_GCM_DIRECTION_ENCRYPT)
-    return TC_ERROR;
-  tc_aes_gcm_start_text(ctx, 1);
-  tc_aes_gcm_finish_ghash(ctx);
-  status = tc_aes_gcm_make_tag(ctx, expected);
-  /* Authentication tags contain secrets, so comparison time must not reveal
-   * the first byte that differs. */
-  if (status == TC_OK)
-    status = TC_ct_equal(expected, tag, ctx->tag_len);
-  if (status == TC_OK && ctx->decrypt_length != 0)
-    status = tc_aes_gcm_decrypt_recheck(ctx, ctx->decrypt_buffer, ctx->decrypt_buffer,
-                                        ctx->decrypt_length, tag);
-  tc_aes_gcm_invalidate(ctx);
-  TC_secure_zero(expected, sizeof(expected));
   return status;
 }
 
@@ -455,18 +323,15 @@ static TC_status tc_aes_gcm_encrypt_impl(const uint8_t* key, TC_bytes iv, TC_byt
                                   (TC_bytes){tag.data, tag.capacity}, short_tag))
     return TC_ERROR;
 
-  if (tc_aes_gcm_init_impl(&ctx, key, iv, tag.capacity, short_tag) != TC_OK)
-    return TC_ERROR;
-  if (TC_AES_GCM_aad_update(&ctx, aad.data, aad.length) != TC_OK) {
-    TC_AES_GCM_clear(&ctx);
-    return TC_ERROR;
+  status = tc_aes_gcm_init_impl(&ctx, key, iv, tag.capacity, short_tag);
+  if (status == TC_OK)
+    status = TC_AES_GCM_aad_update(&ctx, aad.data, aad.length);
+  if (status == TC_OK) {
+    /* AAD is consumed before the text output is written, so it may overlap. */
+    if (plaintext.data != ciphertext.data && plaintext.length != 0)
+      memcpy(ciphertext.data, plaintext.data, plaintext.length);
+    status = TC_AES_GCM_encrypt_update(&ctx, ciphertext.data, plaintext.length);
   }
-
-  /* Copy only after all length/overlap checks and AAD accept. */
-  if (plaintext.data != ciphertext.data && plaintext.length != 0)
-    memcpy(ciphertext.data, plaintext.data, plaintext.length);
-
-  status = TC_AES_GCM_encrypt_update(&ctx, ciphertext.data, plaintext.length);
   if (status == TC_OK)
     status = TC_AES_GCM_encrypt_finish(&ctx, tag.data);
   if (status != TC_OK && plaintext.length != 0)
@@ -476,45 +341,42 @@ static TC_status tc_aes_gcm_encrypt_impl(const uint8_t* key, TC_bytes iv, TC_byt
   return status;
 }
 
+/* SP 800-38D section 7.2. The tag is computed over the AAD and ciphertext
+ * and compared before GCTR writes any plaintext. The one-shot contract keeps
+ * the input unchanged for the call, so each pass reads the same ciphertext. */
 static TC_status tc_aes_gcm_decrypt_impl(const uint8_t* key, TC_bytes iv, TC_bytes aad,
                                          TC_bytes ciphertext, TC_bytes tag, TC_buffer plaintext,
                                          int short_tag)
 {
   struct TC_AES_GCM_ctx ctx;
   uint8_t expected[TC_AES_BLOCKLEN] = {0};
-  TC_status status = TC_ERROR;
+  TC_status status;
   const size_t length = ciphertext.length;
 
   if (!tc_aes_gcm_oneshot_args_ok(key, iv, aad, ciphertext, plaintext, tag, short_tag))
     return TC_ERROR;
 
-  if (tc_aes_gcm_init_impl(&ctx, key, iv, tag.length, short_tag) != TC_OK)
-    return TC_ERROR;
-  if (TC_AES_GCM_aad_update(&ctx, aad.data, aad.length) != TC_OK)
-    goto done;
-
-  /* Absorb ciphertext into GHASH before releasing plaintext. */
-  if (tc_aes_gcm_decrypt_absorb(&ctx, ciphertext.data, length) != TC_OK)
-    goto done;
-
-  tc_aes_gcm_finish_ghash(&ctx);
-  if (tc_aes_gcm_make_tag(&ctx, expected) != TC_OK)
-    goto done;
-  status = TC_ct_equal(expected, tag.data, ctx.tag_len);
-  ctx.phase = TC_AES_GCM_PHASE_FINAL;
-
-  if (status != TC_OK) {
-    /* In-place callers supplied ciphertext in this buffer. Wipe it so an
-     * authentication failure cannot leave unauthenticated data behind. */
-    if (length != 0 && plaintext.data == ciphertext.data)
-      TC_secure_zero(plaintext.data, length);
-    goto done;
+  status = tc_aes_gcm_init_impl(&ctx, key, iv, tag.length, short_tag);
+  if (status == TC_OK)
+    status = TC_AES_GCM_aad_update(&ctx, aad.data, aad.length);
+  if (status == TC_OK) {
+    tc_aes_gcm_start_text(&ctx);
+    tc_aes_gcm_absorb(&ctx, ciphertext.data, length);
+    ctx.text_len = (uint64_t)length;
+    tc_aes_gcm_finish_ghash(&ctx);
+    status = tc_aes_gcm_make_tag(&ctx, expected);
   }
+  /* Tags are secret until checked. The comparison runs in constant time. */
+  if (status == TC_OK)
+    status = TC_ct_equal(expected, tag.data, ctx.tag_len);
+  if (status == TC_OK && length != 0) {
+    if (plaintext.data != ciphertext.data)
+      memcpy(plaintext.data, ciphertext.data, length);
+    status = tc_aes_gcm_gctr(&ctx, plaintext.data, length);
+  }
+  if (status != TC_OK && length != 0)
+    TC_secure_zero(plaintext.data, length);
 
-  if (length != 0)
-    status = tc_aes_gcm_decrypt_recheck(&ctx, ciphertext.data, plaintext.data, length, tag.data);
-
-done:
   TC_AES_GCM_clear(&ctx);
   TC_secure_zero(expected, sizeof(expected));
   return status;

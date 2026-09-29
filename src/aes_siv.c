@@ -102,8 +102,11 @@ static TC_status tc_aes_siv_crypt(const uint8_t* key, const TC_bytes* ad, size_t
       !tc_aes_text_ok(input, output))
     return TC_ERROR;
 
+  /* Decrypt runs S2V over the AD after writing candidate plaintext, so an AD
+   * span inside the output would authenticate overwritten bytes. */
   for (i = 0; i < ad_count; ++i) {
-    if (!tc_internal_span_valid(ad[i].data, ad[i].length))
+    if (!tc_internal_span_valid(ad[i].data, ad[i].length) ||
+        !tc_internal_ranges_disjoint(ad[i].data, ad[i].length, output.data, input_len))
       return TC_ERROR;
   }
 
@@ -118,21 +121,17 @@ static TC_status tc_aes_siv_crypt(const uint8_t* key, const TC_bytes* ad, size_t
                               st.computed);
     if (status == TC_OK)
       status = TC_ct_equal(st.computed, v, TC_AES_BLOCKLEN);
-    if (status != TC_OK) {
-      /* SIV decrypts before authenticating. Any failure discards plaintext. */
-      if (input_len != 0)
-        TC_secure_zero(output.data, input_len);
-    }
   } else {
     status = tc_aes_siv_s2v(st.k1.round_key, ad, ad_count, input, v);
-    if (status == TC_OK) {
+    if (status == TC_OK)
       status = tc_aes_siv_ctr(st.k2.round_key, v, input.data, output.data, input_len);
-      if (status != TC_OK && input_len != 0)
-        TC_secure_zero(output.data, input_len);
-    }
   }
 
 done:
+  /* SIV decrypts before authenticating (RFC 5297 section 2.7). Any failure
+   * discards the candidate plaintext or partial ciphertext. */
+  if (status != TC_OK && input_len != 0)
+    TC_secure_zero(output.data, input_len);
   TC_secure_zero(&st, sizeof(st));
   return status;
 }

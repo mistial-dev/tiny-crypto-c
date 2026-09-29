@@ -804,14 +804,13 @@ minimum length. Longer valid tags must verify; altered tags must fail.
 
 AES-GCM, CCM, GMAC, EAX, and both AES-SIV formats run at all three AES key
 sizes. Valid cases check
-encryption and decryption. Invalid cases must fail without changing a separate
-output buffer. GCM, CCM, EAX and EAX' authentication mismatches must wipe an
-in-place buffer. EAX rejects a zero-length tag, and
-`test_reject_tag_length_config` checks that `config.h` rejects EAX and AES-CMAC
-minimum tag lengths outside 1 to 16.
-SIV follows its separate API contract: an authentication mismatch wipes the
-output, whether separate or in-place. The two SIV formats differ in their
-associated-data components and whether the synthetic IV prefixes the ciphertext.
+encryption and decryption. An authentication mismatch must wipe the text
+output, whether separate or in-place, and leave spare capacity unchanged. An
+argument error must leave every buffer unchanged. EAX rejects a zero-length
+tag, and `test_reject_tag_length_config` checks that `config.h` rejects EAX and
+AES-CMAC minimum tag lengths outside 1 to 16.
+The two SIV formats differ in their associated-data components and whether the
+synthetic IV prefixes the ciphertext.
 
 HKDF checks all four pinned Wycheproof SHA-1/256/384/512 JSON suites, the seven
 RFC 5869 vectors, and additional SHA-224/384/512 vectors. The NIST ACVP HKDF

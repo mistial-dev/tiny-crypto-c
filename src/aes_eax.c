@@ -71,7 +71,6 @@ static TC_status tc_aes_eax_crypt(const uint8_t* key, TC_bytes nonce, TC_bytes a
   } st;
   TC_status status = TC_ERROR;
   uint8_t i;
-  int output_started = 0;
 
   if (key == NULL || !tc_internal_span_valid(nonce.data, nonce.length) ||
       !tc_internal_span_valid(aad.data, aad.length) || !tc_aes_text_ok(input_span, output_span) ||
@@ -99,11 +98,9 @@ static TC_status tc_aes_eax_crypt(const uint8_t* key, TC_bytes nonce, TC_bytes a
     if (status == TC_OK) {
       /* EAX verifies before CTR decryption, so the caller's buffer receives
        * only authenticated plaintext. */
-      output_started = 1;
       status = tc_aes_eax_ctr_xor(&st.aes, st.nonce_mac, input, output, input_len, 0);
     }
   } else {
-    output_started = 1;
     if (tc_aes_eax_ctr_xor(&st.aes, st.nonce_mac, input, output, input_len, 0) != TC_OK ||
         tc_aes_eax_cmac(&st.aes, NULL, 2, output, input_len, st.d, st.q, st.message_mac) != TC_OK)
       goto done;
@@ -114,10 +111,9 @@ static TC_status tc_aes_eax_crypt(const uint8_t* key, TC_bytes nonce, TC_bytes a
   }
 
 done:
-  /* On failure, wipe any output already written. Decrypt writes nothing
-   * before the tag verifies, so a separate output stays untouched. In-place
-   * output still holds the rejected ciphertext and is wiped too. */
-  if (status != TC_OK && (output_started || (decrypt && output == input)) && input_len != 0)
+  /* One-shot AEAD failure rule: after the argument checks, any failure wipes
+   * the text output. Decrypt writes plaintext only after the tag verifies. */
+  if (status != TC_OK && input_len != 0)
     TC_secure_zero(output, input_len);
   TC_secure_zero(&st, sizeof(st));
   return status;
@@ -161,7 +157,6 @@ static TC_status tc_aes_eax_prime_crypt(const uint8_t* key, TC_bytes cleartext, 
   } st;
   uint8_t i;
   TC_status status = TC_ERROR;
-  int output_started = 0;
 
   if (key == NULL || !tc_internal_span_valid(cleartext.data, cleartext.length) ||
       !tc_aes_text_ok(input_span, output_span) || (expected_tag == NULL && output_tag == NULL) ||
@@ -188,11 +183,9 @@ static TC_status tc_aes_eax_prime_crypt(const uint8_t* key, TC_bytes cleartext, 
       st.message_mac[i] = st.full_tag[TC_AES_BLOCKLEN - 1u - i];
     status = TC_ct_equal(st.message_mac, expected_tag, TC_AES_EAX_PRIME_TAG_LEN);
     if (status == TC_OK) {
-      output_started = 1;
       status = tc_aes_eax_ctr_xor(&st.aes, st.nonce_mac, input, output, input_len, 1);
     }
   } else {
-    output_started = 1;
     if (tc_aes_eax_ctr_xor(&st.aes, st.nonce_mac, input, output, input_len, 1) != TC_OK ||
         tc_aes_eax_cmac(&st.aes, st.q, -1, output, input_len, st.d, st.q, st.message_mac) != TC_OK)
       goto done;
@@ -204,10 +197,9 @@ static TC_status tc_aes_eax_prime_crypt(const uint8_t* key, TC_bytes cleartext, 
   }
 
 done:
-  /* On failure, wipe any output already written. Decrypt writes nothing
-   * before the tag verifies, so a separate output stays untouched. In-place
-   * output still holds the rejected ciphertext and is wiped too. */
-  if (status != TC_OK && (output_started || (decrypt && output == input)) && input_len != 0)
+  /* One-shot AEAD failure rule: after the argument checks, any failure wipes
+   * the text output. Decrypt writes plaintext only after the tag verifies. */
+  if (status != TC_OK && input_len != 0)
     TC_secure_zero(output, input_len);
   TC_secure_zero(&st, sizeof(st));
   return status;

@@ -435,6 +435,36 @@ static MunitResult test_siv_api(const MunitParameter params[], void* data)
                    ==, TC_ERROR);
   munit_assert_memory_equal(sizeof(buf), buf, saved);
 
+  /* AD that overlaps the text output is rejected before any write. Decrypt
+   * runs S2V over the AD after writing plaintext, so an overlapping AD would
+   * authenticate overwritten bytes. */
+  {
+    uint8_t ad_copy[8];
+    const TC_bytes ad_outside = {ad_copy, sizeof(ad_copy)};
+    const TC_bytes ad_inside = {buf + 4, sizeof(ad_copy)};
+
+    memset(buf, 0x22, sizeof(buf));
+    memcpy(ad_copy, buf + 4, sizeof(ad_copy));
+    munit_assert_int(TC_AES_SIV_encrypt(key, &ad_outside, 1, (TC_bytes){pt, sizeof(pt)}, v,
+                                        (TC_buffer){ct, sizeof(pt)}),
+                     ==, TC_OK);
+    memcpy(saved, buf, sizeof(buf));
+    munit_assert_int(TC_AES_SIV_decrypt(key, &ad_inside, 1, v, (TC_bytes){ct, sizeof(pt)},
+                                        (TC_buffer){buf, sizeof(pt)}),
+                     ==, TC_ERROR);
+    munit_assert_memory_equal(sizeof(buf), buf, saved);
+    munit_assert_int(TC_AES_SIV_encrypt(key, &ad_inside, 1, (TC_bytes){pt, sizeof(pt)}, v2,
+                                        (TC_buffer){buf, sizeof(pt)}),
+                     ==, TC_ERROR);
+    munit_assert_memory_equal(sizeof(buf), buf, saved);
+    /* AD placed after the text output is disjoint and accepted. */
+    memcpy(buf + 16, ad_copy, sizeof(ad_copy));
+    munit_assert_int(TC_AES_SIV_decrypt(key, &(TC_bytes){buf + 16, sizeof(ad_copy)}, 1, v,
+                                        (TC_bytes){ct, sizeof(pt)}, (TC_buffer){buf, sizeof(pt)}),
+                     ==, TC_OK);
+    munit_assert_memory_equal(sizeof(pt), buf, pt);
+  }
+
   /* v fully after ciphertext (disjoint) is OK */
   memcpy(buf, pt, sizeof(pt));
   munit_assert_int(TC_AES_SIV_encrypt(key, NULL, 0, (TC_bytes){pt, sizeof(pt)}, buf + 16,

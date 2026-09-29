@@ -118,6 +118,8 @@ private:
 };
 
 #if TC_AES_ENABLE_GCM
+/* Streaming GCM encryption. Decrypt with the one-shot gcm_decrypt, which
+ * verifies the tag before writing plaintext. */
 class GCM {
 public:
   GCM() noexcept = default;
@@ -154,17 +156,9 @@ public:
   {
     return TC_AES_GCM_encrypt_update(&ctx_, data, length);
   }
-  TC_CPP_NODISCARD TC_status decrypt_update(uint8_t* data, size_t length) noexcept
-  {
-    return TC_AES_GCM_decrypt_update(&ctx_, data, length);
-  }
   TC_CPP_NODISCARD TC_status encrypt_finish(uint8_t* tag, size_t tag_len) noexcept
   {
     return tag_len == ctx_.tag_len ? TC_AES_GCM_encrypt_finish(&ctx_, tag) : TC_ERROR;
-  }
-  TC_CPP_NODISCARD TC_status decrypt_finish(const uint8_t* tag, size_t tag_len) noexcept
-  {
-    return tag_len == ctx_.tag_len ? TC_AES_GCM_decrypt_finish(&ctx_, tag) : TC_ERROR;
   }
   size_t tag_length() const noexcept
   {
@@ -191,7 +185,42 @@ TC_CPP_NODISCARD inline TC_status aes_cmac(const uint8_t* key, size_t key_len,
 
 /* The one-shot AEAD wrappers take a sized key and check its length before the
  * C call. A wrong length returns TC_ERROR and leaves every output unchanged.
- * CCM, EAX and EAX' take TC_AES_KEYLEN bytes. SIV takes TC_AES_SIV_KEYLEN. */
+ * GCM, CCM, EAX and EAX' take TC_AES_KEYLEN bytes. SIV takes
+ * TC_AES_SIV_KEYLEN. Otherwise they follow the one-shot AEAD contract in
+ * aes.h. */
+#if TC_AES_ENABLE_GCM
+TC_CPP_NODISCARD inline TC_status gcm_encrypt(bytes key, bytes iv, bytes aad, bytes plaintext,
+                                              buffer ciphertext, buffer tag) noexcept
+{
+  if (key.length != TC_AES_KEYLEN)
+    return TC_ERROR;
+  return TC_AES_GCM_encrypt(key.data, iv, aad, plaintext, ciphertext, tag);
+}
+TC_CPP_NODISCARD inline TC_status gcm_decrypt(bytes key, bytes iv, bytes aad, bytes ciphertext,
+                                              bytes tag, buffer plaintext) noexcept
+{
+  if (key.length != TC_AES_KEYLEN)
+    return TC_ERROR;
+  return TC_AES_GCM_decrypt(key.data, iv, aad, ciphertext, tag, plaintext);
+}
+TC_CPP_NODISCARD inline TC_status gcm_encrypt_short_tag(bytes key, bytes iv, bytes aad,
+                                                        bytes plaintext, buffer ciphertext,
+                                                        buffer tag) noexcept
+{
+  if (key.length != TC_AES_KEYLEN)
+    return TC_ERROR;
+  return TC_AES_GCM_encrypt_short_tag(key.data, iv, aad, plaintext, ciphertext, tag);
+}
+TC_CPP_NODISCARD inline TC_status gcm_decrypt_short_tag(bytes key, bytes iv, bytes aad,
+                                                        bytes ciphertext, bytes tag,
+                                                        buffer plaintext) noexcept
+{
+  if (key.length != TC_AES_KEYLEN)
+    return TC_ERROR;
+  return TC_AES_GCM_decrypt_short_tag(key.data, iv, aad, ciphertext, tag, plaintext);
+}
+#endif
+
 #if TC_AES_ENABLE_CCM
 TC_CPP_NODISCARD inline TC_status ccm_encrypt(bytes key, bytes nonce, bytes aad, bytes plaintext,
                                               buffer ciphertext, buffer tag) noexcept

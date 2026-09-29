@@ -123,18 +123,32 @@ TC_status TC_AES_OFB_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length);
 #endif
 
 /*
- * One-shot AEAD contract (GCM, CCM, EAX, EAX', SIV):
+ * One-shot AEAD contract (GCM, CCM, EAX, EAX', SIV). docs/api.md has the
+ * full description.
  * - Encrypt writes plaintext.length bytes to ciphertext and tag.capacity tag
  *   bytes to tag. Decrypt writes ciphertext.length bytes to plaintext and
  *   checks tag.length tag bytes. The tag length is fixed for the key.
  *   EAX' and SIV take fixed-size tag arrays.
  * - The text output capacity must be at least the text input length.
  * - Text input and output are exact aliases or fully disjoint. The tag is
- *   disjoint from the text output. Partial overlap returns TC_ERROR.
- * - Inputs stay unchanged for the duration of the call.
- * - Decrypt authenticates before releasing plaintext. GCM, CCM, EAX and EAX'
- *   leave a separate output untouched and wipe in-place ciphertext on a tag
- *   mismatch.
+ *   disjoint from the text output. SIV associated data is disjoint from the
+ *   text output. A violation returns TC_ERROR before a write.
+ * - The key, and the nonce and AAD of GCM, CCM, EAX and EAX', may share
+ *   storage with the text output. Each is read in full before the first
+ *   output write.
+ * - The caller keeps the key, nonce, AAD, text input and received tag stable
+ *   for the duration of the call. GCM, CCM, EAX and EAX' decrypt read the
+ *   ciphertext twice, once to authenticate it and once to decrypt it.
+ * - TC_ERROR before any write: NULL key, NULL tag, NULL text or AAD with a
+ *   nonzero length, short text output, a forbidden overlap, a nonce or tag
+ *   length outside the mode's range, or a length above the mode's limit.
+ * - GCM, CCM, EAX and EAX' decrypt authenticate before writing plaintext.
+ *   SIV decrypt writes candidate plaintext and then recomputes the synthetic
+ *   IV over the AD and that plaintext (RFC 5297 section 2.7).
+ * - After the argument checks, every failure wipes input.length bytes of the
+ *   text output: TC_MISMATCH for a tag that fails to verify and TC_ERROR for
+ *   a cipher backend failure. In-place callers lose the input. The tag output
+ *   is written only on success.
  */
 
 #if TC_AES_ENABLE_GCM
@@ -176,14 +190,12 @@ struct TC_AES_GCM_ctx {
   uint8_t ghash_len;
   uint8_t tag_len; /* fixed for this key/context (SP 800-38D §5.2.1.2) */
   uint8_t phase;
-  uint8_t direction;
-  /* Streaming decryption authenticates contiguous caller-owned ciphertext. */
-  uint8_t aad_state[TC_AES_BLOCKLEN];
-  uint8_t* decrypt_buffer;
-  size_t decrypt_length;
 };
 
 /*
+ * Streaming GCM encryption. Decryption is one-shot only (TC_AES_GCM_decrypt)
+ * so the tag is verified before any plaintext is released.
+ *
  * Initialize GCM with a 12–16-byte tag. The explicit short-tag initializer
  * accepts 4 or 8 bytes under the SP 800-38D Appendix C packet limits.
  * Tag length is fixed for this context. IV may be any supported
@@ -194,21 +206,18 @@ TC_status TC_AES_GCM_init(struct TC_AES_GCM_ctx* ctx, const uint8_t* key, TC_byt
 TC_status TC_AES_GCM_init_short_tag(struct TC_AES_GCM_ctx* ctx, const uint8_t* key, TC_bytes iv,
                                     size_t tag_len);
 
-/* AAD must be supplied before the first encrypt/decrypt update. A context is
- * single-direction. Reinitialize before switching direction. Check every
- * return value. Decrypt updates authenticate contiguous slices of one mutable
- * ciphertext buffer. Keep it writable through finish. Finish rechecks each
- * ciphertext block before replacing it with plaintext. A changed buffer
- * returns TC_MISMATCH and is wiped. A bad tag leaves ciphertext unchanged. */
+/* AAD must be supplied before the first encrypt update. Check every return
+ * value. encrypt_update encrypts buf in place. Buffers must be disjoint from
+ * the context. Argument errors and exceeded length limits return TC_ERROR and
+ * leave buf and the context unchanged. A cipher backend failure wipes buf,
+ * clears the context and returns TC_ERROR. */
 TC_status TC_AES_GCM_aad_update(struct TC_AES_GCM_ctx* ctx, const uint8_t* aad, size_t length);
 TC_status TC_AES_GCM_encrypt_update(struct TC_AES_GCM_ctx* ctx, uint8_t* buf, size_t length);
-TC_status TC_AES_GCM_decrypt_update(struct TC_AES_GCM_ctx* ctx, uint8_t* buf, size_t length);
 
 /* Tag buffer must hold ctx->tag_len bytes (set at init). Finish consumes the
  * context and wipes it on success and on failure. Argument errors leave it
  * unchanged. */
 TC_status TC_AES_GCM_encrypt_finish(struct TC_AES_GCM_ctx* ctx, uint8_t* tag);
-TC_status TC_AES_GCM_decrypt_finish(struct TC_AES_GCM_ctx* ctx, const uint8_t* tag);
 
 /* One-shot GCM (SP 800-38D). Follows the one-shot AEAD contract above. */
 TC_status TC_AES_GCM_encrypt(const uint8_t* key, TC_bytes iv, TC_bytes aad, TC_bytes plaintext,
@@ -227,7 +236,10 @@ void TC_AES_GCM_clear(struct TC_AES_GCM_ctx* ctx);
 
 #if TC_AES_ENABLE_CCM
 
-/* CCM is a packet mode: payload and AAD lengths are known at entry. */
+/* CCM (SP 800-38C) is a packet mode. Payload and AAD lengths are known at
+ * entry. Follows the one-shot AEAD contract above. The nonce is 7..13 bytes
+ * and the tag 4, 6, 8, 10, 12, 14 or 16 bytes. The payload length must fit the
+ * 15 - nonce length byte length field. */
 TC_status TC_AES_CCM_encrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes plaintext,
                              TC_buffer ciphertext, TC_buffer tag);
 TC_status TC_AES_CCM_decrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes ciphertext,
@@ -237,11 +249,9 @@ TC_status TC_AES_CCM_decrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, T
 
 #if TC_AES_ENABLE_EAX
 
-/* EAX one-shot AEAD. Tags must be TC_AES_EAX_MIN_TAG_LEN..16. Other tag
- * lengths return TC_ERROR. TC_AES_EAX_MIN_TAG_LEN must be in 1..16. Auth
- * failure returns TC_MISMATCH and leaves a separate plaintext buffer
- * untouched. Any decrypt failure after argument checks wipes in-place
- * ciphertext. */
+/* EAX one-shot AEAD. Follows the one-shot AEAD contract above. Tags must be
+ * TC_AES_EAX_MIN_TAG_LEN..16. Other tag lengths return TC_ERROR.
+ * TC_AES_EAX_MIN_TAG_LEN must be in 1..16. The nonce may have any length. */
 TC_status TC_AES_EAX_encrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes plaintext,
                              TC_buffer ciphertext, TC_buffer tag);
 TC_status TC_AES_EAX_decrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes ciphertext,
@@ -253,9 +263,8 @@ TC_status TC_AES_EAX_decrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, T
 
 #define TC_AES_EAX_PRIME_TAG_LEN 4
 
-/* ANSI C12.22 EAX'. Fixed four-byte tag. Auth failure returns TC_MISMATCH
- * and leaves a separate plaintext buffer untouched. Any decrypt failure after
- * argument checks wipes in-place ciphertext. */
+/* ANSI C12.22 EAX'. Fixed four-byte tag. Follows the one-shot AEAD contract
+ * above. The cleartext header is authenticated and serves as the nonce. */
 TC_status TC_AES_EAX_PRIME_encrypt(const uint8_t* key, TC_bytes cleartext, TC_bytes plaintext,
                                    TC_buffer ciphertext, uint8_t tag[TC_AES_EAX_PRIME_TAG_LEN]);
 TC_status TC_AES_EAX_PRIME_decrypt(const uint8_t* key, TC_bytes cleartext, TC_bytes ciphertext,
@@ -319,12 +328,14 @@ void TC_AES_CMAC_ctx_clear(struct TC_AES_CMAC_ctx* ctx);
 #define TC_AES_SIV_MAX_AD 126u
 
 /*
- * One-shot SIV (RFC 5297). Associated data is a vector of 0..TC_AES_SIV_MAX_AD
- * spans (empty components are valid). Ciphertext length equals plaintext
- * length. Text buffers follow the one-shot AEAD contract. v may alias
- * plaintext when ciphertext is distinct and must be disjoint from ciphertext.
- * Any overlap between v and ciphertext returns TC_ERROR. Decrypt writes candidate plaintext, then
- * verifies. Authentication failure wipes the output.
+ * One-shot SIV (RFC 5297). Follows the one-shot AEAD contract above.
+ * Associated data is a vector of 0..TC_AES_SIV_MAX_AD spans (empty components
+ * are valid). Every AD span must be disjoint from the text output, because
+ * decrypt runs S2V over the AD after writing candidate plaintext. Ciphertext
+ * length equals plaintext length. v may alias plaintext when ciphertext is
+ * distinct. Any overlap between v and the text output returns TC_ERROR.
+ * Decrypt writes candidate plaintext, then verifies. A mismatch returns
+ * TC_MISMATCH and wipes the output.
  */
 TC_status TC_AES_SIV_encrypt(const uint8_t* key, const TC_bytes* ad, size_t ad_count,
                              TC_bytes plaintext, uint8_t v[TC_AES_SIV_V_LEN], TC_buffer ciphertext);

@@ -266,15 +266,14 @@ if (status == TC_MISMATCH)
   return status; /* in-place ciphertext has been wiped */
 ```
 
-Authentication checks examine the entire tag. One-shot GCM, CCM, and EAX
+Authentication checks examine the entire tag. GCM, CCM, EAX and EAX'
 decryptors authenticate before writing plaintext. SIV writes candidate
-plaintext to recompute its synthetic IV and wipes the output on a mismatch.
-Streaming GCM decryption authenticates a contiguous caller-owned
-ciphertext buffer during `TC_AES_GCM_decrypt_update`. The buffer remains
-ciphertext until `TC_AES_GCM_decrypt_finish` verifies the tag and decrypts it
-in place. Keep the buffer writable through finish. A tag mismatch leaves the
-ciphertext unchanged. Finish rechecks the ciphertext it decrypts. A buffer
-change after update returns `TC_MISMATCH` and wipes the buffer.
+plaintext to recompute its synthetic IV, so its associated data must be
+disjoint from the output. Every AEAD failure after the argument checks wipes
+the text output, separate or in-place. GCM decryption is one-shot. The
+streaming GCM context encrypts only. See the
+[AEAD contract](docs/api.md#authenticated-encryption) for overlap rules and
+error conditions.
 GCM requires a 12 to 16-byte tag by default. Use the explicit
 `TC_AES_GCM_init_short_tag` or one-shot `_short_tag` functions when a protocol
 requires a 4 or 8-byte tag. The GCM packet limits still apply.
