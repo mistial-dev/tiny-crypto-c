@@ -3,7 +3,7 @@
 #ifndef TC_PKI_OCTETS_INTERNAL_H_
 #define TC_PKI_OCTETS_INTERNAL_H_
 #include "pki_internal.h"
-#include "x509_path_internal.h"
+#include "pki_budget_internal.h"
 
 typedef TC_TLV_result (*tc_pki_octets_consume)(void* context, TC_bytes bytes);
 typedef struct {

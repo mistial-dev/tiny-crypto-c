@@ -178,15 +178,25 @@ static inline int tc_pki_date(unsigned year, unsigned month, unsigned day)
   return day <= days;
 }
 
+/* Named curves from RFC 5480 section 2.1.1.1, plus the Brainpool curves.
+ * X9.62 prime curves are 1.2.840.10045.3.1.{1 secp192r1, 7 secp256r1}. */
 static inline TC_EC_curve tc_pki_curve(TC_bytes oid, unsigned* bits)
 {
-  static const uint8_t p256[] = {0x2a, 0x86, 0x48, 0xce, 0x3d, 3, 1, 7};
+  static const uint8_t prime[] = {0x2a, 0x86, 0x48, 0xce, 0x3d, 3, 1};
   static const uint8_t sec[] = {0x2b, 0x81, 4, 0};
   static const uint8_t brainpool[] = {0x2b, 0x24, 3, 3, 2, 8, 1, 1};
   *bits = 0;
-  if (oid.length == sizeof p256 && !memcmp(oid.data, p256, sizeof p256)) {
-    *bits = 256;
-    return TC_EC_P256;
+  if (oid.length == sizeof prime + 1 && !memcmp(oid.data, prime, sizeof prime)) {
+    switch (oid.data[sizeof prime]) {
+    case 1:
+      *bits = 192;
+      return TC_EC_P192;
+    case 7:
+      *bits = 256;
+      return TC_EC_P256;
+    default:
+      break;
+    }
   }
   if (oid.length == 5 && !memcmp(oid.data, sec, sizeof sec)) {
     switch (oid.data[4]) {

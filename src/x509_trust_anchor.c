@@ -143,6 +143,7 @@ static TC_TLV_result cert_path_controls(TC_bytes contents, const TC_TLV_limits* 
       if (result != TC_TLV_OK)
         return result;
       out->policy_set = element.value;
+      out->replaced_controls |= TC_X509_ANCHOR_REPLACED_POLICY_SET;
       break;
     case 2:
       result = policy_flags(element.value, &out->policy_flags);
@@ -150,11 +151,13 @@ static TC_TLV_result cert_path_controls(TC_bytes contents, const TC_TLV_limits* 
         return result;
       if (!out->policy_set.data && (out->policy_flags & TC_X509_PATH_REQUIRE_EXPLICIT_POLICY))
         return TC_TLV_INVALID;
+      out->replaced_controls |= TC_X509_ANCHOR_REPLACED_POLICY_FLAGS;
       break;
     case 3:
       result = name_constraints(element.value, limits, workspace, &out->names);
       if (result != TC_TLV_OK)
         return result;
+      out->replaced_controls |= TC_X509_ANCHOR_REPLACED_NAMES;
       break;
     default: {
       uint32_t length;
@@ -163,6 +166,7 @@ static TC_TLV_result cert_path_controls(TC_bytes contents, const TC_TLV_limits* 
         return result;
       out->path_len = length;
       out->has_path_len = 1;
+      out->replaced_controls |= TC_X509_ANCHOR_REPLACED_PATH_LEN;
       break;
     }
     }

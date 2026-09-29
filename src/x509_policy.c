@@ -179,14 +179,12 @@ TC_TLV_result tc_x509_policy_graph_init(tc_x509_policy_graph* graph)
 }
 
 TC_TLV_result tc_x509_policy_graph_step(tc_x509_policy_graph* graph, const TC_bytes* policies,
-                                        size_t policy_count, const TC_X509_policy_mapping* mappings,
-                                        size_t mapping_count, int allow_any, int allow_mapping,
-                                        size_t* work)
+                                        size_t policy_count, int allow_any, size_t* work)
 {
   size_t i, j, previous;
   TC_TLV_result result;
   int any = 0;
-  if (!graph || !work || (policy_count && !policies) || (mapping_count && !mappings))
+  if (!graph || !work || (policy_count && !policies))
     return TC_TLV_ARGUMENT;
   if (graph->depth == SIZE_MAX)
     return TC_TLV_LIMIT;
@@ -198,14 +196,6 @@ TC_TLV_result tc_x509_policy_graph_step(tc_x509_policy_graph* graph, const TC_by
     result = tc_pki_work_charge(work, 1);
     if (result != TC_TLV_OK)
       return result;
-    for (j = 0; j < i; ++j) {
-      int same;
-      result = equal(policies[i], policies[j], work, &same);
-      if (result != TC_TLV_OK)
-        return result;
-      if (same)
-        return TC_TLV_INVALID;
-    }
     if (is_any(policies[i])) {
       any = 1;
       continue;
@@ -238,10 +228,7 @@ TC_TLV_result tc_x509_policy_graph_step(tc_x509_policy_graph* graph, const TC_by
         }
     }
   }
-  result = prune(graph, work);
-  if (result != TC_TLV_OK)
-    return result;
-  return tc_x509_policy_graph_map(graph, mappings, mapping_count, allow_mapping, work);
+  return prune(graph, work);
 }
 
 TC_TLV_result tc_x509_policy_graph_map(tc_x509_policy_graph* graph,
@@ -250,6 +237,7 @@ TC_TLV_result tc_x509_policy_graph_map(tc_x509_policy_graph* graph,
 {
   size_t i, j;
   TC_TLV_result result;
+  int deleted = 0;
   if (!graph || !work || (mapping_count && !mappings))
     return TC_TLV_ARGUMENT;
   for (i = 0; i < mapping_count; ++i) {
@@ -264,8 +252,10 @@ TC_TLV_result tc_x509_policy_graph_map(tc_x509_policy_graph* graph,
     if (result != TC_TLV_OK)
       return result;
     if (!allow_mapping) {
-      if (index != SIZE_MAX)
+      if (index != SIZE_MAX) {
         graph->nodes[index].alive = 0;
+        deleted = 1;
+      }
       continue;
     }
     if (index == SIZE_MAX) {
@@ -310,7 +300,8 @@ TC_TLV_result tc_x509_policy_graph_map(tc_x509_policy_graph* graph,
       ++graph->expected_count;
     }
   }
-  return prune(graph, work);
+  /* Added mappings keep every parent alive. Only deletions need a prune. */
+  return deleted ? prune(graph, work) : TC_TLV_OK;
 }
 static TC_TLV_result append_policy(TC_bytes oid, TC_bytes* output, size_t capacity, size_t* count,
                                    size_t* work)

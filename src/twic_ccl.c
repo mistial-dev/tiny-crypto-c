@@ -317,11 +317,11 @@ TC_TWIC_CCL_result TC_TWIC_CCL_store_publish(TC_TWIC_CCL_store* store, size_t re
                                              TC_TWIC_CCL_snapshot* slot)
 {
   TC_TWIC_CCL_snapshot* previous;
-  if (!store || !slot || !tc_pki_storage_separate(store, sizeof *store, slot, sizeof *slot))
+  if (!store || !slot)
     return TC_TWIC_CCL_ARGUMENT;
   previous = store->current;
-  if (previous && (!tc_pki_storage_separate(previous, sizeof *previous, store, sizeof *store) ||
-                   !tc_pki_storage_separate(previous, sizeof *previous, slot, sizeof *slot)))
+  if (!tc_snapshot_publish_separate(store, sizeof *store, slot, sizeof *slot, previous,
+                                    sizeof *previous))
     return TC_TWIC_CCL_ARGUMENT;
   /* State errors outrank staleness. */
   if (tc_snapshot_publish_check(slot->state, slot->readers, previous ? &previous->state : NULL) !=
@@ -347,8 +347,7 @@ TC_TWIC_CCL_result TC_TWIC_CCL_store_acquire(TC_TWIC_CCL_store* store, TC_TWIC_C
   TC_TWIC_CCL_snapshot* slot = store->current;
   if (!slot)
     return TC_TWIC_CCL_UNAVAILABLE;
-  if (!tc_pki_storage_separate(slot, sizeof *slot, out, sizeof *out) ||
-      !tc_pki_storage_separate(slot, sizeof *slot, store, sizeof *store))
+  if (!tc_snapshot_acquire_separate(store, sizeof *store, slot, sizeof *slot, out, sizeof *out))
     return TC_TWIC_CCL_ARGUMENT;
   TC_TWIC_CCL_result result = snapshot_result(tc_snapshot_acquire(slot->state, &slot->readers));
   if (result == TC_TWIC_CCL_OK)

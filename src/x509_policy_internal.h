@@ -17,10 +17,14 @@ typedef struct {
 /* Internal scratch storage. Inputs are decoded OIDs and must not overlap it.
  * On failure discard the graph. OID bytes remain borrowed from certificates. */
 TC_TLV_result tc_x509_policy_graph_init(tc_x509_policy_graph* graph);
+/* Process one certificate's policies (RFC 5280 section 6.1.3 (d)-(f)) and
+ * prune once. policies must be unique, which TC_X509_policy_next enforces
+ * when it decodes them. allow_any enables the anyPolicy expansion. */
 TC_TLV_result tc_x509_policy_graph_step(tc_x509_policy_graph* graph, const TC_bytes* policies,
-                                        size_t policy_count, const TC_X509_policy_mapping* mappings,
-                                        size_t mapping_count, int allow_any, int allow_mapping,
-                                        size_t* work);
+                                        size_t policy_count, int allow_any, size_t* work);
+/* Apply a CA certificate's policyMappings to the depth added by the last step
+ * (RFC 5280 section 6.1.4 (a)-(b)). With allow_mapping clear, mapped nodes
+ * are deleted and the graph is pruned again. No mappings charge no work. */
 TC_TLV_result tc_x509_policy_graph_map(tc_x509_policy_graph* graph,
                                        const TC_X509_policy_mapping* mappings, size_t mapping_count,
                                        int allow_mapping, size_t* work);

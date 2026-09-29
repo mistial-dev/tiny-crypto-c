@@ -120,7 +120,8 @@ typedef struct {
 TC_TWIC_CCL_result TC_TWIC_CCL_check_freshness(const TC_TWIC_CCL_metadata* metadata,
                                                const TC_TWIC_CCL_freshness_policy* policy);
 
-/* Zero-initialize stores and slots. These fields are managed by the API. */
+/* Zero-initialize stores and slots. These fields are managed by the API.
+ * state follows the TC_snapshot_state lifecycle in snapshot.h. */
 typedef struct {
   TC_TWIC_CCL_index index;
   TC_TWIC_CCL_metadata metadata;
@@ -133,16 +134,21 @@ typedef struct {
 } TC_TWIC_CCL_store;
 
 /* Serialize store and snapshot operations with the application's lock. Keep
- * store, slots, inputs and outputs disjoint. Keep backing keys/context stable
+ * store, slots, inputs and outputs disjoint. publish and acquire check the
+ * store, the published slot and their arguments for overlap and return
+ * ARGUMENT unchanged when they overlap. Keep backing keys/context stable
  * until their slot becomes FREE. A prepared index must represent a completed,
  * authenticated import with metadata bound to that image. */
 TC_TWIC_CCL_result TC_TWIC_CCL_store_prepare(TC_TWIC_CCL_snapshot* slot,
                                              const TC_TWIC_CCL_index* index,
                                              const TC_TWIC_CCL_metadata* metadata);
 TC_TWIC_CCL_result TC_TWIC_CCL_store_discard(TC_TWIC_CCL_snapshot* slot);
-/* Persist the image and rollback floor before publication. Reject stale store
- * revisions and publication dates older than the current snapshot. Failures
- * preserve the active list and leave the proposed slot prepared. */
+/* Persist the image and rollback floor before publication. revision must
+ * equal store->revision. A slot that is not PREPARED, has readers, or follows
+ * a current slot that is not CURRENT returns ARGUMENT. A publication date
+ * older than the current snapshot's returns STALE. A stale revision returns
+ * INVALID, and exhausted revision space returns LIMIT. Failures preserve the
+ * active list and leave the proposed slot prepared. */
 TC_TWIC_CCL_result TC_TWIC_CCL_store_publish(TC_TWIC_CCL_store* store, size_t revision,
                                              TC_TWIC_CCL_snapshot* slot);
 /* Acquire returns UNAVAILABLE when no list is published. Each successful

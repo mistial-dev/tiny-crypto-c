@@ -23,7 +23,9 @@ that share scratch. Neither scratch nor metadata may overlap input or the
 work counter.
 
 The provider hashes message segments in order without copying their contents.
-It supports DER ECDSA signatures and RSA PKCS#1 v1.5/PSS. PSS-only keys cannot
+It supports DER ECDSA signatures on the enabled P-192, P-256 and P-384 curves
+and RSA PKCS#1 v1.5/PSS. A key on a disabled or unidentified curve returns
+`TC_X509_SIGNATURE_UNSUPPORTED`. PSS-only keys cannot
 verify v1.5 signatures. When PSS key parameters are present, signature hash
 and MGF hash must match them, and the salt length must meet the key's minimum.
 

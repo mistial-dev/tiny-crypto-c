@@ -353,6 +353,18 @@ static MunitResult policy_controls(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+/* One intermediate certificate's policy processing: RFC 5280 section 6.1.3
+ * (d)-(f) through graph_step, then section 6.1.4 (a)-(b) through graph_map. */
+static TC_TLV_result policy_certificate(tc_x509_policy_graph* graph, const TC_bytes* policies,
+                                        size_t policy_count, const TC_X509_policy_mapping* mappings,
+                                        size_t mapping_count, int allow_mapping, size_t* work)
+{
+  TC_TLV_result result = tc_x509_policy_graph_step(graph, policies, policy_count, 1, work);
+  if (result != TC_TLV_OK)
+    return result;
+  return tc_x509_policy_graph_map(graph, mappings, mapping_count, allow_mapping, work);
+}
+
 static MunitResult policy_graph(const MunitParameter params[], void* user)
 {
   const uint8_t oid_bytes[][2] = {{0x2a, 1}, {0x2a, 2}, {0x2a, 3}};
@@ -368,10 +380,8 @@ static MunitResult policy_graph(const MunitParameter params[], void* user)
   (void)params;
   (void)user;
   munit_assert_int(tc_x509_policy_graph_init(&graph), ==, TC_TLV_OK);
-  munit_assert_int(tc_x509_policy_graph_step(&graph, policies, 2, mappings, 2, 1, 1, &work), ==,
-                   TC_TLV_OK);
-  munit_assert_int(tc_x509_policy_graph_step(&graph, policies + 2, 1, NULL, 0, 1, 1, &work), ==,
-                   TC_TLV_OK);
+  munit_assert_int(policy_certificate(&graph, policies, 2, mappings, 2, 1, &work), ==, TC_TLV_OK);
+  munit_assert_int(tc_x509_policy_graph_step(&graph, policies + 2, 1, 1, &work), ==, TC_TLV_OK);
   munit_assert_size(graph.node_count, ==, 4);
   munit_assert_size(graph.edge_count, ==, 4);
   munit_assert_size(edges[2].child, ==, 3);
@@ -385,35 +395,30 @@ static MunitResult policy_graph(const MunitParameter params[], void* user)
     TC_TLV_result result;
     work = budget;
     munit_assert_int(tc_x509_policy_graph_init(&graph), ==, TC_TLV_OK);
-    result = tc_x509_policy_graph_step(&graph, policies, 2, mappings, 2, 1, 1, &work);
+    result = policy_certificate(&graph, policies, 2, mappings, 2, 1, &work);
     if (result == TC_TLV_OK)
-      result = tc_x509_policy_graph_step(&graph, policies + 2, 1, NULL, 0, 1, 1, &work);
+      result = tc_x509_policy_graph_step(&graph, policies + 2, 1, 1, &work);
     munit_assert_int(result, ==, TC_TLV_LIMIT);
   }
   work = required;
   munit_assert_int(tc_x509_policy_graph_init(&graph), ==, TC_TLV_OK);
-  munit_assert_int(tc_x509_policy_graph_step(&graph, policies, 2, mappings, 2, 1, 1, &work), ==,
-                   TC_TLV_OK);
-  munit_assert_int(tc_x509_policy_graph_step(&graph, policies + 2, 1, NULL, 0, 1, 1, &work), ==,
-                   TC_TLV_OK);
+  munit_assert_int(policy_certificate(&graph, policies, 2, mappings, 2, 1, &work), ==, TC_TLV_OK);
+  munit_assert_int(tc_x509_policy_graph_step(&graph, policies + 2, 1, 1, &work), ==, TC_TLV_OK);
   munit_assert_size(work, ==, 0);
   work = 100000;
   munit_assert_int(tc_x509_policy_graph_init(&graph), ==, TC_TLV_OK);
-  munit_assert_int(tc_x509_policy_graph_step(&graph, policies, 2, mappings, 2, 1, 0, &work), ==,
-                   TC_TLV_OK);
+  munit_assert_int(policy_certificate(&graph, policies, 2, mappings, 2, 0, &work), ==, TC_TLV_OK);
   for (i = 0; i < graph.node_count; ++i)
     munit_assert_int(nodes[i].alive, ==, 0);
-  munit_assert_int(tc_x509_policy_graph_step(&graph, &any, 1, NULL, 0, 1, 1, &work), ==, TC_TLV_OK);
+  munit_assert_int(tc_x509_policy_graph_step(&graph, &any, 1, 1, &work), ==, TC_TLV_OK);
   munit_assert_size(graph.node_count, ==, 3);
   munit_assert_int(tc_x509_policy_graph_init(&graph), ==, TC_TLV_OK);
-  munit_assert_int(tc_x509_policy_graph_step(&graph, &any, 1, NULL, 0, 0, 1, &work), ==, TC_TLV_OK);
+  munit_assert_int(tc_x509_policy_graph_step(&graph, &any, 1, 0, &work), ==, TC_TLV_OK);
   munit_assert_int(nodes[0].alive, ==, 0);
   munit_assert_int(tc_x509_policy_graph_init(&graph), ==, TC_TLV_OK);
-  munit_assert_int(tc_x509_policy_graph_step(&graph, &any, 1, mappings, 1, 1, 1, &work), ==,
-                   TC_TLV_OK);
+  munit_assert_int(policy_certificate(&graph, &any, 1, mappings, 1, 1, &work), ==, TC_TLV_OK);
   munit_assert_size(graph.node_count, ==, 3);
-  munit_assert_int(tc_x509_policy_graph_step(&graph, policies + 2, 1, NULL, 0, 1, 1, &work), ==,
-                   TC_TLV_OK);
+  munit_assert_int(tc_x509_policy_graph_step(&graph, policies + 2, 1, 1, &work), ==, TC_TLV_OK);
   munit_assert_size(graph.edge_count, ==, 3);
   munit_assert_int(nodes[1].alive, ==, 0);
   munit_assert_int(nodes[2].alive, ==, 1);
@@ -424,32 +429,27 @@ static MunitResult policy_graph(const MunitParameter params[], void* user)
     graph.expected_capacity = i == 2 ? 1 : 64;
     work = 100000;
     munit_assert_int(tc_x509_policy_graph_init(&graph), ==, TC_TLV_OK);
-    munit_assert_int(tc_x509_policy_graph_step(&graph, policies, 2, mappings, 2, 1, 1, &work), ==,
+    munit_assert_int(policy_certificate(&graph, policies, 2, mappings, 2, 1, &work), ==,
                      TC_TLV_LIMIT);
   }
   graph.node_capacity = 32;
   graph.edge_capacity = graph.expected_capacity = 64;
   work = 100000;
   munit_assert_int(tc_x509_policy_graph_init(&graph), ==, TC_TLV_OK);
-  munit_assert_int(tc_x509_policy_graph_step(&graph, policies, 2, mappings, 2, 1, 1, &work), ==,
-                   TC_TLV_OK);
-  munit_assert_int(tc_x509_policy_graph_step(&graph, &any, 1, NULL, 0, 1, 1, &work), ==, TC_TLV_OK);
+  munit_assert_int(policy_certificate(&graph, policies, 2, mappings, 2, 1, &work), ==, TC_TLV_OK);
+  munit_assert_int(tc_x509_policy_graph_step(&graph, &any, 1, 1, &work), ==, TC_TLV_OK);
   munit_assert_size(graph.node_count, ==, 4);
   munit_assert_size(graph.edge_count, ==, 4);
   munit_assert_memory_equal(2, nodes[3].oid.data, policies[2].data);
   {
-    TC_bytes duplicate[] = {policies[0], policies[0]};
     TC_X509_policy_mapping invalid = {any, policies[0]};
     munit_assert_int(tc_x509_policy_graph_init(&graph), ==, TC_TLV_OK);
-    munit_assert_int(tc_x509_policy_graph_step(&graph, duplicate, 2, NULL, 0, 1, 1, &work), ==,
-                     TC_TLV_INVALID);
-    munit_assert_int(tc_x509_policy_graph_init(&graph), ==, TC_TLV_OK);
-    munit_assert_int(tc_x509_policy_graph_step(&graph, policies, 2, &invalid, 1, 1, 1, &work), ==,
+    munit_assert_int(policy_certificate(&graph, policies, 2, &invalid, 1, 1, &work), ==,
                      TC_TLV_INVALID);
     invalid.issuer_policy = policies[0];
     invalid.subject_policy = any;
     munit_assert_int(tc_x509_policy_graph_init(&graph), ==, TC_TLV_OK);
-    munit_assert_int(tc_x509_policy_graph_step(&graph, policies, 2, &invalid, 1, 1, 1, &work), ==,
+    munit_assert_int(policy_certificate(&graph, policies, 2, &invalid, 1, 1, &work), ==,
                      TC_TLV_INVALID);
   }
   {
@@ -460,11 +460,20 @@ static MunitResult policy_graph(const MunitParameter params[], void* user)
     work = 1000000;
     munit_assert_int(tc_x509_policy_graph_init(&graph), ==, TC_TLV_OK);
     for (i = 0; i < 8; ++i)
-      munit_assert_int(tc_x509_policy_graph_step(&graph, policies, 2, cross, 4, 1, 1, &work), ==,
-                       TC_TLV_OK);
+      munit_assert_int(policy_certificate(&graph, policies, 2, cross, 4, 1, &work), ==, TC_TLV_OK);
     munit_assert_size(graph.node_count, ==, 17);
     munit_assert_size(graph.edge_count, ==, 30);
     munit_assert_size(graph.expected_count, ==, 32);
+  }
+  /* A map step without mappings changes nothing and charges no work. Each
+   * certificate then pays for one prune. */
+  {
+    const size_t before = work = 1000;
+    munit_assert_int(tc_x509_policy_graph_init(&graph), ==, TC_TLV_OK);
+    munit_assert_int(tc_x509_policy_graph_step(&graph, policies, 2, 1, &work), ==, TC_TLV_OK);
+    const size_t step_work = before - work;
+    munit_assert_int(tc_x509_policy_graph_map(&graph, NULL, 0, 1, &work), ==, TC_TLV_OK);
+    munit_assert_size(before - work, ==, step_work);
   }
   return MUNIT_OK;
 }

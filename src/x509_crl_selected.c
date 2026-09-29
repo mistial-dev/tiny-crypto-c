@@ -6,6 +6,7 @@
 #include <tiny_crypto/common.h>
 #if TC_ENABLE_X509_REVOCATION
 #include "x509_crl_internal.h"
+#include "x509_path_internal.h"
 #include "pki_status_internal.h"
 #include "pki_source_internal.h"
 #include "pki_signature_internal.h"

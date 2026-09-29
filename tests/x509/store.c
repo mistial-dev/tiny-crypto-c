@@ -29,21 +29,21 @@ static MunitResult lifecycle(const MunitParameter params[], void* user)
   munit_assert_int(TC_X509_store_publish(&store, 1, &slots[1]), ==, TC_TLV_OK);
   munit_assert_ptr_equal(store.current, &slots[1]);
   munit_assert_ptr_equal(reader->source.context, &first_context);
-  munit_assert_int(reader->state, ==, TC_X509_SNAPSHOT_RETIRED);
+  munit_assert_int(reader->state, ==, TC_SNAPSHOT_RETIRED);
   munit_assert_int(TC_X509_store_prepare(reader, &second), ==, TC_TLV_LIMIT);
   munit_assert_int(TC_X509_store_release(reader), ==, TC_TLV_OK);
-  munit_assert_int(reader->state, ==, TC_X509_SNAPSHOT_RETIRED);
+  munit_assert_int(reader->state, ==, TC_SNAPSHOT_RETIRED);
   munit_assert_int(TC_X509_store_release(other), ==, TC_TLV_OK);
-  munit_assert_int(slots[0].state, ==, TC_X509_SNAPSHOT_FREE);
+  munit_assert_int(slots[0].state, ==, TC_SNAPSHOT_FREE);
   munit_assert_null(slots[0].source.context);
   munit_assert_int(TC_X509_store_release(other), ==, TC_TLV_ARGUMENT);
   munit_assert_int(TC_X509_store_acquire(&store, &reader), ==, TC_TLV_OK);
   munit_assert_ptr_equal(reader->source.context, &second_context);
   munit_assert_int(TC_X509_store_release(reader), ==, TC_TLV_OK);
-  munit_assert_int(reader->state, ==, TC_X509_SNAPSHOT_CURRENT);
+  munit_assert_int(reader->state, ==, TC_SNAPSHOT_CURRENT);
   munit_assert_int(TC_X509_store_prepare(&slots[0], &first), ==, TC_TLV_OK);
   munit_assert_int(TC_X509_store_publish(&store, 2, &slots[0]), ==, TC_TLV_OK);
-  munit_assert_int(slots[1].state, ==, TC_X509_SNAPSHOT_FREE);
+  munit_assert_int(slots[1].state, ==, TC_SNAPSHOT_FREE);
   return MUNIT_OK;
 }
 
@@ -72,7 +72,7 @@ static MunitResult failures(const MunitParameter params[], void* user)
   store.revision = SIZE_MAX;
   munit_assert_int(TC_X509_store_publish(&store, SIZE_MAX, &slots[0]), ==, TC_TLV_LIMIT);
   munit_assert_null(store.current);
-  munit_assert_int(slots[0].state, ==, TC_X509_SNAPSHOT_PREPARED);
+  munit_assert_int(slots[0].state, ==, TC_SNAPSHOT_PREPARED);
   store.revision = 0;
   munit_assert_int(TC_X509_store_publish(&store, 0, &slots[0]), ==, TC_TLV_OK);
   munit_assert_int(TC_X509_store_discard(&slots[0]), ==, TC_TLV_ARGUMENT);
@@ -85,8 +85,28 @@ static MunitResult failures(const MunitParameter params[], void* user)
   munit_assert_ptr_equal(store.current, &slots[0]);
   munit_assert_size(slots[0].readers, ==, 0);
   munit_assert_int(TC_X509_store_prepare(&slots[1], &slots[1].source), ==, TC_TLV_ARGUMENT);
-  munit_assert_int(slots[1].state, ==, TC_X509_SNAPSHOT_FREE);
+  munit_assert_int(slots[1].state, ==, TC_SNAPSHOT_FREE);
   munit_assert_int(TC_X509_store_publish(&store, 1, &slots[0]), ==, TC_TLV_ARGUMENT);
+  /* A published slot that overlaps the store is rejected before any state
+   * change, as in the TWIC CCL store. */
+  {
+    union {
+      TC_X509_store store;
+      TC_X509_store_snapshot slot;
+    } shared;
+    TC_X509_store_snapshot next = {0}, saved_next, *held = &slots[1];
+    memset(&shared, 0, sizeof shared);
+    shared.store.current = &shared.slot;
+    shared.slot.state = TC_SNAPSHOT_CURRENT;
+    munit_assert_int(TC_X509_store_prepare(&next, &source), ==, TC_TLV_OK);
+    saved_next = next;
+    munit_assert_int(TC_X509_store_publish(&shared.store, 0, &next), ==, TC_TLV_ARGUMENT);
+    munit_assert_memory_equal(sizeof next, &next, &saved_next);
+    munit_assert_ptr_equal(shared.store.current, &shared.slot);
+    munit_assert_int(TC_X509_store_acquire(&shared.store, &held), ==, TC_TLV_ARGUMENT);
+    munit_assert_ptr_equal(held, &slots[1]);
+    munit_assert_ptr_equal(shared.store.current, &shared.slot);
+  }
   munit_assert_int(TC_X509_store_prepare(NULL, &source), ==, TC_TLV_ARGUMENT);
   munit_assert_int(TC_X509_store_prepare(&slots[1], NULL), ==, TC_TLV_ARGUMENT);
   munit_assert_int(TC_X509_store_acquire(NULL, &reader), ==, TC_TLV_ARGUMENT);

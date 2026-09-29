@@ -173,6 +173,137 @@ static void check_certificate_controls(const char* profile, const TC_bytes* chai
                    ==, TC_X509_PATH_INVALID);
 }
 
+/* Append value to out at *length. */
+static void append(uint8_t* out, size_t* length, TC_bytes value)
+{
+  munit_assert_size(value.length, <=, FILE_CAPACITY - *length);
+  memcpy(out + *length, value.data, value.length);
+  *length += value.length;
+}
+
+/* TrustAnchorList with one TrustAnchorInfo for root (RFC 5914 section 2).
+ * CertPathControls embeds root with extension appended to its extensions,
+ * followed by the encoded fields in controls. The embedded signature no
+ * longer matches, and the reader does not verify it. */
+static TC_bytes anchor_list_with(uint8_t* out, const TC_X509_certificate* root, TC_bytes key_id,
+                                 TC_bytes extension, TC_bytes controls, const TC_TLV_limits* limits)
+{
+  static uint8_t body[FILE_CAPACITY], part[FILE_CAPACITY];
+  TC_TLV_element certificate, tbs, extensions, child;
+  TC_TLV_reader fields;
+  size_t length = 0, part_length = 0;
+  munit_assert_int(
+      TC_TLV_read(root->encoded.data, root->encoded.length, TC_TLV_DER, limits, &certificate), ==,
+      TC_TLV_OK);
+  munit_assert_int(TC_TLV_read(root->tbs.data, root->tbs.length, TC_TLV_DER, limits, &tbs), ==,
+                   TC_TLV_OK);
+  munit_assert_int(
+      TC_TLV_read(root->extensions.data, root->extensions.length, TC_TLV_DER, limits, &extensions),
+      ==, TC_TLV_OK);
+  /* TBSCertificate fields before extensions [3], then the extended list. */
+  munit_assert_int(
+      TC_TLV_reader_init(&fields, tbs.value.data, tbs.value.length, TC_TLV_DER, limits), ==,
+      TC_TLV_OK);
+  while (TC_TLV_next(&fields, &child) == TC_TLV_OK && child.header.tag[0] != 0xa3)
+    append(body, &length, child.encoded);
+  append(part, &part_length, extensions.value);
+  append(part, &part_length, extension);
+  part_length = der(part, 0x30, part, part_length);
+  part_length = der(part, 0xa3, part, part_length);
+  append(body, &length, (TC_bytes){part, part_length});
+  length = der(body, 0x30, body, length);
+  /* signatureAlgorithm and signatureValue follow the TBSCertificate. */
+  append(body, &length,
+         (TC_bytes){root->tbs.data + root->tbs.length,
+                    (size_t)(certificate.value.data + certificate.value.length -
+                             (root->tbs.data + root->tbs.length))});
+  length = der(body, 0xa0, body, length);
+  part_length = 0;
+  append(part, &part_length, root->subject);
+  append(part, &part_length, (TC_bytes){body, length});
+  append(part, &part_length, controls);
+  part_length = der(part, 0x30, part, part_length);
+  length = 0;
+  append(body, &length, root->spki);
+  length += der(body + length, 0x04, key_id.data, key_id.length);
+  append(body, &length, (TC_bytes){part, part_length});
+  length = der(body, 0x30, body, length);
+  length = der(body, 0xa2, body, length);
+  length = der(body, 0x30, body, length);
+  memcpy(out, body, length);
+  return (TC_bytes){out, length};
+}
+
+/* RFC 5914 section 2.5: CertPathControls policyFlags replace the embedded
+ * certificate's policyConstraints and inhibitAnyPolicy, even when they clear
+ * a flag the certificate sets. The record marks the replacement, so the
+ * certificate control is neither enforced nor reported as dropped. */
+static void check_replaced_controls(const TC_bytes* chain, const TC_bytes encoded_root,
+                                    const TC_X509_path_options* options,
+                                    const TC_X509_path_workspace* workspace)
+{
+  static const uint8_t explicit_policy[] = {0x30, 3, 0x80, 1, 0};
+  static const uint8_t inhibit_any[] = {2, 1, 0};
+  static const uint8_t cleared_flags[] = {0x82, 1, 0};
+  static uint8_t list[FILE_CAPACITY];
+  const TC_TLV_limits limits = options->parsing;
+  TC_TLV_frame frames[32];
+  TC_bytes oids[32];
+  TC_X509_workspace parser = {frames, 32, oids, 32};
+  TC_X509_certificate root;
+  TC_X509_store_anchor built, anchor;
+  TC_X509_path_result result;
+  TC_TLV_reader reader;
+  uint8_t extension[64];
+  munit_assert_int(TC_X509_read(encoded_root.data, encoded_root.length, &limits, &parser, &root),
+                   ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_store_anchor_from_certificate(&root, &limits, &parser, &built), ==,
+                   TC_TLV_OK);
+  const struct {
+    unsigned id;
+    const uint8_t* value;
+    size_t length;
+    unsigned flag;
+  } controls[] = {
+      {36, explicit_policy, sizeof explicit_policy, TC_X509_PATH_REQUIRE_EXPLICIT_POLICY},
+      {54, inhibit_any, sizeof inhibit_any, TC_X509_PATH_INHIBIT_ANY_POLICY}};
+  for (size_t i = 0; i < sizeof controls / sizeof *controls; ++i) {
+    const TC_bytes control = {extension, critical_extension(extension, controls[i].id,
+                                                            controls[i].value, controls[i].length)};
+    for (int replaced = 0; replaced < 2; ++replaced) {
+      const TC_bytes fields =
+          replaced ? (TC_bytes){cleared_flags, sizeof cleared_flags} : (TC_bytes){NULL, 0};
+      const TC_bytes encoded =
+          anchor_list_with(list, &root, built.key_id, control, fields, &limits);
+      munit_assert_int(
+          TC_X509_trust_anchor_list_init(&reader, encoded.data, encoded.length, &limits, &parser),
+          ==, TC_TLV_OK);
+      munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &parser, &anchor), ==,
+                       TC_TLV_OK);
+      if (replaced) {
+        munit_assert_uint(anchor.policy_flags, ==, 0);
+        munit_assert_uint(anchor.replaced_controls, ==, TC_X509_ANCHOR_REPLACED_POLICY_FLAGS);
+        munit_assert_int(
+            TC_X509_path_validate_with_anchor(chain, 2, &anchor, options, workspace, &result), ==,
+            TC_X509_PATH_VALID);
+        /* A caller-built record without the marker keeps the certificate
+         * control unenforced, so it fails closed. */
+        anchor.replaced_controls = 0;
+        munit_assert_int(
+            TC_X509_path_validate_with_anchor(chain, 2, &anchor, options, workspace, &result), ==,
+            TC_X509_PATH_UNSUPPORTED);
+        anchor.replaced_controls = 1u << 4;
+        munit_assert_int(
+            TC_X509_path_validate_with_anchor(chain, 2, &anchor, options, workspace, &result), ==,
+            TC_X509_PATH_ERROR);
+      } else {
+        munit_assert_uint(anchor.policy_flags, ==, controls[i].flag);
+        munit_assert_uint(anchor.replaced_controls, ==, 0);
+      }
+    }
+  }
+}
+
 static void check_profile(const char* profile)
 {
   const TC_TLV_limits limits = {FILE_CAPACITY, FILE_CAPACITY, 512, 16};
@@ -290,6 +421,8 @@ static void check_profile(const char* profile)
                                                      &storage.path.validation, &result),
                    ==, TC_X509_PATH_UNSUPPORTED);
   check_certificate_controls(profile, chain, &anchor, &options, &storage.path.validation);
+  check_replaced_controls(chain, fixture(profile, "root.der", root_der), &options,
+                          &storage.path.validation);
   options_anchor[0] = anchor;
   options_anchor[0].has_path_len = 1;
   options_anchor[0].path_len = 0;

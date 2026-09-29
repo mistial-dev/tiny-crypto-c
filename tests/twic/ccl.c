@@ -730,6 +730,25 @@ static MunitResult test_snapshot_failures(const MunitParameter params[], void* u
   munit_assert_int(listed, ==, 42);
   munit_assert_int(TC_TWIC_CCL_store_release(reader), ==, TC_TWIC_CCL_OK);
   munit_assert_int(TC_TWIC_CCL_store_release(reader), ==, TC_TWIC_CCL_ARGUMENT);
+  /* A published slot that overlaps the store is rejected before any state
+   * change, as in the X.509 store. */
+  {
+    union {
+      TC_TWIC_CCL_store store;
+      TC_TWIC_CCL_snapshot slot;
+    } shared;
+    TC_TWIC_CCL_snapshot next = {0}, saved_next, *held = &slot;
+    memset(&shared, 0, sizeof shared);
+    shared.store.current = &shared.slot;
+    shared.slot.state = TC_SNAPSHOT_CURRENT;
+    munit_assert_int(TC_TWIC_CCL_store_prepare(&next, &index, &metadata), ==, TC_TWIC_CCL_OK);
+    saved_next = next;
+    munit_assert_int(TC_TWIC_CCL_store_publish(&shared.store, 0, &next), ==, TC_TWIC_CCL_ARGUMENT);
+    munit_assert_memory_equal(sizeof next, &next, &saved_next);
+    munit_assert_ptr_equal(shared.store.current, &shared.slot);
+    munit_assert_int(TC_TWIC_CCL_store_acquire(&shared.store, &held), ==, TC_TWIC_CCL_ARGUMENT);
+    munit_assert_ptr_equal(held, &slot);
+  }
   munit_assert_int(TC_TWIC_CCL_store_prepare(NULL, &index, &metadata), ==, TC_TWIC_CCL_ARGUMENT);
   munit_assert_int(TC_TWIC_CCL_store_discard(NULL), ==, TC_TWIC_CCL_ARGUMENT);
   munit_assert_int(TC_TWIC_CCL_store_release(NULL), ==, TC_TWIC_CCL_ARGUMENT);

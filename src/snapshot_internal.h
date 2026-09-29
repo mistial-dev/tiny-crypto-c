@@ -4,6 +4,29 @@
 #define TC_SNAPSHOT_INTERNAL_H_
 #include <tiny_crypto/snapshot.h>
 #include <tiny_crypto/tlv.h>
+#include "internal.h"
+
+/* Separation checks shared by the snapshot stores. Store and slot objects
+ * must not overlap, so a state change through one pointer never rewrites
+ * another. current is the store's published slot and may be NULL. */
+static inline int tc_snapshot_publish_separate(const void* store, size_t store_size,
+                                               const void* slot, size_t slot_size,
+                                               const void* current, size_t current_size)
+{
+  return tc_internal_ranges_disjoint(store, store_size, slot, slot_size) &&
+         (!current || (tc_internal_ranges_disjoint(current, current_size, store, store_size) &&
+                       tc_internal_ranges_disjoint(current, current_size, slot, slot_size)));
+}
+
+/* current is the non-NULL published slot. out receives the acquired slot. */
+static inline int tc_snapshot_acquire_separate(const void* store, size_t store_size,
+                                               const void* current, size_t current_size,
+                                               const void* out, size_t out_size)
+{
+  return tc_internal_ranges_disjoint(store, store_size, out, out_size) &&
+         tc_internal_ranges_disjoint(current, current_size, out, out_size) &&
+         tc_internal_ranges_disjoint(current, current_size, store, store_size);
+}
 
 /* Callers validate storage and domain-specific payloads before changing state.
  * Reclaim payloads after a successful transition to FREE. */

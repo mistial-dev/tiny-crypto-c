@@ -2,7 +2,9 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #ifndef TC_PKI_CANDIDATE_INTERNAL_H_
 #define TC_PKI_CANDIDATE_INTERNAL_H_
-#include "x509_path_internal.h"
+#include <tiny_crypto/x509_path.h>
+#include "pki_budget_internal.h"
+#include "x509_path_status_internal.h"
 #include "pki_tree_internal.h"
 #include "pki_source_internal.h"
 

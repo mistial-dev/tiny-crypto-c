@@ -365,7 +365,7 @@ static void snapshot_discovery(TC_bytes target, const TC_X509_store_source* sour
       TC_X509_path_build(target, &current->source, &bounded, workspace, &search, &result), ==,
       TC_X509_PATH_INVALID);
   munit_assert_memory_equal(sizeof result, &result, &saved);
-  munit_assert_int(held->state, ==, TC_X509_SNAPSHOT_RETIRED);
+  munit_assert_int(held->state, ==, TC_SNAPSHOT_RETIRED);
   munit_assert_int(TC_X509_path_build(target, &held->source, &bounded, workspace, &search, &result),
                    ==, TC_X509_PATH_VALID);
   munit_assert_ptr_equal(result.validation.public_key.key.data, retained_key.data);
@@ -373,7 +373,7 @@ static void snapshot_discovery(TC_bytes target, const TC_X509_store_source* sour
   munit_assert_int(TC_X509_store_prepare(held, source), ==, TC_TLV_LIMIT);
   munit_assert_int(TC_X509_store_release(current), ==, TC_TLV_OK);
   munit_assert_int(TC_X509_store_release(held), ==, TC_TLV_OK);
-  munit_assert_int(slots[0].state, ==, TC_X509_SNAPSHOT_FREE);
+  munit_assert_int(slots[0].state, ==, TC_SNAPSHOT_FREE);
 }
 
 static void alternate_issuers(X509* const certs[4], EVP_PKEY* const keys[4], const EVP_MD* digest,

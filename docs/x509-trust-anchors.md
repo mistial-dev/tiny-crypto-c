@@ -94,10 +94,17 @@ nameConstraints without subtrees in `names`, certificatePolicies without
 policy flag, and a basicConstraints pathLen without `has_path_len`.
 
 For `TrustAnchorInfo`, its path-control fields take precedence over matching
-extensions in its embedded certificate (RFC 5914 section 2.5). The record
-keeps no marker for a replaced certificate control. A `policyFlags` field that
-clears a flag set by the embedded certificate's policyConstraints or
-inhibitAnyPolicy therefore makes validation return
+extensions in its embedded certificate (RFC 5914 section 2.5). The reader
+records each `CertPathControls` field it applied in `replaced_controls`:
+`TC_X509_ANCHOR_REPLACED_POLICY_SET` for policySet,
+`TC_X509_ANCHOR_REPLACED_POLICY_FLAGS` for policyFlags,
+`TC_X509_ANCHOR_REPLACED_NAMES` for nameConstr and
+`TC_X509_ANCHOR_REPLACED_PATH_LEN` for pathLenConstraint. Validation then
+uses the record field in place of the matching `certificate_extensions`
+control. A `policyFlags` field that clears a flag set by the embedded
+certificate's policyConstraints or inhibitAnyPolicy therefore validates with
+the cleared flag. A caller-built record sets a bit only when its field holds
+the replacing value. Without the bit, the same record returns
 `TC_X509_PATH_UNSUPPORTED`. The `CertPathControls` values are always
 enforced. A basicConstraints pathLen in `exts` can only lower
 `pathLenConstraint`, so the reader keeps the smaller value. A caller-built

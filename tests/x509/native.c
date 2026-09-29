@@ -290,11 +290,61 @@ static MunitResult paths(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+/* The SPKI decoder maps secp192r1, so the native provider reaches its P-192
+ * branch. Builds without P-192 report UNSUPPORTED. */
+static MunitResult p192_signature(const MunitParameter params[], void* user)
+{
+  static const uint8_t ecdsa_sha256[] = {0x2a, 0x86, 0x48, 0xce, 0x3d, 4, 3, 2};
+  uint8_t message[] = {'a', 'b', 'c'}, spki[128], signature[64];
+  TC_ECDSA_workspace ec;
+  TC_X509_native_workspace scratch = {&ec, NULL, TC_X509_NATIVE_DEFAULT_SIGNATURE_WORK};
+  TC_X509_signature_provider provider = TC_X509_native_provider(&scratch);
+  const TC_DER_algorithm algorithm = {{ecdsa_sha256, sizeof ecdsa_sha256}, {NULL, 0}};
+  EVP_PKEY* generated = EVP_EC_gen("prime192v1");
+  EVP_MD_CTX* signer = EVP_MD_CTX_new();
+  unsigned char* cursor = spki;
+  size_t signature_length = sizeof signature, work = 100000;
+  TC_X509_public_key key;
+  (void)params;
+  (void)user;
+  munit_assert_not_null(generated);
+  munit_assert_not_null(signer);
+  const int spki_length = i2d_PUBKEY(generated, NULL);
+  munit_assert_int(spki_length, >, 0);
+  munit_assert_size((size_t)spki_length, <=, sizeof spki);
+  munit_assert_int(i2d_PUBKEY(generated, &cursor), ==, spki_length);
+  munit_assert_int(TC_X509_subject_public_key(spki, (size_t)spki_length, &key), ==, TC_TLV_OK);
+  munit_assert_int(key.curve, ==, TC_EC_P192);
+  munit_assert_uint(key.bits, ==, 192);
+  munit_assert_int(EVP_DigestSignInit(signer, NULL, EVP_sha256(), NULL, generated), ==, 1);
+  munit_assert_int(EVP_DigestSign(signer, signature, &signature_length, message, sizeof message),
+                   ==, 1);
+  const TC_bytes parts[] = {{message, sizeof message}};
+  const TC_X509_signature_result status = TC_X509_signature_verify_message(
+      parts, 1, &algorithm, (TC_bytes){signature, signature_length}, &key, &provider, &work);
+#if TC_EC_ENABLE_P192
+  munit_assert_int(status, ==, TC_X509_SIGNATURE_VALID);
+  message[0] ^= 1;
+  work = 100000;
+  munit_assert_int(TC_X509_signature_verify_message(parts, 1, &algorithm,
+                                                    (TC_bytes){signature, signature_length}, &key,
+                                                    &provider, &work),
+                   ==, TC_X509_SIGNATURE_INVALID);
+#else
+  munit_assert_int(status, ==, TC_X509_SIGNATURE_UNSUPPORTED);
+#endif
+  EVP_MD_CTX_free(signer);
+  EVP_PKEY_free(generated);
+  return MUNIT_OK;
+}
+
 int main(int argc, char** argv)
 {
-  MunitTest tests[] = {{"/signatures", signatures, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-                       {"/paths", paths, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-                       {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
+  MunitTest tests[] = {
+      {"/signatures", signatures, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/p192-signature", p192_signature, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/paths", paths, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
   MunitSuite suite = {"/x509/native", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};
   return munit_suite_main(&suite, NULL, argc, argv);
 }

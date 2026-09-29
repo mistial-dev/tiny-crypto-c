@@ -10,7 +10,7 @@
 static void recycle(TC_X509_store_snapshot* slot)
 {
   memset(&slot->source, 0, sizeof slot->source);
-  slot->state = TC_X509_SNAPSHOT_FREE;
+  slot->state = TC_SNAPSHOT_FREE;
 }
 
 static TC_TLV_result array_candidate(void* context, size_t index, size_t* work, TC_bytes* out)
@@ -87,9 +87,12 @@ TC_TLV_result TC_X509_store_publish(TC_X509_store* store, size_t revision,
                                     TC_X509_store_snapshot* slot)
 {
   TC_X509_store_snapshot* previous;
-  if (!store || !slot || !tc_pki_storage_separate(store, sizeof *store, slot, sizeof *slot))
+  if (!store || !slot)
     return TC_TLV_ARGUMENT;
   previous = store->current;
+  if (!tc_snapshot_publish_separate(store, sizeof *store, slot, sizeof *slot, previous,
+                                    sizeof *previous))
+    return TC_TLV_ARGUMENT;
   TC_TLV_result result =
       tc_snapshot_publish(&slot->state, slot->readers, previous ? &previous->state : NULL,
                           previous ? previous->readers : 0, revision, &store->revision);
@@ -109,7 +112,7 @@ TC_TLV_result TC_X509_store_acquire(TC_X509_store* store, TC_X509_store_snapshot
   slot = store->current;
   if (!slot)
     return TC_TLV_END;
-  if (!tc_pki_storage_separate(slot, sizeof *slot, out, sizeof *out))
+  if (!tc_snapshot_acquire_separate(store, sizeof *store, slot, sizeof *slot, out, sizeof *out))
     return TC_TLV_ARGUMENT;
   TC_TLV_result result = tc_snapshot_acquire(slot->state, &slot->readers);
   if (result != TC_TLV_OK)

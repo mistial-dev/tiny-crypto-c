@@ -603,8 +603,9 @@ ctest --test-dir build -R '^test_x509_crl_corpus$' --output-on-failure
 ```
 
 `test_x509_native` checks the [native provider](x509-crypto.md) against
-OpenSSL-generated ECDSA, RSA v1.5 and PSS signatures, including segmented
-messages, changed content, exhausted budgets and scratch overlap.
+OpenSSL-generated P-192 and P-256 ECDSA, RSA v1.5 and PSS signatures,
+including segmented messages, changed content, exhausted budgets and scratch
+overlap.
 It also exercises certificate verification and the client-path example with
 explicit EC/RSA trust anchors, rejecting expired or tampered leaf certificates
 and the wrong anchor key.

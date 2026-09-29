@@ -8,6 +8,21 @@
 extern "C" {
 #endif
 
+/* replaced_controls bits. Each marks a TrustAnchorInfo CertPathControls field
+ * whose normalized value replaces the corresponding certificate_extensions
+ * control (RFC 5914 section 2.5). */
+enum {
+  /* policySet replaces certificatePolicies in policy_set. */
+  TC_X509_ANCHOR_REPLACED_POLICY_SET = 1u << 0,
+  /* policyFlags replace policyConstraints and inhibitAnyPolicy in
+   * policy_flags. */
+  TC_X509_ANCHOR_REPLACED_POLICY_FLAGS = 1u << 1,
+  /* nameConstr replaces nameConstraints in names. */
+  TC_X509_ANCHOR_REPLACED_NAMES = 1u << 2,
+  /* pathLenConstraint replaces the basicConstraints pathLen in path_len. */
+  TC_X509_ANCHOR_REPLACED_PATH_LEN = 1u << 3
+};
+
 /* One trust anchor with its RFC 5937 path controls. Validation applies the
  * normalized fields names, policy_set, policy_flags and path_len. The
  * extension spans are checked for controls those fields must reflect.
@@ -17,9 +32,10 @@ extern "C" {
  * certificatePolicies, policyConstraints, inhibitAnyPolicy or nameConstraints
  * (RFC 5914 section 2.6). certificate_extensions holds the anchor
  * certificate's own extensions. A path control there whose normalized field
- * is empty makes validation return UNSUPPORTED. Build records from
- * certificates with TC_X509_store_anchor_from_certificate, or from a
- * TrustAnchorList with TC_X509_trust_anchor_next. */
+ * is empty makes validation return UNSUPPORTED, unless replaced_controls marks
+ * it as replaced. Build records from certificates with
+ * TC_X509_store_anchor_from_certificate, or from a TrustAnchorList with
+ * TC_X509_trust_anchor_next. */
 typedef struct {
   TC_X509_trust_anchor trust;
   TC_X509_name_constraints names;
@@ -28,6 +44,10 @@ typedef struct {
   /* TC_X509_PATH_REQUIRE_EXPLICIT_POLICY, _INHIBIT_MAPPING and
    * _INHIBIT_ANY_POLICY only. */
   unsigned policy_flags;
+  /* TC_X509_ANCHOR_REPLACED_* bits. TC_X509_trust_anchor_next sets them.
+   * Caller-built records set a bit only when the normalized field holds the
+   * replacing value. Other bits make validation return ERROR. */
+  unsigned replaced_controls;
   /* Non-self-issued intermediates allowed below the anchor. */
   size_t path_len;
   uint8_t has_path_len;
@@ -78,16 +98,12 @@ typedef struct {
 TC_TLV_result TC_X509_store_array_source(const TC_X509_store_array* array,
                                          TC_X509_store_source* out);
 
-typedef TC_snapshot_state TC_X509_snapshot_state;
-#define TC_X509_SNAPSHOT_FREE TC_SNAPSHOT_FREE
-#define TC_X509_SNAPSHOT_PREPARED TC_SNAPSHOT_PREPARED
-#define TC_X509_SNAPSHOT_CURRENT TC_SNAPSHOT_CURRENT
-#define TC_X509_SNAPSHOT_RETIRED TC_SNAPSHOT_RETIRED
-/* Zero-initialize these objects. Fields are managed by the store functions. */
+/* Zero-initialize these objects. Fields are managed by the store functions.
+ * state follows the TC_snapshot_state lifecycle in snapshot.h. */
 typedef struct {
   TC_X509_store_source source;
   size_t readers;
-  TC_X509_snapshot_state state;
+  TC_snapshot_state state;
 } TC_X509_store_snapshot;
 typedef struct {
   TC_X509_store_snapshot* current;
@@ -95,7 +111,9 @@ typedef struct {
 } TC_X509_store;
 
 /* Serialize every call with the application's lock. Store, slots, source and
- * result pointers must occupy disjoint storage. Do not copy live slots.
+ * result pointers must occupy disjoint storage. publish and acquire check the
+ * store, the published slot and their arguments for overlap and return
+ * ARGUMENT unchanged when they overlap. Do not copy live slots.
  * Keep source context and record bytes unchanged until the slot becomes FREE.
  * Certificate validation and trust authorization are caller responsibilities. */
 

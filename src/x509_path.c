@@ -412,8 +412,8 @@ TC_TLV_result tc_x509_path_policies(const tc_x509_path_input* input,
                                   &mapping_count, &controls);
     if (result != TC_TLV_OK)
       return result;
-    result = tc_x509_policy_graph_step(workspace->graph, workspace->policies, policy_count, NULL, 0,
-                                       counters.any > 0 || (self_issued && !target), 0, work);
+    result = tc_x509_policy_graph_step(workspace->graph, workspace->policies, policy_count,
+                                       counters.any > 0 || (self_issued && !target), work);
     if (result != TC_TLV_OK)
       return result;
     if (!counters.explicit_policy && !workspace->graph->nodes[0].alive) {
@@ -514,12 +514,32 @@ static TC_TLV_result path_storage(const TC_bytes* chain, size_t count,
   return result;
 }
 
+/* CertPathControls field that replaces one certificate path control
+ * (RFC 5914 section 2.5), or 0 for other extensions. */
+static unsigned anchor_replacement(unsigned id)
+{
+  switch (id) {
+  case TC_PKI_EXT_CERTIFICATE_POLICIES:
+    return TC_X509_ANCHOR_REPLACED_POLICY_SET;
+  case TC_PKI_EXT_POLICY_CONSTRAINTS:
+  case TC_PKI_EXT_INHIBIT_ANY_POLICY:
+    return TC_X509_ANCHOR_REPLACED_POLICY_FLAGS;
+  case TC_PKI_EXT_NAME_CONSTRAINTS:
+    return TC_X509_ANCHOR_REPLACED_NAMES;
+  case TC_PKI_EXT_BASIC_CONSTRAINTS:
+    return TC_X509_ANCHOR_REPLACED_PATH_LEN;
+  default:
+    return 0;
+  }
+}
+
 /* Report whether the anchor record reflects one path-control extension.
  * RFC 5914 section 2.5 enforces an anchor certificate's path controls unless
  * CertPathControls replaces them. Validation reads only the record fields,
- * so a control those fields miss would be dropped. trust_anchor_info selects
- * exts, where only a basicConstraints pathLen can occur and it may only lower
- * path_len. */
+ * so a control those fields miss would be dropped. A certificate control
+ * marked in replaced_controls is superseded by its field. trust_anchor_info
+ * selects exts, where only a basicConstraints pathLen can occur and it may
+ * only lower path_len. */
 static TC_TLV_result anchor_control_applied(const TC_X509_store_anchor* anchor, unsigned id,
                                             const TC_X509_extension* extension,
                                             int trust_anchor_info, int* applied)
@@ -527,6 +547,8 @@ static TC_TLV_result anchor_control_applied(const TC_X509_store_anchor* anchor, 
   const TC_bytes value = extension->value;
   TC_TLV_result result;
   *applied = 1;
+  if (!trust_anchor_info && (anchor->replaced_controls & anchor_replacement(id)))
+    return TC_TLV_OK;
   switch (id) {
   case TC_PKI_EXT_NAME_CONSTRAINTS:
     *applied = anchor->names.permitted.length || anchor->names.excluded.length;
@@ -624,9 +646,12 @@ TC_X509_path_status tc_x509_path_validate_anchor(const TC_bytes* chain, size_t c
     return TC_X509_PATH_ERROR;
   if (anchor->x509_unusable)
     return TC_X509_PATH_INVALID;
-  if (anchor->policy_flags &
-      ~(unsigned)(TC_X509_PATH_REQUIRE_EXPLICIT_POLICY | TC_X509_PATH_INHIBIT_MAPPING |
-                  TC_X509_PATH_INHIBIT_ANY_POLICY))
+  if ((anchor->policy_flags &
+       ~(unsigned)(TC_X509_PATH_REQUIRE_EXPLICIT_POLICY | TC_X509_PATH_INHIBIT_MAPPING |
+                   TC_X509_PATH_INHIBIT_ANY_POLICY)) ||
+      (anchor->replaced_controls &
+       ~(unsigned)(TC_X509_ANCHOR_REPLACED_POLICY_SET | TC_X509_ANCHOR_REPLACED_POLICY_FLAGS |
+                   TC_X509_ANCHOR_REPLACED_NAMES | TC_X509_ANCHOR_REPLACED_PATH_LEN)))
     return TC_X509_PATH_ERROR;
   if (!count)
     return TC_X509_PATH_INVALID;

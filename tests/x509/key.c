@@ -274,6 +274,18 @@ static MunitResult test_key_encodings(const MunitParameter params[], void* user)
   ec[24] = 34;
   munit_assert(TC_X509_subject_public_key(ec, 59, &key) == TC_TLV_OK);
   munit_assert(key.bits == 256 && key.key.length == 33);
+  /* secp192r1 is 1.2.840.10045.3.1.1 (RFC 5480 section 2.1.1.1). */
+  {
+    uint8_t p192[75] = {0x30, 73,   0x30, 19,   6,    7,    0x2a, 0x86, 0x48, 0xce, 0x3d, 2, 1, 6,
+                        8,    0x2a, 0x86, 0x48, 0xce, 0x3d, 3,    1,    1,    3,    50,   0, 4};
+    memset(p192 + 27, 1, 48);
+    munit_assert(TC_X509_subject_public_key(p192, sizeof p192, &key) == TC_TLV_OK);
+    munit_assert(key.type == TC_KEY_EC && key.bits == 192 && key.curve == TC_EC_P192);
+    munit_assert_size(key.key.length, ==, 49);
+    p192[1] = 72;
+    p192[24] = 49;
+    munit_assert(TC_X509_subject_public_key(p192, 74, &key) == TC_TLV_INVALID);
+  }
   munit_assert(TC_X509_subject_public_key(ed25519, sizeof ed25519, &key) == TC_TLV_OK);
   munit_assert(key.type == TC_KEY_ED25519 && key.bits == 255);
   ed25519[11] = 1;

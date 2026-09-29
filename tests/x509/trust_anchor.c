@@ -88,6 +88,9 @@ static MunitResult flags_and_unusable(const MunitParameter params[], void* user)
     munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &workspace, &anchor), ==,
                      TC_TLV_OK);
     munit_assert_uint(anchor.policy_flags, ==, cases[i].expected);
+    munit_assert_uint(anchor.replaced_controls, ==,
+                      TC_X509_ANCHOR_REPLACED_POLICY_FLAGS |
+                          (cases[i].policy ? TC_X509_ANCHOR_REPLACED_POLICY_SET : 0u));
     munit_assert_int(anchor.x509_unusable, ==, 0);
     munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &workspace, &anchor), ==,
                      TC_TLV_END);
@@ -216,6 +219,7 @@ static MunitResult precedence(const MunitParameter params[], void* user)
   munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &workspace, &anchor), ==, TC_TLV_OK);
   munit_assert_int(anchor.has_path_len, ==, 1);
   munit_assert_size(anchor.path_len, ==, 0);
+  munit_assert_uint(anchor.replaced_controls, ==, TC_X509_ANCHOR_REPLACED_PATH_LEN);
   return MUNIT_OK;
 }
 
