@@ -221,10 +221,13 @@ TC_RSA_result TC_RSA_encrypt_oaep(const TC_RSA_public_key* key, const TC_RSA_oae
 
 /* OAEP decryption with a validated, unchanged private key and explicit hashes.
  * Both hashes must be enabled. Ciphertext has the modulus length. Label bytes
- * are borrowed; {NULL,0} selects an empty label. Plaintext and its length change
- * only on TC_RSA_OK. Short output storage returns TC_RSA_LIMIT after decoding.
- * Output bytes, length, scratch and RNG state are separate from each other,
- * inputs and metadata. Used scratch is wiped on return. */
+ * are borrowed. {NULL,0} selects an empty label. plaintext.capacity must be at
+ * least modulus_bytes - 2*hash_bytes - 2. A smaller buffer returns TC_RSA_LIMIT
+ * before decryption, without drawing randomness or consuming work, so the
+ * status reveals nothing about the padding (RFC 8017 section 7.1.2). Plaintext
+ * and its length change only on TC_RSA_OK. Output bytes, length, scratch and
+ * RNG state are separate from each other, inputs and metadata. Used scratch is
+ * wiped on return. */
 TC_RSA_result TC_RSA_decrypt_oaep(const TC_RSA_private_key* key, const TC_RSA_oaep_options* options,
                                   TC_bytes ciphertext, const TC_RSA_workspace* workspace,
                                   TC_buffer plaintext, size_t* plaintext_length,

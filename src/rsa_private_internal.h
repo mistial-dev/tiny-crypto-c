@@ -8,8 +8,9 @@
 #include "rsa_prime_internal.h"
 
 /* Sample 1 < blind < modulus with an inverse. Modulus, blind, inverse and
- * arena are separate. Arena has at least 5n limbs; its first n hold the RNG
- * draw and its next n are the range-check scratch. */
+ * arena are separate. Arena has at least 6n limbs, the scratch size of
+ * tc_mp_inverse. Its first n limbs hold the RNG draw and its next n limbs are
+ * the range-check scratch until the inverse reuses the whole arena. */
 static inline TC_RSA_result tc_rsa_sample_blinding(const tc_mp_word* modulus, size_t n,
                                                    tc_mp_word* blind, tc_mp_word* inverse,
                                                    tc_mp_word* arena, const tc_rsa_random* rng,
@@ -80,7 +81,8 @@ static inline int tc_rsa_factors_far_apart(const tc_mp_word* p, const tc_mp_word
   tc_mp_select(difference, other, difference, (tc_mp_word)(0u - below), h);
   /* |p - q| > 2^threshold exactly when |p - q| - (2^threshold + 1) does not borrow. */
   memset(bound, 0, h * sizeof *bound);
-  bound[threshold / TC_MP_WORD_BITS] = (tc_mp_word)((tc_mp_word)1u << (threshold % TC_MP_WORD_BITS));
+  bound[threshold / TC_MP_WORD_BITS] =
+      (tc_mp_word)((tc_mp_word)1u << (threshold % TC_MP_WORD_BITS));
   bound[0] |= 1u;
   return tc_mp_subtract(other, difference, bound, h) == 0;
 }

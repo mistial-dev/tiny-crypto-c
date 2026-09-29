@@ -375,12 +375,16 @@ An empty label is `{NULL, 0}`. Ciphertext length must equal the modulus length.
 Provide `TC_RSA_DECRYPT_WORKSPACE_WORDS(bits)` limbs, or query
 `TC_RSA_workspace_words(TC_RSA_OPERATION_DECRYPT, bits)`.
 
+Allocate at least `modulus_bytes - 2*hash_digest_bytes - 2` bytes for the
+plaintext, the largest message the key and hash can carry. A smaller buffer
+returns `TC_RSA_LIMIT` before the private-key operation. That check uses only
+public sizes, draws no randomness and consumes no work, so the status never
+distinguishes valid from invalid padding (RFC 8017 section 7.1.2).
+
 Plaintext is checked in scratch and copied to the output after OAEP decoding
 succeeds. The plaintext buffer and returned length change only on `TC_RSA_OK`.
-Wrong labels and invalid padding return `TC_RSA_INVALID`. Insufficient plaintext
-capacity returns `TC_RSA_LIMIT`. Temporary plaintext and arithmetic scratch are
-wiped on return. Allocate up to `modulus_bytes - 2*hash_digest_bytes - 2` bytes
-for the output, or use a smaller buffer when the protocol bounds the message.
+Wrong labels and invalid padding return `TC_RSA_INVALID`. Temporary plaintext
+and arithmetic scratch are wiped on return.
 
 Keep ciphertext, label, key components and metadata separate from the output,
 length object, workspace and RNG state. The C++ wrapper,

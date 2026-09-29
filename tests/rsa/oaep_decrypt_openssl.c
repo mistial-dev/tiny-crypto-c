@@ -19,6 +19,7 @@ typedef enum {
   DECRYPT_OK,
   WRONG_LABEL,
   SHORT_OUTPUT,
+  SHORT_OUTPUT_WRONG_LABEL,
   RNG_FAILURE,
   ZERO_WORK,
   SHORT_WORK,
@@ -113,7 +114,8 @@ static MunitResult decrypt(const MunitParameter params[], void* user)
   }
   for (size_t i = 0; i < sizeof input; ++i)
     input[i] = (uint8_t)i;
-  const size_t lengths[] = {0, 1, width - 2 * hash_length - 2};
+  const size_t max_message = width - 2 * hash_length - 2;
+  const size_t lengths[] = {0, 1, max_message};
   const size_t db_length = width - hash_length - 1;
   const size_t db_blocks = db_length / mgf_length + (db_length % mgf_length != 0);
   const size_t seed_blocks = hash_length / mgf_length + (hash_length % mgf_length != 0);
@@ -126,16 +128,19 @@ static MunitResult decrypt(const MunitParameter params[], void* user)
     munit_assert_int(EVP_PKEY_encrypt(encrypt, ciphertext, &encrypted, input, lengths[i]), ==, 1);
     for (unsigned scenario = 0; scenario < SCENARIO_COUNT; ++scenario) {
       const int boundary = i + 1 == sizeof lengths / sizeof *lengths;
-      if (scenario != DECRYPT_OK && !boundary)
+      /* RFC 8017 section 7.1.2 note: a short output buffer is rejected from
+       * public sizes before decryption, so LIMIT reveals nothing about padding. */
+      const int short_output = scenario == SHORT_OUTPUT || scenario == SHORT_OUTPUT_WRONG_LABEL;
+      if (scenario != DECRYPT_OK && !short_output && !boundary)
         continue;
       if ((scenario == RNG_FAILURE || scenario == ZERO_WORK || scenario == ZERO_CIPHERTEXT ||
            scenario == MODULUS_CIPHERTEXT) &&
           !representative)
         continue;
-      const TC_bytes label = scenario == WRONG_LABEL
+      const TC_bytes label = scenario == WRONG_LABEL || scenario == SHORT_OUTPUT_WRONG_LABEL
                                  ? (TC_bytes){wrong_label, label_length ? label_length : 1}
                                  : (TC_bytes){label_bytes, label_length};
-      const size_t capacity = scenario == SHORT_OUTPUT && lengths[i] ? lengths[i] - 1 : lengths[i];
+      const size_t capacity = short_output ? max_message - 1 : max_message;
       random_source random = {0, scenario == RNG_FAILURE ? TC_ERROR : TC_OK};
       const uint32_t work = scenario == ZERO_WORK    ? 0
                             : scenario == SHORT_WORK ? exact_work - 1
@@ -150,22 +155,24 @@ static MunitResult decrypt(const MunitParameter params[], void* user)
       memset(output, 0xa5, sizeof output);
       memset(words, 0xa5, sizeof words);
       const TC_RSA_result expected =
-          scenario == RNG_FAILURE                           ? TC_RSA_ERROR
-          : scenario == ZERO_WORK || scenario == SHORT_WORK ? TC_RSA_LIMIT
+          scenario == RNG_FAILURE                                           ? TC_RSA_ERROR
+          : scenario == ZERO_WORK || scenario == SHORT_WORK || short_output ? TC_RSA_LIMIT
           : scenario == WRONG_LABEL || scenario == ZERO_CIPHERTEXT || scenario == MODULUS_CIPHERTEXT
               ? TC_RSA_INVALID
-          : scenario == SHORT_OUTPUT && lengths[i] ? TC_RSA_LIMIT
-                                                   : TC_RSA_OK;
+              : TC_RSA_OK;
+      /* Preflight rejections draw no randomness, touch no scratch and consume no work. */
+      const int preflight = scenario == ZERO_WORK || short_output;
       const TC_RSA_oaep_options options = {hash->algorithm, mgf->algorithm, label};
       TC_RSA_execution execution = {{random_bytes, &random}, 1, {(uint32_t)work}};
       munit_assert_int(TC_RSA_decrypt_oaep(&key, &options, candidate, &workspace,
                                            (TC_buffer){output, capacity}, &recovered, &execution),
                        ==, expected);
-      munit_assert_uint(random.calls, ==,
-                        scenario == ZERO_WORK || scenario == MODULUS_CIPHERTEXT ? 0 : 1);
+      munit_assert_uint(random.calls, ==, preflight || scenario == MODULUS_CIPHERTEXT ? 0 : 1);
+      if (preflight)
+        munit_assert_uint32(execution.work.remaining, ==, work);
       const size_t used = workspace.capacity * sizeof *words;
       for (size_t j = 0; j < sizeof words; ++j)
-        munit_assert_uint(((uint8_t*)words)[j], ==, scenario == ZERO_WORK || j >= used ? 0xa5 : 0);
+        munit_assert_uint(((uint8_t*)words)[j], ==, preflight || j >= used ? 0xa5 : 0);
       if (expected == TC_RSA_OK) {
         munit_assert_size(recovered, ==, lengths[i]);
         munit_assert_memory_equal(recovered, output, input);

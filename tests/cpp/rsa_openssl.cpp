@@ -67,12 +67,17 @@ TEST_CASE("RSA C++ PSS and OAEP operations")
   REQUIRE(EVP_PKEY_CTX_set_rsa_padding(encrypt.get(), RSA_PKCS1_OAEP_PADDING) == 1);
   REQUIRE(EVP_PKEY_CTX_set_rsa_oaep_md(encrypt.get(), EVP_sha256()) == 1);
   REQUIRE(EVP_PKEY_CTX_set_rsa_mgf1_md(encrypt.get(), EVP_sha256()) == 1);
-  uint8_t message[] = {0, 1, 0xff}, ciphertext[width], plaintext[sizeof message];
+  /* Decryption requires room for the largest OAEP message: k - 2*hLen - 2. */
+  uint8_t message[] = {0, 1, 0xff}, ciphertext[width], plaintext[width - 2 * 32 - 2];
   size_t ciphertext_length = sizeof ciphertext, plaintext_length = SIZE_MAX;
   REQUIRE(EVP_PKEY_encrypt(encrypt.get(), ciphertext, &ciphertext_length, message,
                            sizeof message) == 1);
   tiny_crypto::rsa_oaep_options oaep = {TC_HASH_SHA256, TC_HASH_SHA256, {nullptr, 0}};
   execution.work.remaining = UINT32_MAX;
+  CHECK(tiny_crypto::rsa_decrypt_oaep(key, oaep, {ciphertext, ciphertext_length}, workspace,
+                                      {plaintext, sizeof plaintext - 1}, plaintext_length,
+                                      execution) == TC_RSA_LIMIT);
+  CHECK(plaintext_length == SIZE_MAX);
   REQUIRE(tiny_crypto::rsa_decrypt_oaep(key, oaep, {ciphertext, ciphertext_length}, workspace,
                                         {plaintext, sizeof plaintext}, plaintext_length,
                                         execution) == TC_RSA_OK);

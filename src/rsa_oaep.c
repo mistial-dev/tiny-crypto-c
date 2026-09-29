@@ -128,8 +128,13 @@ TC_RSA_result TC_RSA_decrypt_oaep(const TC_RSA_private_key* key, const TC_RSA_oa
   if (status != TC_RSA_OK)
     return status;
   const size_t n = length / sizeof(TC_RSA_word), required = 14 * n;
+  const size_t max_message = length - 2 * info.digest_length - 2;
   uint32_t* work = &execution->work.remaining;
-  if (!execution->random_attempts || workspace->capacity < required || *work < decode_cost)
+  /* RFC 8017 section 7.1.2, note after step 4: an opponent must learn nothing
+   * about EM. Plaintext capacity is checked against the largest message before
+   * decryption, so LIMIT depends only on public sizes. */
+  if (!execution->random_attempts || workspace->capacity < required || *work < decode_cost ||
+      plaintext.capacity < max_message)
     return TC_RSA_LIMIT;
   TC_hash_context hash_workspace;
   uint8_t block[64];
@@ -142,13 +147,9 @@ TC_RSA_result TC_RSA_decrypt_oaep(const TC_RSA_private_key* key, const TC_RSA_oa
     status = tc_rsa_oaep_decode(options, (TC_buffer){encoded, length},
                                 (tc_rsa_hash_scratch){block, &hash_workspace}, work, &message);
   if (status == TC_RSA_OK) {
-    if (message.length > plaintext.capacity)
-      status = TC_RSA_LIMIT;
-    else {
-      if (message.length)
-        memcpy(plaintext.data, message.data, message.length);
-      *plaintext_length = message.length;
-    }
+    if (message.length)
+      memcpy(plaintext.data, message.data, message.length);
+    *plaintext_length = message.length;
   }
   TC_secure_zero(workspace->words, required * sizeof(TC_RSA_word));
   TC_secure_zero(block, sizeof block);
