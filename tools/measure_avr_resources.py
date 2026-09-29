@@ -105,13 +105,22 @@ def block_cipher_callbacks():
     """Keep the stack model in step with concrete block cipher descriptors.
 
     Each initializer lists block_size, key, encrypt and decrypt. The callbacks
-    are the lowercase tc_ names after the key."""
+    are the lowercase tc_ names after the key, or TC_ macros that name one.
+    Test seams (tc_test_*) never link into the measured build."""
     sources = list((ROOT / "src").glob("*.c")) + list((ROOT / "src").glob("*.h"))
+    texts = [source.read_text() for source in sources]
+    aliases = {}
+    for text in texts:
+        for macro, target in re.findall(r"#define\s+(TC_\w+)\s+(tc_\w+)\s*$", text, re.M):
+            if not target.startswith("tc_test_"):
+                aliases[macro] = target
     found = set()
-    for source in sources:
-        for fields in re.findall(r"tc_block_cipher\s+\w+\s*=\s*\{([^}]*)\}",
-                                 source.read_text()):
-            found.update(re.findall(r"\btc_\w+", fields.split(",", 2)[-1]))
+    for text in texts:
+        for fields in re.findall(r"tc_block_cipher\s+\w+\s*=\s*\{([^}]*)\}", text):
+            callbacks = fields.split(",", 2)[-1]
+            found.update(re.findall(r"\btc_\w+", callbacks))
+            found.update(aliases[name] for name in re.findall(r"\bTC_\w+", callbacks)
+                         if name in aliases)
     if found != BLOCK_CIPHER_CALLBACKS:
         raise RuntimeError(f"Block cipher descriptor callbacks changed: {sorted(found)}")
     return found
