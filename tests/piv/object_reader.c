@@ -58,7 +58,7 @@ int main(int argc, char** argv)
     }
     return 0;
   }
-  result = TC_PIV_CVC_read(data, length, &cvc);
+  result = TC_PIV_CVC_read((TC_bytes){data, length}, &cvc);
   if (result != TC_TLV_OK) {
     fprintf(stderr, "%s: %d\n", argv[1], result);
     return 1;
@@ -73,11 +73,12 @@ int main(int argc, char** argv)
   printf("role=%02x\nkey_bits=%u\n", cvc.role, cvc.key_bits);
   saved = cvc;
   for (i = 0; i < length; ++i) {
-    if (TC_PIV_CVC_read(data, i, &cvc) == TC_TLV_OK || memcmp(&cvc, &saved, sizeof cvc))
+    if (TC_PIV_CVC_read((TC_bytes){data, i}, &cvc) == TC_TLV_OK || memcmp(&cvc, &saved, sizeof cvc))
       return 1;
   }
   data[0] ^= 1;
-  if (TC_PIV_CVC_read(data, length, &cvc) == TC_TLV_OK || memcmp(&cvc, &saved, sizeof cvc))
+  if (TC_PIV_CVC_read((TC_bytes){data, length}, &cvc) == TC_TLV_OK ||
+      memcmp(&cvc, &saved, sizeof cvc))
     return 1;
   return 0;
 }

@@ -328,7 +328,7 @@ TC_TLV_result tc_x509_crl_certificate_extension(void* context, const TC_X509_ext
     return TC_TLV_OK;
   case TC_PKI_EXT_ISSUER_ALT_NAME: {
     TC_bytes contents;
-    result = TC_DER_sequence(extension->value.data, extension->value.length, &contents);
+    result = TC_DER_sequence(extension->value, &contents);
     if (result != TC_TLV_OK)
       return result;
     result = tc_pki_general_names_contents_check(contents, fields->limits, fields->tree);

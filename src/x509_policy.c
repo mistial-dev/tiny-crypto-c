@@ -344,7 +344,7 @@ static TC_TLV_result anchor_policy_contains(TC_bytes set, const TC_TLV_limits* l
   *found = 0;
   if (!set.length)
     return TC_TLV_INVALID;
-  result = TC_TLV_reader_init(&reader, set.data, set.length, TC_TLV_DER, limits);
+  result = TC_TLV_reader_init(&reader, set, TC_TLV_DER, limits);
   if (result != TC_TLV_OK)
     return result;
   while ((result = anchor_policy_next(&reader, work, &oid)) == TC_TLV_OK) {
@@ -444,7 +444,7 @@ TC_TLV_result tc_x509_policy_graph_output(const tc_x509_policy_graph* graph,
     else {
       TC_TLV_reader reader;
       TC_bytes oid;
-      result = TC_TLV_reader_init(&reader, anchor_set.data, anchor_set.length, TC_TLV_DER, limits);
+      result = TC_TLV_reader_init(&reader, anchor_set, TC_TLV_DER, limits);
       if (result != TC_TLV_OK)
         return result;
       while ((result = anchor_policy_next(&reader, work, &oid)) == TC_TLV_OK) {
@@ -491,7 +491,7 @@ static TC_TLV_result qualifier_contents(const TC_TLV_element* element, size_t de
     return TC_TLV_INVALID;
   if (depth > budget->max_depth)
     return TC_TLV_LIMIT;
-  return TC_TLV_reader_init(reader, element->value.data, element->value.length, TC_TLV_DER, budget);
+  return TC_TLV_reader_init(reader, element->value, TC_TLV_DER, budget);
 }
 static TC_TLV_result display_text(const TC_TLV_element* element, size_t* work)
 {
@@ -519,8 +519,7 @@ static TC_TLV_result user_notice(TC_bytes encoded, const TC_TLV_limits* limits, 
   TC_TLV_limits budget = *limits;
   TC_TLV_reader outer, notice, reference, numbers;
   TC_TLV_element element;
-  TC_TLV_result result =
-      TC_TLV_reader_init(&outer, encoded.data, encoded.length, TC_TLV_DER, limits);
+  TC_TLV_result result = TC_TLV_reader_init(&outer, encoded, TC_TLV_DER, limits);
   if (result != TC_TLV_OK)
     return result;
   result = qualifier_next(&outer, &budget, work, &element);
@@ -557,7 +556,7 @@ static TC_TLV_result user_notice(TC_bytes encoded, const TC_TLV_limits* limits, 
     while ((result = qualifier_next(&numbers, &budget, work, &element)) == TC_TLV_OK) {
       if (!tc_pki_tag(&element, 2))
         return TC_TLV_INVALID;
-      result = TC_DER_integer_contents(element.value.data, element.value.length);
+      result = TC_DER_integer_contents(element.value);
       if (result != TC_TLV_OK)
         return result;
     }
@@ -587,8 +586,7 @@ TC_TLV_result tc_x509_policy_qualifiers_check(const TC_X509_policy* policy, int 
     return TC_TLV_ARGUMENT;
   if (tc_pki_work_charge(work, policy->qualifiers.length) != TC_TLV_OK)
     return TC_TLV_LIMIT;
-  result = TC_TLV_walk(policy->qualifiers.data, policy->qualifiers.length, TC_TLV_DER, limits,
-                       frames, NULL, NULL);
+  result = TC_TLV_walk(policy->qualifiers, TC_TLV_DER, limits, frames, NULL, NULL);
   if (result != TC_TLV_OK)
     return result;
   result = TC_X509_policy_qualifiers_init(&reader, policy->qualifiers, limits);
@@ -606,8 +604,7 @@ TC_TLV_result tc_x509_policy_qualifiers_check(const TC_X509_policy* policy, int 
       TC_TLV_element element;
       size_t offset = 0;
       uint32_t point;
-      result = TC_TLV_reader_init(&value, qualifier.value.data, qualifier.value.length, TC_TLV_DER,
-                                  limits);
+      result = TC_TLV_reader_init(&value, qualifier.value, TC_TLV_DER, limits);
       if (result != TC_TLV_OK)
         return result;
       result = tc_pki_next(&value, 0x16, &element);

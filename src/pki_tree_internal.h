@@ -67,7 +67,7 @@ static inline TC_TLV_result tc_pki_tree_read(TC_bytes input, TC_TLV_profile prof
     return TC_TLV_ARGUMENT;
   allowance = input.length < *workspace->work ? input.length : *workspace->work;
   *workspace->work -= allowance;
-  result = TC_TLV_read_tree(input.data, allowance, profile, limits,
+  result = TC_TLV_read_tree((TC_bytes){input.data, allowance}, profile, limits,
                             (TC_TLV_frames){workspace->frames, workspace->capacity}, &parsed);
   if (result == TC_TLV_MORE && allowance < input.length)
     return TC_TLV_LIMIT;
@@ -122,7 +122,7 @@ static inline TC_TLV_result tc_pki_tree_open(TC_bytes input, unsigned tag, TC_TL
     return result;
   if (!tc_pki_tag(&outer, tag) || !outer.header.constructed || outer.encoded.length != input.length)
     return TC_TLV_INVALID;
-  return TC_TLV_reader_init(out, outer.value.data, outer.value.length, profile, limits);
+  return TC_TLV_reader_init(out, outer.value, profile, limits);
 }
 
 typedef struct {
@@ -149,7 +149,7 @@ static inline TC_TLV_result tc_pki_tree_oid_value(TC_bytes input, unsigned tag,
   result = tc_pki_tree_field(&fields, 6, workspace, &element);
   if (result != TC_TLV_OK)
     return result;
-  result = TC_DER_oid_contents(element.value.data, element.value.length);
+  result = TC_DER_oid_contents(element.value);
   if (result != TC_TLV_OK)
     return result;
   parsed.oid = element.value;
@@ -203,14 +203,13 @@ static inline TC_TLV_result tc_pki_tree_attribute(TC_TLV_reader* reader,
     return result;
   if (!tc_pki_tag(&attribute, 0x30))
     return TC_TLV_INVALID;
-  result = TC_TLV_reader_init(&fields, attribute.value.data, attribute.value.length,
-                              reader->profile, &reader->limits);
+  result = TC_TLV_reader_init(&fields, attribute.value, reader->profile, &reader->limits);
   if (result != TC_TLV_OK)
     return result;
   result = tc_pki_tree_field(&fields, 6, workspace, &oid);
   if (result != TC_TLV_OK)
     return result;
-  result = TC_DER_oid_contents(oid.value.data, oid.value.length);
+  result = TC_DER_oid_contents(oid.value);
   if (result != TC_TLV_OK)
     return result;
   result = tc_pki_tree_next(&fields, workspace, &value);
@@ -261,7 +260,7 @@ static inline TC_TLV_result tc_pki_tree_name(TC_bytes input, TC_TLV_profile prof
       return result;
     if (!rdn.value.length)
       return TC_TLV_INVALID;
-    result = TC_TLV_reader_init(&attributes, rdn.value.data, rdn.value.length, profile, limits);
+    result = TC_TLV_reader_init(&attributes, rdn.value, profile, limits);
     if (result != TC_TLV_OK)
       return result;
     while (!tc_pki_end(&attributes)) {

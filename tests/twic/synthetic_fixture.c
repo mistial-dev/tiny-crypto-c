@@ -32,8 +32,7 @@ static TC_bytes value_of(TC_bytes encoded, uint8_t tag)
 {
   const TC_TLV_limits limits = {OBJECT_CAPACITY, OBJECT_CAPACITY, 32, 2};
   TC_TLV_element element;
-  munit_assert_int(TC_TLV_read(encoded.data, encoded.length, TC_TLV_ISO7816, &limits, &element), ==,
-                   TC_TLV_OK);
+  munit_assert_int(TC_TLV_read(encoded, TC_TLV_ISO7816, &limits, &element), ==, TC_TLV_OK);
   munit_assert_size(element.encoded.length, ==, encoded.length);
   munit_assert_uint(element.encoded.data[0], ==, tag);
   return element.value;

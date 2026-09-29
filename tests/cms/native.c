@@ -8159,9 +8159,8 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
         continue;
       TC_TLV_reader octets;
       TC_TLV_element element;
-      munit_assert_int(TC_TLV_reader_init(&octets, identifiers[i].data, identifiers[i].length,
-                                          TC_TLV_DER, &limits),
-                       ==, TC_TLV_OK);
+      munit_assert_int(TC_TLV_reader_init(&octets, identifiers[i], TC_TLV_DER, &limits), ==,
+                       TC_TLV_OK);
       munit_assert_int(TC_TLV_next(&octets, &element), ==, TC_TLV_OK);
       munit_assert_size(element.value.length, ==, expected[i].length);
       munit_assert_memory_equal(expected[i].length, element.value.data, expected[i].data);

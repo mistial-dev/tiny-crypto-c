@@ -174,7 +174,7 @@ TC_TLV_result tc_x509_crl_source_entry_next(tc_source_reader* reader,
     encoded = (TC_bytes){scratch.data, (size_t)size};
   }
   TC_TLV_reader bounded;
-  result = TC_TLV_reader_init(&bounded, encoded.data, encoded.length, TC_TLV_DER, limits);
+  result = TC_TLV_reader_init(&bounded, encoded, TC_TLV_DER, limits);
   if (result != TC_TLV_OK)
     return result;
   tc_x509_crl_entry parsed;

@@ -43,14 +43,16 @@ static MunitResult gzip_member(const MunitParameter params[], void* context)
   uint8_t encoded[] = {0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 2, 0xff, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   TC_GZIP_workspace workspace;
   size_t work = 4096, length = SIZE_MAX;
-  munit_assert_int(TC_GZIP_decode(encoded, sizeof encoded, NULL, 0, &workspace, &work, &length), ==,
-                   TC_GZIP_OK);
+  munit_assert_int(TC_GZIP_decode((TC_bytes){encoded, sizeof encoded}, &workspace, &work,
+                                  (TC_buffer){NULL, 0}, &length),
+                   ==, TC_GZIP_OK);
   munit_assert_size(length, ==, 0);
   encoded[sizeof encoded - 8] ^= 1;
   work = 4096;
   length = SIZE_MAX;
-  munit_assert_int(TC_GZIP_decode(encoded, sizeof encoded, NULL, 0, &workspace, &work, &length), ==,
-                   TC_GZIP_INVALID);
+  munit_assert_int(TC_GZIP_decode((TC_bytes){encoded, sizeof encoded}, &workspace, &work,
+                                  (TC_buffer){NULL, 0}, &length),
+                   ==, TC_GZIP_INVALID);
   munit_assert_size(length, ==, SIZE_MAX);
   (void)params;
   (void)context;

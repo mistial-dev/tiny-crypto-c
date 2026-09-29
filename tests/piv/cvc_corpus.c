@@ -42,7 +42,7 @@ static void check_parsed(const uint8_t* encoded, size_t length, unsigned curve_c
                          const uint8_t expected_issuer[8], const uint8_t expected_subject[16])
 {
   TC_PIV_CVC cvc;
-  munit_assert_int(TC_PIV_CVC_read(encoded, length, &cvc), ==, TC_TLV_OK);
+  munit_assert_int(TC_PIV_CVC_read((TC_bytes){encoded, length}, &cvc), ==, TC_TLV_OK);
   munit_assert_uint(cvc.role, ==, expected_role);
   munit_assert_uint(cvc.key_bits, ==, curve_code == 1 ? 256 : 384);
   munit_assert_size(cvc.issuer.length, ==, 8);
@@ -65,10 +65,8 @@ static void check_intermediate_signatures(TC_bytes card_bytes, TC_bytes intermed
   static const uint8_t ec_public_key_oid[] = {0x2a, 0x86, 0x48, 0xce, 0x3d, 2, 1};
   uint8_t parameters[11];
   TC_PIV_CVC card, intermediate;
-  munit_assert_int(TC_PIV_CVC_read(card_bytes.data, card_bytes.length, &card), ==, TC_TLV_OK);
-  munit_assert_int(
-      TC_PIV_CVC_read(intermediate_bytes.data, intermediate_bytes.length, &intermediate), ==,
-      TC_TLV_OK);
+  munit_assert_int(TC_PIV_CVC_read(card_bytes, &card), ==, TC_TLV_OK);
+  munit_assert_int(TC_PIV_CVC_read(intermediate_bytes, &intermediate), ==, TC_TLV_OK);
   uint8_t digest[TC_SHA1_DIGESTLEN];
   munit_assert_int(TC_SHA1_digest(intermediate.public_key, digest), ==, TC_OK);
   munit_assert_int(!memcmp(digest, intermediate.subject.data, 8), ==, expected_subject_match);

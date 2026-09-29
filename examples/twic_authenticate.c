@@ -497,10 +497,8 @@ static int content_crls_prepare(const Options* options, TC_bytes encoded,
   if (cms.certificates.length) {
     TC_TLV_element certificates;
     TC_TLV_reader reader;
-    if (TC_TLV_read(cms.certificates.data, cms.certificates.length, TC_TLV_BER, limits,
-                    &certificates) != TC_TLV_OK ||
-        TC_TLV_reader_init(&reader, certificates.value.data, certificates.value.length, TC_TLV_BER,
-                           limits) != TC_TLV_OK)
+    if (TC_TLV_read(cms.certificates, TC_TLV_BER, limits, &certificates) != TC_TLV_OK ||
+        TC_TLV_reader_init(&reader, certificates.value, TC_TLV_BER, limits) != TC_TLV_OK)
       return 0;
     TC_TLV_element certificate;
     TC_TLV_result status;
@@ -568,7 +566,7 @@ static int encrypted_object_decode(TC_bytes encoded, TC_buffer output, TC_bytes*
   if (encoded.length > *work)
     return 0;
   *work -= encoded.length;
-  if (TC_TLV_read(encoded.data, encoded.length, TC_TLV_ISO7816, &limits, &value) != TC_TLV_OK ||
+  if (TC_TLV_read(encoded, TC_TLV_ISO7816, &limits, &value) != TC_TLV_OK ||
       value.encoded.length != encoded.length || value.header.tag_length != 1 ||
       value.header.tag[0] != ENCRYPTED_VALUE_TAG || value.value.length > output.capacity ||
       value.value.length > *work)
@@ -619,7 +617,8 @@ static int protected_object_read(ExampleCardIO* io, ExampleCardReadMode mode,
     if (response.length > *work / 2)
       return 0;
     *work -= response.length * 2;
-    if (TC_TLV_read(stored.data, response.length, TC_TLV_ISO7816, &limits, &outer) != TC_TLV_OK ||
+    if (TC_TLV_read((TC_bytes){stored.data, response.length}, TC_TLV_ISO7816, &limits, &outer) !=
+            TC_TLV_OK ||
         outer.encoded.length != response.length || outer.encoded.data[0] != 0x53)
       return 0;
     /* Security-object hashes cover the stored BC field, including ciphertext.
@@ -857,8 +856,9 @@ static int card_certificate(ExampleCardIO* io, const Options* options, TC_PIV_ca
   *encoded = container.certificate;
   if (container.compression == TC_PIV_CERTIFICATE_GZIP) {
     size_t decoded;
-    if (TC_GZIP_decode(encoded->data, encoded->length, sensitive.decoded, sizeof sensitive.decoded,
-                       &sensitive.scratch.gzip, work, &decoded) != TC_GZIP_OK)
+    if (TC_GZIP_decode(*encoded, &sensitive.scratch.gzip, work,
+                       (TC_buffer){sensitive.decoded, sizeof sensitive.decoded},
+                       &decoded) != TC_GZIP_OK)
       return 0;
     *encoded = (TC_bytes){sensitive.decoded, decoded};
   }

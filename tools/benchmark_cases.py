@@ -106,16 +106,16 @@ FEATURES += [
 
 FEATURES += [
     ("TLV definite-length reader",
-     'const uint8_t data[] = {0x30,3,2,1,42}; TC_TLV_limits limits = {64,64,8,4}; TC_TLV_reader reader; TC_TLV_element element; CHECK(TC_TLV_reader_init(&reader,data,sizeof data,TC_TLV_DER,&limits)); CHECK(TC_TLV_next(&reader,&element)); consume(element.value.data,element.value.length);',
+     'const uint8_t data[] = {0x30,3,2,1,42}; TC_TLV_limits limits = {64,64,8,4}; TC_TLV_reader reader; TC_TLV_element element; CHECK(TC_TLV_reader_init(&reader,(TC_bytes){data,sizeof data},TC_TLV_DER,&limits)); CHECK(TC_TLV_next(&reader,&element)); consume(element.value.data,element.value.length);',
      NO256 + " -DTC_ENABLE_TLV=1"),
     ("TLV bounded tree walk",
-     'const uint8_t data[] = {0x30,3,2,1,42}; TC_TLV_limits limits = {64,64,8,4}; TC_TLV_frame frames[4]; CHECK(TC_TLV_walk(data,sizeof data,TC_TLV_DER,&limits,(TC_TLV_frames){frames,4},NULL,NULL)); consume(data,sizeof data);',
+     'const uint8_t data[] = {0x30,3,2,1,42}; TC_TLV_limits limits = {64,64,8,4}; TC_TLV_frame frames[4]; CHECK(TC_TLV_walk((TC_bytes){data,sizeof data},TC_TLV_DER,&limits,(TC_TLV_frames){frames,4},NULL,NULL)); consume(data,sizeof data);',
      NO256 + " -DTC_ENABLE_TLV=1"),
     ("TLV BER incremental reader",
-     'const uint8_t data[] = {0x30,0x80,2,1,42,0,0}; TC_TLV_limits limits = {64,64,8,4}; TC_TLV_frame frames[4]; TC_TLV_stream stream; CHECK(TC_TLV_stream_init(&stream,TC_TLV_BER,&limits,(TC_TLV_frames){frames,4})); if(TC_TLV_stream_feed(&stream,data,1,NULL,NULL)!=TC_TLV_MORE) return 1; CHECK(TC_TLV_stream_feed(&stream,data+1,sizeof data-1,NULL,NULL)); CHECK(TC_TLV_stream_finish(&stream)); consume(data,sizeof data);',
+     'const uint8_t data[] = {0x30,0x80,2,1,42,0,0}; TC_TLV_limits limits = {64,64,8,4}; TC_TLV_frame frames[4]; TC_TLV_stream stream; CHECK(TC_TLV_stream_init(&stream,TC_TLV_BER,&limits,(TC_TLV_frames){frames,4})); if(TC_TLV_stream_feed(&stream,(TC_bytes){data,1},NULL,NULL)!=TC_TLV_MORE) return 1; CHECK(TC_TLV_stream_feed(&stream,(TC_bytes){data+1,sizeof data-1},NULL,NULL)); CHECK(TC_TLV_stream_finish(&stream)); consume(data,sizeof data);',
      NO256 + " -DTC_ENABLE_TLV=1 -DTC_TLV_ENABLE_BER=1 -DTC_TLV_ENABLE_STREAM=1"),
     ("DER integer and OID readers",
-     'const uint8_t integer[] = {2,1,42}, oid[] = {6,3,0x55,4,3}; uint32_t n; TC_bytes span; CHECK(TC_DER_uint32(integer,sizeof integer,&n)); CHECK(TC_DER_oid(oid,sizeof oid,&span)); if(n!=42) return 1; consume(span.data,span.length);',
+     'const uint8_t integer[] = {2,1,42}, oid[] = {6,3,0x55,4,3}; uint32_t n; TC_bytes span; CHECK(TC_DER_uint32((TC_bytes){integer,sizeof integer},&n)); CHECK(TC_DER_oid((TC_bytes){oid,sizeof oid},&span)); if(n!=42) return 1; consume(span.data,span.length);',
      NO256 + " -DTC_ENABLE_TLV=1 -DTC_ENABLE_DER=1"),
 ]
 
@@ -127,7 +127,7 @@ FEATURES += [
      "if(c.card_uuid.length!=16 || c.cardholder_uuid.length!=16) return 1; consume(c.card_uuid.data,16);",
      NO256 + " -DTC_ENABLE_TLV=1 -DTC_ENABLE_PIV_CHUID=1"),
     ("PIV secure messaging CVC reader", c_array(cvc()) +
-     "TC_PIV_CVC c; CHECK(TC_PIV_CVC_read(data,sizeof data,&c)); "
+     "TC_PIV_CVC c; CHECK(TC_PIV_CVC_read((TC_bytes){data,sizeof data},&c)); "
      "if(c.key_bits!=256 || c.role!=0) return 1; consume(c.signed_data.data,c.signed_data.length);",
      PKI + " -DTC_ENABLE_PIV_CVC=1"),
 ]
@@ -138,10 +138,10 @@ FEATURES.append(("TWIC unsigned CHUID reader", c_array(chuid(unsigned=True)) +
 for kind, inherited in (("rsa", False), ("ec", False), ("ec", True)):
     setup = c_array(eac_certificate(kind, not inherited))
     setup += "TC_EAC_CVC c; TC_TLV_limits bounds={4096,4096,128,8}; TC_TLV_frame frames[8]; "
-    setup += "TC_EAC_CVC_workspace work={frames,8}; CHECK(TC_EAC_CVC_read(data,sizeof data,&bounds,&work,&c)); "
+    setup += "TC_EAC_CVC_workspace work={{frames,8}}; CHECK(TC_EAC_CVC_read((TC_bytes){data,sizeof data},&bounds,&work,&c)); "
     if inherited:
         setup += c_array(eac_key(), "domain_data")
-        setup += "TC_EAC_CVC_public_key domain; CHECK(TC_EAC_CVC_public_key_read(domain_data,sizeof domain_data,&bounds,&domain)); "
+        setup += "TC_EAC_CVC_public_key domain; CHECK(TC_EAC_CVC_public_key_read((TC_bytes){domain_data,sizeof domain_data},&bounds,&domain)); "
         setup += "CHECK(TC_EAC_CVC_check_encoding(&c,&domain,&domain)); "
     setup += "consume(c.signed_data.data,c.signed_data.length);"
     label = "inherited EC with encoding checks" if inherited else "RSA-2048" if kind == "rsa" else "explicit EC-256"

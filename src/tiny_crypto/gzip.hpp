@@ -19,19 +19,18 @@ public:
   GZIPDecoder(const GZIPDecoder&) = delete;
   GZIPDecoder& operator=(const GZIPDecoder&) = delete;
 
-  TC_CPP_NODISCARD TC_GZIP_result decode(const uint8_t* input, size_t length, uint8_t* output,
-                                         size_t capacity, size_t& work,
+  TC_CPP_NODISCARD TC_GZIP_result decode(TC_bytes input, size_t& work, TC_buffer output,
                                          size_t& output_length) noexcept
   {
-    return TC_GZIP_decode(input, length, output, capacity, &workspace_, &work, &output_length);
+    return TC_GZIP_decode(input, &workspace_, &work, output, &output_length);
   }
 
   template <size_t InputSize, size_t OutputSize>
-  TC_CPP_NODISCARD TC_GZIP_result decode(const uint8_t (&input)[InputSize],
-                                         uint8_t (&output)[OutputSize], size_t& work,
+  TC_CPP_NODISCARD TC_GZIP_result decode(const uint8_t (&input)[InputSize], size_t& work,
+                                         uint8_t (&output)[OutputSize],
                                          size_t& output_length) noexcept
   {
-    return decode(input, InputSize, output, OutputSize, work, output_length);
+    return decode(TC_bytes{input, InputSize}, work, TC_buffer{output, OutputSize}, output_length);
   }
 
 private:

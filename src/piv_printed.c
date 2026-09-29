@@ -100,7 +100,7 @@ TC_TLV_result TC_PIV_printed_read(TC_bytes input, TC_PIV_printed_encoding encodi
   }
   if (profile == TC_PIV_PRINTED_PROFILE_TWIC && input.length > TWIC_CONTENTS_MAX)
     return TC_TLV_LIMIT;
-  result = TC_TLV_reader_init(&reader, input.data, input.length, TC_TLV_ISO7816, &limits);
+  result = TC_TLV_reader_init(&reader, input, TC_TLV_ISO7816, &limits);
   if (result != TC_TLV_OK)
     return result;
 

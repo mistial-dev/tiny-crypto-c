@@ -46,7 +46,7 @@ TC_TLV_result tc_cms_collection_init(TC_bytes embedded, unsigned tag, size_t max
   if (embedded.length)
     result = tc_pki_tree_open(embedded, tag, TC_TLV_BER, limits, tree, &parsed.embedded);
   else
-    result = TC_TLV_reader_init(&parsed.embedded, NULL, 0, TC_TLV_DER, limits);
+    result = TC_TLV_reader_init(&parsed.embedded, (TC_bytes){NULL, 0}, TC_TLV_DER, limits);
   if (result != TC_TLV_OK)
     return result;
   parsed.remaining = max_records;

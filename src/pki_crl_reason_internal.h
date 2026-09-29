@@ -29,12 +29,12 @@ static inline TC_TLV_result tc_pki_crl_reason_read(TC_bytes encoded, unsigned* o
   TC_TLV_element element;
   if (!out)
     return TC_TLV_ARGUMENT;
-  TC_TLV_result result = TC_TLV_read(encoded.data, encoded.length, TC_TLV_DER, &limits, &element);
+  TC_TLV_result result = TC_TLV_read(encoded, TC_TLV_DER, &limits, &element);
   if (result != TC_TLV_OK)
     return result;
   if (!tc_pki_tag(&element, ENUMERATED_TAG) || element.encoded.length != encoded.length ||
-      TC_DER_integer_contents(element.value.data, element.value.length) != TC_TLV_OK ||
-      element.value.length != 1 || !tc_pki_crl_reason_known(element.value.data[0]))
+      TC_DER_integer_contents(element.value) != TC_TLV_OK || element.value.length != 1 ||
+      !tc_pki_crl_reason_known(element.value.data[0]))
     return TC_TLV_INVALID;
   *out = element.value.data[0];
   return TC_TLV_OK;

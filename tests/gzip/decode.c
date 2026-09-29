@@ -24,9 +24,9 @@ static MunitResult decode(const MunitParameter params[], void* context)
   uint8_t output[32], zeros[sizeof output] = {0};
   TC_GZIP_workspace workspace;
   size_t work = SIZE_MAX, length = SIZE_MAX;
-  munit_assert_int(
-      TC_GZIP_decode(member, sizeof member, output, sizeof output, &workspace, &work, &length), ==,
-      TC_GZIP_OK);
+  munit_assert_int(TC_GZIP_decode((TC_bytes){member, sizeof member}, &workspace, &work,
+                                  (TC_buffer){output, sizeof output}, &length),
+                   ==, TC_GZIP_OK);
   munit_assert_size(length, ==, 18);
   munit_assert_memory_equal(length, output, "abcabcabcabcabcabc");
   for (size_t i = 0; i < sizeof workspace; ++i)
@@ -34,43 +34,58 @@ static MunitResult decode(const MunitParameter params[], void* context)
   member[17] ^= 1;
   work = SIZE_MAX;
   length = SIZE_MAX;
-  munit_assert_int(
-      TC_GZIP_decode(member, sizeof member, output, sizeof output, &workspace, &work, &length), ==,
-      TC_GZIP_INVALID);
+  munit_assert_int(TC_GZIP_decode((TC_bytes){member, sizeof member}, &workspace, &work,
+                                  (TC_buffer){output, sizeof output}, &length),
+                   ==, TC_GZIP_INVALID);
   munit_assert_size(length, ==, SIZE_MAX);
   munit_assert_memory_equal(sizeof output, output, zeros);
   member[17] ^= 1;
   work = 0;
   memset(output, 0x5a, sizeof output);
-  munit_assert_int(
-      TC_GZIP_decode(member, sizeof member, output, sizeof output, &workspace, &work, &length), ==,
-      TC_GZIP_LIMIT);
+  munit_assert_int(TC_GZIP_decode((TC_bytes){member, sizeof member}, &workspace, &work,
+                                  (TC_buffer){output, sizeof output}, &length),
+                   ==, TC_GZIP_LIMIT);
   munit_assert_memory_equal(sizeof output, output, zeros);
   uint8_t saved[sizeof member];
   memcpy(saved, member, sizeof member);
   work = SIZE_MAX;
-  munit_assert_int(
-      TC_GZIP_decode(member, sizeof member, member, sizeof member, &workspace, &work, &length), ==,
-      TC_GZIP_ARGUMENT);
+  munit_assert_int(TC_GZIP_decode((TC_bytes){member, sizeof member}, &workspace, &work,
+                                  (TC_buffer){member, sizeof member}, &length),
+                   ==, TC_GZIP_ARGUMENT);
   munit_assert_memory_equal(sizeof saved, member, saved);
   munit_assert_size(work, ==, SIZE_MAX);
-  munit_assert_int(
-      TC_GZIP_decode(member, sizeof member, output, sizeof output, &workspace, &work, &work), ==,
-      TC_GZIP_ARGUMENT);
+  munit_assert_int(TC_GZIP_decode((TC_bytes){member, sizeof member}, &workspace, &work,
+                                  (TC_buffer){output, sizeof output}, &work),
+                   ==, TC_GZIP_ARGUMENT);
   munit_assert_size(work, ==, SIZE_MAX);
-  munit_assert_int(
-      TC_GZIP_decode(member, sizeof member, output, sizeof output, NULL, &work, &length), ==,
-      TC_GZIP_ARGUMENT);
-  munit_assert_int(TC_GZIP_decode(member, sizeof member, NULL, 1, &workspace, &work, &length), ==,
-                   TC_GZIP_ARGUMENT);
+  munit_assert_int(TC_GZIP_decode((TC_bytes){member, sizeof member}, NULL, &work,
+                                  (TC_buffer){output, sizeof output}, &length),
+                   ==, TC_GZIP_ARGUMENT);
+  munit_assert_int(TC_GZIP_decode((TC_bytes){member, sizeof member}, &workspace, &work,
+                                  (TC_buffer){NULL, 1}, &length),
+                   ==, TC_GZIP_ARGUMENT);
+  munit_assert_size(work, ==, SIZE_MAX);
+  /* A span with NULL data and a length is an argument error that keeps storage. */
+  uint8_t filled[sizeof output];
+  memset(output, 0x5a, sizeof output);
+  memcpy(filled, output, sizeof output);
+  length = SIZE_MAX;
+  munit_assert_int(TC_GZIP_decode((TC_bytes){NULL, 1}, &workspace, &work,
+                                  (TC_buffer){output, sizeof output}, &length),
+                   ==, TC_GZIP_ARGUMENT);
+  munit_assert_int(TC_GZIP_decode((TC_bytes){member, sizeof member}, NULL, &work,
+                                  (TC_buffer){output, sizeof output}, &length),
+                   ==, TC_GZIP_ARGUMENT);
+  munit_assert_memory_equal(sizeof output, output, filled);
+  munit_assert_size(length, ==, SIZE_MAX);
   munit_assert_size(work, ==, SIZE_MAX);
   /* RFC 1952 section 2.3.1: CM 8 is deflate, other methods are unsupported. */
   member[2] = 7;
   length = SIZE_MAX;
   memset(output, 0x5a, sizeof output);
-  munit_assert_int(
-      TC_GZIP_decode(member, sizeof member, output, sizeof output, &workspace, &work, &length), ==,
-      TC_GZIP_UNSUPPORTED);
+  munit_assert_int(TC_GZIP_decode((TC_bytes){member, sizeof member}, &workspace, &work,
+                                  (TC_buffer){output, sizeof output}, &length),
+                   ==, TC_GZIP_UNSUPPORTED);
   munit_assert_size(length, ==, SIZE_MAX);
   munit_assert_memory_equal(sizeof output, output, zeros);
   (void)params;

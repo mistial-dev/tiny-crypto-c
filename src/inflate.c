@@ -8,7 +8,7 @@ enum { END_OF_BLOCK = 256, FIRST_LENGTH = 257, LAST_LENGTH = 285, LAST_DISTANCE 
 
 static TC_GZIP_result reserve(tc_inflate_bits* bits, tc_inflate_output* output, size_t length)
 {
-  if (length > output->capacity - output->length || *bits->work < length)
+  if (length > output->buffer.capacity - output->length || *bits->work < length)
     return TC_GZIP_LIMIT;
   *bits->work -= length;
   return TC_GZIP_OK;
@@ -33,7 +33,7 @@ static TC_GZIP_result stored(tc_inflate_bits* bits, tc_inflate_output* output)
   if (result != TC_GZIP_OK)
     return result;
   if (length)
-    memcpy(output->data + output->length, bits->input.data + bits->offset, length);
+    memcpy(output->buffer.data + output->length, bits->input.data + bits->offset, length);
   bits->offset += length;
   output->length += length;
   return TC_GZIP_OK;
@@ -53,7 +53,7 @@ static TC_GZIP_result compressed(tc_inflate_bits* bits, const TC_GZIP_workspace*
       result = reserve(bits, output, 1);
       if (result != TC_GZIP_OK)
         return result;
-      output->data[output->length++] = (uint8_t)symbol;
+      output->buffer.data[output->length++] = (uint8_t)symbol;
       continue;
     }
     if (symbol > LAST_LENGTH)
@@ -93,7 +93,7 @@ static TC_GZIP_result compressed(tc_inflate_bits* bits, const TC_GZIP_workspace*
       return result;
     /* Forward copying expands overlapping references such as distance one. */
     for (unsigned i = 0; i < length; ++i) {
-      output->data[output->length] = output->data[output->length - distance];
+      output->buffer.data[output->length] = output->buffer.data[output->length - distance];
       ++output->length;
     }
   }

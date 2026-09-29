@@ -46,13 +46,13 @@ static TC_status eac(size_t length)
   TC_EAC_CVC value;
   TC_EAC_CVC_public_key domain;
   TC_TLV_frame frames[8];
-  TC_EAC_CVC_workspace workspace = {frames, 8};
+  TC_EAC_CVC_workspace workspace = {{frames, 8}};
   const TC_TLV_limits limits = {4096, 4096, 128, 8};
-  if (TC_EAC_CVC_read(eac_data, length, &limits, &workspace, &value) != TC_TLV_OK)
+  if (TC_EAC_CVC_read((TC_bytes){eac_data, length}, &limits, &workspace, &value) != TC_TLV_OK)
     return TC_ERROR;
   if (eac_inherited) {
-    if (TC_EAC_CVC_public_key_read(fixture_eac_domain, sizeof fixture_eac_domain, &limits,
-                                   &domain) != TC_TLV_OK ||
+    if (TC_EAC_CVC_public_key_read((TC_bytes){fixture_eac_domain, sizeof fixture_eac_domain},
+                                   &limits, &domain) != TC_TLV_OK ||
         TC_EAC_CVC_check_encoding(&value, &domain, &domain) != TC_TLV_OK)
       return TC_ERROR;
   }
@@ -64,7 +64,7 @@ static TC_status eac(size_t length)
 static TC_status cvc(size_t length)
 {
   TC_PIV_CVC value;
-  TC_TLV_result result = TC_PIV_CVC_read(fixture_cvc, length, &value);
+  TC_TLV_result result = TC_PIV_CVC_read((TC_bytes){fixture_cvc, length}, &value);
   tc_benchmark_consume(&value);
   return result == TC_TLV_OK ? TC_OK : TC_ERROR;
 }

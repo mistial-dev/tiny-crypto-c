@@ -326,11 +326,11 @@ Enable `TINY_CRYPTO_ENABLE_TLV` and include `<tiny_crypto/tlv.h>`:
 
 ```c
 const uint8_t data[] = {0x30, 0x03, 0x02, 0x01, 0x2a};
+const TC_bytes input = {data, sizeof data};
 const TC_TLV_limits limits = {4096, 4096, 256, 16};
 TC_TLV_reader reader;
 TC_TLV_element element;
-TC_TLV_result result = TC_TLV_reader_init(&reader, data, sizeof data,
-                                         TC_TLV_DER, &limits);
+TC_TLV_result result = TC_TLV_reader_init(&reader, input, TC_TLV_DER, &limits);
 if (result == TC_TLV_OK) {
     result = TC_TLV_next(&reader, &element);
     /* element.value borrows data; use it only if result is TC_TLV_OK. */
@@ -430,8 +430,8 @@ for trust prerequisites and workspace setup.
 
 EAC certificates use a different schema. `<tiny_crypto/eac_cvc.h>` provides
 `TC_EAC_CVC_read`, a standalone public-key reader, and an extension iterator.
-The certificate reader takes `TC_TLV_limits` and a `TC_EAC_CVC_workspace`
-containing caller-owned nesting frames. Returned fields borrow the input.
+The certificate reader takes the encoding as `TC_bytes`, `TC_TLV_limits` and a
+`TC_EAC_CVC_workspace` holding caller-owned `TC_TLV_frames`. Returned fields borrow the input.
 Its signed span includes the complete `7F4E` body, including tag and length.
 Unknown extensions are preserved. Unsupported key or authorization OIDs return
 `TC_TLV_UNSUPPORTED`.

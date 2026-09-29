@@ -328,7 +328,7 @@ static TC_X509_path_status cms_signed_data_path_build(const TC_CMS_validation_re
                                       workspace->validation.frames.capacity, work};
   if (tc_pki_work_charge(work, expected_type.length) != TC_TLV_OK)
     return TC_X509_PATH_LIMIT;
-  if (TC_DER_oid_contents(expected_type.data, expected_type.length) != TC_TLV_OK)
+  if (TC_DER_oid_contents(expected_type) != TC_TLV_OK)
     return TC_X509_PATH_ERROR;
   if (prepared) {
     if (signer_index || !prepared->data || !prepared->signer ||

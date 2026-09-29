@@ -53,16 +53,17 @@ typedef struct {
   TC_bytes encoded, value;
 } TC_TLV_element;
 
-/* Input must remain alive and unchanged while any returned span is used.
+/* input borrows the encoded bytes. NULL data is valid only for an empty span.
+ * Input must remain alive and unchanged while any returned span is used.
  * Input, parser state, frame storage, and output structs must not overlap.
  * Failure leaves every output unchanged. Header parsing reads only the tag and length.
  * MORE requests additional bytes. At the end of a message, it means truncation.
  * DER here checks framing only. Typed/schema checks are separate. */
-TC_TLV_result TC_TLV_header_read(const uint8_t* data, size_t length, TC_TLV_profile profile,
+TC_TLV_result TC_TLV_header_read(TC_bytes input, TC_TLV_profile profile,
                                  const TC_TLV_limits* limits, TC_TLV_header* out);
 /* A shallow, definite-length read. Use walk/stream for indefinite BER. */
-TC_TLV_result TC_TLV_read(const uint8_t* data, size_t length, TC_TLV_profile profile,
-                          const TC_TLV_limits* limits, TC_TLV_element* out);
+TC_TLV_result TC_TLV_read(TC_bytes input, TC_TLV_profile profile, const TC_TLV_limits* limits,
+                          TC_TLV_element* out);
 
 /* Sibling cursor over borrowed input. Treat members as read-only and start it
  * with TC_TLV_reader_init or TC_TLV_reader_child. root is set by
@@ -76,11 +77,12 @@ typedef struct {
   uint8_t root;
 } TC_TLV_reader;
 /* Start a root reader over a complete data field or payload. Limits are copied.
- * Returns ARGUMENT for NULL reader/limits, NULL data with a length or an
- * unknown profile, UNSUPPORTED for BER when disabled and LIMIT when length
- * exceeds max_input. Failure leaves reader unchanged. */
-TC_TLV_result TC_TLV_reader_init(TC_TLV_reader* reader, const uint8_t* data, size_t length,
-                                 TC_TLV_profile profile, const TC_TLV_limits* limits);
+ * input is borrowed for the reader's lifetime.
+ * Returns ARGUMENT for NULL reader/limits, NULL input data with a length or an
+ * unknown profile, UNSUPPORTED for BER when disabled and LIMIT when
+ * input.length exceeds max_input. Failure leaves reader unchanged. */
+TC_TLV_result TC_TLV_reader_init(TC_TLV_reader* reader, TC_bytes input, TC_TLV_profile profile,
+                                 const TC_TLV_limits* limits);
 /* Start a reader over the template of an element read from parent. The child
  * inherits the parent's profile and limits, starts its own element count and
  * rejects padding. Its template is complete, so a truncated nested element
@@ -145,26 +147,24 @@ TC_TLV_result TC_TLV_stream_init(TC_TLV_stream* stream, TC_TLV_profile profile,
  * Events emitted before an error remain emitted.
  * OK/MORE both consume the entire chunk. MORE means an object is unfinished.
  * Discard the message on error. */
-TC_TLV_result TC_TLV_stream_feed(TC_TLV_stream* stream, const uint8_t* data, size_t length,
-                                 TC_TLV_visit visit, void* user);
+TC_TLV_result TC_TLV_stream_feed(TC_TLV_stream* stream, TC_bytes chunk, TC_TLV_visit visit,
+                                 void* user);
 TC_TLV_result TC_TLV_stream_finish(TC_TLV_stream* stream);
 #endif
 /* Walk checks all constructed boundaries with one shared element/depth budget.
- * Event spans borrow data and stay valid while data is alive and unchanged.
+ * Event spans borrow input and stay valid while input is alive and unchanged.
  * A sequence of root objects is accepted. A schema needing exactly one root
  * must check that separately. NULL visit validates framing without callbacks. */
-TC_TLV_result TC_TLV_walk(const uint8_t* data, size_t length, TC_TLV_profile profile,
-                          const TC_TLV_limits* limits, TC_TLV_frames frames, TC_TLV_visit visit,
-                          void* user);
+TC_TLV_result TC_TLV_walk(TC_bytes input, TC_TLV_profile profile, const TC_TLV_limits* limits,
+                          TC_TLV_frames frames, TC_TLV_visit visit, void* user);
 
 /* Read one complete object and validate its constructed boundaries. Supports
  * indefinite BER and leaves following siblings unread. Returned spans borrow
  * input. encoded includes EOC and value excludes it. MORE means truncation.
  * Frames may change on failure. out changes only on OK. Input, limits, frames
  * and out must be disjoint. Root padding after the object is left unread. */
-TC_TLV_result TC_TLV_read_tree(const uint8_t* data, size_t length, TC_TLV_profile profile,
-                               const TC_TLV_limits* limits, TC_TLV_frames frames,
-                               TC_TLV_element* out);
+TC_TLV_result TC_TLV_read_tree(TC_bytes input, TC_TLV_profile profile, const TC_TLV_limits* limits,
+                               TC_TLV_frames frames, TC_TLV_element* out);
 
 #ifdef __cplusplus
 }

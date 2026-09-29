@@ -214,10 +214,9 @@ TC_TLV_result TC_TLV_stream_init(TC_TLV_stream* s, TC_TLV_profile profile,
 {
   return initialize(s, profile, limits, frames);
 }
-TC_TLV_result TC_TLV_stream_feed(TC_TLV_stream* s, const uint8_t* data, size_t length,
-                                 TC_TLV_visit visit, void* user)
+TC_TLV_result TC_TLV_stream_feed(TC_TLV_stream* s, TC_bytes chunk, TC_TLV_visit visit, void* user)
 {
-  return feed(s, data, length, visit, user);
+  return feed(s, chunk.data, chunk.length, visit, user);
 }
 TC_TLV_result TC_TLV_stream_finish(TC_TLV_stream* s)
 {
@@ -225,34 +224,34 @@ TC_TLV_result TC_TLV_stream_finish(TC_TLV_stream* s)
 }
 #endif
 
-TC_TLV_result TC_TLV_walk(const uint8_t* data, size_t length, TC_TLV_profile profile,
-                          const TC_TLV_limits* limits, TC_TLV_frames frames, TC_TLV_visit visit,
-                          void* user)
+TC_TLV_result TC_TLV_walk(TC_bytes input, TC_TLV_profile profile, const TC_TLV_limits* limits,
+                          TC_TLV_frames frames, TC_TLV_visit visit, void* user)
 {
   TC_TLV_stream s;
   TC_TLV_result result;
-  if (!data && length)
+  if (!input.data && input.length)
     return TC_TLV_ARGUMENT;
   result = initialize(&s, profile, limits, frames);
   if (result != TC_TLV_OK)
     return result;
-  result = feed(&s, data, length, visit, user);
+  result = feed(&s, input.data, input.length, visit, user);
   if (result != TC_TLV_OK && result != TC_TLV_MORE)
     return result;
   return finish(&s);
 }
 
-TC_TLV_result TC_TLV_read_tree(const uint8_t* data, size_t length, TC_TLV_profile profile,
-                               const TC_TLV_limits* limits, TC_TLV_frames frames,
-                               TC_TLV_element* out)
+TC_TLV_result TC_TLV_read_tree(TC_bytes input, TC_TLV_profile profile, const TC_TLV_limits* limits,
+                               TC_TLV_frames frames, TC_TLV_element* out)
 {
   enum { EOC_BYTES = 2 };
+  const uint8_t* data = input.data;
+  size_t length = input.length;
   TC_TLV_stream s;
   TC_TLV_element element;
   TC_TLV_result result;
   if (!out)
     return TC_TLV_ARGUMENT;
-  result = TC_TLV_header_read(data, length, profile, limits, &element.header);
+  result = TC_TLV_header_read(input, profile, limits, &element.header);
   if (result != TC_TLV_OK)
     return result;
   result = initialize(&s, profile, limits, frames);

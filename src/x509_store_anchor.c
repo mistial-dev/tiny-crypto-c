@@ -15,8 +15,7 @@ TC_TLV_result tc_x509_anchor_policy_set(TC_bytes contents, const TC_TLV_limits* 
   TC_TLV_reader policies;
   TC_X509_policy policy;
   size_t count = 0;
-  TC_TLV_result result =
-      TC_TLV_reader_init(&policies, contents.data, contents.length, TC_TLV_DER, limits);
+  TC_TLV_result result = TC_TLV_reader_init(&policies, contents, TC_TLV_DER, limits);
   if (result != TC_TLV_OK)
     return result;
   if (!contents.length)
@@ -80,8 +79,7 @@ TC_TLV_result tc_x509_anchor_extensions(TC_bytes encoded, const TC_TLV_limits* l
     switch (id) {
     case TC_PKI_EXT_CERTIFICATE_POLICIES: {
       TC_TLV_element value;
-      result =
-          TC_TLV_read(extension.value.data, extension.value.length, TC_TLV_DER, limits, &value);
+      result = TC_TLV_read(extension.value, TC_TLV_DER, limits, &value);
       if (result != TC_TLV_OK || !tc_pki_tag(&value, 0x30) ||
           value.encoded.length != extension.value.length)
         return TC_TLV_INVALID;
@@ -112,7 +110,7 @@ TC_TLV_result tc_x509_anchor_extensions(TC_bytes encoded, const TC_TLV_limits* l
     }
     case TC_PKI_EXT_INHIBIT_ANY_POLICY: {
       uint32_t skip;
-      result = TC_DER_uint32(extension.value.data, extension.value.length, &skip);
+      result = TC_DER_uint32(extension.value, &skip);
       if (result != TC_TLV_OK)
         return result;
       out->policy_flags |= TC_X509_PATH_INHIBIT_ANY_POLICY;
@@ -172,8 +170,7 @@ TC_TLV_result tc_x509_anchor_certificate(const TC_X509_certificate* certificate,
   out->trust.public_key = certificate->public_key;
   if (!certificate->extensions.data)
     return TC_TLV_OK;
-  if (TC_DER_sequence(certificate->extensions.data, certificate->extensions.length, &contents) !=
-      TC_TLV_OK)
+  if (TC_DER_sequence(certificate->extensions, &contents) != TC_TLV_OK)
     return TC_TLV_INVALID;
   out->certificate_extensions = contents;
   return tc_x509_anchor_extensions(certificate->extensions, limits, workspace, 0, out);

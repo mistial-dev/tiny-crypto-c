@@ -27,8 +27,7 @@ static TC_TLV_result unique_field(TC_bytes input, uint8_t tag, TC_bytes* out)
   TC_TLV_reader reader;
   TC_TLV_element element;
   TC_bytes found = {NULL, 0};
-  TC_TLV_result result =
-      TC_TLV_reader_init(&reader, input.data, input.length, TC_TLV_ISO7816, &identity_limits);
+  TC_TLV_result result = TC_TLV_reader_init(&reader, input, TC_TLV_ISO7816, &identity_limits);
   if (result != TC_TLV_OK)
     return result;
   while ((result = TC_TLV_next(&reader, &element)) == TC_TLV_OK) {
@@ -54,7 +53,7 @@ TC_TLV_result example_card_identity(TC_bytes response, ExampleCardApplication ex
   if (!out || (expected != EXAMPLE_CARD_PIV && expected != EXAMPLE_CARD_TWIC))
     return TC_TLV_ARGUMENT;
   TC_TLV_result result =
-      TC_TLV_walk(response.data, response.length, TC_TLV_ISO7816, &identity_limits,
+      TC_TLV_walk(response, TC_TLV_ISO7816, &identity_limits,
                   (TC_TLV_frames){frames, sizeof frames / sizeof *frames}, NULL, NULL);
   if (result == TC_TLV_OK)
     result = unique_field(response, CARD_TEMPLATE, &properties);
@@ -149,7 +148,7 @@ ExampleCardResult example_twic_inventory_read(ExampleCardIO* io, ExampleCardMode
     *work -= response.length;
     TC_TLV_element field;
     const TC_TLV_result framing =
-        TC_TLV_read(pool + used, response.length, TC_TLV_ISO7816, &limits, &field);
+        TC_TLV_read((TC_bytes){pool + used, response.length}, TC_TLV_ISO7816, &limits, &field);
     if (framing != TC_TLV_OK) {
       result = framing == TC_TLV_LIMIT ? EXAMPLE_CARD_LIMIT : EXAMPLE_CARD_PROTOCOL;
       goto failure;
@@ -378,7 +377,8 @@ ExampleCardResult example_card_object_read(ExampleCardIO* io, ExampleCardReadMod
   }
   const TC_TLV_limits limits = {capacity, capacity, 1, 1};
   TC_TLV_element container;
-  if (TC_TLV_read(buffer, response.length, TC_TLV_ISO7816, &limits, &container) != TC_TLV_OK ||
+  if (TC_TLV_read((TC_bytes){buffer, response.length}, TC_TLV_ISO7816, &limits, &container) !=
+          TC_TLV_OK ||
       container.header.tag_length != 1 || container.header.tag[0] != CONTAINER_TAG ||
       container.encoded.length != response.length) {
     TC_secure_zero(buffer, capacity);

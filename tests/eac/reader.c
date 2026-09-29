@@ -18,7 +18,7 @@ int main(int argc, char** argv)
   static uint8_t data[65536];
   TC_TLV_limits limits = {sizeof data, sizeof data, 4096, 16};
   TC_TLV_frame frames[16];
-  TC_EAC_CVC_workspace workspace = {frames, 16};
+  TC_EAC_CVC_workspace workspace = {{frames, 16}};
   TC_EAC_CVC certificate, saved;
   TC_EAC_CVC_public_key key, old_key;
   TC_TLV_result result;
@@ -38,7 +38,7 @@ int main(int argc, char** argv)
   if (argc == 3) {
     memset(&key, 0xa5, sizeof key);
     old_key = key;
-    result = TC_EAC_CVC_public_key_read(data, length, &limits, &key);
+    result = TC_EAC_CVC_public_key_read((TC_bytes){data, length}, &limits, &key);
     printf("result=%d\n", result);
     if (result != TC_TLV_OK)
       return memcmp(&key, &old_key, sizeof key) ? 1 : 0;
@@ -48,7 +48,7 @@ int main(int argc, char** argv)
   }
   memset(&certificate, 0xa5, sizeof certificate);
   saved = certificate;
-  result = TC_EAC_CVC_read(data, length, &limits, &workspace, &certificate);
+  result = TC_EAC_CVC_read((TC_bytes){data, length}, &limits, &workspace, &certificate);
   printf("result=%d\n", result);
   if (result != TC_TLV_OK)
     return memcmp(&certificate, &saved, sizeof certificate) ? 1 : 0;
@@ -88,7 +88,7 @@ int main(int argc, char** argv)
   }
   saved = certificate;
   for (i = 0; i < length; ++i) {
-    result = TC_EAC_CVC_read(data, i, &limits, &workspace, &certificate);
+    result = TC_EAC_CVC_read((TC_bytes){data, i}, &limits, &workspace, &certificate);
     if (result == TC_TLV_OK || memcmp(&certificate, &saved, sizeof certificate))
       return 1;
   }

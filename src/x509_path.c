@@ -597,7 +597,7 @@ static TC_TLV_result anchor_extensions_check(const TC_X509_store_anchor* anchor,
   TC_TLV_result result;
   if (!contents.data)
     return contents.length ? TC_TLV_ARGUMENT : TC_TLV_OK;
-  result = TC_TLV_reader_init(&reader, contents.data, contents.length, TC_TLV_DER, limits);
+  result = TC_TLV_reader_init(&reader, contents, TC_TLV_DER, limits);
   if (result != TC_TLV_OK)
     return result;
   while ((result = tc_pki_extension_next(&reader, work, &extension)) == TC_TLV_OK) {
@@ -683,13 +683,13 @@ TC_X509_path_status tc_x509_path_validate_anchor(const TC_bytes* chain, size_t c
     TC_bytes oid = options->initial_policies[i];
     if (tc_pki_work_charge(work, oid.length) != TC_TLV_OK)
       return TC_X509_PATH_LIMIT;
-    if (TC_DER_oid_contents(oid.data, oid.length) != TC_TLV_OK)
+    if (TC_DER_oid_contents(oid) != TC_TLV_OK)
       return TC_X509_PATH_ERROR;
   }
   if (options->purpose.length) {
     if (tc_pki_work_charge(work, options->purpose.length) != TC_TLV_OK)
       return TC_X509_PATH_LIMIT;
-    if (TC_DER_oid_contents(options->purpose.data, options->purpose.length) != TC_TLV_OK)
+    if (TC_DER_oid_contents(options->purpose) != TC_TLV_OK)
       return TC_X509_PATH_ERROR;
   }
   parser.frames = workspace->frames;

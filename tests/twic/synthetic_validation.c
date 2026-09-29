@@ -79,8 +79,7 @@ static TC_bytes value(TC_bytes encoded, uint8_t tag)
 {
   const TC_TLV_limits limits = {LIMIT, LIMIT, 256, 16};
   TC_TLV_element element;
-  munit_assert_int(TC_TLV_read(encoded.data, encoded.length, TC_TLV_ISO7816, &limits, &element), ==,
-                   TC_TLV_OK);
+  munit_assert_int(TC_TLV_read(encoded, TC_TLV_ISO7816, &limits, &element), ==, TC_TLV_OK);
   munit_assert_size(element.encoded.length, ==, encoded.length);
   munit_assert_uint(element.encoded.data[0], ==, tag);
   return element.value;
@@ -90,8 +89,7 @@ static TC_bytes first_value(TC_bytes encoded, uint8_t tag)
 {
   const TC_TLV_limits limits = {LIMIT, LIMIT, 256, 16};
   TC_TLV_element element;
-  munit_assert_int(TC_TLV_read(encoded.data, encoded.length, TC_TLV_ISO7816, &limits, &element), ==,
-                   TC_TLV_OK);
+  munit_assert_int(TC_TLV_read(encoded, TC_TLV_ISO7816, &limits, &element), ==, TC_TLV_OK);
   munit_assert_uint(element.encoded.data[0], ==, tag);
   return element.value;
 }

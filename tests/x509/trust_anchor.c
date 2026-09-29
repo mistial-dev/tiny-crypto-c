@@ -188,14 +188,11 @@ static MunitResult precedence(const MunitParameter params[], void* user)
   TC_TLV_reader fields;
   TC_X509_trust_anchor_reader reader;
   TC_X509_store_anchor anchor;
-  munit_assert_int(TC_TLV_read(encoded, length, TC_TLV_DER, &limits, &list), ==, TC_TLV_OK);
-  munit_assert_int(TC_TLV_read(list.value.data, list.value.length, TC_TLV_DER, &limits, &choice),
-                   ==, TC_TLV_OK);
-  munit_assert_int(TC_TLV_read(choice.value.data, choice.value.length, TC_TLV_DER, &limits, &info),
-                   ==, TC_TLV_OK);
-  munit_assert_int(
-      TC_TLV_reader_init(&fields, info.value.data, info.value.length, TC_TLV_DER, &limits), ==,
-      TC_TLV_OK);
+  munit_assert_int(TC_TLV_read((TC_bytes){encoded, length}, TC_TLV_DER, &limits, &list), ==,
+                   TC_TLV_OK);
+  munit_assert_int(TC_TLV_read(list.value, TC_TLV_DER, &limits, &choice), ==, TC_TLV_OK);
+  munit_assert_int(TC_TLV_read(choice.value, TC_TLV_DER, &limits, &info), ==, TC_TLV_OK);
+  munit_assert_int(TC_TLV_reader_init(&fields, info.value, TC_TLV_DER, &limits), ==, TC_TLV_OK);
   while (TC_TLV_next(&fields, &part) == TC_TLV_OK)
     if (part.header.tag_length == 1 && part.header.tag[0] == 0x30 &&
         part.encoded.data != info.value.data) {

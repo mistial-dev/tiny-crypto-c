@@ -14,7 +14,7 @@ static TC_TLV_result parameter_algorithm(TC_bytes encoded, TC_TLV_profile profil
                                          const tc_pki_tree_workspace* tree, TC_DER_algorithm* out)
 {
   return tree ? tc_pki_tree_algorithm(encoded, profile, bounds, tree, out)
-              : TC_DER_algorithm_identifier(encoded.data, encoded.length, out);
+              : TC_DER_algorithm_identifier(encoded, out);
 }
 
 static TC_TLV_result hash_algorithm(TC_bytes encoded, TC_TLV_profile profile,
@@ -57,9 +57,9 @@ TC_TLV_result tc_pki_pss_read_profile(TC_bytes encoded, TC_TLV_profile profile,
   if (tree)
     result = tc_pki_tree_open(encoded, 0x30, profile, bounds, tree, &reader);
   else {
-    result = TC_DER_sequence(encoded.data, encoded.length, &contents);
+    result = TC_DER_sequence(encoded, &contents);
     if (result == TC_TLV_OK)
-      result = TC_TLV_reader_init(&reader, contents.data, contents.length, TC_TLV_DER, bounds);
+      result = TC_TLV_reader_init(&reader, contents, TC_TLV_DER, bounds);
   }
   if (result != TC_TLV_OK)
     return result;
@@ -91,12 +91,12 @@ TC_TLV_result tc_pki_pss_read_profile(TC_bytes encoded, TC_TLV_profile profile,
         if (!tc_pki_tag(&integer, 2) || integer.encoded.length != field.value.length)
           return TC_TLV_INVALID;
         value = integer.value;
-        result = TC_DER_integer_contents(value.data, value.length);
+        result = TC_DER_integer_contents(value);
         if (result != TC_TLV_OK)
           return result;
         negative = (value.data[0] & 0x80) != 0;
       } else {
-        result = TC_DER_integer(field.value.data, field.value.length, &value, &negative);
+        result = TC_DER_integer(field.value, &value, &negative);
         if (result != TC_TLV_OK)
           return result;
       }
@@ -137,7 +137,7 @@ TC_TLV_result tc_pki_rsa_key_algorithm(const TC_DER_algorithm* algorithm, TC_key
     return TC_TLV_ARGUMENT;
   if (tc_pki_equal(algorithm->oid, tc_pki_rsa_encryption_oid())) {
     type = TC_KEY_RSA;
-    if (TC_DER_null(algorithm->parameters.data, algorithm->parameters.length) != TC_TLV_OK)
+    if (TC_DER_null(algorithm->parameters) != TC_TLV_OK)
       return TC_TLV_INVALID;
   } else if (tc_pki_equal(algorithm->oid, tc_pki_rsa_pss_oid())) {
     type = TC_KEY_RSA_PSS;
@@ -156,7 +156,7 @@ TC_TLV_result TC_KEY_rsa_private_read(TC_bytes encoded, TC_KEY_rsa_private_key* 
   TC_KEY_rsa_private_key key;
   if (!out)
     return TC_TLV_ARGUMENT;
-  TC_TLV_result result = TC_DER_private_key_info(encoded.data, encoded.length, &key.container);
+  TC_TLV_result result = TC_DER_private_key_info(encoded, &key.container);
   if (result != TC_TLV_OK)
     return result;
   result = tc_pki_rsa_key_algorithm(&key.container.algorithm, &key.type);
@@ -164,15 +164,14 @@ TC_TLV_result TC_KEY_rsa_private_read(TC_bytes encoded, TC_KEY_rsa_private_key* 
     return result;
   if (key.type == TC_KEY_UNKNOWN)
     return TC_TLV_UNSUPPORTED;
-  result = TC_DER_rsa_private(key.container.key.data, key.container.key.length, &key.components);
+  result = TC_DER_rsa_private(key.container.key, &key.components);
   if (result != TC_TLV_OK)
     return result;
   if (key.container.public_key.data) {
     TC_DER_rsa_public_key public_key;
     if (key.container.public_key_unused)
       return TC_TLV_INVALID;
-    result = TC_DER_rsa_public(key.container.public_key.data, key.container.public_key.length,
-                               &public_key);
+    result = TC_DER_rsa_public(key.container.public_key, &public_key);
     if (result != TC_TLV_OK)
       return result;
     if (tc_pki_compare(public_key.modulus, key.components.modulus) ||

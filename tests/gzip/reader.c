@@ -35,8 +35,8 @@ static MunitResult vectors(const MunitParameter params[], void* context)
     munit_assert_size(fread(expected, 1, expected_length, stdin), ==, expected_length);
     size_t work = 100000000, length = SIZE_MAX;
     memset(output, 0x5a, sizeof output);
-    TC_GZIP_result result =
-        TC_GZIP_decode(input, input_length, output, expected_length, &workspace, &work, &length);
+    TC_GZIP_result result = TC_GZIP_decode((TC_bytes){input, input_length}, &workspace, &work,
+                                           (TC_buffer){output, expected_length}, &length);
     munit_assert_int(result, ==, header[0]);
     if (result == TC_GZIP_OK) {
       munit_assert_size(length, ==, expected_length);
@@ -44,8 +44,8 @@ static MunitResult vectors(const MunitParameter params[], void* context)
       if (length) {
         work = 100000000;
         length = SIZE_MAX;
-        munit_assert_int(TC_GZIP_decode(input, input_length, output, expected_length - 1,
-                                        &workspace, &work, &length),
+        munit_assert_int(TC_GZIP_decode((TC_bytes){input, input_length}, &workspace, &work,
+                                        (TC_buffer){output, expected_length - 1}, &length),
                          ==, TC_GZIP_LIMIT);
         munit_assert_size(length, ==, SIZE_MAX);
       }

@@ -57,7 +57,7 @@ int main(void)
     TC_TLV_frame frames[8];
     static const uint8_t encoded_tree[] = {0x30, 0x80, 0, 0};
     TC_TLV_element tree;
-    if (TC_TLV_read_tree(encoded_tree, sizeof encoded_tree, TC_TLV_BER, &cms_limits,
+    if (TC_TLV_read_tree((TC_bytes){encoded_tree, sizeof encoded_tree}, TC_TLV_BER, &cms_limits,
                          (TC_TLV_frames){frames, sizeof frames / sizeof *frames},
                          &tree) != TC_TLV_OK ||
         tree.value.length)
@@ -143,15 +143,15 @@ int main(void)
       TC_X509_policy_next(&policies, &policy) != TC_TLV_OK || policy.oid.length != 1 ||
       policy.oid.data[0] != 42 || TC_X509_policy_next(&policies, &policy) != TC_TLV_END)
     return 1;
-  if (TC_EAC_CVC_public_key_read(eac, sizeof eac, &limits, &eac_key) != TC_TLV_OK ||
+  if (TC_EAC_CVC_public_key_read((TC_bytes){eac, sizeof eac}, &limits, &eac_key) != TC_TLV_OK ||
       eac_key.modulus.length != 2)
     return 1;
-  if (TC_PIV_CVC_read(NULL, 0, &cvc) != TC_TLV_MORE)
+  if (TC_PIV_CVC_read((TC_bytes){NULL, 0}, &cvc) != TC_TLV_MORE)
     return 1;
   if (TC_PIV_CHUID_read((TC_bytes){NULL, 0}, TC_PIV_CHUID_CONTAINER, TC_CHUID_PROFILE_PIV,
                         &chuid) != TC_TLV_MORE)
     return 1;
-  if (TC_DER_uint32(integer, sizeof integer, &number) != TC_TLV_OK || number != 42)
+  if (TC_DER_uint32((TC_bytes){integer, sizeof integer}, &number) != TC_TLV_OK || number != 42)
     return 1;
   if (TC_KMAC256_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0},
                         (TC_buffer){result, sizeof(result)}) != TC_OK)

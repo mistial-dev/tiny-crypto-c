@@ -46,7 +46,7 @@ static inline TC_TLV_result tc_pki_rdn_contents_check(TC_bytes contents,
   TC_TLV_result result;
   if (!tree || !tree->work)
     return TC_TLV_ARGUMENT;
-  result = TC_TLV_reader_init(&attributes, contents.data, contents.length, TC_TLV_DER, limits);
+  result = TC_TLV_reader_init(&attributes, contents, TC_TLV_DER, limits);
   if (result != TC_TLV_OK)
     return result;
   check = attributes;

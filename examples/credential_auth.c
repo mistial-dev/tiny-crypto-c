@@ -23,13 +23,13 @@ static TC_TLV_result response_signature(TC_bytes encoded, TC_bytes* signature)
   const TC_TLV_limits limits = {EXAMPLE_CARD_KEY_RESPONSE_BYTES, EXAMPLE_CARD_KEY_RESPONSE_BYTES, 2,
                                 2};
   TC_TLV_element outer, inner;
-  TC_TLV_result result = TC_TLV_read(encoded.data, encoded.length, TC_TLV_ISO7816, &limits, &outer);
+  TC_TLV_result result = TC_TLV_read(encoded, TC_TLV_ISO7816, &limits, &outer);
   if (result != TC_TLV_OK)
     return result;
   if (outer.header.tag_length != 1 || outer.header.tag[0] != AUTH_TEMPLATE ||
       outer.encoded.length != encoded.length)
     return TC_TLV_INVALID;
-  result = TC_TLV_read(outer.value.data, outer.value.length, TC_TLV_ISO7816, &limits, &inner);
+  result = TC_TLV_read(outer.value, TC_TLV_ISO7816, &limits, &inner);
   if (result != TC_TLV_OK)
     return result;
   if (inner.header.tag_length != 1 || inner.header.tag[0] != AUTH_RESPONSE ||

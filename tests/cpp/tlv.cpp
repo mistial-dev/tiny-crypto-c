@@ -9,11 +9,11 @@ TEST_CASE("TLV reader borrows input and reports incomplete values")
   tiny_crypto::TLVReader reader;
   TC_TLV_element element;
   CHECK(reader.next(element) == TC_TLV_ARGUMENT);
-  CHECK(reader.init(bytes, sizeof bytes, TC_TLV_DER, limits) == TC_TLV_OK);
+  CHECK(reader.init(bytes, TC_TLV_DER, limits) == TC_TLV_OK);
   CHECK(reader.next(element) == TC_TLV_OK);
   CHECK(element.value.data == bytes + 2);
   CHECK(reader.next(element) == TC_TLV_END);
-  CHECK(reader.init(bytes, 2, TC_TLV_DER, limits) == TC_TLV_OK);
+  CHECK(reader.init(TC_bytes{bytes, 2}, TC_TLV_DER, limits) == TC_TLV_OK);
   CHECK(reader.next(element) == TC_TLV_MORE);
 }
 
@@ -23,9 +23,9 @@ TEST_CASE("A failed re-init leaves the TLV reader unusable")
   const TC_TLV_limits limits = {32, 16, 4, 2};
   tiny_crypto::TLVReader reader;
   TC_TLV_element element;
-  CHECK(reader.init(bytes, sizeof bytes, TC_TLV_DER, limits) == TC_TLV_OK);
+  CHECK(reader.init(bytes, TC_TLV_DER, limits) == TC_TLV_OK);
   CHECK(reader.next(element) == TC_TLV_OK);
-  CHECK(reader.init(NULL, 3, TC_TLV_DER, limits) != TC_TLV_OK);
+  CHECK(reader.init(TC_bytes{NULL, 3}, TC_TLV_DER, limits) != TC_TLV_OK);
   CHECK(reader.next(element) == TC_TLV_ARGUMENT);
 }
 
@@ -36,7 +36,7 @@ TEST_CASE("A child TLV reader rejects padding inside a template")
   tiny_crypto::TLVReader root, child, unready;
   TC_TLV_element element = TC_TLV_element(), inner = TC_TLV_element();
   CHECK(child.init_child(unready, element) == TC_TLV_ARGUMENT);
-  CHECK(root.init(bytes, sizeof bytes, TC_TLV_ISO7816_PAD_ZERO_FF, limits) == TC_TLV_OK);
+  CHECK(root.init(TC_bytes{bytes, sizeof bytes}, TC_TLV_ISO7816_PAD_ZERO_FF, limits) == TC_TLV_OK);
   REQUIRE(root.next(element) == TC_TLV_OK);
   CHECK(child.init_child(root, element) == TC_TLV_OK);
   CHECK(child.next(inner) == TC_TLV_OK);
@@ -54,7 +54,7 @@ TEST_CASE("A TLV reader can descend into its own element")
   const TC_TLV_limits limits = {32, 16, 8, 2};
   tiny_crypto::TLVReader reader;
   TC_TLV_element element = TC_TLV_element();
-  REQUIRE(reader.init(bytes, sizeof bytes, TC_TLV_DER, limits) == TC_TLV_OK);
+  REQUIRE(reader.init(bytes, TC_TLV_DER, limits) == TC_TLV_OK);
   REQUIRE(reader.next(element) == TC_TLV_OK);
   CHECK(reader.init_child(reader, element) == TC_TLV_OK);
   REQUIRE(reader.next(element) == TC_TLV_OK);

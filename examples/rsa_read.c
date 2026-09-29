@@ -56,7 +56,7 @@ TC_RSA_result example_sign_rsa_der(TC_bytes der, TC_hash_algorithm hash, TC_byte
   const TC_signature_algorithm operation = {TC_SIGNATURE_RSA_V15, hash, TC_HASH_UNKNOWN, 0};
   if (!der.data)
     return TC_RSA_ARGUMENT;
-  const TC_TLV_result read = TC_DER_rsa_private(der.data, der.length, &parsed);
+  const TC_TLV_result read = TC_DER_rsa_private(der, &parsed);
   if (read != TC_TLV_OK)
     return import_error(read);
   return sign_components(&parsed, &operation, digest, signature, random, workspace);

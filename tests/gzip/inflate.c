@@ -111,7 +111,7 @@ static MunitResult tables(const MunitParameter params[], void* context)
   const uint8_t sentence[] = "The quick brown fox jumps over the lazy dog. ";
   size_t decode_work = SIZE_MAX;
   tc_inflate_bits stream = {{dynamic, sizeof dynamic}, 0, 0, &decode_work};
-  tc_inflate_output output = {output_bytes, sizeof output_bytes, 0};
+  tc_inflate_output output = {{output_bytes, sizeof output_bytes}, 0};
   munit_assert_int(tc_inflate_decode(&stream, &storage, &output), ==, TC_GZIP_OK);
   munit_assert_size(output.length, ==, sizeof output_bytes);
   munit_assert_size(stream.offset, ==, sizeof dynamic);
@@ -139,9 +139,9 @@ static MunitResult tables(const MunitParameter params[], void* context)
   stream.offset = 0;
   stream.bit = 0;
   output.length = 0;
-  output.capacity = sizeof output_bytes - 1;
+  output.buffer.capacity = sizeof output_bytes - 1;
   munit_assert_int(tc_inflate_decode(&stream, &storage, &output), ==, TC_GZIP_LIMIT);
-  munit_assert_size(output.length, <=, output.capacity);
+  munit_assert_size(output.length, <=, output.buffer.capacity);
   size_t work = SIZE_MAX;
   tc_inflate_bits bits = {{dynamic, sizeof dynamic}, 0, 3, &work};
   munit_assert_int(tc_inflate_tables_read(&bits, 2, &storage), ==, TC_GZIP_OK);
@@ -193,7 +193,7 @@ static MunitResult blocks(const MunitParameter params[], void* context)
     for (size_t capacity = 0; capacity <= 18; ++capacity) {
       size_t work = SIZE_MAX;
       tc_inflate_bits bits = {fixtures[i], 0, 0, &work};
-      tc_inflate_output output = {bytes, capacity, 0};
+      tc_inflate_output output = {{bytes, capacity}, 0};
       munit_assert_int(tc_inflate_decode(&bits, &tables, &output), ==,
                        capacity == 18 ? TC_GZIP_OK : TC_GZIP_LIMIT);
       munit_assert_size(output.length, <=, capacity);
@@ -204,7 +204,7 @@ static MunitResult blocks(const MunitParameter params[], void* context)
   const uint8_t multiple[] = {0, 1, 0, 0xfe, 0xff, 'A', 1, 1, 0, 0xfe, 0xff, 'B'};
   size_t work = SIZE_MAX;
   tc_inflate_bits bits = {{multiple, sizeof multiple}, 0, 0, &work};
-  tc_inflate_output output = {bytes, sizeof bytes, 0};
+  tc_inflate_output output = {{bytes, sizeof bytes}, 0};
   munit_assert_int(tc_inflate_decode(&bits, &tables, &output), ==, TC_GZIP_OK);
   munit_assert_memory_equal(2, bytes, "AB");
   const uint8_t invalid[][5] = {{7, 0, 0, 0, 0}, {1, 0, 0, 0, 0}, {3, 2, 0, 0, 0}};
@@ -230,7 +230,7 @@ static MunitResult gzip_members(const MunitParameter params[], void* context)
                               0,    'c',  'o', 'm',  'm', 'e', 'n', 't', 0,   0xf3, 0xdf};
   uint8_t output_bytes[36], encoded[80];
   TC_GZIP_workspace tables;
-  tc_inflate_output output = {output_bytes, sizeof output_bytes, 0};
+  tc_inflate_output output = {{output_bytes, sizeof output_bytes}, 0};
   size_t work = SIZE_MAX;
   TC_bytes input = {member, sizeof member};
   munit_assert_int(tc_gzip_decode(input, &tables, &output, &work), ==, TC_GZIP_OK);
@@ -294,8 +294,8 @@ static MunitResult gzip_members(const MunitParameter params[], void* context)
   munit_assert_int(tc_gzip_decode(input, &tables, &output, &work), ==, TC_GZIP_INVALID);
   input.data = empty;
   input.length = sizeof empty;
-  output.data = NULL;
-  output.capacity = output.length = 0;
+  output.buffer = (TC_buffer){NULL, 0};
+  output.length = 0;
   work = SIZE_MAX;
   munit_assert_int(tc_gzip_decode(input, &tables, &output, &work), ==, TC_GZIP_OK);
   (void)params;

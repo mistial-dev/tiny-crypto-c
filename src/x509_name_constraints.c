@@ -267,20 +267,20 @@ static TC_TLV_result smtp_utf8(TC_bytes contents, const TC_TLV_limits* limits, s
     return TC_TLV_LIMIT;
   if (tc_pki_work_charge(work, contents.length) != TC_TLV_OK)
     return TC_TLV_LIMIT;
-  result = TC_TLV_reader_init(&reader, contents.data, contents.length, TC_TLV_DER, limits);
+  result = TC_TLV_reader_init(&reader, contents, TC_TLV_DER, limits);
   if (result != TC_TLV_OK)
     return result;
   result = tc_pki_next(&reader, 6, &oid);
   if (result != TC_TLV_OK)
     return result == TC_TLV_END ? TC_TLV_INVALID : result;
-  if (TC_DER_oid_contents(oid.value.data, oid.value.length) != TC_TLV_OK)
+  if (TC_DER_oid_contents(oid.value) != TC_TLV_OK)
     return TC_TLV_INVALID;
   result = tc_pki_next(&reader, 0xa0, &wrapper);
   if (result != TC_TLV_OK)
     return result == TC_TLV_END ? TC_TLV_INVALID : result;
   if (!tc_pki_end(&reader))
     return TC_TLV_INVALID;
-  result = TC_TLV_read(wrapper.value.data, wrapper.value.length, TC_TLV_DER, limits, &value);
+  result = TC_TLV_read(wrapper.value, TC_TLV_DER, limits, &value);
   if (result != TC_TLV_OK)
     return result;
   if (value.encoded.length != wrapper.value.length)
@@ -753,14 +753,13 @@ TC_TLV_result tc_x509_certificate_names_check_san(const TC_X509_certificate* cer
     /* RFC 5280 applies legacy subject email constraints only without SAN. */
     while ((result = TC_X509_rdn_next(&subject, &rdn)) == TC_TLV_OK) {
       TC_X509_name_attribute attribute;
-      result = TC_TLV_reader_init(&reader, rdn.data, rdn.length, TC_TLV_DER, limits);
+      result = TC_TLV_reader_init(&reader, rdn, TC_TLV_DER, limits);
       if (result != TC_TLV_OK)
         return result;
       while ((result = tc_x509_name_next_attribute(&reader, work, &attribute, NULL)) == TC_TLV_OK) {
         if (tc_x509_attribute_syntax(attribute.oid) == TC_X509_ATTRIBUTE_EMAIL) {
           TC_TLV_element value;
-          result =
-              TC_TLV_read(attribute.value.data, attribute.value.length, TC_TLV_DER, limits, &value);
+          result = TC_TLV_read(attribute.value, TC_TLV_DER, limits, &value);
           if (result != TC_TLV_OK)
             return result;
           if (!tc_pki_tag(&value, 0x16))

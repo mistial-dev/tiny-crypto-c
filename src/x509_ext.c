@@ -19,7 +19,7 @@ TC_TLV_result TC_X509_subject_key_identifier_read(TC_bytes value, const TC_TLV_l
   TC_TLV_result result;
   if (!out || !limits)
     return TC_TLV_ARGUMENT;
-  result = TC_TLV_read(value.data, value.length, TC_TLV_DER, limits, &element);
+  result = TC_TLV_read(value, TC_TLV_DER, limits, &element);
   if (result == TC_TLV_MORE)
     return TC_TLV_INVALID;
   if (result != TC_TLV_OK)
@@ -61,7 +61,7 @@ TC_TLV_result TC_X509_authority_key_identifier_read(TC_bytes value, const TC_TLV
         return TC_TLV_INVALID;
       parsed.issuer = element.value;
     } else {
-      result = TC_DER_integer_contents(element.value.data, element.value.length);
+      result = TC_DER_integer_contents(element.value);
       if (result != TC_TLV_OK)
         return result;
       parsed.serial = element.value;
@@ -80,7 +80,7 @@ TC_TLV_result TC_X509_extensions_init(TC_TLV_reader* reader, TC_bytes encoded,
                                       const TC_TLV_limits* limits)
 {
   if (!encoded.data && !encoded.length)
-    return TC_TLV_reader_init(reader, NULL, 0, TC_TLV_DER, limits);
+    return TC_TLV_reader_init(reader, (TC_bytes){NULL, 0}, TC_TLV_DER, limits);
   return tc_pki_value_open(reader, encoded, 0x30, limits, 0);
 }
 
@@ -162,7 +162,7 @@ TC_TLV_result TC_X509_policy_mapping_next(TC_TLV_reader* reader, TC_X509_policy_
     result = required_field(&fields, &element);
     if (result != TC_TLV_OK)
       return result;
-    result = TC_DER_oid(element.encoded.data, element.encoded.length, &oids[i]);
+    result = TC_DER_oid(element.encoded, &oids[i]);
     if (result != TC_TLV_OK)
       return result;
     if (oids[i].length == sizeof any_policy &&
@@ -193,7 +193,7 @@ TC_TLV_result TC_X509_extension_next(TC_TLV_reader* reader, TC_X509_extension* o
   result = required_field(&fields, &element);
   if (result != TC_TLV_OK)
     return result;
-  if (TC_DER_oid(element.encoded.data, element.encoded.length, &extension.oid) != TC_TLV_OK)
+  if (TC_DER_oid(element.encoded, &extension.oid) != TC_TLV_OK)
     return TC_TLV_INVALID;
   extension.critical = 0;
   result = required_field(&fields, &element);
@@ -201,9 +201,7 @@ TC_TLV_result TC_X509_extension_next(TC_TLV_reader* reader, TC_X509_extension* o
     return result;
   if (tc_pki_tag(&element, 1)) {
     /* DEFAULT FALSE is omitted in DER. */
-    if (TC_DER_boolean(element.encoded.data, element.encoded.length, &extension.critical) !=
-            TC_TLV_OK ||
-        !extension.critical)
+    if (TC_DER_boolean(element.encoded, &extension.critical) != TC_TLV_OK || !extension.critical)
       return TC_TLV_INVALID;
     result = required_field(&fields, &element);
     if (result != TC_TLV_OK)
@@ -250,7 +248,7 @@ TC_TLV_result tc_x509_policy_information_next(TC_TLV_reader* reader, TC_X509_pol
   result = required_field(&fields, &element);
   if (result != TC_TLV_OK)
     return result;
-  result = TC_DER_oid(element.encoded.data, element.encoded.length, &policy.oid);
+  result = TC_DER_oid(element.encoded, &policy.oid);
   if (result != TC_TLV_OK)
     return result;
   result = TC_TLV_next(&fields, &element);
@@ -323,7 +321,7 @@ TC_TLV_result TC_X509_policy_qualifier_next(TC_TLV_reader* reader, TC_X509_polic
   result = required_field(&fields, &element);
   if (result != TC_TLV_OK)
     return result;
-  result = TC_DER_oid(element.encoded.data, element.encoded.length, &qualifier.oid);
+  result = TC_DER_oid(element.encoded, &qualifier.oid);
   if (result != TC_TLV_OK)
     return result;
   result = required_field(&fields, &element);
@@ -354,16 +352,14 @@ TC_TLV_result TC_X509_basic_constraints_read(TC_bytes value, const TC_TLV_limits
     return result;
   result = TC_TLV_next(&reader, &element);
   if (result == TC_TLV_OK && tc_pki_tag(&element, 1)) {
-    if (TC_DER_boolean(element.encoded.data, element.encoded.length, &constraints.ca) !=
-            TC_TLV_OK ||
-        !constraints.ca)
+    if (TC_DER_boolean(element.encoded, &constraints.ca) != TC_TLV_OK || !constraints.ca)
       return TC_TLV_INVALID;
     result = TC_TLV_next(&reader, &element);
   }
   if (result == TC_TLV_OK) {
     if (!constraints.ca)
       return TC_TLV_INVALID;
-    result = TC_DER_uint32(element.encoded.data, element.encoded.length, &constraints.path_length);
+    result = TC_DER_uint32(element.encoded, &constraints.path_length);
     if (result != TC_TLV_OK)
       return result;
     constraints.has_path_length = 1;
@@ -384,7 +380,7 @@ TC_TLV_result TC_X509_key_usage_read(TC_bytes value, const TC_TLV_limits* limits
   unsigned unused;
   if (!out || !limits)
     return TC_TLV_ARGUMENT;
-  result = TC_TLV_read(value.data, value.length, TC_TLV_DER, limits, &element);
+  result = TC_TLV_read(value, TC_TLV_DER, limits, &element);
   if (result == TC_TLV_MORE)
     return TC_TLV_INVALID;
   if (result != TC_TLV_OK)
@@ -421,7 +417,7 @@ TC_TLV_result TC_X509_extended_key_usage_read(TC_bytes value, const TC_TLV_limit
     return result;
   start = reader;
   while ((result = TC_TLV_next(&reader, &element)) == TC_TLV_OK) {
-    result = TC_DER_oid(element.encoded.data, element.encoded.length, &oid);
+    result = TC_DER_oid(element.encoded, &oid);
     if (result != TC_TLV_OK)
       return result;
     if (found == capacity)
@@ -460,7 +456,7 @@ TC_TLV_result TC_X509_policy_constraints_read(TC_bytes value, const TC_TLV_limit
     uint32_t count;
     if (tc_pki_context_order(&element, skip_tags, sizeof skip_tags, &previous, &index) != TC_TLV_OK)
       return TC_TLV_INVALID;
-    result = TC_DER_uint32_contents(element.value.data, element.value.length, &count);
+    result = TC_DER_uint32_contents(element.value, &count);
     if (result != TC_TLV_OK)
       return result;
     if (index == 0) {

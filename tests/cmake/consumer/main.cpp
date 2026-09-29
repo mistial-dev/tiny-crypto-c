@@ -18,7 +18,7 @@ int main()
   TC_TLV_frame frames[8];
   const uint8_t encoded_tree[] = {0x30, 0x80, 0, 0};
   TC_TLV_element tree;
-  if (TC_TLV_read_tree(encoded_tree, sizeof encoded_tree, TC_TLV_BER, &cms_limits,
+  if (TC_TLV_read_tree(TC_bytes{encoded_tree, sizeof encoded_tree}, TC_TLV_BER, &cms_limits,
                        TC_TLV_frames{frames, sizeof frames / sizeof *frames}, &tree) != TC_TLV_OK ||
       tree.value.length)
     return 1;

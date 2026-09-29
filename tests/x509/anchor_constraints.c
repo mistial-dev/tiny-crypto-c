@@ -193,18 +193,11 @@ static TC_bytes anchor_list_with(uint8_t* out, const TC_X509_certificate* root, 
   TC_TLV_element certificate, tbs, extensions, child;
   TC_TLV_reader fields;
   size_t length = 0, part_length = 0;
-  munit_assert_int(
-      TC_TLV_read(root->encoded.data, root->encoded.length, TC_TLV_DER, limits, &certificate), ==,
-      TC_TLV_OK);
-  munit_assert_int(TC_TLV_read(root->tbs.data, root->tbs.length, TC_TLV_DER, limits, &tbs), ==,
-                   TC_TLV_OK);
-  munit_assert_int(
-      TC_TLV_read(root->extensions.data, root->extensions.length, TC_TLV_DER, limits, &extensions),
-      ==, TC_TLV_OK);
+  munit_assert_int(TC_TLV_read(root->encoded, TC_TLV_DER, limits, &certificate), ==, TC_TLV_OK);
+  munit_assert_int(TC_TLV_read(root->tbs, TC_TLV_DER, limits, &tbs), ==, TC_TLV_OK);
+  munit_assert_int(TC_TLV_read(root->extensions, TC_TLV_DER, limits, &extensions), ==, TC_TLV_OK);
   /* TBSCertificate fields before extensions [3], then the extended list. */
-  munit_assert_int(
-      TC_TLV_reader_init(&fields, tbs.value.data, tbs.value.length, TC_TLV_DER, limits), ==,
-      TC_TLV_OK);
+  munit_assert_int(TC_TLV_reader_init(&fields, tbs.value, TC_TLV_DER, limits), ==, TC_TLV_OK);
   while (TC_TLV_next(&fields, &child) == TC_TLV_OK && child.header.tag[0] != 0xa3)
     append(body, &length, child.encoded);
   append(part, &part_length, extensions.value);

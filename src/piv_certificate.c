@@ -26,7 +26,7 @@ static TC_TLV_result read_container(TC_bytes input, TC_PIV_certificate_profile p
   TC_TLV_result result = tc_piv_container_contents(input, &limits, &contents);
   if (result != TC_TLV_OK)
     return result;
-  result = TC_TLV_reader_init(&reader, contents.data, contents.length, TC_TLV_ISO7816, &limits);
+  result = TC_TLV_reader_init(&reader, contents, TC_TLV_ISO7816, &limits);
   if (result != TC_TLV_OK)
     return result;
   result = tc_pki_next(&reader, CERTIFICATE_TAG, &element);

@@ -20,10 +20,15 @@ typedef struct {
   uint8_t role;
 } TC_PIV_CVC;
 
-/* Pass one complete 7F21 object. All spans borrow input. Input and out must be
- * disjoint. Errors preserve out. signed_data is the original signed byte range.
- * Signature verification and curve-membership checks are separate operations. */
-TC_TLV_result TC_PIV_CVC_read(const uint8_t* data, size_t length, TC_PIV_CVC* out);
+/* Read one complete 7F21 object as encoded. All spans borrow encoded, which
+ * must stay unchanged while they are used. encoded and out must be disjoint.
+ * signed_data is the original signed byte range.
+ * Returns OK, MORE when the outer object is truncated, INVALID for malformed or
+ * trailing input, LIMIT for a tag or length wider than ISO 7816 allows,
+ * UNSUPPORTED for an unknown profile, curve, algorithm or role, and ARGUMENT
+ * for NULL out, NULL data with a length, or overlap. Errors preserve out.
+ * Signature verification and curve-membership checks are separate. */
+TC_TLV_result TC_PIV_CVC_read(TC_bytes encoded, TC_PIV_CVC* out);
 
 typedef struct {
   TC_bytes card, intermediate, card_uuid;

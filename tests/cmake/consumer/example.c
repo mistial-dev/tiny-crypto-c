@@ -127,16 +127,16 @@ int main(void)
   {
     static TC_GZIP_workspace workspace;
     const uint8_t encoded[] = {0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 2, 0xff, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    const TC_bytes input = {encoded, sizeof encoded};
+    const TC_buffer empty_output = {NULL, 0};
     size_t budget = 4096, length = SIZE_MAX;
-    if (TC_GZIP_decode(encoded, sizeof encoded, NULL, 0, &workspace, &budget, &length) !=
-            TC_GZIP_OK ||
-        length)
+    if (TC_GZIP_decode(input, &workspace, &budget, empty_output, &length) != TC_GZIP_OK || length)
       return 1;
 #ifdef __cplusplus
     tiny_crypto::GZIPDecoder decoder;
     budget = 4096;
     length = SIZE_MAX;
-    if (decoder.decode(encoded, sizeof encoded, nullptr, 0, budget, length) != TC_GZIP_OK || length)
+    if (decoder.decode(input, budget, empty_output, length) != TC_GZIP_OK || length)
       return 1;
 #endif
   }

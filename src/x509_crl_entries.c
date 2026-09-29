@@ -85,7 +85,7 @@ static TC_TLV_result entry_issuer_directory_name(TC_bytes names, TC_bytes query,
   enum { DIRECTORY_NAME = 0xa4 };
   TC_TLV_reader reader;
   TC_TLV_element element;
-  TC_TLV_result result = TC_TLV_reader_init(&reader, names.data, names.length, TC_TLV_DER, limits);
+  TC_TLV_result result = TC_TLV_reader_init(&reader, names, TC_TLV_DER, limits);
   if (result != TC_TLV_OK)
     return result;
   while (!tc_pki_end(&reader)) {

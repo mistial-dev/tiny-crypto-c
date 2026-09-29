@@ -19,13 +19,12 @@ static TC_TLV_result public_key(TC_bytes encoded, TC_PIV_CVC* cvc)
   TC_EC_curve curve;
   TC_TLV_reader reader;
   TC_TLV_element element;
-  TC_TLV_result result =
-      TC_TLV_reader_init(&reader, encoded.data, encoded.length, TC_TLV_ISO7816, &limits);
+  TC_TLV_result result = TC_TLV_reader_init(&reader, encoded, TC_TLV_ISO7816, &limits);
   if (result != TC_TLV_OK)
     return result;
   if (tc_pki_next(&reader, 6, &element) != TC_TLV_OK)
     return TC_TLV_INVALID;
-  result = TC_DER_oid_contents(element.value.data, element.value.length);
+  result = TC_DER_oid_contents(element.value);
   if (result != TC_TLV_OK)
     return result;
   cvc->curve_oid = element.value;
@@ -47,7 +46,7 @@ static TC_TLV_result signature(TC_bytes encoded, TC_PIV_CVC* cvc)
   static const uint8_t sha256_rsa[] = {0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 1, 1, 11};
   TC_DER_public_key decoded;
   /* DigitalSignature has the same AlgorithmIdentifier/BIT STRING layout as SPKI. */
-  TC_TLV_result result = TC_DER_subject_public_key(encoded.data, encoded.length, &decoded);
+  TC_TLV_result result = TC_DER_subject_public_key(encoded, &decoded);
   if (result != TC_TLV_OK)
     return result;
   cvc->signature_algorithm = decoded.algorithm;
@@ -55,17 +54,15 @@ static TC_TLV_result signature(TC_bytes encoded, TC_PIV_CVC* cvc)
   if (cvc->role == TC_PIV_CVC_INTERMEDIATE) {
     if (!equals(cvc->signature_algorithm.oid, sha256_rsa, sizeof sha256_rsa))
       return TC_TLV_UNSUPPORTED;
-    return TC_DER_null(cvc->signature_algorithm.parameters.data,
-                       cvc->signature_algorithm.parameters.length) == TC_TLV_OK
-               ? TC_TLV_OK
-               : TC_TLV_INVALID;
+    return TC_DER_null(cvc->signature_algorithm.parameters) == TC_TLV_OK ? TC_TLV_OK
+                                                                         : TC_TLV_INVALID;
   }
   if (!equals(cvc->signature_algorithm.oid, cvc->key_bits == 256 ? sha256_ecdsa : sha384_ecdsa,
               sizeof sha256_ecdsa))
     return TC_TLV_UNSUPPORTED;
   if (cvc->signature_algorithm.parameters.length)
     return TC_TLV_INVALID;
-  result = TC_DER_ecdsa_signature(cvc->signature.data, cvc->signature.length, &cvc->ecdsa);
+  result = TC_DER_ecdsa_signature(cvc->signature, &cvc->ecdsa);
   if (result != TC_TLV_OK)
     return result;
   if (cvc->ecdsa.r.length > cvc->key_bits / 8 || cvc->ecdsa.s.length > cvc->key_bits / 8)
@@ -73,23 +70,23 @@ static TC_TLV_result signature(TC_bytes encoded, TC_PIV_CVC* cvc)
   return TC_TLV_OK;
 }
 
-TC_TLV_result TC_PIV_CVC_read(const uint8_t* data, size_t length, TC_PIV_CVC* out)
+TC_TLV_result TC_PIV_CVC_read(TC_bytes encoded, TC_PIV_CVC* out)
 {
   TC_PIV_CVC cvc;
   TC_TLV_element element;
   TC_TLV_reader reader;
   TC_TLV_result result;
-  if (!out || (!data && length) || !tc_internal_ranges_disjoint(data, length, out, sizeof *out))
+  if (!out || (!encoded.data && encoded.length) ||
+      !tc_internal_ranges_disjoint(encoded.data, encoded.length, out, sizeof *out))
     return TC_TLV_ARGUMENT;
-  result = TC_TLV_read(data, length, TC_TLV_ISO7816, &limits, &element);
+  result = TC_TLV_read(encoded, TC_TLV_ISO7816, &limits, &element);
   if (result != TC_TLV_OK)
     return result;
-  if (!tc_pki_tag(&element, 0x7f21) || element.encoded.length != length)
+  if (!tc_pki_tag(&element, 0x7f21) || element.encoded.length != encoded.length)
     return TC_TLV_INVALID;
   memset(&cvc, 0, sizeof cvc);
   cvc.signed_data.data = element.value.data;
-  result = TC_TLV_reader_init(&reader, element.value.data, element.value.length, TC_TLV_ISO7816,
-                              &limits);
+  result = TC_TLV_reader_init(&reader, element.value, TC_TLV_ISO7816, &limits);
   if (result != TC_TLV_OK)
     return result;
   /* SP 800-73 Part 2, section 4.1.5 fixes both the tags and their order. */

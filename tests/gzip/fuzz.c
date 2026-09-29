@@ -13,8 +13,8 @@ static void check_decode(const uint8_t* input, size_t length, size_t capacity, s
   size_t decoded = SIZE_MAX, work = budget;
   memset(output, 0x5a, sizeof output);
   memset(&workspace, 0xa5, sizeof workspace);
-  TC_GZIP_result result =
-      TC_GZIP_decode(input, length, output, capacity, &workspace, &work, &decoded);
+  TC_GZIP_result result = TC_GZIP_decode((TC_bytes){input, length}, &workspace, &work,
+                                         (TC_buffer){output, capacity}, &decoded);
   if (result == TC_GZIP_ARGUMENT || work > budget)
     abort();
   const uint8_t* scratch = (const uint8_t*)&workspace;

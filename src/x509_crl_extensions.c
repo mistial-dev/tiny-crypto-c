@@ -169,8 +169,7 @@ static TC_TLV_result distribution_cursor_init(const TC_X509_distribution_name* n
     result = tc_pki_general_names_contents_check(name->contents, limits, tree);
     if (result != TC_TLV_OK)
       return result;
-    result = TC_TLV_reader_init(&parsed.names, name->contents.data, name->contents.length,
-                                TC_TLV_DER, limits);
+    result = TC_TLV_reader_init(&parsed.names, name->contents, TC_TLV_DER, limits);
   }
   if (result != TC_TLV_OK)
     return result;
@@ -380,7 +379,7 @@ TC_TLV_result tc_x509_crl_distribution_read(TC_bytes encoded, const TC_TLV_limit
 static TC_TLV_result crl_scalar(TC_bytes encoded, unsigned tag, TC_TLV_element* out)
 {
   const TC_TLV_limits limits = {encoded.length, encoded.length, 1, 0};
-  TC_TLV_result result = TC_TLV_read(encoded.data, encoded.length, TC_TLV_DER, &limits, out);
+  TC_TLV_result result = TC_TLV_read(encoded, TC_TLV_DER, &limits, out);
   if (result != TC_TLV_OK)
     return result;
   return tc_pki_tag(out, tag) && out->encoded.length == encoded.length ? TC_TLV_OK : TC_TLV_INVALID;
@@ -393,7 +392,7 @@ TC_TLV_result tc_x509_crl_number_read(TC_bytes encoded, TC_bytes* out)
   TC_TLV_result result;
   if (!out)
     return TC_TLV_ARGUMENT;
-  result = TC_DER_integer(encoded.data, encoded.length, &value, &negative);
+  result = TC_DER_integer(encoded, &value, &negative);
   if (result != TC_TLV_OK)
     return result;
   if (negative)
@@ -535,8 +534,7 @@ static TC_TLV_result crl_extension_value(void* context, const TC_X509_extension*
   }
   if (names) {
     TC_bytes contents;
-    TC_TLV_result result =
-        TC_DER_sequence(extension->value.data, extension->value.length, &contents);
+    TC_TLV_result result = TC_DER_sequence(extension->value, &contents);
     if (result != TC_TLV_OK)
       return result;
     result = tc_pki_general_names_contents_check(contents, state->limits, state->tree);

@@ -120,7 +120,7 @@ static void check_encode(TC_bytes certificate, size_t capacity, size_t budget)
     abort();
   size_t untouched = 0;
   if (status == TC_TLV_OK) {
-    if (length > capacity || TC_TLV_walk(encoded, length, TC_TLV_DER, &fixture.limits,
+    if (length > capacity || TC_TLV_walk((TC_bytes){encoded, length}, TC_TLV_DER, &fixture.limits,
                                          fixture.workspace.frames, NULL, NULL) != TC_TLV_OK)
       abort();
     untouched = length;

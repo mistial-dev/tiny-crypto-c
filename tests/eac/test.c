@@ -13,27 +13,28 @@ static MunitResult key_limits(const MunitParameter params[], void* user)
   size_t i;
   (void)params;
   (void)user;
-  munit_assert_int(TC_EAC_CVC_public_key_read(encoded, sizeof encoded, &limits, &key), ==,
-                   TC_TLV_OK);
+  munit_assert_int(TC_EAC_CVC_public_key_read((TC_bytes){encoded, sizeof encoded}, &limits, &key),
+                   ==, TC_TLV_OK);
   munit_assert_int(key.algorithm, ==, TC_EAC_RSA_V15);
   munit_assert_uint(key.hash_bits, ==, 160);
   munit_assert_size(key.modulus.length, ==, 2);
   saved = key;
   for (i = 0; i < sizeof encoded; ++i) {
-    munit_assert_int(TC_EAC_CVC_public_key_read(encoded, i, &limits, &key), ==, TC_TLV_MORE);
+    munit_assert_int(TC_EAC_CVC_public_key_read((TC_bytes){encoded, i}, &limits, &key), ==,
+                     TC_TLV_MORE);
     munit_assert_memory_equal(sizeof key, &key, &saved);
   }
   --limits.max_input;
-  munit_assert_int(TC_EAC_CVC_public_key_read(encoded, sizeof encoded, &limits, &key), ==,
-                   TC_TLV_LIMIT);
+  munit_assert_int(TC_EAC_CVC_public_key_read((TC_bytes){encoded, sizeof encoded}, &limits, &key),
+                   ==, TC_TLV_LIMIT);
   ++limits.max_input;
   --limits.max_elements;
-  munit_assert_int(TC_EAC_CVC_public_key_read(encoded, sizeof encoded, &limits, &key), ==,
-                   TC_TLV_LIMIT);
+  munit_assert_int(TC_EAC_CVC_public_key_read((TC_bytes){encoded, sizeof encoded}, &limits, &key),
+                   ==, TC_TLV_LIMIT);
   ++limits.max_elements;
   limits.max_depth = 0;
-  munit_assert_int(TC_EAC_CVC_public_key_read(encoded, sizeof encoded, &limits, &key), ==,
-                   TC_TLV_LIMIT);
+  munit_assert_int(TC_EAC_CVC_public_key_read((TC_bytes){encoded, sizeof encoded}, &limits, &key),
+                   ==, TC_TLV_LIMIT);
   munit_assert_memory_equal(sizeof key, &key, &saved);
   return MUNIT_OK;
 }
@@ -133,29 +134,46 @@ static MunitResult certificate_limits(const MunitParameter params[], void* user)
       0x24, 0x06, 0x03, 0x00, 0x00, 0x01, 0x00, 0x01, 0x5f, 0x37, 0x02, 0x01, 0x01};
   TC_TLV_limits limits = {sizeof encoded, sizeof encoded, 15, 3};
   TC_TLV_frame frames[3];
-  TC_EAC_CVC_workspace workspace = {frames, 3};
+  TC_EAC_CVC_workspace workspace = {{frames, 3}};
   TC_EAC_CVC certificate, saved;
   (void)params;
   (void)user;
-  munit_assert_int(TC_EAC_CVC_read(encoded, sizeof encoded, &limits, &workspace, &certificate), ==,
-                   TC_TLV_OK);
+  munit_assert_int(
+      TC_EAC_CVC_read((TC_bytes){encoded, sizeof encoded}, &limits, &workspace, &certificate), ==,
+      TC_TLV_OK);
   saved = certificate;
   --limits.max_elements;
-  munit_assert_int(TC_EAC_CVC_read(encoded, sizeof encoded, &limits, &workspace, &certificate), ==,
-                   TC_TLV_LIMIT);
+  munit_assert_int(
+      TC_EAC_CVC_read((TC_bytes){encoded, sizeof encoded}, &limits, &workspace, &certificate), ==,
+      TC_TLV_LIMIT);
   ++limits.max_elements;
   --limits.max_depth;
-  munit_assert_int(TC_EAC_CVC_read(encoded, sizeof encoded, &limits, &workspace, &certificate), ==,
-                   TC_TLV_LIMIT);
+  munit_assert_int(
+      TC_EAC_CVC_read((TC_bytes){encoded, sizeof encoded}, &limits, &workspace, &certificate), ==,
+      TC_TLV_LIMIT);
   ++limits.max_depth;
-  --workspace.frame_capacity;
-  munit_assert_int(TC_EAC_CVC_read(encoded, sizeof encoded, &limits, &workspace, &certificate), ==,
-                   TC_TLV_LIMIT);
-  workspace.frame_capacity = 0;
-  workspace.frames = NULL;
-  munit_assert_int(TC_EAC_CVC_read(encoded, sizeof encoded, &limits, &workspace, &certificate), ==,
-                   TC_TLV_LIMIT);
+  --workspace.frames.capacity;
+  munit_assert_int(
+      TC_EAC_CVC_read((TC_bytes){encoded, sizeof encoded}, &limits, &workspace, &certificate), ==,
+      TC_TLV_LIMIT);
+  workspace.frames.capacity = 0;
+  workspace.frames.data = NULL;
+  munit_assert_int(
+      TC_EAC_CVC_read((TC_bytes){encoded, sizeof encoded}, &limits, &workspace, &certificate), ==,
+      TC_TLV_LIMIT);
   munit_assert_memory_equal(sizeof certificate, &certificate, &saved);
+  /* A span with NULL data and a length is an argument error. */
+  workspace.frames = (TC_TLV_frames){frames, 3};
+  munit_assert_int(TC_EAC_CVC_read((TC_bytes){NULL, 1}, &limits, &workspace, &certificate), ==,
+                   TC_TLV_ARGUMENT);
+  munit_assert_int(
+      TC_EAC_CVC_public_key_read((TC_bytes){NULL, 1}, &limits, &certificate.public_key), ==,
+      TC_TLV_ARGUMENT);
+  munit_assert_int(
+      TC_EAC_CVC_read((TC_bytes){encoded, sizeof encoded}, &limits, NULL, &certificate), ==,
+      TC_TLV_ARGUMENT);
+  munit_assert_ptr_equal(certificate.encoded.data, saved.encoded.data);
+  munit_assert_ptr_equal(certificate.public_key.point.data, saved.public_key.point.data);
   return MUNIT_OK;
 }
 

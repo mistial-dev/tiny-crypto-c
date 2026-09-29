@@ -14,8 +14,7 @@ static TC_TLV_result fields_read(TC_bytes input, TC_TWIC_tpk* out)
   const TC_TLV_limits limits = {CONTAINER_BYTES, CONTAINER_BYTES, FIELD_COUNT, 1};
   TC_TLV_element fields[FIELD_COUNT];
   TC_TLV_reader reader;
-  TC_TLV_result result =
-      TC_TLV_reader_init(&reader, input.data, input.length, TC_TLV_ISO7816, &limits);
+  TC_TLV_result result = TC_TLV_reader_init(&reader, input, TC_TLV_ISO7816, &limits);
   if (result != TC_TLV_OK)
     return result;
   for (size_t i = 0; i < FIELD_COUNT; ++i) {
@@ -42,7 +41,7 @@ static TC_TLV_result container_read(TC_bytes input, TC_TWIC_tpk* out)
   TC_TLV_element container;
   if (input.length < sizeof tag || memcmp(input.data, tag, sizeof tag))
     return TC_TLV_INVALID;
-  TC_TLV_result result = TC_TLV_read(input.data, input.length, TC_TLV_ISO7816, &limits, &container);
+  TC_TLV_result result = TC_TLV_read(input, TC_TLV_ISO7816, &limits, &container);
   if (result != TC_TLV_OK)
     return result == TC_TLV_MORE ? TC_TLV_INVALID : result;
   if (container.encoded.length != input.length)

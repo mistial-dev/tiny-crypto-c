@@ -21,8 +21,7 @@ static MunitResult attributes(const MunitParameter params[], void* user)
   munit_assert_size(name.elements, ==, 8);
   munit_assert_ptr_equal(rdn.data, multi + 4);
   munit_assert_size(rdn.length, ==, 20);
-  munit_assert_int(TC_TLV_reader_init(&values, rdn.data, rdn.length, TC_TLV_DER, &bounds), ==,
-                   TC_TLV_OK);
+  munit_assert_int(TC_TLV_reader_init(&values, rdn, TC_TLV_DER, &bounds), ==, TC_TLV_OK);
   munit_assert_int(TC_X509_attribute_next(&values, &attribute), ==, TC_TLV_OK);
   munit_assert_size(values.elements, ==, 3);
   munit_assert_ptr_equal(attribute.encoded.data, multi + 4);

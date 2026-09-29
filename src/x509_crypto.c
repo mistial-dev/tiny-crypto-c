@@ -40,8 +40,8 @@ static TC_X509_signature_result tc_pki_verify_digest(const TC_signature_algorith
     /* Reserve fixed public work for two scalar multiplies and inversions. */
     if (max_work < width * 8 * TC_PKI_ECDSA_WORK_PER_BIT)
       return TC_X509_SIGNATURE_LIMIT;
-    if (TC_DER_ecdsa_signature(signature.data, signature.length, &pair) != TC_TLV_OK ||
-        pair.r.length > width || pair.s.length > width)
+    if (TC_DER_ecdsa_signature(signature, &pair) != TC_TLV_OK || pair.r.length > width ||
+        pair.s.length > width)
       return TC_X509_SIGNATURE_INVALID;
     memset(raw, 0, sizeof raw);
     memcpy(raw + width - pair.r.length, pair.r.data, pair.r.length);

@@ -121,7 +121,8 @@ TC_GZIP_result tc_gzip_decode(TC_bytes input, TC_GZIP_workspace* tables, tc_infl
     result = little32(&bits, &expected_size);
     if (result != TC_GZIP_OK)
       return result;
-    const TC_bytes covered = {output->data ? output->data + start : NULL, output->length - start};
+    const TC_bytes covered = {output->buffer.data ? output->buffer.data + start : NULL,
+                              output->length - start};
     if ((uint32_t)covered.length != expected_size)
       return TC_GZIP_INVALID;
     result = crc32(covered, work, &actual_crc);

@@ -181,13 +181,13 @@ static MunitResult private_key(const MunitParameter params[], void* data)
   const int length = i2d_PrivateKey(generated, &encoded);
   munit_assert_int(length, >, 0);
   TC_DER_rsa_private_key parsed;
-  munit_assert_int(TC_DER_rsa_private(encoded, (size_t)length, &parsed), ==, TC_TLV_OK);
+  munit_assert_int(TC_DER_rsa_private((TC_bytes){encoded, (size_t)length}, &parsed), ==, TC_TLV_OK);
   unsigned char* public_der = NULL;
   const int public_length = i2d_PublicKey(generated, &public_der);
   munit_assert_int(public_length, >, 0);
   TC_DER_rsa_public_key public_key;
-  munit_assert_int(TC_DER_rsa_public(public_der, (size_t)public_length, &public_key), ==,
-                   TC_TLV_OK);
+  munit_assert_int(TC_DER_rsa_public((TC_bytes){public_der, (size_t)public_length}, &public_key),
+                   ==, TC_TLV_OK);
   munit_assert_size(public_key.modulus.length, ==, parsed.modulus.length);
   munit_assert_memory_equal(parsed.modulus.length, public_key.modulus.data, parsed.modulus.data);
   munit_assert_size(public_key.exponent.length, ==, parsed.public_exponent.length);
@@ -200,14 +200,14 @@ static MunitResult private_key(const MunitParameter params[], void* data)
   const int wrapped_length = i2d_PKCS8_PRIV_KEY_INFO(container, &wrapped);
   munit_assert_int(wrapped_length, >, 0);
   TC_DER_private_key info;
-  munit_assert_int(TC_DER_private_key_info(wrapped, (size_t)wrapped_length, &info), ==, TC_TLV_OK);
+  munit_assert_int(TC_DER_private_key_info((TC_bytes){wrapped, (size_t)wrapped_length}, &info), ==,
+                   TC_TLV_OK);
   munit_assert_size(info.key.length, ==, (size_t)length);
   munit_assert_memory_equal((size_t)length, info.key.data, encoded);
   munit_assert_true(info.key.data >= wrapped);
   munit_assert_true(info.key.data + info.key.length <= wrapped + wrapped_length);
   munit_assert_null(info.attributes.data);
-  munit_assert_int(TC_DER_null(info.algorithm.parameters.data, info.algorithm.parameters.length),
-                   ==, TC_TLV_OK);
+  munit_assert_int(TC_DER_null(info.algorithm.parameters), ==, TC_TLV_OK);
   TC_KEY_rsa_private_key imported;
   munit_assert_int(TC_KEY_rsa_private_read((TC_bytes){wrapped, (size_t)wrapped_length}, &imported),
                    ==, TC_TLV_OK);

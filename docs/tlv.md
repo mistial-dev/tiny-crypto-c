@@ -12,6 +12,8 @@ Select the encoding explicitly: DER, ISO 7816, or BER. BER additionally needs
 `TC_TLV_read_tree` checks constructed boundaries and also handles indefinite
 BER lengths. Both return spans into the original buffer and stop before the
 next sibling. Keep that buffer alive and unchanged while using the spans.
+Every TLV and DER entry point takes its input as a borrowed `TC_bytes` span.
+A span with NULL data and a nonzero length returns `TC_TLV_ARGUMENT`.
 
 ```c
 #include <tiny_crypto/tlv.h>
@@ -22,8 +24,8 @@ TC_TLV_result read_ber_object(TC_bytes input, TC_TLV_element* object)
     const TC_TLV_limits limits = {MAX_BYTES, MAX_BYTES, MAX_ELEMENTS, MAX_DEPTH};
     TC_TLV_frame frames[MAX_DEPTH];
 
-    return TC_TLV_read_tree(input.data, input.length, TC_TLV_BER,
-                           &limits, (TC_TLV_frames){frames, MAX_DEPTH}, object);
+    return TC_TLV_read_tree(input, TC_TLV_BER, &limits,
+                            (TC_TLV_frames){frames, MAX_DEPTH}, object);
 }
 ```
 
@@ -74,8 +76,8 @@ TC_TLV_result count_nested(TC_bytes response, size_t* nested)
     TC_TLV_result result;
     size_t count = 0;
 
-    result = TC_TLV_reader_init(&root, response.data, response.length,
-                                TC_TLV_ISO7816_PAD_ZERO_FF, &limits);
+    result = TC_TLV_reader_init(&root, response, TC_TLV_ISO7816_PAD_ZERO_FF,
+                                &limits);
     while (result == TC_TLV_OK &&
            (result = TC_TLV_next(&root, &object)) == TC_TLV_OK) {
         if (!object.header.constructed)

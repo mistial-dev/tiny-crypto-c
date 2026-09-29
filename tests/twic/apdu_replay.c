@@ -113,7 +113,8 @@ static void compare_inventory(const char* profile, const ExampleTWICInventory* i
   for (size_t i = 0; i < required; ++i) {
     const size_t length = fixture_read(profile, objects[i], bytes, sizeof bytes);
     TC_TLV_element field;
-    munit_assert_int(TC_TLV_read(bytes, length, TC_TLV_ISO7816, &limits, &field), ==, TC_TLV_OK);
+    munit_assert_int(TC_TLV_read((TC_bytes){bytes, length}, TC_TLV_ISO7816, &limits, &field), ==,
+                     TC_TLV_OK);
     munit_assert_size(field.encoded.length, ==, length);
     munit_assert_uint(field.header.tag[0], ==, 0x53);
     munit_assert_size(inventory->objects[i].contents.length, ==, field.value.length);

@@ -127,8 +127,7 @@ static TC_TLV_result read_fields(TC_bytes contents, TC_PIV_CHUID_profile profile
   /* Signed content starts after the Buffer Length element, which the
    * signature excludes (SP 800-73-4 Part 1 section 3.1.2). */
   const uint8_t* signed_start = contents.data;
-  TC_TLV_result result =
-      TC_TLV_reader_init(&reader, contents.data, contents.length, TC_TLV_ISO7816, &limits);
+  TC_TLV_result result = TC_TLV_reader_init(&reader, contents, TC_TLV_ISO7816, &limits);
   if (result != TC_TLV_OK)
     return result;
   /* CHUID tags identify opaque fields, even when their constructed bit is set. */

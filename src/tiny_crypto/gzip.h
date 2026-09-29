@@ -31,16 +31,23 @@ typedef enum {
   TC_GZIP_UNSUPPORTED
 } TC_GZIP_result;
 
-/* Decode complete GZIP members with CRC and size checks. Concatenated members
- * share capacity and the remaining work budget. Trailing non-member bytes fail.
- * Input, output capacity, workspace, work and output_length must be disjoint.
- * NULL output is allowed for zero capacity. Bad arguments preserve storage.
- * Processing failures wipe output capacity. output_length changes only on OK.
- * Workspace is wiped after processing. Work measures bounded decoding steps,
- * including bits, table entries and output/checksum bytes. Requires GZIP support. */
-TC_GZIP_result TC_GZIP_decode(const uint8_t* input, size_t input_length, uint8_t* output,
-                              size_t capacity, TC_GZIP_workspace* workspace, size_t* work,
-                              size_t* output_length);
+/* Decode complete GZIP members (RFC 1952) with CRC32 and ISIZE checks.
+ *   input          complete members. Borrowed and read-only for the call.
+ *   workspace      caller-owned scratch. Needs no initialization and is wiped
+ *                  before return. Size it with sizeof(TC_GZIP_workspace).
+ *   work           remaining work budget, decremented by bounded decoding steps
+ *                  (input bits, table entries and output/checksum bytes).
+ *   output         caller-owned storage for the decoded bytes. output.data may
+ *                  be NULL when output.capacity is zero. Decoded output doubles
+ *                  as back-reference history.
+ *   output_length  receives the decoded length on OK.
+ * Concatenated members share output capacity and the remaining work budget.
+ * Trailing non-member bytes return INVALID. Input, output, workspace, work and
+ * output_length must be disjoint. ARGUMENT preserves all storage. Other
+ * failures wipe output.capacity bytes and leave output_length unchanged.
+ * Requires GZIP support. */
+TC_GZIP_result TC_GZIP_decode(TC_bytes input, TC_GZIP_workspace* workspace, size_t* work,
+                              TC_buffer output, size_t* output_length);
 #ifdef __cplusplus
 }
 #endif

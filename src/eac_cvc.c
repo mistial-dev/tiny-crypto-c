@@ -8,7 +8,7 @@
 static const TC_TLV_limits unbounded = {SIZE_MAX, SIZE_MAX, SIZE_MAX, SIZE_MAX};
 static TC_TLV_result eac_open(TC_bytes span, TC_TLV_reader* reader)
 {
-  return TC_TLV_reader_init(reader, span.data, span.length, TC_TLV_DER, &unbounded);
+  return TC_TLV_reader_init(reader, span, TC_TLV_DER, &unbounded);
 }
 static int eac_field(TC_TLV_reader* reader, unsigned tag, TC_TLV_element* element)
 {
@@ -32,7 +32,7 @@ static TC_TLV_result key_contents(TC_bytes contents, int standalone, TC_EAC_CVC_
   unsigned usage, family, id;
   memset(&key, 0, sizeof key);
   if (eac_open(contents, &reader) != TC_TLV_OK || !eac_field(&reader, 6, &element) ||
-      TC_DER_oid_contents(element.value.data, element.value.length) != TC_TLV_OK)
+      TC_DER_oid_contents(element.value) != TC_TLV_OK)
     return TC_TLV_INVALID;
   key.oid = element.value;
   if (key.oid.length != 10 || memcmp(key.oid.data, prefix, sizeof prefix))
@@ -105,20 +105,20 @@ static TC_TLV_result key_contents(TC_bytes contents, int standalone, TC_EAC_CVC_
   return TC_TLV_OK;
 }
 
-TC_TLV_result TC_EAC_CVC_public_key_read(const uint8_t* data, size_t length,
-                                         const TC_TLV_limits* limits, TC_EAC_CVC_public_key* out)
+TC_TLV_result TC_EAC_CVC_public_key_read(TC_bytes encoded, const TC_TLV_limits* limits,
+                                         TC_EAC_CVC_public_key* out)
 {
   TC_TLV_element element;
   TC_TLV_frame frame;
   TC_TLV_result result;
   if (!out)
     return TC_TLV_ARGUMENT;
-  result = TC_TLV_read(data, length, TC_TLV_DER, limits, &element);
+  result = TC_TLV_read(encoded, TC_TLV_DER, limits, &element);
   if (result != TC_TLV_OK)
     return result;
-  if (!tc_pki_tag(&element, 0x7f49) || element.encoded.length != length)
+  if (!tc_pki_tag(&element, 0x7f49) || element.encoded.length != encoded.length)
     return TC_TLV_INVALID;
-  result = TC_TLV_walk(data, length, TC_TLV_DER, limits, (TC_TLV_frames){&frame, 1}, NULL, NULL);
+  result = TC_TLV_walk(encoded, TC_TLV_DER, limits, (TC_TLV_frames){&frame, 1}, NULL, NULL);
   if (result != TC_TLV_OK)
     return result;
   return key_contents(element.value, 1, out);
@@ -165,14 +165,14 @@ TC_TLV_result TC_EAC_CVC_extensions_init(TC_TLV_reader* reader, TC_bytes encoded
   TC_TLV_element element;
   TC_TLV_result result;
   if (!encoded.data && !encoded.length)
-    return TC_TLV_reader_init(reader, NULL, 0, TC_TLV_DER, limits);
-  result = TC_TLV_read(encoded.data, encoded.length, TC_TLV_DER, limits, &element);
+    return TC_TLV_reader_init(reader, encoded, TC_TLV_DER, limits);
+  result = TC_TLV_read(encoded, TC_TLV_DER, limits, &element);
   if (result != TC_TLV_OK)
     return result;
   if (!tc_pki_tag(&element, 0x65) || element.encoded.length != encoded.length ||
       !element.value.length)
     return TC_TLV_INVALID;
-  return TC_TLV_reader_init(reader, element.value.data, element.value.length, TC_TLV_DER, limits);
+  return TC_TLV_reader_init(reader, element.value, TC_TLV_DER, limits);
 }
 TC_TLV_result TC_EAC_CVC_extension_next(TC_TLV_reader* reader, TC_EAC_CVC_extension* out)
 {
@@ -188,15 +188,14 @@ TC_TLV_result TC_EAC_CVC_extension_next(TC_TLV_reader* reader, TC_EAC_CVC_extens
     return result;
   if (!tc_pki_tag(&element, 0x73))
     return TC_TLV_INVALID;
-  result = TC_TLV_reader_init(&inner, element.value.data, element.value.length, TC_TLV_DER,
-                              &next.limits);
+  result = TC_TLV_reader_init(&inner, element.value, TC_TLV_DER, &next.limits);
   if (result != TC_TLV_OK)
     return result;
   inner.elements = next.elements;
   result = tc_pki_next(&inner, 6, &element);
   if (result != TC_TLV_OK)
     return result == TC_TLV_LIMIT ? result : TC_TLV_INVALID;
-  if (TC_DER_oid_contents(element.value.data, element.value.length) != TC_TLV_OK)
+  if (TC_DER_oid_contents(element.value) != TC_TLV_OK)
     return TC_TLV_INVALID;
   extension.oid = element.value;
   extension.fields.data = inner.input.data + inner.offset;
@@ -214,7 +213,7 @@ TC_TLV_result TC_EAC_CVC_extension_next(TC_TLV_reader* reader, TC_EAC_CVC_extens
   return TC_TLV_OK;
 }
 
-TC_TLV_result TC_EAC_CVC_read(const uint8_t* data, size_t length, const TC_TLV_limits* limits,
+TC_TLV_result TC_EAC_CVC_read(TC_bytes encoded, const TC_TLV_limits* limits,
                               TC_EAC_CVC_workspace* workspace, TC_EAC_CVC* out)
 {
   static const uint8_t roles[] = {4, 0, 0x7f, 0, 7, 3, 1, 2};
@@ -225,13 +224,12 @@ TC_TLV_result TC_EAC_CVC_read(const uint8_t* data, size_t length, const TC_TLV_l
   TC_TLV_result result;
   if (!out || !workspace)
     return TC_TLV_ARGUMENT;
-  result = TC_TLV_read(data, length, TC_TLV_DER, limits, &element);
+  result = TC_TLV_read(encoded, TC_TLV_DER, limits, &element);
   if (result != TC_TLV_OK)
     return result;
-  if (!tc_pki_tag(&element, 0x7f21) || element.encoded.length != length)
+  if (!tc_pki_tag(&element, 0x7f21) || element.encoded.length != encoded.length)
     return TC_TLV_INVALID;
-  result = TC_TLV_walk(data, length, TC_TLV_DER, limits,
-                       (TC_TLV_frames){workspace->frames, workspace->frame_capacity}, NULL, NULL);
+  result = TC_TLV_walk(encoded, TC_TLV_DER, limits, workspace->frames, NULL, NULL);
   if (result != TC_TLV_OK)
     return result;
   memset(&certificate, 0, sizeof certificate);
@@ -256,8 +254,7 @@ TC_TLV_result TC_EAC_CVC_read(const uint8_t* data, size_t length, const TC_TLV_l
     return TC_TLV_INVALID;
   certificate.holder = element.value;
   if (!eac_field(&body, 0x7f4c, &element) || eac_open(element.value, &chat) != TC_TLV_OK ||
-      !eac_field(&chat, 6, &element) ||
-      TC_DER_oid_contents(element.value.data, element.value.length) != TC_TLV_OK)
+      !eac_field(&chat, 6, &element) || TC_DER_oid_contents(element.value) != TC_TLV_OK)
     return TC_TLV_INVALID;
   certificate.authorization_oid = element.value;
   if (element.value.length != 9 || memcmp(element.value.data, roles, sizeof roles) ||

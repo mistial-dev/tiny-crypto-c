@@ -5,44 +5,47 @@
 #include <tiny_crypto/der.h>
 #include "der_bits_internal.h"
 
-static TC_TLV_result value(const uint8_t* data, size_t length, uint8_t tag, TC_bytes* out)
+static TC_TLV_result value(TC_bytes encoded, uint8_t tag, TC_bytes* out)
 {
   TC_TLV_limits limits = {SIZE_MAX, SIZE_MAX, 1, 1};
   TC_TLV_element e;
-  TC_TLV_result result = TC_TLV_read(data, length, TC_TLV_DER, &limits, &e);
+  TC_TLV_result result = TC_TLV_read(encoded, TC_TLV_DER, &limits, &e);
   /* Input is the complete encoding, so a truncated object is malformed. */
   if (result == TC_TLV_MORE)
     return TC_TLV_INVALID;
   if (result != TC_TLV_OK)
     return result;
-  if (e.encoded.length != length || e.header.tag_length != 1 || e.header.tag[0] != tag)
+  if (e.encoded.length != encoded.length || e.header.tag_length != 1 || e.header.tag[0] != tag)
     return TC_TLV_INVALID;
   *out = e.value;
   return TC_TLV_OK;
 }
 
-TC_TLV_result TC_DER_integer_contents(const uint8_t* data, size_t length)
+TC_TLV_result TC_DER_integer_contents(TC_bytes contents)
 {
+  const uint8_t* data = contents.data;
+  size_t length = contents.length;
   if (!data && length)
     return TC_TLV_ARGUMENT;
+  /* X.690 section 8.3.2: the first nine bits are never all zero or all one. */
   if (!length ||
       (length > 1 && ((data[0] == 0 && !(data[1] & 128)) || (data[0] == 255 && (data[1] & 128)))))
     return TC_TLV_INVALID;
   return TC_TLV_OK;
 }
 
-TC_TLV_result TC_DER_integer(const uint8_t* data, size_t length, TC_bytes* out, int* negative)
+TC_TLV_result TC_DER_integer(TC_bytes encoded, TC_bytes* out, int* negative)
 {
   TC_bytes v;
   TC_TLV_result result;
   if (!out || !negative)
     return TC_TLV_ARGUMENT;
-  result = value(data, length, 2, &v);
+  result = value(encoded, 2, &v);
   if (result != TC_TLV_OK)
     return result;
   /* A sign octet is allowed only when removing it would change the sign.
    * Keep it in the returned two's-complement span. Signed data stays byte-exact. */
-  result = TC_DER_integer_contents(v.data, v.length);
+  result = TC_DER_integer_contents(v);
   if (result != TC_TLV_OK)
     return result;
   *negative = (v.data[0] & 128) != 0;
@@ -50,64 +53,66 @@ TC_TLV_result TC_DER_integer(const uint8_t* data, size_t length, TC_bytes* out, 
   return TC_TLV_OK;
 }
 
-TC_TLV_result TC_DER_uint32(const uint8_t* data, size_t length, uint32_t* out)
+TC_TLV_result TC_DER_uint32(TC_bytes encoded, uint32_t* out)
 {
   TC_bytes v;
   TC_TLV_result result;
   if (!out)
     return TC_TLV_ARGUMENT;
-  result = value(data, length, 2, &v);
-  return result == TC_TLV_OK ? TC_DER_uint32_contents(v.data, v.length, out) : result;
+  result = value(encoded, 2, &v);
+  return result == TC_TLV_OK ? TC_DER_uint32_contents(v, out) : result;
 }
 
-TC_TLV_result TC_DER_uint32_contents(const uint8_t* data, size_t length, uint32_t* out)
+TC_TLV_result TC_DER_uint32_contents(TC_bytes contents, uint32_t* out)
 {
   size_t i;
   uint32_t n = 0;
   TC_TLV_result result;
   if (!out)
     return TC_TLV_ARGUMENT;
-  result = TC_DER_integer_contents(data, length);
+  result = TC_DER_integer_contents(contents);
   if (result != TC_TLV_OK)
     return result;
-  if (data[0] & 128)
+  if (contents.data[0] & 128)
     return TC_TLV_INVALID;
-  for (i = 0; i < length; ++i) {
-    if (n > (UINT32_MAX - data[i]) / 256)
+  for (i = 0; i < contents.length; ++i) {
+    if (n > (UINT32_MAX - contents.data[i]) / 256)
       return TC_TLV_LIMIT;
-    n = n * 256 + data[i];
+    n = n * 256 + contents.data[i];
   }
   *out = n;
   return TC_TLV_OK;
 }
 
-TC_TLV_result TC_DER_bit_string(const uint8_t* data, size_t length, TC_bytes* out, unsigned* unused)
+TC_TLV_result TC_DER_bit_string(TC_bytes encoded, TC_bytes* out, unsigned* unused)
 {
   TC_bytes v;
   if (!out || !unused)
     return TC_TLV_ARGUMENT;
-  TC_TLV_result result = value(data, length, 3, &v);
+  TC_TLV_result result = value(encoded, 3, &v);
   return result == TC_TLV_OK ? tc_der_bit_string_contents(v, out, unused) : result;
 }
 
-TC_TLV_result TC_DER_oid(const uint8_t* data, size_t length, TC_bytes* out)
+TC_TLV_result TC_DER_oid(TC_bytes encoded, TC_bytes* out)
 {
   TC_bytes v;
   TC_TLV_result result;
   if (!out)
     return TC_TLV_ARGUMENT;
-  result = value(data, length, 6, &v);
+  result = value(encoded, 6, &v);
   if (result != TC_TLV_OK)
     return result;
-  result = TC_DER_oid_contents(v.data, v.length);
+  result = TC_DER_oid_contents(v);
   if (result != TC_TLV_OK)
     return result;
   *out = v;
   return TC_TLV_OK;
 }
 
-TC_TLV_result TC_DER_oid_contents(const uint8_t* data, size_t length)
+TC_TLV_result TC_DER_oid_contents(TC_bytes contents)
 {
+  const uint8_t* data = contents.data;
+  size_t length = contents.length;
   size_t i;
   int first = 1;
   if (!data && length)
@@ -126,13 +131,13 @@ TC_TLV_result TC_DER_oid_contents(const uint8_t* data, size_t length)
   return TC_TLV_OK;
 }
 
-TC_TLV_result TC_DER_boolean(const uint8_t* data, size_t length, int* out)
+TC_TLV_result TC_DER_boolean(TC_bytes encoded, int* out)
 {
   TC_bytes v;
   TC_TLV_result result;
   if (!out)
     return TC_TLV_ARGUMENT;
-  result = value(data, length, 1, &v);
+  result = value(encoded, 1, &v);
   if (result != TC_TLV_OK)
     return result;
   if (v.length != 1 || (v.data[0] != 0 && v.data[0] != 255))
@@ -141,32 +146,32 @@ TC_TLV_result TC_DER_boolean(const uint8_t* data, size_t length, int* out)
   return TC_TLV_OK;
 }
 
-TC_TLV_result TC_DER_null(const uint8_t* data, size_t length)
+TC_TLV_result TC_DER_null(TC_bytes encoded)
 {
   TC_bytes v;
-  TC_TLV_result result = value(data, length, 5, &v);
+  TC_TLV_result result = value(encoded, 5, &v);
   return result != TC_TLV_OK ? result : v.length ? TC_TLV_INVALID : TC_TLV_OK;
 }
-TC_TLV_result TC_DER_sequence(const uint8_t* data, size_t length, TC_bytes* out)
+TC_TLV_result TC_DER_sequence(TC_bytes encoded, TC_bytes* out)
 {
-  return out ? value(data, length, 0x30, out) : TC_TLV_ARGUMENT;
+  return out ? value(encoded, 0x30, out) : TC_TLV_ARGUMENT;
 }
-TC_TLV_result TC_DER_set(const uint8_t* data, size_t length, TC_bytes* out)
+TC_TLV_result TC_DER_set(TC_bytes encoded, TC_bytes* out)
 {
-  return out ? value(data, length, 0x31, out) : TC_TLV_ARGUMENT;
+  return out ? value(encoded, 0x31, out) : TC_TLV_ARGUMENT;
 }
 
-static TC_TLV_result sequence_fields(const uint8_t* data, size_t length, TC_bytes* fields,
-                                     size_t minimum, size_t maximum)
+static TC_TLV_result sequence_fields(TC_bytes encoded, TC_bytes* fields, size_t minimum,
+                                     size_t maximum)
 {
   const TC_TLV_limits limits = {SIZE_MAX, SIZE_MAX, maximum + 1, 1};
   TC_bytes contents;
   TC_TLV_reader reader;
   TC_TLV_element element;
-  TC_TLV_result result = TC_DER_sequence(data, length, &contents);
+  TC_TLV_result result = TC_DER_sequence(encoded, &contents);
   if (result != TC_TLV_OK)
     return result;
-  result = TC_TLV_reader_init(&reader, contents.data, contents.length, TC_TLV_DER, &limits);
+  result = TC_TLV_reader_init(&reader, contents, TC_TLV_DER, &limits);
   if (result != TC_TLV_OK)
     return result;
   for (size_t i = 0; i < maximum; ++i) {
@@ -184,23 +189,22 @@ static TC_TLV_result sequence_fields(const uint8_t* data, size_t length, TC_byte
   return TC_TLV_next(&reader, &element) == TC_TLV_END ? TC_TLV_OK : TC_TLV_INVALID;
 }
 
-static TC_TLV_result pair(const uint8_t* data, size_t length, TC_bytes fields[2],
-                          int optional_second)
+static TC_TLV_result pair(TC_bytes encoded, TC_bytes fields[2], int optional_second)
 {
-  return sequence_fields(data, length, fields, optional_second ? 1 : 2, 2);
+  return sequence_fields(encoded, fields, optional_second ? 1 : 2, 2);
 }
 
-TC_TLV_result TC_DER_algorithm_identifier(const uint8_t* data, size_t length, TC_DER_algorithm* out)
+TC_TLV_result TC_DER_algorithm_identifier(TC_bytes encoded, TC_DER_algorithm* out)
 {
   TC_bytes fields[2];
   TC_DER_algorithm algorithm;
   TC_TLV_result result;
   if (!out)
     return TC_TLV_ARGUMENT;
-  result = pair(data, length, fields, 1);
+  result = pair(encoded, fields, 1);
   if (result != TC_TLV_OK)
     return result;
-  result = TC_DER_oid(fields[0].data, fields[0].length, &algorithm.oid);
+  result = TC_DER_oid(fields[0], &algorithm.oid);
   if (result != TC_TLV_OK)
     return result;
   algorithm.parameters = fields[1];
@@ -208,13 +212,13 @@ TC_TLV_result TC_DER_algorithm_identifier(const uint8_t* data, size_t length, TC
   return TC_TLV_OK;
 }
 
-TC_TLV_result TC_DER_positive_integer(const uint8_t* data, size_t length, TC_bytes* out)
+TC_TLV_result TC_DER_positive_integer(TC_bytes encoded, TC_bytes* out)
 {
   TC_bytes integer;
   int negative;
   if (!out)
     return TC_TLV_ARGUMENT;
-  TC_TLV_result result = TC_DER_integer(data, length, &integer, &negative);
+  TC_TLV_result result = TC_DER_integer(encoded, &integer, &negative);
   if (result != TC_TLV_OK)
     return result;
   if (negative || (integer.length == 1 && integer.data[0] == 0))
@@ -227,19 +231,19 @@ TC_TLV_result TC_DER_positive_integer(const uint8_t* data, size_t length, TC_byt
   return TC_TLV_OK;
 }
 
-TC_TLV_result TC_DER_rsa_public(const uint8_t* data, size_t length, TC_DER_rsa_public_key* out)
+TC_TLV_result TC_DER_rsa_public(TC_bytes encoded, TC_DER_rsa_public_key* out)
 {
   TC_bytes fields[2];
   TC_DER_rsa_public_key key;
   if (!out)
     return TC_TLV_ARGUMENT;
-  TC_TLV_result result = pair(data, length, fields, 0);
+  TC_TLV_result result = pair(encoded, fields, 0);
   if (result != TC_TLV_OK)
     return result;
-  result = TC_DER_positive_integer(fields[0].data, fields[0].length, &key.modulus);
+  result = TC_DER_positive_integer(fields[0], &key.modulus);
   if (result != TC_TLV_OK)
     return result;
-  result = TC_DER_positive_integer(fields[1].data, fields[1].length, &key.exponent);
+  result = TC_DER_positive_integer(fields[1], &key.exponent);
   if (result != TC_TLV_OK)
     return result;
   *out = key;
@@ -248,7 +252,7 @@ TC_TLV_result TC_DER_rsa_public(const uint8_t* data, size_t length, TC_DER_rsa_p
 
 /* RFC 8017 appendix A.1.2 RSAPrivateKey. Version 1 (multi-prime, with an
  * optional otherPrimeInfos tenth field) is UNSUPPORTED. */
-TC_TLV_result TC_DER_rsa_private(const uint8_t* data, size_t length, TC_DER_rsa_private_key* out)
+TC_TLV_result TC_DER_rsa_private(TC_bytes encoded, TC_DER_rsa_private_key* out)
 {
   enum { TWO_PRIME = 0, MULTI_PRIME = 1 };
   TC_bytes fields[10];
@@ -256,10 +260,10 @@ TC_TLV_result TC_DER_rsa_private(const uint8_t* data, size_t length, TC_DER_rsa_
   uint32_t version;
   if (!out)
     return TC_TLV_ARGUMENT;
-  TC_TLV_result result = sequence_fields(data, length, fields, 9, 10);
+  TC_TLV_result result = sequence_fields(encoded, fields, 9, 10);
   if (result != TC_TLV_OK)
     return result;
-  result = TC_DER_uint32(fields[0].data, fields[0].length, &version);
+  result = TC_DER_uint32(fields[0], &version);
   if (result != TC_TLV_OK)
     return result;
   if (version == MULTI_PRIME)
@@ -270,7 +274,7 @@ TC_TLV_result TC_DER_rsa_private(const uint8_t* data, size_t length, TC_DER_rsa_
                             &key.prime1,    &key.prime2,          &key.exponent1,
                             &key.exponent2, &key.coefficient};
   for (size_t i = 0; i < sizeof components / sizeof *components; ++i) {
-    result = TC_DER_positive_integer(fields[i + 1].data, fields[i + 1].length, components[i]);
+    result = TC_DER_positive_integer(fields[i + 1], components[i]);
     if (result != TC_TLV_OK)
       return result;
   }
@@ -278,7 +282,7 @@ TC_TLV_result TC_DER_rsa_private(const uint8_t* data, size_t length, TC_DER_rsa_
   return TC_TLV_OK;
 }
 
-TC_TLV_result TC_DER_subject_public_key(const uint8_t* data, size_t length, TC_DER_public_key* out)
+TC_TLV_result TC_DER_subject_public_key(TC_bytes encoded, TC_DER_public_key* out)
 {
   TC_bytes fields[2];
   TC_DER_public_key key;
@@ -286,13 +290,13 @@ TC_TLV_result TC_DER_subject_public_key(const uint8_t* data, size_t length, TC_D
   unsigned unused;
   if (!out)
     return TC_TLV_ARGUMENT;
-  result = pair(data, length, fields, 0);
+  result = pair(encoded, fields, 0);
   if (result != TC_TLV_OK)
     return result;
-  result = TC_DER_algorithm_identifier(fields[0].data, fields[0].length, &key.algorithm);
+  result = TC_DER_algorithm_identifier(fields[0], &key.algorithm);
   if (result != TC_TLV_OK)
     return result;
-  result = TC_DER_bit_string(fields[1].data, fields[1].length, &key.key, &unused);
+  result = TC_DER_bit_string(fields[1], &key.key, &unused);
   if (result != TC_TLV_OK)
     return result;
   if (unused || !key.key.length)
@@ -301,7 +305,7 @@ TC_TLV_result TC_DER_subject_public_key(const uint8_t* data, size_t length, TC_D
   return TC_TLV_OK;
 }
 
-TC_TLV_result TC_DER_private_key_info(const uint8_t* data, size_t length, TC_DER_private_key* out)
+TC_TLV_result TC_DER_private_key_info(TC_bytes encoded, TC_DER_private_key* out)
 {
   enum {
     VERSION = 0,
@@ -320,19 +324,18 @@ TC_TLV_result TC_DER_private_key_info(const uint8_t* data, size_t length, TC_DER
   uint32_t version;
   if (!out)
     return TC_TLV_ARGUMENT;
-  TC_TLV_result result = sequence_fields(data, length, fields, 3, FIELD_COUNT);
+  TC_TLV_result result = sequence_fields(encoded, fields, 3, FIELD_COUNT);
   if (result != TC_TLV_OK)
     return result;
-  result = TC_DER_uint32(fields[VERSION].data, fields[VERSION].length, &version);
+  result = TC_DER_uint32(fields[VERSION], &version);
   if (result != TC_TLV_OK)
     return result;
   if (version > WITH_PUBLIC_KEY)
     return TC_TLV_UNSUPPORTED;
-  result =
-      TC_DER_algorithm_identifier(fields[ALGORITHM].data, fields[ALGORITHM].length, &key.algorithm);
+  result = TC_DER_algorithm_identifier(fields[ALGORITHM], &key.algorithm);
   if (result != TC_TLV_OK)
     return result;
-  result = value(fields[KEY].data, fields[KEY].length, OCTET_STRING, &key.key);
+  result = value(fields[KEY], OCTET_STRING, &key.key);
   if (result != TC_TLV_OK)
     return result;
   key.attributes = (TC_bytes){NULL, 0};
@@ -340,7 +343,7 @@ TC_TLV_result TC_DER_private_key_info(const uint8_t* data, size_t length, TC_DER
   key.public_key_unused = 0;
   size_t next = OPTIONAL;
   if (fields[next].data && fields[next].data[0] == IMPLICIT_ATTRIBUTES) {
-    result = value(fields[next].data, fields[next].length, IMPLICIT_ATTRIBUTES, &key.attributes);
+    result = value(fields[next], IMPLICIT_ATTRIBUTES, &key.attributes);
     if (result != TC_TLV_OK)
       return result;
     ++next;
@@ -349,7 +352,7 @@ TC_TLV_result TC_DER_private_key_info(const uint8_t* data, size_t length, TC_DER
     TC_bytes bits;
     if (version != WITH_PUBLIC_KEY)
       return TC_TLV_INVALID;
-    result = value(fields[next].data, fields[next].length, IMPLICIT_PUBLIC_KEY, &bits);
+    result = value(fields[next], IMPLICIT_PUBLIC_KEY, &bits);
     if (result != TC_TLV_OK)
       return result;
     result = tc_der_bit_string_contents(bits, &key.public_key, &key.public_key_unused);
@@ -365,20 +368,20 @@ TC_TLV_result TC_DER_private_key_info(const uint8_t* data, size_t length, TC_DER
   return TC_TLV_OK;
 }
 
-TC_TLV_result TC_DER_ecdsa_signature(const uint8_t* data, size_t length, TC_DER_signature_pair* out)
+TC_TLV_result TC_DER_ecdsa_signature(TC_bytes encoded, TC_DER_signature_pair* out)
 {
   TC_bytes fields[2];
   TC_DER_signature_pair signature;
   TC_TLV_result result;
   if (!out)
     return TC_TLV_ARGUMENT;
-  result = pair(data, length, fields, 0);
+  result = pair(encoded, fields, 0);
   if (result != TC_TLV_OK)
     return result;
-  result = TC_DER_positive_integer(fields[0].data, fields[0].length, &signature.r);
+  result = TC_DER_positive_integer(fields[0], &signature.r);
   if (result != TC_TLV_OK)
     return result;
-  result = TC_DER_positive_integer(fields[1].data, fields[1].length, &signature.s);
+  result = TC_DER_positive_integer(fields[1], &signature.s);
   if (result != TC_TLV_OK)
     return result;
   *out = signature;

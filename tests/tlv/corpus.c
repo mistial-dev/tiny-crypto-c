@@ -45,8 +45,8 @@ int main(void)
     if (header[0] & 128) {
       TC_TLV_header parsed;
       const TC_TLV_limits header_limits = {65535, SIZE_MAX, 1, 1};
-      result = TC_TLV_header_read(data, length, (TC_TLV_profile)(header[0] & 127), &header_limits,
-                                  &parsed);
+      result = TC_TLV_header_read((TC_bytes){data, length}, (TC_TLV_profile)(header[0] & 127),
+                                  &header_limits, &parsed);
       if (result == TC_TLV_OK)
         printf("N 0 0 %u %lu 04\n", (unsigned)parsed.header_length, (unsigned long)parsed.length);
       printf("R %d\n", (int)result);
@@ -54,7 +54,7 @@ int main(void)
       free(data);
       continue;
     }
-    result = TC_TLV_walk(data, length, (TC_TLV_profile)header[0], &limits,
+    result = TC_TLV_walk((TC_bytes){data, length}, (TC_TLV_profile)header[0], &limits,
                          (TC_TLV_frames){frames, 32}, node, NULL);
     for (i = 0; i < sizeof chunks / sizeof chunks[0]; ++i) {
       TC_TLV_stream stream;
@@ -67,7 +67,7 @@ int main(void)
         TC_TLV_result r;
         if (n > chunks[i])
           n = chunks[i];
-        r = TC_TLV_stream_feed(&stream, data + p, n, NULL, NULL);
+        r = TC_TLV_stream_feed(&stream, (TC_bytes){data + p, n}, NULL, NULL);
         if (r < 0)
           break;
         p += n;

@@ -51,7 +51,7 @@ static MunitResult vectors(const MunitParameter params[], void* data)
     if (der) {
       TC_DER_signature_pair pair;
       size_t width = bits / 8;
-      decoded = TC_DER_ecdsa_signature(signature, signature_len, &pair) == TC_TLV_OK;
+      decoded = TC_DER_ecdsa_signature((TC_bytes){signature, signature_len}, &pair) == TC_TLV_OK;
       if (decoded)
         decoded = pair.r.length <= width && pair.s.length <= width;
       if (decoded) {

@@ -81,10 +81,9 @@ TC_status example_piv_sm_response_read(TC_PIV_SM_suite suite, TC_bytes encoded,
   size_t prefix;
   if (!coordinate_bytes || !encoded.data || !response)
     return TC_ERROR;
-  if (TC_TLV_read(encoded.data, encoded.length, TC_TLV_ISO7816, &limits, &outer) != TC_TLV_OK ||
-      !tag_is(&outer, 0x7c) || outer.encoded.length != encoded.length ||
-      TC_TLV_read(outer.value.data, outer.value.length, TC_TLV_ISO7816, &limits, &value) !=
-          TC_TLV_OK ||
+  if (TC_TLV_read(encoded, TC_TLV_ISO7816, &limits, &outer) != TC_TLV_OK || !tag_is(&outer, 0x7c) ||
+      outer.encoded.length != encoded.length ||
+      TC_TLV_read(outer.value, TC_TLV_ISO7816, &limits, &value) != TC_TLV_OK ||
       !tag_is(&value, 0x82) || value.encoded.length != outer.value.length)
     return TC_ERROR;
   prefix = 1 + nonce_bytes + 16;
@@ -96,8 +95,7 @@ TC_status example_piv_sm_response_read(TC_PIV_SM_suite suite, TC_bytes encoded,
   parsed.peer.nonce = (TC_bytes){value.value.data + 1, nonce_bytes};
   parsed.peer.cryptogram = (TC_bytes){value.value.data + 1 + nonce_bytes, 16};
   parsed.peer.certificate = (TC_bytes){value.value.data + prefix, value.value.length - prefix};
-  if (TC_PIV_CVC_read(parsed.peer.certificate.data, parsed.peer.certificate.length, &parsed.cvc) !=
-          TC_TLV_OK ||
+  if (TC_PIV_CVC_read(parsed.peer.certificate, &parsed.cvc) != TC_TLV_OK ||
       parsed.cvc.key_bits != coordinate_bytes * 8 || parsed.cvc.role != TC_PIV_CVC_CARD_APPLICATION)
     return TC_ERROR;
   *response = parsed;
@@ -219,8 +217,7 @@ static int response_fields(TC_bytes encoded, TC_bytes* ciphertext, TC_bytes* aut
   TC_TLV_element element;
   ciphertext->data = NULL;
   ciphertext->length = 0;
-  if (TC_TLV_reader_init(&reader, encoded.data, encoded.length, TC_TLV_ISO7816, &limits) !=
-          TC_TLV_OK ||
+  if (TC_TLV_reader_init(&reader, encoded, TC_TLV_ISO7816, &limits) != TC_TLV_OK ||
       TC_TLV_next(&reader, &element) != TC_TLV_OK)
     return 0;
   if (tag_is(&element, 0x87)) {

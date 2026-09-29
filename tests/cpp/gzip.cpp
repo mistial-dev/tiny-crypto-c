@@ -19,27 +19,28 @@ TEST_CASE("GZIP decoder reuse, limits and arguments")
   uint8_t output[sizeof expected - 1];
   tiny_crypto::GZIPDecoder decoder;
   size_t work = 4096, length = SIZE_MAX;
-  REQUIRE(decoder.decode(compressed, output, work, length) == TC_GZIP_OK);
+  REQUIRE(decoder.decode(compressed, work, output, length) == TC_GZIP_OK);
   CHECK(length == sizeof output);
   CHECK(std::memcmp(output, expected, sizeof output) == 0);
   CHECK(work < 4096);
 
   length = SIZE_MAX;
   work = 0;
-  CHECK(decoder.decode(compressed, output, work, length) == TC_GZIP_LIMIT);
+  CHECK(decoder.decode(compressed, work, output, length) == TC_GZIP_LIMIT);
   CHECK(length == SIZE_MAX);
   for (uint8_t byte : output)
     CHECK(byte == 0);
 
   std::memset(output, 0x5a, sizeof output);
   work = 4096;
-  CHECK(decoder.decode(nullptr, 1, output, sizeof output, work, length) == TC_GZIP_ARGUMENT);
+  CHECK(decoder.decode(TC_bytes{nullptr, 1}, work, TC_buffer{output, sizeof output}, length) ==
+        TC_GZIP_ARGUMENT);
   CHECK(work == 4096);
   CHECK(length == SIZE_MAX);
   for (uint8_t byte : output)
     CHECK(byte == 0x5a);
 
-  REQUIRE(decoder.decode(compressed, sizeof compressed, output, sizeof output, work, length) ==
-          TC_GZIP_OK);
+  REQUIRE(decoder.decode(TC_bytes{compressed, sizeof compressed}, work,
+                         TC_buffer{output, sizeof output}, length) == TC_GZIP_OK);
   CHECK(std::memcmp(output, expected, sizeof output) == 0);
 }

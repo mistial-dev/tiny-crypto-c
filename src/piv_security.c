@@ -57,7 +57,7 @@ TC_TLV_result TC_PIV_security_read(TC_bytes encoded, TC_PIV_security_encoding en
     if (result != TC_TLV_OK)
       return result;
   }
-  result = TC_TLV_reader_init(&reader, encoded.data, encoded.length, TC_TLV_ISO7816, &limits);
+  result = TC_TLV_reader_init(&reader, encoded, TC_TLV_ISO7816, &limits);
   if (result != TC_TLV_OK)
     return result;
   /* These tags carry opaque values despite their ASN.1 constructed bits. */

@@ -56,8 +56,9 @@ TC_TLV_result tc_x509_name_next_attribute(TC_TLV_reader* reader, size_t* work,
     return TC_TLV_END;
   if (tc_pki_work_charge(work, 1) != TC_TLV_OK)
     return TC_TLV_LIMIT;
-  result = TC_TLV_read(reader->input.data + reader->offset, reader->input.length - reader->offset,
-                       TC_TLV_DER, &reader->limits, &element);
+  result = TC_TLV_read(
+      (TC_bytes){reader->input.data + reader->offset, reader->input.length - reader->offset},
+      TC_TLV_DER, &reader->limits, &element);
   if (result != TC_TLV_OK)
     return result;
   if (tc_pki_work_charge(work, element.encoded.length) != TC_TLV_OK)
@@ -115,9 +116,8 @@ static TC_TLV_result prepare(const TC_X509_name_attribute* attribute, TC_TLV_pro
   size_t i;
   if (!rule)
     return TC_TLV_UNSUPPORTED;
-  result =
-      tree ? tc_pki_tree_read(attribute->value, profile, bounds, tree, &value)
-           : TC_TLV_read(attribute->value.data, attribute->value.length, profile, &limits, &value);
+  result = tree ? tc_pki_tree_read(attribute->value, profile, bounds, tree, &value)
+                : TC_TLV_read(attribute->value, profile, &limits, &value);
   if (result != TC_TLV_OK)
     return result;
   if (value.header.tag_length != 1)
@@ -240,7 +240,7 @@ static TC_TLV_result rdn_compare(const name_compare* compare, TC_bytes left, TC_
   TC_TLV_result result;
   size_t count = 0, seen = 0;
   int undetermined = 0;
-  result = TC_TLV_reader_init(&b, right.data, right.length, compare->right_profile, limits);
+  result = TC_TLV_reader_init(&b, right, compare->right_profile, limits);
   if (result != TC_TLV_OK)
     return result;
   while ((result = tc_x509_name_next_attribute(&b, work, &second, tree)) == TC_TLV_OK) {
@@ -250,7 +250,7 @@ static TC_TLV_result rdn_compare(const name_compare* compare, TC_bytes left, TC_
   }
   if (result != TC_TLV_END)
     return result;
-  result = TC_TLV_reader_init(&a, left.data, left.length, compare->left_profile, limits);
+  result = TC_TLV_reader_init(&a, left, compare->left_profile, limits);
   if (result != TC_TLV_OK)
     return result;
   while ((result = tc_x509_name_next_attribute(&a, work, &first, tree)) == TC_TLV_OK) {
@@ -261,7 +261,7 @@ static TC_TLV_result rdn_compare(const name_compare* compare, TC_bytes left, TC_
       *out = NAME_MISMATCH;
       return TC_TLV_OK;
     }
-    result = TC_TLV_reader_init(&b, right.data, right.length, compare->right_profile, limits);
+    result = TC_TLV_reader_init(&b, right, compare->right_profile, limits);
     if (result != TC_TLV_OK)
       return result;
     while ((result = tc_x509_name_next_attribute(&b, work, &second, tree)) == TC_TLV_OK) {

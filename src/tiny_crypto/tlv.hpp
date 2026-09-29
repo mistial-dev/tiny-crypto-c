@@ -17,15 +17,22 @@ class TLVReader {
 public:
   TLVReader() noexcept : reader_(), ready_(false)
   {}
-  TC_CPP_NODISCARD TC_TLV_result init(const uint8_t* data, size_t length, TC_TLV_profile profile,
+  TC_CPP_NODISCARD TC_TLV_result init(TC_bytes input, TC_TLV_profile profile,
                                       const TC_TLV_limits& limits) noexcept
   {
     /* A failed init must not leave the previous cursor usable. */
     ready_ = false;
-    TC_TLV_result result = TC_TLV_reader_init(&reader_, data, length, profile, &limits);
+    TC_TLV_result result = TC_TLV_reader_init(&reader_, input, profile, &limits);
     if (result == TC_TLV_OK)
       ready_ = true;
     return result;
+  }
+  /* Borrow a whole C array. */
+  template <size_t Size>
+  TC_CPP_NODISCARD TC_TLV_result init(const uint8_t (&input)[Size], TC_TLV_profile profile,
+                                      const TC_TLV_limits& limits) noexcept
+  {
+    return init(TC_bytes{input, Size}, profile, limits);
   }
   /* Read the template of an element returned by parent. Padding and
    * truncation inside the template return TC_TLV_INVALID. parent may be this

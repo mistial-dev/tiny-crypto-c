@@ -121,9 +121,7 @@ static MunitResult biometric_signatures(const MunitParameter params[], void* con
       if (matched != identifiers_match)
         munit_errorf("biometric record %zu: identifier match %d", count, matched);
       TC_TLV_element uuid;
-      munit_assert_int(TC_TLV_read(object.attributes.entry_uuid_octets.data,
-                                   object.attributes.entry_uuid_octets.length, TC_TLV_DER, &limits,
-                                   &uuid),
+      munit_assert_int(TC_TLV_read(object.attributes.entry_uuid_octets, TC_TLV_DER, &limits, &uuid),
                        ==, TC_TLV_OK);
       munit_assert_int(TC_PIV_CMS_identifiers_match(
                            &object, TC_PIV_CMS_BIOMETRIC, biometric.fascn, uuid.value, &limits,
@@ -149,12 +147,10 @@ static MunitResult biometric_signatures(const MunitParameter params[], void* con
     munit_assert_int(TC_CMS_signed_data_read(inputs[2], &cms_policy, &limits,
                                              (TC_TLV_frames){frames, FRAME_COUNT}, &work, &chuid),
                      ==, TC_TLV_OK);
-    munit_assert_int(TC_TLV_read(chuid.certificates.data, chuid.certificates.length, TC_TLV_BER,
-                                 &limits, &collection),
-                     ==, TC_TLV_OK);
-    munit_assert_int(TC_TLV_reader_init(&certificates, collection.value.data,
-                                        collection.value.length, TC_TLV_BER, &limits),
-                     ==, TC_TLV_OK);
+    munit_assert_int(TC_TLV_read(chuid.certificates, TC_TLV_BER, &limits, &collection), ==,
+                     TC_TLV_OK);
+    munit_assert_int(TC_TLV_reader_init(&certificates, collection.value, TC_TLV_BER, &limits), ==,
+                     TC_TLV_OK);
     int found = 0;
     TC_TLV_result status;
     while ((status = TC_TLV_next(&certificates, &element)) == TC_TLV_OK) {

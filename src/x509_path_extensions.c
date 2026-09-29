@@ -49,7 +49,7 @@ static TC_TLV_result summary_decode(TC_X509_extension_summary* summary, int slot
   case TC_X509_SUMMARY_POLICY_CONSTRAINTS:
     return TC_X509_policy_constraints_read(value, limits, &summary->policy_constraints);
   case TC_X509_SUMMARY_INHIBIT_ANY:
-    return TC_DER_uint32(value.data, value.length, &summary->inhibit_any);
+    return TC_DER_uint32(value, &summary->inhibit_any);
   default:
     return TC_TLV_OK;
   }

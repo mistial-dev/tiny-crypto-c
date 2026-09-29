@@ -25,10 +25,11 @@ typedef struct {
   size_t* work;
 } tc_inflate_bits;
 
-/* Output span. length <= capacity, and data is non-NULL when capacity is nonzero. */
+/* Decoded bytes occupy the first length bytes of buffer.
+ * length <= buffer.capacity, and buffer.data is non-NULL when capacity is nonzero. */
 typedef struct {
-  uint8_t* data;
-  size_t capacity, length;
+  TC_buffer buffer;
+  size_t length;
 } tc_inflate_output;
 
 /* Decode one DEFLATE stream and advance to the next byte boundary.

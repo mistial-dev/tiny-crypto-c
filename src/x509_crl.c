@@ -151,7 +151,7 @@ TC_TLV_result tc_x509_crl_entries_init(TC_bytes encoded, const TC_TLV_limits* li
   if (!out || !tree || !tree->work)
     return TC_TLV_ARGUMENT;
   if (!encoded.data && !encoded.length)
-    return TC_TLV_reader_init(out, NULL, 0, TC_TLV_DER, limits);
+    return TC_TLV_reader_init(out, (TC_bytes){NULL, 0}, TC_TLV_DER, limits);
   result = tc_pki_tree_open(encoded, 0x30, TC_TLV_DER, limits, tree, &parsed);
   if (result != TC_TLV_OK)
     return result;
@@ -181,8 +181,7 @@ TC_TLV_result tc_x509_crl_entry_next(TC_TLV_reader* reader, unsigned version,
   result = tc_pki_tree_field(&fields, 2, tree, &element);
   if (result != TC_TLV_OK)
     return result;
-  result = TC_DER_integer(element.encoded.data, element.encoded.length, &parsed.serial,
-                          &parsed.serial_negative);
+  result = TC_DER_integer(element.encoded, &parsed.serial, &parsed.serial_negative);
   if (result != TC_TLV_OK)
     return result;
   result = tc_pki_tree_next(&fields, tree, &element);
@@ -231,8 +230,7 @@ TC_TLV_result tc_x509_crl_metadata_read(const tc_x509_crl_fields* fields,
                                                &parsed.signature_algorithm);
   if (result != TC_TLV_OK)
     return result;
-  result = TC_DER_bit_string(fields->signature.data, fields->signature.length, &parsed.signature,
-                             &unused);
+  result = TC_DER_bit_string(fields->signature, &parsed.signature, &unused);
   if (result != TC_TLV_OK)
     return result;
   if (unused || !parsed.signature.length)
@@ -240,7 +238,7 @@ TC_TLV_result tc_x509_crl_metadata_read(const tc_x509_crl_fields* fields,
   parsed.version = 1;
   if (fields->version.length) {
     uint32_t version;
-    result = TC_DER_uint32(fields->version.data, fields->version.length, &version);
+    result = TC_DER_uint32(fields->version, &version);
     if (result != TC_TLV_OK)
       return result;
     if (version != 1)
@@ -251,7 +249,7 @@ TC_TLV_result tc_x509_crl_metadata_read(const tc_x509_crl_fields* fields,
     return TC_TLV_LIMIT;
   if (!tc_pki_equal(fields->inner_algorithm, fields->algorithm))
     return TC_TLV_INVALID;
-  result = TC_TLV_read(fields->issuer.data, fields->issuer.length, TC_TLV_DER, limits, &element);
+  result = TC_TLV_read(fields->issuer, TC_TLV_DER, limits, &element);
   if (result != TC_TLV_OK)
     return result;
   if (!element.value.length)
@@ -260,16 +258,14 @@ TC_TLV_result tc_x509_crl_metadata_read(const tc_x509_crl_fields* fields,
   result = tc_pki_tree_name(parsed.issuer, TC_TLV_DER, limits, tree);
   if (result != TC_TLV_OK)
     return result;
-  result = TC_TLV_read(fields->this_update.data, fields->this_update.length, TC_TLV_DER, limits,
-                       &element);
+  result = TC_TLV_read(fields->this_update, TC_TLV_DER, limits, &element);
   if (result != TC_TLV_OK)
     return result;
   result = tc_x509_time_value(&element, &parsed.this_update);
   if (result != TC_TLV_OK)
     return result;
   if (fields->next_update.length) {
-    result = TC_TLV_read(fields->next_update.data, fields->next_update.length, TC_TLV_DER, limits,
-                         &element);
+    result = TC_TLV_read(fields->next_update, TC_TLV_DER, limits, &element);
     if (result != TC_TLV_OK)
       return result;
     result = tc_x509_time_value(&element, &parsed.next_update);

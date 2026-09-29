@@ -42,7 +42,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
     size_t p = 0;
     memset(&e, 0xa5, sizeof e);
     saved = e;
-    r = TC_TLV_read(data, length, (TC_TLV_profile)profile, &limits, &e);
+    r = TC_TLV_read((TC_bytes){data, length}, (TC_TLV_profile)profile, &limits, &e);
     if (r == TC_TLV_OK) {
       if (e.encoded.data != data || e.encoded.length > length ||
           e.value.data != data + e.header.header_length ||
@@ -52,7 +52,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
       abort();
     memset(&e, 0xa5, sizeof e);
     saved = e;
-    r = TC_TLV_read_tree(data, length, (TC_TLV_profile)profile, &limits,
+    r = TC_TLV_read_tree((TC_bytes){data, length}, (TC_TLV_profile)profile, &limits,
                          (TC_TLV_frames){frames, sizeof frames / sizeof *frames}, &e);
     if (r == TC_TLV_OK) {
       if (e.encoded.data != data || e.encoded.length > length || !e.encoded.length ||
@@ -60,14 +60,14 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
           e.value.length !=
               e.encoded.length - e.header.header_length - (e.header.indefinite ? 2u : 0u))
         abort();
-      if (TC_TLV_walk(e.encoded.data, e.encoded.length, (TC_TLV_profile)profile, &limits,
+      if (TC_TLV_walk(e.encoded, (TC_TLV_profile)profile, &limits,
                       (TC_TLV_frames){frames, sizeof frames / sizeof *frames}, NULL,
                       NULL) != TC_TLV_OK)
         abort();
     } else if (memcmp(&e, &saved, sizeof e))
       abort();
-    r = TC_TLV_walk(data, length, (TC_TLV_profile)profile, &limits, (TC_TLV_frames){frames, 16},
-                    trace, &a);
+    r = TC_TLV_walk((TC_bytes){data, length}, (TC_TLV_profile)profile, &limits,
+                    (TC_TLV_frames){frames, 16}, trace, &a);
     if (TC_TLV_stream_init(&stream, (TC_TLV_profile)profile, &limits,
                            (TC_TLV_frames){frames, 16}) != TC_TLV_OK)
       abort();
@@ -76,7 +76,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
       TC_TLV_result step;
       if (n > length - p)
         n = length - p;
-      step = TC_TLV_stream_feed(&stream, data + p, n, trace, &b);
+      step = TC_TLV_stream_feed(&stream, (TC_bytes){data + p, n}, trace, &b);
       if (step < 0)
         break;
       p += n;
@@ -87,13 +87,13 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
         (a.hash != b.hash || a.opens != b.opens || a.closes != b.closes || a.opens != a.closes))
       abort();
   }
-  (void)TC_DER_integer(data, length, &span, &sign);
-  (void)TC_DER_uint32(data, length, &integer);
-  (void)TC_DER_bit_string(data, length, &span, &unused);
-  (void)TC_DER_oid(data, length, &span);
-  (void)TC_DER_boolean(data, length, &sign);
-  (void)TC_DER_null(data, length);
-  (void)TC_DER_algorithm_identifier(data, length, &algorithm);
-  (void)TC_DER_ecdsa_signature(data, length, &signature);
+  (void)TC_DER_integer((TC_bytes){data, length}, &span, &sign);
+  (void)TC_DER_uint32((TC_bytes){data, length}, &integer);
+  (void)TC_DER_bit_string((TC_bytes){data, length}, &span, &unused);
+  (void)TC_DER_oid((TC_bytes){data, length}, &span);
+  (void)TC_DER_boolean((TC_bytes){data, length}, &sign);
+  (void)TC_DER_null((TC_bytes){data, length});
+  (void)TC_DER_algorithm_identifier((TC_bytes){data, length}, &algorithm);
+  (void)TC_DER_ecdsa_signature((TC_bytes){data, length}, &signature);
   return 0;
 }

@@ -36,8 +36,9 @@ static int inspect_certificate(size_t length, ExampleCardApplication application
   TC_bytes encoded = container.certificate;
   if (container.compression == TC_PIV_CERTIFICATE_GZIP) {
     size_t work = DECODE_WORK_LIMIT, decoded;
-    if (TC_GZIP_decode(encoded.data, encoded.length, storage.certificate,
-                       sizeof storage.certificate, &storage.gzip, &work, &decoded) != TC_GZIP_OK)
+    if (TC_GZIP_decode(encoded, &storage.gzip, &work,
+                       (TC_buffer){storage.certificate, sizeof storage.certificate},
+                       &decoded) != TC_GZIP_OK)
       return 0;
     encoded = (TC_bytes){storage.certificate, decoded};
   }

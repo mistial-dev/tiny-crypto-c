@@ -28,17 +28,25 @@ typedef struct {
   TC_EAC_role role;
   TC_EAC_terminal_type terminal_type;
 } TC_EAC_CVC;
+/* Caller-owned nesting scratch. limits.max_depth frames always suffice. */
 typedef struct {
-  TC_TLV_frame* frames;
-  size_t frame_capacity;
+  TC_TLV_frames frames;
 } TC_EAC_CVC_workspace;
 
-/* Parse and bounds-check one TR-03110 certificate. Spans borrow input. out is
- * unchanged on failure. The caller verifies the signature, chain and dates. */
-TC_TLV_result TC_EAC_CVC_read(const uint8_t* data, size_t length, const TC_TLV_limits* limits,
+/* Parse and bounds-check one complete TR-03110 certificate (tag 7F21) as
+ * encoded. Spans borrow encoded, which must stay unchanged while they are
+ * used. limits bounds the whole tree. Workspace frames may change on failure.
+ * Returns OK, MORE for truncated input, INVALID for malformed or trailing
+ * input, LIMIT when limits or frame capacity are exhausted, UNSUPPORTED for an
+ * unknown profile, key algorithm or role, and ARGUMENT for NULL pointers.
+ * out is unchanged on failure. The caller verifies the signature, chain and
+ * dates. */
+TC_TLV_result TC_EAC_CVC_read(TC_bytes encoded, const TC_TLV_limits* limits,
                               TC_EAC_CVC_workspace* workspace, TC_EAC_CVC* out);
-TC_TLV_result TC_EAC_CVC_public_key_read(const uint8_t* data, size_t length,
-                                         const TC_TLV_limits* limits, TC_EAC_CVC_public_key* out);
+/* Read one standalone public key (tag 7F49) with the same statuses and
+ * lifetime rules as TC_EAC_CVC_read. */
+TC_TLV_result TC_EAC_CVC_public_key_read(TC_bytes encoded, const TC_TLV_limits* limits,
+                                         TC_EAC_CVC_public_key* out);
 
 /* issuer must have resolved parameters. inherited supplies the subject's EC
  * domain when absent from its certificate. Missing context is ARGUMENT.

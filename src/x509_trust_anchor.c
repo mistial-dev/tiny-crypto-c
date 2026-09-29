@@ -12,7 +12,7 @@
 static TC_TLV_result contents_reader(TC_TLV_reader* reader, TC_bytes bytes,
                                      const TC_TLV_limits* limits)
 {
-  return TC_TLV_reader_init(reader, bytes.data, bytes.length, TC_TLV_DER, limits);
+  return TC_TLV_reader_init(reader, bytes, TC_TLV_DER, limits);
 }
 
 static TC_TLV_result utf8_string(TC_bytes value, size_t max_characters)
@@ -161,7 +161,7 @@ static TC_TLV_result cert_path_controls(TC_bytes contents, const TC_TLV_limits* 
       break;
     default: {
       uint32_t length;
-      result = TC_DER_uint32_contents(element.value.data, element.value.length, &length);
+      result = TC_DER_uint32_contents(element.value, &length);
       if (result != TC_TLV_OK)
         return result;
       out->path_len = length;
@@ -192,7 +192,7 @@ static TC_TLV_result trust_anchor_info(TC_bytes contents, const TC_TLV_limits* l
     return TC_TLV_INVALID;
   if (tc_pki_tag(&element, 2)) {
     uint32_t version;
-    result = TC_DER_uint32(element.encoded.data, element.encoded.length, &version);
+    result = TC_DER_uint32(element.encoded, &version);
     if (result != TC_TLV_OK)
       return result;
     if (version == 1)
@@ -226,7 +226,7 @@ static TC_TLV_result trust_anchor_info(TC_bytes contents, const TC_TLV_limits* l
       out->x509_unusable = 0;
     } else if (index == 2) {
       TC_TLV_element inner;
-      result = TC_TLV_read(element.value.data, element.value.length, TC_TLV_DER, limits, &inner);
+      result = TC_TLV_read(element.value, TC_TLV_DER, limits, &inner);
       if (result != TC_TLV_OK || !tc_pki_tag(&inner, 0x30) ||
           inner.encoded.length != element.value.length)
         return TC_TLV_INVALID;
@@ -265,8 +265,7 @@ TC_TLV_result TC_X509_trust_anchor_list_init(TC_X509_trust_anchor_reader* reader
   result = tc_pki_value_open(&parsed.reader, encoded, 0x30, limits, 0);
   if (result != TC_TLV_OK)
     return result;
-  result =
-      TC_TLV_walk(encoded.data, encoded.length, TC_TLV_DER, limits, workspace->frames, NULL, NULL);
+  result = TC_TLV_walk(encoded, TC_TLV_DER, limits, workspace->frames, NULL, NULL);
   if (result != TC_TLV_OK)
     return result == TC_TLV_MORE ? TC_TLV_INVALID : result;
   /* The walk bounded the whole list. Each anchor is decoded under limits. */
@@ -319,7 +318,7 @@ TC_TLV_result TC_X509_trust_anchor_next(TC_X509_trust_anchor_reader* reader,
   } else if (tc_pki_tag(&choice, 0xa2)) {
 #if TC_TAF_ENABLE_TRUST_ANCHOR_INFO
     TC_TLV_element info;
-    result = TC_TLV_read(choice.value.data, choice.value.length, TC_TLV_DER, limits, &info);
+    result = TC_TLV_read(choice.value, TC_TLV_DER, limits, &info);
     if (result != TC_TLV_OK || !tc_pki_tag(&info, 0x30) ||
         info.encoded.length != choice.value.length)
       return TC_TLV_INVALID;

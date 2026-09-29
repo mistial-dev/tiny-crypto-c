@@ -36,7 +36,7 @@ static inline TC_TLV_result tc_pki_hash_algorithm_profile(const TC_DER_algorithm
     return TC_TLV_ARGUMENT;
   if (profile != TC_TLV_DER && profile != TC_TLV_BER)
     return TC_TLV_ARGUMENT;
-  if (TC_DER_oid_contents(algorithm->oid.data, algorithm->oid.length) != TC_TLV_OK)
+  if (TC_DER_oid_contents(algorithm->oid) != TC_TLV_OK)
     return TC_TLV_INVALID;
   for (unsigned id = TC_HASH_SHA1; id <= TC_HASH_SHA512; ++id) {
     tc_hash_info info;

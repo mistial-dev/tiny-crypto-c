@@ -14,8 +14,7 @@ static TC_TLV_result lds_number(TC_TLV_reader* reader, const tc_pki_tree_workspa
 {
   TC_TLV_element field;
   TC_TLV_result result = tc_pki_tree_field(reader, 2, tree, &field);
-  return result == TC_TLV_OK ? TC_DER_uint32_contents(field.value.data, field.value.length, number)
-                             : result;
+  return result == TC_TLV_OK ? TC_DER_uint32_contents(field.value, number) : result;
 }
 
 static TC_TLV_result lds_version_string(TC_TLV_reader* reader, const tc_pki_tree_workspace* tree,
@@ -113,7 +112,7 @@ TC_TLV_result TC_LDS_read(TC_bytes encoded, const TC_TLV_limits* limits, TC_TLV_
   if (result != TC_TLV_OK)
     return result;
   parsed.hashes = field.encoded;
-  result = TC_TLV_reader_init(&groups, field.value.data, field.value.length, TC_TLV_DER, limits);
+  result = TC_TLV_reader_init(&groups, field.value, TC_TLV_DER, limits);
   if (result != TC_TLV_OK)
     return result;
   result = lds_hashes(&groups, &tree, info.digest_length, 0, &parsed.groups, NULL);
@@ -124,8 +123,7 @@ TC_TLV_result TC_LDS_read(TC_bytes encoded, const TC_TLV_limits* limits, TC_TLV_
     result = tc_pki_tree_field(&fields, 0x30, &tree, &field);
     if (result != TC_TLV_OK)
       return result;
-    result =
-        TC_TLV_reader_init(&versions, field.value.data, field.value.length, TC_TLV_DER, limits);
+    result = TC_TLV_reader_init(&versions, field.value, TC_TLV_DER, limits);
     if (result != TC_TLV_OK)
       return result;
     result = lds_version_string(&versions, &tree, 4, &parsed.lds_version);

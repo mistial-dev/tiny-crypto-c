@@ -362,7 +362,8 @@ static void fuzz_path(const uint8_t* data, size_t length, const TC_X509_certific
     size_t count = 0, work;
     options.max_certificates = 4;
     options.max_work = 200000;
-    if (TC_TLV_reader_init(&objects, data, length, TC_TLV_DER, &options.parsing) != TC_TLV_OK)
+    if (TC_TLV_reader_init(&objects, (TC_bytes){data, length}, TC_TLV_DER, &options.parsing) !=
+        TC_TLV_OK)
       return;
     while (count < 4 && TC_TLV_next(&objects, &element) == TC_TLV_OK)
       candidates[count++] = element.encoded;
@@ -732,8 +733,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
           TC_TLV_result inner;
           if (names.offset <= old_names.offset || names.elements > limits.max_elements)
             abort();
-          if (TC_TLV_reader_init(&attributes, rdn.data, rdn.length, TC_TLV_DER, &limits) !=
-              TC_TLV_OK)
+          if (TC_TLV_reader_init(&attributes, rdn, TC_TLV_DER, &limits) != TC_TLV_OK)
             abort();
           while ((inner = TC_X509_attribute_next(&attributes, &attribute)) == TC_TLV_OK) {
           }
@@ -858,7 +858,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
     result = TC_X509_subject_key_identifier_read((TC_bytes){data, length}, &limits, &subject);
     if (result != TC_TLV_OK && memcmp(&subject, &old_subject, sizeof subject))
       abort();
-    (void)TC_DER_integer_contents(data, length);
+    (void)TC_DER_integer_contents((TC_bytes){data, length});
   }
   {
     TC_X509_policy_constraints policy, old_policy;
@@ -868,7 +868,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
     result = TC_X509_policy_constraints_read((TC_bytes){data, length}, &limits, &policy);
     if (result != TC_TLV_OK && memcmp(&policy, &old_policy, sizeof policy))
       abort();
-    result = TC_DER_uint32_contents(data, length, &number);
+    result = TC_DER_uint32_contents((TC_bytes){data, length}, &number);
     if (result != TC_TLV_OK && number != 99)
       abort();
   }
@@ -1023,7 +1023,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
   }
   memset(&cvc, 0xa5, sizeof cvc);
   old_cvc = cvc;
-  result = TC_PIV_CVC_read(data, length, &cvc);
+  result = TC_PIV_CVC_read((TC_bytes){data, length}, &cvc);
   if (result != TC_TLV_OK && memcmp(&cvc, &old_cvc, sizeof cvc))
     abort();
   for (profile = TC_CHUID_PROFILE_PIV; profile <= TC_CHUID_PROFILE_LEGACY_KEY_MAP; ++profile)
@@ -1039,10 +1039,10 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
     TC_EAC_CVC eac, old_eac;
     TC_EAC_CVC_public_key eac_key, old_key;
     TC_EAC_CVC_extension ext;
-    TC_EAC_CVC_workspace work = {frames, 16};
+    TC_EAC_CVC_workspace work = {{frames, 16}};
     memset(&eac, 0xa5, sizeof eac);
     old_eac = eac;
-    result = TC_EAC_CVC_read(data, length, &limits, &work, &eac);
+    result = TC_EAC_CVC_read((TC_bytes){data, length}, &limits, &work, &eac);
     if (result == TC_TLV_OK) {
       (void)TC_EAC_CVC_check_encoding(&eac, &eac.public_key, &eac.public_key);
       if (TC_EAC_CVC_extensions_init(&reader, eac.extensions, &limits) != TC_TLV_OK)
@@ -1055,7 +1055,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
       abort();
     memset(&eac_key, 0xa5, sizeof eac_key);
     old_key = eac_key;
-    result = TC_EAC_CVC_public_key_read(data, length, &limits, &eac_key);
+    result = TC_EAC_CVC_public_key_read((TC_bytes){data, length}, &limits, &eac_key);
     if (result != TC_TLV_OK && memcmp(&eac_key, &old_key, sizeof eac_key))
       abort();
   }

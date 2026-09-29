@@ -13,9 +13,7 @@ static TC_TLV_result integer(TC_TLV_reader* reader, TC_bytes* out)
   TC_TLV_element element;
   if (TC_TLV_next(reader, &element) != TC_TLV_OK)
     return TC_TLV_INVALID;
-  return TC_DER_positive_integer(element.encoded.data, element.encoded.length, out) == TC_TLV_OK
-             ? TC_TLV_OK
-             : TC_TLV_INVALID;
+  return TC_DER_positive_integer(element.encoded, out) == TC_TLV_OK ? TC_TLV_OK : TC_TLV_INVALID;
 }
 
 static TC_TLV_result bit_count(TC_bytes value, unsigned* bits)
@@ -35,7 +33,7 @@ static TC_TLV_result bit_count(TC_bytes value, unsigned* bits)
 static TC_TLV_result rsa(TC_X509_public_key* key)
 {
   TC_DER_rsa_public_key parsed;
-  if (TC_DER_rsa_public(key->key.data, key->key.length, &parsed) != TC_TLV_OK)
+  if (TC_DER_rsa_public(key->key, &parsed) != TC_TLV_OK)
     return TC_TLV_INVALID;
   key->modulus = parsed.modulus;
   key->exponent = parsed.exponent;
@@ -57,7 +55,7 @@ static TC_TLV_result dsa(TC_X509_public_key* key)
   TC_bytes parameters = key->algorithm.parameters, value;
   TC_TLV_reader reader;
   TC_TLV_result result;
-  if (TC_DER_positive_integer(key->key.data, key->key.length, &value) != TC_TLV_OK)
+  if (TC_DER_positive_integer(key->key, &value) != TC_TLV_OK)
     return TC_TLV_INVALID;
   if (!parameters.length)
     return TC_TLV_OK;
@@ -80,8 +78,7 @@ static TC_TLV_result ec(TC_X509_public_key* key)
 {
   size_t coordinate;
   uint8_t form = key->key.data[0];
-  if (TC_DER_oid(key->algorithm.parameters.data, key->algorithm.parameters.length,
-                 &key->curve_oid) != TC_TLV_OK)
+  if (TC_DER_oid(key->algorithm.parameters, &key->curve_oid) != TC_TLV_OK)
     return TC_TLV_INVALID;
   key->curve = tc_pki_curve(key->curve_oid, &key->bits);
   if (form != 2 && form != 3 && form != 4)
@@ -103,7 +100,7 @@ TC_TLV_result TC_X509_subject_public_key(TC_bytes encoded, TC_X509_public_key* o
   TC_TLV_result result;
   if (!out)
     return TC_TLV_ARGUMENT;
-  result = TC_DER_subject_public_key(encoded.data, encoded.length, &decoded);
+  result = TC_DER_subject_public_key(encoded, &decoded);
   if (result != TC_TLV_OK)
     return result;
   memset(&key, 0, sizeof key);

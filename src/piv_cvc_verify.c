@@ -115,7 +115,7 @@ TC_X509_signature_result TC_PIV_CVC_chain_verify(const TC_PIV_CVC_chain_request*
   TC_PIV_CVC card, intermediate;
   if (tc_pki_work_charge(work, request->card.length) != TC_TLV_OK)
     return TC_X509_SIGNATURE_LIMIT;
-  parsed = TC_PIV_CVC_read(request->card.data, request->card.length, &card);
+  parsed = TC_PIV_CVC_read(request->card, &card);
   if (parsed != TC_TLV_OK)
     return tc_pki_signature_error(parsed);
   if (card.role != TC_PIV_CVC_CARD_APPLICATION ||
@@ -135,8 +135,7 @@ TC_X509_signature_result TC_PIV_CVC_chain_verify(const TC_PIV_CVC_chain_request*
   if (request->intermediate.length) {
     if (tc_pki_work_charge(work, request->intermediate.length) != TC_TLV_OK)
       return TC_X509_SIGNATURE_LIMIT;
-    parsed =
-        TC_PIV_CVC_read(request->intermediate.data, request->intermediate.length, &intermediate);
+    parsed = TC_PIV_CVC_read(request->intermediate, &intermediate);
     if (parsed != TC_TLV_OK)
       return tc_pki_signature_error(parsed);
     if (intermediate.role != TC_PIV_CVC_INTERMEDIATE ||

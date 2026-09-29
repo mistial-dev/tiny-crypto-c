@@ -93,7 +93,7 @@ static inline TC_TLV_result tc_pki_child_open(TC_TLV_reader* child, const TC_TLV
   if (!budget.max_depth)
     return TC_TLV_LIMIT;
   --budget.max_depth;
-  result = TC_TLV_reader_init(&opened, contents.data, contents.length, TC_TLV_DER, &budget);
+  result = TC_TLV_reader_init(&opened, contents, TC_TLV_DER, &budget);
   if (result != TC_TLV_OK)
     return result;
   opened.root = 0;
@@ -119,7 +119,7 @@ static inline TC_TLV_result tc_pki_value_open(TC_TLV_reader* reader, TC_bytes va
   TC_TLV_result result;
   if (!reader)
     return TC_TLV_ARGUMENT;
-  result = TC_TLV_reader_init(&outer, value.data, value.length, TC_TLV_DER, limits);
+  result = TC_TLV_reader_init(&outer, value, TC_TLV_DER, limits);
   if (result != TC_TLV_OK)
     return result;
   result = TC_TLV_next(&outer, &element);
@@ -151,7 +151,7 @@ static inline TC_TLV_result tc_pki_null(TC_bytes encoded, TC_TLV_profile profile
   TC_TLV_result result;
   if (profile != TC_TLV_DER && profile != TC_TLV_BER)
     return TC_TLV_ARGUMENT;
-  result = TC_TLV_read(encoded.data, encoded.length, profile, &limits, &element);
+  result = TC_TLV_read(encoded, profile, &limits, &element);
   if (result != TC_TLV_OK)
     return result;
   return tc_pki_tag(&element, 5) && !element.value.length &&

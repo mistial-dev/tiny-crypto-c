@@ -126,57 +126,56 @@ TC_TLV_result tc_tlv_header_parse(const uint8_t* data, size_t length, TC_TLV_pro
   return TC_TLV_OK;
 }
 
-TC_TLV_result TC_TLV_header_read(const uint8_t* data, size_t length, TC_TLV_profile profile,
+TC_TLV_result TC_TLV_header_read(TC_bytes input, TC_TLV_profile profile,
                                  const TC_TLV_limits* limits, TC_TLV_header* out)
 {
   TC_TLV_result result = tc_tlv_config(profile, limits);
   if (result != TC_TLV_OK)
     return result;
-  if (!out || (!data && length))
+  if (!out || (!input.data && input.length))
     return TC_TLV_ARGUMENT;
-  if (length > limits->max_input)
+  if (input.length > limits->max_input)
     return TC_TLV_LIMIT;
-  return tc_tlv_header_parse(data, length, profile, limits->max_value, out);
+  return tc_tlv_header_parse(input.data, input.length, profile, limits->max_value, out);
 }
 
-TC_TLV_result TC_TLV_read(const uint8_t* data, size_t length, TC_TLV_profile profile,
-                          const TC_TLV_limits* limits, TC_TLV_element* out)
+TC_TLV_result TC_TLV_read(TC_bytes input, TC_TLV_profile profile, const TC_TLV_limits* limits,
+                          TC_TLV_element* out)
 {
   TC_TLV_element e;
   TC_TLV_result result;
   if (!out)
     return TC_TLV_ARGUMENT;
-  result = TC_TLV_header_read(data, length, profile, limits, &e.header);
+  result = TC_TLV_header_read(input, profile, limits, &e.header);
   if (result != TC_TLV_OK)
     return result;
   if (e.header.indefinite)
     return TC_TLV_UNSUPPORTED;
   /* Subtract only after header_read proved that the header fits. Computing
    * header + value first could wrap before the bounds check on small MCUs. */
-  if (e.header.length > length - e.header.header_length)
+  if (e.header.length > input.length - e.header.header_length)
     return TC_TLV_MORE;
-  e.encoded.data = data;
+  e.encoded.data = input.data;
   e.encoded.length = e.header.header_length + e.header.length;
-  e.value.data = data + e.header.header_length;
+  e.value.data = input.data + e.header.header_length;
   e.value.length = e.header.length;
   *out = e;
   return TC_TLV_OK;
 }
 
-TC_TLV_result TC_TLV_reader_init(TC_TLV_reader* reader, const uint8_t* data, size_t length,
-                                 TC_TLV_profile profile, const TC_TLV_limits* limits)
+TC_TLV_result TC_TLV_reader_init(TC_TLV_reader* reader, TC_bytes input, TC_TLV_profile profile,
+                                 const TC_TLV_limits* limits)
 {
   TC_TLV_reader r;
   TC_TLV_result result = tc_tlv_config(profile, limits);
   if (result != TC_TLV_OK)
     return result;
-  if (!reader || (!data && length))
+  if (!reader || (!input.data && input.length))
     return TC_TLV_ARGUMENT;
-  if (length > limits->max_input)
+  if (input.length > limits->max_input)
     return TC_TLV_LIMIT;
   memset(&r, 0, sizeof r);
-  r.input.data = data;
-  r.input.length = length;
+  r.input = input;
   r.profile = profile;
   r.limits = *limits;
   r.root = 1;
@@ -231,8 +230,8 @@ TC_TLV_result TC_TLV_next(TC_TLV_reader* reader, TC_TLV_element* out)
   }
   if (reader->elements >= reader->limits.max_elements)
     return TC_TLV_LIMIT;
-  result = TC_TLV_read(reader->input.data + p, reader->input.length - p, reader->profile,
-                       &reader->limits, &e);
+  result = TC_TLV_read((TC_bytes){reader->input.data + p, reader->input.length - p},
+                       reader->profile, &reader->limits, &e);
   /* A child template is a complete value, so a truncated element is malformed. */
   if (result == TC_TLV_MORE && !reader->root)
     return TC_TLV_INVALID;

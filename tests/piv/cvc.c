@@ -81,7 +81,7 @@ static MunitResult test_format(const MunitParameter params[], void* user)
   memset(data + sizeof prefix, 1, 64);
   memcpy(data + sizeof prefix + 64, suffix, sizeof suffix);
   munit_assert(sizeof data == 149);
-  munit_assert(TC_PIV_CVC_read(data, sizeof data, &cvc) == TC_TLV_OK);
+  munit_assert(TC_PIV_CVC_read((TC_bytes){data, sizeof data}, &cvc) == TC_TLV_OK);
   munit_assert(cvc.key_bits == 256 && cvc.role == TC_PIV_CVC_CARD_APPLICATION &&
                cvc.subject.length == 16);
   munit_assert(cvc.public_key.length == 65 && cvc.ecdsa.r.length == 1 && cvc.ecdsa.s.length == 1);
@@ -102,8 +102,9 @@ static MunitResult test_format(const MunitParameter params[], void* user)
       memcpy(storage.bytes + offsets[offset_index], data, sizeof data);
       memcpy(original, &storage, sizeof original);
       munit_assert_int(
-          TC_PIV_CVC_read(storage.bytes + offsets[offset_index], sizeof data, &storage.result), ==,
-          TC_TLV_ARGUMENT);
+          TC_PIV_CVC_read((TC_bytes){storage.bytes + offsets[offset_index], sizeof data},
+                          &storage.result),
+          ==, TC_TLV_ARGUMENT);
       munit_assert_memory_equal(sizeof original, original, &storage);
     }
   }
@@ -114,7 +115,7 @@ static MunitResult test_format(const MunitParameter params[], void* user)
     memcpy(long_oid + 42, data + 41, sizeof data - 41);
     ++long_oid[3];
     ++long_oid[39];
-    munit_assert_int(TC_PIV_CVC_read(long_oid, sizeof long_oid, &cvc), ==, TC_TLV_OK);
+    munit_assert_int(TC_PIV_CVC_read((TC_bytes){long_oid, sizeof long_oid}, &cvc), ==, TC_TLV_OK);
     munit_assert(cvc.curve_oid.data == long_oid + 43);
     munit_assert_size(cvc.signed_data.length, ==, saved.signed_data.length + 1);
     munit_assert_memory_equal(cvc.signed_data.length, cvc.signed_data.data, long_oid + 4);
@@ -130,19 +131,19 @@ static MunitResult test_format(const MunitParameter params[], void* user)
     memset(p384 + 50, 1, 96);
     memcpy(p384 + 146, suffix, sizeof suffix);
     p384[166] = 3;
-    munit_assert(TC_PIV_CVC_read(p384, sizeof p384, &cvc) == TC_TLV_OK);
+    munit_assert(TC_PIV_CVC_read((TC_bytes){p384, sizeof p384}, &cvc) == TC_TLV_OK);
     munit_assert(cvc.key_bits == 384 && cvc.public_key.length == 97);
     munit_assert(cvc.signed_data.data == p384 + 4 && cvc.signed_data.length == 146);
     munit_assert(cvc.signature_algorithm.oid.data[7] == 3);
     saved = cvc;
     for (i = 0; i < sizeof p384; ++i) {
-      munit_assert(TC_PIV_CVC_read(p384, i, &cvc) != TC_TLV_OK);
+      munit_assert(TC_PIV_CVC_read((TC_bytes){p384, i}, &cvc) != TC_TLV_OK);
       munit_assert(memcmp(&cvc, &saved, sizeof cvc) == 0);
     }
     p384[166] = 2;
-    munit_assert(TC_PIV_CVC_read(p384, sizeof p384, &cvc) == TC_TLV_UNSUPPORTED);
+    munit_assert(TC_PIV_CVC_read((TC_bytes){p384, sizeof p384}, &cvc) == TC_TLV_UNSUPPORTED);
     munit_assert(memcmp(&cvc, &saved, sizeof cvc) == 0);
-    munit_assert(TC_PIV_CVC_read(data, sizeof data, &cvc) == TC_TLV_OK);
+    munit_assert(TC_PIV_CVC_read((TC_bytes){data, sizeof data}, &cvc) == TC_TLV_OK);
     saved = cvc;
   }
   {
@@ -160,7 +161,7 @@ static MunitResult test_format(const MunitParameter params[], void* user)
     intermediate[113] = TC_PIV_CVC_INTERMEDIATE;
     memcpy(intermediate + 114, rsa_signature_header, sizeof rsa_signature_header);
     memset(intermediate + 143, 1, 256);
-    munit_assert(TC_PIV_CVC_read(intermediate, sizeof intermediate, &cvc) == TC_TLV_OK);
+    munit_assert(TC_PIV_CVC_read((TC_bytes){intermediate, sizeof intermediate}, &cvc) == TC_TLV_OK);
     munit_assert(cvc.role == TC_PIV_CVC_INTERMEDIATE && cvc.subject.length == 8 &&
                  cvc.signature.length == 256);
     munit_assert(cvc.signed_data.data == intermediate + 5 && cvc.signed_data.length == 109);
@@ -175,20 +176,22 @@ static MunitResult test_format(const MunitParameter params[], void* user)
     }
 #endif
     intermediate[136] = 4;
-    munit_assert(TC_PIV_CVC_read(intermediate, sizeof intermediate, &cvc) == TC_TLV_INVALID);
+    munit_assert(TC_PIV_CVC_read((TC_bytes){intermediate, sizeof intermediate}, &cvc) ==
+                 TC_TLV_INVALID);
     intermediate[136] = 5;
     memmove(intermediate + 136, intermediate + 138, 261);
     intermediate[4] -= 2;
     intermediate[118] -= 2;
     intermediate[122] -= 2;
     intermediate[124] -= 2;
-    munit_assert(TC_PIV_CVC_read(intermediate, sizeof intermediate - 2, &cvc) == TC_TLV_INVALID);
+    munit_assert(TC_PIV_CVC_read((TC_bytes){intermediate, sizeof intermediate - 2}, &cvc) ==
+                 TC_TLV_INVALID);
     cvc = saved;
   }
   for (i = 0; i < sizeof malformed / sizeof malformed[0]; ++i) {
     uint8_t byte = data[malformed[i].offset];
     data[malformed[i].offset] = malformed[i].value;
-    munit_assert(TC_PIV_CVC_read(data, sizeof data, &cvc) != TC_TLV_OK);
+    munit_assert(TC_PIV_CVC_read((TC_bytes){data, sizeof data}, &cvc) != TC_TLV_OK);
     munit_assert(memcmp(&cvc, &saved, sizeof cvc) == 0);
     data[malformed[i].offset] = byte;
   }
@@ -201,29 +204,29 @@ static MunitResult test_format(const MunitParameter params[], void* user)
   extended[123] += 2;
   extended[125] += 2;
   extended[127] += 2;
-  munit_assert(TC_PIV_CVC_read(extended, sizeof data + 2, &cvc) == TC_TLV_INVALID);
+  munit_assert(TC_PIV_CVC_read((TC_bytes){extended, sizeof data + 2}, &cvc) == TC_TLV_INVALID);
   /* A repeated role is still invalid when all enclosing lengths fit. */
   memcpy(extended, data, 121);
   memcpy(extended + 121, data + 117, 4);
   memcpy(extended + 125, data + 121, sizeof data - 121);
   extended[3] += 4;
-  munit_assert(TC_PIV_CVC_read(extended, sizeof extended, &cvc) == TC_TLV_INVALID);
+  munit_assert(TC_PIV_CVC_read((TC_bytes){extended, sizeof extended}, &cvc) == TC_TLV_INVALID);
   munit_assert(memcmp(&cvc, &saved, sizeof cvc) == 0);
   for (i = 0; i < sizeof data; ++i) {
-    munit_assert(TC_PIV_CVC_read(data, i, &cvc) != TC_TLV_OK);
+    munit_assert(TC_PIV_CVC_read((TC_bytes){data, i}, &cvc) != TC_TLV_OK);
     munit_assert(memcmp(&cvc, &saved, sizeof cvc) == 0);
   }
   data[7] = 0x81;
-  munit_assert(TC_PIV_CVC_read(data, sizeof data, &cvc) == TC_TLV_UNSUPPORTED);
+  munit_assert(TC_PIV_CVC_read((TC_bytes){data, sizeof data}, &cvc) == TC_TLV_UNSUPPORTED);
   data[7] = 0x80;
   data[sizeof prefix - 1] = 2;
-  munit_assert(TC_PIV_CVC_read(data, sizeof data, &cvc) == TC_TLV_INVALID);
+  munit_assert(TC_PIV_CVC_read((TC_bytes){data, sizeof data}, &cvc) == TC_TLV_INVALID);
   data[sizeof prefix - 1] = 4;
   data[sizeof data - 1] = 0;
-  munit_assert(TC_PIV_CVC_read(data, sizeof data, &cvc) == TC_TLV_INVALID);
+  munit_assert(TC_PIV_CVC_read((TC_bytes){data, sizeof data}, &cvc) == TC_TLV_INVALID);
   munit_assert(memcmp(&cvc, &saved, sizeof cvc) == 0);
-  munit_assert(TC_PIV_CVC_read(NULL, 1, &cvc) == TC_TLV_ARGUMENT);
-  munit_assert(TC_PIV_CVC_read(data, sizeof data, NULL) == TC_TLV_ARGUMENT);
+  munit_assert(TC_PIV_CVC_read((TC_bytes){NULL, 1}, &cvc) == TC_TLV_ARGUMENT);
+  munit_assert(TC_PIV_CVC_read((TC_bytes){data, sizeof data}, NULL) == TC_TLV_ARGUMENT);
   return MUNIT_OK;
 }
 

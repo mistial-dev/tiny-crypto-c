@@ -29,16 +29,14 @@ static TC_TLV_result search_subject(TC_bytes encoded, const TC_TLV_limits* limit
   TC_TLV_result result;
   if (limits->max_depth < 3 || limits->max_elements < 8)
     return TC_TLV_LIMIT;
-  result = TC_TLV_read(encoded.data, encoded.length, TC_TLV_DER, limits, &element);
+  result = TC_TLV_read(encoded, TC_TLV_DER, limits, &element);
   if (result != TC_TLV_OK)
     return result;
   if (!tc_pki_tag(&element, 0x30) || element.encoded.length != encoded.length)
     return TC_TLV_INVALID;
-  if ((result = TC_TLV_reader_init(&outer, element.value.data, element.value.length, TC_TLV_DER,
-                                   limits)) != TC_TLV_OK ||
+  if ((result = TC_TLV_reader_init(&outer, element.value, TC_TLV_DER, limits)) != TC_TLV_OK ||
       (result = tc_pki_field(&outer, 0x30, &element)) != TC_TLV_OK ||
-      (result = TC_TLV_reader_init(&tbs, element.value.data, element.value.length, TC_TLV_DER,
-                                   limits)) != TC_TLV_OK ||
+      (result = TC_TLV_reader_init(&tbs, element.value, TC_TLV_DER, limits)) != TC_TLV_OK ||
       (result = TC_TLV_next(&tbs, &element)) != TC_TLV_OK)
     return result;
   /* Skip the optional version, then serialNumber. */

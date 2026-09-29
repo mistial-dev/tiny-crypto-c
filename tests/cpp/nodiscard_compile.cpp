@@ -127,12 +127,14 @@ void tiny_crypto_nodiscard_compile(uint8_t* data, size_t length)
   GZIPDecoder gzip;
   size_t gzip_work = 0;
   size_t gzip_length = 0;
-  gzip.decode(data, length, data, length, gzip_work, gzip_length); /* DISCARDED */
+  const TC_bytes gzip_input = {data, length};
+  const TC_buffer gzip_output = {data, length};
+  gzip.decode(gzip_input, gzip_work, gzip_output, gzip_length); /* DISCARDED */
   TLVReader reader;
   TC_TLV_limits limits = {};
   TC_TLV_element element = {};
-  reader.init(data, length, TC_TLV_DER, limits); /* DISCARDED */
-  reader.next(element);                          /* DISCARDED */
+  reader.init(TC_bytes{data, length}, TC_TLV_DER, limits); /* DISCARDED */
+  reader.next(element);                                    /* DISCARDED */
 
   /* Clearing stays unmarked. */
   aes.clear();

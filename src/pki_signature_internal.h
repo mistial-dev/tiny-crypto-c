@@ -28,8 +28,7 @@ static inline TC_TLV_result tc_pki_pss_resolve_profile(TC_bytes encoded, TC_TLV_
   result = tc_pki_hash_algorithm_profile(&parameters.mgf_hash, profile, &parsed.mgf_hash);
   if (result != TC_TLV_OK)
     return result;
-  result = TC_DER_uint32_contents(parameters.salt_length.data, parameters.salt_length.length,
-                                  &parsed.salt_length);
+  result = TC_DER_uint32_contents(parameters.salt_length, &parsed.salt_length);
   if (result == TC_TLV_OK)
     *out = parsed;
   return result;
@@ -100,8 +99,7 @@ static inline TC_TLV_result tc_pki_signature_algorithm_read(const TC_DER_algorit
              info.kind == TC_PKI_SIGNATURE_ECDSA) {
     if (tc_pki_signature_parameters_check(info.kind, algorithm->parameters, profile) != TC_TLV_OK)
       return TC_TLV_INVALID;
-    parsed.scheme =
-        info.kind == TC_PKI_SIGNATURE_ECDSA ? TC_SIGNATURE_ECDSA : TC_SIGNATURE_RSA_V15;
+    parsed.scheme = info.kind == TC_PKI_SIGNATURE_ECDSA ? TC_SIGNATURE_ECDSA : TC_SIGNATURE_RSA_V15;
     parsed.hash = info.hash;
   } else
     return TC_TLV_UNSUPPORTED;
