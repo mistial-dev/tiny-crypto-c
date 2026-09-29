@@ -230,7 +230,7 @@ static TC_TLV_result x509_crl_node_evaluate(void* context, size_t index,
       resolution->candidates, &processing,
       &(tc_x509_crl_trust){resolution->source, resolution->anchor_index, resolution->options,
                            workspace->tree, workspace->validation, workspace->search},
-      NULL, 1, 1, node->extra, node->path, &scratch);
+      &(tc_x509_crl_scope_selection){NULL, 1, 1}, node->extra, node->path, &scratch);
   *stop = node->extra->source_failed && *node->extra->source_failed;
   if (result == TC_TLV_OK)
     *evidence = pending;

@@ -3728,23 +3728,23 @@ static MunitResult revocations(const MunitParameter params[], void* user)
               memset(&saved_cache, 0xa5, sizeof saved_cache);
               cache = saved_cache;
               work = TRUST_WORK_BUDGET;
-              munit_assert_int(tc_x509_crl_signature_cache_init(&crl_index, &signer,
-                                                                &updated.signatures, &limits,
-                                                                &names, states, 1, &work, &cache),
+              munit_assert_int(tc_x509_crl_signature_cache_init(
+                                   &crl_index, &signer, &updated.signatures, &limits, &names,
+                                   (TC_buffer){states, 1}, &work, &cache),
                                ==, TC_TLV_LIMIT);
               munit_assert_memory_equal(sizeof cache, &cache, &saved_cache);
               munit_assert_uint(states[0], ==, 0xa5);
               work = 1;
-              munit_assert_int(tc_x509_crl_signature_cache_init(&crl_index, &signer,
-                                                                &updated.signatures, &limits,
-                                                                &names, states, 2, &work, &cache),
+              munit_assert_int(tc_x509_crl_signature_cache_init(
+                                   &crl_index, &signer, &updated.signatures, &limits, &names,
+                                   (TC_buffer){states, 2}, &work, &cache),
                                ==, TC_TLV_LIMIT);
               munit_assert_memory_equal(sizeof cache, &cache, &saved_cache);
               munit_assert_uint(states[0], ==, 0xa5);
               work = 2;
-              munit_assert_int(tc_x509_crl_signature_cache_init(&crl_index, &signer,
-                                                                &updated.signatures, &limits,
-                                                                &names, states, 2, &work, &cache),
+              munit_assert_int(tc_x509_crl_signature_cache_init(
+                                   &crl_index, &signer, &updated.signatures, &limits, &names,
+                                   (TC_buffer){states, 2}, &work, &cache),
                                ==, TC_TLV_OK);
               munit_assert_size(work, ==, 0);
               const size_t calls = probe.calls;
@@ -3836,10 +3836,10 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                 signature_retry_probe retry = {provider, 0, 1, failures[failure]};
                 const TC_X509_signature_provider failing = {retry_signature, &retry, NULL};
                 work = TRUST_WORK_BUDGET;
-                munit_assert_int(tc_x509_crl_signature_cache_init(&crl_index, &signer, &failing,
-                                                                  &limits, &names, states, 2, &work,
-                                                                  &cache),
-                                 ==, TC_TLV_OK);
+                munit_assert_int(
+                    tc_x509_crl_signature_cache_init(&crl_index, &signer, &failing, &limits, &names,
+                                                     (TC_buffer){states, 2}, &work, &cache),
+                    ==, TC_TLV_OK);
                 const uint8_t unchecked = states[1];
                 munit_assert_int(tc_x509_crl_signature_cached(&cache, 1, &work), ==,
                                  errors[failure]);
@@ -4292,7 +4292,7 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                      ==, TC_TLV_OK);
                     munit_assert_int(tc_x509_crl_signature_cache_init(
                                          &index, &signer, &updated.signatures, &limits, &names,
-                                         states, RECORDS, &work, &cache),
+                                         (TC_buffer){states, RECORDS}, &work, &cache),
                                      ==, TC_TLV_OK);
                     TC_bytes latest = sentinel;
                     munit_assert_int(
@@ -4531,7 +4531,7 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                    ==, TC_TLV_OK);
                   munit_assert_int(tc_x509_crl_signature_cache_init(
                                        &index, &signer, &updated.signatures, &limits, &names,
-                                       states, RECORDS, &work, &cache),
+                                       (TC_buffer){states, RECORDS}, &work, &cache),
                                    ==, TC_TLV_OK);
                   TC_bytes latest = delta.signature;
                   munit_assert_int(tc_x509_crl_latest_number(
@@ -4616,7 +4616,7 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                      ==, TC_TLV_OK);
                     munit_assert_int(tc_x509_crl_signature_cache_init(
                                          &index, &signer, &updated.signatures, &limits, &names,
-                                         states, TIED_RECORDS, &work, &cache),
+                                         (TC_buffer){states, TIED_RECORDS}, &work, &cache),
                                      ==, TC_TLV_OK);
                     TC_X509_crl_evidence scope_evidence = {0};
                     munit_assert_int(

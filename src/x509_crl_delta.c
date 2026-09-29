@@ -48,27 +48,26 @@ TC_TLV_result tc_x509_crl_delta_next(const TC_X509_crl_index* index, size_t base
   return TC_TLV_END;
 }
 
-TC_TLV_result tc_x509_crl_signature_cache_init(const TC_X509_crl_index* index,
-                                               const TC_X509_certificate* signer,
-                                               const TC_X509_signature_provider* provider,
-                                               const TC_TLV_limits* limits,
-                                               const TC_X509_name_workspace* names, uint8_t* states,
-                                               size_t capacity, size_t* work,
-                                               tc_x509_crl_signature_cache* out)
+TC_TLV_result
+tc_x509_crl_signature_cache_init(const TC_X509_crl_index* index, const TC_X509_certificate* signer,
+                                 const TC_X509_signature_provider* provider,
+                                 const TC_TLV_limits* limits, const TC_X509_name_workspace* names,
+                                 TC_buffer states, size_t* work, tc_x509_crl_signature_cache* out)
 {
   TC_bytes storage;
   if (!index || (index->count && !index->records) || !signer || !limits || !names || !work ||
-      !out || tc_pki_storage_span(states, capacity, sizeof *states, &storage) != TC_TLV_OK)
+      !out ||
+      tc_pki_storage_span(states.data, states.capacity, sizeof *states.data, &storage) != TC_TLV_OK)
     return TC_TLV_ARGUMENT;
-  if (capacity < index->count)
+  if (states.capacity < index->count)
     return TC_TLV_LIMIT;
   TC_TLV_result result = tc_pki_work_charge(work, index->count);
   if (result != TC_TLV_OK)
     return result;
   if (index->count)
-    memset(states, CRL_SIGNATURE_UNCHECKED, index->count);
-  *out =
-      (tc_x509_crl_signature_cache){index, signer, provider, limits, names, states, capacity, NULL};
+    memset(states.data, CRL_SIGNATURE_UNCHECKED, index->count);
+  *out = (tc_x509_crl_signature_cache){index, signer,      provider,        limits,
+                                       names, states.data, states.capacity, NULL};
   return TC_TLV_OK;
 }
 

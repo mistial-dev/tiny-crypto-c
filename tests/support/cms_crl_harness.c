@@ -281,8 +281,9 @@ static TC_TLV_result cms_crl_scope_run(
   TC_TLV_result result = cms_crl_operation_source(candidates, &store, metadata, &source);
   if (result != TC_TLV_OK)
     return result;
-  return tc_x509_crl_scope_execute(&source, &processing, &trust, points, from_certificate,
-                                   all_scopes, extra, path, out);
+  return tc_x509_crl_scope_execute(
+      &source, &processing, &trust,
+      &(tc_x509_crl_scope_selection){points, from_certificate, all_scopes}, extra, path, out);
 }
 
 TC_TLV_result tc_cms_crl_scope_process(

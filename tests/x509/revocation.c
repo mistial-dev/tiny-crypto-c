@@ -774,8 +774,8 @@ static MunitResult scope_traversal(const MunitParameter params[], void* user)
       break;
     }
     out = saved;
-    munit_assert_int(tc_x509_crl_scopes(NULL, unexpected_search, &processing, &trust, &fields,
-                                        &reader, 1, &failed, &out),
+    munit_assert_int(tc_x509_crl_scopes(&(tc_x509_crl_searcher){NULL, unexpected_search},
+                                        &processing, &trust, &fields, &reader, 1, &failed, &out),
                      ==, expected);
     munit_assert_memory_equal(sizeof evidence, &evidence, &before);
     munit_assert_memory_equal(sizeof out, &out, &saved);
@@ -1463,8 +1463,9 @@ static MunitResult scope_operation(const MunitParameter params[], void* user)
     const TC_bytes points = {bad_points, sizeof bad_points};
     out = saved;
     munit_assert_int(tc_x509_crl_scope_execute(&source, &processing, &trust,
-                                               scenario == BAD_POINTS ? &points : NULL, 0, 0, NULL,
-                                               NULL, &out),
+                                               &(tc_x509_crl_scope_selection){
+                                                   scenario == BAD_POINTS ? &points : NULL, 0, 0},
+                                               NULL, NULL, &out),
                      ==,
                      scenario == VALID        ? TC_TLV_END
                      : scenario == BAD_POINTS ? TC_TLV_MORE
