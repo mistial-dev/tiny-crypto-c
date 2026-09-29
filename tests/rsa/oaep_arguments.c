@@ -21,8 +21,10 @@ static MunitResult algorithms(const MunitParameter params[], void* user)
       uint32_t work = WORK_BUDGET;
       memset(encoded, 0xa5, sizeof encoded);
       memcpy(saved, encoded, sizeof saved);
-      munit_assert_int(tc_rsa_oaep_encode(encoded, sizeof encoded, hash, mask, empty, empty,
-                                          (TC_bytes){seed, seed_length}, block, &workspace, &work),
+      munit_assert_int(tc_rsa_oaep_encode(&(TC_RSA_oaep_options){hash, mask, empty},
+                                          (TC_buffer){encoded, sizeof encoded}, empty,
+                                          (TC_bytes){seed, seed_length},
+                                          (tc_rsa_hash_scratch){block, &workspace}, &work),
                        ==, available ? TC_RSA_OK : TC_RSA_UNSUPPORTED);
       if (!available) {
         munit_assert_size(work, ==, WORK_BUDGET);
@@ -30,8 +32,10 @@ static MunitResult algorithms(const MunitParameter params[], void* user)
       }
       TC_bytes message = {saved, sizeof saved};
       work = WORK_BUDGET;
-      munit_assert_int(tc_rsa_oaep_decode(encoded, sizeof encoded, hash, mask, empty, block,
-                                          &workspace, &work, &message),
+      munit_assert_int(tc_rsa_oaep_decode(&(TC_RSA_oaep_options){hash, mask, empty},
+                                          (TC_buffer){encoded, sizeof encoded},
+                                          (tc_rsa_hash_scratch){block, &workspace}, &work,
+                                          &message),
                        ==, available ? TC_RSA_OK : TC_RSA_UNSUPPORTED);
       if (!available) {
         munit_assert_size(work, ==, WORK_BUDGET);
@@ -59,20 +63,22 @@ static MunitResult missing_storage(const MunitParameter params[], void* user)
     memcpy(saved, encoded, sizeof saved);
     const TC_bytes label = {NULL, missing == LABEL ? 1 : 0};
     if (missing != OUTPUT) {
-      munit_assert_int(tc_rsa_oaep_encode(missing == ENCODED ? NULL : encoded, sizeof encoded,
-                                          TC_HASH_SHA256, TC_HASH_SHA256, label,
-                                          (TC_bytes){NULL, missing == MESSAGE ? 1 : 0},
-                                          (TC_bytes){missing == SEED ? NULL : seed, sizeof seed},
-                                          missing == BLOCK ? NULL : block,
-                                          missing == WORKSPACE ? NULL : &workspace,
-                                          missing == WORK ? NULL : &work),
-                       ==, TC_RSA_ARGUMENT);
+      munit_assert_int(
+          tc_rsa_oaep_encode(&(TC_RSA_oaep_options){TC_HASH_SHA256, TC_HASH_SHA256, label},
+                             (TC_buffer){missing == ENCODED ? NULL : encoded, sizeof encoded},
+                             (TC_bytes){NULL, missing == MESSAGE ? 1 : 0},
+                             (TC_bytes){missing == SEED ? NULL : seed, sizeof seed},
+                             (tc_rsa_hash_scratch){missing == BLOCK ? NULL : block,
+                                                   missing == WORKSPACE ? NULL : &workspace},
+                             missing == WORK ? NULL : &work),
+          ==, TC_RSA_ARGUMENT);
     }
     if (missing != SEED && missing != MESSAGE) {
       munit_assert_int(
-          tc_rsa_oaep_decode(missing == ENCODED ? NULL : encoded, sizeof encoded, TC_HASH_SHA256,
-                             TC_HASH_SHA256, label, missing == BLOCK ? NULL : block,
-                             missing == WORKSPACE ? NULL : &workspace,
+          tc_rsa_oaep_decode(&(TC_RSA_oaep_options){TC_HASH_SHA256, TC_HASH_SHA256, label},
+                             (TC_buffer){missing == ENCODED ? NULL : encoded, sizeof encoded},
+                             (tc_rsa_hash_scratch){missing == BLOCK ? NULL : block,
+                                                   missing == WORKSPACE ? NULL : &workspace},
                              missing == WORK ? NULL : &work, missing == OUTPUT ? NULL : &message),
           ==, TC_RSA_ARGUMENT);
     }
@@ -95,27 +101,31 @@ static MunitResult limits(const MunitParameter params[], void* user)
   if (!tc_hash_available(TC_HASH_SHA256))
     return MUNIT_SKIP;
   uint32_t work = WORK_BUDGET;
-  munit_assert_int(tc_rsa_oaep_encode(encoded, sizeof encoded, TC_HASH_SHA256, TC_HASH_SHA256,
-                                      empty, empty, (TC_bytes){seed, sizeof seed - 1}, block,
-                                      &workspace, &work),
+  munit_assert_int(tc_rsa_oaep_encode(&(TC_RSA_oaep_options){TC_HASH_SHA256, TC_HASH_SHA256, empty},
+                                      (TC_buffer){encoded, sizeof encoded}, empty,
+                                      (TC_bytes){seed, sizeof seed - 1},
+                                      (tc_rsa_hash_scratch){block, &workspace}, &work),
                    ==, TC_RSA_ARGUMENT);
   work = UINT32_MAX;
-  munit_assert_int(tc_rsa_oaep_decode(encoded, SIZE_MAX, TC_HASH_SHA256, TC_HASH_SHA256, empty,
-                                      block, &workspace, &work, &message),
+  munit_assert_int(tc_rsa_oaep_decode(&(TC_RSA_oaep_options){TC_HASH_SHA256, TC_HASH_SHA256, empty},
+                                      (TC_buffer){encoded, SIZE_MAX},
+                                      (tc_rsa_hash_scratch){block, &workspace}, &work, &message),
                    ==, TC_RSA_LIMIT);
   munit_assert_uint32(work, ==, UINT32_MAX);
   work = WORK_BUDGET;
-  munit_assert_int(tc_rsa_oaep_decode(encoded, 2 * sizeof seed + 1, TC_HASH_SHA256, TC_HASH_SHA256,
-                                      empty, block, &workspace, &work, &message),
+  munit_assert_int(tc_rsa_oaep_decode(&(TC_RSA_oaep_options){TC_HASH_SHA256, TC_HASH_SHA256, empty},
+                                      (TC_buffer){encoded, 2 * sizeof seed + 1},
+                                      (tc_rsa_hash_scratch){block, &workspace}, &work, &message),
                    ==, TC_RSA_INVALID);
   if ((uint64_t)SIZE_MAX > (UINT64_MAX >> 3)) {
     /* An oversized label costs more than any 32-bit work budget, so it is
      * rejected before its bytes are read. */
     const TC_bytes oversized = {seed, (size_t)((UINT64_MAX >> 3) + 1)};
     work = UINT32_MAX;
-    munit_assert_int(tc_rsa_oaep_encode(encoded, sizeof encoded, TC_HASH_SHA256, TC_HASH_SHA256,
-                                        oversized, empty, (TC_bytes){seed, sizeof seed}, block,
-                                        &workspace, &work),
+    munit_assert_int(tc_rsa_oaep_encode(
+                         &(TC_RSA_oaep_options){TC_HASH_SHA256, TC_HASH_SHA256, oversized},
+                         (TC_buffer){encoded, sizeof encoded}, empty, (TC_bytes){seed, sizeof seed},
+                         (tc_rsa_hash_scratch){block, &workspace}, &work),
                      ==, TC_RSA_LIMIT);
     munit_assert_uint32(work, ==, UINT32_MAX);
   }

@@ -10,11 +10,16 @@
 /* Sample 1 < blind < modulus with an inverse. Modulus, blind, inverse and
  * arena are separate. Arena has at least 5n limbs; its first n hold the RNG
  * draw and its next n are the range-check scratch. */
-static inline TC_RSA_result tc_rsa_sample_blinding(const tc_mp_word* modulus, tc_mp_word* blind,
-                                                   tc_mp_word* inverse, tc_mp_word* arena, size_t n,
-                                                   TC_random_fn random, void* random_context,
-                                                   size_t max_attempts, uint32_t* work)
+static inline TC_RSA_result tc_rsa_sample_blinding(const tc_mp_word* modulus, size_t n,
+                                                   tc_mp_word* blind, tc_mp_word* inverse,
+                                                   tc_mp_word* arena, const tc_rsa_random* rng,
+                                                   uint32_t* work)
 {
+  if (!rng)
+    return TC_RSA_ARGUMENT;
+  const TC_random_fn random = rng->source.fill;
+  void* const random_context = rng->source.context;
+  const size_t max_attempts = rng->attempts;
   const size_t length = n * sizeof(tc_mp_word);
   const size_t attempt_work = 16 * length + 1;
   tc_mp_word* reduced = arena + n;
@@ -111,17 +116,25 @@ static inline int tc_rsa_exponent_fips(const uint8_t* exponent, size_t length)
  * after use. Arithmetic on secret values runs in time that depends only on
  * the key size. Work counts products and bit-serial reduction passes. */
 static inline TC_RSA_result
-tc_rsa_private_magnitudes_consistent(const uint8_t* modulus, size_t length, const uint8_t* exponent,
-                                     size_t exponent_length, TC_RSA_exponent_policy exponent_policy,
-                                     TC_bytes d_bytes, TC_bytes p_bytes, TC_bytes q_bytes,
-                                     tc_mp_word* scratch, size_t scratch_words, uint32_t* work)
+tc_rsa_private_magnitudes_consistent(const TC_RSA_private_key* key,
+                                     TC_RSA_exponent_policy exponent_policy, tc_mp_scratch area,
+                                     uint32_t* work)
 {
+  if (!key)
+    return TC_RSA_ARGUMENT;
+  const uint8_t* const modulus = key->public_key.modulus.data;
+  const size_t length = key->public_key.modulus.length;
+  const uint8_t* const exponent = key->public_key.exponent.data;
+  const size_t exponent_length = key->public_key.exponent.length;
+  const TC_bytes d_bytes = key->d, p_bytes = key->p, q_bytes = key->q;
+  tc_mp_word* const scratch = area.words;
+  const size_t scratch_words = area.capacity;
   if (!d_bytes.data || !p_bytes.data || !q_bytes.data || !scratch || !work)
     return TC_RSA_ARGUMENT;
   if (!d_bytes.length || !p_bytes.length || !q_bytes.length || d_bytes.length > length ||
       p_bytes.length > length || q_bytes.length > length)
     return TC_RSA_INVALID;
-  TC_RSA_result status = tc_rsa_public_key_check(modulus, length, exponent, exponent_length);
+  TC_RSA_result status = tc_rsa_public_key_check(&key->public_key);
   if (status != TC_RSA_OK)
     return status;
   if (exponent_policy == TC_RSA_EXPONENT_FIPS && !tc_rsa_exponent_fips(exponent, exponent_length))
@@ -207,32 +220,37 @@ cleanup:
  * Factors and d fit length bytes. max_attempts applies per factor.
  * Storage ownership matches the component check; scratch needs 12n+2 limbs.
  * The caller's assurance policy supplies rounds and an independent uniform RNG. */
-static inline TC_RSA_result
-tc_rsa_private_magnitudes_check(const uint8_t* modulus, size_t length, const uint8_t* exponent,
-                                size_t exponent_length, TC_RSA_exponent_policy exponent_policy,
-                                TC_bytes d, TC_bytes p, TC_bytes q, size_t rounds,
-                                TC_random_fn random, void* random_context, size_t max_attempts,
-                                tc_mp_word* scratch, size_t scratch_words, uint32_t* work)
+static inline TC_RSA_result tc_rsa_private_magnitudes_check(const TC_RSA_private_key* key,
+                                                            TC_RSA_exponent_policy exponent_policy,
+                                                            size_t rounds, const tc_rsa_random* rng,
+                                                            tc_mp_scratch area, uint32_t* work)
 {
+  if (!key)
+    return TC_RSA_ARGUMENT;
+  const size_t length = key->public_key.modulus.length;
+  const TC_bytes d = key->d, p = key->p, q = key->q;
+  if (!rng)
+    return TC_RSA_ARGUMENT;
+  const TC_random_fn random = rng->source.fill;
+  const size_t max_attempts = rng->attempts;
+  tc_mp_word* const scratch = area.words;
+  const size_t scratch_words = area.capacity;
   if (!d.data || !p.data || !q.data || !rounds || !random || !scratch || !work)
     return TC_RSA_ARGUMENT;
-  TC_RSA_result status = tc_rsa_public_key_check(modulus, length, exponent, exponent_length);
+  TC_RSA_result status = tc_rsa_public_key_check(&key->public_key);
   if (status != TC_RSA_OK)
     return status;
   const size_t required = 12 * (length / sizeof(tc_mp_word)) + 2;
   const size_t component_cost = 48 * length + 2;
   if (scratch_words < required || max_attempts < rounds || *work < component_cost)
     return TC_RSA_LIMIT;
-  status =
-      tc_rsa_private_magnitudes_consistent(modulus, length, exponent, exponent_length,
-                                           exponent_policy, d, p, q, scratch, scratch_words, work);
+  status = tc_rsa_private_magnitudes_consistent(key, exponent_policy, area, work);
   TC_bytes factors[] = {p, q};
   /* The component check proved each factor fits half the modulus width, so
    * Miller-Rabin runs at that width. */
   for (size_t i = 0; status == TC_RSA_OK && i < 2; ++i) {
     tc_rsa_half_width_field(&factors[i], length);
-    status = tc_rsa_probable_prime_magnitude(factors[i], length / 2, rounds, random, random_context,
-                                             max_attempts, scratch, scratch_words, work);
+    status = tc_rsa_probable_prime_magnitude(factors[i], length / 2, rounds, rng, area, work);
   }
   TC_secure_zero(scratch, required * sizeof *scratch);
   return status;
@@ -244,16 +262,29 @@ tc_rsa_private_magnitudes_check(const uint8_t* modulus, size_t length, const uin
  * Scratch uses 13n limbs, n=length/sizeof(word), and is wiped after use.
  * Work counts size-bounded modular operations, inverse steps and RNG requests.
  * max_attempts bounds rejection sampling. Output changes only after verification. */
-static inline TC_RSA_result tc_rsa_private_operation_magnitude(
-    const uint8_t* modulus, size_t length, const uint8_t* exponent, size_t exponent_length,
-    TC_bytes d, const uint8_t* input, uint8_t* output, TC_random_fn random, void* random_context,
-    size_t max_attempts, tc_mp_word* scratch, size_t scratch_words, uint32_t* work)
+static inline TC_RSA_result tc_rsa_private_operation_magnitude(const TC_RSA_public_key* key,
+                                                               TC_bytes d, const uint8_t* input,
+                                                               uint8_t* output,
+                                                               const tc_rsa_random* rng,
+                                                               tc_mp_scratch area, uint32_t* work)
 {
+  if (!key)
+    return TC_RSA_ARGUMENT;
+  const uint8_t* const modulus = key->modulus.data;
+  const size_t length = key->modulus.length;
+  const uint8_t* const exponent = key->exponent.data;
+  const size_t exponent_length = key->exponent.length;
+  if (!rng)
+    return TC_RSA_ARGUMENT;
+  const TC_random_fn random = rng->source.fill;
+  const size_t max_attempts = rng->attempts;
+  tc_mp_word* const scratch = area.words;
+  const size_t scratch_words = area.capacity;
   if (!d.data || !input || !output || !random || !scratch || !work)
     return TC_RSA_ARGUMENT;
   if (!d.length || d.length > length)
     return TC_RSA_INVALID;
-  TC_RSA_result status = tc_rsa_public_key_check(modulus, length, exponent, exponent_length);
+  TC_RSA_result status = tc_rsa_public_key_check(key);
   if (status != TC_RSA_OK)
     return status;
   const size_t n = length / sizeof(tc_mp_word), required = 13 * n;
@@ -278,8 +309,7 @@ static inline TC_RSA_result tc_rsa_private_operation_magnitude(
   status = TC_RSA_INVALID;
   if (!tc_rsa_private_exponent_check(one, p, n, temporary) || !tc_mp_subtract(temporary, c, p, n))
     goto cleanup;
-  status = tc_rsa_sample_blinding(p, blind, inverse, arena, n, random, random_context, max_attempts,
-                                  work);
+  status = tc_rsa_sample_blinding(p, n, blind, inverse, arena, rng, work);
   if (status != TC_RSA_OK)
     goto cleanup;
   const tc_mp_word factor = tc_mp_montgomery_factor(p[0]);
@@ -317,12 +347,17 @@ cleanup:
  * dQ=d mod(q-1), and the least positive q^-1 mod p.
  * Magnitudes fit a limb-aligned width of at most TC_RSA_MAX_MODULUS_BYTES. Inputs, work and
  * scratch are disjoint. Scratch needs 8n limbs and is wiped after use. */
-static inline TC_RSA_result tc_rsa_crt_consistent(size_t length, TC_bytes d_bytes, TC_bytes p_bytes,
-                                                  TC_bytes q_bytes, TC_bytes dp_bytes,
-                                                  TC_bytes dq_bytes, TC_bytes inverse_bytes,
-                                                  tc_mp_word* scratch, size_t scratch_words,
+static inline TC_RSA_result tc_rsa_crt_consistent(const TC_RSA_private_key* key,
+                                                  const TC_RSA_crt* crt, tc_mp_scratch area,
                                                   uint32_t* work)
 {
+  if (!key || !crt)
+    return TC_RSA_ARGUMENT;
+  const size_t length = key->public_key.modulus.length;
+  const TC_bytes d_bytes = key->d, p_bytes = key->p, q_bytes = key->q;
+  const TC_bytes dp_bytes = crt->dp, dq_bytes = crt->dq, inverse_bytes = crt->q_inverse;
+  tc_mp_word* const scratch = area.words;
+  const size_t scratch_words = area.capacity;
   enum { MAX_BYTES = TC_RSA_MAX_MODULUS_BYTES };
   const TC_bytes inputs[] = {d_bytes, p_bytes, q_bytes, dp_bytes, dq_bytes, inverse_bytes};
   if (!scratch || !work)
@@ -376,12 +411,16 @@ static inline TC_RSA_result tc_rsa_crt_consistent(size_t length, TC_bytes d_byte
 
 /* Derive fixed-width CRT values from validated d, p and q magnitudes. Scratch
  * needs 8n limbs. Results stay in scratch until the caller publishes all three. */
-static inline TC_RSA_result tc_rsa_crt_derive(size_t length, TC_bytes d_bytes, TC_bytes p_bytes,
-                                              TC_bytes q_bytes, tc_mp_word* scratch,
-                                              size_t scratch_words, uint32_t* work,
-                                              tc_mp_word** dp_out, tc_mp_word** dq_out,
-                                              tc_mp_word** inverse_out)
+static inline TC_RSA_result tc_rsa_crt_derive(const TC_RSA_private_key* key, tc_mp_scratch area,
+                                              uint32_t* work, tc_mp_word** dp_out,
+                                              tc_mp_word** dq_out, tc_mp_word** inverse_out)
 {
+  if (!key)
+    return TC_RSA_ARGUMENT;
+  const size_t length = key->public_key.modulus.length;
+  const TC_bytes d_bytes = key->d, p_bytes = key->p, q_bytes = key->q;
+  tc_mp_word* const scratch = area.words;
+  const size_t scratch_words = area.capacity;
   if (!d_bytes.data || !p_bytes.data || !q_bytes.data || !scratch || !work || !dp_out || !dq_out ||
       !inverse_out)
     return TC_RSA_ARGUMENT;
@@ -432,17 +471,29 @@ static inline TC_RSA_result tc_rsa_crt_derive(size_t length, TC_bytes d_bytes, T
 /* Blinded two-prime CRT private operation. The key and CRT fields have already
  * passed their public validation APIs and remain unchanged. Scratch uses 13n
  * limbs, is disjoint from all inputs and output, and is wiped on return. */
-static inline TC_RSA_result
-tc_rsa_crt_private_operation(const uint8_t* modulus, size_t length, const uint8_t* exponent,
-                             size_t exponent_length, TC_bytes p_bytes, TC_bytes q_bytes,
-                             const TC_RSA_crt* crt, const uint8_t* input, uint8_t* output,
-                             TC_random_fn random, void* random_context, size_t max_attempts,
-                             tc_mp_word* scratch, size_t scratch_words, uint32_t* work)
+static inline TC_RSA_result tc_rsa_crt_private_operation(const TC_RSA_private_key* key,
+                                                         const TC_RSA_crt* crt,
+                                                         const uint8_t* input, uint8_t* output,
+                                                         const tc_rsa_random* rng,
+                                                         tc_mp_scratch area, uint32_t* work)
 {
+  if (!key)
+    return TC_RSA_ARGUMENT;
+  const uint8_t* const modulus = key->public_key.modulus.data;
+  const size_t length = key->public_key.modulus.length;
+  const uint8_t* const exponent = key->public_key.exponent.data;
+  const size_t exponent_length = key->public_key.exponent.length;
+  const TC_bytes p_bytes = key->p, q_bytes = key->q;
+  if (!rng)
+    return TC_RSA_ARGUMENT;
+  const TC_random_fn random = rng->source.fill;
+  const size_t max_attempts = rng->attempts;
+  tc_mp_word* const scratch = area.words;
+  const size_t scratch_words = area.capacity;
   if (!crt || !p_bytes.data || !q_bytes.data || !crt->dp.data || !crt->dq.data ||
       !crt->q_inverse.data || !input || !output || !random || !scratch || !work)
     return TC_RSA_ARGUMENT;
-  TC_RSA_result status = tc_rsa_public_key_check(modulus, length, exponent, exponent_length);
+  TC_RSA_result status = tc_rsa_public_key_check(&key->public_key);
   if (status != TC_RSA_OK)
     return status;
   const size_t n = length / sizeof(tc_mp_word), h = n / 2;
@@ -475,8 +526,7 @@ tc_rsa_crt_private_operation(const uint8_t* modulus, size_t length, const uint8_
     goto cleanup;
 
   tc_mp_word* blind = factors;
-  status = tc_rsa_sample_blinding(n_words, blind, inverse, arena, n, random, random_context,
-                                  max_attempts, work);
+  status = tc_rsa_sample_blinding(n_words, n, blind, inverse, arena, rng, work);
   if (status != TC_RSA_OK)
     goto cleanup;
 
@@ -581,21 +631,14 @@ cleanup:
 /* Private operation for a validated key: the CRT form when crt is set,
  * otherwise full-width exponentiation with d. Storage, cost and output rules
  * match the selected operation. */
-static inline TC_RSA_result tc_rsa_private_apply(const TC_RSA_private_key* key, const TC_RSA_crt* crt,
-                                                 const uint8_t* input, uint8_t* output,
-                                                 TC_random_fn random, void* random_context,
-                                                 size_t max_attempts, tc_mp_word* scratch,
-                                                 size_t scratch_words, uint32_t* work)
+static inline TC_RSA_result tc_rsa_private_apply(const TC_RSA_private_key* key,
+                                                 const TC_RSA_crt* crt, const uint8_t* input,
+                                                 uint8_t* output, const tc_rsa_random* rng,
+                                                 tc_mp_scratch scratch, uint32_t* work)
 {
-  const TC_RSA_public_key* public_key = &key->public_key;
   if (crt)
-    return tc_rsa_crt_private_operation(public_key->modulus.data, public_key->modulus.length,
-                                        public_key->exponent.data, public_key->exponent.length,
-                                        key->p, key->q, crt, input, output, random,
-                                        random_context, max_attempts, scratch, scratch_words, work);
-  return tc_rsa_private_operation_magnitude(
-      public_key->modulus.data, public_key->modulus.length, public_key->exponent.data,
-      public_key->exponent.length, key->d, input, output, random, random_context, max_attempts,
-      scratch, scratch_words, work);
+    return tc_rsa_crt_private_operation(key, crt, input, output, rng, scratch, work);
+  return tc_rsa_private_operation_magnitude(&key->public_key, key->d, input, output, rng, scratch,
+                                            work);
 }
 #endif

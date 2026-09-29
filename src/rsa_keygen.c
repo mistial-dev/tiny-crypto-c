@@ -290,8 +290,9 @@ static TC_RSA_result tc_rsa_keygen_step(TC_RSA_keygen_state* state, TC_random_fn
       if (status != TC_RSA_OK)
         TC_RSA_KEYGEN_RETURN(tc_rsa_keygen_stop(state, status));
       const uint8_t* candidate_bytes = state->phase == TC_RSA_KEYGEN_P_ROUND ? p : q;
-      if (!tc_rsa_witness_sample(base, (uint8_t*)temporary, candidate_bytes, prime_length,
-                                 prime_length, scratch, scratch + 7 * h, temporary, h))
+      if (!tc_rsa_witness_sample(base, (uint8_t*)temporary,
+                                 (TC_bytes){candidate_bytes, prime_length}, prime_length, scratch,
+                                 h, scratch + 7 * h))
         continue;
       if (!tc_mp_miller_rabin_round(scratch, base, h, state->twos, scratch + 2 * h)) {
         state->phase =

@@ -220,6 +220,12 @@ static inline uint32_t tc_mp_mod_u32_be(const uint8_t* value, size_t length, uin
   return remainder;
 }
 
+/* Caller-owned limb scratch with its capacity in limbs. */
+typedef struct {
+  tc_mp_word* words;
+  size_t capacity;
+} tc_mp_scratch;
+
 /* An odd modulus p of n limbs for Montgomery arithmetic. n0 = -p[0]^-1
  * modulo the limb radix. product (2n+2 limbs) and reduced (n limbs) are
  * scratch, mutually disjoint and separate from every operand. */

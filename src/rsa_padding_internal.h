@@ -78,6 +78,13 @@ static inline TC_RSA_result tc_rsa_mgf1_xor(TC_hash_algorithm hash, TC_bytes see
 /* Validate EMSA-PSS parameters (RFC 8017 section 9.1) and return the work
  * charged before MGF1: the encoded message, salt, digest and the fixed
  * 8-byte prefix plus one hash invocation. */
+/* Hash scratch for one padding operation: a digest-sized block (64 bytes)
+ * and a hash context. Both are wiped by the caller. */
+typedef struct {
+  uint8_t* block;
+  TC_hash_context* context;
+} tc_rsa_hash_scratch;
+
 static inline TC_RSA_result tc_rsa_pss_parameters(size_t length, size_t bits,
                                                   TC_hash_algorithm hash,
                                                   TC_hash_algorithm mgf_hash, size_t salt_length,
@@ -157,11 +164,15 @@ static inline TC_status tc_rsa_pss_hash(TC_hash_algorithm hash, TC_bytes digest,
 /* Salt bytes come from the caller's cryptographic RNG. Output may change on
  * failure, and callers must discard it. Inputs, output, block and workspace are
  * disjoint. Salt is copied only into its encoded-message field. */
-static inline TC_RSA_result tc_rsa_pss_encode(uint8_t* encoded, size_t length, size_t bits,
-                                              TC_hash_algorithm hash, TC_hash_algorithm mgf_hash,
-                                              TC_bytes digest, TC_bytes salt, uint8_t* block,
-                                              TC_hash_context* workspace, uint32_t* work)
+static inline TC_RSA_result tc_rsa_pss_encode(const TC_RSA_pss_options* options, TC_buffer output,
+                                              size_t bits, TC_bytes digest, TC_bytes salt,
+                                              tc_rsa_hash_scratch hashes, uint32_t* work)
 {
+  uint8_t* const encoded = output.data;
+  const size_t length = output.capacity;
+  const TC_hash_algorithm hash = options->hash, mgf_hash = options->mgf_hash;
+  uint8_t* const block = hashes.block;
+  TC_hash_context* const workspace = hashes.context;
   tc_hash_info info;
   TC_bytes h;
   TC_RSA_result result;
@@ -193,11 +204,15 @@ static inline TC_RSA_result tc_rsa_pss_encode(uint8_t* encoded, size_t length, s
  * encoded is mutable scratch and may change on failure. Other inputs,
  * hash workspace, block and work are disjoint from it and each other. block
  * holds the larger of the message-hash and MGF-hash digests. */
-static inline TC_RSA_result tc_rsa_pss_check(uint8_t* encoded, size_t length, size_t bits,
-                                             TC_hash_algorithm hash, TC_hash_algorithm mgf_hash,
-                                             TC_bytes digest, size_t salt_length, uint8_t* block,
-                                             TC_hash_context* workspace, uint32_t* work)
+static inline TC_RSA_result tc_rsa_pss_check(const TC_RSA_pss_options* options, TC_buffer message,
+                                             size_t bits, TC_bytes digest,
+                                             tc_rsa_hash_scratch hashes, uint32_t* work)
 {
+  uint8_t* const encoded = message.data;
+  const size_t length = message.capacity, salt_length = options->salt_length;
+  const TC_hash_algorithm hash = options->hash, mgf_hash = options->mgf_hash;
+  uint8_t* const block = hashes.block;
+  TC_hash_context* const workspace = hashes.context;
   tc_hash_info info;
   TC_RSA_result result;
   size_t db_length, padding;
@@ -268,12 +283,16 @@ static inline TC_RSA_result tc_rsa_oaep_prepare(size_t length, TC_hash_algorithm
 /* RFC 8017 7.1.1. Seed is hLen bytes from a cryptographic RNG. Caller validates
  * disjoint ranges. block holds the larger hash digest. Encoded bytes are
  * provisional on failure. Message and seed are copied into their fields only. */
-static inline TC_RSA_result tc_rsa_oaep_encode(uint8_t* encoded, size_t length,
-                                               TC_hash_algorithm hash, TC_hash_algorithm mgf_hash,
-                                               TC_bytes label, TC_bytes message, TC_bytes seed,
-                                               uint8_t* block, TC_hash_context* workspace,
-                                               uint32_t* work)
+static inline TC_RSA_result tc_rsa_oaep_encode(const TC_RSA_oaep_options* options, TC_buffer output,
+                                               TC_bytes message, TC_bytes seed,
+                                               tc_rsa_hash_scratch hashes, uint32_t* work)
 {
+  uint8_t* const encoded = output.data;
+  const size_t length = output.capacity;
+  const TC_bytes label = options->label;
+  const TC_hash_algorithm hash = options->hash, mgf_hash = options->mgf_hash;
+  uint8_t* const block = hashes.block;
+  TC_hash_context* const workspace = hashes.context;
   tc_hash_info info;
   if (!encoded || (label.length && !label.data) || (message.length && !message.data) ||
       !seed.data || !block || !workspace || !work)
@@ -307,12 +326,16 @@ static inline TC_RSA_result tc_rsa_oaep_encode(uint8_t* encoded, size_t length,
 /* RFC 8017 7.1.2. Decode in caller-owned scratch and publish a borrowed message
  * only on success. All other ranges are disjoint. Wipe encoded after use or
  * failure. Invalid padding takes the same scan and returns one error status. */
-static inline TC_RSA_result tc_rsa_oaep_decode(uint8_t* encoded, size_t length,
-                                               TC_hash_algorithm hash, TC_hash_algorithm mgf_hash,
-                                               TC_bytes label, uint8_t* block,
-                                               TC_hash_context* workspace, uint32_t* work,
+static inline TC_RSA_result tc_rsa_oaep_decode(const TC_RSA_oaep_options* options, TC_buffer input,
+                                               tc_rsa_hash_scratch hashes, uint32_t* work,
                                                TC_bytes* message)
 {
+  uint8_t* const encoded = input.data;
+  const size_t length = input.capacity;
+  const TC_bytes label = options->label;
+  const TC_hash_algorithm hash = options->hash, mgf_hash = options->mgf_hash;
+  uint8_t* const block = hashes.block;
+  TC_hash_context* const workspace = hashes.context;
   tc_hash_info info;
   if (!encoded || (label.length && !label.data) || !block || !workspace || !work || !message)
     return TC_RSA_ARGUMENT;

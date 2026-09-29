@@ -20,9 +20,9 @@ static TC_RSA_result probable_prime(const uint8_t* candidate, size_t length, siz
                                     size_t max_attempts, tc_mp_word* scratch,
                                     size_t scratch_words, uint32_t* work)
 {
-  return tc_rsa_probable_prime_magnitude((TC_bytes){candidate, length}, length, rounds, random,
-                                         random_context, max_attempts, scratch, scratch_words,
-                                         work);
+  return tc_rsa_probable_prime_magnitude((TC_bytes){candidate, length}, length, rounds,
+                                         &(tc_rsa_random){{random, random_context}, max_attempts},
+                                         (tc_mp_scratch){scratch, scratch_words}, work);
 }
 
 static int reference(const BIGNUM* p, const BIGNUM* base, BN_CTX* context)

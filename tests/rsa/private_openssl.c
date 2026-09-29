@@ -24,8 +24,12 @@ static TC_RSA_result key_consistent(const uint8_t* modulus, size_t length, const
                                     uint32_t* work)
 {
   return tc_rsa_private_magnitudes_consistent(
-      modulus, length, exponent, exponent_length, TC_RSA_EXPONENT_FIPS, (TC_bytes){d, length},
-      (TC_bytes){p, length}, (TC_bytes){q, length}, scratch, scratch_words, work);
+      &(TC_RSA_private_key){{{modulus, length}, {exponent, exponent_length}},
+                            (TC_bytes){d, length},
+                            (TC_bytes){p, length},
+                            (TC_bytes){q, length},
+                            NULL},
+      TC_RSA_EXPONENT_FIPS, (tc_mp_scratch){scratch, scratch_words}, work);
 }
 
 static TC_RSA_result key_check(const uint8_t* modulus, size_t length, const uint8_t* exponent,
@@ -35,9 +39,13 @@ static TC_RSA_result key_check(const uint8_t* modulus, size_t length, const uint
                                size_t scratch_words, uint32_t* work)
 {
   return tc_rsa_private_magnitudes_check(
-      modulus, length, exponent, exponent_length, TC_RSA_EXPONENT_FIPS, (TC_bytes){d, length},
-      (TC_bytes){p, length}, (TC_bytes){q, length}, rounds, random, random_context, max_attempts,
-      scratch, scratch_words, work);
+      &(TC_RSA_private_key){{{modulus, length}, {exponent, exponent_length}},
+                            (TC_bytes){d, length},
+                            (TC_bytes){p, length},
+                            (TC_bytes){q, length},
+                            NULL},
+      TC_RSA_EXPONENT_FIPS, rounds, &(tc_rsa_random){{random, random_context}, max_attempts},
+      (tc_mp_scratch){scratch, scratch_words}, work);
 }
 
 static TC_RSA_result full_width_private(const uint8_t* modulus, size_t length,
@@ -47,10 +55,10 @@ static TC_RSA_result full_width_private(const uint8_t* modulus, size_t length,
                                         size_t max_attempts, tc_mp_word* scratch,
                                         size_t scratch_words, uint32_t* work)
 {
-  return tc_rsa_private_operation_magnitude(modulus, length, exponent, exponent_length,
-                                            (TC_bytes){d, length}, input, output, random,
-                                            random_context, max_attempts, scratch, scratch_words,
-                                            work);
+  return tc_rsa_private_operation_magnitude(
+      &(TC_RSA_public_key){{modulus, length}, {exponent, exponent_length}}, (TC_bytes){d, length},
+      input, output, &(tc_rsa_random){{random, random_context}, max_attempts},
+      (tc_mp_scratch){scratch, scratch_words}, work);
 }
 
 enum {
@@ -223,8 +231,12 @@ static MunitResult private_operation(const MunitParameter params[], void* user)
   key_work = key_cost;
   memset(scratch, 0xa5, sizeof scratch);
   munit_assert_int(tc_rsa_private_magnitudes_consistent(
-                       modulus, width, exponent, sizeof exponent, TC_RSA_EXPONENT_FIPS,
-                       magnitudes[0], magnitudes[1], magnitudes[2], scratch, key_words, &key_work),
+                       &(TC_RSA_private_key){{{modulus, width}, {exponent, sizeof exponent}},
+                                             magnitudes[0],
+                                             magnitudes[1],
+                                             magnitudes[2],
+                                             NULL},
+                       TC_RSA_EXPONENT_FIPS, (tc_mp_scratch){scratch, key_words}, &key_work),
                    ==, TC_RSA_OK);
   munit_assert_size(key_work, ==, 0);
   munit_assert_true(tc_test_all_zero(scratch, key_words * sizeof *scratch));
@@ -339,22 +351,28 @@ static MunitResult private_operation(const MunitParameter params[], void* user)
   uint32_t crt_work = 64 * width + 32 * sizeof exponent + 13;
   memset(actual, 0xa5, sizeof actual);
   memset(scratch, 0xa5, sizeof scratch);
-  munit_assert_int(tc_rsa_crt_private_operation(modulus, width, exponent, sizeof exponent,
-                                                (TC_bytes){factor + width / 2, width / 2},
-                                                (TC_bytes){other_factor + width / 2, width / 2},
-                                                &crt, input, actual, random_bytes, &crt_random, 1,
-                                                scratch, words, &crt_work),
+  munit_assert_int(tc_rsa_crt_private_operation(
+                       &(TC_RSA_private_key){{{modulus, width}, {exponent, sizeof exponent}},
+                                             {NULL, 0},
+                                             (TC_bytes){factor + width / 2, width / 2},
+                                             (TC_bytes){other_factor + width / 2, width / 2},
+                                             NULL},
+                       &crt, input, actual, &(tc_rsa_random){{random_bytes, &crt_random}, 1},
+                       (tc_mp_scratch){scratch, words}, &crt_work),
                    ==, TC_RSA_OK);
   munit_assert_size(crt_work, ==, 0);
   munit_assert_memory_equal(width, actual, expected);
   munit_assert_true(tc_test_all_zero(scratch, words * sizeof *scratch));
   crt_random = (random_source){factor, seed, width, 0, TC_OK};
   crt_work = WORK_BUDGET;
-  munit_assert_int(tc_rsa_crt_private_operation(modulus, width, exponent, sizeof exponent,
-                                                (TC_bytes){factor + width / 2, width / 2},
-                                                (TC_bytes){other_factor + width / 2, width / 2},
-                                                &crt, input, actual, random_bytes, &crt_random, 2,
-                                                scratch, words, &crt_work),
+  munit_assert_int(tc_rsa_crt_private_operation(
+                       &(TC_RSA_private_key){{{modulus, width}, {exponent, sizeof exponent}},
+                                             {NULL, 0},
+                                             (TC_bytes){factor + width / 2, width / 2},
+                                             (TC_bytes){other_factor + width / 2, width / 2},
+                                             NULL},
+                       &crt, input, actual, &(tc_rsa_random){{random_bytes, &crt_random}, 2},
+                       (tc_mp_scratch){scratch, words}, &crt_work),
                    ==, TC_RSA_OK);
   munit_assert_size(crt_random.calls, ==, 2);
   munit_assert_memory_equal(width, actual, expected);
@@ -365,11 +383,14 @@ static MunitResult private_operation(const MunitParameter params[], void* user)
     crt_work = WORK_BUDGET;
     memset(actual, 0xa5, sizeof actual);
     memset(scratch, 0xa5, sizeof scratch);
-    munit_assert_int(tc_rsa_crt_private_operation(modulus, width, exponent, sizeof exponent,
-                                                  (TC_bytes){factor + width / 2, width / 2},
-                                                  (TC_bytes){other_factor + width / 2, width / 2},
-                                                  &crt, input, actual, random_bytes, &crt_random, 1,
-                                                  scratch, words, &crt_work),
+    munit_assert_int(tc_rsa_crt_private_operation(
+                         &(TC_RSA_private_key){{{modulus, width}, {exponent, sizeof exponent}},
+                                               {NULL, 0},
+                                               (TC_bytes){factor + width / 2, width / 2},
+                                               (TC_bytes){other_factor + width / 2, width / 2},
+                                               NULL},
+                         &crt, input, actual, &(tc_rsa_random){{random_bytes, &crt_random}, 1},
+                         (tc_mp_scratch){scratch, words}, &crt_work),
                      ==, TC_RSA_ERROR);
     for (size_t i = 0; i < width; ++i)
       munit_assert_uint(actual[i], ==, 0xa5);
@@ -394,9 +415,10 @@ static MunitResult private_operation(const MunitParameter params[], void* user)
   work = required;
   memset(actual, 0xa5, sizeof actual);
   memset(scratch, 0xa5, sizeof scratch);
-  munit_assert_int(tc_rsa_private_operation_magnitude(modulus, width, exponent, sizeof exponent,
-                                                      magnitudes[0], input, actual, random_bytes,
-                                                      &random, 2, scratch, words, &work),
+  munit_assert_int(tc_rsa_private_operation_magnitude(
+                       &(TC_RSA_public_key){{modulus, width}, {exponent, sizeof exponent}},
+                       magnitudes[0], input, actual, &(tc_rsa_random){{random_bytes, &random}, 2},
+                       (tc_mp_scratch){scratch, words}, &work),
                    ==, TC_RSA_OK);
   munit_assert_memory_equal(width, actual, expected);
   munit_assert_size(work, ==, 0);
@@ -747,8 +769,11 @@ static MunitResult crt_components(const MunitParameter params[], void* user)
       bytes[field][values[field].length - 1] ^= 2;
     memset(scratch, 0xa5, sizeof scratch);
     uint32_t work = cost;
-    munit_assert_int(tc_rsa_crt_consistent(width, values[0], values[1], values[2], values[3],
-                                           values[4], values[5], scratch, required, &work),
+    munit_assert_int(tc_rsa_crt_consistent(
+                         &(TC_RSA_private_key){
+                             {{NULL, width}, {NULL, 0}}, values[0], values[1], values[2], NULL},
+                         &(TC_RSA_crt){values[3], values[4], values[5]},
+                         (tc_mp_scratch){scratch, required}, &work),
                      ==, scenario ? TC_RSA_INVALID : TC_RSA_OK);
     munit_assert_size(work, ==, 0);
     const TC_RSA_crt crt = {values[3], values[4], values[5]};
@@ -779,16 +804,22 @@ static MunitResult crt_components(const MunitParameter params[], void* user)
       if (zero)
         memset(replacement, 0, width);
       uint32_t work = cost;
-      munit_assert_int(tc_rsa_crt_consistent(width, values[0], values[1], values[2], values[3],
-                                             values[4], values[5], scratch, required, &work),
+      munit_assert_int(tc_rsa_crt_consistent(
+                           &(TC_RSA_private_key){
+                               {{NULL, width}, {NULL, 0}}, values[0], values[1], values[2], NULL},
+                           &(TC_RSA_crt){values[3], values[4], values[5]},
+                           (tc_mp_scratch){scratch, required}, &work),
                        ==, TC_RSA_INVALID);
       munit_assert_size(work, ==, 0);
     }
     /* Leading zero bytes preserve a valid magnitude. */
     memcpy(replacement + width - original.length, original.data, original.length);
     uint32_t work = cost;
-    munit_assert_int(tc_rsa_crt_consistent(width, values[0], values[1], values[2], values[3],
-                                           values[4], values[5], scratch, required, &work),
+    munit_assert_int(tc_rsa_crt_consistent(
+                         &(TC_RSA_private_key){
+                             {{NULL, width}, {NULL, 0}}, values[0], values[1], values[2], NULL},
+                         &(TC_RSA_crt){values[3], values[4], values[5]},
+                         (tc_mp_scratch){scratch, required}, &work),
                      ==, TC_RSA_OK);
     values[field] = original;
     BN_clear_free(enlarged);
@@ -831,9 +862,11 @@ static MunitResult crt_components(const MunitParameter params[], void* user)
   for (unsigned short_workspace = 0; short_workspace < 2; ++short_workspace) {
     uint32_t work = cost - !short_workspace;
     const size_t saved_work = work;
-    munit_assert_int(tc_rsa_crt_consistent(width, values[0], values[1], values[2], values[3],
-                                           values[4], values[5], scratch,
-                                           required - short_workspace, &work),
+    munit_assert_int(tc_rsa_crt_consistent(
+                         &(TC_RSA_private_key){
+                             {{NULL, width}, {NULL, 0}}, values[0], values[1], values[2], NULL},
+                         &(TC_RSA_crt){values[3], values[4], values[5]},
+                         (tc_mp_scratch){scratch, required - short_workspace}, &work),
                      ==, TC_RSA_LIMIT);
     munit_assert_size(work, ==, saved_work);
     const TC_RSA_workspace limited = {scratch, required - short_workspace};

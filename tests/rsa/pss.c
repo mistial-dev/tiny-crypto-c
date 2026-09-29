@@ -29,53 +29,60 @@ static MunitResult representative(const MunitParameter params[], void* user)
   for (size_t i = 0; i < sizeof digest; ++i)
     digest[i] = (uint8_t)i;
   memcpy(encoded, fixture, sizeof encoded);
-  munit_assert_int(tc_rsa_pss_check(encoded, sizeof encoded, 1023, TC_HASH_SHA256, TC_HASH_SHA256,
-                                    (TC_bytes){digest, sizeof digest}, 32, block, &workspace,
-                                    &work),
+  munit_assert_int(tc_rsa_pss_check(&(TC_RSA_pss_options){TC_HASH_SHA256, TC_HASH_SHA256, 32},
+                                    (TC_buffer){encoded, sizeof encoded}, 1023,
+                                    (TC_bytes){digest, sizeof digest},
+                                    (tc_rsa_hash_scratch){block, &workspace}, &work),
                    ==, TC_RSA_OK);
   required = 10000 - work;
   memcpy(encoded, fixture, sizeof encoded);
   encoded[0] |= 0x80;
   work = 10000;
-  munit_assert_int(tc_rsa_pss_check(encoded, sizeof encoded, 1023, TC_HASH_SHA256, TC_HASH_SHA256,
-                                    (TC_bytes){digest, sizeof digest}, 32, block, &workspace,
-                                    &work),
+  munit_assert_int(tc_rsa_pss_check(&(TC_RSA_pss_options){TC_HASH_SHA256, TC_HASH_SHA256, 32},
+                                    (TC_buffer){encoded, sizeof encoded}, 1023,
+                                    (TC_bytes){digest, sizeof digest},
+                                    (tc_rsa_hash_scratch){block, &workspace}, &work),
                    ==, TC_RSA_INVALID);
   memcpy(encoded, fixture, sizeof encoded);
   work = 10000;
-  munit_assert_int(tc_rsa_pss_check(encoded, sizeof encoded, 1023, TC_HASH_SHA256, TC_HASH_SHA256,
-                                    (TC_bytes){digest, sizeof digest}, SIZE_MAX, block, &workspace,
-                                    &work),
+  munit_assert_int(tc_rsa_pss_check(&(TC_RSA_pss_options){TC_HASH_SHA256, TC_HASH_SHA256, SIZE_MAX},
+                                    (TC_buffer){encoded, sizeof encoded}, 1023,
+                                    (TC_bytes){digest, sizeof digest},
+                                    (tc_rsa_hash_scratch){block, &workspace}, &work),
                    ==, TC_RSA_INVALID);
   for (size_t i = 0; i < sizeof encoded; ++i) {
     memcpy(encoded, fixture, sizeof encoded);
     encoded[i] ^= 1;
     work = 10000;
-    munit_assert_int(tc_rsa_pss_check(encoded, sizeof encoded, 1023, TC_HASH_SHA256, TC_HASH_SHA256,
-                                      (TC_bytes){digest, sizeof digest}, 32, block, &workspace,
-                                      &work),
+    munit_assert_int(tc_rsa_pss_check(&(TC_RSA_pss_options){TC_HASH_SHA256, TC_HASH_SHA256, 32},
+                                      (TC_buffer){encoded, sizeof encoded}, 1023,
+                                      (TC_bytes){digest, sizeof digest},
+                                      (tc_rsa_hash_scratch){block, &workspace}, &work),
                      ==, TC_RSA_INVALID);
   }
   for (size_t salt = 0; salt < 33; ++salt) {
     memcpy(encoded, fixture, sizeof encoded);
     work = 10000;
-    munit_assert_int(tc_rsa_pss_check(encoded, sizeof encoded, 1023, TC_HASH_SHA256, TC_HASH_SHA256,
-                                      (TC_bytes){digest, sizeof digest}, salt, block, &workspace,
-                                      &work),
+    munit_assert_int(tc_rsa_pss_check(&(TC_RSA_pss_options){TC_HASH_SHA256, TC_HASH_SHA256, salt},
+                                      (TC_buffer){encoded, sizeof encoded}, 1023,
+                                      (TC_bytes){digest, sizeof digest},
+                                      (tc_rsa_hash_scratch){block, &workspace}, &work),
                      ==, salt == 32 ? TC_RSA_OK : TC_RSA_INVALID);
   }
   memcpy(encoded, fixture, sizeof encoded);
   work = required;
-  munit_assert_int(tc_rsa_pss_check(encoded, sizeof encoded, 1023, TC_HASH_SHA256, TC_HASH_SHA256,
-                                    (TC_bytes){digest, sizeof digest}, 32, block, &workspace,
-                                    &work),
+  munit_assert_int(tc_rsa_pss_check(&(TC_RSA_pss_options){TC_HASH_SHA256, TC_HASH_SHA256, 32},
+                                    (TC_buffer){encoded, sizeof encoded}, 1023,
+                                    (TC_bytes){digest, sizeof digest},
+                                    (tc_rsa_hash_scratch){block, &workspace}, &work),
                    ==, TC_RSA_OK);
   munit_assert_size(work, ==, 0);
   memcpy(encoded, fixture, sizeof encoded);
   work = required - 1;
-  munit_assert_int(tc_rsa_pss_check(encoded, sizeof encoded, 1023, TC_HASH_SHA256, TC_HASH_SHA256,
-                                    (TC_bytes){digest, sizeof digest}, 32, block, &workspace,
-                                    &work),
+  munit_assert_int(tc_rsa_pss_check(&(TC_RSA_pss_options){TC_HASH_SHA256, TC_HASH_SHA256, 32},
+                                    (TC_buffer){encoded, sizeof encoded}, 1023,
+                                    (TC_bytes){digest, sizeof digest},
+                                    (tc_rsa_hash_scratch){block, &workspace}, &work),
                    ==, TC_RSA_LIMIT);
   return MUNIT_OK;
 }
@@ -103,16 +110,20 @@ static MunitResult salt_boundaries(const MunitParameter params[], void* user)
     size_t salt_length = i ? sizeof salt : 0;
     uint32_t work = 10000;
     decode_hex(expected, sizeof expected, fixtures[i]);
-    munit_assert_int(tc_rsa_pss_encode(encoded, sizeof encoded, 1023, TC_HASH_SHA256,
-                                       TC_HASH_SHA256, (TC_bytes){digest, sizeof digest},
-                                       (TC_bytes){salt, salt_length}, block, &workspace, &work),
+    munit_assert_int(tc_rsa_pss_encode(&(TC_RSA_pss_options){TC_HASH_SHA256, TC_HASH_SHA256, 0},
+                                       (TC_buffer){encoded, sizeof encoded}, 1023,
+                                       (TC_bytes){digest, sizeof digest},
+                                       (TC_bytes){salt, salt_length},
+                                       (tc_rsa_hash_scratch){block, &workspace}, &work),
                      ==, TC_RSA_OK);
     munit_assert_memory_equal(sizeof encoded, encoded, expected);
     work = 10000;
-    munit_assert_int(tc_rsa_pss_check(encoded, sizeof encoded, 1023, TC_HASH_SHA256, TC_HASH_SHA256,
-                                      (TC_bytes){digest, sizeof digest}, salt_length, block,
-                                      &workspace, &work),
-                     ==, TC_RSA_OK);
+    munit_assert_int(
+        tc_rsa_pss_check(&(TC_RSA_pss_options){TC_HASH_SHA256, TC_HASH_SHA256, salt_length},
+                         (TC_buffer){encoded, sizeof encoded}, 1023,
+                         (TC_bytes){digest, sizeof digest},
+                         (tc_rsa_hash_scratch){block, &workspace}, &work),
+        ==, TC_RSA_OK);
   }
   return MUNIT_OK;
 }

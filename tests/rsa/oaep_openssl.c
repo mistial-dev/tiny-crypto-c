@@ -166,11 +166,12 @@ static MunitResult interoperability(const MunitParameter params[], void* user)
           const TC_bytes message = {input, lengths[m]};
           uint32_t work = WORK_BUDGET;
           size_t size = sizeof ciphertext, recovered = sizeof plaintext;
-          munit_assert_int(tc_rsa_oaep_encode(encoded, width, hashes[h].algorithm,
-                                              hashes[mgf].algorithm, labels[l], message,
-                                              (TC_bytes){seed, info.digest_length}, block,
-                                              &workspace, &work),
-                           ==, TC_RSA_OK);
+          munit_assert_int(
+              tc_rsa_oaep_encode(
+                  &(TC_RSA_oaep_options){hashes[h].algorithm, hashes[mgf].algorithm, labels[l]},
+                  (TC_buffer){encoded, width}, message, (TC_bytes){seed, info.digest_length},
+                  (tc_rsa_hash_scratch){block, &workspace}, &work),
+              ==, TC_RSA_OK);
           /* OpenSSL supplies only the RSA transform for our encoded block. */
           munit_assert_int(EVP_PKEY_encrypt(raw_encrypt, ciphertext, &size, encoded, width), ==, 1);
           memcpy(saved, ciphertext, width);
@@ -216,19 +217,23 @@ static MunitResult interoperability(const MunitParameter params[], void* user)
           memcpy(saved, encoded, width);
           TC_bytes decoded = {NULL, 0};
           work = WORK_BUDGET;
-          munit_assert_int(tc_rsa_oaep_decode(encoded, width, hashes[h].algorithm,
-                                              hashes[mgf].algorithm, labels[l], block, &workspace,
-                                              &work, &decoded),
-                           ==, TC_RSA_OK);
+          munit_assert_int(
+              tc_rsa_oaep_decode(
+                  &(TC_RSA_oaep_options){hashes[h].algorithm, hashes[mgf].algorithm, labels[l]},
+                  (TC_buffer){encoded, width}, (tc_rsa_hash_scratch){block, &workspace}, &work,
+                  &decoded),
+              ==, TC_RSA_OK);
           munit_assert_size(decoded.length, ==, message.length);
           munit_assert_memory_equal(decoded.length, decoded.data, message.data);
           memcpy(encoded, saved, width);
           decoded = (TC_bytes){NULL, 0};
           work = WORK_BUDGET;
-          munit_assert_int(tc_rsa_oaep_decode(encoded, width, hashes[h].algorithm,
-                                              hashes[mgf].algorithm, labels[l ^ 1u], block,
-                                              &workspace, &work, &decoded),
-                           ==, TC_RSA_INVALID);
+          munit_assert_int(
+              tc_rsa_oaep_decode(&(TC_RSA_oaep_options){hashes[h].algorithm, hashes[mgf].algorithm,
+                                                        labels[l ^ 1u]},
+                                 (TC_buffer){encoded, width},
+                                 (tc_rsa_hash_scratch){block, &workspace}, &work, &decoded),
+              ==, TC_RSA_INVALID);
           munit_assert_null(decoded.data);
           munit_assert_size(decoded.length, ==, 0);
         }

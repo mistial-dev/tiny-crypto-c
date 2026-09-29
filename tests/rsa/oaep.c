@@ -27,15 +27,17 @@ static MunitResult known_answer(const MunitParameter params[], void* user)
   (void)user;
   for (size_t i = 0; i < sizeof seed; ++i)
     seed[i] = (uint8_t)i;
-  munit_assert_int(tc_rsa_oaep_encode(encoded, sizeof encoded, TC_HASH_SHA256, TC_HASH_SHA256,
-                                      label, input, (TC_bytes){seed, sizeof seed}, block,
-                                      &workspace, &work),
+  munit_assert_int(tc_rsa_oaep_encode(&(TC_RSA_oaep_options){TC_HASH_SHA256, TC_HASH_SHA256, label},
+                                      (TC_buffer){encoded, sizeof encoded}, input,
+                                      (TC_bytes){seed, sizeof seed},
+                                      (tc_rsa_hash_scratch){block, &workspace}, &work),
                    ==, TC_RSA_OK);
   munit_assert_memory_equal(sizeof encoded, encoded, expected);
   const size_t encode_work = WORK_BUDGET - work;
   work = WORK_BUDGET;
-  munit_assert_int(tc_rsa_oaep_decode(encoded, sizeof encoded, TC_HASH_SHA256, TC_HASH_SHA256,
-                                      label, block, &workspace, &work, &message),
+  munit_assert_int(tc_rsa_oaep_decode(&(TC_RSA_oaep_options){TC_HASH_SHA256, TC_HASH_SHA256, label},
+                                      (TC_buffer){encoded, sizeof encoded},
+                                      (tc_rsa_hash_scratch){block, &workspace}, &work, &message),
                    ==, TC_RSA_OK);
   munit_assert_size(message.length, ==, input.length);
   munit_assert_ptr_equal(message.data, encoded + sizeof encoded - input.length);
@@ -46,27 +48,32 @@ static MunitResult known_answer(const MunitParameter params[], void* user)
     encoded[i] ^= 1;
     work = WORK_BUDGET;
     message = sentinel;
-    munit_assert_int(tc_rsa_oaep_decode(encoded, sizeof encoded, TC_HASH_SHA256, TC_HASH_SHA256,
-                                        label, block, &workspace, &work, &message),
-                     ==, TC_RSA_INVALID);
+    munit_assert_int(
+        tc_rsa_oaep_decode(&(TC_RSA_oaep_options){TC_HASH_SHA256, TC_HASH_SHA256, label},
+                           (TC_buffer){encoded, sizeof encoded},
+                           (tc_rsa_hash_scratch){block, &workspace}, &work, &message),
+        ==, TC_RSA_INVALID);
     munit_assert_size(WORK_BUDGET - work, ==, decode_work);
     munit_assert_ptr_equal(message.data, sentinel.data);
     munit_assert_size(message.length, ==, sentinel.length);
   }
   for (size_t budget = 0; budget <= encode_work; ++budget) {
     work = budget;
-    munit_assert_int(tc_rsa_oaep_encode(encoded, sizeof encoded, TC_HASH_SHA256, TC_HASH_SHA256,
-                                        label, input, (TC_bytes){seed, sizeof seed}, block,
-                                        &workspace, &work),
+    munit_assert_int(tc_rsa_oaep_encode(
+                         &(TC_RSA_oaep_options){TC_HASH_SHA256, TC_HASH_SHA256, label},
+                         (TC_buffer){encoded, sizeof encoded}, input, (TC_bytes){seed, sizeof seed},
+                         (tc_rsa_hash_scratch){block, &workspace}, &work),
                      ==, budget == encode_work ? TC_RSA_OK : TC_RSA_LIMIT);
   }
   for (size_t budget = 0; budget <= decode_work; ++budget) {
     memcpy(encoded, expected, sizeof encoded);
     work = budget;
     message = sentinel;
-    munit_assert_int(tc_rsa_oaep_decode(encoded, sizeof encoded, TC_HASH_SHA256, TC_HASH_SHA256,
-                                        label, block, &workspace, &work, &message),
-                     ==, budget == decode_work ? TC_RSA_OK : TC_RSA_LIMIT);
+    munit_assert_int(
+        tc_rsa_oaep_decode(&(TC_RSA_oaep_options){TC_HASH_SHA256, TC_HASH_SHA256, label},
+                           (TC_buffer){encoded, sizeof encoded},
+                           (tc_rsa_hash_scratch){block, &workspace}, &work, &message),
+        ==, budget == decode_work ? TC_RSA_OK : TC_RSA_LIMIT);
     if (budget != decode_work) {
       munit_assert_ptr_equal(message.data, sentinel.data);
       munit_assert_size(message.length, ==, sentinel.length);
@@ -95,10 +102,12 @@ static MunitResult boundaries(const MunitParameter params[], void* user)
       const size_t length = lengths[k];
       uint32_t work = WORK_BUDGET;
       if (length < 2 * info.digest_length + 2) {
-        munit_assert_int(tc_rsa_oaep_encode(encoded, length, hashes[h], TC_HASH_SHA256, empty,
-                                            empty, (TC_bytes){seed, info.digest_length}, block,
-                                            &workspace, &work),
-                         ==, TC_RSA_INVALID);
+        munit_assert_int(
+            tc_rsa_oaep_encode(&(TC_RSA_oaep_options){hashes[h], TC_HASH_SHA256, empty},
+                               (TC_buffer){encoded, length}, empty,
+                               (TC_bytes){seed, info.digest_length},
+                               (tc_rsa_hash_scratch){block, &workspace}, &work),
+            ==, TC_RSA_INVALID);
         continue;
       }
       const size_t maximum = length - 2 * info.digest_length - 2;
@@ -106,22 +115,27 @@ static MunitResult boundaries(const MunitParameter params[], void* user)
         const TC_bytes input_view = {input, n};
         TC_bytes decoded = {NULL, 0};
         work = WORK_BUDGET;
-        munit_assert_int(tc_rsa_oaep_encode(encoded, length, hashes[h], TC_HASH_SHA256, empty,
-                                            input_view, (TC_bytes){seed, info.digest_length}, block,
-                                            &workspace, &work),
-                         ==, TC_RSA_OK);
+        munit_assert_int(
+            tc_rsa_oaep_encode(&(TC_RSA_oaep_options){hashes[h], TC_HASH_SHA256, empty},
+                               (TC_buffer){encoded, length}, input_view,
+                               (TC_bytes){seed, info.digest_length},
+                               (tc_rsa_hash_scratch){block, &workspace}, &work),
+            ==, TC_RSA_OK);
         work = WORK_BUDGET;
-        munit_assert_int(tc_rsa_oaep_decode(encoded, length, hashes[h], TC_HASH_SHA256, empty,
-                                            block, &workspace, &work, &decoded),
-                         ==, TC_RSA_OK);
+        munit_assert_int(
+            tc_rsa_oaep_decode(&(TC_RSA_oaep_options){hashes[h], TC_HASH_SHA256, empty},
+                               (TC_buffer){encoded, length},
+                               (tc_rsa_hash_scratch){block, &workspace}, &work, &decoded),
+            ==, TC_RSA_OK);
         munit_assert_size(decoded.length, ==, n);
         munit_assert_memory_equal(n, decoded.data, input);
       }
       work = WORK_BUDGET;
-      munit_assert_int(tc_rsa_oaep_encode(encoded, length, hashes[h], TC_HASH_SHA256, empty,
+      munit_assert_int(tc_rsa_oaep_encode(&(TC_RSA_oaep_options){hashes[h], TC_HASH_SHA256, empty},
+                                          (TC_buffer){encoded, length},
                                           (TC_bytes){input, maximum + 1},
-                                          (TC_bytes){seed, info.digest_length}, block, &workspace,
-                                          &work),
+                                          (TC_bytes){seed, info.digest_length},
+                                          (tc_rsa_hash_scratch){block, &workspace}, &work),
                        ==, TC_RSA_INVALID);
     }
   }
@@ -140,14 +154,17 @@ static MunitResult padding(const MunitParameter params[], void* user)
   for (unsigned scenario = 0; scenario < CASE_COUNT; ++scenario) {
     uint32_t work = WORK_BUDGET;
     TC_bytes decoded = empty;
-    munit_assert_int(tc_rsa_oaep_encode(encoded, sizeof encoded, TC_HASH_SHA256, TC_HASH_SHA256,
-                                        empty, input, (TC_bytes){seed, sizeof seed}, block,
-                                        &workspace, &work),
+    munit_assert_int(tc_rsa_oaep_encode(
+                         &(TC_RSA_oaep_options){TC_HASH_SHA256, TC_HASH_SHA256, empty},
+                         (TC_buffer){encoded, sizeof encoded}, input, (TC_bytes){seed, sizeof seed},
+                         (tc_rsa_hash_scratch){block, &workspace}, &work),
                      ==, TC_RSA_OK);
     work = WORK_BUDGET;
-    munit_assert_int(tc_rsa_oaep_decode(encoded, sizeof encoded, TC_HASH_SHA256, TC_HASH_SHA256,
-                                        empty, block, &workspace, &work, &decoded),
-                     ==, TC_RSA_OK);
+    munit_assert_int(
+        tc_rsa_oaep_decode(&(TC_RSA_oaep_options){TC_HASH_SHA256, TC_HASH_SHA256, empty},
+                           (TC_buffer){encoded, sizeof encoded},
+                           (tc_rsa_hash_scratch){block, &workspace}, &work, &decoded),
+        ==, TC_RSA_OK);
     const size_t required = WORK_BUDGET - work;
     uint8_t* db = encoded + HASH_BYTES + 1;
     if (scenario == BAD_PREFIX)
@@ -168,9 +185,11 @@ static MunitResult padding(const MunitParameter params[], void* user)
                      ==, TC_RSA_OK);
     work = WORK_BUDGET;
     decoded = empty;
-    munit_assert_int(tc_rsa_oaep_decode(encoded, sizeof encoded, TC_HASH_SHA256, TC_HASH_SHA256,
-                                        empty, block, &workspace, &work, &decoded),
-                     ==, TC_RSA_INVALID);
+    munit_assert_int(
+        tc_rsa_oaep_decode(&(TC_RSA_oaep_options){TC_HASH_SHA256, TC_HASH_SHA256, empty},
+                           (TC_buffer){encoded, sizeof encoded},
+                           (tc_rsa_hash_scratch){block, &workspace}, &work, &decoded),
+        ==, TC_RSA_INVALID);
     munit_assert_size(WORK_BUDGET - work, ==, required);
     munit_assert_null(decoded.data);
     munit_assert_size(decoded.length, ==, 0);

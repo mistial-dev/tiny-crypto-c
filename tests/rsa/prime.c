@@ -20,9 +20,9 @@ static TC_RSA_result probable_prime(const uint8_t* candidate, size_t length, siz
                                     size_t max_attempts, tc_mp_word* scratch,
                                     size_t scratch_words, uint32_t* work)
 {
-  return tc_rsa_probable_prime_magnitude((TC_bytes){candidate, length}, length, rounds, random,
-                                         random_context, max_attempts, scratch, scratch_words,
-                                         work);
+  return tc_rsa_probable_prime_magnitude((TC_bytes){candidate, length}, length, rounds,
+                                         &(tc_rsa_random){{random, random_context}, max_attempts},
+                                         (tc_mp_scratch){scratch, scratch_words}, work);
 }
 
 static const char* primality_path;
@@ -251,8 +251,9 @@ static MunitResult padded_sampling(const MunitParameter params[], void* user)
       }
       work = 48 * BYTES + 5;
       memset(scratch, 0xa5, sizeof scratch);
-      munit_assert_int(tc_rsa_probable_prime_magnitude(magnitude, BYTES, 1, fixed_base, bytes, 1,
-                                                       scratch, REQUIRED, &work),
+      munit_assert_int(tc_rsa_probable_prime_magnitude(magnitude, BYTES, 1,
+                                                       &(tc_rsa_random){{fixed_base, bytes}, 1},
+                                                       (tc_mp_scratch){scratch, REQUIRED}, &work),
                        ==, expected);
       munit_assert_uint(work, ==, remaining);
       for (size_t i = 0; i < REQUIRED; ++i)
@@ -321,8 +322,8 @@ static MunitResult primality_vectors(const MunitParameter params[], void* user)
       seed = 1;
     uint32_t work = UINT32_MAX;
     TC_RSA_result result = tc_rsa_probable_prime_magnitude(
-        (TC_bytes){candidate, length}, width, 65, corpus_random, &seed, 4096, scratch,
-        12 * (width / sizeof(tc_mp_word)) + 2, &work);
+        (TC_bytes){candidate, length}, width, 65, &(tc_rsa_random){{corpus_random, &seed}, 4096},
+        (tc_mp_scratch){scratch, 12 * (width / sizeof(tc_mp_word)) + 2}, &work);
     if (result != TC_RSA_OK && result != TC_RSA_INVALID)
       munit_errorf("primality vector %s: unexpected status %d", id, result);
     if ((result == TC_RSA_OK) != !strcmp(verdict, "valid"))

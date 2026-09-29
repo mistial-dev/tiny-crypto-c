@@ -5,6 +5,13 @@
 #include <tiny_crypto/rsa.h>
 #include "mp_prime_internal.h"
 
+/* Randomness for one private operation: the source and the number of
+ * requests it may serve. */
+typedef struct {
+  TC_random_source source;
+  size_t attempts;
+} tc_rsa_random;
+
 /* Restrict a random base to the candidate's significant bit width. The
  * candidate may have leading zero bytes within the arithmetic width. */
 static inline void tc_rsa_mask_candidate_width(uint8_t* sampled, const uint8_t* candidate,
@@ -28,11 +35,14 @@ static inline void tc_rsa_mask_candidate_width(uint8_t* sampled, const uint8_t* 
  * masked to the candidate's bit width, and the base is accepted only when
  * 1 < base < p - 1 (FIPS 186-5 B.3.1). last and temporary are n-limb scratch;
  * bytes may alias temporary. */
-static inline int tc_rsa_witness_sample(tc_mp_word* base, uint8_t* bytes, const uint8_t* candidate,
-                                        size_t candidate_length, size_t length,
-                                        const tc_mp_word* p, tc_mp_word* last,
-                                        tc_mp_word* temporary, size_t n)
+static inline int tc_rsa_witness_sample(tc_mp_word* base, uint8_t* bytes, TC_bytes candidate_bytes,
+                                        size_t length, const tc_mp_word* p, size_t n,
+                                        tc_mp_word* scratch)
 {
+  const uint8_t* const candidate = candidate_bytes.data;
+  const size_t candidate_length = candidate_bytes.length;
+  tc_mp_word* const last = scratch;
+  tc_mp_word* const temporary = scratch + n;
   tc_rsa_mask_candidate_width(bytes, candidate, candidate_length, length);
   tc_mp_from_be(base, bytes, length);
   memcpy(last, p, length);
@@ -51,11 +61,17 @@ static inline int tc_rsa_witness_sample(tc_mp_word* base, uint8_t* bytes, const 
  * Inputs, scratch (12n+2 limbs), work and RNG state are disjoint.
  * Work counts limb scans, modular operations and RNG requests. The exact prime
  * three returns OK without consuming randomness, work or scratch. */
-static inline TC_RSA_result
-tc_rsa_probable_prime_magnitude(TC_bytes candidate, size_t length, size_t rounds,
-                                TC_random_fn random, void* random_context, size_t max_attempts,
-                                tc_mp_word* scratch, size_t scratch_words, uint32_t* work)
+static inline TC_RSA_result tc_rsa_probable_prime_magnitude(TC_bytes candidate, size_t length,
+                                                            size_t rounds, const tc_rsa_random* rng,
+                                                            tc_mp_scratch area, uint32_t* work)
 {
+  if (!rng)
+    return TC_RSA_ARGUMENT;
+  const TC_random_fn random = rng->source.fill;
+  void* const random_context = rng->source.context;
+  const size_t max_attempts = rng->attempts;
+  tc_mp_word* const scratch = area.words;
+  const size_t scratch_words = area.capacity;
   if (!candidate.data || !random || !scratch || !work || !rounds)
     return TC_RSA_ARGUMENT;
   if (!length || length > TC_RSA_MAX_MODULUS_BYTES || length % sizeof(tc_mp_word) || !candidate.length ||
@@ -89,8 +105,7 @@ tc_rsa_probable_prime_magnitude(TC_bytes candidate, size_t length, size_t rounds
       status = TC_RSA_ERROR;
       break;
     }
-    if (!tc_rsa_witness_sample(base, (uint8_t*)temporary, candidate.data, candidate.length,
-                               length, p, last, temporary, n))
+    if (!tc_rsa_witness_sample(base, (uint8_t*)temporary, candidate, length, p, n, last))
       continue;
     *work -= round_work;
     if (!tc_mp_miller_rabin_round(p, base, n, twos, arena)) {

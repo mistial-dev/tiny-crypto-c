@@ -72,11 +72,15 @@ static inline int tc_rsa_supported_bits(size_t bits)
   return bits % 8 == 0 && tc_rsa_supported_modulus_size(bits / 8);
 }
 
-static inline TC_RSA_result tc_rsa_public_key_check(const uint8_t* modulus, size_t length,
-                                                    const uint8_t* exponent, size_t exponent_length)
+/* Structural public-key checks: a supported modulus size with the top and
+ * bottom bits set, and an odd minimal exponent 3 <= e < n. */
+static inline TC_RSA_result tc_rsa_public_key_check(const TC_RSA_public_key* key)
 {
-  if (!modulus || !exponent)
+  if (!key || !key->modulus.data || !key->exponent.data)
     return TC_RSA_ARGUMENT;
+  const uint8_t* modulus = key->modulus.data;
+  const uint8_t* exponent = key->exponent.data;
+  const size_t length = key->modulus.length, exponent_length = key->exponent.length;
   /* A size outside the supported set is well formed but not implemented. */
   if (!tc_rsa_supported_modulus_size(length))
     return TC_RSA_UNSUPPORTED;
@@ -96,25 +100,28 @@ static inline TC_RSA_result tc_rsa_public_key_check(const uint8_t* modulus, size
  * is computed here; each has a size-bounded loop. Prepared R² belongs to the
  * same unchanged modulus and stays outside scratch.
  * Output changes only on OK. Validation covers encodings and numeric bounds. */
-static inline TC_RSA_result tc_rsa_public_operation(const uint8_t* modulus, size_t length,
-                                                    const uint8_t* exponent, size_t exponent_length,
+static inline TC_RSA_result tc_rsa_public_operation(const TC_RSA_public_key* key,
                                                     const uint8_t* input, uint8_t* out,
-                                                    tc_mp_word* scratch, size_t scratch_words,
-                                                    uint32_t* work, const tc_mp_word* prepared_r2)
+                                                    tc_mp_scratch scratch_area, uint32_t* work,
+                                                    const tc_mp_word* prepared_r2)
 {
   size_t n, required, cost;
   tc_mp_word *p, *base, *one, *result, *temporary, *reduced, *product, factor;
-  if (!modulus || !exponent || !input || !out || !scratch || !work)
+  tc_mp_word* scratch = scratch_area.words;
+  if (!input || !out || !scratch || !work)
     return TC_RSA_ARGUMENT;
-  TC_RSA_result checked = tc_rsa_public_key_check(modulus, length, exponent, exponent_length);
+  TC_RSA_result checked = tc_rsa_public_key_check(key);
   if (checked != TC_RSA_OK)
     return checked;
+  const uint8_t* modulus = key->modulus.data;
+  const TC_bytes exponent = key->exponent;
+  const size_t length = key->modulus.length;
   if (memcmp(input, modulus, length) >= 0)
     return TC_RSA_INVALID;
   n = length / sizeof(tc_mp_word);
   required = 8 * n + 2;
-  cost = (prepared_r2 ? 0 : 16 * length) + 16 * exponent_length + 4;
-  if (scratch_words < required || *work < cost)
+  cost = (prepared_r2 ? 0 : 16 * length) + 16 * exponent.length + 4;
+  if (scratch_area.capacity < required || *work < cost)
     return TC_RSA_LIMIT;
   *work -= cost;
   p = scratch;
@@ -136,7 +143,7 @@ static inline TC_RSA_result tc_rsa_public_operation(const uint8_t* modulus, size
   const tc_mp_modulus field = {p, n, factor, product, reduced};
   tc_mp_montgomery(one, one, prepared_r2, &field);
   tc_mp_montgomery(base, base, prepared_r2, &field);
-  tc_mp_power_public(result, base, (TC_bytes){exponent, exponent_length}, one, &field);
+  tc_mp_power_public(result, base, exponent, one, &field);
   memset(one, 0, length);
   one[0] = 1;
   tc_mp_montgomery(result, result, one, &field);
@@ -148,12 +155,9 @@ static inline TC_RSA_result tc_rsa_public_operation(const uint8_t* modulus, size
 /* digest is a precomputed hash. No key-size acceptance policy
  * is implied. Scratch needs 9n+2 limbs, including the recovered representative.
  * Other storage preconditions match tc_rsa_public_operation. */
-static inline TC_RSA_result tc_rsa_verify_v15(const uint8_t* modulus, size_t length,
-                                              const uint8_t* exponent, size_t exponent_length,
-                                              const uint8_t* signature, size_t signature_length,
-                                              TC_hash_algorithm hash, const uint8_t* digest,
-                                              size_t digest_length, tc_mp_word* scratch,
-                                              size_t scratch_words, uint32_t* work,
+static inline TC_RSA_result tc_rsa_verify_v15(const TC_RSA_public_key* key, TC_hash_algorithm hash,
+                                              TC_bytes digest, TC_bytes signature,
+                                              tc_mp_scratch scratch, uint32_t* work,
                                               const tc_mp_word* prepared_r2)
 {
   size_t n, arithmetic_words;
@@ -161,29 +165,32 @@ static inline TC_RSA_result tc_rsa_verify_v15(const uint8_t* modulus, size_t len
   TC_RSA_result result;
   TC_status checked;
   tc_hash_info info;
-  if (!modulus || !exponent || !signature || !digest || !scratch || !work)
+  if (!key || !key->modulus.data || !key->exponent.data || !signature.data || !digest.data ||
+      !scratch.words || !work)
     return TC_RSA_ARGUMENT;
+  const size_t length = key->modulus.length, digest_length = digest.length;
   if (!tc_hash_info_get(hash, &info))
     return TC_RSA_UNSUPPORTED;
   if (digest_length != info.digest_length)
     return TC_RSA_ARGUMENT;
   if (!tc_rsa_supported_modulus_size(length))
     return TC_RSA_UNSUPPORTED;
-  if (signature_length != length ||
+  if (signature.length != length ||
       !tc_rsa_v15_size(length, info.digest_info.length, digest_length))
     return TC_RSA_INVALID;
   n = length / sizeof(tc_mp_word);
   arithmetic_words = 8 * n + 2;
-  if (scratch_words < arithmetic_words + n || *work < length)
+  if (scratch.capacity < arithmetic_words + n || *work < length)
     return TC_RSA_LIMIT;
   *work -= length;
-  encoded = (uint8_t*)(scratch + arithmetic_words);
-  result = tc_rsa_public_operation(modulus, length, exponent, exponent_length, signature, encoded,
-                                   scratch, arithmetic_words, work, prepared_r2);
+  encoded = (uint8_t*)(scratch.words + arithmetic_words);
+  result =
+      tc_rsa_public_operation(key, signature.data, encoded,
+                              (tc_mp_scratch){scratch.words, arithmetic_words}, work, prepared_r2);
   if (result != TC_RSA_OK)
     return result;
   checked = tc_rsa_v15_check(encoded, length, info.digest_info.data, info.digest_info.length,
-                             digest, digest_length);
+                             digest.data, digest_length);
   TC_secure_zero(encoded, length);
   return checked == TC_OK ? TC_RSA_OK : TC_RSA_INVALID;
 }
