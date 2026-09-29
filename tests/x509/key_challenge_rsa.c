@@ -154,10 +154,38 @@ static MunitResult exact_work(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+/* Output or work storage inside the workspace returns ARGUMENT before RNG
+ * use and leaves the workspace unchanged. */
+static MunitResult overlapping_storage(const MunitParameter params[], void* user)
+{
+  (void)params;
+  (void)user;
+  const TC_key_challenge_options v15 = v15_options();
+  const TC_X509_public_key key = rsa_key(2048, 256);
+  guarded_workspace guarded, saved;
+  memset(&guarded, 0xa5, sizeof guarded);
+  saved = guarded;
+  TC_bytes* inner_out = (TC_bytes*)(void*)guarded.workspace.challenge;
+  TC_work_budget* inner_work = (TC_work_budget*)(void*)(guarded.workspace.challenge + 64);
+  TC_work_budget work = {100000};
+  TC_bytes out = {NULL, 7};
+  munit_assert_int(TC_key_challenge_prepare(&key, &v15, (TC_random_source){fixed_random, NULL},
+                                            &guarded.workspace, &work, inner_out),
+                   ==, TC_KEY_CHALLENGE_ARGUMENT);
+  munit_assert_int(TC_key_challenge_prepare(&key, &v15, (TC_random_source){fixed_random, NULL},
+                                            &guarded.workspace, inner_work, &out),
+                   ==, TC_KEY_CHALLENGE_ARGUMENT);
+  munit_assert_memory_equal(sizeof guarded, &guarded, &saved);
+  munit_assert_uint32(work.remaining, ==, 100000);
+  munit_assert_ptr_null(out.data);
+  return MUNIT_OK;
+}
+
 static MunitTest tests[] = {
     {"/largest-modulus", largest_modulus, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/unsupported-shapes", unsupported_shapes, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/exact-work", exact_work, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/overlapping-storage", overlapping_storage, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
 static const MunitSuite suite = {"/key-challenge-rsa", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};
 int main(int argc, char* argv[])

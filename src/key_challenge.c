@@ -51,6 +51,10 @@ static TC_key_challenge_result challenge_parameters(const TC_X509_public_key* ke
 #endif
   }
   if (key->type == TC_KEY_EC && signature->scheme == TC_SIGNATURE_ECDSA) {
+    /* The provider decides at verify whether it implements an identified
+     * curve. An unidentified curve has no provider that can verify it. */
+    if (key->curve == TC_EC_UNKNOWN)
+      return TC_KEY_CHALLENGE_UNSUPPORTED;
     *challenge_length = *digest_length;
     return TC_KEY_CHALLENGE_OK;
   }
@@ -104,7 +108,7 @@ TC_key_challenge_result TC_key_challenge_prepare(const TC_X509_public_key* key,
   TC_bytes challenge;
   if (!key || !options || !random.fill || !workspace || !work || !out ||
       !prepare_storage_valid(key, options, random, workspace, work, out))
-    return TC_KEY_CHALLENGE_ERROR;
+    return TC_KEY_CHALLENGE_ARGUMENT;
   TC_key_challenge_result result =
       challenge_parameters(key, options, &digest_length, &challenge_length, &encoding_work);
   if (result != TC_KEY_CHALLENGE_OK)
@@ -147,6 +151,7 @@ TC_key_challenge_result TC_key_challenge_prepare(const TC_X509_public_key* key,
       TC_key_challenge_clear(workspace);
       return encoded == TC_RSA_LIMIT         ? TC_KEY_CHALLENGE_LIMIT
              : encoded == TC_RSA_UNSUPPORTED ? TC_KEY_CHALLENGE_UNSUPPORTED
+             : encoded == TC_RSA_ARGUMENT    ? TC_KEY_CHALLENGE_ARGUMENT
                                              : TC_KEY_CHALLENGE_ERROR;
     }
     challenge = (TC_bytes){workspace->challenge, challenge_length};
@@ -168,10 +173,8 @@ TC_key_challenge_result TC_key_challenge_verify(const TC_X509_public_key* key, T
                                                 TC_key_challenge_workspace* workspace,
                                                 TC_work_budget* work)
 {
-  TC_key_challenge_result result = TC_KEY_CHALLENGE_ERROR;
-  if (!workspace)
-    return result;
-  if (workspace->state != KEY_CHALLENGE_ACTIVE)
+  TC_key_challenge_result result = TC_KEY_CHALLENGE_ARGUMENT;
+  if (!workspace || workspace->state != KEY_CHALLENGE_ACTIVE)
     return result;
   if (!key || !provider || !work || !signature.data || !signature.length ||
       !tc_internal_ranges_disjoint(workspace, sizeof *workspace, key, sizeof *key) ||
@@ -185,6 +188,7 @@ TC_key_challenge_result TC_key_challenge_verify(const TC_X509_public_key* key, T
       TC_X509_signature_verify_digest((TC_bytes){workspace->digest, workspace->digest_length},
                                       &workspace->signature, signature, key, provider, &left);
   tc_pki_work_settle(work, lent, left);
+  result = TC_KEY_CHALLENGE_ERROR;
   switch (verified) {
   case TC_X509_SIGNATURE_VALID:
     result = TC_KEY_CHALLENGE_OK;

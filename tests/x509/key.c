@@ -106,6 +106,133 @@ static MunitResult key_challenge(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+static TC_status counting_random(void* context, uint8_t* output, size_t length)
+{
+  ++*(size_t*)context;
+  memset(output, 0x5a, length);
+  return TC_OK;
+}
+
+static TC_X509_public_key challenge_ec_key(TC_EC_curve curve, const uint8_t* oid,
+                                           const uint8_t* point)
+{
+  TC_X509_public_key key = {0};
+  key.type = TC_KEY_EC;
+  key.curve = curve;
+  key.bits = curve == TC_EC_UNKNOWN ? 0 : 256;
+  key.algorithm.oid = (TC_bytes){oid, 1};
+  key.key = (TC_bytes){point, 1};
+  return key;
+}
+
+/* A curve the X.509 decoder did not identify fails before RNG use and leaves
+ * workspace, output and work unchanged. */
+static MunitResult key_challenge_unknown_curve(const MunitParameter params[], void* user)
+{
+  const uint8_t oid = 1, point = 4;
+  const TC_X509_public_key key = challenge_ec_key(TC_EC_UNKNOWN, &oid, &point);
+  const TC_key_challenge_options options = {
+      {TC_SIGNATURE_ECDSA, TC_HASH_SHA256, TC_HASH_UNKNOWN, 0}};
+  TC_key_challenge_workspace workspace, saved;
+  TC_bytes challenge = {(const uint8_t*)1, 7};
+  const TC_bytes unchanged = challenge;
+  TC_work_budget work = {1000};
+  size_t calls = 0;
+  (void)params;
+  (void)user;
+  memset(&workspace, 0xa5, sizeof workspace);
+  saved = workspace;
+  munit_assert_int(TC_key_challenge_prepare(&key, &options,
+                                            (TC_random_source){counting_random, &calls}, &workspace,
+                                            &work, &challenge),
+                   ==, TC_KEY_CHALLENGE_UNSUPPORTED);
+  munit_assert_size(calls, ==, 0);
+  munit_assert_uint(work.remaining, ==, 1000);
+  munit_assert_memory_equal(sizeof workspace, &workspace, &saved);
+  munit_assert_memory_equal(sizeof challenge, &challenge, &unchanged);
+  return MUNIT_OK;
+}
+
+/* Missing pointers and overlapping storage are caller errors. They return
+ * ARGUMENT before RNG use and leave every output unchanged. */
+static MunitResult key_challenge_argument(const MunitParameter params[], void* user)
+{
+  const uint8_t oid = 1, point = 4, proof = 1;
+  const TC_X509_public_key key = challenge_ec_key(TC_EC_P256, &oid, &point);
+  const TC_key_challenge_options options = {
+      {TC_SIGNATURE_ECDSA, TC_HASH_SHA256, TC_HASH_UNKNOWN, 0}};
+  TC_key_challenge_workspace workspace, saved;
+  TC_bytes challenge = {(const uint8_t*)1, 7};
+  const TC_bytes unchanged = challenge;
+  TC_work_budget work = {1000};
+  size_t calls = 0;
+  const TC_random_source random = {counting_random, &calls};
+  (void)params;
+  (void)user;
+  memset(&workspace, 0xa5, sizeof workspace);
+  saved = workspace;
+  munit_assert_int(TC_key_challenge_prepare(NULL, &options, random, &workspace, &work, &challenge),
+                   ==, TC_KEY_CHALLENGE_ARGUMENT);
+  munit_assert_int(TC_key_challenge_prepare(&key, NULL, random, &workspace, &work, &challenge), ==,
+                   TC_KEY_CHALLENGE_ARGUMENT);
+  munit_assert_int(TC_key_challenge_prepare(&key, &options, (TC_random_source){NULL, &calls},
+                                            &workspace, &work, &challenge),
+                   ==, TC_KEY_CHALLENGE_ARGUMENT);
+  munit_assert_int(TC_key_challenge_prepare(&key, &options, random, &workspace, NULL, &challenge),
+                   ==, TC_KEY_CHALLENGE_ARGUMENT);
+  munit_assert_int(TC_key_challenge_prepare(&key, &options, random, &workspace, &work, NULL), ==,
+                   TC_KEY_CHALLENGE_ARGUMENT);
+  /* The random context shares the workspace. */
+  munit_assert_int(TC_key_challenge_prepare(&key, &options,
+                                            (TC_random_source){counting_random, workspace.digest},
+                                            &workspace, &work, &challenge),
+                   ==, TC_KEY_CHALLENGE_ARGUMENT);
+  munit_assert_size(calls, ==, 0);
+  munit_assert_uint(work.remaining, ==, 1000);
+  munit_assert_memory_equal(sizeof workspace, &workspace, &saved);
+  munit_assert_memory_equal(sizeof challenge, &challenge, &unchanged);
+  munit_assert_int(TC_key_challenge_prepare(&key, &options, random, NULL, &work, &challenge), ==,
+                   TC_KEY_CHALLENGE_ARGUMENT);
+  munit_assert_memory_equal(sizeof challenge, &challenge, &unchanged);
+
+  /* Verify without an active challenge is misuse and leaves the workspace
+   * unchanged. */
+  TC_X509_signature_result proof_outcome = TC_X509_SIGNATURE_VALID;
+  const TC_X509_signature_provider provider = {NULL, &proof_outcome, proof_result};
+  const TC_bytes signature = {&proof, 1};
+  const uint8_t zero[sizeof workspace] = {0};
+  munit_assert_int(TC_key_challenge_verify(&key, signature, &provider, &workspace, &work), ==,
+                   TC_KEY_CHALLENGE_ARGUMENT);
+  munit_assert_memory_equal(sizeof workspace, &workspace, &saved);
+  munit_assert_int(TC_key_challenge_verify(&key, signature, &provider, NULL, &work), ==,
+                   TC_KEY_CHALLENGE_ARGUMENT);
+  munit_assert_uint(work.remaining, ==, 1000);
+
+  /* An argument error on an active challenge ends it without charging work. */
+  for (int misuse = 0; misuse < 6; ++misuse) {
+    munit_assert_int(
+        TC_key_challenge_prepare(&key, &options, random, &workspace, &work, &challenge), ==,
+        TC_KEY_CHALLENGE_OK);
+    work.remaining = 1000;
+    const TC_X509_public_key* used_key = misuse == 0 ? NULL : &key;
+    const TC_X509_signature_provider* used_provider = misuse == 1 ? NULL : &provider;
+    TC_work_budget* used_work = misuse == 2 ? NULL : &work;
+    TC_bytes used_signature = signature;
+    if (misuse == 3)
+      used_signature = (TC_bytes){NULL, 1};
+    else if (misuse == 4)
+      used_signature = (TC_bytes){&proof, 0};
+    else if (misuse == 5)
+      used_signature = (TC_bytes){workspace.challenge, 1};
+    munit_assert_int(
+        TC_key_challenge_verify(used_key, used_signature, used_provider, &workspace, used_work), ==,
+        TC_KEY_CHALLENGE_ARGUMENT);
+    munit_assert_memory_equal(sizeof workspace, &workspace, zero);
+    munit_assert_uint(work.remaining, ==, 1000);
+  }
+  return MUNIT_OK;
+}
+
 static MunitResult test_key_encodings(const MunitParameter params[], void* user)
 {
   (void)params;
@@ -320,6 +447,9 @@ static MunitResult signature_oid_classification(const MunitParameter params[], v
 
 static MunitTest tests[] = {
     {"/key-challenge", key_challenge, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/key-challenge-unknown-curve", key_challenge_unknown_curve, NULL, NULL,
+     MUNIT_TEST_OPTION_NONE, NULL},
+    {"/key-challenge-argument", key_challenge_argument, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/rsa-algorithm", rsa_algorithm, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/signature-restrictions", signature_restrictions, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/signature-oid-classification", signature_oid_classification, NULL, NULL,

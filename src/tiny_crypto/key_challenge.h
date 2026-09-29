@@ -8,11 +8,17 @@
 extern "C" {
 #endif
 
+/* Results follow the TC_RSA_result and TC_EC_result order. INVALID is a bad
+ * proof. LIMIT is exhausted work. ARGUMENT is a NULL pointer, overlapping
+ * storage or verify without an active challenge. UNSUPPORTED is a key, scheme
+ * or size outside the supported set. ERROR is a random-source or provider
+ * failure. */
 typedef enum {
   TC_KEY_CHALLENGE_OK,
   TC_KEY_CHALLENGE_INVALID,
-  TC_KEY_CHALLENGE_UNSUPPORTED,
   TC_KEY_CHALLENGE_LIMIT,
+  TC_KEY_CHALLENGE_ARGUMENT,
+  TC_KEY_CHALLENGE_UNSUPPORTED,
   TC_KEY_CHALLENGE_ERROR
 } TC_key_challenge_result;
 
@@ -50,14 +56,18 @@ typedef struct {
  *
  * Supported keys are RSA moduli accepted by TC_RSA_modulus_supported, with
  * PKCS #1 v1.5 or PSS and a salt of at most TC_KEY_CHALLENGE_MAX_SALT_BYTES,
- * and ECDSA keys. Other keys, schemes and sizes return UNSUPPORTED.
+ * and ECDSA keys on a named curve identified by the X.509 key decoder. Other
+ * keys, schemes and sizes return UNSUPPORTED before any RNG use. This includes
+ * an ECDSA key with curve TC_EC_UNKNOWN. The signature provider decides at
+ * verify whether it implements an identified curve.
  *
  * Work is the digest length, plus the salt length for PSS, plus
  * TC_RSA_encode_v15_work or TC_RSA_encode_pss_work for RSA. A smaller budget
  * returns LIMIT before any RNG use.
  *
- * Preflight failures preserve workspace, out and work. Failures after RNG use
- * wipe workspace. Keep all storage disjoint. */
+ * NULL pointers and overlapping storage return ARGUMENT. Preflight failures
+ * preserve workspace, out and work. A random-source failure returns ERROR.
+ * Failures after RNG use wipe workspace. Keep all storage disjoint. */
 TC_key_challenge_result TC_key_challenge_prepare(const TC_X509_public_key* key,
                                                  const TC_key_challenge_options* options,
                                                  TC_random_source random,
@@ -65,9 +75,13 @@ TC_key_challenge_result TC_key_challenge_prepare(const TC_X509_public_key* key,
                                                  TC_work_budget* work, TC_bytes* out);
 
 /* Verify the private operation's result against the retained digest. This
- * clears every initialized challenge. A bad proof returns INVALID. Exhausted
- * work returns LIMIT. Keep borrowed inputs and provider state disjoint from
- * workspace. */
+ * clears every active challenge, including on ARGUMENT. A bad proof returns
+ * INVALID. Exhausted work returns LIMIT. A provider that lacks the key's curve
+ * or scheme returns UNSUPPORTED, and a provider failure returns ERROR. A NULL
+ * workspace or one without an active challenge returns ARGUMENT and stays
+ * unchanged. NULL pointers, an empty signature and storage overlapping the
+ * workspace return ARGUMENT without charging work. Keep borrowed inputs and
+ * provider state disjoint from workspace. */
 TC_key_challenge_result TC_key_challenge_verify(const TC_X509_public_key* key, TC_bytes signature,
                                                 const TC_X509_signature_provider* provider,
                                                 TC_key_challenge_workspace* workspace,
