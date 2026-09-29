@@ -3,6 +3,7 @@
 #include <tiny_crypto/x509.h>
 #include "../../src/x509_path_internal.h"
 #include "../../src/pki_source_internal.h"
+#include "../../src/x509_crl_internal.h"
 #include <tiny_crypto/x509_store.h>
 #include "../../examples/x509_client.h"
 #include "munit.h"
@@ -1417,11 +1418,62 @@ static MunitResult paths(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+#if TC_ENABLE_X509_REVOCATION
+/* RFC 10007 section 4 amends RFC 5280 section 6.3.3 step (f): a v3 CRL
+ * issuer certificate needs keyUsage with cRLSign. v1 and v2 certificates
+ * carry no extensions and skip the check. */
+static MunitResult crl_signer_key_usage(const MunitParameter params[], void* user)
+{
+  static const struct {
+    int version;
+    const char* key_usage;
+    int authorized;
+  } cases[] = {{3, NULL, 0},
+               {3, "critical,digitalSignature", 0},
+               {3, "critical,keyCertSign", 0},
+               {3, "critical,cRLSign", 1},
+               {3, "critical,keyCertSign,cRLSign", 1},
+               {1, NULL, 1}};
+  static uint8_t der[2048];
+  TC_TLV_frame frames[16];
+  TC_bytes oids[16];
+  const TC_TLV_limits parsing = {sizeof der, sizeof der, 512, 16};
+  TC_X509_workspace parser = {frames, 16, oids, 16};
+  EVP_PKEY* key = EVP_EC_gen("prime256v1");
+  (void)params;
+  (void)user;
+  munit_assert_not_null(key);
+  for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
+    X509* certificate = make_certificate(key, "CRL signer", NULL);
+    if (cases[i].version == 1)
+      munit_assert_int(X509_set_version(certificate, 0), ==, 1);
+    if (cases[i].key_usage)
+      add_extension(certificate, NID_key_usage, cases[i].key_usage);
+    const size_t length = encode_certificate(certificate, key, EVP_sha256(), der, sizeof der);
+    TC_X509_certificate parsed;
+    munit_assert_int(TC_X509_read(der, length, &parsing, &parser, &parsed), ==, TC_TLV_OK);
+    munit_assert_uint(parsed.version, ==, (unsigned)cases[i].version);
+    size_t work = 100000;
+    int authorized = -1;
+    munit_assert_int(tc_x509_crl_signer_usage(&parsed, &parsing, &work, &authorized), ==,
+                     TC_TLV_OK);
+    munit_assert_int(authorized, ==, cases[i].authorized);
+    X509_free(certificate);
+  }
+  EVP_PKEY_free(key);
+  return MUNIT_OK;
+}
+#endif
+
 int main(int argc, char** argv)
 {
-  MunitTest tests[] = {{"/ecdsa", signatures, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-                       {"/paths", paths, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-                       {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
+  MunitTest tests[] = {
+      {"/ecdsa", signatures, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/paths", paths, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+#if TC_ENABLE_X509_REVOCATION
+      {"/crl-signer-key-usage", crl_signer_key_usage, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+#endif
+      {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
   MunitSuite suite = {"/x509/openssl", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};
   return munit_suite_main(&suite, NULL, argc, argv);
 }

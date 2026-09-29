@@ -177,7 +177,9 @@ TC_TLV_result tc_x509_crl_signer_usage(const TC_X509_certificate* signer,
   if (result != TC_TLV_OK)
     return result;
   const int present = tc_x509_summary_has(&extensions, TC_X509_SUMMARY_KEY_USAGE);
-  /* RFC 10007 requires explicit cRLSign for a version 3 CRL signer. */
+  /* RFC 10007 section 4, amending RFC 5280 section 6.3.3 step (f): a v3
+   * issuer certificate must carry keyUsage with cRLSign. v1 and v2
+   * certificates have no extensions and skip the check. */
   *authorized = (signer->version < 3 && !present) ||
                 (present && !!(extensions.key_usage & TC_KEY_USAGE_CRL_SIGN));
   return TC_TLV_OK;

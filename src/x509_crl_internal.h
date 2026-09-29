@@ -84,7 +84,8 @@ tc_x509_crl_signer_check(const TC_X509_crl* crl, const TC_X509_certificate* sign
 /* Verify the CRL signature and build its signer's path to the selected anchor
  * from the same held source snapshot as the certificate path. options contain
  * signer policy, including the signer's EKU/purpose. cRLSign is added to
- * required usage. Version 3 signers require explicit cRLSign (RFC 10007).
+ * required usage. A v3 signer certificate must carry keyUsage with cRLSign
+ * (RFC 10007 section 4). v1 and v2 signers skip the keyUsage check.
  * CRL scope/freshness and signer revocation are separate. Parsed signer metadata
  * must match its unchanged encoded bytes. All inputs, scratch, work and output
  * are disjoint. Work is shared/consumed on failure. out changes only on VALID.
