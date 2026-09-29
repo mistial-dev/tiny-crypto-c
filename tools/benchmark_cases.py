@@ -178,7 +178,7 @@ for bits in (256, 384):
     body = (arrays + "static TC_PIV_SM_workspace work; TC_PIV_SM state={0}; uint8_t host[8]={0}, output[256]; "
             "size_t written; ExamplePIVSMResult result; TC_bytes trusted={public_key,sizeof public_key}; "
             "ExamplePIVSMCommand cmd={{NULL,0},0x20,0,0x80,0}; "
-            f"CHECK(example_piv_sm_begin(&state,{suite},host,fixture_random,NULL,output,sizeof output,&written,&work)); "
+            f"CHECK(example_piv_sm_begin(&state,{suite},host,(TC_random_source){{fixture_random,NULL}},output,sizeof output,&written,&work)); "
             "if(written!=sizeof request || memcmp(output,request,written)) return 1; "
             "TC_bytes response_bytes={response,sizeof response}, reply_bytes={reply,sizeof reply}; "
             "CHECK(example_piv_sm_finish(&state,response_bytes,0x9000,trusted,&work)); "

@@ -6,6 +6,8 @@
  * structure, nonces, work limits and CRL fallback in the composed path check.
  * OCSP_basic_sign stamps producedAt with the wall clock, so every time is
  * relative to the clock read by hierarchy_init. */
+/* gmtime_r is POSIX. glibc declares it only on request under -std=c99. */
+#define _POSIX_C_SOURCE 200809L
 #include "ocsp_fixture.h"
 #include "test_util.h"
 #include "openssl_fixture.h"
