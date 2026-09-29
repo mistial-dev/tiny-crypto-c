@@ -15,6 +15,8 @@
  * scratch space its operations need, so calls use little stack.
  *
  * Configuration: TC_ENABLE_DRBG and TC_DRBG_ENABLE_HASH, _HMAC and _CTR.
+ * Work: every function charges no work budget. Entropy requests are bounded
+ * by TC_DRBG_MAX_ENTROPY_BYTES per instantiate or reseed.
  * Contracts: docs/api.md. Guide: docs/drbg.md. */
 #ifndef TINY_CRYPTO_DRBG_H_
 #define TINY_CRYPTO_DRBG_H_
@@ -72,10 +74,12 @@ typedef enum {
   TC_DRBG_CTR = 3   /* CTR_DRBG with AES, section 10.2.1 */
 } TC_DRBG_mechanism;
 
+/* A DRBG that returned TC_DRBG_ERROR stays unusable. Later reseed and
+ * generate calls return TC_DRBG_ARGUMENT until it is instantiated again. */
 typedef enum {
   TC_DRBG_OK,
-  TC_DRBG_ARGUMENT,    /* invalid argument, state or configuration */
-  TC_DRBG_UNSUPPORTED, /* mechanism, hash or key size absent from this build */
+  TC_DRBG_ARGUMENT,    /* invalid argument, overlap, state or configuration */
+  TC_DRBG_UNSUPPORTED, /* mechanism or hash absent from this build */
   TC_DRBG_LIMIT,       /* request larger than TC_DRBG_MAX_REQUEST_BYTES */
   TC_DRBG_ENTROPY,     /* the entropy source failed and the state is unchanged */
   TC_DRBG_ERROR        /* a primitive failed, so uninstantiate the DRBG */
@@ -144,24 +148,47 @@ typedef struct {
 
 /* Instantiate (SP 800-90A section 9.1). entropy supplies entropy_bytes per
  * call, plus the nonce when nonce is empty. A nonce, when given, has at
- * least strength/16 bytes. CTR_DRBG without a derivation function takes no
- * nonce, and its personalization string is at most the seed length.
- * drbg may hold a previous instantiation, which is replaced. On failure the
- * whole context is wiped and left uninstantiated. The nonce and
- * personalization must stay clear of drbg. */
+ * least strength/16 bytes (section 8.6.7). CTR_DRBG without a derivation
+ * function takes no nonce, and its personalization string is at most the
+ * seed length. drbg keeps a copy of entropy, whose context must outlive the
+ * instantiation. config, nonce and personalization are read only during
+ * the call and must be disjoint from drbg.
+ * Returns TC_DRBG_OK. TC_DRBG_ARGUMENT reports a NULL argument or fill
+ * callback, an invalid span, an overlap, an input above the limits, a
+ * config flag other than 0 or 1, a reseed_interval above 2^48, an unknown
+ * mechanism, hash or AES key size, an entropy_bytes outside the mechanism
+ * rules, or a nonce that is present when unused or too short.
+ * TC_DRBG_UNSUPPORTED reports a mechanism or hash compiled out.
+ * TC_DRBG_ENTROPY and TC_DRBG_ERROR report a failed source or primitive.
+ * drbg may hold a previous instantiation, which is replaced. A NULL drbg is
+ * left alone. On every other failure the whole context is wiped and left
+ * uninstantiated, including on argument errors. */
 TC_DRBG_result TC_DRBG_instantiate(TC_DRBG* drbg, const TC_DRBG_config* config,
                                    TC_random_source entropy, TC_bytes nonce,
                                    TC_bytes personalization);
 
-/* Reseed with fresh entropy and optional additional input (section 9.2).
- * TC_DRBG_ENTROPY leaves the state unchanged. */
+/* Reseed with entropy_bytes of fresh entropy and optional additional input
+ * (section 9.2). additional is read only during the call and must be
+ * disjoint from drbg. Returns TC_DRBG_OK, TC_DRBG_ARGUMENT with the state
+ * unchanged for an uninstantiated or failed drbg, an invalid span, an
+ * overlap or an input above the limits, TC_DRBG_ENTROPY with the state
+ * unchanged, or TC_DRBG_ERROR. */
 TC_DRBG_result TC_DRBG_reseed(TC_DRBG* drbg, TC_bytes additional);
 
-/* Write length bytes of output (section 9.3). A prediction-resistant request
- * reseeds first and needs a DRBG instantiated with prediction_resistance.
- * When the reseed interval is exhausted, the DRBG reseeds itself from its
- * entropy source. Output, additional input and drbg must be disjoint. On
- * any failure the output is wiped. */
+/* Write length bytes of output (section 9.3). length is at most
+ * TC_DRBG_MAX_REQUEST_BYTES, and output may be NULL only when length is 0.
+ * A prediction-resistant request reseeds first and needs a DRBG
+ * instantiated with prediction_resistance. When the reseed interval is
+ * exhausted, the DRBG reseeds itself from its entropy source. A reseed
+ * consumes the additional input. Output, additional input and drbg must be
+ * pairwise disjoint.
+ * Returns TC_DRBG_OK, TC_DRBG_LIMIT for a longer request, TC_DRBG_ARGUMENT
+ * for a NULL output with a nonzero length, an uninstantiated or failed
+ * drbg, an invalid span, an overlap, an input above the limits or an
+ * unavailable prediction-resistant request, TC_DRBG_ENTROPY for a failed
+ * reseed with the state unchanged, or TC_DRBG_ERROR. LIMIT and ARGUMENT
+ * leave the state unchanged. Every failure wipes the output, except that
+ * output overlapping drbg or the additional input stays untouched. */
 TC_DRBG_result TC_DRBG_generate(TC_DRBG* drbg, uint8_t* output, size_t length,
                                 int prediction_resistance, TC_bytes additional);
 
@@ -169,12 +196,16 @@ TC_DRBG_result TC_DRBG_generate(TC_DRBG* drbg, uint8_t* output, size_t length,
 void TC_DRBG_uninstantiate(TC_DRBG* drbg);
 
 /* TC_random_fn over an instantiated DRBG passed as user. Requests of any
- * length are split into TC_DRBG_MAX_REQUEST_BYTES calls. Returns TC_OK only
- * when every byte was generated. */
+ * length are split into TC_DRBG_MAX_REQUEST_BYTES generate calls without
+ * additional input. Returns TC_OK when every byte was generated. Output
+ * that overlaps the DRBG returns TC_ERROR before any generate call, with
+ * output and state unchanged. When any generate call fails, it returns
+ * TC_ERROR and wipes all length bytes of a non-NULL output. */
 TC_status TC_DRBG_random(void* user, uint8_t* output, size_t length);
 
-/* A TC_random_source for RSA key generation, EC, key challenges and PIV
- * secure messaging. The DRBG must outlive the source. */
+/* A TC_random_source over TC_DRBG_random for RSA key generation, EC, key
+ * challenges and PIV secure messaging. The source borrows drbg, which must
+ * outlive it. Calls sharing the source need application serialization. */
 TC_random_source TC_DRBG_random_source(TC_DRBG* drbg);
 
 #ifdef __cplusplus

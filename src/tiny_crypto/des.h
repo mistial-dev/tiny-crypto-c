@@ -16,6 +16,10 @@
  * TC_DES_REJECT_WEAK_KEYS and TC_MIN_TAG_LEN.
  * Limitations: DES has a 56-bit key and its table lookups have no
  * cache-timing protection. Use it for legacy interoperability.
+ * After 2023, SP 800-131A Rev. 2 section 2 allows TDEA only for legacy
+ * decryption.
+ * Work: every function charges no work budget. The functions return
+ * TC_status (TC_OK, TC_MISMATCH or TC_ERROR).
  * Contracts: docs/api.md, including its block-mode and DES sections. */
 
 /*
@@ -59,7 +63,8 @@ typedef struct TC_DES_key_bundle {
  *
  * TC_DES_init selects the cipher from the key length: 8 bytes for single
  * DES, or 16 and 24 bytes for two- and three-key TDEA when TC_DES_ENABLE_TDES
- * is set. TDEA encrypts as E(K1), D(K2), E(K3). The context is caller-owned.
+ * is set. TDEA encrypts as E(K1), D(K2), E(K3) (SP 800-67 Rev. 2 section
+ * 3). A two-key bundle uses K3 = K1. The context is caller-owned.
  * Fields are private. Clear it with TC_DES_ctx_clear when its lifetime ends.
  */
 struct TC_DES_ctx {
@@ -73,13 +78,13 @@ struct TC_DES_ctx {
 #if TC_DES_ENABLE_CTR
   uint8_t ctr_stream[TC_DES_BLOCKLEN];
   uint8_t ctr_pos;
-  uint8_t ctr_exhausted; /* The counter wrapped; set a new IV to continue. */
+  uint8_t ctr_exhausted; /* The counter wrapped. Set a new IV to continue. */
 #endif
 #if TC_DES_ENABLE_OFB
   uint8_t ofb_pos;
 #endif
 #if TC_DES_ENABLE_CFB64
-  uint8_t cfb64_finished; /* A short segment ended the message; set a new IV. */
+  uint8_t cfb64_finished; /* A short segment ended the message. Set a new IV. */
 #endif
 };
 
@@ -97,7 +102,9 @@ void TC_DES_ctx_clear(struct TC_DES_ctx* ctx);
  * a NULL buffer with a nonzero length, or a buffer that overlaps the context,
  * and leave the context and buffer unchanged. Otherwise a NULL buffer with
  * length 0 returns TC_OK.
- * Every mode transforms buf in place. The DES cipher itself cannot fail.
+ * Every mode transforms buf in place. The DES cipher itself cannot fail, so
+ * a call that passes these checks returns TC_OK unless its own description
+ * names another failure.
  */
 
 /**
@@ -110,8 +117,10 @@ void TC_DES_ctx_clear(struct TC_DES_ctx* ctx);
  * @param key Key bytes. They must not overlap ctx.
  * @param keylen TC_DES_KEYLEN, or TC_DES_KEYLEN_2KEY or TC_DES_KEYLEN_3KEY
  *        when TC_DES_ENABLE_TDES is set.
- * @return TC_OK, or TC_ERROR. A NULL ctx is left alone. Every other failure
- *         wipes ctx, so a previous key is unusable after a failed re-init.
+ * @return TC_OK, or TC_ERROR for a NULL argument, another key length, a key
+ *         that overlaps ctx, or a key refused under TC_DES_REJECT_WEAK_KEYS.
+ *         A NULL ctx is left alone. Every other failure wipes ctx, so a
+ *         previous key is unusable after a failed re-init.
  * @note Key parity is ignored. With TC_DES_REJECT_WEAK_KEYS=1 (default 0 for
  *       legacy vectors) weak and semi-weak component keys and TDEA bundles
  *       with K1 = K2 or K2 = K3 are rejected, because those collapse to single
@@ -130,8 +139,13 @@ TC_status TC_DES_init(struct TC_DES_ctx* ctx, const uint8_t* key, size_t keylen)
  * keystream, so a message may span several calls. The IV stays loaded until
  * the next init or clear.
  *
+ * SP 800-38A Appendix C requires an unpredictable CBC and CFB IV and a
+ * unique OFB IV per message, and Appendix B unique CTR counter blocks under
+ * one key.
+ *
  * @param ctx Initialized context.
- * @param iv 8-byte initialization vector. It must not overlap ctx.
+ * @param iv 8-byte initialization vector, copied into ctx. It must be
+ *        disjoint from ctx.
  * @return TC_OK, or TC_ERROR for a NULL argument, an inactive context or an
  *         IV that overlaps ctx. The context is unchanged on error.
  */
@@ -140,7 +154,8 @@ TC_status TC_DES_set_iv(struct TC_DES_ctx* ctx, const uint8_t* iv);
 
 #if TC_DES_ENABLE_ECB
 /**
- * @brief Encrypt one 8-byte block in ECB mode.
+ * @brief Encrypt one 8-byte block in ECB mode (SP 800-38A section 6.1).
+ * ECB leaks equal blocks, so use it only as a building block.
  * @param ctx Initialized context.
  * @param buf 8-byte block, encrypted in place.
  * @return TC_OK, or TC_ERROR for an argument error.
@@ -158,7 +173,8 @@ TC_status TC_DES_ECB_decrypt(const struct TC_DES_ctx* ctx, uint8_t* buf);
 
 #if TC_DES_ENABLE_CBC
 /**
- * @brief Encrypt a buffer in CBC mode. The IV carries the chaining value.
+ * @brief Encrypt a buffer in CBC mode (SP 800-38A section 6.2). The IV
+ * carries the chaining value and advances to the last ciphertext block.
  * @param ctx Initialized context.
  * @param buf Data encrypted in place.
  * @param length Data length in bytes, a multiple of 8.
@@ -168,7 +184,8 @@ TC_status TC_DES_ECB_decrypt(const struct TC_DES_ctx* ctx, uint8_t* buf);
 TC_status TC_DES_CBC_encrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
 
 /**
- * @brief Decrypt a buffer in CBC mode. The IV carries the chaining value.
+ * @brief Decrypt a buffer in CBC mode (SP 800-38A section 6.2). The IV
+ * carries the chaining value and advances to the last ciphertext block.
  * @param ctx Initialized context.
  * @param buf Data decrypted in place.
  * @param length Data length in bytes, a multiple of 8.
@@ -180,13 +197,15 @@ TC_status TC_DES_CBC_decrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length
 
 #if TC_DES_ENABLE_CTR
 /**
- * @brief Encrypt or decrypt a buffer in CTR mode.
+ * @brief Encrypt or decrypt a buffer in CTR mode (SP 800-38A section 6.5).
+ * Unused keystream bytes serve the next call.
  * @param ctx Initialized context. The IV is the big-endian counter block.
  * @param buf Data of any length, transformed in place.
  * @param length Data length in bytes.
- * @return TC_OK, or TC_ERROR if the request would need a block beyond the
- *         2^64-block space of one IV (buffer and IV left unchanged). After the
- *         counter wraps, calls fail until a new IV is set.
+ * @return TC_OK, or TC_ERROR for an argument error or a request that would
+ *         need a block beyond the 2^64-block space of one IV (buffer and
+ *         context unchanged). After the counter wraps, calls fail until a
+ *         new IV is set.
  */
 TC_status TC_DES_CTR_crypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
 #endif
@@ -224,7 +243,7 @@ TC_status TC_DES_CFB64_decrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t leng
 
 #if TC_DES_ENABLE_CFB8
 /**
- * @brief Encrypt a buffer in CFB8 mode.
+ * @brief Encrypt a buffer in CFB8 mode (SP 800-38A section 6.3, s = 8).
  * @param ctx Initialized context (IV holds the feedback register).
  * @param buf Data of any length, encrypted in place.
  * @param length Data length in bytes.
@@ -233,7 +252,7 @@ TC_status TC_DES_CFB64_decrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t leng
 TC_status TC_DES_CFB8_encrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
 
 /**
- * @brief Decrypt a buffer in CFB8 mode.
+ * @brief Decrypt a buffer in CFB8 mode (SP 800-38A section 6.3, s = 8).
  * @param ctx Initialized context (IV holds the feedback register).
  * @param buf Data of any length, decrypted in place.
  * @param length Data length in bytes.
@@ -244,13 +263,14 @@ TC_status TC_DES_CFB8_decrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t lengt
 
 #if TC_DES_ENABLE_CFB1
 /**
- * @brief Encrypt bits in CFB1 mode.
+ * @brief Encrypt bits in CFB1 mode (SP 800-38A section 6.3, s = 1).
  *
  * Bits are packed MSB-first: bit i of the stream is (buf[i/8] >> (7 - i%8)) & 1.
  * Trailing pad bits of the final byte are left unchanged.
  *
  * @param ctx Initialized context (IV holds the feedback register).
- * @param buf Packed bit buffer of at least ceil(bit_length / 8) bytes.
+ * @param buf Packed bit buffer of at least ceil(bit_length / 8) bytes, all
+ *        disjoint from ctx.
  * @param bit_length Data length in bits.
  * @return TC_OK, or TC_ERROR for an argument error.
  */
@@ -268,11 +288,13 @@ TC_status TC_DES_CFB1_decrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t bit_l
 
 #if TC_DES_ENABLE_OFB
 /**
- * @brief Encrypt or decrypt a buffer in OFB mode.
+ * @brief Encrypt or decrypt a buffer in OFB mode (SP 800-38A section 6.4).
+ * Unused output-block bytes serve the next call.
  * @param ctx Initialized context (IV holds the output feedback block).
  * @param buf Data of any length, transformed in place.
  * @param length Data length in bytes.
- * @return TC_OK, or TC_ERROR for an argument error.
+ * @return TC_OK, or TC_ERROR for an argument error or a corrupted stream
+ *         position.
  */
 TC_status TC_DES_OFB_crypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
 #endif
@@ -288,18 +310,19 @@ TC_status TC_DES_OFB_crypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
  * keylen must be 8 (single DES), 16 (2-key TDEA), or 24 (3-key TDEA).
  * tag_len must be in TC_MIN_TAG_LEN..TC_DES_CMAC_TAG_MAX. Truncation keeps
  * the most significant octets of the full T (SP 800-38B section 6.2).
- * Empty message: msg may be NULL when msg_len is 0.
- * The key schedules and the full tag on the stack are wiped before return.
+ * Empty message: msg may be NULL when msg_len is 0. The tag is written
+ * last, so it may overlap key or msg. The key schedules and the full tag on
+ * the stack are wiped before return.
  * @return TC_OK, or TC_ERROR for a NULL key or tag, a bad key length, a key
  *         refused under TC_DES_REJECT_WEAK_KEYS, a NULL msg with a nonzero
- *         length or a tag length outside the range. An argument error leaves
- *         tag unchanged.
+ *         length or a tag length outside the range. Every failure leaves tag
+ *         unchanged.
  */
 TC_status TC_DES_CMAC(const uint8_t* key, size_t keylen, const uint8_t* msg, size_t msg_len,
                       uint8_t* tag, size_t tag_len);
 
-/* Constant-time verify of a (possibly truncated) tag of tag_len bytes, with
- * the same length range as TC_DES_CMAC.
+/* Recompute the CMAC and compare tag_len bytes in constant time
+ * (SP 800-38B section 6.3), with the same length range as TC_DES_CMAC.
  * @return TC_OK when the tag matches, TC_MISMATCH when it differs, or
  *         TC_ERROR as for TC_DES_CMAC. */
 TC_status TC_DES_CMAC_verify(const uint8_t* key, size_t keylen, const uint8_t* msg, size_t msg_len,
@@ -315,12 +338,13 @@ TC_status TC_DES_CMAC_verify_short_tag(const uint8_t* key, size_t keylen, const 
                                        size_t msg_len, const uint8_t* tag, size_t tag_len);
 
 /*
- * Streaming DES/3DES-CMAC. Holds its own key schedules so it works with the
- * ECB/CBC/TDES mode gates compiled out. The most recent block is held back in
- * buf so *_final can apply K1 (complete) or K2 (padded) to the true last
- * block. *_final always emits the full TC_DES_CMAC_TAG_MAX bytes. Argument
- * errors leave the context unchanged. Otherwise *_final wipes it, on success
- * and on failure. Call *_init again before reuse.
+ * Streaming DES/3DES-CMAC (SP 800-38B sections 6.1 and 6.2). Holds its own
+ * key schedules so it works with the ECB/CBC/TDES mode gates compiled out.
+ * The most recent block is held back in buf so *_final can apply K1
+ * (complete) or K2 (padded) to the true last block. *_final always emits
+ * the full TC_DES_CMAC_TAG_MAX bytes. Argument errors leave the context
+ * unchanged. Otherwise *_final wipes it, on success and on failure. Call
+ * *_init again before reuse.
  */
 struct TC_DES_CMAC_ctx {
   TC_DES_key_bundle keys;
@@ -333,9 +357,19 @@ struct TC_DES_CMAC_ctx {
   uint8_t active;
 };
 
-/* keylen must be TC_DES_KEYLEN, TC_DES_KEYLEN_2KEY (K1, K2, K1) or
- * TC_DES_KEYLEN_3KEY. The key, update data and final tag must be disjoint
- * from the context. Overlap is an argument error. */
+/* init keys ctx and derives the subkeys. keylen must be TC_DES_KEYLEN,
+ * TC_DES_KEYLEN_2KEY (K1, K2, K1) or TC_DES_KEYLEN_3KEY, and key must be
+ * disjoint from ctx. It returns TC_OK, or TC_ERROR for a NULL argument,
+ * another key length, an overlap or a key refused under
+ * TC_DES_REJECT_WEAK_KEYS. A NULL ctx is left alone, and every other failure
+ * leaves ctx wiped.
+ * update absorbs data, which may be NULL when len is 0. It returns TC_OK, or
+ * TC_ERROR with ctx unchanged for a NULL ctx, a NULL data with a nonzero len,
+ * data that overlaps ctx, or an unkeyed ctx.
+ * final writes the 8-byte tag, which must be disjoint from ctx. It returns
+ * TC_OK, or TC_ERROR with ctx unchanged for a NULL argument, an overlap or an
+ * unkeyed ctx. Otherwise final wipes ctx.
+ * ctx_clear wipes ctx and ignores NULL. */
 TC_status TC_DES_CMAC_init(struct TC_DES_CMAC_ctx* ctx, const uint8_t* key, size_t keylen);
 TC_status TC_DES_CMAC_update(struct TC_DES_CMAC_ctx* ctx, const uint8_t* data, size_t len);
 TC_status TC_DES_CMAC_final(struct TC_DES_CMAC_ctx* ctx, uint8_t tag[TC_DES_CMAC_TAG_MAX]);
@@ -354,20 +388,20 @@ void TC_DES_CMAC_ctx_clear(struct TC_DES_CMAC_ctx* ctx);
  * || K3 selects the three-key retail extension, whose final encryption uses
  * K3. That extension is outside ISO/IEC 9797-1.
  *
- * Padding 1 adds zero bytes only to a partial block. Padding 2 always adds
- * 0x80 followed by zeroes. NONE requires block alignment and a nonempty
- * message. Padding 1 on an empty message processes one zero block. The caller
- * must authenticate a fixed or separately authenticated length when using
- * NONE or padding 1.
+ * Padding 1 (clause 6.3.2) adds zero bytes only to a partial block. Padding
+ * 2 (clause 6.3.3) always adds 0x80 followed by zeroes. NONE requires block
+ * alignment and a nonempty message. Padding 1 on an empty message processes
+ * one zero block. The caller must authenticate a fixed or separately
+ * authenticated length when using NONE or padding 1.
  *
  * With TC_DES_REJECT_WEAK_KEYS=1, init rejects weak and semi-weak component
  * keys and K1 = K2 or K2 = K3. Clause 7.4 requires independent K and K'.
  *
- * The context is caller-owned and final consumes it. Input, key, and tag
- * buffers must not overlap the context. Overlap is an argument error. A
- * failed init wipes the context. A failed final leaves the tag untouched and
- * wipes the context. An update with invalid arguments leaves the context
- * unchanged. An update that fails while processing wipes it.
+ * The context is caller-owned and final consumes it. Input, key and tag
+ * buffers must be disjoint from the context. Overlap is an argument error. A
+ * failed init wipes the context. Every failed final leaves the tag
+ * untouched. An argument error in update or final leaves the context
+ * unchanged. Any other failure wipes it.
  */
 typedef enum TC_DES_ISO9797_algorithm {
   TC_DES_ISO9797_ALG1 = 1,
@@ -392,26 +426,37 @@ struct TC_DES_ISO9797_ctx {
 };
 
 /* keylen is TC_DES_KEYLEN_2KEY or TC_DES_KEYLEN_3KEY for both algorithms.
- * Returns TC_ERROR for a NULL argument, an unknown algorithm or padding, or
- * another key length. */
+ * Returns TC_OK, or TC_ERROR for a NULL argument, an unknown algorithm or
+ * padding, another key length, a key that overlaps ctx or a key refused
+ * under TC_DES_REJECT_WEAK_KEYS. A NULL ctx is left alone. */
 TC_status TC_DES_ISO9797_init(struct TC_DES_ISO9797_ctx* ctx, TC_DES_ISO9797_algorithm algorithm,
                               TC_DES_ISO9797_padding padding, const uint8_t* key, size_t keylen);
-/* msg may be NULL when msg_len is 0. */
+/* Absorb msg, which may be NULL when msg_len is 0. Returns TC_OK, or
+ * TC_ERROR with ctx unchanged for a NULL ctx, a NULL msg with a nonzero
+ * length, msg that overlaps ctx, or an inactive or corrupted ctx. */
 TC_status TC_DES_ISO9797_update(struct TC_DES_ISO9797_ctx* ctx, const uint8_t* msg, size_t msg_len);
-/* Writes the full MAC. Returns TC_ERROR for a NONE-padded message that is
- * empty or not block-aligned. */
+/* Pad, apply the output transformation and write the full 8-byte MAC.
+ * Callers truncate it to leading bytes (clause 6.8). Returns TC_OK, or
+ * TC_ERROR with ctx unchanged for a NULL argument, a tag that overlaps ctx,
+ * or an inactive or corrupted ctx. A NONE-padded message that is empty or
+ * unaligned returns TC_ERROR and wipes ctx. Every other return wipes ctx. */
 TC_status TC_DES_ISO9797_final(struct TC_DES_ISO9797_ctx* ctx, uint8_t tag[TC_DES_BLOCKLEN]);
+/* Wipe the context. NULL is ignored. */
 void TC_DES_ISO9797_ctx_clear(struct TC_DES_ISO9797_ctx* ctx);
-/* The default one-shot API requires the full 8-byte MAC. MAC leaves tag
- * untouched on error. Verify returns TC_MISMATCH for a bad tag and TC_ERROR
- * for every argument or key error. */
+/* One-shot MAC and verify over the streaming functions. The default forms
+ * require tag_len 8. The tag is written last, so it may overlap key or msg.
+ * MAC returns TC_OK, or TC_ERROR with tag untouched for a NULL tag, a NULL
+ * msg with a nonzero length, another tag length, or any init or final error.
+ * Verify compares in constant time and returns TC_OK on a match,
+ * TC_MISMATCH for a different tag and TC_ERROR for the MAC errors. */
 TC_status TC_DES_ISO9797_MAC(TC_DES_ISO9797_algorithm algorithm, TC_DES_ISO9797_padding padding,
                              const uint8_t* key, size_t keylen, const uint8_t* msg, size_t msg_len,
                              uint8_t* tag, size_t tag_len);
 TC_status TC_DES_ISO9797_verify(TC_DES_ISO9797_algorithm algorithm, TC_DES_ISO9797_padding padding,
                                 const uint8_t* key, size_t keylen, const uint8_t* msg,
                                 size_t msg_len, const uint8_t* tag, size_t tag_len);
-/* Explicit truncated-MAC API. Accepts the leading 4..7 bytes. */
+/* Explicit truncated-MAC API (clause 6.8). Accepts the leading 4..7 bytes
+ * and otherwise follows the default forms. */
 TC_status TC_DES_ISO9797_MAC_short_tag(TC_DES_ISO9797_algorithm algorithm,
                                        TC_DES_ISO9797_padding padding, const uint8_t* key,
                                        size_t keylen, const uint8_t* msg, size_t msg_len,

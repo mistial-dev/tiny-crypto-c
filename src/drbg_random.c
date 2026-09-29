@@ -6,6 +6,7 @@
 #include <tiny_crypto/drbg.h>
 
 #if TC_ENABLE_DRBG
+#include "internal.h"
 
 TC_status TC_DRBG_random(void* user, uint8_t* output, size_t length)
 {
@@ -13,6 +14,10 @@ TC_status TC_DRBG_random(void* user, uint8_t* output, size_t length)
   TC_DRBG* drbg = (TC_DRBG*)user;
   size_t offset = 0;
 
+  /* Output inside the DRBG is an argument error. Reject it before the first
+   * generate call, so no chunk runs and the generator state stays intact. */
+  if (drbg != NULL && !tc_internal_ranges_disjoint(drbg, sizeof *drbg, output, length))
+    return TC_ERROR;
   /* A zero-length request still checks that the DRBG is instantiated. */
   do {
 #if SIZE_MAX > TC_DRBG_MAX_REQUEST_BYTES

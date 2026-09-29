@@ -93,7 +93,9 @@ from a DRBG instantiated without it returns `TC_DRBG_ARGUMENT`.
 | `TC_DRBG_ENTROPY`     | The entropy source failed                         | Unchanged, and a failed instantiate leaves it wiped |
 | `TC_DRBG_ERROR`       | A hash, HMAC or AES operation failed              | Unusable until uninstantiated                       |
 
-Every failed generate call wipes its output buffer. An entropy failure during
+Every failed generate call wipes its output buffer. Output that overlaps the
+context or the additional input is an argument error, and the call leaves it
+untouched so no caller input changes. An entropy failure during
 a reseed or a prediction-resistant request leaves the generator usable, so
 the caller can retry later. Output, additional input, nonce and
 personalization must be disjoint from the context, and output must be
@@ -118,8 +120,10 @@ fields are private.
 
 `TC_DRBG_random_source(&drbg)` returns a `TC_random_source` for RSA key
 generation, EC key generation and signing, key challenges and PIV secure
-messaging. `TC_DRBG_random` splits large requests into maximum-size calls. The
-DRBG must stay instantiated while the source is in use.
+messaging. `TC_DRBG_random` splits large requests into maximum-size calls. It
+rejects output that overlaps the DRBG before the first call and wipes the whole
+output when any call fails. The DRBG must stay instantiated while the source is
+in use.
 
 ## C++
 
@@ -141,7 +145,7 @@ primitive failure. `test_drbg_example` builds and runs it.
 - `test_drbg` covers the lifecycle for each mechanism, argument and overlap
   rejection, request and input limits, entropy failures at instantiate,
   reseed and prediction-resistant generate, automatic reseeding, state
-  wiping and the random-source adapter.
+  wiping, overlap rejection without writes and the random-source adapter.
 - `test_drbg_cavp` runs 11,520 NIST CAVP DRBGVS trials from
   [tests/vectors/drbg](../tests/vectors/drbg/README.md) across the
   prediction-resistant, reseeding and no-reseed procedures. It carries the

@@ -16,10 +16,10 @@
 namespace tiny_crypto {
 
 #if TC_ENABLE_HKDF
-/* RFC 5869 HKDF. Inputs are borrowed byte spans; the input keying material
- * is the concatenation of ikm_count spans. extract writes one digest into a
- * digest-sized array. The C functions document the argument and failure
- * rules. */
+/* RFC 5869 HKDF. Inputs are borrowed byte spans, and the input keying
+ * material is the concatenation of ikm_count spans. extract writes one
+ * digest into a digest-sized array. The C functions document the argument
+ * and failure rules. */
 #define TINY_CRYPTO_HKDF_FAMILY(N)                                                                 \
   TC_CPP_NODISCARD inline TC_status hkdf_sha##N##_extract(                                         \
       bytes salt, const bytes* ikm, size_t ikm_count,                                              \

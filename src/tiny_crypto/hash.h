@@ -16,6 +16,10 @@
  * The profile in config.h selects the digests with TC_ENABLE_SHA1 through
  * TC_ENABLE_SHA512 and HMAC with TC_ENABLE_HMAC. This header declares only
  * the enabled algorithms and is empty when no SHA is enabled.
+ * Standards: FIPS 180-4 sections 5.1 (padding), 6.1 (SHA-1), 6.2 (SHA-256),
+ * 6.3 (SHA-224), 6.4 (SHA-512) and 6.5 (SHA-384). FIPS 198-1 section 4
+ * (HMAC). SP 800-107 Rev. 1 section 5.3 (truncated HMAC tags).
+ * Work: every function charges no work budget.
  * Library-wide contracts: docs/api.md. C++ classes: hash.hpp and docs/cpp.md.
  *
  * Inputs are borrowed TC_bytes spans. A span may have NULL data only when its
@@ -25,25 +29,28 @@
  *
  * Status contract for every SHA and HMAC function below:
  *
- *   init     TC_ERROR for a NULL context. HMAC init also rejects a key span
- *            with NULL data and a nonzero length, and a key that overlaps the
- *            context. A failed HMAC init leaves the context wiped and inactive.
- *   update   TC_ERROR for a NULL context, a data span with NULL data and a
- *            nonzero length, data that overlaps the context, an inactive
- *            context (never initialized, finalized or cleared), a corrupted
- *            context, or input past the message limit (2^61 - 1 bytes for
- *            SHA-1/224/256 and 2^64 - 1 bytes for SHA-384/512). A rejected
- *            update leaves the context unchanged.
- *   final    TC_ERROR for a NULL context, a NULL output, an output that
- *            overlaps the context, or an inactive or corrupted context. A
+ *   init     TC_OK, or TC_ERROR for a NULL context. HMAC init also rejects a
+ *            key span with NULL data and a nonzero length, and a key that
+ *            overlaps the context. A failed HMAC init with a non-NULL context
+ *            leaves the context wiped and inactive.
+ *   update   TC_OK, or TC_ERROR for a NULL context, a data span with NULL
+ *            data and a nonzero length, data that overlaps the context, an
+ *            inactive context (never initialized, finalized or cleared), a
+ *            corrupted context, or input past the message limit (2^61 - 1
+ *            bytes for SHA-1/224/256 and 2^64 - 1 bytes for SHA-384/512). A
+ *            rejected update leaves the context unchanged.
+ *   final    TC_OK, or TC_ERROR for a NULL context, a NULL output, an output
+ *            that overlaps the context, or an inactive or corrupted context. A
  *            rejected final leaves the context unchanged. A successful final
  *            writes the full digest or tag and wipes the context, so call init
  *            before reuse.
- *   digest   One-shot hash or HMAC. TC_ERROR for a NULL output, an invalid
- *            input span, an HMAC key error, or an HMAC tag.capacity outside
- *            TC_HMAC_MIN_TAG_LEN..digest length. The output is written last,
- *            so it may overlap the message or key. A failed call leaves the
- *            output unchanged.
+ *   digest   One-shot hash or HMAC. TC_OK, or TC_ERROR for a NULL output,
+ *            an invalid input span, a message past the limit, an HMAC key
+ *            error, or an HMAC tag.capacity outside
+ *            TC_HMAC_MIN_TAG_LEN..digest length. A truncated HMAC tag keeps
+ *            the leftmost bytes. The output is written last, so it may
+ *            overlap the message or key. A failed call leaves the output
+ *            unchanged.
  *   verify   TC_OK on a match, TC_MISMATCH on a well-formed mismatch, and
  *            TC_ERROR for the digest errors or a tag span with NULL data. The
  *            tag length follows the digest tag.capacity rule. The compare runs
@@ -257,7 +264,8 @@ extern "C" {
 #if TC_ENABLE_SHA1
 /* --- SHA-1 --- */
 
-/* Start a SHA-1 message. Also restarts a live context. */
+/* Start a SHA-1 message (FIPS 180-4 section 6.1). Also restarts a live
+ * context. */
 TC_status TC_SHA1_init(struct TC_SHA1_ctx* ctx);
 
 /* Absorb data. data.data may be NULL only when data.length is 0. The total
@@ -277,7 +285,8 @@ TC_status TC_SHA1_digest(TC_bytes data, uint8_t digest[TC_SHA1_DIGESTLEN]);
 #if TC_ENABLE_SHA224
 /* --- SHA-224 --- */
 
-/* Start a SHA-224 message. Also restarts a live context. */
+/* Start a SHA-224 message (FIPS 180-4 section 6.3). Also restarts a live
+ * context. */
 TC_status TC_SHA224_init(struct TC_SHA224_ctx* ctx);
 
 /* Absorb data. data.data may be NULL only when data.length is 0. The total
@@ -297,7 +306,8 @@ TC_status TC_SHA224_digest(TC_bytes data, uint8_t digest[TC_SHA224_DIGESTLEN]);
 #if TC_ENABLE_SHA256
 /* --- SHA-256 --- */
 
-/* Start a SHA-256 message. Also restarts a live context. */
+/* Start a SHA-256 message (FIPS 180-4 section 6.2). Also restarts a live
+ * context. */
 TC_status TC_SHA256_init(struct TC_SHA256_ctx* ctx);
 
 /* Absorb data. data.data may be NULL only when data.length is 0. The total
@@ -317,7 +327,8 @@ TC_status TC_SHA256_digest(TC_bytes data, uint8_t digest[TC_SHA256_DIGESTLEN]);
 #if TC_ENABLE_SHA384
 /* --- SHA-384 --- */
 
-/* Start a SHA-384 message. Also restarts a live context. */
+/* Start a SHA-384 message (FIPS 180-4 section 6.5). Also restarts a live
+ * context. */
 TC_status TC_SHA384_init(struct TC_SHA384_ctx* ctx);
 
 /* Absorb data. data.data may be NULL only when data.length is 0. The total
@@ -337,7 +348,8 @@ TC_status TC_SHA384_digest(TC_bytes data, uint8_t digest[TC_SHA384_DIGESTLEN]);
 #if TC_ENABLE_SHA512
 /* --- SHA-512 --- */
 
-/* Start a SHA-512 message. Also restarts a live context. */
+/* Start a SHA-512 message (FIPS 180-4 section 6.4). Also restarts a live
+ * context. */
 TC_status TC_SHA512_init(struct TC_SHA512_ctx* ctx);
 
 /* Absorb data. data.data may be NULL only when data.length is 0. The total
@@ -363,7 +375,7 @@ TC_status TC_SHA512_digest(TC_bytes data, uint8_t digest[TC_SHA512_DIGESTLEN]);
  * empty key is accepted. */
 TC_status TC_HMAC_SHA1_init(struct TC_HMAC_SHA1_ctx* ctx, TC_bytes key);
 
-/* Absorb message bytes. */
+/* Absorb message bytes under the update contract. */
 TC_status TC_HMAC_SHA1_update(struct TC_HMAC_SHA1_ctx* ctx, TC_bytes data);
 
 /* Write the full TC_SHA1_DIGESTLEN-byte tag and wipe the context. Call init
@@ -377,7 +389,9 @@ void TC_HMAC_SHA1_ctx_clear(struct TC_HMAC_SHA1_ctx* ctx);
  * TC_HMAC_MIN_TAG_LEN to TC_SHA1_DIGESTLEN. */
 TC_status TC_HMAC_SHA1_digest(TC_bytes key, TC_bytes message, TC_buffer tag);
 
-/* Recompute the tag over tag.length bytes and compare in constant time. */
+/* Recompute the tag, truncated to tag.length bytes, and compare in
+ * constant time. Returns TC_OK, TC_MISMATCH or TC_ERROR under the verify
+ * contract. */
 TC_status TC_HMAC_SHA1_verify(TC_bytes key, TC_bytes message, TC_bytes tag);
 #endif /* TC_ENABLE_SHA1 */
 
@@ -387,7 +401,7 @@ TC_status TC_HMAC_SHA1_verify(TC_bytes key, TC_bytes message, TC_bytes tag);
  * empty key is accepted. */
 TC_status TC_HMAC_SHA224_init(struct TC_HMAC_SHA224_ctx* ctx, TC_bytes key);
 
-/* Absorb message bytes. */
+/* Absorb message bytes under the update contract. */
 TC_status TC_HMAC_SHA224_update(struct TC_HMAC_SHA224_ctx* ctx, TC_bytes data);
 
 /* Write the full TC_SHA224_DIGESTLEN-byte tag and wipe the context. Call init
@@ -401,7 +415,9 @@ void TC_HMAC_SHA224_ctx_clear(struct TC_HMAC_SHA224_ctx* ctx);
  * TC_HMAC_MIN_TAG_LEN to TC_SHA224_DIGESTLEN. */
 TC_status TC_HMAC_SHA224_digest(TC_bytes key, TC_bytes message, TC_buffer tag);
 
-/* Recompute the tag over tag.length bytes and compare in constant time. */
+/* Recompute the tag, truncated to tag.length bytes, and compare in
+ * constant time. Returns TC_OK, TC_MISMATCH or TC_ERROR under the verify
+ * contract. */
 TC_status TC_HMAC_SHA224_verify(TC_bytes key, TC_bytes message, TC_bytes tag);
 #endif /* TC_ENABLE_SHA224 */
 
@@ -411,7 +427,7 @@ TC_status TC_HMAC_SHA224_verify(TC_bytes key, TC_bytes message, TC_bytes tag);
  * empty key is accepted. */
 TC_status TC_HMAC_SHA256_init(struct TC_HMAC_SHA256_ctx* ctx, TC_bytes key);
 
-/* Absorb message bytes. */
+/* Absorb message bytes under the update contract. */
 TC_status TC_HMAC_SHA256_update(struct TC_HMAC_SHA256_ctx* ctx, TC_bytes data);
 
 /* Write the full TC_SHA256_DIGESTLEN-byte tag and wipe the context. Call init
@@ -425,7 +441,9 @@ void TC_HMAC_SHA256_ctx_clear(struct TC_HMAC_SHA256_ctx* ctx);
  * TC_HMAC_MIN_TAG_LEN to TC_SHA256_DIGESTLEN. */
 TC_status TC_HMAC_SHA256_digest(TC_bytes key, TC_bytes message, TC_buffer tag);
 
-/* Recompute the tag over tag.length bytes and compare in constant time. */
+/* Recompute the tag, truncated to tag.length bytes, and compare in
+ * constant time. Returns TC_OK, TC_MISMATCH or TC_ERROR under the verify
+ * contract. */
 TC_status TC_HMAC_SHA256_verify(TC_bytes key, TC_bytes message, TC_bytes tag);
 #endif /* TC_ENABLE_SHA256 */
 
@@ -435,7 +453,7 @@ TC_status TC_HMAC_SHA256_verify(TC_bytes key, TC_bytes message, TC_bytes tag);
  * empty key is accepted. */
 TC_status TC_HMAC_SHA384_init(struct TC_HMAC_SHA384_ctx* ctx, TC_bytes key);
 
-/* Absorb message bytes. */
+/* Absorb message bytes under the update contract. */
 TC_status TC_HMAC_SHA384_update(struct TC_HMAC_SHA384_ctx* ctx, TC_bytes data);
 
 /* Write the full TC_SHA384_DIGESTLEN-byte tag and wipe the context. Call init
@@ -449,7 +467,9 @@ void TC_HMAC_SHA384_ctx_clear(struct TC_HMAC_SHA384_ctx* ctx);
  * TC_HMAC_MIN_TAG_LEN to TC_SHA384_DIGESTLEN. */
 TC_status TC_HMAC_SHA384_digest(TC_bytes key, TC_bytes message, TC_buffer tag);
 
-/* Recompute the tag over tag.length bytes and compare in constant time. */
+/* Recompute the tag, truncated to tag.length bytes, and compare in
+ * constant time. Returns TC_OK, TC_MISMATCH or TC_ERROR under the verify
+ * contract. */
 TC_status TC_HMAC_SHA384_verify(TC_bytes key, TC_bytes message, TC_bytes tag);
 #endif /* TC_ENABLE_SHA384 */
 
@@ -459,7 +479,7 @@ TC_status TC_HMAC_SHA384_verify(TC_bytes key, TC_bytes message, TC_bytes tag);
  * empty key is accepted. */
 TC_status TC_HMAC_SHA512_init(struct TC_HMAC_SHA512_ctx* ctx, TC_bytes key);
 
-/* Absorb message bytes. */
+/* Absorb message bytes under the update contract. */
 TC_status TC_HMAC_SHA512_update(struct TC_HMAC_SHA512_ctx* ctx, TC_bytes data);
 
 /* Write the full TC_SHA512_DIGESTLEN-byte tag and wipe the context. Call init
@@ -473,7 +493,9 @@ void TC_HMAC_SHA512_ctx_clear(struct TC_HMAC_SHA512_ctx* ctx);
  * TC_HMAC_MIN_TAG_LEN to TC_SHA512_DIGESTLEN. */
 TC_status TC_HMAC_SHA512_digest(TC_bytes key, TC_bytes message, TC_buffer tag);
 
-/* Recompute the tag over tag.length bytes and compare in constant time. */
+/* Recompute the tag, truncated to tag.length bytes, and compare in
+ * constant time. Returns TC_OK, TC_MISMATCH or TC_ERROR under the verify
+ * contract. */
 TC_status TC_HMAC_SHA512_verify(TC_bytes key, TC_bytes message, TC_bytes tag);
 #endif /* TC_ENABLE_SHA512 */
 

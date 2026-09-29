@@ -71,7 +71,7 @@ independent oracle are described in the
 
 TWIC CCL parsing and lookup use `test_twic_ccl`. See the
 [CCL guide](twic-ccl.md#tests) for testing a downloaded TSA feed. Its external
-file case skips when `TC_TEST_TWIC_CCL` is unset; synthetic cases always run.
+file case skips when `TC_TEST_TWIC_CCL` is unset. Synthetic cases always run.
 When supplying a file, set `TC_TEST_TWIC_CCL_MD5` to its published 32-digit
 hexadecimal checksum. `test_md5` and `test_cpp_md5` exercise the optional
 [MD5 implementation](md5.md).
@@ -233,7 +233,7 @@ the library's native crypto and each card's CHUID signer certificate. It covers
 107 accepted signatures, two tampered records, the empty UUID and an unresolved
 signer. Each accepted record is also tested with changed content. Strict and
 omitted-RSA-parameter policies run with both attribute encoding modes.
-The content and precomputed-digest APIs must agree; changing the supplied digest
+The content and precomputed-digest APIs must agree, and a changed supplied digest
 must fail verification. Installed C99 and C++11 consumers call both policy APIs.
 The PIV profile reader is checked with exact and one-unit-short work budgets,
 overlapping input/output storage, and both namespace and attribute modes.
@@ -512,7 +512,7 @@ the missing reasons. A valid revocation remains decisive in either order.
 Key-rollover fixtures use two trusted signer keys with the same issuer and IDP.
 They check both source orders, conflicting CRL numbers, a damaged newer signature,
 and unnumbered CRLs under number and explicit update-time ordering.
-Number-order cases also run with exact and one-unit-short work budgets; exhaustion
+Number-order cases also run with exact and one-unit-short work budgets. Exhaustion
 must preserve caller evidence.
 Base/delta rollover tests try all six record orders under each delta policy,
 including a damaged delta signature and required-delta rejection.
@@ -843,7 +843,7 @@ again after fixing the failure.
 
 The external Wycheproof adapter covers P-256 and P-384 ECDH, with
 raw points and DER public keys, on both EC arithmetic implementations.
-Valid cases must produce the expected secret; invalid cases must be rejected.
+Valid cases must produce the expected secret, and invalid cases must be rejected.
 Its acceptable cases are rejected under the API's strict DER, named-curve,
 uncompressed-point policy. Other applicable Wycheproof algorithms remain
 outside this adapter.
@@ -867,8 +867,8 @@ odd byte output lengths.
 Dynamic AES-CMAC runs all three key sizes, checks invalid-key rejection, and
 compares valid and invalid tags. HMAC runs SHA-1/224/256/384/512 through the
 same tests used for the checked-in vectors. Short HMAC tags are compared with
-the full digest, but the verification API must reject tags below its configured
-minimum length. Longer valid tags must verify; altered tags must fail.
+the full digest. The verification API must reject tags below its configured
+minimum length. Longer valid tags must verify, and altered tags must fail.
 
 AES-GCM, CCM, GMAC, EAX, and both AES-SIV formats run at all three AES key
 sizes. Valid cases check
@@ -968,7 +968,7 @@ P-256/P-384 signature through the native X.509 provider, rejects a changed diges
 and checks exhausted verification budgets.
 RSA checks use frozen synthetic 1024/2048/3072-bit fixtures for v1.5 and PSS,
 including changed digests and exhausted budgets. Their test-only generator uses
-Python cryptography to generate and verify signatures; private keys stay in memory.
+Python cryptography to generate and verify signatures. Private keys stay in memory.
 A SHA-1 known-answer check covers the hash required by legacy TWIC credentials.
 The [ESP32-P4 target](esp32-p4.md)
 adds ESP-IDF cross-builds for both roles.
@@ -1091,7 +1091,7 @@ length. SHA-256 with MGF1-SHA-256 also checks RNG failure, zero work, zero
 ciphertext and the RSA input boundary. The `label` parameter selects empty,
 one-byte or 256-byte binary labels. Native limbs cover the complete parameter
 matrix through RSA-4096. Byte limbs cover every RSA-1024 combination plus the
-SHA-256 configuration at RSA-2048 and RSA-3072; focused tests cover RSA-4096
+SHA-256 configuration at RSA-2048 and RSA-3072. Focused tests cover RSA-4096
 with byte limbs to keep the extended corpus bounded.
 
 With `TINY_CRYPTO_TEST_WYCHEPROOF_DIR` configured, run

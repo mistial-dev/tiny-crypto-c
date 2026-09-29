@@ -5,6 +5,7 @@
  * Configuration: TC_ENABLE_SSKDF with TC_ENABLE_SHA*.
  * Limitations: the HMAC and KMAC auxiliary functions of section 4.1 are
  * unsupported.
+ * Work: every function charges no work budget.
  * Contracts: docs/api.md. */
 #ifndef TINY_CRYPTO_SSKDF_H_
 #define TINY_CRYPTO_SSKDF_H_
@@ -26,12 +27,16 @@ extern "C" {
  *                 The span array is read in place and may be NULL when count
  *                 is 0. A span may have NULL data only when its length is 0.
  * output          Exactly output.capacity bytes are written. The capacity
- *                 must be nonzero and at most (2^32 - 1) digests. output must
- *                 not overlap z, any info span or the span array.
+ *                 must be nonzero and at most (2^32 - 1) digests (section 4.1
+ *                 step 2). output must be disjoint from z, every info span
+ *                 and the span array.
  *
- * Returns TC_OK, or TC_ERROR. Argument errors leave output unchanged. A hash
- * failure after derivation starts wipes output. The hash context and digest
- * block live on the stack and are wiped before return. All lengths are bytes. */
+ * Returns TC_OK, or TC_ERROR with output unchanged for a NULL or empty z, a
+ * NULL output.data, a zero or oversized capacity, a NULL info with a nonzero
+ * count, an invalid span, an overlap, or a hash input above 2^64 - 1 bits
+ * (section 4.1 step 4). A hash failure after derivation starts wipes output.
+ * The hash context and digest block live on the stack and are wiped before
+ * return. All lengths are bytes. */
 #if TC_ENABLE_SHA1
 TC_status TC_SSKDF_SHA1(TC_bytes z, const TC_bytes* info, size_t count, TC_buffer output);
 #endif

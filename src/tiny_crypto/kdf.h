@@ -17,7 +17,12 @@
  * The fixed input is opaque to the library. TC_KBKDF_fixed_input builds
  * the conventional Label || 0x00 || Context || [L]_32 encoding. A cached
  * keyed PRF context, a working copy and chaining values live on the stack and
- * are wiped before return. Library-wide contracts: docs/api.md.
+ * are wiped before return.
+ * Standards: SP 800-108r1 sections 4.1 (counter), 4.2 (feedback) and 4.3
+ * (double-pipeline). PRFs: FIPS 198-1 HMAC and SP 800-38B CMAC.
+ * Work: every function charges no work budget. The functions return TC_OK
+ * or TC_ERROR.
+ * Library-wide contracts: docs/api.md.
  *
  * The header declares its API only when TC_ENABLE_KDF is 1. Function families
  * exist per PRF, each with _counter, _feedback and _pipeline variants, and
@@ -131,8 +136,10 @@ extern "C" {
  *               must be at least TC_KBKDF_FIXED_INPUT_LEN(label.length,
  *               context.length). Exactly that many bytes are written. Pass
  *               that length as the fixed input to the derivation.
- * @return TC_OK, or TC_ERROR on a NULL/length violation, an overlapping output,
- *         or a zero byte inside label.
+ * @return TC_OK, or TC_ERROR with output unchanged for a NULL output.data, a
+ *         span with NULL data and a nonzero length, an out_len outside the
+ *         range, a short capacity, an overlapping output, or a zero byte
+ *         inside label.
  */
 TC_status TC_KBKDF_fixed_input(TC_bytes label, TC_bytes context, size_t out_len, TC_buffer output);
 
@@ -156,8 +163,10 @@ TC_status TC_KBKDF_fixed_input(TC_bytes label, TC_bytes context, size_t out_len,
  *                 are computed and the last one is truncated. n must not
  *                 exceed 2^r - 1 when a counter of r bits is used, nor
  *                 2^32 - 1 without one.
- * Return          TC_OK, or TC_ERROR on any violation. out is wiped if the
- *                 error is detected after derivation started.
+ * Return          TC_OK, or TC_ERROR. A violation of the rules above leaves
+ *                 out unchanged. So does a PRF key init failure, such as a
+ *                 DES key refused under TC_DES_REJECT_WEAK_KEYS. A PRF
+ *                 failure after derivation starts wipes out.
  *
  * Counter mode (SP 800-108r1 section 4.1):
  *   K(i) = PRF(KDK, before || [i]_r || after), i = 1..n

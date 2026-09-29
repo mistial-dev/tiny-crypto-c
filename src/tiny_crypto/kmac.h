@@ -4,6 +4,8 @@
  * Standards: SP 800-185 section 4.
  * Configuration: TC_ENABLE_KMAC256.
  * Limitations: fixed-output KMAC256 only.
+ * Work: every function charges no work budget. The functions return TC_OK
+ * or TC_ERROR. Compare received tags with TC_ct_equal.
  * Contracts: docs/api.md. */
 #ifndef TINY_CRYPTO_KMAC_H_
 #define TINY_CRYPTO_KMAC_H_
@@ -26,11 +28,15 @@ extern "C" {
 #endif
 
 /* Inputs are borrowed TC_bytes spans. A span may have NULL data only when it
- * is empty. Key and customization lengths are in bytes, at most UINT64_MAX / 8.
- * Either may be empty. Use a strong key in real protocols.
+ * is empty. Key and customization lengths are in bytes, at most UINT64_MAX / 8
+ * so their bit lengths fit the encodings of SP 800-185 section 2.3.1. Either
+ * may be empty. Use a strong key in real protocols.
  *
- * init returns TC_ERROR for a NULL ctx, an invalid span, an oversized length
- * or a span that overlaps ctx, and leaves ctx unchanged in each case. */
+ * init absorbs the cSHAKE256 prefix with N = "KMAC" and S = custom, then
+ * bytepad(encode_string(key), 136) (section 4.3). key and custom are read
+ * only during init. It returns TC_OK, or TC_ERROR for a NULL ctx, an invalid
+ * span, an oversized length or a span that overlaps ctx, and leaves ctx
+ * unchanged in each case. A successful init also restarts a live ctx. */
 TC_status TC_KMAC256_init(struct TC_KMAC256_ctx* ctx, TC_bytes key, TC_bytes custom);
 /* Absorb data into an active context. data must be disjoint from ctx.
  * Returns TC_ERROR for a NULL or inactive ctx, an invalid span or an overlap.
@@ -38,17 +44,19 @@ TC_status TC_KMAC256_init(struct TC_KMAC256_ctx* ctx, TC_bytes key, TC_bytes cus
 TC_status TC_KMAC256_update(struct TC_KMAC256_ctx* ctx, TC_bytes data);
 /* Write out.capacity bytes of output. The requested length L is part of the
  * KMAC computation (SP 800-185 section 4.3), so changing it changes every
- * output byte. A successful final wipes the context. Call init again before
- * reuse. Returns TC_ERROR for a NULL or inactive ctx, NULL out.data, a zero
- * or oversized capacity, or output that overlaps ctx. On error, neither ctx
- * nor out changes. */
+ * output byte. out.capacity is 1..UINT64_MAX / 8 bytes. A successful final
+ * wipes the context. Call init again before reuse. Returns TC_OK, or
+ * TC_ERROR for a NULL or inactive ctx, NULL out.data, a zero or oversized
+ * capacity, or output that overlaps ctx. On error, neither ctx nor out
+ * changes. */
 TC_status TC_KMAC256_final(struct TC_KMAC256_ctx* ctx, TC_buffer out);
 /* Wipe the context, including its key-dependent state. NULL is accepted. */
 void TC_KMAC256_ctx_clear(struct TC_KMAC256_ctx* ctx);
-/* One-shot KMAC256(key, data, out.capacity * 8, custom). Returns TC_ERROR for
- * an invalid span, an empty output or an oversized length, and leaves out
- * unchanged. Output may overlap inputs because all input is read before any
- * output is written. The internal context is wiped before return. */
+/* One-shot KMAC256(key, data, out.capacity * 8, custom). Returns TC_OK, or
+ * TC_ERROR for an invalid span, a NULL out.data, an empty output or an
+ * oversized length, and leaves out unchanged. Output may overlap inputs
+ * because all input is read before any output is written. The internal
+ * context lives on the stack and is wiped before return. */
 TC_status TC_KMAC256_digest(TC_bytes key, TC_bytes data, TC_bytes custom, TC_buffer out);
 
 #ifdef __cplusplus

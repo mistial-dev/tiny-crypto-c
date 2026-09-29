@@ -335,6 +335,96 @@ static MunitResult test_input_limits(const MunitParameter params[], void* data)
 #endif
 }
 
+/* An argument error for output that overlaps the additional input returns
+ * before any write, so the caller's additional input survives. Other
+ * rejected requests still wipe a disjoint output. */
+static MunitResult test_overlap_preserves_input(const MunitParameter params[], void* data)
+{
+  static TC_DRBG drbg;
+  counter_source source = {0, 0, 0};
+  TC_random_source entropy = {counter_fill, &source};
+  const TC_DRBG_config config = config_for(TC_DRBG_HMAC);
+  uint8_t out[32], expected[32];
+  size_t i;
+  (void)params;
+  (void)data;
+  munit_assert_int(TC_DRBG_instantiate(&drbg, &config, entropy, empty, empty), ==, TC_DRBG_OK);
+  for (i = 0; i < sizeof out; ++i)
+    out[i] = (uint8_t)(0x40u + i);
+  memcpy(expected, out, sizeof out);
+  {
+    const TC_bytes additional = {out + 8, 8};
+    munit_assert_int(TC_DRBG_generate(&drbg, out, sizeof out, 0, additional), ==, TC_DRBG_ARGUMENT);
+  }
+  munit_assert_memory_equal(sizeof out, out, expected);
+  /* The same request with disjoint additional input succeeds. */
+  {
+    const TC_bytes additional = {expected, 8};
+    munit_assert_int(TC_DRBG_generate(&drbg, out, sizeof out, 0, additional), ==, TC_DRBG_OK);
+  }
+  TC_DRBG_uninstantiate(&drbg);
+  return MUNIT_OK;
+}
+
+/* TC_DRBG_random rejects output inside the DRBG without wiping the state,
+ * so the generator stays usable. */
+static MunitResult test_random_overlap_keeps_state(const MunitParameter params[], void* data)
+{
+  static TC_DRBG drbg;
+  counter_source source = {0, 0, 0};
+  TC_random_source entropy = {counter_fill, &source};
+  const TC_DRBG_config config = config_for(TC_DRBG_HASH);
+  uint8_t out[16];
+  (void)params;
+  (void)data;
+  munit_assert_int(TC_DRBG_instantiate(&drbg, &config, entropy, empty, empty), ==, TC_DRBG_OK);
+  munit_assert_int(TC_DRBG_random(&drbg, (uint8_t*)&drbg, 16), ==, TC_ERROR);
+  munit_assert_int(TC_DRBG_generate(&drbg, out, sizeof out, 0, empty), ==, TC_DRBG_OK);
+  TC_DRBG_uninstantiate(&drbg);
+  return MUNIT_OK;
+}
+
+/* A multi-call TC_DRBG_random request whose later chunk reaches into the
+ * DRBG is rejected before the first chunk runs. The output stays unchanged
+ * and the generator state does not advance. */
+static MunitResult test_random_late_overlap(const MunitParameter params[], void* data)
+{
+#if SIZE_MAX > TC_DRBG_MAX_REQUEST_BYTES
+  static struct {
+    uint8_t lead[TC_DRBG_MAX_REQUEST_BYTES];
+    TC_DRBG drbg;
+  } layout;
+  static TC_DRBG reference;
+  counter_source source = {0, 0, 0}, reference_source = {0, 0, 0};
+  TC_random_source entropy = {counter_fill, &source};
+  TC_random_source reference_entropy = {counter_fill, &reference_source};
+  const TC_DRBG_config config = config_for(TC_DRBG_HMAC);
+  uint8_t out[16], expected[16];
+  size_t i;
+  (void)params;
+  (void)data;
+  munit_assert_int(TC_DRBG_instantiate(&layout.drbg, &config, entropy, empty, empty), ==,
+                   TC_DRBG_OK);
+  munit_assert_int(TC_DRBG_instantiate(&reference, &config, reference_entropy, empty, empty), ==,
+                   TC_DRBG_OK);
+  memset(layout.lead, 0xa5, sizeof layout.lead);
+  munit_assert_int(TC_DRBG_random(&layout.drbg, layout.lead, sizeof layout.lead + 16), ==,
+                   TC_ERROR);
+  for (i = 0; i < sizeof layout.lead; ++i)
+    munit_assert_uint8(layout.lead[i], ==, 0xa5);
+  munit_assert_int(TC_DRBG_generate(&layout.drbg, out, sizeof out, 0, empty), ==, TC_DRBG_OK);
+  munit_assert_int(TC_DRBG_generate(&reference, expected, sizeof expected, 0, empty), ==,
+                   TC_DRBG_OK);
+  munit_assert_memory_equal(sizeof out, out, expected);
+  TC_DRBG_uninstantiate(&layout.drbg);
+  TC_DRBG_uninstantiate(&reference);
+#else
+  (void)params;
+  (void)data;
+#endif
+  return MUNIT_OK;
+}
+
 static MunitTest tests[] = {
     {"/input-limits", test_input_limits, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/lifecycle", test_lifecycle, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
@@ -343,6 +433,11 @@ static MunitTest tests[] = {
     {"/entropy-failures", test_entropy_failures, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/reseed-interval", test_reseed_interval, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/random-source", test_random_source, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/random-overlap-keeps-state", test_random_overlap_keeps_state, NULL, NULL,
+     MUNIT_TEST_OPTION_NONE, NULL},
+    {"/random-late-overlap", test_random_late_overlap, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/overlap-preserves-input", test_overlap_preserves_input, NULL, NULL, MUNIT_TEST_OPTION_NONE,
+     NULL},
     {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
 
 static const MunitSuite suite = {"/drbg", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};

@@ -5,7 +5,8 @@
 /* Shared types for every module: TC_bytes and TC_buffer spans, random
  * sources, TC_work_budget, the common result enums and constant-time helpers.
  * Configuration: includes config.h.
- * Contracts: docs/api.md. */
+ * Work: the functions in this header charge no work budget.
+ * Contracts: docs/api.md, including the result model and work-budget units. */
 #ifndef TINY_CRYPTO_COMMON_H_
 #define TINY_CRYPTO_COMMON_H_
 
@@ -17,12 +18,16 @@
 extern "C" {
 #endif
 
-/* Cryptographic APIs share a three-state result. Authentication failures are
- * separate from malformed arguments so protocols can reject packets without
- * treating normal hostile input as an internal error. */
+/* Result of the symmetric, hash, MAC and KDF APIs: TC_OK, TC_MISMATCH for a
+ * tag or comparison that differs, and TC_ERROR for every other failure.
+ * Authentication failures stay separate from argument errors so protocols
+ * can reject hostile packets without treating them as internal errors. */
 typedef int TC_status;
-/* Fill every requested byte from a cryptographically secure random source.
- * Return TC_OK only when the entire request was filled. */
+/* Random-fill callback. user is the TC_random_source context. Fill all
+ * length bytes of output from a cryptographically secure source and return
+ * TC_OK, or return another status when the request cannot be filled in
+ * full. Library operations treat any other status as a failed source and
+ * discard output. */
 typedef TC_status (*TC_random_fn)(void* user, uint8_t* output, size_t length);
 /* Borrowed immutable bytes. Keep the backing storage alive and unchanged while
  * a reader or parsed view uses it. NULL data is valid only for an empty span. */
@@ -37,12 +42,16 @@ typedef struct {
   size_t capacity;
 } TC_buffer;
 
+/* A random callback and its context. The caller owns context and keeps it
+ * alive while any operation holds the source. */
 typedef struct {
   TC_random_fn fill;
   void* context;
 } TC_random_source;
 
-/* Operations consume this shared budget, including failed attempts. */
+/* Remaining algorithm units for EC, RSA and key challenges. Each header gives
+ * its unit and cost functions. Operations consume the budget on success and
+ * on failure (docs/api.md, Work budgets). */
 typedef struct {
   uint32_t remaining;
 } TC_work_budget;
@@ -95,12 +104,17 @@ typedef enum {
 #define TC_OK 0
 #define TC_MISMATCH 1
 
-/* Best-effort secret wipe. memory must be valid for length bytes. NULL is
- * accepted only when length is zero. The compiler barrier prevents common
- * dead-store removal. Copies already held in CPU registers remain. */
+/* Best-effort secret wipe: write zero to length bytes of memory through
+ * volatile stores. GCC and Clang builds add a compiler memory barrier. This
+ * defeats common dead-store removal. memory must be writable for length bytes. NULL is
+ * accepted only when length is zero. Copies already held in CPU registers
+ * or elsewhere remain. */
 void TC_secure_zero(void* memory, size_t length);
 
-/* Compare all public-length bytes without returning at the first mismatch. */
+/* Constant-time comparison of length bytes. length is public, and the scan
+ * always covers every byte. a and b may overlap.
+ * Returns TC_OK when the bytes are equal, TC_MISMATCH when any byte differs
+ * and TC_ERROR when length is nonzero and a or b is NULL. */
 TC_status TC_ct_equal(const uint8_t* a, const uint8_t* b, size_t length);
 
 #ifdef __cplusplus
