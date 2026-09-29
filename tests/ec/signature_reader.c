@@ -46,7 +46,7 @@ static MunitResult vectors(const MunitParameter params[], void* data)
     munit_assert_true(!strcmp(fields[4], "valid") || !strcmp(fields[4], "invalid"));
     uint8_t raw[96];
     const uint8_t* signature_bytes = signature;
-    TC_status result = TC_ERROR;
+    TC_EC_result result = TC_EC_ARGUMENT;
     int decoded = 1;
     if (der) {
       TC_DER_signature_pair pair;
@@ -63,10 +63,13 @@ static MunitResult vectors(const MunitParameter params[], void* data)
         signature_len = 2 * width;
       }
     }
-    if (decoded)
-      result = TC_ECDSA_verify_digest(curve, key, key_len, digest, digest_len, signature_bytes,
-                                      signature_len, &workspace);
-    if ((result == TC_OK) != !strcmp(fields[4], "valid"))
+    if (decoded) {
+      TC_work_budget work = {UINT32_MAX};
+      result =
+          TC_ECDSA_verify_digest(curve, (TC_bytes){key, key_len}, (TC_bytes){digest, digest_len},
+                                 (TC_bytes){signature_bytes, signature_len}, &workspace, &work);
+    }
+    if ((result == TC_EC_OK) != !strcmp(fields[4], "valid"))
       munit_errorf("ECDSA vector %s: status %d, expected %s", fields[5], result, fields[4]);
     ++count;
   }

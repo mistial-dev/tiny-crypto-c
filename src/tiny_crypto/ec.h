@@ -36,56 +36,92 @@ typedef struct {
 extern "C" {
 #endif
 
+/* Status of every EC operation, in the same order as TC_RSA_result.
+ * INVALID covers rejected scalars, points not on the curve and signatures that
+ * do not verify. ARGUMENT covers NULL pointers, wrong lengths and overlapping
+ * storage. UNSUPPORTED means the curve is unknown or disabled. LIMIT means
+ * the work budget or the random-attempt limit ran out. ERROR reports a random
+ * source failure or a signature that failed its own verification. */
+typedef enum {
+  TC_EC_OK,
+  TC_EC_INVALID,
+  TC_EC_LIMIT,
+  TC_EC_ARGUMENT,
+  TC_EC_UNSUPPORTED,
+  TC_EC_ERROR
+} TC_EC_result;
+
+/* Randomized operations draw from random, making at most random_attempts
+ * requests. Work is reduced by the units completed on success and failure. */
+typedef struct {
+  TC_random_source random;
+  size_t random_attempts;
+  TC_work_budget work;
+} TC_EC_execution;
+
+typedef enum {
+  TC_EC_OPERATION_PUBLIC_KEY,
+  TC_EC_OPERATION_VALIDATE,
+  TC_EC_OPERATION_ECDH,
+  TC_EC_OPERATION_VERIFY,
+  TC_EC_OPERATION_SIGN,    /* one nonce attempt, including self-verification */
+  TC_EC_OPERATION_GENERATE /* one scalar attempt */
+} TC_EC_operation;
+
+/* Work units for one operation, or one attempt of a randomized operation, on
+ * curve. A scalar multiplication or a modular inversion costs one unit per
+ * curve bit; point validation and each random request cost one unit. Zero for
+ * an unsupported curve or unknown operation. An operation checks its full cost
+ * before it starts and returns LIMIT, with work unchanged, when the budget is
+ * short. */
+uint32_t TC_EC_operation_work(TC_EC_curve curve, TC_EC_operation operation);
+
 /* Scalars and coordinates are fixed-width, big-endian (24, 32 or 48 bytes).
  * Public keys use SEC 1 uncompressed encoding, 04 || X || Y. Lengths must
- * match the selected curve exactly. Output and workspace must not overlap
- * each other or any input. On failure output is unchanged. Scratch is wiped
- * after use. Unsupported curves return TC_ERROR. */
-TC_status TC_EC_public_key(TC_EC_curve curve, const uint8_t* scalar, size_t scalar_len,
-                           uint8_t* output, size_t output_len, TC_EC_workspace* workspace);
+ * match the selected curve exactly; output buffers need at least that
+ * capacity. Output and workspace must not overlap each other or any input.
+ * Outputs change only on TC_EC_OK. Scratch is wiped after use. Private-scalar
+ * operations use constant-work point multiplication. */
+TC_EC_result TC_EC_public_key(TC_EC_curve curve, TC_bytes private_key, TC_buffer public_key,
+                              TC_EC_workspace* workspace, TC_work_budget* work);
 /* Generate a private scalar and matching SEC 1 public key. The RNG must be
- * cryptographically secure and fill the whole request. Invalid scalar draws
- * are retried up to max_attempts (1..16). Outputs remain unchanged on failure.
- * After input validation, temporary scalar and public-key storage are wiped
- * on return when TC_ZEROIZE=1. Outputs and workspace must be disjoint. The
- * RNG context must not overlap them. */
-TC_status TC_EC_generate_key_pair(TC_EC_curve curve, uint8_t* private_key, size_t private_key_len,
-                                  uint8_t* public_key, size_t public_key_len,
-                                  TC_random_source random, unsigned max_attempts,
-                                  TC_EC_workspace* workspace);
-TC_status TC_EC_validate_public_key(TC_EC_curve curve, const uint8_t* public_key,
-                                    size_t public_key_len, TC_EC_workspace* workspace);
-/* Returns the shared point's X coordinate, including leading zero bytes.
- * Pass this value through the protocol's key derivation function before use. */
-TC_status TC_ECDH(TC_EC_curve curve, const uint8_t* scalar, size_t scalar_len,
-                  const uint8_t* public_key, size_t public_key_len, uint8_t* output,
-                  size_t output_len, TC_EC_workspace* workspace);
+ * cryptographically secure and fill the whole request. Out-of-range scalar
+ * draws are retried within execution->random_attempts. Temporary scalar and
+ * public-key storage is wiped on return. The RNG context must not overlap the
+ * outputs or workspace. */
+TC_EC_result TC_EC_generate_key_pair(TC_EC_curve curve, TC_buffer private_key, TC_buffer public_key,
+                                     TC_EC_workspace* workspace, TC_EC_execution* execution);
+/* Check that an uncompressed public key is a point on the curve (SEC 1
+ * 3.2.2.1). */
+TC_EC_result TC_EC_validate_public_key(TC_EC_curve curve, TC_bytes public_key,
+                                       TC_EC_workspace* workspace, TC_work_budget* work);
+/* Write the shared point's X coordinate, including leading zero bytes, after
+ * validating the peer key. Pass this value through the protocol's key
+ * derivation function before use. */
+TC_EC_result TC_ECDH(TC_EC_curve curve, TC_bytes private_key, TC_bytes peer_public_key,
+                     TC_buffer shared_secret, TC_EC_workspace* workspace, TC_work_budget* work);
 
 /* Verify a precomputed digest with a SEC 1 uncompressed public key.
  * Signature encoding is fixed-width big-endian r || s. Convert DER signatures
  * first. Digests longer than the curve order are truncated to their leftmost
- * bytes. TC_MISMATCH means the signature or public key is invalid. TC_ERROR means
- * an invalid argument or unsupported curve. Workspace must be disjoint
- * from all inputs and is wiped after use. Both high and low s are accepted.
- * Verification branches on public scalar bits. Private-scalar operations use
- * constant-work point multiplication. */
-TC_status TC_ECDSA_verify_digest(TC_EC_curve curve, const uint8_t* public_key,
-                                 size_t public_key_len, const uint8_t* digest, size_t digest_len,
-                                 const uint8_t* signature, size_t signature_len,
-                                 TC_ECDSA_workspace* workspace);
+ * bytes. Both high and low s are accepted. Verification branches on public
+ * scalar bits. TC_EC_INVALID means the signature or public key is invalid. */
+TC_EC_result TC_ECDSA_verify_digest(TC_EC_curve curve, TC_bytes public_key, TC_bytes digest,
+                                    TC_bytes signature, TC_ECDSA_workspace* workspace,
+                                    TC_work_budget* work);
 
-/* Sign a precomputed digest with a fixed-width private scalar. The RNG supplies
- * an independent secret nonce on each attempt. It must be cryptographically
- * secure and fill the entire request. At most 16 attempts are allowed. Signature
- * encoding is fixed-width big-endian r || s. Digests longer than the order are
- * truncated to their leftmost bytes. Output remains unchanged on failure.
- * After input validation, workspace and nonce storage are wiped on return when
- * TC_ZEROIZE=1. Inputs, output and workspace must be pairwise disjoint. The
- * RNG context must not overlap them. */
-TC_status TC_ECDSA_sign_digest(TC_EC_curve curve, const uint8_t* private_key,
-                               size_t private_key_len, const uint8_t* digest, size_t digest_len,
-                               uint8_t* signature, size_t signature_len, TC_random_source random,
-                               unsigned max_attempts, TC_ECDSA_workspace* workspace);
+/* Sign a precomputed digest with a fixed-width private scalar. public_key is
+ * the matching SEC 1 public key. The RNG supplies an independent secret nonce
+ * on each attempt, within execution->random_attempts. It must be
+ * cryptographically secure and fill the entire request. Signature encoding is
+ * fixed-width big-endian r || s. Digests longer than the order are truncated
+ * to their leftmost bytes. With TC_ECDSA_SIGN_VERIFY (default 1), the
+ * signature is verified against public_key before it is written, so a fault
+ * or a public key that does not match returns TC_EC_ERROR. Inputs, output and
+ * workspace must be pairwise disjoint. The RNG context must not overlap them. */
+TC_EC_result TC_ECDSA_sign_digest(TC_EC_curve curve, TC_bytes private_key, TC_bytes public_key,
+                                  TC_bytes digest, TC_buffer signature,
+                                  TC_ECDSA_workspace* workspace, TC_EC_execution* execution);
 
 #ifdef __cplusplus
 }

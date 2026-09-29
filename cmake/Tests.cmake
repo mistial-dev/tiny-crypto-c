@@ -146,6 +146,15 @@ add_test(NAME test_package_boundaries
     tc_add_c_test(test_ecdsa_reader_${small} tiny-crypto-c-test-ec-${small} tests/ec/signature_reader.c)
     tc_add_c_test(test_nist_dss_ec_reader_${small} tiny-crypto-c-test-ec-${small} tests/ec/nist_dss_reader.c)
     tc_add_c_test(test_arithmetic_${small} tiny-crypto-c-test-ec-${small} tests/ec/arithmetic.c)
+    # Sign-then-verify with a fault seam, with the check enabled and disabled.
+    foreach(check 0 1)
+      tc_add_test_library(tiny-crypto-c-test-ec-fault-${small}-${check} src/common.c src/ec.c)
+      target_compile_definitions(tiny-crypto-c-test-ec-fault-${small}-${check} PUBLIC
+        TC_ENABLE_EC=1 TC_EC_SMALL=${small} TC_ENABLE_AES=0 TC_ENABLE_SHA256=0
+        TC_TEST_ECDSA_FAULT=1 TC_ECDSA_SIGN_VERIFY=${check})
+      tc_add_c_test(test_ecdsa_sign_verify_${small}_${check}
+        tiny-crypto-c-test-ec-fault-${small}-${check} tests/ec/sign_verify.c)
+    endforeach()
   endforeach()
   foreach(small 0 1)
     tc_add_test_library(tiny-crypto-c-test-rsa-${small} src/common.c ${tc_rsa_sources} src/pki_storage.c)

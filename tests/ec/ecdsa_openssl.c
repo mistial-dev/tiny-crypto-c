@@ -7,6 +7,17 @@
 #include <openssl/core_names.h>
 #include <string.h>
 
+static TC_EC_result ecdsa_verify(TC_EC_curve curve, const uint8_t* public_key, size_t public_length,
+                                 const uint8_t* digest, size_t digest_length,
+                                 const uint8_t* signature, size_t signature_length,
+                                 TC_ECDSA_workspace* workspace)
+{
+  TC_work_budget work = {UINT32_MAX};
+  return TC_ECDSA_verify_digest(curve, (TC_bytes){public_key, public_length},
+                                (TC_bytes){digest, digest_length},
+                                (TC_bytes){signature, signature_length}, workspace, &work);
+}
+
 static MunitResult verify(const MunitParameter params[], void* data)
 {
   static const char* groups[] = {"prime256v1", "secp384r1", "prime192v1"};
@@ -40,44 +51,43 @@ static MunitResult verify(const MunitParameter params[], void* data)
       ECDSA_SIG_get0(parsed, &r, &s);
       munit_assert_int(BN_bn2binpad(r, signature, (int)bytes), ==, (int)bytes);
       munit_assert_int(BN_bn2binpad(s, signature + bytes, (int)bytes), ==, (int)bytes);
-      munit_assert_int(TC_ECDSA_verify_digest(curves[c], public_key, public_len, digest, digest_len,
-                                              signature, 2 * bytes, &workspace),
-                       ==, TC_OK);
+      munit_assert_int(ecdsa_verify(curves[c], public_key, public_len, digest, digest_len,
+                                    signature, 2 * bytes, &workspace),
+                       ==, TC_EC_OK);
       for (size_t k = 0; k < sizeof workspace; ++k)
         munit_assert_uint8(((uint8_t*)&workspace)[k], ==, 0);
       digest[0] ^= 1;
-      munit_assert_int(TC_ECDSA_verify_digest(curves[c], public_key, public_len, digest, digest_len,
-                                              signature, 2 * bytes, &workspace),
-                       ==, TC_MISMATCH);
+      munit_assert_int(ecdsa_verify(curves[c], public_key, public_len, digest, digest_len,
+                                    signature, 2 * bytes, &workspace),
+                       ==, TC_EC_INVALID);
       digest[0] ^= 1;
       signature[bytes - 1] ^= 1;
-      munit_assert_int(TC_ECDSA_verify_digest(curves[c], public_key, public_len, digest, digest_len,
-                                              signature, 2 * bytes, &workspace),
-                       ==, TC_MISMATCH);
+      munit_assert_int(ecdsa_verify(curves[c], public_key, public_len, digest, digest_len,
+                                    signature, 2 * bytes, &workspace),
+                       ==, TC_EC_INVALID);
       signature[bytes - 1] ^= 1;
       public_key[0] = 0;
-      munit_assert_int(TC_ECDSA_verify_digest(curves[c], public_key, public_len, digest, digest_len,
-                                              signature, 2 * bytes, &workspace),
-                       ==, TC_MISMATCH);
+      munit_assert_int(ecdsa_verify(curves[c], public_key, public_len, digest, digest_len,
+                                    signature, 2 * bytes, &workspace),
+                       ==, TC_EC_INVALID);
       public_key[0] = 4;
-      munit_assert_int(TC_ECDSA_verify_digest(curves[c], public_key, public_len, digest, 0,
-                                              signature, 2 * bytes, &workspace),
-                       ==, TC_ERROR);
-      munit_assert_int(TC_ECDSA_verify_digest(curves[c], public_key, public_len, digest, digest_len,
-                                              signature, 2 * bytes - 1, &workspace),
-                       ==, TC_ERROR);
-      munit_assert_int(TC_ECDSA_verify_digest(curves[c], public_key, public_len,
-                                              (const uint8_t*)&workspace, digest_len, signature,
-                                              2 * bytes, &workspace),
-                       ==, TC_ERROR);
+      munit_assert_int(ecdsa_verify(curves[c], public_key, public_len, digest, 0, signature,
+                                    2 * bytes, &workspace),
+                       ==, TC_EC_ARGUMENT);
+      munit_assert_int(ecdsa_verify(curves[c], public_key, public_len, digest, digest_len,
+                                    signature, 2 * bytes - 1, &workspace),
+                       ==, TC_EC_ARGUMENT);
+      munit_assert_int(ecdsa_verify(curves[c], public_key, public_len, (const uint8_t*)&workspace,
+                                    digest_len, signature, 2 * bytes, &workspace),
+                       ==, TC_EC_ARGUMENT);
       memset(signature + bytes, 0, bytes);
-      munit_assert_int(TC_ECDSA_verify_digest(curves[c], public_key, public_len, digest, digest_len,
-                                              signature, 2 * bytes, &workspace),
-                       ==, TC_MISMATCH);
+      munit_assert_int(ecdsa_verify(curves[c], public_key, public_len, digest, digest_len,
+                                    signature, 2 * bytes, &workspace),
+                       ==, TC_EC_INVALID);
       memset(signature, 0, bytes);
-      munit_assert_int(TC_ECDSA_verify_digest(curves[c], public_key, public_len, digest, digest_len,
-                                              signature, 2 * bytes, &workspace),
-                       ==, TC_MISMATCH);
+      munit_assert_int(ecdsa_verify(curves[c], public_key, public_len, digest, digest_len,
+                                    signature, 2 * bytes, &workspace),
+                       ==, TC_EC_INVALID);
       ECDSA_SIG_free(parsed);
       EVP_PKEY_CTX_free(context);
     }

@@ -62,10 +62,12 @@ int main()
   tiny_crypto::ec_workspace workspace;
   tiny_crypto::piv_sm session;
   scalar[31] = 1;
-  if (tiny_crypto::ec_public_key(TC_EC_P256, {scalar, sizeof scalar}, point, sizeof point,
-                                 workspace) != TC_OK)
+  TC_work_budget ec_work = {UINT32_MAX};
+  if (tiny_crypto::ec_public_key(TC_EC_P256, {scalar, sizeof scalar}, point, workspace, ec_work) !=
+      TC_EC_OK)
     return 1;
-  if (tiny_crypto::ec_validate_public_key(TC_EC_P256, {point, sizeof point}, workspace) != TC_OK)
+  if (tiny_crypto::ec_validate_public_key(TC_EC_P256, {point, sizeof point}, workspace, ec_work) !=
+      TC_EC_OK)
     return 1;
   if (tiny_crypto::sskdf_sha256({scalar, sizeof scalar}, nullptr, 0, derived, sizeof derived) !=
       TC_OK)

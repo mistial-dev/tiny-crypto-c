@@ -155,9 +155,12 @@ int main(void)
   if (TC_HKDF_SHA256_derive(NULL, 0, &secret, 1, NULL, 0, result, sizeof result) != TC_OK)
     return 1;
   key[31] = 1;
-  if (TC_EC_public_key(TC_EC_P256, key, sizeof key, point, sizeof point, &workspace) != TC_OK)
+  TC_work_budget work = {UINT32_MAX};
+  if (TC_EC_public_key(TC_EC_P256, (TC_bytes){key, sizeof key}, (TC_buffer){point, sizeof point},
+                       &workspace, &work) != TC_EC_OK)
     return 1;
-  if (TC_EC_validate_public_key(TC_EC_P256, point, sizeof point, &workspace) != TC_OK)
+  if (TC_EC_validate_public_key(TC_EC_P256, (TC_bytes){point, sizeof point}, &workspace, &work) !=
+      TC_EC_OK)
     return 1;
   TC_PIV_SM_clear(&session);
   return TC_SHA256_digest((const uint8_t*)"abc", 3, result) != TC_OK ||

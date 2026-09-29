@@ -38,9 +38,11 @@ static MunitResult vectors(const MunitParameter params[], void* data)
     munit_assert_size(strlen(fields[2]), ==, 2 * length);
     if (!strcmp(fields[0], "pkv")) {
       munit_assert_size(columns, ==, 4);
-      TC_status result = TC_EC_validate_public_key(curve, point, length, &workspace);
+      TC_work_budget work = {UINT32_MAX};
+      TC_EC_result result =
+          TC_EC_validate_public_key(curve, (TC_bytes){point, length}, &workspace, &work);
       munit_assert_true(!strcmp(fields[3], "valid") || !strcmp(fields[3], "invalid"));
-      if ((result == TC_OK) != !strcmp(fields[3], "valid"))
+      if ((result == TC_EC_OK) != !strcmp(fields[3], "valid"))
         munit_errorf("NIST ECDSA PKV %zu: status %d, expected %s", count, result, fields[3]);
     } else {
       munit_assert_string_equal(fields[0], "keypair");
@@ -49,8 +51,10 @@ static MunitResult vectors(const MunitParameter params[], void* data)
       size_t scalar_length = tc_test_decode_hex(fields[3], scalar, sizeof scalar);
       munit_assert_size(scalar_length, ==, width);
       munit_assert_size(strlen(fields[3]), ==, 2 * scalar_length);
-      TC_status result = TC_EC_public_key(curve, scalar, width, actual, length, &workspace);
-      if (result != TC_OK || memcmp(actual, point, length))
+      TC_work_budget work = {UINT32_MAX};
+      TC_EC_result result = TC_EC_public_key(curve, (TC_bytes){scalar, width},
+                                             (TC_buffer){actual, length}, &workspace, &work);
+      if (result != TC_EC_OK || memcmp(actual, point, length))
         munit_errorf("NIST ECDSA KeyPair %zu: status %d or point mismatch", count, result);
     }
     ++count;

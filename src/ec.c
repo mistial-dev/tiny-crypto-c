@@ -109,25 +109,6 @@ enum { EC_P = 24, EC_N, EC_B, EC_R2, EC_ONE, EC_SCALAR };
 #define F(s, i) ((s)->w->fields[(i)])
 #define T(s, i) F(s, 12 + (i))
 
-static word zero_mask(const word* a, size_t n)
-{
-  word value = 0;
-  size_t i;
-  for (i = 0; i < n; ++i)
-    value |= a[i];
-  return (word)(0u - (unsigned)(value == 0));
-}
-
-static void select_words(word* out, const word* a, const word* b, word mask, size_t n)
-{
-  tc_mp_select(out, a, b, mask, n);
-}
-
-static word subtract(word* out, const word* a, const word* b, size_t n)
-{
-  return tc_mp_subtract(out, a, b, n);
-}
-
 static void add(ec_state* s, word* out, const word* a, const word* b)
 {
   tc_mp_add_mod(out, a, b, F(s, EC_P), s->words, s->w->reduced);
@@ -199,9 +180,9 @@ static void point_add(ec_state* s, int public_inputs)
   mul(s, T(s, 5), F(s, 4), T(s, 0));
   sub(s, T(s, 3), T(s, 3), T(s, 2));
   sub(s, T(s, 5), T(s, 5), T(s, 4));
-  equal = (word)(zero_mask(T(s, 3), s->words) & zero_mask(T(s, 5), s->words));
-  first_infinity = zero_mask(F(s, 2), s->words);
-  second_infinity = zero_mask(F(s, 5), s->words);
+  equal = (word)(tc_mp_zero_mask(T(s, 3), s->words) & tc_mp_zero_mask(T(s, 5), s->words));
+  first_infinity = tc_mp_zero_mask(F(s, 2), s->words);
+  second_infinity = tc_mp_zero_mask(F(s, 5), s->words);
   mul(s, T(s, 6), T(s, 3), T(s, 3));
   mul(s, T(s, 7), T(s, 6), T(s, 3));
   mul(s, T(s, 2), T(s, 2), T(s, 6));
@@ -218,9 +199,9 @@ static void point_add(ec_state* s, int public_inputs)
   if (public_inputs && equal)
     point_double(s, 9, 0);
   for (i = 0; i < 3; ++i) {
-    select_words(F(s, 6 + i), F(s, 9 + i), F(s, 6 + i), equal, s->words);
-    select_words(F(s, 6 + i), F(s, 3 + i), F(s, 6 + i), first_infinity, s->words);
-    select_words(F(s, 6 + i), F(s, i), F(s, 6 + i), second_infinity, s->words);
+    tc_mp_select(F(s, 6 + i), F(s, 9 + i), F(s, 6 + i), equal, s->words);
+    tc_mp_select(F(s, 6 + i), F(s, 3 + i), F(s, 6 + i), first_infinity, s->words);
+    tc_mp_select(F(s, 6 + i), F(s, i), F(s, 6 + i), second_infinity, s->words);
   }
 }
 
@@ -375,8 +356,8 @@ static void initialize(ec_state* s, TC_EC_workspace* workspace, size_t bytes)
 
 static int validate_point(ec_state* s)
 {
-  if (!subtract(s->w->reduced, F(s, 3), F(s, EC_P), s->words) ||
-      !subtract(s->w->reduced, F(s, 4), F(s, EC_P), s->words))
+  if (!tc_mp_subtract(s->w->reduced, F(s, 3), F(s, EC_P), s->words) ||
+      !tc_mp_subtract(s->w->reduced, F(s, 4), F(s, EC_P), s->words))
     return 0;
   mul(s, F(s, 3), F(s, 3), F(s, EC_R2));
   mul(s, F(s, 4), F(s, 4), F(s, EC_R2));
@@ -389,7 +370,7 @@ static int validate_point(ec_state* s)
   sub(s, T(s, 1), T(s, 1), F(s, 3));
   add(s, T(s, 1), T(s, 1), F(s, EC_B));
   sub(s, T(s, 0), T(s, 0), T(s, 1));
-  return zero_mask(T(s, 0), s->words) != 0;
+  return tc_mp_zero_mask(T(s, 0), s->words) != 0;
 }
 
 /* The built-in generator coordinates are already Montgomery residues. */
@@ -408,114 +389,216 @@ static void export_coordinate(ec_state* s, uint8_t* output, unsigned coordinate)
     output[s->bytes - 1 - i] = (uint8_t)(T(s, 10)[i / sizeof(word)] >> (8 * (i % sizeof(word))));
 }
 
-static TC_status key_operation(TC_EC_curve curve, const uint8_t* scalar, size_t scalar_len,
-                               const uint8_t* public_key, size_t public_key_len, uint8_t* output,
-                               size_t output_len, TC_EC_workspace* workspace, int agreement)
+/* Work units per operation. A scalar multiplication or an inversion costs one
+ * unit per curve bit. */
+uint32_t TC_EC_operation_work(TC_EC_curve curve, TC_EC_operation operation)
+{
+  const uint32_t bits = (uint32_t)curve_bytes(curve) * 8u;
+  if (!bits)
+    return 0;
+  switch (operation) {
+  case TC_EC_OPERATION_PUBLIC_KEY:
+    return 2 * bits; /* multiplication and affine conversion */
+  case TC_EC_OPERATION_VALIDATE:
+    return 1;
+  case TC_EC_OPERATION_ECDH:
+    return 2 * bits + 1;
+  case TC_EC_OPERATION_VERIFY:
+    return 4 * bits + 1; /* order inversion, two multiplications, affine */
+  case TC_EC_OPERATION_SIGN:
+    return 3 * bits + 1 + (TC_ECDSA_SIGN_VERIFY ? 4 * bits + 1 : 0);
+  case TC_EC_OPERATION_GENERATE:
+    return 2 * bits + 1;
+  }
+  return 0;
+}
+
+static TC_EC_result charge(TC_EC_curve curve, TC_EC_operation operation, TC_work_budget* work)
+{
+  const uint32_t cost = TC_EC_operation_work(curve, operation);
+  if (work->remaining < cost)
+    return TC_EC_LIMIT;
+  work->remaining -= cost;
+  return TC_EC_OK;
+}
+
+/* A private scalar is in [1, n - 1]. Expects an initialized state. */
+static int scalar_valid(ec_state* s, const word* scalar)
+{
+  return !tc_mp_zero_mask(scalar, s->words) &&
+         tc_mp_subtract(s->w->reduced, scalar, F(s, EC_N), s->words);
+}
+
+static int spans_disjoint(const TC_bytes* spans, size_t count)
+{
+  for (size_t i = 0; i < count; ++i) {
+    if (!tc_internal_span_valid(spans[i].data, spans[i].length))
+      return 0;
+    for (size_t j = 0; j < i; ++j)
+      if (!tc_internal_ranges_disjoint(spans[i].data, spans[i].length, spans[j].data,
+                                       spans[j].length))
+        return 0;
+  }
+  return 1;
+}
+
+/* Public key or ECDH on validated arguments. output holds the full encoding.
+ * The workspace is wiped. */
+static TC_EC_result key_operation(size_t bytes, const uint8_t* scalar, const uint8_t* peer,
+                                  uint8_t* output, TC_EC_workspace* workspace)
 {
   ec_state s;
-  size_t bytes = curve_bytes(curve);
-  TC_status status = TC_ERROR;
-  if (!bytes || !workspace || !scalar || scalar_len != bytes || !output ||
-      output_len != (agreement ? bytes : 1 + 2 * bytes) ||
-      (agreement && (!public_key || public_key_len != 1 + 2 * bytes || public_key[0] != 4)) ||
-      !tc_internal_ranges_disjoint(workspace, sizeof *workspace, scalar, scalar_len) ||
-      !tc_internal_ranges_disjoint(workspace, sizeof *workspace, public_key, public_key_len) ||
-      !tc_internal_ranges_disjoint(workspace, sizeof *workspace, output, output_len) ||
-      !tc_internal_ranges_disjoint(scalar, scalar_len, output, output_len) ||
-      !tc_internal_ranges_disjoint(public_key, public_key_len, output, output_len))
-    return TC_ERROR;
+  TC_EC_result status = TC_EC_INVALID;
   initialize(&s, workspace, bytes);
   import_bytes(&s, F(&s, EC_SCALAR), scalar, 0);
-  if (zero_mask(F(&s, EC_SCALAR), s.words) ||
-      !subtract(workspace->reduced, F(&s, EC_SCALAR), F(&s, EC_N), s.words))
+  if (!scalar_valid(&s, F(&s, EC_SCALAR)))
     goto done;
-  if (agreement) {
-    import_bytes(&s, F(&s, 3), public_key + 1, 0);
-    import_bytes(&s, F(&s, 4), public_key + 1 + bytes, 0);
-  }
-  if (agreement) {
+  if (peer) {
+    import_bytes(&s, F(&s, 3), peer + 1, 0);
+    import_bytes(&s, F(&s, 4), peer + 1 + bytes, 0);
     if (!validate_point(&s))
       goto done;
   } else
     prepare_generator(&s);
   multiply_point(&s);
-  if (zero_mask(F(&s, 2), s.words))
+  if (tc_mp_zero_mask(F(&s, 2), s.words))
     goto done;
   point_to_affine(&s);
-  if (agreement)
+  if (peer)
     export_coordinate(&s, output, 0);
   else {
     output[0] = 4;
     export_coordinate(&s, output + 1, 0);
     export_coordinate(&s, output + 1 + bytes, 1);
   }
-  status = TC_OK;
+  status = TC_EC_OK;
 done:
   TC_secure_zero(workspace, sizeof *workspace);
   return status;
 }
 
-TC_status TC_EC_public_key(TC_EC_curve curve, const uint8_t* scalar, size_t scalar_len,
-                           uint8_t* output, size_t output_len, TC_EC_workspace* workspace)
+TC_EC_result TC_EC_public_key(TC_EC_curve curve, TC_bytes private_key, TC_buffer public_key,
+                              TC_EC_workspace* workspace, TC_work_budget* work)
 {
-  return key_operation(curve, scalar, scalar_len, NULL, 0, output, output_len, workspace, 0);
-}
-
-TC_status TC_EC_generate_key_pair(TC_EC_curve curve, uint8_t* private_key, size_t private_key_len,
-                                  uint8_t* public_key, size_t public_key_len,
-                                  TC_random_source random, unsigned max_attempts,
-                                  TC_EC_workspace* workspace)
-{
-  size_t bytes = curve_bytes(curve);
-  uint8_t candidate[TC_EC_MAX_BYTES] = {0};
-  uint8_t point[1 + 2 * TC_EC_MAX_BYTES] = {0};
-  TC_status status = TC_ERROR;
-  unsigned attempt;
-  if (!bytes || !private_key || private_key_len != bytes || !public_key ||
-      public_key_len != 1 + 2 * bytes || !workspace || !random.fill || !max_attempts ||
-      max_attempts > 16 ||
-      !tc_internal_ranges_disjoint(private_key, private_key_len, public_key, public_key_len) ||
-      !tc_internal_ranges_disjoint(workspace, sizeof *workspace, private_key, private_key_len) ||
-      !tc_internal_ranges_disjoint(workspace, sizeof *workspace, public_key, public_key_len))
-    return TC_ERROR;
-  for (attempt = 0; attempt < max_attempts; ++attempt) {
-    if (random.fill(random.context, candidate, bytes) != TC_OK)
-      break;
-    if (TC_EC_public_key(curve, candidate, bytes, point, 1 + 2 * bytes, workspace) != TC_OK)
-      continue;
-    memcpy(private_key, candidate, bytes);
-    memcpy(public_key, point, 1 + 2 * bytes);
-    status = TC_OK;
-    break;
-  }
-  TC_secure_zero(candidate, sizeof candidate);
+  const size_t bytes = curve_bytes(curve);
+  uint8_t point[1 + 2 * TC_EC_MAX_BYTES];
+  if (!workspace || !work)
+    return TC_EC_ARGUMENT;
+  if (!bytes)
+    return TC_EC_UNSUPPORTED;
+  const TC_bytes spans[] = {private_key,
+                            {public_key.data, public_key.capacity},
+                            {(const uint8_t*)workspace, sizeof *workspace},
+                            {(const uint8_t*)work, sizeof *work}};
+  if (!private_key.data || private_key.length != bytes || !public_key.data ||
+      public_key.capacity < 1 + 2 * bytes || !spans_disjoint(spans, 4))
+    return TC_EC_ARGUMENT;
+  TC_EC_result status = charge(curve, TC_EC_OPERATION_PUBLIC_KEY, work);
+  if (status != TC_EC_OK)
+    return status;
+  status = key_operation(bytes, private_key.data, NULL, point, workspace);
+  if (status == TC_EC_OK)
+    memcpy(public_key.data, point, 1 + 2 * bytes);
   TC_secure_zero(point, sizeof point);
-  TC_secure_zero(workspace, sizeof *workspace);
   return status;
 }
 
-TC_status TC_ECDH(TC_EC_curve curve, const uint8_t* scalar, size_t scalar_len,
-                  const uint8_t* public_key, size_t public_key_len, uint8_t* output,
-                  size_t output_len, TC_EC_workspace* workspace)
+TC_EC_result TC_EC_generate_key_pair(TC_EC_curve curve, TC_buffer private_key, TC_buffer public_key,
+                                     TC_EC_workspace* workspace, TC_EC_execution* execution)
 {
-  return key_operation(curve, scalar, scalar_len, public_key, public_key_len, output, output_len,
-                       workspace, 1);
+  const size_t bytes = curve_bytes(curve);
+  uint8_t candidate[TC_EC_MAX_BYTES];
+  uint8_t point[1 + 2 * TC_EC_MAX_BYTES];
+  if (!workspace || !execution || !execution->random.fill)
+    return TC_EC_ARGUMENT;
+  if (!bytes)
+    return TC_EC_UNSUPPORTED;
+  const TC_bytes spans[] = {{private_key.data, private_key.capacity},
+                            {public_key.data, public_key.capacity},
+                            {(const uint8_t*)workspace, sizeof *workspace},
+                            {(const uint8_t*)execution, sizeof *execution}};
+  if (!private_key.data || private_key.capacity < bytes || !public_key.data ||
+      public_key.capacity < 1 + 2 * bytes || !spans_disjoint(spans, 4))
+    return TC_EC_ARGUMENT;
+  TC_EC_result status = TC_EC_LIMIT;
+  for (size_t attempt = 0; attempt < execution->random_attempts; ++attempt) {
+    status = charge(curve, TC_EC_OPERATION_GENERATE, &execution->work);
+    if (status != TC_EC_OK)
+      break;
+    if (execution->random.fill(execution->random.context, candidate, bytes) != TC_OK) {
+      status = TC_EC_ERROR;
+      break;
+    }
+    /* SEC 1 3.2.1: an out-of-range draw is discarded. */
+    status = key_operation(bytes, candidate, NULL, point, workspace);
+    if (status == TC_EC_OK) {
+      memcpy(private_key.data, candidate, bytes);
+      memcpy(public_key.data, point, 1 + 2 * bytes);
+      break;
+    }
+    status = TC_EC_LIMIT;
+  }
+  TC_secure_zero(candidate, sizeof candidate);
+  TC_secure_zero(point, sizeof point);
+  return status;
 }
 
-TC_status TC_EC_validate_public_key(TC_EC_curve curve, const uint8_t* public_key,
-                                    size_t public_key_len, TC_EC_workspace* workspace)
+TC_EC_result TC_ECDH(TC_EC_curve curve, TC_bytes private_key, TC_bytes peer_public_key,
+                     TC_buffer shared_secret, TC_EC_workspace* workspace, TC_work_budget* work)
+{
+  const size_t bytes = curve_bytes(curve);
+  uint8_t secret[TC_EC_MAX_BYTES];
+  if (!workspace || !work)
+    return TC_EC_ARGUMENT;
+  if (!bytes)
+    return TC_EC_UNSUPPORTED;
+  const TC_bytes spans[] = {private_key,
+                            {shared_secret.data, shared_secret.capacity},
+                            {(const uint8_t*)workspace, sizeof *workspace},
+                            {(const uint8_t*)work, sizeof *work}};
+  if (!private_key.data || private_key.length != bytes || !peer_public_key.data ||
+      peer_public_key.length != 1 + 2 * bytes || !shared_secret.data ||
+      shared_secret.capacity < bytes || !spans_disjoint(spans, 4) ||
+      !tc_internal_ranges_disjoint(peer_public_key.data, peer_public_key.length, shared_secret.data,
+                                   shared_secret.capacity) ||
+      !tc_internal_ranges_disjoint(peer_public_key.data, peer_public_key.length, workspace,
+                                   sizeof *workspace))
+    return TC_EC_ARGUMENT;
+  if (peer_public_key.data[0] != 4)
+    return TC_EC_INVALID;
+  TC_EC_result status = charge(curve, TC_EC_OPERATION_ECDH, work);
+  if (status != TC_EC_OK)
+    return status;
+  status = key_operation(bytes, private_key.data, peer_public_key.data, secret, workspace);
+  if (status == TC_EC_OK)
+    memcpy(shared_secret.data, secret, bytes);
+  TC_secure_zero(secret, sizeof secret);
+  return status;
+}
+
+TC_EC_result TC_EC_validate_public_key(TC_EC_curve curve, TC_bytes public_key,
+                                       TC_EC_workspace* workspace, TC_work_budget* work)
 {
   ec_state s;
-  size_t bytes = curve_bytes(curve);
-  TC_status status;
-  if (!bytes || !workspace || !public_key || public_key_len != 1 + 2 * bytes ||
-      public_key[0] != 4 ||
-      !tc_internal_ranges_disjoint(workspace, sizeof *workspace, public_key, public_key_len))
-    return TC_ERROR;
+  const size_t bytes = curve_bytes(curve);
+  if (!workspace || !work)
+    return TC_EC_ARGUMENT;
+  if (!bytes)
+    return TC_EC_UNSUPPORTED;
+  if (!public_key.data || public_key.length != 1 + 2 * bytes ||
+      !tc_internal_ranges_disjoint(workspace, sizeof *workspace, public_key.data,
+                                   public_key.length) ||
+      !tc_internal_ranges_disjoint(workspace, sizeof *workspace, work, sizeof *work))
+    return TC_EC_ARGUMENT;
+  TC_EC_result status = charge(curve, TC_EC_OPERATION_VALIDATE, work);
+  if (status != TC_EC_OK)
+    return status;
+  if (public_key.data[0] != 4)
+    return TC_EC_INVALID;
   initialize(&s, workspace, bytes);
-  import_bytes(&s, F(&s, 3), public_key + 1, 0);
-  import_bytes(&s, F(&s, 4), public_key + 1 + bytes, 0);
-  status = validate_point(&s) ? TC_OK : TC_ERROR;
+  import_bytes(&s, F(&s, 3), public_key.data + 1, 0);
+  import_bytes(&s, F(&s, 4), public_key.data + 1 + bytes, 0);
+  status = validate_point(&s) ? TC_EC_OK : TC_EC_INVALID;
   TC_secure_zero(workspace, sizeof *workspace);
   return status;
 }
@@ -542,9 +625,9 @@ static int verification_scalars(ec_state* s, const uint8_t* digest, size_t diges
 {
   import_bytes(s, F(s, 6), signature, 0);
   import_bytes(s, F(s, 7), signature + s->bytes, 0);
-  if (zero_mask(F(s, 6), s->words) || zero_mask(F(s, 7), s->words) ||
-      !subtract(s->w->reduced, F(s, 6), F(s, EC_N), s->words) ||
-      !subtract(s->w->reduced, F(s, 7), F(s, EC_N), s->words))
+  if (tc_mp_zero_mask(F(s, 6), s->words) || tc_mp_zero_mask(F(s, 7), s->words) ||
+      !tc_mp_subtract(s->w->reduced, F(s, 6), F(s, EC_N), s->words) ||
+      !tc_mp_subtract(s->w->reduced, F(s, 7), F(s, EC_N), s->words))
     return 0;
 
   /* Supported orders fill their byte width. Short hashes are zero-extended. */
@@ -564,21 +647,15 @@ static int verification_scalars(ec_state* s, const uint8_t* digest, size_t diges
   return 1;
 }
 
-TC_status TC_ECDSA_verify_digest(TC_EC_curve curve, const uint8_t* public_key,
-                                 size_t public_key_len, const uint8_t* digest, size_t digest_len,
-                                 const uint8_t* signature, size_t signature_len,
-                                 TC_ECDSA_workspace* workspace)
+/* ECDSA verification (SEC 1 4.1.4) on validated arguments. The workspace is
+ * wiped. */
+static TC_EC_result verify(size_t bytes, const uint8_t* public_key, const uint8_t* digest,
+                           size_t digest_len, const uint8_t* signature,
+                           TC_ECDSA_workspace* workspace)
 {
   ec_state s;
-  size_t bytes = curve_bytes(curve);
   unsigned i;
-  TC_status status = TC_MISMATCH;
-  if (!bytes || !workspace || !public_key || !digest || !digest_len || !signature ||
-      public_key_len != 1 + 2 * bytes || signature_len != 2 * bytes ||
-      !tc_internal_ranges_disjoint(workspace, sizeof *workspace, public_key, public_key_len) ||
-      !tc_internal_ranges_disjoint(workspace, sizeof *workspace, digest, digest_len) ||
-      !tc_internal_ranges_disjoint(workspace, sizeof *workspace, signature, signature_len))
-    return TC_ERROR;
+  TC_EC_result status = TC_EC_INVALID;
   initialize(&s, &workspace->ec, bytes);
   if (public_key[0] != 4 || !verification_scalars(&s, digest, digest_len, signature, workspace))
     goto done;
@@ -602,7 +679,7 @@ TC_status TC_ECDSA_verify_digest(TC_EC_curve curve, const uint8_t* public_key,
   point_add(&s, 1);
   for (i = 0; i < 3; ++i)
     copy(&s, F(&s, i), F(&s, 6 + i));
-  if (zero_mask(F(&s, 2), s.words))
+  if (tc_mp_zero_mask(F(&s, 2), s.words))
     goto done;
   point_to_affine(&s);
   memset(F(&s, 3), 0, bytes);
@@ -610,60 +687,102 @@ TC_status TC_ECDSA_verify_digest(TC_EC_curve curve, const uint8_t* public_key,
   mul(&s, F(&s, 0), F(&s, 0), F(&s, 3));
   tc_mp_reduce(F(&s, 0), F(&s, 0), 0, F(&s, EC_N), s.words, s.w->reduced);
   import_bytes(&s, F(&s, 1), signature, 0);
-  if (memcmp(F(&s, 0), F(&s, 1), bytes) == 0)
-    status = TC_OK;
+  if (tc_mp_equal(F(&s, 0), F(&s, 1), s.words))
+    status = TC_EC_OK;
 done:
   TC_secure_zero(workspace, sizeof *workspace);
   return status;
 }
 
-TC_status TC_ECDSA_sign_digest(TC_EC_curve curve, const uint8_t* private_key,
-                               size_t private_key_len, const uint8_t* digest, size_t digest_len,
-                               uint8_t* signature, size_t signature_len, TC_random_source random,
-                               unsigned max_attempts, TC_ECDSA_workspace* workspace)
+TC_EC_result TC_ECDSA_verify_digest(TC_EC_curve curve, TC_bytes public_key, TC_bytes digest,
+                                    TC_bytes signature, TC_ECDSA_workspace* workspace,
+                                    TC_work_budget* work)
+{
+  const size_t bytes = curve_bytes(curve);
+  if (!workspace || !work)
+    return TC_EC_ARGUMENT;
+  if (!bytes)
+    return TC_EC_UNSUPPORTED;
+  const TC_bytes writes[] = {{(const uint8_t*)workspace, sizeof *workspace},
+                             {(const uint8_t*)work, sizeof *work}};
+  const TC_bytes inputs[] = {public_key, digest, signature};
+  if (!public_key.data || public_key.length != 1 + 2 * bytes || !digest.data || !digest.length ||
+      !signature.data || signature.length != 2 * bytes || !spans_disjoint(writes, 2))
+    return TC_EC_ARGUMENT;
+  for (size_t i = 0; i < 3; ++i)
+    for (size_t j = 0; j < 2; ++j)
+      if (!tc_internal_ranges_disjoint(inputs[i].data, inputs[i].length, writes[j].data,
+                                       writes[j].length))
+        return TC_EC_ARGUMENT;
+  TC_EC_result status = charge(curve, TC_EC_OPERATION_VERIFY, work);
+  if (status != TC_EC_OK)
+    return status;
+  return verify(bytes, public_key.data, digest.data, digest.length, signature.data, workspace);
+}
+
+#if defined(TC_TEST_ECDSA_FAULT)
+/* Test seam: corrupts a signature between signing and self-verification. */
+void (*tc_test_ecdsa_fault)(uint8_t* signature, size_t length);
+#endif
+
+TC_EC_result TC_ECDSA_sign_digest(TC_EC_curve curve, TC_bytes private_key, TC_bytes public_key,
+                                  TC_bytes digest, TC_buffer signature,
+                                  TC_ECDSA_workspace* workspace, TC_EC_execution* execution)
 {
   ec_state s;
-  size_t bytes = curve_bytes(curve);
-  uint8_t nonce[TC_EC_MAX_BYTES] = {0};
-  TC_status status = TC_ERROR;
-  unsigned attempt;
-  if (!bytes || !private_key || private_key_len != bytes || !digest || !digest_len || !signature ||
-      signature_len != 2 * bytes || !workspace || !random.fill || !max_attempts ||
-      max_attempts > 16 ||
-      !tc_internal_ranges_disjoint(workspace, sizeof *workspace, private_key, private_key_len) ||
-      !tc_internal_ranges_disjoint(workspace, sizeof *workspace, digest, digest_len) ||
-      !tc_internal_ranges_disjoint(workspace, sizeof *workspace, signature, signature_len) ||
-      !tc_internal_ranges_disjoint(private_key, private_key_len, digest, digest_len) ||
-      !tc_internal_ranges_disjoint(private_key, private_key_len, signature, signature_len) ||
-      !tc_internal_ranges_disjoint(digest, digest_len, signature, signature_len))
-    return TC_ERROR;
-
+  const size_t bytes = curve_bytes(curve);
+  uint8_t nonce[TC_EC_MAX_BYTES];
+  uint8_t candidate[2 * TC_EC_MAX_BYTES];
+  if (!workspace || !execution || !execution->random.fill)
+    return TC_EC_ARGUMENT;
+  if (!bytes)
+    return TC_EC_UNSUPPORTED;
+  const TC_bytes spans[] = {private_key,
+                            digest,
+                            {signature.data, signature.capacity},
+                            {(const uint8_t*)workspace, sizeof *workspace},
+                            {(const uint8_t*)execution, sizeof *execution}};
+  if (!private_key.data || private_key.length != bytes || !public_key.data ||
+      public_key.length != 1 + 2 * bytes || !digest.data || !digest.length || !signature.data ||
+      signature.capacity < 2 * bytes || !spans_disjoint(spans, 5) ||
+      !tc_internal_ranges_disjoint(public_key.data, public_key.length, signature.data,
+                                   signature.capacity) ||
+      !tc_internal_ranges_disjoint(public_key.data, public_key.length, workspace,
+                                   sizeof *workspace))
+    return TC_EC_ARGUMENT;
+  TC_EC_result status = TC_EC_LIMIT;
   initialize(&s, &workspace->ec, bytes);
-  import_bytes(&s, workspace->scalars[0], private_key, 0);
-  if (zero_mask(workspace->scalars[0], s.words) ||
-      !subtract(s.w->reduced, workspace->scalars[0], F(&s, EC_N), s.words))
+  import_bytes(&s, workspace->scalars[0], private_key.data, 0);
+  if (!scalar_valid(&s, workspace->scalars[0])) {
+    status = TC_EC_INVALID;
     goto done;
-  digest_scalar(&s, workspace->scalars[1], digest, digest_len);
+  }
+  digest_scalar(&s, workspace->scalars[1], digest.data, digest.length);
 
-  for (attempt = 0; attempt < max_attempts; ++attempt) {
-    initialize(&s, &workspace->ec, bytes);
-    if (random.fill(random.context, nonce, bytes) != TC_OK)
+  for (size_t attempt = 0; attempt < execution->random_attempts; ++attempt) {
+    status = charge(curve, TC_EC_OPERATION_SIGN, &execution->work);
+    if (status != TC_EC_OK)
       goto done;
+    status = TC_EC_LIMIT;
+    initialize(&s, &workspace->ec, bytes);
+    if (execution->random.fill(execution->random.context, nonce, bytes) != TC_OK) {
+      status = TC_EC_ERROR;
+      goto done;
+    }
     import_bytes(&s, F(&s, EC_SCALAR), nonce, 0);
-    if (zero_mask(F(&s, EC_SCALAR), s.words) ||
-        !subtract(s.w->reduced, F(&s, EC_SCALAR), F(&s, EC_N), s.words))
+    if (!scalar_valid(&s, F(&s, EC_SCALAR)))
       continue;
     copy(&s, workspace->point[2], F(&s, EC_SCALAR));
     prepare_generator(&s);
     multiply_point(&s);
-    if (zero_mask(F(&s, 2), s.words))
+    if (tc_mp_zero_mask(F(&s, 2), s.words))
       continue;
     point_to_affine(&s);
     memset(F(&s, 3), 0, bytes);
     F(&s, 3)[0] = 1;
     mul(&s, F(&s, 0), F(&s, 0), F(&s, 3));
     tc_mp_reduce(workspace->point[0], F(&s, 0), 0, F(&s, EC_N), s.words, s.w->reduced);
-    if (zero_mask(workspace->point[0], s.words))
+    if (tc_mp_zero_mask(workspace->point[0], s.words))
       continue;
 
     initialize(&s, &workspace->ec, bytes);
@@ -680,15 +799,29 @@ TC_status TC_ECDSA_sign_digest(TC_EC_curve curve, const uint8_t* private_key,
     invert_prime(&s, F(&s, 9), F(&s, 8), F(&s, 2), F(&s, EC_N), s.order_factor);
     order_mul(&s, F(&s, 10), F(&s, 7), F(&s, 9));
     order_mul(&s, F(&s, 11), F(&s, 10), F(&s, 1));
-    if (zero_mask(F(&s, 11), s.words))
+    if (tc_mp_zero_mask(F(&s, 11), s.words))
       continue;
-    tc_mp_to_be(signature, workspace->point[0], bytes);
-    tc_mp_to_be(signature + bytes, F(&s, 11), bytes);
-    status = TC_OK;
+    tc_mp_to_be(candidate, workspace->point[0], bytes);
+    tc_mp_to_be(candidate + bytes, F(&s, 11), bytes);
+#if defined(TC_TEST_ECDSA_FAULT)
+    if (tc_test_ecdsa_fault)
+      tc_test_ecdsa_fault(candidate, 2 * bytes);
+#endif
+#if TC_ECDSA_SIGN_VERIFY
+    /* Release only a signature that verifies under the caller's public key. */
+    if (verify(bytes, public_key.data, digest.data, digest.length, candidate, workspace) !=
+        TC_EC_OK) {
+      status = TC_EC_ERROR;
+      goto done;
+    }
+#endif
+    memcpy(signature.data, candidate, 2 * bytes);
+    status = TC_EC_OK;
     break;
   }
 done:
   TC_secure_zero(nonce, sizeof nonce);
+  TC_secure_zero(candidate, sizeof candidate);
   TC_secure_zero(workspace, sizeof *workspace);
   return status;
 }

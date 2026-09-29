@@ -78,9 +78,11 @@ static MunitResult native_signature(const MunitParameter params[], void* context
   TC_ECDSA_workspace verification;
   TC_X509_public_key key;
   scalar[scalar_bytes - 1] = 1;
-  munit_assert_int(TC_EC_public_key(p384 ? TC_EC_P384 : TC_EC_P256, scalar, scalar_bytes,
-                                    spki + point_offset, point_bytes, &ec),
-                   ==, TC_OK);
+  TC_work_budget work = {UINT32_MAX};
+  munit_assert_int(TC_EC_public_key(p384 ? TC_EC_P384 : TC_EC_P256,
+                                    (TC_bytes){scalar, scalar_bytes},
+                                    (TC_buffer){spki + point_offset, point_bytes}, &ec, &work),
+                   ==, TC_EC_OK);
   munit_assert_int(TC_X509_subject_public_key(spki, spki_bytes, &key), ==, TC_TLV_OK);
   /* For d=k=1 and z=0, ECDSA has r=s=G.x. DER keeps these integers positive. */
   const size_t padding = (spki[point_offset + 1] & 0x80) ? 1 : 0;

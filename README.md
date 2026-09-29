@@ -437,8 +437,9 @@ cannot be copied or moved. Both APIs keep workspace outside the session so it
 can be reused between operations.
 
 The underlying `TC_ECDH`, `TC_EC_public_key`, and `TC_EC_validate_public_key`
-APIs take fixed-width scalars and uncompressed SEC1 public keys. They support
-P-256 and P-384. `TC_SSKDF_SHA256` and
+APIs take fixed-width scalars and uncompressed SEC1 public keys as spans, plus a
+work budget, and return a `TC_EC_result`. They support P-256 and P-384. See
+[Elliptic-curve operations](docs/ec.md). `TC_SSKDF_SHA256` and
 `TC_SSKDF_SHA384` accept OtherInfo as spans, avoiding a concatenation buffer.
 These APIs implement the single-step KDF. SP 800-108 KBKDF and HKDF have
 separate APIs.

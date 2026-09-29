@@ -83,9 +83,11 @@ TC_status TC_PIV_SM_begin(TC_PIV_SM* session, TC_PIV_SM_suite suite, const uint8
   for (attempt = 0; attempt < 16; ++attempt) {
     if (random(random_user, session->data.handshake.scalar, settings->coordinate_bytes) != TC_OK)
       break;
-    if (TC_EC_public_key(settings->curve, session->data.handshake.scalar,
-                         settings->coordinate_bytes, session->data.handshake.public_key,
-                         public_length, &workspace->operation.ec) == TC_OK) {
+    TC_work_budget budget = {TC_EC_operation_work(settings->curve, TC_EC_OPERATION_PUBLIC_KEY)};
+    if (TC_EC_public_key(settings->curve,
+                         (TC_bytes){session->data.handshake.scalar, settings->coordinate_bytes},
+                         (TC_buffer){session->data.handshake.public_key, public_length},
+                         &workspace->operation.ec, &budget) == TC_EC_OK) {
       status = TC_OK;
       break;
     }
@@ -119,12 +121,16 @@ static TC_status finish_response(TC_PIV_SM* session, const TC_PIV_SM_peer* parse
       !parsed->certificate.data || !parsed->certificate.length || !parsed->nonce.data ||
       !parsed->cryptogram.data)
     goto done;
-  status = TC_ECDH(settings->curve, session->data.handshake.scalar, settings->coordinate_bytes,
-                   authenticated_key.data, authenticated_key.length, workspace->secret,
-                   settings->coordinate_bytes, &workspace->operation.ec);
+  TC_work_budget budget = {TC_EC_operation_work(settings->curve, TC_EC_OPERATION_ECDH)};
+  const TC_EC_result agreed = TC_ECDH(
+      settings->curve, (TC_bytes){session->data.handshake.scalar, settings->coordinate_bytes},
+      authenticated_key, (TC_buffer){workspace->secret, settings->coordinate_bytes},
+      &workspace->operation.ec, &budget);
   TC_secure_zero(session->data.handshake.scalar, sizeof session->data.handshake.scalar);
-  if (status != TC_OK)
+  if (agreed != TC_EC_OK) {
+    status = TC_ERROR;
     goto done;
+  }
   status = TC_SHA256_digest(parsed->certificate.data, parsed->certificate.length,
                             TC_SM_SYM(workspace).digest);
   if (status != TC_OK)

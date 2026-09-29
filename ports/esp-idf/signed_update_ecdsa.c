@@ -16,7 +16,7 @@ esp_err_t verify_ecdsa_signature_block(const ets_secure_boot_signature_t* signat
     uint8_t signature[64];
   }* state;
   TC_EC_curve curve;
-  TC_status result;
+  TC_EC_result result;
   size_t bytes, i;
   if (!signatures || !digest || !trusted)
     return ESP_ERR_INVALID_ARG;
@@ -43,10 +43,12 @@ esp_err_t verify_ecdsa_signature_block(const ets_secure_boot_signature_t* signat
     state->signature[i] = trusted->ecdsa.signature[bytes - 1 - i];
     state->signature[bytes + i] = trusted->ecdsa.signature[2 * bytes - 1 - i];
   }
-  result = TC_ECDSA_verify_digest(curve, state->public_key, 1 + 2 * bytes, digest,
-                                  ESP_SECURE_BOOT_DIGEST_LEN, state->signature, 2 * bytes,
-                                  &state->workspace);
+  TC_work_budget work = {TC_EC_operation_work(curve, TC_EC_OPERATION_VERIFY)};
+  result =
+      TC_ECDSA_verify_digest(curve, (TC_bytes){state->public_key, 1 + 2 * bytes},
+                             (TC_bytes){digest, ESP_SECURE_BOOT_DIGEST_LEN},
+                             (TC_bytes){state->signature, 2 * bytes}, &state->workspace, &work);
   TC_secure_zero(state, sizeof *state);
   free(state);
-  return result == TC_OK ? ESP_OK : ESP_ERR_IMAGE_INVALID;
+  return result == TC_EC_OK ? ESP_OK : ESP_ERR_IMAGE_INVALID;
 }

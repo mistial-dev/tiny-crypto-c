@@ -64,12 +64,15 @@ static TC_X509_signature_result tc_pki_verify_digest(const TC_signature_algorith
     memset(raw, 0, sizeof raw);
     memcpy(raw + width - pair.r.length, pair.r.data, pair.r.length);
     memcpy(raw + 2 * width - pair.s.length, pair.s.data, pair.s.length);
-    result = TC_ECDSA_verify_digest(key->curve, key->key.data, key->key.length, digest.data,
-                                    digest.length, raw, 2 * width, ec);
+    /* The PKI budget above covers the EC operation's own units. */
+    TC_work_budget budget = {TC_EC_operation_work(key->curve, TC_EC_OPERATION_VERIFY)};
+    const TC_EC_result verified = TC_ECDSA_verify_digest(key->curve, key->key, digest,
+                                                         (TC_bytes){raw, 2 * width}, ec, &budget);
     TC_secure_zero(raw, sizeof raw);
-    return result == TC_OK         ? TC_X509_SIGNATURE_VALID
-           : result == TC_MISMATCH ? TC_X509_SIGNATURE_INVALID
-                                   : TC_X509_SIGNATURE_ERROR;
+    return verified == TC_EC_OK            ? TC_X509_SIGNATURE_VALID
+           : verified == TC_EC_INVALID     ? TC_X509_SIGNATURE_INVALID
+           : verified == TC_EC_UNSUPPORTED ? TC_X509_SIGNATURE_UNSUPPORTED
+                                           : TC_X509_SIGNATURE_ERROR;
 #else
     (void)ec;
     return TC_X509_SIGNATURE_UNSUPPORTED;

@@ -93,8 +93,8 @@ static TC_X509_signature_result check_point(const TC_PIV_CVC* cvc, TC_EC_curve c
     return TC_X509_SIGNATURE_INVALID;
   if (tc_pki_work_charge(work, bits * POINT_WORK_PER_BIT) != TC_TLV_OK)
     return TC_X509_SIGNATURE_LIMIT;
-  return TC_EC_validate_public_key(curve, cvc->public_key.data, cvc->public_key.length, points) ==
-                 TC_OK
+  TC_work_budget budget = {TC_EC_operation_work(curve, TC_EC_OPERATION_VALIDATE)};
+  return TC_EC_validate_public_key(curve, cvc->public_key, points, &budget) == TC_EC_OK
              ? TC_X509_SIGNATURE_VALID
              : TC_X509_SIGNATURE_INVALID;
 #else

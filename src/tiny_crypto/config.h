@@ -325,6 +325,14 @@
 #if TC_ENABLE_EC && !TC_EC_ENABLE_P192 && !TC_EC_ENABLE_P256 && !TC_EC_ENABLE_P384
 #error "EC requires at least one curve"
 #endif
+/* Verify each ECDSA signature before returning it, to catch faults during
+ * signing. */
+#ifndef TC_ECDSA_SIGN_VERIFY
+#define TC_ECDSA_SIGN_VERIFY 1
+#endif
+#if TC_ECDSA_SIGN_VERIFY != 0 && TC_ECDSA_SIGN_VERIFY != 1
+#error "TC_ECDSA_SIGN_VERIFY must be 0 or 1"
+#endif
 
 #ifndef TC_ENABLE_SSKDF
 #define TC_ENABLE_SSKDF TC_PROFILE_VALUE(0, 0, 0, 1)

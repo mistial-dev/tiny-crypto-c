@@ -10,6 +10,71 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+/* Pointer-and-length forms of the EC API with an ample work budget. */
+static TC_EC_result ec_public(TC_EC_curve curve, const uint8_t* scalar, size_t scalar_length,
+                              uint8_t* output, size_t output_length, TC_EC_workspace* workspace)
+{
+  TC_work_budget work = {UINT32_MAX};
+  return TC_EC_public_key(curve, (TC_bytes){scalar, scalar_length},
+                          (TC_buffer){output, output_length}, workspace, &work);
+}
+
+static TC_EC_result ec_validate(TC_EC_curve curve, const uint8_t* point, size_t length,
+                                TC_EC_workspace* workspace)
+{
+  TC_work_budget work = {UINT32_MAX};
+  return TC_EC_validate_public_key(curve, (TC_bytes){point, length}, workspace, &work);
+}
+
+static TC_EC_result ec_dh(TC_EC_curve curve, const uint8_t* scalar, size_t scalar_length,
+                          const uint8_t* peer, size_t peer_length, uint8_t* output,
+                          size_t output_length, TC_EC_workspace* workspace)
+{
+  TC_work_budget work = {UINT32_MAX};
+  return TC_ECDH(curve, (TC_bytes){scalar, scalar_length}, (TC_bytes){peer, peer_length},
+                 (TC_buffer){output, output_length}, workspace, &work);
+}
+
+static TC_EC_result ec_generate(TC_EC_curve curve, uint8_t* private_key, size_t private_length,
+                                uint8_t* public_key, size_t public_length, TC_random_source random,
+                                size_t attempts, TC_EC_workspace* workspace)
+{
+  TC_EC_execution execution = {random, attempts, {UINT32_MAX}};
+  return TC_EC_generate_key_pair(curve, (TC_buffer){private_key, private_length},
+                                 (TC_buffer){public_key, public_length}, workspace, &execution);
+}
+
+static TC_EC_result ecdsa_verify(TC_EC_curve curve, const uint8_t* public_key, size_t public_length,
+                                 const uint8_t* digest, size_t digest_length,
+                                 const uint8_t* signature, size_t signature_length,
+                                 TC_ECDSA_workspace* workspace)
+{
+  TC_work_budget work = {UINT32_MAX};
+  return TC_ECDSA_verify_digest(curve, (TC_bytes){public_key, public_length},
+                                (TC_bytes){digest, digest_length},
+                                (TC_bytes){signature, signature_length}, workspace, &work);
+}
+
+/* Signs with the public key derived from private_key, or a placeholder when
+ * the private key is out of range. */
+static TC_EC_result ecdsa_sign(TC_EC_curve curve, const uint8_t* private_key, size_t private_length,
+                               const uint8_t* digest, size_t digest_length, uint8_t* signature,
+                               size_t signature_length, TC_random_source random, size_t attempts,
+                               TC_ECDSA_workspace* workspace)
+{
+  static uint8_t public_key[1 + 2 * TC_EC_MAX_BYTES];
+  TC_EC_workspace key_workspace;
+  memset(public_key, 0, sizeof public_key);
+  public_key[0] = 4;
+  (void)ec_public(curve, private_key, private_length, public_key, 1 + 2 * private_length,
+                  &key_workspace);
+  TC_EC_execution execution = {random, attempts, {UINT32_MAX}};
+  return TC_ECDSA_sign_digest(curve, (TC_bytes){private_key, private_length},
+                              (TC_bytes){public_key, 1 + 2 * private_length},
+                              (TC_bytes){digest, digest_length},
+                              (TC_buffer){signature, signature_length}, workspace, &execution);
+}
+
 static const struct {
   TC_EC_curve curve;
   size_t bytes;
@@ -65,7 +130,7 @@ static MunitResult wycheproof(const MunitParameter params[], void* user)
     char* token = strtok(line, " \t\r\n");
     size_t columns = 0, scalar_length, public_length, expected_length, width;
     TC_EC_curve curve;
-    TC_status status = TC_ERROR;
+    TC_EC_result status = TC_EC_ARGUMENT;
     while (token) {
       munit_assert_size(columns, <, 7);
       fields[columns++] = token;
@@ -85,28 +150,28 @@ static MunitResult wycheproof(const MunitParameter params[], void* user)
     memset(&workspace, 0, sizeof workspace);
     memcpy(output, unchanged, sizeof output);
     if (strcmp(fields[1], "ecpoint") == 0) {
-      status = TC_ECDH(curve, scalar, scalar_length, public_key, public_length, output, width,
-                       &workspace);
+      status =
+          ec_dh(curve, scalar, scalar_length, public_key, public_length, output, width, &workspace);
     }
 #if TC_ENABLE_X509
     else if (strcmp(fields[1], "asn") == 0) {
       TC_X509_public_key key;
       if (TC_X509_subject_public_key(public_key, public_length, &key) == TC_TLV_OK &&
           key.type == TC_KEY_EC && key.curve == curve)
-        status = TC_ECDH(curve, scalar, scalar_length, key.key.data, key.key.length, output, width,
-                         &workspace);
+        status = ec_dh(curve, scalar, scalar_length, key.key.data, key.key.length, output, width,
+                       &workspace);
     }
 #endif
     else
       munit_errorf("Unsupported encoding %s", fields[1]);
     if (strcmp(fields[5], "accept") == 0) {
-      if (status != TC_OK)
+      if (status != TC_EC_OK)
         munit_errorf("Wycheproof %s: rejected valid input", fields[6]);
       munit_assert_size(expected_length, ==, width);
       munit_assert_memory_equal(width, output, expected);
       munit_assert_memory_equal(sizeof output - width, output + width, unchanged + width);
     } else {
-      if (status != TC_ERROR)
+      if (status == TC_EC_OK)
         munit_errorf("Wycheproof %s: accepted rejected input", fields[6]);
       munit_assert_memory_equal(sizeof output, output, unchanged);
     }
@@ -134,9 +199,9 @@ static MunitResult signature_answers(const MunitParameter params[], void* user)
     memcpy(signature, point + 1, n);
     memcpy(signature + n, point + 1, n);
     memset(digest, 0, sizeof digest);
-    munit_assert_int(TC_ECDSA_verify_digest(vectors[v].curve, point, 1 + 2 * n, digest, n,
-                                            signature, 2 * n, &workspace),
-                     ==, TC_OK);
+    munit_assert_int(
+        ecdsa_verify(vectors[v].curve, point, 1 + 2 * n, digest, n, signature, 2 * n, &workspace),
+        ==, TC_EC_OK);
     munit_assert_true(tc_test_all_zero(&workspace, sizeof workspace));
     for (size_t i = n; i > 0; --i) {
       unsigned subtrahend = signature[i - 1] + borrow;
@@ -146,23 +211,23 @@ static MunitResult signature_answers(const MunitParameter params[], void* user)
     munit_assert_uint(borrow, ==, 0);
     /* Replacing s with n-s preserves an ECDSA signature. */
     memcpy(signature + n, complement, n);
-    munit_assert_int(TC_ECDSA_verify_digest(vectors[v].curve, point, 1 + 2 * n, digest, n,
-                                            signature, 2 * n, &workspace),
-                     ==, TC_OK);
+    munit_assert_int(
+        ecdsa_verify(vectors[v].curve, point, 1 + 2 * n, digest, n, signature, 2 * n, &workspace),
+        ==, TC_EC_OK);
     memcpy(signature + n, signature, n);
     /* z = n-r makes u1*G + u2*Q the point at infinity. */
-    munit_assert_int(TC_ECDSA_verify_digest(vectors[v].curve, point, 1 + 2 * n, complement, n,
-                                            signature, 2 * n, &workspace),
-                     ==, TC_MISMATCH);
+    munit_assert_int(ecdsa_verify(vectors[v].curve, point, 1 + 2 * n, complement, n, signature,
+                                  2 * n, &workspace),
+                     ==, TC_EC_INVALID);
     memcpy(signature + n, order, n);
-    munit_assert_int(TC_ECDSA_verify_digest(vectors[v].curve, point, 1 + 2 * n, digest, n,
-                                            signature, 2 * n, &workspace),
-                     ==, TC_MISMATCH);
+    munit_assert_int(
+        ecdsa_verify(vectors[v].curve, point, 1 + 2 * n, digest, n, signature, 2 * n, &workspace),
+        ==, TC_EC_INVALID);
     memcpy(signature + n, signature, n);
     memcpy(signature, order, n);
-    munit_assert_int(TC_ECDSA_verify_digest(vectors[v].curve, point, 1 + 2 * n, digest, n,
-                                            signature, 2 * n, &workspace),
-                     ==, TC_MISMATCH);
+    munit_assert_int(
+        ecdsa_verify(vectors[v].curve, point, 1 + 2 * n, digest, n, signature, 2 * n, &workspace),
+        ==, TC_EC_INVALID);
     munit_assert_true(tc_test_all_zero(&workspace, sizeof workspace));
   }
   return MUNIT_OK;
@@ -181,27 +246,24 @@ static MunitResult known_answers(const MunitParameter params[], void* user)
     scalar[n - 1] = 1;
     munit_assert_size(tc_test_decode_hex(vectors[i].generator, generator, sizeof generator), ==,
                       1 + 2 * n);
-    munit_assert_int(TC_EC_public_key(vectors[i].curve, scalar, n, point, 1 + 2 * n, &w), ==,
-                     TC_OK);
+    munit_assert_int(ec_public(vectors[i].curve, scalar, n, point, 1 + 2 * n, &w), ==, TC_OK);
     munit_assert_memory_equal(1 + 2 * n, point, generator);
     munit_assert_true(tc_test_all_zero(&w, sizeof w));
     scalar[n - 1] = 2;
     munit_assert_size(tc_test_decode_hex(vectors[i].twice, expected, sizeof expected), ==,
                       1 + 2 * n);
-    munit_assert_int(TC_EC_public_key(vectors[i].curve, scalar, n, point, 1 + 2 * n, &w), ==,
-                     TC_OK);
+    munit_assert_int(ec_public(vectors[i].curve, scalar, n, point, 1 + 2 * n, &w), ==, TC_OK);
     munit_assert_memory_equal(1 + 2 * n, point, expected);
-    munit_assert_int(TC_ECDH(vectors[i].curve, scalar, n, generator, 1 + 2 * n, shared, n, &w), ==,
+    munit_assert_int(ec_dh(vectors[i].curve, scalar, n, generator, 1 + 2 * n, shared, n, &w), ==,
                      TC_OK);
     munit_assert_memory_equal(n, shared, expected + 1);
     munit_assert_true(tc_test_all_zero(&w, sizeof w));
     munit_assert_size(tc_test_decode_hex(vectors[i].minus_one, scalar, sizeof scalar), ==, n);
     munit_assert_size(tc_test_decode_hex(vectors[i].negative, expected, sizeof expected), ==,
                       1 + 2 * n);
-    munit_assert_int(TC_EC_public_key(vectors[i].curve, scalar, n, point, 1 + 2 * n, &w), ==,
-                     TC_OK);
+    munit_assert_int(ec_public(vectors[i].curve, scalar, n, point, 1 + 2 * n, &w), ==, TC_OK);
     munit_assert_memory_equal(1 + 2 * n, point, expected);
-    munit_assert_int(TC_EC_validate_public_key(vectors[i].curve, point, 1 + 2 * n, &w), ==, TC_OK);
+    munit_assert_int(ec_validate(vectors[i].curve, point, 1 + 2 * n, &w), ==, TC_EC_OK);
   }
   return MUNIT_OK;
 }
@@ -216,49 +278,47 @@ static MunitResult rejected_inputs(const MunitParameter params[], void* user)
   memset(output, 0xa5, sizeof output);
   memcpy(saved, output, sizeof saved);
 #if !TC_EC_ENABLE_P256
-  munit_assert_int(TC_EC_public_key(TC_EC_P256, scalar, 32, output, 65, &w), ==, TC_ERROR);
+  munit_assert_int(ec_public(TC_EC_P256, scalar, 32, output, 65, &w), ==, TC_EC_UNSUPPORTED);
 #endif
 #if !TC_EC_ENABLE_P384
-  munit_assert_int(TC_EC_public_key(TC_EC_P384, scalar, 48, output, 97, &w), ==, TC_ERROR);
+  munit_assert_int(ec_public(TC_EC_P384, scalar, 48, output, 97, &w), ==, TC_EC_UNSUPPORTED);
 #endif
   for (i = 0; i < sizeof vectors / sizeof vectors[0]; ++i) {
     n = vectors[i].bytes;
     memset(scalar, 0, sizeof scalar);
-    munit_assert_int(TC_EC_public_key(vectors[i].curve, scalar, n, output, 1 + 2 * n, &w), ==,
-                     TC_ERROR);
+    munit_assert_int(ec_public(vectors[i].curve, scalar, n, output, 1 + 2 * n, &w), ==,
+                     TC_EC_INVALID);
     munit_assert_true(tc_test_all_zero(&w, sizeof w));
     munit_assert_size(tc_test_decode_hex(vectors[i].order, scalar, sizeof scalar), ==, n);
-    munit_assert_int(TC_EC_public_key(vectors[i].curve, scalar, n, output, 1 + 2 * n, &w), ==,
-                     TC_ERROR);
+    munit_assert_int(ec_public(vectors[i].curve, scalar, n, output, 1 + 2 * n, &w), ==,
+                     TC_EC_INVALID);
     memset(scalar, 0xff, sizeof scalar);
-    munit_assert_int(TC_EC_public_key(vectors[i].curve, scalar, n, output, 1 + 2 * n, &w), ==,
-                     TC_ERROR);
+    munit_assert_int(ec_public(vectors[i].curve, scalar, n, output, 1 + 2 * n, &w), ==,
+                     TC_EC_INVALID);
     memset(scalar, 0, sizeof scalar);
     scalar[n - 1] = 1;
     munit_assert_size(tc_test_decode_hex(vectors[i].generator, point, sizeof point), ==, 1 + 2 * n);
     for (length = 0; length < 1 + 2 * n; ++length)
-      munit_assert_int(TC_EC_validate_public_key(vectors[i].curve, point, length, &w), ==,
-                       TC_ERROR);
+      munit_assert_int(ec_validate(vectors[i].curve, point, length, &w), ==, TC_EC_ARGUMENT);
     point[0] = 2;
-    munit_assert_int(TC_ECDH(vectors[i].curve, scalar, n, point, 1 + 2 * n, output, n, &w), ==,
-                     TC_ERROR);
+    munit_assert_int(ec_dh(vectors[i].curve, scalar, n, point, 1 + 2 * n, output, n, &w), ==,
+                     TC_EC_INVALID);
     point[0] = 4;
     point[n] ^= 1;
-    munit_assert_int(TC_ECDH(vectors[i].curve, scalar, n, point, 1 + 2 * n, output, n, &w), ==,
-                     TC_ERROR);
+    munit_assert_int(ec_dh(vectors[i].curve, scalar, n, point, 1 + 2 * n, output, n, &w), ==,
+                     TC_EC_INVALID);
     memset(point + 1, 0xff, n);
-    munit_assert_int(TC_ECDH(vectors[i].curve, scalar, n, point, 1 + 2 * n, output, n, &w), ==,
-                     TC_ERROR);
+    munit_assert_int(ec_dh(vectors[i].curve, scalar, n, point, 1 + 2 * n, output, n, &w), ==,
+                     TC_EC_INVALID);
     memset(point + 1, 0, 2 * n);
-    munit_assert_int(TC_EC_validate_public_key(vectors[i].curve, point, 1 + 2 * n, &w), ==,
-                     TC_ERROR);
-    munit_assert_int(TC_EC_public_key(vectors[i].curve, scalar, n, scalar, n, &w), ==, TC_ERROR);
-    munit_assert_int(TC_EC_public_key(vectors[i].curve, scalar, n, (uint8_t*)&w, 1 + 2 * n, &w), ==,
-                     TC_ERROR);
-    munit_assert_int(TC_EC_public_key(vectors[i].curve, scalar, n, output, 1 + 2 * n, NULL), ==,
-                     TC_ERROR);
-    munit_assert_int(TC_EC_public_key((TC_EC_curve)0, scalar, n, output, 1 + 2 * n, &w), ==,
-                     TC_ERROR);
+    munit_assert_int(ec_validate(vectors[i].curve, point, 1 + 2 * n, &w), ==, TC_EC_INVALID);
+    munit_assert_int(ec_public(vectors[i].curve, scalar, n, scalar, n, &w), ==, TC_EC_ARGUMENT);
+    munit_assert_int(ec_public(vectors[i].curve, scalar, n, (uint8_t*)&w, 1 + 2 * n, &w), ==,
+                     TC_EC_ARGUMENT);
+    munit_assert_int(ec_public(vectors[i].curve, scalar, n, output, 1 + 2 * n, NULL), ==,
+                     TC_EC_ARGUMENT);
+    munit_assert_int(ec_public((TC_EC_curve)0, scalar, n, output, 1 + 2 * n, &w), ==,
+                     TC_EC_UNSUPPORTED);
     munit_assert_memory_equal(sizeof output, output, saved);
   }
   return MUNIT_OK;
@@ -281,9 +341,9 @@ static MunitResult captured_answer(const MunitParameter params[], void* user)
   munit_assert_size(tc_test_decode_hex(capture[2], expected, sizeof expected), ==, 1 + 2 * n);
   munit_assert_size(tc_test_decode_hex(capture[3], peer, sizeof peer), ==, 1 + 2 * n);
   munit_assert_size(tc_test_decode_hex(capture[4], z, sizeof z), ==, n);
-  munit_assert_int(TC_EC_public_key(curve, scalar, n, point, 1 + 2 * n, &w), ==, TC_OK);
+  munit_assert_int(ec_public(curve, scalar, n, point, 1 + 2 * n, &w), ==, TC_EC_OK);
   munit_assert_memory_equal(1 + 2 * n, point, expected);
-  munit_assert_int(TC_ECDH(curve, scalar, n, peer, 1 + 2 * n, shared, n, &w), ==, TC_OK);
+  munit_assert_int(ec_dh(curve, scalar, n, peer, 1 + 2 * n, shared, n, &w), ==, TC_EC_OK);
   munit_assert_memory_equal(n, shared, z);
   munit_assert_true(tc_test_all_zero(&w, sizeof w));
   return MUNIT_OK;
@@ -332,9 +392,9 @@ static MunitResult generation_answers(const MunitParameter params[], void* user)
     memset(private_key, 0xa5, sizeof private_key);
     memset(public_key, 0xa5, sizeof public_key);
     random = (SignRandom){0, 1, 0};
-    munit_assert_int(TC_EC_generate_key_pair(vectors[i].curve, private_key, n, public_key,
-                                             1 + 2 * n, source, 2, &workspace),
-                     ==, TC_OK);
+    munit_assert_int(
+        ec_generate(vectors[i].curve, private_key, n, public_key, 1 + 2 * n, source, 2, &workspace),
+        ==, TC_EC_OK);
     munit_assert_uint(random.calls, ==, 2);
     for (j = 0; j < n - 1; ++j)
       munit_assert_uint(private_key[j], ==, 0);
@@ -345,17 +405,17 @@ static MunitResult generation_answers(const MunitParameter params[], void* user)
     memset(private_key, 0xa5, sizeof private_key);
     memset(public_key, 0xa5, sizeof public_key);
     random = (SignRandom){0, 1, 0};
-    munit_assert_int(TC_EC_generate_key_pair(vectors[i].curve, private_key, n, public_key,
-                                             1 + 2 * n, source, 1, &workspace),
-                     ==, TC_ERROR);
+    munit_assert_int(
+        ec_generate(vectors[i].curve, private_key, n, public_key, 1 + 2 * n, source, 1, &workspace),
+        ==, TC_EC_LIMIT);
     for (j = 0; j < sizeof private_key; ++j)
       munit_assert_uint(private_key[j], ==, 0xa5);
     for (j = 0; j < sizeof public_key; ++j)
       munit_assert_uint(public_key[j], ==, 0xa5);
     random = (SignRandom){0, 0, 1};
-    munit_assert_int(TC_EC_generate_key_pair(vectors[i].curve, private_key, n, public_key,
-                                             1 + 2 * n, source, 2, &workspace),
-                     ==, TC_ERROR);
+    munit_assert_int(
+        ec_generate(vectors[i].curve, private_key, n, public_key, 1 + 2 * n, source, 2, &workspace),
+        ==, TC_EC_ERROR);
     for (j = 0; j < sizeof private_key; ++j)
       munit_assert_uint(private_key[j], ==, 0xa5);
     for (j = 0; j < sizeof public_key; ++j)
@@ -410,9 +470,9 @@ static MunitResult signing_rfc6979(const MunitParameter params[], void* user)
     munit_assert_size(tc_test_decode_hex(answers[i].nonce, nonce, sizeof nonce), ==, n);
     munit_assert_size(tc_test_decode_hex(answers[i].signature, expected, sizeof expected), ==,
                       2 * n);
-    munit_assert_int(TC_ECDSA_sign_digest(answers[i].curve, private_key, n, digest, n, signature,
-                                          2 * n, random, 1, &workspace),
-                     ==, TC_OK);
+    munit_assert_int(ecdsa_sign(answers[i].curve, private_key, n, digest, n, signature, 2 * n,
+                                random, 1, &workspace),
+                     ==, TC_EC_OK);
     munit_assert_memory_equal(2 * n, signature, expected);
     munit_assert_true(tc_test_all_zero(&workspace, sizeof workspace));
   }
@@ -431,8 +491,8 @@ static MunitResult signing_rejects_invalid_keys_and_aliasing(const MunitParamete
   (void)user;
   memset(signature, 0xa5, sizeof signature);
   munit_assert_int(
-      TC_ECDSA_sign_digest(TC_EC_P256, key, 32, digest, 32, signature, 64, source, 1, &workspace),
-      ==, TC_ERROR);
+      ecdsa_sign(TC_EC_P256, key, 32, digest, 32, signature, 64, source, 1, &workspace), ==,
+      TC_EC_INVALID);
   munit_assert_true(tc_test_all_zero(&workspace, sizeof workspace));
   munit_assert_uint(random.calls, ==, 0);
   munit_assert_size(
@@ -440,25 +500,25 @@ static MunitResult signing_rejects_invalid_keys_and_aliasing(const MunitParamete
                          sizeof key),
       ==, 32);
   munit_assert_int(
-      TC_ECDSA_sign_digest(TC_EC_P256, key, 32, digest, 32, signature, 64, source, 1, &workspace),
-      ==, TC_ERROR);
+      ecdsa_sign(TC_EC_P256, key, 32, digest, 32, signature, 64, source, 1, &workspace), ==,
+      TC_EC_INVALID);
   munit_assert_true(tc_test_all_zero(&workspace, sizeof workspace));
   munit_assert_uint(random.calls, ==, 0);
   for (size_t i = 0; i < sizeof signature; ++i)
     munit_assert_uint(signature[i], ==, 0xa5);
   overlapping[31] = 1;
-  munit_assert_int(TC_ECDSA_sign_digest(TC_EC_P256, overlapping, 32, digest, 32, overlapping, 64,
-                                        source, 1, &workspace),
-                   ==, TC_ERROR);
+  munit_assert_int(
+      ecdsa_sign(TC_EC_P256, overlapping, 32, digest, 32, overlapping, 64, source, 1, &workspace),
+      ==, TC_EC_ARGUMENT);
   munit_assert_uint(overlapping[31], ==, 1);
   munit_assert_uint(random.calls, ==, 0);
-  munit_assert_int(TC_ECDSA_sign_digest(TC_EC_P256, overlapping, 32, overlapping, 32, signature, 64,
-                                        source, 1, &workspace),
-                   ==, TC_ERROR);
+  munit_assert_int(ecdsa_sign(TC_EC_P256, overlapping, 32, overlapping, 32, signature, 64, source,
+                              1, &workspace),
+                   ==, TC_EC_ARGUMENT);
   munit_assert_uint(random.calls, ==, 0);
-  munit_assert_int(TC_ECDSA_sign_digest(TC_EC_P256, overlapping, 32, digest, 32, signature, 64,
-                                        source, 0, &workspace),
-                   ==, TC_ERROR);
+  munit_assert_int(
+      ecdsa_sign(TC_EC_P256, overlapping, 32, digest, 32, signature, 64, source, 0, &workspace), ==,
+      TC_EC_LIMIT);
   munit_assert_uint(random.calls, ==, 0);
 #else
   (void)params;
@@ -507,35 +567,32 @@ static MunitResult signing_answers(const MunitParameter params[], void* user)
     munit_assert_size(tc_test_decode_hex(signatures[i], expected, sizeof expected), ==, 2 * n);
     memset(signature, 0xa5, sizeof signature);
     random = (SignRandom){0, 1, 0};
-    munit_assert_int(TC_ECDSA_sign_digest(vectors[i].curve, private_key, n, digest,
-                                          n == 48 ? 48 : 32, signature, 2 * n, source, 2,
-                                          &workspace),
-                     ==, TC_OK);
+    munit_assert_int(ecdsa_sign(vectors[i].curve, private_key, n, digest, n == 48 ? 48 : 32,
+                                signature, 2 * n, source, 2, &workspace),
+                     ==, TC_EC_OK);
     munit_assert_uint(random.calls, ==, 2);
     munit_assert_memory_equal(2 * n, signature, expected);
     munit_assert_true(tc_test_all_zero(&workspace, sizeof workspace));
     munit_assert_int(
-        TC_EC_public_key(vectors[i].curve, private_key, n, public_key, 1 + 2 * n, &key_workspace),
-        ==, TC_OK);
-    munit_assert_int(TC_ECDSA_verify_digest(vectors[i].curve, public_key, 1 + 2 * n, digest,
-                                            n == 48 ? 48 : 32, signature, 2 * n, &workspace),
-                     ==, TC_OK);
+        ec_public(vectors[i].curve, private_key, n, public_key, 1 + 2 * n, &key_workspace), ==,
+        TC_EC_OK);
+    munit_assert_int(ecdsa_verify(vectors[i].curve, public_key, 1 + 2 * n, digest,
+                                  n == 48 ? 48 : 32, signature, 2 * n, &workspace),
+                     ==, TC_EC_OK);
 
     memset(signature, 0xa5, sizeof signature);
     random = (SignRandom){0, 1, 0};
-    munit_assert_int(TC_ECDSA_sign_digest(vectors[i].curve, private_key, n, digest,
-                                          n == 48 ? 48 : 32, signature, 2 * n, source, 1,
-                                          &workspace),
-                     ==, TC_ERROR);
+    munit_assert_int(ecdsa_sign(vectors[i].curve, private_key, n, digest, n == 48 ? 48 : 32,
+                                signature, 2 * n, source, 1, &workspace),
+                     ==, TC_EC_LIMIT);
     munit_assert_uint(random.calls, ==, 1);
     for (size_t j = 0; j < sizeof signature; ++j)
       munit_assert_uint(signature[j], ==, 0xa5);
     munit_assert_true(tc_test_all_zero(&workspace, sizeof workspace));
     random = (SignRandom){0, 0, 1};
-    munit_assert_int(TC_ECDSA_sign_digest(vectors[i].curve, private_key, n, digest,
-                                          n == 48 ? 48 : 32, signature, 2 * n, source, 2,
-                                          &workspace),
-                     ==, TC_ERROR);
+    munit_assert_int(ecdsa_sign(vectors[i].curve, private_key, n, digest, n == 48 ? 48 : 32,
+                                signature, 2 * n, source, 2, &workspace),
+                     ==, TC_EC_ERROR);
     for (size_t j = 0; j < sizeof signature; ++j)
       munit_assert_uint(signature[j], ==, 0xa5);
     munit_assert_true(tc_test_all_zero(&workspace, sizeof workspace));
@@ -552,16 +609,16 @@ static MunitResult signing_answers(const MunitParameter params[], void* user)
         ==, 32);
     munit_assert_size(tc_test_decode_hex(answer, expected, sizeof expected), ==, 48);
     random = (SignRandom){0, 0, 0};
-    munit_assert_int(TC_ECDSA_sign_digest(TC_EC_P192, private_key, 24, digest, 32, signature, 48,
-                                          source, 1, &workspace),
-                     ==, TC_OK);
+    munit_assert_int(
+        ecdsa_sign(TC_EC_P192, private_key, 24, digest, 32, signature, 48, source, 1, &workspace),
+        ==, TC_EC_OK);
     munit_assert_memory_equal(48, signature, expected);
     munit_assert_true(tc_test_all_zero(&workspace, sizeof workspace));
-    munit_assert_int(TC_EC_public_key(TC_EC_P192, private_key, 24, public_key, 49, &key_workspace),
-                     ==, TC_OK);
+    munit_assert_int(ec_public(TC_EC_P192, private_key, 24, public_key, 49, &key_workspace), ==,
+                     TC_EC_OK);
     munit_assert_int(
-        TC_ECDSA_verify_digest(TC_EC_P192, public_key, 49, digest, 32, signature, 48, &workspace),
-        ==, TC_OK);
+        ecdsa_verify(TC_EC_P192, public_key, 49, digest, 32, signature, 48, &workspace), ==,
+        TC_EC_OK);
   }
 #endif
   return MUNIT_OK;
