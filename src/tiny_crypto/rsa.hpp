@@ -104,11 +104,12 @@ inline rsa_result rsa_encode_pss_digest(const rsa_pss_options& options, bytes di
   return rsa_encode_pss_digest(options, digest, salt, output, work);
 }
 
-inline rsa_result rsa_validate_private_key(const rsa_private_key& key,
-                                           const rsa_workspace& workspace,
-                                           rsa_execution& execution) noexcept
+inline rsa_result
+rsa_validate_private_key(const rsa_private_key& key, const rsa_workspace& workspace,
+                         rsa_execution& execution,
+                         TC_RSA_exponent_policy exponent_policy = TC_RSA_EXPONENT_FIPS) noexcept
 {
-  return ::TC_RSA_validate_private_key(&key, &workspace, &execution);
+  return ::TC_RSA_validate_private_key(&key, exponent_policy, &workspace, &execution);
 }
 
 inline rsa_result rsa_verify_pss_digest(const rsa_public_key& key, const rsa_pss_options& options,

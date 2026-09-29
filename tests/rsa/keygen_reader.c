@@ -61,12 +61,16 @@ static MunitResult vectors(const MunitParameter params[], void* data)
     el -= leading;
     const TC_RSA_private_key key = {{{n, nl}, {e + leading, el}}, {d, dl}, {p, pl}, {q, ql}, NULL};
     TC_RSA_execution execution = {{draw, &random_state}, 512, {UINT32_MAX}};
-    TC_RSA_result result = TC_RSA_validate_private_key(&key, &workspace, &execution);
+    /* Vectors with e outside the FIPS 186-5 range need the explicit override. */
+    const TC_RSA_exponent_policy policy = TC_RSA_exponent_in_fips_range(key.public_key.exponent)
+                                              ? TC_RSA_EXPONENT_FIPS
+                                              : TC_RSA_EXPONENT_ANY_ODD;
+    TC_RSA_result result = TC_RSA_validate_private_key(&key, policy, &workspace, &execution);
     if (result != TC_RSA_OK)
       munit_errorf("NIST RSA KeyGen record %s: status %d", fields[5], result);
     if (count == 0) {
       p[pl - 1] ^= 1u;
-      result = TC_RSA_validate_private_key(&key, &workspace, &execution);
+      result = TC_RSA_validate_private_key(&key, policy, &workspace, &execution);
       munit_assert_int(result, !=, TC_RSA_OK);
       p[pl - 1] ^= 1u;
     }

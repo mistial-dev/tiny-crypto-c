@@ -49,7 +49,7 @@ static TC_RSA_result validate_private_key(const TC_RSA_private_key* key, TC_rand
                                           const TC_RSA_workspace* workspace, uint32_t work)
 {
   TC_RSA_execution execution = {{random, context}, attempts, {work}};
-  return TC_RSA_validate_private_key(key, workspace, &execution);
+  return TC_RSA_validate_private_key(key, TC_RSA_EXPONENT_FIPS, workspace, &execution);
 }
 
 static TC_RSA_result sign_v15(const TC_RSA_private_key* key, TC_hash_algorithm hash,
@@ -388,10 +388,33 @@ static MunitResult operation_ranges(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+/* FIPS 186-5 A.1.1: e is odd and 2^16 < e < 2^256. */
+static MunitResult exponent_range(const MunitParameter params[], void* user)
+{
+  static const uint8_t e3[] = {3}, e65535[] = {0xff, 0xff}, e65536[] = {1, 0, 0};
+  static const uint8_t e65537[] = {1, 0, 1}, padded[] = {0, 0, 1, 0, 1}, even[] = {1, 0, 2};
+  uint8_t top[32], over[33] = {1};
+  (void)params;
+  (void)user;
+  memset(top, 0xff, sizeof top);
+  over[32] = 1;
+  munit_assert_int(TC_RSA_exponent_in_fips_range((TC_bytes){e3, sizeof e3}), ==, 0);
+  munit_assert_int(TC_RSA_exponent_in_fips_range((TC_bytes){e65535, sizeof e65535}), ==, 0);
+  munit_assert_int(TC_RSA_exponent_in_fips_range((TC_bytes){e65536, sizeof e65536}), ==, 0);
+  munit_assert_int(TC_RSA_exponent_in_fips_range((TC_bytes){e65537, sizeof e65537}), ==, 1);
+  munit_assert_int(TC_RSA_exponent_in_fips_range((TC_bytes){padded, sizeof padded}), ==, 1);
+  munit_assert_int(TC_RSA_exponent_in_fips_range((TC_bytes){even, sizeof even}), ==, 0);
+  munit_assert_int(TC_RSA_exponent_in_fips_range((TC_bytes){top, sizeof top}), ==, 1);
+  munit_assert_int(TC_RSA_exponent_in_fips_range((TC_bytes){over, sizeof over}), ==, 0);
+  munit_assert_int(TC_RSA_exponent_in_fips_range((TC_bytes){NULL, 0}), ==, 0);
+  return MUNIT_OK;
+}
+
 int main(int argc, char** argv)
 {
   MunitTest tests[] = {
       {"/key-generation", key_generation, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/exponent-range", exponent_range, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/ranges", ranges, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/operation-ranges", operation_ranges, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};

@@ -45,6 +45,21 @@ static inline int tc_rsa_private_exponent_check(const tc_mp_word* d, const tc_mp
   return (nonzero != 0) & (d[0] & 1u) & below_modulus;
 }
 
+/* Strip leading zero octets so a factor or CRT value fits half the modulus
+ * width. Returns 0 for an empty field, one longer than the modulus, or a
+ * value wider than length / 2 octets. */
+static inline int tc_rsa_half_width_field(TC_bytes* field, size_t length)
+{
+  const size_t prime_length = length / 2;
+  if (!field->length || field->length > length)
+    return 0;
+  while (field->length > prime_length && !*field->data) {
+    ++field->data;
+    --field->length;
+  }
+  return field->length <= prime_length;
+}
+
 /* FIPS 186-5 A.1.1 2(d): |p - q| > 2^(k-100) for k-bit primes held in h
  * limbs. scratch has 3h limbs. The comparison runs in time that depends only
  * on h. */
@@ -74,15 +89,32 @@ static inline int tc_rsa_factor_has_half_bits(TC_bytes factor, size_t modulus_by
   return factor.length - first == modulus_bytes / 2 && (factor.data[first] & 0x80u) != 0;
 }
 
-/* Check n=p*q and e*d=1 modulo both p-1 and q-1, with distinct odd factors.
- * Full key validation also requires primality testing. Magnitudes fit length
- * bytes. All ranges and work are disjoint. Scratch has 8n
- * limbs and is wiped after use. Work counts products and bit-reduction steps. */
+/* FIPS 186-5 A.1.1 1(b): e odd with 2^16 < e < 2^256. Leading zero octets
+ * are ignored. */
+static inline int tc_rsa_exponent_fips(const uint8_t* exponent, size_t length)
+{
+  while (length && !*exponent) {
+    ++exponent;
+    --length;
+  }
+  /* Three or more significant octets mean e >= 2^16, and an odd e is never
+   * 2^16 itself. At most 32 octets mean e < 2^256. */
+  return length >= 3 && length <= 32 && (exponent[length - 1] & 1u);
+}
+
+/* Check the two-prime component equations and the FIPS 186-5 A.1.1 key
+ * criteria: n = p q with distinct odd p, q of half the modulus width;
+ * sqrt(2) 2^(k-1) <= p, q for k = nlen/2; |p - q| > 2^(k-100);
+ * 2^k < d < LCM(p-1, q-1); and e d = 1 mod LCM(p-1, q-1). exponent_policy
+ * selects the e range. Primality testing is separate. Magnitudes fit length
+ * bytes. All ranges and work are disjoint. Scratch has 12n limbs and is wiped
+ * after use. Arithmetic on secret values runs in time that depends only on
+ * the key size. Work counts products and bit-serial reduction passes. */
 static inline TC_RSA_result
 tc_rsa_private_magnitudes_consistent(const uint8_t* modulus, size_t length, const uint8_t* exponent,
-                                     size_t exponent_length, TC_bytes d_bytes, TC_bytes p_bytes,
-                                     TC_bytes q_bytes, tc_mp_word* scratch, size_t scratch_words,
-                                     uint32_t* work)
+                                     size_t exponent_length, TC_RSA_exponent_policy exponent_policy,
+                                     TC_bytes d_bytes, TC_bytes p_bytes, TC_bytes q_bytes,
+                                     tc_mp_word* scratch, size_t scratch_words, uint32_t* work)
 {
   if (!d_bytes.data || !p_bytes.data || !q_bytes.data || !scratch || !work)
     return TC_RSA_ARGUMENT;
@@ -92,8 +124,10 @@ tc_rsa_private_magnitudes_consistent(const uint8_t* modulus, size_t length, cons
   TC_RSA_result status = tc_rsa_public_key_check(modulus, length, exponent, exponent_length);
   if (status != TC_RSA_OK)
     return status;
-  const size_t n = length / sizeof(tc_mp_word), required = 8 * n;
-  const size_t cost = 32 * length + 2;
+  if (exponent_policy == TC_RSA_EXPONENT_FIPS && !tc_rsa_exponent_fips(exponent, exponent_length))
+    return TC_RSA_INVALID;
+  const size_t n = length / sizeof(tc_mp_word), h = n / 2, required = 12 * n;
+  const size_t cost = 48 * length + 2;
   if (scratch_words < required || *work < cost)
     return TC_RSA_LIMIT;
   *work -= cost;
@@ -101,14 +135,18 @@ tc_rsa_private_magnitudes_consistent(const uint8_t* modulus, size_t length, cons
   tc_mp_word* q = p + n;
   tc_mp_word* d = q + n;
   tc_mp_word* e = d + n;
-  tc_mp_word* product = e + n;
+  tc_mp_word* product = e + n; /* 2n limbs */
   tc_mp_word* remainder = product + 2 * n;
   tc_mp_word* temporary = remainder + n;
+  tc_mp_word* lambda = temporary + n;
+  tc_mp_word* gcd = lambda + n;
+  tc_mp_word* extra = gcd + n; /* 2n limbs */
   tc_mp_from_be_padded(p, p_bytes.data, p_bytes.length, length);
   tc_mp_from_be_padded(q, q_bytes.data, q_bytes.length, length);
   tc_mp_from_be_padded(d, d_bytes.data, d_bytes.length, length);
   tc_mp_from_be(remainder, modulus, length);
   status = TC_RSA_INVALID;
+  /* Public shape checks: each factor has exactly half the modulus width. */
   if (!tc_rsa_factor_has_half_bits(p_bytes, length) ||
       !tc_rsa_factor_has_half_bits(q_bytes, length))
     goto cleanup;
@@ -130,18 +168,35 @@ tc_rsa_private_magnitudes_consistent(const uint8_t* modulus, size_t length, cons
     difference |= (product[i] ^ remainder[i]) | product[n + i];
   if (difference)
     goto cleanup;
+  /* The factors fit h limbs. Accumulate the remaining criteria as masks. */
+  tc_mp_word failed = 0;
+  const tc_mp_word* factors[] = {p, q};
+  for (size_t i = 0; i < 2; ++i) {
+    /* p >= sqrt(2) 2^(k-1) exactly when p^2 >= 2^(2k-1), the top bit of 2k bits. */
+    tc_mp_multiply(product, factors[i], factors[i], h);
+    failed |= (tc_mp_word)(((product[n - 1] >> (TC_MP_WORD_BITS - 1)) & 1u) ^ 1u);
+  }
+  failed |= (tc_mp_word)!tc_rsa_factors_far_apart(p, q, h, extra);
+  /* Both factors are odd, so the decrements need no borrow. */
+  --p[0];
+  --q[0];
+  tc_mp_multiply(product, p, q, h); /* phi, n limbs */
+  memset(gcd, 0, n * sizeof *gcd);
+  tc_mp_gcd(gcd, p, q, h, extra);
+  tc_mp_divide_words(lambda, remainder, product, n, gcd, n, temporary);
+  /* 2^k < d: d - (2^k + 1) does not borrow. d < lambda: d - lambda borrows. */
+  memset(gcd, 0, n * sizeof *gcd);
+  gcd[0] = 1;
+  gcd[h] = 1;
+  failed |= tc_mp_subtract(temporary, d, gcd, n);
+  failed |= (tc_mp_word)(tc_mp_subtract(temporary, d, lambda, n) ^ 1u);
+  /* e d = 1 mod lambda. */
   tc_mp_from_be_padded(e, exponent, exponent_length, length);
   tc_mp_multiply(product, d, e, n);
-  --p[0];
-  --q[0]; /* Both factors are odd, so subtraction needs no borrow. */
-  const tc_mp_word* factors[] = {p, q};
-  for (size_t factor = 0; factor < 2; ++factor) {
-    tc_mp_reduce_words(remainder, product, 2 * n, factors[factor], n, temporary);
-    difference |= remainder[0] ^ 1u;
-    for (size_t i = 1; i < n; ++i)
-      difference |= remainder[i];
-  }
-  if (!difference)
+  tc_mp_divide_words(NULL, remainder, product, 2 * n, lambda, n, temporary);
+  remainder[0] ^= 1u;
+  failed |= (tc_mp_word)~tc_mp_zero_mask(remainder, n);
+  if (!failed)
     status = TC_RSA_OK;
 cleanup:
   TC_secure_zero(scratch, required * sizeof *scratch);
@@ -152,10 +207,12 @@ cleanup:
  * Factors and d fit length bytes. max_attempts applies per factor.
  * Storage ownership matches the component check; scratch needs 12n+2 limbs.
  * The caller's assurance policy supplies rounds and an independent uniform RNG. */
-static inline TC_RSA_result tc_rsa_private_magnitudes_check(
-    const uint8_t* modulus, size_t length, const uint8_t* exponent, size_t exponent_length,
-    TC_bytes d, TC_bytes p, TC_bytes q, size_t rounds, TC_random_fn random, void* random_context,
-    size_t max_attempts, tc_mp_word* scratch, size_t scratch_words, uint32_t* work)
+static inline TC_RSA_result
+tc_rsa_private_magnitudes_check(const uint8_t* modulus, size_t length, const uint8_t* exponent,
+                                size_t exponent_length, TC_RSA_exponent_policy exponent_policy,
+                                TC_bytes d, TC_bytes p, TC_bytes q, size_t rounds,
+                                TC_random_fn random, void* random_context, size_t max_attempts,
+                                tc_mp_word* scratch, size_t scratch_words, uint32_t* work)
 {
   if (!d.data || !p.data || !q.data || !rounds || !random || !scratch || !work)
     return TC_RSA_ARGUMENT;
@@ -163,15 +220,20 @@ static inline TC_RSA_result tc_rsa_private_magnitudes_check(
   if (status != TC_RSA_OK)
     return status;
   const size_t required = 12 * (length / sizeof(tc_mp_word)) + 2;
-  const size_t component_cost = 32 * length + 2;
+  const size_t component_cost = 48 * length + 2;
   if (scratch_words < required || max_attempts < rounds || *work < component_cost)
     return TC_RSA_LIMIT;
-  status = tc_rsa_private_magnitudes_consistent(modulus, length, exponent, exponent_length, d, p, q,
-                                                scratch, scratch_words, work);
-  const TC_bytes factors[] = {p, q};
-  for (size_t i = 0; status == TC_RSA_OK && i < 2; ++i)
-    status = tc_rsa_probable_prime_magnitude(factors[i], length, rounds, random, random_context,
+  status =
+      tc_rsa_private_magnitudes_consistent(modulus, length, exponent, exponent_length,
+                                           exponent_policy, d, p, q, scratch, scratch_words, work);
+  TC_bytes factors[] = {p, q};
+  /* The component check proved each factor fits half the modulus width, so
+   * Miller-Rabin runs at that width. */
+  for (size_t i = 0; status == TC_RSA_OK && i < 2; ++i) {
+    tc_rsa_half_width_field(&factors[i], length);
+    status = tc_rsa_probable_prime_magnitude(factors[i], length / 2, rounds, random, random_context,
                                              max_attempts, scratch, scratch_words, work);
+  }
   TC_secure_zero(scratch, required * sizeof *scratch);
   return status;
 }
@@ -312,21 +374,6 @@ static inline TC_RSA_result tc_rsa_crt_consistent(size_t length, TC_bytes d_byte
   matches &= (unsigned)(difference == 0);
   TC_secure_zero(scratch, required * sizeof *scratch);
   return matches ? TC_RSA_OK : TC_RSA_INVALID;
-}
-
-/* Strip leading zero octets so a factor or CRT value fits half the modulus
- * width. Returns 0 for an empty field, one longer than the modulus, or a
- * value wider than length / 2 octets. */
-static inline int tc_rsa_half_width_field(TC_bytes* field, size_t length)
-{
-  const size_t prime_length = length / 2;
-  if (!field->length || field->length > length)
-    return 0;
-  while (field->length > prime_length && !*field->data) {
-    ++field->data;
-    --field->length;
-  }
-  return field->length <= prime_length;
 }
 
 /* Derive fixed-width CRT values from validated d, p and q magnitudes. Scratch

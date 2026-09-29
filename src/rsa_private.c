@@ -207,11 +207,14 @@ TC_RSA_result TC_RSA_derive_crt(const TC_RSA_private_key* key, const TC_RSA_crt_
   return status;
 }
 
-static TC_RSA_result tc_rsa_validate_private_key(const TC_RSA_private_key* key, TC_random_fn random,
-                                                 void* random_context, size_t max_attempts,
+static TC_RSA_result tc_rsa_validate_private_key(const TC_RSA_private_key* key,
+                                                 TC_RSA_exponent_policy exponent_policy,
+                                                 TC_random_fn random, void* random_context,
+                                                 size_t max_attempts,
                                                  const TC_RSA_workspace* workspace, uint32_t* work)
 {
-  if (!random)
+  if (!random ||
+      (exponent_policy != TC_RSA_EXPONENT_FIPS && exponent_policy != TC_RSA_EXPONENT_ANY_ODD))
     return TC_RSA_ARGUMENT;
   TC_RSA_result checked =
       tc_rsa_private_inputs(key, (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0}, workspace);
@@ -220,11 +223,18 @@ static TC_RSA_result tc_rsa_validate_private_key(const TC_RSA_private_key* key, 
   const size_t length = key->public_key.modulus.length;
   return tc_rsa_private_magnitudes_check(
       key->public_key.modulus.data, length, key->public_key.exponent.data,
-      key->public_key.exponent.length, key->d, key->p, key->q, TC_RSA_VALIDATION_ROUNDS, random,
-      random_context, max_attempts, workspace->words, workspace->capacity, work);
+      key->public_key.exponent.length, exponent_policy, key->d, key->p, key->q,
+      TC_RSA_VALIDATION_ROUNDS, random, random_context, max_attempts, workspace->words,
+      workspace->capacity, work);
+}
+
+int TC_RSA_exponent_in_fips_range(TC_bytes exponent)
+{
+  return tc_rsa_exponent_fips(exponent.data, exponent.length);
 }
 
 TC_RSA_result TC_RSA_validate_private_key(const TC_RSA_private_key* key,
+                                          TC_RSA_exponent_policy exponent_policy,
                                           const TC_RSA_workspace* workspace,
                                           TC_RSA_execution* execution)
 {
@@ -234,9 +244,9 @@ TC_RSA_result TC_RSA_validate_private_key(const TC_RSA_private_key* key,
       workspace, &(TC_bytes){(const uint8_t*)execution, sizeof *execution}, 1);
   if (result != TC_RSA_OK)
     return result;
-  result = tc_rsa_validate_private_key(key, execution->random.fill, execution->random.context,
-                                       execution->random_attempts, workspace,
-                                       &execution->work.remaining);
+  result = tc_rsa_validate_private_key(key, exponent_policy, execution->random.fill,
+                                       execution->random.context, execution->random_attempts,
+                                       workspace, &execution->work.remaining);
   return result;
 }
 

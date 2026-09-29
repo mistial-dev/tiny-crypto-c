@@ -98,8 +98,9 @@ the same caller-owned cache and borrowed-key lifetime as the C API.
 
 `tiny_crypto::rsa_private_key` holds the same borrowed components as the C type.
 `rsa_validate_private_key` takes references to the key, workspace, and
-`rsa_execution`. The execution object groups the random source, rejection
-limit, and remaining work.
+`rsa_execution`, and an exponent policy that defaults to
+`TC_RSA_EXPONENT_FIPS`. The execution object groups the random source,
+rejection limit, and remaining work.
 The C++ key-generation wrappers expose the same caller-owned state and buffers:
 `rsa_keygen_init`, `rsa_keygen_step`, and `rsa_keygen_clear`. They allocate no
 memory and do not throw.
@@ -210,9 +211,20 @@ accepted. Keep all five components stable while
 validation runs. Allocate `TC_RSA_VALIDATE_WORKSPACE_WORDS(bits)` limbs, or use
 `TC_RSA_workspace_words(TC_RSA_OPERATION_VALIDATE, bits)` for a runtime size.
 
-Validation checks `n = p*q`, distinct odd factors, the private-exponent range,
-and `e*d = 1` modulo each factor minus one. Each factor receives 65 Miller-Rabin
-rounds. Three is handled exactly. Supply an independent cryptographically secure
+Validation checks `n = p*q` with distinct odd factors of half the modulus
+width, then the FIPS 186-5 appendix A.1.1 criteria:
+
+- `sqrt(2) * 2^(nlen/2 - 1) <= p, q`, checked exactly as `p^2 >= 2^(nlen - 1)`;
+- `|p - q| > 2^(nlen/2 - 100)`;
+- `2^(nlen/2) < d < LCM(p - 1, q - 1)` and `e*d = 1 mod LCM(p - 1, q - 1)`;
+- the public exponent range selected by `TC_RSA_exponent_policy`.
+
+`TC_RSA_EXPONENT_FIPS` requires an odd `2^16 < e < 2^256`, which
+`TC_RSA_exponent_in_fips_range` tests. `TC_RSA_EXPONENT_ANY_ODD` accepts any
+odd `3 <= e < n` for keys outside FIPS 186-5, such as test vectors with
+`e = 3`. Every other criterion applies under both policies. The GCD, LCM and
+comparisons on secret values run in time that depends only on the key size.
+Each factor then receives 65 Miller-Rabin rounds at the factor width. Three is handled exactly. Supply an independent cryptographically secure
 random source and a request limit of at least `TC_RSA_VALIDATION_ROUNDS` per
 factor. Rejection sampling can require extra requests. `TC_RSA_LIMIT` reports
 exhausted requests, work, or storage. `TC_RSA_ERROR` reports RNG failure.
@@ -223,10 +235,9 @@ factors, assuming independent uniform bases. This uses the validation bound
 discussed in [FIPS 186-5 Appendix C.1][fips1865]. Key-strength policy, provenance,
 and authorization require application checks.
 
-For modulus length `L` bytes and at most `A` requests per factor, a sufficient
-work budget is `32*L + 2 + 2*(24*L + 3 + 65*(24*L + 1) + A)`.
-Use `uint32_t` arithmetic for this budget, including on 16-bit targets, and check
-for overflow when calculating it. Workspace must be aligned
+For a `bits`-bit key and at most `A` requests per factor,
+`TC_RSA_VALIDATE_WORK(bits, A)` is a sufficient work budget. Evaluate it with
+`uint32_t` operands, including on 16-bit targets. Workspace must be aligned
 and separate from key bytes and metadata. The RNG context must also be separate
 from those ranges. Validation wipes used workspace before returning.
 

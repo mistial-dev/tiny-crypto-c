@@ -78,6 +78,11 @@ typedef struct {
   TC_hash_algorithm hash, mgf_hash;
   TC_bytes label;
 } TC_RSA_oaep_options;
+/* Public exponent range accepted by private-key validation. The zero value
+ * applies FIPS 186-5. ANY_ODD admits keys outside FIPS 186-5, such as test
+ * vectors with e = 3. */
+typedef enum { TC_RSA_EXPONENT_FIPS = 0, TC_RSA_EXPONENT_ANY_ODD } TC_RSA_exponent_policy;
+
 /* Caller-owned resumable state. Zero-initialize before the first init and
  * access it only through the key-generation functions below. */
 typedef struct {
@@ -101,6 +106,14 @@ typedef struct {
 #define TC_RSA_RAW_PUBLIC_WORKSPACE_WORDS(bits) (8u * ((bits) / TC_RSA_WORD_BITS) + 2u)
 #define TC_RSA_RAW_PRIVATE_WORKSPACE_WORDS(bits) (13u * ((bits) / TC_RSA_WORD_BITS))
 #define TC_RSA_VALIDATION_ROUNDS 65u
+/* Work that TC_RSA_validate_private_key can consume for a bits-bit key with
+ * attempts RNG requests allowed per factor: the component checks, then one
+ * Miller-Rabin setup, TC_RSA_VALIDATION_ROUNDS rounds and every request for
+ * each half-width factor. */
+#define TC_RSA_VALIDATE_WORK(bits, attempts)                                                       \
+  (48u * ((bits) / 8u) + 2u +                                                                      \
+   2u * ((24u * ((bits) / 16u) + 3u) + TC_RSA_VALIDATION_ROUNDS * (24u * ((bits) / 16u) + 1u) +    \
+         (attempts)))
 #define TC_RSA_KEYGEN_PUBLIC_EXPONENT 65537u
 #define TC_RSA_KEYGEN_WORKSPACE_WORDS(bits) (7u * ((bits) / TC_RSA_WORD_BITS) + 2u)
 #define TC_RSA_KEYGEN_STEP_WORK(bits) (24u * ((bits) / 16u) + 3u)
@@ -246,10 +259,22 @@ TC_RSA_result TC_RSA_sign_pss_digest(const TC_RSA_private_key* key,
  * at least 65. RNG state must be separate from key bytes, metadata and
  * workspace. Scratch is wiped after use.
  * The work budget is 32-bit on every target, including targets with 16-bit size_t.
+ *
+ * The FIPS 186-5 appendix A.1.1 criteria are checked in addition to the
+ * component equations: sqrt(2) 2^(nlen/2 - 1) <= p, q; |p - q| >
+ * 2^(nlen/2 - 100); 2^(nlen/2) < d < LCM(p - 1, q - 1); and e d = 1 mod
+ * LCM(p - 1, q - 1). exponent_policy selects the public exponent range:
+ * TC_RSA_EXPONENT_FIPS requires TC_RSA_exponent_in_fips_range, and
+ * TC_RSA_EXPONENT_ANY_ODD accepts any odd 3 <= e < n. Every other criterion
+ * applies under both policies. An unknown policy returns TC_RSA_ARGUMENT.
  * Key-strength and application acceptance policies belong to the caller. */
 TC_RSA_result TC_RSA_validate_private_key(const TC_RSA_private_key* key,
+                                          TC_RSA_exponent_policy exponent_policy,
                                           const TC_RSA_workspace* workspace,
                                           TC_RSA_execution* execution);
+/* 1 when a big-endian magnitude is odd and 2^16 < e < 2^256 (FIPS 186-5
+ * A.1.1), otherwise 0. Leading zero octets are ignored. */
+int TC_RSA_exponent_in_fips_range(TC_bytes exponent);
 
 /* Check CRT components against an already validated, unchanged private key.
  * Magnitudes are nonempty, at most the modulus length, with optional leading

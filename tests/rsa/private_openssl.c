@@ -9,6 +9,8 @@
 #include "test_util.h"
 #include <openssl/evp.h>
 #include <openssl/rsa.h>
+#include <openssl/rand.h>
+#include <openssl/bn.h>
 #include <openssl/core_names.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,9 +23,9 @@ static TC_RSA_result key_consistent(const uint8_t* modulus, size_t length, const
                                     const uint8_t* q, tc_mp_word* scratch, size_t scratch_words,
                                     uint32_t* work)
 {
-  return tc_rsa_private_magnitudes_consistent(modulus, length, exponent, exponent_length,
-                                              (TC_bytes){d, length}, (TC_bytes){p, length},
-                                              (TC_bytes){q, length}, scratch, scratch_words, work);
+  return tc_rsa_private_magnitudes_consistent(
+      modulus, length, exponent, exponent_length, TC_RSA_EXPONENT_FIPS, (TC_bytes){d, length},
+      (TC_bytes){p, length}, (TC_bytes){q, length}, scratch, scratch_words, work);
 }
 
 static TC_RSA_result key_check(const uint8_t* modulus, size_t length, const uint8_t* exponent,
@@ -32,10 +34,10 @@ static TC_RSA_result key_check(const uint8_t* modulus, size_t length, const uint
                                void* random_context, size_t max_attempts, tc_mp_word* scratch,
                                size_t scratch_words, uint32_t* work)
 {
-  return tc_rsa_private_magnitudes_check(modulus, length, exponent, exponent_length,
-                                         (TC_bytes){d, length}, (TC_bytes){p, length},
-                                         (TC_bytes){q, length}, rounds, random, random_context,
-                                         max_attempts, scratch, scratch_words, work);
+  return tc_rsa_private_magnitudes_check(
+      modulus, length, exponent, exponent_length, TC_RSA_EXPONENT_FIPS, (TC_bytes){d, length},
+      (TC_bytes){p, length}, (TC_bytes){q, length}, rounds, random, random_context, max_attempts,
+      scratch, scratch_words, work);
 }
 
 static TC_RSA_result full_width_private(const uint8_t* modulus, size_t length,
@@ -79,7 +81,7 @@ static TC_RSA_result validate_key(const TC_RSA_private_key* key, TC_random_fn ra
                                   size_t attempts, const TC_RSA_workspace* workspace, uint32_t work)
 {
   TC_RSA_execution execution = {{random, context}, attempts, {work}};
-  return TC_RSA_validate_private_key(key, workspace, &execution);
+  return TC_RSA_validate_private_key(key, TC_RSA_EXPONENT_FIPS, workspace, &execution);
 }
 
 static TC_RSA_result sign_v15(TC_RSA_private_key* key, TC_hash_algorithm hash, TC_bytes digest,
@@ -106,6 +108,33 @@ static TC_RSA_result validate_crt(const TC_RSA_private_key* key, const TC_RSA_cr
 {
   TC_work_budget budget = {work};
   return TC_RSA_validate_crt(key, crt, workspace, &budget);
+}
+
+/* Replace d with e^-1 mod LCM(p-1, q-1). OpenSSL reduces d modulo
+ * (p-1)(q-1) for some key sizes, which FIPS 186-5 A.1.1 rejects. */
+static void lambda_exponent(uint8_t* d, const uint8_t* p, const uint8_t* q, size_t width)
+{
+  BN_CTX* context = BN_CTX_new();
+  BIGNUM *p1 = BN_bin2bn(p, (int)width, NULL), *q1 = BN_bin2bn(q, (int)width, NULL);
+  BIGNUM *phi = BN_new(), *g = BN_new(), *lambda = BN_new(), *e = BN_new(), *out = BN_new();
+  munit_assert_not_null(context);
+  munit_assert_not_null(out);
+  munit_assert_int(BN_sub_word(p1, 1), ==, 1);
+  munit_assert_int(BN_sub_word(q1, 1), ==, 1);
+  munit_assert_int(BN_mul(phi, p1, q1, context), ==, 1);
+  munit_assert_int(BN_gcd(g, p1, q1, context), ==, 1);
+  munit_assert_int(BN_div(lambda, NULL, phi, g, context), ==, 1);
+  munit_assert_int(BN_set_word(e, 65537), ==, 1);
+  munit_assert_not_null(BN_mod_inverse(out, e, lambda, context));
+  munit_assert_int(BN_bn2binpad(out, d, (int)width), ==, (int)width);
+  BN_clear_free(out);
+  BN_free(e);
+  BN_clear_free(lambda);
+  BN_clear_free(g);
+  BN_clear_free(phi);
+  BN_clear_free(q1);
+  BN_clear_free(p1);
+  BN_CTX_free(context);
 }
 
 static void component(EVP_PKEY* key, const char* name, uint8_t* output, size_t length)
@@ -136,10 +165,11 @@ static MunitResult private_operation(const MunitParameter params[], void* user)
   component(key, OSSL_PKEY_PARAM_RSA_D, d, width);
   component(key, OSSL_PKEY_PARAM_RSA_FACTOR1, factor, width);
   component(key, OSSL_PKEY_PARAM_RSA_FACTOR2, other_factor, width);
+  lambda_exponent(d, factor, other_factor, width);
   component(key, OSSL_PKEY_PARAM_RSA_EXPONENT1, dp, width / 2);
   component(key, OSSL_PKEY_PARAM_RSA_EXPONENT2, dq, width / 2);
   component(key, OSSL_PKEY_PARAM_RSA_COEFFICIENT1, q_inverse, width / 2);
-  const size_t key_words = 8 * width / sizeof(tc_mp_word);
+  const size_t key_words = 12 * width / sizeof(tc_mp_word);
   enum {
     KEY_VALID,
     KEY_SWAPPED,
@@ -192,9 +222,9 @@ static MunitResult private_operation(const MunitParameter params[], void* user)
   munit_assert_size(magnitudes[2].length, <, width);
   key_work = key_cost;
   memset(scratch, 0xa5, sizeof scratch);
-  munit_assert_int(tc_rsa_private_magnitudes_consistent(modulus, width, exponent, sizeof exponent,
-                                                        magnitudes[0], magnitudes[1], magnitudes[2],
-                                                        scratch, key_words, &key_work),
+  munit_assert_int(tc_rsa_private_magnitudes_consistent(
+                       modulus, width, exponent, sizeof exponent, TC_RSA_EXPONENT_FIPS,
+                       magnitudes[0], magnitudes[1], magnitudes[2], scratch, key_words, &key_work),
                    ==, TC_RSA_OK);
   munit_assert_size(key_work, ==, 0);
   munit_assert_true(tc_test_all_zero(scratch, key_words * sizeof *scratch));
@@ -214,8 +244,11 @@ static MunitResult private_operation(const MunitParameter params[], void* user)
   }
   input[width - 1] = 42;
   seed[width - 1] = 2;
+  /* Miller-Rabin runs at the half-width factor size and draws base 2. */
+  uint8_t witness[MAX_BYTES] = {0};
+  witness[width / 2 - 1] = 2;
   const size_t validation_words = 12 * width / sizeof(tc_mp_word) + 2;
-  const size_t validation_cost = key_cost + 2 * (48 * width + 5);
+  const size_t validation_cost = key_cost + 2 * (24 * width + 5);
   enum {
     VALIDATION_OK,
     VALIDATION_WORK,
@@ -225,7 +258,8 @@ static MunitResult private_operation(const MunitParameter params[], void* user)
     VALIDATION_CASES
   };
   for (unsigned scenario = 0; scenario < VALIDATION_CASES; ++scenario) {
-    random_source source = {seed, seed, width, 0, scenario == VALIDATION_RNG ? TC_ERROR : TC_OK};
+    random_source source = {witness, witness, width / 2, 0,
+                            scenario == VALIDATION_RNG ? TC_ERROR : TC_OK};
     uint32_t budget = (uint32_t)validation_cost - (scenario == VALIDATION_WORK);
     memcpy(bad_d, d, width);
     if (scenario == VALIDATION_D)
@@ -262,7 +296,7 @@ static MunitResult private_operation(const MunitParameter params[], void* user)
   munit_assert_size(TC_RSA_workspace_words(TC_RSA_OPERATION_VALIDATE, 4096), ==,
                     TC_RSA_VALIDATE_WORKSPACE_WORDS(4096));
   {
-    random_source source = {seed, seed, width, 0, TC_OK};
+    random_source source = {witness, witness, width / 2, 0, TC_OK};
     munit_assert_int(example_validate_rsa_key(&public_components, random_bytes, &source, scratch,
                                               validation_words),
                      ==, TC_RSA_OK);
@@ -270,7 +304,7 @@ static MunitResult private_operation(const MunitParameter params[], void* user)
     munit_assert_true(tc_test_all_zero(scratch, validation_words * sizeof *scratch));
   }
   for (unsigned scenario = 0; scenario < 4; ++scenario) {
-    random_source source = {seed, seed, width, 0, TC_OK};
+    random_source source = {witness, witness, width / 2, 0, TC_OK};
     TC_RSA_private_key checked = public_components;
     TC_RSA_workspace storage = public_workspace;
     if (scenario == 0)
@@ -567,6 +601,7 @@ static MunitResult signing(const MunitParameter params[], void* user)
   component(key, OSSL_PKEY_PARAM_RSA_D, d, width);
   component(key, OSSL_PKEY_PARAM_RSA_FACTOR1, p, width);
   component(key, OSSL_PKEY_PARAM_RSA_FACTOR2, q, width);
+  lambda_exponent(d, p, q, width);
   component(key, OSSL_PKEY_PARAM_RSA_EXPONENT1, dp, width / 2);
   component(key, OSSL_PKEY_PARAM_RSA_EXPONENT2, dq, width / 2);
   component(key, OSSL_PKEY_PARAM_RSA_COEFFICIENT1, inverse, width / 2);
@@ -812,10 +847,178 @@ static MunitResult crt_components(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+/* A random k-bit prime whose top bits are 11, or 10 with p < sqrt(2) 2^(k-1). */
+static void fips_prime(BIGNUM* out, int bits, int below_bound, BN_CTX* context)
+{
+  BIGNUM* square = BN_new();
+  BIGNUM* bound = BN_new();
+  munit_assert_not_null(bound);
+  munit_assert_int(BN_set_word(bound, 1), ==, 1);
+  munit_assert_int(BN_lshift(bound, bound, 2 * bits - 1), ==, 1);
+  for (;;) {
+    munit_assert_int(
+        BN_rand(out, bits, below_bound ? BN_RAND_TOP_ONE : BN_RAND_TOP_TWO, BN_RAND_BOTTOM_ODD), ==,
+        1);
+    munit_assert_int(BN_sqr(square, out, context), ==, 1);
+    if ((BN_cmp(square, bound) < 0) != below_bound)
+      continue;
+    /* Keep p - 1 coprime to 65537 and to 3 for the e = 3 case. */
+    if (BN_mod_word(out, 65537) == 1 || BN_mod_word(out, 3) != 2)
+      continue;
+    if (BN_check_prime(out, context, NULL) == 1)
+      break;
+  }
+  BN_free(bound);
+  BN_free(square);
+}
+
+typedef struct {
+  uint8_t modulus[MAX_BYTES], exponent[MAX_BYTES], d[MAX_BYTES], p[MAX_BYTES], q[MAX_BYTES];
+  size_t exponent_length;
+  TC_RSA_private_key key;
+} built_key;
+
+/* n = p q and d = e^-1 mod LCM(p-1, q-1), plus lambda_multiple * LCM. */
+static void build_key(built_key* out, const BIGNUM* p, const BIGNUM* q, const BIGNUM* e,
+                      unsigned lambda_multiple, size_t width, BN_CTX* context)
+{
+  BIGNUM *n = BN_new(), *p1 = BN_new(), *q1 = BN_new(), *phi = BN_new(), *g = BN_new();
+  BIGNUM *lambda = BN_new(), *d = BN_new(), *extra = BN_new();
+  munit_assert_not_null(extra);
+  munit_assert_int(BN_mul(n, p, q, context), ==, 1);
+  munit_assert_not_null(BN_copy(p1, p));
+  munit_assert_not_null(BN_copy(q1, q));
+  munit_assert_int(BN_sub_word(p1, 1), ==, 1);
+  munit_assert_int(BN_sub_word(q1, 1), ==, 1);
+  munit_assert_int(BN_mul(phi, p1, q1, context), ==, 1);
+  munit_assert_int(BN_gcd(g, p1, q1, context), ==, 1);
+  munit_assert_int(BN_div(lambda, NULL, phi, g, context), ==, 1);
+  munit_assert_not_null(BN_mod_inverse(d, e, lambda, context));
+  munit_assert_not_null(BN_copy(extra, lambda));
+  munit_assert_int(BN_mul_word(extra, lambda_multiple), ==, 1);
+  munit_assert_int(BN_add(d, d, extra), ==, 1);
+  out->exponent_length = (size_t)BN_num_bytes(e);
+  munit_assert_int(BN_bn2binpad(n, out->modulus, (int)width), ==, (int)width);
+  munit_assert_int(BN_bn2bin(e, out->exponent), ==, (int)out->exponent_length);
+  munit_assert_int(BN_bn2binpad(d, out->d, (int)width), ==, (int)width);
+  munit_assert_int(BN_bn2binpad(p, out->p, (int)width / 2), ==, (int)width / 2);
+  munit_assert_int(BN_bn2binpad(q, out->q, (int)width / 2), ==, (int)width / 2);
+  out->key = (TC_RSA_private_key){{{out->modulus, width}, {out->exponent, out->exponent_length}},
+                                  {out->d, width},
+                                  {out->p, width / 2},
+                                  {out->q, width / 2},
+                                  NULL};
+  BN_clear_free(extra);
+  BN_clear_free(d);
+  BN_clear_free(lambda);
+  BN_clear_free(g);
+  BN_clear_free(phi);
+  BN_clear_free(q1);
+  BN_clear_free(p1);
+  BN_free(n);
+}
+
+static TC_status system_random(void* context, uint8_t* output, size_t length)
+{
+  (void)context;
+  return RAND_bytes(output, (int)length) == 1 ? TC_OK : TC_ERROR;
+}
+
+static TC_RSA_result validate_policy(const TC_RSA_private_key* key, TC_RSA_exponent_policy policy)
+{
+  static tc_mp_word scratch[12 * MAX_WORDS + 2];
+  const size_t bits = key->public_key.modulus.length * 8;
+  const TC_RSA_workspace workspace = {scratch, TC_RSA_VALIDATE_WORKSPACE_WORDS(bits)};
+  TC_RSA_execution execution = {{system_random, NULL},
+                                4 * TC_RSA_VALIDATION_ROUNDS,
+                                {TC_RSA_VALIDATE_WORK(bits, 4 * TC_RSA_VALIDATION_ROUNDS)}};
+  return TC_RSA_validate_private_key(key, policy, &workspace, &execution);
+}
+
+/* FIPS 186-5 A.1.1 criteria beyond the component equations. Each rejected
+ * key satisfies n = p q and e d = 1 mod (p-1) and (q-1). */
+static MunitResult fips_criteria(const MunitParameter params[], void* user)
+{
+  const unsigned bits = (unsigned)strtoul(munit_parameters_get(params, "bits"), NULL, 10);
+  const size_t width = bits / 8;
+  const int k = (int)bits / 2;
+  static built_key built;
+  BN_CTX* context = BN_CTX_new();
+  BIGNUM *p = BN_new(), *q = BN_new(), *e = BN_new(), *low = BN_new();
+  (void)user;
+  munit_assert_not_null(context);
+  munit_assert_not_null(low);
+  fips_prime(p, k, 0, context);
+  fips_prime(q, k, 0, context);
+  munit_assert_int(BN_set_word(e, 65537), ==, 1);
+  build_key(&built, p, q, e, 0, width, context);
+  munit_assert_int(validate_policy(&built.key, TC_RSA_EXPONENT_FIPS), ==, TC_RSA_OK);
+  munit_assert_int(validate_policy(&built.key, TC_RSA_EXPONENT_ANY_ODD), ==, TC_RSA_OK);
+  munit_assert_int(validate_policy(&built.key, (TC_RSA_exponent_policy)2), ==, TC_RSA_ARGUMENT);
+  /* d + LCM still satisfies e d = 1 mod (p-1) and (q-1), but d >= LCM. */
+  build_key(&built, p, q, e, 1, width, context);
+  munit_assert_int(validate_policy(&built.key, TC_RSA_EXPONENT_FIPS), ==, TC_RSA_INVALID);
+  /* e = 3 is outside the FIPS range. */
+  munit_assert_int(BN_set_word(e, 3), ==, 1);
+  build_key(&built, p, q, e, 0, width, context);
+  munit_assert_int(validate_policy(&built.key, TC_RSA_EXPONENT_FIPS), ==, TC_RSA_INVALID);
+  munit_assert_int(validate_policy(&built.key, TC_RSA_EXPONENT_ANY_ODD), ==, TC_RSA_OK);
+  /* d <= 2^(nlen/2): choose a small d and derive a large e from it. */
+  BIGNUM *p1 = BN_new(), *q1 = BN_new(), *phi = BN_new(), *g = BN_new(), *lambda = BN_new();
+  munit_assert_not_null(lambda);
+  munit_assert_not_null(BN_copy(p1, p));
+  munit_assert_not_null(BN_copy(q1, q));
+  munit_assert_int(BN_sub_word(p1, 1), ==, 1);
+  munit_assert_int(BN_sub_word(q1, 1), ==, 1);
+  munit_assert_int(BN_mul(phi, p1, q1, context), ==, 1);
+  munit_assert_int(BN_gcd(g, p1, q1, context), ==, 1);
+  munit_assert_int(BN_div(lambda, NULL, phi, g, context), ==, 1);
+  do {
+    munit_assert_int(BN_rand(low, k - 8, BN_RAND_TOP_ONE, BN_RAND_BOTTOM_ODD), ==, 1);
+  } while (!BN_mod_inverse(e, low, lambda, context));
+  build_key(&built, p, q, e, 0, width, context);
+  munit_assert_int(validate_policy(&built.key, TC_RSA_EXPONENT_ANY_ODD), ==, TC_RSA_INVALID);
+  /* A prime below sqrt(2) 2^(k-1). */
+  munit_assert_int(BN_set_word(e, 65537), ==, 1);
+  BIGNUM* small = BN_new();
+  munit_assert_not_null(small);
+  fips_prime(small, k, 1, context);
+  build_key(&built, small, q, e, 0, width, context);
+  munit_assert_int(validate_policy(&built.key, TC_RSA_EXPONENT_FIPS), ==, TC_RSA_INVALID);
+  build_key(&built, p, small, e, 0, width, context);
+  munit_assert_int(validate_policy(&built.key, TC_RSA_EXPONENT_FIPS), ==, TC_RSA_INVALID);
+  /* |p - q| <= 2^(k-100): the next suitable prime after p. */
+  munit_assert_not_null(BN_copy(small, p));
+  do
+    munit_assert_int(BN_add_word(small, 2), ==, 1);
+  while (BN_mod_word(small, 65537) == 1 || BN_check_prime(small, context, NULL) != 1);
+  build_key(&built, p, small, e, 0, width, context);
+  munit_assert_int(validate_policy(&built.key, TC_RSA_EXPONENT_FIPS), ==, TC_RSA_INVALID);
+  BN_free(small);
+  BN_clear_free(lambda);
+  BN_clear_free(g);
+  BN_clear_free(phi);
+  BN_clear_free(q1);
+  BN_clear_free(p1);
+  BN_clear_free(low);
+  BN_free(e);
+  BN_clear_free(q);
+  BN_clear_free(p);
+  BN_CTX_free(context);
+  return MUNIT_OK;
+}
+
 int main(int argc, char** argv)
 {
   static char* sizes[] = {"1024", "2048", "3072", "4096", NULL};
   static MunitParameterEnum parameters[] = {{"bits", sizes}, {NULL, NULL}};
+#if TC_RSA_SMALL
+  /* Byte limbs make the constant-time LCM slow; one size covers the logic. */
+  static char* fips_sizes[] = {"1024", NULL};
+#else
+  static char* fips_sizes[] = {"1024", "2048", NULL};
+#endif
+  static MunitParameterEnum fips_parameters[] = {{"bits", fips_sizes}, {NULL, NULL}};
   static char* hashes[] = {"SHA1", "SHA224", "SHA256", "SHA384", "SHA512", NULL};
   static MunitParameterEnum signing_parameters[] = {
       {"bits", sizes}, {"hash", hashes}, {NULL, NULL}};
@@ -825,6 +1028,7 @@ int main(int argc, char** argv)
       {"/composite-components", composite_components, NULL, NULL, MUNIT_TEST_OPTION_NONE,
        parameters},
       {"/signing", signing, NULL, NULL, MUNIT_TEST_OPTION_NONE, signing_parameters},
+      {"/fips-criteria", fips_criteria, NULL, NULL, MUNIT_TEST_OPTION_NONE, fips_parameters},
       {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
   MunitSuite suite = {"/rsa/private", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};
   return munit_suite_main(&suite, NULL, argc, argv);
