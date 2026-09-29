@@ -83,13 +83,11 @@ TC_TLV_result tc_cms_crl_search(const void* candidates, const tc_x509_crl_signer
  * revocation are separate. Parsed inputs/source data are stable and disjoint
  * from all scratch/work/out. Tree and validation may share frame storage.
  * Work covers all attempts, out changes only on VALID and borrows path storage. */
-TC_X509_path_status
-tc_cms_crl_signer_find(const tc_cms_candidates* candidates, const TC_X509_crl* crl,
-                       const TC_X509_crl_extensions* extensions,
-                       const TC_X509_store_source* path_source, size_t anchor_index,
-                       const TC_X509_path_options* options, const tc_pki_tree_workspace* tree,
-                       const TC_X509_path_workspace* validation,
-                       const TC_X509_search_workspace* search, TC_X509_search_result* out);
+TC_X509_path_status tc_cms_crl_signer_find(const tc_cms_candidates* candidates,
+                                           const TC_X509_crl* crl,
+                                           const TC_X509_crl_extensions* extensions,
+                                           const tc_x509_crl_trust* trust,
+                                           TC_X509_search_result* out);
 /* Process selected CRLs, retrying proposed signers with the same bounded search.
  * Subject, authority hints and cRLSign filter candidates before full processing.
  * END means terminal evidence or no new eligible reasons. INVALID means no
@@ -98,26 +96,22 @@ tc_cms_crl_signer_find(const tc_cms_candidates* candidates, const TC_X509_crl* c
  * stay unchanged and work covers all attempts. Same disjoint/stable storage rules
  * as signer_find, with evidence also separate from inputs and scratch.
  * CRL selection and signer-path revocation remain separate. */
-TC_TLV_result
-tc_cms_crl_process(const tc_cms_candidates* candidates, const tc_x509_crl_selected* selected,
-                   const tc_x509_crl_query* query, const TC_X509_store_source* path_source,
-                   size_t anchor_index, const TC_X509_path_options* options,
-                   const tc_pki_tree_workspace* tree, const TC_X509_path_workspace* validation,
-                   const TC_X509_search_workspace* search, TC_X509_crl_evidence* evidence,
-                   TC_X509_search_result* out);
+TC_TLV_result tc_cms_crl_process(const tc_cms_candidates* candidates,
+                                 const tc_x509_crl_selected* selected,
+                                 const tc_x509_crl_query* query, const tc_x509_crl_trust* trust,
+                                 TC_X509_crl_evidence* evidence, TC_X509_search_result* out);
 /* Process one indexed complete CRL with signer retry and explicit delta policy.
  * Authenticate the base/path once per signer attempt, choose a current signed
  * delta, then apply entries. REQUIRED returns END if no usable delta is found.
  * IF_AVAILABLE falls back to the complete CRL, which must itself be current.
  * Same borrowed/disjoint storage and result rules as crl_process. Index and
  * candidates stay unchanged. Signer-path revocation remains separate. */
-TC_TLV_result tc_cms_crl_index_process(
-    const tc_cms_candidates* candidates, const TC_X509_crl_index* index, size_t base,
-    TC_X509_crl_delta_policy delta_policy, const tc_x509_crl_query* query,
-    const TC_X509_store_source* path_source, size_t anchor_index,
-    const TC_X509_path_options* options, const tc_pki_tree_workspace* tree,
-    const TC_X509_path_workspace* validation, const TC_X509_search_workspace* search,
-    TC_X509_crl_evidence* evidence, TC_X509_search_result* out);
+TC_TLV_result tc_cms_crl_index_process(const tc_cms_candidates* candidates,
+                                       const TC_X509_crl_index* index, size_t base,
+                                       TC_X509_crl_delta_policy delta_policy,
+                                       const tc_x509_crl_query* query,
+                                       const tc_x509_crl_trust* trust,
+                                       TC_X509_crl_evidence* evidence, TC_X509_search_result* out);
 /* Process all indexed scopes for one distribution point. check is required.
  * OK publishes new evidence, which may still have incomplete reason coverage.
  * END means no contribution or terminal input evidence. Failures preserve
@@ -126,41 +120,26 @@ TC_TLV_result tc_cms_crl_index_process(
  * source errors stop processing. Inputs/source snapshot remain stable.
  * Records sharing issuer and IDP are ranked across validated signer keys.
  * The check callback performs the signer revocation work. */
-TC_TLV_result
-tc_cms_crl_point_process(const tc_cms_candidates* candidates, const TC_X509_crl_index* index,
-                         TC_X509_crl_delta_policy delta_policy,
-                         TC_X509_crl_order_policy order_policy, const tc_x509_crl_query* query,
-                         const TC_X509_store_source* path_source, size_t anchor_index,
-                         const TC_X509_path_options* options, const tc_pki_tree_workspace* tree,
-                         const TC_X509_path_workspace* validation,
-                         const TC_X509_search_workspace* search, uint8_t* states, size_t capacity,
-                         const tc_x509_crl_path_check* check, TC_X509_crl_evidence* evidence);
+TC_TLV_result tc_cms_crl_point_process(const tc_cms_candidates* candidates,
+                                       const tc_x509_crl_scope_processing* processing,
+                                       const tc_x509_crl_trust* trust);
 /* Process an encoded CRLDistributionPoints value, then query->point as fallback
  * if coverage is incomplete. An absent value uses only the fallback. The caller
  * supplies the target's validated CA flag and an issuer-wide fallback point.
  * The whole list is checked before processing. Same storage, callback and
  * transactional evidence rules as point_process. One budget covers all points. */
-TC_TLV_result tc_cms_crl_points_process(
-    const tc_cms_candidates* candidates, const TC_X509_crl_index* index,
-    TC_X509_crl_delta_policy delta_policy, TC_X509_crl_order_policy order_policy,
-    const tc_x509_crl_query* query, TC_bytes points, const TC_X509_store_source* path_source,
-    size_t anchor_index, const TC_X509_path_options* options, const tc_pki_tree_workspace* tree,
-    const TC_X509_path_workspace* validation, const TC_X509_search_workspace* search,
-    uint8_t* states, size_t capacity, const tc_x509_crl_path_check* check,
-    TC_X509_crl_evidence* evidence);
+TC_TLV_result tc_cms_crl_points_process(const tc_cms_candidates* candidates,
+                                        const tc_x509_crl_scope_processing* processing,
+                                        TC_bytes points, const tc_x509_crl_trust* trust);
 /* Read BasicConstraints, CRLDistributionPoints and issuerAltName from a target
  * whose path has already been validated to anchor_index. Try listed points,
  * then issuer DN and alternative names while coverage remains incomplete.
  * Extension uniqueness/framing and relevant values are checked here; other
  * extension policy belongs to path validation. Same rules as points_process. */
-TC_TLV_result tc_cms_crl_certificate_process(
-    const tc_cms_candidates* candidates, const TC_X509_crl_index* index,
-    TC_X509_crl_delta_policy delta_policy, TC_X509_crl_order_policy order_policy,
-    const TC_X509_certificate* certificate, const TC_X509_store_source* path_source,
-    size_t anchor_index, const TC_X509_path_options* options, const tc_pki_tree_workspace* tree,
-    const TC_X509_path_workspace* validation, const TC_X509_search_workspace* search,
-    uint8_t* states, size_t capacity, const tc_x509_crl_path_check* check,
-    TC_X509_crl_evidence* evidence);
+TC_TLV_result tc_cms_crl_certificate_process(const tc_cms_candidates* candidates,
+                                             const tc_x509_crl_scope_processing* processing,
+                                             const TC_X509_certificate* certificate,
+                                             const tc_x509_crl_trust* trust);
 typedef struct {
   const tc_cms_candidates* candidates;
   const TC_X509_crl_index* index;
@@ -202,11 +181,7 @@ TC_TLV_result tc_cms_crl_path_resolve(const TC_bytes* chain, size_t count,
  * Opaque source/provider contexts must remain separate from writable storage.
  * Tree/path frames may share an array. Partial overlaps are rejected.
  * Candidate/index views stay unchanged. Signer-path revocation is separate. */
-TC_TLV_result tc_cms_crl_scope_process(
-    const tc_cms_candidates* candidates, const TC_X509_crl_index* index, size_t reference,
-    TC_X509_crl_delta_policy delta_policy, TC_X509_crl_order_policy order_policy,
-    const tc_x509_crl_query* query, const TC_X509_store_source* path_source, size_t anchor_index,
-    const TC_X509_path_options* options, const tc_pki_tree_workspace* tree,
-    const TC_X509_path_workspace* validation, const TC_X509_search_workspace* search,
-    uint8_t* states, size_t capacity, TC_X509_crl_evidence* evidence, TC_X509_search_result* out);
+TC_TLV_result tc_cms_crl_scope_process(const tc_cms_candidates* candidates,
+                                       const tc_x509_crl_scope_processing* processing,
+                                       const tc_x509_crl_trust* trust, TC_X509_search_result* out);
 #endif

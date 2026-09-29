@@ -381,8 +381,9 @@ static void fuzz_path(const uint8_t* data, size_t length, const TC_X509_certific
     memset(&found, 0xa5, sizeof found);
     memcpy(&unchanged, &found, sizeof found);
     work = options.max_work;
-    status = tc_x509_path_search(candidates[0], candidates, count, &anchor, 1, &options, &workspace,
-                                 &search, &work, &found);
+    status =
+        tc_x509_path_search(candidates[0], &(tc_x509_path_arrays){candidates, count, &anchor, 1},
+                            &options, &workspace, &search, &work, &found);
     if (status == TC_X509_PATH_VALID) {
       size_t i, j;
       if (!found.count || found.count > 4 || found.path != path + 4 - found.count ||
@@ -401,8 +402,9 @@ static void fuzz_path(const uint8_t* data, size_t length, const TC_X509_certific
       abort();
     memcpy(&found, &unchanged, sizeof found);
     work = data[length - 1];
-    status = tc_x509_path_search(candidates[0], candidates, count, &anchor, 1, &options, &workspace,
-                                 &search, &work, &found);
+    status =
+        tc_x509_path_search(candidates[0], &(tc_x509_path_arrays){candidates, count, &anchor, 1},
+                            &options, &workspace, &search, &work, &found);
     if (status != TC_X509_PATH_VALID && memcmp(&found, &unchanged, sizeof found))
       abort();
   }

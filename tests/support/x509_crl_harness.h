@@ -45,23 +45,19 @@ TC_TLV_result tc_x509_crl_entry_matches(const tc_x509_crl_revoked_entry* entry,
  * are provisional. out borrows the signer path and records total work used. */
 TC_TLV_result tc_x509_crl_process(const tc_x509_crl_selected* selected,
                                   const TC_X509_certificate* signer, const tc_x509_crl_query* query,
-                                  const TC_X509_store_source* source, size_t anchor_index,
-                                  const TC_X509_path_options* options,
-                                  const TC_X509_path_workspace* validation,
-                                  const TC_X509_search_workspace* search, size_t* work,
-                                  TC_X509_crl_evidence* evidence, TC_X509_search_result* out);
+                                  const tc_x509_crl_trust* trust, TC_X509_crl_evidence* evidence,
+                                  TC_X509_search_result* out);
 
 /* Check pairing, authenticate both CRLs with one signer's key, then resolve
  * their entries. Omit both delta pointers for a complete CRL alone. The caller
  * must establish signer trust, freshness and scope before using this result.
  * Parsed inputs and scratch/output are disjoint. Output changes only on OK.
  * Work and scratch are consumed on failure. */
-TC_TLV_result
-tc_x509_crl_selected_find(const tc_x509_crl_selected* selected, const TC_X509_certificate* signer,
-                          const TC_X509_certificate* certificate,
-                          const TC_X509_signature_provider* provider, const TC_TLV_limits* limits,
-                          const tc_pki_tree_workspace* tree, const TC_X509_name_workspace* names,
-                          TC_bytes* oids, size_t capacity, TC_X509_crl_match* out);
+TC_TLV_result tc_x509_crl_selected_find(const tc_x509_crl_selected* selected,
+                                        const TC_X509_certificate* signer,
+                                        const TC_X509_certificate* certificate,
+                                        const TC_X509_signature_provider* provider,
+                                        const tc_x509_crl_decode* decode, TC_X509_crl_match* out);
 
 /* Check pair compatibility, signatures under one key, and the signer's path to
  * the target anchor. Entries, scope, CRL freshness and signer-path revocation
@@ -70,10 +66,7 @@ tc_x509_crl_selected_find(const tc_x509_crl_selected* selected, const TC_X509_ce
  * the signer path. Source records remain stable for the operation. */
 TC_TLV_result tc_x509_crl_selected_validate(const tc_x509_crl_selected* selected,
                                             const TC_X509_certificate* signer,
-                                            const TC_X509_store_source* source, size_t anchor_index,
-                                            const TC_X509_path_options* options,
-                                            const TC_X509_path_workspace* validation,
-                                            const TC_X509_search_workspace* search, size_t* work,
+                                            const tc_x509_crl_trust* trust,
                                             TC_X509_search_result* out);
 
 /* Digest covers the exact source TBS encoding. Check issuer linkage, cRLSign,
@@ -119,12 +112,18 @@ TC_TLV_result tc_x509_crl_extensions_check(const TC_X509_crl* crl, const TC_TLV_
                                            const tc_pki_tree_workspace* tree, TC_bytes* oids,
                                            size_t capacity);
 
+/* Candidate certificates and trust anchors held in caller arrays. */
+typedef struct {
+  const TC_bytes* candidates;
+  size_t candidate_count;
+  const TC_X509_trust_anchor* anchors;
+  size_t anchor_count;
+} tc_x509_path_arrays;
 /* Internal engine: caller validates storage ranges and keeps input/store records
  * stable and disjoint from both workspaces, work, and out. Path storage is scratch.
  * Successful output borrows its suffix in anchor-issued-first order. */
-TC_X509_path_status tc_x509_path_search(TC_bytes target, const TC_bytes* candidates,
-                                        size_t candidate_count, const TC_X509_trust_anchor* anchors,
-                                        size_t anchor_count, const TC_X509_path_options* options,
+TC_X509_path_status tc_x509_path_search(TC_bytes target, const tc_x509_path_arrays* arrays,
+                                        const TC_X509_path_options* options,
                                         const TC_X509_path_workspace* validation,
                                         const TC_X509_search_workspace* search, size_t* work,
                                         TC_X509_search_result* out);

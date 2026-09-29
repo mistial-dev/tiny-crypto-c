@@ -21,12 +21,15 @@ TC_TLV_result tc_x509_crl_entry_matches(const tc_x509_crl_revoked_entry* entry,
 
 TC_TLV_result tc_x509_crl_process(const tc_x509_crl_selected* selected,
                                   const TC_X509_certificate* signer, const tc_x509_crl_query* query,
-                                  const TC_X509_store_source* source, size_t anchor_index,
-                                  const TC_X509_path_options* options,
-                                  const TC_X509_path_workspace* validation,
-                                  const TC_X509_search_workspace* search, size_t* work,
-                                  TC_X509_crl_evidence* evidence, TC_X509_search_result* out)
+                                  const tc_x509_crl_trust* trust, TC_X509_crl_evidence* evidence,
+                                  TC_X509_search_result* out)
 {
+  const TC_X509_store_source* source = trust->source;
+  const size_t anchor_index = trust->anchor_index;
+  const TC_X509_path_options* options = trust->options;
+  const TC_X509_path_workspace* validation = trust->validation;
+  const TC_X509_search_workspace* search = trust->search;
+  size_t* work = trust->tree->work;
   tc_pki_anchor_source anchor;
   TC_X509_store_source restricted;
   TC_X509_search_result found;
@@ -76,13 +79,17 @@ TC_TLV_result tc_x509_crl_process(const tc_x509_crl_selected* selected,
   return TC_TLV_OK;
 }
 
-TC_TLV_result
-tc_x509_crl_selected_find(const tc_x509_crl_selected* selected, const TC_X509_certificate* signer,
-                          const TC_X509_certificate* certificate,
-                          const TC_X509_signature_provider* provider, const TC_TLV_limits* limits,
-                          const tc_pki_tree_workspace* tree, const TC_X509_name_workspace* names,
-                          TC_bytes* oids, size_t capacity, TC_X509_crl_match* out)
+TC_TLV_result tc_x509_crl_selected_find(const tc_x509_crl_selected* selected,
+                                        const TC_X509_certificate* signer,
+                                        const TC_X509_certificate* certificate,
+                                        const TC_X509_signature_provider* provider,
+                                        const tc_x509_crl_decode* decode, TC_X509_crl_match* out)
 {
+  const TC_TLV_limits* limits = decode->limits;
+  const tc_pki_tree_workspace* tree = decode->tree;
+  const TC_X509_name_workspace* names = decode->names;
+  TC_bytes* oids = decode->oids;
+  const size_t capacity = decode->oid_capacity;
   TC_TLV_result result;
   if (!selected || !selected->base || !selected->base_info || !signer || !certificate || !limits ||
       !tree || !tree->work || !names || !out || !!selected->delta != !!selected->delta_info)
@@ -97,12 +104,15 @@ tc_x509_crl_selected_find(const tc_x509_crl_selected* selected, const TC_X509_ce
 
 TC_TLV_result tc_x509_crl_selected_validate(const tc_x509_crl_selected* selected,
                                             const TC_X509_certificate* signer,
-                                            const TC_X509_store_source* source, size_t anchor_index,
-                                            const TC_X509_path_options* options,
-                                            const TC_X509_path_workspace* validation,
-                                            const TC_X509_search_workspace* search, size_t* work,
+                                            const tc_x509_crl_trust* trust,
                                             TC_X509_search_result* out)
 {
+  const TC_X509_store_source* source = trust->source;
+  const size_t anchor_index = trust->anchor_index;
+  const TC_X509_path_options* options = trust->options;
+  const TC_X509_path_workspace* validation = trust->validation;
+  const TC_X509_search_workspace* search = trust->search;
+  size_t* work = trust->tree->work;
   tc_pki_anchor_source anchor;
   TC_X509_store_source restricted;
   TC_X509_search_result found;
@@ -168,12 +178,22 @@ TC_TLV_result tc_x509_crl_index_attempt(const void* context, const TC_X509_certi
   tc_x509_crl_selected selected = {&base->crl, &base->extensions, NULL, NULL};
   TC_X509_search_result found;
   if (processing->delta_policy == TC_X509_CRL_COMPLETE_ONLY)
-    return tc_x509_crl_process(&selected, signer, processing->query, trust->source,
-                               trust->anchor_index, trust->options, trust->validation,
-                               trust->search, trust->tree->work, processing->evidence, out);
+    return tc_x509_crl_process(
+        &selected, signer, processing->query,
+        &(tc_x509_crl_trust){trust->source, trust->anchor_index, trust->options,
+                             &(tc_pki_tree_workspace){(trust->validation)->frames,
+                                                      (trust->validation)->frame_capacity,
+                                                      trust->tree->work},
+                             trust->validation, trust->search},
+        processing->evidence, out);
   TC_TLV_result result = tc_x509_crl_selected_validate(
-      &selected, signer, trust->source, trust->anchor_index, trust->options, trust->validation,
-      trust->search, trust->tree->work, &found);
+      &selected, signer,
+      &(tc_x509_crl_trust){trust->source, trust->anchor_index, trust->options,
+                           &(tc_pki_tree_workspace){(trust->validation)->frames,
+                                                    (trust->validation)->frame_capacity,
+                                                    trust->tree->work},
+                           trust->validation, trust->search},
+      &found);
   if (result != TC_TLV_OK)
     return result;
   const tc_x509_crl_signature_cache verifier = {processing->index,
@@ -207,9 +227,14 @@ TC_TLV_result tc_x509_crl_process_candidate(const void* context,
                                             TC_X509_search_result* out)
 {
   const tc_x509_crl_processing* processing = context;
-  return tc_x509_crl_process(processing->selected, candidate, processing->query, trust->source,
-                             trust->anchor_index, trust->options, trust->validation, trust->search,
-                             trust->tree->work, processing->evidence, out);
+  return tc_x509_crl_process(
+      processing->selected, candidate, processing->query,
+      &(tc_x509_crl_trust){trust->source, trust->anchor_index, trust->options,
+                           &(tc_pki_tree_workspace){(trust->validation)->frames,
+                                                    (trust->validation)->frame_capacity,
+                                                    trust->tree->work},
+                           trust->validation, trust->search},
+      processing->evidence, out);
 }
 
 TC_TLV_result tc_x509_crl_source_scan_finish(const tc_x509_crl_source_scan* scan,
@@ -303,15 +328,18 @@ static TC_TLV_result array_anchor(void* context, size_t index, size_t* work,
   return TC_TLV_OK;
 }
 
-TC_X509_path_status tc_x509_path_search(TC_bytes target, const TC_bytes* candidates,
-                                        size_t candidate_count, const TC_X509_trust_anchor* anchors,
-                                        size_t anchor_count, const TC_X509_path_options* options,
+TC_X509_path_status tc_x509_path_search(TC_bytes target, const tc_x509_path_arrays* arrays,
+                                        const TC_X509_path_options* options,
                                         const TC_X509_path_workspace* validation,
                                         const TC_X509_search_workspace* search, size_t* work,
                                         TC_X509_search_result* out)
 {
-  array_source arrays = {candidates, anchors};
-  TC_X509_store_source source = {&arrays, candidate_count, anchor_count, array_candidate,
+  const TC_bytes* candidates = arrays->candidates;
+  const size_t candidate_count = arrays->candidate_count;
+  const TC_X509_trust_anchor* anchors = arrays->anchors;
+  const size_t anchor_count = arrays->anchor_count;
+  array_source records = {candidates, anchors};
+  TC_X509_store_source source = {&records, candidate_count, anchor_count, array_candidate,
                                  array_anchor};
   if ((candidate_count && !candidates) || (anchor_count && !anchors))
     return TC_X509_PATH_ERROR;
