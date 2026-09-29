@@ -67,7 +67,8 @@ tc_pki_authority_matches(const TC_X509_authority_key_identifier* authority,
       int equal;
       if (tc_pki_work_charge(tree->work, 1) != TC_TLV_OK)
         return TC_TLV_LIMIT;
-      result = TC_X509_general_name_next(&reader, tree->frames, tree->capacity, &name);
+      result =
+          TC_X509_general_name_next(&reader, (TC_TLV_frames){tree->frames, tree->capacity}, &name);
       if (result != TC_TLV_OK)
         return result;
       if (name.type != DIRECTORY_NAME) {

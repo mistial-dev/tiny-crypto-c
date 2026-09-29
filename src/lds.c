@@ -77,8 +77,8 @@ static TC_TLV_result lds_hashes(TC_TLV_reader* groups, const tc_pki_tree_workspa
   return TC_TLV_OK;
 }
 
-TC_TLV_result TC_LDS_read(TC_bytes encoded, const TC_TLV_limits* limits, TC_TLV_frame* frames,
-                          size_t frame_capacity, size_t* work, TC_LDS_security_object* out)
+TC_TLV_result TC_LDS_read(TC_bytes encoded, const TC_TLV_limits* limits, TC_TLV_frames frames,
+                          size_t* work, TC_LDS_security_object* out)
 {
   TC_LDS_security_object parsed = {0};
   TC_TLV_reader fields, groups;
@@ -87,10 +87,10 @@ TC_TLV_result TC_LDS_read(TC_bytes encoded, const TC_TLV_limits* limits, TC_TLV_
   tc_hash_info info;
   uint32_t version;
   TC_TLV_result result =
-      tc_pki_reader_storage(encoded, limits, frames, frame_capacity, work, out, sizeof *out);
+      tc_pki_reader_storage(encoded, limits, frames.data, frames.capacity, work, out, sizeof *out);
   if (result != TC_TLV_OK)
     return result;
-  const tc_pki_tree_workspace tree = {frames, frame_capacity, work};
+  const tc_pki_tree_workspace tree = {frames.data, frames.capacity, work};
   result = tc_pki_tree_open(encoded, 0x30, TC_TLV_DER, limits, &tree, &fields);
   if (result != TC_TLV_OK)
     return result;
@@ -150,16 +150,15 @@ TC_TLV_result TC_LDS_read(TC_bytes encoded, const TC_TLV_limits* limits, TC_TLV_
 }
 
 TC_TLV_result TC_LDS_read_content(TC_bytes octets, const TC_TLV_limits* limits,
-                                  TC_TLV_frame* frames, size_t frame_capacity, size_t* work,
-                                  uint8_t* buffer, size_t buffer_capacity,
-                                  TC_LDS_security_object* out)
+                                  TC_TLV_frames frames, size_t* work, uint8_t* buffer,
+                                  size_t buffer_capacity, TC_LDS_security_object* out)
 {
   TC_bytes writes[4], content;
   tc_pki_storage_plan plan;
   if (!limits || !work || !out)
     return TC_TLV_ARGUMENT;
   tc_pki_storage_plan_begin(&plan, writes, 4, SIZE_MAX);
-  TC_PKI_PLAN_WRITE(&plan, frames, frame_capacity);
+  TC_PKI_PLAN_WRITE(&plan, frames.data, frames.capacity);
   TC_PKI_PLAN_WRITE(&plan, work, 1);
   TC_PKI_PLAN_WRITE(&plan, out, 1);
   TC_PKI_PLAN_WRITE(&plan, buffer, buffer_capacity);
@@ -173,16 +172,16 @@ TC_TLV_result TC_LDS_read_content(TC_bytes octets, const TC_TLV_limits* limits,
     return result;
   /* CMS permits nested BER chunks. The reconstructed LDS remains DER. */
   result = tc_pki_octets_contiguous(octets, 4, TC_TLV_BER, limits,
-                                    &(tc_pki_tree_workspace){frames, frame_capacity, work},
+                                    &(tc_pki_tree_workspace){frames.data, frames.capacity, work},
                                     (TC_buffer){buffer, buffer_capacity}, &content);
   if (result != TC_TLV_OK)
     return result;
-  return TC_LDS_read(content, limits, frames, frame_capacity, work, out);
+  return TC_LDS_read(content, limits, frames, work, out);
 }
 
 TC_TLV_result TC_LDS_hash_find(const TC_LDS_security_object* object, unsigned number,
-                               const TC_TLV_limits* limits, TC_TLV_frame* frames,
-                               size_t frame_capacity, size_t* work, TC_bytes* out)
+                               const TC_TLV_limits* limits, TC_TLV_frames frames, size_t* work,
+                               TC_bytes* out)
 {
   TC_TLV_reader groups;
   TC_bytes selected;
@@ -191,12 +190,13 @@ TC_TLV_result TC_LDS_hash_find(const TC_LDS_security_object* object, unsigned nu
   if (!object || !number || number > TC_LDS_MAX_GROUPS)
     return TC_TLV_ARGUMENT;
   /* Check both borrowed spans and their metadata before charging work. */
-  TC_TLV_result result = tc_pki_reader_storage_check(
-      object->encoded, object, sizeof *object, frames, frame_capacity, work, out, sizeof *out);
+  TC_TLV_result result =
+      tc_pki_reader_storage_check(object->encoded, object, sizeof *object, frames.data,
+                                  frames.capacity, work, out, sizeof *out);
   if (result != TC_TLV_OK)
     return result;
-  result = tc_pki_reader_storage_check(object->hashes, limits, sizeof *limits, frames,
-                                       frame_capacity, work, out, sizeof *out);
+  result = tc_pki_reader_storage_check(object->hashes, limits, sizeof *limits, frames.data,
+                                       frames.capacity, work, out, sizeof *out);
   if (result != TC_TLV_OK)
     return result;
   if (!tc_hash_info_get(object->hash, &info))
@@ -204,7 +204,7 @@ TC_TLV_result TC_LDS_hash_find(const TC_LDS_security_object* object, unsigned nu
   result = tc_pki_work_charge(work, 2 * TC_PKI_READER_STORAGE_WORK);
   if (result != TC_TLV_OK)
     return result;
-  const tc_pki_tree_workspace tree = {frames, frame_capacity, work};
+  const tc_pki_tree_workspace tree = {frames.data, frames.capacity, work};
   result = tc_pki_tree_open(object->hashes, 0x30, TC_TLV_DER, limits, &tree, &groups);
   if (result != TC_TLV_OK)
     return result;
@@ -221,8 +221,7 @@ TC_TLV_result TC_LDS_hash_find(const TC_LDS_security_object* object, unsigned nu
 
 TC_TLV_result TC_LDS_hash_check(const TC_LDS_security_object* object, unsigned number,
                                 const TC_bytes* parts, size_t count, const TC_TLV_limits* limits,
-                                TC_TLV_frame* frames, size_t frame_capacity, size_t* work,
-                                int* matched)
+                                TC_TLV_frames frames, size_t* work, int* matched)
 {
   enum { WRITES = 3, MAX_DIGEST_BYTES = 64 };
   TC_bytes writes[WRITES], expected;
@@ -232,7 +231,7 @@ TC_TLV_result TC_LDS_hash_check(const TC_LDS_security_object* object, unsigned n
   if (count > limits->max_elements)
     return TC_TLV_LIMIT;
   tc_pki_storage_plan_begin(&plan, writes, WRITES, *work);
-  TC_PKI_PLAN_WRITE(&plan, frames, frame_capacity);
+  TC_PKI_PLAN_WRITE(&plan, frames.data, frames.capacity);
   TC_PKI_PLAN_WRITE(&plan, work, 1);
   TC_PKI_PLAN_WRITE(&plan, matched, 1);
   tc_pki_storage_plan_seal(&plan);
@@ -248,8 +247,7 @@ TC_TLV_result TC_LDS_hash_check(const TC_LDS_security_object* object, unsigned n
   TC_TLV_result stored = tc_pki_storage_plan_finish(&plan, work);
   if (stored != TC_TLV_OK)
     return stored;
-  TC_TLV_result result =
-      TC_LDS_hash_find(object, number, limits, frames, frame_capacity, work, &expected);
+  TC_TLV_result result = TC_LDS_hash_find(object, number, limits, frames, work, &expected);
   if (result != TC_TLV_OK)
     return result;
   if (!tc_hash_available(object->hash))
@@ -259,7 +257,7 @@ TC_TLV_result TC_LDS_hash_check(const TC_LDS_security_object* object, unsigned n
     return result;
   TC_hash_context scratch;
   uint8_t digest[MAX_DIGEST_BYTES];
-  const tc_pki_tree_workspace tree = {frames, frame_capacity, work};
+  const tc_pki_tree_workspace tree = {frames.data, frames.capacity, work};
   result = tc_pki_hash_parts(parts, count, object->hash, limits, &tree, &scratch, digest);
   if (result == TC_TLV_OK) {
     const TC_status comparison = TC_ct_equal(expected.data, digest, expected.length);

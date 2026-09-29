@@ -66,9 +66,9 @@ static MunitResult parsing(const MunitParameter params[], void* context)
     for (unsigned count = 2; count <= TC_LDS_MAX_GROUPS; ++count) {
       const size_t length = fixture(encoded, version, count, 0, 32, count & 1);
       size_t work = WORK;
-      munit_assert_int(
-          TC_LDS_read((TC_bytes){encoded, length}, &limits, frames, FRAMES, &work, &object), ==,
-          TC_TLV_OK);
+      munit_assert_int(TC_LDS_read((TC_bytes){encoded, length}, &limits,
+                                   (TC_TLV_frames){frames, FRAMES}, &work, &object),
+                       ==, TC_TLV_OK);
       munit_assert_uint(object.version, ==, version);
       munit_assert_int(object.hash, ==, TC_HASH_SHA256);
       munit_assert_uint(object.groups, ==, (1u << count) - 1);
@@ -102,18 +102,19 @@ static MunitResult parsing(const MunitParameter params[], void* context)
                                                             : 0);
     size_t work = WORK;
     object = preserved;
-    munit_assert_int(
-        TC_LDS_read((TC_bytes){encoded, length}, &limits, frames, FRAMES, &work, &object), ==,
-        variant == UNKNOWN_HASH || variant == UNKNOWN_VERSION ? TC_TLV_UNSUPPORTED
-                                                              : TC_TLV_INVALID);
+    munit_assert_int(TC_LDS_read((TC_bytes){encoded, length}, &limits,
+                                 (TC_TLV_frames){frames, FRAMES}, &work, &object),
+                     ==,
+                     variant == UNKNOWN_HASH || variant == UNKNOWN_VERSION ? TC_TLV_UNSUPPORTED
+                                                                           : TC_TLV_INVALID);
     munit_assert_memory_equal(sizeof object, &object, &preserved);
   }
   for (unsigned variant = 0; variant < 7; ++variant) {
     size_t length = fixture(encoded, variant == 0 ? 0 : 1, 2, 0, 32, 0);
     size_t work = WORK;
-    munit_assert_int(
-        TC_LDS_read((TC_bytes){encoded, length}, &limits, frames, FRAMES, &work, &object), ==,
-        TC_TLV_OK);
+    munit_assert_int(TC_LDS_read((TC_bytes){encoded, length}, &limits,
+                                 (TC_TLV_frames){frames, FRAMES}, &work, &object),
+                     ==, TC_TLV_OK);
     if (variant < 2)
       encoded[4] ^= 1; /* Missing or unexpected version information. */
     else if (variant == 2)
@@ -128,38 +129,39 @@ static MunitResult parsing(const MunitParameter params[], void* context)
     }
     work = WORK;
     object = preserved;
-    munit_assert_int(
-        TC_LDS_read((TC_bytes){encoded, length}, &limits, frames, FRAMES, &work, &object), ==,
-        TC_TLV_INVALID);
+    munit_assert_int(TC_LDS_read((TC_bytes){encoded, length}, &limits,
+                                 (TC_TLV_frames){frames, FRAMES}, &work, &object),
+                     ==, TC_TLV_INVALID);
     munit_assert_memory_equal(sizeof object, &object, &preserved);
   }
   size_t length = fixture(encoded, 1, 2, 0, 32, 0);
   for (size_t prefix = 0; prefix < length; ++prefix) {
     size_t work = WORK;
     object = preserved;
-    munit_assert_int(
-        TC_LDS_read((TC_bytes){encoded, prefix}, &limits, frames, FRAMES, &work, &object), !=,
-        TC_TLV_OK);
+    munit_assert_int(TC_LDS_read((TC_bytes){encoded, prefix}, &limits,
+                                 (TC_TLV_frames){frames, FRAMES}, &work, &object),
+                     !=, TC_TLV_OK);
     munit_assert_memory_equal(sizeof object, &object, &preserved);
   }
   size_t work = WORK;
-  munit_assert_int(
-      TC_LDS_read((TC_bytes){encoded, length}, &limits, frames, FRAMES, &work, &object), ==,
-      TC_TLV_OK);
+  munit_assert_int(TC_LDS_read((TC_bytes){encoded, length}, &limits,
+                               (TC_TLV_frames){frames, FRAMES}, &work, &object),
+                   ==, TC_TLV_OK);
   const size_t required = WORK - work;
   for (size_t budget = 0; budget <= required; ++budget) {
     work = budget;
     object = preserved;
-    munit_assert_int(
-        TC_LDS_read((TC_bytes){encoded, length}, &limits, frames, FRAMES, &work, &object), ==,
-        budget == required ? TC_TLV_OK : TC_TLV_LIMIT);
+    munit_assert_int(TC_LDS_read((TC_bytes){encoded, length}, &limits,
+                                 (TC_TLV_frames){frames, FRAMES}, &work, &object),
+                     ==, budget == required ? TC_TLV_OK : TC_TLV_LIMIT);
     if (budget < required)
       munit_assert_memory_equal(sizeof object, &object, &preserved);
   }
   work = WORK;
   object = preserved;
-  munit_assert_int(TC_LDS_read((TC_bytes){encoded, length}, &limits, NULL, 0, &work, &object), ==,
-                   TC_TLV_LIMIT);
+  munit_assert_int(
+      TC_LDS_read((TC_bytes){encoded, length}, &limits, (TC_TLV_frames){NULL, 0}, &work, &object),
+      ==, TC_TLV_LIMIT);
   munit_assert_memory_equal(sizeof object, &object, &preserved);
   union {
     TC_LDS_security_object object;
@@ -167,9 +169,9 @@ static MunitResult parsing(const MunitParameter params[], void* context)
   } alias;
   memcpy(alias.bytes, encoded, length);
   work = WORK;
-  munit_assert_int(
-      TC_LDS_read((TC_bytes){alias.bytes, length}, &limits, frames, FRAMES, &work, &alias.object),
-      ==, TC_TLV_ARGUMENT);
+  munit_assert_int(TC_LDS_read((TC_bytes){alias.bytes, length}, &limits,
+                               (TC_TLV_frames){frames, FRAMES}, &work, &alias.object),
+                   ==, TC_TLV_ARGUMENT);
   munit_assert_size(work, ==, WORK);
   munit_assert_memory_equal(length, alias.bytes, encoded);
   (void)params;
@@ -187,14 +189,15 @@ static MunitResult lookup(const MunitParameter params[], void* context)
   for (unsigned count = 2; count <= TC_LDS_MAX_GROUPS; ++count) {
     const size_t length = fixture(encoded, 1, count, 0, 32, 0);
     size_t work = WORK;
-    munit_assert_int(
-        TC_LDS_read((TC_bytes){encoded, length}, &limits, frames, FRAMES, &work, &object), ==,
-        TC_TLV_OK);
+    munit_assert_int(TC_LDS_read((TC_bytes){encoded, length}, &limits,
+                                 (TC_TLV_frames){frames, FRAMES}, &work, &object),
+                     ==, TC_TLV_OK);
     for (unsigned number = 0; number <= TC_LDS_MAX_GROUPS + 1; ++number) {
       TC_bytes digest = sentinel;
       work = WORK;
       const int invalid = !number || number > TC_LDS_MAX_GROUPS;
-      munit_assert_int(TC_LDS_hash_find(&object, number, &limits, frames, FRAMES, &work, &digest),
+      munit_assert_int(TC_LDS_hash_find(&object, number, &limits, (TC_TLV_frames){frames, FRAMES},
+                                        &work, &digest),
                        ==,
                        invalid          ? TC_TLV_ARGUMENT
                        : number > count ? TC_TLV_END
@@ -216,18 +219,20 @@ static MunitResult lookup(const MunitParameter params[], void* context)
   const size_t length = fixture(encoded, 0, 2, 0, 32, 0);
   size_t work = WORK;
   TC_bytes digest;
-  munit_assert_int(
-      TC_LDS_read((TC_bytes){encoded, length}, &limits, frames, FRAMES, &work, &object), ==,
-      TC_TLV_OK);
+  munit_assert_int(TC_LDS_read((TC_bytes){encoded, length}, &limits,
+                               (TC_TLV_frames){frames, FRAMES}, &work, &object),
+                   ==, TC_TLV_OK);
   work = WORK;
-  munit_assert_int(TC_LDS_hash_find(&object, 1, &limits, frames, FRAMES, &work, &digest), ==,
-                   TC_TLV_OK);
+  munit_assert_int(
+      TC_LDS_hash_find(&object, 1, &limits, (TC_TLV_frames){frames, FRAMES}, &work, &digest), ==,
+      TC_TLV_OK);
   const size_t required = WORK - work;
   for (size_t budget = 0; budget <= required; ++budget) {
     work = budget;
     digest = sentinel;
-    munit_assert_int(TC_LDS_hash_find(&object, 1, &limits, frames, FRAMES, &work, &digest), ==,
-                     budget == required ? TC_TLV_OK : TC_TLV_LIMIT);
+    munit_assert_int(
+        TC_LDS_hash_find(&object, 1, &limits, (TC_TLV_frames){frames, FRAMES}, &work, &digest), ==,
+        budget == required ? TC_TLV_OK : TC_TLV_LIMIT);
     if (budget < required) {
       munit_assert_ptr_equal(digest.data, sentinel.data);
       munit_assert_size(digest.length, ==, sentinel.length);
@@ -235,14 +240,16 @@ static MunitResult lookup(const MunitParameter params[], void* context)
   }
   TC_LDS_security_object preserved = object;
   work = WORK;
-  munit_assert_int(TC_LDS_hash_find(&object, 1, &limits, frames, FRAMES, &work, &object.hashes), ==,
-                   TC_TLV_ARGUMENT);
+  munit_assert_int(
+      TC_LDS_hash_find(&object, 1, &limits, (TC_TLV_frames){frames, FRAMES}, &work, &object.hashes),
+      ==, TC_TLV_ARGUMENT);
   munit_assert_size(work, ==, WORK);
   munit_assert_memory_equal(sizeof object, &object, &preserved);
   work = WORK;
   digest = sentinel;
-  munit_assert_int(TC_LDS_hash_find(&object, 1, NULL, frames, FRAMES, &work, &digest), ==,
-                   TC_TLV_ARGUMENT);
+  munit_assert_int(
+      TC_LDS_hash_find(&object, 1, NULL, (TC_TLV_frames){frames, FRAMES}, &work, &digest), ==,
+      TC_TLV_ARGUMENT);
   munit_assert_size(work, ==, WORK);
   munit_assert_ptr_equal(digest.data, sentinel.data);
   /* A later duplicate must fail even when searching for the first group. */
@@ -252,8 +259,9 @@ static MunitResult lookup(const MunitParameter params[], void* context)
   munit_assert_uint(encoded[second_number], ==, 2);
   encoded[second_number] = 1;
   work = WORK;
-  munit_assert_int(TC_LDS_hash_find(&object, 1, &limits, frames, FRAMES, &work, &digest), ==,
-                   TC_TLV_INVALID);
+  munit_assert_int(
+      TC_LDS_hash_find(&object, 1, &limits, (TC_TLV_frames){frames, FRAMES}, &work, &digest), ==,
+      TC_TLV_INVALID);
   munit_assert_ptr_equal(digest.data, sentinel.data);
   (void)params;
   (void)context;
@@ -269,8 +277,8 @@ static MunitResult content_read(const MunitParameter params[], void* context)
   memset(&preserved, 0xa5, sizeof preserved);
   const size_t length = fixture(der, 0, 2, 0, 32, 0);
   size_t used = field(encoded, 4, der, length), work = WORK;
-  munit_assert_int(TC_LDS_read_content((TC_bytes){encoded, used}, &limits, frames, FRAMES, &work,
-                                       NULL, 0, &object),
+  munit_assert_int(TC_LDS_read_content((TC_bytes){encoded, used}, &limits,
+                                       (TC_TLV_frames){frames, FRAMES}, &work, NULL, 0, &object),
                    ==, TC_TLV_OK);
   munit_assert_ptr_equal(object.encoded.data, encoded + used - length);
   for (size_t split = 0; split <= length; ++split) {
@@ -279,8 +287,9 @@ static MunitResult content_read(const MunitParameter params[], void* context)
     used = field(encoded, 0x24, chunks, bytes);
     work = WORK;
     memset(buffer, 0xa5, sizeof buffer);
-    munit_assert_int(TC_LDS_read_content((TC_bytes){encoded, used}, &limits, frames, FRAMES, &work,
-                                         buffer, length, &object),
+    munit_assert_int(TC_LDS_read_content((TC_bytes){encoded, used}, &limits,
+                                         (TC_TLV_frames){frames, FRAMES}, &work, buffer, length,
+                                         &object),
                      ==, TC_TLV_OK);
     munit_assert_memory_equal(length, object.encoded.data, der);
     const int copied = split && split < length;
@@ -290,8 +299,8 @@ static MunitResult content_read(const MunitParameter params[], void* context)
       munit_assert_uint(buffer[0], ==, 0xa5);
     work = WORK;
     object = preserved;
-    munit_assert_int(TC_LDS_read_content((TC_bytes){encoded, used}, &limits, frames, FRAMES, &work,
-                                         NULL, 0, &object),
+    munit_assert_int(TC_LDS_read_content((TC_bytes){encoded, used}, &limits,
+                                         (TC_TLV_frames){frames, FRAMES}, &work, NULL, 0, &object),
                      ==, copied ? TC_TLV_LIMIT : TC_TLV_OK);
     if (copied)
       munit_assert_memory_equal(sizeof object, &object, &preserved);
@@ -305,16 +314,18 @@ static MunitResult content_read(const MunitParameter params[], void* context)
   encoded[used++] = 0;
   encoded[used++] = 0;
   work = WORK;
-  munit_assert_int(TC_LDS_read_content((TC_bytes){encoded, used}, &limits, frames, FRAMES, &work,
-                                       buffer, length, &object),
+  munit_assert_int(TC_LDS_read_content((TC_bytes){encoded, used}, &limits,
+                                       (TC_TLV_frames){frames, FRAMES}, &work, buffer, length,
+                                       &object),
                    ==, TC_TLV_OK);
   munit_assert_memory_equal(length, object.encoded.data, der);
   const size_t required = WORK - work;
   for (size_t budget = 0; budget <= required; ++budget) {
     work = budget;
     object = preserved;
-    munit_assert_int(TC_LDS_read_content((TC_bytes){encoded, used}, &limits, frames, FRAMES, &work,
-                                         buffer, length, &object),
+    munit_assert_int(TC_LDS_read_content((TC_bytes){encoded, used}, &limits,
+                                         (TC_TLV_frames){frames, FRAMES}, &work, buffer, length,
+                                         &object),
                      ==, budget == required ? TC_TLV_OK : TC_TLV_LIMIT);
     if (budget < required)
       munit_assert_memory_equal(sizeof object, &object, &preserved);
@@ -322,18 +333,21 @@ static MunitResult content_read(const MunitParameter params[], void* context)
   for (size_t prefix = 0; prefix < used; ++prefix) {
     work = WORK;
     object = preserved;
-    munit_assert_int(TC_LDS_read_content((TC_bytes){encoded, prefix}, &limits, frames, FRAMES,
-                                         &work, buffer, length, &object),
+    munit_assert_int(TC_LDS_read_content((TC_bytes){encoded, prefix}, &limits,
+                                         (TC_TLV_frames){frames, FRAMES}, &work, buffer, length,
+                                         &object),
                      !=, TC_TLV_OK);
     munit_assert_memory_equal(sizeof object, &object, &preserved);
   }
   work = WORK;
-  munit_assert_int(TC_LDS_read_content((TC_bytes){encoded, used}, &limits, frames, FRAMES, &work,
-                                       buffer, length - 1, &object),
+  munit_assert_int(TC_LDS_read_content((TC_bytes){encoded, used}, &limits,
+                                       (TC_TLV_frames){frames, FRAMES}, &work, buffer, length - 1,
+                                       &object),
                    ==, TC_TLV_LIMIT);
   work = WORK;
-  munit_assert_int(TC_LDS_read_content((TC_bytes){encoded, used}, &limits, frames, FRAMES, &work,
-                                       encoded, sizeof encoded, &object),
+  munit_assert_int(TC_LDS_read_content((TC_bytes){encoded, used}, &limits,
+                                       (TC_TLV_frames){frames, FRAMES}, &work, encoded,
+                                       sizeof encoded, &object),
                    ==, TC_TLV_ARGUMENT);
   munit_assert_size(work, ==, WORK);
   munit_assert_memory_equal(sizeof object, &object, &preserved);
@@ -356,55 +370,57 @@ static MunitResult hash_check(const MunitParameter params[], void* context)
   TC_bytes digest;
   const size_t length = fixture(encoded, 0, 2, 0, 32, 0);
   size_t work = WORK;
+  munit_assert_int(TC_LDS_read((TC_bytes){encoded, length}, &limits,
+                               (TC_TLV_frames){frames, FRAMES}, &work, &object),
+                   ==, TC_TLV_OK);
   munit_assert_int(
-      TC_LDS_read((TC_bytes){encoded, length}, &limits, frames, FRAMES, &work, &object), ==,
+      TC_LDS_hash_find(&object, 1, &limits, (TC_TLV_frames){frames, FRAMES}, &work, &digest), ==,
       TC_TLV_OK);
-  munit_assert_int(TC_LDS_hash_find(&object, 1, &limits, frames, FRAMES, &work, &digest), ==,
-                   TC_TLV_OK);
   memcpy(encoded + (size_t)(digest.data - encoded), expected, sizeof expected);
   work = WORK;
-  munit_assert_int(
-      TC_LDS_read((TC_bytes){encoded, length}, &limits, frames, FRAMES, &work, &object), ==,
-      TC_TLV_OK);
+  munit_assert_int(TC_LDS_read((TC_bytes){encoded, length}, &limits,
+                               (TC_TLV_frames){frames, FRAMES}, &work, &object),
+                   ==, TC_TLV_OK);
   TC_bytes parts[] = {{(const uint8_t*)"a", 1}, {NULL, 0}, {(const uint8_t*)"bc", 2}};
   int matched = 7;
   work = WORK;
-  munit_assert_int(
-      TC_LDS_hash_check(&object, 1, parts, 3, &limits, frames, FRAMES, &work, &matched), ==,
-      TC_ENABLE_SHA256 ? TC_TLV_OK : TC_TLV_UNSUPPORTED);
+  munit_assert_int(TC_LDS_hash_check(&object, 1, parts, 3, &limits, (TC_TLV_frames){frames, FRAMES},
+                                     &work, &matched),
+                   ==, TC_ENABLE_SHA256 ? TC_TLV_OK : TC_TLV_UNSUPPORTED);
   munit_assert_int(matched, ==, TC_ENABLE_SHA256 ? 1 : 7);
 #if TC_ENABLE_SHA256
   const size_t required = WORK - work;
   for (size_t budget = 0; budget <= required; ++budget) {
     work = budget;
     matched = 7;
-    munit_assert_int(
-        TC_LDS_hash_check(&object, 1, parts, 3, &limits, frames, FRAMES, &work, &matched), ==,
-        budget == required ? TC_TLV_OK : TC_TLV_LIMIT);
+    munit_assert_int(TC_LDS_hash_check(&object, 1, parts, 3, &limits,
+                                       (TC_TLV_frames){frames, FRAMES}, &work, &matched),
+                     ==, budget == required ? TC_TLV_OK : TC_TLV_LIMIT);
     munit_assert_int(matched, ==, budget == required ? 1 : 7);
   }
   parts[2] = (TC_bytes){(const uint8_t*)"bd", 2};
   work = WORK;
-  munit_assert_int(
-      TC_LDS_hash_check(&object, 1, parts, 3, &limits, frames, FRAMES, &work, &matched), ==,
-      TC_TLV_OK);
+  munit_assert_int(TC_LDS_hash_check(&object, 1, parts, 3, &limits, (TC_TLV_frames){frames, FRAMES},
+                                     &work, &matched),
+                   ==, TC_TLV_OK);
   munit_assert_int(matched, ==, 0);
   work = WORK;
-  munit_assert_int(TC_LDS_hash_check(&object, 1, NULL, 0, &limits, frames, FRAMES, &work, &matched),
+  munit_assert_int(TC_LDS_hash_check(&object, 1, NULL, 0, &limits, (TC_TLV_frames){frames, FRAMES},
+                                     &work, &matched),
                    ==, TC_TLV_OK);
   munit_assert_int(matched, ==, 0);
 #endif
   work = WORK;
   matched = 7;
-  munit_assert_int(
-      TC_LDS_hash_check(&object, 3, parts, 3, &limits, frames, FRAMES, &work, &matched), ==,
-      TC_TLV_END);
+  munit_assert_int(TC_LDS_hash_check(&object, 3, parts, 3, &limits, (TC_TLV_frames){frames, FRAMES},
+                                     &work, &matched),
+                   ==, TC_TLV_END);
   munit_assert_int(matched, ==, 7);
   parts[0] = (TC_bytes){(const uint8_t*)&matched, sizeof matched};
   work = WORK;
-  munit_assert_int(
-      TC_LDS_hash_check(&object, 1, parts, 3, &limits, frames, FRAMES, &work, &matched), ==,
-      TC_TLV_ARGUMENT);
+  munit_assert_int(TC_LDS_hash_check(&object, 1, parts, 3, &limits, (TC_TLV_frames){frames, FRAMES},
+                                     &work, &matched),
+                   ==, TC_TLV_ARGUMENT);
   munit_assert_size(work, ==, WORK);
   munit_assert_int(matched, ==, 7);
   (void)params;

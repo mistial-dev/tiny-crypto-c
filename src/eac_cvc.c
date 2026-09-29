@@ -118,7 +118,7 @@ TC_TLV_result TC_EAC_CVC_public_key_read(const uint8_t* data, size_t length,
     return result;
   if (!tc_pki_tag(&element, 0x7f49) || element.encoded.length != length)
     return TC_TLV_INVALID;
-  result = TC_TLV_walk(data, length, TC_TLV_DER, limits, &frame, 1, NULL, NULL);
+  result = TC_TLV_walk(data, length, TC_TLV_DER, limits, (TC_TLV_frames){&frame, 1}, NULL, NULL);
   if (result != TC_TLV_OK)
     return result;
   return key_contents(element.value, 1, out);
@@ -230,8 +230,8 @@ TC_TLV_result TC_EAC_CVC_read(const uint8_t* data, size_t length, const TC_TLV_l
     return result;
   if (!tc_pki_tag(&element, 0x7f21) || element.encoded.length != length)
     return TC_TLV_INVALID;
-  result = TC_TLV_walk(data, length, TC_TLV_DER, limits, workspace->frames,
-                       workspace->frame_capacity, NULL, NULL);
+  result = TC_TLV_walk(data, length, TC_TLV_DER, limits,
+                       (TC_TLV_frames){workspace->frames, workspace->frame_capacity}, NULL, NULL);
   if (result != TC_TLV_OK)
     return result;
   memset(&certificate, 0, sizeof certificate);

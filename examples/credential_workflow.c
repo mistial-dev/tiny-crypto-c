@@ -53,21 +53,21 @@ card_identifiers(const TC_X509_validation_result* card, TC_PIV_card_profile prof
       break;
     }
     if (card_key == EXAMPLE_CREDENTIAL_PIV_AUTHENTICATION)
-      status =
-          twic_reader_policy
-              ? TC_TWIC_authentication_identifiers_read(extension.value, card_guid,
-                                                        &context->options->parsing, storage->frames,
-                                                        storage->frame_capacity, work, out)
-              : TC_PIV_authentication_identifiers_read(extension.value, card_guid,
-                                                       &context->options->parsing, storage->frames,
-                                                       storage->frame_capacity, work, out);
+      status = twic_reader_policy
+                   ? TC_TWIC_authentication_identifiers_read(
+                         extension.value, card_guid, &context->options->parsing,
+                         (TC_TLV_frames){storage->frames, storage->frame_capacity}, work, out)
+                   : TC_PIV_authentication_identifiers_read(
+                         extension.value, card_guid, &context->options->parsing,
+                         (TC_TLV_frames){storage->frames, storage->frame_capacity}, work, out);
     else
-      status =
-          profile == TC_PIV_CARD
-              ? TC_PIV_card_identifiers_read(extension.value, profile, &context->options->parsing,
-                                             storage->frames, storage->frame_capacity, work, out)
-              : TC_TWIC_card_identifiers_read(extension.value, profile, &context->options->parsing,
-                                              storage->frames, storage->frame_capacity, work, out);
+      status = profile == TC_PIV_CARD
+                   ? TC_PIV_card_identifiers_read(
+                         extension.value, profile, &context->options->parsing,
+                         (TC_TLV_frames){storage->frames, storage->frame_capacity}, work, out)
+                   : TC_TWIC_card_identifiers_read(
+                         extension.value, profile, &context->options->parsing,
+                         (TC_TLV_frames){storage->frames, storage->frame_capacity}, work, out);
     if (status != TC_TLV_OK)
       break;
     found = 1;

@@ -61,14 +61,14 @@ TC_TLV_result tc_x509_crl_content_equal(const TC_X509_crl* left, const TC_X509_c
   return result;
 }
 
-TC_TLV_result TC_X509_crl_read(TC_bytes encoded, const TC_TLV_limits* limits, TC_TLV_frame* frames,
-                               size_t frame_capacity, size_t* work, TC_X509_crl* out)
+TC_TLV_result TC_X509_crl_read(TC_bytes encoded, const TC_TLV_limits* limits, TC_TLV_frames frames,
+                               size_t* work, TC_X509_crl* out)
 {
   TC_TLV_result result =
-      tc_pki_reader_storage(encoded, limits, frames, frame_capacity, work, out, sizeof *out);
+      tc_pki_reader_storage(encoded, limits, frames.data, frames.capacity, work, out, sizeof *out);
   if (result != TC_TLV_OK)
     return result;
-  const tc_pki_tree_workspace tree = {frames, frame_capacity, work};
+  const tc_pki_tree_workspace tree = {frames.data, frames.capacity, work};
   return tc_x509_crl_read(encoded, limits, &tree, out);
 }
 

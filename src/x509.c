@@ -277,7 +277,8 @@ static TC_TLV_result general_name(const TC_TLV_element* element, int constraint)
       return TC_TLV_INVALID;
     break;
   case 0xa0:
-    if (open(element->value, &fields) != TC_TLV_OK || tc_pki_field(&fields, 6, &value) != TC_TLV_OK ||
+    if (open(element->value, &fields) != TC_TLV_OK ||
+        tc_pki_field(&fields, 6, &value) != TC_TLV_OK ||
         TC_DER_oid(value.encoded.data, value.encoded.length, &contents) != TC_TLV_OK ||
         tc_pki_field(&fields, 0xa0, &value) != TC_TLV_OK || !tc_pki_end(&fields))
       return TC_TLV_INVALID;
@@ -330,8 +331,8 @@ static TC_TLV_result next_tree(TC_TLV_reader* reader, TC_TLV_frame* frames, size
   budget = reader->limits;
   budget.max_elements -= reader->elements;
   remaining = budget.max_elements;
-  result = TC_TLV_walk(element->encoded.data, element->encoded.length, TC_TLV_DER, &budget, frames,
-                       capacity, count_node, &remaining);
+  result = TC_TLV_walk(element->encoded.data, element->encoded.length, TC_TLV_DER, &budget,
+                       (TC_TLV_frames){frames, capacity}, count_node, &remaining);
   if (result != TC_TLV_OK)
     return result;
   next.elements = reader->limits.max_elements - remaining;
@@ -339,8 +340,8 @@ static TC_TLV_result next_tree(TC_TLV_reader* reader, TC_TLV_frame* frames, size
   return TC_TLV_OK;
 }
 
-TC_TLV_result TC_X509_general_name_next(TC_TLV_reader* reader, TC_TLV_frame* frames,
-                                        size_t capacity, TC_X509_general_name* out)
+TC_TLV_result TC_X509_general_name_next(TC_TLV_reader* reader, TC_TLV_frames frames,
+                                        TC_X509_general_name* out)
 {
   TC_TLV_reader next;
   TC_TLV_element element;
@@ -348,7 +349,7 @@ TC_TLV_result TC_X509_general_name_next(TC_TLV_reader* reader, TC_TLV_frame* fra
   if (!reader || !out)
     return TC_TLV_ARGUMENT;
   next = *reader;
-  result = next_tree(&next, frames, capacity, &element);
+  result = next_tree(&next, frames.data, frames.capacity, &element);
   if (result != TC_TLV_OK)
     return result;
   result = general_name(&element, 0);
@@ -361,8 +362,8 @@ TC_TLV_result TC_X509_general_name_next(TC_TLV_reader* reader, TC_TLV_frame* fra
   return TC_TLV_OK;
 }
 
-TC_TLV_result TC_X509_general_subtree_next(TC_TLV_reader* reader, TC_TLV_frame* frames,
-                                           size_t capacity, TC_X509_general_subtree* out)
+TC_TLV_result TC_X509_general_subtree_next(TC_TLV_reader* reader, TC_TLV_frames frames,
+                                           TC_X509_general_subtree* out)
 {
   TC_TLV_reader next, fields;
   TC_TLV_element element;
@@ -373,7 +374,7 @@ TC_TLV_result TC_X509_general_subtree_next(TC_TLV_reader* reader, TC_TLV_frame* 
   if (!reader || !out)
     return TC_TLV_ARGUMENT;
   next = *reader;
-  result = next_tree(&next, frames, capacity, &element);
+  result = next_tree(&next, frames.data, frames.capacity, &element);
   if (result != TC_TLV_OK)
     return result;
   if (!tc_pki_tag(&element, 0x30) || open(element.value, &fields) != TC_TLV_OK ||
@@ -432,7 +433,7 @@ static TC_TLV_result extensions(TC_bytes encoded, TC_X509_workspace* workspace,
     if (embedded.encoded.length != extension.value.length)
       return TC_TLV_INVALID;
     result = TC_TLV_walk(extension.value.data, extension.value.length, TC_TLV_DER, budget,
-                         workspace->frames, workspace->frame_capacity, count_node,
+                         (TC_TLV_frames){workspace->frames, workspace->frame_capacity}, count_node,
                          &budget->max_elements);
     if (result != TC_TLV_OK)
       return result;
@@ -581,7 +582,8 @@ static TC_TLV_result read_bounded(TC_bytes encoded, unsigned tag, const TC_TLV_l
                                   TC_TLV_element* out)
 {
   TC_TLV_result result;
-  if (!limits || !out || !workspace || (!workspace->extension_oids && workspace->extension_capacity))
+  if (!limits || !out || !workspace ||
+      (!workspace->extension_oids && workspace->extension_capacity))
     return TC_TLV_ARGUMENT;
   result = TC_TLV_read(encoded.data, encoded.length, TC_TLV_DER, limits, out);
   if (result != TC_TLV_OK)
@@ -589,8 +591,9 @@ static TC_TLV_result read_bounded(TC_bytes encoded, unsigned tag, const TC_TLV_l
   if (!tc_pki_tag(out, tag) || !out->header.constructed || out->encoded.length != encoded.length)
     return TC_TLV_INVALID;
   *budget = *limits;
-  return TC_TLV_walk(encoded.data, encoded.length, TC_TLV_DER, limits, workspace->frames,
-                     workspace->frame_capacity, count_node, &budget->max_elements);
+  return TC_TLV_walk(encoded.data, encoded.length, TC_TLV_DER, limits,
+                     (TC_TLV_frames){workspace->frames, workspace->frame_capacity}, count_node,
+                     &budget->max_elements);
 }
 
 TC_TLV_result tc_x509_tbs_read(TC_bytes encoded, const TC_TLV_limits* limits,
@@ -638,8 +641,8 @@ TC_TLV_result tc_x509_certificate_read(TC_bytes encoded, unsigned tag, const TC_
   /* RFC 5280 section 4.1.1.2: signatureAlgorithm matches the TBS signature
    * field. Equal DER fields have equal encodings. */
   if (tc_pki_field(&outer, 0x30, &element) != TC_TLV_OK ||
-      TC_DER_algorithm_identifier(element.encoded.data, element.encoded.length,
-                                  &outer_algorithm) != TC_TLV_OK ||
+      TC_DER_algorithm_identifier(element.encoded.data, element.encoded.length, &outer_algorithm) !=
+          TC_TLV_OK ||
       !tc_pki_equal(outer_algorithm.oid, certificate.signature_algorithm.oid) ||
       !tc_pki_equal(outer_algorithm.parameters, certificate.signature_algorithm.parameters))
     return TC_TLV_INVALID;

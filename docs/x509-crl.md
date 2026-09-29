@@ -21,7 +21,7 @@ const TC_TLV_limits limits = {
 size_t work = CRL_WORK;
 TC_X509_crl crl;
 TC_TLV_result result = TC_X509_crl_read(
-    encoded, &limits, frames, CRL_MAX_DEPTH, &work, &crl);
+    encoded, &limits, (TC_TLV_frames){frames, CRL_MAX_DEPTH}, &work, &crl);
 if (result != TC_TLV_OK) {
     /* Handle malformed input, exhausted limits or invalid arguments. */
     return result;

@@ -64,10 +64,12 @@ TC_TLV_result example_read_card_identity(TC_bytes encoded, TC_PIV_card_profile p
       return TC_TLV_INVALID;
     status =
         profile == TC_PIV_CARD
-            ? TC_PIV_card_identifiers_read(extension.value, profile, limits, storage->frames,
-                                           parser.frame_capacity, work, &identity.identifiers)
-            : TC_TWIC_card_identifiers_read(extension.value, profile, limits, storage->frames,
-                                            parser.frame_capacity, work, &identity.identifiers);
+            ? TC_PIV_card_identifiers_read(extension.value, profile, limits,
+                                           (TC_TLV_frames){storage->frames, parser.frame_capacity},
+                                           work, &identity.identifiers)
+            : TC_TWIC_card_identifiers_read(extension.value, profile, limits,
+                                            (TC_TLV_frames){storage->frames, parser.frame_capacity},
+                                            work, &identity.identifiers);
     if (status != TC_TLV_OK)
       return status;
     found = 1;

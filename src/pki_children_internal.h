@@ -57,8 +57,9 @@ static inline TC_TLV_result tc_pki_children(TC_bytes encoded, unsigned tag, TC_T
     return TC_TLV_INVALID;
   if (tc_pki_work_charge(tree->work, encoded.length) != TC_TLV_OK)
     return TC_TLV_LIMIT;
-  result = TC_TLV_walk(encoded.data, encoded.length, profile, limits, tree->frames, tree->capacity,
-                       tc_pki_children_visit, &state);
+  result =
+      TC_TLV_walk(encoded.data, encoded.length, profile, limits,
+                  (TC_TLV_frames){tree->frames, tree->capacity}, tc_pki_children_visit, &state);
   if (result != TC_TLV_OK)
     return result;
   if (state.roots != 1)

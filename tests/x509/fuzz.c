@@ -75,8 +75,9 @@ static void fuzz_card_identifiers(const uint8_t* data, size_t length)
     for (size_t i = 0; i < sizeof budgets / sizeof *budgets; ++i) {
       size_t work = budgets[i];
       memcpy(&out, &saved, sizeof out);
-      TC_TLV_result result = TC_PIV_card_identifiers_read(input, (TC_PIV_card_profile)profile,
-                                                          &limits, frames, FRAMES, &work, &out);
+      TC_TLV_result result =
+          TC_PIV_card_identifiers_read(input, (TC_PIV_card_profile)profile, &limits,
+                                       (TC_TLV_frames){frames, FRAMES}, &work, &out);
       if (work > budgets[i])
         abort();
       if (result != TC_TLV_OK) {
@@ -206,9 +207,10 @@ static void fuzz_lds(TC_bytes input)
     for (size_t i = 0; i < sizeof budgets / sizeof *budgets; ++i) {
       size_t work = budgets[i];
       memcpy(&object, &saved, sizeof object);
-      TC_TLV_result result = wrapped ? TC_LDS_read_content(input, &limits, frames, FRAMES, &work,
-                                                           content, sizeof content, &object)
-                                     : TC_LDS_read(input, &limits, frames, FRAMES, &work, &object);
+      TC_TLV_result result =
+          wrapped ? TC_LDS_read_content(input, &limits, (TC_TLV_frames){frames, FRAMES}, &work,
+                                        content, sizeof content, &object)
+                  : TC_LDS_read(input, &limits, (TC_TLV_frames){frames, FRAMES}, &work, &object);
       if (work > budgets[i])
         abort();
       if (result != TC_TLV_OK) {
@@ -225,7 +227,8 @@ static void fuzz_lds(TC_bytes input)
       for (unsigned number = 1; number <= TC_LDS_MAX_GROUPS; ++number) {
         TC_bytes hash = {NULL, 99};
         work = WORK;
-        result = TC_LDS_hash_find(&object, number, &limits, frames, FRAMES, &work, &hash);
+        result = TC_LDS_hash_find(&object, number, &limits, (TC_TLV_frames){frames, FRAMES}, &work,
+                                  &hash);
         if (work > WORK)
           abort();
         if (object.groups & (1u << (number - 1))) {
@@ -881,7 +884,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
     do {
       memcpy(&old_reader, &reader, sizeof reader);
       memcpy(&old_general, &general, sizeof general);
-      result = TC_X509_general_name_next(&reader, frames, 16, &general);
+      result = TC_X509_general_name_next(&reader, (TC_TLV_frames){frames, 16}, &general);
       if (result == TC_TLV_OK) {
         if (reader.offset <= old_reader.offset || reader.elements <= old_reader.elements ||
             reader.elements > limits.max_elements || general.type > 8)
@@ -905,7 +908,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
       do {
         memcpy(&old_reader, &reader, sizeof reader);
         memcpy(&old_subtree, &subtree, sizeof subtree);
-        result = TC_X509_general_subtree_next(&reader, frames, 16, &subtree);
+        result = TC_X509_general_subtree_next(&reader, (TC_TLV_frames){frames, 16}, &subtree);
         if (result == TC_TLV_OK) {
           if (reader.offset <= old_reader.offset || reader.elements <= old_reader.elements ||
               reader.elements > limits.max_elements || subtree.base.type > 8)

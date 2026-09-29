@@ -268,7 +268,8 @@ static MunitResult pss_signers(const MunitParameter params[], void* user)
         size_t length = encode_signer(encoded, attrs, (TC_bytes){parameters, sizeof parameters},
                                       (TC_bytes){signature, signature_length});
         munit_assert_int(TC_CMS_signer_info_read((TC_bytes){encoded, length}, TC_TLV_BER, &limits,
-                                                 frames, FRAME_CAPACITY, &work, &signer),
+                                                 (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
+                                                 &signer),
                          ==, TC_TLV_OK);
         work = WORK_BUDGET;
         munit_assert_int(TC_CMS_signer_verify_digest(&signer, type, computed, TC_CMS_ATTRIBUTES_DER,
@@ -338,7 +339,8 @@ static MunitResult pss_signers(const MunitParameter params[], void* user)
                                                         : (uint8_t)(saved ^ 1);
           work = WORK_BUDGET;
           munit_assert_int(TC_CMS_signer_info_read((TC_bytes){encoded, length}, TC_TLV_BER, &limits,
-                                                   frames, FRAME_CAPACITY, &work, &signer),
+                                                   (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
+                                                   &signer),
                            ==, TC_TLV_OK);
           munit_assert_int(TC_CMS_signer_verify_digest(&signer, type, computed,
                                                        TC_CMS_ATTRIBUTES_DER, &key, &provider,

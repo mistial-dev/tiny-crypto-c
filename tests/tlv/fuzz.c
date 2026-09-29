@@ -52,21 +52,24 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
       abort();
     memset(&e, 0xa5, sizeof e);
     saved = e;
-    r = TC_TLV_read_tree(data, length, (TC_TLV_profile)profile, &limits, frames,
-                         sizeof frames / sizeof *frames, &e);
+    r = TC_TLV_read_tree(data, length, (TC_TLV_profile)profile, &limits,
+                         (TC_TLV_frames){frames, sizeof frames / sizeof *frames}, &e);
     if (r == TC_TLV_OK) {
       if (e.encoded.data != data || e.encoded.length > length || !e.encoded.length ||
           e.value.data != data + e.header.header_length ||
           e.value.length !=
               e.encoded.length - e.header.header_length - (e.header.indefinite ? 2u : 0u))
         abort();
-      if (TC_TLV_walk(e.encoded.data, e.encoded.length, (TC_TLV_profile)profile, &limits, frames,
-                      sizeof frames / sizeof *frames, NULL, NULL) != TC_TLV_OK)
+      if (TC_TLV_walk(e.encoded.data, e.encoded.length, (TC_TLV_profile)profile, &limits,
+                      (TC_TLV_frames){frames, sizeof frames / sizeof *frames}, NULL,
+                      NULL) != TC_TLV_OK)
         abort();
     } else if (memcmp(&e, &saved, sizeof e))
       abort();
-    r = TC_TLV_walk(data, length, (TC_TLV_profile)profile, &limits, frames, 16, trace, &a);
-    if (TC_TLV_stream_init(&stream, (TC_TLV_profile)profile, &limits, frames, 16) != TC_TLV_OK)
+    r = TC_TLV_walk(data, length, (TC_TLV_profile)profile, &limits, (TC_TLV_frames){frames, 16},
+                    trace, &a);
+    if (TC_TLV_stream_init(&stream, (TC_TLV_profile)profile, &limits,
+                           (TC_TLV_frames){frames, 16}) != TC_TLV_OK)
       abort();
     while (p < length) {
       size_t n = (data[p] % 17) + 1;

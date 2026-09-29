@@ -669,7 +669,8 @@ TC_TLV_result TC_X509_name_constraints_check(const TC_X509_general_name* name,
     if (result != TC_TLV_OK)
       return result;
     while ((result = TC_X509_general_subtree_next(
-                &reader, workspace->frames, workspace->frame_capacity, &subtree)) == TC_TLV_OK) {
+                &reader, (TC_TLV_frames){workspace->frames, workspace->frame_capacity},
+                &subtree)) == TC_TLV_OK) {
       int matched;
       if (tc_pki_work_charge(work, 1) != TC_TLV_OK)
         return TC_TLV_LIMIT;
@@ -739,8 +740,9 @@ TC_TLV_result tc_x509_certificate_names_check_san(const TC_X509_certificate* cer
     result = TC_X509_general_names_init(&reader, san.data, san.length, limits);
     if (result != TC_TLV_OK)
       return result;
-    while ((result = TC_X509_general_name_next(&reader, workspace->frames,
-                                               workspace->frame_capacity, &name)) == TC_TLV_OK) {
+    while ((result = TC_X509_general_name_next(
+                &reader, (TC_TLV_frames){workspace->frames, workspace->frame_capacity}, &name)) ==
+           TC_TLV_OK) {
       if (tc_pki_work_charge(work, 1) != TC_TLV_OK)
         return TC_TLV_LIMIT;
       result =
@@ -809,7 +811,7 @@ TC_TLV_result TC_X509_certificate_names_check(const TC_X509_certificate* certifi
   }
   if (result != TC_TLV_END)
     return result;
-  return tc_x509_certificate_names_check_san(certificate, san, constraints, limits, workspace,
-                                             work, permitted);
+  return tc_x509_certificate_names_check_san(certificate, san, constraints, limits, workspace, work,
+                                             permitted);
 }
 #endif

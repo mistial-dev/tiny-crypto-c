@@ -54,8 +54,8 @@ TC_TLV_result example_card_identity(TC_bytes response, ExampleCardApplication ex
   if (!out || (expected != EXAMPLE_CARD_PIV && expected != EXAMPLE_CARD_TWIC))
     return TC_TLV_ARGUMENT;
   TC_TLV_result result =
-      TC_TLV_walk(response.data, response.length, TC_TLV_ISO7816, &identity_limits, frames,
-                  sizeof frames / sizeof *frames, NULL, NULL);
+      TC_TLV_walk(response.data, response.length, TC_TLV_ISO7816, &identity_limits,
+                  (TC_TLV_frames){frames, sizeof frames / sizeof *frames}, NULL, NULL);
   if (result == TC_TLV_OK)
     result = unique_field(response, CARD_TEMPLATE, &properties);
   if (result == TC_TLV_OK)

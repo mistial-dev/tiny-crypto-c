@@ -69,7 +69,7 @@ static MunitResult verification(const MunitParameter params[], void* user)
   (void)params;
   (void)user;
   munit_assert_int(TC_CMS_signer_info_read((TC_bytes){record, sizeof record}, TC_TLV_BER, &limits,
-                                           frames, FRAME_CAPACITY, &work, &signer),
+                                           (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &signer),
                    ==, TC_TLV_OK);
   work = WORK_BUDGET;
   munit_assert_int(TC_CMS_signer_verify_digest(&signer, type, digest, TC_CMS_ATTRIBUTES_DER, &key,
@@ -190,7 +190,7 @@ static MunitResult content(const MunitParameter params[], void* user)
   (void)params;
   (void)user;
   munit_assert_int(TC_CMS_signer_info_read((TC_bytes){record, sizeof record}, TC_TLV_BER, &limits,
-                                           frames, FRAME_CAPACITY, &work, &signer),
+                                           (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &signer),
                    ==, TC_TLV_OK);
 #if TC_ENABLE_SHA256
   static const uint8_t primitive[] = {4, 3, 'a', 'b', 'c'};

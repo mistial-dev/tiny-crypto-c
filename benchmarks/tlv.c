@@ -12,7 +12,8 @@ static TC_status walk(size_t unused)
   TC_TLV_frame frames[16];
   TC_TLV_result result;
   (void)unused;
-  result = TC_TLV_walk(input, input_size, TC_TLV_DER, &limits, frames, 16, NULL, NULL);
+  result =
+      TC_TLV_walk(input, input_size, TC_TLV_DER, &limits, (TC_TLV_frames){frames, 16}, NULL, NULL);
   tc_benchmark_consume(&result);
   return result == TC_TLV_OK ? TC_OK : TC_ERROR;
 }
@@ -23,7 +24,8 @@ static TC_status reject(size_t unused)
   TC_TLV_frame frames[16];
   TC_TLV_result result;
   (void)unused;
-  result = TC_TLV_walk(input, input_size, TC_TLV_DER, &limits, frames, 16, NULL, NULL);
+  result =
+      TC_TLV_walk(input, input_size, TC_TLV_DER, &limits, (TC_TLV_frames){frames, 16}, NULL, NULL);
   tc_benchmark_consume(&result);
   return result == TC_TLV_INVALID ? TC_OK : TC_ERROR;
 }

@@ -220,8 +220,8 @@ typedef struct {
  * and out must be disjoint. */
 TC_TLV_result TC_X509_general_names_init(TC_TLV_reader* reader, const uint8_t* data, size_t length,
                                          const TC_TLV_limits* limits);
-TC_TLV_result TC_X509_general_name_next(TC_TLV_reader* reader, TC_TLV_frame* frames,
-                                        size_t capacity, TC_X509_general_name* out);
+TC_TLV_result TC_X509_general_name_next(TC_TLV_reader* reader, TC_TLV_frames frames,
+                                        TC_X509_general_name* out);
 typedef struct {
   TC_bytes permitted, excluded;
 } TC_X509_name_constraints;
@@ -242,8 +242,8 @@ typedef struct {
  * Distances above UINT32_MAX return LIMIT. RFC 5280 path validation requires
  * minimum zero and maximum absent. This decoder retains other encoded values.
  * Workspace, budget, borrowing, and failure rules match general_name_next. */
-TC_TLV_result TC_X509_general_subtree_next(TC_TLV_reader* reader, TC_TLV_frame* frames,
-                                           size_t capacity, TC_X509_general_subtree* out);
+TC_TLV_result TC_X509_general_subtree_next(TC_TLV_reader* reader, TC_TLV_frames frames,
+                                           TC_X509_general_subtree* out);
 /* Test a decoded name against one subtree. Different name forms do not match,
  * except SmtpUTF8Mailbox otherName follows rfc822Name constraints (RFC 9598).
  * Supports directoryName, dNSName, rfc822Name, URI and CIDR iPAddress ranges. DNS constraints

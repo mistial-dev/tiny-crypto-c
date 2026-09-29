@@ -319,7 +319,8 @@ static MunitResult content_signature(const MunitParameter params[], void* user)
         EVP_DigestSign(signer, signature, &signature_length, attributes, attributes_length), ==, 1);
     attributes[0] = 0xa0;
     munit_assert_int(TC_CMS_signed_attributes_read((TC_bytes){attributes, attributes_length}, mode,
-                                                   &limits, frames, FRAME_CAPACITY, &work, &parsed),
+                                                   &limits, (TC_TLV_frames){frames, FRAME_CAPACITY},
+                                                   &work, &parsed),
                      ==, TC_TLV_OK);
     munit_assert_int(tc_pki_octets_hash((TC_bytes){content, sizeof content}, TC_TLV_BER, &limits,
                                         &(tc_pki_tree_workspace){frames, FRAME_CAPACITY, &work},
@@ -441,9 +442,9 @@ static MunitResult content_signature(const MunitParameter params[], void* user)
     if (mode != TC_CMS_ATTRIBUTES_DER) {
       memcpy(&saved, &parsed, sizeof saved);
       work = WORK_BUDGET;
-      munit_assert_int(TC_CMS_signed_attributes_read((TC_bytes){attributes, attributes_length},
-                                                     TC_CMS_ATTRIBUTES_DER, &limits, frames,
-                                                     FRAME_CAPACITY, &work, &parsed),
+      munit_assert_int(TC_CMS_signed_attributes_read(
+                           (TC_bytes){attributes, attributes_length}, TC_CMS_ATTRIBUTES_DER,
+                           &limits, (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &parsed),
                        ==, TC_TLV_INVALID);
       munit_assert_memory_equal(sizeof parsed, &parsed, &saved);
     }
@@ -633,14 +634,16 @@ static MunitResult signed_data(const MunitParameter params[], void* user)
     munit_assert_int(tc_cms_signed_data_version_check(&container, &limits, &workspace), ==,
                      TC_TLV_INVALID);
     --container.version;
+    munit_assert_int(TC_CMS_signers_init(container.signers, &limits,
+                                         (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &signers),
+                     ==, TC_TLV_OK);
     munit_assert_int(
-        TC_CMS_signers_init(container.signers, &limits, frames, FRAME_CAPACITY, &work, &signers),
-        ==, TC_TLV_OK);
-    munit_assert_int(TC_CMS_signer_next(&signers, frames, FRAME_CAPACITY, &work, &signer), ==,
-                     TC_TLV_OK);
+        TC_CMS_signer_next(&signers, (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &signer), ==,
+        TC_TLV_OK);
     munit_assert_true(tc_pki_end(&signers));
-    munit_assert_int(TC_CMS_signer_next(&signers, frames, FRAME_CAPACITY, &work, &signer), ==,
-                     TC_TLV_END);
+    munit_assert_int(
+        TC_CMS_signer_next(&signers, (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &signer), ==,
+        TC_TLV_END);
     munit_assert_int(tc_pki_tree_read(signer.encoded, TC_TLV_BER, &limits, &workspace, &element),
                      ==, TC_TLV_OK);
     munit_assert_uint(signer.version, ==, flags[i] & CMS_USE_KEYID ? 3 : 1);
@@ -716,14 +719,15 @@ static MunitResult signed_data(const MunitParameter params[], void* user)
                      ==, TC_TLV_OK);
     munit_assert_true(tc_hash_info_get(algorithm.content_hash, &hash));
     munit_assert_int(TC_CMS_content_digest(container.content, algorithm.content_hash, &limits,
-                                           frames, FRAME_CAPACITY, &work, digest, sizeof digest),
+                                           (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, digest,
+                                           sizeof digest),
                      ==, TC_TLV_OK);
     uint8_t content_digest_bytes[TC_SHA512_DIGESTLEN];
     memcpy(content_digest_bytes, digest, hash.digest_length);
     const TC_bytes computed_content = {content_digest_bytes, hash.digest_length};
     munit_assert_int(TC_CMS_signed_attributes_read(signer.signed_attributes, TC_CMS_ATTRIBUTES_DER,
-                                                   &limits, frames, FRAME_CAPACITY, &work,
-                                                   &attributes),
+                                                   &limits, (TC_TLV_frames){frames, FRAME_CAPACITY},
+                                                   &work, &attributes),
                      ==, TC_TLV_OK);
     munit_assert_int(
         TC_CMS_content_digest_check(&attributes, container.content_type, algorithm.content_hash,
@@ -833,10 +837,10 @@ static MunitResult signed_data(const MunitParameter params[], void* user)
         memset(signer_encoded + signer_length, 0, 2);
         signer_length += 2;
         work = WORK_BUDGET;
-        munit_assert_int(TC_CMS_signer_info_read((TC_bytes){signer_encoded, signer_length},
-                                                 TC_TLV_BER, &limits, frames, FRAME_CAPACITY, &work,
-                                                 &parsed_chunks),
-                         ==, TC_TLV_OK);
+        munit_assert_int(
+            TC_CMS_signer_info_read((TC_bytes){signer_encoded, signer_length}, TC_TLV_BER, &limits,
+                                    (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &parsed_chunks),
+            ==, TC_TLV_OK);
         munit_assert_uint(parsed_chunks.version, ==, signer.version);
         munit_assert_int(
             tc_pki_octets_contiguous(parsed_chunks.signature, 4, TC_TLV_BER, &limits,
@@ -4939,14 +4943,16 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
     const TC_CMS_signature_workspace signature = {frames, FRAME_CAPACITY, NULL, 0};
     const TC_bytes content_digest = {digest, sizeof digest};
     work = WORK_BUDGET;
+    munit_assert_int(TC_CMS_signers_init(container.signers, &limits,
+                                         (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &signers),
+                     ==, TC_TLV_OK);
     munit_assert_int(
-        TC_CMS_signers_init(container.signers, &limits, frames, FRAME_CAPACITY, &work, &signers),
-        ==, TC_TLV_OK);
-    munit_assert_int(TC_CMS_signer_next(&signers, frames, FRAME_CAPACITY, &work, &signer), ==,
-                     TC_TLV_OK);
+        TC_CMS_signer_next(&signers, (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &signer), ==,
+        TC_TLV_OK);
     if (container.has_content) {
-      munit_assert_int(TC_CMS_content_digest(container.content, TC_HASH_SHA256, &limits, frames,
-                                             FRAME_CAPACITY, &work, digest, sizeof digest),
+      munit_assert_int(TC_CMS_content_digest(container.content, TC_HASH_SHA256, &limits,
+                                             (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, digest,
+                                             sizeof digest),
                        ==, TC_TLV_OK);
     } else {
       unsigned digest_length;
@@ -6524,8 +6530,8 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
                                                (TC_PIV_CHUID_profile)profile, &chuid),
                      ==, TC_TLV_OK);
     munit_assert_int(TC_PIV_CMS_read(chuid.signature, TC_PIV_CMS_CHUID, TC_PIV_OIDS_TWIC_COMPATIBLE,
-                                     TC_CMS_ATTRIBUTES_DER, &limits, frames, FRAME_COUNT, &work,
-                                     &object),
+                                     TC_CMS_ATTRIBUTES_DER, &limits,
+                                     (TC_TLV_frames){frames, FRAME_COUNT}, &work, &object),
                      ==, TC_TLV_OK);
     TC_CMS_signer_info signer = object.signer;
     TC_CMS_signed_attributes attributes = object.attributes;
@@ -7254,9 +7260,9 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
     munit_assert_int(attributes.fascn_octets.data != NULL, ==, has_fascn);
     munit_assert_int(attributes.entry_uuid_octets.data != NULL, ==, has_uuid);
     int identifiers_match = -1;
-    munit_assert_int(TC_PIV_CMS_identifiers_match(&object, TC_PIV_CMS_CHUID, chuid.fascn,
-                                                  chuid.card_uuid, &limits, frames, FRAME_COUNT,
-                                                  &work, &identifiers_match),
+    munit_assert_int(TC_PIV_CMS_identifiers_match(
+                         &object, TC_PIV_CMS_CHUID, chuid.fascn, chuid.card_uuid, &limits,
+                         (TC_TLV_frames){frames, FRAME_COUNT}, &work, &identifiers_match),
                      ==, TC_TLV_OK);
     munit_assert_int(identifiers_match, ==, 1);
     size_t identifier_values[2] = {0, 0};
@@ -7385,7 +7391,8 @@ static MunitResult legacy_chuid_key_map_signature(const MunitParameter params[],
   TC_PIV_CMS_object object;
   size_t work = WORK;
   munit_assert_int(TC_PIV_CMS_read(chuid.signature, TC_PIV_CMS_CHUID, TC_PIV_OIDS_ONLY,
-                                   TC_CMS_ATTRIBUTES_DER, &limits, frames, FRAMES, &work, &object),
+                                   TC_CMS_ATTRIBUTES_DER, &limits, (TC_TLV_frames){frames, FRAMES},
+                                   &work, &object),
                    ==, TC_TLV_OK);
   TC_bytes oids[OIDS];
   TC_X509_workspace parser = {frames, FRAMES, oids, OIDS};
@@ -7482,7 +7489,7 @@ static MunitResult security_profile(const MunitParameter params[], void* user)
       size_t work = WORK;
       const TC_TLV_result result = TC_PIV_CMS_read(
           (TC_bytes){encoded, (size_t)length}, TC_PIV_CMS_SECURITY, TC_PIV_OIDS_TWIC_COMPATIBLE,
-          TC_CMS_ATTRIBUTES_DER, &limits, frames, FRAMES, &work, &object);
+          TC_CMS_ATTRIBUTES_DER, &limits, (TC_TLV_frames){frames, FRAMES}, &work, &object);
       if (variant == VALID) {
         munit_assert_int(result, ==, TC_TLV_OK);
         munit_assert_uint(object.signer.version, ==, key_id ? 3 : 1);
@@ -7493,8 +7500,8 @@ static MunitResult security_profile(const MunitParameter params[], void* user)
           work = budget;
           budget_object = preserved;
           munit_assert_int(TC_PIV_CMS_read((TC_bytes){encoded, (size_t)length}, TC_PIV_CMS_SECURITY,
-                                           TC_PIV_OIDS_ONLY, TC_CMS_ATTRIBUTES_DER, &limits, frames,
-                                           FRAMES, &work, &budget_object),
+                                           TC_PIV_OIDS_ONLY, TC_CMS_ATTRIBUTES_DER, &limits,
+                                           (TC_TLV_frames){frames, FRAMES}, &work, &budget_object),
                            ==, budget == required ? TC_TLV_OK : TC_TLV_LIMIT);
           if (budget < required)
             munit_assert_memory_equal(sizeof budget_object, &budget_object, &preserved);
@@ -7520,8 +7527,8 @@ static MunitResult security_profile(const MunitParameter params[], void* user)
           work = WORK;
           object = preserved;
           munit_assert_int(TC_PIV_CMS_read((TC_bytes){encoded, prefix}, TC_PIV_CMS_SECURITY,
-                                           TC_PIV_OIDS_ONLY, TC_CMS_ATTRIBUTES_DER, &limits, frames,
-                                           FRAMES, &work, &object),
+                                           TC_PIV_OIDS_ONLY, TC_CMS_ATTRIBUTES_DER, &limits,
+                                           (TC_TLV_frames){frames, FRAMES}, &work, &object),
                            !=, TC_TLV_OK);
           munit_assert_memory_equal(sizeof object, &object, &preserved);
         }

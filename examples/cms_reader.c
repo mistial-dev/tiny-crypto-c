@@ -47,7 +47,8 @@ TC_TLV_result example_read_cms(TC_bytes input, size_t work_limit, ExampleCMSWork
 {
   if (!workspace)
     return TC_TLV_ARGUMENT;
-  return TC_CMS_signed_data_read(input, &limits, workspace->frames, EXAMPLE_CMS_FRAME_CAPACITY,
+  return TC_CMS_signed_data_read(input, &limits,
+                                 (TC_TLV_frames){workspace->frames, EXAMPLE_CMS_FRAME_CAPACITY},
                                  &work_limit, out);
 }
 
@@ -56,8 +57,9 @@ TC_TLV_result example_read_cms_signer(TC_bytes input, size_t work_limit,
 {
   if (!workspace)
     return TC_TLV_ARGUMENT;
-  return TC_CMS_signer_info_read(input, TC_TLV_BER, &limits, workspace->frames,
-                                 EXAMPLE_CMS_FRAME_CAPACITY, &work_limit, out);
+  return TC_CMS_signer_info_read(input, TC_TLV_BER, &limits,
+                                 (TC_TLV_frames){workspace->frames, EXAMPLE_CMS_FRAME_CAPACITY},
+                                 &work_limit, out);
 }
 
 TC_TLV_result example_parse_cms_signers(TC_bytes encoded_set, size_t work_limit,
@@ -68,12 +70,14 @@ TC_TLV_result example_parse_cms_signers(TC_bytes encoded_set, size_t work_limit,
   TC_TLV_result result;
   if (!workspace)
     return TC_TLV_ARGUMENT;
-  result = TC_CMS_signers_init(encoded_set, &limits, workspace->frames, EXAMPLE_CMS_FRAME_CAPACITY,
+  result = TC_CMS_signers_init(encoded_set, &limits,
+                               (TC_TLV_frames){workspace->frames, EXAMPLE_CMS_FRAME_CAPACITY},
                                &work_limit, &reader);
   if (result != TC_TLV_OK)
     return result;
-  while ((result = TC_CMS_signer_next(&reader, workspace->frames, EXAMPLE_CMS_FRAME_CAPACITY,
-                                      &work_limit, &signer)) == TC_TLV_OK) {
+  while ((result = TC_CMS_signer_next(
+              &reader, (TC_TLV_frames){workspace->frames, EXAMPLE_CMS_FRAME_CAPACITY}, &work_limit,
+              &signer)) == TC_TLV_OK) {
     /* Applications can inspect each signer here before reusing the view. */
   }
   return result == TC_TLV_END ? TC_TLV_OK : result;

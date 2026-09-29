@@ -57,17 +57,20 @@ int main(void)
     TC_TLV_frame frames[8];
     static const uint8_t encoded_tree[] = {0x30, 0x80, 0, 0};
     TC_TLV_element tree;
-    if (TC_TLV_read_tree(encoded_tree, sizeof encoded_tree, TC_TLV_BER, &cms_limits, frames,
-                         sizeof frames / sizeof *frames, &tree) != TC_TLV_OK ||
+    if (TC_TLV_read_tree(encoded_tree, sizeof encoded_tree, TC_TLV_BER, &cms_limits,
+                         (TC_TLV_frames){frames, sizeof frames / sizeof *frames},
+                         &tree) != TC_TLV_OK ||
         tree.value.length)
       return 1;
     TC_CMS_signed_attributes attributes;
     size_t work = 4096;
-    if (TC_CMS_signed_attributes_read(empty, TC_CMS_ATTRIBUTES_DER, &cms_limits, frames, 8, &work,
+    if (TC_CMS_signed_attributes_read(empty, TC_CMS_ATTRIBUTES_DER, &cms_limits,
+                                      (TC_TLV_frames){frames, 8}, &work,
                                       &attributes) != TC_TLV_MORE)
       return 1;
     if (TC_CMS_signed_attributes_read(empty, TC_CMS_ATTRIBUTES_BER_DEFINITE_ORDER, &cms_limits,
-                                      frames, 8, &work, &attributes) != TC_TLV_MORE)
+                                      (TC_TLV_frames){frames, 8}, &work,
+                                      &attributes) != TC_TLV_MORE)
       return 1;
   }
   TC_X509_store store = {0};

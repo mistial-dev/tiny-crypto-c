@@ -120,8 +120,8 @@ static TC_TLV_result extensions(TC_bytes wrapper, TC_bytes* nonce, int* nonce_pr
   TC_TLV_element element;
   TC_X509_extension extension;
   TC_TLV_result status = contents_reader(wrapper, &outer);
-  if (status != TC_TLV_OK || tc_pki_field(&outer, 0x30, &element) != TC_TLV_OK || !tc_pki_end(&outer) ||
-      contents_reader(element.value, &list) != TC_TLV_OK)
+  if (status != TC_TLV_OK || tc_pki_field(&outer, 0x30, &element) != TC_TLV_OK ||
+      !tc_pki_end(&outer) || contents_reader(element.value, &list) != TC_TLV_OK)
     return TC_TLV_INVALID;
   size_t count = 0;
   while ((status = TC_X509_extension_next(&list, &extension)) == TC_TLV_OK) {
@@ -274,8 +274,8 @@ static TC_TLV_result response_data(TC_bytes encoded, const TC_X509_certificate* 
   } else if (tc_pki_tag(&field, 0xa2)) {
     TC_TLV_reader key;
     TC_TLV_element value;
-    if (contents_reader(field.value, &key) != TC_TLV_OK || tc_pki_field(&key, 4, &value) != TC_TLV_OK ||
-        !tc_pki_end(&key) || value.value.length != 20)
+    if (contents_reader(field.value, &key) != TC_TLV_OK ||
+        tc_pki_field(&key, 4, &value) != TC_TLV_OK || !tc_pki_end(&key) || value.value.length != 20)
       return TC_TLV_INVALID;
     parsed->responder = value.value;
     parsed->responder_by_key = 1;
@@ -352,7 +352,8 @@ static TC_TLV_result parse_response(const TC_OCSP_verify_request* request,
   TC_TLV_element field;
   TC_bytes oid;
   TC_TLV_result status = sequence(request->response, &reader);
-  if (status != TC_TLV_OK || tc_pki_field(&reader, 0x0a, &field) != TC_TLV_OK || field.value.length != 1)
+  if (status != TC_TLV_OK || tc_pki_field(&reader, 0x0a, &field) != TC_TLV_OK ||
+      field.value.length != 1)
     return TC_TLV_INVALID;
   if (field.value.data[0] != 0) {
     if (!tc_pki_end(&reader))
@@ -366,7 +367,8 @@ static TC_TLV_result parse_response(const TC_OCSP_verify_request* request,
   if (tc_pki_field(&reader, 0xa0, &field) != TC_TLV_OK || !tc_pki_end(&reader) ||
       contents_reader(field.value, &reader) != TC_TLV_OK ||
       tc_pki_field(&reader, 0x30, &field) != TC_TLV_OK || !tc_pki_end(&reader) ||
-      contents_reader(field.value, &bytes) != TC_TLV_OK || tc_pki_field(&bytes, 6, &field) != TC_TLV_OK ||
+      contents_reader(field.value, &bytes) != TC_TLV_OK ||
+      tc_pki_field(&bytes, 6, &field) != TC_TLV_OK ||
       TC_DER_oid(field.encoded.data, field.encoded.length, &oid) != TC_TLV_OK)
     return TC_TLV_INVALID;
   if (oid.length != sizeof basic_oid || memcmp(oid.data, basic_oid, sizeof basic_oid))
@@ -592,7 +594,7 @@ TC_TLV_result TC_OCSP_response_verify(const TC_OCSP_verify_request* request,
   *work -= request->response.length;
   TC_TLV_result status =
       TC_TLV_walk(request->response.data, request->response.length, TC_TLV_DER, request->parsing,
-                  workspace->frames, workspace->frame_capacity, NULL, NULL);
+                  (TC_TLV_frames){workspace->frames, workspace->frame_capacity}, NULL, NULL);
   if (status != TC_TLV_OK)
     return status;
   TC_X509_workspace scratch = {workspace->frames, workspace->frame_capacity,

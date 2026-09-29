@@ -597,7 +597,7 @@ TC_TLV_result tc_x509_policy_qualifiers_check(const TC_X509_policy* policy, int 
   if (tc_pki_work_charge(work, policy->qualifiers.length) != TC_TLV_OK)
     return TC_TLV_LIMIT;
   result = TC_TLV_walk(policy->qualifiers.data, policy->qualifiers.length, TC_TLV_DER, limits,
-                       frames, capacity, NULL, NULL);
+                       (TC_TLV_frames){frames, capacity}, NULL, NULL);
   if (result != TC_TLV_OK)
     return result;
   result = TC_X509_policy_qualifiers_init(&reader, policy->qualifiers, limits);

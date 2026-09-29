@@ -23,9 +23,14 @@ TC_TLV_result read_ber_object(TC_bytes input, TC_TLV_element* object)
     TC_TLV_frame frames[MAX_DEPTH];
 
     return TC_TLV_read_tree(input.data, input.length, TC_TLV_BER,
-                           &limits, frames, MAX_DEPTH, object);
+                           &limits, (TC_TLV_frames){frames, MAX_DEPTH}, object);
 }
 ```
+
+Every decoder that validates nesting takes its frame storage as
+`TC_TLV_frames`, a caller-owned array and its capacity in frames. It needs one
+frame per constructed nesting level, so `limits.max_depth` frames always
+suffice. The frames are scratch and may change on failure.
 
 Use `object` only after `TC_TLV_OK`. `TC_TLV_MORE` means the object is truncated.
 Request more input or reject an incomplete message. `TC_TLV_INVALID` means bad

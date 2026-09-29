@@ -147,13 +147,14 @@ TC_credential_status TC_PIV_CHUID_validate(const TC_PIV_CHUID_validation_request
     return TC_CREDENTIAL_INVALID;
 
   TC_PIV_CMS_object object;
-  parsed = TC_PIV_CMS_read(chuid.signature, TC_PIV_CMS_CHUID, oids, policy.attributes, limits,
-                           storage->frames, storage->frame_capacity, work, &object);
+  parsed =
+      TC_PIV_CMS_read(chuid.signature, TC_PIV_CMS_CHUID, oids, policy.attributes, limits,
+                      (TC_TLV_frames){storage->frames, storage->frame_capacity}, work, &object);
   if (parsed != TC_TLV_OK)
     return tc_validation_status(parsed);
-  parsed =
-      TC_PIV_CMS_identifiers_match(&object, TC_PIV_CMS_CHUID, chuid.fascn, chuid.card_uuid, limits,
-                                   storage->frames, storage->frame_capacity, work, &matched);
+  parsed = TC_PIV_CMS_identifiers_match(
+      &object, TC_PIV_CMS_CHUID, chuid.fascn, chuid.card_uuid, limits,
+      (TC_TLV_frames){storage->frames, storage->frame_capacity}, work, &matched);
   if (parsed != TC_TLV_OK)
     return tc_validation_status(parsed);
   if (!matched)
@@ -234,8 +235,8 @@ TC_credential_status TC_PIV_biometric_validate(const TC_PIV_biometric_validation
     return TC_CREDENTIAL_INVALID;
   if (request->require_current) {
     int current;
-    if (tc_x509_time_window(&context->options->at, 0, &metadata.valid_from,
-                            &metadata.valid_until, &current) != TC_TLV_OK ||
+    if (tc_x509_time_window(&context->options->at, 0, &metadata.valid_from, &metadata.valid_until,
+                            &current) != TC_TLV_OK ||
         !current)
       return TC_CREDENTIAL_INVALID;
   }
@@ -254,13 +255,14 @@ TC_credential_status TC_PIV_biometric_validate(const TC_PIV_biometric_validation
   }
   if (memcmp(cbeff.fascn.data, request->fascn.data, request->fascn.length))
     return TC_CREDENTIAL_INVALID;
-  parsed = TC_PIV_CMS_read(cbeff.signature, request->signature_profile, oids, policy.attributes,
-                           limits, storage->frames, storage->frame_capacity, work, &object);
+  parsed =
+      TC_PIV_CMS_read(cbeff.signature, request->signature_profile, oids, policy.attributes, limits,
+                      (TC_TLV_frames){storage->frames, storage->frame_capacity}, work, &object);
   if (parsed != TC_TLV_OK)
     return tc_validation_status(parsed);
-  parsed = TC_PIV_CMS_identifiers_match(&object, request->signature_profile, request->fascn,
-                                        request->guid, limits, storage->frames,
-                                        storage->frame_capacity, work, &matched);
+  parsed = TC_PIV_CMS_identifiers_match(
+      &object, request->signature_profile, request->fascn, request->guid, limits,
+      (TC_TLV_frames){storage->frames, storage->frame_capacity}, work, &matched);
   if (parsed != TC_TLV_OK)
     return tc_validation_status(parsed);
   if (!matched)
@@ -353,8 +355,9 @@ TC_credential_status TC_PIV_security_validate(const TC_PIV_security_validation_r
   TC_TLV_result parsed = TC_PIV_security_read(request->encoded, request->encoding, &container);
   if (parsed != TC_TLV_OK)
     return tc_validation_status(parsed);
-  parsed = TC_PIV_CMS_read(container.cms, TC_PIV_CMS_SECURITY, oids, policy.attributes, limits,
-                           storage->frames, storage->frame_capacity, work, &object);
+  parsed =
+      TC_PIV_CMS_read(container.cms, TC_PIV_CMS_SECURITY, oids, policy.attributes, limits,
+                      (TC_TLV_frames){storage->frames, storage->frame_capacity}, work, &object);
   if (parsed != TC_TLV_OK)
     return tc_validation_status(parsed);
   parsed = tc_credential_signer_policy(request->chuid_signer, piv, !piv, request->card_expiration,
@@ -368,9 +371,9 @@ TC_credential_status TC_PIV_security_validate(const TC_PIV_security_validation_r
       &cms, &source, &policy, &revocation, context->workspace, work, &prepared);
   if (result != TC_CREDENTIAL_VALID)
     return result;
-  parsed =
-      TC_LDS_read_content(object.envelope.content, limits, storage->frames, storage->frame_capacity,
-                          work, workspace->content, workspace->content_capacity, &lds);
+  parsed = TC_LDS_read_content(object.envelope.content, limits,
+                               (TC_TLV_frames){storage->frames, storage->frame_capacity}, work,
+                               workspace->content, workspace->content_capacity, &lds);
   if (parsed != TC_TLV_OK)
     return tc_validation_status(parsed);
   if (container.groups != lds.groups)
@@ -389,7 +392,8 @@ TC_credential_status TC_PIV_security_validate(const TC_PIV_security_validation_r
     if (checked & bit)
       return TC_CREDENTIAL_INVALID;
     parsed = TC_LDS_hash_check(&lds, group, request->objects[i].parts, request->objects[i].count,
-                               limits, storage->frames, storage->frame_capacity, work, &matched);
+                               limits, (TC_TLV_frames){storage->frames, storage->frame_capacity},
+                               work, &matched);
     if (parsed != TC_TLV_OK)
       return tc_validation_status(parsed);
     if (!matched)

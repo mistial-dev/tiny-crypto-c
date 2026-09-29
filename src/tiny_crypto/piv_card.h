@@ -19,9 +19,8 @@ typedef struct {
  * Parsing can consume frames and work. out changes only on OK. Keep writable
  * storage disjoint from the input. */
 TC_TLV_result TC_PIV_card_identifiers_read(TC_bytes subject_alt_name, TC_PIV_card_profile profile,
-                                           const TC_TLV_limits* limits, TC_TLV_frame* frames,
-                                           size_t frame_capacity, size_t* work,
-                                           TC_PIV_card_identifiers* out);
+                                           const TC_TLV_limits* limits, TC_TLV_frames frames,
+                                           size_t* work, TC_PIV_card_identifiers* out);
 
 /* Compare a successfully read identifier view with a CHUID's FASC-N and GUID.
  * Inputs may overlap. Keep work and matched disjoint from all inputs and each
@@ -34,25 +33,24 @@ TC_TLV_result TC_PIV_card_identifiers_match(const TC_PIV_card_identifiers* ident
  * an absent UUID. The selected TWIC profile validates any UUID present.
  * Ownership and failure behavior match TC_PIV_card_identifiers_read. */
 TC_TLV_result TC_TWIC_card_identifiers_read(TC_bytes subject_alt_name, TC_PIV_card_profile profile,
-                                            const TC_TLV_limits* limits, TC_TLV_frame* frames,
-                                            size_t frame_capacity, size_t* work,
-                                            TC_PIV_card_identifiers* out);
+                                            const TC_TLV_limits* limits, TC_TLV_frames frames,
+                                            size_t* work, TC_PIV_card_identifiers* out);
 
 /* Read identifiers from a PIV Authentication certificate. card_guid selects
  * the required Card UUID when the SAN also carries a Cardholder UUID. The
  * optional Cardholder UUID must be version 4. Spans borrow subject_alt_name. */
 TC_TLV_result TC_PIV_authentication_identifiers_read(TC_bytes subject_alt_name, TC_bytes card_guid,
                                                      const TC_TLV_limits* limits,
-                                                     TC_TLV_frame* frames, size_t frame_capacity,
-                                                     size_t* work, TC_PIV_card_identifiers* out);
+                                                     TC_TLV_frames frames, size_t* work,
+                                                     TC_PIV_card_identifiers* out);
 
 /* Apply TWIC reader policy to a PIV Authentication certificate. Registered PIV
  * and TWIC FASC-N OIDs are accepted. The Card UUID may be absent. Any UUIDs
  * present follow the PIV Authentication selection rules above. */
 TC_TLV_result TC_TWIC_authentication_identifiers_read(TC_bytes subject_alt_name, TC_bytes card_guid,
                                                       const TC_TLV_limits* limits,
-                                                      TC_TLV_frame* frames, size_t frame_capacity,
-                                                      size_t* work, TC_PIV_card_identifiers* out);
+                                                      TC_TLV_frames frames, size_t* work,
+                                                      TC_PIV_card_identifiers* out);
 
 /* Bind authenticated TWIC objects by their complete FASC-N. A supplied UUID
  * must also match the CHUID GUID. Ownership and failure behavior match

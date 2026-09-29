@@ -219,8 +219,9 @@ static void prepare(const char* profile)
   size_t work = WORK;
   TC_PIV_card_profile card_profile =
       !strcmp(profile, "legacy") ? TC_TWIC_LEGACY_CARD : TC_TWIC_NEXGEN_CARD;
-  munit_assert_int(TC_TWIC_card_identifiers_read(san, card_profile, &limits, state->parse_frames,
-                                                 32, &work, &state->identifiers),
+  munit_assert_int(TC_TWIC_card_identifiers_read(san, card_profile, &limits,
+                                                 (TC_TLV_frames){state->parse_frames, 32}, &work,
+                                                 &state->identifiers),
                    ==, TC_TLV_OK);
   state->candidates[0] = (TC_bytes){state->issuer, state->issuer_length};
   state->candidates[1] = (TC_bytes){state->root, state->root_length};

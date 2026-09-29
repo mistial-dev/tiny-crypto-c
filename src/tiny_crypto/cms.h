@@ -30,8 +30,7 @@ typedef struct {
  * unchanged. Parsing may consume work and frames. out changes only on OK.
  * Limits bound framing. Work covers storage checks and all parsing passes. */
 TC_TLV_result TC_CMS_signed_data_read(TC_bytes encoded, const TC_TLV_limits* limits,
-                                      TC_TLV_frame* frames, size_t frame_capacity, size_t* work,
-                                      TC_CMS_signed_data* out);
+                                      TC_TLV_frames frames, size_t* work, TC_CMS_signed_data* out);
 
 typedef struct {
   TC_bytes encoded;
@@ -55,22 +54,21 @@ typedef struct {
  * signed_data_read. Requires TC_ENABLE_X509, plus TC_TLV_ENABLE_BER for the
  * BER profile. */
 TC_TLV_result TC_CMS_signer_info_read(TC_bytes encoded, TC_TLV_profile profile,
-                                      const TC_TLV_limits* limits, TC_TLV_frame* frames,
-                                      size_t frame_capacity, size_t* work, TC_CMS_signer_info* out);
+                                      const TC_TLV_limits* limits, TC_TLV_frames frames,
+                                      size_t* work, TC_CMS_signer_info* out);
 
 /* Initialize from SignedData.signers, including its SET tag. Checks BER tree
  * framing. next performs each member's schema checks. Empty sets are valid.
  * Input, limits, frames, work and out are disjoint. out changes only on OK.
  * Keep the encoded bytes stable and treat the returned reader as managed state. */
 TC_TLV_result TC_CMS_signers_init(TC_bytes encoded, const TC_TLV_limits* limits,
-                                  TC_TLV_frame* frames, size_t frame_capacity, size_t* work,
-                                  TC_TLV_reader* out);
+                                  TC_TLV_frames frames, size_t* work, TC_TLV_reader* out);
 /* Reader and out change only on OK. Frames/work are provisional on failure.
  * END leaves all storage unchanged, even with zero work remaining. Reuse one
  * budget across init/next calls. Reader, its input, frames, work and out must be
  * disjoint. Output spans borrow input and outlive scratch and reader state. */
-TC_TLV_result TC_CMS_signer_next(TC_TLV_reader* reader, TC_TLV_frame* frames, size_t frame_capacity,
-                                 size_t* work, TC_CMS_signer_info* out);
+TC_TLV_result TC_CMS_signer_next(TC_TLV_reader* reader, TC_TLV_frames frames, size_t* work,
+                                 TC_CMS_signer_info* out);
 
 typedef enum {
   /* RFC 5652 signed attributes, including DER SET OF ordering. */
@@ -127,9 +125,8 @@ typedef struct {
  * This parses attributes only. The caller must check content type and digest,
  * verify the signature over signature_input, and validate the signer's trust. */
 TC_TLV_result TC_CMS_signed_attributes_read(TC_bytes encoded, TC_CMS_attribute_encoding encoding,
-                                            const TC_TLV_limits* limits, TC_TLV_frame* frames,
-                                            size_t frame_capacity, size_t* work,
-                                            TC_CMS_signed_attributes* out);
+                                            const TC_TLV_limits* limits, TC_TLV_frames frames,
+                                            size_t* work, TC_CMS_signed_attributes* out);
 
 /* Hash SignedData.content, including its complete OCTET STRING encoding.
  * BER chunk headers and end markers are excluded from the digest. For detached
@@ -143,9 +140,8 @@ TC_TLV_result TC_CMS_signed_attributes_read(TC_bytes encoded, TC_CMS_attribute_e
  * preserve digest. Work covers storage checks, encoded bytes and hashed bytes.
  * Uses one temporary hash context on the stack and hashes BER chunks in place. */
 TC_TLV_result TC_CMS_content_digest(TC_bytes encoded, TC_hash_algorithm algorithm,
-                                    const TC_TLV_limits* limits, TC_TLV_frame* frames,
-                                    size_t frame_capacity, size_t* work, uint8_t* digest,
-                                    size_t digest_capacity);
+                                    const TC_TLV_limits* limits, TC_TLV_frames frames, size_t* work,
+                                    uint8_t* digest, size_t digest_capacity);
 
 /* Compare parsed signed attributes with the content type OID contents and a
  * computed digest. Hash content value bytes, excluding OCTET STRING framing.

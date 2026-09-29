@@ -27,7 +27,8 @@ static inline TC_TLV_result tc_pki_general_names_contents_check(TC_bytes content
   while (!tc_pki_end(&reader)) {
     if (tc_pki_work_charge(tree->work, 1) != TC_TLV_OK)
       return TC_TLV_LIMIT;
-    result = TC_X509_general_name_next(&reader, tree->frames, tree->capacity, &name);
+    result =
+        TC_X509_general_name_next(&reader, (TC_TLV_frames){tree->frames, tree->capacity}, &name);
     if (result != TC_TLV_OK)
       return result;
   }

@@ -174,8 +174,7 @@ static int cms_identifiers_present(TC_PIV_CMS_kind kind, TC_bytes fascn, TC_byte
 
 TC_TLV_result TC_PIV_CMS_read(TC_bytes encoded, TC_PIV_CMS_kind kind, TC_PIV_oid_profile oids,
                               TC_CMS_attribute_encoding attributes, const TC_TLV_limits* limits,
-                              TC_TLV_frame* frames, size_t frame_capacity, size_t* work,
-                              TC_PIV_CMS_object* out)
+                              TC_TLV_frames frames, size_t* work, TC_PIV_CMS_object* out)
 {
   TC_PIV_CMS_object parsed = {0};
   TC_TLV_reader reader;
@@ -184,11 +183,12 @@ TC_TLV_result TC_PIV_CMS_read(TC_bytes encoded, TC_PIV_CMS_kind kind, TC_PIV_oid
   if (!cms_kind_valid(kind) || (oids != TC_PIV_OIDS_ONLY && oids != TC_PIV_OIDS_TWIC_COMPATIBLE) ||
       (attributes != TC_CMS_ATTRIBUTES_DER && attributes != TC_CMS_ATTRIBUTES_BER_DEFINITE_ORDER))
     return TC_TLV_ARGUMENT;
-  result = tc_pki_reader_storage(encoded, limits, frames, frame_capacity, work, out, sizeof *out);
+  result =
+      tc_pki_reader_storage(encoded, limits, frames.data, frames.capacity, work, out, sizeof *out);
   if (result != TC_TLV_OK)
     return result;
-  const tc_pki_tree_workspace tree = {frames, frame_capacity, work};
-  result = TC_CMS_signed_data_read(encoded, limits, frames, frame_capacity, work, &parsed.envelope);
+  const tc_pki_tree_workspace tree = {frames.data, frames.capacity, work};
+  result = TC_CMS_signed_data_read(encoded, limits, frames, work, &parsed.envelope);
   if (result != TC_TLV_OK)
     return result;
   const int security = kind == TC_PIV_CMS_SECURITY;
@@ -218,20 +218,19 @@ TC_TLV_result TC_PIV_CMS_read(TC_bytes encoded, TC_PIV_CMS_kind kind, TC_PIV_oid
       return result == TC_TLV_OK ? TC_TLV_INVALID : result;
   } else if (kind == TC_PIV_CMS_CHUID)
     return TC_TLV_INVALID;
-  result =
-      TC_CMS_signers_init(parsed.envelope.signers, limits, frames, frame_capacity, work, &reader);
+  result = TC_CMS_signers_init(parsed.envelope.signers, limits, frames, work, &reader);
   if (result != TC_TLV_OK)
     return result;
-  result = TC_CMS_signer_next(&reader, frames, frame_capacity, work, &parsed.signer);
+  result = TC_CMS_signer_next(&reader, frames, work, &parsed.signer);
   if (result != TC_TLV_OK)
     return result == TC_TLV_END ? TC_TLV_INVALID : result;
   if (!security && parsed.signer.version != 1)
     return TC_TLV_INVALID;
-  result = TC_CMS_signer_next(&reader, frames, frame_capacity, work, &parsed.signer);
+  result = TC_CMS_signer_next(&reader, frames, work, &parsed.signer);
   if (result != TC_TLV_END)
     return result == TC_TLV_OK ? TC_TLV_INVALID : result;
   result = TC_CMS_signed_attributes_read(parsed.signer.signed_attributes, attributes, limits,
-                                         frames, frame_capacity, work, &parsed.attributes);
+                                         frames, work, &parsed.attributes);
   if (result != TC_TLV_OK)
     return result;
   result = tc_cms_digest_algorithms(parsed.envelope.digest_algorithms,
@@ -253,8 +252,8 @@ TC_TLV_result TC_PIV_CMS_read(TC_bytes encoded, TC_PIV_CMS_kind kind, TC_PIV_oid
 
 TC_TLV_result TC_PIV_CMS_identifiers_match(const TC_PIV_CMS_object* object, TC_PIV_CMS_kind kind,
                                            TC_bytes fascn, TC_bytes uuid,
-                                           const TC_TLV_limits* limits, TC_TLV_frame* frames,
-                                           size_t frame_capacity, size_t* work, int* matched)
+                                           const TC_TLV_limits* limits, TC_TLV_frames frames,
+                                           size_t* work, int* matched)
 {
   enum { FASCN_BYTES = 25, UUID_BYTES = 16 };
   TC_bytes writes[3];
@@ -268,7 +267,7 @@ TC_TLV_result TC_PIV_CMS_identifiers_match(const TC_PIV_CMS_object* object, TC_P
   const TC_bytes uuid_octets = object->attributes.entry_uuid_octets;
   const TC_bytes fields[] = {fascn, uuid, fascn_octets, uuid_octets, object->envelope.encoded};
   tc_pki_storage_plan_begin(&plan, writes, 3, SIZE_MAX);
-  TC_PKI_PLAN_WRITE(&plan, frames, frame_capacity);
+  TC_PKI_PLAN_WRITE(&plan, frames.data, frames.capacity);
   TC_PKI_PLAN_WRITE(&plan, work, 1);
   TC_PKI_PLAN_WRITE(&plan, matched, 1);
   tc_pki_storage_plan_seal(&plan);
@@ -284,16 +283,16 @@ TC_TLV_result TC_PIV_CMS_identifiers_match(const TC_PIV_CMS_object* object, TC_P
   if (result != TC_TLV_OK)
     return result;
   if (fascn_octets.data) {
-    result =
-        tc_pki_octets_equal(fascn_octets, 4, fascn, TC_TLV_BER, limits,
-                            &(tc_pki_tree_workspace){frames, frame_capacity, work}, &fascn_matches);
+    result = tc_pki_octets_equal(fascn_octets, 4, fascn, TC_TLV_BER, limits,
+                                 &(tc_pki_tree_workspace){frames.data, frames.capacity, work},
+                                 &fascn_matches);
     if (result != TC_TLV_OK)
       return result;
   }
   if (uuid_octets.data) {
-    result =
-        tc_pki_octets_equal(uuid_octets, 4, uuid, TC_TLV_BER, limits,
-                            &(tc_pki_tree_workspace){frames, frame_capacity, work}, &uuid_matches);
+    result = tc_pki_octets_equal(uuid_octets, 4, uuid, TC_TLV_BER, limits,
+                                 &(tc_pki_tree_workspace){frames.data, frames.capacity, work},
+                                 &uuid_matches);
     if (result != TC_TLV_OK)
       return result;
   }

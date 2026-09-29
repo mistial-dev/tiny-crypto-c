@@ -218,9 +218,9 @@ static MunitResult identifiers(const MunitParameter params[], void* context)
         uuid[0] ^= 1;
       size_t work = WORK;
       int matched = -1;
-      munit_assert_int(TC_PIV_CMS_identifiers_match(&object, TC_PIV_CMS_BIOMETRIC, expected_fascn,
-                                                    expected_uuid, &limits, frames, FRAME_COUNT,
-                                                    &work, &matched),
+      munit_assert_int(TC_PIV_CMS_identifiers_match(
+                           &object, TC_PIV_CMS_BIOMETRIC, expected_fascn, expected_uuid, &limits,
+                           (TC_TLV_frames){frames, FRAME_COUNT}, &work, &matched),
                        ==, TC_TLV_OK);
       munit_assert_int(matched, ==, mismatch == 0);
       if (!mismatch)
@@ -233,9 +233,9 @@ static MunitResult identifiers(const MunitParameter params[], void* context)
     for (size_t budget = 0; budget <= required; ++budget) {
       size_t work = budget;
       int matched = -1;
-      munit_assert_int(TC_PIV_CMS_identifiers_match(&object, TC_PIV_CMS_BIOMETRIC, expected_fascn,
-                                                    expected_uuid, &limits, frames, FRAME_COUNT,
-                                                    &work, &matched),
+      munit_assert_int(TC_PIV_CMS_identifiers_match(
+                           &object, TC_PIV_CMS_BIOMETRIC, expected_fascn, expected_uuid, &limits,
+                           (TC_TLV_frames){frames, FRAME_COUNT}, &work, &matched),
                        ==, budget == required ? TC_TLV_OK : TC_TLV_LIMIT);
       munit_assert_int(matched, ==, budget == required ? 1 : -1);
       if (budget == required)
@@ -246,34 +246,35 @@ static MunitResult identifiers(const MunitParameter params[], void* context)
   int matched = -1;
   fascn[0] ^= 1;
   chunks[12] = 5;
-  munit_assert_int(TC_PIV_CMS_identifiers_match(&object, TC_PIV_CMS_BIOMETRIC, expected_fascn,
-                                                expected_uuid, &limits, frames, FRAME_COUNT, &work,
-                                                &matched),
-                   ==, TC_TLV_INVALID);
+  munit_assert_int(
+      TC_PIV_CMS_identifiers_match(&object, TC_PIV_CMS_BIOMETRIC, expected_fascn, expected_uuid,
+                                   &limits, (TC_TLV_frames){frames, FRAME_COUNT}, &work, &matched),
+      ==, TC_TLV_INVALID);
   munit_assert_int(matched, ==, -1);
   fascn[0] ^= 1;
   chunks[12] = 4;
   TC_PIV_CMS_object preserved;
   memcpy(&preserved, &object, sizeof object);
   work = WORK;
-  munit_assert_int(TC_PIV_CMS_identifiers_match(&object, TC_PIV_CMS_BIOMETRIC, expected_fascn,
-                                                expected_uuid, &limits, frames, FRAME_COUNT, &work,
-                                                &object.envelope.has_content),
+  munit_assert_int(TC_PIV_CMS_identifiers_match(
+                       &object, TC_PIV_CMS_BIOMETRIC, expected_fascn, expected_uuid, &limits,
+                       (TC_TLV_frames){frames, FRAME_COUNT}, &work, &object.envelope.has_content),
                    ==, TC_TLV_ARGUMENT);
   munit_assert_size(work, ==, WORK);
   munit_assert_memory_equal(sizeof object, &object, &preserved);
   work = WORK;
   munit_assert_int(TC_PIV_CMS_identifiers_match(&object, TC_PIV_CMS_BIOMETRIC,
                                                 (TC_bytes){fascn, sizeof fascn - 1}, expected_uuid,
-                                                &limits, frames, FRAME_COUNT, &work, &matched),
+                                                &limits, (TC_TLV_frames){frames, FRAME_COUNT},
+                                                &work, &matched),
                    ==, TC_TLV_ARGUMENT);
   munit_assert_size(work, ==, WORK);
   munit_assert_int(matched, ==, -1);
   object.attributes.entry_uuid_octets = (TC_bytes){NULL, 0};
-  munit_assert_int(TC_PIV_CMS_identifiers_match(&object, TC_PIV_CMS_BIOMETRIC, expected_fascn,
-                                                expected_uuid, &limits, frames, FRAME_COUNT, &work,
-                                                &matched),
-                   ==, TC_TLV_INVALID);
+  munit_assert_int(
+      TC_PIV_CMS_identifiers_match(&object, TC_PIV_CMS_BIOMETRIC, expected_fascn, expected_uuid,
+                                   &limits, (TC_TLV_frames){frames, FRAME_COUNT}, &work, &matched),
+      ==, TC_TLV_INVALID);
   munit_assert_int(matched, ==, -1);
   for (unsigned presence = 0; presence < 4; ++presence) {
     object.attributes.fascn_octets =
@@ -282,9 +283,9 @@ static MunitResult identifiers(const MunitParameter params[], void* context)
         presence & 2 ? (TC_bytes){chunks, sizeof chunks} : (TC_bytes){NULL, 0};
     work = WORK;
     matched = -1;
-    munit_assert_int(TC_PIV_CMS_identifiers_match(&object, TC_PIV_CMS_BIOMETRIC, expected_fascn,
-                                                  expected_uuid, &limits, frames, FRAME_COUNT,
-                                                  &work, &matched),
+    munit_assert_int(TC_PIV_CMS_identifiers_match(
+                         &object, TC_PIV_CMS_BIOMETRIC, expected_fascn, expected_uuid, &limits,
+                         (TC_TLV_frames){frames, FRAME_COUNT}, &work, &matched),
                      ==, presence == 3 ? TC_TLV_OK : TC_TLV_INVALID);
     munit_assert_int(matched, ==, presence == 3 ? 1 : -1);
     if (presence != 3)
@@ -296,16 +297,17 @@ static MunitResult identifiers(const MunitParameter params[], void* context)
         uuid[0] ^= 1;
       work = WORK;
       matched = -1;
-      munit_assert_int(TC_PIV_CMS_identifiers_match(&object, TC_PIV_CMS_CHUID, expected_fascn,
-                                                    expected_uuid, &limits, frames, FRAME_COUNT,
-                                                    &work, &matched),
+      munit_assert_int(TC_PIV_CMS_identifiers_match(
+                           &object, TC_PIV_CMS_CHUID, expected_fascn, expected_uuid, &limits,
+                           (TC_TLV_frames){frames, FRAME_COUNT}, &work, &matched),
                        ==, TC_TLV_OK);
       munit_assert_int(matched, ==, mismatch == 0 || !(presence & (1u << (mismatch - 1))));
       size_t legacy_work = WORK;
       int legacy_matched = -1;
       munit_assert_int(TC_PIV_CMS_identifiers_match(&object, TC_PIV_CMS_BIOMETRIC_LEGACY,
-                                                    expected_fascn, expected_uuid, &limits, frames,
-                                                    FRAME_COUNT, &legacy_work, &legacy_matched),
+                                                    expected_fascn, expected_uuid, &limits,
+                                                    (TC_TLV_frames){frames, FRAME_COUNT},
+                                                    &legacy_work, &legacy_matched),
                        ==, presence & 1 ? TC_TLV_OK : TC_TLV_INVALID);
       munit_assert_int(legacy_matched, ==, presence & 1 ? matched : -1);
       if (!(presence & 1))
@@ -319,19 +321,19 @@ static MunitResult identifiers(const MunitParameter params[], void* context)
     for (size_t budget = 0; budget <= required; ++budget) {
       work = budget;
       matched = -1;
-      munit_assert_int(TC_PIV_CMS_identifiers_match(&object, TC_PIV_CMS_CHUID, expected_fascn,
-                                                    expected_uuid, &limits, frames, FRAME_COUNT,
-                                                    &work, &matched),
+      munit_assert_int(TC_PIV_CMS_identifiers_match(
+                           &object, TC_PIV_CMS_CHUID, expected_fascn, expected_uuid, &limits,
+                           (TC_TLV_frames){frames, FRAME_COUNT}, &work, &matched),
                        ==, budget == required ? TC_TLV_OK : TC_TLV_LIMIT);
       munit_assert_int(matched, ==, budget == required ? 1 : -1);
     }
   }
   work = WORK;
   matched = -1;
-  munit_assert_int(TC_PIV_CMS_identifiers_match(&object, (TC_PIV_CMS_kind)-1, expected_fascn,
-                                                expected_uuid, &limits, frames, FRAME_COUNT, &work,
-                                                &matched),
-                   ==, TC_TLV_ARGUMENT);
+  munit_assert_int(
+      TC_PIV_CMS_identifiers_match(&object, (TC_PIV_CMS_kind)-1, expected_fascn, expected_uuid,
+                                   &limits, (TC_TLV_frames){frames, FRAME_COUNT}, &work, &matched),
+      ==, TC_TLV_ARGUMENT);
   munit_assert_size(work, ==, WORK);
   munit_assert_int(matched, ==, -1);
   (void)params;

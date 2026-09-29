@@ -188,7 +188,8 @@ TC_TLV_result tc_x509_path_constraint_distances(const TC_X509_name_constraints* 
     if (result != TC_TLV_OK)
       return result;
     while ((result = TC_X509_general_subtree_next(
-                &reader, workspace->frames, workspace->frame_capacity, &subtree)) == TC_TLV_OK) {
+                &reader, (TC_TLV_frames){workspace->frames, workspace->frame_capacity},
+                &subtree)) == TC_TLV_OK) {
       if (tc_pki_work_charge(work, 1) != TC_TLV_OK)
         return TC_TLV_LIMIT;
       if (subtree.minimum || subtree.has_maximum)
@@ -519,8 +520,8 @@ static TC_TLV_result anchor_extensions_check(TC_bytes contents, int trust_anchor
     const int path_control = tc_pki_extension_path_control(id);
     if (trust_anchor_info && path_control)
       return TC_TLV_INVALID;
-    if (extension.critical && id != TC_PKI_EXT_SUBJECT_KEY_IDENTIFIER && id != TC_PKI_EXT_KEY_USAGE &&
-        id != TC_PKI_EXT_BASIC_CONSTRAINTS && !path_control)
+    if (extension.critical && id != TC_PKI_EXT_SUBJECT_KEY_IDENTIFIER &&
+        id != TC_PKI_EXT_KEY_USAGE && id != TC_PKI_EXT_BASIC_CONSTRAINTS && !path_control)
       return TC_TLV_UNSUPPORTED;
   }
   return result == TC_TLV_END ? TC_TLV_OK : result;

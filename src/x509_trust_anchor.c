@@ -111,7 +111,8 @@ static TC_TLV_result validate_subtrees(const TC_X509_name_constraints* names,
     if (result != TC_TLV_OK)
       return result;
     while ((result = TC_X509_general_subtree_next(
-                &reader, workspace->frames, workspace->frame_capacity, &subtree)) == TC_TLV_OK) {
+                &reader, (TC_TLV_frames){workspace->frames, workspace->frame_capacity},
+                &subtree)) == TC_TLV_OK) {
     }
     if (result != TC_TLV_END)
       return result;
@@ -448,8 +449,8 @@ TC_TLV_result TC_X509_trust_anchor_list_init(TC_TLV_reader* reader, const uint8_
     return result;
   if (!tc_pki_tag(&list, 0x30) || list.encoded.length != length || !list.value.length)
     return TC_TLV_INVALID;
-  result = TC_TLV_walk(data, length, TC_TLV_DER, limits, workspace->frames,
-                       workspace->frame_capacity, NULL, NULL);
+  result = TC_TLV_walk(data, length, TC_TLV_DER, limits,
+                       (TC_TLV_frames){workspace->frames, workspace->frame_capacity}, NULL, NULL);
   if (result != TC_TLV_OK)
     return result;
   result = contents_reader(&parsed, list.value, limits);

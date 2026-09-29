@@ -54,11 +54,13 @@ int main(void)
       free(data);
       continue;
     }
-    result = TC_TLV_walk(data, length, (TC_TLV_profile)header[0], &limits, frames, 32, node, NULL);
+    result = TC_TLV_walk(data, length, (TC_TLV_profile)header[0], &limits,
+                         (TC_TLV_frames){frames, 32}, node, NULL);
     for (i = 0; i < sizeof chunks / sizeof chunks[0]; ++i) {
       TC_TLV_stream stream;
       size_t p = 0;
-      if (TC_TLV_stream_init(&stream, (TC_TLV_profile)header[0], &limits, frames, 32) != TC_TLV_OK)
+      if (TC_TLV_stream_init(&stream, (TC_TLV_profile)header[0], &limits,
+                             (TC_TLV_frames){frames, 32}) != TC_TLV_OK)
         return 1;
       while (p < length) {
         size_t n = length - p;

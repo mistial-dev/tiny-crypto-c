@@ -87,8 +87,9 @@ static MunitResult profiles(const MunitParameter params[], void* context)
       memset(&out, 0xa5, sizeof out);
       memcpy(&saved, &out, sizeof saved);
       size_t work = WORK;
-      const TC_TLV_result result = TC_PIV_card_identifiers_read(
-          (TC_bytes){encoded, length}, cases[i].profile, &limits, frames, FRAMES, &work, &out);
+      const TC_TLV_result result =
+          TC_PIV_card_identifiers_read((TC_bytes){encoded, length}, cases[i].profile, &limits,
+                                       (TC_TLV_frames){frames, FRAMES}, &work, &out);
       if (twic && cases[i].profile == TC_PIV_CARD) {
         munit_assert_int(result, ==, TC_TLV_INVALID);
         munit_assert_memory_equal(sizeof out, &out, &saved);
@@ -139,14 +140,15 @@ static MunitResult malformed(const MunitParameter params[], void* context)
     size_t work = WORK;
     memcpy(&out, &saved, sizeof out);
     munit_assert_int(TC_PIV_card_identifiers_read((TC_bytes){encoded, length}, cases[i].profile,
-                                                  &limits, frames, FRAMES, &work, &out),
+                                                  &limits, (TC_TLV_frames){frames, FRAMES}, &work,
+                                                  &out),
                      ==, TC_TLV_INVALID);
     munit_assert_memory_equal(sizeof out, &out, &saved);
   }
   size_t length = names(piv_oid, sizeof piv_oid, piv_uuid, 1, 1, encoded);
   size_t parse_work = WORK;
   munit_assert_int(TC_PIV_card_identifiers_read((TC_bytes){encoded, length}, TC_PIV_CARD, &limits,
-                                                frames, FRAMES, &parse_work, &out),
+                                                (TC_TLV_frames){frames, FRAMES}, &parse_work, &out),
                    ==, TC_TLV_OK);
   const size_t fascn_offset = (size_t)(out.fascn.data - encoded);
   for (size_t bit = 0; bit < sizeof test_card_fascn * 8; ++bit) {
@@ -154,7 +156,7 @@ static MunitResult malformed(const MunitParameter params[], void* context)
     size_t work = WORK;
     memcpy(&out, &saved, sizeof out);
     munit_assert_int(TC_PIV_card_identifiers_read((TC_bytes){encoded, length}, TC_PIV_CARD, &limits,
-                                                  frames, FRAMES, &work, &out),
+                                                  (TC_TLV_frames){frames, FRAMES}, &work, &out),
                      ==, TC_TLV_INVALID);
     munit_assert_memory_equal(sizeof out, &out, &saved);
     encoded[fascn_offset + bit / 8] ^= (uint8_t)(1u << (bit % 8));
@@ -163,7 +165,8 @@ static MunitResult malformed(const MunitParameter params[], void* context)
     size_t work = WORK;
     memcpy(&out, &saved, sizeof out);
     munit_assert_int(TC_PIV_card_identifiers_read((TC_bytes){encoded, truncated}, TC_PIV_CARD,
-                                                  &limits, frames, FRAMES, &work, &out),
+                                                  &limits, (TC_TLV_frames){frames, FRAMES}, &work,
+                                                  &out),
                      !=, TC_TLV_OK);
     munit_assert_memory_equal(sizeof out, &out, &saved);
   }
@@ -176,7 +179,8 @@ static MunitResult malformed(const MunitParameter params[], void* context)
   length = wrap(0x30, merged, length + other_length - 4, encoded);
   size_t work = WORK;
   munit_assert_int(TC_PIV_card_identifiers_read((TC_bytes){encoded, length}, TC_TWIC_LEGACY_CARD,
-                                                &limits, frames, FRAMES, &work, &out),
+                                                &limits, (TC_TLV_frames){frames, FRAMES}, &work,
+                                                &out),
                    ==, TC_TLV_INVALID);
   (void)params;
   (void)context;
@@ -194,7 +198,8 @@ static MunitResult binding(const MunitParameter params[], void* context)
                               "URN:UUID:00112233-4455-4677-8899-AABBCCDDEEFF", 1, 1, encoded);
   size_t work = WORK;
   munit_assert_int(TC_PIV_card_identifiers_read((TC_bytes){encoded, length}, TC_PIV_CARD, &limits,
-                                                frames, FRAMES, &work, &identifiers),
+                                                (TC_TLV_frames){frames, FRAMES}, &work,
+                                                &identifiers),
                    ==, TC_TLV_OK);
   for (unsigned mismatch = 0; mismatch < 3; ++mismatch) {
     if (mismatch == 1)
@@ -230,10 +235,10 @@ static MunitResult binding(const MunitParameter params[], void* context)
   /* Legacy certificates can omit the UUID; their CHUID GUID remains nil. */
   const size_t legacy_length = names(twic_oid, sizeof twic_oid, nil_uuid, 1, 0, encoded);
   work = WORK;
-  munit_assert_int(TC_PIV_card_identifiers_read((TC_bytes){encoded, legacy_length},
-                                                TC_TWIC_LEGACY_CARD, &limits, frames, FRAMES, &work,
-                                                &identifiers),
-                   ==, TC_TLV_OK);
+  munit_assert_int(
+      TC_PIV_card_identifiers_read((TC_bytes){encoded, legacy_length}, TC_TWIC_LEGACY_CARD, &limits,
+                                   (TC_TLV_frames){frames, FRAMES}, &work, &identifiers),
+      ==, TC_TLV_OK);
   memset(expected_guid, 0, sizeof expected_guid);
   for (unsigned mismatch = 0; mismatch < 2; ++mismatch) {
     expected_guid[15] = (uint8_t)mismatch;
@@ -258,7 +263,7 @@ static MunitResult boundaries(const MunitParameter params[], void* context)
   TC_PIV_card_identifiers out, saved;
   size_t work = WORK;
   munit_assert_int(TC_PIV_card_identifiers_read((TC_bytes){encoded, length}, TC_PIV_CARD, &limits,
-                                                frames, FRAMES, &work, &out),
+                                                (TC_TLV_frames){frames, FRAMES}, &work, &out),
                    ==, TC_TLV_OK);
   const size_t required = WORK - work;
   memset(&saved, 0xa5, sizeof saved);
@@ -266,7 +271,7 @@ static MunitResult boundaries(const MunitParameter params[], void* context)
     work = budget;
     memcpy(&out, &saved, sizeof out);
     munit_assert_int(TC_PIV_card_identifiers_read((TC_bytes){encoded, length}, TC_PIV_CARD, &limits,
-                                                  frames, FRAMES, &work, &out),
+                                                  (TC_TLV_frames){frames, FRAMES}, &work, &out),
                      ==, TC_TLV_LIMIT);
     munit_assert_memory_equal(sizeof out, &out, &saved);
     munit_assert_size(work, <=, budget);
@@ -278,7 +283,7 @@ static MunitResult boundaries(const MunitParameter params[], void* context)
   memcpy(aliased.bytes, encoded, length);
   work = WORK;
   munit_assert_int(TC_PIV_card_identifiers_read((TC_bytes){aliased.bytes, length}, TC_PIV_CARD,
-                                                &limits, frames, FRAMES, &work,
+                                                &limits, (TC_TLV_frames){frames, FRAMES}, &work,
                                                 &aliased.identifiers),
                    ==, TC_TLV_ARGUMENT);
   munit_assert_size(work, ==, WORK);
@@ -287,7 +292,7 @@ static MunitResult boundaries(const MunitParameter params[], void* context)
     work = WORK;
     memcpy(&out, &saved, sizeof out);
     munit_assert_int(TC_PIV_card_identifiers_read((TC_bytes){encoded, length}, TC_PIV_CARD, &limits,
-                                                  frames, capacity, &work, &out),
+                                                  (TC_TLV_frames){frames, capacity}, &work, &out),
                      ==, TC_TLV_LIMIT);
     munit_assert_memory_equal(sizeof out, &out, &saved);
   }
@@ -305,7 +310,8 @@ static MunitResult reader_policy(const MunitParameter params[], void* context)
   size_t length = names(twic_oid, sizeof twic_oid, twic_uuid, 1, 0, encoded);
   size_t work = WORK;
   munit_assert_int(TC_TWIC_card_identifiers_read((TC_bytes){encoded, length}, TC_TWIC_NEXGEN_CARD,
-                                                 &limits, frames, FRAMES, &work, &identifiers),
+                                                 &limits, (TC_TLV_frames){frames, FRAMES}, &work,
+                                                 &identifiers),
                    ==, TC_TLV_OK);
   munit_assert_size(identifiers.uuid_urn.length, ==, 0);
   const size_t read_required = WORK - work;
@@ -314,7 +320,8 @@ static MunitResult reader_policy(const MunitParameter params[], void* context)
     TC_PIV_card_identifiers limited = saved;
     work = budget;
     munit_assert_int(TC_TWIC_card_identifiers_read((TC_bytes){encoded, length}, TC_TWIC_NEXGEN_CARD,
-                                                   &limits, frames, FRAMES, &work, &limited),
+                                                   &limits, (TC_TLV_frames){frames, FRAMES}, &work,
+                                                   &limited),
                      ==, TC_TLV_LIMIT);
     munit_assert_memory_equal(sizeof limited, &limited, &saved);
   }
@@ -333,13 +340,15 @@ static MunitResult reader_policy(const MunitParameter params[], void* context)
   fascn[0] ^= 1;
   work = WORK;
   munit_assert_int(TC_PIV_card_identifiers_read((TC_bytes){encoded, length}, TC_TWIC_NEXGEN_CARD,
-                                                &limits, frames, FRAMES, &work, &identifiers),
+                                                &limits, (TC_TLV_frames){frames, FRAMES}, &work,
+                                                &identifiers),
                    ==, TC_TLV_INVALID);
   munit_assert_memory_equal(sizeof saved, &saved, &identifiers);
   length = names(twic_oid, sizeof twic_oid, twic_uuid, 1, 1, encoded);
   work = WORK;
   munit_assert_int(TC_TWIC_card_identifiers_read((TC_bytes){encoded, length}, TC_TWIC_NEXGEN_CARD,
-                                                 &limits, frames, FRAMES, &work, &identifiers),
+                                                 &limits, (TC_TLV_frames){frames, FRAMES}, &work,
+                                                 &identifiers),
                    ==, TC_TLV_OK);
   work = WORK;
   munit_assert_int(TC_TWIC_card_identifiers_match(&identifiers, (TC_bytes){fascn, sizeof fascn},
@@ -365,7 +374,8 @@ static MunitResult reader_policy(const MunitParameter params[], void* context)
   length = names(twic_oid, sizeof twic_oid, twic_uuid, 2, 0, encoded);
   work = WORK;
   munit_assert_int(TC_TWIC_card_identifiers_read((TC_bytes){encoded, length}, TC_TWIC_NEXGEN_CARD,
-                                                 &limits, frames, FRAMES, &work, &identifiers),
+                                                 &limits, (TC_TLV_frames){frames, FRAMES}, &work,
+                                                 &identifiers),
                    ==, TC_TLV_INVALID);
   (void)params;
   (void)context;
@@ -385,9 +395,9 @@ static MunitResult authentication_policy(const MunitParameter params[], void* co
     const char* second = reversed ? piv_uuid : cardholder_uuid;
     const size_t length = names_values(piv_oid, sizeof piv_oid, first, second, 1, 1, encoded);
     size_t work = WORK;
-    munit_assert_int(TC_PIV_authentication_identifiers_read((TC_bytes){encoded, length},
-                                                            (TC_bytes){guid, sizeof guid}, &limits,
-                                                            frames, FRAMES, &work, &identifiers),
+    munit_assert_int(TC_PIV_authentication_identifiers_read(
+                         (TC_bytes){encoded, length}, (TC_bytes){guid, sizeof guid}, &limits,
+                         (TC_TLV_frames){frames, FRAMES}, &work, &identifiers),
                      ==, TC_TLV_OK);
     munit_assert_memory_equal(strlen(piv_uuid), identifiers.uuid_urn.data, piv_uuid);
     munit_assert_memory_equal(strlen(cardholder_uuid), identifiers.cardholder_uuid_urn.data,
@@ -401,7 +411,7 @@ static MunitResult authentication_policy(const MunitParameter params[], void* co
       work = budget;
       munit_assert_int(TC_PIV_authentication_identifiers_read(
                            (TC_bytes){encoded, length}, (TC_bytes){guid, sizeof guid}, &limits,
-                           frames, FRAMES, &work, &identifiers),
+                           (TC_TLV_frames){frames, FRAMES}, &work, &identifiers),
                        ==, TC_TLV_LIMIT);
       munit_assert_memory_equal(sizeof identifiers, &identifiers, &saved);
     }
@@ -409,25 +419,25 @@ static MunitResult authentication_policy(const MunitParameter params[], void* co
 
   size_t length = names_values(twic_oid, sizeof twic_oid, piv_uuid, cardholder_uuid, 1, 1, encoded);
   size_t work = WORK;
-  munit_assert_int(TC_TWIC_authentication_identifiers_read((TC_bytes){encoded, length},
-                                                           (TC_bytes){guid, sizeof guid}, &limits,
-                                                           frames, FRAMES, &work, &identifiers),
+  munit_assert_int(TC_TWIC_authentication_identifiers_read(
+                       (TC_bytes){encoded, length}, (TC_bytes){guid, sizeof guid}, &limits,
+                       (TC_TLV_frames){frames, FRAMES}, &work, &identifiers),
                    ==, TC_TLV_OK);
   munit_assert_memory_equal(strlen(piv_uuid), identifiers.uuid_urn.data, piv_uuid);
   munit_assert_memory_equal(strlen(cardholder_uuid), identifiers.cardholder_uuid_urn.data,
                             cardholder_uuid);
 
   work = WORK;
-  munit_assert_int(TC_PIV_authentication_identifiers_read((TC_bytes){encoded, length},
-                                                          (TC_bytes){guid, sizeof guid}, &limits,
-                                                          frames, FRAMES, &work, &identifiers),
+  munit_assert_int(TC_PIV_authentication_identifiers_read(
+                       (TC_bytes){encoded, length}, (TC_bytes){guid, sizeof guid}, &limits,
+                       (TC_TLV_frames){frames, FRAMES}, &work, &identifiers),
                    ==, TC_TLV_INVALID);
 
   length = names(twic_oid, sizeof twic_oid, piv_uuid, 1, 0, encoded);
   work = WORK;
-  munit_assert_int(TC_TWIC_authentication_identifiers_read((TC_bytes){encoded, length},
-                                                           (TC_bytes){guid, sizeof guid}, &limits,
-                                                           frames, FRAMES, &work, &identifiers),
+  munit_assert_int(TC_TWIC_authentication_identifiers_read(
+                       (TC_bytes){encoded, length}, (TC_bytes){guid, sizeof guid}, &limits,
+                       (TC_TLV_frames){frames, FRAMES}, &work, &identifiers),
                    ==, TC_TLV_OK);
   munit_assert_size(identifiers.uuid_urn.length, ==, 0);
   munit_assert_size(identifiers.cardholder_uuid_urn.length, ==, 0);
@@ -435,16 +445,16 @@ static MunitResult authentication_policy(const MunitParameter params[], void* co
   static const uint8_t unknown_oid[] = {0x2a, 3, 4};
   length = names(unknown_oid, sizeof unknown_oid, piv_uuid, 1, 0, encoded);
   work = WORK;
-  munit_assert_int(TC_TWIC_authentication_identifiers_read((TC_bytes){encoded, length},
-                                                           (TC_bytes){guid, sizeof guid}, &limits,
-                                                           frames, FRAMES, &work, &identifiers),
+  munit_assert_int(TC_TWIC_authentication_identifiers_read(
+                       (TC_bytes){encoded, length}, (TC_bytes){guid, sizeof guid}, &limits,
+                       (TC_TLV_frames){frames, FRAMES}, &work, &identifiers),
                    ==, TC_TLV_INVALID);
 
   length = names(piv_oid, sizeof piv_oid, piv_uuid, 1, 1, encoded);
   work = WORK;
-  munit_assert_int(TC_PIV_authentication_identifiers_read((TC_bytes){encoded, length},
-                                                          (TC_bytes){guid, sizeof guid}, &limits,
-                                                          frames, FRAMES, &work, &identifiers),
+  munit_assert_int(TC_PIV_authentication_identifiers_read(
+                       (TC_bytes){encoded, length}, (TC_bytes){guid, sizeof guid}, &limits,
+                       (TC_TLV_frames){frames, FRAMES}, &work, &identifiers),
                    ==, TC_TLV_OK);
   munit_assert_size(identifiers.cardholder_uuid_urn.length, ==, 0);
 
@@ -463,17 +473,17 @@ static MunitResult authentication_policy(const MunitParameter params[], void* co
                           invalid[i].copies, encoded);
     identifiers = saved;
     work = WORK;
-    munit_assert_int(TC_PIV_authentication_identifiers_read((TC_bytes){encoded, length},
-                                                            (TC_bytes){guid, sizeof guid}, &limits,
-                                                            frames, FRAMES, &work, &identifiers),
+    munit_assert_int(TC_PIV_authentication_identifiers_read(
+                         (TC_bytes){encoded, length}, (TC_bytes){guid, sizeof guid}, &limits,
+                         (TC_TLV_frames){frames, FRAMES}, &work, &identifiers),
                      ==, TC_TLV_INVALID);
     munit_assert_memory_equal(sizeof identifiers, &identifiers, &saved);
   }
 
   work = WORK;
-  munit_assert_int(TC_PIV_authentication_identifiers_read((TC_bytes){encoded, length},
-                                                          (TC_bytes){guid, 15}, &limits, frames,
-                                                          FRAMES, &work, &identifiers),
+  munit_assert_int(TC_PIV_authentication_identifiers_read(
+                       (TC_bytes){encoded, length}, (TC_bytes){guid, 15}, &limits,
+                       (TC_TLV_frames){frames, FRAMES}, &work, &identifiers),
                    ==, TC_TLV_ARGUMENT);
   munit_assert_size(work, ==, WORK);
   (void)params;

@@ -97,16 +97,16 @@ static MunitResult biometric_signatures(const MunitParameter params[], void* con
       TC_PIV_CMS_object object;
       work = WORK;
       munit_assert_int(TC_PIV_CMS_read(inputs[0], TC_PIV_CMS_BIOMETRIC, TC_PIV_OIDS_ONLY,
-                                       (TC_CMS_attribute_encoding)mode, &limits, frames,
-                                       FRAME_COUNT, &work, &object),
+                                       (TC_CMS_attribute_encoding)mode, &limits,
+                                       (TC_TLV_frames){frames, FRAME_COUNT}, &work, &object),
                        ==, invalid_binding ? TC_TLV_INVALID : TC_TLV_OK);
       if (invalid_binding)
         continue;
       int matched = -1;
       munit_assert_int(TC_PIV_CMS_identifiers_match(
                            &object, TC_PIV_CMS_BIOMETRIC, (TC_bytes){inputs[3].data, FASCN_BYTES},
-                           (TC_bytes){inputs[3].data + FASCN_BYTES, UUID_BYTES}, &limits, frames,
-                           FRAME_COUNT, &work, &matched),
+                           (TC_bytes){inputs[3].data + FASCN_BYTES, UUID_BYTES}, &limits,
+                           (TC_TLV_frames){frames, FRAME_COUNT}, &work, &matched),
                        ==, TC_TLV_OK);
       if (matched != identifiers_match)
         munit_errorf("biometric record %zu: identifier match %d", count, matched);
@@ -115,9 +115,9 @@ static MunitResult biometric_signatures(const MunitParameter params[], void* con
                                    object.attributes.entry_uuid_octets.length, TC_TLV_DER, &limits,
                                    &uuid),
                        ==, TC_TLV_OK);
-      munit_assert_int(TC_PIV_CMS_identifiers_match(&object, TC_PIV_CMS_BIOMETRIC, biometric.fascn,
-                                                    uuid.value, &limits, frames, FRAME_COUNT, &work,
-                                                    &matched),
+      munit_assert_int(TC_PIV_CMS_identifiers_match(
+                           &object, TC_PIV_CMS_BIOMETRIC, biometric.fascn, uuid.value, &limits,
+                           (TC_TLV_frames){frames, FRAME_COUNT}, &work, &matched),
                        ==, TC_TLV_OK);
       munit_assert_int(matched, ==, 1);
     }
@@ -126,17 +126,19 @@ static MunitResult biometric_signatures(const MunitParameter params[], void* con
     TC_CMS_signer_info signer;
     TC_TLV_reader signers, certificates;
     TC_TLV_element collection, element;
+    munit_assert_int(TC_CMS_signed_data_read(inputs[0], &limits,
+                                             (TC_TLV_frames){frames, FRAME_COUNT}, &work,
+                                             &envelope),
+                     ==, TC_TLV_OK);
+    munit_assert_int(TC_CMS_signers_init(envelope.signers, &limits,
+                                         (TC_TLV_frames){frames, FRAME_COUNT}, &work, &signers),
+                     ==, TC_TLV_OK);
     munit_assert_int(
-        TC_CMS_signed_data_read(inputs[0], &limits, frames, FRAME_COUNT, &work, &envelope), ==,
+        TC_CMS_signer_next(&signers, (TC_TLV_frames){frames, FRAME_COUNT}, &work, &signer), ==,
         TC_TLV_OK);
-    munit_assert_int(
-        TC_CMS_signers_init(envelope.signers, &limits, frames, FRAME_COUNT, &work, &signers), ==,
-        TC_TLV_OK);
-    munit_assert_int(TC_CMS_signer_next(&signers, frames, FRAME_COUNT, &work, &signer), ==,
-                     TC_TLV_OK);
-    munit_assert_int(
-        TC_CMS_signed_data_read(inputs[2], &limits, frames, FRAME_COUNT, &work, &chuid), ==,
-        TC_TLV_OK);
+    munit_assert_int(TC_CMS_signed_data_read(inputs[2], &limits,
+                                             (TC_TLV_frames){frames, FRAME_COUNT}, &work, &chuid),
+                     ==, TC_TLV_OK);
     munit_assert_int(TC_TLV_read(chuid.certificates.data, chuid.certificates.length, TC_TLV_BER,
                                  &limits, &collection),
                      ==, TC_TLV_OK);
@@ -260,8 +262,9 @@ static MunitResult captured(const MunitParameter params[], void* context)
     TC_CMS_signed_data envelope, saved;
     TC_CMS_signer_info signer;
     TC_TLV_reader signers;
-    munit_assert_int(TC_CMS_signed_data_read((TC_bytes){bytes, length}, &limits, frames,
-                                             FRAME_COUNT, &work, &envelope),
+    munit_assert_int(TC_CMS_signed_data_read((TC_bytes){bytes, length}, &limits,
+                                             (TC_TLV_frames){frames, FRAME_COUNT}, &work,
+                                             &envelope),
                      ==, TC_TLV_OK);
     munit_assert_uint(envelope.version, ==, 3);
     munit_assert_int(envelope.has_content, ==, !(chuid || biometric));
@@ -275,23 +278,25 @@ static MunitResult captured(const MunitParameter params[], void* context)
         munit_assert_int(TC_PIV_oid_identify(envelope.content_type, (TC_PIV_oid_profile)profile),
                          ==, biometric ? TC_PIV_OID_BIOMETRIC_CONTENT : TC_PIV_OID_CHUID_CONTENT);
     }
+    munit_assert_int(TC_CMS_signers_init(envelope.signers, &limits,
+                                         (TC_TLV_frames){frames, FRAME_COUNT}, &work, &signers),
+                     ==, TC_TLV_OK);
     munit_assert_int(
-        TC_CMS_signers_init(envelope.signers, &limits, frames, FRAME_COUNT, &work, &signers), ==,
+        TC_CMS_signer_next(&signers, (TC_TLV_frames){frames, FRAME_COUNT}, &work, &signer), ==,
         TC_TLV_OK);
-    munit_assert_int(TC_CMS_signer_next(&signers, frames, FRAME_COUNT, &work, &signer), ==,
-                     TC_TLV_OK);
     munit_assert_uint(signer.version, ==, 1);
-    munit_assert_int(TC_CMS_signer_next(&signers, frames, FRAME_COUNT, &work, &signer), ==,
-                     TC_TLV_END);
+    munit_assert_int(
+        TC_CMS_signer_next(&signers, (TC_TLV_frames){frames, FRAME_COUNT}, &work, &signer), ==,
+        TC_TLV_END);
     for (unsigned mode = 0; mode < 2; ++mode) {
       TC_CMS_signed_attributes attributes;
       TC_CMS_signed_attributes untouched;
       memset(&untouched, 0xa5, sizeof untouched);
       memcpy(&attributes, &untouched, sizeof attributes);
       work = WORK;
-      TC_TLV_result status =
-          TC_CMS_signed_attributes_read(signer.signed_attributes, (TC_CMS_attribute_encoding)mode,
-                                        &limits, frames, FRAME_COUNT, &work, &attributes);
+      TC_TLV_result status = TC_CMS_signed_attributes_read(
+          signer.signed_attributes, (TC_CMS_attribute_encoding)mode, &limits,
+          (TC_TLV_frames){frames, FRAME_COUNT}, &work, &attributes);
       if (chuid || biometric) {
         TC_PIV_CMS_object object, preserved;
         memset(&preserved, 0xa5, sizeof preserved);
@@ -306,8 +311,8 @@ static MunitResult captured(const MunitParameter params[], void* context)
           work = WORK;
           memcpy(&object, &preserved, sizeof object);
           munit_assert_int(TC_PIV_CMS_read(input, object_kind, (TC_PIV_oid_profile)profile,
-                                           (TC_CMS_attribute_encoding)mode, &limits, frames,
-                                           FRAME_COUNT, &work, &object),
+                                           (TC_CMS_attribute_encoding)mode, &limits,
+                                           (TC_TLV_frames){frames, FRAME_COUNT}, &work, &object),
                            ==, expected);
           if (expected != TC_TLV_OK)
             munit_assert_memory_equal(sizeof object, &object, &preserved);
@@ -319,8 +324,9 @@ static MunitResult captured(const MunitParameter params[], void* context)
               work = required - short_budget;
               memcpy(&object, &preserved, sizeof object);
               munit_assert_int(TC_PIV_CMS_read(input, object_kind, (TC_PIV_oid_profile)profile,
-                                               (TC_CMS_attribute_encoding)mode, &limits, frames,
-                                               FRAME_COUNT, &work, &object),
+                                               (TC_CMS_attribute_encoding)mode, &limits,
+                                               (TC_TLV_frames){frames, FRAME_COUNT}, &work,
+                                               &object),
                                ==, short_budget ? TC_TLV_LIMIT : TC_TLV_OK);
               if (short_budget)
                 munit_assert_memory_equal(sizeof object, &object, &preserved);
@@ -342,8 +348,8 @@ static MunitResult captured(const MunitParameter params[], void* context)
           work = WORK;
           memcpy(&object, &preserved, sizeof object);
           munit_assert_int(TC_PIV_CMS_read(input, object_kind, TC_PIV_OIDS_ONLY,
-                                           (TC_CMS_attribute_encoding)mode, &limits, frames,
-                                           FRAME_COUNT, &work, &object),
+                                           (TC_CMS_attribute_encoding)mode, &limits,
+                                           (TC_TLV_frames){frames, FRAME_COUNT}, &work, &object),
                            ==, TC_TLV_INVALID);
           munit_assert_memory_equal(sizeof object, &object, &preserved);
           bytes[hash_offset] = original_hash;
@@ -356,7 +362,8 @@ static MunitResult captured(const MunitParameter params[], void* context)
         work = WORK;
         munit_assert_int(TC_PIV_CMS_read((TC_bytes){alias.bytes, length}, object_kind,
                                          TC_PIV_OIDS_ONLY, (TC_CMS_attribute_encoding)mode, &limits,
-                                         frames, FRAME_COUNT, &work, &alias.object),
+                                         (TC_TLV_frames){frames, FRAME_COUNT}, &work,
+                                         &alias.object),
                          ==, TC_TLV_ARGUMENT);
         munit_assert_size(work, ==, WORK);
         munit_assert_memory_equal(length, alias.bytes, bytes);
@@ -364,13 +371,13 @@ static MunitResult captured(const MunitParameter params[], void* context)
         memcpy(&object, &preserved, sizeof object);
         munit_assert_int(TC_PIV_CMS_read(input, chuid ? TC_PIV_CMS_BIOMETRIC : TC_PIV_CMS_CHUID,
                                          TC_PIV_OIDS_ONLY, (TC_CMS_attribute_encoding)mode, &limits,
-                                         frames, FRAME_COUNT, &work, &object),
+                                         (TC_TLV_frames){frames, FRAME_COUNT}, &work, &object),
                          ==, TC_TLV_INVALID);
         munit_assert_memory_equal(sizeof object, &object, &preserved);
         work = 0;
         munit_assert_int(TC_PIV_CMS_read(input, object_kind, TC_PIV_OIDS_ONLY,
-                                         (TC_CMS_attribute_encoding)mode, &limits, frames,
-                                         FRAME_COUNT, &work, &object),
+                                         (TC_CMS_attribute_encoding)mode, &limits,
+                                         (TC_TLV_frames){frames, FRAME_COUNT}, &work, &object),
                          ==, TC_TLV_LIMIT);
         munit_assert_memory_equal(sizeof object, &object, &preserved);
       }
@@ -391,8 +398,9 @@ static MunitResult captured(const MunitParameter params[], void* context)
     for (size_t prefix = 0; prefix < length; ++prefix) {
       work = WORK;
       memcpy(&envelope, &saved, sizeof envelope);
-      munit_assert_int(TC_CMS_signed_data_read((TC_bytes){bytes, prefix}, &limits, frames,
-                                               FRAME_COUNT, &work, &envelope),
+      munit_assert_int(TC_CMS_signed_data_read((TC_bytes){bytes, prefix}, &limits,
+                                               (TC_TLV_frames){frames, FRAME_COUNT}, &work,
+                                               &envelope),
                        !=, TC_TLV_OK);
       munit_assert_memory_equal(sizeof envelope, &envelope, &saved);
     }

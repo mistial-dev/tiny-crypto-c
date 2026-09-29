@@ -67,8 +67,8 @@ static inline TC_TLV_result tc_pki_tree_read(TC_bytes input, TC_TLV_profile prof
     return TC_TLV_ARGUMENT;
   allowance = input.length < *workspace->work ? input.length : *workspace->work;
   *workspace->work -= allowance;
-  result = TC_TLV_read_tree(input.data, allowance, profile, limits, workspace->frames,
-                            workspace->capacity, &parsed);
+  result = TC_TLV_read_tree(input.data, allowance, profile, limits,
+                            (TC_TLV_frames){workspace->frames, workspace->capacity}, &parsed);
   if (result == TC_TLV_MORE && allowance < input.length)
     return TC_TLV_LIMIT;
   if (result != TC_TLV_OK)

@@ -21,8 +21,8 @@ static MunitResult attributes(const MunitParameter params[], void* user)
   static const uint8_t values[] = {0x31, 0x80, 0x31, 5, 4};
   (void)params;
   (void)user;
-  munit_assert_int(TC_CMS_signed_attributes_read(input, TC_CMS_ATTRIBUTES_DER, &limits, frames, 8,
-                                                 &work, &result),
+  munit_assert_int(TC_CMS_signed_attributes_read(input, TC_CMS_ATTRIBUTES_DER, &limits,
+                                                 (TC_TLV_frames){frames, 8}, &work, &result),
                    ==, TC_TLV_OK);
   required = 1000 - work;
   munit_assert_ptr_equal(result.content_type.data, encoded + 37);
@@ -38,8 +38,8 @@ static MunitResult attributes(const MunitParameter params[], void* user)
   memcpy(&saved, &result, sizeof saved);
   for (size_t budget = 0; budget < required; ++budget) {
     work = budget;
-    munit_assert_int(TC_CMS_signed_attributes_read(input, TC_CMS_ATTRIBUTES_DER, &limits, frames, 8,
-                                                   &work, &result),
+    munit_assert_int(TC_CMS_signed_attributes_read(input, TC_CMS_ATTRIBUTES_DER, &limits,
+                                                   (TC_TLV_frames){frames, 8}, &work, &result),
                      ==, TC_TLV_LIMIT);
     munit_assert_memory_equal(sizeof result, &result, &saved);
   }
@@ -48,8 +48,8 @@ static MunitResult attributes(const MunitParameter params[], void* user)
     bad[positions[i]] = values[i];
     work = 1000;
     input = (TC_bytes){bad, sizeof encoded};
-    munit_assert_int(TC_CMS_signed_attributes_read(input, TC_CMS_ATTRIBUTES_DER, &limits, frames, 8,
-                                                   &work, &result),
+    munit_assert_int(TC_CMS_signed_attributes_read(input, TC_CMS_ATTRIBUTES_DER, &limits,
+                                                   (TC_TLV_frames){frames, 8}, &work, &result),
                      !=, TC_TLV_OK);
     munit_assert_memory_equal(sizeof result, &result, &saved);
   }
@@ -58,8 +58,8 @@ static MunitResult attributes(const MunitParameter params[], void* user)
   memcpy(bad + 2, encoded + 20, 26);
   memcpy(bad + 28, encoded + 2, 18);
   work = 1000;
-  munit_assert_int(TC_CMS_signed_attributes_read(input, TC_CMS_ATTRIBUTES_DER, &limits, frames, 8,
-                                                 &work, &result),
+  munit_assert_int(TC_CMS_signed_attributes_read(input, TC_CMS_ATTRIBUTES_DER, &limits,
+                                                 (TC_TLV_frames){frames, 8}, &work, &result),
                    ==, TC_TLV_INVALID);
   memcpy(bad, encoded, 20);
   memcpy(bad + 20, encoded + 2, 18);
@@ -67,33 +67,33 @@ static MunitResult attributes(const MunitParameter params[], void* user)
   bad[1] = 62;
   input.length = 64;
   work = 1000;
-  munit_assert_int(TC_CMS_signed_attributes_read(input, TC_CMS_ATTRIBUTES_DER, &limits, frames, 8,
-                                                 &work, &result),
+  munit_assert_int(TC_CMS_signed_attributes_read(input, TC_CMS_ATTRIBUTES_DER, &limits,
+                                                 (TC_TLV_frames){frames, 8}, &work, &result),
                    ==, TC_TLV_INVALID);
   memcpy(bad, encoded, 20);
   bad[1] = 18;
   input.length = 20;
   work = 1000;
-  munit_assert_int(TC_CMS_signed_attributes_read(input, TC_CMS_ATTRIBUTES_DER, &limits, frames, 8,
-                                                 &work, &result),
+  munit_assert_int(TC_CMS_signed_attributes_read(input, TC_CMS_ATTRIBUTES_DER, &limits,
+                                                 (TC_TLV_frames){frames, 8}, &work, &result),
                    ==, TC_TLV_INVALID);
   memcpy(bad, encoded, sizeof encoded);
   bad[14] = 6;
   input.length = sizeof encoded;
   work = 1000;
-  munit_assert_int(TC_CMS_signed_attributes_read(input, TC_CMS_ATTRIBUTES_DER, &limits, frames, 8,
-                                                 &work, &result),
+  munit_assert_int(TC_CMS_signed_attributes_read(input, TC_CMS_ATTRIBUTES_DER, &limits,
+                                                 (TC_TLV_frames){frames, 8}, &work, &result),
                    ==, TC_TLV_UNSUPPORTED);
   munit_assert_memory_equal(sizeof result, &result, &saved);
   input = (TC_bytes){encoded, sizeof encoded};
   work = 1000;
-  munit_assert_int(TC_CMS_signed_attributes_read(input, TC_CMS_ATTRIBUTES_DER, &limits, frames, 0,
-                                                 &work, &result),
+  munit_assert_int(TC_CMS_signed_attributes_read(input, TC_CMS_ATTRIBUTES_DER, &limits,
+                                                 (TC_TLV_frames){frames, 0}, &work, &result),
                    ==, TC_TLV_LIMIT);
   limits.max_elements = 8;
   work = 1000;
-  munit_assert_int(TC_CMS_signed_attributes_read(input, TC_CMS_ATTRIBUTES_DER, &limits, frames, 8,
-                                                 &work, &result),
+  munit_assert_int(TC_CMS_signed_attributes_read(input, TC_CMS_ATTRIBUTES_DER, &limits,
+                                                 (TC_TLV_frames){frames, 8}, &work, &result),
                    ==, TC_TLV_LIMIT);
   munit_assert_memory_equal(sizeof result, &result, &saved);
   return MUNIT_OK;
@@ -117,7 +117,7 @@ static MunitResult compatibility(const MunitParameter params[], void* user)
   work = 1000;
   munit_assert_int(TC_CMS_signed_attributes_read((TC_bytes){input, 47},
                                                  TC_CMS_ATTRIBUTES_BER_DEFINITE_ORDER, &limits,
-                                                 frames, 8, &work, &result),
+                                                 (TC_TLV_frames){frames, 8}, &work, &result),
                    ==, TC_TLV_OK);
   munit_assert_ptr_equal(result.signature_input[1].data, input + 1);
   munit_assert_size(result.signature_input[1].length, ==, 46);
@@ -126,7 +126,8 @@ static MunitResult compatibility(const MunitParameter params[], void* user)
   memcpy(&saved, &result, sizeof saved);
   work = 1000;
   munit_assert_int(TC_CMS_signed_attributes_read((TC_bytes){input, 47}, TC_CMS_ATTRIBUTES_DER,
-                                                 &limits, frames, 8, &work, &result),
+                                                 &limits, (TC_TLV_frames){frames, 8}, &work,
+                                                 &result),
                    !=, TC_TLV_OK);
   munit_assert_memory_equal(sizeof result, &result, &saved);
   for (unsigned kind = 0; kind < 5; ++kind) {
@@ -154,14 +155,14 @@ static MunitResult compatibility(const MunitParameter params[], void* user)
     work = 1000;
     munit_assert_int(TC_CMS_signed_attributes_read((TC_bytes){input, length},
                                                    TC_CMS_ATTRIBUTES_BER_DEFINITE_ORDER, &limits,
-                                                   frames, 8, &work, &result),
+                                                   (TC_TLV_frames){frames, 8}, &work, &result),
                      !=, TC_TLV_OK);
     munit_assert_memory_equal(sizeof result, &result, &saved);
   }
   work = 1000;
   munit_assert_int(TC_CMS_signed_attributes_read((TC_bytes){encoded, sizeof encoded},
-                                                 (TC_CMS_attribute_encoding)99, &limits, frames, 8,
-                                                 &work, &result),
+                                                 (TC_CMS_attribute_encoding)99, &limits,
+                                                 (TC_TLV_frames){frames, 8}, &work, &result),
                    ==, TC_TLV_ARGUMENT);
   munit_assert_size(work, ==, 1000);
   munit_assert_memory_equal(sizeof result, &result, &saved);
@@ -203,8 +204,8 @@ static MunitResult signing_time(const MunitParameter params[], void* user)
     memset(&result, 0xa5, sizeof result);
     memcpy(&saved, &result, sizeof saved);
     munit_assert_int(TC_CMS_signed_attributes_read((TC_bytes){input, sizeof encoded + length + 17},
-                                                   TC_CMS_ATTRIBUTES_DER, &limits, frames, 8, &work,
-                                                   &result),
+                                                   TC_CMS_ATTRIBUTES_DER, &limits,
+                                                   (TC_TLV_frames){frames, 8}, &work, &result),
                      ==, cases[i].year ? TC_TLV_OK : TC_TLV_INVALID);
     if (cases[i].year) {
       munit_assert_true(result.has_signing_time);
@@ -215,7 +216,8 @@ static MunitResult signing_time(const MunitParameter params[], void* user)
       memcpy(&result, &saved, sizeof result);
       munit_assert_int(
           TC_CMS_signed_attributes_read((TC_bytes){input, sizeof encoded + 2 * (length + 17)},
-                                        TC_CMS_ATTRIBUTES_DER, &limits, frames, 8, &work, &result),
+                                        TC_CMS_ATTRIBUTES_DER, &limits, (TC_TLV_frames){frames, 8},
+                                        &work, &result),
           ==, TC_TLV_INVALID);
       munit_assert_memory_equal(sizeof result, &result, &saved);
     } else
@@ -308,7 +310,7 @@ static MunitResult capabilities(const MunitParameter params[], void* user)
       memcpy(&result, &saved, sizeof result);
       munit_assert_int(TC_CMS_signed_attributes_read((TC_bytes){input, length},
                                                      (TC_CMS_attribute_encoding)mode, &limits,
-                                                     frames, 8, &work, &result),
+                                                     (TC_TLV_frames){frames, 8}, &work, &result),
                        ==, cases[i].valid ? TC_TLV_OK : TC_TLV_INVALID);
       if (!cases[i].valid) {
         munit_assert_memory_equal(sizeof result, &result, &saved);
@@ -324,7 +326,7 @@ static MunitResult capabilities(const MunitParameter params[], void* user)
         memcpy(&result, &saved, sizeof result);
         munit_assert_int(TC_CMS_signed_attributes_read((TC_bytes){input, length},
                                                        (TC_CMS_attribute_encoding)mode, &limits,
-                                                       frames, 8, &work, &result),
+                                                       (TC_TLV_frames){frames, 8}, &work, &result),
                          ==, TC_TLV_LIMIT);
         munit_assert_memory_equal(sizeof result, &result, &saved);
       }
@@ -333,7 +335,7 @@ static MunitResult capabilities(const MunitParameter params[], void* user)
         work = 2000;
         munit_assert_int(TC_CMS_signed_attributes_read((TC_bytes){input, length},
                                                        (TC_CMS_attribute_encoding)mode, &limits,
-                                                       frames, 8, &work, &result),
+                                                       (TC_TLV_frames){frames, 8}, &work, &result),
                          ==, TC_TLV_INVALID);
         munit_assert_memory_equal(sizeof result, &result, &saved);
       }
@@ -357,8 +359,8 @@ static MunitResult signer_name(const MunitParameter params[], void* user)
   for (unsigned mode = 0; mode < 2; ++mode) {
     size_t length = with_attribute(input, oid, name, sizeof name, 0, 0), work = 2000;
     munit_assert_int(TC_CMS_signed_attributes_read((TC_bytes){input, length},
-                                                   (TC_CMS_attribute_encoding)mode, &limits, frames,
-                                                   8, &work, &result),
+                                                   (TC_CMS_attribute_encoding)mode, &limits,
+                                                   (TC_TLV_frames){frames, 8}, &work, &result),
                      ==, TC_TLV_OK);
     munit_assert_size(result.signer_name.length, ==, sizeof name);
     munit_assert_memory_equal(sizeof name, result.signer_name.data, name);
@@ -370,7 +372,7 @@ static MunitResult signer_name(const MunitParameter params[], void* user)
       memcpy(&result, &saved, sizeof result);
       munit_assert_int(TC_CMS_signed_attributes_read((TC_bytes){input, length},
                                                      (TC_CMS_attribute_encoding)mode, &limits,
-                                                     frames, 8, &work, &result),
+                                                     (TC_TLV_frames){frames, 8}, &work, &result),
                        ==, TC_TLV_LIMIT);
       munit_assert_memory_equal(sizeof result, &result, &saved);
     }
@@ -387,7 +389,7 @@ static MunitResult signer_name(const MunitParameter params[], void* user)
       memcpy(&result, &saved, sizeof result);
       munit_assert_int(TC_CMS_signed_attributes_read((TC_bytes){input, length},
                                                      (TC_CMS_attribute_encoding)mode, &limits,
-                                                     frames, 8, &work, &result),
+                                                     (TC_TLV_frames){frames, 8}, &work, &result),
                        ==, TC_TLV_INVALID);
       munit_assert_memory_equal(sizeof result, &result, &saved);
     }
@@ -460,7 +462,7 @@ static MunitResult identifier_octets(const MunitParameter params[], void* user)
         memcpy(&parsed, &saved, sizeof parsed);
         munit_assert_int(TC_CMS_signed_attributes_read((TC_bytes){input, length},
                                                        (TC_CMS_attribute_encoding)mode, &limits,
-                                                       frames, 8, &work, &parsed),
+                                                       (TC_TLV_frames){frames, 8}, &work, &parsed),
                          ==, valid ? TC_TLV_OK : TC_TLV_INVALID);
         if (!valid) {
           munit_assert_memory_equal(sizeof parsed, &parsed, &saved);
@@ -476,9 +478,9 @@ static MunitResult identifier_octets(const MunitParameter params[], void* user)
         for (size_t budget = 0; budget < required; ++budget) {
           work = budget;
           memcpy(&parsed, &saved, sizeof parsed);
-          munit_assert_int(TC_CMS_signed_attributes_read((TC_bytes){input, length},
-                                                         (TC_CMS_attribute_encoding)mode, &limits,
-                                                         frames, 8, &work, &parsed),
+          munit_assert_int(TC_CMS_signed_attributes_read(
+                               (TC_bytes){input, length}, (TC_CMS_attribute_encoding)mode, &limits,
+                               (TC_TLV_frames){frames, 8}, &work, &parsed),
                            ==, TC_TLV_LIMIT);
           munit_assert_memory_equal(sizeof parsed, &parsed, &saved);
         }
@@ -503,7 +505,7 @@ static MunitResult identifier_octets(const MunitParameter params[], void* user)
         memcpy(&parsed, &saved, sizeof parsed);
         munit_assert_int(TC_CMS_signed_attributes_read((TC_bytes){input, length},
                                                        (TC_CMS_attribute_encoding)mode, &limits,
-                                                       frames, 8, &work, &parsed),
+                                                       (TC_TLV_frames){frames, 8}, &work, &parsed),
                          ==, TC_TLV_INVALID);
         munit_assert_memory_equal(sizeof parsed, &parsed, &saved);
       }

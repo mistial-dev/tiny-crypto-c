@@ -499,7 +499,8 @@ static int content_crls_prepare(const Options* options, TC_bytes encoded,
     return 0;
   TC_X509_workspace parser = parser_workspace();
   TC_CMS_signed_data cms;
-  if (TC_CMS_signed_data_read(chuid.signature, limits, parser.frames, parser.frame_capacity, work,
+  if (TC_CMS_signed_data_read(chuid.signature, limits,
+                              (TC_TLV_frames){parser.frames, parser.frame_capacity}, work,
                               &cms) != TC_TLV_OK)
     return 0;
   /* Collect candidate serials before authentication. Validation checks their

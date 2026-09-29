@@ -187,8 +187,9 @@ static MunitResult encoded_content(const MunitParameter params[], void* user)
     for (size_t i = 0; i < sizeof encodings / sizeof *encodings; ++i) {
       size_t work = WORK_BUDGET;
       memset(actual, OUTPUT_SENTINEL, sizeof actual);
-      munit_assert_int(TC_CMS_content_digest(encodings[i], hash, &limits, frames, FRAME_CAPACITY,
-                                             &work, actual, sizeof actual),
+      munit_assert_int(TC_CMS_content_digest(encodings[i], hash, &limits,
+                                             (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, actual,
+                                             sizeof actual),
                        ==, TC_TLV_OK);
       munit_assert_memory_equal(info.digest_length, actual, expected);
       for (size_t spare = info.digest_length; spare < sizeof actual; ++spare)
@@ -197,21 +198,24 @@ static MunitResult encoded_content(const MunitParameter params[], void* user)
       for (size_t budget = 0; budget < required; ++budget) {
         work = budget;
         memcpy(actual, untouched, sizeof actual);
-        munit_assert_int(TC_CMS_content_digest(encodings[i], hash, &limits, frames, FRAME_CAPACITY,
-                                               &work, actual, sizeof actual),
+        munit_assert_int(TC_CMS_content_digest(encodings[i], hash, &limits,
+                                               (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
+                                               actual, sizeof actual),
                          ==, TC_TLV_LIMIT);
         munit_assert_memory_equal(sizeof actual, actual, untouched);
       }
       work = required;
-      munit_assert_int(TC_CMS_content_digest(encodings[i], hash, &limits, frames, FRAME_CAPACITY,
-                                             &work, actual, sizeof actual),
+      munit_assert_int(TC_CMS_content_digest(encodings[i], hash, &limits,
+                                             (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, actual,
+                                             sizeof actual),
                        ==, TC_TLV_OK);
       munit_assert_size(work, ==, 0);
       for (size_t capacity = 0; capacity < info.digest_length; ++capacity) {
         work = WORK_BUDGET;
         memcpy(actual, untouched, sizeof actual);
-        munit_assert_int(TC_CMS_content_digest(encodings[i], hash, &limits, frames, FRAME_CAPACITY,
-                                               &work, actual, capacity),
+        munit_assert_int(TC_CMS_content_digest(encodings[i], hash, &limits,
+                                               (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
+                                               actual, capacity),
                          ==, TC_TLV_LIMIT);
         munit_assert_memory_equal(sizeof actual, actual, untouched);
       }
@@ -219,8 +223,8 @@ static MunitResult encoded_content(const MunitParameter params[], void* user)
         work = WORK_BUDGET;
         memcpy(actual, untouched, sizeof actual);
         munit_assert_int(TC_CMS_content_digest((TC_bytes){encodings[i].data, length}, hash, &limits,
-                                               frames, FRAME_CAPACITY, &work, actual,
-                                               sizeof actual),
+                                               (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
+                                               actual, sizeof actual),
                          !=, TC_TLV_OK);
         munit_assert_memory_equal(sizeof actual, actual, untouched);
       }
@@ -228,8 +232,8 @@ static MunitResult encoded_content(const MunitParameter params[], void* user)
     size_t work = WORK_BUDGET;
     memcpy(actual, untouched, sizeof actual);
     munit_assert_int(TC_CMS_content_digest((TC_bytes){wrong_child, sizeof wrong_child}, hash,
-                                           &limits, frames, FRAME_CAPACITY, &work, actual,
-                                           sizeof actual),
+                                           &limits, (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
+                                           actual, sizeof actual),
                      ==, TC_TLV_INVALID);
     munit_assert_memory_equal(sizeof actual, actual, untouched);
     work = WORK_BUDGET;
@@ -241,8 +245,9 @@ static MunitResult encoded_content(const MunitParameter params[], void* user)
     munit_assert_memory_equal(sizeof scratch, &scratch, zero_scratch);
     munit_assert_int(tc_hash_digest_parts(hash, NULL, 0, expected, &scratch), ==, TC_OK);
     work = WORK_BUDGET;
-    munit_assert_int(TC_CMS_content_digest((TC_bytes){empty, sizeof empty}, hash, &limits, frames,
-                                           FRAME_CAPACITY, &work, actual, sizeof actual),
+    munit_assert_int(TC_CMS_content_digest((TC_bytes){empty, sizeof empty}, hash, &limits,
+                                           (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, actual,
+                                           sizeof actual),
                      ==, TC_TLV_OK);
     munit_assert_memory_equal(info.digest_length, actual, expected);
   }

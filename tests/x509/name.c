@@ -672,7 +672,8 @@ static MunitResult utf8_mail_structure(const MunitParameter params[], void* user
   base.base.value.length = 11;
   munit_assert_int(TC_TLV_reader_init(&reader, encoded, sizeof encoded, TC_TLV_DER, &bounds), ==,
                    TC_TLV_OK);
-  munit_assert_int(TC_X509_general_name_next(&reader, frames, 4, &name), ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_general_name_next(&reader, (TC_TLV_frames){frames, 4}, &name), ==,
+                   TC_TLV_OK);
   munit_assert_int(TC_X509_general_name_within(&name, &base, &bounds, NULL, &work, &matched), ==,
                    TC_TLV_OK);
   munit_assert_int(matched, ==, 1);

@@ -93,6 +93,14 @@ typedef struct {
   uint8_t indefinite, resource_bound;
 } TC_TLV_frame;
 
+/* Caller-owned nesting storage for one decode: capacity frames at data. A
+ * decode needs one frame per constructed nesting level. The frames are
+ * scratch, may change on failure and must not overlap the input. */
+typedef struct {
+  TC_TLV_frame* data;
+  size_t capacity;
+} TC_TLV_frames;
+
 /* Treat members as private after init. Frames are caller-owned and must not
  * alias input or the stream. Callbacks must not modify/reenter the parser.
  * Wait for finish to succeed before acting on events. */
@@ -108,8 +116,7 @@ typedef struct {
 
 #if TC_TLV_ENABLE_STREAM
 TC_TLV_result TC_TLV_stream_init(TC_TLV_stream* stream, TC_TLV_profile profile,
-                                 const TC_TLV_limits* limits, TC_TLV_frame* frames,
-                                 size_t capacity);
+                                 const TC_TLV_limits* limits, TC_TLV_frames frames);
 /* Consumes a chunk without retaining its address. Callbacks borrow spans only
  * for their duration. After an error, call init before reusing the stream.
  * Events emitted before an error remain emitted.
@@ -123,8 +130,8 @@ TC_TLV_result TC_TLV_stream_finish(TC_TLV_stream* stream);
  * A sequence of root objects is accepted. A schema needing exactly one root
  * must check that separately. NULL visit validates framing without callbacks. */
 TC_TLV_result TC_TLV_walk(const uint8_t* data, size_t length, TC_TLV_profile profile,
-                          const TC_TLV_limits* limits, TC_TLV_frame* frames, size_t capacity,
-                          TC_TLV_visit visit, void* user);
+                          const TC_TLV_limits* limits, TC_TLV_frames frames, TC_TLV_visit visit,
+                          void* user);
 
 /* Read one complete object and validate its constructed boundaries. Supports
  * indefinite BER and leaves following siblings unread. Returned spans borrow
@@ -132,7 +139,7 @@ TC_TLV_result TC_TLV_walk(const uint8_t* data, size_t length, TC_TLV_profile pro
  * Frames may change on failure. out changes only on OK. Input, limits, frames
  * and out must be disjoint. Root padding after the object is left unread. */
 TC_TLV_result TC_TLV_read_tree(const uint8_t* data, size_t length, TC_TLV_profile profile,
-                               const TC_TLV_limits* limits, TC_TLV_frame* frames, size_t capacity,
+                               const TC_TLV_limits* limits, TC_TLV_frames frames,
                                TC_TLV_element* out);
 
 #ifdef __cplusplus

@@ -77,8 +77,8 @@ typedef struct {
  * interpretation. Signature, freshness and trust checks are separate steps.
  * Input, limits, frames, work and out must be disjoint. Frames and work may
  * change on failure. out changes only on OK. Frame capacity counts elements. */
-TC_TLV_result TC_X509_crl_read(TC_bytes encoded, const TC_TLV_limits* limits, TC_TLV_frame* frames,
-                               size_t frame_capacity, size_t* work, TC_X509_crl* out);
+TC_TLV_result TC_X509_crl_read(TC_bytes encoded, const TC_TLV_limits* limits, TC_TLV_frames frames,
+                               size_t* work, TC_X509_crl* out);
 
 /* Read crl.extensions, or {NULL,0} when absent. present/critical use EXT masks.
  * Number spans contain INTEGER contents. All spans borrow unchanged input.

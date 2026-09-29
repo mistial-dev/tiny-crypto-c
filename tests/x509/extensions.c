@@ -298,35 +298,42 @@ static MunitResult general_names(const MunitParameter params[], void* user)
   (void)user;
   munit_assert_int(TC_X509_general_names_init(&reader, valid, sizeof valid, &bounds), ==,
                    TC_TLV_OK);
-  munit_assert_int(TC_X509_general_name_next(&reader, frames, 4, &out), ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_general_name_next(&reader, (TC_TLV_frames){frames, 4}, &out), ==,
+                   TC_TLV_OK);
   munit_assert_uint(out.type, ==, 2);
   munit_assert_ptr_equal(out.value.data, valid + 4);
-  munit_assert_int(TC_X509_general_name_next(&reader, frames, 4, &out), ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_general_name_next(&reader, (TC_TLV_frames){frames, 4}, &out), ==,
+                   TC_TLV_OK);
   munit_assert_uint(out.type, ==, 7);
   munit_assert_size(out.value.length, ==, 4);
-  munit_assert_int(TC_X509_general_name_next(&reader, frames, 4, &out), ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_general_name_next(&reader, (TC_TLV_frames){frames, 4}, &out), ==,
+                   TC_TLV_OK);
   munit_assert_uint(out.type, ==, 8);
-  munit_assert_int(TC_X509_general_name_next(&reader, frames, 4, &out), ==, TC_TLV_END);
+  munit_assert_int(TC_X509_general_name_next(&reader, (TC_TLV_frames){frames, 4}, &out), ==,
+                   TC_TLV_END);
   memset(&out, 0xa5, sizeof out);
   memset(&saved, 0xa5, sizeof saved);
   for (i = 0; i < sizeof invalid / sizeof invalid[0]; ++i) {
     munit_assert_int(TC_X509_general_names_init(&reader, invalid[i], invalid[i][1] + 2, &bounds),
                      ==, TC_TLV_OK);
     memcpy(&saved_reader, &reader, sizeof reader);
-    munit_assert_int(TC_X509_general_name_next(&reader, frames, 4, &out), ==, TC_TLV_INVALID);
+    munit_assert_int(TC_X509_general_name_next(&reader, (TC_TLV_frames){frames, 4}, &out), ==,
+                     TC_TLV_INVALID);
     munit_assert_memory_equal(sizeof reader, &reader, &saved_reader);
     munit_assert_memory_equal(sizeof out, &out, &saved);
   }
   bounds.max_elements = 4;
   munit_assert_int(TC_X509_general_names_init(&reader, nested, sizeof nested, &bounds), ==,
                    TC_TLV_OK);
-  munit_assert_int(TC_X509_general_name_next(&reader, frames, 4, &out), ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_general_name_next(&reader, (TC_TLV_frames){frames, 4}, &out), ==,
+                   TC_TLV_OK);
   munit_assert_uint(out.type, ==, 0);
   munit_assert_size(reader.elements, ==, 4);
   memcpy(&saved_reader, &reader, sizeof reader);
   memset(&out, 0xa5, sizeof out);
   memset(&saved, 0xa5, sizeof saved);
-  munit_assert_int(TC_X509_general_name_next(&reader, frames, 4, &out), ==, TC_TLV_LIMIT);
+  munit_assert_int(TC_X509_general_name_next(&reader, (TC_TLV_frames){frames, 4}, &out), ==,
+                   TC_TLV_LIMIT);
   munit_assert_memory_equal(sizeof reader, &reader, &saved_reader);
   munit_assert_memory_equal(sizeof out, &out, &saved);
   return MUNIT_OK;
@@ -360,15 +367,18 @@ static MunitResult name_constraints(const MunitParameter params[], void* user)
   munit_assert_int(
       TC_TLV_reader_init(&reader, out.permitted.data, out.permitted.length, TC_TLV_DER, &bounds),
       ==, TC_TLV_OK);
-  munit_assert_int(TC_X509_general_subtree_next(&reader, frames, 4, &subtree), ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_general_subtree_next(&reader, (TC_TLV_frames){frames, 4}, &subtree), ==,
+                   TC_TLV_OK);
   munit_assert_uint(subtree.base.type, ==, 2);
   munit_assert_uint32(subtree.minimum, ==, 0);
   munit_assert_false(subtree.has_maximum);
-  munit_assert_int(TC_X509_general_subtree_next(&reader, frames, 4, &subtree), ==, TC_TLV_END);
+  munit_assert_int(TC_X509_general_subtree_next(&reader, (TC_TLV_frames){frames, 4}, &subtree), ==,
+                   TC_TLV_END);
   munit_assert_int(
       TC_TLV_reader_init(&reader, out.excluded.data, out.excluded.length, TC_TLV_DER, &bounds), ==,
       TC_TLV_OK);
-  munit_assert_int(TC_X509_general_subtree_next(&reader, frames, 4, &subtree), ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_general_subtree_next(&reader, (TC_TLV_frames){frames, 4}, &subtree), ==,
+                   TC_TLV_OK);
   munit_assert_uint(subtree.base.type, ==, 7);
   munit_assert_size(subtree.base.value.length, ==, 8);
   memcpy(&saved, &out, sizeof saved);
@@ -379,7 +389,8 @@ static MunitResult name_constraints(const MunitParameter params[], void* user)
   }
   munit_assert_int(TC_TLV_reader_init(&reader, distances, sizeof distances, TC_TLV_DER, &bounds),
                    ==, TC_TLV_OK);
-  munit_assert_int(TC_X509_general_subtree_next(&reader, frames, 4, &subtree), ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_general_subtree_next(&reader, (TC_TLV_frames){frames, 4}, &subtree), ==,
+                   TC_TLV_OK);
   munit_assert_uint32(subtree.minimum, ==, 1);
   munit_assert_true(subtree.has_maximum);
   munit_assert_uint32(subtree.maximum, ==, 2);
@@ -388,12 +399,14 @@ static MunitResult name_constraints(const MunitParameter params[], void* user)
       TC_TLV_reader_init(&reader, default_zero, sizeof default_zero, TC_TLV_DER, &bounds), ==,
       TC_TLV_OK);
   memcpy(&saved_reader, &reader, sizeof reader);
-  munit_assert_int(TC_X509_general_subtree_next(&reader, frames, 4, &subtree), ==, TC_TLV_INVALID);
+  munit_assert_int(TC_X509_general_subtree_next(&reader, (TC_TLV_frames){frames, 4}, &subtree), ==,
+                   TC_TLV_INVALID);
   munit_assert_memory_equal(sizeof reader, &reader, &saved_reader);
   munit_assert_memory_equal(sizeof subtree, &subtree, &saved_subtree);
   munit_assert_int(TC_TLV_reader_init(&reader, plain_ip, sizeof plain_ip, TC_TLV_DER, &bounds), ==,
                    TC_TLV_OK);
-  munit_assert_int(TC_X509_general_subtree_next(&reader, frames, 4, &subtree), ==, TC_TLV_INVALID);
+  munit_assert_int(TC_X509_general_subtree_next(&reader, (TC_TLV_frames){frames, 4}, &subtree), ==,
+                   TC_TLV_INVALID);
   return MUNIT_OK;
 }
 
@@ -418,12 +431,14 @@ static MunitResult subtree_limits(const MunitParameter params[], void* user)
   memset(ipv6 + 20, 255, 8);
   munit_assert_int(TC_TLV_reader_init(&reader, ipv6, sizeof ipv6, TC_TLV_DER, &bounds), ==,
                    TC_TLV_OK);
-  munit_assert_int(TC_X509_general_subtree_next(&reader, frames, 4, &out), ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_general_subtree_next(&reader, (TC_TLV_frames){frames, 4}, &out), ==,
+                   TC_TLV_OK);
   munit_assert_size(out.base.value.length, ==, 32);
   munit_assert_ptr_equal(out.base.value.data, ipv6 + 4);
   munit_assert_int(TC_TLV_reader_init(&reader, maximum, sizeof maximum, TC_TLV_DER, &bounds), ==,
                    TC_TLV_OK);
-  munit_assert_int(TC_X509_general_subtree_next(&reader, frames, 4, &out), ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_general_subtree_next(&reader, (TC_TLV_frames){frames, 4}, &out), ==,
+                   TC_TLV_OK);
   munit_assert_uint32(out.maximum, ==, UINT32_MAX);
   memcpy(&saved, &out, sizeof out);
   for (i = 0; i < sizeof invalid / sizeof invalid[0]; ++i) {
@@ -431,27 +446,31 @@ static MunitResult subtree_limits(const MunitParameter params[], void* user)
         TC_TLV_reader_init(&reader, invalid[i], invalid[i][1] + 2, TC_TLV_DER, &bounds), ==,
         TC_TLV_OK);
     memcpy(&saved_reader, &reader, sizeof reader);
-    munit_assert_int(TC_X509_general_subtree_next(&reader, frames, 4, &out), ==, TC_TLV_INVALID);
+    munit_assert_int(TC_X509_general_subtree_next(&reader, (TC_TLV_frames){frames, 4}, &out), ==,
+                     TC_TLV_INVALID);
     munit_assert_memory_equal(sizeof reader, &reader, &saved_reader);
     munit_assert_memory_equal(sizeof out, &out, &saved);
   }
   munit_assert_int(TC_TLV_reader_init(&reader, overflow, sizeof overflow, TC_TLV_DER, &bounds), ==,
                    TC_TLV_OK);
   memcpy(&saved_reader, &reader, sizeof reader);
-  munit_assert_int(TC_X509_general_subtree_next(&reader, frames, 4, &out), ==, TC_TLV_LIMIT);
+  munit_assert_int(TC_X509_general_subtree_next(&reader, (TC_TLV_frames){frames, 4}, &out), ==,
+                   TC_TLV_LIMIT);
   munit_assert_memory_equal(sizeof reader, &reader, &saved_reader);
   munit_assert_memory_equal(sizeof out, &out, &saved);
   munit_assert_int(TC_TLV_reader_init(&reader, ipv6, sizeof ipv6, TC_TLV_DER, &bounds), ==,
                    TC_TLV_OK);
   memcpy(&saved_reader, &reader, sizeof reader);
-  munit_assert_int(TC_X509_general_subtree_next(&reader, frames, 0, &out), ==, TC_TLV_LIMIT);
+  munit_assert_int(TC_X509_general_subtree_next(&reader, (TC_TLV_frames){frames, 0}, &out), ==,
+                   TC_TLV_LIMIT);
   munit_assert_memory_equal(sizeof reader, &reader, &saved_reader);
   munit_assert_memory_equal(sizeof out, &out, &saved);
   bounds.max_depth = 0;
   munit_assert_int(TC_TLV_reader_init(&reader, ipv6, sizeof ipv6, TC_TLV_DER, &bounds), ==,
                    TC_TLV_OK);
   memcpy(&saved_reader, &reader, sizeof reader);
-  munit_assert_int(TC_X509_general_subtree_next(&reader, frames, 4, &out), ==, TC_TLV_LIMIT);
+  munit_assert_int(TC_X509_general_subtree_next(&reader, (TC_TLV_frames){frames, 4}, &out), ==,
+                   TC_TLV_LIMIT);
   munit_assert_memory_equal(sizeof reader, &reader, &saved_reader);
   munit_assert_memory_equal(sizeof out, &out, &saved);
   return MUNIT_OK;

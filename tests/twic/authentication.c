@@ -259,7 +259,8 @@ static void validated_key(EVP_PKEY* card_key, const TC_X509_signature_provider* 
     TC_PIV_card_identifiers identifiers;
     size_t work = WORK_LIMIT;
     munit_assert_int(TC_PIV_card_identifiers_read(extension.value, TC_TWIC_NEXGEN_CARD, &limits,
-                                                  storage.frames, 16, &work, &identifiers),
+                                                  (TC_TLV_frames){storage.frames, 16}, &work,
+                                                  &identifiers),
                      ==, TC_TLV_OK);
     int matched = -1;
     munit_assert_int(TC_PIV_card_identifiers_match(&identifiers, (TC_bytes){fascn, sizeof fascn},

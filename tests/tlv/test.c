@@ -157,50 +157,51 @@ static MunitResult walks(const MunitParameter params[], void* user)
   struct events expected = {0, 0, 0, 0};
   size_t i;
   uint32_t hash = 0;
-  munit_assert(TC_TLV_walk(definite, sizeof definite, TC_TLV_DER, &limits, frames, 16, visit,
-                           &expected) == TC_TLV_OK);
+  munit_assert(TC_TLV_walk(definite, sizeof definite, TC_TLV_DER, &limits,
+                           (TC_TLV_frames){frames, 16}, visit, &expected) == TC_TLV_OK);
   for (i = 0; i < sizeof definite; ++i)
     hash = hash * 33 + definite[i];
   munit_assert(expected.bytes == hash && expected.begins == 4 && expected.closes == 4 &&
                expected.max_depth == 2);
   for (i = 1; i < sizeof definite; ++i)
-    munit_assert(TC_TLV_walk(definite, i, TC_TLV_DER, &limits, frames, 16, NULL, NULL) ==
-                 TC_TLV_INVALID);
-  munit_assert(TC_TLV_walk(escape, sizeof escape, TC_TLV_DER, &limits, frames, 16, NULL, NULL) ==
-               TC_TLV_INVALID);
+    munit_assert(TC_TLV_walk(definite, i, TC_TLV_DER, &limits, (TC_TLV_frames){frames, 16}, NULL,
+                             NULL) == TC_TLV_INVALID);
+  munit_assert(TC_TLV_walk(escape, sizeof escape, TC_TLV_DER, &limits, (TC_TLV_frames){frames, 16},
+                           NULL, NULL) == TC_TLV_INVALID);
   munit_assert(TC_TLV_walk(nested_padding, sizeof nested_padding, TC_TLV_ISO7816_PAD_ZERO, &limits,
-                           frames, 16, NULL, NULL) == TC_TLV_INVALID);
+                           (TC_TLV_frames){frames, 16}, NULL, NULL) == TC_TLV_INVALID);
   small.max_elements = 3;
-  munit_assert(TC_TLV_walk(definite, sizeof definite, TC_TLV_DER, &small, frames, 16, NULL, NULL) ==
-               TC_TLV_LIMIT);
+  munit_assert(TC_TLV_walk(definite, sizeof definite, TC_TLV_DER, &small,
+                           (TC_TLV_frames){frames, 16}, NULL, NULL) == TC_TLV_LIMIT);
   small = limits;
   small.max_depth = 1;
-  munit_assert(TC_TLV_walk(definite, sizeof definite, TC_TLV_DER, &small, frames, 16, NULL, NULL) ==
-               TC_TLV_LIMIT);
-  munit_assert(TC_TLV_walk(definite, sizeof definite, TC_TLV_DER, &limits, NULL, 0, NULL, NULL) ==
-               TC_TLV_LIMIT);
-  munit_assert(TC_TLV_walk(indefinite, sizeof indefinite, TC_TLV_DER, &limits, frames, 16, NULL,
-                           NULL) == TC_TLV_INVALID);
+  munit_assert(TC_TLV_walk(definite, sizeof definite, TC_TLV_DER, &small,
+                           (TC_TLV_frames){frames, 16}, NULL, NULL) == TC_TLV_LIMIT);
+  munit_assert(TC_TLV_walk(definite, sizeof definite, TC_TLV_DER, &limits, (TC_TLV_frames){NULL, 0},
+                           NULL, NULL) == TC_TLV_LIMIT);
+  munit_assert(TC_TLV_walk(indefinite, sizeof indefinite, TC_TLV_DER, &limits,
+                           (TC_TLV_frames){frames, 16}, NULL, NULL) == TC_TLV_INVALID);
 #if TC_TLV_ENABLE_BER
-  munit_assert(TC_TLV_walk(indefinite, sizeof indefinite, TC_TLV_BER, &limits, frames, 16, NULL,
-                           NULL) == TC_TLV_OK);
-  munit_assert(TC_TLV_walk(escaped_eoc, sizeof escaped_eoc, TC_TLV_BER, &limits, frames, 16, NULL,
-                           NULL) == TC_TLV_INVALID);
+  munit_assert(TC_TLV_walk(indefinite, sizeof indefinite, TC_TLV_BER, &limits,
+                           (TC_TLV_frames){frames, 16}, NULL, NULL) == TC_TLV_OK);
+  munit_assert(TC_TLV_walk(escaped_eoc, sizeof escaped_eoc, TC_TLV_BER, &limits,
+                           (TC_TLV_frames){frames, 16}, NULL, NULL) == TC_TLV_INVALID);
   small = limits;
   small.max_value = 2;
-  munit_assert(TC_TLV_walk(indefinite, sizeof indefinite, TC_TLV_BER, &small, frames, 16, NULL,
-                           NULL) == TC_TLV_LIMIT);
+  munit_assert(TC_TLV_walk(indefinite, sizeof indefinite, TC_TLV_BER, &small,
+                           (TC_TLV_frames){frames, 16}, NULL, NULL) == TC_TLV_LIMIT);
 #else
   (void)escaped_eoc;
-  munit_assert(TC_TLV_walk(indefinite, sizeof indefinite, TC_TLV_BER, &limits, frames, 16, NULL,
-                           NULL) == TC_TLV_UNSUPPORTED);
+  munit_assert(TC_TLV_walk(indefinite, sizeof indefinite, TC_TLV_BER, &limits,
+                           (TC_TLV_frames){frames, 16}, NULL, NULL) == TC_TLV_UNSUPPORTED);
 #endif
 #if TC_TLV_ENABLE_STREAM
   for (i = 0; i <= sizeof definite; ++i) {
     TC_TLV_stream s;
     struct events actual = {0, 0, 0, 0};
     TC_TLV_result r;
-    munit_assert(TC_TLV_stream_init(&s, TC_TLV_DER, &limits, frames, 16) == TC_TLV_OK);
+    munit_assert(TC_TLV_stream_init(&s, TC_TLV_DER, &limits, (TC_TLV_frames){frames, 16}) ==
+                 TC_TLV_OK);
     r = TC_TLV_stream_feed(&s, definite, i, visit, &actual);
     munit_assert(r == TC_TLV_OK || r == TC_TLV_MORE);
     munit_assert(TC_TLV_stream_feed(&s, definite + i, sizeof definite - i, visit, &actual) ==
@@ -211,7 +212,8 @@ static MunitResult walks(const MunitParameter params[], void* user)
   }
   {
     TC_TLV_stream s;
-    munit_assert(TC_TLV_stream_init(&s, TC_TLV_DER, &limits, frames, 16) == TC_TLV_OK);
+    munit_assert(TC_TLV_stream_init(&s, TC_TLV_DER, &limits, (TC_TLV_frames){frames, 16}) ==
+                 TC_TLV_OK);
     munit_assert(TC_TLV_stream_feed(&s, escape, sizeof escape, NULL, NULL) == TC_TLV_INVALID);
     munit_assert(TC_TLV_stream_feed(&s, definite, sizeof definite, NULL, NULL) == TC_TLV_INVALID);
     munit_assert(TC_TLV_stream_finish(&s) == TC_TLV_INVALID);
@@ -220,7 +222,8 @@ static MunitResult walks(const MunitParameter params[], void* user)
   for (i = 1; i <= sizeof indefinite; ++i) {
     TC_TLV_stream s;
     size_t p = 0;
-    munit_assert(TC_TLV_stream_init(&s, TC_TLV_BER, &limits, frames, 16) == TC_TLV_OK);
+    munit_assert(TC_TLV_stream_init(&s, TC_TLV_BER, &limits, (TC_TLV_frames){frames, 16}) ==
+                 TC_TLV_OK);
     while (p < sizeof indefinite) {
       size_t n = sizeof indefinite - p;
       TC_TLV_result r;
@@ -522,13 +525,13 @@ static MunitResult tree_reads(const MunitParameter params[], void* user)
     memset(&element, 0xa5, sizeof element);
     memcpy(&saved, &element, sizeof saved);
     for (size_t length = 0; length < valid[i].length; ++length) {
-      munit_assert_int(TC_TLV_read_tree(valid[i].data, length, TC_TLV_DER, &limits, frames,
-                                        FRAME_CAPACITY, &element),
+      munit_assert_int(TC_TLV_read_tree(valid[i].data, length, TC_TLV_DER, &limits,
+                                        (TC_TLV_frames){frames, FRAME_CAPACITY}, &element),
                        ==, TC_TLV_MORE);
       munit_assert_memory_equal(sizeof element, &element, &saved);
     }
     munit_assert_int(TC_TLV_read_tree(valid[i].data, valid[i].length + 1, TC_TLV_DER, &limits,
-                                      frames, FRAME_CAPACITY, &element),
+                                      (TC_TLV_frames){frames, FRAME_CAPACITY}, &element),
                      ==, TC_TLV_OK);
     munit_assert_ptr_equal(element.encoded.data, valid[i].data);
     munit_assert_size(element.encoded.length, ==, valid[i].length);
@@ -537,31 +540,32 @@ static MunitResult tree_reads(const MunitParameter params[], void* user)
   }
   memset(&element, 0xa5, sizeof element);
   memcpy(&saved, &element, sizeof saved);
-  munit_assert_int(TC_TLV_read_tree(escaped, sizeof escaped, TC_TLV_DER, &limits, frames,
-                                    FRAME_CAPACITY, &element),
+  munit_assert_int(TC_TLV_read_tree(escaped, sizeof escaped, TC_TLV_DER, &limits,
+                                    (TC_TLV_frames){frames, FRAME_CAPACITY}, &element),
                    ==, TC_TLV_INVALID);
   munit_assert_memory_equal(sizeof element, &element, &saved);
-  munit_assert_int(TC_TLV_read_tree(cut_header, sizeof cut_header, TC_TLV_DER, &limits, frames,
-                                    FRAME_CAPACITY, &element),
+  munit_assert_int(TC_TLV_read_tree(cut_header, sizeof cut_header, TC_TLV_DER, &limits,
+                                    (TC_TLV_frames){frames, FRAME_CAPACITY}, &element),
                    ==, TC_TLV_INVALID);
   munit_assert_memory_equal(sizeof element, &element, &saved);
   limited.max_elements = 1;
-  munit_assert_int(TC_TLV_read_tree(sequence, sizeof sequence, TC_TLV_DER, &limited, frames,
-                                    FRAME_CAPACITY, &element),
+  munit_assert_int(TC_TLV_read_tree(sequence, sizeof sequence, TC_TLV_DER, &limited,
+                                    (TC_TLV_frames){frames, FRAME_CAPACITY}, &element),
                    ==, TC_TLV_LIMIT);
   limited = limits;
   limited.max_depth = 1;
-  munit_assert_int(TC_TLV_read_tree(nested, sizeof nested, TC_TLV_DER, &limited, frames,
-                                    FRAME_CAPACITY, &element),
+  munit_assert_int(TC_TLV_read_tree(nested, sizeof nested, TC_TLV_DER, &limited,
+                                    (TC_TLV_frames){frames, FRAME_CAPACITY}, &element),
                    ==, TC_TLV_LIMIT);
-  munit_assert_int(
-      TC_TLV_read_tree(nested, sizeof nested, TC_TLV_DER, &limits, frames, 1, &element), ==,
-      TC_TLV_LIMIT);
+  munit_assert_int(TC_TLV_read_tree(nested, sizeof nested, TC_TLV_DER, &limits,
+                                    (TC_TLV_frames){frames, 1}, &element),
+                   ==, TC_TLV_LIMIT);
   munit_assert_memory_equal(sizeof element, &element, &saved);
-  munit_assert_int(TC_TLV_read_tree(NULL, 1, TC_TLV_DER, &limits, frames, FRAME_CAPACITY, &element),
+  munit_assert_int(TC_TLV_read_tree(NULL, 1, TC_TLV_DER, &limits,
+                                    (TC_TLV_frames){frames, FRAME_CAPACITY}, &element),
                    ==, TC_TLV_ARGUMENT);
-  munit_assert_int(TC_TLV_read_tree(sequence, sizeof sequence, TC_TLV_DER, &limits, NULL,
-                                    FRAME_CAPACITY, &element),
+  munit_assert_int(TC_TLV_read_tree(sequence, sizeof sequence, TC_TLV_DER, &limits,
+                                    (TC_TLV_frames){NULL, FRAME_CAPACITY}, &element),
                    ==, TC_TLV_ARGUMENT);
 #if TC_TLV_ENABLE_BER
   {
@@ -573,20 +577,20 @@ static MunitResult tree_reads(const MunitParameter params[], void* user)
       memset(&element, 0xa5, sizeof element);
       memcpy(&saved, &element, sizeof saved);
       for (size_t length = 0; length < objects[i].length; ++length) {
-        munit_assert_int(TC_TLV_read_tree(objects[i].data, length, TC_TLV_BER, &limits, frames,
-                                          FRAME_CAPACITY, &element),
+        munit_assert_int(TC_TLV_read_tree(objects[i].data, length, TC_TLV_BER, &limits,
+                                          (TC_TLV_frames){frames, FRAME_CAPACITY}, &element),
                          ==, TC_TLV_MORE);
         munit_assert_memory_equal(sizeof element, &element, &saved);
       }
       munit_assert_int(TC_TLV_read_tree(objects[i].data, objects[i].length + 1, TC_TLV_BER, &limits,
-                                        frames, FRAME_CAPACITY, &element),
+                                        (TC_TLV_frames){frames, FRAME_CAPACITY}, &element),
                        ==, TC_TLV_OK);
       munit_assert_size(element.encoded.length, ==, objects[i].length);
       munit_assert_size(element.value.length, ==,
                         objects[i].length - element.header.header_length - 2);
       munit_assert_true(element.header.indefinite);
       munit_assert_int(TC_TLV_walk(element.encoded.data, element.encoded.length, TC_TLV_BER,
-                                   &limits, frames, FRAME_CAPACITY, NULL, NULL),
+                                   &limits, (TC_TLV_frames){frames, FRAME_CAPACITY}, NULL, NULL),
                        ==, TC_TLV_OK);
     }
   }

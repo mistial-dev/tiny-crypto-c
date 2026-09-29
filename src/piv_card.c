@@ -146,7 +146,7 @@ static TC_TLV_result identifiers_read(TC_bytes encoded, TC_PIV_card_profile prof
     for (unsigned scan = 0; scan < 2; ++scan)
       if (tc_pki_work_charge(work, element.encoded.length) != TC_TLV_OK)
         return TC_TLV_LIMIT;
-    result = TC_X509_general_name_next(&reader, frames, frame_capacity, &name);
+    result = TC_X509_general_name_next(&reader, (TC_TLV_frames){frames, frame_capacity}, &name);
     if (result != TC_TLV_OK)
       return result;
     if (name.type == GENERAL_NAME_OTHER) {
@@ -215,49 +215,47 @@ static TC_TLV_result identifiers_read(TC_bytes encoded, TC_PIV_card_profile prof
 }
 
 TC_TLV_result TC_PIV_card_identifiers_read(TC_bytes encoded, TC_PIV_card_profile profile,
-                                           const TC_TLV_limits* limits, TC_TLV_frame* frames,
-                                           size_t frame_capacity, size_t* work,
-                                           TC_PIV_card_identifiers* out)
+                                           const TC_TLV_limits* limits, TC_TLV_frames frames,
+                                           size_t* work, TC_PIV_card_identifiers* out)
 {
-  return identifiers_read(encoded, profile, IDENTIFIERS_STRICT, NULL, limits, frames,
-                          frame_capacity, work, out);
+  return identifiers_read(encoded, profile, IDENTIFIERS_STRICT, NULL, limits, frames.data,
+                          frames.capacity, work, out);
 }
 
 TC_TLV_result TC_TWIC_card_identifiers_read(TC_bytes encoded, TC_PIV_card_profile profile,
-                                            const TC_TLV_limits* limits, TC_TLV_frame* frames,
-                                            size_t frame_capacity, size_t* work,
-                                            TC_PIV_card_identifiers* out)
+                                            const TC_TLV_limits* limits, TC_TLV_frames frames,
+                                            size_t* work, TC_PIV_card_identifiers* out)
 {
   if (profile != TC_TWIC_LEGACY_CARD && profile != TC_TWIC_NEXGEN_CARD)
     return TC_TLV_ARGUMENT;
-  return identifiers_read(encoded, profile, IDENTIFIERS_TWIC_READER, NULL, limits, frames,
-                          frame_capacity, work, out);
+  return identifiers_read(encoded, profile, IDENTIFIERS_TWIC_READER, NULL, limits, frames.data,
+                          frames.capacity, work, out);
 }
 
 TC_TLV_result TC_PIV_authentication_identifiers_read(TC_bytes encoded, TC_bytes card_guid,
                                                      const TC_TLV_limits* limits,
-                                                     TC_TLV_frame* frames, size_t frame_capacity,
-                                                     size_t* work, TC_PIV_card_identifiers* out)
+                                                     TC_TLV_frames frames, size_t* work,
+                                                     TC_PIV_card_identifiers* out)
 {
   if (!card_guid.data || card_guid.length != UUID_BYTES)
     return TC_TLV_ARGUMENT;
   uint8_t expected[UUID_BYTES];
   memcpy(expected, card_guid.data, sizeof expected);
   return identifiers_read(encoded, TC_PIV_CARD, IDENTIFIERS_PIV_AUTHENTICATION, expected, limits,
-                          frames, frame_capacity, work, out);
+                          frames.data, frames.capacity, work, out);
 }
 
 TC_TLV_result TC_TWIC_authentication_identifiers_read(TC_bytes encoded, TC_bytes card_guid,
                                                       const TC_TLV_limits* limits,
-                                                      TC_TLV_frame* frames, size_t frame_capacity,
-                                                      size_t* work, TC_PIV_card_identifiers* out)
+                                                      TC_TLV_frames frames, size_t* work,
+                                                      TC_PIV_card_identifiers* out)
 {
   if (!card_guid.data || card_guid.length != UUID_BYTES)
     return TC_TLV_ARGUMENT;
   uint8_t expected[UUID_BYTES];
   memcpy(expected, card_guid.data, sizeof expected);
   return identifiers_read(encoded, TC_PIV_CARD, IDENTIFIERS_TWIC_PIV_AUTHENTICATION, expected,
-                          limits, frames, frame_capacity, work, out);
+                          limits, frames.data, frames.capacity, work, out);
 }
 
 static TC_TLV_result identifiers_match(const TC_PIV_card_identifiers* identifiers, TC_bytes fascn,

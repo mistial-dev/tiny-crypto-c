@@ -124,8 +124,9 @@ static MunitResult public_reader(const MunitParameter params[], void* user)
   const TC_bytes encoded = {input.bytes, input.length};
   TC_X509_crl parsed, saved;
   size_t work = WORK_BUDGET;
-  munit_assert_int(TC_X509_crl_read(encoded, &limits, frames, FRAME_CAPACITY, &work, &parsed), ==,
-                   TC_TLV_OK);
+  munit_assert_int(
+      TC_X509_crl_read(encoded, &limits, (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &parsed),
+      ==, TC_TLV_OK);
   munit_assert_uint(parsed.version, ==, 2);
   munit_assert_ptr_equal(parsed.encoded.data, input.bytes);
   munit_assert_size(parsed.encoded.length, ==, input.length);
@@ -136,31 +137,36 @@ static MunitResult public_reader(const MunitParameter params[], void* user)
   for (unsigned short_budget = 0; short_budget < 2; ++short_budget) {
     memcpy(&parsed, &saved, sizeof parsed);
     work = required - short_budget;
-    munit_assert_int(TC_X509_crl_read(encoded, &limits, frames, FRAME_CAPACITY, &work, &parsed), ==,
-                     short_budget ? TC_TLV_LIMIT : TC_TLV_OK);
+    munit_assert_int(
+        TC_X509_crl_read(encoded, &limits, (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &parsed),
+        ==, short_budget ? TC_TLV_LIMIT : TC_TLV_OK);
     if (short_budget)
       munit_assert_memory_equal(sizeof parsed, &parsed, &saved);
   }
   for (size_t length = 0; length < input.length; ++length) {
     memcpy(&parsed, &saved, sizeof parsed);
     work = WORK_BUDGET;
-    munit_assert_int(TC_X509_crl_read((TC_bytes){input.bytes, length}, &limits, frames,
-                                      FRAME_CAPACITY, &work, &parsed),
+    munit_assert_int(TC_X509_crl_read((TC_bytes){input.bytes, length}, &limits,
+                                      (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &parsed),
                      !=, TC_TLV_OK);
     munit_assert_memory_equal(sizeof parsed, &parsed, &saved);
   }
   memcpy(&parsed, &saved, sizeof parsed);
   work = WORK_BUDGET;
-  munit_assert_int(TC_X509_crl_read(encoded, NULL, frames, FRAME_CAPACITY, &work, &parsed), ==,
-                   TC_TLV_ARGUMENT);
-  munit_assert_int(TC_X509_crl_read(encoded, &limits, frames, SIZE_MAX, &work, &parsed), ==,
-                   TC_TLV_ARGUMENT);
-  munit_assert_int(TC_X509_crl_read(encoded, &limits, frames, FRAME_CAPACITY, NULL, &parsed), ==,
-                   TC_TLV_ARGUMENT);
-  munit_assert_int(TC_X509_crl_read(encoded, &limits, frames, FRAME_CAPACITY, &work, NULL), ==,
-                   TC_TLV_ARGUMENT);
+  munit_assert_int(
+      TC_X509_crl_read(encoded, NULL, (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &parsed), ==,
+      TC_TLV_ARGUMENT);
+  munit_assert_int(
+      TC_X509_crl_read(encoded, &limits, (TC_TLV_frames){frames, SIZE_MAX}, &work, &parsed), ==,
+      TC_TLV_ARGUMENT);
+  munit_assert_int(
+      TC_X509_crl_read(encoded, &limits, (TC_TLV_frames){frames, FRAME_CAPACITY}, NULL, &parsed),
+      ==, TC_TLV_ARGUMENT);
+  munit_assert_int(
+      TC_X509_crl_read(encoded, &limits, (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, NULL), ==,
+      TC_TLV_ARGUMENT);
   munit_assert_int(TC_X509_crl_read((TC_bytes){(const uint8_t*)&parsed, sizeof parsed}, &limits,
-                                    frames, FRAME_CAPACITY, &work, &parsed),
+                                    (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &parsed),
                    ==, TC_TLV_ARGUMENT);
   munit_assert_size(work, ==, WORK_BUDGET);
   munit_assert_memory_equal(sizeof parsed, &parsed, &saved);
@@ -666,8 +672,8 @@ static MunitResult source_layout(const MunitParameter params[], void* user)
       fixture input = make_crl(version, flags);
       size_t work = WORK_BUDGET;
       TC_X509_crl parsed;
-      munit_assert_int(TC_X509_crl_read((TC_bytes){input.bytes, input.length}, &limits, frames,
-                                        FRAME_CAPACITY, &work, &parsed),
+      munit_assert_int(TC_X509_crl_read((TC_bytes){input.bytes, input.length}, &limits,
+                                        (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &parsed),
                        ==, TC_TLV_OK);
       check_source_layout((TC_bytes){input.bytes, input.length}, &parsed);
       for (size_t length = 0; length < input.length; ++length) {
@@ -883,8 +889,8 @@ static MunitResult corpus_file(const MunitParameter params[], void* user)
     work = MIN_WORK;
   memset(&parsed, 0xa5, sizeof parsed);
   memcpy(&saved, &parsed, sizeof saved);
-  TC_TLV_result result =
-      TC_X509_crl_read((TC_bytes){bytes, length}, &limits, frames, MAX_DEPTH, &work, &parsed);
+  TC_TLV_result result = TC_X509_crl_read((TC_bytes){bytes, length}, &limits,
+                                          (TC_TLV_frames){frames, MAX_DEPTH}, &work, &parsed);
   if (!strcmp(expected, "invalid")) {
     munit_assert_int(result, ==, TC_TLV_INVALID);
     munit_assert_memory_equal(sizeof parsed, &parsed, &saved);

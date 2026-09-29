@@ -213,7 +213,7 @@ TC_TLV_result read_attributes(TC_bytes input,
     TC_TLV_frame frames[8];
     size_t work = 16384;
     return TC_CMS_signed_attributes_read(input, encoding, &limits,
-        frames, 8, &work, attributes);
+        (TC_TLV_frames){frames, 8}, &work, attributes);
 }
 ```
 
