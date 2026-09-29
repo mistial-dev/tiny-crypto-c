@@ -3,7 +3,6 @@
 #include <tiny_crypto/twic_ccl.h>
 #if TC_ENABLE_TWIC_CCL
 #include "credential_text_internal.h"
-#include "pki_internal.h"
 #include "pki_storage_internal.h"
 #include "snapshot_internal.h"
 #include <string.h>
@@ -13,7 +12,7 @@ enum { CCL_HEX_BYTES = 2 * TC_TWIC_CCL_FASCN_BYTES, CCL_DATE_OFFSET = CCL_HEX_BY
 TC_TWIC_CCL_result TC_TWIC_CCL_read(TC_bytes line, TC_TWIC_CCL_record* out)
 {
   TC_TWIC_CCL_record record = {{0}, 0, 0, 0};
-  unsigned year = 0, day;
+  TC_X509_time date;
   if (!out || (!line.data && line.length))
     return TC_TWIC_CCL_ARGUMENT;
   if (line.length != TC_TWIC_CCL_RECORD_BYTES)
@@ -27,20 +26,12 @@ TC_TWIC_CCL_result TC_TWIC_CCL_read(TC_bytes line, TC_TWIC_CCL_record* out)
       return TC_TWIC_CCL_INVALID;
     record.fascn[i] = (uint8_t)(high * 16 + low);
   }
-  const uint8_t* date = line.data + CCL_DATE_OFFSET;
-  if (date[0] < '0' || date[0] > '9' || date[1] < '0' || date[1] > '9')
+  /* CCL rows spell the date as DDMmmYYYY, for example 29Feb2024. */
+  if (!tc_credential_day_month_year(line.data + CCL_DATE_OFFSET, 1, &date))
     return TC_TWIC_CCL_INVALID;
-  day = (unsigned)(date[0] - '0') * 10 + (unsigned)(date[1] - '0');
-  for (unsigned i = 5; i < 9; ++i) {
-    if (date[i] < '0' || date[i] > '9')
-      return TC_TWIC_CCL_INVALID;
-    year = year * 10 + (unsigned)(date[i] - '0');
-  }
-  record.month = (uint8_t)tc_credential_month3(date + 2, 1);
-  if (!tc_pki_date(year, record.month, day))
-    return TC_TWIC_CCL_INVALID;
-  record.year = (uint16_t)year;
-  record.day = (uint8_t)day;
+  record.year = (uint16_t)date.year;
+  record.month = date.month;
+  record.day = date.day;
   *out = record;
   return TC_TWIC_CCL_OK;
 }

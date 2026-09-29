@@ -38,50 +38,31 @@ static int printable(TC_bytes value, size_t maximum, int empty)
   return 1;
 }
 
-static int decimal(TC_bytes value)
-{
-  for (size_t i = 0; i < value.length; ++i)
-    if (value.data[i] < '0' || value.data[i] > '9')
-      return 0;
-  return 1;
-}
-
-static unsigned number(const uint8_t* value, size_t length)
-{
-  unsigned result = 0;
-  for (size_t i = 0; i < length; ++i)
-    result = result * 10 + value[i] - '0';
-  return result;
-}
-
 static int twic_issuer(TC_bytes value)
 {
   static const uint8_t prefix[] = {'7', '0', '9', '9'};
-  return value.length == TWIC_ISSUER_LENGTH && decimal(value) &&
+  return value.length == TWIC_ISSUER_LENGTH && tc_credential_digits(value.data, value.length) &&
          !memcmp(value.data, prefix, sizeof prefix);
 }
 
-static int date(TC_bytes value, TC_PIV_printed_profile profile, TC_X509_time* out)
+/* SP 800-73-5 Part 1 Table 15 encodes PIV expiration as YYYYMMMDD. TWIC
+ * NEXGEN/Legacy Part 2 section 4.7.2 uses DDMMMYYYY. Month names are upper
+ * case in both. */
+static int printed_date(TC_bytes value, TC_PIV_printed_profile profile, TC_X509_time* out)
 {
+  size_t year, day;
+  unsigned month;
   if (value.length != PRINTED_DATE_LENGTH)
     return 0;
-  unsigned year, day, parsed_month;
-  if (profile == TC_PIV_PRINTED_PROFILE_PIV) {
-    if (!decimal((TC_bytes){value.data, 4}) || !decimal((TC_bytes){value.data + 7, 2}))
-      return 0;
-    year = number(value.data, 4);
-    parsed_month = tc_credential_month3(value.data + 4, 0);
-    day = number(value.data + 7, 2);
-  } else {
-    if (!decimal((TC_bytes){value.data, 2}) || !decimal((TC_bytes){value.data + 5, 4}))
-      return 0;
-    day = number(value.data, 2);
-    parsed_month = tc_credential_month3(value.data + 2, 0);
-    year = number(value.data + 5, 4);
-  }
-  if (!parsed_month || !tc_pki_date(year, parsed_month, day))
+  if (profile == TC_PIV_PRINTED_PROFILE_TWIC)
+    return tc_credential_day_month_year(value.data, 0, out);
+  if (!tc_credential_decimal(value.data, 4, 9999, &year) ||
+      !tc_credential_decimal(value.data + 7, 2, 31, &day))
     return 0;
-  *out = (TC_X509_time){year, (uint8_t)parsed_month, (uint8_t)day, 0, 0, 0};
+  month = tc_credential_month3(value.data + 4, 0);
+  if (!tc_pki_date((unsigned)year, month, (unsigned)day))
+    return 0;
+  *out = (TC_X509_time){(unsigned)year, (uint8_t)month, (uint8_t)day, 0, 0, 0};
   return 1;
 }
 
@@ -133,14 +114,15 @@ TC_TLV_result TC_PIV_printed_read(TC_bytes input, TC_PIV_printed_encoding encodi
   result = tc_pki_field(&reader, PRINTED_EXPIRATION_TAG, &element);
   if (result != TC_TLV_OK)
     return result;
-  if (!date(element.value, profile, &parsed.expiration))
+  if (!printed_date(element.value, profile, &parsed.expiration))
     return TC_TLV_INVALID;
   parsed.expiration_text = element.value;
   result = tc_pki_field(&reader, PRINTED_SERIAL_TAG, &element);
   if (result != TC_TLV_OK)
     return result;
   if (profile == TC_PIV_PRINTED_PROFILE_TWIC) {
-    if (element.value.length != TWIC_SERIAL_LENGTH || !decimal(element.value))
+    if (element.value.length != TWIC_SERIAL_LENGTH ||
+        !tc_credential_digits(element.value.data, element.value.length))
       return TC_TLV_INVALID;
   } else if (!printable(element.value, PRINTED_SERIAL_MAX, 0))
     return TC_TLV_INVALID;

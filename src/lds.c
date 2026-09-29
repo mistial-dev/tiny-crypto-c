@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/lds.h>
 #if TC_ENABLE_PIV_OBJECTS
+#include "credential_text_internal.h"
 #include "pki_reader_internal.h"
 #include "pki_tree_internal.h"
 #include "pki_hash_internal.h"
@@ -24,11 +25,8 @@ static TC_TLV_result lds_version_string(TC_TLV_reader* reader, const tc_pki_tree
   TC_TLV_result result = tc_pki_tree_field(reader, 0x13, tree, &field);
   if (result != TC_TLV_OK)
     return result;
-  if (field.value.length != digits)
+  if (field.value.length != digits || !tc_credential_digits(field.value.data, digits))
     return TC_TLV_INVALID;
-  for (size_t i = 0; i < digits; ++i)
-    if (field.value.data[i] < '0' || field.value.data[i] > '9')
-      return TC_TLV_INVALID;
   *out = field.value;
   return TC_TLV_OK;
 }

@@ -196,14 +196,9 @@ TC_result TC_validation_context_init(const TC_validation_trust* trust,
       !workspace->path || !out || !options->max_certificates || !options->max_input ||
       !options->max_candidates || !options->max_candidate_bytes ||
       TC_X509_time_check(&options->at) != TC_TLV_OK ||
-      (options->attributes != TC_CMS_ATTRIBUTES_DER &&
-       options->attributes != TC_CMS_ATTRIBUTES_BER_DEFINITE_ORDER) ||
-      (options->rsa_parameters != TC_CMS_RSA_PARAMETERS_NULL &&
-       options->rsa_parameters != TC_CMS_RSA_PARAMETERS_ALLOW_ABSENT) ||
-      options->delta_policy < TC_X509_CRL_COMPLETE_ONLY ||
-      options->delta_policy > TC_X509_CRL_DELTA_REQUIRED ||
-      (options->order_policy != TC_X509_CRL_ORDER_NUMBER &&
-       options->order_policy != TC_X509_CRL_ORDER_THIS_UPDATE) ||
+      !tc_cms_credential_options_valid(
+          (TC_CMS_verification_policy){options->attributes, options->rsa_parameters},
+          options->delta_policy, options->order_policy) ||
       !tc_internal_ranges_disjoint(out, sizeof *out, trust, sizeof *trust) ||
       !tc_internal_ranges_disjoint(out, sizeof *out, trust->certificates,
                                    sizeof *trust->certificates) ||
@@ -265,13 +260,7 @@ void tc_validation_plan_writes(tc_pki_storage_plan* plan, const TC_validation_co
     return;
   }
   const TC_CMS_credential_workspace* w = context->workspace;
-  const TC_CMS_path_workspace* p = w->path;
-  tc_x509_path_storage_plan(plan, &p->validation);
-  TC_PKI_PLAN_WRITE(plan, p->search.path, p->search.capacity);
-  TC_PKI_PLAN_WRITE(plan, p->search.frames, p->search.capacity);
-  TC_PKI_PLAN_WRITE(plan, p->certificates, p->certificate_capacity);
-  TC_PKI_PLAN_WRITE(plan, p->signature, p->signature_capacity);
-  TC_PKI_PLAN_WRITE(plan, p->signed_digest, p->signed_digest_capacity);
+  tc_cms_path_workspace_plan_writes(plan, w->path);
   TC_PKI_PLAN_WRITE(plan, w->held_path, w->path_capacity);
   TC_PKI_PLAN_WRITE(plan, w->crl_states, w->crl_capacity);
   TC_PKI_PLAN_WRITE(plan, w->nodes, w->node_capacity);

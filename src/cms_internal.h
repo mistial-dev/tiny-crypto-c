@@ -9,6 +9,22 @@
 #include "x509_revocation_internal.h"
 #include "pki_candidate_internal.h"
 
+/* Validate the CMS verification and CRL selection enums shared by
+ * TC_CMS_credential_validate and TC_validation_context_init. */
+static inline int tc_cms_credential_options_valid(TC_CMS_verification_policy verification,
+                                                  TC_X509_crl_delta_policy delta,
+                                                  TC_X509_crl_order_policy order)
+{
+  return tc_cms_verification_policy_valid(verification) && x509_crl_delta_policy_valid(delta) &&
+         x509_crl_order_policy_valid(order);
+}
+
+/* Record the TC_CMS_path_workspace writes: path validation storage, search
+ * path and frames, certificate index, signature scratch and signed digest.
+ * Callers add their own result, work and credential writes. */
+void tc_cms_path_workspace_plan_writes(tc_pki_storage_plan* plan,
+                                       const TC_CMS_path_workspace* workspace);
+
 typedef enum { TC_CMS_OTHER_CERTIFICATE, TC_CMS_OTHER_REVOCATION } tc_cms_other_kind;
 typedef struct {
   TC_bytes format, value;

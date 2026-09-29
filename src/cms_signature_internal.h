@@ -11,18 +11,6 @@ typedef struct {
   TC_signature_algorithm signature;
 } tc_cms_signature_algorithm;
 
-static inline int tc_cms_rsa_parameters_valid(TC_CMS_rsa_parameters policy)
-{
-  return policy == TC_CMS_RSA_PARAMETERS_NULL || policy == TC_CMS_RSA_PARAMETERS_ALLOW_ABSENT;
-}
-
-static inline int tc_cms_verification_policy_valid(TC_CMS_verification_policy policy)
-{
-  return (policy.attributes == TC_CMS_ATTRIBUTES_DER ||
-          policy.attributes == TC_CMS_ATTRIBUTES_BER_DEFINITE_ORDER) &&
-         tc_cms_rsa_parameters_valid(policy.rsa_parameters);
-}
-
 /* Resolve parsed SignerInfo algorithms. Hashing and signature validation follow.
  * Input spans are valid and disjoint from out. out changes only on success. */
 static inline TC_TLV_result tc_cms_signature_resolve_policy(

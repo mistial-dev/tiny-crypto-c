@@ -203,6 +203,24 @@ static MunitResult context_setup(const MunitParameter params[], void* user)
   munit_assert_int(TC_validation_context_init(&trust, &options, &workspace.credential, &context),
                    ==, TC_RESULT_ARGUMENT);
   options.attributes = TC_CMS_ATTRIBUTES_DER;
+  /* Every policy enum rejects values on both sides of its range. */
+  for (int bad = -1; bad <= 1; bad += 2) {
+    TC_validation_options changed = options;
+    changed.rsa_parameters =
+        (TC_CMS_rsa_parameters)(bad < 0 ? bad : TC_CMS_RSA_PARAMETERS_ALLOW_ABSENT + bad);
+    munit_assert_int(TC_validation_context_init(&trust, &changed, &workspace.credential, &context),
+                     ==, TC_RESULT_ARGUMENT);
+    changed = options;
+    changed.delta_policy =
+        (TC_X509_crl_delta_policy)(bad < 0 ? bad : TC_X509_CRL_DELTA_REQUIRED + bad);
+    munit_assert_int(TC_validation_context_init(&trust, &changed, &workspace.credential, &context),
+                     ==, TC_RESULT_ARGUMENT);
+    changed = options;
+    changed.order_policy =
+        (TC_X509_crl_order_policy)(bad < 0 ? bad : TC_X509_CRL_ORDER_THIS_UPDATE + bad);
+    munit_assert_int(TC_validation_context_init(&trust, &changed, &workspace.credential, &context),
+                     ==, TC_RESULT_ARGUMENT);
+  }
   TC_X509_validation_result result, unchanged;
   memset(&result, 0xa5, sizeof result);
   memcpy(&unchanged, &result, sizeof result);

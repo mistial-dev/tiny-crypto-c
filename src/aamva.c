@@ -2,10 +2,11 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/aamva.h>
 #if TC_ENABLE_AAMVA
+#include "credential_text_internal.h"
 #include "internal.h"
 #include <string.h>
 
-enum { HEADER_BYTES = 21, ENTRY_BYTES = 10, TYPE_BYTES = 2, OFFSET_DIGITS = 4 };
+enum { HEADER_BYTES = 21, ENTRY_BYTES = 10, TYPE_BYTES = 2, OFFSET_DIGITS = 4, OFFSET_MAX = 9999 };
 
 static int lookup_storage(TC_bytes input, const char* identifier, size_t length, TC_bytes* out)
 {
@@ -19,36 +20,21 @@ static int lookup_storage(TC_bytes input, const char* identifier, size_t length,
   return 1;
 }
 
-static int decimal(const uint8_t* bytes, size_t length, size_t* out)
-{
-  size_t value = 0;
-  for (size_t i = 0; i < length; ++i) {
-    if (bytes[i] < '0' || bytes[i] > '9')
-      return 0;
-    const unsigned digit = bytes[i] - '0';
-    if (value > (SIZE_MAX - digit) / 10)
-      return 0;
-    value = value * 10 + digit;
-  }
-  *out = value;
-  return 1;
-}
-
 TC_TLV_result TC_AAMVA_subfile_find(TC_bytes encoded, const char designator[2], TC_bytes* out)
 {
   static const uint8_t prefix[] = {'@', 10, 30, 13, 'A', 'N', 'S', 'I', ' '};
-  size_t version, count, ignored;
+  size_t version, count, jurisdiction_version;
   TC_bytes found = {NULL, 0};
   if (!lookup_storage(encoded, designator, TYPE_BYTES, out))
     return TC_TLV_ARGUMENT;
   if (encoded.length < HEADER_BYTES || memcmp(encoded.data, prefix, sizeof prefix))
     return TC_TLV_INVALID;
-  /* Validate issuer digits individually so six digits fit on 16-bit targets. */
-  for (size_t i = 9; i < 15; ++i)
-    if (!decimal(encoded.data + i, 1, &ignored))
-      return TC_TLV_INVALID;
-  if (!decimal(encoded.data + 15, 2, &version) || !decimal(encoded.data + 17, 2, &ignored) ||
-      !decimal(encoded.data + 19, 2, &count) || !count)
+  /* The six-digit issuer number exceeds a 16-bit size_t, so only its digits
+   * are checked. */
+  if (!tc_credential_digits(encoded.data + 9, 6) ||
+      !tc_credential_decimal(encoded.data + 15, 2, 99, &version) ||
+      !tc_credential_decimal(encoded.data + 17, 2, 99, &jurisdiction_version) ||
+      !tc_credential_decimal(encoded.data + 19, 2, 99, &count) || !count)
     return TC_TLV_INVALID;
   if (!version)
     return TC_TLV_UNSUPPORTED;
@@ -61,8 +47,9 @@ TC_TLV_result TC_AAMVA_subfile_find(TC_bytes encoded, const char designator[2], 
     for (size_t j = 0; j < TYPE_BYTES; ++j)
       if (entry[j] < 'A' || entry[j] > 'Z')
         return TC_TLV_INVALID;
-    if (!decimal(entry + TYPE_BYTES, OFFSET_DIGITS, &offset) ||
-        !decimal(entry + TYPE_BYTES + OFFSET_DIGITS, OFFSET_DIGITS, &length) ||
+    if (!tc_credential_decimal(entry + TYPE_BYTES, OFFSET_DIGITS, OFFSET_MAX, &offset) ||
+        !tc_credential_decimal(entry + TYPE_BYTES + OFFSET_DIGITS, OFFSET_DIGITS, OFFSET_MAX,
+                               &length) ||
         offset < directory_end || offset > encoded.length || length < TYPE_BYTES + 1 ||
         length > encoded.length - offset || memcmp(entry, encoded.data + offset, TYPE_BYTES) ||
         encoded.data[offset + length - 1] != 13)
@@ -70,8 +57,9 @@ TC_TLV_result TC_AAMVA_subfile_find(TC_bytes encoded, const char designator[2], 
     for (size_t j = 0; j < i; ++j) {
       const uint8_t* prior = encoded.data + HEADER_BYTES + j * ENTRY_BYTES;
       size_t previous_offset, previous_length;
-      if (!decimal(prior + TYPE_BYTES, OFFSET_DIGITS, &previous_offset) ||
-          !decimal(prior + TYPE_BYTES + OFFSET_DIGITS, OFFSET_DIGITS, &previous_length))
+      if (!tc_credential_decimal(prior + TYPE_BYTES, OFFSET_DIGITS, OFFSET_MAX, &previous_offset) ||
+          !tc_credential_decimal(prior + TYPE_BYTES + OFFSET_DIGITS, OFFSET_DIGITS, OFFSET_MAX,
+                                 &previous_length))
         return TC_TLV_INVALID;
       if (!memcmp(entry, prior, TYPE_BYTES) ||
           (offset < previous_offset + previous_length && previous_offset < offset + length))

@@ -150,6 +150,62 @@ static MunitResult failures(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+static TC_TLV_result read_with_date(TC_PIV_printed_profile profile, const char* date,
+                                    TC_PIV_printed* out)
+{
+  fixture value = printed(profile);
+  memcpy(value.bytes + find(&value, 0x04) + 2, date, DATE_BYTES);
+  return TC_PIV_printed_read((TC_bytes){value.bytes, value.length}, TC_PIV_PRINTED_CONTENTS,
+                             profile, out);
+}
+
+static MunitResult dates(const MunitParameter params[], void* user)
+{
+  static const struct {
+    TC_PIV_printed_profile profile;
+    const char* date;
+    unsigned year, month, day;
+  } accepted[] = {{TC_PIV_PRINTED_PROFILE_PIV, "2024FEB29", 2024, 2, 29},
+                  {TC_PIV_PRINTED_PROFILE_PIV, "0001JAN01", 1, 1, 1},
+                  {TC_PIV_PRINTED_PROFILE_PIV, "9999DEC31", 9999, 12, 31},
+                  {TC_PIV_PRINTED_PROFILE_TWIC, "29FEB2000", 2000, 2, 29},
+                  {TC_PIV_PRINTED_PROFILE_TWIC, "31DEC9999", 9999, 12, 31}};
+  static const struct {
+    TC_PIV_printed_profile profile;
+    const char* date;
+  } rejected[] = {
+      {TC_PIV_PRINTED_PROFILE_PIV, "2023FEB29"},  {TC_PIV_PRINTED_PROFILE_PIV, "1900FEB29"},
+      {TC_PIV_PRINTED_PROFILE_PIV, "2026SEP31"},  {TC_PIV_PRINTED_PROFILE_PIV, "2026SEP00"},
+      {TC_PIV_PRINTED_PROFILE_PIV, "0000JAN01"},  {TC_PIV_PRINTED_PROFILE_PIV, "2026Sep10"},
+      {TC_PIV_PRINTED_PROFILE_PIV, "10SEP2026"},  {TC_PIV_PRINTED_PROFILE_PIV, "2026SEP1x"},
+      {TC_PIV_PRINTED_PROFILE_PIV, "x026SEP10"},  {TC_PIV_PRINTED_PROFILE_TWIC, "29FEB2100"},
+      {TC_PIV_PRINTED_PROFILE_TWIC, "31APR2026"}, {TC_PIV_PRINTED_PROFILE_TWIC, "00SEP2026"},
+      {TC_PIV_PRINTED_PROFILE_TWIC, "10Sep2026"}, {TC_PIV_PRINTED_PROFILE_TWIC, "10sep2026"},
+      {TC_PIV_PRINTED_PROFILE_TWIC, "2026SEP10"}, {TC_PIV_PRINTED_PROFILE_TWIC, "1xSEP2026"},
+      {TC_PIV_PRINTED_PROFILE_TWIC, "10SEP202x"}, {TC_PIV_PRINTED_PROFILE_TWIC, "10SEP0000"}};
+  TC_PIV_printed parsed;
+  (void)params;
+  (void)user;
+  for (size_t i = 0; i < sizeof accepted / sizeof *accepted; ++i) {
+    munit_assert_int(read_with_date(accepted[i].profile, accepted[i].date, &parsed), ==, TC_TLV_OK);
+    munit_assert_uint(parsed.expiration.year, ==, accepted[i].year);
+    munit_assert_uint8(parsed.expiration.month, ==, accepted[i].month);
+    munit_assert_uint8(parsed.expiration.day, ==, accepted[i].day);
+    munit_assert_uint8(parsed.expiration.hour, ==, 0);
+    munit_assert_size(parsed.expiration_text.length, ==, DATE_BYTES);
+  }
+  for (size_t i = 0; i < sizeof rejected / sizeof *rejected; ++i) {
+    TC_PIV_printed out;
+    memset(&out, 0, sizeof out);
+    out.expiration.year = 77;
+    munit_assert_int(read_with_date(rejected[i].profile, rejected[i].date, &out), ==,
+                     TC_TLV_INVALID);
+    munit_assert_uint(out.expiration.year, ==, 77);
+    munit_assert_ptr_null(out.name.data);
+  }
+  return MUNIT_OK;
+}
+
 static MunitResult expiration(const MunitParameter params[], void* user)
 {
   (void)params;
@@ -187,6 +243,7 @@ static MunitResult expiration(const MunitParameter params[], void* user)
 
 static MunitTest tests[] = {{"/profiles", profiles, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
                             {"/failures", failures, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+                            {"/dates", dates, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
                             {"/expiration", expiration, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
                             {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
 

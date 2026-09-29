@@ -29,12 +29,26 @@ static TC_status collect(void* context, const TC_TWIC_CCL_record* record)
   return TC_OK;
 }
 
+static void assert_record_equal(const TC_TWIC_CCL_record* actual,
+                                const TC_TWIC_CCL_record* expected)
+{
+  munit_assert_memory_equal(sizeof actual->fascn, actual->fascn, expected->fascn);
+  munit_assert_uint(actual->year, ==, expected->year);
+  munit_assert_uint(actual->month, ==, expected->month);
+  munit_assert_uint(actual->day, ==, expected->day);
+}
+
 static MunitResult test_record(const MunitParameter params[], void* user)
 {
   TC_TWIC_CCL_record record, saved;
   uint8_t bad[sizeof row];
-  const char* dates[] = {"29Feb1900", "00Jan2024", "31Apr2024", "01Jan0000", "01JAN2024",
-                         "01Foo2024", "32Dec2024", "0xJan2024", "01Jan202x"};
+  const char* dates[] = {"29Feb1900", "29Feb2100", "29Feb2023", "00Jan2024", "31Apr2024",
+                         "01Jan0000", "01JAN2024", "01jan2024", "01jAN2024", "01Foo2024",
+                         "32Dec2024", "0xJan2024", "x1Jan2024", "01Jan202x", "01Jan 024"};
+  static const struct {
+    const char* date;
+    unsigned year, month, day;
+  } accepted[] = {{"29Feb2000", 2000, 2, 29}, {"31Dec9999", 9999, 12, 31}, {"01Jan0001", 1, 1, 1}};
   (void)params;
   (void)user;
   munit_assert_int(TC_TWIC_CCL_read((TC_bytes){row, sizeof row - 1}, &record), ==, TC_TWIC_CCL_OK);
@@ -49,7 +63,7 @@ static MunitResult test_record(const MunitParameter params[], void* user)
     bad[i] = 0;
     munit_assert_int(TC_TWIC_CCL_read((TC_bytes){bad, sizeof row - 1}, &record), ==,
                      TC_TWIC_CCL_INVALID);
-    munit_assert_memory_equal(sizeof record, &record, &saved);
+    assert_record_equal(&record, &saved);
     munit_assert_int(TC_TWIC_CCL_read((TC_bytes){row, i}, &record), ==, TC_TWIC_CCL_INVALID);
   }
   for (size_t i = 0; i < sizeof dates / sizeof dates[0]; ++i) {
@@ -57,8 +71,18 @@ static MunitResult test_record(const MunitParameter params[], void* user)
     memcpy(bad + 2 * TC_TWIC_CCL_FASCN_BYTES + 1, dates[i], 9);
     munit_assert_int(TC_TWIC_CCL_read((TC_bytes){bad, sizeof row - 1}, &record), ==,
                      TC_TWIC_CCL_INVALID);
-    munit_assert_memory_equal(sizeof record, &record, &saved);
+    assert_record_equal(&record, &saved);
   }
+  for (size_t i = 0; i < sizeof accepted / sizeof *accepted; ++i) {
+    memcpy(bad, row, sizeof row);
+    memcpy(bad + 2 * TC_TWIC_CCL_FASCN_BYTES + 1, accepted[i].date, 9);
+    munit_assert_int(TC_TWIC_CCL_read((TC_bytes){bad, sizeof row - 1}, &record), ==,
+                     TC_TWIC_CCL_OK);
+    munit_assert_uint(record.year, ==, accepted[i].year);
+    munit_assert_uint(record.month, ==, accepted[i].month);
+    munit_assert_uint(record.day, ==, accepted[i].day);
+  }
+  record = saved;
   memcpy(bad, row, sizeof row);
   for (size_t i = 0; i < 2 * TC_TWIC_CCL_FASCN_BYTES; ++i)
     if (bad[i] >= 'A' && bad[i] <= 'F')

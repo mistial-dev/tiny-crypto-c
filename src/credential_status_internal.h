@@ -4,6 +4,7 @@
 #define TC_CREDENTIAL_STATUS_INTERNAL_H_
 
 #include <tiny_crypto/x509.h>
+#include <tiny_crypto/x509_path.h>
 
 typedef struct {
   TC_credential_status on_ok;
@@ -46,6 +47,22 @@ static inline TC_credential_status tc_credential_signature_status(TC_X509_signat
     return TC_CREDENTIAL_LIMIT;
   case TC_X509_SIGNATURE_UNSUPPORTED:
     return TC_CREDENTIAL_UNSUPPORTED;
+  default:
+    return TC_CREDENTIAL_ERROR;
+  }
+}
+
+static inline TC_credential_status tc_credential_path_status(TC_X509_path_status status)
+{
+  switch (status) {
+  case TC_X509_PATH_VALID:
+    return TC_CREDENTIAL_VALID;
+  case TC_X509_PATH_INVALID:
+    return TC_CREDENTIAL_INVALID;
+  case TC_X509_PATH_UNSUPPORTED:
+    return TC_CREDENTIAL_UNSUPPORTED;
+  case TC_X509_PATH_LIMIT:
+    return TC_CREDENTIAL_LIMIT;
   default:
     return TC_CREDENTIAL_ERROR;
   }

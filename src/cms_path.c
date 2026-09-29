@@ -83,10 +83,8 @@ enum {
   CMS_PATH_WRITE_COUNT
 };
 
-/* Record path, search, index, signature, result and work writes in
- * CMS_*_WRITE slot order. */
-static void cms_path_plan_writes(tc_pki_storage_plan* plan, const TC_CMS_path_workspace* workspace,
-                                 size_t* work, TC_X509_search_result* out)
+void tc_cms_path_workspace_plan_writes(tc_pki_storage_plan* plan,
+                                       const TC_CMS_path_workspace* workspace)
 {
   tc_x509_path_storage_plan(plan, &workspace->validation);
   TC_PKI_PLAN_WRITE(plan, workspace->search.path, workspace->search.capacity);
@@ -94,6 +92,13 @@ static void cms_path_plan_writes(tc_pki_storage_plan* plan, const TC_CMS_path_wo
   TC_PKI_PLAN_WRITE(plan, workspace->certificates, workspace->certificate_capacity);
   TC_PKI_PLAN_WRITE(plan, workspace->signature, workspace->signature_capacity);
   TC_PKI_PLAN_WRITE(plan, workspace->signed_digest, workspace->signed_digest_capacity);
+}
+
+/* Record path workspace, result and work writes in CMS_*_WRITE slot order. */
+static void cms_path_plan_writes(tc_pki_storage_plan* plan, const TC_CMS_path_workspace* workspace,
+                                 size_t* work, TC_X509_search_result* out)
+{
+  tc_cms_path_workspace_plan_writes(plan, workspace);
   TC_PKI_PLAN_WRITE(plan, out, 1);
   TC_PKI_PLAN_WRITE(plan, work, 1);
 }
@@ -463,11 +468,9 @@ TC_credential_status tc_cms_credential_validate_internal(
       !revocation->signer_policy ||
       !cms_path_arguments(source, options, workspace->path, work, &path) ||
       (revocation->index->count && !revocation->index->records) ||
-      (revocation->delta_policy != TC_X509_CRL_COMPLETE_ONLY &&
-       revocation->delta_policy != TC_X509_CRL_DELTA_IF_AVAILABLE &&
-       revocation->delta_policy != TC_X509_CRL_DELTA_REQUIRED) ||
-      (revocation->order_policy != TC_X509_CRL_ORDER_NUMBER &&
-       revocation->order_policy != TC_X509_CRL_ORDER_THIS_UPDATE) ||
+      !tc_cms_credential_options_valid(
+          (TC_CMS_verification_policy){options->attributes, options->rsa_parameters},
+          revocation->delta_policy, revocation->order_policy) ||
       TC_X509_time_compare(&options->path.at, &revocation->signer_policy->at, &time_order) !=
           TC_TLV_OK ||
       time_order)
@@ -507,19 +510,10 @@ TC_credential_status tc_cms_credential_validate_internal(
   tc_pki_source_guard guard = {source, writes, WRITE_COUNT};
   const TC_X509_store_source guarded = tc_pki_source_guard_bind(&guard);
   *work = budget;
-  switch (cms_signed_data_path_build(request, prepared, &guarded, options, workspace->path, work,
-                                     &path)) {
-  case TC_X509_PATH_VALID:
-    break;
-  case TC_X509_PATH_INVALID:
-    return TC_CREDENTIAL_INVALID;
-  case TC_X509_PATH_UNSUPPORTED:
-    return TC_CREDENTIAL_UNSUPPORTED;
-  case TC_X509_PATH_LIMIT:
-    return TC_CREDENTIAL_LIMIT;
-  default:
-    return TC_CREDENTIAL_ERROR;
-  }
+  const TC_credential_status status = tc_credential_path_status(cms_signed_data_path_build(
+      request, prepared, &guarded, options, workspace->path, work, &path));
+  if (status != TC_CREDENTIAL_VALID)
+    return status;
   return tc_cms_path_revocation_check(&path, &guarded, revocation, workspace, work);
 }
 

@@ -481,7 +481,7 @@ add_test(NAME test_package_boundaries
 
   foreach(profile full core)
     tc_add_test_library(tiny-crypto-c-test-tlv-${profile}
-      src/tlv.c src/tlv_walk.c src/der.c src/aamva.c)
+      src/tlv.c src/tlv_walk.c src/der.c src/aamva.c src/credential_text_internal.c)
     target_compile_definitions(tiny-crypto-c-test-tlv-${profile} PUBLIC
       TC_ENABLE_TLV=1 TC_ENABLE_AAMVA=1 TC_ENABLE_AES=0 TC_ENABLE_SHA256=0)
     if(profile STREQUAL "core")
@@ -513,8 +513,10 @@ add_test(NAME test_package_boundaries
   tc_add_c_test(test_rsa_import tiny-crypto-c-test-key-import tests/rsa/import.c)
 
   tc_add_c_test(test_aamva tiny-crypto-c-test-tlv-full tests/twic/aamva.c
-    src/twic_tpk.c src/credential_text_internal.c src/common.c)
+    src/twic_tpk.c src/common.c)
   target_compile_definitions(test_aamva PRIVATE TC_ENABLE_TWIC_TPK=1)
+  # The core TLV library enables AAMVA alone, the smallest credential text user.
+  tc_add_c_test(test_credential_text tiny-crypto-c-test-tlv-core tests/piv/credential_text.c)
   tc_add_test_library(tiny-crypto-c-test-twic-cipher src/common.c ${tc_aes_sources} src/twic_cipher.c)
   target_compile_definitions(tiny-crypto-c-test-twic-cipher PUBLIC
     TC_ENABLE_AES=1 TC_AES_ENABLE_ECB=1 TC_ENABLE_TWIC_OBJECT_CRYPTO=1
@@ -571,6 +573,18 @@ add_test(NAME test_package_boundaries
     tests/cms/external.c tests/support/cms_crl_harness.c tests/support/x509_crl_harness.c)
   tc_add_test_executable(test_eac_reader tests/eac/reader.c)
   tc_add_c_test(test_eac_cvc tiny-crypto-c-test-pki tests/eac/test.c)
+  # Build eac_cvc.c with the POSIX file and process headers visible so a
+  # static helper that reuses a POSIX name such as open() fails the build.
+  include(CheckIncludeFile)
+  check_include_file(fcntl.h TC_TEST_HAVE_FCNTL_H)
+  check_include_file(unistd.h TC_TEST_HAVE_UNISTD_H)
+  if(NOT MSVC AND TC_TEST_HAVE_FCNTL_H AND TC_TEST_HAVE_UNISTD_H)
+    add_library(tiny-crypto-c-test-eac-posix-names OBJECT src/eac_cvc.c)
+    target_link_libraries(tiny-crypto-c-test-eac-posix-names PRIVATE tiny-crypto-c-test-pki)
+    target_compile_options(tiny-crypto-c-test-eac-posix-names PRIVATE
+      "SHELL:-include fcntl.h" "SHELL:-include unistd.h")
+    tc_warnings(tiny-crypto-c-test-eac-posix-names)
+  endif()
   target_link_libraries(test_eac_reader PRIVATE tiny-crypto-c-test-pki)
   if(Python3_Interpreter_FOUND)
     add_test(NAME test_eac_schema COMMAND ${Python3_EXECUTABLE}
