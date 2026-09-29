@@ -371,11 +371,15 @@ static TC_TLV_result anchor_policy_contains(TC_bytes set, const TC_TLV_limits* l
 }
 
 TC_TLV_result tc_x509_policy_graph_output(const tc_x509_policy_graph* graph,
-                                          const TC_bytes* initial, size_t initial_count,
-                                          TC_bytes anchor_set, const TC_TLV_limits* limits,
-                                          TC_bytes* output, size_t capacity, size_t* work,
-                                          size_t* count)
+                                          const tc_x509_policy_filter* filter,
+                                          const TC_TLV_limits* limits, TC_bytes* output,
+                                          size_t capacity, size_t* work, size_t* count)
 {
+  if (!filter)
+    return TC_TLV_ARGUMENT;
+  const TC_bytes* initial = filter->initial;
+  const size_t initial_count = filter->initial_count;
+  const TC_bytes anchor_set = filter->anchor_set;
   size_t i, j, used = 0;
   int unrestricted = 0, anchor_unrestricted = !anchor_set.data;
   if (!graph || !work || !count || !limits || (initial_count && !initial) ||

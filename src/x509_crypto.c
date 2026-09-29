@@ -111,11 +111,29 @@ static TC_X509_signature_result tc_pki_verify_digest(const TC_signature_algorith
 #endif
 }
 
-static TC_X509_signature_result
-native_storage(const TC_X509_native_workspace* workspace, const TC_bytes* message, size_t count,
-               TC_bytes algorithm_metadata, const TC_bytes* algorithm_fields, size_t field_count,
-               TC_bytes signature, const TC_X509_public_key* key, size_t* work)
+/* Inputs of one native signature check. message holds count parts.
+ * algorithm is the caller's algorithm record, and fields are the encoded spans
+ * it references. */
+typedef struct {
+  const TC_bytes* message;
+  size_t count;
+  TC_bytes algorithm;
+  const TC_bytes* fields;
+  size_t field_count;
+  TC_bytes signature;
+  const TC_X509_public_key* key;
+} native_inputs;
+
+/* Check that workspace storage is disjoint from every input and charge the
+ * encoded input bytes. */
+static TC_X509_signature_result native_storage(const TC_X509_native_workspace* workspace,
+                                               const native_inputs* in, size_t* work)
 {
+  const TC_bytes* message = in->message;
+  const size_t count = in->count;
+  const TC_bytes* algorithm_fields = in->fields;
+  const size_t field_count = in->field_count;
+  const TC_X509_public_key* key = in->key;
   TC_bytes writes[3];
   tc_pki_storage_plan plan;
   size_t budget;
@@ -124,7 +142,7 @@ native_storage(const TC_X509_native_workspace* workspace, const TC_bytes* messag
   const TC_bytes fields[] = {key->algorithm.oid, key->algorithm.parameters,
                              key->key,           key->modulus,
                              key->exponent,      key->curve_oid,
-                             signature};
+                             in->signature};
   tc_pki_storage_plan_begin(&plan, writes, 3, *work);
   TC_PKI_PLAN_WRITE(&plan, workspace->ec, workspace->ec ? 1 : 0);
   tc_pki_storage_plan_write(&plan, workspace->rsa ? workspace->rsa->words : NULL,
@@ -134,7 +152,7 @@ native_storage(const TC_X509_native_workspace* workspace, const TC_bytes* messag
   TC_PKI_PLAN_INPUT(&plan, message, count);
   TC_PKI_PLAN_INPUT(&plan, workspace, 1);
   TC_PKI_PLAN_INPUT(&plan, workspace->rsa, workspace->rsa ? 1 : 0);
-  tc_pki_storage_plan_input_span(&plan, algorithm_metadata);
+  tc_pki_storage_plan_input_span(&plan, in->algorithm);
   TC_PKI_PLAN_INPUT(&plan, key, 1);
   tc_pki_storage_plan_input_spans(&plan, fields, sizeof fields / sizeof *fields);
   tc_pki_storage_plan_input_spans(&plan, algorithm_fields, field_count);
@@ -166,9 +184,9 @@ static TC_X509_signature_result native_verify_digest(void* context, TC_bytes dig
   TC_TLV_result checked;
   if (!algorithm)
     return TC_X509_SIGNATURE_ERROR;
-  result = native_storage(workspace, &digest, 1,
-                          (TC_bytes){(const uint8_t*)algorithm, sizeof *algorithm}, NULL, 0,
-                          signature, key, work);
+  const native_inputs inputs = {
+      &digest, 1, {(const uint8_t*)algorithm, sizeof *algorithm}, NULL, 0, signature, key};
+  result = native_storage(workspace, &inputs, work);
   if (result != TC_X509_SIGNATURE_VALID)
     return result;
   checked = tc_pki_signature_key_check(algorithm, key);
@@ -195,9 +213,14 @@ static TC_X509_signature_result native_verify(void* context, const TC_bytes* mes
   if (!algorithm)
     return TC_X509_SIGNATURE_ERROR;
   const TC_bytes fields[] = {algorithm->oid, algorithm->parameters};
-  result = native_storage(workspace, message, count,
-                          (TC_bytes){(const uint8_t*)algorithm, sizeof *algorithm}, fields,
-                          sizeof fields / sizeof *fields, signature, key, work);
+  const native_inputs inputs = {message,
+                                count,
+                                {(const uint8_t*)algorithm, sizeof *algorithm},
+                                fields,
+                                sizeof fields / sizeof *fields,
+                                signature,
+                                key};
+  result = native_storage(workspace, &inputs, work);
   if (result != TC_X509_SIGNATURE_VALID)
     return result;
   checked = tc_pki_signature_resolve(algorithm, key, &selected);

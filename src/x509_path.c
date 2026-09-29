@@ -415,8 +415,9 @@ TC_TLV_result tc_x509_path_policies(const tc_x509_path_input* input,
     }
     tc_x509_policy_counters_advance(&counters, &controls, self_issued, target);
   }
-  result = tc_x509_policy_graph_output(workspace->graph, options->initial, options->initial_count,
-                                       anchor_policy_set, input->limits, workspace->output,
+  const tc_x509_policy_filter filter = {options->initial, options->initial_count,
+                                        anchor_policy_set};
+  result = tc_x509_policy_graph_output(workspace->graph, &filter, input->limits, workspace->output,
                                        workspace->output_capacity, work, &output_count);
   if (result != TC_TLV_OK)
     return result;
