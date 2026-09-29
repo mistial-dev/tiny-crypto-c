@@ -198,7 +198,7 @@ int tiny_crypto_cpp_header_compile(uint8_t* data, size_t length)
 #endif
 #if TC_ENABLE_DRBG
   tiny_crypto::drbg generator;
-  (void)generator;
+  failures += generator.generate(tiny_crypto::buffer{block, sizeof block}) != TC_DRBG_ARGUMENT;
 #endif
 #if TC_ENABLE_RSA
   TC_RSA_word rsa_words[4];
@@ -210,7 +210,11 @@ int tiny_crypto_cpp_header_compile(uint8_t* data, size_t length)
 #endif
 #if TC_ENABLE_PIV_SM
   tiny_crypto::piv_sm session;
-  (void)session;
+  tiny_crypto::piv_sm_workspace sm_workspace{};
+  const tiny_crypto::piv_sm_unprotect_request sm_response{};
+  size_t sm_length = 0;
+  failures += session.unprotect(sm_response, tiny_crypto::buffer{block, sizeof block}, sm_length,
+                                sm_workspace) != TC_ERROR;
 #endif
 #if TC_ENABLE_X509
   TC_RSA_result (*validate)(const TC_RSA_private_key*, TC_RSA_exponent_policy,

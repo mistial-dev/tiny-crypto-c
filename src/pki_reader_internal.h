@@ -41,15 +41,19 @@ static inline TC_TLV_result tc_pki_reader_storage(TC_bytes encoded, const TC_TLV
   return result == TC_TLV_OK ? tc_pki_work_charge(work, TC_PKI_READER_STORAGE_WORK) : result;
 }
 
-static inline TC_TLV_result tc_pki_reader_workspace_storage(TC_bytes encoded,
-                                                            const TC_TLV_limits* limits,
-                                                            const TC_X509_workspace* workspace,
-                                                            size_t* work, void* out,
-                                                            size_t out_size)
+/* Storage plan of a reader that fills an X.509 workspace: the input, the
+ * limits, the workspace struct, both workspace arrays, an optional work
+ * counter and out are kept pairwise disjoint. A NULL work records no range
+ * for readers without a work budget. *used receives the comparisons made. */
+static inline TC_TLV_result tc_pki_reader_workspace_check(TC_bytes encoded,
+                                                          const TC_TLV_limits* limits,
+                                                          const TC_X509_workspace* workspace,
+                                                          const size_t* work, const void* out,
+                                                          size_t out_size, size_t* used)
 {
   TC_bytes ranges[7];
   tc_pki_storage_plan plan;
-  if (!limits || !workspace || !work || !out)
+  if (!limits || !workspace || !out)
     return TC_TLV_ARGUMENT;
   tc_pki_storage_plan_begin(&plan, ranges, 7, SIZE_MAX);
   tc_pki_storage_plan_write_span(&plan, encoded);
@@ -57,10 +61,25 @@ static inline TC_TLV_result tc_pki_reader_workspace_storage(TC_bytes encoded,
   TC_PKI_PLAN_WRITE(&plan, workspace, 1);
   TC_PKI_PLAN_WRITE(&plan, workspace->frames.data, workspace->frames.capacity);
   TC_PKI_PLAN_WRITE(&plan, workspace->extension_oids, workspace->extension_capacity);
-  TC_PKI_PLAN_WRITE(&plan, work, 1);
+  if (work)
+    TC_PKI_PLAN_WRITE(&plan, work, 1);
   tc_pki_storage_plan_write(&plan, out, out_size, 1);
   tc_pki_storage_plan_seal(&plan);
-  TC_TLV_result result = tc_pki_storage_plan_finish(&plan, NULL);
-  return result == TC_TLV_OK ? tc_pki_work_charge(work, tc_pki_storage_plan_used(&plan)) : result;
+  *used = tc_pki_storage_plan_used(&plan);
+  return tc_pki_storage_plan_finish(&plan, NULL);
+}
+
+static inline TC_TLV_result tc_pki_reader_workspace_storage(TC_bytes encoded,
+                                                            const TC_TLV_limits* limits,
+                                                            const TC_X509_workspace* workspace,
+                                                            size_t* work, void* out,
+                                                            size_t out_size)
+{
+  size_t used;
+  if (!work)
+    return TC_TLV_ARGUMENT;
+  TC_TLV_result result =
+      tc_pki_reader_workspace_check(encoded, limits, workspace, work, out, out_size, &used);
+  return result == TC_TLV_OK ? tc_pki_work_charge(work, used) : result;
 }
 #endif

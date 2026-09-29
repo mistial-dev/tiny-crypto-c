@@ -42,11 +42,12 @@ public:
   {
     return ::TC_DRBG_reseed(&state_, additional);
   }
-  TC_CPP_NODISCARD TC_DRBG_result generate(uint8_t* output, size_t length,
-                                           bool prediction_resistance = false,
+  // Fill all output.capacity bytes of output.
+  TC_CPP_NODISCARD TC_DRBG_result generate(buffer output, bool prediction_resistance = false,
                                            bytes additional = bytes{nullptr, 0}) noexcept
   {
-    return ::TC_DRBG_generate(&state_, output, length, prediction_resistance ? 1 : 0, additional);
+    return ::TC_DRBG_generate(&state_, output.data, output.capacity, prediction_resistance ? 1 : 0,
+                              additional);
   }
   void uninstantiate() noexcept
   {

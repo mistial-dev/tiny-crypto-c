@@ -66,8 +66,8 @@ TEST_CASE("PIV SM authenticated exchange")
     tiny_crypto::piv_sm_unprotect_request response = {
         {nullptr, 0}, {fixture.reply.data + 6, 8}, &response_mac, 1};
     size_t plaintext_length = 99;
-    REQUIRE(session.unprotect(response, output, sizeof output, plaintext_length, workspace) ==
-            TC_OK);
+    REQUIRE(session.unprotect(response, tiny_crypto::buffer{output, sizeof output},
+                              plaintext_length, workspace) == TC_OK);
     CHECK(plaintext_length == 0);
     CHECK(session.state() == TC_PIV_SM_READY);
   }
@@ -101,7 +101,8 @@ TEST_CASE("PIV SM session lifecycle")
     size_t length = 456;
     CHECK(session.protect(command, length, tag, workspace) == TC_ERROR);
     tiny_crypto::piv_sm_unprotect_request response{};
-    CHECK(session.unprotect(response, output, sizeof output, length, workspace) == TC_ERROR);
+    CHECK(session.unprotect(response, tiny_crypto::buffer{output, sizeof output}, length,
+                            workspace) == TC_ERROR);
     CHECK(length == 456);
   }
 }

@@ -163,6 +163,76 @@ static MunitResult key_generation(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+/* Output buffers and scratch are sized by the caller. One byte or limb short
+ * of the documented size is LIMIT, and a missing buffer is ARGUMENT. Both
+ * leave the state, outputs and scratch unchanged. The exact sizes succeed. */
+static MunitResult keygen_capacity(const MunitParameter params[], void* user)
+{
+  enum {
+    BITS = 1024,
+    BYTES = BITS / 8,
+    PRIME_BYTES = BYTES / 2,
+    WORDS = TC_RSA_KEYGEN_WORKSPACE_WORDS(BITS)
+  };
+  static TC_RSA_word words[WORDS];
+  static uint8_t modulus[BYTES], exponent[3], d[BYTES], p[PRIME_BYTES], q[PRIME_BYTES];
+  const TC_RSA_keygen_output exact = {{modulus, sizeof modulus},
+                                      {exponent, sizeof exponent},
+                                      {d, sizeof d},
+                                      {p, sizeof p},
+                                      {q, sizeof q}};
+  const TC_RSA_workspace workspace = {words, WORDS};
+  const TC_RSA_keygen_limits limits = {1, 1};
+  TC_RSA_keygen_state state, state_before;
+  (void)params;
+  (void)user;
+  memset(modulus, 0xa5, sizeof modulus);
+  memset(exponent, 0xa5, sizeof exponent);
+  memset(d, 0xa5, sizeof d);
+  memset(p, 0xa5, sizeof p);
+  memset(q, 0xa5, sizeof q);
+  memset(words, 0xa5, sizeof words);
+  memset(&state, 0, sizeof state);
+  memcpy(&state_before, &state, sizeof state);
+  for (size_t field = 0; field < 5; ++field) {
+    for (int missing = 0; missing < 2; ++missing) {
+      TC_RSA_keygen_output output = exact;
+      TC_buffer* const buffers[] = {&output.modulus, &output.exponent, &output.d, &output.p,
+                                    &output.q};
+      if (missing)
+        buffers[field]->data = NULL;
+      else
+        --buffers[field]->capacity;
+      munit_assert_int(TC_RSA_keygen_init(&state, BITS, &output, limits, &workspace), ==,
+                       missing ? TC_RSA_ARGUMENT : TC_RSA_LIMIT);
+      /* A missing buffer is ARGUMENT whatever its capacity. */
+      if (missing) {
+        buffers[field]->capacity = 0;
+        munit_assert_int(TC_RSA_keygen_init(&state, BITS, &output, limits, &workspace), ==,
+                         TC_RSA_ARGUMENT);
+      }
+      munit_assert_memory_equal(sizeof state, &state, &state_before);
+    }
+  }
+  const TC_RSA_workspace short_workspace = {words, WORDS - 1};
+  munit_assert_int(TC_RSA_keygen_init(&state, BITS, &exact, limits, &short_workspace), ==,
+                   TC_RSA_LIMIT);
+  const TC_RSA_workspace no_words = {NULL, 0};
+  munit_assert_int(TC_RSA_keygen_init(&state, BITS, &exact, limits, &no_words), ==,
+                   TC_RSA_ARGUMENT);
+  munit_assert_memory_equal(sizeof state, &state, &state_before);
+  const uint8_t* const untouched[] = {modulus, exponent, d, p, q};
+  const size_t untouched_size[] = {sizeof modulus, sizeof exponent, sizeof d, sizeof p, sizeof q};
+  for (size_t buffer = 0; buffer < 5; ++buffer)
+    for (size_t i = 0; i < untouched_size[buffer]; ++i)
+      munit_assert_uint(untouched[buffer][i], ==, 0xa5);
+  for (size_t i = 0; i < sizeof words; ++i)
+    munit_assert_uint(((const uint8_t*)words)[i], ==, 0xa5);
+  munit_assert_int(TC_RSA_keygen_init(&state, BITS, &exact, limits, &workspace), ==, TC_RSA_OK);
+  TC_RSA_keygen_clear(&state);
+  return MUNIT_OK;
+}
+
 static MunitResult ranges(const MunitParameter params[], void* user)
 {
   enum { BYTES = 128, WORDS = TC_RSA_VALIDATE_WORKSPACE_WORDS(BYTES * 8) };
@@ -409,6 +479,7 @@ int main(int argc, char** argv)
 {
   MunitTest tests[] = {
       {"/key-generation", key_generation, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/keygen-capacity", keygen_capacity, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/exponent-range", exponent_range, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/ranges", ranges, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/operation-ranges", operation_ranges, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

@@ -11,6 +11,7 @@
 #include "x509_time_internal.h"
 #include "internal.h"
 #include "pki_storage_internal.h"
+#include "pki_reader_internal.h"
 #include "hash_info_internal.h"
 #include "pki_signature_oid_internal.h"
 #include "der_bits_internal.h"
@@ -644,17 +645,24 @@ static TC_TLV_result tbs_fields(TC_bytes contents, TC_X509_workspace* workspace,
   return TC_TLV_OK;
 }
 
+/* The certificate readers write out, the frames and the extension OID slots
+ * while they read encoded, the limits and the workspace struct. Every range
+ * must be disjoint from the others. */
+static TC_TLV_result read_storage(TC_bytes encoded, const TC_TLV_limits* limits,
+                                  const TC_X509_workspace* workspace,
+                                  const TC_X509_certificate* out)
+{
+  size_t used;
+  return tc_pki_reader_workspace_check(encoded, limits, workspace, NULL, out, sizeof *out, &used);
+}
+
 /* Read one constructed element with the given tag, walk its tree to bound
  * depth and elements, and return its contents with the remaining budget. */
 static TC_TLV_result read_bounded(TC_bytes encoded, unsigned tag, const TC_TLV_limits* limits,
                                   TC_X509_workspace* workspace, TC_TLV_limits* budget,
                                   TC_TLV_element* out)
 {
-  TC_TLV_result result;
-  if (!limits || !out || !workspace ||
-      (!workspace->extension_oids && workspace->extension_capacity))
-    return TC_TLV_ARGUMENT;
-  result = TC_TLV_read(encoded, TC_TLV_DER, limits, out);
+  TC_TLV_result result = TC_TLV_read(encoded, TC_TLV_DER, limits, out);
   if (result != TC_TLV_OK)
     return result;
   if (!tc_pki_tag(out, tag) || !out->header.constructed || out->encoded.length != encoded.length)
@@ -670,9 +678,9 @@ TC_TLV_result tc_x509_tbs_read(TC_bytes encoded, const TC_TLV_limits* limits,
   TC_X509_certificate certificate = {0};
   TC_TLV_element element;
   TC_TLV_limits budget;
-  TC_TLV_result result;
-  if (!out)
-    return TC_TLV_ARGUMENT;
+  TC_TLV_result result = read_storage(encoded, limits, workspace, out);
+  if (result != TC_TLV_OK)
+    return result;
   result = read_bounded(encoded, 0x30, limits, workspace, &budget, &element);
   if (result != TC_TLV_OK)
     return result;
@@ -694,8 +702,9 @@ TC_TLV_result tc_x509_certificate_read(TC_bytes encoded, unsigned tag, const TC_
   TC_TLV_limits budget;
   TC_TLV_result result;
   unsigned unused;
-  if (!out)
-    return TC_TLV_ARGUMENT;
+  result = read_storage(encoded, limits, workspace, out);
+  if (result != TC_TLV_OK)
+    return result;
   result = read_bounded(encoded, tag, limits, workspace, &budget, &element);
   if (result != TC_TLV_OK)
     return result;

@@ -225,7 +225,10 @@ heap storage. Supply `TC_RSA_KEYGEN_WORKSPACE_WORDS(bits)` aligned limbs, or
 query `TC_RSA_workspace_words(TC_RSA_OPERATION_KEYGEN, bits)`, plus
 caller-owned output buffers.
 The modulus and private exponent need `bits/8` bytes, each prime needs
-`bits/16` bytes, and the exponent needs three bytes.
+`bits/16` bytes, and the exponent needs three bytes. A shorter output buffer
+or workspace returns `TC_RSA_LIMIT`, and a NULL buffer or overlapping storage
+returns `TC_RSA_ARGUMENT`. Both leave the state, outputs and workspace
+unchanged.
 
 Initialize `TC_RSA_keygen_state` to zero before its first use. State, scratch,
 output metadata and output buffers must be mutually disjoint and remain alive

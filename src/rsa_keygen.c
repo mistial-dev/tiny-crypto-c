@@ -112,19 +112,19 @@ static int tc_rsa_keygen_derive(const uint8_t* p_bytes, const uint8_t* q_bytes, 
 
 #define TC_RSA_KEYGEN_MARKER UINT32_C(0x524b4731)
 
-static int tc_rsa_keygen_output_check(const TC_RSA_keygen_state* state,
-                                      const TC_RSA_keygen_output* output,
-                                      const TC_RSA_workspace* workspace, size_t bits)
+/* Argument check: present, aligned and describable storage, with the state,
+ * output metadata, workspace and output buffers pairwise disjoint. Sizes are
+ * checked separately so a short buffer returns LIMIT. */
+static int tc_rsa_keygen_storage_check(const TC_RSA_keygen_state* state,
+                                       const TC_RSA_keygen_output* output,
+                                       const TC_RSA_workspace* workspace)
 {
-  const size_t modulus_length = bits / 8, prime_length = bits / 16;
   const TC_buffer buffers[] = {output->modulus, output->exponent, output->d, output->p, output->q};
-  const size_t needed[] = {modulus_length, 3, modulus_length, prime_length, prime_length};
   if (!workspace->words || (uintptr_t)workspace->words % sizeof(TC_RSA_word) ||
-      workspace->capacity > SIZE_MAX / sizeof *workspace->words ||
-      workspace->capacity < TC_RSA_KEYGEN_WORKSPACE_WORDS(bits))
+      workspace->capacity > SIZE_MAX / sizeof *workspace->words)
     return 0;
   for (size_t i = 0; i < sizeof buffers / sizeof *buffers; ++i) {
-    if (!buffers[i].data || buffers[i].capacity < needed[i])
+    if (!buffers[i].data)
       return 0;
     if (!tc_internal_ranges_disjoint(buffers[i].data, buffers[i].capacity, state, sizeof *state) ||
         !tc_internal_ranges_disjoint(buffers[i].data, buffers[i].capacity, output,
@@ -150,7 +150,8 @@ TC_RSA_result TC_RSA_keygen_init(TC_RSA_keygen_state* state, size_t bits,
 {
   if (!state || !output || !workspace)
     return TC_RSA_ARGUMENT;
-  if (state->marker == TC_RSA_KEYGEN_MARKER)
+  if (state->marker == TC_RSA_KEYGEN_MARKER ||
+      !tc_rsa_keygen_storage_check(state, output, workspace))
     return TC_RSA_ARGUMENT;
   if (!TC_RSA_workspace_words(TC_RSA_OPERATION_KEYGEN, bits))
     return TC_RSA_UNSUPPORTED;
@@ -162,8 +163,6 @@ TC_RSA_result TC_RSA_keygen_init(TC_RSA_keygen_state* state, size_t bits,
       output->d.capacity < length || output->p.capacity < prime_length ||
       output->q.capacity < prime_length)
     return TC_RSA_LIMIT;
-  if (!tc_rsa_keygen_output_check(state, output, workspace, bits))
-    return TC_RSA_ARGUMENT;
   TC_RSA_keygen_state initialized;
   memset(&initialized, 0, sizeof initialized);
   initialized.workspace = *workspace;

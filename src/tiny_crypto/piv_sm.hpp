@@ -74,12 +74,13 @@ public:
   {
     return ::TC_PIV_SM_protect(&session_, &request, &ciphertext_length, tag, &workspace);
   }
-  TC_CPP_NODISCARD TC_status unprotect(const piv_sm_unprotect_request& request, uint8_t* output,
-                                       size_t capacity, size_t& plaintext_length,
+  // Write at most plaintext.capacity bytes and report the count in plaintext_length.
+  TC_CPP_NODISCARD TC_status unprotect(const piv_sm_unprotect_request& request, buffer plaintext,
+                                       size_t& plaintext_length,
                                        piv_sm_workspace& workspace) noexcept
   {
-    return ::TC_PIV_SM_unprotect(&session_, &request, output, capacity, &plaintext_length,
-                                 &workspace);
+    return ::TC_PIV_SM_unprotect(&session_, &request, plaintext.data, plaintext.capacity,
+                                 &plaintext_length, &workspace);
   }
 };
 } // namespace tiny_crypto

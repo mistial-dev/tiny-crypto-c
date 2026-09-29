@@ -31,6 +31,8 @@ TC_TLV_result TC_X509_trust_anchor_list_init(TC_X509_trust_anchor_reader* reader
 /* One choice at a time. A TrustAnchorInfo lacking certPath is returned with
  * x509_unusable=1. Its public key remains available for non-path purposes.
  * Disabled CHOICE variants and unsupported versions return UNSUPPORTED.
+ * out must lie outside the list, the reader, the workspace struct and both
+ * workspace arrays. Returns ARGUMENT for a NULL argument or overlap.
  * Workspace scratch may change on failure. On END or error, reader and out
  * remain unchanged. */
 TC_TLV_result TC_X509_trust_anchor_next(TC_X509_trust_anchor_reader* reader,

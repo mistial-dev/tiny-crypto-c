@@ -582,13 +582,109 @@ static MunitResult certificate_builder(const MunitParameter params[], void* user
                      ==, TC_TLV_ARGUMENT);
     munit_assert_memory_equal(sizeof built, &built, &saved);
   }
-  /* Exhausted extension scratch is LIMIT and wipes the record. */
+  /* Exhausted extension scratch is LIMIT and wipes every byte of the record,
+   * padding included. */
   munit_assert_int(TC_X509_store_anchor_from_certificate(&certificate, &limits, &small, &built), ==,
                    TC_TLV_LIMIT);
   {
-    const TC_X509_store_anchor zero = {0};
-    munit_assert_memory_equal(sizeof built, &built, &zero);
+    static const uint8_t zero[sizeof built];
+    munit_assert_memory_equal(sizeof built, &built, zero);
   }
+  return MUNIT_OK;
+}
+
+/* Expect next to return ARGUMENT with the reader and every byte of shared
+ * unchanged. out may lie inside shared. */
+static void next_rejected(TC_X509_trust_anchor_reader* reader, TC_X509_store_anchor* out,
+                          void* shared, size_t shared_size)
+{
+  static uint8_t before[1024];
+  TC_X509_trust_anchor_reader reader_before = *reader;
+  uint8_t out_before[sizeof *out];
+  munit_assert_size(shared_size, <=, sizeof before);
+  memcpy(before, shared, shared_size);
+  memcpy(out_before, out, sizeof out_before);
+  munit_assert_int(TC_X509_trust_anchor_next(reader, out), ==, TC_TLV_ARGUMENT);
+  munit_assert_memory_equal(shared_size, before, shared);
+  munit_assert_memory_equal(sizeof out_before, out_before, out);
+  munit_assert_ptr_equal(reader->reader.input.data, reader_before.reader.input.data);
+  munit_assert_size(reader->reader.offset, ==, reader_before.reader.offset);
+  munit_assert_ptr_equal(reader->workspace, reader_before.workspace);
+}
+
+/* next writes out, the frames and the extension OID slots while it reads the
+ * list and advances the reader. out must stay outside the list bytes, the
+ * reader, the workspace struct and both workspace arrays. */
+static MunitResult next_overlap(const MunitParameter params[], void* user)
+{
+  uint8_t encoded[140];
+  const size_t length = make_info(encoded, NULL, 0, 0, 1, 0, 0);
+  TC_X509_trust_anchor_reader reader;
+  TC_X509_store_anchor anchor;
+  (void)params;
+  (void)user;
+  /* out inside the list bytes. */
+  {
+    union {
+      uint8_t bytes[sizeof(TC_X509_store_anchor) + sizeof encoded];
+      TC_X509_store_anchor anchor;
+    } list;
+    memset(&list, 0x5a, sizeof list);
+    memcpy(list.bytes, encoded, length);
+    munit_assert_int(TC_X509_trust_anchor_list_init(&reader, (TC_bytes){list.bytes, length},
+                                                    &limits, &workspace),
+                     ==, TC_TLV_OK);
+    next_rejected(&reader, &list.anchor, &list, sizeof list);
+  }
+  munit_assert_int(
+      TC_X509_trust_anchor_list_init(&reader, (TC_bytes){encoded, length}, &limits, &workspace), ==,
+      TC_TLV_OK);
+  /* out over the reader. */
+  {
+    union {
+      TC_X509_trust_anchor_reader reader;
+      TC_X509_store_anchor anchor;
+    } held;
+    memset(&held, 0x5a, sizeof held);
+    held.reader = reader;
+    next_rejected(&held.reader, &held.anchor, &held, sizeof held);
+  }
+  /* out over the workspace struct, the frames or the OID slots. */
+  {
+    union {
+      TC_X509_workspace workspace;
+      TC_TLV_frame frames[16];
+      TC_bytes oids[32];
+      TC_X509_store_anchor anchor;
+    } scratch;
+    TC_X509_trust_anchor_reader bound;
+    TC_X509_workspace frames_alias = {{scratch.frames, 16}, oids, 32};
+    TC_X509_workspace oids_alias = {{frames, 16}, scratch.oids, 32};
+    memset(&scratch, 0x5a, sizeof scratch);
+    scratch.workspace = workspace;
+    munit_assert_int(TC_X509_trust_anchor_list_init(&bound, (TC_bytes){encoded, length}, &limits,
+                                                    &scratch.workspace),
+                     ==, TC_TLV_OK);
+    next_rejected(&bound, &scratch.anchor, &scratch, sizeof scratch);
+    memset(&scratch, 0x5a, sizeof scratch);
+    munit_assert_int(
+        TC_X509_trust_anchor_list_init(&bound, (TC_bytes){encoded, length}, &limits, &frames_alias),
+        ==, TC_TLV_OK);
+    next_rejected(&bound, &scratch.anchor, &scratch, sizeof scratch);
+    munit_assert_int(
+        TC_X509_trust_anchor_list_init(&bound, (TC_bytes){encoded, length}, &limits, &oids_alias),
+        ==, TC_TLV_OK);
+    next_rejected(&bound, &scratch.anchor, &scratch, sizeof scratch);
+  }
+  /* A reader that init never bound has no workspace. */
+  {
+    TC_X509_trust_anchor_reader unbound;
+    memset(&unbound, 0, sizeof unbound);
+    next_rejected(&unbound, &anchor, &unbound, sizeof unbound);
+  }
+  /* The rejected calls left the reader at the first anchor. */
+  munit_assert_int(TC_X509_trust_anchor_next(&reader, &anchor), ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_trust_anchor_next(&reader, &anchor), ==, TC_TLV_END);
   return MUNIT_OK;
 }
 
@@ -708,6 +804,7 @@ static MunitResult reader_binding(const MunitParameter params[], void* user)
 
 static MunitTest tests[] = {
     {"/reader-binding", reader_binding, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/next-overlap", next_overlap, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/certificate-builder", certificate_builder, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/exts-path-length", exts_path_length, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/forbidden-exts", forbidden_exts, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

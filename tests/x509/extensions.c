@@ -881,6 +881,110 @@ static MunitResult element_accounting(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+/* One storage block that every overlap case below carves its ranges from. */
+typedef union {
+  uint8_t bytes[4096];
+  TC_TLV_frame frames[32];
+  TC_bytes oids[32];
+  TC_X509_certificate certificate;
+  TC_X509_workspace workspace;
+  TC_TLV_limits limits;
+} read_storage;
+
+/* Expect ARGUMENT and no change to shared or out. */
+static void read_rejected(TC_bytes encoded, const TC_TLV_limits* limits,
+                          TC_X509_workspace* workspace, TC_X509_certificate* out,
+                          read_storage* shared)
+{
+  static read_storage before;
+  uint8_t out_before[sizeof *out];
+  memcpy(&before, shared, sizeof before);
+  memcpy(out_before, out, sizeof out_before);
+  munit_assert_int(TC_X509_read(encoded, limits, workspace, out), ==, TC_TLV_ARGUMENT);
+  munit_assert_memory_equal(sizeof before, &before, shared);
+  munit_assert_memory_equal(sizeof out_before, out_before, out);
+}
+
+/* TC_X509_read writes out, the frames and the extension OID slots. They stay
+ * separate from each other and from the certificate bytes, the limits and
+ * the workspace struct. */
+static MunitResult read_overlap(const MunitParameter params[], void* user)
+{
+  static uint8_t der[4096];
+  static read_storage shared;
+  TC_TLV_frame frames[32];
+  TC_bytes oids[32];
+  TC_X509_workspace workspace = {{frames, 32}, oids, 32};
+  TC_X509_certificate certificate;
+  FILE* file = fopen(TC_FPKI_CERTIFICATE, "rb");
+  (void)params;
+  (void)user;
+  munit_assert_not_null(file);
+  const size_t length = fread(der, 1, sizeof der, file);
+  munit_assert_int(fclose(file), ==, 0);
+  munit_assert_size(length, >, 0);
+  munit_assert_size(length, <=, sizeof shared.bytes);
+  const TC_TLV_limits limits = {sizeof der, sizeof der, 128, 32};
+  const TC_bytes encoded = {der, length};
+  memset(&certificate, 0xa5, sizeof certificate);
+  munit_assert_int(TC_X509_read(encoded, &limits, &workspace, &certificate), ==, TC_TLV_OK);
+  memset(&certificate, 0xa5, sizeof certificate);
+
+  /* out inside the certificate bytes. */
+  memset(&shared, 0x5a, sizeof shared);
+  memcpy(shared.bytes, der, length);
+  read_rejected((TC_bytes){shared.bytes, length}, &limits, &workspace, &shared.certificate,
+                &shared);
+  /* Frames or OID slots inside the certificate bytes. */
+  {
+    TC_X509_workspace in_bytes = {{shared.frames, 32}, oids, 32};
+    read_rejected((TC_bytes){shared.bytes, length}, &limits, &in_bytes, &certificate, &shared);
+    in_bytes = (TC_X509_workspace){{frames, 32}, shared.oids, 32};
+    read_rejected((TC_bytes){shared.bytes, length}, &limits, &in_bytes, &certificate, &shared);
+  }
+  /* out over the frames, the OID slots, the workspace struct or the limits. */
+  memset(&shared, 0x5a, sizeof shared);
+  {
+    TC_X509_workspace aliased = {{shared.frames, 32}, oids, 32};
+    read_rejected(encoded, &limits, &aliased, &shared.certificate, &shared);
+    aliased = (TC_X509_workspace){{frames, 32}, shared.oids, 32};
+    read_rejected(encoded, &limits, &aliased, &shared.certificate, &shared);
+  }
+  shared.workspace = workspace;
+  read_rejected(encoded, &limits, &shared.workspace, &shared.certificate, &shared);
+  memset(&shared, 0x5a, sizeof shared);
+  shared.limits = limits;
+  read_rejected(encoded, &shared.limits, &workspace, &shared.certificate, &shared);
+  /* Frames over the OID slots, the workspace struct or the limits. */
+  memset(&shared, 0x5a, sizeof shared);
+  {
+    TC_X509_workspace aliased = {{shared.frames, 32}, shared.oids, 32};
+    read_rejected(encoded, &limits, &aliased, &certificate, &shared);
+    shared.workspace = (TC_X509_workspace){{shared.frames, 32}, oids, 32};
+    read_rejected(encoded, &limits, &shared.workspace, &certificate, &shared);
+    memset(&shared, 0x5a, sizeof shared);
+    shared.limits = limits;
+    aliased = (TC_X509_workspace){{shared.frames, 32}, oids, 32};
+    read_rejected(encoded, &shared.limits, &aliased, &certificate, &shared);
+  }
+  /* OID slots over the workspace struct. */
+  memset(&shared, 0x5a, sizeof shared);
+  shared.workspace = (TC_X509_workspace){{frames, 32}, shared.oids, 32};
+  read_rejected(encoded, &limits, &shared.workspace, &certificate, &shared);
+  /* Arrays with a NULL base and a nonzero count. */
+  memset(&shared, 0x5a, sizeof shared);
+  {
+    TC_X509_workspace missing = {{NULL, 32}, oids, 32};
+    read_rejected(encoded, &limits, &missing, &certificate, &shared);
+    missing = (TC_X509_workspace){{frames, 32}, NULL, 32};
+    read_rejected(encoded, &limits, &missing, &certificate, &shared);
+  }
+  read_rejected(encoded, NULL, &workspace, &certificate, &shared);
+  read_rejected(encoded, &limits, NULL, &certificate, &shared);
+  munit_assert_int(TC_X509_read(encoded, &limits, &workspace, NULL), ==, TC_TLV_ARGUMENT);
+  return MUNIT_OK;
+}
+
 /* Optional context-tagged fields must appear once each, in schema order. */
 static MunitResult optional_field_order(const MunitParameter params[], void* user)
 {
@@ -929,6 +1033,7 @@ static MunitResult optional_field_order(const MunitParameter params[], void* use
 static MunitTest tests[] = {
     {"/optional-field-order", optional_field_order, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/element-accounting", element_accounting, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/read-overlap", read_overlap, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/key-identifiers", key_identifiers, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/subtree-limits", subtree_limits, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/name-constraints", name_constraints, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

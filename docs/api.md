@@ -270,14 +270,12 @@ discarded verification or cipher result is reported. Wrapper calls are
 
 Keys, IVs, AAD, messages and received tags are `bytes` spans. Outputs are
 `buffer` spans or fixed-size C arrays whose size is part of the type. Array
-overloads deduce the span length. Three kinds of call take a pointer. Block-mode
+overloads deduce the span length. Two kinds of call take a pointer. Block-mode
 calls (`encrypt_cbc`, `xcrypt_ctr` and the others), `AES_dynamic` CBC and
 `GCM::encrypt_update` transform a caller buffer in place and take a pointer and
 length or an array. `encrypt_ecb` and `decrypt_ecb` transform one block in
-place. `drbg::generate` and `piv_sm::unprotect` write to a pointer and length
-that mirror their C functions. The wrappers check key and IV lengths before the
-C call. A wrong length returns `TC_ERROR`. Every argument error leaves outputs
-unchanged.
+place. The wrappers check key and IV lengths before the C call. A wrong length
+returns `TC_ERROR`. Every argument error leaves outputs unchanged.
 
 `tiny_crypto::ct_equal(a, b)` compares two `bytes` spans. It returns `TC_OK`
 for equal contents and lengths, `TC_MISMATCH` when the contents or the lengths

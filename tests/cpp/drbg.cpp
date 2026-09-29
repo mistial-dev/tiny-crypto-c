@@ -54,12 +54,12 @@ TEST_CASE("HMAC_DRBG SHA-256 CAVP answer and lifecycle")
   config.mechanism = TC_DRBG_HMAC;
   config.hash = TC_HASH_SHA256;
   tiny_crypto::drbg generator;
-  CHECK(generator.generate(out, sizeof(out)) == TC_DRBG_ARGUMENT);
+  CHECK(generator.generate(tiny_crypto::buffer{out, sizeof(out)}) == TC_DRBG_ARGUMENT);
   REQUIRE(generator.instantiate(config, TC_random_source{fill, &source},
                                 tiny_crypto::bytes{nonce, sizeof(nonce)},
                                 tiny_crypto::bytes{nullptr, 0}) == TC_DRBG_OK);
-  REQUIRE(generator.generate(out, sizeof(out)) == TC_DRBG_OK);
-  REQUIRE(generator.generate(out, sizeof(out)) == TC_DRBG_OK);
+  REQUIRE(generator.generate(tiny_crypto::buffer{out, sizeof(out)}) == TC_DRBG_OK);
+  REQUIRE(generator.generate(tiny_crypto::buffer{out, sizeof(out)}) == TC_DRBG_OK);
   CHECK(std::memcmp(out, expected, sizeof(out)) == 0);
 
   // The C random source adapter draws from the same generator.
@@ -68,5 +68,5 @@ TEST_CASE("HMAC_DRBG SHA-256 CAVP answer and lifecycle")
   // Reseeding needs fresh entropy, and this source is spent.
   CHECK(generator.reseed() == TC_DRBG_ENTROPY);
   generator.uninstantiate();
-  CHECK(generator.generate(out, 16) == TC_DRBG_ARGUMENT);
+  CHECK(generator.generate(tiny_crypto::buffer{out, 16}) == TC_DRBG_ARGUMENT);
 }

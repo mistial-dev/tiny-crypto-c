@@ -34,13 +34,25 @@
 #define TC_ENABLE_RSA 1
 #define TC_ENABLE_GZIP 1
 #define TC_ENABLE_TLV 1
+#define TC_ENABLE_DRBG 1
+#define TC_DRBG_ENABLE_HASH 1
+#define TC_DRBG_ENABLE_HMAC 1
+#define TC_DRBG_ENABLE_CTR 1
+#define TC_ENABLE_SSKDF 1
+#define TC_ENABLE_EC 1
+#define TC_EC_ENABLE_P256 1
+#define TC_ENABLE_PIV_SM 1
+#define TC_PIV_SM_ENABLE_CS2 1
+#define TC_PIV_SM_ENABLE_CS7 0
 
 #include <tiny_crypto/aes.hpp>
 #include <tiny_crypto/aes_dynamic.hpp>
 #include <tiny_crypto/des.hpp>
+#include <tiny_crypto/drbg.hpp>
 #include <tiny_crypto/gzip.hpp>
 #include <tiny_crypto/hash.hpp>
 #include <tiny_crypto/kmac.hpp>
+#include <tiny_crypto/piv_sm.hpp>
 #include <tiny_crypto/rsa.hpp>
 #include <tiny_crypto/tlv.hpp>
 
@@ -170,6 +182,16 @@ void tiny_crypto_nodiscard_compile(uint8_t* data, size_t length)
   dynamic_cmac.update(in);   /* DISCARDED */
   dynamic_cmac.final(block); /* DISCARDED */
 
+  /* Generator and secure messaging results. */
+  drbg generator;
+  generator.generate(out);       /* DISCARDED */
+  generator.generate(out, true); /* DISCARDED */
+  piv_sm session;
+  piv_sm_workspace sm_workspace = {};
+  const piv_sm_unprotect_request sm_response = {};
+  size_t sm_length = 0;
+  session.unprotect(sm_response, out, sm_length, sm_workspace); /* DISCARDED */
+
   /* Decoder and parser results. */
   GZIPDecoder gzip;
   size_t gzip_work = 0;
@@ -192,4 +214,6 @@ void tiny_crypto_nodiscard_compile(uint8_t* data, size_t length)
   iso9797.clear();
   kmac.clear();
   dynamic.clear();
+  generator.uninstantiate();
+  session.clear();
 }

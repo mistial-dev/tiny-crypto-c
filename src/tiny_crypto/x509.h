@@ -48,6 +48,10 @@ typedef struct {
  * Interpret extension values according to their OIDs.
  * limits->max_elements counts every element parsed, including the DER inside
  * each extension value. A certificate needing more returns LIMIT.
+ * out, the workspace frames and the extension OID slots are written. They
+ * must be pairwise disjoint and lie outside encoded, limits and the
+ * workspace struct. NULL arguments, a workspace array that is NULL with a
+ * capacity, and overlap return ARGUMENT.
  * Workspace may change on failure. out remains unchanged. */
 TC_TLV_result TC_X509_read(TC_bytes encoded, const TC_TLV_limits* limits,
                            TC_X509_workspace* workspace, TC_X509_certificate* out);

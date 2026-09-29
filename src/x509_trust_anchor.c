@@ -288,6 +288,28 @@ TC_TLV_result TC_X509_trust_anchor_list_init(TC_X509_trust_anchor_reader* reader
   return TC_TLV_OK;
 }
 
+/* next advances the reader and fills out and both workspace arrays while it
+ * reads the list and the workspace struct. out joins the disjoint set that
+ * init checked for the reader and the arrays. */
+static TC_TLV_result next_storage(const TC_X509_trust_anchor_reader* reader,
+                                  const TC_X509_store_anchor* out)
+{
+  const TC_X509_workspace* workspace = reader->workspace;
+  TC_bytes writes[4];
+  tc_pki_storage_plan plan;
+  if (!workspace)
+    return TC_TLV_ARGUMENT;
+  tc_pki_storage_plan_begin(&plan, writes, sizeof writes / sizeof *writes, SIZE_MAX);
+  TC_PKI_PLAN_WRITE(&plan, reader, 1);
+  TC_PKI_PLAN_WRITE(&plan, workspace->frames.data, workspace->frames.capacity);
+  TC_PKI_PLAN_WRITE(&plan, workspace->extension_oids, workspace->extension_capacity);
+  TC_PKI_PLAN_WRITE(&plan, out, 1);
+  tc_pki_storage_plan_seal(&plan);
+  tc_pki_storage_plan_input_span(&plan, reader->reader.input);
+  TC_PKI_PLAN_INPUT(&plan, workspace, 1);
+  return tc_pki_storage_plan_finish(&plan, NULL) == TC_TLV_OK ? TC_TLV_OK : TC_TLV_ARGUMENT;
+}
+
 TC_TLV_result TC_X509_trust_anchor_next(TC_X509_trust_anchor_reader* reader,
                                         TC_X509_store_anchor* out)
 {
@@ -299,6 +321,9 @@ TC_TLV_result TC_X509_trust_anchor_next(TC_X509_trust_anchor_reader* reader,
   TC_TLV_result result;
   if (!reader || !out)
     return TC_TLV_ARGUMENT;
+  result = next_storage(reader, out);
+  if (result != TC_TLV_OK)
+    return result;
   limits = &reader->reader.limits;
   workspace = reader->workspace;
   next = reader->reader;

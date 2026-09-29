@@ -170,7 +170,11 @@ void TC_RSA_prepared_public_key_clear(TC_RSA_prepared_public_key* setup);
  * under FIPS 186-5 appendix A.1.1. Output capacities must be at
  * least bits/8 for modulus and d, bits/16 for p and q, and three bytes for e.
  * Output buffers remain unchanged until a complete key is published. Scratch,
- * state, outputs and their metadata must be mutually disjoint.
+ * state, outputs and their metadata must be mutually disjoint. init returns
+ * ARGUMENT for a NULL pointer or buffer, misaligned scratch, overlap or an
+ * active state, UNSUPPORTED for another key size, and LIMIT for zero limits
+ * or a buffer or scratch shorter than required. Failures leave state,
+ * outputs and scratch unchanged.
  *
  * Each step performs at most work->remaining units and returns
  * TC_RSA_IN_PROGRESS when more work is needed. The configured limits bound
