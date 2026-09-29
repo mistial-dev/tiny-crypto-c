@@ -29,29 +29,13 @@ tc_profile_option(TINY_CRYPTO_ENABLE_TLV TC_ENABLE_TLV "Build bounded TLV reader
 tc_profile_option(TINY_CRYPTO_ENABLE_DER TC_ENABLE_DER "Build DER value helpers")
 tc_profile_option(TINY_CRYPTO_ENABLE_X509 TC_ENABLE_X509 "Build X.509 certificate parser")
 tc_profile_option(TINY_CRYPTO_ENABLE_EAC_CVC TC_ENABLE_EAC_CVC "Build EAC card verifiable certificate parser")
-if(TINY_CRYPTO_ENABLE_EAC_CVC AND NOT TINY_CRYPTO_ENABLE_DER)
-  message(FATAL_ERROR "EAC CVC parsing requires TINY_CRYPTO_ENABLE_DER")
-endif()
-if(TINY_CRYPTO_ENABLE_X509 AND NOT TINY_CRYPTO_ENABLE_DER)
-  message(FATAL_ERROR "X.509 parsing requires TINY_CRYPTO_ENABLE_DER")
-endif()
 tc_profile_option(TINY_CRYPTO_ENABLE_PIV_CVC TC_ENABLE_PIV_CVC "Build PIV secure messaging CVC parser")
 tc_profile_option(TINY_CRYPTO_ENABLE_PIV_CHUID TC_ENABLE_PIV_CHUID "Build PIV CHUID parser")
 tc_profile_option(TINY_CRYPTO_ENABLE_TWIC_CCL TC_ENABLE_TWIC_CCL "Build TWIC canceled card list reader")
 tc_profile_option(TINY_CRYPTO_ENABLE_MD5 TC_ENABLE_MD5 "Build legacy MD5 checksums")
 tc_profile_option(TINY_CRYPTO_ENABLE_GZIP TC_ENABLE_GZIP "Build bounded GZIP decompression")
-if(TINY_CRYPTO_ENABLE_PIV_CHUID AND NOT TINY_CRYPTO_ENABLE_TLV)
-  message(FATAL_ERROR "CHUID parsing requires TINY_CRYPTO_ENABLE_TLV")
-endif()
-if(TINY_CRYPTO_ENABLE_PIV_CVC AND NOT TINY_CRYPTO_ENABLE_DER)
-  message(FATAL_ERROR "PIV CVC parsing requires TINY_CRYPTO_ENABLE_DER")
-endif()
 tc_profile_option(TINY_CRYPTO_TLV_BER TC_TLV_ENABLE_BER "Accept ASN.1 BER including indefinite lengths")
 tc_profile_option(TINY_CRYPTO_TLV_STREAM TC_TLV_ENABLE_STREAM "Expose incremental TLV parsing")
-if((TINY_CRYPTO_ENABLE_DER OR TINY_CRYPTO_TLV_BER OR TINY_CRYPTO_TLV_STREAM)
-   AND NOT TINY_CRYPTO_ENABLE_TLV)
-  message(FATAL_ERROR "DER, BER, and incremental parsing require TINY_CRYPTO_ENABLE_TLV")
-endif()
 tc_profile_option(TINY_CRYPTO_ENABLE_KDF TC_ENABLE_KDF "Build SP 800-108 KBKDF over the enabled HMAC/CMAC PRFs")
 tc_profile_option(TINY_CRYPTO_ENABLE_HKDF TC_ENABLE_HKDF "Build RFC 5869 HKDF over enabled HMAC-SHA algorithms")
 tc_profile_option(TINY_CRYPTO_ENABLE_SSKDF TC_ENABLE_SSKDF "Build the single-step hash KDF")
@@ -59,29 +43,19 @@ tc_profile_option(TINY_CRYPTO_ENABLE_DRBG TC_ENABLE_DRBG "Build NIST SP 800-90A 
 tc_profile_option(TINY_CRYPTO_DRBG_HASH TC_DRBG_ENABLE_HASH "Build Hash_DRBG")
 tc_profile_option(TINY_CRYPTO_DRBG_HMAC TC_DRBG_ENABLE_HMAC "Build HMAC_DRBG")
 tc_profile_option(TINY_CRYPTO_DRBG_CTR TC_DRBG_ENABLE_CTR "Build CTR_DRBG over dynamic AES")
-tc_profile_option(TINY_CRYPTO_ENABLE_EC TC_ENABLE_EC "Build elliptic-curve key agreement")
-tc_profile_option(TINY_CRYPTO_ENABLE_RSA TC_ENABLE_RSA "Build RSA signature verification")
+tc_profile_option(TINY_CRYPTO_ENABLE_EC TC_ENABLE_EC "Build P-192/P-256/P-384 ECDH, ECDSA and key generation")
+tc_profile_option(TINY_CRYPTO_ENABLE_RSA TC_ENABLE_RSA "Build RSA verification, signing, OAEP, key validation and key generation")
 tc_profile_option(TINY_CRYPTO_RSA_SMALL TC_RSA_SMALL "Use byte limbs for RSA arithmetic")
 tc_profile_option(TINY_CRYPTO_EC_P192 TC_EC_ENABLE_P192 "Enable P-192 for legacy protocols")
-tc_profile_option(TINY_CRYPTO_EC_P256 TC_EC_ENABLE_P256 "Enable P-256 key agreement")
-tc_profile_option(TINY_CRYPTO_EC_P384 TC_EC_ENABLE_P384 "Enable P-384 key agreement")
+tc_profile_option(TINY_CRYPTO_EC_P256 TC_EC_ENABLE_P256 "Enable P-256")
+tc_profile_option(TINY_CRYPTO_EC_P384 TC_EC_ENABLE_P384 "Enable P-384")
 tc_profile_option(TINY_CRYPTO_EC_SMALL TC_EC_SMALL "Use byte limbs for elliptic-curve arithmetic")
-if(TINY_CRYPTO_ENABLE_EC AND NOT TINY_CRYPTO_EC_P256 AND NOT TINY_CRYPTO_EC_P384)
-  message(FATAL_ERROR "EC requires at least one curve")
-endif()
-if(TINY_CRYPTO_ENABLE_SSKDF AND NOT TINY_CRYPTO_ENABLE_SHA1 AND NOT TINY_CRYPTO_ENABLE_SHA224
-    AND NOT TINY_CRYPTO_ENABLE_SHA256 AND NOT TINY_CRYPTO_ENABLE_SHA384
-    AND NOT TINY_CRYPTO_ENABLE_SHA512)
-  message(FATAL_ERROR "Single-step KDF requires an enabled SHA algorithm")
-endif()
 tc_profile_option(TINY_CRYPTO_AVR_PROGMEM TC_AVR_PROGMEM "Keep constant tables in AVR flash")
 
 set(TINY_CRYPTO_AES_KEY_BITS 128 CACHE STRING "AES key size: 128, 192, or 256")
 set_property(CACHE TINY_CRYPTO_AES_KEY_BITS PROPERTY STRINGS 128 192 256)
+tc_register_definition(TC_AES_KEY_BITS "${TINY_CRYPTO_AES_KEY_BITS}")
 tc_profile_option(TINY_CRYPTO_AES_DYNAMIC TC_AES_ENABLE_DYNAMIC "Build length-aware AES key, CBC, and CMAC APIs")
-if(TINY_CRYPTO_AES_DYNAMIC AND NOT TINY_CRYPTO_ENABLE_AES)
-  message(FATAL_ERROR "Dynamic AES requires TINY_CRYPTO_ENABLE_AES")
-endif()
 tc_profile_option(TINY_CRYPTO_AES_CBC TC_AES_ENABLE_CBC "Build AES-CBC")
 tc_profile_option(TINY_CRYPTO_AES_ECB TC_AES_ENABLE_ECB "Build AES-ECB")
 tc_profile_option(TINY_CRYPTO_AES_CTR TC_AES_ENABLE_CTR "Build AES-CTR")
@@ -99,6 +73,24 @@ set(TINY_CRYPTO_AES_GHASH "profile" CACHE STRING
     "GCM multiply: profile, auto, bitwise, wide, fast-table, or hardware")
 set_property(CACHE TINY_CRYPTO_AES_GHASH PROPERTY STRINGS
              profile auto bitwise wide fast-table hardware)
+# config.h numbers the S-box modes from 1 and the GHASH modes from 0.
+set(sbox_values constant-time runtime fast)
+list(FIND sbox_values "${TINY_CRYPTO_AES_SBOX}" sbox_index)
+if(sbox_index EQUAL -1)
+  message(FATAL_ERROR "Unknown TINY_CRYPTO_AES_SBOX value")
+endif()
+math(EXPR sbox_value "${sbox_index} + 1")
+tc_register_definition(TC_AES_SBOX_MODE ${sbox_value})
+set(ghash_values auto bitwise wide fast-table hardware)
+if(TINY_CRYPTO_AES_GHASH STREQUAL "profile")
+  set(ghash_value ${tc_profile_default_TC_AES_GCM_GHASH_MODE})
+else()
+  list(FIND ghash_values "${TINY_CRYPTO_AES_GHASH}" ghash_value)
+endif()
+if(ghash_value EQUAL -1)
+  message(FATAL_ERROR "Unknown TINY_CRYPTO_AES_GHASH value")
+endif()
+tc_register_definition(TC_AES_GCM_GHASH_MODE ${ghash_value})
 tc_profile_option(TINY_CRYPTO_AES_WIDE_OPS TC_AES_WIDE_OPS "Use native-width AES helpers")
 tc_profile_option(TINY_CRYPTO_AES_TINY TC_AES_TINY "Reject large per-context GHASH tables")
 
@@ -116,24 +108,12 @@ tc_profile_option(TINY_CRYPTO_DES_REJECT_WEAK_KEYS TC_DES_REJECT_WEAK_KEYS "Reje
 
 include(cmake/Features.cmake)
 
-function(tc_taf_choice_option name description)
-  set(${name} AUTO CACHE STRING "${description} (AUTO follows trust-anchor format)")
-  set_property(CACHE ${name} PROPERTY STRINGS AUTO ON OFF)
-  string(TOUPPER "${${name}}" choice)
-  if(choice STREQUAL "AUTO")
-    set(value ${TINY_CRYPTO_ENABLE_TRUST_ANCHOR_FORMAT})
-  elseif(choice MATCHES "^(ON|TRUE|YES|1)$")
-    set(value 1)
-  elseif(choice MATCHES "^(OFF|FALSE|NO|0)$")
-    set(value 0)
-  else()
-    message(FATAL_ERROR "${name} must be AUTO, ON, or OFF")
-  endif()
-  set(${name} ${value} PARENT_SCOPE)
-endfunction()
-tc_taf_choice_option(TINY_CRYPTO_TAF_CERTIFICATE "Accept RFC 5914 Certificate choices")
-tc_taf_choice_option(TINY_CRYPTO_TAF_TBS_CERTIFICATE "Accept RFC 5914 TBSCertificate choices")
-tc_taf_choice_option(TINY_CRYPTO_TAF_TRUST_ANCHOR_INFO "Accept RFC 5914 TrustAnchorInfo choices")
+tc_taf_choice_option(TINY_CRYPTO_TAF_CERTIFICATE TC_TAF_ENABLE_CERTIFICATE
+  "Accept RFC 5914 Certificate choices")
+tc_taf_choice_option(TINY_CRYPTO_TAF_TBS_CERTIFICATE TC_TAF_ENABLE_TBS_CERTIFICATE
+  "Accept RFC 5914 TBSCertificate choices")
+tc_taf_choice_option(TINY_CRYPTO_TAF_TRUST_ANCHOR_INFO TC_TAF_ENABLE_TRUST_ANCHOR_INFO
+  "Accept RFC 5914 TrustAnchorInfo choices")
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
   option(TINY_CRYPTO_BUILD_TESTS "Build host tests" ON)
@@ -144,107 +124,19 @@ option(TINY_CRYPTO_TEST_FULL "Run checked-in CAVP corpora" OFF)
 set(TINY_CRYPTO_SANITIZE "" CACHE STRING
     "Test sanitizers, for example address,undefined")
 
-set(tc_any_sha OFF)
-if(TINY_CRYPTO_ENABLE_SHA1 OR TINY_CRYPTO_ENABLE_SHA224 OR
-   TINY_CRYPTO_ENABLE_SHA256 OR TINY_CRYPTO_ENABLE_SHA384 OR
-   TINY_CRYPTO_ENABLE_SHA512)
-  set(tc_any_sha ON)
-endif()
-set(tc_any_module OFF)
-foreach(macro_name IN LISTS tc_module_features)
-  set(option_name ${tc_module_option_${macro_name}})
-  if(${option_name})
-    set(tc_any_module ON)
-  endif()
-endforeach()
-if(NOT TINY_CRYPTO_ENABLE_AES AND NOT TINY_CRYPTO_ENABLE_DES AND NOT tc_any_sha
-   AND NOT TINY_CRYPTO_ENABLE_KMAC256 AND NOT TINY_CRYPTO_ENABLE_TLV
-   AND NOT TINY_CRYPTO_ENABLE_EC AND NOT TINY_CRYPTO_ENABLE_RSA
-   AND NOT TINY_CRYPTO_ENABLE_TWIC_CCL AND NOT TINY_CRYPTO_ENABLE_MD5
-   AND NOT TINY_CRYPTO_ENABLE_GZIP AND NOT tc_any_module)
-  message(FATAL_ERROR "Enable at least one algorithm or parser")
-endif()
-if(TINY_CRYPTO_ENABLE_HMAC AND NOT tc_any_sha)
-  message(FATAL_ERROR "HMAC requires at least one SHA algorithm")
-endif()
-if(TINY_CRYPTO_ENABLE_DES AND NOT TINY_CRYPTO_DES_ECB AND
-   NOT TINY_CRYPTO_DES_CBC AND NOT TINY_CRYPTO_DES_CTR AND
-   NOT TINY_CRYPTO_DES_OFB AND NOT TINY_CRYPTO_DES_CFB1 AND
-   NOT TINY_CRYPTO_DES_CFB8 AND NOT TINY_CRYPTO_DES_CFB64 AND
-   NOT TINY_CRYPTO_DES_CMAC AND NOT TINY_CRYPTO_DES_ISO9797)
-  message(FATAL_ERROR "DES requires at least one enabled mode or CMAC")
-endif()
-set(tc_kdf_prf OFF)
-if(TINY_CRYPTO_ENABLE_HMAC AND tc_any_sha)
-  set(tc_kdf_prf ON)
-endif()
-if(TINY_CRYPTO_ENABLE_AES AND TINY_CRYPTO_AES_CMAC)
-  set(tc_kdf_prf ON)
-endif()
-if(TINY_CRYPTO_ENABLE_DES AND TINY_CRYPTO_DES_CMAC)
-  set(tc_kdf_prf ON)
-endif()
-if(TINY_CRYPTO_ENABLE_KDF AND NOT tc_kdf_prf)
-  message(FATAL_ERROR "KDF requires a PRF: HMAC with a SHA, AES-CMAC, or TDEA-CMAC")
-endif()
-if(TINY_CRYPTO_ENABLE_HKDF AND (NOT TINY_CRYPTO_ENABLE_HMAC OR NOT tc_any_sha))
-  message(FATAL_ERROR "HKDF requires HMAC and an enabled SHA algorithm")
-endif()
-if(TINY_CRYPTO_ENABLE_DRBG)
-  if(NOT TINY_CRYPTO_DRBG_HASH AND NOT TINY_CRYPTO_DRBG_HMAC AND NOT TINY_CRYPTO_DRBG_CTR)
-    message(FATAL_ERROR "DRBG requires at least one mechanism")
-  endif()
-  if(TINY_CRYPTO_DRBG_HASH AND NOT tc_any_sha)
-    message(FATAL_ERROR "Hash_DRBG requires a SHA algorithm")
-  endif()
-  if(TINY_CRYPTO_DRBG_HMAC AND NOT TINY_CRYPTO_ENABLE_HMAC)
-    message(FATAL_ERROR "HMAC_DRBG requires TINY_CRYPTO_ENABLE_HMAC")
-  endif()
-  if(TINY_CRYPTO_DRBG_CTR AND (NOT TINY_CRYPTO_ENABLE_AES OR NOT TINY_CRYPTO_AES_DYNAMIC))
-    message(FATAL_ERROR "CTR_DRBG requires TINY_CRYPTO_ENABLE_AES and TINY_CRYPTO_AES_DYNAMIC")
-  endif()
-endif()
-if(NOT TINY_CRYPTO_AES_KEY_BITS MATCHES "^(128|192|256)$")
-  message(FATAL_ERROR "TINY_CRYPTO_AES_KEY_BITS must be 128, 192, or 256")
-endif()
-tc_validate_module_features()
-if(TINY_CRYPTO_ENABLE_TRUST_ANCHOR_FORMAT AND
-   NOT TINY_CRYPTO_TAF_CERTIFICATE AND NOT TINY_CRYPTO_TAF_TBS_CERTIFICATE AND
-   NOT TINY_CRYPTO_TAF_TRUST_ANCHOR_INFO)
-  message(FATAL_ERROR "Trust-anchor format requires at least one choice")
-endif()
-if(NOT TINY_CRYPTO_ENABLE_TRUST_ANCHOR_FORMAT AND
-   (TINY_CRYPTO_TAF_CERTIFICATE OR TINY_CRYPTO_TAF_TBS_CERTIFICATE OR
-    TINY_CRYPTO_TAF_TRUST_ANCHOR_INFO))
-  message(FATAL_ERROR "Trust-anchor choices require trust-anchor format")
-endif()
-
 tc_profile_option(TINY_CRYPTO_ENABLE_PIV_SM TC_ENABLE_PIV_SM "Build PIV secure messaging for the client")
 tc_profile_option(TINY_CRYPTO_PIV_SM_CS2 TC_PIV_SM_ENABLE_CS2 "Enable PIV SM cipher suite 2")
 tc_profile_option(TINY_CRYPTO_PIV_SM_CS7 TC_PIV_SM_ENABLE_CS7 "Enable PIV SM cipher suite 7")
-if(TINY_CRYPTO_ENABLE_PIV_SM)
-  if(NOT TINY_CRYPTO_ENABLE_AES OR NOT TINY_CRYPTO_AES_DYNAMIC OR NOT TINY_CRYPTO_ENABLE_SHA256 OR
-     NOT TINY_CRYPTO_ENABLE_SSKDF OR NOT TINY_CRYPTO_ENABLE_EC)
-    message(FATAL_ERROR "PIV SM requires dynamic AES, SHA-256, single-step KDF, and EC")
-  endif()
-  if(NOT TINY_CRYPTO_PIV_SM_CS2 AND NOT TINY_CRYPTO_PIV_SM_CS7)
-    message(FATAL_ERROR "PIV SM requires at least one cipher suite")
-  endif()
-  if(TINY_CRYPTO_PIV_SM_CS2 AND NOT TINY_CRYPTO_EC_P256)
-    message(FATAL_ERROR "CS2 requires P-256")
-  endif()
-  if(TINY_CRYPTO_PIV_SM_CS7 AND (NOT TINY_CRYPTO_EC_P384 OR NOT TINY_CRYPTO_ENABLE_SHA384))
-    message(FATAL_ERROR "CS7 requires P-384 and SHA-384")
-  endif()
-endif()
 
-function(tc_bool option output)
-  if(${option})
-    set(${output} 1 PARENT_SCOPE)
-  else()
-    set(${output} 0 PARENT_SCOPE)
-  endif()
-endfunction()
+get_property(TC_PUBLIC_DEFINITIONS GLOBAL PROPERTY TINY_CRYPTO_PUBLIC_DEFINITIONS)
+# An empty library has no use. Every other dependency rule lives in config.h.
+if(NOT TC_PUBLIC_DEFINITIONS MATCHES "(^|;)TC_ENABLE_[A-Z0-9_]+=1(;|$)")
+  message(FATAL_ERROR "Enable at least one algorithm or parser")
+endif()
+include(cmake/ConfigCheck.cmake)
+tc_check_config("${TC_PUBLIC_DEFINITIONS}")
+set(tc_build_config "${CMAKE_CURRENT_BINARY_DIR}/install-include/tiny_crypto/build_config.h")
+tc_write_build_config("${tc_build_config}" "${TC_PUBLIC_DEFINITIONS}")
 
 function(tc_warnings target)
   if(MSVC)
@@ -253,108 +145,6 @@ function(tc_warnings target)
     target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
   endif()
 endfunction()
-
-foreach(pair
-    "TINY_CRYPTO_ENABLE_AES;TC_ENABLE_AES"
-    "TINY_CRYPTO_ENABLE_DES;TC_ENABLE_DES"
-    "TINY_CRYPTO_ENABLE_SHA1;TC_ENABLE_SHA1"
-    "TINY_CRYPTO_ENABLE_SHA224;TC_ENABLE_SHA224"
-    "TINY_CRYPTO_ENABLE_SHA256;TC_ENABLE_SHA256"
-    "TINY_CRYPTO_ENABLE_SHA384;TC_ENABLE_SHA384"
-    "TINY_CRYPTO_ENABLE_SHA512;TC_ENABLE_SHA512"
-    "TINY_CRYPTO_ENABLE_HMAC;TC_ENABLE_HMAC"
-    "TINY_CRYPTO_ENABLE_KMAC256;TC_ENABLE_KMAC256"
-    "TINY_CRYPTO_ENABLE_TLV;TC_ENABLE_TLV"
-    "TINY_CRYPTO_ENABLE_DER;TC_ENABLE_DER"
-    "TINY_CRYPTO_ENABLE_X509;TC_ENABLE_X509"
-    "TINY_CRYPTO_TAF_CERTIFICATE;TC_TAF_ENABLE_CERTIFICATE"
-    "TINY_CRYPTO_TAF_TBS_CERTIFICATE;TC_TAF_ENABLE_TBS_CERTIFICATE"
-    "TINY_CRYPTO_TAF_TRUST_ANCHOR_INFO;TC_TAF_ENABLE_TRUST_ANCHOR_INFO"
-    "TINY_CRYPTO_ENABLE_EAC_CVC;TC_ENABLE_EAC_CVC"
-    "TINY_CRYPTO_ENABLE_PIV_CVC;TC_ENABLE_PIV_CVC"
-    "TINY_CRYPTO_ENABLE_PIV_CHUID;TC_ENABLE_PIV_CHUID"
-    "TINY_CRYPTO_ENABLE_TWIC_CCL;TC_ENABLE_TWIC_CCL"
-    "TINY_CRYPTO_ENABLE_MD5;TC_ENABLE_MD5"
-    "TINY_CRYPTO_ENABLE_GZIP;TC_ENABLE_GZIP"
-    "TINY_CRYPTO_TLV_BER;TC_TLV_ENABLE_BER"
-    "TINY_CRYPTO_TLV_STREAM;TC_TLV_ENABLE_STREAM"
-    "TINY_CRYPTO_ENABLE_KDF;TC_ENABLE_KDF"
-    "TINY_CRYPTO_ENABLE_HKDF;TC_ENABLE_HKDF"
-    "TINY_CRYPTO_ENABLE_SSKDF;TC_ENABLE_SSKDF"
-    "TINY_CRYPTO_ENABLE_DRBG;TC_ENABLE_DRBG"
-    "TINY_CRYPTO_DRBG_HASH;TC_DRBG_ENABLE_HASH"
-    "TINY_CRYPTO_DRBG_HMAC;TC_DRBG_ENABLE_HMAC"
-    "TINY_CRYPTO_DRBG_CTR;TC_DRBG_ENABLE_CTR"
-    "TINY_CRYPTO_ENABLE_PIV_SM;TC_ENABLE_PIV_SM"
-    "TINY_CRYPTO_PIV_SM_CS2;TC_PIV_SM_ENABLE_CS2"
-    "TINY_CRYPTO_PIV_SM_CS7;TC_PIV_SM_ENABLE_CS7"
-    "TINY_CRYPTO_ENABLE_EC;TC_ENABLE_EC"
-    "TINY_CRYPTO_ENABLE_RSA;TC_ENABLE_RSA"
-    "TINY_CRYPTO_RSA_SMALL;TC_RSA_SMALL"
-    "TINY_CRYPTO_EC_P256;TC_EC_ENABLE_P256"
-    "TINY_CRYPTO_EC_P192;TC_EC_ENABLE_P192"
-    "TINY_CRYPTO_EC_P384;TC_EC_ENABLE_P384"
-    "TINY_CRYPTO_EC_SMALL;TC_EC_SMALL"
-    "TINY_CRYPTO_AVR_PROGMEM;TC_AVR_PROGMEM"
-    "TINY_CRYPTO_AES_CBC;TC_AES_ENABLE_CBC"
-    "TINY_CRYPTO_AES_DYNAMIC;TC_AES_ENABLE_DYNAMIC"
-    "TINY_CRYPTO_AES_ECB;TC_AES_ENABLE_ECB"
-    "TINY_CRYPTO_AES_CTR;TC_AES_ENABLE_CTR"
-    "TINY_CRYPTO_AES_OFB;TC_AES_ENABLE_OFB"
-    "TINY_CRYPTO_AES_GCM;TC_AES_ENABLE_GCM"
-    "TINY_CRYPTO_AES_CCM;TC_AES_ENABLE_CCM"
-    "TINY_CRYPTO_AES_EAX;TC_AES_ENABLE_EAX"
-    "TINY_CRYPTO_AES_EAX_PRIME;TC_AES_ENABLE_EAX_PRIME"
-    "TINY_CRYPTO_AES_SIV;TC_AES_ENABLE_SIV"
-    "TINY_CRYPTO_AES_CMAC;TC_AES_ENABLE_CMAC"
-    "TINY_CRYPTO_AES_WIDE_OPS;TC_AES_WIDE_OPS"
-    "TINY_CRYPTO_AES_TINY;TC_AES_TINY"
-    "TINY_CRYPTO_DES_ECB;TC_DES_ENABLE_ECB"
-    "TINY_CRYPTO_DES_CBC;TC_DES_ENABLE_CBC"
-    "TINY_CRYPTO_DES_CTR;TC_DES_ENABLE_CTR"
-    "TINY_CRYPTO_DES_OFB;TC_DES_ENABLE_OFB"
-    "TINY_CRYPTO_DES_CFB1;TC_DES_ENABLE_CFB1"
-    "TINY_CRYPTO_DES_CFB8;TC_DES_ENABLE_CFB8"
-    "TINY_CRYPTO_DES_CFB64;TC_DES_ENABLE_CFB64"
-    "TINY_CRYPTO_DES_TDES;TC_DES_ENABLE_TDES"
-    "TINY_CRYPTO_DES_CMAC;TC_DES_ENABLE_CMAC"
-    "TINY_CRYPTO_DES_ISO9797;TC_DES_ENABLE_ISO9797"
-    "TINY_CRYPTO_DES_REJECT_WEAK_KEYS;TC_DES_REJECT_WEAK_KEYS")
-  list(GET pair 0 option_name)
-  list(GET pair 1 macro_name)
-  tc_bool(${option_name} macro_value)
-  list(APPEND TC_PUBLIC_DEFINITIONS ${macro_name}=${macro_value})
-endforeach()
-foreach(macro_name IN LISTS tc_module_features)
-  set(option_name ${tc_module_option_${macro_name}})
-  tc_bool(${option_name} macro_value)
-  list(APPEND TC_PUBLIC_DEFINITIONS ${macro_name}=${macro_value})
-endforeach()
-
-set(sbox_values constant-time runtime fast)
-list(FIND sbox_values "${TINY_CRYPTO_AES_SBOX}" sbox_index)
-if(sbox_index EQUAL -1)
-  message(FATAL_ERROR "Unknown TINY_CRYPTO_AES_SBOX value")
-endif()
-math(EXPR sbox_value "${sbox_index} + 1")
-
-set(ghash_values auto bitwise wide fast-table hardware)
-if(TINY_CRYPTO_AES_GHASH STREQUAL "profile")
-  set(ghash_value ${tc_profile_default_TC_AES_GCM_GHASH_MODE})
-else()
-  list(FIND ghash_values "${TINY_CRYPTO_AES_GHASH}" ghash_value)
-endif()
-if(ghash_value EQUAL -1)
-  message(FATAL_ERROR "Unknown TINY_CRYPTO_AES_GHASH value")
-endif()
-if(TINY_CRYPTO_AES_TINY AND TINY_CRYPTO_AES_GHASH STREQUAL "fast-table")
-  message(FATAL_ERROR "The tiny profile rejects the 256-byte GHASH table")
-endif()
-
-list(APPEND TC_PUBLIC_DEFINITIONS
-  TC_AES_KEY_BITS=${TINY_CRYPTO_AES_KEY_BITS}
-  TC_AES_SBOX_MODE=${sbox_value}
-  TC_AES_GCM_GHASH_MODE=${ghash_value})
 
 # block_modes.c holds the CBC, CTR and OFB cores shared by AES and DES. A
 # target that lists both families compiles it once.
@@ -457,7 +247,9 @@ add_library(tiny-crypto-c::tiny-crypto-c ALIAS tiny-crypto-c)
 target_include_directories(tiny-crypto-c PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
-target_compile_definitions(tiny-crypto-c PUBLIC ${TC_PUBLIC_DEFINITIONS})
+# The build tree passes the configuration as definitions. The installed
+# build_config.h carries it for installed consumers, with or without CMake.
+target_compile_definitions(tiny-crypto-c PUBLIC "$<BUILD_INTERFACE:${TC_PUBLIC_DEFINITIONS}>")
 tc_warnings(tiny-crypto-c)
 
 include(cmake/Sanitizers.cmake)
@@ -495,7 +287,9 @@ install(TARGETS tiny-crypto-c EXPORT tiny-crypto-cTargets
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-install(DIRECTORY src/tiny_crypto DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(DIRECTORY src/tiny_crypto DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+  PATTERN build_config.h EXCLUDE)
+install(FILES ${tc_build_config} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/tiny_crypto)
 install(FILES LICENSE LICENSES/Unicode-3.0.txt
   DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/tiny-crypto-c)
 

@@ -20,6 +20,6 @@ execute_process(
 if(result EQUAL 0)
   message(FATAL_ERROR "DES without a consumer was accepted")
 endif()
-if(NOT "${output}${error}" MATCHES "DES requires at least one enabled mode or CMAC")
+if(NOT "${output}${error}" MATCHES "DES requires at least one enabled mode or MAC")
   message(FATAL_ERROR "DES profile failed for the wrong reason:\n${output}${error}")
 endif()

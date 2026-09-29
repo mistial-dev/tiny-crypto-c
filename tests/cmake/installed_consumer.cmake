@@ -55,6 +55,46 @@ foreach(license LICENSE LICENSES/Unicode-3.0.txt)
     message(FATAL_ERROR "Installed ${name} differs from the source notice")
   endif()
 endforeach()
+# A consumer without the CMake package gets the configuration from the
+# installed build_config.h. MSVC uses a different command line and relies on
+# the CMake package check below.
+if(NOT C_COMPILER MATCHES "(^|[/\\\\])cl(\\.exe)?$")
+  set(archive)
+  foreach(path IN LISTS installed)
+    if(path MATCHES "/libtiny-crypto-c\\.a$")
+      set(archive "${path}")
+    endif()
+  endforeach()
+  if(NOT archive)
+    message(FATAL_ERROR "The install manifest has no static archive")
+  endif()
+  run("${C_COMPILER}" -std=c99 -I "${BINARY_DIR}/prefix/custom-include"
+    "${SOURCE_DIR}/tests/cmake/installed_config.c" "${archive}"
+    -o "${BINARY_DIR}/installed_config")
+  run("${BINARY_DIR}/installed_config")
+  # A definition that matches the installed build compiles, including a
+  # symbolic value that config.h defines after build_config.h.
+  run("${C_COMPILER}" -std=c99 -I "${BINARY_DIR}/prefix/custom-include"
+    -DTC_ENABLE_SHA384=1 -DTC_RESOURCE_PROFILE=TC_RESOURCE_DEFAULT
+    -DTC_AES_SBOX_MODE=TC_AES_SBOX_MODE_CONSTANT_TIME
+    -c "${SOURCE_DIR}/tests/cmake/installed_config.c"
+    -o "${BINARY_DIR}/installed_config_match.o")
+  # A definition that contradicts the installed build fails at compile time.
+  foreach(conflict "TC_ENABLE_SHA384=0" "TC_RESOURCE_PROFILE=TC_RESOURCE_MICRO"
+      "TC_AES_GCM_GHASH_MODE=TC_AES_GCM_GHASH_MODE_WIDE")
+    string(REGEX REPLACE "=.*" "" macro "${conflict}")
+    execute_process(COMMAND "${C_COMPILER}" -std=c99 -I "${BINARY_DIR}/prefix/custom-include"
+        "-D${conflict}" -c "${SOURCE_DIR}/tests/cmake/installed_config.c"
+        -o "${BINARY_DIR}/installed_config_conflict.o"
+      RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE error)
+    if(status EQUAL 0)
+      message(FATAL_ERROR "A conflicting ${conflict} was accepted")
+    endif()
+    if(NOT "${output}${error}" MATCHES "${macro} differs from the installed library configuration")
+      message(FATAL_ERROR "${conflict} failed for the wrong reason:\n${output}${error}")
+    endif()
+  endforeach()
+endif()
 # Copy the consumer so relative includes cannot reach the source tree.
 file(COPY "${SOURCE_DIR}/tests/cmake/consumer/" DESTINATION "${BINARY_DIR}/consumer-source")
 file(COPY "${SOURCE_DIR}/examples/x509_client.c" "${SOURCE_DIR}/examples/x509_client.h"

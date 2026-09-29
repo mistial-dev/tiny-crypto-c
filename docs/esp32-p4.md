@@ -29,7 +29,10 @@ Applications must enforce their accepted signature algorithms and legacy policy.
 Enabling the hash supplies only the implementation.
 
 Applications supply access policy, trust anchors and revocation data.
-Signed-update configuration adds its required primitives independently of the role.
+The component enables SHA-256, SHA-384 and SHA-512 for the vendored image hash.
+Signed-update configuration adds RSA, or EC with P-192 and P-256. These
+platform features apply with or without a role. `AUTO` selects them and an
+explicit `OFF` fails configuration.
 The native X.509 signature provider uses [ECDSA verification](ec.md) and
 [RSA verification](rsa.md). [X.509 path validation](x509-path.md) accepts an
 ordered chain, an explicit trust anchor and a signature provider.

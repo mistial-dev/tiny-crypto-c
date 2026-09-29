@@ -4,6 +4,11 @@
  */
 #ifndef TINY_CRYPTO_CONFIG_H_
 #define TINY_CRYPTO_CONFIG_H_
+/* An installed library records its configuration here, so installed headers
+ * match the archive without -D definitions. The quoted form selects the file
+ * beside this header. A second include at the end of this header checks
+ * consumer definitions against the recorded values. */
+#include "build_config.h"
 #include <tiny_crypto/resource_profile.h>
 
 /* Algorithm selection. Disabled translation units can be omitted entirely by
@@ -693,5 +698,11 @@
 #error "CTR_DRBG requires TC_ENABLE_AES and TC_AES_ENABLE_DYNAMIC"
 #endif
 #endif
+
+/* Reject a consumer definition that differs from the installed archive. The
+ * check runs last, after every symbolic value above is defined. */
+#define TC_BUILD_CONFIG_VERIFY 1
+#include "build_config.h"
+#undef TC_BUILD_CONFIG_VERIFY
 
 #endif

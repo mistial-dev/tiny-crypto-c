@@ -128,7 +128,21 @@ C++17 and requires an unused-result warning on each discarded wrapper result.
 These package checks are separate from sanitizer-instrumented unit tests.
 The install manifest is checked against the expected library, headers, CMake
 package files and license notices. Both installed license files must match the
-source copies byte for byte.
+source copies byte for byte. A C99 program then compiles against the installed
+headers with no `-D` definitions and links the archive. The installed
+`build_config.h` must supply SHA-384 and PIV SM cipher suite 7, which the
+default header profile omits. Matching definitions compile, including symbolic
+values such as `TC_RESOURCE_DEFAULT`. A conflicting `TC_ENABLE_SHA384=0`,
+`TC_RESOURCE_PROFILE=TC_RESOURCE_MICRO` or
+`TC_AES_GCM_GHASH_MODE=TC_AES_GCM_GHASH_MODE_WIDE` must fail.
+
+`test_config_rules` configures one invalid option set for each dependency rule
+in `config.h` and requires the matching `#error` text in the CMake failure. It
+also configures and builds the P-192-only EC, SHA-384-only, ISO 9797-only DES
+and SHA-1-only single-step KDF profiles. `test_esp_idf_platform` applies the
+ESP-IDF port's platform features with an empty `TINY_CRYPTO_TARGET`, compiles
+the port's hash and signed-update sources, and rejects an explicit `OFF` for a
+platform feature.
 Direct-source checks compile and link every product `.c` file in AES-only,
 TLV-only, and EC-only builds, with SHA-256 disabled.
 

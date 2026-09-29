@@ -75,6 +75,12 @@ add_subdirectory(path/to/tiny-crypto-c)
 target_link_libraries(firmware PRIVATE tiny-crypto-c::tiny-crypto-c)
 ```
 
+`cmake --install` installs the headers, the archive, a CMake package and a
+generated `tiny_crypto/build_config.h`. That header records the configuration
+the archive was built with, so consumers that use the installed headers without
+CMake get the same structure layouts. A `-D` definition that contradicts it
+fails with "differs from the installed library configuration".
+
 Public headers are in `src/tiny_crypto/`, following the Arduino library layout:
 
 ```c
@@ -100,8 +106,11 @@ set independently of resource tuning. See [PIV targets and ESP32-P4](docs/esp32-
 for the role requirements and ESP-IDF builds.
 
 Feature options accept `AUTO`, `ON`, or `OFF`. `AUTO` follows the selected
-profile. Explicit settings survive a profile change. Direct-source builds
-select `TC_RESOURCE_PROFILE=TC_RESOURCE_MICRO`, `TC_RESOURCE_MINI`, or
+profile. Explicit settings survive a profile change. Configuration compiles
+`config.h` with the selected values and stops with its `#error` text when an
+option lacks a dependency, so CMake and direct-source builds accept the same
+combinations. Direct-source builds select
+`TC_RESOURCE_PROFILE=TC_RESOURCE_MICRO`, `TC_RESOURCE_MINI`, or
 `TC_RESOURCE_DESKTOP`. The defaults below describe a build with no profile
 selected.
 
@@ -113,7 +122,7 @@ selected.
 | `TINY_CRYPTO_AES_DYNAMIC`    |     OFF | Per-context AES-128/192/256 keys, CBC, and CMAC                     |
 | `TINY_CRYPTO_ENABLE_DES`     |     OFF | DES and 3DES implementation                                         |
 | `TINY_CRYPTO_DES_ISO9797`    |     OFF | ISO/IEC 9797-1 DES MAC algorithms 1 and 3, requires DES             |
-| `TINY_CRYPTO_ENABLE_EC`      |     OFF | P-256/P-384 ECDH, key generation, and ECDSA                         |
+| `TINY_CRYPTO_ENABLE_EC`      |     OFF | P-192/P-256/P-384 ECDH, key generation, and ECDSA                   |
 | `TINY_CRYPTO_ENABLE_RSA`     |     OFF | RSA public and private-key operations                               |
 | `TINY_CRYPTO_ENABLE_SHA1`    |     OFF | SHA-1 implementation                                                |
 | `TINY_CRYPTO_ENABLE_SHA224`  |     OFF | SHA-224 using the SHA-256 core                                      |

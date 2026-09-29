@@ -106,6 +106,18 @@ add_test(NAME test_package_boundaries
         -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/removed-switches
         -DC_COMPILER=${CMAKE_C_COMPILER}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/reject_removed_switches.cmake)
+    add_test(NAME test_config_rules
+      COMMAND ${CMAKE_COMMAND}
+        -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+        -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/config-rules
+        -DC_COMPILER=${CMAKE_C_COMPILER}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/config_rules.cmake)
+    add_test(NAME test_esp_idf_platform
+      COMMAND ${CMAKE_COMMAND}
+        -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+        -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/esp-idf-platform
+        -DC_COMPILER=${CMAKE_C_COMPILER}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/esp_idf_platform.cmake)
     add_test(NAME test_header_config_rules
       COMMAND ${CMAKE_COMMAND}
         -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
@@ -1470,6 +1482,7 @@ add_test(NAME test_package_boundaries
     test_wycheproof_ecdsa
     test_ec_cavp
     test_trust_anchor_options
+    test_config_rules
     test_installed_consumer
     test_installed_consumer_debug_environment
     test_resource_profiles

@@ -19,6 +19,6 @@ execute_process(
 if(result EQUAL 0)
   message(FATAL_ERROR "OCSP without SHA-1 was accepted")
 endif()
-if(NOT "${output}${error}" MATCHES "TINY_CRYPTO_ENABLE_X509_OCSP requires TINY_CRYPTO_ENABLE_SHA1")
+if(NOT "${output}${error}" MATCHES "X.509 OCSP requires SHA-1")
   message(FATAL_ERROR "OCSP profile failed for the wrong reason:\n${output}${error}")
 endif()
