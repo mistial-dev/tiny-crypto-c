@@ -307,15 +307,24 @@ if (tiny_crypto::ccm_decrypt(key, nonce, aad, ciphertext, tag, plaintext) != TC_
 
 ## Block cipher modes
 
-Key a context with `TC_AES_init` or `TC_DES_init`. Init sets an all-zero IV.
-Load a fresh IV with `TC_AES_set_iv` or `TC_DES_set_iv` before each message in
-an IV mode. Clear the context with `TC_AES_ctx_clear` or `TC_DES_ctx_clear`
-when its lifetime ends.
+Key a context with `TC_AES_init` or `TC_DES_init`. Init leaves the context
+without an IV. Load a fresh IV with `TC_AES_set_iv` or `TC_DES_set_iv` before
+each message in an IV mode (CBC, CTR, OFB and the DES CFB modes). Until then
+those modes return `TC_ERROR`, even for an empty buffer, so a missing
+`set_iv` call cannot encrypt under a fixed zero IV. ECB and the MACs need no
+IV. Calls after `set_iv` continue one message: CBC and CFB chain from the last
+ciphertext, and CTR and OFB continue the keystream. The IV stays loaded until
+the next init or clear, so start every new message with `set_iv`. SP 800-38A
+section 5.3 and Appendix C require an unpredictable CBC and CFB IV and a
+unique OFB IV per message, and Appendix B unique CTR counter blocks under one
+key. Clear the context with `TC_AES_ctx_clear` or `TC_DES_ctx_clear` when its
+lifetime ends.
 
 The AES and DES CBC, CTR, OFB and ECB functions, and the DES CFB functions,
 transform `buf` in place. They share one argument rule:
 
-- The context must be initialized. `buf` may be `NULL` only with length zero.
+- The context must be initialized, and an IV mode needs an IV from `set_iv`.
+  `buf` may be `NULL` only with length zero.
 - CBC lengths are a multiple of the block size.
 - `buf`, an IV passed to `set_iv`, and CMAC or ISO 9797 input and tags must be
   disjoint from the context. A span inside the context would change round

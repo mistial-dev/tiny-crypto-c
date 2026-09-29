@@ -14,6 +14,13 @@
   (tc_block_mode_args((ctx), sizeof *(ctx), (buf), (length), (alignment)) && (key_ctx)->active == 1)
 
 #if TC_AES_HAVE_IV
+/* The IV modes also need a loaded IV. TC_AES_init leaves none, so a caller
+ * that skips TC_AES_set_iv gets TC_ERROR and never encrypts under a fixed
+ * all-zero IV. SP 800-38A Appendix C requires an unpredictable CBC IV and a
+ * unique OFB IV per message, and Appendix B unique CTR counter blocks. */
+#define AES_IV_MODE_VALID(ctx, buf, length, alignment)                                             \
+  (AES_MODE_VALID((ctx), &(ctx)->key, (buf), (length), (alignment)) && (ctx)->iv_loaded == 1)
+
 /* The fixed schedule of an AES context, borrowed for one call. */
 static tc_aes_block_key tc_aes_ctx_key(const struct TC_AES_ctx* ctx)
 {
@@ -56,7 +63,7 @@ TC_status TC_AES_ECB_decrypt(const struct TC_AES_key_ctx* ctx, uint8_t* buf)
 #if TC_AES_ENABLE_CBC
 TC_status TC_AES_CBC_encrypt(struct TC_AES_ctx* ctx, uint8_t* buffer, size_t length)
 {
-  if (!AES_MODE_VALID(ctx, &ctx->key, buffer, length, TC_AES_BLOCKLEN))
+  if (!AES_IV_MODE_VALID(ctx, buffer, length, TC_AES_BLOCKLEN))
     return TC_ERROR;
   const tc_aes_block_key key = tc_aes_ctx_key(ctx);
   const tc_block_cipher cipher = tc_aes_block_cipher(&key);
@@ -69,7 +76,7 @@ TC_status TC_AES_CBC_encrypt(struct TC_AES_ctx* ctx, uint8_t* buffer, size_t len
 
 TC_status TC_AES_CBC_decrypt(struct TC_AES_ctx* ctx, uint8_t* buffer, size_t length)
 {
-  if (!AES_MODE_VALID(ctx, &ctx->key, buffer, length, TC_AES_BLOCKLEN))
+  if (!AES_IV_MODE_VALID(ctx, buffer, length, TC_AES_BLOCKLEN))
     return TC_ERROR;
   const tc_aes_block_key key = tc_aes_ctx_key(ctx);
   const tc_block_cipher cipher = tc_aes_block_cipher_inverse(&key);
@@ -84,7 +91,7 @@ TC_status TC_AES_CBC_decrypt(struct TC_AES_ctx* ctx, uint8_t* buffer, size_t len
 #if TC_AES_ENABLE_CTR
 TC_status TC_AES_CTR_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length)
 {
-  if (!AES_MODE_VALID(ctx, &ctx->key, buf, length, 1))
+  if (!AES_IV_MODE_VALID(ctx, buf, length, 1))
     return TC_ERROR;
   const tc_block_ctr_state state = {ctx->iv, ctx->ctr_stream, &ctx->ctr_pos, &ctx->ctr_exhausted};
   if (!tc_block_ctr_request_ok(&state, TC_AES_BLOCKLEN, length))
@@ -102,7 +109,7 @@ TC_status TC_AES_CTR_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length)
 #if TC_AES_ENABLE_OFB
 TC_status TC_AES_OFB_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length)
 {
-  if (!AES_MODE_VALID(ctx, &ctx->key, buf, length, 1) || ctx->ofb_pos > TC_AES_BLOCKLEN)
+  if (!AES_IV_MODE_VALID(ctx, buf, length, 1) || ctx->ofb_pos > TC_AES_BLOCKLEN)
     return TC_ERROR;
   const tc_aes_block_key key = tc_aes_ctx_key(ctx);
   const tc_block_cipher cipher = tc_aes_block_cipher(&key);

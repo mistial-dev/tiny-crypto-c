@@ -842,7 +842,10 @@ synthetic IV prefixes the ciphertext.
 
 The AES and DES mode suites pass buffers, IVs and tags that lie inside the
 context or run into its first byte. Every mode, `set_iv` and MAC entry must
-return `TC_ERROR` and leave the context unchanged. `test_aes_mode_failure`
+return `TC_ERROR` and leave the context unchanged. The `iv-required` and
+`des_iv_required` cases call every IV mode right after init. Each call must
+return `TC_ERROR` and leave the buffer and context unchanged until `set_iv`
+loads an IV, and a re-init must drop that IV again. `test_aes_mode_failure`
 compiles `aes_modes.c` and `block_modes.c` with the block cipher renamed to
 test wrappers that fail a chosen block. Each failure must wipe the buffer and
 the chaining value and clear the context. The library has no runtime cipher

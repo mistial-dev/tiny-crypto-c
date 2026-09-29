@@ -128,6 +128,66 @@ static void cavp_ecb_block(const uint8_t* key, size_t key_len, int encrypt,
   memcpy(output, block, sizeof(block));
 }
 
+#if TC_AES_ENABLE_CBC || TC_AES_ENABLE_OFB
+/* IV modes need an explicit IV, so a record without one runs under an
+ * explicit all-zero IV. */
+static TC_status cavp_load_iv(struct TC_AES_ctx* ctx, const struct cavp_record* record)
+{
+  static const uint8_t zero_iv[TC_AES_BLOCKLEN] = {0};
+  return TC_AES_set_iv(ctx, record->iv != NULL ? record->iv : zero_iv);
+}
+#endif
+
+/* Apply the mode to buf in place. Returns TC_ERROR for a mode missing from
+ * the build. */
+static TC_status cavp_apply_mode(struct TC_AES_ctx* ctx, enum cavp_mode mode, int encrypt,
+                                 const struct cavp_record* record, uint8_t* buf, size_t length)
+{
+  TC_status status = TC_ERROR;
+
+  switch (mode) {
+  case CAVP_ECB:
+#if TC_AES_ENABLE_ECB
+    status = TC_OK;
+    for (size_t offset = 0; status == TC_OK && offset < length; offset += TC_AES_BLOCKLEN)
+      status = encrypt ? TC_AES_ECB_encrypt(&ctx->key, buf + offset)
+                       : TC_AES_ECB_decrypt(&ctx->key, buf + offset);
+#endif
+    break;
+  case CAVP_CBC:
+#if TC_AES_ENABLE_CBC
+    status = cavp_load_iv(ctx, record);
+    if (status == TC_OK)
+      status =
+          encrypt ? TC_AES_CBC_encrypt(ctx, buf, length) : TC_AES_CBC_decrypt(ctx, buf, length);
+#endif
+    break;
+  case CAVP_OFB:
+#if TC_AES_ENABLE_OFB
+    status = cavp_load_iv(ctx, record);
+    if (status == TC_OK)
+      status = TC_AES_OFB_crypt(ctx, buf, length);
+#endif
+    break;
+  }
+  (void)encrypt;
+  (void)record;
+  (void)buf;
+  (void)length;
+  return status;
+}
+
+static TC_status cavp_apply(enum cavp_mode mode, int encrypt, const struct cavp_record* record,
+                            uint8_t* buf, size_t length)
+{
+  struct TC_AES_ctx ctx;
+  TC_status status = TC_AES_init(&ctx, record->key);
+  if (status == TC_OK)
+    status = cavp_apply_mode(&ctx, mode, encrypt, record, buf, length);
+  TC_AES_ctx_clear(&ctx);
+  return status;
+}
+
 static int cavp_standard_case(enum cavp_mode mode, const char* file, int encrypt,
                               const struct cavp_record* record)
 {
@@ -149,47 +209,10 @@ static int cavp_standard_case(enum cavp_mode mode, const char* file, int encrypt
   if (input_len != 0)
     memcpy(actual, input, input_len);
 
-  if (mode == CAVP_ECB) {
-#if TC_AES_ENABLE_ECB
-    struct TC_AES_ctx ctx;
-    size_t offset;
-    TC_AES_init(&ctx, record->key);
-    for (offset = 0; offset < input_len; offset += TC_AES_BLOCKLEN) {
-      if (encrypt) {
-        if (TC_AES_ECB_encrypt(&ctx.key, actual + offset) != TC_OK)
-          return 0;
-      } else {
-        if (TC_AES_ECB_decrypt(&ctx.key, actual + offset) != TC_OK)
-          return 0;
-      }
-    }
-#else
+  if (cavp_apply(mode, encrypt, record, actual, input_len) != TC_OK) {
+    fprintf(stderr, "CAVP mode error: %s Count=%lu\n", file, (unsigned long)record->count);
     free(actual);
     return 0;
-#endif
-  } else if (mode == CAVP_CBC) {
-#if TC_AES_ENABLE_CBC
-    struct TC_AES_ctx ctx;
-    TC_AES_init(&ctx, record->key);
-    TC_AES_set_iv(&ctx, record->iv);
-    if (encrypt)
-      TC_AES_CBC_encrypt(&ctx, actual, input_len);
-    else
-      TC_AES_CBC_decrypt(&ctx, actual, input_len);
-#else
-    free(actual);
-    return 0;
-#endif
-  } else {
-#if TC_AES_ENABLE_OFB
-    struct TC_AES_ctx ctx;
-    TC_AES_init(&ctx, record->key);
-    TC_AES_set_iv(&ctx, record->iv);
-    TC_AES_OFB_crypt(&ctx, actual, input_len);
-#else
-    free(actual);
-    return 0;
-#endif
   }
 
   if (!cavp_compare(file, record->count, encrypt ? "CIPHERTEXT" : "PLAINTEXT", actual, input_len,

@@ -182,6 +182,7 @@ static void assert_aes_ctx_equal(const struct TC_AES_ctx* a, const struct TC_AES
   munit_assert_memory_equal(sizeof a->key.round_key, a->key.round_key, b->key.round_key);
   munit_assert_uint8(a->key.active, ==, b->key.active);
   munit_assert_memory_equal(sizeof a->iv, a->iv, b->iv);
+  munit_assert_uint8(a->iv_loaded, ==, b->iv_loaded);
 #if TC_AES_ENABLE_CTR
   munit_assert_memory_equal(sizeof a->ctr_stream, a->ctr_stream, b->ctr_stream);
   munit_assert_uint8(a->ctr_pos, ==, b->ctr_pos);
@@ -264,6 +265,63 @@ static MunitResult test_mode_overlap(const MunitParameter params[], void* data)
   munit_assert_int(TC_AES_set_iv(&ctx, nist_ctr_iv), ==, TC_OK);
   munit_assert_memory_equal(sizeof ctx.iv, ctx.iv, nist_ctr_iv);
   TC_AES_ctx_clear(&ctx);
+  return MUNIT_OK;
+}
+#endif
+
+#if TC_AES_HAVE_IV
+/* An IV mode called before TC_AES_set_iv would encrypt under a fixed zero
+ * IV. It must fail and leave buf and ctx unchanged, including for an empty
+ * request, and work once an IV is loaded. */
+static void check_mode_requires_iv(aes_mode_fn mode, size_t length)
+{
+  struct TC_AES_ctx ctx;
+  struct TC_AES_ctx saved;
+  uint8_t buf[2 * TC_AES_BLOCKLEN];
+  uint8_t before[sizeof buf];
+
+  memset(buf, 0x3c, sizeof buf);
+  memcpy(before, buf, sizeof buf);
+  munit_assert_int(TC_AES_init(&ctx, TEST_KEY), ==, TC_OK);
+  memcpy(&saved, &ctx, sizeof saved);
+  munit_assert_int(mode(&ctx, buf, length), ==, TC_ERROR);
+  munit_assert_int(mode(&ctx, NULL, 0), ==, TC_ERROR);
+  munit_assert_memory_equal(sizeof buf, buf, before);
+  assert_aes_ctx_equal(&ctx, &saved);
+
+  /* A rejected set_iv loads nothing. */
+  munit_assert_int(TC_AES_set_iv(&ctx, NULL), ==, TC_ERROR);
+  munit_assert_int(mode(&ctx, buf, length), ==, TC_ERROR);
+  munit_assert_memory_equal(sizeof buf, buf, before);
+  assert_aes_ctx_equal(&ctx, &saved);
+
+  munit_assert_int(TC_AES_set_iv(&ctx, nist_iv), ==, TC_OK);
+  munit_assert_int(mode(&ctx, buf, length), ==, TC_OK);
+  munit_assert_memory_not_equal(length, buf, before);
+
+  /* A re-init starts without an IV again. */
+  memcpy(buf, before, sizeof buf);
+  munit_assert_int(TC_AES_init(&ctx, TEST_KEY), ==, TC_OK);
+  munit_assert_int(mode(&ctx, buf, length), ==, TC_ERROR);
+  munit_assert_memory_equal(sizeof buf, buf, before);
+  TC_AES_ctx_clear(&ctx);
+}
+
+static MunitResult test_iv_required(const MunitParameter params[], void* data)
+{
+  (void)params;
+  (void)data;
+  test_initialize_sbox();
+#if TC_AES_ENABLE_CBC
+  check_mode_requires_iv(TC_AES_CBC_encrypt, 2 * TC_AES_BLOCKLEN);
+  check_mode_requires_iv(TC_AES_CBC_decrypt, TC_AES_BLOCKLEN);
+#endif
+#if TC_AES_ENABLE_CTR
+  check_mode_requires_iv(TC_AES_CTR_crypt, 5);
+#endif
+#if TC_AES_ENABLE_OFB
+  check_mode_requires_iv(TC_AES_OFB_crypt, 2 * TC_AES_BLOCKLEN - 3);
+#endif
   return MUNIT_OK;
 }
 #endif
@@ -1453,6 +1511,7 @@ static MunitTest test_suite_tests[] = {
     {"/invalid-key-state", test_invalid_key_state, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
 #if TC_AES_HAVE_IV
     {"/mode-overlap", test_mode_overlap, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/iv-required", test_iv_required, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
 #endif
 #if TC_AES_ENABLE_ECB
     {"/ecb", test_ecb, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

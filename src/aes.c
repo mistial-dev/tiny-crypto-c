@@ -298,21 +298,10 @@ TC_status TC_AES_init(struct TC_AES_ctx* ctx, const uint8_t* key)
     TC_AES_ctx_clear(ctx);
     return TC_ERROR;
   }
+  /* The clear also leaves iv_loaded at 0, so the IV modes fail until
+   * TC_AES_set_iv starts a message. */
   TC_AES_ctx_clear(ctx);
-  if (TC_AES_key_init(&ctx->key, key) != TC_OK)
-    return TC_ERROR;
-#if TC_AES_HAVE_IV
-  memset(ctx->iv, 0, TC_AES_BLOCKLEN);
-#endif
-#if TC_AES_ENABLE_CTR
-  memset(ctx->ctr_stream, 0, TC_AES_BLOCKLEN);
-  ctx->ctr_pos = TC_AES_BLOCKLEN;
-  ctx->ctr_exhausted = 0;
-#endif
-#if TC_AES_ENABLE_OFB
-  ctx->ofb_pos = TC_AES_BLOCKLEN;
-#endif
-  return TC_OK;
+  return TC_AES_key_init(&ctx->key, key);
 }
 #if TC_AES_HAVE_IV
 TC_status TC_AES_set_iv(struct TC_AES_ctx* ctx, const uint8_t* iv)
@@ -321,6 +310,7 @@ TC_status TC_AES_set_iv(struct TC_AES_ctx* ctx, const uint8_t* iv)
   if (!tc_block_mode_args(ctx, sizeof *ctx, iv, TC_AES_BLOCKLEN, 1) || ctx->key.active != 1)
     return TC_ERROR;
   memcpy(ctx->iv, iv, TC_AES_BLOCKLEN);
+  ctx->iv_loaded = 1;
 #if TC_AES_ENABLE_CTR
   ctx->ctr_pos = TC_AES_BLOCKLEN;
   ctx->ctr_exhausted = 0;

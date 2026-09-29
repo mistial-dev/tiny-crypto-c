@@ -77,54 +77,45 @@ static int cavp_parse_bits(const char* s, uint8_t* out, size_t max_bytes)
 /* KAT / MMT execution                                                       */
 /* ------------------------------------------------------------------------- */
 
-/* Apply the mode to buf in place. len is bytes (bits for CAVP_TCFB1). */
-static void cavp_apply(int mode, int encrypt, const uint8_t key[24], const uint8_t* iv, int have_iv,
-                       uint8_t* buf, size_t len)
+/* Run one IV mode over buf in place. len is bytes (bits for CAVP_TCFB1). */
+static TC_status cavp_apply_iv_mode(struct TC_DES_ctx* ctx, int mode, int encrypt, uint8_t* buf,
+                                    size_t len)
 {
+  switch (mode) {
+  case CAVP_TCBC:
+    return encrypt ? TC_DES_CBC_encrypt(ctx, buf, len) : TC_DES_CBC_decrypt(ctx, buf, len);
+  case CAVP_TCFB1:
+    return encrypt ? TC_DES_CFB1_encrypt(ctx, buf, len) : TC_DES_CFB1_decrypt(ctx, buf, len);
+  case CAVP_TCFB8:
+    return encrypt ? TC_DES_CFB8_encrypt(ctx, buf, len) : TC_DES_CFB8_decrypt(ctx, buf, len);
+  case CAVP_TCFB64:
+    return encrypt ? TC_DES_CFB64_encrypt(ctx, buf, len) : TC_DES_CFB64_decrypt(ctx, buf, len);
+  default: /* CAVP_TOFB */
+    return TC_DES_OFB_crypt(ctx, buf, len);
+  }
+}
+
+/* Apply the mode to buf in place. len is bytes (bits for CAVP_TCFB1). IV
+ * modes need an explicit IV, so a record without one runs under an explicit
+ * all-zero IV. */
+static TC_status cavp_apply(int mode, int encrypt, const uint8_t key[24], const uint8_t* iv,
+                            int have_iv, uint8_t* buf, size_t len)
+{
+  static const uint8_t zero_iv[TC_DES_BLOCKLEN] = {0};
   struct TC_DES_ctx ctx;
+  TC_status status = TC_DES_init(&ctx, key, 24);
   size_t i;
 
-  TC_DES_init(&ctx, key, 24);
-  if (have_iv)
-    TC_DES_set_iv(&ctx, iv);
-
-  switch (mode) {
-  case CAVP_TECB:
-    for (i = 0; i < len; i += TC_DES_BLOCKLEN) {
-      if (encrypt)
-        TC_DES_ECB_encrypt(&ctx, buf + i);
-      else
-        TC_DES_ECB_decrypt(&ctx, buf + i);
-    }
-    break;
-  case CAVP_TCBC:
-    if (encrypt)
-      TC_DES_CBC_encrypt(&ctx, buf, len);
-    else
-      TC_DES_CBC_decrypt(&ctx, buf, len);
-    break;
-  case CAVP_TCFB1:
-    if (encrypt)
-      TC_DES_CFB1_encrypt(&ctx, buf, len);
-    else
-      TC_DES_CFB1_decrypt(&ctx, buf, len);
-    break;
-  case CAVP_TCFB8:
-    if (encrypt)
-      TC_DES_CFB8_encrypt(&ctx, buf, len);
-    else
-      TC_DES_CFB8_decrypt(&ctx, buf, len);
-    break;
-  case CAVP_TCFB64:
-    if (encrypt)
-      TC_DES_CFB64_encrypt(&ctx, buf, len);
-    else
-      TC_DES_CFB64_decrypt(&ctx, buf, len);
-    break;
-  default: /* CAVP_TOFB */
-    TC_DES_OFB_crypt(&ctx, buf, len);
-    break;
+  if (status == TC_OK && mode == CAVP_TECB) {
+    for (i = 0; status == TC_OK && i < len; i += TC_DES_BLOCKLEN)
+      status = encrypt ? TC_DES_ECB_encrypt(&ctx, buf + i) : TC_DES_ECB_decrypt(&ctx, buf + i);
+  } else if (status == TC_OK) {
+    status = TC_DES_set_iv(&ctx, have_iv ? iv : zero_iv);
+    if (status == TC_OK)
+      status = cavp_apply_iv_mode(&ctx, mode, encrypt, buf, len);
   }
+  TC_DES_ctx_clear(&ctx);
+  return status;
 }
 
 static int cavp_standard_case(int mode, const char* file, int encrypt, const struct cavp_record* r)
@@ -141,7 +132,10 @@ static int cavp_standard_case(int mode, const char* file, int encrypt, const str
     return 0;
   }
   memcpy(buf, input, (mode == CAVP_TCFB1) ? (in_len + 7) / 8 : in_len);
-  cavp_apply(mode, encrypt, r->key, r->iv, r->have_iv, buf, in_len);
+  if (cavp_apply(mode, encrypt, r->key, r->iv, r->have_iv, buf, in_len) != TC_OK) {
+    fprintf(stderr, "CAVP mode error: %s Count=%ld\n", file, r->count);
+    return 0;
+  }
   if (memcmp(buf, expected, cmp_bytes) != 0) {
     fprintf(stderr, "CAVP failure: %s Count=%ld [%s]\n", file, r->count,
             encrypt ? "ENCRYPT" : "DECRYPT");

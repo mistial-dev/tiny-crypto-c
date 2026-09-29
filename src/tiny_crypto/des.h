@@ -63,6 +63,7 @@ struct TC_DES_ctx {
   uint8_t active;
 #if TC_DES_NEEDS_IV
   uint8_t iv[TC_DES_BLOCKLEN];
+  uint8_t iv_loaded; /* 1 once TC_DES_set_iv loaded an IV for this key. */
 #endif
 #if TC_DES_ENABLE_CTR
   uint8_t ctr_stream[TC_DES_BLOCKLEN];
@@ -86,17 +87,19 @@ void TC_DES_ctx_clear(struct TC_DES_ctx* ctx);
 
 /*
  * The ECB, CBC, CTR, CFB and OFB entry points share one argument contract.
- * They return TC_ERROR for a NULL or uninitialized context, a NULL buffer with
- * a nonzero length, or a buffer that overlaps the context, and leave the
- * context and buffer unchanged. A NULL buffer with length 0 returns TC_OK.
+ * They return TC_ERROR for a NULL or uninitialized context, a context without
+ * an IV from TC_DES_set_iv (every mode except ECB, even for an empty buffer),
+ * a NULL buffer with a nonzero length, or a buffer that overlaps the context,
+ * and leave the context and buffer unchanged. Otherwise a NULL buffer with
+ * length 0 returns TC_OK.
  * Every mode transforms buf in place. The DES cipher itself cannot fail.
  */
 
 /**
  * @brief Initialize a DES or TDEA context with a key.
  *
- * The IV and stream state start at zero. IV modes then take TC_DES_set_iv
- * before the first message.
+ * The context holds no IV afterwards, so the CBC, CTR, CFB and OFB modes
+ * return TC_ERROR until TC_DES_set_iv loads one.
  *
  * @param ctx Caller-owned context.
  * @param key Key bytes. They must not overlap ctx.
@@ -117,7 +120,10 @@ TC_status TC_DES_init(struct TC_DES_ctx* ctx, const uint8_t* key, size_t keylen)
  *
  * Call it after TC_DES_init and before each new message in an IV mode. It
  * resets the CTR and OFB stream positions, the CTR exhaustion flag and the
- * CFB64 finished flag.
+ * CFB64 finished flag. Mode calls after it continue that message: CBC and
+ * CFB chain from the last ciphertext, and CTR and OFB continue the
+ * keystream, so a message may span several calls. The IV stays loaded until
+ * the next init or clear.
  *
  * @param ctx Initialized context.
  * @param iv 8-byte initialization vector. It must not overlap ctx.

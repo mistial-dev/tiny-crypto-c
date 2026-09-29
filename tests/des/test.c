@@ -1011,6 +1011,7 @@ static void assert_des_ctx_equal(const struct TC_DES_ctx* a, const struct TC_DES
   munit_assert_uint8(a->triple, ==, b->triple);
   munit_assert_uint8(a->active, ==, b->active);
   munit_assert_memory_equal(sizeof a->iv, a->iv, b->iv);
+  munit_assert_uint8(a->iv_loaded, ==, b->iv_loaded);
 #if TC_DES_ENABLE_CTR
   munit_assert_memory_equal(sizeof a->ctr_stream, a->ctr_stream, b->ctr_stream);
   munit_assert_uint8(a->ctr_pos, ==, b->ctr_pos);
@@ -1103,6 +1104,75 @@ static void check_des_mode_overlap(des_mode_fn mode, size_t length, size_t bytes
     munit_assert_memory_equal(sizeof before, frame.before, before);
   }
   TC_DES_ctx_clear(&frame.ctx);
+}
+
+/* An IV mode called before TC_DES_set_iv would encrypt under a fixed zero
+ * IV. It must fail and leave buf and ctx unchanged, including for an empty
+ * request, and work once an IV is loaded. length is in the mode's unit and
+ * touches bytes bytes, at most 2 * TC_DES_BLOCKLEN. */
+static void check_des_mode_requires_iv(des_mode_fn mode, size_t length, size_t bytes)
+{
+  static const uint8_t iv[TC_DES_BLOCKLEN] = {1, 2, 3, 4, 5, 6, 7, 8};
+  struct TC_DES_ctx ctx;
+  struct TC_DES_ctx saved;
+  uint8_t buf[2 * TC_DES_BLOCKLEN];
+  uint8_t before[sizeof buf];
+
+  memset(buf, 0x3c, sizeof buf);
+  memcpy(before, buf, sizeof buf);
+  munit_assert_int(TC_OK, ==, TC_DES_init(&ctx, des_test_key, TC_DES_KEYLEN));
+  memcpy(&saved, &ctx, sizeof saved);
+  munit_assert_int(TC_ERROR, ==, mode(&ctx, buf, length));
+  munit_assert_int(TC_ERROR, ==, mode(&ctx, NULL, 0));
+  munit_assert_memory_equal(sizeof buf, buf, before);
+  assert_des_ctx_equal(&ctx, &saved);
+
+  /* A rejected set_iv loads nothing. */
+  munit_assert_int(TC_ERROR, ==, TC_DES_set_iv(&ctx, NULL));
+  munit_assert_int(TC_ERROR, ==, mode(&ctx, buf, length));
+  munit_assert_memory_equal(sizeof buf, buf, before);
+  assert_des_ctx_equal(&ctx, &saved);
+
+  munit_assert_int(TC_OK, ==, TC_DES_set_iv(&ctx, iv));
+  munit_assert_int(TC_OK, ==, mode(&ctx, buf, length));
+  munit_assert_memory_not_equal(bytes, buf, before);
+
+  /* A re-init starts without an IV again. */
+  memcpy(buf, before, sizeof buf);
+  munit_assert_int(TC_OK, ==, TC_DES_init(&ctx, des_test_key, TC_DES_KEYLEN));
+  munit_assert_int(TC_ERROR, ==, mode(&ctx, buf, length));
+  munit_assert_memory_equal(sizeof buf, buf, before);
+  TC_DES_ctx_clear(&ctx);
+}
+
+static MunitResult test_des_iv_required(const MunitParameter params[], void* data)
+{
+  (void)params;
+  (void)data;
+#if TC_DES_ENABLE_CBC
+  check_des_mode_requires_iv(TC_DES_CBC_encrypt, 2 * TC_DES_BLOCKLEN, 2 * TC_DES_BLOCKLEN);
+  check_des_mode_requires_iv(TC_DES_CBC_decrypt, TC_DES_BLOCKLEN, TC_DES_BLOCKLEN);
+#endif
+#if TC_DES_ENABLE_CTR
+  check_des_mode_requires_iv(TC_DES_CTR_crypt, 5, 5);
+#endif
+#if TC_DES_ENABLE_CFB64
+  check_des_mode_requires_iv(TC_DES_CFB64_encrypt, TC_DES_BLOCKLEN, TC_DES_BLOCKLEN);
+  check_des_mode_requires_iv(TC_DES_CFB64_decrypt, 3, 3);
+#endif
+#if TC_DES_ENABLE_CFB8
+  check_des_mode_requires_iv(TC_DES_CFB8_encrypt, 9, 9);
+  check_des_mode_requires_iv(TC_DES_CFB8_decrypt, 1, 1);
+#endif
+#if TC_DES_ENABLE_CFB1
+  /* CFB1 lengths count bits. 57 bits touch 8 bytes. */
+  check_des_mode_requires_iv(TC_DES_CFB1_encrypt, 57, 8);
+  check_des_mode_requires_iv(TC_DES_CFB1_decrypt, 57, 8);
+#endif
+#if TC_DES_ENABLE_OFB
+  check_des_mode_requires_iv(TC_DES_OFB_crypt, 11, 11);
+#endif
+  return MUNIT_OK;
 }
 
 static MunitResult test_des_mode_overlap(const MunitParameter params[], void* data)
@@ -1678,6 +1748,7 @@ static MunitTest test_suite_tests[] = {
     TC_DES_ENABLE_CFB8 || TC_DES_ENABLE_CFB64
     {"/des_null_buffers", test_des_null_buffers, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/des_mode_overlap", test_des_mode_overlap, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/des_iv_required", test_des_iv_required, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
 #endif
 #if TC_DES_ENABLE_CMAC
     {"/des_cmac_overlap", test_des_cmac_overlap, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

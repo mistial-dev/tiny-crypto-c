@@ -49,6 +49,7 @@ struct TC_AES_ctx {
   struct TC_AES_key_ctx key;
 #if TC_AES_HAVE_IV
   uint8_t iv[TC_AES_BLOCKLEN];
+  uint8_t iv_loaded; /* 1 once TC_AES_set_iv loaded an IV for this key. */
 #if TC_AES_ENABLE_CTR
   uint8_t ctr_stream[TC_AES_BLOCKLEN];
   uint8_t ctr_pos;
@@ -66,11 +67,11 @@ void TC_AES_key_ctx_clear(struct TC_AES_key_ctx* ctx);
 /* Wipe an AES context, including mode-specific streaming state. */
 void TC_AES_ctx_clear(struct TC_AES_ctx* ctx);
 
-/* Initialize an expanded key schedule and zero the IV and stream state. Both
+/* Initialize an expanded key schedule. The context holds no IV afterwards,
+ * so CBC, CTR and OFB return TC_ERROR until TC_AES_set_iv loads one. Both
  * pointers must be non-NULL and disjoint. Returns TC_OK or TC_ERROR. A NULL ctx
  * is left alone. Every other failure wipes ctx, so a previous key is unusable
- * after a failed re-init. Modes with an IV then need TC_AES_set_iv before the
- * first message. */
+ * after a failed re-init. */
 TC_status TC_AES_init(struct TC_AES_ctx* ctx, const uint8_t* key);
 #if TC_AES_CAVP
 /* Test-only single-block hooks used by the AESAVS harness. They return
@@ -84,19 +85,23 @@ void TC_AES_init_sbox(void);
 #endif
 #if TC_AES_HAVE_IV
 /* Start a message: load a 16-byte IV and reset the CTR and OFB stream state.
- * Call it after TC_AES_init and before each new message. Returns
- * TC_ERROR, leaving ctx unchanged, for a NULL argument, an uninitialized
- * context or an IV that overlaps ctx. */
+ * Call it after TC_AES_init and before each new message. Mode calls after it
+ * continue that message: CBC chains from the last ciphertext block, and CTR
+ * and OFB continue the keystream, so a message may span several calls. The
+ * IV stays loaded until the next init or clear. Returns TC_ERROR, leaving
+ * ctx unchanged, for a NULL argument, an uninitialized context or an IV that
+ * overlaps ctx. */
 TC_status TC_AES_set_iv(struct TC_AES_ctx* ctx, const uint8_t* iv);
 #endif
 
 /*
  * The CBC, CTR, OFB and ECB functions below transform buf in place and share
  * one failure rule. They return TC_ERROR, leaving buf and ctx unchanged, for
- * an uninitialized context, a NULL buf with a nonzero length, or a buf that
- * overlaps ctx. A block cipher failure part way through wipes buf and clears
- * ctx, so neither partial output nor a broken chaining value survives. ECB
- * takes a const key schedule, so its failure wipes buf only.
+ * an uninitialized context, a context without an IV from TC_AES_set_iv (CBC,
+ * CTR and OFB, even for an empty buf), a NULL buf with a nonzero length, or a
+ * buf that overlaps ctx. A block cipher failure part way through wipes buf and
+ * clears ctx, so neither partial output nor a broken chaining value survives.
+ * ECB takes a const key schedule, so its failure wipes buf only.
  */
 
 #if TC_AES_ENABLE_ECB

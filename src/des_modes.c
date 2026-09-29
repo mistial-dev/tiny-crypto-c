@@ -22,6 +22,18 @@
       return TC_ERROR;                                                                             \
   } while (0)
 
+/* The IV modes also need a loaded IV. TC_DES_init leaves none, so a caller
+ * that skips TC_DES_set_iv gets TC_ERROR and never encrypts under a fixed
+ * all-zero IV. SP 800-38A section 5.3 and Appendix C require an
+ * unpredictable CBC and CFB IV and a unique OFB IV per message, and
+ * Appendix B unique CTR counter blocks. */
+#define DES_IV_MODE_REQUIRE_ARGS(ctx, buf, bytes, alignment)                                       \
+  do {                                                                                             \
+    DES_MODE_REQUIRE_ARGS((ctx), (buf), (bytes), (alignment));                                     \
+    if ((ctx)->iv_loaded != 1)                                                                     \
+      return TC_ERROR;                                                                             \
+  } while (0)
+
 #if TC_DES_ENABLE_ECB || TC_DES_ENABLE_CBC || TC_DES_ENABLE_CTR || TC_DES_ENABLE_OFB ||            \
     TC_DES_ENABLE_CFB1 || TC_DES_ENABLE_CFB8 || TC_DES_ENABLE_CFB64
 /* The context's schedule, borrowed for one call. */
@@ -162,6 +174,7 @@ static int tc_des_ctx_keylen_supported(size_t keylen)
 static void tc_des_ctx_start_message(struct TC_DES_ctx* ctx, const uint8_t iv[TC_DES_BLOCKLEN])
 {
   memcpy(ctx->iv, iv, TC_DES_BLOCKLEN);
+  ctx->iv_loaded = 1;
 #if TC_DES_ENABLE_CTR
   ctx->ctr_pos = TC_DES_BLOCKLEN;
   ctx->ctr_exhausted = 0;
@@ -189,12 +202,8 @@ TC_status TC_DES_init(struct TC_DES_ctx* ctx, const uint8_t* key, size_t keylen)
 #endif
   tc_des_schedule_key(ctx->schedule, key, keylen);
   ctx->triple = (uint8_t)(keylen != TC_DES_KEYLEN);
-#if TC_DES_NEEDS_IV
-  {
-    static const uint8_t zero_iv[TC_DES_BLOCKLEN] = {0};
-    tc_des_ctx_start_message(ctx, zero_iv);
-  }
-#endif
+  /* iv_loaded stays 0 from the clear, so the IV modes fail until
+   * TC_DES_set_iv starts a message. */
   ctx->active = 1;
   return TC_OK;
 }
@@ -231,7 +240,7 @@ TC_status TC_DES_ECB_decrypt(const struct TC_DES_ctx* ctx, uint8_t* buf)
 #if TC_DES_ENABLE_CBC
 TC_status TC_DES_CBC_encrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length)
 {
-  DES_MODE_REQUIRE_ARGS(ctx, buf, length, TC_DES_BLOCKLEN);
+  DES_IV_MODE_REQUIRE_ARGS(ctx, buf, length, TC_DES_BLOCKLEN);
   const tc_des_block_key key = tc_des_ctx_key(ctx);
   const tc_block_cipher cipher = tc_des_block_cipher(&key);
   return tc_block_cbc_encrypt(&cipher, ctx->iv, buf, length);
@@ -239,7 +248,7 @@ TC_status TC_DES_CBC_encrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length
 
 TC_status TC_DES_CBC_decrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length)
 {
-  DES_MODE_REQUIRE_ARGS(ctx, buf, length, TC_DES_BLOCKLEN);
+  DES_IV_MODE_REQUIRE_ARGS(ctx, buf, length, TC_DES_BLOCKLEN);
   const tc_des_block_key key = tc_des_ctx_key(ctx);
   const tc_block_cipher cipher = tc_des_block_cipher_inverse(&key);
   return tc_block_cbc_decrypt(&cipher, ctx->iv, buf, length);
@@ -249,7 +258,7 @@ TC_status TC_DES_CBC_decrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length
 #if TC_DES_ENABLE_CTR
 TC_status TC_DES_CTR_crypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length)
 {
-  DES_MODE_REQUIRE_ARGS(ctx, buf, length, 1);
+  DES_IV_MODE_REQUIRE_ARGS(ctx, buf, length, 1);
   const tc_des_block_key key = tc_des_ctx_key(ctx);
   const tc_block_cipher cipher = tc_des_block_cipher(&key);
   const tc_block_ctr_state state = {ctx->iv, ctx->ctr_stream, &ctx->ctr_pos, &ctx->ctr_exhausted};
@@ -262,13 +271,13 @@ TC_status TC_DES_CTR_crypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length)
 #if TC_DES_ENABLE_CFB64
 TC_status TC_DES_CFB64_encrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length)
 {
-  DES_MODE_REQUIRE_ARGS(ctx, buf, length, 1);
+  DES_IV_MODE_REQUIRE_ARGS(ctx, buf, length, 1);
   return tc_des_mode_cfb64(ctx, buf, length, 0);
 }
 
 TC_status TC_DES_CFB64_decrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length)
 {
-  DES_MODE_REQUIRE_ARGS(ctx, buf, length, 1);
+  DES_IV_MODE_REQUIRE_ARGS(ctx, buf, length, 1);
   /* CFB decryption uses the cipher's forward direction. */
   return tc_des_mode_cfb64(ctx, buf, length, 1);
 }
@@ -277,13 +286,13 @@ TC_status TC_DES_CFB64_decrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t leng
 #if TC_DES_ENABLE_CFB8
 TC_status TC_DES_CFB8_encrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length)
 {
-  DES_MODE_REQUIRE_ARGS(ctx, buf, length, 1);
+  DES_IV_MODE_REQUIRE_ARGS(ctx, buf, length, 1);
   return tc_des_mode_cfb8(ctx, buf, length, 0);
 }
 
 TC_status TC_DES_CFB8_decrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length)
 {
-  DES_MODE_REQUIRE_ARGS(ctx, buf, length, 1);
+  DES_IV_MODE_REQUIRE_ARGS(ctx, buf, length, 1);
   return tc_des_mode_cfb8(ctx, buf, length, 1);
 }
 #endif
@@ -297,13 +306,13 @@ static size_t tc_des_cfb1_bytes(size_t bit_length)
 
 TC_status TC_DES_CFB1_encrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t bit_length)
 {
-  DES_MODE_REQUIRE_ARGS(ctx, buf, tc_des_cfb1_bytes(bit_length), 1);
+  DES_IV_MODE_REQUIRE_ARGS(ctx, buf, tc_des_cfb1_bytes(bit_length), 1);
   return tc_des_mode_cfb1(ctx, buf, bit_length, 0);
 }
 
 TC_status TC_DES_CFB1_decrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t bit_length)
 {
-  DES_MODE_REQUIRE_ARGS(ctx, buf, tc_des_cfb1_bytes(bit_length), 1);
+  DES_IV_MODE_REQUIRE_ARGS(ctx, buf, tc_des_cfb1_bytes(bit_length), 1);
   return tc_des_mode_cfb1(ctx, buf, bit_length, 1);
 }
 #endif
@@ -311,7 +320,7 @@ TC_status TC_DES_CFB1_decrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t bit_l
 #if TC_DES_ENABLE_OFB
 TC_status TC_DES_OFB_crypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length)
 {
-  DES_MODE_REQUIRE_ARGS(ctx, buf, length, 1);
+  DES_IV_MODE_REQUIRE_ARGS(ctx, buf, length, 1);
   if (ctx->ofb_pos > TC_DES_BLOCKLEN)
     return TC_ERROR;
   const tc_des_block_key key = tc_des_ctx_key(ctx);
