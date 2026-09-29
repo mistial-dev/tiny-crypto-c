@@ -228,6 +228,24 @@ TEST_CASE("AES CMAC wrapper returns status")
         TC_ERROR);
   CHECK(tiny_crypto::aes_cmac(kat_key, TC_AES_KEYLEN, nullptr, 1, tag, sizeof(tag)) == TC_ERROR);
 }
+
+TEST_CASE("AES CMAC tag length boundary at TC_MIN_TAG_LEN")
+{
+  const size_t below = TC_MIN_TAG_LEN - 1;
+  uint8_t full[TC_AES_BLOCKLEN];
+  uint8_t tag[TC_AES_BLOCKLEN];
+  REQUIRE(tiny_crypto::aes_cmac(kat_key, TC_AES_KEYLEN, nullptr, 0, full, sizeof(full)) == TC_OK);
+  CHECK(tiny_crypto::aes_cmac(kat_key, TC_AES_KEYLEN, nullptr, 0, tag, below) == TC_ERROR);
+  CHECK(tiny_crypto::aes_cmac(kat_key, TC_AES_KEYLEN, nullptr, 0, tag, TC_MIN_TAG_LEN) == TC_OK);
+  CHECK(std::memcmp(tag, full, TC_MIN_TAG_LEN) == 0);
+  CHECK(tiny_crypto::aes_cmac_short_tag(kat_key, TC_AES_KEYLEN, nullptr, 0, tag, TC_MIN_TAG_LEN) ==
+        TC_ERROR);
+  CHECK(tiny_crypto::aes_cmac_short_tag(kat_key, TC_AES_KEYLEN - 1, nullptr, 0, tag, below) ==
+        TC_ERROR);
+  CHECK(tiny_crypto::aes_cmac_short_tag(kat_key, TC_AES_KEYLEN, nullptr, 0, tag, 0) == TC_ERROR);
+  REQUIRE(tiny_crypto::aes_cmac_short_tag(kat_key, TC_AES_KEYLEN, nullptr, 0, tag, below) == TC_OK);
+  CHECK(std::memcmp(tag, full, below) == 0);
+}
 #endif
 
 #if TC_AES_ENABLE_CCM
@@ -242,43 +260,87 @@ TEST_CASE("AES CCM authentication status")
       TC_AES_KEYLEN};
   uint8_t ciphertext[sizeof(ccm_rfc_plaintext)];
   uint8_t recovered[sizeof(ccm_rfc_plaintext)];
-  uint8_t tag[sizeof(ccm_rfc_tag)];
+  /* The AES-256 test profile raises TC_MIN_TAG_LEN above the 8-byte RFC 3610
+   * tag, so the other key sizes use a full tag. */
+#if TC_AES_KEY_BITS == 128
+  const size_t tag_length = sizeof(ccm_rfc_tag);
+#else
+  const size_t tag_length = TC_AES_BLOCKLEN;
+#endif
+  uint8_t tag[TC_AES_BLOCKLEN];
   REQUIRE(tiny_crypto::ccm_encrypt(
               key, {ccm_rfc_nonce, sizeof(ccm_rfc_nonce)}, {ccm_rfc_aad, sizeof(ccm_rfc_aad)},
               {ccm_rfc_plaintext, sizeof(ccm_rfc_plaintext)},
-              {ciphertext, sizeof(ccm_rfc_plaintext)}, {tag, sizeof(tag)}) == TC_OK);
+              {ciphertext, sizeof(ccm_rfc_plaintext)}, {tag, tag_length}) == TC_OK);
 #if TC_AES_KEY_BITS == 128
   CHECK(std::memcmp(ciphertext, ccm_rfc_ciphertext, sizeof(ciphertext)) == 0);
-  CHECK(std::memcmp(tag, ccm_rfc_tag, sizeof(tag)) == 0);
+  CHECK(std::memcmp(tag, ccm_rfc_tag, tag_length) == 0);
 #endif
   CHECK(tiny_crypto::ccm_decrypt(key, {ccm_rfc_nonce, sizeof(ccm_rfc_nonce)},
                                  {ccm_rfc_aad, sizeof(ccm_rfc_aad)},
-                                 {ciphertext, sizeof(ciphertext)}, {tag, sizeof(tag)},
+                                 {ciphertext, sizeof(ciphertext)}, {tag, tag_length},
                                  {recovered, sizeof(ciphertext)}) == TC_OK);
   CHECK(std::memcmp(recovered, ccm_rfc_plaintext, sizeof(recovered)) == 0);
   tag[0] ^= 1;
   CHECK(tiny_crypto::ccm_decrypt(key, {ccm_rfc_nonce, sizeof(ccm_rfc_nonce)},
                                  {ccm_rfc_aad, sizeof(ccm_rfc_aad)},
-                                 {ciphertext, sizeof(ciphertext)}, {tag, sizeof(tag)},
+                                 {ciphertext, sizeof(ciphertext)}, {tag, tag_length},
                                  {recovered, sizeof(ciphertext)}) == TC_MISMATCH);
 
   uint8_t untouched[sizeof(ccm_rfc_plaintext)];
-  uint8_t untouched_tag[sizeof(ccm_rfc_tag)];
+  uint8_t untouched_tag[TC_AES_BLOCKLEN];
   std::memset(untouched, 0xa5, sizeof(untouched));
   std::memset(untouched_tag, 0xa5, sizeof(untouched_tag));
   const tiny_crypto::bytes short_key = {key.data, TC_AES_KEYLEN - 1};
   CHECK(tiny_crypto::ccm_encrypt(
             short_key, {ccm_rfc_nonce, sizeof(ccm_rfc_nonce)}, {ccm_rfc_aad, sizeof(ccm_rfc_aad)},
             {ccm_rfc_plaintext, sizeof(ccm_rfc_plaintext)}, {untouched, sizeof(untouched)},
-            {untouched_tag, sizeof(untouched_tag)}) == TC_ERROR);
+            {untouched_tag, tag_length}) == TC_ERROR);
   CHECK(tiny_crypto::ccm_decrypt(short_key, {ccm_rfc_nonce, sizeof(ccm_rfc_nonce)},
                                  {ccm_rfc_aad, sizeof(ccm_rfc_aad)},
-                                 {ciphertext, sizeof(ciphertext)}, {tag, sizeof(tag)},
+                                 {ciphertext, sizeof(ciphertext)}, {tag, tag_length},
                                  {untouched, sizeof(untouched)}) == TC_ERROR);
   for (size_t i = 0; i < sizeof(untouched); ++i)
     CHECK(untouched[i] == 0xa5);
   for (size_t i = 0; i < sizeof(untouched_tag); ++i)
     CHECK(untouched_tag[i] == 0xa5);
+}
+#endif
+
+#if TC_AES_ENABLE_CCM
+TEST_CASE("AES CCM tag length boundary at TC_MIN_TAG_LEN")
+{
+  const tiny_crypto::bytes key = {kat_key, TC_AES_KEYLEN};
+  const uint8_t nonce[12] = {0};
+  const uint8_t plaintext[] = {1, 2, 3, 4, 5};
+  const size_t short_max = (TC_MIN_TAG_LEN - 1) & ~static_cast<size_t>(1);
+  const size_t default_min = (TC_MIN_TAG_LEN + 1) & ~static_cast<size_t>(1);
+  uint8_t ciphertext[sizeof(plaintext)];
+  uint8_t recovered[sizeof(plaintext)];
+  uint8_t tag[16];
+  CHECK(tiny_crypto::ccm_encrypt(key, {nonce, sizeof(nonce)}, {nullptr, 0},
+                                 {plaintext, sizeof(plaintext)}, {ciphertext, sizeof(ciphertext)},
+                                 {tag, short_max}) == TC_ERROR);
+  CHECK(tiny_crypto::ccm_encrypt(key, {nonce, sizeof(nonce)}, {nullptr, 0},
+                                 {plaintext, sizeof(plaintext)}, {ciphertext, sizeof(ciphertext)},
+                                 {tag, default_min}) == TC_OK);
+  CHECK(tiny_crypto::ccm_encrypt_short_tag(
+            key, {nonce, sizeof(nonce)}, {nullptr, 0}, {plaintext, sizeof(plaintext)},
+            {ciphertext, sizeof(ciphertext)}, {tag, default_min}) == TC_ERROR);
+  REQUIRE(tiny_crypto::ccm_encrypt_short_tag(
+              key, {nonce, sizeof(nonce)}, {nullptr, 0}, {plaintext, sizeof(plaintext)},
+              {ciphertext, sizeof(ciphertext)}, {tag, short_max}) == TC_OK);
+  CHECK(tiny_crypto::ccm_decrypt(key, {nonce, sizeof(nonce)}, {nullptr, 0},
+                                 {ciphertext, sizeof(ciphertext)}, {tag, short_max},
+                                 {recovered, sizeof(recovered)}) == TC_ERROR);
+  CHECK(tiny_crypto::ccm_decrypt_short_tag(key, {nonce, sizeof(nonce)}, {nullptr, 0},
+                                           {ciphertext, sizeof(ciphertext)}, {tag, short_max},
+                                           {recovered, sizeof(recovered)}) == TC_OK);
+  CHECK(std::memcmp(recovered, plaintext, sizeof(plaintext)) == 0);
+  CHECK(tiny_crypto::ccm_decrypt_short_tag({kat_key, TC_AES_KEYLEN - 1}, {nonce, sizeof(nonce)},
+                                           {nullptr, 0}, {ciphertext, sizeof(ciphertext)},
+                                           {tag, short_max},
+                                           {recovered, sizeof(recovered)}) == TC_ERROR);
 }
 #endif
 
@@ -305,7 +367,23 @@ TEST_CASE("AES EAX wrappers round trip and preserve mismatch")
                                  {recovered, sizeof(ciphertext)}) == TC_MISMATCH);
   CHECK(tiny_crypto::eax_encrypt(key, {nonce, sizeof(nonce)}, {aad, sizeof(aad)},
                                  {plaintext, sizeof(plaintext)}, {ciphertext, sizeof(plaintext)},
-                                 {tag, TC_AES_EAX_MIN_TAG_LEN - 1}) == TC_ERROR);
+                                 {tag, TC_MIN_TAG_LEN - 1}) == TC_ERROR);
+  CHECK(tiny_crypto::eax_encrypt(key, {nonce, sizeof(nonce)}, {aad, sizeof(aad)},
+                                 {plaintext, sizeof(plaintext)}, {ciphertext, sizeof(plaintext)},
+                                 {tag, TC_MIN_TAG_LEN}) == TC_OK);
+  CHECK(tiny_crypto::eax_encrypt_short_tag(
+            key, {nonce, sizeof(nonce)}, {aad, sizeof(aad)}, {plaintext, sizeof(plaintext)},
+            {ciphertext, sizeof(plaintext)}, {tag, TC_MIN_TAG_LEN}) == TC_ERROR);
+  REQUIRE(tiny_crypto::eax_encrypt_short_tag(
+              key, {nonce, sizeof(nonce)}, {aad, sizeof(aad)}, {plaintext, sizeof(plaintext)},
+              {ciphertext, sizeof(plaintext)}, {tag, TC_MIN_TAG_LEN - 1}) == TC_OK);
+  CHECK(tiny_crypto::eax_decrypt(key, {nonce, sizeof(nonce)}, {aad, sizeof(aad)},
+                                 {ciphertext, sizeof(ciphertext)}, {tag, TC_MIN_TAG_LEN - 1},
+                                 {recovered, sizeof(ciphertext)}) == TC_ERROR);
+  CHECK(tiny_crypto::eax_decrypt_short_tag(
+            key, {nonce, sizeof(nonce)}, {aad, sizeof(aad)}, {ciphertext, sizeof(ciphertext)},
+            {tag, TC_MIN_TAG_LEN - 1}, {recovered, sizeof(ciphertext)}) == TC_OK);
+  CHECK(std::memcmp(recovered, plaintext, sizeof(plaintext)) == 0);
 
   uint8_t untouched[sizeof(plaintext)];
   std::memset(untouched, 0xa5, sizeof(untouched));

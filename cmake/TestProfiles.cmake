@@ -11,7 +11,7 @@ set(tc_full_definitions
   TC_AES_ENABLE_CBC=1 TC_AES_ENABLE_ECB=1 TC_AES_ENABLE_CTR=1
   TC_AES_ENABLE_OFB=1 TC_AES_ENABLE_GCM=1
   TC_AES_ENABLE_CCM=1 TC_AES_ENABLE_EAX=1
-  TC_AES_ENABLE_SIV=1 TC_AES_ENABLE_CMAC=1 TC_AES_CMAC_MIN_TAG_LEN=4
+  TC_AES_ENABLE_SIV=1 TC_AES_ENABLE_CMAC=1
   TC_AES_SBOX_MODE=1
   TC_AES_GCM_GHASH_MODE=0 TC_AES_WIDE_OPS=0 TC_AES_TINY=0
   TC_DES_ENABLE_ECB=1 TC_DES_ENABLE_CBC=1 TC_DES_ENABLE_CTR=1
@@ -83,6 +83,12 @@ target_compile_definitions(tiny-crypto-c-test PUBLIC
 # AES-192/256 variants compile only AES and its CMAC-backed KDF, which keeps
 # SHA, HMAC and DES cores out of the per-key-size libraries.
 foreach(key_bits 192 256)
+  # The AES-256 variant raises TC_MIN_TAG_LEN, so the tag policy tests and the
+  # CAVP short-tag routing also run with a minimum above 8.
+  set(tc_min_tag_definition)
+  if(key_bits EQUAL 256)
+    set(tc_min_tag_definition TC_MIN_TAG_LEN=12)
+  endif()
   tc_add_test_library(tiny-crypto-c-test-aes${key_bits}
     src/common.c ${tc_aes_sources} src/kdf.c)
   target_compile_definitions(tiny-crypto-c-test-aes${key_bits} PUBLIC
@@ -93,7 +99,7 @@ foreach(key_bits 192 256)
     TC_AES_ENABLE_CBC=1 TC_AES_ENABLE_ECB=1 TC_AES_ENABLE_CTR=1
     TC_AES_ENABLE_OFB=1 TC_AES_ENABLE_GCM=1 TC_AES_ENABLE_CCM=1
     TC_AES_ENABLE_EAX=1 TC_AES_ENABLE_EAX_PRIME=0 TC_AES_ENABLE_SIV=1
-    TC_AES_ENABLE_CMAC=1 TC_AES_CMAC_MIN_TAG_LEN=4
+    TC_AES_ENABLE_CMAC=1 ${tc_min_tag_definition}
     TC_AES_SBOX_MODE=1 TC_AES_GCM_GHASH_MODE=0 TC_AES_WIDE_OPS=0
     TC_AES_TINY=0 TC_AES_CAVP=$<BOOL:${TINY_CRYPTO_TEST_FULL}>
     TC_KDF_CAVP=$<BOOL:${TINY_CRYPTO_TEST_FULL}>)

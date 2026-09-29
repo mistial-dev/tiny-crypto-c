@@ -138,6 +138,10 @@ TC_status TC_AES_OFB_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length);
  *   bytes to tag. Decrypt writes ciphertext.length bytes to plaintext and
  *   checks tag.length tag bytes. The tag length is fixed for the key.
  *   EAX' and SIV take fixed-size tag arrays.
+ * - CCM and EAX default entry points take tags of at least TC_MIN_TAG_LEN
+ *   bytes (config.h, default 8). Their _short_tag forms take only the
+ *   shorter lengths, for protocols that bound failed verifications
+ *   (SP 800-38B Appendix A.2). GCM short tags follow SP 800-38D Appendix C.
  * - The text output capacity must be at least the text input length.
  * - Text input and output are exact aliases or fully disjoint. The tag is
  *   disjoint from the text output. SIV associated data is disjoint from the
@@ -246,25 +250,38 @@ void TC_AES_GCM_clear(struct TC_AES_GCM_ctx* ctx);
 #if TC_AES_ENABLE_CCM
 
 /* CCM (SP 800-38C) is a packet mode. Payload and AAD lengths are known at
- * entry. Follows the one-shot AEAD contract above. The nonce is 7..13 bytes
- * and the tag 4, 6, 8, 10, 12, 14 or 16 bytes. The payload length must fit the
- * 15 - nonce length byte length field. */
+ * entry. Follows the one-shot AEAD contract above. The nonce is 7..13 bytes.
+ * CCM tags have an even length of 4..16 bytes. The default entry points take
+ * those of at least TC_MIN_TAG_LEN (8, 10, 12, 14 or 16 by default). The
+ * _short_tag forms take those below it (4 or 6 by default). Any other tag
+ * length returns TC_ERROR. The payload length must fit the 15 - nonce length
+ * byte length field. */
 TC_status TC_AES_CCM_encrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes plaintext,
                              TC_buffer ciphertext, TC_buffer tag);
 TC_status TC_AES_CCM_decrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes ciphertext,
                              TC_bytes tag, TC_buffer plaintext);
+TC_status TC_AES_CCM_encrypt_short_tag(const uint8_t* key, TC_bytes nonce, TC_bytes aad,
+                                       TC_bytes plaintext, TC_buffer ciphertext, TC_buffer tag);
+TC_status TC_AES_CCM_decrypt_short_tag(const uint8_t* key, TC_bytes nonce, TC_bytes aad,
+                                       TC_bytes ciphertext, TC_bytes tag, TC_buffer plaintext);
 
 #endif
 
 #if TC_AES_ENABLE_EAX
 
-/* EAX one-shot AEAD. Follows the one-shot AEAD contract above. Tags must be
- * TC_AES_EAX_MIN_TAG_LEN..16. Other tag lengths return TC_ERROR.
- * TC_AES_EAX_MIN_TAG_LEN must be in 1..16. The nonce may have any length. */
+/* EAX one-shot AEAD. Follows the one-shot AEAD contract above. The tag is
+ * the leading bytes of the 16-byte EAX tag. The default entry points take
+ * TC_MIN_TAG_LEN..16 bytes. The _short_tag forms take 1..TC_MIN_TAG_LEN - 1
+ * bytes. Other tag lengths, including 0, return TC_ERROR. The nonce may have
+ * any length. */
 TC_status TC_AES_EAX_encrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes plaintext,
                              TC_buffer ciphertext, TC_buffer tag);
 TC_status TC_AES_EAX_decrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes ciphertext,
                              TC_bytes tag, TC_buffer plaintext);
+TC_status TC_AES_EAX_encrypt_short_tag(const uint8_t* key, TC_bytes nonce, TC_bytes aad,
+                                       TC_bytes plaintext, TC_buffer ciphertext, TC_buffer tag);
+TC_status TC_AES_EAX_decrypt_short_tag(const uint8_t* key, TC_bytes nonce, TC_bytes aad,
+                                       TC_bytes ciphertext, TC_bytes tag, TC_buffer plaintext);
 
 #endif
 
@@ -272,8 +289,10 @@ TC_status TC_AES_EAX_decrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, T
 
 #define TC_AES_EAX_PRIME_TAG_LEN 4
 
-/* ANSI C12.22 EAX'. Fixed four-byte tag. Follows the one-shot AEAD contract
- * above. The cleartext header is authenticated and serves as the nonce. */
+/* ANSI C12.22 EAX'. Follows the one-shot AEAD contract above. The protocol
+ * fixes the tag at four bytes, so EAX' is exempt from TC_MIN_TAG_LEN and has
+ * no _short_tag form. The cleartext header is authenticated and serves as
+ * the nonce. */
 TC_status TC_AES_EAX_PRIME_encrypt(const uint8_t* key, TC_bytes cleartext, TC_bytes plaintext,
                                    TC_buffer ciphertext, uint8_t tag[TC_AES_EAX_PRIME_TAG_LEN]);
 TC_status TC_AES_EAX_PRIME_decrypt(const uint8_t* key, TC_bytes cleartext, TC_bytes ciphertext,
@@ -289,17 +308,32 @@ TC_status TC_AES_EAX_PRIME_decrypt(const uint8_t* key, TC_bytes cleartext, TC_by
 
 /*
  * AES-CMAC (NIST SP 800-38B). One-shot.
- * tag_len must be in TC_AES_CMAC_MIN_TAG_LEN..TC_AES_CMAC_TAG_MAX (default min 8).
- * Truncation keeps the most significant octets of the full T (SP 800-38B).
+ * tag_len must be in TC_MIN_TAG_LEN..TC_AES_CMAC_TAG_MAX. Truncation keeps the
+ * most significant octets of the full T (SP 800-38B section 6.2).
  * msg may be NULL when msg_len is 0. The context and full tag on the stack
  * are wiped before return.
+ * @return TC_OK, or TC_ERROR for a NULL key or tag, a NULL msg with a nonzero
+ *         length, a tag length outside the range, or a cipher failure. An
+ *         argument error leaves tag unchanged.
  */
 TC_status TC_AES_CMAC(const uint8_t* key, const uint8_t* msg, size_t msg_len, uint8_t* tag,
                       size_t tag_len);
 
-/* Constant-time verify of a (possibly truncated) tag. */
+/* Constant-time verify of a (possibly truncated) tag of tag_len bytes, with
+ * the same length range as TC_AES_CMAC.
+ * @return TC_OK when the tag matches, TC_MISMATCH when it differs, or
+ *         TC_ERROR as for TC_AES_CMAC. */
 TC_status TC_AES_CMAC_verify(const uint8_t* key, const uint8_t* msg, size_t msg_len,
                              const uint8_t* tag, size_t tag_len);
+
+/* Short-tag AES-CMAC and verify. tag_len must be in 1..TC_MIN_TAG_LEN - 1.
+ * Use them only when the protocol fixes the short tag and limits failed
+ * verifications for the key (SP 800-38B Appendix A.2). Status values follow
+ * TC_AES_CMAC and TC_AES_CMAC_verify. */
+TC_status TC_AES_CMAC_short_tag(const uint8_t* key, const uint8_t* msg, size_t msg_len,
+                                uint8_t* tag, size_t tag_len);
+TC_status TC_AES_CMAC_verify_short_tag(const uint8_t* key, const uint8_t* msg, size_t msg_len,
+                                       const uint8_t* tag, size_t tag_len);
 
 /*
  * Streaming AES-CMAC. The most recent block is held back in buf so that

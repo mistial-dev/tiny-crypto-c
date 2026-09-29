@@ -1142,8 +1142,7 @@ add_test(NAME test_package_boundaries
       src/common.c ${tc_des_sources} src/mac_core.c)
     target_compile_definitions(tiny-crypto-c-test-des-cmac-cavp PUBLIC
       TC_ENABLE_AES=0 TC_ENABLE_SHA256=0 TC_ENABLE_DES=1
-      TC_DES_ENABLE_TDES=1 TC_DES_ENABLE_CMAC=1
-      TC_DES_CMAC_MIN_TAG_LEN=1 TC_DES_REJECT_WEAK_KEYS=0)
+      TC_DES_ENABLE_TDES=1 TC_DES_ENABLE_CMAC=1 TC_DES_REJECT_WEAK_KEYS=0)
     tc_add_c_test(test_des_cmac_cavp tiny-crypto-c-test-des-cmac-cavp
       tests/des/cmac_cavp.c)
     target_compile_definitions(test_des_cmac_cavp PRIVATE

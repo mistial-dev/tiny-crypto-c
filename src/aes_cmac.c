@@ -75,15 +75,19 @@ void TC_AES_dynamic_CMAC_clear(TC_AES_dynamic_CMAC* ctx)
 #endif
 
 #if TC_AES_ENABLE_CMAC
-TC_status TC_AES_CMAC(const uint8_t* key, const uint8_t* msg, size_t msg_len, uint8_t* tag,
-                      size_t tag_len)
+/* One-shot CMAC over the streaming context. The tag is the leading tag_len
+ * bytes of T (SP 800-38B section 6.2 step 7). short_tag selects the lengths
+ * below TC_MIN_TAG_LEN (Appendix A.2). */
+static TC_status tc_aes_cmac_oneshot(const uint8_t* key, const uint8_t* msg, size_t msg_len,
+                                     uint8_t* tag, size_t tag_len, int short_tag)
 {
   struct TC_AES_CMAC_ctx ctx;
   uint8_t full[TC_AES_BLOCKLEN];
   TC_status status;
 
-  if (key == NULL || tag == NULL || tag_len < TC_AES_CMAC_MIN_TAG_LEN ||
-      tag_len > TC_AES_CMAC_TAG_MAX || !tc_internal_span_valid(msg, msg_len))
+  if (key == NULL || tag == NULL ||
+      !tc_internal_tag_length_allowed(tag_len, TC_AES_CMAC_TAG_MAX, short_tag) ||
+      !tc_internal_span_valid(msg, msg_len))
     return TC_ERROR;
 
   status = TC_AES_CMAC_init(&ctx, key);
@@ -98,14 +102,39 @@ TC_status TC_AES_CMAC(const uint8_t* key, const uint8_t* msg, size_t msg_len, ui
   return status;
 }
 
+static TC_status tc_aes_cmac_verify_oneshot(const uint8_t* key, const uint8_t* msg, size_t msg_len,
+                                            const uint8_t* tag, size_t tag_len, int short_tag)
+{
+  uint8_t computed[TC_AES_CMAC_TAG_MAX];
+  if (tag == NULL || !tc_internal_tag_length_allowed(tag_len, TC_AES_CMAC_TAG_MAX, short_tag))
+    return TC_ERROR;
+  return tc_internal_verify_tag(
+      tc_aes_cmac_oneshot(key, msg, msg_len, computed, tag_len, short_tag), computed,
+      sizeof computed, tag, tag_len);
+}
+
+TC_status TC_AES_CMAC(const uint8_t* key, const uint8_t* msg, size_t msg_len, uint8_t* tag,
+                      size_t tag_len)
+{
+  return tc_aes_cmac_oneshot(key, msg, msg_len, tag, tag_len, 0);
+}
+
 TC_status TC_AES_CMAC_verify(const uint8_t* key, const uint8_t* msg, size_t msg_len,
                              const uint8_t* tag, size_t tag_len)
 {
-  uint8_t computed[TC_AES_CMAC_TAG_MAX];
-  if (tag == NULL || tag_len < TC_AES_CMAC_MIN_TAG_LEN || tag_len > TC_AES_CMAC_TAG_MAX)
-    return TC_ERROR;
-  return tc_internal_verify_tag(TC_AES_CMAC(key, msg, msg_len, computed, tag_len), computed,
-                                sizeof computed, tag, tag_len);
+  return tc_aes_cmac_verify_oneshot(key, msg, msg_len, tag, tag_len, 0);
+}
+
+TC_status TC_AES_CMAC_short_tag(const uint8_t* key, const uint8_t* msg, size_t msg_len,
+                                uint8_t* tag, size_t tag_len)
+{
+  return tc_aes_cmac_oneshot(key, msg, msg_len, tag, tag_len, 1);
+}
+
+TC_status TC_AES_CMAC_verify_short_tag(const uint8_t* key, const uint8_t* msg, size_t msg_len,
+                                       const uint8_t* tag, size_t tag_len)
+{
+  return tc_aes_cmac_verify_oneshot(key, msg, msg_len, tag, tag_len, 1);
 }
 
 TC_status TC_AES_CMAC_init(struct TC_AES_CMAC_ctx* ctx, const uint8_t* key)

@@ -212,18 +212,48 @@ done:
   return status;
 }
 
+/* SP 800-38C A.1 permits tags of 4..16 even bytes. short_tag selects the
+ * lengths below TC_MIN_TAG_LEN. */
+static TC_status tc_aes_ccm_encrypt_with_policy(const uint8_t* key, TC_bytes nonce, TC_bytes aad,
+                                                TC_bytes plaintext, TC_buffer ciphertext,
+                                                TC_buffer tag, int short_tag)
+{
+  if (!tc_internal_tag_length_allowed(tag.capacity, TC_AES_BLOCKLEN, short_tag))
+    return TC_ERROR;
+  return tc_aes_ccm_crypt(key, nonce, aad, plaintext, ciphertext, NULL, tag.data, tag.capacity);
+}
+
+static TC_status tc_aes_ccm_decrypt_with_policy(const uint8_t* key, TC_bytes nonce, TC_bytes aad,
+                                                TC_bytes ciphertext, TC_bytes tag,
+                                                TC_buffer plaintext, int short_tag)
+{
+  if (tag.data == NULL || !tc_internal_tag_length_allowed(tag.length, TC_AES_BLOCKLEN, short_tag))
+    return TC_ERROR;
+  return tc_aes_ccm_crypt(key, nonce, aad, ciphertext, plaintext, tag.data, NULL, tag.length);
+}
+
 TC_status TC_AES_CCM_encrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes plaintext,
                              TC_buffer ciphertext, TC_buffer tag)
 {
-  return tc_aes_ccm_crypt(key, nonce, aad, plaintext, ciphertext, NULL, tag.data, tag.capacity);
+  return tc_aes_ccm_encrypt_with_policy(key, nonce, aad, plaintext, ciphertext, tag, 0);
 }
 
 TC_status TC_AES_CCM_decrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes ciphertext,
                              TC_bytes tag, TC_buffer plaintext)
 {
-  if (tag.data == NULL)
-    return TC_ERROR;
-  return tc_aes_ccm_crypt(key, nonce, aad, ciphertext, plaintext, tag.data, NULL, tag.length);
+  return tc_aes_ccm_decrypt_with_policy(key, nonce, aad, ciphertext, tag, plaintext, 0);
+}
+
+TC_status TC_AES_CCM_encrypt_short_tag(const uint8_t* key, TC_bytes nonce, TC_bytes aad,
+                                       TC_bytes plaintext, TC_buffer ciphertext, TC_buffer tag)
+{
+  return tc_aes_ccm_encrypt_with_policy(key, nonce, aad, plaintext, ciphertext, tag, 1);
+}
+
+TC_status TC_AES_CCM_decrypt_short_tag(const uint8_t* key, TC_bytes nonce, TC_bytes aad,
+                                       TC_bytes ciphertext, TC_bytes tag, TC_buffer plaintext)
+{
+  return tc_aes_ccm_decrypt_with_policy(key, nonce, aad, ciphertext, tag, plaintext, 1);
 }
 
 #endif

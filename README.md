@@ -287,6 +287,10 @@ error conditions.
 GCM requires a 12 to 16-byte tag by default. Use the explicit
 `TC_AES_GCM_init_short_tag` or one-shot `_short_tag` functions when a protocol
 requires a 4 or 8-byte tag. The GCM packet limits still apply.
+CCM, EAX, AES-CMAC and DES-CMAC take tags of at least `TC_MIN_TAG_LEN` bytes
+(default 8, raise-only up to 16). Protocols with shorter tags, such as 4-byte
+CCM tags, call the `_short_tag` forms. EAX' keeps its fixed 4-byte tag. See
+[Tag lengths](docs/api.md#tag-lengths).
 
 CTR, CBC, ECB, OFB, and CFB provide no authentication. Pair them with a MAC or
 use an authenticated mode such as GCM, CCM, EAX, or SIV. Never reuse a CTR,

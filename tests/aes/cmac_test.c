@@ -169,7 +169,6 @@ static MunitResult test_cmac_api(const MunitParameter params[], void* data)
   uint8_t key[TC_AES_KEYLEN];
   uint8_t msg[16];
   uint8_t tag[TC_AES_CMAC_TAG_MAX];
-  uint8_t tag2[TC_AES_CMAC_TAG_MAX];
 
   (void)params;
   (void)data;
@@ -182,13 +181,6 @@ static MunitResult test_cmac_api(const MunitParameter params[], void* data)
   munit_assert_int(TC_AES_CMAC(key, msg, sizeof(msg), tag, 0), ==, TC_ERROR);
   munit_assert_int(TC_AES_CMAC(key, msg, sizeof(msg), tag, 17), ==, TC_ERROR);
   munit_assert_int(TC_AES_CMAC(key, NULL, 1, tag, 16), ==, TC_ERROR);
-#if TC_AES_CMAC_MIN_TAG_LEN > 1
-  munit_assert_int(TC_AES_CMAC(key, msg, sizeof(msg), tag, TC_AES_CMAC_MIN_TAG_LEN - 1u), ==,
-                   TC_ERROR);
-  munit_assert_int(TC_AES_CMAC_verify(key, msg, sizeof(msg), tag, TC_AES_CMAC_MIN_TAG_LEN - 1u), ==,
-                   TC_ERROR);
-#endif
-
   munit_assert_int(TC_AES_CMAC(key, msg, sizeof(msg), tag, 16), ==, TC_OK);
   munit_assert_int(TC_AES_CMAC_verify(key, msg, sizeof(msg), tag, 16), ==, TC_OK);
 
@@ -196,15 +188,61 @@ static MunitResult test_cmac_api(const MunitParameter params[], void* data)
   munit_assert_int(TC_AES_CMAC_verify(key, msg, sizeof(msg), tag, 16), ==, TC_MISMATCH);
   tag[0] ^= 1u;
 
-  /* Truncation at TC_AES_CMAC_MIN_TAG_LEN (product default 8, CAVP builds use 4). */
-  munit_assert_int(TC_AES_CMAC(key, msg, sizeof(msg), tag2, TC_AES_CMAC_MIN_TAG_LEN), ==, TC_OK);
-  munit_assert_memory_equal(TC_AES_CMAC_MIN_TAG_LEN, tag2, tag);
-  munit_assert_int(TC_AES_CMAC_verify(key, msg, sizeof(msg), tag2, TC_AES_CMAC_MIN_TAG_LEN), ==,
-                   TC_OK);
-
   munit_assert_int(TC_AES_CMAC_verify(key, msg, sizeof(msg), NULL, 16), ==, TC_ERROR);
   munit_assert_int(TC_AES_CMAC_verify(key, msg, sizeof(msg), tag, 0), ==, TC_ERROR);
 
+  return MUNIT_OK;
+}
+
+/* The default entry points take TC_MIN_TAG_LEN..16 bytes and the _short_tag
+ * forms take 1..TC_MIN_TAG_LEN - 1 (SP 800-38B Appendix A.2). A rejected
+ * length leaves the tag buffer unchanged. */
+static MunitResult test_cmac_tag_policy(const MunitParameter params[], void* data)
+{
+  uint8_t key[TC_AES_KEYLEN];
+  uint8_t msg[20];
+  uint8_t full[TC_AES_CMAC_TAG_MAX];
+  uint8_t tag[TC_AES_CMAC_TAG_MAX];
+  const size_t below = TC_MIN_TAG_LEN - 1u;
+
+  (void)params;
+  (void)data;
+  memset(key, 0x3c, sizeof(key));
+  memset(msg, 0x5a, sizeof(msg));
+  munit_assert_int(TC_AES_CMAC(key, msg, sizeof(msg), full, sizeof(full)), ==, TC_OK);
+
+  /* Default entry: min - 1 is rejected, min is accepted. */
+  memset(tag, 0xa5, sizeof(tag));
+  munit_assert_int(TC_AES_CMAC(key, msg, sizeof(msg), tag, below), ==, TC_ERROR);
+  munit_assert_true(tc_test_all_value(tag, sizeof(tag), 0xa5));
+  munit_assert_int(TC_AES_CMAC_verify(key, msg, sizeof(msg), full, below), ==, TC_ERROR);
+  munit_assert_int(TC_AES_CMAC(key, msg, sizeof(msg), tag, TC_MIN_TAG_LEN), ==, TC_OK);
+  munit_assert_memory_equal(TC_MIN_TAG_LEN, tag, full);
+  munit_assert_int(TC_AES_CMAC_verify(key, msg, sizeof(msg), full, TC_MIN_TAG_LEN), ==, TC_OK);
+
+  /* Short-tag entry: 1..min - 1 are accepted, 0 and min are rejected. */
+  memset(tag, 0xa5, sizeof(tag));
+  munit_assert_int(TC_AES_CMAC_short_tag(key, msg, sizeof(msg), tag, 0), ==, TC_ERROR);
+  munit_assert_int(TC_AES_CMAC_short_tag(key, msg, sizeof(msg), tag, TC_MIN_TAG_LEN), ==, TC_ERROR);
+  munit_assert_int(TC_AES_CMAC_short_tag(NULL, msg, sizeof(msg), tag, below), ==, TC_ERROR);
+  munit_assert_int(TC_AES_CMAC_short_tag(key, NULL, 1, tag, below), ==, TC_ERROR);
+  munit_assert_true(tc_test_all_value(tag, sizeof(tag), 0xa5));
+  munit_assert_int(TC_AES_CMAC_short_tag(key, msg, sizeof(msg), NULL, below), ==, TC_ERROR);
+  munit_assert_int(TC_AES_CMAC_short_tag(key, msg, sizeof(msg), tag, 1), ==, TC_OK);
+  munit_assert_uint8(tag[0], ==, full[0]);
+  munit_assert_int(TC_AES_CMAC_short_tag(key, msg, sizeof(msg), tag, below), ==, TC_OK);
+  munit_assert_memory_equal(below, tag, full);
+  munit_assert_true(tc_test_all_value(tag + below, sizeof(tag) - below, 0xa5));
+
+  munit_assert_int(TC_AES_CMAC_verify_short_tag(key, msg, sizeof(msg), full, 1), ==, TC_OK);
+  munit_assert_int(TC_AES_CMAC_verify_short_tag(key, msg, sizeof(msg), full, below), ==, TC_OK);
+  munit_assert_int(TC_AES_CMAC_verify_short_tag(key, msg, sizeof(msg), full, 0), ==, TC_ERROR);
+  munit_assert_int(TC_AES_CMAC_verify_short_tag(key, msg, sizeof(msg), full, TC_MIN_TAG_LEN), ==,
+                   TC_ERROR);
+  munit_assert_int(TC_AES_CMAC_verify_short_tag(key, msg, sizeof(msg), NULL, below), ==, TC_ERROR);
+  full[below - 1u] ^= 0x01u;
+  munit_assert_int(TC_AES_CMAC_verify_short_tag(key, msg, sizeof(msg), full, below), ==,
+                   TC_MISMATCH);
   return MUNIT_OK;
 }
 
@@ -466,6 +504,22 @@ static MunitResult test_cmac_wycheproof(const MunitParameter params[], void* dat
 #define CMAC_CAVP_MSG_MAX 65536u
 #define CMAC_CAVP_LINE_MAX (CMAC_CAVP_MSG_MAX * 2u + 64u)
 
+/* CAVP rows use Tlen 4..16. Rows below TC_MIN_TAG_LEN go through the
+ * explicit short-tag entry points. */
+static TC_status cmac_cavp_generate(const uint8_t* key, const uint8_t* msg, size_t msg_len,
+                                    uint8_t* tag, size_t tag_len)
+{
+  return tag_len < TC_MIN_TAG_LEN ? TC_AES_CMAC_short_tag(key, msg, msg_len, tag, tag_len)
+                                  : TC_AES_CMAC(key, msg, msg_len, tag, tag_len);
+}
+
+static TC_status cmac_cavp_verify(const uint8_t* key, const uint8_t* msg, size_t msg_len,
+                                  const uint8_t* tag, size_t tag_len)
+{
+  return tag_len < TC_MIN_TAG_LEN ? TC_AES_CMAC_verify_short_tag(key, msg, msg_len, tag, tag_len)
+                                  : TC_AES_CMAC_verify(key, msg, msg_len, tag, tag_len);
+}
+
 /* Parse one full CAVP .rsp for the active TC_AES_KEYLEN. Mlen=0 → empty message. */
 static MunitResult cmac_run_cavp_file(const char* name, int is_verify, unsigned* ran_out)
 {
@@ -523,7 +577,7 @@ static MunitResult cmac_run_cavp_file(const char* name, int is_verify, unsigned*
       have_mac = (mac_len != SIZE_MAX && tlen != 0 && mac_len == tlen);
       if (!is_verify && have_key && have_msg && have_mac && key_len == TC_AES_KEYLEN) {
         ++ran;
-        if (TC_AES_CMAC(key, msg_len ? msg : NULL, msg_len, out, tlen) != TC_OK ||
+        if (cmac_cavp_generate(key, msg_len ? msg : NULL, msg_len, out, tlen) != TC_OK ||
             memcmp(out, mac, tlen) != 0)
           ++failed;
         have_key = have_msg = have_mac = 0;
@@ -535,7 +589,7 @@ static MunitResult cmac_run_cavp_file(const char* name, int is_verify, unsigned*
           key_len == TC_AES_KEYLEN) {
         int vr;
         ++ran;
-        vr = TC_AES_CMAC_verify(key, msg_len ? msg : NULL, msg_len, mac, tlen);
+        vr = cmac_cavp_verify(key, msg_len ? msg : NULL, msg_len, mac, tlen);
         if (result_pass) {
           if (vr != TC_OK)
             ++failed;
@@ -625,6 +679,8 @@ MunitResult test_cmac(const MunitParameter params[], void* data)
   if (test_cmac_sp800_38b(params, data) != MUNIT_OK)
     return MUNIT_FAIL;
   if (test_cmac_api(params, data) != MUNIT_OK)
+    return MUNIT_FAIL;
+  if (test_cmac_tag_policy(params, data) != MUNIT_OK)
     return MUNIT_FAIL;
   if (test_cmac_streaming(params, data) != MUNIT_OK)
     return MUNIT_FAIL;

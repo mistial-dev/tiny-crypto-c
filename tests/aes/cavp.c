@@ -424,6 +424,8 @@ static int cavp_run_ccm_case(const char* file, const struct cavp_ccm_record* rec
 {
   uint8_t* output = record->payload_len == 0 ? NULL : (uint8_t*)malloc(record->payload_len);
   uint8_t tag[16] = {0};
+  /* CAVP Tlen 4 and 6 rows go through the explicit short-tag entry points. */
+  const int short_tag = record->tag_len < TC_MIN_TAG_LEN;
   int result;
   int ok;
 
@@ -435,17 +437,17 @@ static int cavp_run_ccm_case(const char* file, const struct cavp_ccm_record* rec
       free(output);
       return 0;
     }
-    result = TC_AES_CCM_decrypt(record->key, (TC_bytes){record->nonce, record->nonce_len},
-                                (TC_bytes){record->aad, record->aad_len},
-                                (TC_bytes){record->ct, record->payload_len},
-                                (TC_bytes){record->ct + record->payload_len, record->tag_len},
-                                (TC_buffer){output, record->payload_len});
+    result = (short_tag ? TC_AES_CCM_decrypt_short_tag : TC_AES_CCM_decrypt)(
+        record->key, (TC_bytes){record->nonce, record->nonce_len},
+        (TC_bytes){record->aad, record->aad_len}, (TC_bytes){record->ct, record->payload_len},
+        (TC_bytes){record->ct + record->payload_len, record->tag_len},
+        (TC_buffer){output, record->payload_len});
     ok = record->expected_fail
              ? result == TC_MISMATCH
              : result == TC_OK && (record->payload_len == 0 ||
                                    memcmp(output, record->payload, record->payload_len) == 0);
   } else {
-    result = TC_AES_CCM_encrypt(
+    result = (short_tag ? TC_AES_CCM_encrypt_short_tag : TC_AES_CCM_encrypt)(
         record->key, (TC_bytes){record->nonce, record->nonce_len},
         (TC_bytes){record->aad, record->aad_len}, (TC_bytes){record->payload, record->payload_len},
         (TC_buffer){output, record->payload_len}, (TC_buffer){tag, record->tag_len});

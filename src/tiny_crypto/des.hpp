@@ -148,6 +148,13 @@ TC_CPP_NODISCARD inline TC_status des_cmac(const uint8_t* key, size_t key_len,
 {
   return TC_DES_CMAC(key, key_len, message, message_len, tag, tag_len);
 }
+/* Short-tag form for tag_len in 1..TC_MIN_TAG_LEN - 1. */
+TC_CPP_NODISCARD inline TC_status des_cmac_short_tag(const uint8_t* key, size_t key_len,
+                                                     const uint8_t* message, size_t message_len,
+                                                     uint8_t* tag, size_t tag_len) noexcept
+{
+  return TC_DES_CMAC_short_tag(key, key_len, message, message_len, tag, tag_len);
+}
 #endif
 
 } /* namespace tiny_crypto */

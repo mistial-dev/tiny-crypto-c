@@ -223,6 +223,41 @@ if (status != TC_OK)
   return status; /* packet holds no plaintext */
 ```
 
+## Tag lengths
+
+`TC_MIN_TAG_LEN` in `config.h` sets one minimum tag length for CCM, EAX,
+AES-CMAC and DES-CMAC. It defaults to 8 bytes, the 64-bit floor of SP 800-38B
+Appendix A.2, and a build may raise it to 16. Values outside 8..16 stop the
+build. A value above 8 also requires `TC_DES_ENABLE_CMAC=0`, since a DES-CMAC
+tag holds at most 8 bytes.
+
+| Mode | Default entry points | `_short_tag` entry points |
+| --- | --- | --- |
+| CCM | even lengths from `TC_MIN_TAG_LEN` to 16 | even lengths from 4 up to `TC_MIN_TAG_LEN - 1` |
+| EAX | `TC_MIN_TAG_LEN`..16 | 1..`TC_MIN_TAG_LEN - 1` |
+| AES-CMAC | `TC_MIN_TAG_LEN`..16 | 1..`TC_MIN_TAG_LEN - 1` |
+| DES-CMAC | `TC_MIN_TAG_LEN`..8 | 1..`TC_MIN_TAG_LEN - 1` |
+| GCM | 12..16 | 4 or 8 (SP 800-38D appendix C) |
+| ISO 9797-1 | 8 | 4..7 |
+
+Each length has exactly one entry point. The other entry point returns
+`TC_ERROR` and leaves every output unchanged. A zero-length tag is never
+accepted. Short tags are the leading bytes of the full tag. Call a
+`_short_tag` form only when the protocol fixes that tag length and limits the
+number of failed verifications for a key. EAX' is exempt from the minimum
+because ANSI C12.22 fixes its tag at 4 bytes.
+
+```c
+/* A protocol with 4-byte CCM tags selects the short-tag call. */
+TC_status status = TC_AES_CCM_decrypt_short_tag(key, (TC_bytes){nonce, 13},
+                                                (TC_bytes){header, header_length},
+                                                (TC_bytes){packet, packet_length},
+                                                (TC_bytes){tag, 4},
+                                                (TC_buffer){packet, packet_length});
+if (status != TC_OK)
+  return status; /* packet holds no plaintext */
+```
+
 ## C++ wrappers
 
 The C++11 wrappers in `tiny_crypto` return the C result types. Every call that
@@ -243,7 +278,9 @@ The one-shot GCM, CCM, EAX, EAX' and SIV wrappers take the key as `bytes`.
 GCM, CCM, EAX and EAX' need `TC_AES_KEYLEN` bytes and SIV needs
 `TC_AES_SIV_KEYLEN`. Another length returns `TC_ERROR` before any output is
 written. `GCM` streams encryption only. Decrypt GCM with `gcm_decrypt` or
-`gcm_decrypt_short_tag`.
+`gcm_decrypt_short_tag`. The `ccm_*_short_tag`, `eax_*_short_tag`,
+`aes_cmac_short_tag` and `des_cmac_short_tag` wrappers follow the
+[tag length](#tag-lengths) rules of their C functions.
 
 ```cpp
 const tiny_crypto::bytes key = {key_bytes, sizeof key_bytes};

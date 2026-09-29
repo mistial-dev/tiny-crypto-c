@@ -74,8 +74,7 @@ static TC_status tc_aes_eax_crypt(const uint8_t* key, TC_bytes nonce, TC_bytes a
 
   if (key == NULL || !tc_internal_span_valid(nonce.data, nonce.length) ||
       !tc_internal_span_valid(aad.data, aad.length) || !tc_aes_text_ok(input_span, output_span) ||
-      (expected_tag == NULL && output_tag == NULL) || tag_len == 0 ||
-      tag_len < TC_AES_EAX_MIN_TAG_LEN || tag_len > TC_AES_BLOCKLEN ||
+      (expected_tag == NULL && output_tag == NULL) || tag_len == 0 || tag_len > TC_AES_BLOCKLEN ||
       !tc_internal_ranges_disjoint(output, input_len,
                                    decrypt ? (const void*)expected_tag : (const void*)output_tag,
                                    tag_len))
@@ -119,18 +118,48 @@ done:
   return status;
 }
 
+/* EAX tags are the leading 1..16 bytes of the OMAC sum. short_tag selects
+ * the lengths below TC_MIN_TAG_LEN. */
+static TC_status tc_aes_eax_encrypt_with_policy(const uint8_t* key, TC_bytes nonce, TC_bytes aad,
+                                                TC_bytes plaintext, TC_buffer ciphertext,
+                                                TC_buffer tag, int short_tag)
+{
+  if (!tc_internal_tag_length_allowed(tag.capacity, TC_AES_BLOCKLEN, short_tag))
+    return TC_ERROR;
+  return tc_aes_eax_crypt(key, nonce, aad, plaintext, ciphertext, NULL, tag.data, tag.capacity);
+}
+
+static TC_status tc_aes_eax_decrypt_with_policy(const uint8_t* key, TC_bytes nonce, TC_bytes aad,
+                                                TC_bytes ciphertext, TC_bytes tag,
+                                                TC_buffer plaintext, int short_tag)
+{
+  if (tag.data == NULL || !tc_internal_tag_length_allowed(tag.length, TC_AES_BLOCKLEN, short_tag))
+    return TC_ERROR;
+  return tc_aes_eax_crypt(key, nonce, aad, ciphertext, plaintext, tag.data, NULL, tag.length);
+}
+
 TC_status TC_AES_EAX_encrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes plaintext,
                              TC_buffer ciphertext, TC_buffer tag)
 {
-  return tc_aes_eax_crypt(key, nonce, aad, plaintext, ciphertext, NULL, tag.data, tag.capacity);
+  return tc_aes_eax_encrypt_with_policy(key, nonce, aad, plaintext, ciphertext, tag, 0);
 }
 
 TC_status TC_AES_EAX_decrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes ciphertext,
                              TC_bytes tag, TC_buffer plaintext)
 {
-  if (tag.data == NULL)
-    return TC_ERROR;
-  return tc_aes_eax_crypt(key, nonce, aad, ciphertext, plaintext, tag.data, NULL, tag.length);
+  return tc_aes_eax_decrypt_with_policy(key, nonce, aad, ciphertext, tag, plaintext, 0);
+}
+
+TC_status TC_AES_EAX_encrypt_short_tag(const uint8_t* key, TC_bytes nonce, TC_bytes aad,
+                                       TC_bytes plaintext, TC_buffer ciphertext, TC_buffer tag)
+{
+  return tc_aes_eax_encrypt_with_policy(key, nonce, aad, plaintext, ciphertext, tag, 1);
+}
+
+TC_status TC_AES_EAX_decrypt_short_tag(const uint8_t* key, TC_bytes nonce, TC_bytes aad,
+                                       TC_bytes ciphertext, TC_bytes tag, TC_buffer plaintext)
+{
+  return tc_aes_eax_decrypt_with_policy(key, nonce, aad, ciphertext, tag, plaintext, 1);
 }
 
 #endif /* EAX */

@@ -53,6 +53,18 @@ static inline TC_status tc_internal_verify_tag(TC_status computed_status, uint8_
   return status;
 }
 
+/* Tag length policy for CCM, EAX, AES-CMAC and DES-CMAC. The default entry
+ * points take TC_MIN_TAG_LEN..max_length bytes and the _short_tag entry points
+ * take 1..TC_MIN_TAG_LEN - 1, so each valid length has exactly one entry
+ * point. A zero-length tag is never accepted because it would compare equal
+ * to any MAC. */
+static inline int tc_internal_tag_length_allowed(size_t length, size_t max_length, int short_tag)
+{
+  if (length == 0 || length > max_length)
+    return 0;
+  return short_tag ? length < TC_MIN_TAG_LEN : length >= TC_MIN_TAG_LEN;
+}
+
 /* A span is valid when it has storage or is empty. */
 static inline int tc_internal_span_valid(const void* data, size_t length)
 {

@@ -181,6 +181,14 @@ TC_CPP_NODISCARD inline TC_status aes_cmac(const uint8_t* key, size_t key_len,
 {
   return key_len == TC_AES_KEYLEN ? TC_AES_CMAC(key, message, message_len, tag, tag_len) : TC_ERROR;
 }
+/* Short-tag form for tag_len in 1..TC_MIN_TAG_LEN - 1. */
+TC_CPP_NODISCARD inline TC_status aes_cmac_short_tag(const uint8_t* key, size_t key_len,
+                                                     const uint8_t* message, size_t message_len,
+                                                     uint8_t* tag, size_t tag_len) noexcept
+{
+  return key_len == TC_AES_KEYLEN ? TC_AES_CMAC_short_tag(key, message, message_len, tag, tag_len)
+                                  : TC_ERROR;
+}
 #endif
 
 /* The one-shot AEAD wrappers take a sized key and check its length before the
@@ -236,6 +244,22 @@ TC_CPP_NODISCARD inline TC_status ccm_decrypt(bytes key, bytes nonce, bytes aad,
     return TC_ERROR;
   return TC_AES_CCM_decrypt(key.data, nonce, aad, ciphertext, tag, plaintext);
 }
+TC_CPP_NODISCARD inline TC_status ccm_encrypt_short_tag(bytes key, bytes nonce, bytes aad,
+                                                        bytes plaintext, buffer ciphertext,
+                                                        buffer tag) noexcept
+{
+  if (key.length != TC_AES_KEYLEN)
+    return TC_ERROR;
+  return TC_AES_CCM_encrypt_short_tag(key.data, nonce, aad, plaintext, ciphertext, tag);
+}
+TC_CPP_NODISCARD inline TC_status ccm_decrypt_short_tag(bytes key, bytes nonce, bytes aad,
+                                                        bytes ciphertext, bytes tag,
+                                                        buffer plaintext) noexcept
+{
+  if (key.length != TC_AES_KEYLEN)
+    return TC_ERROR;
+  return TC_AES_CCM_decrypt_short_tag(key.data, nonce, aad, ciphertext, tag, plaintext);
+}
 #endif
 
 #if TC_AES_ENABLE_EAX
@@ -252,6 +276,22 @@ TC_CPP_NODISCARD inline TC_status eax_decrypt(bytes key, bytes nonce, bytes aad,
   if (key.length != TC_AES_KEYLEN)
     return TC_ERROR;
   return TC_AES_EAX_decrypt(key.data, nonce, aad, ciphertext, tag, plaintext);
+}
+TC_CPP_NODISCARD inline TC_status eax_encrypt_short_tag(bytes key, bytes nonce, bytes aad,
+                                                        bytes plaintext, buffer ciphertext,
+                                                        buffer tag) noexcept
+{
+  if (key.length != TC_AES_KEYLEN)
+    return TC_ERROR;
+  return TC_AES_EAX_encrypt_short_tag(key.data, nonce, aad, plaintext, ciphertext, tag);
+}
+TC_CPP_NODISCARD inline TC_status eax_decrypt_short_tag(bytes key, bytes nonce, bytes aad,
+                                                        bytes ciphertext, bytes tag,
+                                                        buffer plaintext) noexcept
+{
+  if (key.length != TC_AES_KEYLEN)
+    return TC_ERROR;
+  return TC_AES_EAX_decrypt_short_tag(key.data, nonce, aad, ciphertext, tag, plaintext);
 }
 #endif
 

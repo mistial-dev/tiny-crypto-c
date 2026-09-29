@@ -58,6 +58,8 @@ void tiny_crypto_nodiscard_compile(uint8_t* data, size_t length)
   ct_equal(data, data, length);                                  /* DISCARDED */
   ccm_decrypt(in, in, in, in, in, out);                          /* DISCARDED */
   eax_decrypt(in, in, in, in, in, out);                          /* DISCARDED */
+  ccm_decrypt_short_tag(in, in, in, in, in, out);                /* DISCARDED */
+  eax_decrypt_short_tag(in, in, in, in, in, out);                /* DISCARDED */
   eax_prime_decrypt(in, in, in, eax_prime_tag, out);             /* DISCARDED */
   siv_decrypt(in, &in, 1, synthetic_iv, in, out);                /* DISCARDED */
 
@@ -84,19 +86,23 @@ void tiny_crypto_nodiscard_compile(uint8_t* data, size_t length)
   aes.decrypt_cbc(data, length); /* DISCARDED */
   aes.set_iv(block);             /* DISCARDED */
   GCM gcm;
-  gcm.encrypt_update(data, length);                   /* DISCARDED */
-  gcm_encrypt(in, in, in, in, out, out);              /* DISCARDED */
-  gcm.encrypt_finish(data, length);                   /* DISCARDED */
-  gcm.aad_update(data, length);                       /* DISCARDED */
-  aes_cmac(data, length, data, length, data, length); /* DISCARDED */
-  ccm_encrypt(in, in, in, in, out, out);              /* DISCARDED */
+  gcm.encrypt_update(data, length);                             /* DISCARDED */
+  gcm_encrypt(in, in, in, in, out, out);                        /* DISCARDED */
+  gcm.encrypt_finish(data, length);                             /* DISCARDED */
+  gcm.aad_update(data, length);                                 /* DISCARDED */
+  aes_cmac(data, length, data, length, data, length);           /* DISCARDED */
+  aes_cmac_short_tag(data, length, data, length, data, length); /* DISCARDED */
+  ccm_encrypt(in, in, in, in, out, out);                        /* DISCARDED */
+  ccm_encrypt_short_tag(in, in, in, in, out, out);              /* DISCARDED */
+  eax_encrypt_short_tag(in, in, in, in, out, out);              /* DISCARDED */
 
   DES des;
-  des.init(data, length);                             /* DISCARDED */
-  des.encrypt_ecb(block);                             /* DISCARDED */
-  des.xcrypt_ctr(data, length);                       /* DISCARDED */
-  des.set_iv(data, length);                           /* DISCARDED */
-  des_cmac(data, length, data, length, data, length); /* DISCARDED */
+  des.init(data, length);                                       /* DISCARDED */
+  des.encrypt_ecb(block);                                       /* DISCARDED */
+  des.xcrypt_ctr(data, length);                                 /* DISCARDED */
+  des.set_iv(data, length);                                     /* DISCARDED */
+  des_cmac(data, length, data, length, data, length);           /* DISCARDED */
+  des_cmac_short_tag(data, length, data, length, data, length); /* DISCARDED */
 
   SHA256 hash;
   hash.update(data, length);                  /* DISCARDED */

@@ -175,7 +175,7 @@ TC_status TC_KBKDF_fixed_input(TC_bytes label, TC_bytes context, size_t out_len,
  *   K(i) = PRF(KDK, A(i) [|| [i]_r] || fixed), counter as in feedback mode
  *
  * The streaming PRF APIs always yield the full h-byte block, so
- * TC_HMAC_MIN_TAG_LEN and the CMAC minimum tag lengths do not apply here.
+ * TC_HMAC_MIN_TAG_LEN and TC_MIN_TAG_LEN do not apply here.
  *
  * CMAC key control: with a CMAC PRF, a party that knows the KDK and chooses
  * part of the fixed input or IV can steer output blocks (SP 800-108r1 section

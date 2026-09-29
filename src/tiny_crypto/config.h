@@ -397,6 +397,22 @@
 #if TC_AVR_PROGMEM != 0 && TC_AVR_PROGMEM != 1
 #error "TC_AVR_PROGMEM must be 0 or 1"
 #endif
+/* Minimum tag length in bytes for the default CCM, EAX, AES-CMAC and
+ * DES-CMAC entry points. SP 800-38B Appendix A.2 asks for at least 64 bits
+ * unless a protocol limits failed verifications. The value may be raised to
+ * 16. Protocols with shorter tags call the explicit _short_tag entry points,
+ * which take the lengths below this minimum. GCM keeps its SP 800-38D
+ * lengths, and the EAX' tag is fixed at 4 bytes by ANSI C12.22. */
+#if defined(TC_AES_EAX_MIN_TAG_LEN) || defined(TC_AES_CMAC_MIN_TAG_LEN) ||                         \
+    defined(TC_DES_CMAC_MIN_TAG_LEN)
+#error "Per-mode minimum tag lengths are removed: set TC_MIN_TAG_LEN or call the _short_tag APIs"
+#endif
+#ifndef TC_MIN_TAG_LEN
+#define TC_MIN_TAG_LEN 8
+#endif
+#if TC_MIN_TAG_LEN < 8 || TC_MIN_TAG_LEN > 16
+#error "TC_MIN_TAG_LEN must be in 8..16"
+#endif
 /* Minimum accepted HMAC tag length for the one-shot HMAC and verify APIs.
  * RFC 2104 section 5 asks for at least half the digest and at least 80 bits.
  * It may not exceed the digest length of any enabled SHA. */
@@ -454,12 +470,6 @@
 #endif
 #ifndef TC_AES_ENABLE_CMAC
 #define TC_AES_ENABLE_CMAC TC_PROFILE_VALUE(0, 0, 0, 1)
-#endif
-#ifndef TC_AES_EAX_MIN_TAG_LEN
-#define TC_AES_EAX_MIN_TAG_LEN 8
-#endif
-#ifndef TC_AES_CMAC_MIN_TAG_LEN
-#define TC_AES_CMAC_MIN_TAG_LEN 8
 #endif
 #ifndef TC_AES_TINY
 #define TC_AES_TINY TC_PROFILE_VALUE(0, 1, 0, 0)
@@ -535,13 +545,6 @@
 #if TC_AES_KEY_BITS != 128 && TC_AES_KEY_BITS != 192 && TC_AES_KEY_BITS != 256
 #error "TC_AES_KEY_BITS must be 128, 192, or 256"
 #endif
-#if TC_AES_CMAC_MIN_TAG_LEN < 1 || TC_AES_CMAC_MIN_TAG_LEN > 16
-#error "TC_AES_CMAC_MIN_TAG_LEN must be in 1..16"
-#endif
-/* A zero minimum would let a zero-length EAX tag authenticate any message. */
-#if TC_AES_EAX_MIN_TAG_LEN < 1 || TC_AES_EAX_MIN_TAG_LEN > 16
-#error "TC_AES_EAX_MIN_TAG_LEN must be in 1..16"
-#endif
 #if TC_AES_GCM_GHASH_MODE < TC_AES_GCM_GHASH_MODE_AUTO ||                                          \
     TC_AES_GCM_GHASH_MODE > TC_AES_GCM_GHASH_MODE_HARDWARE
 #error "TC_AES_GCM_GHASH_MODE is invalid"
@@ -599,11 +602,6 @@
 #ifndef TC_DES_REJECT_WEAK_KEYS
 #define TC_DES_REJECT_WEAK_KEYS TC_PROFILE_VALUE(0, 0, 0, 0)
 #endif
-/* Minimum DES CMAC tag length in bytes (SP 800-38B recommends at least 64
- * bits). */
-#ifndef TC_DES_CMAC_MIN_TAG_LEN
-#define TC_DES_CMAC_MIN_TAG_LEN 8
-#endif
 #if TC_DES_ENABLE_ECB != 0 && TC_DES_ENABLE_ECB != 1
 #error "TC_DES_ENABLE_ECB must be 0 or 1"
 #endif
@@ -642,8 +640,10 @@
     !TC_DES_ENABLE_CMAC && !TC_DES_ENABLE_ISO9797
 #error "DES requires at least one enabled mode or MAC"
 #endif
-#if TC_DES_CMAC_MIN_TAG_LEN < 1 || TC_DES_CMAC_MIN_TAG_LEN > 8
-#error "TC_DES_CMAC_MIN_TAG_LEN must be in 1..8"
+/* A full DES-CMAC tag is one 8-byte block. A higher minimum would leave the
+ * default DES-CMAC entry points with no accepted length. */
+#if TC_ENABLE_DES && TC_DES_ENABLE_CMAC && TC_MIN_TAG_LEN > 8
+#error "TC_MIN_TAG_LEN above 8 requires TC_DES_ENABLE_CMAC=0"
 #endif
 /* KBKDF needs a PRF: HMAC with an enabled SHA, AES-CMAC or DES-CMAC. */
 #if TC_ENABLE_KDF && !TC_ENABLE_HMAC && !(TC_ENABLE_AES && TC_AES_ENABLE_CMAC) &&                  \

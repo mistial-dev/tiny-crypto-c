@@ -30,9 +30,10 @@ archive (`cmactestvectors.zip`, CAVS 11.0), unchanged:
 Includes short tags (`Tlen` 4/5) and 64 KiB messages. The TDES files from the
 same archive are in `tests/vectors/des/cmac/`.
 
-CMAC unit-test builds set `TC_AES_CMAC_MIN_TAG_LEN=4` so every CAVP row can
-exercise the public API. The product default is 8, following the SP 800-38B
-≥ 64-bit guidance and the EAX tag floor.
+Rows with `Tlen` below `TC_MIN_TAG_LEN` (default 8, the SP 800-38B
+Appendix A.2 guidance) run through `TC_AES_CMAC_short_tag` and
+`TC_AES_CMAC_verify_short_tag`. The other rows use `TC_AES_CMAC` and
+`TC_AES_CMAC_verify`.
 
 ## Wycheproof
 

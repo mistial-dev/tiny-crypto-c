@@ -23,14 +23,19 @@ void tc_test_fill_stride3(uint8_t* output, size_t length, uint8_t seed)
   tc_test_fill_bytes(output, length, seed, 3);
 }
 
-int tc_test_all_zero(const void* memory, size_t length)
+int tc_test_all_value(const void* memory, size_t length, uint8_t value)
 {
   const uint8_t* bytes = (const uint8_t*)memory;
   size_t i;
   for (i = 0; i < length; ++i)
-    if (bytes[i] != 0)
+    if (bytes[i] != value)
       return 0;
   return 1;
+}
+
+int tc_test_all_zero(const void* memory, size_t length)
+{
+  return tc_test_all_value(memory, length, 0);
 }
 
 size_t tc_test_decode_hex(const char* text, uint8_t* output, size_t capacity)

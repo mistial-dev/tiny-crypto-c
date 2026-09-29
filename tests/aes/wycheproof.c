@@ -30,6 +30,36 @@ static TC_status siv_decrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, T
   return TC_AES_SIV_decrypt(key, ad, siv_ad_count, tag.data, input, output);
 }
 
+/* Wycheproof CCM groups include 4- and 6-byte tags. Tags below TC_MIN_TAG_LEN
+ * go through the explicit short-tag entry points. */
+static TC_status ccm_encrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes input,
+                             TC_buffer output, TC_buffer tag)
+{
+  return (tag.capacity < TC_MIN_TAG_LEN ? TC_AES_CCM_encrypt_short_tag
+                                        : TC_AES_CCM_encrypt)(key, nonce, aad, input, output, tag);
+}
+
+static TC_status ccm_decrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes input,
+                             TC_bytes tag, TC_buffer output)
+{
+  return (tag.length < TC_MIN_TAG_LEN ? TC_AES_CCM_decrypt_short_tag
+                                      : TC_AES_CCM_decrypt)(key, nonce, aad, input, tag, output);
+}
+
+static TC_status eax_encrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes input,
+                             TC_buffer output, TC_buffer tag)
+{
+  return (tag.capacity < TC_MIN_TAG_LEN ? TC_AES_EAX_encrypt_short_tag
+                                        : TC_AES_EAX_encrypt)(key, nonce, aad, input, output, tag);
+}
+
+static TC_status eax_decrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes input,
+                             TC_bytes tag, TC_buffer output)
+{
+  return (tag.length < TC_MIN_TAG_LEN ? TC_AES_EAX_decrypt_short_tag
+                                      : TC_AES_EAX_decrypt)(key, nonce, aad, input, tag, output);
+}
+
 static TC_bytes span(const uint8_t* data, size_t length)
 {
   return (TC_bytes){data, length};
@@ -69,11 +99,11 @@ static MunitResult vectors(const MunitParameter params[], void* user)
     int valid = strcmp(verdict, "valid") == 0;
     int siv = strcmp(mode, "siv") == 0 || strcmp(mode, "siv-aead") == 0;
     if (strcmp(mode, "ccm") == 0) {
-      encrypt = TC_AES_CCM_encrypt;
-      decrypt = TC_AES_CCM_decrypt;
+      encrypt = ccm_encrypt;
+      decrypt = ccm_decrypt;
     } else if (strcmp(mode, "eax") == 0) {
-      encrypt = TC_AES_EAX_encrypt;
-      decrypt = TC_AES_EAX_decrypt;
+      encrypt = eax_encrypt;
+      decrypt = eax_decrypt;
     } else if (siv) {
       encrypt = siv_encrypt;
       decrypt = siv_decrypt;

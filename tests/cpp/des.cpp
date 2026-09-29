@@ -218,4 +218,22 @@ TEST_CASE("TDEA-CMAC wrapper returns status")
   CHECK(tiny_crypto::des_cmac(tdes3_key, sizeof(tdes3_key), nullptr, 0, tag, sizeof(tag)) == TC_OK);
   CHECK(tiny_crypto::des_cmac(tdes3_key, 12, nullptr, 0, tag, sizeof(tag)) == TC_ERROR);
 }
+
+TEST_CASE("TDEA-CMAC tag length boundary at TC_MIN_TAG_LEN")
+{
+  const size_t below = TC_MIN_TAG_LEN - 1;
+  uint8_t full[TC_DES_BLOCKLEN];
+  uint8_t tag[TC_DES_BLOCKLEN];
+  REQUIRE(tiny_crypto::des_cmac(tdes3_key, sizeof(tdes3_key), nullptr, 0, full, sizeof(full)) ==
+          TC_OK);
+  CHECK(tiny_crypto::des_cmac(tdes3_key, sizeof(tdes3_key), nullptr, 0, tag, below) == TC_ERROR);
+  CHECK(tiny_crypto::des_cmac(tdes3_key, sizeof(tdes3_key), nullptr, 0, tag, TC_MIN_TAG_LEN) ==
+        TC_OK);
+  CHECK(tiny_crypto::des_cmac_short_tag(tdes3_key, sizeof(tdes3_key), nullptr, 0, tag,
+                                        TC_MIN_TAG_LEN) == TC_ERROR);
+  CHECK(tiny_crypto::des_cmac_short_tag(tdes3_key, 12, nullptr, 0, tag, below) == TC_ERROR);
+  REQUIRE(tiny_crypto::des_cmac_short_tag(tdes3_key, sizeof(tdes3_key), nullptr, 0, tag, below) ==
+          TC_OK);
+  CHECK(std::memcmp(tag, full, below) == 0);
+}
 #endif

@@ -333,7 +333,7 @@ static MunitResult test_eax_api(const MunitParameter params[], void* data)
   munit_assert_memory_equal(sizeof(bad), bad, ciphertext);
   munit_assert_int(TC_AES_EAX_decrypt(key, (TC_bytes){nonce, sizeof(nonce)},
                                       (TC_bytes){aad, sizeof(aad)}, (TC_bytes){bad, sizeof(bad)},
-                                      (TC_bytes){tag, TC_AES_EAX_MIN_TAG_LEN - 1u},
+                                      (TC_bytes){tag, TC_MIN_TAG_LEN - 1u},
                                       (TC_buffer){bad, sizeof(bad)}),
                    ==, TC_ERROR);
   munit_assert_memory_equal(sizeof(bad), bad, ciphertext);
@@ -401,16 +401,105 @@ static MunitResult test_eax_api(const MunitParameter params[], void* data)
                          (TC_bytes){message, sizeof(message)},
                          (TC_buffer){ciphertext, sizeof(message)}, (TC_buffer){empty_tag, 0}),
       ==, TC_ERROR);
+  return MUNIT_OK;
+}
+
+/* The default entry points take TC_MIN_TAG_LEN..16 bytes and the _short_tag
+ * forms take 1..TC_MIN_TAG_LEN - 1. A rejected length leaves every output
+ * unchanged. A short tag is the leading bytes of the full tag. */
+static MunitResult test_eax_tag_policy(const MunitParameter params[], void* data)
+{
+  static const uint8_t key[TC_AES_KEYLEN] = {0x91, 0x94, 0x5d, 0x3f, 0x5f, 0x04, 0x6d, 0x2b,
+                                             0x1a, 0x3c, 0x7e, 0x55, 0x60, 0x21, 0x0a, 0xc4};
+  static const uint8_t nonce[12] = {0xbe, 0xca, 0xf0, 0x43, 0xb0, 0xa2,
+                                    0x3d, 0x84, 0x31, 0x94, 0xba, 0x97};
+  static const uint8_t aad[5] = {0x61, 0x62, 0x63, 0x64, 0x65};
+  static const uint8_t message[21] = {0x70, 0x6c, 0x61, 0x69, 0x6e, 0x74, 0x65,
+                                      0x78, 0x74, 0x2e, 0x31, 0x32, 0x33, 0x34,
+                                      0x35, 0x36, 0x37, 0x38, 0x39, 0x30, 0x21};
+  const TC_bytes n = {nonce, sizeof(nonce)}, a = {aad, sizeof(aad)};
+  const TC_bytes m = {message, sizeof(message)};
+  const size_t below = TC_MIN_TAG_LEN - 1u;
+  uint8_t ciphertext[sizeof(message)], full[16], tag[16], output[sizeof(message)];
+
+  (void)params;
+  (void)data;
+  munit_assert_int(TC_AES_EAX_encrypt(key, n, a, m, (TC_buffer){ciphertext, sizeof(ciphertext)},
+                                      (TC_buffer){full, sizeof(full)}),
+                   ==, TC_OK);
+
+  /* Default entry: min - 1 is rejected before any output is written. */
+  memset(output, 0xa5, sizeof(output));
+  memset(tag, 0xa5, sizeof(tag));
+  munit_assert_int(TC_AES_EAX_encrypt(key, n, a, m, (TC_buffer){output, sizeof(output)},
+                                      (TC_buffer){tag, below}),
+                   ==, TC_ERROR);
+  munit_assert_true(tc_test_all_value(output, sizeof(output), 0xa5));
+  munit_assert_true(tc_test_all_value(tag, sizeof(tag), 0xa5));
+  munit_assert_int(TC_AES_EAX_decrypt(key, n, a, (TC_bytes){ciphertext, sizeof(ciphertext)},
+                                      (TC_bytes){full, below}, (TC_buffer){output, sizeof(output)}),
+                   ==, TC_ERROR);
+  munit_assert_true(tc_test_all_value(output, sizeof(output), 0xa5));
+
+  /* Default entry: min is accepted. */
+  munit_assert_int(TC_AES_EAX_encrypt(key, n, a, m, (TC_buffer){output, sizeof(output)},
+                                      (TC_buffer){tag, TC_MIN_TAG_LEN}),
+                   ==, TC_OK);
+  munit_assert_memory_equal(TC_MIN_TAG_LEN, tag, full);
+  munit_assert_int(TC_AES_EAX_decrypt(key, n, a, (TC_bytes){ciphertext, sizeof(ciphertext)},
+                                      (TC_bytes){full, TC_MIN_TAG_LEN},
+                                      (TC_buffer){output, sizeof(output)}),
+                   ==, TC_OK);
+  munit_assert_memory_equal(sizeof(message), output, message);
+
+  /* Short-tag entry: 0 and min are rejected with outputs unchanged. */
+  memset(output, 0xa5, sizeof(output));
+  memset(tag, 0xa5, sizeof(tag));
+  munit_assert_int(TC_AES_EAX_encrypt_short_tag(key, n, a, m, (TC_buffer){output, sizeof(output)},
+                                                (TC_buffer){tag, 0}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_AES_EAX_encrypt_short_tag(key, n, a, m, (TC_buffer){output, sizeof(output)},
+                                                (TC_buffer){tag, TC_MIN_TAG_LEN}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_AES_EAX_encrypt_short_tag(NULL, n, a, m, (TC_buffer){output, sizeof(output)},
+                                                (TC_buffer){tag, below}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_AES_EAX_decrypt_short_tag(
+                       key, n, a, (TC_bytes){ciphertext, sizeof(ciphertext)},
+                       (TC_bytes){full, TC_MIN_TAG_LEN}, (TC_buffer){output, sizeof(output)}),
+                   ==, TC_ERROR);
   munit_assert_int(
-      TC_AES_EAX_encrypt(key, (TC_bytes){nonce, sizeof(nonce)}, (TC_bytes){aad, sizeof(aad)},
-                         (TC_bytes){message, sizeof(message)},
-                         (TC_buffer){ciphertext, sizeof(message)}, (TC_buffer){tag, 7}),
+      TC_AES_EAX_decrypt_short_tag(key, n, a, (TC_bytes){ciphertext, sizeof(ciphertext)},
+                                   (TC_bytes){NULL, below}, (TC_buffer){output, sizeof(output)}),
       ==, TC_ERROR);
+  munit_assert_true(tc_test_all_value(output, sizeof(output), 0xa5));
+  munit_assert_true(tc_test_all_value(tag, sizeof(tag), 0xa5));
+
+  /* Short-tag entry: 1 and min - 1 produce the leading tag bytes. */
+  munit_assert_int(TC_AES_EAX_encrypt_short_tag(key, n, a, m, (TC_buffer){output, sizeof(output)},
+                                                (TC_buffer){tag, 1}),
+                   ==, TC_OK);
+  munit_assert_uint8(tag[0], ==, full[0]);
+  munit_assert_int(TC_AES_EAX_encrypt_short_tag(key, n, a, m, (TC_buffer){output, sizeof(output)},
+                                                (TC_buffer){tag, below}),
+                   ==, TC_OK);
+  munit_assert_memory_equal(sizeof(ciphertext), output, ciphertext);
+  munit_assert_memory_equal(below, tag, full);
+  munit_assert_true(tc_test_all_value(tag + below, sizeof(tag) - below, 0xa5));
   munit_assert_int(
-      TC_AES_EAX_encrypt(key, (TC_bytes){nonce, sizeof(nonce)}, (TC_bytes){aad, sizeof(aad)},
-                         (TC_bytes){message, sizeof(message)},
-                         (TC_buffer){ciphertext, sizeof(message)}, (TC_buffer){tag, 8}),
+      TC_AES_EAX_decrypt_short_tag(key, n, a, (TC_bytes){ciphertext, sizeof(ciphertext)},
+                                   (TC_bytes){full, below}, (TC_buffer){output, sizeof(output)}),
       ==, TC_OK);
+  munit_assert_memory_equal(sizeof(message), output, message);
+
+  /* A short-tag mismatch wipes the output. */
+  memcpy(tag, full, sizeof(tag));
+  tag[below - 1u] ^= 0x01u;
+  munit_assert_int(
+      TC_AES_EAX_decrypt_short_tag(key, n, a, (TC_bytes){ciphertext, sizeof(ciphertext)},
+                                   (TC_bytes){tag, below}, (TC_buffer){output, sizeof(output)}),
+      ==, TC_MISMATCH);
+  munit_assert_true(tc_test_all_zero(output, sizeof(output)));
   return MUNIT_OK;
 }
 
@@ -419,7 +508,8 @@ MunitResult test_eax(const MunitParameter params[], void* data)
   (void)params;
   (void)data;
   return test_eax_rfc(params, data) == MUNIT_OK && test_eax_wycheproof(params, data) == MUNIT_OK &&
-                 test_eax_api(params, data) == MUNIT_OK
+                 test_eax_api(params, data) == MUNIT_OK &&
+                 test_eax_tag_policy(params, data) == MUNIT_OK
              ? MUNIT_OK
              : MUNIT_FAIL;
 }

@@ -281,16 +281,33 @@ TC_status TC_DES_OFB_crypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
 /*
  * DES/3DES-CMAC (NIST SP 800-38B). One-shot.
  * keylen must be 8 (single DES), 16 (2-key TDEA), or 24 (3-key TDEA).
- * tag_len must be in TC_DES_CMAC_MIN_TAG_LEN..TC_DES_CMAC_TAG_MAX.
+ * tag_len must be in TC_MIN_TAG_LEN..TC_DES_CMAC_TAG_MAX. Truncation keeps
+ * the most significant octets of the full T (SP 800-38B section 6.2).
  * Empty message: msg may be NULL when msg_len is 0.
  * The key schedules and the full tag on the stack are wiped before return.
+ * @return TC_OK, or TC_ERROR for a NULL key or tag, a bad key length, a key
+ *         refused under TC_DES_REJECT_WEAK_KEYS, a NULL msg with a nonzero
+ *         length or a tag length outside the range. An argument error leaves
+ *         tag unchanged.
  */
 TC_status TC_DES_CMAC(const uint8_t* key, size_t keylen, const uint8_t* msg, size_t msg_len,
                       uint8_t* tag, size_t tag_len);
 
-/* Constant-time verify of a (possibly truncated) tag. */
+/* Constant-time verify of a (possibly truncated) tag of tag_len bytes, with
+ * the same length range as TC_DES_CMAC.
+ * @return TC_OK when the tag matches, TC_MISMATCH when it differs, or
+ *         TC_ERROR as for TC_DES_CMAC. */
 TC_status TC_DES_CMAC_verify(const uint8_t* key, size_t keylen, const uint8_t* msg, size_t msg_len,
                              const uint8_t* tag, size_t tag_len);
+
+/* Short-tag DES/3DES-CMAC and verify. tag_len must be in
+ * 1..TC_MIN_TAG_LEN - 1. Use them only when the protocol fixes the short tag
+ * and limits failed verifications for the key (SP 800-38B Appendix A.2).
+ * Status values follow TC_DES_CMAC and TC_DES_CMAC_verify. */
+TC_status TC_DES_CMAC_short_tag(const uint8_t* key, size_t keylen, const uint8_t* msg,
+                                size_t msg_len, uint8_t* tag, size_t tag_len);
+TC_status TC_DES_CMAC_verify_short_tag(const uint8_t* key, size_t keylen, const uint8_t* msg,
+                                       size_t msg_len, const uint8_t* tag, size_t tag_len);
 
 /*
  * Streaming DES/3DES-CMAC. Holds its own key schedules so it works with the

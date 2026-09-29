@@ -91,21 +91,25 @@ void TC_DES_CMAC_ctx_clear(struct TC_DES_CMAC_ctx* ctx)
   TC_secure_zero(ctx, sizeof(*ctx));
 }
 
-TC_status TC_DES_CMAC(const uint8_t* key, size_t keylen, const uint8_t* msg, size_t msg_len,
-                      uint8_t* tag, size_t tag_len)
+/* One-shot CMAC over the streaming context. The tag is the leading tag_len
+ * bytes of T (SP 800-38B section 6.2 step 7). short_tag selects the lengths
+ * below TC_MIN_TAG_LEN (Appendix A.2). */
+static TC_status tc_des_cmac_oneshot(const uint8_t* key, size_t keylen, TC_bytes msg, uint8_t* tag,
+                                     size_t tag_len, int short_tag)
 {
   struct TC_DES_CMAC_ctx ctx;
   uint8_t full[TC_DES_CMAC_TAG_MAX];
   TC_status status;
 
-  if (key == NULL || tag == NULL || tag_len < TC_DES_CMAC_MIN_TAG_LEN ||
-      tag_len > TC_DES_CMAC_TAG_MAX || (msg_len != 0 && msg == NULL)) {
+  if (key == NULL || tag == NULL ||
+      !tc_internal_tag_length_allowed(tag_len, TC_DES_CMAC_TAG_MAX, short_tag) ||
+      !tc_internal_span_valid(msg.data, msg.length))
     return TC_ERROR;
-  }
   status = TC_DES_CMAC_init(&ctx, key, keylen);
-  /* Empty message: msg may be NULL. update reads msg only when msg_len > 0. */
+  /* Empty message: msg may be NULL. update reads msg only when its length is
+   * nonzero. */
   if (status == TC_OK)
-    status = TC_DES_CMAC_update(&ctx, msg, msg_len);
+    status = TC_DES_CMAC_update(&ctx, msg.data, msg.length);
   if (status == TC_OK)
     status = TC_DES_CMAC_final(&ctx, full);
   if (status == TC_OK)
@@ -115,14 +119,38 @@ TC_status TC_DES_CMAC(const uint8_t* key, size_t keylen, const uint8_t* msg, siz
   return status;
 }
 
+static TC_status tc_des_cmac_verify_oneshot(const uint8_t* key, size_t keylen, TC_bytes msg,
+                                            const uint8_t* tag, size_t tag_len, int short_tag)
+{
+  uint8_t computed[TC_DES_CMAC_TAG_MAX];
+  if (tag == NULL || !tc_internal_tag_length_allowed(tag_len, TC_DES_CMAC_TAG_MAX, short_tag))
+    return TC_ERROR;
+  return tc_internal_verify_tag(tc_des_cmac_oneshot(key, keylen, msg, computed, tag_len, short_tag),
+                                computed, sizeof computed, tag, tag_len);
+}
+
+TC_status TC_DES_CMAC(const uint8_t* key, size_t keylen, const uint8_t* msg, size_t msg_len,
+                      uint8_t* tag, size_t tag_len)
+{
+  return tc_des_cmac_oneshot(key, keylen, (TC_bytes){msg, msg_len}, tag, tag_len, 0);
+}
+
 TC_status TC_DES_CMAC_verify(const uint8_t* key, size_t keylen, const uint8_t* msg, size_t msg_len,
                              const uint8_t* tag, size_t tag_len)
 {
-  uint8_t computed[TC_DES_CMAC_TAG_MAX];
-  if (tag == NULL || tag_len < TC_DES_CMAC_MIN_TAG_LEN || tag_len > TC_DES_CMAC_TAG_MAX)
-    return TC_ERROR;
-  return tc_internal_verify_tag(TC_DES_CMAC(key, keylen, msg, msg_len, computed, tag_len), computed,
-                                sizeof computed, tag, tag_len);
+  return tc_des_cmac_verify_oneshot(key, keylen, (TC_bytes){msg, msg_len}, tag, tag_len, 0);
+}
+
+TC_status TC_DES_CMAC_short_tag(const uint8_t* key, size_t keylen, const uint8_t* msg,
+                                size_t msg_len, uint8_t* tag, size_t tag_len)
+{
+  return tc_des_cmac_oneshot(key, keylen, (TC_bytes){msg, msg_len}, tag, tag_len, 1);
+}
+
+TC_status TC_DES_CMAC_verify_short_tag(const uint8_t* key, size_t keylen, const uint8_t* msg,
+                                       size_t msg_len, const uint8_t* tag, size_t tag_len)
+{
+  return tc_des_cmac_verify_oneshot(key, keylen, (TC_bytes){msg, msg_len}, tag, tag_len, 1);
 }
 
 #endif /* TC_DES_ENABLE_CMAC */

@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "munit.h"
+#include "test_util.h"
 #include <tiny_crypto/des.h>
 #include "test_vectors.h"
 
@@ -741,6 +742,65 @@ static MunitResult test_des_cmac(const MunitParameter params[], void* data)
   munit_assert_int(TC_ERROR, ==, TC_DES_CMAC(des_test_key, 10, cmac_kat_msg, msglen, cmac1, 8));
   munit_assert_int(TC_ERROR, ==, TC_DES_CMAC(des_test_key, 8, cmac_kat_msg, msglen, cmac1, 0));
 
+  return MUNIT_OK;
+}
+
+/* The default entry points take TC_MIN_TAG_LEN..8 bytes and the _short_tag
+ * forms take 1..TC_MIN_TAG_LEN - 1 (SP 800-38B Appendix A.2). A rejected
+ * length leaves the tag buffer unchanged. */
+static MunitResult test_des_cmac_tag_policy(const MunitParameter params[], void* data)
+{
+  const size_t msglen = sizeof(cmac_kat_msg) - 1;
+  const size_t below = TC_MIN_TAG_LEN - 1u;
+  uint8_t tag[8], bad[8];
+
+  (void)params;
+  (void)data;
+
+  /* Default entry: min - 1 is rejected, min is accepted. */
+  memset(tag, 0xa5, sizeof(tag));
+  munit_assert_int(TC_ERROR, ==, TC_DES_CMAC(tdes2_key, 16, cmac_kat_msg, msglen, tag, below));
+  munit_assert_true(tc_test_all_value(tag, sizeof(tag), 0xa5));
+  munit_assert_int(TC_ERROR, ==,
+                   TC_DES_CMAC_verify(tdes2_key, 16, cmac_kat_msg, msglen, cmac_kat_tdes2, below));
+  munit_assert_int(TC_OK, ==,
+                   TC_DES_CMAC(tdes2_key, 16, cmac_kat_msg, msglen, tag, TC_MIN_TAG_LEN));
+  munit_assert_memory_equal(TC_MIN_TAG_LEN, tag, cmac_kat_tdes2);
+  munit_assert_int(
+      TC_OK, ==,
+      TC_DES_CMAC_verify(tdes2_key, 16, cmac_kat_msg, msglen, cmac_kat_tdes2, TC_MIN_TAG_LEN));
+
+  /* Short-tag entry: 0 and min are rejected with the tag unchanged. */
+  memset(tag, 0xa5, sizeof(tag));
+  munit_assert_int(TC_ERROR, ==,
+                   TC_DES_CMAC_short_tag(tdes2_key, 16, cmac_kat_msg, msglen, tag, 0));
+  munit_assert_int(TC_ERROR, ==,
+                   TC_DES_CMAC_short_tag(tdes2_key, 16, cmac_kat_msg, msglen, tag, TC_MIN_TAG_LEN));
+  munit_assert_int(TC_ERROR, ==,
+                   TC_DES_CMAC_short_tag(tdes2_key, 10, cmac_kat_msg, msglen, tag, below));
+  munit_assert_int(TC_ERROR, ==, TC_DES_CMAC_short_tag(NULL, 16, cmac_kat_msg, msglen, tag, below));
+  munit_assert_true(tc_test_all_value(tag, sizeof(tag), 0xa5));
+
+  /* Short-tag entry: 1 and min - 1 give the leading bytes of the full tag. */
+  munit_assert_int(TC_OK, ==, TC_DES_CMAC_short_tag(tdes2_key, 16, cmac_kat_msg, msglen, tag, 1));
+  munit_assert_uint8(tag[0], ==, cmac_kat_tdes2[0]);
+  munit_assert_int(TC_OK, ==,
+                   TC_DES_CMAC_short_tag(tdes2_key, 16, cmac_kat_msg, msglen, tag, below));
+  munit_assert_memory_equal(below, tag, cmac_kat_tdes2);
+  munit_assert_true(tc_test_all_value(tag + below, sizeof(tag) - below, 0xa5));
+
+  munit_assert_int(
+      TC_OK, ==,
+      TC_DES_CMAC_verify_short_tag(tdes2_key, 16, cmac_kat_msg, msglen, cmac_kat_tdes2, below));
+  munit_assert_int(TC_ERROR, ==,
+                   TC_DES_CMAC_verify_short_tag(tdes2_key, 16, cmac_kat_msg, msglen, cmac_kat_tdes2,
+                                                TC_MIN_TAG_LEN));
+  munit_assert_int(TC_ERROR, ==,
+                   TC_DES_CMAC_verify_short_tag(tdes2_key, 16, cmac_kat_msg, msglen, NULL, below));
+  memcpy(bad, cmac_kat_tdes2, sizeof(bad));
+  bad[below - 1u] ^= 0x01u;
+  munit_assert_int(TC_MISMATCH, ==,
+                   TC_DES_CMAC_verify_short_tag(tdes2_key, 16, cmac_kat_msg, msglen, bad, below));
   return MUNIT_OK;
 }
 
@@ -1584,6 +1644,7 @@ static MunitTest test_suite_tests[] = {
 #endif
 #if TC_DES_ENABLE_CMAC
     {"/des_cmac", test_des_cmac, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/des_cmac_tag_policy", test_des_cmac_tag_policy, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/des_cmac_streaming", test_des_cmac_streaming, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/des_cmac_single_des_degenerate", test_des_cmac_single_des_matches_2k3des_degenerate, NULL,
      NULL, MUNIT_TEST_OPTION_NONE, NULL},
