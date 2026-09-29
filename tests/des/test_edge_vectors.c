@@ -24,43 +24,24 @@ static MunitResult test_edge_vectors(const MunitParameter params[], void* data)
     munit_assert(vector->len <= sizeof(buffer));
     memcpy(buffer, vector->msg, vector->len);
 
-    if (vector->key_len == 8) {
-      struct TC_DES_ctx ctx;
-      TC_DES_init_ctx_iv(&ctx, vector->key, vector->iv);
+    struct TC_DES_ctx ctx;
+    munit_assert_int(TC_DES_init_ctx_iv(&ctx, vector->key, vector->key_len, vector->iv), ==, TC_OK);
 
-      if (strcmp(vector->mode, "ECB") == 0)
-        TC_DES_ECB_encrypt(&ctx, buffer);
-      else if (strcmp(vector->mode, "CBC") == 0)
-        TC_DES_CBC_encrypt(&ctx, buffer, vector->len);
-      else if (strcmp(vector->mode, "CFB1") == 0)
-        TC_DES_CFB1_encrypt(&ctx, buffer, vector->bit_length);
-      else if (strcmp(vector->mode, "CFB8") == 0)
-        TC_DES_CFB8_encrypt(&ctx, buffer, vector->len);
-      else if (strcmp(vector->mode, "CFB64") == 0)
-        TC_DES_CFB64_encrypt(&ctx, buffer, vector->len);
-      else if (strcmp(vector->mode, "OFB") == 0)
-        TC_DES_OFB_crypt(&ctx, buffer, vector->len);
-      else
-        munit_errorf("unknown DES edge-vector mode: %s", vector->mode);
-    } else {
-      struct TC_DES3_ctx ctx;
-      TC_DES3_init_ctx_iv(&ctx, vector->key, vector->key_len, vector->iv);
-
-      if (strcmp(vector->mode, "ECB") == 0)
-        TC_DES3_ECB_encrypt(&ctx, buffer);
-      else if (strcmp(vector->mode, "CBC") == 0)
-        TC_DES3_CBC_encrypt(&ctx, buffer, vector->len);
-      else if (strcmp(vector->mode, "CFB1") == 0)
-        TC_DES3_CFB1_encrypt(&ctx, buffer, vector->bit_length);
-      else if (strcmp(vector->mode, "CFB8") == 0)
-        TC_DES3_CFB8_encrypt(&ctx, buffer, vector->len);
-      else if (strcmp(vector->mode, "CFB64") == 0)
-        TC_DES3_CFB64_encrypt(&ctx, buffer, vector->len);
-      else if (strcmp(vector->mode, "OFB") == 0)
-        TC_DES3_OFB_crypt(&ctx, buffer, vector->len);
-      else
-        munit_errorf("unknown 3DES edge-vector mode: %s", vector->mode);
-    }
+    if (strcmp(vector->mode, "ECB") == 0)
+      munit_assert_int(TC_DES_ECB_encrypt(&ctx, buffer), ==, TC_OK);
+    else if (strcmp(vector->mode, "CBC") == 0)
+      munit_assert_int(TC_DES_CBC_encrypt(&ctx, buffer, vector->len), ==, TC_OK);
+    else if (strcmp(vector->mode, "CFB1") == 0)
+      munit_assert_int(TC_DES_CFB1_encrypt(&ctx, buffer, vector->bit_length), ==, TC_OK);
+    else if (strcmp(vector->mode, "CFB8") == 0)
+      munit_assert_int(TC_DES_CFB8_encrypt(&ctx, buffer, vector->len), ==, TC_OK);
+    else if (strcmp(vector->mode, "CFB64") == 0)
+      munit_assert_int(TC_DES_CFB64_encrypt(&ctx, buffer, vector->len), ==, TC_OK);
+    else if (strcmp(vector->mode, "OFB") == 0)
+      munit_assert_int(TC_DES_OFB_crypt(&ctx, buffer, vector->len), ==, TC_OK);
+    else
+      munit_errorf("unknown DES edge-vector mode: %s", vector->mode);
+    TC_DES_ctx_clear(&ctx);
 
     size_t compare_len = vector->bit_length ? (vector->bit_length + 7) / 8 : vector->len;
     if (memcmp(buffer, vector->ct, compare_len) != 0)

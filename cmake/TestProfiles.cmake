@@ -106,7 +106,7 @@ target_compile_definitions(tiny-crypto-c-test-des-reject-weak PUBLIC
   TC_AVR_PROGMEM=1 TC_DES_ENABLE_ECB=1 TC_DES_ENABLE_CBC=0
   TC_DES_ENABLE_CTR=0 TC_DES_ENABLE_OFB=0 TC_DES_ENABLE_CFB1=0
   TC_DES_ENABLE_CFB8=0 TC_DES_ENABLE_CFB64=0 TC_DES_ENABLE_TDES=1
-  TC_DES_ENABLE_CMAC=0 TC_DES_REJECT_WEAK_KEYS=1)
+  TC_DES_ENABLE_CMAC=1 TC_DES_ENABLE_ISO9797=1 TC_DES_REJECT_WEAK_KEYS=1)
 
 tc_add_test_library(tiny-crypto-c-test-aes-runtime-sbox
   src/common.c ${tc_aes_sources})

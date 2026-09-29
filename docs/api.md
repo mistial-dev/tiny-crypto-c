@@ -186,7 +186,7 @@ enabled (the default on GCC and Clang) so a discarded verification or cipher
 result is reported. Wrapper calls are `noexcept`.
 
 Cipher, hash and MAC classes own their C context, clear it on destruction and
-delete their copy operations. A failed `init` of `AES`, `GCM`, `DES`, `DES3`,
+delete their copy operations. A failed `init` of `AES`, `GCM`, `DES`,
 `AES_dynamic`, `AES_dynamic_CMAC` or an HMAC class leaves the object unkeyed.
 Later cipher, update and finish calls then return `TC_ERROR` until the next
 successful `init`.
@@ -204,14 +204,55 @@ if (tiny_crypto::ccm_decrypt(key, nonce, aad, ciphertext, tag, plaintext) != TC_
 }
 ```
 
+## DES and TDEA
+
+Enable `TINY_CRYPTO_ENABLE_DES=ON` and include `<tiny_crypto/des.h>`. One
+`struct TC_DES_ctx` serves single DES and TDEA. The key length passed to
+`TC_DES_init_ctx` or `TC_DES_init_ctx_iv` selects the cipher. `TC_DES_KEYLEN`
+(8 bytes) selects single DES. `TC_DES_KEYLEN_2KEY` (16) and
+`TC_DES_KEYLEN_3KEY` (24) select two- and three-key TDEA when
+`TINY_CRYPTO_DES_TDES` is on. Every mode function takes the same context.
+A failed init wipes the context, so an earlier key cannot be used after a
+failed re-init. `TC_DES_ctx_set_iv` starts a new message under the same key.
+
+CFB64 processes whole 8-byte segments. A call may end with one short segment,
+which finishes the message. Later CFB64 calls return `TC_ERROR` until a new IV
+is set. Split a stream at multiples of 8 bytes to get the same output as a
+single call.
+
+```c
+#include <tiny_crypto/des.h>
+
+int main(void)
+{
+    static const uint8_t key[TC_DES_KEYLEN_3KEY] = {
+        0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+        0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x01,
+        0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x01, 0x23
+    };
+    static const uint8_t iv[TC_DES_BLOCKLEN] = {0};
+    uint8_t data[16] = "legacy payload";
+    struct TC_DES_ctx ctx;
+    int failed;
+
+    failed = TC_DES_init_ctx_iv(&ctx, key, sizeof key, iv) != TC_OK ||
+             TC_DES_CTR_crypt(&ctx, data, sizeof data) != TC_OK;
+    TC_DES_ctx_clear(&ctx);
+    return failed;
+}
+```
+
 ## DES message authentication
 
 Enable both `TINY_CRYPTO_ENABLE_DES=ON` and `TINY_CRYPTO_DES_ISO9797=ON` to use
 ISO/IEC 9797-1 MAC algorithms 1 and 3. Include `<tiny_crypto/des.h>`.
 Algorithm 1 accepts 16 or 24-byte TDEA keys. Algorithm 3, the retail MAC,
-accepts a 16-byte two-key input. The separate `TC_DES_RETAIL3_*` functions
-provide the three-key retail extension with final encryption under K3.
+accepts a 16-byte two-key input and finishes with D(K2) then E(K1). A 24-byte
+key selects the three-key retail extension, which finishes with E(K3). That
+extension is outside ISO/IEC 9797-1.
 ISO/IEC 9797-1:2011 clause 5 restricts single DES to Algorithms 3 and 4.
+`TINY_CRYPTO_DES_REJECT_WEAK_KEYS=ON` also rejects ISO 9797 keys with a weak
+component, K1 = K2 or K2 = K3, since clause 7.4 requires independent keys.
 Choose no padding for block-aligned input, method 1
 for zero padding of a partial block, or method 2 for an `0x80` byte followed by
 zeroes. Method 1 processes an empty message as one zero block. No padding

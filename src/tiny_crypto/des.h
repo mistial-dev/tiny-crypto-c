@@ -31,22 +31,35 @@
 
 #define TC_DES_BLOCKLEN 8 /**< Block length in bytes - DES is a 64-bit (8 bytes) block cipher */
 #define TC_DES_KEYLEN 8   /**< Single DES key length in bytes (64 bits total, 56 bits effective) */
-
-#define TC_DES3_KEYLEN_2KEY                                                                        \
-  16 /**< 2-Key Triple DES key length in bytes (128 bits total, 112 bits effective) */
-#define TC_DES3_KEYLEN_3KEY                                                                        \
-  24 /**< 3-Key Triple DES key length in bytes (192 bits total, 168 bits effective) */
+/** Two-key TDEA bundle K1 || K2 in bytes. K3 is K1 (112 bits effective). */
+#define TC_DES_KEYLEN_2KEY 16
+/** Three-key TDEA bundle K1 || K2 || K3 in bytes (168 bits effective). */
+#define TC_DES_KEYLEN_3KEY 24
 
 /* Three DES schedules in encrypt, decrypt, encrypt order. */
 typedef struct TC_DES_key_bundle {
   uint8_t schedule[48][6];
 } TC_DES_key_bundle;
 
+/* Round subkeys held by TC_DES_ctx: one schedule for single DES, three for
+ * TDEA when TC_DES_ENABLE_TDES is set. */
+#if TC_DES_ENABLE_TDES
+#define TC_DES_CTX_SUBKEYS 48
+#else
+#define TC_DES_CTX_SUBKEYS 16
+#endif
+
 /**
- * @brief Single DES Context Structure
+ * @brief DES and TDEA context.
+ *
+ * TC_DES_init_ctx selects the cipher from the key length: 8 bytes for single
+ * DES, or 16 and 24 bytes for two- and three-key TDEA when TC_DES_ENABLE_TDES
+ * is set. TDEA encrypts as E(K1), D(K2), E(K3). The context is caller-owned.
+ * Fields are private. Clear it with TC_DES_ctx_clear when its lifetime ends.
  */
 struct TC_DES_ctx {
-  uint8_t Sk[16][6];
+  uint8_t schedule[TC_DES_CTX_SUBKEYS][6];
+  uint8_t triple; /* 1 when schedule holds a K1, K2, K3 TDEA bundle. */
   uint8_t active;
 #if TC_DES_NEEDS_IV
   uint8_t Iv[TC_DES_BLOCKLEN];
@@ -59,117 +72,111 @@ struct TC_DES_ctx {
 #if TC_DES_ENABLE_OFB
   uint8_t ofb_pos;
 #endif
-};
-
-#if TC_DES_ENABLE_TDES
-/**
- * @brief Triple DES (3DES / TDES) Context Structure
- */
-struct TC_DES3_ctx {
-  TC_DES_key_bundle keys;
-  uint8_t active;
-#if TC_DES_NEEDS_IV
-  uint8_t Iv[TC_DES_BLOCKLEN];
-#endif
-#if TC_DES_ENABLE_CTR
-  uint8_t ctr_stream[TC_DES_BLOCKLEN];
-  uint8_t ctr_pos;
-  uint8_t ctr_exhausted; /* The counter wrapped; set a new IV to continue. */
-#endif
-#if TC_DES_ENABLE_OFB
-  uint8_t ofb_pos;
+#if TC_DES_ENABLE_CFB64
+  uint8_t cfb64_finished; /* A short segment ended the message; set a new IV. */
 #endif
 };
-#endif
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* Wipe a DES context (subkeys and IV when present). */
+/* Wipe a DES context (subkeys and IV when present). NULL is a no-op. */
 void TC_DES_ctx_clear(struct TC_DES_ctx* ctx);
-
-#if TC_DES_ENABLE_TDES
-/* Wipe a Triple DES context (subkeys and IV when present). */
-void TC_DES3_ctx_clear(struct TC_DES3_ctx* ctx);
-#endif
 
 /*
  * The CBC, CTR, CFB and OFB entry points share one argument contract. They
  * return TC_ERROR for a NULL or uninitialized context, or a NULL buffer with
  * a nonzero length, and leave the context and buffer unchanged. A NULL buffer
- * with length 0 returns TC_OK.
+ * with length 0 returns TC_OK. Every mode transforms buf in place, and buf
+ * must not overlap the context.
  */
-
-/* --- Single DES API --- */
 
 /**
- * @brief Initialize a Single DES context with key.
- * @param ctx Pointer to Single DES context structure.
- * @param key Pointer to 8-byte key buffer.
- * @note Key parity is ignored. Weak and semi-weak keys are rejected when
- *       TC_DES_REJECT_WEAK_KEYS=1 (default: 0 for compatibility).
+ * @brief Initialize a DES or TDEA context with a key.
+ * @param ctx Caller-owned context.
+ * @param key Key bytes. They must not overlap ctx.
+ * @param keylen TC_DES_KEYLEN, or TC_DES_KEYLEN_2KEY or TC_DES_KEYLEN_3KEY
+ *        when TC_DES_ENABLE_TDES is set.
+ * @return TC_OK, or TC_ERROR. A NULL ctx is left alone. Every other failure
+ *         wipes ctx, so a previous key is unusable after a failed re-init.
+ * @note Key parity is ignored. With TC_DES_REJECT_WEAK_KEYS=1 (default 0 for
+ *       legacy vectors) weak and semi-weak component keys and TDEA bundles
+ *       with K1 = K2 or K2 = K3 are rejected, because those collapse to single
+ *       DES. K1 = K3 remains valid two-key TDEA.
  */
-TC_status TC_DES_init_ctx(struct TC_DES_ctx* ctx, const uint8_t* key);
+TC_status TC_DES_init_ctx(struct TC_DES_ctx* ctx, const uint8_t* key, size_t keylen);
 
 #if TC_DES_NEEDS_IV
 /**
- * @brief Initialize a Single DES context with key and IV.
- * @param ctx Pointer to Single DES context structure.
- * @param key Pointer to 8-byte key buffer.
- * @param iv Pointer to 8-byte Initialization Vector.
+ * @brief Initialize a DES or TDEA context with a key and IV.
+ * @param ctx Caller-owned context.
+ * @param key Key bytes, as for TC_DES_init_ctx.
+ * @param keylen Key length, as for TC_DES_init_ctx.
+ * @param iv 8-byte initialization vector. It must not overlap ctx.
+ * @return TC_OK, or TC_ERROR with the failure behavior of TC_DES_init_ctx.
  */
-TC_status TC_DES_init_ctx_iv(struct TC_DES_ctx* ctx, const uint8_t* key, const uint8_t* iv);
+TC_status TC_DES_init_ctx_iv(struct TC_DES_ctx* ctx, const uint8_t* key, size_t keylen,
+                             const uint8_t* iv);
 
 /**
- * @brief Set or update the Initialization Vector (IV) in Single DES context.
- * @param ctx Pointer to Single DES context structure.
- * @param iv Pointer to 8-byte Initialization Vector.
+ * @brief Start a new message under the same key.
+ *
+ * Resets the CTR and OFB stream positions, the CTR exhaustion flag and the
+ * CFB64 finished flag.
+ *
+ * @param ctx Initialized context.
+ * @param iv 8-byte initialization vector.
+ * @return TC_OK, or TC_ERROR for a NULL argument or an inactive context.
  */
 TC_status TC_DES_ctx_set_iv(struct TC_DES_ctx* ctx, const uint8_t* iv);
 #endif
 
 #if TC_DES_ENABLE_ECB
 /**
- * @brief Encrypt an 8-byte block in ECB mode using Single DES.
- * @param ctx Pointer to initialized Single DES context.
- * @param buf Pointer to 8-byte data block (encrypted in-place).
+ * @brief Encrypt one 8-byte block in ECB mode.
+ * @param ctx Initialized context.
+ * @param buf 8-byte block, encrypted in place.
+ * @return TC_OK, or TC_ERROR for a NULL argument or an inactive context.
  */
 TC_status TC_DES_ECB_encrypt(const struct TC_DES_ctx* ctx, uint8_t* buf);
 
 /**
- * @brief Decrypt an 8-byte block in ECB mode using Single DES.
- * @param ctx Pointer to initialized Single DES context.
- * @param buf Pointer to 8-byte data block (decrypted in-place).
+ * @brief Decrypt one 8-byte block in ECB mode.
+ * @param ctx Initialized context.
+ * @param buf 8-byte block, decrypted in place.
+ * @return TC_OK, or TC_ERROR for a NULL argument or an inactive context.
  */
 TC_status TC_DES_ECB_decrypt(const struct TC_DES_ctx* ctx, uint8_t* buf);
 #endif
 
 #if TC_DES_ENABLE_CBC
 /**
- * @brief Encrypt buffer in CBC mode using Single DES.
- * @param ctx Pointer to initialized Single DES context.
- * @param buf Data buffer (length must be a multiple of 8 bytes). Encrypted in-place.
- * @param length Data length in bytes (must be a multiple of 8).
- * @return TC_OK, or TC_ERROR if length is not block-aligned.
+ * @brief Encrypt a buffer in CBC mode. The IV carries the chaining value.
+ * @param ctx Initialized context.
+ * @param buf Data encrypted in place.
+ * @param length Data length in bytes, a multiple of 8.
+ * @return TC_OK, or TC_ERROR if length is not block-aligned (context and
+ *         buffer unchanged).
  */
 TC_status TC_DES_CBC_encrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
 
 /**
- * @brief Decrypt buffer in CBC mode using Single DES.
- * @param ctx Pointer to initialized Single DES context.
- * @param buf Data buffer (length must be a multiple of 8 bytes). Decrypted in-place.
- * @param length Data length in bytes (must be a multiple of 8).
- * @return TC_OK, or TC_ERROR if length is not block-aligned.
+ * @brief Decrypt a buffer in CBC mode. The IV carries the chaining value.
+ * @param ctx Initialized context.
+ * @param buf Data decrypted in place.
+ * @param length Data length in bytes, a multiple of 8.
+ * @return TC_OK, or TC_ERROR if length is not block-aligned (context and
+ *         buffer unchanged).
  */
 TC_status TC_DES_CBC_decrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
 #endif
 
 #if TC_DES_ENABLE_CTR
 /**
- * @brief Encrypt/Decrypt buffer in Counter (CTR) stream mode using Single DES.
- * @param ctx Pointer to initialized Single DES context.
- * @param buf Data buffer (arbitrary length). Transformed in-place.
+ * @brief Encrypt or decrypt a buffer in CTR mode.
+ * @param ctx Initialized context. The IV is the big-endian counter block.
+ * @param buf Data of any length, transformed in place.
  * @param length Data length in bytes.
  * @return TC_OK, or TC_ERROR if the request would need a block beyond the
  *         2^64-block space of one IV (buffer and IV left unchanged). After the
@@ -179,237 +186,90 @@ TC_status TC_DES_CTR_crypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
 #endif
 
 #if TC_DES_ENABLE_CFB64
+/*
+ * CFB64 (NIST SP 800-38A section 6.3, s = 64) processes whole 8-byte
+ * segments, as section 5.2 requires. As an extension, a call may end with one
+ * short segment of 1..7 bytes. That segment shifts only its ciphertext bytes
+ * into the feedback register and finishes the message. Later CFB64 calls
+ * return TC_ERROR until TC_DES_ctx_set_iv or an init starts a new message.
+ * Split a message at multiples of 8 bytes to get the same output as one call.
+ */
+
 /**
- * @brief Encrypt buffer in 64-bit Cipher Feedback (CFB64) mode using Single DES.
- * @param ctx Pointer to initialized Single DES context (IV holds chaining state).
- * @param buf Data buffer (arbitrary length, final segment may be shorter than 8).
+ * @brief Encrypt a buffer in CFB64 mode.
+ * @param ctx Initialized context (IV holds the feedback register).
+ * @param buf Data encrypted in place.
  * @param length Data length in bytes.
- * @return TC_OK, or TC_ERROR for an inactive context or a NULL buffer with
- *         nonzero length. The context is unchanged on error.
+ * @return TC_OK, or TC_ERROR for an argument error or a finished message.
+ *         The context and buffer are unchanged on error.
  */
 TC_status TC_DES_CFB64_encrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
 
 /**
- * @brief Decrypt buffer in 64-bit Cipher Feedback (CFB64) mode using Single DES.
- * @param ctx Pointer to initialized Single DES context (IV holds chaining state).
- * @param buf Data buffer (arbitrary length, final segment may be shorter than 8).
+ * @brief Decrypt a buffer in CFB64 mode.
+ * @param ctx Initialized context (IV holds the feedback register).
+ * @param buf Data decrypted in place.
  * @param length Data length in bytes.
- * @return TC_OK, or TC_ERROR for an inactive context or a NULL buffer with
- *         nonzero length. The context is unchanged on error.
+ * @return TC_OK, or TC_ERROR for an argument error or a finished message.
+ *         The context and buffer are unchanged on error.
  */
 TC_status TC_DES_CFB64_decrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
 #endif
 
 #if TC_DES_ENABLE_CFB8
 /**
- * @brief Encrypt buffer in 8-bit Cipher Feedback (CFB8) mode using Single DES.
- * @param ctx Pointer to initialized Single DES context (IV holds chaining state).
- * @param buf Data buffer (arbitrary length). Encrypted in-place.
+ * @brief Encrypt a buffer in CFB8 mode.
+ * @param ctx Initialized context (IV holds the feedback register).
+ * @param buf Data of any length, encrypted in place.
  * @param length Data length in bytes.
+ * @return TC_OK, or TC_ERROR for an argument error.
  */
 TC_status TC_DES_CFB8_encrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
 
 /**
- * @brief Decrypt buffer in 8-bit Cipher Feedback (CFB8) mode using Single DES.
- * @param ctx Pointer to initialized Single DES context (IV holds chaining state).
- * @param buf Data buffer (arbitrary length). Decrypted in-place.
+ * @brief Decrypt a buffer in CFB8 mode.
+ * @param ctx Initialized context (IV holds the feedback register).
+ * @param buf Data of any length, decrypted in place.
  * @param length Data length in bytes.
+ * @return TC_OK, or TC_ERROR for an argument error.
  */
 TC_status TC_DES_CFB8_decrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
 #endif
 
 #if TC_DES_ENABLE_CFB1
 /**
- * @brief Encrypt bits in 1-bit Cipher Feedback (CFB1) mode using Single DES.
+ * @brief Encrypt bits in CFB1 mode.
  *
  * Bits are packed MSB-first: bit i of the stream is (buf[i/8] >> (7 - i%8)) & 1.
  * Trailing pad bits of the final byte are left unchanged.
  *
- * @param ctx Pointer to initialized Single DES context (IV holds chaining state).
- * @param buf Packed bit buffer. Encrypted in-place.
+ * @param ctx Initialized context (IV holds the feedback register).
+ * @param buf Packed bit buffer of at least ceil(bit_length / 8) bytes.
  * @param bit_length Data length in bits.
+ * @return TC_OK, or TC_ERROR for an argument error.
  */
 TC_status TC_DES_CFB1_encrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t bit_length);
 
 /**
- * @brief Decrypt bits in 1-bit Cipher Feedback (CFB1) mode using Single DES.
- *
- * Bits are packed MSB-first: bit i of the stream is (buf[i/8] >> (7 - i%8)) & 1.
- * Trailing pad bits of the final byte are left unchanged.
- *
- * @param ctx Pointer to initialized Single DES context (IV holds chaining state).
- * @param buf Packed bit buffer. Decrypted in-place.
+ * @brief Decrypt bits in CFB1 mode, packed as for TC_DES_CFB1_encrypt.
+ * @param ctx Initialized context (IV holds the feedback register).
+ * @param buf Packed bit buffer of at least ceil(bit_length / 8) bytes.
  * @param bit_length Data length in bits.
+ * @return TC_OK, or TC_ERROR for an argument error.
  */
 TC_status TC_DES_CFB1_decrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t bit_length);
 #endif
 
 #if TC_DES_ENABLE_OFB
 /**
- * @brief Encrypt/Decrypt buffer in Output Feedback (OFB) stream mode using Single DES.
- * @param ctx Pointer to initialized Single DES context (IV holds chaining state).
- * @param buf Data buffer (arbitrary length). Transformed in-place.
+ * @brief Encrypt or decrypt a buffer in OFB mode.
+ * @param ctx Initialized context (IV holds the output feedback block).
+ * @param buf Data of any length, transformed in place.
  * @param length Data length in bytes.
+ * @return TC_OK, or TC_ERROR for an argument error.
  */
 TC_status TC_DES_OFB_crypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
 #endif
-
-/* --- Triple DES (3DES / TDES) API --- */
-#if TC_DES_ENABLE_TDES
-
-/**
- * @brief Initialize a Triple DES (3DES) context with key.
- * @param ctx Pointer to 3DES context structure.
- * @param key Pointer to key buffer (16 bytes for 2-Key 3DES, 24 bytes for 3-Key 3DES).
- * @param keylen Key length in bytes (16 or 24).
- * @note Weak component keys and bundles that collapse to single DES are
- *       rejected when TC_DES_REJECT_WEAK_KEYS=1. K1=K3 remains valid 2-key
- *       TDEA. The default is 0 for compatibility with legacy vectors.
- * @return TC_OK on success, TC_ERROR if keylen is not 16 or 24.
- */
-TC_status TC_DES3_init_ctx(struct TC_DES3_ctx* ctx, const uint8_t* key, size_t keylen);
-
-#if TC_DES_NEEDS_IV
-/**
- * @brief Initialize a Triple DES (3DES) context with key and IV.
- * @param ctx Pointer to 3DES context structure.
- * @param key Pointer to key buffer (16 or 24 bytes).
- * @param keylen Key length in bytes (16 or 24).
- * @param iv Pointer to 8-byte Initialization Vector.
- * @return TC_OK on success, TC_ERROR if keylen is not 16 or 24.
- */
-TC_status TC_DES3_init_ctx_iv(struct TC_DES3_ctx* ctx, const uint8_t* key, size_t keylen,
-                              const uint8_t* iv);
-
-/**
- * @brief Set or update the Initialization Vector (IV) in 3DES context.
- * @param ctx Pointer to 3DES context structure.
- * @param iv Pointer to 8-byte Initialization Vector.
- * @return TC_OK on success, or TC_ERROR for a NULL argument.
- */
-TC_status TC_DES3_ctx_set_iv(struct TC_DES3_ctx* ctx, const uint8_t* iv);
-#endif
-
-#if TC_DES_ENABLE_ECB
-/**
- * @brief Encrypt an 8-byte block in ECB mode using 3DES.
- * @param ctx Pointer to initialized 3DES context.
- * @param buf Pointer to 8-byte data block (encrypted in-place).
- */
-TC_status TC_DES3_ECB_encrypt(const struct TC_DES3_ctx* ctx, uint8_t* buf);
-
-/**
- * @brief Decrypt an 8-byte block in ECB mode using 3DES.
- * @param ctx Pointer to initialized 3DES context.
- * @param buf Pointer to 8-byte data block (decrypted in-place).
- */
-TC_status TC_DES3_ECB_decrypt(const struct TC_DES3_ctx* ctx, uint8_t* buf);
-#endif
-
-#if TC_DES_ENABLE_CBC
-/**
- * @brief Encrypt buffer in CBC mode using 3DES.
- * @param ctx Pointer to initialized 3DES context.
- * @param buf Data buffer (length must be a multiple of 8 bytes). Encrypted in-place.
- * @param length Data length in bytes (must be a multiple of 8).
- */
-TC_status TC_DES3_CBC_encrypt(struct TC_DES3_ctx* ctx, uint8_t* buf, size_t length);
-
-/**
- * @brief Decrypt buffer in CBC mode using 3DES.
- * @param ctx Pointer to initialized 3DES context.
- * @param buf Data buffer (length must be a multiple of 8 bytes). Decrypted in-place.
- * @param length Data length in bytes (must be a multiple of 8).
- */
-TC_status TC_DES3_CBC_decrypt(struct TC_DES3_ctx* ctx, uint8_t* buf, size_t length);
-#endif
-
-#if TC_DES_ENABLE_CTR
-/**
- * @brief Encrypt/Decrypt buffer in Counter (CTR) stream mode using 3DES.
- * @param ctx Pointer to initialized 3DES context.
- * @param buf Data buffer (arbitrary length). Transformed in-place.
- * @param length Data length in bytes.
- * @return TC_OK, or TC_ERROR if the request would need a block beyond the
- *         2^64-block space of one IV (buffer and IV left unchanged). After the
- *         counter wraps, calls fail until a new IV is set.
- */
-TC_status TC_DES3_CTR_crypt(struct TC_DES3_ctx* ctx, uint8_t* buf, size_t length);
-#endif
-
-#if TC_DES_ENABLE_CFB64
-/**
- * @brief Encrypt buffer in 64-bit Cipher Feedback (CFB64) mode using 3DES.
- * @param ctx Pointer to initialized 3DES context (IV holds chaining state).
- * @param buf Data buffer (length must be a multiple of 8 bytes). Encrypted in-place.
- * @param length Data length in bytes (must be a multiple of 8).
- */
-TC_status TC_DES3_CFB64_encrypt(struct TC_DES3_ctx* ctx, uint8_t* buf, size_t length);
-
-/**
- * @brief Decrypt buffer in 64-bit Cipher Feedback (CFB64) mode using 3DES.
- * @param ctx Pointer to initialized 3DES context (IV holds chaining state).
- * @param buf Data buffer (length must be a multiple of 8 bytes). Decrypted in-place.
- * @param length Data length in bytes (must be a multiple of 8).
- */
-TC_status TC_DES3_CFB64_decrypt(struct TC_DES3_ctx* ctx, uint8_t* buf, size_t length);
-#endif
-
-#if TC_DES_ENABLE_CFB8
-/**
- * @brief Encrypt buffer in 8-bit Cipher Feedback (CFB8) mode using 3DES.
- * @param ctx Pointer to initialized 3DES context (IV holds chaining state).
- * @param buf Data buffer (arbitrary length). Encrypted in-place.
- * @param length Data length in bytes.
- */
-TC_status TC_DES3_CFB8_encrypt(struct TC_DES3_ctx* ctx, uint8_t* buf, size_t length);
-
-/**
- * @brief Decrypt buffer in 8-bit Cipher Feedback (CFB8) mode using 3DES.
- * @param ctx Pointer to initialized 3DES context (IV holds chaining state).
- * @param buf Data buffer (arbitrary length). Decrypted in-place.
- * @param length Data length in bytes.
- */
-TC_status TC_DES3_CFB8_decrypt(struct TC_DES3_ctx* ctx, uint8_t* buf, size_t length);
-#endif
-
-#if TC_DES_ENABLE_CFB1
-/**
- * @brief Encrypt bits in 1-bit Cipher Feedback (CFB1) mode using 3DES.
- *
- * Bits are packed MSB-first: bit i of the stream is (buf[i/8] >> (7 - i%8)) & 1.
- * Trailing pad bits of the final byte are left unchanged.
- *
- * @param ctx Pointer to initialized 3DES context (IV holds chaining state).
- * @param buf Packed bit buffer. Encrypted in-place.
- * @param bit_length Data length in bits.
- */
-TC_status TC_DES3_CFB1_encrypt(struct TC_DES3_ctx* ctx, uint8_t* buf, size_t bit_length);
-
-/**
- * @brief Decrypt bits in 1-bit Cipher Feedback (CFB1) mode using 3DES.
- *
- * Bits are packed MSB-first: bit i of the stream is (buf[i/8] >> (7 - i%8)) & 1.
- * Trailing pad bits of the final byte are left unchanged.
- *
- * @param ctx Pointer to initialized 3DES context (IV holds chaining state).
- * @param buf Packed bit buffer. Decrypted in-place.
- * @param bit_length Data length in bits.
- */
-TC_status TC_DES3_CFB1_decrypt(struct TC_DES3_ctx* ctx, uint8_t* buf, size_t bit_length);
-#endif
-
-#if TC_DES_ENABLE_OFB
-/**
- * @brief Encrypt/Decrypt buffer in Output Feedback (OFB) stream mode using 3DES.
- * @param ctx Pointer to initialized 3DES context (IV holds chaining state).
- * @param buf Data buffer (arbitrary length). Transformed in-place.
- * @param length Data length in bytes.
- */
-TC_status TC_DES3_OFB_crypt(struct TC_DES3_ctx* ctx, uint8_t* buf, size_t length);
-#endif
-
-#endif /* #if TC_DES_ENABLE_TDES */
 
 /* --- DES / 3DES CMAC (NIST SP 800-38B) --- */
 #if TC_DES_ENABLE_CMAC
@@ -450,7 +310,8 @@ struct TC_DES_CMAC_ctx {
   uint8_t active;
 };
 
-/* keylen must be 8, 16 (K1,K2,K1) or 24. */
+/* keylen must be TC_DES_KEYLEN, TC_DES_KEYLEN_2KEY (K1, K2, K1) or
+ * TC_DES_KEYLEN_3KEY. */
 TC_status TC_DES_CMAC_init(struct TC_DES_CMAC_ctx* ctx, const uint8_t* key, size_t keylen);
 TC_status TC_DES_CMAC_update(struct TC_DES_CMAC_ctx* ctx, const uint8_t* data, size_t len);
 TC_status TC_DES_CMAC_final(struct TC_DES_CMAC_ctx* ctx, uint8_t tag[TC_DES_CMAC_TAG_MAX]);
@@ -459,17 +320,30 @@ void TC_DES_CMAC_ctx_clear(struct TC_DES_CMAC_ctx* ctx);
 #endif /* TC_DES_ENABLE_CMAC */
 
 #if TC_DES_ENABLE_ISO9797
-/* ISO/IEC 9797-1 MAC algorithm 1 (CBC-MAC) or 3 (retail MAC).
- * Algorithm 1 uses 2/3-key TDEA. Algorithm 3 uses two DES keys.
- * CBC iteration uses K1 and the output transform uses D(K2), E(K1).
+/*
+ * ISO/IEC 9797-1:2011 MAC algorithm 1 (CBC-MAC) or 3 (retail MAC) over DES.
+ *
+ * Algorithm 1 runs CBC under a 16- or 24-byte TDEA bundle. ISO/IEC
+ * 9797-1:2011 clause 5 restricts single DES to Algorithms 3 and 4.
+ * Algorithm 3 (clause 7.4) runs CBC under single-DES K1 and applies Output
+ * Transformation 3 (clause 6.7.4) as D(K2) then E(K1). A 24-byte key K1 || K2
+ * || K3 selects the three-key retail extension, whose final encryption uses
+ * K3. That extension is outside ISO/IEC 9797-1.
+ *
  * Padding 1 adds zero bytes only to a partial block. Padding 2 always adds
  * 0x80 followed by zeroes. NONE requires block alignment and a nonempty
- * message. Padding 1 on an empty message processes one zero block.
- * The caller must authenticate a fixed or separately authenticated length
- * when using NONE or padding 1. Context is caller-owned and final consumes it.
- * Input, key, and tag buffers must not overlap the context. A failed final
- * leaves the tag untouched. An update with invalid arguments leaves the
- * context unchanged. An update that fails while processing wipes it.
+ * message. Padding 1 on an empty message processes one zero block. The caller
+ * must authenticate a fixed or separately authenticated length when using
+ * NONE or padding 1.
+ *
+ * With TC_DES_REJECT_WEAK_KEYS=1, init rejects weak and semi-weak component
+ * keys and K1 = K2 or K2 = K3. Clause 7.4 requires independent K and K'.
+ *
+ * The context is caller-owned and final consumes it. Input, key, and tag
+ * buffers must not overlap the context. A failed init wipes the context. A
+ * failed final leaves the tag untouched and wipes the context. An update with
+ * invalid arguments leaves the context unchanged. An update that fails while
+ * processing wipes it.
  */
 typedef enum TC_DES_ISO9797_algorithm {
   TC_DES_ISO9797_ALG1 = 1,
@@ -487,23 +361,29 @@ struct TC_DES_ISO9797_ctx {
   uint8_t mac[TC_DES_BLOCKLEN];
   uint8_t buf[TC_DES_BLOCKLEN];
   uint8_t used;
-  uint8_t keylen;
   uint8_t algorithm;
   uint8_t padding;
   uint8_t active;
   uint8_t nonempty;
 };
 
+/* keylen is TC_DES_KEYLEN_2KEY or TC_DES_KEYLEN_3KEY for both algorithms.
+ * Returns TC_ERROR for a NULL argument, an unknown algorithm or padding, or
+ * another key length. */
 TC_status TC_DES_ISO9797_init(struct TC_DES_ISO9797_ctx* ctx, TC_DES_ISO9797_algorithm algorithm,
                               TC_DES_ISO9797_padding padding, const uint8_t* key, size_t keylen);
+/* msg may be NULL when msg_len is 0. */
 TC_status TC_DES_ISO9797_update(struct TC_DES_ISO9797_ctx* ctx, const uint8_t* msg, size_t msg_len);
+/* Writes the full MAC. Returns TC_ERROR for a NONE-padded message that is
+ * empty or not block-aligned. */
 TC_status TC_DES_ISO9797_final(struct TC_DES_ISO9797_ctx* ctx, uint8_t tag[TC_DES_BLOCKLEN]);
 void TC_DES_ISO9797_clear(struct TC_DES_ISO9797_ctx* ctx);
+/* The default one-shot API requires the full 8-byte MAC. MAC leaves tag
+ * untouched on error. Verify returns TC_MISMATCH for a bad tag and TC_ERROR
+ * for every argument or key error. */
 TC_status TC_DES_ISO9797_MAC(TC_DES_ISO9797_algorithm algorithm, TC_DES_ISO9797_padding padding,
                              const uint8_t* key, size_t keylen, const uint8_t* msg, size_t msg_len,
                              uint8_t* tag, size_t tag_len);
-/* The default one-shot API requires the full 8-byte MAC. MAC leaves tag
- * untouched on error. Verify returns TC_MISMATCH for a bad tag. */
 TC_status TC_DES_ISO9797_verify(TC_DES_ISO9797_algorithm algorithm, TC_DES_ISO9797_padding padding,
                                 const uint8_t* key, size_t keylen, const uint8_t* msg,
                                 size_t msg_len, const uint8_t* tag, size_t tag_len);
@@ -516,16 +396,6 @@ TC_status TC_DES_ISO9797_verify_short_tag(TC_DES_ISO9797_algorithm algorithm,
                                           TC_DES_ISO9797_padding padding, const uint8_t* key,
                                           size_t keylen, const uint8_t* msg, size_t msg_len,
                                           const uint8_t* tag, size_t tag_len);
-
-/* Explicit three-key retail-MAC extension: DES-CBC under K1, then
- * D(K2) and E(K3). Use the standard Algorithm 3 API for two-key MACs. */
-TC_status TC_DES_RETAIL3_init(struct TC_DES_ISO9797_ctx* ctx, TC_DES_ISO9797_padding padding,
-                              const uint8_t key[24]);
-TC_status TC_DES_RETAIL3_MAC(TC_DES_ISO9797_padding padding, const uint8_t key[24],
-                             const uint8_t* msg, size_t msg_len, uint8_t* tag, size_t tag_len);
-TC_status TC_DES_RETAIL3_verify(TC_DES_ISO9797_padding padding, const uint8_t key[24],
-                                const uint8_t* msg, size_t msg_len, const uint8_t* tag,
-                                size_t tag_len);
 #endif /* TC_DES_ENABLE_ISO9797 */
 
 #ifdef __cplusplus

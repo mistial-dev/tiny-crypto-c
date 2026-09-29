@@ -14,10 +14,15 @@ TEST_CASE("DES initialization returns status")
   CHECK(des.init(des_test_key, sizeof(des_test_key) - 1) == TC_ERROR);
   CHECK(des.init(nullptr, sizeof(des_test_key)) == TC_ERROR);
 #if TC_DES_ENABLE_TDES
-  tiny_crypto::DES3 des3;
-  CHECK(des3.init(tdes2_key, sizeof(tdes2_key)) == TC_OK);
-  CHECK(des3.init(tdes3_key, sizeof(tdes3_key)) == TC_OK);
-  CHECK(des3.init(tdes3_key, 12) == TC_ERROR);
+  CHECK(des.init(tdes2_key, sizeof(tdes2_key)) == TC_OK);
+  CHECK(des.get_c_ctx().triple == 1);
+  CHECK(des.init(tdes3_key, sizeof(tdes3_key)) == TC_OK);
+  CHECK(des.init(tdes3_key, 12) == TC_ERROR);
+  CHECK(des.get_c_ctx().active == 0);
+  CHECK(des.init(des_test_key) == TC_OK);
+  CHECK(des.get_c_ctx().triple == 0);
+#else
+  CHECK(des.init(tdes2_key, sizeof(tdes2_key)) == TC_ERROR);
 #endif
 }
 
@@ -146,7 +151,7 @@ TEST_CASE("DES OFB wrapper known answer")
 #if TC_DES_ENABLE_TDES && TC_DES_ENABLE_ECB
 TEST_CASE("TDEA ECB wrapper known answer")
 {
-  tiny_crypto::DES3 des;
+  tiny_crypto::DES des;
   uint8_t data[sizeof(tdes3_pt)];
   REQUIRE(des.init(tdes3_key, sizeof(tdes3_key)) == TC_OK);
   std::memcpy(data, tdes3_pt, sizeof(data));
@@ -160,12 +165,38 @@ TEST_CASE("TDEA ECB wrapper known answer")
 #if TC_DES_ENABLE_TDES && TC_DES_ENABLE_CTR
 TEST_CASE("TDEA CTR wrapper known answer")
 {
-  tiny_crypto::DES3 des;
+  tiny_crypto::DES des;
   uint8_t data[sizeof(des_ctr_pt)];
   REQUIRE(des.init(tdes3_key, sizeof(tdes3_key), des_ctr_iv, sizeof(des_ctr_iv)) == TC_OK);
   std::memcpy(data, des_ctr_pt, sizeof(data));
   CHECK(des.xcrypt_ctr(data, sizeof(data)) == TC_OK);
   CHECK(std::memcmp(data, tdes3_ctr_ct, sizeof(data)) == 0);
+}
+#endif
+
+#if TC_DES_ENABLE_TDES && TC_DES_ENABLE_ECB
+TEST_CASE("DES re-init switches between TDEA and single DES")
+{
+  tiny_crypto::DES des;
+  uint8_t block[TC_DES_BLOCKLEN];
+  REQUIRE(des.init(tdes3_key) == TC_OK);
+  REQUIRE(des.init(des_test_key) == TC_OK);
+  std::memcpy(block, des_test_pt, sizeof(block));
+  CHECK(des.encrypt_ecb(block) == TC_OK);
+  CHECK(std::memcmp(block, des_test_ct, sizeof(block)) == 0);
+}
+#endif
+
+#if TC_DES_ENABLE_CFB64
+TEST_CASE("DES CFB64 short segment ends the message")
+{
+  tiny_crypto::DES des;
+  uint8_t data[TC_DES_BLOCKLEN] = {0};
+  REQUIRE(des.init(des_test_key, sizeof(des_test_key), des_cbc_iv, sizeof(des_cbc_iv)) == TC_OK);
+  CHECK(des.encrypt_cfb64(data, 3) == TC_OK);
+  CHECK(des.encrypt_cfb64(data + 3, 5) == TC_ERROR);
+  REQUIRE(des.set_iv(des_cbc_iv, sizeof(des_cbc_iv)) == TC_OK);
+  CHECK(des.encrypt_cfb64(data, sizeof(data)) == TC_OK);
 }
 #endif
 

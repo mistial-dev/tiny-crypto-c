@@ -8,7 +8,7 @@ static TC_status ctr(size_t length)
   static uint8_t buffer[16384];
   static const uint8_t iv[8] = {0};
   struct TC_DES_ctx ctx;
-  TC_status status = TC_DES_init_ctx_iv(&ctx, key, iv);
+  TC_status status = TC_DES_init_ctx_iv(&ctx, key, TC_DES_KEYLEN, iv);
   if (status == TC_OK && length != 0)
     status = TC_DES_CTR_crypt(&ctx, buffer, length);
   if (status == TC_OK)
@@ -25,13 +25,13 @@ static TC_status ctr3(size_t length)
 {
   static uint8_t buffer[16384];
   static const uint8_t iv[8] = {0};
-  struct TC_DES3_ctx ctx;
-  TC_status status = TC_DES3_init_ctx_iv(&ctx, key3, sizeof(key3), iv);
+  struct TC_DES_ctx ctx;
+  TC_status status = TC_DES_init_ctx_iv(&ctx, key3, sizeof(key3), iv);
   if (status == TC_OK && length != 0)
-    status = TC_DES3_CTR_crypt(&ctx, buffer, length);
+    status = TC_DES_CTR_crypt(&ctx, buffer, length);
   if (status == TC_OK)
     tc_benchmark_consume(length ? (const void*)buffer : (const void*)&ctx);
-  TC_DES3_ctx_clear(&ctx);
+  TC_DES_ctx_clear(&ctx);
   return status;
 }
 #endif
@@ -44,8 +44,8 @@ int main(void)
     return 1;
 #endif
 #if TC_ENABLE_DES && TC_DES_ENABLE_CTR && TC_DES_ENABLE_TDES
-  if (tc_benchmark_run("DES3 setup+clear", 0, ctr3) ||
-      tc_benchmark_sizes("DES3-CTR setup+encrypt+clear", ctr3))
+  if (tc_benchmark_run("TDEA setup+clear", 0, ctr3) ||
+      tc_benchmark_sizes("TDEA-CTR setup+encrypt+clear", ctr3))
     return 1;
 #endif
   return 0;

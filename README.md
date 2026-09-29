@@ -201,6 +201,8 @@ Small MCUs can keep `TINY_CRYPTO_AES_TINY=ON` or use `auto`, `bitwise`, or
 Enabling `TINY_CRYPTO_ENABLE_DES` also enables CTR and 3DES. `DES_ECB`,
 `DES_CBC`, `DES_OFB`, `DES_CFB1`, `DES_CFB8`, `DES_CFB64`, `DES_CMAC`, and
 `DES_ISO9797` select the remaining modes when prefixed with `TINY_CRYPTO_`.
+One `struct TC_DES_ctx` serves single DES and TDEA, selected by an 8, 16 or
+24-byte key. See [DES and TDEA](docs/api.md#des-and-tdea).
 ISO 9797-1 MAC stays off in every resource profile. Enable it explicitly.
 See [DES message authentication](docs/api.md#des-message-authentication) for
 algorithm, padding, and tag requirements.

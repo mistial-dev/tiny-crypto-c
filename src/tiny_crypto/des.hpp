@@ -11,203 +11,23 @@
 #include <tiny_crypto/des.h>
 
 namespace tiny_crypto {
-namespace detail {
 
-struct tc_des_traits {
-  typedef TC_DES_ctx context;
-  /* A wrong key length clears the context, as a failed C init does, so the
-   * previous key schedule is unusable after a failed re-init. */
-  static TC_status init(context* c, const uint8_t* k, size_t n) noexcept
-  {
-    if (n != TC_DES_KEYLEN) {
-      TC_DES_ctx_clear(c);
-      return TC_ERROR;
-    }
-    return TC_DES_init_ctx(c, k);
-  }
-#if TC_DES_NEEDS_IV
-  static TC_status init_iv(context* c, const uint8_t* k, size_t n, const uint8_t* iv) noexcept
-  {
-    if (n != TC_DES_KEYLEN) {
-      TC_DES_ctx_clear(c);
-      return TC_ERROR;
-    }
-    return TC_DES_init_ctx_iv(c, k, iv);
-  }
-  static TC_status set_iv(context* c, const uint8_t* iv) noexcept
-  {
-    return TC_DES_ctx_set_iv(c, iv);
-  }
-#endif
-  static void clear(context* c) noexcept
-  {
-    TC_DES_ctx_clear(c);
-  }
-#if TC_DES_ENABLE_ECB
-  static TC_status encrypt_ecb(const context* c, uint8_t* b) noexcept
-  {
-    return TC_DES_ECB_encrypt(c, b);
-  }
-  static TC_status decrypt_ecb(const context* c, uint8_t* b) noexcept
-  {
-    return TC_DES_ECB_decrypt(c, b);
-  }
-#endif
-#if TC_DES_ENABLE_CBC
-  static TC_status encrypt_cbc(context* c, uint8_t* b, size_t n) noexcept
-  {
-    return TC_DES_CBC_encrypt(c, b, n);
-  }
-  static TC_status decrypt_cbc(context* c, uint8_t* b, size_t n) noexcept
-  {
-    return TC_DES_CBC_decrypt(c, b, n);
-  }
-#endif
-#if TC_DES_ENABLE_CTR
-  static TC_status ctr(context* c, uint8_t* b, size_t n) noexcept
-  {
-    return TC_DES_CTR_crypt(c, b, n);
-  }
-#endif
-#if TC_DES_ENABLE_CFB64
-  static TC_status encrypt_cfb64(context* c, uint8_t* b, size_t n) noexcept
-  {
-    return TC_DES_CFB64_encrypt(c, b, n);
-  }
-  static TC_status decrypt_cfb64(context* c, uint8_t* b, size_t n) noexcept
-  {
-    return TC_DES_CFB64_decrypt(c, b, n);
-  }
-#endif
-#if TC_DES_ENABLE_CFB8
-  static TC_status encrypt_cfb8(context* c, uint8_t* b, size_t n) noexcept
-  {
-    return TC_DES_CFB8_encrypt(c, b, n);
-  }
-  static TC_status decrypt_cfb8(context* c, uint8_t* b, size_t n) noexcept
-  {
-    return TC_DES_CFB8_decrypt(c, b, n);
-  }
-#endif
-#if TC_DES_ENABLE_CFB1
-  static TC_status encrypt_cfb1(context* c, uint8_t* b, size_t n) noexcept
-  {
-    return TC_DES_CFB1_encrypt(c, b, n);
-  }
-  static TC_status decrypt_cfb1(context* c, uint8_t* b, size_t n) noexcept
-  {
-    return TC_DES_CFB1_decrypt(c, b, n);
-  }
-#endif
-#if TC_DES_ENABLE_OFB
-  static TC_status ofb(context* c, uint8_t* b, size_t n) noexcept
-  {
-    return TC_DES_OFB_crypt(c, b, n);
-  }
-#endif
-};
-
-#if TC_DES_ENABLE_TDES
-struct tc_des3_traits {
-  typedef TC_DES3_ctx context;
-  static TC_status init(context* c, const uint8_t* k, size_t n) noexcept
-  {
-    return TC_DES3_init_ctx(c, k, n);
-  }
-#if TC_DES_NEEDS_IV
-  static TC_status init_iv(context* c, const uint8_t* k, size_t n, const uint8_t* iv) noexcept
-  {
-    return TC_DES3_init_ctx_iv(c, k, n, iv);
-  }
-  static TC_status set_iv(context* c, const uint8_t* iv) noexcept
-  {
-    return TC_DES3_ctx_set_iv(c, iv);
-  }
-#endif
-  static void clear(context* c) noexcept
-  {
-    TC_DES3_ctx_clear(c);
-  }
-#if TC_DES_ENABLE_ECB
-  static TC_status encrypt_ecb(const context* c, uint8_t* b) noexcept
-  {
-    return TC_DES3_ECB_encrypt(c, b);
-  }
-  static TC_status decrypt_ecb(const context* c, uint8_t* b) noexcept
-  {
-    return TC_DES3_ECB_decrypt(c, b);
-  }
-#endif
-#if TC_DES_ENABLE_CBC
-  static TC_status encrypt_cbc(context* c, uint8_t* b, size_t n) noexcept
-  {
-    return TC_DES3_CBC_encrypt(c, b, n);
-  }
-  static TC_status decrypt_cbc(context* c, uint8_t* b, size_t n) noexcept
-  {
-    return TC_DES3_CBC_decrypt(c, b, n);
-  }
-#endif
-#if TC_DES_ENABLE_CTR
-  static TC_status ctr(context* c, uint8_t* b, size_t n) noexcept
-  {
-    return TC_DES3_CTR_crypt(c, b, n);
-  }
-#endif
-#if TC_DES_ENABLE_CFB64
-  static TC_status encrypt_cfb64(context* c, uint8_t* b, size_t n) noexcept
-  {
-    return TC_DES3_CFB64_encrypt(c, b, n);
-  }
-  static TC_status decrypt_cfb64(context* c, uint8_t* b, size_t n) noexcept
-  {
-    return TC_DES3_CFB64_decrypt(c, b, n);
-  }
-#endif
-#if TC_DES_ENABLE_CFB8
-  static TC_status encrypt_cfb8(context* c, uint8_t* b, size_t n) noexcept
-  {
-    return TC_DES3_CFB8_encrypt(c, b, n);
-  }
-  static TC_status decrypt_cfb8(context* c, uint8_t* b, size_t n) noexcept
-  {
-    return TC_DES3_CFB8_decrypt(c, b, n);
-  }
-#endif
-#if TC_DES_ENABLE_CFB1
-  static TC_status encrypt_cfb1(context* c, uint8_t* b, size_t n) noexcept
-  {
-    return TC_DES3_CFB1_encrypt(c, b, n);
-  }
-  static TC_status decrypt_cfb1(context* c, uint8_t* b, size_t n) noexcept
-  {
-    return TC_DES3_CFB1_decrypt(c, b, n);
-  }
-#endif
-#if TC_DES_ENABLE_OFB
-  static TC_status ofb(context* c, uint8_t* b, size_t n) noexcept
-  {
-    return TC_DES3_OFB_crypt(c, b, n);
-  }
-#endif
-};
-#endif
-
-} /* namespace detail */
-
-template <class Traits> class basic_des {
+/* DES or TDEA cipher. init selects single DES for an 8-byte key and TDEA for a
+ * 16- or 24-byte bundle when TC_DES_ENABLE_TDES is set. A failed init leaves
+ * the object unkeyed, and later cipher calls return TC_ERROR. */
+class DES {
 public:
-  basic_des() noexcept = default;
-  ~basic_des() noexcept
+  DES() noexcept = default;
+  ~DES() noexcept
   {
-    Traits::clear(&ctx_);
+    TC_DES_ctx_clear(&ctx_);
   }
-  basic_des(const basic_des&) = delete;
-  basic_des& operator=(const basic_des&) = delete;
+  DES(const DES&) = delete;
+  DES& operator=(const DES&) = delete;
 
   TC_CPP_NODISCARD TC_status init(const uint8_t* key, size_t key_len) noexcept
   {
-    return Traits::init(&ctx_, key, key_len);
+    return TC_DES_init_ctx(&ctx_, key, key_len);
   }
   template <size_t N> TC_CPP_NODISCARD TC_status init(const uint8_t (&key)[N]) noexcept
   {
@@ -218,74 +38,71 @@ public:
                                   size_t iv_len) noexcept
   {
     if (iv_len != TC_DES_BLOCKLEN) {
-      Traits::clear(&ctx_);
+      TC_DES_ctx_clear(&ctx_);
       return TC_ERROR;
     }
-    return Traits::init_iv(&ctx_, key, key_len, iv);
+    return TC_DES_init_ctx_iv(&ctx_, key, key_len, iv);
   }
   TC_CPP_NODISCARD TC_status set_iv(const uint8_t* iv, size_t iv_len) noexcept
   {
-    return iv_len == TC_DES_BLOCKLEN ? Traits::set_iv(&ctx_, iv) : TC_ERROR;
+    return iv_len == TC_DES_BLOCKLEN ? TC_DES_ctx_set_iv(&ctx_, iv) : TC_ERROR;
   }
 #endif
 #if TC_DES_ENABLE_ECB
   TC_CPP_NODISCARD TC_status encrypt_ecb(uint8_t* block) const noexcept
   {
-    return Traits::encrypt_ecb(&ctx_, block);
+    return TC_DES_ECB_encrypt(&ctx_, block);
   }
   TC_CPP_NODISCARD TC_status decrypt_ecb(uint8_t* block) const noexcept
   {
-    return Traits::decrypt_ecb(&ctx_, block);
+    return TC_DES_ECB_decrypt(&ctx_, block);
   }
 #endif
 #if TC_DES_ENABLE_CBC
   TC_CPP_NODISCARD TC_status encrypt_cbc(uint8_t* data, size_t n) noexcept
   {
-    return Traits::encrypt_cbc(&ctx_, data, n);
+    return TC_DES_CBC_encrypt(&ctx_, data, n);
   }
   TC_CPP_NODISCARD TC_status decrypt_cbc(uint8_t* data, size_t n) noexcept
   {
-    return Traits::decrypt_cbc(&ctx_, data, n);
+    return TC_DES_CBC_decrypt(&ctx_, data, n);
   }
 #endif
 #if TC_DES_ENABLE_CTR
   TC_CPP_NODISCARD TC_status xcrypt_ctr(uint8_t* data, size_t n) noexcept
   {
-    return Traits::ctr(&ctx_, data, n);
+    return TC_DES_CTR_crypt(&ctx_, data, n);
   }
 #endif
 #if TC_DES_ENABLE_CFB64
+  /* A call whose length is not a multiple of 8 ends the message. See des.h. */
   TC_CPP_NODISCARD TC_status encrypt_cfb64(uint8_t* data, size_t n) noexcept
   {
-    return Traits::encrypt_cfb64(&ctx_, data, n);
+    return TC_DES_CFB64_encrypt(&ctx_, data, n);
   }
   TC_CPP_NODISCARD TC_status decrypt_cfb64(uint8_t* data, size_t n) noexcept
   {
-    return Traits::decrypt_cfb64(&ctx_, data, n);
+    return TC_DES_CFB64_decrypt(&ctx_, data, n);
   }
 #endif
 #if TC_DES_ENABLE_CFB8
   TC_CPP_NODISCARD TC_status encrypt_cfb8(uint8_t* data, size_t n) noexcept
   {
-    return Traits::encrypt_cfb8(&ctx_, data, n);
+    return TC_DES_CFB8_encrypt(&ctx_, data, n);
   }
   TC_CPP_NODISCARD TC_status decrypt_cfb8(uint8_t* data, size_t n) noexcept
   {
-    return Traits::decrypt_cfb8(&ctx_, data, n);
+    return TC_DES_CFB8_decrypt(&ctx_, data, n);
   }
 #endif
 #if TC_DES_ENABLE_CFB1
   TC_CPP_NODISCARD TC_status encrypt_cfb1(uint8_t* data, size_t data_len, size_t bits) noexcept
   {
-    return (bits / 8u < data_len || (bits / 8u == data_len && bits % 8u == 0))
-               ? Traits::encrypt_cfb1(&ctx_, data, bits)
-               : TC_ERROR;
+    return cfb1_fits(data_len, bits) ? TC_DES_CFB1_encrypt(&ctx_, data, bits) : TC_ERROR;
   }
   TC_CPP_NODISCARD TC_status decrypt_cfb1(uint8_t* data, size_t data_len, size_t bits) noexcept
   {
-    return (bits / 8u < data_len || (bits / 8u == data_len && bits % 8u == 0))
-               ? Traits::decrypt_cfb1(&ctx_, data, bits)
-               : TC_ERROR;
+    return cfb1_fits(data_len, bits) ? TC_DES_CFB1_decrypt(&ctx_, data, bits) : TC_ERROR;
   }
   template <size_t N>
   TC_CPP_NODISCARD TC_status encrypt_cfb1(uint8_t (&data)[N], size_t bits) noexcept
@@ -301,26 +118,28 @@ public:
 #if TC_DES_ENABLE_OFB
   TC_CPP_NODISCARD TC_status xcrypt_ofb(uint8_t* data, size_t n) noexcept
   {
-    return Traits::ofb(&ctx_, data, n);
+    return TC_DES_OFB_crypt(&ctx_, data, n);
   }
 #endif
   void clear() noexcept
   {
-    Traits::clear(&ctx_);
+    TC_DES_ctx_clear(&ctx_);
   }
-  const typename Traits::context& get_c_ctx() const noexcept
+  const TC_DES_ctx& get_c_ctx() const noexcept
   {
     return ctx_;
   }
 
 private:
-  typename Traits::context ctx_{};
-};
-
-typedef basic_des<detail::tc_des_traits> DES;
-#if TC_DES_ENABLE_TDES
-typedef basic_des<detail::tc_des3_traits> DES3;
+#if TC_DES_ENABLE_CFB1
+  /* bits must fit in data_len bytes. */
+  static bool cfb1_fits(size_t data_len, size_t bits) noexcept
+  {
+    return bits / 8u < data_len || (bits / 8u == data_len && bits % 8u == 0);
+  }
 #endif
+  TC_DES_ctx ctx_{};
+};
 
 #if TC_DES_ENABLE_CMAC
 TC_CPP_NODISCARD inline TC_status des_cmac(const uint8_t* key, size_t key_len,

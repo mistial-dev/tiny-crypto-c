@@ -203,10 +203,10 @@ int tc_des_bundle_is_rejected(const uint8_t* key, size_t keylen)
 {
   if (tc_des_key_is_weak(key))
     return 1;
-  if (keylen >= TC_DES3_KEYLEN_2KEY &&
+  if (keylen >= TC_DES_KEYLEN_2KEY &&
       (tc_des_key_is_weak(key + TC_DES_KEYLEN) || tc_des_keys_equal(key, key + TC_DES_KEYLEN)))
     return 1;
-  return keylen == TC_DES3_KEYLEN_3KEY &&
+  return keylen == TC_DES_KEYLEN_3KEY &&
          (tc_des_key_is_weak(key + (2u * TC_DES_KEYLEN)) ||
           tc_des_keys_equal(key + TC_DES_KEYLEN, key + (2u * TC_DES_KEYLEN)));
 }
@@ -252,17 +252,19 @@ void tc_des_key_schedule(uint8_t (*sk)[6], const uint8_t* key)
   TC_secure_zero(&D, sizeof D);
 }
 
-#if TC_DES_ENABLE_TDES || TC_DES_ENABLE_CMAC || TC_DES_ENABLE_ISO9797
-void tc_des_bundle_schedule(uint8_t (*sk)[6], const uint8_t* key, size_t keylen)
+/* A single key fills sk[0..15]. A TDEA bundle fills sk[0..47] with K1, K2
+ * and K3, where two-key TDEA repeats K1 as K3. */
+void tc_des_schedule_key(uint8_t (*sk)[6], const uint8_t* key, size_t keylen)
 {
   tc_des_key_schedule(&sk[0], key);
-  tc_des_key_schedule(&sk[16], key + 8);
-  if (keylen == 16)
+  if (keylen == TC_DES_KEYLEN)
+    return;
+  tc_des_key_schedule(&sk[16], key + TC_DES_KEYLEN);
+  if (keylen == TC_DES_KEYLEN_2KEY)
     memcpy(&sk[32], &sk[0], 16u * 6u);
   else
-    tc_des_key_schedule(&sk[32], key + 16);
+    tc_des_key_schedule(&sk[32], key + TC_DES_KEYLEN_2KEY);
 }
-#endif
 
 /* Fast 32-bit Outerbridge Initial Permutation (IP) */
 static inline void tc_des_initial_permutation(uint32_t* pL, uint32_t* pR)
@@ -380,8 +382,7 @@ void tc_des_cipher_block(const uint8_t (*sk)[6], uint8_t* buf, int decrypt)
   buf[7] = (uint8_t)(L);
 }
 
-#if TC_DES_ENABLE_TDES || TC_DES_ENABLE_CMAC || TC_DES_ENABLE_ISO9797
-/* Run one DES stage or the EDE bundle selected by the mode. */
+/* Run one DES stage or the EDE bundle selected by the key length. */
 void tc_des_encrypt_scheduled(const void* schedule, uint8_t block[TC_DES_BLOCKLEN], int triple)
 {
   const uint8_t (*sk)[6] = (const uint8_t (*)[6])schedule;
@@ -391,4 +392,15 @@ void tc_des_encrypt_scheduled(const void* schedule, uint8_t block[TC_DES_BLOCKLE
     tc_des_cipher_block(&sk[32], block, 0);
   }
 }
-#endif
+
+void tc_des_decrypt_scheduled(const void* schedule, uint8_t block[TC_DES_BLOCKLEN], int triple)
+{
+  const uint8_t (*sk)[6] = (const uint8_t (*)[6])schedule;
+  if (!triple) {
+    tc_des_cipher_block(&sk[0], block, 1);
+    return;
+  }
+  tc_des_cipher_block(&sk[32], block, 1);
+  tc_des_cipher_block(&sk[16], block, 0);
+  tc_des_cipher_block(&sk[0], block, 1);
+}
