@@ -267,12 +267,18 @@ Select `TC_PIV_OIDS_ONLY` for PIV identifiers or
 `TC_PIV_OIDS_TWIC_COMPATIBLE` to accept the PIV/TWIC pairs listed in
 [TWIC Part 2 v5, section 6](https://www.tsa.gov/sites/default/files/twic-nexgen-_-legacy-part-2-card-specification-v5.pdf).
 The choice belongs to the application and applies to objects from either card
-application. The helper is available with X.509 support.
+application. Enable the helper with `TINY_CRYPTO_ENABLE_PIV_OIDS`
+(`TC_ENABLE_PIV_OIDS`). CMS support requires it.
 
 The result identifies certificate-policy, FASC-N, content-signing, card-authentication
-and background-check OIDs. PIV CHUID content and signer-DN are recognized under
-their PIV OIDs. The TWIC table supplies no corresponding aliases. The table's
-TWIC digital-signature policy is recognized in compatibility mode.
+and background-check OIDs. Each `TC_PIV_oid` value names one PIV/TWIC pair from
+the section 6 table, and the header lists both names. `TC_PIV_OID_POLICY_COMMON`
+is `id-fpki-common-policy` (`2.16.840.1.101.3.2.1.3.6`), paired with
+`id-TWIC-key-management` (`1.3.6.1.4.1.29138.2.1.3.6`).
+PIV CHUID content, biometric content, signer-DN and the
+`id-fpki-common-piv-contentSigning` policy are recognized under their PIV OIDs
+only, because section 6 lists no TWIC pair for them. The TWIC digital-signature
+policy has no PIV pair and is recognized in compatibility mode only.
 Unknown, malformed and disabled identifiers return `TC_PIV_OID_UNKNOWN`.
 Keep the original OID bytes for signature verification and certificate-path
 policy processing. Recognition alone establishes no trust or permitted usage.

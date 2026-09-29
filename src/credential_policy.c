@@ -9,7 +9,9 @@
  * card-expiration bound on the signer. Signature and path checks run
  * afterwards in the validators. */
 #include "internal.h"
+#include "pki_extensions_internal.h"
 #include "pki_source_internal.h"
+#include "piv_oid_internal.h"
 #include "validation_internal.h"
 #include "cms_internal.h"
 #include "credential_status_internal.h"
@@ -26,7 +28,6 @@ static TC_TLV_result signing_policy_present(TC_bytes encoded_extensions, TC_byte
                                             const TC_TLV_limits* limits,
                                             const TC_X509_path_workspace* storage)
 {
-  static const uint8_t policies_oid[] = {0x55, 0x1d, TC_PKI_EXT_CERTIFICATE_POLICIES};
   TC_TLV_reader extensions;
   TC_X509_extension extension;
   TC_TLV_result status = TC_X509_extensions_init(&extensions, encoded_extensions.data,
@@ -35,8 +36,7 @@ static TC_TLV_result signing_policy_present(TC_bytes encoded_extensions, TC_byte
     return status;
   int found = 0;
   while ((status = TC_X509_extension_next(&extensions, &extension)) == TC_TLV_OK) {
-    if (extension.oid.length != sizeof policies_oid ||
-        memcmp(extension.oid.data, policies_oid, sizeof policies_oid))
+    if (tc_pki_extension_id(&extension) != TC_PKI_EXT_CERTIFICATE_POLICIES)
       continue;
     TC_X509_policy_reader policies;
     TC_X509_policy policy;
@@ -59,7 +59,6 @@ static TC_TLV_result content_signing_purpose(TC_bytes extensions, int twic_compa
                                              TC_X509_path_options* policy,
                                              const TC_X509_path_workspace* storage)
 {
-  static const uint8_t eku_oid[] = {0x55, 0x1d, TC_PKI_EXT_EXTENDED_KEY_USAGE};
   TC_TLV_reader reader;
   TC_TLV_result status =
       TC_X509_extensions_init(&reader, extensions.data, extensions.length, &policy->parsing);
@@ -67,8 +66,7 @@ static TC_TLV_result content_signing_purpose(TC_bytes extensions, int twic_compa
     return status;
   TC_X509_extension extension;
   while ((status = TC_X509_extension_next(&reader, &extension)) == TC_TLV_OK) {
-    if (extension.oid.length != sizeof eku_oid ||
-        memcmp(extension.oid.data, eku_oid, sizeof eku_oid))
+    if (tc_pki_extension_id(&extension) != TC_PKI_EXT_EXTENDED_KEY_USAGE)
       continue;
     size_t count;
     status = TC_X509_extended_key_usage_read(extension.value.data, extension.value.length,
@@ -94,10 +92,12 @@ static TC_TLV_result piv_content_signer_policy(const TC_X509_certificate* signer
                                                TC_X509_path_options* policy,
                                                const TC_X509_path_workspace* storage)
 {
-  static const uint8_t signing_policy[] = {0x60, 0x86, 0x48, 1, 0x65, 3, 2, 1, 3, 39};
-  static const TC_bytes required_policy = {signing_policy, sizeof signing_policy};
+  /* id-fpki-common-piv-contentSigning, Common Policy section 1.2. The span is
+   * static, so the path options may keep it as the initial policy set. */
+  const TC_bytes* required_policy =
+      tc_piv_oid_contents(TC_PIV_OID_POLICY_CONTENT_SIGNING, TC_PIV_OID_NAMESPACE_PIV);
   TC_TLV_result status =
-      signing_policy_present(signer->extensions, required_policy, &policy->parsing, storage);
+      signing_policy_present(signer->extensions, *required_policy, &policy->parsing, storage);
   if (status != TC_TLV_OK)
     return status;
   if (card_expiration) {
@@ -108,7 +108,7 @@ static TC_TLV_result piv_content_signer_policy(const TC_X509_certificate* signer
     if (order < 0)
       return TC_TLV_INVALID;
   }
-  policy->initial_policies = &required_policy;
+  policy->initial_policies = required_policy;
   policy->initial_policy_count = 1;
   policy->flags |= TC_X509_PATH_REQUIRE_EXPLICIT_POLICY;
   return TC_TLV_OK;
