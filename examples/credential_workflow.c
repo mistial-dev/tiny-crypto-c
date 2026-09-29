@@ -314,9 +314,8 @@ example_credential_validate(const ExampleCredentialValidationRequest* request,
   TC_bytes card_guid = {NULL, 0};
   if (request->card_key == EXAMPLE_CREDENTIAL_PIV_AUTHENTICATION) {
     TC_PIV_CHUID structural;
-    const TC_TLV_result parsed =
-        TC_PIV_CHUID_read_profile(request->chuid.data, request->chuid.length,
-                                  request->chuid_encoding, request->chuid_profile, &structural);
+    const TC_TLV_result parsed = TC_PIV_CHUID_read(request->chuid, request->chuid_encoding,
+                                                   request->chuid_profile, &structural);
     if (parsed != TC_TLV_OK)
       return tlv_verdict(parsed);
     card_guid = structural.card_uuid;

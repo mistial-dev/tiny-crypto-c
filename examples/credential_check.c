@@ -30,7 +30,8 @@ static int inspect_certificate(size_t length, ExampleCardApplication application
   const TC_bytes input = {response_buffer, length};
   const TC_PIV_certificate_profile profile =
       application == EXAMPLE_CARD_PIV ? TC_PIV_CERTIFICATE_SLOT : TC_PIV_CERTIFICATE_TWIC;
-  if (TC_PIV_certificate_read(input, profile, &container) != TC_TLV_OK)
+  if (TC_PIV_certificate_read(input, profile, TC_PIV_CERTIFICATE_RECOMMENDED_BYTES, &container) !=
+      TC_TLV_OK)
     return 0;
   TC_bytes encoded = container.certificate;
   if (container.compression == TC_PIV_CERTIFICATE_GZIP) {
@@ -95,11 +96,10 @@ static int inspect_application(ExampleCardIO* io, ExampleCardApplication applica
       return 0;
     }
     TC_PIV_CHUID chuid;
-    int valid =
-        objects[i].kind == OBJECT_CHUID
-            ? TC_PIV_CHUID_read_profile(response_buffer, response.length, TC_PIV_CHUID_CONTAINER,
-                                        chuid_profile, &chuid) == TC_TLV_OK
-            : inspect_certificate(response.length, application);
+    int valid = objects[i].kind == OBJECT_CHUID
+                    ? TC_PIV_CHUID_read((TC_bytes){response_buffer, response.length},
+                                        TC_PIV_CHUID_CONTAINER, chuid_profile, &chuid) == TC_TLV_OK
+                    : inspect_certificate(response.length, application);
     if (!valid) {
       fprintf(stderr, "  %s: malformed or oversized object\n", objects[i].name);
       return 0;

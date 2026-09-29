@@ -25,7 +25,8 @@ static MunitResult containers(const MunitParameter params[], void* context)
     memset(&result, 0xa5, sizeof result);
     memcpy(&saved, &result, sizeof saved);
     TC_TLV_result status = TC_PIV_certificate_read((TC_bytes){encoded, encoded_length},
-                                                   (TC_PIV_certificate_profile)header[0], &result);
+                                                   (TC_PIV_certificate_profile)header[0],
+                                                   TC_PIV_CERTIFICATE_RECOMMENDED_BYTES, &result);
     munit_assert_int(status, ==, header[1] ? TC_TLV_INVALID : TC_TLV_OK);
     if (status == TC_TLV_OK) {
       munit_assert_int(result.compression, ==, header[2]);

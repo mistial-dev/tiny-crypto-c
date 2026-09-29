@@ -487,8 +487,7 @@ static int content_crls_prepare(const Options* options, TC_bytes encoded,
     if (!crl_target_add((TC_bytes){issuer_bytes[i], issuer_lengths[i]}, limits, work))
       return 0;
   TC_PIV_CHUID chuid;
-  if (TC_PIV_CHUID_read_profile(encoded.data, encoded.length, encoding,
-                                TC_CHUID_PROFILE_TWIC_SIGNED, &chuid) != TC_TLV_OK)
+  if (TC_PIV_CHUID_read(encoded, encoding, TC_CHUID_PROFILE_TWIC_SIGNED, &chuid) != TC_TLV_OK)
     return 0;
   TC_X509_workspace parser = parser_workspace();
   TC_CMS_signed_data cms;
@@ -861,7 +860,7 @@ static int card_certificate(ExampleCardIO* io, const Options* options, TC_PIV_ca
     return 0;
   TC_PIV_certificate container;
   if (TC_PIV_certificate_read((TC_bytes){sensitive.response, response.length}, container_profile,
-                              &container) != TC_TLV_OK)
+                              TC_PIV_CERTIFICATE_RECOMMENDED_BYTES, &container) != TC_TLV_OK)
     return 0;
   *encoded = container.certificate;
   if (container.compression == TC_PIV_CERTIFICATE_GZIP) {

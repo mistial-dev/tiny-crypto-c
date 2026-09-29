@@ -6785,10 +6785,10 @@ static void credential_public_workflow(const credential_issuers* issuers,
   const TC_X509_store_source wrong_trust = {&wrong_anchor, 0, 1, NULL, crl_trust_anchor};
   X509_free(wrong_root);
   TC_PIV_CHUID parsed;
-  munit_assert_int(TC_PIV_CHUID_read_profile(chuid.data, chuid.length, TC_PIV_CHUID_CONTENTS,
-                                             profile == TC_PIV_CARD ? TC_CHUID_PROFILE_PIV
-                                                                    : TC_CHUID_PROFILE_TWIC_SIGNED,
-                                             &parsed),
+  munit_assert_int(TC_PIV_CHUID_read(chuid, TC_PIV_CHUID_CONTENTS,
+                                     profile == TC_PIV_CARD ? TC_CHUID_PROFILE_PIV
+                                                            : TC_CHUID_PROFILE_TWIC_SIGNED,
+                                     &parsed),
                    ==, TC_TLV_OK);
   const size_t biometric_length = encode_biometric(signer, signer_key, 0, parsed.fascn,
                                                    parsed.card_uuid, biometric, sizeof biometric);
@@ -7152,8 +7152,8 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
     TC_PIV_CHUID chuid;
     TC_PIV_CMS_object object;
     size_t work = WORK;
-    munit_assert_int(TC_PIV_CHUID_read_profile(encoded, length, TC_PIV_CHUID_CONTENTS,
-                                               (TC_PIV_CHUID_profile)profile, &chuid),
+    munit_assert_int(TC_PIV_CHUID_read((TC_bytes){encoded, length}, TC_PIV_CHUID_CONTENTS,
+                                       (TC_PIV_CHUID_profile)profile, &chuid),
                      ==, TC_TLV_OK);
     munit_assert_int(TC_PIV_CMS_read(chuid.signature, TC_PIV_CMS_CHUID, TC_PIV_OIDS_TWIC_COMPATIBLE,
                                      TC_CMS_ATTRIBUTES_DER, &limits,
@@ -7837,9 +7837,9 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
             if (check == UNSIGNED_OBJECT) {
               TC_PIV_CHUID unsigned_view;
               changed.encoded = (TC_bytes){unsigned_chuid, sizeof unsigned_chuid};
-              munit_assert_int(TC_PIV_CHUID_read_profile(
-                                   unsigned_chuid, sizeof unsigned_chuid, TC_PIV_CHUID_CONTENTS,
-                                   TC_CHUID_PROFILE_TWIC_UNSIGNED, &unsigned_view),
+              munit_assert_int(TC_PIV_CHUID_read((TC_bytes){unsigned_chuid, sizeof unsigned_chuid},
+                                                 TC_PIV_CHUID_CONTENTS,
+                                                 TC_CHUID_PROFILE_TWIC_UNSIGNED, &unsigned_view),
                                ==, TC_TLV_OK);
             }
             TC_PIV_card_identifiers other_card = card;
@@ -8012,14 +8012,14 @@ static MunitResult legacy_chuid_key_map_signature(const MunitParameter params[],
   const size_t encoded_length = (size_t)(cursor - encoded);
 
   TC_PIV_CHUID chuid;
-  munit_assert_int(TC_PIV_CHUID_read_profile(encoded, encoded_length, TC_PIV_CHUID_CONTENTS,
-                                             TC_CHUID_PROFILE_LEGACY_KEY_MAP, &chuid),
+  munit_assert_int(TC_PIV_CHUID_read((TC_bytes){encoded, encoded_length}, TC_PIV_CHUID_CONTENTS,
+                                     TC_CHUID_PROFILE_LEGACY_KEY_MAP, &chuid),
                    ==, TC_TLV_OK);
   TC_PIV_CHUID unchanged;
   memset(&unchanged, 0xa5, sizeof unchanged);
   TC_PIV_CHUID strict = unchanged;
-  munit_assert_int(TC_PIV_CHUID_read_profile(encoded, encoded_length, TC_PIV_CHUID_CONTENTS,
-                                             TC_CHUID_PROFILE_PIV, &strict),
+  munit_assert_int(TC_PIV_CHUID_read((TC_bytes){encoded, encoded_length}, TC_PIV_CHUID_CONTENTS,
+                                     TC_CHUID_PROFILE_PIV, &strict),
                    !=, TC_TLV_OK);
   munit_assert_memory_equal(sizeof strict, &strict, &unchanged);
 

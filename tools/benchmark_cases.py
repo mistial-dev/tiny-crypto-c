@@ -123,7 +123,7 @@ FEATURES += [
 PKI = NO256 + " -DTC_ENABLE_TLV=1 -DTC_ENABLE_DER=1"
 FEATURES += [
     ("PIV CHUID reader", c_array(chuid()) +
-     "TC_PIV_CHUID c; CHECK(TC_PIV_CHUID_read(data,sizeof data,TC_PIV_CHUID_CONTAINER,&c)); "
+     "TC_PIV_CHUID c; CHECK(TC_PIV_CHUID_read((TC_bytes){data,sizeof data},TC_PIV_CHUID_CONTAINER,TC_CHUID_PROFILE_PIV,&c)); "
      "if(c.card_uuid.length!=16 || c.cardholder_uuid.length!=16) return 1; consume(c.card_uuid.data,16);",
      NO256 + " -DTC_ENABLE_TLV=1 -DTC_ENABLE_PIV_CHUID=1"),
     ("PIV secure messaging CVC reader", c_array(cvc()) +
@@ -132,8 +132,8 @@ FEATURES += [
      PKI + " -DTC_ENABLE_PIV_CVC=1"),
 ]
 FEATURES.append(("TWIC unsigned CHUID reader", c_array(chuid(unsigned=True)) +
-    "TC_PIV_CHUID c; CHECK(TC_PIV_CHUID_read_profile(data,sizeof data,TC_PIV_CHUID_CONTAINER,"
-    "TC_CHUID_PROFILE_TWIC_UNSIGNED,&c)); consume(c.card_uuid.data,c.card_uuid.length);",
+    "TC_PIV_CHUID c; CHECK(TC_PIV_CHUID_read((TC_bytes){data,sizeof data},"
+    "TC_PIV_CHUID_CONTAINER,TC_CHUID_PROFILE_TWIC_UNSIGNED,&c)); consume(c.card_uuid.data,c.card_uuid.length);",
     NO256 + " -DTC_ENABLE_TLV=1 -DTC_ENABLE_PIV_CHUID=1"))
 for kind, inherited in (("rsa", False), ("ec", False), ("ec", True)):
     setup = c_array(eac_certificate(kind, not inherited))

@@ -21,15 +21,17 @@ static TC_status x509(size_t length)
 static TC_status twic_unsigned(size_t length)
 {
   TC_PIV_CHUID value;
-  TC_TLV_result result = TC_PIV_CHUID_read_profile(
-      fixture_twic_unsigned, length, TC_PIV_CHUID_GET_DATA, TC_CHUID_PROFILE_TWIC_UNSIGNED, &value);
+  TC_TLV_result result =
+      TC_PIV_CHUID_read((TC_bytes){fixture_twic_unsigned, length}, TC_PIV_CHUID_CONTAINER,
+                        TC_CHUID_PROFILE_TWIC_UNSIGNED, &value);
   tc_benchmark_consume(&value);
   return result == TC_TLV_OK ? TC_OK : TC_ERROR;
 }
 static TC_status chuid(size_t length)
 {
   TC_PIV_CHUID value;
-  TC_TLV_result result = TC_PIV_CHUID_read(fixture_chuid, length, TC_PIV_CHUID_GET_DATA, &value);
+  TC_TLV_result result = TC_PIV_CHUID_read((TC_bytes){fixture_chuid, length},
+                                           TC_PIV_CHUID_CONTAINER, TC_CHUID_PROFILE_PIV, &value);
   tc_benchmark_consume(&value);
   return result == TC_TLV_OK ? TC_OK : TC_ERROR;
 }

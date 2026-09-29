@@ -172,8 +172,10 @@ static TC_TLV_result identifiers_read(TC_bytes encoded, TC_PIV_card_profile prof
   if (!identifiers.fascn.data ||
       (!reader_policy && profile != TC_TWIC_LEGACY_CARD && uuid_count == 0))
     return TC_TLV_INVALID;
+  /* Index of the card UUID. Authentication certificates may also carry a
+   * cardholder UUID, in either order. */
+  size_t card_index = 0;
   if (authentication && uuid_count) {
-    size_t card_index = 0;
     unsigned matches = 0;
     for (size_t i = 0; i < uuid_count; ++i)
       if (!memcmp(uuids[i], card_guid, UUID_BYTES)) {
@@ -190,7 +192,7 @@ static TC_TLV_result identifiers_read(TC_bytes encoded, TC_PIV_card_profile prof
       identifiers.cardholder_uuid_urn = uuid_urns[cardholder_index];
     }
   } else if (uuid_count) {
-    identifiers.uuid_urn = uuid_urns[0];
+    identifiers.uuid_urn = uuid_urns[card_index];
   }
   if (tc_pki_work_charge(work, FASCN_BYTES) != TC_TLV_OK)
     return TC_TLV_LIMIT;
@@ -202,7 +204,8 @@ static TC_TLV_result identifiers_read(TC_bytes encoded, TC_PIV_card_profile prof
     if (tc_pki_work_charge(work, UUID_BYTES) != TC_TLV_OK)
       return TC_TLV_LIMIT;
     int matched;
-    result = TC_TWIC_uuid_match((TC_bytes){uuids[0], sizeof uuids[0]}, &decoded, &matched);
+    result = TC_TWIC_uuid_match((TC_bytes){uuids[card_index], sizeof uuids[card_index]}, &decoded,
+                                &matched);
     if (result != TC_TLV_OK)
       return result;
     if (!matched)

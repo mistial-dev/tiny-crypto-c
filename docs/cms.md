@@ -281,11 +281,12 @@ policy processing. Recognition alone establishes no trust or permitted usage.
 
 ### CHUID content
 
-For a signed CHUID, `TC_PIV_CHUID_read_profile` returns two borrowed
+For a signed CHUID, `TC_PIV_CHUID_read` returns two borrowed
 `signed_content` spans. Hash them in order with the CMS signer's digest
 algorithm, then pass the digest to `TC_CMS_signer_verify_digest`. The spans
 cover the encoded CHUID fields before and after the `3E` signature field,
-including the trailing `FE 00`. They exclude the outer `53` response wrapper.
+including the trailing `FE 00`. They exclude the outer `53` response wrapper
+and a leading Buffer Length (`EE`) field (SP 800-73-4 Part 1 section 3.1.2).
 Keep the original tag and length bytes when hashing, including nonminimal
 length encodings accepted by the CHUID reader.
 

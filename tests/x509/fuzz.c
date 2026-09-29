@@ -46,7 +46,8 @@ static void fuzz_certificate_container(const uint8_t* data, size_t length)
     memset(&certificate, 0xa5, sizeof certificate);
     memcpy(&saved, &certificate, sizeof saved);
     TC_TLV_result result =
-        TC_PIV_certificate_read(input, (TC_PIV_certificate_profile)profile, &certificate);
+        TC_PIV_certificate_read(input, (TC_PIV_certificate_profile)profile,
+                                TC_PIV_CERTIFICATE_RECOMMENDED_BYTES, &certificate);
     if (result != TC_TLV_OK) {
       if (memcmp(&certificate, &saved, sizeof certificate))
         abort();
@@ -1016,12 +1017,12 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
   result = TC_PIV_CVC_read(data, length, &cvc);
   if (result != TC_TLV_OK && memcmp(&cvc, &old_cvc, sizeof cvc))
     abort();
-  for (profile = TC_CHUID_PROFILE_PIV; profile <= TC_CHUID_PROFILE_TWIC_UNSIGNED; ++profile)
+  for (profile = TC_CHUID_PROFILE_PIV; profile <= TC_CHUID_PROFILE_LEGACY_KEY_MAP; ++profile)
     for (encoding = TC_PIV_CHUID_CONTENTS; encoding <= TC_PIV_CHUID_CONTAINER; ++encoding) {
       memset(&chuid, 0xa5, sizeof chuid);
       old_chuid = chuid;
-      result = TC_PIV_CHUID_read_profile(data, length, (TC_PIV_CHUID_encoding)encoding,
-                                         (TC_PIV_CHUID_profile)profile, &chuid);
+      result = TC_PIV_CHUID_read((TC_bytes){data, length}, (TC_PIV_CHUID_encoding)encoding,
+                                 (TC_PIV_CHUID_profile)profile, &chuid);
       if (result != TC_TLV_OK && memcmp(&chuid, &old_chuid, sizeof chuid))
         abort();
     }

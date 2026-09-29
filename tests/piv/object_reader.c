@@ -37,7 +37,7 @@ int main(int argc, char** argv)
     TC_PIV_CHUID chuid, previous;
     TC_PIV_CHUID_encoding encoding =
         strcmp(argv[1], "contents") == 0 ? TC_PIV_CHUID_CONTENTS : TC_PIV_CHUID_CONTAINER;
-    result = TC_PIV_CHUID_read(data, length, encoding, &chuid);
+    result = TC_PIV_CHUID_read((TC_bytes){data, length}, encoding, TC_CHUID_PROFILE_PIV, &chuid);
     if (result != TC_TLV_OK) {
       fprintf(stderr, "%s: %d\n", argv[2], result);
       return 1;
@@ -47,9 +47,12 @@ int main(int argc, char** argv)
     field("cardholder_uuid", chuid.cardholder_uuid);
     field("expiration", chuid.expiration);
     field("signature", chuid.signature);
+    field("signed_content_0", chuid.signed_content[0]);
+    field("signed_content_1", chuid.signed_content[1]);
     previous = chuid;
     for (i = 0; i < length; ++i) {
-      if (TC_PIV_CHUID_read(data, i, encoding, &chuid) == TC_TLV_OK ||
+      if (TC_PIV_CHUID_read((TC_bytes){data, i}, encoding, TC_CHUID_PROFILE_PIV, &chuid) ==
+              TC_TLV_OK ||
           memcmp(&chuid, &previous, sizeof chuid))
         return 1;
     }

@@ -126,8 +126,7 @@ TC_credential_status TC_PIV_CHUID_validate(const TC_PIV_CHUID_validation_request
 
   TC_PIV_CHUID chuid;
   TC_TLV_result parsed =
-      TC_PIV_CHUID_read_profile(request->encoded.data, request->encoded.length, request->encoding,
-                                request->chuid_profile, &chuid);
+      TC_PIV_CHUID_read(request->encoded, request->encoding, request->chuid_profile, &chuid);
   if (parsed != TC_TLV_OK)
     return tc_validation_status(parsed);
 
@@ -501,8 +500,8 @@ TC_TWIC_unsigned_CHUID_validate(const TC_TWIC_unsigned_CHUID_validation_request*
   if (!matched)
     return TC_CREDENTIAL_INVALID;
   TC_PIV_CHUID chuid;
-  parsed = TC_PIV_CHUID_read_profile(request->encoded.data, request->encoded.length,
-                                     request->encoding, TC_CHUID_PROFILE_TWIC_UNSIGNED, &chuid);
+  parsed = TC_PIV_CHUID_read(request->encoded, request->encoding, TC_CHUID_PROFILE_TWIC_UNSIGNED,
+                             &chuid);
   if (parsed != TC_TLV_OK)
     return tc_validation_status(parsed);
   int current;

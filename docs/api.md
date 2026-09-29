@@ -126,7 +126,7 @@ identifier checks, cancellation, fresh key possession, signed objects and a
 bounded list of biometric objects using retained inputs. Reader commands live in the example
 application's proof callback and transport layer.
 
-`TC_PIV_CHUID_read_profile` also provides `TC_CHUID_PROFILE_LEGACY_KEY_MAP`
+`TC_PIV_CHUID_read` also provides `TC_CHUID_PROFILE_LEGACY_KEY_MAP`
 for PIV-shaped CHUIDs containing the historical Authentication Key Map (`3D`).
 Select this profile explicitly for compatible credentials. It accepts one map
 of up to 512 bytes immediately before the signature and returns its borrowed

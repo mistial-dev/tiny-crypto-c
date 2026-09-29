@@ -384,11 +384,21 @@ key usage and transport identifiers before issuing a challenge.
 `TC_PIV_CHUID_read` returns the FASC-N, card UUID (GUID), optional cardholder
 UUID, expiration date, and signature. Select `TC_PIV_CHUID_CONTENTS` for the
 object contents or `TC_PIV_CHUID_CONTAINER` for a `53`-wrapped object.
-The default reader enforces the PIV field order and requires a nonempty
-signature field. `TC_PIV_CHUID_read_profile` also accepts explicit
-`TC_CHUID_PROFILE_TWIC_SIGNED` and `TC_CHUID_PROFILE_TWIC_UNSIGNED` profiles.
-Unsigned TWIC omits the signature and cardholder UUID fields. Choose the
-profile from the requested card object before reading its contents.
+Choose the profile from the requested card object before reading its contents.
+`TC_CHUID_PROFILE_PIV` enforces the SP 800-73-4 Part 1 Table 9 field order and
+requires a nonempty signature field. It accepts the deprecated Buffer Length
+(`EE`), Organizational Identifier (`32`) and DUNS (`33`) fields found on older
+cards. `signed_content` excludes Buffer Length, as section 3.1.2 requires.
+`TC_CHUID_PROFILE_TWIC_SIGNED` and `TC_CHUID_PROFILE_TWIC_UNSIGNED` follow the
+TWIC field schema. Unsigned TWIC omits the signature and cardholder UUID
+fields.
+
+`TC_PIV_certificate_read` reads a `53` certificate container and returns
+borrowed spans for the certificate, the optional secure messaging intermediate
+CVC and the optional historic MSCUID. The MSCUID lies outside the signed
+certificate and is unauthenticated. Pass
+`TC_PIV_CERTIFICATE_RECOMMENDED_BYTES` (1856) as the certificate bound, or a
+larger application limit. SP 800-73-5 treats 1856 bytes as a recommendation.
 
 `TC_PIV_CVC_read` reads card and intermediate secure messaging CVCs as defined
 in SP 800-73-5 Part 2, section 4.1.5. Its `signed_data` span contains the

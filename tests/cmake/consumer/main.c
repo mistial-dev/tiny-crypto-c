@@ -146,7 +146,8 @@ int main(void)
     return 1;
   if (TC_PIV_CVC_read(NULL, 0, &cvc) != TC_TLV_MORE)
     return 1;
-  if (TC_PIV_CHUID_read(NULL, 0, TC_PIV_CHUID_CONTAINER, &chuid) != TC_TLV_MORE)
+  if (TC_PIV_CHUID_read((TC_bytes){NULL, 0}, TC_PIV_CHUID_CONTAINER, TC_CHUID_PROFILE_PIV,
+                        &chuid) != TC_TLV_MORE)
     return 1;
   if (TC_DER_uint32(integer, sizeof integer, &number) != TC_TLV_OK || number != 42)
     return 1;

@@ -149,8 +149,9 @@ int main(void)
     TC_bytes barcode_field;
     TC_TWIC_tpk privacy_key;
     TC_PIV_certificate certificate_container;
-    if (TC_PIV_certificate_read(empty, TC_PIV_CERTIFICATE_SLOT, &certificate_container) !=
-        TC_TLV_INVALID)
+    if (TC_PIV_certificate_read(empty, TC_PIV_CERTIFICATE_SLOT,
+                                TC_PIV_CERTIFICATE_RECOMMENDED_BYTES,
+                                &certificate_container) != TC_TLV_INVALID)
       return 1;
     if (TC_AAMVA_subfile_find(empty, "ZT", &barcode_field) != TC_TLV_INVALID)
       return 1;
