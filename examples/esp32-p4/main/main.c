@@ -21,10 +21,12 @@ static int measure(void)
                                        0x73, 0x65, 0x4e, 0xdf, 0x41, 0x14, 0xba, 0x6d, 0x24, 0x42,
                                        0xd2, 0x16, 0x19, 0x86, 0x2d, 0xa1, 0x87, 0x73};
   uint8_t key[32] = {0}, data[64] = {0}, digest[48];
+  const TC_bytes kmac_key = {key, sizeof key}, message = {data, sizeof data};
+  const TC_bytes no_customization = {NULL, 0};
+  const TC_buffer output = {digest, sizeof digest};
   int64_t start = esp_timer_get_time();
   for (unsigned i = 0; i < 100; ++i) {
-    if (TC_KMAC256_digest(key, sizeof key, data, sizeof data, NULL, 0, digest, sizeof digest) !=
-        TC_OK)
+    if (TC_KMAC256_digest(kmac_key, message, no_customization, output) != TC_OK)
       return 1;
     sink ^= digest[0];
   }

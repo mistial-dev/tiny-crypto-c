@@ -20,11 +20,11 @@ TEST_CASE("MD5 streaming, reuse and argument errors")
   CHECK(std::memcmp(digest, expected, sizeof digest) == 0);
 
   tiny_crypto::MD5 hash;
-  REQUIRE(hash.update(message, 1) == TC_OK);
-  CHECK(hash.update(nullptr, 1) == TC_ERROR);
-  REQUIRE(hash.update(message + 1, 2) == TC_OK);
-  CHECK(hash.finish(digest, sizeof digest - 1) == TC_ERROR);
-  CHECK(hash.finish(nullptr, sizeof digest) == TC_ERROR);
+  REQUIRE(hash.update(tiny_crypto::bytes{message, 1}) == TC_OK);
+  CHECK(hash.update(tiny_crypto::bytes{nullptr, 1}) == TC_ERROR);
+  REQUIRE(hash.update(tiny_crypto::bytes{message + 1, 2}) == TC_OK);
+  CHECK(hash.finish(tiny_crypto::buffer{digest, sizeof digest - 1}) == TC_ERROR);
+  CHECK(hash.finish(tiny_crypto::buffer{nullptr, sizeof digest}) == TC_ERROR);
   REQUIRE(hash.finish(digest) == TC_OK);
   CHECK(std::memcmp(digest, expected, sizeof digest) == 0);
 
@@ -37,7 +37,9 @@ TEST_CASE("MD5 streaming, reuse and argument errors")
   REQUIRE(hash.finish(digest) == TC_OK);
   CHECK(std::memcmp(digest, expected, sizeof digest) == 0);
 
-  CHECK(tiny_crypto::MD5::digest(nullptr, 1, digest, sizeof digest) == TC_ERROR);
-  CHECK(tiny_crypto::MD5::digest(message, sizeof message, digest, sizeof digest - 1) == TC_ERROR);
+  CHECK(tiny_crypto::MD5::digest(tiny_crypto::bytes{nullptr, 1},
+                                 tiny_crypto::buffer{digest, sizeof digest}) == TC_ERROR);
+  CHECK(tiny_crypto::MD5::digest(tiny_crypto::bytes{message, sizeof message},
+                                 tiny_crypto::buffer{digest, sizeof digest - 1}) == TC_ERROR);
   CHECK(std::memcmp(digest, expected, sizeof digest) == 0);
 }

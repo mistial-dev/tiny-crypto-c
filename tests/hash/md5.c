@@ -9,22 +9,22 @@ static void check(const uint8_t* data, size_t length, const char* answer)
 {
   uint8_t expected[TC_MD5_DIGESTLEN], digest[TC_MD5_DIGESTLEN];
   munit_assert_size(tc_test_decode_hex(answer, expected, sizeof expected), ==, sizeof expected);
-  munit_assert_int(TC_MD5_digest(data, length, digest), ==, TC_OK);
+  munit_assert_int(TC_MD5_digest((TC_bytes){data, length}, digest), ==, TC_OK);
   munit_assert_memory_equal(sizeof digest, digest, expected);
   for (size_t split = 0; split <= length; ++split) {
     struct TC_MD5_ctx ctx;
     munit_assert_int(TC_MD5_init(&ctx), ==, TC_OK);
-    munit_assert_int(TC_MD5_update(&ctx, data, split), ==, TC_OK);
-    munit_assert_int(TC_MD5_update(&ctx, NULL, 0), ==, TC_OK);
-    munit_assert_int(TC_MD5_update(&ctx, data + split, length - split), ==, TC_OK);
+    munit_assert_int(TC_MD5_update(&ctx, (TC_bytes){data, split}), ==, TC_OK);
+    munit_assert_int(TC_MD5_update(&ctx, (TC_bytes){NULL, 0}), ==, TC_OK);
+    munit_assert_int(TC_MD5_update(&ctx, (TC_bytes){data + split, length - split}), ==, TC_OK);
     munit_assert_int(TC_MD5_final(&ctx, digest), ==, TC_OK);
     munit_assert_memory_equal(sizeof digest, digest, expected);
-    munit_assert_int(TC_MD5_update(&ctx, data, 1), ==, TC_ERROR);
+    munit_assert_int(TC_MD5_update(&ctx, (TC_bytes){data, 1}), ==, TC_ERROR);
     munit_assert_int(TC_MD5_final(&ctx, digest), ==, TC_ERROR);
     munit_assert(tc_test_all_zero(&ctx, sizeof ctx));
     TC_MD5_ctx_clear(&ctx);
     munit_assert(tc_test_all_zero(&ctx, sizeof ctx));
-    munit_assert_int(TC_MD5_update(&ctx, data, 1), ==, TC_ERROR);
+    munit_assert_int(TC_MD5_update(&ctx, (TC_bytes){data, 1}), ==, TC_ERROR);
     munit_assert_int(TC_MD5_final(&ctx, digest), ==, TC_ERROR);
   }
 }
@@ -82,7 +82,7 @@ static MunitResult test_long(const MunitParameter params[], void* user)
   tc_test_decode_hex("7707d6ae4e027c70eea2a935c2296f21", expected, sizeof expected);
   munit_assert_int(TC_MD5_init(&ctx), ==, TC_OK);
   for (size_t i = 0; i < 1000; ++i)
-    munit_assert_int(TC_MD5_update(&ctx, data, sizeof data), ==, TC_OK);
+    munit_assert_int(TC_MD5_update(&ctx, (TC_bytes){data, sizeof data}), ==, TC_OK);
   munit_assert_int(TC_MD5_final(&ctx, digest), ==, TC_OK);
   munit_assert_memory_equal(sizeof digest, digest, expected);
   return MUNIT_OK;
@@ -97,26 +97,26 @@ static MunitResult test_arguments(const MunitParameter params[], void* user)
   memset(output, 0xa5, sizeof output);
   munit_assert_int(TC_MD5_init(&ctx), ==, TC_OK);
   saved = ctx;
-  munit_assert_int(TC_MD5_update(&ctx, NULL, 1), ==, TC_ERROR);
-  munit_assert_int(TC_MD5_update(&ctx, ctx.Buf, 1), ==, TC_ERROR);
-  munit_assert_int(TC_MD5_final(&ctx, ctx.Buf), ==, TC_ERROR);
+  munit_assert_int(TC_MD5_update(&ctx, (TC_bytes){NULL, 1}), ==, TC_ERROR);
+  munit_assert_int(TC_MD5_update(&ctx, (TC_bytes){ctx.buf, 1}), ==, TC_ERROR);
+  munit_assert_int(TC_MD5_final(&ctx, ctx.buf), ==, TC_ERROR);
   munit_assert_int(TC_MD5_final(&ctx, NULL), ==, TC_ERROR);
   munit_assert_memory_equal(sizeof ctx, &ctx, &saved);
-  ctx.BufLen = TC_MD5_BLOCKLEN;
+  ctx.buf_len = TC_MD5_BLOCKLEN;
   saved = ctx;
-  munit_assert_int(TC_MD5_update(&ctx, data, 1), ==, TC_ERROR);
+  munit_assert_int(TC_MD5_update(&ctx, (TC_bytes){data, 1}), ==, TC_ERROR);
   munit_assert_int(TC_MD5_final(&ctx, output), ==, TC_ERROR);
   munit_assert_memory_equal(sizeof ctx, &ctx, &saved);
-  munit_assert_int(TC_MD5_digest(NULL, 1, output), ==, TC_ERROR);
+  munit_assert_int(TC_MD5_digest((TC_bytes){NULL, 1}, output), ==, TC_ERROR);
   for (size_t i = 0; i < sizeof output; ++i)
     munit_assert_uint(output[i], ==, 0xa5);
   munit_assert_int(TC_MD5_init(NULL), ==, TC_ERROR);
-  munit_assert_int(TC_MD5_update(NULL, data, 1), ==, TC_ERROR);
+  munit_assert_int(TC_MD5_update(NULL, (TC_bytes){data, 1}), ==, TC_ERROR);
   munit_assert_int(TC_MD5_final(NULL, output), ==, TC_ERROR);
-  munit_assert_int(TC_MD5_digest(data, 1, NULL), ==, TC_ERROR);
+  munit_assert_int(TC_MD5_digest((TC_bytes){data, 1}, NULL), ==, TC_ERROR);
   TC_MD5_ctx_clear(NULL);
-  munit_assert_int(TC_MD5_digest(data, sizeof data, output), ==, TC_OK);
-  munit_assert_int(TC_MD5_digest(data, sizeof data, data), ==, TC_OK);
+  munit_assert_int(TC_MD5_digest((TC_bytes){data, sizeof data}, output), ==, TC_OK);
+  munit_assert_int(TC_MD5_digest((TC_bytes){data, sizeof data}, data), ==, TC_OK);
   munit_assert_memory_equal(sizeof output, output, data);
   return MUNIT_OK;
 }

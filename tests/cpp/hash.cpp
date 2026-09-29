@@ -9,50 +9,57 @@
 
 namespace {
 
+using tiny_crypto::buffer;
+using tiny_crypto::bytes;
+
 template <class Hash, size_t N>
 void check_hash(const uint8_t (&expected)[N], const uint8_t (&boundary)[BOUNDARY_COUNT][N])
 {
   uint8_t one_shot[N];
   uint8_t streamed[N];
-  CHECK(Hash::digest(fips_abc_msg, FIPS_ABC_LEN, one_shot, sizeof(one_shot)) == TC_OK);
+  const bytes abc = {fips_abc_msg, FIPS_ABC_LEN};
+  CHECK(Hash::digest(abc, buffer{one_shot, N}) == TC_OK);
   CHECK(std::memcmp(one_shot, expected, N) == 0);
-  CHECK(Hash::digest(nullptr, 1, one_shot, sizeof(one_shot)) == TC_ERROR);
-  CHECK(Hash::digest(nullptr, 0, one_shot, sizeof(one_shot) - 1) == TC_ERROR);
+  CHECK(Hash::digest(bytes{nullptr, 1}, buffer{one_shot, N}) == TC_ERROR);
+  CHECK(Hash::digest(bytes{nullptr, 0}, buffer{one_shot, N - 1}) == TC_ERROR);
+  CHECK(Hash::digest(bytes{nullptr, 0}, buffer{nullptr, N}) == TC_ERROR);
+  CHECK(std::memcmp(one_shot, expected, N) == 0);
 
   Hash hash;
-  CHECK(hash.update(fips_abc_msg, 1) == TC_OK);
-  CHECK(hash.update(fips_abc_msg + 1, FIPS_ABC_LEN - 1) == TC_OK);
+  CHECK(hash.update(bytes{fips_abc_msg, 1}) == TC_OK);
+  CHECK(hash.update(bytes{fips_abc_msg + 1, FIPS_ABC_LEN - 1}) == TC_OK);
+  CHECK(hash.finish(buffer{streamed, N + 1}) == TC_ERROR);
   CHECK(hash.finish(streamed) == TC_OK);
   CHECK(std::memcmp(streamed, expected, N) == 0);
-  CHECK(hash.update(nullptr, 1) == TC_ERROR);
+  CHECK(hash.update(bytes{nullptr, 1}) == TC_ERROR);
 
   uint8_t message[256];
   for (size_t i = 0; i < sizeof(message); ++i)
     message[i] = static_cast<uint8_t>(i);
   for (size_t i = 0; i < BOUNDARY_COUNT; ++i) {
     CAPTURE(boundary_lengths[i]);
-    CHECK(Hash::digest(message, boundary_lengths[i], one_shot, sizeof(one_shot)) == TC_OK);
+    CHECK(Hash::digest(bytes{message, boundary_lengths[i]}, buffer{one_shot, N}) == TC_OK);
     CHECK(std::memcmp(one_shot, boundary[i], N) == 0);
   }
 
-  REQUIRE(Hash::digest(message, 130, one_shot, sizeof(one_shot)) == TC_OK);
+  REQUIRE(Hash::digest(bytes{message, 130}, buffer{one_shot, N}) == TC_OK);
   for (size_t split = 0; split <= 130; ++split) {
     REQUIRE(hash.reset() == TC_OK);
-    CHECK(hash.update(message, split) == TC_OK);
-    CHECK(hash.update(message + split, 130 - split) == TC_OK);
-    CHECK(hash.finish(streamed) == TC_OK);
+    CHECK(hash.update(bytes{message, split}) == TC_OK);
+    CHECK(hash.update(bytes{message + split, 130 - split}) == TC_OK);
+    CHECK(hash.finish(buffer{streamed, N}) == TC_OK);
     CHECK(std::memcmp(streamed, one_shot, N) == 0);
   }
 
-  CHECK(hash.update(fips_abc_msg, FIPS_ABC_LEN) == TC_OK);
+  CHECK(hash.update(abc) == TC_OK);
   CHECK(hash.finish(streamed) == TC_OK);
   CHECK(std::memcmp(streamed, expected, N) == 0);
 
   CHECK(noexcept(Hash()));
   CHECK(noexcept(hash.reset()));
-  CHECK(noexcept(hash.update(message, 1)));
+  CHECK(noexcept(hash.update(abc)));
   CHECK(noexcept(hash.finish(streamed)));
-  CHECK(noexcept(Hash::digest(message, 1, one_shot, sizeof(one_shot))));
+  CHECK(noexcept(Hash::digest(abc, buffer{one_shot, N})));
 }
 
 template <class Hmac, size_t N> void check_hmac(const hmac_vector* vectors, size_t count)
@@ -61,47 +68,62 @@ template <class Hmac, size_t N> void check_hmac(const hmac_vector* vectors, size
   uint8_t streamed[N];
   for (size_t i = 0; i < count; ++i) {
     const hmac_vector& v = vectors[i];
+    const bytes key = {v.key, v.key_len};
+    const bytes msg = {v.msg, v.msg_len};
     CAPTURE(i);
-    CHECK(Hmac::mac(v.key, v.key_len, v.msg, v.msg_len, tag, sizeof(tag)) == TC_OK);
+    CHECK(Hmac::mac(key, msg, buffer{tag, N}) == TC_OK);
     CHECK(std::memcmp(tag, v.tag, N) == 0);
-    CHECK(Hmac::verify(v.key, v.key_len, v.msg, v.msg_len, tag, N) == TC_OK);
-    CHECK(Hmac::verify(v.key, v.key_len, v.msg, v.msg_len, tag, TC_HMAC_MIN_TAG_LEN) == TC_OK);
+    CHECK(Hmac::verify(key, msg, bytes{tag, N}) == TC_OK);
+    CHECK(Hmac::verify(key, msg, bytes{tag, TC_HMAC_MIN_TAG_LEN}) == TC_OK);
     tag[TC_HMAC_MIN_TAG_LEN - 1] ^= 1;
-    CHECK(Hmac::verify(v.key, v.key_len, v.msg, v.msg_len, tag, TC_HMAC_MIN_TAG_LEN) ==
-          TC_MISMATCH);
+    CHECK(Hmac::verify(key, msg, bytes{tag, TC_HMAC_MIN_TAG_LEN}) == TC_MISMATCH);
     tag[TC_HMAC_MIN_TAG_LEN - 1] ^= 1;
 
+    /* A truncated mac is the leading bytes of the full tag and verifies. */
+    uint8_t truncated[N];
+    std::memset(truncated, 0xA5, sizeof truncated);
+    CHECK(Hmac::mac(key, msg, buffer{truncated, TC_HMAC_MIN_TAG_LEN}) == TC_OK);
+    CHECK(std::memcmp(truncated, v.tag, TC_HMAC_MIN_TAG_LEN) == 0);
+    CHECK(truncated[TC_HMAC_MIN_TAG_LEN] == 0xA5);
+    CHECK(Hmac::verify(key, msg, bytes{truncated, TC_HMAC_MIN_TAG_LEN}) == TC_OK);
+
     Hmac hmac;
-    CHECK(hmac.init(v.key, v.key_len) == TC_OK);
+    CHECK(hmac.init(key) == TC_OK);
     const size_t split = v.msg_len / 2;
-    CHECK(hmac.update(v.msg, split) == TC_OK);
-    CHECK(hmac.update(v.msg + split, v.msg_len - split) == TC_OK);
+    CHECK(hmac.update(bytes{v.msg, split}) == TC_OK);
+    CHECK(hmac.update(bytes{v.msg + split, v.msg_len - split}) == TC_OK);
+    CHECK(hmac.finish(buffer{streamed, N - 1}) == TC_ERROR);
     CHECK(hmac.finish(streamed) == TC_OK);
     CHECK(std::memcmp(streamed, v.tag, N) == 0);
     CHECK(hmac.finish(streamed) == TC_ERROR);
-    CHECK(hmac.update(v.msg, v.msg_len) == TC_ERROR);
+    CHECK(hmac.update(msg) == TC_ERROR);
   }
+
+  const bytes key0 = {vectors[0].key, vectors[0].key_len};
+  const bytes msg0 = {vectors[0].msg, vectors[0].msg_len};
 
   /* A default-constructed object holds no key. */
   Hmac unkeyed;
-  CHECK(unkeyed.update(vectors[0].msg, vectors[0].msg_len) == TC_ERROR);
+  CHECK(unkeyed.update(msg0) == TC_ERROR);
   CHECK(unkeyed.finish(streamed) == TC_ERROR);
 
   /* A failed re-init leaves the object unkeyed. */
-  Hmac rekeyed(vectors[0].key, vectors[0].key_len);
-  CHECK(rekeyed.update(vectors[0].msg, vectors[0].msg_len) == TC_OK);
-  CHECK(rekeyed.init(nullptr, 1) == TC_ERROR);
-  CHECK(rekeyed.update(vectors[0].msg, vectors[0].msg_len) == TC_ERROR);
+  Hmac rekeyed(key0);
+  CHECK(rekeyed.update(msg0) == TC_OK);
+  CHECK(rekeyed.init(bytes{nullptr, 1}) == TC_ERROR);
+  CHECK(rekeyed.update(msg0) == TC_ERROR);
   CHECK(rekeyed.finish(streamed) == TC_ERROR);
 
-  CHECK(noexcept(unkeyed.update(vectors[0].msg, vectors[0].msg_len)));
+  const bytes empty = {nullptr, 0};
+  CHECK(noexcept(unkeyed.update(msg0)));
   CHECK(noexcept(unkeyed.finish(streamed)));
-  CHECK(noexcept(Hmac::verify(nullptr, 0, nullptr, 0, nullptr, 0)));
-  CHECK(noexcept(Hmac::mac(nullptr, 0, nullptr, 0, tag, sizeof(tag))));
-  CHECK(noexcept(Hmac(vectors[0].key, vectors[0].key_len)));
-  CHECK(Hmac::mac(vectors[0].key, vectors[0].key_len, nullptr, 1, tag, sizeof(tag)) == TC_ERROR);
-  CHECK(Hmac::verify(vectors[0].key, vectors[0].key_len, vectors[0].msg, vectors[0].msg_len, tag,
-                     TC_HMAC_MIN_TAG_LEN - 1) == TC_ERROR);
+  CHECK(noexcept(Hmac::verify(empty, empty, empty)));
+  CHECK(noexcept(Hmac::mac(empty, empty, buffer{tag, N})));
+  CHECK(noexcept(Hmac(key0)));
+  CHECK(Hmac::mac(key0, bytes{nullptr, 1}, buffer{tag, N}) == TC_ERROR);
+  CHECK(Hmac::mac(key0, msg0, buffer{tag, N + 1}) == TC_ERROR);
+  CHECK(Hmac::mac(key0, msg0, buffer{tag, TC_HMAC_MIN_TAG_LEN - 1}) == TC_ERROR);
+  CHECK(Hmac::verify(key0, msg0, bytes{tag, TC_HMAC_MIN_TAG_LEN - 1}) == TC_ERROR);
 }
 
 } /* namespace */

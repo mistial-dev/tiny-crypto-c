@@ -140,8 +140,7 @@ static TC_status finish_response(TC_PIV_SM* session, const TC_PIV_SM_peer* parse
     status = TC_ERROR;
     goto done;
   }
-  status = TC_SHA256_digest(parsed->certificate.data, parsed->certificate.length,
-                            TC_SM_SYM(workspace).digest);
+  status = TC_SHA256_digest(parsed->certificate, TC_SM_SYM(workspace).digest);
   if (status != TC_OK)
     goto done;
   nonce_length = (uint8_t)settings->nonce_bytes;

@@ -203,17 +203,17 @@ void tc_hash_core_clear(const tc_hash_algorithm_info* stored, void* context)
   TC_secure_zero(view.context, view.size);
 }
 
-TC_status tc_hash_core_digest(const tc_hash_algorithm_info* stored, void* workspace,
-                              const uint8_t* data, size_t length, uint8_t* digest)
+TC_status tc_hash_core_digest(const tc_hash_algorithm_info* stored, void* workspace, TC_bytes data,
+                              uint8_t* digest)
 {
   tc_hash_algorithm_info local;
   const tc_hash_algorithm_info* info = load_info(stored, &local);
   tc_hash_view view = info->view(workspace);
   TC_status status;
-  if (digest == NULL || (length != 0 && data == NULL))
+  if (digest == NULL || (data.length != 0 && data.data == NULL))
     return TC_ERROR;
   view_start(info, view);
-  status = view_absorb(info, view, data, length);
+  status = view_absorb(info, view, data.data, data.length);
   if (status == TC_OK)
     view_finish(info, view, digest);
   TC_secure_zero(view.context, view.size);
@@ -383,41 +383,40 @@ void tc_hmac_core_clear(const tc_hash_algorithm_info* stored, void* context)
 }
 
 /* One-shot HMAC with an optional truncated tag of at least TC_HMAC_MIN_TAG_LEN. */
-TC_status tc_hmac_core_digest(const tc_hash_algorithm_info* stored, void* workspace,
-                              const uint8_t* key, size_t key_length, const uint8_t* message,
-                              size_t message_length, uint8_t* tag, size_t tag_length)
+TC_status tc_hmac_core_digest(const tc_hash_algorithm_info* stored, void* workspace, TC_bytes key,
+                              TC_bytes message, TC_buffer tag)
 {
   tc_hash_algorithm_info local;
   const tc_hash_algorithm_info* info = load_info(stored, &local);
   uint8_t full[TC_HASH_CORE_MAX_DIGEST];
   TC_status status;
 
-  if (tag == NULL || tag_length < TC_HMAC_MIN_TAG_LEN || tag_length > info->digest_bytes ||
-      (message_length != 0 && message == NULL))
+  /* SP 800-107: a truncated tag keeps the leftmost bytes, and
+   * TC_HMAC_MIN_TAG_LEN sets the shortest length accepted. */
+  if (tag.data == NULL || tag.capacity < TC_HMAC_MIN_TAG_LEN || tag.capacity > info->digest_bytes ||
+      (message.length != 0 && message.data == NULL))
     return TC_ERROR;
-  status = tc_hmac_core_init(stored, workspace, key, key_length);
+  status = tc_hmac_core_init(stored, workspace, key.data, key.length);
   if (status == TC_OK)
-    status = tc_hmac_core_update(stored, workspace, message, message_length);
+    status = tc_hmac_core_update(stored, workspace, message.data, message.length);
   if (status == TC_OK)
     status = tc_hmac_core_final(stored, workspace, full);
   if (status == TC_OK)
-    memcpy(tag, full, tag_length);
+    memcpy(tag.data, full, tag.capacity);
   tc_hmac_core_clear(stored, workspace);
   TC_secure_zero(full, sizeof full);
   return status;
 }
 
-TC_status tc_hmac_core_verify(const tc_hash_algorithm_info* stored, void* workspace,
-                              const uint8_t* key, size_t key_length, const uint8_t* message,
-                              size_t message_length, const uint8_t* tag, size_t tag_length)
+TC_status tc_hmac_core_verify(const tc_hash_algorithm_info* stored, void* workspace, TC_bytes key,
+                              TC_bytes message, TC_bytes tag)
 {
   uint8_t computed[TC_HASH_CORE_MAX_DIGEST];
   TC_status status;
-  if (tag == NULL)
+  if (tag.data == NULL)
     return TC_ERROR;
-  status = tc_hmac_core_digest(stored, workspace, key, key_length, message, message_length,
-                               computed, tag_length);
-  return tc_internal_verify_tag(status, computed, sizeof computed, tag, tag_length);
+  status = tc_hmac_core_digest(stored, workspace, key, message, (TC_buffer){computed, tag.length});
+  return tc_internal_verify_tag(status, computed, sizeof computed, tag.data, tag.length);
 }
 
 #endif /* TC_ENABLE_HMAC */

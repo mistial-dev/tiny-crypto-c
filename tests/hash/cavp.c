@@ -42,27 +42,27 @@ static size_t cavp_digest(int alg, const uint8_t* msg, size_t len, uint8_t* out)
   switch (alg) {
 #if TC_ENABLE_SHA1
   case TC_SHA1_DIGESTLEN:
-    munit_assert_int(TC_SHA1_digest(msg, len, out), ==, TC_OK);
+    munit_assert_int(TC_SHA1_digest((TC_bytes){msg, len}, out), ==, TC_OK);
     return TC_SHA1_DIGESTLEN;
 #endif
 #if TC_ENABLE_SHA224
   case TC_SHA224_DIGESTLEN:
-    munit_assert_int(TC_SHA224_digest(msg, len, out), ==, TC_OK);
+    munit_assert_int(TC_SHA224_digest((TC_bytes){msg, len}, out), ==, TC_OK);
     return TC_SHA224_DIGESTLEN;
 #endif
 #if TC_ENABLE_SHA256
   case TC_SHA256_DIGESTLEN:
-    munit_assert_int(TC_SHA256_digest(msg, len, out), ==, TC_OK);
+    munit_assert_int(TC_SHA256_digest((TC_bytes){msg, len}, out), ==, TC_OK);
     return TC_SHA256_DIGESTLEN;
 #endif
 #if TC_ENABLE_SHA384
   case TC_SHA384_DIGESTLEN:
-    munit_assert_int(TC_SHA384_digest(msg, len, out), ==, TC_OK);
+    munit_assert_int(TC_SHA384_digest((TC_bytes){msg, len}, out), ==, TC_OK);
     return TC_SHA384_DIGESTLEN;
 #endif
 #if TC_ENABLE_SHA512
   case TC_SHA512_DIGESTLEN:
-    munit_assert_int(TC_SHA512_digest(msg, len, out), ==, TC_OK);
+    munit_assert_int(TC_SHA512_digest((TC_bytes){msg, len}, out), ==, TC_OK);
     return TC_SHA512_DIGESTLEN;
 #endif
   default:
@@ -251,8 +251,8 @@ MunitResult test_cavp_sha(const MunitParameter params[], void* data)
 #define CAVP_HMAC_FULL_CASE(N)                                                                     \
   {                                                                                                \
     struct TC_HMAC_SHA##N##_ctx ctx;                                                               \
-    munit_assert_int(TC_HMAC_SHA##N##_init(&ctx, key, klen), ==, TC_OK);                           \
-    munit_assert_int(TC_HMAC_SHA##N##_update(&ctx, msg, mlen), ==, TC_OK);                         \
+    munit_assert_int(TC_HMAC_SHA##N##_init(&ctx, (TC_bytes){key, klen}), ==, TC_OK);               \
+    munit_assert_int(TC_HMAC_SHA##N##_update(&ctx, (TC_bytes){msg, mlen}), ==, TC_OK);             \
     munit_assert_int(TC_HMAC_SHA##N##_final(&ctx, tag), ==, TC_OK);                                \
   }
 
@@ -291,23 +291,27 @@ static TC_status cavp_hmac_verify(int alg, const uint8_t* key, size_t klen, cons
   switch (alg) {
 #if TC_ENABLE_SHA1
   case TC_SHA1_DIGESTLEN:
-    return TC_HMAC_SHA1_verify(key, klen, msg, mlen, tag, tlen);
+    return TC_HMAC_SHA1_verify((TC_bytes){key, klen}, (TC_bytes){msg, mlen}, (TC_bytes){tag, tlen});
 #endif
 #if TC_ENABLE_SHA224
   case TC_SHA224_DIGESTLEN:
-    return TC_HMAC_SHA224_verify(key, klen, msg, mlen, tag, tlen);
+    return TC_HMAC_SHA224_verify((TC_bytes){key, klen}, (TC_bytes){msg, mlen},
+                                 (TC_bytes){tag, tlen});
 #endif
 #if TC_ENABLE_SHA256
   case TC_SHA256_DIGESTLEN:
-    return TC_HMAC_SHA256_verify(key, klen, msg, mlen, tag, tlen);
+    return TC_HMAC_SHA256_verify((TC_bytes){key, klen}, (TC_bytes){msg, mlen},
+                                 (TC_bytes){tag, tlen});
 #endif
 #if TC_ENABLE_SHA384
   case TC_SHA384_DIGESTLEN:
-    return TC_HMAC_SHA384_verify(key, klen, msg, mlen, tag, tlen);
+    return TC_HMAC_SHA384_verify((TC_bytes){key, klen}, (TC_bytes){msg, mlen},
+                                 (TC_bytes){tag, tlen});
 #endif
 #if TC_ENABLE_SHA512
   case TC_SHA512_DIGESTLEN:
-    return TC_HMAC_SHA512_verify(key, klen, msg, mlen, tag, tlen);
+    return TC_HMAC_SHA512_verify((TC_bytes){key, klen}, (TC_bytes){msg, mlen},
+                                 (TC_bytes){tag, tlen});
 #endif
   default:
     return TC_ERROR;

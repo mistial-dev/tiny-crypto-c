@@ -70,9 +70,7 @@ static void check_intermediate_signatures(TC_bytes card_bytes, TC_bytes intermed
       TC_PIV_CVC_read(intermediate_bytes.data, intermediate_bytes.length, &intermediate), ==,
       TC_TLV_OK);
   uint8_t digest[TC_SHA1_DIGESTLEN];
-  munit_assert_int(
-      TC_SHA1_digest(intermediate.public_key.data, intermediate.public_key.length, digest), ==,
-      TC_OK);
+  munit_assert_int(TC_SHA1_digest(intermediate.public_key, digest), ==, TC_OK);
   munit_assert_int(!memcmp(digest, intermediate.subject.data, 8), ==, expected_subject_match);
   size_t work = WORK_BUDGET;
   munit_assert_int(TC_X509_signature_verify_message(

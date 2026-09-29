@@ -85,7 +85,7 @@ static TC_X509_signature_result intermediate_subject(const TC_PIV_CVC* cvc, size
   uint8_t digest[TC_SHA1_DIGESTLEN];
   if (tc_pki_work_charge(work, cvc->public_key.length + ISSUER_BYTES) != TC_TLV_OK)
     return TC_X509_SIGNATURE_LIMIT;
-  if (TC_SHA1_digest(cvc->public_key.data, cvc->public_key.length, digest) != TC_OK)
+  if (TC_SHA1_digest(cvc->public_key, digest) != TC_OK)
     return TC_X509_SIGNATURE_ERROR;
   const int matched = !memcmp(digest, cvc->subject.data, ISSUER_BYTES);
   TC_secure_zero(digest, sizeof digest);

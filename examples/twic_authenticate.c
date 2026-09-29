@@ -347,8 +347,7 @@ static int root_digest_match(TC_bytes encoded, const char* expected)
     supplied[i] = (uint8_t)((high << 4) | low);
   }
   struct TC_SHA256_ctx hash;
-  const int valid = TC_SHA256_init(&hash) == TC_OK &&
-                    TC_SHA256_update(&hash, encoded.data, encoded.length) == TC_OK &&
+  const int valid = TC_SHA256_init(&hash) == TC_OK && TC_SHA256_update(&hash, encoded) == TC_OK &&
                     TC_SHA256_final(&hash, actual) == TC_OK &&
                     memcmp(actual, supplied, sizeof actual) == 0;
   TC_secure_zero(actual, sizeof actual);

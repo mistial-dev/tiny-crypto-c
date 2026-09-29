@@ -274,6 +274,21 @@ successful `init`.
 `basic_hash::finish` starts the next message. `basic_hmac::finish` consumes
 the key.
 
+Hash, HMAC, MD5 and KMAC256 inputs are `TC_bytes` spans in C and `bytes` in
+C++. Fixed-length digests and full HMAC tags go to digest-sized arrays. A
+one-shot HMAC writes `tag.capacity` bytes, from `TC_HMAC_MIN_TAG_LEN` to the
+digest length, and verification compares `tag.length` bytes. KMAC256 writes
+`out.capacity` bytes, and that length is part of the MAC input.
+
+```c
+uint8_t tag[16];
+TC_status status = TC_HMAC_SHA256_digest((TC_bytes){key, sizeof key},
+                                         (TC_bytes){message, message_length},
+                                         (TC_buffer){tag, sizeof tag});
+if (status != TC_OK)
+  return status; /* tag is unchanged */
+```
+
 The one-shot GCM, CCM, EAX, EAX' and SIV wrappers take the key as `bytes`.
 GCM, CCM, EAX and EAX' need `TC_AES_KEYLEN` bytes and SIV needs
 `TC_AES_SIV_KEYLEN`. Another length returns `TC_ERROR` before any output is

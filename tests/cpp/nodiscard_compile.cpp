@@ -53,15 +53,15 @@ void tiny_crypto_nodiscard_compile(uint8_t* data, size_t length)
   uint8_t synthetic_iv[TC_AES_SIV_V_LEN] = {0};
 
   /* Authentication and verification results. */
-  gcm_decrypt(in, in, in, in, in, out);                          /* DISCARDED */
-  HMAC_SHA256::verify(data, length, data, length, data, length); /* DISCARDED */
-  ct_equal(data, data, length);                                  /* DISCARDED */
-  ccm_decrypt(in, in, in, in, in, out);                          /* DISCARDED */
-  eax_decrypt(in, in, in, in, in, out);                          /* DISCARDED */
-  ccm_decrypt_short_tag(in, in, in, in, in, out);                /* DISCARDED */
-  eax_decrypt_short_tag(in, in, in, in, in, out);                /* DISCARDED */
-  eax_prime_decrypt(in, in, in, eax_prime_tag, out);             /* DISCARDED */
-  siv_decrypt(in, &in, 1, synthetic_iv, in, out);                /* DISCARDED */
+  gcm_decrypt(in, in, in, in, in, out);              /* DISCARDED */
+  HMAC_SHA256::verify(in, in, in);                   /* DISCARDED */
+  ct_equal(data, data, length);                      /* DISCARDED */
+  ccm_decrypt(in, in, in, in, in, out);              /* DISCARDED */
+  eax_decrypt(in, in, in, in, in, out);              /* DISCARDED */
+  ccm_decrypt_short_tag(in, in, in, in, in, out);    /* DISCARDED */
+  eax_decrypt_short_tag(in, in, in, in, in, out);    /* DISCARDED */
+  eax_prime_decrypt(in, in, in, eax_prime_tag, out); /* DISCARDED */
+  siv_decrypt(in, &in, 1, synthetic_iv, in, out);    /* DISCARDED */
 
   rsa_public_key public_key = {};
   rsa_private_key private_key = {};
@@ -105,17 +105,18 @@ void tiny_crypto_nodiscard_compile(uint8_t* data, size_t length)
   des_cmac_short_tag(data, length, data, length, data, length); /* DISCARDED */
 
   SHA256 hash;
-  hash.update(data, length);                  /* DISCARDED */
-  hash.finish(data, length);                  /* DISCARDED */
-  SHA256::digest(data, length, data, length); /* DISCARDED */
+  hash.update(in);         /* DISCARDED */
+  hash.finish(out);        /* DISCARDED */
+  SHA256::digest(in, out); /* DISCARDED */
   HMAC_SHA256 hmac;
-  hmac.update(data, length);                                  /* DISCARDED */
-  hmac.finish(data, length);                                  /* DISCARDED */
-  HMAC_SHA256::mac(data, length, data, length, data, length); /* DISCARDED */
+  hmac.update(in);               /* DISCARDED */
+  hmac.finish(out);              /* DISCARDED */
+  HMAC_SHA256::mac(in, in, out); /* DISCARDED */
 
   KMAC256 kmac;
-  kmac.update(data, length); /* DISCARDED */
-  kmac.final(data, length);  /* DISCARDED */
+  kmac.update(in);                  /* DISCARDED */
+  kmac.final(out);                  /* DISCARDED */
+  KMAC256::digest(in, in, in, out); /* DISCARDED */
 
   AES_dynamic dynamic;
   dynamic.encrypt(block); /* DISCARDED */

@@ -319,7 +319,7 @@ int main(void)
     const TC_TWIC_CCL_source staged_source = {staged_key, 1, read_ccl_key};
     TC_TWIC_CCL_snapshot proposed;
     memset(&proposed, 0, sizeof proposed);
-    if (TC_MD5_digest(csv, sizeof csv - 1, checksum) != TC_OK ||
+    if (TC_MD5_digest((TC_bytes){csv, sizeof csv - 1}, checksum) != TC_OK ||
         example_twic_ccl_import_init(&import_state, checksum, sizeof csv - 1, 1, append_ccl_key,
                                      staged_key) != TC_TWIC_CCL_OK ||
         example_twic_ccl_import_update(&import_state, input) != TC_TWIC_CCL_OK ||

@@ -8172,9 +8172,7 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
         encoded[identifier_values[variant - CHANGED_FASCN_ATTRIBUTE]] ^= 1;
       munit_assert_int(TC_SHA256_init(&hash), ==, TC_OK);
       for (size_t i = 0; i < (variant == OMITTED_FE ? 1u : 2u); ++i)
-        munit_assert_int(
-            TC_SHA256_update(&hash, chuid.signed_content[i].data, chuid.signed_content[i].length),
-            ==, TC_OK);
+        munit_assert_int(TC_SHA256_update(&hash, chuid.signed_content[i]), ==, TC_OK);
       munit_assert_int(TC_SHA256_final(&hash, digest), ==, TC_OK);
       work = WORK;
       munit_assert_int(
@@ -8288,9 +8286,7 @@ static MunitResult legacy_chuid_key_map_signature(const MunitParameter params[],
       encoded[prefix_length - 3] ^= 1;
     munit_assert_int(TC_SHA256_init(&hash), ==, TC_OK);
     for (size_t i = 0; i < 2; ++i)
-      munit_assert_int(
-          TC_SHA256_update(&hash, chuid.signed_content[i].data, chuid.signed_content[i].length), ==,
-          TC_OK);
+      munit_assert_int(TC_SHA256_update(&hash, chuid.signed_content[i]), ==, TC_OK);
     munit_assert_int(TC_SHA256_final(&hash, digest), ==, TC_OK);
     work = WORK;
     munit_assert_int(

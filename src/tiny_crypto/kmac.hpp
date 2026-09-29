@@ -19,28 +19,26 @@ public:
   {
     clear();
   }
-  TC_CPP_NODISCARD TC_status init(const uint8_t* key, size_t key_len,
-                                  const uint8_t* custom = nullptr, size_t custom_len = 0) noexcept
+  /* The C functions in kmac.h document the span, length and failure rules. */
+  TC_CPP_NODISCARD TC_status init(bytes key, bytes custom = bytes{nullptr, 0}) noexcept
   {
-    return TC_KMAC256_init(&ctx_, key, key_len, custom, custom_len);
+    return TC_KMAC256_init(&ctx_, key, custom);
   }
-  TC_CPP_NODISCARD TC_status update(const uint8_t* data, size_t len) noexcept
+  TC_CPP_NODISCARD TC_status update(bytes data) noexcept
   {
-    return TC_KMAC256_update(&ctx_, data, len);
+    return TC_KMAC256_update(&ctx_, data);
   }
-  TC_CPP_NODISCARD TC_status final(uint8_t* out, size_t len) noexcept
+  TC_CPP_NODISCARD TC_status final(buffer out) noexcept
   {
-    return TC_KMAC256_final(&ctx_, out, len);
+    return TC_KMAC256_final(&ctx_, out);
   }
   void clear() noexcept
   {
     TC_KMAC256_ctx_clear(&ctx_);
   }
-  TC_CPP_NODISCARD static TC_status digest(const uint8_t* key, size_t key_len, const uint8_t* data,
-                                           size_t len, const uint8_t* custom, size_t custom_len,
-                                           uint8_t* out, size_t out_len) noexcept
+  TC_CPP_NODISCARD static TC_status digest(bytes key, bytes data, bytes custom, buffer out) noexcept
   {
-    return TC_KMAC256_digest(key, key_len, data, len, custom, custom_len, out, out_len);
+    return TC_KMAC256_digest(key, data, custom, out);
   }
 };
 } // namespace tiny_crypto

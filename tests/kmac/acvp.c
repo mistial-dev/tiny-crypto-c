@@ -45,9 +45,10 @@ static MunitResult fixed_output(const MunitParameter params[], void* user)
     tag_length = read_hex(fields[3], expected, sizeof expected);
     munit_assert_size(key_length, >, 0);
     munit_assert_size(tag_length, >, 0);
-    munit_assert_int(TC_KMAC256_digest(key, key_length, message, message_length, custom,
-                                       custom_length, actual, tag_length),
-                     ==, TC_OK);
+    munit_assert_int(
+        TC_KMAC256_digest((TC_bytes){key, key_length}, (TC_bytes){message, message_length},
+                          (TC_bytes){custom, custom_length}, (TC_buffer){actual, tag_length}),
+        ==, TC_OK);
     if (memcmp(actual, expected, tag_length))
       munit_errorf("KMAC-256 vector %s: incorrect tag", fields[4]);
     ++cases;

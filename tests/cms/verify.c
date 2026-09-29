@@ -342,7 +342,7 @@ static MunitResult content(const MunitParameter params[], void* user)
     TC_bytes bytes = raw      ? inputs[i]
                      : i == 5 ? (TC_bytes){NULL, 0}
                               : (TC_bytes){message, sizeof message};
-    munit_assert_int(TC_SHA256_digest(bytes.data, bytes.length, expected), ==, TC_OK);
+    munit_assert_int(TC_SHA256_digest(bytes, expected), ==, TC_OK);
     state.digest = expected;
     work = WORK_BUDGET;
     munit_assert_int(

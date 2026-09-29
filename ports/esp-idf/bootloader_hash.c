@@ -47,18 +47,19 @@ static void* tc_boot_hash_start(unsigned bits)
 static void tc_boot_hash_data(void* handle, const void* data, size_t length)
 {
   struct tc_boot_hash* hash = handle;
+  const TC_bytes bytes = {(const uint8_t*)data, length};
   TC_status status;
   if (!hash)
     abort();
   switch (hash->bits) {
   case 256:
-    status = TC_SHA256_update(&hash->context.sha256, data, length);
+    status = TC_SHA256_update(&hash->context.sha256, bytes);
     break;
   case 384:
-    status = TC_SHA384_update(&hash->context.sha384, data, length);
+    status = TC_SHA384_update(&hash->context.sha384, bytes);
     break;
   case 512:
-    status = TC_SHA512_update(&hash->context.sha512, data, length);
+    status = TC_SHA512_update(&hash->context.sha512, bytes);
     break;
   default:
     status = TC_ERROR;

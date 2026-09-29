@@ -150,9 +150,9 @@ static void hmac256_cat(TC_bytes key, TC_bytes a, TC_bytes b, TC_bytes c, TC_byt
 {
   const TC_bytes parts[] = {a, b, c, d};
   struct TC_HMAC_SHA256_ctx ctx;
-  munit_assert_int(TC_HMAC_SHA256_init(&ctx, key.data, key.length), ==, TC_OK);
+  munit_assert_int(TC_HMAC_SHA256_init(&ctx, key), ==, TC_OK);
   for (size_t i = 0; i < sizeof parts / sizeof *parts; ++i)
-    munit_assert_int(TC_HMAC_SHA256_update(&ctx, parts[i].data, parts[i].length), ==, TC_OK);
+    munit_assert_int(TC_HMAC_SHA256_update(&ctx, parts[i]), ==, TC_OK);
   munit_assert_int(TC_HMAC_SHA256_final(&ctx, tag), ==, TC_OK);
 }
 

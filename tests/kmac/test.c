@@ -24,6 +24,13 @@ static size_t unhex(uint8_t* out, const char* hex)
   return n;
 }
 
+/* Compare fields because struct padding is indeterminate after assignment. */
+static int kmac_ctx_equal(const struct TC_KMAC256_ctx* a, const struct TC_KMAC256_ctx* b)
+{
+  return memcmp(a->state, b->state, sizeof a->state) == 0 && a->position == b->position &&
+         a->active == b->active;
+}
+
 static MunitResult test_profile(const MunitParameter params[], void* user)
 {
   (void)params;
@@ -47,90 +54,106 @@ static MunitResult test_profile(const MunitParameter params[], void* user)
   }
   for (i = 0; i < 3; ++i) {
     unhex(want, expected[i]);
-    munit_assert(TC_KMAC256_digest(key, 32, data, i ? 200 : 4, custom,
-                                   i == 1 ? 0 : sizeof(custom) - 1, out, 64) == TC_OK);
+    munit_assert(TC_KMAC256_digest((TC_bytes){key, 32}, (TC_bytes){data, i ? 200 : 4},
+                                   (TC_bytes){custom, i == 1 ? 0 : sizeof(custom) - 1},
+                                   (TC_buffer){out, 64}) == TC_OK);
     munit_assert(memcmp(out, want, 64) == 0);
   }
   /* Try every padding position, especially a suffix in the last rate byte.
    * Long keys, customization strings, and outputs also cross block boundaries. */
   for (n = 0; n <= 300; ++n) {
     size_t output_len = n % 3 == 0 ? 32 : n % 3 == 1 ? 48 : 300;
-    munit_assert(TC_KMAC256_digest(key, n, data, n, custom, sizeof(custom) - 1, out, output_len) ==
-                 TC_OK);
-    munit_assert(TC_KMAC256_init(&ctx, key, n, custom, sizeof(custom) - 1) == TC_OK);
+    munit_assert(TC_KMAC256_digest((TC_bytes){key, n}, (TC_bytes){data, n},
+                                   (TC_bytes){custom, sizeof(custom) - 1},
+                                   (TC_buffer){out, output_len}) == TC_OK);
+    munit_assert(
+        TC_KMAC256_init(&ctx, (TC_bytes){key, n}, (TC_bytes){custom, sizeof(custom) - 1}) == TC_OK);
     for (k = 0; k < n; ++k)
-      munit_assert(TC_KMAC256_update(&ctx, data + k, 1) == TC_OK);
-    munit_assert(TC_KMAC256_update(&ctx, NULL, 0) == TC_OK);
-    munit_assert(TC_KMAC256_final(&ctx, stream, output_len) == TC_OK);
+      munit_assert(TC_KMAC256_update(&ctx, (TC_bytes){data + k, 1}) == TC_OK);
+    munit_assert(TC_KMAC256_update(&ctx, (TC_bytes){NULL, 0}) == TC_OK);
+    munit_assert(TC_KMAC256_final(&ctx, (TC_buffer){stream, output_len}) == TC_OK);
     munit_assert(memcmp(out, stream, output_len) == 0);
     /* Final consumes the context and wipes its key-dependent state. */
     memset(&saved, 0, sizeof(saved));
     munit_assert(memcmp(&ctx, &saved, sizeof(ctx)) == 0);
-    munit_assert(TC_KMAC256_update(&ctx, NULL, 0) == TC_ERROR);
-    munit_assert(TC_KMAC256_final(&ctx, stream, 32) == TC_ERROR);
-    munit_assert(TC_KMAC256_digest(key, 32, data, n, data, n, out, 48) == TC_OK);
+    munit_assert(TC_KMAC256_update(&ctx, (TC_bytes){NULL, 0}) == TC_ERROR);
+    munit_assert(TC_KMAC256_final(&ctx, (TC_buffer){stream, 32}) == TC_ERROR);
+    munit_assert(TC_KMAC256_digest((TC_bytes){key, 32}, (TC_bytes){data, n}, (TC_bytes){data, n},
+                                   (TC_buffer){out, 48}) == TC_OK);
   }
-  munit_assert(TC_KMAC256_digest(NULL, 0, NULL, 0, NULL, 0, out, 32) == TC_OK);
-  munit_assert(TC_KMAC256_digest(NULL, 0, NULL, 0, NULL, 0, stream, 48) == TC_OK);
+  munit_assert(TC_KMAC256_digest((TC_bytes){NULL, 0}, (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0},
+                                 (TC_buffer){out, 32}) == TC_OK);
+  munit_assert(TC_KMAC256_digest((TC_bytes){NULL, 0}, (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0},
+                                 (TC_buffer){stream, 48}) == TC_OK);
   munit_assert(memcmp(out, stream, 32) != 0);
-  munit_assert(TC_KMAC256_digest(key, 32, data, 32, NULL, 0, want, 32) == TC_OK);
+  munit_assert(TC_KMAC256_digest((TC_bytes){key, 32}, (TC_bytes){data, 32}, (TC_bytes){NULL, 0},
+                                 (TC_buffer){want, 32}) == TC_OK);
   memcpy(out, data, 32);
-  munit_assert(TC_KMAC256_digest(key, 32, out, 32, NULL, 0, out, 32) == TC_OK);
+  munit_assert(TC_KMAC256_digest((TC_bytes){key, 32}, (TC_bytes){out, 32}, (TC_bytes){NULL, 0},
+                                 (TC_buffer){out, 32}) == TC_OK);
   munit_assert(memcmp(out, want, 32) == 0);
-  munit_assert(TC_KMAC256_init(&ctx, key, 32, NULL, 0) == TC_OK);
+  munit_assert(TC_KMAC256_init(&ctx, (TC_bytes){key, 32}, (TC_bytes){NULL, 0}) == TC_OK);
   saved = ctx;
   memset(out, 0xa5, sizeof(out));
   memcpy(want, out, sizeof(out));
-  munit_assert(TC_KMAC256_update(&ctx, (const uint8_t*)&ctx, 1) == TC_ERROR);
-  munit_assert(TC_KMAC256_final(&ctx, (uint8_t*)&ctx, 32) == TC_ERROR);
-  munit_assert(TC_KMAC256_final(&ctx, out, 0) == TC_ERROR);
-  munit_assert(TC_KMAC256_init(&ctx, (const uint8_t*)&ctx, 32, NULL, 0) == TC_ERROR);
-  munit_assert(memcmp(&saved, &ctx, sizeof(ctx)) == 0);
+  munit_assert(TC_KMAC256_update(&ctx, (TC_bytes){(const uint8_t*)&ctx, 1}) == TC_ERROR);
+  munit_assert(TC_KMAC256_final(&ctx, (TC_buffer){(uint8_t*)&ctx, 32}) == TC_ERROR);
+  munit_assert(TC_KMAC256_final(&ctx, (TC_buffer){out, 0}) == TC_ERROR);
+  munit_assert(TC_KMAC256_init(&ctx, (TC_bytes){(const uint8_t*)&ctx, 32}, (TC_bytes){NULL, 0}) ==
+               TC_ERROR);
+  munit_assert(kmac_ctx_equal(&saved, &ctx));
   munit_assert(memcmp(want, out, sizeof(out)) == 0);
   /* NULL pointers with nonzero lengths are argument errors that leave the
    * context and output unchanged. */
-  munit_assert(TC_KMAC256_init(NULL, key, 32, NULL, 0) == TC_ERROR);
-  munit_assert(TC_KMAC256_update(NULL, data, 1) == TC_ERROR);
-  munit_assert(TC_KMAC256_final(NULL, out, 32) == TC_ERROR);
-  munit_assert(TC_KMAC256_update(&ctx, NULL, 1) == TC_ERROR);
-  munit_assert(TC_KMAC256_final(&ctx, NULL, 32) == TC_ERROR);
-  munit_assert(memcmp(&saved, &ctx, sizeof(ctx)) == 0);
-  munit_assert(TC_KMAC256_init(&ctx, NULL, 32, NULL, 0) == TC_ERROR);
-  munit_assert(TC_KMAC256_init(&ctx, key, 32, NULL, 1) == TC_ERROR);
-  munit_assert(memcmp(&saved, &ctx, sizeof(ctx)) == 0);
+  munit_assert(TC_KMAC256_init(NULL, (TC_bytes){key, 32}, (TC_bytes){NULL, 0}) == TC_ERROR);
+  munit_assert(TC_KMAC256_update(NULL, (TC_bytes){data, 1}) == TC_ERROR);
+  munit_assert(TC_KMAC256_final(NULL, (TC_buffer){out, 32}) == TC_ERROR);
+  munit_assert(TC_KMAC256_update(&ctx, (TC_bytes){NULL, 1}) == TC_ERROR);
+  munit_assert(TC_KMAC256_final(&ctx, (TC_buffer){NULL, 32}) == TC_ERROR);
+  munit_assert(kmac_ctx_equal(&saved, &ctx));
+  munit_assert(TC_KMAC256_init(&ctx, (TC_bytes){NULL, 32}, (TC_bytes){NULL, 0}) == TC_ERROR);
+  munit_assert(TC_KMAC256_init(&ctx, (TC_bytes){key, 32}, (TC_bytes){NULL, 1}) == TC_ERROR);
+  munit_assert(kmac_ctx_equal(&saved, &ctx));
   munit_assert(memcmp(want, out, sizeof(out)) == 0);
-  munit_assert(TC_KMAC256_digest(NULL, 1, data, 1, NULL, 0, out, 32) == TC_ERROR);
-  munit_assert(TC_KMAC256_digest(key, 32, NULL, 1, NULL, 0, out, 32) == TC_ERROR);
-  munit_assert(TC_KMAC256_digest(key, 32, data, 1, NULL, 1, out, 32) == TC_ERROR);
-  munit_assert(TC_KMAC256_digest(key, 32, data, 1, NULL, 0, NULL, 32) == TC_ERROR);
+  munit_assert(TC_KMAC256_digest((TC_bytes){NULL, 1}, (TC_bytes){data, 1}, (TC_bytes){NULL, 0},
+                                 (TC_buffer){out, 32}) == TC_ERROR);
+  munit_assert(TC_KMAC256_digest((TC_bytes){key, 32}, (TC_bytes){NULL, 1}, (TC_bytes){NULL, 0},
+                                 (TC_buffer){out, 32}) == TC_ERROR);
+  munit_assert(TC_KMAC256_digest((TC_bytes){key, 32}, (TC_bytes){data, 1}, (TC_bytes){NULL, 1},
+                                 (TC_buffer){out, 32}) == TC_ERROR);
+  munit_assert(TC_KMAC256_digest((TC_bytes){key, 32}, (TC_bytes){data, 1}, (TC_bytes){NULL, 0},
+                                 (TC_buffer){NULL, 32}) == TC_ERROR);
 #if SIZE_MAX > UINT64_MAX / 8
-  munit_assert(TC_KMAC256_init(&ctx, key, SIZE_MAX, NULL, 0) == TC_ERROR);
-  munit_assert(TC_KMAC256_init(&ctx, key, 32, key, SIZE_MAX) == TC_ERROR);
-  munit_assert(TC_KMAC256_final(&ctx, out, SIZE_MAX) == TC_ERROR);
+  munit_assert(TC_KMAC256_init(&ctx, (TC_bytes){key, SIZE_MAX}, (TC_bytes){NULL, 0}) == TC_ERROR);
+  munit_assert(TC_KMAC256_init(&ctx, (TC_bytes){key, 32}, (TC_bytes){key, SIZE_MAX}) == TC_ERROR);
+  munit_assert(TC_KMAC256_final(&ctx, (TC_buffer){out, SIZE_MAX}) == TC_ERROR);
 #endif
   TC_KMAC256_ctx_clear(&ctx);
   memset(&saved, 0, sizeof(saved));
-  munit_assert(memcmp(&saved, &ctx, sizeof(ctx)) == 0);
+  munit_assert(kmac_ctx_equal(&saved, &ctx));
 
   /* From the kdf section of osdp-piv-latex's PIV Auto test report.
    * The fixture holds test session keys only. */
   n = unhex(key, "00112233445566778899AABBCCDDEEFF102132435465768798A9BACBDCEDFE0FFFEEDDCCBBAA99887"
                  "766554433221100");
-  munit_assert(TC_KMAC256_digest(key, n, NULL, 0, (const uint8_t*)"OSDP-PIV-AUTO-KDK-v1", 20, out,
-                                 32) == TC_OK);
+  munit_assert(TC_KMAC256_digest((TC_bytes){key, n}, (TC_bytes){NULL, 0},
+                                 (TC_bytes){(const uint8_t*)"OSDP-PIV-AUTO-KDK-v1", 20},
+                                 (TC_buffer){out, 32}) == TC_OK);
   unhex(want, "10FFA4469E902660BA4BEF8C917696848570B20531723D67ECD934A23BA4C89D");
   munit_assert(memcmp(out, want, 32) == 0);
   n = unhex(data, "4F5344502D5049562D4155544F01070000002A000000D13810D828AB6C10C339E5A1685A08C92ADE"
                   "0A6184E739C3E709D49C7EFDD0432EACEA268AE905274C9E0700112233445566778899AABBCCDDEE"
                   "FF102132435465768798A9BACBDCEDFE0F");
-  munit_assert(TC_KMAC256_digest(out, 32, data, n, (const uint8_t*)"OSDP-PIV-AUTO-CHALLENGE-v1", 26,
-                                 stream, 32) == TC_OK);
+  munit_assert(TC_KMAC256_digest((TC_bytes){out, 32}, (TC_bytes){data, n},
+                                 (TC_bytes){(const uint8_t*)"OSDP-PIV-AUTO-CHALLENGE-v1", 26},
+                                 (TC_buffer){stream, 32}) == TC_OK);
   unhex(want, "0864C776F2374124D3E63F0B0B29FC1C5F0E8FF8BB1FA80E2723293B86A0158E");
   munit_assert(memcmp(stream, want, 32) == 0);
   /* Same fixture, Card Authentication P-384 profile (algorithm 0x14). */
   data[n - 33] = 0x14;
-  munit_assert(TC_KMAC256_digest(out, 32, data, n, (const uint8_t*)"OSDP-PIV-AUTO-CHALLENGE-v1", 26,
-                                 stream, 48) == TC_OK);
+  munit_assert(TC_KMAC256_digest((TC_bytes){out, 32}, (TC_bytes){data, n},
+                                 (TC_bytes){(const uint8_t*)"OSDP-PIV-AUTO-CHALLENGE-v1", 26},
+                                 (TC_buffer){stream, 48}) == TC_OK);
   unhex(want, "F3480C6C1DAD008D3E14D0C815D381F01420E9D3402A175BED097C6949E4BA447FA0A11745CE4D054A95"
               "B10A9D5CC689");
   munit_assert(memcmp(stream, want, 48) == 0);
@@ -141,7 +164,8 @@ static const char* vector_path;
 static TC_status vector_kmac(const uint8_t* key, size_t key_length, const uint8_t* message,
                              size_t message_length, uint8_t* output, size_t tag_length)
 {
-  return TC_KMAC256_digest(key, key_length, message, message_length, NULL, 0, output, tag_length);
+  return TC_KMAC256_digest((TC_bytes){key, key_length}, (TC_bytes){message, message_length},
+                           (TC_bytes){NULL, 0}, (TC_buffer){output, tag_length});
 }
 static MunitResult test_wycheproof(const MunitParameter params[], void* user)
 {

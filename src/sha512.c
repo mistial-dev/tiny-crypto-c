@@ -16,7 +16,7 @@
 #include "internal.h"
 
 /* The 128-bit length field represents any 64-bit byte count, so the only
- * limit is the 64-bit Count field. */
+ * limit is the 64-bit count field. */
 #define SHA512_MAX_MESSAGE_BYTES UINT64_MAX
 #define SHA512_LENGTH_BYTES 16u
 

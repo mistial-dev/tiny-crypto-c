@@ -174,7 +174,7 @@ static MunitResult biometric_signatures(const MunitParameter params[], void* con
       const TC_bytes content_digest = {digest, sizeof digest};
       munit_assert_size(signer.digest_algorithm.oid.length, ==, sizeof sha256_oid);
       munit_assert_memory_equal(sizeof sha256_oid, signer.digest_algorithm.oid.data, sha256_oid);
-      munit_assert_int(TC_SHA256_digest(inputs[1].data, inputs[1].length, digest), ==, TC_OK);
+      munit_assert_int(TC_SHA256_digest(inputs[1], digest), ==, TC_OK);
       const TC_CMS_verification_policy invalid_policy = {
           .attributes = TC_CMS_ATTRIBUTES_DER, .rsa_parameters = (TC_CMS_rsa_parameters)2};
       work = WORK;

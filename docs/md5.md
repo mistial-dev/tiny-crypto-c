@@ -11,7 +11,8 @@ Its broken collision resistance makes authenticated transport or trusted
 provisioning essential when the download affects credential acceptance.
 
 Use `TC_MD5_init`, `TC_MD5_update` and `TC_MD5_final` for chunked input, or
-`TC_MD5_digest` for a complete buffer. Digests contain 16 bytes. Compare them to
+`TC_MD5_digest` for a complete buffer. Input is a borrowed `TC_bytes` span.
+Digests contain 16 bytes. Compare them to
 the decoded expected checksum after receiving the complete file. Hash the exact
 download bytes, including line endings.
 
@@ -21,8 +22,8 @@ overlap. Argument failures preserve output and context. Finalization consumes
 the context and wipes it. `TC_MD5_ctx_clear` also wipes it.
 
 For C++11, include `<tiny_crypto/hash.hpp>` and use `tiny_crypto::MD5`.
-It provides `update`, `finish`, `reset` and static `digest` methods with
-pointer-length and C-array overloads. A successful `finish` resets the object
+It provides `update`, `finish`, `reset` and static `digest` methods that take
+`bytes` and `buffer` spans or C arrays. A successful `finish` resets the object
 for another message. Destruction clears its context.
 
 The implementation follows the [RFC 1321 algorithm](https://www.rfc-editor.org/rfc/rfc1321.html).

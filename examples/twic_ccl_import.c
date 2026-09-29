@@ -34,7 +34,7 @@ TC_TWIC_CCL_result example_twic_ccl_import_update(ExampleTwicCclImport* state, T
   TC_TWIC_CCL_result result = TC_TWIC_CCL_stream_update(&state->reader, chunk);
   if (result != TC_TWIC_CCL_OK)
     return fail(state, result);
-  if (TC_MD5_update(&state->checksum, chunk.data, chunk.length) != TC_OK)
+  if (TC_MD5_update(&state->checksum, chunk) != TC_OK)
     return fail(state, TC_TWIC_CCL_ARGUMENT);
   return TC_TWIC_CCL_OK;
 }

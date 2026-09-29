@@ -805,9 +805,10 @@ odd-candidate test. Fourteen signed negative encodings are also tested as
 unsigned byte magnitudes against a separate Python probable-prime oracle.
 The even prime 2 is outside that API's odd-candidate domain.
 
-KMAC256 runs the no-customization suite in strict and relaxed builds. Valid
-tags must match the digest; invalid tags must differ. The KMAC API has
-no tag-verification function, so these tests compare digests.
+KMAC256 runs the no-customization suite in the full test library and in a
+KMAC-only build. Valid tags must match the digest and invalid tags must
+differ. The KMAC API has no tag-verification function, so these tests compare
+digests.
 `test_kmac_acvp` checks one fixed-output, byte-aligned NIST ACVP-Server sample
 with a 512-byte key and six independent OpenSSL answers with customization and
 odd byte output lengths.

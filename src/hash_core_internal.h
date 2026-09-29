@@ -47,13 +47,13 @@ typedef struct {
   size_t size;
 } tc_hmac_view;
 
-/* Every public hash context names its fields Count, State, BufLen, active and
- * Buf, and every HMAC context names them Inner and OuterState. */
+/* Every public hash context names its fields count, state, buf_len, active and
+ * buf, and every HMAC context names them inner and outer_state. */
 #define TC_HASH_VIEW(ctx)                                                                          \
-  ((tc_hash_view){(ctx), sizeof *(ctx), &(ctx)->Count, (ctx)->State, &(ctx)->BufLen,               \
-                  &(ctx)->active, (ctx)->Buf})
+  ((tc_hash_view){(ctx), sizeof *(ctx), &(ctx)->count, (ctx)->state, &(ctx)->buf_len,              \
+                  &(ctx)->active, (ctx)->buf})
 #define TC_HMAC_VIEW(ctx)                                                                          \
-  ((tc_hmac_view){TC_HASH_VIEW(&(ctx)->Inner), (ctx)->OuterState, (ctx), sizeof *(ctx)})
+  ((tc_hmac_view){TC_HASH_VIEW(&(ctx)->inner), (ctx)->outer_state, (ctx), sizeof *(ctx)})
 
 /* One descriptor per enabled algorithm. The per-algorithm file owns the
  * compression function, the initial chaining values and the digest word
@@ -131,8 +131,8 @@ void tc_hash_core_clear(const tc_hash_algorithm_info* info, void* context);
 /* One-shot hash through init, update and final. workspace is the caller's
  * typed context, so the stack holds one context for any algorithm. Once the
  * arguments pass their checks, workspace is wiped before return. */
-TC_status tc_hash_core_digest(const tc_hash_algorithm_info* info, void* workspace,
-                              const uint8_t* data, size_t length, uint8_t* digest);
+TC_status tc_hash_core_digest(const tc_hash_algorithm_info* info, void* workspace, TC_bytes data,
+                              uint8_t* digest);
 
 #if TC_ENABLE_HMAC
 /* HMAC (FIPS 198-1) over the same descriptor. init wipes the HMAC context,
@@ -159,19 +159,17 @@ TC_status tc_hmac_core_parts(const tc_hash_algorithm_info* info, void* context, 
 TC_status tc_hmac_core_resume_parts(const tc_hash_algorithm_info* info, const void* keyed,
                                     void* context, const TC_bytes* parts, size_t count,
                                     uint8_t* tag);
-/* One-shot HMAC truncated to tag_length bytes, which must be at least
- * TC_HMAC_MIN_TAG_LEN and at most digest_bytes (SP 800-107). workspace is the
- * caller's HMAC context. Once the arguments pass their checks, workspace is
- * wiped before return. */
-TC_status tc_hmac_core_digest(const tc_hash_algorithm_info* info, void* workspace,
-                              const uint8_t* key, size_t key_length, const uint8_t* message,
-                              size_t message_length, uint8_t* tag, size_t tag_length);
-/* Recompute a truncated tag and compare it with TC_ct_equal. Returns TC_OK on
- * a match, TC_MISMATCH otherwise, and TC_ERROR for invalid arguments. The
- * computed tag is wiped before return. */
-TC_status tc_hmac_core_verify(const tc_hash_algorithm_info* info, void* workspace,
-                              const uint8_t* key, size_t key_length, const uint8_t* message,
-                              size_t message_length, const uint8_t* tag, size_t tag_length);
+/* One-shot HMAC truncated to tag.capacity bytes, which must be at least
+ * TC_HMAC_MIN_TAG_LEN and at most digest_bytes (SP 800-107). workspace is
+ * the caller's HMAC context. Once the arguments pass their checks, workspace
+ * is wiped before return. */
+TC_status tc_hmac_core_digest(const tc_hash_algorithm_info* info, void* workspace, TC_bytes key,
+                              TC_bytes message, TC_buffer tag);
+/* Recompute a tag of tag.length bytes and compare it with TC_ct_equal.
+ * Returns TC_OK on a match, TC_MISMATCH otherwise, and TC_ERROR for invalid
+ * arguments. The computed tag is wiped before return. */
+TC_status tc_hmac_core_verify(const tc_hash_algorithm_info* info, void* workspace, TC_bytes key,
+                              TC_bytes message, TC_bytes tag);
 #endif
 
 /* Public wrappers for one algorithm. NAME is the public name (SHA256) and
@@ -181,9 +179,9 @@ TC_status tc_hmac_core_verify(const tc_hash_algorithm_info* info, void* workspac
   {                                                                                                \
     return tc_hash_core_init(&tc_##name##_info, ctx);                                              \
   }                                                                                                \
-  TC_status TC_##NAME##_update(struct TC_##NAME##_ctx* ctx, const uint8_t* data, size_t length)    \
+  TC_status TC_##NAME##_update(struct TC_##NAME##_ctx* ctx, TC_bytes data)                         \
   {                                                                                                \
-    return tc_hash_core_update(&tc_##name##_info, ctx, data, length);                              \
+    return tc_hash_core_update(&tc_##name##_info, ctx, data.data, data.length);                    \
   }                                                                                                \
   TC_status TC_##NAME##_final(struct TC_##NAME##_ctx* ctx, uint8_t digest[TC_##NAME##_DIGESTLEN])  \
   {                                                                                                \
@@ -193,25 +191,23 @@ TC_status tc_hmac_core_verify(const tc_hash_algorithm_info* info, void* workspac
   {                                                                                                \
     tc_hash_core_clear(&tc_##name##_info, ctx);                                                    \
   }                                                                                                \
-  TC_status TC_##NAME##_digest(const uint8_t* data, size_t length,                                 \
-                               uint8_t digest[TC_##NAME##_DIGESTLEN])                              \
+  TC_status TC_##NAME##_digest(TC_bytes data, uint8_t digest[TC_##NAME##_DIGESTLEN])               \
   {                                                                                                \
     struct TC_##NAME##_ctx ctx;                                                                    \
-    return tc_hash_core_digest(&tc_##name##_info, &ctx, data, length, digest);                     \
+    return tc_hash_core_digest(&tc_##name##_info, &ctx, data, digest);                             \
   }
 
 #define TC_HMAC_DEFINE(NAME, name)                                                                 \
-  TC_status TC_HMAC_##NAME##_init(struct TC_HMAC_##NAME##_ctx* ctx, const uint8_t* key,            \
-                                  size_t key_length)                                               \
+  TC_status TC_HMAC_##NAME##_init(struct TC_HMAC_##NAME##_ctx* ctx, TC_bytes key)                  \
   {                                                                                                \
-    return tc_hmac_core_init(&tc_##name##_info, ctx, key, key_length);                             \
+    return tc_hmac_core_init(&tc_##name##_info, ctx, key.data, key.length);                        \
   }                                                                                                \
-  TC_status TC_HMAC_##NAME##_update(struct TC_HMAC_##NAME##_ctx* ctx, const uint8_t* data,         \
-                                    size_t length)                                                 \
+  TC_status TC_HMAC_##NAME##_update(struct TC_HMAC_##NAME##_ctx* ctx, TC_bytes data)               \
   {                                                                                                \
-    return tc_hmac_core_update(&tc_##name##_info, ctx, data, length);                              \
+    return tc_hmac_core_update(&tc_##name##_info, ctx, data.data, data.length);                    \
   }                                                                                                \
-  TC_status TC_HMAC_##NAME##_final(struct TC_HMAC_##NAME##_ctx* ctx, uint8_t* tag)                 \
+  TC_status TC_HMAC_##NAME##_final(struct TC_HMAC_##NAME##_ctx* ctx,                               \
+                                   uint8_t tag[TC_##NAME##_DIGESTLEN])                             \
   {                                                                                                \
     return tc_hmac_core_final(&tc_##name##_info, ctx, tag);                                        \
   }                                                                                                \
@@ -219,19 +215,15 @@ TC_status tc_hmac_core_verify(const tc_hash_algorithm_info* info, void* workspac
   {                                                                                                \
     tc_hmac_core_clear(&tc_##name##_info, ctx);                                                    \
   }                                                                                                \
-  TC_status TC_HMAC_##NAME##_digest(const uint8_t* key, size_t key_length, const uint8_t* message, \
-                                    size_t message_length, uint8_t* tag, size_t tag_length)        \
+  TC_status TC_HMAC_##NAME##_digest(TC_bytes key, TC_bytes message, TC_buffer tag)                 \
   {                                                                                                \
     struct TC_HMAC_##NAME##_ctx ctx;                                                               \
-    return tc_hmac_core_digest(&tc_##name##_info, &ctx, key, key_length, message, message_length,  \
-                               tag, tag_length);                                                   \
+    return tc_hmac_core_digest(&tc_##name##_info, &ctx, key, message, tag);                        \
   }                                                                                                \
-  TC_status TC_HMAC_##NAME##_verify(const uint8_t* key, size_t key_length, const uint8_t* message, \
-                                    size_t message_length, const uint8_t* tag, size_t tag_length)  \
+  TC_status TC_HMAC_##NAME##_verify(TC_bytes key, TC_bytes message, TC_bytes tag)                  \
   {                                                                                                \
     struct TC_HMAC_##NAME##_ctx ctx;                                                               \
-    return tc_hmac_core_verify(&tc_##name##_info, &ctx, key, key_length, message, message_length,  \
-                               tag, tag_length);                                                   \
+    return tc_hmac_core_verify(&tc_##name##_info, &ctx, key, message, tag);                        \
   }
 
 /* Serialize the leading words of a chaining state into digest. These are the

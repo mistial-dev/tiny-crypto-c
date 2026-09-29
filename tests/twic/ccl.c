@@ -876,7 +876,7 @@ static MunitResult test_import(const MunitParameter params[], void* user)
   uint8_t expected[TC_MD5_DIGESTLEN];
   (void)params;
   (void)user;
-  munit_assert_int(TC_MD5_digest(list, sizeof list - 1, expected), ==, TC_OK);
+  munit_assert_int(TC_MD5_digest((TC_bytes){list, sizeof list - 1}, expected), ==, TC_OK);
   for (unsigned fault = 0; fault < IMPORT_CASES; ++fault) {
     packed_key staged_keys[2], old_keys[1] = {{0}};
     import_keys staged = {{staged_keys, 0, 2}, 0, 0}, old = {{old_keys, 1, 1}, 0, 0};

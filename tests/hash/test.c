@@ -73,9 +73,10 @@ MunitResult test_cavp_hmac(const MunitParameter params[], void* data);
 #define TC_SHA_ARGUMENT_CHECKS(N, ctx, out)                                                        \
   do {                                                                                             \
     TC_SHA##N##_init(&(ctx));                                                                      \
-    munit_assert_int(TC_SHA##N##_update(NULL, fips_abc_msg, 1), ==, TC_ERROR);                     \
-    munit_assert_int(TC_SHA##N##_update(&(ctx), NULL, 1), ==, TC_ERROR);                           \
-    munit_assert_int(TC_SHA##N##_update(&(ctx), (const uint8_t*)&(ctx), 1), ==, TC_ERROR);         \
+    munit_assert_int(TC_SHA##N##_update(NULL, (TC_bytes){fips_abc_msg, 1}), ==, TC_ERROR);         \
+    munit_assert_int(TC_SHA##N##_update(&(ctx), (TC_bytes){NULL, 1}), ==, TC_ERROR);               \
+    munit_assert_int(TC_SHA##N##_update(&(ctx), (TC_bytes){(const uint8_t*)&(ctx), 1}), ==,        \
+                     TC_ERROR);                                                                    \
     munit_assert_int(TC_SHA##N##_final(NULL, (out)), ==, TC_ERROR);                                \
     munit_assert_int(TC_SHA##N##_final(&(ctx), NULL), ==, TC_ERROR);                               \
     munit_assert_int(TC_SHA##N##_final(&(ctx), (uint8_t*)&(ctx)), ==, TC_ERROR);                   \
@@ -87,14 +88,15 @@ MunitResult test_cavp_hmac(const MunitParameter params[], void* data);
     uint8_t out[TC_SHA##N##_DIGESTLEN];                                                            \
     (void)params;                                                                                  \
     (void)data;                                                                                    \
-    munit_assert_int(TC_SHA##N##_digest(fips_empty_msg, 0, out), ==, TC_OK);                       \
+    munit_assert_int(TC_SHA##N##_digest((TC_bytes){fips_empty_msg, 0}, out), ==, TC_OK);           \
     munit_assert_memory_equal(TC_SHA##N##_DIGESTLEN, out, fips_empty_sha##N);                      \
-    munit_assert_int(TC_SHA##N##_digest(fips_abc_msg, FIPS_ABC_LEN, out), ==, TC_OK);              \
+    munit_assert_int(TC_SHA##N##_digest((TC_bytes){fips_abc_msg, FIPS_ABC_LEN}, out), ==, TC_OK);  \
     munit_assert_memory_equal(TC_SHA##N##_DIGESTLEN, out, fips_abc_sha##N);                        \
-    munit_assert_int(TC_SHA##N##_digest(fips_two_block_msg, FIPS_TWO_BLOCK_LEN, out), ==, TC_OK);  \
+    munit_assert_int(TC_SHA##N##_digest((TC_bytes){fips_two_block_msg, FIPS_TWO_BLOCK_LEN}, out),  \
+                     ==, TC_OK);                                                                   \
     munit_assert_memory_equal(TC_SHA##N##_DIGESTLEN, out, fips_two_block_sha##N);                  \
-    munit_assert_int(TC_SHA##N##_digest(fips_four_block_msg, FIPS_FOUR_BLOCK_LEN, out), ==,        \
-                     TC_OK);                                                                       \
+    munit_assert_int(                                                                              \
+        TC_SHA##N##_digest((TC_bytes){fips_four_block_msg, FIPS_FOUR_BLOCK_LEN}, out), ==, TC_OK); \
     munit_assert_memory_equal(TC_SHA##N##_DIGESTLEN, out, fips_four_block_sha##N);                 \
     return MUNIT_OK;                                                                               \
   }                                                                                                \
@@ -109,16 +111,16 @@ MunitResult test_cavp_hmac(const MunitParameter params[], void* data);
     memset(chunk, 'a', sizeof(chunk));                                                             \
     TC_SHA##N##_init(&ctx);                                                                        \
     for (i = 0; i < 1000; ++i)                                                                     \
-      munit_assert_int(TC_SHA##N##_update(&ctx, chunk, sizeof(chunk)), ==, TC_OK);                 \
+      munit_assert_int(TC_SHA##N##_update(&ctx, (TC_bytes){chunk, sizeof(chunk)}), ==, TC_OK);     \
     munit_assert_int(TC_SHA##N##_final(&ctx, out), ==, TC_OK);                                     \
     munit_assert_memory_equal(TC_SHA##N##_DIGESTLEN, out, million_a_sha##N);                       \
     TC_SHA##N##_init(&ctx);                                                                        \
     for (i = 0; i < 100; ++i)                                                                      \
-      munit_assert_int(TC_SHA##N##_update(&ctx, chunk, 7), ==, TC_OK);                             \
+      munit_assert_int(TC_SHA##N##_update(&ctx, (TC_bytes){chunk, 7}), ==, TC_OK);                 \
     i = 700;                                                                                       \
     while (i < 1000000) {                                                                          \
       const size_t take = (1000000 - i < 999) ? (1000000 - i) : 999;                               \
-      munit_assert_int(TC_SHA##N##_update(&ctx, chunk, take), ==, TC_OK);                          \
+      munit_assert_int(TC_SHA##N##_update(&ctx, (TC_bytes){chunk, take}), ==, TC_OK);              \
       i += take;                                                                                   \
     }                                                                                              \
     munit_assert_int(TC_SHA##N##_final(&ctx, out), ==, TC_OK);                                     \
@@ -135,7 +137,7 @@ MunitResult test_cavp_hmac(const MunitParameter params[], void* data);
     tc_test_fill_incrementing(msg, sizeof(msg));                                                   \
     for (i = 0; i < BOUNDARY_COUNT; ++i) {                                                         \
       munit_assert_size(boundary_lengths[i], <=, sizeof(msg));                                     \
-      munit_assert_int(TC_SHA##N##_digest(msg, boundary_lengths[i], out), ==, TC_OK);              \
+      munit_assert_int(TC_SHA##N##_digest((TC_bytes){msg, boundary_lengths[i]}, out), ==, TC_OK);  \
       munit_assert_memory_equal(TC_SHA##N##_DIGESTLEN, out, boundary_sha##N[i]);                   \
     }                                                                                              \
     return MUNIT_OK;                                                                               \
@@ -151,31 +153,32 @@ MunitResult test_cavp_hmac(const MunitParameter params[], void* data);
     (void)params;                                                                                  \
     (void)data;                                                                                    \
     tc_test_fill_incrementing(msg, sizeof(msg));                                                   \
-    munit_assert_int(TC_SHA##N##_digest(msg, sizeof(msg), expected), ==, TC_OK);                   \
+    munit_assert_int(TC_SHA##N##_digest((TC_bytes){msg, sizeof(msg)}, expected), ==, TC_OK);       \
     for (split = 0; split <= sizeof(msg); ++split) {                                               \
       TC_SHA##N##_init(&ctx);                                                                      \
-      munit_assert_int(TC_SHA##N##_update(&ctx, msg, split), ==, TC_OK);                           \
-      munit_assert_int(TC_SHA##N##_update(&ctx, msg + split, sizeof(msg) - split), ==, TC_OK);     \
+      munit_assert_int(TC_SHA##N##_update(&ctx, (TC_bytes){msg, split}), ==, TC_OK);               \
+      munit_assert_int(TC_SHA##N##_update(&ctx, (TC_bytes){msg + split, sizeof(msg) - split}), ==, \
+                       TC_OK);                                                                     \
       munit_assert_int(TC_SHA##N##_final(&ctx, out), ==, TC_OK);                                   \
       munit_assert_memory_equal(TC_SHA##N##_DIGESTLEN, out, expected);                             \
     }                                                                                              \
     TC_SHA##N##_init(&ctx);                                                                        \
-    munit_assert_int(TC_SHA##N##_update(&ctx, msg, 1), ==, TC_OK);                                 \
-    munit_assert_int(TC_SHA##N##_update(&ctx, msg + 1, 63), ==, TC_OK);                            \
-    munit_assert_int(TC_SHA##N##_update(&ctx, msg + 64, 66), ==, TC_OK);                           \
+    munit_assert_int(TC_SHA##N##_update(&ctx, (TC_bytes){msg, 1}), ==, TC_OK);                     \
+    munit_assert_int(TC_SHA##N##_update(&ctx, (TC_bytes){msg + 1, 63}), ==, TC_OK);                \
+    munit_assert_int(TC_SHA##N##_update(&ctx, (TC_bytes){msg + 64, 66}), ==, TC_OK);               \
     munit_assert_int(TC_SHA##N##_final(&ctx, out), ==, TC_OK);                                     \
     munit_assert_memory_equal(TC_SHA##N##_DIGESTLEN, out, expected);                               \
     TC_SHA##N##_init(&ctx);                                                                        \
     for (i = 0; i < sizeof(msg); ++i)                                                              \
-      munit_assert_int(TC_SHA##N##_update(&ctx, msg + i, 1), ==, TC_OK);                           \
+      munit_assert_int(TC_SHA##N##_update(&ctx, (TC_bytes){msg + i, 1}), ==, TC_OK);               \
     munit_assert_int(TC_SHA##N##_final(&ctx, out), ==, TC_OK);                                     \
     munit_assert_memory_equal(TC_SHA##N##_DIGESTLEN, out, expected);                               \
     TC_SHA##N##_init(&ctx);                                                                        \
-    munit_assert_int(TC_SHA##N##_update(&ctx, NULL, 0), ==, TC_OK);                                \
-    munit_assert_int(TC_SHA##N##_update(&ctx, msg, 0), ==, TC_OK);                                 \
+    munit_assert_int(TC_SHA##N##_update(&ctx, (TC_bytes){NULL, 0}), ==, TC_OK);                    \
+    munit_assert_int(TC_SHA##N##_update(&ctx, (TC_bytes){msg, 0}), ==, TC_OK);                     \
     munit_assert_int(TC_SHA##N##_final(&ctx, out), ==, TC_OK);                                     \
     munit_assert_memory_equal(TC_SHA##N##_DIGESTLEN, out, fips_empty_sha##N);                      \
-    munit_assert_int(TC_SHA##N##_digest(NULL, 0, out), ==, TC_OK);                                 \
+    munit_assert_int(TC_SHA##N##_digest((TC_bytes){NULL, 0}, out), ==, TC_OK);                     \
     munit_assert_memory_equal(TC_SHA##N##_DIGESTLEN, out, fips_empty_sha##N);                      \
     return MUNIT_OK;                                                                               \
   }                                                                                                \
@@ -185,31 +188,35 @@ MunitResult test_cavp_hmac(const MunitParameter params[], void* data);
     uint8_t out[TC_SHA##N##_DIGESTLEN];                                                            \
     (void)params;                                                                                  \
     (void)data;                                                                                    \
-    memset(ctx.Buf, 0xA5, sizeof(ctx.Buf));                                                        \
+    memset(ctx.buf, 0xA5, sizeof(ctx.buf));                                                        \
     TC_SHA##N##_init(&ctx);                                                                        \
-    munit_assert_true(tc_test_all_zero(ctx.Buf, sizeof(ctx.Buf)));                                 \
-    munit_assert_int(TC_SHA##N##_update(&ctx, fips_abc_msg, FIPS_ABC_LEN), ==, TC_OK);             \
+    munit_assert_true(tc_test_all_zero(ctx.buf, sizeof(ctx.buf)));                                 \
+    munit_assert_int(TC_SHA##N##_update(&ctx, (TC_bytes){fips_abc_msg, FIPS_ABC_LEN}), ==, TC_OK); \
     munit_assert_false(tc_test_all_zero(&ctx, sizeof(ctx)));                                       \
     munit_assert_int(TC_SHA##N##_final(&ctx, out), ==, TC_OK);                                     \
     munit_assert_memory_equal(TC_SHA##N##_DIGESTLEN, out, fips_abc_sha##N);                        \
     TC_SHA_ASSERT_CLEARED(ctx);                                                                    \
-    munit_assert_int(TC_SHA##N##_update(&ctx, fips_abc_msg, 1), ==, TC_ERROR);                     \
+    munit_assert_int(TC_SHA##N##_update(&ctx, (TC_bytes){fips_abc_msg, 1}), ==, TC_ERROR);         \
     munit_assert_int(TC_SHA##N##_final(&ctx, out), ==, TC_ERROR);                                  \
     TC_SHA##N##_init(&ctx);                                                                        \
-    munit_assert_int(TC_SHA##N##_update(&ctx, fips_abc_msg, FIPS_ABC_LEN), ==, TC_OK);             \
+    munit_assert_int(TC_SHA##N##_update(&ctx, (TC_bytes){fips_abc_msg, FIPS_ABC_LEN}), ==, TC_OK); \
     TC_SHA##N##_ctx_clear(&ctx);                                                                   \
     munit_assert_true(tc_test_all_zero(&ctx, sizeof(ctx)));                                        \
-    munit_assert_int(TC_SHA##N##_update(&ctx, fips_abc_msg, 1), ==, TC_ERROR);                     \
+    munit_assert_int(TC_SHA##N##_update(&ctx, (TC_bytes){fips_abc_msg, 1}), ==, TC_ERROR);         \
     munit_assert_int(TC_SHA##N##_final(&ctx, out), ==, TC_ERROR);                                  \
     TC_SHA##N##_ctx_clear(NULL);                                                                   \
-    munit_assert_int(TC_SHA##N##_digest(NULL, 1, out), ==, TC_ERROR);                              \
-    munit_assert_int(TC_SHA##N##_digest(fips_abc_msg, 1, NULL), ==, TC_ERROR);                     \
+    munit_assert_int(TC_SHA##N##_digest((TC_bytes){NULL, 1}, out), ==, TC_ERROR);                  \
+    munit_assert_int(TC_SHA##N##_digest((TC_bytes){fips_abc_msg, 1}, NULL), ==, TC_ERROR);         \
     TC_SHA##N##_init(&ctx);                                                                        \
-    ctx.Count = (count_limit);                                                                     \
-    munit_assert_int(TC_SHA##N##_update(&ctx, fips_abc_msg, 1), ==, TC_ERROR);                     \
-    ctx.Count = (count_limit) - 1;                                                                 \
-    munit_assert_int(TC_SHA##N##_update(&ctx, fips_abc_msg, 1), ==, TC_OK);                        \
+    ctx.count = (count_limit);                                                                     \
+    munit_assert_int(TC_SHA##N##_update(&ctx, (TC_bytes){fips_abc_msg, 1}), ==, TC_ERROR);         \
+    ctx.count = (count_limit) - 1;                                                                 \
+    munit_assert_int(TC_SHA##N##_update(&ctx, (TC_bytes){fips_abc_msg, 1}), ==, TC_OK);            \
     TC_SHA_ARGUMENT_CHECKS(N, ctx, out);                                                           \
+    /* The one-shot digest may overwrite its own input. */                                         \
+    memcpy(out, fips_abc_msg, FIPS_ABC_LEN);                                                       \
+    munit_assert_int(TC_SHA##N##_digest((TC_bytes){out, FIPS_ABC_LEN}, out), ==, TC_OK);           \
+    munit_assert_memory_equal(TC_SHA##N##_DIGESTLEN, out, fips_abc_sha##N);                        \
     munit_assert_int(TC_SHA##N##_DIGESTLEN, ==, digest_bytes);                                     \
     munit_assert_int(TC_SHA##N##_BLOCKLEN, ==, block_bytes);                                       \
     return MUNIT_OK;                                                                               \

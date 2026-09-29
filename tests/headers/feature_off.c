@@ -47,6 +47,5 @@ struct TC_SHA256_ctx {
 };
 #else
 /* The enabled hash API stays declared next to the disabled KDF headers. */
-TC_status (*const tc_feature_off_sha256)(const uint8_t*, size_t,
-                                         uint8_t[TC_SHA256_DIGESTLEN]) = TC_SHA256_digest;
+TC_status (*const tc_feature_off_sha256)(TC_bytes, uint8_t[TC_SHA256_DIGESTLEN]) = TC_SHA256_digest;
 #endif

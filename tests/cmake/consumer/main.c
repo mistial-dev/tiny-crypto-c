@@ -153,7 +153,8 @@ int main(void)
     return 1;
   if (TC_DER_uint32(integer, sizeof integer, &number) != TC_TLV_OK || number != 42)
     return 1;
-  if (TC_KMAC256_digest(key, sizeof(key), NULL, 0, NULL, 0, result, sizeof(result)) != TC_OK)
+  if (TC_KMAC256_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0},
+                        (TC_buffer){result, sizeof(result)}) != TC_OK)
     return 1;
   if (TC_SSKDF_SHA256((TC_bytes){key, sizeof key}, NULL, 0, (TC_buffer){result, sizeof result}) !=
       TC_OK)
@@ -171,6 +172,6 @@ int main(void)
       TC_EC_OK)
     return 1;
   TC_PIV_SM_clear(&session);
-  return TC_SHA256_digest((const uint8_t*)"abc", 3, result) != TC_OK ||
+  return TC_SHA256_digest((TC_bytes){(const uint8_t*)"abc", 3}, result) != TC_OK ||
          memcmp(result, expected, sizeof(result)) != 0;
 }
