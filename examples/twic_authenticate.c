@@ -356,6 +356,9 @@ static int root_digest_match(TC_bytes encoded, const char* expected)
   return valid;
 }
 
+/* The builder carries the root's name constraints, policies and path length
+ * into the anchor record. This command also requires a CA root and rejects
+ * other critical extensions when the root is loaded. */
 static int root_read(TC_bytes encoded, const char* expected_digest, const TC_TLV_limits* limits,
                      TC_X509_store_anchor* anchor, size_t* max_certificates)
 {
@@ -363,9 +366,11 @@ static int root_read(TC_bytes encoded, const char* expected_digest, const TC_TLV
   TC_X509_workspace parser = parser_workspace();
   TC_X509_certificate root;
   if (!root_digest_match(encoded, expected_digest) ||
-      TC_X509_read(encoded.data, encoded.length, limits, &parser, &root) != TC_TLV_OK)
+      TC_X509_read(encoded.data, encoded.length, limits, &parser, &root) != TC_TLV_OK ||
+      TC_X509_store_anchor_from_certificate(&root, limits, &parser, anchor) != TC_TLV_OK)
     return 0;
-  anchor->trust = (TC_X509_trust_anchor){root.subject, root.public_key};
+  if (anchor->has_path_len && anchor->path_len < *max_certificates)
+    *max_certificates = anchor->path_len + 1;
   TC_TLV_reader reader;
   if (TC_X509_extensions_init(&reader, root.extensions.data, root.extensions.length, limits) !=
       TC_TLV_OK)
@@ -384,19 +389,7 @@ static int root_read(TC_bytes encoded, const char* expected_digest, const TC_TLV
           !constraints.ca)
         return 0;
       ca = 1;
-      if (constraints.has_path_length && constraints.path_length < *max_certificates)
-        *max_certificates = (size_t)constraints.path_length + 1;
-    } else if (id == KEY_USAGE) {
-      uint16_t usage;
-      if (TC_X509_key_usage_read(extension.value.data, extension.value.length, &usage) !=
-              TC_TLV_OK ||
-          !(usage & TC_KEY_USAGE_CERT_SIGN))
-        return 0;
-    } else if (id == NAME_CONSTRAINTS) {
-      if (TC_X509_name_constraints_read(extension.value.data, extension.value.length, limits,
-                                        &anchor->names) != TC_TLV_OK)
-        return 0;
-    } else if (extension.critical)
+    } else if (extension.critical && id != KEY_USAGE && id != NAME_CONSTRAINTS)
       return 0;
   }
   return status == TC_TLV_END && ca;

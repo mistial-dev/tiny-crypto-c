@@ -139,7 +139,13 @@ static MunitResult source_guards(const MunitParameter params[], void* user)
                         &fixture.anchor.trust.public_key.exponent,
                         &fixture.anchor.trust.public_key.curve_oid,
                         &fixture.anchor.names.permitted,
-                        &fixture.anchor.names.excluded};
+                        &fixture.anchor.names.excluded,
+                        &fixture.anchor.key_id,
+                        &fixture.anchor.title,
+                        &fixture.anchor.title_language,
+                        &fixture.anchor.policy_set,
+                        &fixture.anchor.extensions,
+                        &fixture.anchor.certificate_extensions};
   const TC_TLV_result failures[] = {TC_TLV_END, TC_TLV_INVALID, TC_TLV_ARGUMENT, TC_TLV_LIMIT,
                                     TC_TLV_UNSUPPORTED};
   size_t work;

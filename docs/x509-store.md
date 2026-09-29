@@ -12,7 +12,9 @@ A source provides separate callbacks for untrusted candidate certificates and
 explicit trust anchors. Each anchor can carry path constraints. Source callbacks
 return borrowed spans and charge reads against the supplied work budget.
 An RFC 5914 list can supply anchors through the
-[trust-anchor reader](x509-trust-anchors.md).
+[trust-anchor reader](x509-trust-anchors.md). Build an anchor record from a
+single parsed root certificate with `TC_X509_store_anchor_from_certificate`,
+which carries the root's path controls into the record.
 
 ## Updating a source
 

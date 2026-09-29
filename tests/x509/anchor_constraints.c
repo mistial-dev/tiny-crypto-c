@@ -13,7 +13,7 @@
 
 enum { FILE_CAPACITY = 20000 };
 static uint8_t issuer_der[FILE_CAPACITY], card_der[FILE_CAPACITY], anchors_der[FILE_CAPACITY];
-static uint8_t piv_der[FILE_CAPACITY];
+static uint8_t piv_der[FILE_CAPACITY], root_der[FILE_CAPACITY];
 static TC_validation_storage arena[40000];
 static TC_RSA_word rsa_words[TC_RSA_VERIFY_WORKSPACE_WORDS(3072)];
 static TC_ECDSA_workspace ec;
@@ -33,6 +33,144 @@ static TC_bytes fixture(const char* profile, const char* name, uint8_t* buffer)
   munit_assert_int(fclose(file), ==, 0);
   munit_assert_size(length, >, 0);
   return (TC_bytes){buffer, length};
+}
+
+/* DER tag and length followed by value. out may alias value. */
+static size_t der(uint8_t* out, unsigned tag, const uint8_t* value, size_t length)
+{
+  const size_t header = length < 128 ? 2 : length < 256 ? 3 : 4;
+  munit_assert_size(length, <, 65536);
+  memmove(out + header, value, length);
+  out[0] = (uint8_t)tag;
+  if (header == 2) {
+    out[1] = (uint8_t)length;
+  } else if (header == 3) {
+    out[1] = 0x81;
+    out[2] = (uint8_t)length;
+  } else {
+    out[1] = 0x82;
+    out[2] = (uint8_t)(length >> 8);
+    out[3] = (uint8_t)length;
+  }
+  return header + length;
+}
+
+/* One critical Extension for id-ce id (2.5.29.id) with the given value. */
+static size_t critical_extension(uint8_t* out, unsigned id, const uint8_t* value, size_t length)
+{
+  uint8_t body[FILE_CAPACITY];
+  const uint8_t prefix[] = {6, 3, 0x55, 0x1d, (uint8_t)id, 1, 1, 0xff};
+  size_t n = sizeof prefix;
+  memcpy(body, prefix, n);
+  n += der(body + n, 0x04, value, length);
+  return der(out, 0x30, body, n);
+}
+
+/* nameConstraints excluding directoryName subtrees under name. */
+static size_t excluding_name(uint8_t* out, TC_bytes name)
+{
+  uint8_t value[FILE_CAPACITY];
+  size_t n = der(value, 0xa4, name.data, name.length);
+  n = der(value, 0x30, value, n);
+  n = der(value, 0xa1, value, n);
+  n = der(value, 0x30, value, n);
+  return critical_extension(out, 30, value, n);
+}
+
+/* A caller-built anchor carries its certificate's path controls only through
+ * the normalized record fields. certificate_extensions holding a control
+ * whose field is empty fails closed. TC_X509_store_anchor_from_certificate
+ * fills those fields, so the same constraint then rejects the path. */
+static void check_certificate_controls(const char* profile, const TC_bytes* chain,
+                                       const TC_X509_store_anchor* anchor,
+                                       const TC_X509_path_options* options,
+                                       const TC_X509_path_workspace* workspace)
+{
+  static const uint8_t policies[] = {0x30, 8, 0x30, 6, 6, 4, 0x55, 0x1d, 0x20, 0};
+  static const uint8_t explicit_policy[] = {0x30, 3, 0x80, 1, 0};
+  static const uint8_t inhibit_any[] = {2, 1, 0};
+  static const uint8_t path_zero[] = {0x30, 6, 1, 1, 0xff, 2, 1, 0};
+  const TC_TLV_limits limits = options->parsing;
+  TC_TLV_frame frames[32];
+  TC_bytes oids[32];
+  TC_X509_workspace parser = {frames, 32, oids, 32};
+  TC_X509_certificate issuer, root;
+  TC_X509_store_anchor bare = {0}, built;
+  TC_X509_path_result result;
+  uint8_t extension[FILE_CAPACITY], list[FILE_CAPACITY];
+  size_t length;
+  const TC_bytes encoded_root = fixture(profile, "root.der", root_der);
+  munit_assert_int(TC_X509_read(chain[0].data, chain[0].length, &limits, &parser, &issuer), ==,
+                   TC_TLV_OK);
+  bare.trust = anchor->trust;
+  munit_assert_int(TC_X509_path_validate_with_anchor(chain, 2, &bare, options, workspace, &result),
+                   ==, TC_X509_PATH_VALID);
+  length = excluding_name(extension, issuer.subject);
+  bare.certificate_extensions = (TC_bytes){extension, length};
+  munit_assert_int(TC_X509_path_validate_with_anchor(chain, 2, &bare, options, workspace, &result),
+                   ==, TC_X509_PATH_UNSUPPORTED);
+  {
+    const struct {
+      unsigned id;
+      const uint8_t* value;
+      size_t length;
+    } controls[] = {{32, policies, sizeof policies},
+                    {36, explicit_policy, sizeof explicit_policy},
+                    {54, inhibit_any, sizeof inhibit_any},
+                    {19, path_zero, sizeof path_zero}};
+    for (size_t i = 0; i < sizeof controls / sizeof *controls; ++i) {
+      TC_bytes control;
+      control.length =
+          critical_extension(extension, controls[i].id, controls[i].value, controls[i].length);
+      control.data = extension;
+      bare.certificate_extensions = control;
+      munit_assert_int(
+          TC_X509_path_validate_with_anchor(chain, 2, &bare, options, workspace, &result), ==,
+          TC_X509_PATH_UNSUPPORTED);
+    }
+  }
+  /* A TrustAnchorInfo exts basicConstraints pathLen can only lower path_len
+   * (RFC 5914 section 2.5). A record whose path_len misses it fails closed. */
+  {
+    /* Extension { basicConstraints, OCTET STRING { cA TRUE, pathLen n } } */
+    uint8_t basic[] = {0x30, 15, 6, 3, 0x55, 0x1d, 19, 4, 8, 0x30, 6, 1, 1, 0xff, 2, 1, 1};
+    const struct {
+      uint8_t exts_path_len, has_path_len;
+      size_t path_len;
+      TC_X509_path_status expected;
+    } cases[] = {{1, 0, 0, TC_X509_PATH_UNSUPPORTED},
+                 {1, 1, 2, TC_X509_PATH_UNSUPPORTED},
+                 {1, 1, 1, TC_X509_PATH_VALID},
+                 {5, 1, 1, TC_X509_PATH_VALID},
+                 {0, 1, 0, TC_X509_PATH_INVALID}};
+    bare.certificate_extensions = (TC_bytes){NULL, 0};
+    bare.extensions = (TC_bytes){basic, sizeof basic};
+    for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
+      basic[sizeof basic - 1] = cases[i].exts_path_len;
+      bare.has_path_len = cases[i].has_path_len;
+      bare.path_len = cases[i].path_len;
+      munit_assert_int(
+          TC_X509_path_validate_with_anchor(chain, 2, &bare, options, workspace, &result), ==,
+          cases[i].expected);
+    }
+    bare.extensions = (TC_bytes){NULL, 0};
+    bare.has_path_len = 0;
+    bare.path_len = 0;
+  }
+  /* The builder normalizes the anchor certificate itself. */
+  munit_assert_int(TC_X509_read(encoded_root.data, encoded_root.length, &limits, &parser, &root),
+                   ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_store_anchor_from_certificate(&root, &limits, &parser, &built), ==,
+                   TC_TLV_OK);
+  munit_assert_int(TC_X509_path_validate_with_anchor(chain, 2, &built, options, workspace, &result),
+                   ==, TC_X509_PATH_VALID);
+  length = excluding_name(list, issuer.subject);
+  root.extensions = (TC_bytes){list, der(list, 0x30, list, length)};
+  munit_assert_int(TC_X509_store_anchor_from_certificate(&root, &limits, &parser, &built), ==,
+                   TC_TLV_OK);
+  munit_assert_size(built.names.excluded.length, >, 0);
+  munit_assert_int(TC_X509_path_validate_with_anchor(chain, 2, &built, options, workspace, &result),
+                   ==, TC_X509_PATH_INVALID);
 }
 
 static void check_profile(const char* profile)
@@ -151,6 +289,7 @@ static void check_profile(const char* profile)
   munit_assert_int(TC_X509_path_validate_with_anchor(chain, 2, options_anchor, &options,
                                                      &storage.path.validation, &result),
                    ==, TC_X509_PATH_UNSUPPORTED);
+  check_certificate_controls(profile, chain, &anchor, &options, &storage.path.validation);
   options_anchor[0] = anchor;
   options_anchor[0].has_path_len = 1;
   options_anchor[0].path_len = 0;
@@ -166,6 +305,14 @@ static void check_profile(const char* profile)
   munit_assert_int(
       TC_X509_path_build(card, &source, &options, &storage.path.validation, &search, &found), ==,
       TC_X509_PATH_INVALID);
+  /* A returned policy may borrow the anchor's policy_set, so that span must
+   * stay separate from the search result. */
+  memset(&found, 0, sizeof found);
+  options_anchor[1] = anchor;
+  options_anchor[1].policy_set = (TC_bytes){(const uint8_t*)&found, sizeof found};
+  munit_assert_int(
+      TC_X509_path_build(card, &source, &options, &storage.path.validation, &search, &found), ==,
+      TC_X509_PATH_ERROR);
 }
 
 static MunitResult anchor_constraints(const MunitParameter params[], void* user)

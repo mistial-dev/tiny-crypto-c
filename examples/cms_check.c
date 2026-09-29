@@ -87,9 +87,13 @@ int main(int argc, char** argv)
     fputs("Invalid root certificate or CRL encoding\n", stderr);
     return 2;
   }
-  /* The root file is an application-authorized trust input. */
-  trusted_anchor.trust.name = root.subject;
-  trusted_anchor.trust.public_key = root.public_key;
+  /* The root file is an application-authorized trust input. The builder
+   * carries its path controls into the anchor record. */
+  if (TC_X509_store_anchor_from_certificate(&root, &limits, &parser, &trusted_anchor) !=
+      TC_TLV_OK) {
+    fputs("Root certificate cannot serve as a trust anchor\n", stderr);
+    return 2;
+  }
   const TC_X509_store_source source = example_x509_source(&trust);
   TC_X509_store_snapshot slot = {0};
   TC_X509_store store = {0};

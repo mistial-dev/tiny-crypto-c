@@ -114,6 +114,8 @@ static inline TC_TLV_result tc_pki_source_guard_anchor(void* context, size_t ind
   }
   if (result != TC_TLV_OK)
     return result == TC_TLV_LIMIT || result == TC_TLV_UNSUPPORTED ? result : TC_TLV_ARGUMENT;
+  /* Every borrowed span, including policy_set: result policies may point
+   * into it after the search writes its result. */
   const TC_bytes spans[] = {anchor.trust.name,
                             anchor.trust.public_key.algorithm.oid,
                             anchor.trust.public_key.algorithm.parameters,
@@ -122,7 +124,13 @@ static inline TC_TLV_result tc_pki_source_guard_anchor(void* context, size_t ind
                             anchor.trust.public_key.exponent,
                             anchor.trust.public_key.curve_oid,
                             anchor.names.permitted,
-                            anchor.names.excluded};
+                            anchor.names.excluded,
+                            anchor.key_id,
+                            anchor.title,
+                            anchor.title_language,
+                            anchor.policy_set,
+                            anchor.extensions,
+                            anchor.certificate_extensions};
   for (size_t i = 0; i < sizeof spans / sizeof *spans; ++i) {
     result = tc_pki_source_guard_input(guard, spans[i], work);
     if (result != TC_TLV_OK)

@@ -5,11 +5,9 @@
 #include <tiny_crypto/x509_trust_anchor.h>
 #include <tiny_crypto/x509_path.h>
 #include "pki_internal.h"
-#include "pki_extensions_internal.h"
 #include "string_internal.h"
-#include "x509_time_internal.h"
-#include "der_bits_internal.h"
-#include <string.h>
+#include "pki_bits_internal.h"
+#include "x509_store_anchor_internal.h"
 
 static TC_TLV_result contents_reader(TC_TLV_reader* reader, TC_bytes bytes,
                                      const TC_TLV_limits* limits)
@@ -44,79 +42,23 @@ static TC_TLV_result encoded_name(TC_bytes name, const TC_TLV_limits* limits)
   return result == TC_TLV_END ? TC_TLV_OK : result;
 }
 
-/* CertificatePolicies contents with unique identifiers. RFC 5914 section 2.5
- * forbids policyQualifiers in a TrustAnchorInfo policySet. An anchor
- * certificate's extension may carry them. Uses the extension OID scratch. */
-static TC_TLV_result policy_set(TC_bytes contents, const TC_TLV_limits* limits,
-                                TC_X509_workspace* workspace, int qualifiers_allowed)
-{
-  TC_TLV_reader policies;
-  TC_TLV_element item;
-  TC_X509_policy policy;
-  size_t count = 0;
-  TC_TLV_result result = contents_reader(&policies, contents, limits);
-  if (result != TC_TLV_OK)
-    return result;
-  if (!contents.length)
-    return TC_TLV_INVALID;
-  while ((result = TC_TLV_next(&policies, &item)) == TC_TLV_OK) {
-    if (count == workspace->extension_capacity)
-      return TC_TLV_LIMIT;
-    result = tc_x509_policy_information_read(item.encoded, &policy);
-    if (result != TC_TLV_OK)
-      return result;
-    if (policy.qualifiers.data && !qualifiers_allowed)
-      return TC_TLV_INVALID;
-    workspace->extension_oids[count++] = policy.oid;
-  }
-  if (result != TC_TLV_END)
-    return result;
-  return tc_pki_spans_unique(workspace->extension_oids, count, NULL);
-}
-
+/* RFC 5914 section 2.5 CertPolicyFlags: inhibitPolicyMapping (0),
+ * requireExplicitPolicy (1), inhibitAnyPolicy (2). DER named bits drop
+ * trailing zero bits and clear the unused padding bits. */
 static TC_TLV_result policy_flags(TC_bytes contents, unsigned* flags)
 {
-  unsigned value;
-  if (!flags || !contents.length || contents.length > 2 || contents.data[0] > 7)
-    return TC_TLV_INVALID;
-  if (contents.length == 1) {
-    if (contents.data[0] != 0)
-      return TC_TLV_INVALID;
-    *flags = 0;
-    return TC_TLV_OK;
-  }
-  value = contents.data[1];
-  if ((value & 0x1fu) || !value || (contents.data[0] == 7 && value != 0x80u) ||
-      (contents.data[0] == 6 && (value & 0x40u) == 0) ||
-      (contents.data[0] == 5 && (value & 0x20u) == 0) || contents.data[0] < 5 ||
-      contents.data[0] > 7)
-    return TC_TLV_INVALID;
-  *flags = ((value & 0x80u) ? TC_X509_PATH_INHIBIT_MAPPING : 0u) |
-           ((value & 0x40u) ? TC_X509_PATH_REQUIRE_EXPLICIT_POLICY : 0u) |
-           ((value & 0x20u) ? TC_X509_PATH_INHIBIT_ANY_POLICY : 0u);
-  return TC_TLV_OK;
-}
-
-static TC_TLV_result validate_subtrees(const TC_X509_name_constraints* names,
-                                       const TC_TLV_limits* limits, TC_X509_workspace* workspace)
-{
-  const TC_bytes lists[] = {names->permitted, names->excluded};
-  for (size_t i = 0; i < 2; ++i) {
-    TC_TLV_reader reader;
-    TC_X509_general_subtree subtree;
-    TC_TLV_result result;
-    if (!lists[i].data)
-      continue;
-    result = contents_reader(&reader, lists[i], limits);
-    if (result != TC_TLV_OK)
-      return result;
-    while ((result = TC_X509_general_subtree_next(
-                &reader, (TC_TLV_frames){workspace->frames, workspace->frame_capacity},
-                &subtree)) == TC_TLV_OK) {
-    }
-    if (result != TC_TLV_END)
-      return result;
-  }
+  enum { POLICY_FLAG_BITS = 3 };
+  TC_bytes bits;
+  unsigned unused;
+  uint16_t named;
+  TC_TLV_result result = tc_der_bit_string_contents(contents, &bits, &unused);
+  if (result == TC_TLV_OK)
+    result = tc_pki_named_bits(bits, unused, POLICY_FLAG_BITS, &named);
+  if (result != TC_TLV_OK)
+    return result;
+  *flags = ((named & 1u) ? TC_X509_PATH_INHIBIT_MAPPING : 0u) |
+           ((named & 2u) ? TC_X509_PATH_REQUIRE_EXPLICIT_POLICY : 0u) |
+           ((named & 4u) ? TC_X509_PATH_INHIBIT_ANY_POLICY : 0u);
   return TC_TLV_OK;
 }
 
@@ -145,140 +87,11 @@ static TC_TLV_result name_constraints(TC_bytes contents, const TC_TLV_limits* li
   }
   if (result != TC_TLV_END)
     return result;
-  result = validate_subtrees(&names, limits, workspace);
+  result = tc_x509_anchor_subtrees(&names, limits, workspace);
   if (result != TC_TLV_OK)
     return result;
   *out = names;
   return TC_TLV_OK;
-}
-
-static TC_TLV_result extensions(TC_bytes encoded, const TC_TLV_limits* limits,
-                                TC_X509_workspace* workspace, int tai_ext,
-                                TC_X509_store_anchor* out)
-{
-  TC_TLV_reader reader;
-  TC_X509_extension extension;
-  TC_TLV_result result;
-  size_t count = 0;
-  result = TC_X509_extensions_init(&reader, encoded.data, encoded.length, limits);
-  if (result != TC_TLV_OK)
-    return result;
-  while ((result = TC_X509_extension_next(&reader, &extension)) == TC_TLV_OK) {
-    if (count == workspace->extension_capacity)
-      return TC_TLV_LIMIT;
-    workspace->extension_oids[count++] = extension.oid;
-    const unsigned id = tc_pki_extension_id(&extension);
-    if (!id)
-      continue;
-    /* RFC 5914 section 2.6: these duplicate CertPathControls and must not
-     * appear in TrustAnchorInfo exts. Reject them so a constraint is never
-     * silently dropped. */
-    if (tai_ext && tc_pki_extension_path_control(id))
-      return TC_TLV_INVALID;
-    switch (id) {
-    case TC_PKI_EXT_CERTIFICATE_POLICIES: {
-      TC_TLV_element value;
-      result =
-          TC_TLV_read(extension.value.data, extension.value.length, TC_TLV_DER, limits, &value);
-      if (result != TC_TLV_OK || !tc_pki_tag(&value, 0x30) ||
-          value.encoded.length != extension.value.length)
-        return TC_TLV_INVALID;
-      /* Checked after the loop, which owns the OID scratch until then. */
-      out->policy_set = value.value;
-      break;
-    }
-    case TC_PKI_EXT_NAME_CONSTRAINTS:
-      result = TC_X509_name_constraints_read(extension.value.data, extension.value.length, limits,
-                                             &out->names);
-      if (result != TC_TLV_OK)
-        return result;
-      result = validate_subtrees(&out->names, limits, workspace);
-      if (result != TC_TLV_OK)
-        return result;
-      break;
-    /* RFC 5937 section 2: the presence of these fields sets the Boolean
-     * path inputs. Their SkipCerts counts do not apply to the anchor. */
-    case TC_PKI_EXT_POLICY_CONSTRAINTS: {
-      TC_X509_policy_constraints constraints;
-      result = TC_X509_policy_constraints_read(extension.value.data, extension.value.length,
-                                               &constraints);
-      if (result != TC_TLV_OK)
-        return result;
-      if (constraints.has_require_explicit_policy)
-        out->policy_flags |= TC_X509_PATH_REQUIRE_EXPLICIT_POLICY;
-      if (constraints.has_inhibit_policy_mapping)
-        out->policy_flags |= TC_X509_PATH_INHIBIT_MAPPING;
-      break;
-    }
-    case TC_PKI_EXT_INHIBIT_ANY_POLICY: {
-      uint32_t skip;
-      result = TC_DER_uint32(extension.value.data, extension.value.length, &skip);
-      if (result != TC_TLV_OK)
-        return result;
-      out->policy_flags |= TC_X509_PATH_INHIBIT_ANY_POLICY;
-      break;
-    }
-    case TC_PKI_EXT_BASIC_CONSTRAINTS: {
-      TC_X509_basic_constraints basic;
-      result = TC_X509_basic_constraints_read(extension.value.data, extension.value.length, &basic);
-      if (result != TC_TLV_OK)
-        return result;
-      if (basic.has_path_length) {
-        out->has_path_len = 1;
-        out->path_len = basic.path_length;
-      }
-      break;
-    }
-    case TC_PKI_EXT_SUBJECT_KEY_IDENTIFIER:
-      result = TC_X509_subject_key_identifier_read(extension.value.data, extension.value.length,
-                                                   limits, &out->key_id);
-      if (result != TC_TLV_OK)
-        return result;
-      break;
-    case TC_PKI_EXT_KEY_USAGE: {
-      uint16_t usage;
-      result = TC_X509_key_usage_read(extension.value.data, extension.value.length, &usage);
-      if (result != TC_TLV_OK)
-        return result;
-      if (!(usage & TC_KEY_USAGE_CERT_SIGN))
-        return TC_TLV_INVALID;
-      break;
-    }
-    default:
-      break;
-    }
-  }
-  if (result != TC_TLV_END)
-    return result;
-  result = tc_pki_spans_unique(workspace->extension_oids, count, NULL);
-  if (result != TC_TLV_OK || !out->policy_set.data)
-    return result;
-  return policy_set(out->policy_set, limits, workspace, 1);
-}
-
-/* Anchor fields from a parsed Certificate or TBSCertificate. An anchor
- * issues certificates, so its subject is non-empty (RFC 5280 section
- * 4.1.2.6). A reversed validity period is malformed. */
-static TC_TLV_result certificate_anchor(const TC_X509_certificate* certificate,
-                                        const TC_TLV_limits* limits, TC_X509_workspace* workspace,
-                                        TC_X509_store_anchor* out)
-{
-  TC_bytes contents;
-  int order;
-  if (certificate->subject.length == 2 ||
-      TC_X509_time_compare(&certificate->not_before, &certificate->not_after, &order) !=
-          TC_TLV_OK ||
-      order > 0)
-    return TC_TLV_INVALID;
-  out->trust.name = certificate->subject;
-  out->trust.public_key = certificate->public_key;
-  if (!certificate->extensions.data)
-    return TC_TLV_OK;
-  if (TC_DER_sequence(certificate->extensions.data, certificate->extensions.length, &contents) !=
-      TC_TLV_OK)
-    return TC_TLV_INVALID;
-  out->certificate_extensions = contents;
-  return extensions(certificate->extensions, limits, workspace, 0, out);
 }
 
 static TC_TLV_result cert_path_controls(TC_bytes contents, const TC_TLV_limits* limits,
@@ -310,7 +123,7 @@ static TC_TLV_result cert_path_controls(TC_bytes contents, const TC_TLV_limits* 
       TC_X509_certificate certificate;
       result = tc_x509_certificate_read(element.encoded, 0xa0, limits, workspace, &certificate);
       if (result == TC_TLV_OK)
-        result = certificate_anchor(&certificate, limits, workspace, &embedded);
+        result = tc_x509_anchor_certificate(&certificate, limits, workspace, &embedded);
       if (result != TC_TLV_OK)
         return result;
       if (!tc_pki_equal(embedded.trust.name, out->trust.name) ||
@@ -326,7 +139,7 @@ static TC_TLV_result cert_path_controls(TC_bytes contents, const TC_TLV_limits* 
       break;
     }
     case 1:
-      result = policy_set(element.value, limits, workspace, 0);
+      result = tc_x509_anchor_policy_set(element.value, limits, workspace, 0);
       if (result != TC_TLV_OK)
         return result;
       out->policy_set = element.value;
@@ -414,13 +227,14 @@ static TC_TLV_result trust_anchor_info(TC_bytes contents, const TC_TLV_limits* l
           inner.encoded.length != element.value.length)
         return TC_TLV_INVALID;
       out->extensions = inner.value;
-      /* Path-control extensions are rejected here, so only basicConstraints
-       * can refine the anchor. */
+      /* Path-control extensions are rejected here, so only a basicConstraints
+       * pathLen remains. CertPathControls values are always enforced
+       * (RFC 5914 section 2.5), so exts can only lower the limit. */
       TC_X509_store_anchor overrides = {0};
-      result = extensions(inner.encoded, limits, workspace, 1, &overrides);
+      result = tc_x509_anchor_extensions(inner.encoded, limits, workspace, 1, &overrides);
       if (result != TC_TLV_OK)
         return result;
-      if (overrides.has_path_len) {
+      if (overrides.has_path_len && (!out->has_path_len || overrides.path_len < out->path_len)) {
         out->path_len = overrides.path_len;
         out->has_path_len = 1;
       }
@@ -478,7 +292,7 @@ TC_TLV_result TC_X509_trust_anchor_next(TC_TLV_reader* reader, const TC_TLV_limi
     TC_X509_certificate certificate;
     result = tc_x509_certificate_read(choice.encoded, 0x30, limits, workspace, &certificate);
     if (result == TC_TLV_OK)
-      result = certificate_anchor(&certificate, limits, workspace, &parsed);
+      result = tc_x509_anchor_certificate(&certificate, limits, workspace, &parsed);
     if (result != TC_TLV_OK)
       return result;
 #else
@@ -490,7 +304,7 @@ TC_TLV_result TC_X509_trust_anchor_next(TC_TLV_reader* reader, const TC_TLV_limi
     TC_X509_certificate certificate;
     result = tc_x509_tbs_read(choice.value, limits, workspace, &certificate);
     if (result == TC_TLV_OK)
-      result = certificate_anchor(&certificate, limits, workspace, &parsed);
+      result = tc_x509_anchor_certificate(&certificate, limits, workspace, &parsed);
     if (result != TC_TLV_OK)
       return result;
 #else

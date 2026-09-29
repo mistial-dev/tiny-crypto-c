@@ -8,22 +8,52 @@
 extern "C" {
 #endif
 
+/* One trust anchor with its RFC 5937 path controls. Validation applies the
+ * normalized fields names, policy_set, policy_flags and path_len. The
+ * extension spans are checked for controls those fields must reflect.
+ *
+ * Borrowed DER spans. Policy and extension spans contain SEQUENCE contents.
+ * extensions holds TrustAnchorInfo exts, which must not contain
+ * certificatePolicies, policyConstraints, inhibitAnyPolicy or nameConstraints
+ * (RFC 5914 section 2.6). certificate_extensions holds the anchor
+ * certificate's own extensions. A path control there whose normalized field
+ * is empty makes validation return UNSUPPORTED. Build records from
+ * certificates with TC_X509_store_anchor_from_certificate, or from a
+ * TrustAnchorList with TC_X509_trust_anchor_next. */
 typedef struct {
   TC_X509_trust_anchor trust;
   TC_X509_name_constraints names;
-  /* Borrowed DER spans. Policy and extension spans contain SEQUENCE contents.
-   * extensions holds TrustAnchorInfo exts, which must not contain
-   * certificatePolicies, policyConstraints, inhibitAnyPolicy or
-   * nameConstraints (RFC 5914 section 2.6). certificate_extensions holds the
-   * anchor certificate's own extensions. */
   TC_bytes key_id, title, title_language;
   TC_bytes policy_set, extensions, certificate_extensions;
+  /* TC_X509_PATH_REQUIRE_EXPLICIT_POLICY, _INHIBIT_MAPPING and
+   * _INHIBIT_ANY_POLICY only. */
   unsigned policy_flags;
+  /* Non-self-issued intermediates allowed below the anchor. */
   size_t path_len;
   uint8_t has_path_len;
   /* A TrustAnchorInfo without certPath is valid data with no X.509 name. */
   uint8_t x509_unusable;
 } TC_X509_store_anchor;
+
+/* Build an anchor record from a parsed anchor certificate with the rules of
+ * the RFC 5914 TrustAnchorList certificate choice. certificatePolicies,
+ * nameConstraints, policyConstraints, inhibitAnyPolicy and the
+ * basicConstraints pathLen fill the normalized fields (RFC 5937 section 2).
+ * The record borrows the certificate's DER. Keep that DER unchanged while
+ * the record is in use. The certificate view itself may be discarded.
+ * workspace supplies frames and extension OID scratch.
+ *
+ * Returns OK and writes out. NULL arguments, NULL scratch with a nonzero
+ * capacity, and out overlapping the certificate view, its DER or the scratch
+ * return ARGUMENT with out unchanged. After those checks, failures zero out:
+ * INVALID for an empty subject, a reversed validity period, a keyUsage
+ * without keyCertSign, or malformed or duplicate extensions and policies.
+ * LIMIT for exhausted limits or scratch. The anchor's validity period is not
+ * checked against any time. */
+TC_TLV_result TC_X509_store_anchor_from_certificate(const TC_X509_certificate* certificate,
+                                                    const TC_TLV_limits* limits,
+                                                    TC_X509_workspace* workspace,
+                                                    TC_X509_store_anchor* out);
 
 /* Array-backed source for a fixed, caller-owned snapshot. All records and
  * their borrowed DER must remain stable until readers release the snapshot. */

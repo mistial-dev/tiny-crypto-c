@@ -11,6 +11,8 @@ The [CRL reader](x509-crl.md) provides separate parsing of revocation lists.
 Use [path revocation checking](x509-revocation.md) after validation.
 The [trust-anchor reader](x509-trust-anchors.md) supplies RFC 5914 anchors
 whose RFC 5937 constraints are enforced for the selected path.
+`TC_X509_store_anchor_from_certificate` builds the same record from one
+parsed root certificate for `TC_X509_path_validate_with_anchor`.
 
 Signature verification comes from `options.signatures`. Use
 [`TC_X509_native_provider`](x509-crypto.md) for the library's ECDSA and RSA

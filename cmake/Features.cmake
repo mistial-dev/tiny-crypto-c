@@ -48,7 +48,8 @@ tc_module_feature(TINY_CRYPTO_ENABLE_X509_PATH TC_ENABLE_X509_PATH
   "Build X.509 path validation and stores")
 set(tc_module_requires_TC_ENABLE_X509_PATH TINY_CRYPTO_ENABLE_X509)
 set(tc_module_sources_TC_ENABLE_X509_PATH
-  src/x509_path.c src/x509_path_extensions.c src/x509_search.c src/x509_store.c src/x509_policy.c)
+  src/x509_path.c src/x509_path_extensions.c src/x509_search.c src/x509_store.c src/x509_store_anchor.c
+  src/x509_policy.c)
 
 tc_module_feature(TINY_CRYPTO_ENABLE_TRUST_ANCHOR_FORMAT TC_ENABLE_TRUST_ANCHOR_FORMAT
   "Build RFC 5914 trust-anchor format reader")

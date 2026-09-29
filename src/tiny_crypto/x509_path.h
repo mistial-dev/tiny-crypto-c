@@ -196,7 +196,12 @@ TC_X509_path_status TC_X509_path_validate(const TC_bytes* chain, size_t count,
                                           const TC_X509_path_workspace* workspace,
                                           TC_X509_path_result* out);
 /* Validate against one explicit store anchor, including its path controls.
- * The anchor and its borrowed spans remain stable throughout validation. */
+ * The anchor and its borrowed spans remain stable throughout validation.
+ * Result policy spans may also borrow anchor->policy_set. INVALID for an
+ * x509_unusable anchor or a CertPathControls duplicate in anchor->extensions.
+ * UNSUPPORTED for an unimplemented critical anchor extension, or for a path
+ * control in the anchor's extension spans that its record fields do not
+ * reflect (see TC_X509_store_anchor). */
 TC_X509_path_status TC_X509_path_validate_with_anchor(const TC_bytes* chain, size_t count,
                                                       const TC_X509_store_anchor* anchor,
                                                       const TC_X509_path_options* options,

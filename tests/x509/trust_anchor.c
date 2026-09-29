@@ -111,7 +111,7 @@ static MunitResult malformed(const MunitParameter params[], void* user)
   uint8_t encoded[140];
   TC_TLV_reader reader;
   TC_X509_store_anchor anchor, saved;
-  static const uint8_t bad_flags[][2] = {{6, 0x80}, {5, 0x21}, {4, 0x20}};
+  static const uint8_t bad_flags[][2] = {{6, 0x80}, {5, 0x21}, {4, 0x20}, {6, 0x60}};
   for (size_t i = 0; i < sizeof bad_flags / sizeof *bad_flags; ++i) {
     size_t length = make_info(encoded, bad_flags[i], 2, 0, 1, 0, 0);
     munit_assert_int(TC_X509_trust_anchor_list_init(&reader, encoded, length, &limits, &workspace),
@@ -280,25 +280,24 @@ static size_t make_certificate(uint8_t* out, int reversed_validity, int empty_su
 {
   static const uint8_t version[] = {0xa0, 3, 2, 1, 2};
   static const uint8_t serial[] = {2, 1, 1};
-  static const uint8_t algorithm[] = {0x30, 13, 6, 9, 0x2a, 0x86, 0x48, 0x86, 0xf7,
-                                      0x0d, 1,  1, 11,   5,    0};
+  static const uint8_t algorithm[] = {0x30, 13,   6, 9, 0x2a, 0x86, 0x48, 0x86,
+                                      0xf7, 0x0d, 1, 1, 11,   5,    0};
   static const uint8_t name[] = {0x30, 12, 0x31, 10, 0x30, 8, 6, 3, 0x55, 4, 3, 0x0c, 1, 'A'};
   static const uint8_t empty_name[] = {0x30, 0};
-  static const uint8_t early[] = {0x17, 13, '2', '4', '0', '1', '0', '1',
+  static const uint8_t early[] = {0x17, 13,  '2', '4', '0', '1', '0', '1',
                                   '0',  '0', '0', '0', '0', '0', 'Z'};
-  static const uint8_t late[] = {0x17, 13, '3', '0', '0', '1', '0', '1',
+  static const uint8_t late[] = {0x17, 13,  '3', '0', '0', '1', '0', '1',
                                  '0',  '0', '0', '0', '0', '0', 'Z'};
-  static const uint8_t spki[] = {0x30, 0x1b, 0x30, 13,   6,    9, 0x2a, 0x86, 0x48, 0x86,
-                                 0xf7, 0x0d, 1,    1,    1,    5, 0,    3,    10,   0,
-                                 0x30, 7,    2,    2,    0x0c, 0xa1, 2,   1,    0x11};
+  static const uint8_t spki[] = {0x30, 0x1b, 0x30, 13, 6,    9,    0x2a, 0x86, 0x48, 0x86,
+                                 0xf7, 0x0d, 1,    1,  1,    5,    0,    3,    10,   0,
+                                 0x30, 7,    2,    2,  0x0c, 0xa1, 2,    1,    0x11};
   /* Extension { subjectAltName, critical, dNSName "a" } */
-  static const uint8_t san[] = {0xa3, 19, 0x30, 17,   0x30, 15,   6, 3, 0x55, 0x1d, 17,
-                                1,    1,  0xff, 4,    5,    0x30, 3, 0x82, 1, 'a'};
+  static const uint8_t san[] = {0xa3, 19, 0x30, 17, 0x30, 15,   6, 3,    0x55, 0x1d, 17,
+                                1,    1,  0xff, 4,  5,    0x30, 3, 0x82, 1,    'a'};
   static const uint8_t signature[] = {3, 2, 0, 1};
   uint8_t body[256];
   size_t n = 0;
-#define APPEND(bytes)                                                                              \
-  (memcpy(body + n, bytes, sizeof bytes), n += sizeof bytes)
+#define APPEND(bytes) (memcpy(body + n, bytes, sizeof bytes), n += sizeof bytes)
   APPEND(version);
   APPEND(serial);
   APPEND(algorithm);
@@ -307,8 +306,8 @@ static size_t make_certificate(uint8_t* out, int reversed_validity, int empty_su
   n += sizeof early;
   memcpy(body + n, reversed_validity ? early : late, sizeof late);
   n += sizeof late;
-  n = n - 2 * sizeof early + wrap(body + n - 2 * sizeof early, 0x30, body + n - 2 * sizeof early,
-                                  2 * sizeof early);
+  n = n - 2 * sizeof early +
+      wrap(body + n - 2 * sizeof early, 0x30, body + n - 2 * sizeof early, 2 * sizeof early);
   if (empty_subject)
     APPEND(empty_name);
   else
@@ -356,6 +355,19 @@ static MunitResult certificate_rules(const MunitParameter params[], void* user)
     /* Certificate choice. */
     memcpy(list, certificate, length);
     munit_assert_int(read_anchor(list, length), ==, expected);
+    /* The public builder applies the same rules and wipes out on failure. */
+    TC_X509_store_anchor built;
+    memset(&built, 0xa5, sizeof built);
+    munit_assert_int(TC_X509_store_anchor_from_certificate(&parsed, &limits, &workspace, &built),
+                     ==, expected);
+    if (variant) {
+      const TC_X509_store_anchor zero = {0};
+      munit_assert_memory_equal(sizeof built, &built, &zero);
+    } else {
+      munit_assert_ptr_equal(built.trust.name.data, parsed.subject.data);
+      munit_assert_size(built.trust.name.length, ==, parsed.subject.length);
+      munit_assert_int(built.x509_unusable, ==, 0);
+    }
     /* tbsCert [1] EXPLICIT TBSCertificate. */
     munit_assert_int(read_anchor(list, wrap(list, 0xa1, tbs.data, tbs.length)), ==, expected);
     if (empty)
@@ -379,25 +391,29 @@ static MunitResult certificate_rules(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-/* Read a TrustAnchorInfo whose exts [1] holds the given Extension list
- * contents. */
-static TC_TLV_result read_with_exts(const uint8_t* list, size_t list_length)
+/* Read a TrustAnchorInfo whose CertPathControls holds taName followed by
+ * controls, and whose exts [1] holds the given Extension list contents. */
+static TC_TLV_result read_info(const uint8_t* controls, size_t controls_length, const uint8_t* list,
+                               size_t list_length, TC_X509_store_anchor* out)
 {
   static const uint8_t spki[] = {0x30, 12, 0x30, 5, 6, 3, 0x2a, 3, 4, 3, 3, 0, 1, 2};
   static const uint8_t key_id[] = {4, 1, 1};
   static const uint8_t name[] = {0x30, 12, 0x31, 10, 0x30, 8, 6, 3, 0x55, 4, 3, 0x0c, 1, 'A'};
-  uint8_t extensions[64], exts[66], info[128], info_tlv[130], choice[132], encoded[134];
+  uint8_t extensions[64], exts[66], path[32], info[128], info_tlv[130], choice[132];
+  static uint8_t encoded[134];
   size_t n = 0;
   TC_TLV_reader reader;
-  TC_X509_store_anchor anchor;
   munit_assert_size(list_length, <=, 60);
+  munit_assert_size(sizeof name + controls_length, <=, sizeof path);
+  memcpy(path, name, sizeof name);
+  memcpy(path + sizeof name, controls, controls_length);
   size_t extensions_length = add(extensions, 0x30, list, list_length);
   size_t exts_length = add(exts, 0xa1, extensions, extensions_length);
   memcpy(info + n, spki, sizeof spki);
   n += sizeof spki;
   memcpy(info + n, key_id, sizeof key_id);
   n += sizeof key_id;
-  n += add(info + n, 0x30, name, sizeof name); /* CertPathControls with taName only */
+  n += add(info + n, 0x30, path, sizeof name + controls_length);
   memcpy(info + n, exts, exts_length);
   n += exts_length;
   size_t info_length = add(info_tlv, 0x30, info, n);
@@ -405,7 +421,13 @@ static TC_TLV_result read_with_exts(const uint8_t* list, size_t list_length)
   size_t length = add(encoded, 0x30, choice, choice_length);
   munit_assert_int(TC_X509_trust_anchor_list_init(&reader, encoded, length, &limits, &workspace),
                    ==, TC_TLV_OK);
-  return TC_X509_trust_anchor_next(&reader, &limits, &workspace, &anchor);
+  return TC_X509_trust_anchor_next(&reader, &limits, &workspace, out);
+}
+
+static TC_TLV_result read_with_exts(const uint8_t* list, size_t list_length)
+{
+  TC_X509_store_anchor anchor;
+  return read_info(NULL, 0, list, list_length, &anchor);
 }
 
 /* Read a TrustAnchorInfo whose CertPathControls holds taName and a policySet
@@ -436,9 +458,8 @@ static MunitResult policy_sets(const MunitParameter params[], void* user)
   static const uint8_t first[] = {0x30, 5, 6, 3, 0x2a, 3, 4};
   static const uint8_t second[] = {0x30, 5, 6, 3, 0x2a, 3, 5};
   /* PolicyQualifierInfo { id-qt-cps, IA5String "a" } */
-  static const uint8_t qualified[] = {0x30, 22, 6,    3,    0x2a, 3,    4,    0x30,
-                                      15,   0x30, 13, 6,    8,    0x2b, 6,    1,
-                                      5,    5,    7,  2,    1,    0x16, 1,    'a'};
+  static const uint8_t qualified[] = {0x30, 22,   6, 3, 0x2a, 3, 4, 0x30, 15, 0x30, 13, 6,
+                                      8,    0x2b, 6, 1, 5,    5, 7, 2,    1,  0x16, 1,  'a'};
   uint8_t set[64];
   (void)params;
   (void)user;
@@ -485,7 +506,86 @@ static MunitResult duplicate_exts(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+/* RFC 5914 section 2.5: CertPathControls values are always enforced, and a
+ * basicConstraints pathLen in exts can only tighten them. */
+static MunitResult exts_path_length(const MunitParameter params[], void* user)
+{
+  static const uint8_t path_zero[] = {0x84, 1, 0}, path_five[] = {0x84, 1, 5};
+  /* Extension { basicConstraints, OCTET STRING { cA TRUE, pathLen n } } */
+  uint8_t basic[] = {0x30, 15, 6, 3, 0x55, 0x1d, 19, 4, 8, 0x30, 6, 1, 1, 0xff, 2, 1, 5};
+  TC_X509_store_anchor anchor;
+  (void)params;
+  (void)user;
+  munit_assert_int(read_info(path_zero, sizeof path_zero, basic, sizeof basic, &anchor), ==,
+                   TC_TLV_OK);
+  munit_assert_int(anchor.has_path_len, ==, 1);
+  munit_assert_size(anchor.path_len, ==, 0);
+  basic[sizeof basic - 1] = 1;
+  munit_assert_int(read_info(path_five, sizeof path_five, basic, sizeof basic, &anchor), ==,
+                   TC_TLV_OK);
+  munit_assert_int(anchor.has_path_len, ==, 1);
+  munit_assert_size(anchor.path_len, ==, 1);
+  munit_assert_int(read_info(NULL, 0, basic, sizeof basic, &anchor), ==, TC_TLV_OK);
+  munit_assert_int(anchor.has_path_len, ==, 1);
+  munit_assert_size(anchor.path_len, ==, 1);
+  return MUNIT_OK;
+}
+
+/* TC_X509_store_anchor_from_certificate normalizes the root's path controls
+ * the way the TrustAnchorList certificate choice does. */
+static MunitResult certificate_builder(const MunitParameter params[], void* user)
+{
+  static uint8_t root[4096];
+  TC_X509_certificate certificate;
+  TC_X509_store_anchor built, saved;
+  TC_TLV_frame small_frames[16];
+  TC_bytes small_oids[1];
+  TC_X509_workspace small = {small_frames, 16, small_oids, 1};
+  (void)params;
+  (void)user;
+  size_t length = read_fixture("root.der", root, sizeof root);
+  munit_assert_int(TC_X509_read(root, length, &limits, &workspace, &certificate), ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_store_anchor_from_certificate(&certificate, &limits, &workspace, &built),
+                   ==, TC_TLV_OK);
+  munit_assert_memory_equal(certificate.subject.length, built.trust.name.data,
+                            certificate.subject.data);
+  munit_assert_int(built.has_path_len, ==, 1);
+  munit_assert_size(built.path_len, ==, 2);
+  munit_assert_not_null(built.key_id.data);
+  munit_assert_not_null(built.certificate_extensions.data);
+  munit_assert_null(built.extensions.data);
+  /* Argument errors leave out unchanged. */
+  memset(&saved, 0xa5, sizeof saved);
+  built = saved;
+  munit_assert_int(TC_X509_store_anchor_from_certificate(NULL, &limits, &workspace, &built), ==,
+                   TC_TLV_ARGUMENT);
+  munit_assert_int(TC_X509_store_anchor_from_certificate(&certificate, NULL, &workspace, &built),
+                   ==, TC_TLV_ARGUMENT);
+  munit_assert_int(TC_X509_store_anchor_from_certificate(&certificate, &limits, NULL, &built), ==,
+                   TC_TLV_ARGUMENT);
+  munit_assert_int(TC_X509_store_anchor_from_certificate(&certificate, &limits, &workspace, NULL),
+                   ==, TC_TLV_ARGUMENT);
+  munit_assert_memory_equal(sizeof built, &built, &saved);
+  /* The output record must stay separate from the scratch it is built with. */
+  {
+    TC_X509_workspace aliased = {frames, 16, (TC_bytes*)&built, sizeof built / sizeof(TC_bytes)};
+    munit_assert_int(TC_X509_store_anchor_from_certificate(&certificate, &limits, &aliased, &built),
+                     ==, TC_TLV_ARGUMENT);
+    munit_assert_memory_equal(sizeof built, &built, &saved);
+  }
+  /* Exhausted extension scratch is LIMIT and wipes the record. */
+  munit_assert_int(TC_X509_store_anchor_from_certificate(&certificate, &limits, &small, &built), ==,
+                   TC_TLV_LIMIT);
+  {
+    const TC_X509_store_anchor zero = {0};
+    munit_assert_memory_equal(sizeof built, &built, &zero);
+  }
+  return MUNIT_OK;
+}
+
 static MunitTest tests[] = {
+    {"/certificate-builder", certificate_builder, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/exts-path-length", exts_path_length, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/forbidden-exts", forbidden_exts, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/duplicate-exts", duplicate_exts, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/flags-and-unusable", flags_and_unusable, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

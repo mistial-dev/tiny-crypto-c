@@ -9,6 +9,7 @@
 #include <tiny_crypto/validation.h>
 #include <tiny_crypto/x509_crypto.h>
 #include <tiny_crypto/x509_trust_anchor.h>
+#include "../../src/x509_path_internal.h"
 #include "munit.h"
 #include <stdio.h>
 #include <string.h>
@@ -449,7 +450,62 @@ static MunitResult workspace_limits(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+/* The basic pass parses each path certificate once. A cache-filling pass
+ * therefore costs exactly the DER bytes of every certificate more than the
+ * same pass over already-parsed views. PKITS 4.5.1 gives three certificates. */
+static MunitResult basic_pass_work(const MunitParameter params[], void* user)
+{
+  static uint8_t der_files[3][FILE_CAPACITY];
+  static const char* const files[] = {"BasicSelfIssuedNewKeyCACert.crt",
+                                      "BasicSelfIssuedNewKeyOldWithNewCACert.crt",
+                                      "ValidBasicSelfIssuedOldWithNewTest1EE.crt"};
+  TC_X509_path_workspace* validation = &storage.path.validation;
+  TC_bytes chain[3];
+  tc_x509_path_input input;
+  size_t i, bytes = 0, cached_work, parsed_work;
+  int accepted = 0;
+  (void)params;
+  (void)user;
+  setup_workspace();
+  const TC_X509_store_anchor anchor = pkits_anchor();
+  const TC_X509_path_options options = path_options(0);
+  TC_X509_workspace chain_parser = {validation->frames, validation->frame_capacity,
+                                    validation->oids, validation->oid_capacity};
+  for (i = 0; i < 3; ++i) {
+    chain[i] = load(files[i], der_files[i]);
+    bytes += chain[i].length;
+  }
+  memset(&input, 0, sizeof input);
+  input.count = 3;
+  input.max_certificates = options.max_certificates;
+  input.max_input = options.max_input;
+  input.anchor = &anchor.trust;
+  input.at = &options.at;
+  input.signatures = &options.signatures;
+  input.limits = &options.parsing;
+  input.encoded = chain;
+  input.parser = &chain_parser;
+  input.cache = validation->certificates;
+  input.summaries = validation->summaries;
+  memset(input.summaries, 0, 3 * sizeof *input.summaries);
+  cached_work = options.max_work;
+  munit_assert_int(tc_x509_path_basic(&input, &validation->names, &cached_work, &accepted), ==,
+                   TC_TLV_OK);
+  munit_assert_int(accepted, ==, 1);
+  /* The same pass over the views the first pass left in the cache. */
+  input.certificates = validation->certificates;
+  memset(input.summaries, 0, 3 * sizeof *input.summaries);
+  parsed_work = options.max_work;
+  accepted = 0;
+  munit_assert_int(tc_x509_path_basic(&input, &validation->names, &parsed_work, &accepted), ==,
+                   TC_TLV_OK);
+  munit_assert_int(accepted, ==, 1);
+  munit_assert_size(parsed_work - cached_work, ==, bytes);
+  return MUNIT_OK;
+}
+
 static MunitTest tests[] = {
+    {"/basic-pass-work", basic_pass_work, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/policies", policies, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/names", names, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/parsed-info", parsed_info, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

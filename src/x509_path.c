@@ -41,18 +41,19 @@ TC_TLV_result tc_x509_path_certificate(const tc_x509_path_input* input, size_t i
   return TC_TLV_OK;
 }
 
-TC_TLV_result tc_x509_path_summary(const tc_x509_path_input* input, size_t index,
-                                   const TC_X509_name_workspace* names, size_t* work,
-                                   const TC_X509_extension_summary** out)
+/* Summary of path entry index, filled from certificate when not ready. The
+ * basic pass supplies the view it already holds, so filling the cache parses
+ * each certificate once. */
+static TC_TLV_result path_summary_of(const tc_x509_path_input* input, size_t index,
+                                     const TC_X509_certificate* certificate,
+                                     const TC_X509_name_workspace* names, size_t* work,
+                                     const TC_X509_extension_summary** out)
 {
   TC_X509_extension_summary* summary = &input->summaries[index];
   if (!summary->ready) {
     TC_X509_extension_summary filled;
-    const TC_X509_certificate* certificate;
     int self_issued = 0;
-    TC_TLV_result result = tc_x509_path_certificate(input, index, work, &certificate);
-    if (result == TC_TLV_OK)
-      result = tc_x509_extensions_summarize(certificate, input->limits, work, &filled);
+    TC_TLV_result result = tc_x509_extensions_summarize(certificate, input->limits, work, &filled);
     /* Path length, name constraints and policy counters treat self-issued
      * intermediates specially (RFC 5280 section 6.1). */
     if (result == TC_TLV_OK && index + 1 < input->count)
@@ -65,6 +66,19 @@ TC_TLV_result tc_x509_path_summary(const tc_x509_path_input* input, size_t index
   }
   *out = summary;
   return TC_TLV_OK;
+}
+
+TC_TLV_result tc_x509_path_summary(const tc_x509_path_input* input, size_t index,
+                                   const TC_X509_name_workspace* names, size_t* work,
+                                   const TC_X509_extension_summary** out)
+{
+  const TC_X509_certificate* certificate = NULL;
+  if (!input->summaries[index].ready) {
+    TC_TLV_result result = tc_x509_path_certificate(input, index, work, &certificate);
+    if (result != TC_TLV_OK)
+      return result;
+  }
+  return path_summary_of(input, index, certificate, names, work, out);
 }
 
 TC_TLV_result tc_x509_path_basic(const tc_x509_path_input* input,
@@ -136,7 +150,7 @@ TC_TLV_result tc_x509_path_basic(const tc_x509_path_input* input,
     if (i + 1 < input->count) {
       const TC_X509_extension_summary* extensions;
       TC_X509_basic_constraints basic;
-      result = tc_x509_path_summary(input, i, workspace, work, &extensions);
+      result = path_summary_of(input, i, certificate, workspace, work, &extensions);
       if (result != TC_TLV_OK)
         return result;
       basic = extensions->basic;
@@ -500,14 +514,65 @@ static TC_TLV_result path_storage(const TC_bytes* chain, size_t count,
   return result;
 }
 
-/* Anchor controls are normalized by the TrustAnchorInfo reader. Reject critical
- * extensions whose path semantics this validator does not implement. */
-/* Check a trust anchor's extensions. The certificate's own extensions may
- * carry the path controls the validator applies. TrustAnchorInfo exts must
- * not carry them (RFC 5914 section 2.6), so any such extension there is
- * INVALID. Other critical extensions are UNSUPPORTED. */
-static TC_TLV_result anchor_extensions_check(TC_bytes contents, int trust_anchor_info,
-                                             const TC_TLV_limits* limits, size_t* work)
+/* Report whether the anchor record reflects one path-control extension.
+ * RFC 5914 section 2.5 enforces an anchor certificate's path controls unless
+ * CertPathControls replaces them. Validation reads only the record fields,
+ * so a control those fields miss would be dropped. trust_anchor_info selects
+ * exts, where only a basicConstraints pathLen can occur and it may only lower
+ * path_len. */
+static TC_TLV_result anchor_control_applied(const TC_X509_store_anchor* anchor, unsigned id,
+                                            const TC_X509_extension* extension,
+                                            int trust_anchor_info, int* applied)
+{
+  const TC_bytes value = extension->value;
+  TC_TLV_result result;
+  *applied = 1;
+  switch (id) {
+  case TC_PKI_EXT_NAME_CONSTRAINTS:
+    *applied = anchor->names.permitted.length || anchor->names.excluded.length;
+    return TC_TLV_OK;
+  case TC_PKI_EXT_CERTIFICATE_POLICIES:
+    *applied = anchor->policy_set.data != NULL;
+    return TC_TLV_OK;
+  case TC_PKI_EXT_POLICY_CONSTRAINTS: {
+    TC_X509_policy_constraints constraints;
+    result = TC_X509_policy_constraints_read(value.data, value.length, &constraints);
+    if (result != TC_TLV_OK)
+      return result;
+    if ((constraints.has_require_explicit_policy &&
+         !(anchor->policy_flags & TC_X509_PATH_REQUIRE_EXPLICIT_POLICY)) ||
+        (constraints.has_inhibit_policy_mapping &&
+         !(anchor->policy_flags & TC_X509_PATH_INHIBIT_MAPPING)))
+      *applied = 0;
+    return TC_TLV_OK;
+  }
+  case TC_PKI_EXT_INHIBIT_ANY_POLICY:
+    *applied = (anchor->policy_flags & TC_X509_PATH_INHIBIT_ANY_POLICY) != 0;
+    return TC_TLV_OK;
+  case TC_PKI_EXT_BASIC_CONSTRAINTS: {
+    TC_X509_basic_constraints basic;
+    result = TC_X509_basic_constraints_read(value.data, value.length, &basic);
+    if (result != TC_TLV_OK)
+      return result;
+    if (basic.has_path_length &&
+        (!anchor->has_path_len || (trust_anchor_info && anchor->path_len > basic.path_length)))
+      *applied = 0;
+    return TC_TLV_OK;
+  }
+  default:
+    return TC_TLV_OK;
+  }
+}
+
+/* Check one of the anchor's extension lists before path processing.
+ * TrustAnchorInfo exts must not carry certificatePolicies,
+ * policyConstraints, inhibitAnyPolicy or nameConstraints (RFC 5914 section
+ * 2.6), so any of them there is INVALID. A path control that the record
+ * fields do not reflect is UNSUPPORTED, and so is any other critical
+ * extension this validator does not implement. */
+static TC_TLV_result anchor_extensions_check(const TC_X509_store_anchor* anchor, TC_bytes contents,
+                                             int trust_anchor_info, const TC_TLV_limits* limits,
+                                             size_t* work)
 {
   TC_TLV_reader reader;
   TC_X509_extension extension;
@@ -520,10 +585,16 @@ static TC_TLV_result anchor_extensions_check(TC_bytes contents, int trust_anchor
   while ((result = tc_pki_extension_next(&reader, work, &extension)) == TC_TLV_OK) {
     const unsigned id = tc_pki_extension_id(&extension);
     const int path_control = tc_pki_extension_path_control(id);
+    int applied;
     if (trust_anchor_info && path_control)
       return TC_TLV_INVALID;
     if (extension.critical && id != TC_PKI_EXT_SUBJECT_KEY_IDENTIFIER &&
         id != TC_PKI_EXT_KEY_USAGE && id != TC_PKI_EXT_BASIC_CONSTRAINTS && !path_control)
+      return TC_TLV_UNSUPPORTED;
+    result = anchor_control_applied(anchor, id, &extension, trust_anchor_info, &applied);
+    if (result != TC_TLV_OK)
+      return result;
+    if (!applied)
       return TC_TLV_UNSUPPORTED;
   }
   return result == TC_TLV_END ? TC_TLV_OK : result;
@@ -569,10 +640,11 @@ TC_X509_path_status tc_x509_path_validate_anchor(const TC_bytes* chain, size_t c
   result = path_storage(chain, count, anchor, options, workspace, out, work);
   if (result != TC_TLV_OK)
     return tc_x509_path_status(result);
-  result = anchor_extensions_check(anchor->extensions, 1, &options->parsing, work);
+  result = anchor_extensions_check(anchor, anchor->extensions, 1, &options->parsing, work);
   if (result != TC_TLV_OK)
     return tc_x509_path_status(result);
-  result = anchor_extensions_check(anchor->certificate_extensions, 0, &options->parsing, work);
+  result =
+      anchor_extensions_check(anchor, anchor->certificate_extensions, 0, &options->parsing, work);
   if (result != TC_TLV_OK)
     return tc_x509_path_status(result);
   if (TC_X509_time_check(&options->at) != TC_TLV_OK)
