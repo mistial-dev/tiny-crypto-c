@@ -23,7 +23,7 @@ tc_module_feature(TINY_CRYPTO_ENABLE_TWIC_UUID TC_ENABLE_TWIC_UUID
 set(tc_module_sources_TC_ENABLE_TWIC_UUID src/twic_uuid.c)
 
 tc_module_feature(TINY_CRYPTO_ENABLE_TWIC_TPK TC_ENABLE_TWIC_TPK
-  "Build TWIC transport protection key readers")
+  "Build TWIC Privacy Key container readers")
 set(tc_module_sources_TC_ENABLE_TWIC_TPK src/twic_tpk.c)
 
 tc_module_feature(TINY_CRYPTO_ENABLE_TWIC_OBJECT_CRYPTO

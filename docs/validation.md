@@ -48,8 +48,8 @@ TC_result prepare_validation(TC_buffer arena,
 Call `TC_validation_workspace_size` to obtain the required bytes.
 `TC_validation_workspace_alignment` reports the alignment. An array of
 `TC_validation_storage` provides suitable alignment for static storage. Check
-its byte capacity against the reported size. Typed-array workspace initializers
-remain useful when each array has a fixed application-defined location.
+its byte capacity against the reported size. When each array has a fixed
+application-defined location, fill the `TC_validation_workspace` fields directly.
 
 Keep the workspace descriptor at the address used during initialization.
 Place large arenas in static or application-owned memory on constrained devices.

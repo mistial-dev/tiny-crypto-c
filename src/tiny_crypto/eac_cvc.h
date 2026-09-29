@@ -41,25 +41,37 @@ typedef struct {
 } TC_EAC_CVC_workspace;
 
 /* Parse and bounds-check one complete TR-03110 certificate (tag 7F21) as
- * encoded. Spans borrow encoded, which must stay unchanged while they are
- * used. limits bounds the whole tree. Workspace frames may change on failure.
- * encoded, workspace frames and out must be disjoint.
- * Returns OK, INVALID for truncated, malformed or trailing input, LIMIT when
- * limits or frame capacity are exhausted, UNSUPPORTED for an unknown profile,
- * key algorithm or role, and ARGUMENT for NULL pointers, NULL data with a
- * length, or overlap. out is unchanged on failure. The caller verifies the
- * signature, chain and dates. */
+ * encoded (BSI TR-03110 Part 3 appendix C.1). Checks the profile identifier,
+ * certification authority and holder references, the public key, the
+ * certificate holder authorization template of an IS, AT or ST terminal, the
+ * dates and their order, and the extension templates. Spans borrow encoded,
+ * which must stay unchanged while they are used. limits bounds the whole
+ * tree, and limits->max_depth frames always suffice. encoded, the workspace
+ * frames and out must be disjoint. Charges no work.
+ * Returns OK with out written. INVALID for truncated, malformed or trailing
+ * input or a field outside the profile. LIMIT when limits or frame capacity
+ * are exhausted. UNSUPPORTED for an unknown profile, key algorithm or
+ * authorization role. ARGUMENT for NULL pointers, NULL data with a length, or
+ * overlap. out is unchanged on failure and workspace frames may change. The
+ * caller verifies the signature, chain and dates. */
 TC_TLV_result TC_EAC_CVC_read(TC_bytes encoded, const TC_TLV_limits* limits,
                               TC_EAC_CVC_workspace* workspace, TC_EAC_CVC* out);
-/* Read one standalone public key (tag 7F49) with the same statuses and
- * lifetime rules as TC_EAC_CVC_read. encoded and out must be disjoint. */
+/* Read one standalone public key (tag 7F49). A standalone key may also be
+ * an EC key-agreement key, and EC domain parameters stay optional. Statuses,
+ * lifetime and work follow TC_EAC_CVC_read without the frame workspace.
+ * encoded and out must be disjoint. */
 TC_TLV_result TC_EAC_CVC_public_key_read(TC_bytes encoded, const TC_TLV_limits* limits,
                                          TC_EAC_CVC_public_key* out);
 
-/* issuer must have resolved parameters. inherited supplies the subject's EC
- * domain when absent from its certificate. Missing context is ARGUMENT.
- * Checks field encoding widths. The caller verifies curve membership and the
- * signature. */
+/* Check the field widths that depend on another certificate: the subject EC
+ * point against its domain prime and the signature against the issuer's
+ * order or modulus. issuer must hold resolved parameters. inherited supplies
+ * the subject's EC domain when its certificate omits it. The caller verifies
+ * curve membership and the signature. Charges no work.
+ * Returns OK. ARGUMENT for NULL certificate or issuer, a certificate without
+ * a signature, or missing domain or issuer parameters. INVALID for a width
+ * mismatch. UNSUPPORTED for an issuer key-agreement key. LIMIT for an
+ * issuer order too wide to double in size_t. */
 TC_TLV_result TC_EAC_CVC_check_encoding(const TC_EAC_CVC* certificate,
                                         const TC_EAC_CVC_public_key* issuer,
                                         const TC_EAC_CVC_public_key* inherited);
@@ -67,11 +79,23 @@ TC_TLV_result TC_EAC_CVC_check_encoding(const TC_EAC_CVC* certificate,
 typedef struct {
   TC_bytes oid, fields;
 } TC_EAC_CVC_extension;
-/* Pass certificate.extensions, or {NULL,0} when absent. The iterator counts
- * templates, OIDs, and immediate fields against max_elements. Field contents
- * remain opaque. read checks the full tree's depth and element budgets. */
+/* Start reading the extension templates (BSI TR-03110 Part 3 appendix C.3)
+ * of certificate.extensions, or pass
+ * {NULL, 0} when absent to get an empty reader. The iterator counts
+ * templates, OIDs and immediate fields against limits->max_elements. Field
+ * contents stay opaque. TC_EAC_CVC_read checks the full tree's depth and
+ * element budgets. The reader borrows encoded. Charges no work.
+ * Returns OK with the reader initialized. INVALID for a tag other than 65, an
+ * empty template or trailing bytes. Other statuses follow TC_TLV_read and
+ * TC_TLV_reader_init. The reader changes only on OK. */
 TC_TLV_result TC_EAC_CVC_extensions_init(TC_TLV_reader* reader, TC_bytes encoded,
                                          const TC_TLV_limits* limits);
+/* Read the next discretionary data template (tag 73): its OID and the
+ * context-specific fields that follow. out borrows the reader input.
+ * Returns OK with the reader advanced and out written. END when no template
+ * remains. ARGUMENT for NULL arguments. LIMIT when max_elements runs out.
+ * INVALID for a wrong tag, a malformed OID, no fields or a field outside the
+ * context-specific class. The reader and out change only on OK. */
 TC_TLV_result TC_EAC_CVC_extension_next(TC_TLV_reader* reader, TC_EAC_CVC_extension* out);
 #ifdef __cplusplus
 }

@@ -50,11 +50,31 @@ typedef struct {
   TC_PIV_card_profile profile;
 } TC_PIV_CHUID_result;
 
-/* Authenticate a signed CHUID and bind its identifiers to the validated card.
- * Choose the card OID policy and CHUID schema explicitly. Expiration includes
- * the final second of its UTC date. On VALID, out borrows CHUID and signer
- * bytes. Other statuses leave out unchanged. Keep writable state disjoint from
- * inputs. */
+/* Authenticate a signed CHUID and bind it to the validated card certificate
+ * (SP 800-73-5 Part 1 sections 3.1.2 and 3.1.2.1, TWIC Part 2 v5 section 6).
+ * - request->profile selects the card profile. PIV takes the PIV or
+ *   LEGACY_KEY_MAP CHUID profile and TWIC profiles take TWIC_SIGNED.
+ *   twic_reader_policy is 0 or 1 and applies to the PIV profile only.
+ * - card and card_expiration come from the already validated card
+ *   certificate. The CHUID expiration date must be on or after the context
+ *   time, and it includes the final second of its UTC date.
+ * - The signer certificate needs a content-signing EKU for the profile and,
+ *   for PIV, id-fpki-common-piv-contentSigning and a notAfter no earlier than
+ *   card_expiration. Its path and CRL status use the context policies.
+ * - Request, card, context objects and their bytes stay stable and disjoint
+ *   from the workspace, work and out. out borrows the CHUID and signer bytes.
+ *
+ * Work: one unit per storage comparison, the encoded length, then the CHUID,
+ * CMS, identifier, signer policy, path and revocation steps.
+ * Returns VALID with out written. REVOKED for a revoked signer path member.
+ * ERROR for NULL or empty arguments, an unknown or mismatched profile value,
+ * an incomplete context, a certificate purpose other than content signing
+ * for the profile, or overlap, with work unchanged. LIMIT for an encoded
+ * length above parsing.max_input or exhausted work or capacities. INVALID
+ * for a malformed or expired CHUID, identifiers that differ from the card, a
+ * signer outside the content-signer policy, or a failed signature or path.
+ * UNSUPPORTED for unsupported algorithms or missing CRL evidence. out
+ * changes only on VALID. */
 TC_credential_status TC_PIV_CHUID_validate(const TC_PIV_CHUID_validation_request* request,
                                            const TC_validation_context* context, size_t* work,
                                            TC_PIV_CHUID_result* out);
@@ -87,17 +107,27 @@ typedef struct {
 } TC_PIV_biometric_result;
 
 /* Authenticate a biometric object's CBEFF header and record and bind the
- * FASC-N and GUID of the accepted CHUID. An omitted CMS certificate selects the
- * CHUID signer. An embedded certificate must carry a different key (SP 800-76-2
- * section 9.3). VALID covers object authentication, identifier binding and the
- * selected record profile. Inputs remain borrowed. out is disjoint from inputs
- * and changes only on VALID.
+ * FASC-N and GUID of the accepted CHUID (SP 800-76-2 sections 9.2 and 9.3).
+ * An omitted CMS certificate selects the CHUID signer. An embedded
+ * certificate must carry a different key (SP 800-76-2 section 9.3). The
+ * CBEFF format must equal request->format. The record must pass
+ * TC_PIV_fingerprint_read or TC_PIV_face_read under the card profile.
+ * require_current checks the CBEFF validity period at the context time. The
+ * signer follows the content-signer policy of TC_PIV_CHUID_validate.
+ * Inputs stay borrowed, stable and disjoint from the workspace, work and out.
  *
- * ERROR: NULL arguments, overlap, an unknown profile or format, or a CHUID
- * result whose profile differs from request->profile or whose time differs
- * from context->options->at. UNSUPPORTED: iris images. LIMIT: work or parsing
- * limits. INVALID: malformed or mismatched object data. Other statuses come
- * from signer path and revocation checks. */
+ * Work: one unit per storage comparison, the encoded length, then the CMS,
+ * identifier, signer, path and revocation steps.
+ * Returns VALID with out written. ERROR for NULL or empty arguments, an
+ * unknown profile, format or signature profile, an incomplete context, a
+ * CHUID result that is incomplete or whose profile or time differs from the
+ * request and context, or overlap, with work unchanged. UNSUPPORTED for iris
+ * images, before any work, and for unsupported algorithms or missing CRL
+ * evidence. LIMIT for an encoded length above parsing.max_input or exhausted
+ * work or capacities. INVALID for malformed or mismatched object data, a
+ * record outside its profile, an expired period, a reused CHUID key or a
+ * failed signature or path. REVOKED for a revoked signer path member. out
+ * changes only on VALID. */
 TC_credential_status TC_PIV_biometric_validate(const TC_PIV_biometric_validation_request* request,
                                                const TC_validation_context* context, size_t* work,
                                                TC_PIV_biometric_result* out);
@@ -138,17 +168,26 @@ typedef struct {
 } TC_PIV_security_result;
 
 /* Authenticate a Security Object with the accepted CHUID signer, then check
- * the exact inventory against signed LDS digests (SP 800-73-5 Part 1 section
- * 3.1.7). Parts supply each object's bytes in hash order. All buffers remain
- * caller-owned. content is disjoint mutable scratch. On VALID, out borrows the
- * inventory and signer bytes. Other statuses leave out unchanged.
+ * the exact inventory against its signed LDS digests (SP 800-73-5 Part 1
+ * section 3.1.7). Each object's parts supply its bytes in hash order. Every
+ * signed data group must appear once in the inventory.
+ * - workspace->content receives the decoded LDS content. Size it for the
+ *   largest LDSSecurityObject the application accepts. It must be disjoint
+ *   from every input.
+ * - All buffers stay caller-owned, stable and disjoint from the workspace,
+ *   work and out. out borrows the inventory and signer bytes.
  *
- * ERROR: NULL arguments, overlap, empty parts, or a CHUID result whose profile
- * differs from request->profile or whose time differs from
- * context->options->at. LIMIT: more than TC_LDS_MAX_GROUPS objects, work or
- * parsing limits. INVALID: malformed data, fewer than two objects, duplicate
- * containers or an inventory that differs from the signed digests. Other
- * statuses come from signer path and revocation checks. */
+ * Work: one unit per storage comparison, the encoded length, then the CMS,
+ * signer, path, revocation, LDS decoding and digest steps.
+ * Returns VALID with out written. LIMIT for more than TC_LDS_MAX_GROUPS
+ * objects before any other check, and for an encoded length above
+ * parsing.max_input or exhausted work or capacities. ERROR for NULL or empty
+ * arguments, an unknown encoding or profile, empty parts, an incomplete
+ * context, a CHUID result whose profile or time differs, or overlap. INVALID
+ * for fewer than two objects or duplicate containers, before any work, and
+ * for malformed data or an inventory that differs from the signed digests.
+ * REVOKED and UNSUPPORTED come from the signer path and revocation checks.
+ * out changes only on VALID. */
 TC_credential_status TC_PIV_security_validate(const TC_PIV_security_validation_request* request,
                                               const TC_validation_context* context,
                                               const TC_PIV_security_validation_workspace* workspace,
@@ -166,13 +205,20 @@ typedef struct {
   const TC_PIV_security_result* security;
 } TC_TWIC_unsigned_CHUID_validation_request;
 
-/* Check an unsigned CHUID against a previously authenticated inventory at the
- * same evaluation time. Container 3002 must match encoded byte for byte.
- * The inventory and inputs remain borrowed. Keep work disjoint from them.
- * ERROR: NULL arguments, overlap, a non-TWIC profile, or a security result
- * whose profile or time differs. LIMIT: work or parsing limits. INVALID: a
- * missing or different container 3002, an expired CHUID or other card
- * identifiers. */
+/* Check an unsigned TWIC CHUID against an inventory accepted by
+ * TC_PIV_security_validate at the same evaluation time. Container 3002 of the
+ * inventory must match encoded byte for byte. The CHUID must be current and
+ * its identifiers must match card under TWIC reader rules. The inventory and
+ * inputs stay borrowed and stable, and work is disjoint from them.
+ *
+ * Work: one unit per storage comparison, then the compared inventory bytes
+ * and the identifier comparison.
+ * Returns VALID for a matching, current CHUID. ERROR for NULL or empty
+ * arguments, a non-TWIC profile, an empty or oversized inventory, a security
+ * result whose profile or time differs, or overlap, with work unchanged.
+ * LIMIT for an encoded length above parsing.max_input or exhausted work.
+ * INVALID for a missing or different container 3002, a malformed or expired
+ * CHUID, or other card identifiers. */
 TC_credential_status
 TC_TWIC_unsigned_CHUID_validate(const TC_TWIC_unsigned_CHUID_validation_request* request,
                                 const TC_validation_context* context, size_t* work);
@@ -184,9 +230,22 @@ typedef struct {
   TC_PIV_card_profile profile;
 } TC_PIV_CVC_validation_request;
 
-/* Validate the X.509 signer's path and CRLs, then authenticate the CVC chain.
- * The card profile selects compatible OIDs. On VALID, out borrows card bytes.
- * Keep point scratch disjoint from inputs, provider state, work and out. */
+/* Validate the X.509 signer of a PIV secure-messaging CVC chain as a content
+ * signer with TC_X509_validate, then verify the chain with
+ * TC_PIV_CVC_chain_verify (SP 800-73-5 Part 1 section 3.3.7, Part 2 section
+ * 4.1.5). The card profile selects the accepted content-signing OIDs. point
+ * is EC scratch, cleared after each point check.
+ * Inputs stay borrowed, stable and disjoint from point, the workspace, work
+ * and out. out borrows request->card.
+ *
+ * Work: one unit per storage comparison, the signer certificate and its
+ * policy scan, the signer path and revocation, then the chain.
+ * Returns VALID with out written. ERROR for NULL or empty arguments, an
+ * unknown profile, a certificate purpose other than content signing, an
+ * incomplete context or overlap, with work unchanged. The signer statuses
+ * follow TC_X509_validate. The chain statuses follow TC_PIV_CVC_chain_verify,
+ * mapped to the credential status of the same name. out changes only on
+ * VALID. Secure messaging also requires key confirmation. */
 TC_credential_status TC_PIV_CVC_validate(const TC_PIV_CVC_validation_request* request,
                                          const TC_validation_context* context,
                                          TC_EC_workspace* point, size_t* work, TC_PIV_CVC* out);

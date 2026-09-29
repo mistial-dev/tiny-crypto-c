@@ -1,15 +1,15 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* Revocation checking for a validated path from CRLs and OCSP responses.
+ * The status and time types are shared with x509_ocsp.h.
+ * Standards: RFC 5280 sections 5 and 6.3, RFC 6960.
+ * Configuration: TC_ENABLE_X509_REVOCATION, with OCSP evidence from
+ * TC_ENABLE_X509_OCSP.
+ * Limitations: CMS and credential validation use CRL evidence only.
+ * Contracts: docs/api.md, including its size_t work units.
+ * Guide: docs/x509-revocation.md. */
 #ifndef TINY_CRYPTO_X509_REVOCATION_H_
 #define TINY_CRYPTO_X509_REVOCATION_H_
-
-/* Revocation checking for a validated path from CRLs (RFC 5280 sections 5
- * and 6.3) and OCSP responses (RFC 6960). The status and time types are
- * shared with <tiny_crypto/x509_ocsp.h>. Requires TC_ENABLE_X509_REVOCATION,
- * with OCSP evidence from TC_ENABLE_X509_OCSP. CMS and credential validation
- * use CRL evidence only.
- * Contracts: docs/api.md, including its size_t work units. Guide:
- * docs/x509-revocation.md. */
 
 #include <tiny_crypto/x509_crl.h>
 #include <tiny_crypto/x509_path.h>
@@ -113,14 +113,16 @@ typedef struct {
  * candidates supply CRL signers, their paths and OCSP delegates. signer_policy
  * validates CRL signers and is distinct from the holder's purpose/usage
  * policy. options->time sets the freshness of every CRL and OCSP response,
- * and its at must equal signer_policy->at. max_candidate_bytes bounds the candidate collection.
+ * and its at must equal signer_policy->at. max_candidate_bytes bounds the
+ * candidate collection.
  *
  * Each member uses its OCSP response when one is supplied and accepted. A
  * response signed by a delegate without id-pkix-ocsp-nocheck is accepted only
- * when the CRL index proves the delegate unrevoked (RFC 6960 4.2.2.2.1). A
- * member without an accepted response falls back to CRLs, including when its
- * response is malformed, unauthorized, stale, UNKNOWN or unavailable. A
- * build without TC_ENABLE_X509_OCSP uses CRLs for every member.
+ * when the CRL index proves the delegate unrevoked (RFC 6960 section
+ * 4.2.2.2.1). A member without an accepted response falls back to CRLs,
+ * including when its response is malformed, unauthorized, stale, UNKNOWN or
+ * unavailable, or its delegate lacks that proof. A build without
+ * TC_ENABLE_X509_OCSP uses CRLs for every member.
  *
  * states needs one byte per indexed CRL. nodes covers the path, OCSP
  * delegates without nocheck and distinct signer dependencies. Each node is
@@ -146,11 +148,15 @@ typedef struct {
  *   member is unsupported, such as one with an unknown critical extension.
  * INVALID: a member has no accepted OCSP response, and its candidate CRLs
  *   failed as invalid data with none unsupported. Causes include a CRL
- *   signature that does not verify, no signer candidate with a valid path to
+ *   signature that fails verification, no signer candidate with a valid path to
  *   the anchor, a revoked CRL signer, conflicting CRLs in one scope and
  *   malformed CRL entries.
- * LIMIT: work, storage or a parsing limit is exhausted.
- * Failures leave out unchanged. */
+ * LIMIT: signer_path or signer_policies below the required capacity, before
+ *   any work, or exhausted work, storage or a parsing limit.
+ * Failures leave out unchanged.
+ *
+ * Work: the OCSP verifications, CRL candidate reads and entry lookups, CRL
+ * signer path builds and signature checks, and dependency lookups. */
 TC_TLV_result TC_X509_path_check_revocation(const TC_bytes* chain, size_t count,
                                             const TC_X509_revocation_options* options,
                                             const TC_X509_revocation_workspace* workspace,

@@ -42,10 +42,13 @@ typedef enum {
 } TC_PIV_oid;
 
 /* Classify exact OID contents, excluding the ASN.1 tag and length.
- * TWIC compatibility accepts the pairs in TWIC Part 2 v5, section 6, from
- * either card application. Unlisted, malformed and disabled identifiers return
- * UNKNOWN. Keep original OIDs for signatures and X.509 policy processing.
- * Recognition conveys no trust. Enable TC_ENABLE_PIV_OIDS. */
+ * TWIC compatibility accepts the pairs in TWIC Part 2 v5 section 6 from
+ * either card application. TC_PIV_OIDS_ONLY accepts the PIV identifier of
+ * each pair and the PIV-only entries. oid is borrowed for the call. Charges
+ * no work. Returns the matching value, or UNKNOWN for unlisted or malformed
+ * contents, NULL data, a TWIC identifier under TC_PIV_OIDS_ONLY, or an
+ * unknown profile. Keep original OIDs for signatures and X.509 policy
+ * processing. Recognition conveys no trust. */
 TC_PIV_oid TC_PIV_oid_identify(TC_bytes oid, TC_PIV_oid_profile profile);
 
 #ifdef __cplusplus

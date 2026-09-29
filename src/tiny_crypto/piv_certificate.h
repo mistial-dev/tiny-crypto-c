@@ -43,12 +43,12 @@ typedef struct {
  * accepts larger certificates. Decompress GZIP before parsing X.509. This
  * checks container fields only. Parse and authenticate each certificate
  * separately.
- * Returned spans borrow input. Keep input unchanged while using them.
- * Returns OK, INVALID for a truncated or malformed container, LIMIT when the
- * certificate exceeds max_certificate_bytes or the CVC exceeds 601 bytes,
- * and ARGUMENT for a NULL out, NULL data with a length, zero
- * max_certificate_bytes, an unknown profile, or out overlapping input.
- * out changes only on OK. */
+ * Returned spans borrow input. Keep input unchanged while using them. Charges
+ * no work. Returns OK, INVALID for a truncated or malformed container, LIMIT
+ * when the certificate exceeds max_certificate_bytes or the CVC exceeds 601
+ * bytes, and ARGUMENT for a NULL out, NULL data with a length, zero
+ * max_certificate_bytes, an unknown profile, or out overlapping input. out
+ * changes only on OK. */
 TC_TLV_result TC_PIV_certificate_read(TC_bytes input, TC_PIV_certificate_profile profile,
                                       size_t max_certificate_bytes, TC_PIV_certificate* out);
 #ifdef __cplusplus

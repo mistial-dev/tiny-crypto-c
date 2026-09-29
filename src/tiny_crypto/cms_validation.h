@@ -69,19 +69,59 @@ typedef struct {
   TC_bytes signer_certificate;
 } TC_CMS_validation_request;
 
-/* Find a signer certificate, verify its signature, and build a trusted path.
- * Embedded certificates precede external candidates. Trust comes from source
- * anchors alone. The result borrows all certificate and source bytes. The
- * request and its bytes stay stable and separate from scratch during the call.
- * Unsigned attributes, including countersignatures, stay unauthenticated. */
+/* Find the signer certificate of one parsed SignerInfo, verify the signature
+ * with it and build a trusted path (RFC 5652 section 5.3, RFC 5280 section
+ * 6). Embedded certificates precede source candidates. The SignerInfo
+ * identifier selects candidates: issuer and serial for version 1, subject key
+ * identifier for version 3. A pivSigner-DN attribute must equal the
+ * certificate subject. Trust comes from source anchors alone. Unsigned
+ * attributes, including countersignatures, stay unauthenticated.
+ * - request, source, options and all their bytes stay stable during the call.
+ *   They may overlap each other and must be disjoint from workspace arrays,
+ *   work and out.
+ * - workspace: validation and search scratch sized as in x509_path.h,
+ *   certificates holds one span per indexed candidate, signature holds a
+ *   signature split across BER chunks, and signed_digest holds at least
+ *   TC_CMS_SIGNED_DIGEST_BYTES. signed_digest is wiped before return.
+ * - out borrows certificate and source bytes and survives workspace reuse.
+ *
+ * Work: one unit per storage comparison, the candidate scan, one unit per
+ * candidate, each signature attempt and each path build. The source callbacks
+ * charge their own reads.
+ * Returns VALID with out written. ERROR for NULL arguments, an empty content
+ * type or digest, a signer_certificate span with NULL data and a length or
+ * the reverse, a short signed_digest, a source with NULL arrays and nonzero
+ * counts, an unknown policy value or overlap, with all state unchanged.
+ * LIMIT for exhausted work, parsing, candidate or workspace capacities.
+ * UNSUPPORTED when the best candidate failed on an unsupported algorithm or
+ * feature. INVALID when no candidate yields a valid signature and path. out
+ * changes only on VALID. */
 TC_X509_path_status TC_CMS_signer_path_build(const TC_CMS_signer_path_request* request,
                                              const TC_X509_store_source* source,
                                              const TC_CMS_path_options* options,
                                              const TC_CMS_path_workspace* workspace, size_t* work,
                                              TC_X509_search_result* out);
 
-/* Parse SignedData, bind its content, verify the selected signer and build its
- * path. Storage and borrowing rules match TC_CMS_signer_path_build. */
+/* Parse SignedData, check its content type and the signer's digest listing,
+ * hash the attached or detached content, then run TC_CMS_signer_path_build
+ * for the selected signer (RFC 5652 sections 5.1 to 5.6).
+ * - request->encoded is the complete ContentInfo. Its signer_index selects a
+ *   SignerInfo and expected_type is the required eContentType OID contents.
+ * - Attached content is hashed from the OCTET STRING. Detached content is
+ *   hashed from request->detached_content in array order. The content digest
+ *   uses a stack buffer and hash context that are wiped on return.
+ * Storage, borrowing, workspace and work rules match
+ * TC_CMS_signer_path_build. Work also covers the envelope parse, the version
+ * and signer passes and the hashed content bytes.
+ * Returns VALID with out written. ERROR for the argument errors of
+ * TC_CMS_signer_path_build, an empty envelope or expected type, NULL
+ * detached spans with a count, an expected type with malformed OID
+ * contents, or detached spans for attached content. The last two are found
+ * after the storage check charges work. LIMIT as in TC_CMS_signer_path_build.
+ * UNSUPPORTED for a digest outside SHA-1 and SHA-2 or one disabled in this
+ * build. INVALID for a malformed envelope, a missing signer, a content type
+ * other than expected_type, an unlisted digest and the path failures of
+ * TC_CMS_signer_path_build. out changes only on VALID. */
 TC_X509_path_status TC_CMS_signed_data_path_build(const TC_CMS_validation_request* request,
                                                   const TC_X509_store_source* source,
                                                   const TC_CMS_path_options* options,
@@ -113,10 +153,30 @@ typedef struct {
   size_t signer_policy_capacity;
 } TC_CMS_credential_workspace;
 
-/* Verify one CMS signer, build its path, and check every path member against
- * the fixed CRL index. The selected path source and anchor are applied to CRL
- * signer validation internally, so every supplied policy field affects the
- * result. VALID requires an unrevoked path. */
+/* Run TC_CMS_signed_data_path_build and check every path member against the
+ * CRL index with TC_X509_path_check_revocation (RFC 5280 sections 6.3 and
+ * 5). CRL signer paths use revocation->signer_policy with the selected
+ * source and anchor, so every supplied policy field affects the result. CRL
+ * freshness uses signer_policy->at and its clock skew with no age bound. This
+ * workflow takes CRL evidence only.
+ * - workspace->path is the TC_CMS_path_workspace. held_path holds at least
+ *   path->search.capacity spans and crl_states one byte per index record.
+ *   nodes, scopes, signer_path and signer_policies follow
+ *   TC_X509_revocation_workspace. TC_validation_workspace_init sizes all of
+ *   them from one arena.
+ * - Request, source, options, revocation, index and all their bytes stay
+ *   stable and disjoint from every workspace array and work.
+ *
+ * Work: one unit per storage comparison, charged before any parsing, then the
+ * path build and the revocation check.
+ * Returns VALID when the signature, path and unrevoked status all hold.
+ * REVOKED when a path member is revoked. UNSUPPORTED when no CRL covers a
+ * member, or for an unsupported algorithm or CRL feature. ERROR for NULL
+ * arguments, invalid policy values, a path time that differs from
+ * signer_policy->at or overlap, with work unchanged. LIMIT for a held_path or
+ * crl_states capacity below the path or index size, before any work, and for
+ * exhausted work or capacities. INVALID for a malformed message or failed
+ * signature, path or CRL check. */
 TC_credential_status TC_CMS_credential_validate(const TC_CMS_validation_request* request,
                                                 const TC_X509_store_source* source,
                                                 const TC_CMS_path_options* options,

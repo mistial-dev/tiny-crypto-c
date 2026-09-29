@@ -32,14 +32,26 @@ typedef union {
 extern "C" {
 #endif
 
-/* Authenticate the peer CVC under signer, then complete key confirmation.
- * signer must already satisfy path, usage, policy, time and revocation checks.
- * Any peer or cryptographic failure clears the establishing session. Argument
- * and overlap errors leave it unchanged. A nonzero peer.card_control
- * (SP 800-73-5 Part 2 section 4.1 step H4) or a wrongly sized nonce or
- * cryptogram returns TC_CREDENTIAL_INVALID before any CVC work. Processing
- * consumes work and clears workspace. VALID leaves the session ready for
- * protected requests. */
+/* Authenticate the peer CVC under signer with TC_PIV_CVC_chain_verify, then
+ * complete key confirmation with TC_PIV_SM_finish (SP 800-73-5 Part 2
+ * section 4.1.1, steps H4 onward). signer must already satisfy path, usage,
+ * policy, time and revocation checks, for example through
+ * TC_PIV_CVC_validate. expected_uuid is empty or the 16-byte Card UUID.
+ * - All inputs stay stable and disjoint from session, work and workspace.
+ *   The workspace union serves the point check and then the session step,
+ *   and is wiped before return.
+ *
+ * Work: the TC_PIV_CVC_chain_verify charges. Key confirmation charges no
+ * work.
+ * Returns VALID with the session READY for protected requests. ERROR for
+ * NULL arguments, an empty peer certificate, an expected_uuid of another
+ * nonzero length, a session outside ESTABLISHING or overlap, with the
+ * session, work and workspace unchanged. The following end the session and
+ * wipe the workspace. INVALID for a nonzero peer.card_control (step H4) or a
+ * wrongly sized nonce or cryptogram, before any CVC work, and for a CVC chain
+ * failure or a key-confirmation mismatch. UNSUPPORTED for an unknown session
+ * suite or an unsupported chain. LIMIT for exhausted limits or work. ERROR
+ * for a chain argument error, an invalid peer key or a KDF failure. */
 TC_credential_status TC_PIV_SM_authenticate_response(TC_PIV_SM* session,
                                                      const TC_PIV_SM_authentication* authentication,
                                                      size_t* work,

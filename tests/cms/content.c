@@ -269,12 +269,37 @@ static MunitResult encoded_content(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+/* A digest whose length differs from the selected hash is an argument error,
+ * so it leaves work and matched unchanged (docs/api.md failure rule 1). */
+static MunitResult digest_length_argument(const MunitParameter params[], void* user)
+{
+  enum { WORK_BUDGET = 1024 };
+  static const uint8_t type[] = {42, 3};
+  uint8_t digest[TC_SHA256_DIGESTLEN] = {0};
+  TC_CMS_signed_attributes attributes = {0};
+  (void)params;
+  (void)user;
+  attributes.content_type = (TC_bytes){type, sizeof type};
+  attributes.message_digest = (TC_bytes){digest, sizeof digest};
+  size_t work = WORK_BUDGET;
+  int matched = -1;
+  munit_assert_int(TC_CMS_content_digest_check(&attributes, attributes.content_type, TC_HASH_SHA256,
+                                               (TC_bytes){digest, sizeof digest - 1}, &work,
+                                               &matched),
+                   ==, TC_TLV_ARGUMENT);
+  munit_assert_size(work, ==, WORK_BUDGET);
+  munit_assert_int(matched, ==, -1);
+  return MUNIT_OK;
+}
+
 int main(int argc, char** argv)
 {
-  MunitTest tests[] = {{"/binding", content_binding, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-                       {"/storage", binding_storage, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-                       {"/encoded", encoded_content, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-                       {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
+  MunitTest tests[] = {
+      {"/binding", content_binding, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/storage", binding_storage, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/encoded", encoded_content, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/digest-length-argument", digest_length_argument, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
   MunitSuite suite = {"/cms/content", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};
   return munit_suite_main(&suite, NULL, argc, argv);
 }

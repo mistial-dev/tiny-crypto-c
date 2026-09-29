@@ -46,7 +46,7 @@ typedef struct {
  * signed_content excludes a Buffer Length element (SP 800-73-4 Part 1
  * section 3.1.2). Spans borrow encoded, which must stay unchanged while they
  * are used. An absent optional field has a NULL pointer. The caller verifies
- * the CMS signature.
+ * the CMS signature, or uses TC_PIV_CHUID_validate. Charges no work.
  * Returns OK, MORE when input ends inside the outer 53 object or a CONTENTS
  * field, INVALID for malformed or out-of-profile fields, and ARGUMENT for a
  * NULL out, NULL data with a length, an unknown encoding or profile, or out

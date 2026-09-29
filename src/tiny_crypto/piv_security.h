@@ -20,20 +20,29 @@ typedef struct {
   uint16_t groups;
 } TC_PIV_security_object;
 
-/* Read the BA/BB/FE fields of a PIV or TWIC security object. CONTAINER includes
- * the outer 53 TLV. CONTENTS starts at BA. The mapping contains three-byte
- * records: group number followed by a big-endian container ID. Group numbers
- * and container IDs must be unique. cms and mapping borrow the unchanged input.
- * Input and out must be disjoint. Only OK writes out. This checks the container
- * schema. Authenticate CMS and reconcile its LDS groups before using the map.
- * Requires X509. */
+/* Read the BA, BB and FE fields of a PIV or TWIC Security Object
+ * (SP 800-73-5 Part 1 section 3.1.7). CONTAINER includes the outer 53 TLV.
+ * CONTENTS starts at BA. The mapping holds 1 to TC_LDS_MAX_GROUPS three-byte
+ * records: a group number 1..16 followed by a big-endian container ID. Group
+ * numbers and container IDs are unique. groups has bit n-1 set for each
+ * group n. The CMS value is nonempty and FE is empty. cms and mapping borrow
+ * the unchanged input. encoded and out must be disjoint. Charges no work.
+ * Returns OK with out written. ARGUMENT for NULL out, NULL data with a
+ * length, an unknown encoding or overlap. MORE when input ends inside the
+ * outer 53 object or a field of CONTENTS. INVALID for a missing, reordered
+ * or extra field, trailing bytes or a bad mapping. out changes only on OK.
+ * Authenticate the CMS and reconcile its LDS groups before using the map. */
 TC_TLV_result TC_PIV_security_read(TC_bytes encoded, TC_PIV_security_encoding encoding,
                                    TC_PIV_security_object* out);
 
-/* Find a container ID in a successfully parsed, unchanged object. Scans at
- * most 16 mapping records and writes its group number only on OK. END means
- * absent. Keep number disjoint from object and its borrowed spans. Compare
- * object.groups with the authenticated LDS groups before checking hashes. */
+/* Find the group number of container in an object from
+ * TC_PIV_security_read. Scans at most 16 mapping records. number must be
+ * disjoint from object and its borrowed spans. Charges no work.
+ * Returns OK with number written. END when the container is absent.
+ * ARGUMENT for NULL arguments or overlap. INVALID for a mapping that fails
+ * the read checks or no longer matches object->groups. number changes only
+ * on OK. Compare object->groups with the authenticated LDS groups before
+ * checking hashes. */
 TC_TLV_result TC_PIV_security_group_find(const TC_PIV_security_object* object, uint16_t container,
                                          unsigned* number);
 

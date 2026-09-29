@@ -1,15 +1,19 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* OCSP request encoding and response verification for one certificate,
+ * including stapled responses and delegated responders.
+ * Standards: RFC 6960 sections 4.1 and 4.2, RFC 9654 for nonces.
+ * Configuration: TC_ENABLE_X509_OCSP, which requires X.509 path support and
+ * SHA-1. A byKey ResponderID is always a SHA-1 key hash (RFC 6960 section
+ * 4.2.1).
+ * Limitations: status and freshness use the shared revocation model of
+ * x509_revocation.h, and TC_X509_path_check_revocation consumes responses
+ * for a whole path. The caller establishes the revocation status of a
+ * delegate without id-pkix-ocsp-nocheck.
+ * Contracts: docs/api.md. Guides: docs/x509-ocsp.md,
+ * docs/x509-revocation.md. */
 #ifndef TINY_CRYPTO_X509_OCSP_H_
 #define TINY_CRYPTO_X509_OCSP_H_
-
-/* RFC 6960 OCSP request encoding and response verification for one
- * certificate. Requires TC_ENABLE_X509_OCSP, which requires X.509 path
- * support and SHA-1: a byKey ResponderID is always a SHA-1 key hash
- * (RFC 6960 4.2.1). Nonces follow RFC 9654. Status and freshness use the
- * shared revocation model of <tiny_crypto/x509_revocation.h>.
- * TC_X509_path_check_revocation consumes responses for a whole path.
- * See docs/api.md and docs/x509-revocation.md. */
 
 #include <tiny_crypto/x509_revocation.h>
 
@@ -65,10 +69,12 @@ typedef struct {
   const TC_X509_signature_provider* signatures;
 } TC_X509_ocsp_verify_request;
 
-/* Verify a complete DER OCSPResponse, including one received by stapling.
- * Response, certificate, store records and issuer remain borrowed and
- * unchanged during the call and while out->responder_certificate is used.
- * The certificate path and issuer must already be trusted by the caller.
+/* Verify a complete DER OCSPResponse, including one received by stapling
+ * (RFC 6960 section 4.2). Response, certificate, store records and issuer
+ * remain borrowed and unchanged during the call and while
+ * out->responder_certificate is used. The certificate path and issuer must
+ * already be trusted by the caller. work and out must be disjoint from the
+ * request, its bytes and the workspace.
  *
  * workspace supplies frames, oids and names for parsing, extension checks
  * and Name comparison. A delegate is validated as a one-certificate path
@@ -124,9 +130,9 @@ typedef struct {
 } TC_X509_ocsp_encode_request;
 
 /* Encode one unsigned OCSPRequest (RFC 6960 4.1.1) into encoded and write its
- * size to length. The certificate, issuer and nonce stay borrowed and
- * unchanged during the call and must not overlap encoded. workspace supplies
- * frames, oids and names to parse the certificate and compare its issuer.
+ * size to length. The certificate, issuer and nonce stay borrowed and unchanged
+ * during the call and must be disjoint from encoded. workspace supplies frames,
+ * oids and names to parse the certificate and compare its issuer.
  *
  * Sizing: pass encoded = {NULL, 0} to query the size. When encoded is too
  * small the result is LIMIT, *length holds the required size and encoded is

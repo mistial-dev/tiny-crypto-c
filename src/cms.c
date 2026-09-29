@@ -416,6 +416,12 @@ TC_TLV_result TC_CMS_content_digest_check(const TC_CMS_signed_attributes* attrib
   tc_pki_storage_plan_input_spans(&plan, fields, sizeof fields / sizeof *fields);
   if (tc_pki_storage_plan_finish(&plan, NULL) != TC_TLV_OK)
     return TC_TLV_ARGUMENT;
+  /* The digest length is an argument property, so check it before any charge. */
+  tc_hash_info info;
+  if (!tc_hash_info_get(algorithm, &info))
+    return TC_TLV_UNSUPPORTED;
+  if (digest.length != info.digest_length)
+    return TC_TLV_ARGUMENT;
   if (tc_pki_work_charge(work, tc_pki_storage_plan_used(&plan)) != TC_TLV_OK)
     return TC_TLV_LIMIT;
   return tc_cms_content_digest_check(attributes, expected_type, algorithm, digest, work, matched);

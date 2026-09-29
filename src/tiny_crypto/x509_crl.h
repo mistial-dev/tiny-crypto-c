@@ -79,31 +79,60 @@ typedef struct {
   size_t other_count;
 } TC_X509_crl_index;
 
-/* Read a DER CertificateList. Spans borrow the unchanged input. revoked and
- * extensions retain their SEQUENCE wrappers. Extension values need separate
- * interpretation. Signature, freshness and trust checks are separate steps.
- * Input, limits, frames, work and out must be disjoint. Frames and work may
- * change on failure. out changes only on OK. frames need one entry per
- * constructed nesting level of the CRL. */
+/* Read a DER CertificateList and check every revoked entry (RFC 5280
+ * sections 5.1 and 5.3). Spans borrow the unchanged input. revoked and
+ * extensions keep their SEQUENCE wrappers. Read CRL extensions with
+ * TC_X509_crl_extensions_read. Signature, freshness and trust checks are
+ * separate steps. frames holds one entry per constructed nesting level.
+ * encoded, limits, frames, work and out must be disjoint.
+ *
+ * Work: a 10-unit storage check, then the bytes of the framing, metadata and
+ * entry passes.
+ * Returns OK with out written. ARGUMENT for NULL limits, work or out, or
+ * overlap, with all state unchanged. LIMIT for exhausted limits, frames or
+ * work. INVALID for schema failures, including an empty revokedCertificates
+ * field and entry extensions outside the CRL version. UNSUPPORTED for an
+ * unsupported feature in the encoding. out changes only on OK. Frames and
+ * work are provisional on failure. */
 TC_TLV_result TC_X509_crl_read(TC_bytes encoded, const TC_TLV_limits* limits, TC_TLV_frames frames,
                                size_t* work, TC_X509_crl* out);
 
-/* Read crl.extensions, or {NULL,0} when absent. present/critical use EXT masks.
- * Number spans contain INTEGER contents. All spans borrow unchanged input.
- * An unknown critical OID is reported in unknown_critical_oid.
- * This checks syntax and uniqueness. The caller applies criticality policy and
- * applicability. Input, limits, workspace metadata/arrays, work and out must be
- * disjoint. Scratch/work are provisional. out changes only on OK. */
+/* Read crl.extensions, or {NULL, 0} when absent (RFC 5280 section 5.2).
+ * present and critical use the TC_X509_CRL_EXT masks. Number spans hold
+ * INTEGER contents. An unknown critical OID is reported in
+ * unknown_critical_oid. All spans borrow the unchanged input. This checks
+ * syntax and uniqueness. The caller applies criticality policy and
+ * applicability, or uses TC_X509_crl_index_init, which records that policy.
+ * workspace frames and extension_oids hold the nesting and one OID per
+ * extension. encoded, limits, the workspace metadata and arrays, work and out
+ * must be disjoint.
+ *
+ * Work: a fixed storage check and the extension bytes of each pass.
+ * Returns OK with out written. ARGUMENT for NULL arguments or overlap, with
+ * all state unchanged. LIMIT for exhausted limits, frames, OID slots or work.
+ * INVALID for bad syntax or a repeated extension. out changes only on OK.
+ * Scratch and work are provisional on failure. */
 TC_TLV_result TC_X509_crl_extensions_read(TC_bytes encoded, const TC_TLV_limits* limits,
                                           const TC_X509_workspace* workspace, size_t* work,
                                           TC_X509_crl_extensions* out);
 
-/* Index DER CRLs once into caller-owned records. Limits apply to each CRL.
- * One work budget covers the collection. capacity counts record slots.
- * Keep encodings and indexed records unchanged while using the index.
- * Inputs/metadata, workspace arrays, records, work and out must be disjoint.
- * Records and scratch are provisional on failure. out changes only on OK.
- * Empty input accepts NULL/0 arrays. Signature and trust checks are separate steps. */
+/* Read count DER CRLs once into caller-owned records and publish them as an
+ * index. Each record holds the parsed CRL, its extensions and its extension
+ * policy (RFC 5280 section 5.2). A CRL whose policy is INVALID or UNSUPPORTED
+ * is indexed with that policy, and the revocation check skips it. limits
+ * apply to each CRL. capacity counts record slots. Keep the encodings and
+ * records unchanged while the index is used. The encoded array, its bytes,
+ * limits and the workspace metadata must be disjoint from the workspace
+ * arrays, records, work and out. An empty collection accepts NULL/0 arrays.
+ *
+ * Work: one unit per storage comparison, charged before any parsing, then the
+ * passes of TC_X509_crl_read and TC_X509_crl_extensions_read for each CRL.
+ * Returns OK with out written. ARGUMENT for NULL limits, workspace, work or
+ * out, or overlap, with all state unchanged. LIMIT for count above capacity,
+ * after the storage check, and for exhausted limits, frames or work. INVALID
+ * and UNSUPPORTED for a CRL that TC_X509_crl_read rejects. out changes only
+ * on OK. Records and scratch are provisional on failure. Signature and trust
+ * checks are separate steps. */
 TC_TLV_result TC_X509_crl_index_init(const TC_bytes* encoded, size_t count,
                                      const TC_TLV_limits* limits,
                                      const TC_X509_workspace* workspace, size_t* work,

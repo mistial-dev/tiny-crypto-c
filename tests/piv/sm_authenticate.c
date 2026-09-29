@@ -282,9 +282,39 @@ static MunitResult arguments(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitTest tests[] = {{"/response", authenticate, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-                            {"/arguments", arguments, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-                            {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
+/* An expected card UUID other than 0 or 16 bytes is an argument error, so it
+ * leaves the establishing session and work unchanged. */
+static MunitResult uuid_length_argument(const MunitParameter params[], void* user)
+{
+  (void)params;
+  (void)user;
+  static const uint8_t short_uuid[15] = {0};
+  const TC_TLV_limits limits = {4096, 4096, 128, 8};
+  const TC_X509_signature_provider signatures = {accept_signature, NULL, NULL};
+  TC_X509_certificate signer = {0};
+  signer.extensions = (TC_bytes){signer_extensions, sizeof signer_extensions};
+  signer_key(&sm_fixtures[0], &signer);
+  TC_PIV_SM session, saved;
+  TC_PIV_SM_authentication_workspace workspace;
+  size_t work = TEST_WORK;
+  begin_session(&sm_fixtures[0], &session);
+  saved = session;
+  TC_PIV_SM_authentication request = authentication(&sm_fixtures[0], &signer, &limits, &signatures);
+  request.expected_uuid = (TC_bytes){short_uuid, sizeof short_uuid};
+  munit_assert_int(TC_PIV_SM_authenticate_response(&session, &request, &work, &workspace), ==,
+                   TC_CREDENTIAL_ERROR);
+  munit_assert_int(TC_PIV_SM_get_state(&session), ==, TC_PIV_SM_ESTABLISHING);
+  munit_assert_uint(session.suite, ==, saved.suite);
+  munit_assert_memory_equal(sizeof session.data, &session.data, &saved.data);
+  munit_assert_size(work, ==, TEST_WORK);
+  return MUNIT_OK;
+}
+
+static MunitTest tests[] = {
+    {"/response", authenticate, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/arguments", arguments, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/uuid-length-argument", uuid_length_argument, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
 static const MunitSuite suite = {"/piv-sm-authenticate", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};
 int main(int argc, char** argv)
 {

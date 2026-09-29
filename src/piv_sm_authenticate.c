@@ -13,6 +13,9 @@ TC_credential_status TC_PIV_SM_authenticate_response(TC_PIV_SM* session,
   if (!session || !authentication || !authentication->signer || !authentication->limits ||
       !authentication->signatures || !work || !workspace ||
       !authentication->peer.certificate.data || !authentication->peer.certificate.length ||
+      /* The chain check takes an absent or 16-byte card UUID. Reject other
+       * lengths here so the argument error keeps the session. */
+      (authentication->expected_uuid.length && authentication->expected_uuid.length != 16) ||
       session->state != TC_PIV_SM_ESTABLISHING)
     return TC_CREDENTIAL_ERROR;
   {

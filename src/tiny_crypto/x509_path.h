@@ -163,52 +163,82 @@ typedef struct {
   TC_X509_path_result validation;
 } TC_X509_search_result;
 
-/* Construct and validate a path to an explicit source anchor. Search consumes
- * options.max_work across all branches. Depth and total chain bytes use the same
- * limits as ordered validation. Source callbacks must keep returned records stable
- * and separate from both workspaces and out. Hold the source snapshot until all
- * result use finishes. Candidates come only from source. Check revocation
- * separately. validation.certificates needs one entry per attempted path
- * certificate, and options.max_certificates covers every permitted path.
+/* Construct and validate a path from target to an explicit source anchor
+ * (RFC 5280 section 6.1, with discovery as in RFC 4158). Candidates come only
+ * from source. The depth-first search compares issuer and subject Names,
+ * skips repeated encodings and validates each complete candidate path with
+ * TC_X509_path_validate_with_anchor. Check revocation separately.
+ * - Source callbacks keep returned records stable and separate from both
+ *   workspaces and out. Hold the source snapshot until all result use
+ *   finishes. Workspace arrays are mutually disjoint and separate from input
+ *   storage.
+ * - search holds capacity path spans and frames. validation.certificates and
+ *   summaries need one entry per attempted path certificate.
+ *   options.max_certificates and max_input bound each path.
+ * - On VALID, out->path borrows a suffix of search.path, anchor-issued first
+ *   and target last. anchor_index names the selected source anchor. Key and
+ *   policy lifetimes match TC_X509_path_validate. Copy the path and policy
+ *   span arrays before reusing their workspaces. DER bytes stay in place.
  *
- * On VALID, path borrows a suffix of search.path, anchor-issued first, target last.
- * anchor_index identifies the selected source anchor. Key and policy lifetimes
- * match TC_X509_path_validate. Scratch may change on any result. out changes only
- * on VALID. Copy path and policy span arrays before reusing their workspaces.
- * Copying the result alone retains pointers into scratch. DER bytes can stay in place.
- * Workspace arrays must be mutually disjoint and separate from input storage. */
+ * Work: options.max_work bounds one units counter across all branches. It
+ * covers the storage comparisons, candidate reads, Name comparisons, cycle
+ * checks and each validation. validation.work_used reports the units spent.
+ * Returns VALID with out written. ERROR for NULL arguments, unknown flags, a
+ * source with NULL arrays and nonzero counts, overlap, a callback that
+ * returns an empty record or an argument error found while searching.
+ * LIMIT when max_work, search capacity or a path bound runs out, or when
+ * that was the most severe candidate failure. UNSUPPORTED and INVALID
+ * report the most severe failure among the attempted candidates. out changes
+ * only on VALID. Scratch may change on any result. */
 TC_X509_path_status TC_X509_path_build(TC_bytes target, const TC_X509_store_source* source,
                                        const TC_X509_path_options* options,
                                        const TC_X509_path_workspace* validation,
                                        const TC_X509_search_workspace* search,
                                        TC_X509_search_result* out);
 
-/* Anchor-issued certificate first, target last. chain excludes the anchor.
- * Checks signatures, time, CA/usage, names, policies and critical extensions.
+/* Validate an ordered chain against one trust anchor (RFC 5280 section
+ * 6.1): anchor-issued certificate first and target last, with the anchor
+ * excluded. Checks signatures, validity at options.at widened by
+ * clock_skew_seconds, CA status and path length, key usage, names and name
+ * constraints, the policy tree, extended key usage and critical extensions.
  * Path discovery and revocation checks are separate steps. options.signatures
- * must provide a verifier for the algorithms in use.
+ * provides the verifier for the algorithms in use.
+ * - DER and option spans are borrowed and unchanged during the call. Result
+ *   key bytes borrow the target DER. Policy spans also borrow issuer DER or
+ *   initial_policies. Keep those buffers and workspace.policies alive while
+ *   the result is used.
+ * - workspace.certificates and summaries need at least count entries. The
+ *   policy arrays bound the policy tree, and oids bounds the extensions of
+ *   one certificate. Workspace arrays are mutually disjoint and disjoint from
+ *   inputs and out. The provider context is separate from workspace and out.
  *
- * DER and option spans are borrowed and must remain unchanged during the call.
- * Result key bytes borrow target DER. Policy spans also borrow issuer DER or
- * initial_policies. Keep those buffers and workspace.policies alive while used.
- * The certificate workspace array needs at least count entries and keeps
- * parsed views during validation. Its entries borrow DER and change on reuse.
- * Workspace arrays must be mutually disjoint and disjoint from inputs/out.
- * Provider context must also be separate from workspace and out.
- * Workspace/provider state may change on any result. out changes only on VALID. */
+ * Work: options.max_work bounds a local units counter for the storage
+ * comparisons, chain bytes, extension walks, Name and policy processing and
+ * each signature. out->work_used reports the units spent.
+ * Returns VALID with out written. ERROR for NULL arguments, unknown flags,
+ * an invalid options.at, initial policies or a purpose with malformed OID
+ * contents, or overlap. INVALID for an empty chain, an empty certificate or
+ * any failed check. LIMIT for count above max_certificates or workspace
+ * capacity, before any work, and for exhausted max_work, max_input, parsing
+ * limits or workspace capacities. UNSUPPORTED for an unsupported algorithm,
+ * critical extension or name form. out changes only on VALID. Workspace and
+ * provider state may change on any result. */
 TC_X509_path_status TC_X509_path_validate(const TC_bytes* chain, size_t count,
                                           const TC_X509_trust_anchor* anchor,
                                           const TC_X509_path_options* options,
                                           const TC_X509_path_workspace* workspace,
                                           TC_X509_path_result* out);
-/* Validate against one explicit store anchor, including its path controls.
- * The anchor and its borrowed spans remain stable throughout validation.
- * Result policy spans may also borrow anchor->policy_set. INVALID for an
- * x509_unusable anchor or a CertPathControls duplicate in anchor->extensions.
- * UNSUPPORTED for an unimplemented critical anchor extension, or for a path
- * control in the anchor's extension spans that its record fields do not
- * reflect (see TC_X509_store_anchor). ERROR for unknown policy_flags or
- * replaced_controls bits. */
+/* Validate against one explicit store anchor, including its path controls
+ * (RFC 5937 section 3). anchor->policy_set, policy_flags, names and path_len
+ * add their constraints to options. The anchor and its borrowed spans stay
+ * stable throughout validation, and result policy spans may also borrow
+ * anchor->policy_set. Other rules, work and statuses match
+ * TC_X509_path_validate, with these additions. INVALID for an x509_unusable
+ * anchor or a CertPathControls duplicate in anchor->extensions. UNSUPPORTED
+ * for an unimplemented critical anchor extension, or for a path control in
+ * the anchor's extension spans that its record fields omit (see
+ * TC_X509_store_anchor). ERROR for unknown policy_flags or replaced_controls
+ * bits. */
 TC_X509_path_status TC_X509_path_validate_with_anchor(const TC_bytes* chain, size_t count,
                                                       const TC_X509_store_anchor* anchor,
                                                       const TC_X509_path_options* options,

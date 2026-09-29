@@ -113,17 +113,21 @@ extern "C" {
  * errors leave the session, workspace and outputs unchanged. Causes listed
  * under a function as after validation instead end the session. Every other
  * return wipes the used workspace and leaves the session in the state named
- * for that result. */
+ * for that result. These functions take no work budget. Their EC steps run
+ * under the exact TC_EC_operation_work cost of one operation. */
 
-/* Wipe session keys and counters and return to IDLE. Accepts NULL. */
+/* Wipe session keys and counters and return to IDLE (SP 800-73-5 Part 2
+ * section 4.3). Accepts NULL. */
 void TC_PIV_SM_clear(TC_PIV_SM* session);
 
 /* Return the session state. NULL reports TC_PIV_SM_IDLE. Callers use it to
  * tell a retryable unprotect result from one that ended the session. */
 TC_PIV_SM_state TC_PIV_SM_get_state(const TC_PIV_SM* session);
 
-/* Start a new session and return the fields needed by a protocol handshake.
- * Any state is accepted. Valid arguments discard any previous session.
+/* Start a new session and return the fields needed by a protocol handshake
+ * (SP 800-73-5 Part 2 section 4.1.1). random fills the ephemeral scalar. Any
+ * state is accepted. Valid arguments discard any previous session. A suite
+ * that is unknown or disabled in this build is an argument error.
  * TC_OK: ESTABLISHING. handshake borrows session storage.
  * TC_ERROR after validation: a failed RNG or 16 rejected scalars leaves the
  * session IDLE and handshake unchanged. */
@@ -132,12 +136,13 @@ TC_status TC_PIV_SM_begin(TC_PIV_SM* session, TC_PIV_SM_suite suite, const uint8
                           TC_PIV_SM_workspace* workspace);
 
 /* Authenticate the peer key through the application's trust workflow, then
- * pass that key and the unchanged decoded peer fields here. Requires
- * ESTABLISHING.
+ * pass that key and the unchanged decoded peer fields here. finish runs ECDH,
+ * the key derivation and the key confirmation of SP 800-73-5 Part 2 sections
+ * 4.1.6 and 4.1.7. Requires ESTABLISHING.
  * TC_OK: READY with fresh session keys.
  * TC_MISMATCH: the key-confirmation cryptogram differs. IDLE.
  * TC_ERROR after validation: IDLE. Causes are a nonzero card_control, missing
- * peer fields, peer field or key lengths that do not match the suite, an
+ * peer fields, peer field or key lengths that differ from the suite, an
  * invalid peer key and KDF failure. */
 TC_status TC_PIV_SM_finish(TC_PIV_SM* session, const TC_PIV_SM_peer* peer,
                            TC_bytes authenticated_key, TC_PIV_SM_workspace* workspace);
@@ -148,10 +153,11 @@ TC_status TC_PIV_SM_finish(TC_PIV_SM* session, const TC_PIV_SM_peer* peer,
  * exceeds SIZE_MAX, leaving *ciphertext_length unchanged. */
 TC_status TC_PIV_SM_ciphertext_size(size_t plaintext_length, size_t* ciphertext_length);
 
-/* Encrypt plaintext and authenticate the supplied ordered spans. The caller
- * owns all protocol framing and places the ciphertext span in authenticated
- * where its protocol requires it. Ciphertext storage may overlap authenticated
- * spans. Keep plaintext separate. Requires READY, so only one protected request
+/* Encrypt plaintext and authenticate the supplied ordered spans (SP 800-73-5
+ * Part 2 sections 4.2.2 to 4.2.4). The caller owns all protocol framing and
+ * places the ciphertext span in authenticated where its protocol requires it.
+ * Ciphertext storage may overlap authenticated spans. Keep plaintext
+ * separate. Requires READY, so only one protected request
  * may be pending. A ciphertext_capacity below TC_PIV_SM_ciphertext_size is an
  * argument error.
  * TC_OK: PENDING. Writes ciphertext, *ciphertext_length and tag.
@@ -161,7 +167,8 @@ TC_status TC_PIV_SM_protect(TC_PIV_SM* session, const TC_PIV_SM_protect_request*
                             size_t* ciphertext_length, uint8_t tag[8],
                             TC_PIV_SM_workspace* workspace);
 
-/* Authenticate ordered response spans, then decrypt and check padding.
+/* Authenticate ordered response spans, then decrypt and check padding
+ * (SP 800-73-5 Part 2 sections 4.2.5 and 4.2.6).
  * Plaintext is released only after authentication. Requires PENDING.
  * TC_OK: READY. Writes plaintext and *plaintext_length.
  * TC_MISMATCH: the response tag differs. IDLE.

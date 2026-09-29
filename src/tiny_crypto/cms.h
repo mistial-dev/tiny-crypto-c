@@ -85,22 +85,28 @@ typedef struct {
   int has_content;
 } TC_CMS_signed_data;
 
-/* Read a ContentInfo carrying SignedData, including its version consistency.
- * policy->envelope selects BER or DER framing. Requires TC_TLV_ENABLE_BER and
- * TC_ENABLE_X509. content_type holds OID contents. Other spans retain complete
- * encodings. content is an OCTET STRING, constructed only in BER. has_content
- * distinguishes detached content from an embedded empty value. Missing
- * optional collections have zero-length spans. Use the typed readers for
- * signers, certificates and revocations. Check the selected signer's digest
- * with TC_CMS_digest_algorithms_check. Signature and trust validation are
- * separate steps.
+/* Read a ContentInfo carrying SignedData and check the SignedData version
+ * against its contents (RFC 5652 sections 3 and 5.1).
+ * - encoded: the complete ContentInfo. policy->envelope selects BER or DER
+ *   framing. Other policy fields are validated and otherwise unused here.
+ * - limits bound framing. frames holds one frame per nesting level.
+ * - out: content_type holds OID contents. Other spans keep complete
+ *   encodings. content is an OCTET STRING, constructed only in BER.
+ *   has_content distinguishes detached content from an empty embedded value.
+ *   Absent optional collections have zero-length spans.
+ * All spans borrow encoded, which stays alive and unchanged while they are in
+ * use. encoded, policy, limits, frames, work and out must be disjoint.
  *
- * All spans borrow input, which must remain alive and unchanged. Input, limits,
- * frames, work and out must be disjoint. Bad storage or policy arguments
- * return ARGUMENT and leave them unchanged. Parsing may consume work and
- * frames. out changes only on OK. Limits bound framing. Work covers storage
- * checks and all parsing passes. Missing or extra fields, wrong tags, framing
- * outside the envelope encoding and trailing bytes return INVALID. */
+ * Work: a 10-unit storage check, then the encoded bytes of each parsing pass,
+ * including the version pass over certificates, revocations and signers.
+ * Returns OK with out written. ARGUMENT for NULL policy, limits, work or out,
+ * an unknown policy value or overlapping storage, with all state unchanged.
+ * LIMIT for exhausted limits, frames or work. INVALID for missing or extra
+ * fields, wrong tags, framing outside the envelope encoding, a version that
+ * differs from the RFC 5652 section 5.1 rule and trailing bytes. Failures
+ * leave out unchanged. Frames and work are provisional after the argument
+ * checks. Read signers with TC_CMS_signers_init and check the selected
+ * signer's digest with TC_CMS_digest_algorithms_check. */
 TC_TLV_result TC_CMS_signed_data_read(TC_bytes encoded, const TC_CMS_verification_policy* policy,
                                       const TC_TLV_limits* limits, TC_TLV_frames frames,
                                       size_t* work, TC_CMS_signed_data* out);
@@ -114,49 +120,69 @@ typedef struct {
   int serial_negative;
 } TC_CMS_signer_info;
 
-/* Read one complete SignerInfo under policy->envelope. Version 1 uses
- * issuer/serial. Version 3 uses subject_key_id. issuer is an encoded Name and
- * serial retains INTEGER contents, including sign padding. subject_key_id is
- * the complete implicit OCTET STRING. signature is a complete OCTET STRING.
- * Either OCTET STRING may be constructed in a BER envelope. Attribute spans
- * retain their encodings. Read signed attributes with
- * TC_CMS_signed_attributes_read.
+/* Read one complete SignerInfo under policy->envelope (RFC 5652 section 5.3).
+ * Version 1 identifies the signer by issuer and serial, version 3 by
+ * subject_key_id. issuer is an encoded Name. serial keeps INTEGER contents,
+ * including sign padding. subject_key_id is the complete implicit OCTET
+ * STRING and signature a complete OCTET STRING. Either may be constructed in
+ * a BER envelope. Attribute spans keep their encodings. Read signed
+ * attributes with TC_CMS_signed_attributes_read.
  *
- * Checks identifier/version consistency, Name and algorithm syntax, and field
- * framing. Algorithm selection, signature verification and signer trust are
- * separate steps. Spans borrow input. Storage, policy, work and output rules
- * match signed_data_read. Requires TC_ENABLE_X509 and TC_TLV_ENABLE_BER. */
+ * Checks identifier and version consistency, Name and algorithm syntax and
+ * field framing. Algorithm selection, signature verification and signer
+ * trust are separate steps. Spans borrow encoded. Storage, work, status and
+ * failure rules match TC_CMS_signed_data_read. */
 TC_TLV_result TC_CMS_signer_info_read(TC_bytes encoded, const TC_CMS_verification_policy* policy,
                                       const TC_TLV_limits* limits, TC_TLV_frames frames,
                                       size_t* work, TC_CMS_signer_info* out);
 
-/* Initialize from SignedData.signers, including its SET tag, under
- * policy->envelope. Checks the set framing. next performs each member's schema
- * checks with the same envelope encoding. Empty sets are valid. Input, limits,
- * frames, work and out are disjoint. out changes only on OK. Keep the encoded
- * bytes stable and treat the returned reader as managed state. */
+/* Start reading SignedData.signers, including its SET tag, under
+ * policy->envelope. Checks the SET framing. TC_CMS_signer_next applies each
+ * member's schema with the same envelope encoding. An empty SET is valid.
+ * encoded, policy, limits, frames, work and out must be disjoint. Keep encoded
+ * stable while the reader is in use and treat the reader as managed state.
+ *
+ * Work: a 10-unit storage check plus the encoded bytes. Returns OK with out
+ * initialized. ARGUMENT for NULL arguments, an unknown policy value or
+ * overlap, with all state unchanged. LIMIT for exhausted limits, frames or
+ * work. INVALID for a wrong tag or bad framing. out changes only on OK. */
 TC_TLV_result TC_CMS_signers_init(TC_bytes encoded, const TC_CMS_verification_policy* policy,
                                   const TC_TLV_limits* limits, TC_TLV_frames frames, size_t* work,
                                   TC_TLV_reader* out);
-/* Reader and out change only on OK. Frames/work are provisional on failure.
- * END leaves all storage unchanged, even with zero work remaining. Reuse one
- * budget across init/next calls. Reader, its input, frames, work and out must be
- * disjoint. Output spans borrow input and outlive scratch and reader state. */
+/* Read the next SignerInfo from a reader made by TC_CMS_signers_init.
+ * reader, its input, frames, work and out must be disjoint. Output spans
+ * borrow the reader input and stay valid after later reader calls. Share one
+ * work budget across the init and next calls.
+ *
+ * Work: 10 units for the storage check, then the member's parsing passes.
+ * Returns OK with the reader advanced and out written. END when no
+ * member remains, charging no work and leaving all storage unchanged, even
+ * with zero work remaining. ARGUMENT for NULL arguments, overlap or a reader
+ * with a foreign profile or offset. LIMIT and INVALID follow
+ * TC_CMS_signer_info_read. The reader and out change only on OK. Frames and
+ * work are provisional on failure. */
 TC_TLV_result TC_CMS_signer_next(TC_TLV_reader* reader, TC_TLV_frames frames, size_t* work,
                                  TC_CMS_signer_info* out);
 
 /* Check that digest_algorithm, usually a SignerInfo.digest_algorithm, is
  * listed in signed_data->digest_algorithms with valid parameters. RFC 5652
  * section 5.1 lists every signer's digest there. Equal parameters may use
- * distinct BER encodings. Other listed hashes only need valid syntax because
- * they may belong to other signers.
+ * distinct BER encodings. Other listed algorithms need valid syntax only,
+ * because they may belong to other signers.
+ * - signed_data comes from TC_CMS_signed_data_read and keeps its input stable.
+ * - signed_data, digest_algorithm, limits and their bytes may overlap each
+ *   other. frames, work and out must be disjoint from them and each other.
  *
- * OK writes the recognized hash to out. An unlisted digest returns INVALID.
- * An unknown or disabled selected hash returns UNSUPPORTED. signed_data comes
- * from TC_CMS_signed_data_read and keeps its input stable. Inputs may overlap
- * each other and must be disjoint from limits, frames, work and out. Bad
- * storage returns ARGUMENT and leaves caller state unchanged. out changes only
- * on OK. Requires TC_ENABLE_X509 and TC_TLV_ENABLE_BER. */
+ * Work: one unit per storage comparison, then the selected OID and parameter
+ * bytes, and for each listed algorithm its OID, the selected OID and the
+ * parameters of a matching entry.
+ * Returns OK and writes the SHA-1 or SHA-2 identifier to out. The identifier
+ * names the hash for every build configuration, and the hashing call
+ * reports a disabled hash as UNSUPPORTED. ARGUMENT for NULL arguments, a NULL
+ * digestAlgorithms or OID span, or overlap, with all state unchanged. LIMIT
+ * for exhausted limits, frames or work. UNSUPPORTED for a selected digest
+ * outside SHA-1 and SHA-2. INVALID for bad syntax or parameters, or an
+ * unlisted digest. out changes only on OK. */
 TC_TLV_result TC_CMS_digest_algorithms_check(const TC_CMS_signed_data* signed_data,
                                              const TC_DER_algorithm* digest_algorithm,
                                              const TC_TLV_limits* limits, TC_TLV_frames frames,
@@ -177,62 +203,76 @@ typedef struct {
   TC_bytes entry_uuid_octets;
 } TC_CMS_signed_attributes;
 
-/* Read the complete IMPLICIT [0] signedAttrs field. policy->attributes
- * selects DER, or BER_DEFINITE_ORDER for signatures made over unsorted
- * attributes. Both modes require content-type and message-digest exactly once
- * and reject indefinite lengths. policy->attribute_oids selects the
- * interpreted identifiers: optional signingTime, SMIMECapabilities and
- * entryUUID in every set, pivSigner-DN and pivFASC-N in the PIV sets, and
- * twicFASC-N in PIV_TWIC. FASC-N values contain exactly 25 bytes and entryUUID
- * values 16 bytes. fascn_oid holds the identifier that matched.
- * policy->other_attributes handles the remaining attributes. signingTime is
- * asserted by the signer. Capabilities retain their advertised order and
- * opaque parameter values. Applications interpret them after signature and
- * trust validation. Path-building APIs match signer_name to the certificate
- * subject. Signature-only APIs verify with the supplied key, and the caller
- * handles certificate/name binding.
+/* Read the complete IMPLICIT [0] signedAttrs field (RFC 5652 sections 5.3
+ * and 11).
+ * - policy->attributes selects DER, or BER_DEFINITE_ORDER for signatures made
+ *   over unsorted attributes. Both require contentType and messageDigest
+ *   exactly once and reject indefinite lengths. DER also requires SET OF order
+ *   (X.690 section 11.6).
+ * - policy->attribute_oids selects the interpreted identifiers: optional
+ *   signingTime, SMIMECapabilities and entryUUID in every set, pivSigner-DN
+ *   and pivFASC-N in the PIV sets, and twicFASC-N in PIV_TWIC. FASC-N values
+ *   hold 25 bytes and entryUUID values 16 bytes. fascn_oid holds the
+ *   identifier that matched. policy->other_attributes handles the rest.
+ * - signature_input replaces the [0] tag with the SET OF tag and borrows the
+ *   original length and contents (RFC 5652 section 5.4).
+ * signingTime is asserted by the signer. Capabilities keep their advertised
+ * order and opaque parameters. Path-building APIs match signer_name to the
+ * certificate subject. Signature-only APIs leave that binding to the caller.
+ * Spans borrow encoded. encoded, policy, limits, frames, work and out must be
+ * disjoint.
  *
- * signature_input substitutes the SET OF tag and borrows the original length
- * and contents. Keep input alive and unchanged while using returned spans.
- * Input, limits, frames, work and out must be disjoint. Bad storage or policy
- * arguments return ARGUMENT and leave them unchanged. Frames/work may change on
- * other failures. out changes only on OK. Limits bound framing. Work bounds
- * bytes examined across passes, including the repeated-type scan for skipped
- * attributes. Requires TC_ENABLE_X509.
+ * Work: a 10-unit storage check, the encoded bytes, each attribute's encoded
+ * bytes and the bytes compared by the repeated-type scan.
+ * Returns OK with out written. ARGUMENT for NULL arguments, an unknown policy
+ * value or overlap, with all state unchanged. LIMIT for exhausted limits,
+ * frames or work. UNSUPPORTED for an attribute that the other-attribute
+ * policy rejects, and for twicFASC-N under the PIV set. INVALID for bad
+ * framing or order, a missing or repeated required attribute, a repeated
+ * attribute type or a value of the wrong size. out changes only on OK.
+ * Frames and work are provisional on failure.
  *
- * This parses attributes only. The caller must check content type and digest,
- * verify the signature over signature_input, and validate the signer's trust. */
+ * Parsing only: the caller checks content type and digest, verifies the
+ * signature over signature_input and validates the signer. */
 TC_TLV_result TC_CMS_signed_attributes_read(TC_bytes encoded,
                                             const TC_CMS_verification_policy* policy,
                                             const TC_TLV_limits* limits, TC_TLV_frames frames,
                                             size_t* work, TC_CMS_signed_attributes* out);
 
-/* Hash SignedData.content, including its complete OCTET STRING encoding.
- * BER chunk headers and end markers are excluded from the digest. For detached
- * content, hash the application's raw message with the ordinary hash API.
- * Requires TC_ENABLE_X509, TC_TLV_ENABLE_BER and the selected hash implementation.
- * Unknown or disabled hashes return UNSUPPORTED. A short digest buffer returns
- * LIMIT. Success writes the algorithm's full digest and leaves spare bytes alone.
+/* Hash SignedData.content given as its complete OCTET STRING encoding. BER
+ * chunk headers and end markers are excluded, so the digest covers the value
+ * bytes (RFC 5652 section 5.4). For detached content, hash the application
+ * message with the ordinary hash API.
+ * - digest receives the full digest of algorithm. Size it with the hash's
+ *   digest length. Bytes past that length are left alone.
+ * - encoded, limits, frames, work and the whole digest buffer must be
+ *   disjoint. One hash context lives on the stack and is wiped on return.
  *
- * Input, limits, frames, work and the entire digest buffer must be disjoint.
- * Bad storage leaves them unchanged. Other errors may consume frames/work but
- * preserve digest. Work covers storage checks, encoded bytes and hashed bytes.
- * Uses one temporary hash context on the stack and hashes BER chunks in place. */
+ * Work: a 10-unit storage check, the encoded bytes and the hashed bytes.
+ * Returns OK with the digest written. ARGUMENT for NULL arguments or overlap,
+ * with all state unchanged. UNSUPPORTED for an unknown hash or one disabled in
+ * this build. LIMIT for a short digest buffer, before any parsing, or for
+ * exhausted limits, frames or work. INVALID for a value other than an OCTET
+ * STRING or bad framing. digest changes only on OK. */
 TC_TLV_result TC_CMS_content_digest(TC_bytes encoded, TC_hash_algorithm algorithm,
                                     const TC_TLV_limits* limits, TC_TLV_frames frames, size_t* work,
                                     uint8_t* digest, size_t digest_capacity);
 
-/* Compare parsed signed attributes with the content type OID contents and a
- * computed digest. Hash content value bytes, excluding OCTET STRING framing.
- * Reuse that digest for signers using the same digest algorithm. The selected
- * algorithm determines the required digest length. Hashing may be external.
+/* Compare parsed signed attributes with the expected content type OID
+ * contents and a digest computed over the content value bytes (RFC 5652
+ * section 11.2). The digest may come from external hashing and can be reused
+ * for signers that share the digest algorithm.
+ * - digest.length must equal the digest length of algorithm.
+ * - attributes and the spans may overlap each other. work and matched must be
+ *   disjoint from them and from each other.
  *
- * OK writes matched as 0 or 1. Signature and trust verification are separate steps.
- * Errors leave matched unchanged. Unknown algorithms return UNSUPPORTED.
- * All inputs are borrowed and may overlap each other, but must be disjoint
- * from work and matched, which must also be disjoint. Invalid storage leaves
- * both unchanged. Otherwise work covers storage checks and compared bytes.
- * Requires TC_ENABLE_X509. */
+ * Work: one unit per storage comparison, then the expected type bytes and the
+ * digest length. The digest comparison is constant time.
+ * Returns OK and writes matched as 1 for a match and 0 otherwise. ARGUMENT for
+ * NULL arguments, empty type spans, a NULL digest, a digest of the wrong
+ * length or overlap. UNSUPPORTED for an algorithm outside SHA-1 and SHA-2.
+ * Both leave work and matched unchanged. LIMIT for exhausted work, with
+ * matched unchanged. Signature and trust checks are separate steps. */
 TC_TLV_result TC_CMS_content_digest_check(const TC_CMS_signed_attributes* attributes,
                                           TC_bytes expected_type, TC_hash_algorithm algorithm,
                                           TC_bytes digest, size_t* work, int* matched);
@@ -264,27 +304,37 @@ typedef struct {
   const TC_TLV_limits* limits;
 } TC_CMS_signer_verify_request;
 
-/* Verify one parsed SignerInfo against an independently computed content digest.
- * Hash content with SignerInfo.digest_algorithm. For PSS, the signed-attribute
- * hash may differ.
- * Checks digest binding, signed attributes, algorithm/key compatibility and the
- * signature. Without signed attributes, content_type must be id-data.
- * CMS field framing uses BER. Verification ignores unsigned_attributes,
- * including countersignatures. RFC 5652 sections 5.3 and 11.4 exclude them
- * from the signature, so their contents are unauthenticated.
+/* Verify one parsed SignerInfo against an independently computed digest of
+ * the content under SignerInfo.digest_algorithm. For PSS, the
+ * signed-attribute hash may differ. Checks algorithm and key compatibility,
+ * the signed attributes, their content type and digest binding, and the
+ * signature (RFC 5652 sections 5.4 and 5.6). Without signed attributes the
+ * content type must be id-data (RFC 5652 section 5.3). Verification ignores
+ * unsigned attributes, including countersignatures. RFC 5652 sections 5.3
+ * and 11.4 exclude them from the signature, so they stay unauthenticated.
+ * - The request, its bytes and the digest may overlap each other. Frames,
+ *   workspace->signature and work must be disjoint from them and each other.
+ *   The provider context and its scratch stay separate from all CMS storage.
+ * - workspace->signature holds a signature split across BER chunks. Size it
+ *   for the largest supported signature, or pass NULL/0 for DER signatures.
+ * - The signed-attribute hash and a copy of its digest use stack scratch that
+ *   is wiped on return.
  *
- * The caller checks signer/certificate identity, trust and application
- * algorithm policy, and checks the envelope's digestAlgorithms with
- * TC_CMS_digest_algorithms_check.
- * A VALID result authenticates the supplied digest with the supplied key only.
+ * Work: one unit per storage comparison, algorithm resolution, the
+ * signed-attribute pass, the hashed signature input and the provider charge
+ * described in docs/api.md.
+ * Returns VALID when the signature authenticates the digest with the supplied
+ * key. ERROR for NULL arguments, an unknown policy value, overlap, an empty
+ * content type, a NULL digest, or a digest whose length differs from the
+ * resolved hash. The length check runs after algorithm resolution and so
+ * after some work. UNSUPPORTED for a provider without verify_digest, an
+ * unsupported algorithm or key, or a disabled hash. LIMIT for exhausted
+ * limits, frames, work or signature capacity. INVALID for malformed fields,
+ * a content type or digest mismatch, or a failed signature.
  *
- * The request, its inputs and all metadata may overlap each other. They must be
- * disjoint from frames, signature storage and work, which must also be mutually
- * disjoint. Provider context and its scratch must be separate from all CMS
- * inputs and workspace storage.
- * Bad storage leaves caller state unchanged. Other failures may consume scratch
- * and work. Uses a temporary hash context/digest for signed attributes. Requires
- * X509, BER, a digest provider, and the signed-attribute hash when attributes exist. */
+ * The caller checks signer and certificate identity, trust, application
+ * algorithm policy and the envelope's digestAlgorithms with
+ * TC_CMS_digest_algorithms_check. */
 TC_X509_signature_result TC_CMS_signer_verify_digest(const TC_CMS_signer_verify_request* request,
                                                      TC_bytes digest,
                                                      const TC_CMS_signature_workspace* workspace,
@@ -292,16 +342,18 @@ TC_X509_signature_result TC_CMS_signer_verify_digest(const TC_CMS_signer_verify_
 
 typedef enum { TC_CMS_CONTENT_RAW, TC_CMS_CONTENT_BER_OCTETS } TC_CMS_content_encoding;
 
-/* Hash content and verify one parsed signer, resolving its hash internally.
- * RAW accepts application content, including NULL/0 for an empty message.
- * BER_OCTETS accepts SignedData.content with its complete OCTET STRING encoding.
- * The caller selects the format explicitly. Raw content is bounded by
- * max_input and max_value. BER content also uses the framing limits.
+/* Hash content and verify one parsed signer. The hash comes from
+ * SignerInfo.digest_algorithm. RAW takes application content, including
+ * NULL/0 for an empty message, bounded by limits->max_input and max_value.
+ * BER_OCTETS takes SignedData.content with its complete OCTET STRING encoding
+ * under the framing limits. The content hash reuses the stack scratch of the
+ * signed-attribute hash and never copies the message.
  *
- * Storage, provider, trust and unsigned-attribute rules match
- * signer_verify_digest. The content hash must be enabled. Hash scratch is reused
- * for signed attributes, without copying the message. For cached or externally
- * computed digests, use the digest API. */
+ * Storage, workspace, provider, trust and unsigned-attribute rules and
+ * statuses match TC_CMS_signer_verify_digest. An unknown encoding returns
+ * ERROR before any work. A disabled content hash returns UNSUPPORTED. Work
+ * also covers the hashed content bytes. For cached or external digests, use
+ * TC_CMS_signer_verify_digest. */
 TC_X509_signature_result TC_CMS_signer_verify_content(const TC_CMS_signer_verify_request* request,
                                                       TC_bytes content,
                                                       TC_CMS_content_encoding encoding,

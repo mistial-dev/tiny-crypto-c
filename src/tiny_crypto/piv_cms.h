@@ -25,12 +25,17 @@ typedef struct {
   TC_bytes signed_content, record, signature, fascn;
 } TC_PIV_CBEFF;
 
-/* Split the value of a PIV biometric object's BC field using SP 800-76-2
- * Table 14. The 88-byte header is included in signed_content. Record and CMS
- * signature blocks must be nonempty and consume the complete input.
- * Header version 3 is supported. Biometric format, dates, quality and encryption
- * metadata require application checks. All returned spans borrow input.
- * Input and out must be disjoint. out changes only on OK. */
+/* Split the value of a PIV biometric object's BC field using the CBEFF
+ * header of SP 800-76-2 section 9.2 and Table 14. The 88-byte header is part
+ * of signed_content. Record and CMS signature blocks must be nonempty and
+ * consume the complete input. Header version 3 is supported. Biometric
+ * format, dates, quality and encryption metadata need
+ * TC_PIV_CBEFF_metadata_read and application checks. All spans borrow
+ * encoded. encoded and out must be disjoint. Charges no work.
+ * Returns OK with out written. ARGUMENT for NULL out, NULL data with a
+ * length, or overlap. UNSUPPORTED for another header version. INVALID for a
+ * short header or block lengths that leave the input unfilled. out changes only
+ * on OK. */
 TC_TLV_result TC_PIV_CBEFF_read(TC_bytes encoded, TC_PIV_CBEFF* out);
 
 typedef struct {
@@ -42,11 +47,17 @@ typedef struct {
   int quality, encrypted;
 } TC_PIV_CBEFF_metadata;
 
-/* Read Table 14 metadata from a complete BC value. Checks calendar values and
- * their order, security options, quality range, creator text and reserved bytes.
- * The creator span borrows input. Format identifiers are returned for application
- * interpretation. valid_until is biometric metadata. Credential expiration is an
- * application decision. Input and out are disjoint. Errors preserve out. */
+/* Read the SP 800-76-2 Table 14 metadata from a complete BC value. Checks the
+ * framing of TC_PIV_CBEFF_read, the signed or signed-and-encrypted security
+ * options, calendar values and the order creation <= validity start <=
+ * validity end, the quality range -2..100, NUL-terminated printable creator
+ * text and zero reserved bytes. The creator span borrows encoded. Format
+ * identifiers are returned for application interpretation. valid_until is
+ * biometric metadata. Credential expiration is an application decision.
+ * encoded and out must be disjoint. Charges no work.
+ * Returns OK with out written. ARGUMENT and UNSUPPORTED follow
+ * TC_PIV_CBEFF_read. INVALID for framing or any metadata check. out changes
+ * only on OK. */
 TC_TLV_result TC_PIV_CBEFF_metadata_read(TC_bytes encoded, TC_PIV_CBEFF_metadata* out);
 
 typedef enum {
@@ -57,8 +68,10 @@ typedef enum {
   TC_PIV_CBEFF_FACE_IMAGE
 } TC_PIV_CBEFF_format;
 
-/* Identify SP 800-76-2 Table 15 header tuples. NULL and unrecognized tuples
- * return UNKNOWN. Record contents, encryption and quality need separate checks. */
+/* Identify the SP 800-76-2 Table 15 header tuple of format owner, format
+ * type, biometric type and processing level. NULL and unrecognized tuples
+ * return UNKNOWN. Record contents, encryption and quality need separate
+ * checks. Charges no work. */
 TC_PIV_CBEFF_format TC_PIV_CBEFF_format_identify(const TC_PIV_CBEFF_metadata* metadata);
 
 typedef struct {
@@ -68,45 +81,62 @@ typedef struct {
   TC_bytes certificate;
 } TC_PIV_CMS_object;
 
-/* Read a single-signer PIV/TWIC CMS profile. External signatures follow
- * SP 800-73-5 Part 1 section 3.1.2.1
- * or SP 800-76-2 section 9.3. BIOMETRIC requires FASC-N and entryUUID.
- * BIOMETRIC_LEGACY follows FIPS 201-1 section 4.4.2 and requires FASC-N.
- * SECURITY follows section 3.1.7: attached LDS content (1.3.27.1.1.1) and an omitted signing
- * certificate. Both issuer/serial and subject-key-ID signers are supported.
- * Its signer name and card identifiers are optional signed attributes.
- * policy selects the envelope and attribute encodings, the attribute handling
- * and the identifier set. attribute_oids must be TC_CMS_ATTRIBUTE_OIDS_PIV or
- * TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC. It also selects the content-type identifiers:
- * PIV_TWIC accepts either identifier of each TWIC Part 2 v5 section 6 pair.
- * Other values return ARGUMENT. The signer's digest must be recognized and
- * listed in digestAlgorithms with valid parameters. Unknown selected hashes
- * return UNSUPPORTED.
+/* Read a single-signer PIV or TWIC CMS profile.
+ * - CHUID: SP 800-73-5 Part 1 section 3.1.2.1. Detached content, one
+ *   embedded certificate and a version 1 signer.
+ * - BIOMETRIC: SP 800-76-2 section 9.3. Detached content, an optional
+ *   certificate, and required FASC-N and entryUUID attributes.
+ * - BIOMETRIC_LEGACY: FIPS 201-1 section 4.4.2. As BIOMETRIC with an optional
+ *   entryUUID.
+ * - SECURITY: SP 800-73-5 Part 1 section 3.1.7. Attached LDS content
+ *   (1.3.27.1.1.1), no certificate, and an issuer/serial or subject key
+ *   identifier signer. Signer name and card identifiers are optional.
+ * Every profile needs SignedData version 3, no revocations, matching content
+ * type attributes, the signer's digest listed in digestAlgorithms and, except
+ * SECURITY, a pivSigner-DN attribute. policy selects the envelope and
+ * attribute encodings and the attribute handling. attribute_oids must be
+ * TC_CMS_ATTRIBUTE_OIDS_PIV or TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC and also
+ * selects the content-type identifiers. PIV_TWIC accepts either identifier of
+ * each TWIC Part 2 v5 section 6 pair.
+ * - out holds borrowed views, including the optional encoded certificate.
+ *   Validate that certificate with TC_X509_read. A biometric signature
+ *   without a certificate requires the CHUID signing key.
+ * - policy is copied at entry. encoded, limits, frames, work and out must be
+ *   disjoint. Requires X.509 and BER support.
  *
- * Returns borrowed views, including the optional encoded certificate. Validate
- * that certificate with TC_X509_read. The application must authenticate the
- * content, bind identifiers, and validate signer usage, policy and trust.
- * A biometric signature without a certificate requires the CHUID signing key.
- *
- * policy is copied at entry. Input, limits, frames, work and out must be
- * disjoint. Bad storage preserves caller state. Other errors may consume
- * work/scratch. out changes only on OK.
- * Requires X509 and BER support. */
+ * Work: a 10-unit storage check and the passes of TC_CMS_signed_data_read,
+ * the certificate field, TC_CMS_signers_init, TC_CMS_signer_next,
+ * TC_CMS_signed_attributes_read and the digest listing.
+ * Returns OK with out written. ARGUMENT for an unknown kind, NULL or unknown
+ * policy values, another attribute_oids value, NULL storage or overlap, with
+ * all state unchanged. LIMIT for exhausted limits, frames or work.
+ * UNSUPPORTED for an unknown selected hash or a rejected attribute. INVALID
+ * for any profile or schema failure. out changes only on OK. Frames and work
+ * are provisional on failure. The application authenticates the content,
+ * binds identifiers and validates signer usage, policy and trust, or uses
+ * the validators in credential.h. */
 TC_TLV_result TC_PIV_CMS_read(TC_bytes encoded, TC_PIV_CMS_kind kind,
                               const TC_CMS_verification_policy* policy, const TC_TLV_limits* limits,
                               TC_TLV_frames frames, size_t* work, TC_PIV_CMS_object* out);
 
-/* Match signed attributes against a credential's 25-byte FASC-N and
- * 16-byte CHUID GUID. object must come from TC_PIV_CMS_read with stable buffers.
- * Select the same kind used for reading. BIOMETRIC requires both attributes.
- * BIOMETRIC_LEGACY requires FASC-N and checks entryUUID when present.
- * CHUID and SECURITY check each attribute present and permit either to be absent.
- * Comparisons scan borrowed OCTET STRING chunks. For CHUID, also bind the
- * identifiers in its signed content to the card-authentication certificate.
- * OK writes matched as 0 or 1. All errors preserve it. Authenticate the object's
- * signature and signer trust before accepting an identifier match.
- * Inputs may overlap each other. Frames, work and matched must be disjoint from
- * each other and every input. Bad storage preserves work and output. */
+/* Match the signed attributes of an object from TC_PIV_CMS_read against a
+ * credential's 25-byte FASC-N and 16-byte CHUID GUID. Select the kind used
+ * for reading. BIOMETRIC requires both attributes. BIOMETRIC_LEGACY requires
+ * FASC-N and checks entryUUID when present. CHUID and SECURITY check each
+ * attribute present and permit either to be absent. Comparisons scan the
+ * borrowed OCTET STRING chunks. For CHUID, also bind the identifiers in its
+ * signed content to the card authentication certificate.
+ * - object and its buffers stay stable. Inputs may overlap each other.
+ *   frames, work and matched are disjoint from each other and every input.
+ *
+ * Work: one unit per storage comparison, then the scanned attribute bytes.
+ * Returns OK and writes matched as 1 when every checked attribute matches and
+ * 0 otherwise. ARGUMENT for NULL arguments, an unknown kind, identifiers of
+ * the wrong length or overlap, with work and matched unchanged. INVALID for a
+ * required attribute that is absent, before any work, or for a malformed
+ * attribute. LIMIT for exhausted limits, frames or work. Errors leave matched
+ * unchanged. Authenticate the object's signature and signer trust before
+ * accepting a match. */
 TC_TLV_result TC_PIV_CMS_identifiers_match(const TC_PIV_CMS_object* object, TC_PIV_CMS_kind kind,
                                            TC_bytes fascn, TC_bytes uuid,
                                            const TC_TLV_limits* limits, TC_TLV_frames frames,

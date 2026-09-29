@@ -33,7 +33,7 @@ enum {
  * extension spans are checked for controls those fields must reflect.
  *
  * Borrowed DER spans. Policy and extension spans contain SEQUENCE contents.
- * extensions holds TrustAnchorInfo exts, which must not contain
+ * extensions holds TrustAnchorInfo exts, which must omit
  * certificatePolicies, policyConstraints, inhibitAnyPolicy or nameConstraints
  * (RFC 5914 section 2.6). certificate_extensions holds the anchor
  * certificate's own extensions. A path control there whose normalized field
@@ -66,15 +66,15 @@ typedef struct {
  * basicConstraints pathLen fill the normalized fields (RFC 5937 section 2).
  * The record borrows the certificate's DER. Keep that DER unchanged while
  * the record is in use. The certificate view itself may be discarded.
- * workspace supplies frames and extension OID scratch.
+ * workspace supplies frames and extension OID scratch. Charges no work.
  *
  * Returns OK and writes out. NULL arguments, NULL scratch with a nonzero
  * capacity, and out overlapping the certificate view, its DER or the scratch
  * return ARGUMENT with out unchanged. After those checks, failures zero out:
  * INVALID for an empty subject, a reversed validity period, a keyUsage
  * without keyCertSign, or malformed or duplicate extensions and policies.
- * LIMIT for exhausted limits or scratch. The anchor's validity period is not
- * checked against any time. */
+ * LIMIT for exhausted limits or scratch. The anchor's validity period is
+ * never compared with a time. */
 TC_TLV_result TC_X509_store_anchor_from_certificate(const TC_X509_certificate* certificate,
                                                     const TC_TLV_limits* limits,
                                                     TC_X509_workspace* workspace,
@@ -100,6 +100,12 @@ typedef struct {
   TC_TLV_result (*candidate)(void* context, size_t index, size_t* work, TC_bytes* out);
   TC_TLV_result (*anchor)(void* context, size_t index, size_t* work, TC_X509_store_anchor* out);
 } TC_X509_store_source;
+/* Describe a TC_X509_store_array as a source. out->context points at array,
+ * so keep the array and its records stable while the source is used. Each
+ * record read charges one work unit. Charges no work itself.
+ * Returns OK with out written. ARGUMENT for NULL arguments, NULL record
+ * arrays with nonzero counts, or out overlapping array. out changes only on
+ * OK. */
 TC_TLV_result TC_X509_store_array_source(const TC_X509_store_array* array,
                                          TC_X509_store_source* out);
 
@@ -115,32 +121,49 @@ typedef struct {
   size_t revision;
 } TC_X509_store;
 
-/* Serialize every call with the application's lock. Store, slots, source and
- * result pointers must occupy disjoint storage. publish and acquire check the
- * store, the published slot and their arguments for overlap and return
- * ARGUMENT unchanged when they overlap. Do not copy live slots.
- * Keep source context and record bytes unchanged until the slot becomes FREE.
- * Certificate validation and trust authorization are caller responsibilities. */
-
-/* Copy the callback configuration into a FREE slot. Retains borrowed context
- * and record storage. A busy slot returns LIMIT unchanged. */
+/* Snapshot store. Serialize every call with the application's lock. Store,
+ * slots, source and result pointers occupy disjoint storage. publish and
+ * acquire check the store, the published slot and their arguments for overlap.
+ * Keep each live slot at one address. Keep the source context and record bytes
+ * unchanged until the slot becomes FREE. The state machine is described in
+ * snapshot.h. Certificate validation and trust authorization are caller
+ * responsibilities. None of these functions charges work.
+ *
+ * prepare copies the source descriptor into a FREE slot and makes it
+ * PREPARED. The slot borrows the context and record storage.
+ * Returns OK. ARGUMENT for NULL arguments, overlap, or NULL callbacks with
+ * nonzero counts. LIMIT for a slot outside FREE or with readers. The slot
+ * changes only on OK. */
 TC_TLV_result TC_X509_store_prepare(TC_X509_store_snapshot* slot,
                                     const TC_X509_store_source* source);
-/* Return a PREPARED slot to FREE and clear its source descriptor. Other states
- * return ARGUMENT unchanged. The caller owns the underlying record storage. */
+/* Return a PREPARED slot without readers to FREE and clear its source
+ * descriptor. The caller owns the underlying record storage.
+ * Returns OK, or ARGUMENT for a NULL slot or any other state, with the slot
+ * unchanged. */
 TC_TLV_result TC_X509_store_discard(TC_X509_store_snapshot* slot);
-/* Authorize and persist changes before publication. A stale revision returns
- * INVALID. Exhausted revision space returns LIMIT. Neither changes the store.
- * Publishing an empty source removes all anchors for subsequent readers. */
+/* Make slot CURRENT. Authorize and persist changes before publication.
+ * revision must equal store->revision, which then increments. The previous
+ * slot becomes RETIRED while it has readers and FREE otherwise. Publishing
+ * an empty source removes all anchors for later readers.
+ * Returns OK. ARGUMENT for NULL arguments, overlap, a slot outside PREPARED
+ * or with readers, or a current slot outside CURRENT. INVALID for a stale
+ * revision. LIMIT for exhausted revision space. Failures leave the store and
+ * both slots unchanged. */
 TC_TLV_result TC_X509_store_publish(TC_X509_store* store, size_t revision,
                                     TC_X509_store_snapshot* slot);
-/* Acquire returns END without changing out when no snapshot is published.
- * Each successful acquire needs one release, after all borrowed results expire.
- * Old readers retain the old trust configuration across publication. Applications
- * requiring immediate distrust must cancel or revalidate those operations. */
+/* Add a reader to the current snapshot and write it to out. Each successful
+ * acquire needs one release, after all borrowed results expire. Old readers
+ * keep the old trust configuration across publication. Applications that
+ * need immediate distrust cancel or revalidate those operations.
+ * Returns OK with out written. END when no snapshot is published. ARGUMENT
+ * for NULL arguments, overlap or a current slot outside CURRENT. LIMIT when
+ * the reader count would overflow. out changes only on OK. */
 TC_TLV_result TC_X509_store_acquire(TC_X509_store* store, TC_X509_store_snapshot** out);
-/* Release one acquired reference. The last reader of a RETIRED slot returns it
- * to FREE, allowing the caller to reclaim its context and record storage. */
+/* Release one acquired reference. The last reader of a RETIRED slot returns
+ * it to FREE and clears its descriptor, so the caller can reclaim its context
+ * and record storage.
+ * Returns OK, or ARGUMENT for a NULL slot, no readers, or a slot outside
+ * CURRENT and RETIRED, with the slot unchanged. */
 TC_TLV_result TC_X509_store_release(TC_X509_store_snapshot* slot);
 #ifdef __cplusplus
 }
