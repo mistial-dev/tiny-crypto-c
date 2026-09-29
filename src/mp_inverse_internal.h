@@ -85,4 +85,55 @@ static inline int tc_mp_inverse(tc_mp_word* out, const tc_mp_word* a, const tc_m
   tc_mp_select(out, r, s, (tc_mp_word)(0u - (unsigned)(u_difference == 0)), n);
   return 1;
 }
+/* Greatest common divisor of nonzero a and b with a fixed iteration count
+ * (binary GCD after Stein). out has n limbs. scratch has 3n limbs and is
+ * disjoint from the inputs and out; the caller wipes it. Loop bounds and
+ * memory access depend only on n. */
+static inline void tc_mp_gcd(tc_mp_word* out, const tc_mp_word* a, const tc_mp_word* b, size_t n,
+                             tc_mp_word* scratch)
+{
+  const size_t bits = n * TC_MP_WORD_BITS;
+  tc_mp_word* x = scratch;
+  tc_mp_word* y = x + n;
+  tc_mp_word* difference = y + n;
+  memcpy(x, a, n * sizeof *x);
+  memcpy(y, b, n * sizeof *y);
+  /* Remove the common factor 2^k, counting k without branching. */
+  size_t shift = 0;
+  for (size_t i = 0; i < bits; ++i) {
+    const tc_mp_word both_even = (tc_mp_word)(((x[0] | y[0]) & 1u) ^ 1u);
+    const tc_mp_word mask = (tc_mp_word)(0u - both_even);
+    memcpy(difference, x, n * sizeof *x);
+    tc_mp_shift_right(difference, n, 0);
+    tc_mp_select(x, difference, x, mask, n);
+    memcpy(difference, y, n * sizeof *y);
+    tc_mp_shift_right(difference, n, 0);
+    tc_mp_select(y, difference, y, mask, n);
+    shift += both_even;
+  }
+  /* Keep x odd: at least one operand is odd now. */
+  tc_mp_swap(x, y, (tc_mp_word)(0u - (tc_mp_word)((x[0] & 1u) ^ 1u)), n);
+  /* Each step clears one bit of x + y, so 2 * bits steps reach y = 0. */
+  for (size_t i = 0; i < 2 * bits; ++i) {
+    const tc_mp_word odd = (tc_mp_word)(y[0] & 1u);
+    const tc_mp_word below = tc_mp_subtract(difference, y, x, n);
+    /* For odd y below x, swap so that y - x is nonnegative. */
+    tc_mp_swap(x, y, (tc_mp_word)(0u - (odd & below)), n);
+    tc_mp_subtract(difference, y, x, n);
+    tc_mp_select(y, difference, y, (tc_mp_word)(0u - odd), n);
+    tc_mp_shift_right(y, n, 0);
+  }
+  /* Restore 2^k. shift <= bits, and every step is performed. */
+  for (size_t i = 0; i < bits; ++i) {
+    const tc_mp_word apply = (tc_mp_word)(0u - (tc_mp_word)(i < shift));
+    tc_mp_wide carry = 0;
+    for (size_t j = 0; j < n; ++j) {
+      carry += (tc_mp_wide)x[j] * 2;
+      difference[j] = (tc_mp_word)carry;
+      carry >>= TC_MP_WORD_BITS;
+    }
+    tc_mp_select(x, difference, x, apply, n);
+  }
+  memcpy(out, x, n * sizeof *out);
+}
 #endif

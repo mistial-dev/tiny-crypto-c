@@ -32,6 +32,19 @@ static inline int tc_mp_equal(const tc_mp_word* a, const tc_mp_word* b, size_t n
   return difference == 0;
 }
 
+/* All-ones when every limb is zero, otherwise zero. Runs in time that depends
+ * only on n. */
+static inline tc_mp_word tc_mp_zero_mask(const tc_mp_word* value, size_t n)
+{
+  tc_mp_word any = 0;
+  for (size_t i = 0; i < n; ++i)
+    any |= value[i];
+  /* (any | -any) has its top bit set exactly when any is nonzero. */
+  const tc_mp_word nonzero =
+      (tc_mp_word)(((tc_mp_wide)(any | (tc_mp_word)(0u - any)) >> (TC_MP_WORD_BITS - 1)) & 1u);
+  return (tc_mp_word)(nonzero - 1u);
+}
+
 static inline void tc_mp_shift_right(tc_mp_word* value, size_t n, tc_mp_word high)
 {
   for (size_t i = n; i; --i) {
@@ -133,23 +146,78 @@ static inline void tc_mp_multiply(tc_mp_word* out, const tc_mp_word* a, const tc
   }
 }
 
+/* Divide a little-endian limb array by p > 1, including even p, with one
+ * restoring step per input bit. remainder and scratch have n limbs. A non-NULL
+ * quotient has input_words limbs. All arrays are disjoint. Loop bounds and
+ * memory access depend only on input_words and n. */
+static inline void tc_mp_divide_words(tc_mp_word* quotient, tc_mp_word* remainder,
+                                      const tc_mp_word* input, size_t input_words,
+                                      const tc_mp_word* p, size_t n, tc_mp_word* scratch)
+{
+  memset(remainder, 0, n * sizeof *remainder);
+  if (quotient)
+    memset(quotient, 0, input_words * sizeof *quotient);
+  for (size_t i = input_words; i; --i) {
+    for (unsigned bit = TC_MP_WORD_BITS; bit; --bit) {
+      tc_mp_wide carry = (input[i - 1] >> (bit - 1)) & 1u;
+      for (size_t j = 0; j < n; ++j) {
+        carry += (tc_mp_wide)remainder[j] * 2;
+        remainder[j] = (tc_mp_word)carry;
+        carry >>= TC_MP_WORD_BITS;
+      }
+      /* remainder < 2p here. Subtract p when the shifted value reaches it. */
+      const tc_mp_word borrow = tc_mp_subtract(scratch, remainder, p, n);
+      const tc_mp_word take = (tc_mp_word)((tc_mp_word)carry | (tc_mp_word)(borrow ^ 1u)) & 1u;
+      tc_mp_select(remainder, scratch, remainder, (tc_mp_word)(0u - take), n);
+      if (quotient)
+        quotient[i - 1] |= (tc_mp_word)(take << (bit - 1));
+    }
+  }
+}
+
 /* Reduce a little-endian limb array modulo p > 1, including even p. out and
  * scratch have n limbs. All arrays are disjoint. Loop bounds use input_words/n. */
 static inline void tc_mp_reduce_words(tc_mp_word* out, const tc_mp_word* input, size_t input_words,
                                       const tc_mp_word* p, size_t n, tc_mp_word* scratch)
 {
-  memset(out, 0, n * sizeof *out);
-  for (size_t i = input_words; i; --i) {
+  tc_mp_divide_words(NULL, out, input, input_words, p, n, scratch);
+}
+
+/* Divide a little-endian limb array by a public divisor 1 < d < 2^31 and
+ * return the remainder. quotient may equal input. The running time depends
+ * only on n, so secret dividends do not reach variable-time division. */
+static inline uint32_t tc_mp_divide_u32(tc_mp_word* quotient, const tc_mp_word* input, size_t n,
+                                        uint32_t divisor)
+{
+  uint32_t remainder = 0;
+  for (size_t i = n; i; --i) {
+    const tc_mp_word word = input[i - 1];
+    tc_mp_word q = 0;
     for (unsigned bit = TC_MP_WORD_BITS; bit; --bit) {
-      tc_mp_wide carry = (input[i - 1] >> (bit - 1)) & 1u;
-      for (size_t j = 0; j < n; ++j) {
-        carry += (tc_mp_wide)out[j] * 2;
-        out[j] = (tc_mp_word)carry;
-        carry >>= TC_MP_WORD_BITS;
-      }
-      tc_mp_reduce(out, out, (tc_mp_word)carry, p, n, scratch);
+      remainder = (remainder << 1) | (uint32_t)((word >> (bit - 1)) & 1u);
+      /* The top bit of remainder - divisor is clear exactly when no borrow occurs. */
+      const uint32_t take = ((remainder - divisor) >> 31) ^ 1u;
+      remainder -= divisor & (0u - take);
+      q = (tc_mp_word)(q | (tc_mp_word)(take << (bit - 1)));
     }
+    if (quotient)
+      quotient[i - 1] = q;
   }
+  return remainder;
+}
+
+/* Remainder of a big-endian magnitude modulo a public 1 < d < 2^31, with
+ * running time that depends only on length. */
+static inline uint32_t tc_mp_mod_u32_be(const uint8_t* value, size_t length, uint32_t divisor)
+{
+  uint32_t remainder = 0;
+  for (size_t i = 0; i < length; ++i)
+    for (unsigned bit = 8; bit; --bit) {
+      remainder = (remainder << 1) | (uint32_t)((value[i] >> (bit - 1)) & 1u);
+      const uint32_t take = ((remainder - divisor) >> 31) ^ 1u;
+      remainder -= divisor & (0u - take);
+    }
+  return remainder;
 }
 
 /* Odd p, n > 0, a,b < p. n0 = -p[0]^-1 modulo the limb radix.
