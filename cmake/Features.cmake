@@ -64,7 +64,9 @@ set(tc_module_sources_TC_ENABLE_X509_REVOCATION
 
 tc_module_feature(TINY_CRYPTO_ENABLE_X509_OCSP TC_ENABLE_X509_OCSP
   "Build X.509 OCSP request and response processing")
-set(tc_module_requires_TC_ENABLE_X509_OCSP TINY_CRYPTO_ENABLE_X509_PATH)
+# A byKey ResponderID is a SHA-1 key hash (RFC 6960 4.2.1).
+set(tc_module_requires_TC_ENABLE_X509_OCSP
+  TINY_CRYPTO_ENABLE_X509_PATH TINY_CRYPTO_ENABLE_SHA1)
 set(tc_module_sources_TC_ENABLE_X509_OCSP src/x509_ocsp.c)
 
 tc_module_feature(TINY_CRYPTO_ENABLE_CMS TC_ENABLE_CMS
@@ -111,10 +113,6 @@ function(tc_validate_module_features)
      NOT TINY_CRYPTO_AES_KEY_BITS EQUAL 128)
     message(FATAL_ERROR
       "TINY_CRYPTO_ENABLE_TWIC_OBJECT_CRYPTO requires 128-bit AES keys")
-  endif()
-  if(TINY_CRYPTO_ENABLE_X509_OCSP AND
-     NOT TINY_CRYPTO_ENABLE_SHA1 AND NOT TINY_CRYPTO_ENABLE_SHA256)
-    message(FATAL_ERROR "TINY_CRYPTO_ENABLE_X509_OCSP requires SHA-1 or SHA-256")
   endif()
 endfunction()
 

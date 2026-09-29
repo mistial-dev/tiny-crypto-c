@@ -86,6 +86,11 @@ add_test(NAME test_package_boundaries
       -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
       -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/invalid-des-profile
       -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/reject_des_without_consumer.cmake)
+  add_test(NAME test_reject_ocsp_without_sha1
+    COMMAND ${CMAKE_COMMAND}
+      -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+      -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/invalid-ocsp-profile
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/reject_ocsp_without_sha1.cmake)
 
   # µunit uses C11 atomics when Clang exposes them in C99 mode. Keep the
   # vendored source unchanged and suppress that extension warning locally.
@@ -666,7 +671,9 @@ add_test(NAME test_package_boundaries
   tc_add_c_test(test_x509_ocsp_sd33 tiny-crypto-c-test-pki-native tests/x509/ocsp_sd33.c)
   target_compile_definitions(test_x509_ocsp_sd33 PRIVATE
     TC_SD33_OCSP_ROOT="${PROJECT_SOURCE_DIR}/tests/vectors/x509/ocsp/sd33"
-    TC_SD33_CERT_ROOT="${PROJECT_SOURCE_DIR}/tests/vectors/x509/piv/sd33"
+    TC_SD33_CERT_ROOT="${PROJECT_SOURCE_DIR}/tests/vectors/x509/piv/sd33")
+  tc_add_c_test(test_x509_ocsp_icam tiny-crypto-c-test-pki-native tests/x509/ocsp_icam.c)
+  target_compile_definitions(test_x509_ocsp_icam PRIVATE
     TC_ICAM_OCSP_ROOT="${PROJECT_SOURCE_DIR}/tests/vectors/x509/ocsp/icam")
   if(tc_build_cpp_tests)
     tc_add_linked_test(test_cpp_credential tiny-crypto-c-test-pki-native
@@ -1210,7 +1217,7 @@ add_test(NAME test_package_boundaries
       list(REMOVE_ITEM header_profile_definitions TC_ENABLE_SHA256=0)
       list(APPEND header_profile_definitions
         TC_ENABLE_TLV=1 TC_ENABLE_DER=1 TC_ENABLE_X509=1 TC_ENABLE_X509_PATH=1
-        TC_ENABLE_SHA256=1 TC_ENABLE_X509_OCSP=1 TC_TEST_HEADER_X509_OCSP=1)
+        TC_ENABLE_SHA1=1 TC_ENABLE_SHA256=1 TC_ENABLE_X509_OCSP=1 TC_TEST_HEADER_X509_OCSP=1)
     elseif(header_profile STREQUAL "cms")
       list(APPEND header_profile_definitions
         TC_ENABLE_TLV=1 TC_ENABLE_DER=1 TC_TLV_ENABLE_BER=1 TC_ENABLE_X509=1 TC_ENABLE_PIV_OIDS=1

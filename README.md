@@ -145,7 +145,7 @@ selected.
 | `TINY_CRYPTO_TAF_TBS_CERTIFICATE`        |     OFF | TBS certificate choice in RFC 5914 lists                      |
 | `TINY_CRYPTO_TAF_TRUST_ANCHOR_INFO`      |     OFF | TrustAnchorInfo choice in RFC 5914 lists                      |
 | `TINY_CRYPTO_ENABLE_X509_REVOCATION`     |     OFF | CRL parsing and path revocation, requires X.509 path support  |
-| `TINY_CRYPTO_ENABLE_X509_OCSP`           |     OFF | OCSP requests and response verification, requires X.509 paths |
+| `TINY_CRYPTO_ENABLE_X509_OCSP`           |     OFF | OCSP requests and responses, requires X.509 paths and SHA-1   |
 | `TINY_CRYPTO_ENABLE_KEY_CHALLENGE`       |     OFF | Key proof-of-possession challenge, requires X.509             |
 | `TINY_CRYPTO_ENABLE_GZIP`                |     OFF | Bounded GZIP decompression                                    |
 
