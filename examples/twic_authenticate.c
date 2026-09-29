@@ -595,12 +595,22 @@ static int encrypted_object_decode(TC_bytes encoded, TC_buffer output, TC_bytes*
 #endif
 
 /* Read and decrypt one protected TWIC object. plaintext borrows output. */
+/* One encrypted TWIC biometric object. encoded holds the stored BC field once
+ * read, stored holds the card response, and output receives the plaintext. */
+typedef struct {
+  uint8_t tag_id;
+  TC_bytes* encoded;
+  TC_buffer stored, output;
+} protected_object;
+
 static int protected_object_read(ExampleCardIO* io, ExampleCardReadMode mode,
-                                 TC_PIV_card_profile profile, uint8_t tag_id, TC_bytes* encoded,
-                                 TC_buffer stored, TC_buffer output, TC_bytes* plaintext,
-                                 size_t* work)
+                                 TC_PIV_card_profile profile, const protected_object* object,
+                                 TC_bytes* plaintext, size_t* work)
 {
 #if TC_ENABLE_AES && TC_AES_ENABLE_ECB && TC_AES_KEY_BITS == 128
+  const uint8_t tag_id = object->tag_id;
+  TC_bytes* encoded = object->encoded;
+  const TC_buffer stored = object->stored, output = object->output;
   const TC_TLV_limits limits = {OBJECT_BYTES, OBJECT_BYTES, 4, 2};
   if (!encoded->data) {
     ExampleCardResponse response;
@@ -632,21 +642,27 @@ static int protected_object_read(ExampleCardIO* io, ExampleCardReadMode mode,
   (void)io;
   (void)mode;
   (void)profile;
-  (void)tag_id;
-  (void)encoded;
-  (void)stored;
-  (void)output;
+  (void)object;
   (void)plaintext;
   (void)work;
   return 0;
 #endif
 }
 
+/* Signed card objects. Empty spans are read on first use, and the final
+ * recheck reuses the spans already read. */
+typedef struct {
+  TC_bytes chuid, fingerprints, face;
+} signed_objects;
+
 static int signed_objects_check(ExampleCardIO* io, const Options* options, TC_bytes certificate,
                                 TC_PIV_card_profile profile,
-                                const TC_X509_path_options* card_policy, TC_bytes* encoded,
-                                TC_bytes* fingerprints, TC_bytes* face, size_t* work)
+                                const TC_X509_path_options* card_policy,
+                                signed_objects* card_objects, size_t* work)
 {
+  TC_bytes* encoded = &card_objects->chuid;
+  TC_bytes* fingerprints = &card_objects->fingerprints;
+  TC_bytes* face = &card_objects->face;
   if (!options->chuid_root)
     return 1;
   ExampleCardIdentity card;
@@ -783,16 +799,20 @@ static int signed_objects_check(ExampleCardIO* io, const Options* options, TC_by
   }
   if (!options->tpk_hex)
     return 1;
-  if (!fingerprints->data &&
-      !protected_object_read(
-          io, options->read_mode, profile, 3, &sensitive.fingerprint_object,
-          (TC_buffer){sensitive.stored_fingerprints, sizeof sensitive.stored_fingerprints},
-          (TC_buffer){sensitive.fingerprints, sizeof sensitive.fingerprints}, fingerprints, work))
+  const protected_object fingerprint_object = {
+      3,
+      &sensitive.fingerprint_object,
+      {sensitive.stored_fingerprints, sizeof sensitive.stored_fingerprints},
+      {sensitive.fingerprints, sizeof sensitive.fingerprints}};
+  const protected_object face_object = {8,
+                                        &sensitive.face_object,
+                                        {sensitive.stored_face, sizeof sensitive.stored_face},
+                                        {sensitive.face, sizeof sensitive.face}};
+  if (!fingerprints->data && !protected_object_read(io, options->read_mode, profile,
+                                                    &fingerprint_object, fingerprints, work))
     return 0;
   if (profile == TC_TWIC_NEXGEN_CARD && !face->data &&
-      !protected_object_read(io, options->read_mode, profile, 8, &sensitive.face_object,
-                             (TC_buffer){sensitive.stored_face, sizeof sensitive.stored_face},
-                             (TC_buffer){sensitive.face, sizeof sensitive.face}, face, work))
+      !protected_object_read(io, options->read_mode, profile, &face_object, face, work))
     return 0;
   const TC_PIV_CMS_kind signature_profile =
       options->legacy_biometric ? TC_PIV_CMS_BIOMETRIC_LEGACY : TC_PIV_CMS_BIOMETRIC;
@@ -997,12 +1017,9 @@ int main(int argc, char** argv)
                                                                 : "Unexpected validation result";
   if (result != EXAMPLE_TWIC_AUTHENTICATED)
     goto cleanup;
-  TC_bytes encoded_chuid = {NULL, 0};
-  TC_bytes fingerprints = {NULL, 0};
-  TC_bytes face = {NULL, 0};
+  signed_objects card_objects = {{NULL, 0}, {NULL, 0}, {NULL, 0}};
   failure = "Signed credential object validation failed";
-  if (!signed_objects_check(&io, &options, certificate, profile, &path, &encoded_chuid,
-                            &fingerprints, &face, &work))
+  if (!signed_objects_check(&io, &options, certificate, profile, &path, &card_objects, &work))
     goto cleanup;
   /* Recheck time-sensitive decisions after the physical card exchange. */
   failure = "Clock failure, rollback or transaction time limit";
@@ -1066,8 +1083,8 @@ int main(int argc, char** argv)
       accepted = checked == TC_TLV_OK && result.status == TC_X509_CRL_UNREVOKED;
     }
   }
-  if (accepted && !signed_objects_check(&io, &options, certificate, profile, &path, &encoded_chuid,
-                                        &fingerprints, &face, &work)) {
+  if (accepted &&
+      !signed_objects_check(&io, &options, certificate, profile, &path, &card_objects, &work)) {
     accepted = 0;
     failure = "Signed credential object failed its final time check";
   }
