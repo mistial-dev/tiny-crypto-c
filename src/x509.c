@@ -112,7 +112,8 @@ TC_TLV_result TC_X509_name_init(TC_TLV_reader* reader, TC_bytes encoded,
   TC_TLV_reader parsed;
   TC_TLV_element element;
   TC_TLV_result result;
-  if (!reader)
+  /* The returned reader is rewritten while it reads encoded. */
+  if (!reader || !tc_internal_ranges_disjoint(reader, sizeof *reader, encoded.data, encoded.length))
     return TC_TLV_ARGUMENT;
   result = TC_TLV_read(encoded, TC_TLV_DER, bounds, &element);
   if (result != TC_TLV_OK)

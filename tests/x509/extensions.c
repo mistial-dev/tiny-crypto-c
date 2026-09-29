@@ -1030,10 +1030,48 @@ static MunitResult optional_field_order(const MunitParameter params[], void* use
   return MUNIT_OK;
 }
 
+/* A reader rewrites itself while it reads its input, so the Name, Extensions,
+ * PolicyMappings and policy-qualifier readers reject a reader stored inside
+ * the bytes it would read. The bytes stay unchanged. */
+static MunitResult reader_inside_input(const MunitParameter params[], void* user)
+{
+  static const uint8_t sequence[] = {0x30, 2, 5, 0};
+  union {
+    uint8_t bytes[sizeof(TC_TLV_reader) + sizeof sequence];
+    TC_TLV_reader reader;
+  } shared;
+  uint8_t before[sizeof shared];
+  TC_TLV_reader outside;
+  const TC_bytes value = {shared.bytes, sizeof sequence};
+  (void)params;
+  (void)user;
+  for (int reader_function = 0; reader_function < 4; ++reader_function) {
+    TC_TLV_result result;
+    memset(&shared, 0x5a, sizeof shared);
+    memcpy(shared.bytes, sequence, sizeof sequence);
+    memcpy(before, &shared, sizeof shared);
+    if (reader_function == 0)
+      result = TC_X509_name_init(&shared.reader, value, &value_limits);
+    else if (reader_function == 1)
+      result = TC_X509_extensions_init(&shared.reader, value, &value_limits);
+    else if (reader_function == 2)
+      result = TC_X509_policy_mappings_init(&shared.reader, value, &value_limits);
+    else
+      result = TC_X509_policy_qualifiers_init(&shared.reader, value, &value_limits);
+    munit_assert_int(result, ==, TC_TLV_ARGUMENT);
+    munit_assert_memory_equal(sizeof shared, &shared, before);
+  }
+  /* The same bytes read with a disjoint reader. */
+  munit_assert_int(TC_X509_name_init(&outside, value, &value_limits), ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_extensions_init(&outside, value, &value_limits), ==, TC_TLV_OK);
+  return MUNIT_OK;
+}
+
 static MunitTest tests[] = {
     {"/optional-field-order", optional_field_order, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/element-accounting", element_accounting, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/read-overlap", read_overlap, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/reader-inside-input", reader_inside_input, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/key-identifiers", key_identifiers, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/subtree-limits", subtree_limits, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/name-constraints", name_constraints, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

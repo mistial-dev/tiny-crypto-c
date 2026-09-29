@@ -10,8 +10,10 @@ static TC_TLV_result value(TC_bytes encoded, uint8_t tag, TC_bytes* out)
   TC_TLV_limits limits = {SIZE_MAX, SIZE_MAX, 1, 1};
   TC_TLV_element e;
   TC_TLV_result result = TC_TLV_read(encoded, TC_TLV_DER, &limits, &e);
-  /* Input is the complete encoding, so a truncated object is malformed. */
-  if (result == TC_TLV_MORE)
+  /* Input is the complete encoding, so a truncated object is malformed. With
+   * unbounded limits, LIMIT reports a tag or length field wider than this
+   * build parses, which no complete in-memory encoding needs. */
+  if (result == TC_TLV_MORE || result == TC_TLV_LIMIT)
     return TC_TLV_INVALID;
   if (result != TC_TLV_OK)
     return result;
@@ -264,6 +266,9 @@ TC_TLV_result TC_DER_rsa_private(TC_bytes encoded, TC_DER_rsa_private_key* out)
   if (result != TC_TLV_OK)
     return result;
   result = TC_DER_uint32(fields[0], &version);
+  /* A version above UINT32_MAX is neither defined version. */
+  if (result == TC_TLV_LIMIT)
+    return TC_TLV_INVALID;
   if (result != TC_TLV_OK)
     return result;
   if (version == MULTI_PRIME)
@@ -328,6 +333,9 @@ TC_TLV_result TC_DER_private_key_info(TC_bytes encoded, TC_DER_private_key* out)
   if (result != TC_TLV_OK)
     return result;
   result = TC_DER_uint32(fields[VERSION], &version);
+  /* RFC 5958 section 2: a later version, however large, is a newer syntax. */
+  if (result == TC_TLV_LIMIT)
+    return TC_TLV_UNSUPPORTED;
   if (result != TC_TLV_OK)
     return result;
   if (version > WITH_PUBLIC_KEY)

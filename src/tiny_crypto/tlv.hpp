@@ -20,6 +20,9 @@ class TLVReader {
 public:
   TLVReader() noexcept : reader_(), ready_(false)
   {}
+  /* Start a root reader with TC_TLV_reader_init. input stays borrowed and
+   * unchanged while the reader is used. A failure leaves this reader unusable
+   * until the next successful init. */
   TC_CPP_NODISCARD TC_TLV_result init(TC_bytes input, TC_TLV_profile profile,
                                       const TC_TLV_limits& limits) noexcept
   {
@@ -52,6 +55,7 @@ public:
       ready_ = true;
     return result;
   }
+  /* TC_TLV_next. An unusable reader returns TC_TLV_ARGUMENT. */
   TC_CPP_NODISCARD TC_TLV_result next(TC_TLV_element& element) noexcept
   {
     return ready_ ? TC_TLV_next(&reader_, &element) : TC_TLV_ARGUMENT;

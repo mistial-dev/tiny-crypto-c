@@ -139,9 +139,13 @@ static int tc_rsa_keygen_storage_check(const TC_RSA_keygen_state* state,
                                        buffers[j].capacity))
         return 0;
   }
+  const size_t words_size = workspace->capacity * sizeof *workspace->words;
   return tc_internal_ranges_disjoint(state, sizeof *state, workspace, sizeof *workspace) &&
-         tc_internal_ranges_disjoint(state, sizeof *state, workspace->words,
-                                     workspace->capacity * sizeof *workspace->words);
+         tc_internal_ranges_disjoint(state, sizeof *state, workspace->words, words_size) &&
+         tc_internal_ranges_disjoint(state, sizeof *state, output, sizeof *output) &&
+         tc_internal_ranges_disjoint(output, sizeof *output, workspace, sizeof *workspace) &&
+         tc_internal_ranges_disjoint(output, sizeof *output, workspace->words, words_size) &&
+         tc_internal_ranges_disjoint(workspace, sizeof *workspace, workspace->words, words_size);
 }
 
 TC_RSA_result TC_RSA_keygen_init(TC_RSA_keygen_state* state, size_t bits,

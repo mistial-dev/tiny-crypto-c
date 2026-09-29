@@ -547,7 +547,9 @@ TC_EC_result TC_ECDH(TC_EC_curve curve, TC_bytes private_key, TC_bytes peer_publ
       !tc_internal_ranges_disjoint(peer_public_key.data, peer_public_key.length, shared_secret.data,
                                    shared_secret.capacity) ||
       !tc_internal_ranges_disjoint(peer_public_key.data, peer_public_key.length, workspace,
-                                   sizeof *workspace))
+                                   sizeof *workspace) ||
+      !tc_internal_ranges_disjoint(peer_public_key.data, peer_public_key.length, work,
+                                   sizeof *work))
     return TC_EC_ARGUMENT;
   if (!bytes)
     return TC_EC_UNSUPPORTED;
@@ -736,13 +738,17 @@ TC_EC_result TC_ECDSA_sign_digest(TC_EC_curve curve, TC_bytes private_key, TC_by
       !tc_internal_ranges_disjoint(public_key.data, public_key.length, signature.data,
                                    signature.capacity) ||
       !tc_internal_ranges_disjoint(public_key.data, public_key.length, workspace,
-                                   sizeof *workspace))
+                                   sizeof *workspace) ||
+      !tc_internal_ranges_disjoint(public_key.data, public_key.length, execution,
+                                   sizeof *execution))
     return TC_EC_ARGUMENT;
   if (!bytes)
     return TC_EC_UNSUPPORTED;
   if (private_key.length != bytes || public_key.length != 1 + 2 * bytes)
     return TC_EC_INVALID;
-  if (signature.capacity < 2 * bytes)
+  /* Preflight the first attempt so a short budget leaves the workspace unchanged. */
+  if (signature.capacity < 2 * bytes || !execution->random_attempts ||
+      execution->work.remaining < TC_EC_operation_work(curve, TC_EC_OPERATION_SIGN))
     return TC_EC_LIMIT;
   TC_EC_result status = TC_EC_LIMIT;
   initialize(&s, &workspace->ec, bytes);

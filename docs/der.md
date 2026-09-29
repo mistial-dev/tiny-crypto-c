@@ -70,12 +70,13 @@ for the RSA and EC code that consumes them.
 Every reader returns one of these values:
 
 - `TC_TLV_OK`: the encoding is valid and the outputs are written.
-- `TC_TLV_INVALID`: malformed, truncated or trailing input, a wrong tag, or a
-  value that breaks a DER rule below.
-- `TC_TLV_LIMIT`: a value exceeds its output type, such as an INTEGER above
-  `UINT32_MAX` for `TC_DER_uint32`.
+- `TC_TLV_INVALID`: malformed, truncated or trailing input, a wrong tag, a
+  tag or length field wider than the build parses, or a value that breaks a
+  DER rule below.
+- `TC_TLV_LIMIT`: an INTEGER above `UINT32_MAX` for `TC_DER_uint32` and
+  `TC_DER_uint32_contents`.
 - `TC_TLV_UNSUPPORTED`: PKCS #1 version 1 (multi-prime) and PKCS #8 versions
-  above 1.
+  above 1, including versions above `UINT32_MAX`.
 - `TC_TLV_ARGUMENT`: a NULL output, or a span with NULL data and a nonzero
   length.
 

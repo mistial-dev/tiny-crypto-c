@@ -58,44 +58,69 @@ typedef struct {
   uint32_t state;
 } TC_key_challenge_workspace;
 
-/* Generate a fresh random digest and prepare the input for a private-key
- * operation. RSA returns an encoded representative of the modulus length.
- * ECDSA returns the digest.
+/* Start a challenge: draw a fresh random digest from random and prepare the
+ * input for the card's private-key operation. For RSA, *out is the encoded
+ * message of the modulus length: EMSA-PKCS1-v1_5 (RFC 8017 section 9.2) or
+ * EMSA-PSS with a random salt (RFC 8017 section 9.1.1). For ECDSA, *out is
+ * the digest itself for signing under FIPS 186-5 section 6.4.1. *out borrows
+ * workspace and stays valid until verify, clear or the next prepare.
  *
  * Supported keys are RSA moduli accepted by TC_RSA_modulus_supported, with
  * PKCS #1 v1.5 or PSS and a salt of at most TC_KEY_CHALLENGE_MAX_SALT_BYTES,
- * and ECDSA keys on a named curve identified by the X.509 key decoder. Other
- * keys, schemes and sizes return UNSUPPORTED before any RNG use. This includes
- * an ECDSA key with curve TC_EC_UNKNOWN. The signature provider decides at
- * verify whether it implements an identified curve.
+ * and ECDSA keys on a named curve identified by the X.509 key decoder. The
+ * signature provider decides at verify whether it implements an identified
+ * curve. The key, options and random context stay disjoint from workspace,
+ * work and out.
  *
- * Work is the digest length, plus the salt length for PSS, plus
- * TC_RSA_encode_v15_work or TC_RSA_encode_pss_work for RSA. A smaller budget
- * returns LIMIT before any RNG use.
+ * TC_KEY_CHALLENGE_ARGUMENT     NULL key, options, random.fill, workspace,
+ *                               work or out, or overlap.
+ * TC_KEY_CHALLENGE_UNSUPPORTED  unknown hash, MGF hash or salt set outside
+ *                               PSS, another key type or scheme, an RSA size
+ *                               outside the supported set, a larger salt or
+ *                               an ECDSA key with curve TC_EC_UNKNOWN.
+ * TC_KEY_CHALLENGE_LIMIT        work below the full cost.
+ * TC_KEY_CHALLENGE_ERROR        a random request failed.
  *
- * NULL pointers and overlapping storage return ARGUMENT. Preflight failures
- * preserve workspace, out and work. A random-source failure returns ERROR.
- * Failures after RNG use wipe workspace. Keep all storage disjoint. */
+ * ARGUMENT, UNSUPPORTED and LIMIT leave workspace, out and work unchanged
+ * and make no RNG request. A later failure wipes workspace and consumes the
+ * work spent. out changes only on TC_KEY_CHALLENGE_OK. Work: the digest
+ * length, plus the salt length for PSS, plus TC_RSA_encode_v15_work or
+ * TC_RSA_encode_pss_work for RSA. */
 TC_key_challenge_result TC_key_challenge_prepare(const TC_X509_public_key* key,
                                                  const TC_key_challenge_options* options,
                                                  TC_random_source random,
                                                  TC_key_challenge_workspace* workspace,
                                                  TC_work_budget* work, TC_bytes* out);
 
-/* Verify the private operation's result against the retained digest. This
- * clears every active challenge, including on ARGUMENT. A bad proof returns
- * INVALID. Exhausted work returns LIMIT. A provider that lacks the key's curve
- * or scheme returns UNSUPPORTED, and a provider failure returns ERROR. A NULL
- * workspace or one without an active challenge returns ARGUMENT and stays
- * unchanged. NULL pointers, an empty signature and storage overlapping the
- * workspace return ARGUMENT without charging work. Keep borrowed inputs and
- * provider state disjoint from workspace. */
+/* Verify the card's response against the retained digest with
+ * TC_X509_signature_verify_digest, then wipe workspace. key is the same
+ * public key passed to prepare. signature is borrowed and uses the
+ * provider's encoding: an RSA signature of the modulus length or a DER
+ * ECDSA-Sig-Value. key, provider state and signature stay disjoint from
+ * workspace.
+ *
+ * TC_KEY_CHALLENGE_ARGUMENT     NULL workspace or no active challenge, with
+ *                               workspace unchanged. With an active
+ *                               challenge: NULL key, provider or work, an
+ *                               empty signature or storage overlapping
+ *                               workspace, with workspace wiped and work
+ *                               unchanged.
+ * TC_KEY_CHALLENGE_INVALID      the proof fails verification.
+ * TC_KEY_CHALLENGE_UNSUPPORTED  the provider lacks the key's curve, scheme
+ *                               or size.
+ * TC_KEY_CHALLENGE_LIMIT        work ran out.
+ * TC_KEY_CHALLENGE_ERROR        the provider failed.
+ *
+ * Every result except the first ARGUMENT case wipes workspace, so each
+ * challenge verifies at most once. Work: the charges of
+ * TC_X509_signature_verify_digest, including the provider's own work. */
 TC_key_challenge_result TC_key_challenge_verify(const TC_X509_public_key* key, TC_bytes signature,
                                                 const TC_X509_signature_provider* provider,
                                                 TC_key_challenge_workspace* workspace,
                                                 TC_work_budget* work);
 
-/* Abandon an active challenge and wipe its digest and representative. */
+/* Abandon an active challenge and wipe the whole workspace. Accepts NULL.
+ * Charges no work. */
 void TC_key_challenge_clear(TC_key_challenge_workspace* workspace);
 
 #ifdef __cplusplus

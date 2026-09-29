@@ -233,6 +233,73 @@ static MunitResult keygen_capacity(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+/* The output metadata, the workspace descriptor and the state are disjoint
+ * from the scratch limbs and from each other. Metadata inside scratch or the
+ * state is ARGUMENT, and the scratch bytes stay unchanged. */
+static MunitResult keygen_metadata_overlap(const MunitParameter params[], void* user)
+{
+  enum {
+    BITS = 1024,
+    BYTES = BITS / 8,
+    PRIME_BYTES = BYTES / 2,
+    WORDS = TC_RSA_KEYGEN_WORKSPACE_WORDS(BITS)
+  };
+  static union {
+    TC_RSA_word words[WORDS];
+    TC_RSA_keygen_output output;
+    TC_RSA_workspace workspace;
+  } scratch;
+  static union {
+    TC_RSA_keygen_state state;
+    TC_RSA_keygen_output output;
+  } shared;
+  static uint8_t modulus[BYTES], exponent[3], d[BYTES], p[PRIME_BYTES], q[PRIME_BYTES];
+  static uint8_t before[sizeof scratch];
+  const TC_RSA_keygen_output exact = {{modulus, sizeof modulus},
+                                      {exponent, sizeof exponent},
+                                      {d, sizeof d},
+                                      {p, sizeof p},
+                                      {q, sizeof q}};
+  const TC_RSA_workspace workspace = {scratch.words, WORDS};
+  const TC_RSA_keygen_limits limits = {1, 1};
+  TC_RSA_keygen_state state;
+  (void)params;
+  (void)user;
+  memset(&state, 0, sizeof state);
+
+  /* Output metadata stored in the scratch limbs. */
+  memset(&scratch, 0xa5, sizeof scratch);
+  scratch.output = exact;
+  memcpy(before, &scratch, sizeof scratch);
+  munit_assert_int(TC_RSA_keygen_init(&state, BITS, &scratch.output, limits, &workspace), ==,
+                   TC_RSA_ARGUMENT);
+  munit_assert_memory_equal(sizeof scratch, &scratch, before);
+  munit_assert_uint32(state.marker, ==, 0);
+
+  /* Workspace descriptor stored in the scratch limbs. */
+  memset(&scratch, 0xa5, sizeof scratch);
+  scratch.workspace = workspace;
+  memcpy(before, &scratch, sizeof scratch);
+  munit_assert_int(TC_RSA_keygen_init(&state, BITS, &exact, limits, &scratch.workspace), ==,
+                   TC_RSA_ARGUMENT);
+  munit_assert_memory_equal(sizeof scratch, &scratch, before);
+  munit_assert_uint32(state.marker, ==, 0);
+
+  /* Output metadata stored in the state. */
+  memset(&scratch, 0xa5, sizeof scratch);
+  memset(&shared, 0, sizeof shared);
+  shared.output = exact;
+  munit_assert_int(TC_RSA_keygen_init(&shared.state, BITS, &shared.output, limits, &workspace), ==,
+                   TC_RSA_ARGUMENT);
+  munit_assert_ptr_equal(shared.output.modulus.data, modulus);
+  for (size_t i = 0; i < sizeof scratch; ++i)
+    munit_assert_uint(((const uint8_t*)&scratch)[i], ==, 0xa5);
+
+  munit_assert_int(TC_RSA_keygen_init(&state, BITS, &exact, limits, &workspace), ==, TC_RSA_OK);
+  TC_RSA_keygen_clear(&state);
+  return MUNIT_OK;
+}
+
 static MunitResult ranges(const MunitParameter params[], void* user)
 {
   enum { BYTES = 128, WORDS = TC_RSA_VALIDATE_WORKSPACE_WORDS(BYTES * 8) };
@@ -480,6 +547,8 @@ int main(int argc, char** argv)
   MunitTest tests[] = {
       {"/key-generation", key_generation, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/keygen-capacity", keygen_capacity, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/keygen-metadata-overlap", keygen_metadata_overlap, NULL, NULL, MUNIT_TEST_OPTION_NONE,
+       NULL},
       {"/exponent-range", exponent_range, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/ranges", ranges, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/operation-ranges", operation_ranges, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

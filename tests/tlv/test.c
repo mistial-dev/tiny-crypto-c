@@ -904,6 +904,41 @@ static MunitResult tree_reads(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+#if TC_ENABLE_DER
+/* The DER readers take a complete encoding, so a tag or length field wider
+ * than the build parses is malformed input. A version too large for a
+ * uint32_t follows the reader's rule for other unknown versions. */
+static MunitResult der_status_classes(const MunitParameter params[], void* user)
+{
+  (void)params;
+  (void)user;
+  static const uint8_t long_tag[] = {0x1f, 0x81, 0x81, 0x81, 0x81, 0x81, 0x01, 1, 0};
+  static const uint8_t wide_length[] = {2, 0x89, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0};
+  static const uint8_t pkcs8_version[] = {0x30, 17, 2, 5,  1, 0, 0, 0,    0, 0x30,
+                                          3,    6,  1, 42, 4, 1, 7, 0xa0, 0};
+  static const uint8_t rsa_version[] = {0x30, 31, 2, 5, 1, 0, 0, 0, 0, 2, 1, 1, 2, 1, 1, 2, 1,
+                                        1,    2,  1, 1, 2, 1, 1, 2, 1, 1, 2, 1, 1, 2, 1, 1};
+  TC_bytes v = {NULL, 0};
+  int sign = 3;
+  TC_DER_private_key key;
+  TC_DER_rsa_private_key rsa;
+  memset(&key, 0xa5, sizeof key);
+  memset(&rsa, 0xa5, sizeof rsa);
+  munit_assert_int(TC_DER_integer((TC_bytes){long_tag, sizeof long_tag}, &v, &sign), ==,
+                   TC_TLV_INVALID);
+  munit_assert_int(TC_DER_integer((TC_bytes){wide_length, sizeof wide_length}, &v, &sign), ==,
+                   TC_TLV_INVALID);
+  munit_assert_int(TC_DER_private_key_info((TC_bytes){pkcs8_version, sizeof pkcs8_version}, &key),
+                   ==, TC_TLV_UNSUPPORTED);
+  munit_assert_int(TC_DER_rsa_private((TC_bytes){rsa_version, sizeof rsa_version}, &rsa), ==,
+                   TC_TLV_INVALID);
+  munit_assert(!v.data && !v.length && sign == 3);
+  munit_assert_uint(((const uint8_t*)&key)[0], ==, 0xa5);
+  munit_assert_uint(((const uint8_t*)&rsa)[0], ==, 0xa5);
+  return MUNIT_OK;
+}
+#endif
+
 static MunitTest tests[] = {
     {"/headers", headers, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/lengths", lengths, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
@@ -916,6 +951,7 @@ static MunitTest tests[] = {
     {"/signatures", signatures, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/der", der, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/der-truncation", der_truncation, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/der-status-classes", der_status_classes, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/subject-public-key", subject_public_key, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/oid-contents", oid_contents, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/private-key-info", private_key_info, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

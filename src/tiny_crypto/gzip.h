@@ -37,21 +37,40 @@ typedef enum {
   TC_GZIP_UNSUPPORTED
 } TC_GZIP_result;
 
-/* Decode complete GZIP members (RFC 1952) with CRC32 and ISIZE checks.
- *   input          complete members. Borrowed and read-only for the call.
- *   workspace      caller-owned scratch. Needs no initialization and is wiped
- *                  before return. Size it with sizeof(TC_GZIP_workspace).
- *   work           remaining work budget, decremented by bounded decoding steps
- *                  (input bits, table entries and output/checksum bytes).
- *   output         caller-owned storage for the decoded bytes. output.data may
- *                  be NULL when output.capacity is zero. Decoded output doubles
- *                  as back-reference history.
- *   output_length  receives the decoded length on OK.
- * Concatenated members share output capacity and the remaining work budget.
- * Trailing non-member bytes return INVALID. Input, output, workspace, work and
- * output_length must be disjoint. ARGUMENT preserves all storage. Other
- * failures wipe output.capacity bytes and leave output_length unchanged.
- * Requires GZIP support. */
+/* Decode one or more complete GZIP members (RFC 1952 section 2.3) holding
+ * DEFLATE data (RFC 1951 section 3.2), and check each member's CRC32 and
+ * ISIZE. FHCRC, when present, is checked too.
+ *   input          complete members, borrowed and read-only for the call.
+ *                  Empty input and trailing non-member bytes return INVALID.
+ *   workspace      caller-owned scratch of sizeof(TC_GZIP_workspace) bytes.
+ *                  Needs no initialization and is wiped before any return
+ *                  after the argument checks.
+ *   work           remaining size_t work budget, reduced as decoding runs:
+ *                  one unit per input bit read and per skipped header byte,
+ *                  2 * code count + 15 per Huffman table, one per code-length
+ *                  entry, one per output byte and one per CRC32 input byte.
+ *                  The unspent remainder stays in *work on every result.
+ *   output         caller-owned storage for the decoded bytes of all members.
+ *                  output.data may be NULL when output.capacity is zero.
+ *                  Decoded output doubles as back-reference history, and a
+ *                  back reference stays inside its own member.
+ *   output_length  receives the total decoded length, only on OK.
+ * Input, output, workspace, work and output_length must be pairwise
+ * disjoint.
+ *
+ * TC_GZIP_ARGUMENT     NULL workspace, work or output_length, a span with NULL
+ *                      data and a nonzero size, or overlap. Every argument is
+ *                      unchanged.
+ * TC_GZIP_UNSUPPORTED  a member with a compression method other than
+ *                      deflate (CM 8).
+ * TC_GZIP_INVALID      a bad magic number, reserved flag bits, malformed
+ *                      DEFLATE data, a back reference before the member
+ *                      start, truncation, or a CRC32, FHCRC or ISIZE
+ *                      mismatch.
+ * TC_GZIP_LIMIT        output capacity or the work budget ran out.
+ *
+ * Every failure after the argument checks wipes output.capacity bytes and
+ * leaves output_length unchanged. */
 TC_GZIP_result TC_GZIP_decode(TC_bytes input, TC_GZIP_workspace* workspace, size_t* work,
                               TC_buffer output, size_t* output_length);
 #ifdef __cplusplus

@@ -4,6 +4,7 @@
 #define TC_PKI_INTERNAL_H_
 #include <tiny_crypto/der.h>
 #include <tiny_crypto/x509.h>
+#include "internal.h"
 #include <string.h>
 
 /* Final arc of the RFC 5280 id-ce extensions (2.5.29.n), as returned by
@@ -117,7 +118,8 @@ static inline TC_TLV_result tc_pki_value_open(TC_TLV_reader* reader, TC_bytes va
   TC_TLV_reader outer, contents;
   TC_TLV_element element;
   TC_TLV_result result;
-  if (!reader)
+  /* The returned reader is rewritten while it reads value. */
+  if (!reader || !tc_internal_ranges_disjoint(reader, sizeof *reader, value.data, value.length))
     return TC_TLV_ARGUMENT;
   result = TC_TLV_reader_init(&outer, value, TC_TLV_DER, limits);
   if (result != TC_TLV_OK)

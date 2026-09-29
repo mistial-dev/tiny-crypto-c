@@ -749,6 +749,89 @@ static MunitResult short_output_and_lengths(const MunitParameter params[], void*
   return MUNIT_OK;
 }
 
+/* Signing checks its first attempt's work and a nonzero attempt count before
+ * any arithmetic. A short budget or zero attempts returns LIMIT with the
+ * workspace, work, RNG and output unchanged. */
+static MunitResult sign_budget_preflight(const MunitParameter params[], void* user)
+{
+  TC_ECDSA_workspace workspace;
+  uint8_t scalar[TC_EC_MAX_BYTES], point[1 + 2 * TC_EC_MAX_BYTES];
+  uint8_t digest[TC_EC_MAX_BYTES] = {1}, output[2 * TC_EC_MAX_BYTES];
+  SignRandom random = {0, 0, 0};
+  const TC_random_source source = {sign_nonce, &random};
+  (void)params;
+  (void)user;
+  for (size_t i = 0; i < sizeof vectors / sizeof vectors[0]; ++i) {
+    const TC_EC_curve curve = vectors[i].curve;
+    const size_t n = vectors[i].bytes;
+    const uint32_t cost = TC_EC_operation_work(curve, TC_EC_OPERATION_SIGN);
+    memset(scalar, 0, sizeof scalar);
+    scalar[n - 1] = 1;
+    munit_assert_size(tc_test_hex(vectors[i].generator, point, sizeof point), ==, 1 + 2 * n);
+    const TC_EC_execution cases[] = {{source, 4, {cost - 1}}, {source, 0, {UINT32_MAX}}};
+    for (size_t c = 0; c < sizeof cases / sizeof cases[0]; ++c) {
+      TC_EC_execution execution = cases[c];
+      memset(&workspace, 0x5a, sizeof workspace);
+      memset(output, 0xa5, sizeof output);
+      munit_assert_int(TC_ECDSA_sign_digest(curve, (TC_bytes){scalar, n},
+                                            (TC_bytes){point, 1 + 2 * n}, (TC_bytes){digest, n},
+                                            (TC_buffer){output, 2 * n}, &workspace, &execution),
+                       ==, TC_EC_LIMIT);
+      munit_assert_uint32(execution.work.remaining, ==, cases[c].work.remaining);
+      munit_assert_uint(random.calls, ==, 0);
+      for (size_t j = 0; j < sizeof workspace; ++j)
+        munit_assert_uint(((const uint8_t*)&workspace)[j], ==, 0x5a);
+      for (size_t j = 0; j < sizeof output; ++j)
+        munit_assert_uint(output[j], ==, 0xa5);
+    }
+  }
+  return MUNIT_OK;
+}
+
+/* The work counter is written during the call, so a peer or signer public
+ * key that contains it is an argument error with the key bytes unchanged. */
+static MunitResult work_overlaps_public_key(const MunitParameter params[], void* user)
+{
+  TC_EC_workspace workspace;
+  TC_ECDSA_workspace signature_workspace;
+  uint8_t scalar[TC_EC_MAX_BYTES], output[2 * TC_EC_MAX_BYTES], digest[TC_EC_MAX_BYTES] = {1};
+  union {
+    uint8_t bytes[1 + 2 * TC_EC_MAX_BYTES];
+    TC_work_budget work;
+    TC_EC_execution execution;
+  } shared;
+  uint8_t before[sizeof shared];
+  SignRandom random = {0, 0, 0};
+  (void)params;
+  (void)user;
+  for (size_t i = 0; i < sizeof vectors / sizeof vectors[0]; ++i) {
+    const TC_EC_curve curve = vectors[i].curve;
+    const size_t n = vectors[i].bytes;
+    memset(scalar, 0, sizeof scalar);
+    scalar[n - 1] = 1;
+    memset(&shared, 0, sizeof shared);
+    munit_assert_size(tc_test_hex(vectors[i].generator, shared.bytes, sizeof shared.bytes), ==,
+                      1 + 2 * n);
+    memcpy(before, &shared, sizeof shared);
+    munit_assert_int(TC_ECDH(curve, (TC_bytes){scalar, n}, (TC_bytes){shared.bytes, 1 + 2 * n},
+                             (TC_buffer){output, n}, &workspace, &shared.work),
+                     ==, TC_EC_ARGUMENT);
+    munit_assert_memory_equal(sizeof shared, &shared, before);
+    shared.execution.random = (TC_random_source){sign_nonce, &random};
+    shared.execution.random_attempts = 1;
+    shared.execution.work.remaining = UINT32_MAX;
+    memcpy(before, &shared, sizeof shared);
+    munit_assert_int(TC_ECDSA_sign_digest(curve, (TC_bytes){scalar, n},
+                                          (TC_bytes){shared.bytes, 1 + 2 * n},
+                                          (TC_bytes){digest, n}, (TC_buffer){output, 2 * n},
+                                          &signature_workspace, &shared.execution),
+                     ==, TC_EC_ARGUMENT);
+    munit_assert_memory_equal(sizeof shared, &shared, before);
+    munit_assert_uint(random.calls, ==, 0);
+  }
+  return MUNIT_OK;
+}
+
 static MunitTest tests[] = {
     {"/wycheproof", wycheproof, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/known-answers", known_answers, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
@@ -761,6 +844,9 @@ static MunitTest tests[] = {
     {"/rejected-inputs", rejected_inputs, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/coordinate-bytes", coordinate_bytes, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/short-output", short_output_and_lengths, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/sign-budget-preflight", sign_budget_preflight, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/work-overlaps-public-key", work_overlaps_public_key, NULL, NULL, MUNIT_TEST_OPTION_NONE,
+     NULL},
     {"/captured-answer", captured_answer, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
 static const MunitSuite suite = {"/ec", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};
