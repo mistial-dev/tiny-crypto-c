@@ -40,14 +40,12 @@ TC_result example_validation_options(const TC_CMS_path_options* path,
   return TC_RESULT_OK;
 }
 
-TC_credential_status example_validate_biometric(const TC_PIV_biometric_validation_request* request,
-                                                const TC_X509_store_snapshot* snapshot,
-                                                const TC_CMS_path_options* options,
-                                                const TC_CMS_revocation_policy* revocation,
-                                                size_t* work,
-                                                ExampleCMSCredentialWorkspace* storage)
+TC_credential_status example_validate_biometric(
+    const TC_PIV_biometric_validation_request* request, const TC_X509_store_snapshot* snapshot,
+    const TC_CMS_path_options* options, const TC_CMS_revocation_policy* revocation, size_t* work,
+    ExampleCMSCredentialWorkspace* storage, TC_PIV_biometric_result* out)
 {
-  if (!request || !snapshot || !options || !revocation || !work || !storage)
+  if (!request || !snapshot || !options || !revocation || !work || !storage || !out)
     return TC_CREDENTIAL_ERROR;
   TC_CMS_path_workspace path = example_cms_path_workspace(&storage->cms);
   const TC_CMS_credential_workspace workspace = example_cms_credential_workspace(storage, &path);
@@ -57,7 +55,7 @@ TC_credential_status example_validate_biometric(const TC_PIV_biometric_validatio
   TC_credential_status result = TC_CREDENTIAL_ERROR;
   if (example_validation_options(options, revocation, &validation) == TC_RESULT_OK &&
       TC_validation_context_init(&trust, &validation, &workspace, &context) == TC_RESULT_OK)
-    result = TC_PIV_biometric_validate(request, &context, work);
+    result = TC_PIV_biometric_validate(request, &context, work, out);
   TC_secure_zero(storage, sizeof *storage);
   return result;
 }

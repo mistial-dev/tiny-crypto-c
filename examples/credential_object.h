@@ -26,12 +26,14 @@ typedef TC_PIV_security_validation_request ExampleSecurityRequest;
 TC_result example_validation_options(const TC_CMS_path_options* path,
                                      const TC_CMS_revocation_policy* revocation,
                                      TC_validation_options* out);
-TC_credential_status example_validate_biometric(const TC_PIV_biometric_validation_request* request,
-                                                const TC_X509_store_snapshot* snapshot,
-                                                const TC_CMS_path_options* options,
-                                                const TC_CMS_revocation_policy* revocation,
-                                                size_t* work,
-                                                ExampleCMSCredentialWorkspace* workspace);
+/* Validate a biometric object bound to request->chuid through a held trust
+ * snapshot. options and revocation use the CHUID's evaluation time. Processing
+ * clears workspace. Only VALID writes out, which borrows the request bytes and
+ * the signer certificate. */
+TC_credential_status example_validate_biometric(
+    const TC_PIV_biometric_validation_request* request, const TC_X509_store_snapshot* snapshot,
+    const TC_CMS_path_options* options, const TC_CMS_revocation_policy* revocation, size_t* work,
+    ExampleCMSCredentialWorkspace* workspace, TC_PIV_biometric_result* out);
 TC_credential_status example_validate_security(const TC_PIV_security_validation_request* request,
                                                const TC_X509_store_snapshot* snapshot,
                                                const TC_CMS_path_options* options,

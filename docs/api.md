@@ -153,8 +153,10 @@ profile. `TC_validation_options` provides one evaluation time and signature
 provider plus separate certificate and CRL-signer policies. Initialize a
 `TC_validation_context` with held certificate/CRL trust and a sized
 `TC_CMS_credential_workspace`. A successful `TC_PIV_CHUID_result` supplies the
-authenticated object and signer to dependent checks. Callers retain responsibility
-for transport, cancellation status, and authorization.
+authenticated object and signer to dependent biometric and Security Object
+requests, which reject a result from another profile or evaluation time.
+Callers retain responsibility for transport, cancellation status, and
+authorization.
 
 ## Results and cleanup
 

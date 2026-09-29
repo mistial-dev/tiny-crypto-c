@@ -233,7 +233,7 @@ int main(void)
     if (example_validate_cvc(NULL, NULL, NULL, NULL, &work, NULL, NULL) != TC_CREDENTIAL_ERROR ||
         work != 100)
       return 1;
-    if (example_validate_biometric(NULL, NULL, NULL, NULL, &work, &scratch) !=
+    if (example_validate_biometric(NULL, NULL, NULL, NULL, &work, &scratch, NULL) !=
             TC_CREDENTIAL_ERROR ||
         work != 100)
       return 1;
@@ -263,10 +263,9 @@ int main(void)
           validation.credential.path != &validation.path)
         return 1;
     }
-    if (TC_PIV_biometric_validate(NULL, NULL, &work) != TC_CREDENTIAL_ERROR || work != 100 ||
+    if (TC_PIV_biometric_validate(NULL, NULL, &work, NULL) != TC_CREDENTIAL_ERROR || work != 100 ||
         TC_PIV_security_validate(NULL, NULL, NULL, &work, NULL) != TC_CREDENTIAL_ERROR ||
-        work != 100 ||
-        TC_TWIC_unsigned_CHUID_validate(NULL, NULL, NULL, &work) != TC_CREDENTIAL_ERROR ||
+        work != 100 || TC_TWIC_unsigned_CHUID_validate(NULL, NULL, &work) != TC_CREDENTIAL_ERROR ||
         work != 100)
       return 1;
     if (example_validate_cms_from_store(&request, &store, NULL, NULL, &work, &scratch) !=

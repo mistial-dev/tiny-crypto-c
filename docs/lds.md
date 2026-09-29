@@ -85,12 +85,14 @@ eContent with `TC_LDS_read` before checking object hashes.
 
 `TC_PIV_security_validate` in `<tiny_crypto/credential.h>` composes these
 steps with signer path and revocation validation. Supply a
-`TC_PIV_security_validation_request` containing the security object,
-authenticated CHUID
-signer certificate, card profile and expiration, and a complete array of
-`TC_PIV_security_data` records. Each record associates a container ID with the
-ordered spans to hash. The operation rejects missing, extra, and repeated containers,
-unequal mapping/LDS group sets, and digest mismatches.
+`TC_PIV_security_validation_request` containing the security object, the
+`TC_PIV_CHUID_result` from `TC_PIV_CHUID_validate`, the card profile and
+expiration, and a complete array of `TC_PIV_security_data` records. The CHUID
+result supplies the signer certificate. Its profile and time must equal the
+request profile and the context's evaluation time. Each record associates a
+container ID with the ordered spans to hash. The operation rejects missing,
+extra, and repeated containers, unequal mapping/LDS group sets, and digest
+mismatches.
 
 Supply the shared `TC_validation_context` plus a bounded
 `TC_PIV_security_validation_workspace` LDS content buffer. Keep the request,
@@ -100,7 +102,8 @@ inventory and exact protocol-defined hash inputs, including any framing or
 decryption, before calling this operation.
 
 TWIC's unsigned CHUID remains a separate object. Use
-`TC_TWIC_unsigned_CHUID_validate` to require container `0x3002` in the validated
+`TC_TWIC_unsigned_CHUID_validate` with the `TC_PIV_security_result` in the
+request's `security` field to require container `0x3002` in the validated
 inventory, compare its exact ordered parts with the supplied CHUID, and bind the
 authenticated FASC-N, GUID and expiration to the card certificate. The ordinary
 `TC_PIV_CHUID_validate` operation requires a signed CHUID.

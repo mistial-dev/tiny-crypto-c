@@ -756,7 +756,7 @@ static int signed_objects_check(ExampleCardIO* io, const Options* options, TC_by
     const TC_PIV_security_validation_request security = {sensitive.inventory.security,
                                                          TC_PIV_SECURITY_CONTAINER,
                                                          profile,
-                                                         accepted.signer,
+                                                         &accepted,
                                                          &card.expiration,
                                                          entries,
                                                          sensitive.inventory.count};
@@ -768,15 +768,15 @@ static int signed_objects_check(ExampleCardIO* io, const Options* options, TC_by
     const TC_PIV_security_validation_workspace security_workspace = {
         sensitive.scratch.security_validation.content,
         sizeof sensitive.scratch.security_validation.content};
-    const TC_TWIC_unsigned_CHUID_validation_request unsigned_request = {
-        unsigned_chuid, TC_PIV_CHUID_CONTENTS, profile, &card.identifiers};
     TC_PIV_security_result accepted_security;
+    const TC_TWIC_unsigned_CHUID_validation_request unsigned_request = {
+        unsigned_chuid, TC_PIV_CHUID_CONTENTS, profile, &card.identifiers, &accepted_security};
     if (TC_validation_context_init(&trust, &validation, &security_credential, &security_context) !=
             TC_RESULT_OK ||
         TC_PIV_security_validate(&security, &security_context, &security_workspace, work,
                                  &accepted_security) != TC_CREDENTIAL_VALID ||
-        TC_TWIC_unsigned_CHUID_validate(&unsigned_request, &accepted_security, &security_context,
-                                        work) != TC_CREDENTIAL_VALID)
+        TC_TWIC_unsigned_CHUID_validate(&unsigned_request, &security_context, work) !=
+            TC_CREDENTIAL_VALID)
       return 0;
     if (options->printed_plaintext) {
       TC_PIV_printed printed;
@@ -813,16 +813,11 @@ static int signed_objects_check(ExampleCardIO* io, const Options* options, TC_by
                                          TC_PIV_CBEFF_FACE_IMAGE};
   const size_t object_count = profile == TC_TWIC_NEXGEN_CARD ? sizeof objects / sizeof *objects : 1;
   for (size_t i = 0; i < object_count; ++i) {
-    const TC_PIV_biometric_validation_request biometric = {objects[i],
-                                                           profile,
-                                                           accepted.object.fascn,
-                                                           accepted.object.card_uuid,
-                                                           accepted.signer,
-                                                           &card.expiration,
-                                                           signature_profile,
-                                                           formats[i],
-                                                           1};
-    if (TC_PIV_biometric_validate(&biometric, &chuid_context, work) != TC_CREDENTIAL_VALID)
+    const TC_PIV_biometric_validation_request biometric = {
+        objects[i], profile, &accepted, &card.expiration, signature_profile, formats[i], 1};
+    TC_PIV_biometric_result authenticated;
+    if (TC_PIV_biometric_validate(&biometric, &chuid_context, work, &authenticated) !=
+        TC_CREDENTIAL_VALID)
       return 0;
   }
   return 1;

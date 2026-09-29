@@ -32,21 +32,26 @@ CHUID signing certificate. Keep that certificate's backing buffer stable while
 validating the biometric signature.
 
 `TC_PIV_biometric_validate` in `<tiny_crypto/credential.h>` provides this
-workflow. Pass a complete CBEFF `BC` value, the authenticated CHUID's FASC-N and
-GUID, its signing certificate, and the validated card certificate's expiration.
-The operation checks header metadata, binds the header and signed identifiers,
+workflow. Pass a complete CBEFF `BC` value, the `TC_PIV_CHUID_result` from
+`TC_PIV_CHUID_validate`, and the validated card certificate's expiration. The
+FASC-N, GUID and CHUID signer come from that result. The request profile and
+the context's evaluation time must equal the result's `profile` and `at`.
+Otherwise the operation returns `TC_CREDENTIAL_ERROR` before any work is
+charged. It checks header metadata, binds the header and signed identifiers,
 and validates the CMS signature, signer path and revocation. It shares the
 CHUID operation's content-signing policy and caller-owned context/workspace.
+On `TC_CREDENTIAL_VALID`, `TC_PIV_biometric_result` reports the format, CBEFF
+metadata, borrowed record, signer certificate, profile and evaluation time.
 An embedded biometric certificate must carry a different signing key from
 CHUID. This comparison uses RSA modulus/exponent or the named EC curve and
 point, including compressed/uncompressed representations. Reissued certificates
 with the same key follow the certificate-omission rule too.
 
 Decrypt any outer TWIC privacy-key wrapping before calling this operation. Keep
-the CHUID, biometric and certificate buffers stable through the acceptance
-decision. A successful result authenticates the biometric object. The application
-selects acceptable biometric formats and dates, validates record contents,
-and matches a physical sample. The reader command can authenticate the encrypted
+the CHUID result, biometric and certificate buffers stable through the
+acceptance decision. A successful result authenticates the biometric object.
+The application selects acceptable biometric formats and dates, validates
+record contents, and matches a physical sample. The reader command can authenticate the encrypted
 TWIC biometric objects using its `--tpk-hex` option.
 
 ## SignedData envelopes
@@ -379,8 +384,28 @@ certificate, checks any corresponding signed attributes, requires content-signin
 key usage and purpose, and verifies the signature, path and revocation status.
 Scratch is provisional and remains caller-owned; clear it when its lifetime ends.
 On success, `accepted` borrows the authenticated CHUID fields and signer
-certificate for dependent Security Object and biometric checks. Keep their
-backing bytes unchanged while those values are used.
+certificate. Pass `&accepted` as the `chuid` field of dependent Security Object
+and biometric requests. Those requests use the same card profile and a context
+with the same evaluation time. Keep the backing bytes unchanged while those
+values are used.
+
+```c
+TC_PIV_biometric_validation_request biometric = {
+    .encoded = fingerprint_bc_value,
+    .profile = TC_TWIC_NEXGEN_CARD,
+    .chuid = &accepted,
+    .card_expiration = &card_certificate.not_after,
+    .signature_profile = TC_PIV_CMS_BIOMETRIC,
+    .format = TC_PIV_CBEFF_FINGERPRINT_TEMPLATE,
+    .require_current = 1
+};
+TC_PIV_biometric_result fingerprint;
+status = TC_PIV_biometric_validate(&biometric, &context, &work, &fingerprint);
+if (status != TC_CREDENTIAL_VALID) {
+    return status;
+}
+/* fingerprint.record borrows fingerprint_bc_value for the matcher. */
+```
 
 For `TC_PIV_CARD`, the operation selects the registered PIV content-signing initial
 certificate policy, requires that exact policy in the signer certificate, and

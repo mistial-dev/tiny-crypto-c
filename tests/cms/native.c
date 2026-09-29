@@ -7130,6 +7130,14 @@ static void credential_public_workflow(const credential_issuers* issuers,
       memset(arena, 0, sizeof arena);
       munit_assert_memory_equal(parsed.fascn.length, result.chuid.object.fascn.data,
                                 parsed.fascn.data);
+      munit_assert_size(result.biometric_count, ==, request.biometric_count);
+      for (size_t i = 0; i < result.biometric_count; ++i) {
+        munit_assert_int(result.biometrics[i].format, ==, biometric_inputs[i].format);
+        munit_assert_int(result.biometrics[i].profile, ==, profile);
+        munit_assert_ptr(result.biometrics[i].record.data, >=, biometric_inputs[i].encoded.data);
+        munit_assert_ptr(result.biometrics[i].record.data + result.biometrics[i].record.length, <=,
+                         biometric_inputs[i].encoded.data + biometric_inputs[i].encoded.length);
+      }
       if (variant == VALID) {
         const unsigned calls = proof.calls;
         request.biometric_count = 4;
@@ -7473,6 +7481,11 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
         if (variant == CLEAR && !strcmp(fascn_namespace, "piv") && has_uuid &&
             !strcmp(signing_policy, "required") && !strcmp(signer_profile, "piv")) {
           const size_t chuid_work = work;
+          /* The CHUID accepted in this evaluation, as TC_PIV_CHUID_validate
+           * reports it. Dependent objects take identifiers and the signer from it. */
+          TC_PIV_CHUID_result bound_chuid = {chuid, object.certificate, object_options.at,
+                                             object_request.profile};
+          TC_PIV_biometric_result biometric_result;
           {
             uint8_t security[OBJECT_BYTES];
             uint8_t unsigned_chuid[PREFIX_BYTES + 2];
@@ -7493,7 +7506,7 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
             ExampleSecurityRequest security_request = {{security, security_length},
                                                        TC_PIV_SECURITY_CONTENTS,
                                                        object_request.profile,
-                                                       object.certificate,
+                                                       &bound_chuid,
                                                        &card_expiration,
                                                        inventory,
                                                        2};
@@ -7537,7 +7550,7 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
               ExampleSecurityRequest mixed_request = {{mixed_security, mixed_length},
                                                       TC_PIV_SECURITY_CONTENTS,
                                                       TC_TWIC_NEXGEN_CARD,
-                                                      object.certificate,
+                                                      &bound_chuid,
                                                       &card_expiration,
                                                       mixed_inventory,
                                                       2};
@@ -7573,58 +7586,56 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
               const TC_PIV_security_validation_workspace security_workspace = {
                   security_storage.content, sizeof security_storage.content};
               TC_validation_context security_context;
+              TC_PIV_security_result accepted_security;
               const TC_TWIC_unsigned_CHUID_validation_request unsigned_request = {
-                  contents[1], TC_PIV_CHUID_CONTENTS, object_request.profile, &card};
+                  contents[1], TC_PIV_CHUID_CONTENTS, object_request.profile, &card,
+                  &accepted_security};
               munit_assert_int(TC_validation_context_init(&object_trust, &object_options,
                                                           &security_credential, &security_context),
                                ==, TC_RESULT_OK);
               work = TRUST_WORK;
-              TC_PIV_security_result accepted_security;
               munit_assert_int(TC_PIV_security_validate(&security_request, &security_context,
                                                         &security_workspace, &work,
                                                         &accepted_security),
                                ==, TC_CREDENTIAL_VALID);
-              munit_assert_int(TC_TWIC_unsigned_CHUID_validate(
-                                   &unsigned_request, &accepted_security, &security_context, &work),
-                               ==, TC_CREDENTIAL_VALID);
+              munit_assert_int(
+                  TC_TWIC_unsigned_CHUID_validate(&unsigned_request, &security_context, &work), ==,
+                  TC_CREDENTIAL_VALID);
               munit_assert_ptr_equal(accepted_security.objects, inventory);
               memset(&security_storage, 0, sizeof security_storage);
-              munit_assert_int(TC_TWIC_unsigned_CHUID_validate(
-                                   &unsigned_request, &accepted_security, &security_context, &work),
-                               ==, TC_CREDENTIAL_VALID);
+              munit_assert_int(
+                  TC_TWIC_unsigned_CHUID_validate(&unsigned_request, &security_context, &work), ==,
+                  TC_CREDENTIAL_VALID);
               /* Counter aliases must leave the retained evidence unchanged. */
               TC_TWIC_unsigned_CHUID_validation_request overlapping_request = unsigned_request;
               const size_t encoded_length = overlapping_request.encoded.length;
-              munit_assert_int(TC_TWIC_unsigned_CHUID_validate(
-                                   &overlapping_request, &accepted_security, &security_context,
-                                   &overlapping_request.encoded.length),
+              munit_assert_int(TC_TWIC_unsigned_CHUID_validate(&overlapping_request,
+                                                               &security_context,
+                                                               &overlapping_request.encoded.length),
                                ==, TC_CREDENTIAL_ERROR);
               munit_assert_size(overlapping_request.encoded.length, ==, encoded_length);
               const size_t part_length = contents[1].length;
-              munit_assert_int(
-                  TC_TWIC_unsigned_CHUID_validate(&unsigned_request, &accepted_security,
-                                                  &security_context, (size_t*)&contents[1].length),
-                  ==, TC_CREDENTIAL_ERROR);
+              munit_assert_int(TC_TWIC_unsigned_CHUID_validate(&unsigned_request, &security_context,
+                                                               (size_t*)&contents[1].length),
+                               ==, TC_CREDENTIAL_ERROR);
               munit_assert_size(contents[1].length, ==, part_length);
               const size_t signer_length = accepted_security.signer.length;
-              munit_assert_int(TC_TWIC_unsigned_CHUID_validate(
-                                   &unsigned_request, &accepted_security, &security_context,
-                                   &accepted_security.signer.length),
+              munit_assert_int(TC_TWIC_unsigned_CHUID_validate(&unsigned_request, &security_context,
+                                                               &accepted_security.signer.length),
                                ==, TC_CREDENTIAL_ERROR);
               munit_assert_size(accepted_security.signer.length, ==, signer_length);
               const size_t input_limit = object_options.parsing.max_input;
-              munit_assert_int(TC_TWIC_unsigned_CHUID_validate(
-                                   &unsigned_request, &accepted_security, &security_context,
-                                   &object_options.parsing.max_input),
+              munit_assert_int(TC_TWIC_unsigned_CHUID_validate(&unsigned_request, &security_context,
+                                                               &object_options.parsing.max_input),
                                ==, TC_CREDENTIAL_ERROR);
               munit_assert_size(object_options.parsing.max_input, ==, input_limit);
               TC_validation_options next_time = object_options;
               next_time.at.second = 1;
               TC_validation_context later_context = security_context;
               later_context.options = &next_time;
-              munit_assert_int(TC_TWIC_unsigned_CHUID_validate(
-                                   &unsigned_request, &accepted_security, &later_context, &work),
-                               ==, TC_CREDENTIAL_ERROR);
+              munit_assert_int(
+                  TC_TWIC_unsigned_CHUID_validate(&unsigned_request, &later_context, &work), ==,
+                  TC_CREDENTIAL_ERROR);
               const size_t before_overlap = work;
               munit_assert_int(TC_PIV_security_validate(
                                    &security_request, &security_context, &security_workspace, &work,
@@ -7681,8 +7692,9 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
                 inventory[0].count = 0;
               if (failure == OMITTED_CHECK)
                 inventory[1].parts = &without_check;
-              security_request.chuid_signer =
-                  failure == WRONG_SIGNER ? root_der : object.certificate;
+              TC_PIV_CHUID_result wrong_signer = bound_chuid;
+              wrong_signer.signer = root_der;
+              security_request.chuid = failure == WRONG_SIGNER ? &wrong_signer : &bound_chuid;
               if (failure == WRONG_MAP)
                 security[4] = 1;
               work = failure == NO_WORK ? 0 : TRUST_WORK;
@@ -7718,9 +7730,7 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
               certificate, key, 0, chuid.fascn, chuid.card_uuid, biometric, sizeof biometric);
           ExampleBiometricRequest biometric_request = {{biometric, biometric_length},
                                                        object_request.profile,
-                                                       chuid.fascn,
-                                                       chuid.card_uuid,
-                                                       object.certificate,
+                                                       &bound_chuid,
                                                        &card_expiration,
                                                        TC_PIV_CMS_BIOMETRIC,
                                                        TC_PIV_CBEFF_FINGERPRINT_TEMPLATE,
@@ -7752,7 +7762,7 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
                 decrypted.encoded = (TC_bytes){recovered, plaintext_length};
                 work = TRUST_WORK;
                 authenticated = example_validate_biometric(&decrypted, held, &options, &revocation,
-                                                           &work, &storage);
+                                                           &work, &storage, &biometric_result);
               }
               if (wrong_key)
                 munit_assert_int(authenticated, !=, TC_CREDENTIAL_VALID);
@@ -7781,6 +7791,8 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
           };
           for (unsigned check = 0; check < BIO_CASES; ++check) {
             ExampleBiometricRequest changed = biometric_request;
+            TC_PIV_CHUID_result changed_chuid = bound_chuid;
+            changed.chuid = &changed_chuid;
             uint8_t other_guid[16];
             memcpy(other_guid, chuid.card_uuid.data, sizeof other_guid);
             other_guid[0] ^= 1;
@@ -7789,9 +7801,9 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
             if (check == BIO_HEADER)
               biometric[59] ^= 1;
             if (check == BIO_GUID)
-              changed.guid = (TC_bytes){other_guid, sizeof other_guid};
+              changed_chuid.object.card_uuid = (TC_bytes){other_guid, sizeof other_guid};
             if (check == BIO_SIGNER)
-              changed.chuid_signer = root_der;
+              changed_chuid.signer = root_der;
             if (check == BIO_PROFILE)
               changed.signature_profile = TC_PIV_CMS_CHUID;
             if (check == BIO_FORMAT)
@@ -7805,13 +7817,15 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
             TC_CMS_revocation_policy biometric_revocation = revocation;
             if (check == BIO_EXPIRED) {
               biometric_options.path.at.year = 2029;
+              changed_chuid.at = biometric_options.path.at;
               biometric_crl_policy.at = biometric_options.path.at;
               biometric_revocation.signer_policy = &biometric_crl_policy;
             }
             work = check == BIO_WORK ? 0 : TRUST_WORK;
             memset(&storage, 0xa5, sizeof storage);
             munit_assert_int(example_validate_biometric(&changed, held, &biometric_options,
-                                                        &biometric_revocation, &work, &storage),
+                                                        &biometric_revocation, &work, &storage,
+                                                        &biometric_result),
                              ==,
                              check == BIO_PROFILE                      ? TC_CREDENTIAL_ERROR
                              : check == BIO_IRIS                       ? TC_CREDENTIAL_UNSUPPORTED
@@ -7837,11 +7851,12 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
               legacy.signature_profile =
                   selected ? TC_PIV_CMS_BIOMETRIC_LEGACY : TC_PIV_CMS_BIOMETRIC;
               work = TRUST_WORK;
-              munit_assert_int(
-                  example_validate_biometric(&legacy, held, &options, &revocation, &work, &storage),
-                  ==,
-                  (attributes & 1) && (selected || (attributes & 2)) ? TC_CREDENTIAL_VALID
-                                                                     : TC_CREDENTIAL_INVALID);
+              munit_assert_int(example_validate_biometric(&legacy, held, &options, &revocation,
+                                                          &work, &storage, &biometric_result),
+                               ==,
+                               (attributes & 1) && (selected || (attributes & 2))
+                                   ? TC_CREDENTIAL_VALID
+                                   : TC_CREDENTIAL_INVALID);
             }
           }
           EVP_PKEY* biometric_key = EVP_EC_gen("prime256v1");
@@ -7875,7 +7890,8 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
                 redundant, key, 1, chuid.fascn, chuid.card_uuid, biometric, sizeof biometric);
             work = TRUST_WORK;
             munit_assert_int(example_validate_biometric(&biometric_request, held, &options,
-                                                        &revocation, &work, &storage),
+                                                        &revocation, &work, &storage,
+                                                        &biometric_result),
                              ==, TC_CREDENTIAL_INVALID);
           }
           munit_assert_int(EVP_PKEY_set_utf8_string_param(
@@ -7889,18 +7905,21 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
                                biometric, sizeof biometric);
           work = TRUST_WORK;
           munit_assert_int(example_validate_biometric(&biometric_request, held, &options,
-                                                      &revocation, &work, &storage),
+                                                      &revocation, &work, &storage,
+                                                      &biometric_result),
                            ==, TC_CREDENTIAL_VALID);
           const size_t biometric_work = TRUST_WORK - work;
           work = biometric_work - 1;
           munit_assert_int(example_validate_biometric(&biometric_request, held, &options,
-                                                      &revocation, &work, &storage),
+                                                      &revocation, &work, &storage,
+                                                      &biometric_result),
                            ==, TC_CREDENTIAL_LIMIT);
           TC_CMS_path_options bounded = options;
           bounded.path.parsing.max_input = biometric_request.encoded.length - 1;
           work = TRUST_WORK;
           munit_assert_int(example_validate_biometric(&biometric_request, held, &bounded,
-                                                      &revocation, &work, &storage),
+                                                      &revocation, &work, &storage,
+                                                      &biometric_result),
                            ==, TC_CREDENTIAL_LIMIT);
           {
             uint8_t revoked_bytes[CERT_BYTES];
@@ -7917,7 +7936,8 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
             revoked_options.index = &revoked_index;
             work = TRUST_WORK;
             munit_assert_int(example_validate_biometric(&biometric_request, held, &options,
-                                                        &revoked_options, &work, &storage),
+                                                        &revoked_options, &work, &storage,
+                                                        &biometric_result),
                              ==, TC_CREDENTIAL_REVOKED);
           }
           /* Omission with a different signing key must fail CHUID signer
@@ -7927,7 +7947,8 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
                                biometric, sizeof biometric);
           work = TRUST_WORK;
           munit_assert_int(example_validate_biometric(&biometric_request, held, &options,
-                                                      &revocation, &work, &storage),
+                                                      &revocation, &work, &storage,
+                                                      &biometric_result),
                            ==, TC_CREDENTIAL_INVALID);
           EVP_PKEY_free(biometric_key);
           static const unsigned rsa_sizes[] = {1024, 2048, 3072};
@@ -7939,25 +7960,28 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
                 encode_certificate(biometric_signer, root_key, EVP_sha256(), biometric_certificate,
                                    sizeof biometric_certificate);
             const TC_bytes rsa_certificate = {biometric_certificate, rsa_certificate_length};
-            biometric_request.chuid_signer = object.certificate;
+            bound_chuid.signer = object.certificate;
             biometric_request.encoded.length =
                 encode_biometric(biometric_signer, rsa_key, 1, chuid.fascn, chuid.card_uuid,
                                  biometric, sizeof biometric);
             work = TRUST_WORK;
             munit_assert_int(example_validate_biometric(&biometric_request, held, &options,
-                                                        &revocation, &work, &storage),
+                                                        &revocation, &work, &storage,
+                                                        &biometric_result),
                              ==, TC_CREDENTIAL_VALID);
-            biometric_request.chuid_signer = rsa_certificate;
+            bound_chuid.signer = rsa_certificate;
             work = TRUST_WORK;
             munit_assert_int(example_validate_biometric(&biometric_request, held, &options,
-                                                        &revocation, &work, &storage),
+                                                        &revocation, &work, &storage,
+                                                        &biometric_result),
                              ==, TC_CREDENTIAL_INVALID);
             biometric_request.encoded.length =
                 encode_biometric(biometric_signer, rsa_key, 0, chuid.fascn, chuid.card_uuid,
                                  biometric, sizeof biometric);
             work = TRUST_WORK;
             munit_assert_int(example_validate_biometric(&biometric_request, held, &options,
-                                                        &revocation, &work, &storage),
+                                                        &revocation, &work, &storage,
+                                                        &biometric_result),
                              ==, TC_CREDENTIAL_VALID);
             EVP_PKEY_free(rsa_key);
           }

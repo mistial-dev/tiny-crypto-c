@@ -89,8 +89,9 @@ For signed card objects:
 
 1. Validate the card certificate and read its identifiers.
 1. Pass the identifiers and card expiration to `TC_PIV_CHUID_validate`.
-1. Use the returned CHUID and signer for biometric and Security Object requests.
-1. Pass a successful `TC_PIV_security_result` to
+1. Pass the returned `TC_PIV_CHUID_result` as the `chuid` field of biometric
+   and Security Object requests. Use the same card profile and evaluation time.
+1. Pass a successful `TC_PIV_security_result` as the `security` field of
    `TC_TWIC_unsigned_CHUID_validate` to check container 3002.
 
 CHUID and Security Object results borrow original buffers and inventory

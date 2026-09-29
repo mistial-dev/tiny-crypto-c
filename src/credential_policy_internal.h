@@ -18,23 +18,30 @@
 int tc_credential_profile(TC_PIV_card_profile profile, const TC_validation_options* options,
                           int* piv, TC_PIV_oid_profile* oids);
 
-/* Configure policy for a content signer. When policy->purpose is empty, the
- * first content-signing EKU in the signer certificate becomes the purpose.
- * TWIC-compatible matching also accepts the TWIC OID. PIV cards (piv != 0)
- * additionally require the PIV content-signing certificate policy, set it as
- * the explicit initial policy, and reject signers that expire before
- * card_expiration when it is non-NULL. Every profile requires
- * digitalSignature keyUsage and a present EKU with anyExtendedKeyUsage
- * inhibited.
+/* Parse a content signer certificate with storage frames and OIDs, which
+ * are overwritten. Charges one work unit per certificate byte. The returned
+ * view borrows certificate and stays usable after storage is reused. */
+TC_TLV_result tc_credential_signer_read(TC_bytes certificate, const TC_TLV_limits* limits,
+                                        const TC_X509_path_workspace* storage, size_t* work,
+                                        TC_X509_certificate* out);
+
+/* Configure policy for a parsed content signer in one extension pass. When
+ * policy->purpose is empty, or the card is TWIC, the first content-signing EKU
+ * in the signer becomes the purpose. TWIC-compatible matching also accepts the
+ * TWIC OID. PIV cards (piv != 0) additionally require the PIV content-signing
+ * certificate policy, set it as the explicit initial policy, and reject
+ * signers that expire before card_expiration when it is non-NULL. Every
+ * profile requires digitalSignature keyUsage and a present EKU with
+ * anyExtendedKeyUsage inhibited.
  *
- * The certificate is parsed with storage frames and OIDs, which are
- * overwritten. Parsing charges 3 work units per certificate byte against
- * *work and returns TC_TLV_LIMIT, leaving *work unchanged, when the budget is
- * too small. policy->purpose and policy->initial_policies may borrow storage
- * OIDs, the certificate or static data. Keep those alive while policy is used.
- * Returns TC_TLV_INVALID when the signer lacks the required EKU or policy. */
-TC_TLV_result tc_credential_signer_policy(TC_bytes certificate, int piv, int twic_compatible,
-                                          const TC_X509_time* card_expiration,
+ * The scan charges the extension bytes, one unit per extension and the value
+ * bytes of certificatePolicies and EKU. Exhaustion returns TC_TLV_LIMIT.
+ * storage OIDs are overwritten. policy->purpose borrows signer bytes and
+ * policy->initial_policies borrows static data. policy changes only on
+ * TC_TLV_OK. Returns TC_TLV_INVALID when the signer lacks the required EKU or
+ * policy. */
+TC_TLV_result tc_credential_signer_policy(const TC_X509_certificate* signer, int piv,
+                                          int twic_compatible, const TC_X509_time* card_expiration,
                                           TC_X509_path_options* policy,
                                           const TC_X509_path_workspace* storage, size_t* work);
 

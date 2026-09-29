@@ -10,6 +10,8 @@ static_assert(std::is_standard_layout<TC_PIV_biometric_validation_request>::valu
               "Biometric requests remain ordinary C++ aggregate data");
 static_assert(std::is_standard_layout<TC_PIV_security_validation_request>::value,
               "Security requests remain ordinary C++ aggregate data");
+static_assert(std::is_standard_layout<TC_PIV_biometric_result>::value,
+              "Biometric results remain ordinary C++ aggregate data");
 
 TEST_CASE("CHUID validation rejects incomplete requests atomically")
 {
@@ -21,11 +23,11 @@ TEST_CASE("CHUID validation rejects incomplete requests atomically")
 TEST_CASE("Credential object validation rejects incomplete requests atomically")
 {
   size_t work = 100;
-  CHECK(TC_PIV_biometric_validate(nullptr, nullptr, &work) == TC_CREDENTIAL_ERROR);
+  CHECK(TC_PIV_biometric_validate(nullptr, nullptr, &work, nullptr) == TC_CREDENTIAL_ERROR);
   CHECK(work == 100);
   CHECK(TC_PIV_security_validate(nullptr, nullptr, nullptr, &work, nullptr) == TC_CREDENTIAL_ERROR);
   CHECK(work == 100);
-  CHECK(TC_TWIC_unsigned_CHUID_validate(nullptr, nullptr, nullptr, &work) == TC_CREDENTIAL_ERROR);
+  CHECK(TC_TWIC_unsigned_CHUID_validate(nullptr, nullptr, &work) == TC_CREDENTIAL_ERROR);
   CHECK(work == 100);
 }
 

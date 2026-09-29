@@ -295,15 +295,14 @@ static MunitResult validate(const MunitParameter params[], void* user_data)
   TC_PIV_biometric_validation_request fingerprint = {
       {state->fingerprint_plain, state->fingerprint_plain_length},
       card_profile,
-      chuid.object.fascn,
-      chuid.object.card_uuid,
-      chuid.signer,
+      &chuid,
       &state->card_expiration,
       TC_PIV_CMS_BIOMETRIC,
       TC_PIV_CBEFF_FINGERPRINT_TEMPLATE,
       0};
+  TC_PIV_biometric_result biometric;
   work = WORK;
-  munit_assert_int(TC_PIV_biometric_validate(&fingerprint, &state->context, &work), ==,
+  munit_assert_int(TC_PIV_biometric_validate(&fingerprint, &state->context, &work, &biometric), ==,
                    TC_CREDENTIAL_VALID);
 
   TC_bytes parts[5];
@@ -328,7 +327,7 @@ static MunitResult validate(const MunitParameter params[], void* user_data)
   TC_PIV_security_validation_request security_request = {{state->security, state->security_length},
                                                          TC_PIV_SECURITY_CONTAINER,
                                                          card_profile,
-                                                         chuid.signer,
+                                                         &chuid,
                                                          &state->card_expiration,
                                                          objects,
                                                          count};
@@ -338,12 +337,11 @@ static MunitResult validate(const MunitParameter params[], void* user_data)
   munit_assert_int(TC_PIV_security_validate(&security_request, &state->context, &security_workspace,
                                             &work, &security),
                    ==, TC_CREDENTIAL_VALID);
-  TC_TWIC_unsigned_CHUID_validation_request unsigned_request = {parts[0], TC_PIV_CHUID_CONTENTS,
-                                                                card_profile, &state->identifiers};
+  TC_TWIC_unsigned_CHUID_validation_request unsigned_request = {
+      parts[0], TC_PIV_CHUID_CONTENTS, card_profile, &state->identifiers, &security};
   work = WORK;
-  munit_assert_int(
-      TC_TWIC_unsigned_CHUID_validate(&unsigned_request, &security, &state->context, &work), ==,
-      TC_CREDENTIAL_VALID);
+  munit_assert_int(TC_TWIC_unsigned_CHUID_validate(&unsigned_request, &state->context, &work), ==,
+                   TC_CREDENTIAL_VALID);
 
   TC_bytes piv_fingerprint = first_value(
       value((TC_bytes){state->piv_fingerprint, state->piv_fingerprint_length}, 0x53), 0xbc);
@@ -355,8 +353,9 @@ static MunitResult validate(const MunitParameter params[], void* user_data)
   face_request.encoded = piv_face;
   face_request.format = TC_PIV_CBEFF_FACE_IMAGE;
   work = WORK;
-  munit_assert_int(TC_PIV_biometric_validate(&face_request, &state->context, &work), ==,
+  munit_assert_int(TC_PIV_biometric_validate(&face_request, &state->context, &work, &biometric), ==,
                    TC_CREDENTIAL_VALID);
+  munit_assert_int(biometric.format, ==, TC_PIV_CBEFF_FACE_IMAGE);
   static const uint16_t piv_containers[] = {0x3000, 0x6010, 0xdb00, 0x6030, 0x3001};
   TC_bytes piv_parts[5] = {
       value((TC_bytes){state->piv_chuid, state->piv_chuid_length}, 0x53),
@@ -371,7 +370,7 @@ static MunitResult validate(const MunitParameter params[], void* user_data)
       {state->piv_security, state->piv_security_length},
       TC_PIV_SECURITY_CONTAINER,
       card_profile,
-      chuid.signer,
+      &chuid,
       &state->card_expiration,
       piv_objects,
       5};
@@ -382,7 +381,7 @@ static MunitResult validate(const MunitParameter params[], void* user_data)
 
   state->fingerprint_plain[100] ^= 1;
   work = WORK;
-  munit_assert_int(TC_PIV_biometric_validate(&fingerprint, &state->context, &work), !=,
+  munit_assert_int(TC_PIV_biometric_validate(&fingerprint, &state->context, &work, &biometric), !=,
                    TC_CREDENTIAL_VALID);
   state->fingerprint_plain[100] ^= 1;
   state->fingerprint[10] ^= 1;
@@ -401,12 +400,217 @@ static MunitResult validate(const MunitParameter params[], void* user_data)
   return MUNIT_OK;
 }
 
+static void assert_same_time(const TC_X509_time* left, const TC_X509_time* right)
+{
+  munit_assert_uint(left->year, ==, right->year);
+  munit_assert_uint(left->month, ==, right->month);
+  munit_assert_uint(left->day, ==, right->day);
+  munit_assert_uint(left->hour, ==, right->hour);
+  munit_assert_uint(left->minute, ==, right->minute);
+  munit_assert_uint(left->second, ==, right->second);
+}
+
+/* Dependent objects take identifiers and the signer from the accepted CHUID
+ * and reject a CHUID accepted under another profile or at another time. */
+static MunitResult chuid_binding(const MunitParameter params[], void* user_data)
+{
+  const char* profile = munit_parameters_get(params, "profile");
+  prepare(profile);
+  Fixture* state = &fixture;
+  const TC_PIV_card_profile card_profile =
+      !strcmp(profile, "legacy") ? TC_TWIC_LEGACY_CARD : TC_TWIC_NEXGEN_CARD;
+  const TC_PIV_card_profile other_profile =
+      card_profile == TC_TWIC_LEGACY_CARD ? TC_TWIC_NEXGEN_CARD : TC_TWIC_LEGACY_CARD;
+  const TC_PIV_CHUID_validation_request request = {{state->signed_chuid, state->signed_length},
+                                                   TC_PIV_CHUID_CONTAINER,
+                                                   card_profile,
+                                                   TC_CHUID_PROFILE_TWIC_SIGNED,
+                                                   0,
+                                                   &state->identifiers,
+                                                   &state->card_expiration};
+  TC_PIV_CHUID_result chuid;
+  size_t work = WORK;
+  munit_assert_int(TC_PIV_CHUID_validate(&request, &state->context, &work, &chuid), ==,
+                   TC_CREDENTIAL_VALID);
+
+  TC_PIV_biometric_validation_request fingerprint = {
+      {state->fingerprint_plain, state->fingerprint_plain_length},
+      card_profile,
+      &chuid,
+      &state->card_expiration,
+      TC_PIV_CMS_BIOMETRIC,
+      TC_PIV_CBEFF_FINGERPRINT_TEMPLATE,
+      0};
+  TC_PIV_biometric_result biometric;
+  work = WORK;
+  munit_assert_int(TC_PIV_biometric_validate(&fingerprint, &state->context, &work, &biometric), ==,
+                   TC_CREDENTIAL_VALID);
+  munit_assert_size(work, <, WORK);
+  munit_assert_int(biometric.format, ==, TC_PIV_CBEFF_FINGERPRINT_TEMPLATE);
+  munit_assert_int(biometric.profile, ==, card_profile);
+  assert_same_time(&biometric.at, &state->options.at);
+  munit_assert_size(biometric.signer.length, >, 0);
+  munit_assert_ptr(biometric.record.data, >=, state->fingerprint_plain);
+  munit_assert_ptr(biometric.record.data + biometric.record.length, <=,
+                   state->fingerprint_plain + state->fingerprint_plain_length);
+  munit_assert_int(TC_PIV_CBEFF_format_identify(&biometric.metadata), ==,
+                   TC_PIV_CBEFF_FINGERPRINT_TEMPLATE);
+
+  /* Each rejected binding leaves work and the result unchanged. */
+  TC_PIV_biometric_result saved = biometric;
+  TC_PIV_CHUID_result later = chuid;
+  later.at.second = (uint8_t)(later.at.second + 1);
+  TC_PIV_CHUID_result other = chuid;
+  other.profile = other_profile;
+  TC_PIV_CHUID_result piv = chuid;
+  piv.profile = TC_PIV_CARD;
+  const TC_PIV_CHUID_result* results[] = {&later, &other, &piv, NULL};
+  for (size_t i = 0; i < sizeof results / sizeof *results; ++i) {
+    TC_PIV_biometric_validation_request changed = fingerprint;
+    changed.chuid = results[i];
+    work = WORK;
+    munit_assert_int(TC_PIV_biometric_validate(&changed, &state->context, &work, &biometric), ==,
+                     TC_CREDENTIAL_ERROR);
+    munit_assert_size(work, ==, WORK);
+    munit_assert_int(biometric.format, ==, saved.format);
+    munit_assert_ptr_equal(biometric.record.data, saved.record.data);
+    munit_assert_ptr_equal(biometric.signer.data, saved.signer.data);
+  }
+  TC_PIV_biometric_validation_request mismatched = fingerprint;
+  mismatched.profile = other_profile;
+  work = WORK;
+  munit_assert_int(TC_PIV_biometric_validate(&mismatched, &state->context, &work, &biometric), ==,
+                   TC_CREDENTIAL_ERROR);
+  munit_assert_size(work, ==, WORK);
+
+  /* A CHUID result with another GUID fails identifier binding. */
+  uint8_t other_guid[16];
+  munit_assert_size(chuid.object.card_uuid.length, ==, sizeof other_guid);
+  memcpy(other_guid, chuid.object.card_uuid.data, sizeof other_guid);
+  other_guid[0] ^= 1;
+  TC_PIV_CHUID_result other_card = chuid;
+  other_card.object.card_uuid = (TC_bytes){other_guid, sizeof other_guid};
+  mismatched = fingerprint;
+  mismatched.chuid = &other_card;
+  work = WORK;
+  munit_assert_int(TC_PIV_biometric_validate(&mismatched, &state->context, &work, &biometric), ==,
+                   TC_CREDENTIAL_INVALID);
+  munit_assert_ptr_equal(biometric.record.data, saved.record.data);
+  munit_assert_size(biometric.record.length, ==, saved.record.length);
+  munit_assert_ptr_equal(biometric.signer.data, saved.signer.data);
+
+  /* A tampered record fails after binding and leaves the result unchanged. */
+  memset(&biometric, 0xa5, sizeof biometric);
+  saved = biometric;
+  state->fingerprint_plain[100] ^= 1;
+  work = WORK;
+  munit_assert_int(TC_PIV_biometric_validate(&fingerprint, &state->context, &work, &biometric), !=,
+                   TC_CREDENTIAL_VALID);
+  state->fingerprint_plain[100] ^= 1;
+  munit_assert_int(biometric.format, ==, saved.format);
+  munit_assert_int(biometric.profile, ==, saved.profile);
+  munit_assert_ptr_equal(biometric.record.data, saved.record.data);
+  munit_assert_ptr_equal(biometric.signer.data, saved.signer.data);
+  munit_assert_ptr_equal(biometric.metadata.creator.data, saved.metadata.creator.data);
+
+  /* Work exhaustion after binding returns LIMIT and leaves the result unchanged. */
+  work = 1;
+  munit_assert_int(TC_PIV_biometric_validate(&fingerprint, &state->context, &work, &biometric), ==,
+                   TC_CREDENTIAL_LIMIT);
+  munit_assert_ptr_equal(biometric.record.data, saved.record.data);
+
+  /* The result must stay disjoint from the request and the accepted CHUID. */
+  work = WORK;
+  munit_assert_int(TC_PIV_biometric_validate(&fingerprint, &state->context, &work,
+                                             (TC_PIV_biometric_result*)(void*)&chuid),
+                   ==, TC_CREDENTIAL_ERROR);
+  munit_assert_size(work, ==, WORK);
+  munit_assert_int(TC_PIV_biometric_validate(&fingerprint, &state->context, &work, NULL), ==,
+                   TC_CREDENTIAL_ERROR);
+
+  TC_bytes parts[5];
+  TC_PIV_security_data objects[5];
+  static const uint16_t legacy_containers[] = {0x3002, 0x3000, 0x2003};
+  static const uint16_t nexgen_containers[] = {0x3002, 0x3000, 0x6030, 0x3001, 0x2003};
+  const int nexgen = card_profile == TC_TWIC_NEXGEN_CARD;
+  const size_t count = nexgen ? 5u : 3u;
+  parts[0] = value((TC_bytes){state->unsigned_chuid, state->unsigned_length}, 0x53);
+  parts[1] = value((TC_bytes){state->signed_chuid, state->signed_length}, 0x53);
+  if (nexgen) {
+    parts[2] = value((TC_bytes){state->face, state->face_length}, 0x53);
+    parts[3] = (TC_bytes){state->printed_plain, state->printed_plain_length};
+    parts[4] = value((TC_bytes){state->fingerprint, state->fingerprint_length}, 0x53);
+  } else {
+    parts[2] = value((TC_bytes){state->fingerprint, state->fingerprint_length}, 0x53);
+  }
+  for (size_t i = 0; i < count; ++i)
+    objects[i] =
+        (TC_PIV_security_data){(nexgen ? nexgen_containers : legacy_containers)[i], &parts[i], 1};
+  const TC_PIV_security_validation_request security_request = {
+      {state->security, state->security_length},
+      TC_PIV_SECURITY_CONTAINER,
+      card_profile,
+      &chuid,
+      &state->card_expiration,
+      objects,
+      count};
+  const TC_PIV_security_validation_workspace security_workspace = {state->lds, sizeof state->lds};
+  TC_PIV_security_result security;
+  work = WORK;
+  munit_assert_int(TC_PIV_security_validate(&security_request, &state->context, &security_workspace,
+                                            &work, &security),
+                   ==, TC_CREDENTIAL_VALID);
+  munit_assert_ptr_equal(security.signer.data, chuid.signer.data);
+  munit_assert_int(security.profile, ==, card_profile);
+  for (size_t i = 0; i < sizeof results / sizeof *results; ++i) {
+    TC_PIV_security_validation_request changed = security_request;
+    changed.chuid = results[i];
+    TC_PIV_security_result untouched = security;
+    work = WORK;
+    munit_assert_int(
+        TC_PIV_security_validate(&changed, &state->context, &security_workspace, &work, &untouched),
+        ==, TC_CREDENTIAL_ERROR);
+    munit_assert_size(work, ==, WORK);
+    munit_assert_ptr_equal(untouched.objects, security.objects);
+  }
+  TC_PIV_security_validation_request other_request = security_request;
+  other_request.profile = other_profile;
+  work = WORK;
+  munit_assert_int(TC_PIV_security_validate(&other_request, &state->context, &security_workspace,
+                                            &work, &security),
+                   ==, TC_CREDENTIAL_ERROR);
+  munit_assert_size(work, ==, WORK);
+
+  /* The unsigned CHUID carries the security result in its request. */
+  TC_TWIC_unsigned_CHUID_validation_request unsigned_request = {
+      parts[0], TC_PIV_CHUID_CONTENTS, card_profile, &state->identifiers, &security};
+  work = WORK;
+  munit_assert_int(TC_TWIC_unsigned_CHUID_validate(&unsigned_request, &state->context, &work), ==,
+                   TC_CREDENTIAL_VALID);
+  TC_PIV_security_result later_security = security;
+  later_security.at.second = (uint8_t)(later_security.at.second + 1);
+  const TC_PIV_security_result* inventories[] = {&later_security, NULL};
+  for (size_t i = 0; i < sizeof inventories / sizeof *inventories; ++i) {
+    TC_TWIC_unsigned_CHUID_validation_request changed = unsigned_request;
+    changed.security = inventories[i];
+    work = WORK;
+    munit_assert_int(TC_TWIC_unsigned_CHUID_validate(&changed, &state->context, &work), ==,
+                     TC_CREDENTIAL_ERROR);
+    munit_assert_size(work, ==, WORK);
+  }
+  munit_assert_int(TC_X509_store_release(state->held), ==, TC_TLV_OK);
+  (void)user_data;
+  return MUNIT_OK;
+}
+
 int main(int argc, char** argv)
 {
   static char* profiles[] = {"legacy", "nexgen", NULL};
   MunitParameterEnum parameters[] = {{"profile", profiles}, {NULL, NULL}};
-  MunitTest tests[] = {{"/validate", validate, NULL, NULL, MUNIT_TEST_OPTION_NONE, parameters},
-                       {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
+  MunitTest tests[] = {
+      {"/validate", validate, NULL, NULL, MUNIT_TEST_OPTION_NONE, parameters},
+      {"/chuid-binding", chuid_binding, NULL, NULL, MUNIT_TEST_OPTION_NONE, parameters},
+      {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
   MunitSuite suite = {"/twic/synthetic", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};
   return munit_suite_main(&suite, NULL, argc, argv);
 }

@@ -112,7 +112,8 @@ static int printed_is_authenticated(const TC_PIV_security_result* security, TC_b
 
 static int biometric_formats(const ExampleCredentialValidationRequest* request, unsigned* available)
 {
-  if ((request->biometric_count && !request->biometrics) || request->biometric_count > 3)
+  if ((request->biometric_count && !request->biometrics) ||
+      request->biometric_count > EXAMPLE_CREDENTIAL_BIOMETRICS)
     return 0;
   unsigned formats = 0;
   for (size_t i = 0; i < request->biometric_count; ++i) {
@@ -369,7 +370,7 @@ example_credential_validate(const ExampleCredentialValidationRequest* request,
   if (request->security.encoded.length) {
     const TC_PIV_security_validation_request security = {
         request->security.encoded, request->security.encoding,           request->profile,
-        accepted.chuid.signer,     &accepted.card.certificate.not_after, request->security.objects,
+        &accepted.chuid,           &accepted.card.certificate.not_after, request->security.objects,
         request->security.count};
     const TC_PIV_security_validation_workspace workspace = {request->security.content.data,
                                                             request->security.content.capacity};
@@ -403,9 +404,8 @@ example_credential_validate(const ExampleCredentialValidationRequest* request,
         return EXAMPLE_CREDENTIAL_ERROR;
       const TC_TWIC_unsigned_CHUID_validation_request unsigned_chuid = {
           request->security.unsigned_chuid, request->security.unsigned_chuid_encoding,
-          request->profile, &accepted.identifiers};
-      status = TC_TWIC_unsigned_CHUID_validate(&unsigned_chuid, &accepted.security, content_context,
-                                               work);
+          request->profile, &accepted.identifiers, &accepted.security};
+      status = TC_TWIC_unsigned_CHUID_validate(&unsigned_chuid, content_context, work);
       verdict = credential_verdict(status);
       if (verdict != EXAMPLE_CREDENTIAL_VALID)
         return verdict;
@@ -415,19 +415,16 @@ example_credential_validate(const ExampleCredentialValidationRequest* request,
 
   for (size_t i = 0; i < request->biometric_count; ++i) {
     const ExampleCredentialBiometricInput* input = &request->biometrics[i];
-    const TC_PIV_biometric_validation_request biometric = {input->encoded,
-                                                           request->profile,
-                                                           accepted.chuid.object.fascn,
-                                                           accepted.chuid.object.card_uuid,
-                                                           accepted.chuid.signer,
-                                                           &accepted.card.certificate.not_after,
-                                                           input->signature_profile,
-                                                           input->format,
-                                                           input->require_current};
-    status = TC_PIV_biometric_validate(&biometric, content_context, work);
+    const TC_PIV_biometric_validation_request biometric = {
+        input->encoded,           request->profile,
+        &accepted.chuid,          &accepted.card.certificate.not_after,
+        input->signature_profile, input->format,
+        input->require_current};
+    status = TC_PIV_biometric_validate(&biometric, content_context, work, &accepted.biometrics[i]);
     verdict = credential_verdict(status);
     if (verdict != EXAMPLE_CREDENTIAL_VALID)
       return verdict;
+    accepted.biometric_count = i + 1;
   }
   if (!piv) {
     verdict = cancellation_check(request, accepted.identifiers.fascn);

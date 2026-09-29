@@ -69,6 +69,9 @@ typedef struct {
   int require_current;
 } ExampleCredentialBiometricInput;
 
+/* Fingerprint, face and iris formats may each appear once. */
+enum { EXAMPLE_CREDENTIAL_BIOMETRICS = 3 };
+
 typedef struct {
   TC_PIV_card_profile profile;
   ExampleCredentialCardKey card_key;
@@ -91,7 +94,7 @@ typedef struct {
   unsigned required_objects;
   /* Empty encoded spans omit these dependent objects. */
   ExampleCredentialSecurityInput security;
-  /* Each format may appear once. The list is bounded to three modalities. */
+  /* Each format may appear once, up to EXAMPLE_CREDENTIAL_BIOMETRICS. */
   const ExampleCredentialBiometricInput* biometrics;
   size_t biometric_count;
 } ExampleCredentialValidationRequest;
@@ -104,6 +107,9 @@ typedef struct {
   int has_security;
   TC_PIV_printed printed;
   int has_printed;
+  /* One result per request biometric, in request order. */
+  TC_PIV_biometric_result biometrics[EXAMPLE_CREDENTIAL_BIOMETRICS];
+  size_t biometric_count;
 } ExampleCredentialValidationResult;
 
 /* Compose validation over retained PIV or TWIC objects. The card and content
