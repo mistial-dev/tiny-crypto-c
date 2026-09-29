@@ -173,7 +173,7 @@ static MunitResult private_key(const MunitParameter params[], void* data)
   const char* format = munit_parameters_get(params, "format");
   const int pkcs8 = strcmp(format, "pkcs1") != 0;
   const int pss = strcmp(format, "pkcs8-pss") == 0;
-  EVP_PKEY* generated = EVP_RSA_gen(bits);
+  EVP_PKEY* generated = tc_test_rsa_generate(bits);
   unsigned char* encoded = NULL;
   (void)data;
   munit_assert_not_null(generated);
@@ -325,7 +325,16 @@ static MunitResult restricted_pss(const MunitParameter params[], void* data)
   munit_assert_int(EVP_PKEY_CTX_set_rsa_pss_keygen_md(generation, EVP_sha256()), ==, 1);
   munit_assert_int(EVP_PKEY_CTX_set_rsa_pss_keygen_mgf1_md(generation, EVP_sha256()), ==, 1);
   munit_assert_int(EVP_PKEY_CTX_set_rsa_pss_keygen_saltlen(generation, DIGEST_BYTES), ==, 1);
-  munit_assert_int(EVP_PKEY_keygen(generation, &generated), ==, 1);
+  /* OpenSSL may reduce d modulo (p-1)(q-1). Keep a key that FIPS 186-5
+   * validation accepts. */
+  for (unsigned attempt = 0;; ++attempt) {
+    munit_assert_uint(attempt, <, 64);
+    munit_assert_int(EVP_PKEY_keygen(generation, &generated), ==, 1);
+    if (tc_test_rsa_d_below_lcm(generated))
+      break;
+    EVP_PKEY_free(generated);
+    generated = NULL;
+  }
   EVP_PKEY_CTX_free(generation);
   PKCS8_PRIV_KEY_INFO* container = EVP_PKEY2PKCS8(generated);
   unsigned char* encoded = NULL;
