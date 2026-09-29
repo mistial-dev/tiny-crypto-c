@@ -18,10 +18,12 @@ static MunitResult key_limits(const MunitParameter params[], void* user)
   munit_assert_int(key.algorithm, ==, TC_EAC_RSA_V15);
   munit_assert_uint(key.hash_bits, ==, 160);
   munit_assert_size(key.modulus.length, ==, 2);
-  saved = key;
+  /* Byte copies keep padding comparable. */
+  memcpy(&saved, &key, sizeof saved);
+  /* The input is one complete object, so truncation is malformed. */
   for (i = 0; i < sizeof encoded; ++i) {
     munit_assert_int(TC_EAC_CVC_public_key_read((TC_bytes){encoded, i}, &limits, &key), ==,
-                     TC_TLV_MORE);
+                     TC_TLV_INVALID);
     munit_assert_memory_equal(sizeof key, &key, &saved);
   }
   --limits.max_input;
@@ -36,6 +38,25 @@ static MunitResult key_limits(const MunitParameter params[], void* user)
   munit_assert_int(TC_EAC_CVC_public_key_read((TC_bytes){encoded, sizeof encoded}, &limits, &key),
                    ==, TC_TLV_LIMIT);
   munit_assert_memory_equal(sizeof key, &key, &saved);
+  ++limits.max_depth;
+  {
+    union {
+      TC_EAC_CVC_public_key key;
+      uint8_t bytes[sizeof encoded + sizeof(TC_EAC_CVC_public_key)];
+    } storage;
+    uint8_t original[sizeof storage];
+    const size_t offsets[] = {0, 1, sizeof(TC_EAC_CVC_public_key) - 1};
+    for (i = 0; i < sizeof offsets / sizeof *offsets; ++i) {
+      memset(&storage, 0x5a, sizeof storage);
+      memcpy(storage.bytes + offsets[i], encoded, sizeof encoded);
+      memcpy(original, &storage, sizeof original);
+      munit_assert_int(
+          TC_EAC_CVC_public_key_read((TC_bytes){storage.bytes + offsets[i], sizeof encoded},
+                                     &limits, &storage.key),
+          ==, TC_TLV_ARGUMENT);
+      munit_assert_memory_equal(sizeof original, original, &storage);
+    }
+  }
   return MUNIT_OK;
 }
 
@@ -92,12 +113,12 @@ static MunitResult extension_limits(const MunitParameter params[], void* user)
   (void)params;
   (void)user;
   memset(&extension, 0xa5, sizeof extension);
-  saved = extension;
+  memcpy(&saved, &extension, sizeof saved);
   --limits.max_elements;
   munit_assert_int(
       TC_EAC_CVC_extensions_init(&reader, (TC_bytes){encoded, sizeof encoded}, &limits), ==,
       TC_TLV_OK);
-  saved_reader = reader;
+  memcpy(&saved_reader, &reader, sizeof saved_reader);
   munit_assert_int(TC_EAC_CVC_extension_next(&reader, &extension), ==, TC_TLV_LIMIT);
   munit_assert_memory_equal(sizeof reader, &reader, &saved_reader);
   munit_assert_memory_equal(sizeof extension, &extension, &saved);
@@ -105,7 +126,7 @@ static MunitResult extension_limits(const MunitParameter params[], void* user)
   munit_assert_int(
       TC_EAC_CVC_extensions_init(&reader, (TC_bytes){encoded, sizeof encoded}, &limits), ==,
       TC_TLV_OK);
-  saved_reader = reader;
+  memcpy(&saved_reader, &reader, sizeof saved_reader);
   encoded[8] = 4;
   munit_assert_int(TC_EAC_CVC_extension_next(&reader, &extension), ==, TC_TLV_INVALID);
   munit_assert_memory_equal(sizeof reader, &reader, &saved_reader);
@@ -114,8 +135,8 @@ static MunitResult extension_limits(const MunitParameter params[], void* user)
   munit_assert_int(TC_EAC_CVC_extension_next(&reader, &extension), ==, TC_TLV_OK);
   munit_assert_size(extension.fields.length, ==, 3);
   munit_assert_size(reader.elements, ==, 3);
-  saved_reader = reader;
-  saved = extension;
+  memcpy(&saved_reader, &reader, sizeof saved_reader);
+  memcpy(&saved, &extension, sizeof saved);
   munit_assert_int(TC_EAC_CVC_extension_next(&reader, &extension), ==, TC_TLV_END);
   munit_assert_memory_equal(sizeof reader, &reader, &saved_reader);
   munit_assert_memory_equal(sizeof extension, &extension, &saved);
@@ -136,12 +157,64 @@ static MunitResult certificate_limits(const MunitParameter params[], void* user)
   TC_TLV_frame frames[3];
   TC_EAC_CVC_workspace workspace = {{frames, 3}};
   TC_EAC_CVC certificate, saved;
+  size_t i;
   (void)params;
   (void)user;
   munit_assert_int(
       TC_EAC_CVC_read((TC_bytes){encoded, sizeof encoded}, &limits, &workspace, &certificate), ==,
       TC_TLV_OK);
-  saved = certificate;
+  memcpy(&saved, &certificate, sizeof saved);
+  /* The input is one complete object, so truncation is malformed. */
+  for (i = 0; i < sizeof encoded; ++i) {
+    munit_assert_int(TC_EAC_CVC_read((TC_bytes){encoded, i}, &limits, &workspace, &certificate), ==,
+                     TC_TLV_INVALID);
+    munit_assert_memory_equal(sizeof certificate, &certificate, &saved);
+  }
+  {
+    union {
+      TC_EAC_CVC certificate;
+      uint8_t bytes[sizeof encoded + sizeof(TC_EAC_CVC)];
+    } storage;
+    uint8_t original[sizeof storage];
+    const size_t offsets[] = {0, 1, sizeof(TC_EAC_CVC) - 1};
+    for (i = 0; i < sizeof offsets / sizeof *offsets; ++i) {
+      memset(&storage, 0x5a, sizeof storage);
+      memcpy(storage.bytes + offsets[i], encoded, sizeof encoded);
+      memcpy(original, &storage, sizeof original);
+      munit_assert_int(TC_EAC_CVC_read((TC_bytes){storage.bytes + offsets[i], sizeof encoded},
+                                       &limits, &workspace, &storage.certificate),
+                       ==, TC_TLV_ARGUMENT);
+      munit_assert_memory_equal(sizeof original, original, &storage);
+    }
+  }
+  {
+    /* Frames written during the walk must not alias the input or the result. */
+    union {
+      TC_EAC_CVC certificate;
+      TC_TLV_frame frames[3];
+    } shared;
+    TC_EAC_CVC_workspace aliased = {{shared.frames, 3}};
+    uint8_t original[sizeof shared];
+    memset(&shared, 0x5a, sizeof shared);
+    memcpy(original, &shared, sizeof original);
+    munit_assert_int(TC_EAC_CVC_read((TC_bytes){encoded, sizeof encoded}, &limits, &aliased,
+                                     &shared.certificate),
+                     ==, TC_TLV_ARGUMENT);
+    munit_assert_memory_equal(sizeof original, original, &shared);
+  }
+  {
+    union {
+      TC_TLV_frame frames[1];
+      uint8_t bytes[sizeof encoded];
+    } copy;
+    TC_EAC_CVC_workspace aliased = {{copy.frames, 1}};
+    memcpy(copy.bytes, encoded, sizeof encoded);
+    munit_assert_int(
+        TC_EAC_CVC_read((TC_bytes){copy.bytes, sizeof encoded}, &limits, &aliased, &certificate),
+        ==, TC_TLV_ARGUMENT);
+    munit_assert_memory_equal(sizeof encoded, copy.bytes, encoded);
+    munit_assert_memory_equal(sizeof certificate, &certificate, &saved);
+  }
   --limits.max_elements;
   munit_assert_int(
       TC_EAC_CVC_read((TC_bytes){encoded, sizeof encoded}, &limits, &workspace, &certificate), ==,

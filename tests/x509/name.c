@@ -652,6 +652,60 @@ static MunitResult utf8_mail_constraints(const MunitParameter params[], void* us
   return MUNIT_OK;
 }
 
+/* Reader init binds input and frames. A reader struct aliasing either would
+ * be overwritten while next reads through it, so init rejects the overlap. */
+typedef enum { INIT_NAMES, INIT_CONTENTS, INIT_SUBTREES } reader_init_kind;
+static TC_TLV_result reader_init(reader_init_kind kind, void* reader, TC_bytes input,
+                                 TC_TLV_frames frames)
+{
+  if (kind == INIT_NAMES)
+    return TC_X509_general_names_init(reader, input, &bounds, frames);
+  if (kind == INIT_CONTENTS)
+    return TC_X509_general_names_contents_init(reader, input, &bounds, frames);
+  return TC_X509_general_subtrees_init(reader, input, &bounds, frames);
+}
+
+static MunitResult reader_init_overlap(const MunitParameter params[], void* user)
+{
+  static const uint8_t sequence[] = {0x30, 5, 0x30, 3, 0x82, 1, 'a'};
+  union {
+    TC_X509_general_names_reader names;
+    TC_X509_general_subtrees_reader subtrees;
+    TC_TLV_frame frames[2];
+    uint8_t bytes[sizeof(TC_X509_general_names_reader) + sizeof sequence];
+  } shared;
+  uint8_t original[sizeof shared];
+  TC_TLV_frame frames[2];
+  reader_init_kind kind;
+  (void)params;
+  (void)user;
+  for (kind = INIT_NAMES; kind <= INIT_SUBTREES; ++kind) {
+    /* GeneralNames takes the SEQUENCE. The other readers take contents. */
+    const size_t skip = kind == INIT_NAMES ? 0 : 2;
+    const TC_bytes input = {sequence + skip, sizeof sequence - skip};
+    const size_t offsets[] = {0, 1, sizeof(TC_X509_general_names_reader) - 1};
+    size_t i;
+    memset(&shared, 0x5a, sizeof shared);
+    munit_assert_int(reader_init(kind, &shared, input, (TC_TLV_frames){frames, 2}), ==, TC_TLV_OK);
+    for (i = 0; i < sizeof offsets / sizeof *offsets; ++i) {
+      memset(&shared, 0x5a, sizeof shared);
+      memcpy(shared.bytes + offsets[i], input.data, input.length);
+      memcpy(original, &shared, sizeof original);
+      munit_assert_int(reader_init(kind, &shared,
+                                   (TC_bytes){shared.bytes + offsets[i], input.length},
+                                   (TC_TLV_frames){frames, 2}),
+                       ==, TC_TLV_ARGUMENT);
+      munit_assert_memory_equal(sizeof original, original, &shared);
+    }
+    memset(&shared, 0x5a, sizeof shared);
+    memcpy(original, &shared, sizeof original);
+    munit_assert_int(reader_init(kind, &shared, input, (TC_TLV_frames){shared.frames, 2}), ==,
+                     TC_TLV_ARGUMENT);
+    munit_assert_memory_equal(sizeof original, original, &shared);
+  }
+  return MUNIT_OK;
+}
+
 static MunitResult utf8_mail_structure(const MunitParameter params[], void* user)
 {
   uint8_t encoded[] = {0xa0, 28,  6,    8,   0x2b, 6,   1,    5,    5,   7,
@@ -1091,6 +1145,7 @@ int main(int argc, char** argv)
       {"/uri-host-lengths", uri_host_lengths, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/utf8-mail-constraints", utf8_mail_constraints, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/utf8-mail-structure", utf8_mail_structure, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/reader-init-overlap", reader_init_overlap, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/ip-constraints", ip_constraints, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/constraint-arguments", constraint_arguments, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/constraint-lists", constraint_lists, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

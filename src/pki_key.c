@@ -50,7 +50,7 @@ TC_TLV_result tc_pki_pss_read_profile(TC_bytes encoded, TC_TLV_profile profile,
   if (!out || !bounds || (profile != TC_TLV_DER && profile != TC_TLV_BER) ||
       (profile == TC_TLV_BER && !tree))
     return TC_TLV_ARGUMENT;
-  (void)tc_hash_info_get(TC_HASH_SHA1, &sha1);
+  (void)tc_hash_info_get(TC_HASH_SHA1, &sha1); /* SHA-1 metadata is always present. */
   parsed.hash = (TC_DER_algorithm){sha1.oid, {NULL, 0}};
   parsed.mgf_hash = parsed.hash;
   parsed.salt_length = (TC_bytes){&default_salt, 1};

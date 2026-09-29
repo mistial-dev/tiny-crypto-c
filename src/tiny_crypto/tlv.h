@@ -78,8 +78,8 @@ typedef struct {
 } TC_TLV_reader;
 /* Start a root reader over a complete data field or payload. Limits are copied.
  * input is borrowed for the reader's lifetime.
- * Returns ARGUMENT for NULL reader/limits, NULL input data with a length or an
- * unknown profile, UNSUPPORTED for BER when disabled and LIMIT when
+ * Returns ARGUMENT for NULL reader/limits, NULL input data with a length, a
+ * reader that overlaps input or an unknown profile, UNSUPPORTED for BER when disabled and LIMIT when
  * input.length exceeds max_input. Failure leaves reader unchanged. */
 TC_TLV_result TC_TLV_reader_init(TC_TLV_reader* reader, TC_bytes input, TC_TLV_profile profile,
                                  const TC_TLV_limits* limits);

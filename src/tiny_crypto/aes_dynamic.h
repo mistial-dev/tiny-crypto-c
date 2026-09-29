@@ -22,6 +22,8 @@ typedef struct {
  * usable. Clear is unconditional. */
 TC_status TC_AES_dynamic_key_init(TC_AES_dynamic_key* ctx, const uint8_t* key, size_t key_len);
 void TC_AES_dynamic_key_clear(TC_AES_dynamic_key* ctx);
+/* Transform one block in place. block must be disjoint from ctx. Argument
+ * errors leave block unchanged. A cipher failure wipes block. */
 TC_status TC_AES_dynamic_encrypt(const TC_AES_dynamic_key* ctx, uint8_t block[16]);
 TC_status TC_AES_dynamic_decrypt(const TC_AES_dynamic_key* ctx, uint8_t block[16]);
 

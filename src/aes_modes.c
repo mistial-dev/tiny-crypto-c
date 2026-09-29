@@ -2,8 +2,8 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
  * AES confidentiality modes (NIST SP 800-38A): ECB, CBC, CTR and OFB, plus
- * CBC over dynamic-length keys. CBC, CTR and OFB run on the shared cores in
- * block_modes.c. */
+ * single blocks and CBC over dynamic-length keys. CBC, CTR and OFB run on the
+ * shared cores in block_modes.c. */
 #include <tiny_crypto/aes.h>
 #include "aes_internal.h"
 
@@ -32,27 +32,31 @@ static tc_aes_block_key tc_aes_ctx_key(const struct TC_AES_ctx* ctx)
 /*****************************************************************************/
 /* Public functions:                                                         */
 /*****************************************************************************/
-#if TC_AES_ENABLE_ECB
-/* A cipher failure wipes the block. The key schedule is const and stays. */
-static TC_status tc_aes_ecb_result(TC_status status, uint8_t* buf)
+#if TC_AES_ENABLE_ECB || TC_AES_ENABLE_DYNAMIC
+/* Single-block rule: a cipher failure wipes the block. The key schedule is
+ * const and stays. */
+static TC_status tc_aes_block_result(TC_status status, uint8_t* buf)
 {
   if (status != TC_OK)
     TC_secure_zero(buf, TC_AES_BLOCKLEN);
   return status;
 }
+#endif
+
+#if TC_AES_ENABLE_ECB
 
 TC_status TC_AES_ECB_encrypt(const struct TC_AES_key_ctx* ctx, uint8_t* buf)
 {
   if (!AES_MODE_VALID(ctx, ctx, buf, TC_AES_BLOCKLEN, 1))
     return TC_ERROR;
-  return tc_aes_ecb_result(tc_aes_cipher((state_t*)buf, ctx->round_key), buf);
+  return tc_aes_block_result(tc_aes_cipher((state_t*)buf, ctx->round_key), buf);
 }
 
 TC_status TC_AES_ECB_decrypt(const struct TC_AES_key_ctx* ctx, uint8_t* buf)
 {
   if (!AES_MODE_VALID(ctx, ctx, buf, TC_AES_BLOCKLEN, 1))
     return TC_ERROR;
-  return tc_aes_ecb_result(
+  return tc_aes_block_result(
       tc_aes_inverse_rounds((state_t*)buf, ctx->round_key, TC_AES_FIXED_ROUNDS), buf);
 }
 
@@ -122,6 +126,24 @@ TC_status TC_AES_OFB_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length)
 #endif /* OFB */
 
 #if TC_AES_ENABLE_DYNAMIC
+TC_status TC_AES_dynamic_encrypt(const TC_AES_dynamic_key* ctx, uint8_t block[16])
+{
+  if (!tc_block_mode_args(ctx, sizeof *ctx, block, TC_AES_BLOCKLEN, 1) ||
+      !tc_aes_dynamic_key_valid(ctx))
+    return TC_ERROR;
+  return tc_aes_block_result(tc_aes_cipher_rounds((state_t*)block, ctx->round_key, ctx->rounds),
+                             block);
+}
+
+TC_status TC_AES_dynamic_decrypt(const TC_AES_dynamic_key* ctx, uint8_t block[16])
+{
+  if (!tc_block_mode_args(ctx, sizeof *ctx, block, TC_AES_BLOCKLEN, 1) ||
+      !tc_aes_dynamic_key_valid(ctx))
+    return TC_ERROR;
+  return tc_aes_block_result(tc_aes_inverse_rounds((state_t*)block, ctx->round_key, ctx->rounds),
+                             block);
+}
+
 /* The key, IV and buffer are pairwise disjoint. */
 static int tc_aes_dynamic_cbc_valid(const TC_AES_dynamic_key* ctx, const uint8_t* iv,
                                     const uint8_t* buffer, size_t length)

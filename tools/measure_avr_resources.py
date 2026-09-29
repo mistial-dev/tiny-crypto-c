@@ -14,6 +14,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -255,12 +256,33 @@ def measure(directory, definitions, body, entry, types=None):
     return report
 
 
+def compiler_version(banner):
+    """Version number from the first line of avr-gcc --version, or None."""
+    match = re.search(r"(\d+\.\d+\.\d+)\s*$", banner)
+    return match[1] if match else None
+
+
+def check_budgets(report, budgets, stream=sys.stderr):
+    """Fail when a measured metric exceeds its budget.
+
+    The toolchain that produced the budgets is printed for comparison. A
+    different avr-gcc version is reported and allowed."""
+    print(f"budgets measured with avr-gcc {budgets.get('avr_gcc_version', 'unknown')}, "
+          f"checking with avr-gcc {report.get('avr_gcc_version') or 'unknown'}", file=stream)
+    for name, limits in budgets["profiles"].items():
+        for metric, limit in limits.items():
+            actual = report["profiles"][name][metric]
+            if actual is None or actual > limit:
+                raise SystemExit(f"{name} {metric}: {actual} exceeds {limit}")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--check", type=Path)
     args = parser.parse_args()
-    report = {"compiler": run([CC, "--version"]).splitlines()[0],
+    banner = run([CC, "--version"]).splitlines()[0]
+    report = {"compiler": banner, "avr_gcc_version": compiler_version(banner),
               "stack_scope": __doc__, "profiles": {}}
     with tempfile.TemporaryDirectory() as temporary:
         for name, (definitions, body, entry) in PROFILES.items():
@@ -269,12 +291,7 @@ def main():
             report["profiles"][name] = measure(directory, definitions, body, entry,
                                                TYPE_SIZES.get(name))
     if args.check:
-        budgets = json.loads(args.check.read_text())
-        for name, limits in budgets["profiles"].items():
-            for metric, limit in limits.items():
-                actual = report["profiles"][name][metric]
-                if actual is None or actual > limit:
-                    raise SystemExit(f"{name} {metric}: {actual} exceeds {limit}")
+        check_budgets(report, json.loads(args.check.read_text()))
     text = json.dumps(report, indent=2) + "\n"
     if args.output:
         args.output.write_text(text)

@@ -13,74 +13,76 @@
 /* Abstract work units for two scalar multiplies and inversions. */
 enum { TC_PKI_ECDSA_WORK_PER_BIT = 64 };
 
-/* Inputs/metadata are stable and disjoint from both workspaces. The caller
- * resolves algorithms and charges hashing/DER bytes before this operation.
- * Only the selected algorithm's workspace is required. */
-static TC_X509_signature_result tc_pki_verify_digest(const TC_signature_algorithm* algorithm,
-                                                     const TC_X509_public_key* key, TC_bytes digest,
-                                                     TC_bytes signature, TC_ECDSA_workspace* ec,
-                                                     const TC_RSA_workspace* rsa, size_t max_work)
-{
-  tc_hash_info hash;
-  if (!algorithm || !key)
-    return TC_X509_SIGNATURE_ERROR;
-  if (!tc_hash_info_get(algorithm->hash, &hash))
-    return TC_X509_SIGNATURE_UNSUPPORTED;
-  if (!digest.data || digest.length != hash.digest_length)
-    return TC_X509_SIGNATURE_ERROR;
-  if (algorithm->scheme == TC_SIGNATURE_ECDSA) {
+/* One digest-signature check. Inputs and metadata are stable and disjoint
+ * from both workspaces. The caller resolves the algorithm and charges hashing
+ * and DER bytes first. Only the selected algorithm's workspace is required.
+ * max_work is the fixed work reserved for the public-key operation. */
+typedef struct {
+  const TC_signature_algorithm* algorithm;
+  const TC_X509_public_key* key;
+  TC_bytes digest, signature;
+  TC_ECDSA_workspace* ec;
+  const TC_RSA_workspace* rsa;
+  size_t max_work;
+} digest_check;
+
 #if TC_ENABLE_EC
-    TC_DER_signature_pair pair;
-    uint8_t raw[2 * TC_EC_MAX_BYTES];
-    const size_t width = TC_EC_coordinate_bytes(key->curve);
-    if (!width)
-      return TC_X509_SIGNATURE_UNSUPPORTED;
-    if (!ec)
-      return TC_X509_SIGNATURE_ERROR;
-    /* Reserve fixed public work for two scalar multiplies and inversions. */
-    if (max_work < width * 8 * TC_PKI_ECDSA_WORK_PER_BIT)
-      return TC_X509_SIGNATURE_LIMIT;
-    if (TC_DER_ecdsa_signature(signature, &pair) != TC_TLV_OK || pair.r.length > width ||
-        pair.s.length > width)
-      return TC_X509_SIGNATURE_INVALID;
-    memset(raw, 0, sizeof raw);
-    memcpy(raw + width - pair.r.length, pair.r.data, pair.r.length);
-    memcpy(raw + 2 * width - pair.s.length, pair.s.data, pair.s.length);
-    /* The PKI budget above covers the EC operation's own units. */
-    TC_work_budget budget = {TC_EC_operation_work(key->curve, TC_EC_OPERATION_VERIFY)};
-    const TC_EC_result verified = TC_ECDSA_verify_digest(key->curve, key->key, digest,
-                                                         (TC_bytes){raw, 2 * width}, ec, &budget);
-    TC_secure_zero(raw, sizeof raw);
-    switch (verified) {
-    case TC_EC_OK:
-      return TC_X509_SIGNATURE_VALID;
-    case TC_EC_INVALID:
-      return TC_X509_SIGNATURE_INVALID;
-    case TC_EC_LIMIT:
-      return TC_X509_SIGNATURE_LIMIT;
-    case TC_EC_UNSUPPORTED:
-      return TC_X509_SIGNATURE_UNSUPPORTED;
-    default:
-      return TC_X509_SIGNATURE_ERROR;
-    }
-#else
-    (void)ec;
+static TC_X509_signature_result verify_ecdsa(const digest_check* check)
+{
+  TC_DER_signature_pair pair;
+  uint8_t raw[2 * TC_EC_MAX_BYTES];
+  const TC_X509_public_key* key = check->key;
+  const size_t width = TC_EC_coordinate_bytes(key->curve);
+  if (!width)
     return TC_X509_SIGNATURE_UNSUPPORTED;
-#endif
+  if (!check->ec)
+    return TC_X509_SIGNATURE_ERROR;
+  /* Reserve fixed public work for two scalar multiplies and inversions. */
+  if (check->max_work < width * 8 * TC_PKI_ECDSA_WORK_PER_BIT)
+    return TC_X509_SIGNATURE_LIMIT;
+  if (TC_DER_ecdsa_signature(check->signature, &pair) != TC_TLV_OK || pair.r.length > width ||
+      pair.s.length > width)
+    return TC_X509_SIGNATURE_INVALID;
+  memset(raw, 0, sizeof raw);
+  memcpy(raw + width - pair.r.length, pair.r.data, pair.r.length);
+  memcpy(raw + 2 * width - pair.s.length, pair.s.data, pair.s.length);
+  /* The PKI budget above covers the EC operation's own units. */
+  TC_work_budget budget = {TC_EC_operation_work(key->curve, TC_EC_OPERATION_VERIFY)};
+  const TC_EC_result verified = TC_ECDSA_verify_digest(
+      key->curve, key->key, check->digest, (TC_bytes){raw, 2 * width}, check->ec, &budget);
+  TC_secure_zero(raw, sizeof raw);
+  switch (verified) {
+  case TC_EC_OK:
+    return TC_X509_SIGNATURE_VALID;
+  case TC_EC_INVALID:
+    return TC_X509_SIGNATURE_INVALID;
+  case TC_EC_LIMIT:
+    return TC_X509_SIGNATURE_LIMIT;
+  case TC_EC_UNSUPPORTED:
+    return TC_X509_SIGNATURE_UNSUPPORTED;
+  default:
+    return TC_X509_SIGNATURE_ERROR;
   }
+}
+#endif
+
 #if TC_ENABLE_RSA
-  TC_RSA_public_key public_key = {key->modulus, key->exponent};
+static TC_X509_signature_result verify_rsa(const digest_check* check)
+{
+  const TC_signature_algorithm* algorithm = check->algorithm;
+  TC_RSA_public_key public_key = {check->key->modulus, check->key->exponent};
   TC_RSA_result result;
-  TC_work_budget budget = {max_work > UINT32_MAX ? UINT32_MAX : (uint32_t)max_work};
+  TC_work_budget budget = {check->max_work > UINT32_MAX ? UINT32_MAX : (uint32_t)check->max_work};
   if (algorithm->scheme == TC_SIGNATURE_RSA_V15) {
     const TC_RSA_v15_options options = {algorithm->hash};
-    result = TC_RSA_verify_v15_digest(&public_key, &options, digest, signature, rsa, &budget);
-  } else if (algorithm->scheme == TC_SIGNATURE_RSA_PSS) {
+    result = TC_RSA_verify_v15_digest(&public_key, &options, check->digest, check->signature,
+                                      check->rsa, &budget);
+  } else {
     const TC_RSA_pss_options options = {algorithm->hash, algorithm->mgf_hash,
                                         algorithm->salt_length};
-    result = TC_RSA_verify_pss_digest(&public_key, &options, digest, signature, rsa, &budget);
-  } else
-    return TC_X509_SIGNATURE_UNSUPPORTED;
+    result = TC_RSA_verify_pss_digest(&public_key, &options, check->digest, check->signature,
+                                      check->rsa, &budget);
+  }
   switch (result) {
   case TC_RSA_OK:
     return TC_X509_SIGNATURE_VALID;
@@ -93,13 +95,32 @@ static TC_X509_signature_result tc_pki_verify_digest(const TC_signature_algorith
   default:
     return TC_X509_SIGNATURE_ERROR;
   }
-#else
-  (void)digest;
-  (void)signature;
-  (void)rsa;
-  (void)max_work;
-  return TC_X509_SIGNATURE_UNSUPPORTED;
+}
 #endif
+
+/* Dispatch on the scheme. A scheme whose family is disabled is UNSUPPORTED. */
+static TC_X509_signature_result tc_pki_verify_digest(const digest_check* check)
+{
+  tc_hash_info hash;
+  if (!check->algorithm || !check->key)
+    return TC_X509_SIGNATURE_ERROR;
+  if (!tc_hash_info_get(check->algorithm->hash, &hash))
+    return TC_X509_SIGNATURE_UNSUPPORTED;
+  if (!check->digest.data || check->digest.length != hash.digest_length)
+    return TC_X509_SIGNATURE_ERROR;
+  switch (check->algorithm->scheme) {
+#if TC_ENABLE_EC
+  case TC_SIGNATURE_ECDSA:
+    return verify_ecdsa(check);
+#endif
+#if TC_ENABLE_RSA
+  case TC_SIGNATURE_RSA_V15:
+  case TC_SIGNATURE_RSA_PSS:
+    return verify_rsa(check);
+#endif
+  default:
+    return TC_X509_SIGNATURE_UNSUPPORTED;
+  }
 }
 
 /* Inputs of one native signature check. message holds count parts.
@@ -185,8 +206,9 @@ static TC_X509_signature_result native_verify_digest(void* context, TC_bytes dig
     return tc_pki_signature_error(checked);
   if (tc_pki_work_charge(work, workspace->signature_work) != TC_TLV_OK)
     return TC_X509_SIGNATURE_LIMIT;
-  return tc_pki_verify_digest(algorithm, key, digest, signature, workspace->ec, workspace->rsa,
-                              workspace->signature_work);
+  const digest_check check = {
+      algorithm, key, digest, signature, workspace->ec, workspace->rsa, workspace->signature_work};
+  return tc_pki_verify_digest(&check);
 }
 
 static TC_X509_signature_result native_verify(void* context, const TC_bytes* message, size_t count,
@@ -223,8 +245,14 @@ static TC_X509_signature_result native_verify(void* context, const TC_bytes* mes
     return TC_X509_SIGNATURE_LIMIT;
   if (tc_hash_digest_parts(selected.hash, message, count, digest, &hash_workspace) != TC_OK)
     return TC_X509_SIGNATURE_ERROR;
-  result = tc_pki_verify_digest(&selected, key, (TC_bytes){digest, hash.digest_length}, signature,
-                                workspace->ec, workspace->rsa, workspace->signature_work);
+  const digest_check check = {&selected,
+                              key,
+                              {digest, hash.digest_length},
+                              signature,
+                              workspace->ec,
+                              workspace->rsa,
+                              workspace->signature_work};
+  result = tc_pki_verify_digest(&check);
   TC_secure_zero(digest, sizeof digest);
   return result;
 }

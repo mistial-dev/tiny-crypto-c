@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/common.h>
 #if TC_ENABLE_TLV
+#include "internal.h"
 #include "tlv_internal.h"
 #include <string.h>
 
@@ -170,7 +171,9 @@ TC_TLV_result TC_TLV_reader_init(TC_TLV_reader* reader, TC_bytes input, TC_TLV_p
   TC_TLV_result result = tc_tlv_config(profile, limits);
   if (result != TC_TLV_OK)
     return result;
-  if (!reader || (!input.data && input.length))
+  /* next rewrites the reader while it reads input. */
+  if (!reader || (!input.data && input.length) ||
+      !tc_internal_ranges_disjoint(reader, sizeof *reader, input.data, input.length))
     return TC_TLV_ARGUMENT;
   if (input.length > limits->max_input)
     return TC_TLV_LIMIT;

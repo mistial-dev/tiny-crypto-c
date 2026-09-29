@@ -571,20 +571,4 @@ void TC_AES_dynamic_key_clear(TC_AES_dynamic_key* ctx)
     TC_secure_zero(ctx, sizeof *ctx);
 }
 
-TC_status TC_AES_dynamic_encrypt(const TC_AES_dynamic_key* ctx, uint8_t block[16])
-{
-  if (!tc_aes_dynamic_key_valid(ctx) || !block ||
-      !tc_internal_ranges_disjoint(ctx, sizeof *ctx, block, 16))
-    return TC_ERROR;
-  return tc_aes_cipher_rounds((state_t*)block, ctx->round_key, ctx->rounds);
-}
-
-TC_status TC_AES_dynamic_decrypt(const TC_AES_dynamic_key* ctx, uint8_t block[16])
-{
-  if (!tc_aes_dynamic_key_valid(ctx) || !block ||
-      !tc_internal_ranges_disjoint(ctx, sizeof *ctx, block, 16))
-    return TC_ERROR;
-  return tc_aes_inverse_rounds((state_t*)block, ctx->round_key, ctx->rounds);
-}
-
 #endif

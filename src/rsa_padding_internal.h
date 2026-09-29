@@ -53,7 +53,7 @@ static inline TC_RSA_result tc_rsa_mgf1_xor(TC_hash_algorithm hash, TC_bytes see
   if (cost > *work)
     return TC_RSA_LIMIT;
   *work -= cost;
-  (void)tc_hash_info_get(hash, &info);
+  (void)tc_hash_info_get(hash, &info); /* tc_rsa_mgf1_cost accepted hash. */
   blocks = length / info.digest_length + (length % info.digest_length != 0);
   for (size_t i = 0; i < blocks; ++i) {
     uint32_t counter = (uint32_t)i;

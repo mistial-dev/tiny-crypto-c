@@ -133,6 +133,32 @@ static MunitResult cursor(const MunitParameter params[], void* user)
   munit_assert(TC_TLV_reader_init(&r, (TC_bytes){NULL, 1}, TC_TLV_DER, &limits) == TC_TLV_ARGUMENT);
   munit_assert_size(r.offset, ==, saved.offset);
   munit_assert_ptr_equal(r.input.data, saved.input.data);
+  {
+    /* next rewrites the reader while it reads input, so they must not alias. */
+    union {
+      TC_TLV_reader reader;
+      uint8_t bytes[sizeof(TC_TLV_reader) + sizeof input];
+    } shared;
+    uint8_t original[sizeof shared];
+    const size_t offsets[] = {0, 1, sizeof(TC_TLV_reader) - 1};
+    size_t i;
+    for (i = 0; i < sizeof offsets / sizeof *offsets; ++i) {
+      memset(&shared, 0x5a, sizeof shared);
+      memcpy(shared.bytes + offsets[i], input, sizeof input);
+      memcpy(original, &shared, sizeof original);
+      munit_assert_int(TC_TLV_reader_init(&shared.reader,
+                                          (TC_bytes){shared.bytes + offsets[i], sizeof input},
+                                          TC_TLV_DER, &limits),
+                       ==, TC_TLV_ARGUMENT);
+      munit_assert_memory_equal(sizeof original, original, &shared);
+    }
+    memcpy(shared.bytes + sizeof(TC_TLV_reader), input, sizeof input);
+    munit_assert_int(
+        TC_TLV_reader_init(&shared.reader,
+                           (TC_bytes){shared.bytes + sizeof(TC_TLV_reader), sizeof input},
+                           TC_TLV_DER, &limits),
+        ==, TC_TLV_OK);
+  }
   return MUNIT_OK;
 }
 

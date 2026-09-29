@@ -22,7 +22,10 @@ Bind the list, parsing limits and a bounded `TC_X509_workspace` to a
 call `TC_X509_trust_anchor_next` until it returns `TC_TLV_END`. Store each
 result in a caller-owned array of `TC_X509_store_anchor` records. The reader
 uses the workspace on every call, so keep it alive and unshared until the
-last call. A disabled choice returns `TC_TLV_UNSUPPORTED`.
+last call. The reader, the frames and the extension OID array must be pairwise
+disjoint and lie outside the list and the workspace struct. init returns
+`TC_TLV_ARGUMENT` for any overlap. A disabled choice returns
+`TC_TLV_UNSUPPORTED`.
 
 ```c
 enum { ANCHOR_CAPACITY = 8 };

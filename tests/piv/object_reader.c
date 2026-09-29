@@ -49,7 +49,7 @@ int main(int argc, char** argv)
     field("signature", chuid.signature);
     field("signed_content_0", chuid.signed_content[0]);
     field("signed_content_1", chuid.signed_content[1]);
-    previous = chuid;
+    memcpy(&previous, &chuid, sizeof previous);
     for (i = 0; i < length; ++i) {
       if (TC_PIV_CHUID_read((TC_bytes){data, i}, encoding, TC_CHUID_PROFILE_PIV, &chuid) ==
               TC_TLV_OK ||
@@ -71,7 +71,7 @@ int main(int argc, char** argv)
   field("signature_value", cvc.signature);
   field("signed_data", cvc.signed_data);
   printf("role=%02x\nkey_bits=%u\n", cvc.role, cvc.key_bits);
-  saved = cvc;
+  memcpy(&saved, &cvc, sizeof saved);
   for (i = 0; i < length; ++i) {
     if (TC_PIV_CVC_read((TC_bytes){data, i}, &cvc) == TC_TLV_OK || memcmp(&cvc, &saved, sizeof cvc))
       return 1;

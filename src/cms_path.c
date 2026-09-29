@@ -168,6 +168,7 @@ static int cms_path_arguments(const TC_X509_store_source* source,
 static TC_TLV_result cms_selected_certificate(void* context, size_t index, size_t* work,
                                               TC_bytes* out)
 {
+  /* The source callback type passes work. One borrowed span costs none. */
   (void)work;
   if (index)
     return TC_TLV_END;

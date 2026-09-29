@@ -230,8 +230,10 @@ typedef struct {
  * constructed level inside one GeneralName. next walks each name's complete
  * tree and charges every nested element to the limits. Consume through END
  * to check the full list. Frames may change on failure. Reader and out
- * change only on OK. Input, frames, reader and out must be disjoint. Keep
- * the input and frames alive and unchanged while the reader is used. */
+ * change only on OK. Input, frames, reader and out must be disjoint. init
+ * returns ARGUMENT for a NULL reader, NULL frames with a capacity, or overlap
+ * between reader, input and frames. Keep the input and frames alive and
+ * unchanged while the reader is used. */
 typedef struct {
   TC_TLV_reader reader;
   TC_TLV_frames frames;

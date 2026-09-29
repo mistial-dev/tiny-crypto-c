@@ -146,7 +146,7 @@ int main(void)
   if (TC_EAC_CVC_public_key_read((TC_bytes){eac, sizeof eac}, &limits, &eac_key) != TC_TLV_OK ||
       eac_key.modulus.length != 2)
     return 1;
-  if (TC_PIV_CVC_read((TC_bytes){NULL, 0}, &cvc) != TC_TLV_MORE)
+  if (TC_PIV_CVC_read((TC_bytes){NULL, 0}, &cvc) != TC_TLV_INVALID)
     return 1;
   if (TC_PIV_CHUID_read((TC_bytes){NULL, 0}, TC_PIV_CHUID_CONTAINER, TC_CHUID_PROFILE_PIV,
                         &chuid) != TC_TLV_MORE)

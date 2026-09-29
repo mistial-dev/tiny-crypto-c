@@ -224,6 +224,7 @@ static inline uint32_t tc_mp_mod_u32_be(const uint8_t* value, size_t length, uin
   uint32_t remainder = 0;
   for (size_t i = 0; i < length; ++i)
     for (unsigned bit = 8; bit; --bit)
+      /* Only the remainder is needed. The quotient bit is discarded. */
       (void)tc_mp_mod_u32_step(&remainder, (unsigned)(value[i] >> (bit - 1)), divisor);
   return remainder;
 }

@@ -104,6 +104,7 @@ static int input_within_limit(size_t length)
 #if SIZE_MAX > TC_DRBG_MAX_INPUT_BYTES
   return length <= TC_DRBG_MAX_INPUT_BYTES;
 #else
+  /* size_t cannot exceed the limit, so length needs no comparison. */
   (void)length;
   return 1;
 #endif

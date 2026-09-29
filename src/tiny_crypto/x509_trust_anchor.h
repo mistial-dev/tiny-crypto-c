@@ -19,10 +19,12 @@ typedef struct {
 
 /* init walks the complete list under limits, so every anchor fits them.
  * limits also apply to each anchor that next decodes. frames need one entry
- * per constructed nesting level of the list. Returns ARGUMENT for NULL
- * arguments or a workspace array that is NULL with a capacity, INVALID for a
- * malformed or empty list, and LIMIT when limits or frames are exhausted.
- * reader changes only on OK. */
+ * per constructed nesting level of the list. The reader, the frames and the
+ * extension OID array are written, so they must be pairwise disjoint and lie
+ * outside encoded and the workspace struct.
+ * Returns ARGUMENT for NULL arguments, a workspace array that is NULL with a
+ * capacity, or overlap, INVALID for a malformed or empty list, and LIMIT when
+ * limits or frames are exhausted. reader changes only on OK. */
 TC_TLV_result TC_X509_trust_anchor_list_init(TC_X509_trust_anchor_reader* reader, TC_bytes encoded,
                                              const TC_TLV_limits* limits,
                                              TC_X509_workspace* workspace);

@@ -47,6 +47,7 @@ static void tc_aes_ccm_make_counter(uint8_t* counter, const uint8_t* nonce, size
 /* The counter occupies the low q bytes of the block (SP 800-38C A.3). */
 static void tc_aes_ccm_increment_counter(uint8_t* counter, unsigned q)
 {
+  /* The length checks keep the block count below 2^(8q), so no carry is lost. */
   (void)tc_internal_increment_be(counter + TC_AES_BLOCKLEN - q, q);
 }
 

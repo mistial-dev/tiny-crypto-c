@@ -36,15 +36,16 @@ typedef struct {
 /* Parse and bounds-check one complete TR-03110 certificate (tag 7F21) as
  * encoded. Spans borrow encoded, which must stay unchanged while they are
  * used. limits bounds the whole tree. Workspace frames may change on failure.
- * Returns OK, MORE for truncated input, INVALID for malformed or trailing
- * input, LIMIT when limits or frame capacity are exhausted, UNSUPPORTED for an
- * unknown profile, key algorithm or role, and ARGUMENT for NULL pointers.
- * out is unchanged on failure. The caller verifies the signature, chain and
- * dates. */
+ * encoded, workspace frames and out must be disjoint.
+ * Returns OK, INVALID for truncated, malformed or trailing input, LIMIT when
+ * limits or frame capacity are exhausted, UNSUPPORTED for an unknown profile,
+ * key algorithm or role, and ARGUMENT for NULL pointers, NULL data with a
+ * length, or overlap. out is unchanged on failure. The caller verifies the
+ * signature, chain and dates. */
 TC_TLV_result TC_EAC_CVC_read(TC_bytes encoded, const TC_TLV_limits* limits,
                               TC_EAC_CVC_workspace* workspace, TC_EAC_CVC* out);
 /* Read one standalone public key (tag 7F49) with the same statuses and
- * lifetime rules as TC_EAC_CVC_read. */
+ * lifetime rules as TC_EAC_CVC_read. encoded and out must be disjoint. */
 TC_TLV_result TC_EAC_CVC_public_key_read(TC_bytes encoded, const TC_TLV_limits* limits,
                                          TC_EAC_CVC_public_key* out);
 

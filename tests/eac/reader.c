@@ -37,7 +37,7 @@ int main(int argc, char** argv)
   fclose(file);
   if (argc == 3) {
     memset(&key, 0xa5, sizeof key);
-    old_key = key;
+    memcpy(&old_key, &key, sizeof old_key);
     result = TC_EAC_CVC_public_key_read((TC_bytes){data, length}, &limits, &key);
     printf("result=%d\n", result);
     if (result != TC_TLV_OK)
@@ -47,7 +47,7 @@ int main(int argc, char** argv)
     return 0;
   }
   memset(&certificate, 0xa5, sizeof certificate);
-  saved = certificate;
+  memcpy(&saved, &certificate, sizeof saved);
   result = TC_EAC_CVC_read((TC_bytes){data, length}, &limits, &workspace, &certificate);
   printf("result=%d\n", result);
   if (result != TC_TLV_OK)
@@ -86,7 +86,7 @@ int main(int argc, char** argv)
     issuer.modulus.length = widths[2];
     printf("context_encoding=%d\n", TC_EAC_CVC_check_encoding(&certificate, &issuer, &domain));
   }
-  saved = certificate;
+  memcpy(&saved, &certificate, sizeof saved);
   for (i = 0; i < length; ++i) {
     result = TC_EAC_CVC_read((TC_bytes){data, i}, &limits, &workspace, &certificate);
     if (result == TC_TLV_OK || memcmp(&certificate, &saved, sizeof certificate))

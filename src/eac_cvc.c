@@ -3,9 +3,24 @@
 #include <tiny_crypto/common.h>
 #if TC_ENABLE_EAC_CVC
 #include <tiny_crypto/eac_cvc.h>
+#include "internal.h"
 #include "pki_internal.h"
 
 static const TC_TLV_limits unbounded = {SIZE_MAX, SIZE_MAX, SIZE_MAX, SIZE_MAX};
+/* Read the complete outer object. encoded holds one whole certificate or key,
+ * so a truncated outer TLV is malformed. */
+static TC_TLV_result eac_outer(TC_bytes encoded, const TC_TLV_limits* limits, unsigned tag,
+                               TC_TLV_element* element)
+{
+  TC_TLV_result result = TC_TLV_read(encoded, TC_TLV_DER, limits, element);
+  if (result == TC_TLV_MORE)
+    return TC_TLV_INVALID;
+  if (result != TC_TLV_OK)
+    return result;
+  if (!tc_pki_tag(element, tag) || element->encoded.length != encoded.length)
+    return TC_TLV_INVALID;
+  return TC_TLV_OK;
+}
 static TC_TLV_result eac_open(TC_bytes span, TC_TLV_reader* reader)
 {
   return TC_TLV_reader_init(reader, span, TC_TLV_DER, &unbounded);
@@ -111,13 +126,11 @@ TC_TLV_result TC_EAC_CVC_public_key_read(TC_bytes encoded, const TC_TLV_limits* 
   TC_TLV_element element;
   TC_TLV_frame frame;
   TC_TLV_result result;
-  if (!out)
+  if (!out || !tc_internal_ranges_disjoint(encoded.data, encoded.length, out, sizeof *out))
     return TC_TLV_ARGUMENT;
-  result = TC_TLV_read(encoded, TC_TLV_DER, limits, &element);
+  result = eac_outer(encoded, limits, 0x7f49, &element);
   if (result != TC_TLV_OK)
     return result;
-  if (!tc_pki_tag(&element, 0x7f49) || element.encoded.length != encoded.length)
-    return TC_TLV_INVALID;
   result = TC_TLV_walk(encoded, TC_TLV_DER, limits, (TC_TLV_frames){&frame, 1}, NULL, NULL);
   if (result != TC_TLV_OK)
     return result;
@@ -222,13 +235,21 @@ TC_TLV_result TC_EAC_CVC_read(TC_bytes encoded, const TC_TLV_limits* limits,
   TC_TLV_reader reader, body, chat, extensions;
   TC_EAC_CVC_extension extension;
   TC_TLV_result result;
+  size_t frames_size;
   if (!out || !workspace)
     return TC_TLV_ARGUMENT;
-  result = TC_TLV_read(encoded, TC_TLV_DER, limits, &element);
+  if (workspace->frames.capacity > SIZE_MAX / sizeof *workspace->frames.data)
+    return TC_TLV_ARGUMENT;
+  frames_size = workspace->frames.capacity * sizeof *workspace->frames.data;
+  /* The walk writes frames while reading encoded, and out is written last. */
+  if (!tc_internal_ranges_disjoint(encoded.data, encoded.length, out, sizeof *out) ||
+      !tc_internal_ranges_disjoint(workspace->frames.data, frames_size, out, sizeof *out) ||
+      !tc_internal_ranges_disjoint(workspace->frames.data, frames_size, encoded.data,
+                                   encoded.length))
+    return TC_TLV_ARGUMENT;
+  result = eac_outer(encoded, limits, 0x7f21, &element);
   if (result != TC_TLV_OK)
     return result;
-  if (!tc_pki_tag(&element, 0x7f21) || element.encoded.length != encoded.length)
-    return TC_TLV_INVALID;
   result = TC_TLV_walk(encoded, TC_TLV_DER, limits, workspace->frames, NULL, NULL);
   if (result != TC_TLV_OK)
     return result;

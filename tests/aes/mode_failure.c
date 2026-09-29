@@ -128,10 +128,38 @@ static MunitResult dynamic_cbc(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitTest tests[] = {{"/fixed", fixed_modes, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-                            {"/ecb", ecb, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-                            {"/dynamic-cbc", dynamic_cbc, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-                            {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
+/* Single-block dynamic-key operations follow the ECB rule. */
+static MunitResult dynamic_block(const MunitParameter params[], void* user)
+{
+  static const uint8_t raw[24] = {7, 8, 9};
+  TC_AES_dynamic_key key;
+  uint8_t block[16];
+  (void)params;
+  (void)user;
+  munit_assert_int(TC_AES_dynamic_key_init(&key, raw, sizeof raw), ==, TC_OK);
+  for (int decrypt = 0; decrypt < 2; ++decrypt) {
+    memset(block, 0x33, sizeof block);
+    calls = 0;
+    fail_at = 1;
+    munit_assert_int(decrypt ? TC_AES_dynamic_decrypt(&key, block)
+                             : TC_AES_dynamic_encrypt(&key, block),
+                     ==, TC_ERROR);
+    munit_assert_true(tc_test_all_zero(block, sizeof block));
+    fail_at = 0;
+    munit_assert_int(decrypt ? TC_AES_dynamic_decrypt(&key, block)
+                             : TC_AES_dynamic_encrypt(&key, block),
+                     ==, TC_OK);
+  }
+  TC_AES_dynamic_key_clear(&key);
+  return MUNIT_OK;
+}
+
+static MunitTest tests[] = {
+    {"/fixed", fixed_modes, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/ecb", ecb, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/dynamic-cbc", dynamic_cbc, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/dynamic-block", dynamic_block, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
 
 int main(int argc, char** argv)
 {

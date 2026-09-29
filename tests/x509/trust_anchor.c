@@ -121,7 +121,7 @@ static MunitResult malformed(const MunitParameter params[], void* user)
         TC_X509_trust_anchor_list_init(&reader, (TC_bytes){encoded, length}, &limits, &workspace),
         ==, TC_TLV_OK);
     memset(&anchor, 0xa5, sizeof anchor);
-    saved = anchor;
+    memcpy(&saved, &anchor, sizeof saved);
     size_t offset = reader.reader.offset;
     munit_assert_int(TC_X509_trust_anchor_next(&reader, &anchor), ==, TC_TLV_INVALID);
     munit_assert_size(reader.reader.offset, ==, offset);
@@ -565,7 +565,7 @@ static MunitResult certificate_builder(const MunitParameter params[], void* user
   munit_assert_null(built.extensions.data);
   /* Argument errors leave out unchanged. */
   memset(&saved, 0xa5, sizeof saved);
-  built = saved;
+  memcpy(&built, &saved, sizeof built);
   munit_assert_int(TC_X509_store_anchor_from_certificate(NULL, &limits, &workspace, &built), ==,
                    TC_TLV_ARGUMENT);
   munit_assert_int(TC_X509_store_anchor_from_certificate(&certificate, NULL, &workspace, &built),
@@ -647,6 +647,62 @@ static MunitResult reader_binding(const MunitParameter params[], void* user)
                    ==, TC_TLV_INVALID);
   munit_assert_int(TC_X509_trust_anchor_next(NULL, &anchor), ==, TC_TLV_ARGUMENT);
   munit_assert_int(TC_X509_trust_anchor_next(&reader, NULL), ==, TC_TLV_ARGUMENT);
+  /* The reader must not alias the list, the workspace or its arrays. */
+  {
+    union {
+      TC_X509_trust_anchor_reader reader;
+      TC_X509_workspace workspace;
+      TC_TLV_frame frames[16];
+      TC_bytes oids[32];
+      uint8_t bytes[sizeof(TC_X509_trust_anchor_reader) + sizeof encoded];
+    } shared;
+    uint8_t original[sizeof shared];
+    TC_X509_workspace frames_alias = {{shared.frames, 16}, oids, 32};
+    TC_X509_workspace oids_alias = {{frames, 16}, shared.oids, 32};
+    TC_X509_workspace* const aliases[] = {&shared.workspace, &frames_alias, &oids_alias};
+    size_t i;
+    memset(&shared, 0x5a, sizeof shared);
+    memcpy(shared.bytes + 1, encoded, length);
+    memcpy(original, &shared, sizeof original);
+    munit_assert_int(TC_X509_trust_anchor_list_init(
+                         &shared.reader, (TC_bytes){shared.bytes + 1, length}, &limits, &workspace),
+                     ==, TC_TLV_ARGUMENT);
+    munit_assert_memory_equal(sizeof original, original, &shared);
+    for (i = 0; i < sizeof aliases / sizeof *aliases; ++i) {
+      memset(&shared, 0x5a, sizeof shared);
+      if (aliases[i] == &shared.workspace)
+        shared.workspace = workspace;
+      memcpy(original, &shared, sizeof original);
+      munit_assert_int(TC_X509_trust_anchor_list_init(&shared.reader, (TC_bytes){encoded, length},
+                                                      &limits, aliases[i]),
+                       ==, TC_TLV_ARGUMENT);
+      munit_assert_memory_equal(sizeof original, original, &shared);
+    }
+  }
+  /* next fills the workspace arrays while it reads the list, so the arrays
+   * must not alias the list or each other. */
+  {
+    union {
+      TC_TLV_frame frames[16];
+      TC_bytes oids[32];
+      uint8_t bytes[sizeof encoded];
+    } list, arrays;
+    TC_X509_workspace oids_in_list = {{frames, 16}, list.oids, 32};
+    TC_X509_workspace frames_in_oids = {{arrays.frames, 16}, arrays.oids, 32};
+    memcpy(list.bytes, encoded, length);
+    saved = reader;
+    munit_assert_int(TC_X509_trust_anchor_list_init(&reader, (TC_bytes){list.bytes, length},
+                                                    &limits, &oids_in_list),
+                     ==, TC_TLV_ARGUMENT);
+    munit_assert_memory_equal(length, list.bytes, encoded);
+    munit_assert_size(reader.reader.offset, ==, saved.reader.offset);
+    munit_assert_ptr_equal(reader.workspace, saved.workspace);
+    munit_assert_int(TC_X509_trust_anchor_list_init(&reader, (TC_bytes){encoded, length}, &limits,
+                                                    &frames_in_oids),
+                     ==, TC_TLV_ARGUMENT);
+    munit_assert_size(reader.reader.offset, ==, saved.reader.offset);
+    munit_assert_ptr_equal(reader.workspace, saved.workspace);
+  }
   return MUNIT_OK;
 }
 

@@ -428,7 +428,7 @@ TC_TLV_result TC_X509_extended_key_usage_read(TC_bytes value, const TC_TLV_limit
     return result;
   /* Validate first so a malformed final OID leaves the caller's array intact. */
   for (i = 0; i < found; ++i) {
-    (void)TC_TLV_next(&start, &element);
+    (void)TC_TLV_next(&start, &element); /* The first pass accepted each element. */
     oids[i] = element.value;
   }
   *count = found;

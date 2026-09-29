@@ -56,7 +56,7 @@ FEATURES = [
     ("DES CTR",
      "struct TC_DES_ctx c; CHECK(TC_DES_init(&c, key, 8)); CHECK(TC_DES_set_iv(&c, iv)); CHECK(TC_DES_CTR_crypt(&c, buf, 64)); consume(buf, 64);",
      DES + " -DTC_DES_ENABLE_CTR=1"),
-    ("3DES CTR",
+    ("TDEA CTR",
      "struct TC_DES_ctx c; CHECK(TC_DES_init(&c, key, 24)); CHECK(TC_DES_set_iv(&c, iv)); CHECK(TC_DES_CTR_crypt(&c, buf, 64)); consume(buf, 64);",
      DES + " -DTC_DES_ENABLE_CTR=1 -DTC_DES_ENABLE_TDES=1"),
     ("TDEA CMAC",

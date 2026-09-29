@@ -339,15 +339,30 @@ static TC_TLV_result next_tree(TC_TLV_reader* reader, TC_TLV_frames frames, TC_T
   return TC_TLV_OK;
 }
 
-static TC_TLV_result names_reader_init(TC_TLV_reader* reader, TC_TLV_frames* bound,
-                                       TC_TLV_frames frames)
+/* A names reader binds input and frames at init. The reader struct, input and
+ * frames must be pairwise disjoint because next writes the reader and frames
+ * while reading input. */
+static int names_reader_storage_valid(const void* reader, size_t reader_size, TC_bytes input,
+                                      TC_TLV_frames frames)
 {
-  if (!frames.data && frames.capacity)
-    return TC_TLV_ARGUMENT;
-  if (!tc_internal_ranges_disjoint(reader->input.data, reader->input.length, frames.data,
-                                   frames.capacity * sizeof *frames.data))
-    return TC_TLV_ARGUMENT;
-  *bound = frames;
+  size_t frames_size;
+  if (!reader || (!frames.data && frames.capacity) ||
+      frames.capacity > SIZE_MAX / sizeof *frames.data)
+    return 0;
+  frames_size = frames.capacity * sizeof *frames.data;
+  return tc_internal_ranges_disjoint(reader, reader_size, input.data, input.length) &&
+         tc_internal_ranges_disjoint(reader, reader_size, frames.data, frames_size) &&
+         tc_internal_ranges_disjoint(input.data, input.length, frames.data, frames_size);
+}
+
+static TC_TLV_result names_contents_open(TC_X509_general_names_reader* parsed, TC_bytes contents,
+                                         const TC_TLV_limits* limits, TC_TLV_frames frames)
+{
+  TC_TLV_result result = TC_TLV_reader_init(&parsed->reader, contents, TC_TLV_DER, limits);
+  if (result != TC_TLV_OK)
+    return result;
+  parsed->reader.root = 0;
+  parsed->frames = frames;
   return TC_TLV_OK;
 }
 
@@ -356,14 +371,13 @@ TC_TLV_result TC_X509_general_names_init(TC_X509_general_names_reader* reader, T
 {
   TC_X509_general_names_reader parsed;
   TC_TLV_result result;
-  if (!reader || frames.capacity > SIZE_MAX / sizeof *frames.data)
+  if (!names_reader_storage_valid(reader, sizeof *reader, encoded, frames))
     return TC_TLV_ARGUMENT;
   /* RFC 5280 section 4.2.1.6: GeneralNames ::= SEQUENCE SIZE (1..MAX). */
   result = tc_pki_value_open(&parsed.reader, encoded, 0x30, limits, 0);
-  if (result == TC_TLV_OK)
-    result = names_reader_init(&parsed.reader, &parsed.frames, frames);
   if (result != TC_TLV_OK)
     return result;
+  parsed.frames = frames;
   *reader = parsed;
   return TC_TLV_OK;
 }
@@ -374,14 +388,11 @@ TC_TLV_result TC_X509_general_names_contents_init(TC_X509_general_names_reader* 
 {
   TC_X509_general_names_reader parsed;
   TC_TLV_result result;
-  if (!reader || frames.capacity > SIZE_MAX / sizeof *frames.data)
+  if (!names_reader_storage_valid(reader, sizeof *reader, contents, frames))
     return TC_TLV_ARGUMENT;
-  result = TC_TLV_reader_init(&parsed.reader, contents, TC_TLV_DER, limits);
-  if (result == TC_TLV_OK)
-    result = names_reader_init(&parsed.reader, &parsed.frames, frames);
+  result = names_contents_open(&parsed, contents, limits, frames);
   if (result != TC_TLV_OK)
     return result;
-  parsed.reader.root = 0;
   *reader = parsed;
   return TC_TLV_OK;
 }
@@ -414,9 +425,9 @@ TC_TLV_result TC_X509_general_subtrees_init(TC_X509_general_subtrees_reader* rea
 {
   TC_X509_general_names_reader names;
   TC_TLV_result result;
-  if (!reader)
+  if (!names_reader_storage_valid(reader, sizeof *reader, contents, frames))
     return TC_TLV_ARGUMENT;
-  result = TC_X509_general_names_contents_init(&names, contents, limits, frames);
+  result = names_contents_open(&names, contents, limits, frames);
   if (result != TC_TLV_OK)
     return result;
   reader->reader = names.reader;

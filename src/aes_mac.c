@@ -6,6 +6,13 @@
 #include "aes_mac_core_internal.h"
 
 #if TC_AES_ENABLE_EAX || TC_AES_ENABLE_EAX_PRIME || TC_AES_ENABLE_SIV
+/* EAX, EAX' and SIV share this keystream loop. It stays separate from the
+ * SP 800-38A core in block_modes.c for two reasons. The AEAD counter wraps
+ * modulo 2^128 (the EAX paper and RFC 5297 sections 2.5 and 6), while the core
+ * requires callers to reject a request that would wrap the counter. The
+ * AEAD calls also read input and write a separate output, while the core
+ * works in place and would need an extra copy of the text. Both use a
+ * full-block big-endian increment. */
 TC_status tc_aes_mac_ctr_xor(const uint8_t* round_key, const uint8_t initial[TC_AES_BLOCKLEN],
                              const uint8_t* input, uint8_t* output, size_t length,
                              tc_aes_mac_ctr_bits bits)

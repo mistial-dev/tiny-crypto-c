@@ -478,6 +478,7 @@ static TC_TLV_result x509_crl_path_certificate(void* context, size_t index, TC_b
 {
   const x509_crl_path_context* path = context;
 #if !TC_ENABLE_X509_OCSP
+  /* The callback type passes index for OCSP response lookup. */
   (void)index;
 #else
   /* An accepted OCSP response settles the member. Other outcomes fall back

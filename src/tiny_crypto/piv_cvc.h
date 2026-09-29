@@ -23,8 +23,8 @@ typedef struct {
 /* Read one complete 7F21 object as encoded. All spans borrow encoded, which
  * must stay unchanged while they are used. encoded and out must be disjoint.
  * signed_data is the original signed byte range.
- * Returns OK, MORE when the outer object is truncated, INVALID for malformed or
- * trailing input, LIMIT for a tag or length wider than ISO 7816 allows,
+ * Returns OK, INVALID for truncated, malformed or trailing input, LIMIT for a
+ * tag or length wider than ISO 7816 allows,
  * UNSUPPORTED for an unknown profile, curve, algorithm or role, and ARGUMENT
  * for NULL out, NULL data with a length, or overlap. Errors preserve out.
  * Signature verification and curve-membership checks are separate. */
@@ -50,7 +50,9 @@ typedef struct {
  * Argument failures preserve caller state. Processing consumes bounded work.
  * Only VALID writes out. Point scratch is cleared after use. VALID covers this
  * CVC chain under signer. Secure messaging also requires key confirmation.
- * Requires X509, PIV_CVC and the selected EC curve. Intermediates require SHA-1. */
+ * Requires X509, PIV_CVC and the selected EC curve. Intermediates require SHA-1.
+ * A build without EC, or without SHA-1 for a supplied intermediate, returns
+ * UNSUPPORTED after the argument checks and before any provider call. */
 TC_X509_signature_result TC_PIV_CVC_chain_verify(const TC_PIV_CVC_chain_request* request,
                                                  const TC_TLV_limits* limits,
                                                  const TC_X509_signature_provider* provider,

@@ -5,6 +5,7 @@
 #include <tiny_crypto/x509_trust_anchor.h>
 #include <tiny_crypto/x509_path.h>
 #include "pki_internal.h"
+#include "pki_storage_internal.h"
 #include "string_internal.h"
 #include "pki_bits_internal.h"
 #include "x509_store_anchor_internal.h"
@@ -258,8 +259,20 @@ TC_TLV_result TC_X509_trust_anchor_list_init(TC_X509_trust_anchor_reader* reader
 {
   TC_X509_trust_anchor_reader parsed;
   TC_TLV_result result;
-  if (!reader || !limits || !workspace || (!workspace->frames.data && workspace->frames.capacity) ||
-      (!workspace->extension_oids && workspace->extension_capacity))
+  TC_bytes writes[3];
+  tc_pki_storage_plan plan;
+  if (!reader || !limits || !workspace)
+    return TC_TLV_ARGUMENT;
+  /* init walks the list into the frames, and next rewrites the reader and
+   * fills both workspace arrays while it reads the list. */
+  tc_pki_storage_plan_begin(&plan, writes, sizeof writes / sizeof *writes, SIZE_MAX);
+  TC_PKI_PLAN_WRITE(&plan, reader, 1);
+  TC_PKI_PLAN_WRITE(&plan, workspace->frames.data, workspace->frames.capacity);
+  TC_PKI_PLAN_WRITE(&plan, workspace->extension_oids, workspace->extension_capacity);
+  tc_pki_storage_plan_seal(&plan);
+  tc_pki_storage_plan_input_span(&plan, encoded);
+  TC_PKI_PLAN_INPUT(&plan, workspace, 1);
+  if (tc_pki_storage_plan_finish(&plan, NULL) != TC_TLV_OK)
     return TC_TLV_ARGUMENT;
   /* RFC 5914 section 4: TrustAnchorList ::= SEQUENCE SIZE (1..MAX). */
   result = tc_pki_value_open(&parsed.reader, encoded, 0x30, limits, 0);

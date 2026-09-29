@@ -84,6 +84,7 @@ static void tc_aes_gcm_absorb(struct TC_AES_GCM_ctx* ctx, const uint8_t* data, s
  * change, and they wrap. */
 static void tc_aes_gcm_increment32(uint8_t* counter)
 {
+  /* inc32 wraps by definition, so the carry is discarded. */
   (void)tc_internal_increment_be(counter + 12, 4);
 }
 

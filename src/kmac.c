@@ -93,6 +93,7 @@ static int tc_kmac_length(size_t len)
 #if SIZE_MAX > UINT64_MAX / 8
   return len <= UINT64_MAX / 8;
 #else
+  /* size_t cannot exceed the limit, so len needs no comparison. */
   (void)len;
   return 1;
 #endif

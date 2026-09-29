@@ -39,6 +39,7 @@ static const tc_hash_algorithm_info* load_info(const tc_hash_algorithm_info* sto
   memcpy_P(local, stored, sizeof *local);
   return local;
 #else
+  /* Descriptors are addressable in place, so local is unused. */
   (void)local;
   return stored;
 #endif

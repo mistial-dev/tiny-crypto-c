@@ -97,6 +97,8 @@ ATmega328P ECDSA P-256 sign-and-verify profile, with P-384 disabled and
 RAM including a static `TC_ECDSA_workspace` of 1218 bytes, and 330 bytes of
 project stack. Check it with
 `python3 tools/measure_avr_resources.py --check tests/budgets/avr.json`.
+The file's `avr_gcc_version` names the toolchain the budgets were measured
+with. The check prints it beside the version in use and accepts either.
 
 The C++11 equivalents are in `<tiny_crypto/ec.hpp>`, including
 `ec_coordinate_bytes`. They take `bytes` inputs, fixed-size output arrays and

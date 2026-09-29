@@ -70,33 +70,30 @@ static inline struct tc_kdf_prf tc_kdf_hmac_prf(const tc_hash_algorithm_info* ha
 }
 #endif
 
+/* config.h requires at least one PRF family with KDF. Each dispatch below
+ * tests for CMAC first, so an HMAC-only build compiles the HMAC arm alone. In
+ * a CMAC-only build every PRF is CMAC, so the trailing HMAC fallback is
+ * unreachable. */
 static inline int tc_kdf_key_ok(const struct tc_kdf_prf* prf, size_t key_len)
 {
-#if TC_KBKDF_HAVE_HMAC
-  if (prf->kind == TC_KDF_PRF_HMAC)
-    return 1;
-#endif
 #if TC_KDF_HAVE_CMAC
-  return prf->mac.cmac->key_ok(key_len);
-#else
-  (void)key_len;
-  return 0;
+  if (prf->kind == TC_KDF_PRF_CMAC)
+    return prf->mac.cmac->key_ok(key_len);
 #endif
+  /* HMAC accepts any nonzero key length (RFC 2104 section 2). */
+  return prf->kind == TC_KDF_PRF_HMAC && key_len != 0;
 }
 
 static inline TC_status tc_kdf_mac_init(const struct tc_kdf_prf* prf, void* ctx, const uint8_t* key,
                                         size_t key_len)
 {
-#if TC_KBKDF_HAVE_HMAC
-  if (prf->kind == TC_KDF_PRF_HMAC)
-    return tc_hmac_core_init(prf->mac.hash, ctx, key, key_len);
-#endif
 #if TC_KDF_HAVE_CMAC
-  return prf->mac.cmac->init(ctx, key, key_len);
+  if (prf->kind == TC_KDF_PRF_CMAC)
+    return prf->mac.cmac->init(ctx, key, key_len);
+#endif
+#if TC_KBKDF_HAVE_HMAC
+  return tc_hmac_core_init(prf->mac.hash, ctx, key, key_len);
 #else
-  (void)ctx;
-  (void)key;
-  (void)key_len;
   return TC_ERROR;
 #endif
 }
@@ -104,45 +101,40 @@ static inline TC_status tc_kdf_mac_init(const struct tc_kdf_prf* prf, void* ctx,
 static inline TC_status tc_kdf_mac_update(const struct tc_kdf_prf* prf, void* ctx,
                                           const uint8_t* data, size_t len)
 {
-#if TC_KBKDF_HAVE_HMAC
-  if (prf->kind == TC_KDF_PRF_HMAC)
-    return tc_hmac_core_update(prf->mac.hash, ctx, data, len);
-#endif
 #if TC_KDF_HAVE_CMAC
-  return prf->mac.cmac->update(ctx, data, len);
+  if (prf->kind == TC_KDF_PRF_CMAC)
+    return prf->mac.cmac->update(ctx, data, len);
+#endif
+#if TC_KBKDF_HAVE_HMAC
+  return tc_hmac_core_update(prf->mac.hash, ctx, data, len);
 #else
-  (void)ctx;
-  (void)data;
-  (void)len;
   return TC_ERROR;
 #endif
 }
 
 static inline TC_status tc_kdf_mac_final(const struct tc_kdf_prf* prf, void* ctx, uint8_t* out)
 {
-#if TC_KBKDF_HAVE_HMAC
-  if (prf->kind == TC_KDF_PRF_HMAC)
-    return tc_hmac_core_final(prf->mac.hash, ctx, out);
-#endif
 #if TC_KDF_HAVE_CMAC
-  return prf->mac.cmac->final(ctx, out);
+  if (prf->kind == TC_KDF_PRF_CMAC)
+    return prf->mac.cmac->final(ctx, out);
+#endif
+#if TC_KBKDF_HAVE_HMAC
+  return tc_hmac_core_final(prf->mac.hash, ctx, out);
 #else
-  (void)ctx;
-  (void)out;
   return TC_ERROR;
 #endif
 }
 
 static inline void tc_kdf_mac_clear(const struct tc_kdf_prf* prf, void* ctx)
 {
-#if TC_KBKDF_HAVE_HMAC
-  if (prf->kind == TC_KDF_PRF_HMAC) {
-    tc_hmac_core_clear(prf->mac.hash, ctx);
+#if TC_KDF_HAVE_CMAC
+  if (prf->kind == TC_KDF_PRF_CMAC) {
+    prf->mac.cmac->clear(ctx);
     return;
   }
 #endif
-#if TC_KDF_HAVE_CMAC
-  prf->mac.cmac->clear(ctx);
+#if TC_KBKDF_HAVE_HMAC
+  tc_hmac_core_clear(prf->mac.hash, ctx);
 #else
   TC_secure_zero(ctx, prf->ctx_size);
 #endif
@@ -179,6 +171,7 @@ static int tc_kdf_aes_key_ok(size_t key_len)
 }
 static TC_status tc_kdf_aes_cmac_init(void* ctx, const uint8_t* key, size_t key_len)
 {
+  /* key_ok checked the length. The PRF init type passes it for DES keys. */
   (void)key_len;
   return TC_AES_CMAC_init((struct TC_AES_CMAC_ctx*)ctx, key);
 }

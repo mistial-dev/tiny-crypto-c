@@ -45,7 +45,8 @@ static void disabled_chain(TC_bytes card, TC_bytes intermediate)
   munit_assert_int(TC_PIV_CVC_chain_verify(&request, &limits, &provider, &points, &work, &out), ==,
                    TC_X509_SIGNATURE_UNSUPPORTED);
   munit_assert_memory_equal(sizeof out, &out, &saved);
-  munit_assert_uint(calls, ==, intermediate.length ? 0 : 1);
+  /* Missing EC support is reported before any provider call. */
+  munit_assert_uint(calls, ==, 0);
 }
 #endif
 
@@ -86,7 +87,7 @@ static MunitResult test_format(const MunitParameter params[], void* user)
                cvc.subject.length == 16);
   munit_assert(cvc.public_key.length == 65 && cvc.ecdsa.r.length == 1 && cvc.ecdsa.s.length == 1);
   munit_assert(cvc.signed_data.data == data + 4 && cvc.signed_data.length == sizeof data - 4 - 28);
-  saved = cvc;
+  memcpy(&saved, &cvc, sizeof saved);
 #if !TC_ENABLE_EC
   disabled_chain((TC_bytes){data, sizeof data}, (TC_bytes){NULL, 0});
 #endif
@@ -119,7 +120,7 @@ static MunitResult test_format(const MunitParameter params[], void* user)
     munit_assert(cvc.curve_oid.data == long_oid + 43);
     munit_assert_size(cvc.signed_data.length, ==, saved.signed_data.length + 1);
     munit_assert_memory_equal(cvc.signed_data.length, cvc.signed_data.data, long_oid + 4);
-    cvc = saved;
+    memcpy(&cvc, &saved, sizeof cvc);
   }
   {
     /* Table 19, cipher suite 7: P-384 with ECDSA/SHA-384. */
@@ -135,16 +136,16 @@ static MunitResult test_format(const MunitParameter params[], void* user)
     munit_assert(cvc.key_bits == 384 && cvc.public_key.length == 97);
     munit_assert(cvc.signed_data.data == p384 + 4 && cvc.signed_data.length == 146);
     munit_assert(cvc.signature_algorithm.oid.data[7] == 3);
-    saved = cvc;
+    memcpy(&saved, &cvc, sizeof saved);
     for (i = 0; i < sizeof p384; ++i) {
-      munit_assert(TC_PIV_CVC_read((TC_bytes){p384, i}, &cvc) != TC_TLV_OK);
+      munit_assert_int(TC_PIV_CVC_read((TC_bytes){p384, i}, &cvc), ==, TC_TLV_INVALID);
       munit_assert(memcmp(&cvc, &saved, sizeof cvc) == 0);
     }
     p384[166] = 2;
     munit_assert(TC_PIV_CVC_read((TC_bytes){p384, sizeof p384}, &cvc) == TC_TLV_UNSUPPORTED);
     munit_assert(memcmp(&cvc, &saved, sizeof cvc) == 0);
     munit_assert(TC_PIV_CVC_read((TC_bytes){data, sizeof data}, &cvc) == TC_TLV_OK);
-    saved = cvc;
+    memcpy(&saved, &cvc, sizeof saved);
   }
   {
     static const uint8_t rsa_signature_header[] = {
@@ -186,7 +187,7 @@ static MunitResult test_format(const MunitParameter params[], void* user)
     intermediate[124] -= 2;
     munit_assert(TC_PIV_CVC_read((TC_bytes){intermediate, sizeof intermediate - 2}, &cvc) ==
                  TC_TLV_INVALID);
-    cvc = saved;
+    memcpy(&cvc, &saved, sizeof cvc);
   }
   for (i = 0; i < sizeof malformed / sizeof malformed[0]; ++i) {
     uint8_t byte = data[malformed[i].offset];
@@ -212,8 +213,9 @@ static MunitResult test_format(const MunitParameter params[], void* user)
   extended[3] += 4;
   munit_assert(TC_PIV_CVC_read((TC_bytes){extended, sizeof extended}, &cvc) == TC_TLV_INVALID);
   munit_assert(memcmp(&cvc, &saved, sizeof cvc) == 0);
+  /* The input is one complete object, so truncation is malformed. */
   for (i = 0; i < sizeof data; ++i) {
-    munit_assert(TC_PIV_CVC_read((TC_bytes){data, i}, &cvc) != TC_TLV_OK);
+    munit_assert_int(TC_PIV_CVC_read((TC_bytes){data, i}, &cvc), ==, TC_TLV_INVALID);
     munit_assert(memcmp(&cvc, &saved, sizeof cvc) == 0);
   }
   data[7] = 0x81;

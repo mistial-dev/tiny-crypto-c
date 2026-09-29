@@ -81,7 +81,9 @@ done:
 static TC_status tc_aes_siv_ctr(const uint8_t* k2_round, const uint8_t v[TC_AES_BLOCKLEN],
                                 const uint8_t* input, uint8_t* output, size_t length)
 {
-  /* RFC 5297 clears bit 63 and bit 31 of the synthetic IV. */
+  /* RFC 5297 section 2.5 clears bit 63 and bit 31 of the synthetic IV and
+   * increments the 128-bit counter. The shared loop in aes_mac.c explains
+   * why it stays apart from the SP 800-38A core. */
   return tc_aes_mac_ctr_xor(k2_round, v, input, output, length, (tc_aes_mac_ctr_bits){8u, 12u, 1u});
 }
 

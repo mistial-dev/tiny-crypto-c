@@ -40,6 +40,8 @@ static TC_status tc_aes_eax_cmac(const struct TC_AES_key_ctx* aes,
                                  result);
 }
 
+/* CTR over the full 128-bit counter N', wrapping modulo 2^128. The shared
+ * loop in aes_mac.c explains why it stays apart from the SP 800-38A core. */
 static TC_status tc_aes_eax_ctr_xor(const struct TC_AES_key_ctx* aes,
                                     const uint8_t initial[TC_AES_BLOCKLEN], const uint8_t* input,
                                     uint8_t* output, size_t length, int prime)

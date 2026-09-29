@@ -80,6 +80,9 @@ TC_TLV_result TC_PIV_CVC_read(TC_bytes encoded, TC_PIV_CVC* out)
       !tc_internal_ranges_disjoint(encoded.data, encoded.length, out, sizeof *out))
     return TC_TLV_ARGUMENT;
   result = TC_TLV_read(encoded, TC_TLV_ISO7816, &limits, &element);
+  /* encoded is one complete object, so a truncated outer TLV is malformed. */
+  if (result == TC_TLV_MORE)
+    return TC_TLV_INVALID;
   if (result != TC_TLV_OK)
     return result;
   if (!tc_pki_tag(&element, 0x7f21) || element.encoded.length != encoded.length)

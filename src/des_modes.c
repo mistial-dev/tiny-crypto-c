@@ -51,7 +51,7 @@ static void tc_des_cfb_keystream(const struct TC_DES_ctx* ctx, uint8_t keystream
 {
   const tc_des_block_key key = tc_des_ctx_key(ctx);
   memcpy(keystream, ctx->iv, TC_DES_BLOCKLEN);
-  (void)tc_des_block_encrypt(&key, keystream);
+  (void)tc_des_block_encrypt(&key, keystream); /* DES has no failure path. */
 }
 #endif
 

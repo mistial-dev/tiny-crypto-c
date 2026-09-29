@@ -40,6 +40,7 @@ static uint32_t tc_rsa_keygen_mod_u64(uint64_t value, uint32_t divisor)
 {
   uint32_t remainder = 0;
   for (unsigned bit = 64; bit; --bit)
+    /* Only the remainder is needed. The quotient bit is discarded. */
     (void)tc_mp_mod_u32_step(&remainder, (unsigned)(value >> (bit - 1)), divisor);
   return remainder;
 }

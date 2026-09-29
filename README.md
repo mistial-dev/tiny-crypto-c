@@ -432,6 +432,8 @@ EAC certificates use a different schema. `<tiny_crypto/eac_cvc.h>` provides
 `TC_EAC_CVC_read`, a standalone public-key reader, and an extension iterator.
 The certificate reader takes the encoding as `TC_bytes`, `TC_TLV_limits` and a
 `TC_EAC_CVC_workspace` holding caller-owned `TC_TLV_frames`. Returned fields borrow the input.
+Keep the input, frames and output disjoint. Both CVC readers take one complete
+object and report a truncated encoding as `TC_TLV_INVALID`.
 Its signed span includes the complete `7F4E` body, including tag and length.
 Unknown extensions are preserved. Unsupported key or authorization OIDs return
 `TC_TLV_UNSUPPORTED`.
