@@ -172,8 +172,9 @@ TC_TLV_result TC_LDS_read_content(TC_bytes octets, const TC_TLV_limits* limits,
   if (result != TC_TLV_OK)
     return result;
   /* CMS permits nested BER chunks. The reconstructed LDS remains DER. */
-  result = tc_pki_octets_contiguous(octets, 4, TC_TLV_BER, limits, frames, frame_capacity, work,
-                                    buffer, buffer_capacity, &content);
+  result = tc_pki_octets_contiguous(octets, 4, TC_TLV_BER, limits,
+                                    &(tc_pki_tree_workspace){frames, frame_capacity, work},
+                                    (TC_buffer){buffer, buffer_capacity}, &content);
   if (result != TC_TLV_OK)
     return result;
   return TC_LDS_read(content, limits, frames, frame_capacity, work, out);

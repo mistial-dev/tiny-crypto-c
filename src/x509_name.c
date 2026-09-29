@@ -128,7 +128,8 @@ static TC_TLV_result prepare(const TC_X509_name_attribute* attribute, TC_TLV_pro
     if (!tree)
       return TC_TLV_INVALID;
     result = tc_pki_string_walk(attribute->value, value.header.tag[0] & ~0x20u, profile, bounds,
-                                tree->frames, tree->capacity, work, prepare_point, &state, &bytes);
+                                &(tc_pki_tree_workspace){tree->frames, tree->capacity, work},
+                                prepare_point, &state, &bytes);
     if (result != TC_TLV_OK)
       return result;
     if (rule == 1)
@@ -161,33 +162,49 @@ static TC_TLV_result prepare(const TC_X509_name_attribute* attribute, TC_TLV_pro
 /* Outcome of comparing two RDNs or two Names. */
 typedef enum { NAME_MISMATCH, NAME_MATCH, NAME_UNDETERMINED } name_comparison;
 
+/* Settings shared by every step of one Name comparison. tree is NULL for the
+ * public entry points, which validate the encoding in place. */
+typedef struct {
+  const TC_TLV_limits* limits;
+  const TC_X509_name_workspace* workspace;
+  size_t* work;
+  TC_TLV_profile left_profile;
+  TC_TLV_profile right_profile;
+  const tc_pki_tree_workspace* tree;
+} name_compare;
+
+/* Cached preparation of the left attribute across right candidates. state
+ * is 0 before preparation, 1 when prepared into workspace->left and 2 when
+ * only the exact encoding can be compared. */
+typedef struct {
+  size_t length;
+  int state;
+} left_preparation;
+
 /* Compare one attribute value pair. Values that cannot be prepared compare by
  * exact encoding, where a difference is undetermined. */
-static TC_TLV_result attribute_compare(const TC_X509_name_attribute* first,
-                                       const TC_X509_name_attribute* second,
-                                       const TC_X509_name_workspace* workspace, size_t* work,
-                                       TC_TLV_profile left_profile, TC_TLV_profile right_profile,
-                                       const TC_TLV_limits* limits,
-                                       const tc_pki_tree_workspace* tree, size_t* first_length,
-                                       int* first_state, name_comparison* out)
+static TC_TLV_result attribute_compare(const name_compare* compare,
+                                       const TC_X509_name_attribute* first,
+                                       const TC_X509_name_attribute* second, left_preparation* left,
+                                       name_comparison* out)
 {
+  const TC_X509_name_workspace* workspace = compare->workspace;
+  size_t* work = compare->work;
   size_t second_length = 0;
   TC_TLV_result result;
-  /* first_state caches the left preparation across candidates: 0 not yet
-   * prepared, 1 prepared, 2 exact encoding only. */
-  if (!*first_state) {
-    result = matching_rule(first->oid)
-                 ? prepare(first, left_profile, workspace->left, workspace->scalar_capacity,
-                           first_length, work, limits, tree)
-                 : TC_TLV_UNSUPPORTED;
+  if (!left->state) {
+    result = matching_rule(first->oid) ? prepare(first, compare->left_profile, workspace->left,
+                                                 workspace->scalar_capacity, &left->length, work,
+                                                 compare->limits, compare->tree)
+                                       : TC_TLV_UNSUPPORTED;
     if (result != TC_TLV_OK && result != TC_TLV_UNSUPPORTED)
       return result;
-    *first_state = result == TC_TLV_OK ? 1 : 2;
+    left->state = result == TC_TLV_OK ? 1 : 2;
   }
-  int exact = *first_state == 2;
+  int exact = left->state == 2;
   if (!exact) {
-    result = prepare(second, right_profile, workspace->right, workspace->scalar_capacity,
-                     &second_length, work, limits, tree);
+    result = prepare(second, compare->right_profile, workspace->right, workspace->scalar_capacity,
+                     &second_length, work, compare->limits, compare->tree);
     if (result == TC_TLV_UNSUPPORTED)
       exact = 1;
     else if (result != TC_TLV_OK)
@@ -199,10 +216,10 @@ static TC_TLV_result attribute_compare(const TC_X509_name_attribute* first,
     *out = tc_pki_equal(first->value, second->value) ? NAME_MATCH : NAME_UNDETERMINED;
     return TC_TLV_OK;
   }
-  if (tc_pki_work_charge(work, *first_length) != TC_TLV_OK)
+  if (tc_pki_work_charge(work, left->length) != TC_TLV_OK)
     return TC_TLV_LIMIT;
-  *out = *first_length == second_length &&
-                 !memcmp(workspace->left, workspace->right, *first_length * sizeof(uint32_t))
+  *out = left->length == second_length &&
+                 !memcmp(workspace->left, workspace->right, left->length * sizeof(uint32_t))
              ? NAME_MATCH
              : NAME_MISMATCH;
   return TC_TLV_OK;
@@ -211,17 +228,19 @@ static TC_TLV_result attribute_compare(const TC_X509_name_attribute* first,
 /* RDNs match when they hold the same number of attributes and each left
  * attribute matches a distinct right attribute of the same type. A left
  * attribute with no matching or undetermined candidate decides a mismatch. */
-static TC_TLV_result rdn_compare(TC_bytes left, TC_bytes right, const TC_TLV_limits* limits,
-                                 const TC_X509_name_workspace* workspace, size_t* work,
-                                 TC_TLV_profile left_profile, TC_TLV_profile right_profile,
-                                 const tc_pki_tree_workspace* tree, name_comparison* out)
+static TC_TLV_result rdn_compare(const name_compare* compare, TC_bytes left, TC_bytes right,
+                                 name_comparison* out)
 {
+  const TC_TLV_limits* limits = compare->limits;
+  const TC_X509_name_workspace* workspace = compare->workspace;
+  size_t* work = compare->work;
+  const tc_pki_tree_workspace* tree = compare->tree;
   TC_TLV_reader a, b;
   TC_X509_name_attribute first, second;
   TC_TLV_result result;
   size_t count = 0, seen = 0;
   int undetermined = 0;
-  result = TC_TLV_reader_init(&b, right.data, right.length, right_profile, limits);
+  result = TC_TLV_reader_init(&b, right.data, right.length, compare->right_profile, limits);
   if (result != TC_TLV_OK)
     return result;
   while ((result = tc_x509_name_next_attribute(&b, work, &second, tree)) == TC_TLV_OK) {
@@ -231,24 +250,24 @@ static TC_TLV_result rdn_compare(TC_bytes left, TC_bytes right, const TC_TLV_lim
   }
   if (result != TC_TLV_END)
     return result;
-  result = TC_TLV_reader_init(&a, left.data, left.length, left_profile, limits);
+  result = TC_TLV_reader_init(&a, left.data, left.length, compare->left_profile, limits);
   if (result != TC_TLV_OK)
     return result;
   while ((result = tc_x509_name_next_attribute(&a, work, &first, tree)) == TC_TLV_OK) {
-    size_t first_length = 0, index = 0;
-    int first_state = 0, found = 0, candidate_undetermined = 0;
+    left_preparation preparation = {0, 0};
+    size_t index = 0;
+    int found = 0, candidate_undetermined = 0;
     if (++seen > count) {
       *out = NAME_MISMATCH;
       return TC_TLV_OK;
     }
-    result = TC_TLV_reader_init(&b, right.data, right.length, right_profile, limits);
+    result = TC_TLV_reader_init(&b, right.data, right.length, compare->right_profile, limits);
     if (result != TC_TLV_OK)
       return result;
     while ((result = tc_x509_name_next_attribute(&b, work, &second, tree)) == TC_TLV_OK) {
       if (!workspace->matched[index] && tc_pki_equal(first.oid, second.oid)) {
         name_comparison pair;
-        result = attribute_compare(&first, &second, workspace, work, left_profile, right_profile,
-                                   limits, tree, &first_length, &first_state, &pair);
+        result = attribute_compare(compare, &first, &second, &preparation, &pair);
         if (result != TC_TLV_OK)
           return result;
         if (pair == NAME_MATCH) {
@@ -316,11 +335,18 @@ static TC_TLV_result next_name_rdn(TC_TLV_reader* reader, TC_bytes* suffix,
   return TC_TLV_OK;
 }
 
-static TC_TLV_result match(TC_bytes left, TC_bytes right, const TC_TLV_limits* limits,
-                           const TC_X509_name_workspace* workspace, size_t* work, int* matched,
-                           int subtree, TC_TLV_profile left_profile, TC_TLV_profile right_profile,
-                           const tc_pki_tree_workspace* tree, TC_bytes left_rdn, TC_bytes right_rdn)
+/* Compare left against right. A non-empty left_rdn or right_rdn is appended
+ * to its Name as a final RDN, which requires a tree and DER on both sides.
+ * subtree accepts right as a leading prefix of left. */
+static TC_TLV_result match(const name_compare* compare, TC_bytes left, TC_bytes left_rdn,
+                           TC_bytes right, TC_bytes right_rdn, int subtree, int* matched)
 {
+  const TC_TLV_limits* limits = compare->limits;
+  const TC_X509_name_workspace* workspace = compare->workspace;
+  size_t* work = compare->work;
+  const TC_TLV_profile left_profile = compare->left_profile;
+  const TC_TLV_profile right_profile = compare->right_profile;
+  const tc_pki_tree_workspace* tree = compare->tree;
   TC_TLV_reader a, b;
   TC_bytes rdn_a, rdn_b;
   TC_TLV_result result;
@@ -406,8 +432,7 @@ static TC_TLV_result match(TC_bytes left, TC_bytes right, const TC_TLV_limits* l
     }
     if (result != TC_TLV_OK)
       return result;
-    result =
-        rdn_compare(rdn_a, rdn_b, limits, workspace, work, left_profile, right_profile, tree, &rdn);
+    result = rdn_compare(compare, rdn_a, rdn_b, &rdn);
     if (result != TC_TLV_OK)
       return result;
     if (rdn == NAME_MISMATCH) {
@@ -422,16 +447,16 @@ TC_TLV_result TC_X509_name_equal(TC_bytes left, TC_bytes right, const TC_TLV_lim
                                  const TC_X509_name_workspace* workspace, size_t* work,
                                  int* matched)
 {
-  return match(left, right, limits, workspace, work, matched, 0, TC_TLV_DER, TC_TLV_DER, NULL,
-               (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0});
+  const name_compare compare = {limits, workspace, work, TC_TLV_DER, TC_TLV_DER, NULL};
+  return match(&compare, left, (TC_bytes){NULL, 0}, right, (TC_bytes){NULL, 0}, 0, matched);
 }
 
 TC_TLV_result TC_X509_name_within(TC_bytes name, TC_bytes subtree, const TC_TLV_limits* limits,
                                   const TC_X509_name_workspace* workspace, size_t* work,
                                   int* matched)
 {
-  return match(name, subtree, limits, workspace, work, matched, 1, TC_TLV_DER, TC_TLV_DER, NULL,
-               (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0});
+  const name_compare compare = {limits, workspace, work, TC_TLV_DER, TC_TLV_DER, NULL};
+  return match(&compare, name, (TC_bytes){NULL, 0}, subtree, (TC_bytes){NULL, 0}, 1, matched);
 }
 
 TC_TLV_result tc_pki_name_equal(TC_bytes left, TC_TLV_profile left_profile, TC_bytes right,
@@ -441,8 +466,8 @@ TC_TLV_result tc_pki_name_equal(TC_bytes left, TC_TLV_profile left_profile, TC_b
 {
   if (!tree)
     return TC_TLV_ARGUMENT;
-  return match(left, right, limits, workspace, tree->work, matched, 0, left_profile, right_profile,
-               tree, (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0});
+  const name_compare compare = {limits, workspace, tree->work, left_profile, right_profile, tree};
+  return match(&compare, left, (TC_bytes){NULL, 0}, right, (TC_bytes){NULL, 0}, 0, matched);
 }
 
 TC_TLV_result tc_pki_name_appended_equal(TC_bytes left, TC_bytes left_rdn, TC_bytes right,
@@ -452,7 +477,7 @@ TC_TLV_result tc_pki_name_appended_equal(TC_bytes left, TC_bytes left_rdn, TC_by
 {
   if (!tree)
     return TC_TLV_ARGUMENT;
-  return match(left, right, limits, workspace, tree->work, matched, 0, TC_TLV_DER, TC_TLV_DER, tree,
-               left_rdn, right_rdn);
+  const name_compare compare = {limits, workspace, tree->work, TC_TLV_DER, TC_TLV_DER, tree};
+  return match(&compare, left, left_rdn, right, right_rdn, 0, matched);
 }
 #endif

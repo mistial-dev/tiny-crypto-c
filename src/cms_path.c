@@ -570,8 +570,7 @@ TC_TLV_result tc_cms_signer_matches(const TC_CMS_signer_info* signer, TC_TLV_pro
       *matched = 0;
       return TC_TLV_OK;
     }
-    return tc_pki_octets_equal(signer->subject_key_id, 0x80, ski, profile, limits, tree->frames,
-                               tree->capacity, tree->work, matched);
+    return tc_pki_octets_equal(signer->subject_key_id, 0x80, ski, profile, limits, tree, matched);
   }
   return TC_TLV_ARGUMENT;
 }

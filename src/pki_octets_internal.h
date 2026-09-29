@@ -35,18 +35,19 @@ static void tc_pki_octets_visit(void* user, const TC_TLV_event* event)
 /* Visit only primitive value bytes, in order, including nested BER chunks.
  * Headers/EOC are excluded. Callback state is provisional until OK; discard
  * it on error. Input, frames, work and callback state must be disjoint. */
-static inline TC_TLV_result
-tc_pki_octets_implicit(TC_bytes encoded, unsigned root_tag, TC_TLV_profile profile,
-                       const TC_TLV_limits* limits, TC_TLV_frame* frames, size_t capacity,
-                       size_t* work, tc_pki_octets_consume consume, void* context)
+static inline TC_TLV_result tc_pki_octets_implicit(TC_bytes encoded, unsigned root_tag,
+                                                   TC_TLV_profile profile,
+                                                   const TC_TLV_limits* limits,
+                                                   const tc_pki_tree_workspace* tree,
+                                                   tc_pki_octets_consume consume, void* context)
 {
   tc_pki_octets_state state = {consume, context, 0, profile, TC_TLV_OK, root_tag};
   TC_TLV_result result;
-  if (!work || root_tag > 255 || (root_tag & 0x20) || (root_tag & 31) == 31)
+  if (!tree || !tree->work || root_tag > 255 || (root_tag & 0x20) || (root_tag & 31) == 31)
     return TC_TLV_ARGUMENT;
-  if (tc_pki_work_charge(work, encoded.length) != TC_TLV_OK)
+  if (tc_pki_work_charge(tree->work, encoded.length) != TC_TLV_OK)
     return TC_TLV_LIMIT;
-  result = TC_TLV_walk(encoded.data, encoded.length, profile, limits, frames, capacity,
+  result = TC_TLV_walk(encoded.data, encoded.length, profile, limits, tree->frames, tree->capacity,
                        tc_pki_octets_visit, &state);
   if (result != TC_TLV_OK)
     return result;
@@ -56,12 +57,11 @@ tc_pki_octets_implicit(TC_bytes encoded, unsigned root_tag, TC_TLV_profile profi
 }
 
 static inline TC_TLV_result tc_pki_octets(TC_bytes encoded, TC_TLV_profile profile,
-                                          const TC_TLV_limits* limits, TC_TLV_frame* frames,
-                                          size_t capacity, size_t* work,
+                                          const TC_TLV_limits* limits,
+                                          const tc_pki_tree_workspace* tree,
                                           tc_pki_octets_consume consume, void* context)
 {
-  return tc_pki_octets_implicit(encoded, 4, profile, limits, frames, capacity, work, consume,
-                                context);
+  return tc_pki_octets_implicit(encoded, 4, profile, limits, tree, consume, context);
 }
 typedef struct {
   TC_bytes expected;
@@ -89,14 +89,14 @@ static TC_TLV_result tc_pki_octets_compare_chunk(void* context, TC_bytes bytes)
  * Callers preflight disjoint inputs and writable ranges. */
 static inline TC_TLV_result tc_pki_octets_equal(TC_bytes encoded, unsigned root_tag,
                                                 TC_bytes expected, TC_TLV_profile profile,
-                                                const TC_TLV_limits* limits, TC_TLV_frame* frames,
-                                                size_t capacity, size_t* work, int* out)
+                                                const TC_TLV_limits* limits,
+                                                const tc_pki_tree_workspace* tree, int* out)
 {
-  tc_pki_octets_comparison state = {expected, 0, work, 1};
+  tc_pki_octets_comparison state = {expected, 0, tree ? tree->work : NULL, 1};
   TC_TLV_result result;
   if (!out || (!expected.data && expected.length))
     return TC_TLV_ARGUMENT;
-  result = tc_pki_octets_implicit(encoded, root_tag, profile, limits, frames, capacity, work,
+  result = tc_pki_octets_implicit(encoded, root_tag, profile, limits, tree,
                                   tc_pki_octets_compare_chunk, &state);
   if (result != TC_TLV_OK)
     return result;
@@ -133,20 +133,23 @@ static TC_TLV_result tc_pki_octets_store_chunk(void* context, TC_bytes bytes)
   return TC_TLV_OK;
 }
 
-/* Borrow a single chunk. Join multiple chunks in caller storage. Input must
- * stay unchanged across both passes. All writable ranges must be disjoint.
+/* Borrow a single chunk. Join multiple chunks in scratch. Input must stay
+ * unchanged across both passes. All writable ranges must be disjoint.
  * Output changes only on success. Scratch contents are provisional on error. */
-static inline TC_TLV_result
-tc_pki_octets_contiguous(TC_bytes encoded, unsigned root_tag, TC_TLV_profile profile,
-                         const TC_TLV_limits* limits, TC_TLV_frame* frames, size_t capacity,
-                         size_t* work, uint8_t* buffer, size_t buffer_size, TC_bytes* out)
+static inline TC_TLV_result tc_pki_octets_contiguous(TC_bytes encoded, unsigned root_tag,
+                                                     TC_TLV_profile profile,
+                                                     const TC_TLV_limits* limits,
+                                                     const tc_pki_tree_workspace* tree,
+                                                     TC_buffer scratch, TC_bytes* out)
 {
-  tc_pki_octets_storage state = {{NULL, 0}, 0, 0, NULL, 0, work};
+  uint8_t* buffer = scratch.data;
+  const size_t buffer_size = scratch.capacity;
+  tc_pki_octets_storage state = {{NULL, 0}, 0, 0, NULL, 0, tree ? tree->work : NULL};
   TC_TLV_result result;
   size_t length;
   if (!out || (!buffer && buffer_size))
     return TC_TLV_ARGUMENT;
-  result = tc_pki_octets_implicit(encoded, root_tag, profile, limits, frames, capacity, work,
+  result = tc_pki_octets_implicit(encoded, root_tag, profile, limits, tree,
                                   tc_pki_octets_store_chunk, &state);
   if (result != TC_TLV_OK)
     return result;
@@ -160,7 +163,7 @@ tc_pki_octets_contiguous(TC_bytes encoded, unsigned root_tag, TC_TLV_profile pro
   state.buffer = buffer;
   state.buffer_size = length;
   state.length = 0;
-  result = tc_pki_octets_implicit(encoded, root_tag, profile, limits, frames, capacity, work,
+  result = tc_pki_octets_implicit(encoded, root_tag, profile, limits, tree,
                                   tc_pki_octets_store_chunk, &state);
   if (result != TC_TLV_OK)
     return result;

@@ -187,9 +187,10 @@ cms_verify_digest(const TC_CMS_signer_info* signer, TC_bytes content_type, TC_by
     if (!tc_pki_equal(content_type, (TC_bytes){cms_data_oid, sizeof cms_data_oid}))
       return TC_X509_SIGNATURE_INVALID;
   }
-  checked = tc_pki_octets_contiguous(signer->signature, 4, TC_TLV_BER, limits, workspace->frames,
-                                     workspace->frame_capacity, work, workspace->signature,
-                                     workspace->signature_capacity, &signature);
+  checked = tc_pki_octets_contiguous(
+      signer->signature, 4, TC_TLV_BER, limits,
+      &(tc_pki_tree_workspace){workspace->frames, workspace->frame_capacity, work},
+      (TC_buffer){workspace->signature, workspace->signature_capacity}, &signature);
   return checked == TC_TLV_OK
              ? TC_X509_signature_verify_digest(signed_digest, &algorithm->signature, signature, key,
                                                provider, work)
@@ -204,8 +205,7 @@ TC_TLV_result tc_cms_hash_content(TC_bytes input, TC_CMS_content_encoding encodi
   if (!tc_hash_available(algorithm))
     return TC_TLV_UNSUPPORTED;
   if (encoding == TC_CMS_CONTENT_BER_OCTETS)
-    return tc_pki_octets_hash(input, TC_TLV_BER, limits, tree->frames, tree->capacity, algorithm,
-                              scratch, tree->work, digest);
+    return tc_pki_octets_hash(input, TC_TLV_BER, limits, tree, algorithm, scratch, digest);
   if (encoding != TC_CMS_CONTENT_RAW)
     return TC_TLV_ARGUMENT;
   return tc_pki_hash_parts(&input, 1, algorithm, limits, tree, scratch, digest);
@@ -373,8 +373,9 @@ TC_TLV_result TC_CMS_content_digest(TC_bytes encoded, TC_hash_algorithm algorith
     return TC_TLV_UNSUPPORTED;
   if (digest_capacity < info.digest_length)
     return TC_TLV_LIMIT;
-  return tc_pki_octets_hash(encoded, TC_TLV_BER, limits, frames, frame_capacity, algorithm,
-                            &scratch, work, digest);
+  return tc_pki_octets_hash(encoded, TC_TLV_BER, limits,
+                            &(tc_pki_tree_workspace){frames, frame_capacity, work}, algorithm,
+                            &scratch, digest);
 }
 
 TC_TLV_result TC_CMS_signed_data_read(TC_bytes encoded, const TC_TLV_limits* limits,
@@ -531,8 +532,8 @@ TC_TLV_result tc_cms_signed_data_read(TC_bytes encoded, const TC_TLV_limits* lim
       return TC_TLV_INVALID;
     parsed.has_content = 1;
     parsed.content = fields[0].encoded;
-    result =
-        tc_pki_octets(parsed.content, TC_TLV_BER, limits, frames, frame_capacity, work, NULL, NULL);
+    result = tc_pki_octets(parsed.content, TC_TLV_BER, limits,
+                           &(tc_pki_tree_workspace){frames, frame_capacity, work}, NULL, NULL);
     if (result != TC_TLV_OK)
       return result;
   }
@@ -710,8 +711,9 @@ TC_TLV_result tc_cms_signer_info_read(TC_bytes encoded, TC_TLV_profile profile,
     if (parsed.version != 3)
       return TC_TLV_INVALID;
     octets = 0;
-    CMS_TRY(tc_pki_octets_implicit(element.encoded, 0x80, profile, limits, frames, frame_capacity,
-                                   work, cms_octet_count, &octets));
+    CMS_TRY(tc_pki_octets_implicit(element.encoded, 0x80, profile, limits,
+                                   &(tc_pki_tree_workspace){frames, frame_capacity, work},
+                                   cms_octet_count, &octets));
     if (!octets)
       return TC_TLV_INVALID;
     parsed.subject_key_id = element.encoded;
@@ -747,8 +749,9 @@ TC_TLV_result tc_cms_signer_info_read(TC_bytes encoded, TC_TLV_profile profile,
                                 &parsed.signature_algorithm));
   CMS_TRY(tc_pki_tree_next(&fields, &workspace, &element));
   octets = 0;
-  CMS_TRY(tc_pki_octets(element.encoded, profile, limits, frames, frame_capacity, work,
-                        cms_octet_count, &octets));
+  CMS_TRY(tc_pki_octets(element.encoded, profile, limits,
+                        &(tc_pki_tree_workspace){frames, frame_capacity, work}, cms_octet_count,
+                        &octets));
   if (!octets)
     return TC_TLV_INVALID;
   parsed.signature = element.encoded;
@@ -882,7 +885,8 @@ TC_TLV_result TC_CMS_signed_attributes_read(TC_bytes encoded, TC_CMS_attribute_e
       const size_t required = kind == FASCN ? FASCN_BYTES : UUID_BYTES;
       if (destination->data)
         return TC_TLV_INVALID;
-      result = tc_pki_octets(value.encoded, profile, limits, frames, frame_capacity, work,
+      result = tc_pki_octets(value.encoded, profile, limits,
+                             &(tc_pki_tree_workspace){frames, frame_capacity, work},
                              tc_pki_octets_store_chunk, &octets);
       if (result != TC_TLV_OK)
         return result;

@@ -24,21 +24,20 @@ static TC_TLV_result tc_pki_octets_hash_update(void* context, TC_bytes bytes)
  * Digest has the selected hash's output size and is written only on success.
  * All writable storage is disjoint from inputs and other writable storage. */
 static inline TC_TLV_result tc_pki_octets_hash(TC_bytes encoded, TC_TLV_profile profile,
-                                               const TC_TLV_limits* limits, TC_TLV_frame* frames,
-                                               size_t capacity, TC_hash_algorithm algorithm,
-                                               TC_hash_context* workspace, size_t* work,
-                                               uint8_t* digest)
+                                               const TC_TLV_limits* limits,
+                                               const tc_pki_tree_workspace* tree,
+                                               TC_hash_algorithm algorithm,
+                                               TC_hash_context* workspace, uint8_t* digest)
 {
-  tc_pki_octets_hash_state state = {algorithm, workspace, work};
+  tc_pki_octets_hash_state state = {algorithm, workspace, tree ? tree->work : NULL};
   TC_TLV_result result;
-  if (!workspace || !work || !digest)
+  if (!workspace || !tree || !tree->work || !digest)
     return TC_TLV_ARGUMENT;
   if (!tc_hash_available(algorithm))
     return TC_TLV_UNSUPPORTED;
   if (tc_hash_init(algorithm, workspace) != TC_OK)
     return TC_TLV_INVALID;
-  result = tc_pki_octets(encoded, profile, limits, frames, capacity, work,
-                         tc_pki_octets_hash_update, &state);
+  result = tc_pki_octets(encoded, profile, limits, tree, tc_pki_octets_hash_update, &state);
   if (result == TC_TLV_OK && tc_hash_final(algorithm, workspace, digest) != TC_OK)
     result = TC_TLV_INVALID;
   TC_secure_zero(workspace, sizeof *workspace);

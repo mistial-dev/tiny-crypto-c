@@ -284,14 +284,16 @@ TC_TLV_result TC_PIV_CMS_identifiers_match(const TC_PIV_CMS_object* object, TC_P
   if (result != TC_TLV_OK)
     return result;
   if (fascn_octets.data) {
-    result = tc_pki_octets_equal(fascn_octets, 4, fascn, TC_TLV_BER, limits, frames, frame_capacity,
-                                 work, &fascn_matches);
+    result =
+        tc_pki_octets_equal(fascn_octets, 4, fascn, TC_TLV_BER, limits,
+                            &(tc_pki_tree_workspace){frames, frame_capacity, work}, &fascn_matches);
     if (result != TC_TLV_OK)
       return result;
   }
   if (uuid_octets.data) {
-    result = tc_pki_octets_equal(uuid_octets, 4, uuid, TC_TLV_BER, limits, frames, frame_capacity,
-                                 work, &uuid_matches);
+    result =
+        tc_pki_octets_equal(uuid_octets, 4, uuid, TC_TLV_BER, limits,
+                            &(tc_pki_tree_workspace){frames, frame_capacity, work}, &uuid_matches);
     if (result != TC_TLV_OK)
       return result;
   }

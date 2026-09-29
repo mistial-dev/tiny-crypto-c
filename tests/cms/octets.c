@@ -30,27 +30,27 @@ static MunitResult chunks(const MunitParameter params[], void* user)
   size_t work = 100;
   (void)params;
   (void)user;
-  munit_assert_int(tc_pki_octets((TC_bytes){encoded, sizeof encoded}, TC_TLV_BER, &limits, frames,
-                                 8, &work, consume, &state),
+  munit_assert_int(tc_pki_octets((TC_bytes){encoded, sizeof encoded}, TC_TLV_BER, &limits,
+                                 &(tc_pki_tree_workspace){frames, 8, &work}, consume, &state),
                    ==, TC_TLV_OK);
   munit_assert_size(state.count, ==, 2);
   state.count = 0;
   state.fail = 1;
   work = 100;
-  munit_assert_int(tc_pki_octets((TC_bytes){encoded, sizeof encoded}, TC_TLV_BER, &limits, frames,
-                                 8, &work, consume, &state),
+  munit_assert_int(tc_pki_octets((TC_bytes){encoded, sizeof encoded}, TC_TLV_BER, &limits,
+                                 &(tc_pki_tree_workspace){frames, 8, &work}, consume, &state),
                    ==, TC_TLV_LIMIT);
   munit_assert_size(state.count, ==, 1);
   encoded[9] = 2;
   work = 100;
-  munit_assert_int(tc_pki_octets((TC_bytes){encoded, sizeof encoded}, TC_TLV_BER, &limits, frames,
-                                 8, &work, NULL, NULL),
+  munit_assert_int(tc_pki_octets((TC_bytes){encoded, sizeof encoded}, TC_TLV_BER, &limits,
+                                 &(tc_pki_tree_workspace){frames, 8, &work}, NULL, NULL),
                    ==, TC_TLV_INVALID);
   encoded[9] = 4;
   for (size_t length = 0; length < sizeof encoded; ++length) {
     work = 100;
-    munit_assert_int(tc_pki_octets((TC_bytes){encoded, length}, TC_TLV_BER, &limits, frames, 8,
-                                   &work, NULL, NULL),
+    munit_assert_int(tc_pki_octets((TC_bytes){encoded, length}, TC_TLV_BER, &limits,
+                                   &(tc_pki_tree_workspace){frames, 8, &work}, NULL, NULL),
                      !=, TC_TLV_OK);
   }
   {
@@ -58,19 +58,19 @@ static MunitResult chunks(const MunitParameter params[], void* user)
     static const uint8_t empty[] = {4, 0, 4, 0};
     work = 100;
     munit_assert_int(tc_pki_octets((TC_bytes){constructed, sizeof constructed}, TC_TLV_BER, &limits,
-                                   frames, 8, &work, NULL, NULL),
+                                   &(tc_pki_tree_workspace){frames, 8, &work}, NULL, NULL),
                      ==, TC_TLV_OK);
     work = 100;
     munit_assert_int(tc_pki_octets((TC_bytes){constructed, sizeof constructed}, TC_TLV_DER, &limits,
-                                   frames, 8, &work, NULL, NULL),
+                                   &(tc_pki_tree_workspace){frames, 8, &work}, NULL, NULL),
                      ==, TC_TLV_INVALID);
     work = 100;
-    munit_assert_int(
-        tc_pki_octets((TC_bytes){empty, 2}, TC_TLV_DER, &limits, frames, 8, &work, NULL, NULL), ==,
-        TC_TLV_OK);
+    munit_assert_int(tc_pki_octets((TC_bytes){empty, 2}, TC_TLV_DER, &limits,
+                                   &(tc_pki_tree_workspace){frames, 8, &work}, NULL, NULL),
+                     ==, TC_TLV_OK);
     work = 100;
-    munit_assert_int(tc_pki_octets((TC_bytes){empty, sizeof empty}, TC_TLV_BER, &limits, frames, 8,
-                                   &work, NULL, NULL),
+    munit_assert_int(tc_pki_octets((TC_bytes){empty, sizeof empty}, TC_TLV_BER, &limits,
+                                   &(tc_pki_tree_workspace){frames, 8, &work}, NULL, NULL),
                      ==, TC_TLV_INVALID);
   }
   return MUNIT_OK;
@@ -88,13 +88,15 @@ static MunitResult contiguous(const MunitParameter params[], void* user)
   (void)params;
   (void)user;
   munit_assert_int(tc_pki_octets_contiguous((TC_bytes){single, sizeof single}, 4, TC_TLV_BER,
-                                            &limits, frames, 8, &work, NULL, 0, &out),
+                                            &limits, &(tc_pki_tree_workspace){frames, 8, &work},
+                                            (TC_buffer){NULL, 0}, &out),
                    ==, TC_TLV_OK);
   munit_assert_ptr_equal(out.data, single + 4);
   munit_assert_size(out.length, ==, 1);
   work = 100;
   munit_assert_int(tc_pki_octets_contiguous((TC_bytes){split, sizeof split}, 4, TC_TLV_BER, &limits,
-                                            frames, 8, &work, buffer, sizeof buffer, &out),
+                                            &(tc_pki_tree_workspace){frames, 8, &work},
+                                            (TC_buffer){buffer, sizeof buffer}, &out),
                    ==, TC_TLV_OK);
   munit_assert_ptr_equal(out.data, buffer);
   munit_assert_size(out.length, ==, 2);
@@ -104,27 +106,30 @@ static MunitResult contiguous(const MunitParameter params[], void* user)
     work = budget;
     out = (TC_bytes){NULL, 99};
     munit_assert_int(tc_pki_octets_contiguous((TC_bytes){split, sizeof split}, 4, TC_TLV_BER,
-                                              &limits, frames, 8, &work, buffer, sizeof buffer,
-                                              &out),
+                                              &limits, &(tc_pki_tree_workspace){frames, 8, &work},
+                                              (TC_buffer){buffer, sizeof buffer}, &out),
                      ==, TC_TLV_LIMIT);
     munit_assert_null(out.data);
     munit_assert_size(out.length, ==, 99);
   }
   work = 100;
   munit_assert_int(tc_pki_octets_contiguous((TC_bytes){split, sizeof split}, 4, TC_TLV_BER, &limits,
-                                            frames, 8, &work, buffer, 1, &out),
+                                            &(tc_pki_tree_workspace){frames, 8, &work},
+                                            (TC_buffer){buffer, 1}, &out),
                    ==, TC_TLV_LIMIT);
   munit_assert_size(out.length, ==, 99);
   for (size_t length = 0; length < sizeof split; ++length) {
     work = 100;
     munit_assert_int(tc_pki_octets_contiguous((TC_bytes){split, length}, 4, TC_TLV_BER, &limits,
-                                              frames, 8, &work, buffer, sizeof buffer, &out),
+                                              &(tc_pki_tree_workspace){frames, 8, &work},
+                                              (TC_buffer){buffer, sizeof buffer}, &out),
                      !=, TC_TLV_OK);
     munit_assert_size(out.length, ==, 99);
   }
   work = 100;
   munit_assert_int(tc_pki_octets_contiguous((TC_bytes){empty, sizeof empty}, 4, TC_TLV_DER, &limits,
-                                            frames, 8, &work, NULL, 0, &out),
+                                            &(tc_pki_tree_workspace){frames, 8, &work},
+                                            (TC_buffer){NULL, 0}, &out),
                    ==, TC_TLV_OK);
   munit_assert_size(out.length, ==, 0);
   return MUNIT_OK;

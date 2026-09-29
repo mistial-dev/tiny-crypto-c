@@ -140,10 +140,16 @@ typedef struct {
 /* Decode explicit parameters, applying RFC 4055 defaults. Unknown digest OIDs
  * remain available for provider selection. out changes only on OK. */
 TC_TLV_result tc_pki_pss_read(TC_bytes encoded, tc_pki_pss_parameters* out);
-struct tc_pki_tree_workspace;
+/* Scratch for decoding one encoded object: nesting frames and the shared
+ * work budget. Frames, work and the input are disjoint. */
+typedef struct tc_pki_tree_workspace {
+  TC_TLV_frame* frames;
+  size_t capacity;
+  size_t* work;
+} tc_pki_tree_workspace;
 TC_TLV_result tc_pki_pss_read_profile(TC_bytes encoded, TC_TLV_profile profile,
                                       const TC_TLV_limits* limits,
-                                      const struct tc_pki_tree_workspace* tree,
+                                      const tc_pki_tree_workspace* tree,
                                       tc_pki_pss_parameters* out);
 
 typedef enum {

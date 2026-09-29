@@ -234,7 +234,8 @@ static MunitResult encoded_content(const MunitParameter params[], void* user)
     munit_assert_memory_equal(sizeof actual, actual, untouched);
     work = WORK_BUDGET;
     munit_assert_int(tc_pki_octets_hash((TC_bytes){definite, sizeof definite}, TC_TLV_DER, &limits,
-                                        frames, FRAME_CAPACITY, hash, &scratch, &work, actual),
+                                        &(tc_pki_tree_workspace){frames, FRAME_CAPACITY, &work},
+                                        hash, &scratch, actual),
                      ==, TC_TLV_INVALID);
     munit_assert_memory_equal(sizeof actual, actual, untouched);
     munit_assert_memory_equal(sizeof scratch, &scratch, zero_scratch);

@@ -262,26 +262,29 @@ TC_status TC_DES_RETAIL3_init(struct TC_DES_ISO9797_ctx* ctx, TC_DES_ISO9797_pad
   return status;
 }
 
-static TC_status tc_des_iso9797_mac_common(TC_DES_ISO9797_algorithm algorithm,
-                                           TC_DES_ISO9797_padding padding, const uint8_t* key,
-                                           size_t keylen, const uint8_t* msg, size_t msg_len,
-                                           uint8_t* tag, size_t tag_len, int retail3, int short_tag)
+/* One-shot arguments. A short tag has 4..7 bytes, a full tag one block. */
+static int tc_des_iso9797_mac_args(const uint8_t* msg, size_t msg_len, const uint8_t* tag,
+                                   size_t tag_len, int short_tag)
 {
-  struct TC_DES_ISO9797_ctx ctx;
+  return tag != NULL && (msg_len == 0 || msg != NULL) &&
+         (short_tag ? tag_len >= 4 && tag_len < TC_DES_BLOCKLEN : tag_len == TC_DES_BLOCKLEN);
+}
+
+/* MAC msg with a context whose initialization returned init, then write the
+ * leading tag_len bytes. The context is consumed or cleared on every path. */
+static TC_status tc_des_iso9797_mac_run(struct TC_DES_ISO9797_ctx* ctx, TC_status init,
+                                        const uint8_t* msg, size_t msg_len, uint8_t* tag,
+                                        size_t tag_len)
+{
   uint8_t full[TC_DES_BLOCKLEN];
   TC_status status;
-  if (tag == NULL ||
-      (short_tag ? (tag_len < 4 || tag_len >= TC_DES_BLOCKLEN) : tag_len != TC_DES_BLOCKLEN) ||
-      (msg_len && msg == NULL))
+  if (init != TC_OK)
     return TC_ERROR;
-  if ((retail3 ? TC_DES_RETAIL3_init(&ctx, padding, key)
-               : TC_DES_ISO9797_init(&ctx, algorithm, padding, key, keylen)) != TC_OK)
-    return TC_ERROR;
-  status = TC_DES_ISO9797_update(&ctx, msg, msg_len);
+  status = TC_DES_ISO9797_update(ctx, msg, msg_len);
   if (status == TC_OK)
-    status = TC_DES_ISO9797_final(&ctx, full);
+    status = TC_DES_ISO9797_final(ctx, full);
   else
-    TC_DES_ISO9797_clear(&ctx);
+    TC_DES_ISO9797_clear(ctx);
   if (status == TC_OK)
     memcpy(tag, full, tag_len);
   TC_secure_zero(full, sizeof(full));
@@ -292,8 +295,11 @@ TC_status TC_DES_ISO9797_MAC(TC_DES_ISO9797_algorithm algorithm, TC_DES_ISO9797_
                              const uint8_t* key, size_t keylen, const uint8_t* msg, size_t msg_len,
                              uint8_t* tag, size_t tag_len)
 {
-  return tc_des_iso9797_mac_common(algorithm, padding, key, keylen, msg, msg_len, tag, tag_len, 0,
-                                   0);
+  struct TC_DES_ISO9797_ctx ctx;
+  if (!tc_des_iso9797_mac_args(msg, msg_len, tag, tag_len, 0))
+    return TC_ERROR;
+  return tc_des_iso9797_mac_run(&ctx, TC_DES_ISO9797_init(&ctx, algorithm, padding, key, keylen),
+                                msg, msg_len, tag, tag_len);
 }
 
 TC_status TC_DES_ISO9797_MAC_short_tag(TC_DES_ISO9797_algorithm algorithm,
@@ -301,15 +307,21 @@ TC_status TC_DES_ISO9797_MAC_short_tag(TC_DES_ISO9797_algorithm algorithm,
                                        size_t keylen, const uint8_t* msg, size_t msg_len,
                                        uint8_t* tag, size_t tag_len)
 {
-  return tc_des_iso9797_mac_common(algorithm, padding, key, keylen, msg, msg_len, tag, tag_len, 0,
-                                   1);
+  struct TC_DES_ISO9797_ctx ctx;
+  if (!tc_des_iso9797_mac_args(msg, msg_len, tag, tag_len, 1))
+    return TC_ERROR;
+  return tc_des_iso9797_mac_run(&ctx, TC_DES_ISO9797_init(&ctx, algorithm, padding, key, keylen),
+                                msg, msg_len, tag, tag_len);
 }
 
 TC_status TC_DES_RETAIL3_MAC(TC_DES_ISO9797_padding padding, const uint8_t key[24],
                              const uint8_t* msg, size_t msg_len, uint8_t* tag, size_t tag_len)
 {
-  return tc_des_iso9797_mac_common(TC_DES_ISO9797_ALG3, padding, key, 24, msg, msg_len, tag,
-                                   tag_len, 1, 0);
+  struct TC_DES_ISO9797_ctx ctx;
+  if (!tc_des_iso9797_mac_args(msg, msg_len, tag, tag_len, 0))
+    return TC_ERROR;
+  return tc_des_iso9797_mac_run(&ctx, TC_DES_RETAIL3_init(&ctx, padding, key), msg, msg_len, tag,
+                                tag_len);
 }
 
 TC_status TC_DES_ISO9797_verify(TC_DES_ISO9797_algorithm algorithm, TC_DES_ISO9797_padding padding,

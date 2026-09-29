@@ -322,8 +322,8 @@ static MunitResult content_signature(const MunitParameter params[], void* user)
                                                    &limits, frames, FRAME_CAPACITY, &work, &parsed),
                      ==, TC_TLV_OK);
     munit_assert_int(tc_pki_octets_hash((TC_bytes){content, sizeof content}, TC_TLV_BER, &limits,
-                                        frames, FRAME_CAPACITY, TC_HASH_SHA256, &hash_workspace,
-                                        &work, digest),
+                                        &(tc_pki_tree_workspace){frames, FRAME_CAPACITY, &work},
+                                        TC_HASH_SHA256, &hash_workspace, digest),
                      ==, TC_TLV_OK);
     munit_assert_int(TC_CMS_content_digest_check(
                          &parsed, (TC_bytes){content_type, sizeof content_type}, TC_HASH_SHA256,
@@ -417,8 +417,8 @@ static MunitResult content_signature(const MunitParameter params[], void* user)
     content[CONTENT_MUTATION_OFFSET] ^= 1;
     work = WORK_BUDGET;
     munit_assert_int(tc_pki_octets_hash((TC_bytes){content, sizeof content}, TC_TLV_BER, &limits,
-                                        frames, FRAME_CAPACITY, TC_HASH_SHA256, &hash_workspace,
-                                        &work, digest),
+                                        &(tc_pki_tree_workspace){frames, FRAME_CAPACITY, &work},
+                                        TC_HASH_SHA256, &hash_workspace, digest),
                      ==, TC_TLV_OK);
     munit_assert_int(TC_CMS_content_digest_check(
                          &parsed, (TC_bytes){content_type, sizeof content_type}, TC_HASH_SHA256,
@@ -783,9 +783,11 @@ static MunitResult signed_data(const MunitParameter params[], void* user)
                              sizeof attributes.signature_input / sizeof *attributes.signature_input,
                              digest, &hash_workspace),
         ==, TC_OK);
-    munit_assert_int(tc_pki_octets_contiguous(signer.signature, 4, TC_TLV_BER, &limits, frames,
-                                              FRAME_CAPACITY, &work, NULL, 0, &signature),
-                     ==, TC_TLV_OK);
+    munit_assert_int(
+        tc_pki_octets_contiguous(signer.signature, 4, TC_TLV_BER, &limits,
+                                 &(tc_pki_tree_workspace){frames, FRAME_CAPACITY, &work},
+                                 (TC_buffer){NULL, 0}, &signature),
+        ==, TC_TLV_OK);
     munit_assert_int(TC_X509_signature_verify_digest((TC_bytes){digest, hash.digest_length},
                                                      &algorithm.signature, signature, &key,
                                                      &provider, &work),
@@ -836,10 +838,11 @@ static MunitResult signed_data(const MunitParameter params[], void* user)
                                                  &parsed_chunks),
                          ==, TC_TLV_OK);
         munit_assert_uint(parsed_chunks.version, ==, signer.version);
-        munit_assert_int(tc_pki_octets_contiguous(parsed_chunks.signature, 4, TC_TLV_BER, &limits,
-                                                  frames, FRAME_CAPACITY, &work, scratch,
-                                                  sizeof scratch, &joined),
-                         ==, TC_TLV_OK);
+        munit_assert_int(
+            tc_pki_octets_contiguous(parsed_chunks.signature, 4, TC_TLV_BER, &limits,
+                                     &(tc_pki_tree_workspace){frames, FRAME_CAPACITY, &work},
+                                     (TC_buffer){scratch, sizeof scratch}, &joined),
+            ==, TC_TLV_OK);
         munit_assert_size(joined.length, ==, signature.length);
         munit_assert_memory_equal(joined.length, joined.data, signature.data);
         munit_assert_int(verify_digest_native(&algorithm.signature, &key,
@@ -871,10 +874,11 @@ static MunitResult signed_data(const MunitParameter params[], void* user)
                            ==, TC_X509_SIGNATURE_INVALID);
           work = WORK_BUDGET;
           joined = (TC_bytes){NULL, 99};
-          munit_assert_int(tc_pki_octets_contiguous((TC_bytes){chunked, offset}, 4, TC_TLV_BER,
-                                                    &limits, frames, FRAME_CAPACITY, &work, scratch,
-                                                    signature.length - 1, &joined),
-                           ==, TC_TLV_LIMIT);
+          munit_assert_int(
+              tc_pki_octets_contiguous((TC_bytes){chunked, offset}, 4, TC_TLV_BER, &limits,
+                                       &(tc_pki_tree_workspace){frames, FRAME_CAPACITY, &work},
+                                       (TC_buffer){scratch, signature.length - 1}, &joined),
+              ==, TC_TLV_LIMIT);
           munit_assert_null(joined.data);
           munit_assert_size(joined.length, ==, 99);
         }

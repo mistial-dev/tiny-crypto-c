@@ -31,7 +31,7 @@ static inline TC_TLV_result tc_pki_string_chunk(void* context, TC_bytes bytes)
  * Callers preflight disjoint input/scratch. Callback output is provisional. */
 static inline TC_TLV_result tc_pki_string_walk(TC_bytes encoded, unsigned tag,
                                                TC_TLV_profile profile, const TC_TLV_limits* limits,
-                                               TC_TLV_frame* frames, size_t capacity, size_t* work,
+                                               const tc_pki_tree_workspace* tree,
                                                tc_asn1_string_consume consume, void* context,
                                                size_t* length)
 {
@@ -44,8 +44,7 @@ static inline TC_TLV_result tc_pki_string_walk(TC_bytes encoded, unsigned tag,
     return TC_TLV_INVALID;
   if (tag == 0x14 && consume)
     return TC_TLV_UNSUPPORTED;
-  result = tc_pki_octets_implicit(encoded, tag, profile, limits, frames, capacity, work,
-                                  tc_pki_string_chunk, &state);
+  result = tc_pki_octets_implicit(encoded, tag, profile, limits, tree, tc_pki_string_chunk, &state);
   if (result != TC_TLV_OK)
     return result;
   if (state.decoder.used)
@@ -53,12 +52,6 @@ static inline TC_TLV_result tc_pki_string_walk(TC_bytes encoded, unsigned tag,
   *length = state.bytes;
   return TC_TLV_OK;
 }
-
-typedef struct tc_pki_tree_workspace {
-  TC_TLV_frame* frames;
-  size_t capacity;
-  size_t* work;
-} tc_pki_tree_workspace;
 
 /* Bound the scan before parsing. Successful reads charge only their object;
  * failed reads consume the reserved allowance. Inputs and scratch are disjoint. */
@@ -231,9 +224,8 @@ static inline TC_TLV_result tc_pki_tree_attribute(TC_TLV_reader* reader,
     if (value.header.tag_length != 1)
       return TC_TLV_INVALID;
     const unsigned tag = value.header.tag[0] & ~0x20u;
-    result =
-        tc_pki_string_walk(value.encoded, tag, reader->profile, &reader->limits, workspace->frames,
-                           workspace->capacity, workspace->work, NULL, NULL, &length);
+    result = tc_pki_string_walk(value.encoded, tag, reader->profile, &reader->limits, workspace,
+                                NULL, NULL, &length);
     if (result != TC_TLV_OK)
       return result;
     if (!tc_x509_attribute_type(oid.value, tag, length))
