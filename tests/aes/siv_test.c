@@ -49,8 +49,7 @@ static MunitResult test_siv_rfc_a1(const MunitParameter params[], void* data)
                                                      0x0a, 0x2e, 0xcc, 0x93};
   static const uint8_t expect_c[] = {0x40, 0xc0, 0x2b, 0x96, 0x90, 0xc4, 0xdc,
                                      0x04, 0xda, 0xef, 0x7f, 0x6a, 0xfe, 0x5c};
-  const uint8_t* ad[1];
-  size_t ad_lens[1];
+  TC_bytes ad[1];
   uint8_t v[TC_AES_SIV_V_LEN];
   uint8_t ct[sizeof(plaintext)];
   uint8_t pt[sizeof(plaintext)];
@@ -58,20 +57,24 @@ static MunitResult test_siv_rfc_a1(const MunitParameter params[], void* data)
   (void)params;
   (void)data;
 
-  ad[0] = ad_bytes;
-  ad_lens[0] = sizeof(ad_bytes);
+  ad[0] = (TC_bytes){ad_bytes, sizeof(ad_bytes)};
 
-  munit_assert_int(TC_AES_SIV_encrypt(key, ad, ad_lens, 1, plaintext, sizeof(plaintext), v, ct), ==,
-                   TC_OK);
+  munit_assert_int(TC_AES_SIV_encrypt(key, ad, 1, (TC_bytes){plaintext, sizeof(plaintext)}, v,
+                                      (TC_buffer){ct, sizeof(plaintext)}),
+                   ==, TC_OK);
   munit_assert_memory_equal(TC_AES_SIV_V_LEN, v, expect_v);
   munit_assert_memory_equal(sizeof(expect_c), ct, expect_c);
 
-  munit_assert_int(TC_AES_SIV_decrypt(key, ad, ad_lens, 1, v, ct, sizeof(ct), pt), ==, TC_OK);
+  munit_assert_int(
+      TC_AES_SIV_decrypt(key, ad, 1, v, (TC_bytes){ct, sizeof(ct)}, (TC_buffer){pt, sizeof(ct)}),
+      ==, TC_OK);
   munit_assert_memory_equal(sizeof(plaintext), pt, plaintext);
 
   v[0] ^= 1u;
   memset(pt, 0xa5, sizeof(pt));
-  munit_assert_int(TC_AES_SIV_decrypt(key, ad, ad_lens, 1, v, ct, sizeof(ct), pt), ==, TC_MISMATCH);
+  munit_assert_int(
+      TC_AES_SIV_decrypt(key, ad, 1, v, (TC_bytes){ct, sizeof(ct)}, (TC_buffer){pt, sizeof(ct)}),
+      ==, TC_MISMATCH);
   {
     size_t i;
     for (i = 0; i < sizeof(pt); ++i)
@@ -108,8 +111,7 @@ static MunitResult test_siv_rfc_a2(const MunitParameter params[], void* data)
                                      0x09, 0x4f, 0xa6, 0x63, 0xb7, 0xa3, 0xf7, 0x48, 0xba, 0x8a,
                                      0xf8, 0x29, 0xea, 0x64, 0xad, 0x54, 0x4a, 0x27, 0x2e, 0x9c,
                                      0x48, 0x5b, 0x62, 0xa3, 0xfd, 0x5c, 0x0d};
-  const uint8_t* ad[3];
-  size_t ad_lens[3];
+  TC_bytes ad[3];
   uint8_t v[TC_AES_SIV_V_LEN];
   uint8_t ct[sizeof(plaintext)];
   uint8_t pt[sizeof(plaintext)];
@@ -117,19 +119,19 @@ static MunitResult test_siv_rfc_a2(const MunitParameter params[], void* data)
   (void)params;
   (void)data;
 
-  ad[0] = ad1;
-  ad_lens[0] = sizeof(ad1);
-  ad[1] = ad2;
-  ad_lens[1] = sizeof(ad2);
-  ad[2] = nonce;
-  ad_lens[2] = sizeof(nonce);
+  ad[0] = (TC_bytes){ad1, sizeof(ad1)};
+  ad[1] = (TC_bytes){ad2, sizeof(ad2)};
+  ad[2] = (TC_bytes){nonce, sizeof(nonce)};
 
-  munit_assert_int(TC_AES_SIV_encrypt(key, ad, ad_lens, 3, plaintext, sizeof(plaintext), v, ct), ==,
-                   TC_OK);
+  munit_assert_int(TC_AES_SIV_encrypt(key, ad, 3, (TC_bytes){plaintext, sizeof(plaintext)}, v,
+                                      (TC_buffer){ct, sizeof(plaintext)}),
+                   ==, TC_OK);
   munit_assert_memory_equal(TC_AES_SIV_V_LEN, v, expect_v);
   munit_assert_memory_equal(sizeof(expect_c), ct, expect_c);
 
-  munit_assert_int(TC_AES_SIV_decrypt(key, ad, ad_lens, 3, v, ct, sizeof(ct), pt), ==, TC_OK);
+  munit_assert_int(
+      TC_AES_SIV_decrypt(key, ad, 3, v, (TC_bytes){ct, sizeof(ct)}, (TC_buffer){pt, sizeof(ct)}),
+      ==, TC_OK);
   munit_assert_memory_equal(sizeof(plaintext), pt, plaintext);
 
   return MUNIT_OK;
@@ -248,8 +250,7 @@ static MunitResult test_siv_wycheproof(const MunitParameter params[], void* data
         uint8_t out_pt[4096];
         uint8_t out_v[TC_AES_SIV_V_LEN];
         size_t key_len, iv_len, aad_len, msg_len, ct_len, tag_len;
-        const uint8_t* ad[2];
-        size_t ad_lens[2];
+        TC_bytes ad[2];
         int expect_ok = (strcmp(result, "valid") == 0);
 
         key_len = tc_test_decode_hex_relaxed(key_hex, key, sizeof(key));
@@ -267,10 +268,8 @@ static MunitResult test_siv_wycheproof(const MunitParameter params[], void* data
           continue;
         }
 
-        ad[0] = aad;
-        ad_lens[0] = aad_len;
-        ad[1] = iv;
-        ad_lens[1] = iv_len;
+        ad[0] = (TC_bytes){aad, aad_len};
+        ad[1] = (TC_bytes){iv, iv_len};
 
         ++ran;
         if (expect_ok)
@@ -279,14 +278,17 @@ static MunitResult test_siv_wycheproof(const MunitParameter params[], void* data
           ++ran_invalid;
 
         if (expect_ok) {
-          if (TC_AES_SIV_encrypt(key, ad, ad_lens, 2, msg, msg_len, out_v, out_ct) != TC_OK ||
+          if (TC_AES_SIV_encrypt(key, ad, 2, (TC_bytes){msg, msg_len}, out_v,
+                                 (TC_buffer){out_ct, msg_len}) != TC_OK ||
               memcmp(out_v, tag, TC_AES_SIV_V_LEN) != 0 || memcmp(out_ct, ct, ct_len) != 0)
             ++failed;
-          else if (TC_AES_SIV_decrypt(key, ad, ad_lens, 2, tag, ct, ct_len, out_pt) != TC_OK ||
+          else if (TC_AES_SIV_decrypt(key, ad, 2, tag, (TC_bytes){ct, ct_len},
+                                      (TC_buffer){out_pt, ct_len}) != TC_OK ||
                    memcmp(out_pt, msg, msg_len) != 0)
             ++failed;
         } else {
-          if (TC_AES_SIV_decrypt(key, ad, ad_lens, 2, tag, ct, ct_len, out_pt) != TC_MISMATCH)
+          if (TC_AES_SIV_decrypt(key, ad, 2, tag, (TC_bytes){ct, ct_len},
+                                 (TC_buffer){out_pt, ct_len}) != TC_MISMATCH)
             ++failed;
         }
         have = 0;
@@ -313,8 +315,7 @@ static MunitResult test_siv_api(const MunitParameter params[], void* data)
   uint8_t pt[16];
   uint8_t ct[16];
   uint8_t empty;
-  const uint8_t* ad[TC_AES_SIV_MAX_AD + 1u];
-  size_t ad_lens[TC_AES_SIV_MAX_AD + 1u];
+  TC_bytes ad[TC_AES_SIV_MAX_AD + 1u];
   size_t i;
 
   (void)params;
@@ -325,48 +326,66 @@ static MunitResult test_siv_api(const MunitParameter params[], void* data)
   memset(pt, 0x33, sizeof(pt));
 
   /* NULL / bound checks */
-  munit_assert_int(TC_AES_SIV_encrypt(NULL, NULL, NULL, 0, buf, sizeof(buf), v, buf), ==, TC_ERROR);
-  munit_assert_int(TC_AES_SIV_encrypt(key, NULL, NULL, 1, buf, sizeof(buf), v, buf), ==, TC_ERROR);
-  munit_assert_int(
-      TC_AES_SIV_encrypt(key, NULL, NULL, TC_AES_SIV_MAX_AD + 1, buf, sizeof(buf), v, buf), ==,
-      TC_ERROR);
-  munit_assert_int(TC_AES_SIV_encrypt(key, NULL, NULL, 0, buf, sizeof(buf), NULL, buf), ==,
-                   TC_ERROR);
+  munit_assert_int(TC_AES_SIV_encrypt(NULL, NULL, 0, (TC_bytes){buf, sizeof(buf)}, v,
+                                      (TC_buffer){buf, sizeof(buf)}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_AES_SIV_encrypt(key, NULL, 1, (TC_bytes){buf, sizeof(buf)}, v,
+                                      (TC_buffer){buf, sizeof(buf)}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_AES_SIV_encrypt(key, NULL, TC_AES_SIV_MAX_AD + 1,
+                                      (TC_bytes){buf, sizeof(buf)}, v,
+                                      (TC_buffer){buf, sizeof(buf)}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_AES_SIV_encrypt(key, NULL, 0, (TC_bytes){buf, sizeof(buf)}, NULL,
+                                      (TC_buffer){buf, sizeof(buf)}),
+                   ==, TC_ERROR);
 
   /* Empty plaintext, no AD */
-  munit_assert_int(TC_AES_SIV_encrypt(key, NULL, NULL, 0, NULL, 0, v, NULL), ==, TC_OK);
-  munit_assert_int(TC_AES_SIV_decrypt(key, NULL, NULL, 0, v, NULL, 0, NULL), ==, TC_OK);
+  munit_assert_int(TC_AES_SIV_encrypt(key, NULL, 0, (TC_bytes){NULL, 0}, v, (TC_buffer){NULL, 0}),
+                   ==, TC_OK);
+  munit_assert_int(TC_AES_SIV_decrypt(key, NULL, 0, v, (TC_bytes){NULL, 0}, (TC_buffer){NULL, 0}),
+                   ==, TC_OK);
 
   /* Zero-length AD component vs no AD — both valid, different transcripts */
-  ad[0] = &empty;
-  ad_lens[0] = 0;
-  munit_assert_int(TC_AES_SIV_encrypt(key, ad, ad_lens, 1, pt, sizeof(pt), v, ct), ==, TC_OK);
-  munit_assert_int(TC_AES_SIV_encrypt(key, NULL, NULL, 0, pt, sizeof(pt), v2, buf), ==, TC_OK);
+  ad[0] = (TC_bytes){&empty, 0};
+  munit_assert_int(
+      TC_AES_SIV_encrypt(key, ad, 1, (TC_bytes){pt, sizeof(pt)}, v, (TC_buffer){ct, sizeof(pt)}),
+      ==, TC_OK);
+  munit_assert_int(TC_AES_SIV_encrypt(key, NULL, 0, (TC_bytes){pt, sizeof(pt)}, v2,
+                                      (TC_buffer){buf, sizeof(pt)}),
+                   ==, TC_OK);
   munit_assert_memory_not_equal(TC_AES_SIV_V_LEN, v, v2);
 
   /* 126 AD components accepted; 127 rejected */
   for (i = 0; i < TC_AES_SIV_MAX_AD + 1u; ++i) {
-    ad[i] = &empty;
-    ad_lens[i] = 0;
+    ad[i] = (TC_bytes){&empty, 0};
   }
-  munit_assert_int(TC_AES_SIV_encrypt(key, ad, ad_lens, TC_AES_SIV_MAX_AD, pt, sizeof(pt), v, ct),
+  munit_assert_int(TC_AES_SIV_encrypt(key, ad, TC_AES_SIV_MAX_AD, (TC_bytes){pt, sizeof(pt)}, v,
+                                      (TC_buffer){ct, sizeof(pt)}),
                    ==, TC_OK);
-  munit_assert_int(
-      TC_AES_SIV_encrypt(key, ad, ad_lens, TC_AES_SIV_MAX_AD + 1u, pt, sizeof(pt), v, ct), ==,
-      TC_ERROR);
+  munit_assert_int(TC_AES_SIV_encrypt(key, ad, TC_AES_SIV_MAX_AD + 1u, (TC_bytes){pt, sizeof(pt)},
+                                      v, (TC_buffer){ct, sizeof(pt)}),
+                   ==, TC_ERROR);
 
   /* In-place encrypt/decrypt success */
   memcpy(buf, pt, sizeof(pt));
-  munit_assert_int(TC_AES_SIV_encrypt(key, NULL, NULL, 0, buf, sizeof(pt), v, buf), ==, TC_OK);
-  munit_assert_int(TC_AES_SIV_decrypt(key, NULL, NULL, 0, v, buf, sizeof(pt), buf), ==, TC_OK);
+  munit_assert_int(TC_AES_SIV_encrypt(key, NULL, 0, (TC_bytes){buf, sizeof(pt)}, v,
+                                      (TC_buffer){buf, sizeof(pt)}),
+                   ==, TC_OK);
+  munit_assert_int(TC_AES_SIV_decrypt(key, NULL, 0, v, (TC_bytes){buf, sizeof(pt)},
+                                      (TC_buffer){buf, sizeof(pt)}),
+                   ==, TC_OK);
   munit_assert_memory_equal(sizeof(pt), buf, pt);
 
   /* In-place decrypt failure wipes the buffer completely */
   memcpy(buf, pt, sizeof(pt));
-  munit_assert_int(TC_AES_SIV_encrypt(key, NULL, NULL, 0, buf, sizeof(pt), v, buf), ==, TC_OK);
+  munit_assert_int(TC_AES_SIV_encrypt(key, NULL, 0, (TC_bytes){buf, sizeof(pt)}, v,
+                                      (TC_buffer){buf, sizeof(pt)}),
+                   ==, TC_OK);
   v[0] ^= 1u;
-  munit_assert_int(TC_AES_SIV_decrypt(key, NULL, NULL, 0, v, buf, sizeof(pt), buf), ==,
-                   TC_MISMATCH);
+  munit_assert_int(TC_AES_SIV_decrypt(key, NULL, 0, v, (TC_bytes){buf, sizeof(pt)},
+                                      (TC_buffer){buf, sizeof(pt)}),
+                   ==, TC_MISMATCH);
   for (i = 0; i < sizeof(pt); ++i)
     munit_assert_uint8(buf[i], ==, 0);
   v[0] ^= 1u;
@@ -374,17 +393,22 @@ static MunitResult test_siv_api(const MunitParameter params[], void* data)
   /* Partial pt/ct overlap rejected; buffers unchanged */
   memcpy(buf, pt, sizeof(pt));
   memcpy(saved, buf, sizeof(buf));
-  munit_assert_int(TC_AES_SIV_encrypt(key, NULL, NULL, 0, buf, sizeof(pt), v, buf + 1), ==,
-                   TC_ERROR);
+  munit_assert_int(TC_AES_SIV_encrypt(key, NULL, 0, (TC_bytes){buf, sizeof(pt)}, v,
+                                      (TC_buffer){buf + 1, sizeof(pt)}),
+                   ==, TC_ERROR);
   munit_assert_memory_equal(sizeof(buf), buf, saved);
 
   /* v may alias plaintext when ciphertext is distinct (staged) */
   memcpy(buf, pt, sizeof(pt));
-  munit_assert_int(TC_AES_SIV_encrypt(key, NULL, NULL, 0, buf, sizeof(pt), buf, ct), ==, TC_OK);
+  munit_assert_int(TC_AES_SIV_encrypt(key, NULL, 0, (TC_bytes){buf, sizeof(pt)}, buf,
+                                      (TC_buffer){ct, sizeof(pt)}),
+                   ==, TC_OK);
   /* The first 16 bytes of buf hold V. Decrypt with that V into a pt-sized buffer. */
   {
     uint8_t rec[16];
-    munit_assert_int(TC_AES_SIV_decrypt(key, NULL, NULL, 0, buf, ct, sizeof(pt), rec), ==, TC_OK);
+    munit_assert_int(TC_AES_SIV_decrypt(key, NULL, 0, buf, (TC_bytes){ct, sizeof(pt)},
+                                        (TC_buffer){rec, sizeof(pt)}),
+                     ==, TC_OK);
     munit_assert_memory_equal(sizeof(pt), rec, pt);
   }
 
@@ -395,8 +419,9 @@ static MunitResult test_siv_api(const MunitParameter params[], void* data)
   {
     uint8_t ct_saved[16];
     memcpy(ct_saved, ct, sizeof(ct));
-    munit_assert_int(TC_AES_SIV_encrypt(key, NULL, NULL, 0, pt, sizeof(pt), buf, buf), ==,
-                     TC_ERROR);
+    munit_assert_int(TC_AES_SIV_encrypt(key, NULL, 0, (TC_bytes){pt, sizeof(pt)}, buf,
+                                        (TC_buffer){buf, sizeof(pt)}),
+                     ==, TC_ERROR);
     munit_assert_memory_equal(sizeof(buf), buf, saved);
     munit_assert_memory_equal(sizeof(ct), ct, ct_saved);
   }
@@ -405,16 +430,19 @@ static MunitResult test_siv_api(const MunitParameter params[], void* data)
   memcpy(buf, pt, sizeof(pt));
   memcpy(buf + 16, pt, sizeof(pt));
   memcpy(saved, buf, sizeof(buf));
-  munit_assert_int(TC_AES_SIV_encrypt(key, NULL, NULL, 0, pt, sizeof(pt), buf, buf + 1), ==,
-                   TC_ERROR);
+  munit_assert_int(TC_AES_SIV_encrypt(key, NULL, 0, (TC_bytes){pt, sizeof(pt)}, buf,
+                                      (TC_buffer){buf + 1, sizeof(pt)}),
+                   ==, TC_ERROR);
   munit_assert_memory_equal(sizeof(buf), buf, saved);
 
   /* v fully after ciphertext (disjoint) is OK */
   memcpy(buf, pt, sizeof(pt));
-  munit_assert_int(TC_AES_SIV_encrypt(key, NULL, NULL, 0, pt, sizeof(pt), buf + 16, buf), ==,
-                   TC_OK);
-  munit_assert_int(TC_AES_SIV_decrypt(key, NULL, NULL, 0, buf + 16, buf, sizeof(pt), ct), ==,
-                   TC_OK);
+  munit_assert_int(TC_AES_SIV_encrypt(key, NULL, 0, (TC_bytes){pt, sizeof(pt)}, buf + 16,
+                                      (TC_buffer){buf, sizeof(pt)}),
+                   ==, TC_OK);
+  munit_assert_int(TC_AES_SIV_decrypt(key, NULL, 0, buf + 16, (TC_bytes){buf, sizeof(pt)},
+                                      (TC_buffer){ct, sizeof(pt)}),
+                   ==, TC_OK);
   munit_assert_memory_equal(sizeof(pt), ct, pt);
 
   return MUNIT_OK;

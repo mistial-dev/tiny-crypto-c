@@ -21,8 +21,7 @@
 #define EAX_VECTOR_FILE "tests/vectors/wycheproof/testvectors_v1/aes_eax_test.json"
 #endif
 
-#if TC_AES_ENABLE_EAX ||                                    \
-    TC_AES_ENABLE_EAX_PRIME
+#if TC_AES_ENABLE_EAX || TC_AES_ENABLE_EAX_PRIME
 
 #if TC_AES_ENABLE_EAX
 
@@ -101,13 +100,15 @@ static MunitResult test_eax_rfc(const MunitParameter params[], void* data)
     munit_assert_true(eax_decode_vector(&eax_rfc_vectors[i], key, nonce, aad, msg, expected, tag,
                                         &key_len, &nonce_len, &aad_len, &msg_len, &cipher_len,
                                         &tag_len));
-    munit_assert_int(TC_AES_EAX_encrypt(key, nonce, nonce_len, aad, aad_len, msg, msg_len, output,
-                                        generated, tag_len),
+    munit_assert_int(TC_AES_EAX_encrypt(key, (TC_bytes){nonce, nonce_len}, (TC_bytes){aad, aad_len},
+                                        (TC_bytes){msg, msg_len}, (TC_buffer){output, msg_len},
+                                        (TC_buffer){generated, tag_len}),
                      ==, TC_OK);
     munit_assert_memory_equal(cipher_len, output, expected);
     munit_assert_memory_equal(tag_len, generated, tag);
-    munit_assert_int(TC_AES_EAX_decrypt(key, nonce, nonce_len, aad, aad_len, expected, cipher_len,
-                                        tag, tag_len, output),
+    munit_assert_int(TC_AES_EAX_decrypt(key, (TC_bytes){nonce, nonce_len}, (TC_bytes){aad, aad_len},
+                                        (TC_bytes){expected, cipher_len}, (TC_bytes){tag, tag_len},
+                                        (TC_buffer){output, cipher_len}),
                      ==, TC_OK);
     munit_assert_memory_equal(msg_len, output, msg);
   }
@@ -221,16 +222,18 @@ static MunitResult test_eax_wycheproof(const MunitParameter params[], void* data
       munit_assert_size(ct_len, !=, SIZE_MAX);
       munit_assert_size(tag_len, ==, 16);
       if (strcmp(result, "valid") == 0) {
-        munit_assert_int(TC_AES_EAX_encrypt(key, iv, iv_len, aad, aad_len, msg, msg_len, output,
-                                            generated, tag_len),
+        munit_assert_int(TC_AES_EAX_encrypt(key, (TC_bytes){iv, iv_len}, (TC_bytes){aad, aad_len},
+                                            (TC_bytes){msg, msg_len}, (TC_buffer){output, msg_len},
+                                            (TC_buffer){generated, tag_len}),
                          ==, TC_OK);
         munit_assert_memory_equal(ct_len, output, ct);
         munit_assert_memory_equal(tag_len, generated, tag);
       }
       memset(output, 0xa5, sizeof(output));
-      munit_assert_int(
-          TC_AES_EAX_decrypt(key, iv, iv_len, aad, aad_len, ct, ct_len, tag, tag_len, output), ==,
-          strcmp(result, "valid") == 0 ? TC_OK : TC_MISMATCH);
+      munit_assert_int(TC_AES_EAX_decrypt(key, (TC_bytes){iv, iv_len}, (TC_bytes){aad, aad_len},
+                                          (TC_bytes){ct, ct_len}, (TC_bytes){tag, tag_len},
+                                          (TC_buffer){output, ct_len}),
+                       ==, strcmp(result, "valid") == 0 ? TC_OK : TC_MISMATCH);
       if (strcmp(result, "valid") == 0)
         munit_assert_memory_equal(msg_len, output, msg);
     }
@@ -257,19 +260,23 @@ static MunitResult test_eax_api(const MunitParameter params[], void* data)
 
   (void)params;
   (void)data;
-  munit_assert_int(TC_AES_EAX_encrypt(key, nonce, sizeof(nonce), aad, sizeof(aad), message,
-                                      sizeof(message), ciphertext, tag, sizeof(tag)),
-                   ==, TC_OK);
+  munit_assert_int(
+      TC_AES_EAX_encrypt(key, (TC_bytes){nonce, sizeof(nonce)}, (TC_bytes){aad, sizeof(aad)},
+                         (TC_bytes){message, sizeof(message)},
+                         (TC_buffer){ciphertext, sizeof(message)}, (TC_buffer){tag, sizeof(tag)}),
+      ==, TC_OK);
 
   memcpy(bad, message, sizeof(message));
-  munit_assert_int(TC_AES_EAX_encrypt(key, nonce, sizeof(nonce), aad, sizeof(aad), bad, sizeof(bad),
-                                      bad, tag, sizeof(tag)),
+  munit_assert_int(TC_AES_EAX_encrypt(key, (TC_bytes){nonce, sizeof(nonce)},
+                                      (TC_bytes){aad, sizeof(aad)}, (TC_bytes){bad, sizeof(bad)},
+                                      (TC_buffer){bad, sizeof(bad)}, (TC_buffer){tag, sizeof(tag)}),
                    ==, TC_OK);
   munit_assert_memory_equal(sizeof(ciphertext), bad, ciphertext);
 
   memcpy(bad, ciphertext, sizeof(ciphertext));
-  munit_assert_int(TC_AES_EAX_decrypt(key, nonce, sizeof(nonce), aad, sizeof(aad), bad, sizeof(bad),
-                                      tag, sizeof(tag), bad),
+  munit_assert_int(TC_AES_EAX_decrypt(key, (TC_bytes){nonce, sizeof(nonce)},
+                                      (TC_bytes){aad, sizeof(aad)}, (TC_bytes){bad, sizeof(bad)},
+                                      (TC_bytes){tag, sizeof(tag)}, (TC_buffer){bad, sizeof(bad)}),
                    ==, TC_OK);
   munit_assert_memory_equal(sizeof(message), bad, message);
 
@@ -277,57 +284,86 @@ static MunitResult test_eax_api(const MunitParameter params[], void* data)
   bad_tag[0] ^= 1;
   memset(bad, 0xa5, sizeof(bad));
   memset(untouched, 0xa5, sizeof(untouched));
-  munit_assert_int(TC_AES_EAX_decrypt(key, nonce, sizeof(nonce), aad, sizeof(aad), ciphertext,
-                                      sizeof(ciphertext), bad_tag, sizeof(bad_tag), bad),
+  munit_assert_int(TC_AES_EAX_decrypt(
+                       key, (TC_bytes){nonce, sizeof(nonce)}, (TC_bytes){aad, sizeof(aad)},
+                       (TC_bytes){ciphertext, sizeof(ciphertext)},
+                       (TC_bytes){bad_tag, sizeof(bad_tag)}, (TC_buffer){bad, sizeof(ciphertext)}),
                    ==, TC_MISMATCH);
   munit_assert_memory_equal(sizeof(bad), bad, untouched);
 
   bad[0] = ciphertext[0] ^ 1;
   memcpy(bad + 1, ciphertext + 1, sizeof(ciphertext) - 1);
-  munit_assert_int(TC_AES_EAX_decrypt(key, nonce, sizeof(nonce), aad, sizeof(aad), bad, sizeof(bad),
-                                      tag, sizeof(tag), NULL),
+  munit_assert_int(TC_AES_EAX_decrypt(key, (TC_bytes){nonce, sizeof(nonce)},
+                                      (TC_bytes){aad, sizeof(aad)}, (TC_bytes){bad, sizeof(bad)},
+                                      (TC_bytes){tag, sizeof(tag)}, (TC_buffer){NULL, sizeof(bad)}),
                    ==, TC_ERROR);
-  munit_assert_int(TC_AES_EAX_decrypt(key, nonce, sizeof(nonce), aad, sizeof(aad), ciphertext,
-                                      sizeof(ciphertext), tag, sizeof(tag), NULL),
-                   ==, TC_ERROR);
+  munit_assert_int(
+      TC_AES_EAX_decrypt(key, (TC_bytes){nonce, sizeof(nonce)}, (TC_bytes){aad, sizeof(aad)},
+                         (TC_bytes){ciphertext, sizeof(ciphertext)}, (TC_bytes){tag, sizeof(tag)},
+                         (TC_buffer){NULL, sizeof(ciphertext)}),
+      ==, TC_ERROR);
 
   bad[0] = aad[0] ^ 1;
-  munit_assert_int(TC_AES_EAX_decrypt(key, nonce, sizeof(nonce), bad, sizeof(aad), ciphertext,
-                                      sizeof(ciphertext), tag, sizeof(tag), bad),
-                   ==, TC_MISMATCH);
+  munit_assert_int(
+      TC_AES_EAX_decrypt(key, (TC_bytes){nonce, sizeof(nonce)}, (TC_bytes){bad, sizeof(aad)},
+                         (TC_bytes){ciphertext, sizeof(ciphertext)}, (TC_bytes){tag, sizeof(tag)},
+                         (TC_buffer){bad, sizeof(ciphertext)}),
+      ==, TC_MISMATCH);
   bad[0] = nonce[0] ^ 1;
-  munit_assert_int(TC_AES_EAX_decrypt(key, bad, sizeof(nonce), aad, sizeof(aad), ciphertext,
-                                      sizeof(ciphertext), tag, sizeof(tag), bad),
-                   ==, TC_MISMATCH);
+  munit_assert_int(
+      TC_AES_EAX_decrypt(key, (TC_bytes){bad, sizeof(nonce)}, (TC_bytes){aad, sizeof(aad)},
+                         (TC_bytes){ciphertext, sizeof(ciphertext)}, (TC_bytes){tag, sizeof(tag)},
+                         (TC_buffer){bad, sizeof(ciphertext)}),
+      ==, TC_MISMATCH);
 
-  munit_assert_int(TC_AES_EAX_encrypt(key, NULL, 0, NULL, 0, NULL, 0, NULL, tag, sizeof(tag)), ==,
-                   TC_OK);
-  munit_assert_int(TC_AES_EAX_decrypt(key, NULL, 0, NULL, 0, NULL, 0, tag, sizeof(tag), NULL), ==,
-                   TC_OK);
-  munit_assert_int(TC_AES_EAX_encrypt(key, nonce, sizeof(nonce), aad, sizeof(aad), message,
-                                      sizeof(message), ciphertext, tag, sizeof(tag) + 1),
-                   ==, TC_ERROR);
-  munit_assert_int(TC_AES_EAX_encrypt(NULL, nonce, sizeof(nonce), aad, sizeof(aad), message,
-                                      sizeof(message), ciphertext, tag, sizeof(tag)),
-                   ==, TC_ERROR);
-  munit_assert_int(TC_AES_EAX_encrypt(key, NULL, 1, aad, sizeof(aad), message, sizeof(message),
-                                      ciphertext, tag, sizeof(tag)),
-                   ==, TC_ERROR);
-  munit_assert_int(TC_AES_EAX_encrypt(key, nonce, sizeof(nonce), NULL, 1, message, sizeof(message),
-                                      ciphertext, tag, sizeof(tag)),
-                   ==, TC_ERROR);
-  munit_assert_int(TC_AES_EAX_encrypt(key, nonce, sizeof(nonce), aad, sizeof(aad), message,
-                                      sizeof(message), ciphertext, NULL, sizeof(tag)),
-                   ==, TC_ERROR);
-  munit_assert_int(TC_AES_EAX_encrypt(key, nonce, sizeof(nonce), aad, sizeof(aad), message,
-                                      sizeof(message), ciphertext, empty_tag, 0),
-                   ==, TC_ERROR);
-  munit_assert_int(TC_AES_EAX_encrypt(key, nonce, sizeof(nonce), aad, sizeof(aad), message,
-                                      sizeof(message), ciphertext, tag, 7),
-                   ==, TC_ERROR);
-  munit_assert_int(TC_AES_EAX_encrypt(key, nonce, sizeof(nonce), aad, sizeof(aad), message,
-                                      sizeof(message), ciphertext, tag, 8),
+  munit_assert_int(TC_AES_EAX_encrypt(key, (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0},
+                                      (TC_bytes){NULL, 0}, (TC_buffer){NULL, 0},
+                                      (TC_buffer){tag, sizeof(tag)}),
                    ==, TC_OK);
+  munit_assert_int(TC_AES_EAX_decrypt(key, (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0},
+                                      (TC_bytes){NULL, 0}, (TC_bytes){tag, sizeof(tag)},
+                                      (TC_buffer){NULL, 0}),
+                   ==, TC_OK);
+  munit_assert_int(TC_AES_EAX_encrypt(
+                       key, (TC_bytes){nonce, sizeof(nonce)}, (TC_bytes){aad, sizeof(aad)},
+                       (TC_bytes){message, sizeof(message)},
+                       (TC_buffer){ciphertext, sizeof(message)}, (TC_buffer){tag, sizeof(tag) + 1}),
+                   ==, TC_ERROR);
+  munit_assert_int(
+      TC_AES_EAX_encrypt(NULL, (TC_bytes){nonce, sizeof(nonce)}, (TC_bytes){aad, sizeof(aad)},
+                         (TC_bytes){message, sizeof(message)},
+                         (TC_buffer){ciphertext, sizeof(message)}, (TC_buffer){tag, sizeof(tag)}),
+      ==, TC_ERROR);
+  munit_assert_int(TC_AES_EAX_encrypt(key, (TC_bytes){NULL, 1}, (TC_bytes){aad, sizeof(aad)},
+                                      (TC_bytes){message, sizeof(message)},
+                                      (TC_buffer){ciphertext, sizeof(message)},
+                                      (TC_buffer){tag, sizeof(tag)}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_AES_EAX_encrypt(key, (TC_bytes){nonce, sizeof(nonce)}, (TC_bytes){NULL, 1},
+                                      (TC_bytes){message, sizeof(message)},
+                                      (TC_buffer){ciphertext, sizeof(message)},
+                                      (TC_buffer){tag, sizeof(tag)}),
+                   ==, TC_ERROR);
+  munit_assert_int(
+      TC_AES_EAX_encrypt(key, (TC_bytes){nonce, sizeof(nonce)}, (TC_bytes){aad, sizeof(aad)},
+                         (TC_bytes){message, sizeof(message)},
+                         (TC_buffer){ciphertext, sizeof(message)}, (TC_buffer){NULL, sizeof(tag)}),
+      ==, TC_ERROR);
+  munit_assert_int(
+      TC_AES_EAX_encrypt(key, (TC_bytes){nonce, sizeof(nonce)}, (TC_bytes){aad, sizeof(aad)},
+                         (TC_bytes){message, sizeof(message)},
+                         (TC_buffer){ciphertext, sizeof(message)}, (TC_buffer){empty_tag, 0}),
+      ==, TC_ERROR);
+  munit_assert_int(
+      TC_AES_EAX_encrypt(key, (TC_bytes){nonce, sizeof(nonce)}, (TC_bytes){aad, sizeof(aad)},
+                         (TC_bytes){message, sizeof(message)},
+                         (TC_buffer){ciphertext, sizeof(message)}, (TC_buffer){tag, 7}),
+      ==, TC_ERROR);
+  munit_assert_int(
+      TC_AES_EAX_encrypt(key, (TC_bytes){nonce, sizeof(nonce)}, (TC_bytes){aad, sizeof(aad)},
+                         (TC_bytes){message, sizeof(message)},
+                         (TC_buffer){ciphertext, sizeof(message)}, (TC_buffer){tag, 8}),
+      ==, TC_OK);
   return MUNIT_OK;
 }
 
@@ -489,13 +525,15 @@ static MunitResult test_eax_prime_worked(const MunitParameter params[], void* da
   TC_AES_init_sbox();
 #endif
   for (i = 0; i < sizeof(plaintext_len) / sizeof(plaintext_len[0]); ++i) {
-    munit_assert_int(TC_AES_EAX_PRIME_encrypt(keys[i], cleartext[i], cleartext_len[i], plaintext[i],
-                                              plaintext_len[i], ciphertext, tag),
+    munit_assert_int(TC_AES_EAX_PRIME_encrypt(keys[i], (TC_bytes){cleartext[i], cleartext_len[i]},
+                                              (TC_bytes){plaintext[i], plaintext_len[i]},
+                                              (TC_buffer){ciphertext, plaintext_len[i]}, tag),
                      ==, TC_OK);
     munit_assert_memory_equal(plaintext_len[i], ciphertext, expected_ciphertext[i]);
     munit_assert_memory_equal(sizeof(tag), tag, expected_tag[i]);
-    munit_assert_int(TC_AES_EAX_PRIME_decrypt(keys[i], cleartext[i], cleartext_len[i], ciphertext,
-                                              plaintext_len[i], tag, output),
+    munit_assert_int(TC_AES_EAX_PRIME_decrypt(keys[i], (TC_bytes){cleartext[i], cleartext_len[i]},
+                                              (TC_bytes){ciphertext, plaintext_len[i]}, tag,
+                                              (TC_buffer){output, plaintext_len[i]}),
                      ==, TC_OK);
     munit_assert_memory_equal(plaintext_len[i], output, plaintext[i]);
   }
@@ -508,20 +546,23 @@ static MunitResult test_eax_prime_worked(const MunitParameter params[], void* da
       boundary_cleartext[j] = (uint8_t)(j * 37u + i);
     for (j = 0; j < boundary_plaintext_len; ++j)
       boundary_plaintext[j] = (uint8_t)(0xffu - j * 19u - i);
-    munit_assert_int(TC_AES_EAX_PRIME_encrypt(keys[0], boundary_cleartext, boundary_cleartext_len,
-                                              boundary_plaintext, boundary_plaintext_len,
-                                              boundary_ciphertext, boundary_tag),
+    munit_assert_int(TC_AES_EAX_PRIME_encrypt(
+                         keys[0], (TC_bytes){boundary_cleartext, boundary_cleartext_len},
+                         (TC_bytes){boundary_plaintext, boundary_plaintext_len},
+                         (TC_buffer){boundary_ciphertext, boundary_plaintext_len}, boundary_tag),
                      ==, TC_OK);
-    munit_assert_int(TC_AES_EAX_PRIME_decrypt(keys[0], boundary_cleartext, boundary_cleartext_len,
-                                              boundary_ciphertext, boundary_plaintext_len,
-                                              boundary_tag, boundary_output),
+    munit_assert_int(TC_AES_EAX_PRIME_decrypt(
+                         keys[0], (TC_bytes){boundary_cleartext, boundary_cleartext_len},
+                         (TC_bytes){boundary_ciphertext, boundary_plaintext_len}, boundary_tag,
+                         (TC_buffer){boundary_output, boundary_plaintext_len}),
                      ==, TC_OK);
     munit_assert_memory_equal(boundary_plaintext_len, boundary_output, boundary_plaintext);
     memcpy(boundary_output, boundary_plaintext, boundary_plaintext_len);
     boundary_tag[0] ^= 1;
-    munit_assert_int(TC_AES_EAX_PRIME_decrypt(keys[0], boundary_cleartext, boundary_cleartext_len,
-                                              boundary_ciphertext, boundary_plaintext_len,
-                                              boundary_tag, boundary_output),
+    munit_assert_int(TC_AES_EAX_PRIME_decrypt(
+                         keys[0], (TC_bytes){boundary_cleartext, boundary_cleartext_len},
+                         (TC_bytes){boundary_ciphertext, boundary_plaintext_len}, boundary_tag,
+                         (TC_buffer){boundary_output, boundary_plaintext_len}),
                      ==, TC_MISMATCH);
     for (j = 0; j < boundary_plaintext_len; ++j)
       munit_assert_uint(boundary_output[j], ==, boundary_plaintext[j]);
@@ -530,9 +571,10 @@ static MunitResult test_eax_prime_worked(const MunitParameter params[], void* da
     if (boundary_plaintext_len != 0) {
       memcpy(boundary_output, boundary_plaintext, boundary_plaintext_len);
       boundary_ciphertext[boundary_plaintext_len - 1] ^= 1;
-      munit_assert_int(TC_AES_EAX_PRIME_decrypt(keys[0], boundary_cleartext, boundary_cleartext_len,
-                                                boundary_ciphertext, boundary_plaintext_len,
-                                                boundary_tag, boundary_output),
+      munit_assert_int(TC_AES_EAX_PRIME_decrypt(
+                           keys[0], (TC_bytes){boundary_cleartext, boundary_cleartext_len},
+                           (TC_bytes){boundary_ciphertext, boundary_plaintext_len}, boundary_tag,
+                           (TC_buffer){boundary_output, boundary_plaintext_len}),
                        ==, TC_MISMATCH);
       for (j = 0; j < boundary_plaintext_len; ++j)
         munit_assert_uint(boundary_output[j], ==, boundary_plaintext[j]);
@@ -541,9 +583,10 @@ static MunitResult test_eax_prime_worked(const MunitParameter params[], void* da
     if (boundary_cleartext_len != 0) {
       memcpy(boundary_output, boundary_plaintext, boundary_plaintext_len);
       boundary_cleartext[boundary_cleartext_len - 1] ^= 1;
-      munit_assert_int(TC_AES_EAX_PRIME_decrypt(keys[0], boundary_cleartext, boundary_cleartext_len,
-                                                boundary_ciphertext, boundary_plaintext_len,
-                                                boundary_tag, boundary_output),
+      munit_assert_int(TC_AES_EAX_PRIME_decrypt(
+                           keys[0], (TC_bytes){boundary_cleartext, boundary_cleartext_len},
+                           (TC_bytes){boundary_ciphertext, boundary_plaintext_len}, boundary_tag,
+                           (TC_buffer){boundary_output, boundary_plaintext_len}),
                        ==, TC_MISMATCH);
       for (j = 0; j < boundary_plaintext_len; ++j)
         munit_assert_uint(boundary_output[j], ==, boundary_plaintext[j]);
@@ -579,40 +622,46 @@ static MunitResult test_eax_prime_c12_22(const MunitParameter params[], void* da
 #if TC_AES_SBOX_MODE == TC_AES_SBOX_MODE_RUNTIME
   TC_AES_init_sbox();
 #endif
-  munit_assert_int(TC_AES_EAX_PRIME_encrypt(key, cleartext, sizeof(cleartext), plaintext,
-                                            sizeof(plaintext), ciphertext, tag),
+  munit_assert_int(TC_AES_EAX_PRIME_encrypt(key, (TC_bytes){cleartext, sizeof(cleartext)},
+                                            (TC_bytes){plaintext, sizeof(plaintext)},
+                                            (TC_buffer){ciphertext, sizeof(plaintext)}, tag),
                    ==, TC_OK);
   munit_assert_memory_equal(sizeof(expected_ciphertext), ciphertext, expected_ciphertext);
   munit_assert_memory_equal(sizeof(expected_tag), tag, expected_tag);
 
-  munit_assert_int(TC_AES_EAX_PRIME_decrypt(key, cleartext, sizeof(cleartext), ciphertext,
-                                            sizeof(ciphertext), tag, decrypted),
+  munit_assert_int(TC_AES_EAX_PRIME_decrypt(key, (TC_bytes){cleartext, sizeof(cleartext)},
+                                            (TC_bytes){ciphertext, sizeof(ciphertext)}, tag,
+                                            (TC_buffer){decrypted, sizeof(ciphertext)}),
                    ==, TC_OK);
   munit_assert_memory_equal(sizeof(plaintext), decrypted, plaintext);
 
   memcpy(decrypted, plaintext, sizeof(plaintext));
-  munit_assert_int(TC_AES_EAX_PRIME_encrypt(key, cleartext, sizeof(cleartext), decrypted,
-                                            sizeof(decrypted), decrypted, tag),
+  munit_assert_int(TC_AES_EAX_PRIME_encrypt(key, (TC_bytes){cleartext, sizeof(cleartext)},
+                                            (TC_bytes){decrypted, sizeof(decrypted)},
+                                            (TC_buffer){decrypted, sizeof(decrypted)}, tag),
                    ==, TC_OK);
   munit_assert_memory_equal(sizeof(expected_ciphertext), decrypted, expected_ciphertext);
-  munit_assert_int(TC_AES_EAX_PRIME_decrypt(key, cleartext, sizeof(cleartext), decrypted,
-                                            sizeof(decrypted), tag, decrypted),
+  munit_assert_int(TC_AES_EAX_PRIME_decrypt(key, (TC_bytes){cleartext, sizeof(cleartext)},
+                                            (TC_bytes){decrypted, sizeof(decrypted)}, tag,
+                                            (TC_buffer){decrypted, sizeof(decrypted)}),
                    ==, TC_OK);
   munit_assert_memory_equal(sizeof(plaintext), decrypted, plaintext);
 
   memcpy(bad_tag, tag, sizeof(bad_tag));
   bad_tag[0] ^= 1;
   memset(decrypted, 0xa5, sizeof(decrypted));
-  munit_assert_int(TC_AES_EAX_PRIME_decrypt(key, cleartext, sizeof(cleartext), ciphertext,
-                                            sizeof(ciphertext), bad_tag, decrypted),
+  munit_assert_int(TC_AES_EAX_PRIME_decrypt(key, (TC_bytes){cleartext, sizeof(cleartext)},
+                                            (TC_bytes){ciphertext, sizeof(ciphertext)}, bad_tag,
+                                            (TC_buffer){decrypted, sizeof(ciphertext)}),
                    ==, TC_MISMATCH);
   for (size_t i = 0; i < sizeof(decrypted); ++i)
     munit_assert_uint(decrypted[i], ==, 0xa5);
 
   ciphertext[0] ^= 1;
   memset(decrypted, 0xa5, sizeof(decrypted));
-  munit_assert_int(TC_AES_EAX_PRIME_decrypt(key, cleartext, sizeof(cleartext), ciphertext,
-                                            sizeof(ciphertext), tag, decrypted),
+  munit_assert_int(TC_AES_EAX_PRIME_decrypt(key, (TC_bytes){cleartext, sizeof(cleartext)},
+                                            (TC_bytes){ciphertext, sizeof(ciphertext)}, tag,
+                                            (TC_buffer){decrypted, sizeof(ciphertext)}),
                    ==, TC_MISMATCH);
   for (size_t i = 0; i < sizeof(decrypted); ++i)
     munit_assert_uint(decrypted[i], ==, 0xa5);
@@ -621,29 +670,38 @@ static MunitResult test_eax_prime_c12_22(const MunitParameter params[], void* da
   memcpy(bad_cleartext, cleartext, sizeof(cleartext));
   bad_cleartext[0] ^= 1;
   memset(decrypted, 0xa5, sizeof(decrypted));
-  munit_assert_int(TC_AES_EAX_PRIME_decrypt(key, bad_cleartext, sizeof(bad_cleartext), ciphertext,
-                                            sizeof(ciphertext), tag, decrypted),
+  munit_assert_int(TC_AES_EAX_PRIME_decrypt(key, (TC_bytes){bad_cleartext, sizeof(bad_cleartext)},
+                                            (TC_bytes){ciphertext, sizeof(ciphertext)}, tag,
+                                            (TC_buffer){decrypted, sizeof(ciphertext)}),
                    ==, TC_MISMATCH);
   for (size_t i = 0; i < sizeof(decrypted); ++i)
     munit_assert_uint(decrypted[i], ==, 0xa5);
 
-  munit_assert_int(TC_AES_EAX_PRIME_encrypt(key, cleartext, sizeof(cleartext), plaintext,
-                                            sizeof(plaintext), ciphertext, NULL),
+  munit_assert_int(TC_AES_EAX_PRIME_encrypt(key, (TC_bytes){cleartext, sizeof(cleartext)},
+                                            (TC_bytes){plaintext, sizeof(plaintext)},
+                                            (TC_buffer){ciphertext, sizeof(plaintext)}, NULL),
                    ==, TC_ERROR);
-  munit_assert_int(TC_AES_EAX_PRIME_decrypt(key, cleartext, sizeof(cleartext), ciphertext,
-                                            sizeof(ciphertext), NULL, decrypted),
+  munit_assert_int(TC_AES_EAX_PRIME_decrypt(key, (TC_bytes){cleartext, sizeof(cleartext)},
+                                            (TC_bytes){ciphertext, sizeof(ciphertext)}, NULL,
+                                            (TC_buffer){decrypted, sizeof(ciphertext)}),
                    ==, TC_ERROR);
-  munit_assert_int(TC_AES_EAX_PRIME_encrypt(NULL, cleartext, sizeof(cleartext), plaintext,
-                                            sizeof(plaintext), ciphertext, tag),
+  munit_assert_int(TC_AES_EAX_PRIME_encrypt(NULL, (TC_bytes){cleartext, sizeof(cleartext)},
+                                            (TC_bytes){plaintext, sizeof(plaintext)},
+                                            (TC_buffer){ciphertext, sizeof(plaintext)}, tag),
                    ==, TC_ERROR);
-  munit_assert_int(
-      TC_AES_EAX_PRIME_encrypt(key, NULL, 1, plaintext, sizeof(plaintext), ciphertext, tag), ==,
-      TC_ERROR);
-  munit_assert_int(
-      TC_AES_EAX_PRIME_encrypt(key, cleartext, sizeof(cleartext), NULL, 1, ciphertext, tag), ==,
-      TC_ERROR);
-  munit_assert_int(TC_AES_EAX_PRIME_encrypt(key, NULL, 0, NULL, 0, NULL, tag), ==, TC_OK);
-  munit_assert_int(TC_AES_EAX_PRIME_decrypt(key, NULL, 0, NULL, 0, tag, NULL), ==, TC_OK);
+  munit_assert_int(TC_AES_EAX_PRIME_encrypt(key, (TC_bytes){NULL, 1},
+                                            (TC_bytes){plaintext, sizeof(plaintext)},
+                                            (TC_buffer){ciphertext, sizeof(plaintext)}, tag),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_AES_EAX_PRIME_encrypt(key, (TC_bytes){cleartext, sizeof(cleartext)},
+                                            (TC_bytes){NULL, 1}, (TC_buffer){ciphertext, 1}, tag),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_AES_EAX_PRIME_encrypt(key, (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0},
+                                            (TC_buffer){NULL, 0}, tag),
+                   ==, TC_OK);
+  munit_assert_int(TC_AES_EAX_PRIME_decrypt(key, (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0}, tag,
+                                            (TC_buffer){NULL, 0}),
+                   ==, TC_OK);
   return MUNIT_OK;
 }
 

@@ -240,6 +240,27 @@ TC_MISMATCH  /* valid comparison or authentication failure */
 TC_ERROR     /* malformed argument or invalid state */
 ```
 
+One-shot AEAD functions take inputs as `TC_bytes` and outputs as `TC_buffer`.
+The tag buffer capacity selects the tag length. The text output must hold the
+whole text input, and it may be the same buffer as the input:
+
+```c
+uint8_t ciphertext[sizeof message], tag[16];
+TC_status status = TC_AES_GCM_encrypt(key, (TC_bytes){iv, 12}, (TC_bytes){aad, sizeof aad},
+                                      (TC_bytes){message, sizeof message},
+                                      (TC_buffer){ciphertext, sizeof ciphertext},
+                                      (TC_buffer){tag, sizeof tag});
+if (status != TC_OK)
+  return status; /* ciphertext and tag hold no usable output */
+
+status = TC_AES_GCM_decrypt(key, (TC_bytes){iv, 12}, (TC_bytes){aad, sizeof aad},
+                            (TC_bytes){ciphertext, sizeof ciphertext},
+                            (TC_bytes){tag, sizeof tag},
+                            (TC_buffer){ciphertext, sizeof ciphertext});
+if (status == TC_MISMATCH)
+  return status; /* in-place ciphertext has been wiped */
+```
+
 Authentication checks examine the entire tag. One-shot GCM, CCM, and EAX
 decryptors authenticate before writing plaintext. SIV writes candidate
 plaintext to recompute its synthetic IV and wipes the output on a mismatch.

@@ -22,6 +22,7 @@
 namespace tiny_crypto {
 
 typedef ::TC_bytes bytes;
+typedef ::TC_buffer buffer;
 typedef ::TC_credential_status credential_status;
 
 /* The byte count is public. Timing depends on the length and is independent of content. */

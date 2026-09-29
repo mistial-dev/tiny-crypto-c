@@ -70,11 +70,20 @@ done:
   return status;
 }
 
-static TC_status tc_aes_ccm_crypt(const uint8_t* key, const uint8_t* nonce, size_t nonce_len,
-                                  const uint8_t* aad, size_t aad_len, const uint8_t* input,
-                                  size_t input_len, uint8_t* output, const uint8_t* expected_tag,
-                                  uint8_t* output_tag, size_t tag_len, int decrypt)
+/* Decrypt when expected_tag is set, otherwise encrypt and write output_tag.
+ * Exactly one tag pointer is set. */
+static TC_status tc_aes_ccm_crypt(const uint8_t* key, TC_bytes nonce_span, TC_bytes aad_span,
+                                  TC_bytes input_span, TC_buffer output_span,
+                                  const uint8_t* expected_tag, uint8_t* output_tag, size_t tag_len)
 {
+  const uint8_t* nonce = nonce_span.data;
+  const size_t nonce_len = nonce_span.length;
+  const uint8_t* aad = aad_span.data;
+  const size_t aad_len = aad_span.length;
+  const uint8_t* input = input_span.data;
+  const size_t input_len = input_span.length;
+  uint8_t* output = output_span.data;
+  const int decrypt = expected_tag != NULL;
   /* Single workspace so stack use is predictable and wipe is one call. */
   struct {
     struct TC_AES_key_ctx aes;
@@ -94,15 +103,14 @@ static TC_status tc_aes_ccm_crypt(const uint8_t* key, const uint8_t* nonce, size
   TC_status status = TC_ERROR;
   int output_started = 0;
 
-  if (key == NULL || nonce == NULL || (decrypt ? expected_tag == NULL : output_tag == NULL) ||
-      (aad_len != 0 && aad == NULL) || (input_len != 0 && (input == NULL || output == NULL)) ||
+  if (key == NULL || nonce == NULL || (expected_tag == NULL && output_tag == NULL) ||
+      !tc_internal_span_valid(aad, aad_len) || !tc_aes_text_ok(input_span, output_span) ||
       nonce_len < TC_AES_CCM_MIN_NONCE_LEN || nonce_len > TC_AES_CCM_MAX_NONCE_LEN ||
       !tc_aes_ccm_tag_length_is_valid(tag_len) ||
       !tc_aes_ccm_payload_length_is_valid(nonce_len, input_len) ||
-      !tc_aes_buffers_ok(input, input_len, output, input_len) ||
       !tc_internal_ranges_disjoint(output, input_len,
-                               decrypt ? (const void*)expected_tag : (const void*)output_tag,
-                               tag_len))
+                                   decrypt ? (const void*)expected_tag : (const void*)output_tag,
+                                   tag_len))
     return TC_ERROR;
 
   memset(&st, 0, sizeof(st));
@@ -212,22 +220,18 @@ done:
   return status;
 }
 
-TC_status TC_AES_CCM_encrypt(const uint8_t* key, const uint8_t* nonce, size_t nonce_len,
-                             const uint8_t* aad, size_t aad_len, const uint8_t* plaintext,
-                             size_t plaintext_len, uint8_t* ciphertext, uint8_t* tag,
-                             size_t tag_len)
+TC_status TC_AES_CCM_encrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes plaintext,
+                             TC_buffer ciphertext, TC_buffer tag)
 {
-  return tc_aes_ccm_crypt(key, nonce, nonce_len, aad, aad_len, plaintext, plaintext_len, ciphertext,
-                          NULL, tag, tag_len, 0);
+  return tc_aes_ccm_crypt(key, nonce, aad, plaintext, ciphertext, NULL, tag.data, tag.capacity);
 }
 
-TC_status TC_AES_CCM_decrypt(const uint8_t* key, const uint8_t* nonce, size_t nonce_len,
-                             const uint8_t* aad, size_t aad_len, const uint8_t* ciphertext,
-                             size_t ciphertext_len, const uint8_t* tag, size_t tag_len,
-                             uint8_t* plaintext)
+TC_status TC_AES_CCM_decrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes ciphertext,
+                             TC_bytes tag, TC_buffer plaintext)
 {
-  return tc_aes_ccm_crypt(key, nonce, nonce_len, aad, aad_len, ciphertext, ciphertext_len,
-                          plaintext, tag, NULL, tag_len, 1);
+  if (tag.data == NULL)
+    return TC_ERROR;
+  return tc_aes_ccm_crypt(key, nonce, aad, ciphertext, plaintext, tag.data, NULL, tag.length);
 }
 
 #endif

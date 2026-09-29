@@ -36,20 +36,19 @@ TC_status tc_aes_inverse_rounds(state_t* state, const uint8_t* round_key, uint8_
 
 #if TC_AES_NEED_AEAD_BUFFERS
 /*
- * Buffer relationship for one-shot in/out pairs:
- *   exact alias (same pointer) — OK
- *   completely disjoint — OK
- *   partial overlap — rejected (TC_ERROR)
- * Empty lengths are always OK.
+ * One-shot AEAD text check. Both spans need storage unless empty, the output
+ * holds input.length bytes, and input and output are exact aliases or fully
+ * disjoint. Partial overlap is rejected.
  */
-static inline int tc_aes_buffers_ok(const void* a, size_t a_len, const void* b, size_t b_len)
+static inline int tc_aes_text_ok(TC_bytes input, TC_buffer output)
 {
-  const uintptr_t pa = (uintptr_t)a;
-  const uintptr_t pb = (uintptr_t)b;
-
-  if (a_len == 0 || b_len == 0 || pa == pb)
+  if (!tc_internal_span_valid(input.data, input.length) || output.capacity < input.length)
+    return 0;
+  if (input.length == 0)
     return 1;
-  return tc_internal_ranges_disjoint(a, a_len, b, b_len);
+  return output.data != NULL &&
+         ((const void*)input.data == (const void*)output.data ||
+          tc_internal_ranges_disjoint(input.data, input.length, output.data, input.length));
 }
 #endif
 

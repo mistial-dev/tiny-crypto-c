@@ -6,33 +6,33 @@
 #include <stdio.h>
 #include <string.h>
 
-typedef TC_status (*encrypt_fn)(const uint8_t*, const uint8_t*, size_t, const uint8_t*, size_t,
-                                const uint8_t*, size_t, uint8_t*, uint8_t*, size_t);
-typedef TC_status (*decrypt_fn)(const uint8_t*, const uint8_t*, size_t, const uint8_t*, size_t,
-                                const uint8_t*, size_t, const uint8_t*, size_t, uint8_t*);
+typedef TC_status (*encrypt_fn)(const uint8_t*, TC_bytes, TC_bytes, TC_bytes, TC_buffer, TC_buffer);
+typedef TC_status (*decrypt_fn)(const uint8_t*, TC_bytes, TC_bytes, TC_bytes, TC_bytes, TC_buffer);
 static const char* vector_path;
 static size_t siv_ad_count;
 
-static TC_status siv_encrypt(const uint8_t* key, const uint8_t* nonce, size_t nonce_len,
-                             const uint8_t* aad, size_t aad_len, const uint8_t* input,
-                             size_t input_len, uint8_t* output, uint8_t* tag, size_t tag_len)
+/* SIV takes the Wycheproof AAD and nonce as its associated-data vector. */
+static TC_status siv_encrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes input,
+                             TC_buffer output, TC_buffer tag)
 {
-  const uint8_t* ad[] = {aad, nonce};
-  const size_t lengths[] = {aad_len, nonce_len};
-  if (tag_len != 16)
+  const TC_bytes ad[] = {aad, nonce};
+  if (tag.capacity != TC_AES_SIV_V_LEN)
     return TC_ERROR;
-  return TC_AES_SIV_encrypt(key, ad, lengths, siv_ad_count, input, input_len, tag, output);
+  return TC_AES_SIV_encrypt(key, ad, siv_ad_count, input, tag.data, output);
 }
 
-static TC_status siv_decrypt(const uint8_t* key, const uint8_t* nonce, size_t nonce_len,
-                             const uint8_t* aad, size_t aad_len, const uint8_t* input,
-                             size_t input_len, const uint8_t* tag, size_t tag_len, uint8_t* output)
+static TC_status siv_decrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes input,
+                             TC_bytes tag, TC_buffer output)
 {
-  const uint8_t* ad[] = {aad, nonce};
-  const size_t lengths[] = {aad_len, nonce_len};
-  if (tag_len != 16)
+  const TC_bytes ad[] = {aad, nonce};
+  if (tag.length != TC_AES_SIV_V_LEN)
     return TC_ERROR;
-  return TC_AES_SIV_decrypt(key, ad, lengths, siv_ad_count, tag, input, input_len, output);
+  return TC_AES_SIV_decrypt(key, ad, siv_ad_count, tag.data, input, output);
+}
+
+static TC_bytes span(const uint8_t* data, size_t length)
+{
+  return (TC_bytes){data, length};
 }
 
 static size_t decode(const char* text, uint8_t* output)
@@ -86,8 +86,9 @@ static MunitResult vectors(const MunitParameter params[], void* user)
     munit_assert_size(length[0], ==, siv ? TC_AES_SIV_KEYLEN : TC_AES_KEYLEN);
     munit_assert_size(length[5], <=, sizeof generated);
     memcpy(output, expected, sizeof output);
-    status = decrypt(value[0], value[1], length[1], value[2], length[2], value[4], length[4],
-                     value[5], length[5], output);
+    status = decrypt(value[0], span(value[1], length[1]), span(value[2], length[2]),
+                     span(value[4], length[4]), span(value[5], length[5]),
+                     (TC_buffer){output, length[4]});
     if (valid) {
       if (status != TC_OK)
         munit_errorf("AEAD case %u: valid decrypt rejected (%d)", id, status);
@@ -95,8 +96,9 @@ static MunitResult vectors(const MunitParameter params[], void* user)
       munit_assert_memory_equal(length[3], output, value[3]);
       munit_assert_memory_equal(sizeof output - length[3], output + length[3],
                                 expected + length[3]);
-      munit_assert_int(encrypt(value[0], value[1], length[1], value[2], length[2], value[3],
-                               length[3], output, generated, length[5]),
+      munit_assert_int(encrypt(value[0], span(value[1], length[1]), span(value[2], length[2]),
+                               span(value[3], length[3]), (TC_buffer){output, length[3]},
+                               (TC_buffer){generated, length[5]}),
                        ==, TC_OK);
       munit_assert_memory_equal(length[4], output, value[4]);
       munit_assert_memory_equal(length[5], generated, value[5]);
@@ -112,8 +114,9 @@ static MunitResult vectors(const MunitParameter params[], void* user)
     }
     memcpy(output, expected, sizeof output);
     memcpy(output, value[4], length[4]);
-    status = decrypt(value[0], value[1], length[1], value[2], length[2], output, length[4],
-                     value[5], length[5], output);
+    status = decrypt(value[0], span(value[1], length[1]), span(value[2], length[2]),
+                     (TC_bytes){output, length[4]}, span(value[5], length[5]),
+                     (TC_buffer){output, length[4]});
     if (valid) {
       munit_assert_int(status, ==, TC_OK);
       munit_assert_memory_equal(length[3], output, value[3]);

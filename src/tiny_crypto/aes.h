@@ -122,6 +122,21 @@ TC_status TC_AES_CTR_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length);
 TC_status TC_AES_OFB_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length);
 #endif
 
+/*
+ * One-shot AEAD contract (GCM, CCM, EAX, EAX', SIV):
+ * - Encrypt writes plaintext.length bytes to ciphertext and tag.capacity tag
+ *   bytes to tag. Decrypt writes ciphertext.length bytes to plaintext and
+ *   checks tag.length tag bytes. The tag length is fixed for the key.
+ *   EAX' and SIV take fixed-size tag arrays.
+ * - The text output capacity must be at least the text input length.
+ * - Text input and output are exact aliases or fully disjoint. The tag is
+ *   disjoint from the text output. Partial overlap returns TC_ERROR.
+ * - Inputs stay unchanged for the duration of the call.
+ * - Decrypt authenticates before releasing plaintext. GCM and CCM leave a
+ *   separate output untouched and wipe in-place ciphertext on a tag mismatch.
+ *   EAX leaves both kinds of output untouched on authentication failure.
+ */
+
 #if TC_AES_ENABLE_GCM
 
 /*
@@ -174,10 +189,10 @@ struct TC_AES_GCM_ctx {
  * Tag length is fixed for this context. IV may be any supported
  * non-zero byte length. 12 bytes (96 bits) is the recommended fast path.
  */
-TC_status TC_AES_GCM_init(struct TC_AES_GCM_ctx* ctx, const uint8_t* key, const uint8_t* iv,
-                          size_t iv_len, size_t tag_len);
-TC_status TC_AES_GCM_init_short_tag(struct TC_AES_GCM_ctx* ctx, const uint8_t* key,
-                                    const uint8_t* iv, size_t iv_len, size_t tag_len);
+TC_status TC_AES_GCM_init(struct TC_AES_GCM_ctx* ctx, const uint8_t* key, TC_bytes iv,
+                          size_t tag_len);
+TC_status TC_AES_GCM_init_short_tag(struct TC_AES_GCM_ctx* ctx, const uint8_t* key, TC_bytes iv,
+                                    size_t tag_len);
 
 /* AAD must be supplied before the first encrypt/decrypt update. A context is
  * single-direction. Reinitialize before switching direction. Check every
@@ -193,30 +208,15 @@ TC_status TC_AES_GCM_decrypt_update(struct TC_AES_GCM_ctx* ctx, uint8_t* buf, si
 TC_status TC_AES_GCM_encrypt_finish(struct TC_AES_GCM_ctx* ctx, uint8_t* tag);
 TC_status TC_AES_GCM_decrypt_finish(struct TC_AES_GCM_ctx* ctx, const uint8_t* tag);
 
-/*
- * One-shot GCM. tag_len is fixed for this key use (SP 800-38D).
- * Buffer contract (all one-shot AEAD): in and out may be exact aliases or fully
- * disjoint. Partial overlap returns TC_ERROR.
- * Decrypt authenticates before releasing plaintext. GCM and CCM leave a
- * separate output untouched and wipe in-place ciphertext on a tag mismatch.
- * EAX leaves both kinds of output untouched on authentication failure.
- */
-TC_status TC_AES_GCM_encrypt(const uint8_t* key, const uint8_t* iv, size_t iv_len,
-                             const uint8_t* aad, size_t aad_len, const uint8_t* plaintext,
-                             size_t plaintext_len, uint8_t* ciphertext, uint8_t* tag,
-                             size_t tag_len);
-TC_status TC_AES_GCM_decrypt(const uint8_t* key, const uint8_t* iv, size_t iv_len,
-                             const uint8_t* aad, size_t aad_len, const uint8_t* ciphertext,
-                             size_t ciphertext_len, const uint8_t* tag, size_t tag_len,
-                             uint8_t* plaintext);
-TC_status TC_AES_GCM_encrypt_short_tag(const uint8_t* key, const uint8_t* iv, size_t iv_len,
-                                       const uint8_t* aad, size_t aad_len, const uint8_t* plaintext,
-                                       size_t plaintext_len, uint8_t* ciphertext, uint8_t* tag,
-                                       size_t tag_len);
-TC_status TC_AES_GCM_decrypt_short_tag(const uint8_t* key, const uint8_t* iv, size_t iv_len,
-                                       const uint8_t* aad, size_t aad_len,
-                                       const uint8_t* ciphertext, size_t ciphertext_len,
-                                       const uint8_t* tag, size_t tag_len, uint8_t* plaintext);
+/* One-shot GCM (SP 800-38D). Follows the one-shot AEAD contract above. */
+TC_status TC_AES_GCM_encrypt(const uint8_t* key, TC_bytes iv, TC_bytes aad, TC_bytes plaintext,
+                             TC_buffer ciphertext, TC_buffer tag);
+TC_status TC_AES_GCM_decrypt(const uint8_t* key, TC_bytes iv, TC_bytes aad, TC_bytes ciphertext,
+                             TC_bytes tag, TC_buffer plaintext);
+TC_status TC_AES_GCM_encrypt_short_tag(const uint8_t* key, TC_bytes iv, TC_bytes aad,
+                                       TC_bytes plaintext, TC_buffer ciphertext, TC_buffer tag);
+TC_status TC_AES_GCM_decrypt_short_tag(const uint8_t* key, TC_bytes iv, TC_bytes aad,
+                                       TC_bytes ciphertext, TC_bytes tag, TC_buffer plaintext);
 
 /* Clear expanded key material and intermediate authentication state. */
 void TC_AES_GCM_clear(struct TC_AES_GCM_ctx* ctx);
@@ -226,14 +226,10 @@ void TC_AES_GCM_clear(struct TC_AES_GCM_ctx* ctx);
 #if TC_AES_ENABLE_CCM
 
 /* CCM is a packet mode: payload and AAD lengths are known at entry. */
-TC_status TC_AES_CCM_encrypt(const uint8_t* key, const uint8_t* nonce, size_t nonce_len,
-                             const uint8_t* aad, size_t aad_len, const uint8_t* plaintext,
-                             size_t plaintext_len, uint8_t* ciphertext, uint8_t* tag,
-                             size_t tag_len);
-TC_status TC_AES_CCM_decrypt(const uint8_t* key, const uint8_t* nonce, size_t nonce_len,
-                             const uint8_t* aad, size_t aad_len, const uint8_t* ciphertext,
-                             size_t ciphertext_len, const uint8_t* tag, size_t tag_len,
-                             uint8_t* plaintext);
+TC_status TC_AES_CCM_encrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes plaintext,
+                             TC_buffer ciphertext, TC_buffer tag);
+TC_status TC_AES_CCM_decrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes ciphertext,
+                             TC_bytes tag, TC_buffer plaintext);
 
 #endif
 
@@ -241,14 +237,10 @@ TC_status TC_AES_CCM_decrypt(const uint8_t* key, const uint8_t* nonce, size_t no
 
 /* EAX one-shot AEAD. Tags must be TC_AES_EAX_MIN_TAG_LEN..16. Auth failure
  * leaves plaintext untouched. */
-TC_status TC_AES_EAX_encrypt(const uint8_t* key, const uint8_t* nonce, size_t nonce_len,
-                             const uint8_t* aad, size_t aad_len, const uint8_t* plaintext,
-                             size_t plaintext_len, uint8_t* ciphertext, uint8_t* tag,
-                             size_t tag_len);
-TC_status TC_AES_EAX_decrypt(const uint8_t* key, const uint8_t* nonce, size_t nonce_len,
-                             const uint8_t* aad, size_t aad_len, const uint8_t* ciphertext,
-                             size_t ciphertext_len, const uint8_t* tag, size_t tag_len,
-                             uint8_t* plaintext);
+TC_status TC_AES_EAX_encrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes plaintext,
+                             TC_buffer ciphertext, TC_buffer tag);
+TC_status TC_AES_EAX_decrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes ciphertext,
+                             TC_bytes tag, TC_buffer plaintext);
 
 #endif
 
@@ -257,14 +249,11 @@ TC_status TC_AES_EAX_decrypt(const uint8_t* key, const uint8_t* nonce, size_t no
 #define TC_AES_EAX_PRIME_TAG_LEN 4
 
 /* ANSI C12.22 EAX'. Fixed four-byte tag. Auth failure leaves output untouched. */
-TC_status TC_AES_EAX_PRIME_encrypt(const uint8_t* key, const uint8_t* cleartext,
-                                   size_t cleartext_len, const uint8_t* plaintext,
-                                   size_t plaintext_len, uint8_t* ciphertext,
-                                   uint8_t tag[TC_AES_EAX_PRIME_TAG_LEN]);
-TC_status TC_AES_EAX_PRIME_decrypt(const uint8_t* key, const uint8_t* cleartext,
-                                   size_t cleartext_len, const uint8_t* ciphertext,
-                                   size_t ciphertext_len,
-                                   const uint8_t tag[TC_AES_EAX_PRIME_TAG_LEN], uint8_t* plaintext);
+TC_status TC_AES_EAX_PRIME_encrypt(const uint8_t* key, TC_bytes cleartext, TC_bytes plaintext,
+                                   TC_buffer ciphertext, uint8_t tag[TC_AES_EAX_PRIME_TAG_LEN]);
+TC_status TC_AES_EAX_PRIME_decrypt(const uint8_t* key, TC_bytes cleartext, TC_bytes ciphertext,
+                                   const uint8_t tag[TC_AES_EAX_PRIME_TAG_LEN],
+                                   TC_buffer plaintext);
 
 #endif
 
@@ -321,19 +310,17 @@ void TC_AES_CMAC_ctx_clear(struct TC_AES_CMAC_ctx* ctx);
 
 /*
  * One-shot SIV (RFC 5297). Associated data is a vector of 0..TC_AES_SIV_MAX_AD
- * components (empty components are valid). Ciphertext length equals
- * plaintext length. pt/ct must be exact aliases or fully disjoint (partial
- * overlap returns TC_ERROR). v may alias plaintext when ciphertext is
- * distinct, but must be disjoint from ciphertext (exact or partial overlap
- * with ct returns TC_ERROR). Decrypt writes candidate plaintext, then
+ * spans (empty components are valid). Ciphertext length equals plaintext
+ * length. Text buffers follow the one-shot AEAD contract. v may alias
+ * plaintext when ciphertext is distinct and must be disjoint from ciphertext.
+ * Any overlap between v and ciphertext returns TC_ERROR. Decrypt writes candidate plaintext, then
  * verifies. Authentication failure wipes the output.
  */
-TC_status TC_AES_SIV_encrypt(const uint8_t* key, const uint8_t* const* ad, const size_t* ad_lens,
-                             size_t ad_count, const uint8_t* plaintext, size_t plaintext_len,
-                             uint8_t v[TC_AES_SIV_V_LEN], uint8_t* ciphertext);
-TC_status TC_AES_SIV_decrypt(const uint8_t* key, const uint8_t* const* ad, const size_t* ad_lens,
-                             size_t ad_count, const uint8_t v[TC_AES_SIV_V_LEN],
-                             const uint8_t* ciphertext, size_t ciphertext_len, uint8_t* plaintext);
+TC_status TC_AES_SIV_encrypt(const uint8_t* key, const TC_bytes* ad, size_t ad_count,
+                             TC_bytes plaintext, uint8_t v[TC_AES_SIV_V_LEN], TC_buffer ciphertext);
+TC_status TC_AES_SIV_decrypt(const uint8_t* key, const TC_bytes* ad, size_t ad_count,
+                             const uint8_t v[TC_AES_SIV_V_LEN], TC_bytes ciphertext,
+                             TC_buffer plaintext);
 
 #endif
 

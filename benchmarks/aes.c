@@ -33,8 +33,9 @@ static TC_status gcm(size_t length)
   static uint8_t buffer[16384];
   static const uint8_t iv[12] = {0}, aad[16] = {0};
   uint8_t tag[16];
-  TC_status status = TC_AES_GCM_encrypt(key, iv, sizeof(iv), aad, sizeof(aad), buffer, length,
-                                        buffer, tag, sizeof(tag));
+  TC_status status = TC_AES_GCM_encrypt(key, (TC_bytes){iv, sizeof(iv)},
+                                        (TC_bytes){aad, sizeof(aad)}, (TC_bytes){buffer, length},
+                                        (TC_buffer){buffer, length}, (TC_buffer){tag, sizeof(tag)});
   if (status == TC_OK)
     tc_benchmark_consume(tag);
   return status;

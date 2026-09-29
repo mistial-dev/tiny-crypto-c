@@ -33,7 +33,6 @@ static TC_X509_signature_result tc_pki_verify_digest(const TC_signature_algorith
     TC_DER_signature_pair pair;
     uint8_t raw[2 * TC_EC_MAX_BYTES];
     size_t width;
-    TC_status result;
     switch (key->curve) {
 #if TC_EC_ENABLE_P192
     case TC_EC_P192:

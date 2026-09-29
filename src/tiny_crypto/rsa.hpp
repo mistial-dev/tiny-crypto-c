@@ -12,7 +12,6 @@ typedef ::TC_RSA_private_key rsa_private_key;
 typedef ::TC_RSA_crt rsa_crt;
 typedef ::TC_RSA_crt_output rsa_crt_output;
 typedef ::TC_RSA_workspace rsa_workspace;
-typedef ::TC_buffer buffer;
 typedef ::TC_RSA_execution rsa_execution;
 typedef ::TC_RSA_v15_options rsa_v15_options;
 typedef ::TC_RSA_pss_options rsa_pss_options;

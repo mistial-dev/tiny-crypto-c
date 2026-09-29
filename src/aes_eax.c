@@ -50,11 +50,16 @@ static TC_status tc_aes_eax_ctr_xor(const struct TC_AES_key_ctx* aes,
 
 #if TC_AES_ENABLE_EAX
 
-static TC_status tc_aes_eax_crypt(const uint8_t* key, const uint8_t* nonce, size_t nonce_len,
-                                  const uint8_t* aad, size_t aad_len, const uint8_t* input,
-                                  size_t input_len, uint8_t* output, const uint8_t* expected_tag,
-                                  uint8_t* output_tag, size_t tag_len, int decrypt)
+/* Decrypt when expected_tag is set, otherwise encrypt and write output_tag.
+ * Exactly one tag pointer is set. */
+static TC_status tc_aes_eax_crypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad,
+                                  TC_bytes input_span, TC_buffer output_span,
+                                  const uint8_t* expected_tag, uint8_t* output_tag, size_t tag_len)
 {
+  const uint8_t* input = input_span.data;
+  const size_t input_len = input_span.length;
+  uint8_t* output = output_span.data;
+  const int decrypt = expected_tag != NULL;
   struct {
     struct TC_AES_key_ctx aes;
     uint8_t nonce_mac[TC_AES_BLOCKLEN];
@@ -68,20 +73,21 @@ static TC_status tc_aes_eax_crypt(const uint8_t* key, const uint8_t* nonce, size
   uint8_t i;
   int output_started = 0;
 
-  if (key == NULL || (nonce_len != 0 && nonce == NULL) || (aad_len != 0 && aad == NULL) ||
-      (input_len != 0 && (input == NULL || output == NULL)) ||
-      (decrypt ? expected_tag == NULL : output_tag == NULL) || tag_len < TC_AES_EAX_MIN_TAG_LEN ||
-      tag_len > TC_AES_BLOCKLEN || !tc_aes_buffers_ok(input, input_len, output, input_len) ||
+  if (key == NULL || !tc_internal_span_valid(nonce.data, nonce.length) ||
+      !tc_internal_span_valid(aad.data, aad.length) || !tc_aes_text_ok(input_span, output_span) ||
+      (expected_tag == NULL && output_tag == NULL) || tag_len < TC_AES_EAX_MIN_TAG_LEN ||
+      tag_len > TC_AES_BLOCKLEN ||
       !tc_internal_ranges_disjoint(output, input_len,
-                               decrypt ? (const void*)expected_tag : (const void*)output_tag,
-                               tag_len))
+                                   decrypt ? (const void*)expected_tag : (const void*)output_tag,
+                                   tag_len))
     return TC_ERROR;
 
   if (TC_AES_key_init(&st.aes, key) != TC_OK)
     goto done;
   if (tc_aes_eax_constants(&st.aes, 0, st.d, st.q) != TC_OK ||
-      tc_aes_eax_cmac(&st.aes, NULL, 0, nonce, nonce_len, st.d, st.q, st.nonce_mac) != TC_OK ||
-      tc_aes_eax_cmac(&st.aes, NULL, 1, aad, aad_len, st.d, st.q, st.header_mac) != TC_OK)
+      tc_aes_eax_cmac(&st.aes, NULL, 0, nonce.data, nonce.length, st.d, st.q, st.nonce_mac) !=
+          TC_OK ||
+      tc_aes_eax_cmac(&st.aes, NULL, 1, aad.data, aad.length, st.d, st.q, st.header_mac) != TC_OK)
     goto done;
 
   if (decrypt) {
@@ -116,34 +122,34 @@ done:
   return status;
 }
 
-TC_status TC_AES_EAX_encrypt(const uint8_t* key, const uint8_t* nonce, size_t nonce_len,
-                             const uint8_t* aad, size_t aad_len, const uint8_t* plaintext,
-                             size_t plaintext_len, uint8_t* ciphertext, uint8_t* tag,
-                             size_t tag_len)
+TC_status TC_AES_EAX_encrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes plaintext,
+                             TC_buffer ciphertext, TC_buffer tag)
 {
-  return tc_aes_eax_crypt(key, nonce, nonce_len, aad, aad_len, plaintext, plaintext_len, ciphertext,
-                          NULL, tag, tag_len, 0);
+  return tc_aes_eax_crypt(key, nonce, aad, plaintext, ciphertext, NULL, tag.data, tag.capacity);
 }
 
-TC_status TC_AES_EAX_decrypt(const uint8_t* key, const uint8_t* nonce, size_t nonce_len,
-                             const uint8_t* aad, size_t aad_len, const uint8_t* ciphertext,
-                             size_t ciphertext_len, const uint8_t* tag, size_t tag_len,
-                             uint8_t* plaintext)
+TC_status TC_AES_EAX_decrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes ciphertext,
+                             TC_bytes tag, TC_buffer plaintext)
 {
-  return tc_aes_eax_crypt(key, nonce, nonce_len, aad, aad_len, ciphertext, ciphertext_len,
-                          plaintext, tag, NULL, tag_len, 1);
+  if (tag.data == NULL)
+    return TC_ERROR;
+  return tc_aes_eax_crypt(key, nonce, aad, ciphertext, plaintext, tag.data, NULL, tag.length);
 }
 
 #endif /* EAX */
 
 #if TC_AES_ENABLE_EAX_PRIME
 
-static TC_status tc_aes_eax_prime_crypt(const uint8_t* key, const uint8_t* cleartext,
-                                        size_t cleartext_len, const uint8_t* input,
-                                        size_t input_len, uint8_t* output,
-                                        const uint8_t* expected_tag, uint8_t* output_tag,
-                                        int decrypt)
+/* Decrypt when expected_tag is set, otherwise encrypt and write output_tag.
+ * Exactly one tag pointer is set. */
+static TC_status tc_aes_eax_prime_crypt(const uint8_t* key, TC_bytes cleartext, TC_bytes input_span,
+                                        TC_buffer output_span, const uint8_t* expected_tag,
+                                        uint8_t* output_tag)
 {
+  const uint8_t* input = input_span.data;
+  const size_t input_len = input_span.length;
+  uint8_t* output = output_span.data;
+  const int decrypt = expected_tag != NULL;
   struct {
     struct TC_AES_key_ctx aes;
     uint8_t d[TC_AES_BLOCKLEN];
@@ -156,20 +162,18 @@ static TC_status tc_aes_eax_prime_crypt(const uint8_t* key, const uint8_t* clear
   TC_status status = TC_ERROR;
   int output_started = 0;
 
-  if (key == NULL || (cleartext_len != 0 && cleartext == NULL) ||
-      (input_len != 0 && (input == NULL || output == NULL)) ||
-      (decrypt ? expected_tag == NULL : output_tag == NULL) ||
-      !tc_aes_buffers_ok(input, input_len, output, input_len) ||
+  if (key == NULL || !tc_internal_span_valid(cleartext.data, cleartext.length) ||
+      !tc_aes_text_ok(input_span, output_span) || (expected_tag == NULL && output_tag == NULL) ||
       !tc_internal_ranges_disjoint(output, input_len,
-                               decrypt ? (const void*)expected_tag : (const void*)output_tag,
-                               TC_AES_EAX_PRIME_TAG_LEN))
+                                   decrypt ? (const void*)expected_tag : (const void*)output_tag,
+                                   TC_AES_EAX_PRIME_TAG_LEN))
     return TC_ERROR;
 
   if (TC_AES_key_init(&st.aes, key) != TC_OK)
     goto done;
   if (tc_aes_eax_constants(&st.aes, 1, st.d, st.q) != TC_OK ||
-      tc_aes_eax_cmac(&st.aes, st.d, -1, cleartext, cleartext_len, st.d, st.q, st.nonce_mac) !=
-          TC_OK)
+      tc_aes_eax_cmac(&st.aes, st.d, -1, cleartext.data, cleartext.length, st.d, st.q,
+                      st.nonce_mac) != TC_OK)
     goto done;
 
   if (decrypt) {
@@ -207,22 +211,18 @@ done:
   return status;
 }
 
-TC_status TC_AES_EAX_PRIME_encrypt(const uint8_t* key, const uint8_t* cleartext,
-                                   size_t cleartext_len, const uint8_t* plaintext,
-                                   size_t plaintext_len, uint8_t* ciphertext,
-                                   uint8_t tag[TC_AES_EAX_PRIME_TAG_LEN])
+TC_status TC_AES_EAX_PRIME_encrypt(const uint8_t* key, TC_bytes cleartext, TC_bytes plaintext,
+                                   TC_buffer ciphertext, uint8_t tag[TC_AES_EAX_PRIME_TAG_LEN])
 {
-  return tc_aes_eax_prime_crypt(key, cleartext, cleartext_len, plaintext, plaintext_len, ciphertext,
-                                NULL, tag, 0);
+  return tc_aes_eax_prime_crypt(key, cleartext, plaintext, ciphertext, NULL, tag);
 }
 
-TC_status TC_AES_EAX_PRIME_decrypt(const uint8_t* key, const uint8_t* cleartext,
-                                   size_t cleartext_len, const uint8_t* ciphertext,
-                                   size_t ciphertext_len,
-                                   const uint8_t tag[TC_AES_EAX_PRIME_TAG_LEN], uint8_t* plaintext)
+TC_status TC_AES_EAX_PRIME_decrypt(const uint8_t* key, TC_bytes cleartext, TC_bytes ciphertext,
+                                   const uint8_t tag[TC_AES_EAX_PRIME_TAG_LEN], TC_buffer plaintext)
 {
-  return tc_aes_eax_prime_crypt(key, cleartext, cleartext_len, ciphertext, ciphertext_len,
-                                plaintext, tag, NULL, 1);
+  if (tag == NULL)
+    return TC_ERROR;
+  return tc_aes_eax_prime_crypt(key, cleartext, ciphertext, plaintext, tag, NULL);
 }
 
 #endif /* EAX_PRIME */
