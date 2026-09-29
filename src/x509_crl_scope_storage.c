@@ -33,7 +33,7 @@ TC_TLV_result tc_x509_crl_scope_arguments(const tc_x509_crl_scope_processing* pr
   TC_TLV_result result = tc_x509_crl_evidence_status(processing->evidence, &status);
   if (result != TC_TLV_OK)
     return result;
-  return status == TC_X509_CRL_UNDETERMINED ? TC_TLV_OK : TC_TLV_END;
+  return status == TC_X509_REVOCATION_UNDETERMINED ? TC_TLV_OK : TC_TLV_END;
 }
 
 void tc_x509_crl_scope_plan_outputs(tc_pki_storage_plan* plan,
@@ -71,6 +71,10 @@ void tc_x509_crl_path_plan_inputs(tc_pki_storage_plan* plan, const tc_x509_crl_h
       return;
     }
     tc_pki_storage_plan_input_span(plan, path->chain[i]);
+  }
+  if (path->ocsp_count) {
+    TC_PKI_PLAN_INPUT(plan, path->ocsp, path->ocsp_count);
+    tc_pki_storage_plan_input_spans(plan, path->ocsp, path->ocsp_count);
   }
 }
 
@@ -133,6 +137,7 @@ void tc_x509_crl_scope_plan_inputs(tc_pki_storage_plan* plan,
     TC_PKI_PLAN_INPUT(plan, processing->check, 1);
   TC_PKI_PLAN_INPUT(plan, trust->source, 1);
   TC_PKI_PLAN_INPUT(plan, trust->options, 1);
+  TC_PKI_PLAN_INPUT(plan, trust->time, 1);
   TC_PKI_PLAN_INPUT(plan, trust->validation, 1);
   TC_PKI_PLAN_INPUT(plan, trust->search, 1);
   TC_PKI_PLAN_INPUT(plan, trust->tree, 1);

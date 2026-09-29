@@ -219,7 +219,9 @@ static MunitResult corpus_case(const MunitParameter params[], void* user)
                                              512 * 1024,
                                              delta ? TC_X509_CRL_DELTA_IF_AVAILABLE
                                                    : TC_X509_CRL_COMPLETE_ONLY,
-                                             TC_X509_CRL_ORDER_NUMBER};
+                                             TC_X509_CRL_ORDER_NUMBER,
+                                             {options.at, options.clock_skew_seconds, 0},
+                                             {NULL, 0, 0, 0}};
     TC_X509_revocation_workspace workspace = {
         &validation, &search,  states,      sizeof states,    dependencies,    MAX_CERTIFICATES,
         scopes,      MAX_CRLS, signer_path, MAX_CERTIFICATES, signer_policies, 64};
@@ -244,8 +246,8 @@ static MunitResult corpus_case(const MunitParameter params[], void* user)
     munit_assert_int(checked, ==, expected_checked);
     if (checked == TC_TLV_OK) {
       munit_assert_int(evidence.status, ==,
-                       strcmp(expected_revocation, "revoked") == 0 ? TC_X509_CRL_REVOKED
-                                                                   : TC_X509_CRL_UNREVOKED);
+                       strcmp(expected_revocation, "revoked") == 0 ? TC_X509_REVOCATION_REVOKED
+                                                                   : TC_X509_REVOCATION_GOOD);
     } else
       munit_assert_memory_equal(sizeof evidence, &evidence, &saved_evidence);
     const size_t required = WORK_BUDGET - work;

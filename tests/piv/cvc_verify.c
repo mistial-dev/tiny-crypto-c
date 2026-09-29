@@ -160,7 +160,9 @@ static void trusted_chain(const ExampleCVCRequest* request, X509* root, EVP_PKEY
                                                    0,
                                                    CAPACITY,
                                                    TC_X509_CRL_COMPLETE_ONLY,
-                                                   TC_X509_CRL_ORDER_NUMBER};
+                                                   TC_X509_CRL_ORDER_NUMBER,
+                                                   {crl_policy.at, 0, 0},
+                                                   {NULL, 0, 0, 0}};
     if (test == WRONG_ANCHOR)
       anchor.trust.public_key = parsed_signer.public_key;
     ExampleCVCCredentialWorkspace workspace;

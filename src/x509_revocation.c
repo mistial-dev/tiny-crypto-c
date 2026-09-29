@@ -11,6 +11,10 @@
 #include "pki_status_internal.h"
 #include "pki_identifier_internal.h"
 #include "pki_extensions_internal.h"
+#include "pki_source_internal.h"
+#if TC_ENABLE_X509_OCSP
+#include <tiny_crypto/x509_ocsp.h>
+#endif
 
 TC_TLV_result tc_x509_crl_resolve_dependencies(TC_bytes target,
                                                tc_x509_crl_dependencies* dependencies,
@@ -27,7 +31,7 @@ TC_TLV_result tc_x509_crl_resolve_dependencies(TC_bytes target,
   TC_TLV_result result = tc_x509_crl_dependency_add(dependencies, target, work, &root);
   if (result != TC_TLV_OK)
     return result;
-  if (workspace->nodes[root].status == TC_X509_CRL_UNREVOKED) {
+  if (workspace->nodes[root].status == TC_X509_REVOCATION_GOOD) {
     /* A proven node already covers every revocation reason. */
     TC_X509_crl_evidence evidence = {0};
     evidence.reasons = TC_X509_CRL_ALL_REASONS;
@@ -36,7 +40,10 @@ TC_TLV_result tc_x509_crl_resolve_dependencies(TC_bytes target,
   }
   result = tc_x509_crl_nodes_resolve(workspace->nodes, workspace->node_capacity,
                                      &dependencies->count, root, work, evaluate, context, out);
-  if (result == TC_TLV_OK && path)
+  /* Keep nodes added by an unresolved target too. Their lookup links stay in
+   * the table, and a later target of the held path (such as the member after
+   * an OCSP delegate) must see them. LIMIT and ARGUMENT end the operation. */
+  if (path && result != TC_TLV_LIMIT && result != TC_TLV_ARGUMENT)
     path->dependency_count = dependencies->count;
   return result;
 }
@@ -114,19 +121,19 @@ TC_TLV_result tc_x509_crl_path_resolve(const TC_bytes* chain, size_t count,
   TC_TLV_result result = tc_pki_storage_span(chain, count, sizeof *chain, &storage);
   if (result != TC_TLV_OK)
     return result;
-  TC_X509_revocation_result proposed = {TC_X509_CRL_UNREVOKED, SIZE_MAX, {0}};
+  TC_X509_revocation_result proposed = {TC_X509_REVOCATION_GOOD, SIZE_MAX, {0}};
   for (size_t i = 0; i < count; ++i) {
     TC_X509_crl_evidence evidence = {0};
-    result = resolve(context, chain[i], &evidence);
+    result = resolve(context, i, chain[i], &evidence);
     if (result != TC_TLV_OK)
       return result;
     TC_X509_revocation_status status;
     result = tc_x509_crl_evidence_status(&evidence, &status);
     if (result != TC_TLV_OK)
       return result;
-    if (status == TC_X509_CRL_UNDETERMINED)
+    if (status == TC_X509_REVOCATION_UNDETERMINED)
       return TC_TLV_UNSUPPORTED;
-    if (status == TC_X509_CRL_REVOKED) {
+    if (status == TC_X509_REVOCATION_REVOKED) {
       proposed.status = status;
       proposed.certificate_index = i;
       proposed.evidence = evidence;
@@ -150,7 +157,7 @@ TC_TLV_result tc_x509_crl_nodes_resolve(TC_X509_revocation_node* nodes, size_t c
     size_t resolved = 0;
     for (size_t i = 0; i < *count; ++i) {
       /* Re-evaluate the root to recover its revocation reason and date. */
-      if (i != root && nodes[i].status != TC_X509_CRL_UNDETERMINED)
+      if (i != root && nodes[i].status != TC_X509_REVOCATION_UNDETERMINED)
         continue;
       TC_X509_crl_evidence evidence = {0};
       int stop = 0;
@@ -174,7 +181,7 @@ TC_TLV_result tc_x509_crl_nodes_resolve(TC_X509_revocation_node* nodes, size_t c
       result = tc_x509_crl_evidence_status(&evidence, &status);
       if (result != TC_TLV_OK)
         return result;
-      if (status == TC_X509_CRL_UNDETERMINED)
+      if (status == TC_X509_REVOCATION_UNDETERMINED)
         continue;
       nodes[i].status = status;
       ++resolved;
@@ -229,7 +236,8 @@ static TC_TLV_result x509_crl_node_evaluate(void* context, size_t index,
   result = tc_x509_crl_scope_execute(
       resolution->candidates, &processing,
       &(tc_x509_crl_trust){resolution->source, resolution->anchor_index, resolution->options,
-                           workspace->tree, workspace->validation, workspace->search},
+                           workspace->tree, workspace->validation, workspace->search,
+                           resolution->time},
       &(tc_x509_crl_scope_selection){NULL, 1, 1}, node->extra, node->path, &scratch);
   *stop = node->extra->source_failed && *node->extra->source_failed;
   if (result == TC_TLV_OK)
@@ -245,9 +253,9 @@ TC_TLV_result tc_x509_crl_resolve(const TC_X509_certificate* target,
   if (!target || !resolution || !workspace || !out || !target->encoded.data ||
       !target->encoded.length || !resolution->candidates)
     return TC_TLV_ARGUMENT;
-  const tc_x509_crl_trust trust = {resolution->source,    resolution->anchor_index,
-                                   resolution->options,   workspace->tree,
-                                   workspace->validation, workspace->search};
+  const tc_x509_crl_trust trust = {
+      resolution->source,    resolution->anchor_index, resolution->options, workspace->tree,
+      workspace->validation, workspace->search,        resolution->time};
   const tc_pki_distribution_point fallback = {0};
   const tc_x509_crl_query query = {target, &fallback, 0};
   TC_X509_search_result scratch;
@@ -321,16 +329,134 @@ TC_TLV_result tc_x509_crl_resolve(const TC_X509_certificate* target,
                                           &node, path, out);
 }
 
+/* OCSP evidence for the members of one path check. writes records the
+ * validation workspace that OCSP verification modifies, so issuer anchors
+ * and delegate candidates are checked against it. */
+typedef struct {
+  const TC_X509_revocation_options* options;
+  const TC_bytes* chain;
+  TC_bytes writes[TC_X509_PATH_STORAGE_COUNT];
+} x509_ocsp_members;
+
 typedef struct {
   tc_x509_crl_held_path* held;
   const tc_x509_crl_resolution* resolution;
   const tc_x509_crl_resolution_workspace* workspace;
+  const x509_ocsp_members* ocsp;
 } x509_crl_path_context;
 
-static TC_TLV_result x509_crl_path_certificate(void* context, TC_bytes encoded,
+#if TC_ENABLE_X509_OCSP
+/* The issuer of chain[index]: the selected anchor for the first member,
+ * otherwise the previous member. Both borrow stable input bytes. */
+static TC_TLV_result x509_ocsp_issuer(const x509_crl_path_context* path, size_t index,
+                                      TC_X509_trust_anchor* out)
+{
+  const x509_ocsp_members* ocsp = path->ocsp;
+  const TC_X509_path_workspace* validation = path->workspace->validation;
+  size_t* work = path->workspace->tree->work;
+  TC_TLV_result result;
+  if (!index) {
+    const tc_pki_source_guard guard = {ocsp->options->source, ocsp->writes,
+                                       TC_X509_PATH_STORAGE_COUNT};
+    TC_X509_store_anchor anchor;
+    result = tc_pki_source_guard_anchor((void*)&guard, ocsp->options->anchor_index, work, &anchor);
+    if (result == TC_TLV_OK)
+      *out = anchor.trust;
+    return result;
+  }
+  TC_X509_workspace parser = {validation->frames, validation->frame_capacity, validation->oids,
+                              validation->oid_capacity};
+  TC_X509_certificate issuer;
+  const TC_bytes encoded = ocsp->chain[index - 1];
+  result = tc_pki_work_charge(work, encoded.length);
+  if (result == TC_TLV_OK)
+    result = TC_X509_read(encoded.data, encoded.length, &ocsp->options->signer_policy->parsing,
+                          &parser, &issuer);
+  if (result == TC_TLV_OK)
+    *out = (TC_X509_trust_anchor){issuer.subject, issuer.public_key};
+  return result;
+}
+
+/* RFC 6960 4.2.2.2.1: a delegate without id-pkix-ocsp-nocheck is trusted
+ * only when separate evidence shows it unrevoked. Here that evidence is the
+ * CRL index. OK means the delegate is proven unrevoked. */
+static TC_TLV_result x509_ocsp_delegate_checked(const x509_crl_path_context* path,
+                                                TC_bytes delegate)
+{
+  TC_X509_certificate certificate = {0};
+  TC_X509_crl_evidence evidence = {0};
+  TC_X509_revocation_status status;
+  certificate.encoded = delegate;
+  TC_TLV_result result =
+      tc_x509_crl_resolve(&certificate, path->resolution, path->workspace, path->held, &evidence);
+  if (result == TC_TLV_OK)
+    result = tc_x509_crl_evidence_status(&evidence, &status);
+  if (result != TC_TLV_OK)
+    return result;
+  return status == TC_X509_REVOCATION_GOOD ? TC_TLV_OK : TC_TLV_UNSUPPORTED;
+}
+
+/* Verify the member's OCSP response and convert an accepted result to CRL
+ * evidence with complete reason coverage. Any result other than OK leaves
+ * evidence unchanged, and the caller falls back to CRLs unless it is LIMIT or
+ * ARGUMENT. */
+static TC_TLV_result x509_ocsp_member(const x509_crl_path_context* path, size_t index,
+                                      TC_bytes certificate, TC_X509_crl_evidence* evidence)
+{
+  const TC_X509_revocation_options* options = path->ocsp->options;
+  const TC_X509_path_workspace* validation = path->workspace->validation;
+  size_t* work = path->workspace->tree->work;
+  TC_X509_trust_anchor issuer;
+  TC_TLV_result result = x509_ocsp_issuer(path, index, &issuer);
+  if (result != TC_TLV_OK)
+    return result;
+  tc_pki_source_guard guard = {options->source, path->ocsp->writes, TC_X509_PATH_STORAGE_COUNT};
+  const TC_X509_store_source delegates = tc_pki_source_guard_bind(&guard);
+  const TC_X509_ocsp_verify_request request = {options->ocsp.responses[index],
+                                               certificate,
+                                               {NULL, 0},
+                                               &issuer,
+                                               &delegates,
+                                               options->time,
+                                               options->ocsp.max_responses,
+                                               options->ocsp.max_certificates,
+                                               &options->signer_policy->parsing,
+                                               &options->signer_policy->signatures};
+  TC_X509_ocsp_result verified;
+  result = TC_X509_ocsp_response_verify(&request, validation, work, &verified);
+  if (result == TC_TLV_OK && verified.responder_certificate.data && !verified.responder_nocheck)
+    result = x509_ocsp_delegate_checked(path, verified.responder_certificate);
+  if (result != TC_TLV_OK)
+    return result;
+  TC_X509_crl_evidence accepted = {0};
+  accepted.reasons = TC_X509_CRL_ALL_REASONS;
+  if (verified.status == TC_X509_REVOCATION_REVOKED) {
+    accepted.revocation.found = 1;
+    accepted.revocation.revoked_at = verified.revocation_time;
+    accepted.revocation.reason =
+        verified.has_reason ? verified.reason : TC_PKI_CRL_REASON_UNSPECIFIED;
+  }
+  *evidence = accepted;
+  return TC_TLV_OK;
+}
+#endif
+
+static TC_TLV_result x509_crl_path_certificate(void* context, size_t index, TC_bytes encoded,
                                                TC_X509_crl_evidence* evidence)
 {
   const x509_crl_path_context* path = context;
+#if !TC_ENABLE_X509_OCSP
+  (void)index;
+#else
+  /* An accepted OCSP response settles the member. Other outcomes fall back
+   * to CRLs, except exhausted limits and argument errors. */
+  if (path->ocsp && path->ocsp->options->ocsp.count &&
+      path->ocsp->options->ocsp.responses[index].length) {
+    TC_TLV_result result = x509_ocsp_member(path, index, encoded, evidence);
+    if (result == TC_TLV_OK || result == TC_TLV_LIMIT || result == TC_TLV_ARGUMENT)
+      return result;
+  }
+#endif
   TC_X509_certificate certificate = {0};
   certificate.encoded = encoded;
   return tc_x509_crl_resolve(&certificate, path->resolution, path->workspace, path->held, evidence);
@@ -342,9 +468,28 @@ TC_TLV_result tc_x509_crl_path_operation(tc_x509_crl_held_path* held,
 {
   if (!held)
     return TC_TLV_ARGUMENT;
-  x509_crl_path_context context = {held, resolution, workspace};
+  x509_crl_path_context context = {held, resolution, workspace, NULL};
   return tc_x509_crl_path_resolve(held->chain, held->count, x509_crl_path_certificate, &context,
                                   held->out);
+}
+
+/* Check the OCSP responses and the chain against the validation workspace
+ * that OCSP verification writes. The CRL operation checks the other
+ * workspace arrays against these inputs. */
+static TC_TLV_result x509_ocsp_preflight(x509_ocsp_members* ocsp, size_t count,
+                                         const TC_X509_path_workspace* validation, size_t* work)
+{
+  const TC_X509_revocation_ocsp* responses = &ocsp->options->ocsp;
+  tc_pki_storage_plan plan;
+  tc_pki_storage_plan_begin(&plan, ocsp->writes, TC_X509_PATH_STORAGE_COUNT, *work);
+  tc_x509_path_storage_plan(&plan, validation);
+  tc_pki_storage_plan_seal(&plan);
+  TC_PKI_PLAN_INPUT(&plan, ocsp->options, 1);
+  TC_PKI_PLAN_INPUT(&plan, responses->responses, count);
+  TC_PKI_PLAN_INPUT(&plan, ocsp->chain, count);
+  tc_pki_storage_plan_input_spans(&plan, responses->responses, count);
+  tc_pki_storage_plan_input_spans(&plan, ocsp->chain, count);
+  return tc_pki_storage_plan_finish(&plan, work);
 }
 
 TC_TLV_result TC_X509_path_check_revocation(const TC_bytes* chain, size_t count,
@@ -356,9 +501,26 @@ TC_TLV_result TC_X509_path_check_revocation(const TC_bytes* chain, size_t count,
       !workspace->validation || !workspace->search || !workspace->scopes ||
       !workspace->signer_path || !workspace->signer_policies || !work)
     return TC_TLV_ARGUMENT;
+  /* CRL signer paths validate at signer_policy->at. Freshness and OCSP use
+   * options->time.at. A single evaluation time keeps them consistent. */
+  int time_order = 1;
+  if (TC_X509_time_compare(&options->time.at, &options->signer_policy->at, &time_order) !=
+          TC_TLV_OK ||
+      time_order ||
+      (options->ocsp.count &&
+       (options->ocsp.count != count || !options->ocsp.responses || !options->ocsp.max_responses)))
+    return TC_TLV_ARGUMENT;
   if (workspace->signer_path_capacity < workspace->search->capacity ||
       workspace->signer_policy_capacity < workspace->validation->policy_capacity)
     return TC_TLV_LIMIT;
+  x509_ocsp_members ocsp = {options, chain, {{NULL, 0}}};
+  if (options->ocsp.count) {
+    if (!chain)
+      return TC_TLV_ARGUMENT;
+    TC_TLV_result result = x509_ocsp_preflight(&ocsp, count, workspace->validation, work);
+    if (result != TC_TLV_OK)
+      return result;
+  }
   const tc_pki_tree_workspace tree = {workspace->validation->frames,
                                       workspace->validation->frame_capacity, work};
   tc_pki_store_candidates cursor = {options->source, options->signer_policy->parsing, 0,
@@ -369,8 +531,8 @@ TC_TLV_result TC_X509_path_check_revocation(const TC_bytes* chain, size_t count,
       candidate_metadata,
       sizeof candidate_metadata / sizeof *candidate_metadata};
   const tc_x509_crl_resolution resolution = {
-      &candidates,           options->index,        options->source,      options->signer_policy,
-      options->anchor_index, options->delta_policy, options->order_policy};
+      &candidates,           options->index,        options->source,       options->signer_policy,
+      options->anchor_index, options->delta_policy, options->order_policy, &options->time};
   tc_x509_crl_signer_cache signer_cache = {{0},
                                            {0},
                                            workspace->signer_path,
@@ -395,7 +557,11 @@ TC_TLV_result TC_X509_path_check_revocation(const TC_bytes* chain, size_t count,
   held.out = out;
   held.metadata[CRL_PATH_OPTIONS] = (TC_bytes){(const uint8_t*)options, sizeof *options};
   held.metadata[CRL_PATH_WORKSPACE] = (TC_bytes){(const uint8_t*)workspace, sizeof *workspace};
-  return tc_x509_crl_path_operation(&held, &resolution, &scratch);
+  held.ocsp = options->ocsp.responses;
+  held.ocsp_count = options->ocsp.count;
+  x509_crl_path_context context = {&held, &resolution, &scratch,
+                                   options->ocsp.count ? &ocsp : NULL};
+  return tc_x509_crl_path_resolve(chain, count, x509_crl_path_certificate, &context, out);
 }
 
 TC_X509_path_status tc_x509_crl_dependencies_path(const TC_X509_search_result* path,
@@ -421,12 +587,12 @@ TC_X509_path_status tc_x509_crl_dependencies_path(const TC_X509_search_result* p
     if (result != TC_TLV_OK)
       return tc_x509_path_status(result);
     switch (workspace->nodes[index].status) {
-    case TC_X509_CRL_REVOKED:
+    case TC_X509_REVOCATION_REVOKED:
       return TC_X509_PATH_INVALID;
-    case TC_X509_CRL_UNDETERMINED:
+    case TC_X509_REVOCATION_UNDETERMINED:
       unresolved = 1;
       break;
-    case TC_X509_CRL_UNREVOKED:
+    case TC_X509_REVOCATION_GOOD:
       break;
     default:
       return TC_X509_PATH_ERROR;
@@ -478,8 +644,8 @@ TC_TLV_result tc_x509_crl_dependency_find(TC_X509_revocation_node* nodes, size_t
   }
   if (*count == capacity)
     return TC_TLV_LIMIT;
-  nodes[*count] =
-      (TC_X509_revocation_node){.certificate = certificate, .status = TC_X509_CRL_UNDETERMINED};
+  nodes[*count] = (TC_X509_revocation_node){.certificate = certificate,
+                                            .status = TC_X509_REVOCATION_UNDETERMINED};
   *index = (*count)++;
   return TC_TLV_OK;
 }
@@ -521,7 +687,7 @@ TC_TLV_result tc_x509_crl_dependency_find_indexed(TC_X509_revocation_node* nodes
   if (*count == capacity)
     return TC_TLV_LIMIT;
   nodes[*count].certificate = certificate;
-  nodes[*count].status = TC_X509_CRL_UNDETERMINED;
+  nodes[*count].status = TC_X509_REVOCATION_UNDETERMINED;
   nodes[*count].hash_next = nodes[bucket].hash_head;
   nodes[bucket].hash_head = *count;
   *index = (*count)++;

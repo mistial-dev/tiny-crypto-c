@@ -6,9 +6,12 @@
 #include "pki_tree_internal.h"
 #include "pki_names_internal.h"
 #include "pki_distribution_internal.h"
+#include "pki_crl_reason_internal.h"
+#include "x509_time_internal.h"
 
 /* Borrowed path state shared by CRL signer searches and dependency resolution.
- * tree->work is the operation's work budget. */
+ * tree->work is the operation's work budget. options validates CRL signer
+ * paths. time sets CRL freshness. */
 typedef struct {
   const TC_X509_store_source* source;
   size_t anchor_index;
@@ -16,6 +19,7 @@ typedef struct {
   const tc_pki_tree_workspace* tree;
   const TC_X509_path_workspace* validation;
   const TC_X509_search_workspace* search;
+  const TC_X509_revocation_time* time;
 } tc_x509_crl_trust;
 
 /* Decoding resources shared by CRL entry, scope and evidence checks. tree
@@ -49,17 +53,13 @@ typedef struct {
   int serial_negative;
 } tc_x509_crl_entry;
 
-typedef enum {
-  TC_X509_CRL_CURRENT,
-  TC_X509_CRL_FUTURE,
-  TC_X509_CRL_STALE,
-  TC_X509_CRL_NO_NEXT_UPDATE
-} tc_x509_crl_freshness;
-/* Current means thisUpdate <= at < nextUpdate, with no implicit clock skew.
- * Missing nextUpdate never establishes freshness. Invalid dates or a reversed
- * interval return INVALID. Output changes only on OK. Inputs/output are disjoint. */
-TC_TLV_result tc_x509_crl_fresh_at(const TC_X509_crl* crl, const TC_X509_time* at,
-                                   tc_x509_crl_freshness* out);
+/* Freshness of one CRL under the shared revocation time rule (RFC 5280
+ * section 6.3.3 (a)(2) with the skew and age bounds of
+ * TC_X509_revocation_time). Missing nextUpdate never establishes freshness.
+ * Invalid dates or a reversed interval return INVALID. Output changes only
+ * on OK. Inputs/output are disjoint. */
+TC_TLV_result tc_x509_crl_fresh_at(const TC_X509_crl* crl, const TC_X509_revocation_time* time,
+                                   tc_x509_freshness* out);
 /* RFC 5280 6.3.3(f): KeyUsage, when present, must permit cRLSign.
  * The certificate is already parsed. cA, signer trust, critical extensions and
  * the path are validated separately. Input, work and output are disjoint.
@@ -246,7 +246,7 @@ typedef struct {
  * Parsed inputs are stable. Scratch/evidence are disjoint. Evidence changes only on
  * OK. Work and scratch are provisional. END means no new eligible coverage. */
 TC_TLV_result tc_x509_crl_apply(const tc_x509_crl_selected* selected,
-                                const tc_x509_crl_query* query, const TC_X509_time* at,
+                                const tc_x509_crl_query* query, const TC_X509_revocation_time* time,
                                 const tc_x509_crl_decode* decode, TC_X509_crl_evidence* evidence);
 /* Zero-initialize evidence. Add only selected, authenticated, current and
  * applicable CRLs. Combine base/delta results first. Only newly covered reasons
@@ -271,7 +271,7 @@ TC_TLV_result tc_x509_crl_scope_reasons(const TC_X509_crl* crl, const TC_X509_cr
                                         TC_bytes certificate_issuer, int certificate_ca,
                                         const tc_x509_crl_decode* decode, uint16_t* out);
 typedef struct {
-  tc_x509_crl_freshness freshness;
+  tc_x509_freshness freshness;
   uint16_t reasons;
 } tc_x509_crl_coverage;
 /* Eligible reasons at the requested time, after extension-policy and scope
@@ -280,7 +280,7 @@ typedef struct {
  * Parsed inputs/scratch/out are disjoint. Output changes only on OK. */
 TC_TLV_result tc_x509_crl_coverage_at(const TC_X509_crl* crl,
                                       const TC_X509_crl_extensions* extensions,
-                                      const TC_X509_time* at,
+                                      const TC_X509_revocation_time* time,
                                       const tc_pki_distribution_point* point,
                                       TC_bytes certificate_issuer, int certificate_ca,
                                       const tc_x509_crl_decode* decode, tc_x509_crl_coverage* out);
@@ -288,8 +288,6 @@ TC_TLV_result tc_x509_crl_coverage_at(const TC_X509_crl* crl,
 /* Scalar outputs change only on OK. Input/output must be disjoint.
  * Nonnegative INTEGER contents include sign padding, with no width truncation. */
 TC_TLV_result tc_x509_crl_number_read(TC_bytes encoded, TC_bytes* out);
-/* RFC 5280 CRLReason values: 0..6 and 8..10. */
-TC_TLV_result tc_x509_crl_reason_read(TC_bytes encoded, unsigned* out);
 TC_TLV_result tc_x509_crl_invalidity_date_read(TC_bytes encoded, TC_X509_time* out);
 
 /* DER CertificateList and revoked-entry fields. Extension collections retain
@@ -303,12 +301,6 @@ TC_TLV_result tc_x509_crl_entries_init(TC_bytes encoded, const TC_TLV_limits* li
 /* Reader and out are unchanged on failure or END. Work/scratch are provisional. */
 TC_TLV_result tc_x509_crl_entry_next(TC_TLV_reader* reader, unsigned version,
                                      const tc_pki_tree_workspace* tree, tc_x509_crl_entry* out);
-/* CRLReason values defined by RFC 5280 section 5.3.1 (7 is unassigned). */
-enum { CRL_REASON_UNUSED = 7, CRL_REASON_REMOVE = 8, CRL_REASON_LAST = 10 };
-static inline int tc_x509_crl_reason_known(unsigned reason)
-{
-  return reason <= CRL_REASON_LAST && reason != CRL_REASON_UNUSED;
-}
 
 /* Match a revoked entry against a serial and issuer query. */
 TC_TLV_result tc_x509_crl_query_matches(const tc_x509_crl_revoked_entry* entry,
@@ -322,11 +314,10 @@ TC_TLV_result tc_x509_crl_selected_path(const tc_x509_crl_selected* selected,
                                         const TC_X509_certificate* signer,
                                         const tc_x509_crl_trust* trust, TC_X509_search_result* out);
 /* Reason coverage a selected CRL pair adds for query. */
-TC_TLV_result tc_x509_crl_selected_coverage(const tc_x509_crl_selected* selected,
-                                            const tc_x509_crl_query* query, const TC_X509_time* at,
-                                            const tc_x509_crl_decode* decode,
-                                            const TC_X509_crl_evidence* evidence,
-                                            tc_x509_crl_coverage* coverage);
+TC_TLV_result
+tc_x509_crl_selected_coverage(const tc_x509_crl_selected* selected, const tc_x509_crl_query* query,
+                              const TC_X509_revocation_time* time, const tc_x509_crl_decode* decode,
+                              const TC_X509_crl_evidence* evidence, tc_x509_crl_coverage* coverage);
 /* Apply a selected CRL pair's entries for certificate to evidence. */
 TC_TLV_result tc_x509_crl_selected_evidence(const tc_x509_crl_selected* selected,
                                             const TC_X509_certificate* certificate,

@@ -47,12 +47,12 @@ TC_TLV_result tc_x509_crl_process(const tc_x509_crl_selected* selected,
   result = tc_pki_source_select_anchor(source, anchor_index, &anchor, &restricted);
   if (result != TC_TLV_OK)
     return result;
-  if (status != TC_X509_CRL_UNDETERMINED)
+  if (status != TC_X509_REVOCATION_UNDETERMINED)
     return TC_TLV_END;
   const size_t initial_work = *work;
   const tc_pki_tree_workspace tree = {validation->frames, validation->frame_capacity, work};
   result = tc_x509_crl_selected_coverage(
-      selected, query, &options->at,
+      selected, query, &(TC_X509_revocation_time){options->at, 0, 0},
       &(tc_x509_crl_decode){&options->parsing, &tree, &validation->names, NULL, 0}, evidence,
       &coverage);
   if (result != TC_TLV_OK)
@@ -62,7 +62,7 @@ TC_TLV_result tc_x509_crl_process(const tc_x509_crl_selected* selected,
       &(tc_x509_crl_trust){
           &restricted, anchor_index, options,
           &(tc_pki_tree_workspace){validation->frames, validation->frame_capacity, work},
-          validation, search},
+          validation, search, &(TC_X509_revocation_time){(options)->at, 0, 0}},
       &found);
   if (result != TC_TLV_OK)
     return result;
@@ -128,7 +128,7 @@ TC_TLV_result tc_x509_crl_selected_validate(const tc_x509_crl_selected* selected
       &(tc_x509_crl_trust){
           &restricted, anchor_index, options,
           &(tc_pki_tree_workspace){validation->frames, validation->frame_capacity, work},
-          validation, search},
+          validation, search, &(TC_X509_revocation_time){(options)->at, 0, 0}},
       &found);
   if (result != TC_TLV_OK)
     return result;
@@ -184,7 +184,7 @@ TC_TLV_result tc_x509_crl_index_attempt(const void* context, const TC_X509_certi
                              &(tc_pki_tree_workspace){(trust->validation)->frames,
                                                       (trust->validation)->frame_capacity,
                                                       trust->tree->work},
-                             trust->validation, trust->search},
+                             trust->validation, trust->search, trust->time},
         processing->evidence, out);
   TC_TLV_result result = tc_x509_crl_selected_validate(
       &selected, signer,
@@ -192,7 +192,7 @@ TC_TLV_result tc_x509_crl_index_attempt(const void* context, const TC_X509_certi
                            &(tc_pki_tree_workspace){(trust->validation)->frames,
                                                     (trust->validation)->frame_capacity,
                                                     trust->tree->work},
-                           trust->validation, trust->search},
+                           trust->validation, trust->search, trust->time},
       &found);
   if (result != TC_TLV_OK)
     return result;
@@ -204,14 +204,14 @@ TC_TLV_result tc_x509_crl_index_attempt(const void* context, const TC_X509_certi
                                                 NULL,
                                                 0,
                                                 NULL};
-  result = tc_x509_crl_delta_select(&verifier, processing->base, &trust->options->at, trust->tree,
-                                    NULL, &selected);
+  result = tc_x509_crl_delta_select(&verifier, processing->base, trust->time, trust->tree, NULL,
+                                    &selected);
   if (result != TC_TLV_OK &&
       !(result == TC_TLV_END && processing->delta_policy == TC_X509_CRL_DELTA_IF_AVAILABLE))
     return result;
   /* Selection preserves the established signer path and verified base. */
   result = tc_x509_crl_apply(
-      &selected, processing->query, &trust->options->at,
+      &selected, processing->query, trust->time,
       &(tc_x509_crl_decode){&trust->options->parsing, trust->tree, &trust->validation->names,
                             trust->validation->oids, trust->validation->oid_capacity},
       processing->evidence);
@@ -233,7 +233,7 @@ TC_TLV_result tc_x509_crl_process_candidate(const void* context,
                            &(tc_pki_tree_workspace){(trust->validation)->frames,
                                                     (trust->validation)->frame_capacity,
                                                     trust->tree->work},
-                           trust->validation, trust->search},
+                           trust->validation, trust->search, trust->time},
       processing->evidence, out);
 }
 

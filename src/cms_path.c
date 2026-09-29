@@ -394,13 +394,19 @@ TC_credential_status tc_cms_path_revocation_check(const TC_X509_search_result* p
 {
   for (size_t i = 0; i < path->count; ++i)
     workspace->held_path[i] = path->path[i];
+  /* CRL freshness uses the signer policy's time and clock skew, with no age
+   * bound. CMS credential validation takes no OCSP responses. */
+  const TC_X509_revocation_time time = {revocation->signer_policy->at,
+                                        revocation->signer_policy->clock_skew_seconds, 0};
   const TC_X509_revocation_options policy = {revocation->index,
                                              source,
                                              revocation->signer_policy,
                                              path->anchor_index,
                                              revocation->max_candidate_bytes,
                                              revocation->delta_policy,
-                                             revocation->order_policy};
+                                             revocation->order_policy,
+                                             time,
+                                             {NULL, 0, 0, 0}};
   const TC_X509_revocation_workspace scratch = {&workspace->path->validation,
                                                 &workspace->path->search,
                                                 workspace->crl_states,
@@ -418,9 +424,10 @@ TC_credential_status tc_cms_path_revocation_check(const TC_X509_search_result* p
                                                        &scratch, work, &checked);
   if (result != TC_TLV_OK)
     return cms_credential_error(result);
-  if (checked.status == TC_X509_CRL_REVOKED)
+  if (checked.status == TC_X509_REVOCATION_REVOKED)
     return TC_CREDENTIAL_REVOKED;
-  return checked.status == TC_X509_CRL_UNREVOKED ? TC_CREDENTIAL_VALID : TC_CREDENTIAL_UNSUPPORTED;
+  return checked.status == TC_X509_REVOCATION_GOOD ? TC_CREDENTIAL_VALID
+                                                   : TC_CREDENTIAL_UNSUPPORTED;
 }
 
 TC_credential_status tc_cms_credential_validate_internal(

@@ -211,7 +211,7 @@ TC_TLV_result tc_x509_crl_scopes(const tc_x509_crl_searcher* searcher,
   TC_TLV_result result = tc_x509_crl_evidence_status(evidence, &status);
   if (result != TC_TLV_OK)
     return result;
-  if (status != TC_X509_CRL_UNDETERMINED)
+  if (status != TC_X509_REVOCATION_UNDETERMINED)
     return TC_TLV_END;
   tc_x509_crl_scope_processing processing = *input;
   const tc_x509_crl_query* query = input->query;
@@ -299,7 +299,7 @@ TC_TLV_result tc_x509_crl_scopes(const tc_x509_crl_searcher* searcher,
         result = tc_x509_crl_evidence_status(&pending, &status);
         if (result != TC_TLV_OK)
           return result;
-        if (status != TC_X509_CRL_UNDETERMINED)
+        if (status != TC_X509_REVOCATION_UNDETERMINED)
           break;
       } else {
         if (!all_scopes || *source_failed || result == TC_TLV_ARGUMENT || result == TC_TLV_LIMIT)
@@ -308,7 +308,7 @@ TC_TLV_result tc_x509_crl_scopes(const tc_x509_crl_searcher* searcher,
           failure = result;
       }
     }
-    if (status != TC_X509_CRL_UNDETERMINED)
+    if (status != TC_X509_REVOCATION_UNDETERMINED)
       break;
     if (fallback) {
       if (alternative || !fields->alternative.name.encoded.length)
@@ -316,7 +316,7 @@ TC_TLV_result tc_x509_crl_scopes(const tc_x509_crl_searcher* searcher,
       alternative = 1;
     }
   }
-  if (status == TC_X509_CRL_UNDETERMINED && failure != TC_TLV_END)
+  if (status == TC_X509_REVOCATION_UNDETERMINED && failure != TC_TLV_END)
     return failure;
   if (!contributed)
     return TC_TLV_END;
@@ -557,7 +557,7 @@ TC_TLV_result tc_x509_crl_scope_attempt(const void* context, const TC_X509_certi
   TC_X509_crl_evidence pending = *processing->evidence;
   tc_x509_crl_selected selected = {0};
   const tc_x509_crl_scope_context scope = {
-      &cache,      processing->delta_policy, processing->order_policy,       &trust->options->at,
+      &cache,      processing->delta_policy, processing->order_policy,       trust->time,
       trust->tree, trust->validation->oids,  trust->validation->oid_capacity};
   result = tc_x509_crl_scope_evaluate(&scope, processing->reference, processing->query, &pending,
                                       processing->proposal || processing->check ? &selected : NULL);

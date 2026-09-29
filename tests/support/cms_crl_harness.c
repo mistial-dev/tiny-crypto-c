@@ -209,7 +209,7 @@ TC_TLV_result tc_cms_crl_process(const tc_cms_candidates* candidates,
   result = tc_x509_crl_evidence_status(evidence, &status);
   if (result != TC_TLV_OK)
     return result;
-  if (status != TC_X509_CRL_UNDETERMINED)
+  if (status != TC_X509_REVOCATION_UNDETERMINED)
     return TC_TLV_END;
   const tc_x509_crl_processing processing = {selected, query, evidence};
   return tc_cms_crl_search(candidates,
@@ -237,7 +237,7 @@ TC_TLV_result tc_cms_crl_index_process(const tc_cms_candidates* candidates,
   TC_TLV_result result = tc_x509_crl_evidence_status(evidence, &status);
   if (result != TC_TLV_OK)
     return result;
-  if (status != TC_X509_CRL_UNDETERMINED)
+  if (status != TC_X509_REVOCATION_UNDETERMINED)
     return TC_TLV_END;
   const tc_x509_crl_index_processing processing = {index, base, delta_policy, query, evidence};
   return tc_cms_crl_search(candidates,
@@ -347,10 +347,13 @@ static TC_TLV_result cms_crl_operation_source(const tc_cms_candidates* candidate
 static TC_TLV_result cms_crl_resolution_init(const tc_cms_crl_resolution* input,
                                              tc_pki_store_candidates* store, TC_bytes metadata[3],
                                              tc_x509_crl_operation_source* source,
+                                             TC_X509_revocation_time* time,
                                              tc_x509_crl_resolution* out)
 {
-  if (!input || !out)
+  if (!input || !input->options || !out)
     return TC_TLV_ARGUMENT;
+  /* The harness evaluates CRL freshness at the signer policy time. */
+  *time = (TC_X509_revocation_time){input->options->at, 0, 0};
   TC_TLV_result result = cms_crl_operation_source(input->candidates, store, metadata, source);
   if (result != TC_TLV_OK)
     return result;
@@ -360,7 +363,8 @@ static TC_TLV_result cms_crl_resolution_init(const tc_cms_crl_resolution* input,
                                   input->options,
                                   input->anchor_index,
                                   input->delta_policy,
-                                  input->order_policy};
+                                  input->order_policy,
+                                  time};
   return TC_TLV_OK;
 }
 
@@ -373,7 +377,9 @@ TC_TLV_result tc_cms_crl_resolve(const TC_X509_certificate* target,
   TC_bytes metadata[3];
   tc_x509_crl_operation_source source;
   tc_x509_crl_resolution operation;
-  TC_TLV_result result = cms_crl_resolution_init(resolution, &store, metadata, &source, &operation);
+  TC_X509_revocation_time time;
+  TC_TLV_result result =
+      cms_crl_resolution_init(resolution, &store, metadata, &source, &time, &operation);
   if (result != TC_TLV_OK)
     return result;
   return tc_x509_crl_resolve(target, &operation, workspace, NULL, out);
@@ -388,7 +394,9 @@ TC_TLV_result tc_cms_crl_path_resolve(const TC_bytes* chain, size_t count,
   TC_bytes metadata[3];
   tc_x509_crl_operation_source source;
   tc_x509_crl_resolution operation;
-  TC_TLV_result result = cms_crl_resolution_init(resolution, &store, metadata, &source, &operation);
+  TC_X509_revocation_time time;
+  TC_TLV_result result =
+      cms_crl_resolution_init(resolution, &store, metadata, &source, &time, &operation);
   if (result != TC_TLV_OK)
     return result;
   tc_x509_crl_held_path held = {0};

@@ -84,7 +84,7 @@ static TC_TLV_result read_dependency_candidate(void* context, size_t index, size
 {
   dependency_source_probe* probe = context;
   if (probe->dependency && probe->dependency->certificate.data &&
-      probe->dependency->status != TC_X509_CRL_UNDETERMINED) {
+      probe->dependency->status != TC_X509_REVOCATION_UNDETERMINED) {
     ++probe->failures;
     return probe->failure;
   }
@@ -1363,7 +1363,7 @@ static MunitResult revocations(const MunitParameter params[], void* user)
               &(tc_x509_crl_trust){
                   &source, 1, &options,
                   &(tc_pki_tree_workspace){validation.frames, validation.frame_capacity, &work},
-                  &validation, &search},
+                  &validation, &search, &(TC_X509_revocation_time){(&options)->at, 0, 0}},
               &found),
           ==, TC_X509_PATH_VALID);
       munit_assert_size(found.anchor_index, ==, 1);
@@ -1394,7 +1394,7 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                 &(tc_x509_crl_trust){
                     &source, anchor_index, &rejected,
                     &(tc_pki_tree_workspace){validation.frames, validation.frame_capacity, &work},
-                    &validation, &search},
+                    &validation, &search, &(TC_X509_revocation_time){(&rejected)->at, 0, 0}},
                 &found),
             ==, failure == 3 ? TC_X509_PATH_LIMIT : TC_X509_PATH_INVALID);
         munit_assert_memory_equal(sizeof found, &found, &saved);
@@ -1408,7 +1408,7 @@ static MunitResult revocations(const MunitParameter params[], void* user)
               &(tc_x509_crl_trust){
                   &source, 1, &options,
                   &(tc_pki_tree_workspace){validation.frames, validation.frame_capacity, &work},
-                  &validation, &search},
+                  &validation, &search, &(TC_X509_revocation_time){(&options)->at, 0, 0}},
               &found),
           ==, TC_X509_PATH_VALID);
       munit_assert_size(work, ==, 0);
@@ -1424,7 +1424,7 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                 &(tc_x509_crl_trust){
                     &source, 1, &options,
                     &(tc_pki_tree_workspace){validation.frames, validation.frame_capacity, &work},
-                    &validation, &search},
+                    &validation, &search, &(TC_X509_revocation_time){(&options)->at, 0, 0}},
                 &found),
             ==, TC_X509_PATH_INVALID);
         munit_assert_memory_equal(sizeof found, &found, &saved);
@@ -1435,7 +1435,7 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                 &(tc_x509_crl_trust){
                     &source, source.anchor_count, &options,
                     &(tc_pki_tree_workspace){validation.frames, validation.frame_capacity, &work},
-                    &validation, &search},
+                    &validation, &search, &(TC_X509_revocation_time){(&options)->at, 0, 0}},
                 &found),
             ==, TC_X509_PATH_ERROR);
         munit_assert_memory_equal(sizeof found, &found, &saved);
@@ -1447,7 +1447,7 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                 &(tc_x509_crl_trust){
                     &source, 1, &options,
                     &(tc_pki_tree_workspace){validation.frames, validation.frame_capacity, &work},
-                    &validation, &search},
+                    &validation, &search, &(TC_X509_revocation_time){(&options)->at, 0, 0}},
                 &found),
             ==, TC_X509_PATH_UNSUPPORTED);
         munit_assert_memory_equal(sizeof found, &found, &saved);
@@ -1470,10 +1470,11 @@ static MunitResult revocations(const MunitParameter params[], void* user)
             ==, TC_TLV_OK);
         memcpy(&before, &reader, sizeof before);
         work = TRUST_WORK_BUDGET;
-        munit_assert_int(tc_cms_crl_signer_find(&reader, &parsed, &crl_info,
-                                                &(tc_x509_crl_trust){&source, 1, &options, &tree,
-                                                                     &validation, &search},
-                                                &found),
+        munit_assert_int(tc_cms_crl_signer_find(
+                             &reader, &parsed, &crl_info,
+                             &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation, &search,
+                                                  &(TC_X509_revocation_time){(&options)->at, 0, 0}},
+                             &found),
                          ==, TC_X509_PATH_VALID);
         munit_assert_size(candidates.calls, ==, 3);
         munit_assert_ptr_equal(found.path[found.count - 1].data, signer_der);
@@ -1482,28 +1483,31 @@ static MunitResult revocations(const MunitParameter params[], void* user)
         munit_assert_size(found.validation.work_used, ==, search_work);
         work = search_work - 1;
         memcpy(&found, &saved, sizeof found);
-        munit_assert_int(tc_cms_crl_signer_find(&reader, &parsed, &crl_info,
-                                                &(tc_x509_crl_trust){&source, 1, &options, &tree,
-                                                                     &validation, &search},
-                                                &found),
+        munit_assert_int(tc_cms_crl_signer_find(
+                             &reader, &parsed, &crl_info,
+                             &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation, &search,
+                                                  &(TC_X509_revocation_time){(&options)->at, 0, 0}},
+                             &found),
                          ==, TC_X509_PATH_LIMIT);
         munit_assert_memory_equal(sizeof found, &found, &saved);
         munit_assert_size(work, ==, 0);
         work = search_work;
-        munit_assert_int(tc_cms_crl_signer_find(&reader, &parsed, &crl_info,
-                                                &(tc_x509_crl_trust){&source, 1, &options, &tree,
-                                                                     &validation, &search},
-                                                &found),
+        munit_assert_int(tc_cms_crl_signer_find(
+                             &reader, &parsed, &crl_info,
+                             &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation, &search,
+                                                  &(TC_X509_revocation_time){(&options)->at, 0, 0}},
+                             &found),
                          ==, TC_X509_PATH_VALID);
         munit_assert_size(work, ==, 0);
         signature_retry_probe probe = {provider, 0, 2, TC_X509_SIGNATURE_UNSUPPORTED};
         options.signatures = (TC_X509_signature_provider){retry_signature, &probe, NULL};
         work = TRUST_WORK_BUDGET;
         candidates.calls = 0;
-        munit_assert_int(tc_cms_crl_signer_find(&reader, &parsed, &crl_info,
-                                                &(tc_x509_crl_trust){&source, 1, &options, &tree,
-                                                                     &validation, &search},
-                                                &found),
+        munit_assert_int(tc_cms_crl_signer_find(
+                             &reader, &parsed, &crl_info,
+                             &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation, &search,
+                                                  &(TC_X509_revocation_time){(&options)->at, 0, 0}},
+                             &found),
                          ==, TC_X509_PATH_VALID);
         munit_assert_size(candidates.calls, ==, candidates.count);
         munit_assert_size(probe.calls, ==, 4);
@@ -1512,28 +1516,31 @@ static MunitResult revocations(const MunitParameter params[], void* user)
         work = TRUST_WORK_BUDGET;
         candidates.calls = 0;
         memcpy(&found, &saved, sizeof found);
-        munit_assert_int(tc_cms_crl_signer_find(&reader, &parsed, &crl_info,
-                                                &(tc_x509_crl_trust){&source, 1, &options, &tree,
-                                                                     &validation, &search},
-                                                &found),
+        munit_assert_int(tc_cms_crl_signer_find(
+                             &reader, &parsed, &crl_info,
+                             &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation, &search,
+                                                  &(TC_X509_revocation_time){(&options)->at, 0, 0}},
+                             &found),
                          ==, TC_X509_PATH_ERROR);
         munit_assert_size(candidates.calls, ==, 3);
         munit_assert_memory_equal(sizeof found, &found, &saved);
         options.signatures.verify = NULL;
         work = TRUST_WORK_BUDGET;
         memcpy(&found, &saved, sizeof found);
-        munit_assert_int(tc_cms_crl_signer_find(&reader, &parsed, &crl_info,
-                                                &(tc_x509_crl_trust){&source, 1, &options, &tree,
-                                                                     &validation, &search},
-                                                &found),
+        munit_assert_int(tc_cms_crl_signer_find(
+                             &reader, &parsed, &crl_info,
+                             &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation, &search,
+                                                  &(TC_X509_revocation_time){(&options)->at, 0, 0}},
+                             &found),
                          ==, TC_X509_PATH_UNSUPPORTED);
         munit_assert_memory_equal(sizeof found, &found, &saved);
         options.signatures = provider;
         work = TRUST_WORK_BUDGET;
-        munit_assert_int(tc_cms_crl_signer_find(&reader, &parsed, &crl_info,
-                                                &(tc_x509_crl_trust){&source, 0, &options, &tree,
-                                                                     &validation, &search},
-                                                &found),
+        munit_assert_int(tc_cms_crl_signer_find(
+                             &reader, &parsed, &crl_info,
+                             &(tc_x509_crl_trust){&source, 0, &options, &tree, &validation, &search,
+                                                  &(TC_X509_revocation_time){(&options)->at, 0, 0}},
+                             &found),
                          ==, TC_X509_PATH_INVALID);
         munit_assert_memory_equal(sizeof found, &found, &saved);
         munit_assert_memory_equal(sizeof reader, &reader, &before);
@@ -1552,8 +1559,9 @@ static MunitResult revocations(const MunitParameter params[], void* user)
           work = TRUST_WORK_BUDGET;
           candidates.calls = 0;
           munit_assert_int(tc_cms_crl_process(&reader, &selected, &query,
-                                              &(tc_x509_crl_trust){&source, 1, &options, &tree,
-                                                                   &validation, &search},
+                                              &(tc_x509_crl_trust){
+                                                  &source, 1, &options, &tree, &validation, &search,
+                                                  &(TC_X509_revocation_time){(&options)->at, 0, 0}},
                                               &evidence, &found),
                            ==, TC_TLV_OK);
           const size_t required = TRUST_WORK_BUDGET - work;
@@ -1561,13 +1569,15 @@ static MunitResult revocations(const MunitParameter params[], void* user)
           munit_assert_size(candidates.calls, ==, 3);
           munit_assert_ptr_equal(found.path[found.count - 1].data, signer_der);
           munit_assert_int(tc_x509_crl_evidence_status(&evidence, &status), ==, TC_TLV_OK);
-          munit_assert_int(status, ==, revoked ? TC_X509_CRL_REVOKED : TC_X509_CRL_UNREVOKED);
+          munit_assert_int(status, ==,
+                           revoked ? TC_X509_REVOCATION_REVOKED : TC_X509_REVOCATION_GOOD);
           const TC_X509_crl_evidence terminal = evidence;
           work = 0;
           memcpy(&found, &saved, sizeof found);
           munit_assert_int(tc_cms_crl_process(&reader, &selected, &query,
-                                              &(tc_x509_crl_trust){&source, 1, &options, &tree,
-                                                                   &validation, &search},
+                                              &(tc_x509_crl_trust){
+                                                  &source, 1, &options, &tree, &validation, &search,
+                                                  &(TC_X509_revocation_time){(&options)->at, 0, 0}},
                                               &evidence, &found),
                            ==, TC_TLV_END);
           munit_assert_memory_equal(sizeof evidence, &evidence, &terminal);
@@ -1576,8 +1586,9 @@ static MunitResult revocations(const MunitParameter params[], void* user)
           evidence = initial;
           work = required;
           munit_assert_int(tc_cms_crl_process(&reader, &selected, &query,
-                                              &(tc_x509_crl_trust){&source, 1, &options, &tree,
-                                                                   &validation, &search},
+                                              &(tc_x509_crl_trust){
+                                                  &source, 1, &options, &tree, &validation, &search,
+                                                  &(TC_X509_revocation_time){(&options)->at, 0, 0}},
                                               &evidence, &found),
                            ==, TC_TLV_OK);
           munit_assert_size(work, ==, 0);
@@ -1614,7 +1625,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
           munit_assert_int(
               tc_cms_crl_index_process(
                   &reader, &crl_index, 0, TC_X509_CRL_DELTA_IF_AVAILABLE, &query,
-                  &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation, &search},
+                  &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation, &search,
+                                       &(TC_X509_revocation_time){(&options)->at, 0, 0}},
                   &evidence, &found),
               ==, TC_TLV_OK);
           const size_t indexed_required = TRUST_WORK_BUDGET - work;
@@ -1623,7 +1635,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
           munit_assert_int(
               tc_cms_crl_index_process(
                   &reader, &crl_index, 0, TC_X509_CRL_DELTA_IF_AVAILABLE, &query,
-                  &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation, &search},
+                  &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation, &search,
+                                       &(TC_X509_revocation_time){(&options)->at, 0, 0}},
                   &evidence, &found),
               ==, TC_TLV_OK);
           munit_assert_size(work, ==, 0);
@@ -1637,7 +1650,9 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                                   TC_X509_CRL_ORDER_NUMBER, &query,
                                                   signature_states, sizeof signature_states,
                                                   &evidence, NULL, NULL, NULL, NULL, NULL},
-                  &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation, &search}, &found),
+                  &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation, &search,
+                                       &(TC_X509_revocation_time){(&options)->at, 0, 0}},
+                  &found),
               ==, TC_TLV_OK);
           const size_t scope_required = TRUST_WORK_BUDGET - work;
           evidence = initial;
@@ -1649,7 +1664,9 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                                   TC_X509_CRL_ORDER_NUMBER, &query,
                                                   signature_states, sizeof signature_states,
                                                   &evidence, NULL, NULL, NULL, NULL, NULL},
-                  &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation, &search}, &found),
+                  &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation, &search,
+                                       &(TC_X509_revocation_time){(&options)->at, 0, 0}},
+                  &found),
               ==, TC_TLV_OK);
           munit_assert_size(work, ==, 0);
           enum { COVERED_REASONS, OTHER_ISSUER, FILTER_CASES };
@@ -1678,8 +1695,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                                     TC_X509_CRL_ORDER_NUMBER, &filtered_query,
                                                     signature_states, sizeof signature_states,
                                                     &evidence, NULL, NULL, NULL, NULL, NULL},
-                    &(tc_x509_crl_trust){&source, 1, &filtered_options, &tree, &validation,
-                                         &search},
+                    &(tc_x509_crl_trust){&source, 1, &filtered_options, &tree, &validation, &search,
+                                         &(TC_X509_revocation_time){(&filtered_options)->at, 0, 0}},
                     &found),
                 ==, TC_TLV_END);
             const size_t filter_work = TRUST_WORK_BUDGET - work;
@@ -1695,8 +1712,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                                     TC_X509_CRL_ORDER_NUMBER, &filtered_query,
                                                     signature_states, sizeof signature_states,
                                                     &evidence, NULL, NULL, NULL, NULL, NULL},
-                    &(tc_x509_crl_trust){&source, 1, &filtered_options, &tree, &validation,
-                                         &search},
+                    &(tc_x509_crl_trust){&source, 1, &filtered_options, &tree, &validation, &search,
+                                         &(TC_X509_revocation_time){(&filtered_options)->at, 0, 0}},
                     &found),
                 ==, TC_TLV_LIMIT);
             munit_assert_memory_equal(sizeof evidence, &evidence, &initial);
@@ -1709,8 +1726,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                                     TC_X509_CRL_ORDER_NUMBER, &filtered_query,
                                                     signature_states, sizeof signature_states,
                                                     &evidence, NULL, NULL, NULL, NULL, NULL},
-                    &(tc_x509_crl_trust){&source, 1, &filtered_options, &tree, &validation,
-                                         &search},
+                    &(tc_x509_crl_trust){&source, 1, &filtered_options, &tree, &validation, &search,
+                                         &(TC_X509_revocation_time){(&filtered_options)->at, 0, 0}},
                     &found),
                 ==, TC_TLV_END);
             munit_assert_size(work, ==, 0);
@@ -1758,10 +1775,11 @@ static MunitResult revocations(const MunitParameter params[], void* user)
               break;
             }
             munit_assert_int(
-                tc_cms_crl_process(&reader, &selected, &query,
-                                   &(tc_x509_crl_trust){&source, anchor_index, &checked, &tree,
-                                                        &validation, &search},
-                                   &evidence, &found),
+                tc_cms_crl_process(
+                    &reader, &selected, &query,
+                    &(tc_x509_crl_trust){&source, anchor_index, &checked, &tree, &validation,
+                                         &search, &(TC_X509_revocation_time){(&checked)->at, 0, 0}},
+                    &evidence, &found),
                 ==, cases[i].result);
             munit_assert_memory_equal(sizeof reader, &reader, &before);
             if (cases[i].result != TC_TLV_OK) {
@@ -1772,7 +1790,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
               munit_assert_size(retry.calls, ==, 4);
               munit_assert_size(found.validation.work_used, ==, TRUST_WORK_BUDGET - work);
               munit_assert_int(tc_x509_crl_evidence_status(&evidence, &status), ==, TC_TLV_OK);
-              munit_assert_int(status, ==, revoked ? TC_X509_CRL_REVOKED : TC_X509_CRL_UNREVOKED);
+              munit_assert_int(status, ==,
+                               revoked ? TC_X509_REVOCATION_REVOKED : TC_X509_REVOCATION_GOOD);
             }
             if (cases[i].kind == SOURCE_ERROR || cases[i].kind == MALFORMED ||
                 cases[i].kind == INCREASE_WORK || cases[i].kind == STALE)
@@ -1787,20 +1806,23 @@ static MunitResult revocations(const MunitParameter params[], void* user)
               const size_t operation_work = scope ? scope_required : indexed_required;
               work = cases[i].kind == SHORT ? operation_work - 1 : TRUST_WORK_BUDGET;
               TC_TLV_result result =
-                  scope ? tc_cms_crl_scope_process(
-                              &reader,
-                              &(tc_x509_crl_scope_processing){
-                                  &crl_index, 0, TC_X509_CRL_DELTA_IF_AVAILABLE,
-                                  TC_X509_CRL_ORDER_NUMBER, &query, signature_states,
-                                  sizeof signature_states, &evidence, NULL, NULL, NULL, NULL, NULL},
-                              &(tc_x509_crl_trust){&source, anchor_index, &checked, &tree,
-                                                   &validation, &search},
-                              &found)
-                        : tc_cms_crl_index_process(
-                              &reader, &crl_index, 0, TC_X509_CRL_DELTA_IF_AVAILABLE, &query,
-                              &(tc_x509_crl_trust){&source, anchor_index, &checked, &tree,
-                                                   &validation, &search},
-                              &evidence, &found);
+                  scope
+                      ? tc_cms_crl_scope_process(
+                            &reader,
+                            &(tc_x509_crl_scope_processing){
+                                &crl_index, 0, TC_X509_CRL_DELTA_IF_AVAILABLE,
+                                TC_X509_CRL_ORDER_NUMBER, &query, signature_states,
+                                sizeof signature_states, &evidence, NULL, NULL, NULL, NULL, NULL},
+                            &(tc_x509_crl_trust){&source, anchor_index, &checked, &tree,
+                                                 &validation, &search,
+                                                 &(TC_X509_revocation_time){(&checked)->at, 0, 0}},
+                            &found)
+                      : tc_cms_crl_index_process(
+                            &reader, &crl_index, 0, TC_X509_CRL_DELTA_IF_AVAILABLE, &query,
+                            &(tc_x509_crl_trust){&source, anchor_index, &checked, &tree,
+                                                 &validation, &search,
+                                                 &(TC_X509_revocation_time){(&checked)->at, 0, 0}},
+                            &evidence, &found);
               munit_assert_int(result, ==, cases[i].result);
               munit_assert_memory_equal(sizeof reader, &reader, &before);
               if (cases[i].result != TC_TLV_OK) {
@@ -1811,7 +1833,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                 munit_assert_size(retry.calls, ==, 4);
                 munit_assert_size(found.validation.work_used, ==, TRUST_WORK_BUDGET - work);
                 munit_assert_int(tc_x509_crl_evidence_status(&evidence, &status), ==, TC_TLV_OK);
-                munit_assert_int(status, ==, revoked ? TC_X509_CRL_REVOKED : TC_X509_CRL_UNREVOKED);
+                munit_assert_int(status, ==,
+                                 revoked ? TC_X509_REVOCATION_REVOKED : TC_X509_REVOCATION_GOOD);
               }
             }
           }
@@ -1856,7 +1879,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                                     TC_X509_CRL_ORDER_NUMBER, &query,
                                                     (uint8_t*)state_overlaps[overlap], 1, &evidence,
                                                     NULL, NULL, NULL, NULL, NULL},
-                    &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation, &search},
+                    &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation, &search,
+                                         &(TC_X509_revocation_time){(&options)->at, 0, 0}},
                     &found),
                 ==, TC_TLV_ARGUMENT);
             munit_assert_memory_equal(sizeof evidence, &evidence, &initial);
@@ -1882,7 +1906,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                                     TC_X509_CRL_ORDER_NUMBER, &query,
                                                     signature_states, sizeof signature_states,
                                                     &evidence, NULL, NULL, NULL, NULL, NULL},
-                    &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation, &search},
+                    &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation, &search,
+                                         &(TC_X509_revocation_time){(&options)->at, 0, 0}},
                     &found),
                 ==, TC_TLV_ARGUMENT);
             munit_assert_memory_equal(sizeof evidence, &evidence, &initial);
@@ -1904,7 +1929,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                                     TC_X509_CRL_ORDER_NUMBER, &query,
                                                     signature_states, sizeof signature_states,
                                                     &evidence, NULL, NULL, NULL, NULL, NULL},
-                    &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation, &search},
+                    &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation, &search,
+                                         &(TC_X509_revocation_time){(&options)->at, 0, 0}},
                     &found),
                 ==, TC_TLV_ARGUMENT);
             munit_assert_memory_equal(sizeof evidence, &evidence, &initial);
@@ -1923,7 +1949,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                                   TC_X509_CRL_ORDER_NUMBER, &query,
                                                   signature_states, sizeof signature_states,
                                                   &evidence, NULL, NULL, NULL, NULL, NULL},
-                  &(tc_x509_crl_trust){&source, 1, &options, &partial_tree, &validation, &search},
+                  &(tc_x509_crl_trust){&source, 1, &options, &partial_tree, &validation, &search,
+                                       &(TC_X509_revocation_time){(&options)->at, 0, 0}},
                   &found),
               ==, TC_TLV_ARGUMENT);
           munit_assert_memory_equal(sizeof evidence, &evidence, &initial);
@@ -2054,11 +2081,12 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                     munit_assert_int(
                         tc_x509_crl_signer_validate(
                             &rows[reference].crl, generation ? &replacement_view : &signer,
-                            &(tc_x509_crl_trust){&source, 1, &rollover_options,
-                                                 &(tc_pki_tree_workspace){validation.frames,
-                                                                          validation.frame_capacity,
-                                                                          &work},
-                                                 &validation, &search},
+                            &(tc_x509_crl_trust){
+                                &source, 1, &rollover_options,
+                                &(tc_pki_tree_workspace){validation.frames,
+                                                         validation.frame_capacity, &work},
+                                &validation, &search,
+                                &(TC_X509_revocation_time){(&rollover_options)->at, 0, 0}},
                             &found),
                         ==,
                         generation && kind == BAD_SIGNATURE ? TC_X509_PATH_INVALID
@@ -2072,22 +2100,24 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                   const TC_TLV_result expected_result = kind == TIED         ? TC_TLV_INVALID
                                                         : kind == UNNUMBERED ? TC_TLV_UNSUPPORTED
                                                                              : TC_TLV_OK;
-                  munit_assert_int(tc_cms_crl_point_process(
-                                       &rollover_candidates,
-                                       &(tc_x509_crl_scope_processing){
-                                           &index, 0, TC_X509_CRL_COMPLETE_ONLY,
-                                           TC_X509_CRL_ORDER_NUMBER, &query, states, sizeof states,
-                                           &evidence, &check, NULL, NULL, NULL, NULL},
-                                       &(tc_x509_crl_trust){&source, 1, &rollover_options, &tree,
-                                                            &validation, &search}),
-                                   ==, expected_result);
+                  munit_assert_int(
+                      tc_cms_crl_point_process(
+                          &rollover_candidates,
+                          &(tc_x509_crl_scope_processing){&index, 0, TC_X509_CRL_COMPLETE_ONLY,
+                                                          TC_X509_CRL_ORDER_NUMBER, &query, states,
+                                                          sizeof states, &evidence, &check, NULL,
+                                                          NULL, NULL, NULL},
+                          &(tc_x509_crl_trust){
+                              &source, 1, &rollover_options, &tree, &validation, &search,
+                              &(TC_X509_revocation_time){(&rollover_options)->at, 0, 0}}),
+                      ==, expected_result);
                   munit_assert_size(probe.calls, ==, kind == BAD_SIGNATURE ? 1 : PARTITIONS);
                   if (expected_result == TC_TLV_OK) {
                     munit_assert_int(tc_x509_crl_evidence_status(&evidence, &status), ==,
                                      TC_TLV_OK);
                     munit_assert_int(status, ==,
-                                     kind == BAD_SIGNATURE ? TC_X509_CRL_UNREVOKED
-                                                           : TC_X509_CRL_REVOKED);
+                                     kind == BAD_SIGNATURE ? TC_X509_REVOCATION_GOOD
+                                                           : TC_X509_REVOCATION_REVOKED);
                     if (kind == NEWER)
                       munit_assert_uint(evidence.revocation.reason, ==, 1);
                   } else
@@ -2106,8 +2136,9 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                                             TC_X509_CRL_ORDER_NUMBER, &query,
                                                             states, sizeof states, &evidence,
                                                             &check, NULL, NULL, NULL, NULL},
-                            &(tc_x509_crl_trust){&source, 1, &rollover_options, &tree, &validation,
-                                                 &search}),
+                            &(tc_x509_crl_trust){
+                                &source, 1, &rollover_options, &tree, &validation, &search,
+                                &(TC_X509_revocation_time){(&rollover_options)->at, 0, 0}}),
                         ==, short_budget ? TC_TLV_LIMIT : expected_result);
                     if (short_budget)
                       munit_assert_memory_equal(sizeof evidence, &evidence, &empty);
@@ -2130,7 +2161,7 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                           tc_cms_crl_resolve(&replacement_view, &resolution, &workspace, &evidence),
                           ==, TC_TLV_UNSUPPORTED);
                       munit_assert_memory_equal(sizeof evidence, &evidence, &empty);
-                      munit_assert_int(nodes[0].status, ==, TC_X509_CRL_UNDETERMINED);
+                      munit_assert_int(nodes[0].status, ==, TC_X509_REVOCATION_UNDETERMINED);
                     }
                     for (unsigned generation = 0; generation < PARTITIONS; ++generation) {
                       for (unsigned rejected = 0; rejected < 2; ++rejected) {
@@ -2152,16 +2183,18 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                     &index, 0, TC_X509_CRL_COMPLETE_ONLY, TC_X509_CRL_ORDER_NUMBER,
                                     &query, states, sizeof states, &evidence, &pending_check, NULL,
                                     NULL, NULL, NULL},
-                                &(tc_x509_crl_trust){&source, 1, &rollover_options, &tree,
-                                                     &validation, &search}),
+                                &(tc_x509_crl_trust){
+                                    &source, 1, &rollover_options, &tree, &validation, &search,
+                                    &(TC_X509_revocation_time){(&rollover_options)->at, 0, 0}}),
                             ==, pending_result);
                         if (pending_result != TC_TLV_OK)
                           munit_assert_memory_equal(sizeof evidence, &evidence, &empty);
                         else {
                           munit_assert_int(tc_x509_crl_evidence_status(&evidence, &status), ==,
                                            TC_TLV_OK);
-                          munit_assert_int(
-                              status, ==, generation ? TC_X509_CRL_UNREVOKED : TC_X509_CRL_REVOKED);
+                          munit_assert_int(status, ==,
+                                           generation ? TC_X509_REVOCATION_GOOD
+                                                      : TC_X509_REVOCATION_REVOKED);
                         }
                         const size_t required = TRUST_WORK_BUDGET - work;
                         const TC_X509_crl_evidence expected = evidence;
@@ -2175,8 +2208,9 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                       &index, 0, TC_X509_CRL_COMPLETE_ONLY,
                                       TC_X509_CRL_ORDER_NUMBER, &query, states, sizeof states,
                                       &evidence, &pending_check, NULL, NULL, NULL, NULL},
-                                  &(tc_x509_crl_trust){&source, 1, &rollover_options, &tree,
-                                                       &validation, &search}),
+                                  &(tc_x509_crl_trust){
+                                      &source, 1, &rollover_options, &tree, &validation, &search,
+                                      &(TC_X509_revocation_time){(&rollover_options)->at, 0, 0}}),
                               ==, short_budget ? TC_TLV_LIMIT : pending_result);
                           if (short_budget)
                             munit_assert_memory_equal(sizeof evidence, &evidence, &empty);
@@ -2213,8 +2247,9 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                                             TC_X509_CRL_ORDER_NUMBER, &query,
                                                             states, sizeof states, &evidence,
                                                             &retry_check, NULL, NULL, NULL, NULL},
-                            &(tc_x509_crl_trust){&source, 1, &rollover_options, &tree, &validation,
-                                                 &search}),
+                            &(tc_x509_crl_trust){
+                                &source, 1, &rollover_options, &tree, &validation, &search,
+                                &(TC_X509_revocation_time){(&rollover_options)->at, 0, 0}}),
                         ==, kind == TIED ? TC_TLV_INVALID : TC_TLV_OK);
                     munit_assert_size(unresolved.path.calls, >=, retry_count);
                     if (kind == TIED)
@@ -2222,7 +2257,7 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                     else {
                       munit_assert_int(tc_x509_crl_evidence_status(&evidence, &status), ==,
                                        TC_TLV_OK);
-                      munit_assert_int(status, ==, TC_X509_CRL_REVOKED);
+                      munit_assert_int(status, ==, TC_X509_REVOCATION_REVOKED);
                     }
                   }
                   if (kind == UNNUMBERED) {
@@ -2234,12 +2269,13 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                                             TC_X509_CRL_ORDER_THIS_UPDATE, &query,
                                                             states, sizeof states, &evidence,
                                                             &check, NULL, NULL, NULL, NULL},
-                            &(tc_x509_crl_trust){&source, 1, &rollover_options, &tree, &validation,
-                                                 &search}),
+                            &(tc_x509_crl_trust){
+                                &source, 1, &rollover_options, &tree, &validation, &search,
+                                &(TC_X509_revocation_time){(&rollover_options)->at, 0, 0}}),
                         ==, TC_TLV_OK);
                     munit_assert_int(tc_x509_crl_evidence_status(&evidence, &status), ==,
                                      TC_TLV_OK);
-                    munit_assert_int(status, ==, TC_X509_CRL_REVOKED);
+                    munit_assert_int(status, ==, TC_X509_REVOCATION_REVOKED);
                   }
                   TC_bytes swap = rollover_inputs[0];
                   rollover_inputs[0] = rollover_inputs[1];
@@ -2350,15 +2386,16 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                             &(tc_x509_crl_scope_processing){
                                 &index, 0, policies[policy], TC_X509_CRL_ORDER_NUMBER, &query,
                                 states, sizeof states, &evidence, &check, NULL, NULL, NULL, NULL},
-                            &(tc_x509_crl_trust){&source, 1, &rollover_options, &tree, &validation,
-                                                 &search}),
+                            &(tc_x509_crl_trust){
+                                &source, 1, &rollover_options, &tree, &validation, &search,
+                                &(TC_X509_revocation_time){(&rollover_options)->at, 0, 0}}),
                         ==, TC_TLV_OK);
                     munit_assert_int(tc_x509_crl_evidence_status(&evidence, &status), ==,
                                      TC_TLV_OK);
                     munit_assert_int(status, ==,
                                      policies[policy] == TC_X509_CRL_COMPLETE_ONLY
-                                         ? TC_X509_CRL_UNREVOKED
-                                         : TC_X509_CRL_REVOKED);
+                                         ? TC_X509_REVOCATION_GOOD
+                                         : TC_X509_REVOCATION_REVOKED);
                     munit_assert_size(probe.pairs, ==,
                                       policies[policy] == TC_X509_CRL_COMPLETE_ONLY ? 0
                                                                                     : PARTITIONS);
@@ -2375,8 +2412,9 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                             &(tc_x509_crl_scope_processing){
                                 &index, 0, policies[policy], TC_X509_CRL_ORDER_NUMBER, &query,
                                 states, sizeof states, &evidence, &check, NULL, NULL, NULL, NULL},
-                            &(tc_x509_crl_trust){&source, 1, &rollover_options, &tree, &validation,
-                                                 &search}),
+                            &(tc_x509_crl_trust){
+                                &source, 1, &rollover_options, &tree, &validation, &search,
+                                &(TC_X509_revocation_time){(&rollover_options)->at, 0, 0}}),
                         ==,
                         policies[policy] == TC_X509_CRL_DELTA_REQUIRED ? TC_TLV_INVALID
                                                                        : TC_TLV_OK);
@@ -2386,7 +2424,7 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                     } else {
                       munit_assert_int(tc_x509_crl_evidence_status(&evidence, &status), ==,
                                        TC_TLV_OK);
-                      munit_assert_int(status, ==, TC_X509_CRL_UNREVOKED);
+                      munit_assert_int(status, ==, TC_X509_REVOCATION_GOOD);
                     }
                     pair_der[1][signature_end] ^= 1;
                   }
@@ -2413,8 +2451,9 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                                             TC_X509_CRL_ORDER_NUMBER, &query,
                                                             states, sizeof states, &evidence,
                                                             &check, NULL, NULL, NULL, NULL},
-                            &(tc_x509_crl_trust){&source, 1, &rollover_options, &tree, &validation,
-                                                 &search}),
+                            &(tc_x509_crl_trust){
+                                &source, 1, &rollover_options, &tree, &validation, &search,
+                                &(TC_X509_revocation_time){(&rollover_options)->at, 0, 0}}),
                         ==, damaged ? TC_TLV_INVALID : TC_TLV_OK);
                     if (damaged) {
                       munit_assert_memory_equal(sizeof evidence, &evidence, &empty);
@@ -2422,7 +2461,7 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                     } else {
                       munit_assert_int(tc_x509_crl_evidence_status(&evidence, &status), ==,
                                        TC_TLV_OK);
-                      munit_assert_int(status, ==, TC_X509_CRL_UNREVOKED);
+                      munit_assert_int(status, ==, TC_X509_REVOCATION_GOOD);
                     }
                   }
                 }
@@ -2551,7 +2590,9 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                                              1,
                                                              sizeof issuer_der + sizeof signer_der,
                                                              TC_X509_CRL_COMPLETE_ONLY,
-                                                             TC_X509_CRL_ORDER_NUMBER};
+                                                             TC_X509_CRL_ORDER_NUMBER,
+                                                             {options.at, 0, 0},
+                                                             {NULL, 0, 0, 0}};
                 if (!rejected) {
                   TC_X509_certificate issuer_view;
                   munit_assert_int(
@@ -2561,8 +2602,14 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                   TC_X509_path_options counted = options;
                   counted.signatures =
                       (TC_X509_signature_provider){retry_signature, &signature_count, retry_digest};
-                  const tc_x509_crl_trust trusted = {&complete_source, 1,      &counted, &tree,
-                                                     &validation,      &search};
+                  const tc_x509_crl_trust trusted = {
+                      &complete_source,
+                      1,
+                      &counted,
+                      &tree,
+                      &validation,
+                      &search,
+                      &(TC_X509_revocation_time){(&counted)->at, 0, 0}};
                   const tc_pki_distribution_point fallback = {0};
                   const tc_x509_crl_query query = {&issuer_view, &fallback, 0};
                   TC_X509_crl_evidence evidence = {0};
@@ -2630,7 +2677,7 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                                                &path_evidence),
                                  ==, TC_TLV_OK);
                 munit_assert_int(path_evidence.status, ==,
-                                 rejected ? TC_X509_CRL_REVOKED : TC_X509_CRL_UNREVOKED);
+                                 rejected ? TC_X509_REVOCATION_REVOKED : TC_X509_REVOCATION_GOOD);
                 munit_assert_size(path_evidence.certificate_index, ==, rejected ? 0 : SIZE_MAX);
                 const size_t public_work = TRUST_WORK_BUDGET - work;
                 for (unsigned short_budget = 0; short_budget < 2; ++short_budget) {
@@ -2739,7 +2786,7 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                                                &path_evidence),
                                  ==, TC_TLV_OK);
                 munit_assert_int(path_evidence.status, ==,
-                                 rejected ? TC_X509_CRL_REVOKED : TC_X509_CRL_UNREVOKED);
+                                 rejected ? TC_X509_REVOCATION_REVOKED : TC_X509_REVOCATION_GOOD);
                 munit_assert_size(path_evidence.certificate_index, ==, rejected ? 0 : SIZE_MAX);
                 path_evidence = path_sentinel;
                 work = TRUST_WORK_BUDGET;
@@ -2765,13 +2812,13 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                                          &workspace, &path_evidence),
                                  ==, TC_TLV_OK);
                 munit_assert_int(path_evidence.status, ==,
-                                 rejected ? TC_X509_CRL_REVOKED : TC_X509_CRL_UNREVOKED);
+                                 rejected ? TC_X509_REVOCATION_REVOKED : TC_X509_REVOCATION_GOOD);
                 munit_assert_size(path_evidence.certificate_index, ==, rejected ? 0 : SIZE_MAX);
                 munit_assert_ptr_equal(nodes[0].certificate.data, issuer_der);
                 if (!rejected) {
                   munit_assert_ptr_equal(nodes[1].certificate.data, leaf_der);
-                  munit_assert_int(nodes[0].status, ==, TC_X509_CRL_UNREVOKED);
-                  munit_assert_int(nodes[1].status, ==, TC_X509_CRL_UNREVOKED);
+                  munit_assert_int(nodes[0].status, ==, TC_X509_REVOCATION_GOOD);
+                  munit_assert_int(nodes[1].status, ==, TC_X509_REVOCATION_GOOD);
                 }
                 const size_t path_work = TRUST_WORK_BUDGET - work;
                 for (unsigned short_budget = 0; short_budget < 2; ++short_budget) {
@@ -2857,14 +2904,14 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                  ==, rejected ? TC_TLV_INVALID : TC_TLV_OK);
                 munit_assert_ptr_equal(nodes[1].certificate.data, issuer_der);
                 munit_assert_int(nodes[1].status, ==,
-                                 rejected ? TC_X509_CRL_REVOKED : TC_X509_CRL_UNREVOKED);
+                                 rejected ? TC_X509_REVOCATION_REVOKED : TC_X509_REVOCATION_GOOD);
                 const size_t required = TRUST_WORK_BUDGET - work;
                 const TC_X509_crl_evidence expected_evidence = evidence;
                 if (rejected)
                   munit_assert_memory_equal(sizeof evidence, &evidence, &empty);
                 else {
                   munit_assert_int(tc_x509_crl_evidence_status(&evidence, &status), ==, TC_TLV_OK);
-                  munit_assert_int(status, ==, TC_X509_CRL_UNREVOKED);
+                  munit_assert_int(status, ==, TC_X509_REVOCATION_GOOD);
                 }
                 for (unsigned short_budget = 0; short_budget < 2; ++short_budget) {
                   evidence = empty;
@@ -2901,7 +2948,7 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                       source_failures[failure].expected);
                   munit_assert_size(dependency_source.failures, ==, 1);
                   munit_assert_int(nodes[1].status, ==,
-                                   rejected ? TC_X509_CRL_REVOKED : TC_X509_CRL_UNREVOKED);
+                                   rejected ? TC_X509_REVOCATION_REVOKED : TC_X509_REVOCATION_GOOD);
                   munit_assert_memory_equal(sizeof evidence, &evidence, &empty);
                 }
                 dependency_source.dependency = NULL;
@@ -2925,11 +2972,11 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                   munit_assert_int(
                       tc_cms_crl_resolve(&leaf_view, &incomplete, &workspace, &evidence), ==,
                       TC_TLV_UNSUPPORTED);
-                  munit_assert_int(nodes[0].status, ==, TC_X509_CRL_UNDETERMINED);
+                  munit_assert_int(nodes[0].status, ==, TC_X509_REVOCATION_UNDETERMINED);
                   munit_assert_memory_equal(sizeof evidence, &evidence, &empty);
                   if (!available) {
                     munit_assert_ptr_equal(nodes[1].certificate.data, issuer_der);
-                    munit_assert_int(nodes[1].status, ==, TC_X509_CRL_UNDETERMINED);
+                    munit_assert_int(nodes[1].status, ==, TC_X509_REVOCATION_UNDETERMINED);
                   }
                 }
                 const TC_X509_crl_record swap = rows[0];
@@ -2981,11 +3028,11 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                   munit_assert_int(tc_cms_crl_path_resolve(chain, DEPENDENCIES, &leaf_resolution,
                                                            &workspace, &path_evidence),
                                    ==, TC_TLV_OK);
-                  munit_assert_int(path_evidence.status, ==, TC_X509_CRL_REVOKED);
+                  munit_assert_int(path_evidence.status, ==, TC_X509_REVOCATION_REVOKED);
                   munit_assert_size(path_evidence.certificate_index, ==, DEPENDENCIES - 1);
                   munit_assert_int(tc_x509_crl_evidence_status(&path_evidence.evidence, &status),
                                    ==, TC_TLV_OK);
-                  munit_assert_int(status, ==, TC_X509_CRL_REVOKED);
+                  munit_assert_int(status, ==, TC_X509_REVOCATION_REVOKED);
                   munit_assert_uint(path_evidence.evidence.revocation.reason, ==,
                                     CRL_REASON_KEY_COMPROMISE);
                   int order;
@@ -3001,7 +3048,7 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                                                  &public_options, &public_workspace,
                                                                  &work, &path_evidence),
                                    ==, TC_TLV_OK);
-                  munit_assert_int(path_evidence.status, ==, TC_X509_CRL_REVOKED);
+                  munit_assert_int(path_evidence.status, ==, TC_X509_REVOCATION_REVOKED);
                   munit_assert_size(path_evidence.certificate_index, ==, DEPENDENCIES - 1);
                   munit_assert_uint(path_evidence.evidence.revocation.reason, ==,
                                     CRL_REASON_KEY_COMPROMISE);
@@ -3051,12 +3098,12 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                                          PARTITIONS, &partitions),
                                    ==, TC_TLV_OK);
                   evidence = (TC_X509_crl_evidence){0};
-                  status = TC_X509_CRL_UNDETERMINED;
+                  status = TC_X509_REVOCATION_UNDETERMINED;
                   uint16_t covered = 0;
                   work = TRUST_WORK_BUDGET;
                   for (unsigned reference = 0; reference < PARTITIONS; ++reference) {
                     const unsigned partition = order ? PARTITIONS - 1 - reference : reference;
-                    const int terminal = status != TC_X509_CRL_UNDETERMINED;
+                    const int terminal = status != TC_X509_REVOCATION_UNDETERMINED;
                     const TC_TLV_result expected_result = terminal ? TC_TLV_END
                                                           : bad_signature && partition
                                                               ? TC_TLV_INVALID
@@ -3072,7 +3119,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                 &partitions, reference, TC_X509_CRL_COMPLETE_ONLY,
                                 TC_X509_CRL_ORDER_NUMBER, &query, states, sizeof states, &evidence,
                                 NULL, NULL, NULL, NULL, NULL},
-                            &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation, &search},
+                            &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation, &search,
+                                                 &(TC_X509_revocation_time){(&options)->at, 0, 0}},
                             &found),
                         ==, expected_result);
                     if (expected_result == TC_TLV_OK)
@@ -3087,13 +3135,13 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                     munit_assert_int(tc_x509_crl_evidence_status(&evidence, &status), ==,
                                      TC_TLV_OK);
                     if (!reference && expected_result == TC_TLV_OK && (!listed || partition))
-                      munit_assert_int(status, ==, TC_X509_CRL_UNDETERMINED);
+                      munit_assert_int(status, ==, TC_X509_REVOCATION_UNDETERMINED);
                     munit_assert_memory_equal(sizeof reader, &reader, &before);
                   }
                   munit_assert_int(status, ==,
-                                   listed          ? TC_X509_CRL_REVOKED
-                                   : bad_signature ? TC_X509_CRL_UNDETERMINED
-                                                   : TC_X509_CRL_UNREVOKED);
+                                   listed          ? TC_X509_REVOCATION_REVOKED
+                                   : bad_signature ? TC_X509_REVOCATION_UNDETERMINED
+                                                   : TC_X509_REVOCATION_GOOD);
                   const TC_X509_crl_evidence empty = {0};
                   crl_path_probe probe = {
                       {signer_der, (size_t)signer_length}, 1, 0, TC_X509_PATH_VALID, 0, NULL, 0};
@@ -3110,7 +3158,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                                           TC_X509_CRL_ORDER_NUMBER, &query, states,
                                                           sizeof states, &evidence, &check, NULL,
                                                           NULL, NULL, NULL},
-                          &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation, &search}),
+                          &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation, &search,
+                                               &(TC_X509_revocation_time){(&options)->at, 0, 0}}),
                       ==, run_result);
                   munit_assert_size(probe.calls, ==,
                                     (listed && !order) || bad_signature ? 1 : PARTITIONS);
@@ -3118,31 +3167,31 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                     munit_assert_int(tc_x509_crl_evidence_status(&evidence, &status), ==,
                                      TC_TLV_OK);
                     munit_assert_int(status, ==,
-                                     listed ? TC_X509_CRL_REVOKED : TC_X509_CRL_UNREVOKED);
+                                     listed ? TC_X509_REVOCATION_REVOKED : TC_X509_REVOCATION_GOOD);
                     const size_t run_work = TRUST_WORK_BUDGET - work;
                     evidence = empty;
                     work = run_work - 1;
                     munit_assert_int(
-                        tc_cms_crl_point_process(&reader,
-                                                 &(tc_x509_crl_scope_processing){
-                                                     &partitions, 0, TC_X509_CRL_COMPLETE_ONLY,
-                                                     TC_X509_CRL_ORDER_NUMBER, &query, states,
-                                                     sizeof states, &evidence, &check, NULL, NULL,
-                                                     NULL, NULL},
-                                                 &(tc_x509_crl_trust){&source, 1, &options, &tree,
-                                                                      &validation, &search}),
+                        tc_cms_crl_point_process(
+                            &reader,
+                            &(tc_x509_crl_scope_processing){
+                                &partitions, 0, TC_X509_CRL_COMPLETE_ONLY, TC_X509_CRL_ORDER_NUMBER,
+                                &query, states, sizeof states, &evidence, &check, NULL, NULL, NULL,
+                                NULL},
+                            &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation, &search,
+                                                 &(TC_X509_revocation_time){(&options)->at, 0, 0}}),
                         ==, TC_TLV_LIMIT);
                     munit_assert_memory_equal(sizeof evidence, &evidence, &empty);
                     work = run_work;
                     munit_assert_int(
-                        tc_cms_crl_point_process(&reader,
-                                                 &(tc_x509_crl_scope_processing){
-                                                     &partitions, 0, TC_X509_CRL_COMPLETE_ONLY,
-                                                     TC_X509_CRL_ORDER_NUMBER, &query, states,
-                                                     sizeof states, &evidence, &check, NULL, NULL,
-                                                     NULL, NULL},
-                                                 &(tc_x509_crl_trust){&source, 1, &options, &tree,
-                                                                      &validation, &search}),
+                        tc_cms_crl_point_process(
+                            &reader,
+                            &(tc_x509_crl_scope_processing){
+                                &partitions, 0, TC_X509_CRL_COMPLETE_ONLY, TC_X509_CRL_ORDER_NUMBER,
+                                &query, states, sizeof states, &evidence, &check, NULL, NULL, NULL,
+                                NULL},
+                            &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation, &search,
+                                                 &(TC_X509_revocation_time){(&options)->at, 0, 0}}),
                         ==, TC_TLV_OK);
                     munit_assert_size(work, ==, 0);
                   } else
@@ -3294,16 +3343,17 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                     TC_X509_CRL_ORDER_NUMBER, NULL, states, sizeof states,
                                     &evidence, &check, NULL, NULL, NULL, NULL},
                                 &target_view,
-                                &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation,
-                                                     &search}),
+                                &(tc_x509_crl_trust){
+                                    &source, 1, &options, &tree, &validation, &search,
+                                    &(TC_X509_revocation_time){(&options)->at, 0, 0}}),
                             ==, expected);
                         if (expected == TC_TLV_OK) {
                           munit_assert_size(probe.calls, ==, 1);
                           munit_assert_int(tc_x509_crl_evidence_status(&evidence, &status), ==,
                                            TC_TLV_OK);
                           munit_assert_int(status, ==,
-                                           kind == REVOKED_TARGET ? TC_X509_CRL_REVOKED
-                                                                  : TC_X509_CRL_UNREVOKED);
+                                           kind == REVOKED_TARGET ? TC_X509_REVOCATION_REVOKED
+                                                                  : TC_X509_REVOCATION_GOOD);
                         } else {
                           munit_assert_size(probe.calls, ==, 0);
                           munit_assert_memory_equal(sizeof evidence, &evidence, &empty);
@@ -3322,8 +3372,9 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                       TC_X509_CRL_ORDER_NUMBER, NULL, states, sizeof states,
                                       &evidence, &check, NULL, NULL, NULL, NULL},
                                   &target_view,
-                                  &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation,
-                                                       &search}),
+                                  &(tc_x509_crl_trust){
+                                      &source, 1, &options, &tree, &validation, &search,
+                                      &(TC_X509_revocation_time){(&options)->at, 0, 0}}),
                               ==, short_budget ? TC_TLV_LIMIT : expected);
                           if (short_budget)
                             munit_assert_memory_equal(sizeof evidence, &evidence, &empty);
@@ -3356,8 +3407,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                               TC_TLV_OK);
                           munit_assert_true(equal);
                           munit_assert_int(dependencies[0].status, ==,
-                                           kind == REVOKED_TARGET ? TC_X509_CRL_REVOKED
-                                                                  : TC_X509_CRL_UNREVOKED);
+                                           kind == REVOKED_TARGET ? TC_X509_REVOCATION_REVOKED
+                                                                  : TC_X509_REVOCATION_GOOD);
                         } else
                           munit_assert_memory_equal(sizeof evidence, &evidence, &empty);
                         const size_t resolve_work = TRUST_WORK_BUDGET - work;
@@ -3393,8 +3444,9 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                     TC_X509_CRL_ORDER_NUMBER, NULL, states, sizeof states,
                                     &evidence, &check, NULL, NULL, NULL, NULL},
                                 &target_view,
-                                &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation,
-                                                     &search}),
+                                &(tc_x509_crl_trust){
+                                    &source, 1, &options, &tree, &validation, &search,
+                                    &(TC_X509_revocation_time){(&options)->at, 0, 0}}),
                             ==, TC_TLV_ARGUMENT);
                         munit_assert_size(work, ==, TRUST_WORK_BUDGET);
                         munit_assert_memory_equal(sizeof evidence, &evidence, &empty);
@@ -3428,8 +3480,9 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                   TC_X509_CRL_ORDER_NUMBER, &query, states, sizeof states,
                                   &evidence, &check, NULL, NULL, NULL, NULL},
                               point_lists[list],
-                              &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation,
-                                                   &search}),
+                              &(tc_x509_crl_trust){
+                                  &source, 1, &options, &tree, &validation, &search,
+                                  &(TC_X509_revocation_time){(&options)->at, 0, 0}}),
                           ==, invalid ? TC_TLV_INVALID : TC_TLV_OK);
                       if (invalid) {
                         munit_assert_size(probe.calls, ==, 0);
@@ -3438,7 +3491,7 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                         munit_assert_size(probe.calls, ==, PARTITIONS);
                         munit_assert_int(tc_x509_crl_evidence_status(&evidence, &status), ==,
                                          TC_TLV_OK);
-                        munit_assert_int(status, ==, TC_X509_CRL_UNREVOKED);
+                        munit_assert_int(status, ==, TC_X509_REVOCATION_GOOD);
                         const size_t required = TRUST_WORK_BUDGET - work;
                         for (unsigned short_budget = 0; short_budget < 2; ++short_budget) {
                           evidence = empty;
@@ -3451,8 +3504,9 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                       TC_X509_CRL_ORDER_NUMBER, &query, states, sizeof states,
                                       &evidence, &check, NULL, NULL, NULL, NULL},
                                   point_lists[list],
-                                  &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation,
-                                                       &search}),
+                                  &(tc_x509_crl_trust){
+                                      &source, 1, &options, &tree, &validation, &search,
+                                      &(TC_X509_revocation_time){(&options)->at, 0, 0}}),
                               ==, short_budget ? TC_TLV_LIMIT : TC_TLV_OK);
                           if (short_budget)
                             munit_assert_memory_equal(sizeof evidence, &evidence, &empty);
@@ -3462,15 +3516,15 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                     evidence = empty;
                     work = TRUST_WORK_BUDGET;
                     munit_assert_int(
-                        tc_cms_crl_points_process(&reader,
-                                                  &(tc_x509_crl_scope_processing){
-                                                      &partitions, 0, TC_X509_CRL_COMPLETE_ONLY,
-                                                      TC_X509_CRL_ORDER_NUMBER, &query, states,
-                                                      sizeof states, &evidence, &check, NULL, NULL,
-                                                      NULL, NULL},
-                                                  (TC_bytes){states, 1},
-                                                  &(tc_x509_crl_trust){&source, 1, &options, &tree,
-                                                                       &validation, &search}),
+                        tc_cms_crl_points_process(
+                            &reader,
+                            &(tc_x509_crl_scope_processing){
+                                &partitions, 0, TC_X509_CRL_COMPLETE_ONLY, TC_X509_CRL_ORDER_NUMBER,
+                                &query, states, sizeof states, &evidence, &check, NULL, NULL, NULL,
+                                NULL},
+                            (TC_bytes){states, 1},
+                            &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation, &search,
+                                                 &(TC_X509_revocation_time){(&options)->at, 0, 0}}),
                         ==, TC_TLV_ARGUMENT);
                     munit_assert_size(work, ==, TRUST_WORK_BUDGET);
                     munit_assert_memory_equal(sizeof evidence, &evidence, &empty);
@@ -3489,8 +3543,9 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                   TC_X509_CRL_ORDER_NUMBER, &query, states, sizeof states,
                                   &evidence, &check, NULL, NULL, NULL, NULL},
                               (TC_bytes){split_points, sizeof split_points},
-                              &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation,
-                                                   &search}),
+                              &(tc_x509_crl_trust){
+                                  &source, 1, &options, &tree, &validation, &search,
+                                  &(TC_X509_revocation_time){(&options)->at, 0, 0}}),
                           ==, source_failure ? TC_TLV_UNSUPPORTED : TC_TLV_INVALID);
                       munit_assert_memory_equal(sizeof evidence, &evidence, &empty);
                       if (source_failure)
@@ -3512,14 +3567,15 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                       evidence = empty;
                       work = TRUST_WORK_BUDGET;
                       munit_assert_int(
-                          tc_cms_crl_point_process(&reader,
-                                                   &(tc_x509_crl_scope_processing){
-                                                       &partitions, 0, TC_X509_CRL_COMPLETE_ONLY,
-                                                       TC_X509_CRL_ORDER_NUMBER, &query, states,
-                                                       sizeof states, &evidence, &check, NULL, NULL,
-                                                       NULL, NULL},
-                                                   &(tc_x509_crl_trust){&source, 1, &options, &tree,
-                                                                        &validation, &search}),
+                          tc_cms_crl_point_process(
+                              &reader,
+                              &(tc_x509_crl_scope_processing){
+                                  &partitions, 0, TC_X509_CRL_COMPLETE_ONLY,
+                                  TC_X509_CRL_ORDER_NUMBER, &query, states, sizeof states,
+                                  &evidence, &check, NULL, NULL, NULL, NULL},
+                              &(tc_x509_crl_trust){
+                                  &source, 1, &options, &tree, &validation, &search,
+                                  &(TC_X509_revocation_time){(&options)->at, 0, 0}}),
                           ==, tc_x509_path_result_status(probe.result));
                       munit_assert_memory_equal(sizeof evidence, &evidence, &empty);
                       munit_assert_size(probe.calls, >, 0);
@@ -3530,14 +3586,14 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                     evidence = empty;
                     work = TRUST_WORK_BUDGET;
                     munit_assert_int(
-                        tc_cms_crl_point_process(&reader,
-                                                 &(tc_x509_crl_scope_processing){
-                                                     &partitions, 0, TC_X509_CRL_COMPLETE_ONLY,
-                                                     TC_X509_CRL_ORDER_NUMBER, &query, states,
-                                                     sizeof states, &evidence, &check, NULL, NULL,
-                                                     NULL, NULL},
-                                                 &(tc_x509_crl_trust){&source, 1, &options, &tree,
-                                                                      &validation, &search}),
+                        tc_cms_crl_point_process(
+                            &reader,
+                            &(tc_x509_crl_scope_processing){
+                                &partitions, 0, TC_X509_CRL_COMPLETE_ONLY, TC_X509_CRL_ORDER_NUMBER,
+                                &query, states, sizeof states, &evidence, &check, NULL, NULL, NULL,
+                                NULL},
+                            &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation, &search,
+                                                 &(TC_X509_revocation_time){(&options)->at, 0, 0}}),
                         ==, TC_TLV_INVALID);
                     munit_assert_memory_equal(sizeof evidence, &evidence, &empty);
                     munit_assert_size(probe.calls, >, 1);
@@ -3547,14 +3603,14 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                     probe.source_status = &candidates.status;
                     work = TRUST_WORK_BUDGET;
                     munit_assert_int(
-                        tc_cms_crl_point_process(&reader,
-                                                 &(tc_x509_crl_scope_processing){
-                                                     &partitions, 0, TC_X509_CRL_COMPLETE_ONLY,
-                                                     TC_X509_CRL_ORDER_NUMBER, &query, states,
-                                                     sizeof states, &evidence, &check, NULL, NULL,
-                                                     NULL, NULL},
-                                                 &(tc_x509_crl_trust){&source, 1, &options, &tree,
-                                                                      &validation, &search}),
+                        tc_cms_crl_point_process(
+                            &reader,
+                            &(tc_x509_crl_scope_processing){
+                                &partitions, 0, TC_X509_CRL_COMPLETE_ONLY, TC_X509_CRL_ORDER_NUMBER,
+                                &query, states, sizeof states, &evidence, &check, NULL, NULL, NULL,
+                                NULL},
+                            &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation, &search,
+                                                 &(TC_X509_revocation_time){(&options)->at, 0, 0}}),
                         ==, TC_TLV_UNSUPPORTED);
                     munit_assert_memory_equal(sizeof evidence, &evidence, &empty);
                     munit_assert_size(probe.calls, ==, 1);
@@ -3564,14 +3620,14 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                     evidence = empty;
                     work = TRUST_WORK_BUDGET;
                     munit_assert_int(
-                        tc_cms_crl_point_process(&reader,
-                                                 &(tc_x509_crl_scope_processing){
-                                                     &partitions, 0, TC_X509_CRL_COMPLETE_ONLY,
-                                                     TC_X509_CRL_ORDER_NUMBER, &query, states,
-                                                     sizeof states, &evidence, &check, NULL, NULL,
-                                                     NULL, NULL},
-                                                 &(tc_x509_crl_trust){&source, 1, &options, &tree,
-                                                                      &validation, &search}),
+                        tc_cms_crl_point_process(
+                            &reader,
+                            &(tc_x509_crl_scope_processing){
+                                &partitions, 0, TC_X509_CRL_COMPLETE_ONLY, TC_X509_CRL_ORDER_NUMBER,
+                                &query, states, sizeof states, &evidence, &check, NULL, NULL, NULL,
+                                NULL},
+                            &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation, &search,
+                                                 &(TC_X509_revocation_time){(&options)->at, 0, 0}}),
                         ==, TC_TLV_ARGUMENT);
                     munit_assert_memory_equal(sizeof evidence, &evidence, &empty);
                     munit_assert_size(work, ==, 0);
@@ -3581,14 +3637,14 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                     candidates.calls = 0;
                     work = TRUST_WORK_BUDGET;
                     munit_assert_int(
-                        tc_cms_crl_point_process(&reader,
-                                                 &(tc_x509_crl_scope_processing){
-                                                     &partitions, 0, TC_X509_CRL_COMPLETE_ONLY,
-                                                     TC_X509_CRL_ORDER_NUMBER, &query, states,
-                                                     sizeof states, &evidence, &check, NULL, NULL,
-                                                     NULL, NULL},
-                                                 &(tc_x509_crl_trust){&source, 1, &options, &tree,
-                                                                      &validation, &search}),
+                        tc_cms_crl_point_process(
+                            &reader,
+                            &(tc_x509_crl_scope_processing){
+                                &partitions, 0, TC_X509_CRL_COMPLETE_ONLY, TC_X509_CRL_ORDER_NUMBER,
+                                &query, states, sizeof states, &evidence, &check, NULL, NULL, NULL,
+                                NULL},
+                            &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation, &search,
+                                                 &(TC_X509_revocation_time){(&options)->at, 0, 0}}),
                         ==, TC_TLV_UNSUPPORTED);
                     munit_assert_memory_equal(sizeof evidence, &evidence, &empty);
                     munit_assert_size(candidates.calls, ==, 1);
@@ -3603,49 +3659,49 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                                             TC_X509_CRL_ORDER_NUMBER, &query,
                                                             states, sizeof states, &evidence,
                                                             &check, NULL, NULL, NULL, NULL},
-                            &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation,
-                                                 &search}),
+                            &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation, &search,
+                                                 &(TC_X509_revocation_time){(&options)->at, 0, 0}}),
                         ==, TC_TLV_OK);
                     munit_assert_int(tc_x509_crl_evidence_status(&evidence, &status), ==,
                                      TC_TLV_OK);
-                    munit_assert_int(status, ==, TC_X509_CRL_UNDETERMINED);
+                    munit_assert_int(status, ==, TC_X509_REVOCATION_UNDETERMINED);
                     munit_assert_uint(evidence.reasons, ==, masks[order]);
                     evidence = empty;
                     work = TRUST_WORK_BUDGET;
                     probe.calls = 0;
                     const TC_X509_crl_index no_records = {NULL, 0, 0};
                     munit_assert_int(
-                        tc_cms_crl_point_process(&reader,
-                                                 &(tc_x509_crl_scope_processing){
-                                                     &no_records, 0, TC_X509_CRL_COMPLETE_ONLY,
-                                                     TC_X509_CRL_ORDER_NUMBER, &query, NULL, 0,
-                                                     &evidence, &check, NULL, NULL, NULL, NULL},
-                                                 &(tc_x509_crl_trust){&source, 1, &options, &tree,
-                                                                      &validation, &search}),
+                        tc_cms_crl_point_process(
+                            &reader,
+                            &(tc_x509_crl_scope_processing){
+                                &no_records, 0, TC_X509_CRL_COMPLETE_ONLY, TC_X509_CRL_ORDER_NUMBER,
+                                &query, NULL, 0, &evidence, &check, NULL, NULL, NULL, NULL},
+                            &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation, &search,
+                                                 &(TC_X509_revocation_time){(&options)->at, 0, 0}}),
                         ==, TC_TLV_END);
                     munit_assert_memory_equal(sizeof evidence, &evidence, &empty);
                     munit_assert_size(probe.calls, ==, 0);
                     work = TRUST_WORK_BUDGET;
                     munit_assert_int(
-                        tc_cms_crl_point_process(&reader,
-                                                 &(tc_x509_crl_scope_processing){
-                                                     &partitions, 0, TC_X509_CRL_COMPLETE_ONLY,
-                                                     TC_X509_CRL_ORDER_NUMBER, &query, states,
-                                                     sizeof states, &evidence, NULL, NULL, NULL,
-                                                     NULL, NULL},
-                                                 &(tc_x509_crl_trust){&source, 1, &options, &tree,
-                                                                      &validation, &search}),
+                        tc_cms_crl_point_process(
+                            &reader,
+                            &(tc_x509_crl_scope_processing){
+                                &partitions, 0, TC_X509_CRL_COMPLETE_ONLY, TC_X509_CRL_ORDER_NUMBER,
+                                &query, states, sizeof states, &evidence, NULL, NULL, NULL, NULL,
+                                NULL},
+                            &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation, &search,
+                                                 &(TC_X509_revocation_time){(&options)->at, 0, 0}}),
                         ==, TC_TLV_ARGUMENT);
                     munit_assert_size(work, ==, TRUST_WORK_BUDGET);
                     munit_assert_int(
-                        tc_cms_crl_point_process(&reader,
-                                                 &(tc_x509_crl_scope_processing){
-                                                     &partitions, 0, TC_X509_CRL_COMPLETE_ONLY,
-                                                     TC_X509_CRL_ORDER_NUMBER, &query,
-                                                     (uint8_t*)&check, sizeof check, &evidence,
-                                                     &check, NULL, NULL, NULL, NULL},
-                                                 &(tc_x509_crl_trust){&source, 1, &options, &tree,
-                                                                      &validation, &search}),
+                        tc_cms_crl_point_process(
+                            &reader,
+                            &(tc_x509_crl_scope_processing){
+                                &partitions, 0, TC_X509_CRL_COMPLETE_ONLY, TC_X509_CRL_ORDER_NUMBER,
+                                &query, (uint8_t*)&check, sizeof check, &evidence, &check, NULL,
+                                NULL, NULL, NULL},
+                            &(tc_x509_crl_trust){&source, 1, &options, &tree, &validation, &search,
+                                                 &(TC_X509_revocation_time){(&options)->at, 0, 0}}),
                         ==, TC_TLV_ARGUMENT);
                     munit_assert_size(work, ==, TRUST_WORK_BUDGET);
                     munit_assert_memory_equal(sizeof evidence, &evidence, &empty);
@@ -3696,7 +3752,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                 &(tc_x509_crl_trust){&source, 1, &checked,
                                      &(tc_pki_tree_workspace){(&validation)->frames,
                                                               (&validation)->frame_capacity, &work},
-                                     &validation, &search},
+                                     &validation, &search,
+                                     &(TC_X509_revocation_time){(&checked)->at, 0, 0}},
                 &evidence, &trusted),
             ==, TC_TLV_OK);
         munit_assert_size(probe.calls, ==, 2);
@@ -3705,7 +3762,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
         munit_assert_size(trusted.anchor_index, ==, 1);
         munit_assert_ptr_equal(trusted.path[0].data, signer_der);
         munit_assert_int(tc_x509_crl_evidence_status(&evidence, &status), ==, TC_TLV_OK);
-        munit_assert_int(status, ==, revoked ? TC_X509_CRL_REVOKED : TC_X509_CRL_UNREVOKED);
+        munit_assert_int(status, ==,
+                         revoked ? TC_X509_REVOCATION_REVOKED : TC_X509_REVOCATION_GOOD);
         const TC_X509_crl_evidence terminal = evidence;
         trusted = unchanged;
         munit_assert_int(
@@ -3714,7 +3772,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                 &(tc_x509_crl_trust){&source, 1, &checked,
                                      &(tc_pki_tree_workspace){(&validation)->frames,
                                                               (&validation)->frame_capacity, &work},
-                                     &validation, &search},
+                                     &validation, &search,
+                                     &(TC_X509_revocation_time){(&checked)->at, 0, 0}},
                 &evidence, &trusted),
             ==, TC_TLV_END);
         munit_assert_memory_equal(sizeof evidence, &evidence, &terminal);
@@ -3728,7 +3787,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                 &(tc_x509_crl_trust){&source, 1, &options,
                                      &(tc_pki_tree_workspace){(&validation)->frames,
                                                               (&validation)->frame_capacity, &work},
-                                     &validation, &search},
+                                     &validation, &search,
+                                     &(TC_X509_revocation_time){(&options)->at, 0, 0}},
                 &evidence, &trusted),
             ==, TC_TLV_OK);
         munit_assert_size(work, ==, 0);
@@ -3797,15 +3857,16 @@ static MunitResult revocations(const MunitParameter params[], void* user)
           }
           const TC_X509_crl_evidence before = evidence;
           trusted = unchanged;
-          munit_assert_int(
-              tc_x509_crl_process(&rejected, &signer, &rejected_query,
-                                  &(tc_x509_crl_trust){&source, anchor_index, &rejected_options,
-                                                       &(tc_pki_tree_workspace){
-                                                           (&validation)->frames,
-                                                           (&validation)->frame_capacity, &work},
-                                                       &validation, &search},
-                                  &evidence, &trusted),
-              ==, expected_result);
+          munit_assert_int(tc_x509_crl_process(
+                               &rejected, &signer, &rejected_query,
+                               &(tc_x509_crl_trust){
+                                   &source, anchor_index, &rejected_options,
+                                   &(tc_pki_tree_workspace){(&validation)->frames,
+                                                            (&validation)->frame_capacity, &work},
+                                   &validation, &search,
+                                   &(TC_X509_revocation_time){(&rejected_options)->at, 0, 0}},
+                               &evidence, &trusted),
+                           ==, expected_result);
           munit_assert_memory_equal(sizeof evidence, &evidence, &before);
           munit_assert_memory_equal(sizeof trusted, &trusted, &unchanged);
         }
@@ -3819,11 +3880,13 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                 &(tc_x509_crl_trust){&source, 1, &options,
                                      &(tc_pki_tree_workspace){(&validation)->frames,
                                                               (&validation)->frame_capacity, &work},
-                                     &validation, &search},
+                                     &validation, &search,
+                                     &(TC_X509_revocation_time){(&options)->at, 0, 0}},
                 &evidence, &trusted),
             ==, TC_TLV_OK);
         munit_assert_int(tc_x509_crl_evidence_status(&evidence, &status), ==, TC_TLV_OK);
-        munit_assert_int(status, ==, revoked ? TC_X509_CRL_REVOKED : TC_X509_CRL_UNDETERMINED);
+        munit_assert_int(status, ==,
+                         revoked ? TC_X509_REVOCATION_REVOKED : TC_X509_REVOCATION_UNDETERMINED);
         trusted = unchanged;
         munit_assert_int(
             tc_x509_crl_process(
@@ -3831,7 +3894,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                 &(tc_x509_crl_trust){&source, 1, &options,
                                      &(tc_pki_tree_workspace){(&validation)->frames,
                                                               (&validation)->frame_capacity, &work},
-                                     &validation, &search},
+                                     &validation, &search,
+                                     &(TC_X509_revocation_time){(&options)->at, 0, 0}},
                 &evidence, &trusted),
             ==, TC_TLV_END);
         munit_assert_memory_equal(sizeof trusted, &trusted, &unchanged);
@@ -3839,16 +3903,17 @@ static MunitResult revocations(const MunitParameter params[], void* user)
           point.reasons = TC_X509_CRL_ALL_REASONS & ~KEY_COMPROMISE_REASONS;
           work = TRUST_WORK_BUDGET;
           munit_assert_int(
-              tc_x509_crl_process(&selected, &signer, &query,
-                                  &(tc_x509_crl_trust){&source, 1, &options,
-                                                       &(tc_pki_tree_workspace){
-                                                           (&validation)->frames,
-                                                           (&validation)->frame_capacity, &work},
-                                                       &validation, &search},
-                                  &evidence, &trusted),
+              tc_x509_crl_process(
+                  &selected, &signer, &query,
+                  &(tc_x509_crl_trust){
+                      &source, 1, &options,
+                      &(tc_pki_tree_workspace){(&validation)->frames, (&validation)->frame_capacity,
+                                               &work},
+                      &validation, &search, &(TC_X509_revocation_time){(&options)->at, 0, 0}},
+                  &evidence, &trusted),
               ==, TC_TLV_OK);
           munit_assert_int(tc_x509_crl_evidence_status(&evidence, &status), ==, TC_TLV_OK);
-          munit_assert_int(status, ==, TC_X509_CRL_UNREVOKED);
+          munit_assert_int(status, ==, TC_X509_REVOCATION_GOOD);
         }
         point = (tc_pki_distribution_point){0};
       }
@@ -3968,15 +4033,16 @@ static MunitResult revocations(const MunitParameter params[], void* user)
             const tc_x509_crl_selected complete = {indexed_pair.base, indexed_pair.base_info, NULL,
                                                    NULL};
             work = TRUST_WORK_BUDGET;
-            munit_assert_int(tc_x509_crl_selected_validate(
-                                 &complete, &signer,
-                                 &(tc_x509_crl_trust){
-                                     &source, 1, &updated,
-                                     &(tc_pki_tree_workspace){(&validation)->frames,
-                                                              (&validation)->frame_capacity, &work},
-                                     &validation, &search},
-                                 &trusted),
-                             ==, TC_TLV_OK);
+            munit_assert_int(
+                tc_x509_crl_selected_validate(
+                    &complete, &signer,
+                    &(tc_x509_crl_trust){
+                        &source, 1, &updated,
+                        &(tc_pki_tree_workspace){(&validation)->frames,
+                                                 (&validation)->frame_capacity, &work},
+                        &validation, &search, &(TC_X509_revocation_time){(&updated)->at, 0, 0}},
+                    &trusted),
+                ==, TC_TLV_OK);
             memset(&untouched, 0xa5, sizeof untouched);
             preferred = untouched;
             {
@@ -4010,9 +4076,10 @@ static MunitResult revocations(const MunitParameter params[], void* user)
               for (unsigned repeat = 0; repeat < 2; ++repeat) {
                 tc_x509_crl_selected cached_pair = untouched;
                 work = TRUST_WORK_BUDGET;
-                munit_assert_int(
-                    tc_x509_crl_delta_select(&cache, 0, &updated.at, &tree, NULL, &cached_pair), ==,
-                    wrong_key ? TC_TLV_END : TC_TLV_OK);
+                munit_assert_int(tc_x509_crl_delta_select(
+                                     &cache, 0, &(TC_X509_revocation_time){updated.at, 0, 0}, &tree,
+                                     NULL, &cached_pair),
+                                 ==, wrong_key ? TC_TLV_END : TC_TLV_OK);
                 munit_assert_size(probe.calls, ==, calls + 1);
                 if (wrong_key)
                   munit_assert_memory_equal(sizeof cached_pair, &cached_pair, &untouched);
@@ -4033,9 +4100,9 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                   tc_x509_crl_selected effective = untouched;
                   work = TRUST_WORK_BUDGET;
                   munit_assert_int(tc_x509_crl_effective_next(
-                                       &(tc_x509_crl_scope_context){&cache, selection_modes[mode],
-                                                                    TC_X509_CRL_ORDER_NUMBER, at,
-                                                                    &tree, NULL, 0},
+                                       &(tc_x509_crl_scope_context){
+                                           &cache, selection_modes[mode], TC_X509_CRL_ORDER_NUMBER,
+                                           &(TC_X509_revocation_time){*(at), 0, 0}, &tree, NULL, 0},
                                        0, &position, NULL, &effective),
                                    ==, available ? TC_TLV_OK : TC_TLV_END);
                   munit_assert_size(probe.calls, ==, calls + 2);
@@ -4044,12 +4111,13 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                     munit_assert_ptr_equal(effective.base, indexed_pair.base);
                     munit_assert_ptr_equal(effective.delta, period ? indexed_pair.delta : NULL);
                     const tc_x509_crl_selected prior = effective;
-                    munit_assert_int(tc_x509_crl_effective_next(
-                                         &(tc_x509_crl_scope_context){&cache, selection_modes[mode],
-                                                                      TC_X509_CRL_ORDER_NUMBER, at,
-                                                                      &tree, NULL, 0},
-                                         0, &position, NULL, &effective),
-                                     ==, TC_TLV_END);
+                    munit_assert_int(
+                        tc_x509_crl_effective_next(
+                            &(tc_x509_crl_scope_context){
+                                &cache, selection_modes[mode], TC_X509_CRL_ORDER_NUMBER,
+                                &(TC_X509_revocation_time){*(at), 0, 0}, &tree, NULL, 0},
+                            0, &position, NULL, &effective),
+                        ==, TC_TLV_END);
                     munit_assert_memory_equal(sizeof effective, &effective, &prior);
                   } else {
                     munit_assert_size(position, ==, 0);
@@ -4062,9 +4130,10 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                 work = TRUST_WORK_BUDGET;
                 munit_assert_int(
                     tc_x509_crl_effective_next(
-                        &(tc_x509_crl_scope_context){&cache, TC_X509_CRL_COMPLETE_ONLY,
-                                                     TC_X509_CRL_ORDER_NUMBER, &parsed.this_update,
-                                                     &tree, NULL, 0},
+                        &(tc_x509_crl_scope_context){
+                            &cache, TC_X509_CRL_COMPLETE_ONLY, TC_X509_CRL_ORDER_NUMBER,
+                            &(TC_X509_revocation_time){*(&parsed.this_update), 0, 0}, &tree, NULL,
+                            0},
                         0, &position, NULL, &effective),
                     ==, TC_TLV_OK);
                 const size_t required = TRUST_WORK_BUDGET - work;
@@ -4074,9 +4143,10 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                   effective = untouched;
                   munit_assert_int(
                       tc_x509_crl_effective_next(
-                          &(tc_x509_crl_scope_context){&cache, TC_X509_CRL_COMPLETE_ONLY,
-                                                       TC_X509_CRL_ORDER_NUMBER,
-                                                       &parsed.this_update, &tree, NULL, 0},
+                          &(tc_x509_crl_scope_context){
+                              &cache, TC_X509_CRL_COMPLETE_ONLY, TC_X509_CRL_ORDER_NUMBER,
+                              &(TC_X509_revocation_time){*(&parsed.this_update), 0, 0}, &tree, NULL,
+                              0},
                           0, &position, NULL, &effective),
                       ==, budget == required ? TC_TLV_OK : TC_TLV_LIMIT);
                   if (budget < required) {
@@ -4113,7 +4183,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
             munit_assert_int(tc_x509_crl_delta_select(
                                  &(tc_x509_crl_signature_cache){&crl_index, &signer, &provider,
                                                                 &limits, &names, NULL, 0, NULL},
-                                 0, &updated.at, &tree, NULL, &preferred),
+                                 0, &(TC_X509_revocation_time){updated.at, 0, 0}, &tree, NULL,
+                                 &preferred),
                              ==, wrong_key ? TC_TLV_END : TC_TLV_OK);
             if (wrong_key)
               munit_assert_memory_equal(sizeof preferred, &preferred, &untouched);
@@ -4125,21 +4196,24 @@ static MunitResult revocations(const MunitParameter params[], void* user)
               munit_assert_int(tc_x509_crl_delta_select(
                                    &(tc_x509_crl_signature_cache){&crl_index, &signer, &provider,
                                                                   &limits, &names, NULL, 0, NULL},
-                                   0, &updated.at, &tree, NULL, &preferred),
+                                   0, &(TC_X509_revocation_time){updated.at, 0, 0}, &tree, NULL,
+                                   &preferred),
                                ==, TC_TLV_LIMIT);
               munit_assert_memory_equal(sizeof preferred, &preferred, &untouched);
               work = required;
               munit_assert_int(tc_x509_crl_delta_select(
                                    &(tc_x509_crl_signature_cache){&crl_index, &signer, &provider,
                                                                   &limits, &names, NULL, 0, NULL},
-                                   0, &updated.at, &tree, NULL, &preferred),
+                                   0, &(TC_X509_revocation_time){updated.at, 0, 0}, &tree, NULL,
+                                   &preferred),
                                ==, TC_TLV_OK);
               munit_assert_size(work, ==, 0);
               TC_X509_crl_evidence applied = {0};
               TC_X509_revocation_status applied_status;
               const size_t signature_calls = probe.calls;
               work = TRUST_WORK_BUDGET;
-              munit_assert_int(tc_x509_crl_apply(&preferred, &query, &updated.at,
+              munit_assert_int(tc_x509_crl_apply(&preferred, &query,
+                                                 &(TC_X509_revocation_time){updated.at, 0, 0},
                                                  &(tc_x509_crl_decode){&limits, &tree, &names, oids,
                                                                        EXTENSION_CAPACITY},
                                                  &applied),
@@ -4149,10 +4223,11 @@ static MunitResult revocations(const MunitParameter params[], void* user)
               munit_assert_int(tc_x509_crl_evidence_status(&applied, &applied_status), ==,
                                TC_TLV_OK);
               munit_assert_int(applied_status, ==,
-                               revoked && reasons[i] != 8 ? TC_X509_CRL_REVOKED
-                                                          : TC_X509_CRL_UNREVOKED);
+                               revoked && reasons[i] != 8 ? TC_X509_REVOCATION_REVOKED
+                                                          : TC_X509_REVOCATION_GOOD);
               const TC_X509_crl_evidence completed = applied;
-              munit_assert_int(tc_x509_crl_apply(&preferred, &query, &updated.at,
+              munit_assert_int(tc_x509_crl_apply(&preferred, &query,
+                                                 &(TC_X509_revocation_time){updated.at, 0, 0},
                                                  &(tc_x509_crl_decode){&limits, &tree, &names, oids,
                                                                        EXTENSION_CAPACITY},
                                                  &applied),
@@ -4160,14 +4235,16 @@ static MunitResult revocations(const MunitParameter params[], void* user)
               munit_assert_memory_equal(sizeof applied, &applied, &completed);
               applied = empty;
               work = apply_work - 1;
-              munit_assert_int(tc_x509_crl_apply(&preferred, &query, &updated.at,
+              munit_assert_int(tc_x509_crl_apply(&preferred, &query,
+                                                 &(TC_X509_revocation_time){updated.at, 0, 0},
                                                  &(tc_x509_crl_decode){&limits, &tree, &names, oids,
                                                                        EXTENSION_CAPACITY},
                                                  &applied),
                                ==, TC_TLV_LIMIT);
               munit_assert_memory_equal(sizeof applied, &applied, &empty);
               work = apply_work;
-              munit_assert_int(tc_x509_crl_apply(&preferred, &query, &updated.at,
+              munit_assert_int(tc_x509_crl_apply(&preferred, &query,
+                                                 &(TC_X509_revocation_time){updated.at, 0, 0},
                                                  &(tc_x509_crl_decode){&limits, &tree, &names, oids,
                                                                        EXTENSION_CAPACITY},
                                                  &applied),
@@ -4175,11 +4252,12 @@ static MunitResult revocations(const MunitParameter params[], void* user)
               munit_assert_size(work, ==, 0);
               applied = empty;
               work = TRUST_WORK_BUDGET;
-              munit_assert_int(tc_x509_crl_apply(&preferred, &query, &delta.next_update,
-                                                 &(tc_x509_crl_decode){&limits, &tree, &names, oids,
-                                                                       EXTENSION_CAPACITY},
-                                                 &applied),
-                               ==, TC_TLV_END);
+              munit_assert_int(
+                  tc_x509_crl_apply(
+                      &preferred, &query, &(TC_X509_revocation_time){delta.next_update, 0, 0},
+                      &(tc_x509_crl_decode){&limits, &tree, &names, oids, EXTENSION_CAPACITY},
+                      &applied),
+                  ==, TC_TLV_END);
               munit_assert_memory_equal(sizeof applied, &applied, &empty);
             }
             if (!wrong_key && i == 0) {
@@ -4220,10 +4298,10 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                                        &mixed_index),
                                  ==, TC_TLV_OK);
                 munit_assert_int(
-                    tc_x509_crl_delta_select(&(tc_x509_crl_signature_cache){&mixed_index, &signer,
-                                                                            &provider, &limits,
-                                                                            &names, NULL, 0, NULL},
-                                             0, &updated.at, &tree, NULL, &preferred),
+                    tc_x509_crl_delta_select(
+                        &(tc_x509_crl_signature_cache){&mixed_index, &signer, &provider, &limits,
+                                                       &names, NULL, 0, NULL},
+                        0, &(TC_X509_revocation_time){updated.at, 0, 0}, &tree, NULL, &preferred),
                     ==, TC_TLV_OK);
                 munit_assert_ptr_equal(preferred.delta->encoded.data, extra_der[0]);
                 TC_bytes swap = extended[1];
@@ -4235,14 +4313,16 @@ static MunitResult revocations(const MunitParameter params[], void* user)
               munit_assert_int(tc_x509_crl_delta_select(
                                    &(tc_x509_crl_signature_cache){&mixed_index, &signer, &provider,
                                                                   &limits, &names, NULL, 0, NULL},
-                                   0, &delta.next_update, &tree, NULL, &preferred),
+                                   0, &(TC_X509_revocation_time){delta.next_update, 0, 0}, &tree,
+                                   NULL, &preferred),
                                ==, TC_TLV_END);
               munit_assert_memory_equal(sizeof preferred, &preferred, &untouched);
               work = TRUST_WORK_BUDGET;
               munit_assert_int(tc_x509_crl_delta_select(
                                    &(tc_x509_crl_signature_cache){&mixed_index, &signer, NULL,
                                                                   &limits, &names, NULL, 0, NULL},
-                                   0, &updated.at, &tree, NULL, &preferred),
+                                   0, &(TC_X509_revocation_time){updated.at, 0, 0}, &tree, NULL,
+                                   &preferred),
                                ==, TC_TLV_UNSUPPORTED);
               munit_assert_memory_equal(sizeof preferred, &preferred, &untouched);
               for (long collision = 2; collision <= 3; ++collision) {
@@ -4283,7 +4363,7 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                       tc_x509_crl_delta_select(
                           &(tc_x509_crl_signature_cache){&mixed_index, &signer, &provider, &limits,
                                                          &names, NULL, 0, NULL},
-                          0, &updated.at, &tree, NULL, &preferred),
+                          0, &(TC_X509_revocation_time){updated.at, 0, 0}, &tree, NULL, &preferred),
                       ==, collision == 3 ? TC_TLV_INVALID : TC_TLV_OK);
                   if (collision == 3)
                     munit_assert_memory_equal(sizeof preferred, &preferred, &untouched);
@@ -4298,15 +4378,16 @@ static MunitResult revocations(const MunitParameter params[], void* user)
             trusted = unchanged;
             probe.calls = 0;
             work = TRUST_WORK_BUDGET;
-            munit_assert_int(tc_x509_crl_selected_validate(
-                                 &indexed_pair, &signer,
-                                 &(tc_x509_crl_trust){
-                                     &source, 1, &updated,
-                                     &(tc_pki_tree_workspace){(&validation)->frames,
-                                                              (&validation)->frame_capacity, &work},
-                                     &validation, &search},
-                                 &trusted),
-                             ==, wrong_key ? TC_TLV_INVALID : TC_TLV_OK);
+            munit_assert_int(
+                tc_x509_crl_selected_validate(
+                    &indexed_pair, &signer,
+                    &(tc_x509_crl_trust){
+                        &source, 1, &updated,
+                        &(tc_pki_tree_workspace){(&validation)->frames,
+                                                 (&validation)->frame_capacity, &work},
+                        &validation, &search, &(TC_X509_revocation_time){(&updated)->at, 0, 0}},
+                    &trusted),
+                ==, wrong_key ? TC_TLV_INVALID : TC_TLV_OK);
             if (wrong_key)
               munit_assert_memory_equal(sizeof trusted, &trusted, &unchanged);
             else {
@@ -4316,26 +4397,28 @@ static MunitResult revocations(const MunitParameter params[], void* user)
               munit_assert_size(probe.calls, ==, 3);
               trusted = unchanged;
               work = required - 1;
-              munit_assert_int(tc_x509_crl_selected_validate(
-                                   &indexed_pair, &signer,
-                                   &(tc_x509_crl_trust){&source, 1, &updated,
-                                                        &(tc_pki_tree_workspace){
-                                                            (&validation)->frames,
-                                                            (&validation)->frame_capacity, &work},
-                                                        &validation, &search},
-                                   &trusted),
-                               ==, TC_TLV_LIMIT);
+              munit_assert_int(
+                  tc_x509_crl_selected_validate(
+                      &indexed_pair, &signer,
+                      &(tc_x509_crl_trust){
+                          &source, 1, &updated,
+                          &(tc_pki_tree_workspace){(&validation)->frames,
+                                                   (&validation)->frame_capacity, &work},
+                          &validation, &search, &(TC_X509_revocation_time){(&updated)->at, 0, 0}},
+                      &trusted),
+                  ==, TC_TLV_LIMIT);
               munit_assert_memory_equal(sizeof trusted, &trusted, &unchanged);
               work = required;
-              munit_assert_int(tc_x509_crl_selected_validate(
-                                   &indexed_pair, &signer,
-                                   &(tc_x509_crl_trust){&source, 1, &updated,
-                                                        &(tc_pki_tree_workspace){
-                                                            (&validation)->frames,
-                                                            (&validation)->frame_capacity, &work},
-                                                        &validation, &search},
-                                   &trusted),
-                               ==, TC_TLV_OK);
+              munit_assert_int(
+                  tc_x509_crl_selected_validate(
+                      &indexed_pair, &signer,
+                      &(tc_x509_crl_trust){
+                          &source, 1, &updated,
+                          &(tc_pki_tree_workspace){(&validation)->frames,
+                                                   (&validation)->frame_capacity, &work},
+                          &validation, &search, &(TC_X509_revocation_time){(&updated)->at, 0, 0}},
+                      &trusted),
+                  ==, TC_TLV_OK);
               munit_assert_size(work, ==, 0);
             }
             const TC_X509_crl_delta_policy policies[] = {TC_X509_CRL_COMPLETE_ONLY,
@@ -4356,8 +4439,9 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                 work = TRUST_WORK_BUDGET;
                 munit_assert_int(tc_cms_crl_index_process(
                                      &candidate_reader, &crl_index, 0, policies[policy], &query,
-                                     &(tc_x509_crl_trust){&source, 1, &indexed_options, &tree,
-                                                          &validation, &search},
+                                     &(tc_x509_crl_trust){
+                                         &source, 1, &indexed_options, &tree, &validation, &search,
+                                         &(TC_X509_revocation_time){(&indexed_options)->at, 0, 0}},
                                      &indexed_evidence, &trusted),
                                  ==, expected);
                 munit_assert_memory_equal(sizeof candidate_reader, &candidate_reader,
@@ -4372,26 +4456,31 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                   munit_assert_int(tc_x509_crl_evidence_status(&indexed_evidence, &indexed_status),
                                    ==, TC_TLV_OK);
                   munit_assert_int(indexed_status, ==,
-                                   revoked && (!period || reasons[i] != 8) ? TC_X509_CRL_REVOKED
-                                                                           : TC_X509_CRL_UNREVOKED);
+                                   revoked && (!period || reasons[i] != 8)
+                                       ? TC_X509_REVOCATION_REVOKED
+                                       : TC_X509_REVOCATION_GOOD);
                   indexed_evidence = empty;
                   trusted = unchanged;
                   work = required - 1;
-                  munit_assert_int(tc_cms_crl_index_process(
-                                       &candidate_reader, &crl_index, 0, policies[policy], &query,
-                                       &(tc_x509_crl_trust){&source, 1, &indexed_options, &tree,
-                                                            &validation, &search},
-                                       &indexed_evidence, &trusted),
-                                   ==, TC_TLV_LIMIT);
+                  munit_assert_int(
+                      tc_cms_crl_index_process(
+                          &candidate_reader, &crl_index, 0, policies[policy], &query,
+                          &(tc_x509_crl_trust){
+                              &source, 1, &indexed_options, &tree, &validation, &search,
+                              &(TC_X509_revocation_time){(&indexed_options)->at, 0, 0}},
+                          &indexed_evidence, &trusted),
+                      ==, TC_TLV_LIMIT);
                   munit_assert_memory_equal(sizeof indexed_evidence, &indexed_evidence, &empty);
                   munit_assert_memory_equal(sizeof trusted, &trusted, &unchanged);
                   work = required;
-                  munit_assert_int(tc_cms_crl_index_process(
-                                       &candidate_reader, &crl_index, 0, policies[policy], &query,
-                                       &(tc_x509_crl_trust){&source, 1, &indexed_options, &tree,
-                                                            &validation, &search},
-                                       &indexed_evidence, &trusted),
-                                   ==, TC_TLV_OK);
+                  munit_assert_int(
+                      tc_cms_crl_index_process(
+                          &candidate_reader, &crl_index, 0, policies[policy], &query,
+                          &(tc_x509_crl_trust){
+                              &source, 1, &indexed_options, &tree, &validation, &search,
+                              &(TC_X509_revocation_time){(&indexed_options)->at, 0, 0}},
+                          &indexed_evidence, &trusted),
+                      ==, TC_TLV_OK);
                   munit_assert_size(work, ==, 0);
                 } else {
                   munit_assert_memory_equal(sizeof indexed_evidence, &indexed_evidence, &empty);
@@ -4408,8 +4497,9 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                          &crl_index, 0, policies[policy], TC_X509_CRL_ORDER_NUMBER,
                                          &query, scope_states, sizeof scope_states,
                                          &indexed_evidence, NULL, NULL, NULL, NULL, NULL},
-                                     &(tc_x509_crl_trust){&source, 1, &indexed_options, &tree,
-                                                          &validation, &search},
+                                     &(tc_x509_crl_trust){
+                                         &source, 1, &indexed_options, &tree, &validation, &search,
+                                         &(TC_X509_revocation_time){(&indexed_options)->at, 0, 0}},
                                      &trusted),
                                  ==, expected);
                 munit_assert_memory_equal(sizeof candidate_reader, &candidate_reader,
@@ -4422,8 +4512,9 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                   munit_assert_int(tc_x509_crl_evidence_status(&indexed_evidence, &scope_status),
                                    ==, TC_TLV_OK);
                   munit_assert_int(scope_status, ==,
-                                   revoked && (!period || reasons[i] != 8) ? TC_X509_CRL_REVOKED
-                                                                           : TC_X509_CRL_UNREVOKED);
+                                   revoked && (!period || reasons[i] != 8)
+                                       ? TC_X509_REVOCATION_REVOKED
+                                       : TC_X509_REVOCATION_GOOD);
                 } else {
                   munit_assert_memory_equal(sizeof indexed_evidence, &indexed_evidence, &empty);
                   munit_assert_memory_equal(sizeof trusted, &trusted, &unchanged);
@@ -4457,12 +4548,13 @@ static MunitResult revocations(const MunitParameter params[], void* user)
               munit_assert_int(tc_cms_crl_index_init(&revocations, &tree, oids, EXTENSION_CAPACITY,
                                                      overlap_rows, 2, &overlap_index),
                                ==, TC_TLV_OK);
-              tc_x509_crl_freshness freshness;
+              tc_x509_freshness freshness;
               for (size_t record = 0; record < overlap_index.count; ++record) {
-                munit_assert_int(
-                    tc_x509_crl_fresh_at(&overlap_rows[record].crl, &updated.at, &freshness), ==,
-                    TC_TLV_OK);
-                munit_assert_int(freshness, ==, TC_X509_CRL_CURRENT);
+                munit_assert_int(tc_x509_crl_fresh_at(&overlap_rows[record].crl,
+                                                      &(TC_X509_revocation_time){updated.at, 0, 0},
+                                                      &freshness),
+                                 ==, TC_TLV_OK);
+                munit_assert_int(freshness, ==, TC_X509_FRESH_CURRENT);
               }
               for (size_t policy = 0; policy < sizeof policies / sizeof policies[0]; ++policy) {
                 TC_X509_crl_evidence overlap_evidence = {0};
@@ -4475,7 +4567,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                 munit_assert_int(
                     tc_cms_crl_index_process(
                         &candidate_reader, &overlap_index, 0, policies[policy], &query,
-                        &(tc_x509_crl_trust){&source, 1, &updated, &tree, &validation, &search},
+                        &(tc_x509_crl_trust){&source, 1, &updated, &tree, &validation, &search,
+                                             &(TC_X509_revocation_time){(&updated)->at, 0, 0}},
                         &overlap_evidence, &trusted),
                     ==, required_missing ? TC_TLV_END : TC_TLV_OK);
                 munit_assert_size(probe.calls, ==,
@@ -4489,8 +4582,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                    ==, TC_TLV_OK);
                   munit_assert_int(overlap_status, ==,
                                    revoked && (!use_delta || reasons[i] != 8)
-                                       ? TC_X509_CRL_REVOKED
-                                       : TC_X509_CRL_UNREVOKED);
+                                       ? TC_X509_REVOCATION_REVOKED
+                                       : TC_X509_REVOCATION_GOOD);
                 }
               }
               if (!wrong_key && i == 0) {
@@ -4577,9 +4670,9 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                     TC_bytes latest = sentinel;
                     munit_assert_int(
                         tc_x509_crl_latest_number(
-                            &(tc_x509_crl_scope_context){&cache, TC_X509_CRL_DELTA_IF_AVAILABLE,
-                                                         TC_X509_CRL_ORDER_NUMBER, &selection_at,
-                                                         &tree, NULL, 0},
+                            &(tc_x509_crl_scope_context){
+                                &cache, TC_X509_CRL_DELTA_IF_AVAILABLE, TC_X509_CRL_ORDER_NUMBER,
+                                &(TC_X509_revocation_time){*(&selection_at), 0, 0}, &tree, NULL, 0},
                             0, &latest),
                         ==, numbered ? TC_TLV_OK : TC_TLV_UNSUPPORTED);
                     if (numbered) {
@@ -4589,9 +4682,10 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                       work = TRUST_WORK_BUDGET;
                       munit_assert_int(
                           tc_x509_crl_latest_number(
-                              &(tc_x509_crl_scope_context){&cache, TC_X509_CRL_DELTA_IF_AVAILABLE,
-                                                           TC_X509_CRL_ORDER_NUMBER, &selection_at,
-                                                           &tree, NULL, 0},
+                              &(tc_x509_crl_scope_context){
+                                  &cache, TC_X509_CRL_DELTA_IF_AVAILABLE, TC_X509_CRL_ORDER_NUMBER,
+                                  &(TC_X509_revocation_time){*(&selection_at), 0, 0}, &tree, NULL,
+                                  0},
                               0, &latest),
                           ==, TC_TLV_OK);
                       const size_t required = TRUST_WORK_BUDGET - work;
@@ -4599,18 +4693,20 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                       work = required - 1;
                       munit_assert_int(
                           tc_x509_crl_latest_number(
-                              &(tc_x509_crl_scope_context){&cache, TC_X509_CRL_DELTA_IF_AVAILABLE,
-                                                           TC_X509_CRL_ORDER_NUMBER, &selection_at,
-                                                           &tree, NULL, 0},
+                              &(tc_x509_crl_scope_context){
+                                  &cache, TC_X509_CRL_DELTA_IF_AVAILABLE, TC_X509_CRL_ORDER_NUMBER,
+                                  &(TC_X509_revocation_time){*(&selection_at), 0, 0}, &tree, NULL,
+                                  0},
                               0, &latest),
                           ==, TC_TLV_LIMIT);
                       munit_assert_memory_equal(sizeof latest, &latest, &sentinel);
                       work = required;
                       munit_assert_int(
                           tc_x509_crl_latest_number(
-                              &(tc_x509_crl_scope_context){&cache, TC_X509_CRL_DELTA_IF_AVAILABLE,
-                                                           TC_X509_CRL_ORDER_NUMBER, &selection_at,
-                                                           &tree, NULL, 0},
+                              &(tc_x509_crl_scope_context){
+                                  &cache, TC_X509_CRL_DELTA_IF_AVAILABLE, TC_X509_CRL_ORDER_NUMBER,
+                                  &(TC_X509_revocation_time){*(&selection_at), 0, 0}, &tree, NULL,
+                                  0},
                               0, &latest),
                           ==, TC_TLV_OK);
                       munit_assert_size(work, ==, 0);
@@ -4620,16 +4716,18 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                       work = TRUST_WORK_BUDGET;
                       munit_assert_int(
                           tc_x509_crl_scope_apply(
-                              &(tc_x509_crl_scope_context){&cache, TC_X509_CRL_DELTA_IF_AVAILABLE,
-                                                           TC_X509_CRL_ORDER_NUMBER, &selection_at,
-                                                           &tree, oids, EXTENSION_CAPACITY},
+                              &(tc_x509_crl_scope_context){
+                                  &cache, TC_X509_CRL_DELTA_IF_AVAILABLE, TC_X509_CRL_ORDER_NUMBER,
+                                  &(TC_X509_revocation_time){*(&selection_at), 0, 0}, &tree, oids,
+                                  EXTENSION_CAPACITY},
                               0, &query, &selected_evidence),
                           ==, TC_TLV_OK);
                       munit_assert_int(
                           tc_x509_crl_evidence_status(&selected_evidence, &selected_status), ==,
                           TC_TLV_OK);
                       munit_assert_int(selected_status, ==,
-                                       revoked ? TC_X509_CRL_REVOKED : TC_X509_CRL_UNREVOKED);
+                                       revoked ? TC_X509_REVOCATION_REVOKED
+                                               : TC_X509_REVOCATION_GOOD);
                       if (revoked)
                         munit_assert_uint(selected_evidence.revocation.reason, ==, 2);
                       munit_assert_size(probe.calls, ==, RECORDS);
@@ -4642,13 +4740,15 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                         tc_x509_crl_scope_apply(
                             &(tc_x509_crl_scope_context){
                                 &cache, TC_X509_CRL_COMPLETE_ONLY, TC_X509_CRL_ORDER_THIS_UPDATE,
-                                &selection_at, &tree, oids, EXTENSION_CAPACITY},
+                                &(TC_X509_revocation_time){*(&selection_at), 0, 0}, &tree, oids,
+                                EXTENSION_CAPACITY},
                             0, &query, &legacy_evidence),
                         ==, TC_TLV_OK);
                     munit_assert_int(tc_x509_crl_evidence_status(&legacy_evidence, &legacy_status),
                                      ==, TC_TLV_OK);
                     munit_assert_int(legacy_status, ==,
-                                     revoked ? TC_X509_CRL_REVOKED : TC_X509_CRL_UNREVOKED);
+                                     revoked ? TC_X509_REVOCATION_REVOKED
+                                             : TC_X509_REVOCATION_GOOD);
                     if (revoked)
                       munit_assert_uint(legacy_evidence.revocation.reason, ==, 2);
                     const size_t calls = probe.calls;
@@ -4658,7 +4758,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                         tc_x509_crl_scope_apply(
                             &(tc_x509_crl_scope_context){
                                 &cache, TC_X509_CRL_COMPLETE_ONLY, TC_X509_CRL_ORDER_THIS_UPDATE,
-                                &selection_at, &tree, oids, EXTENSION_CAPACITY},
+                                &(TC_X509_revocation_time){*(&selection_at), 0, 0}, &tree, oids,
+                                EXTENSION_CAPACITY},
                             0, &query, &legacy_evidence),
                         ==, TC_TLV_OK);
                     const size_t legacy_work = TRUST_WORK_BUDGET - work;
@@ -4668,7 +4769,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                         tc_x509_crl_scope_apply(
                             &(tc_x509_crl_scope_context){
                                 &cache, TC_X509_CRL_COMPLETE_ONLY, TC_X509_CRL_ORDER_THIS_UPDATE,
-                                &selection_at, &tree, oids, EXTENSION_CAPACITY},
+                                &(TC_X509_revocation_time){*(&selection_at), 0, 0}, &tree, oids,
+                                EXTENSION_CAPACITY},
                             0, &query, &legacy_evidence),
                         ==, TC_TLV_LIMIT);
                     munit_assert_memory_equal(sizeof legacy_evidence, &legacy_evidence, &empty);
@@ -4677,7 +4779,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                         tc_x509_crl_scope_apply(
                             &(tc_x509_crl_scope_context){
                                 &cache, TC_X509_CRL_COMPLETE_ONLY, TC_X509_CRL_ORDER_THIS_UPDATE,
-                                &selection_at, &tree, oids, EXTENSION_CAPACITY},
+                                &(TC_X509_revocation_time){*(&selection_at), 0, 0}, &tree, oids,
+                                EXTENSION_CAPACITY},
                             0, &query, &legacy_evidence),
                         ==, TC_TLV_OK);
                     munit_assert_size(work, ==, 0);
@@ -4688,7 +4791,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                         tc_x509_crl_scope_apply(
                             &(tc_x509_crl_scope_context){
                                 &cache, TC_X509_CRL_COMPLETE_ONLY, (TC_X509_crl_order_policy)-1,
-                                &selection_at, &tree, oids, EXTENSION_CAPACITY},
+                                &(TC_X509_revocation_time){*(&selection_at), 0, 0}, &tree, oids,
+                                EXTENSION_CAPACITY},
                             0, &query, &legacy_evidence),
                         ==, TC_TLV_ARGUMENT);
                     munit_assert_memory_equal(sizeof legacy_evidence, &legacy_evidence, &empty);
@@ -4704,14 +4808,15 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                     work = TRUST_WORK_BUDGET;
                     probe.calls = 0;
                     munit_assert_int(
-                        tc_cms_crl_scope_process(&candidate_reader,
-                                                 &(tc_x509_crl_scope_processing){
-                                                     &index, 0, scope_delta, scope_order, &query,
-                                                     states, RECORDS, &legacy_evidence, NULL, NULL,
-                                                     NULL, NULL, NULL},
-                                                 &(tc_x509_crl_trust){&source, 1, &scope_options,
-                                                                      &tree, &validation, &search},
-                                                 &trusted),
+                        tc_cms_crl_scope_process(
+                            &candidate_reader,
+                            &(tc_x509_crl_scope_processing){
+                                &index, 0, scope_delta, scope_order, &query, states, RECORDS,
+                                &legacy_evidence, NULL, NULL, NULL, NULL, NULL},
+                            &(tc_x509_crl_trust){
+                                &source, 1, &scope_options, &tree, &validation, &search,
+                                &(TC_X509_revocation_time){(&scope_options)->at, 0, 0}},
+                            &trusted),
                         ==, TC_TLV_OK);
                     const size_t scope_work = TRUST_WORK_BUDGET - work;
                     munit_assert_size(trusted.validation.work_used, ==, scope_work);
@@ -4720,7 +4825,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                     munit_assert_int(tc_x509_crl_evidence_status(&legacy_evidence, &legacy_status),
                                      ==, TC_TLV_OK);
                     munit_assert_int(legacy_status, ==,
-                                     revoked ? TC_X509_CRL_REVOKED : TC_X509_CRL_UNREVOKED);
+                                     revoked ? TC_X509_REVOCATION_REVOKED
+                                             : TC_X509_REVOCATION_GOOD);
                     if (revoked)
                       munit_assert_uint(legacy_evidence.revocation.reason, ==, 2);
                     munit_assert_memory_equal(sizeof candidate_reader, &candidate_reader,
@@ -4729,54 +4835,58 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                     trusted = unchanged;
                     work = scope_work - 1;
                     munit_assert_int(
-                        tc_cms_crl_scope_process(&candidate_reader,
-                                                 &(tc_x509_crl_scope_processing){
-                                                     &index, 0, scope_delta, scope_order, &query,
-                                                     states, RECORDS, &legacy_evidence, NULL, NULL,
-                                                     NULL, NULL, NULL},
-                                                 &(tc_x509_crl_trust){&source, 1, &scope_options,
-                                                                      &tree, &validation, &search},
-                                                 &trusted),
+                        tc_cms_crl_scope_process(
+                            &candidate_reader,
+                            &(tc_x509_crl_scope_processing){
+                                &index, 0, scope_delta, scope_order, &query, states, RECORDS,
+                                &legacy_evidence, NULL, NULL, NULL, NULL, NULL},
+                            &(tc_x509_crl_trust){
+                                &source, 1, &scope_options, &tree, &validation, &search,
+                                &(TC_X509_revocation_time){(&scope_options)->at, 0, 0}},
+                            &trusted),
                         ==, TC_TLV_LIMIT);
                     munit_assert_memory_equal(sizeof legacy_evidence, &legacy_evidence, &empty);
                     munit_assert_memory_equal(sizeof trusted, &trusted, &unchanged);
                     work = scope_work;
                     munit_assert_int(
-                        tc_cms_crl_scope_process(&candidate_reader,
-                                                 &(tc_x509_crl_scope_processing){
-                                                     &index, 0, scope_delta, scope_order, &query,
-                                                     states, RECORDS, &legacy_evidence, NULL, NULL,
-                                                     NULL, NULL, NULL},
-                                                 &(tc_x509_crl_trust){&source, 1, &scope_options,
-                                                                      &tree, &validation, &search},
-                                                 &trusted),
+                        tc_cms_crl_scope_process(
+                            &candidate_reader,
+                            &(tc_x509_crl_scope_processing){
+                                &index, 0, scope_delta, scope_order, &query, states, RECORDS,
+                                &legacy_evidence, NULL, NULL, NULL, NULL, NULL},
+                            &(tc_x509_crl_trust){
+                                &source, 1, &scope_options, &tree, &validation, &search,
+                                &(TC_X509_revocation_time){(&scope_options)->at, 0, 0}},
+                            &trusted),
                         ==, TC_TLV_OK);
                     munit_assert_size(work, ==, 0);
                     legacy_evidence = empty;
                     trusted = unchanged;
                     work = TRUST_WORK_BUDGET;
                     munit_assert_int(
-                        tc_cms_crl_scope_process(&candidate_reader,
-                                                 &(tc_x509_crl_scope_processing){
-                                                     &index, 0, scope_delta, scope_order, &query,
-                                                     states, RECORDS - 1, &legacy_evidence, NULL,
-                                                     NULL, NULL, NULL, NULL},
-                                                 &(tc_x509_crl_trust){&source, 1, &scope_options,
-                                                                      &tree, &validation, &search},
-                                                 &trusted),
+                        tc_cms_crl_scope_process(
+                            &candidate_reader,
+                            &(tc_x509_crl_scope_processing){
+                                &index, 0, scope_delta, scope_order, &query, states, RECORDS - 1,
+                                &legacy_evidence, NULL, NULL, NULL, NULL, NULL},
+                            &(tc_x509_crl_trust){
+                                &source, 1, &scope_options, &tree, &validation, &search,
+                                &(TC_X509_revocation_time){(&scope_options)->at, 0, 0}},
+                            &trusted),
                         ==, TC_TLV_LIMIT);
                     munit_assert_size(work, ==, TRUST_WORK_BUDGET);
                     munit_assert_memory_equal(sizeof legacy_evidence, &legacy_evidence, &empty);
                     munit_assert_memory_equal(sizeof trusted, &trusted, &unchanged);
                     munit_assert_int(
-                        tc_cms_crl_scope_process(&candidate_reader,
-                                                 &(tc_x509_crl_scope_processing){
-                                                     &index, 0, scope_delta, scope_order, &query,
-                                                     states, RECORDS, &legacy_evidence, NULL, NULL,
-                                                     NULL, NULL, NULL},
-                                                 &(tc_x509_crl_trust){&source, 0, &scope_options,
-                                                                      &tree, &validation, &search},
-                                                 &trusted),
+                        tc_cms_crl_scope_process(
+                            &candidate_reader,
+                            &(tc_x509_crl_scope_processing){
+                                &index, 0, scope_delta, scope_order, &query, states, RECORDS,
+                                &legacy_evidence, NULL, NULL, NULL, NULL, NULL},
+                            &(tc_x509_crl_trust){
+                                &source, 0, &scope_options, &tree, &validation, &search,
+                                &(TC_X509_revocation_time){(&scope_options)->at, 0, 0}},
+                            &trusted),
                         ==, TC_TLV_INVALID);
                     munit_assert_memory_equal(sizeof legacy_evidence, &legacy_evidence, &empty);
                     munit_assert_memory_equal(sizeof trusted, &trusted, &unchanged);
@@ -4789,8 +4899,9 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                               &(tc_x509_crl_scope_processing){
                                   &index, 1, scope_delta, scope_order, &query, states, RECORDS,
                                   &legacy_evidence, NULL, NULL, NULL, NULL, NULL},
-                              &(tc_x509_crl_trust){&source, 1, &scope_options, &tree, &validation,
-                                                   &search},
+                              &(tc_x509_crl_trust){
+                                  &source, 1, &scope_options, &tree, &validation, &search,
+                                  &(TC_X509_revocation_time){(&scope_options)->at, 0, 0}},
                               &trusted),
                           ==, TC_TLV_OK);
                       munit_assert_size(probe.calls, ==, RECORDS + 1);
@@ -4798,7 +4909,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                           tc_x509_crl_evidence_status(&legacy_evidence, &legacy_status), ==,
                           TC_TLV_OK);
                       munit_assert_int(legacy_status, ==,
-                                       revoked ? TC_X509_CRL_REVOKED : TC_X509_CRL_UNREVOKED);
+                                       revoked ? TC_X509_REVOCATION_REVOKED
+                                               : TC_X509_REVOCATION_GOOD);
                       if (revoked)
                         munit_assert_uint(legacy_evidence.revocation.reason, ==, 2);
                       const TC_X509_crl_evidence completed = legacy_evidence;
@@ -4811,8 +4923,9 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                               &(tc_x509_crl_scope_processing){
                                   &index, 1, scope_delta, scope_order, &query, states, RECORDS,
                                   &legacy_evidence, NULL, NULL, NULL, NULL, NULL},
-                              &(tc_x509_crl_trust){&source, 1, &scope_options, &tree, &validation,
-                                                   &search},
+                              &(tc_x509_crl_trust){
+                                  &source, 1, &scope_options, &tree, &validation, &search,
+                                  &(TC_X509_revocation_time){(&scope_options)->at, 0, 0}},
                               &trusted),
                           ==, TC_TLV_END);
                       munit_assert_memory_equal(sizeof legacy_evidence, &legacy_evidence,
@@ -4849,20 +4962,22 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                        (TC_buffer){states, RECORDS}, &work, &cache),
                                    ==, TC_TLV_OK);
                   TC_bytes latest = delta.signature;
-                  munit_assert_int(tc_x509_crl_latest_number(
-                                       &(tc_x509_crl_scope_context){
-                                           &cache, TC_X509_CRL_DELTA_IF_AVAILABLE,
-                                           TC_X509_CRL_ORDER_NUMBER, &selection_at, &tree, NULL, 0},
-                                       0, &latest),
-                                   ==, TC_TLV_INVALID);
+                  munit_assert_int(
+                      tc_x509_crl_latest_number(
+                          &(tc_x509_crl_scope_context){
+                              &cache, TC_X509_CRL_DELTA_IF_AVAILABLE, TC_X509_CRL_ORDER_NUMBER,
+                              &(TC_X509_revocation_time){*(&selection_at), 0, 0}, &tree, NULL, 0},
+                          0, &latest),
+                      ==, TC_TLV_INVALID);
                   munit_assert_memory_equal(sizeof latest, &latest, &delta.signature);
                   TC_X509_crl_evidence rejected = {0};
                   work = TRUST_WORK_BUDGET;
                   munit_assert_int(
                       tc_x509_crl_scope_apply(
-                          &(tc_x509_crl_scope_context){&cache, TC_X509_CRL_DELTA_IF_AVAILABLE,
-                                                       TC_X509_CRL_ORDER_NUMBER, &selection_at,
-                                                       &tree, oids, EXTENSION_CAPACITY},
+                          &(tc_x509_crl_scope_context){
+                              &cache, TC_X509_CRL_DELTA_IF_AVAILABLE, TC_X509_CRL_ORDER_NUMBER,
+                              &(TC_X509_revocation_time){*(&selection_at), 0, 0}, &tree, oids,
+                              EXTENSION_CAPACITY},
                           0, &query, &rejected),
                       ==, TC_TLV_INVALID);
                   munit_assert_memory_equal(sizeof rejected, &rejected, &empty);
@@ -4936,9 +5051,10 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                     TC_X509_crl_evidence scope_evidence = {0};
                     munit_assert_int(
                         tc_x509_crl_scope_apply(
-                            &(tc_x509_crl_scope_context){&cache, TC_X509_CRL_DELTA_IF_AVAILABLE,
-                                                         TC_X509_CRL_ORDER_NUMBER, &tie_at, &tree,
-                                                         oids, EXTENSION_CAPACITY},
+                            &(tc_x509_crl_scope_context){
+                                &cache, TC_X509_CRL_DELTA_IF_AVAILABLE, TC_X509_CRL_ORDER_NUMBER,
+                                &(TC_X509_revocation_time){*(&tie_at), 0, 0}, &tree, oids,
+                                EXTENSION_CAPACITY},
                             0, &query, &scope_evidence),
                         ==, fault == CONSISTENT ? TC_TLV_OK : TC_TLV_INVALID);
                     munit_assert_size(probe.calls, ==, TIED_RECORDS);
@@ -4947,14 +5063,16 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                       munit_assert_int(tc_x509_crl_evidence_status(&scope_evidence, &scope_status),
                                        ==, TC_TLV_OK);
                       munit_assert_int(scope_status, ==,
-                                       revoked ? TC_X509_CRL_REVOKED : TC_X509_CRL_UNREVOKED);
+                                       revoked ? TC_X509_REVOCATION_REVOKED
+                                               : TC_X509_REVOCATION_GOOD);
                       scope_evidence = empty;
                       work = TRUST_WORK_BUDGET;
                       munit_assert_int(
                           tc_x509_crl_scope_apply(
-                              &(tc_x509_crl_scope_context){&cache, TC_X509_CRL_DELTA_IF_AVAILABLE,
-                                                           TC_X509_CRL_ORDER_NUMBER, &tie_at, &tree,
-                                                           oids, EXTENSION_CAPACITY},
+                              &(tc_x509_crl_scope_context){
+                                  &cache, TC_X509_CRL_DELTA_IF_AVAILABLE, TC_X509_CRL_ORDER_NUMBER,
+                                  &(TC_X509_revocation_time){*(&tie_at), 0, 0}, &tree, oids,
+                                  EXTENSION_CAPACITY},
                               0, &query, &scope_evidence),
                           ==, TC_TLV_OK);
                       const size_t required = TRUST_WORK_BUDGET - work;
@@ -4962,18 +5080,20 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                       work = required - 1;
                       munit_assert_int(
                           tc_x509_crl_scope_apply(
-                              &(tc_x509_crl_scope_context){&cache, TC_X509_CRL_DELTA_IF_AVAILABLE,
-                                                           TC_X509_CRL_ORDER_NUMBER, &tie_at, &tree,
-                                                           oids, EXTENSION_CAPACITY},
+                              &(tc_x509_crl_scope_context){
+                                  &cache, TC_X509_CRL_DELTA_IF_AVAILABLE, TC_X509_CRL_ORDER_NUMBER,
+                                  &(TC_X509_revocation_time){*(&tie_at), 0, 0}, &tree, oids,
+                                  EXTENSION_CAPACITY},
                               0, &query, &scope_evidence),
                           ==, TC_TLV_LIMIT);
                       munit_assert_memory_equal(sizeof scope_evidence, &scope_evidence, &empty);
                       work = required;
                       munit_assert_int(
                           tc_x509_crl_scope_apply(
-                              &(tc_x509_crl_scope_context){&cache, TC_X509_CRL_DELTA_IF_AVAILABLE,
-                                                           TC_X509_CRL_ORDER_NUMBER, &tie_at, &tree,
-                                                           oids, EXTENSION_CAPACITY},
+                              &(tc_x509_crl_scope_context){
+                                  &cache, TC_X509_CRL_DELTA_IF_AVAILABLE, TC_X509_CRL_ORDER_NUMBER,
+                                  &(TC_X509_revocation_time){*(&tie_at), 0, 0}, &tree, oids,
+                                  EXTENSION_CAPACITY},
                               0, &query, &scope_evidence),
                           ==, TC_TLV_OK);
                       munit_assert_size(work, ==, 0);
@@ -4982,13 +5102,14 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                       munit_assert_memory_equal(sizeof scope_evidence, &scope_evidence, &empty);
                     scope_evidence = empty;
                     work = TRUST_WORK_BUDGET;
-                    munit_assert_int(
-                        tc_x509_crl_scope_apply(
-                            &(tc_x509_crl_scope_context){&cache, TC_X509_CRL_DELTA_IF_AVAILABLE,
-                                                         TC_X509_CRL_ORDER_THIS_UPDATE, &tie_at,
-                                                         &tree, oids, EXTENSION_CAPACITY},
-                            0, &query, &scope_evidence),
-                        ==, fault == DIFFERENT_REASON ? TC_TLV_INVALID : TC_TLV_OK);
+                    munit_assert_int(tc_x509_crl_scope_apply(
+                                         &(tc_x509_crl_scope_context){
+                                             &cache, TC_X509_CRL_DELTA_IF_AVAILABLE,
+                                             TC_X509_CRL_ORDER_THIS_UPDATE,
+                                             &(TC_X509_revocation_time){*(&tie_at), 0, 0}, &tree,
+                                             oids, EXTENSION_CAPACITY},
+                                         0, &query, &scope_evidence),
+                                     ==, fault == DIFFERENT_REASON ? TC_TLV_INVALID : TC_TLV_OK);
                     if (fault == DIFFERENT_REASON)
                       munit_assert_memory_equal(sizeof scope_evidence, &scope_evidence, &empty);
                     else {
@@ -4996,7 +5117,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                       munit_assert_int(tc_x509_crl_evidence_status(&scope_evidence, &scope_status),
                                        ==, TC_TLV_OK);
                       munit_assert_int(scope_status, ==,
-                                       revoked ? TC_X509_CRL_REVOKED : TC_X509_CRL_UNREVOKED);
+                                       revoked ? TC_X509_REVOCATION_REVOKED
+                                               : TC_X509_REVOCATION_GOOD);
                     }
                     munit_assert_size(probe.calls, ==, TIED_RECORDS);
                     TC_bytes swap = inputs[0];
@@ -5010,11 +5132,13 @@ static MunitResult revocations(const MunitParameter params[], void* user)
             trusted = unchanged;
             probe.calls = 0;
             work = TRUST_WORK_BUDGET;
-            munit_assert_int(tc_cms_crl_process(&candidate_reader, &indexed_pair, &query,
-                                                &(tc_x509_crl_trust){&source, 1, &updated, &tree,
-                                                                     &validation, &search},
-                                                &evidence, &trusted),
-                             ==, wrong_key ? TC_TLV_INVALID : TC_TLV_OK);
+            munit_assert_int(
+                tc_cms_crl_process(
+                    &candidate_reader, &indexed_pair, &query,
+                    &(tc_x509_crl_trust){&source, 1, &updated, &tree, &validation, &search,
+                                         &(TC_X509_revocation_time){(&updated)->at, 0, 0}},
+                    &evidence, &trusted),
+                ==, wrong_key ? TC_TLV_INVALID : TC_TLV_OK);
             munit_assert_memory_equal(sizeof candidate_reader, &candidate_reader, &before_search);
             if (wrong_key) {
               munit_assert_memory_equal(sizeof trusted, &trusted, &unchanged);
@@ -5025,28 +5149,31 @@ static MunitResult revocations(const MunitParameter params[], void* user)
               munit_assert_size(trusted.validation.work_used, ==, TRUST_WORK_BUDGET - work);
               munit_assert_int(tc_x509_crl_evidence_status(&evidence, &status), ==, TC_TLV_OK);
               munit_assert_int(status, ==,
-                               revoked && reasons[i] != 8 ? TC_X509_CRL_REVOKED
-                                                          : TC_X509_CRL_UNREVOKED);
+                               revoked && reasons[i] != 8 ? TC_X509_REVOCATION_REVOKED
+                                                          : TC_X509_REVOCATION_GOOD);
               /* The complete CRL is stale. The current delta supplies its
                * update interval. */
-              tc_x509_crl_freshness freshness;
-              munit_assert_int(tc_x509_crl_fresh_at(&parsed, &updated.at, &freshness), ==,
-                               TC_TLV_OK);
-              munit_assert_int(freshness, ==, TC_X509_CRL_STALE);
+              tc_x509_freshness freshness;
+              munit_assert_int(tc_x509_crl_fresh_at(&parsed,
+                                                    &(TC_X509_revocation_time){updated.at, 0, 0},
+                                                    &freshness),
+                               ==, TC_TLV_OK);
+              munit_assert_int(freshness, ==, TC_X509_FRESH_STALE);
               for (unsigned boundary = 0; boundary < 2; ++boundary) {
                 updated.at = boundary ? delta.next_update : parsed.this_update;
                 work = TRUST_WORK_BUDGET;
                 evidence = empty;
                 trusted = unchanged;
-                munit_assert_int(tc_x509_crl_process(
-                                     &selected, &signer, &query,
-                                     &(tc_x509_crl_trust){&source, 1, &updated,
-                                                          &(tc_pki_tree_workspace){
-                                                              (&validation)->frames,
-                                                              (&validation)->frame_capacity, &work},
-                                                          &validation, &search},
-                                     &evidence, &trusted),
-                                 ==, TC_TLV_END);
+                munit_assert_int(
+                    tc_x509_crl_process(
+                        &selected, &signer, &query,
+                        &(tc_x509_crl_trust){
+                            &source, 1, &updated,
+                            &(tc_pki_tree_workspace){(&validation)->frames,
+                                                     (&validation)->frame_capacity, &work},
+                            &validation, &search, &(TC_X509_revocation_time){(&updated)->at, 0, 0}},
+                        &evidence, &trusted),
+                    ==, TC_TLV_END);
                 munit_assert_memory_equal(sizeof trusted, &trusted, &unchanged);
                 munit_assert_memory_equal(sizeof evidence, &evidence, &empty);
               }
@@ -5221,7 +5348,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                 &(tc_x509_crl_trust){&source, scenario == WRONG_ANCHOR ? 0 : 1, &checked,
                                      &(tc_pki_tree_workspace){(&validation)->frames,
                                                               (&validation)->frame_capacity, &work},
-                                     &validation, &search},
+                                     &validation, &search,
+                                     &(TC_X509_revocation_time){(&checked)->at, 0, 0}},
                 &evidence, &found),
             ==, scenario == TRUSTED ? TC_TLV_UNSUPPORTED : TC_TLV_INVALID);
         munit_assert_size(probe.calls, ==, scenario == EXPIRED ? 1 : 2);
@@ -5615,7 +5743,7 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
                   &(tc_x509_crl_trust){
                       &held->source, 0, &options,
                       &(tc_pki_tree_workspace){validation.frames, validation.frame_capacity, &work},
-                      &validation, &search},
+                      &validation, &search, &(TC_X509_revocation_time){(&options)->at, 0, 0}},
                   &trusted_signer);
               munit_assert_int(signer_status, ==, TC_X509_PATH_VALID);
             }
@@ -6484,14 +6612,16 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
     work = WORK_BUDGET;
     munit_assert_int(tc_cms_crl_signer_find(
                          &candidates, &parsed_crl, &extensions,
-                         &(tc_x509_crl_trust){&external, 0, &options, &tree, &validation, &search},
+                         &(tc_x509_crl_trust){&external, 0, &options, &tree, &validation, &search,
+                                              &(TC_X509_revocation_time){(&options)->at, 0, 0}},
                          &found),
                      ==, TC_X509_PATH_INVALID);
     munit_assert_memory_equal(sizeof found, &found, &saved);
     work = WORK_BUDGET;
     munit_assert_int(tc_cms_crl_signer_find(
                          &candidates, &parsed_crl, &extensions,
-                         &(tc_x509_crl_trust){&indexed, 0, &options, &tree, &validation, &search},
+                         &(tc_x509_crl_trust){&indexed, 0, &options, &tree, &validation, &search,
+                                              &(TC_X509_revocation_time){(&options)->at, 0, 0}},
                          &found),
                      ==, TC_X509_PATH_VALID);
     munit_assert_size(found.count, ==, 2);
@@ -6506,7 +6636,8 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
     work = WORK_BUDGET;
     munit_assert_int(tc_cms_crl_signer_find(
                          &candidates, &parsed_crl, &extensions,
-                         &(tc_x509_crl_trust){&indexed, 0, &options, &tree, &validation, &search},
+                         &(tc_x509_crl_trust){&indexed, 0, &options, &tree, &validation, &search,
+                                              &(TC_X509_revocation_time){(&options)->at, 0, 0}},
                          &found),
                      ==, TC_X509_PATH_INVALID);
     munit_assert_memory_equal(sizeof found, &found, &saved);

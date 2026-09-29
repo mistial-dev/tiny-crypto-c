@@ -106,7 +106,13 @@ static MunitResult signer_search(const MunitParameter params[], void* user)
   for (size_t i = 0; i < sizeof results / sizeof *results; ++i) {
     size_t work = 100;
     const tc_pki_tree_workspace tree = {NULL, 0, &work};
-    const tc_x509_crl_trust trust = {&source, 0, &options, &tree, &validation, &search};
+    const tc_x509_crl_trust trust = {&source,
+                                     0,
+                                     &options,
+                                     &tree,
+                                     &validation,
+                                     &search,
+                                     &(TC_X509_revocation_time){(&options)->at, 0, 0}};
     signer_cursor cursor = {results[i], 0};
     int failed = 0;
     out = saved;
@@ -155,7 +161,13 @@ static MunitResult trust_arguments(const MunitParameter params[], void* user)
     size_t work = 100;
     tc_pki_tree_workspace tree = {NULL, 0, &work};
     TC_X509_store_source source = {NULL, 0, 1, NULL, tc_pki_source_guard_anchor};
-    tc_x509_crl_trust trust = {&source, 0, &options, &tree, &validation, &search};
+    tc_x509_crl_trust trust = {&source,
+                               0,
+                               &options,
+                               &tree,
+                               &validation,
+                               &search,
+                               &(TC_X509_revocation_time){(&options)->at, 0, 0}};
     switch (scenario) {
     case SOURCE:
       trust.source = NULL;
@@ -205,7 +217,7 @@ static MunitResult dependencies(const MunitParameter params[], void* user)
   munit_assert_size(count, ==, 1);
   munit_assert_size(index, ==, 0);
   munit_assert_ptr_equal(nodes[0].certificate.data, first);
-  nodes[0].status = TC_X509_CRL_REVOKED;
+  nodes[0].status = TC_X509_REVOCATION_REVOKED;
   memcpy(saved, nodes, sizeof nodes);
   for (size_t budget = 0; budget <= sizeof first; ++budget) {
     work = budget;
@@ -309,15 +321,16 @@ static MunitResult dependency_status(const MunitParameter params[], void* user)
 {
   static const uint8_t encoded[] = {1, 2};
   const TC_bytes certificate = {encoded, sizeof encoded};
-  const TC_X509_revocation_status statuses[] = {TC_X509_CRL_UNREVOKED, TC_X509_CRL_REVOKED,
-                                                TC_X509_CRL_UNDETERMINED,
+  const TC_X509_revocation_status statuses[] = {TC_X509_REVOCATION_GOOD, TC_X509_REVOCATION_REVOKED,
+                                                TC_X509_REVOCATION_UNDETERMINED,
                                                 (TC_X509_revocation_status)-1};
   const TC_X509_path_status expected[] = {TC_X509_PATH_VALID, TC_X509_PATH_INVALID,
                                           TC_X509_PATH_UNSUPPORTED, TC_X509_PATH_ERROR};
   TC_X509_search_result path = {0};
   path.path = &certificate;
   path.count = 1;
-  TC_X509_revocation_node node = {.certificate = certificate, .status = TC_X509_CRL_UNDETERMINED};
+  TC_X509_revocation_node node = {.certificate = certificate,
+                                  .status = TC_X509_REVOCATION_UNDETERMINED};
   tc_x509_crl_resolution_workspace workspace = {0};
   workspace.nodes = &node;
   workspace.node_capacity = 1;
@@ -335,7 +348,7 @@ static MunitResult dependency_status(const MunitParameter params[], void* user)
   munit_assert_int(tc_x509_crl_dependencies_path(&path, &workspace, &count, NULL, 0, &work), ==,
                    TC_X509_PATH_UNSUPPORTED);
   munit_assert_size(count, ==, 1);
-  munit_assert_int(node.status, ==, TC_X509_CRL_UNDETERMINED);
+  munit_assert_int(node.status, ==, TC_X509_REVOCATION_UNDETERMINED);
   munit_assert_ptr_equal(node.certificate.data, encoded);
   return MUNIT_OK;
 }
@@ -360,7 +373,7 @@ static MunitResult dependency_failures(const MunitParameter params[], void* user
   (void)params;
   (void)user;
   for (unsigned scenario = 0; scenario < CASE_COUNT; ++scenario) {
-    TC_X509_revocation_node node = {.certificate = certificate, .status = TC_X509_CRL_UNREVOKED},
+    TC_X509_revocation_node node = {.certificate = certificate, .status = TC_X509_REVOCATION_GOOD},
                             saved;
     memcpy(&saved, &node, sizeof node);
     TC_X509_search_result path = {0};
@@ -447,7 +460,7 @@ static TC_TLV_result evaluate_node(void* context, size_t index, TC_X509_crl_evid
     *state->count = 2;
     return TC_TLV_UNSUPPORTED;
   }
-  if (index == 0 && state->nodes[1].status != TC_X509_CRL_UNREVOKED)
+  if (index == 0 && state->nodes[1].status != TC_X509_REVOCATION_GOOD)
     return TC_TLV_UNSUPPORTED;
   evidence->reasons = TC_X509_CRL_ALL_REASONS;
   return TC_TLV_OK;
@@ -474,8 +487,8 @@ static MunitResult resolution(const MunitParameter params[], void* user)
     if (scenario == RESOLVE_CHAIN) {
       munit_assert_uint(state.calls, ==, 3);
       munit_assert_uint(out.reasons, ==, TC_X509_CRL_ALL_REASONS);
-      munit_assert_int(nodes[0].status, ==, TC_X509_CRL_UNREVOKED);
-      munit_assert_int(nodes[1].status, ==, TC_X509_CRL_UNREVOKED);
+      munit_assert_int(nodes[0].status, ==, TC_X509_REVOCATION_GOOD);
+      munit_assert_int(nodes[1].status, ==, TC_X509_REVOCATION_GOOD);
     } else {
       munit_assert_uint(state.calls, ==, 1);
       munit_assert_memory_equal(sizeof out, &out, &saved);
@@ -490,11 +503,12 @@ typedef struct {
   int complete;
 } path_fixture;
 
-static TC_TLV_result resolve_certificate(void* context, TC_bytes certificate,
+static TC_TLV_result resolve_certificate(void* context, size_t index, TC_bytes certificate,
                                          TC_X509_crl_evidence* evidence)
 {
   path_fixture* state = context;
   munit_assert_size(certificate.length, ==, 1);
+  munit_assert_size(index, ==, state->calls);
   munit_assert_size(certificate.data[0], ==, state->calls);
   if (state->calls++ == state->fail_at)
     return state->result;
@@ -529,10 +543,10 @@ static MunitResult held_path(const MunitParameter params[], void* user)
                                               : TC_TLV_OK);
     munit_assert_size(state.calls, ==, scenario == INCOMPLETE || scenario == FIRST_REVOKED ? 1 : 2);
     if (scenario == COMPLETE) {
-      munit_assert_int(out.status, ==, TC_X509_CRL_UNREVOKED);
+      munit_assert_int(out.status, ==, TC_X509_REVOCATION_GOOD);
       munit_assert_size(out.certificate_index, ==, SIZE_MAX);
     } else if (revoked_at != SIZE_MAX) {
-      munit_assert_int(out.status, ==, TC_X509_CRL_REVOKED);
+      munit_assert_int(out.status, ==, TC_X509_REVOCATION_REVOKED);
       munit_assert_size(out.certificate_index, ==, revoked_at);
       munit_assert_int(out.evidence.revocation.found, ==, 1);
       munit_assert_uint(out.evidence.revocation.revoked_at.year, ==, 2025);
@@ -562,7 +576,13 @@ static MunitResult storage_spans(const MunitParameter params[], void* user)
                                   scenario == VALIDATION_LARGER ? 1 : 2, &work};
     if (scenario == FRAME_OVERFLOW)
       tree.capacity = SIZE_MAX;
-    const tc_x509_crl_trust trust = {&source, 0, &options, &tree, &validation, &search};
+    const tc_x509_crl_trust trust = {&source,
+                                     0,
+                                     &options,
+                                     &tree,
+                                     &validation,
+                                     &search,
+                                     &(TC_X509_revocation_time){(&options)->at, 0, 0}};
     TC_X509_crl_evidence evidence = {0};
     tc_x509_crl_scope_processing processing = {0};
     processing.states = scenario == MISSING_STATES ? NULL : states;
@@ -646,7 +666,13 @@ static MunitResult scope_inputs(const MunitParameter params[], void* user)
   TC_X509_store_source source = {NULL, 0, 1, NULL, tc_pki_source_guard_anchor};
   size_t work = 1000;
   tc_pki_tree_workspace tree = {NULL, 0, &work};
-  const tc_x509_crl_trust trust = {&source, 0, &options, &tree, &validation, &search};
+  const tc_x509_crl_trust trust = {&source,
+                                   0,
+                                   &options,
+                                   &tree,
+                                   &validation,
+                                   &search,
+                                   &(TC_X509_revocation_time){(&options)->at, 0, 0}};
   tc_x509_crl_scope_processing processing = {0};
   processing.index = &index;
   processing.query = &query;
@@ -736,7 +762,13 @@ static MunitResult scope_traversal(const MunitParameter params[], void* user)
     size_t work = scenario == NO_WORK ? 0 : 100;
     const tc_pki_tree_workspace tree = {NULL, 0, &work};
     const TC_X509_store_source source = {NULL, 0, 1, NULL, tc_pki_source_guard_anchor};
-    const tc_x509_crl_trust trust = {&source, 0, &options, &tree, &validation, &search};
+    const tc_x509_crl_trust trust = {&source,
+                                     0,
+                                     &options,
+                                     &tree,
+                                     &validation,
+                                     &search,
+                                     &(TC_X509_revocation_time){(&options)->at, 0, 0}};
     TC_X509_crl_record record = {0};
     record.policy = TC_TLV_INVALID;
     TC_X509_crl_index index = {0};
@@ -930,7 +962,7 @@ static MunitResult dependency_read(const MunitParameter params[], void* user)
     size_t work = scenario == NO_WORK ? 0 : WORK_BUDGET;
     const tc_pki_tree_workspace tree = {frames, FRAME_CAPACITY, &work};
     TC_X509_revocation_node node = {.certificate = {encoded, sizeof encoded},
-                                    .status = TC_X509_CRL_UNDETERMINED};
+                                    .status = TC_X509_REVOCATION_UNDETERMINED};
     tc_x509_crl_resolution_workspace workspace = {0};
     workspace.tree = &tree;
     workspace.validation = &validation;
@@ -991,7 +1023,7 @@ static MunitResult extra_inputs(const MunitParameter params[], void* user)
     memset(&node, 0, sizeof node);
     memset(&extra, 0, sizeof extra);
     node.certificate = (TC_bytes){encoded, sizeof encoded};
-    node.status = TC_X509_CRL_UNDETERMINED;
+    node.status = TC_X509_REVOCATION_UNDETERMINED;
     extra.nodes = &node;
     extra.count = 1;
     extra.inputs[CRL_EXTRA_RESOLUTION] = node.certificate;
@@ -1034,8 +1066,8 @@ static MunitResult resolve_dependencies(const MunitParameter params[], void* use
   (void)user;
   for (unsigned scenario = NEW_CHAIN; scenario < CASE_COUNT; ++scenario) {
     TC_X509_revocation_node nodes[2] = {
-        {.certificate = target, .status = TC_X509_CRL_UNDETERMINED},
-        {.certificate = {second, sizeof second}, .status = TC_X509_CRL_UNDETERMINED}};
+        {.certificate = target, .status = TC_X509_REVOCATION_UNDETERMINED},
+        {.certificate = {second, sizeof second}, .status = TC_X509_REVOCATION_UNDETERMINED}};
     size_t work = scenario == NO_WORK ? 0 : 100;
     const tc_pki_tree_workspace tree = {NULL, 0, &work};
     tc_x509_crl_resolution_workspace workspace = {0};
@@ -1048,7 +1080,7 @@ static MunitResult resolve_dependencies(const MunitParameter params[], void* use
     if (scenario == CACHED || scenario == NO_WORK)
       dependencies.count = path.dependency_count = 1;
     if (scenario == CACHED)
-      nodes[0].status = TC_X509_CRL_UNREVOKED;
+      nodes[0].status = TC_X509_REVOCATION_GOOD;
     if (scenario == OVERLAP) {
       dependencies.writes = &target;
       dependencies.write_count = 1;
@@ -1071,7 +1103,9 @@ static MunitResult resolve_dependencies(const MunitParameter params[], void* use
       munit_assert_size(path.dependency_count, ==, scenario == CACHED ? 1 : 2);
     } else {
       munit_assert_memory_equal(sizeof out, &out, &saved);
-      munit_assert_size(path.dependency_count, ==, initial_count);
+      /* An unresolved target keeps its nodes for later path members. */
+      munit_assert_size(path.dependency_count, ==,
+                        scenario == CYCLE ? dependencies.count : initial_count);
     }
     munit_assert_uint(state.calls, ==, scenario == NEW_CHAIN ? 3 : scenario == CYCLE ? 1 : 0);
   }
@@ -1110,7 +1144,13 @@ static MunitResult scope_arguments(const MunitParameter params[], void* user)
   for (unsigned scenario = VALID; scenario < CASE_COUNT; ++scenario) {
     size_t work = 100;
     const tc_pki_tree_workspace tree = {NULL, 0, &work};
-    const tc_x509_crl_trust trust = {&source, 0, &options, &tree, &validation, &search};
+    const tc_x509_crl_trust trust = {&source,
+                                     0,
+                                     &options,
+                                     &tree,
+                                     &validation,
+                                     &search,
+                                     &(TC_X509_revocation_time){(&options)->at, 0, 0}};
     TC_X509_crl_record record = {0};
     record.policy = TC_TLV_OK;
     TC_X509_crl_index index = {0};
@@ -1305,7 +1345,13 @@ static MunitResult store_search(const MunitParameter params[], void* user)
     const tc_pki_tree_workspace tree = {frames, FRAME_CAPACITY, &work};
     store_search_fixture fixture = {TC_TLV_OK, {encoded, sizeof encoded}, 0};
     TC_X509_store_source source = {&fixture, 1, 1, store_search_record, tc_pki_source_guard_anchor};
-    const tc_x509_crl_trust trust = {&source, 0, &options, &tree, &validation, &search};
+    const tc_x509_crl_trust trust = {&source,
+                                     0,
+                                     &options,
+                                     &tree,
+                                     &validation,
+                                     &search,
+                                     &(TC_X509_revocation_time){(&options)->at, 0, 0}};
     tc_pki_store_candidates cursor = {&source, options.parsing, 0, 1, sizeof encoded};
     switch (scenario) {
     case EMPTY:
@@ -1424,7 +1470,13 @@ static MunitResult scope_operation(const MunitParameter params[], void* user)
     store_search_fixture fixture = {TC_TLV_OK, {encoded, sizeof encoded}, 0};
     const TC_X509_store_source external = {&fixture, 1, 1, store_search_record,
                                            tc_pki_source_guard_anchor};
-    const tc_x509_crl_trust trust = {&external, 0, &options, &tree, &validation, &search};
+    const tc_x509_crl_trust trust = {&external,
+                                     0,
+                                     &options,
+                                     &tree,
+                                     &validation,
+                                     &search,
+                                     &(TC_X509_revocation_time){(&options)->at, 0, 0}};
     tc_x509_crl_candidate_source adapter = {&external, &external, guarded_scope_search};
     TC_X509_certificate certificate = {0};
     certificate.issuer = (TC_bytes){issuer, sizeof issuer};

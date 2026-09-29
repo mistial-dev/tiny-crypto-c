@@ -9,7 +9,7 @@
 static inline int tc_x509_crl_trust_valid(const tc_x509_crl_trust* trust)
 {
   return trust && trust->source && trust->options && trust->tree && trust->tree->work &&
-         trust->validation && trust->search && trust->source->anchor &&
+         trust->validation && trust->search && trust->time && trust->source->anchor &&
          trust->anchor_index < trust->source->anchor_count;
 }
 
@@ -196,13 +196,17 @@ typedef struct {
 
 enum { CRL_PATH_OPTIONS, CRL_PATH_WORKSPACE, CRL_PATH_METADATA_COUNT };
 
-/* The chain and operation metadata stay live across dependency searches. */
+/* The chain, optional OCSP responses and operation metadata stay live across
+ * dependency searches. ocsp is NULL with ocsp_count zero, or holds one span
+ * per chain entry. */
 typedef struct {
   const TC_bytes* chain;
   size_t count;
   TC_X509_revocation_result* out;
   size_t dependency_count;
   TC_bytes metadata[CRL_PATH_METADATA_COUNT];
+  const TC_bytes* ocsp;
+  size_t ocsp_count;
 } tc_x509_crl_held_path;
 
 /* Caller guards the path object before this checks its borrowed inputs. */
@@ -252,6 +256,8 @@ typedef struct {
   size_t anchor_index;
   TC_X509_crl_delta_policy delta_policy;
   TC_X509_crl_order_policy order_policy;
+  /* CRL freshness time, checked by the public entry. */
+  const TC_X509_revocation_time* time;
 } tc_x509_crl_resolution;
 
 typedef struct {
@@ -333,7 +339,9 @@ TC_TLV_result tc_x509_crl_resolve_dependencies(TC_bytes target,
                                                tc_x509_crl_held_path* path,
                                                TC_X509_crl_evidence* out);
 
-typedef TC_TLV_result (*tc_x509_crl_certificate_resolve)(void* context, TC_bytes certificate,
+/* index is the member's position in the chain. */
+typedef TC_TLV_result (*tc_x509_crl_certificate_resolve)(void* context, size_t index,
+                                                         TC_bytes certificate,
                                                          TC_X509_crl_evidence* evidence);
 /* Resolve an anchor-issued-first chain. resolve guards the whole held chain
  * before reading bytes or using scratch. Publish only determined evidence. */
@@ -445,7 +453,7 @@ typedef struct {
   const tc_x509_crl_signature_cache* cache;
   TC_X509_crl_delta_policy delta_policy;
   TC_X509_crl_order_policy order_policy;
-  const TC_X509_time* at;
+  const TC_X509_revocation_time* time;
   const tc_pki_tree_workspace* tree;
   TC_bytes* oids;
   size_t oid_capacity;
@@ -544,8 +552,9 @@ TC_TLV_result tc_x509_crl_latest(const tc_x509_crl_scope_context* scope, size_t 
  * entries and signer revocation are separate. Stable/disjoint inputs and
  * scratch. out changes only on OK. */
 TC_TLV_result tc_x509_crl_delta_select(const tc_x509_crl_signature_cache* signer, size_t base,
-                                       const TC_X509_time* at, const tc_pki_tree_workspace* tree,
-                                       int* conflict, tc_x509_crl_selected* out);
+                                       const TC_X509_revocation_time* time,
+                                       const tc_pki_tree_workspace* tree, int* conflict,
+                                       tc_x509_crl_selected* out);
 /* Enumerate authenticated effective candidates in one issuer/IDP scope.
  * reference identifies the scope. cursor starts at zero. Signature cache is
  * scoped to the proposed signer, whose trust remains the caller's

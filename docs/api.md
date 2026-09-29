@@ -75,17 +75,26 @@ validation headers are selected by `TINY_CRYPTO_ENABLE_CMS_VALIDATION`.
 
 `<tiny_crypto/x509_ocsp.h>` encodes bounded OCSP requests and verifies complete
 DER OCSP responses, including stapled responses. Supply the certificate and its
-issuer from a validated path, a signature provider, evaluation time, freshness
-limits, and caller-owned scratch. The BasicOCSPResponse inside the response is
-parsed under the same `TC_TLV_limits` as the outer response. When a delegated
-responder signed the response, `responder_certificate` borrows its certificate
-and `responder_nocheck` reports `id-pkix-ocsp-nocheck`. Without nocheck, the
-caller establishes the delegate's revocation status (RFC 6960 4.2.2.2.1).
-`TC_OCSP_request_encode` reports the required size with `TC_TLV_LIMIT` for a
-short or empty buffer. OCSP requires SHA-1. An authenticated `TC_OCSP_UNKNOWN`
-and an unauthenticated `TC_OCSP_UNAVAILABLE` each require an application policy
-decision. Neither establishes a valid certificate. The composed validation APIs
-currently require CRL evidence.
+issuer from a validated path, a signature provider, a `TC_X509_revocation_time`
+and a `TC_X509_path_workspace`. The BasicOCSPResponse inside the response is
+parsed under the same `TC_TLV_limits` as the outer response. A delegated
+responder is validated as a one-certificate path below the issuer with the
+OCSPSigning purpose. `responder_certificate` then borrows its certificate and
+`responder_nocheck` reports `id-pkix-ocsp-nocheck`. Without nocheck, the caller
+establishes the delegate's revocation status (RFC 6960 4.2.2.2.1).
+`TC_X509_ocsp_request_encode` reports the required size with `TC_TLV_LIMIT`
+for a short or empty buffer. OCSP requires SHA-1.
+
+`TC_X509_ocsp_response_verify` returns `TC_TLV_OK` only for an authenticated,
+fresh GOOD or REVOKED status, with the CRLReason when the response has one. An
+authenticated unknown status and the unsigned error responses (internalError,
+tryLater, sigRequired, unauthorized) return `TC_TLV_UNSUPPORTED`. CRL and OCSP
+results share `TC_X509_revocation_status` and the freshness rule of
+`TC_X509_revocation_time`. `TC_X509_path_check_revocation` accepts one OCSP
+response per path member and falls back to CRLs for a member without an
+accepted response. It accepts a delegate without nocheck only when the CRL
+index proves that delegate unrevoked. The CMS and credential validation APIs
+use CRL evidence only.
 
 PIV/TWIC object policy and the final access decision require their own checks.
 Select compatibility options explicitly, including TWIC signed/unsigned CHUID

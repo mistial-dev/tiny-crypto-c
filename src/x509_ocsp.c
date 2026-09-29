@@ -1,12 +1,18 @@
 /* SPDX-FileCopyrightText: Mistial Dev
- * SPDX-License-Identifier: GPL-2.0-or-later */
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
+ * RFC 6960 OCSP response verification and request encoding. */
 #include <tiny_crypto/common.h>
 #if TC_ENABLE_X509_OCSP
 #include <tiny_crypto/x509_ocsp.h>
 #include "pki_internal.h"
 #include "pki_tree_internal.h"
 #include "pki_source_internal.h"
+#include "pki_extensions_internal.h"
+#include "pki_status_internal.h"
+#include "pki_crl_reason_internal.h"
 #include "hash_dispatch_internal.h"
+#include "x509_path_internal.h"
 #include "x509_time_internal.h"
 #include "internal.h"
 #include <string.h>
@@ -15,13 +21,15 @@ static const uint8_t basic_oid[] = {0x2b, 6, 1, 5, 5, 7, 0x30, 1, 1};
 static const uint8_t nonce_oid[] = {0x2b, 6, 1, 5, 5, 7, 0x30, 1, 2};
 static const uint8_t nocheck_oid[] = {0x2b, 6, 1, 5, 5, 7, 0x30, 1, 5};
 static const uint8_t ocsp_signing_oid[] = {0x2b, 6, 1, 5, 5, 7, 3, 9};
-static const uint8_t eku_oid[] = {0x55, 0x1d, TC_PKI_EXT_EXTENDED_KEY_USAGE};
-static const uint8_t ku_oid[] = {0x55, 0x1d, TC_PKI_EXT_KEY_USAGE};
+
+/* CertStatus as read from a SingleResponse (RFC 6960 4.2.1). */
+typedef enum { OCSP_GOOD, OCSP_REVOKED, OCSP_UNKNOWN } ocsp_cert_status;
 
 typedef struct {
   TC_bytes tbs, signature, responder, embedded, nonce;
   TC_DER_algorithm algorithm;
-  TC_OCSP_result result;
+  TC_X509_ocsp_result result;
+  ocsp_cert_status status;
   int responder_by_key, matched, nonce_present;
 } ocsp_response;
 
@@ -39,6 +47,11 @@ static TC_TLV_result contents_reader(TC_bytes contents, const TC_TLV_limits* lim
                                      TC_TLV_reader* reader)
 {
   return TC_TLV_reader_init(reader, contents.data, contents.length, TC_TLV_DER, limits);
+}
+
+static int oid_is(TC_bytes oid, const uint8_t* expected, size_t length)
+{
+  return oid.length == length && !memcmp(oid.data, expected, length);
 }
 
 static TC_TLV_result time_value(const TC_TLV_element* element, TC_X509_time* out)
@@ -72,7 +85,7 @@ static TC_TLV_result digest(TC_hash_algorithm algorithm, TC_bytes bytes, uint8_t
 }
 
 static TC_TLV_result cert_id_matches(TC_bytes encoded, const TC_X509_certificate* certificate,
-                                     const TC_OCSP_verify_request* request, size_t* work,
+                                     const TC_X509_ocsp_verify_request* request, size_t* work,
                                      int* matched)
 {
   const TC_X509_trust_anchor* issuer = request->issuer;
@@ -120,47 +133,81 @@ static TC_TLV_result cert_id_matches(TC_bytes encoded, const TC_X509_certificate
   return status;
 }
 
-static TC_TLV_result extensions(TC_bytes wrapper, const TC_TLV_limits* limits, TC_bytes* nonce,
-                                int* nonce_present, int allow_nonce, size_t max_extensions)
+/* Extension check state. Only responseExtensions may carry a nonce. */
+typedef struct {
+  const TC_TLV_limits* limits;
+  int allow_nonce, nonce_present;
+  TC_bytes nonce;
+} ocsp_extensions;
+
+/* RFC 9654 2.1: the nonce extnValue is an OCTET STRING of 1..128 octets and
+ * the extension is non-critical. Unknown critical extensions are
+ * unsupported (RFC 5280 4.2). tc_pki_extensions_visit rejects empty lists and
+ * duplicate OIDs. */
+static TC_TLV_result ocsp_extension(void* context, const TC_X509_extension* extension)
 {
-  TC_TLV_reader outer, list;
-  TC_TLV_element element;
-  TC_X509_extension extension;
-  TC_TLV_result status = contents_reader(wrapper, limits, &outer);
-  if (status != TC_TLV_OK || tc_pki_field(&outer, 0x30, &element) != TC_TLV_OK ||
-      !tc_pki_end(&outer) || contents_reader(element.value, limits, &list) != TC_TLV_OK)
+  ocsp_extensions* state = context;
+  TC_TLV_element value;
+  if (!oid_is(extension->oid, nonce_oid, sizeof nonce_oid))
+    return extension->critical ? TC_TLV_UNSUPPORTED : TC_TLV_OK;
+  if (!state->allow_nonce || extension->critical ||
+      TC_TLV_read(extension->value.data, extension->value.length, TC_TLV_DER, state->limits,
+                  &value) != TC_TLV_OK ||
+      !tc_pki_tag(&value, 4) || value.encoded.length != extension->value.length ||
+      !value.value.length || value.value.length > 128)
     return TC_TLV_INVALID;
-  size_t count = 0;
-  while ((status = TC_X509_extension_next(&list, &extension)) == TC_TLV_OK) {
-    if (++count > max_extensions)
-      return TC_TLV_LIMIT;
-    if (extension.oid.length == sizeof nonce_oid &&
-        !memcmp(extension.oid.data, nonce_oid, sizeof nonce_oid)) {
-      if (!allow_nonce || *nonce_present || extension.critical)
-        return TC_TLV_INVALID;
-      TC_TLV_element value;
-      if (TC_TLV_read(extension.value.data, extension.value.length, TC_TLV_DER, limits, &value) !=
-              TC_TLV_OK ||
-          !tc_pki_tag(&value, 4) || value.encoded.length != extension.value.length ||
-          !value.value.length || value.value.length > 128)
-        return TC_TLV_INVALID;
-      *nonce = value.value;
-      *nonce_present = 1;
-    } else if (extension.critical)
-      return TC_TLV_UNSUPPORTED;
+  state->nonce = value.value;
+  state->nonce_present = 1;
+  return TC_TLV_OK;
+}
+
+/* wrapper holds the contents of an [1] EXPLICIT Extensions field. */
+static TC_TLV_result extensions(TC_bytes wrapper, const TC_X509_ocsp_verify_request* request,
+                                const TC_X509_path_workspace* workspace, size_t* work,
+                                ocsp_extensions* state)
+{
+  TC_TLV_reader outer;
+  TC_TLV_element list;
+  const tc_pki_tree_workspace tree = {workspace->frames, workspace->frame_capacity, work};
+  if (contents_reader(wrapper, request->parsing, &outer) != TC_TLV_OK ||
+      tc_pki_field(&outer, 0x30, &list) != TC_TLV_OK || !tc_pki_end(&outer))
+    return TC_TLV_INVALID;
+  return tc_pki_extensions_visit(list.encoded, request->parsing, &tree, workspace->oids,
+                                 workspace->oid_capacity, ocsp_extension, state);
+}
+
+/* revokedInfo: revocationTime GeneralizedTime, revocationReason [0] EXPLICIT
+ * CRLReason OPTIONAL (RFC 6960 4.2.1). removeFromCRL appears only in delta
+ * CRLs (RFC 5280 5.3.1), so a response that carries it is INVALID. */
+static TC_TLV_result revoked_info(TC_bytes contents, const TC_TLV_limits* limits,
+                                  TC_X509_ocsp_result* result)
+{
+  TC_TLV_reader revoked;
+  TC_TLV_element field;
+  if (contents_reader(contents, limits, &revoked) != TC_TLV_OK ||
+      tc_pki_field(&revoked, 0x18, &field) != TC_TLV_OK ||
+      time_value(&field, &result->revocation_time) != TC_TLV_OK)
+    return TC_TLV_INVALID;
+  if (!tc_pki_end(&revoked)) {
+    if (tc_pki_field(&revoked, 0xa0, &field) != TC_TLV_OK ||
+        tc_pki_crl_reason_read(field.value, &result->reason) != TC_TLV_OK ||
+        result->reason == TC_PKI_CRL_REASON_REMOVE)
+      return TC_TLV_INVALID;
+    result->has_reason = 1;
   }
-  return status == TC_TLV_END ? TC_TLV_OK : status;
+  return tc_pki_end(&revoked) ? TC_TLV_OK : TC_TLV_INVALID;
 }
 
 static TC_TLV_result single_response(TC_bytes encoded, const TC_X509_certificate* certificate,
-                                     const TC_OCSP_verify_request* request,
-                                     const TC_OCSP_workspace* workspace, size_t* work,
+                                     const TC_X509_ocsp_verify_request* request,
+                                     const TC_X509_path_workspace* workspace, size_t* work,
                                      ocsp_response* parsed)
 {
   TC_TLV_reader reader;
   TC_TLV_element field;
-  TC_OCSP_result result = {0};
-  int matched, no_nonce = 0;
+  TC_X509_ocsp_result result = {0};
+  ocsp_cert_status cert_status;
+  int matched;
   TC_TLV_result status = sequence(encoded, request->parsing, &reader);
   if (status != TC_TLV_OK || tc_pki_field(&reader, 0x30, &field) != TC_TLV_OK)
     return TC_TLV_INVALID;
@@ -173,34 +220,19 @@ static TC_TLV_result single_response(TC_bytes encoded, const TC_X509_certificate
   case 0x80:
     if (field.value.length)
       return TC_TLV_INVALID;
-    result.status = TC_OCSP_GOOD;
+    cert_status = OCSP_GOOD;
     break;
   case 0x82:
     if (field.value.length)
       return TC_TLV_INVALID;
-    result.status = TC_OCSP_UNKNOWN;
+    cert_status = OCSP_UNKNOWN;
     break;
-  case 0xa1: {
-    TC_TLV_reader revoked;
-    TC_TLV_element date;
-    if (contents_reader(field.value, request->parsing, &revoked) != TC_TLV_OK ||
-        tc_pki_field(&revoked, 0x18, &date) != TC_TLV_OK ||
-        time_value(&date, &result.revocation_time) != TC_TLV_OK)
-      return TC_TLV_INVALID;
-    if (!tc_pki_end(&revoked)) {
-      TC_TLV_reader reason;
-      if (tc_pki_field(&revoked, 0xa0, &date) != TC_TLV_OK ||
-          contents_reader(date.value, request->parsing, &reason) != TC_TLV_OK ||
-          tc_pki_field(&reason, 0x0a, &date) != TC_TLV_OK || !tc_pki_end(&reason) ||
-          date.value.length != 1 || date.value.data[0] > 10 || date.value.data[0] == 7)
-        return TC_TLV_INVALID;
-    }
-    if (!tc_pki_end(&revoked))
-      return TC_TLV_INVALID;
-    result.has_revocation_time = 1;
-    result.status = TC_OCSP_REVOKED;
+  case 0xa1:
+    status = revoked_info(field.value, request->parsing, &result);
+    if (status != TC_TLV_OK)
+      return status;
+    cert_status = OCSP_REVOKED;
     break;
-  }
   default:
     return TC_TLV_UNSUPPORTED;
   }
@@ -224,9 +256,8 @@ static TC_TLV_result single_response(TC_bytes encoded, const TC_X509_certificate
   if (!tc_pki_end(&reader)) {
     if (tc_pki_field(&reader, 0xa1, &field) != TC_TLV_OK)
       return TC_TLV_INVALID;
-    TC_bytes ignored = {0};
-    status = extensions(field.value, request->parsing, &ignored, &no_nonce, 0,
-                        workspace->extension_capacity);
+    ocsp_extensions single = {request->parsing, 0, 0, {NULL, 0}};
+    status = extensions(field.value, request, workspace, work, &single);
     if (status != TC_TLV_OK)
       return status;
   }
@@ -236,19 +267,20 @@ static TC_TLV_result single_response(TC_bytes encoded, const TC_X509_certificate
     if (parsed->matched)
       return TC_TLV_INVALID;
     parsed->matched = 1;
-    parsed->result.status = result.status;
+    parsed->status = cert_status;
     parsed->result.this_update = result.this_update;
     parsed->result.next_update = result.next_update;
-    parsed->result.revocation_time = result.revocation_time;
     parsed->result.has_next_update = result.has_next_update;
-    parsed->result.has_revocation_time = result.has_revocation_time;
+    parsed->result.revocation_time = result.revocation_time;
+    parsed->result.reason = result.reason;
+    parsed->result.has_reason = result.has_reason;
   }
   return TC_TLV_OK;
 }
 
 static TC_TLV_result response_data(TC_bytes encoded, const TC_X509_certificate* certificate,
-                                   const TC_OCSP_verify_request* request,
-                                   const TC_OCSP_workspace* workspace, size_t* work,
+                                   const TC_X509_ocsp_verify_request* request,
+                                   const TC_X509_path_workspace* workspace, size_t* work,
                                    ocsp_response* parsed)
 {
   TC_TLV_reader reader, responses;
@@ -309,17 +341,19 @@ static TC_TLV_result response_data(TC_bytes encoded, const TC_X509_certificate* 
   if (!tc_pki_end(&reader)) {
     if (tc_pki_field(&reader, 0xa1, &field) != TC_TLV_OK)
       return TC_TLV_INVALID;
-    status = extensions(field.value, request->parsing, &parsed->nonce, &parsed->nonce_present, 1,
-                        workspace->extension_capacity);
+    ocsp_extensions response = {request->parsing, 1, 0, {NULL, 0}};
+    status = extensions(field.value, request, workspace, work, &response);
     if (status != TC_TLV_OK)
       return status;
+    parsed->nonce = response.nonce;
+    parsed->nonce_present = response.nonce_present;
   }
   return tc_pki_end(&reader) ? TC_TLV_OK : TC_TLV_INVALID;
 }
 
 static TC_TLV_result basic_response(TC_bytes encoded, const TC_X509_certificate* certificate,
-                                    const TC_OCSP_verify_request* request,
-                                    const TC_OCSP_workspace* workspace, size_t* work,
+                                    const TC_X509_ocsp_verify_request* request,
+                                    const TC_X509_path_workspace* workspace, size_t* work,
                                     ocsp_response* parsed)
 {
   TC_TLV_reader reader;
@@ -357,9 +391,18 @@ static TC_TLV_result basic_response(TC_bytes encoded, const TC_X509_certificate*
   return tc_pki_end(&reader) ? TC_TLV_OK : TC_TLV_INVALID;
 }
 
-static TC_TLV_result parse_response(const TC_OCSP_verify_request* request,
+/* OCSPResponseStatus values (RFC 6960 4.2.1). */
+enum {
+  OCSP_SUCCESSFUL = 0,
+  OCSP_INTERNAL_ERROR = 2,
+  OCSP_TRY_LATER = 3,
+  OCSP_SIG_REQUIRED = 5,
+  OCSP_UNAUTHORIZED = 6
+};
+
+static TC_TLV_result parse_response(const TC_X509_ocsp_verify_request* request,
                                     const TC_X509_certificate* certificate,
-                                    const TC_OCSP_workspace* workspace, size_t* work,
+                                    const TC_X509_path_workspace* workspace, size_t* work,
                                     ocsp_response* parsed)
 {
   TC_TLV_reader reader, bytes;
@@ -369,14 +412,15 @@ static TC_TLV_result parse_response(const TC_OCSP_verify_request* request,
   if (status != TC_TLV_OK || tc_pki_field(&reader, 0x0a, &field) != TC_TLV_OK ||
       field.value.length != 1)
     return TC_TLV_INVALID;
-  if (field.value.data[0] != 0) {
+  const unsigned response_status = field.value.data[0];
+  if (response_status != OCSP_SUCCESSFUL) {
+    /* Unsigned error responses carry no status for the certificate. */
     if (!tc_pki_end(&reader))
       return TC_TLV_INVALID;
-    if (field.value.data[0] == 2 || field.value.data[0] == 3 || field.value.data[0] == 6) {
-      parsed->result.status = TC_OCSP_UNAVAILABLE;
-      return TC_TLV_OK;
-    }
-    return field.value.data[0] == 5 ? TC_TLV_UNSUPPORTED : TC_TLV_INVALID;
+    return response_status == OCSP_INTERNAL_ERROR || response_status == OCSP_TRY_LATER ||
+                   response_status == OCSP_SIG_REQUIRED || response_status == OCSP_UNAUTHORIZED
+               ? TC_TLV_UNSUPPORTED
+               : TC_TLV_INVALID;
   }
   if (tc_pki_field(&reader, 0xa0, &field) != TC_TLV_OK || !tc_pki_end(&reader) ||
       contents_reader(field.value, request->parsing, &reader) != TC_TLV_OK ||
@@ -385,42 +429,40 @@ static TC_TLV_result parse_response(const TC_OCSP_verify_request* request,
       tc_pki_field(&bytes, 6, &field) != TC_TLV_OK ||
       TC_DER_oid(field.encoded.data, field.encoded.length, &oid) != TC_TLV_OK)
     return TC_TLV_INVALID;
-  if (oid.length != sizeof basic_oid || memcmp(oid.data, basic_oid, sizeof basic_oid))
+  if (!oid_is(oid, basic_oid, sizeof basic_oid))
     return TC_TLV_UNSUPPORTED;
   if (tc_pki_field(&bytes, 4, &field) != TC_TLV_OK || !tc_pki_end(&bytes))
     return TC_TLV_INVALID;
   return basic_response(field.value, certificate, request, workspace, work, parsed);
 }
 
-/* Freshness of a parsed response against now, in Unix seconds, with the
- * request's skew and age already range checked at entry. producedAt and
- * thisUpdate may be at most skew ahead of now. thisUpdate may be at most
- * max_age_seconds older than now - skew. A present nextUpdate must not precede
- * thisUpdate or now - skew (RFC 6960 3.2 items 5 and 6, 4.2.2.1). Response times
- * that cannot be converted are INVALID. */
-static TC_TLV_result time_check(const TC_OCSP_verify_request* request, int64_t now,
-                                const TC_OCSP_result* result)
+/* Freshness of a parsed response (RFC 6960 3.2 items 5 and 6, 4.2.2.1) under
+ * the shared revocation time rule. producedAt may be at most skew ahead of
+ * at. A response without nextUpdate is fresh only under a nonzero
+ * max_age_seconds. Response times that cannot be converted are INVALID. */
+static TC_TLV_result time_check(const TC_X509_ocsp_verify_request* request,
+                                const TC_X509_ocsp_result* result)
 {
-  int64_t produced, updated, next_time;
-  if (TC_X509_time_to_unix(&result->produced_at, &produced) != TC_TLV_OK ||
-      TC_X509_time_to_unix(&result->this_update, &updated) != TC_TLV_OK)
+  int64_t now, produced;
+  tc_x509_freshness freshness;
+  if (TC_X509_time_to_unix(&request->time.at, &now) != TC_TLV_OK ||
+      TC_X509_time_to_unix(&result->produced_at, &produced) != TC_TLV_OK ||
+      produced > now + (int64_t)request->time.clock_skew_seconds)
     return TC_TLV_INVALID;
-  const int64_t skew = (int64_t)request->clock_skew_seconds;
-  const int64_t age = (int64_t)request->max_age_seconds;
-  if (produced > now + skew || updated > now + skew ||
-      (now - skew >= updated && (uint64_t)(now - skew) - (uint64_t)updated > (uint64_t)age))
+  if (tc_x509_freshness_at(&request->time, &result->this_update,
+                           result->has_next_update ? &result->next_update : NULL,
+                           &freshness) != TC_TLV_OK)
     return TC_TLV_INVALID;
-  if (result->has_next_update) {
-    if (TC_X509_time_to_unix(&result->next_update, &next_time) != TC_TLV_OK ||
-        next_time < updated || next_time < now - skew)
-      return TC_TLV_INVALID;
-  }
-  return TC_TLV_OK;
+  if (freshness == TC_X509_FRESH_CURRENT ||
+      (freshness == TC_X509_FRESH_NO_NEXT_UPDATE && request->time.max_age_seconds))
+    return TC_TLV_OK;
+  return TC_TLV_INVALID;
 }
 
 static TC_TLV_result name_matches(TC_bytes left, TC_bytes right,
-                                  const TC_OCSP_verify_request* request,
-                                  const TC_OCSP_workspace* workspace, size_t* work, int* matched)
+                                  const TC_X509_ocsp_verify_request* request,
+                                  const TC_X509_path_workspace* workspace, size_t* work,
+                                  int* matched)
 {
   return TC_X509_name_equal(left, right, request->parsing, &workspace->names, work, matched);
 }
@@ -428,8 +470,8 @@ static TC_TLV_result name_matches(TC_bytes left, TC_bytes right,
 /* A byKey ResponderID is the SHA-1 hash of the responder's subjectPublicKey
  * BIT STRING value (RFC 6960 4.2.1). The build requires SHA-1 for OCSP. */
 static TC_TLV_result responder_matches(const ocsp_response* response, TC_bytes name, TC_bytes key,
-                                       const TC_OCSP_verify_request* request,
-                                       const TC_OCSP_workspace* workspace, size_t* work,
+                                       const TC_X509_ocsp_verify_request* request,
+                                       const TC_X509_path_workspace* workspace, size_t* work,
                                        int* matched)
 {
   if (!response->responder_by_key)
@@ -441,185 +483,147 @@ static TC_TLV_result responder_matches(const ocsp_response* response, TC_bytes n
   return status;
 }
 
-typedef struct {
-  int permitted;
-  int nocheck;
-} delegate_usage;
-
-static int oid_is(TC_bytes oid, const uint8_t* expected, size_t length)
+/* INVALID when the signature does not verify under key. */
+static TC_TLV_result verify_signature(const ocsp_response* response, const TC_X509_public_key* key,
+                                      const TC_X509_ocsp_verify_request* request, size_t* work)
 {
-  return oid.length == length && !memcmp(oid.data, expected, length);
+  const TC_bytes message = response->tbs;
+  return tc_pki_signature_status(TC_X509_signature_verify_message(
+      &message, 1, &response->algorithm, response->signature, key, request->signatures, work));
 }
 
-/* RFC 6960 4.2.2.2 requires id-kp-OCSPSigning in the delegate's extended key
- * usage. A present key usage must allow digitalSignature. RFC 6960 4.2.2.2.1
- * defines id-pkix-ocsp-nocheck with a NULL value. */
-static TC_TLV_result delegate_extensions(const TC_X509_certificate* signer,
-                                         const TC_OCSP_verify_request* request,
-                                         const TC_OCSP_workspace* workspace, delegate_usage* out)
+/* RFC 6960 4.2.2.2: the delegate is issued directly by the CA that issued
+ * the certificate and carries id-kp-OCSPSigning. Validate it as a
+ * one-certificate path below the issuer with that purpose, which also checks
+ * its signature, validity with skew, digitalSignature in a present key usage
+ * and critical extensions. anyExtendedKeyUsage does not authorize it. */
+static TC_TLV_result delegate_path(TC_bytes encoded, const TC_X509_ocsp_verify_request* request,
+                                   const TC_X509_path_workspace* workspace, size_t* work,
+                                   TC_X509_public_key* key)
 {
-  TC_TLV_reader outer, extensions_reader;
-  TC_TLV_element element;
+  TC_X509_path_options options;
+  TC_X509_path_result validated;
+  memset(&options, 0, sizeof options);
+  options.at = request->time.at;
+  options.clock_skew_seconds = request->time.clock_skew_seconds;
+  options.parsing = *request->parsing;
+  options.max_certificates = 1;
+  options.max_input = request->parsing->max_input;
+  options.signatures = *request->signatures;
+  options.purpose = (TC_bytes){ocsp_signing_oid, sizeof ocsp_signing_oid};
+  options.key_usage = TC_KEY_USAGE_DIGITAL_SIGNATURE;
+  options.flags = TC_X509_PATH_REQUIRE_EXTENDED_KEY_USAGE | TC_X509_PATH_INHIBIT_ANY_PURPOSE;
+  TC_X509_path_status status = tc_x509_path_validate_budget(&encoded, 1, request->issuer, &options,
+                                                            workspace, work, &validated);
+  if (status == TC_X509_PATH_VALID)
+    *key = validated.public_key;
+  return tc_x509_path_result_status(status);
+}
+
+/* id-pkix-ocsp-nocheck has a NULL value (RFC 6960 4.2.2.2.1). The path
+ * validation before this call already rejected duplicate extensions. */
+static TC_TLV_result delegate_nocheck(const TC_X509_certificate* signer,
+                                      const TC_TLV_limits* limits, size_t* work, int* nocheck)
+{
+  TC_TLV_reader reader;
   TC_X509_extension extension;
-  TC_TLV_result status;
-  int has_eku = 0, has_usage = 0, has_nocheck = 0, eku = 0, usage = 0;
-  if (!signer->extensions.data ||
-      contents_reader(signer->extensions, request->parsing, &outer) != TC_TLV_OK ||
-      tc_pki_field(&outer, 0x30, &element) != TC_TLV_OK || !tc_pki_end(&outer) ||
-      contents_reader(element.value, request->parsing, &extensions_reader) != TC_TLV_OK)
-    return TC_TLV_INVALID;
-  while ((status = TC_X509_extension_next(&extensions_reader, &extension)) == TC_TLV_OK) {
-    if (oid_is(extension.oid, eku_oid, sizeof eku_oid)) {
-      size_t count;
-      if (has_eku || TC_X509_extended_key_usage_read(
-                         extension.value.data, extension.value.length, workspace->extension_oids,
-                         workspace->extension_capacity, &count) != TC_TLV_OK)
-        return TC_TLV_INVALID;
-      has_eku = 1;
-      for (size_t i = 0; i < count; ++i)
-        if (oid_is(workspace->extension_oids[i], ocsp_signing_oid, sizeof ocsp_signing_oid))
-          eku = 1;
-    } else if (oid_is(extension.oid, ku_oid, sizeof ku_oid)) {
-      uint16_t bits;
-      if (has_usage ||
-          TC_X509_key_usage_read(extension.value.data, extension.value.length, &bits) != TC_TLV_OK)
-        return TC_TLV_INVALID;
-      has_usage = 1;
-      usage = (bits & TC_KEY_USAGE_DIGITAL_SIGNATURE) != 0;
-    } else if (oid_is(extension.oid, nocheck_oid, sizeof nocheck_oid)) {
-      if (has_nocheck || TC_DER_null(extension.value.data, extension.value.length) != TC_TLV_OK)
-        return TC_TLV_INVALID;
-      has_nocheck = 1;
-    } else if (extension.critical)
-      return TC_TLV_UNSUPPORTED;
+  int found = 0;
+  TC_TLV_result status = tc_pki_extensions_init(&reader, signer, limits, work);
+  if (status != TC_TLV_OK)
+    return status;
+  while ((status = tc_pki_extension_next(&reader, work, &extension)) == TC_TLV_OK) {
+    if (!oid_is(extension.oid, nocheck_oid, sizeof nocheck_oid))
+      continue;
+    if (TC_DER_null(extension.value.data, extension.value.length) != TC_TLV_OK)
+      return TC_TLV_INVALID;
+    found = 1;
   }
   if (status != TC_TLV_END)
     return status;
-  out->permitted = has_eku && eku && (!has_usage || usage);
-  out->nocheck = has_nocheck;
+  *nocheck = found;
   return TC_TLV_OK;
-}
-
-static TC_TLV_result verify_signature(const ocsp_response* response,
-                                      const TC_X509_public_key* signer,
-                                      const TC_OCSP_verify_request* request, size_t* work,
-                                      int* valid)
-{
-  const TC_bytes message = response->tbs;
-  TC_X509_signature_result status = TC_X509_signature_verify_message(
-      &message, 1, &response->algorithm, response->signature, signer, request->signatures, work);
-  if (status == TC_X509_SIGNATURE_LIMIT)
-    return TC_TLV_LIMIT;
-  if (status == TC_X509_SIGNATURE_UNSUPPORTED)
-    return TC_TLV_UNSUPPORTED;
-  if (status == TC_X509_SIGNATURE_ERROR)
-    return TC_TLV_ARGUMENT;
-  *valid = status == TC_X509_SIGNATURE_VALID;
-  return TC_TLV_OK;
-}
-
-/* Authorize one candidate as a delegated responder (RFC 6960 4.2.2.2): it
- * matches the ResponderID, was issued and signed by the issuer, is valid at
- * the request time and carries id-kp-OCSPSigning. OK with *valid set means the
- * candidate signed the response. nocheck receives its id-pkix-ocsp-nocheck. */
-static TC_TLV_result try_delegate(TC_bytes encoded, const ocsp_response* response,
-                                  const TC_OCSP_verify_request* request,
-                                  const TC_OCSP_workspace* workspace, size_t* work, int* valid,
-                                  int* nocheck)
-{
-  TC_X509_workspace scratch = {workspace->frames, workspace->frame_capacity,
-                               workspace->extension_oids, workspace->extension_capacity};
-  TC_X509_certificate signer;
-  TC_TLV_result status =
-      TC_X509_read(encoded.data, encoded.length, request->parsing, &scratch, &signer);
-  if (status != TC_TLV_OK)
-    return status;
-  int matches;
-  status = responder_matches(response, signer.subject, signer.public_key.key, request, workspace,
-                             work, &matches);
-  if (status != TC_TLV_OK || !matches)
-    return status;
-  status = name_matches(signer.issuer, request->issuer->name, request, workspace, work, &matches);
-  if (status != TC_TLV_OK || !matches)
-    return status;
-  int current;
-  delegate_usage usage;
-  status = TC_X509_valid_at(&signer, &request->at, &current);
-  if (status != TC_TLV_OK || !current)
-    return status;
-  status = delegate_extensions(&signer, request, workspace, &usage);
-  if (status != TC_TLV_OK || !usage.permitted)
-    return status;
-  TC_X509_signature_result certificate_signature =
-      TC_X509_signature_verify(&signer, &request->issuer->public_key, request->signatures, work);
-  if (certificate_signature == TC_X509_SIGNATURE_LIMIT)
-    return TC_TLV_LIMIT;
-  if (certificate_signature == TC_X509_SIGNATURE_UNSUPPORTED)
-    return TC_TLV_UNSUPPORTED;
-  if (certificate_signature != TC_X509_SIGNATURE_VALID)
-    return TC_TLV_OK;
-  status = verify_signature(response, &signer.public_key, request, work, valid);
-  *nocheck = usage.nocheck;
-  return status;
 }
 
 /* Delegate candidates come from the response certs field, then the store.
  * max_certificates bounds the candidates examined across both sources. */
 typedef struct {
   size_t examined;
-  int valid, nocheck;
+  int nocheck;
   TC_bytes certificate;
 } delegate_search;
 
+/* Try one candidate as a delegated responder. OK with search->certificate
+ * set means the candidate is authorized and signed the response. A candidate
+ * that is malformed, unauthorized or unsupported leaves the search running.
+ * LIMIT and ARGUMENT stop it. */
 static TC_TLV_result try_candidate(TC_bytes encoded, const ocsp_response* response,
-                                   const TC_OCSP_verify_request* request,
-                                   const TC_OCSP_workspace* workspace, size_t* work,
+                                   const TC_X509_ocsp_verify_request* request,
+                                   const TC_X509_path_workspace* workspace, size_t* work,
                                    delegate_search* search)
 {
   if (search->examined++ >= request->max_certificates)
     return TC_TLV_LIMIT;
+  TC_X509_workspace parser = {workspace->frames, workspace->frame_capacity, workspace->oids,
+                              workspace->oid_capacity};
+  TC_X509_certificate signer;
+  TC_X509_public_key key;
+  int matches, nocheck;
   TC_TLV_result status =
-      try_delegate(encoded, response, request, workspace, work, &search->valid, &search->nocheck);
-  if (search->valid)
+      TC_X509_read(encoded.data, encoded.length, request->parsing, &parser, &signer);
+  if (status == TC_TLV_OK)
+    status = responder_matches(response, signer.subject, signer.public_key.key, request, workspace,
+                               work, &matches);
+  if (status == TC_TLV_OK && !matches)
+    return TC_TLV_OK;
+  if (status == TC_TLV_OK)
+    status = delegate_path(encoded, request, workspace, work, &key);
+  if (status == TC_TLV_OK)
+    status = delegate_nocheck(&signer, request->parsing, work, &nocheck);
+  if (status == TC_TLV_OK)
+    status = verify_signature(response, &key, request, work);
+  if (status == TC_TLV_OK) {
     search->certificate = encoded;
-  /* A candidate that is malformed or unauthorized does not stop the search. */
-  return status == TC_TLV_LIMIT ? status : TC_TLV_OK;
+    search->nocheck = nocheck;
+  }
+  return status == TC_TLV_LIMIT || status == TC_TLV_ARGUMENT ? status : TC_TLV_OK;
 }
 
 static TC_TLV_result authorize_response(ocsp_response* response,
-                                        const TC_OCSP_verify_request* request,
-                                        const TC_OCSP_workspace* workspace, size_t* work)
+                                        const TC_X509_ocsp_verify_request* request,
+                                        const TC_X509_path_workspace* workspace, size_t* work)
 {
-  int matches, valid = 0;
+  int matches;
   TC_TLV_result status =
       responder_matches(response, request->issuer->name, request->issuer->public_key.key, request,
                         workspace, work, &matches);
   if (status != TC_TLV_OK)
     return status;
   if (matches) {
-    status = verify_signature(response, &request->issuer->public_key, request, work, &valid);
-    if (status != TC_TLV_OK || valid)
+    /* A signature that does not verify under the issuer key may still come
+     * from a delegate with the same ResponderID. */
+    status = verify_signature(response, &request->issuer->public_key, request, work);
+    if (status != TC_TLV_INVALID)
       return status;
   }
-  delegate_search search = {0, 0, 0, {NULL, 0}};
+  delegate_search search = {0, 0, {NULL, 0}};
   if (response->embedded.data) {
     TC_TLV_reader embedded;
     TC_TLV_element element;
     status = contents_reader(response->embedded, request->parsing, &embedded);
     if (status != TC_TLV_OK)
       return status;
-    while (!search.valid && (status = TC_TLV_next(&embedded, &element)) == TC_TLV_OK) {
+    while (!search.certificate.data && (status = TC_TLV_next(&embedded, &element)) == TC_TLV_OK) {
       if (!tc_pki_tag(&element, 0x30))
         return TC_TLV_INVALID;
       status = try_candidate(element.encoded, response, request, workspace, work, &search);
       if (status != TC_TLV_OK)
         return status;
     }
-    if (!search.valid && status != TC_TLV_END)
+    if (!search.certificate.data && status != TC_TLV_END)
       return status;
   }
   const TC_X509_store_source* store = request->certificates;
-  for (size_t i = 0; store && !search.valid && i < store->candidate_count; ++i) {
+  for (size_t i = 0; store && !search.certificate.data && i < store->candidate_count; ++i) {
     TC_bytes candidate;
     status = tc_pki_source_candidate(store, i, work, &candidate);
     if (status != TC_TLV_OK)
@@ -628,7 +632,7 @@ static TC_TLV_result authorize_response(ocsp_response* response,
     if (status != TC_TLV_OK)
       return status;
   }
-  if (!search.valid)
+  if (!search.certificate.data)
     return TC_TLV_INVALID;
   response->result.responder_certificate = search.certificate;
   response->result.responder_nocheck = search.nocheck;
@@ -640,33 +644,11 @@ static int trust_anchor_present(const TC_X509_trust_anchor* issuer)
   return issuer && issuer->name.data && issuer->public_key.key.data;
 }
 
-/* Range check the time arguments and convert the request time once. */
-static TC_TLV_result request_time(const TC_OCSP_verify_request* request, int64_t* now)
+/* Verify after the entry checks. out is written only on OK. */
+static TC_TLV_result verify_response(const TC_X509_ocsp_verify_request* request,
+                                     const TC_X509_path_workspace* workspace, size_t* work,
+                                     TC_X509_ocsp_result* out)
 {
-  if (TC_X509_time_check(&request->at) != TC_TLV_OK ||
-      TC_X509_time_to_unix(&request->at, now) != TC_TLV_OK ||
-      request->clock_skew_seconds > INT64_MAX || request->max_age_seconds > INT64_MAX)
-    return TC_TLV_ARGUMENT;
-  const int64_t skew = (int64_t)request->clock_skew_seconds;
-  return *now <= INT64_MAX - skew && *now >= INT64_MIN + skew ? TC_TLV_OK : TC_TLV_ARGUMENT;
-}
-
-TC_TLV_result TC_OCSP_response_verify(const TC_OCSP_verify_request* request,
-                                      const TC_OCSP_workspace* workspace, size_t* work,
-                                      TC_OCSP_result* out)
-{
-  int64_t now;
-  if (!request || !workspace || !work || !out || !request->response.data ||
-      !request->certificate.data || !trust_anchor_present(request->issuer) || !request->parsing ||
-      !request->signatures || !workspace->frames || !workspace->extension_oids ||
-      !request->max_responses ||
-      (request->certificates && request->certificates->candidate_count &&
-       !request->certificates->candidate) ||
-      (request->expected_nonce.length &&
-       (!request->expected_nonce.data || request->expected_nonce.length < 32 ||
-        request->expected_nonce.length > 128)) ||
-      request_time(request, &now) != TC_TLV_OK)
-    return TC_TLV_ARGUMENT;
   if (request->response.length > *work)
     return TC_TLV_LIMIT;
   *work -= request->response.length;
@@ -675,11 +657,11 @@ TC_TLV_result TC_OCSP_response_verify(const TC_OCSP_verify_request* request,
                   (TC_TLV_frames){workspace->frames, workspace->frame_capacity}, NULL, NULL);
   if (status != TC_TLV_OK)
     return status;
-  TC_X509_workspace scratch = {workspace->frames, workspace->frame_capacity,
-                               workspace->extension_oids, workspace->extension_capacity};
+  TC_X509_workspace parser = {workspace->frames, workspace->frame_capacity, workspace->oids,
+                              workspace->oid_capacity};
   TC_X509_certificate certificate;
   status = TC_X509_read(request->certificate.data, request->certificate.length, request->parsing,
-                        &scratch, &certificate);
+                        &parser, &certificate);
   if (status != TC_TLV_OK)
     return status;
   int matches;
@@ -687,23 +669,45 @@ TC_TLV_result TC_OCSP_response_verify(const TC_OCSP_verify_request* request,
       name_matches(certificate.issuer, request->issuer->name, request, workspace, work, &matches);
   if (status != TC_TLV_OK || !matches)
     return status == TC_TLV_OK ? TC_TLV_INVALID : status;
-  ocsp_response parsed = {0};
+  ocsp_response parsed;
+  memset(&parsed, 0, sizeof parsed);
   status = parse_response(request, &certificate, workspace, work, &parsed);
   if (status != TC_TLV_OK)
     return status;
-  if (parsed.result.status == TC_OCSP_UNAVAILABLE) {
-    *out = parsed.result;
-    return TC_TLV_OK;
-  }
   if (request->expected_nonce.length &&
       (!parsed.nonce_present || !tc_pki_equal(request->expected_nonce, parsed.nonce)))
     return TC_TLV_INVALID;
-  status = time_check(request, now, &parsed.result);
+  status = time_check(request, &parsed.result);
+  if (status == TC_TLV_OK)
+    status = authorize_response(&parsed, request, workspace, work);
   if (status != TC_TLV_OK)
     return status;
-  status = authorize_response(&parsed, request, workspace, work);
-  if (status == TC_TLV_OK)
-    *out = parsed.result;
+  /* An authenticated unknown status gives no revocation decision. */
+  if (parsed.status == OCSP_UNKNOWN)
+    return TC_TLV_UNSUPPORTED;
+  parsed.result.status =
+      parsed.status == OCSP_REVOKED ? TC_X509_REVOCATION_REVOKED : TC_X509_REVOCATION_GOOD;
+  *out = parsed.result;
+  return TC_TLV_OK;
+}
+
+TC_TLV_result TC_X509_ocsp_response_verify(const TC_X509_ocsp_verify_request* request,
+                                           const TC_X509_path_workspace* workspace, size_t* work,
+                                           TC_X509_ocsp_result* out)
+{
+  if (!request || !workspace || !work || !out || !request->response.data ||
+      !request->certificate.data || !trust_anchor_present(request->issuer) || !request->parsing ||
+      !request->signatures || !workspace->frames || !workspace->oids || !request->max_responses ||
+      (request->certificates && request->certificates->candidate_count &&
+       !request->certificates->candidate) ||
+      (request->expected_nonce.length &&
+       (!request->expected_nonce.data || request->expected_nonce.length < 32 ||
+        request->expected_nonce.length > 128)) ||
+      TC_X509_time_check(&request->time.at) != TC_TLV_OK)
+    return TC_TLV_ARGUMENT;
+  TC_TLV_result status = verify_response(request, workspace, work, out);
+  if (status != TC_TLV_OK)
+    memset(out, 0, sizeof *out);
   return status;
 }
 
@@ -776,9 +780,9 @@ static request_layout request_sizes(const tc_hash_info* info, size_t serial_leng
   return layout;
 }
 
-TC_TLV_result TC_OCSP_request_encode(const TC_OCSP_encode_request* request,
-                                     const TC_OCSP_workspace* workspace, size_t* work,
-                                     TC_buffer encoded, size_t* length)
+TC_TLV_result TC_X509_ocsp_request_encode(const TC_X509_ocsp_encode_request* request,
+                                          const TC_X509_path_workspace* workspace, size_t* work,
+                                          TC_buffer encoded, size_t* length)
 {
   if (!request)
     return TC_TLV_ARGUMENT;
@@ -789,7 +793,7 @@ TC_TLV_result TC_OCSP_request_encode(const TC_OCSP_encode_request* request,
   const TC_TLV_limits* parsing = request->parsing;
   tc_hash_info info;
   if (!certificate.data || !trust_anchor_present(issuer) || !parsing || !workspace ||
-      !workspace->frames || !workspace->extension_oids || !work || !length ||
+      !workspace->frames || !workspace->oids || !work || !length ||
       (encoded.capacity && !encoded.data) ||
       (nonce.length && (!nonce.data || nonce.length < 32 || nonce.length > 128)))
     return TC_TLV_ARGUMENT;
@@ -809,8 +813,8 @@ TC_TLV_result TC_OCSP_request_encode(const TC_OCSP_encode_request* request,
   if ((hash != TC_HASH_SHA1 && hash != TC_HASH_SHA256) || !tc_hash_info_get(hash, &info) ||
       !tc_hash_available(hash))
     return TC_TLV_UNSUPPORTED;
-  TC_X509_workspace parser = {workspace->frames, workspace->frame_capacity,
-                              workspace->extension_oids, workspace->extension_capacity};
+  TC_X509_workspace parser = {workspace->frames, workspace->frame_capacity, workspace->oids,
+                              workspace->oid_capacity};
   TC_X509_certificate target;
   TC_TLV_result status =
       TC_X509_read(certificate.data, certificate.length, parsing, &parser, &target);

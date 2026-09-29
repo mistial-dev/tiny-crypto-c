@@ -509,6 +509,13 @@ missing required inputs, candidate-byte and work limits, and caller metadata/wor
 overlap before source reads. They check source-error propagation, rejection of
 callbacks that increase the work budget, and unchanged results on failure.
 The caller-owned workspace example is compiled and exercised too.
+`test_x509_ocsp_icam` runs the path check over the ICAM Root CA, Signing CA
+and card paths with OCSP responses. It covers a delegate with
+id-pkix-ocsp-nocheck, a delegate without it that needs CRL evidence, a REVOKED
+response that only OCSP can supply, fallback to CRLs for unknown and stale
+responses, OCSP argument checks, response overlap with scratch, and short work
+budgets. CRL freshness tests pin the clock-skew and max-age boundaries in
+`test_x509_crl` and through the public path check.
 
 Run the focused certificate-iterator and revocation-workspace tests with:
 

@@ -23,7 +23,7 @@ TC_TLV_result tc_x509_crl_entry_policy(const TC_X509_crl_extensions* crl,
       (!(entry->critical & TC_CRL_ENTRY_ISSUER) || !(crl->present & TC_X509_CRL_EXT_DISTRIBUTION) ||
        !crl->distribution.indirect))
     return TC_TLV_INVALID;
-  if ((entry->present & TC_CRL_ENTRY_REASON) && entry->reason == CRL_REASON_REMOVE &&
+  if ((entry->present & TC_CRL_ENTRY_REASON) && entry->reason == TC_PKI_CRL_REASON_REMOVE &&
       !(crl->present & TC_X509_CRL_EXT_DELTA))
     return TC_TLV_INVALID;
   return TC_TLV_OK;
@@ -49,38 +49,18 @@ TC_TLV_result tc_x509_crl_extension_policy(const TC_X509_crl_extensions* info)
   return TC_TLV_OK;
 }
 
-TC_TLV_result tc_x509_crl_fresh_at(const TC_X509_crl* crl, const TC_X509_time* at,
-                                   tc_x509_crl_freshness* out)
+TC_TLV_result tc_x509_crl_fresh_at(const TC_X509_crl* crl, const TC_X509_revocation_time* time,
+                                   tc_x509_freshness* out)
 {
-  TC_TLV_result result;
-  int from_start, to_end = 0, interval;
-  if (!crl || !at || !out || (crl->has_next_update != 0 && crl->has_next_update != 1))
+  if (!crl || !time || !out || (crl->has_next_update != 0 && crl->has_next_update != 1))
     return TC_TLV_ARGUMENT;
-  result = TC_X509_time_compare(at, &crl->this_update, &from_start);
-  if (result != TC_TLV_OK)
-    return result;
-  if (crl->has_next_update) {
-    result = TC_X509_time_compare(&crl->this_update, &crl->next_update, &interval);
-    if (result != TC_TLV_OK)
-      return result;
-    if (interval > 0)
-      return TC_TLV_INVALID;
-    result = TC_X509_time_compare(at, &crl->next_update, &to_end);
-    if (result != TC_TLV_OK)
-      return result;
-  }
-  if (from_start < 0)
-    *out = TC_X509_CRL_FUTURE;
-  else if (!crl->has_next_update)
-    *out = TC_X509_CRL_NO_NEXT_UPDATE;
-  else
-    *out = to_end < 0 ? TC_X509_CRL_CURRENT : TC_X509_CRL_STALE;
-  return TC_TLV_OK;
+  return tc_x509_freshness_at(time, &crl->this_update,
+                              crl->has_next_update ? &crl->next_update : NULL, out);
 }
 
 TC_TLV_result tc_x509_crl_coverage_at(const TC_X509_crl* crl,
                                       const TC_X509_crl_extensions* extensions,
-                                      const TC_X509_time* at,
+                                      const TC_X509_revocation_time* time,
                                       const tc_pki_distribution_point* point,
                                       TC_bytes certificate_issuer, int certificate_ca,
                                       const tc_x509_crl_decode* decode, tc_x509_crl_coverage* out)
@@ -92,7 +72,7 @@ TC_TLV_result tc_x509_crl_coverage_at(const TC_X509_crl* crl,
   const TC_X509_name_workspace* names = decode->names;
   tc_x509_crl_coverage coverage = {0};
   TC_TLV_result result;
-  if (!crl || !extensions || !at || !point || !limits || !tree || !tree->work || !names || !out ||
+  if (!crl || !extensions || !time || !point || !limits || !tree || !tree->work || !names || !out ||
       (certificate_ca != 0 && certificate_ca != 1))
     return TC_TLV_ARGUMENT;
   if (tc_pki_work_charge(tree->work, 1) != TC_TLV_OK)
@@ -100,10 +80,10 @@ TC_TLV_result tc_x509_crl_coverage_at(const TC_X509_crl* crl,
   result = tc_x509_crl_extension_policy(extensions);
   if (result != TC_TLV_OK)
     return result;
-  result = tc_x509_crl_fresh_at(crl, at, &coverage.freshness);
+  result = tc_x509_crl_fresh_at(crl, time, &coverage.freshness);
   if (result != TC_TLV_OK)
     return result;
-  if (coverage.freshness == TC_X509_CRL_CURRENT) {
+  if (coverage.freshness == TC_X509_FRESH_CURRENT) {
     const TC_X509_crl_distribution* idp =
         extensions->present & TC_X509_CRL_EXT_DISTRIBUTION ? &extensions->distribution : NULL;
     result = tc_x509_crl_scope_reasons(crl, idp, point, certificate_issuer, certificate_ca, decode,
@@ -422,23 +402,6 @@ TC_TLV_result tc_x509_crl_number_read(TC_bytes encoded, TC_bytes* out)
   return TC_TLV_OK;
 }
 
-TC_TLV_result tc_x509_crl_reason_read(TC_bytes encoded, unsigned* out)
-{
-  enum { ENUMERATED_TAG = 10 };
-  TC_TLV_element element;
-  TC_TLV_result result;
-  if (!out)
-    return TC_TLV_ARGUMENT;
-  result = crl_scalar(encoded, ENUMERATED_TAG, &element);
-  if (result != TC_TLV_OK)
-    return result;
-  if (TC_DER_integer_contents(element.value.data, element.value.length) != TC_TLV_OK ||
-      element.value.length != 1 || !tc_x509_crl_reason_known(element.value.data[0]))
-    return TC_TLV_INVALID;
-  *out = element.value.data[0];
-  return TC_TLV_OK;
-}
-
 TC_TLV_result tc_x509_crl_invalidity_date_read(TC_bytes encoded, TC_X509_time* out)
 {
   TC_TLV_element element;
@@ -596,7 +559,7 @@ static TC_TLV_result crl_extension_value(void* context, const TC_X509_extension*
   }
   if (id == TC_PKI_EXT_REASON_CODE) {
     unsigned reason;
-    TC_TLV_result result = tc_x509_crl_reason_read(extension->value, &reason);
+    TC_TLV_result result = tc_pki_crl_reason_read(extension->value, &reason);
     if (result == TC_TLV_OK && entry_info)
       entry_info->reason = reason;
     return result;

@@ -6,29 +6,36 @@
 /* RFC 6960 OCSP request encoding and response verification for one
  * certificate. Requires TC_ENABLE_X509_OCSP, which requires X.509 path
  * support and SHA-1: a byKey ResponderID is always a SHA-1 key hash
- * (RFC 6960 4.2.1). Nonces follow RFC 9654. See docs/api.md. */
+ * (RFC 6960 4.2.1). Nonces follow RFC 9654. Status and freshness use the
+ * shared revocation model of <tiny_crypto/x509_revocation.h>.
+ * TC_X509_path_check_revocation consumes responses for a whole path.
+ * See docs/api.md and docs/x509-revocation.md. */
 
-#include <tiny_crypto/x509_path.h>
+#include <tiny_crypto/x509_revocation.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef enum { TC_OCSP_GOOD, TC_OCSP_REVOKED, TC_OCSP_UNKNOWN, TC_OCSP_UNAVAILABLE } TC_OCSP_status;
-
 typedef struct {
-  TC_OCSP_status status;
-  TC_X509_time produced_at, this_update, next_update, revocation_time;
-  int has_next_update, has_revocation_time;
+  /* TC_X509_REVOCATION_GOOD or TC_X509_REVOCATION_REVOKED. */
+  TC_X509_revocation_status status;
+  TC_X509_time produced_at, this_update, next_update;
+  int has_next_update;
+  /* revocationTime of a REVOKED status. */
+  TC_X509_time revocation_time;
+  /* CRLReason of a REVOKED status (RFC 5280 5.3.1), valid when has_reason. */
+  unsigned reason;
+  int has_reason;
   /* DER certificate of the delegated responder that signed the response
-   * (RFC 6960 4.2.2.2). It is {NULL, 0} when the issuer signed directly and
-   * for UNAVAILABLE. The span borrows request->response or a store record. */
+   * (RFC 6960 4.2.2.2). It is {NULL, 0} when the issuer signed directly.
+   * The span borrows request->response or a store record. */
   TC_bytes responder_certificate;
   /* Nonzero when that delegate carries id-pkix-ocsp-nocheck. Zero for a
    * delegate means the caller must establish the delegate's own revocation
    * status before relying on the result (RFC 6960 4.2.2.2.1). */
   int responder_nocheck;
-} TC_OCSP_result;
+} TC_X509_ocsp_result;
 
 typedef struct {
   /* A complete DER OCSPResponse and the certificate it should cover. */
@@ -42,68 +49,67 @@ typedef struct {
   /* Optional untrusted delegate candidates, searched after the response's
    * own certs field. */
   const TC_X509_store_source* certificates;
-  /* Evaluation time. Checked with TC_X509_time_check. */
-  TC_X509_time at;
-  /* Seconds. producedAt and thisUpdate may be up to clock_skew_seconds after
-   * at. thisUpdate may be up to max_age_seconds before at - clock_skew_seconds.
-   * A present nextUpdate must not be before at - clock_skew_seconds. Both
-   * values must be at most INT64_MAX. */
-  size_t max_age_seconds, clock_skew_seconds;
+  /* Evaluation time and freshness (see TC_X509_revocation_time). producedAt
+   * must also be at most clock_skew_seconds after at. A response without
+   * nextUpdate needs a nonzero max_age_seconds. */
+  TC_X509_revocation_time time;
   /* max_responses bounds the SingleResponses read and must be nonzero.
    * max_certificates bounds the delegate candidates examined, from the certs
    * field and the store together. Zero examines none, which suffices for a
    * response signed by the issuer. */
   size_t max_responses, max_certificates;
   /* Applied to the OCSPResponse, the nested BasicOCSPResponse, the target
-   * certificate and every delegate candidate. max_input bounds the response. */
+   * certificate and every delegate candidate. max_input bounds the response
+   * and each certificate. */
   const TC_TLV_limits* parsing;
   const TC_X509_signature_provider* signatures;
-} TC_OCSP_verify_request;
-
-/* Caller-owned scratch. frames need one entry per constructed nesting level
- * of the deepest object parsed. extension_oids holds the extended key usage
- * OIDs of one delegate candidate and also bounds the extensions read from
- * each extension list. names is the Name comparison workspace. */
-typedef struct {
-  TC_TLV_frame* frames;
-  size_t frame_capacity;
-  TC_bytes* extension_oids;
-  size_t extension_capacity;
-  TC_X509_name_workspace names;
-} TC_OCSP_workspace;
+} TC_X509_ocsp_verify_request;
 
 /* Verify a complete DER OCSPResponse, including one received by stapling.
  * Response, certificate, store records and issuer remain borrowed and
  * unchanged during the call and while out->responder_certificate is used.
  * The certificate path and issuer must already be trusted by the caller.
  *
+ * workspace supplies frames, oids and names for parsing, extension checks
+ * and Name comparison. A delegate is validated as a one-certificate path
+ * below the issuer, which also uses certificates and summaries (one entry
+ * each) and the policy arrays. frames need one entry per constructed nesting
+ * level of the deepest object parsed. oids bounds the extensions of each
+ * extension list.
+ *
  * A response is accepted when the issuer signed it, or when a delegate
- * signed it that matches the ResponderID, is issued and signed by the issuer,
- * is valid at `at` and carries id-kp-OCSPSigning (RFC 6960 4.2.2.2). The
- * result names that delegate. The caller establishes the delegate's own
+ * signed it that matches the ResponderID and validates as a path below the
+ * issuer at time.at with time.clock_skew_seconds, with id-kp-OCSPSigning in
+ * its extended key usage and digitalSignature in a present key usage
+ * (RFC 6960 4.2.2.2). The result names that delegate and reports
+ * id-pkix-ocsp-nocheck. The caller establishes the delegate's own
  * revocation status, using responder_nocheck for RFC 6960 4.2.2.2.1.
  *
- * OK: out holds the status. A successful responseStatus is authenticated,
- *   and its nonce and freshness are checked. The unsigned responseStatus
- *   values internalError, tryLater and unauthorized yield UNAVAILABLE, which
- *   is unauthenticated and skips the signature, nonce and time checks.
+ * OK: the response is authenticated, fresh and echoes a present nonce, and
+ *   out->status is GOOD or REVOKED.
  * ARGUMENT: a required pointer or issuer span is NULL, a store with
  *   candidates has no candidate callback, max_responses is zero, the nonce
- *   length is outside 32..128, `at` fails TC_X509_time_check, or a time limit
- *   exceeds INT64_MAX or overflows with `at`. Checked before any parsing.
- *   Later, a store callback failure other than LIMIT or UNSUPPORTED, or a
- *   signature provider error for the issuer's own signature, is ARGUMENT.
- * LIMIT: work, a parsing limit, max_responses or max_certificates is exceeded.
- * UNSUPPORTED: an unknown response type, CertID hash, version, critical
- *   extension or signature algorithm, or the sigRequired responseStatus.
- * INVALID: malformed DER, no SingleResponse for the certificate, a wrong
- *   issuer, a nonce mismatch, stale or future times, or no authorized signer.
- * Every result other than OK leaves out unchanged. Work is charged for the
- * response and BasicOCSPResponse bytes, hashing, Name comparison and
- * signature verification. Work and scratch may change on every result. */
-TC_TLV_result TC_OCSP_response_verify(const TC_OCSP_verify_request* request,
-                                      const TC_OCSP_workspace* workspace, size_t* work,
-                                      TC_OCSP_result* out);
+ *   length is outside 32..128, or time.at fails TC_X509_time_check. Checked
+ *   before any parsing, with out unchanged. Later, a store callback failure
+ *   other than LIMIT or UNSUPPORTED, or a signature provider error, is
+ *   ARGUMENT.
+ * UNSUPPORTED: an authenticated unknown status, an unsuccessful
+ *   responseStatus other than malformedRequest (internalError, tryLater,
+ *   sigRequired, unauthorized), or an unknown response type, CertID hash,
+ *   version, critical extension or signature algorithm.
+ * INVALID: malformed DER, a malformedRequest responseStatus, an empty or
+ *   duplicate extension list entry, no SingleResponse for the certificate,
+ *   a duplicate one, a wrong issuer, a nonce mismatch, stale or future
+ *   times, a removeFromCRL reason, or no authorized signer.
+ * LIMIT: work, a parsing limit, workspace capacity, max_responses or
+ *   max_certificates is exceeded.
+ * After the argument checks, every result other than OK zeroes out. Work is
+ * charged for the response and BasicOCSPResponse bytes, extensions,
+ * hashing, Name comparison, delegate path validation and signature
+ * verification. Work and scratch may change on every result. */
+TC_TLV_result TC_X509_ocsp_response_verify(const TC_X509_ocsp_verify_request* request,
+                                           const TC_X509_path_workspace* workspace, size_t* work,
+                                           TC_X509_ocsp_result* out);
 
 /* One OCSPRequest for a single certificate. issuer names and holds the key
  * of the certificate's issuer. hash selects the CertID hash: SHA-256 is
@@ -115,11 +121,12 @@ typedef struct {
   TC_hash_algorithm hash;
   TC_bytes nonce;
   const TC_TLV_limits* parsing;
-} TC_OCSP_encode_request;
+} TC_X509_ocsp_encode_request;
 
 /* Encode one unsigned OCSPRequest (RFC 6960 4.1.1) into encoded and write its
  * size to length. The certificate, issuer and nonce stay borrowed and
- * unchanged during the call and must not overlap encoded.
+ * unchanged during the call and must not overlap encoded. workspace supplies
+ * frames, oids and names to parse the certificate and compare its issuer.
  *
  * Sizing: pass encoded = {NULL, 0} to query the size. When encoded is too
  * small the result is LIMIT, *length holds the required size and encoded is
@@ -138,9 +145,9 @@ typedef struct {
  * After argument validation, failures other than a short buffer set *length
  * to 0 and leave encoded unchanged. Work is charged for Name comparison and
  * for hashing the issuer name and key. */
-TC_TLV_result TC_OCSP_request_encode(const TC_OCSP_encode_request* request,
-                                     const TC_OCSP_workspace* workspace, size_t* work,
-                                     TC_buffer encoded, size_t* length);
+TC_TLV_result TC_X509_ocsp_request_encode(const TC_X509_ocsp_encode_request* request,
+                                          const TC_X509_path_workspace* workspace, size_t* work,
+                                          TC_buffer encoded, size_t* length);
 
 #ifdef __cplusplus
 }

@@ -1067,12 +1067,14 @@ int main(int argc, char** argv)
                                                      final_path.anchor_index,
                                                      CERTIFICATE_BYTES * (ISSUERS + 1),
                                                      TC_X509_CRL_COMPLETE_ONLY,
-                                                     TC_X509_CRL_ORDER_NUMBER};
+                                                     TC_X509_CRL_ORDER_NUMBER,
+                                                     {path.at, path.clock_skew_seconds, 0},
+                                                     {NULL, 0, 0, 0}};
       TC_X509_revocation_result result;
       failure = "Card certificate revocation check failed";
       const TC_TLV_result checked = example_check_path_revocation(
           chain, final_path.count, &revocation, &work, &sensitive.scratch.revocation, &result);
-      accepted = checked == TC_TLV_OK && result.status == TC_X509_CRL_UNREVOKED;
+      accepted = checked == TC_TLV_OK && result.status == TC_X509_REVOCATION_GOOD;
     }
   }
   if (accepted &&

@@ -575,7 +575,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
         abort();
     } else if (number.data || number.length != 99)
       abort();
-    result = tc_x509_crl_reason_read(input, &reason);
+    result = tc_pki_crl_reason_read(input, &reason);
     if (result == TC_TLV_OK) {
       if (reason > 10 || reason == 7)
         abort();

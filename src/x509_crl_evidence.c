@@ -13,7 +13,7 @@ static int crl_effective_match_valid(const TC_X509_crl_match* match)
   return (match->found == 0 || match->found == 1) &&
          (match->has_invalidity_date == 0 || match->has_invalidity_date == 1) &&
          (!match->found ||
-          (tc_x509_crl_reason_known(match->reason) && match->reason != CRL_REASON_REMOVE));
+          (tc_pki_crl_reason_known(match->reason) && match->reason != TC_PKI_CRL_REASON_REMOVE));
 }
 
 TC_TLV_result tc_x509_crl_evidence_status(const TC_X509_crl_evidence* evidence,
@@ -23,9 +23,9 @@ TC_TLV_result tc_x509_crl_evidence_status(const TC_X509_crl_evidence* evidence,
       !crl_effective_match_valid(&evidence->revocation) ||
       (!evidence->reasons && evidence->revocation.found))
     return TC_TLV_ARGUMENT;
-  *out = evidence->revocation.found                     ? TC_X509_CRL_REVOKED
-         : evidence->reasons == TC_X509_CRL_ALL_REASONS ? TC_X509_CRL_UNREVOKED
-                                                        : TC_X509_CRL_UNDETERMINED;
+  *out = evidence->revocation.found                     ? TC_X509_REVOCATION_REVOKED
+         : evidence->reasons == TC_X509_CRL_ALL_REASONS ? TC_X509_REVOCATION_GOOD
+                                                        : TC_X509_REVOCATION_UNDETERMINED;
   return TC_TLV_OK;
 }
 
@@ -46,7 +46,7 @@ TC_TLV_result tc_x509_crl_evidence_equal(const TC_X509_crl_evidence* left,
     *equal = 0;
     return TC_TLV_OK;
   }
-  if (a == TC_X509_CRL_REVOKED) {
+  if (a == TC_X509_REVOCATION_REVOKED) {
     const TC_X509_crl_match* x = &left->revocation;
     const TC_X509_crl_match* y = &right->revocation;
     if (x->reason != y->reason || x->has_invalidity_date != y->has_invalidity_date) {
@@ -86,7 +86,7 @@ TC_TLV_result tc_x509_crl_evidence_add(TC_X509_crl_evidence* evidence, uint16_t 
   result = tc_x509_crl_evidence_status(evidence, &status);
   if (result != TC_TLV_OK)
     return result;
-  if (status != TC_X509_CRL_UNDETERMINED)
+  if (status != TC_X509_REVOCATION_UNDETERMINED)
     return TC_TLV_END;
   if (!(reasons & ~evidence->reasons))
     return TC_TLV_OK;
@@ -103,12 +103,13 @@ TC_TLV_result tc_x509_crl_combine(const TC_X509_crl_match* base, const TC_X509_c
   if (!base || !out || (base->found != 0 && base->found != 1) ||
       (delta && delta->found != 0 && delta->found != 1))
     return TC_TLV_ARGUMENT;
-  if (base->found && (!tc_x509_crl_reason_known(base->reason) || base->reason == CRL_REASON_REMOVE))
+  if (base->found &&
+      (!tc_pki_crl_reason_known(base->reason) || base->reason == TC_PKI_CRL_REASON_REMOVE))
     return TC_TLV_INVALID;
-  if (delta && delta->found && !tc_x509_crl_reason_known(delta->reason))
+  if (delta && delta->found && !tc_pki_crl_reason_known(delta->reason))
     return TC_TLV_INVALID;
   result = delta && delta->found ? *delta : *base;
-  if (!result.found || result.reason == CRL_REASON_REMOVE)
+  if (!result.found || result.reason == TC_PKI_CRL_REASON_REMOVE)
     result = (TC_X509_crl_match){0};
   *out = result;
   return TC_TLV_OK;

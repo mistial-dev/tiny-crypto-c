@@ -186,16 +186,15 @@ TC_TLV_result tc_x509_crl_signer_usage(const TC_X509_certificate* signer,
   return TC_TLV_OK;
 }
 
-TC_TLV_result tc_x509_crl_selected_coverage(const tc_x509_crl_selected* selected,
-                                            const tc_x509_crl_query* query, const TC_X509_time* at,
-                                            const tc_x509_crl_decode* decode,
-                                            const TC_X509_crl_evidence* evidence,
-                                            tc_x509_crl_coverage* coverage)
+TC_TLV_result
+tc_x509_crl_selected_coverage(const tc_x509_crl_selected* selected, const tc_x509_crl_query* query,
+                              const TC_X509_revocation_time* time, const tc_x509_crl_decode* decode,
+                              const TC_X509_crl_evidence* evidence, tc_x509_crl_coverage* coverage)
 {
   /* The delta supplies the effective update interval. */
   TC_TLV_result result = tc_x509_crl_coverage_at(
       selected->delta ? selected->delta : selected->base,
-      selected->delta ? selected->delta_info : selected->base_info, at, query->point,
+      selected->delta ? selected->delta_info : selected->base_info, time, query->point,
       query->certificate->issuer, query->certificate_ca, decode, coverage);
   if (result != TC_TLV_OK)
     return result;
@@ -215,7 +214,7 @@ TC_TLV_result tc_x509_crl_selected_evidence(const tc_x509_crl_selected* selected
 }
 
 TC_TLV_result tc_x509_crl_apply(const tc_x509_crl_selected* selected,
-                                const tc_x509_crl_query* query, const TC_X509_time* at,
+                                const tc_x509_crl_query* query, const TC_X509_revocation_time* time,
                                 const tc_x509_crl_decode* decode, TC_X509_crl_evidence* evidence)
 {
   if (!decode)
@@ -226,16 +225,16 @@ TC_TLV_result tc_x509_crl_apply(const tc_x509_crl_selected* selected,
   TC_X509_revocation_status status;
   tc_x509_crl_coverage coverage;
   if (!selected || !selected->base || !selected->base_info || !query || !query->certificate ||
-      !query->point || !at || !limits || !tree || !tree->work || !names ||
+      !query->point || !time || !limits || !tree || !tree->work || !names ||
       (query->certificate_ca != 0 && query->certificate_ca != 1) ||
       !!selected->delta != !!selected->delta_info)
     return TC_TLV_ARGUMENT;
   TC_TLV_result result = tc_x509_crl_evidence_status(evidence, &status);
   if (result != TC_TLV_OK)
     return result;
-  if (status != TC_X509_CRL_UNDETERMINED)
+  if (status != TC_X509_REVOCATION_UNDETERMINED)
     return TC_TLV_END;
-  result = tc_x509_crl_selected_coverage(selected, query, at, decode, evidence, &coverage);
+  result = tc_x509_crl_selected_coverage(selected, query, time, decode, evidence, &coverage);
   if (result != TC_TLV_OK)
     return result;
   return tc_x509_crl_selected_evidence(selected, query->certificate, coverage.reasons, decode,

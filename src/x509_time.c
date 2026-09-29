@@ -84,6 +84,33 @@ TC_TLV_result tc_x509_time_window(const TC_X509_time* at, uint32_t skew_seconds,
   return TC_TLV_OK;
 }
 
+TC_TLV_result tc_x509_freshness_at(const TC_X509_revocation_time* time,
+                                   const TC_X509_time* this_update, const TC_X509_time* next_update,
+                                   tc_x509_freshness* out)
+{
+  int64_t at, updated, next = 0;
+  if (!time || !this_update || !out)
+    return TC_TLV_ARGUMENT;
+  if (TC_X509_time_to_unix(&time->at, &at) != TC_TLV_OK ||
+      TC_X509_time_to_unix(this_update, &updated) != TC_TLV_OK ||
+      (next_update && TC_X509_time_to_unix(next_update, &next) != TC_TLV_OK))
+    return TC_TLV_INVALID;
+  if (next_update && next < updated)
+    return TC_TLV_INVALID;
+  /* Calendar times convert to within about 2^38 seconds, so the skew and age
+   * arithmetic below cannot overflow int64_t. */
+  const int64_t early = at - (int64_t)time->clock_skew_seconds;
+  if (updated > at + (int64_t)time->clock_skew_seconds)
+    *out = TC_X509_FRESH_FUTURE;
+  else if (time->max_age_seconds && early - updated > (int64_t)time->max_age_seconds)
+    *out = TC_X509_FRESH_STALE;
+  else if (!next_update)
+    *out = TC_X509_FRESH_NO_NEXT_UPDATE;
+  else
+    *out = next > early ? TC_X509_FRESH_CURRENT : TC_X509_FRESH_STALE;
+  return TC_TLV_OK;
+}
+
 TC_TLV_result TC_X509_valid_at(const TC_X509_certificate* certificate, const TC_X509_time* at,
                                int* valid)
 {

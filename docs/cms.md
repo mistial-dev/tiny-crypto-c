@@ -119,7 +119,7 @@ OCTET STRING and may contain nested chunks, so its payload may be fragmented.
 value. Certificate, revocation and signer collections need further parsing.
 Validation reads certificates from the embedded CertificateSet. It ignores
 the embedded RevocationInfoChoices: revocation status comes from the CRL
-index or OCSP responses the caller supplies.
+index the caller supplies.
 
 [The fixed-workspace example](../examples/cms_reader.c) accepts envelopes up to
 16 KiB and returns parsing or resource-limit errors to its caller. Its
@@ -624,8 +624,10 @@ Supply the expected content type, signer index, signed-attribute encoding,
 holder usage policy and `TC_CMS_revocation_policy` explicitly. The CMS policy
 contains the CRL index, CRL-signer path policy, candidate-byte limit, delta
 policy, and ordering policy. Both path policies must use the same validation
-time. The validator binds CRL checks to the held certificate source and the
-anchor selected during path construction. Additional CRL signer certificates
+time. CRL freshness uses the CRL-signer policy's time and clock skew, with no
+age bound (see [x509-revocation.md](x509-revocation.md#freshness)). The
+validator binds CRL checks to the held certificate source and the anchor
+selected during path construction. Additional CRL signer certificates
 must be available from that source. Include the root certificate as a candidate
 when it signs a CRL. The separately configured trust anchor establishes trust,
 while the candidate supplies the CRL signer's certificate and extensions.

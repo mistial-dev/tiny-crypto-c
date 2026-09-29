@@ -56,3 +56,12 @@ carries no nonce and was generated with `-ndays 2`.
 
 OpenSSL `ocsp -respin ... -issuer issuer -cert card -CAfile issuer
 -partial_chain -no_nonce` verified each response and returned `good`.
+
+## Path revocation cases
+
+`root.der` is a DER conversion of the vendored
+`../../icam/ca/roots/00_ICAM_Test_Card_Root_CA.crt`, the issuer of
+`issuer.der`. The path revocation tests use it as the anchor, together with
+the vendored `ICAMTestCardRootCA.crl` and `ICAMTestCardGen3SigningCA.crl`
+from `../../icam/ca/crls`. The second CRL is signed by `issuer.der`, and
+neither lists a revoked certificate.

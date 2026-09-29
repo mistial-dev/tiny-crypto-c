@@ -465,7 +465,7 @@ static MunitResult extension_values(const MunitParameter params[], void* user)
     reason[2] = (uint8_t)i;
     code = 99;
     const int valid = i <= 10 && i != 7;
-    munit_assert_int(tc_x509_crl_reason_read((TC_bytes){reason, sizeof reason}, &code), ==,
+    munit_assert_int(tc_pki_crl_reason_read((TC_bytes){reason, sizeof reason}, &code), ==,
                      valid ? TC_TLV_OK : TC_TLV_INVALID);
     munit_assert_uint(code, ==, valid ? i : 99);
   }
@@ -1117,13 +1117,13 @@ static MunitResult evidence_status(const MunitParameter params[], void* user)
     const uint16_t reasons = (uint16_t)(subset << 1);
     evidence = (TC_X509_crl_evidence){0};
     munit_assert_int(tc_x509_crl_evidence_status(&evidence, &status), ==, TC_TLV_OK);
-    munit_assert_int(status, ==, TC_X509_CRL_UNDETERMINED);
+    munit_assert_int(status, ==, TC_X509_REVOCATION_UNDETERMINED);
     munit_assert_int(tc_x509_crl_evidence_add(&evidence, reasons, &absent), ==, TC_TLV_OK);
     munit_assert_uint(evidence.reasons, ==, reasons);
     munit_assert_int(tc_x509_crl_evidence_status(&evidence, &status), ==, TC_TLV_OK);
     munit_assert_int(status, ==,
-                     reasons == TC_X509_CRL_ALL_REASONS ? TC_X509_CRL_UNREVOKED
-                                                        : TC_X509_CRL_UNDETERMINED);
+                     reasons == TC_X509_CRL_ALL_REASONS ? TC_X509_REVOCATION_GOOD
+                                                        : TC_X509_REVOCATION_UNDETERMINED);
     memcpy(&saved, &evidence, sizeof saved);
     munit_assert_int(tc_x509_crl_evidence_add(&evidence, reasons, &revoked), ==,
                      reasons == TC_X509_CRL_ALL_REASONS ? TC_TLV_END : TC_TLV_OK);
@@ -1133,12 +1133,12 @@ static MunitResult evidence_status(const MunitParameter params[], void* user)
           tc_x509_crl_evidence_add(&evidence, TC_X509_CRL_ALL_REASONS ^ reasons, &absent), ==,
           TC_TLV_OK);
     munit_assert_int(tc_x509_crl_evidence_status(&evidence, &status), ==, TC_TLV_OK);
-    munit_assert_int(status, ==, TC_X509_CRL_UNREVOKED);
+    munit_assert_int(status, ==, TC_X509_REVOCATION_GOOD);
   }
   evidence = (TC_X509_crl_evidence){0};
   munit_assert_int(tc_x509_crl_evidence_add(&evidence, 2, &revoked), ==, TC_TLV_OK);
   munit_assert_int(tc_x509_crl_evidence_status(&evidence, &status), ==, TC_TLV_OK);
-  munit_assert_int(status, ==, TC_X509_CRL_REVOKED);
+  munit_assert_int(status, ==, TC_X509_REVOCATION_REVOKED);
   munit_assert_memory_equal(sizeof revoked, &evidence.revocation, &revoked);
   memcpy(&saved, &evidence, sizeof saved);
   munit_assert_int(tc_x509_crl_evidence_add(&evidence, TC_X509_CRL_ALL_REASONS, &absent), ==,
@@ -1163,7 +1163,7 @@ static MunitResult evidence_status(const MunitParameter params[], void* user)
     munit_assert_int(tc_x509_crl_evidence_add(&evidence, TC_X509_CRL_ALL_REASONS, &combined), ==,
                      TC_TLV_OK);
     munit_assert_int(tc_x509_crl_evidence_status(&evidence, &status), ==, TC_TLV_OK);
-    munit_assert_int(status, ==, TC_X509_CRL_UNREVOKED);
+    munit_assert_int(status, ==, TC_X509_REVOCATION_GOOD);
   }
   const uint16_t invalid_masks[] = {1, 1u << 9, 1u << 15};
   for (size_t i = 0; i < sizeof invalid_masks / sizeof invalid_masks[0]; ++i) {
@@ -1173,9 +1173,9 @@ static MunitResult evidence_status(const MunitParameter params[], void* user)
                      TC_TLV_ARGUMENT);
     munit_assert_memory_equal(sizeof evidence, &evidence, &saved);
     evidence.reasons = invalid_masks[i];
-    status = TC_X509_CRL_REVOKED;
+    status = TC_X509_REVOCATION_REVOKED;
     munit_assert_int(tc_x509_crl_evidence_status(&evidence, &status), ==, TC_TLV_ARGUMENT);
-    munit_assert_int(status, ==, TC_X509_CRL_REVOKED);
+    munit_assert_int(status, ==, TC_X509_REVOCATION_REVOKED);
   }
   for (unsigned field = 0; field < 2; ++field) {
     TC_X509_crl_match invalid = revoked;
@@ -1190,9 +1190,9 @@ static MunitResult evidence_status(const MunitParameter params[], void* user)
     munit_assert_memory_equal(sizeof evidence, &evidence, &saved);
     evidence.reasons = 2;
     evidence.revocation = invalid;
-    status = TC_X509_CRL_UNREVOKED;
+    status = TC_X509_REVOCATION_GOOD;
     munit_assert_int(tc_x509_crl_evidence_status(&evidence, &status), ==, TC_TLV_ARGUMENT);
-    munit_assert_int(status, ==, TC_X509_CRL_UNREVOKED);
+    munit_assert_int(status, ==, TC_X509_REVOCATION_GOOD);
   }
   evidence = (TC_X509_crl_evidence){0};
   munit_assert_int(tc_x509_crl_evidence_add(&evidence, 2, &evidence.revocation), ==, TC_TLV_OK);
@@ -2032,6 +2032,18 @@ static MunitResult extension_info(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+static tc_x509_freshness fresh_at(const TC_X509_crl* crl, TC_X509_time at, uint32_t skew,
+                                  uint32_t max_age)
+{
+  const TC_X509_revocation_time time = {at, skew, max_age};
+  tc_x509_freshness state = TC_X509_FRESH_NO_NEXT_UPDATE;
+  munit_assert_int(tc_x509_crl_fresh_at(crl, &time, &state), ==, TC_TLV_OK);
+  return state;
+}
+
+/* Current means thisUpdate <= at + skew, nextUpdate > at - skew and, under a
+ * nonzero max_age, at - skew - thisUpdate <= max_age (RFC 5280 6.3.3 (a)(2)
+ * with the TC_X509_revocation_time bounds). */
 static MunitResult freshness(const MunitParameter params[], void* user)
 {
   (void)params;
@@ -2042,48 +2054,58 @@ static MunitResult freshness(const MunitParameter params[], void* user)
   crl.has_next_update = 1;
   const struct {
     TC_X509_time at;
-    tc_x509_crl_freshness expected;
-  } cases[] = {{{2049, 12, 31, 23, 59, 58}, TC_X509_CRL_FUTURE},
-               {{2049, 12, 31, 23, 59, 59}, TC_X509_CRL_CURRENT},
-               {{2050, 1, 1, 0, 0, 0}, TC_X509_CRL_CURRENT},
-               {{2050, 1, 1, 0, 0, 1}, TC_X509_CRL_STALE},
-               {{2050, 1, 1, 0, 0, 2}, TC_X509_CRL_STALE}};
-  for (size_t i = 0; i < sizeof cases / sizeof cases[0]; ++i) {
-    tc_x509_crl_freshness state = TC_X509_CRL_NO_NEXT_UPDATE;
-    munit_assert_int(tc_x509_crl_fresh_at(&crl, &cases[i].at, &state), ==, TC_TLV_OK);
-    munit_assert_int(state, ==, cases[i].expected);
-  }
-  tc_x509_crl_freshness state = TC_X509_CRL_CURRENT;
+    tc_x509_freshness expected;
+  } cases[] = {{{2049, 12, 31, 23, 59, 58}, TC_X509_FRESH_FUTURE},
+               {{2049, 12, 31, 23, 59, 59}, TC_X509_FRESH_CURRENT},
+               {{2050, 1, 1, 0, 0, 0}, TC_X509_FRESH_CURRENT},
+               {{2050, 1, 1, 0, 0, 1}, TC_X509_FRESH_STALE},
+               {{2050, 1, 1, 0, 0, 2}, TC_X509_FRESH_STALE}};
+  for (size_t i = 0; i < sizeof cases / sizeof cases[0]; ++i)
+    munit_assert_int(fresh_at(&crl, cases[i].at, 0, 0), ==, cases[i].expected);
+
+  /* Clock skew widens both ends by the same amount. */
+  const TC_X509_time early = {2049, 12, 31, 23, 59, 49};
+  munit_assert_int(fresh_at(&crl, early, 9, 0), ==, TC_X509_FRESH_FUTURE);
+  munit_assert_int(fresh_at(&crl, early, 10, 0), ==, TC_X509_FRESH_CURRENT);
+  const TC_X509_time late = {2050, 1, 1, 0, 0, 11};
+  munit_assert_int(fresh_at(&crl, late, 10, 0), ==, TC_X509_FRESH_STALE);
+  munit_assert_int(fresh_at(&crl, late, 11, 0), ==, TC_X509_FRESH_CURRENT);
+
+  /* max_age bounds thisUpdate against at - skew. Zero sets no bound. */
+  crl.next_update = (TC_X509_time){2050, 2, 1, 0, 0, 0};
+  const TC_X509_time aged = {2050, 1, 1, 0, 0, 59};
+  munit_assert_int(fresh_at(&crl, aged, 0, 0), ==, TC_X509_FRESH_CURRENT);
+  munit_assert_int(fresh_at(&crl, aged, 0, 60), ==, TC_X509_FRESH_CURRENT);
+  munit_assert_int(fresh_at(&crl, aged, 0, 59), ==, TC_X509_FRESH_STALE);
+  munit_assert_int(fresh_at(&crl, aged, 1, 59), ==, TC_X509_FRESH_CURRENT);
+  crl.next_update = (TC_X509_time){2050, 1, 1, 0, 0, 1};
+
   crl.has_next_update = 0;
-  munit_assert_int(tc_x509_crl_fresh_at(&crl, &crl.this_update, &state), ==, TC_TLV_OK);
-  munit_assert_int(state, ==, TC_X509_CRL_NO_NEXT_UPDATE);
-  munit_assert_int(tc_x509_crl_fresh_at(&crl, &cases[0].at, &state), ==, TC_TLV_OK);
-  munit_assert_int(state, ==, TC_X509_CRL_FUTURE);
+  munit_assert_int(fresh_at(&crl, crl.this_update, 0, 0), ==, TC_X509_FRESH_NO_NEXT_UPDATE);
+  munit_assert_int(fresh_at(&crl, cases[0].at, 0, 0), ==, TC_X509_FRESH_FUTURE);
+  munit_assert_int(fresh_at(&crl, aged, 0, 59), ==, TC_X509_FRESH_STALE);
   crl.has_next_update = 1;
   crl.next_update = crl.this_update;
-  munit_assert_int(tc_x509_crl_fresh_at(&crl, &crl.this_update, &state), ==, TC_TLV_OK);
-  munit_assert_int(state, ==, TC_X509_CRL_STALE);
+  munit_assert_int(fresh_at(&crl, crl.this_update, 0, 0), ==, TC_X509_FRESH_STALE);
   crl.next_update.second--;
-  state = TC_X509_CRL_NO_NEXT_UPDATE;
-  munit_assert_int(tc_x509_crl_fresh_at(&crl, &crl.this_update, &state), ==, TC_TLV_INVALID);
-  munit_assert_int(state, ==, TC_X509_CRL_NO_NEXT_UPDATE);
+  tc_x509_freshness state = TC_X509_FRESH_NO_NEXT_UPDATE;
+  TC_X509_revocation_time time = {crl.this_update, 0, 0};
+  munit_assert_int(tc_x509_crl_fresh_at(&crl, &time, &state), ==, TC_TLV_INVALID);
+  munit_assert_int(state, ==, TC_X509_FRESH_NO_NEXT_UPDATE);
   crl.this_update = (TC_X509_time){2024, 2, 29, 0, 0, 0};
   crl.next_update = (TC_X509_time){2024, 3, 1, 0, 0, 0};
-  munit_assert_int(tc_x509_crl_fresh_at(&crl, &crl.this_update, &state), ==, TC_TLV_OK);
-  munit_assert_int(state, ==, TC_X509_CRL_CURRENT);
+  munit_assert_int(fresh_at(&crl, crl.this_update, 0, 0), ==, TC_X509_FRESH_CURRENT);
   TC_X509_time invalid = {2023, 2, 29, 0, 0, 0};
   for (unsigned field = 0; field < 3; ++field) {
     TC_X509_crl bad = crl;
-    const TC_X509_time* at = &crl.this_update;
-    if (field == 0)
-      at = &invalid;
-    else if (field == 1)
+    time.at = field == 0 ? invalid : crl.this_update;
+    if (field == 1)
       bad.this_update = invalid;
-    else
+    else if (field == 2)
       bad.next_update = invalid;
-    state = TC_X509_CRL_NO_NEXT_UPDATE;
-    munit_assert_int(tc_x509_crl_fresh_at(&bad, at, &state), ==, TC_TLV_INVALID);
-    munit_assert_int(state, ==, TC_X509_CRL_NO_NEXT_UPDATE);
+    state = TC_X509_FRESH_NO_NEXT_UPDATE;
+    munit_assert_int(tc_x509_crl_fresh_at(&bad, &time, &state), ==, TC_TLV_INVALID);
+    munit_assert_int(state, ==, TC_X509_FRESH_NO_NEXT_UPDATE);
   }
   return MUNIT_OK;
 }
@@ -2187,25 +2209,26 @@ static MunitResult scope_reasons(const MunitParameter params[], void* user)
     info.distribution.ca_only = 1;
     info.distribution.has_reasons = 1;
     info.distribution.reasons = 10;
-    const tc_x509_crl_freshness states[] = {TC_X509_CRL_FUTURE, TC_X509_CRL_CURRENT,
-                                            TC_X509_CRL_STALE, TC_X509_CRL_NO_NEXT_UPDATE};
+    const tc_x509_freshness states[] = {TC_X509_FRESH_FUTURE, TC_X509_FRESH_CURRENT,
+                                        TC_X509_FRESH_STALE, TC_X509_FRESH_NO_NEXT_UPDATE};
     for (unsigned state = 0; state < sizeof states / sizeof states[0]; ++state)
       for (int restricted = 0; restricted <= 1; ++restricted)
         for (int ca = 0; ca <= 1; ++ca) {
           TC_X509_time at = crl.this_update;
-          if (states[state] == TC_X509_CRL_FUTURE)
+          if (states[state] == TC_X509_FRESH_FUTURE)
             --at.year;
-          if (states[state] == TC_X509_CRL_STALE)
+          if (states[state] == TC_X509_FRESH_STALE)
             ++at.year;
-          crl.has_next_update = states[state] != TC_X509_CRL_NO_NEXT_UPDATE;
+          crl.has_next_update = states[state] != TC_X509_FRESH_NO_NEXT_UPDATE;
           info.present = info.critical = restricted ? TC_X509_CRL_EXT_DISTRIBUTION : 0;
-          const uint16_t wanted = states[state] != TC_X509_CRL_CURRENT ? 0
-                                  : !restricted                        ? point.reasons
-                                  : ca                                 ? 2
-                                                                       : 0;
+          const uint16_t wanted = states[state] != TC_X509_FRESH_CURRENT ? 0
+                                  : !restricted                          ? point.reasons
+                                  : ca                                   ? 2
+                                                                         : 0;
           work = WORK_BUDGET;
           munit_assert_int(tc_x509_crl_coverage_at(
-                               &crl, &info, &at, &point, crl.issuer, ca,
+                               &crl, &info, &(TC_X509_revocation_time){at, 0, 0}, &point,
+                               crl.issuer, ca,
                                &(tc_x509_crl_decode){&limits, &tree, &names, NULL, 0}, &coverage),
                            ==, TC_TLV_OK);
           munit_assert_int(coverage.freshness, ==, states[state]);
@@ -2215,14 +2238,16 @@ static MunitResult scope_reasons(const MunitParameter params[], void* user)
             work = budget;
             memcpy(&coverage, &saved, sizeof coverage);
             munit_assert_int(tc_x509_crl_coverage_at(
-                                 &crl, &info, &at, &point, crl.issuer, ca,
+                                 &crl, &info, &(TC_X509_revocation_time){at, 0, 0}, &point,
+                                 crl.issuer, ca,
                                  &(tc_x509_crl_decode){&limits, &tree, &names, NULL, 0}, &coverage),
                              ==, TC_TLV_LIMIT);
             munit_assert_memory_equal(sizeof coverage, &coverage, &saved);
           }
           work = required;
           munit_assert_int(tc_x509_crl_coverage_at(
-                               &crl, &info, &at, &point, crl.issuer, ca,
+                               &crl, &info, &(TC_X509_revocation_time){at, 0, 0}, &point,
+                               crl.issuer, ca,
                                &(tc_x509_crl_decode){&limits, &tree, &names, NULL, 0}, &coverage),
                            ==, TC_TLV_OK);
           munit_assert_size(work, ==, 0);
@@ -2230,27 +2255,30 @@ static MunitResult scope_reasons(const MunitParameter params[], void* user)
     info.critical = 0;
     work = WORK_BUDGET;
     memcpy(&coverage, &saved, sizeof coverage);
-    munit_assert_int(tc_x509_crl_coverage_at(&crl, &info, &crl.this_update, &point, crl.issuer, 0,
-                                             &(tc_x509_crl_decode){&limits, &tree, &names, NULL, 0},
-                                             &coverage),
-                     ==, TC_TLV_INVALID);
+    munit_assert_int(
+        tc_x509_crl_coverage_at(&crl, &info, &(TC_X509_revocation_time){crl.this_update, 0, 0},
+                                &point, crl.issuer, 0,
+                                &(tc_x509_crl_decode){&limits, &tree, &names, NULL, 0}, &coverage),
+        ==, TC_TLV_INVALID);
     munit_assert_memory_equal(sizeof coverage, &coverage, &saved);
     info = (TC_X509_crl_extensions){0};
     static const uint8_t unknown_oid[] = {0x2a, 3};
     info.unknown_critical_oid = (TC_bytes){unknown_oid, sizeof unknown_oid};
     work = WORK_BUDGET;
-    munit_assert_int(tc_x509_crl_coverage_at(&crl, &info, &crl.this_update, &point, crl.issuer, 0,
-                                             &(tc_x509_crl_decode){&limits, &tree, &names, NULL, 0},
-                                             &coverage),
-                     ==, TC_TLV_UNSUPPORTED);
+    munit_assert_int(
+        tc_x509_crl_coverage_at(&crl, &info, &(TC_X509_revocation_time){crl.this_update, 0, 0},
+                                &point, crl.issuer, 0,
+                                &(tc_x509_crl_decode){&limits, &tree, &names, NULL, 0}, &coverage),
+        ==, TC_TLV_UNSUPPORTED);
     munit_assert_memory_equal(sizeof coverage, &coverage, &saved);
     info.unknown_critical_oid = (TC_bytes){NULL, 0};
     crl.this_update.year = 0;
     work = WORK_BUDGET;
-    munit_assert_int(tc_x509_crl_coverage_at(&crl, &info, &crl.next_update, &point, crl.issuer, 0,
-                                             &(tc_x509_crl_decode){&limits, &tree, &names, NULL, 0},
-                                             &coverage),
-                     ==, TC_TLV_INVALID);
+    munit_assert_int(
+        tc_x509_crl_coverage_at(&crl, &info, &(TC_X509_revocation_time){crl.next_update, 0, 0},
+                                &point, crl.issuer, 0,
+                                &(tc_x509_crl_decode){&limits, &tree, &names, NULL, 0}, &coverage),
+        ==, TC_TLV_INVALID);
     munit_assert_memory_equal(sizeof coverage, &coverage, &saved);
   }
   return MUNIT_OK;

@@ -103,22 +103,23 @@ TC_TLV_result tc_x509_crl_signature_cached(const tc_x509_crl_signature_cache* ca
 }
 
 TC_TLV_result tc_x509_crl_delta_select(const tc_x509_crl_signature_cache* signer, size_t base,
-                                       const TC_X509_time* at, const tc_pki_tree_workspace* tree,
-                                       int* conflict, tc_x509_crl_selected* out)
+                                       const TC_X509_revocation_time* time,
+                                       const tc_pki_tree_workspace* tree, int* conflict,
+                                       tc_x509_crl_selected* out)
 {
   tc_x509_crl_selected candidate, chosen = {0};
   TC_TLV_result result;
   size_t cursor = 0;
   int conflicting = 0;
-  if (!signer || !signer->signer || !at || !tree || !out)
+  if (!signer || !signer->signer || !time || !tree || !out)
     return TC_TLV_ARGUMENT;
   while ((result = tc_x509_crl_delta_next(signer->index, base, &cursor, signer->limits, tree,
                                           signer->names, &candidate)) == TC_TLV_OK) {
-    tc_x509_crl_freshness freshness;
-    result = tc_x509_crl_fresh_at(candidate.delta, at, &freshness);
+    tc_x509_freshness freshness;
+    result = tc_x509_crl_fresh_at(candidate.delta, time, &freshness);
     if (result != TC_TLV_OK)
       return result;
-    if (freshness != TC_X509_CRL_CURRENT)
+    if (freshness != TC_X509_FRESH_CURRENT)
       continue;
     /* Signature states are optional. Without them each delta is verified. */
     result = signer->states ? tc_x509_crl_signature_cached(signer, cursor - 1, tree->work)
@@ -181,10 +182,10 @@ TC_TLV_result tc_x509_crl_effective_next(const tc_x509_crl_scope_context* scope,
     return TC_TLV_ARGUMENT;
   const tc_x509_crl_signature_cache* cache = scope->cache;
   const TC_X509_crl_delta_policy delta_policy = scope->delta_policy;
-  const TC_X509_time* at = scope->at;
+  const TC_X509_revocation_time* time = scope->time;
   const tc_pki_tree_workspace* tree = scope->tree;
   if (!tc_x509_crl_signature_cache_valid(cache) || reference >= cache->index->count || !cursor ||
-      *cursor > cache->index->count || !at || !tree || !tree->work || !out ||
+      *cursor > cache->index->count || !time || !tree || !tree->work || !out ||
       !x509_crl_delta_policy_valid(delta_policy))
     return TC_TLV_ARGUMENT;
   const TC_X509_crl_record* reference_record = &cache->index->records[reference];
@@ -207,12 +208,12 @@ TC_TLV_result tc_x509_crl_effective_next(const tc_x509_crl_scope_context* scope,
     }
     if (!same_scope)
       continue;
-    tc_x509_crl_freshness freshness;
-    result = tc_x509_crl_fresh_at(&base->crl, at, &freshness);
+    tc_x509_freshness freshness;
+    result = tc_x509_crl_fresh_at(&base->crl, time, &freshness);
     if (result != TC_TLV_OK)
       return result;
-    if (freshness == TC_X509_CRL_FUTURE ||
-        (delta_policy == TC_X509_CRL_COMPLETE_ONLY && freshness != TC_X509_CRL_CURRENT))
+    if (freshness == TC_X509_FRESH_FUTURE ||
+        (delta_policy == TC_X509_CRL_COMPLETE_ONLY && freshness != TC_X509_FRESH_CURRENT))
       continue;
     result = tc_x509_crl_signature_cached(cache, i, tree->work);
     if (result == TC_TLV_INVALID)
@@ -223,9 +224,9 @@ TC_TLV_result tc_x509_crl_effective_next(const tc_x509_crl_scope_context* scope,
     int conflicting = 0;
     if (delta_policy != TC_X509_CRL_COMPLETE_ONLY) {
       result =
-          tc_x509_crl_delta_select(cache, i, at, tree, conflict ? &conflicting : NULL, &selected);
+          tc_x509_crl_delta_select(cache, i, time, tree, conflict ? &conflicting : NULL, &selected);
       if (result == TC_TLV_END) {
-        if (delta_policy == TC_X509_CRL_DELTA_REQUIRED || freshness != TC_X509_CRL_CURRENT)
+        if (delta_policy == TC_X509_CRL_DELTA_REQUIRED || freshness != TC_X509_FRESH_CURRENT)
           continue;
       } else if (result != TC_TLV_OK)
         return result;
@@ -288,7 +289,7 @@ TC_TLV_result tc_x509_crl_scope_evaluate(const tc_x509_crl_scope_context* scope,
   const tc_x509_crl_signature_cache* cache = scope->cache;
   const TC_X509_crl_delta_policy delta_policy = scope->delta_policy;
   const TC_X509_crl_order_policy order_policy = scope->order_policy;
-  const TC_X509_time* at = scope->at;
+  const TC_X509_revocation_time* time = scope->time;
   const tc_pki_tree_workspace* tree = scope->tree;
   TC_X509_revocation_status status;
   tc_x509_crl_selected selected;
@@ -300,12 +301,12 @@ TC_TLV_result tc_x509_crl_scope_evaluate(const tc_x509_crl_scope_context* scope,
   if (!tc_x509_crl_signature_cache_valid(cache) || reference >= cache->index->count ||
       !x509_crl_delta_policy_valid(delta_policy) || !x509_crl_order_policy_valid(order_policy) ||
       !query || !query->certificate || !query->point ||
-      (query->certificate_ca != 0 && query->certificate_ca != 1) || !at || !tree || !tree->work)
+      (query->certificate_ca != 0 && query->certificate_ca != 1) || !time || !tree || !tree->work)
     return TC_TLV_ARGUMENT;
   TC_TLV_result result = tc_x509_crl_evidence_status(evidence, &status);
   if (result != TC_TLV_OK)
     return result;
-  if (status != TC_X509_CRL_UNDETERMINED)
+  if (status != TC_X509_REVOCATION_UNDETERMINED)
     return TC_TLV_END;
   result = tc_x509_crl_latest(scope, reference, &latest, preference ? &conflict : NULL);
   if (result != TC_TLV_OK)
@@ -328,7 +329,7 @@ TC_TLV_result tc_x509_crl_scope_evaluate(const tc_x509_crl_scope_context* scope,
       return TC_TLV_INVALID;
     TC_X509_crl_evidence candidate = {0};
     result = tc_x509_crl_apply(
-        &selected, query, at,
+        &selected, query, time,
         &(tc_x509_crl_decode){cache->limits, tree, cache->names, scope->oids, scope->oid_capacity},
         &candidate);
     if (result == TC_TLV_END)
