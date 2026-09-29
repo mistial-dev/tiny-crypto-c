@@ -19,19 +19,11 @@ TC_TLV_result tc_x509_crl_scope_run(const tc_x509_crl_candidate_source* candidat
                                     const TC_bytes writes[CRL_SCOPE_WRITES], int* source_failed,
                                     TC_X509_search_result* out)
 {
-  if (!candidates || !candidates->search || !selection || !writes || !source_failed)
-    return TC_TLV_ARGUMENT;
   const TC_bytes* points = selection->points;
-  const int from_certificate = selection->from_certificate;
-  const int all_scopes = selection->all_scopes;
-  TC_TLV_result result = tc_x509_crl_scope_arguments(processing, trust, all_scopes, out);
-  if (result != TC_TLV_OK)
-    return result;
   const TC_X509_path_options* options = trust->options;
   const tc_pki_tree_workspace* tree = trust->tree;
   const TC_X509_path_workspace* validation = trust->validation;
   const TC_X509_store_source* path_source = trust->source;
-  const size_t initial_work = *tree->work;
   TC_TLV_reader point_reader;
   tc_x509_crl_certificate_fields fields = {0};
   fields.limits = &options->parsing;
@@ -39,9 +31,9 @@ TC_TLV_result tc_x509_crl_scope_run(const tc_x509_crl_candidate_source* candidat
   fields.ca = processing->query->certificate_ca;
   if (points)
     fields.points = *points;
-  result =
-      tc_x509_crl_points_init(&fields, from_certificate ? processing->query->certificate : NULL,
-                              validation->oids, validation->oid_capacity, &point_reader);
+  TC_TLV_result result = tc_x509_crl_points_init(
+      &fields, selection->from_certificate ? processing->query->certificate : NULL,
+      validation->oids, validation->oid_capacity, &point_reader);
   if (result != TC_TLV_OK)
     return result;
   tc_pki_source_status_guard path_guard = {{path_source, writes, CRL_SCOPE_WRITES}, source_failed};
@@ -61,11 +53,8 @@ TC_TLV_result tc_x509_crl_scope_run(const tc_x509_crl_candidate_source* candidat
   tc_x509_crl_trust guarded_trust = *trust;
   guarded_trust.source = &guarded_path;
   const tc_x509_crl_searcher searcher = {&source, tc_x509_crl_source_search};
-  result = tc_x509_crl_scopes(&searcher, processing, &guarded_trust, &fields, &point_reader,
-                              all_scopes, source_failed, out);
-  if (result == TC_TLV_OK && !all_scopes)
-    out->validation.work_used = initial_work - *tree->work;
-  return result;
+  return tc_x509_crl_scopes(&searcher, processing, &guarded_trust, &fields, &point_reader,
+                            selection->all_scopes, source_failed, out);
 }
 
 TC_TLV_result tc_x509_crl_scope_prepare(const tc_x509_crl_operation_source* candidates,
@@ -101,8 +90,6 @@ TC_TLV_result tc_x509_crl_scope_execute(const tc_x509_crl_operation_source* cand
                                         const tc_x509_crl_scope_processing* processing,
                                         const tc_x509_crl_trust* trust,
                                         const tc_x509_crl_scope_selection* selection,
-                                        const tc_x509_crl_extra_storage* extra,
-                                        const tc_x509_crl_held_path* path,
                                         TC_X509_search_result* out)
 {
   if (!selection)
@@ -113,15 +100,14 @@ TC_TLV_result tc_x509_crl_scope_execute(const tc_x509_crl_operation_source* cand
     return result;
   TC_bytes writes[CRL_SCOPE_WRITES];
   const size_t initial_work = *trust->tree->work;
-  result = tc_x509_crl_scope_prepare(candidates, processing, trust, selection->points, extra, path,
+  result = tc_x509_crl_scope_prepare(candidates, processing, trust, selection->points, NULL, NULL,
                                      out, writes);
   if (result != TC_TLV_OK)
     return result;
   int source_failed = 0;
   result = tc_x509_crl_scope_run(&candidates->candidates, processing, trust, selection, writes,
                                  &source_failed, out);
-  if (source_failed && extra && extra->source_failed)
-    *extra->source_failed = 1;
+  /* The only work_used write: it covers the preflight and every attempt. */
   if (result == TC_TLV_OK && !all_scopes)
     out->validation.work_used = initial_work - *trust->tree->work;
   return result;
@@ -220,7 +206,6 @@ TC_TLV_result tc_x509_crl_scopes(const tc_x509_crl_searcher* searcher,
   const TC_X509_path_options* options = trust->options;
   const tc_pki_tree_workspace* tree = trust->tree;
   const TC_X509_path_workspace* validation = trust->validation;
-  const size_t initial_work = *tree->work;
   tc_pki_distribution_point point;
   TC_X509_crl_evidence pending = *evidence;
   TC_X509_search_result found;
@@ -321,10 +306,8 @@ TC_TLV_result tc_x509_crl_scopes(const tc_x509_crl_searcher* searcher,
   if (!contributed)
     return TC_TLV_END;
   *evidence = pending;
-  if (!all_scopes) {
-    found.validation.work_used = initial_work - *tree->work;
+  if (!all_scopes)
     *out = found;
-  }
   return TC_TLV_OK;
 }
 

@@ -77,14 +77,6 @@ TC_TLV_result tc_x509_crl_search_candidates(void* cursor, tc_pki_candidate_next 
                                             const tc_x509_crl_trust* trust,
                                             TC_X509_search_result* out, int* source_failed);
 
-typedef struct {
-  const TC_X509_crl_index* index;
-  size_t base;
-  TC_X509_crl_delta_policy delta_policy;
-  const tc_x509_crl_query* query;
-  TC_X509_crl_evidence* evidence;
-} tc_x509_crl_index_processing;
-
 static inline int tc_x509_crl_index_arguments(const TC_X509_crl_index* index,
                                               const tc_x509_crl_query* query,
                                               const tc_x509_crl_trust* trust,
@@ -94,12 +86,6 @@ static inline int tc_x509_crl_index_arguments(const TC_X509_crl_index* index,
          query && query->certificate && query->point &&
          (query->certificate_ca == 0 || query->certificate_ca == 1);
 }
-
-typedef struct {
-  const tc_x509_crl_selected* selected;
-  const tc_x509_crl_query* query;
-  TC_X509_crl_evidence* evidence;
-} tc_x509_crl_processing;
 
 typedef struct {
   tc_x509_crl_selected selected;
@@ -280,7 +266,6 @@ typedef struct {
   TC_bytes nodes_storage, output_storage, inputs[CRL_EXTRA_INPUT_COUNT];
   const TC_X509_revocation_node* nodes;
   size_t count;
-  int* source_failed;
 } tc_x509_crl_extra_storage;
 
 /* Check the node array and borrowed bytes of extra as plan inputs. The caller
@@ -377,8 +362,11 @@ typedef struct {
   int all_scopes;
 } tc_x509_crl_scope_selection;
 
-/* Run a scope operation after storage preflight. Sources and input bytes stay
- * fixed. source_failed accumulates callback failures across dependency searches. */
+/* Run a scope operation after tc_x509_crl_scope_arguments and the storage
+ * preflight that sealed writes. The caller validates every argument once, so
+ * this body repeats neither step. Sources and input bytes stay fixed.
+ * source_failed accumulates callback failures across dependency searches.
+ * out receives the signer path on OK. Its work_used is left to the caller. */
 TC_TLV_result tc_x509_crl_scope_run(const tc_x509_crl_candidate_source* candidates,
                                     const tc_x509_crl_scope_processing* processing,
                                     const tc_x509_crl_trust* trust,
@@ -386,21 +374,22 @@ TC_TLV_result tc_x509_crl_scope_run(const tc_x509_crl_candidate_source* candidat
                                     const TC_bytes writes[CRL_SCOPE_WRITES], int* source_failed,
                                     TC_X509_search_result* out);
 
-/* Preflight and run one scope through a prepared candidate adapter. */
+/* Validate, preflight and run one scope through a prepared candidate adapter.
+ * On OK for a single scope, out->validation.work_used covers the whole call. */
 TC_TLV_result tc_x509_crl_scope_execute(const tc_x509_crl_operation_source* candidates,
                                         const tc_x509_crl_scope_processing* processing,
                                         const tc_x509_crl_trust* trust,
                                         const tc_x509_crl_scope_selection* selection,
-                                        const tc_x509_crl_extra_storage* extra,
-                                        const tc_x509_crl_held_path* path,
                                         TC_X509_search_result* out);
 
-/* Resolve a parsed target or held path through the shared, non-recursive
- * dependency operation. The path form reuses proven nodes across members. */
+/* Resolve one parsed target through the shared, non-recursive dependency
+ * operation. Validates the resolution and runs one storage preflight. */
 TC_TLV_result tc_x509_crl_resolve(const TC_X509_certificate* target,
                                   const tc_x509_crl_resolution* resolution,
                                   const tc_x509_crl_resolution_workspace* workspace,
-                                  tc_x509_crl_held_path* path, TC_X509_crl_evidence* out);
+                                  TC_X509_crl_evidence* out);
+/* Resolve every member of a held path. One validation and storage preflight
+ * cover all members and dependency nodes, and proven nodes are reused. */
 TC_TLV_result tc_x509_crl_path_operation(tc_x509_crl_held_path* held,
                                          const tc_x509_crl_resolution* resolution,
                                          const tc_x509_crl_resolution_workspace* workspace);

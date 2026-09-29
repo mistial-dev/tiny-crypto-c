@@ -31,19 +31,6 @@ static TC_X509_path_status crl_signer_path(const TC_X509_certificate* signer,
   return TC_X509_PATH_VALID;
 }
 
-TC_TLV_result tc_x509_crl_selected_path(const tc_x509_crl_selected* selected,
-                                        const TC_X509_certificate* signer,
-                                        const tc_x509_crl_trust* trust, TC_X509_search_result* out)
-{
-  const TC_X509_path_options* options = trust->options;
-  TC_TLV_result result = tc_x509_crl_selected_authenticate(
-      selected, signer, &options->signatures,
-      &(tc_x509_crl_decode){&options->parsing, trust->tree, &trust->validation->names, NULL, 0});
-  if (result != TC_TLV_OK)
-    return result;
-  return tc_x509_path_result_status(crl_signer_path(signer, trust->source, trust, out));
-}
-
 TC_X509_path_status tc_x509_crl_signer_validate(const TC_X509_crl* crl,
                                                 const TC_X509_certificate* signer,
                                                 const tc_x509_crl_trust* trust,
@@ -186,10 +173,11 @@ TC_TLV_result tc_x509_crl_signer_usage(const TC_X509_certificate* signer,
   return TC_TLV_OK;
 }
 
-TC_TLV_result
-tc_x509_crl_selected_coverage(const tc_x509_crl_selected* selected, const tc_x509_crl_query* query,
-                              const TC_X509_revocation_time* time, const tc_x509_crl_decode* decode,
-                              const TC_X509_crl_evidence* evidence, tc_x509_crl_coverage* coverage)
+/* Reason coverage a selected CRL pair adds for query. */
+static TC_TLV_result
+crl_selected_coverage(const tc_x509_crl_selected* selected, const tc_x509_crl_query* query,
+                      const TC_X509_revocation_time* time, const tc_x509_crl_decode* decode,
+                      const TC_X509_crl_evidence* evidence, tc_x509_crl_coverage* coverage)
 {
   /* The delta supplies the effective update interval. */
   TC_TLV_result result = tc_x509_crl_coverage_at(
@@ -201,10 +189,11 @@ tc_x509_crl_selected_coverage(const tc_x509_crl_selected* selected, const tc_x50
   return coverage->reasons & ~evidence->reasons ? TC_TLV_OK : TC_TLV_END;
 }
 
-TC_TLV_result tc_x509_crl_selected_evidence(const tc_x509_crl_selected* selected,
-                                            const TC_X509_certificate* certificate,
-                                            uint16_t reasons, const tc_x509_crl_decode* decode,
-                                            TC_X509_crl_evidence* evidence)
+/* Apply a selected CRL pair's entries for certificate to evidence. */
+static TC_TLV_result crl_selected_evidence(const tc_x509_crl_selected* selected,
+                                           const TC_X509_certificate* certificate, uint16_t reasons,
+                                           const tc_x509_crl_decode* decode,
+                                           TC_X509_crl_evidence* evidence)
 {
   TC_X509_crl_match match;
   TC_TLV_result result = tc_x509_crl_selected_lookup(selected, certificate, decode, &match);
@@ -234,11 +223,10 @@ TC_TLV_result tc_x509_crl_apply(const tc_x509_crl_selected* selected,
     return result;
   if (status != TC_X509_REVOCATION_UNDETERMINED)
     return TC_TLV_END;
-  result = tc_x509_crl_selected_coverage(selected, query, time, decode, evidence, &coverage);
+  result = crl_selected_coverage(selected, query, time, decode, evidence, &coverage);
   if (result != TC_TLV_OK)
     return result;
-  return tc_x509_crl_selected_evidence(selected, query->certificate, coverage.reasons, decode,
-                                       evidence);
+  return crl_selected_evidence(selected, query->certificate, coverage.reasons, decode, evidence);
 }
 
 TC_TLV_result tc_x509_crl_selected_authenticate(const tc_x509_crl_selected* selected,

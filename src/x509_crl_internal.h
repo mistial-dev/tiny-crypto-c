@@ -308,21 +308,6 @@ TC_TLV_result tc_x509_crl_query_matches(const tc_x509_crl_revoked_entry* entry,
                                         const TC_TLV_limits* limits,
                                         const tc_pki_tree_workspace* tree,
                                         const TC_X509_name_workspace* names, int* matched);
-/* Validate a signer path for a selected CRL pair to trust->anchor_index.
- * trust->source is already restricted to that anchor. */
-TC_TLV_result tc_x509_crl_selected_path(const tc_x509_crl_selected* selected,
-                                        const TC_X509_certificate* signer,
-                                        const tc_x509_crl_trust* trust, TC_X509_search_result* out);
-/* Reason coverage a selected CRL pair adds for query. */
-TC_TLV_result
-tc_x509_crl_selected_coverage(const tc_x509_crl_selected* selected, const tc_x509_crl_query* query,
-                              const TC_X509_revocation_time* time, const tc_x509_crl_decode* decode,
-                              const TC_X509_crl_evidence* evidence, tc_x509_crl_coverage* coverage);
-/* Apply a selected CRL pair's entries for certificate to evidence. */
-TC_TLV_result tc_x509_crl_selected_evidence(const tc_x509_crl_selected* selected,
-                                            const TC_X509_certificate* certificate,
-                                            uint16_t reasons, const tc_x509_crl_decode* decode,
-                                            TC_X509_crl_evidence* evidence);
 /* Verify a selected CRL pair's signatures under signer. */
 TC_TLV_result tc_x509_crl_selected_authenticate(const tc_x509_crl_selected* selected,
                                                 const TC_X509_certificate* signer,

@@ -94,7 +94,8 @@ done:
 }
 
 #include "openssl_fixture.h"
-#include "x509_crl_harness.h"
+#include "../../src/x509_path_internal.h"
+#include "../../src/pki_source_internal.h"
 
 static size_t certificate(EVP_PKEY* key, const EVP_MD* digest, uint8_t* der, size_t capacity)
 {
@@ -307,6 +308,29 @@ static TC_TLV_result store_indexed_anchor(void* context, size_t index, size_t* w
   return result;
 }
 
+/* A store record carrying only the anchor name and key. */
+static TC_X509_store_anchor anchor_record(TC_X509_trust_anchor trust)
+{
+  TC_X509_store_anchor record = {0};
+  record.trust = trust;
+  return record;
+}
+
+/* Discover a path from caller arrays through the shipped array source and
+ * search engine. work is the explicit budget, so tests can observe the
+ * consumption of failed searches too. */
+static TC_X509_path_status array_path_build(TC_bytes target, const TC_X509_store_array* array,
+                                            const TC_X509_path_options* options,
+                                            const TC_X509_path_workspace* validation,
+                                            const TC_X509_search_workspace* search, size_t* work,
+                                            TC_X509_search_result* out)
+{
+  TC_X509_store_source source;
+  if (TC_X509_store_array_source(array, &source) != TC_TLV_OK)
+    return TC_X509_PATH_ERROR;
+  return tc_x509_path_build_work(target, &source, options, validation, search, work, out);
+}
+
 static void snapshot_discovery(TC_bytes target, const TC_X509_store_source* source,
                                const TC_X509_path_options* options,
                                const TC_X509_path_workspace* workspace)
@@ -389,6 +413,8 @@ static void alternate_issuers(X509* const certs[4], EVP_PKEY* const keys[4], con
   TC_X509_search_workspace search = {slots, frames, 3};
   TC_X509_search_result found, saved;
   TC_X509_trust_anchor anchors[2] = {*anchor, *anchor};
+  const TC_X509_store_anchor array_anchor = anchor_record(*anchor);
+  TC_X509_store_anchor array_anchors[2] = {anchor_record(*anchor), anchor_record(*anchor)};
   TC_X509_path_options bounded = *options;
   TC_X509_certificate wrong_parsed;
   TC_X509_workspace parser = {workspace->frames, workspace->frame_capacity, workspace->oids,
@@ -405,25 +431,26 @@ static void alternate_issuers(X509* const certs[4], EVP_PKEY* const keys[4], con
   memset(&found, 0xa5, sizeof found);
   memcpy(&saved, &found, sizeof saved);
   budget = 2000000;
-  munit_assert_int(tc_x509_path_search(encoded_path[2],
-                                       &(tc_x509_path_arrays){candidates, 2, anchor, 1}, options,
-                                       workspace, &search, &budget, &found),
+  munit_assert_int(array_path_build(encoded_path[2],
+                                    &(TC_X509_store_array){candidates, 2, &array_anchor, 1},
+                                    options, workspace, &search, &budget, &found),
                    ==, TC_X509_PATH_INVALID);
   munit_assert_memory_equal(sizeof found, &found, &saved);
   budget = 2000000;
-  munit_assert_int(tc_x509_path_search(encoded_path[2],
-                                       &(tc_x509_path_arrays){candidates, 3, anchor, 1}, options,
-                                       workspace, &search, &budget, &found),
+  munit_assert_int(array_path_build(encoded_path[2],
+                                    &(TC_X509_store_array){candidates, 3, &array_anchor, 1},
+                                    options, workspace, &search, &budget, &found),
                    ==, TC_X509_PATH_VALID);
   munit_assert_ptr_equal(found.path[1].data, encoded_path[1].data);
   munit_assert_int(TC_X509_read(encoded_path[1].data, encoded_path[1].length, &options->parsing,
                                 &parser, &wrong_parsed),
                    ==, TC_TLV_OK);
   anchors[0].public_key = wrong_parsed.public_key;
+  array_anchors[0].trust.public_key = wrong_parsed.public_key;
   budget = 2000000;
-  munit_assert_int(tc_x509_path_search(encoded_path[2],
-                                       &(tc_x509_path_arrays){candidates, 3, anchors, 2}, options,
-                                       workspace, &search, &budget, &found),
+  munit_assert_int(array_path_build(encoded_path[2],
+                                    &(TC_X509_store_array){candidates, 3, array_anchors, 2},
+                                    options, workspace, &search, &budget, &found),
                    ==, TC_X509_PATH_VALID);
   munit_assert_size(found.anchor_index, ==, 1);
   munit_assert_ptr_equal(found.path[1].data, encoded_path[1].data);
@@ -521,23 +548,23 @@ static void alternate_issuers(X509* const certs[4], EVP_PKEY* const keys[4], con
   }
   bounded.max_input = encoded_path[0].length + encoded_path[1].length + encoded_path[2].length;
   budget = 2000000;
-  munit_assert_int(tc_x509_path_search(encoded_path[2],
-                                       &(tc_x509_path_arrays){candidates, 3, anchor, 1}, &bounded,
-                                       workspace, &search, &budget, &found),
+  munit_assert_int(array_path_build(encoded_path[2],
+                                    &(TC_X509_store_array){candidates, 3, &array_anchor, 1},
+                                    &bounded, workspace, &search, &budget, &found),
                    ==, TC_X509_PATH_VALID);
   --bounded.max_input;
   budget = 2000000;
   memcpy(&found, &saved, sizeof found);
-  munit_assert_int(tc_x509_path_search(encoded_path[2],
-                                       &(tc_x509_path_arrays){candidates, 3, anchor, 1}, &bounded,
-                                       workspace, &search, &budget, &found),
+  munit_assert_int(array_path_build(encoded_path[2],
+                                    &(TC_X509_store_array){candidates, 3, &array_anchor, 1},
+                                    &bounded, workspace, &search, &budget, &found),
                    ==, TC_X509_PATH_LIMIT);
   munit_assert_memory_equal(sizeof found, &found, &saved);
   bounded.max_input = encoded_path[2].length - 1;
   budget = 2000000;
-  munit_assert_int(tc_x509_path_search(encoded_path[2],
-                                       &(tc_x509_path_arrays){candidates, 3, anchor, 1}, &bounded,
-                                       workspace, &search, &budget, &found),
+  munit_assert_int(array_path_build(encoded_path[2],
+                                    &(TC_X509_store_array){candidates, 3, &array_anchor, 1},
+                                    &bounded, workspace, &search, &budget, &found),
                    ==, TC_X509_PATH_LIMIT);
   munit_assert_memory_equal(sizeof found, &found, &saved);
   {
@@ -709,6 +736,8 @@ static void cross_signed_issuer(X509* const certs[4], const char* group, const E
                    TC_TLV_OK);
   foreign_anchor.name = root.subject;
   foreign_anchor.public_key = root.public_key;
+  const TC_X509_store_anchor array_anchor = anchor_record(*anchor),
+                             array_foreign = anchor_record(foreign_anchor);
   munit_assert_int(X509_set_issuer_name(cross, X509_get_subject_name(foreign_root)), ==, 1);
   candidates[0].data = cross_der;
   candidates[0].length =
@@ -723,21 +752,21 @@ static void cross_signed_issuer(X509* const certs[4], const char* group, const E
   memset(&found, 0xa5, sizeof found);
   memcpy(&saved, &found, sizeof saved);
   budget = 2000000;
-  munit_assert_int(tc_x509_path_search(encoded_path[2],
-                                       &(tc_x509_path_arrays){candidates, 2, anchor, 1}, options,
-                                       workspace, &search, &budget, &found),
+  munit_assert_int(array_path_build(encoded_path[2],
+                                    &(TC_X509_store_array){candidates, 2, &array_anchor, 1},
+                                    options, workspace, &search, &budget, &found),
                    ==, TC_X509_PATH_INVALID);
   munit_assert_memory_equal(sizeof found, &found, &saved);
   budget = 2000000;
-  munit_assert_int(tc_x509_path_search(encoded_path[2],
-                                       &(tc_x509_path_arrays){candidates, 3, anchor, 1}, options,
-                                       workspace, &search, &budget, &found),
+  munit_assert_int(array_path_build(encoded_path[2],
+                                    &(TC_X509_store_array){candidates, 3, &array_anchor, 1},
+                                    options, workspace, &search, &budget, &found),
                    ==, TC_X509_PATH_VALID);
   munit_assert_ptr_equal(found.path[0].data, encoded_path[0].data);
   budget = 2000000;
-  munit_assert_int(tc_x509_path_search(encoded_path[2],
-                                       &(tc_x509_path_arrays){candidates, 3, &foreign_anchor, 1},
-                                       options, workspace, &search, &budget, &found),
+  munit_assert_int(array_path_build(encoded_path[2],
+                                    &(TC_X509_store_array){candidates, 3, &array_foreign, 1},
+                                    options, workspace, &search, &budget, &found),
                    ==, TC_X509_PATH_VALID);
   munit_assert_ptr_equal(found.path[0].data, cross_der);
   X509_free(cross);
@@ -1111,6 +1140,7 @@ static MunitResult paths(const MunitParameter params[], void* user)
                            ==, wanted);
           if (wanted != TC_X509_PATH_VALID)
             munit_assert_memory_equal(sizeof explicit_result, &explicit_result, &unchanged);
+          const TC_X509_store_anchor array_anchor = anchor_record(anchor);
           TC_bytes discovered[3], candidates[2] = {encoded_path[1], encoded_path[0]};
           TC_X509_search_frame search_frames[3];
           TC_X509_search_workspace search = {discovered, search_frames, 3};
@@ -1118,9 +1148,9 @@ static MunitResult paths(const MunitParameter params[], void* user)
           size_t budget = 2000000;
           memset(&preserved, 0xa5, sizeof preserved);
           memcpy(&found, &preserved, sizeof found);
-          munit_assert_int(tc_x509_path_search(encoded_path[2],
-                                               &(tc_x509_path_arrays){candidates, 2, &anchor, 1},
-                                               &options, &workspace, &search, &budget, &found),
+          munit_assert_int(array_path_build(encoded_path[2],
+                                            &(TC_X509_store_array){candidates, 2, &array_anchor, 1},
+                                            &options, &workspace, &search, &budget, &found),
                            ==, wanted);
           if (wanted != TC_X509_PATH_VALID)
             munit_assert_memory_equal(sizeof found, &found, &preserved);
@@ -1189,6 +1219,7 @@ static MunitResult paths(const MunitParameter params[], void* user)
                               &workspace);
             cross_signed_issuer(certs, groups[group], digests[group], encoded_path, &anchor,
                                 &options, &workspace);
+            const TC_X509_store_anchor array_anchor = anchor_record(anchor);
             TC_bytes path_slots[4],
                 candidates[3] = {encoded_path[1], encoded_path[2], encoded_path[0]};
             TC_X509_search_frame search_frames[4];
@@ -1197,10 +1228,11 @@ static MunitResult paths(const MunitParameter params[], void* user)
             size_t budget = 2000000, consumed;
             memset(&found, 0xa5, sizeof found);
             memcpy(&saved, &found, sizeof saved);
-            munit_assert_int(tc_x509_path_search(encoded_path[2],
-                                                 &(tc_x509_path_arrays){candidates, 3, &anchor, 1},
-                                                 &options, &workspace, &search, &budget, &found),
-                             ==, TC_X509_PATH_VALID);
+            munit_assert_int(
+                array_path_build(encoded_path[2],
+                                 &(TC_X509_store_array){candidates, 3, &array_anchor, 1}, &options,
+                                 &workspace, &search, &budget, &found),
+                ==, TC_X509_PATH_VALID);
             consumed = 2000000 - budget;
             munit_assert_size(found.count, ==, 3);
             munit_assert_size(found.anchor_index, ==, 0);
@@ -1209,18 +1241,27 @@ static MunitResult paths(const MunitParameter params[], void* user)
               munit_assert_ptr_equal(found.path[entry].data, encoded_path[entry].data);
             {
               TC_bytes wrong_subject = encoded_path[0];
-              size_t empty_work = 2000000, mismatch_work = 2000000;
+              /* Baselines: no records, and one record that fails at its first
+               * byte. The second excludes the per-record read cost. */
+              static const uint8_t short_record[] = {0x31, 0x00};
+              const TC_bytes rejected = {short_record, sizeof short_record};
+              size_t empty_work = 2000000, rejected_work = 2000000, mismatch_work = 2000000;
+              munit_assert_int(array_path_build(encoded_path[2],
+                                                &(TC_X509_store_array){NULL, 0, &array_anchor, 1},
+                                                &options, &workspace, &search, &empty_work, &found),
+                               ==, TC_X509_PATH_INVALID);
               munit_assert_int(
-                  tc_x509_path_search(encoded_path[2], &(tc_x509_path_arrays){NULL, 0, &anchor, 1},
-                                      &options, &workspace, &search, &empty_work, &found),
+                  array_path_build(encoded_path[2],
+                                   &(TC_X509_store_array){&rejected, 1, &array_anchor, 1}, &options,
+                                   &workspace, &search, &rejected_work, &found),
                   ==, TC_X509_PATH_INVALID);
               munit_assert_int(
-                  tc_x509_path_search(encoded_path[2],
-                                      &(tc_x509_path_arrays){&wrong_subject, 1, &anchor, 1},
-                                      &options, &workspace, &search, &mismatch_work, &found),
+                  array_path_build(encoded_path[2],
+                                   &(TC_X509_store_array){&wrong_subject, 1, &array_anchor, 1},
+                                   &options, &workspace, &search, &mismatch_work, &found),
                   ==, TC_X509_PATH_INVALID);
               /* A subject mismatch need not walk and validate the full certificate. */
-              munit_assert_size(empty_work - mismatch_work, <, wrong_subject.length);
+              munit_assert_size(rejected_work - mismatch_work, <, wrong_subject.length);
               uint8_t malformed[2048];
               munit_assert_size(wrong_subject.length, <=, sizeof malformed);
               memcpy(malformed, wrong_subject.data, wrong_subject.length);
@@ -1228,46 +1269,50 @@ static MunitResult paths(const MunitParameter params[], void* user)
               wrong_subject.data = malformed;
               mismatch_work = 2000000;
               munit_assert_int(
-                  tc_x509_path_search(encoded_path[2],
-                                      &(tc_x509_path_arrays){&wrong_subject, 1, &anchor, 1},
-                                      &options, &workspace, &search, &mismatch_work, &found),
+                  array_path_build(encoded_path[2],
+                                   &(TC_X509_store_array){&wrong_subject, 1, &array_anchor, 1},
+                                   &options, &workspace, &search, &mismatch_work, &found),
                   ==, TC_X509_PATH_INVALID);
               /* Broken framing still reaches the full parser's error path. */
               munit_assert_size(empty_work - mismatch_work, >=, wrong_subject.length);
             }
             budget = consumed;
-            munit_assert_int(tc_x509_path_search(encoded_path[2],
-                                                 &(tc_x509_path_arrays){candidates, 3, &anchor, 1},
-                                                 &options, &workspace, &search, &budget, &found),
-                             ==, TC_X509_PATH_VALID);
+            munit_assert_int(
+                array_path_build(encoded_path[2],
+                                 &(TC_X509_store_array){candidates, 3, &array_anchor, 1}, &options,
+                                 &workspace, &search, &budget, &found),
+                ==, TC_X509_PATH_VALID);
             munit_assert_size(budget, ==, 0);
             budget = consumed - 1;
             memcpy(&found, &saved, sizeof found);
-            munit_assert_int(tc_x509_path_search(encoded_path[2],
-                                                 &(tc_x509_path_arrays){candidates, 3, &anchor, 1},
-                                                 &options, &workspace, &search, &budget, &found),
-                             ==, TC_X509_PATH_LIMIT);
+            munit_assert_int(
+                array_path_build(encoded_path[2],
+                                 &(TC_X509_store_array){candidates, 3, &array_anchor, 1}, &options,
+                                 &workspace, &search, &budget, &found),
+                ==, TC_X509_PATH_LIMIT);
             munit_assert_memory_equal(sizeof found, &found, &saved);
             candidates[0] = encoded_path[0];
             candidates[2] = encoded_path[1];
             budget = 2000000;
-            munit_assert_int(tc_x509_path_search(encoded_path[2],
-                                                 &(tc_x509_path_arrays){candidates, 3, &anchor, 1},
-                                                 &options, &workspace, &search, &budget, &found),
-                             ==, TC_X509_PATH_VALID);
+            munit_assert_int(
+                array_path_build(encoded_path[2],
+                                 &(TC_X509_store_array){candidates, 3, &array_anchor, 1}, &options,
+                                 &workspace, &search, &budget, &found),
+                ==, TC_X509_PATH_VALID);
             search.capacity = 2;
             budget = 2000000;
             memcpy(&found, &saved, sizeof found);
-            munit_assert_int(tc_x509_path_search(encoded_path[2],
-                                                 &(tc_x509_path_arrays){candidates, 3, &anchor, 1},
-                                                 &options, &workspace, &search, &budget, &found),
-                             ==, TC_X509_PATH_LIMIT);
+            munit_assert_int(
+                array_path_build(encoded_path[2],
+                                 &(TC_X509_store_array){candidates, 3, &array_anchor, 1}, &options,
+                                 &workspace, &search, &budget, &found),
+                ==, TC_X509_PATH_LIMIT);
             munit_assert_memory_equal(sizeof found, &found, &saved);
             search.capacity = 4;
             budget = 2000000;
-            munit_assert_int(tc_x509_path_search(encoded_path[2],
-                                                 &(tc_x509_path_arrays){NULL, 0, &anchor, 1},
-                                                 &options, &workspace, &search, &budget, &found),
+            munit_assert_int(array_path_build(encoded_path[2],
+                                              &(TC_X509_store_array){NULL, 0, &array_anchor, 1},
+                                              &options, &workspace, &search, &budget, &found),
                              ==, TC_X509_PATH_INVALID);
             munit_assert_memory_equal(sizeof found, &found, &saved);
           }

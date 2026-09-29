@@ -195,71 +195,40 @@ TC_TLV_result tc_x509_crl_nodes_resolve(TC_X509_revocation_node* nodes, size_t c
   }
 }
 
+/* One validated CRL resolution with its storage preflight. Every target
+ * resolved through it reuses the sealed write set, the anchor, the scope
+ * groups and the scratch below, which the preflight covered. */
 typedef struct {
-  tc_x509_crl_dependencies* dependencies;
   const tc_x509_crl_resolution* resolution;
-  tc_x509_crl_extra_storage* extra;
+  const tc_x509_crl_resolution_workspace* workspace;
   tc_x509_crl_held_path* path;
-  const tc_x509_crl_path_check* check;
-} x509_crl_node_context;
-
-static TC_TLV_result x509_crl_node_evaluate(void* context, size_t index,
-                                            TC_X509_crl_evidence* evidence, int* stop)
-{
-  const x509_crl_node_context* node = context;
-  const tc_x509_crl_resolution* resolution = node->resolution;
-  const tc_x509_crl_resolution_workspace* workspace = node->dependencies->workspace;
-  TC_X509_certificate certificate;
-  TC_TLV_result result = tc_x509_crl_dependency_read(node->dependencies, index, &certificate);
-  if (result != TC_TLV_OK) {
-    *stop = 1;
-    return result;
-  }
-  const tc_pki_distribution_point fallback = {0};
-  const tc_x509_crl_query query = {&certificate, &fallback, 0};
-  TC_X509_crl_evidence pending = {0};
+  TC_bytes writes[CRL_SCOPE_WRITES];
+  TC_X509_store_anchor anchor;
+  /* Evidence and discarded signer path of the node being evaluated. */
+  TC_X509_crl_evidence pending;
   TC_X509_search_result scratch;
-  tc_x509_crl_scope_processing processing = {resolution->index,
-                                             0,
-                                             resolution->delta_policy,
-                                             resolution->order_policy,
-                                             &query,
-                                             workspace->states,
-                                             workspace->state_capacity,
-                                             &pending,
-                                             node->check,
-                                             NULL,
-                                             NULL,
-                                             workspace->scopes,
-                                             workspace->signer_cache};
-  node->extra->count = node->dependencies->count;
-  result = tc_x509_crl_scope_execute(
-      resolution->candidates, &processing,
-      &(tc_x509_crl_trust){resolution->source, resolution->anchor_index, resolution->options,
-                           workspace->tree, workspace->validation, workspace->search,
-                           resolution->time},
-      &(tc_x509_crl_scope_selection){NULL, 1, 1}, node->extra, node->path, &scratch);
-  *stop = node->extra->source_failed && *node->extra->source_failed;
-  if (result == TC_TLV_OK)
-    *evidence = pending;
-  return result;
-}
+  int source_failed;
+} x509_crl_prepared;
 
-TC_TLV_result tc_x509_crl_resolve(const TC_X509_certificate* target,
-                                  const tc_x509_crl_resolution* resolution,
-                                  const tc_x509_crl_resolution_workspace* workspace,
-                                  tc_x509_crl_held_path* path, TC_X509_crl_evidence* out)
+/* Validate the resolution and preflight its storage once. target is the
+ * single target to resolve, or NULL for the members of path. out is that
+ * target's evidence, or NULL with a path, whose result is recorded instead. */
+static TC_TLV_result x509_crl_prepare(const TC_X509_certificate* target,
+                                      const tc_x509_crl_resolution* resolution,
+                                      const tc_x509_crl_resolution_workspace* workspace,
+                                      tc_x509_crl_held_path* path, TC_X509_crl_evidence* out,
+                                      x509_crl_prepared* prepared)
 {
-  if (!target || !resolution || !workspace || !out || !target->encoded.data ||
-      !target->encoded.length || !resolution->candidates)
+  const TC_X509_certificate no_target = {0};
+  if (!resolution || !workspace || !resolution->candidates || !!target == !!path ||
+      (target && (!out || !target->encoded.data || !target->encoded.length)))
     return TC_TLV_ARGUMENT;
   const tc_x509_crl_trust trust = {
       resolution->source,    resolution->anchor_index, resolution->options, workspace->tree,
       workspace->validation, workspace->search,        resolution->time};
   const tc_pki_distribution_point fallback = {0};
-  const tc_x509_crl_query query = {target, &fallback, 0};
-  TC_X509_search_result scratch;
-  if (!tc_x509_crl_index_arguments(resolution->index, &query, &trust, &scratch) ||
+  const tc_x509_crl_query query = {target ? target : &no_target, &fallback, 0};
+  if (!tc_x509_crl_index_arguments(resolution->index, &query, &trust, &prepared->scratch) ||
       !x509_crl_delta_policy_valid(resolution->delta_policy) ||
       !x509_crl_order_policy_valid(resolution->order_policy))
     return TC_TLV_ARGUMENT;
@@ -267,34 +236,24 @@ TC_TLV_result tc_x509_crl_resolve(const TC_X509_certificate* target,
     return TC_TLV_LIMIT;
   if (workspace->scopes && workspace->scope_capacity < resolution->index->count)
     return TC_TLV_LIMIT;
-  TC_TLV_result result;
-  int source_failed = 0;
   tc_x509_crl_extra_storage extra = {0};
   extra.count = path ? path->dependency_count : 0;
   if (extra.count > workspace->node_capacity)
     return TC_TLV_ARGUMENT;
-  result = tc_pki_storage_span(workspace->nodes, workspace->node_capacity, sizeof *workspace->nodes,
-                               &extra.nodes_storage);
-  if (result != TC_TLV_OK)
-    return result;
-  result = tc_pki_storage_span(out, 1, sizeof *out, &extra.output_storage);
+  TC_TLV_result result = tc_pki_storage_span(workspace->nodes, workspace->node_capacity,
+                                             sizeof *workspace->nodes, &extra.nodes_storage);
+  if (result == TC_TLV_OK && out)
+    result = tc_pki_storage_span(out, 1, sizeof *out, &extra.output_storage);
   if (result != TC_TLV_OK)
     return result;
   extra.inputs[CRL_EXTRA_RESOLUTION] = (TC_bytes){(const uint8_t*)resolution, sizeof *resolution};
   extra.inputs[CRL_EXTRA_WORKSPACE] = (TC_bytes){(const uint8_t*)workspace, sizeof *workspace};
   extra.nodes = workspace->nodes;
-  extra.source_failed = &source_failed;
-  TC_bytes writes[CRL_SCOPE_WRITES];
-  TC_X509_store_anchor anchor;
-  TC_X509_crl_evidence pending = {0};
-  tc_x509_crl_dependencies dependencies = {resolution->options,
-                                           resolution->anchor_index,
-                                           workspace,
-                                           &anchor.trust,
-                                           writes,
-                                           CRL_SCOPE_WRITES,
-                                           extra.count};
-  const tc_x509_crl_path_check check = {&dependencies, tc_x509_crl_dependencies_check};
+  prepared->resolution = resolution;
+  prepared->workspace = workspace;
+  prepared->path = path;
+  prepared->pending = (TC_X509_crl_evidence){0};
+  prepared->source_failed = 0;
   const tc_x509_crl_scope_processing processing = {resolution->index,
                                                    0,
                                                    resolution->delta_policy,
@@ -302,14 +261,14 @@ TC_TLV_result tc_x509_crl_resolve(const TC_X509_certificate* target,
                                                    &query,
                                                    workspace->states,
                                                    workspace->state_capacity,
-                                                   &pending,
-                                                   &check,
+                                                   &prepared->pending,
+                                                   NULL,
                                                    NULL,
                                                    NULL,
                                                    workspace->scopes,
                                                    workspace->signer_cache};
   result = tc_x509_crl_scope_prepare(resolution->candidates, &processing, &trust, NULL, &extra,
-                                     path, &scratch, writes);
+                                     path, &prepared->scratch, prepared->writes);
   if (result != TC_TLV_OK)
     return result;
   if (workspace->scopes) {
@@ -319,14 +278,94 @@ TC_TLV_result tc_x509_crl_resolve(const TC_X509_certificate* target,
     if (result != TC_TLV_OK)
       return result;
   }
-  const tc_pki_source_guard source_guard = {resolution->source, writes, CRL_SCOPE_WRITES};
-  result = tc_pki_source_guard_anchor((void*)&source_guard, resolution->anchor_index,
-                                      workspace->tree->work, &anchor);
+  const tc_pki_source_guard source_guard = {resolution->source, prepared->writes, CRL_SCOPE_WRITES};
+  return tc_pki_source_guard_anchor((void*)&source_guard, resolution->anchor_index,
+                                    workspace->tree->work, &prepared->anchor);
+}
+
+typedef struct {
+  x509_crl_prepared* prepared;
+  tc_x509_crl_dependencies* dependencies;
+  const tc_x509_crl_path_check* check;
+} x509_crl_node_context;
+
+/* Evaluate one dependency node over every indexed scope. The prepared
+ * resolution already validated and preflighted this operation. */
+static TC_TLV_result x509_crl_node_evaluate(void* context, size_t index,
+                                            TC_X509_crl_evidence* evidence, int* stop)
+{
+  const x509_crl_node_context* node = context;
+  x509_crl_prepared* prepared = node->prepared;
+  const tc_x509_crl_resolution* resolution = prepared->resolution;
+  const tc_x509_crl_resolution_workspace* workspace = prepared->workspace;
+  TC_X509_certificate certificate;
+  TC_TLV_result result = tc_x509_crl_dependency_read(node->dependencies, index, &certificate);
+  if (result != TC_TLV_OK) {
+    *stop = 1;
+    return result;
+  }
+  const tc_pki_distribution_point fallback = {0};
+  const tc_x509_crl_query query = {&certificate, &fallback, 0};
+  prepared->pending = (TC_X509_crl_evidence){0};
+  const tc_x509_crl_scope_processing processing = {resolution->index,
+                                                   0,
+                                                   resolution->delta_policy,
+                                                   resolution->order_policy,
+                                                   &query,
+                                                   workspace->states,
+                                                   workspace->state_capacity,
+                                                   &prepared->pending,
+                                                   node->check,
+                                                   NULL,
+                                                   NULL,
+                                                   workspace->scopes,
+                                                   workspace->signer_cache};
+  result = tc_x509_crl_scope_run(&resolution->candidates->candidates, &processing,
+                                 &(tc_x509_crl_trust){resolution->source, resolution->anchor_index,
+                                                      resolution->options, workspace->tree,
+                                                      workspace->validation, workspace->search,
+                                                      resolution->time},
+                                 &(tc_x509_crl_scope_selection){NULL, 1, 1}, prepared->writes,
+                                 &prepared->source_failed, &prepared->scratch);
+  *stop = prepared->source_failed;
+  if (result == TC_TLV_OK)
+    *evidence = prepared->pending;
+  return result;
+}
+
+/* Resolve one target through a prepared resolution. The dependency table
+ * guards the target bytes against the sealed writes before any use. */
+static TC_TLV_result x509_crl_resolve_target(x509_crl_prepared* prepared, TC_bytes target,
+                                             TC_X509_crl_evidence* out)
+{
+  const tc_x509_crl_resolution* resolution = prepared->resolution;
+  tc_x509_crl_held_path* path = prepared->path;
+  tc_x509_crl_dependencies dependencies = {resolution->options,
+                                           resolution->anchor_index,
+                                           prepared->workspace,
+                                           &prepared->anchor.trust,
+                                           prepared->writes,
+                                           CRL_SCOPE_WRITES,
+                                           path ? path->dependency_count : 0};
+  const tc_x509_crl_path_check check = {&dependencies, tc_x509_crl_dependencies_check};
+  x509_crl_node_context node = {prepared, &dependencies, &check};
+  prepared->source_failed = 0;
+  return tc_x509_crl_resolve_dependencies(target, &dependencies, x509_crl_node_evaluate, &node,
+                                          path, out);
+}
+
+TC_TLV_result tc_x509_crl_resolve(const TC_X509_certificate* target,
+                                  const tc_x509_crl_resolution* resolution,
+                                  const tc_x509_crl_resolution_workspace* workspace,
+                                  TC_X509_crl_evidence* out)
+{
+  x509_crl_prepared prepared;
+  if (!target)
+    return TC_TLV_ARGUMENT;
+  TC_TLV_result result = x509_crl_prepare(target, resolution, workspace, NULL, out, &prepared);
   if (result != TC_TLV_OK)
     return result;
-  x509_crl_node_context node = {&dependencies, resolution, &extra, path, &check};
-  return tc_x509_crl_resolve_dependencies(target->encoded, &dependencies, x509_crl_node_evaluate,
-                                          &node, path, out);
+  return x509_crl_resolve_target(&prepared, target->encoded, out);
 }
 
 /* OCSP evidence for the members of one path check. writes records the
@@ -339,9 +378,7 @@ typedef struct {
 } x509_ocsp_members;
 
 typedef struct {
-  tc_x509_crl_held_path* held;
-  const tc_x509_crl_resolution* resolution;
-  const tc_x509_crl_resolution_workspace* workspace;
+  x509_crl_prepared* prepared;
   const x509_ocsp_members* ocsp;
 } x509_crl_path_context;
 
@@ -352,8 +389,8 @@ static TC_TLV_result x509_ocsp_issuer(const x509_crl_path_context* path, size_t 
                                       TC_X509_trust_anchor* out)
 {
   const x509_ocsp_members* ocsp = path->ocsp;
-  const TC_X509_path_workspace* validation = path->workspace->validation;
-  size_t* work = path->workspace->tree->work;
+  const TC_X509_path_workspace* validation = path->prepared->workspace->validation;
+  size_t* work = path->prepared->workspace->tree->work;
   TC_TLV_result result;
   if (!index) {
     const tc_pki_source_guard guard = {ocsp->options->source, ocsp->writes,
@@ -383,12 +420,9 @@ static TC_TLV_result x509_ocsp_issuer(const x509_crl_path_context* path, size_t 
 static TC_TLV_result x509_ocsp_delegate_checked(const x509_crl_path_context* path,
                                                 TC_bytes delegate)
 {
-  TC_X509_certificate certificate = {0};
   TC_X509_crl_evidence evidence = {0};
   TC_X509_revocation_status status;
-  certificate.encoded = delegate;
-  TC_TLV_result result =
-      tc_x509_crl_resolve(&certificate, path->resolution, path->workspace, path->held, &evidence);
+  TC_TLV_result result = x509_crl_resolve_target(path->prepared, delegate, &evidence);
   if (result == TC_TLV_OK)
     result = tc_x509_crl_evidence_status(&evidence, &status);
   if (result != TC_TLV_OK)
@@ -404,8 +438,8 @@ static TC_TLV_result x509_ocsp_member(const x509_crl_path_context* path, size_t 
                                       TC_bytes certificate, TC_X509_crl_evidence* evidence)
 {
   const TC_X509_revocation_options* options = path->ocsp->options;
-  const TC_X509_path_workspace* validation = path->workspace->validation;
-  size_t* work = path->workspace->tree->work;
+  const TC_X509_path_workspace* validation = path->prepared->workspace->validation;
+  size_t* work = path->prepared->workspace->tree->work;
   TC_X509_trust_anchor issuer;
   TC_TLV_result result = x509_ocsp_issuer(path, index, &issuer);
   if (result != TC_TLV_OK)
@@ -457,20 +491,32 @@ static TC_TLV_result x509_crl_path_certificate(void* context, size_t index, TC_b
       return result;
   }
 #endif
-  TC_X509_certificate certificate = {0};
-  certificate.encoded = encoded;
-  return tc_x509_crl_resolve(&certificate, path->resolution, path->workspace, path->held, evidence);
+  return x509_crl_resolve_target(path->prepared, encoded, evidence);
+}
+
+/* Prepare the resolution once for the whole held path, then resolve each
+ * member. ocsp is NULL when no member carries a response. */
+static TC_TLV_result x509_crl_path_run(tc_x509_crl_held_path* held,
+                                       const tc_x509_crl_resolution* resolution,
+                                       const tc_x509_crl_resolution_workspace* workspace,
+                                       const x509_ocsp_members* ocsp)
+{
+  x509_crl_prepared prepared;
+  if (!held || !held->chain || !held->count || !held->out)
+    return TC_TLV_ARGUMENT;
+  TC_TLV_result result = x509_crl_prepare(NULL, resolution, workspace, held, NULL, &prepared);
+  if (result != TC_TLV_OK)
+    return result;
+  x509_crl_path_context context = {&prepared, ocsp};
+  return tc_x509_crl_path_resolve(held->chain, held->count, x509_crl_path_certificate, &context,
+                                  held->out);
 }
 
 TC_TLV_result tc_x509_crl_path_operation(tc_x509_crl_held_path* held,
                                          const tc_x509_crl_resolution* resolution,
                                          const tc_x509_crl_resolution_workspace* workspace)
 {
-  if (!held)
-    return TC_TLV_ARGUMENT;
-  x509_crl_path_context context = {held, resolution, workspace, NULL};
-  return tc_x509_crl_path_resolve(held->chain, held->count, x509_crl_path_certificate, &context,
-                                  held->out);
+  return x509_crl_path_run(held, resolution, workspace, NULL);
 }
 
 /* Check the OCSP responses and the chain against the validation workspace
@@ -559,9 +605,7 @@ TC_TLV_result TC_X509_path_check_revocation(const TC_bytes* chain, size_t count,
   held.metadata[CRL_PATH_WORKSPACE] = (TC_bytes){(const uint8_t*)workspace, sizeof *workspace};
   held.ocsp = options->ocsp.responses;
   held.ocsp_count = options->ocsp.count;
-  x509_crl_path_context context = {&held, &resolution, &scratch,
-                                   options->ocsp.count ? &ocsp : NULL};
-  return tc_x509_crl_path_resolve(chain, count, x509_crl_path_certificate, &context, out);
+  return x509_crl_path_run(&held, &resolution, &scratch, options->ocsp.count ? &ocsp : NULL);
 }
 
 TC_X509_path_status tc_x509_crl_dependencies_path(const TC_X509_search_result* path,

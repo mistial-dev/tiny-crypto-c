@@ -138,9 +138,14 @@ typedef struct {
  *   TC_X509_time_check or differs from signer_policy->at, ocsp.count is
  *   neither zero nor count, or OCSP responses are supplied with a zero
  *   max_responses.
- * UNSUPPORTED: a member has no accepted OCSP response and no CRL evidence, or
- *   the evidence depends on a cycle.
- * INVALID: every candidate CRL for a member failed with INVALID.
+ * UNSUPPORTED: a member has no accepted OCSP response and no CRL evidence,
+ *   the evidence depends on a cycle, or a candidate CRL for an unsettled
+ *   member is unsupported, such as one with an unknown critical extension.
+ * INVALID: a member has no accepted OCSP response, and its candidate CRLs
+ *   failed as invalid data with none unsupported. Causes include a CRL
+ *   signature that does not verify, no signer candidate with a valid path to
+ *   the anchor, a revoked CRL signer, conflicting CRLs in one scope and
+ *   malformed CRL entries.
  * LIMIT: work, storage or a parsing limit is exhausted.
  * Failures leave out unchanged. */
 TC_TLV_result TC_X509_path_check_revocation(const TC_bytes* chain, size_t count,

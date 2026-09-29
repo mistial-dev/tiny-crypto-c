@@ -1514,15 +1514,15 @@ static MunitResult scope_operation(const MunitParameter params[], void* user)
                                                  sizeof metadata / sizeof *metadata};
     const TC_bytes points = {bad_points, sizeof bad_points};
     out = saved;
-    munit_assert_int(tc_x509_crl_scope_execute(&source, &processing, &trust,
-                                               &(tc_x509_crl_scope_selection){
-                                                   scenario == BAD_POINTS ? &points : NULL, 0, 0},
-                                               NULL, NULL, &out),
-                     ==,
-                     scenario == VALID        ? TC_TLV_END
-                     : scenario == BAD_POINTS ? TC_TLV_MORE
-                     : scenario == NO_WORK    ? TC_TLV_LIMIT
-                                              : TC_TLV_ARGUMENT);
+    munit_assert_int(
+        tc_x509_crl_scope_execute(
+            &source, &processing, &trust,
+            &(tc_x509_crl_scope_selection){scenario == BAD_POINTS ? &points : NULL, 0, 0}, &out),
+        ==,
+        scenario == VALID        ? TC_TLV_END
+        : scenario == BAD_POINTS ? TC_TLV_MORE
+        : scenario == NO_WORK    ? TC_TLV_LIMIT
+                                 : TC_TLV_ARGUMENT);
     munit_assert_uint(fixture.calls, ==, scenario == VALID ? 1 : 0);
     munit_assert_memory_equal(sizeof out, &out, &saved);
     munit_assert_memory_equal(sizeof evidence, &evidence, &initial);

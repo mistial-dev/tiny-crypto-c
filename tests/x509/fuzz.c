@@ -21,7 +21,7 @@
 #include <tiny_crypto/twic_uuid.h>
 #include <tiny_crypto/x509.h>
 #include <tiny_crypto/x509_path.h>
-#include "x509_crl_harness.h"
+#include "../support/x509_crl_harness.h"
 
 typedef struct {
   uint64_t hash;
@@ -107,8 +107,7 @@ static void fuzz_card_identifiers(const uint8_t* data, size_t length)
   if (length >= sizeof expected_guid)
     memcpy(expected_guid, data, sizeof expected_guid);
   typedef TC_TLV_result (*authentication_reader)(TC_bytes, TC_bytes, const TC_TLV_limits*,
-                                                 TC_TLV_frame*, size_t, size_t*,
-                                                 TC_PIV_card_identifiers*);
+                                                 TC_TLV_frames, size_t*, TC_PIV_card_identifiers*);
   static const authentication_reader readers[] = {TC_PIV_authentication_identifiers_read,
                                                   TC_TWIC_authentication_identifiers_read};
   const size_t authentication_budgets[] = {WORK, length ? data[0] : 0};
@@ -117,8 +116,8 @@ static void fuzz_card_identifiers(const uint8_t* data, size_t length)
       size_t work = authentication_budgets[i];
       memcpy(&out, &saved, sizeof out);
       const TC_TLV_result result =
-          readers[reader](input, (TC_bytes){expected_guid, sizeof expected_guid}, &limits, frames,
-                          FRAMES, &work, &out);
+          readers[reader](input, (TC_bytes){expected_guid, sizeof expected_guid}, &limits,
+                          (TC_TLV_frames){frames, FRAMES}, &work, &out);
       if (work > authentication_budgets[i])
         abort();
       if (result != TC_TLV_OK) {
@@ -379,12 +378,17 @@ static void fuzz_path(const uint8_t* data, size_t length, const TC_X509_certific
     /* The final record supplies the test's trust anchor. */
     anchor.name = selected.subject;
     anchor.public_key = selected.public_key;
+    TC_X509_store_anchor anchor_record = {0};
+    anchor_record.trust = anchor;
+    const TC_X509_store_array records = {candidates, count, &anchor_record, 1};
+    TC_X509_store_source source;
+    if (TC_X509_store_array_source(&records, &source) != TC_TLV_OK)
+      abort();
     memset(&found, 0xa5, sizeof found);
     memcpy(&unchanged, &found, sizeof found);
     work = options.max_work;
-    status =
-        tc_x509_path_search(candidates[0], &(tc_x509_path_arrays){candidates, count, &anchor, 1},
-                            &options, &workspace, &search, &work, &found);
+    status = tc_x509_path_build_work(candidates[0], &source, &options, &workspace, &search, &work,
+                                     &found);
     if (status == TC_X509_PATH_VALID) {
       size_t i, j;
       if (!found.count || found.count > 4 || found.path != path + 4 - found.count ||
@@ -403,9 +407,8 @@ static void fuzz_path(const uint8_t* data, size_t length, const TC_X509_certific
       abort();
     memcpy(&found, &unchanged, sizeof found);
     work = data[length - 1];
-    status =
-        tc_x509_path_search(candidates[0], &(tc_x509_path_arrays){candidates, count, &anchor, 1},
-                            &options, &workspace, &search, &work, &found);
+    status = tc_x509_path_build_work(candidates[0], &source, &options, &workspace, &search, &work,
+                                     &found);
     if (status != TC_X509_PATH_VALID && memcmp(&found, &unchanged, sizeof found))
       abort();
   }

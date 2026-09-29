@@ -10,8 +10,10 @@ Include `<tiny_crypto/x509_revocation.h>` and enable
 previously validated certificate path. Path validation and certificate, CRL and
 OCSP retrieval stay with the caller.
 The path operation, candidate-source guards, storage preflight and dependency
-resolution are implemented by the X.509 revocation layer. CMS validation uses
-the same operation with an adapter for embedded certificate collections.
+resolution are implemented by the X.509 revocation layer. One argument check
+and one storage preflight cover every path member and dependency node. CMS
+validation uses the same operation with an adapter for embedded certificate
+collections.
 
 First validate or discover the path. Keep its anchor, validation time and
 [trust-store snapshot](x509-store.md) fixed for revocation checking. Pass the
@@ -90,10 +92,15 @@ same signer appears again. Verified dependencies are shared across path members.
 Each call starts with no trusted cached results.
 OCSP verification uses the validation workspace.
 Cycles without independent evidence and members with no accepted OCSP response
-and no CRL evidence return `TC_TLV_UNSUPPORTED`. `TC_TLV_INVALID` means every
-candidate CRL for a member failed as invalid. An invalid `time.at`, a
-`time.at` that differs from `signer_policy->at`, or an `ocsp.count` other than
-zero or the path length returns `TC_TLV_ARGUMENT`.
+and no CRL evidence return `TC_TLV_UNSUPPORTED`. So does an unsettled member
+with an unsupported candidate CRL, such as one with an unknown critical
+extension. `TC_TLV_INVALID` means a member has no accepted OCSP response and
+its candidate CRLs failed as invalid data, with none unsupported. Causes
+include a CRL signature that does not verify, no signer candidate with a valid
+path to the anchor, a revoked CRL signer, conflicting CRLs in one scope and
+malformed CRL entries. An invalid `time.at`, a `time.at` that differs from
+`signer_policy->at`, or an `ocsp.count` other than zero or the path length
+returns `TC_TLV_ARGUMENT`.
 Input bytes, options, source records and workspace metadata must remain stable
 while the call runs.
 

@@ -194,58 +194,6 @@ TC_X509_path_status tc_cms_crl_signer_find(const tc_cms_candidates* candidates,
       trust, out, NULL));
 }
 
-TC_TLV_result tc_cms_crl_process(const tc_cms_candidates* candidates,
-                                 const tc_x509_crl_selected* selected,
-                                 const tc_x509_crl_query* query, const tc_x509_crl_trust* trust,
-                                 TC_X509_crl_evidence* evidence, TC_X509_search_result* out)
-{
-  TC_X509_revocation_status status;
-  TC_TLV_result result;
-  if (!candidates || !tc_x509_crl_trust_valid(trust) || !selected || !selected->base ||
-      !selected->base_info || !!selected->delta != !!selected->delta_info || !query ||
-      !query->certificate || !query->point ||
-      (query->certificate_ca != 0 && query->certificate_ca != 1) || !out)
-    return TC_TLV_ARGUMENT;
-  result = tc_x509_crl_evidence_status(evidence, &status);
-  if (result != TC_TLV_OK)
-    return result;
-  if (status != TC_X509_REVOCATION_UNDETERMINED)
-    return TC_TLV_END;
-  const tc_x509_crl_processing processing = {selected, query, evidence};
-  return tc_cms_crl_search(candidates,
-                           &(tc_x509_crl_signer_query){selected->base, selected->base_info,
-                                                       tc_x509_crl_process_candidate, &processing},
-                           trust, out, NULL);
-}
-
-TC_TLV_result tc_cms_crl_index_process(const tc_cms_candidates* candidates,
-                                       const TC_X509_crl_index* index, size_t base,
-                                       TC_X509_crl_delta_policy delta_policy,
-                                       const tc_x509_crl_query* query,
-                                       const tc_x509_crl_trust* trust,
-                                       TC_X509_crl_evidence* evidence, TC_X509_search_result* out)
-{
-  TC_X509_revocation_status status;
-  if (!candidates || !tc_x509_crl_index_arguments(index, query, trust, out) ||
-      base >= index->count || !x509_crl_delta_policy_valid(delta_policy))
-    return TC_TLV_ARGUMENT;
-  const TC_X509_crl_record* record = &index->records[base];
-  if (record->policy != TC_TLV_OK)
-    return record->policy;
-  if (record->extensions.present & TC_X509_CRL_EXT_DELTA)
-    return TC_TLV_ARGUMENT;
-  TC_TLV_result result = tc_x509_crl_evidence_status(evidence, &status);
-  if (result != TC_TLV_OK)
-    return result;
-  if (status != TC_X509_REVOCATION_UNDETERMINED)
-    return TC_TLV_END;
-  const tc_x509_crl_index_processing processing = {index, base, delta_policy, query, evidence};
-  return tc_cms_crl_search(candidates,
-                           &(tc_x509_crl_signer_query){&record->crl, &record->extensions,
-                                                       tc_x509_crl_index_attempt, &processing},
-                           trust, out, NULL);
-}
-
 static TC_TLV_result cms_crl_operation_source(const tc_cms_candidates* candidates,
                                               tc_pki_store_candidates* store, TC_bytes metadata[3],
                                               tc_x509_crl_operation_source* out);
@@ -265,7 +213,7 @@ static TC_TLV_result cms_crl_scope_run(const tc_cms_candidates* candidates,
   TC_TLV_result result = cms_crl_operation_source(candidates, &store, metadata, &source);
   if (result != TC_TLV_OK)
     return result;
-  return tc_x509_crl_scope_execute(&source, processing, trust, selection, NULL, NULL, out);
+  return tc_x509_crl_scope_execute(&source, processing, trust, selection, out);
 }
 
 TC_TLV_result tc_cms_crl_scope_process(const tc_cms_candidates* candidates,
@@ -382,7 +330,7 @@ TC_TLV_result tc_cms_crl_resolve(const TC_X509_certificate* target,
       cms_crl_resolution_init(resolution, &store, metadata, &source, &time, &operation);
   if (result != TC_TLV_OK)
     return result;
-  return tc_x509_crl_resolve(target, &operation, workspace, NULL, out);
+  return tc_x509_crl_resolve(target, &operation, workspace, out);
 }
 
 TC_TLV_result tc_cms_crl_path_resolve(const TC_bytes* chain, size_t count,

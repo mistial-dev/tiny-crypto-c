@@ -88,30 +88,6 @@ TC_X509_path_status tc_cms_crl_signer_find(const tc_cms_candidates* candidates,
                                            const TC_X509_crl_extensions* extensions,
                                            const tc_x509_crl_trust* trust,
                                            TC_X509_search_result* out);
-/* Process selected CRLs, retrying proposed signers with the same bounded search.
- * Subject, authority hints and cRLSign filter candidates before full processing.
- * END means terminal evidence or no new eligible reasons. INVALID means no
- * candidate succeeded. Unresolved limits/algorithms retain their own status.
- * Source/record errors stop search. Evidence/out change only on OK. Candidates
- * stay unchanged and work covers all attempts. Same disjoint/stable storage rules
- * as signer_find, with evidence also separate from inputs and scratch.
- * CRL selection and signer-path revocation remain separate. */
-TC_TLV_result tc_cms_crl_process(const tc_cms_candidates* candidates,
-                                 const tc_x509_crl_selected* selected,
-                                 const tc_x509_crl_query* query, const tc_x509_crl_trust* trust,
-                                 TC_X509_crl_evidence* evidence, TC_X509_search_result* out);
-/* Process one indexed complete CRL with signer retry and explicit delta policy.
- * Authenticate the base/path once per signer attempt, choose a current signed
- * delta, then apply entries. REQUIRED returns END if no usable delta is found.
- * IF_AVAILABLE falls back to the complete CRL, which must itself be current.
- * Same borrowed/disjoint storage and result rules as crl_process. Index and
- * candidates stay unchanged. Signer-path revocation remains separate. */
-TC_TLV_result tc_cms_crl_index_process(const tc_cms_candidates* candidates,
-                                       const TC_X509_crl_index* index, size_t base,
-                                       TC_X509_crl_delta_policy delta_policy,
-                                       const tc_x509_crl_query* query,
-                                       const tc_x509_crl_trust* trust,
-                                       TC_X509_crl_evidence* evidence, TC_X509_search_result* out);
 /* Process all indexed scopes for one distribution point. check is required.
  * OK publishes new evidence, which may still have incomplete reason coverage.
  * END means no contribution or terminal input evidence. Failures preserve
