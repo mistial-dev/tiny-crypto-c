@@ -5,6 +5,7 @@
 #include "../../src/mp_internal.h"
 #include "../../src/rsa_internal.h"
 #include "munit.h"
+#include "test_util.h"
 
 static void encode(tc_mp_word* out, uint32_t value, size_t n)
 {
@@ -27,14 +28,12 @@ static uint32_t power(uint32_t value, uint32_t exponent, uint32_t modulus)
   return (uint32_t)result;
 }
 
-static MunitResult montgomery(const MunitParameter params[], void* user)
+TC_TEST(montgomery)
 {
   enum { MAX_WORDS = 3072 / TC_MP_WORD_BITS };
   static const uint32_t primes[] = {251, 65521, 2147483647};
   tc_mp_word a[MAX_WORDS], b[MAX_WORDS], p[MAX_WORDS], out[MAX_WORDS];
   tc_mp_word product[2 * MAX_WORDS + 2], reduced[MAX_WORDS];
-  (void)params;
-  (void)user;
   for (size_t k = 0; k < sizeof primes / sizeof *primes; ++k) {
     uint32_t modulus = primes[k];
     for (size_t bytes = 4; bytes <= 384; bytes = bytes == 4 ? 128 : bytes + 128) {
@@ -77,13 +76,11 @@ static MunitResult montgomery(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult full_width(const MunitParameter params[], void* user)
+TC_TEST(full_width)
 {
   enum { MAX_WORDS = 3072 / TC_MP_WORD_BITS };
   tc_mp_word p[MAX_WORDS], a[MAX_WORDS], r2[MAX_WORDS], expected[MAX_WORDS];
   tc_mp_word product[2 * MAX_WORDS + 2], reduced[MAX_WORDS];
-  (void)params;
-  (void)user;
   for (size_t bytes = 128; bytes <= 384; bytes += 128) {
     size_t n = bytes / sizeof(tc_mp_word);
     tc_mp_word factor;
@@ -111,15 +108,13 @@ static MunitResult full_width(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult exponentiation(const MunitParameter params[], void* user)
+TC_TEST(exponentiation)
 {
   enum { N = 32 / TC_MP_WORD_BITS };
   tc_mp_word p[N], base[N], one[N], out[N], temporary[N], product[2 * N + 2], reduced[N];
   const uint32_t modulus = 65521;
   tc_mp_word factor;
   uint64_t radix = 1;
-  (void)params;
-  (void)user;
   encode(p, modulus, N);
   factor = tc_mp_montgomery_factor(p[0]);
   for (unsigned bit = 0; bit < 32; ++bit)
@@ -150,14 +145,12 @@ static MunitResult exponentiation(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult public_operation(const MunitParameter params[], void* user)
+TC_TEST(public_operation)
 {
   uint8_t modulus[128], input[128] = {0}, output[128], saved[128], exponent[] = {3};
   tc_mp_word scratch[8 * 128 / sizeof(tc_mp_word) + 2];
   const size_t capacity = sizeof scratch / sizeof *scratch, cost = 16 * 128 + 16 + 4;
   uint32_t work;
-  (void)params;
-  (void)user;
   memset(modulus, 0xff, sizeof modulus);
   modulus[127] = 0xd3;
   input[127] = 1;
@@ -194,13 +187,11 @@ static MunitResult public_operation(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult padded_input(const MunitParameter params[], void* data)
+TC_TEST(padded_input)
 {
   enum { WIDTH = 16 };
   uint8_t input[WIDTH], encoded[WIDTH];
   tc_mp_word words[WIDTH / sizeof(tc_mp_word) + 1];
-  (void)params;
-  (void)data;
   for (size_t i = 0; i < WIDTH; ++i)
     input[i] = (uint8_t)(i + 1);
   for (size_t length = 0; length <= WIDTH; ++length) {

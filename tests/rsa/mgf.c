@@ -2,9 +2,10 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "../../src/rsa_padding_internal.h"
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
-static MunitResult mask(const MunitParameter params[], void* user)
+TC_TEST(mask)
 {
   static const uint8_t expected[] = {
       0x3b, 0xda, 0xba, 0x83, 0xcf, 0xf1, 0x33, 0x37, 0xb3, 0x23, 0xac, 0x38, 0x3c,
@@ -16,8 +17,6 @@ static MunitResult mask(const MunitParameter params[], void* user)
   TC_hash_context workspace;
   uint8_t output[sizeof expected], block[64];
   uint32_t work;
-  (void)params;
-  (void)user;
   for (size_t length = 0; length <= sizeof output; ++length) {
     size_t cost = length + ((length + 31) / 32) * 8;
     memset(output, 0, sizeof output);

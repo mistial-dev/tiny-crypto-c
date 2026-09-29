@@ -24,15 +24,13 @@ TC_status tc_test_cipher(state_t* state, const uint8_t* key)
   return tc_test_cipher_rounds(state, key, TC_AES_FIXED_ROUNDS);
 }
 
-static MunitResult failures(const MunitParameter params[], void* user)
+TC_TEST(failures)
 {
   uint8_t key[16] = {0}, data[33] = {0}, tag[16], expected[16];
   struct TC_AES_CMAC_ctx fixed;
   struct TC_AES_CMAC_ctx failed_fixed;
   TC_AES_dynamic_CMAC dynamic;
   unsigned stage;
-  (void)params;
-  (void)user;
   memset(expected, 0x5a, sizeof expected);
   memset(&failed_fixed, 0, sizeof failed_fixed);
   for (stage = 1; stage <= 4; ++stage) {
@@ -73,15 +71,13 @@ static MunitResult failures(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult siv_failures(const MunitParameter params[], void* user)
+TC_TEST(siv_failures)
 {
   const size_t lengths[] = {0, 1, 16, 33};
   uint8_t key[2 * TC_AES_KEYLEN] = {0}, plain[33] = {0};
   uint8_t ciphertext[33], output[33], tag[16], failed_tag[16], sentinel[16];
   const TC_bytes ad[] = {{NULL, 0}, {plain, sizeof plain}};
   size_t index;
-  (void)params;
-  (void)user;
   memset(sentinel, 0x5a, sizeof sentinel);
   for (index = 0; index < sizeof lengths / sizeof lengths[0]; ++index) {
     unsigned total, stage;
@@ -141,15 +137,13 @@ static TC_status eax_operation(int prime, int decrypt, const uint8_t* key, const
                             (TC_buffer){tag, 16});
 }
 
-static MunitResult eax_failures(const MunitParameter params[], void* user)
+TC_TEST(eax_failures)
 {
   const size_t lengths[] = {0, 1, 16, 33};
   uint8_t key[TC_AES_KEYLEN] = {0}, plain[33] = {0}, ciphertext[33];
   uint8_t output[33], tag[16], failed_tag[16], sentinel[16];
   int prime;
   size_t index;
-  (void)params;
-  (void)user;
   memset(sentinel, 0x5a, sizeof sentinel);
   for (prime = 0; prime <= 1; ++prime) {
     for (index = 0; index < sizeof lengths / sizeof lengths[0]; ++index) {
@@ -187,14 +181,12 @@ static MunitResult eax_failures(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult ccm_failures(const MunitParameter params[], void* user)
+TC_TEST(ccm_failures)
 {
   const size_t lengths[] = {0, 1, 16, 33};
   uint8_t key[TC_AES_KEYLEN] = {0}, plain[33] = {0}, nonce[13] = {0};
   uint8_t ciphertext[33], output[33], tag[16], failed_tag[16], sentinel[16];
   size_t index;
-  (void)params;
-  (void)user;
   memset(sentinel, 0x5a, sizeof sentinel);
   for (index = 0; index < sizeof lengths / sizeof lengths[0]; ++index) {
     unsigned total, stage;
@@ -252,14 +244,12 @@ static MunitResult ccm_failures(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult gcm_failures(const MunitParameter params[], void* user)
+TC_TEST(gcm_failures)
 {
   uint8_t key[TC_AES_KEYLEN] = {0}, plain[33] = {0}, iv[12] = {0};
   uint8_t ciphertext[33], output[33], tag[16], failed_tag[16], sentinel[16];
   struct TC_AES_GCM_ctx ctx;
   unsigned stage;
-  (void)params;
-  (void)user;
   memset(sentinel, 0x5a, sizeof sentinel);
   calls = 0;
   fail_at = 0;

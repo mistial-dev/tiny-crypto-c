@@ -2,19 +2,18 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/x509.h>
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
 static const uint8_t multi[] = {0x30, 22,  0x31, 20, 0x30, 8, 6,    3, 0x55, 4,    3, 0x0c,
                                 1,    'A', 0x30, 8,  6,    3, 0x55, 4, 10,   0x13, 1, 'Z'};
 static const TC_TLV_limits bounds = {1024, 1024, 32, 3};
 
-static MunitResult attributes(const MunitParameter params[], void* user)
+TC_TEST(attributes)
 {
   TC_bytes encoded = {multi, sizeof multi}, rdn;
   TC_TLV_reader name, values;
   TC_X509_name_attribute attribute;
-  (void)params;
-  (void)user;
   munit_assert_int(TC_X509_name_init(&name, encoded, &bounds), ==, TC_TLV_OK);
   munit_assert_size(name.elements, ==, 1);
   munit_assert_int(TC_X509_rdn_next(&name, &rdn), ==, TC_TLV_OK);
@@ -34,14 +33,12 @@ static MunitResult attributes(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult limits(const MunitParameter params[], void* user)
+TC_TEST(limits)
 {
   TC_bytes encoded = {multi, sizeof multi}, rdn = {multi, 1};
   TC_TLV_reader reader, saved;
   TC_TLV_limits limited = bounds;
   size_t i;
-  (void)params;
-  (void)user;
   for (i = 1; i < 8; ++i) {
     limited.max_elements = i;
     munit_assert_int(TC_X509_name_init(&reader, encoded, &limited), ==, TC_TLV_OK);
@@ -70,14 +67,12 @@ static MunitResult limits(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult invalid(const MunitParameter params[], void* user)
+TC_TEST(invalid)
 {
   uint8_t bad[sizeof multi];
   TC_bytes encoded = {bad, sizeof bad}, rdn = {NULL, 0};
   TC_TLV_reader reader, saved;
   unsigned variant;
-  (void)params;
-  (void)user;
   for (variant = 0; variant < 4; ++variant) {
     memcpy(bad, multi, sizeof bad);
     if (variant == 0) {
@@ -99,7 +94,7 @@ static MunitResult invalid(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult matching(const MunitParameter params[], void* user)
+TC_TEST(matching)
 {
   const uint8_t a[] = {0x30, 22,  0x31, 20, 0x30, 8, 6,    3, 0x55, 4,    3, 0x0c,
                        1,    'b', 0x30, 8,  6,    3, 0x55, 4, 3,    0x13, 1, 'A'};
@@ -110,8 +105,6 @@ static MunitResult matching(const MunitParameter params[], void* user)
   TC_bytes left = {a, sizeof a}, right = {b, sizeof b};
   size_t work = 10000;
   int equal = 99;
-  (void)params;
-  (void)user;
   memcpy(b, a, sizeof b);
   b[13] = 'a';
   b[23] = 'B';
@@ -131,7 +124,7 @@ static MunitResult matching(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult binary_attributes(const MunitParameter params[], void* user)
+TC_TEST(binary_attributes)
 {
   static const uint8_t email[] = {0x30, 18,   0x31, 16,   0x30, 14, 0x06, 9,    0x2a, 0x86,
                                   0x48, 0x86, 0xf7, 0x0d, 1,    9,  1,    0x16, 1,    'A'};
@@ -141,8 +134,6 @@ static MunitResult binary_attributes(const MunitParameter params[], void* user)
   TC_X509_name_workspace workspace = {first, second, 32, used, 2};
   size_t work = 10000;
   int equal = 99;
-  (void)params;
-  (void)user;
   memcpy(changed, email, sizeof email);
   munit_assert_int(TC_X509_name_equal((TC_bytes){email, sizeof email},
                                       (TC_bytes){changed, sizeof changed}, &bounds, &workspace,
@@ -171,7 +162,7 @@ static MunitResult binary_attributes(const MunitParameter params[], void* user)
  * encodings match. Different encodings are undetermined, because the
  * matching rule could still equate them, and return UNSUPPORTED unless
  * another attribute already decides the comparison. */
-static MunitResult undetermined_values(const MunitParameter params[], void* user)
+TC_TEST(undetermined_values)
 {
   /* O=abc as PrintableString, and O as TeletexString. */
   static const uint8_t printable[] = {0x30, 14, 0x31, 12,   0x30, 10,  6,   3,
@@ -207,8 +198,6 @@ static MunitResult undetermined_values(const MunitParameter params[], void* user
   uint32_t first[32], second[32];
   uint8_t used[2];
   TC_X509_name_workspace workspace = {first, second, 32, used, 2};
-  (void)params;
-  (void)user;
   for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
     const TC_bytes left = {cases[i].left, cases[i].left_length};
     const TC_bytes right = {cases[i].right, cases[i].right_length};
@@ -228,7 +217,7 @@ static MunitResult undetermined_values(const MunitParameter params[], void* user
 
 /* An excluded directoryName subtree that the library cannot compare must
  * fail closed. Reporting "outside the subtree" would admit the name. */
-static MunitResult undetermined_excluded_subtree(const MunitParameter params[], void* user)
+TC_TEST(undetermined_excluded_subtree)
 {
   static const uint8_t subject[] = {0x30, 14, 0x31, 12,   0x30, 10,  6,   3,
                                     0x55, 4,  10,   0x13, 3,    'a', 'b', 'c'};
@@ -241,8 +230,6 @@ static MunitResult undetermined_excluded_subtree(const MunitParameter params[], 
   TC_X509_general_subtree base;
   size_t work = 10000;
   int matched = 99;
-  (void)params;
-  (void)user;
   memset(&base, 0, sizeof base);
   base.base.type = 4;
   base.base.value = (TC_bytes){excluded, sizeof excluded};
@@ -266,7 +253,7 @@ static MunitResult undetermined_excluded_subtree(const MunitParameter params[], 
   return MUNIT_OK;
 }
 
-static MunitResult subtree(const MunitParameter params[], void* user)
+TC_TEST(subtree)
 {
   const uint8_t parent[] = {0x30, 12, 0x31, 10, 0x30, 8, 6, 3, 0x55, 4, 3, 0x0c, 1, 'A'};
   uint8_t child[] = {0x30, 24,   0x31, 10,   0x30, 8, 6, 3,    0x55, 4,  3,    0x0c, 1,
@@ -278,8 +265,6 @@ static MunitResult subtree(const MunitParameter params[], void* user)
   TC_bytes name = {child, sizeof child}, base = {parent, sizeof parent}, root = {empty, 2};
   size_t work = 10000;
   int equal = 99;
-  (void)params;
-  (void)user;
   munit_assert_int(TC_X509_name_within(name, base, &bounds, &workspace, &work, &equal), ==,
                    TC_TLV_OK);
   munit_assert_int(equal, ==, 1);
@@ -305,7 +290,7 @@ static MunitResult subtree(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult match_limits(const MunitParameter params[], void* user)
+TC_TEST(match_limits)
 {
   TC_bytes name = {multi, sizeof multi};
   uint32_t first[32], second[32];
@@ -313,8 +298,6 @@ static MunitResult match_limits(const MunitParameter params[], void* user)
   TC_X509_name_workspace workspace = {first, second, 32, used, 2};
   size_t work = 10000, required, i;
   int equal = 99;
-  (void)params;
-  (void)user;
   munit_assert_int(TC_X509_name_equal(name, name, &bounds, &workspace, &work, &equal), ==,
                    TC_TLV_OK);
   munit_assert_int(equal, ==, 1);
@@ -346,7 +329,7 @@ static MunitResult match_limits(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult matching_rules(const MunitParameter params[], void* user)
+TC_TEST(matching_rules)
 {
   uint8_t name[] = {0x30, 12, 0x31, 10, 0x30, 8, 6, 3, 0x55, 4, 3, 0x14, 1, 'A'};
   const uint8_t domain[] = {0x30, 19,   0x31, 17,   0x30, 15, 6,  10,   9, 0x92, 0x26,
@@ -358,8 +341,6 @@ static MunitResult matching_rules(const MunitParameter params[], void* user)
   TC_bytes left = {name, sizeof name}, right = left;
   size_t work = 10000;
   int equal = 99;
-  (void)params;
-  (void)user;
   munit_assert_int(TC_X509_name_equal(left, right, &bounds, &workspace, &work, &equal), ==,
                    TC_TLV_OK);
   munit_assert_int(equal, ==, 1);
@@ -382,7 +363,7 @@ static MunitResult matching_rules(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult unicode_names(const MunitParameter params[], void* user)
+TC_TEST(unicode_names)
 {
   const uint8_t utf8[] = {0x30, 13, 0x31, 11, 0x30, 9, 6, 3, 0x55, 4, 3, 0x0c, 2, 0xc3, 0x85};
   const uint8_t bmp[] = {0x30, 13, 0x31, 11, 0x30, 9, 6, 3, 0x55, 4, 3, 0x1e, 2, 0, 0xe5};
@@ -394,8 +375,6 @@ static MunitResult unicode_names(const MunitParameter params[], void* user)
   TC_bytes left = {utf8, sizeof utf8}, right = {bmp, sizeof bmp};
   size_t work = 10000;
   int equal = 99;
-  (void)params;
-  (void)user;
   munit_assert_int(TC_X509_name_equal(left, right, &bounds, &workspace, &work, &equal), ==,
                    TC_TLV_OK);
   munit_assert_int(equal, ==, 1);
@@ -453,7 +432,7 @@ static void string_constraints(unsigned type, const StringConstraint* cases, siz
   }
 }
 
-static MunitResult dns_constraints(const MunitParameter params[], void* user)
+TC_TEST(dns_constraints)
 {
   static const StringConstraint cases[] = {{"example.com", "example.com", TC_TLV_OK, 1},
                                            {"A.Example.COM", "example.com", TC_TLV_OK, 1},
@@ -471,13 +450,11 @@ static MunitResult dns_constraints(const MunitParameter params[], void* user)
                                            {"a_b.example.com", "example.com", TC_TLV_INVALID, 0},
                                            {"*.example.com", "example.com", TC_TLV_UNSUPPORTED, 0},
                                            {"example.com", "*.com", TC_TLV_UNSUPPORTED, 0}};
-  (void)params;
-  (void)user;
   string_constraints(2, cases, sizeof cases / sizeof cases[0]);
   return MUNIT_OK;
 }
 
-static MunitResult mail_constraints(const MunitParameter params[], void* user)
+TC_TEST(mail_constraints)
 {
   static const StringConstraint cases[] = {
       {"user@example.com", "EXAMPLE.com", TC_TLV_OK, 1},
@@ -517,13 +494,11 @@ static MunitResult mail_constraints(const MunitParameter params[], void* user)
        "example", TC_TLV_INVALID, 0},
       {"<user@example.com>", "example.com", TC_TLV_INVALID, 0},
       {"user@example.com (name)", "example.com", TC_TLV_INVALID, 0}};
-  (void)params;
-  (void)user;
   string_constraints(1, cases, sizeof cases / sizeof cases[0]);
   return MUNIT_OK;
 }
 
-static MunitResult uri_constraints(const MunitParameter params[], void* user)
+TC_TEST(uri_constraints)
 {
   static const StringConstraint cases[] = {
       {"https://EXAMPLE.com", "example.com", TC_TLV_OK, 1},
@@ -579,19 +554,15 @@ static MunitResult uri_constraints(const MunitParameter params[], void* user)
       {"https://example%2/", "example.com", TC_TLV_INVALID, 0},
       {"https://example%gg/", "example.com", TC_TLV_INVALID, 0},
       {"https://example%/", "example.com", TC_TLV_INVALID, 0}};
-  (void)params;
-  (void)user;
   string_constraints(6, cases, sizeof cases / sizeof cases[0]);
   return MUNIT_OK;
 }
 
-static MunitResult uri_host_lengths(const MunitParameter params[], void* user)
+TC_TEST(uri_host_lengths)
 {
   static const size_t lengths[] = {63, 64, 253, 254};
   uint8_t uri[800], host[254];
   size_t test, i;
-  (void)params;
-  (void)user;
   for (test = 0; test < sizeof lengths / sizeof lengths[0]; ++test) {
     TC_X509_general_name name = {0};
     TC_X509_general_subtree base = {0};
@@ -617,7 +588,7 @@ static MunitResult uri_host_lengths(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult utf8_mail_constraints(const MunitParameter params[], void* user)
+TC_TEST(utf8_mail_constraints)
 {
   static const StringConstraint cases[] = {
       {"\xc3\xa9@example.com", "example.com", TC_TLV_OK, 1},
@@ -646,8 +617,6 @@ static MunitResult utf8_mail_constraints(const MunitParameter params[], void* us
       {".\xc3\xa9@example.com", "example.com", TC_TLV_INVALID, 0},
       {"\xc3\xa9..a@example.com", "example.com", TC_TLV_INVALID, 0},
       {"\xc3\xa9@example.com", "user@example.com", TC_TLV_UNSUPPORTED, 0}};
-  (void)params;
-  (void)user;
   string_constraints(0, cases, sizeof cases / sizeof cases[0]);
   return MUNIT_OK;
 }
@@ -665,7 +634,7 @@ static TC_TLV_result reader_init(reader_init_kind kind, void* reader, TC_bytes i
   return TC_X509_general_subtrees_init(reader, input, &bounds, frames);
 }
 
-static MunitResult reader_init_overlap(const MunitParameter params[], void* user)
+TC_TEST(reader_init_overlap)
 {
   static const uint8_t sequence[] = {0x30, 5, 0x30, 3, 0x82, 1, 'a'};
   union {
@@ -677,8 +646,6 @@ static MunitResult reader_init_overlap(const MunitParameter params[], void* user
   uint8_t original[sizeof shared];
   TC_TLV_frame frames[2];
   reader_init_kind kind;
-  (void)params;
-  (void)user;
   for (kind = INIT_NAMES; kind <= INIT_SUBTREES; ++kind) {
     /* GeneralNames takes the SEQUENCE. The other readers take contents. */
     const size_t skip = kind == INIT_NAMES ? 0 : 2;
@@ -706,7 +673,7 @@ static MunitResult reader_init_overlap(const MunitParameter params[], void* user
   return MUNIT_OK;
 }
 
-static MunitResult utf8_mail_structure(const MunitParameter params[], void* user)
+TC_TEST(utf8_mail_structure)
 {
   uint8_t encoded[] = {0xa0, 28,  6,    8,   0x2b, 6,   1,    5,    5,   7,
                        8,    9,   0xa0, 16,  0x0c, 14,  0xc3, 0xa9, '@', 'e',
@@ -718,8 +685,6 @@ static MunitResult utf8_mail_structure(const MunitParameter params[], void* user
   TC_TLV_limits small = bounds;
   size_t work = 10000, length;
   int matched = 99;
-  (void)params;
-  (void)user;
   base.base.type = 1;
   base.base.value.data = (const uint8_t*)"example.com";
   base.base.value.length = 11;
@@ -791,7 +756,7 @@ static MunitResult utf8_mail_structure(const MunitParameter params[], void* user
   return MUNIT_OK;
 }
 
-static MunitResult constraint_lists(const MunitParameter params[], void* user)
+TC_TEST(constraint_lists)
 {
   uint8_t permit[] = {0x30, 13,   0x82, 11,   'e', 'x', 'a', 'm', 'p', 'l', 'e', '.', 'c', 'o',
                       'm',  0x30, 11,   0x82, 9,   'o', 't', 'h', 'e', 'r', '.', 'c', 'o', 'm'};
@@ -809,8 +774,6 @@ static MunitResult constraint_lists(const MunitParameter params[], void* user)
   TC_TLV_limits small = bounds;
   size_t i, work, needed, budget;
   int allowed;
-  (void)params;
-  (void)user;
   name.type = 2;
   for (i = 0; i < sizeof cases / sizeof cases[0]; ++i) {
     name.value.data = (const uint8_t*)cases[i].name;
@@ -886,7 +849,7 @@ static MunitResult constraint_lists(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult certificate_names(const MunitParameter params[], void* user)
+TC_TEST(certificate_names)
 {
   uint8_t san[] = {0x30, 37, 0x30, 35,  6,   3,   0x55, 0x1d, 17,  4,   28,  0x30, 26,
                    0x82, 11, 'e',  'x', 'a', 'm', 'p',  'l',  'e', '.', 'c', 'o',  'm',
@@ -902,8 +865,6 @@ static MunitResult certificate_names(const MunitParameter params[], void* user)
   TC_X509_constraint_workspace workspace = {{frames, 4}, NULL};
   size_t work = 10000, needed, budget;
   int allowed = 99;
-  (void)params;
-  (void)user;
   certificate.subject.data = multi;
   certificate.subject.length = sizeof multi;
   certificate.extensions.data = san;
@@ -1010,7 +971,7 @@ static MunitResult certificate_names(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult constraint_arguments(const MunitParameter params[], void* user)
+TC_TEST(constraint_arguments)
 {
   TC_X509_general_name name = {0};
   TC_X509_general_subtree base = {0};
@@ -1020,8 +981,6 @@ static MunitResult constraint_arguments(const MunitParameter params[], void* use
   TC_TLV_limits small = bounds;
   size_t work = 10000;
   int matched = 99;
-  (void)params;
-  (void)user;
   name.type = base.base.type = 4;
   name.value.data = base.base.value.data = multi;
   name.value.length = base.base.value.length = sizeof multi;
@@ -1069,12 +1028,10 @@ static MunitResult constraint_arguments(const MunitParameter params[], void* use
   return MUNIT_OK;
 }
 
-static MunitResult ip_constraints(const MunitParameter params[], void* user)
+TC_TEST(ip_constraints)
 {
   uint8_t address[16], range[32];
   size_t width, prefix, i;
-  (void)params;
-  (void)user;
   for (width = 4; width <= 16; width += 12) {
     for (prefix = 0; prefix <= width * 8; ++prefix) {
       TC_X509_general_name name = {0};

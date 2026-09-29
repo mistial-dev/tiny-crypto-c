@@ -7,17 +7,15 @@
 
 #include <tiny_crypto/des.h>
 #include "munit.h"
+#include "test_util.h"
 
 #if TC_DES_ENABLE_ECB && TC_DES_ENABLE_CBC && TC_DES_ENABLE_CFB1 && TC_DES_ENABLE_CFB8 &&          \
     TC_DES_ENABLE_CFB64 && TC_DES_ENABLE_OFB && TC_DES_ENABLE_TDES
 
 #include "edge_vectors.h"
 
-static MunitResult test_edge_vectors(const MunitParameter params[], void* data)
+TC_TEST(test_edge_vectors)
 {
-  (void)params;
-  (void)data;
-
   for (size_t i = 0; i < EDGE_VECTOR_COUNT; ++i) {
     const struct edge_vector* vector = &edge_vectors[i];
     uint8_t buffer[32];
@@ -59,10 +57,8 @@ MunitResult test_edge_vectors_suite(const MunitParameter params[], void* data)
 
 #else
 
-MunitResult test_edge_vectors_suite(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_edge_vectors_suite)
 {
-  (void)params;
-  (void)data;
   return MUNIT_SKIP;
 }
 

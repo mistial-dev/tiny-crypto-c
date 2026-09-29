@@ -7,6 +7,7 @@
 #include "source.h"
 #include "../../examples/cms_reader.h"
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
 static const TC_CMS_verification_policy cms_policy = {.envelope = TC_CMS_ENVELOPE_BER};
@@ -15,7 +16,7 @@ static const TC_CMS_verification_policy cms_der_policy = {.envelope = TC_CMS_ENV
 static const uint8_t signer[] = {0x30, 21, 2,    1, 3, 0x80, 1,    0xaa, 0x30, 4, 6,   2,
                                  0x2a, 3,  0x30, 4, 6, 2,    0x2a, 3,    4,    1, 0xbb};
 
-static MunitResult identifiers(const MunitParameter params[], void* user)
+TC_TEST(identifiers)
 {
   static const uint8_t issuer_id[] = {0x30, 17, 0x30, 12,   0x31, 10,  0x30, 8, 6, 3,
                                       0x55, 4,  3,    0x0c, 1,    'A', 2,    1, 1};
@@ -24,8 +25,6 @@ static MunitResult identifiers(const MunitParameter params[], void* user)
   TC_CMS_signer_info result, saved;
   uint8_t input[64];
   size_t work = 1000;
-  (void)params;
-  (void)user;
   munit_assert_int(TC_CMS_signer_info_read((TC_bytes){signer, sizeof signer}, &cms_der_policy,
                                            &limits, (TC_TLV_frames){frames, 8}, &work, &result),
                    ==, TC_TLV_OK);
@@ -68,7 +67,7 @@ static MunitResult identifiers(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult attributes(const MunitParameter params[], void* user)
+TC_TEST(attributes)
 {
   /* Unknown attributes are retained here. Their semantics are checked separately. */
   static const uint8_t attribute[] = {0xa0, 11, 0x30, 9, 6, 2, 0x2a, 3, 0x31, 3, 4, 1, 0xcc};
@@ -76,8 +75,6 @@ static MunitResult attributes(const MunitParameter params[], void* user)
   TC_TLV_frame frames[8];
   TC_CMS_signer_info result, saved;
   uint8_t input[64];
-  (void)params;
-  (void)user;
   for (unsigned mask = 0; mask < 4; ++mask) {
     size_t length = 14, signed_offset = 0, unsigned_offset = 0, work = 1000;
     memcpy(input, signer, 14);
@@ -130,7 +127,7 @@ static MunitResult attributes(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult malformed(const MunitParameter params[], void* user)
+TC_TEST(malformed)
 {
   enum { WORK_BUDGET = 1024 };
   static const size_t offsets[] = {4, 5, 8, 14, 20};
@@ -140,8 +137,6 @@ static MunitResult malformed(const MunitParameter params[], void* user)
   TC_CMS_signer_info result, saved;
   uint8_t input[sizeof signer];
   size_t work;
-  (void)params;
-  (void)user;
   memset(&result, 0xa5, sizeof result);
   memcpy(&saved, &result, sizeof saved);
   for (size_t length = 0; length < sizeof signer; ++length) {
@@ -181,7 +176,7 @@ static MunitResult malformed(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult ber_fields(const MunitParameter params[], void* user)
+TC_TEST(ber_fields)
 {
   enum { FRAME_CAPACITY = 8, WORK_BUDGET = 4096, SKI_OFFSET = 5, SKI_CHILD_OFFSET = 7 };
   uint8_t encoded[] = {0x30, 0x80, 2,    1,    3, 0xa0, 0x80, 4,    1,    0xaa, 0, 0,    0x30,
@@ -195,8 +190,6 @@ static MunitResult ber_fields(const MunitParameter params[], void* user)
   TC_TLV_frame frames[FRAME_CAPACITY];
   TC_CMS_signer_info result, saved;
   size_t work = WORK_BUDGET;
-  (void)params;
-  (void)user;
   munit_assert_int(TC_CMS_signer_info_read((TC_bytes){encoded, sizeof encoded}, &cms_policy,
                                            &limits, (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
                                            &result),
@@ -294,7 +287,7 @@ static MunitResult ber_fields(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult issuer_schema(const MunitParameter params[], void* user)
+TC_TEST(issuer_schema)
 {
   enum { FRAME_CAPACITY = 8, WORK_BUDGET = 4096 };
   static const uint8_t unsorted[] = {0x30, 22,  0x31, 20, 0x30, 8, 6,    3, 0x55, 4,    3, 0x0c,
@@ -306,8 +299,6 @@ static MunitResult issuer_schema(const MunitParameter params[], void* user)
   TC_TLV_frame frames[FRAME_CAPACITY];
   size_t work = WORK_BUDGET;
   const tc_pki_tree_workspace workspace = {frames, FRAME_CAPACITY, &work};
-  (void)params;
-  (void)user;
   munit_assert_int(
       tc_pki_tree_name((TC_bytes){unsorted, sizeof unsorted}, TC_TLV_BER, &limits, &workspace), ==,
       TC_TLV_OK);
@@ -337,7 +328,7 @@ static MunitResult issuer_schema(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult issuer_matching(const MunitParameter params[], void* user)
+TC_TEST(issuer_matching)
 {
   enum {
     FRAME_CAPACITY = 8,
@@ -361,8 +352,6 @@ static MunitResult issuer_matching(const MunitParameter params[], void* user)
   size_t work = WORK_BUDGET;
   tc_pki_tree_workspace tree = {frames, FRAME_CAPACITY, &work};
   int matched = -1;
-  (void)params;
-  (void)user;
   munit_assert_int(
       tc_pki_name_equal(left, TC_TLV_DER, right, TC_TLV_BER, &limits, &names, &tree, &matched), ==,
       TC_TLV_OK);
@@ -449,7 +438,7 @@ static size_t chunked_name(uint8_t* output, unsigned tag, TC_bytes value, size_t
   return used + CLOSING_BYTES;
 }
 
-static MunitResult constructed_names(const MunitParameter params[], void* user)
+TC_TEST(constructed_names)
 {
   enum {
     ENCODED_CAPACITY = 64,
@@ -478,8 +467,6 @@ static MunitResult constructed_names(const MunitParameter params[], void* user)
   size_t work = WORK_BUDGET;
   const tc_pki_tree_workspace tree = {frames, FRAME_CAPACITY, &work};
   int matched;
-  (void)params;
-  (void)user;
   for (size_t i = 0; i < sizeof cases / sizeof cases[0]; ++i) {
     for (size_t split = 0; split <= cases[i].length; ++split) {
       const size_t length =
@@ -567,7 +554,7 @@ static MunitResult constructed_names(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult certificate_ski(const MunitParameter params[], void* user)
+TC_TEST(certificate_ski)
 {
   enum { WORK_BUDGET = 1024, EXTENSION_HEADER = 2 };
   static const uint8_t present[] = {0x30, 12, 0x30, 10, 6, 3, 0x55, 0x1d, 14, 4, 3, 4, 1, 0xaa};
@@ -577,8 +564,6 @@ static MunitResult certificate_ski(const MunitParameter params[], void* user)
   TC_X509_certificate certificate = {0};
   TC_bytes out, saved = {present, 1};
   size_t work;
-  (void)params;
-  (void)user;
   for (size_t i = 0; i < sizeof cases / sizeof cases[0]; ++i) {
     certificate.extensions = cases[i];
     work = WORK_BUDGET;
@@ -638,7 +623,7 @@ static MunitResult certificate_ski(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult certificate_identifiers(const MunitParameter params[], void* user)
+TC_TEST(certificate_identifiers)
 {
   enum { FRAME_CAPACITY = 8, SCALAR_CAPACITY = 32, ATTRIBUTE_CAPACITY = 4, WORK_BUDGET = 16384 };
   static const uint8_t issuer_der[] = {0x30, 12, 0x31, 10, 0x30, 8, 6, 3, 0x55, 4, 3, 0x0c, 1, 'A'};
@@ -660,8 +645,6 @@ static MunitResult certificate_identifiers(const MunitParameter params[], void* 
   TC_X509_certificate certificate = {0};
   TC_CMS_signer_info info = {0};
   int matched;
-  (void)params;
-  (void)user;
   certificate.issuer = (TC_bytes){issuer_der, sizeof issuer_der};
   certificate.serial = (TC_bytes){serial, sizeof serial};
   certificate.extensions = (TC_bytes){extensions, sizeof extensions};
@@ -759,7 +742,7 @@ static MunitResult certificate_identifiers(const MunitParameter params[], void* 
   return MUNIT_OK;
 }
 
-static MunitResult candidate_iteration(const MunitParameter params[], void* user)
+TC_TEST(candidate_iteration)
 {
   enum { FRAME_CAPACITY = 8, WORK_BUDGET = 4096, RECORD_COUNT = 3 };
   static const uint8_t embedded[] = {0xa0, 0x80, 0x30, 0, 0xa2, 0, 0, 0};
@@ -775,8 +758,6 @@ static MunitResult candidate_iteration(const MunitParameter params[], void* user
   tc_cms_candidates reader, saved;
   tc_cms_certificate_choice choice, previous;
   const TC_bytes input = {embedded, sizeof embedded};
-  (void)params;
-  (void)user;
   munit_assert_int(tc_cms_candidates_init(input, &external, RECORD_COUNT,
                                           sizeof embedded + sizeof external_record, &limits, &tree,
                                           &reader),

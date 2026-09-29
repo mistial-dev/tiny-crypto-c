@@ -2,9 +2,10 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/twic_uuid.h>
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
-static MunitResult mapping(const MunitParameter params[], void* context)
+TC_TEST(mapping)
 {
   /* TWIC Part 2 v5, Appendix D: 7099-1055-048796. */
   static const uint8_t known[] = {0x91, 0xbe, 0x20, 0x94, 0xf6, 0xdc, 0x53, 0x49,
@@ -62,12 +63,10 @@ static MunitResult mapping(const MunitParameter params[], void* context)
   munit_assert_int(TC_TWIC_uuid_write(expected, NULL, 16), ==, TC_TLV_ARGUMENT);
   munit_assert_int(TC_TWIC_uuid_match((TC_bytes){known, sizeof known}, NULL, &matched), ==,
                    TC_TLV_ARGUMENT);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult invalid_storage(const MunitParameter params[], void* context)
+TC_TEST(invalid_storage)
 {
   union {
     uint64_t number;
@@ -110,8 +109,6 @@ static MunitResult invalid_storage(const MunitParameter params[], void* context)
   memset(&fascn, 0, sizeof fascn);
   munit_assert_int(TC_TWIC_uuid_match(encoded, &fascn, &matched), ==, TC_TLV_INVALID);
   munit_assert_int(matched, ==, 7);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 

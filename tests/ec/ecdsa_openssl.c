@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/ec.h>
 #include "munit.h"
+#include "test_util.h"
 #include <openssl/evp.h>
 #include <openssl/ec.h>
 #include <openssl/core_names.h>
@@ -18,15 +19,13 @@ static TC_EC_result ecdsa_verify(TC_EC_curve curve, const uint8_t* public_key, s
                                 (TC_bytes){signature, signature_length}, workspace, &work);
 }
 
-static MunitResult verify(const MunitParameter params[], void* data)
+TC_TEST(verify)
 {
   static const char* groups[] = {"prime256v1", "secp384r1", "prime192v1"};
   static const TC_EC_curve curves[] = {TC_EC_P256, TC_EC_P384, TC_EC_P192};
   TC_ECDSA_workspace workspace;
   uint8_t digest[64], encoded[128], signature[96], public_key[97];
   size_t c, j;
-  (void)params;
-  (void)data;
   for (c = 0; c < 3; ++c) {
     size_t bytes = c == 0 ? 32 : c == 1 ? 48 : 24;
     EVP_PKEY* key = EVP_EC_gen(groups[c]);

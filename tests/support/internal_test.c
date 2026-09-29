@@ -3,13 +3,12 @@
 /* Shared byte-order, counter and span helpers from src/internal.h. */
 #include "../../src/internal.h"
 #include "munit.h"
+#include "test_util.h"
 
-static MunitResult byte_order(const MunitParameter params[], void* user)
+TC_TEST(byte_order)
 {
   static const uint8_t bytes[8] = {0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef};
   uint8_t out[8];
-  (void)params;
-  (void)user;
   munit_assert_uint32(tc_internal_load_be32(bytes), ==, 0x01234567u);
   munit_assert_uint32(tc_internal_load_be32(bytes + 4), ==, 0x89abcdefu);
   tc_internal_store_be32(out, 0x89abcdefu);
@@ -20,11 +19,9 @@ static MunitResult byte_order(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult counters(const MunitParameter params[], void* user)
+TC_TEST(counters)
 {
   uint8_t counter[4] = {0, 0, 0xff, 0xff};
-  (void)params;
-  (void)user;
   munit_assert_uint8(tc_internal_increment_be(counter, 4), ==, 0);
   munit_assert_uint8(counter[1], ==, 1);
   munit_assert_uint8(counter[3], ==, 0);
@@ -56,11 +53,9 @@ static MunitResult counters(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult spans(const MunitParameter params[], void* user)
+TC_TEST(spans)
 {
   static const uint8_t byte = 0;
-  (void)params;
-  (void)user;
   munit_assert_true(tc_internal_span_valid(NULL, 0));
   munit_assert_true(tc_internal_span_valid(&byte, 0));
   munit_assert_true(tc_internal_span_valid(&byte, 1));

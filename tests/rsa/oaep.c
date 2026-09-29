@@ -2,10 +2,11 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "../../src/rsa_padding_internal.h"
 #include "munit.h"
+#include "test_util.h"
 
 enum { MAX_BYTES = 384, MAX_DIGEST = 64, WORK_BUDGET = 100000 };
 
-static MunitResult known_answer(const MunitParameter params[], void* user)
+TC_TEST(known_answer)
 {
   /* Independently calculated with Python hashlib, SHA-256 for both hashes. */
   static const uint8_t expected[] =
@@ -23,8 +24,6 @@ static MunitResult known_answer(const MunitParameter params[], void* user)
   TC_bytes message = sentinel;
   TC_hash_context workspace;
   uint32_t work = WORK_BUDGET;
-  (void)params;
-  (void)user;
   for (size_t i = 0; i < sizeof seed; ++i)
     seed[i] = (uint8_t)i;
   munit_assert_int(tc_rsa_oaep_encode(&(TC_RSA_oaep_options){TC_HASH_SHA256, TC_HASH_SHA256, label},
@@ -82,7 +81,7 @@ static MunitResult known_answer(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult boundaries(const MunitParameter params[], void* user)
+TC_TEST(boundaries)
 {
   const TC_hash_algorithm hashes[] = {TC_HASH_SHA1, TC_HASH_SHA224, TC_HASH_SHA256, TC_HASH_SHA384,
                                       TC_HASH_SHA512};
@@ -90,8 +89,6 @@ static MunitResult boundaries(const MunitParameter params[], void* user)
   uint8_t encoded[MAX_BYTES], input[MAX_BYTES], seed[MAX_DIGEST], block[MAX_DIGEST];
   TC_hash_context workspace;
   const TC_bytes empty = {NULL, 0};
-  (void)params;
-  (void)user;
   memset(seed, 0xa5, sizeof seed);
   for (size_t i = 0; i < sizeof input; ++i)
     input[i] = (uint8_t)i;
@@ -142,15 +139,13 @@ static MunitResult boundaries(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult padding(const MunitParameter params[], void* user)
+TC_TEST(padding)
 {
   enum { WIDTH = 128, HASH_BYTES = 32, DB_LENGTH = WIDTH - HASH_BYTES - 1 };
   enum { BAD_PREFIX, BAD_HASH, BAD_PADDING, NO_DELIMITER, CASE_COUNT };
   uint8_t encoded[WIDTH], seed[HASH_BYTES] = {0}, block[MAX_DIGEST];
   TC_hash_context workspace;
   const TC_bytes empty = {NULL, 0}, input = {(const uint8_t*)"test", 4};
-  (void)params;
-  (void)user;
   for (unsigned scenario = 0; scenario < CASE_COUNT; ++scenario) {
     uint32_t work = WORK_BUDGET;
     TC_bytes decoded = empty;

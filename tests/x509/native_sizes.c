@@ -5,9 +5,10 @@
  * certificate as a forged one. */
 #include <tiny_crypto/x509_crypto.h>
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
-static MunitResult unsupported_rsa_sizes(const MunitParameter params[], void* user)
+TC_TEST(unsupported_rsa_sizes)
 {
   static uint8_t modulus[520], signature[520];
   static TC_RSA_word words[TC_RSA_VERIFY_WORKSPACE_WORDS(4096)];
@@ -22,8 +23,6 @@ static MunitResult unsupported_rsa_sizes(const MunitParameter params[], void* us
   TC_X509_native_workspace scratch = {&ec, &rsa, TC_X509_NATIVE_DEFAULT_SIGNATURE_WORK};
   const TC_X509_signature_provider provider = TC_X509_native_provider(&scratch);
   TC_signature_algorithm algorithm;
-  (void)params;
-  (void)user;
   memset(modulus, 0xff, sizeof modulus);
   memset(&algorithm, 0, sizeof algorithm);
   algorithm.scheme = TC_SIGNATURE_RSA_V15;
@@ -50,7 +49,7 @@ static MunitResult unsupported_rsa_sizes(const MunitParameter params[], void* us
 }
 
 /* A provider without the workspace its algorithm needs reports ERROR. */
-static MunitResult missing_workspace(const MunitParameter params[], void* user)
+TC_TEST(missing_workspace)
 {
   static uint8_t modulus[256], signature[256], encoded_key[266];
   static const uint8_t exponent[] = {1, 0, 1};
@@ -61,8 +60,6 @@ static MunitResult missing_workspace(const MunitParameter params[], void* user)
   TC_signature_algorithm algorithm;
   TC_X509_public_key key;
   size_t work = 1000000;
-  (void)params;
-  (void)user;
   memset(modulus, 0xff, sizeof modulus);
   memset(&algorithm, 0, sizeof algorithm);
   algorithm.scheme = TC_SIGNATURE_RSA_V15;

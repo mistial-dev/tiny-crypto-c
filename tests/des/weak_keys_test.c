@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 #include "munit.h"
+#include "test_util.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -99,10 +100,8 @@ static void check_iso9797_profile(const uint8_t* k1, const uint8_t* k2, const ui
 }
 #endif
 
-static MunitResult test_profile(const MunitParameter params[], void* user)
+TC_TEST(test_profile)
 {
-  (void)params;
-  (void)user;
   static const uint8_t k1[TC_DES_KEYLEN] = {0x13, 0x34, 0x57, 0x79, 0x9b, 0xbc, 0xdf, 0xf1};
   static const uint8_t k2[TC_DES_KEYLEN] = {0x0e, 0x32, 0x92, 0x32, 0xea, 0x6d, 0x0d, 0x73};
   static const uint8_t k3[TC_DES_KEYLEN] = {0xa1, 0xb2, 0xc3, 0xd4, 0xe5, 0xf6, 0x07, 0x18};

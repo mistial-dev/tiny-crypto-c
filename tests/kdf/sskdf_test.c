@@ -69,12 +69,10 @@ static const acvp_one_step_vector acvp_vectors[] = {
 #include "../vectors/kda/acvp_onestep.inc"
 };
 
-static MunitResult nist_kas_answers(const MunitParameter params[], void* user)
+TC_TEST(nist_kas_answers)
 {
   uint8_t z[512], other[256], expected[64], output[65];
   size_t i;
-  (void)params;
-  (void)user;
   for (i = 0; i < sizeof nist_kas_vectors / sizeof nist_kas_vectors[0]; ++i) {
     const nist_kas_vector* vector = &nist_kas_vectors[i];
     size_t z_len = tc_test_hex(vector->z, z, sizeof z);
@@ -101,12 +99,10 @@ static MunitResult nist_kas_answers(const MunitParameter params[], void* user)
 
 /* AFT cases must reproduce the DKM. VAL cases must agree with the ACVP
  * verdict on the supplied DKM. Each fixedInfo field is its own span. */
-static MunitResult acvp_one_step_answers(const MunitParameter params[], void* user)
+TC_TEST(acvp_one_step_answers)
 {
   uint8_t z[64], fields[6][64], expected[128], output[129];
   size_t i, f, ran = 0, rejected = 0;
-  (void)params;
-  (void)user;
   for (i = 0; i < sizeof acvp_vectors / sizeof acvp_vectors[0]; ++i) {
     const acvp_one_step_vector* vector = &acvp_vectors[i];
     derive_fn derive = family_for(vector->hash_bits);
@@ -141,14 +137,12 @@ static MunitResult acvp_one_step_answers(const MunitParameter params[], void* us
   return MUNIT_OK;
 }
 
-static MunitResult captured_answer(const MunitParameter params[], void* user)
+TC_TEST(captured_answer)
 {
   uint8_t z[48], other[256], expected[192], output[192];
   TC_bytes info;
   size_t z_len, length, split;
   derive_fn derive;
-  (void)params;
-  (void)user;
   if (!capture)
     return MUNIT_SKIP;
   derive = family_for((unsigned)strtoul(capture[0], NULL, 10));
@@ -169,7 +163,7 @@ static MunitResult captured_answer(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult known_answers(const MunitParameter params[], void* user)
+TC_TEST(known_answers)
 {
   /* Python hashlib: the first 97 bytes of hash([i]_32 || Z || info) blocks,
    * Z = 00..1f and info = "purposecontext". SHA-1 needs five blocks. NIST
@@ -196,8 +190,6 @@ static MunitResult known_answers(const MunitParameter params[], void* user)
   TC_bytes info[3];
   uint8_t z[32], output[98], expected[97];
   size_t a, split, length, ran = 0;
-  (void)params;
-  (void)user;
   tc_test_fill_incrementing(z, sizeof z);
   info[1].data = NULL;
   info[1].length = 0;
@@ -226,13 +218,11 @@ static MunitResult known_answers(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult invalid_arguments(const MunitParameter params[], void* user)
+TC_TEST(invalid_arguments)
 {
   uint8_t buffer[64], saved[64];
   TC_bytes info = {buffer, 16};
   size_t f;
-  (void)params;
-  (void)user;
   memset(buffer, 0xa5, sizeof buffer);
   memcpy(saved, buffer, sizeof saved);
   for (f = 0; f < FAMILY_COUNT; ++f) {

@@ -4,6 +4,7 @@
 #define TC_MP_WORD_BITS TC_RSA_WORD_BITS
 #include "../../src/mp_inverse_internal.h"
 #include "munit.h"
+#include "test_util.h"
 
 static uint32_t gcd(uint32_t a, uint32_t b)
 {
@@ -42,22 +43,18 @@ static void check(uint32_t value, uint32_t modulus)
   }
 }
 
-static MunitResult small_moduli(const MunitParameter params[], void* user)
+TC_TEST(small_moduli)
 {
-  (void)params;
-  (void)user;
   for (uint32_t p = 3; p <= 255; p += 2)
     for (uint32_t a = 0; a < p; ++a)
       check(a, p);
   return MUNIT_OK;
 }
 
-static MunitResult carry_boundaries(const MunitParameter params[], void* user)
+TC_TEST(carry_boundaries)
 {
   static const uint32_t moduli[] = {257,         65535,       65537,     0x7fffffffu,
                                     0x80000001u, 0xfffffffbu, UINT32_MAX};
-  (void)params;
-  (void)user;
   for (size_t i = 0; i < sizeof moduli / sizeof *moduli; ++i) {
     const uint32_t p = moduli[i], values[] = {0, 1, 2, 3, p / 2, p - 2, p - 1};
     for (size_t j = 0; j < sizeof values / sizeof *values; ++j)

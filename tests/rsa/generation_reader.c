@@ -3,6 +3,7 @@
 /* Wycheproof deterministic PKCS#1 v1.5 signatures through raw RSA. */
 #include <tiny_crypto/rsa.h>
 #include "munit.h"
+#include "test_util.h"
 #include "cavp.h"
 #include "hash_name.h"
 #include <stdio.h>
@@ -19,7 +20,7 @@ static TC_status random_two(void* context, uint8_t* output, size_t length)
   return TC_OK;
 }
 
-static MunitResult vectors(const MunitParameter params[], void* data)
+TC_TEST(vectors)
 {
   char line[MAX_LINE];
   uint8_t modulus[MAX_BYTES], exponent[MAX_BYTES], private_exponent[MAX_BYTES];
@@ -28,8 +29,6 @@ static MunitResult vectors(const MunitParameter params[], void* data)
   const TC_RSA_workspace workspace = {words, sizeof words / sizeof words[0]};
   size_t count = 0;
   FILE* file;
-  (void)params;
-  (void)data;
   if (!path)
     return MUNIT_SKIP;
   file = fopen(path, "r");

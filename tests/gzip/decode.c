@@ -2,9 +2,10 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/gzip.h>
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
-static MunitResult result_order(const MunitParameter params[], void* context)
+TC_TEST(result_order)
 {
   /* GZIP shares the RSA and EC result order. */
   munit_assert_int(TC_GZIP_OK, ==, 0);
@@ -12,12 +13,10 @@ static MunitResult result_order(const MunitParameter params[], void* context)
   munit_assert_int(TC_GZIP_LIMIT, ==, 2);
   munit_assert_int(TC_GZIP_ARGUMENT, ==, 3);
   munit_assert_int(TC_GZIP_UNSUPPORTED, ==, 4);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult decode(const MunitParameter params[], void* context)
+TC_TEST(decode)
 {
   uint8_t member[] = {0x1f, 0x8b, 8,    0, 0, 0,    0,    0,    2,  0xff, 0x4b, 0x4c, 0x4a,
                       0x4e, 0x44, 0x45, 0, 4, 0xc0, 0x26, 0xdc, 18, 0,    0,    0};
@@ -88,8 +87,6 @@ static MunitResult decode(const MunitParameter params[], void* context)
                    ==, TC_GZIP_UNSUPPORTED);
   munit_assert_size(length, ==, SIZE_MAX);
   munit_assert_memory_equal(sizeof output, output, zeros);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 

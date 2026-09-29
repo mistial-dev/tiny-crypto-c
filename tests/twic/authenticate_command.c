@@ -4,6 +4,7 @@
 #include "../../examples/credential_validate.h"
 #include "../cms/openssl_fixture.h"
 #include "card_fixture.h"
+#include "test_util.h"
 #include <sys/resource.h>
 #include <zlib.h>
 
@@ -963,12 +964,11 @@ static MunitResult command_workflow(const MunitParameter params[], void* context
   EVP_PKEY_free(card_key);
   EVP_PKEY_free(other_card_key);
   EVP_PKEY_free(signing_key);
-  (void)params;
   (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult command_arguments(const MunitParameter params[], void* context)
+TC_TEST(command_arguments)
 {
   char* argv[32] = {"twic_authenticate", "--reader", "synthetic", "--root", "root", "--ccl", "ccl",
                     "--marsec-level",    "1",        NULL};
@@ -1046,8 +1046,6 @@ static MunitResult command_arguments(const MunitParameter params[], void* contex
   munit_assert_uint(opened, ==, 0);
   munit_assert_uint(locked, ==, 0);
   munit_assert_uint(commands, ==, 0);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 

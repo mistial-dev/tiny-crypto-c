@@ -4,6 +4,7 @@
  * Builds and runs examples/drbg.c against deterministic and failing
  * entropy sources. */
 #include "munit.h"
+#include "test_util.h"
 #include "drbg.h"
 #include <string.h>
 
@@ -22,7 +23,7 @@ static TC_status fill(void* user, uint8_t* output, size_t length)
   return TC_OK;
 }
 
-static MunitResult test_example(const MunitParameter params[], void* data)
+TC_TEST(test_example)
 {
   static ExampleRandom random;
   static const uint8_t device[] = "unit-0042";
@@ -33,8 +34,6 @@ static MunitResult test_example(const MunitParameter params[], void* data)
   source_state state = {0, 0};
   TC_random_source entropy = {fill, &state};
   uint8_t a[32], b[32];
-  (void)params;
-  (void)data;
 
   munit_assert_int(example_random_start(&random, entropy, device_id), ==, TC_DRBG_OK);
   munit_assert_int(example_random_session_key(&random, tls, a), ==, TC_DRBG_OK);

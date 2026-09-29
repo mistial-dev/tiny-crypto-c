@@ -7,6 +7,7 @@
 #include "../x509/openssl_fixture.h"
 #include "envelope.h"
 #include "munit.h"
+#include "test_util.h"
 #include <openssl/evp.h>
 #include <openssl/ec.h>
 #include <openssl/rsa.h>
@@ -188,7 +189,7 @@ static size_t encode_signer(uint8_t* encoded, TC_bytes attributes, TC_bytes para
   return length;
 }
 
-static MunitResult pss_signers(const MunitParameter params[], void* user)
+TC_TEST(pss_signers)
 {
   static const unsigned key_sizes[] = {1024, 2048, MAX_RSA_BITS};
   static const struct {
@@ -213,8 +214,6 @@ static MunitResult pss_signers(const MunitParameter params[], void* user)
   const TC_bytes type = {data_type, sizeof data_type};
   const TC_bytes computed = {digest, sizeof digest};
   unsigned digest_length = 0;
-  (void)params;
-  (void)user;
   munit_assert_int(EVP_Digest(message, sizeof message, digest, &digest_length, EVP_sha256(), NULL),
                    ==, 1);
   munit_assert_uint(digest_length, ==, sizeof digest);

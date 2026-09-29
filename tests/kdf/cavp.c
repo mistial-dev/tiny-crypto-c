@@ -19,6 +19,7 @@
 #include <tiny_crypto/kdf.h>
 #include "cavp.h"
 #include "munit.h"
+#include "test_util.h"
 
 #ifndef KDF_CAVP_DIR
 #define KDF_CAVP_DIR "tests/vectors/kdf/cavp"
@@ -301,22 +302,18 @@ static void cavp_check_counts(const struct kdf_cavp_stats* stats, long total, lo
   munit_assert_long(stats->ran, ==, per_prf * KDF_CAVP_ACTIVE_PRFS);
 }
 
-MunitResult test_kbkdf_cavp_counter(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_kbkdf_cavp_counter)
 {
   struct kdf_cavp_stats stats;
-  (void)params;
-  (void)data;
 
   cavp_run_file("KDFCTR_gen.rsp", KDF_CAVP_MODE_COUNTER, 1, &stats);
   cavp_check_counts(&stats, 4800, 480);
   return MUNIT_OK;
 }
 
-MunitResult test_kbkdf_cavp_feedback(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_kbkdf_cavp_feedback)
 {
   struct kdf_cavp_stats stats;
-  (void)params;
-  (void)data;
 
   cavp_run_file("KDFFeedbackWithZeroIV_gen.rsp", KDF_CAVP_MODE_FEEDBACK, 1, &stats);
   cavp_check_counts(&stats, 4800, 480);
@@ -332,11 +329,9 @@ MunitResult test_kbkdf_cavp_feedback(const MunitParameter params[], void* data)
   return MUNIT_OK;
 }
 
-MunitResult test_kbkdf_cavp_pipeline(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_kbkdf_cavp_pipeline)
 {
   struct kdf_cavp_stats stats;
-  (void)params;
-  (void)data;
 
   cavp_run_file("KDFDblPipelineWithCtr_gen.rsp", KDF_CAVP_MODE_PIPELINE, 1, &stats);
   cavp_check_counts(&stats, 4800, 480);
@@ -348,22 +343,16 @@ MunitResult test_kbkdf_cavp_pipeline(const MunitParameter params[], void* data)
 
 #else /* !TC_KDF_CAVP */
 
-MunitResult test_kbkdf_cavp_counter(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_kbkdf_cavp_counter)
 {
-  (void)params;
-  (void)data;
   return MUNIT_SKIP;
 }
-MunitResult test_kbkdf_cavp_feedback(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_kbkdf_cavp_feedback)
 {
-  (void)params;
-  (void)data;
   return MUNIT_SKIP;
 }
-MunitResult test_kbkdf_cavp_pipeline(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_kbkdf_cavp_pipeline)
 {
-  (void)params;
-  (void)data;
   return MUNIT_SKIP;
 }
 

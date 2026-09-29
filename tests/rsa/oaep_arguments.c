@@ -2,16 +2,15 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "../../src/rsa_padding_internal.h"
 #include "munit.h"
+#include "test_util.h"
 
 enum { WIDTH = 256, MAX_DIGEST = 64, WORK_BUDGET = 100000 };
 
-static MunitResult algorithms(const MunitParameter params[], void* user)
+TC_TEST(algorithms)
 {
   uint8_t encoded[WIDTH], saved[WIDTH], seed[MAX_DIGEST] = {0}, block[MAX_DIGEST];
   TC_hash_context workspace;
   const TC_bytes empty = {NULL, 0};
-  (void)params;
-  (void)user;
   for (unsigned h = TC_HASH_UNKNOWN; h <= TC_HASH_SHA512; ++h) {
     for (unsigned mgf = TC_HASH_UNKNOWN; mgf <= TC_HASH_SHA512; ++mgf) {
       const TC_hash_algorithm hash = (TC_hash_algorithm)h, mask = (TC_hash_algorithm)mgf;
@@ -49,13 +48,11 @@ static MunitResult algorithms(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult missing_storage(const MunitParameter params[], void* user)
+TC_TEST(missing_storage)
 {
   enum { ENCODED, LABEL, SEED, BLOCK, WORKSPACE, WORK, OUTPUT, MESSAGE, CASE_COUNT };
   uint8_t encoded[WIDTH], saved[WIDTH], seed[32] = {0}, block[MAX_DIGEST];
   TC_hash_context workspace;
-  (void)params;
-  (void)user;
   for (unsigned missing = 0; missing < CASE_COUNT; ++missing) {
     uint32_t work = WORK_BUDGET;
     TC_bytes message = {saved, sizeof saved};
@@ -90,14 +87,12 @@ static MunitResult missing_storage(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult limits(const MunitParameter params[], void* user)
+TC_TEST(limits)
 {
   uint8_t encoded[WIDTH], seed[32] = {0}, block[MAX_DIGEST];
   TC_hash_context workspace;
   const TC_bytes empty = {NULL, 0};
   TC_bytes message = empty;
-  (void)params;
-  (void)user;
   if (!tc_hash_available(TC_HASH_SHA256))
     return MUNIT_SKIP;
   uint32_t work = WORK_BUDGET;
@@ -142,7 +137,7 @@ static TC_status unexpected_random(void* context, uint8_t* output, size_t length
   return TC_ERROR;
 }
 
-static MunitResult encryption_arguments(const MunitParameter params[], void* user)
+TC_TEST(encryption_arguments)
 {
   enum {
     NULL_KEY,
@@ -168,8 +163,6 @@ static MunitResult encryption_arguments(const MunitParameter params[], void* use
   };
   uint8_t modulus[WIDTH], exponent[] = {3}, input[WIDTH], output[WIDTH];
   TC_RSA_word words[TC_RSA_ENCRYPT_WORKSPACE_WORDS(WIDTH * 8)];
-  (void)params;
-  (void)user;
   for (unsigned bad = 0; bad < CASE_COUNT; ++bad) {
     memset(modulus, 0xff, sizeof modulus);
     memset(input, 0xa5, sizeof input);
@@ -257,14 +250,12 @@ static MunitResult encryption_arguments(const MunitParameter params[], void* use
   return MUNIT_OK;
 }
 
-static MunitResult encryption_algorithms(const MunitParameter params[], void* user)
+TC_TEST(encryption_algorithms)
 {
   uint8_t modulus[WIDTH], exponent[] = {3}, output[WIDTH];
   TC_RSA_word words[TC_RSA_ENCRYPT_WORKSPACE_WORDS(WIDTH * 8)];
   const TC_RSA_public_key key = {{modulus, sizeof modulus}, {exponent, sizeof exponent}};
   const TC_RSA_workspace workspace = {words, sizeof words / sizeof *words};
-  (void)params;
-  (void)user;
   memset(modulus, 0xff, sizeof modulus);
   for (unsigned h = TC_HASH_UNKNOWN; h <= TC_HASH_SHA512; ++h) {
     for (unsigned mgf = TC_HASH_UNKNOWN; mgf <= TC_HASH_SHA512; ++mgf) {

@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/cms.h>
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 #if TC_ENABLE_SHA256
 #include <tiny_crypto/hash.h>
@@ -57,7 +58,7 @@ static TC_X509_public_key public_key(void)
   return key;
 }
 
-static MunitResult verification(const MunitParameter params[], void* user)
+TC_TEST(verification)
 {
   TC_TLV_frame frames[FRAME_CAPACITY];
   TC_CMS_signature_workspace workspace = {{frames, FRAME_CAPACITY}, NULL, 0};
@@ -68,8 +69,6 @@ static MunitResult verification(const MunitParameter params[], void* user)
   const TC_bytes type = {data_type, sizeof data_type};
   const TC_bytes digest = {digest_bytes, sizeof digest_bytes};
   size_t work = WORK_BUDGET;
-  (void)params;
-  (void)user;
   munit_assert_int(TC_CMS_signer_info_read((TC_bytes){record, sizeof record}, &cms_policy, &limits,
                                            (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &signer),
                    ==, TC_TLV_OK);
@@ -188,7 +187,7 @@ static MunitResult verification(const MunitParameter params[], void* user)
 /* RFC 5652 section 5.3: the signature excludes unsignedAttrs. A section 11.4
  * countersignature in unsignedAttrs is unauthenticated and leaves the result
  * unchanged. The countersignature value repeats record. */
-static MunitResult unsigned_attributes(const MunitParameter params[], void* user)
+TC_TEST(unsigned_attributes)
 {
   static const uint8_t countersigned[] = {
       0x30, 91,   2,    1,    3,    0x80, 1,    0xaa, 0x30, 13, 6, 9,    0x60, 0x86, 0x48, 1,
@@ -212,8 +211,6 @@ static MunitResult unsigned_attributes(const MunitParameter params[], void* user
       &limits};
   const TC_bytes digest = {digest_bytes, sizeof digest_bytes};
   size_t work = WORK_BUDGET;
-  (void)params;
-  (void)user;
   munit_assert_int(TC_CMS_signer_info_read((TC_bytes){countersigned, sizeof countersigned},
                                            &cms_der_policy, &limits,
                                            (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &signer),
@@ -240,7 +237,7 @@ static MunitResult unsigned_attributes(const MunitParameter params[], void* user
   return MUNIT_OK;
 }
 
-static MunitResult storage(const MunitParameter params[], void* user)
+TC_TEST(storage)
 {
   enum { SIGNER, KEY, PROVIDER, LIMITS, WORKSPACE, INPUT, FRAMES, BUFFER, WORK, COUNT };
   union slot {
@@ -255,8 +252,6 @@ static MunitResult storage(const MunitParameter params[], void* user)
   } slots[COUNT];
   uint8_t saved[sizeof slots];
   ProviderState state = {0};
-  (void)params;
-  (void)user;
   for (unsigned operation = 0; operation < 3; ++operation)
     for (unsigned output = FRAMES; output < COUNT; ++output)
       for (unsigned input = 0; input < output; ++input) {
@@ -305,7 +300,7 @@ static MunitResult storage(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult content(const MunitParameter params[], void* user)
+TC_TEST(content)
 {
   static const uint8_t message[] = {'a', 'b', 'c'};
   TC_TLV_frame frames[FRAME_CAPACITY];
@@ -316,8 +311,6 @@ static MunitResult content(const MunitParameter params[], void* user)
   TC_X509_signature_provider provider = {NULL, &state, verify};
   const TC_bytes type = {data_type, sizeof data_type};
   size_t work = WORK_BUDGET;
-  (void)params;
-  (void)user;
   munit_assert_int(TC_CMS_signer_info_read((TC_bytes){record, sizeof record}, &cms_policy, &limits,
                                            (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &signer),
                    ==, TC_TLV_OK);

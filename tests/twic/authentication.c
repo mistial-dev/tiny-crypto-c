@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "card_fixture.h"
+#include "test_util.h"
 
 static void assert_cleared(const ExampleCardKeyWorkspace* scratch)
 {
@@ -565,7 +566,7 @@ static MunitResult possession(const MunitParameter params[], void* context)
   return MUNIT_OK;
 }
 
-static MunitResult encoding(const MunitParameter params[], void* context)
+TC_TEST(encoding)
 {
   uint8_t digest[32] = {0}, encoded[384], saved[384];
   const TC_bytes input = {digest, sizeof digest};
@@ -607,12 +608,10 @@ static MunitResult encoding(const MunitParameter params[], void* context)
     munit_assert_uint(encoded[size - 52], ==, 0);
     munit_assert_memory_equal(sizeof digest, encoded + size - sizeof digest, digest);
   }
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult pss_encoding(const MunitParameter params[], void* context)
+TC_TEST(pss_encoding)
 {
   uint8_t digest[32] = {0}, salt[32] = {1}, encoded[384], expected[384];
   TC_RSA_pss_options options = {TC_HASH_SHA256, TC_HASH_SHA256, sizeof salt};
@@ -669,8 +668,6 @@ static MunitResult pss_encoding(const MunitParameter params[], void* context)
     for (size_t i = 0; i < sizeof encoded; ++i)
       munit_assert_uint(encoded[i], ==, 0x5a);
   }
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 

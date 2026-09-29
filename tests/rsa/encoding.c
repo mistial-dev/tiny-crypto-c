@@ -4,15 +4,14 @@
 #define TC_MP_WORD_BITS TC_RSA_WORD_BITS
 #include "../../src/rsa_internal.h"
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
-static MunitResult v15(const MunitParameter params[], void* user)
+TC_TEST(v15)
 {
   static const uint8_t prefix[] = {0x30, 0x31, 0x30, 0x0d, 6, 9, 0x60, 0x86, 0x48, 1,
                                    0x65, 3,    4,    2,    1, 5, 0,    4,    32};
   uint8_t digest[32], encoded[512], expected[512], saved[512];
-  (void)params;
-  (void)user;
   for (size_t i = 0; i < sizeof digest; ++i)
     digest[i] = (uint8_t)i;
   for (size_t length = 128; length <= 512; length += 128) {

@@ -5,6 +5,7 @@
  * Test the configured tiny-crypto-c library target as a consumer links it.
  */
 #include "munit.h"
+#include "test_util.h"
 
 #include <string.h>
 
@@ -24,12 +25,10 @@ static int bytes_equal(const uint8_t* left, const uint8_t* right, size_t length)
 }
 #endif
 
-static MunitResult test_profile(const MunitParameter params[], void* user)
+TC_TEST(test_profile)
 {
   uint8_t cleared[16];
   size_t i;
-  (void)params;
-  (void)user;
   memset(cleared, 0xa5, sizeof cleared);
   TC_secure_zero(cleared, sizeof cleared);
   for (i = 0; i < sizeof cleared; ++i)

@@ -2,6 +2,7 @@
 #include "secure_boot_signature_priv.h"
 #include <tiny_crypto/hash.h>
 #include "munit.h"
+#include "test_util.h"
 #include <stdio.h>
 #include <string.h>
 #include "image_fixture.h"
@@ -15,12 +16,10 @@ static const char* image_path;
 #define block_signature(block) ((block).signature)
 #endif
 
-static MunitResult image_signature(const MunitParameter params[], void* user)
+TC_TEST(image_signature)
 {
   ets_secure_boot_signature_t signatures;
   uint8_t digest[32];
-  (void)params;
-  (void)user;
   if (!image_path)
     return MUNIT_SKIP;
   read_image_fixture(image_path, &signatures, digest);

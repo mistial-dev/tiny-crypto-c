@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "../../src/cms_signature_internal.h"
 #include "munit.h"
+#include "test_util.h"
 
 static const uint8_t rsa_oid[] = {0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 1, 1, 1};
 static const uint8_t null_parameters[] = {5, 0};
@@ -13,14 +14,12 @@ static void digest_algorithm(TC_CMS_signer_info* signer, TC_hash_algorithm hash)
   signer->digest_algorithm = (TC_DER_algorithm){info.oid, {NULL, 0}};
 }
 
-static MunitResult rsa_selection(const MunitParameter params[], void* user)
+TC_TEST(rsa_selection)
 {
   static const uint8_t invalid_parameters[] = {4, 0};
   TC_CMS_signer_info signer = {0};
   TC_X509_public_key key = {0};
   tc_cms_signature_algorithm parsed, saved;
-  (void)params;
-  (void)user;
   signer.signature_algorithm =
       (TC_DER_algorithm){{rsa_oid, sizeof rsa_oid}, {null_parameters, sizeof null_parameters}};
   key.type = TC_KEY_RSA;
@@ -61,7 +60,7 @@ static MunitResult rsa_selection(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult rsa_parameter_policy(const MunitParameter params[], void* user)
+TC_TEST(rsa_parameter_policy)
 {
   enum { FRAME_COUNT = 4, WORK = 4096 };
   static const uint8_t encodings[][4] = {{5, 0},    {5, 0x81, 0},    {4, 0},
@@ -72,8 +71,6 @@ static MunitResult rsa_parameter_policy(const MunitParameter params[], void* use
   TC_CMS_signer_info signer = {0};
   TC_X509_public_key key = {0};
   tc_cms_signature_algorithm parsed, saved;
-  (void)params;
-  (void)user;
   digest_algorithm(&signer, TC_HASH_SHA256);
   signer.signature_algorithm.oid = (TC_bytes){rsa_oid, sizeof rsa_oid};
   key.type = TC_KEY_RSA;
@@ -116,7 +113,7 @@ static MunitResult rsa_parameter_policy(const MunitParameter params[], void* use
   return MUNIT_OK;
 }
 
-static MunitResult hash_selection(const MunitParameter params[], void* user)
+TC_TEST(hash_selection)
 {
   static const uint8_t ecdsa[] = {0x2a, 0x86, 0x48, 0xce, 0x3d, 4, 3, 2};
   static const uint8_t rsa_sha256[] = {0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 1, 1, 11};
@@ -127,8 +124,6 @@ static MunitResult hash_selection(const MunitParameter params[], void* user)
   TC_CMS_signer_info signer = {0};
   TC_X509_public_key key = {0};
   tc_cms_signature_algorithm parsed, saved;
-  (void)params;
-  (void)user;
   digest_algorithm(&signer, TC_HASH_SHA256);
   key.type = TC_KEY_EC;
   signer.signature_algorithm = (TC_DER_algorithm){{ecdsa, sizeof ecdsa}, {NULL, 0}};
@@ -196,7 +191,7 @@ static MunitResult hash_selection(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult ber_parameters(const MunitParameter params[], void* user)
+TC_TEST(ber_parameters)
 {
   enum { FRAME_CAPACITY = 8, WORK_BUDGET = 16384, TRAILER_VALUE_FROM_END = 5 };
   static const uint8_t ber_null[] = {5, 0x82, 0, 0};
@@ -216,8 +211,6 @@ static MunitResult ber_parameters(const MunitParameter params[], void* user)
   TC_CMS_signer_info signer = {0};
   TC_X509_public_key key = {0};
   tc_cms_signature_algorithm parsed, saved;
-  (void)params;
-  (void)user;
   digest_algorithm(&signer, TC_HASH_SHA256);
   signer.digest_algorithm.parameters = (TC_bytes){ber_null, sizeof ber_null};
   signer.signature_algorithm =
@@ -314,7 +307,7 @@ static MunitResult ber_parameters(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult digest_sets(const MunitParameter params[], void* user)
+TC_TEST(digest_sets)
 {
   enum { FRAME_COUNT = 8, WORK_BUDGET = 4096, OID_BYTES = 9 };
   static const uint8_t oid[] = {0x60, 0x86, 0x48, 1, 0x65, 3, 4, 2, 1};
@@ -386,12 +379,10 @@ static MunitResult digest_sets(const MunitParameter params[], void* user)
   munit_assert_int(tc_cms_digest_algorithms(input, &selected, &limits, &tree, &hash), ==,
                    TC_TLV_UNSUPPORTED);
   munit_assert_int(hash, ==, TC_HASH_UNKNOWN);
-  (void)params;
-  (void)user;
   return MUNIT_OK;
 }
 
-static MunitResult digest_check(const MunitParameter params[], void* user)
+TC_TEST(digest_check)
 {
   enum { FRAME_COUNT = 8, WORK_BUDGET = 4096 };
   static const uint8_t sha256[] = {0x60, 0x86, 0x48, 1, 0x65, 3, 4, 2, 1};
@@ -408,8 +399,6 @@ static MunitResult digest_check(const MunitParameter params[], void* user)
   const TC_DER_algorithm selected = {{sha256, sizeof sha256}, {NULL, 0}};
   TC_hash_algorithm hash = TC_HASH_UNKNOWN;
   size_t work = WORK_BUDGET;
-  (void)params;
-  (void)user;
   munit_assert_int(TC_CMS_digest_algorithms_check(&data, &selected, &limits,
                                                   (TC_TLV_frames){frames, FRAME_COUNT}, &work,
                                                   &hash),

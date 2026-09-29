@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "fascn_fixture.h"
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 #include <tiny_crypto/piv_card.h>
 
@@ -63,7 +64,7 @@ static size_t names(const uint8_t* oid, size_t oid_length, const char* uuid, uns
   return names_values(oid, oid_length, uuid, NULL, fascn_count, uuid_count, output);
 }
 
-static MunitResult profiles(const MunitParameter params[], void* context)
+TC_TEST(profiles)
 {
   const struct {
     TC_PIV_card_profile profile;
@@ -104,12 +105,10 @@ static MunitResult profiles(const MunitParameter params[], void* context)
       }
     }
   }
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult malformed(const MunitParameter params[], void* context)
+TC_TEST(malformed)
 {
   const struct {
     const char* uuid;
@@ -182,12 +181,10 @@ static MunitResult malformed(const MunitParameter params[], void* context)
                                                 &limits, (TC_TLV_frames){frames, FRAMES}, &work,
                                                 &out),
                    ==, TC_TLV_INVALID);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult binding(const MunitParameter params[], void* context)
+TC_TEST(binding)
 {
   uint8_t encoded[CAPACITY], fascn[25], expected_guid[16];
   TC_TLV_frame frames[FRAMES];
@@ -250,12 +247,10 @@ static MunitResult binding(const MunitParameter params[], void* context)
                      ==, TC_TLV_OK);
     munit_assert_int(matched, ==, !mismatch);
   }
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult boundaries(const MunitParameter params[], void* context)
+TC_TEST(boundaries)
 {
   uint8_t encoded[CAPACITY];
   const size_t length = names(piv_oid, sizeof piv_oid, piv_uuid, 1, 1, encoded);
@@ -296,12 +291,10 @@ static MunitResult boundaries(const MunitParameter params[], void* context)
                      ==, TC_TLV_LIMIT);
     munit_assert_memory_equal(sizeof out, &out, &saved);
   }
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult reader_policy(const MunitParameter params[], void* context)
+TC_TEST(reader_policy)
 {
   uint8_t encoded[CAPACITY], fascn[25];
   TC_TLV_frame frames[FRAMES];
@@ -377,12 +370,10 @@ static MunitResult reader_policy(const MunitParameter params[], void* context)
                                                  &limits, (TC_TLV_frames){frames, FRAMES}, &work,
                                                  &identifiers),
                    ==, TC_TLV_INVALID);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult authentication_policy(const MunitParameter params[], void* context)
+TC_TEST(authentication_policy)
 {
   static const char cardholder_uuid[] = "urn:uuid:10213243-5465-4768-899a-abbccddeeff0";
   static const char version_one_uuid[] = "urn:uuid:10213243-5465-1768-899a-abbccddeeff0";
@@ -486,8 +477,6 @@ static MunitResult authentication_policy(const MunitParameter params[], void* co
                        (TC_TLV_frames){frames, FRAMES}, &work, &identifiers),
                    ==, TC_TLV_ARGUMENT);
   munit_assert_size(work, ==, WORK);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 

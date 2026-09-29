@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/fascn.h>
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
 static void assert_fascn_equal(const TC_FASCN* left, const TC_FASCN* right)
@@ -41,7 +42,7 @@ static void encode_characters(uint8_t symbols[40], uint8_t encoded[TC_FASCN_BYTE
   }
 }
 
-static MunitResult codec(const MunitParameter params[], void* context)
+TC_TEST(codec)
 {
   TC_FASCN value, preserved;
   uint8_t encoded[TC_FASCN_BYTES + 1];
@@ -147,8 +148,6 @@ static MunitResult codec(const MunitParameter params[], void* context)
         munit_assert_memory_equal(sizeof value, &value, &preserved);
     }
   }
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 

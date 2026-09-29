@@ -3,13 +3,12 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 #include "munit.h"
+#include "test_util.h"
 
 #include <tiny_crypto/aes.h>
 
-static MunitResult test_profile(const MunitParameter params[], void* user)
+TC_TEST(test_profile)
 {
-  (void)params;
-  (void)user;
   struct TC_AES_ctx ctx;
   uint8_t key[TC_AES_KEYLEN] = {0};
   uint8_t tag[TC_AES_CMAC_TAG_MAX];

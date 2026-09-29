@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/gzip.h>
 #include "munit.h"
+#include "test_util.h"
 #include <stdio.h>
 #include <string.h>
 #if defined(_WIN32)
@@ -16,7 +17,7 @@ static size_t big_endian(const uint8_t* bytes)
   return ((size_t)bytes[0] << 24) | ((size_t)bytes[1] << 16) | ((size_t)bytes[2] << 8) | bytes[3];
 }
 
-static MunitResult vectors(const MunitParameter params[], void* context)
+TC_TEST(vectors)
 {
   uint8_t header[9];
   size_t records = 0;
@@ -59,8 +60,6 @@ static MunitResult vectors(const MunitParameter params[], void* context)
   }
   munit_assert_size(records, >, 0);
   printf("%lu GZIP vectors checked\n", (unsigned long)records);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 int main(int argc, char** argv)

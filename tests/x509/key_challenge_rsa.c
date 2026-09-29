@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "munit.h"
+#include "test_util.h"
 
 /* A workspace followed by a canary detects writes past the challenge buffer
  * without relying on a sanitizer. */
@@ -74,10 +75,8 @@ static TC_key_challenge_result prepare(const TC_X509_public_key* key,
 }
 
 /* Every supported modulus size, including the largest, fits the workspace. */
-static MunitResult largest_modulus(const MunitParameter params[], void* user)
+TC_TEST(largest_modulus)
 {
-  (void)params;
-  (void)user;
   const TC_key_challenge_options schemes[] = {v15_options(), pss_options(32)};
   const TC_X509_public_key key = rsa_key(4096, 512);
   for (size_t i = 0; i < sizeof schemes / sizeof *schemes; ++i) {
@@ -94,10 +93,8 @@ static MunitResult largest_modulus(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult unsupported_shapes(const MunitParameter params[], void* user)
+TC_TEST(unsupported_shapes)
 {
-  (void)params;
-  (void)user;
   const TC_key_challenge_options v15 = v15_options();
   const TC_key_challenge_options salt_too_long = pss_options(TC_KEY_CHALLENGE_MAX_SALT_BYTES + 1);
   const TC_X509_public_key oversized = rsa_key(8192, 1024);
@@ -122,10 +119,8 @@ static MunitResult unsupported_shapes(const MunitParameter params[], void* user)
 
 /* The documented cost is exact: one unit less fails before any RNG use and
  * leaves the workspace unchanged. */
-static MunitResult exact_work(const MunitParameter params[], void* user)
+TC_TEST(exact_work)
 {
-  (void)params;
-  (void)user;
   const TC_key_challenge_options schemes[] = {v15_options(), pss_options(32)};
   const TC_X509_public_key key = rsa_key(4096, 512);
   for (size_t i = 0; i < sizeof schemes / sizeof *schemes; ++i) {
@@ -156,10 +151,8 @@ static MunitResult exact_work(const MunitParameter params[], void* user)
 
 /* Output or work storage inside the workspace returns ARGUMENT before RNG
  * use and leaves the workspace unchanged. */
-static MunitResult overlapping_storage(const MunitParameter params[], void* user)
+TC_TEST(overlapping_storage)
 {
-  (void)params;
-  (void)user;
   const TC_key_challenge_options v15 = v15_options();
   const TC_X509_public_key key = rsa_key(2048, 256);
   guarded_workspace guarded, saved;

@@ -3,9 +3,10 @@
 #include <tiny_crypto/twic_tpk.h>
 #include <tiny_crypto/aes.h>
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
-static MunitResult decrypt(const MunitParameter params[], void* context)
+TC_TEST(decrypt)
 {
   TC_TWIC_tpk key = {{0}};
   struct TC_AES_key_ctx aes;
@@ -40,11 +41,9 @@ static MunitResult decrypt(const MunitParameter params[], void* context)
     munit_assert_uint(buffer[i], ==, 0x5a);
   munit_assert_size(length, ==, SIZE_MAX);
   TC_secure_zero(&aes, sizeof aes);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
-static MunitResult known_answers(const MunitParameter params[], void* context)
+TC_TEST(known_answers)
 {
   /* OpenSSL enc -aes-128-ecb, PKCS#7 padding, key bytes 00 through 0f. */
   static const uint8_t ciphertext[][TC_AES_BLOCKLEN] = {
@@ -87,12 +86,10 @@ static MunitResult known_answers(const MunitParameter params[], void* context)
   munit_assert_int(TC_TWIC_object_decrypt(&key, NULL, sizeof buffer, &length), ==, TC_ERROR);
   munit_assert_int(TC_TWIC_object_decrypt(&key, buffer, 0, &length), ==, TC_ERROR);
   munit_assert_int(TC_TWIC_object_decrypt(&key, buffer, sizeof buffer, NULL), ==, TC_ERROR);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult encrypt(const MunitParameter params[], void* context)
+TC_TEST(encrypt)
 {
   TC_TWIC_tpk key = {{0}};
   uint8_t buffer[TC_AES_BLOCKLEN * 4], original[sizeof buffer];
@@ -132,8 +129,6 @@ static MunitResult encrypt(const MunitParameter params[], void* context)
   munit_assert_int(TC_TWIC_object_encrypt(&alias.key, alias.bytes, 0, sizeof alias.bytes, &length),
                    ==, TC_ERROR);
   munit_assert_memory_equal(sizeof alias.bytes, alias.bytes, original);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 

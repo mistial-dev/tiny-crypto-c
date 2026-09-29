@@ -5,11 +5,10 @@
 #include <string.h>
 
 #include "munit.h"
+#include "test_util.h"
 
-static MunitResult test_profiles(const MunitParameter params[], void* user)
+TC_TEST(test_profiles)
 {
-  (void)params;
-  (void)user;
   static const char* invalid_dates[] = {"19000229", "20240230", "20241301",
                                         "20240431", "00000101", "2024x101"};
   uint8_t data[81] = {0x53, 79, 0x30, 25};
@@ -130,14 +129,12 @@ static MunitResult test_profiles(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult test_boundaries(const MunitParameter params[], void* user)
+TC_TEST(test_boundaries)
 {
   uint8_t data[66] = {0x53, 0, 0x30, 25};
   TC_PIV_CHUID chuid, saved;
   unsigned profile;
   size_t length, cut;
-  (void)params;
-  (void)user;
   data[29] = 0x34;
   data[30] = 16;
   data[47] = 0x35;
@@ -184,13 +181,11 @@ static MunitResult test_boundaries(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult test_signed_content(const MunitParameter params[], void* user)
+TC_TEST(test_signed_content)
 {
   enum { FIELD_BYTES = 61, SIGNATURE_OFFSET = 55, FOOTER_OFFSET = 59, WRAPPER_BYTES = 3 };
   uint8_t fields[FIELD_BYTES] = {0x30, 25}, wrapped[80];
   TC_PIV_CHUID chuid;
-  (void)params;
-  (void)user;
   fields[27] = 0x34;
   fields[28] = 16;
   fields[45] = 0x35;
@@ -235,7 +230,7 @@ static MunitResult test_signed_content(const MunitParameter params[], void* user
   return MUNIT_OK;
 }
 
-static MunitResult test_legacy_key_map(const MunitParameter params[], void* user)
+TC_TEST(test_legacy_key_map)
 {
   enum { PREFIX_BYTES = 55, MAP_HEADER_BYTES = 4, MAX_MAP_BYTES = 512 };
   uint8_t fields[PREFIX_BYTES + MAP_HEADER_BYTES + MAX_MAP_BYTES + 1 + 8] = {0x30, 25};
@@ -286,8 +281,6 @@ static MunitResult test_legacy_key_map(const MunitParameter params[], void* user
                                        TC_CHUID_PROFILE_LEGACY_KEY_MAP, &parsed),
                      ==, TC_TLV_INVALID);
   }
-  (void)params;
-  (void)user;
   return MUNIT_OK;
 }
 
@@ -301,13 +294,11 @@ static size_t field_append(uint8_t* out, size_t offset, uint8_t tag, size_t leng
 }
 
 /* SP 800-73-4 Part 1 Table 9 optional fields: EE (2), 32 (4) and 33 (9). */
-static MunitResult test_deprecated_fields(const MunitParameter params[], void* user)
+TC_TEST(test_deprecated_fields)
 {
   enum { BUFFER_LENGTH = 1, ORGANIZATION = 2, DUNS = 4, CARDHOLDER = 8 };
   uint8_t fields[128];
   TC_PIV_CHUID chuid, preserved;
-  (void)params;
-  (void)user;
   for (unsigned mask = 0; mask < 16; ++mask) {
     size_t length = 0, signed_start, signature;
     if (mask & BUFFER_LENGTH)
@@ -440,12 +431,10 @@ static MunitResult test_deprecated_fields(const MunitParameter params[], void* u
   return MUNIT_OK;
 }
 
-static MunitResult test_arguments(const MunitParameter params[], void* user)
+TC_TEST(test_arguments)
 {
   static const uint8_t data[] = {0x53, 0};
   TC_PIV_CHUID chuid, preserved;
-  (void)params;
-  (void)user;
   memset(&chuid, 0xa5, sizeof chuid);
   preserved = chuid;
   munit_assert_int(

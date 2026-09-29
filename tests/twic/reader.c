@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "../../examples/credential_io.h"
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
 typedef struct {
@@ -81,7 +82,7 @@ static int inventory_transmit(void* context, const uint8_t* command, size_t leng
   return 1;
 }
 
-static MunitResult inventory(const MunitParameter params[], void* context)
+TC_TEST(inventory)
 {
   uint8_t pool[2048];
   ExampleTWICInventory out, preserved;
@@ -155,12 +156,10 @@ static MunitResult inventory(const MunitParameter params[], void* context)
     munit_assert_memory_equal(sizeof out, &out, &preserved);
     munit_assert_int(io.stopped, ==, 1);
   }
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult responses(const MunitParameter params[], void* context)
+TC_TEST(responses)
 {
   static const Exchange steps[] = {
       {{0, 0xcb, 0x3f, 0xff, 5, 0x5c, 3, 0x5f, 0xc1, 2, 0xff}, {0x6c, 4}, 11, 2, 1},
@@ -181,12 +180,10 @@ static MunitResult responses(const MunitParameter params[], void* context)
   munit_assert_size(io.exchanges_left, ==, 0);
   munit_assert_int(io.stopped, ==, 0);
   munit_assert_size(script.next, ==, 3);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult extended_responses(const MunitParameter params[], void* context)
+TC_TEST(extended_responses)
 {
   static const Exchange steps[] = {{{0, 0xcb, 0x3f, 0xff, 0, 0, 5, 0x5c, 3, 0x5f, 0xc1, 2, 1, 0x2a},
                                     {0x53, 2, 1, 2, 0x62, 0x82},
@@ -218,12 +215,10 @@ static MunitResult extended_responses(const MunitParameter params[], void* conte
   munit_assert_uint(buffer[out.length + 1], ==, 0);
   munit_assert_size(script.next, ==, 4);
   munit_assert_int(io.stopped, ==, 0);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult extended_maximum(const MunitParameter params[], void* context)
+TC_TEST(extended_maximum)
 {
   static const Exchange steps[] = {
       {{0, 0xcb, 0x3f, 0xff, 0, 0, 3, 0x5c, 1, 0x53, 0xff, 0xff}, {0x53, 0, 0x62, 0x82}, 12, 4, 1}};
@@ -238,12 +233,10 @@ static MunitResult extended_maximum(const MunitParameter params[], void* context
   munit_assert_size(out.length, ==, 2);
   munit_assert_uint(out.status, ==, 0x6282);
   munit_assert_size(script.next, ==, 1);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult extended_failures(const MunitParameter params[], void* context)
+TC_TEST(extended_failures)
 {
   static const Exchange steps[] = {
       {{0, 0xcb, 0x3f, 0xff, 0, 0, 3, 0x5c, 1, 0x53, 0, 1}, {0x6c, 1}, 12, 2, 1},
@@ -280,12 +273,10 @@ static MunitResult extended_failures(const MunitParameter params[], void* contex
   munit_assert_size(script.next, ==, 0);
   munit_assert_int(io.stopped, ==, 0);
   munit_assert_uint(buffer[0], ==, 1);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult object_responses(const MunitParameter params[], void* context)
+TC_TEST(object_responses)
 {
   static const uint8_t payloads[][8] = {{0x53, 1, 7, 0x62, 0x82},
                                         {0x53, 2, 7, 0x62, 0x82},
@@ -321,12 +312,10 @@ static MunitResult object_responses(const MunitParameter params[], void* context
       munit_assert_uint(out.status, ==, i == 6 ? 0x6982 : i == 2 ? 0x9000 : 0x6282);
     }
   }
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult selection(const MunitParameter params[], void* context)
+TC_TEST(selection)
 {
   static const Exchange steps[] = {
       {{0, 0xa4, 4, 0, 9, 0xa0, 0, 0, 3, 0x67, 0x20, 0, 0, 1, 0xff}, {0x6a, 0x82}, 15, 2, 1},
@@ -342,12 +331,10 @@ static MunitResult selection(const MunitParameter params[], void* context)
   munit_assert_int(example_card_select(&io, EXAMPLE_CARD_PIV, buffer, sizeof buffer, &out), ==,
                    EXAMPLE_CARD_OK);
   munit_assert_size(script.next, ==, 2);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult failures(const MunitParameter params[], void* context)
+TC_TEST(failures)
 {
   const uint8_t tag = 0x7e;
   const Exchange cases[] = {{{0, 0xcb, 0x3f, 0xff, 3, 0x5c, 1, 0x7e, 0xff}, {0}, 9, 0, 0},
@@ -373,12 +360,10 @@ static MunitResult failures(const MunitParameter params[], void* context)
                      EXAMPLE_CARD_TRANSPORT);
     munit_assert_size(script.next, ==, 1);
   }
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult limits(const MunitParameter params[], void* context)
+TC_TEST(limits)
 {
   const uint8_t tag = 0x7e;
   const Exchange repeated[] = {{{0, 0xcb, 0x3f, 0xff, 3, 0x5c, 1, 0x7e, 0xff}, {0x6c, 1}, 9, 2, 1},
@@ -421,12 +406,10 @@ static MunitResult limits(const MunitParameter params[], void* context)
   munit_assert_size(io.exchanges_left, ==, 2);
   for (size_t i = 0; i < sizeof buffer; ++i)
     munit_assert_uint(buffer[i], ==, 0x5a);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult identity(const MunitParameter params[], void* context)
+TC_TEST(identity)
 {
   static const uint8_t identities[][15] = {
       {0x61, 13, 0x4f, 11, 0xa0, 0, 0, 3, 8, 0, 0, 0x10, 0, 1, 0},
@@ -478,12 +461,10 @@ static MunitResult identity(const MunitParameter params[], void* context)
   out = (ExampleCardModel)99;
   munit_assert_int(example_card_identity(input, EXAMPLE_CARD_TWIC, &out), ==, TC_TLV_INVALID);
   munit_assert_int(out, ==, 99);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult pin(const MunitParameter params[], void* context)
+TC_TEST(pin)
 {
   static const uint8_t digits[] = "12345678";
   Exchange steps[] = {
@@ -584,8 +565,6 @@ static MunitResult pin(const MunitParameter params[], void* context)
                    EXAMPLE_CARD_ARGUMENT);
   munit_assert_int(guard.used, ==, 0);
   munit_assert_size(script.next, ==, 0);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 

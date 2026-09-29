@@ -2,6 +2,7 @@
 #include <tiny_crypto/tiny_crypto.h>
 #include <tiny_crypto/x509_crypto.h>
 #include "munit.h"
+#include "test_util.h"
 #include "cavp.h"
 #include "rsa_vectors.h"
 #include <string.h>
@@ -25,7 +26,7 @@
 #error "Unrelated algorithm enabled in a PIV role"
 #endif
 
-static MunitResult legacy_hash(const MunitParameter params[], void* context)
+TC_TEST(legacy_hash)
 {
   const uint8_t message[] = {'a', 'b', 'c'};
   const uint8_t expected[] = {0xa9, 0x99, 0x3e, 0x36, 0x47, 0x06, 0x81, 0x6a, 0xba, 0x3e,
@@ -33,12 +34,10 @@ static MunitResult legacy_hash(const MunitParameter params[], void* context)
   uint8_t digest[TC_SHA1_DIGESTLEN];
   munit_assert_int(TC_SHA1_digest((TC_bytes){message, sizeof message}, digest), ==, TC_OK);
   munit_assert_memory_equal(sizeof digest, digest, expected);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult gzip_member(const MunitParameter params[], void* context)
+TC_TEST(gzip_member)
 {
   uint8_t encoded[] = {0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 2, 0xff, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   TC_GZIP_workspace workspace;
@@ -54,8 +53,6 @@ static MunitResult gzip_member(const MunitParameter params[], void* context)
                                   (TC_buffer){NULL, 0}, &length),
                    ==, TC_GZIP_INVALID);
   munit_assert_size(length, ==, SIZE_MAX);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
@@ -112,7 +109,6 @@ static MunitResult native_signature(const MunitParameter params[], void* context
                      : variant == 1 ? TC_X509_SIGNATURE_INVALID
                                     : TC_X509_SIGNATURE_VALID);
   }
-  (void)params;
   (void)context;
   return MUNIT_OK;
 }

@@ -3,12 +3,13 @@
 #include <tiny_crypto/validation.h>
 #include "../../src/credential_status_internal.h"
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
 enum { ARENA_UNITS = 4096 };
 static TC_validation_storage arena[ARENA_UNITS];
 
-static MunitResult status_mapping(const MunitParameter params[], void* context)
+TC_TEST(status_mapping)
 {
   munit_assert_int(tc_credential_signature_status(TC_X509_SIGNATURE_VALID), ==,
                    TC_CREDENTIAL_VALID);
@@ -32,12 +33,10 @@ static MunitResult status_mapping(const MunitParameter params[], void* context)
                    TC_CREDENTIAL_ERROR);
   munit_assert_int(tc_credential_tlv_status((TC_TLV_result)127, &tc_credential_tlv_cms), ==,
                    TC_CREDENTIAL_ERROR);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult profiles(const MunitParameter params[], void* context)
+TC_TEST(profiles)
 {
   size_t previous = 0;
   for (int profile = TC_VALIDATION_MICRO; profile <= TC_VALIDATION_DESKTOP; ++profile) {
@@ -87,12 +86,10 @@ static MunitResult profiles(const MunitParameter params[], void* context)
       munit_assert_uint8(((uint8_t*)arena)[i], ==, 0xa5);
     previous = bytes;
   }
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult invalid_storage(const MunitParameter params[], void* context)
+TC_TEST(invalid_storage)
 {
   TC_validation_capacity capacity;
   TC_validation_workspace workspace, saved;
@@ -123,12 +120,10 @@ static MunitResult invalid_storage(const MunitParameter params[], void* context)
   munit_assert_memory_equal(sizeof saved, &workspace, &saved);
   munit_assert_int(TC_validation_capacity_init((TC_validation_profile)99, &capacity), ==,
                    TC_RESULT_ARGUMENT);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult context_setup(const MunitParameter params[], void* user)
+TC_TEST(context_setup)
 {
   TC_validation_capacity capacity;
   TC_validation_workspace workspace;
@@ -249,8 +244,6 @@ static MunitResult context_setup(const MunitParameter params[], void* user)
                                     &work, (TC_X509_validation_result*)arena),
                    ==, TC_CREDENTIAL_ERROR);
   munit_assert_size(work, ==, 10000);
-  (void)params;
-  (void)user;
   return MUNIT_OK;
 }
 

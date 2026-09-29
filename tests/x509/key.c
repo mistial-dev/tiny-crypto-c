@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include "munit.h"
+#include "test_util.h"
 
 static TC_status fixed_random(void* context, uint8_t* output, size_t length)
 {
@@ -32,7 +33,7 @@ static TC_X509_signature_result proof_result(void* context, TC_bytes digest,
   return *(const TC_X509_signature_result*)context;
 }
 
-static MunitResult key_challenge(const MunitParameter params[], void* user)
+TC_TEST(key_challenge)
 {
   uint8_t oid = 1, point = 4, proof = 1;
   TC_X509_public_key key = {0};
@@ -47,8 +48,6 @@ static MunitResult key_challenge(const MunitParameter params[], void* user)
   TC_bytes challenge = {(const uint8_t*)1, 7}, unchanged = challenge;
   TC_work_budget work = {31};
   int fail = 0;
-  (void)params;
-  (void)user;
   memset(&workspace, 0xa5, sizeof workspace);
   saved = workspace;
   munit_assert_int(TC_key_challenge_prepare(&key, &options, (TC_random_source){fixed_random, &fail},
@@ -127,7 +126,7 @@ static TC_X509_public_key challenge_ec_key(TC_EC_curve curve, const uint8_t* oid
 
 /* A curve the X.509 decoder did not identify fails before RNG use and leaves
  * workspace, output and work unchanged. */
-static MunitResult key_challenge_unknown_curve(const MunitParameter params[], void* user)
+TC_TEST(key_challenge_unknown_curve)
 {
   const uint8_t oid = 1, point = 4;
   const TC_X509_public_key key = challenge_ec_key(TC_EC_UNKNOWN, &oid, &point);
@@ -138,8 +137,6 @@ static MunitResult key_challenge_unknown_curve(const MunitParameter params[], vo
   const TC_bytes unchanged = challenge;
   TC_work_budget work = {1000};
   size_t calls = 0;
-  (void)params;
-  (void)user;
   memset(&workspace, 0xa5, sizeof workspace);
   saved = workspace;
   munit_assert_int(TC_key_challenge_prepare(&key, &options,
@@ -155,7 +152,7 @@ static MunitResult key_challenge_unknown_curve(const MunitParameter params[], vo
 
 /* Missing pointers and overlapping storage are caller errors. They return
  * ARGUMENT before RNG use and leave every output unchanged. */
-static MunitResult key_challenge_argument(const MunitParameter params[], void* user)
+TC_TEST(key_challenge_argument)
 {
   const uint8_t oid = 1, point = 4, proof = 1;
   const TC_X509_public_key key = challenge_ec_key(TC_EC_P256, &oid, &point);
@@ -167,8 +164,6 @@ static MunitResult key_challenge_argument(const MunitParameter params[], void* u
   TC_work_budget work = {1000};
   size_t calls = 0;
   const TC_random_source random = {counting_random, &calls};
-  (void)params;
-  (void)user;
   memset(&workspace, 0xa5, sizeof workspace);
   saved = workspace;
   munit_assert_int(TC_key_challenge_prepare(NULL, &options, random, &workspace, &work, &challenge),
@@ -233,10 +228,8 @@ static MunitResult key_challenge_argument(const MunitParameter params[], void* u
   return MUNIT_OK;
 }
 
-static MunitResult test_key_encodings(const MunitParameter params[], void* user)
+TC_TEST(test_key_encodings)
 {
-  (void)params;
-  (void)user;
   uint8_t rsa[] = {0x30, 27, 0x30, 13, 6, 9,    0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 1, 1, 1,
                    5,    0,  3,    10, 0, 0x30, 7,    2,    2,    0x0c, 0xa1, 2,    1, 17};
   uint8_t ec[91] = {0x30, 89,   0x30, 19,   6,    7,    0x2a, 0x86, 0x48, 0xce, 0x3d, 2, 1, 6,
@@ -295,14 +288,12 @@ static MunitResult test_key_encodings(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult rsa_algorithm(const MunitParameter params[], void* user)
+TC_TEST(rsa_algorithm)
 {
   uint8_t oid[] = {0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 1, 1, 1};
   const uint8_t null[] = {5, 0}, defaults[] = {0x30, 0};
   TC_DER_algorithm algorithm = {{oid, sizeof oid}, {null, sizeof null}};
   TC_key_type type = TC_KEY_UNKNOWN;
-  (void)params;
-  (void)user;
   munit_assert_int(tc_pki_rsa_key_algorithm(&algorithm, &type), ==, TC_TLV_OK);
   munit_assert_int(type, ==, TC_KEY_RSA);
   algorithm.parameters = (TC_bytes){NULL, 0};
@@ -325,7 +316,7 @@ static MunitResult rsa_algorithm(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult pss_parameters(const MunitParameter params[], void* user)
+TC_TEST(pss_parameters)
 {
   static const uint8_t defaults[] = {0x30, 0};
   uint8_t encoded[] = {0x30, 52,   0xa0, 15,   0x30, 13,   6,    9,    0x60, 0x86, 0x48,
@@ -335,8 +326,6 @@ static MunitResult pss_parameters(const MunitParameter params[], void* user)
                        4,    2,    2,    5,    0,    0xa2, 3,    2,    1,    32};
   tc_pki_pss_parameters parsed, saved;
   TC_hash_algorithm hash = TC_HASH_UNKNOWN;
-  (void)params;
-  (void)user;
   munit_assert_int(tc_pki_pss_read((TC_bytes){defaults, sizeof defaults}, &parsed), ==, TC_TLV_OK);
   munit_assert_int(tc_pki_hash_algorithm(&parsed.hash, &hash), ==, TC_TLV_OK);
   munit_assert_int(hash, ==, TC_HASH_SHA1);
@@ -365,7 +354,7 @@ static MunitResult pss_parameters(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult signature_restrictions(const MunitParameter params[], void* user)
+TC_TEST(signature_restrictions)
 {
   uint8_t oid[] = {0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 1, 1, 10};
   static const uint8_t defaults[] = {0x30, 0};
@@ -376,8 +365,6 @@ static MunitResult signature_restrictions(const MunitParameter params[], void* u
   TC_DER_algorithm algorithm = {{oid, sizeof oid}, {salt, sizeof salt}};
   TC_X509_public_key key = {0};
   TC_signature_algorithm parsed, saved;
-  (void)params;
-  (void)user;
   key.type = TC_KEY_RSA_PSS;
   key.algorithm.parameters = (TC_bytes){defaults, sizeof defaults};
   munit_assert_int(tc_pki_signature_resolve(&algorithm, &key, &parsed), ==, TC_TLV_OK);
@@ -414,7 +401,7 @@ static MunitResult signature_restrictions(const MunitParameter params[], void* u
   return MUNIT_OK;
 }
 
-static MunitResult signature_oid_classification(const MunitParameter params[], void* user)
+TC_TEST(signature_oid_classification)
 {
   static const struct {
     uint8_t oid[9];
@@ -433,8 +420,6 @@ static MunitResult signature_oid_classification(const MunitParameter params[], v
       {{0x2a, 0x86, 0x48, 0xce, 0x3d, 4, 3, 4}, 8, TC_PKI_SIGNATURE_ECDSA, TC_HASH_SHA512},
       {{0x2b, 0x65, 112}, 3, TC_PKI_SIGNATURE_ED25519, TC_HASH_UNKNOWN},
       {{0x2b, 0x65, 113}, 3, TC_PKI_SIGNATURE_ED448, TC_HASH_UNKNOWN}};
-  (void)params;
-  (void)user;
   for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
     tc_pki_signature_oid_info info =
         tc_pki_signature_oid_classify((TC_bytes){cases[i].oid, cases[i].length});

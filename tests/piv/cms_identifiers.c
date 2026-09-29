@@ -2,9 +2,10 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/piv_cms.h>
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
-static MunitResult cbeff(const MunitParameter params[], void* context)
+TC_TEST(cbeff)
 {
   enum {
     HEADER_BYTES = 88,
@@ -59,12 +60,10 @@ static MunitResult cbeff(const MunitParameter params[], void* context)
   munit_assert_int(TC_PIV_CBEFF_read((TC_bytes){alias.bytes, OBJECT_BYTES}, &alias.object), ==,
                    TC_TLV_ARGUMENT);
   munit_assert_memory_equal(OBJECT_BYTES, alias.bytes, bytes);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult metadata(const MunitParameter params[], void* context)
+TC_TEST(metadata)
 {
   uint8_t bytes[91] = {3, 0x0d, 0, 0, 0, 1, 0, 2, 0, 0x1b, 2, 1};
   static const uint8_t date[] = {20, 24, 2, 29, 12, 30, 0, 'Z'};
@@ -138,12 +137,10 @@ static MunitResult metadata(const MunitParameter params[], void* context)
   bytes[58] = 0;
   munit_assert_int(TC_PIV_CBEFF_metadata_read(input, &parsed), ==, TC_TLV_OK);
   munit_assert_size(parsed.creator.length, ==, 17);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult formats(const MunitParameter params[], void* context)
+TC_TEST(formats)
 {
   static const struct {
     uint16_t owner, type;
@@ -179,12 +176,10 @@ static MunitResult formats(const MunitParameter params[], void* context)
       munit_assert_int(TC_PIV_CBEFF_format_identify(&metadata), ==, TC_PIV_CBEFF_FORMAT_UNKNOWN);
     }
   }
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult identifiers(const MunitParameter params[], void* context)
+TC_TEST(identifiers)
 {
   enum { FASCN_BYTES = 25, UUID_BYTES = 16, FRAME_COUNT = 8, WORK = 8192 };
   uint8_t fascn[FASCN_BYTES], uuid[UUID_BYTES];
@@ -336,8 +331,6 @@ static MunitResult identifiers(const MunitParameter params[], void* context)
       ==, TC_TLV_ARGUMENT);
   munit_assert_size(work, ==, WORK);
   munit_assert_int(matched, ==, -1);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 

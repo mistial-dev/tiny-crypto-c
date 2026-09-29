@@ -2,9 +2,10 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/piv_security.h>
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
-static MunitResult schema(const MunitParameter params[], void* context)
+TC_TEST(schema)
 {
   /* CMS is opaque at this layer. Its signature is checked by the CMS API. */
   uint8_t encoded[] = {0x53, 13, 0xba, 6, 1, 0x30, 0, 16, 0x20, 3, 0xbb, 1, 0, 0xfe, 0};
@@ -56,12 +57,10 @@ static MunitResult schema(const MunitParameter params[], void* context)
   munit_assert_int(
       TC_PIV_security_read((TC_bytes){encoded, sizeof encoded}, TC_PIV_SECURITY_CONTENTS, NULL), ==,
       TC_TLV_ARGUMENT);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult mapping_limits(const MunitParameter params[], void* context)
+TC_TEST(mapping_limits)
 {
   enum { MAX_GROUPS = 16, RECORD_BYTES = 3, HEADER_BYTES = 2, TRAILER_BYTES = 5 };
   uint8_t encoded[HEADER_BYTES + (MAX_GROUPS + 1) * RECORD_BYTES + TRAILER_BYTES];
@@ -105,8 +104,6 @@ static MunitResult mapping_limits(const MunitParameter params[], void* context)
     }
   }
   munit_assert_int(TC_PIV_security_group_find(NULL, 0, NULL), ==, TC_TLV_ARGUMENT);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 

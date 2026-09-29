@@ -101,12 +101,10 @@ static TC_status hmac_verify(int alg, const uint8_t* key, size_t key_len, const 
 /* RFC 2202 / RFC 4231                                                       */
 /* ------------------------------------------------------------------------- */
 
-MunitResult test_hmac_rfc(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_hmac_rfc)
 {
   uint8_t tag[TC_SHA512_DIGESTLEN];
   size_t i;
-  (void)params;
-  (void)data;
 
 #if TC_ENABLE_SHA1
   for (i = 0; i < RFC2202_COUNT; ++i) {
@@ -196,15 +194,13 @@ MunitResult test_hmac_rfc(const MunitParameter params[], void* data)
 /* Key lengths: 0, 1, 63, 64, 65, 131; long keys equal HMAC(H(K)).           */
 /* ------------------------------------------------------------------------- */
 
-MunitResult test_hmac_key_lengths(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_hmac_key_lengths)
 {
   uint8_t key[256];
   uint8_t tag[TC_SHA512_DIGESTLEN];
   uint8_t tag2[TC_SHA512_DIGESTLEN];
   uint8_t hashed[TC_SHA512_DIGESTLEN];
   size_t i;
-  (void)params;
-  (void)data;
 
   tc_test_fill_incrementing(key, sizeof(key));
 
@@ -335,14 +331,12 @@ MunitResult test_hmac_key_lengths(const MunitParameter params[], void* data)
 /* Truncation bounds                                                         */
 /* ------------------------------------------------------------------------- */
 
-MunitResult test_hmac_truncation(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_hmac_truncation)
 {
   uint8_t key[16];
   uint8_t msg[40];
   uint8_t full[TC_SHA512_DIGESTLEN];
   uint8_t tag[TC_SHA512_DIGESTLEN + 1];
-  (void)params;
-  (void)data;
 
   tc_test_fill_incrementing(key, sizeof(key));
   tc_test_fill_incrementing(msg, sizeof(msg));
@@ -591,13 +585,11 @@ MunitResult test_hmac_truncation(const MunitParameter params[], void* data)
 /* Verify: correct tags pass, single-byte flips fail                         */
 /* ------------------------------------------------------------------------- */
 
-MunitResult test_hmac_verify(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_hmac_verify)
 {
   uint8_t key[20];
   uint8_t msg[70];
   uint8_t tag[TC_SHA512_DIGESTLEN];
-  (void)params;
-  (void)data;
 
   tc_test_fill_incrementing(key, sizeof(key));
   tc_test_fill_incrementing(msg, sizeof(msg));
@@ -785,15 +777,13 @@ MunitResult test_hmac_verify(const MunitParameter params[], void* data)
 /* Streaming equals one-shot; empty message with NULL pointer                */
 /* ------------------------------------------------------------------------- */
 
-MunitResult test_hmac_streaming(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_hmac_streaming)
 {
   uint8_t key[33];
   uint8_t msg[150];
   uint8_t expected[TC_SHA512_DIGESTLEN];
   uint8_t tag[TC_SHA512_DIGESTLEN];
   size_t split;
-  (void)params;
-  (void)data;
 
   tc_test_fill_incrementing(key, sizeof(key));
   tc_test_fill_incrementing(msg, sizeof(msg));
@@ -962,12 +952,10 @@ MunitResult test_hmac_streaming(const MunitParameter params[], void* data)
 /* Zeroization                                                               */
 /* ------------------------------------------------------------------------- */
 
-MunitResult test_hmac_zeroize(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_hmac_zeroize)
 {
   uint8_t key[16];
   uint8_t tag[TC_SHA512_DIGESTLEN];
-  (void)params;
-  (void)data;
 
   tc_test_fill_incrementing(key, sizeof(key));
 
@@ -1068,13 +1056,12 @@ static long json_number(const char* p)
   return strtol(p, NULL, 10);
 }
 
-/* Decodes the quoted hex string at p. */
+/* Decode the quoted hex string at p and return its byte count. A missing
+ * quote or malformed hex fails the current test. */
 static size_t json_hex(const char* p, uint8_t* out, size_t capacity)
 {
-  size_t length = SIZE_MAX;
-  if (*p != '"' || !tc_test_hex_decode(p + 1, TC_TEST_HEX_FIELD, out, capacity, &length))
-    return SIZE_MAX;
-  return length;
+  munit_assert_char(*p, ==, '"');
+  return tc_test_hex(p + 1, out, capacity);
 }
 
 struct wycheproof_case {
@@ -1130,15 +1117,12 @@ static void run_wycheproof_file(int alg, const char* path)
       tc.have_key = tc.have_msg = tc.have_tag = 0;
     } else if ((p = json_field(line, "key")) != NULL) {
       tc.key_len = json_hex(p, tc.key, sizeof(tc.key));
-      munit_assert_size(tc.key_len, !=, SIZE_MAX);
       tc.have_key = 1;
     } else if ((p = json_field(line, "msg")) != NULL) {
       tc.msg_len = json_hex(p, tc.msg, sizeof(tc.msg));
-      munit_assert_size(tc.msg_len, !=, SIZE_MAX);
       tc.have_msg = 1;
     } else if ((p = json_field(line, "tag")) != NULL) {
       tc.tag_len = json_hex(p, tc.tag, sizeof(tc.tag));
-      munit_assert_size(tc.tag_len, !=, SIZE_MAX);
       tc.have_tag = 1;
     } else if ((p = json_field(line, "result")) != NULL) {
       uint8_t computed[TC_SHA512_DIGESTLEN];
@@ -1180,10 +1164,8 @@ static void run_wycheproof_file(int alg, const char* path)
 
 /* The key is read after init wipes the context, so a key stored inside the
  * context must be rejected. Accepting it would key the MAC with zeros. */
-MunitResult test_hmac_key_overlap(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_hmac_key_overlap)
 {
-  (void)params;
-  (void)data;
 #if TC_ENABLE_SHA256
   struct {
     struct TC_HMAC_SHA256_ctx ctx;
@@ -1217,10 +1199,8 @@ MunitResult test_hmac_key_overlap(const MunitParameter params[], void* data)
   return MUNIT_OK;
 }
 
-MunitResult test_hmac_wycheproof(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_hmac_wycheproof)
 {
-  (void)params;
-  (void)data;
 #if TC_ENABLE_SHA1
   run_wycheproof_file(TC_SHA1_DIGESTLEN, HMAC_WYCHEPROOF_DIR "/hmac_sha1_test.json");
 #endif
@@ -1241,52 +1221,36 @@ MunitResult test_hmac_wycheproof(const MunitParameter params[], void* data)
 
 #else /* !TC_ENABLE_HMAC */
 
-MunitResult test_hmac_rfc(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_hmac_rfc)
 {
-  (void)params;
-  (void)data;
   return MUNIT_SKIP;
 }
-MunitResult test_hmac_key_lengths(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_hmac_key_lengths)
 {
-  (void)params;
-  (void)data;
   return MUNIT_SKIP;
 }
-MunitResult test_hmac_truncation(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_hmac_truncation)
 {
-  (void)params;
-  (void)data;
   return MUNIT_SKIP;
 }
-MunitResult test_hmac_verify(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_hmac_verify)
 {
-  (void)params;
-  (void)data;
   return MUNIT_SKIP;
 }
-MunitResult test_hmac_streaming(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_hmac_streaming)
 {
-  (void)params;
-  (void)data;
   return MUNIT_SKIP;
 }
-MunitResult test_hmac_zeroize(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_hmac_zeroize)
 {
-  (void)params;
-  (void)data;
   return MUNIT_SKIP;
 }
-MunitResult test_hmac_key_overlap(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_hmac_key_overlap)
 {
-  (void)params;
-  (void)data;
   return MUNIT_SKIP;
 }
-MunitResult test_hmac_wycheproof(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_hmac_wycheproof)
 {
-  (void)params;
-  (void)data;
   return MUNIT_SKIP;
 }
 

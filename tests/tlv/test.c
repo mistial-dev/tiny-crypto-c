@@ -7,13 +7,12 @@
 #include <string.h>
 
 #include "munit.h"
+#include "test_util.h"
 static const TC_TLV_limits limits = {SIZE_MAX, SIZE_MAX, 4096, 16};
 
 /* X.690 sections 8 and 10, ISO 7816-4 section 6. */
-static MunitResult headers(const MunitParameter params[], void* user)
+TC_TEST(headers)
 {
-  (void)params;
-  (void)user;
   static const uint8_t sequence[] = {0x30, 3, 2, 1, 42};
   static const uint8_t long_tag[] = {0x5f, 0x20, 0};
   static const uint8_t nonshort[] = {4, 0x81, 1, 0xaa};
@@ -68,10 +67,8 @@ static MunitResult headers(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult lengths(const MunitParameter params[], void* user)
+TC_TEST(lengths)
 {
-  (void)params;
-  (void)user;
   static const size_t values[] = {0, 1, 127, 128, 255, 256, 1024};
   static const uint8_t expected_headers[] = {2, 2, 2, 3, 3, 4, 4};
   size_t i;
@@ -107,10 +104,8 @@ static MunitResult lengths(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult cursor(const MunitParameter params[], void* user)
+TC_TEST(cursor)
 {
-  (void)params;
-  (void)user;
   static const uint8_t input[] = {0, 4, 0, 0xff, 2, 1, 42, 0};
   static const uint8_t truncated[] = {4, 2, 1};
   TC_TLV_reader r, saved;
@@ -164,10 +159,8 @@ static MunitResult cursor(const MunitParameter params[], void* user)
 
 /* ISO/IEC 7816-4:2020 section 6.4: a constructed template holds nested data
  * objects without padding. Padding is a root-level property of the reader. */
-static MunitResult child_reader(const MunitParameter params[], void* user)
+TC_TEST(child_reader)
 {
-  (void)params;
-  (void)user;
   static const uint8_t padded[] = {0, 0x30, 3, 0, 4, 0, 0xff};
   static const uint8_t nested[] = {0x30, 4, 4, 0, 4, 0};
   static const uint8_t other[] = {0x30, 0};
@@ -250,10 +243,8 @@ static void visit(void* user, const TC_TLV_event* e)
     v->bytes = v->bytes * 33 + e->bytes.data[i];
 }
 
-static MunitResult walks(const MunitParameter params[], void* user)
+TC_TEST(walks)
 {
-  (void)params;
-  (void)user;
   static const uint8_t definite[] = {0x30, 9, 0x30, 3, 2, 1, 42, 4, 2, 0, 0};
   static const uint8_t indefinite[] = {0x30, 0x80, 0x30, 0x80, 2, 1, 42, 0, 0, 4, 2, 0, 0, 0, 0};
   static const uint8_t escape[] = {0x30, 2, 4, 3, 1, 2, 3};
@@ -371,10 +362,8 @@ static void check_borrowed(void* user, const TC_TLV_event* e)
     ++b->borrowed;
 }
 
-static MunitResult walk_spans_borrow_input(const MunitParameter params[], void* user)
+TC_TEST(walk_spans_borrow_input)
 {
-  (void)params;
-  (void)user;
   static const uint8_t definite[] = {0x30, 9, 0x30, 3, 2, 1, 42, 4, 2, 0, 0};
   TC_TLV_frame frames[4];
   struct borrowed spans = {definite, 0, 0};
@@ -411,10 +400,8 @@ static MunitResult walk_spans_borrow_input(const MunitParameter params[], void* 
 }
 
 #if TC_ENABLE_DER
-static MunitResult signatures(const MunitParameter params[], void* user)
+TC_TEST(signatures)
 {
-  (void)params;
-  (void)user;
   static const uint8_t absent[] = {0x30, 3, 6, 1, 42};
   static const uint8_t null_parameter[] = {0x30, 5, 6, 1, 42, 5, 0};
   static const uint8_t extra[] = {0x30, 7, 6, 1, 42, 5, 0, 5, 0};
@@ -459,10 +446,8 @@ static MunitResult signatures(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult rsa_public_key(const MunitParameter params[], void* user)
+TC_TEST(rsa_public_key)
 {
-  (void)params;
-  (void)user;
   uint8_t encoded[] = {0x30, 7, 2, 2, 0, 128, 2, 1, 3};
   TC_DER_rsa_public_key key;
   munit_assert_int(TC_DER_rsa_public((TC_bytes){encoded, sizeof encoded}, &key), ==, TC_TLV_OK);
@@ -499,10 +484,8 @@ static MunitResult rsa_public_key(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult private_key_info(const MunitParameter params[], void* user)
+TC_TEST(private_key_info)
 {
-  (void)params;
-  (void)user;
   /* An opaque key under OID 1.2, with an empty attributes set. */
   uint8_t encoded[] = {0x30, 13, 2, 1, 0, 0x30, 3, 6, 1, 42, 4, 1, 7, 0xa0, 0};
   TC_DER_private_key key;
@@ -590,10 +573,8 @@ static MunitResult private_key_info(const MunitParameter params[], void* user)
 }
 
 /* The complete-input readers report truncation as malformed input. */
-static MunitResult der_truncation(const MunitParameter params[], void* user)
+TC_TEST(der_truncation)
 {
-  (void)params;
-  (void)user;
   static const uint8_t integer[] = {2, 5, 0};
   static const uint8_t short_header[] = {2};
   static const uint8_t long_length[] = {4, 0x82, 1};
@@ -624,10 +605,8 @@ static MunitResult der_truncation(const MunitParameter params[], void* user)
 }
 
 /* RFC 5280 section 4.1.2.7 SubjectPublicKeyInfo. */
-static MunitResult subject_public_key(const MunitParameter params[], void* user)
+TC_TEST(subject_public_key)
 {
-  (void)params;
-  (void)user;
   static const uint8_t valid[] = {0x30, 9, 0x30, 3, 6, 1, 42, 3, 2, 0, 7};
   static const uint8_t unused_bits[] = {0x30, 9, 0x30, 3, 6, 1, 42, 3, 2, 1, 6};
   static const uint8_t empty_key[] = {0x30, 8, 0x30, 3, 6, 1, 42, 3, 1, 0};
@@ -667,10 +646,8 @@ static MunitResult subject_public_key(const MunitParameter params[], void* user)
 }
 
 /* X.690 section 8.19.2: base-128 subidentifiers with minimal leading octets. */
-static MunitResult oid_contents(const MunitParameter params[], void* user)
+TC_TEST(oid_contents)
 {
-  (void)params;
-  (void)user;
   static const uint8_t rsa[] = {0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 1, 1, 1};
   static const uint8_t large_arc[] = {0x2a, 0xff, 0xff, 0xff, 0xff, 0xff,
                                       0xff, 0xff, 0xff, 0xff, 0xff, 0x7f};
@@ -693,10 +670,8 @@ static MunitResult oid_contents(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult der(const MunitParameter params[], void* user)
+TC_TEST(der)
 {
-  (void)params;
-  (void)user;
   static const uint8_t positive[] = {2, 2, 0, 128}, negative[] = {2, 1, 255};
   static const uint8_t nonminimal[] = {2, 2, 0, 127}, zero[] = {2, 0};
   static const uint8_t maximum[] = {2, 5, 0, 255, 255, 255, 255};
@@ -809,7 +784,7 @@ static MunitResult der(const MunitParameter params[], void* user)
 }
 #endif
 
-static MunitResult tree_reads(const MunitParameter params[], void* user)
+TC_TEST(tree_reads)
 {
   enum { FRAME_CAPACITY = 4 };
   static const uint8_t sequence[] = {0x30, 3, 4, 1, 42, 0xff};
@@ -824,8 +799,6 @@ static MunitResult tree_reads(const MunitParameter params[], void* user)
   TC_TLV_frame frames[FRAME_CAPACITY];
   TC_TLV_element element, saved;
   TC_TLV_limits limited = limits;
-  (void)params;
-  (void)user;
   for (size_t i = 0; i < sizeof valid / sizeof *valid; ++i) {
     memset(&element, 0xa5, sizeof element);
     memcpy(&saved, &element, sizeof saved);
@@ -908,10 +881,8 @@ static MunitResult tree_reads(const MunitParameter params[], void* user)
 /* The DER readers take a complete encoding, so a tag or length field wider
  * than the build parses is malformed input. A version too large for a
  * uint32_t follows the reader's rule for other unknown versions. */
-static MunitResult der_status_classes(const MunitParameter params[], void* user)
+TC_TEST(der_status_classes)
 {
-  (void)params;
-  (void)user;
   static const uint8_t long_tag[] = {0x1f, 0x81, 0x81, 0x81, 0x81, 0x81, 0x01, 1, 0};
   static const uint8_t wide_length[] = {2, 0x89, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0};
   static const uint8_t pkcs8_version[] = {0x30, 17, 2, 5,  1, 0, 0, 0,    0, 0x30,

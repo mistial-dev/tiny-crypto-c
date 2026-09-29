@@ -2,8 +2,9 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "../../src/pki_hash_internal.h"
 #include "munit.h"
+#include "test_util.h"
 
-static MunitResult identifiers(const MunitParameter params[], void* user)
+TC_TEST(identifiers)
 {
   static const uint8_t null_value[] = {5, 0};
   static const uint8_t wrong[] = {4, 0};
@@ -11,8 +12,6 @@ static MunitResult identifiers(const MunitParameter params[], void* user)
   static const uint8_t malformed[] = {42, 0x80};
   TC_hash_algorithm hash;
   TC_DER_algorithm algorithm = {{unknown, sizeof unknown}, {NULL, 0}};
-  (void)params;
-  (void)user;
   for (unsigned id = TC_HASH_SHA1; id <= TC_HASH_SHA512; ++id) {
     tc_hash_info info;
     munit_assert_true(tc_hash_info_get((TC_hash_algorithm)id, &info));

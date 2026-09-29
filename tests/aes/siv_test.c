@@ -8,6 +8,7 @@
 
 #include <tiny_crypto/aes.h>
 #include "munit.h"
+#include "test_util.h"
 #include "cavp.h"
 #include "test_io.h"
 
@@ -33,7 +34,7 @@ static void siv_initialize_sbox(void)
 
 /* RFC 5297 Appendix A.1 — deterministic AEAD (AES-SIV-CMAC-256). */
 #if TC_AES_KEY_BITS == 128
-static MunitResult test_siv_rfc_a1(const MunitParameter params[], void* data)
+TC_TEST(test_siv_rfc_a1)
 {
   static const uint8_t key[TC_AES_SIV_KEYLEN] = {0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
                                                  0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
@@ -53,9 +54,6 @@ static MunitResult test_siv_rfc_a1(const MunitParameter params[], void* data)
   uint8_t v[TC_AES_SIV_V_LEN];
   uint8_t ct[sizeof(plaintext)];
   uint8_t pt[sizeof(plaintext)];
-
-  (void)params;
-  (void)data;
 
   ad[0] = (TC_bytes){ad_bytes, sizeof(ad_bytes)};
 
@@ -85,7 +83,7 @@ static MunitResult test_siv_rfc_a1(const MunitParameter params[], void* data)
 }
 
 /* RFC 5297 Appendix A.2 — nonce-based AEAD (AD1, AD2, Nonce, P). */
-static MunitResult test_siv_rfc_a2(const MunitParameter params[], void* data)
+TC_TEST(test_siv_rfc_a2)
 {
   static const uint8_t key[TC_AES_SIV_KEYLEN] = {0x7f, 0x7e, 0x7d, 0x7c, 0x7b, 0x7a, 0x79, 0x78,
                                                  0x77, 0x76, 0x75, 0x74, 0x73, 0x72, 0x71, 0x70,
@@ -116,9 +114,6 @@ static MunitResult test_siv_rfc_a2(const MunitParameter params[], void* data)
   uint8_t ct[sizeof(plaintext)];
   uint8_t pt[sizeof(plaintext)];
 
-  (void)params;
-  (void)data;
-
   ad[0] = (TC_bytes){ad1, sizeof(ad1)};
   ad[1] = (TC_bytes){ad2, sizeof(ad2)};
   ad[2] = (TC_bytes){nonce, sizeof(nonce)};
@@ -143,7 +138,7 @@ static MunitResult test_siv_rfc_a2(const MunitParameter params[], void* data)
  * plaintext. Empty aad is still passed as a zero-length component.
  * Only groups whose key size matches this build's TC_AES_SIV_KEYLEN run.
  */
-static MunitResult test_siv_wycheproof(const MunitParameter params[], void* data)
+TC_TEST(test_siv_wycheproof)
 {
   FILE* file;
   char line[2048];
@@ -166,9 +161,6 @@ static MunitResult test_siv_wycheproof(const MunitParameter params[], void* data
   const unsigned expect_valid = 84u;
   const unsigned expect_invalid = 216u;
   const int want_bits = (int)(TC_AES_SIV_KEYLEN * 8);
-
-  (void)params;
-  (void)data;
 
   key_hex[0] = iv_hex[0] = aad_hex[0] = msg_hex[0] = ct_hex[0] = tag_hex[0] = result[0] = '\0';
 
@@ -249,22 +241,19 @@ static MunitResult test_siv_wycheproof(const MunitParameter params[], void* data
         uint8_t out_ct[4096];
         uint8_t out_pt[4096];
         uint8_t out_v[TC_AES_SIV_V_LEN];
-        /* A value that fails to decode keeps SIZE_MAX. */
-        size_t key_len = SIZE_MAX, iv_len = SIZE_MAX, aad_len = SIZE_MAX, msg_len = SIZE_MAX,
-               ct_len = SIZE_MAX, tag_len = SIZE_MAX;
+        size_t key_len = 0, iv_len = 0, aad_len = 0, msg_len = 0, ct_len = 0, tag_len = 0;
         TC_bytes ad[2];
         int expect_ok = (strcmp(result, "valid") == 0);
+        int decoded =
+            tc_test_hex_decode(key_hex, TC_TEST_HEX_SEPARATED, key, sizeof(key), &key_len) &&
+            tc_test_hex_decode(iv_hex, TC_TEST_HEX_SEPARATED, iv, sizeof(iv), &iv_len) &&
+            tc_test_hex_decode(aad_hex, TC_TEST_HEX_SEPARATED, aad, sizeof(aad), &aad_len) &&
+            tc_test_hex_decode(msg_hex, TC_TEST_HEX_SEPARATED, msg, sizeof(msg), &msg_len) &&
+            tc_test_hex_decode(ct_hex, TC_TEST_HEX_SEPARATED, ct, sizeof(ct), &ct_len) &&
+            tc_test_hex_decode(tag_hex, TC_TEST_HEX_SEPARATED, tag, sizeof(tag), &tag_len);
 
-        (void)tc_test_hex_decode(key_hex, TC_TEST_HEX_SEPARATED, key, sizeof(key), &key_len);
-        (void)tc_test_hex_decode(iv_hex, TC_TEST_HEX_SEPARATED, iv, sizeof(iv), &iv_len);
-        (void)tc_test_hex_decode(aad_hex, TC_TEST_HEX_SEPARATED, aad, sizeof(aad), &aad_len);
-        (void)tc_test_hex_decode(msg_hex, TC_TEST_HEX_SEPARATED, msg, sizeof(msg), &msg_len);
-        (void)tc_test_hex_decode(ct_hex, TC_TEST_HEX_SEPARATED, ct, sizeof(ct), &ct_len);
-        (void)tc_test_hex_decode(tag_hex, TC_TEST_HEX_SEPARATED, tag, sizeof(tag), &tag_len);
-
-        if (key_len == SIZE_MAX || iv_len == SIZE_MAX || aad_len == SIZE_MAX ||
-            msg_len == SIZE_MAX || ct_len == SIZE_MAX || tag_len == SIZE_MAX ||
-            key_len != TC_AES_SIV_KEYLEN || tag_len != TC_AES_SIV_V_LEN || msg_len != ct_len) {
+        if (!decoded || key_len != TC_AES_SIV_KEYLEN || tag_len != TC_AES_SIV_V_LEN ||
+            msg_len != ct_len) {
           failed++;
           have = 0;
           continue;
@@ -307,7 +296,7 @@ static MunitResult test_siv_wycheproof(const MunitParameter params[], void* data
   return MUNIT_OK;
 }
 
-static MunitResult test_siv_api(const MunitParameter params[], void* data)
+TC_TEST(test_siv_api)
 {
   uint8_t key[TC_AES_SIV_KEYLEN];
   uint8_t v[TC_AES_SIV_V_LEN];
@@ -319,9 +308,6 @@ static MunitResult test_siv_api(const MunitParameter params[], void* data)
   uint8_t empty;
   TC_bytes ad[TC_AES_SIV_MAX_AD + 1u];
   size_t i;
-
-  (void)params;
-  (void)data;
 
   memset(key, 0x11, sizeof(key));
   memset(buf, 0x22, sizeof(buf));
@@ -482,8 +468,6 @@ static MunitResult test_siv_api(const MunitParameter params[], void* data)
 
 MunitResult test_siv(const MunitParameter params[], void* data)
 {
-  (void)params;
-  (void)data;
 
   siv_initialize_sbox();
 
@@ -502,10 +486,8 @@ MunitResult test_siv(const MunitParameter params[], void* data)
 
 #else /* !SIV */
 
-MunitResult test_siv(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_siv)
 {
-  (void)params;
-  (void)data;
   return MUNIT_SKIP;
 }
 

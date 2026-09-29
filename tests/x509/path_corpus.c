@@ -3,6 +3,7 @@
 #include <tiny_crypto/x509_crypto.h>
 #include <tiny_crypto/x509_revocation.h>
 #include "munit.h"
+#include "test_util.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -105,7 +106,7 @@ static TC_X509_path_options path_options(const TC_X509_signature_provider* signa
   return options;
 }
 
-static MunitResult corpus_case(const MunitParameter params[], void* user)
+TC_TEST(corpus_case)
 {
   const char* target_path = getenv("TC_X509_TARGET");
   const char* expected_path = getenv("TC_X509_EXPECT_PATH");
@@ -144,8 +145,6 @@ static MunitResult corpus_case(const MunitParameter params[], void* user)
   TC_X509_path_options options = path_options(&signatures);
   TC_X509_search_result result;
   size_t crl_count, anchor_count, work;
-  (void)params;
-  (void)user;
 
   munit_assert_not_null(target_path);
   munit_assert_not_null(expected_path);

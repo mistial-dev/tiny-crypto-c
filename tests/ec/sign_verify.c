@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/ec.h>
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
 /* Test seam in src/ec.c, compiled with TC_TEST_ECDSA_FAULT. */
@@ -22,7 +23,7 @@ static TC_status counter_random(void* context, uint8_t* output, size_t length)
 
 /* A faulted signature is withheld when TC_ECDSA_SIGN_VERIFY is set and
  * released otherwise. A public key from another key pair is also caught. */
-static MunitResult fault_detection(const MunitParameter params[], void* user)
+TC_TEST(fault_detection)
 {
   TC_EC_workspace key_workspace;
   TC_ECDSA_workspace workspace;
@@ -30,8 +31,6 @@ static MunitResult fault_detection(const MunitParameter params[], void* user)
   uint8_t digest[32] = {1, 2, 3}, signature[64];
   unsigned counter = 0;
   TC_EC_execution execution = {{counter_random, &counter}, 8, {UINT32_MAX}};
-  (void)params;
-  (void)user;
   munit_assert_int(TC_EC_generate_key_pair(TC_EC_P256, (TC_buffer){private_key, 32},
                                            (TC_buffer){public_key, 65}, &key_workspace, &execution),
                    ==, TC_EC_OK);
@@ -66,14 +65,12 @@ static MunitResult fault_detection(const MunitParameter params[], void* user)
 }
 
 /* Every operation checks its documented cost before it starts. */
-static MunitResult work_limits(const MunitParameter params[], void* user)
+TC_TEST(work_limits)
 {
   TC_EC_workspace workspace;
   TC_ECDSA_workspace signing;
   uint8_t scalar[32] = {0}, public_key[65], digest[32] = {0}, signature[64];
   unsigned counter = 0;
-  (void)params;
-  (void)user;
   scalar[31] = 1;
   const uint32_t cost = TC_EC_operation_work(TC_EC_P256, TC_EC_OPERATION_PUBLIC_KEY);
   munit_assert_uint32(cost, ==, 512);

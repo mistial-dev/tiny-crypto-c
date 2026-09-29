@@ -4,6 +4,7 @@
 #include <tiny_crypto/x509_crypto.h>
 #include <tiny_crypto/hash.h>
 #include "munit.h"
+#include "test_util.h"
 #include <stdio.h>
 #include <string.h>
 #ifdef _WIN32
@@ -93,7 +94,7 @@ static void check_intermediate_signatures(TC_bytes card_bytes, TC_bytes intermed
                    ==, TC_X509_SIGNATURE_VALID);
 }
 
-static MunitResult records(const MunitParameter params[], void* context)
+TC_TEST(records)
 {
   static uint8_t card[MAX_CVC], intermediate[MAX_CVC], certificate[MAX_CERTIFICATE];
   static uint8_t saved_card[MAX_CVC], saved_intermediate[MAX_CVC],
@@ -190,8 +191,6 @@ static MunitResult records(const MunitParameter params[], void* context)
   munit_assert_size(record_count, >, 0);
   printf("%zu CVC corpus records checked: %zu parsed, %zu chains accepted, %zu rejected\n",
          record_count, parse_count, accepted_count, rejected_count);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 

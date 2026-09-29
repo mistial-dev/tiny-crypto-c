@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "ocsp_fixture.h"
+#include "test_util.h"
 #include "../../examples/x509_ocsp.h"
 
 static const TC_X509_time captured_at = {2026, 9, 28, 6, 0, 0};
@@ -17,12 +18,10 @@ static ocsp_fixture fixture;
 static uint8_t issuer_bytes[OCSP_FILE_CAPACITY], response_bytes[OCSP_FILE_CAPACITY];
 static uint8_t certificate_bytes[OCSP_FILE_CAPACITY], expected_bytes[OCSP_FILE_CAPACITY];
 
-static MunitResult captured_responses(const MunitParameter params[], void* user)
+TC_TEST(captured_responses)
 {
   const unsigned cards[] = {1, 2, 3, 4, 10};
   uint8_t request_bytes[512];
-  (void)params;
-  (void)user;
   ocsp_fixture_init(&fixture);
 
   for (size_t i = 0; i < sizeof cards / sizeof *cards; ++i) {
@@ -110,11 +109,9 @@ static MunitResult captured_responses(const MunitParameter params[], void* user)
 /* The evaluation time is checked at entry, before any response field is
  * read. An unsuccessful responseStatus has no time fields, so it would expose
  * a late check. That response is UNSUPPORTED and zeroes the result. */
-static MunitResult time_arguments(const MunitParameter params[], void* user)
+TC_TEST(time_arguments)
 {
   static const uint8_t unavailable[] = {0x30, 0x03, 0x0a, 0x01, 0x03};
-  (void)params;
-  (void)user;
   ocsp_fixture_init(&fixture);
   char path[512];
   munit_assert_int(snprintf(path, sizeof path, "%s/card01_issuer.der", TC_SD33_OCSP_ROOT), >, 0);
@@ -140,11 +137,9 @@ static MunitResult time_arguments(const MunitParameter params[], void* user)
 }
 
 /* A short buffer, including an empty size query, reports the exact length. */
-static MunitResult request_sizing(const MunitParameter params[], void* user)
+TC_TEST(request_sizing)
 {
   uint8_t encoded[512], nonce[32];
-  (void)params;
-  (void)user;
   ocsp_fixture_init(&fixture);
   char path[512];
   munit_assert_int(snprintf(path, sizeof path, "%s/card01_issuer.der", TC_SD33_OCSP_ROOT), >, 0);
@@ -230,11 +225,9 @@ static MunitResult request_sizing(const MunitParameter params[], void* user)
 static ExampleX509Workspace example_storage;
 
 /* The example encodes a nonce request and maps each verification status. */
-static MunitResult example(const MunitParameter params[], void* user)
+TC_TEST(example)
 {
   uint8_t nonce[EXAMPLE_OCSP_NONCE_LENGTH], encoded[EXAMPLE_OCSP_REQUEST_CAPACITY];
-  (void)params;
-  (void)user;
   ocsp_fixture_init(&fixture);
   const TC_X509_trust_anchor anchor =
       ocsp_read_anchor(&fixture, TC_SD33_OCSP_ROOT "/card04_issuer.der", issuer_bytes);

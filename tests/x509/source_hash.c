@@ -6,6 +6,7 @@
 #include <tiny_crypto/x509_crypto.h>
 #include <tiny_crypto/x509_crl_source.h>
 #include "munit.h"
+#include "test_util.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
@@ -19,10 +20,8 @@ static TC_status failed_read(void* context, uint64_t offset, uint8_t* output, si
   return TC_ERROR;
 }
 
-static MunitResult hashing(const MunitParameter params[], void* user)
+TC_TEST(hashing)
 {
-  (void)params;
-  (void)user;
   static const uint8_t expected[] = {0xba, 0x78, 0x16, 0xbf, 0x8f, 0x01, 0xcf, 0xea,
                                      0x41, 0x41, 0x40, 0xde, 0x5d, 0xae, 0x22, 0x23,
                                      0xb0, 0x03, 0x61, 0xa3, 0x96, 0x17, 0x7a, 0x9c,
@@ -99,10 +98,8 @@ typedef struct {
   int corrupt;
 } file_source;
 
-static MunitResult preparation(const MunitParameter params[], void* user)
+TC_TEST(preparation)
 {
-  (void)params;
-  (void)user;
   static const uint8_t encoded[] = {
       0x30, 0x44, 0x30, 0x2f, 2,   1,    1,   0x30, 13,   6,    9,    0x2a, 0x86, 0x48,
       0x86, 0xf7, 13,   1,    1,   11,   5,   0,    0x30, 12,   0x31, 10,   0x30, 8,
@@ -166,10 +163,8 @@ static MunitResult preparation(const MunitParameter params[], void* user)
 /* An unknown critical CRL extension leaves the CRL unusable (RFC 5280 section
  * 5.2). Preparation keeps the policy status in the record, skips the entry
  * scan and completes with zero matches, as TC_X509_crl_index_init does. */
-static MunitResult extension_policy(const MunitParameter params[], void* user)
+TC_TEST(extension_policy)
 {
-  (void)params;
-  (void)user;
   static const uint8_t encoded[] = {
       0x30, 0x6c, 0x30, 0x57, 2,    1,    1,   0x30, 13,   6,    9,    0x2a, 0x86, 0x48,
       0x86, 0xf7, 13,   1,    1,    11,   5,   0,    0x30, 12,   0x31, 10,   0x30, 8,
@@ -246,10 +241,8 @@ static MunitResult extension_policy(const MunitParameter params[], void* user)
 
 /* State storage must meet TC_X509_crl_prepare_alignment. TC_X509_crl_storage
  * provides it for static arrays. */
-static MunitResult alignment(const MunitParameter params[], void* user)
+TC_TEST(alignment)
 {
-  (void)params;
-  (void)user;
   const size_t required = TC_X509_crl_prepare_alignment();
   munit_assert_size(required, >, 0);
   munit_assert_size(required & (required - 1), ==, 0);
@@ -303,10 +296,8 @@ static TC_status file_read(void* context, uint64_t offset, uint8_t* output, size
   return TC_OK;
 }
 
-static MunitResult public_crl(const MunitParameter params[], void* user)
+TC_TEST(public_crl)
 {
-  (void)params;
-  (void)user;
   const char* crl_path = getenv("TC_CRL_FILE");
   const char* issuer_path = getenv("TC_CRL_ISSUER");
   if (!crl_path || !issuer_path)
@@ -497,10 +488,8 @@ static MunitResult public_crl(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult content_comparison(const MunitParameter params[], void* user)
+TC_TEST(content_comparison)
 {
-  (void)params;
-  (void)user;
   const TC_bytes bytes = {(const uint8_t*)"abc", 3};
   uint8_t digest[TC_SHA256_DIGESTLEN], different[TC_SHA256_DIGESTLEN];
   TC_hash_context hash;

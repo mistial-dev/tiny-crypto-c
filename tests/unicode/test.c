@@ -3,12 +3,13 @@
 #include "../../src/unicode_internal.h"
 #include "../../src/string_internal.h"
 #include "munit.h"
+#include "test_util.h"
 #include "cavp.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-static MunitResult known_answers(const MunitParameter params[], void* user)
+TC_TEST(known_answers)
 {
   static const uint32_t inputs[][4] = {{0x65, 0x301},
                                        {0x65, 0x300, 0x301},
@@ -24,8 +25,6 @@ static MunitResult known_answers(const MunitParameter params[], void* user)
   static const size_t lengths[] = {2, 3, 3, 3, 1, 1, 1, 1};
   static const size_t expected_lengths[] = {1, 2, 2, 3, 2, 1, 1, 1};
   size_t i;
-  (void)params;
-  (void)user;
   for (i = 0; i < sizeof lengths / sizeof lengths[0]; ++i) {
     uint32_t output[32];
     size_t written = 99, work = 1000;
@@ -37,14 +36,12 @@ static MunitResult known_answers(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult bounds(const MunitParameter params[], void* user)
+TC_TEST(bounds)
 {
   const uint32_t input[] = {0xfb01, 0x315, 0x301, 0x327};
   const uint32_t invalid[] = {0x110000, 0xd800, 0xdfff};
   uint32_t output[16];
   size_t written = 99, work = 1000, needed, i;
-  (void)params;
-  (void)user;
   munit_assert_int(tc_unicode_nfkc(input, 4, output, 16, &written, &work), ==, TC_TLV_OK);
   needed = 1000 - work;
   for (i = 0; i < needed; ++i) {
@@ -85,7 +82,7 @@ static MunitResult bounds(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult mapping(const MunitParameter params[], void* user)
+TC_TEST(mapping)
 {
   static const uint32_t removed[] = {0,      8,       14,      31,      0x7f,    0x84,   0x86,
                                      0x9f,   0xad,    0x34f,   0x6dd,   0x70f,   0x1806, 0x180b,
@@ -99,8 +96,6 @@ static MunitResult mapping(const MunitParameter params[], void* user)
   static const size_t lengths[] = {1, 2, 2, 1, 1};
   uint32_t output[5] = {0, 0, 0, 0, 0xdeadbeef};
   size_t i;
-  (void)params;
-  (void)user;
   for (i = 0; i < sizeof removed / sizeof removed[0]; ++i)
     munit_assert_size(tc_unicode_map(removed[i], output), ==, 0);
   for (i = 0; i < sizeof spaces / sizeof spaces[0]; ++i) {
@@ -117,7 +112,7 @@ static MunitResult mapping(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult repertoire(const MunitParameter params[], void* user)
+TC_TEST(repertoire)
 {
   static const uint32_t prohibited[] = {0x221,    0x340,    0x341,    0x200e,   0x202a,  0x206f,
                                         0xd800,   0xdfff,   0xe000,   0xf8ff,   0xfdd0,  0xfdef,
@@ -125,8 +120,6 @@ static MunitResult repertoire(const MunitParameter params[], void* user)
                                         0x100000, 0x10fffd, 0x10ffff, 0x110000, 0x1f600};
   static const uint32_t allowed[] = {0x20, 0x41, 0xdf, 0x220, 0x300, 0x5d0, 0x20000, 0x2a6d6};
   size_t i;
-  (void)params;
-  (void)user;
   for (i = 0; i < sizeof prohibited / sizeof prohibited[0]; ++i)
     munit_assert_false(tc_unicode_allowed(prohibited[i]));
   for (i = 0; i < sizeof allowed / sizeof allowed[0]; ++i)
@@ -140,7 +133,7 @@ static MunitResult repertoire(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult name_spaces(const MunitParameter params[], void* user)
+TC_TEST(name_spaces)
 {
   static const uint32_t inputs[][8] = {{0},
                                        {0x20, 0x20},
@@ -160,8 +153,6 @@ static MunitResult name_spaces(const MunitParameter params[], void* user)
   static const size_t result_lengths[] = {2, 2, 6, 4, 6, 7, 3};
   uint32_t buffer[16];
   size_t i, budget, work, written;
-  (void)params;
-  (void)user;
   for (i = 0; i < sizeof lengths / sizeof lengths[0]; ++i) {
     memcpy(buffer, inputs[i], sizeof inputs[i]);
     written = 99;
@@ -195,14 +186,12 @@ static MunitResult name_spaces(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult normalization_file(const MunitParameter params[], void* user)
+TC_TEST(normalization_file)
 {
   const char* path = getenv("TC_UNICODE_NORMALIZATION_FILE");
   FILE* file;
   char line[8192];
   size_t cases = 0;
-  (void)params;
-  (void)user;
   munit_assert_not_null(path);
   file = fopen(path, "r");
   munit_assert_not_null(file);
@@ -259,7 +248,7 @@ static TC_TLV_result collect_scalar(void* context, uint32_t point)
   return TC_TLV_OK;
 }
 
-static MunitResult decoding(const MunitParameter params[], void* user)
+TC_TEST(decoding)
 {
   static const uint8_t valid[][4] = {{0},
                                      {0x7f},
@@ -288,8 +277,6 @@ static MunitResult decoding(const MunitParameter params[], void* user)
                                        {0xf1, 0x80, 0x80, 0x20}};
   uint32_t point;
   size_t i, length, offset;
-  (void)params;
-  (void)user;
   for (i = 0; i < sizeof widths / sizeof widths[0]; ++i) {
     TC_bytes input = {valid[i], widths[i]};
     point = 99;
@@ -389,7 +376,7 @@ static TC_TLV_result prepare_scalar(void* context, uint32_t point)
                                   &state->work);
 }
 
-static MunitResult preparation(const MunitParameter params[], void* user)
+TC_TEST(preparation)
 {
   static const uint8_t inputs[][10] = {{0xc3, 0x85},
                                        {0, 0xc5},
@@ -414,8 +401,6 @@ static MunitResult preparation(const MunitParameter params[], void* user)
   static const size_t answer_lengths[] = {3, 3, 3, 3, 6, 2, 3, 4, 9};
   size_t i, work, written;
   uint32_t output[32];
-  (void)params;
-  (void)user;
   for (i = 0; i < sizeof lengths / sizeof lengths[0]; ++i) {
     TC_bytes input = {inputs[i], lengths[i]};
     size_t required, limit;
@@ -472,7 +457,7 @@ static MunitResult preparation(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult preparation_oracle(const MunitParameter params[], void* user)
+TC_TEST(preparation_oracle)
 {
   const char* path = getenv("TC_UNICODE_ORACLE_FILE");
   FILE* file;
@@ -482,8 +467,6 @@ static MunitResult preparation_oracle(const MunitParameter params[], void* user)
   size_t total, count = 0;
   int status, fields;
   unsigned tag;
-  (void)params;
-  (void)user;
   munit_assert_not_null(path);
   file = fopen(path, "r");
   munit_assert_not_null(file);

@@ -123,10 +123,8 @@ static TC_PIV_SM_authentication authentication(const struct tc_sm_fixture* fixtu
   return value;
 }
 
-static MunitResult authenticate(const MunitParameter params[], void* user)
+TC_TEST(authenticate)
 {
-  (void)params;
-  (void)user;
   const TC_TLV_limits limits = {4096, 4096, 128, 8};
   const TC_X509_signature_provider accepted = {accept_signature, NULL, NULL};
   const TC_X509_signature_provider rejected = {reject_signature, NULL, NULL};
@@ -257,10 +255,8 @@ static MunitResult authenticate(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult arguments(const MunitParameter params[], void* user)
+TC_TEST(arguments)
 {
-  (void)params;
-  (void)user;
   const TC_TLV_limits limits = {4096, 4096, 128, 8};
   const TC_X509_signature_provider signatures = {accept_signature, NULL, NULL};
   TC_X509_certificate signer = {0};
@@ -284,10 +280,8 @@ static MunitResult arguments(const MunitParameter params[], void* user)
 
 /* An expected card UUID other than 0 or 16 bytes is an argument error, so it
  * leaves the establishing session and work unchanged. */
-static MunitResult uuid_length_argument(const MunitParameter params[], void* user)
+TC_TEST(uuid_length_argument)
 {
-  (void)params;
-  (void)user;
   static const uint8_t short_uuid[15] = {0};
   const TC_TLV_limits limits = {4096, 4096, 128, 8};
   const TC_X509_signature_provider signatures = {accept_signature, NULL, NULL};

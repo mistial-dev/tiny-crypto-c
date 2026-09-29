@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 #include <tiny_crypto/piv_biometric.h>
 
@@ -11,10 +12,8 @@ static const uint8_t valid_record[RECORD_BYTES] = {
     0,   0,   197, 0, 197, 2,   0,   2, 0, 100,          1, 0x40, 10, 0, 20,   90, 80, 0, 0,
     7,   2,   100, 0, 0,   0};
 
-static MunitResult valid(const MunitParameter params[], void* user)
+TC_TEST(valid)
 {
-  (void)params;
-  (void)user;
   TC_PIV_fingerprint_record record;
   munit_assert_int(TC_PIV_fingerprint_read((TC_bytes){valid_record, sizeof valid_record}, &record),
                    ==, TC_TLV_OK);
@@ -28,10 +27,8 @@ static MunitResult valid(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult invalid(const MunitParameter params[], void* user)
+TC_TEST(invalid)
 {
-  (void)params;
-  (void)user;
   enum {
     FORMAT,
     VERSION,
@@ -159,10 +156,8 @@ static MunitResult invalid(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult face(const MunitParameter params[], void* user)
+TC_TEST(face)
 {
-  (void)params;
-  (void)user;
   static const uint8_t encoded[] = {
       'F', 'A', 'C', 0,    '0', '1',  '0', 0, 0, 0, 0, 50, 0,    1,    0,    0,   0,
       36,  0,   0,   0,    0,   0,    0,   0, 0, 0, 1, 0,  0,    0,    0,    0,   0,

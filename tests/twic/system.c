@@ -2,9 +2,10 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "../../examples/credential_system.h"
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
-static MunitResult host_services(const MunitParameter params[], void* context)
+TC_TEST(host_services)
 {
   TC_X509_time now;
   int64_t seconds;
@@ -20,8 +21,6 @@ static MunitResult host_services(const MunitParameter params[], void* context)
     munit_assert_uint(entropy[i], ==, 0xa5);
   munit_assert_int(example_card_random(NULL, entropy, sizeof entropy), ==, TC_OK);
   TC_secure_zero(entropy, sizeof entropy);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 

@@ -2,17 +2,16 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "../../src/hash_dispatch_internal.h"
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
-static MunitResult parts(const MunitParameter params[], void* user)
+TC_TEST(parts)
 {
   const uint8_t input[] = {'a', 'b', 'c'};
   const TC_bytes whole = {input, sizeof input};
   TC_hash_context workspace;
   uint8_t expected[64], actual[64], saved[64];
   tc_hash_info info;
-  (void)params;
-  (void)user;
   for (unsigned id = TC_HASH_SHA1; id <= TC_HASH_SHA512; ++id) {
     TC_hash_algorithm hash = (TC_hash_algorithm)id;
     memset(actual, 0xa5, sizeof actual);

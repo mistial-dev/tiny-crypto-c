@@ -3,6 +3,7 @@
 #include <tiny_crypto/x509_trust_anchor.h>
 #include <tiny_crypto/x509_path.h>
 #include "munit.h"
+#include "test_util.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -60,10 +61,8 @@ static size_t make_info(uint8_t* out, const uint8_t* flags, size_t flag_length, 
   return add(out, 0x30, choice, choice_length);
 }
 
-static MunitResult flags_and_unusable(const MunitParameter params[], void* user)
+TC_TEST(flags_and_unusable)
 {
-  (void)params;
-  (void)user;
   struct {
     uint8_t data[2];
     size_t length;
@@ -107,10 +106,8 @@ static MunitResult flags_and_unusable(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult malformed(const MunitParameter params[], void* user)
+TC_TEST(malformed)
 {
-  (void)params;
-  (void)user;
   uint8_t encoded[140];
   TC_X509_trust_anchor_reader reader;
   TC_X509_store_anchor anchor, saved;
@@ -178,10 +175,8 @@ static void grow_length(uint8_t* buffer, const TC_TLV_element* element, size_t e
   }
 }
 
-static MunitResult precedence(const MunitParameter params[], void* user)
+TC_TEST(precedence)
 {
-  (void)params;
-  (void)user;
   uint8_t encoded[8192];
   size_t length = read_fixture("trust-anchors.der", encoded, sizeof encoded);
   TC_TLV_element list, choice, info, part, controls = {0};
@@ -222,10 +217,8 @@ static MunitResult precedence(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult choices(const MunitParameter params[], void* user)
+TC_TEST(choices)
 {
-  (void)params;
-  (void)user;
   static uint8_t encoded[8192], root[4096], tbs_choice[4096], list[4096];
   TC_X509_trust_anchor_reader reader;
   TC_X509_store_anchor anchor;
@@ -345,11 +338,9 @@ static TC_TLV_result read_anchor(uint8_t* list, size_t choice_length)
 
 /* Every anchor choice applies the same certificate rules: a non-empty
  * subject and a validity period that is not reversed. */
-static MunitResult certificate_rules(const MunitParameter params[], void* user)
+TC_TEST(certificate_rules)
 {
   static const uint8_t spki_and_key_id[] = {4, 1, 1};
-  (void)params;
-  (void)user;
   for (int variant = 0; variant < 3; ++variant) {
     const int reversed = variant == 1, empty = variant == 2;
     const TC_TLV_result expected = variant ? TC_TLV_INVALID : TC_TLV_OK;
@@ -461,7 +452,7 @@ static TC_TLV_result read_with_policy_set(const uint8_t* policies, size_t polici
 
 /* RFC 5914 section 2.5: a policySet lists unique identifiers without
  * policyQualifiers. */
-static MunitResult policy_sets(const MunitParameter params[], void* user)
+TC_TEST(policy_sets)
 {
   static const uint8_t first[] = {0x30, 5, 6, 3, 0x2a, 3, 4};
   static const uint8_t second[] = {0x30, 5, 6, 3, 0x2a, 3, 5};
@@ -469,8 +460,6 @@ static MunitResult policy_sets(const MunitParameter params[], void* user)
   static const uint8_t qualified[] = {0x30, 22,   6, 3, 0x2a, 3, 4, 0x30, 15, 0x30, 13, 6,
                                       8,    0x2b, 6, 1, 5,    5, 7, 2,    1,  0x16, 1,  'a'};
   uint8_t set[64];
-  (void)params;
-  (void)user;
   memcpy(set, first, sizeof first);
   memcpy(set + sizeof first, second, sizeof second);
   munit_assert_int(read_with_policy_set(set, sizeof first + sizeof second), ==, TC_TLV_OK);
@@ -482,11 +471,9 @@ static MunitResult policy_sets(const MunitParameter params[], void* user)
 }
 
 /* RFC 5914 section 2.6 forbids these extensions in TrustAnchorInfo exts. */
-static MunitResult forbidden_exts(const MunitParameter params[], void* user)
+TC_TEST(forbidden_exts)
 {
   static const unsigned ids[] = {30, 32, 36, 54, 19};
-  (void)params;
-  (void)user;
   for (size_t i = 0; i < sizeof ids / sizeof *ids; ++i) {
     /* basicConstraints (19) is permitted and parses; the others are not. */
     uint8_t extension[] = {0x30, 9, 6, 3, 0x55, 0x1d, (uint8_t)ids[i], 4, 2, 0x30, 0};
@@ -497,13 +484,11 @@ static MunitResult forbidden_exts(const MunitParameter params[], void* user)
 }
 
 /* RFC 5280 section 4.2: an extension OID appears at most once. */
-static MunitResult duplicate_exts(const MunitParameter params[], void* user)
+TC_TEST(duplicate_exts)
 {
   static const uint8_t basic[] = {0x30, 9, 6, 3, 0x55, 0x1d, 19, 4, 2, 0x30, 0};
   static const uint8_t other[] = {0x30, 9, 6, 3, 0x2a, 3, 5, 4, 2, 5, 0};
   uint8_t list[3 * sizeof basic];
-  (void)params;
-  (void)user;
   memcpy(list, basic, sizeof basic);
   memcpy(list + sizeof basic, other, sizeof other);
   munit_assert_int(read_with_exts(list, 2 * sizeof basic), ==, TC_TLV_OK);
@@ -516,14 +501,12 @@ static MunitResult duplicate_exts(const MunitParameter params[], void* user)
 
 /* RFC 5914 section 2.5: CertPathControls values are always enforced, and a
  * basicConstraints pathLen in exts can only tighten them. */
-static MunitResult exts_path_length(const MunitParameter params[], void* user)
+TC_TEST(exts_path_length)
 {
   static const uint8_t path_zero[] = {0x84, 1, 0}, path_five[] = {0x84, 1, 5};
   /* Extension { basicConstraints, OCTET STRING { cA TRUE, pathLen n } } */
   uint8_t basic[] = {0x30, 15, 6, 3, 0x55, 0x1d, 19, 4, 8, 0x30, 6, 1, 1, 0xff, 2, 1, 5};
   TC_X509_store_anchor anchor;
-  (void)params;
-  (void)user;
   munit_assert_int(read_info(path_zero, sizeof path_zero, basic, sizeof basic, &anchor), ==,
                    TC_TLV_OK);
   munit_assert_int(anchor.has_path_len, ==, 1);
@@ -541,7 +524,7 @@ static MunitResult exts_path_length(const MunitParameter params[], void* user)
 
 /* TC_X509_store_anchor_from_certificate normalizes the root's path controls
  * the way the TrustAnchorList certificate choice does. */
-static MunitResult certificate_builder(const MunitParameter params[], void* user)
+TC_TEST(certificate_builder)
 {
   static uint8_t root[4096];
   TC_X509_certificate certificate;
@@ -549,8 +532,6 @@ static MunitResult certificate_builder(const MunitParameter params[], void* user
   TC_TLV_frame small_frames[16];
   TC_bytes small_oids[1];
   TC_X509_workspace small = {{small_frames, 16}, small_oids, 1};
-  (void)params;
-  (void)user;
   size_t length = read_fixture("root.der", root, sizeof root);
   munit_assert_int(TC_X509_read((TC_bytes){root, length}, &limits, &workspace, &certificate), ==,
                    TC_TLV_OK);
@@ -615,14 +596,12 @@ static void next_rejected(TC_X509_trust_anchor_reader* reader, TC_X509_store_anc
 /* next writes out, the frames and the extension OID slots while it reads the
  * list and advances the reader. out must stay outside the list bytes, the
  * reader, the workspace struct and both workspace arrays. */
-static MunitResult next_overlap(const MunitParameter params[], void* user)
+TC_TEST(next_overlap)
 {
   uint8_t encoded[140];
   const size_t length = make_info(encoded, NULL, 0, 0, 1, 0, 0);
   TC_X509_trust_anchor_reader reader;
   TC_X509_store_anchor anchor;
-  (void)params;
-  (void)user;
   /* out inside the list bytes. */
   {
     union {
@@ -690,7 +669,7 @@ static MunitResult next_overlap(const MunitParameter params[], void* user)
 
 /* init binds the limits and workspace. next uses the bound copy, so later
  * changes to the caller's limits object have no effect. */
-static MunitResult reader_binding(const MunitParameter params[], void* user)
+TC_TEST(reader_binding)
 {
   uint8_t encoded[140];
   TC_X509_trust_anchor_reader reader, saved;
@@ -699,8 +678,6 @@ static MunitResult reader_binding(const MunitParameter params[], void* user)
   TC_X509_workspace no_frames = {{NULL, 4}, oids, 32};
   TC_X509_workspace one_frame = {{frames, 1}, oids, 32};
   const size_t length = make_info(encoded, NULL, 0, 0, 1, 0, 0);
-  (void)params;
-  (void)user;
   munit_assert_int(
       TC_X509_trust_anchor_list_init(&reader, (TC_bytes){encoded, length}, &bound, &workspace), ==,
       TC_TLV_OK);

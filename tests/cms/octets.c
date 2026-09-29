@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "../../src/pki_octets_internal.h"
 #include "munit.h"
+#include "test_util.h"
 
 typedef struct {
   const uint8_t* input;
@@ -20,7 +21,7 @@ static TC_TLV_result consume(void* context, TC_bytes bytes)
   return state->fail ? TC_TLV_LIMIT : TC_TLV_OK;
 }
 
-static MunitResult chunks(const MunitParameter params[], void* user)
+TC_TEST(chunks)
 {
   uint8_t encoded[] = {0x24, 0x80, 4, 1, 'a', 0x24, 0x80, 4, 0, 4, 2, 'b', 'c', 0, 0, 0, 0};
   /* The empty primitive at offset 7 emits no value bytes. */
@@ -28,8 +29,6 @@ static MunitResult chunks(const MunitParameter params[], void* user)
   TC_TLV_frame frames[8];
   consumer state = {encoded, 0, 0};
   size_t work = 100;
-  (void)params;
-  (void)user;
   munit_assert_int(tc_pki_octets((TC_bytes){encoded, sizeof encoded}, TC_TLV_BER, &limits,
                                  &(tc_pki_tree_workspace){frames, 8, &work}, consume, &state),
                    ==, TC_TLV_OK);
@@ -75,7 +74,7 @@ static MunitResult chunks(const MunitParameter params[], void* user)
   }
   return MUNIT_OK;
 }
-static MunitResult contiguous(const MunitParameter params[], void* user)
+TC_TEST(contiguous)
 {
   const uint8_t split[] = {0x24, 0x80, 4, 1, 'a', 0x24, 3, 4, 1, 'b', 0, 0};
   const uint8_t single[] = {0x24, 3, 4, 1, 'a'};
@@ -85,8 +84,6 @@ static MunitResult contiguous(const MunitParameter params[], void* user)
   uint8_t buffer[2];
   TC_bytes out = {NULL, 99};
   size_t work = 100, used;
-  (void)params;
-  (void)user;
   munit_assert_int(tc_pki_octets_contiguous((TC_bytes){single, sizeof single}, 4, TC_TLV_BER,
                                             &limits, &(tc_pki_tree_workspace){frames, 8, &work},
                                             (TC_buffer){NULL, 0}, &out),

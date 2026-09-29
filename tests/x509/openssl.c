@@ -7,6 +7,7 @@
 #include <tiny_crypto/x509_store.h>
 #include "../../examples/x509_client.h"
 #include "munit.h"
+#include "test_util.h"
 #include <openssl/core_names.h>
 #include <openssl/conf.h>
 #include <openssl/ec.h>
@@ -105,7 +106,7 @@ static size_t certificate(EVP_PKEY* key, const EVP_MD* digest, uint8_t* der, siz
   return length;
 }
 
-static MunitResult signatures(const MunitParameter params[], void* user)
+TC_TEST(signatures)
 {
   static const char* groups[] = {"prime256v1", "secp384r1"};
   const EVP_MD* digests[] = {EVP_sha256(), EVP_sha384()};
@@ -117,8 +118,6 @@ static MunitResult signatures(const MunitParameter params[], void* user)
   TC_X509_certificate parsed, other;
   unsigned group, hash, calls = 0;
   TC_X509_signature_provider provider = {verify, &calls, NULL};
-  (void)params;
-  (void)user;
   for (group = 0; group < 2; ++group) {
     EVP_PKEY* key = EVP_EC_gen(groups[group]);
     EVP_PKEY* wrong = EVP_EC_gen(groups[group]);
@@ -773,7 +772,7 @@ static void cross_signed_issuer(X509* const certs[4], const char* group, const E
   EVP_PKEY_free(foreign_key);
 }
 
-static MunitResult paths(const MunitParameter params[], void* user)
+TC_TEST(paths)
 {
   enum {
     USAGE_VALID = 15,
@@ -807,8 +806,6 @@ static MunitResult paths(const MunitParameter params[], void* user)
   tc_x509_path_input input = {
       parsed + 1,       3,          3,         6144, &anchor, &at, &provider, &limits, encoded_path,
       &parse_workspace, parsed + 1, summaries, 0,    0,       0};
-  (void)params;
-  (void)user;
   for (group = 0; group < 2; ++group) {
     EVP_PKEY* keys[4];
     for (i = 0; i < 4; ++i) {
@@ -1467,7 +1464,7 @@ static MunitResult paths(const MunitParameter params[], void* user)
 /* RFC 10007 section 4 amends RFC 5280 section 6.3.3 step (f): a v3 CRL
  * issuer certificate needs keyUsage with cRLSign. v1 and v2 certificates
  * carry no extensions and skip the check. */
-static MunitResult crl_signer_key_usage(const MunitParameter params[], void* user)
+TC_TEST(crl_signer_key_usage)
 {
   static const struct {
     int version;
@@ -1485,8 +1482,6 @@ static MunitResult crl_signer_key_usage(const MunitParameter params[], void* use
   const TC_TLV_limits parsing = {sizeof der, sizeof der, 512, 16};
   TC_X509_workspace parser = {{frames, 16}, oids, 16};
   EVP_PKEY* key = EVP_EC_gen("prime256v1");
-  (void)params;
-  (void)user;
   munit_assert_not_null(key);
   for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
     X509* certificate = make_certificate(key, "CRL signer", NULL);

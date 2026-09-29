@@ -77,7 +77,7 @@ static size_t decode(const char* text, uint8_t* output)
   return length;
 }
 
-static MunitResult vectors(const MunitParameter params[], void* user)
+TC_TEST(vectors)
 {
   FILE* file;
   char mode[16], verdict[16], hex[6][2049];
@@ -85,8 +85,6 @@ static MunitResult vectors(const MunitParameter params[], void* user)
   size_t length[6], i;
   unsigned id, count = 0;
   int fields;
-  (void)params;
-  (void)user;
   if (!vector_path)
     return MUNIT_SKIP;
   file = fopen(vector_path, "r");

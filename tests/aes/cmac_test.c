@@ -38,12 +38,9 @@ static void cmac_initialize_sbox(void)
 #endif
 
 /* NIST SP 800-38B Appendix D — full 16-byte tags. */
-static MunitResult test_cmac_sp800_38b(const MunitParameter params[], void* data)
+TC_TEST(test_cmac_sp800_38b)
 {
   uint8_t tag[TC_AES_CMAC_TAG_MAX];
-
-  (void)params;
-  (void)data;
 
 #if TC_AES_KEY_BITS == 128
   {
@@ -164,14 +161,11 @@ static MunitResult test_cmac_sp800_38b(const MunitParameter params[], void* data
   return MUNIT_OK;
 }
 
-static MunitResult test_cmac_api(const MunitParameter params[], void* data)
+TC_TEST(test_cmac_api)
 {
   uint8_t key[TC_AES_KEYLEN];
   uint8_t msg[16];
   uint8_t tag[TC_AES_CMAC_TAG_MAX];
-
-  (void)params;
-  (void)data;
 
   memset(key, 0x11, sizeof(key));
   memset(msg, 0x22, sizeof(msg));
@@ -197,7 +191,7 @@ static MunitResult test_cmac_api(const MunitParameter params[], void* data)
 /* The default entry points take TC_MIN_TAG_LEN..16 bytes and the _short_tag
  * forms take 1..TC_MIN_TAG_LEN - 1 (SP 800-38B Appendix A.2). A rejected
  * length leaves the tag buffer unchanged. */
-static MunitResult test_cmac_tag_policy(const MunitParameter params[], void* data)
+TC_TEST(test_cmac_tag_policy)
 {
   uint8_t key[TC_AES_KEYLEN];
   uint8_t msg[20];
@@ -205,8 +199,6 @@ static MunitResult test_cmac_tag_policy(const MunitParameter params[], void* dat
   uint8_t tag[TC_AES_CMAC_TAG_MAX];
   const size_t below = TC_MIN_TAG_LEN - 1u;
 
-  (void)params;
-  (void)data;
   memset(key, 0x3c, sizeof(key));
   memset(msg, 0x5a, sizeof(msg));
   munit_assert_int(TC_AES_CMAC(key, msg, sizeof(msg), full, sizeof(full)), ==, TC_OK);
@@ -248,7 +240,7 @@ static MunitResult test_cmac_tag_policy(const MunitParameter params[], void* dat
 
 /* Streaming context must match the one-shot for every split pattern,
  * including an empty message and a message ending on a block boundary. */
-static MunitResult test_cmac_streaming(const MunitParameter params[], void* data)
+TC_TEST(test_cmac_streaming)
 {
   static const size_t lengths[] = {0, 1, 15, 16, 17, 32, 40, 64, 100};
   static const size_t splits[] = {1, 15, 16, 17, 40};
@@ -258,9 +250,6 @@ static MunitResult test_cmac_streaming(const MunitParameter params[], void* data
   uint8_t tag[TC_AES_CMAC_TAG_MAX];
   struct TC_AES_CMAC_ctx ctx;
   size_t li, si, i;
-
-  (void)params;
-  (void)data;
 
   for (i = 0; i < sizeof(key); ++i)
     key[i] = (uint8_t)(0xA0u + i);
@@ -362,7 +351,7 @@ static MunitResult test_cmac_streaming(const MunitParameter params[], void* data
  * Matching: valid → generate+verify; invalid ModifiedTag → verify fails.
  * Wrong key length: API is fixed TC_AES_KEYLEN; result must be invalid.
  */
-static MunitResult test_cmac_wycheproof(const MunitParameter params[], void* data)
+TC_TEST(test_cmac_wycheproof)
 {
   FILE* file;
   char line[1024];
@@ -382,9 +371,6 @@ static MunitResult test_cmac_wycheproof(const MunitParameter params[], void* dat
   const unsigned expect_valid = 21u;
   const unsigned expect_invalid = 86u;
   const int want_bits = (int)(TC_AES_KEYLEN * 8);
-
-  (void)params;
-  (void)data;
 
   key_hex[0] = msg_hex[0] = tag_hex[0] = result[0] = '\0';
 
@@ -451,15 +437,16 @@ static MunitResult test_cmac_wycheproof(const MunitParameter params[], void* dat
         uint8_t msg[64];
         uint8_t tag[TC_AES_CMAC_TAG_MAX];
         uint8_t out[TC_AES_CMAC_TAG_MAX];
-        /* A value that fails to decode keeps SIZE_MAX. */
-        size_t key_len = SIZE_MAX, msg_len = SIZE_MAX, tag_len = SIZE_MAX;
+        size_t key_len = 0, msg_len = 0, tag_len = 0;
         int expect_ok = (strcmp(result, "valid") == 0);
+        int key_decoded =
+            tc_test_hex_decode(key_hex, TC_TEST_HEX_SEPARATED, key, sizeof(key), &key_len);
+        int msg_decoded =
+            tc_test_hex_decode(msg_hex, TC_TEST_HEX_SEPARATED, msg, sizeof(msg), &msg_len);
+        int tag_decoded =
+            tc_test_hex_decode(tag_hex, TC_TEST_HEX_SEPARATED, tag, sizeof(tag), &tag_len);
 
-        (void)tc_test_hex_decode(key_hex, TC_TEST_HEX_SEPARATED, key, sizeof(key), &key_len);
-        (void)tc_test_hex_decode(msg_hex, TC_TEST_HEX_SEPARATED, msg, sizeof(msg), &msg_len);
-        (void)tc_test_hex_decode(tag_hex, TC_TEST_HEX_SEPARATED, tag, sizeof(tag), &tag_len);
-
-        if (key_len == SIZE_MAX || msg_len == SIZE_MAX || (tag_len == SIZE_MAX && expect_ok)) {
+        if (!key_decoded || !msg_decoded || (!tag_decoded && expect_ok)) {
           ++failed;
           have = 0;
           continue;
@@ -475,7 +462,7 @@ static MunitResult test_cmac_wycheproof(const MunitParameter params[], void* dat
           /* Fixed key-size API cannot accept this key; must be invalid. */
           if (expect_ok)
             ++failed;
-        } else if (tag_len != TC_AES_CMAC_TAG_MAX) {
+        } else if (!tag_decoded || tag_len != TC_AES_CMAC_TAG_MAX) {
           ++failed;
         } else if (expect_ok) {
           if (TC_AES_CMAC(key, msg_len ? msg : NULL, msg_len, out, tag_len) != TC_OK ||
@@ -609,14 +596,11 @@ static MunitResult cmac_run_cavp_file(const char* name, int is_verify, unsigned*
   return MUNIT_OK;
 }
 
-static MunitResult test_cmac_cavp_gen(const MunitParameter params[], void* data)
+TC_TEST(test_cmac_cavp_gen)
 {
   const char* name;
   unsigned ran = 0;
   MunitResult r;
-
-  (void)params;
-  (void)data;
 
 #if TC_AES_KEY_BITS == 128
   name = "CMACGenAES128.rsp";
@@ -639,14 +623,11 @@ static MunitResult test_cmac_cavp_gen(const MunitParameter params[], void* data)
   return MUNIT_OK;
 }
 
-static MunitResult test_cmac_cavp_ver(const MunitParameter params[], void* data)
+TC_TEST(test_cmac_cavp_ver)
 {
   const char* name;
   unsigned ran = 0;
   MunitResult r;
-
-  (void)params;
-  (void)data;
 
 #if TC_AES_KEY_BITS == 128
   name = "CMACVerAES128.rsp";
@@ -672,8 +653,6 @@ static MunitResult test_cmac_cavp_ver(const MunitParameter params[], void* data)
 
 MunitResult test_cmac(const MunitParameter params[], void* data)
 {
-  (void)params;
-  (void)data;
 
   cmac_initialize_sbox();
 
@@ -696,10 +675,8 @@ MunitResult test_cmac(const MunitParameter params[], void* data)
 
 #else /* !CMAC */
 
-MunitResult test_cmac(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_cmac)
 {
-  (void)params;
-  (void)data;
   return MUNIT_SKIP;
 }
 

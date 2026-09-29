@@ -2,9 +2,10 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/piv_certificate.h>
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
-static MunitResult containers(const MunitParameter params[], void* context)
+TC_TEST(containers)
 {
   static const uint8_t fixtures[][16] = {
       {0x53, 8, 0x70, 1, 0x30, 0x71, 1, 0, 0xfe, 0},
@@ -66,11 +67,9 @@ static MunitResult containers(const MunitParameter params[], void* context)
                                            TC_PIV_CERTIFICATE_RECOMMENDED_BYTES, &alias.out),
                    ==, TC_TLV_ARGUMENT);
   munit_assert_memory_equal(sizeof saved, alias.bytes, saved);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
-static MunitResult boundaries(const MunitParameter params[], void* context)
+TC_TEST(boundaries)
 {
   uint8_t buffer[2048];
   for (unsigned intermediate = 0; intermediate <= 1; ++intermediate) {
@@ -121,12 +120,10 @@ static MunitResult boundaries(const MunitParameter params[], void* context)
       }
     }
   }
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult malformed(const MunitParameter params[], void* context)
+TC_TEST(malformed)
 {
   static const uint8_t fixtures[][18] = {
       {0x53, 8, 0x71, 1, 0, 0x70, 1, 0x30, 0xfe, 0}, /* Reordered fields. */
@@ -150,14 +147,12 @@ static MunitResult malformed(const MunitParameter params[], void* context)
                      ==, TC_TLV_INVALID);
     munit_assert_memory_equal(sizeof out, &out, saved);
   }
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
 /* SP 800-73-4 Part 1 Table 10 and SP 800-73-5 Part 1 Tables 21-40 allow an
  * optional MSCUID (72, at most 38 bytes) before FE. */
-static MunitResult mscuid(const MunitParameter params[], void* context)
+TC_TEST(mscuid)
 {
   uint8_t buffer[64];
   static const size_t sizes[] = {0, 1, 16, 38, 39};
@@ -207,14 +202,12 @@ static MunitResult mscuid(const MunitParameter params[], void* context)
                                              TC_PIV_CERTIFICATE_RECOMMENDED_BYTES, &out),
                      ==, TC_TLV_INVALID);
   }
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
 /* SP 800-73-5 Part 1 footnote 23: 1856 bytes is a recommended size, so the
  * caller sets the certificate bound. */
-static MunitResult caller_bound(const MunitParameter params[], void* context)
+TC_TEST(caller_bound)
 {
   enum { CERTIFICATE_BYTES = 3000 };
   static uint8_t buffer[CERTIFICATE_BYTES + 16];
@@ -259,8 +252,6 @@ static MunitResult caller_bound(const MunitParameter params[], void* context)
                                            TC_PIV_CERTIFICATE_RECOMMENDED_BYTES, NULL),
                    ==, TC_TLV_ARGUMENT);
   munit_assert_memory_equal(sizeof out, &out, &saved);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 

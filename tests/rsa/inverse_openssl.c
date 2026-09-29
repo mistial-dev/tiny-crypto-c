@@ -4,10 +4,11 @@
 #define TC_MP_WORD_BITS TC_RSA_WORD_BITS
 #include "../../src/mp_inverse_internal.h"
 #include "munit.h"
+#include "test_util.h"
 #include <openssl/bn.h>
 #include <openssl/err.h>
 
-static MunitResult inverse(const MunitParameter params[], void* user)
+TC_TEST(inverse)
 {
   enum { MAX_BYTES = 384, MAX_WORDS = MAX_BYTES / sizeof(tc_mp_word), SAMPLES = 4 };
   uint8_t input[MAX_BYTES], modulus[MAX_BYTES], expected[MAX_BYTES], actual[MAX_BYTES];
@@ -15,8 +16,6 @@ static MunitResult inverse(const MunitParameter params[], void* user)
   BN_CTX* context = BN_CTX_new();
   BIGNUM* value = BN_new();
   BIGNUM* modulus_bn = BN_new();
-  (void)params;
-  (void)user;
   munit_assert_not_null(context);
   munit_assert_not_null(value);
   munit_assert_not_null(modulus_bn);

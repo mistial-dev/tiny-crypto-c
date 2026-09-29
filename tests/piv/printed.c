@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 #include <tiny_crypto/piv_printed.h>
 
@@ -54,10 +55,8 @@ static fixture printed(TC_PIV_printed_profile profile)
   return value;
 }
 
-static MunitResult profiles(const MunitParameter params[], void* user)
+TC_TEST(profiles)
 {
-  (void)params;
-  (void)user;
   for (unsigned profile = TC_PIV_PRINTED_PROFILE_PIV; profile <= TC_PIV_PRINTED_PROFILE_TWIC;
        ++profile) {
     fixture value = printed((TC_PIV_printed_profile)profile);
@@ -85,10 +84,8 @@ static MunitResult profiles(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult failures(const MunitParameter params[], void* user)
+TC_TEST(failures)
 {
-  (void)params;
-  (void)user;
   fixture piv = printed(TC_PIV_PRINTED_PROFILE_PIV);
   TC_PIV_printed unchanged, out;
   memset(&unchanged, 0xa5, sizeof unchanged);
@@ -159,7 +156,7 @@ static TC_TLV_result read_with_date(TC_PIV_printed_profile profile, const char* 
                              profile, out);
 }
 
-static MunitResult dates(const MunitParameter params[], void* user)
+TC_TEST(dates)
 {
   static const struct {
     TC_PIV_printed_profile profile;
@@ -184,8 +181,6 @@ static MunitResult dates(const MunitParameter params[], void* user)
       {TC_PIV_PRINTED_PROFILE_TWIC, "2026SEP10"}, {TC_PIV_PRINTED_PROFILE_TWIC, "1xSEP2026"},
       {TC_PIV_PRINTED_PROFILE_TWIC, "10SEP202x"}, {TC_PIV_PRINTED_PROFILE_TWIC, "10SEP0000"}};
   TC_PIV_printed parsed;
-  (void)params;
-  (void)user;
   for (size_t i = 0; i < sizeof accepted / sizeof *accepted; ++i) {
     munit_assert_int(read_with_date(accepted[i].profile, accepted[i].date, &parsed), ==, TC_TLV_OK);
     munit_assert_uint(parsed.expiration.year, ==, accepted[i].year);
@@ -206,10 +201,8 @@ static MunitResult dates(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult expiration(const MunitParameter params[], void* user)
+TC_TEST(expiration)
 {
-  (void)params;
-  (void)user;
   fixture value = printed(TC_PIV_PRINTED_PROFILE_PIV);
   TC_PIV_printed parsed;
   munit_assert_int(TC_PIV_printed_read((TC_bytes){value.bytes, value.length},

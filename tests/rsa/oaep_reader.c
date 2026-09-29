@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/rsa.h>
 #include "munit.h"
+#include "test_util.h"
 #include "cavp.h"
 #include "hash_name.h"
 #include <stdio.h>
@@ -26,7 +27,7 @@ static TC_bytes decode(const char* text, uint8_t* output, size_t capacity)
   return (TC_bytes){output, length};
 }
 
-static MunitResult vectors(const MunitParameter params[], void* data)
+TC_TEST(vectors)
 {
   enum { KEY_BYTES = 512, PAYLOAD_BYTES = 8192, FIELD_COUNT = 12 };
   char line[65536];
@@ -34,8 +35,6 @@ static MunitResult vectors(const MunitParameter params[], void* data)
   uint8_t expected[PAYLOAD_BYTES], output[KEY_BYTES];
   TC_RSA_word words[TC_RSA_DECRYPT_WORKSPACE_WORDS(4096)];
   size_t count = 0;
-  (void)params;
-  (void)data;
   if (!path)
     return MUNIT_SKIP;
   FILE* file = fopen(path, "r");

@@ -3,15 +3,14 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 #include "munit.h"
+#include "test_util.h"
 
 #include <string.h>
 
 #include <tiny_crypto/aes.h>
 
-static MunitResult test_profile(const MunitParameter params[], void* user)
+TC_TEST(test_profile)
 {
-  (void)params;
-  (void)user;
   static const uint8_t expected_ciphertext[16] = {0x03, 0x88, 0xda, 0xce, 0x60, 0xb6, 0xa3, 0x92,
                                                   0xf3, 0x28, 0xc2, 0xb9, 0x71, 0xb2, 0xfe, 0x78};
   static const uint8_t expected_tag[16] = {0xab, 0x6e, 0x47, 0xd4, 0x2c, 0xec, 0x13, 0xbd,

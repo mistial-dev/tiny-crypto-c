@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/ec.h>
 #include "munit.h"
+#include "test_util.h"
 #include "cavp.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,15 +9,13 @@
 
 static const char* vector_path;
 
-static MunitResult vectors(const MunitParameter params[], void* data)
+TC_TEST(vectors)
 {
   char line[1024];
   uint8_t scalar[48], point[128], actual[97];
   TC_EC_workspace workspace;
   size_t count = 0;
   FILE* file;
-  (void)params;
-  (void)data;
   if (!vector_path)
     return MUNIT_SKIP;
   file = fopen(vector_path, "r");

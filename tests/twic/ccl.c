@@ -39,7 +39,7 @@ static void assert_record_equal(const TC_TWIC_CCL_record* actual,
   munit_assert_uint(actual->day, ==, expected->day);
 }
 
-static MunitResult test_record(const MunitParameter params[], void* user)
+TC_TEST(test_record)
 {
   TC_TWIC_CCL_record record, saved;
   uint8_t bad[sizeof row];
@@ -50,8 +50,6 @@ static MunitResult test_record(const MunitParameter params[], void* user)
     const char* date;
     unsigned year, month, day;
   } accepted[] = {{"29Feb2000", 2000, 2, 29}, {"31Dec9999", 9999, 12, 31}, {"01Jan0001", 1, 1, 1}};
-  (void)params;
-  (void)user;
   munit_assert_int(TC_TWIC_CCL_read((TC_bytes){row, sizeof row - 1}, &record), ==, TC_TWIC_CCL_OK);
   for (size_t i = 0; i < sizeof record.fascn; ++i)
     munit_assert_size(record.fascn[i], ==, i);
@@ -97,10 +95,8 @@ static MunitResult test_record(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult test_chunks(const MunitParameter params[], void* user)
+TC_TEST(test_chunks)
 {
-  (void)params;
-  (void)user;
   for (size_t step = 1; step <= sizeof list; ++step) {
     TC_TWIC_CCL_stream stream;
     sink output = {0, SIZE_MAX, {{0}, 0, 0, 0}};
@@ -127,11 +123,9 @@ static MunitResult test_chunks(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult test_failures(const MunitParameter params[], void* user)
+TC_TEST(test_failures)
 {
   uint8_t bad[sizeof list];
-  (void)params;
-  (void)user;
   /* Every prefix except a complete first row is empty or truncated. */
   for (size_t cut = 0; cut < sizeof list - 1; ++cut) {
     TC_TWIC_CCL_stream stream;
@@ -164,12 +158,10 @@ static MunitResult test_failures(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult test_limits(const MunitParameter params[], void* user)
+TC_TEST(test_limits)
 {
   TC_TWIC_CCL_stream stream, saved;
   sink output = {0, SIZE_MAX, {{0}, 0, 0, 0}};
-  (void)params;
-  (void)user;
   for (size_t bytes = 0; bytes < sizeof list - 1; ++bytes) {
     munit_assert_int(TC_TWIC_CCL_stream_init(&stream, bytes, 2, collect, &output), ==,
                      TC_TWIC_CCL_OK);
@@ -235,7 +227,7 @@ static TC_status packed_key_read(void* context, size_t position, TC_bytes* out)
   return TC_OK;
 }
 
-static MunitResult test_external(const MunitParameter params[], void* user)
+TC_TEST(test_external)
 {
   const char* path = getenv("TC_TEST_TWIC_CCL");
   const char* checksum = getenv("TC_TEST_TWIC_CCL_MD5");
@@ -244,8 +236,6 @@ static MunitResult test_external(const MunitParameter params[], void* user)
   uint8_t buffer[4096];
   packed_keys keys;
   size_t length;
-  (void)params;
-  (void)user;
   if (!path)
     return MUNIT_SKIP;
   munit_assert_not_null(checksum);
@@ -309,12 +299,10 @@ static MunitResult test_external(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult test_lookup(const MunitParameter params[], void* user)
+TC_TEST(test_lookup)
 {
   uint8_t fascn[TC_TWIC_CCL_FASCN_BYTES], bad[sizeof list];
   int listed = 42;
-  (void)params;
-  (void)user;
   for (size_t i = 0; i < sizeof fascn; ++i)
     fascn[i] = (uint8_t)i;
   munit_assert_int(TC_TWIC_CCL_contains((TC_bytes){list, sizeof list - 1},
@@ -388,14 +376,12 @@ static void source_init(key_source* source)
     source->keys[i][TC_TWIC_CCL_FASCN_BYTES - 1] = (uint8_t)(2 * i);
 }
 
-static MunitResult test_index(const MunitParameter params[], void* user)
+TC_TEST(test_index)
 {
   key_source source;
   TC_TWIC_CCL_index index;
   uint8_t query[TC_TWIC_CCL_FASCN_BYTES] = {0};
   int listed;
-  (void)params;
-  (void)user;
   source_init(&source);
   TC_TWIC_CCL_source input = {&source, source.count, source_key};
   munit_assert_int(TC_TWIC_CCL_index_prepare(&input, source.count, &index), ==, TC_TWIC_CCL_OK);
@@ -427,14 +413,12 @@ static MunitResult test_index(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult test_index_failures(const MunitParameter params[], void* user)
+TC_TEST(test_index_failures)
 {
   key_source source;
   TC_TWIC_CCL_index index, saved;
   uint8_t query[TC_TWIC_CCL_FASCN_BYTES] = {0};
   int listed = 42;
-  (void)params;
-  (void)user;
   source_init(&source);
   TC_TWIC_CCL_source input = {&source, source.count, source_key};
   munit_assert_int(TC_TWIC_CCL_index_prepare(&input, source.count, &index), ==, TC_TWIC_CCL_OK);
@@ -495,7 +479,7 @@ static TC_status read_storage(void* context, size_t offset, uint8_t* out, size_t
   return TC_OK;
 }
 
-static MunitResult test_memory(const MunitParameter params[], void* user)
+TC_TEST(test_memory)
 {
   uint8_t keys[3][TC_TWIC_CCL_FASCN_BYTES];
   for (size_t i = 0; i < 3; ++i)
@@ -540,18 +524,14 @@ static MunitResult test_memory(const MunitParameter params[], void* user)
   munit_assert_int(TC_TWIC_CCL_index_from_memory(&image, 3, &index), ==, TC_TWIC_CCL_OK);
   memset(keys[0], 3, sizeof keys[0]);
   munit_assert_int(TC_TWIC_CCL_index_from_memory(&image, 3, &index), ==, TC_TWIC_CCL_INVALID);
-  (void)params;
-  (void)user;
   return MUNIT_OK;
 }
 
-static MunitResult test_storage(const MunitParameter params[], void* user)
+TC_TEST(test_storage)
 {
   key_source source;
   TC_TWIC_CCL_index index, saved;
   int listed = 42;
-  (void)params;
-  (void)user;
   source_init(&source);
   ExampleTwicCclStorage storage = {&source, read_storage, sizeof source.keys, {0}};
   munit_assert_int(example_twic_ccl_open(&storage, source.count, &index), ==, TC_TWIC_CCL_OK);
@@ -575,12 +555,10 @@ static MunitResult test_storage(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult test_freshness(const MunitParameter params[], void* user)
+TC_TEST(test_freshness)
 {
   TC_TWIC_CCL_metadata metadata = {100, 110};
   TC_TWIC_CCL_freshness_policy policy = {120, 20, 100};
-  (void)params;
-  (void)user;
   munit_assert_int(TC_TWIC_CCL_check_freshness(&metadata, &policy), ==, TC_TWIC_CCL_OK);
   --policy.max_age;
   munit_assert_int(TC_TWIC_CCL_check_freshness(&metadata, &policy), ==, TC_TWIC_CCL_STALE);
@@ -611,7 +589,7 @@ static MunitResult test_freshness(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult test_snapshots(const MunitParameter params[], void* user)
+TC_TEST(test_snapshots)
 {
   key_source old_keys, new_keys;
   TC_TWIC_CCL_index old_index, new_index;
@@ -621,8 +599,6 @@ static MunitResult test_snapshots(const MunitParameter params[], void* user)
   TC_TWIC_CCL_freshness_policy policy = {120, 20, 0};
   uint8_t query[TC_TWIC_CCL_FASCN_BYTES] = {0};
   int listed = 42;
-  (void)params;
-  (void)user;
   source_init(&old_keys);
   source_init(&new_keys);
   new_keys.keys[0][TC_TWIC_CCL_FASCN_BYTES - 1] = 1;
@@ -691,7 +667,7 @@ static MunitResult test_snapshots(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult test_snapshot_failures(const MunitParameter params[], void* user)
+TC_TEST(test_snapshot_failures)
 {
   key_source keys;
   TC_TWIC_CCL_index index;
@@ -700,8 +676,6 @@ static MunitResult test_snapshot_failures(const MunitParameter params[], void* u
   TC_TWIC_CCL_metadata metadata = {100, 101};
   TC_TWIC_CCL_freshness_policy policy = {120, 20, 0};
   int listed = 42;
-  (void)params;
-  (void)user;
   source_init(&keys);
   TC_TWIC_CCL_source source = {&keys, 1, source_key};
   munit_assert_int(TC_TWIC_CCL_index_prepare(&source, 1, &index), ==, TC_TWIC_CCL_OK);
@@ -782,7 +756,7 @@ static MunitResult test_snapshot_failures(const MunitParameter params[], void* u
   return MUNIT_OK;
 }
 
-static MunitResult test_check_example(const MunitParameter params[], void* user)
+TC_TEST(test_check_example)
 {
   key_source keys;
   TC_TWIC_CCL_index index;
@@ -793,8 +767,6 @@ static MunitResult test_check_example(const MunitParameter params[], void* user)
   ExampleTwicCclResult result = {42, 43}, saved = result;
   uint8_t query[TC_TWIC_CCL_FASCN_BYTES] = {0};
   TC_bytes fascn = {query, sizeof query};
-  (void)params;
-  (void)user;
   source_init(&keys);
   TC_TWIC_CCL_source source = {&keys, 1, source_key};
   munit_assert_int(example_check_twic_cancellation(&store, &policy, 20, fascn, 1, &result), ==,
@@ -860,7 +832,7 @@ static TC_status import_key_read(void* context, size_t position, TC_bytes* out)
   return packed_key_read(&input->keys, position, out);
 }
 
-static MunitResult test_import(const MunitParameter params[], void* user)
+TC_TEST(test_import)
 {
   enum {
     IMPORT_OK,
@@ -875,8 +847,6 @@ static MunitResult test_import(const MunitParameter params[], void* user)
     IMPORT_CASES
   };
   uint8_t expected[TC_MD5_DIGESTLEN];
-  (void)params;
-  (void)user;
   munit_assert_int(TC_MD5_digest((TC_bytes){list, sizeof list - 1}, expected), ==, TC_OK);
   for (unsigned fault = 0; fault < IMPORT_CASES; ++fault) {
     packed_key staged_keys[2], old_keys[1] = {{0}};

@@ -10,6 +10,7 @@
 #include "../../src/pki_distribution_internal.h"
 #include "../../src/pki_identifier_internal.h"
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -114,10 +115,8 @@ static TC_TLV_result index_inputs(const TC_X509_crl_index* index, TC_bytes write
   return tc_pki_storage_plan_finish(&plan, work);
 }
 
-static MunitResult public_reader(const MunitParameter params[], void* user)
+TC_TEST(public_reader)
 {
-  (void)params;
-  (void)user;
   const TC_TLV_limits limits = {FIXTURE_CAPACITY, FIXTURE_CAPACITY, 128, FRAME_CAPACITY};
   TC_TLV_frame frames[FRAME_CAPACITY];
   fixture input = make_crl(2, NEXT_UPDATE | REVOKED | CRL_EXTENSIONS | ENTRY_EXTENSIONS);
@@ -173,10 +172,8 @@ static MunitResult public_reader(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult public_index(const MunitParameter params[], void* user)
+TC_TEST(public_index)
 {
-  (void)params;
-  (void)user;
   enum { RECORD_COUNT = 2, OID_CAPACITY = 8 };
   fixture first = make_crl(1, 0), second = make_crl(2, NEXT_UPDATE | REVOKED);
   TC_bytes inputs[] = {{first.bytes, first.length}, {second.bytes, second.length}};
@@ -241,15 +238,13 @@ static MunitResult public_index(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult fields(const MunitParameter params[], void* user)
+TC_TEST(fields)
 {
   const TC_TLV_limits limits = {FIXTURE_CAPACITY, FIXTURE_CAPACITY, 128, FRAME_CAPACITY};
   TC_TLV_frame frames[FRAME_CAPACITY];
   size_t work;
   const tc_pki_tree_workspace tree = {frames, FRAME_CAPACITY, &work};
   TC_X509_crl parsed, saved;
-  (void)params;
-  (void)user;
   memset(&saved, 0xa5, sizeof saved);
   for (unsigned version = 1; version <= 2; ++version)
     for (unsigned flags = 0; flags < 16; ++flags) {
@@ -330,15 +325,13 @@ static MunitResult fields(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult malformed(const MunitParameter params[], void* user)
+TC_TEST(malformed)
 {
   TC_TLV_limits limits = {FIXTURE_CAPACITY, FIXTURE_CAPACITY, 128, FRAME_CAPACITY};
   TC_TLV_frame frames[FRAME_CAPACITY];
   size_t work;
   const tc_pki_tree_workspace tree = {frames, FRAME_CAPACITY, &work};
   TC_X509_crl parsed, saved;
-  (void)params;
-  (void)user;
   memset(&saved, 0xa5, sizeof saved);
   for (unsigned fault = 0; fault < 9; ++fault) {
     fixture input = make_crl(2, REVOKED | NEXT_UPDATE);
@@ -393,7 +386,7 @@ static MunitResult malformed(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult extensions(const MunitParameter params[], void* user)
+TC_TEST(extensions)
 {
   const uint8_t extension[] = {0x30, 8, 6, 2, 0x2a, 3, 4, 2, 5, 0};
   uint8_t encoded[2 + 3 * sizeof extension] = {0x30, 3 * sizeof extension};
@@ -402,8 +395,6 @@ static MunitResult extensions(const MunitParameter params[], void* user)
   TC_bytes oids[3];
   size_t work;
   const tc_pki_tree_workspace tree = {frames, FRAME_CAPACITY, &work};
-  (void)params;
-  (void)user;
   for (size_t i = 0; i < 3; ++i) {
     memcpy(encoded + 2 + i * sizeof extension, extension, sizeof extension);
     encoded[2 + i * sizeof extension + 5] = (uint8_t)(3 - i);
@@ -450,7 +441,7 @@ static MunitResult extensions(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult extension_values(const MunitParameter params[], void* user)
+TC_TEST(extension_values)
 {
   uint8_t reason[] = {10, 1, 0};
   uint8_t number[23] = {2, 21, 0x7f};
@@ -459,8 +450,6 @@ static MunitResult extension_values(const MunitParameter params[], void* user)
   TC_bytes value;
   TC_X509_time parsed, saved;
   unsigned code;
-  (void)params;
-  (void)user;
   for (unsigned i = 0; i <= 255; ++i) {
     reason[2] = (uint8_t)i;
     code = 99;
@@ -659,10 +648,8 @@ static void check_source_layout(TC_bytes bytes, const TC_X509_crl* parsed)
   }
 }
 
-static MunitResult source_layout(const MunitParameter params[], void* user)
+TC_TEST(source_layout)
 {
-  (void)params;
-  (void)user;
   const TC_TLV_limits limits = {FIXTURE_CAPACITY, FIXTURE_CAPACITY, 128, FRAME_CAPACITY};
   TC_TLV_frame frames[FRAME_CAPACITY];
   for (unsigned version = 1; version <= 2; ++version) {
@@ -695,10 +682,8 @@ static MunitResult source_layout(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult source_entry_failures(const MunitParameter params[], void* user)
+TC_TEST(source_entry_failures)
 {
-  (void)params;
-  (void)user;
   const TC_TLV_limits limits = {FIXTURE_CAPACITY, FIXTURE_CAPACITY, 128, FRAME_CAPACITY};
   TC_TLV_frame frames[FRAME_CAPACITY];
   uint8_t window[1], scratch[FIXTURE_CAPACITY];
@@ -738,10 +723,8 @@ static MunitResult source_entry_failures(const MunitParameter params[], void* us
   return MUNIT_OK;
 }
 
-static MunitResult source_batch(const MunitParameter params[], void* user)
+TC_TEST(source_batch)
 {
-  (void)params;
-  (void)user;
   const uint8_t issuer[] = {0x30, 12, 0x31, 10, 0x30, 8, 6, 3, 0x55, 4, 3, 0x0c, 1, 'A'};
   const uint8_t serials[] = {1, 3, 99};
   TC_X509_crl_target queries[3];
@@ -851,7 +834,7 @@ static MunitResult source_batch(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult corpus_file(const MunitParameter params[], void* user)
+TC_TEST(corpus_file)
 {
   enum {
     MAX_BYTES = 32 * 1024 * 1024,
@@ -869,8 +852,6 @@ static MunitResult corpus_file(const MunitParameter params[], void* user)
   const tc_pki_tree_workspace tree = {frames, MAX_DEPTH, &work};
   TC_X509_crl parsed, saved;
   FILE* file;
-  (void)params;
-  (void)user;
   munit_assert_not_null(path);
   munit_assert_not_null(expected);
   munit_assert_true(!strcmp(expected, "valid") || !strcmp(expected, "invalid"));
@@ -907,7 +888,7 @@ static MunitResult corpus_file(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult authority_identifiers(const MunitParameter params[], void* user)
+TC_TEST(authority_identifiers)
 {
   enum { NAME_SCALARS = 32, NAME_ATTRIBUTES = 4 };
   static const uint8_t issuer[] = {0x30, 12, 0x31, 10, 0x30, 8, 6, 3, 0x55, 4, 3, 0x0c, 1, 'A'};
@@ -927,8 +908,6 @@ static MunitResult authority_identifiers(const MunitParameter params[], void* us
   size_t work;
   const tc_pki_tree_workspace tree = {frames, FRAME_CAPACITY, &work};
   int matched;
-  (void)params;
-  (void)user;
   candidate.issuer = (TC_bytes){issuer, sizeof issuer};
   candidate.serial = (TC_bytes){serial, sizeof serial};
   candidate.extensions = (TC_bytes){ski_extension, sizeof ski_extension};
@@ -1035,10 +1014,8 @@ static MunitResult authority_identifiers(const MunitParameter params[], void* us
   return MUNIT_OK;
 }
 
-static MunitResult signer_usage(const MunitParameter params[], void* user)
+TC_TEST(signer_usage)
 {
-  (void)params;
-  (void)user;
   const struct {
     uint8_t unused, bits;
     int allowed;
@@ -1102,14 +1079,12 @@ static MunitResult signer_usage(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult evidence_status(const MunitParameter params[], void* user)
+TC_TEST(evidence_status)
 {
   const TC_X509_crl_match absent = {0};
   TC_X509_crl_match revoked = {0};
   TC_X509_crl_evidence evidence, saved;
   TC_X509_revocation_status status;
-  (void)params;
-  (void)user;
   revoked.found = 1;
   revoked.reason = 1;
   revoked.revoked_at = (TC_X509_time){2026, 1, 1, 0, 0, 0};
@@ -1201,11 +1176,9 @@ static MunitResult evidence_status(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult evidence_equality(const MunitParameter params[], void* user)
+TC_TEST(evidence_equality)
 {
   TC_X509_crl_evidence left = {0}, right;
-  (void)params;
-  (void)user;
   left.reasons = TC_X509_CRL_ALL_REASONS;
   left.revocation.found = 1;
   left.revocation.reason = 1;
@@ -1254,10 +1227,8 @@ static MunitResult evidence_equality(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult combine_status(const MunitParameter params[], void* user)
+TC_TEST(combine_status)
 {
-  (void)params;
-  (void)user;
   TC_X509_crl_match base = {0}, delta = {0}, combined, saved;
   memset(&saved, 0xa5, sizeof saved);
   base.reason = 6;
@@ -1307,7 +1278,7 @@ static MunitResult combine_status(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult scope_groups(const MunitParameter params[], void* user)
+TC_TEST(scope_groups)
 {
   const uint8_t issuer[] = {0x30, 12, 0x31, 10, 0x30, 8, 6, 3, 0x55, 4, 3, 0x0c, 1, 'A'};
   uint8_t other[sizeof issuer];
@@ -1322,8 +1293,6 @@ static MunitResult scope_groups(const MunitParameter params[], void* user)
   const TC_X509_name_workspace names = {left, right, 32, used, 2};
   size_t work;
   const tc_pki_tree_workspace tree = {frames, FRAME_CAPACITY, &work};
-  (void)params;
-  (void)user;
   enum { SAME, NORMALIZED_NAME, OTHER_ISSUER, ONE_IDP, SAME_IDP, OTHER_IDP, AUTHORITY_HINT };
   const int expected[] = {1, 1, 0, 0, 1, 0, 1};
   for (unsigned scenario = SAME; scenario <= AUTHORITY_HINT; ++scenario) {
@@ -1363,10 +1332,8 @@ static MunitResult scope_groups(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult delta_pairing(const MunitParameter params[], void* user)
+TC_TEST(delta_pairing)
 {
-  (void)params;
-  (void)user;
   const uint8_t issuer[] = {0x30, 12, 0x31, 10, 0x30, 8, 6, 3, 0x55, 4, 3, 0x0c, 1, 'A'};
   uint8_t delta_issuer[sizeof issuer];
   memcpy(delta_issuer, issuer, sizeof issuer);
@@ -1501,10 +1468,8 @@ static MunitResult delta_pairing(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult issuer_inheritance(const MunitParameter params[], void* user)
+TC_TEST(issuer_inheritance)
 {
-  (void)params;
-  (void)user;
   const uint8_t issuer[] = {0x30, 12, 0x31, 10, 0x30, 8, 6, 3, 0x55, 4, 3, 0x0c, 1, 'A'};
   fixture list = {0};
   const uint8_t list_header[] = {0x30, 0x81, 0};
@@ -1774,10 +1739,8 @@ static MunitResult issuer_inheritance(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult entry_policy(const MunitParameter params[], void* user)
+TC_TEST(entry_policy)
 {
-  (void)params;
-  (void)user;
   TC_X509_crl_extensions crl = {0};
   tc_x509_crl_entry_info entry = {0};
   munit_assert_int(tc_x509_crl_entry_policy(&crl, &entry), ==, TC_TLV_OK);
@@ -1810,10 +1773,8 @@ static MunitResult entry_policy(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult entry_info(const MunitParameter params[], void* user)
+TC_TEST(entry_info)
 {
-  (void)params;
-  (void)user;
   const uint8_t reason[] = {10, 1, 8};
   const uint8_t date[] = {0x18, 15,  '2', '0', '2', '4', '0', '2', '2',
                           '9',  '0', '0', '0', '0', '0', '0', 'Z'};
@@ -1884,10 +1845,8 @@ static MunitResult entry_info(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult extension_policy(const MunitParameter params[], void* user)
+TC_TEST(extension_policy)
 {
-  (void)params;
-  (void)user;
   static const struct {
     unsigned present, critical;
     TC_TLV_result result;
@@ -1923,10 +1882,8 @@ static MunitResult extension_policy(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult extension_info(const MunitParameter params[], void* user)
+TC_TEST(extension_info)
 {
-  (void)params;
-  (void)user;
   static const struct {
     uint8_t arc, length;
     uint8_t value[16];
@@ -2044,10 +2001,8 @@ static tc_x509_freshness fresh_at(const TC_X509_crl* crl, TC_X509_time at, uint3
 /* Current means thisUpdate <= at + skew, nextUpdate > at - skew and, under a
  * nonzero max_age, at - skew - thisUpdate <= max_age (RFC 5280 6.3.3 (a)(2)
  * with the TC_X509_revocation_time bounds). */
-static MunitResult freshness(const MunitParameter params[], void* user)
+TC_TEST(freshness)
 {
-  (void)params;
-  (void)user;
   TC_X509_crl crl = {0};
   crl.this_update = (TC_X509_time){2049, 12, 31, 23, 59, 59};
   crl.next_update = (TC_X509_time){2050, 1, 1, 0, 0, 1};
@@ -2110,10 +2065,8 @@ static MunitResult freshness(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult scope_reasons(const MunitParameter params[], void* user)
+TC_TEST(scope_reasons)
 {
-  (void)params;
-  (void)user;
   const uint8_t issuer[] = {0x30, 12, 0x31, 10, 0x30, 8, 6, 3, 0x55, 4, 3, 0x0c, 1, 'A'};
   const uint16_t expected[] = {TC_X509_CRL_ALL_REASONS, 10, 6, 2};
   const int permitted[4][2] = {{1, 1}, {1, 0}, {0, 1}, {0, 0}};
@@ -2284,10 +2237,8 @@ static MunitResult scope_reasons(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult name_scope(const MunitParameter params[], void* user)
+TC_TEST(name_scope)
 {
-  (void)params;
-  (void)user;
   enum { FULL_DN, RELATIVE_DN, DNS_A, DNS_B, ISSUER_DN, DNS_LIST, ISSUER_FALLBACK };
   static const struct {
     size_t length;
@@ -2403,10 +2354,8 @@ static MunitResult name_scope(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult appended_names(const MunitParameter params[], void* user)
+TC_TEST(appended_names)
 {
-  (void)params;
-  (void)user;
   const uint8_t base[] = {0x30, 12, 0x31, 10, 0x30, 8, 6, 3, 0x55, 4, 3, 0x0c, 1, 'A'};
   const uint8_t full[] = {0x30, 24,   0x31, 10,   0x30, 8, 6, 3,    0x55, 4, 3,    0x0c, 1,
                           'A',  0x31, 10,   0x30, 8,    6, 3, 0x55, 4,    3, 0x0c, 1,    'B'};
@@ -2468,10 +2417,8 @@ static MunitResult appended_names(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult issuer_linkage(const MunitParameter params[], void* user)
+TC_TEST(issuer_linkage)
 {
-  (void)params;
-  (void)user;
   const uint8_t directory[] = {0xa4, 14, 0x30, 12, 0x31, 10,   0x30, 8,
                                6,    3,  0x55, 4,  3,    0x0c, 1,    'A'};
   uint8_t crl_name[sizeof directory - 2];
@@ -2542,10 +2489,8 @@ static MunitResult issuer_linkage(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult distribution_issuer(const MunitParameter params[], void* user)
+TC_TEST(distribution_issuer)
 {
-  (void)params;
-  (void)user;
   const uint8_t directory[] = {0xa4, 14, 0x30, 12, 0x31, 10,   0x30, 8,
                                6,    3,  0x55, 4,  3,    0x0c, 1,    'A'};
   const uint8_t dns[] = {0x82, 1, 'a'};
@@ -2592,10 +2537,8 @@ static MunitResult distribution_issuer(const MunitParameter params[], void* user
   return MUNIT_OK;
 }
 
-static MunitResult distribution_points(const MunitParameter params[], void* user)
+TC_TEST(distribution_points)
 {
-  (void)params;
-  (void)user;
   static const struct {
     size_t length;
     int valid, freshest;
@@ -2687,10 +2630,8 @@ static MunitResult distribution_points(const MunitParameter params[], void* user
   return MUNIT_OK;
 }
 
-static MunitResult distribution(const MunitParameter params[], void* user)
+TC_TEST(distribution)
 {
-  (void)params;
-  (void)user;
   static const struct {
     size_t length;
     uint8_t bytes[24];
@@ -2771,12 +2712,10 @@ static MunitResult distribution(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult named_bits(const MunitParameter params[], void* user)
+TC_TEST(named_bits)
 {
   const TC_TLV_limits key_usage_limits = {8, 8, 1, 0};
   enum { REASON_BITS = 9, SENTINEL = 0xdead };
-  (void)params;
-  (void)user;
   const uint16_t usages[] = {TC_KEY_USAGE_DIGITAL_SIGNATURE, TC_KEY_USAGE_CONTENT_COMMITMENT,
                              TC_KEY_USAGE_KEY_ENCIPHERMENT,  TC_KEY_USAGE_DATA_ENCIPHERMENT,
                              TC_KEY_USAGE_KEY_AGREEMENT,     TC_KEY_USAGE_CERT_SIGN,
@@ -2836,7 +2775,7 @@ static MunitResult named_bits(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult record_index(const MunitParameter params[], void* user)
+TC_TEST(record_index)
 {
   const TC_TLV_limits limits = {FIXTURE_CAPACITY, FIXTURE_CAPACITY, 128, FRAME_CAPACITY};
   TC_TLV_frame frames[FRAME_CAPACITY];
@@ -2850,8 +2789,6 @@ static MunitResult record_index(const MunitParameter params[], void* user)
   tc_cms_revocations reader, saved_reader;
   TC_X509_crl_record rows[2];
   TC_X509_crl_index index, saved;
-  (void)params;
-  (void)user;
   munit_assert_int(tc_cms_revocations_init((TC_bytes){NULL, 0}, &external, 2, 2 * FIXTURE_CAPACITY,
                                            &limits, &tree, &reader),
                    ==, TC_TLV_OK);
@@ -2906,7 +2843,7 @@ static MunitResult record_index(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult record_index_storage(const MunitParameter params[], void* user)
+TC_TEST(record_index_storage)
 {
   fixture input = make_crl(2, 0);
   TC_bytes encoded = {input.bytes, input.length}, oids[4];
@@ -2919,8 +2856,6 @@ static MunitResult record_index_storage(const MunitParameter params[], void* use
   tc_cms_revocations reader, saved_reader;
   TC_X509_crl_record row, saved_row;
   TC_X509_crl_index index, saved;
-  (void)params;
-  (void)user;
   munit_assert_int(tc_cms_revocations_init((TC_bytes){NULL, 0}, &external, 1, FIXTURE_CAPACITY,
                                            &limits, &tree, &reader),
                    ==, TC_TLV_OK);
@@ -2987,7 +2922,7 @@ static MunitResult record_index_storage(const MunitParameter params[], void* use
   return MUNIT_OK;
 }
 
-static MunitResult indexed_deltas(const MunitParameter params[], void* user)
+TC_TEST(indexed_deltas)
 {
   const uint8_t issuer[] = {0x30, 0}, numbers[] = {5, 7, 3, 4, 9};
   TC_X509_crl_record rows[5] = {0};
@@ -3000,8 +2935,6 @@ static MunitResult indexed_deltas(const MunitParameter params[], void* user)
   size_t work, cursor;
   const tc_pki_tree_workspace tree = {frames, FRAME_CAPACITY, &work};
   tc_x509_crl_selected selected, saved;
-  (void)params;
-  (void)user;
   memset(&saved, 0xa5, sizeof saved);
   for (size_t i = 0; i < index.count; ++i) {
     rows[i].crl.issuer = (TC_bytes){issuer, sizeof issuer};
@@ -3054,7 +2987,7 @@ static MunitResult indexed_deltas(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult record_index_failures(const MunitParameter params[], void* user)
+TC_TEST(record_index_failures)
 {
   const TC_TLV_limits limits = {FIXTURE_CAPACITY, FIXTURE_CAPACITY, 128, FRAME_CAPACITY};
   TC_TLV_frame frames[FRAME_CAPACITY];
@@ -3068,8 +3001,6 @@ static MunitResult record_index_failures(const MunitParameter params[], void* us
   tc_cms_revocations reader, saved_reader;
   TC_X509_crl_record row;
   TC_X509_crl_index index, saved;
-  (void)params;
-  (void)user;
   munit_assert_int(tc_cms_revocations_init((TC_bytes){NULL, 0}, &external, 1, FIXTURE_CAPACITY,
                                            &limits, &tree, &reader),
                    ==, TC_TLV_OK);
@@ -3127,7 +3058,7 @@ static MunitResult record_index_failures(const MunitParameter params[], void* us
   return MUNIT_OK;
 }
 
-static MunitResult candidate_arguments(const MunitParameter params[], void* user)
+TC_TEST(candidate_arguments)
 {
   enum { CRL, EXTENSIONS, CANDIDATE, LIMITS, NAMES, TREE, WORK, MATCHED, CASE_COUNT };
   TC_X509_crl crl = {0};
@@ -3135,8 +3066,6 @@ static MunitResult candidate_arguments(const MunitParameter params[], void* user
   TC_X509_certificate candidate = {0};
   TC_TLV_limits limits = {0};
   TC_X509_name_workspace names = {0};
-  (void)params;
-  (void)user;
   for (unsigned missing = 0; missing < CASE_COUNT; ++missing) {
     size_t work = 100;
     int matched = -1;
@@ -3153,7 +3082,7 @@ static MunitResult candidate_arguments(const MunitParameter params[], void* user
   return MUNIT_OK;
 }
 
-static MunitResult certificate_fields(const MunitParameter params[], void* user)
+TC_TEST(certificate_fields)
 {
   enum { ISSUER_ALT_NAME = 18, BASIC_CONSTRAINTS = 19, DISTRIBUTION_POINTS = 31 };
   static const uint8_t ca[] = {0x30, 3, 1, 1, 0xff};
@@ -3170,8 +3099,6 @@ static MunitResult certificate_fields(const MunitParameter params[], void* user)
   fields.limits = &limits;
   fields.tree = &tree;
   TC_X509_extension extension = {{oid, sizeof oid}, {ca, sizeof ca}, 0};
-  (void)params;
-  (void)user;
   munit_assert_int(tc_x509_crl_certificate_extension(&fields, &extension), ==, TC_TLV_OK);
   munit_assert_int(fields.ca, ==, 1);
   extension.value = (TC_bytes){leaf, sizeof leaf};
@@ -3206,7 +3133,7 @@ static MunitResult certificate_fields(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult points_init(const MunitParameter params[], void* user)
+TC_TEST(points_init)
 {
   static const uint8_t points[] = {0x30, 9, 0x30, 7, 0xa0, 5, 0xa0, 3, 0x82, 1, 'a'};
   static const uint8_t bad_tail[] = {0x30, 11, 0x30, 7, 0xa0, 5, 0xa0, 3, 0x82, 1, 'a', 0x05, 0};
@@ -3217,8 +3144,6 @@ static MunitResult points_init(const MunitParameter params[], void* user)
   const tc_pki_tree_workspace tree = {frames, FRAME_CAPACITY, &work};
   tc_x509_crl_certificate_fields fields = {0}, saved;
   TC_TLV_reader reader, unchanged;
-  (void)params;
-  (void)user;
   memset(&unchanged, 0xa5, sizeof unchanged);
   fields.limits = &limits;
   fields.tree = &tree;

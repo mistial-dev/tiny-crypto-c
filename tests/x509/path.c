@@ -3,6 +3,7 @@
 #include "../../src/x509_path_internal.h"
 #include "../../src/x509_policy_internal.h"
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
 typedef struct {
@@ -34,7 +35,7 @@ static TC_X509_signature_result verify(void* context, const TC_bytes* message, s
   return provider->result;
 }
 
-static MunitResult basic(const MunitParameter params[], void* user)
+TC_TEST(basic)
 {
   const uint8_t names[][14] = {{0x30, 12, 0x31, 10, 0x30, 8, 6, 3, 0x55, 4, 3, 0x0c, 1, 'A'},
                                {0x30, 12, 0x31, 10, 0x30, 8, 6, 3, 0x55, 4, 3, 0x0c, 1, 'B'},
@@ -61,8 +62,6 @@ static MunitResult basic(const MunitParameter params[], void* user)
                               NULL,         summaries,   0,       0,    0};
   size_t i, work = 100000, required;
   int accepted = 99;
-  (void)params;
-  (void)user;
   memset(certificates, 0, sizeof certificates);
   memset(&anchor, 0, sizeof anchor);
   anchor.name.data = names[0];
@@ -182,7 +181,7 @@ static MunitResult basic(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult names(const MunitParameter params[], void* user)
+TC_TEST(names)
 {
   const uint8_t dn_a[] = {0x30, 12, 0x31, 10, 0x30, 8, 6, 3, 0x55, 4, 3, 0x0c, 1, 'A'};
   const uint8_t dn_b[] = {0x30, 12, 0x31, 10, 0x30, 8, 6, 3, 0x55, 4, 3, 0x0c, 1, 'B'};
@@ -203,8 +202,6 @@ static MunitResult names(const MunitParameter params[], void* user)
                               NULL,         NULL, NULL, summaries, 0,    0,    0};
   size_t i, work = 100000, required;
   int accepted = 99;
-  (void)params;
-  (void)user;
   memset(certificates, 0, sizeof certificates);
   memcpy(narrower, constraints, sizeof narrower);
   for (i = 0; i < 3; ++i) {
@@ -280,7 +277,7 @@ static TC_TLV_result read_controls(const TC_X509_certificate* certificate,
   return result;
 }
 
-static MunitResult policy_controls(const MunitParameter params[], void* user)
+TC_TEST(policy_controls)
 {
   uint8_t extensions[] = {0x30, 29, 0x30, 15,   6,  3, 0x55, 0x1d, 36,   4,  8, 0x30, 6, 0x80, 1, 2,
                           0x81, 1,  3,    0x30, 10, 6, 3,    0x55, 0x1d, 54, 4, 3,    2, 1,    4};
@@ -290,8 +287,6 @@ static MunitResult policy_controls(const MunitParameter params[], void* user)
   tc_x509_policy_counters counters;
   size_t work = 1000, required, i;
   unsigned target, self_issued;
-  (void)params;
-  (void)user;
   memset(&certificate, 0, sizeof certificate);
   certificate.extensions.data = extensions;
   certificate.extensions.length = sizeof extensions;
@@ -365,7 +360,7 @@ static TC_TLV_result policy_certificate(tc_x509_policy_graph* graph, const TC_by
   return tc_x509_policy_graph_map(graph, mappings, mapping_count, allow_mapping, work);
 }
 
-static MunitResult policy_graph(const MunitParameter params[], void* user)
+TC_TEST(policy_graph)
 {
   const uint8_t oid_bytes[][2] = {{0x2a, 1}, {0x2a, 2}, {0x2a, 3}};
   const uint8_t any_bytes[] = {0x55, 0x1d, 0x20, 0};
@@ -377,8 +372,6 @@ static MunitResult policy_graph(const MunitParameter params[], void* user)
   TC_X509_policy_expected expected[64];
   tc_x509_policy_graph graph = {nodes, 32, 0, edges, 64, 0, expected, 64, 0, 0};
   size_t work = 100000, required, budget, i;
-  (void)params;
-  (void)user;
   munit_assert_int(tc_x509_policy_graph_init(&graph), ==, TC_TLV_OK);
   munit_assert_int(policy_certificate(&graph, policies, 2, mappings, 2, 1, &work), ==, TC_TLV_OK);
   munit_assert_int(tc_x509_policy_graph_step(&graph, policies + 2, 1, 1, &work), ==, TC_TLV_OK);
@@ -478,7 +471,7 @@ static MunitResult policy_graph(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult policies(const MunitParameter params[], void* user)
+TC_TEST(policies)
 {
   const uint8_t dn[] = {0x30, 12, 0x31, 10, 0x30, 8, 6, 3, 0x55, 4, 3, 0x0c, 1, 'A'};
   const uint8_t oid_bytes[][2] = {{0x2a, 1}, {0x2a, 2}};
@@ -510,8 +503,6 @@ static MunitResult policies(const MunitParameter params[], void* user)
   tc_x509_policy_options options = {initial, 1, 1, 0, 0};
   size_t i, count = 99, work = 100000, required;
   int accepted = 99;
-  (void)params;
-  (void)user;
   memset(certificates, 0, sizeof certificates);
   for (i = 0; i < 2; ++i) {
     certificates[i].issuer.data = dn;
@@ -625,7 +616,7 @@ static MunitResult policies(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult qualifiers(const MunitParameter params[], void* user)
+TC_TEST(qualifiers)
 {
   static const struct {
     uint8_t value[24];
@@ -659,8 +650,6 @@ static MunitResult qualifiers(const MunitParameter params[], void* user)
   TC_TLV_frame frames[8];
   TC_TLV_limits limits = {1024, 1024, 64, 8};
   size_t i, budget, required, work;
-  (void)params;
-  (void)user;
   for (i = 0; i < sizeof cases / sizeof cases[0]; ++i) {
     encoded[1] = (uint8_t)(12 + cases[i].length);
     encoded[3] = (uint8_t)(10 + cases[i].length);
@@ -711,7 +700,7 @@ static MunitResult qualifiers(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult usage(const MunitParameter params[], void* user)
+TC_TEST(usage)
 {
   const uint8_t dn[] = {0x30, 12, 0x31, 10, 0x30, 8, 6, 3, 0x55, 4, 3, 0x0c, 1, 'A'};
   const uint8_t oid[] = {0x2a, 1};
@@ -739,8 +728,6 @@ static MunitResult usage(const MunitParameter params[], void* user)
   tc_x509_path_usage purpose = {{oid, sizeof oid}, 1, 1, 1, 0};
   size_t i, work = 100000, required;
   int accepted = 99;
-  (void)params;
-  (void)user;
   memset(certificates, 0, sizeof certificates);
   certificates[0].subject.data = dn;
   certificates[0].subject.length = sizeof dn;

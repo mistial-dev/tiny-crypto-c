@@ -111,7 +111,7 @@ static const struct {
 static char** capture;
 static const char* vector_path;
 
-static MunitResult wycheproof(const MunitParameter params[], void* user)
+TC_TEST(wycheproof)
 {
   static char line[32768];
   /* Holds the largest Wycheproof ECDH public value, a 4272-byte SPKI. */
@@ -120,8 +120,6 @@ static MunitResult wycheproof(const MunitParameter params[], void* user)
   TC_EC_workspace workspace;
   FILE* file;
   size_t count = 0;
-  (void)params;
-  (void)user;
   if (!vector_path)
     return MUNIT_SKIP;
   file = fopen(vector_path, "r");
@@ -186,12 +184,10 @@ static MunitResult wycheproof(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult signature_answers(const MunitParameter params[], void* user)
+TC_TEST(signature_answers)
 {
   TC_ECDSA_workspace workspace;
   uint8_t point[97], signature[96], order[48], complement[48], digest[48];
-  (void)params;
-  (void)user;
   for (size_t v = 0; v < sizeof vectors / sizeof vectors[0]; ++v) {
     size_t n = vectors[v].bytes;
     unsigned borrow = 0;
@@ -235,13 +231,11 @@ static MunitResult signature_answers(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult known_answers(const MunitParameter params[], void* user)
+TC_TEST(known_answers)
 {
   TC_EC_workspace w;
   uint8_t scalar[48] = {0}, point[97], expected[97], generator[97], shared[48];
   size_t i, n;
-  (void)params;
-  (void)user;
   for (i = 0; i < sizeof vectors / sizeof vectors[0]; ++i) {
     n = vectors[i].bytes;
     memset(scalar, 0, sizeof scalar);
@@ -268,13 +262,11 @@ static MunitResult known_answers(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult rejected_inputs(const MunitParameter params[], void* user)
+TC_TEST(rejected_inputs)
 {
   TC_EC_workspace w;
   uint8_t scalar[48] = {0}, point[97], output[97], saved[97];
   size_t i, n, length;
-  (void)params;
-  (void)user;
   memset(output, 0xa5, sizeof output);
   memcpy(saved, output, sizeof saved);
 #if !TC_EC_ENABLE_P256
@@ -324,14 +316,12 @@ static MunitResult rejected_inputs(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult captured_answer(const MunitParameter params[], void* user)
+TC_TEST(captured_answer)
 {
   TC_EC_workspace w;
   uint8_t scalar[48], peer[97], expected[97], point[97], z[48], shared[48];
   size_t n;
   TC_EC_curve curve;
-  (void)params;
-  (void)user;
   if (!capture)
     return MUNIT_SKIP;
   munit_assert_true(strcmp(capture[0], "256") == 0 || strcmp(capture[0], "384") == 0);
@@ -375,7 +365,7 @@ static TC_status fixed_nonce(void* context, uint8_t* output, size_t length)
   return TC_OK;
 }
 
-static MunitResult generation_answers(const MunitParameter params[], void* user)
+TC_TEST(generation_answers)
 {
   TC_EC_workspace workspace;
   uint8_t private_key[TC_EC_MAX_BYTES], public_key[1 + 2 * TC_EC_MAX_BYTES];
@@ -383,8 +373,6 @@ static MunitResult generation_answers(const MunitParameter params[], void* user)
   SignRandom random;
   TC_random_source source = {sign_nonce, &random};
   size_t i, j;
-  (void)params;
-  (void)user;
   for (i = 0; i < sizeof vectors / sizeof vectors[0]; ++i) {
     size_t n = vectors[i].bytes;
     munit_assert_size(tc_test_hex(vectors[i].generator, expected, sizeof expected), ==, 1 + 2 * n);
@@ -423,7 +411,7 @@ static MunitResult generation_answers(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult signing_rfc6979(const MunitParameter params[], void* user)
+TC_TEST(signing_rfc6979)
 {
   /* RFC 6979 A.2.5 and A.2.6, SHA-256/P-256 and SHA-384/P-384, "sample".
    * The API takes the nonce from injected randomness, so these answers check
@@ -457,8 +445,6 @@ static MunitResult signing_rfc6979(const MunitParameter params[], void* user)
   TC_ECDSA_workspace workspace;
   uint8_t private_key[48], digest[48], nonce[48], signature[96], expected[96];
   size_t i;
-  (void)params;
-  (void)user;
   for (i = 0; i < sizeof answers / sizeof answers[0]; ++i) {
     size_t n = answers[i].bytes;
     TC_bytes fixed = {nonce, n};
@@ -477,16 +463,13 @@ static MunitResult signing_rfc6979(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult signing_rejects_invalid_keys_and_aliasing(const MunitParameter params[],
-                                                             void* user)
+TC_TEST(signing_rejects_invalid_keys_and_aliasing)
 {
 #if TC_EC_ENABLE_P256
   TC_ECDSA_workspace workspace;
   uint8_t key[32] = {0}, digest[32] = {1}, signature[64], overlapping[64] = {0};
   SignRandom random = {0, 0, 0};
   TC_random_source source = {sign_nonce, &random};
-  (void)params;
-  (void)user;
   memset(signature, 0xa5, sizeof signature);
   munit_assert_int(ecdsa_sign(TC_EC_P256, (TC_bytes){key, 32}, (TC_bytes){digest, 32},
                               (TC_buffer){signature, 64},
@@ -523,13 +506,11 @@ static MunitResult signing_rejects_invalid_keys_and_aliasing(const MunitParamete
                    ==, TC_EC_LIMIT);
   munit_assert_uint(random.calls, ==, 0);
 #else
-  (void)params;
-  (void)user;
 #endif
   return MUNIT_OK;
 }
 
-static MunitResult signing_answers(const MunitParameter params[], void* user)
+TC_TEST(signing_answers)
 {
   static const char* signatures[] = {
 #if TC_EC_ENABLE_P256
@@ -549,8 +530,6 @@ static MunitResult signing_answers(const MunitParameter params[], void* user)
   SignRandom random;
   TC_random_source source = {sign_nonce, &random};
   size_t i, n;
-  (void)params;
-  (void)user;
   for (i = 0; i < sizeof vectors / sizeof vectors[0]; ++i) {
     n = vectors[i].bytes;
     memset(private_key, 0, sizeof private_key);
@@ -633,10 +612,8 @@ static MunitResult signing_answers(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult coordinate_bytes(const MunitParameter params[], void* user)
+TC_TEST(coordinate_bytes)
 {
-  (void)params;
-  (void)user;
   munit_assert_size(TC_EC_coordinate_bytes(TC_EC_P192), ==, TC_EC_ENABLE_P192 ? 24 : 0);
   munit_assert_size(TC_EC_coordinate_bytes(TC_EC_P256), ==, TC_EC_ENABLE_P256 ? 32 : 0);
   munit_assert_size(TC_EC_coordinate_bytes(TC_EC_P384), ==, TC_EC_ENABLE_P384 ? 48 : 0);
@@ -653,7 +630,7 @@ static MunitResult coordinate_bytes(const MunitParameter params[], void* user)
 
 /* A short caller output buffer returns LIMIT before any work, RNG request or
  * output write. Received data of the wrong length returns INVALID. */
-static MunitResult short_output_and_lengths(const MunitParameter params[], void* user)
+TC_TEST(short_output_and_lengths)
 {
   TC_EC_workspace workspace;
   TC_ECDSA_workspace signature_workspace;
@@ -662,8 +639,6 @@ static MunitResult short_output_and_lengths(const MunitParameter params[], void*
   uint8_t signature[2 * TC_EC_MAX_BYTES] = {0}, generated[TC_EC_MAX_BYTES];
   SignRandom random = {0, 0, 0};
   TC_random_source source = {sign_nonce, &random};
-  (void)params;
-  (void)user;
   for (size_t i = 0; i < sizeof vectors / sizeof vectors[0]; ++i) {
     const TC_EC_curve curve = vectors[i].curve;
     const size_t n = vectors[i].bytes;
@@ -752,15 +727,13 @@ static MunitResult short_output_and_lengths(const MunitParameter params[], void*
 /* Signing checks its first attempt's work and a nonzero attempt count before
  * any arithmetic. A short budget or zero attempts returns LIMIT with the
  * workspace, work, RNG and output unchanged. */
-static MunitResult sign_budget_preflight(const MunitParameter params[], void* user)
+TC_TEST(sign_budget_preflight)
 {
   TC_ECDSA_workspace workspace;
   uint8_t scalar[TC_EC_MAX_BYTES], point[1 + 2 * TC_EC_MAX_BYTES];
   uint8_t digest[TC_EC_MAX_BYTES] = {1}, output[2 * TC_EC_MAX_BYTES];
   SignRandom random = {0, 0, 0};
   const TC_random_source source = {sign_nonce, &random};
-  (void)params;
-  (void)user;
   for (size_t i = 0; i < sizeof vectors / sizeof vectors[0]; ++i) {
     const TC_EC_curve curve = vectors[i].curve;
     const size_t n = vectors[i].bytes;
@@ -790,7 +763,7 @@ static MunitResult sign_budget_preflight(const MunitParameter params[], void* us
 
 /* The work counter is written during the call, so a peer or signer public
  * key that contains it is an argument error with the key bytes unchanged. */
-static MunitResult work_overlaps_public_key(const MunitParameter params[], void* user)
+TC_TEST(work_overlaps_public_key)
 {
   TC_EC_workspace workspace;
   TC_ECDSA_workspace signature_workspace;
@@ -802,8 +775,6 @@ static MunitResult work_overlaps_public_key(const MunitParameter params[], void*
   } shared;
   uint8_t before[sizeof shared];
   SignRandom random = {0, 0, 0};
-  (void)params;
-  (void)user;
   for (size_t i = 0; i < sizeof vectors / sizeof vectors[0]; ++i) {
     const TC_EC_curve curve = vectors[i].curve;
     const size_t n = vectors[i].bytes;

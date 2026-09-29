@@ -99,12 +99,10 @@ static int eax_decode_vector(const struct eax_rfc_vector* vector, eax_decoded* o
 }
 #endif
 
-static MunitResult test_eax_rfc(const MunitParameter params[], void* data)
+TC_TEST(test_eax_rfc)
 {
   size_t i;
 
-  (void)params;
-  (void)data;
 #if TC_AES_SBOX_MODE == TC_AES_SBOX_MODE_RUNTIME
   TC_AES_init_sbox();
 #endif
@@ -187,7 +185,7 @@ static int eax_json_uint(const char* line, const char* name, unsigned* output)
   return 1;
 }
 
-static MunitResult test_eax_wycheproof(const MunitParameter params[], void* data)
+TC_TEST(test_eax_wycheproof)
 {
   FILE* file;
   char line[4096];
@@ -198,8 +196,6 @@ static MunitResult test_eax_wycheproof(const MunitParameter params[], void* data
   unsigned tc_id = 0;
   size_t vector_count = 0;
 
-  (void)params;
-  (void)data;
   file = tc_test_fopen(EAX_VECTOR_FILE, "rb");
   munit_assert_not_null(file);
   while (fgets(line, sizeof(line), file) != NULL) {
@@ -218,24 +214,24 @@ static MunitResult test_eax_wycheproof(const MunitParameter params[], void* data
     if (eax_json_field(line, "result", result, sizeof(result))) {
       uint8_t key[32], iv[2048], aad[2048], msg[2048], ct[2048], tag[32];
       uint8_t output[2048], generated[32];
-      /* A value that fails to decode keeps SIZE_MAX. */
-      size_t key_len = SIZE_MAX, iv_len = SIZE_MAX, aad_len = SIZE_MAX, msg_len = SIZE_MAX,
-             ct_len = SIZE_MAX, tag_len = SIZE_MAX;
-      (void)tc_test_hex_decode(key_text, TC_TEST_HEX_SEPARATED, key, sizeof(key), &key_len);
-      (void)tc_test_hex_decode(iv_text, TC_TEST_HEX_SEPARATED, iv, sizeof(iv), &iv_len);
-      (void)tc_test_hex_decode(aad_text, TC_TEST_HEX_SEPARATED, aad, sizeof(aad), &aad_len);
-      (void)tc_test_hex_decode(msg_text, TC_TEST_HEX_SEPARATED, msg, sizeof(msg), &msg_len);
-      (void)tc_test_hex_decode(ct_text, TC_TEST_HEX_SEPARATED, ct, sizeof(ct), &ct_len);
-      (void)tc_test_hex_decode(tag_text, TC_TEST_HEX_SEPARATED, tag, sizeof(tag), &tag_len);
+      size_t key_len = 0, iv_len = 0, aad_len = 0, msg_len = 0, ct_len = 0, tag_len = 0;
+      int key_decoded =
+          tc_test_hex_decode(key_text, TC_TEST_HEX_SEPARATED, key, sizeof(key), &key_len);
 
       munit_assert_uint(tc_id, >, 0);
       ++vector_count;
-      if (key_len != TC_AES_KEYLEN)
+      if (!key_decoded || key_len != TC_AES_KEYLEN)
         continue;
-      munit_assert_size(iv_len, !=, SIZE_MAX);
-      munit_assert_size(aad_len, !=, SIZE_MAX);
-      munit_assert_size(msg_len, !=, SIZE_MAX);
-      munit_assert_size(ct_len, !=, SIZE_MAX);
+      munit_assert_true(
+          tc_test_hex_decode(iv_text, TC_TEST_HEX_SEPARATED, iv, sizeof(iv), &iv_len));
+      munit_assert_true(
+          tc_test_hex_decode(aad_text, TC_TEST_HEX_SEPARATED, aad, sizeof(aad), &aad_len));
+      munit_assert_true(
+          tc_test_hex_decode(msg_text, TC_TEST_HEX_SEPARATED, msg, sizeof(msg), &msg_len));
+      munit_assert_true(
+          tc_test_hex_decode(ct_text, TC_TEST_HEX_SEPARATED, ct, sizeof(ct), &ct_len));
+      munit_assert_true(
+          tc_test_hex_decode(tag_text, TC_TEST_HEX_SEPARATED, tag, sizeof(tag), &tag_len));
       munit_assert_size(tag_len, ==, 16);
       if (strcmp(result, "valid") == 0) {
         munit_assert_int(TC_AES_EAX_encrypt(key, (TC_bytes){iv, iv_len}, (TC_bytes){aad, aad_len},
@@ -259,7 +255,7 @@ static MunitResult test_eax_wycheproof(const MunitParameter params[], void* data
   return MUNIT_OK;
 }
 
-static MunitResult test_eax_api(const MunitParameter params[], void* data)
+TC_TEST(test_eax_api)
 {
   static const uint8_t key[TC_AES_KEYLEN] = {0x23, 0x39, 0x52, 0xde, 0xe4, 0xd5, 0xed, 0x5f,
                                              0x9b, 0x9c, 0x6d, 0x6f, 0xf8, 0x0f, 0xf4, 0x78};
@@ -274,8 +270,6 @@ static MunitResult test_eax_api(const MunitParameter params[], void* data)
   uint8_t empty_tag[1];
   uint8_t untouched[32];
 
-  (void)params;
-  (void)data;
   munit_assert_int(
       TC_AES_EAX_encrypt(key, (TC_bytes){nonce, sizeof(nonce)}, (TC_bytes){aad, sizeof(aad)},
                          (TC_bytes){message, sizeof(message)},
@@ -411,7 +405,7 @@ static MunitResult test_eax_api(const MunitParameter params[], void* data)
 /* The default entry points take TC_MIN_TAG_LEN..16 bytes and the _short_tag
  * forms take 1..TC_MIN_TAG_LEN - 1. A rejected length leaves every output
  * unchanged. A short tag is the leading bytes of the full tag. */
-static MunitResult test_eax_tag_policy(const MunitParameter params[], void* data)
+TC_TEST(test_eax_tag_policy)
 {
   static const uint8_t key[TC_AES_KEYLEN] = {0x91, 0x94, 0x5d, 0x3f, 0x5f, 0x04, 0x6d, 0x2b,
                                              0x1a, 0x3c, 0x7e, 0x55, 0x60, 0x21, 0x0a, 0xc4};
@@ -426,8 +420,6 @@ static MunitResult test_eax_tag_policy(const MunitParameter params[], void* data
   const size_t below = TC_MIN_TAG_LEN - 1u;
   uint8_t ciphertext[sizeof(message)], full[16], tag[16], output[sizeof(message)];
 
-  (void)params;
-  (void)data;
   munit_assert_int(TC_AES_EAX_encrypt(key, n, a, m, (TC_buffer){ciphertext, sizeof(ciphertext)},
                                       (TC_buffer){full, sizeof(full)}),
                    ==, TC_OK);
@@ -509,8 +501,6 @@ static MunitResult test_eax_tag_policy(const MunitParameter params[], void* data
 
 MunitResult test_eax(const MunitParameter params[], void* data)
 {
-  (void)params;
-  (void)data;
   return test_eax_rfc(params, data) == MUNIT_OK && test_eax_wycheproof(params, data) == MUNIT_OK &&
                  test_eax_api(params, data) == MUNIT_OK &&
                  test_eax_tag_policy(params, data) == MUNIT_OK
@@ -522,7 +512,7 @@ MunitResult test_eax(const MunitParameter params[], void* data)
 
 #if TC_AES_ENABLE_EAX_PRIME
 
-static MunitResult test_eax_prime_worked(const MunitParameter params[], void* data)
+TC_TEST(test_eax_prime_worked)
 {
   static const uint8_t keys[][16] = {{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a,
                                       0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10},
@@ -660,8 +650,6 @@ static MunitResult test_eax_prime_worked(const MunitParameter params[], void* da
                                                {47, 1},  {1, 47},  {64, 64}, {79, 65}};
   size_t i;
 
-  (void)params;
-  (void)data;
 #if TC_AES_SBOX_MODE == TC_AES_SBOX_MODE_RUNTIME
   TC_AES_init_sbox();
 #endif
@@ -734,7 +722,7 @@ static MunitResult test_eax_prime_worked(const MunitParameter params[], void* da
   return MUNIT_OK;
 }
 
-static MunitResult test_eax_prime_c12_22(const MunitParameter params[], void* data)
+TC_TEST(test_eax_prime_c12_22)
 {
   static const uint8_t key[16] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
                                   0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
@@ -755,8 +743,6 @@ static MunitResult test_eax_prime_c12_22(const MunitParameter params[], void* da
   uint8_t bad_tag[TC_AES_EAX_PRIME_TAG_LEN];
   uint8_t bad_cleartext[sizeof(cleartext)];
 
-  (void)params;
-  (void)data;
 #if TC_AES_SBOX_MODE == TC_AES_SBOX_MODE_RUNTIME
   TC_AES_init_sbox();
 #endif

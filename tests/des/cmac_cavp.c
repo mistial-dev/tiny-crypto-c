@@ -4,6 +4,7 @@
 #include <tiny_crypto/des.h>
 #include "cavp.h"
 #include "munit.h"
+#include "test_util.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -124,10 +125,8 @@ static void run_file(const char* name, size_t keys, int verify, unsigned expecte
   munit_assert_uint(cryptographic, ==, expected - expected_invalid_bundle);
 }
 
-static MunitResult cavp(const MunitParameter params[], void* user)
+TC_TEST(cavp)
 {
-  (void)params;
-  (void)user;
   run_file("CMACGenTDES2.rsp", 2, 0, 96, 0);
   run_file("CMACVerTDES2.rsp", 2, 1, 360, 72);
   run_file("CMACGenTDES3.rsp", 3, 0, 96, 0);

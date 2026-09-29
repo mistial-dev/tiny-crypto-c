@@ -5,6 +5,7 @@
 #endif
 #include "../../examples/pki_input.h"
 #include "munit.h"
+#include "test_util.h"
 #include <tiny_crypto/twic_ccl.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -12,7 +13,7 @@
 #include <fcntl.h>
 #endif
 
-static MunitResult streams(const MunitParameter params[], void* context)
+TC_TEST(streams)
 {
   static const uint8_t contents[] = {1, 2, 3, 4};
   for (size_t length = 0; length <= sizeof contents; ++length) {
@@ -49,12 +50,10 @@ static MunitResult streams(const MunitParameter params[], void* context)
   for (size_t i = 0; i < sizeof buffer; ++i)
     munit_assert_uint(buffer[i], ==, 0xa5);
   munit_assert_ptr_equal(out.data, contents);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult files(const MunitParameter params[], void* context)
+TC_TEST(files)
 {
   uint8_t buffer[8192];
   TC_bytes out = {NULL, 0};
@@ -70,12 +69,10 @@ static MunitResult files(const MunitParameter params[], void* context)
   for (size_t i = 0; i < sizeof buffer; ++i)
     munit_assert_uint(buffer[i], ==, 0);
   munit_assert_size(out.length, ==, length);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult created_files(const MunitParameter params[], void* context)
+TC_TEST(created_files)
 {
   uint8_t expected[8192], buffer[8192];
   TC_bytes contents;
@@ -123,12 +120,10 @@ static MunitResult created_files(const MunitParameter params[], void* context)
   munit_assert_uint(buffer[0], ==, 0xa5);
   munit_assert_ptr_equal(out.data, expected);
   munit_assert_uint64(created, ==, UINT64_MAX);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult cancellation_image(const MunitParameter params[], void* context)
+TC_TEST(cancellation_image)
 {
   uint8_t packed[2 * TC_TWIC_CCL_FASCN_BYTES] = {0};
   memset(packed + TC_TWIC_CCL_FASCN_BYTES, 2, TC_TWIC_CCL_FASCN_BYTES);
@@ -161,12 +156,10 @@ static MunitResult cancellation_image(const MunitParameter params[], void* conte
     munit_assert_int(listed, ==, value != 1);
   }
   munit_assert_int(TC_TWIC_CCL_store_release(held), ==, TC_TWIC_CCL_OK);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult source(const MunitParameter params[], void* context)
+TC_TEST(source)
 {
   const uint8_t bytes[] = {1, 2, 3};
   const TC_bytes candidates[] = {{bytes, sizeof bytes}};
@@ -193,12 +186,10 @@ static MunitResult source(const MunitParameter params[], void* context)
   munit_assert_size(empty.anchor_count, ==, 0);
   munit_assert_size(empty.candidate_count, ==, 0);
   munit_assert_int(empty.anchor(empty.context, 0, &work, &found), ==, TC_TLV_ARGUMENT);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult stream_source(const MunitParameter params[], void* context)
+TC_TEST(stream_source)
 {
   FILE* file = tmpfile();
   munit_assert_not_null(file);
@@ -223,8 +214,6 @@ static MunitResult stream_source(const MunitParameter params[], void* context)
   munit_assert_int(source.read(source.context, 0, output, sizeof output), ==, TC_OK);
   munit_assert_memory_equal(sizeof output, output, bytes);
   munit_assert_int(fclose(file), ==, 0);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 

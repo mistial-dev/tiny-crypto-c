@@ -12,6 +12,7 @@
  * the trials skipped for options outside this library. */
 #include "cavp.h"
 #include "munit.h"
+#include "test_util.h"
 #include <tiny_crypto/drbg.h>
 #include <stdlib.h>
 #include <string.h>
@@ -219,26 +220,20 @@ static void run_variant(const char* directory, variant kind)
            2 * TRIALS_PER_OPTION);
 }
 
-static MunitResult test_pr_true(const MunitParameter params[], void* data)
+TC_TEST(test_pr_true)
 {
-  (void)params;
-  (void)data;
   run_variant("pr_true", VARIANT_PR_TRUE);
   return MUNIT_OK;
 }
 
-static MunitResult test_pr_false(const MunitParameter params[], void* data)
+TC_TEST(test_pr_false)
 {
-  (void)params;
-  (void)data;
   run_variant("pr_false", VARIANT_PR_FALSE);
   return MUNIT_OK;
 }
 
-static MunitResult test_no_reseed(const MunitParameter params[], void* data)
+TC_TEST(test_no_reseed)
 {
-  (void)params;
-  (void)data;
   run_variant("no_reseed", VARIANT_NO_RESEED);
   return MUNIT_OK;
 }

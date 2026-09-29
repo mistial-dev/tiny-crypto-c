@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "ocsp_fixture.h"
+#include "test_util.h"
 #include <tiny_crypto/x509_revocation.h>
 
 /* TC_X509_time has padding, so compare its fields. */
@@ -29,11 +30,9 @@ static TC_X509_trust_anchor read_issuer(void)
 /* The embedded OCSP Valid Signer gen3 signs every content signer response.
  * An authenticated unknown status gives no decision and is UNSUPPORTED, as
  * is an unsigned tryLater response (RFC 6960 4.2.1). */
-static MunitResult content_signer(const MunitParameter params[], void* user)
+TC_TEST(content_signer)
 {
   const char* suffixes[] = {"good", "revoked", "unknown"};
-  (void)params;
-  (void)user;
   ocsp_fixture_init(&fixture);
   const TC_X509_trust_anchor anchor = read_issuer();
   const TC_bytes certificate = ocsp_read_path(TC_ICAM_OCSP_ROOT "/target.der", certificate_bytes);
@@ -116,10 +115,8 @@ static TC_X509_ocsp_result verify_card(unsigned card, const char* response_name,
 /* RFC 6960 4.2.2.2.1: a delegate's own revocation status is established by
  * id-pkix-ocsp-nocheck or by separate evidence. ICAM cards 43 and 44 carry
  * the two delegate forms. The result reports which one signed. */
-static MunitResult delegate_nocheck(const MunitParameter params[], void* user)
+TC_TEST(delegate_nocheck)
 {
-  (void)params;
-  (void)user;
   ocsp_fixture_init(&fixture);
   const TC_X509_trust_anchor anchor = read_issuer();
 
@@ -143,10 +140,8 @@ static MunitResult delegate_nocheck(const MunitParameter params[], void* user)
 
 /* A delegate supplied through the store is reported from the store record.
  * max_certificates counts every delegate candidate, and zero examines none. */
-static MunitResult store_delegate(const MunitParameter params[], void* user)
+TC_TEST(store_delegate)
 {
-  (void)params;
-  (void)user;
   ocsp_fixture_init(&fixture);
   const TC_X509_trust_anchor anchor = read_issuer();
   const TC_bytes signer =
@@ -216,10 +211,8 @@ static void verify_argument(const TC_X509_trust_anchor* anchor, const TC_X509_st
 /* An incomplete issuer or store is an argument error found at entry. A store
  * callback failure other than LIMIT or UNSUPPORTED is ARGUMENT, as the store
  * contract requires. */
-static MunitResult source_arguments(const MunitParameter params[], void* user)
+TC_TEST(source_arguments)
 {
-  (void)params;
-  (void)user;
   ocsp_fixture_init(&fixture);
   const TC_X509_trust_anchor anchor = read_issuer();
   TC_X509_trust_anchor incomplete = anchor;
@@ -238,10 +231,8 @@ static MunitResult source_arguments(const MunitParameter params[], void* user)
 
 /* A response signed by the issuer needs no certificates, so max_certificates
  * may be zero. The byKey ResponderID is the SHA-1 key hash (RFC 6960 4.2.1). */
-static MunitResult issuer_signed(const MunitParameter params[], void* user)
+TC_TEST(issuer_signed)
 {
-  (void)params;
-  (void)user;
   ocsp_fixture_init(&fixture);
   const TC_X509_trust_anchor anchor = read_issuer();
   char path[512];
@@ -269,10 +260,8 @@ static MunitResult issuer_signed(const MunitParameter params[], void* user)
  * not reach it. Its elements and nesting must still respect the caller limits.
  * The response is 127 elements deep 8 levels, while the target and delegate
  * certificates need at most 82 elements and 5 levels. */
-static MunitResult bounded_inner_response(const MunitParameter params[], void* user)
+TC_TEST(bounded_inner_response)
 {
-  (void)params;
-  (void)user;
   ocsp_fixture_init(&fixture);
   const TC_X509_trust_anchor anchor = read_issuer();
   const TC_bytes certificate = ocsp_read_path(TC_ICAM_OCSP_ROOT "/target.der", certificate_bytes);
@@ -306,10 +295,8 @@ static const TC_X509_time local_at = {2026, 9, 30, 0, 0, 0};
 
 /* CA-signed local responses: the revocationReason is reported (RFC 6960
  * 4.2.1). A response without nextUpdate needs a nonzero max_age_seconds. */
-static MunitResult local_responses(const MunitParameter params[], void* user)
+TC_TEST(local_responses)
 {
-  (void)params;
-  (void)user;
   ocsp_fixture_init(&fixture);
   const TC_X509_trust_anchor anchor =
       ocsp_read_anchor(&fixture, TC_LOCAL_OCSP_ROOT "/ca.der", issuer_bytes);
@@ -426,11 +413,9 @@ static void assert_unchanged(const TC_X509_revocation_result* result)
 /* TC_X509_path_check_revocation uses a member's OCSP response first. A
  * delegate without id-pkix-ocsp-nocheck counts only when the CRL index shows
  * it unrevoked (RFC 6960 4.2.2.2.1). Other outcomes fall back to CRLs. */
-static MunitResult path_ocsp(const MunitParameter params[], void* user)
+TC_TEST(path_ocsp)
 {
   TC_X509_revocation_result result;
-  (void)params;
-  (void)user;
   /* Card 43's delegate carries nocheck, so OCSP alone decides. */
   munit_assert_int(
       check_member("card43_piv_auth_cert", "card43_delegate_nocheck", 0, card_at, &result), ==,
@@ -473,10 +458,8 @@ static MunitResult path_ocsp(const MunitParameter params[], void* user)
 }
 
 /* The OCSP evidence runs under the caller's limits and argument rules. */
-static MunitResult path_ocsp_arguments(const MunitParameter params[], void* user)
+TC_TEST(path_ocsp_arguments)
 {
-  (void)params;
-  (void)user;
   revocation_init(1, card_at);
   const TC_bytes chain[] = {
       revocation.candidates[1],
@@ -543,11 +526,9 @@ static MunitResult path_ocsp_arguments(const MunitParameter params[], void* user
 /* CRL freshness applies the revocation clock skew and max_age. The Gen3 CRL
  * has thisUpdate 2020-04-07 21:50:52, the Root CA CRL 2018-05-27 00:00:00,
  * and both have nextUpdate in December 2032. */
-static MunitResult path_crl_time(const MunitParameter params[], void* user)
+TC_TEST(path_crl_time)
 {
   const TC_X509_time early = {2020, 4, 7, 21, 50, 42};
-  (void)params;
-  (void)user;
   revocation_init(1, early);
   const TC_bytes chain[] = {
       revocation.candidates[1],

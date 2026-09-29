@@ -3,6 +3,7 @@
 #include <tiny_crypto/cms.h>
 #include "../../examples/cms_reader.h"
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
 static const TC_CMS_verification_policy cms_policy = {.envelope = TC_CMS_ENVELOPE_BER};
@@ -13,7 +14,7 @@ static const uint8_t detached[] = {0x30, 35,   6,    9,    0x2a, 0x86, 0x48, 0x8
                                    0x31, 0,    0x30, 11,   6,    9,    0x2a, 0x86, 0x48, 0x86,
                                    0xf7, 0x0d, 1,    7,    1,    0x31, 0};
 
-static MunitResult read_envelope(const MunitParameter params[], void* user)
+TC_TEST(read_envelope)
 {
   enum { VERSION_OFFSET = 19, CONTENT_TYPE_OFFSET = 26, SIGNERS_OFFSET = 35 };
   uint8_t encoded[sizeof detached + 2];
@@ -21,8 +22,6 @@ static MunitResult read_envelope(const MunitParameter params[], void* user)
   TC_TLV_frame frames[FRAME_CAPACITY];
   TC_CMS_signed_data parsed, saved;
   size_t work;
-  (void)params;
-  (void)user;
   memset(&saved, 0xa5, sizeof saved);
   for (unsigned indefinite = 0; indefinite < 2; ++indefinite) {
     memcpy(encoded, detached, sizeof detached);
@@ -137,7 +136,7 @@ static const uint8_t empty_content[] = {4, 0};
 static const uint8_t primitive_content[] = {4, 3, 'a', 'b', 'c'};
 static const uint8_t constructed_content[] = {0x24, 7, 4, 1, 'a', 4, 2, 'b', 'c'};
 
-static MunitResult embedded_content(const MunitParameter params[], void* user)
+TC_TEST(embedded_content)
 {
   enum { OCTETS_OFFSET = 37 };
   const TC_bytes forms[] = {{empty_content, sizeof empty_content},
@@ -147,8 +146,6 @@ static MunitResult embedded_content(const MunitParameter params[], void* user)
   TC_TLV_limits limits = {INPUT_CAPACITY, INPUT_CAPACITY, 32, FRAME_CAPACITY};
   TC_TLV_frame frames[FRAME_CAPACITY];
   TC_CMS_signed_data parsed;
-  (void)params;
-  (void)user;
   for (size_t i = 0; i < sizeof forms / sizeof forms[0]; ++i) {
     const size_t length = embed_content(encoded, forms[i]);
     size_t work = WORK_BUDGET;
@@ -163,7 +160,7 @@ static MunitResult embedded_content(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult der_envelope(const MunitParameter params[], void* user)
+TC_TEST(der_envelope)
 {
   enum { PRIMITIVE, CONSTRUCTED, INDEFINITE, LONG_LENGTH, DETACHED, EMPTY_SET, CASE_COUNT };
   static const TC_CMS_verification_policy der = {.envelope = TC_CMS_ENVELOPE_DER};
@@ -171,8 +168,6 @@ static MunitResult der_envelope(const MunitParameter params[], void* user)
   TC_TLV_frame frames[FRAME_CAPACITY];
   uint8_t encoded[INPUT_CAPACITY];
   TC_CMS_signed_data parsed, saved;
-  (void)params;
-  (void)user;
   memset(&saved, 0xa5, sizeof saved);
   for (unsigned kind = 0; kind < CASE_COUNT; ++kind) {
     size_t length;
@@ -255,7 +250,7 @@ static MunitResult der_envelope(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult storage(const MunitParameter params[], void* user)
+TC_TEST(storage)
 {
   enum { INPUT, LIMITS, FRAMES, WORK, OUTPUT, SLOT_COUNT };
   union slot {
@@ -269,8 +264,6 @@ static MunitResult storage(const MunitParameter params[], void* user)
     TC_TLV_reader reader;
   } slots[SLOT_COUNT];
   uint8_t saved[sizeof slots];
-  (void)params;
-  (void)user;
   enum { ENVELOPE, ATTRIBUTES, SIGNER, SIGNERS_INIT, SIGNER_NEXT, DIGEST, READER_COUNT };
   for (unsigned reader = 0; reader < READER_COUNT; ++reader)
     for (unsigned left = 0; left < SLOT_COUNT; ++left)
@@ -343,7 +336,7 @@ static MunitResult storage(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult signer_iteration(const MunitParameter params[], void* user)
+TC_TEST(signer_iteration)
 {
   static const uint8_t record[] = {0x30, 21, 2,    1, 3, 0x80, 1,    0xaa, 0x30, 4, 6,   2,
                                    0x2a, 3,  0x30, 4, 6, 2,    0x2a, 3,    4,    1, 0xbb};
@@ -353,8 +346,6 @@ static MunitResult signer_iteration(const MunitParameter params[], void* user)
   TC_TLV_frame frames[FRAME_CAPACITY];
   TC_TLV_reader reader, saved_reader;
   TC_CMS_signer_info signer, saved;
-  (void)params;
-  (void)user;
   memset(&saved, 0xa5, sizeof saved);
   for (unsigned outer_indefinite = 0; outer_indefinite < 2; ++outer_indefinite)
     for (unsigned inner_indefinite = 0; inner_indefinite < 2; ++inner_indefinite) {

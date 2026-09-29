@@ -2,17 +2,16 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/eac_cvc.h>
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
-static MunitResult key_limits(const MunitParameter params[], void* user)
+TC_TEST(key_limits)
 {
   static const uint8_t encoded[] = {0x7f, 0x49, 19, 6, 10,   4, 0,    0x7f, 0,    7, 2,
                                     2,    2,    1,  1, 0x81, 2, 0x0c, 0xa1, 0x82, 1, 17};
   TC_TLV_limits limits = {sizeof encoded, sizeof encoded, 4, 1};
   TC_EAC_CVC_public_key key, saved;
   size_t i;
-  (void)params;
-  (void)user;
   munit_assert_int(TC_EAC_CVC_public_key_read((TC_bytes){encoded, sizeof encoded}, &limits, &key),
                    ==, TC_TLV_OK);
   munit_assert_int(key.algorithm, ==, TC_EAC_RSA_V15);
@@ -60,13 +59,11 @@ static MunitResult key_limits(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult issuer_widths(const MunitParameter params[], void* user)
+TC_TEST(issuer_widths)
 {
   uint8_t prime[32] = {0x80}, order[48] = {0x80}, point[65] = {4}, signature[96] = {1};
   TC_EAC_CVC certificate;
   TC_EAC_CVC_public_key issuer, domain;
-  (void)params;
-  (void)user;
   memset(&certificate, 0, sizeof certificate);
   memset(&issuer, 0, sizeof issuer);
   memset(&domain, 0, sizeof domain);
@@ -104,14 +101,12 @@ static MunitResult issuer_widths(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult extension_limits(const MunitParameter params[], void* user)
+TC_TEST(extension_limits)
 {
   uint8_t encoded[] = {0x65, 9, 0x73, 7, 6, 2, 0x2a, 3, 0x80, 1, 42};
   TC_TLV_limits limits = {sizeof encoded, sizeof encoded, 3, 3};
   TC_TLV_reader reader, saved_reader;
   TC_EAC_CVC_extension extension, saved;
-  (void)params;
-  (void)user;
   memset(&extension, 0xa5, sizeof extension);
   memcpy(&saved, &extension, sizeof saved);
   --limits.max_elements;
@@ -143,7 +138,7 @@ static MunitResult extension_limits(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult certificate_limits(const MunitParameter params[], void* user)
+TC_TEST(certificate_limits)
 {
   static const uint8_t encoded[] = {
       0x7f, 0x21, 0x64, 0x7f, 0x4e, 0x5c, 0x5f, 0x29, 0x01, 0x00, 0x42, 0x0b, 'D',  'E',  'T',
@@ -158,8 +153,6 @@ static MunitResult certificate_limits(const MunitParameter params[], void* user)
   TC_EAC_CVC_workspace workspace = {{frames, 3}};
   TC_EAC_CVC certificate, saved;
   size_t i;
-  (void)params;
-  (void)user;
   munit_assert_int(
       TC_EAC_CVC_read((TC_bytes){encoded, sizeof encoded}, &limits, &workspace, &certificate), ==,
       TC_TLV_OK);

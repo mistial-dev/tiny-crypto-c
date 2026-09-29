@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "../../examples/credential_io.h"
 #include "munit.h"
+#include "test_util.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -399,32 +400,24 @@ static MunitResult replay_profile(const char* profile, const char* interface)
   return MUNIT_OK;
 }
 
-static MunitResult legacy_contact(const MunitParameter params[], void* context)
+TC_TEST(legacy_contact)
 {
-  (void)params;
-  (void)context;
   return replay_profile("legacy", "contact");
 }
-static MunitResult legacy_contactless(const MunitParameter params[], void* context)
+TC_TEST(legacy_contactless)
 {
-  (void)params;
-  (void)context;
   return replay_profile("legacy", "contactless");
 }
-static MunitResult nexgen_contact(const MunitParameter params[], void* context)
+TC_TEST(nexgen_contact)
 {
-  (void)params;
-  (void)context;
   return replay_profile("nexgen", "contact");
 }
-static MunitResult nexgen_contactless(const MunitParameter params[], void* context)
+TC_TEST(nexgen_contactless)
 {
-  (void)params;
-  (void)context;
   return replay_profile("nexgen", "contactless");
 }
 
-static MunitResult required_nonempty(const MunitParameter params[], void* context)
+TC_TEST(required_nonempty)
 {
   static const uint8_t required[][3] = {{0x5f, 0xc1, 0x02}, {0xdf, 0xc1, 0x03}, {0xdf, 0xc1, 0x0f}};
   char path[512];
@@ -451,12 +444,10 @@ static MunitResult required_nonempty(const MunitParameter params[], void* contex
       munit_assert_uint(pool[n], ==, 0);
     munit_assert_int(fclose(file), ==, 0);
   }
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult invalid_legacy_proof(const MunitParameter params[], void* context)
+TC_TEST(invalid_legacy_proof)
 {
   char path[512];
   fixture_path(path, sizeof path, "legacy", "apdu-ga-invalid.txt");
@@ -473,8 +464,6 @@ static MunitResult invalid_legacy_proof(const MunitParameter params[], void* con
   munit_assert_null(next_line(file, tail, sizeof tail));
   munit_assert_int(fclose(file), ==, 0);
   munit_assert_size(replay.exchanges, ==, 4);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 

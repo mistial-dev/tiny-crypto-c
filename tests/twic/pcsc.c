@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "../../examples/credential_pcsc.h"
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
 /* These entry points replace the platform service for lifecycle tests. */
@@ -78,7 +79,7 @@ static void reset(void)
   calls = fail_call = released = disconnected = ended = transfers = 0;
 }
 
-static MunitResult lifecycle(const MunitParameter params[], void* context)
+TC_TEST(lifecycle)
 {
   for (unsigned failure = 0; failure <= 6; ++failure) {
     ExampleCardPCSC state = {0}, zero = {0};
@@ -102,11 +103,9 @@ static MunitResult lifecycle(const MunitParameter params[], void* context)
   munit_assert_uint(disconnected, ==, 1);
   munit_assert_uint(released, ==, 1);
   selected_protocol = SCARD_PROTOCOL_T1;
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
-static MunitResult transport(const MunitParameter params[], void* context)
+TC_TEST(transport)
 {
   const uint8_t command[] = {0, 0x20, 0, 0x80};
   for (unsigned protocol = SCARD_PROTOCOL_T0; protocol <= SCARD_PROTOCOL_T1; ++protocol) {
@@ -133,8 +132,6 @@ static MunitResult transport(const MunitParameter params[], void* context)
     munit_assert_uint(transfers, ==, 2);
     munit_assert_int(example_card_pcsc_close(&state), ==, 1);
   }
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 int main(int argc, char** argv)

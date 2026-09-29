@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "munit.h"
+#include "test_util.h"
 
 #if !TC_ENABLE_EC
 /* Isolate the curve-capability check from signature mathematics. */
@@ -50,10 +51,8 @@ static void disabled_chain(TC_bytes card, TC_bytes intermediate)
 }
 #endif
 
-static MunitResult test_format(const MunitParameter params[], void* user)
+TC_TEST(test_format)
 {
-  (void)params;
-  (void)user;
   /* Format fixture: P-256 card CVC, with r=s=1. */
   static const uint8_t prefix[] = {
       0x7f, 0x21, 0x81, 0x91, 0x5f, 0x29, 1,    0x80, 0x42, 8,    1,    2, 3, 4,  5,    6,  7,  8,

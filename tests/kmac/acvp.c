@@ -3,6 +3,7 @@
 /* Pinned NIST ACVP and independently computed OpenSSL KMAC-256 answers. */
 #include <tiny_crypto/kmac.h>
 #include "munit.h"
+#include "test_util.h"
 #include "cavp.h"
 #include <stdio.h>
 #include <string.h>
@@ -16,14 +17,12 @@ static size_t read_hex(const char* field, uint8_t* output, size_t capacity)
   return strcmp(field, "-") == 0 ? 0 : tc_test_hex(field, output, capacity);
 }
 
-static MunitResult fixed_output(const MunitParameter params[], void* user)
+TC_TEST(fixed_output)
 {
   char line[4096];
   uint8_t key[512], message[512], custom[128], expected[512], actual[512];
   FILE* file = fopen(KMAC_ACVP_FILE, "r");
   unsigned cases = 0, odd_output_lengths = 0, customized = 0;
-  (void)params;
-  (void)user;
   munit_assert_not_null(file);
   while (fgets(line, sizeof line, file)) {
     char* fields[5];

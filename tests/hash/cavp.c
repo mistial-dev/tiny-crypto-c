@@ -21,6 +21,7 @@
 #include <tiny_crypto/hash.h>
 #include "cavp.h"
 #include "munit.h"
+#include "test_util.h"
 
 #ifndef CAVP_VECTOR_DIR
 #define CAVP_VECTOR_DIR "tests/vectors/hash/cavp"
@@ -214,11 +215,8 @@ static void cavp_run_sha_set(int alg, const char* short_file, long short_cases,
   munit_assert_long(cavp_run_monte_file(alg, monte_file), ==, 100);
 }
 
-MunitResult test_cavp_sha(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_cavp_sha)
 {
-  (void)params;
-  (void)data;
-
 #if TC_ENABLE_SHA1
   cavp_run_sha_set(TC_SHA1_DIGESTLEN, "sha/SHA1ShortMsg.rsp", 65, "sha/SHA1LongMsg.rsp", 64,
                    "sha/SHA1Monte.rsp");
@@ -323,7 +321,7 @@ static TC_status cavp_hmac_verify(int alg, const uint8_t* key, size_t klen, cons
   (TC_ENABLE_SHA1 * 300 + TC_ENABLE_SHA224 * 375 + TC_ENABLE_SHA256 * 225 +                        \
    TC_ENABLE_SHA384 * 300 + TC_ENABLE_SHA512 * 375)
 
-MunitResult test_cavp_hmac(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_cavp_hmac)
 {
   tc_cavp_reader reader;
   long group_len = -1; /* [L=20] / [L=28] / [L=32] / [L=48] / [L=64] */
@@ -334,8 +332,6 @@ MunitResult test_cavp_hmac(const MunitParameter params[], void* data)
   long key_len = -1, msg_len = -1;
   long cases = 0;
   tc_cavp_event event;
-  (void)params;
-  (void)data;
 
   cavp_open(&reader, "hmac/HMAC.rsp");
   while ((event = tc_cavp_next(&reader)) != TC_CAVP_END) {
@@ -421,10 +417,8 @@ MunitResult test_cavp_hmac(const MunitParameter params[], void* data)
 
 #else /* !TC_ENABLE_HMAC */
 
-MunitResult test_cavp_hmac(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_cavp_hmac)
 {
-  (void)params;
-  (void)data;
   return MUNIT_SKIP;
 }
 
@@ -432,17 +426,13 @@ MunitResult test_cavp_hmac(const MunitParameter params[], void* data)
 
 #else /* !TC_HASH_CAVP */
 
-MunitResult test_cavp_sha(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_cavp_sha)
 {
-  (void)params;
-  (void)data;
   return MUNIT_SKIP;
 }
 
-MunitResult test_cavp_hmac(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_cavp_hmac)
 {
-  (void)params;
-  (void)data;
   return MUNIT_SKIP;
 }
 

@@ -4,6 +4,7 @@
 #define TC_MP_WORD_BITS TC_RSA_WORD_BITS
 #include "../../src/mp_inverse_internal.h"
 #include "munit.h"
+#include "test_util.h"
 #include <openssl/bn.h>
 
 enum { MAX_BYTES = 512, MAX_WORDS = MAX_BYTES / sizeof(tc_mp_word), SAMPLES = 24 };
@@ -31,14 +32,12 @@ static void random_value(BIGNUM* out, int bits)
 }
 
 /* tc_mp_divide_words matches BN_div for quotient and remainder. */
-static MunitResult divide(const MunitParameter params[], void* user)
+TC_TEST(divide)
 {
   static tc_mp_word input[2 * MAX_WORDS], divisor[MAX_WORDS], quotient[2 * MAX_WORDS],
       remainder[MAX_WORDS], scratch[MAX_WORDS];
   BN_CTX* context = BN_CTX_new();
   BIGNUM *a = BN_new(), *d = BN_new(), *q = BN_new(), *r = BN_new();
-  (void)params;
-  (void)user;
   munit_assert_not_null(context);
   for (size_t bytes = 16; bytes <= MAX_BYTES; bytes *= 2) {
     const size_t n = bytes / sizeof(tc_mp_word);
@@ -70,13 +69,11 @@ static MunitResult divide(const MunitParameter params[], void* user)
 }
 
 /* tc_mp_gcd matches BN_gcd, including shared powers of two. */
-static MunitResult gcd(const MunitParameter params[], void* user)
+TC_TEST(gcd)
 {
   static tc_mp_word x[MAX_WORDS], y[MAX_WORDS], out[MAX_WORDS], scratch[3 * MAX_WORDS];
   BN_CTX* context = BN_CTX_new();
   BIGNUM *a = BN_new(), *b = BN_new(), *g = BN_new(), *common = BN_new();
-  (void)params;
-  (void)user;
   munit_assert_not_null(context);
   for (size_t bytes = 16; bytes <= MAX_BYTES / 2; bytes *= 2) {
     const size_t n = bytes / sizeof(tc_mp_word);
@@ -115,14 +112,12 @@ static MunitResult gcd(const MunitParameter params[], void* user)
 }
 
 /* The small-divisor helpers match BN_div_word and BN_mod_word. */
-static MunitResult small_divisor(const MunitParameter params[], void* user)
+TC_TEST(small_divisor)
 {
   static const uint32_t divisors[] = {3, 7, 251, 65537, 0x7fffffffu};
   static tc_mp_word words[MAX_WORDS], quotient[MAX_WORDS];
   uint8_t bytes[MAX_BYTES];
   BIGNUM *a = BN_new(), *q = BN_new();
-  (void)params;
-  (void)user;
   for (unsigned sample = 0; sample < SAMPLES; ++sample)
     for (size_t i = 0; i < sizeof divisors / sizeof *divisors; ++i) {
       random_value(a, 8 * MAX_BYTES);
@@ -141,11 +136,9 @@ static MunitResult small_divisor(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult zero_mask(const MunitParameter params[], void* user)
+TC_TEST(zero_mask)
 {
   tc_mp_word value[4] = {0};
-  (void)params;
-  (void)user;
   munit_assert_uint((unsigned)tc_mp_zero_mask(value, 4), ==, (unsigned)(tc_mp_word)~0u);
   for (size_t i = 0; i < 4; ++i)
     for (unsigned bit = 0; bit < TC_MP_WORD_BITS; ++bit) {

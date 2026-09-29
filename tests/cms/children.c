@@ -4,6 +4,7 @@
 #include "cms_crl_harness.h"
 #include "source.h"
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
 static const TC_CMS_verification_policy cms_policy = {.envelope = TC_CMS_ENVELOPE_BER};
@@ -25,7 +26,7 @@ static size_t signed_data_envelope(const uint8_t* body, size_t body_length, uint
 /* Field collection runs through TC_CMS_signed_data_read. BER end-of-contents
  * markers belong to each field's encoding. Every nesting level validates the
  * whole constructed value before any output is written. */
-static MunitResult fields(const MunitParameter params[], void* user)
+TC_TEST(fields)
 {
   enum { WORK_BUDGET = 1000, FRAME_CAPACITY = 8, INPUT_CAPACITY = 96 };
   static const uint8_t body[] = {2, 1, 1,    0x31, 0x80, 0,    0,    0x30, 0x80,
@@ -41,8 +42,6 @@ static MunitResult fields(const MunitParameter params[], void* user)
   uint8_t input[INPUT_CAPACITY];
   TC_CMS_signed_data result, saved;
   size_t work, length;
-  (void)params;
-  (void)user;
   length = signed_data_envelope(body, sizeof body, input);
   work = WORK_BUDGET;
   munit_assert_int(TC_CMS_signed_data_read((TC_bytes){input, length}, &cms_policy, &limits,
@@ -109,7 +108,7 @@ static MunitResult fields(const MunitParameter params[], void* user)
                    ==, TC_TLV_OK);
   return MUNIT_OK;
 }
-static MunitResult envelope(const MunitParameter params[], void* user)
+TC_TEST(envelope)
 {
   uint8_t encoded[] = {0x30, 35,   6,    9,    0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 1,  7, 2,
                        0xa0, 22,   0x30, 20,   2,    1,    1,    0x31, 0,    0x30, 11, 6, 9,
@@ -118,8 +117,6 @@ static MunitResult envelope(const MunitParameter params[], void* user)
   TC_TLV_frame frames[8];
   TC_CMS_signed_data result, saved;
   size_t work;
-  (void)params;
-  (void)user;
   for (unsigned indefinite = 0; indefinite < 2; ++indefinite) {
     size_t length = sizeof encoded - (indefinite ? 0 : 2);
     encoded[1] = indefinite ? 0x80 : 35;
@@ -200,7 +197,7 @@ static MunitResult envelope(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult versions(const MunitParameter params[], void* user)
+TC_TEST(versions)
 {
   enum { WORK_BUDGET = 4096, FRAME_CAPACITY = 8 };
   uint8_t content_type[] = {0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 1, 7, 1};
@@ -216,8 +213,6 @@ static MunitResult versions(const MunitParameter params[], void* user)
   size_t work;
   const tc_pki_tree_workspace tree = {frames, FRAME_CAPACITY, &work};
   TC_CMS_signed_data input = {0};
-  (void)params;
-  (void)user;
   input.content_type = (TC_bytes){content_type, sizeof content_type};
   for (unsigned cert = 0; cert <= sizeof choice_tags; ++cert)
     for (unsigned rev = 0; rev < 3; ++rev)
@@ -281,7 +276,7 @@ static MunitResult versions(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult other_formats(const MunitParameter params[], void* user)
+TC_TEST(other_formats)
 {
   enum { WORK_BUDGET = 1024, FRAME_CAPACITY = 8 };
   uint8_t simple[] = {0xa3, 6, 6, 2, 0x2a, 3, 5, 0};
@@ -299,8 +294,6 @@ static MunitResult other_formats(const MunitParameter params[], void* user)
   size_t work;
   const tc_pki_tree_workspace tree = {frames, FRAME_CAPACITY, &work};
   tc_cms_other_format parsed, saved;
-  (void)params;
-  (void)user;
   memset(&saved, 0xa5, sizeof saved);
   for (unsigned kind = TC_CMS_OTHER_CERTIFICATE; kind <= TC_CMS_OTHER_REVOCATION; ++kind) {
     for (size_t i = 0; i < sizeof cases / sizeof cases[0]; ++i) {
@@ -369,7 +362,7 @@ static MunitResult other_formats(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult revocation_records(const MunitParameter params[], void* user)
+TC_TEST(revocation_records)
 {
   enum { WORK_BUDGET = 4096, FRAME_CAPACITY = 8, RECORD_COUNT = 3 };
   /* This checks choice framing. Typed CRL processing must reject the empty SEQUENCE. */
@@ -387,8 +380,6 @@ static MunitResult revocation_records(const MunitParameter params[], void* user)
   tc_cms_revocations reader, saved;
   tc_cms_revocation_choice choice, previous;
   const TC_bytes input = {embedded, sizeof embedded};
-  (void)params;
-  (void)user;
   munit_assert_int(tc_cms_revocations_init(input, &external, RECORD_COUNT,
                                            sizeof embedded + sizeof external_bytes, &limits, &tree,
                                            &reader),
@@ -475,7 +466,7 @@ static MunitResult revocation_records(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult guarded_records(const MunitParameter params[], void* user)
+TC_TEST(guarded_records)
 {
   enum { WORK_BUDGET = 4096, FRAME_CAPACITY = 8 };
   uint8_t bytes[] = {0x30, 0};
@@ -493,8 +484,6 @@ static MunitResult guarded_records(const MunitParameter params[], void* user)
                        {(const uint8_t*)&reader, sizeof reader}};
   tc_pki_record_guard guard = {&source, writes, sizeof writes / sizeof writes[0]};
   const tc_pki_record_source guarded = {&guard, 1, tc_pki_record_guard_read};
-  (void)params;
-  (void)user;
   munit_assert_int(tc_cms_revocations_init((TC_bytes){NULL, 0}, &guarded, 1, WORK_BUDGET, &limits,
                                            &tree, &reader),
                    ==, TC_TLV_OK);

@@ -4,6 +4,7 @@
 #include <tiny_crypto/tlv.h>
 #include <tiny_crypto/piv_biometric.h>
 #include "munit.h"
+#include "test_util.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -93,12 +94,10 @@ static void check_profile(const char* profile, int face_and_printed)
   }
 }
 
-static MunitResult fixture_crypto(const MunitParameter params[], void* user_data)
+TC_TEST(fixture_crypto)
 {
   check_profile("legacy", 0);
   check_profile("nexgen", 1);
-  (void)params;
-  (void)user_data;
   return MUNIT_OK;
 }
 

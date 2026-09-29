@@ -5,6 +5,7 @@
  * input limits, entropy failures, reseed scheduling, sticky errors, state
  * wiping and the TC_random_fn adapter. Known answers are in cavp.c. */
 #include "munit.h"
+#include "test_util.h"
 #include <tiny_crypto/drbg.h>
 #include <string.h>
 
@@ -53,13 +54,11 @@ static int all_zero(const void* data, size_t length)
   return 1;
 }
 
-static MunitResult test_lifecycle(const MunitParameter params[], void* data)
+TC_TEST(test_lifecycle)
 {
   static TC_DRBG drbg;
   uint8_t out[64], again[64];
   size_t m;
-  (void)params;
-  (void)data;
   for (m = 0; m < sizeof mechanisms / sizeof mechanisms[0]; ++m) {
     counter_source source = {0, 0, 0};
     TC_random_source entropy = {counter_fill, &source};
@@ -94,7 +93,7 @@ static MunitResult test_lifecycle(const MunitParameter params[], void* data)
   return MUNIT_OK;
 }
 
-static MunitResult test_arguments(const MunitParameter params[], void* data)
+TC_TEST(test_arguments)
 {
   static TC_DRBG drbg;
   static uint8_t big[TC_DRBG_MAX_REQUEST_BYTES + 1];
@@ -104,8 +103,6 @@ static MunitResult test_arguments(const MunitParameter params[], void* data)
   TC_DRBG_config config = config_for(TC_DRBG_HMAC);
   uint8_t nonce[16] = {1}, out[16];
   const TC_bytes short_nonce = {nonce, 15}, good_nonce = {nonce, 16};
-  (void)params;
-  (void)data;
 
   munit_assert_int(TC_DRBG_instantiate(NULL, &config, entropy, empty, empty), ==, TC_DRBG_ARGUMENT);
   munit_assert_int(TC_DRBG_instantiate(&drbg, NULL, entropy, empty, empty), ==, TC_DRBG_ARGUMENT);
@@ -161,7 +158,7 @@ static MunitResult test_arguments(const MunitParameter params[], void* data)
   return MUNIT_OK;
 }
 
-static MunitResult test_ctr_without_df(const MunitParameter params[], void* data)
+TC_TEST(test_ctr_without_df)
 {
   static TC_DRBG drbg;
   counter_source source = {0, 0, 0};
@@ -169,8 +166,6 @@ static MunitResult test_ctr_without_df(const MunitParameter params[], void* data
   TC_DRBG_config config = config_for(TC_DRBG_CTR);
   uint8_t input[49] = {0}, out[16];
   const TC_bytes seedlen = {input, 48}, too_long = {input, 49}, nonce = {input, 16};
-  (void)params;
-  (void)data;
 
   config.derivation_function = 0;
   /* No nonce, inputs at most seedlen, entropy exactly seedlen. */
@@ -193,12 +188,10 @@ static MunitResult test_ctr_without_df(const MunitParameter params[], void* data
   return MUNIT_OK;
 }
 
-static MunitResult test_entropy_failures(const MunitParameter params[], void* data)
+TC_TEST(test_entropy_failures)
 {
   static TC_DRBG drbg, saved;
   size_t m;
-  (void)params;
-  (void)data;
   for (m = 0; m < sizeof mechanisms / sizeof mechanisms[0]; ++m) {
     counter_source source = {0, 1, 0};
     TC_random_source entropy = {counter_fill, &source};
@@ -232,7 +225,7 @@ static MunitResult test_entropy_failures(const MunitParameter params[], void* da
   return MUNIT_OK;
 }
 
-static MunitResult test_reseed_interval(const MunitParameter params[], void* data)
+TC_TEST(test_reseed_interval)
 {
   static TC_DRBG drbg;
   counter_source source = {0, 0, 0};
@@ -240,8 +233,6 @@ static MunitResult test_reseed_interval(const MunitParameter params[], void* dat
   TC_DRBG_config config = config_for(TC_DRBG_HASH);
   uint8_t out[16];
   int i;
-  (void)params;
-  (void)data;
 
   config.reseed_interval = 2;
   munit_assert_int(TC_DRBG_instantiate(&drbg, &config, entropy, empty, empty), ==, TC_DRBG_OK);
@@ -263,7 +254,7 @@ static MunitResult test_reseed_interval(const MunitParameter params[], void* dat
   return MUNIT_OK;
 }
 
-static MunitResult test_random_source(const MunitParameter params[], void* data)
+TC_TEST(test_random_source)
 {
   static TC_DRBG drbg;
   static uint8_t large[200000], reference[200000];
@@ -272,8 +263,6 @@ static MunitResult test_random_source(const MunitParameter params[], void* data)
   const TC_DRBG_config config = config_for(TC_DRBG_CTR);
   TC_random_source random;
   size_t offset;
-  (void)params;
-  (void)data;
 
   /* The adapter splits a 200000-byte request into maximum-size calls. */
   munit_assert_int(TC_DRBG_instantiate(&drbg, &config, entropy, empty, empty), ==, TC_DRBG_OK);
@@ -297,7 +286,7 @@ static MunitResult test_random_source(const MunitParameter params[], void* data)
 /* SP 800-90A Table 2 and Table 3 bound personalization, nonce and
  * additional input at 2^35 bits. An oversized input is a caller error: it is
  * rejected before any entropy is drawn and the DRBG stays usable. */
-static MunitResult test_input_limits(const MunitParameter params[], void* data)
+TC_TEST(test_input_limits)
 {
 #if SIZE_MAX > UINT32_MAX
   static TC_DRBG drbg[2];
@@ -306,8 +295,6 @@ static MunitResult test_input_limits(const MunitParameter params[], void* data)
   const TC_bytes oversized = {(const uint8_t*)&drbg[1], (size_t)TC_DRBG_MAX_INPUT_BYTES + 1u};
   uint8_t out[16];
   size_t m;
-  (void)params;
-  (void)data;
   for (m = 0; m < sizeof mechanisms / sizeof mechanisms[0]; ++m) {
     counter_source source = {0, 0, 0};
     TC_random_source entropy = {counter_fill, &source};
@@ -329,8 +316,6 @@ static MunitResult test_input_limits(const MunitParameter params[], void* data)
   }
   return MUNIT_OK;
 #else
-  (void)params;
-  (void)data;
   return MUNIT_SKIP;
 #endif
 }
@@ -338,7 +323,7 @@ static MunitResult test_input_limits(const MunitParameter params[], void* data)
 /* An argument error for output that overlaps the additional input returns
  * before any write, so the caller's additional input survives. Other
  * rejected requests still wipe a disjoint output. */
-static MunitResult test_overlap_preserves_input(const MunitParameter params[], void* data)
+TC_TEST(test_overlap_preserves_input)
 {
   static TC_DRBG drbg;
   counter_source source = {0, 0, 0};
@@ -346,8 +331,6 @@ static MunitResult test_overlap_preserves_input(const MunitParameter params[], v
   const TC_DRBG_config config = config_for(TC_DRBG_HMAC);
   uint8_t out[32], expected[32];
   size_t i;
-  (void)params;
-  (void)data;
   munit_assert_int(TC_DRBG_instantiate(&drbg, &config, entropy, empty, empty), ==, TC_DRBG_OK);
   for (i = 0; i < sizeof out; ++i)
     out[i] = (uint8_t)(0x40u + i);
@@ -368,15 +351,13 @@ static MunitResult test_overlap_preserves_input(const MunitParameter params[], v
 
 /* TC_DRBG_random rejects output inside the DRBG without wiping the state,
  * so the generator stays usable. */
-static MunitResult test_random_overlap_keeps_state(const MunitParameter params[], void* data)
+TC_TEST(test_random_overlap_keeps_state)
 {
   static TC_DRBG drbg;
   counter_source source = {0, 0, 0};
   TC_random_source entropy = {counter_fill, &source};
   const TC_DRBG_config config = config_for(TC_DRBG_HASH);
   uint8_t out[16];
-  (void)params;
-  (void)data;
   munit_assert_int(TC_DRBG_instantiate(&drbg, &config, entropy, empty, empty), ==, TC_DRBG_OK);
   munit_assert_int(TC_DRBG_random(&drbg, (uint8_t*)&drbg, 16), ==, TC_ERROR);
   munit_assert_int(TC_DRBG_generate(&drbg, out, sizeof out, 0, empty), ==, TC_DRBG_OK);
@@ -387,7 +368,7 @@ static MunitResult test_random_overlap_keeps_state(const MunitParameter params[]
 /* A multi-call TC_DRBG_random request whose later chunk reaches into the
  * DRBG is rejected before the first chunk runs. The output stays unchanged
  * and the generator state does not advance. */
-static MunitResult test_random_late_overlap(const MunitParameter params[], void* data)
+TC_TEST(test_random_late_overlap)
 {
 #if SIZE_MAX > TC_DRBG_MAX_REQUEST_BYTES
   static struct {
@@ -401,8 +382,6 @@ static MunitResult test_random_late_overlap(const MunitParameter params[], void*
   const TC_DRBG_config config = config_for(TC_DRBG_HMAC);
   uint8_t out[16], expected[16];
   size_t i;
-  (void)params;
-  (void)data;
   munit_assert_int(TC_DRBG_instantiate(&layout.drbg, &config, entropy, empty, empty), ==,
                    TC_DRBG_OK);
   munit_assert_int(TC_DRBG_instantiate(&reference, &config, reference_entropy, empty, empty), ==,
@@ -419,8 +398,6 @@ static MunitResult test_random_late_overlap(const MunitParameter params[], void*
   TC_DRBG_uninstantiate(&layout.drbg);
   TC_DRBG_uninstantiate(&reference);
 #else
-  (void)params;
-  (void)data;
 #endif
   return MUNIT_OK;
 }

@@ -20,6 +20,7 @@
 #include "envelope.h"
 #include "fascn_fixture.h"
 #include "munit.h"
+#include "test_util.h"
 #include "native_support.h"
 #include "openssl_fixture.h"
 #include "source.h"
@@ -50,7 +51,7 @@ static TC_X509_signature_result verify_digest_native(const TC_signature_algorith
   return provider.verify_digest(provider.context, digest, algorithm, signature, key, &work);
 }
 
-static MunitResult content_signature(const MunitParameter params[], void* user)
+TC_TEST(content_signature)
 {
   enum {
     FRAME_CAPACITY = 8,
@@ -90,8 +91,6 @@ static MunitResult content_signature(const MunitParameter params[], void* user)
   unsigned char* cursor = spki;
   unsigned digest_length;
   int spki_length;
-  (void)params;
-  (void)user;
   munit_assert_not_null(generated);
   munit_assert_not_null(signer);
   spki_length = i2d_PUBKEY(generated, NULL);
@@ -296,7 +295,7 @@ static MunitResult content_signature(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult rsa_signature(const MunitParameter params[], void* user)
+TC_TEST(rsa_signature)
 {
   enum { SPKI_CAPACITY = 512, MAX_RSA_BITS = 3072 };
   static const unsigned key_sizes[] = {1024, 2048, MAX_RSA_BITS};
@@ -311,8 +310,6 @@ static MunitResult rsa_signature(const MunitParameter params[], void* user)
   TC_RSA_word words[TC_RSA_VERIFY_WORKSPACE_WORDS(MAX_RSA_BITS)];
   TC_RSA_workspace workspace = {words, sizeof words / sizeof *words};
   uint8_t spki[SPKI_CAPACITY], signature[MAX_RSA_BITS / 8], digest[TC_SHA256_DIGESTLEN];
-  (void)params;
-  (void)user;
   munit_assert_true(tc_hash_info_get(TC_HASH_SHA256, &hash));
   info.digest_algorithm = (TC_DER_algorithm){hash.oid, {NULL, 0}};
   info.signature_algorithm =
@@ -407,7 +404,7 @@ static MunitResult rsa_signature(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult signed_data(const MunitParameter params[], void* user)
+TC_TEST(signed_data)
 {
   enum {
     ENCODED_CAPACITY = 4096,
@@ -441,8 +438,6 @@ static MunitResult signed_data(const MunitParameter params[], void* user)
   X509 *certificate, *other_certificate;
   unsigned char* cursor;
   size_t certificate_length, other_length;
-  (void)params;
-  (void)user;
   munit_assert_not_null(generated);
   munit_assert_not_null(other_key);
   certificate = make_certificate(generated, "CMS signer", NULL);
@@ -2218,12 +2213,11 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
   EVP_PKEY_free(key);
   X509_free(root);
   EVP_PKEY_free(root_key);
-  (void)params;
   (void)user;
   return MUNIT_OK;
 }
 
-static MunitResult legacy_chuid_key_map_signature(const MunitParameter params[], void* user)
+TC_TEST(legacy_chuid_key_map_signature)
 {
   enum { CAPACITY = 2048, CERTIFICATE_BYTES = 1024, FRAMES = 16, OIDS = 16, WORK = 100000 };
   uint8_t encoded[CAPACITY], certificate_bytes[CERTIFICATE_BYTES];
@@ -2325,12 +2319,10 @@ static MunitResult legacy_chuid_key_map_signature(const MunitParameter params[],
   CMS_ContentInfo_free(cms);
   X509_free(certificate);
   EVP_PKEY_free(key);
-  (void)params;
-  (void)user;
   return MUNIT_OK;
 }
 
-static MunitResult security_profile(const MunitParameter params[], void* user)
+TC_TEST(security_profile)
 {
   enum { CAPACITY = 4096, FRAMES = 16, WORK = 100000 };
   static const uint8_t content[] = {0x30, 0};
@@ -2471,8 +2463,6 @@ static MunitResult security_profile(const MunitParameter params[], void* user)
   }
   X509_free(certificate);
   EVP_PKEY_free(key);
-  (void)params;
-  (void)user;
   return MUNIT_OK;
 }
 

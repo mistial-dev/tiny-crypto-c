@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/cms.h>
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
 static const TC_CMS_verification_policy cms_policy = {.envelope = TC_CMS_ENVELOPE_BER};
@@ -18,7 +19,7 @@ static const uint8_t encoded[] = {
     3,    4,    1,    0xaa, 0x30, 0x18, 0x06, 9,    0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 1, 9,
     3,    0x31, 0x0b, 0x06, 9,    0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 1,    7,    1};
 
-static MunitResult attributes(const MunitParameter params[], void* user)
+TC_TEST(attributes)
 {
   TC_TLV_limits limits = {1024, 1024, 32, 8};
   TC_TLV_frame frames[8];
@@ -28,8 +29,6 @@ static MunitResult attributes(const MunitParameter params[], void* user)
   uint8_t bad[64];
   static const size_t positions[] = {0, 1, 2, 17, 35};
   static const uint8_t values[] = {0x31, 0x80, 0x31, 5, 4};
-  (void)params;
-  (void)user;
   munit_assert_int(TC_CMS_signed_attributes_read(input, &cms_policy, &limits,
                                                  (TC_TLV_frames){frames, 8}, &work, &result),
                    ==, TC_TLV_OK);
@@ -108,15 +107,13 @@ static MunitResult attributes(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult compatibility(const MunitParameter params[], void* user)
+TC_TEST(compatibility)
 {
   const TC_TLV_limits limits = {1024, 1024, 64, 8};
   TC_TLV_frame frames[8];
   TC_CMS_signed_attributes result, saved;
   uint8_t input[96];
   size_t work;
-  (void)params;
-  (void)user;
   /* Preserve reversed members and a nonminimal outer length in signature input. */
   input[0] = 0xa0;
   input[1] = 0x81;
@@ -178,7 +175,7 @@ static MunitResult compatibility(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult signing_time(const MunitParameter params[], void* user)
+TC_TEST(signing_time)
 {
   static const struct {
     unsigned tag;
@@ -194,8 +191,6 @@ static MunitResult signing_time(const MunitParameter params[], void* user)
   TC_TLV_frame frames[8];
   uint8_t input[128];
   TC_CMS_signed_attributes result, saved;
-  (void)params;
-  (void)user;
   for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
     size_t length = strlen(cases[i].text), work = 1000;
     uint8_t* attribute = input + sizeof encoded;
@@ -305,7 +300,7 @@ static size_t with_attribute(uint8_t out[ATTRIBUTE_BUFFER_BYTES], TC_bytes oid,
   return attribute_set(out, extra, duplicate ? 2 : 1);
 }
 
-static MunitResult capabilities(const MunitParameter params[], void* user)
+TC_TEST(capabilities)
 {
   static const uint8_t capability_oid[] = {0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 1, 9, 15};
   const TC_bytes oid = {capability_oid, sizeof capability_oid};
@@ -327,8 +322,6 @@ static MunitResult capabilities(const MunitParameter params[], void* user)
   TC_TLV_frame frames[8];
   uint8_t input[ATTRIBUTE_BUFFER_BYTES];
   TC_CMS_signed_attributes result, saved;
-  (void)params;
-  (void)user;
   memset(&saved, 0xa5, sizeof saved);
   for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
     for (unsigned mode = 0; mode < 2; ++mode) {
@@ -371,7 +364,7 @@ static MunitResult capabilities(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult signer_name(const MunitParameter params[], void* user)
+TC_TEST(signer_name)
 {
   static const uint8_t name_oid[] = {0x60, 0x86, 0x48, 1, 0x65, 3, 6, 5};
   static const uint8_t name[] = {0x30, 12, 0x31, 10, 0x30, 8, 6, 3, 0x55, 4, 3, 0x0c, 1, 'A'};
@@ -380,8 +373,6 @@ static MunitResult signer_name(const MunitParameter params[], void* user)
   TC_TLV_frame frames[8];
   uint8_t input[ATTRIBUTE_BUFFER_BYTES], bad_name[sizeof name];
   TC_CMS_signed_attributes result, saved;
-  (void)params;
-  (void)user;
   memset(&saved, 0xa5, sizeof saved);
   for (unsigned mode = 0; mode < 2; ++mode) {
     size_t length = with_attribute(input, oid, name, sizeof name, 0, 0), work = 2000;
@@ -424,7 +415,7 @@ static MunitResult signer_name(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult identifier_octets(const MunitParameter params[], void* user)
+TC_TEST(identifier_octets)
 {
   enum { FASCN_BYTES = 25, WORK = 4000 };
   static const uint8_t piv[] = {0x60, 0x86, 0x48, 1, 0x65, 3, 6, 6};
@@ -538,8 +529,6 @@ static MunitResult identifier_octets(const MunitParameter params[], void* user)
       }
     }
   }
-  (void)params;
-  (void)user;
   return MUNIT_OK;
 }
 
@@ -576,7 +565,7 @@ static TC_TLV_result read_checked(TC_bytes input, const TC_CMS_verification_poli
   return expected;
 }
 
-static MunitResult other_attributes(const MunitParameter params[], void* user)
+TC_TEST(other_attributes)
 {
   /* RFC 6211 section 2, RFC 5035 sections 5 and 3, RFC 5652 section 11.4, and
    * a private arc. */
@@ -604,8 +593,6 @@ static MunitResult other_attributes(const MunitParameter params[], void* user)
   enum { ONE, DUPLICATE, MULTIPLE_VALUES, OCTET_VALUE, VARIANTS };
   uint8_t input[ATTRIBUTE_BUFFER_BYTES];
   TC_CMS_signed_attributes parsed;
-  (void)params;
-  (void)user;
   for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
     const TC_bytes oid = {cases[i].oid, cases[i].oid_length};
     for (size_t h = 0; h < sizeof handling / sizeof *handling; ++h) {
@@ -674,7 +661,7 @@ static MunitResult other_attributes(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult identifier_namespaces(const MunitParameter params[], void* user)
+TC_TEST(identifier_namespaces)
 {
   enum { NAME, PIV_FASCN, TWIC_FASCN, KINDS, FASCN_BYTES = 25 };
   static const uint8_t name_oid[] = {0x60, 0x86, 0x48, 1, 0x65, 3, 6, 5};
@@ -688,8 +675,6 @@ static MunitResult identifier_namespaces(const MunitParameter params[], void* us
   uint8_t fascn[FASCN_BYTES + 2] = {4, FASCN_BYTES};
   uint8_t input[ATTRIBUTE_BUFFER_BYTES];
   TC_CMS_signed_attributes parsed;
-  (void)params;
-  (void)user;
   for (unsigned kind = 0; kind < KINDS; ++kind) {
     const uint8_t* value = kind == NAME ? name : fascn;
     const size_t value_length = kind == NAME ? sizeof name : sizeof fascn;
@@ -727,15 +712,13 @@ static MunitResult identifier_namespaces(const MunitParameter params[], void* us
   return MUNIT_OK;
 }
 
-static MunitResult policy_arguments(const MunitParameter params[], void* user)
+TC_TEST(policy_arguments)
 {
   const TC_TLV_limits limits = {512, 512, 64, 8};
   TC_TLV_frame frames[8];
   TC_CMS_signed_attributes parsed, saved;
   const TC_bytes input = {encoded, sizeof encoded};
   size_t work = 1000;
-  (void)params;
-  (void)user;
   memset(&parsed, 0xa5, sizeof parsed);
   memcpy(&saved, &parsed, sizeof saved);
   munit_assert_int(TC_CMS_signed_attributes_read(input, NULL, &limits, (TC_TLV_frames){frames, 8},

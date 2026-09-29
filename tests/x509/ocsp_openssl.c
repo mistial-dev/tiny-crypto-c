@@ -7,6 +7,7 @@
  * OCSP_basic_sign stamps producedAt with the wall clock, so every time is
  * relative to the clock read by hierarchy_init. */
 #include "ocsp_fixture.h"
+#include "test_util.h"
 #include "openssl_fixture.h"
 #include <openssl/evp.h>
 #include <openssl/ocsp.h>
@@ -324,12 +325,10 @@ static TC_TLV_result verify(const response_spec* spec, const TC_X509_store_sourc
 
 /* A response signed by the CA itself, identified byName or byKey (RFC 6960
  * 4.2.1 and 4.2.2.2), reports its status and no delegate. */
-static MunitResult ca_signed(const MunitParameter params[], void* user)
+TC_TEST(ca_signed)
 {
   const unsigned long forms[] = {OCSP_NOCERTS, OCSP_NOCERTS | OCSP_RESPID_KEY, 0};
   TC_X509_ocsp_result result;
-  (void)params;
-  (void)user;
   hierarchy_init();
   for (size_t i = 0; i < sizeof forms / sizeof *forms; ++i) {
     response_spec spec = response_by(pki.ca, pki.ca_key);
@@ -403,11 +402,9 @@ static MunitResult ca_signed(const MunitParameter params[], void* user)
 
 /* CertID hashes: SHA-1 and SHA-256 are supported. Any other hash is
  * UNSUPPORTED. A CertID naming another issuer covers no certificate. */
-static MunitResult cert_id(const MunitParameter params[], void* user)
+TC_TEST(cert_id)
 {
   TC_X509_ocsp_result result;
-  (void)params;
-  (void)user;
   hierarchy_init();
   response_spec spec = response_by(pki.ca, pki.ca_key);
   spec.flags = OCSP_NOCERTS;
@@ -427,12 +424,10 @@ static MunitResult cert_id(const MunitParameter params[], void* user)
 /* Delegates embedded in the response or supplied through the store, named
  * byName or byKey. The result reports the delegate and id-pkix-ocsp-nocheck
  * (RFC 6960 4.2.2.2 and 4.2.2.2.1). */
-static MunitResult delegates(const MunitParameter params[], void* user)
+TC_TEST(delegates)
 {
   const unsigned long forms[] = {0, OCSP_RESPID_KEY};
   TC_X509_ocsp_result result;
-  (void)params;
-  (void)user;
   hierarchy_init();
   for (int nocheck = 0; nocheck < 2; ++nocheck) {
     certificate_spec authorized = delegate_spec();
@@ -480,12 +475,10 @@ static MunitResult delegates(const MunitParameter params[], void* user)
  * the evaluation time, allow digitalSignature when keyUsage is present and
  * have no unknown critical extension (RFC 6960 4.2.2.2, RFC 5280 4.2). Each
  * rejected delegate leaves the response without an authorized signer. */
-static MunitResult delegate_rejections(const MunitParameter params[], void* user)
+TC_TEST(delegate_rejections)
 {
   enum { CASES = 8 };
   TC_X509_ocsp_result result;
-  (void)params;
-  (void)user;
   hierarchy_init();
   for (int i = 0; i < CASES; ++i) {
     certificate_spec rejected = delegate_spec();
@@ -535,11 +528,9 @@ static MunitResult delegate_rejections(const MunitParameter params[], void* user
 
 /* responses may hold other certificates' SingleResponses. The target must
  * appear once. max_responses bounds every SingleResponse read. */
-static MunitResult single_responses(const MunitParameter params[], void* user)
+TC_TEST(single_responses)
 {
   TC_X509_ocsp_result result;
-  (void)params;
-  (void)user;
   hierarchy_init();
   response_spec spec = response_by(pki.ca, pki.ca_key);
   spec.flags = OCSP_NOCERTS;
@@ -565,11 +556,9 @@ static MunitResult single_responses(const MunitParameter params[], void* user)
  * in responseExtensions or singleExtensions is UNSUPPORTED (RFC 6960 4.4,
  * RFC 5280 4.2). A nonce is noncritical and only in responseExtensions
  * (RFC 9654 2.1). */
-static MunitResult extensions(const MunitParameter params[], void* user)
+TC_TEST(extensions)
 {
   TC_X509_ocsp_result result;
-  (void)params;
-  (void)user;
   hierarchy_init();
   response_spec spec = response_by(pki.ca, pki.ca_key);
   spec.flags = OCSP_NOCERTS;
@@ -602,12 +591,10 @@ static MunitResult extensions(const MunitParameter params[], void* user)
  * and verify the echo (RFC 6960 4.1.1, RFC 9654 2.1). Nonces outside
  * 32..128 octets are argument errors, and a missing or different echo is
  * INVALID. */
-static MunitResult nonce(const MunitParameter params[], void* user)
+TC_TEST(nonce)
 {
   uint8_t nonce_bytes[130], encoded[512];
   TC_X509_ocsp_result result;
-  (void)params;
-  (void)user;
   hierarchy_init();
   for (size_t i = 0; i < sizeof nonce_bytes; ++i)
     nonce_bytes[i] = (uint8_t)(0x40 + i);
@@ -698,11 +685,9 @@ static void assert_work_limit(const TC_X509_ocsp_verify_request* request, size_t
  * path and its signature, then the response signature. A budget one short of
  * the full cost, and budgets spread across every stage, are LIMIT. Workspace
  * and parsing capacities are LIMIT too. */
-static MunitResult work_limits(const MunitParameter params[], void* user)
+TC_TEST(work_limits)
 {
   TC_X509_ocsp_result result;
-  (void)params;
-  (void)user;
   hierarchy_init();
   X509* delegate;
   {
@@ -755,13 +740,11 @@ static MunitResult work_limits(const MunitParameter params[], void* user)
 
 /* Unsuccessful responses carry no status (RFC 6960 4.2.1). malformedRequest
  * reports bad data, the others give no decision, and value 4 is unused. */
-static MunitResult unsuccessful(const MunitParameter params[], void* user)
+TC_TEST(unsuccessful)
 {
   const TC_TLV_result expected[] = {TC_TLV_INVALID, TC_TLV_UNSUPPORTED, TC_TLV_UNSUPPORTED,
                                     TC_TLV_INVALID, TC_TLV_UNSUPPORTED, TC_TLV_UNSUPPORTED};
   TC_X509_ocsp_result result;
-  (void)params;
-  (void)user;
   hierarchy_init();
   for (int status = 1; status <= 6; ++status) {
     OCSP_RESPONSE* response = OCSP_response_create(status, NULL);
@@ -847,11 +830,9 @@ static TC_TLV_result check_path(TC_bytes response, int crl, const TC_bytes* dele
 /* TC_X509_path_check_revocation settles a member with an accepted OCSP
  * response and falls back to CRLs otherwise. A delegate without
  * id-pkix-ocsp-nocheck needs CRL evidence of its own (RFC 6960 4.2.2.2.1). */
-static MunitResult path_fallback(const MunitParameter params[], void* user)
+TC_TEST(path_fallback)
 {
   TC_X509_revocation_result result;
-  (void)params;
-  (void)user;
   hierarchy_init();
   response_spec spec = response_by(pki.ca, pki.ca_key);
   spec.flags = OCSP_NOCERTS;

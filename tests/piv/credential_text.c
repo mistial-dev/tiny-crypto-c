@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "../../src/credential_text_internal.h"
 #include "munit.h"
+#include "test_util.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -21,11 +22,9 @@ static void assert_time(const TC_X509_time* actual, unsigned year, unsigned mont
   munit_assert_uint8(actual->second, ==, 0);
 }
 
-static MunitResult decimal(const MunitParameter params[], void* user)
+TC_TEST(decimal)
 {
   size_t value = 7;
-  (void)params;
-  (void)user;
   munit_assert_true(tc_credential_decimal(text("0042"), 4, 9999, &value));
   munit_assert_size(value, ==, 42);
   munit_assert_true(tc_credential_decimal(text("31"), 2, 31, &value));
@@ -61,7 +60,7 @@ static MunitResult decimal(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult day_month_year(const MunitParameter params[], void* user)
+TC_TEST(day_month_year)
 {
   static const char* const rejected_upper[] = {"29FEB1900", "00JAN2024", "31APR2024", "01JAN0000",
                                                "01Jan2024", "01FOO2024", "32DEC2024", "0xJAN2024",
@@ -69,8 +68,6 @@ static MunitResult day_month_year(const MunitParameter params[], void* user)
   static const char* const rejected_title[] = {"01JAN2024", "01jan2024", "01jAN2024", "29Feb2023"};
   const TC_X509_time sentinel = {1, 2, 3, 4, 5, 6};
   TC_X509_time out = sentinel;
-  (void)params;
-  (void)user;
   munit_assert_true(tc_credential_day_month_year(text("29FEB2024"), 0, &out));
   assert_time(&out, 2024, 2, 29);
   munit_assert_true(tc_credential_day_month_year(text("31Dec9999"), 1, &out));
@@ -91,11 +88,9 @@ static MunitResult day_month_year(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult yyyymmdd(const MunitParameter params[], void* user)
+TC_TEST(yyyymmdd)
 {
   unsigned year = 1, month = 2, day = 3;
-  (void)params;
-  (void)user;
   munit_assert_true(tc_credential_yyyymmdd(text("20240229"), 8, &year, &month, &day));
   munit_assert_uint(year, ==, 2024);
   munit_assert_uint(month, ==, 2);

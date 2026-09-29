@@ -8,6 +8,7 @@
 #include <tiny_crypto/aes.h>
 #include "cavp.h"
 #include "munit.h"
+#include "test_util.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -847,10 +848,8 @@ static int cavp_run_all(void)
   return ok;
 }
 
-MunitResult test_cavp(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_cavp)
 {
-  (void)params;
-  (void)data;
 #if TC_AES_ENABLE_ECB || TC_AES_ENABLE_CBC || TC_AES_ENABLE_OFB || TC_AES_ENABLE_GCM ||            \
     TC_AES_ENABLE_CCM
   cavp_initialize_sbox();
@@ -868,10 +867,8 @@ MunitResult test_cavp(const MunitParameter params[], void* data)
 
 #else
 
-MunitResult test_cavp(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_cavp)
 {
-  (void)params;
-  (void)data;
   return MUNIT_SKIP;
 }
 

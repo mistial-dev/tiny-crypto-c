@@ -5,6 +5,7 @@
 #include "../../src/mp_internal.h"
 #include "../../src/rsa_internal.h"
 #include "munit.h"
+#include "test_util.h"
 #include <openssl/bn.h>
 #include <openssl/core_names.h>
 #include <openssl/evp.h>
@@ -41,7 +42,7 @@ static TC_RSA_result verify_v15(const TC_RSA_public_key* key, TC_hash_algorithm 
   return result;
 }
 
-static MunitResult oracle(const MunitParameter params[], void* user)
+TC_TEST(oracle)
 {
   tc_mp_word p[MAX_WORDS], base[MAX_WORDS], r2[MAX_WORDS], one[MAX_WORDS];
   tc_mp_word out[MAX_WORDS], temporary[MAX_WORDS], product[2 * MAX_WORDS + 2], reduced[MAX_WORDS];
@@ -49,8 +50,6 @@ static MunitResult oracle(const MunitParameter params[], void* user)
   uint32_t state = 0x694e762d;
   BN_CTX* context = BN_CTX_new();
   BIGNUM *mod = BN_new(), *a = BN_new(), *e = BN_new(), *radix = BN_new(), *expected = BN_new();
-  (void)params;
-  (void)user;
   munit_assert_not_null(context);
   munit_assert_not_null(mod);
   munit_assert_not_null(a);
@@ -128,13 +127,11 @@ static MunitResult oracle(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult signatures(const MunitParameter params[], void* user)
+TC_TEST(signatures)
 {
   uint8_t modulus[MAX_BYTES], exponent[MAX_BYTES], signature[MAX_BYTES], digest[64] = {0};
   const EVP_MD* hashes[] = {EVP_sha1(), EVP_sha224(), EVP_sha256(), EVP_sha384(), EVP_sha512()};
   tc_mp_word scratch[9 * MAX_WORDS + 2];
-  (void)params;
-  (void)user;
   for (size_t length = 128; length <= MAX_BYTES; length += 128) {
     EVP_PKEY* key = EVP_RSA_gen((unsigned)(length * 8));
     EVP_PKEY_CTX* context;

@@ -37,13 +37,11 @@ static TC_status cmac_stream(size_t keylen, const uint8_t* data, size_t length, 
   return status;
 }
 
-static MunitResult cmac_failures(const MunitParameter params[], void* user)
+TC_TEST(cmac_failures)
 {
   static const size_t keylens[] = {TC_DES_KEYLEN, TC_DES_KEYLEN_2KEY, TC_DES_KEYLEN_3KEY};
   static const size_t lengths[] = {0, 8, 17};
   uint8_t data[17], tag[TC_DES_CMAC_TAG_MAX], untouched[TC_DES_CMAC_TAG_MAX];
-  (void)params;
-  (void)user;
   tc_test_fill_incrementing(data, sizeof data);
   memset(untouched, 0x5a, sizeof untouched);
   for (size_t k = 0; k < sizeof keylens / sizeof *keylens; ++k) {
@@ -98,7 +96,7 @@ static TC_status iso9797_stream(TC_DES_ISO9797_algorithm algorithm, TC_DES_ISO97
   return status;
 }
 
-static MunitResult iso9797_failures(const MunitParameter params[], void* user)
+TC_TEST(iso9797_failures)
 {
   static const TC_DES_ISO9797_algorithm algorithms[] = {TC_DES_ISO9797_ALG1, TC_DES_ISO9797_ALG3};
   static const struct {
@@ -109,8 +107,6 @@ static MunitResult iso9797_failures(const MunitParameter params[], void* user)
                   {TC_DES_ISO9797_PAD2, 0},      {TC_DES_ISO9797_PAD2, 16}};
   static const size_t keylens[] = {TC_DES_KEYLEN_2KEY, TC_DES_KEYLEN_3KEY};
   uint8_t data[16], tag[TC_DES_BLOCKLEN], untouched[TC_DES_BLOCKLEN];
-  (void)params;
-  (void)user;
   tc_test_fill_incrementing(data, sizeof data);
   memset(untouched, 0x5a, sizeof untouched);
   for (size_t a = 0; a < sizeof algorithms / sizeof *algorithms; ++a) {

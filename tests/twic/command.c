@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "../../examples/credential_pcsc.h"
 #include "munit.h"
+#include "test_util.h"
 #include "cavp.h"
 #include <string.h>
 #include <sys/resource.h>
@@ -188,7 +189,7 @@ static int run(void)
     args[3] = NULL;
   return example_credential_main(unsigned_option ? 4 : 3, args);
 }
-static MunitResult workflow(const MunitParameter params[], void* context)
+TC_TEST(workflow)
 {
   for (unsigned mask = 0; mask < 4; ++mask) {
     reset();
@@ -251,11 +252,9 @@ static MunitResult workflow(const MunitParameter params[], void* context)
   unsigned_option = 1;
   munit_assert_int(run(), ==, 1);
   munit_assert_uint(transfers, ==, 5);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
-static MunitResult protection(const MunitParameter params[], void* context)
+TC_TEST(protection)
 {
   for (int failure = 1; failure <= 2; ++failure) {
     reset();
@@ -271,8 +270,6 @@ static MunitResult protection(const MunitParameter params[], void* context)
   munit_assert_uint(transfers, ==, 0);
   munit_assert_uint(closes, ==, 1);
   munit_assert_uint(unlocks, ==, 1);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 int main(int argc, char** argv)

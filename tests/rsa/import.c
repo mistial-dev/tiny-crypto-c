@@ -2,17 +2,16 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/key.h>
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
-static MunitResult rsa_private_import(const MunitParameter params[], void* user)
+TC_TEST(rsa_private_import)
 {
   uint8_t encoded[] = {
       0x30, 60,   2,  1, 1, 0x30, 13, 6, 9,  0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 1, 1,  1, 5, 0, 4,
       29,   0x30, 27, 2, 1, 0,    2,  1, 15, 2,    1,    3,    2,    1,    3,    2, 1,  3, 2, 1, 5,
       2,    1,    1,  2, 1, 3,    2,  1, 2,  0x81, 9,    0,    0x30, 6,    2,    1, 15, 2, 1, 3};
   TC_KEY_rsa_private_key key;
-  (void)params;
-  (void)user;
   munit_assert_int(TC_KEY_rsa_private_read((TC_bytes){encoded, sizeof encoded}, &key), ==,
                    TC_TLV_OK);
   munit_assert_int(key.type, ==, TC_KEY_RSA);

@@ -2,9 +2,10 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "../../src/inflate_internal.h"
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
-static MunitResult trees(const MunitParameter params[], void* context)
+TC_TEST(trees)
 {
   /* RFC 1951 section 3.2.2 alphabet ABCDEFGH. */
   const uint8_t lengths[] = {3, 3, 3, 3, 3, 2, 4, 4};
@@ -35,11 +36,9 @@ static MunitResult trees(const MunitParameter params[], void* context)
                        ==, valid ? TC_GZIP_OK : TC_GZIP_INVALID);
     }
   }
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
-static MunitResult bits_and_symbols(const MunitParameter params[], void* context)
+TC_TEST(bits_and_symbols)
 {
   /* ABCDEFGH from RFC 1951's canonical-code example, packed LSB-first. */
   const uint8_t encoded[] = {0x72, 0x3a, 0xee, 0x01};
@@ -92,12 +91,10 @@ static MunitResult bits_and_symbols(const MunitParameter params[], void* context
       ++decoded;
     munit_assert_uint(decoded, <, 8);
   }
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult tables(const MunitParameter params[], void* context)
+TC_TEST(tables)
 {
   /* Python zlib, raw DEFLATE of the sentence below repeated 100 times. */
   static const uint8_t dynamic[] = {
@@ -175,12 +172,10 @@ static MunitResult tables(const MunitParameter params[], void* context)
   munit_assert_uint(storage.literal.counts[8], ==, 152);
   munit_assert_uint(storage.literal.counts[9], ==, 112);
   munit_assert_uint(storage.distance.counts[5], ==, 32);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult blocks(const MunitParameter params[], void* context)
+TC_TEST(blocks)
 {
   /* Independent zlib fixed and stored encodings of six repetitions of abc. */
   const uint8_t fixed[] = {0x4b, 0x4c, 0x4a, 0x4e, 0x44, 0x45, 0};
@@ -214,12 +209,10 @@ static MunitResult blocks(const MunitParameter params[], void* context)
     output.length = 8; /* A new stream cannot reference an earlier member. */
     munit_assert_int(tc_inflate_decode(&bad, &tables, &output), ==, TC_GZIP_INVALID);
   }
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult gzip_members(const MunitParameter params[], void* context)
+TC_TEST(gzip_members)
 {
   /* Python gzip.compress(..., mtime=0); optional-header CRC from zlib.crc32. */
   const uint8_t member[] = {0x1f, 0x8b, 8,    0, 0, 0,    0,    0,    2,  0xff, 0x4b, 0x4c, 0x4a,
@@ -298,8 +291,6 @@ static MunitResult gzip_members(const MunitParameter params[], void* context)
   output.length = 0;
   work = SIZE_MAX;
   munit_assert_int(tc_gzip_decode(input, &tables, &output, &work), ==, TC_GZIP_OK);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 

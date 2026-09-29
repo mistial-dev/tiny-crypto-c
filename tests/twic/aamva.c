@@ -3,9 +3,10 @@
 #include <tiny_crypto/aamva.h>
 #include <tiny_crypto/twic_tpk.h>
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
-static MunitResult directory(const MunitParameter params[], void* context)
+TC_TEST(directory)
 {
   uint8_t bytes[] = "@\n\036\rANSI 999999100002ID00410003ZT00440007ID\rZT\nZTA\r";
   const TC_bytes input = {bytes, sizeof bytes - 1};
@@ -72,12 +73,10 @@ static MunitResult directory(const MunitParameter params[], void* context)
   munit_assert_memory_equal(sizeof bytes, alias.bytes, bytes);
   munit_assert_int(TC_AAMVA_subfile_find(input, NULL, &out), ==, TC_TLV_ARGUMENT);
   munit_assert_int(TC_AAMVA_subfile_find(input, "ZT", NULL), ==, TC_TLV_ARGUMENT);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult fields(const MunitParameter params[], void* context)
+TC_TEST(fields)
 {
   static const struct {
     const char* data;
@@ -124,12 +123,10 @@ static MunitResult fields(const MunitParameter params[], void* context)
       TC_AAMVA_field_find((TC_bytes){alias.bytes, sizeof input - 1}, "ZTA", &alias.span), ==,
       TC_TLV_ARGUMENT);
   munit_assert_memory_equal(sizeof input, alias.bytes, input);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult privacy_key(const MunitParameter params[], void* context)
+TC_TEST(privacy_key)
 {
   uint8_t container[] = {0xdf, 0xc1, 1,  24, 0xc0, 16, 0,  1,  2,    3, 4, 5,    6, 7,
                          8,    9,    10, 11, 12,   13, 14, 15, 0xc1, 1, 8, 0xc2, 1, 0};
@@ -217,8 +214,6 @@ static MunitResult privacy_key(const MunitParameter params[], void* context)
   munit_assert_int(TC_TWIC_tpk_read((TC_bytes){hex, sizeof hex - 1}, TC_TWIC_TPK_BARCODE_HEX, &key),
                    ==, TC_TLV_INVALID);
   munit_assert_memory_equal(sizeof key, &key, &saved);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 

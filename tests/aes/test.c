@@ -78,7 +78,7 @@ MunitResult test_siv(const MunitParameter params[], void* data);
 MunitResult test_cmac(const MunitParameter params[], void* data);
 #endif
 
-static MunitResult test_key_schedule(const MunitParameter params[], void* data)
+TC_TEST(test_key_schedule)
 {
   static const char expected[] =
 #if TC_AES_KEY_BITS == 128
@@ -117,8 +117,6 @@ static MunitResult test_key_schedule(const MunitParameter params[], void* data)
   struct TC_AES_key_ctx ctx;
   size_t i;
 
-  (void)params;
-  (void)data;
   test_initialize_sbox();
   munit_assert_size(sizeof(expected) - 1u, ==, 2u * TC_AES_KEY_EXP_SIZE);
   munit_assert_int(TC_AES_key_init(&ctx, TEST_KEY), ==, TC_OK);
@@ -128,14 +126,12 @@ static MunitResult test_key_schedule(const MunitParameter params[], void* data)
   return MUNIT_OK;
 }
 
-static MunitResult test_invalid_key_state(const MunitParameter params[], void* data)
+TC_TEST(test_invalid_key_state)
 {
   struct TC_AES_ctx ctx = {0};
   struct TC_AES_key_ctx key = {0};
   uint8_t block[TC_AES_BLOCKLEN] = {1};
   uint8_t saved[TC_AES_BLOCKLEN];
-  (void)params;
-  (void)data;
   test_initialize_sbox();
   memcpy(saved, block, sizeof block);
 #if TC_AES_ENABLE_ECB
@@ -223,12 +219,10 @@ static void check_mode_overlap(aes_mode_fn mode, size_t length)
   TC_AES_ctx_clear(&frame.ctx);
 }
 
-static MunitResult test_mode_overlap(const MunitParameter params[], void* data)
+TC_TEST(test_mode_overlap)
 {
   struct TC_AES_ctx ctx;
   struct TC_AES_ctx saved;
-  (void)params;
-  (void)data;
   test_initialize_sbox();
 #if TC_AES_ENABLE_CBC
   check_mode_overlap(TC_AES_CBC_encrypt, TC_AES_BLOCKLEN);
@@ -306,10 +300,8 @@ static void check_mode_requires_iv(aes_mode_fn mode, size_t length)
   TC_AES_ctx_clear(&ctx);
 }
 
-static MunitResult test_iv_required(const MunitParameter params[], void* data)
+TC_TEST(test_iv_required)
 {
-  (void)params;
-  (void)data;
   test_initialize_sbox();
 #if TC_AES_ENABLE_CBC
   check_mode_requires_iv(TC_AES_CBC_encrypt, 2 * TC_AES_BLOCKLEN);
@@ -325,14 +317,11 @@ static MunitResult test_iv_required(const MunitParameter params[], void* data)
 }
 #endif
 
-static MunitResult test_secure_zero_and_clear(const MunitParameter params[], void* data)
+TC_TEST(test_secure_zero_and_clear)
 {
   struct TC_AES_ctx ctx;
   uint8_t buffer[32];
   size_t i;
-
-  (void)params;
-  (void)data;
 
   test_initialize_sbox();
   for (i = 0; i < sizeof(buffer); ++i)
@@ -360,13 +349,10 @@ static MunitResult test_secure_zero_and_clear(const MunitParameter params[], voi
 #endif
 
 #if TC_AES_ENABLE_ECB
-static MunitResult test_ecb(const MunitParameter params[], void* data)
+TC_TEST(test_ecb)
 {
   struct TC_AES_ctx ctx;
   uint8_t buffer[TC_AES_BLOCKLEN];
-
-  (void)params;
-  (void)data;
 
   test_initialize_sbox();
   TC_AES_init(&ctx, TEST_KEY);
@@ -382,13 +368,10 @@ static MunitResult test_ecb(const MunitParameter params[], void* data)
 #endif
 
 #if TC_AES_ENABLE_CBC
-static MunitResult test_cbc(const MunitParameter params[], void* data)
+TC_TEST(test_cbc)
 {
   struct TC_AES_ctx ctx;
   uint8_t buffer[sizeof(nist_plaintext)];
-
-  (void)params;
-  (void)data;
 
   test_initialize_sbox();
   aes_init_with_iv(&ctx, TEST_KEY, nist_iv);
@@ -403,13 +386,10 @@ static MunitResult test_cbc(const MunitParameter params[], void* data)
   return MUNIT_OK;
 }
 
-static MunitResult test_cbc_alignment(const MunitParameter params[], void* data)
+TC_TEST(test_cbc_alignment)
 {
   struct TC_AES_ctx ctx;
   uint8_t buffer[TC_AES_BLOCKLEN + 1];
-
-  (void)params;
-  (void)data;
 
   test_initialize_sbox();
   aes_init_with_iv(&ctx, TEST_KEY, nist_iv);
@@ -423,13 +403,10 @@ static MunitResult test_cbc_alignment(const MunitParameter params[], void* data)
 #endif
 
 #if TC_AES_ENABLE_CTR
-static MunitResult test_ctr(const MunitParameter params[], void* data)
+TC_TEST(test_ctr)
 {
   struct TC_AES_ctx ctx;
   uint8_t buffer[sizeof(nist_plaintext)];
-
-  (void)params;
-  (void)data;
 
   test_initialize_sbox();
   aes_init_with_iv(&ctx, TEST_KEY, nist_ctr_iv);
@@ -444,14 +421,11 @@ static MunitResult test_ctr(const MunitParameter params[], void* data)
   return MUNIT_OK;
 }
 
-static MunitResult test_ctr_unaligned(const MunitParameter params[], void* data)
+TC_TEST(test_ctr_unaligned)
 {
   struct TC_AES_ctx ctx;
   uint8_t storage[sizeof(nist_plaintext) + 1];
   uint8_t* buffer = storage + 1;
-
-  (void)params;
-  (void)data;
 
   test_initialize_sbox();
   aes_init_with_iv(&ctx, TEST_KEY, nist_ctr_iv);
@@ -468,7 +442,7 @@ static MunitResult test_ctr_unaligned(const MunitParameter params[], void* data)
   return MUNIT_OK;
 }
 
-static MunitResult test_ctr_wrap(const MunitParameter params[], void* data)
+TC_TEST(test_ctr_wrap)
 {
   struct TC_AES_ctx ctx;
   uint8_t iv[TC_AES_BLOCKLEN];
@@ -476,9 +450,6 @@ static MunitResult test_ctr_wrap(const MunitParameter params[], void* data)
   uint8_t buffer[TC_AES_BLOCKLEN * 2];
   uint8_t saved_buffer[TC_AES_BLOCKLEN * 2];
   uint8_t i;
-
-  (void)params;
-  (void)data;
 
   test_initialize_sbox();
   memset(iv, 0xff, sizeof(iv));
@@ -520,7 +491,7 @@ static MunitResult test_ctr_wrap(const MunitParameter params[], void* data)
 #endif
 
 #if TC_AES_ENABLE_OFB
-static MunitResult test_ofb(const MunitParameter params[], void* data)
+TC_TEST(test_ofb)
 {
   static const size_t encrypt_chunks[] = {1, 15, 17, 31};
   static const size_t decrypt_chunks[] = {7, 9, 16, 32};
@@ -530,9 +501,6 @@ static MunitResult test_ofb(const MunitParameter params[], void* data)
   uint8_t* unaligned = storage + 1;
   size_t offset;
   size_t i;
-
-  (void)params;
-  (void)data;
 
   test_initialize_sbox();
 
@@ -618,13 +586,10 @@ static void test_ccm_vector(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC
     munit_assert_uint8(buffer[i], ==, i < plaintext.length ? 0 : 0xa5);
 }
 
-static MunitResult test_ccm(const MunitParameter params[], void* data)
+TC_TEST(test_ccm)
 {
   static uint8_t nist_aad4[65536];
   size_t i;
-
-  (void)params;
-  (void)data;
 
   test_initialize_sbox();
   for (i = 0; i < sizeof(nist_aad4); ++i)
@@ -648,7 +613,7 @@ static MunitResult test_ccm(const MunitParameter params[], void* data)
   return MUNIT_OK;
 }
 
-static MunitResult test_ccm_api(const MunitParameter params[], void* data)
+TC_TEST(test_ccm_api)
 {
   static uint8_t large_aad[65280];
   static uint8_t max_plaintext[65535];
@@ -663,9 +628,6 @@ static MunitResult test_ccm_api(const MunitParameter params[], void* data)
   uint8_t bad_tag[sizeof(ccm_nist_tag1)];
   uint8_t one = 0;
   size_t i;
-
-  (void)params;
-  (void)data;
 
   test_initialize_sbox();
   memcpy(bad_aad, ccm_nist_aad1, sizeof(bad_aad));
@@ -845,7 +807,7 @@ static MunitResult test_ccm_api(const MunitParameter params[], void* data)
 /* The default entry points take the CCM tag lengths of at least
  * TC_MIN_TAG_LEN. The _short_tag forms take the shorter CCM lengths (4 and 6
  * with the default minimum). A rejected length leaves every output unchanged. */
-static MunitResult test_ccm_tag_policy(const MunitParameter params[], void* data)
+TC_TEST(test_ccm_tag_policy)
 {
   const size_t short_max = (TC_MIN_TAG_LEN - 1u) & ~(size_t)1u;
   const size_t default_min = (TC_MIN_TAG_LEN + 1u) & ~(size_t)1u;
@@ -856,8 +818,6 @@ static MunitResult test_ccm_tag_policy(const MunitParameter params[], void* data
   uint8_t full[16], tag[16];
   size_t length;
 
-  (void)params;
-  (void)data;
   test_initialize_sbox();
 
   /* Default entry: the largest length below the minimum is rejected. */
@@ -943,16 +903,13 @@ static MunitResult test_ccm_tag_policy(const MunitParameter params[], void* data
 #endif
 
 #if TC_AES_ENABLE_GCM
-static MunitResult test_gcm(const MunitParameter params[], void* data)
+TC_TEST(test_gcm)
 {
   const struct gcm_test_vector* vector = &TEST_GCM_VECTOR;
   struct TC_AES_GCM_ctx ctx;
   uint8_t buffer[16];
   uint8_t tag[16];
   uint8_t short_tag[4];
-
-  (void)params;
-  (void)data;
 
   test_initialize_sbox();
   memset(&ctx, 0, sizeof ctx);
@@ -1037,15 +994,12 @@ static MunitResult test_gcm(const MunitParameter params[], void* data)
 }
 
 #if TC_AES_KEY_BITS == 128
-static MunitResult test_gcm_non96_iv(const MunitParameter params[], void* data)
+TC_TEST(test_gcm_non96_iv)
 {
   const struct gcm_test_vector* vector = &gcm_non96_test_vector;
   struct TC_AES_GCM_ctx ctx;
   uint8_t buffer[16];
   uint8_t tag[16];
-
-  (void)params;
-  (void)data;
 
   test_initialize_sbox();
   memcpy(buffer, vector->plaintext, vector->length);
@@ -1062,7 +1016,7 @@ static MunitResult test_gcm_non96_iv(const MunitParameter params[], void* data)
 }
 #endif
 
-static MunitResult test_gcm_oneshot(const MunitParameter params[], void* data)
+TC_TEST(test_gcm_oneshot)
 {
   const struct gcm_test_vector* vector = &TEST_GCM_VECTOR;
   uint8_t ciphertext[64];
@@ -1072,9 +1026,6 @@ static MunitResult test_gcm_oneshot(const MunitParameter params[], void* data)
   uint8_t poison[64];
   uint8_t overlap[64];
   size_t i;
-
-  (void)params;
-  (void)data;
 
   test_initialize_sbox();
   munit_assert_size(vector->length, <=, sizeof(ciphertext));
@@ -1136,7 +1087,7 @@ static MunitResult test_gcm_oneshot(const MunitParameter params[], void* data)
 
 #if TC_AES_KEY_BITS == 128
 /* Two contexts, two keys: both must work independently (per-context state). */
-static MunitResult test_gcm_multi_key(const MunitParameter params[], void* data)
+TC_TEST(test_gcm_multi_key)
 {
   static const uint8_t key_b[16] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
                                     0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f};
@@ -1148,9 +1099,6 @@ static MunitResult test_gcm_multi_key(const MunitParameter params[], void* data)
   uint8_t tag_a[16];
   uint8_t tag_b[16];
   uint8_t expect_b[32];
-
-  (void)params;
-  (void)data;
 
   test_initialize_sbox();
   munit_assert_size(va->length, <=, sizeof(buf_a));
@@ -1201,7 +1149,7 @@ static MunitResult test_gcm_multi_key(const MunitParameter params[], void* data)
 #if TC_AES_ENABLE_GCM || TC_AES_ENABLE_CCM || TC_AES_ENABLE_EAX || TC_AES_ENABLE_EAX_PRIME ||      \
     TC_AES_ENABLE_SIV
 /* A text output smaller than the text input is rejected before any write. */
-static MunitResult test_aead_output_capacity(const MunitParameter params[], void* data)
+TC_TEST(test_aead_output_capacity)
 {
   static const uint8_t key[2 * TC_AES_KEYLEN] = {1};
   static const uint8_t nonce[12] = {2};
@@ -1212,8 +1160,6 @@ static MunitResult test_aead_output_capacity(const MunitParameter params[], void
   uint8_t tag[16];
   const TC_buffer small = {output, sizeof output - 1};
 
-  (void)params;
-  (void)data;
   test_initialize_sbox();
   memset(output, 0x5a, sizeof output);
   memset(tag, 0x5a, sizeof tag);
@@ -1352,10 +1298,8 @@ static void check_aad_in_output(aead_encrypt_fn encrypt, aead_decrypt_fn decrypt
 }
 #endif
 
-static MunitResult test_aead_aad_in_output(const MunitParameter params[], void* data)
+TC_TEST(test_aead_aad_in_output)
 {
-  (void)params;
-  (void)data;
   test_initialize_sbox();
 #if TC_AES_ENABLE_GCM
   check_aad_in_output(TC_AES_GCM_encrypt, TC_AES_GCM_decrypt);
@@ -1369,10 +1313,8 @@ static MunitResult test_aead_aad_in_output(const MunitParameter params[], void* 
   return MUNIT_OK;
 }
 
-static MunitResult test_aead_mismatch_wipes(const MunitParameter params[], void* data)
+TC_TEST(test_aead_mismatch_wipes)
 {
-  (void)params;
-  (void)data;
   test_initialize_sbox();
 #if TC_AES_ENABLE_GCM
   check_mismatch_wipes(TC_AES_GCM_encrypt, TC_AES_GCM_decrypt);
@@ -1432,10 +1374,8 @@ static MunitResult test_aead_mismatch_wipes(const MunitParameter params[], void*
   return MUNIT_OK;
 }
 
-static MunitResult test_aead_tag_overlap(const MunitParameter params[], void* data)
+TC_TEST(test_aead_tag_overlap)
 {
-  (void)params;
-  (void)data;
   test_initialize_sbox();
 #if TC_AES_ENABLE_GCM
   check_tag_overlap(TC_AES_GCM_encrypt, TC_AES_GCM_decrypt);

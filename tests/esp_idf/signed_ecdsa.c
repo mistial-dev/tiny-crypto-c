@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "munit.h"
+#include "test_util.h"
 #include "secure_boot_signature_priv.h"
 #include "rom/ecdsa.h"
 #include <openssl/evp.h>
@@ -8,14 +9,12 @@
 #include <openssl/core_names.h>
 #include <string.h>
 
-static MunitResult verify(const MunitParameter params[], void* data)
+TC_TEST(verify)
 {
   static const char* groups[] = {"prime192v1", "prime256v1"};
   ets_secure_boot_signature_t blocks;
   uint8_t digest[32] = {0}, public_key[65], raw[64], der[80];
   size_t c, i;
-  (void)params;
-  (void)data;
   for (c = 0; c < 2; ++c) {
     size_t bytes = c ? 32 : 24, public_len = sizeof public_key, der_len = sizeof der;
     const uint8_t* cursor = der;

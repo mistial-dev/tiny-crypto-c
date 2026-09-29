@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "../../src/pki_candidate_internal.h"
 #include "munit.h"
+#include "test_util.h"
 #include "test_io.h"
 #include <string.h>
 
@@ -72,7 +73,7 @@ static TC_TLV_result attempt_candidate(const void* context, const TC_X509_certif
   return TC_TLV_OK;
 }
 
-static MunitResult callbacks(const MunitParameter params[], void* user)
+TC_TEST(callbacks)
 {
   const TC_TLV_result expected[] = {TC_TLV_OK,       TC_TLV_OK,       TC_TLV_INVALID,
                                     TC_TLV_INVALID,  TC_TLV_LIMIT,    TC_TLV_ARGUMENT,
@@ -80,8 +81,6 @@ static MunitResult callbacks(const MunitParameter params[], void* user)
                                     TC_TLV_ARGUMENT, TC_TLV_END};
   const TC_TLV_limits limits = {0};
   const TC_X509_path_workspace validation = {0};
-  (void)params;
-  (void)user;
   for (unsigned scenario = 0; scenario < CASE_COUNT; ++scenario) {
     size_t work = 3;
     fixture state = {scenario, 0, 0, &work};
@@ -128,7 +127,7 @@ static TC_TLV_result read_record(void* context, size_t index, size_t* work, TC_b
   return record->result;
 }
 
-static MunitResult store_limits(const MunitParameter params[], void* user)
+TC_TEST(store_limits)
 {
   enum {
     EMPTY_STORE,
@@ -150,8 +149,6 @@ static MunitResult store_limits(const MunitParameter params[], void* user)
   TC_TLV_frame frames[8];
   TC_bytes oids[8];
   TC_X509_workspace parser = {{frames, 8}, oids, 8};
-  (void)params;
-  (void)user;
   for (unsigned scenario = 0; scenario < STORE_CASE_COUNT; ++scenario) {
     size_t work = scenario == NO_WORK ? 0 : scenario == PARSE_WORK ? 1 : 4096;
     record_fixture record = {{invalid, sizeof invalid}, TC_TLV_OK, 0};
@@ -195,13 +192,11 @@ static MunitResult store_limits(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult store_certificates(const MunitParameter params[], void* user)
+TC_TEST(store_certificates)
 {
   enum { INPUT_CAPACITY = 1024, FRAME_CAPACITY = 16, OID_CAPACITY = 32, RECORD_COUNT = 2 };
   uint8_t encoded[INPUT_CAPACITY];
   FILE* file = tc_test_fopen(TC_CANDIDATE_FILE, "rb");
-  (void)params;
-  (void)user;
   munit_assert_not_null(file);
   const size_t length = fread(encoded, 1, sizeof encoded, file);
   const int complete = feof(file) && !ferror(file);

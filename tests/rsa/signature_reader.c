@@ -1,13 +1,14 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/rsa.h>
 #include "munit.h"
+#include "test_util.h"
 #include "cavp.h"
 #include "hash_name.h"
 #include <stdio.h>
 #include <string.h>
 
 static const char* path;
-static MunitResult vectors(const MunitParameter params[], void* data)
+TC_TEST(vectors)
 {
   char line[32768];
   uint8_t modulus[512], exponent[512], digest[64], signature[8192];
@@ -15,8 +16,6 @@ static MunitResult vectors(const MunitParameter params[], void* data)
   TC_RSA_workspace workspace = {words, sizeof words / sizeof words[0]};
   size_t count = 0;
   FILE* file;
-  (void)params;
-  (void)data;
   if (!path)
     return MUNIT_SKIP;
   file = fopen(path, "r");

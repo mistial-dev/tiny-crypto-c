@@ -3,6 +3,7 @@
 #include <string.h>
 #include <tiny_crypto/hkdf.h>
 #include "munit.h"
+#include "test_util.h"
 #include "cavp.h"
 
 struct hkdf_vector {
@@ -62,11 +63,9 @@ static size_t decode(const char* text, uint8_t* output, size_t capacity)
   return length;
 }
 
-static MunitResult test_hkdf_vectors(const MunitParameter params[], void* data)
+TC_TEST(test_hkdf_vectors)
 {
   size_t i;
-  (void)params;
-  (void)data;
   for (i = 0; i < sizeof hkdf_vectors / sizeof hkdf_vectors[0]; ++i) {
     const struct hkdf_vector* v = &hkdf_vectors[i];
     const struct hkdf_family* f = find_family(v->hash);
@@ -99,13 +98,11 @@ static MunitResult test_hkdf_vectors(const MunitParameter params[], void* data)
   return MUNIT_OK;
 }
 
-static MunitResult test_hkdf_limits(const MunitParameter params[], void* data)
+TC_TEST(test_hkdf_limits)
 {
   static uint8_t output[16322];
   uint8_t prk[64];
   size_t i;
-  (void)params;
-  (void)data;
   memset(prk, 0x42, sizeof prk);
   for (i = 0; i < sizeof families / sizeof families[0]; ++i) {
     const struct hkdf_family* f = &families[i];
@@ -130,12 +127,10 @@ static MunitResult test_hkdf_limits(const MunitParameter params[], void* data)
   return MUNIT_OK;
 }
 
-static MunitResult test_hkdf_arguments(const MunitParameter params[], void* data)
+TC_TEST(test_hkdf_arguments)
 {
   uint8_t input[128], output[128], prk[128];
   size_t i;
-  (void)params;
-  (void)data;
   memset(input, 0x11, sizeof input);
   memset(prk, 0x22, sizeof prk);
   const TC_bytes one = {input, 1}, missing = {NULL, 1}, empty = {NULL, 0};
@@ -190,16 +185,13 @@ static MunitResult test_hkdf_arguments(const MunitParameter params[], void* data
 
 /* SP 800-56C revision 2 hybrid secrets: extracting Z || T from separate
  * parts equals extracting the concatenation, for every split point. */
-static MunitResult test_hkdf_parts_and_multiple_expansions(const MunitParameter params[],
-                                                           void* data)
+TC_TEST(test_hkdf_parts_and_multiple_expansions)
 {
   const uint8_t salt[] = {1, 2, 3, 4};
   const uint8_t combined[] = {5, 6, 7, 8, 9};
   const uint8_t first_info[] = {0x10};
   const uint8_t second_info[] = {0x20};
   size_t i;
-  (void)params;
-  (void)data;
   for (i = 0; i < sizeof families / sizeof families[0]; ++i) {
     const struct hkdf_family* f = &families[i];
     const TC_bytes whole = {combined, sizeof combined};

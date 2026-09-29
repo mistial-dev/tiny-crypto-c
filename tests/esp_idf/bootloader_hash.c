@@ -1,10 +1,11 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "bootloader_sha.h"
 #include "munit.h"
+#include "test_util.h"
 #include "cavp.h"
 #include <string.h>
 
-static MunitResult hashes(const MunitParameter params[], void* user)
+TC_TEST(hashes)
 {
   static const char* answers[] = {
       "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
@@ -13,8 +14,6 @@ static MunitResult hashes(const MunitParameter params[], void* user)
       "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3fe"
       "ebbd454d4423643ce80e2a9ac94fa54ca49f"};
   unsigned algorithm;
-  (void)params;
-  (void)user;
   for (algorithm = 0; algorithm < 3; ++algorithm) {
     size_t split;
     uint8_t expected[64], digest[64];

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/x509.h>
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
 /* Generous limits for the single-value decoders. */
@@ -9,12 +10,10 @@ static const TC_TLV_limits value_limits = {256, 256, 32, 4};
 static const uint8_t purposes[] = {0x30, 15, 6, 8, 0x2b, 6,    1,    5,   5,
                                    7,    3,  2, 6, 3,    0x55, 0x1d, 0x25};
 
-static MunitResult eku_valid(const MunitParameter params[], void* user)
+TC_TEST(eku_valid)
 {
   TC_bytes oids[3];
   size_t count = 99;
-  (void)params;
-  (void)user;
   memset(oids, 0, sizeof oids);
   munit_assert_int(TC_X509_extended_key_usage_read((TC_bytes){purposes, sizeof purposes},
                                                    &value_limits, oids, 3, &count),
@@ -29,7 +28,7 @@ static MunitResult eku_valid(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult eku_invalid(const MunitParameter params[], void* user)
+TC_TEST(eku_invalid)
 {
   const uint8_t empty[] = {0x30, 0};
   const uint8_t empty_oid[] = {0x30, 2, 6, 0};
@@ -37,8 +36,6 @@ static MunitResult eku_invalid(const MunitParameter params[], void* user)
   uint8_t bad[sizeof purposes];
   TC_bytes oids[3], saved[3];
   size_t count = 99, i;
-  (void)params;
-  (void)user;
   memset(saved, 0xa5, sizeof saved);
   memcpy(oids, saved, sizeof oids);
   for (i = 0; i < sizeof purposes; ++i) {
@@ -67,12 +64,10 @@ static MunitResult eku_invalid(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult eku_storage(const MunitParameter params[], void* user)
+TC_TEST(eku_storage)
 {
   TC_bytes oids[3], saved[3];
   size_t count = 99;
-  (void)params;
-  (void)user;
   memset(saved, 0xa5, sizeof saved);
   memcpy(oids, saved, sizeof oids);
   munit_assert_int(TC_X509_extended_key_usage_read((TC_bytes){purposes, sizeof purposes},
@@ -108,7 +103,7 @@ static MunitResult eku_storage(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult policy_constraints(const MunitParameter params[], void* user)
+TC_TEST(policy_constraints)
 {
   const uint8_t both[] = {0x30, 6, 0x80, 1, 0, 0x81, 1, 3};
   const uint8_t one[] = {0x30, 3, 0x81, 1, 0};
@@ -124,8 +119,6 @@ static MunitResult policy_constraints(const MunitParameter params[], void* user)
                                 {0x30, 2, 0x80, 0}};
   TC_X509_policy_constraints out, saved;
   size_t i;
-  (void)params;
-  (void)user;
   munit_assert_int(
       TC_X509_policy_constraints_read((TC_bytes){both, sizeof both}, &value_limits, &out), ==,
       TC_TLV_OK);
@@ -167,15 +160,13 @@ static MunitResult policy_constraints(const MunitParameter params[], void* user)
 
 /* A reader's limits cover the complete value passed to init: the outer
  * SEQUENCE and every element read beneath it, as TC_TLV_walk counts them. */
-static MunitResult extension_budget(const MunitParameter params[], void* user)
+TC_TEST(extension_budget)
 {
   const uint8_t extensions[] = {0x30, 19, 0x30, 6,  6, 1, 42,   4, 1, 0, 0x30,
                                 9,    6,  1,    43, 1, 1, 0xff, 4, 1, 0};
   TC_TLV_limits bounds = {sizeof extensions, sizeof extensions, 8, 2};
   TC_TLV_reader reader, saved_reader;
   TC_X509_extension out;
-  (void)params;
-  (void)user;
   munit_assert_int(
       TC_X509_extensions_init(&reader, (TC_bytes){extensions, sizeof extensions}, &bounds), ==,
       TC_TLV_OK);
@@ -210,14 +201,12 @@ static MunitResult extension_budget(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult policy_mapping_budget(const MunitParameter params[], void* user)
+TC_TEST(policy_mapping_budget)
 {
   const uint8_t mappings[] = {0x30, 16, 0x30, 6, 6, 1, 42, 6, 1, 42, 0x30, 6, 6, 1, 42, 6, 1, 43};
   TC_TLV_limits bounds = {sizeof mappings, sizeof mappings, 7, 2};
   TC_TLV_reader reader, saved_reader;
   TC_X509_policy_mapping out;
-  (void)params;
-  (void)user;
   munit_assert_int(
       TC_X509_policy_mappings_init(&reader, (TC_bytes){mappings, sizeof mappings}, &bounds), ==,
       TC_TLV_OK);
@@ -246,7 +235,7 @@ static MunitResult policy_mapping_budget(const MunitParameter params[], void* us
 
 /* Single-value decoders count the outer element, every field and each
  * constructed level, and fail with LIMIT one element or level short. */
-static MunitResult value_budgets(const MunitParameter params[], void* user)
+TC_TEST(value_budgets)
 {
   const uint8_t basic[] = {0x30, 6, 1, 1, 0xff, 2, 1, 3};
   const uint8_t constraints[] = {0x30, 6, 0x80, 1, 0, 0x81, 1, 3};
@@ -259,8 +248,6 @@ static MunitResult value_budgets(const MunitParameter params[], void* user)
   TC_bytes oids[2];
   size_t count = 0;
   uint16_t usage_out = 0;
-  (void)params;
-  (void)user;
   munit_assert_int(
       TC_X509_basic_constraints_read((TC_bytes){basic, sizeof basic}, &bounds, &basic_out), ==,
       TC_TLV_OK);
@@ -324,7 +311,7 @@ static MunitResult value_budgets(const MunitParameter params[], void* user)
 }
 
 /* CertificatePolicies and qualifier readers spend one budget across the list. */
-static MunitResult policy_budgets(const MunitParameter params[], void* user)
+TC_TEST(policy_budgets)
 {
   const uint8_t valid[] = {0x30, 19,   0x30, 3,    6, 1, 42, 0x30, 12, 6, 1,
                            43,   0x30, 7,    0x30, 5, 6, 1,  44,   5,  0};
@@ -334,8 +321,6 @@ static MunitResult policy_budgets(const MunitParameter params[], void* user)
   TC_X509_policy policy;
   TC_TLV_reader qualifiers;
   TC_X509_policy_qualifier qualifier;
-  (void)params;
-  (void)user;
   munit_assert_int(
       TC_X509_policies_init(&reader, (TC_bytes){valid, sizeof valid}, &bounds, seen, 2), ==,
       TC_TLV_OK);
@@ -369,7 +354,7 @@ static MunitResult policy_budgets(const MunitParameter params[], void* user)
 }
 
 /* Contents readers cover IMPLICIT GeneralNames such as an AKI issuer. */
-static MunitResult general_names_contents(const MunitParameter params[], void* user)
+TC_TEST(general_names_contents)
 {
   const uint8_t contents[] = {0x82, 1, 'a', 0x86, 1, 'b'};
   const TC_TLV_limits bounds = {64, 64, 2, 1};
@@ -377,8 +362,6 @@ static MunitResult general_names_contents(const MunitParameter params[], void* u
   TC_TLV_frame frames[2];
   TC_X509_general_names_reader reader;
   TC_X509_general_name name;
-  (void)params;
-  (void)user;
   munit_assert_int(TC_X509_general_names_contents_init(&reader,
                                                        (TC_bytes){contents, sizeof contents},
                                                        &bounds, (TC_TLV_frames){frames, 2}),
@@ -423,7 +406,7 @@ static MunitResult general_names_contents(const MunitParameter params[], void* u
   return MUNIT_OK;
 }
 
-static MunitResult policy_mappings(const MunitParameter params[], void* user)
+TC_TEST(policy_mappings)
 {
   const uint8_t valid[] = {0x30, 16, 0x30, 6, 6, 1, 42, 6, 1, 42, 0x30, 6, 6, 1, 42, 6, 1, 43};
   const uint8_t invalid[][16] = {{0x30, 2, 0x30, 0},
@@ -441,8 +424,6 @@ static MunitResult policy_mappings(const MunitParameter params[], void* user)
   TC_TLV_reader reader, saved_reader;
   TC_X509_policy_mapping out, saved;
   size_t i;
-  (void)params;
-  (void)user;
   munit_assert_int(TC_X509_policy_mappings_init(&reader, (TC_bytes){valid, sizeof valid}, &bounds),
                    ==, TC_TLV_OK);
   for (i = 0; i < 2; ++i) {
@@ -498,7 +479,7 @@ static MunitResult policy_mappings(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult policies(const MunitParameter params[], void* user)
+TC_TEST(policies)
 {
   const uint8_t valid[] = {0x30, 19,   0x30, 3,    6, 1, 42, 0x30, 12, 6, 1,
                            43,   0x30, 7,    0x30, 5, 6, 1,  44,   5,  0};
@@ -513,8 +494,6 @@ static MunitResult policies(const MunitParameter params[], void* user)
   TC_X509_policy_qualifier qualifier;
   uint8_t duplicate[sizeof valid];
   size_t i;
-  (void)params;
-  (void)user;
   munit_assert_int(
       TC_X509_policies_init(&reader, (TC_bytes){valid, sizeof valid}, &bounds, seen, 2), ==,
       TC_TLV_OK);
@@ -578,7 +557,7 @@ static MunitResult policies(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult general_names(const MunitParameter params[], void* user)
+TC_TEST(general_names)
 {
   const uint8_t valid[] = {0x30, 14, 0x82, 3, 'a', '.', 'b', 0x87, 4, 127, 0, 0, 1, 0x88, 1, 42};
   const uint8_t nested[] = {0x30, 14, 0xa0, 7, 6, 1, 42, 0xa0, 2, 5, 0, 0x82, 3, 'a', '.', 'b'};
@@ -592,8 +571,6 @@ static MunitResult general_names(const MunitParameter params[], void* user)
   const TC_TLV_frames scratch = {frames, 4};
   TC_X509_general_name out, saved;
   size_t i;
-  (void)params;
-  (void)user;
   munit_assert_int(
       TC_X509_general_names_init(&reader, (TC_bytes){valid, sizeof valid}, &bounds, scratch), ==,
       TC_TLV_OK);
@@ -634,7 +611,7 @@ static MunitResult general_names(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult name_constraints(const MunitParameter params[], void* user)
+TC_TEST(name_constraints)
 {
   const uint8_t valid[] = {0x30, 21,   0xa0, 5,   0x30, 3, 0x82, 1,   'a', 0xa1, 12, 0x30,
                            10,   0x87, 8,    192, 0,    2, 0,    255, 255, 255,  0};
@@ -653,8 +630,6 @@ static MunitResult name_constraints(const MunitParameter params[], void* user)
   TC_X509_name_constraints out, saved;
   TC_X509_general_subtree subtree, saved_subtree;
   size_t i;
-  (void)params;
-  (void)user;
   munit_assert_int(TC_X509_name_constraints_read((TC_bytes){valid, sizeof valid}, &bounds, &out),
                    ==, TC_TLV_OK);
   munit_assert_ptr_equal(out.permitted.data, valid + 4);
@@ -705,7 +680,7 @@ static MunitResult name_constraints(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult subtree_limits(const MunitParameter params[], void* user)
+TC_TEST(subtree_limits)
 {
   uint8_t ipv6[36] = {0x30, 34, 0x87, 32, 0x20, 1, 0x0d, 0xb8};
   const uint8_t maximum[] = {0x30, 10, 0x82, 1, 'a', 0x81, 5, 0, 255, 255, 255, 255};
@@ -721,8 +696,6 @@ static MunitResult subtree_limits(const MunitParameter params[], void* user)
   TC_TLV_frame frames[4];
   TC_X509_general_subtree out, saved;
   size_t i;
-  (void)params;
-  (void)user;
   memset(ipv6 + 20, 255, 8);
   munit_assert_int(TC_X509_general_subtrees_init(&reader, (TC_bytes){ipv6, sizeof ipv6}, &bounds,
                                                  (TC_TLV_frames){frames, 4}),
@@ -784,7 +757,7 @@ static MunitResult subtree_limits(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult key_identifiers(const MunitParameter params[], void* user)
+TC_TEST(key_identifiers)
 {
   const uint8_t all[] = {0x30, 11, 0x80, 1, 7, 0xa1, 3, 0x82, 1, 'a', 0x82, 1, 1};
   const uint8_t empty[] = {0x30, 0}, empty_key[] = {0x30, 2, 0x80, 0};
@@ -801,8 +774,6 @@ static MunitResult key_identifiers(const MunitParameter params[], void* user)
   TC_X509_authority_key_identifier out, saved;
   TC_bytes key;
   size_t i;
-  (void)params;
-  (void)user;
   munit_assert_int(TC_X509_subject_key_identifier_read((TC_bytes){ski, sizeof ski}, &bounds, &key),
                    ==, TC_TLV_OK);
   munit_assert_ptr_equal(key.data, ski + 2);
@@ -858,7 +829,7 @@ static MunitResult key_identifiers(const MunitParameter params[], void* user)
 /* max_elements covers every element TC_X509_read parses, including the
  * DER inside each extnValue. fcpcag2.crt has 70 elements in its outer
  * structure and 8 more inside its extension values. */
-static MunitResult element_accounting(const MunitParameter params[], void* user)
+TC_TEST(element_accounting)
 {
   static uint8_t der[4096];
   TC_TLV_frame frames[32];
@@ -866,8 +837,6 @@ static MunitResult element_accounting(const MunitParameter params[], void* user)
   TC_X509_workspace workspace = {{frames, 32}, oids, 32};
   TC_X509_certificate certificate;
   FILE* file = fopen(TC_FPKI_CERTIFICATE, "rb");
-  (void)params;
-  (void)user;
   munit_assert_not_null(file);
   const size_t length = fread(der, 1, sizeof der, file);
   munit_assert_int(fclose(file), ==, 0);
@@ -908,7 +877,7 @@ static void read_rejected(TC_bytes encoded, const TC_TLV_limits* limits,
 /* TC_X509_read writes out, the frames and the extension OID slots. They stay
  * separate from each other and from the certificate bytes, the limits and
  * the workspace struct. */
-static MunitResult read_overlap(const MunitParameter params[], void* user)
+TC_TEST(read_overlap)
 {
   static uint8_t der[4096];
   static read_storage shared;
@@ -917,8 +886,6 @@ static MunitResult read_overlap(const MunitParameter params[], void* user)
   TC_X509_workspace workspace = {{frames, 32}, oids, 32};
   TC_X509_certificate certificate;
   FILE* file = fopen(TC_FPKI_CERTIFICATE, "rb");
-  (void)params;
-  (void)user;
   munit_assert_not_null(file);
   const size_t length = fread(der, 1, sizeof der, file);
   munit_assert_int(fclose(file), ==, 0);
@@ -986,11 +953,9 @@ static MunitResult read_overlap(const MunitParameter params[], void* user)
 }
 
 /* Optional context-tagged fields must appear once each, in schema order. */
-static MunitResult optional_field_order(const MunitParameter params[], void* user)
+TC_TEST(optional_field_order)
 {
   const TC_TLV_limits bounds = {256, 256, 32, 8};
-  (void)params;
-  (void)user;
   /* AuthorityKeyIdentifier: [0] keyIdentifier, [1] issuer, [2] serial. */
   static const uint8_t key_id_only[] = {0x30, 3, 0x80, 1, 1};
   static const uint8_t key_id_twice[] = {0x30, 6, 0x80, 1, 1, 0x80, 1, 2};
@@ -1033,7 +998,7 @@ static MunitResult optional_field_order(const MunitParameter params[], void* use
 /* A reader rewrites itself while it reads its input, so the Name, Extensions,
  * PolicyMappings and policy-qualifier readers reject a reader stored inside
  * the bytes it would read. The bytes stay unchanged. */
-static MunitResult reader_inside_input(const MunitParameter params[], void* user)
+TC_TEST(reader_inside_input)
 {
   static const uint8_t sequence[] = {0x30, 2, 5, 0};
   union {
@@ -1043,8 +1008,6 @@ static MunitResult reader_inside_input(const MunitParameter params[], void* user
   uint8_t before[sizeof shared];
   TC_TLV_reader outside;
   const TC_bytes value = {shared.bytes, sizeof sequence};
-  (void)params;
-  (void)user;
   for (int reader_function = 0; reader_function < 4; ++reader_function) {
     TC_TLV_result result;
     memset(&shared, 0x5a, sizeof shared);

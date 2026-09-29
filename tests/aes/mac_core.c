@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "../../src/mac_core_internal.h"
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
 static TC_status increment_block(const void* cipher, uint8_t* block)
@@ -11,7 +12,7 @@ static TC_status increment_block(const void* cipher, uint8_t* block)
   return TC_OK;
 }
 
-static MunitResult block_boundaries(const MunitParameter params[], void* user)
+TC_TEST(block_boundaries)
 {
   const size_t width = 8;
   const tc_block_cipher cipher = {8, &width, increment_block, NULL};
@@ -24,8 +25,6 @@ static MunitResult block_boundaries(const MunitParameter params[], void* user)
   const uint8_t partial_tag[8] = {10, 130, 7, 8, 5, 6, 11, 12};
   uint8_t mac[8] = {0}, block[8] = {0}, tag[8];
   uint8_t used = 0;
-  (void)params;
-  (void)user;
 
   munit_assert_int(tc_mac_cmac_final(&cipher, mac, block, used, k1, k2, tag), ==, TC_OK);
   munit_assert_memory_equal(8, tag, empty_tag);
@@ -51,7 +50,7 @@ static MunitResult block_boundaries(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult eager_padding(const MunitParameter params[], void* user)
+TC_TEST(eager_padding)
 {
   const size_t width = 8;
   const tc_block_cipher cipher = {8, &width, increment_block, NULL};
@@ -60,8 +59,6 @@ static MunitResult eager_padding(const MunitParameter params[], void* user)
   const uint8_t padded_mac[8] = {12, 4, 5, 6, 7, 8, 9, 10};
   uint8_t mac[8] = {0}, block[8] = {0};
   uint8_t used = 0;
-  (void)params;
-  (void)user;
   munit_assert_int(tc_mac_cbc_update(&cipher, mac, block, &used, input, 9, 0), ==, TC_OK);
   munit_assert_uint8(used, ==, 1);
   munit_assert_memory_equal(8, mac, first_mac);
@@ -78,14 +75,12 @@ static MunitResult eager_padding(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult gf_doubling(const MunitParameter params[], void* user)
+TC_TEST(gf_doubling)
 {
   const uint8_t input[16] = {0x80};
   const uint8_t expected_des[8] = {0, 0, 0, 0, 0, 0, 0, 0x1b};
   const uint8_t expected_aes[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x87};
   uint8_t block[16];
-  (void)params;
-  (void)user;
   tc_mac_gf_double(block, input, 8, 0x1b);
   munit_assert_memory_equal(8, block, expected_des);
   memcpy(block, input, sizeof block);
@@ -96,7 +91,7 @@ static MunitResult gf_doubling(const MunitParameter params[], void* user)
 
 /* CMAC over parts equals streaming the concatenation, for every split and
  * for a nonzero initial chaining value. */
-static MunitResult cmac_parts(const MunitParameter params[], void* user)
+TC_TEST(cmac_parts)
 {
   const size_t width = 8;
   const tc_block_cipher cipher = {8, &width, increment_block, NULL};
@@ -104,8 +99,6 @@ static MunitResult cmac_parts(const MunitParameter params[], void* user)
   const uint8_t k1[8] = {1, 1, 1, 1, 1, 1, 1, 1};
   const uint8_t k2[8] = {2, 2, 2, 2, 2, 2, 2, 2};
   const uint8_t initial[8] = {9, 8, 7, 6, 5, 4, 3, 2};
-  (void)params;
-  (void)user;
   for (size_t length = 0; length <= sizeof input; ++length)
     for (size_t split = 0; split <= length; ++split) {
       uint8_t mac[8], block[8] = {0}, expected[8], tag[8];
@@ -122,7 +115,7 @@ static MunitResult cmac_parts(const MunitParameter params[], void* user)
 
 /* SP 800-38B subkeys K1 = dbl(L), K2 = dbl(K1) with L = E(0). The reversed
  * form doubles toward higher byte indexes and reduces into byte zero. */
-static MunitResult subkeys(const MunitParameter params[], void* user)
+TC_TEST(subkeys)
 {
   const size_t width = 8;
   const tc_block_cipher cipher = {8, &width, increment_block, NULL};
@@ -130,8 +123,6 @@ static MunitResult subkeys(const MunitParameter params[], void* user)
   const uint8_t k1[8] = {2, 2, 2, 2, 2, 2, 2, 2}, k2[8] = {4, 4, 4, 4, 4, 4, 4, 4};
   const uint8_t high[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x80};
   uint8_t out1[16], out2[16];
-  (void)params;
-  (void)user;
   munit_assert_int(tc_mac_derive_subkeys(&cipher, 0x1b, 0, out1, out2), ==, TC_OK);
   munit_assert_memory_equal(8, out1, k1);
   munit_assert_memory_equal(8, out2, k2);

@@ -2,9 +2,10 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/x509.h>
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
-static MunitResult unix_time(const MunitParameter params[], void* user)
+TC_TEST(unix_time)
 {
   static const struct {
     TC_X509_time time;
@@ -59,12 +60,10 @@ static MunitResult unix_time(const MunitParameter params[], void* user)
   munit_assert_int(TC_X509_time_to_unix(NULL, &seconds), ==, TC_TLV_ARGUMENT);
   munit_assert_int(TC_X509_time_to_unix(&cases[0].time, NULL), ==, TC_TLV_ARGUMENT);
   munit_assert_int64(seconds, ==, 99);
-  (void)params;
-  (void)user;
   return MUNIT_OK;
 }
 
-static MunitResult ordering(const MunitParameter params[], void* user)
+TC_TEST(ordering)
 {
   static const TC_X509_time times[] = {
       {1, 1, 1, 0, 0, 0},         {1999, 12, 31, 23, 59, 59}, {2000, 1, 1, 0, 0, 0},
@@ -72,8 +71,6 @@ static MunitResult ordering(const MunitParameter params[], void* user)
       {2049, 12, 31, 23, 59, 59}, {2050, 1, 1, 0, 0, 0},      {2100, 2, 28, 23, 59, 59},
       {2100, 3, 1, 0, 0, 0},      {9999, 12, 31, 23, 59, 59}};
   size_t i, j;
-  (void)params;
-  (void)user;
   for (i = 0; i < sizeof times / sizeof times[0]; ++i)
     for (j = 0; j < sizeof times / sizeof times[0]; ++j) {
       int order = 99;
@@ -83,14 +80,12 @@ static MunitResult ordering(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult validity(const MunitParameter params[], void* user)
+TC_TEST(validity)
 {
   TC_X509_certificate certificate = {0};
   TC_X509_time before = {2049, 12, 31, 23, 59, 58}, first = {2049, 12, 31, 23, 59, 59};
   TC_X509_time last = {2050, 1, 1, 0, 0, 0}, after = {2050, 1, 1, 0, 0, 1};
   int valid = 99;
-  (void)params;
-  (void)user;
   certificate.not_before = first;
   certificate.not_after = last;
   munit_assert_int(TC_X509_valid_at(&certificate, &before, &valid), ==, TC_TLV_OK);
@@ -111,7 +106,7 @@ static MunitResult validity(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult invalid(const MunitParameter params[], void* user)
+TC_TEST(invalid)
 {
   static const TC_X509_time bad[] = {
       {0, 1, 1, 0, 0, 0},     {10000, 1, 1, 0, 0, 0}, {2000, 0, 1, 0, 0, 0},
@@ -123,8 +118,6 @@ static MunitResult invalid(const MunitParameter params[], void* user)
   const TC_X509_time good = {2000, 1, 1, 0, 0, 0};
   size_t i;
   int output = 99;
-  (void)params;
-  (void)user;
   for (i = 0; i < sizeof bad / sizeof bad[0]; ++i) {
     int64_t seconds = 99;
     munit_assert_int(TC_X509_time_to_unix(&bad[i], &seconds), ==, TC_TLV_INVALID);
@@ -146,7 +139,7 @@ static MunitResult invalid(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult time_check(const MunitParameter params[], void* user)
+TC_TEST(time_check)
 {
   static const TC_X509_time valid[] = {
       {1, 1, 1, 0, 0, 0}, {2024, 2, 29, 23, 59, 59}, {9999, 12, 31, 23, 59, 59}};
@@ -154,8 +147,6 @@ static MunitResult time_check(const MunitParameter params[], void* user)
                                          {2023, 2, 29, 0, 0, 0}, {2024, 13, 1, 0, 0, 0},
                                          {2024, 1, 1, 24, 0, 0}, {2024, 1, 1, 0, 60, 0},
                                          {2024, 1, 1, 0, 0, 60}};
-  (void)params;
-  (void)user;
   for (size_t i = 0; i < sizeof valid / sizeof *valid; ++i)
     munit_assert_int(TC_X509_time_check(&valid[i]), ==, TC_TLV_OK);
   for (size_t i = 0; i < sizeof invalid / sizeof *invalid; ++i)

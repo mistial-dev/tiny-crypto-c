@@ -69,10 +69,8 @@ static void check_fixed_mode(mode_fn mode, size_t length)
   munit_assert_int(mode(&ctx, buffer, length), ==, TC_ERROR);
 }
 
-static MunitResult fixed_modes(const MunitParameter params[], void* user)
+TC_TEST(fixed_modes)
 {
-  (void)params;
-  (void)user;
   check_fixed_mode(TC_AES_CBC_encrypt, 48);
   check_fixed_mode(TC_AES_CBC_decrypt, 48);
   check_fixed_mode(TC_AES_CTR_crypt, 40);
@@ -80,13 +78,11 @@ static MunitResult fixed_modes(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult ecb(const MunitParameter params[], void* user)
+TC_TEST(ecb)
 {
   static const uint8_t key[TC_AES_KEYLEN] = {1};
   struct TC_AES_key_ctx schedule;
   uint8_t block[TC_AES_BLOCKLEN] = {0};
-  (void)params;
-  (void)user;
   munit_assert_int(TC_AES_key_init(&schedule, key), ==, TC_OK);
   /* A failed block cipher call leaves no partly transformed block. */
   calls = 0;
@@ -104,13 +100,11 @@ static MunitResult ecb(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult dynamic_cbc(const MunitParameter params[], void* user)
+TC_TEST(dynamic_cbc)
 {
   static const uint8_t raw[16] = {7, 8, 9};
   TC_AES_dynamic_key key;
   uint8_t iv[16], buffer[48];
-  (void)params;
-  (void)user;
   munit_assert_int(TC_AES_dynamic_key_init(&key, raw, sizeof raw), ==, TC_OK);
   for (int decrypt = 0; decrypt < 2; ++decrypt) {
     memset(iv, 0x22, sizeof iv);
@@ -129,13 +123,11 @@ static MunitResult dynamic_cbc(const MunitParameter params[], void* user)
 }
 
 /* Single-block dynamic-key operations follow the ECB rule. */
-static MunitResult dynamic_block(const MunitParameter params[], void* user)
+TC_TEST(dynamic_block)
 {
   static const uint8_t raw[24] = {7, 8, 9};
   TC_AES_dynamic_key key;
   uint8_t block[16];
-  (void)params;
-  (void)user;
   munit_assert_int(TC_AES_dynamic_key_init(&key, raw, sizeof raw), ==, TC_OK);
   for (int decrypt = 0; decrypt < 2; ++decrypt) {
     memset(block, 0x33, sizeof block);

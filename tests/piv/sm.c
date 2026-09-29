@@ -28,7 +28,7 @@ static TC_status fixed_random(void* user, uint8_t* output, size_t length)
   return TC_OK;
 }
 
-static MunitResult begin_failures(const MunitParameter params[], void* user)
+TC_TEST(begin_failures)
 {
   TC_PIV_SM session = {0}, saved;
   TC_PIV_SM_workspace w;
@@ -42,8 +42,6 @@ static MunitResult begin_failures(const MunitParameter params[], void* user)
   const TC_PIV_SM_suite selected = TC_PIV_SM_CS7;
   const size_t scalar_length = 48, request_length = 118;
 #endif
-  (void)params;
-  (void)user;
   memset(request, 0xa5, sizeof request);
   memcpy(expected, request, sizeof expected);
   random.scalar[scalar_length - 1] = 1;
@@ -99,7 +97,7 @@ static MunitResult begin_failures(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult ciphertext_size(const MunitParameter params[], void* user)
+TC_TEST(ciphertext_size)
 {
   static const struct {
     size_t plaintext, ciphertext;
@@ -107,8 +105,6 @@ static MunitResult ciphertext_size(const MunitParameter params[], void* user)
                {17, 32}, {31, 32}, {32, 48}, {SIZE_MAX - 16, SIZE_MAX - 15}};
   static const size_t overflow[] = {SIZE_MAX - 15, SIZE_MAX - 1, SIZE_MAX};
   size_t i, length;
-  (void)params;
-  (void)user;
   for (i = 0; i < sizeof sizes / sizeof sizes[0]; ++i) {
     length = 999;
     munit_assert_int(TC_PIV_SM_ciphertext_size(sizes[i].plaintext, &length), ==, TC_OK);
@@ -187,7 +183,7 @@ static size_t make_response(const TC_PIV_SM* session, size_t plain_length, int b
   return at + 8;
 }
 
-static MunitResult response_failures(const MunitParameter params[], void* user)
+TC_TEST(response_failures)
 {
   static const size_t lengths[] = {0, 1, 15, 16, 17, 31, 32};
   const TC_PIV_SM_suite suites[] = {
@@ -203,8 +199,6 @@ static MunitResult response_failures(const MunitParameter params[], void* user)
   ExamplePIVSMResult result, saved_result;
   uint8_t response[128], output[64], expected[64], plain[64];
   size_t s, i, j, length;
-  (void)params;
-  (void)user;
   tc_test_fill_incrementing(plain, sizeof plain);
   memset(expected, 0xa5, sizeof expected);
   memset(&saved_result, 0xa5, sizeof saved_result);
@@ -310,7 +304,7 @@ static MunitResult response_failures(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult replay(const MunitParameter params[], void* user)
+TC_TEST(replay)
 {
   static char line[131072];
   static uint8_t data[32768], expected[32768], output[32768];
@@ -319,8 +313,6 @@ static MunitResult replay(const MunitParameter params[], void* user)
   random_state random = {{0}, 0, 0, 0};
   FILE* file;
   size_t lines = 0;
-  (void)params;
-  (void)user;
   if (!transcript_path)
     return MUNIT_SKIP;
   file = fopen(transcript_path, "r");

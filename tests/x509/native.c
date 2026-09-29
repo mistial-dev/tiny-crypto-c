@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/x509_crypto.h>
 #include "munit.h"
+#include "test_util.h"
 #include <openssl/evp.h>
 #include <openssl/ec.h>
 #include <openssl/rsa.h>
@@ -9,7 +10,7 @@
 #include "openssl_fixture.h"
 #include "../../examples/x509_client.h"
 
-static MunitResult signatures(const MunitParameter params[], void* user)
+TC_TEST(signatures)
 {
   static const uint8_t ec_oid[] = {0x2a, 0x86, 0x48, 0xce, 0x3d, 4, 3, 2};
   uint8_t rsa_oid[] = {0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 1, 1, 11};
@@ -24,8 +25,6 @@ static MunitResult signatures(const MunitParameter params[], void* user)
   TC_RSA_workspace rsa = {words, sizeof words / sizeof *words};
   TC_X509_native_workspace scratch = {&ec, &rsa, TC_X509_NATIVE_DEFAULT_SIGNATURE_WORK};
   TC_X509_signature_provider provider = TC_X509_native_provider(&scratch);
-  (void)params;
-  (void)user;
   for (unsigned kind = 0; kind < 3; ++kind) {
     EVP_PKEY* generated = kind == 0 ? EVP_EC_gen("prime256v1") : EVP_RSA_gen(2048);
     EVP_MD_CTX* signer = EVP_MD_CTX_new();
@@ -206,7 +205,7 @@ static TC_TLV_result source_anchor(void* context, size_t index, size_t* work,
   return TC_TLV_OK;
 }
 
-static MunitResult paths(const MunitParameter params[], void* user)
+TC_TEST(paths)
 {
   TC_ECDSA_workspace ec;
   TC_RSA_word words[TC_RSA_VERIFY_WORKSPACE_WORDS(3072)];
@@ -220,8 +219,6 @@ static MunitResult paths(const MunitParameter params[], void* user)
   TC_TLV_limits limits = {2048, 2048, 256, 16};
   TC_X509_time at = {2026, 1, 1, 0, 0, 0};
   uint8_t root_der[2048], leaf_der[2048];
-  (void)params;
-  (void)user;
   for (unsigned kind = 0; kind < 2; ++kind) {
     EVP_PKEY* root_key = kind ? EVP_RSA_gen(2048) : EVP_EC_gen("prime256v1");
     EVP_PKEY* leaf_key = EVP_EC_gen("prime256v1");
@@ -304,7 +301,7 @@ static MunitResult paths(const MunitParameter params[], void* user)
 
 /* The SPKI decoder maps secp192r1, so the native provider reaches its P-192
  * branch. Builds without P-192 report UNSUPPORTED. */
-static MunitResult p192_signature(const MunitParameter params[], void* user)
+TC_TEST(p192_signature)
 {
   static const uint8_t ecdsa_sha256[] = {0x2a, 0x86, 0x48, 0xce, 0x3d, 4, 3, 2};
   uint8_t message[] = {'a', 'b', 'c'}, spki[128], signature[64];
@@ -317,8 +314,6 @@ static MunitResult p192_signature(const MunitParameter params[], void* user)
   unsigned char* cursor = spki;
   size_t signature_length = sizeof signature, work = 100000;
   TC_X509_public_key key;
-  (void)params;
-  (void)user;
   munit_assert_not_null(generated);
   munit_assert_not_null(signer);
   const int spki_length = i2d_PUBKEY(generated, NULL);

@@ -7,7 +7,7 @@
 #include "mac_vectors.h"
 #include <string.h>
 
-static MunitResult block_vectors(const MunitParameter params[], void* user)
+TC_TEST(block_vectors)
 {
   static const char* answers[] = {"69c4e0d86a7b0430d8cdb78070b4c55a",
                                   "dda97ca4864cdfe06eaf70a0ec0d7191",
@@ -15,8 +15,6 @@ static MunitResult block_vectors(const MunitParameter params[], void* user)
   uint8_t key[32], plain[16], block[16], expected[16];
   TC_AES_dynamic_key ctx;
   size_t i;
-  (void)params;
-  (void)user;
   tc_test_fill_incrementing(key, sizeof key);
   munit_assert_size(tc_test_hex("00112233445566778899aabbccddeeff", plain, 16), ==, 16);
   for (i = 0; i < 3; ++i) {
@@ -34,7 +32,7 @@ static MunitResult block_vectors(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult cbc_and_cmac_vectors(const MunitParameter params[], void* user)
+TC_TEST(cbc_and_cmac_vectors)
 {
   static const char* keys[] = {"2b7e151628aed2a6abf7158809cf4f3c",
                                "8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b",
@@ -49,8 +47,6 @@ static MunitResult cbc_and_cmac_vectors(const MunitParameter params[], void* use
   TC_AES_dynamic_key ctx;
   TC_AES_dynamic_CMAC mac;
   size_t i, split, length;
-  (void)params;
-  (void)user;
   munit_assert_size(tc_test_hex("6bc1bee22e409f96e93d7e117393172a", plain, 16), ==, 16);
   for (i = 0; i < 3; ++i) {
     length = tc_test_hex(keys[i], key, sizeof key);
@@ -80,14 +76,12 @@ static MunitResult cbc_and_cmac_vectors(const MunitParameter params[], void* use
   return MUNIT_OK;
 }
 
-static MunitResult invalid_arguments(const MunitParameter params[], void* user)
+TC_TEST(invalid_arguments)
 {
   TC_AES_dynamic_key key, saved;
   TC_AES_dynamic_CMAC mac, saved_mac;
   uint8_t raw[32] = {0}, block[32] = {0}, iv[16] = {0};
   size_t i;
-  (void)params;
-  (void)user;
   /* A failed init clears the context, like TC_AES_key_init, so no earlier
    * key stays usable. */
   for (i = 0; i <= 33; ++i) {
@@ -144,10 +138,8 @@ static TC_status vector_cmac(const uint8_t* key, size_t key_length, const uint8_
   TC_AES_dynamic_CMAC_clear(&ctx);
   return status;
 }
-static MunitResult wycheproof(const MunitParameter params[], void* user)
+TC_TEST(wycheproof)
 {
-  (void)params;
-  (void)user;
   return tc_test_mac_vectors(vector_path, vector_cmac);
 }
 

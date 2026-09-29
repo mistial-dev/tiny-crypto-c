@@ -30,7 +30,7 @@ static void check(const uint8_t* data, size_t length, const char* answer)
   }
 }
 
-static MunitResult test_known(const MunitParameter params[], void* user)
+TC_TEST(test_known)
 {
   /* RFC 1321 known answers. */
   static const char* messages[] = {
@@ -46,14 +46,12 @@ static MunitResult test_known(const MunitParameter params[], void* user)
       "900150983cd24fb0d6963f7d28e17f72", "f96b697d7cb7938d525a2f31aaf161d0",
       "c3fcd3d76192e4007dfb496cca67e13b", "d174ab98d277d9f5a5611c2c9f419d9f",
       "57edf4a22be3c955ac49da2e2107b67a"};
-  (void)params;
-  (void)user;
   for (size_t i = 0; i < sizeof messages / sizeof messages[0]; ++i)
     check((const uint8_t*)messages[i], strlen(messages[i]), answers[i]);
   return MUNIT_OK;
 }
 
-static MunitResult test_boundaries(const MunitParameter params[], void* user)
+TC_TEST(test_boundaries)
 {
   static const size_t lengths[] = {55, 56, 63, 64, 65, 119, 120, 127, 128, 129, 255, 256};
   /* Independent hashlib answers for the byte sequence 00,01,...,FF. */
@@ -65,20 +63,16 @@ static MunitResult test_boundaries(const MunitParameter params[], void* user)
       "37eff01866ba3f538421b30b7cbefcac", "46f986692847558fc38b0cece591c20f",
       "11b7aaa64c413d2f0fccf893881c46a2", "e2c865db4162bed963bfaa9ef6ac18f0"};
   uint8_t data[256];
-  (void)params;
-  (void)user;
   tc_test_fill_incrementing(data, sizeof data);
   for (size_t i = 0; i < sizeof lengths / sizeof lengths[0]; ++i)
     check(data, lengths[i], answers[i]);
   return MUNIT_OK;
 }
 
-static MunitResult test_long(const MunitParameter params[], void* user)
+TC_TEST(test_long)
 {
   struct TC_MD5_ctx ctx;
   uint8_t data[1000], digest[TC_MD5_DIGESTLEN], expected[TC_MD5_DIGESTLEN];
-  (void)params;
-  (void)user;
   memset(data, 'a', sizeof data);
   tc_test_hex("7707d6ae4e027c70eea2a935c2296f21", expected, sizeof expected);
   munit_assert_int(TC_MD5_init(&ctx), ==, TC_OK);
@@ -89,12 +83,10 @@ static MunitResult test_long(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult test_arguments(const MunitParameter params[], void* user)
+TC_TEST(test_arguments)
 {
   struct TC_MD5_ctx ctx, saved;
   uint8_t output[TC_MD5_DIGESTLEN], data[32] = {0};
-  (void)params;
-  (void)user;
   memset(output, 0xa5, sizeof output);
   munit_assert_int(TC_MD5_init(&ctx), ==, TC_OK);
   saved = ctx;

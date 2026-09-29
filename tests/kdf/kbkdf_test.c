@@ -80,10 +80,8 @@ static const struct kdf_family kdf_families[] = {
 /* Kdf108 cross-check vector                                                 */
 /* ------------------------------------------------------------------------- */
 
-MunitResult test_kbkdf_known(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_kbkdf_known)
 {
-  (void)params;
-  (void)data;
 #if TC_KBKDF_HAVE_HMAC_SHA256
   {
     const struct TC_KBKDF_params p = {TC_KBKDF_COUNTER_32, 0, 0};
@@ -156,7 +154,7 @@ static void hmac256_cat(TC_bytes key, TC_bytes a, TC_bytes b, TC_bytes c, TC_byt
   munit_assert_int(TC_HMAC_SHA256_final(&ctx, tag), ==, TC_OK);
 }
 
-MunitResult test_kbkdf_counter_encoding(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_kbkdf_counter_encoding)
 {
   static const uint8_t ctr1[4][4] = {
       {0x01}, {0x00, 0x01}, {0x00, 0x00, 0x01}, {0x00, 0x00, 0x00, 0x01}};
@@ -171,8 +169,6 @@ MunitResult test_kbkdf_counter_encoding(const MunitParameter params[], void* dat
   uint8_t a1[TC_SHA256_DIGESTLEN];
   struct TC_KBKDF_params p;
   unsigned r;
-  (void)params;
-  (void)data;
 
   tc_test_fill_stride3(key, sizeof(key), 0x10);
   tc_test_fill_stride3(fixed, sizeof(fixed), 0x40);
@@ -316,10 +312,8 @@ MunitResult test_kbkdf_counter_encoding(const MunitParameter params[], void* dat
 
 #else /* !TC_KBKDF_HAVE_HMAC_SHA256 */
 
-MunitResult test_kbkdf_counter_encoding(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_kbkdf_counter_encoding)
 {
-  (void)params;
-  (void)data;
   return MUNIT_SKIP;
 }
 
@@ -329,14 +323,12 @@ MunitResult test_kbkdf_counter_encoding(const MunitParameter params[], void* dat
 /* CMAC PRFs: first block equals the one-shot CMAC over 0x01 || F            */
 /* ------------------------------------------------------------------------- */
 
-MunitResult test_kbkdf_cmac_first_block(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_kbkdf_cmac_first_block)
 {
   const struct TC_KBKDF_params p = {TC_KBKDF_COUNTER_8, 0, 0};
   uint8_t fixed[1 + 37];
   uint8_t key[32];
   int ran = 0;
-  (void)params;
-  (void)data;
 
   tc_test_fill_stride3(key, sizeof(key), 0x21);
   fixed[0] = 0x01;
@@ -395,13 +387,11 @@ static const struct kdf_family* kdf_family_for(int prf_id)
   return NULL;
 }
 
-MunitResult test_kbkdf_generated(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_kbkdf_generated)
 {
   static uint8_t out[512];
   size_t i;
   unsigned ran = 0;
-  (void)params;
-  (void)data;
 
   for (i = 0; i < KBKDF_VECTOR_COUNT; ++i) {
     const struct kbkdf_vector* v = &kbkdf_vectors[i];
@@ -444,14 +434,12 @@ MunitResult test_kbkdf_generated(const MunitParameter params[], void* data)
 /* Fixed-input builder                                                       */
 /* ------------------------------------------------------------------------- */
 
-MunitResult test_kbkdf_fixed_input(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_kbkdf_fixed_input)
 {
   static const uint8_t label[] = {'k', 'e', 'y'};
   static const uint8_t bad_label[] = {'k', 0x00, 'y'};
   static const uint8_t context[] = {0xde, 0xad};
   uint8_t buf[TC_KBKDF_FIXED_INPUT_LEN(sizeof(label), sizeof(context)) + 4];
-  (void)params;
-  (void)data;
 
   munit_assert_size(TC_KBKDF_FIXED_INPUT_LEN(3, 2), ==, 10);
 
@@ -528,7 +516,7 @@ static int all_bytes(const uint8_t* p, size_t len, uint8_t value)
   return 1;
 }
 
-MunitResult test_kbkdf_api(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_kbkdf_api)
 {
   uint8_t key[32];
   uint8_t fixed[40];
@@ -537,8 +525,6 @@ MunitResult test_kbkdf_api(const MunitParameter params[], void* data)
   uint8_t out2[64];
   uint8_t scratch[128];
   size_t fi;
-  (void)params;
-  (void)data;
 
   tc_test_fill_stride3(key, sizeof(key), 0x01);
   tc_test_fill_stride3(fixed, sizeof(fixed), 0x80);
@@ -742,14 +728,12 @@ MunitResult test_kbkdf_api(const MunitParameter params[], void* data)
 /* Counter-limit enforcement: n <= 2^r - 1                                   */
 /* ------------------------------------------------------------------------- */
 
-MunitResult test_kbkdf_limits(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_kbkdf_limits)
 {
   static uint8_t out[256 * TC_KBKDF_PRF_MAX];
   uint8_t key[32];
   uint8_t fixed[16];
   size_t fi;
-  (void)params;
-  (void)data;
 
   tc_test_fill_stride3(key, sizeof(key), 0x33);
   tc_test_fill_stride3(fixed, sizeof(fixed), 0x99);
@@ -810,7 +794,7 @@ MunitResult test_kbkdf_limits(const MunitParameter params[], void* data)
 /* Truncation: shorter outputs are prefixes of longer ones                   */
 /* ------------------------------------------------------------------------- */
 
-MunitResult test_kbkdf_truncation(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_kbkdf_truncation)
 {
   uint8_t key[32];
   uint8_t fixed[20];
@@ -818,8 +802,6 @@ MunitResult test_kbkdf_truncation(const MunitParameter params[], void* data)
   uint8_t full[3 * TC_KBKDF_PRF_MAX];
   uint8_t part[3 * TC_KBKDF_PRF_MAX];
   size_t fi;
-  (void)params;
-  (void)data;
 
   tc_test_fill_stride3(key, sizeof(key), 0x44);
   tc_test_fill_stride3(fixed, sizeof(fixed), 0x88);
@@ -870,52 +852,36 @@ MunitResult test_kbkdf_truncation(const MunitParameter params[], void* data)
 
 #else /* !TC_ENABLE_KDF */
 
-MunitResult test_kbkdf_known(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_kbkdf_known)
 {
-  (void)params;
-  (void)data;
   return MUNIT_SKIP;
 }
-MunitResult test_kbkdf_counter_encoding(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_kbkdf_counter_encoding)
 {
-  (void)params;
-  (void)data;
   return MUNIT_SKIP;
 }
-MunitResult test_kbkdf_cmac_first_block(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_kbkdf_cmac_first_block)
 {
-  (void)params;
-  (void)data;
   return MUNIT_SKIP;
 }
-MunitResult test_kbkdf_generated(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_kbkdf_generated)
 {
-  (void)params;
-  (void)data;
   return MUNIT_SKIP;
 }
-MunitResult test_kbkdf_fixed_input(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_kbkdf_fixed_input)
 {
-  (void)params;
-  (void)data;
   return MUNIT_SKIP;
 }
-MunitResult test_kbkdf_api(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_kbkdf_api)
 {
-  (void)params;
-  (void)data;
   return MUNIT_SKIP;
 }
-MunitResult test_kbkdf_limits(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_kbkdf_limits)
 {
-  (void)params;
-  (void)data;
   return MUNIT_SKIP;
 }
-MunitResult test_kbkdf_truncation(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_kbkdf_truncation)
 {
-  (void)params;
-  (void)data;
   return MUNIT_SKIP;
 }
 

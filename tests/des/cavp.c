@@ -17,6 +17,7 @@
 #include <tiny_crypto/des.h>
 #include "cavp.h"
 #include "munit.h"
+#include "test_util.h"
 
 #ifndef CAVP_VECTOR_DIR
 #define CAVP_VECTOR_DIR "tests/vectors/des/cavp"
@@ -609,15 +610,12 @@ static const char* const cavp_mct_files[] = {
     "TCFB1Monte2.rsp",  "TCFB1Monte3.rsp",  "TCFB8Monte2.rsp", "TCFB8Monte3.rsp",
     "TCFB64Monte2.rsp", "TCFB64Monte3.rsp", "TOFBMonte2.rsp",  "TOFBMonte3.rsp"};
 
-static MunitResult cavp_run_group(const MunitParameter params[], void* data, const char* subdir,
-                                  const char* const* files, size_t file_count, const char* prefix)
+static MunitResult cavp_run_group(const char* subdir, const char* const* files, size_t file_count,
+                                  const char* prefix)
 {
   size_t i;
   size_t ran = 0;
   int failures = 0;
-
-  (void)params;
-  (void)data;
 
   for (i = 0; i < file_count; ++i) {
     if (prefix != NULL && strncmp(files[i], prefix, strlen(prefix)) != 0)
@@ -631,22 +629,22 @@ static MunitResult cavp_run_group(const MunitParameter params[], void* data, con
   return MUNIT_OK;
 }
 
-MunitResult test_cavp_kat(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_cavp_kat)
 {
-  return cavp_run_group(params, data, "kat", cavp_kat_files,
-                        sizeof(cavp_kat_files) / sizeof(cavp_kat_files[0]), NULL);
+  return cavp_run_group("kat", cavp_kat_files, sizeof(cavp_kat_files) / sizeof(cavp_kat_files[0]),
+                        NULL);
 }
 
-MunitResult test_cavp_mmt(const MunitParameter params[], void* data)
+TC_TEST_SHARED(test_cavp_mmt)
 {
-  return cavp_run_group(params, data, "mmt", cavp_mmt_files,
-                        sizeof(cavp_mmt_files) / sizeof(cavp_mmt_files[0]), NULL);
+  return cavp_run_group("mmt", cavp_mmt_files, sizeof(cavp_mmt_files) / sizeof(cavp_mmt_files[0]),
+                        NULL);
 }
 
 #define TC_DES_CAVP_MCT_TEST(name, prefix)                                                         \
-  MunitResult test_cavp_mct_##name(const MunitParameter params[], void* data)                      \
+  TC_TEST_SHARED(test_cavp_mct_##name)                                                             \
   {                                                                                                \
-    return cavp_run_group(params, data, "mct", cavp_mct_files,                                     \
+    return cavp_run_group("mct", cavp_mct_files,                                                   \
                           sizeof(cavp_mct_files) / sizeof(cavp_mct_files[0]), prefix);             \
   }
 

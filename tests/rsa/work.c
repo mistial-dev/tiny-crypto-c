@@ -104,12 +104,10 @@ static int all_bytes(const uint8_t* data, size_t length, uint8_t value)
   return 1;
 }
 
-static MunitResult modulus_supported(const MunitParameter params[], void* user)
+TC_TEST(modulus_supported)
 {
   static const size_t supported[] = {1024, 2048, 3072, 4096};
   static const size_t unsupported[] = {0, 8, 1016, 1023, 1025, 1536, 4104, 8192, SIZE_MAX};
-  (void)params;
-  (void)user;
   for (size_t i = 0; i < sizeof supported / sizeof *supported; ++i)
     munit_assert_int(TC_RSA_modulus_supported(supported[i]), ==, 1);
   for (size_t i = 0; i < sizeof unsupported / sizeof *unsupported; ++i)
@@ -118,15 +116,13 @@ static MunitResult modulus_supported(const MunitParameter params[], void* user)
 }
 
 /* TC_RSA_encode_*_work is the exact cost of a successful encoding. */
-static MunitResult encode_work(const MunitParameter params[], void* user)
+TC_TEST(encode_work)
 {
   static const TC_hash_algorithm hashes[] = {TC_HASH_SHA1, TC_HASH_SHA224, TC_HASH_SHA256,
                                              TC_HASH_SHA384, TC_HASH_SHA512};
   static const size_t digest_lengths[] = {20, 28, 32, 48, 64};
   static const size_t sizes[] = {128, 256, 384, 512};
   uint8_t digest[64] = {0}, salt[64] = {0}, encoded[512], saved[512];
-  (void)params;
-  (void)user;
   for (size_t h = 0; h < sizeof hashes / sizeof *hashes; ++h) {
     const TC_bytes hashed = {digest, digest_lengths[h]};
     for (size_t s = 0; s < sizeof sizes / sizeof *sizes; ++s) {
@@ -207,7 +203,7 @@ static MunitResult encode_work(const MunitParameter params[], void* user)
 
 /* Public-key costs: raw, one-shot and prepared verification, and OAEP
  * encryption. */
-static MunitResult public_work(const MunitParameter params[], void* user)
+TC_TEST(public_work)
 {
   const test_key* fixture = key_fixture();
   const TC_RSA_public_key* key = &fixture->key.public_key;
@@ -215,8 +211,6 @@ static MunitResult public_work(const MunitParameter params[], void* user)
   const TC_RSA_workspace workspace = {scratch, WORDS};
   uint8_t input[BYTES] = {0}, output[BYTES], saved[BYTES], digest[SHA256_BYTES] = {0};
   uint8_t signature[BYTES];
-  (void)params;
-  (void)user;
   input[BYTES - 1] = 7;
   const uint32_t public_cost = TC_RSA_public_work(key);
   munit_assert_uint32(public_cost, ==, 16 * BYTES + 16 * 3 + 4);
@@ -314,10 +308,8 @@ static MunitResult public_work(const MunitParameter params[], void* user)
 
 /* OAEP padding covers both masks and has the same cost for encoding and
  * decoding. */
-static MunitResult oaep_work(const MunitParameter params[], void* user)
+TC_TEST(oaep_work)
 {
-  (void)params;
-  (void)user;
   const TC_RSA_oaep_options sha256 = {TC_HASH_SHA256, TC_HASH_SHA256, {NULL, 0}};
   const TC_RSA_oaep_options sha1_mgf = {TC_HASH_SHA256, TC_HASH_SHA1, {NULL, 0}};
   /* D = L - H - 1 = 95, ceil(D/G) = 3 and ceil(H/G) = 1 for SHA-256. */
@@ -355,15 +347,13 @@ static TC_status reject_once_random(void* context, uint8_t* output, size_t lengt
 /* TC_RSA_private_work(key, A) covers A blinding attempts. A budget one unit
  * short of the second attempt fails after the first request with LIMIT, and
  * the signature and workspace stay unpublished. */
-static MunitResult rejected_blinding(const MunitParameter params[], void* user)
+TC_TEST(rejected_blinding)
 {
   const test_key* fixture = key_fixture();
   static TC_RSA_word scratch[WORDS];
   const TC_RSA_workspace workspace = {scratch, WORDS};
   uint8_t digest[SHA256_BYTES] = {0}, signature[BYTES];
   const TC_RSA_v15_options v15 = {TC_HASH_SHA256};
-  (void)params;
-  (void)user;
   for (unsigned use_crt = 0; use_crt < 2; ++use_crt) {
     TC_RSA_private_key key = fixture->key;
     key.crt = use_crt ? &fixture->crt : NULL;
@@ -397,14 +387,12 @@ static MunitResult rejected_blinding(const MunitParameter params[], void* user)
 /* Private-key costs for full-width and CRT keys: signing, raw private
  * operations and OAEP decryption. A short budget fails before any RNG
  * request. */
-static MunitResult private_work(const MunitParameter params[], void* user)
+TC_TEST(private_work)
 {
   const test_key* fixture = key_fixture();
   static TC_RSA_word scratch[WORDS];
   const TC_RSA_workspace workspace = {scratch, WORDS};
   uint8_t digest[SHA256_BYTES] = {0}, signature[BYTES], saved[BYTES], input[BYTES] = {0};
-  (void)params;
-  (void)user;
   input[BYTES - 1] = 9;
   for (unsigned use_crt = 0; use_crt < 2; ++use_crt) {
     TC_RSA_private_key key = fixture->key;
@@ -487,7 +475,7 @@ static MunitResult private_work(const MunitParameter params[], void* user)
 
 /* A short caller output buffer returns TC_RSA_LIMIT before any work or RNG
  * use. A larger buffer is accepted and receives exactly modulus_bytes. */
-static MunitResult output_capacity(const MunitParameter params[], void* user)
+TC_TEST(output_capacity)
 {
   const test_key* fixture = key_fixture();
   static TC_RSA_word scratch[WORDS];
@@ -496,8 +484,6 @@ static MunitResult output_capacity(const MunitParameter params[], void* user)
   const TC_RSA_v15_options v15 = {TC_HASH_SHA256};
   const TC_RSA_pss_options pss = {TC_HASH_SHA256, TC_HASH_SHA256, SHA256_BYTES};
   const TC_RSA_oaep_options oaep = {TC_HASH_SHA256, TC_HASH_SHA256, {NULL, 0}};
-  (void)params;
-  (void)user;
   input[BYTES - 1] = 5;
   enum { SIGN_V15, SIGN_PSS, ENCRYPT, RAW_PUBLIC, RAW_PRIVATE, OPERATION_COUNT };
   for (unsigned operation = 0; operation < OPERATION_COUNT; ++operation) {
@@ -546,7 +532,7 @@ static MunitResult output_capacity(const MunitParameter params[], void* user)
 
 /* NULL and overlapping storage outrank every data check. Key and parameter
  * problems outrank received-data checks, and all of them outrank limits. */
-static MunitResult argument_order(const MunitParameter params[], void* user)
+TC_TEST(argument_order)
 {
   const test_key* fixture = key_fixture();
   static TC_RSA_word scratch[WORDS];
@@ -561,8 +547,6 @@ static MunitResult argument_order(const MunitParameter params[], void* user)
   even[BYTES - 1] &= 0xfe;
   const TC_RSA_public_key invalid_key = {{even, BYTES}, key->exponent};
   unsigned calls = 0;
-  (void)params;
-  (void)user;
 
   /* A NULL digest with a wrong signature length. */
   TC_work_budget work = {UINT32_MAX};

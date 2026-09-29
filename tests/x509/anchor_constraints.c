@@ -4,6 +4,7 @@
 #include <tiny_crypto/x509_crypto.h>
 #include <tiny_crypto/x509_trust_anchor.h>
 #include "munit.h"
+#include "test_util.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -438,10 +439,8 @@ static void check_profile(const char* profile)
       TC_X509_PATH_ERROR);
 }
 
-static MunitResult anchor_constraints(const MunitParameter params[], void* user)
+TC_TEST(anchor_constraints)
 {
-  (void)params;
-  (void)user;
   check_profile("legacy");
   check_profile("nexgen");
   return MUNIT_OK;

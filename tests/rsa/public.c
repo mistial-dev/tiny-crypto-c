@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/rsa.h>
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
 static TC_RSA_result verify(const TC_RSA_public_key* key, TC_hash_algorithm hash, TC_bytes digest,
@@ -12,15 +13,13 @@ static TC_RSA_result verify(const TC_RSA_public_key* key, TC_hash_algorithm hash
   return TC_RSA_verify_v15_digest(key, &options, digest, signature, workspace, &budget);
 }
 
-static MunitResult arguments(const MunitParameter params[], void* user)
+TC_TEST(arguments)
 {
   uint8_t modulus[128], exponent[] = {3}, digest[32] = {0}, signature[128] = {0};
   TC_RSA_word scratch[9 * 1024 / TC_RSA_WORD_BITS + 2];
   TC_RSA_public_key key = {{modulus, sizeof modulus}, {exponent, sizeof exponent}};
   TC_RSA_workspace workspace = {scratch, sizeof scratch / sizeof *scratch};
   TC_bytes hashed = {digest, sizeof digest}, signed_bytes = {signature, sizeof signature};
-  (void)params;
-  (void)user;
   memset(modulus, 0xff, sizeof modulus);
   munit_assert_size(TC_RSA_workspace_words(TC_RSA_OPERATION_VERIFY, 1024), ==, workspace.capacity);
   munit_assert_size(TC_RSA_workspace_words(TC_RSA_OPERATION_VERIFY, 2048), ==,
@@ -87,15 +86,13 @@ static MunitResult arguments(const MunitParameter params[], void* user)
 /* A well-formed key of a size the library does not implement is
  * UNSUPPORTED, so X.509 reports it as unsupported rather than as a bad
  * signature. No work is charged. */
-static MunitResult unsupported_sizes(const MunitParameter params[], void* user)
+TC_TEST(unsupported_sizes)
 {
   static uint8_t modulus[520], data[520], out[520];
   static TC_RSA_word scratch[9 * 4160 / TC_RSA_WORD_BITS + 2];
   const uint8_t exponent[] = {1, 0, 1};
   const size_t lengths[] = {96, 192, 520};
   uint8_t digest[32] = {0};
-  (void)params;
-  (void)user;
   memset(modulus, 0xff, sizeof modulus);
   for (size_t i = 0; i < sizeof lengths / sizeof *lengths; ++i) {
     const size_t length = lengths[i];
@@ -119,7 +116,7 @@ static MunitResult unsupported_sizes(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult ranges(const MunitParameter params[], void* user)
+TC_TEST(ranges)
 {
   enum { WORDS = 9 * 1024 / TC_RSA_WORD_BITS + 2 };
   union {
@@ -133,8 +130,6 @@ static MunitResult ranges(const MunitParameter params[], void* user)
   TC_bytes hashed = {digest, sizeof digest}, signed_bytes = {signature, sizeof signature};
   TC_bytes* inputs[] = {&key.modulus, &key.exponent, &hashed, &signed_bytes};
   uint8_t saved[sizeof shared];
-  (void)params;
-  (void)user;
   memset(modulus, 0xff, sizeof modulus);
   memset(&shared, 0xa5, sizeof shared);
   memcpy(saved, &shared, sizeof shared);
@@ -170,11 +165,9 @@ static MunitResult ranges(const MunitParameter params[], void* user)
 }
 
 /* One sizing function covers every operation and matches the static macros. */
-static MunitResult workspace_sizes(const MunitParameter params[], void* user)
+TC_TEST(workspace_sizes)
 {
   static const size_t sizes[] = {1024, 2048, 3072, 4096};
-  (void)params;
-  (void)user;
   for (size_t i = 0; i < sizeof sizes / sizeof *sizes; ++i) {
     const size_t bits = sizes[i];
     const size_t expected[] = {

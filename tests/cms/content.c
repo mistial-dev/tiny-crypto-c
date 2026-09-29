@@ -3,8 +3,9 @@
 #include <tiny_crypto/cms.h>
 #include "../../src/hash_dispatch_internal.h"
 #include "munit.h"
+#include "test_util.h"
 
-static MunitResult content_binding(const MunitParameter params[], void* user)
+TC_TEST(content_binding)
 {
   enum { WORK_BUDGET = 1024 };
   static const uint8_t type[] = {42, 3};
@@ -12,8 +13,6 @@ static MunitResult content_binding(const MunitParameter params[], void* user)
   TC_CMS_signed_attributes attributes = {0};
   TC_hash_context scratch;
   uint8_t digest[TC_SHA512_DIGESTLEN], actual[TC_SHA512_DIGESTLEN];
-  (void)params;
-  (void)user;
   attributes.content_type = (TC_bytes){type, sizeof type};
   for (unsigned id = TC_HASH_SHA1; id <= TC_HASH_SHA512; ++id) {
     tc_hash_info info;
@@ -85,7 +84,7 @@ static MunitResult content_binding(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult binding_storage(const MunitParameter params[], void* user)
+TC_TEST(binding_storage)
 {
   enum {
     ATTRIBUTES,
@@ -105,8 +104,6 @@ static MunitResult binding_storage(const MunitParameter params[], void* user)
     int matched;
   } slots[SLOT_COUNT];
   uint8_t saved[sizeof slots];
-  (void)params;
-  (void)user;
   /* Read-only ranges may alias each other. Writable ranges must not alias any range. */
   for (unsigned output = WORK; output <= MATCHED; ++output)
     for (unsigned input = 0; input < output; ++input) {
@@ -151,7 +148,7 @@ static MunitResult binding_storage(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult encoded_content(const MunitParameter params[], void* user)
+TC_TEST(encoded_content)
 {
   enum { FRAME_CAPACITY = 8, WORK_BUDGET = 1024, OUTPUT_SENTINEL = 0xa5 };
   static const uint8_t message[] = {'a', 'b', 'c'};
@@ -174,8 +171,6 @@ static MunitResult encoded_content(const MunitParameter params[], void* user)
   TC_hash_context scratch;
   uint8_t expected[TC_SHA512_DIGESTLEN], actual[TC_SHA512_DIGESTLEN];
   uint8_t untouched[sizeof actual];
-  (void)params;
-  (void)user;
   memset(untouched, OUTPUT_SENTINEL, sizeof untouched);
   for (unsigned id = TC_HASH_SHA1; id <= TC_HASH_SHA512; ++id) {
     const TC_hash_algorithm hash = (TC_hash_algorithm)id;
@@ -271,14 +266,12 @@ static MunitResult encoded_content(const MunitParameter params[], void* user)
 
 /* A digest whose length differs from the selected hash is an argument error,
  * so it leaves work and matched unchanged (docs/api.md failure rule 1). */
-static MunitResult digest_length_argument(const MunitParameter params[], void* user)
+TC_TEST(digest_length_argument)
 {
   enum { WORK_BUDGET = 1024 };
   static const uint8_t type[] = {42, 3};
   uint8_t digest[TC_SHA256_DIGESTLEN] = {0};
   TC_CMS_signed_attributes attributes = {0};
-  (void)params;
-  (void)user;
   attributes.content_type = (TC_bytes){type, sizeof type};
   attributes.message_digest = (TC_bytes){digest, sizeof digest};
   size_t work = WORK_BUDGET;

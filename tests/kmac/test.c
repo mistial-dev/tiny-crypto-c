@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "munit.h"
+#include "test_util.h"
 #include <tiny_crypto/kmac.h>
 #include "cavp.h"
 #include "mac_vectors.h"
@@ -13,10 +14,8 @@ static int kmac_ctx_equal(const struct TC_KMAC256_ctx* a, const struct TC_KMAC25
          a->active == b->active;
 }
 
-static MunitResult test_profile(const MunitParameter params[], void* user)
+TC_TEST(test_profile)
 {
-  (void)params;
-  (void)user;
   /* NIST SP 800-185 KMAC_samples.pdf, samples 4, 5, 6.
    * https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Standards-and-Guidelines/documents/examples/KMAC_samples.pdf */
   static const char* expected[] = {
@@ -155,10 +154,8 @@ static TC_status vector_kmac(const uint8_t* key, size_t key_length, const uint8_
   return TC_KMAC256_digest((TC_bytes){key, key_length}, (TC_bytes){message, message_length},
                            (TC_bytes){NULL, 0}, (TC_buffer){output, tag_length});
 }
-static MunitResult test_wycheproof(const MunitParameter params[], void* user)
+TC_TEST(test_wycheproof)
 {
-  (void)params;
-  (void)user;
   return tc_test_mac_vectors(vector_path, vector_kmac);
 }
 

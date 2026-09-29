@@ -26,13 +26,11 @@ static void capture_hash_block(void* context, const uint8_t* block)
   ++capture->calls;
 }
 
-static MunitResult test_hash_stream_length_fields(const MunitParameter params[], void* data)
+TC_TEST(test_hash_stream_length_fields)
 {
   hash_stream_capture capture = {{0}, 128u, 0u};
   uint8_t block[128] = {0};
   uint8_t used = 112u;
-  (void)params;
-  (void)data;
 
   /* SHA-512's high length word first becomes nonzero at 2^61 bytes. */
   tc_hash_stream_finish(&capture, UINT64_C(1) << 61, &used, block, 128u, 16u,
@@ -83,11 +81,9 @@ MunitResult test_cavp_hmac(const MunitParameter params[], void* data);
   } while (0)
 
 #define TC_SHA_TEST_MATRIX(N, digest_bytes, block_bytes, count_limit)                              \
-  static MunitResult test_sha##N##_fips(const MunitParameter params[], void* data)                 \
+  TC_TEST(test_sha##N##_fips)                                                                      \
   {                                                                                                \
     uint8_t out[TC_SHA##N##_DIGESTLEN];                                                            \
-    (void)params;                                                                                  \
-    (void)data;                                                                                    \
     munit_assert_int(TC_SHA##N##_digest((TC_bytes){fips_empty_msg, 0}, out), ==, TC_OK);           \
     munit_assert_memory_equal(TC_SHA##N##_DIGESTLEN, out, fips_empty_sha##N);                      \
     munit_assert_int(TC_SHA##N##_digest((TC_bytes){fips_abc_msg, FIPS_ABC_LEN}, out), ==, TC_OK);  \
@@ -100,14 +96,12 @@ MunitResult test_cavp_hmac(const MunitParameter params[], void* data);
     munit_assert_memory_equal(TC_SHA##N##_DIGESTLEN, out, fips_four_block_sha##N);                 \
     return MUNIT_OK;                                                                               \
   }                                                                                                \
-  static MunitResult test_sha##N##_million(const MunitParameter params[], void* data)              \
+  TC_TEST(test_sha##N##_million)                                                                   \
   {                                                                                                \
     struct TC_SHA##N##_ctx ctx;                                                                    \
     uint8_t chunk[1000];                                                                           \
     uint8_t out[TC_SHA##N##_DIGESTLEN];                                                            \
     size_t i;                                                                                      \
-    (void)params;                                                                                  \
-    (void)data;                                                                                    \
     memset(chunk, 'a', sizeof(chunk));                                                             \
     TC_SHA##N##_init(&ctx);                                                                        \
     for (i = 0; i < 1000; ++i)                                                                     \
@@ -127,13 +121,11 @@ MunitResult test_cavp_hmac(const MunitParameter params[], void* data);
     munit_assert_memory_equal(TC_SHA##N##_DIGESTLEN, out, million_a_sha##N);                       \
     return MUNIT_OK;                                                                               \
   }                                                                                                \
-  static MunitResult test_sha##N##_boundaries(const MunitParameter params[], void* data)           \
+  TC_TEST(test_sha##N##_boundaries)                                                                \
   {                                                                                                \
     uint8_t msg[256];                                                                              \
     uint8_t out[TC_SHA##N##_DIGESTLEN];                                                            \
     size_t i;                                                                                      \
-    (void)params;                                                                                  \
-    (void)data;                                                                                    \
     tc_test_fill_incrementing(msg, sizeof(msg));                                                   \
     for (i = 0; i < BOUNDARY_COUNT; ++i) {                                                         \
       munit_assert_size(boundary_lengths[i], <=, sizeof(msg));                                     \
@@ -142,7 +134,7 @@ MunitResult test_cavp_hmac(const MunitParameter params[], void* data);
     }                                                                                              \
     return MUNIT_OK;                                                                               \
   }                                                                                                \
-  static MunitResult test_sha##N##_incremental(const MunitParameter params[], void* data)          \
+  TC_TEST(test_sha##N##_incremental)                                                               \
   {                                                                                                \
     uint8_t msg[130];                                                                              \
     uint8_t expected[TC_SHA##N##_DIGESTLEN];                                                       \
@@ -150,8 +142,6 @@ MunitResult test_cavp_hmac(const MunitParameter params[], void* data);
     struct TC_SHA##N##_ctx ctx;                                                                    \
     size_t split;                                                                                  \
     size_t i;                                                                                      \
-    (void)params;                                                                                  \
-    (void)data;                                                                                    \
     tc_test_fill_incrementing(msg, sizeof(msg));                                                   \
     munit_assert_int(TC_SHA##N##_digest((TC_bytes){msg, sizeof(msg)}, expected), ==, TC_OK);       \
     for (split = 0; split <= sizeof(msg); ++split) {                                               \
@@ -182,12 +172,10 @@ MunitResult test_cavp_hmac(const MunitParameter params[], void* data);
     munit_assert_memory_equal(TC_SHA##N##_DIGESTLEN, out, fips_empty_sha##N);                      \
     return MUNIT_OK;                                                                               \
   }                                                                                                \
-  static MunitResult test_sha##N##_api(const MunitParameter params[], void* data)                  \
+  TC_TEST(test_sha##N##_api)                                                                       \
   {                                                                                                \
     struct TC_SHA##N##_ctx ctx;                                                                    \
     uint8_t out[TC_SHA##N##_DIGESTLEN];                                                            \
-    (void)params;                                                                                  \
-    (void)data;                                                                                    \
     memset(ctx.buf, 0xA5, sizeof(ctx.buf));                                                        \
     TC_SHA##N##_init(&ctx);                                                                        \
     munit_assert_true(tc_test_all_zero(ctx.buf, sizeof(ctx.buf)));                                 \
@@ -243,12 +231,10 @@ TC_SHA_TEST_MATRIX(512, 64, 128, UINT64_MAX)
 #undef TC_SHA_ASSERT_CLEARED
 
 /* Secure wipe test and status codes */
-static MunitResult test_secure_zero(const MunitParameter params[], void* data)
+TC_TEST(test_secure_zero)
 {
   uint8_t buf[16];
   size_t i;
-  (void)params;
-  (void)data;
 
   for (i = 0; i < sizeof(buf); ++i)
     buf[i] = (uint8_t)(0xA5U + (uint8_t)i);
@@ -266,12 +252,10 @@ static MunitResult test_secure_zero(const MunitParameter params[], void* data)
   return MUNIT_OK;
 }
 
-static MunitResult test_ct_eq(const MunitParameter params[], void* data)
+TC_TEST(test_ct_eq)
 {
   const uint8_t a[] = {0x00, 0x11, 0x22, 0x33, 0x44};
   uint8_t b[5];
-  (void)params;
-  (void)data;
 
   memcpy(b, a, sizeof(a));
   munit_assert_int(TC_ct_equal(a, b, sizeof(a)), ==, TC_OK);

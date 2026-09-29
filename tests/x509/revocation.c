@@ -3,6 +3,7 @@
 #include "../../src/x509_revocation_internal.h"
 #include "../../src/pki_source_internal.h"
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 #include "x509_crl_harness.h"
 
@@ -90,7 +91,7 @@ static TC_TLV_result scope_outputs_result(const tc_x509_crl_extra_storage* extra
   return tc_pki_storage_plan_finish(&plan, work);
 }
 
-static MunitResult signer_search(const MunitParameter params[], void* user)
+TC_TEST(signer_search)
 {
   const TC_X509_path_options options = {0};
   const TC_X509_path_workspace validation = {0};
@@ -101,8 +102,6 @@ static MunitResult signer_search(const MunitParameter params[], void* user)
   const TC_TLV_result results[] = {TC_TLV_END, TC_TLV_INVALID, TC_TLV_LIMIT, TC_TLV_ARGUMENT};
   TC_X509_search_result out, saved;
   memset(&saved, 0xa5, sizeof saved);
-  (void)params;
-  (void)user;
   for (size_t i = 0; i < sizeof results / sizeof *results; ++i) {
     size_t work = 100;
     const tc_pki_tree_workspace tree = {NULL, 0, &work};
@@ -136,7 +135,7 @@ static MunitResult signer_search(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult trust_arguments(const MunitParameter params[], void* user)
+TC_TEST(trust_arguments)
 {
   enum {
     VALID,
@@ -154,8 +153,6 @@ static MunitResult trust_arguments(const MunitParameter params[], void* user)
   const TC_X509_path_options options = {0};
   const TC_X509_path_workspace validation = {0};
   const TC_X509_search_workspace search = {0};
-  (void)params;
-  (void)user;
   munit_assert_false(tc_x509_crl_trust_valid(NULL));
   for (unsigned scenario = VALID; scenario < CASE_COUNT; ++scenario) {
     size_t work = 100;
@@ -205,14 +202,12 @@ static MunitResult trust_arguments(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult dependencies(const MunitParameter params[], void* user)
+TC_TEST(dependencies)
 {
   static const uint8_t first[] = {1, 2}, duplicate[] = {1, 2}, second[] = {1, 3};
   const TC_bytes a = {first, sizeof first}, b = {second, sizeof second};
   TC_X509_revocation_node nodes[1] = {0}, saved[1];
   size_t count = 0, index = SIZE_MAX, work = 0;
-  (void)params;
-  (void)user;
   munit_assert_int(tc_x509_crl_dependency_find(nodes, 1, &count, a, &work, &index), ==, TC_TLV_OK);
   munit_assert_size(count, ==, 1);
   munit_assert_size(index, ==, 0);
@@ -244,13 +239,11 @@ static MunitResult dependencies(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult indexed_dependencies(const MunitParameter params[], void* user)
+TC_TEST(indexed_dependencies)
 {
   static const uint8_t bytes[] = {0, 1, 2, 3, 0};
   TC_X509_revocation_node nodes[4] = {0};
   size_t count = 0, index = SIZE_MAX, work = 100;
-  (void)params;
-  (void)user;
   for (size_t i = 0; i < 4; ++i) {
     if (i == 3)
       work = 2;
@@ -282,7 +275,7 @@ static MunitResult indexed_dependencies(const MunitParameter params[], void* use
   return MUNIT_OK;
 }
 
-static MunitResult indexed_scopes(const MunitParameter params[], void* user)
+TC_TEST(indexed_scopes)
 {
   const uint8_t issuer[] = {0x30, 12, 0x31, 10, 0x30, 8, 6, 3, 0x55, 4, 3, 0x0c, 1, 'A'};
   const uint8_t other[] = {0x30, 12, 0x31, 10, 0x30, 8, 6, 3, 0x55, 4, 3, 0x0c, 1, 'B'};
@@ -297,8 +290,6 @@ static MunitResult indexed_scopes(const MunitParameter params[], void* user)
   size_t work = 1000;
   const tc_pki_tree_workspace tree = {frames, 16, &work};
   const TC_X509_crl_index index = {records, 4, 0};
-  (void)params;
-  (void)user;
   for (size_t i = 0; i < 4; ++i) {
     records[i].crl.issuer = (TC_bytes){issuer, sizeof issuer};
     records[i].extensions.present = TC_X509_CRL_EXT_DISTRIBUTION;
@@ -317,7 +308,7 @@ static MunitResult indexed_scopes(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult dependency_status(const MunitParameter params[], void* user)
+TC_TEST(dependency_status)
 {
   static const uint8_t encoded[] = {1, 2};
   const TC_bytes certificate = {encoded, sizeof encoded};
@@ -334,8 +325,6 @@ static MunitResult dependency_status(const MunitParameter params[], void* user)
   tc_x509_crl_resolution_workspace workspace = {0};
   workspace.nodes = &node;
   workspace.node_capacity = 1;
-  (void)params;
-  (void)user;
   for (size_t i = 0; i < sizeof statuses / sizeof *statuses; ++i) {
     size_t count = 1, work = 100;
     node.status = statuses[i];
@@ -353,7 +342,7 @@ static MunitResult dependency_status(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult dependency_failures(const MunitParameter params[], void* user)
+TC_TEST(dependency_failures)
 {
   enum {
     PATH,
@@ -370,8 +359,6 @@ static MunitResult dependency_failures(const MunitParameter params[], void* user
   };
   static const uint8_t encoded[] = {1, 2};
   const TC_bytes certificate = {encoded, sizeof encoded};
-  (void)params;
-  (void)user;
   for (unsigned scenario = 0; scenario < CASE_COUNT; ++scenario) {
     TC_X509_revocation_node node = {.certificate = certificate, .status = TC_X509_REVOCATION_GOOD},
                             saved;
@@ -466,14 +453,12 @@ static TC_TLV_result evaluate_node(void* context, size_t index, TC_X509_crl_evid
   return TC_TLV_OK;
 }
 
-static MunitResult resolution(const MunitParameter params[], void* user)
+TC_TEST(resolution)
 {
   const TC_TLV_result expected[] = {TC_TLV_OK,       TC_TLV_UNSUPPORTED, TC_TLV_INVALID,
                                     TC_TLV_ARGUMENT, TC_TLV_ARGUMENT,    TC_TLV_ARGUMENT,
                                     TC_TLV_ARGUMENT, TC_TLV_ARGUMENT,    TC_TLV_UNSUPPORTED,
                                     TC_TLV_INVALID,  TC_TLV_LIMIT};
-  (void)params;
-  (void)user;
   for (unsigned scenario = RESOLVE_CHAIN; scenario < RESOLVE_CASE_COUNT; ++scenario) {
     TC_X509_revocation_node nodes[2] = {0};
     size_t count = 1, work = 100;
@@ -521,13 +506,11 @@ static TC_TLV_result resolve_certificate(void* context, size_t index, TC_bytes c
   return TC_TLV_OK;
 }
 
-static MunitResult held_path(const MunitParameter params[], void* user)
+TC_TEST(held_path)
 {
   enum { COMPLETE, LATER_LIMIT, INCOMPLETE, FIRST_REVOKED, LAST_REVOKED, CASE_COUNT };
   static const uint8_t bytes[] = {0, 1};
   const TC_bytes chain[] = {{bytes, 1}, {bytes + 1, 1}};
-  (void)params;
-  (void)user;
   for (unsigned scenario = 0; scenario < CASE_COUNT; ++scenario) {
     const size_t revoked_at = scenario == FIRST_REVOKED  ? 0
                               : scenario == LAST_REVOKED ? 1
@@ -557,7 +540,7 @@ static MunitResult held_path(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult storage_spans(const MunitParameter params[], void* user)
+TC_TEST(storage_spans)
 {
   enum { TREE_LARGER, VALIDATION_LARGER, SEPARATE, MISSING_STATES, FRAME_OVERFLOW, CASE_COUNT };
   TC_TLV_frame frames[2], other[2];
@@ -565,8 +548,6 @@ static MunitResult storage_spans(const MunitParameter params[], void* user)
   const TC_X509_path_options options = {0};
   const TC_X509_search_workspace search = {0};
   const TC_X509_store_source source = {NULL, 0, 1, NULL, tc_pki_source_guard_anchor};
-  (void)params;
-  (void)user;
   for (unsigned scenario = 0; scenario < CASE_COUNT; ++scenario) {
     size_t work = 100;
     TC_X509_path_workspace validation = {0};
@@ -612,7 +593,7 @@ static MunitResult storage_spans(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult record_storage(const MunitParameter params[], void* user)
+TC_TEST(record_storage)
 {
   uint8_t byte = 0;
   const TC_bytes write = {&byte, 1};
@@ -639,8 +620,6 @@ static MunitResult record_storage(const MunitParameter params[], void* user)
                         &record.extensions.authority.serial,
                         &record.extensions.distribution.name.encoded,
                         &record.extensions.distribution.name.contents};
-  (void)params;
-  (void)user;
   for (size_t i = 0; i < sizeof fields / sizeof *fields; ++i) {
     size_t work = 1000;
     *fields[i] = write;
@@ -652,7 +631,7 @@ static MunitResult record_storage(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult scope_inputs(const MunitParameter params[], void* user)
+TC_TEST(scope_inputs)
 {
   uint8_t byte = 0;
   const TC_bytes bytes = {&byte, 1};
@@ -695,8 +674,6 @@ static MunitResult scope_inputs(const MunitParameter params[], void* user)
                         &options.purpose,
                         &options.anchor_names.permitted,
                         &options.anchor_names.excluded};
-  (void)params;
-  (void)user;
   for (size_t i = 0; i < sizeof metadata / sizeof *metadata; ++i) {
     work = 1000;
     munit_assert_int(scope_inputs_result(&processing, &trust, metadata[i], &work), ==,
@@ -735,7 +712,7 @@ static TC_TLV_result unexpected_search(const void* candidates,
   munit_error("Rejected CRL records must be filtered before signer search");
 }
 
-static MunitResult scope_traversal(const MunitParameter params[], void* user)
+TC_TEST(scope_traversal)
 {
   enum {
     EMPTY,
@@ -756,8 +733,6 @@ static MunitResult scope_traversal(const MunitParameter params[], void* user)
   query.point = &point;
   TC_X509_search_result out, saved;
   memset(&saved, 0xa5, sizeof saved);
-  (void)params;
-  (void)user;
   for (unsigned scenario = EMPTY; scenario < CASE_COUNT; ++scenario) {
     size_t work = scenario == NO_WORK ? 0 : 100;
     const tc_pki_tree_workspace tree = {NULL, 0, &work};
@@ -821,7 +796,7 @@ static MunitResult scope_traversal(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult path_inputs(const MunitParameter params[], void* user)
+TC_TEST(path_inputs)
 {
   enum {
     VALID,
@@ -838,8 +813,6 @@ static MunitResult path_inputs(const MunitParameter params[], void* user)
   };
   const uint8_t encoded[] = {1, 2};
   uint8_t scratch;
-  (void)params;
-  (void)user;
   for (unsigned scenario = VALID; scenario < CASE_COUNT; ++scenario) {
     TC_bytes chain[] = {{encoded, sizeof encoded}};
     TC_bytes writes = {&scratch, sizeof scratch};
@@ -889,7 +862,7 @@ static MunitResult path_inputs(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult dependency_context(const MunitParameter params[], void* user)
+TC_TEST(dependency_context)
 {
   const uint8_t encoded[] = {1, 2};
   const TC_bytes certificate = {encoded, sizeof encoded};
@@ -904,8 +877,6 @@ static MunitResult dependency_context(const MunitParameter params[], void* user)
   tc_x509_crl_dependencies dependencies = {&options, 0, &workspace, &anchor, NULL, 0, 0};
   TC_X509_search_result path = {0};
   size_t work = 100, index = SIZE_MAX;
-  (void)params;
-  (void)user;
   munit_assert_int(tc_x509_crl_dependencies_check(NULL, &path, NULL, &work), ==,
                    TC_X509_PATH_ERROR);
   munit_assert_int(tc_x509_crl_dependencies_check(&dependencies, &path, NULL, &work), ==,
@@ -940,7 +911,7 @@ static MunitResult dependency_context(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult dependency_read(const MunitParameter params[], void* user)
+TC_TEST(dependency_read)
 {
   enum { FRAME_CAPACITY = 8, OID_CAPACITY = 8, WORK_BUDGET = 100, ELEMENT_LIMIT = 20 };
   enum { TRUNCATED, BAD_INDEX, BAD_COUNT, MISSING_TREE, MISSING_BYTES, NO_WORK, CASE_COUNT };
@@ -956,8 +927,6 @@ static MunitResult dependency_read(const MunitParameter params[], void* user)
   validation.oid_capacity = OID_CAPACITY;
   TC_X509_certificate out, saved;
   memset(&saved, 0xa5, sizeof saved);
-  (void)params;
-  (void)user;
   for (unsigned scenario = TRUNCATED; scenario < CASE_COUNT; ++scenario) {
     size_t work = scenario == NO_WORK ? 0 : WORK_BUDGET;
     const tc_pki_tree_workspace tree = {frames, FRAME_CAPACITY, &work};
@@ -1001,7 +970,7 @@ static MunitResult dependency_read(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult extra_inputs(const MunitParameter params[], void* user)
+TC_TEST(extra_inputs)
 {
   enum {
     VALID,
@@ -1015,8 +984,6 @@ static MunitResult extra_inputs(const MunitParameter params[], void* user)
   const uint8_t encoded[] = {1, 2};
   uint8_t scratch;
   const TC_bytes writes = {&scratch, sizeof scratch};
-  (void)params;
-  (void)user;
   for (unsigned scenario = VALID; scenario < CASE_COUNT; ++scenario) {
     TC_X509_revocation_node node;
     tc_x509_crl_extra_storage extra;
@@ -1057,13 +1024,11 @@ static MunitResult extra_inputs(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult resolve_dependencies(const MunitParameter params[], void* user)
+TC_TEST(resolve_dependencies)
 {
   enum { NEW_CHAIN, CACHED, CYCLE, OVERLAP, NO_WORK, CASE_COUNT };
   const uint8_t first[] = {1, 2}, second[] = {1, 3};
   const TC_bytes target = {first, sizeof first};
-  (void)params;
-  (void)user;
   for (unsigned scenario = NEW_CHAIN; scenario < CASE_COUNT; ++scenario) {
     TC_X509_revocation_node nodes[2] = {
         {.certificate = target, .status = TC_X509_REVOCATION_UNDETERMINED},
@@ -1112,7 +1077,7 @@ static MunitResult resolve_dependencies(const MunitParameter params[], void* use
   return MUNIT_OK;
 }
 
-static MunitResult scope_arguments(const MunitParameter params[], void* user)
+TC_TEST(scope_arguments)
 {
   enum {
     VALID,
@@ -1139,8 +1104,6 @@ static MunitResult scope_arguments(const MunitParameter params[], void* user)
   const tc_x509_crl_path_check check = {0};
   TC_X509_search_result out, saved;
   memset(&saved, 0xa5, sizeof saved);
-  (void)params;
-  (void)user;
   for (unsigned scenario = VALID; scenario < CASE_COUNT; ++scenario) {
     size_t work = 100;
     const tc_pki_tree_workspace tree = {NULL, 0, &work};
@@ -1225,7 +1188,7 @@ static MunitResult scope_arguments(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult scope_storage_check(const MunitParameter params[], void* user)
+TC_TEST(scope_storage_check)
 {
   enum {
     VALID,
@@ -1240,8 +1203,6 @@ static MunitResult scope_storage_check(const MunitParameter params[], void* user
   };
   uint8_t bytes[3];
   TC_X509_revocation_result output = {0};
-  (void)params;
-  (void)user;
   for (unsigned scenario = VALID; scenario < CASE_COUNT; ++scenario) {
     TC_bytes writes[CRL_SCOPE_WRITES] = {{NULL, 0}};
     const TC_bytes prefix = {bytes, 1};
@@ -1310,7 +1271,7 @@ static TC_TLV_result store_search_record(void* context, size_t index, size_t* wo
   return fixture->result;
 }
 
-static MunitResult store_search(const MunitParameter params[], void* user)
+TC_TEST(store_search)
 {
   enum { FRAME_CAPACITY = 8, WORK_BUDGET = 100, ELEMENT_LIMIT = 20 };
   enum {
@@ -1338,8 +1299,6 @@ static MunitResult store_search(const MunitParameter params[], void* user)
   const TC_X509_search_workspace search = {0};
   TC_X509_search_result out, saved;
   memset(&saved, 0xa5, sizeof saved);
-  (void)params;
-  (void)user;
   for (unsigned scenario = EMPTY; scenario < CASE_COUNT; ++scenario) {
     size_t work = scenario == NO_WORK ? 0 : WORK_BUDGET;
     const tc_pki_tree_workspace tree = {frames, FRAME_CAPACITY, &work};
@@ -1448,7 +1407,7 @@ static TC_TLV_result guarded_scope_search(const void* candidates,
   return result == TC_TLV_OK ? TC_TLV_END : result;
 }
 
-static MunitResult scope_operation(const MunitParameter params[], void* user)
+TC_TEST(scope_operation)
 {
   enum { FRAME_CAPACITY = 8, WORK_BUDGET = 10000, ELEMENT_LIMIT = 20 };
   enum { VALID, OVERLAP, MISSING_ADAPTER, BAD_POINTS, NO_WORK, CASE_COUNT };
@@ -1462,8 +1421,6 @@ static MunitResult scope_operation(const MunitParameter params[], void* user)
   const TC_X509_search_workspace search = {0};
   TC_X509_search_result out, saved;
   memset(&saved, 0xa5, sizeof saved);
-  (void)params;
-  (void)user;
   for (unsigned scenario = VALID; scenario < CASE_COUNT; ++scenario) {
     size_t work = scenario == NO_WORK ? 0 : WORK_BUDGET;
     const tc_pki_tree_workspace tree = {frames, FRAME_CAPACITY, &work};

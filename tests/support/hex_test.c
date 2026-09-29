@@ -3,16 +3,15 @@
 /* Behaviour of the shared test hex decoder in tests/support/cavp.c. */
 #include "cavp.h"
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
-static MunitResult field_format(const MunitParameter params[], void* user)
+TC_TEST(field_format)
 {
   static const char* const terminated[] = {"00aB\"",        "00aB\r\n", "00aB\n",     "00aB \t",
                                            "00aB\", \"x\"", "00aB \"x", "00aB\t\r\n", "00aB"};
   uint8_t output[4];
   size_t length, i;
-  (void)params;
-  (void)user;
   for (i = 0; i < sizeof terminated / sizeof *terminated; ++i) {
     length = 99;
     memset(output, 0xa5, sizeof output);
@@ -30,7 +29,7 @@ static MunitResult field_format(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult field_rejects(const MunitParameter params[], void* user)
+TC_TEST(field_rejects)
 {
   /* Only whitespace may follow the digits, before NUL or a closing quote. */
   static const char* const malformed[] = {"0",       "012",     "0g",     "g0",     "01:02",
@@ -38,8 +37,6 @@ static MunitResult field_rejects(const MunitParameter params[], void* user)
                                           "00 rest", "00aB\tx", "00 \t x"};
   uint8_t output[4];
   size_t length, i;
-  (void)params;
-  (void)user;
   for (i = 0; i < sizeof malformed / sizeof *malformed; ++i) {
     length = 99;
     munit_assert_false(
@@ -57,12 +54,10 @@ static MunitResult field_rejects(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult separated_format(const MunitParameter params[], void* user)
+TC_TEST(separated_format)
 {
   uint8_t output[4];
   size_t length = 99;
-  (void)params;
-  (void)user;
   munit_assert_true(tc_test_hex_decode("\"0a: 0B-\r\n\tff\"", TC_TEST_HEX_SEPARATED, output,
                                        sizeof output, &length));
   munit_assert_size(length, ==, 3);

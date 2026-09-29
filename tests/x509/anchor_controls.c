@@ -11,6 +11,7 @@
 #include <tiny_crypto/x509_trust_anchor.h>
 #include "../../src/x509_path_internal.h"
 #include "munit.h"
+#include "test_util.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -155,15 +156,13 @@ static size_t policy_set(TC_buffer out, const uint8_t* oid, size_t length)
   return der(out, 0x30, element, element_length);
 }
 
-static MunitResult policies(const MunitParameter params[], void* user)
+TC_TEST(policies)
 {
   static uint8_t set1[64], set2[64], set_any[64];
   const TC_bytes initial1[] = {{policy1, sizeof policy1}};
   TC_X509_store_anchor anchor = pkits_anchor();
   TC_X509_path_options options = path_options(0);
   TC_X509_path_result result;
-  (void)params;
-  (void)user;
   setup_workspace();
 
   /* 4.1.1: the unconstrained anchor accepts the path. With no initial
@@ -248,7 +247,7 @@ static MunitResult policies(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult names(const MunitParameter params[], void* user)
+TC_TEST(names)
 {
   static uint8_t pkits[80], other[80];
   const TC_bytes pkits_subtree = {
@@ -258,8 +257,6 @@ static MunitResult names(const MunitParameter params[], void* user)
   TC_X509_store_anchor anchor = pkits_anchor();
   TC_X509_path_options options = path_options(0);
   TC_X509_path_result result;
-  (void)params;
-  (void)user;
   setup_workspace();
 
   /* Permitted and excluded subtrees from the anchor apply to every
@@ -332,7 +329,7 @@ static size_t trust_anchor_info(TC_buffer out, const TC_X509_certificate* root, 
   return der(out, 0x30, info, length);
 }
 
-static MunitResult parsed_info(const MunitParameter params[], void* user)
+TC_TEST(parsed_info)
 {
   static const uint8_t explicit_policy[] = {0x06, 0x40};
   static uint8_t list[4096], subtree[80];
@@ -345,8 +342,6 @@ static MunitResult parsed_info(const MunitParameter params[], void* user)
   TC_X509_path_result result;
   const TC_bytes encoded = load("TrustAnchorRootCertificate.crt", anchor_der);
   size_t length;
-  (void)params;
-  (void)user;
   setup_workspace();
   munit_assert_int(TC_X509_read(encoded, &limits, &parser, &root), ==, TC_TLV_OK);
 
@@ -401,7 +396,7 @@ static MunitResult parsed_info(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult workspace_limits(const MunitParameter params[], void* user)
+TC_TEST(workspace_limits)
 {
   static uint8_t list[4096];
   TC_TLV_frame frames[2];
@@ -412,8 +407,6 @@ static MunitResult workspace_limits(const MunitParameter params[], void* user)
   TC_X509_store_anchor anchor;
   const TC_bytes encoded = load("TrustAnchorRootCertificate.crt", anchor_der);
   size_t length;
-  (void)params;
-  (void)user;
 
   /* A certificate choice: the list wraps the PKITS root certificate. */
   length = der((TC_buffer){list, sizeof list}, 0x30, encoded.data, encoded.length);
@@ -456,7 +449,7 @@ static MunitResult workspace_limits(const MunitParameter params[], void* user)
 /* The basic pass parses each path certificate once. A cache-filling pass
  * therefore costs exactly the DER bytes of every certificate more than the
  * same pass over already-parsed views. PKITS 4.5.1 gives three certificates. */
-static MunitResult basic_pass_work(const MunitParameter params[], void* user)
+TC_TEST(basic_pass_work)
 {
   static uint8_t der_files[3][FILE_CAPACITY];
   static const char* const files[] = {"BasicSelfIssuedNewKeyCACert.crt",
@@ -467,8 +460,6 @@ static MunitResult basic_pass_work(const MunitParameter params[], void* user)
   tc_x509_path_input input;
   size_t i, bytes = 0, cached_work, parsed_work;
   int accepted = 0;
-  (void)params;
-  (void)user;
   setup_workspace();
   const TC_X509_store_anchor anchor = pkits_anchor();
   const TC_X509_path_options options = path_options(0);

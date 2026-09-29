@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/piv_certificate.h>
 #include "munit.h"
+#include "test_util.h"
 #include <stdio.h>
 #include <string.h>
 #ifdef _WIN32
@@ -9,7 +10,7 @@
 #include <io.h>
 #endif
 
-static MunitResult containers(const MunitParameter params[], void* context)
+TC_TEST(containers)
 {
   uint8_t header[7], encoded[4096], expected[1856];
   size_t records = 0, count;
@@ -40,8 +41,6 @@ static MunitResult containers(const MunitParameter params[], void* context)
   munit_assert_int(ferror(stdin), ==, 0);
   munit_assert_size(records, >, 0);
   printf("%zu certificate-container records checked\n", records);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 

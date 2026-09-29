@@ -2,6 +2,7 @@
 #include <tiny_crypto/ec.h>
 #include <tiny_crypto/der.h>
 #include "munit.h"
+#include "test_util.h"
 #include "cavp.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,15 +10,13 @@
 
 static const char* path;
 static int der;
-static MunitResult vectors(const MunitParameter params[], void* data)
+TC_TEST(vectors)
 {
   char line[32768];
   uint8_t key[256], digest[128], signature[8192];
   TC_ECDSA_workspace workspace;
   size_t count = 0;
   FILE* file;
-  (void)params;
-  (void)data;
   if (!path)
     return MUNIT_SKIP;
   file = fopen(path, "r");

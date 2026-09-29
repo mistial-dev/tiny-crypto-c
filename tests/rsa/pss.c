@@ -3,9 +3,10 @@
 #include "../../src/rsa_padding_internal.h"
 #include "cavp.h"
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
-static MunitResult representative(const MunitParameter params[], void* user)
+TC_TEST(representative)
 {
   /* SHA-256, emBits=1023, digest and salt both 00..1f. */
   static const char hex[] = "0f40a4c395c03be3bb5c3aa2e026b83be8c9cc8a14929a4b919c1d3e639412b0"
@@ -15,8 +16,6 @@ static MunitResult representative(const MunitParameter params[], void* user)
   uint8_t fixture[128], encoded[128], digest[32], block[64];
   TC_hash_context workspace;
   uint32_t work = 10000, required;
-  (void)params;
-  (void)user;
   munit_assert_size(tc_test_hex(hex, fixture, sizeof fixture), ==, sizeof fixture);
   for (size_t i = 0; i < sizeof digest; ++i)
     digest[i] = (uint8_t)i;
@@ -79,7 +78,7 @@ static MunitResult representative(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult salt_boundaries(const MunitParameter params[], void* user)
+TC_TEST(salt_boundaries)
 {
   static const char* fixtures[] = {
       "3965a3f5891d0f6091fdfd3b81b045cdaf014dd3fa505ad5d419b924daf4cf44"
@@ -92,8 +91,6 @@ static MunitResult salt_boundaries(const MunitParameter params[], void* user)
       "8b8a586faca1433394a0742feebb3e4e4f2cae1c88b5086f36e52650583b13bc"};
   uint8_t expected[128], encoded[128], digest[32], salt[94], block[64];
   TC_hash_context workspace;
-  (void)params;
-  (void)user;
   for (size_t i = 0; i < sizeof digest; ++i)
     digest[i] = (uint8_t)i;
   for (size_t i = 0; i < sizeof salt; ++i)

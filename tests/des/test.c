@@ -30,11 +30,8 @@ MunitResult test_edge_vectors_suite(const MunitParameter params[], void* data);
 
 /* 1A. Single DES ECB (KAT Encrypt, KAT Decrypt, & Round-Trip) */
 #if TC_DES_ENABLE_ECB
-static MunitResult test_des_ecb(const MunitParameter params[], void* data)
+TC_TEST(test_des_ecb)
 {
-  (void)params;
-  (void)data;
-
   struct TC_DES_ctx ctx;
   uint8_t buffer[8];
 
@@ -62,11 +59,8 @@ static MunitResult test_des_ecb(const MunitParameter params[], void* data)
 
 /* 1B. Single DES CBC (KAT Encrypt, KAT Decrypt, & Round-Trip) */
 #if TC_DES_ENABLE_CBC
-static MunitResult test_des_cbc(const MunitParameter params[], void* data)
+TC_TEST(test_des_cbc)
 {
-  (void)params;
-  (void)data;
-
   struct TC_DES_ctx ctx;
   uint8_t buffer[8];
 
@@ -97,12 +91,10 @@ static MunitResult test_des_cbc(const MunitParameter params[], void* data)
 /* 1C. Single DES CTR Stream Mode */
 #if TC_DES_ENABLE_CTR
 /* A counter that wraps past 2^64 is exhausted until a new IV is set. */
-static MunitResult test_des_ctr_exhaustion(const MunitParameter params[], void* data)
+TC_TEST(test_des_ctr_exhaustion)
 {
   uint8_t iv[TC_DES_BLOCKLEN], buffer[2 * TC_DES_BLOCKLEN], saved[sizeof buffer];
   struct TC_DES_ctx ctx;
-  (void)params;
-  (void)data;
   memset(iv, 0xff, sizeof iv);
   memset(buffer, 0x11, sizeof buffer);
   munit_assert_int(des_init_with_iv(&ctx, des_test_key, TC_DES_KEYLEN, iv), ==, TC_OK);
@@ -133,11 +125,8 @@ static MunitResult test_des_ctr_exhaustion(const MunitParameter params[], void* 
   return MUNIT_OK;
 }
 
-static MunitResult test_des_ctr(const MunitParameter params[], void* data)
+TC_TEST(test_des_ctr)
 {
-  (void)params;
-  (void)data;
-
   struct TC_DES_ctx ctx;
   uint8_t original[20] = "Hello DES CTR Mode!";
   uint8_t buffer[20];
@@ -173,11 +162,8 @@ static MunitResult test_des_ctr(const MunitParameter params[], void* data)
 
 /* 2A. 2-Key 3DES ECB (KAT Encrypt, KAT Decrypt, & Round-Trip) */
 #if TC_DES_ENABLE_TDES && TC_DES_ENABLE_ECB
-static MunitResult test_tdes2_ecb(const MunitParameter params[], void* data)
+TC_TEST(test_tdes2_ecb)
 {
-  (void)params;
-  (void)data;
-
   struct TC_DES_ctx ctx;
   uint8_t buffer[16];
 
@@ -209,11 +195,8 @@ static MunitResult test_tdes2_ecb(const MunitParameter params[], void* data)
 
 /* 2B. 2-Key 3DES CBC (KAT Encrypt, KAT Decrypt, & Round-Trip) */
 #if TC_DES_ENABLE_TDES && TC_DES_ENABLE_CBC
-static MunitResult test_tdes2_cbc(const MunitParameter params[], void* data)
+TC_TEST(test_tdes2_cbc)
 {
-  (void)params;
-  (void)data;
-
   struct TC_DES_ctx ctx;
   uint8_t buffer[16];
 
@@ -243,11 +226,8 @@ static MunitResult test_tdes2_cbc(const MunitParameter params[], void* data)
 
 /* 2C. 2-Key 3DES CTR Stream Mode */
 #if TC_DES_ENABLE_TDES && TC_DES_ENABLE_CTR
-static MunitResult test_tdes2_ctr(const MunitParameter params[], void* data)
+TC_TEST(test_tdes2_ctr)
 {
-  (void)params;
-  (void)data;
-
   struct TC_DES_ctx ctx;
   uint8_t original[24] = "Stream 2-Key 3DES Test!";
   uint8_t buffer[24];
@@ -274,11 +254,8 @@ static MunitResult test_tdes2_ctr(const MunitParameter params[], void* data)
 
 /* 3A. 3-Key 3DES ECB (KAT Encrypt, KAT Decrypt, & Round-Trip) */
 #if TC_DES_ENABLE_TDES && TC_DES_ENABLE_ECB
-static MunitResult test_tdes3_ecb(const MunitParameter params[], void* data)
+TC_TEST(test_tdes3_ecb)
 {
-  (void)params;
-  (void)data;
-
   struct TC_DES_ctx ctx;
   uint8_t buffer[16];
 
@@ -310,11 +287,8 @@ static MunitResult test_tdes3_ecb(const MunitParameter params[], void* data)
 
 /* 3B. 3-Key 3DES CBC (KAT Encrypt, KAT Decrypt, & Round-Trip) */
 #if TC_DES_ENABLE_TDES && TC_DES_ENABLE_CBC
-static MunitResult test_tdes3_cbc(const MunitParameter params[], void* data)
+TC_TEST(test_tdes3_cbc)
 {
-  (void)params;
-  (void)data;
-
   struct TC_DES_ctx ctx;
   uint8_t buffer[16];
 
@@ -344,11 +318,8 @@ static MunitResult test_tdes3_cbc(const MunitParameter params[], void* data)
 
 /* 3C. 3-Key 3DES CTR Stream Mode */
 #if TC_DES_ENABLE_TDES && TC_DES_ENABLE_CTR
-static MunitResult test_tdes3_ctr(const MunitParameter params[], void* data)
+TC_TEST(test_tdes3_ctr)
 {
-  (void)params;
-  (void)data;
-
   struct TC_DES_ctx ctx;
   uint8_t original[32] = "Stream 3-Key Triple-DES Test!12";
   uint8_t buffer[32];
@@ -381,11 +352,8 @@ static MunitResult test_tdes3_ctr(const MunitParameter params[], void* data)
 
 /* 4A. Single DES OFB (KAT, Decrypt symmetry, Cross-call chaining) */
 #if TC_DES_ENABLE_OFB
-static MunitResult test_des_ofb(const MunitParameter params[], void* data)
+TC_TEST(test_des_ofb)
 {
-  (void)params;
-  (void)data;
-
   struct TC_DES_ctx ctx;
   uint8_t buffer[8];
 
@@ -408,11 +376,8 @@ static MunitResult test_des_ofb(const MunitParameter params[], void* data)
 
 /* 4B. Single DES CFB64 (KAT Encrypt, KAT Decrypt) */
 #if TC_DES_ENABLE_CFB64
-static MunitResult test_des_cfb64(const MunitParameter params[], void* data)
+TC_TEST(test_des_cfb64)
 {
-  (void)params;
-  (void)data;
-
   struct TC_DES_ctx ctx;
   uint8_t buffer[8];
 
@@ -433,14 +398,12 @@ static MunitResult test_des_cfb64(const MunitParameter params[], void* data)
 /* SP 800-38A section 5.2: CFB64 messages are whole 8-byte segments. A short
  * segment ends the message until a new IV is set. Splitting at multiples of 8
  * matches one call, for single DES and TDEA. */
-static MunitResult test_des_cfb64_short_segment(const MunitParameter params[], void* data)
+TC_TEST(test_des_cfb64_short_segment)
 {
   const uint8_t* keys[3] = {des_test_key, tdes2_key, tdes3_key};
   const size_t keylens[3] = {TC_DES_KEYLEN, TC_DES_KEYLEN_2KEY, TC_DES_KEYLEN_3KEY};
   const size_t key_count = TC_DES_ENABLE_TDES ? 3 : 1;
   size_t k;
-  (void)params;
-  (void)data;
 
   for (k = 0; k < key_count; ++k) {
     struct TC_DES_ctx ctx;
@@ -497,11 +460,8 @@ static MunitResult test_des_cfb64_short_segment(const MunitParameter params[], v
 
 /* 4C. Single DES CFB8 (KAT Encrypt, KAT Decrypt) */
 #if TC_DES_ENABLE_CFB8
-static MunitResult test_des_cfb8(const MunitParameter params[], void* data)
+TC_TEST(test_des_cfb8)
 {
-  (void)params;
-  (void)data;
-
   struct TC_DES_ctx ctx;
   uint8_t buffer[8];
 
@@ -520,11 +480,8 @@ static MunitResult test_des_cfb8(const MunitParameter params[], void* data)
 
 /* 4D. Single DES CFB1: NIST CAVP TCFB1vartext.rsp single-bit cases + roundtrip */
 #if TC_DES_ENABLE_CFB1
-static MunitResult test_des_cfb1(const MunitParameter params[], void* data)
+TC_TEST(test_des_cfb1)
 {
-  (void)params;
-  (void)data;
-
   struct TC_DES_ctx ctx;
 
   /* TCFB1vartext.rsp COUNT 0: KEYs=0101010101010101 IV=8000000000000000 PT=0 -> CT=1 */
@@ -562,11 +519,8 @@ static MunitResult test_des_cfb1(const MunitParameter params[], void* data)
 /* 4E. 3-Key 3DES OFB / CFB64 / CFB8 (KAT + Decrypt) */
 #if TC_DES_ENABLE_TDES &&                                                                          \
     (TC_DES_ENABLE_OFB || TC_DES_ENABLE_CFB64 || TC_DES_ENABLE_CFB8 || TC_DES_ENABLE_CFB1)
-static MunitResult test_tdes3_feedback_modes(const MunitParameter params[], void* data)
+TC_TEST(test_tdes3_feedback_modes)
 {
-  (void)params;
-  (void)data;
-
   struct TC_DES_ctx ctx;
   uint8_t buffer[16];
 
@@ -612,11 +566,8 @@ static MunitResult test_tdes3_feedback_modes(const MunitParameter params[], void
 /* 4F. Cross-call chaining: split calls must equal one-shot output */
 #if TC_DES_ENABLE_TDES &&                                                                          \
     (TC_DES_ENABLE_OFB || TC_DES_ENABLE_CFB64 || TC_DES_ENABLE_CFB8 || TC_DES_ENABLE_CFB1)
-static MunitResult test_feedback_mode_chaining(const MunitParameter params[], void* data)
+TC_TEST(test_feedback_mode_chaining)
 {
-  (void)params;
-  (void)data;
-
   struct TC_DES_ctx ctx;
   uint8_t oneshot[16];
   uint8_t split[16];
@@ -671,11 +622,8 @@ static MunitResult test_feedback_mode_chaining(const MunitParameter params[], vo
 
 /* Equivalence Test: 3DES with K1=K2=K3 equals Single DES */
 #if TC_DES_ENABLE_TDES && TC_DES_ENABLE_ECB
-static MunitResult test_tdes_single_des_equivalence(const MunitParameter params[], void* data)
+TC_TEST(test_tdes_single_des_equivalence)
 {
-  (void)params;
-  (void)data;
-
   struct TC_DES_ctx single_ctx;
   struct TC_DES_ctx tdes_ctx;
 
@@ -721,11 +669,8 @@ static const uint8_t cmac_kat_tdes2_empty[8] = {0x79, 0xce, 0x52, 0xa7, 0xf7, 0x
 static const uint8_t cmac_kat_tdes3_empty[8] = {0x7d, 0xb0, 0xd3, 0x7d, 0xf9, 0x36, 0xc5, 0x50};
 
 /* CMAC Tests (NIST SP 800-38B) */
-static MunitResult test_des_cmac(const MunitParameter params[], void* data)
+TC_TEST(test_des_cmac)
 {
-  (void)params;
-  (void)data;
-
   uint8_t cmac1[8], cmac2[8], cmac3[8], cmac_empty[8], bad[8];
   size_t msglen = sizeof(cmac_kat_msg) - 1;
 
@@ -758,14 +703,11 @@ static MunitResult test_des_cmac(const MunitParameter params[], void* data)
 /* The default entry points take TC_MIN_TAG_LEN..8 bytes and the _short_tag
  * forms take 1..TC_MIN_TAG_LEN - 1 (SP 800-38B Appendix A.2). A rejected
  * length leaves the tag buffer unchanged. */
-static MunitResult test_des_cmac_tag_policy(const MunitParameter params[], void* data)
+TC_TEST(test_des_cmac_tag_policy)
 {
   const size_t msglen = sizeof(cmac_kat_msg) - 1;
   const size_t below = TC_MIN_TAG_LEN - 1u;
   uint8_t tag[8], bad[8];
-
-  (void)params;
-  (void)data;
 
   /* Default entry: min - 1 is rejected, min is accepted. */
   memset(tag, 0xa5, sizeof(tag));
@@ -816,7 +758,7 @@ static MunitResult test_des_cmac_tag_policy(const MunitParameter params[], void*
 
 /* Streaming context must match the one-shot for every split pattern and
    key length, including an empty message and block-aligned messages. */
-static MunitResult test_des_cmac_streaming(const MunitParameter params[], void* data)
+TC_TEST(test_des_cmac_streaming)
 {
   static const size_t lengths[] = {0, 1, 7, 8, 9, 16, 21, 24, 50};
   static const size_t splits[] = {1, 7, 8, 9, 20};
@@ -826,9 +768,6 @@ static MunitResult test_des_cmac_streaming(const MunitParameter params[], void* 
   uint8_t expected[8], tag[8];
   struct TC_DES_CMAC_ctx ctx;
   size_t ki, li, si, i;
-
-  (void)params;
-  (void)data;
 
   keys[0] = des_test_key;
   keylens[0] = 8;
@@ -881,12 +820,8 @@ static MunitResult test_des_cmac_streaming(const MunitParameter params[], void* 
 }
 
 /* Degenerate Single-DES key (8 bytes) == 2-Key 3DES key with K1=K2 */
-static MunitResult test_des_cmac_single_des_matches_2k3des_degenerate(const MunitParameter params[],
-                                                                      void* data)
+TC_TEST(test_des_cmac_single_des_matches_2k3des_degenerate)
 {
-  (void)params;
-  (void)data;
-
   uint8_t key8[8] = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88};
   uint8_t key16[16] = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
                        0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88};
@@ -905,11 +840,8 @@ static MunitResult test_des_cmac_single_des_matches_2k3des_degenerate(const Muni
 #endif /* TC_DES_ENABLE_CMAC */
 
 /* Negative classical API cases */
-static MunitResult test_des_api_errors(const MunitParameter params[], void* data)
+TC_TEST(test_des_api_errors)
 {
-  (void)params;
-  (void)data;
-
   {
     struct TC_DES_ctx ctx = {0};
     uint8_t block[TC_DES_BLOCKLEN] = {1};
@@ -1025,15 +957,13 @@ static void assert_des_ctx_equal(const struct TC_DES_ctx* a, const struct TC_DES
 #endif
 }
 
-static MunitResult test_des_null_buffers(const MunitParameter params[], void* data)
+TC_TEST(test_des_null_buffers)
 {
   static const uint8_t iv[TC_DES_BLOCKLEN] = {1, 2, 3, 4, 5, 6, 7, 8};
   const uint8_t* keys[3] = {des_test_key, tdes2_key, tdes3_key};
   const size_t keylens[3] = {TC_DES_KEYLEN, TC_DES_KEYLEN_2KEY, TC_DES_KEYLEN_3KEY};
   const size_t key_count = TC_DES_ENABLE_TDES ? 3 : 1;
   size_t k;
-  (void)params;
-  (void)data;
 
   for (k = 0; k < key_count; ++k) {
     struct TC_DES_ctx ctx;
@@ -1145,10 +1075,8 @@ static void check_des_mode_requires_iv(des_mode_fn mode, size_t length, size_t b
   TC_DES_ctx_clear(&ctx);
 }
 
-static MunitResult test_des_iv_required(const MunitParameter params[], void* data)
+TC_TEST(test_des_iv_required)
 {
-  (void)params;
-  (void)data;
 #if TC_DES_ENABLE_CBC
   check_des_mode_requires_iv(TC_DES_CBC_encrypt, 2 * TC_DES_BLOCKLEN, 2 * TC_DES_BLOCKLEN);
   check_des_mode_requires_iv(TC_DES_CBC_decrypt, TC_DES_BLOCKLEN, TC_DES_BLOCKLEN);
@@ -1175,13 +1103,11 @@ static MunitResult test_des_iv_required(const MunitParameter params[], void* dat
   return MUNIT_OK;
 }
 
-static MunitResult test_des_mode_overlap(const MunitParameter params[], void* data)
+TC_TEST(test_des_mode_overlap)
 {
   static const uint8_t iv[TC_DES_BLOCKLEN] = {8, 7, 6, 5, 4, 3, 2, 1};
   struct TC_DES_ctx ctx;
   struct TC_DES_ctx saved;
-  (void)params;
-  (void)data;
 #if TC_DES_ENABLE_CBC
   check_des_mode_overlap(TC_DES_CBC_encrypt, TC_DES_BLOCKLEN, TC_DES_BLOCKLEN);
   check_des_mode_overlap(TC_DES_CBC_decrypt, TC_DES_BLOCKLEN, TC_DES_BLOCKLEN);
@@ -1228,7 +1154,7 @@ static MunitResult test_des_mode_overlap(const MunitParameter params[], void* da
 #if TC_DES_ENABLE_CMAC
 /* Message or tag bytes inside a MAC context change while the MAC runs, and a
  * tag inside it is wiped when final clears the context. */
-static MunitResult test_des_cmac_overlap(const MunitParameter params[], void* data)
+TC_TEST(test_des_cmac_overlap)
 {
   /* after gives a tag that straddles the context end its storage. */
   struct {
@@ -1239,8 +1165,6 @@ static MunitResult test_des_cmac_overlap(const MunitParameter params[], void* da
   uint8_t tag[TC_DES_CMAC_TAG_MAX];
   uint8_t saved_mac[TC_DES_BLOCKLEN];
   uint8_t saved_buf[TC_DES_BLOCKLEN];
-  (void)params;
-  (void)data;
   munit_assert_int(TC_OK, ==, TC_DES_CMAC_init(ctx, des_test_key, TC_DES_KEYLEN));
   munit_assert_int(TC_OK, ==, TC_DES_CMAC_update(ctx, cmac_kat_msg, 3));
   memcpy(saved_mac, ctx->mac, sizeof saved_mac);
@@ -1259,7 +1183,7 @@ static MunitResult test_des_cmac_overlap(const MunitParameter params[], void* da
 #endif
 
 #if TC_DES_ENABLE_ISO9797
-static MunitResult test_des_iso9797_overlap(const MunitParameter params[], void* data)
+TC_TEST(test_des_iso9797_overlap)
 {
   static const uint8_t message[] = "Now is the time for all ";
   /* after gives a tag that straddles the context end its storage. */
@@ -1271,8 +1195,6 @@ static MunitResult test_des_iso9797_overlap(const MunitParameter params[], void*
   uint8_t tag[TC_DES_BLOCKLEN];
   uint8_t saved_mac[TC_DES_BLOCKLEN];
   uint8_t saved_buf[TC_DES_BLOCKLEN];
-  (void)params;
-  (void)data;
   munit_assert_int(TC_OK, ==,
                    TC_DES_ISO9797_init(ctx, TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, tdes2_key,
                                        TC_DES_KEYLEN_2KEY));
@@ -1294,11 +1216,8 @@ static MunitResult test_des_iso9797_overlap(const MunitParameter params[], void*
 #endif
 
 /* Secure wipe / context clear tests */
-static MunitResult test_des_secure_zero_and_clear(const MunitParameter params[], void* data)
+TC_TEST(test_des_secure_zero_and_clear)
 {
-  (void)params;
-  (void)data;
-
   uint8_t buf[16];
   struct TC_DES_ctx ctx;
   size_t i;
@@ -1346,12 +1265,10 @@ static MunitResult test_des_secure_zero_and_clear(const MunitParameter params[],
 
 #if TC_DES_ENABLE_CBC && TC_DES_ENABLE_ISO9797
 #include "../vectors/des/iso9797/annex_b_algorithm1.h"
-static MunitResult test_iso9797_annex_b_algorithm1(const MunitParameter params[], void* data)
+TC_TEST(test_iso9797_annex_b_algorithm1)
 {
   static const uint8_t key[8] = {0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef};
   static const uint8_t zero_iv[8] = {0};
-  (void)params;
-  (void)data;
   for (size_t i = 0; i < sizeof iso9797_annex_b_alg1 / sizeof iso9797_annex_b_alg1[0]; ++i) {
     uint8_t blocks[32] = {0};
     struct TC_DES_ctx ctx;
@@ -1424,15 +1341,13 @@ static void iso9797_reference_mac(TC_DES_ISO9797_algorithm algorithm,
   TC_DES_ctx_clear(&ctx);
 }
 
-static MunitResult test_iso9797_three_key_reference(const MunitParameter params[], void* data)
+TC_TEST(test_iso9797_three_key_reference)
 {
   static const uint8_t msg[] = "Now is the time for all ";
   static const TC_DES_ISO9797_padding paddings[] = {TC_DES_ISO9797_PAD1, TC_DES_ISO9797_PAD2};
   static const size_t lengths[] = {0, 1, 7, 8, 15, 22, 24};
   uint8_t expected[8], tag[8];
   size_t p, l, a;
-  (void)params;
-  (void)data;
 
   iso9797_reference_mac(TC_DES_ISO9797_ALG1, TC_DES_ISO9797_PAD1, iso9797_key3, sizeof iso9797_key3,
                         msg, sizeof msg - 2, expected);
@@ -1461,7 +1376,7 @@ static MunitResult test_iso9797_three_key_reference(const MunitParameter params[
 #if TC_DES_ENABLE_ISO9797
 /* Three-key Algorithm 3: streaming equals one-shot, verify and argument
  * failures, and the two-key special case K3 = K1. */
-static MunitResult test_iso9797_three_key_api(const MunitParameter params[], void* data)
+TC_TEST(test_iso9797_three_key_api)
 {
   static const uint8_t msg[] = "Now is the time for all ";
   static const TC_DES_ISO9797_padding paddings[] = {TC_DES_ISO9797_PAD_NONE, TC_DES_ISO9797_PAD1,
@@ -1470,8 +1385,6 @@ static MunitResult test_iso9797_three_key_api(const MunitParameter params[], voi
   uint8_t key_k3_is_k1[24];
   uint8_t oneshot[8], streamed[8], two_key[8], guard[8];
   size_t p, i;
-  (void)params;
-  (void)data;
 
   for (p = 0; p < 3; ++p) {
     const size_t len = paddings[p] == TC_DES_ISO9797_PAD_NONE ? 24 : 22;
@@ -1561,7 +1474,7 @@ static MunitResult test_iso9797_three_key_api(const MunitParameter params[], voi
 #endif
 
 #if TC_DES_ENABLE_ISO9797
-static MunitResult test_des_iso9797(const MunitParameter params[], void* data)
+TC_TEST(test_des_iso9797)
 {
   static const uint8_t key2[16] = {0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
                                    0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10};
@@ -1575,8 +1488,6 @@ static MunitResult test_des_iso9797(const MunitParameter params[], void* data)
   uint8_t tag[8];
   uint8_t guard[8];
   size_t i;
-  (void)params;
-  (void)data;
 
   /* ISO/IEC 9797-1:2011 Annex B.4 gives these Algorithm 3 tags. */
   munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD_NONE, key2,

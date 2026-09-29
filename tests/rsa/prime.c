@@ -5,6 +5,7 @@
 #include "../../src/mp_prime_internal.h"
 #include "../../src/rsa_prime_internal.h"
 #include "munit.h"
+#include "test_util.h"
 #include "cavp.h"
 #include <stdio.h>
 
@@ -72,23 +73,19 @@ static int check(uint32_t candidate, uint32_t witness)
   return result;
 }
 
-static MunitResult small_candidates(const MunitParameter params[], void* user)
+TC_TEST(small_candidates)
 {
-  (void)params;
-  (void)user;
   for (uint32_t p = 5; p < 128; p += 2)
     for (uint32_t base = 2; base < p - 1; ++base)
       check(p, base);
   return MUNIT_OK;
 }
 
-static MunitResult pseudoprimes(const MunitParameter params[], void* user)
+TC_TEST(pseudoprimes)
 {
   static const uint32_t candidates[] = {257,  561,   641,     1105,        1729,
                                         2047, 65537, 1373653, 0xfffffffbu, UINT32_MAX};
   static const uint32_t bases[] = {2, 3, 5, 7, 11, 17};
-  (void)params;
-  (void)user;
   for (size_t i = 0; i < sizeof candidates / sizeof *candidates; ++i)
     for (size_t j = 0; j < sizeof bases / sizeof *bases; ++j)
       check(candidates[i], bases[j]);
@@ -100,14 +97,12 @@ static MunitResult pseudoprimes(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult prepared_rounds(const MunitParameter params[], void* user)
+TC_TEST(prepared_rounds)
 {
   enum { BYTES = 4, WORDS = BYTES / sizeof(tc_mp_word) };
   static const uint8_t candidate[] = {0, 0, 7, 255}; /* 2047 passes base2, fails base3. */
   static const uint8_t witnesses[] = {2, 3, 2};
   tc_mp_word p[WORDS], base[WORDS], scratch[10 * WORDS + 2], setup[4 * WORDS];
-  (void)params;
-  (void)user;
   tc_mp_from_be(p, candidate, BYTES);
   size_t twos = tc_mp_miller_rabin_prepare(p, WORDS, scratch);
   memcpy(setup, scratch, sizeof setup);
@@ -135,7 +130,7 @@ static TC_status random_base(void* context, uint8_t* output, size_t length)
   return source->status;
 }
 
-static MunitResult sampling(const MunitParameter params[], void* user)
+TC_TEST(sampling)
 {
   enum { BYTES = 4, WORDS = BYTES / sizeof(tc_mp_word), REQUIRED = 12 * WORDS + 2 };
   static const uint8_t prime[] = {0xff, 0xff, 0xff, 0xfb};
@@ -143,8 +138,6 @@ static MunitResult sampling(const MunitParameter params[], void* user)
   const size_t round_work = 48 * BYTES + 4;
   const size_t two_round_work = 24 * BYTES + 3 + 2 * (24 * BYTES + 2);
   tc_mp_word scratch[REQUIRED + 1];
-  (void)params;
-  (void)user;
   for (unsigned scenario = 0; scenario < 5; ++scenario) {
     random_source source = {0,
                             scenario == 1   ? 1u
@@ -208,15 +201,13 @@ static TC_status fixed_base(void* context, uint8_t* output, size_t length)
   return TC_OK;
 }
 
-static MunitResult padded_sampling(const MunitParameter params[], void* user)
+TC_TEST(padded_sampling)
 {
   enum { BYTES = 4, WORDS = BYTES / sizeof(tc_mp_word), REQUIRED = 12 * WORDS + 2 };
   tc_mp_word scratch[REQUIRED];
   uint8_t candidate[BYTES], bytes[BYTES];
   static const uint32_t wider[] = {257, 65537, 0x7fffffffu};
   enum { SMALL_FIRST = 5, SMALL_LIMIT = 128, SMALL_COUNT = (SMALL_LIMIT - SMALL_FIRST + 1) / 2 };
-  (void)params;
-  (void)user;
   for (size_t sample = 0; sample < SMALL_COUNT + sizeof wider / sizeof *wider; ++sample) {
     uint32_t p =
         sample < SMALL_COUNT ? SMALL_FIRST + 2 * (uint32_t)sample : wider[sample - SMALL_COUNT];
@@ -290,15 +281,13 @@ static TC_status corpus_random(void* context, uint8_t* output, size_t length)
   return TC_OK;
 }
 
-static MunitResult primality_vectors(const MunitParameter params[], void* user)
+TC_TEST(primality_vectors)
 {
   uint8_t candidate[384];
   tc_mp_word scratch[12 * (384 / sizeof(tc_mp_word)) + 2];
   char line[1024];
   size_t count = 0;
   FILE* file;
-  (void)params;
-  (void)user;
   if (!primality_path)
     return MUNIT_SKIP;
   file = fopen(primality_path, "r");

@@ -3,6 +3,7 @@
 #include "bootloader_sha.h"
 #include "secure_boot_signature_priv.h"
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
 static uint8_t trusted[3][32];
@@ -133,12 +134,10 @@ static void trust(unsigned slot, const ets_secure_boot_sig_block_t* block)
 
 #ifndef TC_TEST_IDF_REAL_CRYPTO
 #ifndef CONFIG_SECURE_SIGNED_ON_UPDATE_NO_SECURE_BOOT
-static MunitResult policy(const MunitParameter params[], void* data)
+TC_TEST(policy)
 {
   ets_secure_boot_signature_t blocks;
   uint8_t digest[32] = {0}, verified[32];
-  (void)params;
-  (void)data;
   secure_enabled = true;
   memset(&blocks, 0, sizeof blocks);
   memset(trusted, 0, sizeof trusted);
@@ -204,12 +203,10 @@ static MunitResult policy(const MunitParameter params[], void* data)
 
 #endif
 
-static MunitResult running_image(const MunitParameter params[], void* data)
+TC_TEST(running_image)
 {
   ets_secure_boot_signature_t candidate;
   uint8_t digest[32] = {0};
-  (void)params;
-  (void)data;
   secure_enabled = false;
   partition_available = true;
   metadata_result = ESP_OK;
@@ -289,12 +286,10 @@ static MunitResult running_image(const MunitParameter params[], void* data)
 #ifdef TC_TEST_IDF_REAL_CRYPTO
 #include "image_fixture.h"
 static const char* image_path;
-static MunitResult image_policy(const MunitParameter params[], void* data)
+TC_TEST(image_policy)
 {
   ets_secure_boot_signature_t blocks;
   uint8_t digest[32];
-  (void)params;
-  (void)data;
   if (!image_path)
     return MUNIT_SKIP;
   read_image_fixture(image_path, &blocks, digest);

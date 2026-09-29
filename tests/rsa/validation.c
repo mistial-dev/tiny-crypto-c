@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/rsa.h>
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
 static TC_status random_bytes(void* context, uint8_t* output, size_t length)
@@ -74,7 +75,7 @@ static TC_RSA_result decrypt_oaep(const TC_RSA_private_key* key, TC_RSA_oaep_opt
   return TC_RSA_decrypt_oaep(key, &options, ciphertext, workspace, output, length, &execution);
 }
 
-static MunitResult key_generation(const MunitParameter params[], void* user)
+TC_TEST(key_generation)
 {
   enum {
     BITS = 1024,
@@ -93,8 +94,6 @@ static MunitResult key_generation(const MunitParameter params[], void* user)
   TC_RSA_workspace workspace = {words, WORDS};
   TC_RSA_keygen_state generation = {0};
   uint32_t rng = UINT32_C(0x6d2b79f5);
-  (void)params;
-  (void)user;
   memset(modulus, 0xa5, sizeof modulus);
   memset(exponent, 0xa5, sizeof exponent);
   memset(d, 0xa5, sizeof d);
@@ -166,7 +165,7 @@ static MunitResult key_generation(const MunitParameter params[], void* user)
 /* Output buffers and scratch are sized by the caller. One byte or limb short
  * of the documented size is LIMIT, and a missing buffer is ARGUMENT. Both
  * leave the state, outputs and scratch unchanged. The exact sizes succeed. */
-static MunitResult keygen_capacity(const MunitParameter params[], void* user)
+TC_TEST(keygen_capacity)
 {
   enum {
     BITS = 1024,
@@ -184,8 +183,6 @@ static MunitResult keygen_capacity(const MunitParameter params[], void* user)
   const TC_RSA_workspace workspace = {words, WORDS};
   const TC_RSA_keygen_limits limits = {1, 1};
   TC_RSA_keygen_state state, state_before;
-  (void)params;
-  (void)user;
   memset(modulus, 0xa5, sizeof modulus);
   memset(exponent, 0xa5, sizeof exponent);
   memset(d, 0xa5, sizeof d);
@@ -236,7 +233,7 @@ static MunitResult keygen_capacity(const MunitParameter params[], void* user)
 /* The output metadata, the workspace descriptor and the state are disjoint
  * from the scratch limbs and from each other. Metadata inside scratch or the
  * state is ARGUMENT, and the scratch bytes stay unchanged. */
-static MunitResult keygen_metadata_overlap(const MunitParameter params[], void* user)
+TC_TEST(keygen_metadata_overlap)
 {
   enum {
     BITS = 1024,
@@ -263,8 +260,6 @@ static MunitResult keygen_metadata_overlap(const MunitParameter params[], void* 
   const TC_RSA_workspace workspace = {scratch.words, WORDS};
   const TC_RSA_keygen_limits limits = {1, 1};
   TC_RSA_keygen_state state;
-  (void)params;
-  (void)user;
   memset(&state, 0, sizeof state);
 
   /* Output metadata stored in the scratch limbs. */
@@ -300,7 +295,7 @@ static MunitResult keygen_metadata_overlap(const MunitParameter params[], void* 
   return MUNIT_OK;
 }
 
-static MunitResult ranges(const MunitParameter params[], void* user)
+TC_TEST(ranges)
 {
   enum { BYTES = 128, WORDS = TC_RSA_VALIDATE_WORKSPACE_WORDS(BYTES * 8) };
   union {
@@ -319,8 +314,6 @@ static MunitResult ranges(const MunitParameter params[], void* user)
                             &key.q};
   uint8_t saved[sizeof shared];
   unsigned calls = 0;
-  (void)params;
-  (void)user;
   memset(modulus, 0xff, sizeof modulus);
   memset(&shared, 0xa5, sizeof shared);
   memcpy(saved, &shared, sizeof shared);
@@ -411,7 +404,7 @@ static MunitResult ranges(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult operation_ranges(const MunitParameter params[], void* user)
+TC_TEST(operation_ranges)
 {
   enum { BYTES = 128, WORDS = TC_RSA_SIGN_WORKSPACE_WORDS(BYTES * 8) };
   struct {
@@ -444,8 +437,6 @@ static MunitResult operation_ranges(const MunitParameter params[], void* user)
                         (uint8_t*)fixture.scratch,
                         (uint8_t*)&fixture.key,
                         (uint8_t*)&fixture.workspace};
-  (void)params;
-  (void)user;
   for (size_t i = 0; i < sizeof aliases / sizeof *aliases; ++i) {
     munit_assert_int(sign_v15(&fixture.key, TC_HASH_SHA256,
                               (TC_bytes){fixture.digest, sizeof fixture.digest},
@@ -521,13 +512,11 @@ static MunitResult operation_ranges(const MunitParameter params[], void* user)
 }
 
 /* FIPS 186-5 A.1.1: e is odd and 2^16 < e < 2^256. */
-static MunitResult exponent_range(const MunitParameter params[], void* user)
+TC_TEST(exponent_range)
 {
   static const uint8_t e3[] = {3}, e65535[] = {0xff, 0xff}, e65536[] = {1, 0, 0};
   static const uint8_t e65537[] = {1, 0, 1}, padded[] = {0, 0, 1, 0, 1}, even[] = {1, 0, 2};
   uint8_t top[32], over[33] = {1};
-  (void)params;
-  (void)user;
   memset(top, 0xff, sizeof top);
   over[32] = 1;
   munit_assert_int(TC_RSA_exponent_in_fips_range((TC_bytes){e3, sizeof e3}), ==, 0);

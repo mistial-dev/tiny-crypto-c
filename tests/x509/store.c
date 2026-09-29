@@ -4,17 +4,16 @@
 #include "../../src/pki_source_internal.h"
 #include "../../src/x509_path_internal.h"
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
-static MunitResult lifecycle(const MunitParameter params[], void* user)
+TC_TEST(lifecycle)
 {
   int first_context, second_context;
   TC_X509_store_source first = {&first_context, 0, 0, NULL, NULL};
   TC_X509_store_source second = {&second_context, 0, 0, NULL, NULL};
   TC_X509_store store = {0};
   TC_X509_store_snapshot slots[2] = {0}, *reader = NULL, *other = NULL;
-  (void)params;
-  (void)user;
   munit_assert_int(TC_X509_store_acquire(&store, &reader), ==, TC_TLV_END);
   munit_assert_null(reader);
   munit_assert_int(TC_X509_store_prepare(&slots[0], &first), ==, TC_TLV_OK);
@@ -47,13 +46,11 @@ static MunitResult lifecycle(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult failures(const MunitParameter params[], void* user)
+TC_TEST(failures)
 {
   TC_X509_store_source source = {0};
   TC_X509_store store = {0}, saved_store;
   TC_X509_store_snapshot slots[2] = {0}, saved_slot, *reader = &slots[1];
-  (void)params;
-  (void)user;
   munit_assert_int(TC_X509_store_prepare(&slots[0], &source), ==, TC_TLV_OK);
   memcpy(&saved_store, &store, sizeof store);
   memcpy(&saved_slot, &slots[0], sizeof saved_slot);
@@ -142,7 +139,7 @@ static TC_TLV_result anchor_record(void* context, size_t index, size_t* work,
   return fixture->result;
 }
 
-static MunitResult source_guards(const MunitParameter params[], void* user)
+TC_TEST(source_guards)
 {
   uint8_t input = 1, scratch = 0;
   SourceFixture fixture = {.candidate = {&input, 1}, .result = TC_TLV_OK};
@@ -169,8 +166,6 @@ static MunitResult source_guards(const MunitParameter params[], void* user)
   const TC_TLV_result failures[] = {TC_TLV_END, TC_TLV_INVALID, TC_TLV_ARGUMENT, TC_TLV_LIMIT,
                                     TC_TLV_UNSUPPORTED};
   size_t work;
-  (void)params;
-  (void)user;
   memset(&saved_anchor, 0xa5, sizeof saved_anchor);
   work = 100;
   munit_assert_int(tc_pki_source_guard_candidate(&guard, 0, &work, &candidate), ==, TC_TLV_OK);
@@ -242,7 +237,7 @@ static MunitResult source_guards(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult search_preflight(const MunitParameter params[], void* user)
+TC_TEST(search_preflight)
 {
   TC_X509_store_source source = {0};
   TC_X509_path_options options = {0}, saved_options;
@@ -251,8 +246,6 @@ static MunitResult search_preflight(const MunitParameter params[], void* user)
   TC_X509_search_result out, saved_out;
   TC_bytes target = {NULL, 0};
   size_t work;
-  (void)params;
-  (void)user;
   memset(&out, 0xa5, sizeof out);
   memcpy(&saved_out, &out, sizeof out);
   options.max_work = 10000;
@@ -295,7 +288,7 @@ static MunitResult search_preflight(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult source_status(const MunitParameter params[], void* user)
+TC_TEST(source_status)
 {
   uint8_t input = 1;
   SourceFixture fixture = {.candidate = {&input, 1}, .result = TC_TLV_OK};
@@ -308,8 +301,6 @@ static MunitResult source_status(const MunitParameter params[], void* user)
   TC_bytes candidate;
   TC_X509_store_anchor anchor;
   size_t work = 100;
-  (void)params;
-  (void)user;
   munit_assert_int(tc_pki_source_status_candidate(&guard, 0, &work, &candidate), ==, TC_TLV_OK);
   munit_assert_int(failed, ==, 0);
   fixture.result = TC_TLV_LIMIT;

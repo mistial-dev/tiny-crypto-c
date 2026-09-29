@@ -4,11 +4,10 @@
 #include "cms_crl_harness.h"
 #include "source.h"
 #include "munit.h"
+#include "test_util.h"
 
-static MunitResult external_collections(const MunitParameter params[], void* user)
+TC_TEST(external_collections)
 {
-  (void)params;
-  (void)user;
   enum { FRAME_CAPACITY = 4, WORK_BUDGET = 128 };
   /* Collection iteration returns records. Schema parsing is a separate step. */
   const uint8_t sequence[] = {0x30, 0};

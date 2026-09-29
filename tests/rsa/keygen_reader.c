@@ -2,6 +2,7 @@
 /* Validate NIST CAVP generated key material through the public RSA API. */
 #include <tiny_crypto/rsa.h>
 #include "munit.h"
+#include "test_util.h"
 #include "cavp.h"
 #include <stdio.h>
 #include <string.h>
@@ -20,7 +21,7 @@ static TC_status draw(void* context, uint8_t* output, size_t length)
   return TC_OK;
 }
 
-static MunitResult vectors(const MunitParameter params[], void* data)
+TC_TEST(vectors)
 {
   char line[4096];
   uint8_t n[512], e[512], d[512], p[256], q[256];
@@ -29,8 +30,6 @@ static MunitResult vectors(const MunitParameter params[], void* data)
   uint32_t random_state = 0x12345678u;
   FILE* file;
   size_t count = 0;
-  (void)params;
-  (void)data;
   if (!vector_path)
     return MUNIT_SKIP;
   file = fopen(vector_path, "r");

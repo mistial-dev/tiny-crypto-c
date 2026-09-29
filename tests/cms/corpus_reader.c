@@ -8,6 +8,7 @@
 #include "../../src/cms_internal.h"
 #include "cms_crl_harness.h"
 #include "munit.h"
+#include "test_util.h"
 #include "cavp.h"
 #include <stdio.h>
 #include <string.h>
@@ -22,7 +23,7 @@ static const TC_CMS_verification_policy cms_attribute_policies[] = {
 static const char* vector_path;
 static const char* biometric_path;
 
-static MunitResult biometric_signatures(const MunitParameter params[], void* context)
+TC_TEST(biometric_signatures)
 {
   enum {
     INPUT_BYTES = 16384,
@@ -49,8 +50,6 @@ static MunitResult biometric_signatures(const MunitParameter params[], void* con
   const TC_X509_signature_provider provider = TC_X509_native_provider(&native);
   const TC_CMS_signature_workspace verification = {{frames, FRAME_COUNT}, NULL, 0};
   size_t count = 0;
-  (void)params;
-  (void)context;
   if (!biometric_path)
     return MUNIT_SKIP;
   FILE* file = fopen(biometric_path, "r");
@@ -248,7 +247,7 @@ static MunitResult biometric_signatures(const MunitParameter params[], void* con
   return MUNIT_OK;
 }
 
-static MunitResult captured(const MunitParameter params[], void* context)
+TC_TEST(captured)
 {
   enum { INPUT_BYTES = 16384, FRAME_COUNT = 24, ELEMENT_COUNT = 2048, WORK = 1000000 };
   static char line[2 * INPUT_BYTES + 32];
@@ -259,8 +258,6 @@ static MunitResult captured(const MunitParameter params[], void* context)
   static const uint8_t biometric_type[] = {0x60, 0x86, 0x48, 1, 0x65, 3, 6, 2};
   static const uint8_t security_type[] = {0x2b, 0x1b, 1, 1, 1};
   size_t count = 0;
-  (void)params;
-  (void)context;
   if (!vector_path)
     return MUNIT_SKIP;
   FILE* file = fopen(vector_path, "r");

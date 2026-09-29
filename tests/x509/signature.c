@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/x509.h>
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
 enum { SHA256_DIGEST_BYTES = 32 };
@@ -67,7 +68,7 @@ static void fixture(TC_X509_certificate* certificate, TC_X509_public_key* key)
   key->key.length = sizeof public_key;
 }
 
-static MunitResult dispatch(const MunitParameter params[], void* user)
+TC_TEST(dispatch)
 {
   TC_X509_certificate certificate;
   TC_X509_public_key key;
@@ -75,8 +76,6 @@ static MunitResult dispatch(const MunitParameter params[], void* user)
   TC_X509_signature_provider provider = {verify, &state, NULL};
   size_t work;
   unsigned result;
-  (void)params;
-  (void)user;
   fixture(&certificate, &key);
   for (result = TC_X509_SIGNATURE_VALID; result <= TC_X509_SIGNATURE_LIMIT; ++result) {
     state.result = (TC_X509_signature_result)result;
@@ -98,15 +97,13 @@ static MunitResult dispatch(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult limits(const MunitParameter params[], void* user)
+TC_TEST(limits)
 {
   TC_X509_certificate certificate;
   TC_X509_public_key key;
   ProviderState state = {&certificate, &key, TC_X509_SIGNATURE_VALID, 0, 0};
   TC_X509_signature_provider provider = {verify, &state, NULL};
   size_t work = 100, required, i;
-  (void)params;
-  (void)user;
   fixture(&certificate, &key);
   munit_assert_int(TC_X509_signature_verify(&certificate, &key, &provider, &work), ==,
                    TC_X509_SIGNATURE_VALID);
@@ -141,7 +138,7 @@ static MunitResult limits(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult segments(const MunitParameter params[], void* user)
+TC_TEST(segments)
 {
   TC_X509_certificate certificate;
   TC_X509_public_key key;
@@ -149,8 +146,6 @@ static MunitResult segments(const MunitParameter params[], void* user)
   TC_X509_signature_provider provider = {verify, &state, NULL};
   TC_bytes message[3];
   size_t work = 100, required;
-  (void)params;
-  (void)user;
   fixture(&certificate, &key);
   message[0] = (TC_bytes){certificate.tbs.data, 1};
   message[1] = (TC_bytes){NULL, 0};
@@ -212,7 +207,7 @@ static TC_X509_signature_result verify_digest(void* context, TC_bytes digest,
   return state->result;
 }
 
-static MunitResult digests(const MunitParameter params[], void* user)
+TC_TEST(digests)
 {
   enum { DIGEST_BYTES = SHA256_DIGEST_BYTES, WORK_BUDGET = 1024 };
   uint8_t bytes[DIGEST_BYTES] = {0};
@@ -223,8 +218,6 @@ static MunitResult digests(const MunitParameter params[], void* user)
   ProviderState state = {&certificate, &key, TC_X509_SIGNATURE_VALID, 0, 0};
   TC_X509_signature_provider provider = {NULL, &state, verify_digest};
   size_t work = WORK_BUDGET;
-  (void)params;
-  (void)user;
   fixture(&certificate, &key);
   munit_assert_int(TC_X509_signature_verify_digest(digest, &algorithm, certificate.signature, &key,
                                                    &provider, &work),
@@ -281,7 +274,7 @@ static MunitResult digests(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult issuer(const MunitParameter params[], void* user)
+TC_TEST(issuer)
 {
   static const uint8_t name[] = {0x30, 12, 0x31, 10, 0x30, 8, 6, 3, 0x55, 4, 3, 0x0c, 1, 'A'};
   uint8_t other[sizeof name];
@@ -294,8 +287,6 @@ static MunitResult issuer(const MunitParameter params[], void* user)
   ProviderState state = {&certificate, &anchor.public_key, TC_X509_SIGNATURE_VALID, 0, 0};
   TC_X509_signature_provider provider = {verify, &state, NULL};
   size_t work = 10000, required, i;
-  (void)params;
-  (void)user;
   fixture(&certificate, &anchor.public_key);
   certificate.issuer.data = name;
   certificate.issuer.length = sizeof name;
@@ -344,7 +335,7 @@ static MunitResult issuer(const MunitParameter params[], void* user)
 /* Both forms charge one unit plus the length of each signed-data span, the
  * signature, the algorithm spans and the issuer key. Key sub-spans are not
  * charged again, and a preflight LIMIT leaves no work. */
-static MunitResult metering(const MunitParameter params[], void* user)
+TC_TEST(metering)
 {
   enum { BUDGET = 1000, PROVIDER = 1 };
   uint8_t bytes[SHA256_DIGEST_BYTES] = {0};
@@ -355,11 +346,9 @@ static MunitResult metering(const MunitParameter params[], void* user)
   ProviderState state = {&certificate, &key, TC_X509_SIGNATURE_VALID, 0, 0};
   TC_X509_signature_provider provider = {verify, &state, verify_digest};
   size_t work;
-  (void)params;
-  (void)user;
   fixture(&certificate, &key);
-  const size_t key_cost = 3 * 1 + key.algorithm.oid.length + key.algorithm.parameters.length +
-                          key.key.length;
+  const size_t key_cost =
+      3 * 1 + key.algorithm.oid.length + key.algorithm.parameters.length + key.key.length;
   const size_t message_cost = 1 + certificate.tbs.length + 1 + certificate.signature.length + 2 +
                               certificate.signature_algorithm.oid.length +
                               certificate.signature_algorithm.parameters.length + key_cost;

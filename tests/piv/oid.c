@@ -3,9 +3,10 @@
 #include <tiny_crypto/piv_oid.h>
 #include "../../src/piv_oid_internal.h"
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
-static MunitResult identifiers(const MunitParameter params[], void* user)
+TC_TEST(identifiers)
 {
   static const struct {
     uint8_t suffix[4];
@@ -62,14 +63,12 @@ static MunitResult identifiers(const MunitParameter params[], void* user)
                    TC_PIV_OID_UNKNOWN);
   munit_assert_int(TC_PIV_oid_identify((TC_bytes){encoded, 8}, (TC_PIV_oid_profile)99), ==,
                    TC_PIV_OID_UNKNOWN);
-  (void)params;
-  (void)user;
   return MUNIT_OK;
 }
 
 /* Every identifier maps to the exact contents that identify it, in the
  * namespaces TWIC Part 2 v5 section 6 lists for it. */
-static MunitResult contents(const MunitParameter params[], void* user)
+TC_TEST(contents)
 {
   static const uint8_t common_policy[] = {0x60, 0x86, 0x48, 1, 0x65, 3, 2, 1, 3, 6};
   static const uint8_t twic_key_management[] = {0x2b, 6, 1, 4, 1, 0x81, 0xe3, 0x52, 2, 1, 3, 6};
@@ -123,8 +122,6 @@ static MunitResult contents(const MunitParameter params[], void* user)
   munit_assert_null(tc_piv_oid_contents(TC_PIV_OID_UNKNOWN, TC_PIV_OID_NAMESPACE_TWIC));
   munit_assert_null(tc_piv_oid_contents((TC_PIV_oid)99, TC_PIV_OID_NAMESPACE_PIV));
   munit_assert_null(tc_piv_oid_contents(TC_PIV_OID_FASCN, (tc_piv_oid_namespace)99));
-  (void)params;
-  (void)user;
   return MUNIT_OK;
 }
 

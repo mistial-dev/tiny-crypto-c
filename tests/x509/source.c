@@ -3,6 +3,7 @@
 #include "../../src/source_internal.h"
 #include "../../src/source_der_internal.h"
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
 typedef struct {
@@ -19,10 +20,8 @@ static TC_status read_storage(void* context, uint64_t offset, uint8_t* destinati
   return state->fail ? TC_ERROR : TC_OK;
 }
 
-static MunitResult reads(const MunitParameter params[], void* data)
+TC_TEST(reads)
 {
-  (void)params;
-  (void)data;
   uint8_t window[16];
   storage state = {0, 0};
   const TC_source source = {read_storage, &state, UINT64_MAX};
@@ -53,10 +52,8 @@ static MunitResult reads(const MunitParameter params[], void* data)
   return MUNIT_OK;
 }
 
-static MunitResult failures(const MunitParameter params[], void* data)
+TC_TEST(failures)
 {
-  (void)params;
-  (void)data;
   uint8_t window[16];
   storage state = {0, 1};
   TC_source source = {read_storage, &state, 10};
@@ -100,10 +97,8 @@ static TC_status read_header(void* context, uint64_t offset, uint8_t* destinatio
   return TC_OK;
 }
 
-static MunitResult framing(const MunitParameter params[], void* data)
+TC_TEST(framing)
 {
-  (void)params;
-  (void)data;
   /* A four-GiB value represented by its header and virtual backing storage. */
   const uint8_t large[] = {0x30, 0x85, 1, 0, 0, 0, 0};
   TC_bytes bytes = {large, sizeof large};

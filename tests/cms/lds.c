@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/lds.h>
 #include "munit.h"
+#include "test_util.h"
 #include <string.h>
 
 enum { CAPACITY = 2048, FRAMES = 8, WORK = 100000 };
@@ -55,7 +56,7 @@ static size_t fixture(uint8_t* out, unsigned version, unsigned count, int duplic
   return field(out, 0x30, body, used);
 }
 
-static MunitResult parsing(const MunitParameter params[], void* context)
+TC_TEST(parsing)
 {
   uint8_t encoded[CAPACITY];
   TC_TLV_frame frames[FRAMES];
@@ -174,12 +175,10 @@ static MunitResult parsing(const MunitParameter params[], void* context)
                    ==, TC_TLV_ARGUMENT);
   munit_assert_size(work, ==, WORK);
   munit_assert_memory_equal(length, alias.bytes, encoded);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult lookup(const MunitParameter params[], void* context)
+TC_TEST(lookup)
 {
   uint8_t encoded[CAPACITY];
   TC_TLV_frame frames[FRAMES];
@@ -263,12 +262,10 @@ static MunitResult lookup(const MunitParameter params[], void* context)
       TC_LDS_hash_find(&object, 1, &limits, (TC_TLV_frames){frames, FRAMES}, &work, &digest), ==,
       TC_TLV_INVALID);
   munit_assert_ptr_equal(digest.data, sentinel.data);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult content_read(const MunitParameter params[], void* context)
+TC_TEST(content_read)
 {
   uint8_t der[CAPACITY], encoded[CAPACITY], chunks[CAPACITY], buffer[CAPACITY];
   TC_TLV_frame frames[FRAMES];
@@ -351,12 +348,10 @@ static MunitResult content_read(const MunitParameter params[], void* context)
                    ==, TC_TLV_ARGUMENT);
   munit_assert_size(work, ==, WORK);
   munit_assert_memory_equal(sizeof object, &object, &preserved);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
-static MunitResult hash_check(const MunitParameter params[], void* context)
+TC_TEST(hash_check)
 {
   /* SHA-256 of the three ASCII bytes abc. */
   static const uint8_t expected[] = {0xba, 0x78, 0x16, 0xbf, 0x8f, 0x01, 0xcf, 0xea,
@@ -423,8 +418,6 @@ static MunitResult hash_check(const MunitParameter params[], void* context)
                    ==, TC_TLV_ARGUMENT);
   munit_assert_size(work, ==, WORK);
   munit_assert_int(matched, ==, 7);
-  (void)params;
-  (void)context;
   return MUNIT_OK;
 }
 
