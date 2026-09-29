@@ -45,7 +45,8 @@ TC_RSA_result TC_RSA_encrypt_oaep(const TC_RSA_public_key* key, const TC_RSA_oae
                             &encode_cost);
   if (status != TC_RSA_OK)
     return status;
-  (void)tc_hash_info_get(options->hash, &info);
+  if (!tc_hash_info_get(options->hash, &info))
+    return TC_RSA_UNSUPPORTED;
   /* RFC 8017 section 7.1.1 step 1.b: mLen <= k - 2 hLen - 2. */
   if (plaintext.length > length - 2 * info.digest_length - 2)
     return TC_RSA_INVALID;
@@ -114,7 +115,8 @@ TC_RSA_result TC_RSA_decrypt_oaep(const TC_RSA_private_key* key, const TC_RSA_oa
                             &decode_cost);
   if (status != TC_RSA_OK)
     return status;
-  (void)tc_hash_info_get(options->hash, &info);
+  if (!tc_hash_info_get(options->hash, &info))
+    return TC_RSA_UNSUPPORTED;
   /* RFC 8017 section 7.1.2 step 1.b: the ciphertext has the modulus length. */
   if (ciphertext.length != length)
     return TC_RSA_INVALID;

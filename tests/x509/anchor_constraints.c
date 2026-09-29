@@ -35,11 +35,13 @@ static TC_bytes fixture(const char* profile, const char* name, uint8_t* buffer)
   return (TC_bytes){buffer, length};
 }
 
-/* DER tag and length followed by value. out may alias value. */
-static size_t der(uint8_t* out, unsigned tag, const uint8_t* value, size_t length)
+/* DER tag and length followed by value into capacity bytes at out. out may
+ * alias value. */
+static size_t der(uint8_t* out, size_t capacity, unsigned tag, const uint8_t* value, size_t length)
 {
   const size_t header = length < 128 ? 2 : length < 256 ? 3 : 4;
   munit_assert_size(length, <, 65536);
+  munit_assert_size(capacity, >=, header + length);
   memmove(out + header, value, length);
   out[0] = (uint8_t)tag;
   if (header == 2) {
@@ -56,25 +58,26 @@ static size_t der(uint8_t* out, unsigned tag, const uint8_t* value, size_t lengt
 }
 
 /* One critical Extension for id-ce id (2.5.29.id) with the given value. */
-static size_t critical_extension(uint8_t* out, unsigned id, const uint8_t* value, size_t length)
+static size_t critical_extension(uint8_t* out, size_t capacity, unsigned id, const uint8_t* value,
+                                 size_t length)
 {
   uint8_t body[FILE_CAPACITY];
   const uint8_t prefix[] = {6, 3, 0x55, 0x1d, (uint8_t)id, 1, 1, 0xff};
   size_t n = sizeof prefix;
   memcpy(body, prefix, n);
-  n += der(body + n, 0x04, value, length);
-  return der(out, 0x30, body, n);
+  n += der(body + n, sizeof body - n, 0x04, value, length);
+  return der(out, capacity, 0x30, body, n);
 }
 
 /* nameConstraints excluding directoryName subtrees under name. */
-static size_t excluding_name(uint8_t* out, TC_bytes name)
+static size_t excluding_name(uint8_t* out, size_t capacity, TC_bytes name)
 {
   uint8_t value[FILE_CAPACITY];
-  size_t n = der(value, 0xa4, name.data, name.length);
-  n = der(value, 0x30, value, n);
-  n = der(value, 0xa1, value, n);
-  n = der(value, 0x30, value, n);
-  return critical_extension(out, 30, value, n);
+  size_t n = der(value, sizeof value, 0xa4, name.data, name.length);
+  n = der(value, sizeof value, 0x30, value, n);
+  n = der(value, sizeof value, 0xa1, value, n);
+  n = der(value, sizeof value, 0x30, value, n);
+  return critical_extension(out, capacity, 30, value, n);
 }
 
 /* A caller-built anchor carries its certificate's path controls only through
@@ -105,7 +108,7 @@ static void check_certificate_controls(const char* profile, const TC_bytes* chai
   bare.trust = anchor->trust;
   munit_assert_int(TC_X509_path_validate_with_anchor(chain, 2, &bare, options, workspace, &result),
                    ==, TC_X509_PATH_VALID);
-  length = excluding_name(extension, issuer.subject);
+  length = excluding_name(extension, sizeof extension, issuer.subject);
   bare.certificate_extensions = (TC_bytes){extension, length};
   munit_assert_int(TC_X509_path_validate_with_anchor(chain, 2, &bare, options, workspace, &result),
                    ==, TC_X509_PATH_UNSUPPORTED);
@@ -120,8 +123,8 @@ static void check_certificate_controls(const char* profile, const TC_bytes* chai
                     {19, path_zero, sizeof path_zero}};
     for (size_t i = 0; i < sizeof controls / sizeof *controls; ++i) {
       TC_bytes control;
-      control.length =
-          critical_extension(extension, controls[i].id, controls[i].value, controls[i].length);
+      control.length = critical_extension(extension, sizeof extension, controls[i].id,
+                                          controls[i].value, controls[i].length);
       control.data = extension;
       bare.certificate_extensions = control;
       munit_assert_int(
@@ -164,8 +167,8 @@ static void check_certificate_controls(const char* profile, const TC_bytes* chai
                    TC_TLV_OK);
   munit_assert_int(TC_X509_path_validate_with_anchor(chain, 2, &built, options, workspace, &result),
                    ==, TC_X509_PATH_VALID);
-  length = excluding_name(list, issuer.subject);
-  root.extensions = (TC_bytes){list, der(list, 0x30, list, length)};
+  length = excluding_name(list, sizeof list, issuer.subject);
+  root.extensions = (TC_bytes){list, der(list, sizeof list, 0x30, list, length)};
   munit_assert_int(TC_X509_store_anchor_from_certificate(&root, &limits, &parser, &built), ==,
                    TC_TLV_OK);
   munit_assert_size(built.names.excluded.length, >, 0);
@@ -208,28 +211,28 @@ static TC_bytes anchor_list_with(uint8_t* out, const TC_X509_certificate* root, 
     append(body, &length, child.encoded);
   append(part, &part_length, extensions.value);
   append(part, &part_length, extension);
-  part_length = der(part, 0x30, part, part_length);
-  part_length = der(part, 0xa3, part, part_length);
+  part_length = der(part, sizeof part, 0x30, part, part_length);
+  part_length = der(part, sizeof part, 0xa3, part, part_length);
   append(body, &length, (TC_bytes){part, part_length});
-  length = der(body, 0x30, body, length);
+  length = der(body, sizeof body, 0x30, body, length);
   /* signatureAlgorithm and signatureValue follow the TBSCertificate. */
   append(body, &length,
          (TC_bytes){root->tbs.data + root->tbs.length,
                     (size_t)(certificate.value.data + certificate.value.length -
                              (root->tbs.data + root->tbs.length))});
-  length = der(body, 0xa0, body, length);
+  length = der(body, sizeof body, 0xa0, body, length);
   part_length = 0;
   append(part, &part_length, root->subject);
   append(part, &part_length, (TC_bytes){body, length});
   append(part, &part_length, controls);
-  part_length = der(part, 0x30, part, part_length);
+  part_length = der(part, sizeof part, 0x30, part, part_length);
   length = 0;
   append(body, &length, root->spki);
-  length += der(body + length, 0x04, key_id.data, key_id.length);
+  length += der(body + length, sizeof body - length, 0x04, key_id.data, key_id.length);
   append(body, &length, (TC_bytes){part, part_length});
-  length = der(body, 0x30, body, length);
-  length = der(body, 0xa2, body, length);
-  length = der(body, 0x30, body, length);
+  length = der(body, sizeof body, 0x30, body, length);
+  length = der(body, sizeof body, 0xa2, body, length);
+  length = der(body, sizeof body, 0x30, body, length);
   memcpy(out, body, length);
   return (TC_bytes){out, length};
 }
@@ -268,8 +271,9 @@ static void check_replaced_controls(const TC_bytes* chain, const TC_bytes encode
       {36, explicit_policy, sizeof explicit_policy, TC_X509_PATH_REQUIRE_EXPLICIT_POLICY},
       {54, inhibit_any, sizeof inhibit_any, TC_X509_PATH_INHIBIT_ANY_POLICY}};
   for (size_t i = 0; i < sizeof controls / sizeof *controls; ++i) {
-    const TC_bytes control = {extension, critical_extension(extension, controls[i].id,
-                                                            controls[i].value, controls[i].length)};
+    const TC_bytes control = {extension,
+                              critical_extension(extension, sizeof extension, controls[i].id,
+                                                 controls[i].value, controls[i].length)};
     for (int replaced = 0; replaced < 2; ++replaced) {
       const TC_bytes fields =
           replaced ? (TC_bytes){cleared_flags, sizeof cleared_flags} : (TC_bytes){NULL, 0};

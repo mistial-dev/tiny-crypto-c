@@ -3,6 +3,17 @@
 #include "ocsp_fixture.h"
 #include <tiny_crypto/x509_revocation.h>
 
+/* TC_X509_time has padding, so compare its fields. */
+static void assert_time_equal(const TC_X509_time* actual, const TC_X509_time* expected)
+{
+  munit_assert_uint(actual->year, ==, expected->year);
+  munit_assert_uint(actual->month, ==, expected->month);
+  munit_assert_uint(actual->day, ==, expected->day);
+  munit_assert_uint(actual->hour, ==, expected->hour);
+  munit_assert_uint(actual->minute, ==, expected->minute);
+  munit_assert_uint(actual->second, ==, expected->second);
+}
+
 static const TC_X509_time content_signer_at = {2026, 9, 28, 9, 0, 0};
 static const TC_X509_time card_at = {2026, 9, 29, 10, 0, 0};
 
@@ -51,7 +62,7 @@ static MunitResult content_signer(const MunitParameter params[], void* user)
     munit_assert_false(result.has_reason);
     if (i == 1) {
       const TC_X509_time revoked = {2024, 1, 1, 0, 0, 0};
-      munit_assert_memory_equal(sizeof revoked, &result.revocation_time, &revoked);
+      assert_time_equal(&result.revocation_time, &revoked);
     }
     /* The embedded OCSP Valid Signer gen3 has no id-pkix-ocsp-nocheck. */
     munit_assert_true(ocsp_span_within(result.responder_certificate, response));
@@ -319,7 +330,7 @@ static MunitResult local_responses(const MunitParameter params[], void* user)
   munit_assert_true(result.has_reason);
   munit_assert_uint(result.reason, ==, 1);
   const TC_X509_time revoked = {2026, 9, 1, 0, 0, 0};
-  munit_assert_memory_equal(sizeof revoked, &result.revocation_time, &revoked);
+  assert_time_equal(&result.revocation_time, &revoked);
   munit_assert_null(result.responder_certificate.data);
 
   response = ocsp_read_path(TC_LOCAL_OCSP_ROOT "/good_no_next_update.der", response_bytes);
