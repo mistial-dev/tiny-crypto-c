@@ -375,21 +375,25 @@ and signature validation are separate steps. C++11 code can use `tiny_crypto::TL
 
 TC_TLV_frame frames[16];
 TC_bytes extension_oids[32];
-TC_X509_workspace workspace = {frames, 16, extension_oids, 32};
+TC_X509_workspace workspace = {{frames, 16}, extension_oids, 32};
 const TC_TLV_limits limits = {8192, 8192, 1024, 16};
 TC_X509_certificate certificate;
-TC_TLV_result result = TC_X509_read(data, length, &limits, &workspace,
-                                   &certificate);
+TC_TLV_result result = TC_X509_read((TC_bytes){data, length}, &limits,
+                                   &workspace, &certificate);
 ```
 
-Choose the limits for your application. Each extension needs one OID slot.
-Exceeding a limit returns `TC_TLV_LIMIT`. Results borrow the input buffer, so
-keep it alive while using them. The workspace can be reused after the call.
+Choose the limits for your application. The workspace needs one frame per
+nesting level and one OID slot per extension. Exceeding a limit returns
+`TC_TLV_LIMIT`. Results borrow the input buffer, so keep it alive while using
+them. The workspace can be reused after the call.
 
 `certificate.public_key` identifies the subject's algorithm, key size, and
 named curve. `TC_X509_subject_public_key` also reads a standalone
 SubjectPublicKeyInfo. The extension iterator exposes OIDs, critical flags,
-and values. Helpers decode Basic Constraints and Key Usage.
+and values. Extension decoders take the value as a `TC_bytes` span with its
+own limits, which cover the outer element and every element beneath it.
+Readers such as `TC_X509_general_names_init` bind their input, limits and
+frames at init, and each `next` call spends the budget left by earlier calls.
 
 `<tiny_crypto/key_challenge.h>` prepares and verifies a fresh proof-of-possession
 challenge from a validated public key and explicit signature parameters. Card

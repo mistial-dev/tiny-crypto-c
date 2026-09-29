@@ -55,7 +55,7 @@ static TC_TLV_result prepare_storage(const TC_source* source, const TC_X509_crl_
   tc_pki_storage_plan_write(&plan, w->metadata.data, w->metadata.capacity, 1);
   tc_pki_storage_plan_write(&plan, w->entry.data, w->entry.capacity, 1);
   tc_pki_storage_plan_write(&plan, w->issuer.data, w->issuer.capacity, 1);
-  TC_PKI_PLAN_WRITE(&plan, w->parsing.frames, w->parsing.frame_capacity);
+  TC_PKI_PLAN_WRITE(&plan, w->parsing.frames.data, w->parsing.frames.capacity);
   TC_PKI_PLAN_WRITE(&plan, w->parsing.extension_oids, w->parsing.extension_capacity);
   TC_PKI_PLAN_WRITE(&plan, w->names.left, w->names.scalar_capacity);
   TC_PKI_PLAN_WRITE(&plan, w->names.right, w->names.scalar_capacity);
@@ -98,8 +98,8 @@ TC_TLV_result TC_X509_crl_prepare_begin(const TC_source* source, const TC_X509_c
   result = tc_x509_crl_source_layout(&job->reader, &layout);
   if (result != TC_TLV_OK)
     return result;
-  const tc_pki_tree_workspace tree = {workspace->parsing.frames, workspace->parsing.frame_capacity,
-                                      work};
+  const tc_pki_tree_workspace tree = {workspace->parsing.frames.data,
+                                      workspace->parsing.frames.capacity, work};
   result = tc_x509_crl_source_metadata(&job->reader, &layout, workspace->metadata,
                                        &options->parsing, &tree, &job->record.crl);
   if (result != TC_TLV_OK)
@@ -157,7 +157,7 @@ static void prepare_plan_inputs(tc_pki_storage_plan* plan, const TC_X509_crl_job
   tc_pki_storage_plan_input(plan, w->metadata.data, w->metadata.capacity, 1);
   tc_pki_storage_plan_input(plan, w->entry.data, w->entry.capacity, 1);
   tc_pki_storage_plan_input(plan, w->issuer.data, w->issuer.capacity, 1);
-  TC_PKI_PLAN_INPUT(plan, w->parsing.frames, w->parsing.frame_capacity);
+  TC_PKI_PLAN_INPUT(plan, w->parsing.frames.data, w->parsing.frames.capacity);
   TC_PKI_PLAN_INPUT(plan, w->parsing.extension_oids, w->parsing.extension_capacity);
   TC_PKI_PLAN_INPUT(plan, w->names.left, w->names.scalar_capacity);
   TC_PKI_PLAN_INPUT(plan, w->names.right, w->names.scalar_capacity);
@@ -186,8 +186,8 @@ TC_TLV_result TC_X509_crl_prepare_step(TC_X509_crl_job* job, size_t max_entries,
   TC_TLV_result result = tc_pki_storage_plan_finish(&plan, work);
   if (result != TC_TLV_OK)
     return result;
-  const tc_pki_tree_workspace tree = {job->workspace.parsing.frames,
-                                      job->workspace.parsing.frame_capacity, work};
+  const tc_pki_tree_workspace tree = {job->workspace.parsing.frames.data,
+                                      job->workspace.parsing.frames.capacity, work};
   int done = 0;
   if (job->phase == CRL_JOB_SCANNING) {
     result = tc_x509_crl_source_scan_step(

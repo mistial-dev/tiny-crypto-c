@@ -44,8 +44,8 @@ static TC_TLV_result signer_policies_scan(TC_bytes value, signer_extensions* sca
   TC_X509_policy policy;
   if (tc_pki_work_charge(work, value.length) != TC_TLV_OK)
     return TC_TLV_LIMIT;
-  TC_TLV_result status = TC_X509_policies_init(&policies, value.data, value.length, limits,
-                                               storage->oids, storage->oid_capacity);
+  TC_TLV_result status =
+      TC_X509_policies_init(&policies, value, limits, storage->oids, storage->oid_capacity);
   if (status != TC_TLV_OK)
     return status;
   while ((status = TC_X509_policy_next(&policies, &policy)) == TC_TLV_OK)
@@ -56,13 +56,14 @@ static TC_TLV_result signer_policies_scan(TC_bytes value, signer_extensions* sca
 }
 
 static TC_TLV_result signer_purpose_scan(TC_bytes value, signer_extensions* scan,
+                                         const TC_TLV_limits* limits,
                                          const TC_X509_path_workspace* storage, size_t* work)
 {
   size_t count;
   if (tc_pki_work_charge(work, value.length) != TC_TLV_OK)
     return TC_TLV_LIMIT;
-  TC_TLV_result status = TC_X509_extended_key_usage_read(value.data, value.length, storage->oids,
-                                                         storage->oid_capacity, &count);
+  TC_TLV_result status =
+      TC_X509_extended_key_usage_read(value, limits, storage->oids, storage->oid_capacity, &count);
   if (status != TC_TLV_OK)
     return status;
   /* The span borrows certificate bytes, so later scans may reuse the OID slots. */
@@ -87,7 +88,7 @@ static TC_TLV_result signer_extensions_scan(const TC_X509_certificate* signer,
     if (id == TC_PKI_EXT_CERTIFICATE_POLICIES && scan->required_policy)
       status = signer_policies_scan(extension.value, scan, limits, storage, work);
     else if (id == TC_PKI_EXT_EXTENDED_KEY_USAGE && scan->find_purpose)
-      status = signer_purpose_scan(extension.value, scan, storage, work);
+      status = signer_purpose_scan(extension.value, scan, limits, storage, work);
     if (status != TC_TLV_OK)
       return status;
   }
@@ -98,11 +99,10 @@ TC_TLV_result tc_credential_signer_read(TC_bytes certificate, const TC_TLV_limit
                                         const TC_X509_path_workspace* storage, size_t* work,
                                         TC_X509_certificate* out)
 {
-  TC_X509_workspace parser = {storage->frames, storage->frame_capacity, storage->oids,
-                              storage->oid_capacity};
+  TC_X509_workspace parser = {storage->frames, storage->oids, storage->oid_capacity};
   if (tc_pki_work_charge(work, certificate.length) != TC_TLV_OK)
     return TC_TLV_LIMIT;
-  return TC_X509_read(certificate.data, certificate.length, limits, &parser, out);
+  return TC_X509_read(certificate, limits, &parser, out);
 }
 
 TC_TLV_result tc_credential_signer_policy(const TC_X509_certificate* signer, int piv,

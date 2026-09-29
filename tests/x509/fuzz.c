@@ -357,7 +357,7 @@ static void fuzz_path(const uint8_t* data, size_t length, const TC_X509_certific
     TC_X509_search_frame search_frames[4];
     TC_X509_search_workspace search = {path, search_frames, 4};
     TC_X509_search_result found, unchanged;
-    TC_X509_workspace parser = {frames, 16, oids, 16};
+    TC_X509_workspace parser = {{frames, 16}, oids, 16};
     TC_X509_certificate selected;
     size_t count = 0, work;
     options.max_certificates = 4;
@@ -368,12 +368,10 @@ static void fuzz_path(const uint8_t* data, size_t length, const TC_X509_certific
       candidates[count++] = element.encoded;
     if (!count)
       return;
-    if (TC_X509_read(candidates[0].data, candidates[0].length, &options.parsing, &parser,
-                     &selected) != TC_TLV_OK)
+    if (TC_X509_read(candidates[0], &options.parsing, &parser, &selected) != TC_TLV_OK)
       return;
     options.at = selected.not_before;
-    if (TC_X509_read(candidates[count - 1].data, candidates[count - 1].length, &options.parsing,
-                     &parser, &selected) != TC_TLV_OK)
+    if (TC_X509_read(candidates[count - 1], &options.parsing, &parser, &selected) != TC_TLV_OK)
       return;
     /* The final record supplies the test's trust anchor. */
     anchor.name = selected.subject;
@@ -433,7 +431,7 @@ static void fuzz_cms_path(const uint8_t* data, size_t length)
   const TC_X509_store_source source = {0};
   TC_X509_search_result found, saved;
   options.path.parsing =
-      (TC_TLV_limits){MAX_BYTES, MAX_BYTES, MAX_ELEMENTS, workspace.validation.frame_capacity};
+      (TC_TLV_limits){MAX_BYTES, MAX_BYTES, MAX_ELEMENTS, workspace.validation.frames.capacity};
   options.path.at = (TC_X509_time){2026, 1, 1, 0, 0, 0};
   options.path.max_certificates = workspace.search.capacity;
   options.path.max_input = MAX_BYTES;
@@ -550,7 +548,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
 {
   TC_TLV_frame frames[16];
   TC_bytes oids[64];
-  TC_X509_workspace workspace = {frames, 16, oids, 64};
+  TC_X509_workspace workspace = {{frames, 16}, oids, 64};
   TC_TLV_limits limits = {32768, 32768, 2048, 16};
   TC_X509_certificate certificate, saved;
   TC_X509_public_key key;
@@ -818,14 +816,13 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
   }
   memset(&certificate, 0xa5, sizeof certificate);
   saved = certificate;
-  result = TC_X509_read(data, length, &limits, &workspace, &certificate);
+  result = TC_X509_read((TC_bytes){data, length}, &limits, &workspace, &certificate);
   fuzz_path(data, length, result == TC_TLV_OK ? &certificate : NULL);
   if (result == TC_TLV_OK) {
     if (certificate.encoded.data != data || certificate.encoded.length != length ||
         certificate.version < 1 || certificate.version > 3)
       abort();
-    if (TC_X509_extensions_init(&reader, certificate.extensions.data, certificate.extensions.length,
-                                &limits) != TC_TLV_OK)
+    if (TC_X509_extensions_init(&reader, certificate.extensions, &limits) != TC_TLV_OK)
       abort();
     while ((result = TC_X509_extension_next(&reader, &extension)) == TC_TLV_OK) {
     }
@@ -833,7 +830,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
       abort();
     {
       const TC_X509_name_constraints names = {{NULL, 0}, {NULL, 0}};
-      TC_X509_constraint_workspace scratch = {frames, 16, NULL};
+      TC_X509_constraint_workspace scratch = {{frames, 16}, NULL};
       size_t work = 200000;
       int permitted = 99;
       result = TC_X509_certificate_names_check(&certificate, &names, &limits, &scratch, &work,
@@ -845,9 +842,9 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
     }
   } else if (memcmp(&certificate, &saved, sizeof certificate))
     abort();
-  (void)TC_X509_subject_public_key(data, length, &key);
-  (void)TC_X509_basic_constraints_read(data, length, &constraints);
-  (void)TC_X509_key_usage_read(data, length, &usage);
+  (void)TC_X509_subject_public_key((TC_bytes){data, length}, &key);
+  (void)TC_X509_basic_constraints_read((TC_bytes){data, length}, &limits, &constraints);
+  (void)TC_X509_key_usage_read((TC_bytes){data, length}, &limits, &usage);
   {
     TC_X509_authority_key_identifier identifier, old_identifier;
     TC_bytes subject, old_subject;
@@ -855,10 +852,10 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
     memcpy(&old_identifier, &identifier, sizeof identifier);
     memset(&subject, 0xa5, sizeof subject);
     memcpy(&old_subject, &subject, sizeof subject);
-    result = TC_X509_authority_key_identifier_read(data, length, &limits, &identifier);
+    result = TC_X509_authority_key_identifier_read((TC_bytes){data, length}, &limits, &identifier);
     if (result != TC_TLV_OK && memcmp(&identifier, &old_identifier, sizeof identifier))
       abort();
-    result = TC_X509_subject_key_identifier_read(data, length, &limits, &subject);
+    result = TC_X509_subject_key_identifier_read((TC_bytes){data, length}, &limits, &subject);
     if (result != TC_TLV_OK && memcmp(&subject, &old_subject, sizeof subject))
       abort();
     (void)TC_DER_integer_contents(data, length);
@@ -868,7 +865,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
     uint32_t number = 99;
     memset(&old_policy, 0xa5, sizeof old_policy);
     memcpy(&policy, &old_policy, sizeof policy);
-    result = TC_X509_policy_constraints_read(data, length, &policy);
+    result = TC_X509_policy_constraints_read((TC_bytes){data, length}, &limits, &policy);
     if (result != TC_TLV_OK && memcmp(&policy, &old_policy, sizeof policy))
       abort();
     result = TC_DER_uint32_contents(data, length, &number);
@@ -880,59 +877,66 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
     size_t count = 99;
     memset(old_purposes, 0xa5, sizeof old_purposes);
     memcpy(purposes, old_purposes, sizeof purposes);
-    result = TC_X509_extended_key_usage_read(data, length, purposes, 8, &count);
+    result =
+        TC_X509_extended_key_usage_read((TC_bytes){data, length}, &limits, purposes, 8, &count);
     if (result == TC_TLV_OK) {
       if (!count || count > 8)
         abort();
     } else if (count != 99 || memcmp(purposes, old_purposes, sizeof purposes))
       abort();
   }
-  if (TC_X509_extensions_init(&reader, data, length, &limits) == TC_TLV_OK)
+  if (TC_X509_extensions_init(&reader, (TC_bytes){data, length}, &limits) == TC_TLV_OK)
     while (TC_X509_extension_next(&reader, &extension) == TC_TLV_OK) {
     }
-  if (TC_X509_general_names_init(&reader, data, length, &limits) == TC_TLV_OK) {
-    TC_X509_general_name general, old_general;
-    TC_TLV_reader old_reader;
-    memset(&general, 0xa5, sizeof general);
-    do {
-      memcpy(&old_reader, &reader, sizeof reader);
-      memcpy(&old_general, &general, sizeof general);
-      result = TC_X509_general_name_next(&reader, (TC_TLV_frames){frames, 16}, &general);
-      if (result == TC_TLV_OK) {
-        if (reader.offset <= old_reader.offset || reader.elements <= old_reader.elements ||
-            reader.elements > limits.max_elements || general.type > 8)
+  {
+    TC_X509_general_names_reader names, old_names;
+    if (TC_X509_general_names_init(&names, (TC_bytes){data, length}, &limits,
+                                   (TC_TLV_frames){frames, 16}) == TC_TLV_OK) {
+      TC_X509_general_name general, old_general;
+      memset(&general, 0xa5, sizeof general);
+      do {
+        memcpy(&old_names, &names, sizeof names);
+        memcpy(&old_general, &general, sizeof general);
+        result = TC_X509_general_name_next(&names, &general);
+        if (result == TC_TLV_OK) {
+          if (names.reader.offset <= old_names.reader.offset ||
+              names.reader.elements <= old_names.reader.elements ||
+              names.reader.elements > limits.max_elements || general.type > 8)
+            abort();
+        } else if (memcmp(&old_names, &names, sizeof names) ||
+                   memcmp(&old_general, &general, sizeof general))
           abort();
-      } else if (memcmp(&old_reader, &reader, sizeof reader) ||
-                 memcmp(&old_general, &general, sizeof general))
-        abort();
-    } while (result == TC_TLV_OK);
+      } while (result == TC_TLV_OK);
+    }
   }
   {
     TC_X509_name_constraints constraints, old_constraints;
     TC_X509_general_subtree subtree, old_subtree;
-    TC_TLV_reader old_reader;
+    TC_X509_general_subtrees_reader subtrees, old_subtrees;
     memset(&constraints, 0xa5, sizeof constraints);
     memcpy(&old_constraints, &constraints, sizeof constraints);
-    result = TC_X509_name_constraints_read(data, length, &limits, &constraints);
+    result = TC_X509_name_constraints_read((TC_bytes){data, length}, &limits, &constraints);
     if (result != TC_TLV_OK && memcmp(&old_constraints, &constraints, sizeof constraints))
       abort();
     memset(&subtree, 0xa5, sizeof subtree);
-    if (TC_TLV_reader_init(&reader, data, length, TC_TLV_DER, &limits) == TC_TLV_OK) {
+    if (TC_X509_general_subtrees_init(&subtrees, (TC_bytes){data, length}, &limits,
+                                      (TC_TLV_frames){frames, 16}) == TC_TLV_OK) {
       do {
-        memcpy(&old_reader, &reader, sizeof reader);
+        memcpy(&old_subtrees, &subtrees, sizeof subtrees);
         memcpy(&old_subtree, &subtree, sizeof subtree);
-        result = TC_X509_general_subtree_next(&reader, (TC_TLV_frames){frames, 16}, &subtree);
+        result = TC_X509_general_subtree_next(&subtrees, &subtree);
         if (result == TC_TLV_OK) {
-          if (reader.offset <= old_reader.offset || reader.elements <= old_reader.elements ||
-              reader.elements > limits.max_elements || subtree.base.type > 8)
+          if (subtrees.reader.offset <= old_subtrees.reader.offset ||
+              subtrees.reader.elements <= old_subtrees.reader.elements ||
+              subtrees.reader.elements > limits.max_elements || subtree.base.type > 8)
             abort();
-        } else if (memcmp(&old_reader, &reader, sizeof reader) ||
+        } else if (memcmp(&old_subtrees, &subtrees, sizeof subtrees) ||
                    memcmp(&old_subtree, &subtree, sizeof subtree))
           abort();
       } while (result == TC_TLV_OK);
     }
   }
-  if (TC_X509_policy_mappings_init(&reader, data, length, &limits) == TC_TLV_OK) {
+  if (TC_X509_policy_mappings_init(&reader, (TC_bytes){data, length}, &limits) == TC_TLV_OK) {
     TC_X509_policy_mapping mapping, old_mapping;
     TC_TLV_reader old_reader;
     memset(&mapping, 0xa5, sizeof mapping);
@@ -956,7 +960,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
     TC_bytes seen[8], old_seen[8];
     memset(seen, 0xa5, sizeof seen);
     memset(&policy, 0xa5, sizeof policy);
-    if (TC_X509_policies_init(&policies, data, length, &limits, seen, 8) == TC_TLV_OK) {
+    if (TC_X509_policies_init(&policies, (TC_bytes){data, length}, &limits, seen, 8) == TC_TLV_OK) {
       do {
         memcpy(&old_policies, &policies, sizeof policies);
         memcpy(&old_policy, &policy, sizeof policy);
@@ -1005,7 +1009,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
         abort();
       {
         TC_X509_name_constraints constraints = {base.base.value, {NULL, 0}};
-        TC_X509_constraint_workspace workspace = {frames, 16, NULL};
+        TC_X509_constraint_workspace workspace = {{frames, 16}, NULL};
         work = 100000;
         matched = 99;
         result = TC_X509_name_constraints_check(&name, &constraints, &limits, &workspace, &work,

@@ -60,7 +60,7 @@ static TC_X509_public_key public_key(void)
 static MunitResult verification(const MunitParameter params[], void* user)
 {
   TC_TLV_frame frames[FRAME_CAPACITY];
-  TC_CMS_signature_workspace workspace = {frames, FRAME_CAPACITY, NULL, 0};
+  TC_CMS_signature_workspace workspace = {{frames, FRAME_CAPACITY}, NULL, 0};
   TC_CMS_signer_info signer;
   TC_X509_public_key key = public_key();
   ProviderState state = {0};
@@ -198,7 +198,7 @@ static MunitResult unsigned_attributes(const MunitParameter params[], void* user
       13,   6,    9,    0x60, 0x86, 0x48, 1,    0x65, 3,    4,  2, 1,    5,    0,    0x30, 10,
       6,    8,    0x2a, 0x86, 0x48, 0xce, 0x3d, 4,    3,    2,  4, 1,    1};
   TC_TLV_frame frames[FRAME_CAPACITY];
-  TC_CMS_signature_workspace workspace = {frames, FRAME_CAPACITY, NULL, 0};
+  TC_CMS_signature_workspace workspace = {{frames, FRAME_CAPACITY}, NULL, 0};
   TC_CMS_signer_info signer;
   TC_X509_public_key key = public_key();
   ProviderState state = {0};
@@ -273,7 +273,7 @@ static MunitResult storage(const MunitParameter params[], void* user)
             (TC_X509_signature_provider){NULL, &state, verify};
         *(TC_TLV_limits*)pointers[LIMITS] = limits;
         *(TC_CMS_signature_workspace*)pointers[WORKSPACE] =
-            (TC_CMS_signature_workspace){pointers[FRAMES], FRAME_CAPACITY, pointers[BUFFER], 256};
+            (TC_CMS_signature_workspace){{pointers[FRAMES], FRAME_CAPACITY}, pointers[BUFFER], 256};
         memcpy(saved, slots, sizeof slots);
         TC_X509_signature_result result;
         if (operation == 0)
@@ -309,7 +309,7 @@ static MunitResult content(const MunitParameter params[], void* user)
 {
   static const uint8_t message[] = {'a', 'b', 'c'};
   TC_TLV_frame frames[FRAME_CAPACITY];
-  TC_CMS_signature_workspace workspace = {frames, FRAME_CAPACITY, NULL, 0};
+  TC_CMS_signature_workspace workspace = {{frames, FRAME_CAPACITY}, NULL, 0};
   TC_CMS_signer_info signer;
   TC_X509_public_key key = public_key();
   ProviderState state = {0};

@@ -155,58 +155,57 @@ static void prepare(const char* profile)
                      ==, TC_OK);
   }
   TC_secure_zero(&key, sizeof key);
-  TC_X509_workspace parser = {state->parse_frames, 32, state->parse_oids, 32};
+  TC_X509_workspace parser = {{state->parse_frames, 32}, state->parse_oids, 32};
   TC_X509_certificate card;
-  TC_TLV_reader trust_reader;
-  munit_assert_int(TC_X509_trust_anchor_list_init(&trust_reader, state->trust_list,
-                                                  state->trust_list_length, &limits, &parser),
-                   ==, TC_TLV_OK);
-  munit_assert_int(TC_X509_trust_anchor_next(&trust_reader, &limits, &parser, &state->anchor), ==,
-                   TC_TLV_OK);
+  TC_X509_trust_anchor_reader trust_reader;
+  munit_assert_int(
+      TC_X509_trust_anchor_list_init(
+          &trust_reader, (TC_bytes){state->trust_list, state->trust_list_length}, &limits, &parser),
+      ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_trust_anchor_next(&trust_reader, &state->anchor), ==, TC_TLV_OK);
   munit_assert_int(state->anchor.x509_unusable, ==, 0);
   TC_X509_store_anchor ignored;
-  munit_assert_int(TC_X509_trust_anchor_next(&trust_reader, &limits, &parser, &ignored), ==,
-                   TC_TLV_END);
-  munit_assert_int(TC_X509_trust_anchor_list_init(&trust_reader, state->trust_certificate,
-                                                  state->trust_certificate_length, &limits,
-                                                  &parser),
+  munit_assert_int(TC_X509_trust_anchor_next(&trust_reader, &ignored), ==, TC_TLV_END);
+  munit_assert_int(TC_X509_trust_anchor_list_init(
+                       &trust_reader,
+                       (TC_bytes){state->trust_certificate, state->trust_certificate_length},
+                       &limits, &parser),
                    ==, TC_TLV_OK);
-  munit_assert_int(TC_X509_trust_anchor_next(&trust_reader, &limits, &parser, &ignored), ==,
-                   TC_TLV_OK);
+  munit_assert_int(TC_X509_trust_anchor_next(&trust_reader, &ignored), ==, TC_TLV_OK);
   munit_assert_size(ignored.trust.name.length, ==, state->anchor.trust.name.length);
   munit_assert_memory_equal(ignored.trust.name.length, ignored.trust.name.data,
                             state->anchor.trust.name.data);
-  munit_assert_int(TC_X509_trust_anchor_list_init(&trust_reader, state->trust_bad_keyid,
-                                                  state->trust_bad_keyid_length, &limits, &parser),
+  munit_assert_int(TC_X509_trust_anchor_list_init(
+                       &trust_reader,
+                       (TC_bytes){state->trust_bad_keyid, state->trust_bad_keyid_length}, &limits,
+                       &parser),
                    ==, TC_TLV_OK);
-  munit_assert_int(TC_X509_trust_anchor_next(&trust_reader, &limits, &parser, &ignored), ==,
-                   TC_TLV_INVALID);
+  munit_assert_int(TC_X509_trust_anchor_next(&trust_reader, &ignored), ==, TC_TLV_INVALID);
   const TC_bytes invalid_lists[] = {{state->trust_bad_name, state->trust_bad_name_length},
                                     {state->trust_bad_key, state->trust_bad_key_length},
                                     {state->trust_bad_certsign, state->trust_bad_certsign_length}};
   for (size_t i = 0; i < sizeof invalid_lists / sizeof *invalid_lists; ++i) {
-    munit_assert_int(TC_X509_trust_anchor_list_init(&trust_reader, invalid_lists[i].data,
-                                                    invalid_lists[i].length, &limits, &parser),
-                     ==, TC_TLV_OK);
-    munit_assert_int(TC_X509_trust_anchor_next(&trust_reader, &limits, &parser, &ignored), ==,
-                     TC_TLV_INVALID);
+    munit_assert_int(
+        TC_X509_trust_anchor_list_init(&trust_reader, invalid_lists[i], &limits, &parser), ==,
+        TC_TLV_OK);
+    munit_assert_int(TC_X509_trust_anchor_next(&trust_reader, &ignored), ==, TC_TLV_INVALID);
   }
   /* Fixture authorization is the pinned synthetic root certificate. */
   TC_X509_certificate root;
-  munit_assert_int(TC_X509_read(state->root, state->root_length, &limits, &parser, &root), ==,
-                   TC_TLV_OK);
+  munit_assert_int(
+      TC_X509_read((TC_bytes){state->root, state->root_length}, &limits, &parser, &root), ==,
+      TC_TLV_OK);
   munit_assert_size(state->anchor.trust.name.length, ==, root.subject.length);
   munit_assert_memory_equal(root.subject.length, state->anchor.trust.name.data, root.subject.data);
   munit_assert_size(state->anchor.trust.public_key.key.length, ==, root.public_key.key.length);
   munit_assert_memory_equal(root.public_key.key.length, state->anchor.trust.public_key.key.data,
                             root.public_key.key.data);
-  munit_assert_int(TC_X509_read(state->card, state->card_length, &limits, &parser, &card), ==,
-                   TC_TLV_OK);
+  munit_assert_int(
+      TC_X509_read((TC_bytes){state->card, state->card_length}, &limits, &parser, &card), ==,
+      TC_TLV_OK);
   state->card_expiration = card.not_after;
   TC_TLV_reader extensions;
-  munit_assert_int(
-      TC_X509_extensions_init(&extensions, card.extensions.data, card.extensions.length, &limits),
-      ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_extensions_init(&extensions, card.extensions, &limits), ==, TC_TLV_OK);
   TC_X509_extension extension;
   static const uint8_t san_oid[] = {0x55, 0x1d, 0x11};
   TC_bytes san = {NULL, 0};

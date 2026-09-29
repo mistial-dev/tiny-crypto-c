@@ -168,8 +168,7 @@ typedef struct {
   TC_bytes* output;
   size_t output_capacity;
   const TC_X509_name_workspace* names;
-  TC_TLV_frame* frames;
-  size_t frame_capacity;
+  TC_TLV_frames frames;
 } tc_x509_policy_workspace;
 /* Run after signature and CA checks. Workspace is scratch and disjoint from
  * all inputs and result pointers. count and accepted change only on OK. */

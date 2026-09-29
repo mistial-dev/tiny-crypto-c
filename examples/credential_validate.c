@@ -40,17 +40,17 @@ TC_TLV_result example_read_card_identity(TC_bytes encoded, TC_PIV_card_profile p
   if (encoded.length > *work / 2)
     return TC_TLV_LIMIT;
   *work -= encoded.length * 2;
-  TC_X509_workspace parser = {storage->frames, sizeof storage->frames / sizeof *storage->frames,
-                              storage->oids, sizeof storage->oids / sizeof *storage->oids};
+  TC_X509_workspace parser = {{storage->frames, sizeof storage->frames / sizeof *storage->frames},
+                              storage->oids,
+                              sizeof storage->oids / sizeof *storage->oids};
   TC_X509_certificate certificate;
-  TC_TLV_result status = TC_X509_read(encoded.data, encoded.length, limits, &parser, &certificate);
+  TC_TLV_result status = TC_X509_read(encoded, limits, &parser, &certificate);
   if (status != TC_TLV_OK)
     return status;
   ExampleCardIdentity identity = {0};
   identity.expiration = certificate.not_after;
   TC_TLV_reader extensions;
-  status = TC_X509_extensions_init(&extensions, certificate.extensions.data,
-                                   certificate.extensions.length, limits);
+  status = TC_X509_extensions_init(&extensions, certificate.extensions, limits);
   if (status != TC_TLV_OK)
     return status;
   static const uint8_t san_oid[] = {0x55, 0x1d, 17};
@@ -62,14 +62,11 @@ TC_TLV_result example_read_card_identity(TC_bytes encoded, TC_PIV_card_profile p
       continue;
     if (found)
       return TC_TLV_INVALID;
-    status =
-        profile == TC_PIV_CARD
-            ? TC_PIV_card_identifiers_read(extension.value, profile, limits,
-                                           (TC_TLV_frames){storage->frames, parser.frame_capacity},
-                                           work, &identity.identifiers)
-            : TC_TWIC_card_identifiers_read(extension.value, profile, limits,
-                                            (TC_TLV_frames){storage->frames, parser.frame_capacity},
-                                            work, &identity.identifiers);
+    status = profile == TC_PIV_CARD
+                 ? TC_PIV_card_identifiers_read(extension.value, profile, limits, parser.frames,
+                                                work, &identity.identifiers)
+                 : TC_TWIC_card_identifiers_read(extension.value, profile, limits, parser.frames,
+                                                 work, &identity.identifiers);
     if (status != TC_TLV_OK)
       return status;
     found = 1;

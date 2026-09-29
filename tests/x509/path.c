@@ -197,7 +197,7 @@ static MunitResult names(const MunitParameter params[], void* user)
   uint8_t used[4];
   TC_TLV_frame frames[8];
   TC_X509_name_workspace name_workspace = {left, right, 32, used, 4};
-  TC_X509_constraint_workspace workspace = {frames, 8, &name_workspace};
+  TC_X509_constraint_workspace workspace = {{frames, 8}, &name_workspace};
   TC_X509_extension_summary summaries[3];
   tc_x509_path_input input = {certificates, 3,    3,    3,         NULL, NULL, NULL, &limits,
                               NULL,         NULL, NULL, summaries, 0,    0,    0};
@@ -505,8 +505,8 @@ static MunitResult policies(const MunitParameter params[], void* user)
   TC_bytes policy_scratch[4], output[4];
   TC_X509_policy_mapping mappings[4];
   TC_TLV_frame frames[8];
-  tc_x509_policy_workspace workspace = {&graph, policy_scratch, 4,      mappings, 4, output,
-                                        4,      &names,         frames, 8};
+  tc_x509_policy_workspace workspace = {&graph, policy_scratch, 4,          mappings, 4, output,
+                                        4,      &names,         {frames, 8}};
   tc_x509_policy_options options = {initial, 1, 1, 0, 0};
   size_t i, count = 99, work = 100000, required;
   int accepted = 99;
@@ -735,7 +735,7 @@ static MunitResult usage(const MunitParameter params[], void* user)
   TC_TLV_frame frames[8];
   TC_bytes oids[4];
   TC_X509_name_workspace names = {left, right, 32, used, 4};
-  tc_x509_extension_workspace workspace = {oids, 4, {frames, 8, &names}};
+  tc_x509_extension_workspace workspace = {oids, 4, {{frames, 8}, &names}};
   tc_x509_path_usage purpose = {{oid, sizeof oid}, 1, 1, 1, 0};
   size_t i, work = 100000, required;
   int accepted = 99;

@@ -96,7 +96,7 @@ int main(void)
   TC_PIV_SM session = {0};
   TC_EC_workspace workspace;
   uint8_t point[65];
-  TC_TLV_limits limits = {64, 64, 4, 1};
+  TC_TLV_limits limits = {64, 64, 4, 2};
   static const uint8_t policy_extension[] = {0x30, 5, 0x30, 3, 6, 1, 42};
   static const uint8_t eac[] = {0x7f, 0x49, 19, 6, 10,   4, 0,    0x7f, 0,    7, 2,
                                 2,    2,    1,  1, 0x81, 2, 0x0c, 0xa1, 0x82, 1, 17};
@@ -122,7 +122,7 @@ int main(void)
         TC_X509_PATH_INVALID)
       return 1;
   }
-  if (TC_X509_subject_public_key(spki, sizeof spki, &public_key) != TC_TLV_OK ||
+  if (TC_X509_subject_public_key((TC_bytes){spki, sizeof spki}, &public_key) != TC_TLV_OK ||
       public_key.bits != 12)
     return 1;
   {
@@ -138,8 +138,8 @@ int main(void)
         !equal)
       return 1;
   }
-  if (TC_X509_policies_init(&policies, policy_extension, sizeof policy_extension, &limits,
-                            policy_oids, 1) != TC_TLV_OK ||
+  if (TC_X509_policies_init(&policies, (TC_bytes){policy_extension, sizeof policy_extension},
+                            &limits, policy_oids, 1) != TC_TLV_OK ||
       TC_X509_policy_next(&policies, &policy) != TC_TLV_OK || policy.oid.length != 1 ||
       policy.oid.data[0] != 42 || TC_X509_policy_next(&policies, &policy) != TC_TLV_END)
     return 1;

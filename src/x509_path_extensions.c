@@ -38,15 +38,16 @@ static int summary_slot(unsigned id)
 }
 
 /* Decode the fixed-form values every pass needs. Other values stay as spans. */
-static TC_TLV_result summary_decode(TC_X509_extension_summary* summary, int slot, TC_bytes value)
+static TC_TLV_result summary_decode(TC_X509_extension_summary* summary, int slot, TC_bytes value,
+                                    const TC_TLV_limits* limits)
 {
   switch (slot) {
   case TC_X509_SUMMARY_BASIC_CONSTRAINTS:
-    return TC_X509_basic_constraints_read(value.data, value.length, &summary->basic);
+    return TC_X509_basic_constraints_read(value, limits, &summary->basic);
   case TC_X509_SUMMARY_KEY_USAGE:
-    return TC_X509_key_usage_read(value.data, value.length, &summary->key_usage);
+    return TC_X509_key_usage_read(value, limits, &summary->key_usage);
   case TC_X509_SUMMARY_POLICY_CONSTRAINTS:
-    return TC_X509_policy_constraints_read(value.data, value.length, &summary->policy_constraints);
+    return TC_X509_policy_constraints_read(value, limits, &summary->policy_constraints);
   case TC_X509_SUMMARY_INHIBIT_ANY:
     return TC_DER_uint32(value.data, value.length, &summary->inhibit_any);
   default:
@@ -79,7 +80,7 @@ TC_TLV_result tc_x509_extensions_summarize(const TC_X509_certificate* certificat
     if (extension.critical)
       summary.critical |= (uint16_t)(1u << slot);
     summary.values[slot] = extension.value;
-    result = summary_decode(&summary, slot, extension.value);
+    result = summary_decode(&summary, slot, extension.value, limits);
     if (result != TC_TLV_OK)
       return result;
   }
@@ -102,12 +103,10 @@ static TC_TLV_result extended_key_usage_permits(TC_bytes value, const tc_x509_pa
   *permitted = !usage->purpose.length;
   if (tc_pki_work_charge(work, value.length) != TC_TLV_OK)
     return TC_TLV_LIMIT;
-  result = TC_X509_extended_key_usage_read(value.data, value.length, workspace->oids,
-                                           workspace->oid_capacity, &count);
+  result = TC_X509_extended_key_usage_read(value, limits, workspace->oids, workspace->oid_capacity,
+                                           &count);
   if (result != TC_TLV_OK)
     return result;
-  if (count > limits->max_elements)
-    return TC_TLV_LIMIT;
   for (i = 0; i < count; ++i) {
     const TC_bytes oid = workspace->oids[i];
     if (tc_pki_work_charge(work, oid.length) != TC_TLV_OK)
@@ -176,7 +175,7 @@ TC_TLV_result tc_x509_path_extensions(const tc_x509_path_input* input,
     if (has_constraints) {
       const TC_bytes value = extensions->values[TC_X509_SUMMARY_NAME_CONSTRAINTS];
       TC_X509_name_constraints constraints;
-      result = TC_X509_name_constraints_read(value.data, value.length, input->limits, &constraints);
+      result = TC_X509_name_constraints_read(value, input->limits, &constraints);
       if (result != TC_TLV_OK)
         return result;
       /* The names pass checked issuer distances. The target's constraints

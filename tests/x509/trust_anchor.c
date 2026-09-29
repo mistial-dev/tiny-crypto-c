@@ -13,7 +13,7 @@
 static const TC_TLV_limits limits = {8192, 8192, 128, 16};
 static TC_TLV_frame frames[16];
 static TC_bytes oids[32];
-static TC_X509_workspace workspace = {frames, 16, oids, 32};
+static TC_X509_workspace workspace = {{frames, 16}, oids, 32};
 
 static size_t add(uint8_t* out, unsigned tag, const uint8_t* value, size_t length)
 {
@@ -81,27 +81,27 @@ static MunitResult flags_and_unusable(const MunitParameter params[], void* user)
   for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
     uint8_t encoded[140];
     size_t length = make_info(encoded, cases[i].data, cases[i].length, cases[i].policy, 1, 0, 0);
-    TC_TLV_reader reader;
+    TC_X509_trust_anchor_reader reader;
     TC_X509_store_anchor anchor;
-    munit_assert_int(TC_X509_trust_anchor_list_init(&reader, encoded, length, &limits, &workspace),
-                     ==, TC_TLV_OK);
-    munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &workspace, &anchor), ==,
-                     TC_TLV_OK);
+    munit_assert_int(
+        TC_X509_trust_anchor_list_init(&reader, (TC_bytes){encoded, length}, &limits, &workspace),
+        ==, TC_TLV_OK);
+    munit_assert_int(TC_X509_trust_anchor_next(&reader, &anchor), ==, TC_TLV_OK);
     munit_assert_uint(anchor.policy_flags, ==, cases[i].expected);
     munit_assert_uint(anchor.replaced_controls, ==,
                       TC_X509_ANCHOR_REPLACED_POLICY_FLAGS |
                           (cases[i].policy ? TC_X509_ANCHOR_REPLACED_POLICY_SET : 0u));
     munit_assert_int(anchor.x509_unusable, ==, 0);
-    munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &workspace, &anchor), ==,
-                     TC_TLV_END);
+    munit_assert_int(TC_X509_trust_anchor_next(&reader, &anchor), ==, TC_TLV_END);
   }
   uint8_t encoded[140];
   size_t length = make_info(encoded, NULL, 0, 0, 0, 0, 0);
-  TC_TLV_reader reader;
+  TC_X509_trust_anchor_reader reader;
   TC_X509_store_anchor anchor;
-  munit_assert_int(TC_X509_trust_anchor_list_init(&reader, encoded, length, &limits, &workspace),
-                   ==, TC_TLV_OK);
-  munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &workspace, &anchor), ==, TC_TLV_OK);
+  munit_assert_int(
+      TC_X509_trust_anchor_list_init(&reader, (TC_bytes){encoded, length}, &limits, &workspace), ==,
+      TC_TLV_OK);
+  munit_assert_int(TC_X509_trust_anchor_next(&reader, &anchor), ==, TC_TLV_OK);
   munit_assert_int(anchor.x509_unusable, ==, 1);
   munit_assert_null(anchor.trust.name.data);
   return MUNIT_OK;
@@ -112,35 +112,35 @@ static MunitResult malformed(const MunitParameter params[], void* user)
   (void)params;
   (void)user;
   uint8_t encoded[140];
-  TC_TLV_reader reader;
+  TC_X509_trust_anchor_reader reader;
   TC_X509_store_anchor anchor, saved;
   static const uint8_t bad_flags[][2] = {{6, 0x80}, {5, 0x21}, {4, 0x20}, {6, 0x60}};
   for (size_t i = 0; i < sizeof bad_flags / sizeof *bad_flags; ++i) {
     size_t length = make_info(encoded, bad_flags[i], 2, 0, 1, 0, 0);
-    munit_assert_int(TC_X509_trust_anchor_list_init(&reader, encoded, length, &limits, &workspace),
-                     ==, TC_TLV_OK);
+    munit_assert_int(
+        TC_X509_trust_anchor_list_init(&reader, (TC_bytes){encoded, length}, &limits, &workspace),
+        ==, TC_TLV_OK);
     memset(&anchor, 0xa5, sizeof anchor);
     saved = anchor;
-    size_t offset = reader.offset;
-    munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &workspace, &anchor), ==,
-                     TC_TLV_INVALID);
-    munit_assert_size(reader.offset, ==, offset);
+    size_t offset = reader.reader.offset;
+    munit_assert_int(TC_X509_trust_anchor_next(&reader, &anchor), ==, TC_TLV_INVALID);
+    munit_assert_size(reader.reader.offset, ==, offset);
     munit_assert_memory_equal(sizeof anchor, &anchor, &saved);
   }
   size_t length = make_info(encoded, NULL, 0, 0, 0, 1, 0);
-  munit_assert_int(TC_X509_trust_anchor_list_init(&reader, encoded, length, &limits, &workspace),
-                   ==, TC_TLV_OK);
-  munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &workspace, &anchor), ==,
-                   TC_TLV_INVALID);
+  munit_assert_int(
+      TC_X509_trust_anchor_list_init(&reader, (TC_bytes){encoded, length}, &limits, &workspace), ==,
+      TC_TLV_OK);
+  munit_assert_int(TC_X509_trust_anchor_next(&reader, &anchor), ==, TC_TLV_INVALID);
   length = make_info(encoded, NULL, 0, 0, 0, 0, 0);
   munit_assert_int(
-      TC_X509_trust_anchor_list_init(&reader, encoded, length - 1, &limits, &workspace), !=,
-      TC_TLV_OK);
+      TC_X509_trust_anchor_list_init(&reader, (TC_bytes){encoded, length - 1}, &limits, &workspace),
+      !=, TC_TLV_OK);
   length = make_info(encoded, NULL, 0, 1, 1, 0, 1);
-  munit_assert_int(TC_X509_trust_anchor_list_init(&reader, encoded, length, &limits, &workspace),
-                   ==, TC_TLV_OK);
-  munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &workspace, &anchor), ==,
-                   TC_TLV_INVALID);
+  munit_assert_int(
+      TC_X509_trust_anchor_list_init(&reader, (TC_bytes){encoded, length}, &limits, &workspace), ==,
+      TC_TLV_OK);
+  munit_assert_int(TC_X509_trust_anchor_next(&reader, &anchor), ==, TC_TLV_INVALID);
   return MUNIT_OK;
 }
 
@@ -185,7 +185,8 @@ static MunitResult precedence(const MunitParameter params[], void* user)
   uint8_t encoded[8192];
   size_t length = read_fixture("trust-anchors.der", encoded, sizeof encoded);
   TC_TLV_element list, choice, info, part, controls = {0};
-  TC_TLV_reader fields, reader;
+  TC_TLV_reader fields;
+  TC_X509_trust_anchor_reader reader;
   TC_X509_store_anchor anchor;
   munit_assert_int(TC_TLV_read(encoded, length, TC_TLV_DER, &limits, &list), ==, TC_TLV_OK);
   munit_assert_int(TC_TLV_read(list.value.data, list.value.length, TC_TLV_DER, &limits, &choice),
@@ -214,9 +215,10 @@ static MunitResult precedence(const MunitParameter params[], void* user)
   grow_length(encoded, &info, 3);
   grow_length(encoded, &controls, 3);
   length += 3;
-  munit_assert_int(TC_X509_trust_anchor_list_init(&reader, encoded, length, &limits, &workspace),
-                   ==, TC_TLV_OK);
-  munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &workspace, &anchor), ==, TC_TLV_OK);
+  munit_assert_int(
+      TC_X509_trust_anchor_list_init(&reader, (TC_bytes){encoded, length}, &limits, &workspace), ==,
+      TC_TLV_OK);
+  munit_assert_int(TC_X509_trust_anchor_next(&reader, &anchor), ==, TC_TLV_OK);
   munit_assert_int(anchor.has_path_len, ==, 1);
   munit_assert_size(anchor.path_len, ==, 0);
   munit_assert_uint(anchor.replaced_controls, ==, TC_X509_ANCHOR_REPLACED_PATH_LEN);
@@ -228,20 +230,23 @@ static MunitResult choices(const MunitParameter params[], void* user)
   (void)params;
   (void)user;
   static uint8_t encoded[8192], root[4096], tbs_choice[4096], list[4096];
-  TC_TLV_reader reader;
+  TC_X509_trust_anchor_reader reader;
   TC_X509_store_anchor anchor;
   size_t length = read_fixture("trust-anchors.der", encoded, sizeof encoded);
-  munit_assert_int(TC_X509_trust_anchor_list_init(&reader, encoded, length, &limits, &workspace),
-                   ==, TC_TLV_OK);
-  munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &workspace, &anchor), ==, TC_TLV_OK);
+  munit_assert_int(
+      TC_X509_trust_anchor_list_init(&reader, (TC_bytes){encoded, length}, &limits, &workspace), ==,
+      TC_TLV_OK);
+  munit_assert_int(TC_X509_trust_anchor_next(&reader, &anchor), ==, TC_TLV_OK);
   munit_assert_int(anchor.x509_unusable, ==, 0);
   length = read_fixture("trust-anchor-certificate.der", encoded, sizeof encoded);
-  munit_assert_int(TC_X509_trust_anchor_list_init(&reader, encoded, length, &limits, &workspace),
-                   ==, TC_TLV_OK);
-  munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &workspace, &anchor), ==, TC_TLV_OK);
+  munit_assert_int(
+      TC_X509_trust_anchor_list_init(&reader, (TC_bytes){encoded, length}, &limits, &workspace), ==,
+      TC_TLV_OK);
+  munit_assert_int(TC_X509_trust_anchor_next(&reader, &anchor), ==, TC_TLV_OK);
   length = read_fixture("root.der", root, sizeof root);
   TC_X509_certificate certificate;
-  munit_assert_int(TC_X509_read(root, length, &limits, &workspace, &certificate), ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_read((TC_bytes){root, length}, &limits, &workspace, &certificate), ==,
+                   TC_TLV_OK);
   /* The TBSCertificate choice is explicitly wrapped. Its DER is borrowed. */
   munit_assert_size(certificate.tbs.length, <, 0x10000);
   size_t t = certificate.tbs.length;
@@ -256,10 +261,10 @@ static MunitResult choices(const MunitParameter params[], void* user)
   list[2] = (uint8_t)(choice_length >> 8);
   list[3] = (uint8_t)choice_length;
   memcpy(list + 4, tbs_choice, choice_length);
-  munit_assert_int(
-      TC_X509_trust_anchor_list_init(&reader, list, choice_length + 4, &limits, &workspace), ==,
-      TC_TLV_OK);
-  munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &workspace, &anchor), ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_trust_anchor_list_init(&reader, (TC_bytes){list, choice_length + 4},
+                                                  &limits, &workspace),
+                   ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_trust_anchor_next(&reader, &anchor), ==, TC_TLV_OK);
   munit_assert_int(anchor.x509_unusable, ==, 0);
   return MUNIT_OK;
 }
@@ -332,12 +337,13 @@ static size_t make_certificate(uint8_t* out, int reversed_validity, int empty_su
 
 static TC_TLV_result read_anchor(uint8_t* list, size_t choice_length)
 {
-  TC_TLV_reader reader;
+  TC_X509_trust_anchor_reader reader;
   TC_X509_store_anchor anchor;
   size_t length = wrap(list, 0x30, list, choice_length);
-  munit_assert_int(TC_X509_trust_anchor_list_init(&reader, list, length, &limits, &workspace), ==,
-                   TC_TLV_OK);
-  return TC_X509_trust_anchor_next(&reader, &limits, &workspace, &anchor);
+  munit_assert_int(
+      TC_X509_trust_anchor_list_init(&reader, (TC_bytes){list, length}, &limits, &workspace), ==,
+      TC_TLV_OK);
+  return TC_X509_trust_anchor_next(&reader, &anchor);
 }
 
 /* Every anchor choice applies the same certificate rules: a non-empty
@@ -354,8 +360,8 @@ static MunitResult certificate_rules(const MunitParameter params[], void* user)
     TC_X509_certificate parsed;
     TC_bytes tbs;
     size_t length = make_certificate(certificate, reversed, empty, &tbs);
-    munit_assert_int(TC_X509_read(certificate, length, &limits, &workspace, &parsed), ==,
-                     TC_TLV_OK);
+    munit_assert_int(TC_X509_read((TC_bytes){certificate, length}, &limits, &workspace, &parsed),
+                     ==, TC_TLV_OK);
     /* Certificate choice. */
     memcpy(list, certificate, length);
     munit_assert_int(read_anchor(list, length), ==, expected);
@@ -406,7 +412,7 @@ static TC_TLV_result read_info(const uint8_t* controls, size_t controls_length, 
   uint8_t extensions[64], exts[66], path[32], info[128], info_tlv[130], choice[132];
   static uint8_t encoded[134];
   size_t n = 0;
-  TC_TLV_reader reader;
+  TC_X509_trust_anchor_reader reader;
   munit_assert_size(list_length, <=, 60);
   munit_assert_size(sizeof name + controls_length, <=, sizeof path);
   memcpy(path, name, sizeof name);
@@ -423,9 +429,10 @@ static TC_TLV_result read_info(const uint8_t* controls, size_t controls_length, 
   size_t info_length = add(info_tlv, 0x30, info, n);
   size_t choice_length = add(choice, 0xa2, info_tlv, info_length);
   size_t length = add(encoded, 0x30, choice, choice_length);
-  munit_assert_int(TC_X509_trust_anchor_list_init(&reader, encoded, length, &limits, &workspace),
-                   ==, TC_TLV_OK);
-  return TC_X509_trust_anchor_next(&reader, &limits, &workspace, out);
+  munit_assert_int(
+      TC_X509_trust_anchor_list_init(&reader, (TC_bytes){encoded, length}, &limits, &workspace), ==,
+      TC_TLV_OK);
+  return TC_X509_trust_anchor_next(&reader, out);
 }
 
 static TC_TLV_result read_with_exts(const uint8_t* list, size_t list_length)
@@ -544,11 +551,12 @@ static MunitResult certificate_builder(const MunitParameter params[], void* user
   TC_X509_store_anchor built, saved;
   TC_TLV_frame small_frames[16];
   TC_bytes small_oids[1];
-  TC_X509_workspace small = {small_frames, 16, small_oids, 1};
+  TC_X509_workspace small = {{small_frames, 16}, small_oids, 1};
   (void)params;
   (void)user;
   size_t length = read_fixture("root.der", root, sizeof root);
-  munit_assert_int(TC_X509_read(root, length, &limits, &workspace, &certificate), ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_read((TC_bytes){root, length}, &limits, &workspace, &certificate), ==,
+                   TC_TLV_OK);
   munit_assert_int(TC_X509_store_anchor_from_certificate(&certificate, &limits, &workspace, &built),
                    ==, TC_TLV_OK);
   munit_assert_memory_equal(certificate.subject.length, built.trust.name.data,
@@ -572,7 +580,7 @@ static MunitResult certificate_builder(const MunitParameter params[], void* user
   munit_assert_memory_equal(sizeof built, &built, &saved);
   /* The output record must stay separate from the scratch it is built with. */
   {
-    TC_X509_workspace aliased = {frames, 16, (TC_bytes*)&built, sizeof built / sizeof(TC_bytes)};
+    TC_X509_workspace aliased = {{frames, 16}, (TC_bytes*)&built, sizeof built / sizeof(TC_bytes)};
     munit_assert_int(TC_X509_store_anchor_from_certificate(&certificate, &limits, &aliased, &built),
                      ==, TC_TLV_ARGUMENT);
     munit_assert_memory_equal(sizeof built, &built, &saved);
@@ -587,7 +595,66 @@ static MunitResult certificate_builder(const MunitParameter params[], void* user
   return MUNIT_OK;
 }
 
+/* init binds the limits and workspace. next uses the bound copy, so later
+ * changes to the caller's limits object have no effect. */
+static MunitResult reader_binding(const MunitParameter params[], void* user)
+{
+  uint8_t encoded[140];
+  TC_X509_trust_anchor_reader reader, saved;
+  TC_X509_store_anchor anchor;
+  TC_TLV_limits bound = limits;
+  TC_X509_workspace no_frames = {{NULL, 4}, oids, 32};
+  TC_X509_workspace one_frame = {{frames, 1}, oids, 32};
+  const size_t length = make_info(encoded, NULL, 0, 0, 1, 0, 0);
+  (void)params;
+  (void)user;
+  munit_assert_int(
+      TC_X509_trust_anchor_list_init(&reader, (TC_bytes){encoded, length}, &bound, &workspace), ==,
+      TC_TLV_OK);
+  bound.max_elements = 0;
+  bound.max_depth = 0;
+  munit_assert_int(TC_X509_trust_anchor_next(&reader, &anchor), ==, TC_TLV_OK);
+  munit_assert_false(anchor.x509_unusable);
+  munit_assert_int(TC_X509_trust_anchor_next(&reader, &anchor), ==, TC_TLV_END);
+  /* The walk in init applies limits to the whole list. */
+  saved = reader;
+  munit_assert_int(
+      TC_X509_trust_anchor_list_init(&reader, (TC_bytes){encoded, length}, &bound, &workspace), ==,
+      TC_TLV_LIMIT);
+  munit_assert_size(reader.reader.offset, ==, saved.reader.offset);
+  bound = limits;
+  bound.max_elements = 8;
+  munit_assert_int(
+      TC_X509_trust_anchor_list_init(&reader, (TC_bytes){encoded, length}, &bound, &workspace), ==,
+      TC_TLV_LIMIT);
+  /* The init walk needs one frame per nesting level of the list. */
+  munit_assert_int(
+      TC_X509_trust_anchor_list_init(&reader, (TC_bytes){encoded, length}, &limits, &one_frame), ==,
+      TC_TLV_LIMIT);
+  munit_assert_size(reader.reader.offset, ==, saved.reader.offset);
+  munit_assert_ptr_equal(reader.workspace, saved.workspace);
+  munit_assert_int(
+      TC_X509_trust_anchor_list_init(&reader, (TC_bytes){encoded, length}, &limits, &no_frames), ==,
+      TC_TLV_ARGUMENT);
+  munit_assert_int(
+      TC_X509_trust_anchor_list_init(NULL, (TC_bytes){encoded, length}, &limits, &workspace), ==,
+      TC_TLV_ARGUMENT);
+  munit_assert_int(
+      TC_X509_trust_anchor_list_init(&reader, (TC_bytes){encoded, length}, NULL, &workspace), ==,
+      TC_TLV_ARGUMENT);
+  munit_assert_int(
+      TC_X509_trust_anchor_list_init(&reader, (TC_bytes){encoded, length}, &limits, NULL), ==,
+      TC_TLV_ARGUMENT);
+  munit_assert_int(TC_X509_trust_anchor_list_init(
+                       &reader, (TC_bytes){(const uint8_t*)"\x30\x00", 2}, &limits, &workspace),
+                   ==, TC_TLV_INVALID);
+  munit_assert_int(TC_X509_trust_anchor_next(NULL, &anchor), ==, TC_TLV_ARGUMENT);
+  munit_assert_int(TC_X509_trust_anchor_next(&reader, NULL), ==, TC_TLV_ARGUMENT);
+  return MUNIT_OK;
+}
+
 static MunitTest tests[] = {
+    {"/reader-binding", reader_binding, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/certificate-builder", certificate_builder, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/exts-path-length", exts_path_length, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/forbidden-exts", forbidden_exts, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

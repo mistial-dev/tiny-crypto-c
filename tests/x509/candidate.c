@@ -149,7 +149,7 @@ static MunitResult store_limits(const MunitParameter params[], void* user)
   static const uint8_t invalid[] = {0x30, 0};
   TC_TLV_frame frames[8];
   TC_bytes oids[8];
-  TC_X509_workspace parser = {frames, 8, oids, 8};
+  TC_X509_workspace parser = {{frames, 8}, oids, 8};
   (void)params;
   (void)user;
   for (unsigned scenario = 0; scenario < STORE_CASE_COUNT; ++scenario) {
@@ -211,7 +211,7 @@ static MunitResult store_certificates(const MunitParameter params[], void* user)
   munit_assert_size(length, >, 0);
   TC_TLV_frame frames[FRAME_CAPACITY];
   TC_bytes oids[OID_CAPACITY];
-  TC_X509_workspace parser = {frames, FRAME_CAPACITY, oids, OID_CAPACITY};
+  TC_X509_workspace parser = {{frames, FRAME_CAPACITY}, oids, OID_CAPACITY};
   record_fixture record = {{encoded, length}, TC_TLV_OK, 0};
   TC_X509_store_source source = {&record, RECORD_COUNT, 0, read_record, NULL};
   tc_pki_store_candidates reader = {&source,

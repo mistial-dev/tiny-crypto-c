@@ -191,11 +191,10 @@ static TC_X509_path_status cms_signer_path_build(const TC_CMS_signer_path_reques
   TC_TLV_result result;
   tc_pki_source_guard guard = {source, writes, CMS_PATH_WRITE_COUNT};
   TC_X509_store_source guarded = tc_pki_source_guard_bind(&guard);
-  const tc_pki_tree_workspace tree = {workspace->validation.frames,
-                                      workspace->validation.frame_capacity, work};
-  const TC_CMS_signature_workspace signature = {
-      workspace->validation.frames, workspace->validation.frame_capacity, workspace->signature,
-      workspace->signature_capacity};
+  const tc_pki_tree_workspace tree = {workspace->validation.frames.data,
+                                      workspace->validation.frames.capacity, work};
+  const TC_CMS_signature_workspace signature = {workspace->validation.frames, workspace->signature,
+                                                workspace->signature_capacity};
   result = tc_cms_candidates_init(request->certificates, &guarded, options->max_candidates,
                                   options->max_candidate_bytes, &options->path.parsing, &tree,
                                   &candidates);
@@ -325,8 +324,8 @@ static TC_X509_path_status cms_signed_data_path_build(const TC_CMS_validation_re
     return tc_x509_path_status(result);
   const TC_TLV_limits* limits = &options->path.parsing;
   const TC_TLV_profile envelope = tc_cms_envelope_profile(options->verification);
-  const tc_pki_tree_workspace tree = {workspace->validation.frames,
-                                      workspace->validation.frame_capacity, work};
+  const tc_pki_tree_workspace tree = {workspace->validation.frames.data,
+                                      workspace->validation.frames.capacity, work};
   if (tc_pki_work_charge(work, expected_type.length) != TC_TLV_OK)
     return TC_X509_PATH_LIMIT;
   if (TC_DER_oid_contents(expected_type.data, expected_type.length) != TC_TLV_OK)

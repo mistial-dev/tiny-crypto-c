@@ -325,15 +325,11 @@ static TC_TLV_result append_policy(TC_bytes oid, TC_bytes* output, size_t capaci
  * or an anchor certificate's extension. Only the identifiers are inputs. */
 static TC_TLV_result anchor_policy_next(TC_TLV_reader* reader, size_t* work, TC_bytes* oid)
 {
-  TC_TLV_element element;
   TC_X509_policy policy;
   TC_TLV_result result;
   if (tc_pki_work_charge(work, 1) != TC_TLV_OK)
     return TC_TLV_LIMIT;
-  result = TC_TLV_next(reader, &element);
-  if (result != TC_TLV_OK)
-    return result;
-  result = tc_x509_policy_information_read(element.encoded, &policy);
+  result = tc_x509_policy_information_next(reader, &policy);
   if (result == TC_TLV_OK)
     *oid = policy.oid;
   return result;

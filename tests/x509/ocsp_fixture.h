@@ -48,7 +48,7 @@ static inline void ocsp_fixture_init(ocsp_fixture* fixture)
   fixture->limits =
       (TC_TLV_limits){OCSP_FILE_CAPACITY, OCSP_FILE_CAPACITY, 512, OCSP_FRAME_CAPACITY};
   fixture->parser =
-      (TC_X509_workspace){fixture->frames, OCSP_FRAME_CAPACITY, fixture->oids, OCSP_OID_CAPACITY};
+      (TC_X509_workspace){{fixture->frames, OCSP_FRAME_CAPACITY}, fixture->oids, OCSP_OID_CAPACITY};
   fixture->workspace = (TC_X509_path_workspace)TC_X509_PATH_WORKSPACE_INIT(
       fixture->frames, fixture->oids, fixture->left, fixture->right, fixture->matched,
       fixture->nodes, fixture->edges, fixture->expected, fixture->mappings, fixture->policies,
@@ -77,9 +77,8 @@ static inline TC_X509_trust_anchor ocsp_read_anchor(ocsp_fixture* fixture, const
 {
   const TC_bytes encoded = ocsp_read_path(path, bytes);
   TC_X509_certificate issuer;
-  munit_assert_int(
-      TC_X509_read(encoded.data, encoded.length, &fixture->limits, &fixture->parser, &issuer), ==,
-      TC_TLV_OK);
+  munit_assert_int(TC_X509_read(encoded, &fixture->limits, &fixture->parser, &issuer), ==,
+                   TC_TLV_OK);
   return (TC_X509_trust_anchor){issuer.subject, issuer.public_key};
 }
 

@@ -47,8 +47,8 @@ typedef struct {
 } TC_X509_extension_summary;
 
 typedef struct {
-  TC_TLV_frame* frames;
-  size_t frame_capacity;
+  /* One frame per constructed nesting level of the deepest object parsed. */
+  TC_TLV_frames frames;
   /* Shared by extension decoding, policy decoding and EKU checks. */
   TC_bytes* oids;
   size_t oid_capacity;
@@ -77,8 +77,7 @@ typedef struct {
 #define TC_X509_PATH_ARRAY_COUNT_(a) (sizeof(a) / sizeof((a)[0]))
 #define TC_X509_PATH_WORKSPACE_INIT(frames_, oids_, left_, right_, matched_, nodes_, edges_,       \
                                     expected_, mappings_, policies_, certificates_, summaries_)    \
-  {(frames_),                                                                                      \
-   TC_X509_PATH_ARRAY_COUNT_(frames_),                                                             \
+  {{(frames_), TC_X509_PATH_ARRAY_COUNT_(frames_)},                                                \
    (oids_),                                                                                        \
    TC_X509_PATH_ARRAY_COUNT_(oids_),                                                               \
    {(left_), (right_),                                                                             \

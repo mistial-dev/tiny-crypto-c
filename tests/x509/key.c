@@ -244,53 +244,54 @@ static MunitResult test_key_encodings(const MunitParameter params[], void* user)
   uint8_t ed25519[44] = {0x30, 42, 0x30, 5, 6, 3, 0x2b, 0x65, 112, 3, 33, 0};
   TC_X509_public_key key, saved;
   size_t i;
-  munit_assert(TC_X509_subject_public_key(rsa, sizeof rsa, &key) == TC_TLV_OK);
+  munit_assert(TC_X509_subject_public_key((TC_bytes){rsa, sizeof rsa}, &key) == TC_TLV_OK);
   munit_assert(key.type == TC_KEY_RSA && key.bits == 12 && key.modulus.length == 2);
   munit_assert(key.exponent.length == 1 && key.exponent.data[0] == 17);
   saved = key;
   for (i = 0; i < sizeof rsa; ++i) {
-    munit_assert(TC_X509_subject_public_key(rsa, i, &key) == TC_TLV_INVALID);
+    munit_assert(TC_X509_subject_public_key((TC_bytes){rsa, i}, &key) == TC_TLV_INVALID);
     munit_assert(memcmp(&key, &saved, sizeof key) == 0);
   }
   rsa[25] = 0xa0;
-  munit_assert(TC_X509_subject_public_key(rsa, sizeof rsa, &key) == TC_TLV_INVALID);
+  munit_assert(TC_X509_subject_public_key((TC_bytes){rsa, sizeof rsa}, &key) == TC_TLV_INVALID);
   rsa[25] = 0xa1;
   rsa[28] = 2;
-  munit_assert(TC_X509_subject_public_key(rsa, sizeof rsa, &key) == TC_TLV_INVALID);
+  munit_assert(TC_X509_subject_public_key((TC_bytes){rsa, sizeof rsa}, &key) == TC_TLV_INVALID);
   rsa[28] = 1;
-  munit_assert(TC_X509_subject_public_key(rsa, sizeof rsa, &key) == TC_TLV_INVALID);
+  munit_assert(TC_X509_subject_public_key((TC_bytes){rsa, sizeof rsa}, &key) == TC_TLV_INVALID);
   rsa[28] = 17;
   rsa[15] = 4;
-  munit_assert(TC_X509_subject_public_key(rsa, sizeof rsa, &key) == TC_TLV_INVALID);
+  munit_assert(TC_X509_subject_public_key((TC_bytes){rsa, sizeof rsa}, &key) == TC_TLV_INVALID);
   munit_assert(memcmp(&key, &saved, sizeof key) == 0);
   memset(ec + 27, 1, 64);
-  munit_assert(TC_X509_subject_public_key(ec, sizeof ec, &key) == TC_TLV_OK);
+  munit_assert(TC_X509_subject_public_key((TC_bytes){ec, sizeof ec}, &key) == TC_TLV_OK);
   munit_assert(key.type == TC_KEY_EC && key.bits == 256 && key.curve == TC_EC_P256);
   ec[26] = 6;
-  munit_assert(TC_X509_subject_public_key(ec, sizeof ec, &key) == TC_TLV_INVALID);
+  munit_assert(TC_X509_subject_public_key((TC_bytes){ec, sizeof ec}, &key) == TC_TLV_INVALID);
   ec[26] = 2;
-  munit_assert(TC_X509_subject_public_key(ec, sizeof ec, &key) == TC_TLV_INVALID);
+  munit_assert(TC_X509_subject_public_key((TC_bytes){ec, sizeof ec}, &key) == TC_TLV_INVALID);
   ec[1] = 57;
   ec[24] = 34;
-  munit_assert(TC_X509_subject_public_key(ec, 59, &key) == TC_TLV_OK);
+  munit_assert(TC_X509_subject_public_key((TC_bytes){ec, 59}, &key) == TC_TLV_OK);
   munit_assert(key.bits == 256 && key.key.length == 33);
   /* secp192r1 is 1.2.840.10045.3.1.1 (RFC 5480 section 2.1.1.1). */
   {
     uint8_t p192[75] = {0x30, 73,   0x30, 19,   6,    7,    0x2a, 0x86, 0x48, 0xce, 0x3d, 2, 1, 6,
                         8,    0x2a, 0x86, 0x48, 0xce, 0x3d, 3,    1,    1,    3,    50,   0, 4};
     memset(p192 + 27, 1, 48);
-    munit_assert(TC_X509_subject_public_key(p192, sizeof p192, &key) == TC_TLV_OK);
+    munit_assert(TC_X509_subject_public_key((TC_bytes){p192, sizeof p192}, &key) == TC_TLV_OK);
     munit_assert(key.type == TC_KEY_EC && key.bits == 192 && key.curve == TC_EC_P192);
     munit_assert_size(key.key.length, ==, 49);
     p192[1] = 72;
     p192[24] = 49;
-    munit_assert(TC_X509_subject_public_key(p192, 74, &key) == TC_TLV_INVALID);
+    munit_assert(TC_X509_subject_public_key((TC_bytes){p192, 74}, &key) == TC_TLV_INVALID);
   }
-  munit_assert(TC_X509_subject_public_key(ed25519, sizeof ed25519, &key) == TC_TLV_OK);
+  munit_assert(TC_X509_subject_public_key((TC_bytes){ed25519, sizeof ed25519}, &key) == TC_TLV_OK);
   munit_assert(key.type == TC_KEY_ED25519 && key.bits == 255);
   ed25519[11] = 1;
-  munit_assert(TC_X509_subject_public_key(ed25519, sizeof ed25519, &key) == TC_TLV_INVALID);
-  munit_assert(TC_X509_subject_public_key(NULL, 1, &key) == TC_TLV_ARGUMENT);
+  munit_assert(TC_X509_subject_public_key((TC_bytes){ed25519, sizeof ed25519}, &key) ==
+               TC_TLV_INVALID);
+  munit_assert(TC_X509_subject_public_key((TC_bytes){NULL, 1}, &key) == TC_TLV_ARGUMENT);
   return MUNIT_OK;
 }
 

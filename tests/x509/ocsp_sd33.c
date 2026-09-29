@@ -91,9 +91,8 @@ static MunitResult captured_responses(const MunitParameter params[], void* user)
       ocsp_assert_wiped(&result);
       if (card == 1 && role == 0) {
         TC_X509_certificate changed;
-        munit_assert_int(TC_X509_read(certificate.data, certificate.length, &fixture.limits,
-                                      &fixture.parser, &changed),
-                         ==, TC_TLV_OK);
+        munit_assert_int(TC_X509_read(certificate, &fixture.limits, &fixture.parser, &changed), ==,
+                         TC_TLV_OK);
         uint8_t* serial = (uint8_t*)changed.serial.data;
         serial[changed.serial.length - 1] ^= 1;
         work = 20000000;

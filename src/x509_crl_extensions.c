@@ -520,8 +520,8 @@ static TC_TLV_result crl_extension_value(void* context, const TC_X509_extension*
     return TC_TLV_LIMIT;
   if (authority) {
     TC_X509_authority_key_identifier identifier;
-    TC_TLV_result result = TC_X509_authority_key_identifier_read(
-        extension->value.data, extension->value.length, state->limits, &identifier);
+    TC_TLV_result result =
+        TC_X509_authority_key_identifier_read(extension->value, state->limits, &identifier);
     if (result != TC_TLV_OK)
       return result;
     if (identifier.issuer.length) {

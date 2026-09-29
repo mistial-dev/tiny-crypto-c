@@ -198,7 +198,7 @@ static TC_TLV_result cms_signature_storage(const TC_CMS_signer_verify_request* r
       key->algorithm.oid, key->algorithm.parameters, key->key, key->modulus, key->exponent,
       key->curve_oid,     request->content_type,     input};
   tc_pki_storage_plan_begin(&plan, writes, 3, SIZE_MAX);
-  TC_PKI_PLAN_WRITE(&plan, workspace->frames, workspace->frame_capacity);
+  TC_PKI_PLAN_WRITE(&plan, workspace->frames.data, workspace->frames.capacity);
   TC_PKI_PLAN_WRITE(&plan, workspace->signature, workspace->signature_capacity);
   TC_PKI_PLAN_WRITE(&plan, work, 1);
   tc_pki_storage_plan_seal(&plan);
@@ -249,9 +249,8 @@ static TC_X509_signature_result cms_verify_digest(const TC_CMS_signer_verify_req
         *signer_name = cache->signer_name;
       signed_digest = (TC_bytes){cache->digest, cache->digest_length};
     } else {
-      checked = TC_CMS_signed_attributes_read(
-          signer->signed_attributes, &request->policy, limits,
-          (TC_TLV_frames){workspace->frames, workspace->frame_capacity}, work, &attributes);
+      checked = TC_CMS_signed_attributes_read(signer->signed_attributes, &request->policy, limits,
+                                              workspace->frames, work, &attributes);
       if (checked != TC_TLV_OK)
         return tc_pki_signature_error(checked);
       if (signer_name)
@@ -293,7 +292,7 @@ static TC_X509_signature_result cms_verify_digest(const TC_CMS_signer_verify_req
   }
   checked = tc_pki_octets_contiguous(
       signer->signature, 4, tc_cms_envelope_profile(request->policy), limits,
-      &(tc_pki_tree_workspace){workspace->frames, workspace->frame_capacity, work},
+      &(tc_pki_tree_workspace){workspace->frames.data, workspace->frames.capacity, work},
       (TC_buffer){workspace->signature, workspace->signature_capacity}, &signature);
   return checked == TC_TLV_OK
              ? TC_X509_signature_verify_digest(signed_digest, &algorithm->signature, signature,
@@ -339,7 +338,7 @@ TC_X509_signature_result tc_cms_signer_verify(const TC_CMS_signer_verify_request
   if (!request->content_type.data || !request->content_type.length ||
       (kind == TC_CMS_VERIFY_DIGEST && !input.data))
     return TC_X509_SIGNATURE_ERROR;
-  const tc_pki_tree_workspace tree = {workspace->frames, workspace->frame_capacity, work};
+  const tc_pki_tree_workspace tree = {workspace->frames.data, workspace->frames.capacity, work};
   checked = tc_cms_signature_resolve_policy(
       request->signer, request->key, tc_cms_envelope_profile(request->policy), request->limits,
       &tree, request->policy.rsa_parameters, &algorithm);

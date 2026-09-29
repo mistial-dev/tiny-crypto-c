@@ -43,7 +43,8 @@ static MunitResult signatures(const MunitParameter params[], void* user)
     munit_assert_int(spki_length, >, 0);
     munit_assert_size((size_t)spki_length, <=, sizeof spki);
     munit_assert_int(i2d_PUBKEY(generated, &cursor), ==, spki_length);
-    munit_assert_int(TC_X509_subject_public_key(spki, (size_t)spki_length, &key), ==, TC_TLV_OK);
+    munit_assert_int(TC_X509_subject_public_key((TC_bytes){spki, (size_t)spki_length}, &key), ==,
+                     TC_TLV_OK);
     munit_assert_int(EVP_DigestSignInit(signer, &signing_key, EVP_sha256(), NULL, generated), ==,
                      1);
     if (kind == 2) {
@@ -215,7 +216,7 @@ static MunitResult paths(const MunitParameter params[], void* user)
   ExampleX509Workspace storage;
   TC_TLV_frame frames[16];
   TC_bytes oids[16];
-  TC_X509_workspace parser = {frames, 16, oids, 16};
+  TC_X509_workspace parser = {{frames, 16}, oids, 16};
   TC_TLV_limits limits = {2048, 2048, 256, 16};
   TC_X509_time at = {2026, 1, 1, 0, 0, 0};
   uint8_t root_der[2048], leaf_der[2048];
@@ -232,10 +233,12 @@ static MunitResult paths(const MunitParameter params[], void* user)
         encode_certificate(leaf, root_key, EVP_sha256(), leaf_der, sizeof leaf_der);
     TC_X509_certificate parsed_root, parsed_leaf;
     TC_X509_path_result result;
-    munit_assert_int(TC_X509_read(root_der, root_length, &limits, &parser, &parsed_root), ==,
-                     TC_TLV_OK);
-    munit_assert_int(TC_X509_read(leaf_der, leaf_length, &limits, &parser, &parsed_leaf), ==,
-                     TC_TLV_OK);
+    munit_assert_int(
+        TC_X509_read((TC_bytes){root_der, root_length}, &limits, &parser, &parsed_root), ==,
+        TC_TLV_OK);
+    munit_assert_int(
+        TC_X509_read((TC_bytes){leaf_der, leaf_length}, &limits, &parser, &parsed_leaf), ==,
+        TC_TLV_OK);
     TC_X509_trust_anchor anchor = {parsed_root.subject, parsed_root.public_key};
     TC_bytes chain = {leaf_der, leaf_length};
     size_t work = 100000;
@@ -322,7 +325,8 @@ static MunitResult p192_signature(const MunitParameter params[], void* user)
   munit_assert_int(spki_length, >, 0);
   munit_assert_size((size_t)spki_length, <=, sizeof spki);
   munit_assert_int(i2d_PUBKEY(generated, &cursor), ==, spki_length);
-  munit_assert_int(TC_X509_subject_public_key(spki, (size_t)spki_length, &key), ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_subject_public_key((TC_bytes){spki, (size_t)spki_length}, &key), ==,
+                   TC_TLV_OK);
   munit_assert_int(key.curve, ==, TC_EC_P192);
   munit_assert_uint(key.bits, ==, 192);
   munit_assert_int(EVP_DigestSignInit(signer, NULL, EVP_sha256(), NULL, generated), ==, 1);

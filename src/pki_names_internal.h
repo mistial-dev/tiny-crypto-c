@@ -10,7 +10,7 @@ static inline TC_TLV_result tc_pki_general_names_contents_check(TC_bytes content
                                                                 const TC_TLV_limits* limits,
                                                                 const tc_pki_tree_workspace* tree)
 {
-  TC_TLV_reader reader;
+  TC_X509_general_names_reader reader;
   TC_X509_general_name name;
   TC_TLV_result result;
   if (!tree || !tree->work)
@@ -21,14 +21,14 @@ static inline TC_TLV_result tc_pki_general_names_contents_check(TC_bytes content
   if (tc_pki_work_charge(tree->work, contents.length) != TC_TLV_OK ||
       tc_pki_work_charge(tree->work, contents.length) != TC_TLV_OK)
     return TC_TLV_LIMIT;
-  result = TC_TLV_reader_init(&reader, contents.data, contents.length, TC_TLV_DER, limits);
+  result = TC_X509_general_names_contents_init(&reader, contents, limits,
+                                               (TC_TLV_frames){tree->frames, tree->capacity});
   if (result != TC_TLV_OK)
     return result;
-  while (!tc_pki_end(&reader)) {
+  while (!tc_pki_end(&reader.reader)) {
     if (tc_pki_work_charge(tree->work, 1) != TC_TLV_OK)
       return TC_TLV_LIMIT;
-    result =
-        TC_X509_general_name_next(&reader, (TC_TLV_frames){tree->frames, tree->capacity}, &name);
+    result = TC_X509_general_name_next(&reader, &name);
     if (result != TC_TLV_OK)
       return result;
   }

@@ -527,8 +527,8 @@ static TC_TLV_result constraint_storage(const TC_bytes* inputs, size_t input_cou
   TC_bytes reads[3], writes[6];
   size_t i, j, count = 3;
   if (!limits || !workspace || !work || !permitted ||
-      workspace->frame_capacity > SIZE_MAX / sizeof(TC_TLV_frame) ||
-      (!workspace->frames && workspace->frame_capacity))
+      workspace->frames.capacity > SIZE_MAX / sizeof(TC_TLV_frame) ||
+      (!workspace->frames.data && workspace->frames.capacity))
     return TC_TLV_ARGUMENT;
   reads[0].data = (const uint8_t*)limits;
   reads[0].length = sizeof(*limits);
@@ -536,8 +536,8 @@ static TC_TLV_result constraint_storage(const TC_bytes* inputs, size_t input_cou
   reads[1].length = sizeof(*workspace);
   reads[2].data = (const uint8_t*)workspace->names;
   reads[2].length = workspace->names ? sizeof(*workspace->names) : 0;
-  writes[0].data = (const uint8_t*)workspace->frames;
-  writes[0].length = workspace->frame_capacity * sizeof(TC_TLV_frame);
+  writes[0].data = (const uint8_t*)workspace->frames.data;
+  writes[0].length = workspace->frames.capacity * sizeof(TC_TLV_frame);
   writes[1].data = (const uint8_t*)work;
   writes[1].length = sizeof(*work);
   writes[2].data = (const uint8_t*)permitted;
@@ -584,7 +584,7 @@ TC_X509_signature_result TC_X509_issuer_check(const TC_X509_certificate* certifi
                                               const TC_X509_name_workspace* workspace, size_t* work)
 {
   TC_bytes inputs[16];
-  TC_X509_constraint_workspace scratch = {NULL, 0, workspace};
+  TC_X509_constraint_workspace scratch = {{NULL, 0}, workspace};
   TC_TLV_result result;
   int equal;
   if (!certificate || !issuer_key || !workspace)
@@ -629,7 +629,7 @@ TC_TLV_result TC_X509_name_constraints_check(const TC_X509_general_name* name,
 {
   TC_bytes inputs[5], lists[2];
   TC_TLV_limits budget;
-  TC_TLV_reader reader;
+  TC_X509_general_subtrees_reader reader;
   TC_X509_general_subtree subtree;
   TC_TLV_result result;
   unsigned form, list;
@@ -665,12 +665,10 @@ TC_TLV_result TC_X509_name_constraints_check(const TC_X509_general_name* name,
   }
   budget = *limits;
   for (list = 0; list < 2; ++list) {
-    result = TC_TLV_reader_init(&reader, lists[list].data, lists[list].length, TC_TLV_DER, &budget);
+    result = TC_X509_general_subtrees_init(&reader, lists[list], &budget, workspace->frames);
     if (result != TC_TLV_OK)
       return result;
-    while ((result = TC_X509_general_subtree_next(
-                &reader, (TC_TLV_frames){workspace->frames, workspace->frame_capacity},
-                &subtree)) == TC_TLV_OK) {
+    while ((result = TC_X509_general_subtree_next(&reader, &subtree)) == TC_TLV_OK) {
       int matched;
       if (tc_pki_work_charge(work, 1) != TC_TLV_OK)
         return TC_TLV_LIMIT;
@@ -688,7 +686,7 @@ TC_TLV_result TC_X509_name_constraints_check(const TC_X509_general_name* name,
     }
     if (result != TC_TLV_END)
       return result;
-    budget.max_elements -= reader.elements;
+    budget.max_elements -= reader.reader.elements;
   }
   *permitted = (!restricted || included) && !excluded;
   return TC_TLV_OK;
@@ -737,12 +735,11 @@ TC_TLV_result tc_x509_certificate_names_check_san(const TC_X509_certificate* cer
   if (has_san) {
     if (tc_pki_work_charge(work, san.length) != TC_TLV_OK)
       return TC_TLV_LIMIT;
-    result = TC_X509_general_names_init(&reader, san.data, san.length, limits);
+    TC_X509_general_names_reader names;
+    result = TC_X509_general_names_init(&names, san, limits, workspace->frames);
     if (result != TC_TLV_OK)
       return result;
-    while ((result = TC_X509_general_name_next(
-                &reader, (TC_TLV_frames){workspace->frames, workspace->frame_capacity}, &name)) ==
-           TC_TLV_OK) {
+    while ((result = TC_X509_general_name_next(&names, &name)) == TC_TLV_OK) {
       if (tc_pki_work_charge(work, 1) != TC_TLV_OK)
         return TC_TLV_LIMIT;
       result =

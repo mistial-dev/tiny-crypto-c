@@ -303,7 +303,7 @@ static TC_TLV_result general_name(const TC_TLV_element* element, int constraint)
 static TC_TLV_result general_names(TC_bytes encoded, TC_X509_workspace* workspace)
 {
   size_t work = SIZE_MAX;
-  const tc_pki_tree_workspace tree = {workspace->frames, workspace->frame_capacity, &work};
+  const tc_pki_tree_workspace tree = {workspace->frames.data, workspace->frames.capacity, &work};
   TC_bytes contents;
   if (TC_DER_sequence(encoded.data, encoded.length, &contents) != TC_TLV_OK)
     return TC_TLV_INVALID;
@@ -317,6 +317,9 @@ static void count_node(void* user, const TC_TLV_event* event)
     --*remaining;
 }
 
+/* Read the next element and walk its complete tree under the reader's
+ * remaining element budget. The walk counts the element and everything
+ * beneath it. */
 static TC_TLV_result next_tree(TC_TLV_reader* reader, TC_TLV_frames frames, TC_TLV_element* element)
 {
   TC_TLV_reader next;
@@ -339,7 +342,54 @@ static TC_TLV_result next_tree(TC_TLV_reader* reader, TC_TLV_frames frames, TC_T
   return TC_TLV_OK;
 }
 
-TC_TLV_result TC_X509_general_name_next(TC_TLV_reader* reader, TC_TLV_frames frames,
+static TC_TLV_result names_reader_init(TC_TLV_reader* reader, TC_TLV_frames* bound,
+                                       TC_TLV_frames frames)
+{
+  if (!frames.data && frames.capacity)
+    return TC_TLV_ARGUMENT;
+  if (!tc_internal_ranges_disjoint(reader->input.data, reader->input.length, frames.data,
+                                   frames.capacity * sizeof *frames.data))
+    return TC_TLV_ARGUMENT;
+  *bound = frames;
+  return TC_TLV_OK;
+}
+
+TC_TLV_result TC_X509_general_names_init(TC_X509_general_names_reader* reader, TC_bytes encoded,
+                                         const TC_TLV_limits* limits, TC_TLV_frames frames)
+{
+  TC_X509_general_names_reader parsed;
+  TC_TLV_result result;
+  if (!reader || frames.capacity > SIZE_MAX / sizeof *frames.data)
+    return TC_TLV_ARGUMENT;
+  /* RFC 5280 section 4.2.1.6: GeneralNames ::= SEQUENCE SIZE (1..MAX). */
+  result = tc_pki_value_open(&parsed.reader, encoded, 0x30, limits, 0);
+  if (result == TC_TLV_OK)
+    result = names_reader_init(&parsed.reader, &parsed.frames, frames);
+  if (result != TC_TLV_OK)
+    return result;
+  *reader = parsed;
+  return TC_TLV_OK;
+}
+
+TC_TLV_result TC_X509_general_names_contents_init(TC_X509_general_names_reader* reader,
+                                                  TC_bytes contents, const TC_TLV_limits* limits,
+                                                  TC_TLV_frames frames)
+{
+  TC_X509_general_names_reader parsed;
+  TC_TLV_result result;
+  if (!reader || frames.capacity > SIZE_MAX / sizeof *frames.data)
+    return TC_TLV_ARGUMENT;
+  result = TC_TLV_reader_init(&parsed.reader, contents.data, contents.length, TC_TLV_DER, limits);
+  if (result == TC_TLV_OK)
+    result = names_reader_init(&parsed.reader, &parsed.frames, frames);
+  if (result != TC_TLV_OK)
+    return result;
+  parsed.reader.root = 0;
+  *reader = parsed;
+  return TC_TLV_OK;
+}
+
+TC_TLV_result TC_X509_general_name_next(TC_X509_general_names_reader* reader,
                                         TC_X509_general_name* out)
 {
   TC_TLV_reader next;
@@ -347,8 +397,8 @@ TC_TLV_result TC_X509_general_name_next(TC_TLV_reader* reader, TC_TLV_frames fra
   TC_TLV_result result;
   if (!reader || !out)
     return TC_TLV_ARGUMENT;
-  next = *reader;
-  result = next_tree(&next, frames, &element);
+  next = reader->reader;
+  result = next_tree(&next, reader->frames, &element);
   if (result != TC_TLV_OK)
     return result;
   result = general_name(&element, 0);
@@ -357,11 +407,27 @@ TC_TLV_result TC_X509_general_name_next(TC_TLV_reader* reader, TC_TLV_frames fra
   out->type = element.header.tag[0] & 31;
   out->encoded = element.encoded;
   out->value = element.value;
-  *reader = next;
+  reader->reader = next;
   return TC_TLV_OK;
 }
 
-TC_TLV_result TC_X509_general_subtree_next(TC_TLV_reader* reader, TC_TLV_frames frames,
+TC_TLV_result TC_X509_general_subtrees_init(TC_X509_general_subtrees_reader* reader,
+                                            TC_bytes contents, const TC_TLV_limits* limits,
+                                            TC_TLV_frames frames)
+{
+  TC_X509_general_names_reader names;
+  TC_TLV_result result;
+  if (!reader)
+    return TC_TLV_ARGUMENT;
+  result = TC_X509_general_names_contents_init(&names, contents, limits, frames);
+  if (result != TC_TLV_OK)
+    return result;
+  reader->reader = names.reader;
+  reader->frames = names.frames;
+  return TC_TLV_OK;
+}
+
+TC_TLV_result TC_X509_general_subtree_next(TC_X509_general_subtrees_reader* reader,
                                            TC_X509_general_subtree* out)
 {
   TC_TLV_reader next, fields;
@@ -372,10 +438,11 @@ TC_TLV_result TC_X509_general_subtree_next(TC_TLV_reader* reader, TC_TLV_frames 
   size_t previous = 0, index;
   if (!reader || !out)
     return TC_TLV_ARGUMENT;
-  next = *reader;
-  result = next_tree(&next, frames, &element);
+  next = reader->reader;
+  result = next_tree(&next, reader->frames, &element);
   if (result != TC_TLV_OK)
     return result;
+  /* next_tree bounded the subtree, so its fields need no further budget. */
   if (!tc_pki_tag(&element, 0x30) || open(element.value, &fields) != TC_TLV_OK ||
       TC_TLV_next(&fields, &element) != TC_TLV_OK || general_name(&element, 1) != TC_TLV_OK)
     return TC_TLV_INVALID;
@@ -401,7 +468,7 @@ TC_TLV_result TC_X509_general_subtree_next(TC_TLV_reader* reader, TC_TLV_frames 
   }
   if (result != TC_TLV_END)
     return result;
-  *reader = next;
+  reader->reader = next;
   *out = parsed;
   return TC_TLV_OK;
 }
@@ -432,23 +499,23 @@ static TC_TLV_result extensions(TC_bytes encoded, TC_X509_workspace* workspace,
     if (embedded.encoded.length != extension.value.length)
       return TC_TLV_INVALID;
     result = TC_TLV_walk(extension.value.data, extension.value.length, TC_TLV_DER, budget,
-                         (TC_TLV_frames){workspace->frames, workspace->frame_capacity}, count_node,
-                         &budget->max_elements);
+                         workspace->frames, count_node, &budget->max_elements);
     if (result != TC_TLV_OK)
       return result;
     {
+      /* The walk above charged these values to budget, so their decoders run
+       * unlimited. */
       const unsigned id = tc_pki_extension_id(&extension);
       if (id == TC_PKI_EXT_BASIC_CONSTRAINTS) {
         TC_X509_basic_constraints constraints;
-        result = TC_X509_basic_constraints_read(extension.value.data, extension.value.length,
-                                                &constraints);
+        result = TC_X509_basic_constraints_read(extension.value, &unlimited, &constraints);
         if (result != TC_TLV_OK)
-          return result == TC_TLV_MORE ? TC_TLV_INVALID : result;
+          return result;
       } else if (id == TC_PKI_EXT_KEY_USAGE) {
         uint16_t usage;
-        result = TC_X509_key_usage_read(extension.value.data, extension.value.length, &usage);
+        result = TC_X509_key_usage_read(extension.value, &unlimited, &usage);
         if (result != TC_TLV_OK)
-          return result == TC_TLV_MORE ? TC_TLV_INVALID : result;
+          return result;
       } else if (id == TC_PKI_EXT_SUBJECT_ALT_NAME || id == TC_PKI_EXT_ISSUER_ALT_NAME) {
         result = general_names(extension.value, workspace);
         if (result != TC_TLV_OK)
@@ -544,8 +611,7 @@ static TC_TLV_result tbs_fields(TC_bytes contents, TC_X509_workspace* workspace,
   if (tc_pki_field(&tbs, 0x30, &element) != TC_TLV_OK)
     return TC_TLV_INVALID;
   certificate->spki = element.encoded;
-  result = TC_X509_subject_public_key(element.encoded.data, element.encoded.length,
-                                      &certificate->public_key);
+  result = TC_X509_subject_public_key(element.encoded, &certificate->public_key);
   if (result != TC_TLV_OK)
     return result == TC_TLV_MORE ? TC_TLV_INVALID : result;
   while (!tc_pki_end(&tbs)) {
@@ -590,9 +656,8 @@ static TC_TLV_result read_bounded(TC_bytes encoded, unsigned tag, const TC_TLV_l
   if (!tc_pki_tag(out, tag) || !out->header.constructed || out->encoded.length != encoded.length)
     return TC_TLV_INVALID;
   *budget = *limits;
-  return TC_TLV_walk(encoded.data, encoded.length, TC_TLV_DER, limits,
-                     (TC_TLV_frames){workspace->frames, workspace->frame_capacity}, count_node,
-                     &budget->max_elements);
+  return TC_TLV_walk(encoded.data, encoded.length, TC_TLV_DER, limits, workspace->frames,
+                     count_node, &budget->max_elements);
 }
 
 TC_TLV_result tc_x509_tbs_read(TC_bytes encoded, const TC_TLV_limits* limits,
@@ -657,10 +722,10 @@ TC_TLV_result tc_x509_certificate_read(TC_bytes encoded, unsigned tag, const TC_
   return TC_TLV_OK;
 }
 
-TC_TLV_result TC_X509_read(const uint8_t* data, size_t length, const TC_TLV_limits* limits,
+TC_TLV_result TC_X509_read(TC_bytes encoded, const TC_TLV_limits* limits,
                            TC_X509_workspace* workspace, TC_X509_certificate* out)
 {
-  return tc_x509_certificate_read((TC_bytes){data, length}, 0x30, limits, workspace, out);
+  return tc_x509_certificate_read(encoded, 0x30, limits, workspace, out);
 }
 
 static TC_X509_signature_result signature_callback_result(TC_X509_signature_result result,

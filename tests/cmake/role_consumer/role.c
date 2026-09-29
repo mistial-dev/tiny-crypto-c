@@ -83,7 +83,7 @@ static MunitResult native_signature(const MunitParameter params[], void* context
                                     (TC_bytes){scalar, scalar_bytes},
                                     (TC_buffer){spki + point_offset, point_bytes}, &ec, &work),
                    ==, TC_EC_OK);
-  munit_assert_int(TC_X509_subject_public_key(spki, spki_bytes, &key), ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_subject_public_key((TC_bytes){spki, spki_bytes}, &key), ==, TC_TLV_OK);
   /* For d=k=1 and z=0, ECDSA has r=s=G.x. DER keeps these integers positive. */
   const size_t padding = (spki[point_offset + 1] & 0x80) ? 1 : 0;
   const size_t component_bytes = scalar_bytes + padding, signature_bytes = 6 + 2 * component_bytes;
@@ -134,7 +134,8 @@ static MunitResult rsa_signature(const MunitParameter params[], void* context)
     munit_assert_size(spki_length, >, 0);
     munit_assert_size(signature_length, ==, rsa_vectors[i].bits / 8);
     munit_assert_size(tc_test_decode_hex(rsa_digest, digest, sizeof digest), ==, sizeof digest);
-    munit_assert_int(TC_X509_subject_public_key(spki, spki_length, &key), ==, TC_TLV_OK);
+    munit_assert_int(TC_X509_subject_public_key((TC_bytes){spki, spki_length}, &key), ==,
+                     TC_TLV_OK);
     munit_assert_uint(key.bits, ==, rsa_vectors[i].bits);
     for (unsigned variant = 0; variant < 3; ++variant) {
       size_t work = variant == 2 ? 0 : WORK_LIMIT;

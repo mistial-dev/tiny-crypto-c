@@ -10,9 +10,10 @@ static TC_status x509(size_t length)
   TC_X509_certificate certificate;
   TC_TLV_frame frames[8];
   TC_bytes oids[8];
-  TC_X509_workspace workspace = {frames, 8, oids, 8};
+  TC_X509_workspace workspace = {{frames, 8}, oids, 8};
   const TC_TLV_limits limits = {4096, 4096, 128, 8};
-  TC_TLV_result result = TC_X509_read(certificate_data, length, &limits, &workspace, &certificate);
+  TC_TLV_result result =
+      TC_X509_read((TC_bytes){certificate_data, length}, &limits, &workspace, &certificate);
   tc_benchmark_consume(&certificate);
   return result == TC_TLV_OK ? TC_OK : TC_ERROR;
 }

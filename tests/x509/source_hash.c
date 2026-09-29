@@ -122,7 +122,7 @@ static MunitResult preparation(const MunitParameter params[], void* user)
                                              {metadata, sizeof metadata},
                                              {scratch, sizeof scratch},
                                              {issuer, sizeof issuer},
-                                             {frames, 16, oids, 8},
+                                             {{frames, 16}, oids, 8},
                                              {left, right, 32, names, 8},
                                              NULL,
                                              0};
@@ -196,7 +196,7 @@ static MunitResult extension_policy(const MunitParameter params[], void* user)
                                                    {metadata, sizeof metadata},
                                                    {scratch, sizeof scratch},
                                                    {issuer, sizeof issuer},
-                                                   {frames, 16, oids, 8},
+                                                   {{frames, 16}, oids, 8},
                                                    {left, right, 32, names, 8},
                                                    &match,
                                                    1};
@@ -222,7 +222,7 @@ static MunitResult extension_policy(const MunitParameter params[], void* user)
   /* The RAM index records the same policy for the same bytes. */
   TC_X509_crl_record indexed;
   TC_X509_crl_index index;
-  const TC_X509_workspace parser = {frames, 16, oids, 8};
+  const TC_X509_workspace parser = {{frames, 16}, oids, 8};
   work = 60000;
   munit_assert_int(
       TC_X509_crl_index_init(&bytes, 1, &options.parsing, &parser, &work, &indexed, 1, &index), ==,
@@ -275,7 +275,7 @@ static MunitResult alignment(const MunitParameter params[], void* user)
                                                    {metadata, sizeof metadata},
                                                    {scratch, sizeof scratch},
                                                    {issuer, sizeof issuer},
-                                                   {frames, 16, oids, 8},
+                                                   {{frames, 16}, oids, 8},
                                                    {left, right, 32, names, 8},
                                                    NULL,
                                                    0};
@@ -330,11 +330,12 @@ static MunitResult public_crl(const MunitParameter params[], void* user)
   munit_assert_int(fclose(issuer_file), ==, 0);
   TC_TLV_frame frames[FRAME_COUNT];
   TC_bytes oids[OID_COUNT];
-  TC_X509_workspace workspace = {frames, FRAME_COUNT, oids, OID_COUNT};
+  TC_X509_workspace workspace = {{frames, FRAME_COUNT}, oids, OID_COUNT};
   const TC_TLV_limits limits = {CERTIFICATE_BYTES, CERTIFICATE_BYTES, 4096, FRAME_COUNT};
   TC_X509_certificate issuer;
-  munit_assert_int(TC_X509_read(certificate, certificate_length, &limits, &workspace, &issuer), ==,
-                   TC_TLV_OK);
+  munit_assert_int(
+      TC_X509_read((TC_bytes){certificate, certificate_length}, &limits, &workspace, &issuer), ==,
+      TC_TLV_OK);
   file_source file = {fopen(crl_path, "rb"), 0, 0};
   munit_assert_not_null(file.file);
   munit_assert_int(fseek(file.file, 0, SEEK_END), ==, 0);

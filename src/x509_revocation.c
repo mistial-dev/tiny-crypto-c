@@ -58,12 +58,12 @@ TC_TLV_result tc_x509_crl_dependency_read(const tc_x509_crl_dependencies* depend
       dependencies->count > workspace->node_capacity || index >= dependencies->count)
     return TC_TLV_ARGUMENT;
   const TC_bytes encoded = workspace->nodes[index].certificate;
-  TC_X509_workspace parser = {workspace->validation->frames, workspace->validation->frame_capacity,
-                              workspace->validation->oids, workspace->validation->oid_capacity};
+  TC_X509_workspace parser = {workspace->validation->frames, workspace->validation->oids,
+                              workspace->validation->oid_capacity};
   TC_TLV_result result = tc_pki_work_charge(workspace->tree->work, encoded.length);
   if (result != TC_TLV_OK)
     return result;
-  return TC_X509_read(encoded.data, encoded.length, &dependencies->options->parsing, &parser, out);
+  return TC_X509_read(encoded, &dependencies->options->parsing, &parser, out);
 }
 
 TC_TLV_result tc_x509_crl_dependency_add(tc_x509_crl_dependencies* dependencies,
@@ -401,14 +401,12 @@ static TC_TLV_result x509_ocsp_issuer(const x509_crl_path_context* path, size_t 
       *out = anchor.trust;
     return result;
   }
-  TC_X509_workspace parser = {validation->frames, validation->frame_capacity, validation->oids,
-                              validation->oid_capacity};
+  TC_X509_workspace parser = {validation->frames, validation->oids, validation->oid_capacity};
   TC_X509_certificate issuer;
   const TC_bytes encoded = ocsp->chain[index - 1];
   result = tc_pki_work_charge(work, encoded.length);
   if (result == TC_TLV_OK)
-    result = TC_X509_read(encoded.data, encoded.length, &ocsp->options->signer_policy->parsing,
-                          &parser, &issuer);
+    result = TC_X509_read(encoded, &ocsp->options->signer_policy->parsing, &parser, &issuer);
   if (result == TC_TLV_OK)
     *out = (TC_X509_trust_anchor){issuer.subject, issuer.public_key};
   return result;
@@ -567,8 +565,8 @@ TC_TLV_result TC_X509_path_check_revocation(const TC_bytes* chain, size_t count,
     if (result != TC_TLV_OK)
       return result;
   }
-  const tc_pki_tree_workspace tree = {workspace->validation->frames,
-                                      workspace->validation->frame_capacity, work};
+  const tc_pki_tree_workspace tree = {workspace->validation->frames.data,
+                                      workspace->validation->frames.capacity, work};
   tc_pki_store_candidates cursor = {options->source, options->signer_policy->parsing, 0,
                                     options->source->candidate_count, options->max_candidate_bytes};
   const TC_bytes candidate_metadata[] = {{(const uint8_t*)&cursor, sizeof cursor}};

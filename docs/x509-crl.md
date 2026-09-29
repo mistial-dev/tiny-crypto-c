@@ -9,7 +9,8 @@ Include `<tiny_crypto/x509_crl.h>` and enable
 `TC_X509_crl_read` reads a DER `CertificateList` into borrowed spans and decoded
 update times. Revocation decisions use the separate path revocation API.
 
-Pass the encoded CRL, parsing limits, a frame array, a work budget and a result:
+Pass the encoded CRL, parsing limits, frames with one entry per nesting level,
+a work budget and a result:
 
 ```c
 enum { CRL_MAX_BYTES = 65536, CRL_MAX_ELEMENTS = 8192,
@@ -55,7 +56,7 @@ scope and base/delta selection are separate from this reader. Use
 enum { CRL_EXTENSION_CAPACITY = 16 };
 TC_bytes extension_oids[CRL_EXTENSION_CAPACITY];
 TC_X509_workspace workspace = {
-    frames, CRL_MAX_DEPTH, extension_oids, CRL_EXTENSION_CAPACITY
+    {frames, CRL_MAX_DEPTH}, extension_oids, CRL_EXTENSION_CAPACITY
 };
 TC_X509_crl_extensions extensions;
 result = TC_X509_crl_extensions_read(

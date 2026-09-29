@@ -76,7 +76,8 @@ typedef struct {
  * extensions retain their SEQUENCE wrappers. Extension values need separate
  * interpretation. Signature, freshness and trust checks are separate steps.
  * Input, limits, frames, work and out must be disjoint. Frames and work may
- * change on failure. out changes only on OK. Frame capacity counts elements. */
+ * change on failure. out changes only on OK. frames need one entry per
+ * constructed nesting level of the CRL. */
 TC_TLV_result TC_X509_crl_read(TC_bytes encoded, const TC_TLV_limits* limits, TC_TLV_frames frames,
                                size_t* work, TC_X509_crl* out);
 

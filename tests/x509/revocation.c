@@ -570,8 +570,8 @@ static MunitResult storage_spans(const MunitParameter params[], void* user)
   for (unsigned scenario = 0; scenario < CASE_COUNT; ++scenario) {
     size_t work = 100;
     TC_X509_path_workspace validation = {0};
-    validation.frames = frames;
-    validation.frame_capacity = scenario == VALIDATION_LARGER ? 2 : 1;
+    validation.frames.data = frames;
+    validation.frames.capacity = scenario == VALIDATION_LARGER ? 2 : 1;
     tc_pki_tree_workspace tree = {scenario == SEPARATE ? other : frames,
                                   scenario == VALIDATION_LARGER ? 1 : 2, &work};
     if (scenario == FRAME_OVERFLOW)
@@ -950,8 +950,8 @@ static MunitResult dependency_read(const MunitParameter params[], void* user)
   TC_X509_path_options options = {0};
   options.parsing = (TC_TLV_limits){WORK_BUDGET, WORK_BUDGET, ELEMENT_LIMIT, FRAME_CAPACITY};
   TC_X509_path_workspace validation = {0};
-  validation.frames = frames;
-  validation.frame_capacity = FRAME_CAPACITY;
+  validation.frames.data = frames;
+  validation.frames.capacity = FRAME_CAPACITY;
   validation.oids = oids;
   validation.oid_capacity = OID_CAPACITY;
   TC_X509_certificate out, saved;
@@ -1333,8 +1333,8 @@ static MunitResult store_search(const MunitParameter params[], void* user)
   TC_X509_path_options options = {0};
   options.parsing = (TC_TLV_limits){WORK_BUDGET, WORK_BUDGET, ELEMENT_LIMIT, FRAME_CAPACITY};
   TC_X509_path_workspace validation = {0};
-  validation.frames = frames;
-  validation.frame_capacity = FRAME_CAPACITY;
+  validation.frames.data = frames;
+  validation.frames.capacity = FRAME_CAPACITY;
   const TC_X509_search_workspace search = {0};
   TC_X509_search_result out, saved;
   memset(&saved, 0xa5, sizeof saved);
@@ -1457,8 +1457,8 @@ static MunitResult scope_operation(const MunitParameter params[], void* user)
   TC_X509_path_options options = {0};
   options.parsing = (TC_TLV_limits){WORK_BUDGET, WORK_BUDGET, ELEMENT_LIMIT, FRAME_CAPACITY};
   TC_X509_path_workspace validation = {0};
-  validation.frames = frames;
-  validation.frame_capacity = FRAME_CAPACITY;
+  validation.frames.data = frames;
+  validation.frames.capacity = FRAME_CAPACITY;
   const TC_X509_search_workspace search = {0};
   TC_X509_search_result out, saved;
   memset(&saved, 0xa5, sizeof saved);

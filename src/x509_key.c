@@ -8,8 +8,6 @@
 #include <limits.h>
 #include <string.h>
 
-static const TC_TLV_limits limits = {SIZE_MAX, SIZE_MAX, 4, 1};
-
 static TC_TLV_result integer(TC_TLV_reader* reader, TC_bytes* out)
 {
   TC_TLV_element element;
@@ -51,6 +49,33 @@ static TC_TLV_result rsa(TC_X509_public_key* key)
   return bit_count(key->modulus, &key->bits);
 }
 
+/* RFC 3279 section 2.3.2: DSAPublicKey ::= INTEGER, and the optional
+ * Dss-Parms ::= SEQUENCE { p, q, g } sets the key size from p. */
+static TC_TLV_result dsa(TC_X509_public_key* key)
+{
+  enum { DSS_PARMS_ELEMENTS = 4, DSS_PARMS_DEPTH = 1 };
+  TC_bytes parameters = key->algorithm.parameters, value;
+  TC_TLV_reader reader;
+  TC_TLV_result result;
+  if (TC_DER_positive_integer(key->key.data, key->key.length, &value) != TC_TLV_OK)
+    return TC_TLV_INVALID;
+  if (!parameters.length)
+    return TC_TLV_OK;
+  /* The fixed schema bounds the parameter parse. */
+  const TC_TLV_limits schema = {parameters.length, parameters.length, DSS_PARMS_ELEMENTS,
+                                DSS_PARMS_DEPTH};
+  if (tc_pki_value_open(&reader, parameters, 0x30, &schema, 0) != TC_TLV_OK ||
+      integer(&reader, &value) != TC_TLV_OK)
+    return TC_TLV_INVALID;
+  result = bit_count(value, &key->bits);
+  if (result != TC_TLV_OK)
+    return result;
+  if (integer(&reader, &value) != TC_TLV_OK || integer(&reader, &value) != TC_TLV_OK ||
+      !tc_pki_end(&reader))
+    return TC_TLV_INVALID;
+  return TC_TLV_OK;
+}
+
 static TC_TLV_result ec(TC_X509_public_key* key)
 {
   size_t coordinate;
@@ -70,8 +95,7 @@ static TC_TLV_result ec(TC_X509_public_key* key)
   return TC_TLV_OK;
 }
 
-TC_TLV_result TC_X509_subject_public_key(const uint8_t* data, size_t length,
-                                         TC_X509_public_key* out)
+TC_TLV_result TC_X509_subject_public_key(TC_bytes encoded, TC_X509_public_key* out)
 {
   const TC_bytes ec_oid = tc_pki_ec_public_key_oid();
   TC_DER_public_key decoded;
@@ -79,7 +103,7 @@ TC_TLV_result TC_X509_subject_public_key(const uint8_t* data, size_t length,
   TC_TLV_result result;
   if (!out)
     return TC_TLV_ARGUMENT;
-  result = TC_DER_subject_public_key(data, length, &decoded);
+  result = TC_DER_subject_public_key(encoded.data, encoded.length, &decoded);
   if (result != TC_TLV_OK)
     return result;
   memset(&key, 0, sizeof key);
@@ -94,26 +118,8 @@ TC_TLV_result TC_X509_subject_public_key(const uint8_t* data, size_t length,
     key.type = TC_KEY_EC;
     result = ec(&key);
   } else if (tc_pki_equal(key.algorithm.oid, tc_pki_dsa_oid())) {
-    TC_TLV_reader reader;
-    TC_bytes value;
     key.type = TC_KEY_DSA;
-    if (TC_TLV_reader_init(&reader, key.key.data, key.key.length, TC_TLV_DER, &limits) !=
-            TC_TLV_OK ||
-        integer(&reader, &value) != TC_TLV_OK || reader.offset != key.key.length)
-      return TC_TLV_INVALID;
-    if (key.algorithm.parameters.length) {
-      if (TC_DER_sequence(key.algorithm.parameters.data, key.algorithm.parameters.length, &value) !=
-              TC_TLV_OK ||
-          TC_TLV_reader_init(&reader, value.data, value.length, TC_TLV_DER, &limits) != TC_TLV_OK ||
-          integer(&reader, &value) != TC_TLV_OK)
-        return TC_TLV_INVALID;
-      result = bit_count(value, &key.bits);
-      if (result != TC_TLV_OK)
-        return result;
-      if (integer(&reader, &value) != TC_TLV_OK || integer(&reader, &value) != TC_TLV_OK ||
-          reader.offset != reader.input.length)
-        return TC_TLV_INVALID;
-    }
+    result = dsa(&key);
   } else if (key.algorithm.oid.length == 3 && key.algorithm.oid.data[0] == 0x2b &&
              key.algorithm.oid.data[1] == 0x65 && key.algorithm.oid.data[2] >= 110 &&
              key.algorithm.oid.data[2] <= 113) {

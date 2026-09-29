@@ -134,7 +134,7 @@ TC_TLV_result tc_x509_crl_signer_key(const TC_X509_crl* crl, const TC_X509_certi
     return TC_TLV_INVALID;
   if (tc_pki_work_charge(work, signer->spki.length) != TC_TLV_OK)
     return TC_TLV_LIMIT;
-  return TC_X509_subject_public_key(signer->spki.data, signer->spki.length, key);
+  return TC_X509_subject_public_key(signer->spki, key);
 }
 
 TC_X509_signature_result tc_x509_crl_signer_check(const TC_X509_crl* crl,

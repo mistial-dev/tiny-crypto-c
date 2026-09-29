@@ -76,16 +76,13 @@ static void trusted_chain(const ExampleCVCRequest* request, X509* root, EVP_PKEY
       root_bytes, encode_certificate(root, root_key, EVP_sha256(), root_bytes, sizeof root_bytes)};
   TC_TLV_frame frames[FRAMES];
   TC_bytes oids[OIDS];
-  TC_X509_workspace parser = {frames, FRAMES, oids, OIDS};
+  TC_X509_workspace parser = {{frames, FRAMES}, oids, OIDS};
   const TC_TLV_limits limits = {CAPACITY, CAPACITY, 128, FRAMES};
   TC_X509_certificate parsed_root;
-  munit_assert_int(TC_X509_read(root_der.data, root_der.length, &limits, &parser, &parsed_root), ==,
-                   TC_TLV_OK);
+  munit_assert_int(TC_X509_read(root_der, &limits, &parser, &parsed_root), ==, TC_TLV_OK);
   TC_X509_certificate parsed_signer;
-  munit_assert_int(TC_X509_read(request->signer_certificate.data,
-                                request->signer_certificate.length, &limits, &parser,
-                                &parsed_signer),
-                   ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_read(request->signer_certificate, &limits, &parser, &parsed_signer), ==,
+                   TC_TLV_OK);
   TC_X509_store_anchor anchor = {.trust = {parsed_root.subject, parsed_root.public_key}};
   ExampleX509Source arrays = {&root_der, 1, &anchor, 1};
   const TC_X509_store_source source = example_x509_source(&arrays);
@@ -227,11 +224,11 @@ static MunitResult chains(const MunitParameter params[], void* context)
       encode_certificate(certificate, root_key, EVP_sha256(), signer_der, sizeof signer_der);
   TC_TLV_frame frames[FRAMES];
   TC_bytes oids[OIDS];
-  TC_X509_workspace parser = {frames, FRAMES, oids, OIDS};
+  TC_X509_workspace parser = {{frames, FRAMES}, oids, OIDS};
   const TC_TLV_limits limits = {CAPACITY, CAPACITY, 128, FRAMES};
   TC_X509_certificate signer;
-  munit_assert_int(TC_X509_read(signer_der, signer_length, &limits, &parser, &signer), ==,
-                   TC_TLV_OK);
+  munit_assert_int(TC_X509_read((TC_bytes){signer_der, signer_length}, &limits, &parser, &signer),
+                   ==, TC_TLV_OK);
   const uint8_t ski[] = {1, 2, 3, 4, 5, 6, 7, 8};
   const uint8_t uuid[] = {0, 1, 2, 3, 4, 5, 0x46, 7, 0x88, 9, 10, 11, 12, 13, 14, 15};
   uint8_t point[97], intermediate_id[EVP_MAX_MD_SIZE];

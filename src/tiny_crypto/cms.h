@@ -230,8 +230,8 @@ TC_TLV_result TC_CMS_content_digest_check(const TC_CMS_signed_attributes* attrib
                                           TC_bytes digest, size_t* work, int* matched);
 
 typedef struct {
-  TC_TLV_frame* frames;
-  size_t frame_capacity;
+  /* One frame per constructed nesting level of the deepest object parsed. */
+  TC_TLV_frames frames;
   /* Needed only for a signature split across BER chunks. NULL/0 is allowed.
    * Capacity must hold the decoded signature. */
   uint8_t* signature;

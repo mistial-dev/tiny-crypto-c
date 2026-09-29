@@ -81,8 +81,8 @@ static void check_envelope_path(TC_bytes signer, EVP_PKEY* key, TC_RSA_workspace
                                      0,
                                      signed_digest,
                                      sizeof signed_digest};
-  TC_X509_workspace parser = {workspace.validation.frames, workspace.validation.frame_capacity,
-                              workspace.validation.oids, workspace.validation.oid_capacity};
+  TC_X509_workspace parser = {workspace.validation.frames, workspace.validation.oids,
+                              workspace.validation.oid_capacity};
   TC_CMS_path_options options = {0};
   TC_X509_certificate parsed_root;
   TC_X509_search_result found, saved;
@@ -106,8 +106,8 @@ static void check_envelope_path(TC_bytes signer, EVP_PKEY* key, TC_RSA_workspace
   options.max_candidates = 1;
   options.max_candidate_bytes = CERT_CAPACITY;
   munit_assert_int(
-      TC_X509_read(root_der, root_length, &options.path.parsing, &parser, &parsed_root), ==,
-      TC_TLV_OK);
+      TC_X509_read((TC_bytes){root_der, root_length}, &options.path.parsing, &parser, &parsed_root),
+      ==, TC_TLV_OK);
   PssSource records = {{leaf_der, leaf_length},
                        {.trust = {parsed_root.subject, parsed_root.public_key}}};
   const TC_X509_store_source source = {&records, 1, 1, pss_candidate, pss_anchor};
@@ -208,7 +208,7 @@ static MunitResult pss_signers(const MunitParameter params[], void* user)
   TC_RSA_workspace rsa = {words, sizeof words / sizeof *words};
   const TC_X509_native_workspace native = {NULL, &rsa, TC_X509_NATIVE_DEFAULT_SIGNATURE_WORK};
   const TC_X509_signature_provider provider = TC_X509_native_provider(&native);
-  const TC_CMS_signature_workspace workspace = {frames, FRAME_CAPACITY, NULL, 0};
+  const TC_CMS_signature_workspace workspace = {{frames, FRAME_CAPACITY}, NULL, 0};
   const TC_TLV_limits limits = {ENCODED_CAPACITY, ENCODED_CAPACITY, 128, FRAME_CAPACITY};
   const TC_bytes type = {data_type, sizeof data_type};
   const TC_bytes computed = {digest, sizeof digest};
@@ -244,7 +244,8 @@ static MunitResult pss_signers(const MunitParameter params[], void* user)
       munit_assert_int(spki_length, >, 0);
       munit_assert_size((size_t)spki_length, <=, sizeof spki);
       munit_assert_int(i2d_PUBKEY(generated, &cursor), ==, spki_length);
-      munit_assert_int(TC_X509_subject_public_key(spki, (size_t)spki_length, &key), ==, TC_TLV_OK);
+      munit_assert_int(TC_X509_subject_public_key((TC_bytes){spki, (size_t)spki_length}, &key), ==,
+                       TC_TLV_OK);
       munit_assert_int(key.type, ==, restricted ? TC_KEY_RSA_PSS : TC_KEY_RSA);
       for (size_t variant = 0; variant < sizeof cases / sizeof *cases; ++variant) {
         if (restricted && !cases[variant].distinct_hash)

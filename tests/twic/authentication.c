@@ -182,10 +182,11 @@ static void validated_key(EVP_PKEY* card_key, const TC_X509_signature_provider* 
   const size_t card_length = encode_certificate(card, issuer_key, EVP_sha256(), encoded, capacity);
   ExampleX509Workspace storage;
   const TC_X509_path_workspace workspace = example_x509_workspace(&storage);
-  TC_X509_workspace parser = {storage.frames, 16, storage.oids, 16};
+  TC_X509_workspace parser = {{storage.frames, 16}, storage.oids, 16};
   const TC_TLV_limits limits = {BUFFER_CAPACITY, BUFFER_CAPACITY, 256, 16};
   TC_X509_certificate root;
-  munit_assert_int(TC_X509_read(root_bytes, root_length, &limits, &parser, &root), ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_read((TC_bytes){root_bytes, root_length}, &limits, &parser, &root), ==,
+                   TC_TLV_OK);
   const TC_X509_trust_anchor anchor = {root.subject, root.public_key};
   TC_X509_path_options options = {0};
   options.at = (TC_X509_time){2026, 9, 9, 0, 0, 0};
@@ -245,11 +246,10 @@ static void validated_key(EVP_PKEY* card_key, const TC_X509_signature_provider* 
   TC_TLV_reader extensions;
   TC_X509_extension extension;
   static const uint8_t san_oid[] = {0x55, 0x1d, 17};
-  munit_assert_int(TC_X509_read(encoded, card_length, &limits, &parser, &parsed_card), ==,
-                   TC_TLV_OK);
-  munit_assert_int(TC_X509_extensions_init(&extensions, parsed_card.extensions.data,
-                                           parsed_card.extensions.length, &limits),
+  munit_assert_int(TC_X509_read((TC_bytes){encoded, card_length}, &limits, &parser, &parsed_card),
                    ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_extensions_init(&extensions, parsed_card.extensions, &limits), ==,
+                   TC_TLV_OK);
   unsigned found = 0;
   TC_TLV_result next;
   while ((next = TC_X509_extension_next(&extensions, &extension)) == TC_TLV_OK) {

@@ -17,10 +17,35 @@ enforces constraints on a selected anchor. See the
 
 ## Read and publish a list
 
-Use `TC_X509_trust_anchor_list_init` and call
-`TC_X509_trust_anchor_next` until it returns `TC_TLV_END`. Supply a bounded
-`TC_X509_workspace` and a caller-owned array of `TC_X509_store_anchor`
-records. A disabled choice returns `TC_TLV_UNSUPPORTED`. A valid
+Bind the list, parsing limits and a bounded `TC_X509_workspace` to a
+`TC_X509_trust_anchor_reader` with `TC_X509_trust_anchor_list_init`, then
+call `TC_X509_trust_anchor_next` until it returns `TC_TLV_END`. Store each
+result in a caller-owned array of `TC_X509_store_anchor` records. The reader
+uses the workspace on every call, so keep it alive and unshared until the
+last call. A disabled choice returns `TC_TLV_UNSUPPORTED`.
+
+```c
+enum { ANCHOR_CAPACITY = 8 };
+TC_TLV_frame frames[16];
+TC_bytes oids[32];
+TC_X509_workspace parser = {{frames, 16}, oids, 32};
+const TC_TLV_limits limits = {16384, 16384, 2048, 16};
+TC_X509_store_anchor anchors[ANCHOR_CAPACITY], record;
+TC_X509_trust_anchor_reader reader;
+size_t count = 0;
+TC_TLV_result result = TC_X509_trust_anchor_list_init(&reader, list, &limits, &parser);
+if (result != TC_TLV_OK)
+  return result; /* ARGUMENT, INVALID or LIMIT. */
+while ((result = TC_X509_trust_anchor_next(&reader, &record)) == TC_TLV_OK) {
+  if (count == ANCHOR_CAPACITY)
+    return TC_TLV_LIMIT;
+  anchors[count++] = record;
+}
+if (result != TC_TLV_END)
+  return result; /* A malformed, unsupported or oversized anchor. */
+```
+
+Here `list` is a `TC_bytes` span over the DER TrustAnchorList. A valid
 `TrustAnchorInfo` without `certPath` is marked `x509_unusable` and cannot
 authorize an X.509 path.
 
@@ -58,7 +83,7 @@ the record is in use.
 ```c
 TC_X509_certificate root;
 TC_X509_store_anchor anchor;
-if (TC_X509_read(der, der_length, &limits, &parser, &root) != TC_TLV_OK ||
+if (TC_X509_read((TC_bytes){der, der_length}, &limits, &parser, &root) != TC_TLV_OK ||
     TC_X509_store_anchor_from_certificate(&root, &limits, &parser, &anchor) != TC_TLV_OK)
   return 0; /* ARGUMENT leaves anchor unchanged. Other failures zero it. */
 ```

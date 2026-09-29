@@ -41,13 +41,13 @@ static MunitResult biometric_signatures(const MunitParameter params[], void* con
   uint8_t flags[NAME_ATTRIBUTES];
   const TC_X509_name_workspace names = {left, right, NAME_SCALARS, flags, NAME_ATTRIBUTES};
   const TC_TLV_limits limits = {INPUT_BYTES, INPUT_BYTES, 2048, FRAME_COUNT};
-  TC_X509_workspace parser = {frames, FRAME_COUNT, oids, OID_COUNT};
+  TC_X509_workspace parser = {{frames, FRAME_COUNT}, oids, OID_COUNT};
   TC_ECDSA_workspace ec;
   TC_RSA_word words[TC_RSA_VERIFY_WORKSPACE_WORDS(3072)];
   const TC_RSA_workspace rsa = {words, sizeof words / sizeof *words};
   const TC_X509_native_workspace native = {&ec, &rsa, TC_X509_NATIVE_DEFAULT_SIGNATURE_WORK};
   const TC_X509_signature_provider provider = TC_X509_native_provider(&native);
-  const TC_CMS_signature_workspace verification = {frames, FRAME_COUNT, NULL, 0};
+  const TC_CMS_signature_workspace verification = {{frames, FRAME_COUNT}, NULL, 0};
   size_t count = 0;
   (void)params;
   (void)context;
@@ -161,9 +161,8 @@ static MunitResult biometric_signatures(const MunitParameter params[], void* con
       TC_X509_certificate certificate;
       int matched;
       const tc_pki_tree_workspace tree = {frames, FRAME_COUNT, &work};
-      munit_assert_int(TC_X509_read(element.encoded.data, element.encoded.length, &limits, &parser,
-                                    &certificate),
-                       ==, TC_TLV_OK);
+      munit_assert_int(TC_X509_read(element.encoded, &limits, &parser, &certificate), ==,
+                       TC_TLV_OK);
       munit_assert_int(tc_cms_signer_matches(&signer, TC_TLV_BER, &certificate, &limits, &names,
                                              &tree, &matched),
                        ==, TC_TLV_OK);

@@ -44,7 +44,7 @@ tc_pki_authority_matches(const TC_X509_authority_key_identifier* authority,
     }
   }
   if (authority->serial.length) {
-    TC_TLV_reader reader;
+    TC_X509_general_names_reader reader;
     TC_X509_general_name name;
     int found = 0, unsupported = 0;
     if (!names || !authority->issuer.length)
@@ -59,16 +59,15 @@ tc_pki_authority_matches(const TC_X509_authority_key_identifier* authority,
     if (tc_pki_work_charge(tree->work, authority->issuer.length) != TC_TLV_OK ||
         tc_pki_work_charge(tree->work, authority->issuer.length) != TC_TLV_OK)
       return TC_TLV_LIMIT;
-    result = TC_TLV_reader_init(&reader, authority->issuer.data, authority->issuer.length,
-                                TC_TLV_DER, limits);
+    result = TC_X509_general_names_contents_init(&reader, authority->issuer, limits,
+                                                 (TC_TLV_frames){tree->frames, tree->capacity});
     if (result != TC_TLV_OK)
       return result;
-    while (!tc_pki_end(&reader)) {
+    while (!tc_pki_end(&reader.reader)) {
       int equal;
       if (tc_pki_work_charge(tree->work, 1) != TC_TLV_OK)
         return TC_TLV_LIMIT;
-      result =
-          TC_X509_general_name_next(&reader, (TC_TLV_frames){tree->frames, tree->capacity}, &name);
+      result = TC_X509_general_name_next(&reader, &name);
       if (result != TC_TLV_OK)
         return result;
       if (name.type != DIRECTORY_NAME) {

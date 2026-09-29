@@ -22,13 +22,13 @@ typedef struct {
 
 /* Decode SubjectPublicKeyInfo. Unknown algorithms retain their OID and key
  * bytes with type UNKNOWN. The caller checks EC coordinates for curve membership.
- * Input is the complete encoding, so truncation returns INVALID. */
-TC_TLV_result TC_X509_subject_public_key(const uint8_t* data, size_t length,
-                                         TC_X509_public_key* out);
+ * encoded is the complete encoding, so truncation returns INVALID. The fixed
+ * key schemas bound their own parsing. out changes only on OK. */
+TC_TLV_result TC_X509_subject_public_key(TC_bytes encoded, TC_X509_public_key* out);
 
 typedef struct {
-  TC_TLV_frame* frames;
-  size_t frame_capacity;
+  /* One frame per constructed nesting level of the deepest object parsed. */
+  TC_TLV_frames frames;
   /* One slot per extension, used to detect duplicate OIDs. */
   TC_bytes* extension_oids;
   size_t extension_capacity;
@@ -43,13 +43,13 @@ typedef struct {
   int serial_negative;
 } TC_X509_certificate;
 
-/* Parse one DER certificate. Returned spans borrow data.
+/* Parse one DER certificate. Returned spans borrow encoded.
  * Validate signatures, paths, revocation and time before accepting the certificate.
  * Interpret extension values according to their OIDs.
  * limits->max_elements counts every element parsed, including the DER inside
  * each extension value. A certificate needing more returns LIMIT.
  * Workspace may change on failure. out remains unchanged. */
-TC_TLV_result TC_X509_read(const uint8_t* data, size_t length, const TC_TLV_limits* limits,
+TC_TLV_result TC_X509_read(TC_bytes encoded, const TC_TLV_limits* limits,
                            TC_X509_workspace* workspace, TC_X509_certificate* out);
 /* UTC calendar times, years 1..9999, without leap-second values. order receives
  * -1, 0 or 1. valid_at includes both endpoints and rejects reversed intervals.
@@ -195,33 +195,58 @@ typedef struct {
   TC_bytes key_identifier, issuer, serial;
   int has_key_identifier, serial_negative;
 } TC_X509_authority_key_identifier;
-/* These decoders take extension values and return borrowed spans. Identifiers
- * have no assumed hash or fixed length. Authority issuer and serial must occur
- * together. issuer contains GeneralNames contents for a DER reader. Serial
- * retains its signed INTEGER contents. Decode issuer names separately.
- * Empty AuthorityKeyIdentifier is syntactically valid. Certificate-profile
- * requirements and issuer selection are separate checks. out changes only on OK. */
-TC_TLV_result TC_X509_authority_key_identifier_read(const uint8_t* data, size_t length,
-                                                    const TC_TLV_limits* limits,
+/* Extension-value decoders.
+ * Each decoder and reader init below takes one complete extension value, the
+ * bytes inside the extnValue OCTET STRING, unless it names a contents span.
+ * Returned spans borrow those bytes, which must stay unchanged while the
+ * spans are used. max_elements counts the outer element and every element the
+ * decoder reads beneath it. max_depth counts the constructed levels it opens,
+ * the outer SEQUENCE included. A constructed field returned as a span, such as
+ * an AKI issuer or a name-constraint list, counts as one element. Decode it
+ * under its own limits. A reader's next spends the budget left by earlier
+ * calls, so the limits bound the whole list. Exhausted limits return LIMIT.
+ * Malformed or truncated values return INVALID. NULL arguments return
+ * ARGUMENT. Outputs, and reader state for next, change only on OK. */
+
+/* Identifiers have no assumed hash or fixed length. Authority issuer and
+ * serial must occur together. issuer contains GeneralNames contents for
+ * TC_X509_general_names_contents_init. Serial retains its signed INTEGER
+ * contents. Empty AuthorityKeyIdentifier is syntactically valid.
+ * Certificate-profile requirements and issuer selection are separate checks. */
+TC_TLV_result TC_X509_authority_key_identifier_read(TC_bytes value, const TC_TLV_limits* limits,
                                                     TC_X509_authority_key_identifier* out);
-TC_TLV_result TC_X509_subject_key_identifier_read(const uint8_t* data, size_t length,
-                                                  const TC_TLV_limits* limits, TC_bytes* out);
+TC_TLV_result TC_X509_subject_key_identifier_read(TC_bytes value, const TC_TLV_limits* limits,
+                                                  TC_bytes* out);
 typedef struct {
   unsigned type;
   TC_bytes encoded, value;
 } TC_X509_general_name;
-/* GeneralNames as used in subject/issuer alternative names. Name-constraint
- * subtrees use TC_X509_general_subtree_next. type is the ASN.1 choice number
- * (0..8). IP addresses are 4 or 16 bytes. Spans borrow input. x400Address and
- * ediPartyName retain their DER structure. Their schemas and otherName's
- * OID-specific value require caller interpretation.
- * The element budget includes nested objects across all returned names. Depth
- * is relative to each GeneralName. Consume through END to check the full list.
- * Frames may change on failure. Reader and out stay unchanged. Input, frames, reader,
- * and out must be disjoint. */
-TC_TLV_result TC_X509_general_names_init(TC_TLV_reader* reader, const uint8_t* data, size_t length,
-                                         const TC_TLV_limits* limits);
-TC_TLV_result TC_X509_general_name_next(TC_TLV_reader* reader, TC_TLV_frames frames,
+/* GeneralNames reader for subject/issuer alternative names, AKI issuers and
+ * CRL names. Name-constraint subtrees use the subtree reader below. type is
+ * the ASN.1 choice number (0..8). IP addresses are 4 or 16 bytes. Spans borrow
+ * input. x400Address and ediPartyName retain their DER structure. Their
+ * schemas and otherName's OID-specific value require caller interpretation.
+ * init binds the input, limits and frames. frames need one entry per
+ * constructed level inside one GeneralName. next walks each name's complete
+ * tree and charges every nested element to the limits. Consume through END
+ * to check the full list. Frames may change on failure. Reader and out
+ * change only on OK. Input, frames, reader and out must be disjoint. Keep
+ * the input and frames alive and unchanged while the reader is used. */
+typedef struct {
+  TC_TLV_reader reader;
+  TC_TLV_frames frames;
+} TC_X509_general_names_reader;
+/* encoded is a complete, nonempty GeneralNames SEQUENCE, such as a
+ * subjectAltName or issuerAltName extension value. */
+TC_TLV_result TC_X509_general_names_init(TC_X509_general_names_reader* reader, TC_bytes encoded,
+                                         const TC_TLV_limits* limits, TC_TLV_frames frames);
+/* contents holds GeneralNames fields without their SEQUENCE header, such as
+ * authority_key_identifier.issuer or a CRL fullName. limits cover contents
+ * alone. Empty contents return END from the first next. */
+TC_TLV_result TC_X509_general_names_contents_init(TC_X509_general_names_reader* reader,
+                                                  TC_bytes contents, const TC_TLV_limits* limits,
+                                                  TC_TLV_frames frames);
+TC_TLV_result TC_X509_general_name_next(TC_X509_general_names_reader* reader,
                                         TC_X509_general_name* out);
 typedef struct {
   TC_bytes permitted, excluded;
@@ -230,20 +255,28 @@ typedef struct {
  * Spans contain the IMPLICIT sequence contents, without a SEQUENCE wrapper.
  * Individual GeneralSubtree values still require decoding and name matching.
  * out is unchanged on failure. */
-TC_TLV_result TC_X509_name_constraints_read(const uint8_t* data, size_t length,
-                                            const TC_TLV_limits* limits,
+TC_TLV_result TC_X509_name_constraints_read(TC_bytes value, const TC_TLV_limits* limits,
                                             TC_X509_name_constraints* out);
 typedef struct {
   TC_X509_general_name base;
   uint32_t minimum, maximum;
   int has_maximum;
 } TC_X509_general_subtree;
-/* Initialize a DER TC_TLV_reader over a permitted/excluded contents span, then
- * consume through END. IP bases contain address and mask (8 or 32 bytes).
- * Distances above UINT32_MAX return LIMIT. RFC 5280 path validation requires
- * minimum zero and maximum absent. This decoder retains other encoded values.
- * Workspace, budget, borrowing, and failure rules match general_name_next. */
-TC_TLV_result TC_X509_general_subtree_next(TC_TLV_reader* reader, TC_TLV_frames frames,
+/* GeneralSubtrees reader over a permitted or excluded contents span from
+ * TC_X509_name_constraints_read. Consume through END. IP bases contain address
+ * and mask (8 or 32 bytes). Distances above UINT32_MAX return LIMIT. RFC 5280
+ * path validation requires minimum zero and maximum absent. This decoder
+ * retains other encoded values. limits cover contents alone. frames need one
+ * entry per constructed level inside one GeneralSubtree. Binding, budget,
+ * borrowing and failure rules match the GeneralNames reader. */
+typedef struct {
+  TC_TLV_reader reader;
+  TC_TLV_frames frames;
+} TC_X509_general_subtrees_reader;
+TC_TLV_result TC_X509_general_subtrees_init(TC_X509_general_subtrees_reader* reader,
+                                            TC_bytes contents, const TC_TLV_limits* limits,
+                                            TC_TLV_frames frames);
+TC_TLV_result TC_X509_general_subtree_next(TC_X509_general_subtrees_reader* reader,
                                            TC_X509_general_subtree* out);
 /* Test a decoded name against one subtree. Different name forms do not match,
  * except SmtpUTF8Mailbox otherName follows rfc822Name constraints (RFC 9598).
@@ -265,8 +298,7 @@ TC_TLV_result TC_X509_general_name_within(const TC_X509_general_name* name,
                                           const TC_X509_name_workspace* workspace, size_t* work,
                                           int* matched);
 typedef struct {
-  TC_TLV_frame* frames;
-  size_t frame_capacity;
+  TC_TLV_frames frames;
   const TC_X509_name_workspace* names;
 } TC_X509_constraint_workspace;
 /* Check one decoded name against one certificate's constraint lists. A name
@@ -292,8 +324,11 @@ TC_TLV_result TC_X509_certificate_names_check(const TC_X509_certificate* certifi
                                               const TC_TLV_limits* limits,
                                               const TC_X509_constraint_workspace* workspace,
                                               size_t* work, int* permitted);
-/* Pass certificate.extensions, or {NULL, 0} for an absent extension sequence. */
-TC_TLV_result TC_X509_extensions_init(TC_TLV_reader* reader, const uint8_t* data, size_t length,
+/* Pass certificate.extensions, or {NULL, 0} for an absent extension sequence.
+ * limits cover the Extensions SEQUENCE under the extension-value rules above.
+ * next checks one Extension's fields and returns its extnValue contents.
+ * Consume through END to check every extension. */
+TC_TLV_result TC_X509_extensions_init(TC_TLV_reader* reader, TC_bytes encoded,
                                       const TC_TLV_limits* limits);
 TC_TLV_result TC_X509_extension_next(TC_TLV_reader* reader, TC_X509_extension* out);
 
@@ -302,10 +337,9 @@ typedef struct {
 } TC_X509_policy_mapping;
 /* Pass the PolicyMappings extension value. init checks the outer sequence.
  * next validates each OID pair and rejects mappings to or from anyPolicy.
- * Consume through END to check every pair. Spans borrow input bytes. Reader
- * and out change only when next returns OK. */
-TC_TLV_result TC_X509_policy_mappings_init(TC_TLV_reader* reader, const uint8_t* data,
-                                           size_t length, const TC_TLV_limits* limits);
+ * Consume through END to check every pair. */
+TC_TLV_result TC_X509_policy_mappings_init(TC_TLV_reader* reader, TC_bytes value,
+                                           const TC_TLV_limits* limits);
 TC_TLV_result TC_X509_policy_mapping_next(TC_TLV_reader* reader, TC_X509_policy_mapping* out);
 
 typedef struct {
@@ -316,21 +350,23 @@ typedef struct {
   TC_bytes* seen;
   size_t capacity, count;
 } TC_X509_policy_reader;
-/* seen has one slot per policy, used to reject duplicate identifiers.
- * Input, seen, reader, and output must be disjoint. next checks PolicyInformation
- * structure. qualifiers retain their complete SEQUENCE encoding for separate
- * interpretation. An absent qualifier sequence is {NULL, 0}.
- * Consume through END. A failed next leaves reader, seen, and out unchanged. */
-TC_TLV_result TC_X509_policies_init(TC_X509_policy_reader* reader, const uint8_t* data,
-                                    size_t length, const TC_TLV_limits* limits, TC_bytes* seen,
-                                    size_t capacity);
+/* Pass the CertificatePolicies extension value. seen has one slot per
+ * policy, used to reject duplicate identifiers. More policies than capacity
+ * return LIMIT. Input, seen, reader and output must be disjoint. next checks
+ * PolicyInformation structure. qualifiers retain their complete SEQUENCE
+ * encoding for separate interpretation. The qualifier SEQUENCE counts as one
+ * element here. An absent qualifier sequence is {NULL, 0}.
+ * Consume through END. A failed next leaves reader, seen and out unchanged. */
+TC_TLV_result TC_X509_policies_init(TC_X509_policy_reader* reader, TC_bytes value,
+                                    const TC_TLV_limits* limits, TC_bytes* seen, size_t capacity);
 TC_TLV_result TC_X509_policy_next(TC_X509_policy_reader* reader, TC_X509_policy* out);
 
 typedef struct {
   TC_bytes oid, value;
 } TC_X509_policy_qualifier;
 /* Pass policy.qualifiers, including {NULL, 0} when absent. value retains its
- * DER tag and length. OID-specific syntax and acceptance are caller checks. */
+ * DER tag and length and counts as one element. OID-specific syntax and
+ * acceptance are caller checks. */
 TC_TLV_result TC_X509_policy_qualifiers_init(TC_TLV_reader* reader, TC_bytes qualifiers,
                                              const TC_TLV_limits* limits);
 TC_TLV_result TC_X509_policy_qualifier_next(TC_TLV_reader* reader, TC_X509_policy_qualifier* out);
@@ -344,8 +380,7 @@ typedef struct {
   TC_bytes encoded, contents;
   int relative;
 } TC_X509_distribution_name;
-/* These helpers take an extension's value, inside its OCTET STRING. */
-TC_TLV_result TC_X509_basic_constraints_read(const uint8_t* data, size_t length,
+TC_TLV_result TC_X509_basic_constraints_read(TC_bytes value, const TC_TLV_limits* limits,
                                              TC_X509_basic_constraints* out);
 /* Mask bit n is ASN.1 KeyUsage bit n, independent of encoded byte order. */
 enum {
@@ -361,14 +396,14 @@ enum {
   TC_KEY_USAGE_ALL = (1u << 9) - 1
 };
 /* Returns a combination of the KeyUsage masks above. */
-TC_TLV_result TC_X509_key_usage_read(const uint8_t* data, size_t length, uint16_t* out);
+TC_TLV_result TC_X509_key_usage_read(TC_bytes value, const TC_TLV_limits* limits, uint16_t* out);
 
 /* Decode the nonempty sequence of key-purpose OIDs inside an EKU extension.
- * OID spans borrow input bytes. capacity counts span slots.
- * Input, oids, and count must be disjoint. On failure neither output changes.
- * Insufficient capacity returns TC_TLV_LIMIT. Unknown purpose OIDs are retained. */
-TC_TLV_result TC_X509_extended_key_usage_read(const uint8_t* data, size_t length, TC_bytes* oids,
-                                              size_t capacity, size_t* count);
+ * capacity counts span slots. Input, oids and count must be disjoint. On
+ * failure neither output changes. More OIDs than capacity return LIMIT.
+ * Unknown purpose OIDs are retained. */
+TC_TLV_result TC_X509_extended_key_usage_read(TC_bytes value, const TC_TLV_limits* limits,
+                                              TC_bytes* oids, size_t capacity, size_t* count);
 
 typedef struct {
   int has_require_explicit_policy, has_inhibit_policy_mapping;
@@ -376,7 +411,7 @@ typedef struct {
 } TC_X509_policy_constraints;
 /* At least one field must be present. Counts above UINT32_MAX return LIMIT.
  * A present zero count applies immediately. An absent field adds no constraint. */
-TC_TLV_result TC_X509_policy_constraints_read(const uint8_t* data, size_t length,
+TC_TLV_result TC_X509_policy_constraints_read(TC_bytes value, const TC_TLV_limits* limits,
                                               TC_X509_policy_constraints* out);
 /* InhibitAnyPolicy is a nonnegative INTEGER. Decode it with TC_DER_uint32. */
 

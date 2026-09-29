@@ -29,7 +29,7 @@ static TC_ECDSA_workspace ec;
 static TC_X509_native_workspace native;
 static TC_TLV_frame parse_frames[32];
 static TC_bytes parse_oids[32];
-static TC_X509_workspace parser = {parse_frames, 32, parse_oids, 32};
+static TC_X509_workspace parser = {{parse_frames, 32}, parse_oids, 32};
 
 /* NIST-test-policy-1 and -2 (2.16.840.1.101.3.2.1.48.1, .2) and anyPolicy. */
 static const uint8_t policy1[] = {0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x02, 0x01, 0x30, 0x01};
@@ -114,8 +114,7 @@ static TC_X509_store_anchor pkits_anchor(void)
   TC_X509_certificate certificate;
   TC_X509_store_anchor anchor = {0};
   const TC_bytes encoded = load("TrustAnchorRootCertificate.crt", anchor_der);
-  munit_assert_int(TC_X509_read(encoded.data, encoded.length, &limits, &parser, &certificate), ==,
-                   TC_TLV_OK);
+  munit_assert_int(TC_X509_read(encoded, &limits, &parser, &certificate), ==, TC_TLV_OK);
   anchor.trust.name = certificate.subject;
   anchor.trust.public_key = certificate.public_key;
   return anchor;
@@ -341,7 +340,7 @@ static MunitResult parsed_info(const MunitParameter params[], void* user)
       directory_subtree((TC_buffer){subtree, sizeof subtree}, pkits_rdns, sizeof pkits_rdns);
   TC_X509_certificate root;
   TC_X509_store_anchor anchor;
-  TC_TLV_reader reader;
+  TC_X509_trust_anchor_reader reader;
   TC_X509_path_options options = path_options(0);
   TC_X509_path_result result;
   const TC_bytes encoded = load("TrustAnchorRootCertificate.crt", anchor_der);
@@ -349,17 +348,17 @@ static MunitResult parsed_info(const MunitParameter params[], void* user)
   (void)params;
   (void)user;
   setup_workspace();
-  munit_assert_int(TC_X509_read(encoded.data, encoded.length, &limits, &parser, &root), ==,
-                   TC_TLV_OK);
+  munit_assert_int(TC_X509_read(encoded, &limits, &parser, &root), ==, TC_TLV_OK);
 
   /* Decoded controls: policy1 required explicitly, PKITS names permitted and
    * one intermediate allowed. */
   length = trust_anchor_info(
       (TC_buffer){list, sizeof list}, &root, (TC_bytes){policy1, sizeof policy1},
       (TC_bytes){explicit_policy, sizeof explicit_policy}, (TC_bytes){subtree, subtree_length}, 1);
-  munit_assert_int(TC_X509_trust_anchor_list_init(&reader, list, length, &limits, &parser), ==,
-                   TC_TLV_OK);
-  munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &parser, &anchor), ==, TC_TLV_OK);
+  munit_assert_int(
+      TC_X509_trust_anchor_list_init(&reader, (TC_bytes){list, length}, &limits, &parser), ==,
+      TC_TLV_OK);
+  munit_assert_int(TC_X509_trust_anchor_next(&reader, &anchor), ==, TC_TLV_OK);
   munit_assert_int(anchor.x509_unusable, ==, 0);
   munit_assert_uint(anchor.policy_flags, ==, TC_X509_PATH_REQUIRE_EXPLICIT_POLICY);
   munit_assert_int(anchor.has_path_len, ==, 1);
@@ -372,9 +371,10 @@ static MunitResult parsed_info(const MunitParameter params[], void* user)
   length = trust_anchor_info(
       (TC_buffer){list, sizeof list}, &root, (TC_bytes){policy2, sizeof policy2},
       (TC_bytes){explicit_policy, sizeof explicit_policy}, (TC_bytes){NULL, 0}, -1);
-  munit_assert_int(TC_X509_trust_anchor_list_init(&reader, list, length, &limits, &parser), ==,
-                   TC_TLV_OK);
-  munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &parser, &anchor), ==, TC_TLV_OK);
+  munit_assert_int(
+      TC_X509_trust_anchor_list_init(&reader, (TC_bytes){list, length}, &limits, &parser), ==,
+      TC_TLV_OK);
+  munit_assert_int(TC_X509_trust_anchor_next(&reader, &anchor), ==, TC_TLV_OK);
   munit_assert_int(
       validate("GoodCACert.crt", "ValidCertificatePathTest1EE.crt", &anchor, &options, &result), ==,
       TC_X509_PATH_INVALID);
@@ -382,9 +382,10 @@ static MunitResult parsed_info(const MunitParameter params[], void* user)
   /* pathLenConstraint 0 forbids the intermediate CA. */
   length = trust_anchor_info((TC_buffer){list, sizeof list}, &root, (TC_bytes){NULL, 0},
                              (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0}, 0);
-  munit_assert_int(TC_X509_trust_anchor_list_init(&reader, list, length, &limits, &parser), ==,
-                   TC_TLV_OK);
-  munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &parser, &anchor), ==, TC_TLV_OK);
+  munit_assert_int(
+      TC_X509_trust_anchor_list_init(&reader, (TC_bytes){list, length}, &limits, &parser), ==,
+      TC_TLV_OK);
+  munit_assert_int(TC_X509_trust_anchor_next(&reader, &anchor), ==, TC_TLV_OK);
   munit_assert_int(
       validate("GoodCACert.crt", "ValidCertificatePathTest1EE.crt", &anchor, &options, &result), ==,
       TC_X509_PATH_INVALID);
@@ -393,10 +394,10 @@ static MunitResult parsed_info(const MunitParameter params[], void* user)
   length = trust_anchor_info((TC_buffer){list, sizeof list}, &root, (TC_bytes){NULL, 0},
                              (TC_bytes){explicit_policy, sizeof explicit_policy},
                              (TC_bytes){NULL, 0}, -1);
-  munit_assert_int(TC_X509_trust_anchor_list_init(&reader, list, length, &limits, &parser), ==,
-                   TC_TLV_OK);
-  munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &parser, &anchor), ==,
-                   TC_TLV_INVALID);
+  munit_assert_int(
+      TC_X509_trust_anchor_list_init(&reader, (TC_bytes){list, length}, &limits, &parser), ==,
+      TC_TLV_OK);
+  munit_assert_int(TC_X509_trust_anchor_next(&reader, &anchor), ==, TC_TLV_INVALID);
   return MUNIT_OK;
 }
 
@@ -405,9 +406,9 @@ static MunitResult workspace_limits(const MunitParameter params[], void* user)
   static uint8_t list[4096];
   TC_TLV_frame frames[2];
   TC_bytes oids[1];
-  TC_X509_workspace small_frames = {frames, 2, parse_oids, 32};
-  TC_X509_workspace small_oids = {parse_frames, 32, oids, 1};
-  TC_TLV_reader reader;
+  TC_X509_workspace small_frames = {{frames, 2}, parse_oids, 32};
+  TC_X509_workspace small_oids = {{parse_frames, 32}, oids, 1};
+  TC_X509_trust_anchor_reader reader;
   TC_X509_store_anchor anchor;
   const TC_bytes encoded = load("TrustAnchorRootCertificate.crt", anchor_der);
   size_t length;
@@ -416,16 +417,18 @@ static MunitResult workspace_limits(const MunitParameter params[], void* user)
 
   /* A certificate choice: the list wraps the PKITS root certificate. */
   length = der((TC_buffer){list, sizeof list}, 0x30, encoded.data, encoded.length);
-  munit_assert_int(TC_X509_trust_anchor_list_init(&reader, list, length, &limits, &small_frames),
-                   ==, TC_TLV_LIMIT);
-  munit_assert_int(TC_X509_trust_anchor_list_init(&reader, list, length, &limits, &small_oids), ==,
-                   TC_TLV_OK);
-  munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &small_oids, &anchor), ==,
-                   TC_TLV_LIMIT);
-  munit_assert_int(TC_X509_trust_anchor_list_init(&reader, list, length, &limits, &parser), ==,
-                   TC_TLV_OK);
-  munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &parser, &anchor), ==, TC_TLV_OK);
-  munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &parser, &anchor), ==, TC_TLV_END);
+  munit_assert_int(
+      TC_X509_trust_anchor_list_init(&reader, (TC_bytes){list, length}, &limits, &small_frames), ==,
+      TC_TLV_LIMIT);
+  munit_assert_int(
+      TC_X509_trust_anchor_list_init(&reader, (TC_bytes){list, length}, &limits, &small_oids), ==,
+      TC_TLV_OK);
+  munit_assert_int(TC_X509_trust_anchor_next(&reader, &anchor), ==, TC_TLV_LIMIT);
+  munit_assert_int(
+      TC_X509_trust_anchor_list_init(&reader, (TC_bytes){list, length}, &limits, &parser), ==,
+      TC_TLV_OK);
+  munit_assert_int(TC_X509_trust_anchor_next(&reader, &anchor), ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_trust_anchor_next(&reader, &anchor), ==, TC_TLV_END);
 
   /* Path validation needs one extension summary per certificate. */
   setup_workspace();
@@ -469,8 +472,7 @@ static MunitResult basic_pass_work(const MunitParameter params[], void* user)
   setup_workspace();
   const TC_X509_store_anchor anchor = pkits_anchor();
   const TC_X509_path_options options = path_options(0);
-  TC_X509_workspace chain_parser = {validation->frames, validation->frame_capacity,
-                                    validation->oids, validation->oid_capacity};
+  TC_X509_workspace chain_parser = {validation->frames, validation->oids, validation->oid_capacity};
   for (i = 0; i < 3; ++i) {
     chain[i] = load(files[i], der_files[i]);
     bytes += chain[i].length;

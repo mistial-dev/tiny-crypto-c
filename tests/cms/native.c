@@ -361,7 +361,8 @@ static MunitResult content_signature(const MunitParameter params[], void* user)
   munit_assert_int(spki_length, >, 0);
   munit_assert_size((size_t)spki_length, <=, sizeof spki);
   munit_assert_int(i2d_PUBKEY(generated, &cursor), ==, spki_length);
-  munit_assert_int(TC_X509_subject_public_key(spki, (size_t)spki_length, &key), ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_subject_public_key((TC_bytes){spki, (size_t)spki_length}, &key), ==,
+                   TC_TLV_OK);
   memcpy(digest_attribute, digest_attribute_header, sizeof digest_attribute_header);
   munit_assert_int(EVP_Digest(message, sizeof message,
                               digest_attribute + sizeof digest_attribute_header, &digest_length,
@@ -419,7 +420,7 @@ static MunitResult content_signature(const MunitParameter params[], void* user)
       uint8_t encoded_signature[SIGNATURE_CAPACITY + TLV_HEADER_BYTES];
       TC_CMS_signer_info info = {0};
       tc_hash_info hash;
-      const TC_CMS_signature_workspace verification = {frames, FRAME_CAPACITY, NULL, 0};
+      const TC_CMS_signature_workspace verification = {{frames, FRAME_CAPACITY}, NULL, 0};
       munit_assert_true(tc_hash_info_get(TC_HASH_SHA256, &hash));
       munit_assert_size(signature_length, <, 128);
       encoded_signature[0] = 4;
@@ -592,7 +593,8 @@ static MunitResult rsa_signature(const MunitParameter params[], void* user)
     munit_assert_int(spki_length, >, 0);
     munit_assert_size((size_t)spki_length, <=, sizeof spki);
     munit_assert_int(i2d_PUBKEY(generated, &cursor), ==, spki_length);
-    munit_assert_int(TC_X509_subject_public_key(spki, (size_t)spki_length, &key), ==, TC_TLV_OK);
+    munit_assert_int(TC_X509_subject_public_key((TC_bytes){spki, (size_t)spki_length}, &key), ==,
+                     TC_TLV_OK);
     munit_assert_int(EVP_DigestSignInit(signer, NULL, EVP_sha256(), NULL, generated), ==, 1);
     munit_assert_int(EVP_DigestSign(signer, signature, &signature_length, message, sizeof message),
                      ==, 1);
@@ -613,7 +615,7 @@ static MunitResult rsa_signature(const MunitParameter params[], void* user)
       TC_TLV_frame frames[FRAME_CAPACITY];
       const TC_TLV_limits limits = {sizeof encoded_signature, sizeof encoded_signature, 32,
                                     FRAME_CAPACITY};
-      const TC_CMS_signature_workspace verification = {frames, FRAME_CAPACITY, NULL, 0};
+      const TC_CMS_signature_workspace verification = {{frames, FRAME_CAPACITY}, NULL, 0};
       const TC_X509_native_workspace native = {NULL, &workspace,
                                                TC_X509_NATIVE_DEFAULT_SIGNATURE_WORK};
       const TC_X509_signature_provider provider = TC_X509_native_provider(&native);
@@ -689,7 +691,7 @@ static MunitResult signed_data(const MunitParameter params[], void* user)
                                         NAME_ATTRIBUTES};
   TC_TLV_frame frames[FRAME_CAPACITY];
   TC_bytes extension_oids[NAME_ATTRIBUTES];
-  TC_X509_workspace parser = {frames, FRAME_CAPACITY, extension_oids, NAME_ATTRIBUTES};
+  TC_X509_workspace parser = {{frames, FRAME_CAPACITY}, extension_oids, NAME_ATTRIBUTES};
   TC_X509_certificate parsed_certificate;
   const TC_TLV_limits limits = {ENCODED_CAPACITY, ENCODED_CAPACITY, ELEMENT_LIMIT, FRAME_CAPACITY};
   TC_hash_context hash_workspace;
@@ -710,9 +712,9 @@ static MunitResult signed_data(const MunitParameter params[], void* user)
   add_extension(certificate, NID_subject_key_identifier, "hash");
   certificate_length = encode_certificate(certificate, generated, EVP_sha256(), certificate_der,
                                           sizeof certificate_der);
-  munit_assert_int(
-      TC_X509_read(certificate_der, certificate_length, &limits, &parser, &parsed_certificate), ==,
-      TC_TLV_OK);
+  munit_assert_int(TC_X509_read((TC_bytes){certificate_der, certificate_length}, &limits, &parser,
+                                &parsed_certificate),
+                   ==, TC_TLV_OK);
   key = parsed_certificate.public_key;
   other_certificate = make_certificate(other_key, "Other signer", NULL);
   add_extension(other_certificate, NID_subject_key_identifier, "hash");
@@ -852,7 +854,7 @@ static MunitResult signed_data(const MunitParameter params[], void* user)
         ==, TC_TLV_OK);
     munit_assert_int(matched, ==, 1);
     {
-      const TC_CMS_signature_workspace verification = {frames, FRAME_CAPACITY, NULL, 0};
+      const TC_CMS_signature_workspace verification = {{frames, FRAME_CAPACITY}, NULL, 0};
       size_t verification_work = WORK_BUDGET;
       const TC_bytes content_digest = {digest, hash.digest_length};
       munit_assert_int(
@@ -994,8 +996,8 @@ static MunitResult signed_data(const MunitParameter params[], void* user)
                                               (TC_bytes){digest, hash.digest_length}, joined, &ec,
                                               NULL, TC_X509_NATIVE_DEFAULT_SIGNATURE_WORK),
                          ==, TC_X509_SIGNATURE_VALID);
-        const TC_CMS_signature_workspace verification = {frames, FRAME_CAPACITY, scratch,
-                                                         sizeof scratch};
+        const TC_CMS_signature_workspace verification = {
+            {frames, FRAME_CAPACITY}, scratch, sizeof scratch};
         size_t verification_work = WORK_BUDGET;
         munit_assert_int(
             TC_CMS_signer_verify_digest(
@@ -1142,7 +1144,7 @@ static MunitResult revocations(const MunitParameter params[], void* user)
       TC_X509_PATH_WORKSPACE_INIT(frames, oids, name_left, name_right, name_flags, nodes, edges,
                                   expected, mappings, policies, certificate_cache, summaries);
   TC_X509_search_workspace search = {path, search_frames, PATH_CAPACITY};
-  TC_X509_workspace parser = {frames, FRAME_CAPACITY, oids, EXTENSION_CAPACITY};
+  TC_X509_workspace parser = {{frames, FRAME_CAPACITY}, oids, EXTENSION_CAPACITY};
   TC_X509_certificate signer;
   const TC_TLV_limits limits = {ENCODED_CAPACITY, ENCODED_CAPACITY, 256, FRAME_CAPACITY};
   size_t work;
@@ -1169,8 +1171,9 @@ static MunitResult revocations(const MunitParameter params[], void* user)
   munit_assert_size((size_t)other_length, <=, sizeof other_spki);
   cursor = other_spki;
   munit_assert_int(i2d_PUBKEY(other_key, &cursor), ==, other_length);
-  munit_assert_int(TC_X509_subject_public_key(other_spki, (size_t)other_length, &other_public), ==,
-                   TC_TLV_OK);
+  munit_assert_int(
+      TC_X509_subject_public_key((TC_bytes){other_spki, (size_t)other_length}, &other_public), ==,
+      TC_TLV_OK);
   munit_assert_int(ASN1_TIME_set_string(date, "260101000000Z"), ==, 1);
   certificate = make_certificate(generated, "CRL issuer", NULL);
   add_extension(certificate, NID_subject_key_identifier, "hash");
@@ -1181,8 +1184,9 @@ static MunitResult revocations(const MunitParameter params[], void* user)
   munit_assert_size((size_t)signer_length, <=, sizeof signer_der);
   cursor = signer_der;
   munit_assert_int(i2d_X509(certificate, &cursor), ==, signer_length);
-  munit_assert_int(TC_X509_read(signer_der, (size_t)signer_length, &limits, &parser, &signer), ==,
-                   TC_TLV_OK);
+  munit_assert_int(
+      TC_X509_read((TC_bytes){signer_der, (size_t)signer_length}, &limits, &parser, &signer), ==,
+      TC_TLV_OK);
   X509* denied_certificate = X509_dup(certificate);
   munit_assert_not_null(denied_certificate);
   const int denied_usage = X509_get_ext_by_NID(denied_certificate, NID_key_usage, -1);
@@ -1204,7 +1208,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
   munit_assert_int(spki_length, >, 0);
   munit_assert_size((size_t)spki_length, <=, sizeof spki);
   munit_assert_int(i2d_PUBKEY(generated, &cursor), ==, spki_length);
-  munit_assert_int(TC_X509_subject_public_key(spki, (size_t)spki_length, &key), ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_subject_public_key((TC_bytes){spki, (size_t)spki_length}, &key), ==,
+                   TC_TLV_OK);
   TC_X509_store_anchor anchors[2] = {0};
   anchors[0].trust = (TC_X509_trust_anchor){signer.subject, other_public};
   anchors[1].trust = (TC_X509_trust_anchor){signer.subject, signer.public_key};
@@ -1432,10 +1437,11 @@ static MunitResult revocations(const MunitParameter params[], void* user)
       munit_assert_int(
           tc_x509_crl_signer_validate(
               &parsed, &signer,
-              &(tc_x509_crl_trust){
-                  &source, 1, &options,
-                  &(tc_pki_tree_workspace){validation.frames, validation.frame_capacity, &work},
-                  &validation, &search, &(TC_X509_revocation_time){(&options)->at, 0, 0}},
+              &(tc_x509_crl_trust){&source, 1, &options,
+                                   &(tc_pki_tree_workspace){validation.frames.data,
+                                                            validation.frames.capacity, &work},
+                                   &validation, &search,
+                                   &(TC_X509_revocation_time){(&options)->at, 0, 0}},
               &found),
           ==, TC_X509_PATH_VALID);
       munit_assert_size(found.anchor_index, ==, 1);
@@ -1463,10 +1469,11 @@ static MunitResult revocations(const MunitParameter params[], void* user)
         munit_assert_int(
             tc_x509_crl_signer_validate(
                 &parsed, &signer,
-                &(tc_x509_crl_trust){
-                    &source, anchor_index, &rejected,
-                    &(tc_pki_tree_workspace){validation.frames, validation.frame_capacity, &work},
-                    &validation, &search, &(TC_X509_revocation_time){(&rejected)->at, 0, 0}},
+                &(tc_x509_crl_trust){&source, anchor_index, &rejected,
+                                     &(tc_pki_tree_workspace){validation.frames.data,
+                                                              validation.frames.capacity, &work},
+                                     &validation, &search,
+                                     &(TC_X509_revocation_time){(&rejected)->at, 0, 0}},
                 &found),
             ==, failure == 3 ? TC_X509_PATH_LIMIT : TC_X509_PATH_INVALID);
         munit_assert_memory_equal(sizeof found, &found, &saved);
@@ -1477,26 +1484,29 @@ static MunitResult revocations(const MunitParameter params[], void* user)
       munit_assert_int(
           tc_x509_crl_signer_validate(
               &parsed, &signer,
-              &(tc_x509_crl_trust){
-                  &source, 1, &options,
-                  &(tc_pki_tree_workspace){validation.frames, validation.frame_capacity, &work},
-                  &validation, &search, &(TC_X509_revocation_time){(&options)->at, 0, 0}},
+              &(tc_x509_crl_trust){&source, 1, &options,
+                                   &(tc_pki_tree_workspace){validation.frames.data,
+                                                            validation.frames.capacity, &work},
+                                   &validation, &search,
+                                   &(TC_X509_revocation_time){(&options)->at, 0, 0}},
               &found),
           ==, TC_X509_PATH_VALID);
       munit_assert_size(work, ==, 0);
       {
         TC_X509_certificate denied_signer;
-        munit_assert_int(TC_X509_read(denied_der, denied_length, &limits, &parser, &denied_signer),
-                         ==, TC_TLV_OK);
+        munit_assert_int(
+            TC_X509_read((TC_bytes){denied_der, denied_length}, &limits, &parser, &denied_signer),
+            ==, TC_TLV_OK);
         work = TRUST_WORK_BUDGET;
         memcpy(&found, &saved, sizeof found);
         munit_assert_int(
             tc_x509_crl_signer_validate(
                 &parsed, &denied_signer,
-                &(tc_x509_crl_trust){
-                    &source, 1, &options,
-                    &(tc_pki_tree_workspace){validation.frames, validation.frame_capacity, &work},
-                    &validation, &search, &(TC_X509_revocation_time){(&options)->at, 0, 0}},
+                &(tc_x509_crl_trust){&source, 1, &options,
+                                     &(tc_pki_tree_workspace){validation.frames.data,
+                                                              validation.frames.capacity, &work},
+                                     &validation, &search,
+                                     &(TC_X509_revocation_time){(&options)->at, 0, 0}},
                 &found),
             ==, TC_X509_PATH_INVALID);
         munit_assert_memory_equal(sizeof found, &found, &saved);
@@ -1504,10 +1514,11 @@ static MunitResult revocations(const MunitParameter params[], void* user)
         munit_assert_int(
             tc_x509_crl_signer_validate(
                 &parsed, &signer,
-                &(tc_x509_crl_trust){
-                    &source, source.anchor_count, &options,
-                    &(tc_pki_tree_workspace){validation.frames, validation.frame_capacity, &work},
-                    &validation, &search, &(TC_X509_revocation_time){(&options)->at, 0, 0}},
+                &(tc_x509_crl_trust){&source, source.anchor_count, &options,
+                                     &(tc_pki_tree_workspace){validation.frames.data,
+                                                              validation.frames.capacity, &work},
+                                     &validation, &search,
+                                     &(TC_X509_revocation_time){(&options)->at, 0, 0}},
                 &found),
             ==, TC_X509_PATH_ERROR);
         munit_assert_memory_equal(sizeof found, &found, &saved);
@@ -1516,10 +1527,11 @@ static MunitResult revocations(const MunitParameter params[], void* user)
         munit_assert_int(
             tc_x509_crl_signer_validate(
                 &parsed, &signer,
-                &(tc_x509_crl_trust){
-                    &source, 1, &options,
-                    &(tc_pki_tree_workspace){validation.frames, validation.frame_capacity, &work},
-                    &validation, &search, &(TC_X509_revocation_time){(&options)->at, 0, 0}},
+                &(tc_x509_crl_trust){&source, 1, &options,
+                                     &(tc_pki_tree_workspace){validation.frames.data,
+                                                              validation.frames.capacity, &work},
+                                     &validation, &search,
+                                     &(TC_X509_revocation_time){(&options)->at, 0, 0}},
                 &found),
             ==, TC_X509_PATH_UNSUPPORTED);
         munit_assert_memory_equal(sizeof found, &found, &saved);
@@ -1990,8 +2002,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                   replacement, generated, EVP_sha256(), replacement_der, sizeof replacement_der);
               TC_X509_certificate replacement_view;
               work = TRUST_WORK_BUDGET;
-              munit_assert_int(TC_X509_read(replacement_der, replacement_length, &limits, &parser,
-                                            &replacement_view),
+              munit_assert_int(TC_X509_read((TC_bytes){replacement_der, replacement_length},
+                                            &limits, &parser, &replacement_view),
                                ==, TC_TLV_OK);
               TC_bytes rollover_inputs[PARTITIONS];
               X509_CRL* newest = NULL;
@@ -2103,8 +2115,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                             &rows[reference].crl, generation ? &replacement_view : &signer,
                             &(tc_x509_crl_trust){
                                 &source, 1, &rollover_options,
-                                &(tc_pki_tree_workspace){validation.frames,
-                                                         validation.frame_capacity, &work},
+                                &(tc_pki_tree_workspace){validation.frames.data,
+                                                         validation.frames.capacity, &work},
                                 &validation, &search,
                                 &(TC_X509_revocation_time){(&rollover_options)->at, 0, 0}},
                             &found),
@@ -2506,8 +2518,9 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                   encode_certificate(leaf, other_key, EVP_sha256(), leaf_der, sizeof leaf_der);
               X509_free(leaf);
               TC_X509_certificate leaf_view;
-              munit_assert_int(TC_X509_read(leaf_der, leaf_length, &limits, &parser, &leaf_view),
-                               ==, TC_TLV_OK);
+              munit_assert_int(
+                  TC_X509_read((TC_bytes){leaf_der, leaf_length}, &limits, &parser, &leaf_view), ==,
+                  TC_TLV_OK);
               const TC_bytes chain[] = {{issuer_der, issuer_length}, {leaf_der, leaf_length}};
               TC_X509_path_result validated;
               work = TRUST_WORK_BUDGET;
@@ -2615,9 +2628,9 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                                              {NULL, 0, 0, 0}};
                 if (!rejected) {
                   TC_X509_certificate issuer_view;
-                  munit_assert_int(
-                      TC_X509_read(issuer_der, issuer_length, &limits, &parser, &issuer_view), ==,
-                      TC_TLV_OK);
+                  munit_assert_int(TC_X509_read((TC_bytes){issuer_der, issuer_length}, &limits,
+                                                &parser, &issuer_view),
+                                   ==, TC_TLV_OK);
                   signature_retry_probe signature_count = {provider, 0, 0, TC_X509_SIGNATURE_ERROR};
                   TC_X509_path_options counted = options;
                   counted.signatures =
@@ -3417,9 +3430,9 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                         X509_free(cert);
                         TC_X509_certificate target_view;
                         const int rejected_at_read = kind == DUPLICATE || kind == BAD_ALT;
-                        munit_assert_int(
-                            TC_X509_read(target_der, length, &limits, &parser, &target_view), ==,
-                            rejected_at_read ? TC_TLV_INVALID : TC_TLV_OK);
+                        munit_assert_int(TC_X509_read((TC_bytes){target_der, length}, &limits,
+                                                      &parser, &target_view),
+                                         ==, rejected_at_read ? TC_TLV_INVALID : TC_TLV_OK);
                         if (rejected_at_read) {
                           /* Exercise the private driver's parsed-view checks
                            * too. */
@@ -3862,8 +3875,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
             crl_signer_scope(
                 &selected_record, signer.encoded, &query,
                 &(tc_x509_crl_trust){&source, 1, &checked,
-                                     &(tc_pki_tree_workspace){(&validation)->frames,
-                                                              (&validation)->frame_capacity, &work},
+                                     &(tc_pki_tree_workspace){validation.frames.data,
+                                                              validation.frames.capacity, &work},
                                      &validation, &search,
                                      &(TC_X509_revocation_time){(&checked)->at, 0, 0}},
                 &evidence, &trusted),
@@ -3882,8 +3895,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
             crl_signer_scope(
                 &selected_record, signer.encoded, &query,
                 &(tc_x509_crl_trust){&source, 1, &checked,
-                                     &(tc_pki_tree_workspace){(&validation)->frames,
-                                                              (&validation)->frame_capacity, &work},
+                                     &(tc_pki_tree_workspace){validation.frames.data,
+                                                              validation.frames.capacity, &work},
                                      &validation, &search,
                                      &(TC_X509_revocation_time){(&checked)->at, 0, 0}},
                 &evidence, &trusted),
@@ -3897,8 +3910,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
             crl_signer_scope(
                 &selected_record, signer.encoded, &query,
                 &(tc_x509_crl_trust){&source, 1, &options,
-                                     &(tc_pki_tree_workspace){(&validation)->frames,
-                                                              (&validation)->frame_capacity, &work},
+                                     &(tc_pki_tree_workspace){validation.frames.data,
+                                                              validation.frames.capacity, &work},
                                      &validation, &search,
                                      &(TC_X509_revocation_time){(&options)->at, 0, 0}},
                 &evidence, &trusted),
@@ -3970,14 +3983,14 @@ static MunitResult revocations(const MunitParameter params[], void* user)
           const TC_X509_crl_record rejected_record = {copy, info, TC_TLV_OK};
           trusted = unchanged;
           munit_assert_int(
-              crl_signer_scope(&rejected_record, signer.encoded, &rejected_query,
-                               &(tc_x509_crl_trust){
-                                   &source, anchor_index, &rejected_options,
-                                   &(tc_pki_tree_workspace){(&validation)->frames,
-                                                            (&validation)->frame_capacity, &work},
-                                   &validation, &search,
-                                   &(TC_X509_revocation_time){(&rejected_options)->at, 0, 0}},
-                               &evidence, &trusted),
+              crl_signer_scope(
+                  &rejected_record, signer.encoded, &rejected_query,
+                  &(tc_x509_crl_trust){&source, anchor_index, &rejected_options,
+                                       &(tc_pki_tree_workspace){validation.frames.data,
+                                                                validation.frames.capacity, &work},
+                                       &validation, &search,
+                                       &(TC_X509_revocation_time){(&rejected_options)->at, 0, 0}},
+                  &evidence, &trusted),
               ==, expected_result);
           munit_assert_memory_equal(sizeof evidence, &evidence, &before);
           munit_assert_memory_equal(sizeof trusted, &trusted, &unchanged);
@@ -3990,8 +4003,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
             crl_signer_scope(
                 &selected_record, signer.encoded, &query,
                 &(tc_x509_crl_trust){&source, 1, &options,
-                                     &(tc_pki_tree_workspace){(&validation)->frames,
-                                                              (&validation)->frame_capacity, &work},
+                                     &(tc_pki_tree_workspace){validation.frames.data,
+                                                              validation.frames.capacity, &work},
                                      &validation, &search,
                                      &(TC_X509_revocation_time){(&options)->at, 0, 0}},
                 &evidence, &trusted),
@@ -4004,8 +4017,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
             crl_signer_scope(
                 &selected_record, signer.encoded, &query,
                 &(tc_x509_crl_trust){&source, 1, &options,
-                                     &(tc_pki_tree_workspace){(&validation)->frames,
-                                                              (&validation)->frame_capacity, &work},
+                                     &(tc_pki_tree_workspace){validation.frames.data,
+                                                              validation.frames.capacity, &work},
                                      &validation, &search,
                                      &(TC_X509_revocation_time){(&options)->at, 0, 0}},
                 &evidence, &trusted),
@@ -4015,14 +4028,14 @@ static MunitResult revocations(const MunitParameter params[], void* user)
           point.reasons = TC_X509_CRL_ALL_REASONS & ~KEY_COMPROMISE_REASONS;
           work = TRUST_WORK_BUDGET;
           munit_assert_int(
-              crl_signer_scope(&selected_record, signer.encoded, &query,
-                               &(tc_x509_crl_trust){
-                                   &source, 1, &options,
-                                   &(tc_pki_tree_workspace){(&validation)->frames,
-                                                            (&validation)->frame_capacity, &work},
-                                   &validation, &search,
-                                   &(TC_X509_revocation_time){(&options)->at, 0, 0}},
-                               &evidence, &trusted),
+              crl_signer_scope(
+                  &selected_record, signer.encoded, &query,
+                  &(tc_x509_crl_trust){&source, 1, &options,
+                                       &(tc_pki_tree_workspace){validation.frames.data,
+                                                                validation.frames.capacity, &work},
+                                       &validation, &search,
+                                       &(TC_X509_revocation_time){(&options)->at, 0, 0}},
+                  &evidence, &trusted),
               ==, TC_TLV_OK);
           munit_assert_int(tc_x509_crl_evidence_status(&evidence, &status), ==, TC_TLV_OK);
           munit_assert_int(status, ==, TC_X509_REVOCATION_GOOD);
@@ -4146,8 +4159,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                     complete.base, &signer,
                     &(tc_x509_crl_trust){
                         &source, 1, &updated,
-                        &(tc_pki_tree_workspace){(&validation)->frames,
-                                                 (&validation)->frame_capacity, &work},
+                        &(tc_pki_tree_workspace){validation.frames.data, validation.frames.capacity,
+                                                 &work},
                         &validation, &search, &(TC_X509_revocation_time){(&updated)->at, 0, 0}},
                     &trusted),
                 ==, TC_X509_PATH_VALID);
@@ -4496,7 +4509,7 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                   &source,
                   1,
                   &updated,
-                  &(tc_pki_tree_workspace){(&validation)->frames, (&validation)->frame_capacity,
+                  &(tc_pki_tree_workspace){validation.frames.data, validation.frames.capacity,
                                            &work},
                   &validation,
                   &search,
@@ -5358,8 +5371,9 @@ static MunitResult revocations(const MunitParameter params[], void* user)
       munit_assert_int(tc_x509_crl_extension_info_read(entry_view.extensions, &limits, &tree, oids,
                                                        EXTENSION_CAPACITY, &entry_info),
                        ==, TC_TLV_OK);
-      munit_assert_int(TC_X509_read(expired_der, expired_length, &limits, &parser, &expired), ==,
-                       TC_TLV_OK);
+      munit_assert_int(
+          TC_X509_read((TC_bytes){expired_der, expired_length}, &limits, &parser, &expired), ==,
+          TC_TLV_OK);
       const uint8_t serial = 9;
       TC_X509_certificate target = {0};
       target.serial = (TC_bytes){&serial, 1};
@@ -5383,8 +5397,8 @@ static MunitResult revocations(const MunitParameter params[], void* user)
             crl_signer_scope(
                 &entry_record, scenario == EXPIRED ? expired.encoded : signer.encoded, &query,
                 &(tc_x509_crl_trust){&source, scenario == WRONG_ANCHOR ? 0 : 1, &checked,
-                                     &(tc_pki_tree_workspace){(&validation)->frames,
-                                                              (&validation)->frame_capacity, &work},
+                                     &(tc_pki_tree_workspace){validation.frames.data,
+                                                              validation.frames.capacity, &work},
                                      &validation, &search,
                                      &(TC_X509_revocation_time){(&checked)->at, 0, 0}},
                 &evidence, &found),
@@ -5446,7 +5460,7 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
       TC_X509_PATH_WORKSPACE_INIT(frames, oids, left, right, name_flags, nodes, edges, expected,
                                   mappings, policies, certificate_cache, summaries);
   TC_X509_search_workspace search = {path, search_frames, PATH_CAPACITY};
-  TC_X509_workspace parser = {frames, FRAME_CAPACITY, oids, POLICY_CAPACITY};
+  TC_X509_workspace parser = {{frames, FRAME_CAPACITY}, oids, POLICY_CAPACITY};
   const TC_TLV_limits limits = {CMS_CAPACITY, CMS_CAPACITY, 256, FRAME_CAPACITY};
   TC_ECDSA_workspace ec;
   TC_RSA_word rsa_words[TC_RSA_VERIFY_WORKSPACE_WORDS(RSA_BITS)];
@@ -5512,8 +5526,8 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
   munit_assert_size((size_t)length, <=, sizeof encoded);
   unsigned char* cursor = encoded;
   munit_assert_int(i2d_CMS_ContentInfo(cms, &cursor), ==, length);
-  munit_assert_int(TC_X509_read(root_der, root_length, &limits, &parser, &parsed_root), ==,
-                   TC_TLV_OK);
+  munit_assert_int(TC_X509_read((TC_bytes){root_der, root_length}, &limits, &parser, &parsed_root),
+                   ==, TC_TLV_OK);
   TC_X509_store_anchor anchor = {.trust = {parsed_root.subject, parsed_root.public_key}};
   const TC_X509_store_source external = {&anchor, 0, 1, NULL, crl_trust_anchor};
   options.at = (TC_X509_time){2026, 1, 1, 0, 0, 0};
@@ -5550,7 +5564,7 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
     TC_CMS_signer_info signer;
     TC_X509_search_result saved;
     uint8_t digest[TC_SHA256_DIGESTLEN];
-    const TC_CMS_signature_workspace signature = {frames, FRAME_CAPACITY, NULL, 0};
+    const TC_CMS_signature_workspace signature = {{frames, FRAME_CAPACITY}, NULL, 0};
     const TC_bytes content_digest = {digest, sizeof digest};
     work = WORK_BUDGET;
     munit_assert_int(TC_CMS_signers_init(container.signers, &cms_policy, &limits,
@@ -5761,9 +5775,9 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
                                            {root_der, root_length}};
             TC_X509_crl_target targets[3];
             for (size_t target = 0; target < 3; ++target) {
-              munit_assert_int(TC_X509_read(target_der[target].data, target_der[target].length,
-                                            &limits, &parser, &target_certificates[target]),
-                               ==, TC_TLV_OK);
+              munit_assert_int(
+                  TC_X509_read(target_der[target], &limits, &parser, &target_certificates[target]),
+                  ==, TC_TLV_OK);
               size_t usage_work = WORK_BUDGET;
               int authorized = 0;
               munit_assert_int(tc_x509_crl_signer_usage(&target_certificates[target], &limits,
@@ -5778,10 +5792,11 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
               work = WORK_BUDGET;
               TC_X509_path_status signer_status = tc_x509_crl_signer_validate(
                   &records[record].crl, &target_certificates[record + 1],
-                  &(tc_x509_crl_trust){
-                      &held->source, 0, &options,
-                      &(tc_pki_tree_workspace){validation.frames, validation.frame_capacity, &work},
-                      &validation, &search, &(TC_X509_revocation_time){(&options)->at, 0, 0}},
+                  &(tc_x509_crl_trust){&held->source, 0, &options,
+                                       &(tc_pki_tree_workspace){validation.frames.data,
+                                                                validation.frames.capacity, &work},
+                                       &validation, &search,
+                                       &(TC_X509_revocation_time){(&options)->at, 0, 0}},
                   &trusted_signer);
               munit_assert_int(signer_status, ==, TC_X509_PATH_VALID);
             }
@@ -6011,9 +6026,9 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
               }
             }
             TC_X509_certificate wrong_key;
-            munit_assert_int(
-                TC_X509_read(intermediate_der, intermediate_length, &limits, &parser, &wrong_key),
-                ==, TC_TLV_OK);
+            munit_assert_int(TC_X509_read((TC_bytes){intermediate_der, intermediate_length},
+                                          &limits, &parser, &wrong_key),
+                             ==, TC_TLV_OK);
             TC_X509_store_anchor wrong_anchor = anchor;
             wrong_anchor.trust.public_key = wrong_key.public_key;
             const TC_X509_store_source wrong_trust = {&wrong_anchor, 0, 1, NULL, crl_trust_anchor};
@@ -6969,7 +6984,7 @@ static void credential_public_workflow(const credential_issuers* issuers,
       encode_issuer_crl(root, root_key, certificate, revoked_crl_bytes, sizeof revoked_crl_bytes)};
   TC_TLV_frame crl_frames[16];
   TC_bytes crl_oids[16];
-  TC_X509_workspace crl_parser = {crl_frames, 16, crl_oids, 16};
+  TC_X509_workspace crl_parser = {{crl_frames, 16}, crl_oids, 16};
   TC_X509_crl_record revoked_record;
   TC_X509_crl_index revoked_index;
   size_t crl_work = WORK;
@@ -6985,8 +7000,8 @@ static void credential_public_workflow(const credential_issuers* issuers,
   const size_t wrong_root_length = encode_certificate(wrong_root, wrong_root_key, EVP_sha256(),
                                                       wrong_root_bytes, sizeof wrong_root_bytes);
   TC_X509_certificate parsed_wrong_root;
-  munit_assert_int(TC_X509_read(wrong_root_bytes, wrong_root_length, &content->options->parsing,
-                                &crl_parser, &parsed_wrong_root),
+  munit_assert_int(TC_X509_read((TC_bytes){wrong_root_bytes, wrong_root_length},
+                                &content->options->parsing, &crl_parser, &parsed_wrong_root),
                    ==, TC_TLV_OK);
   TC_X509_store_anchor wrong_anchor = {
       .trust = {parsed_wrong_root.subject, parsed_wrong_root.public_key}};
@@ -7281,13 +7296,13 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
   TC_TLV_frame frames[FRAME_COUNT];
   TC_bytes oids[OID_COUNT];
   const TC_TLV_limits limits = {OBJECT_BYTES, OBJECT_BYTES, 256, FRAME_COUNT};
-  TC_X509_workspace parser = {frames, FRAME_COUNT, oids, OID_COUNT};
+  TC_X509_workspace parser = {{frames, FRAME_COUNT}, oids, OID_COUNT};
   TC_ECDSA_workspace ec;
   TC_RSA_word rsa_words[TC_RSA_VERIFY_WORKSPACE_WORDS(3072)];
   const TC_RSA_workspace rsa = {rsa_words, sizeof rsa_words / sizeof *rsa_words};
   const TC_X509_native_workspace native = {&ec, &rsa, TC_X509_NATIVE_DEFAULT_SIGNATURE_WORK};
   const TC_X509_signature_provider provider = TC_X509_native_provider(&native);
-  const TC_CMS_signature_workspace verification = {frames, FRAME_COUNT, NULL, 0};
+  const TC_CMS_signature_workspace verification = {{frames, FRAME_COUNT}, NULL, 0};
   EVP_PKEY* key = EVP_EC_gen("prime256v1");
   EVP_PKEY* root_key = EVP_EC_gen("prime256v1");
   munit_assert_not_null(key);
@@ -7317,9 +7332,9 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
   size_t certificate_length = encode_certificate(certificate, root_key, EVP_sha256(),
                                                  certificate_bytes, sizeof certificate_bytes);
   TC_X509_certificate signer_certificate;
-  munit_assert_int(
-      TC_X509_read(certificate_bytes, certificate_length, &limits, &parser, &signer_certificate),
-      ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_read((TC_bytes){certificate_bytes, certificate_length}, &limits, &parser,
+                                &signer_certificate),
+                   ==, TC_TLV_OK);
   encoded[27] = 0x34;
   encoded[28] = 16;
   static const uint8_t card_guid[] = {0x91, 0xbe, 0x20, 0x94, 0xf6, 0xdc, 0x53, 0x49,
@@ -7386,8 +7401,7 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
       static const uint8_t content_signing[] = {0x60, 0x86, 0x48, 1, 0x65, 3, 6, 7};
       static const uint8_t twic_content_signing[] = {0x2b, 6, 1, 4, 1, 0x81, 0xe3, 0x52, 6, 7};
       TC_X509_certificate parsed_root;
-      munit_assert_int(TC_X509_read(root_der.data, root_der.length, &limits, &parser, &parsed_root),
-                       ==, TC_TLV_OK);
+      munit_assert_int(TC_X509_read(root_der, &limits, &parser, &parsed_root), ==, TC_TLV_OK);
       TC_X509_store_anchor anchor = {.trust = {parsed_root.subject, parsed_root.public_key}};
       const TC_X509_store_source anchors = {&anchor, 0, 1, NULL, crl_trust_anchor};
       candidate_source supplied = {&root_der, 1, 0, TC_TLV_OK, 0};
@@ -7947,8 +7961,8 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
                   encode_certificate(redundant, root_key, EVP_sha256(), biometric_certificate,
                                      sizeof biometric_certificate);
               TC_X509_certificate redundant_view;
-              munit_assert_int(TC_X509_read(biometric_certificate, redundant_length, &limits,
-                                            &parser, &redundant_view),
+              munit_assert_int(TC_X509_read((TC_bytes){biometric_certificate, redundant_length},
+                                            &limits, &parser, &redundant_view),
                                ==, TC_TLV_OK);
               munit_assert_size(redundant_view.public_key.key.length, ==, reissued == 2 ? 33 : 65);
             }
@@ -8270,15 +8284,15 @@ static MunitResult legacy_chuid_key_map_signature(const MunitParameter params[],
                       &limits, (TC_TLV_frames){frames, FRAMES}, &work, &object),
       ==, TC_TLV_OK);
   TC_bytes oids[OIDS];
-  TC_X509_workspace parser = {frames, FRAMES, oids, OIDS};
+  TC_X509_workspace parser = {{frames, FRAMES}, oids, OIDS};
   TC_X509_certificate parsed_certificate;
-  munit_assert_int(
-      TC_X509_read(certificate_bytes, certificate_length, &limits, &parser, &parsed_certificate),
-      ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_read((TC_bytes){certificate_bytes, certificate_length}, &limits, &parser,
+                                &parsed_certificate),
+                   ==, TC_TLV_OK);
   TC_ECDSA_workspace ec;
   const TC_X509_native_workspace native = {&ec, NULL, TC_X509_NATIVE_DEFAULT_SIGNATURE_WORK};
   const TC_X509_signature_provider provider = TC_X509_native_provider(&native);
-  const TC_CMS_signature_workspace signature = {frames, FRAMES, NULL, 0};
+  const TC_CMS_signature_workspace signature = {{frames, FRAMES}, NULL, 0};
   for (unsigned changed = 0; changed < 2; ++changed) {
     uint8_t digest[TC_SHA256_DIGESTLEN];
     struct TC_SHA256_ctx hash;
@@ -8318,7 +8332,7 @@ static MunitResult security_profile(const MunitParameter params[], void* user)
   TC_TLV_frame frames[FRAMES];
   TC_bytes oids[FRAMES];
   const TC_TLV_limits limits = {CAPACITY, CAPACITY, 256, FRAMES};
-  TC_X509_workspace parser = {frames, FRAMES, oids, FRAMES};
+  TC_X509_workspace parser = {{frames, FRAMES}, oids, FRAMES};
   EVP_PKEY* key = EVP_EC_gen("prime256v1");
   munit_assert_not_null(key);
   X509* certificate = make_certificate(key, "Synthetic security-object signer", NULL);
@@ -8326,13 +8340,13 @@ static MunitResult security_profile(const MunitParameter params[], void* user)
   const size_t certificate_length =
       encode_certificate(certificate, key, EVP_sha256(), certificate_bytes, CAPACITY);
   TC_X509_certificate parsed_certificate;
-  munit_assert_int(
-      TC_X509_read(certificate_bytes, certificate_length, &limits, &parser, &parsed_certificate),
-      ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_read((TC_bytes){certificate_bytes, certificate_length}, &limits, &parser,
+                                &parsed_certificate),
+                   ==, TC_TLV_OK);
   TC_ECDSA_workspace ec;
   const TC_X509_native_workspace native = {&ec, NULL, TC_X509_NATIVE_DEFAULT_SIGNATURE_WORK};
   const TC_X509_signature_provider provider = TC_X509_native_provider(&native);
-  const TC_CMS_signature_workspace signature = {frames, FRAMES, NULL, 0};
+  const TC_CMS_signature_workspace signature = {{frames, FRAMES}, NULL, 0};
   enum { VALID, DETACHED, EMBEDDED_CERTIFICATE, WRONG_TYPE, MRTD_TYPE, NO_ATTRIBUTES, VARIANTS };
   for (unsigned key_id = 0; key_id < 2; ++key_id) {
     for (unsigned variant = 0; variant < VARIANTS; ++variant) {

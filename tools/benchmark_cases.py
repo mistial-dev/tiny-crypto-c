@@ -151,8 +151,8 @@ for key_kind, bits in (("rsa", 2048), ("ec", 256)):
     data = benchmark_certificate(key_kind, bits)
     FEATURES.append((f"X.509 {key_kind.upper()}-{bits} certificate reader", c_array(data) +
         "TC_X509_certificate c; TC_TLV_limits bounds={1024,1024,128,8}; TC_TLV_frame frames[8]; "
-        "TC_bytes oids[8]; TC_X509_workspace work={frames,8,oids,8}; "
-        "CHECK(TC_X509_read(data,sizeof data,&bounds,&work,&c)); "
+        "TC_bytes oids[8]; TC_X509_workspace work={{frames,8},oids,8}; "
+        "CHECK(TC_X509_read((TC_bytes){data,sizeof data},&bounds,&work,&c)); "
         f"if(c.public_key.bits!={bits}) return 1; consume(c.public_key.key.data,c.public_key.key.length);",
         PKI + " -DTC_ENABLE_X509=1"))
 

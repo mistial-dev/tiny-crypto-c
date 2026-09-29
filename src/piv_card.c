@@ -133,9 +133,10 @@ static TC_TLV_result identifiers_read(TC_bytes encoded, TC_PIV_card_profile prof
     return result == TC_TLV_MORE ? TC_TLV_INVALID : result;
   if (tc_pki_end(&reader))
     return TC_TLV_INVALID;
-  while (!tc_pki_end(&reader)) {
+  TC_X509_general_names_reader names = {reader, frames};
+  while (!tc_pki_end(&names.reader)) {
     TC_X509_general_name name;
-    TC_TLV_reader next = reader;
+    TC_TLV_reader next = names.reader;
     TC_TLV_element element;
     result = TC_TLV_next(&next, &element);
     if (result != TC_TLV_OK)
@@ -144,7 +145,7 @@ static TC_TLV_result identifiers_read(TC_bytes encoded, TC_PIV_card_profile prof
     for (unsigned scan = 0; scan < 2; ++scan)
       if (tc_pki_work_charge(work, element.encoded.length) != TC_TLV_OK)
         return TC_TLV_LIMIT;
-    result = TC_X509_general_name_next(&reader, frames, &name);
+    result = TC_X509_general_name_next(&names, &name);
     if (result != TC_TLV_OK)
       return result;
     if (name.type == GENERAL_NAME_OTHER) {

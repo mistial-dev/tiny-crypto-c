@@ -12,11 +12,10 @@ static TC_TLV_result search_read(TC_bytes encoded, const TC_X509_path_options* o
                                  const TC_X509_path_workspace* workspace, size_t* work,
                                  TC_X509_certificate* out)
 {
-  TC_X509_workspace parser = {workspace->frames, workspace->frame_capacity, workspace->oids,
-                              workspace->oid_capacity};
+  TC_X509_workspace parser = {workspace->frames, workspace->oids, workspace->oid_capacity};
   if (tc_pki_work_charge(work, encoded.length) != TC_TLV_OK)
     return TC_TLV_LIMIT;
-  return TC_X509_read(encoded.data, encoded.length, &options->parsing, &parser, out);
+  return TC_X509_read(encoded, &options->parsing, &parser, out);
 }
 
 /* Read only the fixed TBSCertificate prefix needed to locate the subject,

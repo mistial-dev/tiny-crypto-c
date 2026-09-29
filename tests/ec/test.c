@@ -155,7 +155,7 @@ static MunitResult wycheproof(const MunitParameter params[], void* user)
 #if TC_ENABLE_X509
     else if (strcmp(fields[1], "asn") == 0) {
       TC_X509_public_key key;
-      if (TC_X509_subject_public_key(public_key, public_length, &key) == TC_TLV_OK &&
+      if (TC_X509_subject_public_key((TC_bytes){public_key, public_length}, &key) == TC_TLV_OK &&
           key.type == TC_KEY_EC && key.curve == curve)
         status = ec_dh(curve, scalar, scalar_length, key.key.data, key.key.length, output, width,
                        &workspace);

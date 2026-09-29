@@ -183,7 +183,7 @@ static MunitResult public_index(const MunitParameter params[], void* user)
   const TC_TLV_limits limits = {FIXTURE_CAPACITY, FIXTURE_CAPACITY, 128, FRAME_CAPACITY};
   TC_TLV_frame frames[FRAME_CAPACITY];
   TC_bytes oids[OID_CAPACITY];
-  const TC_X509_workspace workspace = {frames, FRAME_CAPACITY, oids, OID_CAPACITY};
+  const TC_X509_workspace workspace = {{frames, FRAME_CAPACITY}, oids, OID_CAPACITY};
   TC_X509_crl_record records[RECORD_COUNT];
   TC_X509_crl_index index, saved;
   memset(&saved, 0xa5, sizeof saved);
@@ -1942,7 +1942,7 @@ static MunitResult extension_info(const MunitParameter params[], void* user)
   TC_bytes oids[8];
   TC_TLV_limits limits = {FIXTURE_CAPACITY, FIXTURE_CAPACITY, 128, FRAME_CAPACITY};
   size_t work;
-  const TC_X509_workspace workspace = {frames, FRAME_CAPACITY, oids, 8};
+  const TC_X509_workspace workspace = {{frames, FRAME_CAPACITY}, oids, 8};
   TC_X509_crl_extensions info, saved;
   memset(&saved, 0xa5, sizeof saved);
   for (unsigned critical = 0; critical < 64; ++critical) {
@@ -2773,6 +2773,7 @@ static MunitResult distribution(const MunitParameter params[], void* user)
 
 static MunitResult named_bits(const MunitParameter params[], void* user)
 {
+  const TC_TLV_limits key_usage_limits = {8, 8, 1, 0};
   enum { REASON_BITS = 9, SENTINEL = 0xdead };
   (void)params;
   (void)user;
@@ -2799,8 +2800,9 @@ static MunitResult named_bits(const MunitParameter params[], void* user)
     munit_assert_uint(out, ==, flags);
     uint8_t key_usage[] = {3, (uint8_t)(length + 1), (uint8_t)unused, bytes[0], bytes[1]};
     out = SENTINEL;
-    munit_assert_int(TC_X509_key_usage_read(key_usage, length + 3, &out), ==,
-                     count ? TC_TLV_OK : TC_TLV_INVALID);
+    munit_assert_int(
+        TC_X509_key_usage_read((TC_bytes){key_usage, length + 3}, &key_usage_limits, &out), ==,
+        count ? TC_TLV_OK : TC_TLV_INVALID);
     munit_assert_uint(out, ==, count ? flags : SENTINEL);
     if (count) {
       uint16_t expected = 0;

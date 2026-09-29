@@ -104,7 +104,7 @@ static const TC_X509_path_workspace* credential_storage_of(const TC_validation_c
 static TC_TLV_frames credential_frames(const TC_validation_context* context)
 {
   const TC_X509_path_workspace* storage = credential_storage_of(context);
-  return (TC_TLV_frames){storage->frames, storage->frame_capacity};
+  return storage->frames;
 }
 
 /* Verify the CMS signature and the signer path with the prepared envelope. */

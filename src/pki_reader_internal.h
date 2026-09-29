@@ -55,7 +55,7 @@ static inline TC_TLV_result tc_pki_reader_workspace_storage(TC_bytes encoded,
   tc_pki_storage_plan_write_span(&plan, encoded);
   TC_PKI_PLAN_WRITE(&plan, limits, 1);
   TC_PKI_PLAN_WRITE(&plan, workspace, 1);
-  TC_PKI_PLAN_WRITE(&plan, workspace->frames, workspace->frame_capacity);
+  TC_PKI_PLAN_WRITE(&plan, workspace->frames.data, workspace->frames.capacity);
   TC_PKI_PLAN_WRITE(&plan, workspace->extension_oids, workspace->extension_capacity);
   TC_PKI_PLAN_WRITE(&plan, work, 1);
   tc_pki_storage_plan_write(&plan, out, out_size, 1);

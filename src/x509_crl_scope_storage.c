@@ -201,7 +201,7 @@ void tc_x509_crl_scope_plan_writes(tc_pki_storage_plan* plan,
   TC_PKI_PLAN_WRITE(plan, trust->search->frames, trust->search->capacity);
   TC_PKI_PLAN_WRITE(plan, trust->tree->frames, trust->tree->capacity);
   /* Tree traversal and path validation can reuse the same frame array. */
-  if (plan->status == TC_TLV_OK && trust->tree->frames == trust->validation->frames) {
+  if (plan->status == TC_TLV_OK && trust->tree->frames == trust->validation->frames.data) {
     if (plan->writes[CRL_SCOPE_TREE].length > plan->writes[TC_X509_PATH_STORAGE_FRAMES].length)
       plan->writes[TC_X509_PATH_STORAGE_FRAMES] = plan->writes[CRL_SCOPE_TREE];
     plan->writes[CRL_SCOPE_TREE] = (TC_bytes){NULL, 0};

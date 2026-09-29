@@ -318,7 +318,7 @@ TC_TLV_result tc_x509_crl_certificate_extension(void* context, const TC_X509_ext
   switch (tc_pki_extension_id(extension)) {
   case TC_PKI_EXT_BASIC_CONSTRAINTS: {
     TC_X509_basic_constraints basic;
-    result = TC_X509_basic_constraints_read(extension->value.data, extension->value.length, &basic);
+    result = TC_X509_basic_constraints_read(extension->value, fields->limits, &basic);
     if (result == TC_TLV_OK)
       fields->ca = basic.ca;
     return result;

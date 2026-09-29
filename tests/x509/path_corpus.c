@@ -116,7 +116,7 @@ static MunitResult corpus_case(const MunitParameter params[], void* user)
   TC_X509_store_source revocation_source = {&revocation_records, 0, 0, read_candidate, read_anchor};
   TC_TLV_frame parse_frames[32], path_frames[32];
   TC_bytes parse_oids[32], path_oids[32];
-  TC_X509_workspace parser = {parse_frames, 32, parse_oids, 32};
+  TC_X509_workspace parser = {{parse_frames, 32}, parse_oids, 32};
   uint32_t left[256], right[256];
   uint8_t matched[32], states[MAX_CRLS];
   TC_X509_policy_node nodes[64];
@@ -158,9 +158,8 @@ static MunitResult corpus_case(const MunitParameter params[], void* user)
   munit_assert_size(anchor_count, >, 0);
   for (size_t i = 0; i < anchor_count; ++i) {
     TC_X509_certificate parsed;
-    munit_assert_int(TC_X509_read(anchor_bytes[i].data, anchor_bytes[i].length, &options.parsing,
-                                  &parser, &parsed),
-                     ==, TC_TLV_OK);
+    munit_assert_int(TC_X509_read(anchor_bytes[i], &options.parsing, &parser, &parsed), ==,
+                     TC_TLV_OK);
     records.anchors[i].trust = (TC_X509_trust_anchor){parsed.subject, parsed.public_key};
   }
   records.anchor_count = source.anchor_count = anchor_count;

@@ -202,7 +202,7 @@ static TC_TLV_result trust_anchor_info(TC_bytes contents, const TC_TLV_limits* l
   if (!tc_pki_tag(&element, 0x30))
     return TC_TLV_INVALID;
   spki = element.encoded;
-  result = TC_X509_subject_public_key(spki.data, spki.length, &out->trust.public_key);
+  result = TC_X509_subject_public_key(spki, &out->trust.public_key);
   if (result != TC_TLV_OK)
     return result;
   result = tc_pki_field(&reader, 4, &element);
@@ -252,42 +252,44 @@ static TC_TLV_result trust_anchor_info(TC_bytes contents, const TC_TLV_limits* l
   return result == TC_TLV_END ? TC_TLV_OK : result;
 }
 
-TC_TLV_result TC_X509_trust_anchor_list_init(TC_TLV_reader* reader, const uint8_t* data,
-                                             size_t length, const TC_TLV_limits* limits,
+TC_TLV_result TC_X509_trust_anchor_list_init(TC_X509_trust_anchor_reader* reader, TC_bytes encoded,
+                                             const TC_TLV_limits* limits,
                                              TC_X509_workspace* workspace)
 {
-  TC_TLV_element list;
-  TC_TLV_reader parsed;
+  TC_X509_trust_anchor_reader parsed;
   TC_TLV_result result;
-  if (!reader || !limits || !workspace || (!workspace->frames && workspace->frame_capacity) ||
+  if (!reader || !limits || !workspace || (!workspace->frames.data && workspace->frames.capacity) ||
       (!workspace->extension_oids && workspace->extension_capacity))
     return TC_TLV_ARGUMENT;
-  result = TC_TLV_read(data, length, TC_TLV_DER, limits, &list);
+  /* RFC 5914 section 4: TrustAnchorList ::= SEQUENCE SIZE (1..MAX). */
+  result = tc_pki_value_open(&parsed.reader, encoded, 0x30, limits, 0);
   if (result != TC_TLV_OK)
     return result;
-  if (!tc_pki_tag(&list, 0x30) || list.encoded.length != length || !list.value.length)
-    return TC_TLV_INVALID;
-  result = TC_TLV_walk(data, length, TC_TLV_DER, limits,
-                       (TC_TLV_frames){workspace->frames, workspace->frame_capacity}, NULL, NULL);
+  result =
+      TC_TLV_walk(encoded.data, encoded.length, TC_TLV_DER, limits, workspace->frames, NULL, NULL);
   if (result != TC_TLV_OK)
-    return result;
-  result = contents_reader(&parsed, list.value, limits);
-  if (result != TC_TLV_OK)
-    return result;
+    return result == TC_TLV_MORE ? TC_TLV_INVALID : result;
+  /* The walk bounded the whole list. Each anchor is decoded under limits. */
+  parsed.reader.limits = *limits;
+  parsed.workspace = workspace;
   *reader = parsed;
   return TC_TLV_OK;
 }
 
-TC_TLV_result TC_X509_trust_anchor_next(TC_TLV_reader* reader, const TC_TLV_limits* limits,
-                                        TC_X509_workspace* workspace, TC_X509_store_anchor* out)
+TC_TLV_result TC_X509_trust_anchor_next(TC_X509_trust_anchor_reader* reader,
+                                        TC_X509_store_anchor* out)
 {
   TC_TLV_reader next;
   TC_TLV_element choice;
   TC_X509_store_anchor parsed = {0};
+  const TC_TLV_limits* limits;
+  TC_X509_workspace* workspace;
   TC_TLV_result result;
-  if (!reader || !limits || !workspace || !out || reader->profile != TC_TLV_DER)
+  if (!reader || !out)
     return TC_TLV_ARGUMENT;
-  next = *reader;
+  limits = &reader->reader.limits;
+  workspace = reader->workspace;
+  next = reader->reader;
   result = TC_TLV_next(&next, &choice);
   if (result != TC_TLV_OK)
     return result;
@@ -329,7 +331,7 @@ TC_TLV_result TC_X509_trust_anchor_next(TC_TLV_reader* reader, const TC_TLV_limi
 #endif
   } else
     return TC_TLV_INVALID;
-  *reader = next;
+  reader->reader = next;
   *out = parsed;
   return TC_TLV_OK;
 }

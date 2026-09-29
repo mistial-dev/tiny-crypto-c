@@ -36,9 +36,8 @@ card_identifiers(const TC_X509_validation_result* card, TC_PIV_card_profile prof
     return EXAMPLE_CREDENTIAL_LIMIT;
   *work -= card->certificate.extensions.length;
   TC_TLV_reader extensions;
-  TC_TLV_result status =
-      TC_X509_extensions_init(&extensions, card->certificate.extensions.data,
-                              card->certificate.extensions.length, &context->options->parsing);
+  TC_TLV_result status = TC_X509_extensions_init(&extensions, card->certificate.extensions,
+                                                 &context->options->parsing);
   if (status != TC_TLV_OK)
     goto done;
   static const uint8_t san_oid[] = {0x55, 0x1d, 17};
@@ -54,20 +53,19 @@ card_identifiers(const TC_X509_validation_result* card, TC_PIV_card_profile prof
     }
     if (card_key == EXAMPLE_CREDENTIAL_PIV_AUTHENTICATION)
       status = twic_reader_policy
-                   ? TC_TWIC_authentication_identifiers_read(
-                         extension.value, card_guid, &context->options->parsing,
-                         (TC_TLV_frames){storage->frames, storage->frame_capacity}, work, out)
-                   : TC_PIV_authentication_identifiers_read(
-                         extension.value, card_guid, &context->options->parsing,
-                         (TC_TLV_frames){storage->frames, storage->frame_capacity}, work, out);
+                   ? TC_TWIC_authentication_identifiers_read(extension.value, card_guid,
+                                                             &context->options->parsing,
+                                                             storage->frames, work, out)
+                   : TC_PIV_authentication_identifiers_read(extension.value, card_guid,
+                                                            &context->options->parsing,
+                                                            storage->frames, work, out);
     else
-      status = profile == TC_PIV_CARD
-                   ? TC_PIV_card_identifiers_read(
-                         extension.value, profile, &context->options->parsing,
-                         (TC_TLV_frames){storage->frames, storage->frame_capacity}, work, out)
-                   : TC_TWIC_card_identifiers_read(
-                         extension.value, profile, &context->options->parsing,
-                         (TC_TLV_frames){storage->frames, storage->frame_capacity}, work, out);
+      status =
+          profile == TC_PIV_CARD
+              ? TC_PIV_card_identifiers_read(extension.value, profile, &context->options->parsing,
+                                             storage->frames, work, out)
+              : TC_TWIC_card_identifiers_read(extension.value, profile, &context->options->parsing,
+                                              storage->frames, work, out);
     if (status != TC_TLV_OK)
       break;
     found = 1;
@@ -192,17 +190,14 @@ static ExampleCredentialVerdict card_policy(const ExampleCredentialValidationReq
     if (request->certificate.length > *work / 2)
       return EXAMPLE_CREDENTIAL_LIMIT;
     *work -= request->certificate.length * 2;
-    TC_X509_workspace parser = {storage->frames, storage->frame_capacity, storage->oids,
-                                storage->oid_capacity};
+    TC_X509_workspace parser = {storage->frames, storage->oids, storage->oid_capacity};
     TC_X509_certificate certificate;
-    TC_TLV_result status = TC_X509_read(request->certificate.data, request->certificate.length,
-                                        &out->parsing, &parser, &certificate);
+    TC_TLV_result status = TC_X509_read(request->certificate, &out->parsing, &parser, &certificate);
     if (status != TC_TLV_OK)
       return tlv_verdict(status);
     static const uint8_t eku_oid[] = {0x55, 0x1d, 37};
     TC_TLV_reader extensions;
-    status = TC_X509_extensions_init(&extensions, certificate.extensions.data,
-                                     certificate.extensions.length, &out->parsing);
+    status = TC_X509_extensions_init(&extensions, certificate.extensions, &out->parsing);
     if (status != TC_TLV_OK)
       return tlv_verdict(status);
     TC_X509_extension extension;
@@ -211,8 +206,8 @@ static ExampleCredentialVerdict card_policy(const ExampleCredentialValidationReq
           memcmp(extension.oid.data, eku_oid, sizeof eku_oid))
         continue;
       size_t count;
-      status = TC_X509_extended_key_usage_read(extension.value.data, extension.value.length,
-                                               storage->oids, storage->oid_capacity, &count);
+      status = TC_X509_extended_key_usage_read(extension.value, &out->parsing, storage->oids,
+                                               storage->oid_capacity, &count);
       if (status != TC_TLV_OK)
         return tlv_verdict(status);
       for (size_t i = 0; i < count; ++i) {

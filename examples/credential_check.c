@@ -44,9 +44,9 @@ static int inspect_certificate(size_t length, ExampleCardApplication application
   const TC_TLV_limits limits = {CERTIFICATE_CAPACITY, CERTIFICATE_CAPACITY, 512, FRAME_CAPACITY};
   TC_TLV_frame frames[FRAME_CAPACITY];
   TC_bytes extensions[EXTENSION_CAPACITY];
-  TC_X509_workspace workspace = {frames, FRAME_CAPACITY, extensions, EXTENSION_CAPACITY};
+  TC_X509_workspace workspace = {{frames, FRAME_CAPACITY}, extensions, EXTENSION_CAPACITY};
   TC_X509_certificate certificate;
-  return TC_X509_read(encoded.data, encoded.length, &limits, &workspace, &certificate) == TC_TLV_OK;
+  return TC_X509_read(encoded, &limits, &workspace, &certificate) == TC_TLV_OK;
 }
 
 static int inspect_application(ExampleCardIO* io, ExampleCardApplication application,

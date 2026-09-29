@@ -43,15 +43,14 @@ TEST_CASE("Constrained trust anchor from C++")
   const TC_TLV_limits limits = {capacity, capacity, 512, 16};
   TC_TLV_frame frames[32];
   TC_bytes oids[32];
-  TC_X509_workspace parser = {frames, 32, oids, 32};
+  TC_X509_workspace parser = {{frames, 32}, oids, 32};
   const TC_bytes list = fixture("trust-anchors.der", anchors_der);
   const TC_bytes chain[] = {fixture("issuer.der", issuer_der), fixture("card.der", card_der)};
-  TC_TLV_reader reader;
+  TC_X509_trust_anchor_reader reader;
   TC_X509_store_anchor anchor = {};
-  REQUIRE(TC_X509_trust_anchor_list_init(&reader, list.data, list.length, &limits, &parser) ==
-          TC_TLV_OK);
-  REQUIRE(TC_X509_trust_anchor_next(&reader, &limits, &parser, &anchor) == TC_TLV_OK);
-  CHECK(TC_X509_trust_anchor_next(&reader, &limits, &parser, &anchor) == TC_TLV_END);
+  REQUIRE(TC_X509_trust_anchor_list_init(&reader, list, &limits, &parser) == TC_TLV_OK);
+  REQUIRE(TC_X509_trust_anchor_next(&reader, &anchor) == TC_TLV_OK);
+  CHECK(TC_X509_trust_anchor_next(&reader, &anchor) == TC_TLV_END);
 
   TC_validation_capacity sizes;
   TC_validation_workspace storage;

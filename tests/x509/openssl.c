@@ -112,7 +112,7 @@ static MunitResult signatures(const MunitParameter params[], void* user)
   uint8_t der[2048], other_der[2048];
   TC_TLV_frame frames[16];
   TC_bytes oids[8];
-  TC_X509_workspace workspace = {frames, 16, oids, 8};
+  TC_X509_workspace workspace = {{frames, 16}, oids, 8};
   const TC_TLV_limits limits = {2048, 2048, 128, 16};
   TC_X509_certificate parsed, other;
   unsigned group, hash, calls = 0;
@@ -128,9 +128,11 @@ static MunitResult signatures(const MunitParameter params[], void* user)
       size_t length = certificate(key, digests[hash], der, sizeof der);
       size_t other_length = certificate(wrong, digests[hash], other_der, sizeof other_der);
       size_t work = 10000, offset;
-      munit_assert_int(TC_X509_read(der, length, &limits, &workspace, &parsed), ==, TC_TLV_OK);
-      munit_assert_int(TC_X509_read(other_der, other_length, &limits, &workspace, &other), ==,
+      munit_assert_int(TC_X509_read((TC_bytes){der, length}, &limits, &workspace, &parsed), ==,
                        TC_TLV_OK);
+      munit_assert_int(
+          TC_X509_read((TC_bytes){other_der, other_length}, &limits, &workspace, &other), ==,
+          TC_TLV_OK);
       calls = 0;
       munit_assert_int(TC_X509_signature_verify(&parsed, &parsed.public_key, &provider, &work), ==,
                        TC_X509_SIGNATURE_VALID);
@@ -417,8 +419,7 @@ static void alternate_issuers(X509* const certs[4], EVP_PKEY* const keys[4], con
   TC_X509_store_anchor array_anchors[2] = {anchor_record(*anchor), anchor_record(*anchor)};
   TC_X509_path_options bounded = *options;
   TC_X509_certificate wrong_parsed;
-  TC_X509_workspace parser = {workspace->frames, workspace->frame_capacity, workspace->oids,
-                              workspace->oid_capacity};
+  TC_X509_workspace parser = {workspace->frames, workspace->oids, workspace->oid_capacity};
   size_t budget;
   munit_assert_not_null(wrong);
   /* Same issuer and subject, valid issuer signature, but a different subject key. */
@@ -442,9 +443,8 @@ static void alternate_issuers(X509* const certs[4], EVP_PKEY* const keys[4], con
                                     options, workspace, &search, &budget, &found),
                    ==, TC_X509_PATH_VALID);
   munit_assert_ptr_equal(found.path[1].data, encoded_path[1].data);
-  munit_assert_int(TC_X509_read(encoded_path[1].data, encoded_path[1].length, &options->parsing,
-                                &parser, &wrong_parsed),
-                   ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_read(encoded_path[1], &options->parsing, &parser, &wrong_parsed), ==,
+                   TC_TLV_OK);
   anchors[0].public_key = wrong_parsed.public_key;
   array_anchors[0].trust.public_key = wrong_parsed.public_key;
   budget = 2000000;
@@ -660,7 +660,7 @@ static void alternate_issuers(X509* const certs[4], EVP_PKEY* const keys[4], con
     store.exhaust_work = 0;
     {
       TC_X509_trust_anchor bad_anchor = *anchor;
-      TC_bytes bad_candidate = {(const uint8_t*)workspace->frames, 1};
+      TC_bytes bad_candidate = {(const uint8_t*)workspace->frames.data, 1};
       TC_bytes* anchor_fields[] = {&bad_anchor.name,
                                    &bad_anchor.public_key.algorithm.oid,
                                    &bad_anchor.public_key.algorithm.parameters,
@@ -723,8 +723,7 @@ static void cross_signed_issuer(X509* const certs[4], const char* group, const E
   TC_X509_search_result found, saved;
   TC_X509_certificate root;
   TC_X509_trust_anchor foreign_anchor;
-  TC_X509_workspace parser = {workspace->frames, workspace->frame_capacity, workspace->oids,
-                              workspace->oid_capacity};
+  TC_X509_workspace parser = {workspace->frames, workspace->oids, workspace->oid_capacity};
   size_t length, budget;
   munit_assert_not_null(foreign_key);
   munit_assert_not_null(cross);
@@ -732,8 +731,8 @@ static void cross_signed_issuer(X509* const certs[4], const char* group, const E
   add_extension(foreign_root, NID_basic_constraints, "critical,CA:TRUE,pathlen:2");
   add_extension(foreign_root, NID_key_usage, "critical,keyCertSign");
   length = encode_certificate(foreign_root, foreign_key, digest, root_der, sizeof root_der);
-  munit_assert_int(TC_X509_read(root_der, length, &options->parsing, &parser, &root), ==,
-                   TC_TLV_OK);
+  munit_assert_int(TC_X509_read((TC_bytes){root_der, length}, &options->parsing, &parser, &root),
+                   ==, TC_TLV_OK);
   foreign_anchor.name = root.subject;
   foreign_anchor.public_key = root.public_key;
   const TC_X509_store_anchor array_anchor = anchor_record(*anchor),
@@ -794,9 +793,9 @@ static MunitResult paths(const MunitParameter params[], void* user)
   uint32_t left[64], right[64];
   TC_TLV_frame frames[16];
   TC_bytes oids[16];
-  TC_X509_workspace parse_workspace = {frames, 16, oids, 16};
+  TC_X509_workspace parse_workspace = {{frames, 16}, oids, 16};
   TC_X509_name_workspace names = {left, right, 64, used, 8};
-  TC_X509_constraint_workspace constraints = {frames, 16, &names};
+  TC_X509_constraint_workspace constraints = {{frames, 16}, &names};
   const TC_TLV_limits limits = {2048, 2048, 256, 16};
   const TC_X509_time at = {2026, 1, 1, 0, 0, 0};
   TC_X509_certificate parsed[4];
@@ -874,8 +873,9 @@ static MunitResult paths(const MunitParameter params[], void* user)
         length = encode_certificate(certs[i], signer, digests[group], der[i], sizeof der[i]);
         munit_assert_int(EVP_Digest(der[i], length, original_hash[i], NULL, EVP_sha256(), NULL), ==,
                          1);
-        munit_assert_int(TC_X509_read(der[i], length, &limits, &parse_workspace, &parsed[i]), ==,
-                         TC_TLV_OK);
+        munit_assert_int(
+            TC_X509_read((TC_bytes){der[i], length}, &limits, &parse_workspace, &parsed[i]), ==,
+            TC_TLV_OK);
         if (i)
           encoded_path[i - 1] = parsed[i].encoded;
       }
@@ -903,13 +903,13 @@ static MunitResult paths(const MunitParameter params[], void* user)
                              TC_TLV_OK);
             munit_assert_int(checked, ==, 1);
             munit_assert_size(budget, ==, 0);
-            parse_workspace.frame_capacity = 0;
+            parse_workspace.frames.capacity = 0;
             budget = 1000000;
             checked = 99;
             munit_assert_int(tc_x509_path_basic(fresh(&input), &names, &budget, &checked), ==,
                              TC_TLV_LIMIT);
             munit_assert_int(checked, ==, 99);
-            parse_workspace.frame_capacity = 16;
+            parse_workspace.frames.capacity = 16;
           }
           munit_assert_int(tc_x509_path_names(fresh(&input), &constraints, &work, &accepted), ==,
                            TC_TLV_OK);
@@ -925,8 +925,8 @@ static MunitResult paths(const MunitParameter params[], void* user)
           tc_x509_policy_graph graph = {nodes, 16, 0, edges, 32, 0, expected, 16, 0, 0};
           TC_bytes policies[8], output[8];
           TC_X509_policy_mapping mappings[8];
-          tc_x509_policy_workspace policy_workspace = {&graph, policies, 8,      mappings, 8,
-                                                       output, 8,        &names, frames,   16};
+          tc_x509_policy_workspace policy_workspace = {&graph, policies, 8,      mappings,    8,
+                                                       output, 8,        &names, {frames, 16}};
           size_t count;
           int wanted = scenario == 8 || scenario == 9 || scenario >= 14;
           unsigned long flags = scenario == 10   ? X509_V_FLAG_INHIBIT_MAP
@@ -949,7 +949,7 @@ static MunitResult paths(const MunitParameter params[], void* user)
           if (wanted) {
             static const uint8_t server_auth[] = {0x2b, 6, 1, 5, 5, 7, 3, 1};
             tc_x509_path_usage usage = {{NULL, 0}, 0, 0, 0, 0};
-            tc_x509_extension_workspace extension_workspace = {policies, 8, {frames, 16, &names}};
+            tc_x509_extension_workspace extension_workspace = {policies, 8, {{frames, 16}, &names}};
             TC_TLV_result result;
             int usage_valid = scenario < USAGE_VALID || scenario == USAGE_VALID ||
                               scenario == UNKNOWN_NONCRITICAL;
@@ -1377,11 +1377,11 @@ static MunitResult paths(const MunitParameter params[], void* user)
                 TC_X509_path_validate(encoded_path, 3, &anchor, &options, &workspace, &result), ==,
                 TC_X509_PATH_ERROR);
             workspace.names.left = left;
-            workspace.frame_capacity = SIZE_MAX;
+            workspace.frames.capacity = SIZE_MAX;
             munit_assert_int(
                 TC_X509_path_validate(encoded_path, 3, &anchor, &options, &workspace, &result), ==,
                 TC_X509_PATH_ERROR);
-            workspace.frame_capacity = 16;
+            workspace.frames.capacity = 16;
             options.max_certificates = 2;
             munit_assert_int(
                 TC_X509_path_validate(encoded_path, 3, &anchor, &options, &workspace, &result), ==,
@@ -1483,7 +1483,7 @@ static MunitResult crl_signer_key_usage(const MunitParameter params[], void* use
   TC_TLV_frame frames[16];
   TC_bytes oids[16];
   const TC_TLV_limits parsing = {sizeof der, sizeof der, 512, 16};
-  TC_X509_workspace parser = {frames, 16, oids, 16};
+  TC_X509_workspace parser = {{frames, 16}, oids, 16};
   EVP_PKEY* key = EVP_EC_gen("prime256v1");
   (void)params;
   (void)user;
@@ -1496,7 +1496,8 @@ static MunitResult crl_signer_key_usage(const MunitParameter params[], void* use
       add_extension(certificate, NID_key_usage, cases[i].key_usage);
     const size_t length = encode_certificate(certificate, key, EVP_sha256(), der, sizeof der);
     TC_X509_certificate parsed;
-    munit_assert_int(TC_X509_read(der, length, &parsing, &parser, &parsed), ==, TC_TLV_OK);
+    munit_assert_int(TC_X509_read((TC_bytes){der, length}, &parsing, &parser, &parsed), ==,
+                     TC_TLV_OK);
     munit_assert_uint(parsed.version, ==, (unsigned)cases[i].version);
     size_t work = 100000;
     int authorized = -1;

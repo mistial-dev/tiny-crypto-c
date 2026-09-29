@@ -317,8 +317,10 @@ static int options_read(int argc, char** argv, Options* out)
 static TC_X509_workspace parser_workspace(void)
 {
   ExampleX509Workspace* memory = &sensitive.scratch.validation.certificate.validation;
-  const TC_X509_workspace parser = {memory->frames, sizeof memory->frames / sizeof *memory->frames,
-                                    memory->oids, sizeof memory->oids / sizeof *memory->oids};
+  const TC_X509_workspace parser = {
+      {memory->frames, sizeof memory->frames / sizeof *memory->frames},
+      memory->oids,
+      sizeof memory->oids / sizeof *memory->oids};
   return parser;
 }
 
@@ -365,14 +367,13 @@ static int root_read(TC_bytes encoded, const char* expected_digest, const TC_TLV
   TC_X509_workspace parser = parser_workspace();
   TC_X509_certificate root;
   if (!root_digest_match(encoded, expected_digest) ||
-      TC_X509_read(encoded.data, encoded.length, limits, &parser, &root) != TC_TLV_OK ||
+      TC_X509_read(encoded, limits, &parser, &root) != TC_TLV_OK ||
       TC_X509_store_anchor_from_certificate(&root, limits, &parser, anchor) != TC_TLV_OK)
     return 0;
   if (anchor->has_path_len && anchor->path_len < *max_certificates)
     *max_certificates = anchor->path_len + 1;
   TC_TLV_reader reader;
-  if (TC_X509_extensions_init(&reader, root.extensions.data, root.extensions.length, limits) !=
-      TC_TLV_OK)
+  if (TC_X509_extensions_init(&reader, root.extensions, limits) != TC_TLV_OK)
     return 0;
   TC_X509_extension extension;
   TC_TLV_result status;
@@ -383,8 +384,7 @@ static int root_read(TC_bytes encoded, const char* expected_digest, const TC_TLV
     const unsigned id = standard ? extension.oid.data[2] : 0;
     if (id == BASIC_CONSTRAINTS) {
       TC_X509_basic_constraints constraints;
-      if (TC_X509_basic_constraints_read(extension.value.data, extension.value.length,
-                                         &constraints) != TC_TLV_OK ||
+      if (TC_X509_basic_constraints_read(extension.value, limits, &constraints) != TC_TLV_OK ||
           !constraints.ca)
         return 0;
       ca = 1;
@@ -402,11 +402,10 @@ static int purpose_read(TC_bytes encoded, TC_PIV_oid expected, const TC_TLV_limi
   *work -= encoded.length * 2;
   TC_X509_workspace parser = parser_workspace();
   TC_X509_certificate certificate;
-  if (TC_X509_read(encoded.data, encoded.length, limits, &parser, &certificate) != TC_TLV_OK)
+  if (TC_X509_read(encoded, limits, &parser, &certificate) != TC_TLV_OK)
     return 0;
   TC_TLV_reader reader;
-  if (TC_X509_extensions_init(&reader, certificate.extensions.data, certificate.extensions.length,
-                              limits) != TC_TLV_OK)
+  if (TC_X509_extensions_init(&reader, certificate.extensions, limits) != TC_TLV_OK)
     return 0;
   TC_X509_extension extension;
   TC_TLV_result status;
@@ -418,8 +417,7 @@ static int purpose_read(TC_bytes encoded, TC_PIV_oid expected, const TC_TLV_limi
       continue;
     TC_bytes usages[16];
     size_t count;
-    if (TC_X509_extended_key_usage_read(extension.value.data, extension.value.length, usages, 16,
-                                        &count) != TC_TLV_OK)
+    if (TC_X509_extended_key_usage_read(extension.value, limits, usages, 16, &count) != TC_TLV_OK)
       return 0;
     for (size_t i = 0; i < count; ++i) {
       if (TC_PIV_oid_identify(usages[i], TC_PIV_OIDS_TWIC_COMPATIBLE) != expected)
@@ -464,7 +462,7 @@ static int crl_target_add(TC_bytes encoded, const TC_TLV_limits* limits, size_t*
   *work -= encoded.length;
   TC_X509_workspace parser = parser_workspace();
   TC_X509_certificate certificate;
-  if (TC_X509_read(encoded.data, encoded.length, limits, &parser, &certificate) != TC_TLV_OK)
+  if (TC_X509_read(encoded, limits, &parser, &certificate) != TC_TLV_OK)
     return 0;
   sensitive.crl.targets[sensitive.crl.count++] =
       (TC_X509_crl_target){certificate.serial, certificate.issuer};
@@ -491,9 +489,8 @@ static int content_crls_prepare(const Options* options, TC_bytes encoded,
   TC_X509_workspace parser = parser_workspace();
   TC_CMS_signed_data cms;
   const TC_CMS_verification_policy envelope = {.envelope = TC_CMS_ENVELOPE_BER};
-  if (TC_CMS_signed_data_read(chuid.signature, &envelope, limits,
-                              (TC_TLV_frames){parser.frames, parser.frame_capacity}, work,
-                              &cms) != TC_TLV_OK)
+  if (TC_CMS_signed_data_read(chuid.signature, &envelope, limits, parser.frames, work, &cms) !=
+      TC_TLV_OK)
     return 0;
   /* Collect candidate serials before authentication. Validation checks their
    * trust. */

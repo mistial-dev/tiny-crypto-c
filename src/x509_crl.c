@@ -79,7 +79,7 @@ TC_TLV_result TC_X509_crl_extensions_read(TC_bytes encoded, const TC_TLV_limits*
       tc_pki_reader_workspace_storage(encoded, limits, workspace, work, out, sizeof *out);
   if (result != TC_TLV_OK)
     return result;
-  const tc_pki_tree_workspace tree = {workspace->frames, workspace->frame_capacity, work};
+  const tc_pki_tree_workspace tree = {workspace->frames.data, workspace->frames.capacity, work};
   return tc_x509_crl_extension_info_read(encoded, limits, &tree, workspace->extension_oids,
                                          workspace->extension_capacity, out);
 }
@@ -116,7 +116,7 @@ TC_TLV_result TC_X509_crl_index_init(const TC_bytes* encoded, size_t count,
   if (!limits || !workspace || !work || !out)
     return TC_TLV_ARGUMENT;
   tc_pki_storage_plan_begin(&plan, writes, 5, *work);
-  TC_PKI_PLAN_WRITE(&plan, workspace->frames, workspace->frame_capacity);
+  TC_PKI_PLAN_WRITE(&plan, workspace->frames.data, workspace->frames.capacity);
   TC_PKI_PLAN_WRITE(&plan, workspace->extension_oids, workspace->extension_capacity);
   TC_PKI_PLAN_WRITE(&plan, work, 1);
   TC_PKI_PLAN_WRITE(&plan, records, capacity);
@@ -132,7 +132,7 @@ TC_TLV_result TC_X509_crl_index_init(const TC_bytes* encoded, size_t count,
     return result;
   if (count > capacity)
     return TC_TLV_LIMIT;
-  const tc_pki_tree_workspace tree = {workspace->frames, workspace->frame_capacity, work};
+  const tc_pki_tree_workspace tree = {workspace->frames.data, workspace->frames.capacity, work};
   for (size_t i = 0; i < count; ++i) {
     result = tc_x509_crl_record_read(encoded[i], limits, &tree, workspace->extension_oids,
                                      workspace->extension_capacity, &records[i]);

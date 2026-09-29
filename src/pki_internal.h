@@ -79,6 +79,65 @@ static inline int tc_pki_end(const TC_TLV_reader* reader)
   return reader->offset == reader->input.length;
 }
 
+/* Open a DER reader over the contents of a constructed element that parent
+ * has just read. The child continues the parent's element count one level
+ * deeper, and treats a truncated nested element as INVALID. Hand the count
+ * back with tc_pki_child_close once the element is accepted. A parent with no
+ * depth left returns LIMIT. */
+static inline TC_TLV_result tc_pki_child_open(TC_TLV_reader* child, const TC_TLV_reader* parent,
+                                              TC_bytes contents)
+{
+  TC_TLV_limits budget = parent->limits;
+  TC_TLV_reader opened;
+  TC_TLV_result result;
+  if (!budget.max_depth)
+    return TC_TLV_LIMIT;
+  --budget.max_depth;
+  result = TC_TLV_reader_init(&opened, contents.data, contents.length, TC_TLV_DER, &budget);
+  if (result != TC_TLV_OK)
+    return result;
+  opened.root = 0;
+  opened.elements = parent->elements;
+  *child = opened;
+  return TC_TLV_OK;
+}
+
+static inline void tc_pki_child_close(TC_TLV_reader* parent, const TC_TLV_reader* child)
+{
+  parent->elements = child->elements;
+}
+
+/* Open a DER reader over a complete constructed value with the given tag.
+ * The outer element counts as one element and one level, so the reader's
+ * limits cover the value as TC_TLV_walk counts it. Empty contents are
+ * INVALID unless allow_empty is set. reader changes only on OK. */
+static inline TC_TLV_result tc_pki_value_open(TC_TLV_reader* reader, TC_bytes value, unsigned tag,
+                                              const TC_TLV_limits* limits, int allow_empty)
+{
+  TC_TLV_reader outer, contents;
+  TC_TLV_element element;
+  TC_TLV_result result;
+  if (!reader)
+    return TC_TLV_ARGUMENT;
+  result = TC_TLV_reader_init(&outer, value.data, value.length, TC_TLV_DER, limits);
+  if (result != TC_TLV_OK)
+    return result;
+  result = TC_TLV_next(&outer, &element);
+  if (result == TC_TLV_END || result == TC_TLV_MORE)
+    return TC_TLV_INVALID;
+  if (result != TC_TLV_OK)
+    return result;
+  if (!tc_pki_tag(&element, tag) || !element.header.constructed || !tc_pki_end(&outer) ||
+      (!allow_empty && !element.value.length))
+    return TC_TLV_INVALID;
+  /* The outer element stays charged to the returned reader. */
+  result = tc_pki_child_open(&contents, &outer, element.value);
+  if (result != TC_TLV_OK)
+    return result;
+  *reader = contents;
+  return TC_TLV_OK;
+}
+
 static inline int tc_pki_equal(TC_bytes a, TC_bytes b)
 {
   return a.length == b.length && (!a.length || !memcmp(a.data, b.data, a.length));
@@ -123,9 +182,10 @@ TC_TLV_result tc_x509_certificate_names_check_san(const TC_X509_certificate* cer
                                                   const TC_TLV_limits* limits,
                                                   const TC_X509_constraint_workspace* workspace,
                                                   size_t* work, int* permitted);
-/* One RFC 5280 PolicyInformation. qualifiers keeps the complete SEQUENCE
- * encoding and is {NULL, 0} when absent. out changes only on OK. */
-TC_TLV_result tc_x509_policy_information_read(TC_bytes encoded, TC_X509_policy* out);
+/* Read the next RFC 5280 PolicyInformation from reader and charge its
+ * fields to the reader's budget. qualifiers keeps the complete SEQUENCE
+ * encoding and is {NULL, 0} when absent. reader and out change only on OK. */
+TC_TLV_result tc_x509_policy_information_next(TC_TLV_reader* reader, TC_X509_policy* out);
 /* Parse a bare DER TBSCertificate with the TC_X509_read field rules. encoded,
  * signature and the outer signatureAlgorithm stay empty. The TBS signature
  * field is returned in signature_algorithm. */

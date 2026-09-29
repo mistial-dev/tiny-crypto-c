@@ -58,7 +58,7 @@ static MunitResult profiles(const MunitParameter params[], void* context)
     munit_assert_size(workspace.path.validation.certificate_capacity, ==, capacity.path);
     munit_assert_size(workspace.credential.path_capacity, ==, capacity.path);
     munit_assert_size(workspace.path.validation.names.scalar_capacity, ==, capacity.name_scalars);
-    const void* starts[] = {workspace.path.validation.frames,
+    const void* starts[] = {workspace.path.validation.frames.data,
                             workspace.path.validation.oids,
                             workspace.path.validation.names.left,
                             workspace.path.validation.names.right,

@@ -17,8 +17,9 @@ static const TC_CMS_verification_policy cms_policy = {.envelope = TC_CMS_ENVELOP
 
 static TC_CMS_signature_workspace signature_workspace(ExampleCMSVerifyWorkspace* workspace)
 {
-  TC_CMS_signature_workspace view = {workspace->parser.frames, EXAMPLE_CMS_FRAME_CAPACITY,
-                                     workspace->signature, sizeof workspace->signature};
+  TC_CMS_signature_workspace view = {{workspace->parser.frames, EXAMPLE_CMS_FRAME_CAPACITY},
+                                     workspace->signature,
+                                     sizeof workspace->signature};
   return view;
 }
 

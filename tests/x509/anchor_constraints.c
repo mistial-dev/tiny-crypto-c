@@ -96,15 +96,14 @@ static void check_certificate_controls(const char* profile, const TC_bytes* chai
   const TC_TLV_limits limits = options->parsing;
   TC_TLV_frame frames[32];
   TC_bytes oids[32];
-  TC_X509_workspace parser = {frames, 32, oids, 32};
+  TC_X509_workspace parser = {{frames, 32}, oids, 32};
   TC_X509_certificate issuer, root;
   TC_X509_store_anchor bare = {0}, built;
   TC_X509_path_result result;
   uint8_t extension[FILE_CAPACITY], list[FILE_CAPACITY];
   size_t length;
   const TC_bytes encoded_root = fixture(profile, "root.der", root_der);
-  munit_assert_int(TC_X509_read(chain[0].data, chain[0].length, &limits, &parser, &issuer), ==,
-                   TC_TLV_OK);
+  munit_assert_int(TC_X509_read(chain[0], &limits, &parser, &issuer), ==, TC_TLV_OK);
   bare.trust = anchor->trust;
   munit_assert_int(TC_X509_path_validate_with_anchor(chain, 2, &bare, options, workspace, &result),
                    ==, TC_X509_PATH_VALID);
@@ -161,8 +160,7 @@ static void check_certificate_controls(const char* profile, const TC_bytes* chai
     bare.path_len = 0;
   }
   /* The builder normalizes the anchor certificate itself. */
-  munit_assert_int(TC_X509_read(encoded_root.data, encoded_root.length, &limits, &parser, &root),
-                   ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_read(encoded_root, &limits, &parser, &root), ==, TC_TLV_OK);
   munit_assert_int(TC_X509_store_anchor_from_certificate(&root, &limits, &parser, &built), ==,
                    TC_TLV_OK);
   munit_assert_int(TC_X509_path_validate_with_anchor(chain, 2, &built, options, workspace, &result),
@@ -252,14 +250,13 @@ static void check_replaced_controls(const TC_bytes* chain, const TC_bytes encode
   const TC_TLV_limits limits = options->parsing;
   TC_TLV_frame frames[32];
   TC_bytes oids[32];
-  TC_X509_workspace parser = {frames, 32, oids, 32};
+  TC_X509_workspace parser = {{frames, 32}, oids, 32};
   TC_X509_certificate root;
   TC_X509_store_anchor built, anchor;
   TC_X509_path_result result;
-  TC_TLV_reader reader;
+  TC_X509_trust_anchor_reader reader;
   uint8_t extension[64];
-  munit_assert_int(TC_X509_read(encoded_root.data, encoded_root.length, &limits, &parser, &root),
-                   ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_read(encoded_root, &limits, &parser, &root), ==, TC_TLV_OK);
   munit_assert_int(TC_X509_store_anchor_from_certificate(&root, &limits, &parser, &built), ==,
                    TC_TLV_OK);
   const struct {
@@ -279,11 +276,9 @@ static void check_replaced_controls(const TC_bytes* chain, const TC_bytes encode
           replaced ? (TC_bytes){cleared_flags, sizeof cleared_flags} : (TC_bytes){NULL, 0};
       const TC_bytes encoded =
           anchor_list_with(list, &root, built.key_id, control, fields, &limits);
-      munit_assert_int(
-          TC_X509_trust_anchor_list_init(&reader, encoded.data, encoded.length, &limits, &parser),
-          ==, TC_TLV_OK);
-      munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &parser, &anchor), ==,
+      munit_assert_int(TC_X509_trust_anchor_list_init(&reader, encoded, &limits, &parser), ==,
                        TC_TLV_OK);
+      munit_assert_int(TC_X509_trust_anchor_next(&reader, &anchor), ==, TC_TLV_OK);
       if (replaced) {
         munit_assert_uint(anchor.policy_flags, ==, 0);
         munit_assert_uint(anchor.replaced_controls, ==, TC_X509_ANCHOR_REPLACED_POLICY_FLAGS);
@@ -318,8 +313,8 @@ static void check_profile(const char* profile)
   TC_bytes candidates[] = {issuer};
   TC_TLV_frame parse_frames[32];
   TC_bytes parse_oids[32];
-  TC_X509_workspace parser = {parse_frames, 32, parse_oids, 32};
-  TC_TLV_reader list;
+  TC_X509_workspace parser = {{parse_frames, 32}, parse_oids, 32};
+  TC_X509_trust_anchor_reader list;
   TC_X509_store_anchor anchor, options_anchor[2];
   TC_X509_native_workspace native;
   TC_RSA_workspace rsa = {rsa_words, sizeof rsa_words / sizeof *rsa_words};
@@ -335,10 +330,8 @@ static void check_profile(const char* profile)
   TC_bytes discovered[3];
   size_t bytes;
   static const uint8_t unknown_critical[] = {0x30, 12, 6, 3, 0x2a, 3, 99, 1, 1, 0xff, 4, 2, 5, 0};
-  munit_assert_int(
-      TC_X509_trust_anchor_list_init(&list, encoded.data, encoded.length, &limits, &parser), ==,
-      TC_TLV_OK);
-  munit_assert_int(TC_X509_trust_anchor_next(&list, &limits, &parser, &anchor), ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_trust_anchor_list_init(&list, encoded, &limits, &parser), ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_trust_anchor_next(&list, &anchor), ==, TC_TLV_OK);
   munit_assert_int(anchor.x509_unusable, ==, 0);
   munit_assert_int(TC_validation_capacity_init(TC_VALIDATION_DESKTOP, &capacity), ==, TC_RESULT_OK);
   munit_assert_int(TC_validation_workspace_size(&capacity, &bytes), ==, TC_RESULT_OK);

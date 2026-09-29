@@ -130,12 +130,13 @@ static MunitResult records(const MunitParameter params[], void* context)
     if (verdict != CORPUS_PARSE_ONLY) {
       TC_TLV_frame frames[PARSER_FRAMES];
       TC_bytes oids[PARSER_OIDS];
-      TC_X509_workspace parser = {frames, PARSER_FRAMES, oids, PARSER_OIDS};
+      TC_X509_workspace parser = {{frames, PARSER_FRAMES}, oids, PARSER_OIDS};
       const TC_TLV_limits limits = {MAX_CERTIFICATE, MAX_CERTIFICATE, 256, PARSER_FRAMES};
       TC_X509_certificate signer;
       munit_assert_size(certificate_length, >, 0);
-      munit_assert_int(TC_X509_read(certificate, certificate_length, &limits, &parser, &signer), ==,
-                       TC_TLV_OK);
+      munit_assert_int(
+          TC_X509_read((TC_bytes){certificate, certificate_length}, &limits, &parser, &signer), ==,
+          TC_TLV_OK);
       TC_ECDSA_workspace ecdsa;
       TC_EC_workspace point;
       TC_RSA_word words[TC_RSA_VERIFY_WORKSPACE_WORDS(2048)];

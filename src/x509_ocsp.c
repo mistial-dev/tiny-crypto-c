@@ -168,7 +168,7 @@ static TC_TLV_result extensions(TC_bytes wrapper, const TC_X509_ocsp_verify_requ
 {
   TC_TLV_reader outer;
   TC_TLV_element list;
-  const tc_pki_tree_workspace tree = {workspace->frames, workspace->frame_capacity, work};
+  const tc_pki_tree_workspace tree = {workspace->frames.data, workspace->frames.capacity, work};
   if (contents_reader(wrapper, request->parsing, &outer) != TC_TLV_OK ||
       tc_pki_field(&outer, 0x30, &list) != TC_TLV_OK || !tc_pki_end(&outer))
     return TC_TLV_INVALID;
@@ -361,7 +361,7 @@ static TC_TLV_result basic_response(TC_bytes encoded, const TC_X509_certificate*
   unsigned unused;
   /* The outer walk stops at the responseBytes OCTET STRING. Walk the whole
    * BasicOCSPResponse under the caller limits and charge its bytes to work. */
-  const tc_pki_tree_workspace tree = {workspace->frames, workspace->frame_capacity, work};
+  const tc_pki_tree_workspace tree = {workspace->frames.data, workspace->frames.capacity, work};
   TC_TLV_result status =
       tc_pki_tree_open(encoded, 0x30, TC_TLV_DER, request->parsing, &tree, &reader);
   if (status != TC_TLV_OK)
@@ -563,13 +563,11 @@ static TC_TLV_result try_candidate(TC_bytes encoded, const ocsp_response* respon
 {
   if (search->examined++ >= request->max_certificates)
     return TC_TLV_LIMIT;
-  TC_X509_workspace parser = {workspace->frames, workspace->frame_capacity, workspace->oids,
-                              workspace->oid_capacity};
+  TC_X509_workspace parser = {workspace->frames, workspace->oids, workspace->oid_capacity};
   TC_X509_certificate signer;
   TC_X509_public_key key;
   int matches, nocheck;
-  TC_TLV_result status =
-      TC_X509_read(encoded.data, encoded.length, request->parsing, &parser, &signer);
+  TC_TLV_result status = TC_X509_read(encoded, request->parsing, &parser, &signer);
   if (status == TC_TLV_OK)
     status = responder_matches(response, signer.subject, signer.public_key.key, request, workspace,
                                work, &matches);
@@ -652,16 +650,13 @@ static TC_TLV_result verify_response(const TC_X509_ocsp_verify_request* request,
   if (request->response.length > *work)
     return TC_TLV_LIMIT;
   *work -= request->response.length;
-  TC_TLV_result status =
-      TC_TLV_walk(request->response.data, request->response.length, TC_TLV_DER, request->parsing,
-                  (TC_TLV_frames){workspace->frames, workspace->frame_capacity}, NULL, NULL);
+  TC_TLV_result status = TC_TLV_walk(request->response.data, request->response.length, TC_TLV_DER,
+                                     request->parsing, workspace->frames, NULL, NULL);
   if (status != TC_TLV_OK)
     return status;
-  TC_X509_workspace parser = {workspace->frames, workspace->frame_capacity, workspace->oids,
-                              workspace->oid_capacity};
+  TC_X509_workspace parser = {workspace->frames, workspace->oids, workspace->oid_capacity};
   TC_X509_certificate certificate;
-  status = TC_X509_read(request->certificate.data, request->certificate.length, request->parsing,
-                        &parser, &certificate);
+  status = TC_X509_read(request->certificate, request->parsing, &parser, &certificate);
   if (status != TC_TLV_OK)
     return status;
   int matches;
@@ -697,7 +692,8 @@ TC_TLV_result TC_X509_ocsp_response_verify(const TC_X509_ocsp_verify_request* re
 {
   if (!request || !workspace || !work || !out || !request->response.data ||
       !request->certificate.data || !trust_anchor_present(request->issuer) || !request->parsing ||
-      !request->signatures || !workspace->frames || !workspace->oids || !request->max_responses ||
+      !request->signatures || !workspace->frames.data || !workspace->oids ||
+      !request->max_responses ||
       (request->certificates && request->certificates->candidate_count &&
        !request->certificates->candidate) ||
       (request->expected_nonce.length &&
@@ -793,7 +789,7 @@ TC_TLV_result TC_X509_ocsp_request_encode(const TC_X509_ocsp_encode_request* req
   const TC_TLV_limits* parsing = request->parsing;
   tc_hash_info info;
   if (!certificate.data || !trust_anchor_present(issuer) || !parsing || !workspace ||
-      !workspace->frames || !workspace->oids || !work || !length ||
+      !workspace->frames.data || !workspace->oids || !work || !length ||
       (encoded.capacity && !encoded.data) ||
       (nonce.length && (!nonce.data || nonce.length < 32 || nonce.length > 128)))
     return TC_TLV_ARGUMENT;
@@ -813,11 +809,9 @@ TC_TLV_result TC_X509_ocsp_request_encode(const TC_X509_ocsp_encode_request* req
   if ((hash != TC_HASH_SHA1 && hash != TC_HASH_SHA256) || !tc_hash_info_get(hash, &info) ||
       !tc_hash_available(hash))
     return TC_TLV_UNSUPPORTED;
-  TC_X509_workspace parser = {workspace->frames, workspace->frame_capacity, workspace->oids,
-                              workspace->oid_capacity};
+  TC_X509_workspace parser = {workspace->frames, workspace->oids, workspace->oid_capacity};
   TC_X509_certificate target;
-  TC_TLV_result status =
-      TC_X509_read(certificate.data, certificate.length, parsing, &parser, &target);
+  TC_TLV_result status = TC_X509_read(certificate, parsing, &parser, &target);
   if (status != TC_TLV_OK)
     return status;
   int matched;

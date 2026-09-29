@@ -255,7 +255,7 @@ static MunitResult undetermined_excluded_subtree(const MunitParameter params[], 
   uint8_t list[4 + sizeof excluded] = {0x30, 2 + sizeof excluded, 0xa4, sizeof excluded};
   memcpy(list + 4, excluded, sizeof excluded);
   TC_TLV_frame frames[8];
-  const TC_X509_constraint_workspace constraint_workspace = {frames, 8, &workspace};
+  const TC_X509_constraint_workspace constraint_workspace = {{frames, 8}, &workspace};
   const TC_X509_name_constraints constraints = {{NULL, 0}, {list, sizeof list}};
   const TC_TLV_limits deep = {1024, 1024, 32, 8};
   int allowed = 99;
@@ -658,7 +658,7 @@ static MunitResult utf8_mail_structure(const MunitParameter params[], void* user
   uint8_t encoded[] = {0xa0, 28,  6,    8,   0x2b, 6,   1,    5,    5,   7,
                        8,    9,   0xa0, 16,  0x0c, 14,  0xc3, 0xa9, '@', 'e',
                        'x',  'a', 'm',  'p', 'l',  'e', '.',  'c',  'o', 'm'};
-  TC_TLV_reader reader;
+  TC_X509_general_names_reader reader;
   TC_TLV_frame frames[4];
   TC_X509_general_name name;
   TC_X509_general_subtree base = {0};
@@ -670,10 +670,10 @@ static MunitResult utf8_mail_structure(const MunitParameter params[], void* user
   base.base.type = 1;
   base.base.value.data = (const uint8_t*)"example.com";
   base.base.value.length = 11;
-  munit_assert_int(TC_TLV_reader_init(&reader, encoded, sizeof encoded, TC_TLV_DER, &bounds), ==,
-                   TC_TLV_OK);
-  munit_assert_int(TC_X509_general_name_next(&reader, (TC_TLV_frames){frames, 4}, &name), ==,
-                   TC_TLV_OK);
+  munit_assert_int(TC_X509_general_names_contents_init(&reader, (TC_bytes){encoded, sizeof encoded},
+                                                       &bounds, (TC_TLV_frames){frames, 4}),
+                   ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_general_name_next(&reader, &name), ==, TC_TLV_OK);
   munit_assert_int(TC_X509_general_name_within(&name, &base, &bounds, NULL, &work, &matched), ==,
                    TC_TLV_OK);
   munit_assert_int(matched, ==, 1);
@@ -681,7 +681,7 @@ static MunitResult utf8_mail_structure(const MunitParameter params[], void* user
     uint8_t permitted[] = {0x30, 13,  0x81, 11,  'e', 'x', 'a', 'm',
                            'p',  'l', 'e',  '.', 'c', 'o', 'm'};
     TC_X509_name_constraints constraints = {{permitted, sizeof permitted}, {NULL, 0}};
-    TC_X509_constraint_workspace workspace = {frames, 4, NULL};
+    TC_X509_constraint_workspace workspace = {{frames, 4}, NULL};
     work = 10000;
     matched = 99;
     munit_assert_int(
@@ -750,7 +750,7 @@ static MunitResult constraint_lists(const MunitParameter params[], void* user)
   } cases[] = {{"example.com", 1},     {"a.example.com", 1},     {"other.com", 1},
                {"bad.example.com", 0}, {"a.bad.example.com", 0}, {"unlisted.com", 0}};
   TC_TLV_frame frames[4];
-  TC_X509_constraint_workspace workspace = {frames, 4, NULL};
+  TC_X509_constraint_workspace workspace = {{frames, 4}, NULL};
   TC_X509_name_constraints constraints = {{permit, sizeof permit}, {exclude, sizeof exclude}};
   TC_X509_general_name name = {0};
   TC_TLV_limits small = bounds;
@@ -792,13 +792,13 @@ static MunitResult constraint_lists(const MunitParameter params[], void* user)
       TC_X509_name_constraints_check(&name, &constraints, &small, &workspace, &work, &allowed), ==,
       TC_TLV_LIMIT);
   munit_assert_int(allowed, ==, 99);
-  workspace.frame_capacity = 0;
+  workspace.frames.capacity = 0;
   work = 10000;
   munit_assert_int(
       TC_X509_name_constraints_check(&name, &constraints, &bounds, &workspace, &work, &allowed), ==,
       TC_TLV_LIMIT);
   munit_assert_int(allowed, ==, 99);
-  workspace.frame_capacity = 4;
+  workspace.frames.capacity = 4;
   small = bounds;
   small.max_input = sizeof permit + sizeof exclude - 1;
   work = 10000;
@@ -846,7 +846,7 @@ static MunitResult certificate_names(const MunitParameter params[], void* user)
   TC_X509_certificate certificate = {0};
   TC_X509_name_constraints constraints = {{permit, sizeof permit}, {NULL, 0}};
   TC_TLV_frame frames[4];
-  TC_X509_constraint_workspace workspace = {frames, 4, NULL};
+  TC_X509_constraint_workspace workspace = {{frames, 4}, NULL};
   size_t work = 10000, needed, budget;
   int allowed = 99;
   (void)params;
@@ -925,7 +925,7 @@ static MunitResult certificate_names(const MunitParameter params[], void* user)
     uint32_t left[32], right[32];
     uint8_t used[2];
     TC_X509_name_workspace names = {left, right, 32, used, 2};
-    TC_X509_constraint_workspace deep_workspace = {deep_frames, 8, &names};
+    TC_X509_constraint_workspace deep_workspace = {{deep_frames, 8}, &names};
     const TC_TLV_limits deep = {1024, 1024, 64, 8};
     memcpy(directory + 4, multi, sizeof multi);
     constraints.permitted.data = directory;

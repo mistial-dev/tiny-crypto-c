@@ -13,8 +13,7 @@ static inline TC_TLV_result tc_pki_extensions_init(TC_TLV_reader* reader,
 {
   if (tc_pki_work_charge(work, certificate->extensions.length) != TC_TLV_OK)
     return TC_TLV_LIMIT;
-  return TC_X509_extensions_init(reader, certificate->extensions.data,
-                                 certificate->extensions.length, limits);
+  return TC_X509_extensions_init(reader, certificate->extensions, limits);
 }
 
 static inline TC_TLV_result tc_pki_extension_next(TC_TLV_reader* reader, size_t* work,
@@ -118,8 +117,7 @@ static inline TC_TLV_result tc_pki_subject_key_identifier(const TC_X509_certific
       return TC_TLV_INVALID;
     if (tc_pki_work_charge(work, extension.value.length) != TC_TLV_OK)
       return TC_TLV_LIMIT;
-    result = TC_X509_subject_key_identifier_read(extension.value.data, extension.value.length,
-                                                 limits, &identifier);
+    result = TC_X509_subject_key_identifier_read(extension.value, limits, &identifier);
     if (result != TC_TLV_OK)
       return result;
   }

@@ -13,7 +13,6 @@ TC_TLV_result tc_x509_anchor_policy_set(TC_bytes contents, const TC_TLV_limits* 
                                         TC_X509_workspace* workspace, int qualifiers_allowed)
 {
   TC_TLV_reader policies;
-  TC_TLV_element item;
   TC_X509_policy policy;
   size_t count = 0;
   TC_TLV_result result =
@@ -22,12 +21,9 @@ TC_TLV_result tc_x509_anchor_policy_set(TC_bytes contents, const TC_TLV_limits* 
     return result;
   if (!contents.length)
     return TC_TLV_INVALID;
-  while ((result = TC_TLV_next(&policies, &item)) == TC_TLV_OK) {
+  while ((result = tc_x509_policy_information_next(&policies, &policy)) == TC_TLV_OK) {
     if (count == workspace->extension_capacity)
       return TC_TLV_LIMIT;
-    result = tc_x509_policy_information_read(item.encoded, &policy);
-    if (result != TC_TLV_OK)
-      return result;
     if (policy.qualifiers.data && !qualifiers_allowed)
       return TC_TLV_INVALID;
     workspace->extension_oids[count++] = policy.oid;
@@ -42,17 +38,15 @@ TC_TLV_result tc_x509_anchor_subtrees(const TC_X509_name_constraints* names,
 {
   const TC_bytes lists[] = {names->permitted, names->excluded};
   for (size_t i = 0; i < 2; ++i) {
-    TC_TLV_reader reader;
+    TC_X509_general_subtrees_reader reader;
     TC_X509_general_subtree subtree;
     TC_TLV_result result;
     if (!lists[i].data)
       continue;
-    result = TC_TLV_reader_init(&reader, lists[i].data, lists[i].length, TC_TLV_DER, limits);
+    result = TC_X509_general_subtrees_init(&reader, lists[i], limits, workspace->frames);
     if (result != TC_TLV_OK)
       return result;
-    while ((result = TC_X509_general_subtree_next(
-                &reader, (TC_TLV_frames){workspace->frames, workspace->frame_capacity},
-                &subtree)) == TC_TLV_OK) {
+    while ((result = TC_X509_general_subtree_next(&reader, &subtree)) == TC_TLV_OK) {
     }
     if (result != TC_TLV_END)
       return result;
@@ -68,7 +62,7 @@ TC_TLV_result tc_x509_anchor_extensions(TC_bytes encoded, const TC_TLV_limits* l
   TC_X509_extension extension;
   TC_TLV_result result;
   size_t count = 0;
-  result = TC_X509_extensions_init(&reader, encoded.data, encoded.length, limits);
+  result = TC_X509_extensions_init(&reader, encoded, limits);
   if (result != TC_TLV_OK)
     return result;
   while ((result = TC_X509_extension_next(&reader, &extension)) == TC_TLV_OK) {
@@ -96,8 +90,7 @@ TC_TLV_result tc_x509_anchor_extensions(TC_bytes encoded, const TC_TLV_limits* l
       break;
     }
     case TC_PKI_EXT_NAME_CONSTRAINTS:
-      result = TC_X509_name_constraints_read(extension.value.data, extension.value.length, limits,
-                                             &out->names);
+      result = TC_X509_name_constraints_read(extension.value, limits, &out->names);
       if (result != TC_TLV_OK)
         return result;
       result = tc_x509_anchor_subtrees(&out->names, limits, workspace);
@@ -108,8 +101,7 @@ TC_TLV_result tc_x509_anchor_extensions(TC_bytes encoded, const TC_TLV_limits* l
      * path inputs. Their SkipCerts counts do not apply to the anchor. */
     case TC_PKI_EXT_POLICY_CONSTRAINTS: {
       TC_X509_policy_constraints constraints;
-      result = TC_X509_policy_constraints_read(extension.value.data, extension.value.length,
-                                               &constraints);
+      result = TC_X509_policy_constraints_read(extension.value, limits, &constraints);
       if (result != TC_TLV_OK)
         return result;
       if (constraints.has_require_explicit_policy)
@@ -128,7 +120,7 @@ TC_TLV_result tc_x509_anchor_extensions(TC_bytes encoded, const TC_TLV_limits* l
     }
     case TC_PKI_EXT_BASIC_CONSTRAINTS: {
       TC_X509_basic_constraints basic;
-      result = TC_X509_basic_constraints_read(extension.value.data, extension.value.length, &basic);
+      result = TC_X509_basic_constraints_read(extension.value, limits, &basic);
       if (result != TC_TLV_OK)
         return result;
       if (basic.has_path_length) {
@@ -138,14 +130,13 @@ TC_TLV_result tc_x509_anchor_extensions(TC_bytes encoded, const TC_TLV_limits* l
       break;
     }
     case TC_PKI_EXT_SUBJECT_KEY_IDENTIFIER:
-      result = TC_X509_subject_key_identifier_read(extension.value.data, extension.value.length,
-                                                   limits, &out->key_id);
+      result = TC_X509_subject_key_identifier_read(extension.value, limits, &out->key_id);
       if (result != TC_TLV_OK)
         return result;
       break;
     case TC_PKI_EXT_KEY_USAGE: {
       uint16_t usage;
-      result = TC_X509_key_usage_read(extension.value.data, extension.value.length, &usage);
+      result = TC_X509_key_usage_read(extension.value, limits, &usage);
       if (result != TC_TLV_OK)
         return result;
       if (!(usage & TC_KEY_USAGE_CERT_SIGN))
@@ -199,7 +190,7 @@ static TC_TLV_result anchor_storage(const TC_X509_certificate* certificate,
                              certificate->spki, certificate->extensions};
   tc_pki_storage_plan plan;
   tc_pki_storage_plan_begin(&plan, writes, sizeof writes / sizeof *writes, SIZE_MAX);
-  TC_PKI_PLAN_WRITE(&plan, workspace->frames, workspace->frame_capacity);
+  TC_PKI_PLAN_WRITE(&plan, workspace->frames.data, workspace->frames.capacity);
   TC_PKI_PLAN_WRITE(&plan, workspace->extension_oids, workspace->extension_capacity);
   TC_PKI_PLAN_WRITE(&plan, out, 1);
   tc_pki_storage_plan_seal(&plan);
@@ -217,7 +208,7 @@ TC_TLV_result TC_X509_store_anchor_from_certificate(const TC_X509_certificate* c
   TC_X509_store_anchor anchor = {0};
   TC_TLV_result result;
   if (!certificate || !limits || !workspace || !out ||
-      (!workspace->frames && workspace->frame_capacity) ||
+      (!workspace->frames.data && workspace->frames.capacity) ||
       (!workspace->extension_oids && workspace->extension_capacity))
     return TC_TLV_ARGUMENT;
   result = anchor_storage(certificate, workspace, out);

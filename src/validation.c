@@ -101,7 +101,7 @@ static TC_result layout(const TC_validation_capacity* c, uint8_t* arena, TC_vali
       return TC_RESULT_LIMIT;                                                                      \
     w->field = arena && (count) ? (type*)(arena + start) : NULL;                                   \
   } while (0)
-  ARRAY(path.validation.frames, TC_TLV_frame, c->frames);
+  ARRAY(path.validation.frames.data, TC_TLV_frame, c->frames);
   ARRAY(path.validation.oids, TC_bytes, c->oids);
   ARRAY(path.validation.names.left, uint32_t, c->name_scalars);
   ARRAY(path.validation.names.right, uint32_t, c->name_scalars);
@@ -125,7 +125,7 @@ static TC_result layout(const TC_validation_capacity* c, uint8_t* arena, TC_vali
   ARRAY(credential.signer_path, TC_bytes, c->path);
   ARRAY(credential.signer_policies, TC_bytes, c->policies);
 #undef ARRAY
-  w->path.validation.frame_capacity = c->frames;
+  w->path.validation.frames.capacity = c->frames;
   w->path.validation.oid_capacity = c->oids;
   w->path.validation.names.scalar_capacity = c->name_scalars;
   w->path.validation.names.attribute_capacity = c->name_attributes;

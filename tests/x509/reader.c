@@ -23,7 +23,7 @@ int main(int argc, char** argv)
   uint8_t bytes[65536];
   TC_TLV_frame frames[32];
   TC_bytes oids[256];
-  TC_X509_workspace workspace = {frames, 32, oids, 256};
+  TC_X509_workspace workspace = {{frames, 32}, oids, 256};
   TC_TLV_limits limits = {sizeof bytes, sizeof bytes, 8192, 32};
   TC_X509_certificate certificate, saved;
   TC_TLV_result result;
@@ -44,10 +44,10 @@ int main(int argc, char** argv)
       return 2;
     limits.max_input = (size_t)values[0];
     limits.max_elements = (size_t)values[1];
-    workspace.frame_capacity = (size_t)values[2];
+    workspace.frames.capacity = (size_t)values[2];
     workspace.extension_capacity = (size_t)values[3];
-    if (!workspace.frame_capacity)
-      workspace.frames = NULL;
+    if (!workspace.frames.capacity)
+      workspace.frames.data = NULL;
     if (!workspace.extension_capacity)
       workspace.extension_oids = NULL;
   }
@@ -66,7 +66,7 @@ int main(int argc, char** argv)
   fclose(file);
   memset(&certificate, 0xa5, sizeof certificate);
   saved = certificate;
-  result = TC_X509_read(bytes, length, &limits, &workspace, &certificate);
+  result = TC_X509_read((TC_bytes){bytes, length}, &limits, &workspace, &certificate);
   printf("result=%d\n", result);
   if (result != TC_TLV_OK)
     return memcmp(&certificate, &saved, sizeof certificate) ? 1 : 0;

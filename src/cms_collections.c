@@ -221,8 +221,7 @@ TC_TLV_result tc_cms_x509_candidate_next(tc_cms_candidates* reader, tc_pki_candi
       continue;
     if (tc_pki_work_charge(tree->work, choice.encoded.length) != TC_TLV_OK)
       return TC_TLV_LIMIT;
-    result = TC_X509_read(choice.encoded.data, choice.encoded.length,
-                          &next.collection.embedded.limits, parser, scratch);
+    result = TC_X509_read(choice.encoded, &next.collection.embedded.limits, parser, scratch);
     if (result != TC_TLV_OK)
       return result;
     if (filter) {

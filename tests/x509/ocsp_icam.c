@@ -134,10 +134,9 @@ static MunitResult delegate_nocheck(const MunitParameter params[], void* user)
   munit_assert_false(result.responder_nocheck);
   /* The reported span is the complete delegate certificate. */
   TC_X509_certificate delegate;
-  munit_assert_int(TC_X509_read(result.responder_certificate.data,
-                                result.responder_certificate.length, &fixture.limits,
-                                &fixture.parser, &delegate),
-                   ==, TC_TLV_OK);
+  munit_assert_int(
+      TC_X509_read(result.responder_certificate, &fixture.limits, &fixture.parser, &delegate), ==,
+      TC_TLV_OK);
   munit_assert_size(delegate.encoded.length, ==, result.responder_certificate.length);
   return MUNIT_OK;
 }
@@ -406,9 +405,7 @@ static void revocation_init(int with_crl, TC_X509_time at)
   const TC_bytes root = ocsp_read_path(TC_ICAM_ROOT_CA, revocation.root_bytes);
   const TC_bytes issuer = ocsp_read_path(TC_ICAM_OCSP_ROOT "/issuer.der", issuer_bytes);
   TC_X509_certificate root_view;
-  munit_assert_int(
-      TC_X509_read(root.data, root.length, &fixture.limits, &fixture.parser, &root_view), ==,
-      TC_TLV_OK);
+  munit_assert_int(TC_X509_read(root, &fixture.limits, &fixture.parser, &root_view), ==, TC_TLV_OK);
   munit_assert_int(TC_X509_store_anchor_from_certificate(&root_view, &fixture.limits,
                                                          &fixture.parser, &revocation.anchor),
                    ==, TC_TLV_OK);

@@ -38,7 +38,7 @@ static inline TC_TLV_result tc_pki_store_candidate_next(void* context,
   if (encoded.length > reader->bytes_left ||
       tc_pki_work_charge(tree->work, encoded.length) != TC_TLV_OK)
     return TC_TLV_LIMIT;
-  result = TC_X509_read(encoded.data, encoded.length, &reader->limits, parser, out);
+  result = TC_X509_read(encoded, &reader->limits, parser, out);
   if (result != TC_TLV_OK)
     return result;
   ++reader->index;
@@ -78,8 +78,7 @@ static inline TC_TLV_result tc_pki_certificate_search(
   if (!next || !checks || !checks->filter || !checks->attempt || !limits || !tree || !tree->work ||
       !validation || !out)
     return TC_TLV_ARGUMENT;
-  TC_X509_workspace parser = {validation->frames, validation->frame_capacity, validation->oids,
-                              validation->oid_capacity};
+  TC_X509_workspace parser = {validation->frames, validation->oids, validation->oid_capacity};
   TC_X509_path_status failure = TC_X509_PATH_INVALID;
   const size_t initial_work = *tree->work;
   for (;;) {
