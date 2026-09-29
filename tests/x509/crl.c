@@ -13,6 +13,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "x509_crl_harness.h"
 
 enum {
   NEXT_UPDATE = 1,

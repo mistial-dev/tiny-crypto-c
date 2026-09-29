@@ -631,34 +631,4 @@ TC_TLV_result tc_x509_crl_extension_info_read(TC_bytes encoded, const TC_TLV_lim
   *out = parsed;
   return TC_TLV_OK;
 }
-TC_TLV_result tc_x509_crl_extensions_check(const TC_X509_crl* crl, const TC_TLV_limits* limits,
-                                           const tc_pki_tree_workspace* tree, TC_bytes* oids,
-                                           size_t capacity)
-{
-  TC_TLV_reader entries;
-  TC_TLV_result result;
-  if (!crl || !tree)
-    return TC_TLV_ARGUMENT;
-  crl_extension_context context = {0, limits, tree, NULL, NULL};
-  result = tc_pki_extensions_visit(crl->extensions, limits, tree, oids, capacity,
-                                   crl_extension_value, &context);
-  if (result != TC_TLV_OK)
-    return result;
-  result = tc_x509_crl_entries_init(crl->revoked, limits, tree, &entries);
-  if (result != TC_TLV_OK)
-    return result;
-  context.entry = 1;
-  while (!tc_pki_end(&entries)) {
-    tc_x509_crl_entry entry;
-    result = tc_x509_crl_entry_next(&entries, crl->version, tree, &entry);
-    if (result != TC_TLV_OK)
-      return result;
-    result = tc_pki_extensions_visit(entry.extensions, limits, tree, oids, capacity,
-                                     crl_extension_value, &context);
-    if (result != TC_TLV_OK)
-      return result;
-  }
-  return TC_TLV_OK;
-}
-
 #endif

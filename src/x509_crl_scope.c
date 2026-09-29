@@ -147,19 +147,6 @@ tc_x509_crl_store_source_search(const void* candidates, const TC_X509_store_sour
                                        attempt, context, out, source_failed);
 }
 
-TC_TLV_result tc_x509_crl_store_search(const void* candidates, const TC_X509_crl* crl,
-                                       const TC_X509_crl_extensions* extensions,
-                                       const tc_x509_crl_trust* trust, tc_x509_crl_attempt attempt,
-                                       const void* context, TC_X509_search_result* out,
-                                       int* source_failed)
-{
-  if (!candidates)
-    return TC_TLV_ARGUMENT;
-  const tc_pki_store_candidates* cursor = candidates;
-  return tc_x509_crl_store_source_search(cursor, cursor->source, crl, extensions, trust, attempt,
-                                         context, out, source_failed);
-}
-
 TC_TLV_result tc_x509_crl_filter_match(const void* context, const TC_X509_certificate* candidate,
                                        const TC_TLV_limits* limits,
                                        const tc_pki_tree_workspace* tree, int* matched)
@@ -564,10 +551,10 @@ TC_TLV_result tc_x509_crl_scope_attempt(const void* context, const TC_X509_certi
   cache.scopes = processing->scopes;
   TC_X509_crl_evidence pending = *processing->evidence;
   tc_x509_crl_selected selected = {0};
-  result = tc_x509_crl_scope_evaluate(&cache, processing->reference, processing->delta_policy,
-                                      processing->order_policy, processing->query,
-                                      &trust->options->at, trust->tree, trust->validation->oids,
-                                      trust->validation->oid_capacity, &pending,
+  const tc_x509_crl_scope_context scope = {
+      &cache,      processing->delta_policy, processing->order_policy,       &trust->options->at,
+      trust->tree, trust->validation->oids,  trust->validation->oid_capacity};
+  result = tc_x509_crl_scope_evaluate(&scope, processing->reference, processing->query, &pending,
                                       processing->proposal || processing->check ? &selected : NULL);
   if (result == TC_TLV_ARGUMENT || result == TC_TLV_LIMIT)
     return result;
@@ -658,58 +645,6 @@ TC_TLV_result tc_x509_crl_proposal_merge(tc_x509_crl_proposal* chosen,
     return result;
   if (order || !equal)
     chosen->result = TC_TLV_INVALID;
-  return TC_TLV_OK;
-}
-
-TC_TLV_result tc_x509_crl_check_signer(const void* context, const TC_X509_certificate* candidate,
-                                       const tc_x509_crl_trust* trust, TC_X509_search_result* out)
-{
-  return tc_x509_path_result_status(tc_x509_crl_signer_validate(
-      context, candidate, trust->source, trust->anchor_index, trust->options, trust->validation,
-      trust->search, trust->tree->work, out));
-}
-
-TC_TLV_result tc_x509_crl_process_candidate(const void* context,
-                                            const TC_X509_certificate* candidate,
-                                            const tc_x509_crl_trust* trust,
-                                            TC_X509_search_result* out)
-{
-  const tc_x509_crl_processing* processing = context;
-  return tc_x509_crl_process(processing->selected, candidate, processing->query, trust->source,
-                             trust->anchor_index, trust->options, trust->validation, trust->search,
-                             trust->tree->work, processing->evidence, out);
-}
-
-TC_TLV_result tc_x509_crl_index_attempt(const void* context, const TC_X509_certificate* signer,
-                                        const tc_x509_crl_trust* trust, TC_X509_search_result* out)
-{
-  const tc_x509_crl_index_processing* processing = context;
-  const TC_X509_crl_record* base = &processing->index->records[processing->base];
-  tc_x509_crl_selected selected = {&base->crl, &base->extensions, NULL, NULL};
-  TC_X509_search_result found;
-  if (processing->delta_policy == TC_X509_CRL_COMPLETE_ONLY)
-    return tc_x509_crl_process(&selected, signer, processing->query, trust->source,
-                               trust->anchor_index, trust->options, trust->validation,
-                               trust->search, trust->tree->work, processing->evidence, out);
-  TC_TLV_result result = tc_x509_crl_selected_validate(
-      &selected, signer, trust->source, trust->anchor_index, trust->options, trust->validation,
-      trust->search, trust->tree->work, &found);
-  if (result != TC_TLV_OK)
-    return result;
-  result = tc_x509_crl_delta_select(
-      processing->index, processing->base, signer, &trust->options->at, &trust->options->signatures,
-      &trust->options->parsing, trust->tree, &trust->validation->names, &selected);
-  if (result != TC_TLV_OK &&
-      !(result == TC_TLV_END && processing->delta_policy == TC_X509_CRL_DELTA_IF_AVAILABLE))
-    return result;
-  /* Selection preserves the established signer path and verified base. */
-  result =
-      tc_x509_crl_apply(&selected, processing->query, &trust->options->at, &trust->options->parsing,
-                        trust->tree, &trust->validation->names, trust->validation->oids,
-                        trust->validation->oid_capacity, processing->evidence);
-  if (result != TC_TLV_OK)
-    return result;
-  *out = found;
   return TC_TLV_OK;
 }
 

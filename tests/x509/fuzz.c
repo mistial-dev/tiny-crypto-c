@@ -21,6 +21,7 @@
 #include <tiny_crypto/twic_uuid.h>
 #include <tiny_crypto/x509.h>
 #include <tiny_crypto/x509_path.h>
+#include "x509_crl_harness.h"
 
 typedef struct {
   uint64_t hash;

@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
+#include "x509_crl_harness.h"
 
 static TC_status failed_read(void* context, uint64_t offset, uint8_t* output, size_t length)
 {

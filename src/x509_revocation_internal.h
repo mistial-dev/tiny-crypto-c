@@ -82,13 +82,6 @@ TC_TLV_result tc_x509_crl_search_candidates(void* cursor, tc_pki_candidate_next 
                                             tc_x509_crl_attempt attempt, const void* context,
                                             TC_X509_search_result* out, int* source_failed);
 
-/* candidates points to a guarded store cursor snapshot, reused across searches. */
-TC_TLV_result tc_x509_crl_store_search(const void* candidates, const TC_X509_crl* crl,
-                                       const TC_X509_crl_extensions* extensions,
-                                       const tc_x509_crl_trust* trust, tc_x509_crl_attempt attempt,
-                                       const void* context, TC_X509_search_result* out,
-                                       int* source_failed);
-
 typedef struct {
   const TC_X509_crl_index* index;
   size_t base;
@@ -107,24 +100,11 @@ static inline int tc_x509_crl_index_arguments(const TC_X509_crl_index* index,
          (query->certificate_ca == 0 || query->certificate_ca == 1);
 }
 
-/* Caller validates the index, base, query and trust before candidate search.
- * Establish the signer path before selecting and applying a delta CRL. */
-TC_TLV_result tc_x509_crl_index_attempt(const void* context, const TC_X509_certificate* signer,
-                                        const tc_x509_crl_trust* trust, TC_X509_search_result* out);
-
 typedef struct {
   const tc_x509_crl_selected* selected;
   const tc_x509_crl_query* query;
   TC_X509_crl_evidence* evidence;
 } tc_x509_crl_processing;
-
-/* Candidate callbacks borrow validated search state for the whole attempt. */
-TC_TLV_result tc_x509_crl_check_signer(const void* context, const TC_X509_certificate* candidate,
-                                       const tc_x509_crl_trust* trust, TC_X509_search_result* out);
-TC_TLV_result tc_x509_crl_process_candidate(const void* context,
-                                            const TC_X509_certificate* candidate,
-                                            const tc_x509_crl_trust* trust,
-                                            TC_X509_search_result* out);
 
 typedef struct {
   tc_x509_crl_selected selected;
@@ -448,6 +428,18 @@ typedef struct {
   size_t capacity;
   const TC_X509_revocation_scope* scopes;
 } tc_x509_crl_signature_cache;
+/* One CRL scope evaluation: a signer's signature cache, the delta and order
+ * policies, the validation time, tree scratch with its work budget, and
+ * entry-extension OID scratch. Every field is borrowed for the call. */
+typedef struct {
+  const tc_x509_crl_signature_cache* cache;
+  TC_X509_crl_delta_policy delta_policy;
+  TC_X509_crl_order_policy order_policy;
+  const TC_X509_time* at;
+  const tc_pki_tree_workspace* tree;
+  TC_bytes* oids;
+  size_t oid_capacity;
+} tc_x509_crl_scope_context;
 /* One byte per indexed record, scoped to this signer/provider and stable input
  * snapshot. Cache valid/invalid signatures only. Limits and provider errors can
  * be retried.
@@ -471,65 +463,11 @@ TC_TLV_result tc_x509_crl_delta_next(const TC_X509_crl_index* index, size_t base
                                      const TC_TLV_limits* limits, const tc_pki_tree_workspace* tree,
                                      const TC_X509_name_workspace* names,
                                      tc_x509_crl_selected* out);
-/* Select the highest-numbered current delta signed by the validated base's
- * signer. Caller has authenticated the base and established signer trust.
- * Bad signatures are skipped; provider failures and limits stop selection.
- * Conflicting TBS bytes at the highest authenticated number are INVALID.
- * END means no usable delta. Scope, entries and signer revocation are separate.
- * Stable/disjoint inputs and scratch. out changes only on OK. */
-TC_TLV_result tc_x509_crl_delta_select(const TC_X509_crl_index* index, size_t base,
-                                       const TC_X509_certificate* signer, const TC_X509_time* at,
-                                       const TC_X509_signature_provider* provider,
-                                       const TC_TLV_limits* limits,
-                                       const tc_pki_tree_workspace* tree,
-                                       const TC_X509_name_workspace* names,
-                                       tc_x509_crl_selected* out);
-/* Same selection using the cache's signer/provider and parsing workspace. */
-TC_TLV_result tc_x509_crl_delta_select_cached(const tc_x509_crl_signature_cache* cache, size_t base,
-                                              const TC_X509_time* at,
-                                              const tc_pki_tree_workspace* tree,
-                                              tc_x509_crl_selected* out);
-/* Enumerate authenticated effective candidates in one issuer/IDP scope.
- * reference identifies the scope. cursor starts at zero. Signature cache is
- * scoped to the proposed signer, whose trust remains the caller's responsibility.
- * Stale bases need a current delta; future bases are skipped. Entry and target
- * coverage checks follow selection. Cursor/out change only on OK. Cache/work
- * and name scratch are provisional. Ranking across bases is a separate step. */
-TC_TLV_result tc_x509_crl_effective_next(const tc_x509_crl_signature_cache* cache, size_t reference,
-                                         size_t* cursor, TC_X509_crl_delta_policy delta_policy,
-                                         const TC_X509_time* at, const tc_pki_tree_workspace* tree,
-                                         tc_x509_crl_selected* out);
-/* Highest authenticated effective number in this scope. A delta supplies its
- * own number. Unnumbered candidates return UNSUPPORTED. END means
- * no eligible candidate. Output borrows number contents and changes only on OK.
- * Conflicting deltas return INVALID only at the highest effective number.
- * Tied candidates still need entry consistency checks before evidence is applied. */
-TC_TLV_result tc_x509_crl_latest_number(const tc_x509_crl_signature_cache* cache, size_t reference,
-                                        TC_X509_crl_delta_policy delta_policy,
-                                        const TC_X509_time* at, const tc_pki_tree_workspace* tree,
-                                        TC_bytes* out);
-/* Apply CRLs from one scope after signer trust has been established.
- * ORDER_NUMBER requires CRLNumber. ORDER_THIS_UPDATE explicitly orders all
- * effective candidates by thisUpdate, including legacy unnumbered complete CRLs.
- * Delta pairing still requires numbers. There is no automatic ordering fallback.
- * First find the latest candidate, then require tied candidates to agree
- * on thisUpdate, reason coverage and the target's revocation information.
- * Evidence changes only on OK. Input/cache/scratch storage is disjoint and stable.
- * Signer-path revocation remains separate. Cache/work/scratch are provisional. */
-TC_TLV_result tc_x509_crl_scope_apply(const tc_x509_crl_signature_cache* cache, size_t reference,
-                                      TC_X509_crl_delta_policy delta_policy,
-                                      TC_X509_crl_order_policy order_policy,
-                                      const tc_x509_crl_query* query, const TC_X509_time* at,
-                                      const tc_pki_tree_workspace* tree, TC_bytes* oids,
-                                      size_t oid_capacity, TC_X509_crl_evidence* evidence);
 
 /* Apply the newest authenticated CRLs and retain their selection rank. */
-TC_TLV_result tc_x509_crl_scope_evaluate(const tc_x509_crl_signature_cache* cache, size_t reference,
-                                         TC_X509_crl_delta_policy delta_policy,
-                                         TC_X509_crl_order_policy order_policy,
-                                         const tc_x509_crl_query* query, const TC_X509_time* at,
-                                         const tc_pki_tree_workspace* tree, TC_bytes* oids,
-                                         size_t oid_capacity, TC_X509_crl_evidence* evidence,
+TC_TLV_result tc_x509_crl_scope_evaluate(const tc_x509_crl_scope_context* scope, size_t reference,
+                                         const tc_x509_crl_query* query,
+                                         TC_X509_crl_evidence* evidence,
                                          tc_x509_crl_selected* preference);
 
 enum { CRL_SIGNATURE_UNCHECKED, CRL_SIGNATURE_VALID, CRL_SIGNATURE_INVALID };
@@ -584,4 +522,29 @@ TC_TLV_result tc_x509_crl_scope_prepare(const tc_x509_crl_operation_source* cand
                                         TC_X509_search_result* out,
                                         TC_bytes writes[CRL_SCOPE_WRITES]);
 
+/* Nonzero when a signature cache is bound to an index and signer. */
+int tc_x509_crl_signature_cache_valid(const tc_x509_crl_signature_cache* cache);
+/* The latest effective CRL for a reference scope. */
+TC_TLV_result tc_x509_crl_latest(const tc_x509_crl_scope_context* scope, size_t reference,
+                                 tc_x509_crl_selected* out, int* conflict);
+/* Select the highest-numbered current delta signed by the validated base's
+ * signer. Caller has authenticated the base and established signer trust.
+ * Bad signatures are skipped; provider failures and limits stop selection.
+ * Conflicting TBS bytes at the highest authenticated number are INVALID.
+ * END means no usable delta. A non-NULL cache reuses verified signatures, and
+ * a non-NULL conflict reports a conflict in place of returning INVALID. Scope,
+ * entries and signer revocation are separate. Stable/disjoint inputs and
+ * scratch. out changes only on OK. */
+TC_TLV_result tc_x509_crl_delta_select(const tc_x509_crl_signature_cache* signer, size_t base,
+                                       const TC_X509_time* at, const tc_pki_tree_workspace* tree,
+                                       int* conflict, tc_x509_crl_selected* out);
+/* Enumerate authenticated effective candidates in one issuer/IDP scope.
+ * reference identifies the scope. cursor starts at zero. Signature cache is
+ * scoped to the proposed signer, whose trust remains the caller's
+ * responsibility. Stale bases need a current delta; future bases are skipped.
+ * conflict is optional, as for tc_x509_crl_delta_select. Entry and target
+ * coverage checks follow selection. Cursor/out change only on OK. Cache/work
+ * and name scratch are provisional. Ranking across bases is a separate step. */
+TC_TLV_result tc_x509_crl_effective_next(const tc_x509_crl_scope_context* scope, size_t reference,
+                                         size_t* cursor, int* conflict, tc_x509_crl_selected* out);
 #endif

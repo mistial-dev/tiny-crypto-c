@@ -528,7 +528,7 @@ add_test(NAME test_package_boundaries
     TC_ENABLE_CMS_VALIDATION=1 TC_ENABLE_PIV_OBJECTS=1 TC_ENABLE_CREDENTIAL=1
     TC_ENABLE_AES=0 TC_ENABLE_SHA256=0 TC_ENABLE_EAC_CVC=1)
   tc_add_c_test(test_cms_external_collections tiny-crypto-c-test-pki
-    tests/cms/external.c tests/support/cms_crl_harness.c)
+    tests/cms/external.c tests/support/cms_crl_harness.c tests/support/x509_crl_harness.c)
   tc_add_test_executable(test_eac_reader tests/eac/reader.c)
   tc_add_c_test(test_eac_cvc tiny-crypto-c-test-pki tests/eac/test.c)
   target_link_libraries(test_eac_reader PRIVATE tiny-crypto-c-test-pki)
@@ -612,7 +612,7 @@ add_test(NAME test_package_boundaries
     TC_ENABLE_TWIC_CCL=1
     TC_INPUT_FILE="${CMAKE_CURRENT_BINARY_DIR}/pki-input.txt")
   file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/pki-input.txt" CONTENT "sample input\n")
-  tc_add_c_test(test_x509_crl tiny-crypto-c-test-pki tests/x509/crl.c tests/support/cms_crl_harness.c)
+  tc_add_c_test(test_x509_crl tiny-crypto-c-test-pki tests/x509/crl.c tests/support/cms_crl_harness.c tests/support/x509_crl_harness.c)
   tc_add_c_test(test_source tiny-crypto-c-test-pki tests/x509/source.c)
   tc_add_c_test(test_x509_path tiny-crypto-c-test-pki tests/x509/path.c)
   tc_add_c_test(test_x509_anchor_constraints tiny-crypto-c-test-pki-native
@@ -627,7 +627,8 @@ add_test(NAME test_package_boundaries
   tc_add_c_test(test_x509_candidate tiny-crypto-c-test-pki tests/x509/candidate.c)
   target_compile_definitions(test_x509_candidate PRIVATE
     TC_CANDIDATE_FILE="${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/x509/eid_testbeds/csca/CERT_ECARD_CSCA_1.DER")
-  tc_add_c_test(test_x509_revocation tiny-crypto-c-test-pki tests/x509/revocation.c)
+  tc_add_c_test(test_x509_revocation tiny-crypto-c-test-pki tests/x509/revocation.c
+    tests/support/x509_crl_harness.c)
   tc_add_test_executable(test_x509_path_corpus_reader tests/x509/path_corpus.c tests/support/munit.c)
   target_include_directories(test_x509_path_corpus_reader PRIVATE tests/support)
   target_link_libraries(test_x509_path_corpus_reader PRIVATE tiny-crypto-c-test-pki-native)
@@ -636,7 +637,7 @@ add_test(NAME test_package_boundaries
   tc_add_c_test(test_cms_attributes tiny-crypto-c-test-pki tests/cms/attributes.c)
   tc_add_c_test(test_cms_algorithm tiny-crypto-c-test-pki tests/cms/algorithm.c)
   tc_add_c_test(test_cms_children tiny-crypto-c-test-pki tests/cms/children.c
-    tests/support/cms_crl_harness.c)
+    tests/support/cms_crl_harness.c tests/support/x509_crl_harness.c)
   tc_add_c_test(test_cms_reader tiny-crypto-c-test-pki tests/cms/reader.c examples/cms_reader.c)
   get_target_property(tc_native_pki_sources tiny-crypto-c-test-pki SOURCES)
   tc_add_test_library(tiny-crypto-c-test-pki-native ${tc_native_pki_sources}
@@ -677,7 +678,8 @@ add_test(NAME test_package_boundaries
     target_compile_definitions(test_cpp_trust_anchor PRIVATE
       TC_TWIC_SYNTHETIC_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/twic/synthetic")
   endif()
-  tc_add_c_test(test_source_hash tiny-crypto-c-test-pki-native tests/x509/source_hash.c)
+  tc_add_c_test(test_source_hash tiny-crypto-c-test-pki-native tests/x509/source_hash.c
+    tests/support/x509_crl_harness.c)
   tc_add_c_test(test_twic_synthetic_fixture tiny-crypto-c-test-pki-native
     tests/twic/synthetic_fixture.c)
   target_compile_definitions(test_twic_synthetic_fixture PRIVATE
@@ -699,7 +701,7 @@ add_test(NAME test_package_boundaries
   tc_warnings(test_piv_cvc_corpus_reader)
   tc_use_test_sanitizers(test_piv_cvc_corpus_reader)
   tc_add_c_test(test_cms_corpus_reader tiny-crypto-c-test-pki-native tests/cms/corpus_reader.c
-    tests/support/cms_crl_harness.c)
+    tests/support/cms_crl_harness.c tests/support/x509_crl_harness.c)
   set_tests_properties(test_cms_corpus_reader PROPERTIES
     SKIP_REGULAR_EXPRESSION "No tests run, 2 .* skipped")
   tc_add_c_test(test_cms_octets tiny-crypto-c-test-pki tests/cms/octets.c)
@@ -719,7 +721,7 @@ add_test(NAME test_package_boundaries
   tc_add_c_test(test_cms_content tiny-crypto-c-test-cms-crypto tests/cms/content.c)
   tc_add_c_test(test_cms_verify_content tiny-crypto-c-test-cms-crypto tests/cms/verify.c)
   tc_add_c_test(test_cms_signer_info tiny-crypto-c-test-pki tests/cms/signer.c examples/cms_reader.c
-    tests/support/cms_crl_harness.c)
+    tests/support/cms_crl_harness.c tests/support/x509_crl_harness.c)
   option(TINY_CRYPTO_TEST_OPENSSL "Check PKI and multiprecision arithmetic against OpenSSL 3" OFF)
   if(TINY_CRYPTO_TEST_OPENSSL)
     find_package(OpenSSL 3 REQUIRED COMPONENTS Crypto)
@@ -771,7 +773,7 @@ add_test(NAME test_package_boundaries
     set_property(TARGET test_x509_native PROPERTY NO_SYSTEM_FROM_IMPORTED TRUE)
     tc_add_c_test(test_lds_native tiny-crypto-c-test-pki-native tests/cms/lds.c)
     tc_add_c_test(test_cms_native tiny-crypto-c-test-pki-native tests/cms/native.c
-      tests/support/cms_crl_harness.c
+      tests/support/cms_crl_harness.c tests/support/x509_crl_harness.c
       examples/cms_reader.c examples/cms_validate.c examples/credential_object.c examples/x509_revocation.c
       examples/card_key_policy.c examples/credential_workflow.c src/twic_ccl.c)
     target_compile_definitions(test_cms_native PRIVATE TC_ENABLE_TWIC_CCL=1)
@@ -842,7 +844,8 @@ add_test(NAME test_package_boundaries
       target_link_libraries(test_arithmetic_openssl_${small} PRIVATE OpenSSL::Crypto)
       set_property(TARGET test_arithmetic_openssl_${small} PROPERTY NO_SYSTEM_FROM_IMPORTED TRUE)
     endforeach()
-    tc_add_c_test(test_x509_openssl tiny-crypto-c-test-pki tests/x509/openssl.c)
+    tc_add_c_test(test_x509_openssl tiny-crypto-c-test-pki tests/x509/openssl.c
+      tests/support/x509_crl_harness.c)
     target_sources(test_x509_openssl PRIVATE examples/x509_client.c)
     target_link_libraries(test_x509_openssl PRIVATE OpenSSL::Crypto)
     set_property(TARGET test_x509_openssl PROPERTY NO_SYSTEM_FROM_IMPORTED TRUE)
@@ -981,7 +984,7 @@ add_test(NAME test_package_boundaries
     get_target_property(pki_fuzz_sources tiny-crypto-c-test-pki SOURCES)
     get_target_property(pki_fuzz_definitions tiny-crypto-c-test-pki COMPILE_DEFINITIONS)
     list(REMOVE_ITEM pki_fuzz_definitions TC_ENABLE_SHA256=0)
-    add_executable(fuzz_pki tests/x509/fuzz.c ${tc_hash_sources} ${pki_fuzz_sources})
+    add_executable(fuzz_pki tests/x509/fuzz.c tests/support/x509_crl_harness.c ${tc_hash_sources} ${pki_fuzz_sources})
     target_include_directories(fuzz_pki PRIVATE src)
     target_compile_definitions(fuzz_pki PRIVATE ${pki_fuzz_definitions}
       TC_ENABLE_SHA256=1 TC_STRICT=0)

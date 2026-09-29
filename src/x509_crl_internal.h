@@ -58,12 +58,6 @@ TC_X509_signature_result
 tc_x509_crl_signer_check(const TC_X509_crl* crl, const TC_X509_certificate* signer,
                          const TC_X509_signature_provider* provider, const TC_TLV_limits* limits,
                          const TC_X509_name_workspace* names, size_t* work);
-/* Digest covers the exact source TBS encoding. Check issuer linkage, cRLSign,
- * algorithm/key restrictions and signature. Signer trust and CRL scope follow. */
-TC_X509_signature_result tc_x509_crl_signer_digest_check(
-    const TC_X509_crl* crl, TC_hash_algorithm hash, TC_bytes digest,
-    const TC_X509_certificate* signer, const TC_X509_signature_provider* provider,
-    const TC_TLV_limits* limits, const TC_X509_name_workspace* names, size_t* work);
 /* Verify the CRL signature and build its signer's path to the selected anchor
  * from the same held source snapshot as the certificate path. options contain
  * signer policy, including the signer's EKU/purpose. cRLSign is added to
@@ -127,14 +121,6 @@ TC_TLV_result tc_x509_crl_revoked_init(const TC_X509_crl* crl,
 TC_TLV_result tc_x509_crl_revoked_next(tc_x509_crl_revoked_reader* reader,
                                        const tc_pki_tree_workspace* tree, TC_bytes* oids,
                                        size_t capacity, tc_x509_crl_revoked_entry* out);
-/* Match parsed serial/issuer fields against a resolved entry. Explicit issuer
- * DNs require the certificate's encoding (5.3.3); the default issuer uses Name
- * comparison. Output changes only on OK. Inputs and scratch are disjoint. */
-TC_TLV_result tc_x509_crl_entry_matches(const tc_x509_crl_revoked_entry* entry,
-                                        const TC_X509_certificate* certificate,
-                                        const TC_TLV_limits* limits,
-                                        const tc_pki_tree_workspace* tree,
-                                        const TC_X509_name_workspace* names, int* matched);
 /* Accumulate one query match. Duplicate issuer/serial entries are invalid. */
 TC_TLV_result tc_x509_crl_match_update(const tc_x509_crl_revoked_entry* entry,
                                        const TC_X509_crl_target* query, const TC_TLV_limits* limits,
@@ -147,29 +133,6 @@ typedef struct {
   const TC_X509_crl* delta;
   const TC_X509_crl_extensions* delta_info;
 } tc_x509_crl_selected;
-/* Check pair compatibility, signatures under one key, and the signer's path to
- * the target anchor. Entries, scope, CRL freshness and signer-path revocation
- * are separate checks. Parsed inputs and writable storage are
- * disjoint. Work/scratch are provisional. out changes only on OK and borrows
- * the signer path. Source records remain stable for the operation. */
-TC_TLV_result tc_x509_crl_selected_validate(const tc_x509_crl_selected* selected,
-                                            const TC_X509_certificate* signer,
-                                            const TC_X509_store_source* source, size_t anchor_index,
-                                            const TC_X509_path_options* options,
-                                            const TC_X509_path_workspace* validation,
-                                            const TC_X509_search_workspace* search, size_t* work,
-                                            TC_X509_search_result* out);
-/* Check pairing, authenticate both CRLs with one signer's key, then resolve
- * their entries. Omit both delta pointers for a complete CRL alone. The caller
- * must establish signer trust, freshness and scope before using this result.
- * Parsed inputs and scratch/output are disjoint. Output changes only on OK.
- * Work and scratch are consumed on failure. */
-TC_TLV_result
-tc_x509_crl_selected_find(const tc_x509_crl_selected* selected, const TC_X509_certificate* signer,
-                          const TC_X509_certificate* certificate,
-                          const TC_X509_signature_provider* provider, const TC_TLV_limits* limits,
-                          const tc_pki_tree_workspace* tree, const TC_X509_name_workspace* names,
-                          TC_bytes* oids, size_t capacity, TC_X509_crl_match* out);
 /* Combine lookups from an already validated compatible pair. delta may be NULL.
  * A matching delta overrides the base, including removeFromCRL. A cleared or
  * absent match still needs complete reason coverage before good status is known.
@@ -256,23 +219,6 @@ typedef struct {
   const tc_pki_distribution_point* point;
   int certificate_ca;
 } tc_x509_crl_query;
-/* Process selected CRLs for one distribution point and proposed signer.
- * Checks effective freshness/scope, both signatures and the signer path to the
- * target certificate's anchor, then accumulates reasons and resolved entries.
- * A delta supplies the effective update times (RFC 5280 5.2.4).
- * END means no new eligible reasons or an already determined status.
- * options hold signer policy; certificate_ca is the target's validated cA.
- * Signer-path revocation is separate. The source is the target path's held
- * snapshot. Inputs, scratch, work, evidence and out are disjoint; parsed views
- * must match unchanged encodings. Evidence/out change only on OK. Scratch/work
- * are provisional. out borrows the signer path and records total work used. */
-TC_TLV_result tc_x509_crl_process(const tc_x509_crl_selected* selected,
-                                  const TC_X509_certificate* signer, const tc_x509_crl_query* query,
-                                  const TC_X509_store_source* source, size_t anchor_index,
-                                  const TC_X509_path_options* options,
-                                  const TC_X509_path_workspace* validation,
-                                  const TC_X509_search_workspace* search, size_t* work,
-                                  TC_X509_crl_evidence* evidence, TC_X509_search_result* out);
 /* Apply an authenticated pair: effective freshness/scope, entry lookup and
  * reason coverage. Caller has checked pair compatibility, both signatures and
  * signer trust. Those checks are not repeated. Signer-path revocation is separate.
@@ -340,13 +286,6 @@ TC_TLV_result tc_x509_crl_entries_init(TC_bytes encoded, const TC_TLV_limits* li
 /* Reader and out are unchanged on failure or END. Work/scratch are provisional. */
 TC_TLV_result tc_x509_crl_entry_next(TC_TLV_reader* reader, unsigned version,
                                      const tc_pki_tree_workspace* tree, tc_x509_crl_entry* out);
-/* Check CRL and entry extension wrappers, embedded DER, and duplicate OIDs.
- * Checks numbers, reasons, dates, AKIDs, issuer names and issuing distribution points.
- * Reuses OID scratch per list. Critical flags, cross-field rules and other
- * extension semantics remain separate from this structural check. */
-TC_TLV_result tc_x509_crl_extensions_check(const TC_X509_crl* crl, const TC_TLV_limits* limits,
-                                           const tc_pki_tree_workspace* tree, TC_bytes* oids,
-                                           size_t capacity);
 /* CRLReason values defined by RFC 5280 section 5.3.1 (7 is unassigned). */
 enum { CRL_REASON_UNUSED = 7, CRL_REASON_REMOVE = 8, CRL_REASON_LAST = 10 };
 static inline int tc_x509_crl_reason_known(unsigned reason)
@@ -354,4 +293,58 @@ static inline int tc_x509_crl_reason_known(unsigned reason)
   return reason <= CRL_REASON_LAST && reason != CRL_REASON_UNUSED;
 }
 
+/* Match a revoked entry against a serial and issuer query. */
+TC_TLV_result tc_x509_crl_query_matches(const tc_x509_crl_revoked_entry* entry,
+                                        const TC_X509_crl_target* certificate,
+                                        const TC_TLV_limits* limits,
+                                        const tc_pki_tree_workspace* tree,
+                                        const TC_X509_name_workspace* names, int* matched);
+/* Validate a signer path for a selected CRL pair to anchor_index. */
+TC_TLV_result tc_x509_crl_selected_path(const tc_x509_crl_selected* selected,
+                                        const TC_X509_certificate* signer,
+                                        const TC_X509_store_source* restricted, size_t anchor_index,
+                                        const TC_X509_path_options* options,
+                                        const TC_X509_path_workspace* validation,
+                                        const TC_X509_search_workspace* search, size_t* work,
+                                        TC_X509_search_result* out);
+/* Reason coverage a selected CRL pair adds for query. */
+TC_TLV_result tc_x509_crl_selected_coverage(const tc_x509_crl_selected* selected,
+                                            const tc_x509_crl_query* query, const TC_X509_time* at,
+                                            const TC_TLV_limits* limits,
+                                            const tc_pki_tree_workspace* tree,
+                                            const TC_X509_name_workspace* names,
+                                            const TC_X509_crl_evidence* evidence,
+                                            tc_x509_crl_coverage* coverage);
+/* Apply a selected CRL pair's entries for certificate to evidence. */
+TC_TLV_result tc_x509_crl_selected_evidence(const tc_x509_crl_selected* selected,
+                                            const TC_X509_certificate* certificate,
+                                            uint16_t reasons, const TC_TLV_limits* limits,
+                                            const tc_pki_tree_workspace* tree,
+                                            const TC_X509_name_workspace* names, TC_bytes* oids,
+                                            size_t oid_capacity, TC_X509_crl_evidence* evidence);
+/* Verify a selected CRL pair's signatures under signer. */
+TC_TLV_result tc_x509_crl_selected_authenticate(const tc_x509_crl_selected* selected,
+                                                const TC_X509_certificate* signer,
+                                                const TC_X509_signature_provider* provider,
+                                                const TC_TLV_limits* limits,
+                                                const tc_pki_tree_workspace* tree,
+                                                const TC_X509_name_workspace* names);
+/* Look up certificate in an authenticated selected CRL pair. */
+TC_TLV_result tc_x509_crl_selected_lookup(const tc_x509_crl_selected* selected,
+                                          const TC_X509_certificate* certificate,
+                                          const TC_TLV_limits* limits,
+                                          const tc_pki_tree_workspace* tree,
+                                          const TC_X509_name_workspace* names, TC_bytes* oids,
+                                          size_t capacity, TC_X509_crl_match* out);
+/* The CRL signer key after issuer and usage checks. */
+TC_TLV_result tc_x509_crl_signer_key(const TC_X509_crl* crl, const TC_X509_certificate* signer,
+                                     const TC_TLV_limits* limits,
+                                     const TC_X509_name_workspace* names, size_t* work,
+                                     TC_X509_public_key* key);
+/* Verify a CRL signature over a supplied digest. */
+TC_X509_signature_result tc_x509_crl_digest_signature(const TC_X509_crl* crl,
+                                                      TC_hash_algorithm hash, TC_bytes digest,
+                                                      const TC_X509_public_key* key,
+                                                      const TC_X509_signature_provider* provider,
+                                                      size_t* work);
 #endif

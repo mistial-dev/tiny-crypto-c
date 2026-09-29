@@ -4,6 +4,7 @@
 #include "../../src/pki_source_internal.h"
 #include "munit.h"
 #include <string.h>
+#include "x509_crl_harness.h"
 
 typedef struct {
   TC_TLV_result result;

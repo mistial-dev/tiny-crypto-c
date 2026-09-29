@@ -93,8 +93,4 @@ TC_TLV_result tc_x509_crl_source_scan_step(tc_x509_crl_source_scan* scan, size_t
                                            const tc_pki_tree_workspace* tree,
                                            const TC_X509_name_workspace* names, TC_bytes* oids,
                                            size_t capacity, int* complete);
-/* Copy matches after the complete entry scan. Signature, signer trust, freshness
- * and CRL applicability must also succeed before a credential verdict is issued. */
-TC_TLV_result tc_x509_crl_source_scan_finish(const tc_x509_crl_source_scan* scan,
-                                             TC_X509_crl_match* out, size_t capacity);
 #endif

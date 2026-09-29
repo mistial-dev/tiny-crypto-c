@@ -211,11 +211,6 @@ TC_X509_path_status tc_x509_path_search_source(TC_bytes target, const TC_X509_st
   return failure;
 }
 
-typedef struct {
-  const TC_bytes* candidates;
-  const TC_X509_trust_anchor* anchors;
-} array_source;
-
 enum {
   SEARCH_PATH_WRITE = TC_X509_PATH_STORAGE_COUNT,
   SEARCH_FRAMES_WRITE,
@@ -282,36 +277,4 @@ TC_X509_path_status TC_X509_path_build(TC_bytes target, const TC_X509_store_sour
   return tc_x509_path_build_work(target, source, options, validation, search, &work, out);
 }
 
-static TC_TLV_result array_candidate(void* context, size_t index, size_t* work, TC_bytes* out)
-{
-  const array_source* source = context;
-  (void)work;
-  *out = source->candidates[index];
-  return TC_TLV_OK;
-}
-
-static TC_TLV_result array_anchor(void* context, size_t index, size_t* work,
-                                  TC_X509_store_anchor* out)
-{
-  const array_source* source = context;
-  (void)work;
-  out->trust = source->anchors[index];
-  out->names = (TC_X509_name_constraints){{NULL, 0}, {NULL, 0}};
-  return TC_TLV_OK;
-}
-
-TC_X509_path_status tc_x509_path_search(TC_bytes target, const TC_bytes* candidates,
-                                        size_t candidate_count, const TC_X509_trust_anchor* anchors,
-                                        size_t anchor_count, const TC_X509_path_options* options,
-                                        const TC_X509_path_workspace* validation,
-                                        const TC_X509_search_workspace* search, size_t* work,
-                                        TC_X509_search_result* out)
-{
-  array_source arrays = {candidates, anchors};
-  TC_X509_store_source source = {&arrays, candidate_count, anchor_count, array_candidate,
-                                 array_anchor};
-  if ((candidate_count && !candidates) || (anchor_count && !anchors))
-    return TC_X509_PATH_ERROR;
-  return tc_x509_path_search_source(target, &source, options, validation, search, work, out);
-}
 #endif

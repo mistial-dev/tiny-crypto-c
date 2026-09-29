@@ -8,6 +8,7 @@
 #include <tiny_crypto/cms_validation.h>
 #include <tiny_crypto/piv_oid.h>
 #include "../../src/cms_internal.h"
+#include "x509_crl_harness.h"
 
 typedef struct {
   tc_cms_collection collection;

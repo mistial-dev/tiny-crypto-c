@@ -93,6 +93,7 @@ done:
 }
 
 #include "openssl_fixture.h"
+#include "x509_crl_harness.h"
 
 static size_t certificate(EVP_PKEY* key, const EVP_MD* digest, uint8_t* der, size_t capacity)
 {

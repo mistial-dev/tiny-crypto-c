@@ -302,18 +302,6 @@ TC_TLV_result tc_x509_crl_source_scan_step(tc_x509_crl_source_scan* scan, size_t
   return TC_TLV_OK;
 }
 
-TC_TLV_result tc_x509_crl_source_scan_finish(const tc_x509_crl_source_scan* scan,
-                                             TC_X509_crl_match* out, size_t capacity)
-{
-  if (!scan || scan->phase != TC_CRL_SCAN_COMPLETE || (scan->count && !out))
-    return TC_TLV_ARGUMENT;
-  if (scan->count > capacity)
-    return TC_TLV_LIMIT;
-  if (scan->count)
-    memcpy(out, scan->matches, scan->count * sizeof *out);
-  return TC_TLV_OK;
-}
-
 TC_TLV_result tc_x509_crl_source_metadata(tc_source_reader* reader,
                                           const tc_x509_crl_layout* layout, TC_buffer storage,
                                           const TC_TLV_limits* limits,

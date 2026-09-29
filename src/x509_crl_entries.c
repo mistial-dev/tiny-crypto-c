@@ -104,11 +104,11 @@ static TC_TLV_result entry_issuer_directory_name(TC_bytes names, TC_bytes query,
   return TC_TLV_OK;
 }
 
-static TC_TLV_result crl_query_matches(const tc_x509_crl_revoked_entry* entry,
-                                       const TC_X509_crl_target* certificate,
-                                       const TC_TLV_limits* limits,
-                                       const tc_pki_tree_workspace* tree,
-                                       const TC_X509_name_workspace* names, int* matched)
+TC_TLV_result tc_x509_crl_query_matches(const tc_x509_crl_revoked_entry* entry,
+                                        const TC_X509_crl_target* certificate,
+                                        const TC_TLV_limits* limits,
+                                        const tc_pki_tree_workspace* tree,
+                                        const TC_X509_name_workspace* names, int* matched)
 {
   if (!entry || !certificate || !tree || !tree->work || !matched || !entry->entry.serial.length ||
       !certificate->serial.length)
@@ -127,18 +127,6 @@ static TC_TLV_result crl_query_matches(const tc_x509_crl_revoked_entry* entry,
                                      matched);
 }
 
-TC_TLV_result tc_x509_crl_entry_matches(const tc_x509_crl_revoked_entry* entry,
-                                        const TC_X509_certificate* certificate,
-                                        const TC_TLV_limits* limits,
-                                        const tc_pki_tree_workspace* tree,
-                                        const TC_X509_name_workspace* names, int* matched)
-{
-  if (!certificate)
-    return TC_TLV_ARGUMENT;
-  const TC_X509_crl_target query = {certificate->serial, certificate->issuer};
-  return crl_query_matches(entry, &query, limits, tree, names, matched);
-}
-
 TC_TLV_result tc_x509_crl_match_update(const tc_x509_crl_revoked_entry* entry,
                                        const TC_X509_crl_target* query, const TC_TLV_limits* limits,
                                        const tc_pki_tree_workspace* tree,
@@ -148,7 +136,7 @@ TC_TLV_result tc_x509_crl_match_update(const tc_x509_crl_revoked_entry* entry,
   if (!match)
     return TC_TLV_ARGUMENT;
   int matched;
-  TC_TLV_result result = crl_query_matches(entry, query, limits, tree, names, &matched);
+  TC_TLV_result result = tc_x509_crl_query_matches(entry, query, limits, tree, names, &matched);
   if (result != TC_TLV_OK || !matched)
     return result;
   if (match->found)

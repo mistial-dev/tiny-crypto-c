@@ -10,17 +10,6 @@
 #include "pki_source_internal.h"
 #include "pki_signature_internal.h"
 
-static TC_TLV_result
-crl_selected_authenticate(const tc_x509_crl_selected* selected, const TC_X509_certificate* signer,
-                          const TC_X509_signature_provider* provider, const TC_TLV_limits* limits,
-                          const tc_pki_tree_workspace* tree, const TC_X509_name_workspace* names);
-static TC_TLV_result crl_selected_lookup(const tc_x509_crl_selected* selected,
-                                         const TC_X509_certificate* certificate,
-                                         const TC_TLV_limits* limits,
-                                         const tc_pki_tree_workspace* tree,
-                                         const TC_X509_name_workspace* names, TC_bytes* oids,
-                                         size_t capacity, TC_X509_crl_match* out);
-
 static TC_X509_path_status crl_signer_path(const TC_X509_certificate* signer,
                                            const TC_X509_store_source* restricted,
                                            size_t anchor_index, const TC_X509_path_options* options,
@@ -40,46 +29,21 @@ static TC_X509_path_status crl_signer_path(const TC_X509_certificate* signer,
   return TC_X509_PATH_VALID;
 }
 
-static TC_TLV_result
-crl_selected_path(const tc_x509_crl_selected* selected, const TC_X509_certificate* signer,
-                  const TC_X509_store_source* restricted, size_t anchor_index,
-                  const TC_X509_path_options* options, const TC_X509_path_workspace* validation,
-                  const TC_X509_search_workspace* search, size_t* work, TC_X509_search_result* out)
+TC_TLV_result tc_x509_crl_selected_path(const tc_x509_crl_selected* selected,
+                                        const TC_X509_certificate* signer,
+                                        const TC_X509_store_source* restricted, size_t anchor_index,
+                                        const TC_X509_path_options* options,
+                                        const TC_X509_path_workspace* validation,
+                                        const TC_X509_search_workspace* search, size_t* work,
+                                        TC_X509_search_result* out)
 {
   const tc_pki_tree_workspace tree = {validation->frames, validation->frame_capacity, work};
-  TC_TLV_result result = crl_selected_authenticate(selected, signer, &options->signatures,
-                                                   &options->parsing, &tree, &validation->names);
+  TC_TLV_result result = tc_x509_crl_selected_authenticate(
+      selected, signer, &options->signatures, &options->parsing, &tree, &validation->names);
   if (result != TC_TLV_OK)
     return result;
   return tc_x509_path_result_status(
       crl_signer_path(signer, restricted, anchor_index, options, validation, search, work, out));
-}
-
-TC_TLV_result tc_x509_crl_selected_validate(const tc_x509_crl_selected* selected,
-                                            const TC_X509_certificate* signer,
-                                            const TC_X509_store_source* source, size_t anchor_index,
-                                            const TC_X509_path_options* options,
-                                            const TC_X509_path_workspace* validation,
-                                            const TC_X509_search_workspace* search, size_t* work,
-                                            TC_X509_search_result* out)
-{
-  tc_pki_anchor_source anchor;
-  TC_X509_store_source restricted;
-  TC_X509_search_result found;
-  if (!selected || !selected->base || !selected->base_info || !signer || !options || !validation ||
-      !search || !work || !out || !!selected->delta != !!selected->delta_info)
-    return TC_TLV_ARGUMENT;
-  TC_TLV_result result = tc_pki_source_select_anchor(source, anchor_index, &anchor, &restricted);
-  if (result != TC_TLV_OK)
-    return result;
-  const size_t initial_work = *work;
-  result = crl_selected_path(selected, signer, &restricted, anchor_index, options, validation,
-                             search, work, &found);
-  if (result != TC_TLV_OK)
-    return result;
-  found.validation.work_used = initial_work - *work;
-  *out = found;
-  return TC_TLV_OK;
 }
 
 TC_X509_path_status tc_x509_crl_signer_validate(
@@ -114,10 +78,11 @@ TC_X509_path_status tc_x509_crl_signer_validate(
   return TC_X509_PATH_VALID;
 }
 
-static TC_X509_signature_result crl_digest_signature(const TC_X509_crl* crl, TC_hash_algorithm hash,
-                                                     TC_bytes digest, const TC_X509_public_key* key,
-                                                     const TC_X509_signature_provider* provider,
-                                                     size_t* work)
+TC_X509_signature_result tc_x509_crl_digest_signature(const TC_X509_crl* crl,
+                                                      TC_hash_algorithm hash, TC_bytes digest,
+                                                      const TC_X509_public_key* key,
+                                                      const TC_X509_signature_provider* provider,
+                                                      size_t* work)
 {
   TC_signature_algorithm algorithm;
   TC_TLV_result result = tc_pki_signature_resolve(&crl->signature_algorithm, key, &algorithm);
@@ -136,8 +101,8 @@ static TC_X509_signature_result crl_key_signature(const TC_X509_crl* crl,
   if (crl->prepared) {
     if (crl->encoded.length || crl->tbs.length || crl->revoked.length)
       return TC_X509_SIGNATURE_ERROR;
-    return crl_digest_signature(crl, crl->prepared->hash, crl->prepared->digest, key, provider,
-                                work);
+    return tc_x509_crl_digest_signature(crl, crl->prepared->hash, crl->prepared->digest, key,
+                                        provider, work);
   }
   return TC_X509_signature_verify_message(&crl->tbs, 1, &crl->signature_algorithm, crl->signature,
                                           key, provider, work);
@@ -163,10 +128,10 @@ TC_X509_signature_result tc_x509_crl_anchor_check(const TC_X509_crl* crl,
   return crl_key_signature(crl, &anchor->public_key, provider, work);
 }
 
-static TC_TLV_result crl_signer_key(const TC_X509_crl* crl, const TC_X509_certificate* signer,
-                                    const TC_TLV_limits* limits,
-                                    const TC_X509_name_workspace* names, size_t* work,
-                                    TC_X509_public_key* key)
+TC_TLV_result tc_x509_crl_signer_key(const TC_X509_crl* crl, const TC_X509_certificate* signer,
+                                     const TC_TLV_limits* limits,
+                                     const TC_X509_name_workspace* names, size_t* work,
+                                     TC_X509_public_key* key)
 {
   TC_TLV_result result;
   int accepted;
@@ -198,26 +163,10 @@ TC_X509_signature_result tc_x509_crl_signer_check(const TC_X509_crl* crl,
   if (!provider || (crl->prepared ? !provider->verify_digest : !provider->verify))
     return TC_X509_SIGNATURE_UNSUPPORTED;
   TC_X509_public_key key;
-  TC_TLV_result result = crl_signer_key(crl, signer, limits, names, work, &key);
+  TC_TLV_result result = tc_x509_crl_signer_key(crl, signer, limits, names, work, &key);
   if (result != TC_TLV_OK)
     return tc_pki_signature_error(result);
   return crl_key_signature(crl, &key, provider, work);
-}
-
-TC_X509_signature_result tc_x509_crl_signer_digest_check(
-    const TC_X509_crl* crl, TC_hash_algorithm hash, TC_bytes digest,
-    const TC_X509_certificate* signer, const TC_X509_signature_provider* provider,
-    const TC_TLV_limits* limits, const TC_X509_name_workspace* names, size_t* work)
-{
-  if (!crl || !signer || !limits || !names || !work)
-    return TC_X509_SIGNATURE_ERROR;
-  if (!provider || !provider->verify_digest)
-    return TC_X509_SIGNATURE_UNSUPPORTED;
-  TC_X509_public_key key;
-  TC_TLV_result result = crl_signer_key(crl, signer, limits, names, work, &key);
-  if (result != TC_TLV_OK)
-    return tc_pki_signature_error(result);
-  return crl_digest_signature(crl, hash, digest, &key, provider, work);
 }
 
 TC_TLV_result tc_x509_crl_signer_usage(const TC_X509_certificate* signer,
@@ -237,11 +186,13 @@ TC_TLV_result tc_x509_crl_signer_usage(const TC_X509_certificate* signer,
   return TC_TLV_OK;
 }
 
-static TC_TLV_result
-crl_selected_coverage(const tc_x509_crl_selected* selected, const tc_x509_crl_query* query,
-                      const TC_X509_time* at, const TC_TLV_limits* limits,
-                      const tc_pki_tree_workspace* tree, const TC_X509_name_workspace* names,
-                      const TC_X509_crl_evidence* evidence, tc_x509_crl_coverage* coverage)
+TC_TLV_result tc_x509_crl_selected_coverage(const tc_x509_crl_selected* selected,
+                                            const tc_x509_crl_query* query, const TC_X509_time* at,
+                                            const TC_TLV_limits* limits,
+                                            const tc_pki_tree_workspace* tree,
+                                            const TC_X509_name_workspace* names,
+                                            const TC_X509_crl_evidence* evidence,
+                                            tc_x509_crl_coverage* coverage)
 {
   /* The delta supplies the effective update interval. */
   TC_TLV_result result = tc_x509_crl_coverage_at(
@@ -253,16 +204,16 @@ crl_selected_coverage(const tc_x509_crl_selected* selected, const tc_x509_crl_qu
   return coverage->reasons & ~evidence->reasons ? TC_TLV_OK : TC_TLV_END;
 }
 
-static TC_TLV_result crl_selected_evidence(const tc_x509_crl_selected* selected,
-                                           const TC_X509_certificate* certificate, uint16_t reasons,
-                                           const TC_TLV_limits* limits,
-                                           const tc_pki_tree_workspace* tree,
-                                           const TC_X509_name_workspace* names, TC_bytes* oids,
-                                           size_t oid_capacity, TC_X509_crl_evidence* evidence)
+TC_TLV_result tc_x509_crl_selected_evidence(const tc_x509_crl_selected* selected,
+                                            const TC_X509_certificate* certificate,
+                                            uint16_t reasons, const TC_TLV_limits* limits,
+                                            const tc_pki_tree_workspace* tree,
+                                            const TC_X509_name_workspace* names, TC_bytes* oids,
+                                            size_t oid_capacity, TC_X509_crl_evidence* evidence)
 {
   TC_X509_crl_match match;
-  TC_TLV_result result =
-      crl_selected_lookup(selected, certificate, limits, tree, names, oids, oid_capacity, &match);
+  TC_TLV_result result = tc_x509_crl_selected_lookup(selected, certificate, limits, tree, names,
+                                                     oids, oid_capacity, &match);
   if (result != TC_TLV_OK)
     return result;
   return tc_x509_crl_evidence_add(evidence, reasons, &match);
@@ -286,82 +237,20 @@ TC_TLV_result tc_x509_crl_apply(const tc_x509_crl_selected* selected,
     return result;
   if (status != TC_X509_CRL_UNDETERMINED)
     return TC_TLV_END;
-  result = crl_selected_coverage(selected, query, at, limits, tree, names, evidence, &coverage);
+  result =
+      tc_x509_crl_selected_coverage(selected, query, at, limits, tree, names, evidence, &coverage);
   if (result != TC_TLV_OK)
     return result;
-  return crl_selected_evidence(selected, query->certificate, coverage.reasons, limits, tree, names,
-                               oids, oid_capacity, evidence);
+  return tc_x509_crl_selected_evidence(selected, query->certificate, coverage.reasons, limits, tree,
+                                       names, oids, oid_capacity, evidence);
 }
 
-TC_TLV_result tc_x509_crl_process(const tc_x509_crl_selected* selected,
-                                  const TC_X509_certificate* signer, const tc_x509_crl_query* query,
-                                  const TC_X509_store_source* source, size_t anchor_index,
-                                  const TC_X509_path_options* options,
-                                  const TC_X509_path_workspace* validation,
-                                  const TC_X509_search_workspace* search, size_t* work,
-                                  TC_X509_crl_evidence* evidence, TC_X509_search_result* out)
-{
-  tc_pki_anchor_source anchor;
-  TC_X509_store_source restricted;
-  TC_X509_search_result found;
-  tc_x509_crl_coverage coverage;
-  TC_X509_revocation_status status;
-  TC_TLV_result result;
-  if (!selected || !selected->base || !selected->base_info || !signer || !query ||
-      !query->certificate || !query->point || !options || !validation || !search || !work || !out ||
-      (query->certificate_ca != 0 && query->certificate_ca != 1) ||
-      !!selected->delta != !!selected->delta_info)
-    return TC_TLV_ARGUMENT;
-  result = tc_x509_crl_evidence_status(evidence, &status);
-  if (result != TC_TLV_OK)
-    return result;
-  result = tc_pki_source_select_anchor(source, anchor_index, &anchor, &restricted);
-  if (result != TC_TLV_OK)
-    return result;
-  if (status != TC_X509_CRL_UNDETERMINED)
-    return TC_TLV_END;
-  const size_t initial_work = *work;
-  const tc_pki_tree_workspace tree = {validation->frames, validation->frame_capacity, work};
-  result = crl_selected_coverage(selected, query, &options->at, &options->parsing, &tree,
-                                 &validation->names, evidence, &coverage);
-  if (result != TC_TLV_OK)
-    return result;
-  result = crl_selected_path(selected, signer, &restricted, anchor_index, options, validation,
-                             search, work, &found);
-  if (result != TC_TLV_OK)
-    return result;
-  /* Entry scans can be large; defer them until a signer path succeeds. */
-  result = crl_selected_evidence(selected, query->certificate, coverage.reasons, &options->parsing,
-                                 &tree, &validation->names, validation->oids,
-                                 validation->oid_capacity, evidence);
-  if (result != TC_TLV_OK)
-    return result;
-  found.validation.work_used = initial_work - *work;
-  *out = found;
-  return TC_TLV_OK;
-}
-
-TC_TLV_result
-tc_x509_crl_selected_find(const tc_x509_crl_selected* selected, const TC_X509_certificate* signer,
-                          const TC_X509_certificate* certificate,
-                          const TC_X509_signature_provider* provider, const TC_TLV_limits* limits,
-                          const tc_pki_tree_workspace* tree, const TC_X509_name_workspace* names,
-                          TC_bytes* oids, size_t capacity, TC_X509_crl_match* out)
-{
-  TC_TLV_result result;
-  if (!selected || !selected->base || !selected->base_info || !signer || !certificate || !limits ||
-      !tree || !tree->work || !names || !out || !!selected->delta != !!selected->delta_info)
-    return TC_TLV_ARGUMENT;
-  result = crl_selected_authenticate(selected, signer, provider, limits, tree, names);
-  if (result != TC_TLV_OK)
-    return result;
-  return crl_selected_lookup(selected, certificate, limits, tree, names, oids, capacity, out);
-}
-
-static TC_TLV_result
-crl_selected_authenticate(const tc_x509_crl_selected* selected, const TC_X509_certificate* signer,
-                          const TC_X509_signature_provider* provider, const TC_TLV_limits* limits,
-                          const tc_pki_tree_workspace* tree, const TC_X509_name_workspace* names)
+TC_TLV_result tc_x509_crl_selected_authenticate(const tc_x509_crl_selected* selected,
+                                                const TC_X509_certificate* signer,
+                                                const TC_X509_signature_provider* provider,
+                                                const TC_TLV_limits* limits,
+                                                const tc_pki_tree_workspace* tree,
+                                                const TC_X509_name_workspace* names)
 {
   TC_TLV_result result;
   if (selected->base_info->present & TC_X509_CRL_EXT_DELTA)
@@ -392,12 +281,12 @@ crl_selected_authenticate(const tc_x509_crl_selected* selected, const TC_X509_ce
   return TC_TLV_OK;
 }
 
-static TC_TLV_result crl_selected_lookup(const tc_x509_crl_selected* selected,
-                                         const TC_X509_certificate* certificate,
-                                         const TC_TLV_limits* limits,
-                                         const tc_pki_tree_workspace* tree,
-                                         const TC_X509_name_workspace* names, TC_bytes* oids,
-                                         size_t capacity, TC_X509_crl_match* out)
+TC_TLV_result tc_x509_crl_selected_lookup(const tc_x509_crl_selected* selected,
+                                          const TC_X509_certificate* certificate,
+                                          const TC_TLV_limits* limits,
+                                          const tc_pki_tree_workspace* tree,
+                                          const TC_X509_name_workspace* names, TC_bytes* oids,
+                                          size_t capacity, TC_X509_crl_match* out)
 {
   TC_X509_crl_match base, delta;
   TC_TLV_result result = tc_x509_crl_find(selected->base, selected->base_info, certificate, limits,
