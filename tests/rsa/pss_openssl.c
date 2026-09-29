@@ -222,13 +222,17 @@ static MunitResult signatures(const MunitParameter params[], void* user)
                      &workspace,
                      (TC_RSA_execution){{random_bytes, &random}, 1, {exact_work - short_work}}),
             ==, short_work ? TC_RSA_LIMIT : TC_RSA_OK);
-        munit_assert_uint(random.calls, ==, (salts[i] != 0) + !short_work);
-        munit_assert_true(tc_test_all_zero(
-            scratch, TC_RSA_workspace_words(TC_RSA_OPERATION_SIGN, bits) * sizeof *scratch));
+        /* A short budget fails before the salt request and leaves scratch
+         * unused. */
+        munit_assert_uint(random.calls, ==, short_work ? 0 : (salts[i] != 0) + 1);
         if (short_work) {
+          for (size_t j = 0; j < sizeof scratch; ++j)
+            munit_assert_uint(((uint8_t*)scratch)[j], ==, 0xa5);
           for (size_t j = 0; j < sizeof signature; ++j)
             munit_assert_uint(signature[j], ==, 0xa5);
         } else {
+          munit_assert_true(tc_test_all_zero(
+              scratch, TC_RSA_workspace_words(TC_RSA_OPERATION_SIGN, bits) * sizeof *scratch));
           munit_assert_int(
               verify_pss(&key, hash, mgf_hash, (size_t)salts[i], (TC_bytes){digest, digest_length},
                          (TC_bytes){signature, key.modulus.length}, &workspace, UINT32_MAX),

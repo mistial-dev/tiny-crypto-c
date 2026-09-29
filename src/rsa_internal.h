@@ -73,7 +73,8 @@ static inline int tc_rsa_supported_bits(size_t bits)
 }
 
 /* Structural public-key checks: a supported modulus size with the top and
- * bottom bits set, and an odd minimal exponent 3 <= e < n. */
+ * bottom bits set, and an odd minimal exponent 3 <= e < n (RFC 8017 section
+ * 3.1). Public entries call this once, after their storage checks. */
 static inline TC_RSA_result tc_rsa_public_key_check(const TC_RSA_public_key* key)
 {
   if (!key || !key->modulus.data || !key->exponent.data)
@@ -92,35 +93,57 @@ static inline TC_RSA_result tc_rsa_public_key_check(const TC_RSA_public_key* key
   return TC_RSA_OK;
 }
 
-/* Internal public-key exponentiation. Modulus and input
- * have length bytes; out has the same capacity. Exponent is minimally encoded.
- * All ranges, work and scratch are disjoint. The caller validates address ranges.
- * Scratch needs 8*(length/sizeof(word))+2 limbs and is wiped after use.
- * Work counts modular additions/multiplications plus one setup unit when R²
- * is computed here; each has a size-bounded loop. Prepared R² belongs to the
- * same unchanged modulus and stays outside scratch.
- * Output changes only on OK. Validation covers encodings and numeric bounds. */
+/* Work units of one public operation on a checked key of length bytes and a
+ * minimal exponent of exponent_length bytes: 16 * length for the R^2 setup,
+ * skipped with a prepared R^2, then 16 * exponent_length + 4 for the
+ * exponentiation. Supported sizes keep the total below 2^15. */
+static inline uint32_t tc_rsa_public_cost(size_t length, size_t exponent_length, int prepared)
+{
+  const uint32_t setup = prepared ? 0u : UINT32_C(16) * (uint32_t)length;
+  return setup + UINT32_C(16) * (uint32_t)exponent_length + 4u;
+}
+
+/* Work units of one private operation before blinding: 32 * length +
+ * 32 * exponent_length + 8 at full width, or 48 * length + 32 *
+ * exponent_length + 12 for the CRT form. */
+static inline uint32_t tc_rsa_private_base_cost(size_t length, size_t exponent_length, int crt)
+{
+  return (crt ? UINT32_C(48) * (uint32_t)length + 12u : UINT32_C(32) * (uint32_t)length + 8u) +
+         UINT32_C(32) * (uint32_t)exponent_length;
+}
+
+/* Work units of one blinding attempt: an RNG request and its checks. */
+static inline uint32_t tc_rsa_blinding_cost(size_t length)
+{
+  return UINT32_C(16) * (uint32_t)length + 1u;
+}
+
+/* Public-key exponentiation on a key that passed tc_rsa_public_key_check.
+ * Input and out have the modulus length and out has at least that capacity.
+ * All ranges, work and scratch are disjoint, and the caller validated them.
+ * Scratch needs TC_RSA_RAW_PUBLIC_WORKSPACE_WORDS limbs and is wiped after
+ * use. Work is tc_rsa_public_cost. Prepared R^2 belongs to the same unchanged
+ * modulus and stays outside scratch. Output changes only on OK. An input of
+ * at least the modulus returns INVALID. */
 static inline TC_RSA_result tc_rsa_public_operation(const TC_RSA_public_key* key,
                                                     const uint8_t* input, uint8_t* out,
                                                     tc_mp_scratch scratch_area, uint32_t* work,
                                                     const tc_mp_word* prepared_r2)
 {
-  size_t n, required, cost;
+  size_t n, required;
+  uint32_t cost;
   tc_mp_word *p, *base, *one, *result, *temporary, *reduced, *product, factor;
   tc_mp_word* scratch = scratch_area.words;
-  if (!input || !out || !scratch || !work)
-    return TC_RSA_ARGUMENT;
-  TC_RSA_result checked = tc_rsa_public_key_check(key);
-  if (checked != TC_RSA_OK)
-    return checked;
   const uint8_t* modulus = key->modulus.data;
   const TC_bytes exponent = key->exponent;
   const size_t length = key->modulus.length;
+  /* RFC 8017 sections 5.1.1 and 5.2.2, step 1: the representative is below
+   * the modulus. */
   if (memcmp(input, modulus, length) >= 0)
     return TC_RSA_INVALID;
   n = length / sizeof(tc_mp_word);
-  required = 8 * n + 2;
-  cost = (prepared_r2 ? 0 : 16 * length) + 16 * exponent.length + 4;
+  required = TC_RSA_RAW_PUBLIC_WORKSPACE_WORDS(length * 8);
+  cost = tc_rsa_public_cost(length, exponent.length, prepared_r2 != NULL);
   if (scratch_area.capacity < required || *work < cost)
     return TC_RSA_LIMIT;
   *work -= cost;
@@ -152,78 +175,73 @@ static inline TC_RSA_result tc_rsa_public_operation(const TC_RSA_public_key* key
   return TC_RSA_OK;
 }
 
-/* digest is a precomputed hash. No key-size acceptance policy
- * is implied. Scratch needs 9n+2 limbs, including the recovered representative.
- * Other storage preconditions match tc_rsa_public_operation. */
-static inline TC_RSA_result tc_rsa_verify_v15(const TC_RSA_public_key* key, TC_hash_algorithm hash,
-                                              TC_bytes digest, TC_bytes signature,
-                                              tc_mp_scratch scratch, uint32_t* work,
-                                              const tc_mp_word* prepared_r2)
+/* ARGUMENT when a known hash has a digest length other than length. An
+ * unknown hash passes here and is reported as UNSUPPORTED by the scheme. */
+static inline TC_RSA_result tc_rsa_digest_length_check(TC_hash_algorithm hash, size_t length)
 {
-  size_t n, arithmetic_words;
-  uint8_t* encoded;
-  TC_RSA_result result;
-  TC_status checked;
   tc_hash_info info;
-  if (!key || !key->modulus.data || !key->exponent.data || !signature.data || !digest.data ||
-      !scratch.words || !work)
-    return TC_RSA_ARGUMENT;
-  const size_t length = key->modulus.length, digest_length = digest.length;
-  if (!tc_hash_info_get(hash, &info))
-    return TC_RSA_UNSUPPORTED;
-  if (digest_length != info.digest_length)
-    return TC_RSA_ARGUMENT;
-  if (!tc_rsa_supported_modulus_size(length))
-    return TC_RSA_UNSUPPORTED;
-  if (signature.length != length ||
-      !tc_rsa_v15_size(length, info.digest_info.length, digest_length))
-    return TC_RSA_INVALID;
-  n = length / sizeof(tc_mp_word);
-  arithmetic_words = 8 * n + 2;
-  if (scratch.capacity < arithmetic_words + n || *work < length)
-    return TC_RSA_LIMIT;
-  *work -= length;
-  encoded = (uint8_t*)(scratch.words + arithmetic_words);
-  result =
-      tc_rsa_public_operation(key, signature.data, encoded,
-                              (tc_mp_scratch){scratch.words, arithmetic_words}, work, prepared_r2);
-  if (result != TC_RSA_OK)
-    return result;
-  checked = tc_rsa_v15_check(encoded, length, info.digest_info.data, info.digest_info.length,
-                             digest.data, digest_length);
-  TC_secure_zero(encoded, length);
-  return checked == TC_OK ? TC_RSA_OK : TC_RSA_INVALID;
+  return tc_hash_info_get(hash, &info) && info.digest_length != length ? TC_RSA_ARGUMENT
+                                                                       : TC_RSA_OK;
 }
 
-/* Shared RSA argument checks. Each helper checks that workspace words are
- * aligned, that scratch and output are disjoint from each other and from the
- * borrowed inputs, and returns TC_RSA_ARGUMENT for invalid storage. */
+/* A private key after its entry checks. The public key passed
+ * tc_rsa_public_key_check. d, p and q are nonempty and at most the modulus
+ * length, and p and q have their leading zero octets stripped to at most half
+ * the modulus length. When crt is nonzero, dp, dq and q_inverse are stripped
+ * the same way. The spans borrow the caller's key bytes. */
+typedef struct {
+  const TC_RSA_public_key* public_key;
+  TC_bytes d, p, q;
+  int crt;
+  TC_bytes dp, dq, q_inverse;
+} tc_rsa_private_view;
 
-/* Maps a sealed plan's final status to an RSA result. */
-TC_RSA_result tc_rsa_storage_status(const tc_pki_storage_plan* plan);
+/* Check key, and crt when it is not NULL, once at a public entry and fill
+ * view. Returns the public-key status, or INVALID for a component that is
+ * empty, longer than the modulus, or wider than its half-width field. The
+ * caller has already checked every span pointer. */
+TC_RSA_result tc_rsa_private_view_init(const TC_RSA_private_key* key, const TC_RSA_crt* crt,
+                                       tc_rsa_private_view* view);
 
-/* Workspace only. Inputs must stay clear of scratch. */
-TC_RSA_result tc_rsa_workspace_inputs(const TC_RSA_workspace* workspace, const TC_bytes* inputs,
-                                      size_t count);
+/* One storage preflight per public entry:
+ *
+ *   1. begin records the workspace limbs and checks their alignment.
+ *   2. write, output and workspace record every other range the call
+ *      modifies: outputs, length objects, work counters and caches.
+ *   3. seal checks the writes against each other and then treats the
+ *      workspace descriptor as an input.
+ *   4. input, span, required and the key helpers record every borrowed range.
+ *   5. finish returns TC_RSA_ARGUMENT for the first failure.
+ *
+ * A NULL object, a NULL required span, a misaligned workspace, overlap
+ * between a write and any other range, or a range that wraps fails the
+ * plan. Later steps return at once after a failure, so a caller checks only
+ * the result of finish. */
+enum { TC_RSA_STORAGE_WRITES = 5 };
+typedef struct {
+  tc_pki_storage_plan plan;
+  TC_bytes writes[TC_RSA_STORAGE_WRITES];
+  const TC_RSA_workspace* workspace;
+} tc_rsa_storage;
 
-/* Workspace and output: both are written, so neither may overlap an input. */
-TC_RSA_result tc_rsa_output_inputs(const TC_RSA_workspace* workspace, const TC_bytes* inputs,
-                                   size_t count, TC_bytes output);
-
-/* Two caller control structures (key, options) against workspace and output. */
-TC_RSA_result tc_rsa_control_inputs(const TC_RSA_workspace* workspace, TC_bytes output,
-                                    const void* first, size_t first_size, const void* second,
-                                    size_t second_size);
-
-/* Public key plus up to two message spans. */
-TC_RSA_result tc_rsa_public_inputs(const TC_RSA_public_key* key, TC_bytes first, TC_bytes second,
-                                   TC_bytes output, const TC_RSA_workspace* workspace);
-
-/* Private key and digest. Also rejects empty or oversized d, p and q. */
-TC_RSA_result tc_rsa_private_inputs(const TC_RSA_private_key* key, TC_bytes digest, TC_bytes output,
-                                    const TC_RSA_workspace* workspace);
-
-/* CRT parameters. Rejects values longer than a prime after leading zeros. */
-TC_RSA_result tc_rsa_crt_inputs(const TC_RSA_private_key* key, const TC_RSA_crt* crt,
-                                TC_bytes output, const TC_RSA_workspace* workspace);
+void tc_rsa_storage_begin(tc_rsa_storage* storage, const TC_RSA_workspace* workspace);
+/* A second aligned limb array, such as a prepared-key cache. */
+void tc_rsa_storage_workspace(tc_rsa_storage* storage, const TC_RSA_workspace* workspace);
+void tc_rsa_storage_write(tc_rsa_storage* storage, const void* data, size_t size);
+/* A caller output buffer. Its data must be non-NULL. */
+void tc_rsa_storage_output(tc_rsa_storage* storage, TC_buffer output);
+void tc_rsa_storage_seal(tc_rsa_storage* storage);
+/* A borrowed object. NULL fails. */
+void tc_rsa_storage_input(tc_rsa_storage* storage, const void* data, size_t size);
+/* A borrowed span that may be empty with NULL data. */
+void tc_rsa_storage_span(tc_rsa_storage* storage, TC_bytes span);
+/* A borrowed span whose data must be non-NULL. */
+void tc_rsa_storage_required(tc_rsa_storage* storage, TC_bytes span);
+/* The key object, modulus and exponent. */
+void tc_rsa_storage_public_key(tc_rsa_storage* storage, const TC_RSA_public_key* key);
+/* The public key plus d, p and q. key->crt is recorded separately. */
+void tc_rsa_storage_private_key(tc_rsa_storage* storage, const TC_RSA_private_key* key);
+/* The CRT object and its three values. */
+void tc_rsa_storage_crt(tc_rsa_storage* storage, const TC_RSA_crt* crt);
+TC_RSA_result tc_rsa_storage_finish(const tc_rsa_storage* storage);
 #endif

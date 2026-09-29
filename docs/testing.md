@@ -1094,6 +1094,21 @@ pointers. The entire fixture must remain unchanged.
 ctest --test-dir build -R '^test_rsa_validation_[01]$' --output-on-failure
 ```
 
+`test_rsa_work` generates a deterministic RSA-1024 key with CRT values and
+checks every published work cost against the operation it describes. Each
+cost must succeed with nothing left over, and one unit less must return
+`TC_RSA_LIMIT` with outputs, work and the RNG untouched. It also covers
+`TC_RSA_modulus_supported`, the zero cost for rejected options, the
+short-output rule for signing, encryption and raw operations, and the order
+of statuses when a call has several problems, such as a NULL digest with a
+wrong signature length. A rejected blinding factor must fit the
+`TC_RSA_private_work(key, 2)` budget. `test_rsa_work_small` runs the same
+checks with byte limbs.
+
+```sh
+ctest --test-dir build -R '^test_rsa_work(_small)?$' --output-on-failure
+```
+
 The `test_rsa_inverse_0` and `test_rsa_inverse_1` arithmetic tests cover every
 input below each odd modulus from 3 through 255, plus carry boundaries and
 non-invertible inputs. With OpenSSL enabled, `test_rsa_inverse_openssl_0` and

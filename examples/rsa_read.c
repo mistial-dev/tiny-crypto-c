@@ -24,9 +24,8 @@ static TC_RSA_result sign_components(const TC_DER_rsa_private_key* parsed,
   const TC_RSA_result valid = example_validate_rsa_key(&key, random, workspace);
   if (valid != TC_RSA_OK)
     return valid;
-  /* The validated modulus bounds this budget on 16-bit targets too. */
-  const size_t crt_work = 32 * key.public_key.modulus.length + 1;
-  TC_work_budget work = {(uint32_t)crt_work};
+  /* CRT validation costs 32 work units per modulus byte, plus one. */
+  TC_work_budget work = {UINT32_C(32) * (uint32_t)key.public_key.modulus.length + 1u};
   const TC_RSA_result checked = TC_RSA_validate_crt(&key, &crt, workspace, &work);
   if (checked != TC_RSA_OK)
     return checked;

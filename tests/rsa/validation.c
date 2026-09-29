@@ -326,7 +326,7 @@ static MunitResult operation_ranges(const MunitParameter params[], void* user)
                  {TC_HASH_SHA256, {NULL, 32}, BYTES, 1, 10000, TC_RSA_ARGUMENT},
                  {TC_HASH_SHA256, {fixture.digest, 31}, BYTES, 1, 10000, TC_RSA_ARGUMENT},
                  {TC_HASH_SHA256, {fixture.digest, SIZE_MAX}, BYTES, 1, 10000, TC_RSA_ARGUMENT},
-                 {TC_HASH_SHA256, {fixture.digest, 32}, BYTES - 1, 1, 10000, TC_RSA_INVALID},
+                 {TC_HASH_SHA256, {fixture.digest, 32}, BYTES - 1, 1, 10000, TC_RSA_LIMIT},
                  {TC_HASH_SHA256, {fixture.digest, 32}, SIZE_MAX, 1, 10000, TC_RSA_ARGUMENT},
                  {TC_HASH_SHA256, {fixture.digest, 32}, BYTES, 0, 10000, TC_RSA_LIMIT},
                  {TC_HASH_SHA256, {fixture.digest, 32}, BYTES, 1, 0, TC_RSA_LIMIT}};

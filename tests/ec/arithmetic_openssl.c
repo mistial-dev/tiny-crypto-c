@@ -26,6 +26,21 @@ static void equal_bn(const tc_mp_word* value, size_t length, const BIGNUM* expec
   munit_assert_memory_equal(length, value, words);
 }
 
+/* The public v1.5 verifier with a pointer-and-count workspace. */
+static TC_RSA_result verify_v15(const TC_RSA_public_key* key, TC_hash_algorithm hash,
+                                TC_bytes digest, TC_bytes signature, tc_mp_word* scratch,
+                                uint32_t* work)
+{
+  const TC_RSA_v15_options options = {hash};
+  const TC_RSA_workspace workspace = {(TC_RSA_word*)scratch,
+                                      TC_RSA_VERIFY_WORKSPACE_WORDS(key->modulus.length * 8)};
+  TC_work_budget budget = {*work};
+  const TC_RSA_result result =
+      TC_RSA_verify_v15_digest(key, &options, digest, signature, &workspace, &budget);
+  *work = budget.remaining;
+  return result;
+}
+
 static MunitResult oracle(const MunitParameter params[], void* user)
 {
   tc_mp_word p[MAX_WORDS], base[MAX_WORDS], r2[MAX_WORDS], one[MAX_WORDS];
@@ -146,12 +161,11 @@ static MunitResult signatures(const MunitParameter params[], void* user)
       munit_assert_size(signature_length, ==, length);
       cost = 17 * length + 16 * exponent_length + 4;
       work = cost;
-      munit_assert_int(tc_rsa_verify_v15(
-                           &(TC_RSA_public_key){{modulus, length}, {exponent, exponent_length}},
-                           hash, (TC_bytes){digest, digest_length},
-                           (TC_bytes){signature, signature_length},
-                           (tc_mp_scratch){scratch, 9 * length / sizeof *scratch + 2}, &work, NULL),
-                       ==, TC_RSA_OK);
+      munit_assert_int(
+          verify_v15(&(TC_RSA_public_key){{modulus, length}, {exponent, exponent_length}}, hash,
+                     (TC_bytes){digest, digest_length}, (TC_bytes){signature, signature_length},
+                     scratch, &work),
+          ==, TC_RSA_OK);
       munit_assert_size(work, ==, 0);
       for (size_t i = 0; i < 9 * length / sizeof *scratch + 2; ++i)
         munit_assert_uint(scratch[i], ==, 0);
@@ -187,36 +201,32 @@ static MunitResult signatures(const MunitParameter params[], void* user)
       }
       digest[0] ^= 1;
       work = cost;
-      munit_assert_int(tc_rsa_verify_v15(
-                           &(TC_RSA_public_key){{modulus, length}, {exponent, exponent_length}},
-                           hash, (TC_bytes){digest, digest_length},
-                           (TC_bytes){signature, signature_length},
-                           (tc_mp_scratch){scratch, 9 * length / sizeof *scratch + 2}, &work, NULL),
-                       ==, TC_RSA_INVALID);
+      munit_assert_int(
+          verify_v15(&(TC_RSA_public_key){{modulus, length}, {exponent, exponent_length}}, hash,
+                     (TC_bytes){digest, digest_length}, (TC_bytes){signature, signature_length},
+                     scratch, &work),
+          ==, TC_RSA_INVALID);
       digest[0] ^= 1;
       signature[length - 1] ^= 1;
       work = cost;
-      munit_assert_int(tc_rsa_verify_v15(
-                           &(TC_RSA_public_key){{modulus, length}, {exponent, exponent_length}},
-                           hash, (TC_bytes){digest, digest_length},
-                           (TC_bytes){signature, signature_length},
-                           (tc_mp_scratch){scratch, 9 * length / sizeof *scratch + 2}, &work, NULL),
-                       ==, TC_RSA_INVALID);
+      munit_assert_int(
+          verify_v15(&(TC_RSA_public_key){{modulus, length}, {exponent, exponent_length}}, hash,
+                     (TC_bytes){digest, digest_length}, (TC_bytes){signature, signature_length},
+                     scratch, &work),
+          ==, TC_RSA_INVALID);
       signature[length - 1] ^= 1;
       work = cost - 1;
-      munit_assert_int(tc_rsa_verify_v15(
-                           &(TC_RSA_public_key){{modulus, length}, {exponent, exponent_length}},
-                           hash, (TC_bytes){digest, digest_length},
-                           (TC_bytes){signature, signature_length},
-                           (tc_mp_scratch){scratch, 9 * length / sizeof *scratch + 2}, &work, NULL),
-                       ==, TC_RSA_LIMIT);
+      munit_assert_int(
+          verify_v15(&(TC_RSA_public_key){{modulus, length}, {exponent, exponent_length}}, hash,
+                     (TC_bytes){digest, digest_length}, (TC_bytes){signature, signature_length},
+                     scratch, &work),
+          ==, TC_RSA_LIMIT);
       work = cost;
-      munit_assert_int(tc_rsa_verify_v15(
-                           &(TC_RSA_public_key){{modulus, length}, {exponent, exponent_length}},
-                           hash, (TC_bytes){digest, digest_length},
-                           (TC_bytes){signature, signature_length - 1},
-                           (tc_mp_scratch){scratch, 9 * length / sizeof *scratch + 2}, &work, NULL),
-                       ==, TC_RSA_INVALID);
+      munit_assert_int(
+          verify_v15(&(TC_RSA_public_key){{modulus, length}, {exponent, exponent_length}}, hash,
+                     (TC_bytes){digest, digest_length}, (TC_bytes){signature, signature_length - 1},
+                     scratch, &work),
+          ==, TC_RSA_INVALID);
       EVP_PKEY_CTX_free(context);
     }
     BN_free(e);

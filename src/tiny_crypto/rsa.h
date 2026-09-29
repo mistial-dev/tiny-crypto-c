@@ -17,6 +17,25 @@ typedef uint32_t TC_RSA_word;
 #define TC_RSA_MAX_MODULUS_BITS 4096u
 #define TC_RSA_MAX_MODULUS_BYTES (TC_RSA_MAX_MODULUS_BITS / 8u)
 
+/* Results. Every RSA function checks its arguments once, in this order, and
+ * reports the first problem it finds:
+ *
+ *   TC_RSA_ARGUMENT     NULL pointers, overlapping or misaligned storage, and
+ *                       a digest whose length differs from its known hash.
+ *   TC_RSA_UNSUPPORTED  a modulus size, hash or option the build does not
+ *                       implement.
+ *   TC_RSA_INVALID      a malformed key or CRT value, out-of-range scheme
+ *                       parameters, then received data: a signature,
+ *                       ciphertext or raw input of the wrong length.
+ *   TC_RSA_LIMIT        a caller output buffer shorter than required, then
+ *                       too little workspace, RNG attempts or work.
+ *
+ * The arithmetic finds a representative at or above the modulus and returns
+ * TC_RSA_INVALID after the limit checks pass. Output buffers larger than
+ * required are accepted, and exactly the documented length is written.
+ * UNSUPPORTED and LIMIT never report success. Argument errors and limits
+ * found before arithmetic leave every output, the workspace and the work
+ * budget unchanged. */
 typedef enum {
   TC_RSA_OK,
   TC_RSA_INVALID,
@@ -140,7 +159,8 @@ size_t TC_RSA_workspace_words(TC_RSA_operation operation, size_t bits);
 /* Prepare a borrowed public key for repeated v1.5 or PSS verification.
  * Cache needs one modulus width of limbs and scratch needs two; scratch is
  * wiped on return. Keep the cache and borrowed key bytes unchanged and alive
- * until clear. Setup, key, cache, scratch, and work must be disjoint. */
+ * until clear. Setup, key, cache, scratch, and work must be disjoint. The
+ * work is 16*modulus_bytes + 1. */
 TC_RSA_result TC_RSA_prepare_public_key(TC_RSA_prepared_public_key* setup,
                                         const TC_RSA_public_key* key, const TC_RSA_workspace* cache,
                                         const TC_RSA_workspace* workspace, TC_work_budget* work);
@@ -167,14 +187,22 @@ TC_RSA_result TC_RSA_keygen_step(TC_RSA_keygen_state* state, TC_random_source ra
                                  TC_work_budget* work);
 void TC_RSA_keygen_clear(TC_RSA_keygen_state* state);
 
-/* Apply RSA to one already formatted, fixed-width representative. No padding,
- * hashing or encoding is provided; callers must select and validate their
- * protocol's encoding. Input must be less than the modulus. Output is exactly
- * modulus.length bytes and changes only on TC_RSA_OK. Scratch is wiped after
- * use. All borrowed inputs, output, metadata, work and scratch are disjoint.
- * The private operation blinds and verifies the result using the public
- * exponent. Its RNG must provide full-width unpredictable bytes and its
- * context must not overlap the other arguments. */
+/* Apply RSA (RFC 8017 sections 5.1 and 5.2) to one already formatted,
+ * fixed-width representative. No padding, hashing or encoding is provided.
+ * Callers select and validate their protocol's encoding. Input has the
+ * modulus length and must be less than the modulus, otherwise the result is
+ * TC_RSA_INVALID. output.capacity is at least modulus.length, a shorter
+ * buffer returns TC_RSA_LIMIT, and exactly modulus.length bytes are written,
+ * only on TC_RSA_OK. Scratch is wiped after use. All borrowed inputs,
+ * output, metadata, work and scratch are disjoint.
+ *
+ * The private operation takes a private exponent of 1 to modulus.length
+ * bytes. It blinds the input, and verifies the result with the public
+ * exponent before publishing it. A failed verification returns
+ * TC_RSA_ERROR. Its RNG must provide full-width unpredictable bytes and its
+ * context must not overlap the other arguments. The work is
+ * TC_RSA_public_work(key) for the public operation and TC_RSA_private_work
+ * for a key without CRT values for the private operation. */
 TC_RSA_result TC_RSA_raw_public(const TC_RSA_public_key* key, TC_bytes input,
                                 const TC_RSA_workspace* workspace, TC_buffer output,
                                 TC_work_budget* work);
@@ -185,68 +213,126 @@ TC_RSA_result TC_RSA_raw_private(const TC_RSA_public_key* key, TC_bytes private_
 /* Return 1 when bits names a supported modulus size, otherwise 0. */
 int TC_RSA_modulus_supported(size_t bits);
 
-/* Work units consumed by a successful TC_RSA_encode_v15_digest or
- * TC_RSA_encode_pss_digest call for a modulus of modulus_bytes. Callers that
- * must preflight a budget before drawing random input use these values.
- * Returns 0 when the options name a disabled or unknown hash, the size is
- * unsupported, or the PSS salt does not fit the encoded message. */
+/* Work contracts. TC_work_budget counts public work units: modular
+ * operations, encoded and masked bytes, hash invocations and RNG requests. It
+ * does not measure time. The functions below return the exact work of one
+ * successful call, or 0 for a NULL argument, an unknown or disabled hash, an
+ * unsupported size or key, parameters the operation rejects, or a cost
+ * above UINT32_MAX. Operations add them as follows:
+ *
+ *   TC_RSA_raw_public           TC_RSA_public_work
+ *   TC_RSA_verify_v15_digest    TC_RSA_public_work + TC_RSA_encode_v15_work
+ *   TC_RSA_verify_pss_digest    TC_RSA_public_work + TC_RSA_encode_pss_work
+ *   TC_RSA_verify_*_prepared    TC_RSA_prepared_public_work in place of
+ *                               TC_RSA_public_work
+ *   TC_RSA_encrypt_oaep         1 + TC_RSA_oaep_work + TC_RSA_public_work
+ *   TC_RSA_raw_private          TC_RSA_private_work
+ *   TC_RSA_sign_v15_digest      TC_RSA_private_work + TC_RSA_encode_v15_work
+ *   TC_RSA_sign_pss_digest      TC_RSA_private_work + TC_RSA_encode_pss_work
+ *                               + 1 when salt_length is nonzero
+ *   TC_RSA_decrypt_oaep         TC_RSA_private_work + TC_RSA_oaep_work
+ *
+ * Each operation checks its cost, with one blinding attempt for private
+ * keys, before arithmetic or any RNG request. A smaller budget returns
+ * TC_RSA_LIMIT and leaves outputs, work and the RNG untouched. A rejected
+ * blinding factor costs one more attempt, so budget TC_RSA_private_work with
+ * execution.random_attempts to cover every attempt. Verification consumes
+ * work up to the point where it detects an invalid signature. */
+
+/* EMSA-PKCS1-v1_5 and EMSA-PSS encoding for a modulus of modulus_bytes. The
+ * same cost covers PSS encoding and PSS verification. */
 uint32_t TC_RSA_encode_v15_work(const TC_RSA_v15_options* options, size_t modulus_bytes);
 uint32_t TC_RSA_encode_pss_work(const TC_RSA_pss_options* options, size_t modulus_bytes);
+/* EME-OAEP encoding or decoding with both MGF1 masks: modulus_bytes +
+ * label length + 1, then D + ceil(D/G)*(H + 5) and H + ceil(H/G)*(D + 5)
+ * for message-hash length H, MGF-hash length G and D = modulus_bytes - H - 1. */
+uint32_t TC_RSA_oaep_work(const TC_RSA_oaep_options* options, size_t modulus_bytes);
+/* One public operation: 16*modulus_bytes + 16*exponent_bytes + 4. */
+uint32_t TC_RSA_public_work(const TC_RSA_public_key* key);
+/* One public operation with the setup's cached R^2: 16*exponent_bytes + 4.
+ * Preparing the setup costs 16*modulus_bytes + 1. Returns 0 for a setup that
+ * TC_RSA_prepare_public_key did not initialize. */
+uint32_t TC_RSA_prepared_public_work(const TC_RSA_prepared_public_key* setup);
+/* One private operation with at most attempts blinding requests, attempts
+ * from 1. Full width costs 32*modulus_bytes + 32*exponent_bytes + 8, and a
+ * key with key->crt set costs 48*modulus_bytes + 32*exponent_bytes + 12.
+ * Each attempt adds 16*modulus_bytes + 1. Only key->public_key and whether
+ * key->crt is NULL are read, so a raw private operation can pass a key that
+ * holds only its public key. */
+uint32_t TC_RSA_private_work(const TC_RSA_private_key* key, size_t attempts);
 
 /* Encode a precomputed SHA digest using EMSA-PKCS1-v1_5 (RFC 8017 section 9.2).
  * Used when a card or hardware provider performs the RSA private operation.
  * encoded.capacity is the modulus size: 128, 256, 384 or 512 bytes. No hashing or key
- * operation is performed. Input and output must be disjoint. All failures
- * preserve output; the work budget must cover encoded.capacity bytes. */
+ * operation is performed. encoded and work are disjoint from the options, the
+ * digest and each other. All failures preserve output. The work is
+ * TC_RSA_encode_v15_work. */
 TC_RSA_result TC_RSA_encode_v15_digest(const TC_RSA_v15_options* options, TC_bytes digest,
                                        TC_buffer encoded, TC_work_budget* work);
 
 /* Encode a digest and caller-supplied salt using EMSA-PSS (RFC 8017 section 9.1.1).
- * encoded.capacity is the modulus size: 128, 256, 384 or 512 bytes; emBits is one
- * less than that size in bits. salt.length must equal options->salt_length.
- * Generate salt with a cryptographic RNG. Inputs may share storage; encoded
- * and work are disjoint from every input and each other. Preflight failures
- * preserve output and work. Processing failures wipe output and consume work. */
+ * encoded.capacity is the modulus size: 128, 256, 384 or 512 bytes. emBits is one
+ * less than that size in bits. salt.length must equal options->salt_length,
+ * otherwise the result is TC_RSA_ARGUMENT. Generate salt with a cryptographic RNG. Inputs may share storage. encoded
+ * and work are disjoint from every input and each other. The work is
+ * TC_RSA_encode_pss_work, and a smaller budget returns TC_RSA_LIMIT with
+ * output and work unchanged. A hash failure during encoding returns
+ * TC_RSA_ERROR, wipes output and consumes work. */
 TC_RSA_result TC_RSA_encode_pss_digest(const TC_RSA_pss_options* options, TC_bytes digest,
                                        TC_bytes salt, TC_buffer encoded, TC_work_budget* work);
 
-/* OAEP encryption with explicit message and MGF hashes; both must be enabled.
- * Message length is at most modulus_bytes - 2*hash_bytes - 2. An empty label
- * is {NULL,0}. Ciphertext length equals the modulus length and changes only
- * on TC_RSA_OK. The RNG supplies one hash-sized seed. Keep output, scratch and
- * RNG state separate from inputs and metadata. Used scratch is wiped. */
+/* OAEP encryption (RFC 8017 section 7.1.1) with explicit message and MGF
+ * hashes. Both must be enabled. Message length is at most modulus_bytes -
+ * 2*hash_bytes - 2, and a longer message returns TC_RSA_INVALID. An empty
+ * label is {NULL,0}. ciphertext.capacity is at least the modulus length, a
+ * shorter buffer returns TC_RSA_LIMIT, and exactly the modulus length is
+ * written, only on TC_RSA_OK. The RNG supplies one hash-sized seed and a
+ * failed request returns TC_RSA_ERROR. Keep output, scratch and RNG state
+ * separate from inputs and metadata. Used scratch is wiped. The work is
+ * 1 + TC_RSA_oaep_work + TC_RSA_public_work and is checked in full before the
+ * seed request. */
 TC_RSA_result TC_RSA_encrypt_oaep(const TC_RSA_public_key* key, const TC_RSA_oaep_options* options,
                                   TC_bytes plaintext, const TC_RSA_workspace* workspace,
                                   TC_buffer ciphertext, TC_RSA_execution* execution);
 
-/* OAEP decryption with a validated, unchanged private key and explicit hashes.
- * Both hashes must be enabled. Ciphertext has the modulus length. Label bytes
- * are borrowed. {NULL,0} selects an empty label. plaintext.capacity must be at
- * least modulus_bytes - 2*hash_bytes - 2. A smaller buffer returns TC_RSA_LIMIT
- * before decryption, without drawing randomness or consuming work, so the
- * status reveals nothing about the padding (RFC 8017 section 7.1.2). Plaintext
- * and its length change only on TC_RSA_OK. Output bytes, length, scratch and
- * RNG state are separate from each other, inputs and metadata. Used scratch is
- * wiped on return. */
+/* OAEP decryption (RFC 8017 section 7.1.2) with a validated, unchanged
+ * private key and explicit hashes. Both hashes must be enabled. Ciphertext
+ * has the modulus length, otherwise the result is TC_RSA_INVALID. Label bytes
+ * are borrowed. {NULL,0} selects an empty label. plaintext_length is an
+ * aligned size_t. plaintext.capacity must be at least modulus_bytes -
+ * 2*hash_bytes - 2. A smaller buffer returns TC_RSA_LIMIT before decryption,
+ * without drawing randomness or consuming work, so the status reveals nothing
+ * about the padding (RFC 8017 section 7.1.2). Invalid padding and a wrong
+ * label return TC_RSA_INVALID. Plaintext and its length change only on
+ * TC_RSA_OK. Output bytes, length, scratch and RNG state are separate from
+ * each other, inputs and metadata. Used scratch is wiped on return. The work
+ * is TC_RSA_private_work + TC_RSA_oaep_work. */
 TC_RSA_result TC_RSA_decrypt_oaep(const TC_RSA_private_key* key, const TC_RSA_oaep_options* options,
                                   TC_bytes ciphertext, const TC_RSA_workspace* workspace,
                                   TC_buffer plaintext, size_t* plaintext_length,
                                   TC_RSA_execution* execution);
 
-/* Sign a precomputed SHA digest with PKCS#1 v1.5 using a validated private key.
- * Validate the components before use and keep them unchanged afterward.
- * Signature length equals the modulus length. All input, output, metadata,
- * scratch and RNG state are disjoint. RNG requests provide blinding factors;
- * execution.random_attempts bounds rejected factors. Output changes only on
- * TC_RSA_OK. Used scratch is wiped. Hash implementations are optional. */
+/* Sign a precomputed SHA digest with PKCS#1 v1.5 (RFC 8017 section 8.2.1)
+ * using a validated private key. Validate the components before use and keep
+ * them unchanged afterward. signature.capacity is at least the modulus
+ * length, a shorter buffer returns TC_RSA_LIMIT, and exactly the modulus
+ * length is written, only on TC_RSA_OK. All input, output, metadata, scratch
+ * and RNG state are disjoint. RNG requests provide blinding factors, and
+ * execution.random_attempts bounds rejected factors. A failed RNG request
+ * returns TC_RSA_ERROR. The result is checked with the public exponent before
+ * it is published, and a failed check returns TC_RSA_ERROR. Used scratch is
+ * wiped. Hash implementations are optional. The work is TC_RSA_private_work +
+ * TC_RSA_encode_v15_work. */
 TC_RSA_result TC_RSA_sign_v15_digest(const TC_RSA_private_key* key,
                                      const TC_RSA_v15_options* options, TC_bytes digest,
                                      const TC_RSA_workspace* workspace, TC_buffer signature,
                                      TC_RSA_execution* execution);
 
-/* PSS signing uses explicit message/MGF hashes and salt length. Both hashes
- * must be enabled. The RNG supplies salt and blinding bytes; zero-length salt
- * skips its RNG request. Workspace and key rules match v1.5 signing. */
+/* PSS signing (RFC 8017 section 8.1.1) uses explicit message/MGF hashes and
+ * salt length. Both hashes must be enabled. The RNG supplies salt and
+ * blinding bytes, and a zero-length salt skips its RNG request. Output,
+ * workspace, key and status rules match v1.5 signing. The work is
+ * TC_RSA_private_work + TC_RSA_encode_pss_work, plus 1 for a salt request. */
 TC_RSA_result TC_RSA_sign_pss_digest(const TC_RSA_private_key* key,
                                      const TC_RSA_pss_options* options, TC_bytes digest,
                                      const TC_RSA_workspace* workspace, TC_buffer signature,
@@ -280,45 +366,56 @@ TC_RSA_result TC_RSA_validate_private_key(const TC_RSA_private_key* key,
 int TC_RSA_exponent_in_fips_range(TC_bytes exponent);
 
 /* Check CRT components against an already validated, unchanged private key.
- * Magnitudes are nonempty, at most the modulus length, with optional leading
- * zero bytes. Scratch must be separate from all key bytes and metadata.
- * Used scratch is wiped; preflight failures preserve it. A sufficient work
- * budget is 32*modulus_bytes+1. Key validation remains a prerequisite. */
+ * Magnitudes are nonempty, at most the modulus length, and fit half the
+ * modulus length after optional leading zero bytes, otherwise the result is
+ * TC_RSA_INVALID. Scratch must be separate from all key bytes and metadata.
+ * Used scratch is wiped. Preflight failures preserve it. The work is
+ * 32*modulus_bytes+1. Key validation remains a prerequisite. */
 TC_RSA_result TC_RSA_validate_crt(const TC_RSA_private_key* key, const TC_RSA_crt* crt,
                                   const TC_RSA_workspace* workspace, TC_work_budget* work);
 
 /* Derive fixed-width dP, dQ and qInv from an already validated private key.
- * Each output needs modulus_bytes/2 capacity. Outputs change together only on
- * success and must be mutually disjoint from the key, metadata and scratch.
- * Used scratch is wiped. A sufficient work budget is 48*modulus_bytes+3. */
+ * Each output needs modulus_bytes/2 capacity, and a shorter buffer returns
+ * TC_RSA_LIMIT. Exactly modulus_bytes/2 bytes are written to each. Outputs
+ * change together only on success and must be mutually disjoint from the
+ * key, metadata and scratch. Used scratch is wiped. The work is
+ * 48*modulus_bytes+3. */
 TC_RSA_result TC_RSA_derive_crt(const TC_RSA_private_key* key, const TC_RSA_crt_output* output,
                                 const TC_RSA_workspace* workspace, TC_work_budget* work);
 
-/* Verify a precomputed SHA-1/224/256/384/512 digest with PKCS#1 v1.5.
- * Modulus and exponent are unsigned, minimal big-endian encodings, without DER
- * sign padding. Modulus size is exactly 1024, 2048, 3072 or 4096 bits. Signature size
- * must equal the modulus size in bytes. Acceptance policy belongs to the caller.
+/* Verify a precomputed SHA-1/224/256/384/512 digest with PKCS#1 v1.5 (RFC
+ * 8017 section 8.2.2). Modulus and exponent are unsigned, minimal big-endian
+ * encodings, without DER sign padding. Modulus size is exactly 1024, 2048,
+ * 3072 or 4096 bits. A signature of another length, or one that does not
+ * match, returns TC_RSA_INVALID. Acceptance policy belongs to the caller.
  *
  * All bytes are borrowed for this call. Workspace must be aligned, separate from
  * inputs and metadata, and exclusive to the operation. Scratch is wiped after
  * verification. No hash implementation is required for this prehashed API.
- * Work is a public bound on modular operations and encoding comparisons, not
- * elapsed time. Unsupported hashes, invalid signatures and exhausted limits are
- * distinct results. This does not validate a certificate or establish trust. */
+ * The work is TC_RSA_public_work + TC_RSA_encode_v15_work and is checked
+ * before arithmetic. Unsupported hashes, invalid signatures and exhausted
+ * limits are distinct results. This does not validate a certificate or
+ * establish trust. */
 TC_RSA_result TC_RSA_verify_v15_digest(const TC_RSA_public_key* key,
                                        const TC_RSA_v15_options* options, TC_bytes digest,
                                        TC_bytes signature, const TC_RSA_workspace* workspace,
                                        TC_work_budget* work);
 /* Use an initialized setup with unchanged borrowed key and cache storage.
- * Verification workspace and all inputs must be separate from that setup. */
+ * Verification workspace and all inputs must be separate from that setup. A
+ * setup that TC_RSA_prepare_public_key did not initialize returns
+ * TC_RSA_ARGUMENT. The work is TC_RSA_prepared_public_work +
+ * TC_RSA_encode_v15_work. */
 TC_RSA_result TC_RSA_verify_v15_prepared(const TC_RSA_prepared_public_key* setup,
                                          const TC_RSA_v15_options* options, TC_bytes digest,
                                          TC_bytes signature, const TC_RSA_workspace* workspace,
                                          TC_work_budget* work);
 
-/* PSS uses explicit message/MGF hashes and salt length, with the same key and
- * workspace rules. Both hashes must be enabled. No automatic salt detection.
- * Additional stack storage holds one hash context and a 64-byte digest buffer. */
+/* PSS verification (RFC 8017 section 8.1.2) uses explicit message/MGF hashes
+ * and salt length, with the same key, workspace and status rules. Both hashes
+ * must be enabled. No automatic salt detection. Additional stack storage
+ * holds one hash context and a 64-byte digest buffer. The work is
+ * TC_RSA_public_work + TC_RSA_encode_pss_work, or
+ * TC_RSA_prepared_public_work + TC_RSA_encode_pss_work for a setup. */
 TC_RSA_result TC_RSA_verify_pss_digest(const TC_RSA_public_key* key,
                                        const TC_RSA_pss_options* options, TC_bytes digest,
                                        TC_bytes signature, const TC_RSA_workspace* workspace,

@@ -160,8 +160,9 @@ static MunitResult decrypt(const MunitParameter params[], void* user)
           : scenario == WRONG_LABEL || scenario == ZERO_CIPHERTEXT || scenario == MODULUS_CIPHERTEXT
               ? TC_RSA_INVALID
               : TC_RSA_OK;
-      /* Preflight rejections draw no randomness, touch no scratch and consume no work. */
-      const int preflight = scenario == ZERO_WORK || short_output;
+      /* Preflight rejections draw no randomness, touch no scratch and consume
+       * no work. The whole budget is part of the preflight. */
+      const int preflight = scenario == ZERO_WORK || scenario == SHORT_WORK || short_output;
       const TC_RSA_oaep_options options = {hash->algorithm, mgf->algorithm, label};
       TC_RSA_execution execution = {{random_bytes, &random}, 1, {(uint32_t)work}};
       munit_assert_int(TC_RSA_decrypt_oaep(&key, &options, candidate, &workspace,

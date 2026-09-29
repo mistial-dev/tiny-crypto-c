@@ -103,7 +103,7 @@ static MunitResult interoperability(const MunitParameter params[], void* user)
     }
     if (failure == SHORT_OUTPUT) {
       --output_length;
-      expected = TC_RSA_INVALID;
+      expected = TC_RSA_LIMIT;
     }
     if (failure == OVERLAP) {
       message.data = ciphertext;
@@ -130,18 +130,27 @@ static MunitResult interoperability(const MunitParameter params[], void* user)
                                                    (TC_random_source){failed_seed, &example_calls},
                                                    &(TC_RSA_workspace){words, required}),
                    ==, TC_RSA_ARGUMENT);
+  /* Spans that wrap the address space are argument errors. */
   TC_RSA_public_key oversized_key = public_key;
   oversized_key.modulus.length = SIZE_MAX;
   munit_assert_int(example_encrypt_rsa_oaep_sha256(&oversized_key, labels[0], labels[0],
                                                    (TC_buffer){ciphertext, width},
                                                    (TC_random_source){failed_seed, &example_calls},
                                                    &(TC_RSA_workspace){words, required}),
-                   ==, TC_RSA_INVALID);
+                   ==, TC_RSA_ARGUMENT);
   munit_assert_int(example_encrypt_rsa_oaep_sha256(&public_key, (TC_bytes){input, SIZE_MAX},
                                                    labels[0], (TC_buffer){ciphertext, width},
                                                    (TC_random_source){failed_seed, &example_calls},
                                                    &(TC_RSA_workspace){words, required}),
-                   ==, TC_RSA_LIMIT);
+                   ==, TC_RSA_ARGUMENT);
+  /* An unsupported modulus size reports UNSUPPORTED through the zero budget. */
+  TC_RSA_public_key unsupported_key = public_key;
+  unsupported_key.modulus.length = 96;
+  munit_assert_int(example_encrypt_rsa_oaep_sha256(&unsupported_key, labels[0], labels[0],
+                                                   (TC_buffer){ciphertext, width},
+                                                   (TC_random_source){failed_seed, &example_calls},
+                                                   &(TC_RSA_workspace){words, required}),
+                   ==, TC_RSA_UNSUPPORTED);
   munit_assert_size(example_calls, ==, 0);
   for (size_t h = 0; h < sizeof hashes / sizeof *hashes; ++h) {
     tc_hash_info info;
@@ -193,9 +202,12 @@ static MunitResult interoperability(const MunitParameter params[], void* user)
             if (!complete)
               for (size_t j = 0; j < sizeof ciphertext; ++j)
                 munit_assert_uint(ciphertext[j], ==, 0xa5);
+            /* The whole budget is checked before the seed request, so a
+             * short budget leaves scratch unused. */
             const uint8_t* scratch_bytes = (const uint8_t*)words;
             for (size_t j = 0; j < sizeof words; ++j)
-              munit_assert_uint(scratch_bytes[j], ==, j < required * sizeof *words ? 0 : 0xa5);
+              munit_assert_uint(scratch_bytes[j], ==,
+                                complete && j < required * sizeof *words ? 0 : 0xa5);
           }
           munit_assert_memory_equal(width, ciphertext, saved);
           if (hashes[h].algorithm == TC_HASH_SHA256 && hashes[mgf].algorithm == TC_HASH_SHA256) {

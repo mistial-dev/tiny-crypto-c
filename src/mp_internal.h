@@ -183,9 +183,22 @@ static inline void tc_mp_reduce_words(tc_mp_word* out, const tc_mp_word* input, 
   tc_mp_divide_words(NULL, out, input, input_words, p, n, scratch);
 }
 
+/* One step of bit-serial reduction by a public divisor 1 < d < 2^31: shift
+ * bit into remainder < d and subtract d when the result reaches it. Returns
+ * the quotient bit. Every step runs the same instructions, so a secret
+ * dividend does not reach variable-time division. */
+static inline uint32_t tc_mp_mod_u32_step(uint32_t* remainder, unsigned bit, uint32_t divisor)
+{
+  const uint32_t shifted = (*remainder << 1) | (uint32_t)(bit & 1u);
+  /* The top bit of shifted - divisor is clear exactly when no borrow occurs. */
+  const uint32_t take = ((shifted - divisor) >> 31) ^ 1u;
+  *remainder = shifted - (divisor & (0u - take));
+  return take;
+}
+
 /* Divide a little-endian limb array by a public divisor 1 < d < 2^31 and
  * return the remainder. quotient may equal input. The running time depends
- * only on n, so secret dividends do not reach variable-time division. */
+ * only on n. */
 static inline uint32_t tc_mp_divide_u32(tc_mp_word* quotient, const tc_mp_word* input, size_t n,
                                         uint32_t divisor)
 {
@@ -194,10 +207,8 @@ static inline uint32_t tc_mp_divide_u32(tc_mp_word* quotient, const tc_mp_word* 
     const tc_mp_word word = input[i - 1];
     tc_mp_word q = 0;
     for (unsigned bit = TC_MP_WORD_BITS; bit; --bit) {
-      remainder = (remainder << 1) | (uint32_t)((word >> (bit - 1)) & 1u);
-      /* The top bit of remainder - divisor is clear exactly when no borrow occurs. */
-      const uint32_t take = ((remainder - divisor) >> 31) ^ 1u;
-      remainder -= divisor & (0u - take);
+      const uint32_t take =
+          tc_mp_mod_u32_step(&remainder, (unsigned)((word >> (bit - 1)) & 1u), divisor);
       q = (tc_mp_word)(q | (tc_mp_word)(take << (bit - 1)));
     }
     if (quotient)
@@ -212,11 +223,8 @@ static inline uint32_t tc_mp_mod_u32_be(const uint8_t* value, size_t length, uin
 {
   uint32_t remainder = 0;
   for (size_t i = 0; i < length; ++i)
-    for (unsigned bit = 8; bit; --bit) {
-      remainder = (remainder << 1) | (uint32_t)((value[i] >> (bit - 1)) & 1u);
-      const uint32_t take = ((remainder - divisor) >> 31) ^ 1u;
-      remainder -= divisor & (0u - take);
-    }
+    for (unsigned bit = 8; bit; --bit)
+      (void)tc_mp_mod_u32_step(&remainder, (unsigned)(value[i] >> (bit - 1)), divisor);
   return remainder;
 }
 

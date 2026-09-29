@@ -39,11 +39,8 @@ static int tc_rsa_keygen_candidate_filter(const uint8_t* candidate, size_t lengt
 static uint32_t tc_rsa_keygen_mod_u64(uint64_t value, uint32_t divisor)
 {
   uint32_t remainder = 0;
-  for (unsigned bit = 64; bit; --bit) {
-    remainder = (remainder << 1) | (uint32_t)((value >> (bit - 1)) & 1u);
-    const uint32_t take = ((remainder - divisor) >> 31) ^ 1u;
-    remainder -= divisor & (0u - take);
-  }
+  for (unsigned bit = 64; bit; --bit)
+    (void)tc_mp_mod_u32_step(&remainder, (unsigned)(value >> (bit - 1)), divisor);
   return remainder;
 }
 
@@ -64,23 +61,22 @@ static uint32_t tc_rsa_keygen_inverse_65537(uint32_t value)
  * size. Every step runs in time that depends only on the key size. Returns 0
  * when d <= 2^(nlen/2); the caller then generates new primes. Results remain
  * in scratch until publication. */
-static int tc_rsa_keygen_derive(const uint8_t* p_bytes, const uint8_t* q_bytes,
-                                size_t prime_length, tc_mp_word* scratch,
-                                tc_mp_word** modulus_out, tc_mp_word** d_out)
+static int tc_rsa_keygen_derive(const uint8_t* p_bytes, const uint8_t* q_bytes, size_t prime_length,
+                                tc_mp_word* scratch, tc_mp_word** modulus_out, tc_mp_word** d_out)
 {
   const size_t h = prime_length / sizeof(tc_mp_word), n = 2 * h;
   const size_t extra = (16 + TC_MP_WORD_BITS - 1) / TC_MP_WORD_BITS;
-  tc_mp_word* p = scratch;              /* h limbs */
-  tc_mp_word* q = p + h;                /* h limbs */
-  tc_mp_word* modulus = q + h;          /* n limbs: phi, then n */
-  tc_mp_word* gcd = modulus + n;        /* n limbs */
-  tc_mp_word* remainder = gcd + n;      /* n limbs, gcd scratch */
-  tc_mp_word* lambda = remainder + n;   /* n limbs, gcd scratch */
-  tc_mp_word* d = lambda + n;           /* n + extra limbs */
+  tc_mp_word* p = scratch;            /* h limbs */
+  tc_mp_word* q = p + h;              /* h limbs */
+  tc_mp_word* modulus = q + h;        /* n limbs: phi, then n */
+  tc_mp_word* gcd = modulus + n;      /* n limbs */
+  tc_mp_word* remainder = gcd + n;    /* n limbs, gcd scratch */
+  tc_mp_word* lambda = remainder + n; /* n limbs, gcd scratch */
+  tc_mp_word* d = lambda + n;         /* n + extra limbs */
   tc_mp_from_be(p, p_bytes, prime_length);
   tc_mp_from_be(q, q_bytes, prime_length);
   --p[0];
-  --q[0]; /* Both primes are odd, so the decrement needs no borrow. */
+  --q[0];                           /* Both primes are odd, so the decrement needs no borrow. */
   tc_mp_multiply(modulus, p, q, h); /* phi = (p-1)(q-1) */
   memset(gcd, 0, n * sizeof *gcd);
   tc_mp_gcd(gcd, p, q, h, remainder);
@@ -91,8 +87,7 @@ static int tc_rsa_keygen_derive(const uint8_t* p_bytes, const uint8_t* q_bytes,
   tc_mp_multiply(modulus, p, q, h);
   /* e d = 1 + lambda k with k = -lambda^-1 mod e, so d = (lambda k + 1) / e. */
   const uint32_t residue = tc_mp_divide_u32(NULL, lambda, n, TC_RSA_KEYGEN_PUBLIC_EXPONENT);
-  const uint32_t multiplier =
-      TC_RSA_KEYGEN_PUBLIC_EXPONENT - tc_rsa_keygen_inverse_65537(residue);
+  const uint32_t multiplier = TC_RSA_KEYGEN_PUBLIC_EXPONENT - tc_rsa_keygen_inverse_65537(residue);
   uint64_t carry = 1;
   for (size_t i = 0; i < n; ++i) {
     carry += (uint64_t)lambda[i] * multiplier;
@@ -317,8 +312,8 @@ static TC_RSA_result tc_rsa_keygen_step(TC_RSA_keygen_state* state, TC_random_fn
         TC_RSA_KEYGEN_RETURN(TC_RSA_IN_PROGRESS);
       max_work -= setup_work;
       TC_RSA_word *modulus_words, *d_words;
-      const int d_large = tc_rsa_keygen_derive(p, q, prime_length, scratch, &modulus_words,
-                                               &d_words);
+      const int d_large =
+          tc_rsa_keygen_derive(p, q, prime_length, scratch, &modulus_words, &d_words);
       if (!d_large) {
         /* FIPS 186-5 A.1.1 3: d <= 2^(nlen/2) requires new primes. */
         state->phase = TC_RSA_KEYGEN_P_NEW;

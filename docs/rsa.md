@@ -34,11 +34,37 @@ arithmetic leave scratch unused.
 
 Pass the hash in `TC_RSA_v15_options`. `TC_work_budget.remaining` bounds the
 count of modular operations and encoding comparisons and is reduced by work
-performed, including work before an invalid signature is detected.
-For this verifier, a sufficient arithmetic budget is
-`17 * modulus_bytes + 16 * exponent_bytes + 4`. Check the result explicitly:
-`TC_RSA_OK`, `TC_RSA_INVALID`, `TC_RSA_LIMIT`, `TC_RSA_ARGUMENT`, or
-`TC_RSA_UNSUPPORTED`. Only `TC_RSA_OK` accepts the signature.
+performed, including work before an invalid signature is detected. The
+verifier needs `TC_RSA_public_work(&key) + TC_RSA_encode_v15_work(&options,
+modulus_bytes)` and checks that amount before any arithmetic. See
+[work budgets](#work-budgets). Check the result explicitly: `TC_RSA_OK`,
+`TC_RSA_INVALID`, `TC_RSA_LIMIT`, `TC_RSA_ARGUMENT`, or `TC_RSA_UNSUPPORTED`.
+Only `TC_RSA_OK` accepts the signature.
+
+## Status rule
+
+Every RSA function checks its arguments once and reports the first problem in
+this order:
+
+1. `TC_RSA_ARGUMENT`: a NULL pointer, overlapping or misaligned storage, or a
+   digest whose length differs from its known hash.
+2. `TC_RSA_UNSUPPORTED` or `TC_RSA_INVALID` for the key: an unsupported modulus
+   size, or a malformed modulus, exponent, private component or CRT value.
+3. `TC_RSA_UNSUPPORTED` or `TC_RSA_INVALID` for the scheme: a disabled or
+   unknown hash, or parameters such as a salt or label that do not fit.
+4. `TC_RSA_INVALID` for received data: a signature, ciphertext or raw input of
+   the wrong length.
+5. `TC_RSA_LIMIT`: a caller output buffer shorter than the modulus or the
+   documented size, then too little workspace, blinding attempts or work.
+
+The arithmetic finds a representative at or above the modulus and returns
+`TC_RSA_INVALID` after the limit checks pass. Output buffers larger than
+required are accepted, and exactly the documented length is written.
+`TC_RSA_ERROR` reports an RNG failure, a hash failure, or a private-key result
+that fails its check with the public exponent. Argument errors and limits found
+before arithmetic leave outputs, workspace and work unchanged. A blinding limit
+reached after rejected factors consumes the work of each attempt, wipes the
+workspace and leaves the output unchanged.
 
 For repeated verification with one key, initialize a caller-owned
 `TC_RSA_prepared_public_key` with `TC_RSA_prepare_public_key`. Preparation uses
@@ -47,9 +73,10 @@ widths, and a budget of `16 * modulus_bytes + 1`. It wipes temporary storage
 on success. Keep the borrowed modulus, exponent, and cache storage alive and
 unchanged until `TC_RSA_prepared_public_key_clear`, which wipes the cache.
 Use `TC_RSA_verify_v15_prepared` or `TC_RSA_verify_pss_prepared` with a separate
-verification workspace. Each prepared v1.5 verification needs at least
-`modulus_bytes + 16 * exponent_bytes + 4` work units. The one-shot functions
-remain useful when the key is used only once.
+verification workspace. `TC_RSA_prepared_public_work(&setup)` replaces
+`TC_RSA_public_work` in the verification budget because the cached `R^2`
+skips the setup work. The one-shot functions remain useful when the key is
+used only once.
 
 `TINY_CRYPTO_RSA_SMALL=ON` selects byte limbs. Native builds otherwise use
 32-bit limbs. AVR uses byte limbs. RSA verification needs neither EC nor a
@@ -60,7 +87,8 @@ hash implementation when the caller supplies the digest.
 For card or hardware signing, `TC_RSA_encode_v15_digest` produces the complete
 EMSA-PKCS1-v1_5 representative from a precomputed digest. Supply 128, 256,
 384, or 512 output bytes for RSA-1024, RSA-2048, RSA-3072, or RSA-4096 and a work budget
-covering that length. Input and output must be disjoint. Failures preserve the output.
+covering that length. Keep output and the work budget separate from the options,
+the digest and each other. Failures preserve the output.
 The function shares the software signer's encoding implementation and requires
 no hash context or RSA workspace. See [card-key authentication](credential-reader.md#card-key-authentication)
 for an example that submits this representative to a card.
@@ -76,9 +104,64 @@ the private-key operation.
 
 `TC_RSA_encode_v15_work` and `TC_RSA_encode_pss_work` return the exact work a
 successful encoding consumes for given options and modulus size, or zero when
-the options or size are unsupported. Use them to preflight a budget before
+the options or size are unsupported. A smaller budget returns `TC_RSA_LIMIT`
+with output and work unchanged. Use them to preflight a budget before
 drawing digest or salt bytes from a random source. `TC_key_challenge_prepare`
 does this so that a short budget fails before any RNG use.
+
+## Work budgets
+
+`TC_work_budget.remaining` is a `uint32_t` count of public work units:
+modular operations, encoded and masked bytes, hash invocations and RNG
+requests. It does not measure time. The work functions return the exact cost
+of one successful call, or zero when the operation would reject the arguments
+or the cost exceeds `UINT32_MAX`:
+
+| Operation | Work |
+| --- | --- |
+| `TC_RSA_raw_public` | `TC_RSA_public_work(&key)` |
+| `TC_RSA_verify_v15_digest` | `TC_RSA_public_work(&key) + TC_RSA_encode_v15_work(&options, L)` |
+| `TC_RSA_verify_pss_digest` | `TC_RSA_public_work(&key) + TC_RSA_encode_pss_work(&options, L)` |
+| `TC_RSA_verify_*_prepared` | `TC_RSA_prepared_public_work(&setup)` in place of `TC_RSA_public_work` |
+| `TC_RSA_encrypt_oaep` | `1 + TC_RSA_oaep_work(&options, L) + TC_RSA_public_work(&key)` |
+| `TC_RSA_raw_private` | `TC_RSA_private_work(&key, A)` for a key without CRT values |
+| `TC_RSA_sign_v15_digest` | `TC_RSA_private_work(&key, A) + TC_RSA_encode_v15_work(&options, L)` |
+| `TC_RSA_sign_pss_digest` | `TC_RSA_private_work(&key, A) + TC_RSA_encode_pss_work(&options, L)`, plus 1 for a nonempty salt |
+| `TC_RSA_decrypt_oaep` | `TC_RSA_private_work(&key, A) + TC_RSA_oaep_work(&options, L)` |
+
+`L` is the modulus length in bytes and `A` is the number of blinding attempts.
+`TC_RSA_private_work` reads only `key->public_key` and whether `key->crt` is
+set, and selects the CRT cost when it is. Each rejected blinding factor costs
+one more attempt, so budget with the same `A` as `execution.random_attempts`.
+Operations check their cost with one attempt before any arithmetic or RNG
+request. A smaller budget returns `TC_RSA_LIMIT` and leaves outputs, work and
+the RNG untouched. Add costs with overflow checks. The
+[signing](../examples/rsa_sign.c) and [encryption](../examples/rsa_encrypt.c)
+examples show the pattern.
+
+For reference, the public operation costs `16*L + 16*E + 4` for exponent
+length `E`, and a prepared key skips the `16*L` term. The private operation
+costs `32*L + 32*E + 8` at full width or `48*L + 32*E + 12` with CRT values,
+and each attempt adds `16*L + 1`. Key preparation costs `16*L + 1`, CRT
+validation `32*L + 1`, CRT derivation `48*L + 3`, and private-key validation
+`TC_RSA_VALIDATE_WORK(bits, attempts)`.
+
+## Raw operations
+
+`TC_RSA_raw_public` and `TC_RSA_raw_private` apply RSAEP/RSAVP1 and
+RSADP/RSASP1 ([RFC 8017, sections 5.1 and 5.2](https://www.rfc-editor.org/rfc/rfc8017.html#section-5))
+to one caller-formatted representative. They add no padding, so the caller
+selects and checks its protocol's encoding. The input has the modulus length
+and must be less than the modulus, otherwise the result is `TC_RSA_INVALID`.
+The output needs at least the modulus length. A shorter buffer returns
+`TC_RSA_LIMIT`, and exactly the modulus length is written on `TC_RSA_OK`.
+Allocate `TC_RSA_RAW_PUBLIC_WORKSPACE_WORDS(bits)` or
+`TC_RSA_RAW_PRIVATE_WORKSPACE_WORDS(bits)` limbs.
+
+The private operation takes the private exponent as a magnitude of 1 to
+`L` bytes. It blinds the input with an RNG factor, bounded by
+`execution.random_attempts`, and checks the result with the public exponent
+before publishing it. A failed check returns `TC_RSA_ERROR`.
 
 ## C++11
 
@@ -108,8 +191,9 @@ memory and do not throw.
 `TC_RSA_verify_pss_digest` verifies a precomputed digest using explicit message
 and MGF hashes and salt length. Both hash implementations must be enabled.
 It uses the same caller-owned limb workspace as v1.5 verification, plus a local
-hash context and 64-byte digest buffer. Its work budget also covers PSS hashing
-and mask generation. The v1.5 budget formula covers v1.5 only.
+hash context and 64-byte digest buffer. Its work is `TC_RSA_public_work(&key)
++ TC_RSA_encode_pss_work(&options, L)`, which covers PSS hashing and mask
+generation.
 
 The public RSA API provides v1.5 and PSS signing and signature verification,
 OAEP encryption/decryption, and private-key component validation. The
@@ -260,28 +344,30 @@ The check compares the reduced exponents and verifies the coefficient and its
 range. Allocate `TC_RSA_CRT_WORKSPACE_WORDS(bits)` limbs or query
 `TC_RSA_workspace_words(TC_RSA_OPERATION_CRT, bits)`. Existing validation workspace can be reused.
 Keep it separate from key bytes and metadata. Used scratch is wiped.
-A sufficient work budget is `32*modulus_bytes+1`.
+The work is `32*modulus_bytes+1`.
 The C++ wrapper is `tiny_crypto::rsa_validate_crt`.
 
 Generated or imported keys that contain only `n`, `e`, `d`, `p`, and `q` can
 derive the remaining values with `TC_RSA_derive_crt` or
 `tiny_crypto::rsa_derive_crt`. The three caller-owned outputs each need half the
 modulus length. They are published together only after all computations succeed.
-The CRT validation workspace can be reused, and a sufficient work budget is
-`48*modulus_bytes+3`.
+A shorter output returns `TC_RSA_LIMIT`. The CRT validation workspace can be
+reused, and the work is `48*modulus_bytes+3`.
 
 `TC_RSA_sign_v15_digest` signs a precomputed SHA digest using PKCS#1 v1.5.
 Validate the private components before signing and keep them unchanged while
 in use. Allocate `TC_RSA_SIGN_WORKSPACE_WORDS(bits)` limbs or query
-`TC_RSA_workspace_words(TC_RSA_OPERATION_SIGN, bits)`. The signature buffer must have exactly
-the modulus length and be separate from the key, digest, metadata and workspace.
+`TC_RSA_workspace_words(TC_RSA_OPERATION_SIGN, bits)`. The signature buffer needs at
+least the modulus length and must be separate from the key, digest, metadata and
+workspace. A shorter buffer returns `TC_RSA_LIMIT`, and exactly the modulus
+length is written.
 
 Supply a `TC_RSA_execution` containing a cryptographically secure random source,
 a blinding-attempt limit, and a work budget. The operation checks its result
-using the public exponent
-before publishing signature bytes. Failures preserve the signature buffer.
-Used workspace is wiped. A sufficient work budget for `A` attempts is
-`33*modulus_bytes + 32*exponent_bytes + 8 + A*(16*modulus_bytes + 1)`.
+using the public exponent before publishing signature bytes, and a failed
+check returns `TC_RSA_ERROR`. Failures preserve the signature buffer.
+Used workspace is wiped. For `A` attempts the work is
+`TC_RSA_private_work(&key, A) + TC_RSA_encode_v15_work(&options, L)`.
 Use overflow-checked arithmetic for application-selected limits.
 
 The compiled [v1.5 signing example](../examples/rsa_sign.c) builds a workspace
@@ -298,9 +384,8 @@ After CRT validation, assign its borrowed view to `TC_RSA_private_key.crt`.
 `TC_RSA_sign_v15_digest` and its C++ wrapper then select the accelerated private
 kernel without changing PKCS #1 encoding. The CRT kernel blinds modulo `n`, performs
 the two half-width exponentiations, recombines, unblinds, and verifies the result
-with the public exponent before publishing it. For `A` blinding attempts, its
-v1.5 budget is
-`49*modulus_bytes + 32*exponent_bytes + 12 + A*(16*modulus_bytes + 1)`.
+with the public exponent before publishing it. `TC_RSA_private_work` selects
+the CRT cost when `crt` is set.
 
 `TC_RSA_sign_pss_digest` and `tiny_crypto::rsa_sign_pss_digest` take a
 `TC_RSA_pss_options` value containing the message hash, MGF hash, and salt
@@ -308,24 +393,11 @@ length. Both hash implementations
 must be enabled. They use the same signing workspace. Salt occupies temporary
 scratch while the encoded message is built, then that storage is reused for
 blinded exponentiation. A nonempty salt adds one RNG request.
-`execution.random_attempts` bounds blinding requests. PSS hashing and mask
-generation also consume work,
-so the v1.5 budget formula covers only v1.5 signing.
+`execution.random_attempts` bounds blinding requests.
 The optional `TC_RSA_private_key.crt` view selects the same CRT acceleration.
-
-For a PSS budget, let `L` and `E` be the modulus and exponent lengths, `H` and
-`G` the message-hash and MGF digest lengths, and `S` the salt length, all in bytes.
-With at most `A` blinding attempts, calculate:
-
-```text
-db = L - H - 1
-blocks = ceil(db / G)
-encoding = L + H + S + 9 + db + blocks * (H + 5)
-private_operation = 32*L + 32*E + 8 + A*(16*L + 1)
-work = encoding + private_operation + (S != 0)
-```
-
-Check the salt limit `S <= L - H - 2` and use overflow-checked arithmetic.
+The work is `TC_RSA_private_work(&key, A) + TC_RSA_encode_pss_work(&options,
+L)`, plus 1 for a nonempty salt. The salt length is at most `L - H - 2` for
+message-hash length `H`, and a longer salt returns `TC_RSA_INVALID`.
 
 ## OAEP encryption
 
@@ -339,7 +411,8 @@ Allocate `TC_RSA_ENCRYPT_WORKSPACE_WORDS(bits)` limbs, or query
 `TC_RSA_workspace_words(TC_RSA_OPERATION_ENCRYPT, bits)`. `TC_RSA_execution` supplies the RNG and
 shared work budget. Its `random_attempts` field is unused because OAEP encryption
 requests one seed.
-Ciphertext storage must have exactly the modulus length and changes only on
+Ciphertext storage needs at least the modulus length, and a shorter buffer
+returns `TC_RSA_LIMIT`. Exactly the modulus length is written, only on
 `TC_RSA_OK`. Keep it and scratch separate from the key, plaintext, label and
 metadata. Keep RNG state separate from those buffers too. Used scratch is wiped,
 including when the RNG fails or the work budget runs out.
@@ -351,20 +424,10 @@ The compiled [SHA-256 example](../examples/rsa_encrypt.c) calculates the work
 budget and calls this API with your public key, RNG and scratch buffer. It uses
 SHA-256 for both hashes and checks budget overflow before requesting randomness.
 
-For modulus length `L`, exponent length `E`, label length `A`, message-hash
-length `H` and MGF-hash length `G`, all in bytes, a sufficient work budget is:
-
-```text
-D = L - H - 1
-1 + (L + A + 1)
-  + D + ceil(D/G)*(H + 5)
-  + H + ceil(H/G)*(D + 5)
-  + 16*L + 16*E + 4
-```
-
-The terms cover the RNG request, encoding, two masks and exponentiation.
-Use overflow-checked arithmetic when calculating the budget. A smaller budget
-can return `TC_RSA_LIMIT` after consuming randomness. Ciphertext remains unchanged.
+The work is `1 + TC_RSA_oaep_work(&options, L) + TC_RSA_public_work(&key)`:
+the seed request, the encoding with both masks, and the exponentiation. The
+whole budget is checked before the seed request, so a smaller budget returns
+`TC_RSA_LIMIT` without using randomness. Ciphertext remains unchanged.
 
 ## OAEP decryption
 
@@ -373,13 +436,15 @@ the message hash, MGF hash, and label in `TC_RSA_oaep_options`. Both hashes must
 be enabled.
 An empty label is `{NULL, 0}`. Ciphertext length must equal the modulus length.
 Provide `TC_RSA_DECRYPT_WORKSPACE_WORDS(bits)` limbs, or query
-`TC_RSA_workspace_words(TC_RSA_OPERATION_DECRYPT, bits)`.
+`TC_RSA_workspace_words(TC_RSA_OPERATION_DECRYPT, bits)`. The work is
+`TC_RSA_private_work(&key, A) + TC_RSA_oaep_work(&options, L)`.
 
 Allocate at least `modulus_bytes - 2*hash_digest_bytes - 2` bytes for the
 plaintext, the largest message the key and hash can carry. A smaller buffer
-returns `TC_RSA_LIMIT` before the private-key operation. That check uses only
-public sizes, draws no randomness and consumes no work, so the status never
-distinguishes valid from invalid padding (RFC 8017 section 7.1.2).
+returns `TC_RSA_LIMIT` before the private-key operation. That check and the
+work check use only public sizes, draw no randomness and consume no work, so
+the status never distinguishes valid from invalid padding (RFC 8017 section
+7.1.2).
 
 Plaintext is checked in scratch and copied to the output after OAEP decoding
 succeeds. The plaintext buffer and returned length change only on `TC_RSA_OK`.

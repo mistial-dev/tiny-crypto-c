@@ -122,8 +122,10 @@ TEST_CASE("RSA CRT wrapper argument checks")
   tiny_crypto::rsa_crt_output output = {};
   CHECK(workspace.capacity == TC_RSA_workspace_words(TC_RSA_OPERATION_CRT, 1024));
   TC_work_budget work = {0};
-  CHECK(tiny_crypto::rsa_validate_crt(key, crt, workspace, work) == TC_RSA_INVALID);
-  CHECK(tiny_crypto::rsa_derive_crt(key, output, workspace, work) == TC_RSA_INVALID);
+  /* NULL key and output spans are argument errors, reported before any key
+   * check. */
+  CHECK(tiny_crypto::rsa_validate_crt(key, crt, workspace, work) == TC_RSA_ARGUMENT);
+  CHECK(tiny_crypto::rsa_derive_crt(key, output, workspace, work) == TC_RSA_ARGUMENT);
   workspace.words = nullptr;
   CHECK(tiny_crypto::rsa_validate_crt(key, crt, workspace, work) == TC_RSA_ARGUMENT);
 }

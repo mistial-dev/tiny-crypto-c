@@ -75,9 +75,6 @@ static inline TC_RSA_result tc_rsa_mgf1_xor(TC_hash_algorithm hash, TC_bytes see
   return TC_RSA_OK;
 }
 
-/* Validate EMSA-PSS parameters (RFC 8017 section 9.1) and return the work
- * charged before MGF1: the encoded message, salt, digest and the fixed
- * 8-byte prefix plus one hash invocation. */
 /* Hash scratch for one padding operation: a digest-sized block (64 bytes)
  * and a hash context. Both are wiped by the caller. */
 typedef struct {
@@ -85,6 +82,9 @@ typedef struct {
   TC_hash_context* context;
 } tc_rsa_hash_scratch;
 
+/* Validate EMSA-PSS parameters (RFC 8017 section 9.1) and return the work
+ * charged before MGF1: the encoded message, salt, digest and the fixed
+ * 8-byte prefix plus one hash invocation. */
 static inline TC_RSA_result tc_rsa_pss_parameters(size_t length, size_t bits,
                                                   TC_hash_algorithm hash,
                                                   TC_hash_algorithm mgf_hash, size_t salt_length,
@@ -140,7 +140,8 @@ static inline TC_RSA_result tc_rsa_pss_plan(size_t length, size_t bits, TC_hash_
 
 static inline TC_RSA_result tc_rsa_pss_prepare(size_t length, size_t bits, TC_hash_algorithm hash,
                                                TC_hash_algorithm mgf_hash, size_t digest_length,
-                                               size_t salt_length, uint32_t* work, tc_hash_info* info)
+                                               size_t salt_length, uint32_t* work,
+                                               tc_hash_info* info)
 {
   size_t cost;
   TC_RSA_result result =
@@ -250,19 +251,44 @@ static inline TC_RSA_result tc_rsa_pss_check(const TC_RSA_pss_options* options, 
   return difference ? TC_RSA_INVALID : TC_RSA_OK;
 }
 
-/* Check OAEP arguments and report the encode or decode cost without charging
- * it. info and cost are valid on OK. */
-static inline TC_RSA_result tc_rsa_oaep_plan(size_t length, TC_hash_algorithm hash,
-                                             TC_hash_algorithm mgf_hash, TC_bytes label,
-                                             tc_hash_info* info, size_t* cost)
+/* Validate RSAES-OAEP parameters (RFC 8017 section 7.1) and return the work
+ * charged before MGF1: the encoded message, the label and one hash
+ * invocation. info and cost are valid on OK. */
+static inline TC_RSA_result tc_rsa_oaep_parameters(size_t length, TC_hash_algorithm hash,
+                                                   TC_hash_algorithm mgf_hash, size_t label_length,
+                                                   tc_hash_info* info, size_t* cost)
 {
   if (!tc_hash_info_get(hash, info) || !tc_hash_available(hash) || !tc_hash_available(mgf_hash))
     return TC_RSA_UNSUPPORTED;
+  /* RFC 8017 section 7.1.2 step 1.c: k >= 2 hLen + 2. */
   if (length < 2 * info->digest_length + 2)
     return TC_RSA_INVALID;
-  if (length == SIZE_MAX || label.length > SIZE_MAX - length - 1)
+  if (length == SIZE_MAX || label_length > SIZE_MAX - length - 1)
     return TC_RSA_LIMIT;
-  *cost = length + label.length + 1;
+  *cost = length + label_length + 1;
+  return TC_RSA_OK;
+}
+
+/* Total work of a successful tc_rsa_oaep_encode or tc_rsa_oaep_decode: the
+ * parameter charge, the dbMask over DB and the seedMask over the seed. */
+static inline TC_RSA_result tc_rsa_oaep_cost(size_t length, TC_hash_algorithm hash,
+                                             TC_hash_algorithm mgf_hash, size_t label_length,
+                                             size_t* cost)
+{
+  tc_hash_info info;
+  size_t db_mask, seed_mask;
+  TC_RSA_result result = tc_rsa_oaep_parameters(length, hash, mgf_hash, label_length, &info, cost);
+  if (result != TC_RSA_OK)
+    return result;
+  const size_t h = info.digest_length, db_length = length - h - 1;
+  result = tc_rsa_mgf1_cost(mgf_hash, h, db_length, &db_mask);
+  if (result == TC_RSA_OK)
+    result = tc_rsa_mgf1_cost(mgf_hash, db_length, h, &seed_mask);
+  if (result != TC_RSA_OK)
+    return result;
+  if (db_mask > SIZE_MAX - *cost || seed_mask > SIZE_MAX - *cost - db_mask)
+    return TC_RSA_LIMIT;
+  *cost += db_mask + seed_mask;
   return TC_RSA_OK;
 }
 
@@ -271,7 +297,7 @@ static inline TC_RSA_result tc_rsa_oaep_prepare(size_t length, TC_hash_algorithm
                                                 uint32_t* work, tc_hash_info* info)
 {
   size_t cost;
-  TC_RSA_result result = tc_rsa_oaep_plan(length, hash, mgf_hash, label, info, &cost);
+  TC_RSA_result result = tc_rsa_oaep_parameters(length, hash, mgf_hash, label.length, info, &cost);
   if (result != TC_RSA_OK)
     return result;
   if (cost > *work)

@@ -2,20 +2,15 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "rsa_sign.h"
 
-enum { MAX_KEY_BITS = 4096, BLINDING_ATTEMPTS = 4, SHA256_BYTES = EXAMPLE_RSA_PSS_SHA256_BYTES };
+enum { BLINDING_ATTEMPTS = 4, SHA256_BYTES = EXAMPLE_RSA_PSS_SHA256_BYTES };
 
-static TC_RSA_result private_budget(const TC_RSA_private_key* key, uint32_t* work)
+/* Add two work costs. A zero cost means the operation rejects its arguments,
+ * and a zero budget lets the call report that status. */
+static uint32_t total_work(uint32_t private_work, uint32_t encoding_work, uint32_t requests)
 {
-  if (!key)
-    return TC_RSA_ARGUMENT;
-  const size_t length = key->public_key.modulus.length;
-  const size_t exponent_length = key->public_key.exponent.length;
-  if (length > MAX_KEY_BITS / 8 || !TC_RSA_workspace_words(TC_RSA_OPERATION_SIGN, length * 8) ||
-      exponent_length > length)
-    return TC_RSA_INVALID;
-  *work = UINT32_C(32) * length + UINT32_C(32) * exponent_length + 8 +
-          BLINDING_ATTEMPTS * (UINT32_C(16) * length + 1);
-  return TC_RSA_OK;
+  if (!private_work || !encoding_work || encoding_work > UINT32_MAX - private_work - requests)
+    return 0;
+  return private_work + encoding_work + requests;
 }
 
 TC_RSA_result example_sign_rsa_v15_digest(const TC_RSA_private_key* key, TC_hash_algorithm hash,
@@ -23,17 +18,11 @@ TC_RSA_result example_sign_rsa_v15_digest(const TC_RSA_private_key* key, TC_hash
                                           TC_random_source random,
                                           const TC_RSA_workspace* workspace)
 {
-  uint32_t work;
-  const TC_RSA_result result = private_budget(key, &work);
-  if (result != TC_RSA_OK)
-    return result;
-  work += key->public_key.modulus.length;
-  /* Bound the budget before converting to the platform's work-counter type. */
-#if SIZE_MAX < UINT32_MAX
-  if (work > SIZE_MAX)
-    return TC_RSA_LIMIT;
-#endif
   const TC_RSA_v15_options options = {hash};
+  const size_t length = key ? key->public_key.modulus.length : 0;
+  /* Budget every blinding attempt so a rejected factor can be replaced. */
+  const uint32_t work = total_work(TC_RSA_private_work(key, BLINDING_ATTEMPTS),
+                                   TC_RSA_encode_v15_work(&options, length), 0);
   TC_RSA_execution execution = {random, BLINDING_ATTEMPTS, {work}};
   return TC_RSA_sign_v15_digest(key, &options, digest, workspace, signature, &execution);
 }
@@ -42,20 +31,11 @@ TC_RSA_result example_sign_rsa_pss_sha256_digest(const TC_RSA_private_key* key, 
                                                  TC_buffer signature, TC_random_source random,
                                                  const TC_RSA_workspace* workspace)
 {
-  uint32_t work;
-  const TC_RSA_result result = private_budget(key, &work);
-  if (result != TC_RSA_OK)
-    return result;
-  const uint32_t length = key->public_key.modulus.length;
-  const uint32_t db = length - SHA256_BYTES - 1;
-  const uint32_t blocks = (db + SHA256_BYTES - 1) / SHA256_BYTES;
-  /* SHA-256 for both hashes, a digest-length salt, and one salt RNG request. */
-  work += length + 2 * SHA256_BYTES + 9 + db + blocks * (SHA256_BYTES + 5) + 1;
-#if SIZE_MAX < UINT32_MAX
-  if (work > SIZE_MAX)
-    return TC_RSA_LIMIT;
-#endif
   const TC_RSA_pss_options options = {TC_HASH_SHA256, TC_HASH_SHA256, SHA256_BYTES};
+  const size_t length = key ? key->public_key.modulus.length : 0;
+  /* The PSS encoding, one salt request and every blinding attempt. */
+  const uint32_t work = total_work(TC_RSA_private_work(key, BLINDING_ATTEMPTS),
+                                   TC_RSA_encode_pss_work(&options, length), 1);
   TC_RSA_execution execution = {random, BLINDING_ATTEMPTS, {work}};
   return TC_RSA_sign_pss_digest(key, &options, digest, workspace, signature, &execution);
 }

@@ -1,7 +1,14 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * RSAES-OAEP encryption and decryption (RFC 8017 section 7.1). */
+ * RSAES-OAEP encryption and decryption (RFC 8017 section 7.1).
+ *
+ * Both entries check their arguments once, in this order: NULL and
+ * overlapping storage (ARGUMENT), the key (UNSUPPORTED or INVALID), the OAEP
+ * parameters (UNSUPPORTED or INVALID), the message or ciphertext length
+ * (INVALID), then output capacity, workspace and the whole work budget
+ * (LIMIT). Every check before the RNG request depends only on public
+ * values. */
 #include <tiny_crypto/rsa.h>
 #if TC_ENABLE_RSA
 #define TC_MP_WORD_BITS TC_RSA_WORD_BITS
@@ -9,64 +16,46 @@
 #include "rsa_padding_internal.h"
 #include "rsa_internal.h"
 
-/* Additional output metadata uses the same disjoint-range rules as bytes. */
-static TC_RSA_result tc_rsa_decrypt_inputs(const TC_RSA_private_key* key, TC_bytes ciphertext,
-                                           TC_bytes label, uint8_t* plaintext, size_t capacity,
-                                           size_t* plaintext_length,
-                                           const TC_RSA_workspace* workspace)
-{
-  if (!plaintext_length || (uintptr_t)plaintext_length % sizeof *plaintext_length)
-    return TC_RSA_ARGUMENT;
-  TC_RSA_result status =
-      tc_rsa_private_inputs(key, ciphertext, (TC_bytes){plaintext, capacity}, workspace);
-  if (status != TC_RSA_OK)
-    return status;
-  TC_bytes writes[3];
-  tc_pki_storage_plan plan;
-  tc_pki_storage_plan_begin(&plan, writes, 3, SIZE_MAX);
-  TC_PKI_PLAN_WRITE(&plan, workspace->words, workspace->capacity);
-  TC_PKI_PLAN_WRITE(&plan, plaintext, capacity);
-  TC_PKI_PLAN_WRITE(&plan, plaintext_length, 1);
-  tc_pki_storage_plan_seal(&plan);
-  tc_pki_storage_plan_input_span(&plan, label);
-  if (tc_rsa_storage_status(&plan) != TC_RSA_OK)
-    return TC_RSA_ARGUMENT;
-  /* Treat the length object as another output when checking key and ciphertext. */
-  return tc_rsa_private_inputs(key, ciphertext, writes[2], workspace);
-}
-
 TC_RSA_result TC_RSA_encrypt_oaep(const TC_RSA_public_key* key, const TC_RSA_oaep_options* options,
                                   TC_bytes plaintext, const TC_RSA_workspace* workspace,
                                   TC_buffer ciphertext, TC_RSA_execution* execution)
 {
-  if (!options || !execution || !execution->random.fill || !ciphertext.data)
+  tc_rsa_storage storage;
+  if (!options)
     return TC_RSA_ARGUMENT;
-  TC_RSA_result status =
-      tc_rsa_control_inputs(workspace, (TC_bytes){ciphertext.data, ciphertext.capacity}, options,
-                            sizeof *options, execution, sizeof *execution);
-  if (status == TC_RSA_OK)
-    status = tc_rsa_public_inputs(key, plaintext, options->label,
-                                  (TC_bytes){ciphertext.data, ciphertext.capacity}, workspace);
+  tc_rsa_storage_begin(&storage, workspace);
+  tc_rsa_storage_output(&storage, ciphertext);
+  tc_rsa_storage_write(&storage, execution, sizeof *execution);
+  tc_rsa_storage_seal(&storage);
+  tc_rsa_storage_input(&storage, options, sizeof *options);
+  tc_rsa_storage_span(&storage, options->label);
+  tc_rsa_storage_public_key(&storage, key);
+  tc_rsa_storage_span(&storage, plaintext);
+  TC_RSA_result status = tc_rsa_storage_finish(&storage);
+  if (status == TC_RSA_OK && !execution->random.fill)
+    status = TC_RSA_ARGUMENT;
   if (status == TC_RSA_OK)
     status = tc_rsa_public_key_check(key);
   if (status != TC_RSA_OK)
     return status;
   const size_t length = key->modulus.length;
-  if (ciphertext.capacity != length)
-    return TC_RSA_INVALID;
   tc_hash_info info;
   size_t encode_cost;
-  status = tc_rsa_oaep_plan(length, options->hash, options->mgf_hash, options->label, &info,
+  status = tc_rsa_oaep_cost(length, options->hash, options->mgf_hash, options->label.length,
                             &encode_cost);
   if (status != TC_RSA_OK)
     return status;
+  (void)tc_hash_info_get(options->hash, &info);
+  /* RFC 8017 section 7.1.1 step 1.b: mLen <= k - 2 hLen - 2. */
   if (plaintext.length > length - 2 * info.digest_length - 2)
     return TC_RSA_INVALID;
-  const size_t n = length / sizeof(TC_RSA_word), arithmetic_words = 8 * n + 2;
-  const size_t required = arithmetic_words + n;
+  const size_t arithmetic_words = TC_RSA_RAW_PUBLIC_WORKSPACE_WORDS(length * 8);
+  const size_t required = TC_RSA_ENCRYPT_WORKSPACE_WORDS(length * 8);
+  const uint32_t public_cost = tc_rsa_public_cost(length, key->exponent.length, 0);
   uint32_t* work = &execution->work.remaining;
-  /* One unit for the seed request, then the encoding cost. */
-  if (workspace->capacity < required || *work <= encode_cost)
+  /* The seed request, the encoding and the public operation. */
+  if (ciphertext.capacity < length || workspace->capacity < required || *work <= public_cost ||
+      *work - public_cost - 1 < encode_cost)
     return TC_RSA_LIMIT;
   TC_hash_context hash_workspace;
   uint8_t block[64];
@@ -96,53 +85,59 @@ TC_RSA_result TC_RSA_decrypt_oaep(const TC_RSA_private_key* key, const TC_RSA_oa
                                   TC_buffer plaintext, size_t* plaintext_length,
                                   TC_RSA_execution* execution)
 {
-  tc_hash_info info;
-  size_t decode_cost;
-  if (!key || !options || !execution || !execution->random.fill)
+  tc_rsa_private_view view;
+  tc_rsa_storage storage;
+  if (!options || (uintptr_t)plaintext_length % sizeof *plaintext_length)
     return TC_RSA_ARGUMENT;
-  TC_RSA_result status =
-      tc_rsa_control_inputs(workspace, (TC_bytes){plaintext.data, plaintext.capacity}, options,
-                            sizeof *options, execution, sizeof *execution);
-  if (status != TC_RSA_OK)
-    return status;
-  if (!plaintext_length ||
-      !tc_internal_ranges_disjoint(options, sizeof *options, plaintext_length,
-                                   sizeof *plaintext_length) ||
-      !tc_internal_ranges_disjoint(execution, sizeof *execution, plaintext_length,
-                                   sizeof *plaintext_length))
-    return TC_RSA_ARGUMENT;
-  status = tc_rsa_decrypt_inputs(key, ciphertext, options->label, plaintext.data,
-                                 plaintext.capacity, plaintext_length, workspace);
-  if (status == TC_RSA_OK && key->crt)
-    status =
-        tc_rsa_crt_inputs(key, key->crt, (TC_bytes){plaintext.data, plaintext.capacity}, workspace);
+  tc_rsa_storage_begin(&storage, workspace);
+  tc_rsa_storage_output(&storage, plaintext);
+  tc_rsa_storage_write(&storage, plaintext_length, sizeof *plaintext_length);
+  tc_rsa_storage_write(&storage, execution, sizeof *execution);
+  tc_rsa_storage_seal(&storage);
+  tc_rsa_storage_input(&storage, options, sizeof *options);
+  tc_rsa_storage_span(&storage, options->label);
+  tc_rsa_storage_private_key(&storage, key);
+  if (key && key->crt)
+    tc_rsa_storage_crt(&storage, key->crt);
+  tc_rsa_storage_required(&storage, ciphertext);
+  TC_RSA_result status = tc_rsa_storage_finish(&storage);
+  if (status == TC_RSA_OK && !execution->random.fill)
+    status = TC_RSA_ARGUMENT;
   if (status == TC_RSA_OK)
-    status = tc_rsa_public_key_check(&key->public_key);
+    status = tc_rsa_private_view_init(key, key->crt, &view);
   if (status != TC_RSA_OK)
     return status;
   const size_t length = key->public_key.modulus.length;
-  if (ciphertext.length != length)
-    return TC_RSA_INVALID;
-  status = tc_rsa_oaep_plan(length, options->hash, options->mgf_hash, options->label, &info,
+  tc_hash_info info;
+  size_t decode_cost;
+  status = tc_rsa_oaep_cost(length, options->hash, options->mgf_hash, options->label.length,
                             &decode_cost);
   if (status != TC_RSA_OK)
     return status;
-  const size_t n = length / sizeof(TC_RSA_word), required = 14 * n;
+  (void)tc_hash_info_get(options->hash, &info);
+  /* RFC 8017 section 7.1.2 step 1.b: the ciphertext has the modulus length. */
+  if (ciphertext.length != length)
+    return TC_RSA_INVALID;
+  const size_t required = TC_RSA_DECRYPT_WORKSPACE_WORDS(length * 8);
+  const size_t arithmetic_words = TC_RSA_RAW_PRIVATE_WORKSPACE_WORDS(length * 8);
   const size_t max_message = length - 2 * info.digest_length - 2;
+  const uint32_t private_cost =
+      tc_rsa_private_base_cost(length, key->public_key.exponent.length, view.crt) +
+      tc_rsa_blinding_cost(length);
   uint32_t* work = &execution->work.remaining;
-  /* RFC 8017 section 7.1.2, note after step 4: an opponent must learn nothing
-   * about EM. Plaintext capacity is checked against the largest message before
-   * decryption, so LIMIT depends only on public sizes. */
-  if (!execution->random_attempts || workspace->capacity < required || *work < decode_cost ||
-      plaintext.capacity < max_message)
+  /* RFC 8017 section 7.1.2, note after step 4: an opponent must not learn
+   * which decryption error occurred. Plaintext capacity and the whole budget
+   * are checked before decryption, so LIMIT depends only on public sizes. */
+  if (plaintext.capacity < max_message || !execution->random_attempts ||
+      workspace->capacity < required || *work < private_cost || *work - private_cost < decode_cost)
     return TC_RSA_LIMIT;
   TC_hash_context hash_workspace;
   uint8_t block[64];
-  uint8_t* encoded = (uint8_t*)(workspace->words + 13 * n);
+  uint8_t* encoded = (uint8_t*)(workspace->words + arithmetic_words);
   TC_bytes message = {0};
   const tc_rsa_random rng = {execution->random, execution->random_attempts};
-  status = tc_rsa_private_apply(key, key->crt, ciphertext.data, encoded, &rng,
-                                (tc_mp_scratch){workspace->words, 13 * n}, work);
+  status = tc_rsa_private_apply(&view, ciphertext.data, encoded, &rng,
+                                (tc_mp_scratch){workspace->words, arithmetic_words}, work);
   if (status == TC_RSA_OK)
     status = tc_rsa_oaep_decode(options, (TC_buffer){encoded, length},
                                 (tc_rsa_hash_scratch){block, &hash_workspace}, work, &message);

@@ -176,27 +176,13 @@ static MunitResult public_operation(const MunitParameter params[], void* user)
                    ==, TC_RSA_LIMIT);
   munit_assert_size(work, ==, cost);
   munit_assert_memory_equal(sizeof output, output, saved);
-  for (unsigned invalid = 0; invalid < 3; ++invalid) {
-    exponent[0] = (uint8_t)invalid;
-    munit_assert_int(tc_rsa_public_operation(&(TC_RSA_public_key){{modulus, 128}, {exponent, 1}},
-                                             input, output, (tc_mp_scratch){scratch, capacity},
-                                             &work, NULL),
-                     ==, TC_RSA_INVALID);
-    munit_assert_memory_equal(sizeof output, output, saved);
-  }
-  exponent[0] = 3;
+  /* Key shape is checked at the public entries. The kernel checks the
+   * representative against the modulus. */
   munit_assert_int(tc_rsa_public_operation(&(TC_RSA_public_key){{modulus, 128}, {exponent, 1}},
                                            modulus, output, (tc_mp_scratch){scratch, capacity},
                                            &work, NULL),
                    ==, TC_RSA_INVALID);
   munit_assert_memory_equal(sizeof output, output, saved);
-  modulus[127] &= 0xfe;
-  munit_assert_int(tc_rsa_public_operation(&(TC_RSA_public_key){{modulus, 128}, {exponent, 1}},
-                                           input, output, (tc_mp_scratch){scratch, capacity}, &work,
-                                           NULL),
-                   ==, TC_RSA_INVALID);
-  munit_assert_memory_equal(sizeof output, output, saved);
-  modulus[127] |= 1;
   munit_assert_int(tc_rsa_public_operation(&(TC_RSA_public_key){{modulus, 128}, {exponent, 1}},
                                            input, output, (tc_mp_scratch){scratch, capacity}, &work,
                                            NULL),
