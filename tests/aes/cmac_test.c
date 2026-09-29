@@ -6,6 +6,7 @@
  * Test-only translation unit.
  */
 
+#include <stddef.h>
 #include <tiny_crypto/aes.h>
 #include "munit.h"
 #include "cavp.h"
@@ -272,6 +273,21 @@ static MunitResult test_cmac_streaming(const MunitParameter params[], void* data
   TC_AES_CMAC_ctx_clear(&ctx);
 #endif
   TC_AES_CMAC_ctx_clear(NULL);
+
+  /* A key stored anywhere inside the context overlaps it. Init must reject
+   * it before clearing the context, so it never MACs with a wiped key. */
+  {
+    uint8_t* const staged_k1 = (uint8_t*)&ctx + offsetof(struct TC_AES_CMAC_ctx, k1);
+    uint8_t* const staged_mac = (uint8_t*)&ctx + offsetof(struct TC_AES_CMAC_ctx, mac);
+
+    memcpy(staged_k1, key, sizeof key);
+    munit_assert_int(TC_AES_CMAC_init(&ctx, staged_k1), ==, TC_ERROR);
+    munit_assert_int(ctx.active, ==, 0);
+    munit_assert_int(TC_AES_CMAC_update(&ctx, msg, 1), ==, TC_ERROR);
+    memcpy(staged_mac, key, sizeof key);
+    munit_assert_int(TC_AES_CMAC_init(&ctx, staged_mac), ==, TC_ERROR);
+    munit_assert_int(TC_AES_CMAC_final(&ctx, tag), ==, TC_ERROR);
+  }
 
   return MUNIT_OK;
 }

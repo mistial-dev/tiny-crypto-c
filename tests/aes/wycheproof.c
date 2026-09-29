@@ -121,10 +121,7 @@ static MunitResult vectors(const MunitParameter params[], void* user)
       munit_assert_int(status, ==, TC_OK);
       munit_assert_memory_equal(length[3], output, value[3]);
     } else if (status == TC_MISMATCH) {
-      if (strcmp(mode, "eax") == 0)
-        munit_assert_memory_equal(length[4], output, value[4]);
-      else
-        munit_assert_true(tc_test_all_zero(output, length[4]));
+      munit_assert_true(tc_test_all_zero(output, length[4]));
     } else {
       munit_assert_int(status, ==, TC_ERROR);
       munit_assert_memory_equal(length[4], output, value[4]);

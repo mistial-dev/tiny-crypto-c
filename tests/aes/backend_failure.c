@@ -197,8 +197,9 @@ static MunitResult eax_failures(const MunitParameter params[], void* user)
         memcpy(output, ciphertext, length);
         munit_assert_int(eax_operation(prime, 1, key, plain, output, length, output, tag), ==,
                          TC_ERROR);
+        /* Any in-place decrypt failure wipes the rejected ciphertext. */
         for (byte = 0; byte < length; ++byte)
-          munit_assert_uint8(output[byte], ==, stage <= total - ctr_blocks ? ciphertext[byte] : 0);
+          munit_assert_uint8(output[byte], ==, 0);
       }
     }
   }

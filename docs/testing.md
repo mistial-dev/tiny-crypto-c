@@ -771,8 +771,10 @@ minimum length. Longer valid tags must verify; altered tags must fail.
 AES-GCM, CCM, GMAC, EAX, and both AES-SIV formats run at all three AES key
 sizes. Valid cases check
 encryption and decryption. Invalid cases must fail without changing a separate
-output buffer. GCM and CCM authentication mismatches must wipe an in-place
-buffer. EAX must leave its ciphertext unchanged.
+output buffer. GCM, CCM, EAX and EAX' authentication mismatches must wipe an
+in-place buffer. EAX rejects a zero-length tag, and
+`test_reject_tag_length_config` checks that `config.h` rejects EAX and AES-CMAC
+minimum tag lengths outside 1 to 16.
 SIV follows its separate API contract: an authentication mismatch wipes the
 output, whether separate or in-place. The two SIV formats differ in their
 associated-data components and whether the synthetic IV prefixes the ciphertext.

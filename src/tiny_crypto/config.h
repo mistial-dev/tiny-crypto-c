@@ -542,6 +542,10 @@
 #if TC_AES_CMAC_MIN_TAG_LEN < 1 || TC_AES_CMAC_MIN_TAG_LEN > 16
 #error "TC_AES_CMAC_MIN_TAG_LEN must be in 1..16"
 #endif
+/* A zero minimum would let a zero-length EAX tag authenticate any message. */
+#if TC_AES_EAX_MIN_TAG_LEN < 1 || TC_AES_EAX_MIN_TAG_LEN > 16
+#error "TC_AES_EAX_MIN_TAG_LEN must be in 1..16"
+#endif
 #if TC_AES_GCM_GHASH_MODE < TC_AES_GCM_GHASH_MODE_AUTO ||                                          \
     TC_AES_GCM_GHASH_MODE > TC_AES_GCM_GHASH_MODE_HARDWARE
 #error "TC_AES_GCM_GHASH_MODE is invalid"

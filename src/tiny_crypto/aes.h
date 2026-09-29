@@ -132,9 +132,9 @@ TC_status TC_AES_OFB_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length);
  * - Text input and output are exact aliases or fully disjoint. The tag is
  *   disjoint from the text output. Partial overlap returns TC_ERROR.
  * - Inputs stay unchanged for the duration of the call.
- * - Decrypt authenticates before releasing plaintext. GCM and CCM leave a
- *   separate output untouched and wipe in-place ciphertext on a tag mismatch.
- *   EAX leaves both kinds of output untouched on authentication failure.
+ * - Decrypt authenticates before releasing plaintext. GCM, CCM, EAX and EAX'
+ *   leave a separate output untouched and wipe in-place ciphertext on a tag
+ *   mismatch.
  */
 
 #if TC_AES_ENABLE_GCM
@@ -235,8 +235,11 @@ TC_status TC_AES_CCM_decrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, T
 
 #if TC_AES_ENABLE_EAX
 
-/* EAX one-shot AEAD. Tags must be TC_AES_EAX_MIN_TAG_LEN..16. Auth failure
- * leaves plaintext untouched. */
+/* EAX one-shot AEAD. Tags must be TC_AES_EAX_MIN_TAG_LEN..16. Other tag
+ * lengths return TC_ERROR. TC_AES_EAX_MIN_TAG_LEN must be in 1..16. Auth
+ * failure returns TC_MISMATCH and leaves a separate plaintext buffer
+ * untouched. Any decrypt failure after argument checks wipes in-place
+ * ciphertext. */
 TC_status TC_AES_EAX_encrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes plaintext,
                              TC_buffer ciphertext, TC_buffer tag);
 TC_status TC_AES_EAX_decrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes ciphertext,
@@ -248,7 +251,9 @@ TC_status TC_AES_EAX_decrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, T
 
 #define TC_AES_EAX_PRIME_TAG_LEN 4
 
-/* ANSI C12.22 EAX'. Fixed four-byte tag. Auth failure leaves output untouched. */
+/* ANSI C12.22 EAX'. Fixed four-byte tag. Auth failure returns TC_MISMATCH
+ * and leaves a separate plaintext buffer untouched. Any decrypt failure after
+ * argument checks wipes in-place ciphertext. */
 TC_status TC_AES_EAX_PRIME_encrypt(const uint8_t* key, TC_bytes cleartext, TC_bytes plaintext,
                                    TC_buffer ciphertext, uint8_t tag[TC_AES_EAX_PRIME_TAG_LEN]);
 TC_status TC_AES_EAX_PRIME_decrypt(const uint8_t* key, TC_bytes cleartext, TC_bytes ciphertext,
@@ -293,6 +298,8 @@ struct TC_AES_CMAC_ctx {
   uint8_t active;
 };
 
+/* The key must be disjoint from the whole context. Overlap returns TC_ERROR
+ * and leaves the context cleared. */
 TC_status TC_AES_CMAC_init(struct TC_AES_CMAC_ctx* ctx, const uint8_t* key);
 TC_status TC_AES_CMAC_update(struct TC_AES_CMAC_ctx* ctx, const uint8_t* data, size_t len);
 TC_status TC_AES_CMAC_final(struct TC_AES_CMAC_ctx* ctx, uint8_t tag[TC_AES_CMAC_TAG_MAX]);

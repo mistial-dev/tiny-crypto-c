@@ -303,6 +303,39 @@ static MunitResult test_eax_api(const MunitParameter params[], void* data)
                    ==, TC_MISMATCH);
   munit_assert_memory_equal(sizeof(bad), bad, untouched);
 
+  /* An in-place mismatch wipes the forged ciphertext, as GCM and CCM do. */
+  memcpy(bad, ciphertext, sizeof(ciphertext));
+  memset(untouched, 0, sizeof(untouched));
+  munit_assert_int(TC_AES_EAX_decrypt(key, (TC_bytes){nonce, sizeof(nonce)},
+                                      (TC_bytes){aad, sizeof(aad)}, (TC_bytes){bad, sizeof(bad)},
+                                      (TC_bytes){bad_tag, sizeof(bad_tag)},
+                                      (TC_buffer){bad, sizeof(bad)}),
+                   ==, TC_MISMATCH);
+  munit_assert_memory_equal(sizeof(bad), bad, untouched);
+
+  /* A zero-length tag never authenticates. Tag length errors are argument
+   * errors, so an in-place buffer keeps its ciphertext. */
+  memset(bad, 0xa5, sizeof(bad));
+  memset(untouched, 0xa5, sizeof(untouched));
+  munit_assert_int(TC_AES_EAX_decrypt(key, (TC_bytes){nonce, sizeof(nonce)},
+                                      (TC_bytes){aad, sizeof(aad)},
+                                      (TC_bytes){ciphertext, sizeof(ciphertext)},
+                                      (TC_bytes){tag, 0}, (TC_buffer){bad, sizeof(ciphertext)}),
+                   ==, TC_ERROR);
+  munit_assert_memory_equal(sizeof(bad), bad, untouched);
+  memcpy(bad, ciphertext, sizeof(ciphertext));
+  munit_assert_int(TC_AES_EAX_decrypt(key, (TC_bytes){nonce, sizeof(nonce)},
+                                      (TC_bytes){aad, sizeof(aad)}, (TC_bytes){bad, sizeof(bad)},
+                                      (TC_bytes){tag, 0}, (TC_buffer){bad, sizeof(bad)}),
+                   ==, TC_ERROR);
+  munit_assert_memory_equal(sizeof(bad), bad, ciphertext);
+  munit_assert_int(TC_AES_EAX_decrypt(key, (TC_bytes){nonce, sizeof(nonce)},
+                                      (TC_bytes){aad, sizeof(aad)}, (TC_bytes){bad, sizeof(bad)},
+                                      (TC_bytes){tag, TC_AES_EAX_MIN_TAG_LEN - 1u},
+                                      (TC_buffer){bad, sizeof(bad)}),
+                   ==, TC_ERROR);
+  munit_assert_memory_equal(sizeof(bad), bad, ciphertext);
+
   bad[0] = ciphertext[0] ^ 1;
   memcpy(bad + 1, ciphertext + 1, sizeof(ciphertext) - 1);
   munit_assert_int(TC_AES_EAX_decrypt(key, (TC_bytes){nonce, sizeof(nonce)},
@@ -668,6 +701,15 @@ static MunitResult test_eax_prime_c12_22(const MunitParameter params[], void* da
                    ==, TC_MISMATCH);
   for (size_t i = 0; i < sizeof(decrypted); ++i)
     munit_assert_uint(decrypted[i], ==, 0xa5);
+
+  /* An in-place mismatch wipes the forged ciphertext. */
+  memcpy(decrypted, ciphertext, sizeof(ciphertext));
+  munit_assert_int(TC_AES_EAX_PRIME_decrypt(key, (TC_bytes){cleartext, sizeof(cleartext)},
+                                            (TC_bytes){decrypted, sizeof(decrypted)}, bad_tag,
+                                            (TC_buffer){decrypted, sizeof(decrypted)}),
+                   ==, TC_MISMATCH);
+  for (size_t i = 0; i < sizeof(decrypted); ++i)
+    munit_assert_uint(decrypted[i], ==, 0);
 
   ciphertext[0] ^= 1;
   memset(decrypted, 0xa5, sizeof(decrypted));

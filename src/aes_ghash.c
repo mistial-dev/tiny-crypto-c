@@ -159,6 +159,8 @@ void tc_aes_gcm_ghash_block(struct TC_AES_GCM_ctx* ctx, const uint8_t* block)
   for (i = 0; i < TC_AES_BLOCKLEN; ++i)
     value[i] = (uint8_t)(ctx->S[i] ^ block[i]);
   tc_aes_gcm_multiply(ctx->S, value, ctx);
+  /* S xor block depends on H. Wipe it so it does not outlive the call. */
+  TC_secure_zero(value, sizeof(value));
 }
 
 void tc_aes_gcm_hash_bytes(struct TC_AES_GCM_ctx* ctx, const uint8_t* data, size_t length)

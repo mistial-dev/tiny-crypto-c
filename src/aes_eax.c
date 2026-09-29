@@ -75,8 +75,8 @@ static TC_status tc_aes_eax_crypt(const uint8_t* key, TC_bytes nonce, TC_bytes a
 
   if (key == NULL || !tc_internal_span_valid(nonce.data, nonce.length) ||
       !tc_internal_span_valid(aad.data, aad.length) || !tc_aes_text_ok(input_span, output_span) ||
-      (expected_tag == NULL && output_tag == NULL) || tag_len < TC_AES_EAX_MIN_TAG_LEN ||
-      tag_len > TC_AES_BLOCKLEN ||
+      (expected_tag == NULL && output_tag == NULL) || tag_len == 0 ||
+      tag_len < TC_AES_EAX_MIN_TAG_LEN || tag_len > TC_AES_BLOCKLEN ||
       !tc_internal_ranges_disjoint(output, input_len,
                                    decrypt ? (const void*)expected_tag : (const void*)output_tag,
                                    tag_len))
@@ -114,7 +114,10 @@ static TC_status tc_aes_eax_crypt(const uint8_t* key, TC_bytes nonce, TC_bytes a
   }
 
 done:
-  if (status != TC_OK && output_started && input_len != 0)
+  /* On failure, wipe any output already written. Decrypt writes nothing
+   * before the tag verifies, so a separate output stays untouched. In-place
+   * output still holds the rejected ciphertext and is wiped too. */
+  if (status != TC_OK && (output_started || (decrypt && output == input)) && input_len != 0)
     TC_secure_zero(output, input_len);
 #if TC_ZEROIZE
   TC_secure_zero(&st, sizeof(st));
@@ -203,7 +206,10 @@ static TC_status tc_aes_eax_prime_crypt(const uint8_t* key, TC_bytes cleartext, 
   }
 
 done:
-  if (status != TC_OK && output_started && input_len != 0)
+  /* On failure, wipe any output already written. Decrypt writes nothing
+   * before the tag verifies, so a separate output stays untouched. In-place
+   * output still holds the rejected ciphertext and is wiped too. */
+  if (status != TC_OK && (output_started || (decrypt && output == input)) && input_len != 0)
     TC_secure_zero(output, input_len);
 #if TC_ZEROIZE
   TC_secure_zero(&st, sizeof(st));

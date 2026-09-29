@@ -113,8 +113,11 @@ TC_status TC_AES_CMAC_init(struct TC_AES_CMAC_ctx* ctx, const uint8_t* key)
 {
   if (!ctx)
     return TC_ERROR;
+  /* Check the whole context before clearing it. Clearing first would wipe a
+   * key staged in k1, k2, mac or buf and then key the context with zeros. */
+  const int disjoint = tc_internal_ranges_disjoint(ctx, sizeof *ctx, key, TC_AES_KEYLEN);
   TC_AES_CMAC_ctx_clear(ctx);
-  if (TC_AES_key_init(&ctx->key, key) != TC_OK)
+  if (!disjoint || TC_AES_key_init(&ctx->key, key) != TC_OK)
     return TC_ERROR;
   if (tc_aes_cmac_generate_subkeys(ctx->key.round_key, TC_AES_FIXED_ROUNDS, ctx->k1, ctx->k2) !=
       TC_OK) {

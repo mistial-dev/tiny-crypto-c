@@ -91,6 +91,14 @@ add_test(NAME test_package_boundaries
       -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
       -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/invalid-ocsp-profile
       -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/reject_ocsp_without_sha1.cmake)
+  if(NOT MSVC)
+    add_test(NAME test_reject_tag_length_config
+      COMMAND ${CMAKE_COMMAND}
+        -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+        -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/tag-length-config
+        -DC_COMPILER=${CMAKE_C_COMPILER}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/reject_tag_length_config.cmake)
+  endif()
 
   # µunit uses C11 atomics when Clang exposes them in C99 mode. Keep the
   # vendored source unchanged and suppress that extension warning locally.
