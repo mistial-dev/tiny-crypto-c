@@ -3842,8 +3842,10 @@ static MunitResult revocations(const MunitParameter params[], void* user)
               TC_X509_revocation_status applied_status;
               const size_t signature_calls = probe.calls;
               work = TRUST_WORK_BUDGET;
-              munit_assert_int(tc_x509_crl_apply(&preferred, &query, &updated.at, &limits, &tree,
-                                                 &names, oids, EXTENSION_CAPACITY, &applied),
+              munit_assert_int(tc_x509_crl_apply(&preferred, &query, &updated.at,
+                                                 &(tc_x509_crl_decode){&limits, &tree, &names, oids,
+                                                                       EXTENSION_CAPACITY},
+                                                 &applied),
                                ==, TC_TLV_OK);
               const size_t apply_work = TRUST_WORK_BUDGET - work;
               munit_assert_size(probe.calls, ==, signature_calls);
@@ -3853,25 +3855,33 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                revoked && reasons[i] != 8 ? TC_X509_CRL_REVOKED
                                                           : TC_X509_CRL_UNREVOKED);
               const TC_X509_crl_evidence completed = applied;
-              munit_assert_int(tc_x509_crl_apply(&preferred, &query, &updated.at, &limits, &tree,
-                                                 &names, oids, EXTENSION_CAPACITY, &applied),
+              munit_assert_int(tc_x509_crl_apply(&preferred, &query, &updated.at,
+                                                 &(tc_x509_crl_decode){&limits, &tree, &names, oids,
+                                                                       EXTENSION_CAPACITY},
+                                                 &applied),
                                ==, TC_TLV_END);
               munit_assert_memory_equal(sizeof applied, &applied, &completed);
               applied = empty;
               work = apply_work - 1;
-              munit_assert_int(tc_x509_crl_apply(&preferred, &query, &updated.at, &limits, &tree,
-                                                 &names, oids, EXTENSION_CAPACITY, &applied),
+              munit_assert_int(tc_x509_crl_apply(&preferred, &query, &updated.at,
+                                                 &(tc_x509_crl_decode){&limits, &tree, &names, oids,
+                                                                       EXTENSION_CAPACITY},
+                                                 &applied),
                                ==, TC_TLV_LIMIT);
               munit_assert_memory_equal(sizeof applied, &applied, &empty);
               work = apply_work;
-              munit_assert_int(tc_x509_crl_apply(&preferred, &query, &updated.at, &limits, &tree,
-                                                 &names, oids, EXTENSION_CAPACITY, &applied),
+              munit_assert_int(tc_x509_crl_apply(&preferred, &query, &updated.at,
+                                                 &(tc_x509_crl_decode){&limits, &tree, &names, oids,
+                                                                       EXTENSION_CAPACITY},
+                                                 &applied),
                                ==, TC_TLV_OK);
               munit_assert_size(work, ==, 0);
               applied = empty;
               work = TRUST_WORK_BUDGET;
-              munit_assert_int(tc_x509_crl_apply(&preferred, &query, &delta.next_update, &limits,
-                                                 &tree, &names, oids, EXTENSION_CAPACITY, &applied),
+              munit_assert_int(tc_x509_crl_apply(&preferred, &query, &delta.next_update,
+                                                 &(tc_x509_crl_decode){&limits, &tree, &names, oids,
+                                                                       EXTENSION_CAPACITY},
+                                                 &applied),
                                ==, TC_TLV_END);
               munit_assert_memory_equal(sizeof applied, &applied, &empty);
             }

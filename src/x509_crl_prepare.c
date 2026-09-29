@@ -184,10 +184,12 @@ TC_TLV_result TC_X509_crl_prepare_step(TC_X509_crl_job* job, size_t max_entries,
                                       job->workspace.parsing.frame_capacity, work};
   int done = 0;
   if (job->phase == CRL_JOB_SCANNING) {
-    result = tc_x509_crl_source_scan_step(&job->scan, max_entries, job->workspace.entry,
-                                          &job->options.parsing, &tree, &job->workspace.names,
-                                          job->workspace.parsing.extension_oids,
-                                          job->workspace.parsing.extension_capacity, &done);
+    result = tc_x509_crl_source_scan_step(
+        &job->scan, max_entries, job->workspace.entry,
+        &(tc_x509_crl_decode){&job->options.parsing, &tree, &job->workspace.names,
+                              job->workspace.parsing.extension_oids,
+                              job->workspace.parsing.extension_capacity},
+        &done);
     if (result == TC_TLV_OK && done)
       job->phase = CRL_JOB_HASHING;
   }

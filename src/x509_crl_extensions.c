@@ -78,13 +78,18 @@ TC_TLV_result tc_x509_crl_fresh_at(const TC_X509_crl* crl, const TC_X509_time* a
   return TC_TLV_OK;
 }
 
-TC_TLV_result
-tc_x509_crl_coverage_at(const TC_X509_crl* crl, const TC_X509_crl_extensions* extensions,
-                        const TC_X509_time* at, const tc_pki_distribution_point* point,
-                        TC_bytes certificate_issuer, int certificate_ca,
-                        const TC_TLV_limits* limits, const tc_pki_tree_workspace* tree,
-                        const TC_X509_name_workspace* names, tc_x509_crl_coverage* out)
+TC_TLV_result tc_x509_crl_coverage_at(const TC_X509_crl* crl,
+                                      const TC_X509_crl_extensions* extensions,
+                                      const TC_X509_time* at,
+                                      const tc_pki_distribution_point* point,
+                                      TC_bytes certificate_issuer, int certificate_ca,
+                                      const tc_x509_crl_decode* decode, tc_x509_crl_coverage* out)
 {
+  if (!decode)
+    return TC_TLV_ARGUMENT;
+  const TC_TLV_limits* limits = decode->limits;
+  const tc_pki_tree_workspace* tree = decode->tree;
+  const TC_X509_name_workspace* names = decode->names;
   tc_x509_crl_coverage coverage = {0};
   TC_TLV_result result;
   if (!crl || !extensions || !at || !point || !limits || !tree || !tree->work || !names || !out ||
@@ -101,8 +106,8 @@ tc_x509_crl_coverage_at(const TC_X509_crl* crl, const TC_X509_crl_extensions* ex
   if (coverage.freshness == TC_X509_CRL_CURRENT) {
     const TC_X509_crl_distribution* idp =
         extensions->present & TC_X509_CRL_EXT_DISTRIBUTION ? &extensions->distribution : NULL;
-    result = tc_x509_crl_scope_reasons(crl, idp, point, certificate_issuer, certificate_ca, limits,
-                                       tree, names, &coverage.reasons);
+    result = tc_x509_crl_scope_reasons(crl, idp, point, certificate_issuer, certificate_ca, decode,
+                                       &coverage.reasons);
     if (result != TC_TLV_OK)
       return result;
   }
@@ -113,10 +118,13 @@ tc_x509_crl_coverage_at(const TC_X509_crl* crl, const TC_X509_crl_extensions* ex
 TC_TLV_result tc_x509_crl_scope_reasons(const TC_X509_crl* crl, const TC_X509_crl_distribution* idp,
                                         const tc_pki_distribution_point* point,
                                         TC_bytes certificate_issuer, int certificate_ca,
-                                        const TC_TLV_limits* limits,
-                                        const tc_pki_tree_workspace* tree,
-                                        const TC_X509_name_workspace* names, uint16_t* out)
+                                        const tc_x509_crl_decode* decode, uint16_t* out)
 {
+  if (!decode)
+    return TC_TLV_ARGUMENT;
+  const TC_TLV_limits* limits = decode->limits;
+  const tc_pki_tree_workspace* tree = decode->tree;
+  const TC_X509_name_workspace* names = decode->names;
   TC_TLV_result result;
   int matched;
   uint16_t reasons = TC_X509_CRL_ALL_REASONS;
@@ -455,9 +463,11 @@ static TC_TLV_result crl_extension_value(void* context, const TC_X509_extension*
 {
   crl_extension_context* state = context;
   const unsigned id = tc_pki_extension_id(extension);
-  const int number = !state->entry && (id == TC_PKI_EXT_CRL_NUMBER || id == TC_PKI_EXT_DELTA_CRL_INDICATOR);
+  const int number =
+      !state->entry && (id == TC_PKI_EXT_CRL_NUMBER || id == TC_PKI_EXT_DELTA_CRL_INDICATOR);
   const int authority = !state->entry && id == TC_PKI_EXT_AUTHORITY_KEY_IDENTIFIER;
-  const int names = state->entry ? id == TC_PKI_EXT_CERTIFICATE_ISSUER : id == TC_PKI_EXT_ISSUER_ALT_NAME;
+  const int names =
+      state->entry ? id == TC_PKI_EXT_CERTIFICATE_ISSUER : id == TC_PKI_EXT_ISSUER_ALT_NAME;
   TC_X509_crl_extensions* info = state->info;
   tc_x509_crl_entry_info* entry_info = state->entry_info;
   if (entry_info) {

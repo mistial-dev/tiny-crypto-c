@@ -7,6 +7,18 @@
 #include "pki_names_internal.h"
 #include "pki_distribution_internal.h"
 
+/* Decoding resources shared by CRL entry, scope and evidence checks. tree
+ * holds the frames and work budget. oids holds up to oid_capacity extension
+ * OIDs for duplicate detection and may be NULL/0 where no extensions are read.
+ * All storage is caller scratch and may change on failure. */
+typedef struct {
+  const TC_TLV_limits* limits;
+  const tc_pki_tree_workspace* tree;
+  const TC_X509_name_workspace* names;
+  TC_bytes* oids;
+  size_t oid_capacity;
+} tc_x509_crl_decode;
+
 /* Compare authenticated signed content, including source-backed records. */
 TC_TLV_result tc_x509_crl_content_equal(const TC_X509_crl* left, const TC_X509_crl* right,
                                         size_t* work, int* equal);
@@ -144,19 +156,17 @@ TC_TLV_result tc_x509_crl_combine(const TC_X509_crl_match* base, const TC_X509_c
  * supports good status only after signature, scope and freshness checks.
  * Parsed/disjoint inputs, provisional scratch/work, output only on OK. */
 TC_TLV_result tc_x509_crl_find(const TC_X509_crl* crl, const TC_X509_crl_extensions* extensions,
-                               const TC_X509_certificate* certificate, const TC_TLV_limits* limits,
-                               const tc_pki_tree_workspace* tree,
-                               const TC_X509_name_workspace* names, TC_bytes* oids, size_t capacity,
-                               TC_X509_crl_match* out);
+                               const TC_X509_certificate* certificate,
+                               const tc_x509_crl_decode* decode, TC_X509_crl_match* out);
 /* Base/delta pairing (5.2.4, 6.3.3(c)): issuer, IDP, AKID and number range.
  * AKIDs may be absent on both sides. Signatures must still bind both CRLs to
  * the same validated key. Freshness is checked separately. Parsed/disjoint input
  * contract. compatible changes only on OK. Scratch/work are provisional. */
-TC_TLV_result
-tc_x509_crl_delta_compatible(const TC_X509_crl* base, const TC_X509_crl_extensions* base_info,
-                             const TC_X509_crl* delta, const TC_X509_crl_extensions* delta_info,
-                             const TC_TLV_limits* limits, const tc_pki_tree_workspace* tree,
-                             const TC_X509_name_workspace* names, int* compatible);
+TC_TLV_result tc_x509_crl_delta_compatible(const TC_X509_crl* base,
+                                           const TC_X509_crl_extensions* base_info,
+                                           const TC_X509_crl* delta,
+                                           const TC_X509_crl_extensions* delta_info,
+                                           const tc_x509_crl_decode* decode, int* compatible);
 /* Compare issuer names and issuingDistributionPoint encodings/presence.
  * Key identity, authority hints, extension policy and freshness are separate.
  * Parsed/disjoint inputs. equal changes only on OK. Scratch/work are provisional. */
@@ -226,9 +236,7 @@ typedef struct {
  * OK. Work and scratch are provisional. END means no new eligible coverage. */
 TC_TLV_result tc_x509_crl_apply(const tc_x509_crl_selected* selected,
                                 const tc_x509_crl_query* query, const TC_X509_time* at,
-                                const TC_TLV_limits* limits, const tc_pki_tree_workspace* tree,
-                                const TC_X509_name_workspace* names, TC_bytes* oids,
-                                size_t oid_capacity, TC_X509_crl_evidence* evidence);
+                                const tc_x509_crl_decode* decode, TC_X509_crl_evidence* evidence);
 /* Zero-initialize evidence. Add only selected, authenticated, current and
  * applicable CRLs. Combine base/delta results first. Only newly covered reasons
  * contribute (RFC 5280 6.3.3(e)). END means status is already determined.
@@ -250,9 +258,7 @@ TC_TLV_result tc_x509_crl_evidence_equal(const TC_X509_crl_evidence* left,
 TC_TLV_result tc_x509_crl_scope_reasons(const TC_X509_crl* crl, const TC_X509_crl_distribution* idp,
                                         const tc_pki_distribution_point* point,
                                         TC_bytes certificate_issuer, int certificate_ca,
-                                        const TC_TLV_limits* limits,
-                                        const tc_pki_tree_workspace* tree,
-                                        const TC_X509_name_workspace* names, uint16_t* out);
+                                        const tc_x509_crl_decode* decode, uint16_t* out);
 typedef struct {
   tc_x509_crl_freshness freshness;
   uint16_t reasons;
@@ -261,12 +267,12 @@ typedef struct {
  * checks. Noncurrent CRLs contribute zero. Authenticate the CRL before adding
  * these reasons to coverage. A delta also needs a validated compatible base.
  * Parsed inputs/scratch/out are disjoint. Output changes only on OK. */
-TC_TLV_result
-tc_x509_crl_coverage_at(const TC_X509_crl* crl, const TC_X509_crl_extensions* extensions,
-                        const TC_X509_time* at, const tc_pki_distribution_point* point,
-                        TC_bytes certificate_issuer, int certificate_ca,
-                        const TC_TLV_limits* limits, const tc_pki_tree_workspace* tree,
-                        const TC_X509_name_workspace* names, tc_x509_crl_coverage* out);
+TC_TLV_result tc_x509_crl_coverage_at(const TC_X509_crl* crl,
+                                      const TC_X509_crl_extensions* extensions,
+                                      const TC_X509_time* at,
+                                      const tc_pki_distribution_point* point,
+                                      TC_bytes certificate_issuer, int certificate_ca,
+                                      const tc_x509_crl_decode* decode, tc_x509_crl_coverage* out);
 
 /* Scalar outputs change only on OK. Input/output must be disjoint.
  * Nonnegative INTEGER contents include sign padding, with no width truncation. */
@@ -310,32 +316,23 @@ TC_TLV_result tc_x509_crl_selected_path(const tc_x509_crl_selected* selected,
 /* Reason coverage a selected CRL pair adds for query. */
 TC_TLV_result tc_x509_crl_selected_coverage(const tc_x509_crl_selected* selected,
                                             const tc_x509_crl_query* query, const TC_X509_time* at,
-                                            const TC_TLV_limits* limits,
-                                            const tc_pki_tree_workspace* tree,
-                                            const TC_X509_name_workspace* names,
+                                            const tc_x509_crl_decode* decode,
                                             const TC_X509_crl_evidence* evidence,
                                             tc_x509_crl_coverage* coverage);
 /* Apply a selected CRL pair's entries for certificate to evidence. */
 TC_TLV_result tc_x509_crl_selected_evidence(const tc_x509_crl_selected* selected,
                                             const TC_X509_certificate* certificate,
-                                            uint16_t reasons, const TC_TLV_limits* limits,
-                                            const tc_pki_tree_workspace* tree,
-                                            const TC_X509_name_workspace* names, TC_bytes* oids,
-                                            size_t oid_capacity, TC_X509_crl_evidence* evidence);
+                                            uint16_t reasons, const tc_x509_crl_decode* decode,
+                                            TC_X509_crl_evidence* evidence);
 /* Verify a selected CRL pair's signatures under signer. */
 TC_TLV_result tc_x509_crl_selected_authenticate(const tc_x509_crl_selected* selected,
                                                 const TC_X509_certificate* signer,
                                                 const TC_X509_signature_provider* provider,
-                                                const TC_TLV_limits* limits,
-                                                const tc_pki_tree_workspace* tree,
-                                                const TC_X509_name_workspace* names);
+                                                const tc_x509_crl_decode* decode);
 /* Look up certificate in an authenticated selected CRL pair. */
 TC_TLV_result tc_x509_crl_selected_lookup(const tc_x509_crl_selected* selected,
                                           const TC_X509_certificate* certificate,
-                                          const TC_TLV_limits* limits,
-                                          const tc_pki_tree_workspace* tree,
-                                          const TC_X509_name_workspace* names, TC_bytes* oids,
-                                          size_t capacity, TC_X509_crl_match* out);
+                                          const tc_x509_crl_decode* decode, TC_X509_crl_match* out);
 /* The CRL signer key after issuer and usage checks. */
 TC_TLV_result tc_x509_crl_signer_key(const TC_X509_crl* crl, const TC_X509_certificate* signer,
                                      const TC_TLV_limits* limits,

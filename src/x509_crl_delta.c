@@ -33,8 +33,9 @@ TC_TLV_result tc_x509_crl_delta_next(const TC_X509_crl_index* index, size_t base
         !(delta->extensions.present & TC_X509_CRL_EXT_DELTA))
       continue;
     int compatible;
-    result = tc_x509_crl_delta_compatible(&complete->crl, &complete->extensions, &delta->crl,
-                                          &delta->extensions, limits, tree, names, &compatible);
+    result = tc_x509_crl_delta_compatible(
+        &complete->crl, &complete->extensions, &delta->crl, &delta->extensions,
+        &(tc_x509_crl_decode){limits, tree, names, NULL, 0}, &compatible);
     if (result != TC_TLV_OK)
       return result;
     if (!compatible)
@@ -327,8 +328,10 @@ TC_TLV_result tc_x509_crl_scope_evaluate(const tc_x509_crl_scope_context* scope,
     if (conflict)
       return TC_TLV_INVALID;
     TC_X509_crl_evidence candidate = {0};
-    result = tc_x509_crl_apply(&selected, query, at, cache->limits, tree, cache->names, scope->oids,
-                               scope->oid_capacity, &candidate);
+    result = tc_x509_crl_apply(
+        &selected, query, at,
+        &(tc_x509_crl_decode){cache->limits, tree, cache->names, scope->oids, scope->oid_capacity},
+        &candidate);
     if (result == TC_TLV_END)
       continue;
     if (result != TC_TLV_OK)

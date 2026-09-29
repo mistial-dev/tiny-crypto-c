@@ -89,8 +89,6 @@ TC_TLV_result tc_x509_crl_source_scan_init(tc_source_reader* reader,
 /* Process at most max_entries; work and I/O limits bound each call further.
  * Failure makes the scan terminal. complete changes only on success. */
 TC_TLV_result tc_x509_crl_source_scan_step(tc_x509_crl_source_scan* scan, size_t max_entries,
-                                           TC_buffer scratch, const TC_TLV_limits* limits,
-                                           const tc_pki_tree_workspace* tree,
-                                           const TC_X509_name_workspace* names, TC_bytes* oids,
-                                           size_t capacity, int* complete);
+                                           TC_buffer scratch, const tc_x509_crl_decode* decode,
+                                           int* complete);
 #endif

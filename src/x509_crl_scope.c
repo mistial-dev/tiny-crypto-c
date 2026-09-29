@@ -253,9 +253,10 @@ TC_TLV_result tc_x509_crl_scopes(const void* candidates, tc_x509_crl_search sear
                 ? &record->extensions.distribution
                 : NULL;
         /* Defer freshness checks until a delta has been selected. */
-        result = tc_x509_crl_scope_reasons(&record->crl, distribution, current_query.point,
-                                           query->certificate->issuer, current_query.certificate_ca,
-                                           &options->parsing, tree, &validation->names, &reasons);
+        result = tc_x509_crl_scope_reasons(
+            &record->crl, distribution, current_query.point, query->certificate->issuer,
+            current_query.certificate_ca,
+            &(tc_x509_crl_decode){&options->parsing, tree, &validation->names, NULL, 0}, &reasons);
         if (result == TC_TLV_OK && !(reasons & ~pending.reasons))
           result = TC_TLV_END;
         if (result == TC_TLV_OK && all_scopes && processing.scopes &&

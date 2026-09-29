@@ -798,8 +798,9 @@ static MunitResult source_batch(const MunitParameter params[], void* user)
     unsigned steps = 0;
     while (!complete && result == TC_TLV_OK) {
       work = WORK_BUDGET;
-      result = tc_x509_crl_source_scan_step(&scan, 1, (TC_buffer){scratch, sizeof scratch}, &limits,
-                                            &tree, &names, oids, 2, &complete);
+      result = tc_x509_crl_source_scan_step(&scan, 1, (TC_buffer){scratch, sizeof scratch},
+                                            &(tc_x509_crl_decode){&limits, &tree, &names, oids, 2},
+                                            &complete);
       munit_assert_uint(++steps, <=, 4);
       munit_assert_memory_equal(sizeof output, output, saved);
     }
@@ -819,8 +820,9 @@ static MunitResult source_batch(const MunitParameter params[], void* user)
         certificate.issuer = queries[i].issuer;
         TC_X509_crl_match found;
         work = WORK_BUDGET;
-        munit_assert_int(tc_x509_crl_find(&crl, &extensions, &certificate, &limits, &tree, &names,
-                                          oids, 2, &found),
+        munit_assert_int(tc_x509_crl_find(&crl, &extensions, &certificate,
+                                          &(tc_x509_crl_decode){&limits, &tree, &names, oids, 2},
+                                          &found),
                          ==, TC_TLV_OK);
         munit_assert_int(found.found, ==, output[i].found);
       }
@@ -832,9 +834,10 @@ static MunitResult source_batch(const MunitParameter params[], void* user)
       memset(&found, 0xa5, sizeof found);
       memcpy(&before, &found, sizeof before);
       work = WORK_BUDGET;
-      munit_assert_int(
-          tc_x509_crl_find(&crl, &extensions, &missing, &limits, &tree, &names, oids, 2, &found),
-          ==, TC_TLV_UNSUPPORTED);
+      munit_assert_int(tc_x509_crl_find(&crl, &extensions, &missing,
+                                        &(tc_x509_crl_decode){&limits, &tree, &names, oids, 2},
+                                        &found),
+                       ==, TC_TLV_UNSUPPORTED);
       munit_assert_memory_equal(sizeof found, &found, &before);
       TC_X509_crl_record record = {0};
       record.crl = crl;
@@ -1389,22 +1392,25 @@ static MunitResult delta_pairing(const MunitParameter params[], void* user)
   for (number = 2; number <= 8; ++number) {
     work = WORK_BUDGET;
     compatible = 99;
-    munit_assert_int(tc_x509_crl_delta_compatible(&base, &base_info, &delta, &delta_info, &limits,
-                                                  &tree, &names, &compatible),
+    munit_assert_int(tc_x509_crl_delta_compatible(
+                         &base, &base_info, &delta, &delta_info,
+                         &(tc_x509_crl_decode){&limits, &tree, &names, NULL, 0}, &compatible),
                      ==, TC_TLV_OK);
     munit_assert_int(compatible, ==, number >= minimum && number < newer);
     const size_t required = WORK_BUDGET - work;
     for (size_t budget = 0; budget < required; ++budget) {
       work = budget;
       compatible = 99;
-      munit_assert_int(tc_x509_crl_delta_compatible(&base, &base_info, &delta, &delta_info, &limits,
-                                                    &tree, &names, &compatible),
+      munit_assert_int(tc_x509_crl_delta_compatible(
+                           &base, &base_info, &delta, &delta_info,
+                           &(tc_x509_crl_decode){&limits, &tree, &names, NULL, 0}, &compatible),
                        ==, TC_TLV_LIMIT);
       munit_assert_int(compatible, ==, 99);
     }
     work = required;
-    munit_assert_int(tc_x509_crl_delta_compatible(&base, &base_info, &delta, &delta_info, &limits,
-                                                  &tree, &names, &compatible),
+    munit_assert_int(tc_x509_crl_delta_compatible(
+                         &base, &base_info, &delta, &delta_info,
+                         &(tc_x509_crl_decode){&limits, &tree, &names, NULL, 0}, &compatible),
                      ==, TC_TLV_OK);
     munit_assert_size(work, ==, 0);
   }
@@ -1475,9 +1481,10 @@ static MunitResult delta_pairing(const MunitParameter params[], void* user)
     }
     work = WORK_BUDGET;
     compatible = 99;
-    munit_assert_int(
-        tc_x509_crl_delta_compatible(&base, &a, &delta, &b, &limits, &tree, &names, &compatible),
-        ==, change == UNKNOWN_CRITICAL ? TC_TLV_UNSUPPORTED : TC_TLV_OK);
+    munit_assert_int(tc_x509_crl_delta_compatible(
+                         &base, &a, &delta, &b,
+                         &(tc_x509_crl_decode){&limits, &tree, &names, NULL, 0}, &compatible),
+                     ==, change == UNKNOWN_CRITICAL ? TC_TLV_UNSUPPORTED : TC_TLV_OK);
     munit_assert_int(compatible, ==, change == UNKNOWN_CRITICAL ? 99 : expected[change]);
   }
   /* Twenty magnitude octets plus DER's leading sign octet. */
@@ -1486,8 +1493,9 @@ static MunitResult delta_pairing(const MunitParameter params[], void* user)
   base_info.number = delta_info.base_number = (TC_bytes){large, sizeof large};
   delta_info.number = (TC_bytes){larger, sizeof larger};
   work = WORK_BUDGET;
-  munit_assert_int(tc_x509_crl_delta_compatible(&base, &base_info, &delta, &delta_info, &limits,
-                                                &tree, &names, &compatible),
+  munit_assert_int(tc_x509_crl_delta_compatible(
+                       &base, &base_info, &delta, &delta_info,
+                       &(tc_x509_crl_decode){&limits, &tree, &names, NULL, 0}, &compatible),
                    ==, TC_TLV_OK);
   munit_assert_int(compatible, ==, 1);
   return MUNIT_OK;
@@ -1696,9 +1704,10 @@ static MunitResult issuer_inheritance(const MunitParameter params[], void* user)
     certificate.serial = (TC_bytes){&serial, 1};
     certificate.issuer = (TC_bytes){query_name, sizeof query_name};
     work = WORK_BUDGET;
-    munit_assert_int(
-        tc_x509_crl_find(&crl, &info, &certificate, &limits, &tree, &scan_names, oids, 2, &found),
-        ==, TC_TLV_OK);
+    munit_assert_int(tc_x509_crl_find(&crl, &info, &certificate,
+                                      &(tc_x509_crl_decode){&limits, &tree, &scan_names, oids, 2},
+                                      &found),
+                     ==, TC_TLV_OK);
     munit_assert_int(found.found, ==, query < 5);
     if (found.found) {
       munit_assert_uint(found.reason, ==, 0);
@@ -1710,23 +1719,26 @@ static MunitResult issuer_inheritance(const MunitParameter params[], void* user)
       for (size_t budget = 0; budget < required; ++budget) {
         work = budget;
         found = unchanged;
-        munit_assert_int(tc_x509_crl_find(&crl, &info, &certificate, &limits, &tree, &scan_names,
-                                          oids, 2, &found),
-                         ==, TC_TLV_LIMIT);
+        munit_assert_int(
+            tc_x509_crl_find(&crl, &info, &certificate,
+                             &(tc_x509_crl_decode){&limits, &tree, &scan_names, oids, 2}, &found),
+            ==, TC_TLV_LIMIT);
         munit_assert_memory_equal(sizeof found, &found, &unchanged);
       }
       work = required;
-      munit_assert_int(
-          tc_x509_crl_find(&crl, &info, &certificate, &limits, &tree, &scan_names, oids, 2, &found),
-          ==, TC_TLV_OK);
+      munit_assert_int(tc_x509_crl_find(&crl, &info, &certificate,
+                                        &(tc_x509_crl_decode){&limits, &tree, &scan_names, oids, 2},
+                                        &found),
+                       ==, TC_TLV_OK);
       munit_assert_size(work, ==, 0);
       enum { ENTRY_TIME_TAG_OFFSET = 5 };
       list.bytes[last_entry_offset + ENTRY_TIME_TAG_OFFSET] = 0x16;
       work = WORK_BUDGET;
       found = unchanged;
-      munit_assert_int(
-          tc_x509_crl_find(&crl, &info, &certificate, &limits, &tree, &scan_names, oids, 2, &found),
-          ==, TC_TLV_INVALID);
+      munit_assert_int(tc_x509_crl_find(&crl, &info, &certificate,
+                                        &(tc_x509_crl_decode){&limits, &tree, &scan_names, oids, 2},
+                                        &found),
+                       ==, TC_TLV_INVALID);
       munit_assert_memory_equal(sizeof found, &found, &unchanged);
       list.bytes[last_entry_offset + ENTRY_TIME_TAG_OFFSET] = 0x17;
     }
@@ -1743,9 +1755,10 @@ static MunitResult issuer_inheritance(const MunitParameter params[], void* user)
   duplicate.issuer = (TC_bytes){duplicate_name, sizeof duplicate_name};
   work = WORK_BUDGET;
   found = unchanged;
-  munit_assert_int(
-      tc_x509_crl_find(&crl, &info, &duplicate, &limits, &tree, &scan_names, oids, 2, &found), ==,
-      TC_TLV_INVALID);
+  munit_assert_int(tc_x509_crl_find(&crl, &info, &duplicate,
+                                    &(tc_x509_crl_decode){&limits, &tree, &scan_names, oids, 2},
+                                    &found),
+                   ==, TC_TLV_INVALID);
   munit_assert_memory_equal(sizeof found, &found, &unchanged);
   list.bytes[last_entry_offset + ENTRY_SERIAL_OFFSET] = 5;
   /* Direct CRLs cannot change the entry issuer. Failure leaves the first issuer. */
@@ -2107,22 +2120,25 @@ static MunitResult scope_reasons(const MunitParameter params[], void* user)
         const uint16_t wanted = permitted[type][ca] ? expected[mask] : 0;
         work = WORK_BUDGET;
         uint16_t reasons = SENTINEL;
-        munit_assert_int(tc_x509_crl_scope_reasons(&crl, &idp, &point, crl.issuer, ca, &limits,
-                                                   &tree, &names, &reasons),
+        munit_assert_int(tc_x509_crl_scope_reasons(
+                             &crl, &idp, &point, crl.issuer, ca,
+                             &(tc_x509_crl_decode){&limits, &tree, &names, NULL, 0}, &reasons),
                          ==, TC_TLV_OK);
         munit_assert_uint(reasons, ==, wanted);
         const size_t required = WORK_BUDGET - work;
         for (size_t budget = 0; budget < required; ++budget) {
           work = budget;
           reasons = SENTINEL;
-          munit_assert_int(tc_x509_crl_scope_reasons(&crl, &idp, &point, crl.issuer, ca, &limits,
-                                                     &tree, &names, &reasons),
+          munit_assert_int(tc_x509_crl_scope_reasons(
+                               &crl, &idp, &point, crl.issuer, ca,
+                               &(tc_x509_crl_decode){&limits, &tree, &names, NULL, 0}, &reasons),
                            ==, TC_TLV_LIMIT);
           munit_assert_uint(reasons, ==, SENTINEL);
         }
         work = required;
-        munit_assert_int(tc_x509_crl_scope_reasons(&crl, &idp, &point, crl.issuer, ca, &limits,
-                                                   &tree, &names, &reasons),
+        munit_assert_int(tc_x509_crl_scope_reasons(
+                             &crl, &idp, &point, crl.issuer, ca,
+                             &(tc_x509_crl_decode){&limits, &tree, &names, NULL, 0}, &reasons),
                          ==, TC_TLV_OK);
         munit_assert_size(work, ==, 0);
       }
@@ -2130,8 +2146,9 @@ static MunitResult scope_reasons(const MunitParameter params[], void* user)
   TC_X509_crl_distribution idp = {0};
   uint16_t reasons = SENTINEL;
   work = WORK_BUDGET;
-  munit_assert_int(tc_x509_crl_scope_reasons(&crl, NULL, &point, crl.issuer, 0, &limits, &tree,
-                                             &names, &reasons),
+  munit_assert_int(tc_x509_crl_scope_reasons(&crl, NULL, &point, crl.issuer, 0,
+                                             &(tc_x509_crl_decode){&limits, &tree, &names, NULL, 0},
+                                             &reasons),
                    ==, TC_TLV_OK);
   munit_assert_uint(reasons, ==, TC_X509_CRL_ALL_REASONS);
   idp.has_reasons = 1;
@@ -2139,20 +2156,23 @@ static MunitResult scope_reasons(const MunitParameter params[], void* user)
   point.has_reasons = 1;
   point.reasons = 4;
   work = WORK_BUDGET;
-  munit_assert_int(tc_x509_crl_scope_reasons(&crl, &idp, &point, crl.issuer, 0, &limits, &tree,
-                                             &names, &reasons),
+  munit_assert_int(tc_x509_crl_scope_reasons(&crl, &idp, &point, crl.issuer, 0,
+                                             &(tc_x509_crl_decode){&limits, &tree, &names, NULL, 0},
+                                             &reasons),
                    ==, TC_TLV_OK);
   munit_assert_uint(reasons, ==, 0);
   point.has_reasons = 0;
   work = WORK_BUDGET;
-  munit_assert_int(tc_x509_crl_scope_reasons(&crl, &idp, &point, crl.issuer, 0, &limits, &tree,
-                                             &names, &reasons),
+  munit_assert_int(tc_x509_crl_scope_reasons(&crl, &idp, &point, crl.issuer, 0,
+                                             &(tc_x509_crl_decode){&limits, &tree, &names, NULL, 0},
+                                             &reasons),
                    ==, TC_TLV_OK);
   munit_assert_uint(reasons, ==, 2);
   reasons = SENTINEL;
   work = WORK_BUDGET;
-  munit_assert_int(tc_x509_crl_scope_reasons(&crl, &idp, &point, crl.issuer, 2, &limits, &tree,
-                                             &names, &reasons),
+  munit_assert_int(tc_x509_crl_scope_reasons(&crl, &idp, &point, crl.issuer, 2,
+                                             &(tc_x509_crl_decode){&limits, &tree, &names, NULL, 0},
+                                             &reasons),
                    ==, TC_TLV_ARGUMENT);
   munit_assert_uint(reasons, ==, SENTINEL);
   {
@@ -2184,8 +2204,9 @@ static MunitResult scope_reasons(const MunitParameter params[], void* user)
                                   : ca                                 ? 2
                                                                        : 0;
           work = WORK_BUDGET;
-          munit_assert_int(tc_x509_crl_coverage_at(&crl, &info, &at, &point, crl.issuer, ca,
-                                                   &limits, &tree, &names, &coverage),
+          munit_assert_int(tc_x509_crl_coverage_at(
+                               &crl, &info, &at, &point, crl.issuer, ca,
+                               &(tc_x509_crl_decode){&limits, &tree, &names, NULL, 0}, &coverage),
                            ==, TC_TLV_OK);
           munit_assert_int(coverage.freshness, ==, states[state]);
           munit_assert_uint(coverage.reasons, ==, wanted);
@@ -2193,14 +2214,16 @@ static MunitResult scope_reasons(const MunitParameter params[], void* user)
           for (size_t budget = 0; budget < required; ++budget) {
             work = budget;
             memcpy(&coverage, &saved, sizeof coverage);
-            munit_assert_int(tc_x509_crl_coverage_at(&crl, &info, &at, &point, crl.issuer, ca,
-                                                     &limits, &tree, &names, &coverage),
+            munit_assert_int(tc_x509_crl_coverage_at(
+                                 &crl, &info, &at, &point, crl.issuer, ca,
+                                 &(tc_x509_crl_decode){&limits, &tree, &names, NULL, 0}, &coverage),
                              ==, TC_TLV_LIMIT);
             munit_assert_memory_equal(sizeof coverage, &coverage, &saved);
           }
           work = required;
-          munit_assert_int(tc_x509_crl_coverage_at(&crl, &info, &at, &point, crl.issuer, ca,
-                                                   &limits, &tree, &names, &coverage),
+          munit_assert_int(tc_x509_crl_coverage_at(
+                               &crl, &info, &at, &point, crl.issuer, ca,
+                               &(tc_x509_crl_decode){&limits, &tree, &names, NULL, 0}, &coverage),
                            ==, TC_TLV_OK);
           munit_assert_size(work, ==, 0);
         }
@@ -2208,7 +2231,8 @@ static MunitResult scope_reasons(const MunitParameter params[], void* user)
     work = WORK_BUDGET;
     memcpy(&coverage, &saved, sizeof coverage);
     munit_assert_int(tc_x509_crl_coverage_at(&crl, &info, &crl.this_update, &point, crl.issuer, 0,
-                                             &limits, &tree, &names, &coverage),
+                                             &(tc_x509_crl_decode){&limits, &tree, &names, NULL, 0},
+                                             &coverage),
                      ==, TC_TLV_INVALID);
     munit_assert_memory_equal(sizeof coverage, &coverage, &saved);
     info = (TC_X509_crl_extensions){0};
@@ -2216,14 +2240,16 @@ static MunitResult scope_reasons(const MunitParameter params[], void* user)
     info.unknown_critical_oid = (TC_bytes){unknown_oid, sizeof unknown_oid};
     work = WORK_BUDGET;
     munit_assert_int(tc_x509_crl_coverage_at(&crl, &info, &crl.this_update, &point, crl.issuer, 0,
-                                             &limits, &tree, &names, &coverage),
+                                             &(tc_x509_crl_decode){&limits, &tree, &names, NULL, 0},
+                                             &coverage),
                      ==, TC_TLV_UNSUPPORTED);
     munit_assert_memory_equal(sizeof coverage, &coverage, &saved);
     info.unknown_critical_oid = (TC_bytes){NULL, 0};
     crl.this_update.year = 0;
     work = WORK_BUDGET;
     munit_assert_int(tc_x509_crl_coverage_at(&crl, &info, &crl.next_update, &point, crl.issuer, 0,
-                                             &limits, &tree, &names, &coverage),
+                                             &(tc_x509_crl_decode){&limits, &tree, &names, NULL, 0},
+                                             &coverage),
                      ==, TC_TLV_INVALID);
     munit_assert_memory_equal(sizeof coverage, &coverage, &saved);
   }
@@ -2299,8 +2325,9 @@ static MunitResult name_scope(const MunitParameter params[], void* user)
     munit_assert_size(work, ==, 0);
     uint16_t coverage = 0;
     work = WORK_BUDGET;
-    munit_assert_int(tc_x509_crl_scope_reasons(&crl, &idp, &point, crl.issuer, 0, &limits, &tree,
-                                               &names, &coverage),
+    munit_assert_int(tc_x509_crl_scope_reasons(
+                         &crl, &idp, &point, crl.issuer, 0,
+                         &(tc_x509_crl_decode){&limits, &tree, &names, NULL, 0}, &coverage),
                      ==, TC_TLV_OK);
     munit_assert_uint(coverage, ==, cases[i].match ? TC_X509_CRL_ALL_REASONS : 0);
   }
@@ -2470,8 +2497,9 @@ static MunitResult issuer_linkage(const MunitParameter params[], void* user)
     munit_assert_size(work, ==, 0);
     uint16_t coverage = 0;
     work = WORK_BUDGET;
-    munit_assert_int(tc_x509_crl_scope_reasons(&crl, scope, &point, certificate_issuer, 0, &limits,
-                                               &tree, &names, &coverage),
+    munit_assert_int(tc_x509_crl_scope_reasons(
+                         &crl, scope, &point, certificate_issuer, 0,
+                         &(tc_x509_crl_decode){&limits, &tree, &names, NULL, 0}, &coverage),
                      ==, TC_TLV_OK);
     munit_assert_uint(coverage, ==, cases[i].match ? TC_X509_CRL_ALL_REASONS : 0);
   }

@@ -269,11 +269,16 @@ TC_TLV_result tc_x509_crl_source_scan_init(tc_source_reader* reader,
 }
 
 TC_TLV_result tc_x509_crl_source_scan_step(tc_x509_crl_source_scan* scan, size_t max_entries,
-                                           TC_buffer scratch, const TC_TLV_limits* limits,
-                                           const tc_pki_tree_workspace* tree,
-                                           const TC_X509_name_workspace* names, TC_bytes* oids,
-                                           size_t capacity, int* complete)
+                                           TC_buffer scratch, const tc_x509_crl_decode* decode,
+                                           int* complete)
 {
+  if (!decode)
+    return TC_TLV_ARGUMENT;
+  const TC_TLV_limits* limits = decode->limits;
+  const tc_pki_tree_workspace* tree = decode->tree;
+  const TC_X509_name_workspace* names = decode->names;
+  TC_bytes* oids = decode->oids;
+  const size_t capacity = decode->oid_capacity;
   if (!scan || !complete || !max_entries || scan->phase != TC_CRL_SCAN_ACTIVE)
     return TC_TLV_ARGUMENT;
   for (size_t step = 0; step < max_entries; ++step) {

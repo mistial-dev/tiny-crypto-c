@@ -166,12 +166,17 @@ tc_x509_crl_scope_equal(const TC_X509_crl* left, const TC_X509_crl_extensions* l
   return TC_TLV_OK;
 }
 
-TC_TLV_result
-tc_x509_crl_delta_compatible(const TC_X509_crl* base, const TC_X509_crl_extensions* base_info,
-                             const TC_X509_crl* delta, const TC_X509_crl_extensions* delta_info,
-                             const TC_TLV_limits* limits, const tc_pki_tree_workspace* tree,
-                             const TC_X509_name_workspace* names, int* compatible)
+TC_TLV_result tc_x509_crl_delta_compatible(const TC_X509_crl* base,
+                                           const TC_X509_crl_extensions* base_info,
+                                           const TC_X509_crl* delta,
+                                           const TC_X509_crl_extensions* delta_info,
+                                           const tc_x509_crl_decode* decode, int* compatible)
 {
+  if (!decode)
+    return TC_TLV_ARGUMENT;
+  const TC_TLV_limits* limits = decode->limits;
+  const tc_pki_tree_workspace* tree = decode->tree;
+  const TC_X509_name_workspace* names = decode->names;
   const unsigned shared = TC_X509_CRL_EXT_DISTRIBUTION | TC_X509_CRL_EXT_AUTHORITY;
   const unsigned delta_required = TC_X509_CRL_EXT_NUMBER | TC_X509_CRL_EXT_DELTA;
   TC_TLV_result result;

@@ -244,7 +244,8 @@ static MunitResult public_crl(const MunitParameter params[], void* user)
     work = 60000;
     munit_assert_int(
         tc_x509_crl_source_scan_step(&scan, 1, (TC_buffer){entry_scratch, sizeof entry_scratch},
-                                     &limits, &tree, NULL, oids, OID_COUNT, &scan_complete),
+                                     &(tc_x509_crl_decode){&limits, &tree, NULL, oids, OID_COUNT},
+                                     &scan_complete),
         ==, TC_TLV_OK);
   }
   munit_assert_int(tc_x509_crl_source_scan_finish(&scan, NULL, 0), ==, TC_TLV_OK);

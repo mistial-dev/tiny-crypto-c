@@ -36,11 +36,16 @@ static TC_TLV_result crl_prepared_find(const TC_X509_crl_prepared* prepared,
 }
 
 TC_TLV_result tc_x509_crl_find(const TC_X509_crl* crl, const TC_X509_crl_extensions* extensions,
-                               const TC_X509_certificate* certificate, const TC_TLV_limits* limits,
-                               const tc_pki_tree_workspace* tree,
-                               const TC_X509_name_workspace* names, TC_bytes* oids, size_t capacity,
-                               TC_X509_crl_match* out)
+                               const TC_X509_certificate* certificate,
+                               const tc_x509_crl_decode* decode, TC_X509_crl_match* out)
 {
+  if (!decode)
+    return TC_TLV_ARGUMENT;
+  const TC_TLV_limits* limits = decode->limits;
+  const tc_pki_tree_workspace* tree = decode->tree;
+  const TC_X509_name_workspace* names = decode->names;
+  TC_bytes* oids = decode->oids;
+  const size_t capacity = decode->oid_capacity;
   tc_x509_crl_revoked_reader reader;
   tc_x509_crl_revoked_entry entry;
   TC_X509_crl_match parsed = {0};
