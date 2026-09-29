@@ -86,8 +86,7 @@ TC_TLV_result TC_LDS_read(TC_bytes encoded, const TC_TLV_limits* limits, TC_TLV_
   TC_DER_algorithm algorithm;
   tc_hash_info info;
   uint32_t version;
-  TC_TLV_result result =
-      tc_pki_reader_storage(encoded, limits, frames.data, frames.capacity, work, out, sizeof *out);
+  TC_TLV_result result = tc_pki_reader_storage(encoded, limits, frames, work, out, sizeof *out);
   if (result != TC_TLV_OK)
     return result;
   const tc_pki_tree_workspace tree = {frames.data, frames.capacity, work};
@@ -190,13 +189,12 @@ TC_TLV_result TC_LDS_hash_find(const TC_LDS_security_object* object, unsigned nu
   if (!object || !number || number > TC_LDS_MAX_GROUPS)
     return TC_TLV_ARGUMENT;
   /* Check both borrowed spans and their metadata before charging work. */
-  TC_TLV_result result =
-      tc_pki_reader_storage_check(object->encoded, object, sizeof *object, frames.data,
-                                  frames.capacity, work, out, sizeof *out);
+  TC_TLV_result result = tc_pki_reader_storage_check(object->encoded, object, sizeof *object,
+                                                     frames, work, out, sizeof *out);
   if (result != TC_TLV_OK)
     return result;
-  result = tc_pki_reader_storage_check(object->hashes, limits, sizeof *limits, frames.data,
-                                       frames.capacity, work, out, sizeof *out);
+  result = tc_pki_reader_storage_check(object->hashes, limits, sizeof *limits, frames, work, out,
+                                       sizeof *out);
   if (result != TC_TLV_OK)
     return result;
   if (!tc_hash_info_get(object->hash, &info))

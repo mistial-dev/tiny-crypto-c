@@ -585,8 +585,8 @@ static TC_TLV_result user_notice(TC_bytes encoded, const TC_TLV_limits* limits, 
 }
 
 TC_TLV_result tc_x509_policy_qualifiers_check(const TC_X509_policy* policy, int critical,
-                                              const TC_TLV_limits* limits, TC_TLV_frame* frames,
-                                              size_t capacity, size_t* work)
+                                              const TC_TLV_limits* limits, TC_TLV_frames frames,
+                                              size_t* work)
 {
   static const uint8_t prefix[] = {0x2b, 6, 1, 5, 5, 7, 2};
   TC_TLV_reader reader;
@@ -597,7 +597,7 @@ TC_TLV_result tc_x509_policy_qualifiers_check(const TC_X509_policy* policy, int 
   if (tc_pki_work_charge(work, policy->qualifiers.length) != TC_TLV_OK)
     return TC_TLV_LIMIT;
   result = TC_TLV_walk(policy->qualifiers.data, policy->qualifiers.length, TC_TLV_DER, limits,
-                       (TC_TLV_frames){frames, capacity}, NULL, NULL);
+                       frames, NULL, NULL);
   if (result != TC_TLV_OK)
     return result;
   result = TC_X509_policy_qualifiers_init(&reader, policy->qualifiers, limits);

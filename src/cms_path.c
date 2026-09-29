@@ -311,7 +311,8 @@ static TC_X509_path_status cms_signed_data_path_build_parts(
       return TC_X509_PATH_ERROR;
     data = *prepared->data;
   } else {
-    result = tc_cms_signed_data_read(encoded, limits, tree.frames, tree.capacity, work, &data);
+    result = tc_cms_signed_data_read(encoded, limits, (TC_TLV_frames){tree.frames, tree.capacity},
+                                     work, &data);
     if (result != TC_TLV_OK)
       return tc_x509_path_status(result);
   }

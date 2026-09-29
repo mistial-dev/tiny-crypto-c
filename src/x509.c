@@ -317,8 +317,7 @@ static void count_node(void* user, const TC_TLV_event* event)
     --*remaining;
 }
 
-static TC_TLV_result next_tree(TC_TLV_reader* reader, TC_TLV_frame* frames, size_t capacity,
-                               TC_TLV_element* element)
+static TC_TLV_result next_tree(TC_TLV_reader* reader, TC_TLV_frames frames, TC_TLV_element* element)
 {
   TC_TLV_reader next;
   TC_TLV_limits budget;
@@ -331,8 +330,8 @@ static TC_TLV_result next_tree(TC_TLV_reader* reader, TC_TLV_frame* frames, size
   budget = reader->limits;
   budget.max_elements -= reader->elements;
   remaining = budget.max_elements;
-  result = TC_TLV_walk(element->encoded.data, element->encoded.length, TC_TLV_DER, &budget,
-                       (TC_TLV_frames){frames, capacity}, count_node, &remaining);
+  result = TC_TLV_walk(element->encoded.data, element->encoded.length, TC_TLV_DER, &budget, frames,
+                       count_node, &remaining);
   if (result != TC_TLV_OK)
     return result;
   next.elements = reader->limits.max_elements - remaining;
@@ -349,7 +348,7 @@ TC_TLV_result TC_X509_general_name_next(TC_TLV_reader* reader, TC_TLV_frames fra
   if (!reader || !out)
     return TC_TLV_ARGUMENT;
   next = *reader;
-  result = next_tree(&next, frames.data, frames.capacity, &element);
+  result = next_tree(&next, frames, &element);
   if (result != TC_TLV_OK)
     return result;
   result = general_name(&element, 0);
@@ -374,7 +373,7 @@ TC_TLV_result TC_X509_general_subtree_next(TC_TLV_reader* reader, TC_TLV_frames 
   if (!reader || !out)
     return TC_TLV_ARGUMENT;
   next = *reader;
-  result = next_tree(&next, frames.data, frames.capacity, &element);
+  result = next_tree(&next, frames, &element);
   if (result != TC_TLV_OK)
     return result;
   if (!tc_pki_tag(&element, 0x30) || open(element.value, &fields) != TC_TLV_OK ||

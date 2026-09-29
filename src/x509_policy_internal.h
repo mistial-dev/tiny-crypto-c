@@ -33,6 +33,6 @@ TC_TLV_result tc_x509_policy_graph_output(const tc_x509_policy_graph* graph,
                                           size_t* count);
 /* Qualifiers are checked and omitted from the policy-set output. */
 TC_TLV_result tc_x509_policy_qualifiers_check(const TC_X509_policy* policy, int critical,
-                                              const TC_TLV_limits* limits, TC_TLV_frame* frames,
-                                              size_t capacity, size_t* work);
+                                              const TC_TLV_limits* limits, TC_TLV_frames frames,
+                                              size_t* work);
 #endif

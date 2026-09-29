@@ -625,7 +625,8 @@ static MunitResult signed_data(const MunitParameter params[], void* user)
     cursor = encoded;
     munit_assert_int(i2d_CMS_ContentInfo(cms, &cursor), ==, encoded_length);
     munit_assert_int(tc_cms_signed_data_read((TC_bytes){encoded, (size_t)encoded_length}, &limits,
-                                             frames, FRAME_CAPACITY, &work, &container),
+                                             (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
+                                             &container),
                      ==, TC_TLV_OK);
     munit_assert_true(container.has_content);
     munit_assert_int(tc_cms_signed_data_version_check(&container, &limits, &workspace), ==,
@@ -1115,8 +1116,9 @@ static MunitResult revocations(const MunitParameter params[], void* user)
     cursor = encoded;
     munit_assert_int(i2d_CMS_ContentInfo(cms, &cursor), ==, length);
     work = WORK_BUDGET;
-    munit_assert_int(tc_cms_signed_data_read((TC_bytes){encoded, (size_t)length}, &limits, frames,
-                                             FRAME_CAPACITY, &work, &container),
+    munit_assert_int(tc_cms_signed_data_read((TC_bytes){encoded, (size_t)length}, &limits,
+                                             (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
+                                             &container),
                      ==, TC_TLV_OK);
     munit_assert_int(tc_cms_signed_data_version_check(&container, &limits, &tree), ==, TC_TLV_OK);
     munit_assert_int(
@@ -4916,8 +4918,9 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
   const TC_bytes target = {leaf_der, leaf_length};
   munit_assert_int(TC_X509_path_build(target, &external, &options, &validation, &search, &found),
                    ==, TC_X509_PATH_INVALID);
-  munit_assert_int(tc_cms_signed_data_read((TC_bytes){encoded, (size_t)length}, &limits, frames,
-                                           FRAME_CAPACITY, &work, &container),
+  munit_assert_int(tc_cms_signed_data_read((TC_bytes){encoded, (size_t)length}, &limits,
+                                           (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
+                                           &container),
                    ==, TC_TLV_OK);
   munit_assert_int(tc_cms_candidates_init(container.certificates, &external, INDEX_CAPACITY,
                                           CMS_CAPACITY, &limits, &tree, &candidates),

@@ -328,8 +328,9 @@ static TC_TLV_result certificate_policies(const TC_X509_extension_summary* exten
       result = TC_X509_policy_next(&policies, &policy);
       if (result != TC_TLV_OK)
         break;
-      result = tc_x509_policy_qualifiers_check(&policy, critical, limits, workspace->frames,
-                                               workspace->frame_capacity, work);
+      result = tc_x509_policy_qualifiers_check(
+          &policy, critical, limits, (TC_TLV_frames){workspace->frames, workspace->frame_capacity},
+          work);
       if (result != TC_TLV_OK)
         return result;
     }

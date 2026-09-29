@@ -14,9 +14,8 @@ enum {
 /* Reader storage: every range, including read-only ones, is kept disjoint
  * from every other range, so all of them are recorded as writes. */
 static inline TC_TLV_result tc_pki_reader_storage_check(TC_bytes encoded, const void* metadata,
-                                                        size_t metadata_size, TC_TLV_frame* frames,
-                                                        size_t frame_capacity, size_t* work,
-                                                        void* out, size_t out_size)
+                                                        size_t metadata_size, TC_TLV_frames frames,
+                                                        size_t* work, void* out, size_t out_size)
 {
   TC_bytes ranges[TC_PKI_READER_RANGES];
   tc_pki_storage_plan plan;
@@ -25,7 +24,7 @@ static inline TC_TLV_result tc_pki_reader_storage_check(TC_bytes encoded, const 
   tc_pki_storage_plan_begin(&plan, ranges, TC_PKI_READER_RANGES, SIZE_MAX);
   tc_pki_storage_plan_write_span(&plan, encoded);
   tc_pki_storage_plan_write(&plan, metadata, 1, metadata_size);
-  TC_PKI_PLAN_WRITE(&plan, frames, frame_capacity);
+  TC_PKI_PLAN_WRITE(&plan, frames.data, frames.capacity);
   TC_PKI_PLAN_WRITE(&plan, work, 1);
   tc_pki_storage_plan_write(&plan, out, out_size, 1);
   /* Check the work pointer before charging the caller's budget. */
@@ -34,11 +33,11 @@ static inline TC_TLV_result tc_pki_reader_storage_check(TC_bytes encoded, const 
 }
 
 static inline TC_TLV_result tc_pki_reader_storage(TC_bytes encoded, const TC_TLV_limits* limits,
-                                                  TC_TLV_frame* frames, size_t frame_capacity,
-                                                  size_t* work, void* out, size_t out_size)
+                                                  TC_TLV_frames frames, size_t* work, void* out,
+                                                  size_t out_size)
 {
-  TC_TLV_result result = tc_pki_reader_storage_check(encoded, limits, sizeof *limits, frames,
-                                                     frame_capacity, work, out, out_size);
+  TC_TLV_result result =
+      tc_pki_reader_storage_check(encoded, limits, sizeof *limits, frames, work, out, out_size);
   return result == TC_TLV_OK ? tc_pki_work_charge(work, TC_PKI_READER_STORAGE_WORK) : result;
 }
 

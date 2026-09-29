@@ -364,8 +364,8 @@ TC_TLV_result TC_CMS_content_digest(TC_bytes encoded, TC_hash_algorithm algorith
 {
   TC_hash_context scratch;
   tc_hash_info info;
-  TC_TLV_result result = tc_pki_reader_storage(encoded, limits, frames.data, frames.capacity, work,
-                                               digest, digest_capacity);
+  TC_TLV_result result =
+      tc_pki_reader_storage(encoded, limits, frames, work, digest, digest_capacity);
   if (result != TC_TLV_OK)
     return result;
   if (!tc_hash_available(algorithm) || !tc_hash_info_get(algorithm, &info))
@@ -382,11 +382,10 @@ TC_TLV_result TC_CMS_signed_data_read(TC_bytes encoded, const TC_TLV_limits* lim
 {
   TC_CMS_signed_data parsed;
   const tc_pki_tree_workspace tree = {frames.data, frames.capacity, work};
-  TC_TLV_result result =
-      tc_pki_reader_storage(encoded, limits, frames.data, frames.capacity, work, out, sizeof *out);
+  TC_TLV_result result = tc_pki_reader_storage(encoded, limits, frames, work, out, sizeof *out);
   if (result != TC_TLV_OK)
     return result;
-  result = tc_cms_signed_data_read(encoded, limits, frames.data, frames.capacity, work, &parsed);
+  result = tc_cms_signed_data_read(encoded, limits, frames, work, &parsed);
   if (result != TC_TLV_OK)
     return result;
   result = tc_cms_signed_data_version_check(&parsed, limits, &tree);
@@ -402,11 +401,10 @@ TC_TLV_result TC_CMS_signer_info_read(TC_bytes encoded, TC_TLV_profile profile,
 {
   if (profile != TC_TLV_DER && profile != TC_TLV_BER)
     return TC_TLV_ARGUMENT;
-  TC_TLV_result result =
-      tc_pki_reader_storage(encoded, limits, frames.data, frames.capacity, work, out, sizeof *out);
+  TC_TLV_result result = tc_pki_reader_storage(encoded, limits, frames, work, out, sizeof *out);
   if (result != TC_TLV_OK)
     return result;
-  return tc_cms_signer_info_read(encoded, profile, limits, frames.data, frames.capacity, work, out);
+  return tc_cms_signer_info_read(encoded, profile, limits, frames, work, out);
 }
 
 TC_TLV_result TC_CMS_signers_init(TC_bytes encoded, const TC_TLV_limits* limits,
@@ -414,8 +412,7 @@ TC_TLV_result TC_CMS_signers_init(TC_bytes encoded, const TC_TLV_limits* limits,
 {
   TC_TLV_reader reader = {0};
   const tc_pki_tree_workspace tree = {frames.data, frames.capacity, work};
-  TC_TLV_result result =
-      tc_pki_reader_storage(encoded, limits, frames.data, frames.capacity, work, out, sizeof *out);
+  TC_TLV_result result = tc_pki_reader_storage(encoded, limits, frames, work, out, sizeof *out);
   if (result != TC_TLV_OK)
     return result;
   result = tc_pki_tree_open(encoded, 0x31, TC_TLV_BER, limits, &tree, &reader);
@@ -436,8 +433,8 @@ TC_TLV_result TC_CMS_signer_next(TC_TLV_reader* reader, TC_TLV_frames frames, si
   TC_TLV_result result;
   if (!reader || tc_pki_storage_span(reader, 1, sizeof *reader, &metadata) != TC_TLV_OK)
     return TC_TLV_ARGUMENT;
-  result = tc_pki_reader_storage_check(reader->input, reader, sizeof *reader, frames.data,
-                                       frames.capacity, work, out, sizeof *out);
+  result = tc_pki_reader_storage_check(reader->input, reader, sizeof *reader, frames, work, out,
+                                       sizeof *out);
   if (result != TC_TLV_OK)
     return result;
   if (reader->profile != TC_TLV_BER || reader->offset > reader->input.length)
@@ -452,8 +449,8 @@ TC_TLV_result TC_CMS_signer_next(TC_TLV_reader* reader, TC_TLV_frames frames, si
   result = tc_pki_tree_next(&next, &tree, &element);
   if (result != TC_TLV_OK)
     return result;
-  result = tc_cms_signer_info_read(element.encoded, TC_TLV_BER, &next.limits, frames.data,
-                                   frames.capacity, work, &parsed);
+  result =
+      tc_cms_signer_info_read(element.encoded, TC_TLV_BER, &next.limits, frames, work, &parsed);
   if (result != TC_TLV_OK)
     return result;
   *reader = next;
@@ -462,8 +459,7 @@ TC_TLV_result TC_CMS_signer_next(TC_TLV_reader* reader, TC_TLV_frames frames, si
 }
 
 TC_TLV_result tc_cms_signed_data_read(TC_bytes encoded, const TC_TLV_limits* limits,
-                                      TC_TLV_frame* frames, size_t frame_capacity, size_t* work,
-                                      TC_CMS_signed_data* out)
+                                      TC_TLV_frames frames, size_t* work, TC_CMS_signed_data* out)
 {
   static const uint8_t signed_data_oid[] = {0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 1, 7, 2};
   enum { SIGNED_DATA_FIELDS = 6 };
@@ -475,7 +471,7 @@ TC_TLV_result tc_cms_signed_data_read(TC_bytes encoded, const TC_TLV_limits* lim
   if (!out)
     return TC_TLV_ARGUMENT;
   parsed.encoded = encoded;
-  const tc_pki_tree_workspace tree = {frames, frame_capacity, work};
+  const tc_pki_tree_workspace tree = {frames.data, frames.capacity, work};
 #define CMS_FIELDS(input, tag)                                                                     \
   tc_pki_children(input, tag, TC_TLV_BER, limits, &tree, fields, SIGNED_DATA_FIELDS, &count)
   result = CMS_FIELDS(encoded, 0x30);
@@ -622,8 +618,9 @@ TC_TLV_result tc_cms_signed_data_check(const TC_CMS_signed_data* input, const TC
     result = tc_pki_tree_next(&reader, tree, &element);
     if (result != TC_TLV_OK)
       return result;
-    result = tc_cms_signer_info_read(element.encoded, TC_TLV_BER, limits, tree->frames,
-                                     tree->capacity, tree->work, &signer);
+    result =
+        tc_cms_signer_info_read(element.encoded, TC_TLV_BER, limits,
+                                (TC_TLV_frames){tree->frames, tree->capacity}, tree->work, &signer);
     if (result != TC_TLV_OK)
       return result;
     if (signer.version == EXTENDED_VERSION && required < EXTENDED_VERSION)
@@ -654,8 +651,8 @@ static void cms_definite(void* user, const TC_TLV_event* event)
 }
 
 static TC_TLV_result cms_open(TC_bytes encoded, unsigned tag, TC_TLV_profile profile,
-                              const TC_TLV_limits* limits, TC_TLV_frame* frames,
-                              size_t frame_capacity, size_t* work, TC_TLV_element* outer)
+                              const TC_TLV_limits* limits, TC_TLV_frames frames, size_t* work,
+                              TC_TLV_element* outer)
 {
   int definite = 1;
   TC_TLV_result result = TC_TLV_read(encoded.data, encoded.length, profile, limits, outer);
@@ -665,8 +662,8 @@ static TC_TLV_result cms_open(TC_bytes encoded, unsigned tag, TC_TLV_profile pro
     return TC_TLV_INVALID;
   if (tc_pki_work_charge(work, encoded.length) != TC_TLV_OK)
     return TC_TLV_LIMIT;
-  result = TC_TLV_walk(encoded.data, encoded.length, profile, limits,
-                       (TC_TLV_frames){frames, frame_capacity}, cms_definite, &definite);
+  result =
+      TC_TLV_walk(encoded.data, encoded.length, profile, limits, frames, cms_definite, &definite);
   return result != TC_TLV_OK ? result : definite ? TC_TLV_OK : TC_TLV_INVALID;
 }
 
@@ -680,11 +677,11 @@ static TC_TLV_result cms_octet_count(void* context, TC_bytes bytes)
 }
 
 TC_TLV_result tc_cms_signer_info_read(TC_bytes encoded, TC_TLV_profile profile,
-                                      const TC_TLV_limits* limits, TC_TLV_frame* frames,
-                                      size_t frame_capacity, size_t* work, TC_CMS_signer_info* out)
+                                      const TC_TLV_limits* limits, TC_TLV_frames frames,
+                                      size_t* work, TC_CMS_signer_info* out)
 {
   TC_CMS_signer_info parsed = {0};
-  const tc_pki_tree_workspace workspace = {frames, frame_capacity, work};
+  const tc_pki_tree_workspace workspace = {frames.data, frames.capacity, work};
   TC_TLV_element element;
   TC_TLV_reader fields, identifier;
   size_t octets;
@@ -707,7 +704,7 @@ TC_TLV_result tc_cms_signer_info_read(TC_bytes encoded, TC_TLV_profile profile,
       return TC_TLV_INVALID;
     octets = 0;
     CMS_TRY(tc_pki_octets_implicit(element.encoded, 0x80, profile, limits,
-                                   &(tc_pki_tree_workspace){frames, frame_capacity, work},
+                                   &(tc_pki_tree_workspace){frames.data, frames.capacity, work},
                                    cms_octet_count, &octets));
     if (!octets)
       return TC_TLV_INVALID;
@@ -745,8 +742,8 @@ TC_TLV_result tc_cms_signer_info_read(TC_bytes encoded, TC_TLV_profile profile,
   CMS_TRY(tc_pki_tree_next(&fields, &workspace, &element));
   octets = 0;
   CMS_TRY(tc_pki_octets(element.encoded, profile, limits,
-                        &(tc_pki_tree_workspace){frames, frame_capacity, work}, cms_octet_count,
-                        &octets));
+                        &(tc_pki_tree_workspace){frames.data, frames.capacity, work},
+                        cms_octet_count, &octets));
   if (!octets)
     return TC_TLV_INVALID;
   parsed.signature = element.encoded;
@@ -808,12 +805,11 @@ TC_TLV_result TC_CMS_signed_attributes_read(TC_bytes encoded, TC_CMS_attribute_e
     return TC_TLV_ARGUMENT;
   if (encoding != TC_CMS_ATTRIBUTES_DER && encoding != TC_CMS_ATTRIBUTES_BER_DEFINITE_ORDER)
     return TC_TLV_ARGUMENT;
-  result =
-      tc_pki_reader_storage(encoded, limits, frames.data, frames.capacity, work, out, sizeof *out);
+  result = tc_pki_reader_storage(encoded, limits, frames, work, out, sizeof *out);
   if (result != TC_TLV_OK)
     return result;
   profile = encoding == TC_CMS_ATTRIBUTES_DER ? TC_TLV_DER : TC_TLV_BER;
-  result = cms_open(encoded, 0xa0, profile, limits, frames.data, frames.capacity, work, &outer);
+  result = cms_open(encoded, 0xa0, profile, limits, frames, work, &outer);
   if (result != TC_TLV_OK)
     return result;
   result = TC_TLV_reader_init(&attributes, outer.value.data, outer.value.length, profile, limits);

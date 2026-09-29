@@ -462,8 +462,8 @@ static void fuzz_cms(const uint8_t* data, size_t length)
   fuzz_cms_path(data, length);
   memset(&container, 0xa5, sizeof container);
   memcpy(&saved_container, &container, sizeof container);
-  result = tc_cms_signed_data_read((TC_bytes){data, length}, &limits, frames, FRAME_CAPACITY, &work,
-                                   &container);
+  result = tc_cms_signed_data_read((TC_bytes){data, length}, &limits,
+                                   (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &container);
   if (result != TC_TLV_OK && memcmp(&container, &saved_container, sizeof container))
     abort();
   if (result == TC_TLV_OK) {
@@ -505,8 +505,8 @@ static void fuzz_cms(const uint8_t* data, size_t length)
       work = budgets[j];
       memset(&signer, 0xa5, sizeof signer);
       memcpy(&saved, &signer, sizeof signer);
-      result = tc_cms_signer_info_read((TC_bytes){data, length}, profiles[i], &limits, frames,
-                                       FRAME_CAPACITY, &work, &signer);
+      result = tc_cms_signer_info_read((TC_bytes){data, length}, profiles[i], &limits,
+                                       (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &signer);
       if (work > budgets[j])
         abort();
       if (result != TC_TLV_OK && memcmp(&signer, &saved, sizeof signer))

@@ -56,8 +56,9 @@ static MunitResult basic(const MunitParameter params[], void* user)
   Provider state = {0, TC_X509_SIGNATURE_VALID};
   TC_X509_signature_provider signatures = {verify, &state, NULL};
   TC_X509_extension_summary summaries[3];
-  tc_x509_path_input input = {certificates, 3,    3,    3,    &anchor, &at, &signatures,
-                              &limits,      NULL, NULL, NULL, summaries, 0, 0, 0};
+  tc_x509_path_input input = {certificates, 3,           3,       3,    &anchor,
+                              &at,          &signatures, &limits, NULL, NULL,
+                              NULL,         summaries,   0,       0,    0};
   size_t i, work = 100000, required;
   int accepted = 99;
   (void)params;
@@ -93,7 +94,8 @@ static MunitResult basic(const MunitParameter params[], void* user)
   for (i = 0; i < required; ++i) {
     work = i;
     accepted = 99;
-    munit_assert_int(tc_x509_path_basic(fresh(&input), &workspace, &work, &accepted), ==, TC_TLV_LIMIT);
+    munit_assert_int(tc_x509_path_basic(fresh(&input), &workspace, &work, &accepted), ==,
+                     TC_TLV_LIMIT);
     munit_assert_int(accepted, ==, 99);
   }
   extensions[21] = 0;
@@ -145,11 +147,13 @@ static MunitResult basic(const MunitParameter params[], void* user)
   input.max_input = 2;
   work = 100000;
   accepted = 99;
-  munit_assert_int(tc_x509_path_basic(fresh(&input), &workspace, &work, &accepted), ==, TC_TLV_LIMIT);
+  munit_assert_int(tc_x509_path_basic(fresh(&input), &workspace, &work, &accepted), ==,
+                   TC_TLV_LIMIT);
   munit_assert_int(accepted, ==, 99);
   input.max_input = 3;
   input.max_certificates = 2;
-  munit_assert_int(tc_x509_path_basic(fresh(&input), &workspace, &work, &accepted), ==, TC_TLV_LIMIT);
+  munit_assert_int(tc_x509_path_basic(fresh(&input), &workspace, &work, &accepted), ==,
+                   TC_TLV_LIMIT);
   munit_assert_int(accepted, ==, 99);
   input.max_certificates = 3;
   input.signatures = NULL;
@@ -195,8 +199,8 @@ static MunitResult names(const MunitParameter params[], void* user)
   TC_X509_name_workspace name_workspace = {left, right, 32, used, 4};
   TC_X509_constraint_workspace workspace = {frames, 8, &name_workspace};
   TC_X509_extension_summary summaries[3];
-  tc_x509_path_input input = {certificates, 3,    3,    3,    NULL, NULL, NULL,
-                              &limits,      NULL, NULL, NULL, summaries, 0, 0, 0};
+  tc_x509_path_input input = {certificates, 3,    3,    3,         NULL, NULL, NULL, &limits,
+                              NULL,         NULL, NULL, summaries, 0,    0,    0};
   size_t i, work = 100000, required;
   int accepted = 99;
   (void)params;
@@ -223,7 +227,8 @@ static MunitResult names(const MunitParameter params[], void* user)
   for (i = 0; i < required; ++i) {
     work = i;
     accepted = 99;
-    munit_assert_int(tc_x509_path_names(fresh(&input), &workspace, &work, &accepted), ==, TC_TLV_LIMIT);
+    munit_assert_int(tc_x509_path_names(fresh(&input), &workspace, &work, &accepted), ==,
+                     TC_TLV_LIMIT);
     munit_assert_int(accepted, ==, 99);
   }
   narrower[19] = 'b';
@@ -239,7 +244,8 @@ static MunitResult names(const MunitParameter params[], void* user)
   constraints[15] = 0x31;
   work = 100000;
   accepted = 99;
-  munit_assert_int(tc_x509_path_names(fresh(&input), &workspace, &work, &accepted), ==, TC_TLV_INVALID);
+  munit_assert_int(tc_x509_path_names(fresh(&input), &workspace, &work, &accepted), ==,
+                   TC_TLV_INVALID);
   munit_assert_int(accepted, ==, 99);
   constraints[15] = 0x30;
   /* A rollover certificate is exempt, but its child still inherits the constraint. */
@@ -478,8 +484,8 @@ static MunitResult policies(const MunitParameter params[], void* user)
   TC_X509_certificate certificates[2];
   const TC_TLV_limits limits = {1024, 1024, 64, 8};
   TC_X509_extension_summary summaries[3];
-  tc_x509_path_input input = {certificates, 2,    2,    2048, NULL, NULL, NULL,
-                              &limits,      NULL, NULL, NULL, summaries, 0, 0, 0};
+  tc_x509_path_input input = {certificates, 2,    2,    2048,      NULL, NULL, NULL, &limits,
+                              NULL,         NULL, NULL, summaries, 0,    0,    0};
   uint32_t left[32], right[32];
   uint8_t used[4];
   TC_X509_name_workspace names = {left, right, 32, used, 4};
@@ -507,8 +513,8 @@ static MunitResult policies(const MunitParameter params[], void* user)
   certificates[0].extensions.length = sizeof issuing;
   certificates[1].extensions.data = leaf;
   certificates[1].extensions.length = sizeof leaf;
-  munit_assert_int(tc_x509_path_policies(fresh(&input), &options, (TC_bytes){NULL, 0}, &workspace, &work,
-                                         &count, &accepted),
+  munit_assert_int(tc_x509_path_policies(fresh(&input), &options, (TC_bytes){NULL, 0}, &workspace,
+                                         &work, &count, &accepted),
                    ==, TC_TLV_OK);
   munit_assert_int(accepted, ==, 1);
   munit_assert_size(count, ==, 1);
@@ -518,15 +524,15 @@ static MunitResult policies(const MunitParameter params[], void* user)
     work = i;
     count = 99;
     accepted = 99;
-    munit_assert_int(tc_x509_path_policies(fresh(&input), &options, (TC_bytes){NULL, 0}, &workspace, &work,
-                                           &count, &accepted),
+    munit_assert_int(tc_x509_path_policies(fresh(&input), &options, (TC_bytes){NULL, 0}, &workspace,
+                                           &work, &count, &accepted),
                      ==, TC_TLV_LIMIT);
     munit_assert_size(count, ==, 99);
     munit_assert_int(accepted, ==, 99);
   }
   work = required;
-  munit_assert_int(tc_x509_path_policies(fresh(&input), &options, (TC_bytes){NULL, 0}, &workspace, &work,
-                                         &count, &accepted),
+  munit_assert_int(tc_x509_path_policies(fresh(&input), &options, (TC_bytes){NULL, 0}, &workspace,
+                                         &work, &count, &accepted),
                    ==, TC_TLV_OK);
   munit_assert_size(work, ==, 0);
   munit_assert_int(accepted, ==, 1);
@@ -535,22 +541,25 @@ static MunitResult policies(const MunitParameter params[], void* user)
     const uint8_t anchor_b[] = {0x30, 4, 6, 2, 0x2a, 2};
     const TC_bytes app_with_any[] = {initial[2], initial[1]};
     work = 100000;
-    munit_assert_int(tc_x509_path_policies(fresh(&input), &options, (TC_bytes){anchor_a, sizeof anchor_a},
-                                           &workspace, &work, &count, &accepted),
+    munit_assert_int(tc_x509_path_policies(fresh(&input), &options,
+                                           (TC_bytes){anchor_a, sizeof anchor_a}, &workspace, &work,
+                                           &count, &accepted),
                      ==, TC_TLV_OK);
     munit_assert_int(accepted, ==, 1);
     munit_assert_size(count, ==, 1);
     work = 100000;
-    munit_assert_int(tc_x509_path_policies(fresh(&input), &options, (TC_bytes){anchor_b, sizeof anchor_b},
-                                           &workspace, &work, &count, &accepted),
+    munit_assert_int(tc_x509_path_policies(fresh(&input), &options,
+                                           (TC_bytes){anchor_b, sizeof anchor_b}, &workspace, &work,
+                                           &count, &accepted),
                      ==, TC_TLV_OK);
     munit_assert_int(accepted, ==, 0);
     munit_assert_size(count, ==, 0);
     options.initial = app_with_any;
     options.initial_count = 2;
     work = 100000;
-    munit_assert_int(tc_x509_path_policies(fresh(&input), &options, (TC_bytes){anchor_a, sizeof anchor_a},
-                                           &workspace, &work, &count, &accepted),
+    munit_assert_int(tc_x509_path_policies(fresh(&input), &options,
+                                           (TC_bytes){anchor_a, sizeof anchor_a}, &workspace, &work,
+                                           &count, &accepted),
                      ==, TC_TLV_OK);
     munit_assert_int(accepted, ==, 1);
     munit_assert_size(count, ==, 1);
@@ -559,23 +568,23 @@ static MunitResult policies(const MunitParameter params[], void* user)
   }
   options.initial = initial + 1;
   work = 100000;
-  munit_assert_int(tc_x509_path_policies(fresh(&input), &options, (TC_bytes){NULL, 0}, &workspace, &work,
-                                         &count, &accepted),
+  munit_assert_int(tc_x509_path_policies(fresh(&input), &options, (TC_bytes){NULL, 0}, &workspace,
+                                         &work, &count, &accepted),
                    ==, TC_TLV_OK);
   munit_assert_int(accepted, ==, 0);
   munit_assert_size(count, ==, 0);
   options.initial = initial + 2;
   work = 100000;
-  munit_assert_int(tc_x509_path_policies(fresh(&input), &options, (TC_bytes){NULL, 0}, &workspace, &work,
-                                         &count, &accepted),
+  munit_assert_int(tc_x509_path_policies(fresh(&input), &options, (TC_bytes){NULL, 0}, &workspace,
+                                         &work, &count, &accepted),
                    ==, TC_TLV_OK);
   munit_assert_int(accepted, ==, 1);
   munit_assert_size(count, ==, 1);
   munit_assert_memory_equal(2, output[0].data, initial[0].data);
   options.inhibit_mapping = 1;
   work = 100000;
-  munit_assert_int(tc_x509_path_policies(fresh(&input), &options, (TC_bytes){NULL, 0}, &workspace, &work,
-                                         &count, &accepted),
+  munit_assert_int(tc_x509_path_policies(fresh(&input), &options, (TC_bytes){NULL, 0}, &workspace,
+                                         &work, &count, &accepted),
                    ==, TC_TLV_OK);
   munit_assert_int(accepted, ==, 0);
   options.inhibit_mapping = 0;
@@ -583,8 +592,8 @@ static MunitResult policies(const MunitParameter params[], void* user)
   work = 100000;
   count = 99;
   accepted = 99;
-  munit_assert_int(tc_x509_path_policies(fresh(&input), &options, (TC_bytes){NULL, 0}, &workspace, &work,
-                                         &count, &accepted),
+  munit_assert_int(tc_x509_path_policies(fresh(&input), &options, (TC_bytes){NULL, 0}, &workspace,
+                                         &work, &count, &accepted),
                    ==, TC_TLV_LIMIT);
   munit_assert_size(count, ==, 99);
   munit_assert_int(accepted, ==, 99);
@@ -592,15 +601,15 @@ static MunitResult policies(const MunitParameter params[], void* user)
   certificates[1].extensions.data = NULL;
   certificates[1].extensions.length = 0;
   work = 100000;
-  munit_assert_int(tc_x509_path_policies(fresh(&input), &options, (TC_bytes){NULL, 0}, &workspace, &work,
-                                         &count, &accepted),
+  munit_assert_int(tc_x509_path_policies(fresh(&input), &options, (TC_bytes){NULL, 0}, &workspace,
+                                         &work, &count, &accepted),
                    ==, TC_TLV_OK);
   munit_assert_int(accepted, ==, 0);
   munit_assert_size(count, ==, 0);
   options.require_explicit = 0;
   work = 100000;
-  munit_assert_int(tc_x509_path_policies(fresh(&input), &options, (TC_bytes){NULL, 0}, &workspace, &work,
-                                         &count, &accepted),
+  munit_assert_int(tc_x509_path_policies(fresh(&input), &options, (TC_bytes){NULL, 0}, &workspace,
+                                         &work, &count, &accepted),
                    ==, TC_TLV_OK);
   munit_assert_int(accepted, ==, 1);
   munit_assert_size(count, ==, 0);
@@ -650,39 +659,46 @@ static MunitResult qualifiers(const MunitParameter params[], void* user)
     memcpy(encoded + 14, cases[i].value, cases[i].length);
     policy.qualifiers.length = 14 + cases[i].length;
     work = 10000;
-    munit_assert_int(tc_x509_policy_qualifiers_check(&policy, 1, &limits, frames, 8, &work), ==,
-                     cases[i].result);
+    munit_assert_int(
+        tc_x509_policy_qualifiers_check(&policy, 1, &limits, (TC_TLV_frames){frames, 8}, &work), ==,
+        cases[i].result);
     if (cases[i].result != TC_TLV_OK)
       continue;
     required = 10000 - work;
     for (budget = 0; budget < required; ++budget) {
       work = budget;
-      munit_assert_int(tc_x509_policy_qualifiers_check(&policy, 1, &limits, frames, 8, &work), ==,
-                       TC_TLV_LIMIT);
+      munit_assert_int(
+          tc_x509_policy_qualifiers_check(&policy, 1, &limits, (TC_TLV_frames){frames, 8}, &work),
+          ==, TC_TLV_LIMIT);
     }
     work = 10000;
     limits.max_elements = 1;
-    munit_assert_int(tc_x509_policy_qualifiers_check(&policy, 1, &limits, frames, 8, &work), ==,
-                     TC_TLV_LIMIT);
+    munit_assert_int(
+        tc_x509_policy_qualifiers_check(&policy, 1, &limits, (TC_TLV_frames){frames, 8}, &work), ==,
+        TC_TLV_LIMIT);
     limits.max_elements = 64;
     limits.max_depth = 0;
     work = 10000;
-    munit_assert_int(tc_x509_policy_qualifiers_check(&policy, 1, &limits, frames, 8, &work), ==,
-                     TC_TLV_LIMIT);
+    munit_assert_int(
+        tc_x509_policy_qualifiers_check(&policy, 1, &limits, (TC_TLV_frames){frames, 8}, &work), ==,
+        TC_TLV_LIMIT);
     limits.max_depth = 8;
     work = 10000;
-    munit_assert_int(tc_x509_policy_qualifiers_check(&policy, 1, &limits, NULL, 0, &work), ==,
-                     TC_TLV_LIMIT);
+    munit_assert_int(
+        tc_x509_policy_qualifiers_check(&policy, 1, &limits, (TC_TLV_frames){NULL, 0}, &work), ==,
+        TC_TLV_LIMIT);
   }
   /* The final fixture is an unknown qualifier on an ordinary policy. */
   work = 10000;
-  munit_assert_int(tc_x509_policy_qualifiers_check(&policy, 0, &limits, frames, 8, &work), ==,
-                   TC_TLV_OK);
+  munit_assert_int(
+      tc_x509_policy_qualifiers_check(&policy, 0, &limits, (TC_TLV_frames){frames, 8}, &work), ==,
+      TC_TLV_OK);
   policy.oid.data = wildcard;
   policy.oid.length = sizeof wildcard;
   work = 10000;
-  munit_assert_int(tc_x509_policy_qualifiers_check(&policy, 0, &limits, frames, 8, &work), ==,
-                   TC_TLV_UNSUPPORTED);
+  munit_assert_int(
+      tc_x509_policy_qualifiers_check(&policy, 0, &limits, (TC_TLV_frames){frames, 8}, &work), ==,
+      TC_TLV_UNSUPPORTED);
   return MUNIT_OK;
 }
 
@@ -703,8 +719,8 @@ static MunitResult usage(const MunitParameter params[], void* user)
   TC_X509_certificate certificates[2];
   const TC_TLV_limits limits = {1024, 1024, 64, 8};
   TC_X509_extension_summary summaries[3];
-  tc_x509_path_input input = {certificates, 1,    2,    2048, NULL, NULL, NULL,
-                              &limits,      NULL, NULL, NULL, summaries, 0, 0, 0};
+  tc_x509_path_input input = {certificates, 1,    2,    2048,      NULL, NULL, NULL, &limits,
+                              NULL,         NULL, NULL, summaries, 0,    0,    0};
   uint32_t left[32], right[32];
   uint8_t used[4];
   TC_TLV_frame frames[8];
@@ -722,46 +738,46 @@ static MunitResult usage(const MunitParameter params[], void* user)
   certificates[0].issuer = certificates[0].subject;
   certificates[0].extensions.data = extensions;
   certificates[0].extensions.length = sizeof extensions;
-  munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted), ==,
-                   TC_TLV_OK);
+  munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted),
+                   ==, TC_TLV_OK);
   munit_assert_int(accepted, ==, 1);
   required = 100000 - work;
   for (i = 0; i < required; ++i) {
     accepted = 99;
     work = i;
-    munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted), ==,
-                     TC_TLV_LIMIT);
+    munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted),
+                     ==, TC_TLV_LIMIT);
     munit_assert_int(accepted, ==, 99);
   }
   extensions[29] = 2;
   work = 100000;
-  munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted), ==,
-                   TC_TLV_OK);
+  munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted),
+                   ==, TC_TLV_OK);
   munit_assert_int(accepted, ==, 0);
   extensions[29] = 1;
   purpose.key_usage = 2;
   work = 100000;
-  munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted), ==,
-                   TC_TLV_OK);
+  munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted),
+                   ==, TC_TLV_OK);
   munit_assert_int(accepted, ==, 0);
   purpose.key_usage = 1;
   certificates[0].extensions.data = NULL;
   certificates[0].extensions.length = 0;
   work = 100000;
-  munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted), ==,
-                   TC_TLV_OK);
+  munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted),
+                   ==, TC_TLV_OK);
   munit_assert_int(accepted, ==, 0);
   purpose.require_key_usage = purpose.require_extended_key_usage = 0;
   work = 100000;
-  munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted), ==,
-                   TC_TLV_OK);
+  munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted),
+                   ==, TC_TLV_OK);
   munit_assert_int(accepted, ==, 1);
   certificates[0].extensions.data = unknown;
   certificates[0].extensions.length = sizeof unknown;
   work = 100000;
   accepted = 99;
-  munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted), ==,
-                   TC_TLV_UNSUPPORTED);
+  munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted),
+                   ==, TC_TLV_UNSUPPORTED);
   munit_assert_int(accepted, ==, 99);
   /* Remove the critical BOOLEAN, retaining the same unknown extension OID. */
   unknown[1] = 9;
@@ -770,44 +786,44 @@ static MunitResult usage(const MunitParameter params[], void* user)
   unknown[10] = 0;
   certificates[0].extensions.length = 11;
   work = 100000;
-  munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted), ==,
-                   TC_TLV_OK);
+  munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted),
+                   ==, TC_TLV_OK);
   munit_assert_int(accepted, ==, 1);
   certificates[0].extensions.data = wildcard;
   certificates[0].extensions.length = sizeof wildcard;
   work = 100000;
-  munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted), ==,
-                   TC_TLV_OK);
+  munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted),
+                   ==, TC_TLV_OK);
   munit_assert_int(accepted, ==, 1);
   certificates[1] = certificates[0];
   input.count = 2;
   purpose.inhibit_any_purpose = 1;
   work = 100000;
-  munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted), ==,
-                   TC_TLV_OK);
+  munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted),
+                   ==, TC_TLV_OK);
   munit_assert_int(accepted, ==, 0);
   input.count = 1;
   certificates[0].extensions.data = extensions;
   certificates[0].extensions.length = sizeof extensions;
   work = 100000;
-  munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted), ==,
-                   TC_TLV_OK);
+  munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted),
+                   ==, TC_TLV_OK);
   munit_assert_int(accepted, ==, 1);
   /* An explicit match remains usable alongside the wildcard. */
   certificates[0].extensions = (TC_bytes){combined, sizeof combined};
   work = 100000;
-  munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted), ==,
-                   TC_TLV_OK);
+  munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted),
+                   ==, TC_TLV_OK);
   munit_assert_int(accepted, ==, 1);
   certificates[0].extensions = (TC_bytes){NULL, 0};
   work = 100000;
-  munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted), ==,
-                   TC_TLV_OK);
+  munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted),
+                   ==, TC_TLV_OK);
   munit_assert_int(accepted, ==, 1);
   purpose.require_extended_key_usage = 1;
   work = 100000;
-  munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted), ==,
-                   TC_TLV_OK);
+  munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted),
+                   ==, TC_TLV_OK);
   munit_assert_int(accepted, ==, 0);
   purpose.require_extended_key_usage = 0;
   /* Isolate the intermediate's wildcard while the leaf explicitly permits use. */
@@ -818,14 +834,14 @@ static MunitResult usage(const MunitParameter params[], void* user)
   for (unsigned inhibit = 0; inhibit < 2; ++inhibit) {
     purpose.inhibit_any_purpose = (int)inhibit;
     work = 100000;
-    munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted), ==,
-                     TC_TLV_OK);
+    munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted),
+                     ==, TC_TLV_OK);
     munit_assert_int(accepted, ==, !inhibit);
     const size_t needed = 100000 - work;
     work = needed - 1;
     accepted = 99;
-    munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted), ==,
-                     TC_TLV_LIMIT);
+    munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted),
+                     ==, TC_TLV_LIMIT);
     munit_assert_int(accepted, ==, 99);
   }
   certificates[1].extensions = (TC_bytes){wildcard, sizeof wildcard};
@@ -836,8 +852,8 @@ static MunitResult usage(const MunitParameter params[], void* user)
   certificates[0].extensions.length = sizeof extensions;
   extensions[29] = 2;
   work = 100000;
-  munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted), ==,
-                   TC_TLV_OK);
+  munit_assert_int(tc_x509_path_extensions(fresh(&input), &purpose, &workspace, &work, &accepted),
+                   ==, TC_TLV_OK);
   munit_assert_int(accepted, ==, 0);
   return MUNIT_OK;
 }

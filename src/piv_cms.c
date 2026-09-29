@@ -183,8 +183,7 @@ TC_TLV_result TC_PIV_CMS_read(TC_bytes encoded, TC_PIV_CMS_kind kind, TC_PIV_oid
   if (!cms_kind_valid(kind) || (oids != TC_PIV_OIDS_ONLY && oids != TC_PIV_OIDS_TWIC_COMPATIBLE) ||
       (attributes != TC_CMS_ATTRIBUTES_DER && attributes != TC_CMS_ATTRIBUTES_BER_DEFINITE_ORDER))
     return TC_TLV_ARGUMENT;
-  result =
-      tc_pki_reader_storage(encoded, limits, frames.data, frames.capacity, work, out, sizeof *out);
+  result = tc_pki_reader_storage(encoded, limits, frames, work, out, sizeof *out);
   if (result != TC_TLV_OK)
     return result;
   const tc_pki_tree_workspace tree = {frames.data, frames.capacity, work};

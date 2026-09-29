@@ -29,18 +29,18 @@ static void emit(TC_TLV_visit visit, void* user, TC_TLV_event_kind kind, size_t 
 }
 
 static TC_TLV_result initialize(TC_TLV_stream* s, TC_TLV_profile profile,
-                                const TC_TLV_limits* limits, TC_TLV_frame* frames, size_t capacity)
+                                const TC_TLV_limits* limits, TC_TLV_frames frames)
 {
   TC_TLV_result result = tc_tlv_config(profile, limits);
   if (result != TC_TLV_OK)
     return result;
-  if (!s || (!frames && capacity))
+  if (!s || (!frames.data && frames.capacity))
     return TC_TLV_ARGUMENT;
   memset(s, 0, sizeof *s);
   s->profile = profile;
   s->limits = *limits;
-  s->frames = frames;
-  s->capacity = capacity;
+  s->frames = frames.data;
+  s->capacity = frames.capacity;
   return TC_TLV_OK;
 }
 
@@ -199,7 +199,7 @@ static TC_TLV_result finish(TC_TLV_stream* s)
 TC_TLV_result TC_TLV_stream_init(TC_TLV_stream* s, TC_TLV_profile profile,
                                  const TC_TLV_limits* limits, TC_TLV_frames frames)
 {
-  return initialize(s, profile, limits, frames.data, frames.capacity);
+  return initialize(s, profile, limits, frames);
 }
 TC_TLV_result TC_TLV_stream_feed(TC_TLV_stream* s, const uint8_t* data, size_t length,
                                  TC_TLV_visit visit, void* user)
@@ -220,7 +220,7 @@ TC_TLV_result TC_TLV_walk(const uint8_t* data, size_t length, TC_TLV_profile pro
   TC_TLV_result result;
   if (!data && length)
     return TC_TLV_ARGUMENT;
-  result = initialize(&s, profile, limits, frames.data, frames.capacity);
+  result = initialize(&s, profile, limits, frames);
   if (result != TC_TLV_OK)
     return result;
   result = feed(&s, data, length, visit, user);
@@ -242,7 +242,7 @@ TC_TLV_result TC_TLV_read_tree(const uint8_t* data, size_t length, TC_TLV_profil
   result = TC_TLV_header_read(data, length, profile, limits, &element.header);
   if (result != TC_TLV_OK)
     return result;
-  result = initialize(&s, profile, limits, frames.data, frames.capacity);
+  result = initialize(&s, profile, limits, frames);
   if (result != TC_TLV_OK)
     return result;
   result = feed(&s, data, element.header.header_length, NULL, NULL);
