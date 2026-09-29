@@ -62,9 +62,7 @@ static TC_bytes span(const value* v)
 
 static void take(value* v, const char* hex)
 {
-  const long length = tc_cavp_parse_hex(hex, v->data, sizeof v->data);
-  munit_assert_long(length, >=, 0);
-  v->length = (size_t)length;
+  v->length = tc_test_hex(hex, v->data, sizeof v->data);
 }
 
 /* Map a DRBGVS option header to a configuration. Returns 0 for options this
@@ -190,9 +188,8 @@ static void run_file(const char* directory, variant kind, const char* name,
       munit_assert_size(t.entropy_pr_count, <, 2);
       take(&t.entropy_pr[t.entropy_pr_count++], v);
     } else if (tc_cavp_is(&reader, "ReturnedBits")) {
-      const long length = tc_cavp_parse_hex(v, t.returned, sizeof t.returned);
-      munit_assert_long(length, >, 0);
-      t.returned_length = (size_t)length;
+      t.returned_length = tc_test_hex(v, t.returned, sizeof t.returned);
+      munit_assert_size(t.returned_length, >, 0);
       if (supported) {
         run_trial(kind, &config, &t, relative, option);
         ++run;

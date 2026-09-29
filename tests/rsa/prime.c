@@ -5,7 +5,7 @@
 #include "../../src/mp_prime_internal.h"
 #include "../../src/rsa_prime_internal.h"
 #include "munit.h"
-#include "test_util.h"
+#include "cavp.h"
 #include <stdio.h>
 
 /* One Miller-Rabin round with its own preparation. */
@@ -311,7 +311,7 @@ static MunitResult primality_vectors(const MunitParameter params[], void* user)
     munit_assert_not_null(verdict);
     munit_assert_not_null(id);
     munit_assert_null(strtok(NULL, " \t\r\n"));
-    size_t length = tc_test_decode_hex(value, candidate, sizeof candidate);
+    size_t length = tc_test_hex(value, candidate, sizeof candidate);
     munit_assert_size(length * 2, ==, strlen(value));
     size_t width = (length + sizeof(tc_mp_word) - 1) / sizeof(tc_mp_word) * sizeof(tc_mp_word);
     uint32_t seed = UINT32_C(0x9e3779b9);

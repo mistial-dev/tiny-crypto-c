@@ -134,6 +134,7 @@ add_test(NAME test_package_boundaries
   endif()
 
   include(${CMAKE_CURRENT_LIST_DIR}/TestProfiles.cmake)
+  tc_add_c_test(test_support_hex tiny-crypto-c-test tests/support/hex_test.c)
   tc_add_c_test(test_hash_dispatch tiny-crypto-c-test tests/hash/dispatch.c)
   tc_add_c_test(test_rsa_mgf tiny-crypto-c-test tests/rsa/mgf.c)
   tc_add_c_test(test_rsa_pss tiny-crypto-c-test tests/rsa/pss.c)
@@ -852,11 +853,18 @@ add_test(NAME test_package_boundaries
     target_link_libraries(test_x509_native PRIVATE OpenSSL::Crypto)
     set_property(TARGET test_x509_native PROPERTY NO_SYSTEM_FROM_IMPORTED TRUE)
     tc_add_c_test(test_lds_native tiny-crypto-c-test-pki-native tests/cms/lds.c)
-    tc_add_c_test(test_cms_native tiny-crypto-c-test-pki-native tests/cms/native.c
-      tests/support/cms_crl_harness.c tests/support/x509_crl_harness.c
-      examples/cms_reader.c examples/cms_validate.c examples/credential_object.c examples/x509_revocation.c
-      examples/card_key_policy.c examples/credential_workflow.c src/twic_ccl.c)
-    target_compile_definitions(test_cms_native PRIVATE TC_ENABLE_TWIC_CCL=1)
+    # native.c covers SignedData, CHUID and security objects, path.c the
+    # signer path builder and credential validation, revocation.c signed CRLs.
+    foreach(cms_suite native path revocation)
+      tc_add_c_test(test_cms_${cms_suite} tiny-crypto-c-test-pki-native tests/cms/${cms_suite}.c
+        tests/support/cms_crl_harness.c tests/support/x509_crl_harness.c
+        examples/cms_reader.c examples/cms_validate.c examples/credential_object.c
+        examples/x509_revocation.c examples/card_key_policy.c examples/credential_workflow.c
+        src/twic_ccl.c)
+      target_compile_definitions(test_cms_${cms_suite} PRIVATE TC_ENABLE_TWIC_CCL=1)
+      target_link_libraries(test_cms_${cms_suite} PRIVATE OpenSSL::Crypto)
+      set_property(TARGET test_cms_${cms_suite} PROPERTY NO_SYSTEM_FROM_IMPORTED TRUE)
+    endforeach()
     add_executable(cms_check examples/cms_check.c examples/cms_reader.c
       examples/cms_validate.c examples/pki_input.c)
     target_link_libraries(cms_check PRIVATE tiny-crypto-c-test-pki-native)
@@ -866,8 +874,6 @@ add_test(NAME test_package_boundaries
       add_test(NAME test_cms_command COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/cms/command.py $<TARGET_FILE:cms_check>)
     endif()
-    target_link_libraries(test_cms_native PRIVATE OpenSSL::Crypto)
-    set_property(TARGET test_cms_native PROPERTY NO_SYSTEM_FROM_IMPORTED TRUE)
     tc_add_c_test(test_cms_pss tiny-crypto-c-test-pki-native tests/cms/pss.c)
     tc_add_c_test(test_rsa_key_openssl tiny-crypto-c-test-pki-native tests/rsa/key_openssl.c
       examples/rsa_read.c examples/rsa_validate.c examples/rsa_sign.c)
@@ -1052,53 +1058,64 @@ add_test(NAME test_package_boundaries
     if(NOT CMAKE_C_COMPILER_ID MATCHES "Clang")
       message(FATAL_ERROR "Fuzz targets require Clang with libFuzzer")
     endif()
+    function(tc_add_fuzzer target)
+      add_executable(${target} ${ARGN})
+      target_include_directories(${target} PRIVATE src)
+      target_compile_options(${target} PRIVATE -fsanitize=fuzzer,address,undefined
+        -fno-omit-frame-pointer)
+      target_link_options(${target} PRIVATE -fsanitize=fuzzer,address,undefined)
+      tc_warnings(${target})
+    endfunction()
+    # Replay tests/fuzz/<name> and any listed fixture directories once without
+    # mutation. Add each crash reproducer to tests/fuzz/<name> after the fix.
+    function(tc_add_fuzz_regression name)
+      add_test(NAME test_fuzz_${name}_regression COMMAND fuzz_${name} -runs=0
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/fuzz/${name} ${ARGN})
+    endfunction()
+    set(tc_vectors ${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors)
+
     get_target_property(gzip_fuzz_sources tiny-crypto-c-test-gzip SOURCES)
     get_target_property(gzip_fuzz_definitions tiny-crypto-c-test-gzip COMPILE_DEFINITIONS)
-    add_executable(fuzz_gzip tests/gzip/fuzz.c ${gzip_fuzz_sources})
-    target_include_directories(fuzz_gzip PRIVATE src)
+    tc_add_fuzzer(fuzz_gzip tests/gzip/fuzz.c ${gzip_fuzz_sources})
     target_compile_definitions(fuzz_gzip PRIVATE ${gzip_fuzz_definitions})
-    target_compile_options(fuzz_gzip PRIVATE -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer)
-    target_link_options(fuzz_gzip PRIVATE -fsanitize=fuzzer,address,undefined)
-    tc_warnings(fuzz_gzip)
-    add_executable(fuzz_tlv tests/tlv/fuzz.c src/tlv.c src/tlv_walk.c src/der.c)
-    target_include_directories(fuzz_tlv PRIVATE src)
+    tc_add_fuzz_regression(gzip)
+
+    tc_add_fuzzer(fuzz_tlv tests/tlv/fuzz.c src/tlv.c src/tlv_walk.c src/der.c)
     target_compile_definitions(fuzz_tlv PRIVATE TC_ENABLE_TLV=1 TC_ENABLE_DER=1
       TC_TLV_ENABLE_BER=1 TC_TLV_ENABLE_STREAM=1)
-    target_compile_options(fuzz_tlv PRIVATE -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer)
-    target_link_options(fuzz_tlv PRIVATE -fsanitize=fuzzer,address,undefined)
-    tc_warnings(fuzz_tlv)
+    tc_add_fuzz_regression(tlv ${tc_vectors}/x509/rfc)
+
     get_target_property(pki_fuzz_sources tiny-crypto-c-test-pki SOURCES)
     get_target_property(pki_fuzz_definitions tiny-crypto-c-test-pki COMPILE_DEFINITIONS)
     list(REMOVE_ITEM pki_fuzz_definitions TC_ENABLE_SHA256=0)
-    add_executable(fuzz_pki tests/x509/fuzz.c tests/support/x509_crl_harness.c ${tc_hash_sources} ${pki_fuzz_sources})
-    target_include_directories(fuzz_pki PRIVATE src)
+    tc_add_fuzzer(fuzz_pki tests/x509/fuzz.c tests/support/x509_crl_harness.c ${tc_hash_sources}
+      ${pki_fuzz_sources} src/x509_trust_anchor.c)
     target_compile_definitions(fuzz_pki PRIVATE ${pki_fuzz_definitions}
-      TC_ENABLE_SHA256=1)
-    target_compile_options(fuzz_pki PRIVATE -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer)
-    target_link_options(fuzz_pki PRIVATE -fsanitize=fuzzer,address,undefined)
-    tc_warnings(fuzz_pki)
+      TC_ENABLE_SHA256=1 TC_ENABLE_TRUST_ANCHOR_FORMAT=1)
+    tc_add_fuzz_regression(pki ${tc_vectors}/x509/rfc ${tc_vectors}/twic/synthetic/legacy
+      ${tc_vectors}/twic/synthetic/nexgen)
+
     get_target_property(ocsp_fuzz_sources tiny-crypto-c-test-pki-native SOURCES)
     get_target_property(ocsp_fuzz_definitions tiny-crypto-c-test-pki-native COMPILE_DEFINITIONS)
-    add_executable(fuzz_ocsp tests/x509/fuzz_ocsp.c ${ocsp_fuzz_sources})
-    target_include_directories(fuzz_ocsp PRIVATE src tests/support)
+    tc_add_fuzzer(fuzz_ocsp tests/x509/fuzz_ocsp.c ${ocsp_fuzz_sources})
+    target_include_directories(fuzz_ocsp PRIVATE tests/support)
     target_compile_definitions(fuzz_ocsp PRIVATE ${ocsp_fuzz_definitions}
-      TC_OCSP_FUZZ_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/x509/ocsp/icam")
-    target_compile_options(fuzz_ocsp PRIVATE -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer)
-    target_link_options(fuzz_ocsp PRIVATE -fsanitize=fuzzer,address,undefined)
-    tc_warnings(fuzz_ocsp)
-    # Replay the checked-in OCSP fixtures once as the regression corpus.
-    add_test(NAME test_fuzz_ocsp_fixtures COMMAND fuzz_ocsp -runs=0
-      ${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/x509/ocsp/icam
-      ${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/x509/ocsp/local
-      ${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/x509/ocsp/sd33)
+      TC_OCSP_FUZZ_ROOT="${tc_vectors}/x509/ocsp/icam")
+    tc_add_fuzz_regression(ocsp ${tc_vectors}/x509/ocsp/icam ${tc_vectors}/x509/ocsp/local
+      ${tc_vectors}/x509/ocsp/sd33)
+
     get_target_property(sm_fuzz_sources tiny-crypto-c-test-piv-sm SOURCES)
     get_target_property(sm_fuzz_definitions tiny-crypto-c-test-piv-sm COMPILE_DEFINITIONS)
-    add_executable(fuzz_piv_sm tests/piv/sm_fuzz.c ${sm_fuzz_sources})
-    target_include_directories(fuzz_piv_sm PRIVATE src)
+    tc_add_fuzzer(fuzz_piv_sm tests/piv/sm_fuzz.c ${sm_fuzz_sources})
     target_compile_definitions(fuzz_piv_sm PRIVATE ${sm_fuzz_definitions})
-    target_compile_options(fuzz_piv_sm PRIVATE -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer)
-    target_link_options(fuzz_piv_sm PRIVATE -fsanitize=fuzzer,address,undefined)
-    tc_warnings(fuzz_piv_sm)
+    tc_add_fuzz_regression(piv_sm)
+
+    tc_add_fuzzer(fuzz_twic tests/twic/fuzz.c src/common.c src/tlv.c src/tlv_walk.c src/der.c
+      src/credential_text_internal.c src/twic_ccl.c src/aamva.c src/twic_tpk.c)
+    target_compile_definitions(fuzz_twic PRIVATE TC_ENABLE_TLV=1 TC_ENABLE_DER=1
+      TC_ENABLE_TWIC_CCL=1 TC_ENABLE_AAMVA=1 TC_ENABLE_TWIC_TPK=1
+      TC_ENABLE_AES=0 TC_ENABLE_SHA256=0)
+    tc_add_fuzz_regression(twic ${tc_vectors}/twic/synthetic/legacy)
   endif()
 
   tc_add_c_test(test_kmac tiny-crypto-c-test tests/kmac/test.c)
@@ -1198,7 +1215,7 @@ add_test(NAME test_package_boundaries
   tc_add_linked_test(test_hkdf_example tiny-crypto-c-test examples/hkdf.c)
   if(Python3_Interpreter_FOUND)
     tc_add_test_executable(test_hkdf_reader tests/kdf/hkdf_reader.c
-      tests/support/test_util.c tests/support/cavp.c)
+      tests/support/cavp.c tests/support/munit.c)
     target_link_libraries(test_hkdf_reader PRIVATE tiny-crypto-c-test)
     target_include_directories(test_hkdf_reader PRIVATE tests/support)
     add_test(NAME test_hkdf_wycheproof

@@ -2,7 +2,7 @@
 #include <tiny_crypto/tiny_crypto.h>
 #include <tiny_crypto/x509_crypto.h>
 #include "munit.h"
-#include "test_util.h"
+#include "cavp.h"
 #include "rsa_vectors.h"
 #include <string.h>
 
@@ -130,12 +130,12 @@ static MunitResult rsa_signature(const MunitParameter params[], void* context)
                                             TC_HASH_SHA256, TC_HASH_SHA256, TC_SHA256_DIGESTLEN};
   for (size_t i = 0; i < sizeof rsa_vectors / sizeof *rsa_vectors; ++i) {
     TC_X509_public_key key;
-    size_t spki_length = tc_test_decode_hex(rsa_vectors[i].spki, spki, sizeof spki);
-    size_t signature_length = tc_test_decode_hex(pss ? rsa_vectors[i].pss : rsa_vectors[i].v15,
-                                                 signature, sizeof signature);
+    size_t spki_length = tc_test_hex(rsa_vectors[i].spki, spki, sizeof spki);
+    size_t signature_length =
+        tc_test_hex(pss ? rsa_vectors[i].pss : rsa_vectors[i].v15, signature, sizeof signature);
     munit_assert_size(spki_length, >, 0);
     munit_assert_size(signature_length, ==, rsa_vectors[i].bits / 8);
-    munit_assert_size(tc_test_decode_hex(rsa_digest, digest, sizeof digest), ==, sizeof digest);
+    munit_assert_size(tc_test_hex(rsa_digest, digest, sizeof digest), ==, sizeof digest);
     munit_assert_int(TC_X509_subject_public_key((TC_bytes){spki, spki_length}, &key), ==,
                      TC_TLV_OK);
     munit_assert_uint(key.bits, ==, rsa_vectors[i].bits);

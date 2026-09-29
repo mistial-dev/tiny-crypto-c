@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/sskdf.h>
 #include "munit.h"
+#include "cavp.h"
 #include "test_util.h"
 #include <stdlib.h>
 #include <string.h>
@@ -76,9 +77,9 @@ static MunitResult nist_kas_answers(const MunitParameter params[], void* user)
   (void)user;
   for (i = 0; i < sizeof nist_kas_vectors / sizeof nist_kas_vectors[0]; ++i) {
     const nist_kas_vector* vector = &nist_kas_vectors[i];
-    size_t z_len = tc_test_decode_hex(vector->z, z, sizeof z);
-    size_t info_len = tc_test_decode_hex(vector->other_info, other, sizeof other);
-    size_t output_len = tc_test_decode_hex(vector->dkm, expected, sizeof expected);
+    size_t z_len = tc_test_hex(vector->z, z, sizeof z);
+    size_t info_len = tc_test_hex(vector->other_info, other, sizeof other);
+    size_t output_len = tc_test_hex(vector->dkm, expected, sizeof expected);
     derive_fn derive = family_for(vector->hash_bits);
     TC_bytes info[] = {{other, info_len / 2}, {other + info_len / 2, info_len - info_len / 2}};
     if (!derive)
@@ -113,13 +114,13 @@ static MunitResult acvp_one_step_answers(const MunitParameter params[], void* us
     size_t z_len, dkm_len;
     if (!derive)
       continue;
-    z_len = tc_test_decode_hex(vector->z, z, sizeof z);
-    dkm_len = tc_test_decode_hex(vector->dkm, expected, sizeof expected);
+    z_len = tc_test_hex(vector->z, z, sizeof z);
+    dkm_len = tc_test_hex(vector->dkm, expected, sizeof expected);
     munit_assert_size(z_len * 2, ==, strlen(vector->z));
     munit_assert_size(dkm_len * 2, ==, strlen(vector->dkm));
     for (f = 0; f < 6; ++f) {
       info[f].data = fields[f];
-      info[f].length = tc_test_decode_hex(vector->fixed_info[f], fields[f], sizeof fields[f]);
+      info[f].length = tc_test_hex(vector->fixed_info[f], fields[f], sizeof fields[f]);
       munit_assert_size(info[f].length * 2, ==, strlen(vector->fixed_info[f]));
     }
     memset(output, 0xa5, sizeof output);
@@ -152,10 +153,10 @@ static MunitResult captured_answer(const MunitParameter params[], void* user)
     return MUNIT_SKIP;
   derive = family_for((unsigned)strtoul(capture[0], NULL, 10));
   munit_assert_true(derive != NULL);
-  z_len = tc_test_decode_hex(capture[1], z, sizeof z);
+  z_len = tc_test_hex(capture[1], z, sizeof z);
   info.data = other;
-  info.length = tc_test_decode_hex(capture[2], other, sizeof other);
-  length = tc_test_decode_hex(capture[3], expected, sizeof expected);
+  info.length = tc_test_hex(capture[2], other, sizeof other);
+  length = tc_test_hex(capture[3], expected, sizeof expected);
   munit_assert_size(z_len, >, 0);
   munit_assert_size(info.length, >, 0);
   munit_assert_size(length, >, 0);
@@ -205,7 +206,7 @@ static MunitResult known_answers(const MunitParameter params[], void* user)
     if (!derive)
       continue;
     ++ran;
-    munit_assert_size(tc_test_decode_hex(answers[a].answer, expected, sizeof expected), ==,
+    munit_assert_size(tc_test_hex(answers[a].answer, expected, sizeof expected), ==,
                       sizeof expected);
     for (split = 0; split < sizeof text; ++split) {
       info[0].data = text;

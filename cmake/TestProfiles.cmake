@@ -116,6 +116,17 @@ target_compile_definitions(tiny-crypto-c-test-des-reject-weak PUBLIC
   TC_DES_ENABLE_CFB8=0 TC_DES_ENABLE_CFB64=0 TC_DES_ENABLE_TDES=1
   TC_DES_ENABLE_CMAC=1 TC_DES_ENABLE_ISO9797=1 TC_DES_REJECT_WEAK_KEYS=1)
 
+# DES MACs over a forward cipher that fails on request (TC_TEST_DES_FAULT).
+tc_add_test_library(tiny-crypto-c-test-des-fault
+  src/common.c ${tc_des_sources} src/mac_core.c)
+target_compile_definitions(tiny-crypto-c-test-des-fault PUBLIC
+  TC_ENABLE_AES=0 TC_ENABLE_DES=1 TC_ENABLE_SHA1=0 TC_ENABLE_SHA224=0
+  TC_ENABLE_SHA256=0 TC_ENABLE_SHA384=0 TC_ENABLE_SHA512=0
+  TC_ENABLE_HMAC=0 TC_ENABLE_KDF=0 TC_DES_ENABLE_TDES=1
+  TC_DES_ENABLE_CMAC=1 TC_DES_ENABLE_ISO9797=1 TC_DES_REJECT_WEAK_KEYS=0
+  TC_TEST_DES_FAULT=1)
+tc_add_c_test(test_des_mac_failure tiny-crypto-c-test-des-fault tests/des/mac_failure.c)
+
 tc_add_test_library(tiny-crypto-c-test-aes-runtime-sbox
   src/common.c ${tc_aes_sources})
 target_compile_definitions(tiny-crypto-c-test-aes-runtime-sbox PUBLIC

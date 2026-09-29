@@ -11,7 +11,5 @@ void tc_test_fill_stride3(uint8_t* output, size_t length, uint8_t seed);
 /* Return 1 when every byte of memory equals value. */
 int tc_test_all_value(const void* memory, size_t length, uint8_t value);
 int tc_test_all_zero(const void* memory, size_t length);
-size_t tc_test_decode_hex(const char* text, uint8_t* output, size_t capacity);
-size_t tc_test_decode_hex_relaxed(const char* text, uint8_t* output, size_t capacity);
 
 #endif

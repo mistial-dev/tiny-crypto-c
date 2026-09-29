@@ -90,11 +90,11 @@ GitHub Actions runs these configurations:
 | Push `host` (macOS, Windows)       | Release, no OpenSSL                                                                        | every configured test except the OpenSSL cross-checks                       |
 | Push `extended`                    | `make test-sanitize TINY_CRYPTO_TEST_OPENSSL=ON`, `make test-msan` (Clang)                 | tests without the `extended` label                                          |
 | Push `esp32p4`                     | ESP-IDF 5.5.1                                                                              | builds for both roles and for the `signed-rsa` and `signed-ecdsa` fragments |
-| Push `parser`                      | Clang fuzzers                                                                              | fixed fuzzing time for each harness, OCSP seeded from its fixtures          |
+| Push `parser`                      | Clang fuzzers                                                                              | regression corpus replay, then fixed fuzzing time for each seeded harness   |
 | Manual **Full test suite**         | `make test-full` and `make test-sanitize-full` with OpenSSL, `make test-msan-full` (Clang) | every configured test, including CAVP                                       |
 
-Push CI omits the `TINY_CRYPTO_TEST_FULL` CAVP suites, fuzz regression replay
-other than the OCSP fixtures, and the external capture corpora described below.
+Push CI omits the `TINY_CRYPTO_TEST_FULL` CAVP suites and the external capture
+corpora described below.
 
 Use `act` to run the push sanitizer checks in Linux. `--bind` includes current
 working tree changes:
@@ -115,6 +115,15 @@ The Wycheproof runners report accepted input categories and excluded parameters.
 C tests use [µunit](https://nemequ.github.io/munit/). C++ tests use
 [doctest](https://github.com/doctest/doctest). CTest also checks installed
 consumers, package boundaries, and resource-profile configuration.
+Test code decodes hex through one helper in `tests/support/cavp.c`.
+`tc_test_hex` decodes a well-formed fixture and fails the test otherwise.
+`tc_test_hex_decode` reports malformed values from external files and selects
+field or separated-byte syntax. `test_support_hex` covers both.
+Fault seams exercise failure paths that the shipped ciphers cannot reach.
+`test_aes_backend_failure` and `test_aes_mode_failure` fail chosen AES block
+calls. `test_des_mac_failure` builds the DES MACs with `TC_TEST_DES_FAULT` and
+fails each DES block call of CMAC and ISO/IEC 9797-1 in turn. Every failure
+must return `TC_ERROR`, wipe the context and leave the tag untouched.
 The installed-consumer check builds a separate Release library, installs it,
 and compiles isolated C99 and C++11 callers against that installation. It also
 builds the X.509, CMS, TWIC validation and RSA encryption examples. The isolated
@@ -289,7 +298,7 @@ and work limits. These readers return borrowed values and leave their format-spe
 to the caller.
 
 ```sh
-ctest --test-dir build -R '^test_cms_(reader|attributes|algorithm|signer_info|children|octets|content|verify|verify_content|pss|native)$' --output-on-failure
+ctest --test-dir build -R '^test_cms_(reader|attributes|algorithm|signer_info|children|octets|content|verify|verify_content|pss|native|path|revocation)$' --output-on-failure
 ```
 
 With OpenSSL tests enabled, `test_cms_native` connects BER content hashing,
@@ -322,7 +331,7 @@ split at every byte boundary in nested BER OCTET STRINGs, parsed as SignerInfo,
 and verified with the native provider. These cases also check corrupted
 signatures and short scratch buffers.
 
-`test_cms_native` also checks the public signer path builder with issuer/serial
+`test_cms_path` checks the public signer path builder with issuer/serial
 and key-ID signers, an embedded intermediate and an explicit external anchor.
 Cases cover missing intermediates/anchors, expired certificates, changed content
 and signatures, wrong identifiers and missing providers. Candidate retries retain
@@ -332,7 +341,7 @@ input, and source records overlapping the certificate index. The compiled exampl
 is exercised with a valid chain and by installed C/C++ consumers.
 Complete SignedData policy and revocation validation remain separate steps.
 
-The combined credential example is exercised by `/cms/native/embedded-path`.
+The combined credential example is exercised by `/cms/path/credential-workflow`.
 It uses a held trust snapshot and signed issuer/root CRLs for clear chains,
 revoked signers and revoked intermediates. Negative cases cover missing CRLs,
 wrong or absent trust anchors, expiration, wrong key usage, changed signatures,
@@ -434,7 +443,7 @@ name normalization, conflicting hints, alternative issuer names and malformed
 tails. Directory names are supported. Other unresolved name forms return
 `TC_TLV_UNSUPPORTED`. Candidate matching identifies possible issuers, and trust
 comes from path validation.
-`test_cms_native` extracts OpenSSL-generated CRLs from CMS,
+`test_cms_revocation` extracts OpenSSL-generated CRLs from CMS,
 reads their entries, and verifies their signatures with the native provider.
 Signer checks cover subject linkage, cRLSign permission, altered signatures,
 missing providers and short work budgets. These checks use the signer
@@ -555,15 +564,17 @@ These cover source limits, borrowed buffers, workspace overlap, dependency
 resolution, and held-path results. Run the signed native revocation cases with:
 
 ```sh
-./build/test_cms_native /cms/native/revocations
+./build/test_cms_revocation
 ```
 
-The `group` parameter selects `signer`, `discovery`, or `selection` checks.
-The `outcome` parameter selects `clear` or `revoked`. Omit it to run both.
-For example, to check signer handling with a CRL containing no revoked entries:
+Each test names one behaviour under `/cms/revocation/signer`,
+`/cms/revocation/discovery` or `/cms/revocation/selection`. The `outcome`
+parameter selects a CRL that lists the target (`revoked`) or one that does not
+(`clear`). Omit it to run both. For example, to check CRL signer candidates
+against a CRL with no revoked entries:
 
 ```sh
-./build/test_cms_native /cms/native/revocations --param group signer --param outcome clear
+./build/test_cms_revocation /cms/revocation/signer/candidates --param outcome clear
 ```
 
 Source errors injected after an issuer is resolved preserve the target output
@@ -773,7 +784,8 @@ Check the test listing before treating this as a full run. Expect
 be absent when their paths are unset or Python is unavailable.
 Also check for `test_wycheproof_ecdsa`, `test_wycheproof_rsa_signatures`,
 `test_wycheproof_rsa_generation`, `test_wycheproof_primality`,
-the `test_wycheproof_rsa_oaep_*` shards, `test_cms_native`, and the OpenSSL RSA private-operation
+the `test_wycheproof_rsa_oaep_*` shards, `test_cms_native`, `test_cms_path`,
+`test_cms_revocation`, and the OpenSSL RSA private-operation
 tests. On macOS, this configuration includes `test_twic_authenticate_command`.
 
 The vendored FIPS 186 vectors enable `test_nist_dss_*`. ECDSA tests cover
@@ -970,51 +982,77 @@ ctest --test-dir build -R '^test_piv_(cvc_corpus|sm_authenticate)$' --output-on-
 
 ## Fuzzing
 
-Fuzzing runs separately from CTest. Use Clang with libFuzzer support and keep
-the writable corpus and crash artifacts outside the source tree.
-CI builds all five harnesses and runs each for 60 seconds with an 8192-byte input
-limit and a two-second per-input timeout. The OCSP harness starts from the
-fixtures in `tests/vectors/x509/ocsp`, and `test_fuzz_ocsp_fixtures` replays
-them once under CTest in the fuzzer build.
-On macOS, use Homebrew LLVM if the Apple toolchain lacks the libFuzzer runtime.
-Set the C and C++ compiler paths to its `clang` and `clang++` executables.
-The SM harness tests raw malformed responses and builds authenticated CS2/CS7
-responses from fuzz input to exercise decryption, invalid padding, and
-output-buffer retries.
+Use Clang with libFuzzer support and keep the writable corpus and crash
+artifacts outside the source tree. On macOS, use Homebrew LLVM if the Apple
+toolchain lacks the libFuzzer runtime. Set the C and C++ compiler paths to its
+`clang` and `clang++` executables.
+
+| Harness       | Inputs                                                                       |
+| ------------- | ---------------------------------------------------------------------------- |
+| `fuzz_tlv`    | BER and DER TLV readers, walkers and streams                                 |
+| `fuzz_pki`    | certificates, CRLs, CMS, names, PIV and EAC objects, TrustAnchorList records |
+| `fuzz_ocsp`   | OCSP responses for the ICAM fixture certificates and OCSP request encoding   |
+| `fuzz_piv_sm` | PIV secure messaging responses                                               |
+| `fuzz_gzip`   | GZIP certificate decompression                                               |
+| `fuzz_twic`   | TSA canceled card list CSV and index images, AAMVA payloads, TWIC TPK        |
+
+Each harness has a regression corpus in `tests/fuzz/<name>`, where `<name>` is
+the harness name without the `fuzz_` prefix. The fuzzer build registers
+`test_fuzz_<name>_regression`, which replays that directory and the listed
+fixture directories under `tests/vectors` once with `-runs=0`. Add each crash
+reproducer to the regression corpus with the fix that resolves it. Keep the
+files small and synthetic, with no private keys or captured credential data.
+
+CI replays the regression corpora, then runs each harness for 60 seconds with
+an 8192-byte input limit and a two-second per-input timeout. Each run starts
+from its regression corpus plus fixtures under 8 KiB from `tests/vectors`.
+
+The PKI harness includes all three PIV certificate-container profiles. It checks
+that returned spans stay within the input and failures preserve the result.
+It also exercises PIV/TWIC certificate identifiers with bounded work and checks
+FASC-N and TWIC UUID decode/encode round trips. The regression corpus holds
+synthetic GeneralNames, a packed 25-byte FASC-N and a 16-byte UUID to reach
+those checks. Security-object checks cover BA/BB/FE mappings and LDS hash
+lookup, including absent groups and output preservation. LDS input can be plain
+DER or a complete BER OCTET STRING. Fragmented content exercises caller-buffer
+assembly. Each input is read as an RFC 5914 TrustAnchorList, and each parsed
+certificate is converted with `TC_X509_store_anchor_from_certificate`. Anchor
+records must borrow the input, and failures must leave the reader and record
+unchanged or zeroed as the header documents.
 The OCSP harness verifies each input as a response for the ICAM fixture
 certificates, with a store delegate and a full and a small work budget. It
 requires zeroed results on failure and borrowed responder spans on success. It
 also encodes a request for each input as a certificate with varied capacity.
+The SM harness tests raw malformed responses and builds authenticated CS2/CS7
+responses from fuzz input to exercise decryption, invalid padding, and
+output-buffer retries.
 The GZIP harness checks decoding with varied capacity and work limits, including
 failure wiping, workspace cleanup and output boundaries.
-The PKI harness includes all three PIV certificate-container profiles. It checks
-that returned spans stay within the input and failures preserve the result.
-It also exercises PIV/TWIC certificate identifiers with bounded work and checks
-FASC-N and TWIC UUID decode/encode round trips. Seed it with synthetic DER
-GeneralNames, packed 25-byte FASC-Ns and 16-byte UUIDs to reach those checks.
-Security-object checks cover BA/BB/FE mappings and LDS hash lookup, including
-absent groups and output preservation. LDS input can be plain DER or a complete
-BER OCTET STRING. Fragmented content exercises caller-buffer assembly.
+The TWIC harness reads the input as one CCL record, as a complete CCL stream in
+one chunk and in input-selected chunks, and as a packed index image. Chunking
+must never change the result or the delivered records. Index lookups must find
+every key within a bounded read count. It also searches AAMVA subfiles and
+fields and reads the TPK in each encoding, with borrowed results and unchanged
+outputs on failure.
 
 ```sh
 cmake -S . -B /tmp/tiny-crypto-fuzz \
   -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
   -DTINY_CRYPTO_BUILD_FUZZERS=ON
 cmake --build /tmp/tiny-crypto-fuzz --target fuzz_tlv fuzz_pki fuzz_piv_sm fuzz_gzip \
-  fuzz_ocsp --parallel
+  fuzz_ocsp fuzz_twic --parallel
+ctest --test-dir /tmp/tiny-crypto-fuzz -R '^test_fuzz_' --output-on-failure
 fuzz_dir=$(mktemp -d /tmp/tiny-crypto-fuzz-inputs.XXXXXX)
-mkdir "$fuzz_dir/tlv" "$fuzz_dir/pki" "$fuzz_dir/sm" "$fuzz_dir/gzip" "$fuzz_dir/ocsp"
+for name in tlv pki piv_sm gzip ocsp twic; do
+  mkdir "$fuzz_dir/$name"
+  cp tests/fuzz/$name/* "$fuzz_dir/$name/"
+done
 cp tests/vectors/x509/ocsp/*/*.der "$fuzz_dir/ocsp/"
-/tmp/tiny-crypto-fuzz/fuzz_tlv "$fuzz_dir/tlv" \
-  -artifact_prefix="$fuzz_dir/" -max_total_time=300
-/tmp/tiny-crypto-fuzz/fuzz_pki "$fuzz_dir/pki" \
-  -artifact_prefix="$fuzz_dir/" -max_total_time=300
-/tmp/tiny-crypto-fuzz/fuzz_piv_sm "$fuzz_dir/sm" \
-  -artifact_prefix="$fuzz_dir/" -max_total_time=300
-/tmp/tiny-crypto-fuzz/fuzz_gzip "$fuzz_dir/gzip" \
-  -artifact_prefix="$fuzz_dir/" -max_total_time=300
-/tmp/tiny-crypto-fuzz/fuzz_ocsp "$fuzz_dir/ocsp" \
-  -artifact_prefix="$fuzz_dir/" -max_total_time=300
+cp tests/vectors/twic/synthetic/*/trust-anchor*.der "$fuzz_dir/pki/"
+for name in tlv pki piv_sm gzip ocsp twic; do
+  /tmp/tiny-crypto-fuzz/fuzz_$name "$fuzz_dir/$name" \
+    -artifact_prefix="$fuzz_dir/" -max_total_time=300
+done
 ```
 
 ## RSA arithmetic and encoding tests

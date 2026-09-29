@@ -1,17 +1,9 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "../../src/rsa_padding_internal.h"
+#include "cavp.h"
 #include "munit.h"
 #include <string.h>
-
-static void decode_hex(uint8_t* out, size_t length, const char* hex)
-{
-  const char* digits = "0123456789abcdef";
-  munit_assert_size(strlen(hex), ==, length * 2);
-  for (size_t i = 0; i < length; ++i)
-    out[i] = (uint8_t)(((strchr(digits, hex[2 * i]) - digits) << 4) |
-                       (strchr(digits, hex[2 * i + 1]) - digits));
-}
 
 static MunitResult representative(const MunitParameter params[], void* user)
 {
@@ -25,7 +17,7 @@ static MunitResult representative(const MunitParameter params[], void* user)
   uint32_t work = 10000, required;
   (void)params;
   (void)user;
-  decode_hex(fixture, sizeof fixture, hex);
+  munit_assert_size(tc_test_hex(hex, fixture, sizeof fixture), ==, sizeof fixture);
   for (size_t i = 0; i < sizeof digest; ++i)
     digest[i] = (uint8_t)i;
   memcpy(encoded, fixture, sizeof encoded);
@@ -109,7 +101,7 @@ static MunitResult salt_boundaries(const MunitParameter params[], void* user)
   for (size_t i = 0; i < 2; ++i) {
     size_t salt_length = i ? sizeof salt : 0;
     uint32_t work = 10000;
-    decode_hex(expected, sizeof expected, fixtures[i]);
+    munit_assert_size(tc_test_hex(fixtures[i], expected, sizeof expected), ==, sizeof expected);
     munit_assert_int(tc_rsa_pss_encode(&(TC_RSA_pss_options){TC_HASH_SHA256, TC_HASH_SHA256, 0},
                                        (TC_buffer){encoded, sizeof encoded}, 1023,
                                        (TC_bytes){digest, sizeof digest},

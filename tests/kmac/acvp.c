@@ -3,7 +3,7 @@
 /* Pinned NIST ACVP and independently computed OpenSSL KMAC-256 answers. */
 #include <tiny_crypto/kmac.h>
 #include "munit.h"
-#include "test_util.h"
+#include "cavp.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -13,7 +13,7 @@
 
 static size_t read_hex(const char* field, uint8_t* output, size_t capacity)
 {
-  return strcmp(field, "-") == 0 ? 0 : tc_test_decode_hex(field, output, capacity);
+  return strcmp(field, "-") == 0 ? 0 : tc_test_hex(field, output, capacity);
 }
 
 static MunitResult fixed_output(const MunitParameter params[], void* user)

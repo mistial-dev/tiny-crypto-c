@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "bootloader_sha.h"
 #include "munit.h"
-#include "test_util.h"
+#include "cavp.h"
 #include <string.h>
 
 static MunitResult hashes(const MunitParameter params[], void* user)
@@ -18,7 +18,7 @@ static MunitResult hashes(const MunitParameter params[], void* user)
   for (algorithm = 0; algorithm < 3; ++algorithm) {
     size_t split;
     uint8_t expected[64], digest[64];
-    size_t length = tc_test_decode_hex(answers[algorithm], expected, sizeof expected);
+    size_t length = tc_test_hex(answers[algorithm], expected, sizeof expected);
     for (split = 0; split <= 3; ++split) {
       void* handle =
           algorithm == 0 ? bootloader_sha256_start() : bootloader_sha512_start(algorithm == 1);

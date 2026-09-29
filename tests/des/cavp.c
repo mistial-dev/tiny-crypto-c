@@ -516,7 +516,7 @@ static int cavp_run_file(const char* subdir, const char* filename)
       continue;
     }
     if (tc_cavp_is(&reader, "KEYs")) {
-      if (tc_cavp_parse_hex(v, rec.key, 8) != 8) {
+      if (tc_test_hex(v, rec.key, 8) != 8) {
         ok = 0;
         break;
       }
@@ -526,26 +526,26 @@ static int cavp_run_file(const char* subdir, const char* filename)
       continue;
     }
     if (tc_cavp_is(&reader, "KEY1")) {
-      ok &= tc_cavp_parse_hex(v, rec.key, 8) == 8;
+      ok &= tc_test_hex(v, rec.key, 8) == 8;
       rec.have_key = 1;
       continue;
     }
     if (tc_cavp_is(&reader, "KEY2")) {
-      ok &= tc_cavp_parse_hex(v, rec.key + 8, 8) == 8;
+      ok &= tc_test_hex(v, rec.key + 8, 8) == 8;
       continue;
     }
     if (tc_cavp_is(&reader, "KEY3")) {
-      ok &= tc_cavp_parse_hex(v, rec.key + 16, 8) == 8;
+      ok &= tc_test_hex(v, rec.key + 16, 8) == 8;
       continue;
     }
     if (tc_cavp_is(&reader, "IV")) {
-      ok &= tc_cavp_parse_hex(v, rec.iv, 8) == 8;
+      ok &= tc_test_hex(v, rec.iv, 8) == 8;
       rec.have_iv = 1;
       continue;
     }
     if (tc_cavp_is(&reader, "PLAINTEXT")) {
       n = bitmode ? cavp_parse_bits(v, rec.pt, sizeof(rec.pt))
-                  : tc_cavp_parse_hex(v, rec.pt, sizeof(rec.pt));
+                  : (int)tc_test_hex(v, rec.pt, sizeof(rec.pt));
       if (n < 0) {
         ok = 0;
         break;
@@ -554,7 +554,7 @@ static int cavp_run_file(const char* subdir, const char* filename)
       rec.have_pt = 1;
     } else if (tc_cavp_is(&reader, "CIPHERTEXT")) {
       n = bitmode ? cavp_parse_bits(v, rec.ct, sizeof(rec.ct))
-                  : tc_cavp_parse_hex(v, rec.ct, sizeof(rec.ct));
+                  : (int)tc_test_hex(v, rec.ct, sizeof(rec.ct));
       if (n < 0) {
         ok = 0;
         break;

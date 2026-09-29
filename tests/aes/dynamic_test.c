@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/aes_dynamic.h>
 #include "munit.h"
+#include "cavp.h"
 #include "test_util.h"
 #include "mac_vectors.h"
 #include <string.h>
@@ -17,9 +18,9 @@ static MunitResult block_vectors(const MunitParameter params[], void* user)
   (void)params;
   (void)user;
   tc_test_fill_incrementing(key, sizeof key);
-  munit_assert_size(tc_test_decode_hex("00112233445566778899aabbccddeeff", plain, 16), ==, 16);
+  munit_assert_size(tc_test_hex("00112233445566778899aabbccddeeff", plain, 16), ==, 16);
   for (i = 0; i < 3; ++i) {
-    munit_assert_size(tc_test_decode_hex(answers[i], expected, 16), ==, 16);
+    munit_assert_size(tc_test_hex(answers[i], expected, 16), ==, 16);
     memcpy(block, plain, 16);
     munit_assert_int(TC_AES_dynamic_key_init(&ctx, key, 16 + 8 * i), ==, TC_OK);
     munit_assert_int(TC_AES_dynamic_encrypt(&ctx, block), ==, TC_OK);
@@ -50,11 +51,11 @@ static MunitResult cbc_and_cmac_vectors(const MunitParameter params[], void* use
   size_t i, split, length;
   (void)params;
   (void)user;
-  munit_assert_size(tc_test_decode_hex("6bc1bee22e409f96e93d7e117393172a", plain, 16), ==, 16);
+  munit_assert_size(tc_test_hex("6bc1bee22e409f96e93d7e117393172a", plain, 16), ==, 16);
   for (i = 0; i < 3; ++i) {
-    length = tc_test_decode_hex(keys[i], key, sizeof key);
+    length = tc_test_hex(keys[i], key, sizeof key);
     munit_assert_size(length, ==, 16 + 8 * i);
-    munit_assert_size(tc_test_decode_hex(cbc[i], expected, 16), ==, 16);
+    munit_assert_size(tc_test_hex(cbc[i], expected, 16), ==, 16);
     munit_assert_int(TC_AES_dynamic_key_init(&ctx, key, length), ==, TC_OK);
     tc_test_fill_incrementing(iv, sizeof iv);
     memcpy(block, plain, 16);
@@ -65,7 +66,7 @@ static MunitResult cbc_and_cmac_vectors(const MunitParameter params[], void* use
     munit_assert_int(TC_AES_dynamic_CBC_decrypt(&ctx, iv, block, 16), ==, TC_OK);
     munit_assert_memory_equal(16, block, plain);
     munit_assert_memory_equal(16, iv, expected);
-    munit_assert_size(tc_test_decode_hex(tags[i], expected, 16), ==, 16);
+    munit_assert_size(tc_test_hex(tags[i], expected, 16), ==, 16);
     for (split = 0; split <= 16; ++split) {
       munit_assert_int(TC_AES_dynamic_CMAC_init(&mac, key, length), ==, TC_OK);
       munit_assert_int(TC_AES_dynamic_CMAC_update(&mac, plain, split), ==, TC_OK);

@@ -21,6 +21,7 @@
 #include <tiny_crypto/twic_uuid.h>
 #include <tiny_crypto/x509.h>
 #include <tiny_crypto/x509_path.h>
+#include <tiny_crypto/x509_trust_anchor.h>
 #include "../support/x509_crl_harness.h"
 
 typedef struct {
@@ -275,6 +276,85 @@ static void fuzz_string_chunks(unsigned tag, TC_bytes input)
       abort();
   } else if (partial == TC_TLV_OK)
     abort();
+}
+
+static void check_anchor_spans(TC_bytes input, const TC_X509_store_anchor* anchor)
+{
+  check_borrowed_span(input, anchor->trust.name);
+  check_borrowed_span(input, anchor->trust.public_key.key);
+  check_borrowed_span(input, anchor->names.permitted);
+  check_borrowed_span(input, anchor->names.excluded);
+  check_borrowed_span(input, anchor->key_id);
+  check_borrowed_span(input, anchor->title);
+  check_borrowed_span(input, anchor->title_language);
+  check_borrowed_span(input, anchor->policy_set);
+  check_borrowed_span(input, anchor->extensions);
+  check_borrowed_span(input, anchor->certificate_extensions);
+  if (anchor->replaced_controls &
+      ~(unsigned)(TC_X509_ANCHOR_REPLACED_POLICY_SET | TC_X509_ANCHOR_REPLACED_POLICY_FLAGS |
+                  TC_X509_ANCHOR_REPLACED_NAMES | TC_X509_ANCHOR_REPLACED_PATH_LEN))
+    abort();
+  if (!anchor->x509_unusable && !anchor->trust.name.length)
+    abort();
+}
+
+/* RFC 5914 TrustAnchorList decoding. Every record borrows the list DER, and
+ * failures leave the reader and the record unchanged. */
+static void fuzz_trust_anchor_list(TC_bytes input)
+{
+  enum { FRAMES = 16, OIDS = 32, MAX_ANCHORS = 64 };
+  const TC_TLV_limits limits = {32768, 32768, 2048, FRAMES};
+  TC_TLV_frame frames[FRAMES];
+  TC_bytes oids[OIDS];
+  TC_X509_workspace workspace = {{frames, FRAMES}, oids, OIDS};
+  TC_X509_trust_anchor_reader reader, saved_reader;
+  TC_X509_store_anchor anchor, saved_anchor;
+  TC_TLV_result result;
+  memset(&saved_reader, 0xa5, sizeof saved_reader);
+  memcpy(&reader, &saved_reader, sizeof reader);
+  result = TC_X509_trust_anchor_list_init(&reader, input, &limits, &workspace);
+  if (result != TC_TLV_OK) {
+    if (result == TC_TLV_ARGUMENT || memcmp(&reader, &saved_reader, sizeof reader))
+      abort();
+    return;
+  }
+  memset(&saved_anchor, 0xa5, sizeof saved_anchor);
+  for (size_t count = 0; count < MAX_ANCHORS; ++count) {
+    memcpy(&saved_reader, &reader, sizeof saved_reader);
+    memcpy(&anchor, &saved_anchor, sizeof anchor);
+    result = TC_X509_trust_anchor_next(&reader, &anchor);
+    if (result != TC_TLV_OK) {
+      if (result == TC_TLV_ARGUMENT || memcmp(&reader, &saved_reader, sizeof reader) ||
+          memcmp(&anchor, &saved_anchor, sizeof anchor))
+        abort();
+      return;
+    }
+    if (reader.reader.offset <= saved_reader.reader.offset)
+      abort();
+    check_anchor_spans(input, &anchor);
+  }
+}
+
+/* Anchor records built from a parsed certificate borrow its DER. After
+ * argument checks, failures zero the record. */
+static void fuzz_certificate_anchor(const TC_X509_certificate* certificate,
+                                    const TC_TLV_limits* limits, TC_X509_workspace* workspace)
+{
+  TC_X509_store_anchor anchor;
+  memset(&anchor, 0xa5, sizeof anchor);
+  const TC_TLV_result result =
+      TC_X509_store_anchor_from_certificate(certificate, limits, workspace, &anchor);
+  if (result == TC_TLV_OK) {
+    if (anchor.x509_unusable || anchor.replaced_controls)
+      abort();
+    check_anchor_spans(certificate->encoded, &anchor);
+    return;
+  }
+  if (result == TC_TLV_ARGUMENT)
+    abort();
+  for (size_t i = 0; i < sizeof anchor; ++i)
+    if (((const uint8_t*)&anchor)[i])
+      abort();
 }
 
 /* Bypass cryptography here so DER mutations reach the path's structural checks.
@@ -568,6 +648,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
   fuzz_identity_codecs((TC_bytes){data, length});
   fuzz_security_container((TC_bytes){data, length});
   fuzz_lds((TC_bytes){data, length});
+  fuzz_trust_anchor_list((TC_bytes){data, length});
   {
     TC_bytes number = {NULL, 99};
     TC_X509_time date, previous;
@@ -822,6 +903,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
     if (certificate.encoded.data != data || certificate.encoded.length != length ||
         certificate.version < 1 || certificate.version > 3)
       abort();
+    fuzz_certificate_anchor(&certificate, &limits, &workspace);
     if (TC_X509_extensions_init(&reader, certificate.extensions, &limits) != TC_TLV_OK)
       abort();
     while ((result = TC_X509_extension_next(&reader, &extension)) == TC_TLV_OK) {

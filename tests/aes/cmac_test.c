@@ -451,12 +451,13 @@ static MunitResult test_cmac_wycheproof(const MunitParameter params[], void* dat
         uint8_t msg[64];
         uint8_t tag[TC_AES_CMAC_TAG_MAX];
         uint8_t out[TC_AES_CMAC_TAG_MAX];
-        size_t key_len, msg_len, tag_len;
+        /* A value that fails to decode keeps SIZE_MAX. */
+        size_t key_len = SIZE_MAX, msg_len = SIZE_MAX, tag_len = SIZE_MAX;
         int expect_ok = (strcmp(result, "valid") == 0);
 
-        key_len = tc_test_decode_hex_relaxed(key_hex, key, sizeof(key));
-        msg_len = tc_test_decode_hex_relaxed(msg_hex, msg, sizeof(msg));
-        tag_len = tc_test_decode_hex_relaxed(tag_hex, tag, sizeof(tag));
+        (void)tc_test_hex_decode(key_hex, TC_TEST_HEX_SEPARATED, key, sizeof(key), &key_len);
+        (void)tc_test_hex_decode(msg_hex, TC_TEST_HEX_SEPARATED, msg, sizeof(msg), &msg_len);
+        (void)tc_test_hex_decode(tag_hex, TC_TEST_HEX_SEPARATED, tag, sizeof(tag), &tag_len);
 
         if (key_len == SIZE_MAX || msg_len == SIZE_MAX || (tag_len == SIZE_MAX && expect_ok)) {
           ++failed;
@@ -560,8 +561,7 @@ static MunitResult cmac_run_cavp_file(const char* name, int is_verify, unsigned*
     else if (tc_cavp_is(&reader, "Tlen"))
       tlen = (size_t)strtoul(value, NULL, 10);
     else if (tc_cavp_is(&reader, "Key")) {
-      key_len = tc_test_decode_hex_relaxed(value, key, sizeof(key));
-      have_key = (key_len != SIZE_MAX);
+      have_key = tc_test_hex_decode(value, TC_TEST_HEX_SEPARATED, key, sizeof(key), &key_len);
     } else if (tc_cavp_is(&reader, "Msg")) {
       if (mlen == 0) {
         msg_len = 0;
@@ -569,12 +569,13 @@ static MunitResult cmac_run_cavp_file(const char* name, int is_verify, unsigned*
       } else if (mlen > CMAC_CAVP_MSG_MAX)
         have_msg = 0;
       else {
-        msg_len = tc_test_decode_hex_relaxed(value, msg, CMAC_CAVP_MSG_MAX);
-        have_msg = (msg_len != SIZE_MAX && msg_len == mlen);
+        have_msg =
+            tc_test_hex_decode(value, TC_TEST_HEX_SEPARATED, msg, CMAC_CAVP_MSG_MAX, &msg_len) &&
+            msg_len == mlen;
       }
     } else if (tc_cavp_is(&reader, "Mac")) {
-      mac_len = tc_test_decode_hex_relaxed(value, mac, sizeof(mac));
-      have_mac = (mac_len != SIZE_MAX && tlen != 0 && mac_len == tlen);
+      have_mac = tc_test_hex_decode(value, TC_TEST_HEX_SEPARATED, mac, sizeof(mac), &mac_len) &&
+                 tlen != 0 && mac_len == tlen;
       if (!is_verify && have_key && have_msg && have_mac && key_len == TC_AES_KEYLEN) {
         ++ran;
         if (cmac_cavp_generate(key, msg_len ? msg : NULL, msg_len, out, tlen) != TC_OK ||

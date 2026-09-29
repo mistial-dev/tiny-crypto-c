@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/ec.h>
 #include "munit.h"
-#include "test_util.h"
+#include "cavp.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,7 +34,7 @@ static MunitResult vectors(const MunitParameter params[], void* data)
     munit_assert_true(bits == 192 || bits == 256 || bits == 384);
     TC_EC_curve curve = bits == 192 ? TC_EC_P192 : bits == 256 ? TC_EC_P256 : TC_EC_P384;
     size_t width = bits / 8;
-    size_t length = tc_test_decode_hex(fields[2], point, sizeof point);
+    size_t length = tc_test_hex(fields[2], point, sizeof point);
     munit_assert_size(strlen(fields[2]), ==, 2 * length);
     if (!strcmp(fields[0], "pkv")) {
       munit_assert_size(columns, ==, 4);
@@ -48,7 +48,7 @@ static MunitResult vectors(const MunitParameter params[], void* data)
       munit_assert_string_equal(fields[0], "keypair");
       munit_assert_size(columns, ==, 4);
       munit_assert_size(length, ==, 1 + 2 * width);
-      size_t scalar_length = tc_test_decode_hex(fields[3], scalar, sizeof scalar);
+      size_t scalar_length = tc_test_hex(fields[3], scalar, sizeof scalar);
       munit_assert_size(scalar_length, ==, width);
       munit_assert_size(strlen(fields[3]), ==, 2 * scalar_length);
       TC_work_budget work = {UINT32_MAX};

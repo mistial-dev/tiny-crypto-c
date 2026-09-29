@@ -194,25 +194,25 @@ static void cavp_run_file(const char* relative, int mode, int has_counter,
     if (tc_cavp_is(&reader, "L"))
       rec.l_bits = strtol(v, NULL, 10);
     else if (tc_cavp_is(&reader, "KI"))
-      rec.ki_len = tc_cavp_parse_hex(v, rec.ki, sizeof(rec.ki));
+      rec.ki_len = (long)tc_test_hex(v, rec.ki, sizeof(rec.ki));
     else if (tc_cavp_is(&reader, "IVlen"))
       rec.iv_bits = strtol(v, NULL, 10);
     else if (tc_cavp_is(&reader, "IV"))
-      rec.iv_len = tc_cavp_parse_hex(v, rec.iv, sizeof(rec.iv));
+      rec.iv_len = (long)tc_test_hex(v, rec.iv, sizeof(rec.iv));
     else if (tc_cavp_is(&reader, "FixedInputDataByteLen"))
       rec.fixed_bytes = strtol(v, NULL, 10);
     else if (tc_cavp_is(&reader, "FixedInputData"))
-      rec.fixed_len = tc_cavp_parse_hex(v, rec.fixed, sizeof(rec.fixed));
+      rec.fixed_len = (long)tc_test_hex(v, rec.fixed, sizeof(rec.fixed));
     else if (tc_cavp_is(&reader, "DataBeforeCtrLen"))
       rec.before_bytes = strtol(v, NULL, 10);
     else if (tc_cavp_is(&reader, "DataBeforeCtrData"))
-      rec.before_len = tc_cavp_parse_hex(v, rec.before, sizeof(rec.before));
+      rec.before_len = (long)tc_test_hex(v, rec.before, sizeof(rec.before));
     else if (tc_cavp_is(&reader, "DataAfterCtrLen"))
       rec.after_bytes = strtol(v, NULL, 10);
     else if (tc_cavp_is(&reader, "DataAfterCtrData"))
-      rec.after_len = tc_cavp_parse_hex(v, rec.after, sizeof(rec.after));
+      rec.after_len = (long)tc_test_hex(v, rec.after, sizeof(rec.after));
     else if (tc_cavp_is(&reader, "KO")) {
-      long ko_len = tc_cavp_parse_hex(v, ko, sizeof(ko));
+      long ko_len = (long)tc_test_hex(v, ko, sizeof(ko));
       struct TC_KBKDF_params p;
       TC_status rc;
 

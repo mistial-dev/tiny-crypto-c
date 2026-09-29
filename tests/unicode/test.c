@@ -3,7 +3,7 @@
 #include "../../src/unicode_internal.h"
 #include "../../src/string_internal.h"
 #include "munit.h"
-#include "test_util.h"
+#include "cavp.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -495,11 +495,9 @@ static MunitResult preparation_oracle(const MunitParameter params[], void* user)
     TC_TLV_result result;
     size_t written = SIZE_MAX, work = 500000, expected_bytes, i;
     value.data = input;
-    value.length = strcmp(input_hex, "-") ? tc_test_decode_hex(input_hex, input, sizeof input) : 0;
+    value.length = strcmp(input_hex, "-") ? tc_test_hex(input_hex, input, sizeof input) : 0;
     expected_bytes =
-        strcmp(expected_hex, "-") ? tc_test_decode_hex(expected_hex, expected, sizeof expected) : 0;
-    munit_assert_size(value.length, !=, SIZE_MAX);
-    munit_assert_size(expected_bytes, !=, SIZE_MAX);
+        strcmp(expected_hex, "-") ? tc_test_hex(expected_hex, expected, sizeof expected) : 0;
     munit_assert_size(expected_bytes % 4, ==, 0);
     result = tc_unicode_prepare(tag, value, output, 1024, &written, &work);
     if ((int)result != status)

@@ -45,17 +45,27 @@ static inline TC_status tc_des_block_decrypt(const void* key, uint8_t* block)
   return TC_OK;
 }
 
+#if defined(TC_TEST_DES_FAULT)
+/* Test seam: the test supplies a forward cipher that fails on request, so the
+ * failure paths shared with fallible AES backends can run with DES. */
+TC_status tc_test_des_block_encrypt(const void* key, uint8_t* block);
+#define TC_DES_DESCRIPTOR_ENCRYPT tc_test_des_block_encrypt
+#else
+#define TC_DES_DESCRIPTOR_ENCRYPT tc_des_block_encrypt
+#endif
+
 /* Forward-only descriptor for the stream modes, CBC encryption and the MACs. */
 static inline tc_block_cipher tc_des_block_cipher(const tc_des_block_key* key)
 {
-  const tc_block_cipher cipher = {TC_DES_BLOCKLEN, key, tc_des_block_encrypt, NULL};
+  const tc_block_cipher cipher = {TC_DES_BLOCKLEN, key, TC_DES_DESCRIPTOR_ENCRYPT, NULL};
   return cipher;
 }
 
 /* Descriptor with the inverse cipher, for CBC decryption. */
 static inline tc_block_cipher tc_des_block_cipher_inverse(const tc_des_block_key* key)
 {
-  const tc_block_cipher cipher = {TC_DES_BLOCKLEN, key, tc_des_block_encrypt, tc_des_block_decrypt};
+  const tc_block_cipher cipher = {TC_DES_BLOCKLEN, key, TC_DES_DESCRIPTOR_ENCRYPT,
+                                  tc_des_block_decrypt};
   return cipher;
 }
 

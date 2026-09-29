@@ -2,7 +2,7 @@
 #include <tiny_crypto/ec.h>
 #include <tiny_crypto/der.h>
 #include "munit.h"
-#include "test_util.h"
+#include "cavp.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,10 +35,10 @@ static MunitResult vectors(const MunitParameter params[], void* data)
     unsigned bits = (unsigned)strtoul(fields[0], NULL, 10);
     munit_assert_true(bits == 192 || bits == 256 || bits == 384);
     TC_EC_curve curve = bits == 192 ? TC_EC_P192 : bits == 256 ? TC_EC_P256 : TC_EC_P384;
-    size_t key_len = tc_test_decode_hex(fields[1], key, sizeof key);
-    size_t digest_len = tc_test_decode_hex(fields[2], digest, sizeof digest);
+    size_t key_len = tc_test_hex(fields[1], key, sizeof key);
+    size_t digest_len = tc_test_hex(fields[2], digest, sizeof digest);
     size_t signature_len =
-        strcmp(fields[3], "-") ? tc_test_decode_hex(fields[3], signature, sizeof signature) : 0;
+        strcmp(fields[3], "-") ? tc_test_hex(fields[3], signature, sizeof signature) : 0;
     munit_assert_size(key_len * 2, ==, strlen(fields[1]));
     munit_assert_size(digest_len * 2, ==, strlen(fields[2]));
     if (strcmp(fields[3], "-"))

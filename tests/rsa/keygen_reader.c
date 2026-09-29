@@ -2,7 +2,7 @@
 /* Validate NIST CAVP generated key material through the public RSA API. */
 #include <tiny_crypto/rsa.h>
 #include "munit.h"
-#include "test_util.h"
+#include "cavp.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -44,11 +44,11 @@ static MunitResult vectors(const MunitParameter params[], void* data)
       token = strtok(NULL, " \t\r\n");
     }
     munit_assert_size(columns, ==, 6);
-    size_t nl = tc_test_decode_hex(fields[0], n, sizeof n);
-    size_t el = tc_test_decode_hex(fields[1], e, sizeof e);
-    size_t dl = tc_test_decode_hex(fields[2], d, sizeof d);
-    size_t pl = tc_test_decode_hex(fields[3], p, sizeof p);
-    size_t ql = tc_test_decode_hex(fields[4], q, sizeof q);
+    size_t nl = tc_test_hex(fields[0], n, sizeof n);
+    size_t el = tc_test_hex(fields[1], e, sizeof e);
+    size_t dl = tc_test_hex(fields[2], d, sizeof d);
+    size_t pl = tc_test_hex(fields[3], p, sizeof p);
+    size_t ql = tc_test_hex(fields[4], q, sizeof q);
     munit_assert_size(nl * 2, ==, strlen(fields[0]));
     munit_assert_size(el * 2, ==, strlen(fields[1]));
     munit_assert_size(dl * 2, ==, strlen(fields[2]));

@@ -113,6 +113,7 @@ static MunitResult test_key_schedule(const MunitParameter params[], void* data)
       "749c47ab18501ddae2757e4f7401905acafaaae3e4d59b349adf6acebd10190d"
       "fe4890d1e6188d0b046df344706c631e";
 #endif
+  uint8_t schedule[TC_AES_KEY_EXP_SIZE];
   struct TC_AES_key_ctx ctx;
   size_t i;
 
@@ -121,11 +122,9 @@ static MunitResult test_key_schedule(const MunitParameter params[], void* data)
   test_initialize_sbox();
   munit_assert_size(sizeof(expected) - 1u, ==, 2u * TC_AES_KEY_EXP_SIZE);
   munit_assert_int(TC_AES_key_init(&ctx, TEST_KEY), ==, TC_OK);
-  for (i = 0; i < TC_AES_KEY_EXP_SIZE; ++i) {
-    const uint8_t value = (uint8_t)((tc_cavp_hex_nibble(expected[2u * i]) << 4) |
-                                    tc_cavp_hex_nibble(expected[2u * i + 1u]));
-    munit_assert_uint8(ctx.round_key[i], ==, value);
-  }
+  munit_assert_size(tc_test_hex(expected, schedule, sizeof schedule), ==, sizeof schedule);
+  for (i = 0; i < TC_AES_KEY_EXP_SIZE; ++i)
+    munit_assert_uint8(ctx.round_key[i], ==, schedule[i]);
   return MUNIT_OK;
 }
 

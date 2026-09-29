@@ -78,10 +78,27 @@ int tc_cavp_header_has(const tc_cavp_reader* reader, const char* label);
 
 void tc_cavp_close(tc_cavp_reader* reader);
 
-int tc_cavp_hex_nibble(int c);
-/* Decode hex up to the first NUL, CR, LF or space. Returns the byte count,
- * or -1 for an odd length, a non-hex character or too little capacity. */
-long tc_cavp_parse_hex(const char* text, uint8_t* output, size_t capacity);
+typedef enum {
+  /* One field value. The digits may be followed by spaces, tabs, CR or LF
+   * and end at NUL or a closing '"'. Any other text after them fails. */
+  TC_TEST_HEX_FIELD,
+  /* Hex bytes with any non-hex separators between them, such as "00 01:02".
+   * Decoding ends at NUL. */
+  TC_TEST_HEX_SEPARATED
+} tc_test_hex_format;
+
+/* The one hex decoder of the test suite. Decode text into output and store
+ * the byte count in *length. Returns 1 on success. Returns 0 with *length
+ * unchanged for an odd digit count, a non-hex character inside a byte, a
+ * non-hex character in TC_TEST_HEX_FIELD format, or more bytes than capacity.
+ * output may change on failure. */
+int tc_test_hex_decode(const char* text, tc_test_hex_format format, uint8_t* output,
+                       size_t capacity, size_t* length);
+/* Decode a fixture known to be well formed in TC_TEST_HEX_FIELD format and
+ * return its byte count. Malformed text or too little capacity fails the
+ * current munit test. Readers of external files that must report malformed
+ * values call tc_test_hex_decode instead. */
+size_t tc_test_hex(const char* text, uint8_t* output, size_t capacity);
 /* Match "NAME = value" in a raw line and return the value, or NULL. */
 const char* tc_cavp_field_value(const char* line, const char* name);
 void tc_cavp_print_bytes(const char* label, const uint8_t* data, size_t length);

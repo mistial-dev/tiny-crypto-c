@@ -10,6 +10,7 @@
 #include <tiny_crypto/hash.h>
 #include "munit.h"
 #include "test_io.h"
+#include "cavp.h"
 #include "test_util.h"
 #include "test_vectors.h"
 
@@ -1070,9 +1071,10 @@ static long json_number(const char* p)
 /* Decodes the quoted hex string at p. */
 static size_t json_hex(const char* p, uint8_t* out, size_t capacity)
 {
-  if (*p != '"')
+  size_t length = SIZE_MAX;
+  if (*p != '"' || !tc_test_hex_decode(p + 1, TC_TEST_HEX_FIELD, out, capacity, &length))
     return SIZE_MAX;
-  return tc_test_decode_hex(p + 1, out, capacity);
+  return length;
 }
 
 struct wycheproof_case {

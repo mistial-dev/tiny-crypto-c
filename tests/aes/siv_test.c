@@ -8,7 +8,7 @@
 
 #include <tiny_crypto/aes.h>
 #include "munit.h"
-#include "test_util.h"
+#include "cavp.h"
 #include "test_io.h"
 
 #include <stdio.h>
@@ -249,16 +249,18 @@ static MunitResult test_siv_wycheproof(const MunitParameter params[], void* data
         uint8_t out_ct[4096];
         uint8_t out_pt[4096];
         uint8_t out_v[TC_AES_SIV_V_LEN];
-        size_t key_len, iv_len, aad_len, msg_len, ct_len, tag_len;
+        /* A value that fails to decode keeps SIZE_MAX. */
+        size_t key_len = SIZE_MAX, iv_len = SIZE_MAX, aad_len = SIZE_MAX, msg_len = SIZE_MAX,
+               ct_len = SIZE_MAX, tag_len = SIZE_MAX;
         TC_bytes ad[2];
         int expect_ok = (strcmp(result, "valid") == 0);
 
-        key_len = tc_test_decode_hex_relaxed(key_hex, key, sizeof(key));
-        iv_len = tc_test_decode_hex_relaxed(iv_hex, iv, sizeof(iv));
-        aad_len = tc_test_decode_hex_relaxed(aad_hex, aad, sizeof(aad));
-        msg_len = tc_test_decode_hex_relaxed(msg_hex, msg, sizeof(msg));
-        ct_len = tc_test_decode_hex_relaxed(ct_hex, ct, sizeof(ct));
-        tag_len = tc_test_decode_hex_relaxed(tag_hex, tag, sizeof(tag));
+        (void)tc_test_hex_decode(key_hex, TC_TEST_HEX_SEPARATED, key, sizeof(key), &key_len);
+        (void)tc_test_hex_decode(iv_hex, TC_TEST_HEX_SEPARATED, iv, sizeof(iv), &iv_len);
+        (void)tc_test_hex_decode(aad_hex, TC_TEST_HEX_SEPARATED, aad, sizeof(aad), &aad_len);
+        (void)tc_test_hex_decode(msg_hex, TC_TEST_HEX_SEPARATED, msg, sizeof(msg), &msg_len);
+        (void)tc_test_hex_decode(ct_hex, TC_TEST_HEX_SEPARATED, ct, sizeof(ct), &ct_len);
+        (void)tc_test_hex_decode(tag_hex, TC_TEST_HEX_SEPARATED, tag, sizeof(tag), &tag_len);
 
         if (key_len == SIZE_MAX || iv_len == SIZE_MAX || aad_len == SIZE_MAX ||
             msg_len == SIZE_MAX || ct_len == SIZE_MAX || tag_len == SIZE_MAX ||

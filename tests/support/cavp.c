@@ -2,6 +2,7 @@
  * SPDX-FileCopyrightText: Mistial Dev */
 
 #include "cavp.h"
+#include "munit.h"
 #include "test_io.h"
 
 #include <string.h>
@@ -168,7 +169,7 @@ void tc_cavp_close(tc_cavp_reader* reader)
   reader->file = NULL;
 }
 
-int tc_cavp_hex_nibble(int c)
+static int hex_nibble(int c)
 {
   if (c >= '0' && c <= '9')
     return c - '0';
@@ -179,19 +180,50 @@ int tc_cavp_hex_nibble(int c)
   return -1;
 }
 
-long tc_cavp_parse_hex(const char* text, uint8_t* output, size_t capacity)
+static int hex_space(char c)
+{
+  return c == ' ' || c == '\t' || c == '\r' || c == '\n';
+}
+
+/* A field ends at NUL or a closing quote. Whitespace may precede either. */
+static int hex_field_end(const char* text)
+{
+  while (hex_space(*text))
+    ++text;
+  return *text == '\0' || *text == '"';
+}
+
+int tc_test_hex_decode(const char* text, tc_test_hex_format format, uint8_t* output,
+                       size_t capacity, size_t* length)
+{
+  size_t count = 0;
+
+  for (;;) {
+    int high, low;
+    if (format == TC_TEST_HEX_FIELD ? hex_field_end(text) : *text == '\0')
+      break;
+    high = hex_nibble((unsigned char)*text++);
+    if (high < 0) {
+      /* Separators may appear only between bytes. */
+      if (format == TC_TEST_HEX_SEPARATED)
+        continue;
+      return 0;
+    }
+    low = hex_nibble((unsigned char)*text++);
+    if (low < 0 || count == capacity)
+      return 0;
+    output[count++] = (uint8_t)((high << 4) | low);
+  }
+  *length = count;
+  return 1;
+}
+
+size_t tc_test_hex(const char* text, uint8_t* output, size_t capacity)
 {
   size_t length = 0;
-
-  while (text[0] != '\0' && text[0] != '\r' && text[0] != '\n' && text[0] != ' ') {
-    const int high = tc_cavp_hex_nibble((unsigned char)text[0]);
-    const int low = tc_cavp_hex_nibble((unsigned char)text[1]);
-    if (high < 0 || low < 0 || length >= capacity)
-      return -1;
-    output[length++] = (uint8_t)((high << 4) | low);
-    text += 2;
-  }
-  return (long)length;
+  if (!tc_test_hex_decode(text, TC_TEST_HEX_FIELD, output, capacity, &length))
+    munit_errorf("malformed hex fixture or capacity %zu too small: %.64s", capacity, text);
+  return length;
 }
 
 const char* tc_cavp_field_value(const char* line, const char* name)

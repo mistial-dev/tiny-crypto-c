@@ -5,6 +5,7 @@
 #include <tiny_crypto/x509.h>
 #endif
 #include "munit.h"
+#include "cavp.h"
 #include "test_util.h"
 #include <string.h>
 #include <stdio.h>
@@ -113,7 +114,9 @@ static const char* vector_path;
 static MunitResult wycheproof(const MunitParameter params[], void* user)
 {
   static char line[32768];
-  uint8_t scalar[80], public_key[4096], expected[48], output[48], unchanged[48];
+  /* Holds the largest Wycheproof ECDH public value, a 4272-byte SPKI. */
+  static uint8_t public_key[8192];
+  uint8_t scalar[80], expected[48], output[48], unchanged[48];
   TC_EC_workspace workspace;
   FILE* file;
   size_t count = 0;
@@ -139,11 +142,11 @@ static MunitResult wycheproof(const MunitParameter params[], void* user)
     munit_assert_true(strcmp(fields[0], "256") == 0 || strcmp(fields[0], "384") == 0);
     curve = strcmp(fields[0], "256") == 0 ? TC_EC_P256 : TC_EC_P384;
     width = curve == TC_EC_P256 ? 32 : 48;
-    scalar_length = tc_test_decode_hex(fields[2], scalar, sizeof scalar);
+    scalar_length = tc_test_hex(fields[2], scalar, sizeof scalar);
     public_length =
-        strcmp(fields[3], "-") ? tc_test_decode_hex(fields[3], public_key, sizeof public_key) : 0;
+        strcmp(fields[3], "-") ? tc_test_hex(fields[3], public_key, sizeof public_key) : 0;
     expected_length =
-        strcmp(fields[4], "-") ? tc_test_decode_hex(fields[4], expected, sizeof expected) : 0;
+        strcmp(fields[4], "-") ? tc_test_hex(fields[4], expected, sizeof expected) : 0;
     munit_assert_size(scalar_length, ==, strlen(fields[2]) / 2);
     munit_assert_true(strcmp(fields[5], "accept") == 0 || strcmp(fields[5], "reject") == 0);
     memset(&workspace, 0, sizeof workspace);
@@ -192,8 +195,8 @@ static MunitResult signature_answers(const MunitParameter params[], void* user)
   for (size_t v = 0; v < sizeof vectors / sizeof vectors[0]; ++v) {
     size_t n = vectors[v].bytes;
     unsigned borrow = 0;
-    munit_assert_size(tc_test_decode_hex(vectors[v].generator, point, sizeof point), ==, 1 + 2 * n);
-    munit_assert_size(tc_test_decode_hex(vectors[v].order, order, sizeof order), ==, n);
+    munit_assert_size(tc_test_hex(vectors[v].generator, point, sizeof point), ==, 1 + 2 * n);
+    munit_assert_size(tc_test_hex(vectors[v].order, order, sizeof order), ==, n);
     /* d = k = 1 and z = 0 gives Q = G and r = s = Gx for these curves. */
     memcpy(signature, point + 1, n);
     memcpy(signature + n, point + 1, n);
@@ -243,23 +246,21 @@ static MunitResult known_answers(const MunitParameter params[], void* user)
     n = vectors[i].bytes;
     memset(scalar, 0, sizeof scalar);
     scalar[n - 1] = 1;
-    munit_assert_size(tc_test_decode_hex(vectors[i].generator, generator, sizeof generator), ==,
+    munit_assert_size(tc_test_hex(vectors[i].generator, generator, sizeof generator), ==,
                       1 + 2 * n);
     munit_assert_int(ec_public(vectors[i].curve, scalar, n, point, 1 + 2 * n, &w), ==, TC_OK);
     munit_assert_memory_equal(1 + 2 * n, point, generator);
     munit_assert_true(tc_test_all_zero(&w, sizeof w));
     scalar[n - 1] = 2;
-    munit_assert_size(tc_test_decode_hex(vectors[i].twice, expected, sizeof expected), ==,
-                      1 + 2 * n);
+    munit_assert_size(tc_test_hex(vectors[i].twice, expected, sizeof expected), ==, 1 + 2 * n);
     munit_assert_int(ec_public(vectors[i].curve, scalar, n, point, 1 + 2 * n, &w), ==, TC_OK);
     munit_assert_memory_equal(1 + 2 * n, point, expected);
     munit_assert_int(ec_dh(vectors[i].curve, scalar, n, generator, 1 + 2 * n, shared, n, &w), ==,
                      TC_OK);
     munit_assert_memory_equal(n, shared, expected + 1);
     munit_assert_true(tc_test_all_zero(&w, sizeof w));
-    munit_assert_size(tc_test_decode_hex(vectors[i].minus_one, scalar, sizeof scalar), ==, n);
-    munit_assert_size(tc_test_decode_hex(vectors[i].negative, expected, sizeof expected), ==,
-                      1 + 2 * n);
+    munit_assert_size(tc_test_hex(vectors[i].minus_one, scalar, sizeof scalar), ==, n);
+    munit_assert_size(tc_test_hex(vectors[i].negative, expected, sizeof expected), ==, 1 + 2 * n);
     munit_assert_int(ec_public(vectors[i].curve, scalar, n, point, 1 + 2 * n, &w), ==, TC_OK);
     munit_assert_memory_equal(1 + 2 * n, point, expected);
     munit_assert_int(ec_validate(vectors[i].curve, point, 1 + 2 * n, &w), ==, TC_EC_OK);
@@ -288,7 +289,7 @@ static MunitResult rejected_inputs(const MunitParameter params[], void* user)
     munit_assert_int(ec_public(vectors[i].curve, scalar, n, output, 1 + 2 * n, &w), ==,
                      TC_EC_INVALID);
     munit_assert_true(tc_test_all_zero(&w, sizeof w));
-    munit_assert_size(tc_test_decode_hex(vectors[i].order, scalar, sizeof scalar), ==, n);
+    munit_assert_size(tc_test_hex(vectors[i].order, scalar, sizeof scalar), ==, n);
     munit_assert_int(ec_public(vectors[i].curve, scalar, n, output, 1 + 2 * n, &w), ==,
                      TC_EC_INVALID);
     memset(scalar, 0xff, sizeof scalar);
@@ -296,7 +297,7 @@ static MunitResult rejected_inputs(const MunitParameter params[], void* user)
                      TC_EC_INVALID);
     memset(scalar, 0, sizeof scalar);
     scalar[n - 1] = 1;
-    munit_assert_size(tc_test_decode_hex(vectors[i].generator, point, sizeof point), ==, 1 + 2 * n);
+    munit_assert_size(tc_test_hex(vectors[i].generator, point, sizeof point), ==, 1 + 2 * n);
     for (length = 0; length < 1 + 2 * n; ++length)
       munit_assert_int(ec_validate(vectors[i].curve, point, length, &w), ==, TC_EC_INVALID);
     point[0] = 2;
@@ -336,10 +337,10 @@ static MunitResult captured_answer(const MunitParameter params[], void* user)
   munit_assert_true(strcmp(capture[0], "256") == 0 || strcmp(capture[0], "384") == 0);
   curve = strcmp(capture[0], "256") == 0 ? TC_EC_P256 : TC_EC_P384;
   n = curve == TC_EC_P256 ? 32 : 48;
-  munit_assert_size(tc_test_decode_hex(capture[1], scalar, sizeof scalar), ==, n);
-  munit_assert_size(tc_test_decode_hex(capture[2], expected, sizeof expected), ==, 1 + 2 * n);
-  munit_assert_size(tc_test_decode_hex(capture[3], peer, sizeof peer), ==, 1 + 2 * n);
-  munit_assert_size(tc_test_decode_hex(capture[4], z, sizeof z), ==, n);
+  munit_assert_size(tc_test_hex(capture[1], scalar, sizeof scalar), ==, n);
+  munit_assert_size(tc_test_hex(capture[2], expected, sizeof expected), ==, 1 + 2 * n);
+  munit_assert_size(tc_test_hex(capture[3], peer, sizeof peer), ==, 1 + 2 * n);
+  munit_assert_size(tc_test_hex(capture[4], z, sizeof z), ==, n);
   munit_assert_int(ec_public(curve, scalar, n, point, 1 + 2 * n, &w), ==, TC_EC_OK);
   munit_assert_memory_equal(1 + 2 * n, point, expected);
   munit_assert_int(ec_dh(curve, scalar, n, peer, 1 + 2 * n, shared, n, &w), ==, TC_EC_OK);
@@ -386,8 +387,7 @@ static MunitResult generation_answers(const MunitParameter params[], void* user)
   (void)user;
   for (i = 0; i < sizeof vectors / sizeof vectors[0]; ++i) {
     size_t n = vectors[i].bytes;
-    munit_assert_size(tc_test_decode_hex(vectors[i].generator, expected, sizeof expected), ==,
-                      1 + 2 * n);
+    munit_assert_size(tc_test_hex(vectors[i].generator, expected, sizeof expected), ==, 1 + 2 * n);
     memset(private_key, 0xa5, sizeof private_key);
     memset(public_key, 0xa5, sizeof public_key);
     random = (SignRandom){0, 1, 0};
@@ -463,12 +463,10 @@ static MunitResult signing_rfc6979(const MunitParameter params[], void* user)
     size_t n = answers[i].bytes;
     TC_bytes fixed = {nonce, n};
     TC_random_source random = {fixed_nonce, &fixed};
-    munit_assert_size(tc_test_decode_hex(answers[i].private_key, private_key, sizeof private_key),
-                      ==, n);
-    munit_assert_size(tc_test_decode_hex(answers[i].digest, digest, sizeof digest), ==, n);
-    munit_assert_size(tc_test_decode_hex(answers[i].nonce, nonce, sizeof nonce), ==, n);
-    munit_assert_size(tc_test_decode_hex(answers[i].signature, expected, sizeof expected), ==,
-                      2 * n);
+    munit_assert_size(tc_test_hex(answers[i].private_key, private_key, sizeof private_key), ==, n);
+    munit_assert_size(tc_test_hex(answers[i].digest, digest, sizeof digest), ==, n);
+    munit_assert_size(tc_test_hex(answers[i].nonce, nonce, sizeof nonce), ==, n);
+    munit_assert_size(tc_test_hex(answers[i].signature, expected, sizeof expected), ==, 2 * n);
     munit_assert_int(ecdsa_sign(answers[i].curve, (TC_bytes){private_key, n}, (TC_bytes){digest, n},
                                 (TC_buffer){signature, 2 * n},
                                 (TC_EC_execution){random, 1, {UINT32_MAX}}, &workspace),
@@ -496,10 +494,9 @@ static MunitResult signing_rejects_invalid_keys_and_aliasing(const MunitParamete
                    ==, TC_EC_INVALID);
   munit_assert_true(tc_test_all_zero(&workspace, sizeof workspace));
   munit_assert_uint(random.calls, ==, 0);
-  munit_assert_size(
-      tc_test_decode_hex("FFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551", key,
-                         sizeof key),
-      ==, 32);
+  munit_assert_size(tc_test_hex("FFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551",
+                                key, sizeof key),
+                    ==, 32);
   munit_assert_int(ecdsa_sign(TC_EC_P256, (TC_bytes){key, 32}, (TC_bytes){digest, 32},
                               (TC_buffer){signature, 64},
                               (TC_EC_execution){source, 1, {UINT32_MAX}}, &workspace),
@@ -559,17 +556,17 @@ static MunitResult signing_answers(const MunitParameter params[], void* user)
     memset(private_key, 0, sizeof private_key);
     private_key[n - 1] = 1;
     if (n == 48) {
-      munit_assert_size(tc_test_decode_hex("9A9083505BC92276AEC4BE312696EF7BF3BF603F4BBD381196A029F"
-                                           "340585312313BCA4A9B5B890EFEE42C77B1EE25FE",
-                                           digest, sizeof digest),
+      munit_assert_size(tc_test_hex("9A9083505BC92276AEC4BE312696EF7BF3BF603F4BBD381196A029F"
+                                    "340585312313BCA4A9B5B890EFEE42C77B1EE25FE",
+                                    digest, sizeof digest),
                         ==, 48);
     } else {
       munit_assert_size(
-          tc_test_decode_hex("AF2BDBE1AA9B6EC1E2ADE1D694F41FC71A831D0268E9891562113D8A62ADD1BF",
-                             digest, sizeof digest),
+          tc_test_hex("AF2BDBE1AA9B6EC1E2ADE1D694F41FC71A831D0268E9891562113D8A62ADD1BF", digest,
+                      sizeof digest),
           ==, 32);
     }
-    munit_assert_size(tc_test_decode_hex(signatures[i], expected, sizeof expected), ==, 2 * n);
+    munit_assert_size(tc_test_hex(signatures[i], expected, sizeof expected), ==, 2 * n);
     memset(signature, 0xa5, sizeof signature);
     random = (SignRandom){0, 1, 0};
     munit_assert_int(ecdsa_sign(vectors[i].curve, (TC_bytes){private_key, n},
@@ -615,10 +612,10 @@ static MunitResult signing_answers(const MunitParameter params[], void* user)
     memset(private_key, 0, sizeof private_key);
     private_key[23] = 1;
     munit_assert_size(
-        tc_test_decode_hex("AF2BDBE1AA9B6EC1E2ADE1D694F41FC71A831D0268E9891562113D8A62ADD1BF",
-                           digest, sizeof digest),
+        tc_test_hex("AF2BDBE1AA9B6EC1E2ADE1D694F41FC71A831D0268E9891562113D8A62ADD1BF", digest,
+                    sizeof digest),
         ==, 32);
-    munit_assert_size(tc_test_decode_hex(answer, expected, sizeof expected), ==, 48);
+    munit_assert_size(tc_test_hex(answer, expected, sizeof expected), ==, 48);
     random = (SignRandom){0, 0, 0};
     munit_assert_int(ecdsa_sign(TC_EC_P192, (TC_bytes){private_key, 24}, (TC_bytes){digest, 32},
                                 (TC_buffer){signature, 48},
@@ -673,7 +670,7 @@ static MunitResult short_output_and_lengths(const MunitParameter params[], void*
     TC_work_budget work = {UINT32_MAX};
     memset(scalar, 0, sizeof scalar);
     scalar[n - 1] = 1;
-    munit_assert_size(tc_test_decode_hex(vectors[i].generator, point, sizeof point), ==, 1 + 2 * n);
+    munit_assert_size(tc_test_hex(vectors[i].generator, point, sizeof point), ==, 1 + 2 * n);
     memset(output, 0xa5, sizeof output);
     memset(&workspace, 0x5a, sizeof workspace);
     memset(&signature_workspace, 0x5a, sizeof signature_workspace);

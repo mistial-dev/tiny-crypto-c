@@ -62,17 +62,17 @@ static int cavp_decode_hex(const char* text, uint8_t** output, size_t* length)
 {
   const size_t digits = strlen(text);
   uint8_t* result = digits == 0 ? NULL : (uint8_t*)malloc(digits / 2u);
-  long decoded;
+  size_t decoded = 0;
 
   if (digits != 0 && result == NULL)
     return 0;
-  decoded = tc_cavp_parse_hex(text, result, digits / 2u);
-  if (decoded < 0 || (size_t)decoded * 2u != digits) {
+  if (!tc_test_hex_decode(text, TC_TEST_HEX_FIELD, result, digits / 2u, &decoded) ||
+      decoded * 2u != digits) {
     free(result);
     return 0;
   }
   *output = result;
-  *length = (size_t)decoded;
+  *length = decoded;
   return 1;
 }
 

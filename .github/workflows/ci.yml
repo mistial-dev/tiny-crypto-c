@@ -207,25 +207,43 @@ jobs:
       - name: Build
         run: >-
           cmake --build build-parser --target
-          fuzz_tlv fuzz_pki fuzz_piv_sm fuzz_gzip fuzz_ocsp
+          fuzz_tlv fuzz_pki fuzz_piv_sm fuzz_gzip fuzz_ocsp fuzz_twic
           test_tlv_corpus_reader test_x509_reader test_piv_cvc test_piv_chuid
           test_x509_key test_eac_cvc test_eac_reader --parallel 4
       - name: External length cases
         run: ctest --test-dir build-parser -R test_tlv_external_lengths --output-on-failure
       - name: Certificate and PIV cases
         run: ctest --test-dir build-parser -R 'test_(x509_schema|x509_key|piv_cvc|piv_chuid|eac_cvc|eac_schema)$' --output-on-failure
-      - name: Fuzz TLV
-        run: build-parser/fuzz_tlv -max_total_time=60 -max_len=8192 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"
-      - name: Fuzz certificates and PIV objects
-        run: build-parser/fuzz_pki -max_total_time=60 -max_len=8192 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"
-      - name: Fuzz PIV secure messaging responses
-        run: build-parser/fuzz_piv_sm -max_total_time=60 -max_len=8192 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"
-      - name: Fuzz certificate decompression
-        run: build-parser/fuzz_gzip -max_total_time=60 -max_len=8192 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"
-      - name: Replay OCSP fixtures
-        run: ctest --test-dir build-parser -R test_fuzz_ocsp_fixtures --output-on-failure
-      - name: Fuzz OCSP responses and requests
+      - name: Replay fuzz regression corpora
+        run: ctest --test-dir build-parser -R '^test_fuzz_' --output-on-failure
+      - name: Seed fuzz corpora
         run: |
-          mkdir -p "$RUNNER_TEMP/ocsp-corpus"
-          cp tests/vectors/x509/ocsp/*/*.der "$RUNNER_TEMP/ocsp-corpus/"
-          build-parser/fuzz_ocsp "$RUNNER_TEMP/ocsp-corpus" -max_total_time=60 -max_len=8192 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"
+          # Start each harness from its regression corpus plus small fixtures.
+          seed() {
+            target=$1
+            shift
+            mkdir -p "$RUNNER_TEMP/corpus/$target"
+            cp tests/fuzz/"$target"/* "$RUNNER_TEMP/corpus/$target/"
+            for pattern in "$@"; do
+              find tests/vectors -type f -path "$pattern" -size -8k \
+                -exec cp --backup=numbered {} "$RUNNER_TEMP/corpus/$target/" \;
+            done
+          }
+          seed tlv '*.der' '*.cer' '*.crl'
+          seed pki '*.der' '*.cer' '*.crt' '*.crl' '*.p7c' '*/twic/synthetic/*.bin'
+          seed piv_sm
+          seed gzip '*.gz'
+          seed ocsp '*/x509/ocsp/*.der'
+          seed twic '*/twic/synthetic/*/tpk.bin'
+      - name: Fuzz TLV
+        run: build-parser/fuzz_tlv "$RUNNER_TEMP/corpus/tlv" -max_total_time=60 -max_len=8192 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"
+      - name: Fuzz certificates, trust anchors and PIV objects
+        run: build-parser/fuzz_pki "$RUNNER_TEMP/corpus/pki" -max_total_time=60 -max_len=8192 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"
+      - name: Fuzz PIV secure messaging responses
+        run: build-parser/fuzz_piv_sm "$RUNNER_TEMP/corpus/piv_sm" -max_total_time=60 -max_len=8192 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"
+      - name: Fuzz certificate decompression
+        run: build-parser/fuzz_gzip "$RUNNER_TEMP/corpus/gzip" -max_total_time=60 -max_len=8192 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"
+      - name: Fuzz OCSP responses and requests
+        run: build-parser/fuzz_ocsp "$RUNNER_TEMP/corpus/ocsp" -max_total_time=60 -max_len=8192 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"
+      - name: Fuzz TWIC CCL, AAMVA and privacy key inputs
+        run: build-parser/fuzz_twic "$RUNNER_TEMP/corpus/twic" -max_total_time=60 -max_len=8192 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"

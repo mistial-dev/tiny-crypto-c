@@ -3,7 +3,7 @@
 #ifndef TC_TEST_MAC_VECTORS_H
 #define TC_TEST_MAC_VECTORS_H
 #include "munit.h"
-#include "test_util.h"
+#include "cavp.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -12,13 +12,8 @@ typedef TC_status (*tc_test_mac_fn)(const uint8_t*, size_t, const uint8_t*, size
 
 static size_t tc_test_mac_hex(const char* text, uint8_t* output, size_t capacity)
 {
-  size_t length;
-  if (strcmp(text, "-") == 0)
-    return 0;
-  length = tc_test_decode_hex(text, output, capacity);
-  munit_assert_size(strlen(text) % 2, ==, 0);
-  munit_assert_size(length, ==, strlen(text) / 2);
-  return length;
+  /* "-" marks an empty value. */
+  return strcmp(text, "-") == 0 ? 0 : tc_test_hex(text, output, capacity);
 }
 
 static MunitResult tc_test_mac_vectors(const char* path, tc_test_mac_fn digest)

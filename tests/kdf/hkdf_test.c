@@ -3,7 +3,7 @@
 #include <string.h>
 #include <tiny_crypto/hkdf.h>
 #include "munit.h"
-#include "test_util.h"
+#include "cavp.h"
 
 struct hkdf_vector {
   int hash;
@@ -57,7 +57,7 @@ static const struct hkdf_family* find_family(int hash)
 
 static size_t decode(const char* text, uint8_t* output, size_t capacity)
 {
-  size_t length = tc_test_decode_hex(text, output, capacity);
+  size_t length = tc_test_hex(text, output, capacity);
   munit_assert_size(length, ==, strlen(text) / 2u);
   return length;
 }

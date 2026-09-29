@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/rsa.h>
 #include "munit.h"
-#include "test_util.h"
+#include "cavp.h"
 #include "hash_name.h"
 #include <stdio.h>
 #include <string.h>
@@ -52,10 +52,10 @@ static MunitResult vectors(const MunitParameter params[], void* data)
         salt = salt * 10 + (size_t)(*digit - '0');
       }
     }
-    size_t n = tc_test_decode_hex(n_text, modulus, sizeof modulus);
-    size_t e = tc_test_decode_hex(e_text, exponent, sizeof exponent);
-    size_t h = tc_test_decode_hex(h_text, digest, sizeof digest);
-    size_t s = strcmp(s_text, "-") ? tc_test_decode_hex(s_text, signature, sizeof signature) : 0;
+    size_t n = tc_test_hex(n_text, modulus, sizeof modulus);
+    size_t e = tc_test_hex(e_text, exponent, sizeof exponent);
+    size_t h = tc_test_hex(h_text, digest, sizeof digest);
+    size_t s = strcmp(s_text, "-") ? tc_test_hex(s_text, signature, sizeof signature) : 0;
     munit_assert_size(n * 2, ==, strlen(n_text));
     munit_assert_size(e * 2, ==, strlen(e_text));
     munit_assert_size(h * 2, ==, strlen(h_text));

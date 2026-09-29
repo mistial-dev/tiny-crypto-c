@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "../../examples/credential_pcsc.h"
 #include "munit.h"
-#include "test_util.h"
+#include "cavp.h"
 #include <string.h>
 #include <sys/resource.h>
 
@@ -108,8 +108,7 @@ int example_card_pcsc_transmit(void* context, const uint8_t* command, size_t len
                                        "32310aa2d9c9ccc4c0080028a0d93c94000000";
       uint8_t encoded[192];
       int gzip = certificate_case == 1 || certificate_case == 2;
-      size_t encoded_length =
-          tc_test_decode_hex(gzip ? compressed : plain, encoded, sizeof encoded);
+      size_t encoded_length = tc_test_hex(gzip ? compressed : plain, encoded, sizeof encoded);
       munit_assert_size(encoded_length, >, 0);
       if (certificate_case == 2)
         encoded[encoded_length - 8] ^= 1;

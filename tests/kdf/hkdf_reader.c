@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <tiny_crypto/hkdf.h>
-#include "test_util.h"
+#include "cavp.h"
 
 typedef TC_status (*derive_fn)(TC_bytes, const TC_bytes*, size_t, TC_bytes, TC_buffer);
 
@@ -37,11 +37,8 @@ static derive_fn select_hash(const char* name)
 
 static int read_hex(const char* text, uint8_t* bytes, size_t capacity, size_t* length)
 {
-  size_t digits = strlen(text);
-  if (digits > 2u * capacity || (digits & 1u) != 0)
-    return 0;
-  *length = tc_test_decode_hex(text, bytes, capacity);
-  return *length == digits / 2u;
+  return tc_test_hex_decode(text, TC_TEST_HEX_FIELD, bytes, capacity, length) &&
+         *length * 2u == strlen(text);
 }
 
 int main(int argc, char** argv)

@@ -8,7 +8,7 @@
 #include "../../src/cms_internal.h"
 #include "cms_crl_harness.h"
 #include "munit.h"
-#include "test_util.h"
+#include "cavp.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -78,7 +78,7 @@ static MunitResult biometric_signatures(const MunitParameter params[], void* con
     for (size_t i = 0; i < 4; ++i) {
       char* hex = strtok(NULL, " \t\r\n");
       munit_assert_not_null(hex);
-      inputs[i] = (TC_bytes){bytes[i], tc_test_decode_hex(hex, bytes[i], sizeof bytes[i])};
+      inputs[i] = (TC_bytes){bytes[i], tc_test_hex(hex, bytes[i], sizeof bytes[i])};
       munit_assert_size(inputs[i].length * 2, ==, strlen(hex));
     }
     munit_assert_null(strtok(NULL, " \t\r\n"));
@@ -278,7 +278,7 @@ static MunitResult captured(const MunitParameter params[], void* context)
     const int chuid = !strcmp(kind, "chuid");
     const int biometric = !strcmp(kind, "biometric");
     munit_assert_true(chuid || biometric || !strcmp(kind, "security"));
-    size_t length = tc_test_decode_hex(hex, bytes, sizeof bytes), work = WORK;
+    size_t length = tc_test_hex(hex, bytes, sizeof bytes), work = WORK;
     munit_assert_size(length * 2, ==, strlen(hex));
     TC_CMS_signed_data envelope, saved;
     TC_CMS_signer_info signer;

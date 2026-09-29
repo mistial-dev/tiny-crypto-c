@@ -110,7 +110,7 @@ static long cavp_run_msg_file(int alg, const char* relative)
       msg_len = -1;
       expected_len = -1;
     } else if (tc_cavp_is(&reader, "Msg")) {
-      msg_len = tc_cavp_parse_hex(v, cavp_msg, sizeof(cavp_msg));
+      msg_len = (long)tc_test_hex(v, cavp_msg, sizeof(cavp_msg));
       munit_assert_long(msg_len, >=, 0);
       /* Len = 0 records carry a placeholder "Msg = 00". */
       if (len_bits == 0)
@@ -119,7 +119,7 @@ static long cavp_run_msg_file(int alg, const char* relative)
     } else if (tc_cavp_is(&reader, "MD")) {
       uint8_t actual[TC_SHA512_DIGESTLEN];
       size_t actual_len;
-      expected_len = tc_cavp_parse_hex(v, expected, sizeof(expected));
+      expected_len = (long)tc_test_hex(v, expected, sizeof(expected));
       munit_assert_long(expected_len, >, 0);
       munit_assert_long(msg_len, >=, 0);
 
@@ -163,7 +163,7 @@ static long cavp_run_monte_file(int alg, const char* relative)
   while (cavp_next_field(&reader, relative)) {
     const char* v = reader.value;
     if (tc_cavp_is(&reader, "Seed")) {
-      munit_assert_long(tc_cavp_parse_hex(v, seed, sizeof(seed)), ==, (long)n);
+      munit_assert_long((long)tc_test_hex(v, seed, sizeof(seed)), ==, (long)n);
       have_seed = 1;
     } else if (tc_cavp_is(&reader, "COUNT")) {
       count = strtol(v, NULL, 10);
@@ -173,7 +173,7 @@ static long cavp_run_monte_file(int alg, const char* relative)
 
       munit_assert_true(have_seed);
       munit_assert_long(count, ==, cases);
-      munit_assert_long(tc_cavp_parse_hex(v, expected, sizeof(expected)), ==, (long)n);
+      munit_assert_long((long)tc_test_hex(v, expected, sizeof(expected)), ==, (long)n);
 
       memcpy(md[0], seed, n);
       memcpy(md[1], seed, n);
@@ -382,15 +382,15 @@ MunitResult test_cavp_hmac(const MunitParameter params[], void* data)
     else if (tc_cavp_is(&reader, "Tlen"))
       tlen = strtol(v, NULL, 10);
     else if (tc_cavp_is(&reader, "Key")) {
-      key_len = tc_cavp_parse_hex(v, key, sizeof(key));
+      key_len = (long)tc_test_hex(v, key, sizeof(key));
       munit_assert_long(key_len, ==, klen);
     } else if (tc_cavp_is(&reader, "Msg")) {
-      msg_len = tc_cavp_parse_hex(v, msg, sizeof(msg));
+      msg_len = (long)tc_test_hex(v, msg, sizeof(msg));
       munit_assert_long(msg_len, >=, 0);
     } else if (tc_cavp_is(&reader, "Mac")) {
       uint8_t expected[TC_SHA512_DIGESTLEN];
       uint8_t actual[TC_SHA512_DIGESTLEN];
-      long expected_len = tc_cavp_parse_hex(v, expected, sizeof(expected));
+      long expected_len = (long)tc_test_hex(v, expected, sizeof(expected));
       int alg = (int)group_len;
 
       munit_assert_long(expected_len, ==, tlen);

@@ -1,28 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "munit.h"
 #include <tiny_crypto/kmac.h>
+#include "cavp.h"
 #include "mac_vectors.h"
-#include <ctype.h>
 #include <stdio.h>
 #include <string.h>
-
-static size_t unhex(uint8_t* out, const char* hex)
-{
-  static const char digits[] = "0123456789abcdef";
-  size_t n = 0;
-  while (*hex) {
-    const char *high, *low;
-    if (!hex[1])
-      return 0;
-    high = strchr(digits, tolower((unsigned char)hex[0]));
-    low = strchr(digits, tolower((unsigned char)hex[1]));
-    if (!high || !low)
-      return 0;
-    out[n++] = (uint8_t)((high - digits) * 16 + (low - digits));
-    hex += 2;
-  }
-  return n;
-}
 
 /* Compare fields because struct padding is indeterminate after assignment. */
 static int kmac_ctx_equal(const struct TC_KMAC256_ctx* a, const struct TC_KMAC256_ctx* b)
@@ -53,7 +35,7 @@ static MunitResult test_profile(const MunitParameter params[], void* user)
     data[i] = (uint8_t)i;
   }
   for (i = 0; i < 3; ++i) {
-    unhex(want, expected[i]);
+    tc_test_hex(expected[i], want, sizeof want);
     munit_assert(TC_KMAC256_digest((TC_bytes){key, 32}, (TC_bytes){data, i ? 200 : 4},
                                    (TC_bytes){custom, i == 1 ? 0 : sizeof(custom) - 1},
                                    (TC_buffer){out, 64}) == TC_OK);
@@ -134,28 +116,34 @@ static MunitResult test_profile(const MunitParameter params[], void* user)
 
   /* From the kdf section of osdp-piv-latex's PIV Auto test report.
    * The fixture holds test session keys only. */
-  n = unhex(key, "00112233445566778899AABBCCDDEEFF102132435465768798A9BACBDCEDFE0FFFEEDDCCBBAA99887"
-                 "766554433221100");
+  n = tc_test_hex(
+      "00112233445566778899AABBCCDDEEFF102132435465768798A9BACBDCEDFE0FFFEEDDCCBBAA99887"
+      "766554433221100",
+      key, sizeof key);
   munit_assert(TC_KMAC256_digest((TC_bytes){key, n}, (TC_bytes){NULL, 0},
                                  (TC_bytes){(const uint8_t*)"OSDP-PIV-AUTO-KDK-v1", 20},
                                  (TC_buffer){out, 32}) == TC_OK);
-  unhex(want, "10FFA4469E902660BA4BEF8C917696848570B20531723D67ECD934A23BA4C89D");
+  tc_test_hex("10FFA4469E902660BA4BEF8C917696848570B20531723D67ECD934A23BA4C89D", want,
+              sizeof want);
   munit_assert(memcmp(out, want, 32) == 0);
-  n = unhex(data, "4F5344502D5049562D4155544F01070000002A000000D13810D828AB6C10C339E5A1685A08C92ADE"
+  n = tc_test_hex("4F5344502D5049562D4155544F01070000002A000000D13810D828AB6C10C339E5A1685A08C92ADE"
                   "0A6184E739C3E709D49C7EFDD0432EACEA268AE905274C9E0700112233445566778899AABBCCDDEE"
-                  "FF102132435465768798A9BACBDCEDFE0F");
+                  "FF102132435465768798A9BACBDCEDFE0F",
+                  data, sizeof data);
   munit_assert(TC_KMAC256_digest((TC_bytes){out, 32}, (TC_bytes){data, n},
                                  (TC_bytes){(const uint8_t*)"OSDP-PIV-AUTO-CHALLENGE-v1", 26},
                                  (TC_buffer){stream, 32}) == TC_OK);
-  unhex(want, "0864C776F2374124D3E63F0B0B29FC1C5F0E8FF8BB1FA80E2723293B86A0158E");
+  tc_test_hex("0864C776F2374124D3E63F0B0B29FC1C5F0E8FF8BB1FA80E2723293B86A0158E", want,
+              sizeof want);
   munit_assert(memcmp(stream, want, 32) == 0);
   /* Same fixture, Card Authentication P-384 profile (algorithm 0x14). */
   data[n - 33] = 0x14;
   munit_assert(TC_KMAC256_digest((TC_bytes){out, 32}, (TC_bytes){data, n},
                                  (TC_bytes){(const uint8_t*)"OSDP-PIV-AUTO-CHALLENGE-v1", 26},
                                  (TC_buffer){stream, 48}) == TC_OK);
-  unhex(want, "F3480C6C1DAD008D3E14D0C815D381F01420E9D3402A175BED097C6949E4BA447FA0A11745CE4D054A95"
-              "B10A9D5CC689");
+  tc_test_hex("F3480C6C1DAD008D3E14D0C815D381F01420E9D3402A175BED097C6949E4BA447FA0A11745CE4D054A95"
+              "B10A9D5CC689",
+              want, sizeof want);
   munit_assert(memcmp(stream, want, 48) == 0);
   return MUNIT_OK;
 }

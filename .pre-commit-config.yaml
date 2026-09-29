@@ -1,5 +1,5 @@
 minimum_pre_commit_version: '4.2.0'
-exclude: '^(ports/esp-idf/vendor/|tests/vectors/|tests/support/(munit\.[ch]|doctest\.h)$|tests/(des/(test_vectors|edge_vectors)\.h|hash/test_vectors\.h|kdf/test_vectors\.h)$|src/unicode_data\.inc$|docs/benchmarks\.md$|AGENTS\.md$)'
+exclude: '^(ports/esp-idf/vendor/|tests/vectors/|tests/fuzz/|tests/support/(munit\.[ch]|doctest\.h)$|tests/(des/(test_vectors|edge_vectors)\.h|hash/test_vectors\.h|kdf/test_vectors\.h)$|src/unicode_data\.inc$|docs/benchmarks\.md$|AGENTS\.md$)'
 
 repos:
   - repo: https://github.com/pre-commit/mirrors-clang-format

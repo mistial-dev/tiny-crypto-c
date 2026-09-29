@@ -5,6 +5,7 @@
 #include "../../examples/twic_ccl_storage.h"
 #include "../../examples/twic_ccl_import.h"
 #include "munit.h"
+#include "cavp.h"
 #include "test_util.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -249,7 +250,7 @@ static MunitResult test_external(const MunitParameter params[], void* user)
     return MUNIT_SKIP;
   munit_assert_not_null(checksum);
   munit_assert_size(strlen(checksum), ==, 2 * sizeof expected);
-  munit_assert_size(tc_test_decode_hex(checksum, expected, sizeof expected), ==, sizeof expected);
+  munit_assert_size(tc_test_hex(checksum, expected, sizeof expected), ==, sizeof expected);
   FILE* file = fopen(path, "rb");
   munit_assert_not_null(file);
   munit_assert_int(fseek(file, 0, SEEK_END), ==, 0);

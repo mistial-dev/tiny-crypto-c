@@ -4,7 +4,6 @@
 #include <tiny_crypto/des.h>
 #include "cavp.h"
 #include "munit.h"
-#include "test_util.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -26,7 +25,8 @@ typedef struct {
 
 static void field_hex(const char* value, uint8_t* output, size_t capacity, size_t expected)
 {
-  const size_t length = tc_test_decode_hex_relaxed(value, output, capacity);
+  size_t length = 0;
+  munit_assert_true(tc_test_hex_decode(value, TC_TEST_HEX_SEPARATED, output, capacity, &length));
   munit_assert_size(length, ==, expected);
 }
 

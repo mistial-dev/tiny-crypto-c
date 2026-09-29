@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/rsa.h>
 #include "munit.h"
-#include "test_util.h"
+#include "cavp.h"
 #include "hash_name.h"
 #include <stdio.h>
 #include <string.h>
@@ -20,7 +20,7 @@ static TC_status blinding_bytes(void* context, uint8_t* output, size_t length)
 
 static TC_bytes decode(const char* text, uint8_t* output, size_t capacity)
 {
-  size_t length = strcmp(text, "-") ? tc_test_decode_hex(text, output, capacity) : 0;
+  size_t length = strcmp(text, "-") ? tc_test_hex(text, output, capacity) : 0;
   if (strcmp(text, "-"))
     munit_assert_size(length * 2, ==, strlen(text));
   return (TC_bytes){output, length};

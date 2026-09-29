@@ -3,7 +3,7 @@
 /* Wycheproof deterministic PKCS#1 v1.5 signatures through raw RSA. */
 #include <tiny_crypto/rsa.h>
 #include "munit.h"
-#include "test_util.h"
+#include "cavp.h"
 #include "hash_name.h"
 #include <stdio.h>
 #include <string.h>
@@ -44,11 +44,11 @@ static MunitResult vectors(const MunitParameter params[], void* data)
       token = strtok(NULL, " \t\r\n");
     }
     munit_assert_true(columns == 8 || columns == 9);
-    const size_t n = tc_test_decode_hex(fields[0], modulus, sizeof modulus);
-    size_t e = tc_test_decode_hex(fields[1], exponent, sizeof exponent);
-    const size_t d = tc_test_decode_hex(fields[2], private_exponent, sizeof private_exponent);
-    const size_t h = tc_test_decode_hex(fields[4], digest, sizeof digest);
-    const size_t s = tc_test_decode_hex(fields[5], expected, sizeof expected);
+    const size_t n = tc_test_hex(fields[0], modulus, sizeof modulus);
+    size_t e = tc_test_hex(fields[1], exponent, sizeof exponent);
+    const size_t d = tc_test_hex(fields[2], private_exponent, sizeof private_exponent);
+    const size_t h = tc_test_hex(fields[4], digest, sizeof digest);
+    const size_t s = tc_test_hex(fields[5], expected, sizeof expected);
     munit_assert_size(n * 2, ==, strlen(fields[0]));
     munit_assert_size(e * 2, ==, strlen(fields[1]));
     munit_assert_size(d * 2, ==, strlen(fields[2]));
@@ -69,7 +69,7 @@ static MunitResult vectors(const MunitParameter params[], void* data)
     TC_RSA_execution execution = {{random_two, NULL}, 8, {UINT32_MAX}};
     TC_RSA_result result;
     if (columns == 9) {
-      size_t salt_length = tc_test_decode_hex(fields[8], salt, sizeof salt);
+      size_t salt_length = tc_test_hex(fields[8], salt, sizeof salt);
       munit_assert_size(salt_length * 2, ==, strlen(fields[8]));
       const TC_RSA_pss_options pss = {hash, hash, salt_length};
       encode_work.remaining = UINT32_MAX;

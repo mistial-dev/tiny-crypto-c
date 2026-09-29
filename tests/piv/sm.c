@@ -3,6 +3,7 @@
 #include <tiny_crypto/piv_sm.h>
 #include "../../examples/piv_sm_wire.h"
 #include "munit.h"
+#include "cavp.h"
 #include "test_util.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -127,7 +128,7 @@ static size_t decode(const char* hex, uint8_t* output, size_t capacity)
   size_t length;
   if (strcmp(hex, "-") == 0)
     return 0;
-  length = tc_test_decode_hex(hex, output, capacity);
+  length = tc_test_hex(hex, output, capacity);
   munit_assert_size(length, ==, strlen(hex) / 2);
   munit_assert_size(strlen(hex) % 2, ==, 0);
   return length;

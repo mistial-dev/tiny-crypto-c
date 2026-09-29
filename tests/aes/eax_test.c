@@ -7,6 +7,7 @@
 
 #include <tiny_crypto/aes.h>
 #include "munit.h"
+#include "cavp.h"
 #include "test_util.h"
 #include "test_io.h"
 
@@ -71,8 +72,8 @@ typedef struct {
 
 static int eax_decode_field(const char* hex, uint8_t* storage, size_t capacity, TC_bytes* out)
 {
-  const size_t length = tc_test_decode_hex_relaxed(hex, storage, capacity);
-  if (length == SIZE_MAX)
+  size_t length = 0;
+  if (!tc_test_hex_decode(hex, TC_TEST_HEX_SEPARATED, storage, capacity, &length))
     return 0;
   *out = (TC_bytes){storage, length};
   return 1;
@@ -217,12 +218,15 @@ static MunitResult test_eax_wycheproof(const MunitParameter params[], void* data
     if (eax_json_field(line, "result", result, sizeof(result))) {
       uint8_t key[32], iv[2048], aad[2048], msg[2048], ct[2048], tag[32];
       uint8_t output[2048], generated[32];
-      const size_t key_len = tc_test_decode_hex_relaxed(key_text, key, sizeof(key));
-      const size_t iv_len = tc_test_decode_hex_relaxed(iv_text, iv, sizeof(iv));
-      const size_t aad_len = tc_test_decode_hex_relaxed(aad_text, aad, sizeof(aad));
-      const size_t msg_len = tc_test_decode_hex_relaxed(msg_text, msg, sizeof(msg));
-      const size_t ct_len = tc_test_decode_hex_relaxed(ct_text, ct, sizeof(ct));
-      const size_t tag_len = tc_test_decode_hex_relaxed(tag_text, tag, sizeof(tag));
+      /* A value that fails to decode keeps SIZE_MAX. */
+      size_t key_len = SIZE_MAX, iv_len = SIZE_MAX, aad_len = SIZE_MAX, msg_len = SIZE_MAX,
+             ct_len = SIZE_MAX, tag_len = SIZE_MAX;
+      (void)tc_test_hex_decode(key_text, TC_TEST_HEX_SEPARATED, key, sizeof(key), &key_len);
+      (void)tc_test_hex_decode(iv_text, TC_TEST_HEX_SEPARATED, iv, sizeof(iv), &iv_len);
+      (void)tc_test_hex_decode(aad_text, TC_TEST_HEX_SEPARATED, aad, sizeof(aad), &aad_len);
+      (void)tc_test_hex_decode(msg_text, TC_TEST_HEX_SEPARATED, msg, sizeof(msg), &msg_len);
+      (void)tc_test_hex_decode(ct_text, TC_TEST_HEX_SEPARATED, ct, sizeof(ct), &ct_len);
+      (void)tc_test_hex_decode(tag_text, TC_TEST_HEX_SEPARATED, tag, sizeof(tag), &tag_len);
 
       munit_assert_uint(tc_id, >, 0);
       ++vector_count;

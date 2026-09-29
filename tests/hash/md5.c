@@ -2,13 +2,14 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/md5.h>
 #include "munit.h"
+#include "cavp.h"
 #include "test_util.h"
 #include <string.h>
 
 static void check(const uint8_t* data, size_t length, const char* answer)
 {
   uint8_t expected[TC_MD5_DIGESTLEN], digest[TC_MD5_DIGESTLEN];
-  munit_assert_size(tc_test_decode_hex(answer, expected, sizeof expected), ==, sizeof expected);
+  munit_assert_size(tc_test_hex(answer, expected, sizeof expected), ==, sizeof expected);
   munit_assert_int(TC_MD5_digest((TC_bytes){data, length}, digest), ==, TC_OK);
   munit_assert_memory_equal(sizeof digest, digest, expected);
   for (size_t split = 0; split <= length; ++split) {
@@ -79,7 +80,7 @@ static MunitResult test_long(const MunitParameter params[], void* user)
   (void)params;
   (void)user;
   memset(data, 'a', sizeof data);
-  tc_test_decode_hex("7707d6ae4e027c70eea2a935c2296f21", expected, sizeof expected);
+  tc_test_hex("7707d6ae4e027c70eea2a935c2296f21", expected, sizeof expected);
   munit_assert_int(TC_MD5_init(&ctx), ==, TC_OK);
   for (size_t i = 0; i < 1000; ++i)
     munit_assert_int(TC_MD5_update(&ctx, (TC_bytes){data, sizeof data}), ==, TC_OK);

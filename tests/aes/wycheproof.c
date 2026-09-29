@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/aes.h>
 #include "munit.h"
+#include "cavp.h"
 #include "test_util.h"
 #include <stdio.h>
 #include <string.h>
@@ -70,7 +71,7 @@ static size_t decode(const char* text, uint8_t* output)
   size_t length;
   if (strcmp(text, "-") == 0)
     return 0;
-  length = tc_test_decode_hex(text, output, 1024);
+  length = tc_test_hex(text, output, 1024);
   munit_assert_size(strlen(text) % 2, ==, 0);
   munit_assert_size(length, ==, strlen(text) / 2);
   return length;
