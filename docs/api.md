@@ -306,6 +306,11 @@ if (tiny_crypto::ccm_decrypt(key, nonce, aad, ciphertext, tag, plaintext) != TC_
 
 ## Block cipher modes
 
+Key a context with `TC_AES_init` or `TC_DES_init`. Init sets an all-zero IV.
+Load a fresh IV with `TC_AES_set_iv` or `TC_DES_set_iv` before each message in
+an IV mode. Clear the context with `TC_AES_ctx_clear` or `TC_DES_ctx_clear`
+when its lifetime ends.
+
 The AES and DES CBC, CTR, OFB and ECB functions, and the DES CFB functions,
 transform `buf` in place. They share one argument rule:
 
@@ -326,12 +331,12 @@ request needs a counter block beyond the space of the IV.
 
 Enable `TINY_CRYPTO_ENABLE_DES=ON` and include `<tiny_crypto/des.h>`. One
 `struct TC_DES_ctx` serves single DES and TDEA. The key length passed to
-`TC_DES_init_ctx` or `TC_DES_init_ctx_iv` selects the cipher. `TC_DES_KEYLEN`
-(8 bytes) selects single DES. `TC_DES_KEYLEN_2KEY` (16) and
-`TC_DES_KEYLEN_3KEY` (24) select two- and three-key TDEA when
-`TINY_CRYPTO_DES_TDES` is on. Every mode function takes the same context.
-A failed init wipes the context, so an earlier key cannot be used after a
-failed re-init. `TC_DES_ctx_set_iv` starts a new message under the same key.
+`TC_DES_init` selects the cipher. `TC_DES_KEYLEN` (8 bytes) selects single
+DES. `TC_DES_KEYLEN_2KEY` (16) and `TC_DES_KEYLEN_3KEY` (24) select two- and
+three-key TDEA when `TINY_CRYPTO_DES_TDES` is on. Every mode function takes the
+same context. A failed init wipes the context, so an earlier key cannot be used
+after a failed re-init. `TC_DES_set_iv` loads the IV for the first message and
+starts each later message under the same key.
 
 CFB64 processes whole 8-byte segments. A call may end with one short segment,
 which finishes the message. Later CFB64 calls return `TC_ERROR` until a new IV
@@ -353,7 +358,8 @@ int main(void)
     struct TC_DES_ctx ctx;
     int failed;
 
-    failed = TC_DES_init_ctx_iv(&ctx, key, sizeof key, iv) != TC_OK ||
+    failed = TC_DES_init(&ctx, key, sizeof key) != TC_OK ||
+             TC_DES_set_iv(&ctx, iv) != TC_OK ||
              TC_DES_CTR_crypt(&ctx, data, sizeof data) != TC_OK;
     TC_DES_ctx_clear(&ctx);
     return failed;

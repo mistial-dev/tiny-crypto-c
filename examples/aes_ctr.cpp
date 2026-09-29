@@ -26,10 +26,9 @@ static int aes_ctr_roundtrip(void)
 
   memcpy(original, data, sizeof(data));
   /* CTR encryption and decryption are the same operation with the same IV. */
-  failed = TC_AES_init_ctx_iv(&ctx, key, iv) != TC_OK ||
+  failed = TC_AES_init(&ctx, key) != TC_OK || TC_AES_set_iv(&ctx, iv) != TC_OK ||
            TC_AES_CTR_crypt(&ctx, data, sizeof(data)) != TC_OK ||
-           TC_AES_ctx_set_iv(&ctx, iv) != TC_OK ||
-           TC_AES_CTR_crypt(&ctx, data, sizeof(data)) != TC_OK;
+           TC_AES_set_iv(&ctx, iv) != TC_OK || TC_AES_CTR_crypt(&ctx, data, sizeof(data)) != TC_OK;
   TC_AES_ctx_clear(&ctx);
   return failed || memcmp(data, original, sizeof(data)) != 0;
 }

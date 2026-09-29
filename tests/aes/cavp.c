@@ -153,7 +153,7 @@ static int cavp_standard_case(enum cavp_mode mode, const char* file, int encrypt
 #if TC_AES_ENABLE_ECB
     struct TC_AES_ctx ctx;
     size_t offset;
-    TC_AES_init_ctx(&ctx, record->key);
+    TC_AES_init(&ctx, record->key);
     for (offset = 0; offset < input_len; offset += TC_AES_BLOCKLEN) {
       if (encrypt) {
         if (TC_AES_ECB_encrypt(&ctx.key, actual + offset) != TC_OK)
@@ -170,7 +170,8 @@ static int cavp_standard_case(enum cavp_mode mode, const char* file, int encrypt
   } else if (mode == CAVP_CBC) {
 #if TC_AES_ENABLE_CBC
     struct TC_AES_ctx ctx;
-    TC_AES_init_ctx_iv(&ctx, record->key, record->iv);
+    TC_AES_init(&ctx, record->key);
+    TC_AES_set_iv(&ctx, record->iv);
     if (encrypt)
       TC_AES_CBC_encrypt(&ctx, actual, input_len);
     else
@@ -182,7 +183,8 @@ static int cavp_standard_case(enum cavp_mode mode, const char* file, int encrypt
   } else {
 #if TC_AES_ENABLE_OFB
     struct TC_AES_ctx ctx;
-    TC_AES_init_ctx_iv(&ctx, record->key, record->iv);
+    TC_AES_init(&ctx, record->key);
+    TC_AES_set_iv(&ctx, record->iv);
     TC_AES_OFB_crypt(&ctx, actual, input_len);
 #else
     free(actual);

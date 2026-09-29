@@ -27,7 +27,7 @@ public:
 
   TC_CPP_NODISCARD TC_status init(const uint8_t* key, size_t key_len) noexcept
   {
-    return TC_DES_init_ctx(&ctx_, key, key_len);
+    return TC_DES_init(&ctx_, key, key_len);
   }
   template <size_t N> TC_CPP_NODISCARD TC_status init(const uint8_t (&key)[N]) noexcept
   {
@@ -41,11 +41,16 @@ public:
       TC_DES_ctx_clear(&ctx_);
       return TC_ERROR;
     }
-    return TC_DES_init_ctx_iv(&ctx_, key, key_len, iv);
+    TC_status status = TC_DES_init(&ctx_, key, key_len);
+    if (status == TC_OK)
+      status = TC_DES_set_iv(&ctx_, iv);
+    if (status != TC_OK)
+      TC_DES_ctx_clear(&ctx_);
+    return status;
   }
   TC_CPP_NODISCARD TC_status set_iv(const uint8_t* iv, size_t iv_len) noexcept
   {
-    return iv_len == TC_DES_BLOCKLEN ? TC_DES_ctx_set_iv(&ctx_, iv) : TC_ERROR;
+    return iv_len == TC_DES_BLOCKLEN ? TC_DES_set_iv(&ctx_, iv) : TC_ERROR;
   }
 #endif
 #if TC_DES_ENABLE_ECB

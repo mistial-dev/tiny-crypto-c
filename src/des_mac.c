@@ -177,7 +177,7 @@ TC_status TC_DES_ISO9797_init(struct TC_DES_ISO9797_ctx* ctx, TC_DES_ISO9797_alg
 {
   if (ctx == NULL)
     return TC_ERROR;
-  TC_DES_ISO9797_clear(ctx);
+  TC_DES_ISO9797_ctx_clear(ctx);
   /* Algorithm 1 uses TDEA and Algorithm 3 uses K1 with K2 (and K3). Both
    * take a 16- or 24-byte bundle. */
   if (key == NULL || (algorithm != TC_DES_ISO9797_ALG1 && algorithm != TC_DES_ISO9797_ALG3) ||
@@ -210,7 +210,7 @@ TC_status TC_DES_ISO9797_update(struct TC_DES_ISO9797_ctx* ctx, const uint8_t* m
   key.triple = ctx->algorithm == TC_DES_ISO9797_ALG1;
   const tc_block_cipher cipher = tc_des_block_cipher(&key);
   if (tc_mac_cbc_update(&cipher, ctx->mac, ctx->buf, &ctx->used, msg, msg_len, 0) != TC_OK) {
-    TC_DES_ISO9797_clear(ctx);
+    TC_DES_ISO9797_ctx_clear(ctx);
     return TC_ERROR;
   }
   return TC_OK;
@@ -225,7 +225,7 @@ TC_status TC_DES_ISO9797_final(struct TC_DES_ISO9797_ctx* ctx, uint8_t tag[TC_DE
     return TC_ERROR;
   if ((ctx->padding == TC_DES_ISO9797_PAD_NONE && ctx->used != 0) ||
       (ctx->padding == TC_DES_ISO9797_PAD_NONE && !ctx->nonempty)) {
-    TC_DES_ISO9797_clear(ctx);
+    TC_DES_ISO9797_ctx_clear(ctx);
     return TC_ERROR;
   }
   key.schedule = ctx->keys.schedule;
@@ -242,17 +242,17 @@ TC_status TC_DES_ISO9797_final(struct TC_DES_ISO9797_ctx* ctx, uint8_t tag[TC_DE
     status = tc_mac_cbc_block(&cipher, ctx->mac, ctx->buf);
   }
   if (status != TC_OK) {
-    TC_DES_ISO9797_clear(ctx);
+    TC_DES_ISO9797_ctx_clear(ctx);
     return TC_ERROR;
   }
   if (ctx->algorithm == TC_DES_ISO9797_ALG3)
     tc_des_iso9797_output_transformation3(ctx, ctx->mac);
   memcpy(tag, ctx->mac, TC_DES_BLOCKLEN);
-  TC_DES_ISO9797_clear(ctx);
+  TC_DES_ISO9797_ctx_clear(ctx);
   return TC_OK;
 }
 
-void TC_DES_ISO9797_clear(struct TC_DES_ISO9797_ctx* ctx)
+void TC_DES_ISO9797_ctx_clear(struct TC_DES_ISO9797_ctx* ctx)
 {
   if (ctx != NULL)
     TC_secure_zero(ctx, sizeof(*ctx));
@@ -280,7 +280,7 @@ static TC_status tc_des_iso9797_mac_run(struct TC_DES_ISO9797_ctx* ctx, TC_statu
   if (status == TC_OK)
     status = TC_DES_ISO9797_final(ctx, full);
   else
-    TC_DES_ISO9797_clear(ctx);
+    TC_DES_ISO9797_ctx_clear(ctx);
   if (status == TC_OK)
     memcpy(tag, full, tag_len);
   TC_secure_zero(full, sizeof(full));

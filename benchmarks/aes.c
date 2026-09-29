@@ -19,7 +19,9 @@ static TC_status ctr(size_t length)
   static uint8_t buffer[16384];
   static const uint8_t iv[16] = {0};
   struct TC_AES_ctx ctx;
-  TC_status status = TC_AES_init_ctx_iv(&ctx, key, iv);
+  TC_status status = TC_AES_init(&ctx, key);
+  if (status == TC_OK)
+    status = TC_AES_set_iv(&ctx, iv);
   if (status == TC_OK)
     status = TC_AES_CTR_crypt(&ctx, buffer, length);
   tc_benchmark_consume(buffer);

@@ -53,7 +53,8 @@ static MunitResult test_profile(const MunitParameter params[], void* user)
 #if TC_AES_SBOX_MODE == TC_AES_SBOX_MODE_RUNTIME
   TC_AES_init_sbox();
 #endif
-  munit_assert_int(TC_AES_init_ctx_iv(&aes, key, iv), ==, TC_OK);
+  munit_assert_int(TC_AES_init(&aes, key), ==, TC_OK);
+  munit_assert_int(TC_AES_set_iv(&aes, iv), ==, TC_OK);
   munit_assert_int(TC_AES_CTR_crypt(&aes, block, sizeof(block)), ==, TC_OK);
   munit_assert(bytes_equal(block, expected, sizeof(expected)));
 #endif

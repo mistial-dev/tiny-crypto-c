@@ -26,7 +26,7 @@ BASE = ["-std=c99", "-Os", "-mmcu=atmega328p", "-ffunction-sections",
 PROFILES = {
     "aes_ctr": ([], """
       struct TC_AES_ctx ctx;
-      if (TC_AES_init_ctx_iv(&ctx, key, iv) != TC_OK) return 1;
+      if (TC_AES_init(&ctx, key) != TC_OK || TC_AES_set_iv(&ctx, iv) != TC_OK) return 1;
       return TC_AES_CTR_crypt(&ctx, out, sizeof(out)) != TC_OK;
     """, "TC_AES_CTR_crypt"),
     "kdf_sha256": (["TC_ENABLE_HMAC=1", "TC_ENABLE_KDF=1"], """

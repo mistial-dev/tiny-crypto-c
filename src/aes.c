@@ -290,7 +290,7 @@ TC_status TC_AES_key_init(struct TC_AES_key_ctx* ctx, const uint8_t* key)
   return TC_OK;
 }
 
-TC_status TC_AES_init_ctx(struct TC_AES_ctx* ctx, const uint8_t* key)
+TC_status TC_AES_init(struct TC_AES_ctx* ctx, const uint8_t* key)
 {
   if (ctx == NULL)
     return TC_ERROR;
@@ -315,27 +315,7 @@ TC_status TC_AES_init_ctx(struct TC_AES_ctx* ctx, const uint8_t* key)
   return TC_OK;
 }
 #if TC_AES_HAVE_IV
-TC_status TC_AES_init_ctx_iv(struct TC_AES_ctx* ctx, const uint8_t* key, const uint8_t* iv)
-{
-  if (ctx == NULL)
-    return TC_ERROR;
-  if (iv == NULL || !tc_internal_ranges_disjoint(ctx, sizeof *ctx, iv, TC_AES_BLOCKLEN)) {
-    TC_AES_ctx_clear(ctx);
-    return TC_ERROR;
-  }
-  if (TC_AES_init_ctx(ctx, key) != TC_OK)
-    return TC_ERROR;
-  memcpy(ctx->iv, iv, TC_AES_BLOCKLEN);
-#if TC_AES_ENABLE_CTR
-  ctx->ctr_pos = TC_AES_BLOCKLEN;
-  ctx->ctr_exhausted = 0;
-#endif
-#if TC_AES_ENABLE_OFB
-  ctx->ofb_pos = TC_AES_BLOCKLEN;
-#endif
-  return TC_OK;
-}
-TC_status TC_AES_ctx_set_iv(struct TC_AES_ctx* ctx, const uint8_t* iv)
+TC_status TC_AES_set_iv(struct TC_AES_ctx* ctx, const uint8_t* iv)
 {
   /* An IV inside the context would be an overlapping copy. */
   if (!tc_block_mode_args(ctx, sizeof *ctx, iv, TC_AES_BLOCKLEN, 1) || ctx->key.active != 1)

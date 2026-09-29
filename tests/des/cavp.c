@@ -84,9 +84,9 @@ static void cavp_apply(int mode, int encrypt, const uint8_t key[24], const uint8
   struct TC_DES_ctx ctx;
   size_t i;
 
-  TC_DES_init_ctx(&ctx, key, 24);
+  TC_DES_init(&ctx, key, 24);
   if (have_iv)
-    TC_DES_ctx_set_iv(&ctx, iv);
+    TC_DES_set_iv(&ctx, iv);
 
   switch (mode) {
   case CAVP_TECB:
@@ -243,7 +243,7 @@ static void mct_round(int mode, int encrypt, struct mct_state* st, uint8_t resul
   uint8_t cur[8], cv[8], tmp[8], text0[8], last_ks[8];
   int j;
 
-  TC_DES_init_ctx(&ctx, st->key, 24);
+  TC_DES_init(&ctx, st->key, 24);
   memset(hist, 0, sizeof(hist));
   memcpy(cur, st->text, 8);
   memcpy(cv, st->iv, 8);

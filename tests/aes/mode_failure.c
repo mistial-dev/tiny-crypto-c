@@ -52,13 +52,14 @@ static void check_fixed_mode(mode_fn mode, size_t length)
   uint8_t buffer[48];
   struct TC_AES_ctx ctx;
   munit_assert_size(length, <=, sizeof buffer);
-  munit_assert_int(TC_AES_init_ctx_iv(&ctx, key, iv), ==, TC_OK);
+  munit_assert_int(TC_AES_init(&ctx, key), ==, TC_OK);
+  munit_assert_int(TC_AES_set_iv(&ctx, iv), ==, TC_OK);
   memset(buffer, 0x11, sizeof buffer);
   calls = 0;
   fail_at = 0;
   munit_assert_int(mode(&ctx, buffer, length), ==, TC_OK);
   munit_assert_uint(calls, >, 1);
-  munit_assert_int(TC_AES_ctx_set_iv(&ctx, iv), ==, TC_OK);
+  munit_assert_int(TC_AES_set_iv(&ctx, iv), ==, TC_OK);
   calls = 0;
   fail_at = 2;
   munit_assert_int(mode(&ctx, buffer, length), ==, TC_ERROR);

@@ -51,6 +51,19 @@ TEST_CASE("AES initialization returns status")
 #endif
 }
 
+#if TC_AES_ENABLE_CTR
+TEST_CASE("AES IV re-init with a NULL IV clears the previous key")
+{
+  tiny_crypto::AES aes;
+  uint8_t data[TC_AES_BLOCKLEN];
+  std::memcpy(data, nist_plaintext, sizeof(data));
+  REQUIRE(aes.init(kat_key, TC_AES_KEYLEN, nist_ctr_iv, sizeof(nist_ctr_iv)) == TC_OK);
+  CHECK(aes.init(kat_key, TC_AES_KEYLEN, nullptr, TC_AES_BLOCKLEN) == TC_ERROR);
+  CHECK(aes.xcrypt_ctr(data) == TC_ERROR);
+  CHECK(std::memcmp(data, nist_plaintext, sizeof(data)) == 0);
+}
+#endif
+
 #if TC_AES_ENABLE_ECB
 TEST_CASE("AES ECB wrapper")
 {

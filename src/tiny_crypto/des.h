@@ -21,7 +21,7 @@
  * Only TC_DES_ENABLE_* names are used so this header can co-exist with aes.h.
  */
 
-/* Modes that keep chaining state in ctx->Iv */
+/* Modes that keep chaining state in ctx->iv */
 #if (TC_DES_ENABLE_CBC == 1) || (TC_DES_ENABLE_CTR == 1) || (TC_DES_ENABLE_CFB1 == 1) ||           \
     (TC_DES_ENABLE_CFB8 == 1) || (TC_DES_ENABLE_CFB64 == 1) || (TC_DES_ENABLE_OFB == 1)
 #define TC_DES_NEEDS_IV 1
@@ -52,7 +52,7 @@ typedef struct TC_DES_key_bundle {
 /**
  * @brief DES and TDEA context.
  *
- * TC_DES_init_ctx selects the cipher from the key length: 8 bytes for single
+ * TC_DES_init selects the cipher from the key length: 8 bytes for single
  * DES, or 16 and 24 bytes for two- and three-key TDEA when TC_DES_ENABLE_TDES
  * is set. TDEA encrypts as E(K1), D(K2), E(K3). The context is caller-owned.
  * Fields are private. Clear it with TC_DES_ctx_clear when its lifetime ends.
@@ -62,7 +62,7 @@ struct TC_DES_ctx {
   uint8_t triple; /* 1 when schedule holds a K1, K2, K3 TDEA bundle. */
   uint8_t active;
 #if TC_DES_NEEDS_IV
-  uint8_t Iv[TC_DES_BLOCKLEN];
+  uint8_t iv[TC_DES_BLOCKLEN];
 #endif
 #if TC_DES_ENABLE_CTR
   uint8_t ctr_stream[TC_DES_BLOCKLEN];
@@ -94,6 +94,10 @@ void TC_DES_ctx_clear(struct TC_DES_ctx* ctx);
 
 /**
  * @brief Initialize a DES or TDEA context with a key.
+ *
+ * The IV and stream state start at zero. IV modes then take TC_DES_set_iv
+ * before the first message.
+ *
  * @param ctx Caller-owned context.
  * @param key Key bytes. They must not overlap ctx.
  * @param keylen TC_DES_KEYLEN, or TC_DES_KEYLEN_2KEY or TC_DES_KEYLEN_3KEY
@@ -105,24 +109,14 @@ void TC_DES_ctx_clear(struct TC_DES_ctx* ctx);
  *       with K1 = K2 or K2 = K3 are rejected, because those collapse to single
  *       DES. K1 = K3 remains valid two-key TDEA.
  */
-TC_status TC_DES_init_ctx(struct TC_DES_ctx* ctx, const uint8_t* key, size_t keylen);
+TC_status TC_DES_init(struct TC_DES_ctx* ctx, const uint8_t* key, size_t keylen);
 
 #if TC_DES_NEEDS_IV
 /**
- * @brief Initialize a DES or TDEA context with a key and IV.
- * @param ctx Caller-owned context.
- * @param key Key bytes, as for TC_DES_init_ctx.
- * @param keylen Key length, as for TC_DES_init_ctx.
- * @param iv 8-byte initialization vector. It must not overlap ctx.
- * @return TC_OK, or TC_ERROR with the failure behavior of TC_DES_init_ctx.
- */
-TC_status TC_DES_init_ctx_iv(struct TC_DES_ctx* ctx, const uint8_t* key, size_t keylen,
-                             const uint8_t* iv);
-
-/**
  * @brief Start a new message under the same key.
  *
- * Resets the CTR and OFB stream positions, the CTR exhaustion flag and the
+ * Call it after TC_DES_init and before each new message in an IV mode. It
+ * resets the CTR and OFB stream positions, the CTR exhaustion flag and the
  * CFB64 finished flag.
  *
  * @param ctx Initialized context.
@@ -130,7 +124,7 @@ TC_status TC_DES_init_ctx_iv(struct TC_DES_ctx* ctx, const uint8_t* key, size_t 
  * @return TC_OK, or TC_ERROR for a NULL argument, an inactive context or an
  *         IV that overlaps ctx. The context is unchanged on error.
  */
-TC_status TC_DES_ctx_set_iv(struct TC_DES_ctx* ctx, const uint8_t* iv);
+TC_status TC_DES_set_iv(struct TC_DES_ctx* ctx, const uint8_t* iv);
 #endif
 
 #if TC_DES_ENABLE_ECB
@@ -192,7 +186,7 @@ TC_status TC_DES_CTR_crypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
  * segments, as section 5.2 requires. As an extension, a call may end with one
  * short segment of 1..7 bytes. That segment shifts only its ciphertext bytes
  * into the feedback register and finishes the message. Later CFB64 calls
- * return TC_ERROR until TC_DES_ctx_set_iv or an init starts a new message.
+ * return TC_ERROR until TC_DES_set_iv or an init starts a new message.
  * Split a message at multiples of 8 bytes to get the same output as one call.
  */
 
@@ -396,7 +390,7 @@ TC_status TC_DES_ISO9797_update(struct TC_DES_ISO9797_ctx* ctx, const uint8_t* m
 /* Writes the full MAC. Returns TC_ERROR for a NONE-padded message that is
  * empty or not block-aligned. */
 TC_status TC_DES_ISO9797_final(struct TC_DES_ISO9797_ctx* ctx, uint8_t tag[TC_DES_BLOCKLEN]);
-void TC_DES_ISO9797_clear(struct TC_DES_ISO9797_ctx* ctx);
+void TC_DES_ISO9797_ctx_clear(struct TC_DES_ISO9797_ctx* ctx);
 /* The default one-shot API requires the full 8-byte MAC. MAC leaves tag
  * untouched on error. Verify returns TC_MISMATCH for a bad tag and TC_ERROR
  * for every argument or key error. */

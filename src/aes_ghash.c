@@ -95,7 +95,7 @@ void tc_aes_gcm_init_table(struct TC_AES_GCM_ctx* ctx)
 
   for (entry = 0; entry < 16; ++entry) {
     input[0] = (uint8_t)(entry << 4);
-    tc_aes_gcm_multiply_bitwise(ctx->ghash_table[entry], input, ctx->H);
+    tc_aes_gcm_multiply_bitwise(ctx->ghash_table[entry], input, ctx->h);
   }
   TC_secure_zero(input, sizeof(input));
 }
@@ -130,18 +130,18 @@ static void tc_aes_gcm_multiply(uint8_t* result, const uint8_t* left,
                                 const struct TC_AES_GCM_ctx* ctx)
 {
 #if TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_HARDWARE
-  TC_AES_GCM_hardware_multiply(result, left, ctx->H);
+  TC_AES_GCM_hardware_multiply(result, left, ctx->h);
 #elif TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_FAST_TABLE
   tc_aes_gcm_multiply_fast_table(result, left, ctx);
 #elif TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_WIDE ||                                       \
     ((TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_AUTO) && TC_AES_WIDE_OPS)
 #if defined(UINT64_MAX)
-  tc_aes_gcm_multiply_wide(result, left, ctx->H);
+  tc_aes_gcm_multiply_wide(result, left, ctx->h);
 #else
-  tc_aes_gcm_multiply_bitwise(result, left, ctx->H);
+  tc_aes_gcm_multiply_bitwise(result, left, ctx->h);
 #endif
 #else
-  tc_aes_gcm_multiply_bitwise(result, left, ctx->H);
+  tc_aes_gcm_multiply_bitwise(result, left, ctx->h);
 #endif
 }
 
@@ -151,8 +151,8 @@ void tc_aes_gcm_ghash_block(struct TC_AES_GCM_ctx* ctx, const uint8_t* block)
   unsigned i;
 
   for (i = 0; i < TC_AES_BLOCKLEN; ++i)
-    value[i] = (uint8_t)(ctx->S[i] ^ block[i]);
-  tc_aes_gcm_multiply(ctx->S, value, ctx);
+    value[i] = (uint8_t)(ctx->s[i] ^ block[i]);
+  tc_aes_gcm_multiply(ctx->s, value, ctx);
   /* S xor block depends on H. Wipe it so it does not outlive the call. */
   TC_secure_zero(value, sizeof(value));
 }

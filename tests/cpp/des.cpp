@@ -53,6 +53,19 @@ TEST_CASE("DES IV re-init with a wrong key length clears the previous key")
 }
 #endif
 
+#if TC_DES_ENABLE_CTR
+TEST_CASE("DES IV re-init with a NULL IV clears the previous key")
+{
+  tiny_crypto::DES des;
+  uint8_t data[TC_DES_BLOCKLEN];
+  std::memcpy(data, des_test_pt, sizeof(data));
+  REQUIRE(des.init(des_test_key, sizeof(des_test_key), des_ctr_iv, sizeof(des_ctr_iv)) == TC_OK);
+  CHECK(des.init(des_test_key, sizeof(des_test_key), nullptr, TC_DES_BLOCKLEN) == TC_ERROR);
+  CHECK(des.xcrypt_ctr(data, sizeof(data)) == TC_ERROR);
+  CHECK(std::memcmp(data, des_test_pt, sizeof(data)) == 0);
+}
+#endif
+
 #if TC_DES_ENABLE_ECB
 TEST_CASE("DES ECB wrapper")
 {

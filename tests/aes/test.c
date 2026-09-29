@@ -53,6 +53,15 @@ static void test_initialize_sbox(void)
 {}
 #endif
 
+#if TC_AES_HAVE_IV
+/* Key the context, then start a message with iv. */
+static TC_status aes_init_with_iv(struct TC_AES_ctx* ctx, const uint8_t* key, const uint8_t* iv)
+{
+  TC_status status = TC_AES_init(ctx, key);
+  return status == TC_OK ? TC_AES_set_iv(ctx, iv) : status;
+}
+#endif
+
 #if TC_AES_CAVP
 MunitResult test_cavp(const MunitParameter params[], void* data);
 #endif
@@ -150,12 +159,17 @@ static MunitResult test_invalid_key_state(const MunitParameter params[], void* d
 #if TC_AES_ENABLE_ECB
   munit_assert_int(TC_AES_ECB_encrypt(&key, block), ==, TC_ERROR);
 #endif
-  munit_assert_int(TC_AES_init_ctx(&ctx, TEST_KEY), ==, TC_OK);
+  munit_assert_int(TC_AES_init(&ctx, TEST_KEY), ==, TC_OK);
   TC_AES_ctx_clear(&ctx);
 #if TC_AES_ENABLE_CTR
   munit_assert_int(TC_AES_CTR_crypt(&ctx, block, 1), ==, TC_ERROR);
 #endif
-  munit_assert_int(TC_AES_init_ctx(&ctx, NULL), ==, TC_ERROR);
+#if TC_AES_HAVE_IV
+  /* set_iv needs a keyed context. */
+  munit_assert_int(TC_AES_set_iv(&ctx, nist_iv), ==, TC_ERROR);
+  munit_assert_uint8(ctx.iv[0], ==, 0);
+#endif
+  munit_assert_int(TC_AES_init(&ctx, NULL), ==, TC_ERROR);
 #if TC_AES_ENABLE_CBC
   munit_assert_int(TC_AES_CBC_decrypt(&ctx, block, sizeof block), ==, TC_ERROR);
 #endif
@@ -197,7 +211,7 @@ static void check_mode_overlap(aes_mode_fn mode, size_t length)
                              frame.before + sizeof frame.before + 1 - length};
   size_t i;
 
-  munit_assert_int(TC_AES_init_ctx_iv(&frame.ctx, TEST_KEY, nist_iv), ==, TC_OK);
+  munit_assert_int(aes_init_with_iv(&frame.ctx, TEST_KEY, nist_iv), ==, TC_OK);
   memset(frame.before, 0x5a, sizeof frame.before);
   memcpy(before, frame.before, sizeof before);
   memcpy(&saved, &frame.ctx, sizeof saved);
@@ -229,7 +243,7 @@ static MunitResult test_mode_overlap(const MunitParameter params[], void* data)
   check_mode_overlap(TC_AES_OFB_crypt, TC_AES_BLOCKLEN);
 #endif
 #if TC_AES_ENABLE_ECB
-  munit_assert_int(TC_AES_init_ctx(&ctx, TEST_KEY), ==, TC_OK);
+  munit_assert_int(TC_AES_init(&ctx, TEST_KEY), ==, TC_OK);
   memcpy(&saved, &ctx, sizeof saved);
   munit_assert_int(TC_AES_ECB_encrypt(&ctx.key, ctx.key.round_key + 8), ==, TC_ERROR);
   munit_assert_int(TC_AES_ECB_decrypt(&ctx.key, ctx.key.round_key), ==, TC_ERROR);
@@ -239,15 +253,15 @@ static MunitResult test_mode_overlap(const MunitParameter params[], void* data)
   /* set_iv copies 16 bytes into ctx->iv. A source inside the context would
    * be an overlapping memcpy, and one in the round keys would leak key
    * material into the IV. */
-  munit_assert_int(TC_AES_init_ctx_iv(&ctx, TEST_KEY, nist_iv), ==, TC_OK);
+  munit_assert_int(aes_init_with_iv(&ctx, TEST_KEY, nist_iv), ==, TC_OK);
   memcpy(&saved, &ctx, sizeof saved);
-  munit_assert_int(TC_AES_ctx_set_iv(&ctx, ctx.iv), ==, TC_ERROR);
-  munit_assert_int(TC_AES_ctx_set_iv(&ctx, ctx.iv + 1), ==, TC_ERROR);
-  munit_assert_int(TC_AES_ctx_set_iv(&ctx, ctx.key.round_key), ==, TC_ERROR);
+  munit_assert_int(TC_AES_set_iv(&ctx, ctx.iv), ==, TC_ERROR);
+  munit_assert_int(TC_AES_set_iv(&ctx, ctx.iv + 1), ==, TC_ERROR);
+  munit_assert_int(TC_AES_set_iv(&ctx, ctx.key.round_key), ==, TC_ERROR);
   assert_aes_ctx_equal(&ctx, &saved);
-  munit_assert_int(TC_AES_ctx_set_iv(&ctx, NULL), ==, TC_ERROR);
-  munit_assert_int(TC_AES_ctx_set_iv(NULL, nist_iv), ==, TC_ERROR);
-  munit_assert_int(TC_AES_ctx_set_iv(&ctx, nist_ctr_iv), ==, TC_OK);
+  munit_assert_int(TC_AES_set_iv(&ctx, NULL), ==, TC_ERROR);
+  munit_assert_int(TC_AES_set_iv(NULL, nist_iv), ==, TC_ERROR);
+  munit_assert_int(TC_AES_set_iv(&ctx, nist_ctr_iv), ==, TC_OK);
   munit_assert_memory_equal(sizeof ctx.iv, ctx.iv, nist_ctr_iv);
   TC_AES_ctx_clear(&ctx);
   return MUNIT_OK;
@@ -270,7 +284,7 @@ static MunitResult test_secure_zero_and_clear(const MunitParameter params[], voi
   for (i = 0; i < sizeof(buffer); ++i)
     munit_assert_uint8(buffer[i], ==, 0);
 
-  TC_AES_init_ctx(&ctx, TEST_KEY);
+  TC_AES_init(&ctx, TEST_KEY);
   TC_AES_ctx_clear(&ctx);
   for (i = 0; i < sizeof(ctx); ++i)
     munit_assert_uint8(((const uint8_t*)&ctx)[i], ==, 0);
@@ -298,7 +312,7 @@ static MunitResult test_ecb(const MunitParameter params[], void* data)
   (void)data;
 
   test_initialize_sbox();
-  TC_AES_init_ctx(&ctx, TEST_KEY);
+  TC_AES_init(&ctx, TEST_KEY);
   memcpy(buffer, nist_plaintext, TC_AES_BLOCKLEN);
   munit_assert_int(TC_AES_ECB_encrypt(&ctx.key, buffer), ==, TC_OK);
   munit_assert_memory_equal(TC_AES_BLOCKLEN, buffer, TEST_ECB_CIPHERTEXT);
@@ -320,12 +334,12 @@ static MunitResult test_cbc(const MunitParameter params[], void* data)
   (void)data;
 
   test_initialize_sbox();
-  TC_AES_init_ctx_iv(&ctx, TEST_KEY, nist_iv);
+  aes_init_with_iv(&ctx, TEST_KEY, nist_iv);
   memcpy(buffer, nist_plaintext, sizeof(buffer));
   munit_assert_int(TC_AES_CBC_encrypt(&ctx, buffer, sizeof(buffer)), ==, TC_OK);
   munit_assert_memory_equal(sizeof(buffer), buffer, TEST_CBC_CIPHERTEXT);
 
-  TC_AES_ctx_set_iv(&ctx, nist_iv);
+  TC_AES_set_iv(&ctx, nist_iv);
   munit_assert_int(TC_AES_CBC_decrypt(&ctx, buffer, sizeof(buffer)), ==, TC_OK);
   munit_assert_memory_equal(sizeof(buffer), buffer, nist_plaintext);
 
@@ -341,7 +355,7 @@ static MunitResult test_cbc_alignment(const MunitParameter params[], void* data)
   (void)data;
 
   test_initialize_sbox();
-  TC_AES_init_ctx_iv(&ctx, TEST_KEY, nist_iv);
+  aes_init_with_iv(&ctx, TEST_KEY, nist_iv);
   memset(buffer, 0x5a, sizeof(buffer));
   munit_assert_int(TC_AES_CBC_encrypt(&ctx, buffer, TC_AES_BLOCKLEN + 1), ==, TC_ERROR);
   munit_assert_int(TC_AES_CBC_decrypt(&ctx, buffer, 1), ==, TC_ERROR);
@@ -361,12 +375,12 @@ static MunitResult test_ctr(const MunitParameter params[], void* data)
   (void)data;
 
   test_initialize_sbox();
-  TC_AES_init_ctx_iv(&ctx, TEST_KEY, nist_ctr_iv);
+  aes_init_with_iv(&ctx, TEST_KEY, nist_ctr_iv);
   memcpy(buffer, nist_plaintext, sizeof(buffer));
   munit_assert_int(TC_AES_CTR_crypt(&ctx, buffer, sizeof(buffer)), ==, TC_OK);
   munit_assert_memory_equal(sizeof(buffer), buffer, TEST_CTR_CIPHERTEXT);
 
-  TC_AES_ctx_set_iv(&ctx, nist_ctr_iv);
+  TC_AES_set_iv(&ctx, nist_ctr_iv);
   munit_assert_int(TC_AES_CTR_crypt(&ctx, buffer, sizeof(buffer)), ==, TC_OK);
   munit_assert_memory_equal(sizeof(buffer), buffer, nist_plaintext);
 
@@ -383,13 +397,13 @@ static MunitResult test_ctr_unaligned(const MunitParameter params[], void* data)
   (void)data;
 
   test_initialize_sbox();
-  TC_AES_init_ctx_iv(&ctx, TEST_KEY, nist_ctr_iv);
+  aes_init_with_iv(&ctx, TEST_KEY, nist_ctr_iv);
   memcpy(buffer, nist_plaintext, sizeof(nist_plaintext));
   munit_assert_int(TC_AES_CTR_crypt(&ctx, buffer, 5), ==, TC_OK);
   munit_assert_int(TC_AES_CTR_crypt(&ctx, buffer + 5, sizeof(nist_plaintext) - 5), ==, TC_OK);
   munit_assert_memory_equal(sizeof(nist_plaintext), buffer, TEST_CTR_CIPHERTEXT);
 
-  TC_AES_ctx_set_iv(&ctx, nist_ctr_iv);
+  TC_AES_set_iv(&ctx, nist_ctr_iv);
   munit_assert_int(TC_AES_CTR_crypt(&ctx, buffer, 7), ==, TC_OK);
   munit_assert_int(TC_AES_CTR_crypt(&ctx, buffer + 7, sizeof(nist_plaintext) - 7), ==, TC_OK);
   munit_assert_memory_equal(sizeof(nist_plaintext), buffer, nist_plaintext);
@@ -413,7 +427,7 @@ static MunitResult test_ctr_wrap(const MunitParameter params[], void* data)
   memset(iv, 0xff, sizeof(iv));
   memset(buffer, 0x11, sizeof(buffer));
   memcpy(saved_buffer, buffer, sizeof(buffer));
-  TC_AES_init_ctx_iv(&ctx, TEST_KEY, iv);
+  aes_init_with_iv(&ctx, TEST_KEY, iv);
   memcpy(saved_iv, ctx.iv, sizeof(saved_iv));
 
   /* Two blocks from an all-0xff counter would wrap past 2^128. */
@@ -434,14 +448,14 @@ static MunitResult test_ctr_wrap(const MunitParameter params[], void* data)
   munit_assert_memory_equal(sizeof(buffer), buffer, saved_buffer);
 
   /* Bytes still cached from the last block remain usable. */
-  TC_AES_init_ctx_iv(&ctx, TEST_KEY, iv);
+  aes_init_with_iv(&ctx, TEST_KEY, iv);
   munit_assert_int(TC_AES_CTR_crypt(&ctx, buffer, 8), ==, TC_OK);
   munit_assert_int(TC_AES_CTR_crypt(&ctx, buffer + 8, 8), ==, TC_OK);
   munit_assert_int(TC_AES_CTR_crypt(&ctx, buffer + 16, 1), ==, TC_ERROR);
 
   /* A new IV restores the full counter space. */
   memset(iv, 0, sizeof(iv));
-  munit_assert_int(TC_AES_ctx_set_iv(&ctx, iv), ==, TC_OK);
+  munit_assert_int(TC_AES_set_iv(&ctx, iv), ==, TC_OK);
   munit_assert_int(TC_AES_CTR_crypt(&ctx, buffer, sizeof(buffer)), ==, TC_OK);
 
   return MUNIT_OK;
@@ -465,18 +479,18 @@ static MunitResult test_ofb(const MunitParameter params[], void* data)
 
   test_initialize_sbox();
 
-  TC_AES_init_ctx_iv(&ctx, TEST_KEY, nist_iv);
+  aes_init_with_iv(&ctx, TEST_KEY, nist_iv);
   memcpy(buffer, nist_plaintext, sizeof(buffer));
   munit_assert_int(TC_AES_OFB_crypt(&ctx, buffer, 0), ==, TC_OK);
   munit_assert_memory_equal(sizeof(buffer), buffer, nist_plaintext);
   munit_assert_int(TC_AES_OFB_crypt(&ctx, buffer, sizeof(buffer)), ==, TC_OK);
   munit_assert_memory_equal(sizeof(buffer), buffer, TEST_OFB_CIPHERTEXT);
 
-  TC_AES_ctx_set_iv(&ctx, nist_iv);
+  TC_AES_set_iv(&ctx, nist_iv);
   munit_assert_int(TC_AES_OFB_crypt(&ctx, buffer, sizeof(buffer)), ==, TC_OK);
   munit_assert_memory_equal(sizeof(buffer), buffer, nist_plaintext);
 
-  TC_AES_ctx_set_iv(&ctx, nist_iv);
+  TC_AES_set_iv(&ctx, nist_iv);
   memcpy(buffer, nist_plaintext, sizeof(buffer));
   offset = 0;
   for (i = 0; i < sizeof(encrypt_chunks) / sizeof(encrypt_chunks[0]); ++i) {
@@ -485,7 +499,7 @@ static MunitResult test_ofb(const MunitParameter params[], void* data)
   }
   munit_assert_memory_equal(sizeof(buffer), buffer, TEST_OFB_CIPHERTEXT);
 
-  TC_AES_ctx_set_iv(&ctx, nist_iv);
+  TC_AES_set_iv(&ctx, nist_iv);
   offset = 0;
   for (i = 0; i < sizeof(decrypt_chunks) / sizeof(decrypt_chunks[0]); ++i) {
     munit_assert_int(TC_AES_OFB_crypt(&ctx, buffer + offset, decrypt_chunks[i]), ==, TC_OK);
@@ -493,12 +507,12 @@ static MunitResult test_ofb(const MunitParameter params[], void* data)
   }
   munit_assert_memory_equal(sizeof(buffer), buffer, nist_plaintext);
 
-  TC_AES_ctx_set_iv(&ctx, nist_iv);
+  TC_AES_set_iv(&ctx, nist_iv);
   memcpy(unaligned, nist_plaintext, sizeof(nist_plaintext));
   munit_assert_int(TC_AES_OFB_crypt(&ctx, unaligned, 37), ==, TC_OK);
   munit_assert_memory_equal(37, unaligned, TEST_OFB_CIPHERTEXT);
 
-  TC_AES_ctx_set_iv(&ctx, nist_iv);
+  TC_AES_set_iv(&ctx, nist_iv);
   munit_assert_int(TC_AES_OFB_crypt(&ctx, unaligned, 37), ==, TC_OK);
   munit_assert_memory_equal(37, unaligned, nist_plaintext);
 
@@ -909,8 +923,8 @@ static MunitResult test_gcm(const MunitParameter params[], void* data)
     static const struct TC_AES_key_ctx zero_key;
     static const uint8_t zero_block[TC_AES_BLOCKLEN];
     munit_assert_memory_equal(sizeof zero_key, &ctx.key, &zero_key);
-    munit_assert_memory_equal(sizeof zero_block, ctx.H, zero_block);
-    munit_assert_memory_equal(sizeof zero_block, ctx.S, zero_block);
+    munit_assert_memory_equal(sizeof zero_block, ctx.h, zero_block);
+    munit_assert_memory_equal(sizeof zero_block, ctx.s, zero_block);
   }
   munit_assert_int(TC_AES_GCM_encrypt_finish(&ctx, tag), ==, TC_ERROR);
   munit_assert_int(TC_AES_GCM_encrypt_update(&ctx, buffer, 1), ==, TC_ERROR);
@@ -1120,8 +1134,8 @@ static MunitResult test_gcm_multi_key(const MunitParameter params[], void* data)
   munit_assert_memory_equal(va->length, buf_a, va->plaintext);
   munit_assert_memory_equal(va->length, buf_b, expect_b);
 
-  TC_AES_GCM_clear(&ctx_a);
-  TC_AES_GCM_clear(&ctx_b);
+  TC_AES_GCM_ctx_clear(&ctx_a);
+  TC_AES_GCM_ctx_clear(&ctx_b);
   return MUNIT_OK;
 }
 #endif

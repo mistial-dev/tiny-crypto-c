@@ -14,10 +14,10 @@ static MunitResult test_profile(const MunitParameter params[], void* user)
   uint8_t key[TC_AES_KEYLEN] = {0};
   uint8_t tag[TC_AES_CMAC_TAG_MAX];
 
-  munit_assert_false(TC_AES_init_ctx(&ctx, key) != TC_ERROR);
+  munit_assert_false(TC_AES_init(&ctx, key) != TC_ERROR);
   munit_assert_false(TC_AES_CMAC(key, NULL, 0, tag, sizeof(tag)) != TC_ERROR);
   TC_AES_init_sbox();
-  munit_assert_false(TC_AES_init_ctx(&ctx, key) != TC_OK);
+  munit_assert_false(TC_AES_init(&ctx, key) != TC_OK);
   munit_assert_false(TC_AES_CMAC(key, NULL, 0, tag, sizeof(tag)) != TC_OK);
   return MUNIT_OK;
 }

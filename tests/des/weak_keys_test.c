@@ -45,7 +45,7 @@ static int expect_iso9797_status(const uint8_t* key, size_t keylen, int accepted
       TC_DES_ISO9797_init(&ctx, TC_DES_ISO9797_ALG1, TC_DES_ISO9797_PAD2, key, keylen);
   const TC_status alg3 =
       TC_DES_ISO9797_init(&ctx, TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, key, keylen);
-  TC_DES_ISO9797_clear(&ctx);
+  TC_DES_ISO9797_ctx_clear(&ctx);
   if (accepted)
     return alg1 == TC_OK && alg3 == TC_OK;
   return expect_key_status(alg1) && expect_key_status(alg3);
@@ -114,9 +114,9 @@ static MunitResult test_profile(const MunitParameter params[], void* user)
   uint8_t key[TC_DES_KEYLEN_3KEY];
   size_t i;
 
-  munit_assert(TC_DES_init_ctx(&des, k1, TC_DES_KEYLEN) == TC_OK);
+  munit_assert(TC_DES_init(&des, k1, TC_DES_KEYLEN) == TC_OK);
   for (i = 0; i < 16; ++i) {
-    munit_assert(expect_key_status(TC_DES_init_ctx(&des, weak_keys[i], TC_DES_KEYLEN)));
+    munit_assert(expect_key_status(TC_DES_init(&des, weak_keys[i], TC_DES_KEYLEN)));
 #if TC_DES_ENABLE_CMAC
     munit_assert(expect_key_status(TC_DES_CMAC_init(&cmac, weak_keys[i], TC_DES_KEYLEN)));
 #endif
@@ -125,52 +125,52 @@ static MunitResult test_profile(const MunitParameter params[], void* user)
   memcpy(key, weak_keys[0], TC_DES_KEYLEN);
   for (i = 0; i < TC_DES_KEYLEN; ++i)
     key[i] ^= 0x01u;
-  munit_assert(expect_key_status(TC_DES_init_ctx(&des, key, TC_DES_KEYLEN)));
+  munit_assert(expect_key_status(TC_DES_init(&des, key, TC_DES_KEYLEN)));
 
   memcpy(key, k1, TC_DES_KEYLEN);
   memcpy(key + TC_DES_KEYLEN, k2, TC_DES_KEYLEN);
-  munit_assert(TC_DES_init_ctx(&des3, key, TC_DES_KEYLEN_2KEY) == TC_OK);
+  munit_assert(TC_DES_init(&des3, key, TC_DES_KEYLEN_2KEY) == TC_OK);
 
   memcpy(key + TC_DES_KEYLEN, weak_keys[0], TC_DES_KEYLEN);
-  munit_assert(expect_key_status(TC_DES_init_ctx(&des3, key, TC_DES_KEYLEN_2KEY)));
+  munit_assert(expect_key_status(TC_DES_init(&des3, key, TC_DES_KEYLEN_2KEY)));
 #if TC_DES_ENABLE_CMAC
   munit_assert(expect_key_status(TC_DES_CMAC_init(&cmac, key, TC_DES_KEYLEN_2KEY)));
 #endif
 
   memcpy(key + TC_DES_KEYLEN, k1, TC_DES_KEYLEN);
-  munit_assert(expect_key_status(TC_DES_init_ctx(&des3, key, TC_DES_KEYLEN_2KEY)));
+  munit_assert(expect_key_status(TC_DES_init(&des3, key, TC_DES_KEYLEN_2KEY)));
   for (i = TC_DES_KEYLEN; i < TC_DES_KEYLEN_2KEY; ++i)
     key[i] ^= 0x01u;
-  munit_assert(expect_key_status(TC_DES_init_ctx(&des3, key, TC_DES_KEYLEN_2KEY)));
+  munit_assert(expect_key_status(TC_DES_init(&des3, key, TC_DES_KEYLEN_2KEY)));
 
   memcpy(key, k1, TC_DES_KEYLEN);
   memcpy(key + TC_DES_KEYLEN, k2, TC_DES_KEYLEN);
   memcpy(key + (2u * TC_DES_KEYLEN), k1, TC_DES_KEYLEN);
-  munit_assert(TC_DES_init_ctx(&des3, key, TC_DES_KEYLEN_3KEY) == TC_OK);
+  munit_assert(TC_DES_init(&des3, key, TC_DES_KEYLEN_3KEY) == TC_OK);
 
   memcpy(key + (2u * TC_DES_KEYLEN), k3, TC_DES_KEYLEN);
-  munit_assert(TC_DES_init_ctx(&des3, key, TC_DES_KEYLEN_3KEY) == TC_OK);
+  munit_assert(TC_DES_init(&des3, key, TC_DES_KEYLEN_3KEY) == TC_OK);
 
   memcpy(key, weak_keys[0], TC_DES_KEYLEN);
-  munit_assert(expect_key_status(TC_DES_init_ctx(&des3, key, TC_DES_KEYLEN_3KEY)));
+  munit_assert(expect_key_status(TC_DES_init(&des3, key, TC_DES_KEYLEN_3KEY)));
 
   memcpy(key, k1, TC_DES_KEYLEN);
   memcpy(key + TC_DES_KEYLEN, weak_keys[0], TC_DES_KEYLEN);
-  munit_assert(expect_key_status(TC_DES_init_ctx(&des3, key, TC_DES_KEYLEN_3KEY)));
+  munit_assert(expect_key_status(TC_DES_init(&des3, key, TC_DES_KEYLEN_3KEY)));
 
   memcpy(key + TC_DES_KEYLEN, k2, TC_DES_KEYLEN);
   memcpy(key + (2u * TC_DES_KEYLEN), weak_keys[0], TC_DES_KEYLEN);
-  munit_assert(expect_key_status(TC_DES_init_ctx(&des3, key, TC_DES_KEYLEN_3KEY)));
+  munit_assert(expect_key_status(TC_DES_init(&des3, key, TC_DES_KEYLEN_3KEY)));
 
   memcpy(key, k1, TC_DES_KEYLEN);
   memcpy(key + TC_DES_KEYLEN, k1, TC_DES_KEYLEN);
   memcpy(key + (2u * TC_DES_KEYLEN), k3, TC_DES_KEYLEN);
-  munit_assert(expect_key_status(TC_DES_init_ctx(&des3, key, TC_DES_KEYLEN_3KEY)));
+  munit_assert(expect_key_status(TC_DES_init(&des3, key, TC_DES_KEYLEN_3KEY)));
 
   memcpy(key, k1, TC_DES_KEYLEN);
   memcpy(key + TC_DES_KEYLEN, k2, TC_DES_KEYLEN);
   memcpy(key + (2u * TC_DES_KEYLEN), k2, TC_DES_KEYLEN);
-  munit_assert(expect_key_status(TC_DES_init_ctx(&des3, key, TC_DES_KEYLEN_3KEY)));
+  munit_assert(expect_key_status(TC_DES_init(&des3, key, TC_DES_KEYLEN_3KEY)));
 
 #if TC_DES_ENABLE_ISO9797
   check_iso9797_profile(k1, k2, k3);

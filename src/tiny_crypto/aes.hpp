@@ -28,7 +28,7 @@ public:
       TC_AES_ctx_clear(&ctx_);
       return TC_ERROR;
     }
-    return TC_AES_init_ctx(&ctx_, key);
+    return TC_AES_init(&ctx_, key);
   }
   template <size_t N> TC_CPP_NODISCARD TC_status init(const uint8_t (&key)[N]) noexcept
   {
@@ -43,11 +43,16 @@ public:
       TC_AES_ctx_clear(&ctx_);
       return TC_ERROR;
     }
-    return TC_AES_init_ctx_iv(&ctx_, key, iv);
+    TC_status status = TC_AES_init(&ctx_, key);
+    if (status == TC_OK)
+      status = TC_AES_set_iv(&ctx_, iv);
+    if (status != TC_OK)
+      TC_AES_ctx_clear(&ctx_);
+    return status;
   }
   TC_CPP_NODISCARD TC_status set_iv(const uint8_t* iv, size_t iv_len) noexcept
   {
-    return iv_len == TC_AES_BLOCKLEN ? TC_AES_ctx_set_iv(&ctx_, iv) : TC_ERROR;
+    return iv_len == TC_AES_BLOCKLEN ? TC_AES_set_iv(&ctx_, iv) : TC_ERROR;
   }
   template <size_t N> TC_CPP_NODISCARD TC_status set_iv(const uint8_t (&iv)[N]) noexcept
   {
@@ -125,7 +130,7 @@ public:
   GCM() noexcept = default;
   ~GCM() noexcept
   {
-    TC_AES_GCM_clear(&ctx_);
+    TC_AES_GCM_ctx_clear(&ctx_);
   }
   GCM(const GCM&) = delete;
   GCM& operator=(const GCM&) = delete;
@@ -134,7 +139,7 @@ public:
                                   size_t tag_len = TC_AES_BLOCKLEN) noexcept
   {
     if (key_len != TC_AES_KEYLEN) {
-      TC_AES_GCM_clear(&ctx_);
+      TC_AES_GCM_ctx_clear(&ctx_);
       return TC_ERROR;
     }
     return TC_AES_GCM_init(&ctx_, key, iv, tag_len);
@@ -143,7 +148,7 @@ public:
                                             size_t tag_len) noexcept
   {
     if (key_len != TC_AES_KEYLEN) {
-      TC_AES_GCM_clear(&ctx_);
+      TC_AES_GCM_ctx_clear(&ctx_);
       return TC_ERROR;
     }
     return TC_AES_GCM_init_short_tag(&ctx_, key, iv, tag_len);

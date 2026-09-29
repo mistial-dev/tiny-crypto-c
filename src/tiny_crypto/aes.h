@@ -66,8 +66,12 @@ void TC_AES_key_ctx_clear(struct TC_AES_key_ctx* ctx);
 /* Wipe an AES context, including mode-specific streaming state. */
 void TC_AES_ctx_clear(struct TC_AES_ctx* ctx);
 
-/* Initialize an expanded key schedule. Both pointers must be non-NULL. */
-TC_status TC_AES_init_ctx(struct TC_AES_ctx* ctx, const uint8_t* key);
+/* Initialize an expanded key schedule and zero the IV and stream state. Both
+ * pointers must be non-NULL and disjoint. Returns TC_OK or TC_ERROR. A NULL ctx
+ * is left alone. Every other failure wipes ctx, so a previous key is unusable
+ * after a failed re-init. Modes with an IV then need TC_AES_set_iv before the
+ * first message. */
+TC_status TC_AES_init(struct TC_AES_ctx* ctx, const uint8_t* key);
 #if TC_AES_CAVP
 /* Test-only single-block hooks used by the AESAVS harness. They return
  * TC_ERROR, leaving block unchanged, when the key cannot be scheduled. */
@@ -75,15 +79,15 @@ TC_status TC_AES_CAVP_encrypt_block(const uint8_t* key, uint8_t block[TC_AES_BLO
 TC_status TC_AES_CAVP_decrypt_block(const uint8_t* key, uint8_t block[TC_AES_BLOCKLEN]);
 #endif
 #if TC_AES_SBOX_MODE == TC_AES_SBOX_MODE_RUNTIME
-/* Must be called once before TC_AES_init_ctx(), TC_AES_init_ctx_iv(), or encryption. */
+/* Must be called once before TC_AES_init() or encryption. */
 void TC_AES_init_sbox(void);
 #endif
 #if TC_AES_HAVE_IV
-TC_status TC_AES_init_ctx_iv(struct TC_AES_ctx* ctx, const uint8_t* key, const uint8_t* iv);
-/* Load a new 16-byte IV and reset the CTR and OFB stream state. Returns
+/* Start a message: load a 16-byte IV and reset the CTR and OFB stream state.
+ * Call it after TC_AES_init and before each new message. Returns
  * TC_ERROR, leaving ctx unchanged, for a NULL argument, an uninitialized
  * context or an IV that overlaps ctx. */
-TC_status TC_AES_ctx_set_iv(struct TC_AES_ctx* ctx, const uint8_t* iv);
+TC_status TC_AES_set_iv(struct TC_AES_ctx* ctx, const uint8_t* iv);
 #endif
 
 /*
@@ -104,8 +108,8 @@ TC_status TC_AES_ECB_decrypt(const struct TC_AES_key_ctx* ctx, uint8_t* buf);
 #if TC_AES_ENABLE_CBC
 /*
  * length must be a multiple of TC_AES_BLOCKLEN. The caller applies padding.
- * An unaligned length is an argument error. Set the IV via TC_AES_init_ctx_iv()
- * or TC_AES_ctx_set_iv(). Never reuse an IV with the same key.
+ * An unaligned length is an argument error. Set the IV with TC_AES_set_iv().
+ * Never reuse an IV with the same key.
  */
 TC_status TC_AES_CBC_encrypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length);
 TC_status TC_AES_CBC_decrypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length);
@@ -117,8 +121,8 @@ TC_status TC_AES_CBC_decrypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length
  * is incremented for every block, and one IV covers at most 2^128 blocks
  * across all calls. Returns TC_ERROR, leaving buf and IV unchanged, when the
  * request would need a block beyond that space. Once the counter wraps,
- * further calls fail until TC_AES_ctx_set_iv or TC_AES_init_ctx_iv supplies a
- * new IV. Never reuse an IV with the same key.
+ * further calls fail until TC_AES_set_iv supplies a new IV. Never reuse an IV
+ * with the same key.
  */
 TC_status TC_AES_CTR_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length);
 #endif
@@ -187,11 +191,11 @@ TC_status TC_AES_OFB_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length);
 
 struct TC_AES_GCM_ctx {
   struct TC_AES_key_ctx key;
-  uint8_t H[TC_AES_BLOCKLEN];
-  uint8_t J0[TC_AES_BLOCKLEN];
+  uint8_t h[TC_AES_BLOCKLEN];
+  uint8_t j0[TC_AES_BLOCKLEN];
   uint8_t counter[TC_AES_BLOCKLEN];
   uint8_t stream[TC_AES_BLOCKLEN];
-  uint8_t S[TC_AES_BLOCKLEN];
+  uint8_t s[TC_AES_BLOCKLEN];
   uint8_t ghash[TC_AES_BLOCKLEN];
 #if TC_AES_GCM_GHASH_MODE == TC_AES_GCM_GHASH_MODE_FAST_TABLE
   uint8_t ghash_table[16][TC_AES_BLOCKLEN];
@@ -243,7 +247,7 @@ TC_status TC_AES_GCM_decrypt_short_tag(const uint8_t* key, TC_bytes iv, TC_bytes
                                        TC_bytes ciphertext, TC_bytes tag, TC_buffer plaintext);
 
 /* Clear expanded key material and intermediate authentication state. */
-void TC_AES_GCM_clear(struct TC_AES_GCM_ctx* ctx);
+void TC_AES_GCM_ctx_clear(struct TC_AES_GCM_ctx* ctx);
 
 #endif /* TC_AES_ENABLE_GCM */
 

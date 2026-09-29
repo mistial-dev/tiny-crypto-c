@@ -25,7 +25,8 @@ static MunitResult test_edge_vectors(const MunitParameter params[], void* data)
     memcpy(buffer, vector->msg, vector->len);
 
     struct TC_DES_ctx ctx;
-    munit_assert_int(TC_DES_init_ctx_iv(&ctx, vector->key, vector->key_len, vector->iv), ==, TC_OK);
+    munit_assert_int(TC_DES_init(&ctx, vector->key, vector->key_len), ==, TC_OK);
+    munit_assert_int(TC_DES_set_iv(&ctx, vector->iv), ==, TC_OK);
 
     if (strcmp(vector->mode, "ECB") == 0)
       munit_assert_int(TC_DES_ECB_encrypt(&ctx, buffer), ==, TC_OK);

@@ -18,19 +18,19 @@ static void tc_aes_gcm_make_j0(struct TC_AES_GCM_ctx* ctx, const uint8_t* iv, si
 {
   uint8_t length_block[TC_AES_BLOCKLEN] = {0};
 
-  memset(ctx->S, 0, TC_AES_BLOCKLEN);
+  memset(ctx->s, 0, TC_AES_BLOCKLEN);
   memset(ctx->ghash, 0, TC_AES_BLOCKLEN);
   if (iv_len == 12) {
-    memset(ctx->J0, 0, TC_AES_BLOCKLEN);
-    memcpy(ctx->J0, iv, iv_len);
-    ctx->J0[15] = 1;
+    memset(ctx->j0, 0, TC_AES_BLOCKLEN);
+    memcpy(ctx->j0, iv, iv_len);
+    ctx->j0[15] = 1;
   } else {
     tc_aes_gcm_hash_bytes(ctx, iv, iv_len);
     tc_internal_store_be64(length_block + 8, (uint64_t)iv_len * 8u);
     tc_aes_gcm_ghash_block(ctx, length_block);
-    memcpy(ctx->J0, ctx->S, TC_AES_BLOCKLEN);
+    memcpy(ctx->j0, ctx->s, TC_AES_BLOCKLEN);
   }
-  memset(ctx->S, 0, TC_AES_BLOCKLEN);
+  memset(ctx->s, 0, TC_AES_BLOCKLEN);
   memset(ctx->ghash, 0, TC_AES_BLOCKLEN);
 }
 
@@ -157,7 +157,7 @@ static int tc_aes_gcm_packet_length_ok(const struct TC_AES_GCM_ctx* ctx, uint64_
 
 static void tc_aes_gcm_invalidate(struct TC_AES_GCM_ctx* ctx)
 {
-  TC_AES_GCM_clear(ctx);
+  TC_AES_GCM_ctx_clear(ctx);
   ctx->phase = TC_AES_GCM_PHASE_FINAL;
 }
 
@@ -168,11 +168,11 @@ static TC_status tc_aes_gcm_make_tag(const struct TC_AES_GCM_ctx* ctx, uint8_t* 
   uint8_t i;
   TC_status status;
 
-  memcpy(mask, ctx->J0, TC_AES_BLOCKLEN);
+  memcpy(mask, ctx->j0, TC_AES_BLOCKLEN);
   status = tc_aes_cipher((state_t*)mask, ctx->key.round_key);
   if (status != TC_OK)
     goto done;
-  memcpy(hash, ctx->S, TC_AES_BLOCKLEN);
+  memcpy(hash, ctx->s, TC_AES_BLOCKLEN);
   /* MSBt truncation: leading tag_len bytes of the 128-bit block. */
   for (i = 0; i < ctx->tag_len; ++i)
     tag[i] = (uint8_t)(mask[i] ^ hash[i]);
@@ -194,18 +194,18 @@ static TC_status tc_aes_gcm_init_impl(struct TC_AES_GCM_ctx* ctx, const uint8_t*
   if ((key != NULL && !tc_internal_ranges_disjoint(ctx, sizeof(*ctx), key, TC_AES_KEYLEN)) ||
       (iv != NULL && iv_len <= TC_AES_GCM_MAX_IV_BYTES &&
        !tc_internal_ranges_disjoint(ctx, sizeof(*ctx), iv, iv_len))) {
-    TC_AES_GCM_clear(ctx);
+    TC_AES_GCM_ctx_clear(ctx);
     return TC_ERROR;
   }
-  TC_AES_GCM_clear(ctx);
+  TC_AES_GCM_ctx_clear(ctx);
   if (key == NULL || iv == NULL || iv_len == 0 || (uint64_t)iv_len > TC_AES_GCM_MAX_IV_BYTES ||
       !tc_aes_gcm_tag_length_is_allowed(tag_len, short_tag))
     return TC_ERROR;
 
   if (TC_AES_key_init(&ctx->key, key) != TC_OK)
     return TC_ERROR;
-  memcpy(ctx->H, zero, TC_AES_BLOCKLEN);
-  if (tc_aes_cipher((state_t*)ctx->H, ctx->key.round_key) != TC_OK) {
+  memcpy(ctx->h, zero, TC_AES_BLOCKLEN);
+  if (tc_aes_cipher((state_t*)ctx->h, ctx->key.round_key) != TC_OK) {
     tc_aes_gcm_invalidate(ctx);
     return TC_ERROR;
   }
@@ -213,8 +213,8 @@ static TC_status tc_aes_gcm_init_impl(struct TC_AES_GCM_ctx* ctx, const uint8_t*
   tc_aes_gcm_init_table(ctx);
 #endif
   tc_aes_gcm_make_j0(ctx, iv, iv_len);
-  memcpy(ctx->counter, ctx->J0, TC_AES_BLOCKLEN);
-  memcpy(ctx->S, zero, TC_AES_BLOCKLEN);
+  memcpy(ctx->counter, ctx->j0, TC_AES_BLOCKLEN);
+  memcpy(ctx->s, zero, TC_AES_BLOCKLEN);
   memcpy(ctx->ghash, zero, TC_AES_BLOCKLEN);
   ctx->aad_len = 0;
   ctx->text_len = 0;
@@ -289,7 +289,7 @@ TC_status TC_AES_GCM_encrypt_finish(struct TC_AES_GCM_ctx* ctx, uint8_t* tag)
   return status;
 }
 
-void TC_AES_GCM_clear(struct TC_AES_GCM_ctx* ctx)
+void TC_AES_GCM_ctx_clear(struct TC_AES_GCM_ctx* ctx)
 {
   if (ctx == NULL)
     return;
@@ -337,7 +337,7 @@ static TC_status tc_aes_gcm_encrypt_impl(const uint8_t* key, TC_bytes iv, TC_byt
   if (status != TC_OK && plaintext.length != 0)
     TC_secure_zero(ciphertext.data, plaintext.length);
 
-  TC_AES_GCM_clear(&ctx);
+  TC_AES_GCM_ctx_clear(&ctx);
   return status;
 }
 
@@ -377,7 +377,7 @@ static TC_status tc_aes_gcm_decrypt_impl(const uint8_t* key, TC_bytes iv, TC_byt
   if (status != TC_OK && length != 0)
     TC_secure_zero(plaintext.data, length);
 
-  TC_AES_GCM_clear(&ctx);
+  TC_AES_GCM_ctx_clear(&ctx);
   TC_secure_zero(expected, sizeof(expected));
   return status;
 }
