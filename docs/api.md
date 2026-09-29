@@ -22,16 +22,16 @@ Each module returns a named result type. Compare against the exact success
 value. Avoid treating a result as a Boolean or converting between enums
 numerically.
 
-| Result type | Returned by | Success |
-| --- | --- | --- |
-| `TC_status` | AES, DES, hashes, HMAC, MD5, KMAC256, KBKDF, HKDF, SSKDF, PIV SM | `TC_OK` |
-| `TC_EC_result`, `TC_RSA_result`, `TC_GZIP_result`, `TC_key_challenge_result` | EC, RSA, GZIP, key challenges | `*_OK` |
-| `TC_DRBG_result` | SP 800-90A DRBGs | `TC_DRBG_OK` |
-| `TC_TLV_result` | TLV, DER, X.509, CMS, CRL, OCSP, CVC and PIV/TWIC readers | `TC_TLV_OK` |
-| `TC_X509_signature_result`, `TC_X509_path_status` | signature providers, path validation | `*_VALID` |
-| `TC_credential_status` | CMS, CHUID, biometric, security-object and SM validation | `TC_CREDENTIAL_VALID` |
-| `TC_TWIC_CCL_result` | TWIC canceled card lists | `TC_TWIC_CCL_OK` |
-| `TC_result` | workspace sizing and setup helpers | `TC_RESULT_OK` |
+| Result type                                                                  | Returned by                                                      | Success               |
+| ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------- |
+| `TC_status`                                                                  | AES, DES, hashes, HMAC, MD5, KMAC256, KBKDF, HKDF, SSKDF, PIV SM | `TC_OK`               |
+| `TC_EC_result`, `TC_RSA_result`, `TC_GZIP_result`, `TC_key_challenge_result` | EC, RSA, GZIP, key challenges                                    | `*_OK`                |
+| `TC_DRBG_result`                                                             | SP 800-90A DRBGs                                                 | `TC_DRBG_OK`          |
+| `TC_TLV_result`                                                              | TLV, DER, X.509, CMS, CRL, OCSP, CVC and PIV/TWIC readers        | `TC_TLV_OK`           |
+| `TC_X509_signature_result`, `TC_X509_path_status`                            | signature providers, path validation                             | `*_VALID`             |
+| `TC_credential_status`                                                       | CMS, CHUID, biometric, security-object and SM validation         | `TC_CREDENTIAL_VALID` |
+| `TC_TWIC_CCL_result`                                                         | TWIC canceled card lists                                         | `TC_TWIC_CCL_OK`      |
+| `TC_result`                                                                  | workspace sizing and setup helpers                               | `TC_RESULT_OK`        |
 
 `TC_status` has three values. `TC_MISMATCH` reports a failed authentication or
 comparison: a tag, MAC or constant-time comparison that differs. `TC_ERROR`
@@ -77,18 +77,18 @@ exception:
    error leaves every output, context, workspace, work budget and random
    source unchanged. So does a capacity or work preflight that returns LIMIT
    before processing starts.
-2. Readers and parsers write their result only on success. A failed read
+1. Readers and parsers write their result only on success. A failed read
    leaves `out` unchanged.
-3. After the argument checks, a failure wipes any output that could hold
+1. After the argument checks, a failure wipes any output that could hold
    partial plaintext, keys or unauthenticated data. The output then holds
    zero bytes. In-place callers lose the input.
-4. Frames, workspaces and other scratch are provisional. Any failure may
+1. Frames, workspaces and other scratch are provisional. Any failure may
    change them. Scratch that held secrets is wiped before return.
-5. Work budgets decrease by the work completed, on success and on failure.
-6. A final or finish call consumes its context and wipes it. A failure while
+1. Work budgets decrease by the work completed, on success and on failure.
+1. A final or finish call consumes its context and wipes it. A failure while
    processing clears the context, so no partial chaining value or key stays
    usable. `*_clear` functions always wipe and accept a NULL context.
-7. Key schedules, MAC states and stack secrets are wiped before return.
+1. Key schedules, MAC states and stack secrets are wiped before return.
 
 Wiping is unconditional, and defining `TC_ZEROIZE` or `TC_STRICT` stops the
 build with an `#error`. `TC_secure_zero` is a best-effort wipe for
@@ -242,11 +242,11 @@ Function names end with the operation:
 Arguments follow the operation:
 
 1. The context, session or reader, when the call has one.
-2. Configuration: algorithm, profile, options or policy.
-3. Inputs, as `TC_bytes` spans or input structures.
-4. For parsers and validators: limits, frames, workspace and the `size_t`
+1. Configuration: algorithm, profile, options or policy.
+1. Inputs, as `TC_bytes` spans or input structures.
+1. For parsers and validators: limits, frames, workspace and the `size_t`
    work counter, then the output last.
-5. For cryptographic one-shots: outputs after the inputs. EC and RSA then take
+1. For cryptographic one-shots: outputs after the inputs. EC and RSA then take
    the workspace and the `TC_work_budget` or execution descriptor last.
 
 A call that needs more than eight parameters takes a `*_request` structure
@@ -433,14 +433,14 @@ Appendix A.2, and a build may raise it to 16. Values outside 8..16 stop the
 build. A value above 8 also requires `TC_DES_ENABLE_CMAC=0`, since a DES-CMAC
 tag holds at most 8 bytes.
 
-| Mode | Default entry points | `_short_tag` entry points |
-| --- | --- | --- |
-| CCM | even lengths from `TC_MIN_TAG_LEN` to 16 | even lengths from 4 up to `TC_MIN_TAG_LEN - 1` |
-| EAX | `TC_MIN_TAG_LEN`..16 | 1..`TC_MIN_TAG_LEN - 1` |
-| AES-CMAC | `TC_MIN_TAG_LEN`..16 | 1..`TC_MIN_TAG_LEN - 1` |
-| DES-CMAC | `TC_MIN_TAG_LEN`..8 | 1..`TC_MIN_TAG_LEN - 1` |
-| GCM | 12..16 | 4 or 8 (SP 800-38D appendix C) |
-| ISO 9797-1 | 8 | 4..7 |
+| Mode       | Default entry points                     | `_short_tag` entry points                      |
+| ---------- | ---------------------------------------- | ---------------------------------------------- |
+| CCM        | even lengths from `TC_MIN_TAG_LEN` to 16 | even lengths from 4 up to `TC_MIN_TAG_LEN - 1` |
+| EAX        | `TC_MIN_TAG_LEN`..16                     | 1..`TC_MIN_TAG_LEN - 1`                        |
+| AES-CMAC   | `TC_MIN_TAG_LEN`..16                     | 1..`TC_MIN_TAG_LEN - 1`                        |
+| DES-CMAC   | `TC_MIN_TAG_LEN`..8                      | 1..`TC_MIN_TAG_LEN - 1`                        |
+| GCM        | 12..16                                   | 4 or 8 (SP 800-38D appendix C)                 |
+| ISO 9797-1 | 8                                        | 4..7                                           |
 
 Each length has exactly one entry point. The other entry point returns
 `TC_ERROR` and leaves every output unchanged. A zero-length tag is never

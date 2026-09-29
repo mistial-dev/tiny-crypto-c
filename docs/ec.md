@@ -21,14 +21,14 @@ unknown or disabled in the build. Size buffers from it: a public key is
 
 Every function returns a `TC_EC_result`:
 
-| Status | Meaning |
-|---|---|
-| `TC_EC_OK` | The operation completed and its outputs were written. |
-| `TC_EC_INVALID` | A key or signature whose length does not match the curve, a private scalar outside `[1, n-1]`, a point that is not on the curve, or a signature that does not verify. |
-| `TC_EC_LIMIT` | An output buffer shorter than required, or the work budget or the random-attempt limit ran out. |
-| `TC_EC_ARGUMENT` | A NULL pointer, an empty digest or overlapping storage. |
-| `TC_EC_UNSUPPORTED` | The curve is unknown or disabled in this build. |
-| `TC_EC_ERROR` | The random source failed, or a new signature failed its own verification. |
+| Status              | Meaning                                                                                                                                                               |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TC_EC_OK`          | The operation completed and its outputs were written.                                                                                                                 |
+| `TC_EC_INVALID`     | A key or signature whose length does not match the curve, a private scalar outside `[1, n-1]`, a point that is not on the curve, or a signature that does not verify. |
+| `TC_EC_LIMIT`       | An output buffer shorter than required, or the work budget or the random-attempt limit ran out.                                                                       |
+| `TC_EC_ARGUMENT`    | A NULL pointer, an empty digest or overlapping storage.                                                                                                               |
+| `TC_EC_UNSUPPORTED` | The curve is unknown or disabled in this build.                                                                                                                       |
+| `TC_EC_ERROR`       | The random source failed, or a new signature failed its own verification.                                                                                             |
 
 Each function checks its arguments once and reports the first problem in
 this order: `TC_EC_ARGUMENT`, `TC_EC_UNSUPPORTED`, `TC_EC_INVALID` for input

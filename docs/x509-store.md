@@ -38,12 +38,12 @@ persistent storage and recovery after power loss.
 Each slot follows the `TC_snapshot_state` lifecycle from
 `<tiny_crypto/snapshot.h>`, which the TWIC canceled-card-list store shares.
 
-| State | Entered by | Leaves by |
-| --- | --- | --- |
-| `TC_SNAPSHOT_FREE` | zero initialization, discard, last release of a retired slot | prepare |
-| `TC_SNAPSHOT_PREPARED` | prepare | publish, discard |
-| `TC_SNAPSHOT_CURRENT` | publish | a later publish |
-| `TC_SNAPSHOT_RETIRED` | a later publish while readers remain | last release |
+| State                  | Entered by                                                   | Leaves by        |
+| ---------------------- | ------------------------------------------------------------ | ---------------- |
+| `TC_SNAPSHOT_FREE`     | zero initialization, discard, last release of a retired slot | prepare          |
+| `TC_SNAPSHOT_PREPARED` | prepare                                                      | publish, discard |
+| `TC_SNAPSHOT_CURRENT`  | publish                                                      | a later publish  |
+| `TC_SNAPSHOT_RETIRED`  | a later publish while readers remain                         | last release     |
 
 Only a `TC_SNAPSHOT_CURRENT` slot accepts new readers. A superseded slot with
 no readers goes directly to `TC_SNAPSHOT_FREE`. Publish and acquire return

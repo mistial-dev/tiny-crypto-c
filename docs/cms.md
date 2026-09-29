@@ -191,13 +191,13 @@ may contain no signers. Parsing an empty collection authenticates nothing.
 Readers and verifiers copy it at entry. A zero-initialized policy selects the
 RFC 5652 defaults. Unknown enum values return an argument error.
 
-| Field | Default | Other values |
-|---|---|---|
-| `envelope` | `TC_CMS_ENVELOPE_BER` | `TC_CMS_ENVELOPE_DER` restricts SignedData and SignerInfo framing to DER |
-| `attributes` | `TC_CMS_ATTRIBUTES_DER` | `TC_CMS_ATTRIBUTES_BER_DEFINITE_ORDER` for signatures over unsorted attributes |
-| `rsa_parameters` | `TC_CMS_RSA_PARAMETERS_NULL` | `TC_CMS_RSA_PARAMETERS_ALLOW_ABSENT` |
-| `attribute_oids` | `TC_CMS_ATTRIBUTE_OIDS_CMS` | `TC_CMS_ATTRIBUTE_OIDS_PIV`, `TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC` |
-| `other_attributes` | `TC_CMS_OTHER_ATTRIBUTES_SKIP_LISTED` | `TC_CMS_OTHER_ATTRIBUTES_REJECT`, `TC_CMS_OTHER_ATTRIBUTES_SKIP_ALL` |
+| Field              | Default                               | Other values                                                                   |
+| ------------------ | ------------------------------------- | ------------------------------------------------------------------------------ |
+| `envelope`         | `TC_CMS_ENVELOPE_BER`                 | `TC_CMS_ENVELOPE_DER` restricts SignedData and SignerInfo framing to DER       |
+| `attributes`       | `TC_CMS_ATTRIBUTES_DER`               | `TC_CMS_ATTRIBUTES_BER_DEFINITE_ORDER` for signatures over unsorted attributes |
+| `rsa_parameters`   | `TC_CMS_RSA_PARAMETERS_NULL`          | `TC_CMS_RSA_PARAMETERS_ALLOW_ABSENT`                                           |
+| `attribute_oids`   | `TC_CMS_ATTRIBUTE_OIDS_CMS`           | `TC_CMS_ATTRIBUTE_OIDS_PIV`, `TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC`                  |
+| `other_attributes` | `TC_CMS_OTHER_ATTRIBUTES_SKIP_LISTED` | `TC_CMS_OTHER_ATTRIBUTES_REJECT`, `TC_CMS_OTHER_ATTRIBUTES_SKIP_ALL`           |
 
 `TC_CMS_path_options.verification` and `TC_validation_options.verification`
 embed the same policy. The PIV and TWIC credential validators replace
@@ -544,7 +544,7 @@ TC_X509_signature_result result = TC_CMS_signer_verify_content(
     &request, signed_data.content, TC_CMS_CONTENT_BER_OCTETS, &workspace, &work);
 ```
 
- It selects the content and signature hashes from the
+It selects the content and signature hashes from the
 signer's algorithm identifiers. Use `TC_CMS_CONTENT_BER_OCTETS` with
 `signed_data.content`, or `TC_CMS_CONTENT_RAW` for application-provided message
 bytes. Raw NULL/0 is an empty message. The function uses the selected format and

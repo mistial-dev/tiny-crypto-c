@@ -35,9 +35,13 @@ arithmetic leave scratch unused.
 Pass the hash in `TC_RSA_v15_options`. `TC_work_budget.remaining` bounds the
 count of modular operations and encoding comparisons and is reduced by work
 performed, including work before an invalid signature is detected. The
-verifier needs `TC_RSA_public_work(&key) + TC_RSA_encode_v15_work(&options,
-modulus_bytes)` and checks that amount before any arithmetic. See
-[work budgets](#work-budgets). Check the result explicitly: `TC_RSA_OK`,
+verifier checks this amount before any arithmetic:
+
+```c
+TC_RSA_public_work(&key) + TC_RSA_encode_v15_work(&options, modulus_bytes)
+```
+
+See [work budgets](#work-budgets). Check the result explicitly: `TC_RSA_OK`,
 `TC_RSA_INVALID`, `TC_RSA_LIMIT`, `TC_RSA_ARGUMENT`, or `TC_RSA_UNSUPPORTED`.
 Only `TC_RSA_OK` accepts the signature.
 
@@ -48,13 +52,13 @@ this order:
 
 1. `TC_RSA_ARGUMENT`: a NULL pointer, overlapping or misaligned storage, or a
    digest whose length differs from its known hash.
-2. `TC_RSA_UNSUPPORTED` or `TC_RSA_INVALID` for the key: an unsupported modulus
+1. `TC_RSA_UNSUPPORTED` or `TC_RSA_INVALID` for the key: an unsupported modulus
    size, or a malformed modulus, exponent, private component or CRT value.
-3. `TC_RSA_UNSUPPORTED` or `TC_RSA_INVALID` for the scheme: a disabled or
+1. `TC_RSA_UNSUPPORTED` or `TC_RSA_INVALID` for the scheme: a disabled or
    unknown hash, or parameters such as a salt or label that do not fit.
-4. `TC_RSA_INVALID` for received data: a signature, ciphertext or raw input of
+1. `TC_RSA_INVALID` for received data: a signature, ciphertext or raw input of
    the wrong length.
-5. `TC_RSA_LIMIT`: a caller output buffer shorter than the modulus or the
+1. `TC_RSA_LIMIT`: a caller output buffer shorter than the modulus or the
    documented size, then too little workspace, blinding attempts or work.
 
 The arithmetic finds a representative at or above the modulus and returns
@@ -117,17 +121,17 @@ requests. It does not measure time. The work functions return the exact cost
 of one successful call, or zero when the operation would reject the arguments
 or the cost exceeds `UINT32_MAX`:
 
-| Operation | Work |
-| --- | --- |
-| `TC_RSA_raw_public` | `TC_RSA_public_work(&key)` |
-| `TC_RSA_verify_v15_digest` | `TC_RSA_public_work(&key) + TC_RSA_encode_v15_work(&options, L)` |
-| `TC_RSA_verify_pss_digest` | `TC_RSA_public_work(&key) + TC_RSA_encode_pss_work(&options, L)` |
-| `TC_RSA_verify_*_prepared` | `TC_RSA_prepared_public_work(&setup)` in place of `TC_RSA_public_work` |
-| `TC_RSA_encrypt_oaep` | `1 + TC_RSA_oaep_work(&options, L) + TC_RSA_public_work(&key)` |
-| `TC_RSA_raw_private` | `TC_RSA_private_work(&key, A)` for a key without CRT values |
-| `TC_RSA_sign_v15_digest` | `TC_RSA_private_work(&key, A) + TC_RSA_encode_v15_work(&options, L)` |
-| `TC_RSA_sign_pss_digest` | `TC_RSA_private_work(&key, A) + TC_RSA_encode_pss_work(&options, L)`, plus 1 for a nonempty salt |
-| `TC_RSA_decrypt_oaep` | `TC_RSA_private_work(&key, A) + TC_RSA_oaep_work(&options, L)` |
+| Operation                  | Work                                                                                             |
+| -------------------------- | ------------------------------------------------------------------------------------------------ |
+| `TC_RSA_raw_public`        | `TC_RSA_public_work(&key)`                                                                       |
+| `TC_RSA_verify_v15_digest` | `TC_RSA_public_work(&key) + TC_RSA_encode_v15_work(&options, L)`                                 |
+| `TC_RSA_verify_pss_digest` | `TC_RSA_public_work(&key) + TC_RSA_encode_pss_work(&options, L)`                                 |
+| `TC_RSA_verify_*_prepared` | `TC_RSA_prepared_public_work(&setup)` in place of `TC_RSA_public_work`                           |
+| `TC_RSA_encrypt_oaep`      | `1 + TC_RSA_oaep_work(&options, L) + TC_RSA_public_work(&key)`                                   |
+| `TC_RSA_raw_private`       | `TC_RSA_private_work(&key, A)` for a key without CRT values                                      |
+| `TC_RSA_sign_v15_digest`   | `TC_RSA_private_work(&key, A) + TC_RSA_encode_v15_work(&options, L)`                             |
+| `TC_RSA_sign_pss_digest`   | `TC_RSA_private_work(&key, A) + TC_RSA_encode_pss_work(&options, L)`, plus 1 for a nonempty salt |
+| `TC_RSA_decrypt_oaep`      | `TC_RSA_private_work(&key, A) + TC_RSA_oaep_work(&options, L)`                                   |
 
 `L` is the modulus length in bytes and `A` is the number of blinding attempts.
 `TC_RSA_private_work` reads only `key->public_key` and whether `key->crt` is
@@ -208,9 +212,10 @@ if (tiny_crypto::rsa_raw_public(key, signature, workspace, representative, work)
 `TC_RSA_verify_pss_digest` verifies a precomputed digest using explicit message
 and MGF hashes and salt length. Both hash implementations must be enabled.
 It uses the same caller-owned limb workspace as v1.5 verification, plus a local
-hash context and 64-byte digest buffer. Its work is `TC_RSA_public_work(&key)
-+ TC_RSA_encode_pss_work(&options, L)`, which covers PSS hashing and mask
-generation.
+hash context and 64-byte digest buffer. Its work is \`TC_RSA_public_work(&key)
+
+- TC_RSA_encode_pss_work(&options, L)\`, which covers PSS hashing and mask
+  generation.
 
 The public RSA API provides v1.5 and PSS signing and signature verification,
 OAEP encryption/decryption, and private-key component validation. The
@@ -427,9 +432,14 @@ scratch while the encoded message is built, then that storage is reused for
 blinded exponentiation. A nonempty salt adds one RNG request.
 `execution.random_attempts` bounds blinding requests.
 The optional `TC_RSA_private_key.crt` view selects the same CRT acceleration.
-The work is `TC_RSA_private_work(&key, A) + TC_RSA_encode_pss_work(&options,
-L)`, plus 1 for a nonempty salt. The salt length is at most `L - H - 2` for
-message-hash length `H`, and a longer salt returns `TC_RSA_INVALID`.
+The work is the sum below, plus 1 for a nonempty salt:
+
+```c
+TC_RSA_private_work(&key, A) + TC_RSA_encode_pss_work(&options, L)
+```
+
+The salt length is at most `L - H - 2` for message-hash length `H`, and a
+longer salt returns `TC_RSA_INVALID`.
 
 ## OAEP encryption
 

@@ -34,7 +34,7 @@ static inline TC_TLV_result tc_pki_signature_parameters_check(tc_pki_signature_k
   case TC_PKI_SIGNATURE_RSA_V15:
     /* RFC 4055 section 5: readers accept absent or NULL parameters. */
     return !parameters.length || tc_pki_null(parameters, profile) == TC_TLV_OK ? TC_TLV_OK
-                                                                              : TC_TLV_INVALID;
+                                                                               : TC_TLV_INVALID;
   case TC_PKI_SIGNATURE_ECDSA:
   case TC_PKI_SIGNATURE_DSA:
   case TC_PKI_SIGNATURE_ED25519:

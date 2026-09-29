@@ -25,10 +25,10 @@ SHA-256, SSKDF and EC. `TC_PIV_SM_authenticate_response` also needs X.509 and
 PIV CVC parsing, and `examples/piv_sm_wire.c` needs TLV and PIV CVC parsing.
 The suites follow Table 18.
 
-| Suite | P1 | Curve | KDF hash | Session keys | Nonce |
-|-------|----|-------|----------|--------------|-------|
-| CS2 | `27` | P-256 | SHA-256 | AES-128 | 16 bytes |
-| CS7 | `2E` | P-384 | SHA-384 | AES-256 | 24 bytes |
+| Suite | P1   | Curve | KDF hash | Session keys | Nonce    |
+| ----- | ---- | ----- | -------- | ------------ | -------- |
+| CS2   | `27` | P-256 | SHA-256  | AES-128      | 16 bytes |
+| CS7   | `2E` | P-384 | SHA-384  | AES-256      | 24 bytes |
 
 `TINY_CRYPTO_PIV_SM_CS2` and `TINY_CRYPTO_PIV_SM_CS7` select the suites. Both
 are ON in every profile. CS2 needs P-256. CS7 needs P-384 and SHA-384. Disable
@@ -38,12 +38,12 @@ size the session for the largest enabled suite.
 
 ## Objects and storage
 
-| Object | Owner | Lifetime |
-|--------|-------|----------|
-| `TC_PIV_SM` | caller | One card session. Zero-initialize before first use. |
-| `TC_PIV_SM_workspace` | caller | One call. Processed calls wipe it before returning. |
-| `TC_PIV_SM_handshake` | caller | Borrows session storage until the session changes. |
-| `TC_PIV_SM_peer` | caller | Borrows the received response for `TC_PIV_SM_finish`. |
+| Object                | Owner  | Lifetime                                              |
+| --------------------- | ------ | ----------------------------------------------------- |
+| `TC_PIV_SM`           | caller | One card session. Zero-initialize before first use.   |
+| `TC_PIV_SM_workspace` | caller | One call. Processed calls wipe it before returning.   |
+| `TC_PIV_SM_handshake` | caller | Borrows session storage until the session changes.    |
+| `TC_PIV_SM_peer`      | caller | Borrows the received response for `TC_PIV_SM_finish`. |
 
 Treat `TC_PIV_SM` members as private. Read the state with `TC_PIV_SM_get_state`.
 Never copy a live session, because the copy would reuse keys and counters.
@@ -55,12 +55,12 @@ the authenticated spans.
 
 The session moves through four states.
 
-| State | Meaning | Accepted calls |
-|-------|---------|----------------|
-| `TC_PIV_SM_IDLE` | No session | `begin`, `clear` |
+| State                    | Meaning           | Accepted calls                      |
+| ------------------------ | ----------------- | ----------------------------------- |
+| `TC_PIV_SM_IDLE`         | No session        | `begin`, `clear`                    |
 | `TC_PIV_SM_ESTABLISHING` | `begin` succeeded | `finish` or `authenticate_response` |
-| `TC_PIV_SM_READY` | Keys established | `protect` |
-| `TC_PIV_SM_PENDING` | One command sent | `unprotect` |
+| `TC_PIV_SM_READY`        | Keys established  | `protect`                           |
+| `TC_PIV_SM_PENDING`      | One command sent  | `unprotect`                         |
 
 `TC_PIV_SM_begin` and `TC_PIV_SM_clear` are accepted in any state and discard
 the previous session. Call `TC_PIV_SM_clear` when the card is removed or when
@@ -73,17 +73,17 @@ The flow maps to the client steps in section 4.1.1.
 1. `TC_PIV_SM_begin` sets CB_H to zero (H1), generates the ephemeral key pair
    for the selected suite (H2) and returns the host identifier and the
    uncompressed ephemeral public key in a `TC_PIV_SM_handshake`.
-2. The application sends GENERAL AUTHENTICATE with CLA `00`, INS `87`, P1 set to
+1. The application sends GENERAL AUTHENTICATE with CLA `00`, INS `87`, P1 set to
    the suite and P2 `04`. The data field is
    `7C { 81 { CB_H || ID_sH || Q_eH } 82 00 }` (section 4.1.8).
-3. The application checks the status word and decodes
+1. The application checks the status word and decodes
    `7C { 82 { CB_ICC || N_ICC || AuthCryptogram_ICC || C_ICC } }` into a
    `TC_PIV_SM_peer`. `certificate` holds the exact encoded CVC, because the
    derivation hashes those bytes into ID_sICC (H6). `card_control` holds the
    received CB_ICC byte.
-4. The application verifies the CVC signature and the content-signing
+1. The application verifies the CVC signature and the content-signing
    certificate through its trust workflow (H5).
-5. `TC_PIV_SM_finish` takes the authenticated public key and the unchanged peer
+1. `TC_PIV_SM_finish` takes the authenticated public key and the unchanged peer
    fields. It rejects a nonzero CB_ICC (H4), derives the session keys with the
    OtherInfo layout from section 4.1.6 (H6 to H11) and checks the key
    confirmation cryptogram from section 4.1.7 (H12). The ephemeral private key,
@@ -206,12 +206,12 @@ released only after authentication. The status word inside the `99` object is
 authenticated. The outer SW1-SW2 of the response APDU is transport status, and
 the application checks it before calling unprotect.
 
-| Result | State | Meaning |
-|--------|-------|---------|
-| `TC_OK` | READY | Plaintext and length written. The next command may follow. |
-| `TC_MISMATCH` | IDLE | The response tag differs. |
-| `TC_ERROR` | PENDING | Argument error or short plaintext buffer. Retry the same response. |
-| `TC_ERROR` | IDLE | Malformed padding, exhausted counter or cipher failure. |
+| Result        | State   | Meaning                                                            |
+| ------------- | ------- | ------------------------------------------------------------------ |
+| `TC_OK`       | READY   | Plaintext and length written. The next command may follow.         |
+| `TC_MISMATCH` | IDLE    | The response tag differs.                                          |
+| `TC_ERROR`    | PENDING | Argument error or short plaintext buffer. Retry the same response. |
+| `TC_ERROR`    | IDLE    | Malformed padding, exhausted counter or cipher failure.            |
 
 A plaintext capacity of `request.ciphertext.length` always suffices. Check
 `TC_PIV_SM_get_state` after `TC_ERROR` to tell a retryable call from one that

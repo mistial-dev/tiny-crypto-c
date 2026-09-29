@@ -182,22 +182,22 @@ algorithm is enabled.
 
 ### Formats, compression and trust
 
-| Option                                   | Default | micro | mini | desktop | Purpose                                                |
-| ---------------------------------------- | ------- | ----- | ---- | ------- | ------------------------------------------------------ |
-| `TINY_CRYPTO_ENABLE_TLV`                 | OFF     | OFF   | OFF  | ON      | Bounded TLV readers and tree traversal                 |
-| `TINY_CRYPTO_TLV_BER`                    | OFF     | OFF   | OFF  | ON      | ASN.1 BER, including indefinite lengths                |
-| `TINY_CRYPTO_TLV_STREAM`                 | OFF     | OFF   | OFF  | ON      | Incremental TLV reader                                 |
-| `TINY_CRYPTO_ENABLE_DER`                 | OFF     | OFF   | OFF  | ON      | DER value readers, requires TLV                        |
-| `TINY_CRYPTO_ENABLE_X509`                | OFF     | OFF   | OFF  | ON      | X.509 certificate and public-key readers, requires DER |
-| `TINY_CRYPTO_ENABLE_X509_PATH`           | OFF     | OFF   | OFF  | ON      | Path validation and trust stores                       |
-| `TINY_CRYPTO_ENABLE_TRUST_ANCHOR_FORMAT` | OFF     | OFF   | OFF  | ON      | RFC 5914 trust-anchor lists                            |
-| `TINY_CRYPTO_TAF_CERTIFICATE`            | format  | format | format | format | Certificate choice in RFC 5914 lists                   |
-| `TINY_CRYPTO_TAF_TBS_CERTIFICATE`        | format  | format | format | format | TBSCertificate choice in RFC 5914 lists                |
-| `TINY_CRYPTO_TAF_TRUST_ANCHOR_INFO`      | format  | format | format | format | TrustAnchorInfo choice in RFC 5914 lists               |
-| `TINY_CRYPTO_ENABLE_X509_REVOCATION`     | OFF     | OFF   | OFF  | ON      | CRL parsing and path revocation                        |
-| `TINY_CRYPTO_ENABLE_X509_OCSP`           | OFF     | OFF   | OFF  | ON      | OCSP requests and responses, requires SHA-1            |
-| `TINY_CRYPTO_ENABLE_KEY_CHALLENGE`       | OFF     | OFF   | OFF  | ON      | Public-key proof-of-possession challenges              |
-| `TINY_CRYPTO_ENABLE_GZIP`                | OFF     | OFF   | OFF  | ON      | Bounded GZIP decompression                             |
+| Option                                   | Default | micro  | mini   | desktop | Purpose                                                |
+| ---------------------------------------- | ------- | ------ | ------ | ------- | ------------------------------------------------------ |
+| `TINY_CRYPTO_ENABLE_TLV`                 | OFF     | OFF    | OFF    | ON      | Bounded TLV readers and tree traversal                 |
+| `TINY_CRYPTO_TLV_BER`                    | OFF     | OFF    | OFF    | ON      | ASN.1 BER, including indefinite lengths                |
+| `TINY_CRYPTO_TLV_STREAM`                 | OFF     | OFF    | OFF    | ON      | Incremental TLV reader                                 |
+| `TINY_CRYPTO_ENABLE_DER`                 | OFF     | OFF    | OFF    | ON      | DER value readers, requires TLV                        |
+| `TINY_CRYPTO_ENABLE_X509`                | OFF     | OFF    | OFF    | ON      | X.509 certificate and public-key readers, requires DER |
+| `TINY_CRYPTO_ENABLE_X509_PATH`           | OFF     | OFF    | OFF    | ON      | Path validation and trust stores                       |
+| `TINY_CRYPTO_ENABLE_TRUST_ANCHOR_FORMAT` | OFF     | OFF    | OFF    | ON      | RFC 5914 trust-anchor lists                            |
+| `TINY_CRYPTO_TAF_CERTIFICATE`            | format  | format | format | format  | Certificate choice in RFC 5914 lists                   |
+| `TINY_CRYPTO_TAF_TBS_CERTIFICATE`        | format  | format | format | format  | TBSCertificate choice in RFC 5914 lists                |
+| `TINY_CRYPTO_TAF_TRUST_ANCHOR_INFO`      | format  | format | format | format  | TrustAnchorInfo choice in RFC 5914 lists               |
+| `TINY_CRYPTO_ENABLE_X509_REVOCATION`     | OFF     | OFF    | OFF    | ON      | CRL parsing and path revocation                        |
+| `TINY_CRYPTO_ENABLE_X509_OCSP`           | OFF     | OFF    | OFF    | ON      | OCSP requests and responses, requires SHA-1            |
+| `TINY_CRYPTO_ENABLE_KEY_CHALLENGE`       | OFF     | OFF    | OFF    | ON      | Public-key proof-of-possession challenges              |
+| `TINY_CRYPTO_ENABLE_GZIP`                | OFF     | OFF    | OFF    | ON      | Bounded GZIP decompression                             |
 
 ### PIV, TWIC and credentials
 
@@ -499,16 +499,16 @@ The workflow in `<tiny_crypto/piv_sm.h>` follows the protocol:
 
 1. `TC_PIV_SM_begin` starts a session and fills a `TC_PIV_SM_handshake` with the
    host identifier and ephemeral public key.
-2. The application encodes them into GENERAL AUTHENTICATE and decodes the
+1. The application encodes them into GENERAL AUTHENTICATE and decodes the
    card's response into a `TC_PIV_SM_peer`: the exact CVC bytes, nonce,
    cryptogram and received CB_ICC byte.
-3. `TC_PIV_SM_finish` takes the CVC public key after the application has
+1. `TC_PIV_SM_finish` takes the CVC public key after the application has
    authenticated it. `TC_PIV_SM_authenticate_response` in
    `<tiny_crypto/piv_sm_authenticate.h>` verifies the CVC chain and completes key
    confirmation in one call.
-4. `TC_PIV_SM_protect` encrypts command data and tags the caller's ordered
+1. `TC_PIV_SM_protect` encrypts command data and tags the caller's ordered
    authenticated spans. `TC_PIV_SM_ciphertext_size` gives the padded length.
-5. `TC_PIV_SM_unprotect` authenticates the response spans and then decrypts.
+1. `TC_PIV_SM_unprotect` authenticates the response spans and then decrypts.
 
 The caller owns the zero-initialized `TC_PIV_SM` and the `TC_PIV_SM_workspace`.
 Only one command may be pending. `TC_PIV_SM_get_state` tells a retryable

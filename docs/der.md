@@ -40,22 +40,22 @@ different tag returns `TC_TLV_INVALID`.
 
 ## Readers
 
-| Function | ASN.1 type | Output |
-| --- | --- | --- |
-| `TC_DER_integer` | INTEGER | two's-complement contents and a sign flag |
-| `TC_DER_positive_integer` | INTEGER greater than zero | magnitude without a sign octet |
-| `TC_DER_uint32` | INTEGER from 0 to `UINT32_MAX` | `uint32_t` |
-| `TC_DER_bit_string` | BIT STRING | payload bytes and the unused-bit count |
-| `TC_DER_oid` | OBJECT IDENTIFIER | encoded contents |
-| `TC_DER_boolean` | BOOLEAN | 0 or 1 |
-| `TC_DER_null` | NULL | none |
-| `TC_DER_sequence`, `TC_DER_set` | SEQUENCE, SET | contents octets |
-| `TC_DER_algorithm_identifier` | AlgorithmIdentifier | OID and complete parameter encoding |
-| `TC_DER_subject_public_key` | SubjectPublicKeyInfo | algorithm and key bytes |
-| `TC_DER_private_key_info` | PKCS #8 PrivateKeyInfo, RFC 5958 OneAsymmetricKey | algorithm, key, attributes, public key |
-| `TC_DER_rsa_public` | PKCS #1 RSAPublicKey | modulus and exponent magnitudes |
-| `TC_DER_rsa_private` | PKCS #1 two-prime RSAPrivateKey | eight component magnitudes |
-| `TC_DER_ecdsa_signature` | ECDSA-Sig-Value | `r` and `s` magnitudes |
+| Function                        | ASN.1 type                                        | Output                                    |
+| ------------------------------- | ------------------------------------------------- | ----------------------------------------- |
+| `TC_DER_integer`                | INTEGER                                           | two's-complement contents and a sign flag |
+| `TC_DER_positive_integer`       | INTEGER greater than zero                         | magnitude without a sign octet            |
+| `TC_DER_uint32`                 | INTEGER from 0 to `UINT32_MAX`                    | `uint32_t`                                |
+| `TC_DER_bit_string`             | BIT STRING                                        | payload bytes and the unused-bit count    |
+| `TC_DER_oid`                    | OBJECT IDENTIFIER                                 | encoded contents                          |
+| `TC_DER_boolean`                | BOOLEAN                                           | 0 or 1                                    |
+| `TC_DER_null`                   | NULL                                              | none                                      |
+| `TC_DER_sequence`, `TC_DER_set` | SEQUENCE, SET                                     | contents octets                           |
+| `TC_DER_algorithm_identifier`   | AlgorithmIdentifier                               | OID and complete parameter encoding       |
+| `TC_DER_subject_public_key`     | SubjectPublicKeyInfo                              | algorithm and key bytes                   |
+| `TC_DER_private_key_info`       | PKCS #8 PrivateKeyInfo, RFC 5958 OneAsymmetricKey | algorithm, key, attributes, public key    |
+| `TC_DER_rsa_public`             | PKCS #1 RSAPublicKey                              | modulus and exponent magnitudes           |
+| `TC_DER_rsa_private`            | PKCS #1 two-prime RSAPrivateKey                   | eight component magnitudes                |
+| `TC_DER_ecdsa_signature`        | ECDSA-Sig-Value                                   | `r` and `s` magnitudes                    |
 
 `TC_DER_integer_contents`, `TC_DER_uint32_contents` and `TC_DER_oid_contents`
 check the contents octets of an IMPLICIT-tagged value. Use them after a TLV

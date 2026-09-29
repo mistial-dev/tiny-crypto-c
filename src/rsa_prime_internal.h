@@ -74,8 +74,9 @@ static inline TC_RSA_result tc_rsa_probable_prime_magnitude(TC_bytes candidate, 
   const size_t scratch_words = area.capacity;
   if (!candidate.data || !random || !scratch || !work || !rounds)
     return TC_RSA_ARGUMENT;
-  if (!length || length > TC_RSA_MAX_MODULUS_BYTES || length % sizeof(tc_mp_word) || !candidate.length ||
-      candidate.length > length || !(candidate.data[candidate.length - 1] & 1u))
+  if (!length || length > TC_RSA_MAX_MODULUS_BYTES || length % sizeof(tc_mp_word) ||
+      !candidate.length || candidate.length > length ||
+      !(candidate.data[candidate.length - 1] & 1u))
     return TC_RSA_INVALID;
   unsigned above_three = candidate.data[candidate.length - 1] & ~3u;
   for (size_t i = 0; i + 1 < candidate.length; ++i)

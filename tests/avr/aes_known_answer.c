@@ -30,11 +30,10 @@ int main(void)
   TC_AES_init_sbox();
 #endif
   memcpy(block, plaintext, sizeof block);
-  const int ok = TC_AES_key_init(&schedule, key) == TC_OK &&
-                 TC_AES_ECB_encrypt(&schedule, block) == TC_OK &&
-                 !memcmp(block, ciphertext, sizeof block) &&
-                 TC_AES_ECB_decrypt(&schedule, block) == TC_OK &&
-                 !memcmp(block, plaintext, sizeof block);
+  const int ok =
+      TC_AES_key_init(&schedule, key) == TC_OK && TC_AES_ECB_encrypt(&schedule, block) == TC_OK &&
+      !memcmp(block, ciphertext, sizeof block) && TC_AES_ECB_decrypt(&schedule, block) == TC_OK &&
+      !memcmp(block, plaintext, sizeof block);
   put_string(ok ? "AES-OK\n" : "AES-BAD\n");
   for (;;) {
   }
