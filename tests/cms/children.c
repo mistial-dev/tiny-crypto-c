@@ -16,8 +16,8 @@ static MunitResult fields(const MunitParameter params[], void* user)
   size_t work = 100, count = 99;
   (void)params;
   (void)user;
-  munit_assert_int(tc_pki_children((TC_bytes){ber, sizeof ber}, 0x30, TC_TLV_BER, &limits, frames,
-                                   4, &work, children, 2, &count),
+  munit_assert_int(tc_pki_children((TC_bytes){ber, sizeof ber}, 0x30, TC_TLV_BER, &limits,
+                                   &(tc_pki_tree_workspace){frames, 4, &work}, children, 2, &count),
                    ==, TC_TLV_OK);
   munit_assert_size(count, ==, 2);
   munit_assert_ptr_equal(children[0].value.data, ber + 4);
@@ -29,22 +29,23 @@ static MunitResult fields(const MunitParameter params[], void* user)
   for (size_t length = 0; length < sizeof ber; ++length) {
     work = 100;
     count = 99;
-    munit_assert_int(tc_pki_children((TC_bytes){ber, length}, 0x30, TC_TLV_BER, &limits, frames, 4,
-                                     &work, children, 2, &count),
+    munit_assert_int(tc_pki_children((TC_bytes){ber, length}, 0x30, TC_TLV_BER, &limits,
+                                     &(tc_pki_tree_workspace){frames, 4, &work}, children, 2,
+                                     &count),
                      !=, TC_TLV_OK);
     munit_assert_size(count, ==, 99);
   }
   work = 100;
-  munit_assert_int(tc_pki_children((TC_bytes){ber, sizeof ber}, 0x30, TC_TLV_BER, &limits, frames,
-                                   4, &work, children, 1, &count),
+  munit_assert_int(tc_pki_children((TC_bytes){ber, sizeof ber}, 0x30, TC_TLV_BER, &limits,
+                                   &(tc_pki_tree_workspace){frames, 4, &work}, children, 1, &count),
                    ==, TC_TLV_LIMIT);
   work = 100;
-  munit_assert_int(tc_pki_children((TC_bytes){ber, sizeof ber}, 0x30, TC_TLV_DER, &limits, frames,
-                                   4, &work, children, 2, &count),
+  munit_assert_int(tc_pki_children((TC_bytes){ber, sizeof ber}, 0x30, TC_TLV_DER, &limits,
+                                   &(tc_pki_tree_workspace){frames, 4, &work}, children, 2, &count),
                    !=, TC_TLV_OK);
   work = sizeof ber - 1;
-  munit_assert_int(tc_pki_children((TC_bytes){ber, sizeof ber}, 0x30, TC_TLV_BER, &limits, frames,
-                                   4, &work, children, 2, &count),
+  munit_assert_int(tc_pki_children((TC_bytes){ber, sizeof ber}, 0x30, TC_TLV_BER, &limits,
+                                   &(tc_pki_tree_workspace){frames, 4, &work}, children, 2, &count),
                    ==, TC_TLV_LIMIT);
   return MUNIT_OK;
 }

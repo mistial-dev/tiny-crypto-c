@@ -90,9 +90,9 @@ static MunitResult callbacks(const MunitParameter params[], void* user)
     int source_failed = 0;
     memset(&out, 0xa5, sizeof out);
     memcpy(&saved, &out, sizeof out);
-    munit_assert_int(tc_pki_certificate_search(&state, next_candidate, filter_candidate, &state,
-                                               &limits, &tree, &validation, attempt_candidate,
-                                               &state, &out, &source_failed),
+    const tc_pki_candidate_checks checks = {filter_candidate, &state, attempt_candidate, &state};
+    munit_assert_int(tc_pki_certificate_search(&state, next_candidate, &checks, &limits, &tree,
+                                               &validation, &out, &source_failed),
                      ==, expected[scenario]);
     munit_assert_int(source_failed, ==, scenario == SOURCE_ERROR || scenario == SOURCE_INCREASE);
     if (expected[scenario] == TC_TLV_OK) {

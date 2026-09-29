@@ -277,11 +277,10 @@ tc_pki_candidate_next tc_cms_candidate_cursor_init(const tc_cms_candidates* sour
 }
 
 TC_TLV_result tc_cms_certificate_search(const tc_cms_candidates* candidates,
-                                        tc_pki_candidate_filter filter, const void* filter_context,
+                                        const tc_pki_candidate_checks* checks,
                                         const TC_TLV_limits* limits,
                                         const tc_pki_tree_workspace* tree,
                                         const TC_X509_path_workspace* validation,
-                                        tc_pki_candidate_attempt attempt, const void* context,
                                         TC_X509_search_result* out, int* source_failed)
 {
   if (!candidates)
@@ -289,8 +288,8 @@ TC_TLV_result tc_cms_certificate_search(const tc_cms_candidates* candidates,
   tc_cms_candidate_cursor storage;
   void* cursor;
   const tc_pki_candidate_next next = tc_cms_candidate_cursor_init(candidates, &storage, &cursor);
-  return tc_pki_certificate_search(cursor, next, filter, filter_context, limits, tree, validation,
-                                   attempt, context, out, source_failed);
+  return tc_pki_certificate_search(cursor, next, checks, limits, tree, validation, out,
+                                   source_failed);
 }
 
 #endif

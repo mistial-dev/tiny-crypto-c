@@ -82,9 +82,10 @@ tc_cms_signer_find(const tc_cms_candidates* candidates, const TC_CMS_signer_info
   const cms_signer_filter filter = {signer, TC_TLV_BER, &validation->names};
   const cms_signer_trust trust = {signer, content_type, digest,     policy, path_source, options,
                                   tree,   signature,    validation, search, signed_attrs};
-  return tc_x509_path_status(tc_cms_certificate_search(candidates, cms_signer_candidate, &filter,
-                                                       &options->parsing, tree, validation,
-                                                       cms_signer_attempt, &trust, out, NULL));
+  const tc_pki_candidate_checks checks = {cms_signer_candidate, &filter, cms_signer_attempt,
+                                          &trust};
+  return tc_x509_path_status(tc_cms_certificate_search(candidates, &checks, &options->parsing, tree,
+                                                       validation, out, NULL));
 }
 
 enum {

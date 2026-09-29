@@ -478,9 +478,9 @@ TC_TLV_result tc_cms_signed_data_read(TC_bytes encoded, const TC_TLV_limits* lim
   if (!out)
     return TC_TLV_ARGUMENT;
   parsed.encoded = encoded;
+  const tc_pki_tree_workspace tree = {frames, frame_capacity, work};
 #define CMS_FIELDS(input, tag)                                                                     \
-  tc_pki_children(input, tag, TC_TLV_BER, limits, frames, frame_capacity, work, fields,            \
-                  SIGNED_DATA_FIELDS, &count)
+  tc_pki_children(input, tag, TC_TLV_BER, limits, &tree, fields, SIGNED_DATA_FIELDS, &count)
   result = CMS_FIELDS(encoded, 0x30);
   if (result != TC_TLV_OK)
     return result;
@@ -532,13 +532,11 @@ TC_TLV_result tc_cms_signed_data_read(TC_bytes encoded, const TC_TLV_limits* lim
       return TC_TLV_INVALID;
     parsed.has_content = 1;
     parsed.content = fields[0].encoded;
-    result = tc_pki_octets(parsed.content, TC_TLV_BER, limits,
-                           &(tc_pki_tree_workspace){frames, frame_capacity, work}, NULL, NULL);
+    result = tc_pki_octets(parsed.content, TC_TLV_BER, limits, &tree, NULL, NULL);
     if (result != TC_TLV_OK)
       return result;
   }
 #undef CMS_FIELDS
-  const tc_pki_tree_workspace tree = {frames, frame_capacity, work};
   result = tc_cms_digest_algorithms(parsed.digest_algorithms, NULL, limits, &tree, NULL);
   if (result != TC_TLV_OK)
     return result;

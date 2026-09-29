@@ -41,23 +41,23 @@ static void tc_pki_children_visit(void* user, const TC_TLV_event* event)
  * BER EOC belongs to encoded and is excluded from value. fields/frames are caller
  * scratch and may change on failure. count changes only on OK. All storage is disjoint. */
 static inline TC_TLV_result tc_pki_children(TC_bytes encoded, unsigned tag, TC_TLV_profile profile,
-                                            const TC_TLV_limits* limits, TC_TLV_frame* frames,
-                                            size_t frame_capacity, size_t* work,
+                                            const TC_TLV_limits* limits,
+                                            const tc_pki_tree_workspace* tree,
                                             TC_TLV_element* fields, size_t capacity, size_t* count)
 {
   TC_TLV_element root;
   tc_pki_children_state state = {encoded, fields, capacity, 0, 0, 0};
   TC_TLV_result result;
-  if (!work || !count || (capacity && !fields))
+  if (!tree || !tree->work || !count || (capacity && !fields))
     return TC_TLV_ARGUMENT;
   result = TC_TLV_header_read(encoded.data, encoded.length, profile, limits, &root.header);
   if (result != TC_TLV_OK)
     return result;
   if (!root.header.constructed || !tc_pki_tag(&root, tag))
     return TC_TLV_INVALID;
-  if (tc_pki_work_charge(work, encoded.length) != TC_TLV_OK)
+  if (tc_pki_work_charge(tree->work, encoded.length) != TC_TLV_OK)
     return TC_TLV_LIMIT;
-  result = TC_TLV_walk(encoded.data, encoded.length, profile, limits, frames, frame_capacity,
+  result = TC_TLV_walk(encoded.data, encoded.length, profile, limits, tree->frames, tree->capacity,
                        tc_pki_children_visit, &state);
   if (result != TC_TLV_OK)
     return result;

@@ -55,16 +55,26 @@ typedef TC_TLV_result (*tc_pki_candidate_attempt)(const void* context,
 typedef TC_TLV_result (*tc_pki_candidate_next)(void* context, const tc_pki_tree_workspace* tree,
                                                TC_X509_workspace* parser, TC_X509_certificate* out);
 
+/* Per-candidate checks of one search. filter decides whether a candidate is
+ * worth a path attempt, and attempt builds and validates that path. Each
+ * callback receives its own context. */
+typedef struct {
+  tc_pki_candidate_filter filter;
+  const void* filter_context;
+  tc_pki_candidate_attempt attempt;
+  const void* attempt_context;
+} tc_pki_candidate_checks;
+
 /* next supplies one parsed, borrowed certificate. Charge one unit per candidate
  * in addition to callback work. Failed paths may be retried; source errors stop
  * the search. Caller keeps input, cursor, scratch and output storage disjoint. */
 static inline TC_TLV_result tc_pki_certificate_search(
-    void* cursor, tc_pki_candidate_next next, tc_pki_candidate_filter filter,
-    const void* filter_context, const TC_TLV_limits* limits, const tc_pki_tree_workspace* tree,
-    const TC_X509_path_workspace* validation, tc_pki_candidate_attempt attempt, const void* context,
-    TC_X509_search_result* out, int* source_failed)
+    void* cursor, tc_pki_candidate_next next, const tc_pki_candidate_checks* checks,
+    const TC_TLV_limits* limits, const tc_pki_tree_workspace* tree,
+    const TC_X509_path_workspace* validation, TC_X509_search_result* out, int* source_failed)
 {
-  if (!next || !filter || !limits || !tree || !tree->work || !validation || !attempt || !out)
+  if (!next || !checks || !checks->filter || !checks->attempt || !limits || !tree || !tree->work ||
+      !validation || !out)
     return TC_TLV_ARGUMENT;
   TC_X509_workspace parser = {validation->frames, validation->frame_capacity, validation->oids,
                               validation->oid_capacity};
@@ -90,7 +100,7 @@ static inline TC_TLV_result tc_pki_certificate_search(
       return TC_TLV_LIMIT;
     int matched = 0;
     before = *tree->work;
-    result = filter(filter_context, &candidate, limits, tree, &matched);
+    result = checks->filter(checks->filter_context, &candidate, limits, tree, &matched);
     if (*tree->work > before) {
       *tree->work = 0;
       return TC_TLV_ARGUMENT;
@@ -101,7 +111,7 @@ static inline TC_TLV_result tc_pki_certificate_search(
       continue;
     if (result == TC_TLV_OK) {
       before = *tree->work;
-      result = attempt(context, &candidate, &found);
+      result = checks->attempt(checks->attempt_context, &candidate, &found);
       if (*tree->work > before) {
         *tree->work = 0;
         return TC_TLV_ARGUMENT;

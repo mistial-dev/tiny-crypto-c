@@ -183,9 +183,10 @@ TC_TLV_result tc_x509_crl_search_candidates(void* cursor, tc_pki_candidate_next 
     return TC_TLV_ARGUMENT;
   const tc_x509_crl_filter filter = {crl, extensions, &trust->validation->names};
   const x509_crl_search_context search = {trust, attempt, context};
-  return tc_pki_certificate_search(cursor, next, tc_x509_crl_filter_match, &filter,
-                                   &trust->options->parsing, trust->tree, trust->validation,
-                                   x509_crl_attempt_candidate, &search, out, source_failed);
+  const tc_pki_candidate_checks checks = {tc_x509_crl_filter_match, &filter,
+                                          x509_crl_attempt_candidate, &search};
+  return tc_pki_certificate_search(cursor, next, &checks, &trust->options->parsing, trust->tree,
+                                   trust->validation, out, source_failed);
 }
 
 TC_TLV_result tc_x509_crl_scopes(const void* candidates, tc_x509_crl_search search_candidates,
