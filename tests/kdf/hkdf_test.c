@@ -5,6 +5,11 @@
 #include "munit.h"
 #include "test_util.h"
 #include "cavp.h"
+#if defined(__unix__) || defined(__APPLE__)
+#include <sys/mman.h>
+#include <unistd.h>
+#define HKDF_TEST_GUARD_PAGE 1
+#endif
 
 struct hkdf_vector {
   int hash;
@@ -183,6 +188,40 @@ TC_TEST(test_hkdf_arguments)
   return MUNIT_OK;
 }
 
+/* An ikm_count whose array size overflows size_t is rejected before any
+ * element is read. The one-element array ends at a guard page, so reading
+ * a second element faults. The count wraps count * sizeof(TC_bytes) to one
+ * element's size. */
+TC_TEST(test_hkdf_ikm_count_overflow)
+{
+#if HKDF_TEST_GUARD_PAGE
+  const size_t page = (size_t)sysconf(_SC_PAGESIZE);
+  const size_t wrapping_count = SIZE_MAX / sizeof(TC_bytes) + 2u;
+  uint8_t output[64];
+  size_t i;
+  uint8_t* pages =
+      (uint8_t*)mmap(NULL, 2 * page, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+  munit_assert_ptr_not_equal(pages, MAP_FAILED);
+  munit_assert_int(mprotect(pages + page, page, PROT_NONE), ==, 0);
+  TC_bytes* ikm = (TC_bytes*)(void*)(pages + page - sizeof(TC_bytes));
+  ikm->data = NULL;
+  ikm->length = 0;
+  for (i = 0; i < sizeof families / sizeof families[0]; ++i) {
+    const struct hkdf_family* f = &families[i];
+    memset(output, 0xa5, sizeof output);
+    munit_assert_int(f->extract((TC_bytes){NULL, 0}, ikm, wrapping_count, output), ==, TC_ERROR);
+    munit_assert_int(f->derive((TC_bytes){NULL, 0}, ikm, wrapping_count, (TC_bytes){NULL, 0},
+                               (TC_buffer){output, f->hash_len}),
+                     ==, TC_ERROR);
+    munit_assert_true(tc_test_all_value(output, sizeof output, 0xa5));
+  }
+  munit_assert_int(munmap(pages, 2 * page), ==, 0);
+  return MUNIT_OK;
+#else
+  return MUNIT_SKIP;
+#endif
+}
+
 /* SP 800-56C revision 2 hybrid secrets: extracting Z || T from separate
  * parts equals extracting the concatenation, for every split point. */
 TC_TEST(test_hkdf_parts_and_multiple_expansions)
@@ -231,6 +270,7 @@ static MunitTest tests[] = {
     {"/vectors", test_hkdf_vectors, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/limits", test_hkdf_limits, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/arguments", test_hkdf_arguments, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/ikm-count-overflow", test_hkdf_ikm_count_overflow, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/parts-and-multiple-expansions", test_hkdf_parts_and_multiple_expansions, NULL, NULL,
      MUNIT_TEST_OPTION_NONE, NULL},
     {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};

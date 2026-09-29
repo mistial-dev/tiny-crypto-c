@@ -46,7 +46,8 @@ typedef struct {
  * encoded, which holds secret key material. Keep it alive and unchanged while
  * out is used, and keep out disjoint from it. The reader charges no work.
  *
- * TC_TLV_ARGUMENT     NULL out, or encoded with NULL data and a length.
+ * TC_TLV_ARGUMENT     NULL out, out overlapping encoded, or encoded with
+ *                     NULL data and a length.
  * TC_TLV_INVALID      malformed DER, rsaEncryption parameters other than
  *                     NULL, malformed PSS parameters, or an embedded public
  *                     key with unused bits or other n or e.

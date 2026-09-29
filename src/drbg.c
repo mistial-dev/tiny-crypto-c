@@ -232,38 +232,24 @@ TC_DRBG_result TC_DRBG_reseed(TC_DRBG* drbg, TC_bytes additional)
   return reseed(drbg, additional);
 }
 
-/* A rejected generate request wipes its output so an unchecked result never
- * looks random. Output that overlaps the DRBG or the additional input stays
- * untouched, because wiping it would change a caller input. */
-static void wipe_rejected_output(const TC_DRBG* drbg, uint8_t* output, size_t length,
-                                 TC_bytes additional)
-{
-  if (output != NULL && (drbg == NULL || outside(drbg, output, length)) &&
-      tc_internal_ranges_disjoint(output, length, additional.data, additional.length))
-    TC_secure_zero(output, length);
-}
-
+/* Argument checks and the request-size preflight run before any write, so
+ * a rejected request leaves the output and the state unchanged. */
 TC_DRBG_result TC_DRBG_generate(TC_DRBG* drbg, uint8_t* output, size_t length,
                                 int prediction_resistance, TC_bytes additional)
 {
   TC_DRBG_result result;
 
-  if (output == NULL && length != 0)
-    return TC_DRBG_ARGUMENT;
-#if SIZE_MAX > TC_DRBG_MAX_REQUEST_BYTES
-  if (length > TC_DRBG_MAX_REQUEST_BYTES) {
-    wipe_rejected_output(drbg, output, length, additional);
-    return TC_DRBG_LIMIT;
-  }
-#endif
-  if (!live(drbg) || !tc_internal_span_valid(additional.data, additional.length) ||
+  if ((output == NULL && length != 0) || !live(drbg) ||
+      !tc_internal_span_valid(additional.data, additional.length) ||
       !outside(drbg, output, length) || !outside(drbg, additional.data, additional.length) ||
       !tc_internal_ranges_disjoint(output, length, additional.data, additional.length) ||
       !input_length_valid(drbg, additional.length) ||
-      (prediction_resistance && !drbg->prediction_resistance)) {
-    wipe_rejected_output(drbg, output, length, additional);
+      (prediction_resistance && !drbg->prediction_resistance))
     return TC_DRBG_ARGUMENT;
-  }
+#if SIZE_MAX > TC_DRBG_MAX_REQUEST_BYTES
+  if (length > TC_DRBG_MAX_REQUEST_BYTES)
+    return TC_DRBG_LIMIT;
+#endif
 
   /* Section 9.3.1 steps 7 and 9: reseed on request or when the interval is
    * spent. The reseed consumes the additional input. */

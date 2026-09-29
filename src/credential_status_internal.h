@@ -30,6 +30,7 @@ static inline TC_credential_status tc_credential_tlv_status(TC_TLV_result result
   case TC_TLV_UNSUPPORTED:
     return TC_CREDENTIAL_UNSUPPORTED;
   case TC_TLV_ARGUMENT:
+  case TC_TLV_IO: /* a storage source failed to supply bytes */
     return TC_CREDENTIAL_ERROR;
   default:
     return policy->on_unmapped;

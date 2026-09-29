@@ -271,7 +271,8 @@ Include `<tiny_crypto/key.h>` for PKCS #8 RSA import. Enable
 `TINY_CRYPTO_ENABLE_DER=ON`. The import reader also works with X.509 disabled.
 `TC_KEY_rsa_private_read` returns a `TC_KEY_rsa_private_key` containing borrowed
 components, attributes and algorithm parameters. An optional public key must
-match the private key's modulus and exponent.
+match the private key's modulus and exponent. An output that overlaps the
+encoding returns `TC_TLV_ARGUMENT`.
 
 Before signing, pass the selected `TC_signature_algorithm` to
 `TC_KEY_rsa_private_signature_check`. A `TC_KEY_RSA_PSS` key permits PSS only.
@@ -349,9 +350,11 @@ discussed in [FIPS 186-5 Appendix C.1][fips1865]. Key-strength policy, provenanc
 and authorization require application checks.
 
 For a `bits`-bit key and at most `A` requests per factor,
-`TC_RSA_VALIDATE_WORK(bits, A)` is a sufficient work budget. Evaluate it with
-`uint32_t` operands, including on 16-bit targets. Workspace must be aligned
-and separate from key bytes and metadata. The RNG context must also be separate
+`TC_RSA_VALIDATE_WORK(bits, A)` is the work budget validation requires. It is
+checked in full before any arithmetic or RNG request, so a smaller budget
+returns `TC_RSA_LIMIT` with the budget, workspace and RNG unchanged. Evaluate
+it with `uint32_t` operands, including on 16-bit targets. Workspace must be
+aligned and separate from key bytes and metadata. The RNG context must also be separate
 from those ranges. Validation wipes used workspace before returning.
 
 The compiled [validation example](../examples/rsa_validate.c) shows workspace

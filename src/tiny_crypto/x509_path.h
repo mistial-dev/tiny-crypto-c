@@ -217,8 +217,8 @@ TC_X509_path_status TC_X509_path_build(TC_bytes target, const TC_X509_store_sour
  * each signature. out->work_used reports the units spent.
  * Returns VALID with out written. ERROR for NULL arguments, unknown flags,
  * an invalid options.at, initial policies or a purpose with malformed OID
- * contents, or overlap. INVALID for an empty chain, an empty certificate or
- * any failed check. LIMIT for count above max_certificates or workspace
+ * contents, or overlap. The options are checked before any work. INVALID
+ * for an empty chain, an empty certificate or any failed check. LIMIT for count above max_certificates or workspace
  * capacity, before any work, and for exhausted max_work, max_input, parsing
  * limits or workspace capacities. UNSUPPORTED for an unsupported algorithm,
  * critical extension or name form. out changes only on VALID. Workspace and

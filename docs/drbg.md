@@ -93,13 +93,12 @@ from a DRBG instantiated without it returns `TC_DRBG_ARGUMENT`.
 | `TC_DRBG_ENTROPY`     | The entropy source failed                         | Unchanged, and a failed instantiate leaves it wiped |
 | `TC_DRBG_ERROR`       | A hash, HMAC or AES operation failed              | Unusable until uninstantiated                       |
 
-Every failed generate call wipes its output buffer. Output that overlaps the
-context or the additional input is an argument error, and the call leaves it
-untouched so no caller input changes. An entropy failure during
-a reseed or a prediction-resistant request leaves the generator usable, so
-the caller can retry later. Output, additional input, nonce and
-personalization must be disjoint from the context, and output must be
-disjoint from additional input.
+`TC_DRBG_ARGUMENT` and `TC_DRBG_LIMIT` leave the output buffer unchanged.
+`TC_DRBG_ENTROPY` and `TC_DRBG_ERROR` from a generate call wipe it. An entropy
+failure during a reseed or a prediction-resistant request leaves the
+generator usable, so the caller can retry later. Output, additional input,
+nonce and personalization must be disjoint from the context, and output must
+be disjoint from additional input.
 
 ## Storage
 
@@ -121,8 +120,9 @@ fields are private.
 `TC_DRBG_random_source(&drbg)` returns a `TC_random_source` for RSA key
 generation, EC key generation and signing, key challenges and PIV secure
 messaging. `TC_DRBG_random` splits large requests into maximum-size calls. It
-rejects output that overlaps the DRBG before the first call and wipes the whole
-output when any call fails. The DRBG must stay instantiated while the source is
+rejects a NULL or uninstantiated DRBG and output that overlaps the DRBG before
+the first call, with the output unchanged. It wipes the whole output when a
+later call fails. The DRBG must stay instantiated while the source is
 in use.
 
 ## C++

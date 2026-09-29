@@ -186,9 +186,9 @@ TC_DRBG_result TC_DRBG_reseed(TC_DRBG* drbg, TC_bytes additional);
  * for a NULL output with a nonzero length, an uninstantiated or failed
  * drbg, an invalid span, an overlap, an input above the limits or an
  * unavailable prediction-resistant request, TC_DRBG_ENTROPY for a failed
- * reseed with the state unchanged, or TC_DRBG_ERROR. LIMIT and ARGUMENT
- * leave the state unchanged. Every failure wipes the output, except that
- * output overlapping drbg or the additional input stays untouched. */
+ * reseed with the state unchanged, or TC_DRBG_ERROR. ARGUMENT is checked
+ * before LIMIT, and both leave the output and the state unchanged. ENTROPY
+ * and ERROR wipe the output. */
 TC_DRBG_result TC_DRBG_generate(TC_DRBG* drbg, uint8_t* output, size_t length,
                                 int prediction_resistance, TC_bytes additional);
 
@@ -197,10 +197,12 @@ void TC_DRBG_uninstantiate(TC_DRBG* drbg);
 
 /* TC_random_fn over an instantiated DRBG passed as user. Requests of any
  * length are split into TC_DRBG_MAX_REQUEST_BYTES generate calls without
- * additional input. Returns TC_OK when every byte was generated. Output
- * that overlaps the DRBG returns TC_ERROR before any generate call, with
- * output and state unchanged. When any generate call fails, it returns
- * TC_ERROR and wipes all length bytes of a non-NULL output. */
+ * additional input. Returns TC_OK when every byte was generated. An
+ * argument error returns TC_ERROR before any byte is written, with output
+ * and state unchanged: a NULL, uninstantiated or failed drbg, a NULL output
+ * with a nonzero length, or output that overlaps the DRBG. Any other
+ * generate failure returns TC_ERROR and wipes all length bytes of the
+ * output. */
 TC_status TC_DRBG_random(void* user, uint8_t* output, size_t length);
 
 /* A TC_random_source over TC_DRBG_random for RSA key generation, EC, key

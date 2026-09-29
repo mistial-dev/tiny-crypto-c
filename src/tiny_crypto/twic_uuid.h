@@ -23,9 +23,9 @@ TC_TLV_result TC_TWIC_uuid_read(TC_bytes encoded, uint64_t* number);
 
 /* Write the NEXGEN UUID of a number in 0..99999999999999 as exactly
  * TC_TWIC_UUID_BYTES bytes. Charges no work.
- * Returns OK with 16 bytes written. ARGUMENT for NULL out or a capacity that
- * wraps the address space. LIMIT for a capacity below 16. INVALID for a
- * number above the range. out changes only on OK. */
+ * Returns OK with 16 bytes written. ARGUMENT for NULL out, a capacity that
+ * wraps the address space or a number above the range, checked before the
+ * capacity. LIMIT for a capacity below 16. out changes only on OK. */
 TC_TLV_result TC_TWIC_uuid_write(uint64_t number, uint8_t* out, size_t capacity);
 
 /* Compare a NEXGEN UUID with the agency, system and credential fields of a

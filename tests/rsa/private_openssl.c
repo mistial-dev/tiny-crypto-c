@@ -292,13 +292,17 @@ static MunitResult private_operation(const MunitParameter params[], void* user)
                      : scenario == VALIDATION_RNG ? TC_RSA_ERROR
                      : scenario == VALIDATION_D   ? TC_RSA_INVALID
                                                   : TC_RSA_LIMIT);
+    /* A budget one unit below the full cost fails the preflight, so no RNG
+     * request, work or scratch is used. */
     munit_assert_size(source.calls, ==,
                       scenario == VALIDATION_OK    ? 2
-                      : scenario <= VALIDATION_RNG ? 1
+                      : scenario == VALIDATION_RNG ? 1
                                                    : 0);
     if (scenario == VALIDATION_OK)
       munit_assert_size(budget, ==, 0);
-    if (scenario == VALIDATION_STORAGE) {
+    if (scenario == VALIDATION_WORK)
+      munit_assert_uint32(budget, ==, (uint32_t)validation_cost - 1u);
+    if (scenario == VALIDATION_STORAGE || scenario == VALIDATION_WORK) {
       for (size_t i = 0; i < sizeof scratch; ++i)
         munit_assert_uint(((uint8_t*)scratch)[i], ==, 0xa5);
     } else

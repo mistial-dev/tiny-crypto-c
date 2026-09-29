@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "../../src/x509_path_internal.h"
+#include "../../src/x509_path_status_internal.h"
 #include "../../src/x509_policy_internal.h"
 #include "munit.h"
 #include "test_util.h"
@@ -854,6 +855,72 @@ TC_TEST(usage)
   return MUNIT_OK;
 }
 
+/* Invalid options are argument errors found at the entry: an invalid
+ * validation time, malformed initial-policy OID contents or a malformed
+ * purpose return ERROR before the storage and anchor checks charge work. */
+TC_TEST(entry_option_checks)
+{
+  static const uint8_t certificate[] = {0x30, 0};
+  static const uint8_t any_policy[] = {0x55, 0x1d, 0x20, 0};
+  static const uint8_t malformed_oid[] = {0x80, 1};
+  const TC_bytes chain = {certificate, sizeof certificate};
+  TC_TLV_frame frames[4];
+  TC_bytes oids[4], policies[4], initial[2];
+  uint32_t left[8], right[8];
+  uint8_t matched[4];
+  TC_X509_policy_node nodes[4];
+  TC_X509_policy_edge edges[4];
+  TC_X509_policy_expected expected[4];
+  TC_X509_policy_mapping mappings[4];
+  TC_X509_certificate certificates[2];
+  TC_X509_extension_summary summaries[2];
+  const TC_X509_path_workspace workspace =
+      TC_X509_PATH_WORKSPACE_INIT(frames, oids, left, right, matched, nodes, edges, expected,
+                                  mappings, policies, certificates, summaries);
+  TC_X509_trust_anchor anchor;
+  TC_X509_path_options options;
+  TC_X509_path_result out;
+  unsigned scenario;
+  memset(&anchor, 0, sizeof anchor);
+  for (scenario = 0; scenario < 3; ++scenario) {
+    size_t work = 100000;
+    memset(&options, 0, sizeof options);
+    options.at = (TC_X509_time){2026, 1, 1, 0, 0, 0};
+    options.parsing = (TC_TLV_limits){1024, 1024, 64, 8};
+    options.max_certificates = 2;
+    options.max_input = 1024;
+    initial[0] = (TC_bytes){any_policy, sizeof any_policy};
+    initial[1] = (TC_bytes){malformed_oid, sizeof malformed_oid};
+    if (scenario == 0)
+      options.at.month = 13;
+    if (scenario == 1) {
+      options.initial_policies = initial;
+      options.initial_policy_count = 2;
+    }
+    if (scenario == 2)
+      options.purpose = (TC_bytes){malformed_oid, sizeof malformed_oid};
+    memset(&out, 0xa5, sizeof out);
+    munit_assert_int(
+        tc_x509_path_validate_budget(&chain, 1, &anchor, &options, &workspace, &work, &out), ==,
+        TC_X509_PATH_ERROR);
+    munit_assert_size(work, ==, 100000);
+    munit_assert_true(tc_test_all_value(&out, sizeof out, 0xa5));
+  }
+  return MUNIT_OK;
+}
+
+/* A storage source that failed to supply bytes is a source failure. */
+TC_TEST(status_mapping)
+{
+  munit_assert_int(tc_x509_path_status(TC_TLV_IO), ==, TC_X509_PATH_ERROR);
+  munit_assert_int(tc_x509_path_status(TC_TLV_ARGUMENT), ==, TC_X509_PATH_ERROR);
+  munit_assert_int(tc_x509_path_status(TC_TLV_INVALID), ==, TC_X509_PATH_INVALID);
+  munit_assert_int(tc_x509_path_status(TC_TLV_MORE), ==, TC_X509_PATH_INVALID);
+  munit_assert_int(tc_x509_path_status(TC_TLV_LIMIT), ==, TC_X509_PATH_LIMIT);
+  munit_assert_int(tc_x509_path_status(TC_TLV_UNSUPPORTED), ==, TC_X509_PATH_UNSUPPORTED);
+  return MUNIT_OK;
+}
+
 int main(int argc, char** argv)
 {
   MunitTest tests[] = {
@@ -864,6 +931,8 @@ int main(int argc, char** argv)
       {"/policies", policies, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/qualifiers", qualifiers, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/usage", usage, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/entry-option-checks", entry_option_checks, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/status-mapping", status_mapping, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
   MunitSuite suite = {"/x509/path", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};
   return munit_suite_main(&suite, NULL, argc, argv);

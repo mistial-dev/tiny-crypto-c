@@ -44,16 +44,6 @@ static TC_DRBG_config config_for(TC_DRBG_mechanism mechanism)
 
 static const TC_DRBG_mechanism mechanisms[] = {TC_DRBG_HASH, TC_DRBG_HMAC, TC_DRBG_CTR};
 
-static int all_zero(const void* data, size_t length)
-{
-  const uint8_t* bytes = (const uint8_t*)data;
-  size_t i;
-  for (i = 0; i < length; ++i)
-    if (bytes[i] != 0)
-      return 0;
-  return 1;
-}
-
 TC_TEST(test_lifecycle)
 {
   static TC_DRBG drbg;
@@ -64,11 +54,14 @@ TC_TEST(test_lifecycle)
     TC_random_source entropy = {counter_fill, &source};
     const TC_DRBG_config config = config_for(mechanisms[m]);
 
-    /* Use before instantiation fails and wipes the output. */
+    /* Use before instantiation is an argument error that leaves the output
+     * unchanged. */
     memset(out, 0xa5, sizeof out);
     memset(&drbg, 0, sizeof drbg);
     munit_assert_int(TC_DRBG_generate(&drbg, out, sizeof out, 0, empty), ==, TC_DRBG_ARGUMENT);
-    munit_assert_true(all_zero(out, sizeof out));
+    munit_assert_true(tc_test_all_value(out, sizeof out, 0xa5));
+    munit_assert_int(TC_DRBG_generate(NULL, out, sizeof out, 0, empty), ==, TC_DRBG_ARGUMENT);
+    munit_assert_true(tc_test_all_value(out, sizeof out, 0xa5));
     munit_assert_int(TC_DRBG_reseed(&drbg, empty), ==, TC_DRBG_ARGUMENT);
 
     /* Deterministic replay: the same entropy gives the same output. */
@@ -86,7 +79,7 @@ TC_TEST(test_lifecycle)
     munit_assert_int(TC_DRBG_generate(&drbg, again, sizeof again, 0, empty), ==, TC_DRBG_OK);
     munit_assert_memory_not_equal(sizeof out, out, again);
     TC_DRBG_uninstantiate(&drbg);
-    munit_assert_true(all_zero(&drbg, sizeof drbg));
+    munit_assert_true(tc_test_all_zero(&drbg, sizeof drbg));
     munit_assert_int(TC_DRBG_generate(&drbg, out, sizeof out, 0, empty), ==, TC_DRBG_ARGUMENT);
   }
   TC_DRBG_uninstantiate(NULL);
@@ -128,7 +121,7 @@ TC_TEST(test_arguments)
   config.mechanism = (TC_DRBG_mechanism)9;
   munit_assert_int(TC_DRBG_instantiate(&drbg, &config, entropy, good_nonce, empty), ==,
                    TC_DRBG_ARGUMENT);
-  munit_assert_true(all_zero(&drbg, sizeof drbg));
+  munit_assert_true(tc_test_all_zero(&drbg, sizeof drbg));
 
   /* A nonce that overlaps the context is rejected. */
   config.mechanism = TC_DRBG_HMAC;
@@ -142,17 +135,25 @@ TC_TEST(test_arguments)
   /* 65536 bytes is the SP 800-90A maximum per request. */
   munit_assert_int(TC_DRBG_generate(&drbg, big, TC_DRBG_MAX_REQUEST_BYTES, 0, empty), ==,
                    TC_DRBG_OK);
+  /* The request-size preflight returns LIMIT before any work, so the
+   * output is unchanged. */
   memset(big, 0xa5, sizeof big);
   munit_assert_int(TC_DRBG_generate(&drbg, big, sizeof big, 0, empty), ==, TC_DRBG_LIMIT);
-  munit_assert_true(all_zero(big, sizeof big));
+  munit_assert_true(tc_test_all_value(big, sizeof big, 0xa5));
+  /* An argument error takes precedence over the request size. */
+  munit_assert_int(TC_DRBG_generate(&drbg, big, sizeof big, 1, empty), ==, TC_DRBG_ARGUMENT);
+  munit_assert_true(tc_test_all_value(big, sizeof big, 0xa5));
   munit_assert_int(TC_DRBG_generate(&drbg, NULL, 1, 0, empty), ==, TC_DRBG_ARGUMENT);
   munit_assert_int(TC_DRBG_generate(&drbg, (uint8_t*)&drbg, 16, 0, empty), ==, TC_DRBG_ARGUMENT);
   {
     const TC_bytes overlap = {out + 8, 8};
     munit_assert_int(TC_DRBG_generate(&drbg, out, sizeof out, 0, overlap), ==, TC_DRBG_ARGUMENT);
   }
-  /* Prediction resistance needs an instantiation that allows it. */
+  /* Prediction resistance needs an instantiation that allows it. The
+   * rejected request leaves a disjoint output unchanged. */
+  memset(out, 0xa5, sizeof out);
   munit_assert_int(TC_DRBG_generate(&drbg, out, sizeof out, 1, empty), ==, TC_DRBG_ARGUMENT);
+  munit_assert_true(tc_test_all_value(out, sizeof out, 0xa5));
   munit_assert_int(TC_DRBG_generate(&drbg, out, 0, 0, empty), ==, TC_DRBG_OK);
   TC_DRBG_uninstantiate(&drbg);
   return MUNIT_OK;
@@ -201,7 +202,7 @@ TC_TEST(test_entropy_failures)
     /* Instantiate: a failed source leaves the context wiped. */
     munit_assert_int(TC_DRBG_instantiate(&drbg, &config, entropy, empty, empty), ==,
                      TC_DRBG_ENTROPY);
-    munit_assert_true(all_zero(&drbg, sizeof drbg));
+    munit_assert_true(tc_test_all_zero(&drbg, sizeof drbg));
 
     /* Reseed and prediction-resistant generate: the state is unchanged and
      * the output is wiped. */
@@ -215,7 +216,7 @@ TC_TEST(test_entropy_failures)
     source.fail_at = 3;
     memset(out, 0xa5, sizeof out);
     munit_assert_int(TC_DRBG_generate(&drbg, out, sizeof out, 1, empty), ==, TC_DRBG_ENTROPY);
-    munit_assert_true(all_zero(out, sizeof out));
+    munit_assert_true(tc_test_all_zero(out, sizeof out));
     munit_assert_memory_equal(sizeof drbg, &drbg, &saved);
     source.fail_at = 0;
     munit_assert_int(TC_DRBG_generate(&drbg, out, sizeof out, 1, empty), ==, TC_DRBG_OK);
@@ -277,9 +278,14 @@ TC_TEST(test_random_source)
     munit_assert_int(TC_DRBG_generate(&drbg, reference + offset, chunk, 0, empty), ==, TC_DRBG_OK);
   }
   munit_assert_memory_equal(sizeof large, large, reference);
+  /* A NULL or uninstantiated DRBG is an argument error: TC_ERROR with the
+   * output unchanged. */
   TC_DRBG_uninstantiate(&drbg);
+  memset(large, 0xa5, 16);
   munit_assert_int(random.fill(random.context, large, 16), ==, TC_ERROR);
-  munit_assert_true(all_zero(large, 16));
+  munit_assert_true(tc_test_all_value(large, 16, 0xa5));
+  munit_assert_int(TC_DRBG_random(NULL, large, 16), ==, TC_ERROR);
+  munit_assert_true(tc_test_all_value(large, 16, 0xa5));
   return MUNIT_OK;
 }
 
@@ -321,8 +327,7 @@ TC_TEST(test_input_limits)
 }
 
 /* An argument error for output that overlaps the additional input returns
- * before any write, so the caller's additional input survives. Other
- * rejected requests still wipe a disjoint output. */
+ * before any write, so the caller's additional input survives. */
 TC_TEST(test_overlap_preserves_input)
 {
   static TC_DRBG drbg;

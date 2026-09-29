@@ -254,8 +254,9 @@ static TC_X509_signature_result cms_verify_digest(const TC_CMS_signer_verify_req
         return tc_pki_signature_error(checked);
       if (signer_name)
         *signer_name = attributes.signer_name;
-      checked = tc_cms_content_digest_check(&attributes, request->content_type,
-                                            algorithm->content_hash, digest, work, &matched);
+      /* The entry checked the digest length against the content hash. */
+      checked =
+          tc_cms_content_digest_compare(&attributes, request->content_type, digest, work, &matched);
       if (checked != TC_TLV_OK)
         return tc_pki_signature_error(checked);
       if (!matched)
@@ -346,7 +347,8 @@ TC_X509_signature_result tc_cms_signer_verify(const TC_CMS_signer_verify_request
   if (!tc_hash_info_get(algorithm.content_hash, &hash))
     return TC_X509_SIGNATURE_UNSUPPORTED;
   if (kind == TC_CMS_VERIFY_DIGEST) {
-    if (digest.length != hash.digest_length)
+    /* A caller digest of the wrong length is an argument error. */
+    if (tc_cms_content_digest_length_check(algorithm.content_hash, digest) != TC_TLV_OK)
       return TC_X509_SIGNATURE_ERROR;
   } else {
     checked = tc_cms_hash_content(
@@ -417,14 +419,12 @@ TC_TLV_result TC_CMS_content_digest_check(const TC_CMS_signed_attributes* attrib
   if (tc_pki_storage_plan_finish(&plan, NULL) != TC_TLV_OK)
     return TC_TLV_ARGUMENT;
   /* The digest length is an argument property, so check it before any charge. */
-  tc_hash_info info;
-  if (!tc_hash_info_get(algorithm, &info))
-    return TC_TLV_UNSUPPORTED;
-  if (digest.length != info.digest_length)
-    return TC_TLV_ARGUMENT;
+  const TC_TLV_result length = tc_cms_content_digest_length_check(algorithm, digest);
+  if (length != TC_TLV_OK)
+    return length;
   if (tc_pki_work_charge(work, tc_pki_storage_plan_used(&plan)) != TC_TLV_OK)
     return TC_TLV_LIMIT;
-  return tc_cms_content_digest_check(attributes, expected_type, algorithm, digest, work, matched);
+  return tc_cms_content_digest_compare(attributes, expected_type, digest, work, matched);
 }
 
 TC_TLV_result TC_CMS_content_digest(TC_bytes encoded, TC_hash_algorithm algorithm,

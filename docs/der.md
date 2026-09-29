@@ -77,11 +77,11 @@ Every reader returns one of these values:
   `TC_DER_uint32_contents`.
 - `TC_TLV_UNSUPPORTED`: PKCS #1 version 1 (multi-prime) and PKCS #8 versions
   above 1, including versions above `UINT32_MAX`.
-- `TC_TLV_ARGUMENT`: a NULL output, or a span with NULL data and a nonzero
-  length.
+- `TC_TLV_ARGUMENT`: a NULL output, an output that overlaps the input or
+  another output, or a span with NULL data and a nonzero length.
 
 Outputs are unchanged on every failure. `TC_TLV_END` and `TC_TLV_MORE` are
-never returned. Keep each output object separate from its input.
+never returned.
 
 ## Conformance
 

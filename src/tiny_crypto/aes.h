@@ -104,8 +104,9 @@ TC_status TC_AES_CAVP_decrypt_block(const uint8_t* key, uint8_t block[TC_AES_BLO
 #endif
 #if TC_AES_SBOX_MODE == TC_AES_SBOX_MODE_RUNTIME
 /* Build the S-boxes in RAM. Call it once before any key init. Until then,
- * every key init returns TC_ERROR. Calls after the first have no effect.
- * Call it before sharing AES across threads. */
+ * every key init returns TC_ERROR. Each call rebuilds the tables with the
+ * same values. A call writes the shared tables, so make it before sharing
+ * AES across threads and never while another thread uses AES. */
 void TC_AES_init_sbox(void);
 #endif
 #if TC_AES_HAVE_IV

@@ -50,8 +50,8 @@ The richer result types use shared names with one meaning:
   function's domain.
 - `UNSUPPORTED`: well-formed input that uses an algorithm, size, version or
   feature outside this library or build.
-- `ERROR`: a random source, signature provider, cipher backend or internal
-  self-check failed.
+- `ERROR`: a random source, signature provider, cipher backend, storage
+  source or internal self-check failed.
 
 EC, RSA, GZIP and key challenges order their values OK, INVALID, LIMIT,
 ARGUMENT, UNSUPPORTED, ERROR, so one handler can cover them. GZIP has no ERROR.
@@ -59,7 +59,8 @@ RSA adds `TC_RSA_IN_PROGRESS` and `TC_RSA_CANCELLED` for stepwise key
 generation. `TC_DRBG_ENTROPY` reports a failed entropy source with the DRBG
 state unchanged. `TC_TLV_END` and `TC_TLV_MORE` are reader states: no more
 siblings, or a root reader that needs more input. `TC_TLV_IO` reports backing
-storage that failed to supply bytes. `TC_X509_REVOCATION_UNDETERMINED` means
+storage that failed to supply bytes, and path and credential validation
+report it as their ERROR value. `TC_X509_REVOCATION_UNDETERMINED` means
 no evidence covers a certificate. `TC_CREDENTIAL_REVOKED` and
 `TC_CREDENTIAL_UNAVAILABLE` distinguish revoked credentials from missing trust
 or evidence.
@@ -94,6 +95,21 @@ build with an `#error`. `TC_secure_zero` is a best-effort wipe for
 application buffers. Copies held in CPU registers remain. Clear
 application-held keys and plaintext with `TC_secure_zero` when their lifetime
 ends, and release acquired snapshots on every exit path.
+
+### Documented exceptions
+
+These functions depart from the rules above by design. Their headers give
+the details.
+
+- Modules that return `TC_status` (AES, DES, hashes, HMAC, MD5, KMAC256,
+  KBKDF, HKDF, SSKDF and PIV SM) report a short output buffer as `TC_ERROR`,
+  because `TC_status` has no LIMIT value.
+- `TC_TWIC_CCL_stream_update` makes argument errors sticky after init. The
+  stream returns the first error until the next init, so a rejected chunk
+  can never be skipped.
+- `TC_CMS_signer_verify_digest` checks the digest length after algorithm
+  resolution, because the resolved hash sets the length. An argument error
+  there can follow charged work.
 
 ## Buffers and lifetimes
 

@@ -23,8 +23,9 @@ TC_TEST(status_mapping)
                    TC_CREDENTIAL_ERROR);
   munit_assert_int(tc_credential_tlv_status(TC_TLV_OK, &tc_credential_tlv_validation), ==,
                    TC_CREDENTIAL_VALID);
+  /* A failed storage source is a source failure under both policies. */
   munit_assert_int(tc_credential_tlv_status(TC_TLV_IO, &tc_credential_tlv_validation), ==,
-                   TC_CREDENTIAL_INVALID);
+                   TC_CREDENTIAL_ERROR);
   munit_assert_int(tc_credential_tlv_status((TC_TLV_result)127, &tc_credential_tlv_validation), ==,
                    TC_CREDENTIAL_INVALID);
   munit_assert_int(tc_credential_tlv_status(TC_TLV_OK, &tc_credential_tlv_cms), ==,

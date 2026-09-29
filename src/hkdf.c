@@ -22,11 +22,13 @@ static int hkdf_output_length_ok(size_t hash_len, size_t output_len)
   return output_len != 0 && output_len <= 255u * hash_len;
 }
 
-/* Every input span is valid and disjoint from output. */
+/* Every input span is valid and disjoint from output. The ikm array size
+ * must fit in size_t before its range is compared. */
 static int hkdf_arguments(const hkdf_inputs* in, const uint8_t* output, size_t output_len)
 {
   if (!output || !tc_internal_span_valid(in->salt.data, in->salt.length) ||
       !tc_internal_span_valid(in->info.data, in->info.length) || (in->ikm_count && !in->ikm) ||
+      in->ikm_count > SIZE_MAX / sizeof *in->ikm ||
       !tc_internal_ranges_disjoint(output, output_len, in->salt.data, in->salt.length) ||
       !tc_internal_ranges_disjoint(output, output_len, in->info.data, in->info.length) ||
       !tc_internal_ranges_disjoint(output, output_len, in->ikm, in->ikm_count * sizeof *in->ikm))

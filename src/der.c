@@ -4,6 +4,21 @@
 #if TC_ENABLE_DER
 #include <tiny_crypto/der.h>
 #include "der_bits_internal.h"
+#include "internal.h"
+
+/* Each output object is non-NULL and disjoint from the input, since writing
+ * it would change the bytes that returned spans borrow. */
+static int output_separate(TC_bytes encoded, const void* out, size_t size)
+{
+  return out && tc_internal_ranges_disjoint(out, size, encoded.data, encoded.length);
+}
+#define OUTPUT_SEPARATE(encoded, out) output_separate((encoded), (out), sizeof *(out))
+
+/* Two outputs of one reader are each separate from the input and disjoint
+ * from each other. */
+#define OUTPUTS_SEPARATE(encoded, first, second)                                                   \
+  (OUTPUT_SEPARATE(encoded, first) && OUTPUT_SEPARATE(encoded, second) &&                          \
+   tc_internal_ranges_disjoint((first), sizeof *(first), (second), sizeof *(second)))
 
 static TC_TLV_result value(TC_bytes encoded, uint8_t tag, TC_bytes* out)
 {
@@ -40,7 +55,7 @@ TC_TLV_result TC_DER_integer(TC_bytes encoded, TC_bytes* out, int* negative)
 {
   TC_bytes v;
   TC_TLV_result result;
-  if (!out || !negative)
+  if (!OUTPUTS_SEPARATE(encoded, out, negative))
     return TC_TLV_ARGUMENT;
   result = value(encoded, 2, &v);
   if (result != TC_TLV_OK)
@@ -59,7 +74,7 @@ TC_TLV_result TC_DER_uint32(TC_bytes encoded, uint32_t* out)
 {
   TC_bytes v;
   TC_TLV_result result;
-  if (!out)
+  if (!OUTPUT_SEPARATE(encoded, out))
     return TC_TLV_ARGUMENT;
   result = value(encoded, 2, &v);
   return result == TC_TLV_OK ? TC_DER_uint32_contents(v, out) : result;
@@ -70,7 +85,7 @@ TC_TLV_result TC_DER_uint32_contents(TC_bytes contents, uint32_t* out)
   size_t i;
   uint32_t n = 0;
   TC_TLV_result result;
-  if (!out)
+  if (!OUTPUT_SEPARATE(contents, out))
     return TC_TLV_ARGUMENT;
   result = TC_DER_integer_contents(contents);
   if (result != TC_TLV_OK)
@@ -89,7 +104,7 @@ TC_TLV_result TC_DER_uint32_contents(TC_bytes contents, uint32_t* out)
 TC_TLV_result TC_DER_bit_string(TC_bytes encoded, TC_bytes* out, unsigned* unused)
 {
   TC_bytes v;
-  if (!out || !unused)
+  if (!OUTPUTS_SEPARATE(encoded, out, unused))
     return TC_TLV_ARGUMENT;
   TC_TLV_result result = value(encoded, 3, &v);
   return result == TC_TLV_OK ? tc_der_bit_string_contents(v, out, unused) : result;
@@ -99,7 +114,7 @@ TC_TLV_result TC_DER_oid(TC_bytes encoded, TC_bytes* out)
 {
   TC_bytes v;
   TC_TLV_result result;
-  if (!out)
+  if (!OUTPUT_SEPARATE(encoded, out))
     return TC_TLV_ARGUMENT;
   result = value(encoded, 6, &v);
   if (result != TC_TLV_OK)
@@ -137,7 +152,7 @@ TC_TLV_result TC_DER_boolean(TC_bytes encoded, int* out)
 {
   TC_bytes v;
   TC_TLV_result result;
-  if (!out)
+  if (!OUTPUT_SEPARATE(encoded, out))
     return TC_TLV_ARGUMENT;
   result = value(encoded, 1, &v);
   if (result != TC_TLV_OK)
@@ -156,11 +171,11 @@ TC_TLV_result TC_DER_null(TC_bytes encoded)
 }
 TC_TLV_result TC_DER_sequence(TC_bytes encoded, TC_bytes* out)
 {
-  return out ? value(encoded, 0x30, out) : TC_TLV_ARGUMENT;
+  return OUTPUT_SEPARATE(encoded, out) ? value(encoded, 0x30, out) : TC_TLV_ARGUMENT;
 }
 TC_TLV_result TC_DER_set(TC_bytes encoded, TC_bytes* out)
 {
-  return out ? value(encoded, 0x31, out) : TC_TLV_ARGUMENT;
+  return OUTPUT_SEPARATE(encoded, out) ? value(encoded, 0x31, out) : TC_TLV_ARGUMENT;
 }
 
 static TC_TLV_result sequence_fields(TC_bytes encoded, TC_bytes* fields, size_t minimum,
@@ -201,7 +216,7 @@ TC_TLV_result TC_DER_algorithm_identifier(TC_bytes encoded, TC_DER_algorithm* ou
   TC_bytes fields[2];
   TC_DER_algorithm algorithm;
   TC_TLV_result result;
-  if (!out)
+  if (!OUTPUT_SEPARATE(encoded, out))
     return TC_TLV_ARGUMENT;
   result = pair(encoded, fields, 1);
   if (result != TC_TLV_OK)
@@ -218,7 +233,7 @@ TC_TLV_result TC_DER_positive_integer(TC_bytes encoded, TC_bytes* out)
 {
   TC_bytes integer;
   int negative;
-  if (!out)
+  if (!OUTPUT_SEPARATE(encoded, out))
     return TC_TLV_ARGUMENT;
   TC_TLV_result result = TC_DER_integer(encoded, &integer, &negative);
   if (result != TC_TLV_OK)
@@ -237,7 +252,7 @@ TC_TLV_result TC_DER_rsa_public(TC_bytes encoded, TC_DER_rsa_public_key* out)
 {
   TC_bytes fields[2];
   TC_DER_rsa_public_key key;
-  if (!out)
+  if (!OUTPUT_SEPARATE(encoded, out))
     return TC_TLV_ARGUMENT;
   TC_TLV_result result = pair(encoded, fields, 0);
   if (result != TC_TLV_OK)
@@ -260,7 +275,7 @@ TC_TLV_result TC_DER_rsa_private(TC_bytes encoded, TC_DER_rsa_private_key* out)
   TC_bytes fields[10];
   TC_DER_rsa_private_key key;
   uint32_t version;
-  if (!out)
+  if (!OUTPUT_SEPARATE(encoded, out))
     return TC_TLV_ARGUMENT;
   TC_TLV_result result = sequence_fields(encoded, fields, 9, 10);
   if (result != TC_TLV_OK)
@@ -293,7 +308,7 @@ TC_TLV_result TC_DER_subject_public_key(TC_bytes encoded, TC_DER_public_key* out
   TC_DER_public_key key;
   TC_TLV_result result;
   unsigned unused;
-  if (!out)
+  if (!OUTPUT_SEPARATE(encoded, out))
     return TC_TLV_ARGUMENT;
   result = pair(encoded, fields, 0);
   if (result != TC_TLV_OK)
@@ -327,7 +342,7 @@ TC_TLV_result TC_DER_private_key_info(TC_bytes encoded, TC_DER_private_key* out)
   TC_bytes fields[FIELD_COUNT];
   TC_DER_private_key key;
   uint32_t version;
-  if (!out)
+  if (!OUTPUT_SEPARATE(encoded, out))
     return TC_TLV_ARGUMENT;
   TC_TLV_result result = sequence_fields(encoded, fields, 3, FIELD_COUNT);
   if (result != TC_TLV_OK)
@@ -381,7 +396,7 @@ TC_TLV_result TC_DER_ecdsa_signature(TC_bytes encoded, TC_DER_signature_pair* ou
   TC_bytes fields[2];
   TC_DER_signature_pair signature;
   TC_TLV_result result;
-  if (!out)
+  if (!OUTPUT_SEPARATE(encoded, out))
     return TC_TLV_ARGUMENT;
   result = pair(encoded, fields, 0);
   if (result != TC_TLV_OK)

@@ -618,6 +618,30 @@ static TC_TLV_result anchor_extensions_check(const TC_X509_store_anchor* anchor,
   return result == TC_TLV_END ? TC_TLV_OK : result;
 }
 
+/* Caller options checked at the entry, before any work is charged: a valid
+ * validation time, and initial policies and a purpose with well-formed OID
+ * contents (X.690 section 8.19). bytes receives the OID bytes examined, which
+ * validation charges once the storage checks pass. The caller has bounded
+ * initial_policy_count by the parsing element limit. */
+static int path_options_valid(const TC_X509_path_options* options, size_t* bytes)
+{
+  size_t i, examined = 0;
+  if (TC_X509_time_check(&options->at) != TC_TLV_OK ||
+      (options->initial_policy_count && !options->initial_policies))
+    return 0;
+  for (i = 0; i < options->initial_policy_count; ++i) {
+    const TC_bytes oid = options->initial_policies[i];
+    if (TC_DER_oid_contents(oid) != TC_TLV_OK || oid.length > SIZE_MAX - examined)
+      return 0;
+    examined += oid.length;
+  }
+  if (options->purpose.length && (TC_DER_oid_contents(options->purpose) != TC_TLV_OK ||
+                                  options->purpose.length > SIZE_MAX - examined))
+    return 0;
+  *bytes = examined + options->purpose.length;
+  return 1;
+}
+
 TC_X509_path_status tc_x509_path_validate_anchor(const TC_bytes* chain, size_t count,
                                                  const TC_X509_store_anchor* anchor,
                                                  const TC_X509_path_options* options,
@@ -635,7 +659,7 @@ TC_X509_path_status tc_x509_path_validate_anchor(const TC_bytes* chain, size_t c
   const TC_X509_certificate* target;
   TC_X509_path_result validated;
   TC_TLV_result result;
-  size_t i, set, initial_work, total = 0, policy_count;
+  size_t i, set, initial_work, total = 0, policy_count, option_bytes;
   int accepted;
   if (!chain || !anchor || !options || !workspace || !work || !out ||
       (options->flags & ~(unsigned)TC_X509_PATH_SUPPORTED_FLAGS))
@@ -657,6 +681,8 @@ TC_X509_path_status tc_x509_path_validate_anchor(const TC_bytes* chain, size_t c
   if (!workspace->certificates || count > workspace->certificate_capacity ||
       !workspace->summaries || count > workspace->summary_capacity)
     return TC_X509_PATH_LIMIT;
+  if (!path_options_valid(options, &option_bytes))
+    return TC_X509_PATH_ERROR;
   initial_work = *work;
   result = path_storage(chain, count, anchor, options, workspace, out, work);
   if (result != TC_TLV_OK)
@@ -668,8 +694,6 @@ TC_X509_path_status tc_x509_path_validate_anchor(const TC_bytes* chain, size_t c
       anchor_extensions_check(anchor, anchor->certificate_extensions, 0, &options->parsing, work);
   if (result != TC_TLV_OK)
     return tc_x509_path_status(result);
-  if (TC_X509_time_check(&options->at) != TC_TLV_OK)
-    return TC_X509_PATH_ERROR;
   for (i = 0; i < count; ++i) {
     if (tc_pki_work_charge(work, 1) != TC_TLV_OK)
       return TC_X509_PATH_LIMIT;
@@ -679,19 +703,9 @@ TC_X509_path_status tc_x509_path_validate_anchor(const TC_bytes* chain, size_t c
       return TC_X509_PATH_LIMIT;
     total += chain[i].length;
   }
-  for (i = 0; i < options->initial_policy_count; ++i) {
-    TC_bytes oid = options->initial_policies[i];
-    if (tc_pki_work_charge(work, oid.length) != TC_TLV_OK)
-      return TC_X509_PATH_LIMIT;
-    if (TC_DER_oid_contents(oid) != TC_TLV_OK)
-      return TC_X509_PATH_ERROR;
-  }
-  if (options->purpose.length) {
-    if (tc_pki_work_charge(work, options->purpose.length) != TC_TLV_OK)
-      return TC_X509_PATH_LIMIT;
-    if (TC_DER_oid_contents(options->purpose) != TC_TLV_OK)
-      return TC_X509_PATH_ERROR;
-  }
+  /* The entry checked the option OIDs. Charge the bytes it examined. */
+  if (tc_pki_work_charge(work, option_bytes) != TC_TLV_OK)
+    return TC_X509_PATH_LIMIT;
   parser.frames = workspace->frames;
   parser.extension_oids = workspace->oids;
   parser.extension_capacity = workspace->oid_capacity;

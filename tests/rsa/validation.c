@@ -129,6 +129,36 @@ TC_TEST(key_generation)
   munit_assert_int(
       validate_private_key(&key, deterministic_random, &rng, 256, &validation, UINT32_MAX), ==,
       TC_RSA_OK);
+  {
+    /* TC_RSA_VALIDATE_WORK is checked in full before any arithmetic or RNG
+     * request. One unit less returns LIMIT with the budget, workspace and
+     * RNG unchanged. */
+    const uint32_t full = TC_RSA_VALIDATE_WORK(BITS, 256u);
+    TC_RSA_execution execution = {{deterministic_random, &rng}, 256, {full - 1u}};
+    const uint32_t rng_before = rng;
+    memset(validation_words, 0xa5, sizeof validation_words);
+    munit_assert_int(
+        TC_RSA_validate_private_key(&key, TC_RSA_EXPONENT_FIPS, &validation, &execution), ==,
+        TC_RSA_LIMIT);
+    munit_assert_uint32(execution.work.remaining, ==, full - 1u);
+    munit_assert_uint32(rng, ==, rng_before);
+    munit_assert_true(tc_test_all_value(validation_words, sizeof validation_words, 0xa5));
+    execution.work.remaining = full;
+    munit_assert_int(
+        TC_RSA_validate_private_key(&key, TC_RSA_EXPONENT_FIPS, &validation, &execution), ==,
+        TC_RSA_OK);
+    munit_assert_uint32(execution.work.remaining, <, full);
+    /* A request count whose full cost exceeds UINT32_MAX can never be
+     * covered, so it returns LIMIT before any work or RNG request. */
+    execution.random_attempts = SIZE_MAX;
+    execution.work.remaining = UINT32_MAX;
+    const uint32_t rng_unbounded = rng;
+    munit_assert_int(
+        TC_RSA_validate_private_key(&key, TC_RSA_EXPONENT_FIPS, &validation, &execution), ==,
+        TC_RSA_LIMIT);
+    munit_assert_uint32(execution.work.remaining, ==, UINT32_MAX);
+    munit_assert_uint32(rng, ==, rng_unbounded);
+  }
   int cancelled = 1;
   memset(&generation, 0, sizeof generation);
   memset(words, 0xa5, sizeof words);

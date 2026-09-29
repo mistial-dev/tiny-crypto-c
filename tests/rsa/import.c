@@ -70,6 +70,29 @@ TC_TEST(rsa_private_import)
   munit_assert_memory_equal(sizeof key, &key, &preserved);
   munit_assert_int(TC_KEY_rsa_private_read((TC_bytes){encoded, sizeof encoded}, NULL), ==,
                    TC_TLV_ARGUMENT);
+  encoded[17] = 1;
+  encoded[18] = 5;
+  munit_assert_int(TC_KEY_rsa_private_read((TC_bytes){encoded, sizeof encoded}, &key), ==,
+                   TC_TLV_OK);
+  /* An output that overlaps the encoding is an argument error, and the
+   * encoding keeps its bytes. */
+  {
+    static union {
+      TC_KEY_rsa_private_key key;
+      uint8_t bytes[sizeof(TC_KEY_rsa_private_key) + sizeof encoded];
+    } shared;
+    uint8_t saved_bytes[sizeof shared.bytes];
+    memset(shared.bytes, 0, sizeof shared.bytes);
+    memcpy(shared.bytes, encoded, sizeof encoded);
+    memcpy(saved_bytes, shared.bytes, sizeof saved_bytes);
+    munit_assert_int(TC_KEY_rsa_private_read((TC_bytes){shared.bytes, sizeof encoded}, &shared.key),
+                     ==, TC_TLV_ARGUMENT);
+    munit_assert_memory_equal(sizeof saved_bytes, shared.bytes, saved_bytes);
+    memcpy(shared.bytes + sizeof shared.key, encoded, sizeof encoded);
+    munit_assert_int(TC_KEY_rsa_private_read(
+                         (TC_bytes){shared.bytes + sizeof shared.key, sizeof encoded}, &shared.key),
+                     ==, TC_TLV_OK);
+  }
   return MUNIT_OK;
 }
 

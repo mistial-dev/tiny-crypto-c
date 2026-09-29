@@ -171,7 +171,9 @@ TEST_CASE("RSA private validation wrapper")
   execution = {{nullptr, &calls}, TC_RSA_VALIDATION_ROUNDS, {10000}};
   CHECK(tiny_crypto::rsa_validate_private_key(key, workspace, execution) == TC_RSA_ARGUMENT);
   std::memset(words, 0xa5, sizeof words);
-  execution = {{unavailable_random, &calls}, TC_RSA_VALIDATION_ROUNDS, {10000}};
+  execution = {{unavailable_random, &calls},
+               TC_RSA_VALIDATION_ROUNDS,
+               {TC_RSA_VALIDATE_WORK(1024u, TC_RSA_VALIDATION_ROUNDS)}};
   CHECK(tiny_crypto::rsa_validate_private_key(key, workspace, execution) == TC_RSA_INVALID);
   CHECK(calls == 0);
   for (auto word : words)

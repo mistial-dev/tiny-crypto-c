@@ -111,8 +111,11 @@ TC_TEST(codec)
       value.association = 10;
       break;
     }
+    /* A field above its decimal width is a caller error, checked before
+     * the capacity. */
     memset(encoded, 0xa5, sizeof encoded);
-    munit_assert_int(TC_FASCN_write(&value, encoded, sizeof encoded), ==, TC_TLV_INVALID);
+    munit_assert_int(TC_FASCN_write(&value, encoded, sizeof encoded), ==, TC_TLV_ARGUMENT);
+    munit_assert_int(TC_FASCN_write(&value, encoded, TC_FASCN_BYTES - 1), ==, TC_TLV_ARGUMENT);
     for (size_t i = 0; i < sizeof encoded; ++i)
       munit_assert_uint(encoded[i], ==, 0xa5);
   }

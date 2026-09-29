@@ -146,7 +146,10 @@ also runs valid, invalid and work-limited signed-chain cases through it.
 - `TC_X509_PATH_UNSUPPORTED`: a required algorithm, name rule or critical extension
   is unavailable in the configured build.
 - `TC_X509_PATH_LIMIT`: an input, workspace or processing limit was reached.
-- `TC_X509_PATH_ERROR`: invalid arguments, overlapping storage or a provider error.
+- `TC_X509_PATH_ERROR`: invalid arguments or options, overlapping storage, a
+  provider error or a storage source that failed to supply bytes. Invalid
+  options, such as `options.at` or a malformed initial-policy OID, are
+  reported before any work is charged.
 
 Only `VALID` authorizes use of the returned key under the supplied path settings.
 Other statuses leave `out` unchanged. Workspace and provider state may change

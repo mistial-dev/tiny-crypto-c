@@ -18,7 +18,8 @@ extern "C" {
 /* Readers take the complete DER encoding, including tag and length, as a
  * borrowed span and return spans that borrow it. The input must stay
  * unchanged while a returned span is used. Output objects must be disjoint
- * from the input, since writing them would change the borrowed bytes. The
+ * from the input and from each other, since writing them would change the
+ * borrowed bytes. The
  * *_contents forms take only the contents octets of an IMPLICIT value. The
  * readers charge no work and need no workspace. Every reader returns one of:
  *
@@ -30,7 +31,8 @@ extern "C" {
  *                TC_DER_uint32_contents above UINT32_MAX only.
  *   UNSUPPORTED  a defined version outside this reader, for
  *                TC_DER_private_key_info and TC_DER_rsa_private only.
- *   ARGUMENT     a NULL output, or a span with NULL data and a nonzero
+ *   ARGUMENT     a NULL output, an output that overlaps the input or
+ *                another output, or a span with NULL data and a nonzero
  *                length.
  *
  * Outputs are unchanged on every failure. END and MORE are never returned.

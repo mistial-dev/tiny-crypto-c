@@ -572,6 +572,99 @@ TC_TEST(private_key_info)
   return MUNIT_OK;
 }
 
+/* An output that overlaps the input, or another output, is an argument
+ * error. The reader returns before any write, so the borrowed input keeps
+ * its bytes. Each case places the encoding at the start of aligned storage
+ * and the output object on top of it. */
+static union {
+  TC_DER_private_key private_key;
+  TC_DER_rsa_private_key rsa_private;
+  TC_DER_public_key public_key;
+  uint8_t bytes[128];
+} overlap_storage;
+static uint8_t overlap_saved[sizeof overlap_storage.bytes];
+
+static TC_bytes overlap_place(const uint8_t* encoding, size_t length)
+{
+  memset(overlap_storage.bytes, 0, sizeof overlap_storage.bytes);
+  memcpy(overlap_storage.bytes, encoding, length);
+  memcpy(overlap_saved, overlap_storage.bytes, sizeof overlap_saved);
+  return (TC_bytes){overlap_storage.bytes, length};
+}
+
+static void overlap_unchanged(TC_TLV_result result)
+{
+  munit_assert_int(result, ==, TC_TLV_ARGUMENT);
+  munit_assert_memory_equal(sizeof overlap_saved, overlap_storage.bytes, overlap_saved);
+}
+
+TC_TEST(der_output_overlap)
+{
+  static const uint8_t integer[] = {2, 1, 5}, bits[] = {3, 2, 0, 7}, oid[] = {6, 1, 42};
+  static const uint8_t boolean[] = {1, 1, 255}, sequence[] = {0x30, 0}, set[] = {0x31, 0};
+  static const uint8_t algorithm[] = {0x30, 3, 6, 1, 42};
+  static const uint8_t spki[] = {0x30, 9, 0x30, 3, 6, 1, 42, 3, 2, 0, 7};
+  static const uint8_t pkcs8[] = {0x30, 13, 2, 1, 0, 0x30, 3, 6, 1, 42, 4, 1, 7, 0xa0, 0};
+  static const uint8_t rsa_public[] = {0x30, 7, 2, 2, 0, 128, 2, 1, 3};
+  static const uint8_t rsa_private[] = {0x30, 27, 2, 1, 0, 2, 1, 15, 2, 1, 3, 2, 1, 3, 2,
+                                        1,    3,  2, 1, 5, 2, 1, 1,  2, 1, 3, 2, 1, 2};
+  static const uint8_t signature[] = {0x30, 6, 2, 1, 1, 2, 1, 1};
+  void* const out = overlap_storage.bytes;
+  TC_bytes v;
+  int sign;
+  unsigned unused;
+  TC_bytes in = overlap_place(integer, sizeof integer);
+  overlap_unchanged(TC_DER_integer(in, (TC_bytes*)out, &sign));
+  overlap_unchanged(TC_DER_integer(in, &v, (int*)out));
+  overlap_unchanged(TC_DER_positive_integer(in, (TC_bytes*)out));
+  overlap_unchanged(TC_DER_uint32(in, (uint32_t*)out));
+  in = overlap_place(integer + 2, 1);
+  overlap_unchanged(TC_DER_uint32_contents(in, (uint32_t*)out));
+  in = overlap_place(bits, sizeof bits);
+  overlap_unchanged(TC_DER_bit_string(in, (TC_bytes*)out, &unused));
+  overlap_unchanged(TC_DER_bit_string(in, &v, (unsigned*)out));
+  in = overlap_place(oid, sizeof oid);
+  overlap_unchanged(TC_DER_oid(in, (TC_bytes*)out));
+  in = overlap_place(boolean, sizeof boolean);
+  overlap_unchanged(TC_DER_boolean(in, (int*)out));
+  in = overlap_place(sequence, sizeof sequence);
+  overlap_unchanged(TC_DER_sequence(in, (TC_bytes*)out));
+  in = overlap_place(set, sizeof set);
+  overlap_unchanged(TC_DER_set(in, (TC_bytes*)out));
+  in = overlap_place(algorithm, sizeof algorithm);
+  overlap_unchanged(TC_DER_algorithm_identifier(in, (TC_DER_algorithm*)out));
+  in = overlap_place(spki, sizeof spki);
+  overlap_unchanged(TC_DER_subject_public_key(in, &overlap_storage.public_key));
+  in = overlap_place(pkcs8, sizeof pkcs8);
+  overlap_unchanged(TC_DER_private_key_info(in, &overlap_storage.private_key));
+  in = overlap_place(rsa_public, sizeof rsa_public);
+  overlap_unchanged(TC_DER_rsa_public(in, (TC_DER_rsa_public_key*)out));
+  in = overlap_place(rsa_private, sizeof rsa_private);
+  overlap_unchanged(TC_DER_rsa_private(in, &overlap_storage.rsa_private));
+  in = overlap_place(signature, sizeof signature);
+  overlap_unchanged(TC_DER_ecdsa_signature(in, (TC_DER_signature_pair*)out));
+
+  /* Two outputs of one reader must also be disjoint. */
+  {
+    union {
+      TC_bytes span;
+      int sign;
+      unsigned unused;
+    } shared;
+    memset(&shared, 0xa5, sizeof shared);
+    munit_assert_int(
+        TC_DER_integer((TC_bytes){integer, sizeof integer}, &shared.span, &shared.sign), ==,
+        TC_TLV_ARGUMENT);
+    munit_assert_int(TC_DER_bit_string((TC_bytes){bits, sizeof bits}, &shared.span, &shared.unused),
+                     ==, TC_TLV_ARGUMENT);
+    munit_assert_true(tc_test_all_value(&shared, sizeof shared, 0xa5));
+  }
+  /* Disjoint outputs still read the same encodings. */
+  munit_assert_int(TC_DER_integer((TC_bytes){integer, sizeof integer}, &v, &sign), ==, TC_TLV_OK);
+  munit_assert_int(TC_DER_bit_string((TC_bytes){bits, sizeof bits}, &v, &unused), ==, TC_TLV_OK);
+  return MUNIT_OK;
+}
+
 /* The complete-input readers report truncation as malformed input. */
 TC_TEST(der_truncation)
 {
@@ -922,6 +1015,7 @@ static MunitTest tests[] = {
     {"/signatures", signatures, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/der", der, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/der-truncation", der_truncation, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/der-output-overlap", der_output_overlap, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/der-status-classes", der_status_classes, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/subject-public-key", subject_public_key, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/oid-contents", oid_contents, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

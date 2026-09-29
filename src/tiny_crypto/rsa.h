@@ -470,14 +470,14 @@ TC_RSA_result TC_RSA_sign_pss_digest(const TC_RSA_private_key* key,
  * TC_RSA_INVALID      malformed components, or a failed criterion or
  *                     primality round.
  * TC_RSA_LIMIT        short scratch, random_attempts below the round count,
- *                     or work that runs out.
+ *                     or a work budget below the full cost.
  * TC_RSA_ERROR        an RNG request failed.
  *
- * Work: at most TC_RSA_VALIDATE_WORK(bits, attempts). Only the component
- * checks, 48*k + 2 units, are checked before arithmetic. The primality
- * rounds charge as they run, so a budget below TC_RSA_VALIDATE_WORK can
- * return LIMIT after consuming work. Key-strength and application acceptance
- * policies belong to the caller. */
+ * Work: at most TC_RSA_VALIDATE_WORK(bits, random_attempts). That full cost
+ * is checked before any arithmetic or RNG request. A smaller budget, or a
+ * cost above UINT32_MAX, returns TC_RSA_LIMIT with work, workspace and the
+ * RNG unchanged. Key-strength and application acceptance policies belong to
+ * the caller. */
 TC_RSA_result TC_RSA_validate_private_key(const TC_RSA_private_key* key,
                                           TC_RSA_exponent_policy exponent_policy,
                                           const TC_RSA_workspace* workspace,

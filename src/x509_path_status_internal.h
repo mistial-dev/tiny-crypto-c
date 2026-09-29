@@ -24,6 +24,7 @@ static inline TC_X509_path_status tc_x509_path_status(TC_TLV_result result)
   case TC_TLV_UNSUPPORTED:
     return TC_X509_PATH_UNSUPPORTED;
   case TC_TLV_ARGUMENT:
+  case TC_TLV_IO: /* a storage source failed to supply bytes */
     return TC_X509_PATH_ERROR;
   default:
     return TC_X509_PATH_INVALID;

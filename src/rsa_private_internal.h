@@ -193,11 +193,35 @@ cleanup:
   return status;
 }
 
+/* Full work for a length-byte modulus, matching TC_RSA_VALIDATE_WORK: the
+ * component checks, then for each half-width factor one Miller-Rabin setup,
+ * rounds rounds and attempts RNG requests. Returns 0 when the cost exceeds
+ * a uint32_t budget. */
+static inline int tc_rsa_validation_cost(size_t length, size_t rounds, size_t attempts,
+                                         uint32_t* cost)
+{
+  const uint32_t component = UINT32_C(48) * (uint32_t)length + 2;
+  const uint32_t setup = UINT32_C(24) * (uint32_t)(length / 2) + 3;
+  const uint32_t round = UINT32_C(24) * (uint32_t)(length / 2) + 1;
+  if (rounds > (UINT32_MAX - setup) / round)
+    return 0;
+  uint32_t factor = setup + (uint32_t)rounds * round;
+  if (attempts > UINT32_MAX - factor)
+    return 0;
+  factor += (uint32_t)attempts;
+  if (factor > (UINT32_MAX - component) / 2)
+    return 0;
+  *cost = component + 2 * factor;
+  return 1;
+}
+
 /* Validate two-prime components and test each factor with rounds
  * Miller-Rabin rounds. The key passed its entry checks. max_attempts applies
  * per factor. Storage ownership matches the component check. Scratch needs
  * TC_RSA_VALIDATE_WORKSPACE_WORDS limbs. The caller's assurance policy
- * supplies rounds and an independent uniform RNG. */
+ * supplies rounds and an independent uniform RNG. The full cost from
+ * tc_rsa_validation_cost is checked before any arithmetic, so a short
+ * budget returns LIMIT with work, scratch and the RNG unchanged. */
 static inline TC_RSA_result tc_rsa_private_magnitudes_check(const tc_rsa_private_view* key,
                                                             TC_RSA_exponent_policy exponent_policy,
                                                             size_t rounds, const tc_rsa_random* rng,
@@ -208,8 +232,9 @@ static inline TC_RSA_result tc_rsa_private_magnitudes_check(const tc_rsa_private
   tc_mp_word* const scratch = area.words;
   const size_t scratch_words = area.capacity;
   const size_t required = TC_RSA_VALIDATE_WORKSPACE_WORDS(length * 8);
-  const size_t component_cost = 48 * length + 2;
-  if (scratch_words < required || max_attempts < rounds || *work < component_cost)
+  uint32_t full_cost;
+  if (scratch_words < required || max_attempts < rounds ||
+      !tc_rsa_validation_cost(length, rounds, max_attempts, &full_cost) || *work < full_cost)
     return TC_RSA_LIMIT;
   TC_RSA_result status = tc_rsa_private_magnitudes_consistent(key, exponent_policy, area, work);
   /* The entry checks stripped each factor to half the modulus width, so

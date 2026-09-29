@@ -14,9 +14,10 @@ TC_status TC_DRBG_random(void* user, uint8_t* output, size_t length)
   TC_DRBG* drbg = (TC_DRBG*)user;
   size_t offset = 0;
 
-  /* Output inside the DRBG is an argument error. Reject it before the first
-   * generate call, so no chunk runs and the generator state stays intact. */
-  if (drbg != NULL && !tc_internal_ranges_disjoint(drbg, sizeof *drbg, output, length))
+  /* A NULL drbg and output inside the DRBG are argument errors. Reject them
+   * before the first generate call, so no chunk runs and the output and the
+   * generator state stay intact. */
+  if (drbg == NULL || !tc_internal_ranges_disjoint(drbg, sizeof *drbg, output, length))
     return TC_ERROR;
   /* A zero-length request still checks that the DRBG is instantiated. */
   do {
@@ -26,9 +27,13 @@ TC_status TC_DRBG_random(void* user, uint8_t* output, size_t length)
 #else
     const size_t chunk = length - offset; /* every size_t length fits one request */
 #endif
-    if (TC_DRBG_generate(drbg, output == NULL ? NULL : output + offset, chunk, 0, empty) !=
-        TC_DRBG_OK) {
-      if (output != NULL)
+    const TC_DRBG_result result =
+        TC_DRBG_generate(drbg, output == NULL ? NULL : output + offset, chunk, 0, empty);
+    /* Every chunk has the same arguments, so an argument error can only come
+     * from the first chunk, before any byte is written. Later failures wipe
+     * the chunks already generated. */
+    if (result != TC_DRBG_OK) {
+      if (result != TC_DRBG_ARGUMENT && output != NULL)
         TC_secure_zero(output, length);
       return TC_ERROR;
     }

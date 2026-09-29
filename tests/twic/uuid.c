@@ -41,7 +41,7 @@ TC_TEST(mapping)
   for (size_t i = 0; i < sizeof numbers / sizeof *numbers; ++i) {
     memset(encoded, 0xa5, sizeof encoded);
     munit_assert_int(TC_TWIC_uuid_write(numbers[i], encoded, sizeof encoded), ==,
-                     i < 3 ? TC_TLV_OK : TC_TLV_INVALID);
+                     i < 3 ? TC_TLV_OK : TC_TLV_ARGUMENT);
     if (i < 3) {
       munit_assert_int(TC_TWIC_uuid_read((TC_bytes){encoded, sizeof known}, &number), ==,
                        TC_TLV_OK);
@@ -54,6 +54,9 @@ TC_TEST(mapping)
     memset(encoded, 0xa5, sizeof encoded);
     number = expected;
     munit_assert_int(TC_TWIC_uuid_write(expected, encoded, length), ==, TC_TLV_LIMIT);
+    /* The caller's number is checked before the capacity. */
+    munit_assert_int(TC_TWIC_uuid_write(UINT64_C(100000000000000), encoded, length), ==,
+                     TC_TLV_ARGUMENT);
     munit_assert_int(TC_TWIC_uuid_read((TC_bytes){known, length}, &number), ==, TC_TLV_INVALID);
     munit_assert_uint64(number, ==, expected);
     for (size_t i = 0; i < sizeof encoded; ++i)

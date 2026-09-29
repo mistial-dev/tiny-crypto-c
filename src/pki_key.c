@@ -6,6 +6,7 @@
 #include "pki_hash_internal.h"
 #include "pki_tree_internal.h"
 #include "pki_signature_internal.h"
+#include "internal.h"
 
 static const TC_TLV_limits pss_limits = {SIZE_MAX, SIZE_MAX, 4, 1};
 
@@ -154,7 +155,8 @@ TC_TLV_result tc_pki_rsa_key_algorithm(const TC_DER_algorithm* algorithm, TC_key
 TC_TLV_result TC_KEY_rsa_private_read(TC_bytes encoded, TC_KEY_rsa_private_key* out)
 {
   TC_KEY_rsa_private_key key;
-  if (!out)
+  /* Writing out over the encoding would change the borrowed key bytes. */
+  if (!out || !tc_internal_ranges_disjoint(out, sizeof *out, encoded.data, encoded.length))
     return TC_TLV_ARGUMENT;
   TC_TLV_result result = TC_DER_private_key_info(encoded, &key.container);
   if (result != TC_TLV_OK)

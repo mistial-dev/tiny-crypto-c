@@ -35,9 +35,10 @@ extern "C" {
  * A span may have NULL data only when it is empty. Output must be disjoint
  * from every input, including the ikm array. Each function returns TC_OK, or
  * TC_ERROR with output unchanged for a NULL output, an invalid span, a NULL
- * ikm with a nonzero ikm_count, an overlap, a short or NULL PRK (expand) or
- * an output.capacity outside 1..255 * HashLen. A failure after processing
- * begins wipes output. */
+ * ikm with a nonzero ikm_count, an ikm_count whose array size overflows
+ * size_t, an overlap, a short or NULL PRK (expand) or an output.capacity
+ * outside 1..255 * HashLen. A failure after processing begins wipes
+ * output. */
 #define TC_HKDF_DECLARE(N)                                                                         \
   TC_status TC_HKDF_SHA##N##_extract(TC_bytes salt, const TC_bytes* ikm, size_t ikm_count,         \
                                      uint8_t prk[TC_SHA##N##_DIGESTLEN]);                          \

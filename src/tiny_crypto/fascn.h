@@ -32,9 +32,9 @@ TC_TLV_result TC_FASCN_read(TC_bytes encoded, TC_FASCN* out);
 
 /* Encode all fields, including parity and LRC, as exactly TC_FASCN_BYTES
  * bytes. value and the entire output range must be disjoint. Charges no work.
- * Returns OK with 25 bytes written. ARGUMENT for NULL arguments or overlap.
- * LIMIT for a capacity below TC_FASCN_BYTES. INVALID for a field above its
- * decimal width. out changes only on OK. */
+ * Returns OK with 25 bytes written. ARGUMENT for NULL arguments, overlap or
+ * a field above its decimal width, checked before the capacity. LIMIT for a
+ * capacity below TC_FASCN_BYTES. out changes only on OK. */
 TC_TLV_result TC_FASCN_write(const TC_FASCN* value, uint8_t* out, size_t capacity);
 
 #ifdef __cplusplus

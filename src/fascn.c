@@ -93,18 +93,20 @@ TC_TLV_result TC_FASCN_write(const TC_FASCN* value, uint8_t* out, size_t capacit
 {
   if (!value || !out || !tc_internal_ranges_disjoint(value, sizeof *value, out, capacity))
     return TC_TLV_ARGUMENT;
-  if (capacity < TC_FASCN_BYTES)
-    return TC_TLV_LIMIT;
   uint64_t values[FIELDS] = {value->agency,   value->system,       value->credential,
                              value->series,   value->issue,        value->person,
                              value->category, value->organization, value->association};
+  /* PACS TIG v2.3 section 6.1: each field has a fixed decimal width. A wider
+   * caller value is an argument error, checked before the capacity. */
   for (size_t i = 0; i < FIELDS; ++i) {
     uint64_t limit = 1;
     for (unsigned j = 0; j < fields[i].digits; ++j)
       limit *= 10;
     if (values[i] >= limit)
-      return TC_TLV_INVALID;
+      return TC_TLV_ARGUMENT;
   }
+  if (capacity < TC_FASCN_BYTES)
+    return TC_TLV_LIMIT;
   /* All validation precedes output writes. Each character occupies five bits. */
   memset(out, 0, TC_FASCN_BYTES);
   unsigned checksum = 0;
