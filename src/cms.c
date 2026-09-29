@@ -269,6 +269,8 @@ TC_X509_signature_result tc_cms_signer_verify(const TC_CMS_signer_verify_request
     }
     digest = (TC_bytes){digest_scratch, hash.digest_length};
   }
+  /* RFC 5652 sections 5.3 and 11.4: the signature excludes unsignedAttrs, so
+   * countersignatures and other unsigned attributes stay unread here. */
   const cms_hash_scratch scratch = {&hash_workspace, digest_scratch};
   result =
       cms_verify_digest(request, digest, &algorithm, workspace, work, &scratch, signer_name, cache);

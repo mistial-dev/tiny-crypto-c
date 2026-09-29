@@ -63,7 +63,8 @@ typedef struct {
 /* Find a signer certificate, verify its signature, and build a trusted path.
  * Embedded certificates precede external candidates. Trust comes from source
  * anchors alone. The result borrows all certificate and source bytes. The
- * request and its bytes stay stable and separate from scratch during the call. */
+ * request and its bytes stay stable and separate from scratch during the call.
+ * Unsigned attributes, including countersignatures, stay unauthenticated. */
 TC_X509_path_status TC_CMS_signer_path_build(const TC_CMS_signer_path_request* request,
                                              const TC_X509_store_source* source,
                                              const TC_CMS_path_options* options,

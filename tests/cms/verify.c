@@ -175,6 +175,60 @@ static MunitResult verification(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+/* RFC 5652 section 5.3: the signature excludes unsignedAttrs. A section 11.4
+ * countersignature in unsignedAttrs is unauthenticated and leaves the result
+ * unchanged. The countersignature value repeats record. */
+static MunitResult unsigned_attributes(const MunitParameter params[], void* user)
+{
+  static const uint8_t countersigned[] = {
+      0x30, 91,   2,    1,    3,    0x80, 1,    0xaa, 0x30, 13, 6, 9,    0x60, 0x86, 0x48, 1,
+      0x65, 3,    4,    2,    1,    5,    0,    0x30, 10,   6,  8, 0x2a, 0x86, 0x48, 0xce, 0x3d,
+      4,    3,    2,    4,    1,    1,    0xa1, 53,   0x30, 51, 6, 9,    0x2a, 0x86, 0x48, 0x86,
+      0xf7, 0x0d, 1,    9,    6,    0x31, 38,   0x30, 36,   2,  1, 3,    0x80, 1,    0xaa, 0x30,
+      13,   6,    9,    0x60, 0x86, 0x48, 1,    0x65, 3,    4,  2, 1,    5,    0,    0x30, 10,
+      6,    8,    0x2a, 0x86, 0x48, 0xce, 0x3d, 4,    3,    2,  4, 1,    1};
+  TC_TLV_frame frames[FRAME_CAPACITY];
+  TC_CMS_signature_workspace workspace = {frames, FRAME_CAPACITY, NULL, 0};
+  TC_CMS_signer_info signer;
+  TC_X509_public_key key = public_key();
+  ProviderState state = {0};
+  TC_X509_signature_provider provider = {NULL, &state, verify};
+  const TC_CMS_signer_verify_request request = {&signer,
+                                                {data_type, sizeof data_type},
+                                                {TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
+                                                &key,
+                                                &provider,
+                                                &limits};
+  const TC_bytes digest = {digest_bytes, sizeof digest_bytes};
+  size_t work = WORK_BUDGET;
+  (void)params;
+  (void)user;
+  munit_assert_int(TC_CMS_signer_info_read((TC_bytes){countersigned, sizeof countersigned},
+                                           TC_TLV_DER, &limits,
+                                           (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &signer),
+                   ==, TC_TLV_OK);
+  munit_assert_ptr_equal(signer.unsigned_attributes.data, countersigned + 38);
+  munit_assert_size(signer.unsigned_attributes.length, ==, sizeof countersigned - 38);
+  work = WORK_BUDGET;
+  munit_assert_int(TC_CMS_signer_verify_digest(&request, digest, &workspace, &work), ==,
+                   TC_X509_SIGNATURE_VALID);
+  munit_assert_uint(state.calls, ==, 1);
+  /* A corrupted countersignature leaves the signer result unchanged. */
+  uint8_t tampered[sizeof countersigned];
+  memcpy(tampered, countersigned, sizeof tampered);
+  tampered[sizeof tampered - 1] ^= 0xff;
+  work = WORK_BUDGET;
+  munit_assert_int(TC_CMS_signer_info_read((TC_bytes){tampered, sizeof tampered}, TC_TLV_DER,
+                                           &limits, (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
+                                           &signer),
+                   ==, TC_TLV_OK);
+  work = WORK_BUDGET;
+  munit_assert_int(TC_CMS_signer_verify_digest(&request, digest, &workspace, &work), ==,
+                   TC_X509_SIGNATURE_VALID);
+  munit_assert_uint(state.calls, ==, 2);
+  return MUNIT_OK;
+}
+
 static MunitResult storage(const MunitParameter params[], void* user)
 {
   enum { SIGNER, KEY, PROVIDER, LIMITS, WORKSPACE, INPUT, FRAMES, BUFFER, WORK, COUNT };
@@ -394,10 +448,12 @@ static MunitResult content(const MunitParameter params[], void* user)
 
 int main(int argc, char** argv)
 {
-  MunitTest tests[] = {{"/digest", verification, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-                       {"/storage", storage, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-                       {"/content", content, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-                       {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
+  MunitTest tests[] = {
+      {"/digest", verification, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/unsigned-attributes", unsigned_attributes, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/storage", storage, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/content", content, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
   MunitSuite suite = {"/cms/verify", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};
   return munit_suite_main(&suite, NULL, argc, argv);
 }

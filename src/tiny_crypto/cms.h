@@ -189,7 +189,9 @@ typedef struct {
  * hash may differ.
  * Checks digest binding, signed attributes, algorithm/key compatibility and the
  * signature. Without signed attributes, content_type must be id-data.
- * CMS field framing uses BER. This operation rejects countersignatures.
+ * CMS field framing uses BER. Verification ignores unsigned_attributes,
+ * including countersignatures. RFC 5652 sections 5.3 and 11.4 exclude them
+ * from the signature, so their contents are unauthenticated.
  *
  * The caller checks signer/certificate identity, trust, application algorithm
  * policy and the envelope's digestAlgorithms.
@@ -215,9 +217,10 @@ typedef enum { TC_CMS_CONTENT_RAW, TC_CMS_CONTENT_BER_OCTETS } TC_CMS_content_en
  * The caller selects the format explicitly. Raw content is bounded by
  * max_input and max_value. BER content also uses the framing limits.
  *
- * Storage, provider and trust rules match signer_verify_digest. The content hash
- * must be enabled. Hash scratch is reused for signed attributes, without copying
- * the message. For cached or externally computed digests, use the digest API. */
+ * Storage, provider, trust and unsigned-attribute rules match
+ * signer_verify_digest. The content hash must be enabled. Hash scratch is reused
+ * for signed attributes, without copying the message. For cached or externally
+ * computed digests, use the digest API. */
 TC_X509_signature_result TC_CMS_signer_verify_content(const TC_CMS_signer_verify_request* request,
                                                       TC_bytes content,
                                                       TC_CMS_content_encoding encoding,

@@ -458,7 +458,13 @@ verification APIs handle that distinction internally.
 Pass the envelope's `content_type` and select the signed-attribute encoding
 explicitly in the policy. The verifier checks attribute binding and hashes the original signed
 bytes, then calls the provider's digest operation. Without signed attributes,
-only `id-data` content is allowed. Countersignatures are outside this API's scope.
+only `id-data` content is allowed.
+
+Verification ignores `unsigned_attributes`. RFC 5652 section 5.3 excludes
+them from the SignerInfo signature, so their contents are unauthenticated.
+This includes countersignatures (RFC 5652 section 11.4). A VALID result says
+nothing about a countersignature or any other unsigned attribute. Applications
+that rely on an unsigned attribute must parse and authenticate it separately.
 
 `TC_CMS_signature_workspace` holds caller-owned parser frames and optional
 signature storage. A primitive signature is borrowed directly. Fragmented BER
