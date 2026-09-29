@@ -354,7 +354,7 @@ TC_credential_status TC_PIV_biometric_validate(const TC_PIV_biometric_validation
   if (status != TC_CREDENTIAL_VALID)
     return status;
   TC_PIV_CMS_object object;
-  int matched;
+  int matched = 0;
   session.policy.verification.attribute_oids = credential_attribute_oids(session.oids);
   parsed =
       TC_PIV_CMS_read(cbeff.signature, request->signature_profile, &session.policy.verification,
@@ -483,7 +483,7 @@ TC_credential_status TC_PIV_security_validate(const TC_PIV_security_validation_r
   const TC_X509_path_workspace* scratch = credential_storage_of(context);
 
   TC_PIV_security_object container;
-  TC_PIV_CMS_object object;
+  TC_PIV_CMS_object object = {0};
   TC_X509_certificate signer;
   session.policy.verification.attribute_oids = credential_attribute_oids(session.oids);
   parsed = TC_PIV_security_read(request->encoded, request->encoding, &container);

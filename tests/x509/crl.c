@@ -2562,7 +2562,7 @@ TC_TEST(distribution_points)
   size_t work;
   const tc_pki_tree_workspace tree = {frames, FRAME_CAPACITY, &work};
   tc_pki_distribution_point point, saved;
-  TC_TLV_reader reader, start;
+  TC_TLV_reader reader = {0}, start;
   memset(&saved, 0xa5, sizeof saved);
   for (size_t i = 0; i < sizeof cases / sizeof cases[0]; ++i) {
     uint8_t list[64] = {0x30, (uint8_t)(cases[i].length * 2)};

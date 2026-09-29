@@ -222,7 +222,7 @@ static TC_TLV_result path_constraint_target(const tc_x509_path_input* input, siz
                                             const TC_X509_constraint_workspace* workspace,
                                             size_t* work, int* accepted)
 {
-  const TC_X509_extension_summary* extensions;
+  const TC_X509_extension_summary* extensions = NULL;
   const TC_X509_certificate* certificate;
   TC_bytes san = {NULL, 0};
   TC_TLV_result result;

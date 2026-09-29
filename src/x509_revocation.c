@@ -419,7 +419,7 @@ static TC_TLV_result x509_ocsp_delegate_checked(const x509_crl_path_context* pat
                                                 TC_bytes delegate)
 {
   TC_X509_crl_evidence evidence = {0};
-  TC_X509_revocation_status status;
+  TC_X509_revocation_status status = TC_X509_REVOCATION_UNDETERMINED;
   TC_TLV_result result = x509_crl_resolve_target(path->prepared, delegate, &evidence);
   if (result == TC_TLV_OK)
     result = tc_x509_crl_evidence_status(&evidence, &status);

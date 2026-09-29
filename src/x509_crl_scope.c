@@ -208,7 +208,7 @@ TC_TLV_result tc_x509_crl_scopes(const tc_x509_crl_searcher* searcher,
   const TC_X509_path_workspace* validation = trust->validation;
   tc_pki_distribution_point point;
   TC_X509_crl_evidence pending = *evidence;
-  TC_X509_search_result found;
+  TC_X509_search_result found = {0};
   TC_TLV_result failure = TC_TLV_END;
   int contributed = 0;
   processing.evidence = &pending;
@@ -274,9 +274,10 @@ TC_TLV_result tc_x509_crl_scopes(const tc_x509_crl_searcher* searcher,
                                                 &chosen.evidence.revocation);
           }
         } else if (result == TC_TLV_OK) {
-          const tc_x509_crl_signer_query query = {&record->crl, &record->extensions,
-                                                  tc_x509_crl_scope_attempt, &processing};
-          result = searcher->search(searcher->candidates, &query, trust, &found, source_failed);
+          const tc_x509_crl_signer_query signer_query = {&record->crl, &record->extensions,
+                                                         tc_x509_crl_scope_attempt, &processing};
+          result =
+              searcher->search(searcher->candidates, &signer_query, trust, &found, source_failed);
         }
       }
       if (result == TC_TLV_OK) {
@@ -483,7 +484,7 @@ TC_TLV_result tc_x509_crl_scope_attempt(const void* context, const TC_X509_certi
 {
   const tc_x509_crl_scope_processing* processing = context;
   tc_x509_crl_signature_cache cache;
-  TC_X509_search_result found;
+  TC_X509_search_result found = {0};
   tc_x509_crl_signer_cache* saved = processing->signer_cache;
   int reuse = 0;
   if (saved && saved->valid && saved->signer.length == signer->encoded.length) {

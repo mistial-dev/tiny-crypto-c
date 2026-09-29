@@ -135,7 +135,7 @@ TC_TLV_result tc_x509_path_extensions(const tc_x509_path_input* input,
   if (input->count > input->max_certificates)
     return TC_TLV_LIMIT;
   for (i = 0; i < input->count; ++i) {
-    const TC_X509_extension_summary* extensions;
+    const TC_X509_extension_summary* extensions = NULL;
     const TC_X509_certificate* certificate;
     TC_bytes san = {NULL, 0};
     TC_TLV_result result;

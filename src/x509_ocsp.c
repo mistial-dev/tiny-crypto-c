@@ -560,7 +560,7 @@ static TC_TLV_result try_candidate(TC_bytes encoded, const ocsp_response* respon
   TC_X509_workspace parser = {workspace->frames, workspace->oids, workspace->oid_capacity};
   TC_X509_certificate signer;
   TC_X509_public_key key;
-  int matches, nocheck;
+  int matches = 0, nocheck = 0;
   TC_TLV_result status = TC_X509_read(encoded, request->parsing, &parser, &signer);
   if (status == TC_TLV_OK)
     status = responder_matches(response, signer.subject, signer.public_key.key, request, workspace,

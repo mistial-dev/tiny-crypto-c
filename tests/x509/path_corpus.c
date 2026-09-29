@@ -51,7 +51,7 @@ static TC_bytes load_file(const char* name)
   munit_assert_not_null(file);
   munit_assert_int(fseek(file, 0, SEEK_END), ==, 0);
   length = ftell(file);
-  munit_assert_int(length, >, 0);
+  munit_assert_long(length, >, 0);
   munit_assert_int(fseek(file, 0, SEEK_SET), ==, 0);
   data = malloc((size_t)length);
   munit_assert_not_null(data);

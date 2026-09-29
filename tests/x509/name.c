@@ -36,7 +36,7 @@ TC_TEST(attributes)
 TC_TEST(limits)
 {
   TC_bytes encoded = {multi, sizeof multi}, rdn = {multi, 1};
-  TC_TLV_reader reader, saved;
+  TC_TLV_reader reader = {0}, saved;
   TC_TLV_limits limited = bounds;
   size_t i;
   for (i = 1; i < 8; ++i) {
@@ -71,7 +71,7 @@ TC_TEST(invalid)
 {
   uint8_t bad[sizeof multi];
   TC_bytes encoded = {bad, sizeof bad}, rdn = {NULL, 0};
-  TC_TLV_reader reader, saved;
+  TC_TLV_reader reader = {0}, saved;
   unsigned variant;
   for (variant = 0; variant < 4; ++variant) {
     memcpy(bad, multi, sizeof bad);

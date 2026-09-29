@@ -120,7 +120,7 @@ tc_rsa_private_magnitudes_consistent(const tc_rsa_private_view* key,
   const size_t cost = 48 * length + 2;
   if (scratch_words < required || *work < cost)
     return TC_RSA_LIMIT;
-  *work -= cost;
+  *work -= (uint32_t)cost; /* cost <= *work, checked above. */
   tc_mp_word* p = scratch;
   tc_mp_word* q = p + n;
   tc_mp_word* d = q + n;
@@ -343,7 +343,7 @@ static inline TC_RSA_result tc_rsa_crt_consistent(const tc_rsa_private_view* key
   const size_t cost = 32 * length + 1;
   if (scratch_words < required || *work < cost)
     return TC_RSA_LIMIT;
-  *work -= cost;
+  *work -= (uint32_t)cost; /* cost <= *work, checked above. */
   tc_mp_word* p = scratch;
   tc_mp_word* q = p + n;
   tc_mp_word* d = q + n;
@@ -396,7 +396,7 @@ static inline TC_RSA_result tc_rsa_crt_derive(const tc_rsa_private_view* key, tc
   const TC_bytes fields[] = {key->p, key->q};
   if (scratch_words < required || *work < cost)
     return TC_RSA_LIMIT;
-  *work -= cost;
+  *work -= (uint32_t)cost; /* cost <= *work, checked above. */
   tc_mp_word* p = scratch;
   tc_mp_word* q = p + h;
   tc_mp_word* d = q + h;

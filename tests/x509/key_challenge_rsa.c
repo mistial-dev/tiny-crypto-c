@@ -30,7 +30,7 @@ static TC_X509_public_key rsa_key(size_t bits, size_t modulus_length)
   memset(&key, 0, sizeof key);
   memset(modulus, 0xff, sizeof modulus);
   key.type = TC_KEY_RSA;
-  key.bits = bits;
+  key.bits = (unsigned)bits;
   key.modulus = (TC_bytes){modulus, modulus_length};
   key.exponent = (TC_bytes){exponent, sizeof exponent};
   return key;
@@ -51,7 +51,7 @@ static TC_key_challenge_options pss_options(size_t salt_length)
   TC_key_challenge_options options = v15_options();
   options.signature.scheme = TC_SIGNATURE_RSA_PSS;
   options.signature.mgf_hash = TC_HASH_SHA256;
-  options.signature.salt_length = salt_length;
+  options.signature.salt_length = (uint32_t)salt_length;
   return options;
 }
 

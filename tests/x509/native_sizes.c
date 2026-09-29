@@ -37,7 +37,7 @@ TC_TEST(unsupported_rsa_sizes)
     key.algorithm.oid = (TC_bytes){rsa_encryption, sizeof rsa_encryption};
     key.algorithm.parameters = (TC_bytes){null_parameters, sizeof null_parameters};
     key.key = (TC_bytes){encoded_key, lengths[i] + 10};
-    key.bits = lengths[i] * 8;
+    key.bits = (unsigned)(lengths[i] * 8);
     key.modulus = (TC_bytes){modulus, lengths[i]};
     key.exponent = (TC_bytes){exponent, sizeof exponent};
     munit_assert_int(TC_X509_signature_verify_digest((TC_bytes){digest, sizeof digest}, &algorithm,

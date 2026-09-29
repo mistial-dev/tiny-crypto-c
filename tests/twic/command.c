@@ -17,8 +17,8 @@ static size_t held_capacity;
 int example_test_setrlimit(int resource, const struct rlimit* limit)
 {
   munit_assert_int(resource, ==, RLIMIT_CORE);
-  munit_assert_uint(limit->rlim_cur, ==, 0);
-  munit_assert_uint(limit->rlim_max, ==, 0);
+  munit_assert_true(limit->rlim_cur == 0);
+  munit_assert_true(limit->rlim_max == 0);
   protected_memory = protection_failure != 1;
   return protected_memory ? 0 : -1;
 }

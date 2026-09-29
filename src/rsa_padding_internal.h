@@ -52,7 +52,7 @@ static inline TC_RSA_result tc_rsa_mgf1_xor(TC_hash_algorithm hash, TC_bytes see
     return TC_RSA_OK;
   if (cost > *work)
     return TC_RSA_LIMIT;
-  *work -= cost;
+  *work -= (uint32_t)cost;             /* cost <= *work, checked above. */
   (void)tc_hash_info_get(hash, &info); /* tc_rsa_mgf1_cost accepted hash. */
   blocks = length / info.digest_length + (length % info.digest_length != 0);
   for (size_t i = 0; i < blocks; ++i) {
@@ -150,7 +150,7 @@ static inline TC_RSA_result tc_rsa_pss_prepare(size_t length, size_t bits, TC_ha
     return result;
   if (cost > *work)
     return TC_RSA_LIMIT;
-  *work -= cost;
+  *work -= (uint32_t)cost; /* cost <= *work, checked above. */
   return TC_RSA_OK;
 }
 
@@ -276,7 +276,7 @@ static inline TC_RSA_result tc_rsa_oaep_cost(size_t length, TC_hash_algorithm ha
                                              size_t* cost)
 {
   tc_hash_info info;
-  size_t db_mask, seed_mask;
+  size_t db_mask = 0, seed_mask = 0;
   TC_RSA_result result = tc_rsa_oaep_parameters(length, hash, mgf_hash, label_length, &info, cost);
   if (result != TC_RSA_OK)
     return result;
@@ -302,7 +302,7 @@ static inline TC_RSA_result tc_rsa_oaep_prepare(size_t length, TC_hash_algorithm
     return result;
   if (cost > *work)
     return TC_RSA_LIMIT;
-  *work -= cost;
+  *work -= (uint32_t)cost; /* cost <= *work, checked above. */
   return TC_RSA_OK;
 }
 

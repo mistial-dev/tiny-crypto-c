@@ -51,7 +51,7 @@ static TC_TLV_result policy_flags(TC_bytes contents, unsigned* flags)
   enum { POLICY_FLAG_BITS = 3 };
   TC_bytes bits;
   unsigned unused;
-  uint16_t named;
+  uint16_t named = 0;
   TC_TLV_result result = tc_der_bit_string_contents(contents, &bits, &unused);
   if (result == TC_TLV_OK)
     result = tc_pki_named_bits(bits, unused, POLICY_FLAG_BITS, &named);

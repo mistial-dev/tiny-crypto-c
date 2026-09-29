@@ -445,7 +445,7 @@ TC_TEST(replay)
                                                 output, sizeof output, &result, &w),
                        ==, TC_OK);
       munit_assert_size(result.length, ==, expected_length);
-      munit_assert_uint(result.status, ==, strtoul(fields[4], NULL, 16));
+      munit_assert_uint(result.status, ==, (unsigned)strtoul(fields[4], NULL, 16));
       munit_assert_memory_equal(result.length, output, expected);
       munit_assert_int(TC_PIV_SM_get_state(&session), ==, TC_PIV_SM_READY);
     } else if (strcmp(fields[0], "state") == 0) {

@@ -124,7 +124,7 @@ TC_TEST(iso9797_failures)
             TC_OK);
         total = calls;
         /* One CBC call per block, including the padding block. */
-        munit_assert_uint(total, ==,
+        munit_assert_size(total, ==,
                           (length + (padding == TC_DES_ISO9797_PAD2 ? 8 : 7)) / 8 +
                               (padding == TC_DES_ISO9797_PAD1 && !length));
         for (fail_at = 1; fail_at <= total; ++fail_at) {

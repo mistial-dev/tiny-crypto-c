@@ -491,8 +491,9 @@ TC_TEST(operation_ranges)
   for (size_t i = 0; i < sizeof invalid / sizeof *invalid; ++i) {
     munit_assert_int(sign_v15(&fixture.key, invalid[i].hash, invalid[i].digest,
                               (TC_buffer){fixture.signature, invalid[i].length}, &fixture.workspace,
-                              (TC_RSA_execution){
-                                  {random_bytes, &calls}, invalid[i].attempts, {invalid[i].work}}),
+                              (TC_RSA_execution){{random_bytes, &calls},
+                                                 invalid[i].attempts,
+                                                 {(uint32_t)invalid[i].work}}),
                      ==, invalid[i].result);
     munit_assert_memory_equal(sizeof fixture, &fixture, saved);
   }

@@ -57,7 +57,7 @@ TC_TEST(known_answer)
     munit_assert_size(message.length, ==, sentinel.length);
   }
   for (size_t budget = 0; budget <= encode_work; ++budget) {
-    work = budget;
+    work = (uint32_t)budget;
     munit_assert_int(tc_rsa_oaep_encode(
                          &(TC_RSA_oaep_options){TC_HASH_SHA256, TC_HASH_SHA256, label},
                          (TC_buffer){encoded, sizeof encoded}, input, (TC_bytes){seed, sizeof seed},
@@ -66,7 +66,7 @@ TC_TEST(known_answer)
   }
   for (size_t budget = 0; budget <= decode_work; ++budget) {
     memcpy(encoded, expected, sizeof encoded);
-    work = budget;
+    work = (uint32_t)budget;
     message = sentinel;
     munit_assert_int(
         tc_rsa_oaep_decode(&(TC_RSA_oaep_options){TC_HASH_SHA256, TC_HASH_SHA256, label},

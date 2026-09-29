@@ -18,7 +18,7 @@ TC_TEST(mask)
   uint8_t output[sizeof expected], block[64];
   uint32_t work;
   for (size_t length = 0; length <= sizeof output; ++length) {
-    size_t cost = length + ((length + 31) / 32) * 8;
+    const uint32_t cost = (uint32_t)(length + ((length + 31) / 32) * 8);
     memset(output, 0, sizeof output);
     work = cost;
     munit_assert_int(tc_rsa_mgf1_xor(TC_HASH_SHA256, (TC_bytes){seed, sizeof seed}, output, length,

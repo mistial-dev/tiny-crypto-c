@@ -838,7 +838,7 @@ TC_TEST(candidate_iteration)
   munit_assert_memory_equal(sizeof choice, &choice, &previous);
   {
     enum { INDEX_CAPACITY = 2 };
-    TC_bytes index[INDEX_CAPACITY], record, prior_record;
+    TC_bytes index[INDEX_CAPACITY], record = {NULL, 0}, prior_record;
     TC_X509_store_source indexed, prior_source;
     tc_cms_path_source context, prior_context;
     source.calls = 0;

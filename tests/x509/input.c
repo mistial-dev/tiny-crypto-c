@@ -198,7 +198,7 @@ TC_TEST(stream_source)
   munit_assert_int(fseek(file, 2, SEEK_SET), ==, 0);
   TC_source source = {0};
   munit_assert_true(example_stream_source(file, sizeof bytes, &source));
-  munit_assert_int(ftell(file), ==, 2);
+  munit_assert_long(ftell(file), ==, 2);
   munit_assert_uint64(source.length, ==, sizeof bytes);
   uint8_t output[3];
   munit_assert_int(source.read(source.context, 1, output, sizeof output), ==, TC_OK);

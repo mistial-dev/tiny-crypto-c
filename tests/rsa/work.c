@@ -129,7 +129,7 @@ TC_TEST(encode_work)
       const size_t length = sizes[s];
       const TC_RSA_v15_options v15 = {hashes[h]};
       const uint32_t v15_cost = TC_RSA_encode_v15_work(&v15, length);
-      munit_assert_uint32(v15_cost, ==, length);
+      munit_assert_size(v15_cost, ==, length);
       TC_work_budget work = {v15_cost};
       munit_assert_int(TC_RSA_encode_v15_digest(&v15, hashed, (TC_buffer){encoded, length}, &work),
                        ==, TC_RSA_OK);
@@ -148,7 +148,7 @@ TC_TEST(encode_work)
           digest_lengths[h] < largest_salt ? digest_lengths[h] : largest_salt;
       const TC_RSA_pss_options pss = {hashes[h], TC_HASH_SHA256, salt_length};
       const uint32_t pss_cost = TC_RSA_encode_pss_work(&pss, length);
-      munit_assert_uint32(pss_cost, >, length);
+      munit_assert_size(pss_cost, >, length);
       const TC_bytes salted = {salt, salt_length};
       work.remaining = pss_cost;
       munit_assert_int(
