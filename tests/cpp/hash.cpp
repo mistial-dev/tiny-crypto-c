@@ -131,13 +131,25 @@ template <class Hmac, size_t N> void check_hmac(const hmac_vector* vectors, size
 
 } /* namespace */
 
-TEST_CASE("ct_equal preserves C status values")
+TEST_CASE("ct_equal compares byte spans")
 {
+  using tiny_crypto::bytes;
   const uint8_t a[] = {1, 2};
   const uint8_t b[] = {1, 3};
-  CHECK(tiny_crypto::ct_equal(a, a, 2) == TC_OK);
-  CHECK(tiny_crypto::ct_equal(a, b, 2) == TC_MISMATCH);
-  CHECK(tiny_crypto::ct_equal(nullptr, b, 1) == TC_ERROR);
+  const uint8_t longer[] = {1, 2, 0};
+  CHECK(tiny_crypto::ct_equal(bytes{a, 2}, bytes{a, 2}) == TC_OK);
+  CHECK(tiny_crypto::ct_equal(bytes{a, 2}, bytes{b, 2}) == TC_MISMATCH);
+  CHECK(tiny_crypto::ct_equal(bytes{nullptr, 0}, bytes{nullptr, 0}) == TC_OK);
+  /* Unequal lengths never match, including a matching prefix or an empty span. */
+  CHECK(tiny_crypto::ct_equal(bytes{a, 2}, bytes{longer, 3}) == TC_MISMATCH);
+  CHECK(tiny_crypto::ct_equal(bytes{longer, 3}, bytes{a, 2}) == TC_MISMATCH);
+  CHECK(tiny_crypto::ct_equal(bytes{nullptr, 0}, bytes{a, 2}) == TC_MISMATCH);
+  /* A NULL span with a nonzero length is an argument error, whatever the other length. */
+  CHECK(tiny_crypto::ct_equal(bytes{nullptr, 1}, bytes{b, 1}) == TC_ERROR);
+  CHECK(tiny_crypto::ct_equal(bytes{b, 1}, bytes{nullptr, 1}) == TC_ERROR);
+  CHECK(tiny_crypto::ct_equal(bytes{nullptr, 2}, bytes{b, 1}) == TC_ERROR);
+  CHECK(tiny_crypto::ct_equal(bytes{b, 0}, bytes{nullptr, 3}) == TC_ERROR);
+  CHECK(noexcept(tiny_crypto::ct_equal(bytes{a, 2}, bytes{b, 2})));
 }
 
 #if TC_ENABLE_SHA1

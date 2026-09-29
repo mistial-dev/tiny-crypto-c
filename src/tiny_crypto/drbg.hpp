@@ -5,6 +5,11 @@
  * uninstantiates it on destruction. Results are the C TC_DRBG_result values. */
 #ifndef TINY_CRYPTO_DRBG_HPP_
 #define TINY_CRYPTO_DRBG_HPP_
+
+#ifndef __cplusplus
+#error Do not include drbg.hpp in a C project, include drbg.h instead
+#endif
+
 #include <tiny_crypto/common.hpp>
 #include <tiny_crypto/drbg.h>
 

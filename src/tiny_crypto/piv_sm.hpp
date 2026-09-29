@@ -2,6 +2,11 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #ifndef TINY_CRYPTO_PIV_SM_HPP_
 #define TINY_CRYPTO_PIV_SM_HPP_
+
+#ifndef __cplusplus
+#error Do not include piv_sm.hpp in a C project, include piv_sm.h instead
+#endif
+
 #include <tiny_crypto/common.hpp>
 #include <tiny_crypto/piv_sm.h>
 #if TC_ENABLE_X509 && TC_ENABLE_PIV_CVC

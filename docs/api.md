@@ -268,12 +268,21 @@ Build with `-Wunused-result` enabled (the default on GCC and Clang) so a
 discarded verification or cipher result is reported. Wrapper calls are
 `noexcept`, allocate nothing and need no standard library.
 
-Keys, IVs, AAD and messages are `bytes` spans. Outputs are `buffer` spans or
-fixed-size C arrays whose size is part of the type. Array overloads deduce the
-span length. Block-mode calls (`encrypt_cbc`, `xcrypt_ctr` and the others) and
+Keys, IVs, AAD, messages and received tags are `bytes` spans. Outputs are
+`buffer` spans or fixed-size C arrays whose size is part of the type. Array
+overloads deduce the span length. Three kinds of call take a pointer. Block-mode
+calls (`encrypt_cbc`, `xcrypt_ctr` and the others), `AES_dynamic` CBC and
 `GCM::encrypt_update` transform a caller buffer in place and take a pointer and
-length or an array. The wrappers check key and IV lengths before the C call. A
-wrong length returns `TC_ERROR`. Every argument error leaves outputs unchanged.
+length or an array. `encrypt_ecb` and `decrypt_ecb` transform one block in
+place. `drbg::generate` and `piv_sm::unprotect` write to a pointer and length
+that mirror their C functions. The wrappers check key and IV lengths before the
+C call. A wrong length returns `TC_ERROR`. Every argument error leaves outputs
+unchanged.
+
+`tiny_crypto::ct_equal(a, b)` compares two `bytes` spans. It returns `TC_OK`
+for equal contents and lengths, `TC_MISMATCH` when the contents or the lengths
+differ, and `TC_ERROR` for a span with NULL data and a nonzero length. Lengths
+are public. Timing depends on the shorter length and is independent of content.
 
 Cipher, hash and MAC classes own their C context, clear it on destruction and
 delete their copy operations. Each follows init, update, finish or clear:
@@ -332,7 +341,8 @@ bool retail_mac_valid(const uint8_t (&key)[16], tiny_crypto::bytes message,
   if (mac.init(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, key) != TC_OK ||
       mac.update(message) != TC_OK || mac.finish(computed) != TC_OK)
     return false; /* The destructor wipes the key schedule. */
-  const bool valid = tiny_crypto::ct_equal(computed, received, sizeof computed) == TC_OK;
+  const bool valid = tiny_crypto::ct_equal({computed, sizeof computed},
+                                           {received, sizeof received}) == TC_OK;
   TC_secure_zero(computed, sizeof computed);
   return valid;
 }

@@ -56,7 +56,7 @@ void tiny_crypto_nodiscard_compile(uint8_t* data, size_t length)
   /* Authentication and verification results. */
   gcm_decrypt(in, in, in, in, in, out);              /* DISCARDED */
   HMAC_SHA256::verify(in, in, in);                   /* DISCARDED */
-  ct_equal(data, data, length);                      /* DISCARDED */
+  ct_equal(in, in);                                  /* DISCARDED */
   ccm_decrypt(in, in, in, in, in, out);              /* DISCARDED */
   eax_decrypt(in, in, in, in, in, out);              /* DISCARDED */
   ccm_decrypt_short_tag(in, in, in, in, in, out);    /* DISCARDED */
@@ -99,6 +99,8 @@ void tiny_crypto_nodiscard_compile(uint8_t* data, size_t length)
   aes.init(block, block);        /* DISCARDED */
   GCM gcm;
   gcm.init(in, in);                                /* DISCARDED */
+  gcm.init(block, in);                             /* DISCARDED */
+  gcm.init_short_tag(block, in, 8);                /* DISCARDED */
   gcm.init_short_tag(in, in, 8);                   /* DISCARDED */
   gcm.encrypt_update(data, length);                /* DISCARDED */
   gcm_encrypt(in, in, in, in, out, out);           /* DISCARDED */

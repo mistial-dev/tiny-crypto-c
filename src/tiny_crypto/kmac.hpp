@@ -2,7 +2,7 @@
 #ifndef TINY_CRYPTO_KMAC_HPP_
 #define TINY_CRYPTO_KMAC_HPP_
 #ifndef __cplusplus
-#error "Use kmac.h in C projects"
+#error Do not include kmac.hpp in a C project, include kmac.h instead
 #endif
 #include <tiny_crypto/kmac.h>
 #include <tiny_crypto/common.hpp>

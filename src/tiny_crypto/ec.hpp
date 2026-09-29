@@ -2,6 +2,11 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #ifndef TINY_CRYPTO_EC_HPP_
 #define TINY_CRYPTO_EC_HPP_
+
+#ifndef __cplusplus
+#error Do not include ec.hpp in a C project, include ec.h instead
+#endif
+
 #include <tiny_crypto/common.hpp>
 #include <tiny_crypto/ec.h>
 

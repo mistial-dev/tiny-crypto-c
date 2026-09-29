@@ -127,6 +127,8 @@ int tiny_crypto_cpp_header_compile(uint8_t* data, size_t length)
 #if TC_AES_ENABLE_GCM
   tiny_crypto::GCM gcm;
   failures += gcm.init(in, in) != TC_OK;
+  failures += gcm.init(block, in) != TC_OK;
+  failures += gcm.init_short_tag(block, in, 8) != TC_OK;
   failures += gcm.encrypt_update(block) != TC_OK;
   failures += gcm.encrypt_finish(block) != TC_OK;
   gcm.clear();

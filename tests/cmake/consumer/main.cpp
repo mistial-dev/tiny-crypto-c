@@ -6,6 +6,9 @@
 
 int main()
 {
+  const uint8_t prefix[] = {1, 2};
+  if (tiny_crypto::ct_equal({prefix, sizeof prefix}, {prefix, 1}) != TC_MISMATCH)
+    return 1;
   if (!tiny_crypto::rsa_workspace_words(TC_RSA_OPERATION_VERIFY, 3072) ||
       !tiny_crypto::rsa_modulus_supported(3072))
     return 1;

@@ -65,6 +65,44 @@ TEST_CASE("AES IV re-init with a NULL IV clears the previous key")
 }
 #endif
 
+#if TC_AES_ENABLE_CBC || TC_AES_ENABLE_CTR || TC_AES_ENABLE_OFB
+/* A key alone loads no IV. Each IV mode returns TC_ERROR with the buffer
+ * unchanged until set_iv starts a message. */
+TEST_CASE("AES IV modes fail after a key-only init until set_iv")
+{
+  tiny_crypto::AES aes;
+  uint8_t data[2 * TC_AES_BLOCKLEN];
+  std::memcpy(data, nist_plaintext, sizeof data);
+#if TC_AES_ENABLE_CBC
+  REQUIRE(aes.init({kat_key, TC_AES_KEYLEN}) == TC_OK);
+  CHECK(aes.encrypt_cbc(data) == TC_ERROR);
+  CHECK(aes.decrypt_cbc(data) == TC_ERROR);
+  CHECK(std::memcmp(data, nist_plaintext, sizeof data) == 0);
+  REQUIRE(aes.set_iv(nist_iv) == TC_OK);
+  CHECK(aes.encrypt_cbc(data) == TC_OK);
+  CHECK(std::memcmp(data, kat_cbc, sizeof data) == 0);
+  std::memcpy(data, nist_plaintext, sizeof data);
+#endif
+#if TC_AES_ENABLE_CTR
+  REQUIRE(aes.init({kat_key, TC_AES_KEYLEN}) == TC_OK);
+  CHECK(aes.xcrypt_ctr(data) == TC_ERROR);
+  CHECK(std::memcmp(data, nist_plaintext, sizeof data) == 0);
+  REQUIRE(aes.set_iv(nist_ctr_iv) == TC_OK);
+  CHECK(aes.xcrypt_ctr(data) == TC_OK);
+  CHECK(std::memcmp(data, kat_ctr, sizeof data) == 0);
+  std::memcpy(data, nist_plaintext, sizeof data);
+#endif
+#if TC_AES_ENABLE_OFB
+  REQUIRE(aes.init({kat_key, TC_AES_KEYLEN}) == TC_OK);
+  CHECK(aes.xcrypt_ofb(data) == TC_ERROR);
+  CHECK(std::memcmp(data, nist_plaintext, sizeof data) == 0);
+  REQUIRE(aes.set_iv(nist_iv) == TC_OK);
+  CHECK(aes.xcrypt_ofb(data) == TC_OK);
+  CHECK(std::memcmp(data, kat_ofb, sizeof data) == 0);
+#endif
+}
+#endif
+
 #if TC_AES_ENABLE_ECB
 TEST_CASE("AES ECB wrapper")
 {
@@ -424,6 +462,52 @@ TEST_CASE("AES GCM clear and failed re-init leave the object unkeyed")
   CHECK(gcm.encrypt_finish(tag) == TC_OK);
   CHECK(gcm.encrypt_finish(tag) == TC_ERROR);
   CHECK(noexcept(gcm.clear()));
+}
+
+TEST_CASE("AES GCM array key overloads deduce the key length")
+{
+  const gcm_test_vector* v = nullptr;
+  for (size_t i = 0; i < sizeof(gcm_test_vectors) / sizeof(gcm_test_vectors[0]); ++i)
+    if (gcm_test_vectors[i].key_len == TC_AES_KEYLEN && gcm_test_vectors[i].tag_len == 16) {
+      v = &gcm_test_vectors[i];
+      break;
+    }
+  REQUIRE(v != nullptr);
+  uint8_t key[TC_AES_KEYLEN];
+  std::memcpy(key, v->key, sizeof key);
+  const tiny_crypto::bytes iv = {v->iv, v->iv_len};
+  std::vector<uint8_t> data(v->plaintext, v->plaintext + v->length);
+  uint8_t tag[TC_AES_BLOCKLEN];
+
+  /* The array key matches the span form, including the default tag length. */
+  tiny_crypto::GCM gcm;
+  REQUIRE(gcm.init(key, iv) == TC_OK);
+  CHECK(gcm.tag_length() == TC_AES_BLOCKLEN);
+  CHECK(gcm.aad_update({v->aad, v->aad_len}) == TC_OK);
+  CHECK(gcm.encrypt_update(data.data(), data.size()) == TC_OK);
+  CHECK(gcm.encrypt_finish(tag) == TC_OK);
+  CHECK(std::memcmp(data.data(), v->ciphertext, v->length) == 0);
+  CHECK(std::memcmp(tag, v->tag, sizeof tag) == 0);
+
+  /* A wrong array size returns TC_ERROR and leaves the object unkeyed. */
+  const uint8_t short_key[TC_AES_KEYLEN - 1] = {0};
+  const uint8_t long_key[TC_AES_KEYLEN + 1] = {0};
+  uint8_t block[TC_AES_BLOCKLEN] = {0};
+  REQUIRE(gcm.init(key, iv) == TC_OK);
+  CHECK(gcm.init(short_key, iv) == TC_ERROR);
+  CHECK(gcm.encrypt_update(block) == TC_ERROR);
+  CHECK(gcm.get_c_ctx().phase == 0);
+  REQUIRE(gcm.init(key, iv, 12) == TC_OK);
+  CHECK(gcm.tag_length() == 12);
+  CHECK(gcm.init(long_key, iv) == TC_ERROR);
+  CHECK(gcm.aad_update({block, 1}) == TC_ERROR);
+
+  REQUIRE(gcm.init_short_tag(key, iv, 8) == TC_OK);
+  CHECK(gcm.tag_length() == 8);
+  CHECK(gcm.init_short_tag(short_key, iv, 8) == TC_ERROR);
+  CHECK(gcm.encrypt_update(block) == TC_ERROR);
+  CHECK(noexcept(gcm.init(key, iv)));
+  CHECK(noexcept(gcm.init_short_tag(key, iv, 8)));
 }
 #endif
 

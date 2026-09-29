@@ -1421,6 +1421,12 @@ add_test(NAME test_package_boundaries
       -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}
       -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/cpp_nodiscard.cmake)
   endif()
+  # A C build that includes a C++ header must stop at the header's guard.
+  if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    add_test(NAME test_cpp_headers_reject_c COMMAND ${CMAKE_COMMAND}
+      -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR} -DC_COMPILER=${CMAKE_C_COMPILER}
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/cpp_headers_reject_c.cmake)
+  endif()
 
   find_program(TC_AVR_CXX NAMES avr-g++)
   find_program(TC_AVR_CC NAMES avr-gcc)

@@ -25,11 +25,17 @@ typedef ::TC_bytes bytes;
 typedef ::TC_buffer buffer;
 typedef ::TC_credential_status credential_status;
 
-/* The byte count is public. Timing depends on the length and is independent of content. */
-TC_CPP_NODISCARD inline TC_status ct_equal(const uint8_t* a, const uint8_t* b,
-                                           size_t length) noexcept
+/* Compare two byte spans. Returns TC_OK when both hold the same bytes and
+ * TC_MISMATCH when the contents or the lengths differ. A span with NULL data
+ * and a nonzero length returns TC_ERROR. Lengths are public. The scan covers
+ * the common length and its timing is independent of content. */
+TC_CPP_NODISCARD inline TC_status ct_equal(bytes a, bytes b) noexcept
 {
-  return ::TC_ct_equal(a, b, length);
+  if ((a.length != 0 && a.data == nullptr) || (b.length != 0 && b.data == nullptr))
+    return TC_ERROR;
+  const size_t common = a.length < b.length ? a.length : b.length;
+  const TC_status status = ::TC_ct_equal(a.data, b.data, common);
+  return status == TC_OK && a.length != b.length ? TC_MISMATCH : status;
 }
 
 } // namespace tiny_crypto

@@ -137,10 +137,10 @@ private:
 
 #if TC_AES_ENABLE_GCM
 /* Streaming GCM encryption (SP 800-38D). init takes a TC_AES_KEYLEN-byte key
- * and fixes the tag length. A wrong key length or any other init failure
- * clears the object. Supply all AAD before the first encrypt_update, which
- * encrypts data in place. encrypt_finish writes exactly tag_length() bytes
- * and consumes the key. Decrypt with the one-shot gcm_decrypt, which verifies
+ * as a span or an array and fixes the tag length. A wrong key length or any
+ * other init failure clears the object. Supply all AAD before the first
+ * encrypt_update, which encrypts data in place. encrypt_finish writes exactly
+ * tag_length() bytes and consumes the key. Decrypt with the one-shot gcm_decrypt, which verifies
  * the tag before it releases plaintext. clear and the destructor wipe the key
  * schedule and the authentication state. */
 class GCM {
@@ -162,6 +162,12 @@ public:
     }
     return TC_AES_GCM_init(&ctx_, key.data, iv, tag_len);
   }
+  template <size_t N>
+  TC_CPP_NODISCARD TC_status init(const uint8_t (&key)[N], bytes iv,
+                                  size_t tag_len = TC_AES_BLOCKLEN) noexcept
+  {
+    return init(bytes{key, N}, iv, tag_len);
+  }
   /* tag_len is 4 or 8 bytes under the SP 800-38D Appendix C packet limits. */
   TC_CPP_NODISCARD TC_status init_short_tag(bytes key, bytes iv, size_t tag_len) noexcept
   {
@@ -170,6 +176,12 @@ public:
       return TC_ERROR;
     }
     return TC_AES_GCM_init_short_tag(&ctx_, key.data, iv, tag_len);
+  }
+  template <size_t N>
+  TC_CPP_NODISCARD TC_status init_short_tag(const uint8_t (&key)[N], bytes iv,
+                                            size_t tag_len) noexcept
+  {
+    return init_short_tag(bytes{key, N}, iv, tag_len);
   }
   TC_CPP_NODISCARD TC_status aad_update(bytes aad) noexcept
   {

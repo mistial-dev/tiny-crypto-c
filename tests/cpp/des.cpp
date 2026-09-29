@@ -69,6 +69,65 @@ TEST_CASE("DES IV re-init with a NULL IV clears the previous key")
 }
 #endif
 
+#if TC_DES_NEEDS_IV
+/* A key alone loads no IV. Each IV mode returns TC_ERROR with the buffer
+ * unchanged until set_iv starts a message. */
+TEST_CASE("DES IV modes fail after a key-only init until set_iv")
+{
+  tiny_crypto::DES des;
+  uint8_t data[TC_DES_BLOCKLEN];
+  const auto expect_iv_required = [&](TC_status (*run)(tiny_crypto::DES&, uint8_t*),
+                                      const uint8_t* ciphertext) {
+    std::memcpy(data, des_test_pt, sizeof data);
+    REQUIRE(des.init(des_test_key) == TC_OK);
+    CHECK(run(des, data) == TC_ERROR);
+    CHECK(std::memcmp(data, des_test_pt, sizeof data) == 0);
+    REQUIRE(des.set_iv(des_cbc_iv) == TC_OK);
+    CHECK(run(des, data) == TC_OK);
+    CHECK(std::memcmp(data, ciphertext, sizeof data) == 0);
+  };
+  (void)expect_iv_required;
+#if TC_DES_ENABLE_CBC
+  expect_iv_required([](tiny_crypto::DES& d, uint8_t* p) { return d.encrypt_cbc(p, 8); },
+                     des_cbc_ct);
+  std::memcpy(data, des_test_pt, sizeof data);
+  REQUIRE(des.init(des_test_key) == TC_OK);
+  CHECK(des.decrypt_cbc(data, sizeof data) == TC_ERROR);
+  CHECK(std::memcmp(data, des_test_pt, sizeof data) == 0);
+#endif
+#if TC_DES_ENABLE_OFB
+  expect_iv_required([](tiny_crypto::DES& d, uint8_t* p) { return d.xcrypt_ofb(p, 8); },
+                     des_ofb_ct);
+#endif
+#if TC_DES_ENABLE_CFB64
+  expect_iv_required([](tiny_crypto::DES& d, uint8_t* p) { return d.encrypt_cfb64(p, 8); },
+                     des_cfb64_ct);
+#endif
+#if TC_DES_ENABLE_CFB8
+  expect_iv_required([](tiny_crypto::DES& d, uint8_t* p) { return d.encrypt_cfb8(p, 8); },
+                     des_cfb8_ct);
+#endif
+#if TC_DES_ENABLE_CFB1
+  std::memcpy(data, des_test_pt, sizeof data);
+  REQUIRE(des.init(des_test_key) == TC_OK);
+  CHECK(des.encrypt_cfb1(data, 8 * sizeof data) == TC_ERROR);
+  CHECK(std::memcmp(data, des_test_pt, sizeof data) == 0);
+  REQUIRE(des.set_iv(des_cbc_iv) == TC_OK);
+  CHECK(des.encrypt_cfb1(data, 8 * sizeof data) == TC_OK);
+#endif
+#if TC_DES_ENABLE_CTR
+  uint8_t counter_data[sizeof des_ctr_pt];
+  std::memcpy(counter_data, des_ctr_pt, sizeof counter_data);
+  REQUIRE(des.init(des_test_key) == TC_OK);
+  CHECK(des.xcrypt_ctr(counter_data, sizeof counter_data) == TC_ERROR);
+  CHECK(std::memcmp(counter_data, des_ctr_pt, sizeof counter_data) == 0);
+  REQUIRE(des.set_iv(des_ctr_iv) == TC_OK);
+  CHECK(des.xcrypt_ctr(counter_data, sizeof counter_data) == TC_OK);
+  CHECK(std::memcmp(counter_data, des_ctr_ct, sizeof counter_data) == 0);
+#endif
+}
+#endif
+
 #if TC_DES_ENABLE_ECB
 TEST_CASE("DES ECB wrapper")
 {
