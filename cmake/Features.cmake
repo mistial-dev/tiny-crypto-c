@@ -77,7 +77,7 @@ tc_module_feature(TINY_CRYPTO_ENABLE_CMS_VALIDATION TC_ENABLE_CMS_VALIDATION
 set(tc_module_requires_TC_ENABLE_CMS_VALIDATION
   TINY_CRYPTO_ENABLE_CMS TINY_CRYPTO_ENABLE_X509_REVOCATION)
 set(tc_module_sources_TC_ENABLE_CMS_VALIDATION
-  src/cms_collections.c src/cms_path.c src/cms_crl.c src/validation.c)
+  src/cms_collections.c src/cms_path.c src/validation.c)
 
 tc_module_feature(TINY_CRYPTO_ENABLE_PIV_OBJECTS TC_ENABLE_PIV_OBJECTS
   "Build PIV and TWIC credential-object readers")

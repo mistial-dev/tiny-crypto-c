@@ -6,6 +6,7 @@
 #include <tiny_crypto/piv_oid.h>
 #include <tiny_crypto/piv_cms.h>
 #include "../../src/cms_internal.h"
+#include "cms_crl_harness.h"
 #include "munit.h"
 #include "test_util.h"
 #include <stdio.h>

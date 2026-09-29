@@ -6,6 +6,7 @@
 #include "../../examples/x509_revocation.h"
 #include "../../src/cms_digest_internal.h"
 #include "../../src/cms_internal.h"
+#include "cms_crl_harness.h"
 #include "../../src/cms_signature_internal.h"
 #include "../../src/pki_identifier_internal.h"
 #include "../../src/pki_octets_hash_internal.h"
@@ -490,7 +491,9 @@ static MunitResult rsa_signature(const MunitParameter params[], void* user)
     munit_assert_int(EVP_DigestSign(signer, signature, &signature_length, message, sizeof message),
                      ==, 1);
     const TC_bytes signature_bytes = {signature, signature_length};
-    munit_assert_int(tc_cms_signature_resolve(&info, &key, &algorithm), ==, TC_TLV_OK);
+    munit_assert_int(tc_cms_signature_resolve_policy(&info, &key, TC_TLV_DER, NULL, NULL,
+                                                     TC_CMS_RSA_PARAMETERS_NULL, &algorithm),
+                     ==, TC_TLV_OK);
     munit_assert_int(
         tc_hash_digest_parts(algorithm.content_hash, &part, 1, digest, &hash_workspace), ==, TC_OK);
     munit_assert_int(verify_digest_native(&algorithm.signature, &key,
@@ -707,8 +710,8 @@ static MunitResult signed_data(const MunitParameter params[], void* user)
                        ==, TC_TLV_END);
       munit_assert_ptr_equal(selected_der.data, certificate_der);
     }
-    munit_assert_int(tc_cms_signature_resolve_profile(&signer, &key, TC_TLV_BER, &limits,
-                                                      &workspace, &algorithm),
+    munit_assert_int(tc_cms_signature_resolve_policy(&signer, &key, TC_TLV_BER, &limits, &workspace,
+                                                     TC_CMS_RSA_PARAMETERS_NULL, &algorithm),
                      ==, TC_TLV_OK);
     munit_assert_true(tc_hash_info_get(algorithm.content_hash, &hash));
     munit_assert_int(TC_CMS_content_digest(container.content, algorithm.content_hash, &limits,
@@ -4892,10 +4895,12 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
     memset(&saved, 0xa5, sizeof saved);
     memcpy(&found, &saved, sizeof found);
     work = WORK_BUDGET;
-    munit_assert_int(tc_cms_signer_find(&candidates, &signer, container.content_type,
-                                        content_digest, TC_CMS_ATTRIBUTES_DER, &indexed, &options,
-                                        &tree, &signature, &validation, &search, &found),
-                     ==, TC_X509_PATH_VALID);
+    munit_assert_int(
+        tc_cms_signer_find(
+            &candidates, &signer, container.content_type, content_digest,
+            (TC_CMS_verification_policy){TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
+            &indexed, &options, &tree, &signature, &validation, &search, &found, NULL),
+        ==, TC_X509_PATH_VALID);
     munit_assert_size(found.count, ==, 2);
     munit_assert_size(found.anchor_index, ==, 0);
     munit_assert_memory_equal(intermediate_length, found.path[0].data, intermediate_der);
@@ -4903,10 +4908,12 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
     const size_t required = WORK_BUDGET - work;
     munit_assert_size(found.validation.work_used, ==, required);
     work = required;
-    munit_assert_int(tc_cms_signer_find(&candidates, &signer, container.content_type,
-                                        content_digest, TC_CMS_ATTRIBUTES_DER, &indexed, &options,
-                                        &tree, &signature, &validation, &search, &found),
-                     ==, TC_X509_PATH_VALID);
+    munit_assert_int(
+        tc_cms_signer_find(
+            &candidates, &signer, container.content_type, content_digest,
+            (TC_CMS_verification_policy){TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
+            &indexed, &options, &tree, &signature, &validation, &search, &found, NULL),
+        ==, TC_X509_PATH_VALID);
     munit_assert_size(work, ==, 0);
     {
       uint8_t signature_bytes[SIGNATURE_CAPACITY];
@@ -5730,10 +5737,12 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
         checked.signatures.verify = NULL;
         break;
       }
-      munit_assert_int(tc_cms_signer_find(&candidates, &proposed, container.content_type,
-                                          content_digest, TC_CMS_ATTRIBUTES_DER, &source, &checked,
-                                          &tree, &signature, &validation, &search, &found),
-                       ==, failures[i].status);
+      munit_assert_int(
+          tc_cms_signer_find(
+              &candidates, &proposed, container.content_type, content_digest,
+              (TC_CMS_verification_policy){TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
+              &source, &checked, &tree, &signature, &validation, &search, &found, NULL),
+          ==, failures[i].status);
       munit_assert_memory_equal(sizeof found, &found, &saved);
       if (failures[i].kind == BAD_CONTENT)
         digest[0] ^= 1;
@@ -5763,9 +5772,10 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
         records_context.calls = 0;
         memcpy(&found, &saved, sizeof found);
         munit_assert_int(
-            tc_cms_signer_find(&retries, &signer, container.content_type, content_digest,
-                               TC_CMS_ATTRIBUTES_DER, &indexed, &checked, &tree, &signature,
-                               &validation, &search, &found),
+            tc_cms_signer_find(
+                &retries, &signer, container.content_type, content_digest,
+                (TC_CMS_verification_policy){TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
+                &indexed, &checked, &tree, &signature, &validation, &search, &found, NULL),
             ==,
             retry_results[i] == TC_X509_SIGNATURE_ERROR ? TC_X509_PATH_ERROR : TC_X509_PATH_VALID);
         munit_assert_memory_equal(sizeof retries, &retries, &before);

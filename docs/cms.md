@@ -117,6 +117,9 @@ contents. The other fields retain their complete encodings. `content` is an
 OCTET STRING and may contain nested chunks, so its payload may be fragmented.
 `has_content` distinguishes detached content from an embedded empty
 value. Certificate, revocation and signer collections need further parsing.
+Validation reads certificates from the embedded CertificateSet. It ignores
+the embedded RevocationInfoChoices: revocation status comes from the CRL
+index or OCSP responses the caller supplies.
 
 [The fixed-workspace example](../examples/cms_reader.c) accepts envelopes up to
 16 KiB and returns parsing or resource-limit errors to its caller. Its

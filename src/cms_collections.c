@@ -1,8 +1,9 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * CMS certificate and revocation collections: readers, the CRL index and
- * candidate search over embedded and external sources. */
+ * CMS certificate collections: the shared collection reader and candidate
+ * search over embedded and external sources. Embedded revocation
+ * information is ignored by CMS validation. */
 #include <tiny_crypto/cms_validation.h>
 #include <tiny_crypto/piv_oid.h>
 #if TC_ENABLE_CMS_VALIDATION
@@ -32,9 +33,9 @@ TC_TLV_result tc_cms_other_format_read(TC_bytes encoded, tc_cms_other_kind kind,
   return TC_TLV_OK;
 }
 
-static TC_TLV_result cms_collection_init(TC_bytes embedded, unsigned tag, size_t max_records,
-                                         size_t max_bytes, const TC_TLV_limits* limits,
-                                         const tc_pki_tree_workspace* tree, tc_cms_collection* out)
+TC_TLV_result tc_cms_collection_init(TC_bytes embedded, unsigned tag, size_t max_records,
+                                     size_t max_bytes, const TC_TLV_limits* limits,
+                                     const tc_pki_tree_workspace* tree, tc_cms_collection* out)
 {
   tc_cms_collection parsed = {0};
   TC_TLV_result result;
@@ -56,10 +57,10 @@ static TC_TLV_result cms_collection_init(TC_bytes embedded, unsigned tag, size_t
 
 /* One bounded traversal for certificates and revocation objects. Typed wrappers
  * classify embedded choices before committing the reader position. */
-static TC_TLV_result cms_collection_next(tc_cms_collection* reader,
-                                         const tc_pki_record_source* external,
-                                         const tc_pki_tree_workspace* tree, TC_TLV_element* out,
-                                         int* embedded)
+TC_TLV_result tc_cms_collection_next(tc_cms_collection* reader,
+                                     const tc_pki_record_source* external,
+                                     const tc_pki_tree_workspace* tree, TC_TLV_element* out,
+                                     int* embedded)
 {
   tc_cms_collection next;
   TC_TLV_element element = {0};
@@ -101,8 +102,8 @@ TC_TLV_result tc_cms_candidates_init(TC_bytes embedded, const TC_X509_store_sour
   TC_TLV_result result;
   if (!out || (external && external->candidate_count && !external->candidate))
     return TC_TLV_ARGUMENT;
-  result = cms_collection_init(embedded, 0xa0, max_candidates, max_bytes, limits, tree,
-                               &parsed.collection);
+  result = tc_cms_collection_init(embedded, 0xa0, max_candidates, max_bytes, limits, tree,
+                                  &parsed.collection);
   if (result != TC_TLV_OK)
     return result;
   parsed.external = external;
@@ -125,7 +126,7 @@ TC_TLV_result tc_cms_candidates_next(tc_cms_candidates* reader, const tc_pki_tre
   if (next.external)
     external = (tc_pki_record_source){next.external->context, next.external->candidate_count,
                                       next.external->candidate};
-  result = cms_collection_next(&next.collection, &external, tree, &element, &embedded);
+  result = tc_cms_collection_next(&next.collection, &external, tree, &element, &embedded);
   if (result != TC_TLV_OK)
     return result;
   if (embedded) {
@@ -143,110 +144,6 @@ TC_TLV_result tc_cms_candidates_next(tc_cms_candidates* reader, const tc_pki_tre
   choice.encoded = element.encoded;
   *reader = next;
   *out = choice;
-  return TC_TLV_OK;
-}
-
-TC_TLV_result tc_cms_revocations_init(TC_bytes embedded, const tc_pki_record_source* external,
-                                      size_t max_records, size_t max_bytes,
-                                      const TC_TLV_limits* limits,
-                                      const tc_pki_tree_workspace* tree, tc_cms_revocations* out)
-{
-  tc_cms_revocations parsed;
-  TC_TLV_result result;
-  if (!out || (external && external->count && !external->read))
-    return TC_TLV_ARGUMENT;
-  result =
-      cms_collection_init(embedded, 0xa1, max_records, max_bytes, limits, tree, &parsed.collection);
-  if (result != TC_TLV_OK)
-    return result;
-  parsed.external = external;
-  *out = parsed;
-  return TC_TLV_OK;
-}
-
-TC_TLV_result tc_cms_revocations_next(tc_cms_revocations* reader, const tc_pki_tree_workspace* tree,
-                                      tc_cms_revocation_choice* out)
-{
-  tc_cms_revocations next;
-  tc_cms_revocation_choice choice = {{NULL, 0}, TC_CMS_REVOCATION_CRL};
-  TC_TLV_element element;
-  TC_TLV_result result;
-  int embedded;
-  if (!reader || !out)
-    return TC_TLV_ARGUMENT;
-  next = *reader;
-  result = cms_collection_next(&next.collection, next.external, tree, &element, &embedded);
-  if (result != TC_TLV_OK)
-    return result;
-  if (embedded && !tc_pki_tag(&element, 0x30)) {
-    tc_cms_other_format other;
-    if (!tc_pki_tag(&element, 0xa1))
-      return TC_TLV_INVALID;
-    result = tc_cms_other_format_read(element.encoded, TC_CMS_OTHER_REVOCATION,
-                                      &next.collection.embedded.limits, tree, &other);
-    if (result != TC_TLV_OK)
-      return result;
-    choice.kind = TC_CMS_REVOCATION_OTHER;
-  }
-  choice.encoded = element.encoded;
-  *reader = next;
-  *out = choice;
-  return TC_TLV_OK;
-}
-
-TC_TLV_result tc_cms_crl_index_init(const tc_cms_revocations* reader,
-                                    const tc_pki_tree_workspace* tree, TC_bytes* oids,
-                                    size_t oid_capacity, TC_X509_crl_record* records,
-                                    size_t capacity, TC_X509_crl_index* out)
-{
-  enum { CRL_ROWS, CRL_OIDS, CRL_FRAMES, CRL_WORK, CRL_OUTPUT, CRL_WRITES };
-  tc_cms_revocations next;
-  tc_cms_revocation_choice choice;
-  TC_X509_crl_index index = {records, 0, 0};
-  TC_bytes writes[CRL_WRITES];
-  TC_TLV_result result;
-  if (!reader || !tree || !tree->work || !out)
-    return TC_TLV_ARGUMENT;
-  tc_pki_storage_plan plan;
-  tc_pki_storage_plan_begin(&plan, writes, CRL_WRITES, *tree->work);
-  TC_PKI_PLAN_WRITE(&plan, records, capacity);
-  TC_PKI_PLAN_WRITE(&plan, oids, oid_capacity);
-  TC_PKI_PLAN_WRITE(&plan, tree->frames, tree->capacity);
-  TC_PKI_PLAN_WRITE(&plan, tree->work, 1);
-  TC_PKI_PLAN_WRITE(&plan, out, 1);
-  tc_pki_storage_plan_seal(&plan);
-  TC_PKI_PLAN_INPUT(&plan, reader, 1);
-  TC_PKI_PLAN_INPUT(&plan, tree, 1);
-  if (reader->external)
-    TC_PKI_PLAN_INPUT(&plan, reader->external, 1);
-  tc_pki_storage_plan_input_span(&plan, reader->collection.embedded.input);
-  /* Keep bookkeeping private until work is known to be disjoint from inputs. */
-  result = tc_pki_storage_plan_finish(&plan, tree->work);
-  if (result != TC_TLV_OK)
-    return result;
-  tc_pki_record_guard guard = {reader->external, writes, CRL_WRITES};
-  const tc_pki_record_source guarded = {&guard, reader->external ? reader->external->count : 0,
-                                        tc_pki_record_guard_read};
-  next = *reader;
-  if (reader->external)
-    next.external = &guarded;
-  while ((result = tc_cms_revocations_next(&next, tree, &choice)) == TC_TLV_OK) {
-    if (choice.kind == TC_CMS_REVOCATION_OTHER) {
-      ++index.other_count;
-      continue;
-    }
-    if (index.count == capacity)
-      return TC_TLV_LIMIT;
-    TC_X509_crl_record* record = &records[index.count];
-    result = tc_x509_crl_record_read(choice.encoded, &next.collection.embedded.limits, tree, oids,
-                                     oid_capacity, record);
-    if (result != TC_TLV_OK)
-      return result;
-    ++index.count;
-  }
-  if (result != TC_TLV_END)
-    return result;
-  *out = index;
   return TC_TLV_OK;
 }
 
@@ -358,11 +255,6 @@ static TC_TLV_result cms_next_candidate(void* context, const tc_pki_tree_workspa
   return tc_cms_x509_candidate_next(context, NULL, NULL, tree, parser, out, &encoded);
 }
 
-typedef union {
-  tc_cms_candidates collection;
-  tc_pki_store_candidates store;
-} cms_candidate_cursor;
-
 tc_pki_store_candidates tc_cms_store_cursor(const tc_cms_candidates* source)
 {
   return (tc_pki_store_candidates){source->external, source->collection.embedded.limits,
@@ -371,8 +263,8 @@ tc_pki_store_candidates tc_cms_store_cursor(const tc_cms_candidates* source)
 }
 
 /* Each search owns its cursor; certificate bytes remain borrowed from the source. */
-static tc_pki_candidate_next cms_candidate_cursor_init(const tc_cms_candidates* source,
-                                                       cms_candidate_cursor* storage, void** cursor)
+tc_pki_candidate_next tc_cms_candidate_cursor_init(const tc_cms_candidates* source,
+                                                   tc_cms_candidate_cursor* storage, void** cursor)
 {
   if (source->external && tc_pki_end(&source->collection.embedded)) {
     storage->store = tc_cms_store_cursor(source);
@@ -394,43 +286,11 @@ TC_TLV_result tc_cms_certificate_search(const tc_cms_candidates* candidates,
 {
   if (!candidates)
     return TC_TLV_ARGUMENT;
-  cms_candidate_cursor storage;
+  tc_cms_candidate_cursor storage;
   void* cursor;
-  const tc_pki_candidate_next next = cms_candidate_cursor_init(candidates, &storage, &cursor);
+  const tc_pki_candidate_next next = tc_cms_candidate_cursor_init(candidates, &storage, &cursor);
   return tc_pki_certificate_search(cursor, next, filter, filter_context, limits, tree, validation,
                                    attempt, context, out, source_failed);
-}
-
-TC_TLV_result tc_cms_crl_source_search(const void* candidates, const TC_X509_store_source* external,
-                                       const TC_X509_crl* crl,
-                                       const TC_X509_crl_extensions* extensions,
-                                       const tc_x509_crl_trust* trust, tc_x509_crl_attempt attempt,
-                                       const void* context, TC_X509_search_result* out,
-                                       int* source_failed)
-{
-  if (!candidates)
-    return TC_TLV_ARGUMENT;
-  cms_candidate_cursor storage;
-  void* cursor;
-  const tc_pki_candidate_next next = cms_candidate_cursor_init(candidates, &storage, &cursor);
-  if (next == tc_pki_store_candidate_next)
-    storage.store.source = external;
-  else
-    storage.collection.external = external;
-  return tc_x509_crl_search_candidates(cursor, next, crl, extensions, trust, attempt, context, out,
-                                       source_failed);
-}
-
-TC_TLV_result tc_cms_crl_search(const void* candidates, const TC_X509_crl* crl,
-                                const TC_X509_crl_extensions* extensions,
-                                const tc_x509_crl_trust* trust, tc_x509_crl_attempt attempt,
-                                const void* context, TC_X509_search_result* out, int* source_failed)
-{
-  const tc_cms_candidates* source = candidates;
-  if (!source)
-    return TC_TLV_ARGUMENT;
-  return tc_cms_crl_source_search(source, source->external, crl, extensions, trust, attempt,
-                                  context, out, source_failed);
 }
 
 #endif

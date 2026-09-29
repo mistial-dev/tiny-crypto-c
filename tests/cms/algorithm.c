@@ -26,25 +26,37 @@ static MunitResult rsa_selection(const MunitParameter params[], void* user)
   key.type = TC_KEY_RSA;
   for (unsigned id = TC_HASH_SHA1; id <= TC_HASH_SHA512; ++id) {
     digest_algorithm(&signer, (TC_hash_algorithm)id);
-    munit_assert_int(tc_cms_signature_resolve(&signer, &key, &parsed), ==, TC_TLV_OK);
+    munit_assert_int(tc_cms_signature_resolve_policy(&signer, &key, TC_TLV_DER, NULL, NULL,
+                                                     TC_CMS_RSA_PARAMETERS_NULL, &parsed),
+                     ==, TC_TLV_OK);
     munit_assert_int(parsed.content_hash, ==, (TC_hash_algorithm)id);
     munit_assert_int(parsed.signature.hash, ==, (TC_hash_algorithm)id);
     munit_assert_int(parsed.signature.scheme, ==, TC_SIGNATURE_RSA_V15);
     signer.digest_algorithm.parameters = (TC_bytes){null_parameters, sizeof null_parameters};
-    munit_assert_int(tc_cms_signature_resolve(&signer, &key, &parsed), ==, TC_TLV_OK);
+    munit_assert_int(tc_cms_signature_resolve_policy(&signer, &key, TC_TLV_DER, NULL, NULL,
+                                                     TC_CMS_RSA_PARAMETERS_NULL, &parsed),
+                     ==, TC_TLV_OK);
   }
   memset(&parsed, 0xa5, sizeof parsed);
   memcpy(&saved, &parsed, sizeof saved);
   key.type = TC_KEY_RSA_PSS;
-  munit_assert_int(tc_cms_signature_resolve(&signer, &key, &parsed), ==, TC_TLV_INVALID);
+  munit_assert_int(tc_cms_signature_resolve_policy(&signer, &key, TC_TLV_DER, NULL, NULL,
+                                                   TC_CMS_RSA_PARAMETERS_NULL, &parsed),
+                   ==, TC_TLV_INVALID);
   munit_assert_memory_equal(sizeof parsed, &parsed, &saved);
   key.type = TC_KEY_EC;
-  munit_assert_int(tc_cms_signature_resolve(&signer, &key, &parsed), ==, TC_TLV_INVALID);
+  munit_assert_int(tc_cms_signature_resolve_policy(&signer, &key, TC_TLV_DER, NULL, NULL,
+                                                   TC_CMS_RSA_PARAMETERS_NULL, &parsed),
+                   ==, TC_TLV_INVALID);
   key.type = TC_KEY_RSA;
   signer.signature_algorithm.parameters = (TC_bytes){NULL, 0};
-  munit_assert_int(tc_cms_signature_resolve(&signer, &key, &parsed), ==, TC_TLV_INVALID);
+  munit_assert_int(tc_cms_signature_resolve_policy(&signer, &key, TC_TLV_DER, NULL, NULL,
+                                                   TC_CMS_RSA_PARAMETERS_NULL, &parsed),
+                   ==, TC_TLV_INVALID);
   signer.signature_algorithm.parameters = (TC_bytes){invalid_parameters, sizeof invalid_parameters};
-  munit_assert_int(tc_cms_signature_resolve(&signer, &key, &parsed), ==, TC_TLV_INVALID);
+  munit_assert_int(tc_cms_signature_resolve_policy(&signer, &key, TC_TLV_DER, NULL, NULL,
+                                                   TC_CMS_RSA_PARAMETERS_NULL, &parsed),
+                   ==, TC_TLV_INVALID);
   munit_assert_memory_equal(sizeof parsed, &parsed, &saved);
   return MUNIT_OK;
 }
@@ -120,45 +132,67 @@ static MunitResult hash_selection(const MunitParameter params[], void* user)
   digest_algorithm(&signer, TC_HASH_SHA256);
   key.type = TC_KEY_EC;
   signer.signature_algorithm = (TC_DER_algorithm){{ecdsa, sizeof ecdsa}, {NULL, 0}};
-  munit_assert_int(tc_cms_signature_resolve(&signer, &key, &parsed), ==, TC_TLV_OK);
+  munit_assert_int(tc_cms_signature_resolve_policy(&signer, &key, TC_TLV_DER, NULL, NULL,
+                                                   TC_CMS_RSA_PARAMETERS_NULL, &parsed),
+                   ==, TC_TLV_OK);
   munit_assert_int(parsed.signature.scheme, ==, TC_SIGNATURE_ECDSA);
   memset(&parsed, 0xa5, sizeof parsed);
   memcpy(&saved, &parsed, sizeof saved);
   digest_algorithm(&signer, TC_HASH_SHA384);
-  munit_assert_int(tc_cms_signature_resolve(&signer, &key, &parsed), ==, TC_TLV_INVALID);
+  munit_assert_int(tc_cms_signature_resolve_policy(&signer, &key, TC_TLV_DER, NULL, NULL,
+                                                   TC_CMS_RSA_PARAMETERS_NULL, &parsed),
+                   ==, TC_TLV_INVALID);
   /* Attribute framing is checked separately. This stage uses presence only. */
   signer.signed_attributes = (TC_bytes){defaults, sizeof defaults};
-  munit_assert_int(tc_cms_signature_resolve(&signer, &key, &parsed), ==, TC_TLV_INVALID);
+  munit_assert_int(tc_cms_signature_resolve_policy(&signer, &key, TC_TLV_DER, NULL, NULL,
+                                                   TC_CMS_RSA_PARAMETERS_NULL, &parsed),
+                   ==, TC_TLV_INVALID);
   munit_assert_memory_equal(sizeof parsed, &parsed, &saved);
   key.type = TC_KEY_RSA;
   signer.signature_algorithm = (TC_DER_algorithm){{rsa_sha256, sizeof rsa_sha256}, {NULL, 0}};
-  munit_assert_int(tc_cms_signature_resolve(&signer, &key, &parsed), ==, TC_TLV_INVALID);
+  munit_assert_int(tc_cms_signature_resolve_policy(&signer, &key, TC_TLV_DER, NULL, NULL,
+                                                   TC_CMS_RSA_PARAMETERS_NULL, &parsed),
+                   ==, TC_TLV_INVALID);
   digest_algorithm(&signer, TC_HASH_SHA256);
-  munit_assert_int(tc_cms_signature_resolve(&signer, &key, &parsed), ==, TC_TLV_OK);
+  munit_assert_int(tc_cms_signature_resolve_policy(&signer, &key, TC_TLV_DER, NULL, NULL,
+                                                   TC_CMS_RSA_PARAMETERS_NULL, &parsed),
+                   ==, TC_TLV_OK);
   munit_assert_int(parsed.signature.scheme, ==, TC_SIGNATURE_RSA_V15);
   signer.signature_algorithm =
       (TC_DER_algorithm){{pss_oid, sizeof pss_oid}, {defaults, sizeof defaults}};
-  munit_assert_int(tc_cms_signature_resolve(&signer, &key, &parsed), ==, TC_TLV_OK);
+  munit_assert_int(tc_cms_signature_resolve_policy(&signer, &key, TC_TLV_DER, NULL, NULL,
+                                                   TC_CMS_RSA_PARAMETERS_NULL, &parsed),
+                   ==, TC_TLV_OK);
   munit_assert_int(parsed.content_hash, ==, TC_HASH_SHA256);
   munit_assert_int(parsed.signature.hash, ==, TC_HASH_SHA1);
   munit_assert_int(parsed.signature.scheme, ==, TC_SIGNATURE_RSA_PSS);
   memset(&parsed, 0xa5, sizeof parsed);
   memcpy(&saved, &parsed, sizeof saved);
   signer.signed_attributes = (TC_bytes){NULL, 0};
-  munit_assert_int(tc_cms_signature_resolve(&signer, &key, &parsed), ==, TC_TLV_INVALID);
+  munit_assert_int(tc_cms_signature_resolve_policy(&signer, &key, TC_TLV_DER, NULL, NULL,
+                                                   TC_CMS_RSA_PARAMETERS_NULL, &parsed),
+                   ==, TC_TLV_INVALID);
   munit_assert_memory_equal(sizeof parsed, &parsed, &saved);
   digest_algorithm(&signer, TC_HASH_SHA1);
-  munit_assert_int(tc_cms_signature_resolve(&signer, &key, &parsed), ==, TC_TLV_OK);
+  munit_assert_int(tc_cms_signature_resolve_policy(&signer, &key, TC_TLV_DER, NULL, NULL,
+                                                   TC_CMS_RSA_PARAMETERS_NULL, &parsed),
+                   ==, TC_TLV_OK);
   key.type = TC_KEY_RSA_PSS;
   key.algorithm.parameters = (TC_bytes){sha256_parameters, sizeof sha256_parameters};
   memset(&parsed, 0xa5, sizeof parsed);
   memcpy(&saved, &parsed, sizeof saved);
-  munit_assert_int(tc_cms_signature_resolve(&signer, &key, &parsed), ==, TC_TLV_INVALID);
+  munit_assert_int(tc_cms_signature_resolve_policy(&signer, &key, TC_TLV_DER, NULL, NULL,
+                                                   TC_CMS_RSA_PARAMETERS_NULL, &parsed),
+                   ==, TC_TLV_INVALID);
   munit_assert_memory_equal(sizeof parsed, &parsed, &saved);
   key.algorithm.parameters = (TC_bytes){defaults, sizeof defaults};
-  munit_assert_int(tc_cms_signature_resolve(&signer, &key, &parsed), ==, TC_TLV_OK);
+  munit_assert_int(tc_cms_signature_resolve_policy(&signer, &key, TC_TLV_DER, NULL, NULL,
+                                                   TC_CMS_RSA_PARAMETERS_NULL, &parsed),
+                   ==, TC_TLV_OK);
   signer.signature_algorithm.parameters = (TC_bytes){NULL, 0};
-  munit_assert_int(tc_cms_signature_resolve(&signer, &key, &parsed), !=, TC_TLV_OK);
+  munit_assert_int(tc_cms_signature_resolve_policy(&signer, &key, TC_TLV_DER, NULL, NULL,
+                                                   TC_CMS_RSA_PARAMETERS_NULL, &parsed),
+                   !=, TC_TLV_OK);
   return MUNIT_OK;
 }
 
@@ -189,13 +223,15 @@ static MunitResult ber_parameters(const MunitParameter params[], void* user)
   signer.signature_algorithm =
       (TC_DER_algorithm){{rsa_oid, sizeof rsa_oid}, {ber_null, sizeof ber_null}};
   key.type = TC_KEY_RSA;
-  munit_assert_int(
-      tc_cms_signature_resolve_profile(&signer, &key, TC_TLV_BER, &limits, &tree, &parsed), ==,
-      TC_TLV_OK);
+  munit_assert_int(tc_cms_signature_resolve_policy(&signer, &key, TC_TLV_BER, &limits, &tree,
+                                                   TC_CMS_RSA_PARAMETERS_NULL, &parsed),
+                   ==, TC_TLV_OK);
   munit_assert_int(parsed.signature.scheme, ==, TC_SIGNATURE_RSA_V15);
   memset(&parsed, 0xa5, sizeof parsed);
   memcpy(&saved, &parsed, sizeof saved);
-  munit_assert_int(tc_cms_signature_resolve(&signer, &key, &parsed), ==, TC_TLV_INVALID);
+  munit_assert_int(tc_cms_signature_resolve_policy(&signer, &key, TC_TLV_DER, NULL, NULL,
+                                                   TC_CMS_RSA_PARAMETERS_NULL, &parsed),
+                   ==, TC_TLV_INVALID);
   munit_assert_memory_equal(sizeof parsed, &parsed, &saved);
   {
     static const uint8_t invalid_nulls[][4] = {
@@ -204,17 +240,17 @@ static MunitResult ber_parameters(const MunitParameter params[], void* user)
     for (size_t i = 0; i < sizeof lengths / sizeof lengths[0]; ++i) {
       signer.signature_algorithm.parameters = (TC_bytes){invalid_nulls[i], lengths[i]};
       work = WORK_BUDGET;
-      munit_assert_int(
-          tc_cms_signature_resolve_profile(&signer, &key, TC_TLV_BER, &limits, &tree, &parsed), ==,
-          TC_TLV_INVALID);
+      munit_assert_int(tc_cms_signature_resolve_policy(&signer, &key, TC_TLV_BER, &limits, &tree,
+                                                       TC_CMS_RSA_PARAMETERS_NULL, &parsed),
+                       ==, TC_TLV_INVALID);
       munit_assert_memory_equal(sizeof parsed, &parsed, &saved);
     }
   }
   signer.signature_algorithm = (TC_DER_algorithm){{pss_oid, sizeof pss_oid}, {pss, sizeof pss}};
   work = WORK_BUDGET;
-  munit_assert_int(
-      tc_cms_signature_resolve_profile(&signer, &key, TC_TLV_BER, &limits, &tree, &parsed), ==,
-      TC_TLV_OK);
+  munit_assert_int(tc_cms_signature_resolve_policy(&signer, &key, TC_TLV_BER, &limits, &tree,
+                                                   TC_CMS_RSA_PARAMETERS_NULL, &parsed),
+                   ==, TC_TLV_OK);
   munit_assert_int(parsed.signature.scheme, ==, TC_SIGNATURE_RSA_PSS);
   munit_assert_int(parsed.signature.hash, ==, TC_HASH_SHA256);
   munit_assert_int(parsed.signature.mgf_hash, ==, TC_HASH_SHA384);
@@ -224,24 +260,24 @@ static MunitResult ber_parameters(const MunitParameter params[], void* user)
   memcpy(&saved, &parsed, sizeof saved);
   for (size_t budget = 0; budget < required; ++budget) {
     work = budget;
-    munit_assert_int(
-        tc_cms_signature_resolve_profile(&signer, &key, TC_TLV_BER, &limits, &tree, &parsed), ==,
-        TC_TLV_LIMIT);
+    munit_assert_int(tc_cms_signature_resolve_policy(&signer, &key, TC_TLV_BER, &limits, &tree,
+                                                     TC_CMS_RSA_PARAMETERS_NULL, &parsed),
+                     ==, TC_TLV_LIMIT);
     munit_assert_memory_equal(sizeof parsed, &parsed, &saved);
   }
   for (size_t prefix = 0; prefix < sizeof pss; ++prefix) {
     signer.signature_algorithm.parameters.length = prefix;
     work = WORK_BUDGET;
-    munit_assert_int(
-        tc_cms_signature_resolve_profile(&signer, &key, TC_TLV_BER, &limits, &tree, &parsed), !=,
-        TC_TLV_OK);
+    munit_assert_int(tc_cms_signature_resolve_policy(&signer, &key, TC_TLV_BER, &limits, &tree,
+                                                     TC_CMS_RSA_PARAMETERS_NULL, &parsed),
+                     !=, TC_TLV_OK);
     munit_assert_memory_equal(sizeof parsed, &parsed, &saved);
   }
   signer.signature_algorithm.parameters.length = sizeof pss;
   work = required;
-  munit_assert_int(
-      tc_cms_signature_resolve_profile(&signer, &key, TC_TLV_BER, &limits, &tree, &parsed), ==,
-      TC_TLV_OK);
+  munit_assert_int(tc_cms_signature_resolve_policy(&signer, &key, TC_TLV_BER, &limits, &tree,
+                                                   TC_CMS_RSA_PARAMETERS_NULL, &parsed),
+                   ==, TC_TLV_OK);
   munit_assert_size(work, ==, 0);
   memset(&parsed, 0xa5, sizeof parsed);
   memcpy(&saved, &parsed, sizeof saved);
@@ -249,31 +285,31 @@ static MunitResult ber_parameters(const MunitParameter params[], void* user)
     TC_TLV_limits shallow = limits;
     shallow.max_depth = 2;
     work = WORK_BUDGET;
-    munit_assert_int(
-        tc_cms_signature_resolve_profile(&signer, &key, TC_TLV_BER, &shallow, &tree, &parsed), ==,
-        TC_TLV_LIMIT);
+    munit_assert_int(tc_cms_signature_resolve_policy(&signer, &key, TC_TLV_BER, &shallow, &tree,
+                                                     TC_CMS_RSA_PARAMETERS_NULL, &parsed),
+                     ==, TC_TLV_LIMIT);
     munit_assert_memory_equal(sizeof parsed, &parsed, &saved);
     shallow = limits;
     shallow.max_elements = 2;
     work = WORK_BUDGET;
-    munit_assert_int(
-        tc_cms_signature_resolve_profile(&signer, &key, TC_TLV_BER, &shallow, &tree, &parsed), ==,
-        TC_TLV_LIMIT);
+    munit_assert_int(tc_cms_signature_resolve_policy(&signer, &key, TC_TLV_BER, &shallow, &tree,
+                                                     TC_CMS_RSA_PARAMETERS_NULL, &parsed),
+                     ==, TC_TLV_LIMIT);
     munit_assert_memory_equal(sizeof parsed, &parsed, &saved);
   }
   key.type = TC_KEY_RSA_PSS;
   key.algorithm.parameters = (TC_bytes){defaults, sizeof defaults};
   work = WORK_BUDGET;
-  munit_assert_int(
-      tc_cms_signature_resolve_profile(&signer, &key, TC_TLV_BER, &limits, &tree, &parsed), ==,
-      TC_TLV_INVALID);
+  munit_assert_int(tc_cms_signature_resolve_policy(&signer, &key, TC_TLV_BER, &limits, &tree,
+                                                   TC_CMS_RSA_PARAMETERS_NULL, &parsed),
+                   ==, TC_TLV_INVALID);
   munit_assert_memory_equal(sizeof parsed, &parsed, &saved);
   key.type = TC_KEY_RSA;
   pss[sizeof pss - TRAILER_VALUE_FROM_END] = 2;
   work = WORK_BUDGET;
-  munit_assert_int(
-      tc_cms_signature_resolve_profile(&signer, &key, TC_TLV_BER, &limits, &tree, &parsed), ==,
-      TC_TLV_INVALID);
+  munit_assert_int(tc_cms_signature_resolve_policy(&signer, &key, TC_TLV_BER, &limits, &tree,
+                                                   TC_CMS_RSA_PARAMETERS_NULL, &parsed),
+                   ==, TC_TLV_INVALID);
   munit_assert_memory_equal(sizeof parsed, &parsed, &saved);
   return MUNIT_OK;
 }

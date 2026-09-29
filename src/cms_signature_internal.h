@@ -71,18 +71,4 @@ static inline TC_TLV_result tc_cms_signature_resolve_policy(
     *out = parsed;
   return result;
 }
-static inline TC_TLV_result
-tc_cms_signature_resolve_profile(const TC_CMS_signer_info* signer, const TC_X509_public_key* key,
-                                 TC_TLV_profile profile, const TC_TLV_limits* limits,
-                                 const tc_pki_tree_workspace* tree, tc_cms_signature_algorithm* out)
-{
-  return tc_cms_signature_resolve_policy(signer, key, profile, limits, tree,
-                                         TC_CMS_RSA_PARAMETERS_NULL, out);
-}
-static inline TC_TLV_result tc_cms_signature_resolve(const TC_CMS_signer_info* signer,
-                                                     const TC_X509_public_key* key,
-                                                     tc_cms_signature_algorithm* out)
-{
-  return tc_cms_signature_resolve_profile(signer, key, TC_TLV_DER, NULL, NULL, out);
-}
 #endif

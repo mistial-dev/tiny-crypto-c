@@ -3,6 +3,7 @@
 #include "../../src/x509_crl_internal.h"
 #include "../../src/x509_crl_source_internal.h"
 #include "../../src/cms_internal.h"
+#include "cms_crl_harness.h"
 #include "../cms/source.h"
 #include "../../src/pki_extensions_internal.h"
 #include "../../src/pki_bits_internal.h"

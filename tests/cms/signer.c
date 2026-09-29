@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "../../src/cms_internal.h"
+#include "cms_crl_harness.h"
 #include "../../src/pki_tree_internal.h"
 #include "../../src/pki_extensions_internal.h"
 #include "source.h"

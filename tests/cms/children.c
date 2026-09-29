@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "../../src/pki_children_internal.h"
 #include "../../src/cms_internal.h"
+#include "cms_crl_harness.h"
 #include "source.h"
 #include "munit.h"
 #include <string.h>

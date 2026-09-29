@@ -27,20 +27,6 @@ static TC_TLV_result cms_signer_candidate(const void* context, const TC_X509_cer
                                tree, matched);
 }
 
-TC_TLV_result tc_cms_signer_candidate_next(tc_cms_candidates* reader,
-                                           const TC_CMS_signer_info* signer, TC_TLV_profile profile,
-                                           const TC_X509_name_workspace* names,
-                                           const tc_pki_tree_workspace* tree,
-                                           TC_X509_workspace* parser, TC_X509_certificate* scratch,
-                                           TC_bytes* out)
-{
-  const cms_signer_filter filter = {signer, profile, names};
-  if (!signer || (profile != TC_TLV_DER && profile != TC_TLV_BER))
-    return TC_TLV_ARGUMENT;
-  return tc_cms_x509_candidate_next(reader, cms_signer_candidate, &filter, tree, parser, scratch,
-                                    out);
-}
-
 typedef struct {
   const TC_CMS_signer_info* signer;
   TC_bytes content_type, digest;
@@ -81,13 +67,13 @@ static TC_TLV_result cms_signer_attempt(const void* context, const TC_X509_certi
                                                             trust->search, trust->tree->work, out));
 }
 
-static TC_X509_path_status cms_signer_find_policy(
-    const tc_cms_candidates* candidates, const TC_CMS_signer_info* signer, TC_bytes content_type,
-    TC_bytes digest, TC_CMS_verification_policy policy, const TC_X509_store_source* path_source,
-    const TC_X509_path_options* options, const tc_pki_tree_workspace* tree,
-    const TC_CMS_signature_workspace* signature, const TC_X509_path_workspace* validation,
-    const TC_X509_search_workspace* search, TC_X509_search_result* out,
-    tc_cms_signed_attrs_cache* signed_attrs)
+TC_X509_path_status
+tc_cms_signer_find(const tc_cms_candidates* candidates, const TC_CMS_signer_info* signer,
+                   TC_bytes content_type, TC_bytes digest, TC_CMS_verification_policy policy,
+                   const TC_X509_store_source* path_source, const TC_X509_path_options* options,
+                   const tc_pki_tree_workspace* tree, const TC_CMS_signature_workspace* signature,
+                   const TC_X509_path_workspace* validation, const TC_X509_search_workspace* search,
+                   TC_X509_search_result* out, tc_cms_signed_attrs_cache* signed_attrs)
 {
   if (!signer || !path_source || !options || !signature || !validation || !search ||
       !content_type.data || !content_type.length || !digest.data || !digest.length ||
@@ -99,20 +85,6 @@ static TC_X509_path_status cms_signer_find_policy(
   return tc_x509_path_status(tc_cms_certificate_search(candidates, cms_signer_candidate, &filter,
                                                        &options->parsing, tree, validation,
                                                        cms_signer_attempt, &trust, out, NULL));
-}
-
-TC_X509_path_status
-tc_cms_signer_find(const tc_cms_candidates* candidates, const TC_CMS_signer_info* signer,
-                   TC_bytes content_type, TC_bytes digest, TC_CMS_attribute_encoding encoding,
-                   const TC_X509_store_source* path_source, const TC_X509_path_options* options,
-                   const tc_pki_tree_workspace* tree, const TC_CMS_signature_workspace* signature,
-                   const TC_X509_path_workspace* validation, const TC_X509_search_workspace* search,
-                   TC_X509_search_result* out)
-{
-  return cms_signer_find_policy(candidates, signer, content_type, digest,
-                                (TC_CMS_verification_policy){encoding, TC_CMS_RSA_PARAMETERS_NULL},
-                                path_source, options, tree, signature, validation, search, out,
-                                NULL);
 }
 
 enum {
@@ -245,11 +217,11 @@ cms_signer_path_build(const TC_CMS_signer_info* signer, TC_bytes content_type, T
   tc_cms_signed_attrs_cache signed_attrs = {0};
   signed_attrs.digest = workspace->signed_digest;
   signed_attrs.capacity = workspace->signed_digest_capacity;
-  const TC_X509_path_status status = cms_signer_find_policy(
-      &candidates, signer, content_type, digest,
-      (TC_CMS_verification_policy){options->attributes, options->rsa_parameters}, &indexed,
-      &options->path, &tree, &signature, &workspace->validation, &workspace->search, out,
-      &signed_attrs);
+  const TC_X509_path_status status =
+      tc_cms_signer_find(&candidates, signer, content_type, digest,
+                         (TC_CMS_verification_policy){options->attributes, options->rsa_parameters},
+                         &indexed, &options->path, &tree, &signature, &workspace->validation,
+                         &workspace->search, out, &signed_attrs);
   TC_secure_zero(workspace->signed_digest, TC_CMS_SIGNED_DIGEST_BYTES);
   return status;
 }
