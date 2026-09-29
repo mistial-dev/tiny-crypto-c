@@ -167,32 +167,45 @@ typedef struct {
   size_t signature_capacity;
 } TC_CMS_signature_workspace;
 
+/* One SignerInfo verification.
+ * - signer and key come from their schema readers and retain stable input.
+ * - content_type is the envelope's eContentType OID contents.
+ * - policy selects the signed-attribute encoding and the rsaEncryption
+ *   parameter rule. {TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL} is the
+ *   RFC 5652 / RFC 3370 section 3.2 default. ALLOW_ABSENT applies only to
+ *   rsaEncryption in SignerInfo. Present parameters must encode NULL.
+ * - provider verifies the signature. limits bound every decode. */
+typedef struct {
+  const TC_CMS_signer_info* signer;
+  TC_bytes content_type;
+  TC_CMS_verification_policy policy;
+  const TC_X509_public_key* key;
+  const TC_X509_signature_provider* provider;
+  const TC_TLV_limits* limits;
+} TC_CMS_signer_verify_request;
+
 /* Verify one parsed SignerInfo against an independently computed content digest.
  * Hash content with SignerInfo.digest_algorithm. For PSS, the signed-attribute
- * hash may differ. content_type is the envelope's OID contents.
+ * hash may differ.
  * Checks digest binding, signed attributes, algorithm/key compatibility and the
  * signature. Without signed attributes, content_type must be id-data.
- * Select signed-attribute encoding explicitly. CMS field framing uses BER.
- * This operation rejects countersignatures.
+ * CMS field framing uses BER. This operation rejects countersignatures.
  *
- * signer and key must come from their schema readers and retain stable input.
  * The caller checks signer/certificate identity, trust, application algorithm
  * policy and the envelope's digestAlgorithms.
  * A VALID result authenticates the supplied digest with the supplied key only.
  *
- * Inputs and all metadata may overlap each other. They must be disjoint from
- * frames, signature storage and work, which must also be mutually disjoint.
- * Provider context and its scratch must be separate from all CMS inputs and
- * workspace storage.
+ * The request, its inputs and all metadata may overlap each other. They must be
+ * disjoint from frames, signature storage and work, which must also be mutually
+ * disjoint. Provider context and its scratch must be separate from all CMS
+ * inputs and workspace storage.
  * Bad storage leaves caller state unchanged. Other failures may consume scratch
  * and work. Uses a temporary hash context/digest for signed attributes. Requires
  * X509, BER, a digest provider, and the signed-attribute hash when attributes exist. */
-TC_X509_signature_result
-TC_CMS_signer_verify_digest(const TC_CMS_signer_info* signer, TC_bytes content_type,
-                            TC_bytes digest, TC_CMS_attribute_encoding encoding,
-                            const TC_X509_public_key* key,
-                            const TC_X509_signature_provider* provider, const TC_TLV_limits* limits,
-                            const TC_CMS_signature_workspace* workspace, size_t* work);
+TC_X509_signature_result TC_CMS_signer_verify_digest(const TC_CMS_signer_verify_request* request,
+                                                     TC_bytes digest,
+                                                     const TC_CMS_signature_workspace* workspace,
+                                                     size_t* work);
 
 typedef enum { TC_CMS_CONTENT_RAW, TC_CMS_CONTENT_BER_OCTETS } TC_CMS_content_encoding;
 
@@ -205,27 +218,11 @@ typedef enum { TC_CMS_CONTENT_RAW, TC_CMS_CONTENT_BER_OCTETS } TC_CMS_content_en
  * Storage, provider and trust rules match signer_verify_digest. The content hash
  * must be enabled. Hash scratch is reused for signed attributes, without copying
  * the message. For cached or externally computed digests, use the digest API. */
-TC_X509_signature_result TC_CMS_signer_verify_content(
-    const TC_CMS_signer_info* signer, TC_bytes content_type, TC_bytes content,
-    TC_CMS_content_encoding content_encoding, TC_CMS_attribute_encoding attribute_encoding,
-    const TC_X509_public_key* key, const TC_X509_signature_provider* provider,
-    const TC_TLV_limits* limits, const TC_CMS_signature_workspace* workspace, size_t* work);
-
-/* Explicit compatibility policy for captured CMS signatures. ALLOW_ABSENT applies
- * only to rsaEncryption in SignerInfo. Present parameters must encode NULL.
- * Certificate algorithms and RSA DigestInfo retain their own validation rules.
- * The ordinary verify functions use RSA_PARAMETERS_NULL (RFC 3370 section 3.2).
- * Storage, hashing and trust requirements match the corresponding functions above. */
-TC_X509_signature_result TC_CMS_signer_verify_digest_with_policy(
-    const TC_CMS_signer_info* signer, TC_bytes content_type, TC_bytes digest,
-    TC_CMS_verification_policy policy, const TC_X509_public_key* key,
-    const TC_X509_signature_provider* provider, const TC_TLV_limits* limits,
-    const TC_CMS_signature_workspace* workspace, size_t* work);
-TC_X509_signature_result TC_CMS_signer_verify_content_with_policy(
-    const TC_CMS_signer_info* signer, TC_bytes content_type, TC_bytes content,
-    TC_CMS_content_encoding content_encoding, TC_CMS_verification_policy policy,
-    const TC_X509_public_key* key, const TC_X509_signature_provider* provider,
-    const TC_TLV_limits* limits, const TC_CMS_signature_workspace* workspace, size_t* work);
+TC_X509_signature_result TC_CMS_signer_verify_content(const TC_CMS_signer_verify_request* request,
+                                                      TC_bytes content,
+                                                      TC_CMS_content_encoding encoding,
+                                                      const TC_CMS_signature_workspace* workspace,
+                                                      size_t* work);
 
 #ifdef __cplusplus
 }

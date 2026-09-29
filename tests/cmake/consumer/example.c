@@ -179,13 +179,14 @@ int main(void)
                         NULL, (TC_TLV_frames){NULL, 0}, &work, &piv_object) != TC_TLV_ARGUMENT ||
         work != 100)
       return 1;
-    if (TC_CMS_signer_verify_content_with_policy(NULL, empty, empty, TC_CMS_CONTENT_RAW, cms_policy,
-                                                 NULL, NULL, NULL, NULL,
-                                                 &work) != TC_X509_SIGNATURE_ERROR ||
+    if (TC_CMS_signer_verify_content(
+            &(TC_CMS_signer_verify_request){NULL, empty, cms_policy, NULL, NULL, NULL}, empty,
+            TC_CMS_CONTENT_RAW, NULL, &work) != TC_X509_SIGNATURE_ERROR ||
         work != 100)
       return 1;
-    if (TC_CMS_signer_verify_digest_with_policy(NULL, empty, empty, cms_policy, NULL, NULL, NULL,
-                                                NULL, &work) != TC_X509_SIGNATURE_ERROR ||
+    if (TC_CMS_signer_verify_digest(
+            &(TC_CMS_signer_verify_request){NULL, empty, cms_policy, NULL, NULL, NULL}, empty, NULL,
+            &work) != TC_X509_SIGNATURE_ERROR ||
         work != 100)
       return 1;
     memset(&store, 0, sizeof store);
@@ -489,28 +490,25 @@ int main(void)
       return 28;
     static ExampleCMSVerifyWorkspace verification;
     memset(&signer, 0, sizeof signer);
-    if (example_verify_cms_digest(&signer, content_type, computed, TC_CMS_ATTRIBUTES_DER,
-                                  &anchor.public_key, &verifier, 4096,
-                                  &verification) != TC_X509_SIGNATURE_UNSUPPORTED)
+    if (example_verify_cms_digest(&signer, content_type, computed, &anchor.public_key, &verifier,
+                                  4096, &verification) != TC_X509_SIGNATURE_UNSUPPORTED)
       return 29;
-    if (example_verify_cms_digest(&signer, content_type, computed, TC_CMS_ATTRIBUTES_DER,
-                                  &anchor.public_key, &verifier, 0,
+    if (example_verify_cms_digest(&signer, content_type, computed, &anchor.public_key, &verifier, 0,
                                   &verification) != TC_X509_SIGNATURE_LIMIT)
       return 30;
-    if (example_verify_cms_digest(&signer, content_type, computed, TC_CMS_ATTRIBUTES_DER,
-                                  &anchor.public_key, &verifier, 4096,
-                                  NULL) != TC_X509_SIGNATURE_ERROR)
+    if (example_verify_cms_digest(&signer, content_type, computed, &anchor.public_key, &verifier,
+                                  4096, NULL) != TC_X509_SIGNATURE_ERROR)
       return 31;
     if (example_verify_cms_content(&signer, content_type, empty, TC_CMS_CONTENT_RAW,
-                                   TC_CMS_ATTRIBUTES_DER, &anchor.public_key, &verifier, 4096,
+                                   &anchor.public_key, &verifier, 4096,
                                    &verification) != TC_X509_SIGNATURE_UNSUPPORTED)
       return 32;
     if (example_verify_cms_content(&signer, content_type, empty, TC_CMS_CONTENT_RAW,
-                                   TC_CMS_ATTRIBUTES_DER, &anchor.public_key, &verifier, 0,
+                                   &anchor.public_key, &verifier, 0,
                                    &verification) != TC_X509_SIGNATURE_LIMIT)
       return 33;
     if (example_verify_cms_content(&signer, content_type, empty, TC_CMS_CONTENT_RAW,
-                                   TC_CMS_ATTRIBUTES_DER, &anchor.public_key, &verifier, 4096,
+                                   &anchor.public_key, &verifier, 4096,
                                    NULL) != TC_X509_SIGNATURE_ERROR)
       return 34;
     static ExampleCMSPathWorkspace path_storage;

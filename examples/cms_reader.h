@@ -31,22 +31,24 @@ TC_TLV_result example_read_cms_signer(TC_bytes input, size_t work_limit,
 TC_TLV_result example_parse_cms_signers(TC_bytes encoded_set, size_t work_limit,
                                         ExampleCMSWorkspace* workspace);
 
-/* Verify a parsed signer with a digest computed by the application. The key
+/* Verify a parsed signer with a digest computed by the application, using DER
+ * signed attributes and the RFC 3370 rsaEncryption parameter rule. The key
  * must already be selected for that signer. Key trust is validated separately.
  * Scratch accommodates fragmented RSA signatures through 3072 bits and ECDSA. */
 TC_X509_signature_result
 example_verify_cms_digest(const TC_CMS_signer_info* signer, TC_bytes content_type, TC_bytes digest,
-                          TC_CMS_attribute_encoding encoding, const TC_X509_public_key* key,
-                          const TC_X509_signature_provider* provider, size_t work_limit,
-                          ExampleCMSVerifyWorkspace* workspace);
+                          const TC_X509_public_key* key, const TC_X509_signature_provider* provider,
+                          size_t work_limit, ExampleCMSVerifyWorkspace* workspace);
 
 /* Hash raw content or a complete BER OCTET STRING, then verify the signer.
- * Same key-selection, trust and storage rules as the prehashed example. */
-TC_X509_signature_result example_verify_cms_content(
-    const TC_CMS_signer_info* signer, TC_bytes content_type, TC_bytes content,
-    TC_CMS_content_encoding content_encoding, TC_CMS_attribute_encoding attribute_encoding,
-    const TC_X509_public_key* key, const TC_X509_signature_provider* provider, size_t work_limit,
-    ExampleCMSVerifyWorkspace* workspace);
+ * Same policy, key-selection, trust and storage rules as the prehashed example. */
+TC_X509_signature_result example_verify_cms_content(const TC_CMS_signer_info* signer,
+                                                    TC_bytes content_type, TC_bytes content,
+                                                    TC_CMS_content_encoding content_encoding,
+                                                    const TC_X509_public_key* key,
+                                                    const TC_X509_signature_provider* provider,
+                                                    size_t work_limit,
+                                                    ExampleCMSVerifyWorkspace* workspace);
 
 #ifdef __cplusplus
 }

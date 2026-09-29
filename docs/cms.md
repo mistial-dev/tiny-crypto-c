@@ -168,11 +168,11 @@ may contain no signers. Parsing an empty collection authenticates nothing.
 
 ## RSA parameter compatibility
 
-The ordinary signature-verification functions require a `NULL` parameter for
-CMS `rsaEncryption`, as specified in RFC 3370 section 3.2. Some captured PIV
-biometric signatures omit that parameter. Applications can accept those with
-`TC_CMS_signer_verify_content_with_policy` or
-`TC_CMS_signer_verify_digest_with_policy`:
+`TC_CMS_RSA_PARAMETERS_NULL` requires a `NULL` parameter for CMS
+`rsaEncryption`, as specified in RFC 3370 section 3.2. Some captured PIV
+biometric signatures omit that parameter. Applications can accept those by
+selecting `TC_CMS_RSA_PARAMETERS_ALLOW_ABSENT` in the verification request's
+policy:
 
 ```c
 TC_CMS_verification_policy policy = {
@@ -427,7 +427,20 @@ other and from every input, including the signed-attribute view itself.
 ## Verify a signer
 
 `TC_CMS_signer_verify_content` hashes content and verifies one parsed SignerInfo
-with a supplied public key. It selects the content and signature hashes from the
+with a supplied public key. A `TC_CMS_signer_verify_request` names the signer,
+the envelope's content type, the verification policy, the key, the signature
+provider and the parsing limits:
+
+```c
+const TC_CMS_signer_verify_request request = {
+    &signer, signed_data.content_type,
+    {TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
+    &key, &provider, &limits};
+TC_X509_signature_result result = TC_CMS_signer_verify_content(
+    &request, signed_data.content, TC_CMS_CONTENT_BER_OCTETS, &workspace, &work);
+```
+
+ It selects the content and signature hashes from the
 signer's algorithm identifiers. Use `TC_CMS_CONTENT_BER_OCTETS` with
 `signed_data.content`, or `TC_CMS_CONTENT_RAW` for application-provided message
 bytes. Raw NULL/0 is an empty message. The function uses the selected format and
@@ -444,7 +457,7 @@ one message digest. PSS may use a different hash for signed attributes. Both
 verification APIs handle that distinction internally.
 
 Pass the envelope's `content_type` and select the signed-attribute encoding
-explicitly. The verifier checks attribute binding and hashes the original signed
+explicitly in the policy. The verifier checks attribute binding and hashes the original signed
 bytes, then calls the provider's digest operation. Without signed attributes,
 only `id-data` content is allowed. Countersignatures are outside this API's scope.
 
@@ -456,7 +469,7 @@ Insufficient capacity returns `TC_X509_SIGNATURE_LIMIT`.
 The compiled [examples](../examples/cms_reader.c), `example_verify_cms_content`
 and `example_verify_cms_digest`, use 16 frames and a 384-byte signature buffer for
 RSA through 3072 bits and supported ECDSA signatures. They propagate verification
-errors and accept an explicit work budget and attribute encoding. Use a separate
+errors, accept an explicit work budget and use DER signed attributes. Use a separate
 native-provider workspace as shown in [signature verification](x509-crypto.md).
 
 Only `TC_X509_SIGNATURE_VALID` is a successful signature check. It confirms the

@@ -45,10 +45,12 @@ static TC_TLV_result cms_signer_attempt(const void* context, const TC_X509_certi
 {
   const cms_signer_trust* trust = context;
   TC_bytes signer_name = {NULL, 0};
-  TC_X509_signature_result signature = tc_cms_signer_verify_cached(
-      trust->signer, trust->content_type, trust->digest, TC_CMS_VERIFY_DIGEST, trust->policy,
-      &candidate->public_key, &trust->options->signatures, &trust->options->parsing,
-      trust->signature, trust->tree->work, &signer_name, trust->signed_attrs);
+  const TC_CMS_signer_verify_request verify = {
+      trust->signer,          trust->content_type,         trust->policy,
+      &candidate->public_key, &trust->options->signatures, &trust->options->parsing};
+  TC_X509_signature_result signature =
+      tc_cms_signer_verify(&verify, trust->digest, TC_CMS_VERIFY_DIGEST, trust->signature,
+                           trust->tree->work, &signer_name, trust->signed_attrs);
   if (signature != TC_X509_SIGNATURE_VALID)
     return tc_pki_signature_status(signature);
   if (signer_name.data) {

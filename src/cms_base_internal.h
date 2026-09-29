@@ -45,19 +45,14 @@ TC_TLV_result tc_cms_hash_content(TC_bytes input, TC_CMS_content_encoding encodi
                                   TC_hash_algorithm algorithm, const TC_TLV_limits* limits,
                                   const tc_pki_tree_workspace* tree, TC_hash_context* scratch,
                                   uint8_t* digest);
-TC_X509_signature_result
-tc_cms_signer_verify(const TC_CMS_signer_info* signer, TC_bytes content_type, TC_bytes input,
-                     tc_cms_verify_input input_kind, TC_CMS_verification_policy policy,
-                     const TC_X509_public_key* key, const TC_X509_signature_provider* provider,
-                     const TC_TLV_limits* limits, const TC_CMS_signature_workspace* workspace,
-                     size_t* work, TC_bytes* signer_name);
-TC_X509_signature_result
-tc_cms_signer_verify_cached(const TC_CMS_signer_info* signer, TC_bytes content_type, TC_bytes input,
-                            tc_cms_verify_input input_kind, TC_CMS_verification_policy policy,
-                            const TC_X509_public_key* key,
-                            const TC_X509_signature_provider* provider, const TC_TLV_limits* limits,
-                            const TC_CMS_signature_workspace* workspace, size_t* work,
-                            TC_bytes* signer_name, tc_cms_signed_attrs_cache* cache);
+/* Verify request->signer over input, which is a digest or content per kind.
+ * signer_name, when set, receives the signed signerName attribute or an empty
+ * span. cache, when set, reuses and records the signed-attribute digest. */
+TC_X509_signature_result tc_cms_signer_verify(const TC_CMS_signer_verify_request* request,
+                                              TC_bytes input, tc_cms_verify_input kind,
+                                              const TC_CMS_signature_workspace* workspace,
+                                              size_t* work, TC_bytes* signer_name,
+                                              tc_cms_signed_attrs_cache* cache);
 TC_TLV_result tc_cms_signed_data_check(const TC_CMS_signed_data* input, const TC_TLV_limits* limits,
                                        const tc_pki_tree_workspace* tree, size_t signer_index,
                                        TC_CMS_signer_info* selected);

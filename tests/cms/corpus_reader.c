@@ -168,11 +168,12 @@ static MunitResult biometric_signatures(const MunitParameter params[], void* con
       const TC_CMS_verification_policy invalid_policy = {TC_CMS_ATTRIBUTES_DER,
                                                          (TC_CMS_rsa_parameters)2};
       work = WORK;
-      munit_assert_int(TC_CMS_signer_verify_content_with_policy(
-                           &signer, envelope.content_type, inputs[1], TC_CMS_CONTENT_RAW,
-                           invalid_policy, &certificate.public_key, &provider, &limits,
-                           &verification, &work),
-                       ==, TC_X509_SIGNATURE_ERROR);
+      munit_assert_int(
+          TC_CMS_signer_verify_content(
+              &(TC_CMS_signer_verify_request){&signer, envelope.content_type, invalid_policy,
+                                              &certificate.public_key, &provider, &limits},
+              inputs[1], TC_CMS_CONTENT_RAW, &verification, &work),
+          ==, TC_X509_SIGNATURE_ERROR);
       munit_assert_size(work, ==, WORK);
       for (unsigned mode = 0; mode < 4; ++mode) {
         const TC_CMS_verification_policy policy = {(TC_CMS_attribute_encoding)(mode % 2),
@@ -181,38 +182,49 @@ static MunitResult biometric_signatures(const MunitParameter params[], void* con
         const int accepted = valid && (mode >= 2 || signer.signature_algorithm.parameters.length);
         work = WORK;
         if (mode < 2) {
-          munit_assert_int(TC_CMS_signer_verify_content(&signer, envelope.content_type, inputs[1],
-                                                        TC_CMS_CONTENT_RAW, policy.attributes,
-                                                        &certificate.public_key, &provider, &limits,
-                                                        &verification, &work),
-                           ==, accepted ? TC_X509_SIGNATURE_VALID : TC_X509_SIGNATURE_INVALID);
+          munit_assert_int(
+              TC_CMS_signer_verify_content(
+                  &(TC_CMS_signer_verify_request){&signer,
+                                                  envelope.content_type,
+                                                  {policy.attributes, TC_CMS_RSA_PARAMETERS_NULL},
+                                                  &certificate.public_key,
+                                                  &provider,
+                                                  &limits},
+                  inputs[1], TC_CMS_CONTENT_RAW, &verification, &work),
+              ==, accepted ? TC_X509_SIGNATURE_VALID : TC_X509_SIGNATURE_INVALID);
           work = WORK;
         }
-        TC_X509_signature_result result = TC_CMS_signer_verify_content_with_policy(
-            &signer, envelope.content_type, inputs[1], TC_CMS_CONTENT_RAW, policy,
-            &certificate.public_key, &provider, &limits, &verification, &work);
+        TC_X509_signature_result result = TC_CMS_signer_verify_content(
+            &(TC_CMS_signer_verify_request){&signer, envelope.content_type, policy,
+                                            &certificate.public_key, &provider, &limits},
+            inputs[1], TC_CMS_CONTENT_RAW, &verification, &work);
         if (result != (accepted ? TC_X509_SIGNATURE_VALID : TC_X509_SIGNATURE_INVALID))
           munit_errorf("biometric record %zu mode %u: signature returned %d", count, mode, result);
         work = WORK;
-        munit_assert_int(TC_CMS_signer_verify_digest_with_policy(
-                             &signer, envelope.content_type, content_digest, policy,
-                             &certificate.public_key, &provider, &limits, &verification, &work),
-                         ==, result);
+        munit_assert_int(
+            TC_CMS_signer_verify_digest(
+                &(TC_CMS_signer_verify_request){&signer, envelope.content_type, policy,
+                                                &certificate.public_key, &provider, &limits},
+                content_digest, &verification, &work),
+            ==, result);
         if (accepted) {
           digest[0] ^= 1;
           work = WORK;
-          munit_assert_int(TC_CMS_signer_verify_digest_with_policy(
-                               &signer, envelope.content_type, content_digest, policy,
-                               &certificate.public_key, &provider, &limits, &verification, &work),
-                           ==, TC_X509_SIGNATURE_INVALID);
+          munit_assert_int(
+              TC_CMS_signer_verify_digest(
+                  &(TC_CMS_signer_verify_request){&signer, envelope.content_type, policy,
+                                                  &certificate.public_key, &provider, &limits},
+                  content_digest, &verification, &work),
+              ==, TC_X509_SIGNATURE_INVALID);
           digest[0] ^= 1;
           bytes[1][inputs[1].length - 1] ^= 1;
           work = WORK;
-          munit_assert_int(TC_CMS_signer_verify_content_with_policy(
-                               &signer, envelope.content_type, inputs[1], TC_CMS_CONTENT_RAW,
-                               policy, &certificate.public_key, &provider, &limits, &verification,
-                               &work),
-                           ==, TC_X509_SIGNATURE_INVALID);
+          munit_assert_int(
+              TC_CMS_signer_verify_content(
+                  &(TC_CMS_signer_verify_request){&signer, envelope.content_type, policy,
+                                                  &certificate.public_key, &provider, &limits},
+                  inputs[1], TC_CMS_CONTENT_RAW, &verification, &work),
+              ==, TC_X509_SIGNATURE_INVALID);
           bytes[1][inputs[1].length - 1] ^= 1;
         }
       }

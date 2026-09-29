@@ -15,30 +15,35 @@ static TC_CMS_signature_workspace signature_workspace(ExampleCMSVerifyWorkspace*
 
 TC_X509_signature_result
 example_verify_cms_digest(const TC_CMS_signer_info* signer, TC_bytes content_type, TC_bytes digest,
-                          TC_CMS_attribute_encoding encoding, const TC_X509_public_key* key,
-                          const TC_X509_signature_provider* provider, size_t work_limit,
-                          ExampleCMSVerifyWorkspace* workspace)
+                          const TC_X509_public_key* key, const TC_X509_signature_provider* provider,
+                          size_t work_limit, ExampleCMSVerifyWorkspace* workspace)
 {
+  const TC_CMS_signer_verify_request request = {
+      signer, content_type, {TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
+      key,    provider,     &limits};
   TC_CMS_signature_workspace verification;
   if (!workspace)
     return TC_X509_SIGNATURE_ERROR;
   verification = signature_workspace(workspace);
-  return TC_CMS_signer_verify_digest(signer, content_type, digest, encoding, key, provider, &limits,
-                                     &verification, &work_limit);
+  return TC_CMS_signer_verify_digest(&request, digest, &verification, &work_limit);
 }
 
-TC_X509_signature_result example_verify_cms_content(
-    const TC_CMS_signer_info* signer, TC_bytes content_type, TC_bytes content,
-    TC_CMS_content_encoding content_encoding, TC_CMS_attribute_encoding attribute_encoding,
-    const TC_X509_public_key* key, const TC_X509_signature_provider* provider, size_t work_limit,
-    ExampleCMSVerifyWorkspace* workspace)
+TC_X509_signature_result example_verify_cms_content(const TC_CMS_signer_info* signer,
+                                                    TC_bytes content_type, TC_bytes content,
+                                                    TC_CMS_content_encoding content_encoding,
+                                                    const TC_X509_public_key* key,
+                                                    const TC_X509_signature_provider* provider,
+                                                    size_t work_limit,
+                                                    ExampleCMSVerifyWorkspace* workspace)
 {
+  const TC_CMS_signer_verify_request request = {
+      signer, content_type, {TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
+      key,    provider,     &limits};
   TC_CMS_signature_workspace verification;
   if (!workspace)
     return TC_X509_SIGNATURE_ERROR;
   verification = signature_workspace(workspace);
-  return TC_CMS_signer_verify_content(signer, content_type, content, content_encoding,
-                                      attribute_encoding, key, provider, &limits, &verification,
+  return TC_CMS_signer_verify_content(&request, content, content_encoding, &verification,
                                       &work_limit);
 }
 
