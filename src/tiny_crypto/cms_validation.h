@@ -32,30 +32,51 @@ typedef struct {
   size_t signed_digest_capacity;
 } TC_CMS_path_workspace;
 
+/* One signer whose path is built.
+ * - signer comes from a SignerInfo reader and retains stable input.
+ * - content_type and digest are the eContentType OID contents and the content
+ *   digest under SignerInfo.digest_algorithm.
+ * - certificates holds the SignedData certificates field, or is empty.
+ * - signer_certificate, when set, is the required DER signer certificate.
+ *   Leave it empty to discover the signer from certificates and the source. */
+typedef struct {
+  const TC_CMS_signer_info* signer;
+  TC_bytes content_type, digest, certificates, signer_certificate;
+} TC_CMS_signer_path_request;
+
+/* One SignedData message.
+ * - encoded is the complete ContentInfo, and signer_index selects a SignerInfo.
+ * - expected_type is the required eContentType OID contents.
+ * - detached_content holds detached_count spans hashed in array order. Empty
+ *   spans are allowed, and zero spans are an empty message. Attached content
+ *   requires zero detached spans.
+ * - signer_certificate follows TC_CMS_signer_path_request. */
+typedef struct {
+  TC_bytes encoded;
+  size_t signer_index;
+  TC_bytes expected_type;
+  const TC_bytes* detached_content;
+  size_t detached_count;
+  TC_bytes signer_certificate;
+} TC_CMS_validation_request;
+
 /* Find a signer certificate, verify its signature, and build a trusted path.
  * Embedded certificates precede external candidates. Trust comes from source
- * anchors alone. The result borrows all certificate and source bytes. */
-TC_X509_path_status TC_CMS_signer_path_build(const TC_CMS_signer_info* signer,
-                                             TC_bytes content_type, TC_bytes digest,
-                                             TC_bytes embedded, const TC_X509_store_source* source,
+ * anchors alone. The result borrows all certificate and source bytes. The
+ * request and its bytes stay stable and separate from scratch during the call. */
+TC_X509_path_status TC_CMS_signer_path_build(const TC_CMS_signer_path_request* request,
+                                             const TC_X509_store_source* source,
                                              const TC_CMS_path_options* options,
                                              const TC_CMS_path_workspace* workspace, size_t* work,
                                              TC_X509_search_result* out);
 
 /* Parse SignedData, bind its content, verify the selected signer and build its
- * path. Attached content requires an empty detached input. */
-TC_X509_path_status TC_CMS_signed_data_path_build(TC_bytes encoded, size_t signer_index,
-                                                  TC_bytes expected_type, TC_bytes detached_content,
+ * path. Storage and borrowing rules match TC_CMS_signer_path_build. */
+TC_X509_path_status TC_CMS_signed_data_path_build(const TC_CMS_validation_request* request,
                                                   const TC_X509_store_source* source,
                                                   const TC_CMS_path_options* options,
                                                   const TC_CMS_path_workspace* workspace,
                                                   size_t* work, TC_X509_search_result* out);
-
-/* Detached content spans are hashed in array order. Empty parts are allowed. */
-TC_X509_path_status TC_CMS_signed_data_path_build_parts(
-    TC_bytes encoded, size_t signer_index, TC_bytes expected_type, const TC_bytes* detached_content,
-    size_t detached_count, const TC_X509_store_source* source, const TC_CMS_path_options* options,
-    const TC_CMS_path_workspace* workspace, size_t* work, TC_X509_search_result* out);
 
 typedef struct {
   const TC_X509_crl_index* index;
@@ -81,15 +102,6 @@ typedef struct {
   TC_bytes* signer_policies;
   size_t signer_policy_capacity;
 } TC_CMS_credential_workspace;
-
-typedef struct {
-  TC_bytes encoded;
-  size_t signer_index;
-  TC_bytes expected_type;
-  const TC_bytes* detached_content;
-  size_t detached_count;
-  TC_bytes signer_certificate;
-} TC_CMS_validation_request;
 
 /* Verify one CMS signer, build its path, and check every path member against
  * the fixed CRL index. The selected path source and anchor are applied to CRL

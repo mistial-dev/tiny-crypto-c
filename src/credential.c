@@ -167,8 +167,9 @@ TC_credential_status TC_PIV_CHUID_validate(const TC_PIV_CHUID_validation_request
   const TC_CMS_validation_request cms = {chuid.signature,      0, object.envelope.content_type,
                                          chuid.signed_content, 2, object.certificate};
   const tc_cms_prepared_signed_data prepared = {&object.envelope, &object.signer};
-  TC_credential_status status = tc_cms_credential_validate_prepared(
-      &cms, &source, &policy, &revocation, workspace, work, &prepared);
+  const tc_cms_validation_extras extras = {NULL, 0, &prepared};
+  TC_credential_status status = tc_cms_credential_validate_internal(
+      &cms, &source, &policy, &revocation, workspace, work, &extras);
   if (status == TC_CREDENTIAL_VALID) {
     const TC_PIV_CHUID_result result = {chuid, object.certificate, context->options->at,
                                         request->profile};
@@ -282,8 +283,9 @@ TC_credential_status TC_PIV_biometric_validate(const TC_PIV_biometric_validation
   const TC_CMS_validation_request cms = {cbeff.signature,       0, object.envelope.content_type,
                                          &cbeff.signed_content, 1, certificate};
   const tc_cms_prepared_signed_data prepared = {&object.envelope, &object.signer};
-  return tc_cms_credential_validate_prepared(&cms, &source, &policy, &revocation,
-                                             context->workspace, work, &prepared);
+  const tc_cms_validation_extras extras = {NULL, 0, &prepared};
+  return tc_cms_credential_validate_internal(&cms, &source, &policy, &revocation,
+                                             context->workspace, work, &extras);
 }
 
 TC_credential_status TC_PIV_security_validate(const TC_PIV_security_validation_request* request,
@@ -367,8 +369,9 @@ TC_credential_status TC_PIV_security_validate(const TC_PIV_security_validation_r
   const TC_CMS_validation_request cms = {container.cms, 0, object.envelope.content_type,
                                          NULL,          0, request->chuid_signer};
   const tc_cms_prepared_signed_data prepared = {&object.envelope, &object.signer};
-  TC_credential_status result = tc_cms_credential_validate_prepared(
-      &cms, &source, &policy, &revocation, context->workspace, work, &prepared);
+  const tc_cms_validation_extras extras = {NULL, 0, &prepared};
+  TC_credential_status result = tc_cms_credential_validate_internal(
+      &cms, &source, &policy, &revocation, context->workspace, work, &extras);
   if (result != TC_CREDENTIAL_VALID)
     return result;
   parsed = TC_LDS_read_content(object.envelope.content, limits,

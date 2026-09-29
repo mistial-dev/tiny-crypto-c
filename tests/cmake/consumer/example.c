@@ -179,14 +179,12 @@ int main(void)
                         NULL, (TC_TLV_frames){NULL, 0}, &work, &piv_object) != TC_TLV_ARGUMENT ||
         work != 100)
       return 1;
-    if (TC_CMS_signer_verify_content(
-            &(TC_CMS_signer_verify_request){NULL, empty, cms_policy, NULL, NULL, NULL}, empty,
-            TC_CMS_CONTENT_RAW, NULL, &work) != TC_X509_SIGNATURE_ERROR ||
+    const TC_CMS_signer_verify_request no_signer = {NULL, empty, cms_policy, NULL, NULL, NULL};
+    if (TC_CMS_signer_verify_content(&no_signer, empty, TC_CMS_CONTENT_RAW, NULL, &work) !=
+            TC_X509_SIGNATURE_ERROR ||
         work != 100)
       return 1;
-    if (TC_CMS_signer_verify_digest(
-            &(TC_CMS_signer_verify_request){NULL, empty, cms_policy, NULL, NULL, NULL}, empty, NULL,
-            &work) != TC_X509_SIGNATURE_ERROR ||
+    if (TC_CMS_signer_verify_digest(&no_signer, empty, NULL, &work) != TC_X509_SIGNATURE_ERROR ||
         work != 100)
       return 1;
     memset(&store, 0, sizeof store);
@@ -279,8 +277,9 @@ int main(void)
             TC_CREDENTIAL_ERROR ||
         slot.readers || work != 100)
       return 1;
-    if (TC_CMS_signed_data_path_build_parts(empty, 0, empty, NULL, 0, NULL, NULL, NULL, &work,
-                                            NULL) != TC_X509_PATH_ERROR ||
+    const TC_CMS_validation_request no_envelope = {empty, 0, empty, NULL, 0, {NULL, 0}};
+    if (TC_CMS_signed_data_path_build(&no_envelope, NULL, NULL, NULL, &work, NULL) !=
+            TC_X509_PATH_ERROR ||
         work != 100)
       return 1;
   }
@@ -520,30 +519,33 @@ int main(void)
     memset(&path_result, 0xa5, sizeof path_result);
     memcpy(&saved_path, &path_result, sizeof path_result);
     settings.path.parsing = limits;
-    if (example_find_cms_signer_path(&signer, content_type, computed, empty, &source, &settings,
-                                     4096, &path_storage, &path_result) != TC_X509_PATH_INVALID)
+    const TC_CMS_signer_path_request signer_request = {
+        &signer, content_type, computed, empty, {NULL, 0}};
+    const TC_CMS_validation_request chain_request = {chain, 0, content_type, NULL, 0, {NULL, 0}};
+    if (example_find_cms_signer_path(&signer_request, &source, &settings, 4096, &path_storage,
+                                     &path_result) != TC_X509_PATH_INVALID)
       return 35;
     if (memcmp(&path_result, &saved_path, sizeof path_result))
       return 36;
-    if (example_find_cms_signer_path(&signer, content_type, computed, empty, &source, &settings, 0,
-                                     &path_storage, &path_result) != TC_X509_PATH_LIMIT)
+    if (example_find_cms_signer_path(&signer_request, &source, &settings, 0, &path_storage,
+                                     &path_result) != TC_X509_PATH_LIMIT)
       return 37;
     if (memcmp(&path_result, &saved_path, sizeof path_result))
       return 38;
-    if (example_find_cms_signer_path(&signer, content_type, computed, empty, &source, &settings,
-                                     4096, NULL, &path_result) != TC_X509_PATH_ERROR)
+    if (example_find_cms_signer_path(&signer_request, &source, &settings, 4096, NULL,
+                                     &path_result) != TC_X509_PATH_ERROR)
       return 39;
-    if (example_check_cms_signed_data(chain, 0, content_type, empty, &source, &settings, 4096,
-                                      &path_storage, &path_result) != TC_X509_PATH_INVALID)
+    if (example_check_cms_signed_data(&chain_request, &source, &settings, 4096, &path_storage,
+                                      &path_result) != TC_X509_PATH_INVALID)
       return 40;
     if (memcmp(&path_result, &saved_path, sizeof path_result))
       return 41;
-    if (example_check_cms_signed_data(chain, 0, content_type, empty, &source, &settings, 0,
-                                      &path_storage, &path_result) != TC_X509_PATH_LIMIT)
+    if (example_check_cms_signed_data(&chain_request, &source, &settings, 0, &path_storage,
+                                      &path_result) != TC_X509_PATH_LIMIT)
       return 42;
     if (memcmp(&path_result, &saved_path, sizeof path_result))
       return 43;
-    if (example_check_cms_signed_data(chain, 0, content_type, empty, &source, &settings, 4096, NULL,
+    if (example_check_cms_signed_data(&chain_request, &source, &settings, 4096, NULL,
                                       &path_result) != TC_X509_PATH_ERROR)
       return 44;
   }

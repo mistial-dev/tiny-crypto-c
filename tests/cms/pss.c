@@ -122,26 +122,29 @@ static void check_envelope_path(TC_bytes signer, EVP_PKEY* key, TC_RSA_workspace
       test_cms_encode_envelope(&data, (TC_bytes){algorithms, sizeof algorithms},
                                (TC_bytes){signers, signer.length + 4}, encoded, sizeof encoded);
   size_t work = PATH_WORK;
-  munit_assert_int(TC_CMS_signed_data_path_build((TC_bytes){encoded, length}, 0, data.content_type,
-                                                 (TC_bytes){NULL, 0}, &source, &options, &workspace,
-                                                 &work, &found),
+  munit_assert_int(TC_CMS_signed_data_path_build(
+                       &(TC_CMS_validation_request){
+                           (TC_bytes){encoded, length}, 0, data.content_type, NULL, 0, {NULL, 0}},
+                       &source, &options, &workspace, &work, &found),
                    ==, TC_X509_PATH_VALID);
   munit_assert_size(found.count, ==, 1);
   munit_assert_ptr_equal(found.path[0].data, leaf_der);
   const size_t required = PATH_WORK - work;
   munit_assert_size(found.validation.work_used, ==, required);
   work = required;
-  munit_assert_int(TC_CMS_signed_data_path_build((TC_bytes){encoded, length}, 0, data.content_type,
-                                                 (TC_bytes){NULL, 0}, &source, &options, &workspace,
-                                                 &work, &found),
+  munit_assert_int(TC_CMS_signed_data_path_build(
+                       &(TC_CMS_validation_request){
+                           (TC_bytes){encoded, length}, 0, data.content_type, NULL, 0, {NULL, 0}},
+                       &source, &options, &workspace, &work, &found),
                    ==, TC_X509_PATH_VALID);
   munit_assert_size(work, ==, 0);
   memset(&found, 0xa5, sizeof found);
   memcpy(&saved, &found, sizeof saved);
   work = required - 1;
-  munit_assert_int(TC_CMS_signed_data_path_build((TC_bytes){encoded, length}, 0, data.content_type,
-                                                 (TC_bytes){NULL, 0}, &source, &options, &workspace,
-                                                 &work, &found),
+  munit_assert_int(TC_CMS_signed_data_path_build(
+                       &(TC_CMS_validation_request){
+                           (TC_bytes){encoded, length}, 0, data.content_type, NULL, 0, {NULL, 0}},
+                       &source, &options, &workspace, &work, &found),
                    ==, TC_X509_PATH_LIMIT);
   munit_assert_memory_equal(sizeof found, &found, &saved);
   X509_free(leaf);

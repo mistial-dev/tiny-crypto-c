@@ -27,23 +27,10 @@ static TC_TLV_result cms_signer_candidate(const void* context, const TC_X509_cer
                                tree, matched);
 }
 
-typedef struct {
-  const TC_CMS_signer_info* signer;
-  TC_bytes content_type, digest;
-  TC_CMS_verification_policy policy;
-  const TC_X509_store_source* source;
-  const TC_X509_path_options* options;
-  const tc_pki_tree_workspace* tree;
-  const TC_CMS_signature_workspace* signature;
-  const TC_X509_path_workspace* validation;
-  const TC_X509_search_workspace* search;
-  tc_cms_signed_attrs_cache* signed_attrs;
-} cms_signer_trust;
-
 static TC_TLV_result cms_signer_attempt(const void* context, const TC_X509_certificate* candidate,
                                         TC_X509_search_result* out)
 {
-  const cms_signer_trust* trust = context;
+  const tc_cms_signer_search* trust = context;
   TC_bytes signer_name = {NULL, 0};
   const TC_CMS_signer_verify_request verify = {
       trust->signer,          trust->content_type,         trust->policy,
@@ -64,30 +51,25 @@ static TC_TLV_result cms_signer_attempt(const void* context, const TC_X509_certi
     if (!matched)
       return TC_TLV_INVALID;
   }
-  return tc_x509_path_result_status(tc_x509_path_build_work(candidate->encoded, trust->source,
+  return tc_x509_path_result_status(tc_x509_path_build_work(candidate->encoded, trust->path_source,
                                                             trust->options, trust->validation,
                                                             trust->search, trust->tree->work, out));
 }
 
-TC_X509_path_status
-tc_cms_signer_find(const tc_cms_candidates* candidates, const TC_CMS_signer_info* signer,
-                   TC_bytes content_type, TC_bytes digest, TC_CMS_verification_policy policy,
-                   const TC_X509_store_source* path_source, const TC_X509_path_options* options,
-                   const tc_pki_tree_workspace* tree, const TC_CMS_signature_workspace* signature,
-                   const TC_X509_path_workspace* validation, const TC_X509_search_workspace* search,
-                   TC_X509_search_result* out, tc_cms_signed_attrs_cache* signed_attrs)
+TC_X509_path_status tc_cms_signer_find(const tc_cms_candidates* candidates,
+                                       const tc_cms_signer_search* search,
+                                       TC_X509_search_result* out)
 {
-  if (!signer || !path_source || !options || !signature || !validation || !search ||
-      !content_type.data || !content_type.length || !digest.data || !digest.length ||
-      !tc_cms_verification_policy_valid(policy))
+  if (!search || !search->signer || !search->path_source || !search->options ||
+      !search->signature || !search->validation || !search->search || !search->content_type.data ||
+      !search->content_type.length || !search->digest.data || !search->digest.length ||
+      !tc_cms_verification_policy_valid(search->policy))
     return TC_X509_PATH_ERROR;
-  const cms_signer_filter filter = {signer, TC_TLV_BER, &validation->names};
-  const cms_signer_trust trust = {signer, content_type, digest,     policy, path_source, options,
-                                  tree,   signature,    validation, search, signed_attrs};
+  const cms_signer_filter filter = {search->signer, TC_TLV_BER, &search->validation->names};
   const tc_pki_candidate_checks checks = {cms_signer_candidate, &filter, cms_signer_attempt,
-                                          &trust};
-  return tc_x509_path_status(tc_cms_certificate_search(candidates, &checks, &options->parsing, tree,
-                                                       validation, out, NULL));
+                                          search};
+  return tc_x509_path_status(tc_cms_certificate_search(
+      candidates, &checks, &search->options->parsing, search->tree, search->validation, out, NULL));
 }
 
 enum {
@@ -116,31 +98,42 @@ static void cms_path_plan_writes(tc_pki_storage_plan* plan, const TC_CMS_path_wo
   TC_PKI_PLAN_WRITE(plan, work, 1);
 }
 
-static void cms_path_plan_inputs(tc_pki_storage_plan* plan, const TC_CMS_signer_info* signer,
-                                 const TC_bytes* inputs, size_t input_count, const TC_bytes* parts,
-                                 size_t part_count, const TC_X509_store_source* source,
+/* Caller inputs of one path build, checked against every writable range.
+ * request is the caller's request struct. spans are its byte inputs, parts the
+ * detached content spans, and signer an optional parsed SignerInfo. */
+typedef struct {
+  const void* request;
+  size_t request_size;
+  const TC_CMS_signer_info* signer;
+  const TC_bytes* spans;
+  size_t span_count;
+  const TC_bytes* parts;
+  size_t part_count;
+} cms_path_inputs;
+
+static void cms_path_plan_inputs(tc_pki_storage_plan* plan, const cms_path_inputs* in,
+                                 const TC_X509_store_source* source,
                                  const TC_CMS_path_options* options,
                                  const TC_CMS_path_workspace* workspace)
 {
-  if (signer)
-    TC_PKI_PLAN_INPUT(plan, signer, 1);
+  tc_pki_storage_plan_input(plan, in->request, 1, in->request_size);
+  if (in->signer)
+    TC_PKI_PLAN_INPUT(plan, in->signer, 1);
   TC_PKI_PLAN_INPUT(plan, source, 1);
   TC_PKI_PLAN_INPUT(plan, options, 1);
   TC_PKI_PLAN_INPUT(plan, workspace, 1);
-  TC_PKI_PLAN_INPUT(plan, parts, part_count);
-  if (signer) {
+  TC_PKI_PLAN_INPUT(plan, in->parts, in->part_count);
+  if (in->signer) {
     TC_bytes signer_fields[TC_CMS_SIGNER_SPAN_COUNT];
-    tc_cms_signer_spans(signer, signer_fields);
+    tc_cms_signer_spans(in->signer, signer_fields);
     tc_pki_storage_plan_input_spans(plan, signer_fields, TC_CMS_SIGNER_SPAN_COUNT);
   }
-  tc_pki_storage_plan_input_spans(plan, inputs, input_count);
-  tc_pki_storage_plan_input_spans(plan, parts, part_count);
+  tc_pki_storage_plan_input_spans(plan, in->spans, in->span_count);
+  tc_pki_storage_plan_input_spans(plan, in->parts, in->part_count);
   tc_x509_path_options_plan_inputs(plan, &options->path);
 }
 
-static TC_TLV_result cms_path_storage(const TC_CMS_signer_info* signer, const TC_bytes* inputs,
-                                      size_t input_count, const TC_bytes* parts, size_t part_count,
-                                      const TC_X509_store_source* source,
+static TC_TLV_result cms_path_storage(const cms_path_inputs* in, const TC_X509_store_source* source,
                                       const TC_CMS_path_options* options,
                                       const TC_CMS_path_workspace* workspace, size_t* work,
                                       TC_X509_search_result* out,
@@ -150,8 +143,7 @@ static TC_TLV_result cms_path_storage(const TC_CMS_signer_info* signer, const TC
   tc_pki_storage_plan_begin(&plan, writes, CMS_PATH_WRITE_COUNT, *work);
   cms_path_plan_writes(&plan, workspace, work, out);
   tc_pki_storage_plan_seal(&plan);
-  cms_path_plan_inputs(&plan, signer, inputs, input_count, parts, part_count, source, options,
-                       workspace);
+  cms_path_plan_inputs(&plan, in, source, options, workspace);
   return tc_pki_storage_plan_finish(&plan, remaining);
 }
 
@@ -179,13 +171,15 @@ static TC_TLV_result cms_selected_certificate(void* context, size_t index, size_
 }
 
 /* All inputs and source records are covered by the caller's storage preflight. */
-static TC_X509_path_status
-cms_signer_path_build(const TC_CMS_signer_info* signer, TC_bytes content_type, TC_bytes digest,
-                      TC_bytes embedded, TC_bytes selected, const TC_X509_store_source* source,
-                      const TC_CMS_path_options* options, const TC_CMS_path_workspace* workspace,
-                      size_t* work, TC_X509_search_result* out,
-                      const TC_bytes writes[CMS_PATH_WRITE_COUNT])
+static TC_X509_path_status cms_signer_path_build(const TC_CMS_signer_path_request* request,
+                                                 const TC_X509_store_source* source,
+                                                 const TC_CMS_path_options* options,
+                                                 const TC_CMS_path_workspace* workspace,
+                                                 size_t* work, TC_X509_search_result* out,
+                                                 const TC_bytes writes[CMS_PATH_WRITE_COUNT])
 {
+  /* The single-record source borrows this copy as its context. */
+  TC_bytes selected = request->signer_certificate;
   tc_cms_candidates candidates;
   tc_cms_path_source context;
   TC_X509_store_source indexed;
@@ -197,7 +191,7 @@ cms_signer_path_build(const TC_CMS_signer_info* signer, TC_bytes content_type, T
   const TC_CMS_signature_workspace signature = {
       workspace->validation.frames, workspace->validation.frame_capacity, workspace->signature,
       workspace->signature_capacity};
-  result = tc_cms_candidates_init(embedded, &guarded, options->max_candidates,
+  result = tc_cms_candidates_init(request->certificates, &guarded, options->max_candidates,
                                   options->max_candidate_bytes, &options->path.parsing, &tree,
                                   &candidates);
   if (result != TC_TLV_OK)
@@ -220,18 +214,25 @@ cms_signer_path_build(const TC_CMS_signer_info* signer, TC_bytes content_type, T
   tc_cms_signed_attrs_cache signed_attrs = {0};
   signed_attrs.digest = workspace->signed_digest;
   signed_attrs.capacity = workspace->signed_digest_capacity;
-  const TC_X509_path_status status =
-      tc_cms_signer_find(&candidates, signer, content_type, digest,
-                         (TC_CMS_verification_policy){options->attributes, options->rsa_parameters},
-                         &indexed, &options->path, &tree, &signature, &workspace->validation,
-                         &workspace->search, out, &signed_attrs);
+  const tc_cms_signer_search search = {
+      request->signer,
+      request->content_type,
+      request->digest,
+      (TC_CMS_verification_policy){options->attributes, options->rsa_parameters},
+      &indexed,
+      &options->path,
+      &tree,
+      &signature,
+      &workspace->validation,
+      &workspace->search,
+      &signed_attrs};
+  const TC_X509_path_status status = tc_cms_signer_find(&candidates, &search, out);
   TC_secure_zero(workspace->signed_digest, TC_CMS_SIGNED_DIGEST_BYTES);
   return status;
 }
 
-TC_X509_path_status TC_CMS_signer_path_build(const TC_CMS_signer_info* signer,
-                                             TC_bytes content_type, TC_bytes digest,
-                                             TC_bytes embedded, const TC_X509_store_source* source,
+TC_X509_path_status TC_CMS_signer_path_build(const TC_CMS_signer_path_request* request,
+                                             const TC_X509_store_source* source,
                                              const TC_CMS_path_options* options,
                                              const TC_CMS_path_workspace* workspace, size_t* work,
                                              TC_X509_search_result* out)
@@ -240,17 +241,20 @@ TC_X509_path_status TC_CMS_signer_path_build(const TC_CMS_signer_info* signer,
   TC_TLV_result result;
   TC_X509_path_status status;
   size_t initial_work;
-  if (!signer || !content_type.data || !content_type.length || !digest.data || !digest.length ||
+  if (!request || !request->signer || !request->content_type.data ||
+      !request->content_type.length || !request->digest.data || !request->digest.length ||
+      (!request->signer_certificate.data) != (!request->signer_certificate.length) ||
       !cms_path_arguments(source, options, workspace, work, out))
     return TC_X509_PATH_ERROR;
   initial_work = *work;
-  const TC_bytes inputs[] = {content_type, digest, embedded};
-  result = cms_path_storage(signer, inputs, sizeof inputs / sizeof *inputs, NULL, 0, source,
-                            options, workspace, work, out, writes, work);
+  const TC_bytes spans[] = {request->content_type, request->digest, request->certificates,
+                            request->signer_certificate};
+  const cms_path_inputs inputs = {
+      request, sizeof *request, request->signer, spans, sizeof spans / sizeof *spans, NULL, 0};
+  result = cms_path_storage(&inputs, source, options, workspace, work, out, writes, work);
   if (result != TC_TLV_OK)
     return tc_x509_path_status(result);
-  status = cms_signer_path_build(signer, content_type, digest, embedded, (TC_bytes){NULL, 0},
-                                 source, options, workspace, work, out, writes);
+  status = cms_signer_path_build(request, source, options, workspace, work, out, writes);
   if (status == TC_X509_PATH_VALID)
     out->validation.work_used = initial_work - *work;
   return status;
@@ -273,12 +277,22 @@ static TC_TLV_result cms_signed_content_digest(const TC_CMS_signed_data* data,
   return result;
 }
 
-static TC_X509_path_status cms_signed_data_path_build_parts(
-    TC_bytes encoded, size_t signer_index, TC_bytes expected_type, const TC_bytes* detached_content,
-    size_t detached_count, TC_bytes selected, const tc_cms_prepared_signed_data* prepared,
-    const TC_X509_store_source* source, const TC_CMS_path_options* options,
-    const TC_CMS_path_workspace* workspace, size_t* work, TC_X509_search_result* out)
+/* prepared, when set, supplies views already read from request->encoded. */
+static TC_X509_path_status cms_signed_data_path_build(const TC_CMS_validation_request* request,
+                                                      const tc_cms_prepared_signed_data* prepared,
+                                                      const TC_X509_store_source* source,
+                                                      const TC_CMS_path_options* options,
+                                                      const TC_CMS_path_workspace* workspace,
+                                                      size_t* work, TC_X509_search_result* out)
 {
+  if (!request)
+    return TC_X509_PATH_ERROR;
+  const TC_bytes encoded = request->encoded;
+  const TC_bytes expected_type = request->expected_type;
+  const TC_bytes* detached_content = request->detached_content;
+  const size_t detached_count = request->detached_count;
+  const size_t signer_index = request->signer_index;
+  const TC_bytes selected = request->signer_certificate;
   enum { MAX_DIGEST_BYTES = 64 };
   TC_bytes writes[CMS_PATH_WRITE_COUNT];
   TC_CMS_signed_data data;
@@ -290,13 +304,19 @@ static TC_X509_path_status cms_signed_data_path_build_parts(
   TC_X509_path_status status;
   size_t initial_work;
   if (!encoded.data || !encoded.length || !expected_type.data || !expected_type.length ||
+      (detached_count && !detached_content) || (!selected.data) != (!selected.length) ||
       !cms_path_arguments(source, options, workspace, work, out))
     return TC_X509_PATH_ERROR;
   initial_work = *work;
-  const TC_bytes inputs[] = {encoded, expected_type, selected};
-  result = cms_path_storage(prepared ? prepared->signer : NULL, inputs,
-                            sizeof inputs / sizeof *inputs, detached_content, detached_count,
-                            source, options, workspace, work, out, writes, work);
+  const TC_bytes spans[] = {encoded, expected_type, selected};
+  const cms_path_inputs inputs = {request,
+                                  sizeof *request,
+                                  prepared ? prepared->signer : NULL,
+                                  spans,
+                                  sizeof spans / sizeof *spans,
+                                  detached_content,
+                                  detached_count};
+  result = cms_path_storage(&inputs, source, options, workspace, work, out, writes, work);
   if (result != TC_TLV_OK)
     return tc_x509_path_status(result);
   const TC_TLV_limits* limits = &options->path.parsing;
@@ -340,10 +360,10 @@ static TC_X509_path_status cms_signed_data_path_build_parts(
     return TC_X509_PATH_UNSUPPORTED;
   result = cms_signed_content_digest(&data, detached_content, detached_count, algorithm, limits,
                                      &tree, digest);
+  const TC_CMS_signer_path_request signer_request = {
+      &signer, data.content_type, {digest, hash.digest_length}, data.certificates, selected};
   if (result == TC_TLV_OK)
-    status = cms_signer_path_build(&signer, data.content_type,
-                                   (TC_bytes){digest, hash.digest_length}, data.certificates,
-                                   selected, source, options, workspace, work, out, writes);
+    status = cms_signer_path_build(&signer_request, source, options, workspace, work, out, writes);
   else
     status = tc_x509_path_status(result);
   TC_secure_zero(digest, sizeof digest);
@@ -352,27 +372,13 @@ static TC_X509_path_status cms_signed_data_path_build_parts(
   return status;
 }
 
-TC_X509_path_status TC_CMS_signed_data_path_build_parts(
-    TC_bytes encoded, size_t signer_index, TC_bytes expected_type, const TC_bytes* detached_content,
-    size_t detached_count, const TC_X509_store_source* source, const TC_CMS_path_options* options,
-    const TC_CMS_path_workspace* workspace, size_t* work, TC_X509_search_result* out)
-{
-  return cms_signed_data_path_build_parts(encoded, signer_index, expected_type, detached_content,
-                                          detached_count, (TC_bytes){NULL, 0}, NULL, source,
-                                          options, workspace, work, out);
-}
-
-TC_X509_path_status TC_CMS_signed_data_path_build(TC_bytes encoded, size_t signer_index,
-                                                  TC_bytes expected_type, TC_bytes detached_content,
+TC_X509_path_status TC_CMS_signed_data_path_build(const TC_CMS_validation_request* request,
                                                   const TC_X509_store_source* source,
                                                   const TC_CMS_path_options* options,
                                                   const TC_CMS_path_workspace* workspace,
                                                   size_t* work, TC_X509_search_result* out)
 {
-  const size_t count = detached_content.data || detached_content.length ? 1u : 0u;
-  return TC_CMS_signed_data_path_build_parts(encoded, signer_index, expected_type,
-                                             count ? &detached_content : NULL, count, source,
-                                             options, workspace, work, out);
+  return cms_signed_data_path_build(request, NULL, source, options, workspace, work, out);
 }
 
 static TC_credential_status cms_credential_error(TC_TLV_result result)
@@ -417,12 +423,15 @@ TC_credential_status tc_cms_path_revocation_check(const TC_X509_search_result* p
   return checked.status == TC_X509_CRL_UNREVOKED ? TC_CREDENTIAL_VALID : TC_CREDENTIAL_UNSUPPORTED;
 }
 
-static TC_credential_status cms_credential_validate_impl(
+TC_credential_status tc_cms_credential_validate_internal(
     const TC_CMS_validation_request* request, const TC_X509_store_source* source,
     const TC_CMS_path_options* options, const TC_CMS_revocation_policy* revocation,
-    const TC_CMS_credential_workspace* workspace, size_t* work, const TC_bytes* metadata,
-    size_t metadata_count, const tc_cms_prepared_signed_data* prepared)
+    const TC_CMS_credential_workspace* workspace, size_t* work,
+    const tc_cms_validation_extras* extras)
 {
+  const TC_bytes* metadata = extras ? extras->metadata : NULL;
+  const size_t metadata_count = extras ? extras->metadata_count : 0;
+  const tc_cms_prepared_signed_data* prepared = extras ? extras->prepared : NULL;
   enum { HELD_PATH = CMS_PATH_WRITE_COUNT, CRL_STATES, CRL_NODES, WRITE_COUNT };
   TC_bytes writes[WRITE_COUNT];
   TC_X509_search_result path;
@@ -468,10 +477,11 @@ static TC_credential_status cms_credential_validate_impl(
   TC_PKI_PLAN_WRITE(&plan, workspace->crl_states, workspace->crl_capacity);
   TC_PKI_PLAN_WRITE(&plan, workspace->nodes, workspace->node_capacity);
   tc_pki_storage_plan_seal(&plan);
-  cms_path_plan_inputs(&plan, NULL, inputs, sizeof inputs / sizeof *inputs, detached_content,
-                       detached_count, source, options, workspace->path);
+  const cms_path_inputs path_inputs = {
+      request,          sizeof *request, NULL, inputs, sizeof inputs / sizeof *inputs,
+      detached_content, detached_count};
+  cms_path_plan_inputs(&plan, &path_inputs, source, options, workspace->path);
   TC_PKI_PLAN_INPUT(&plan, workspace, 1);
-  TC_PKI_PLAN_INPUT(&plan, request, 1);
   TC_PKI_PLAN_INPUT(&plan, revocation, 1);
   TC_PKI_PLAN_INPUT(&plan, revocation->index, 1);
   TC_PKI_PLAN_INPUT(&plan, revocation->index->records, revocation->index->count);
@@ -490,9 +500,8 @@ static TC_credential_status cms_credential_validate_impl(
   tc_pki_source_guard guard = {source, writes, WRITE_COUNT};
   const TC_X509_store_source guarded = tc_pki_source_guard_bind(&guard);
   *work = budget;
-  switch (cms_signed_data_path_build_parts(encoded, signer_index, expected_type, detached_content,
-                                           detached_count, selected, prepared, &guarded, options,
-                                           workspace->path, work, &path)) {
+  switch (cms_signed_data_path_build(request, prepared, &guarded, options, workspace->path, work,
+                                     &path)) {
   case TC_X509_PATH_VALID:
     break;
   case TC_X509_PATH_INVALID:
@@ -507,26 +516,6 @@ static TC_credential_status cms_credential_validate_impl(
   return tc_cms_path_revocation_check(&path, &guarded, revocation, workspace, work);
 }
 
-TC_credential_status tc_cms_credential_validate_with_metadata(
-    const TC_CMS_validation_request* request, const TC_X509_store_source* source,
-    const TC_CMS_path_options* options, const TC_CMS_revocation_policy* revocation,
-    const TC_CMS_credential_workspace* workspace, size_t* work, const TC_bytes* metadata,
-    size_t metadata_count)
-{
-  return cms_credential_validate_impl(request, source, options, revocation, workspace, work,
-                                      metadata, metadata_count, NULL);
-}
-
-TC_credential_status tc_cms_credential_validate_prepared(
-    const TC_CMS_validation_request* request, const TC_X509_store_source* source,
-    const TC_CMS_path_options* options, const TC_CMS_revocation_policy* revocation,
-    const TC_CMS_credential_workspace* workspace, size_t* work,
-    const tc_cms_prepared_signed_data* prepared)
-{
-  return cms_credential_validate_impl(request, source, options, revocation, workspace, work, NULL,
-                                      0, prepared);
-}
-
 TC_credential_status TC_CMS_credential_validate(const TC_CMS_validation_request* request,
                                                 const TC_X509_store_source* source,
                                                 const TC_CMS_path_options* options,
@@ -534,8 +523,8 @@ TC_credential_status TC_CMS_credential_validate(const TC_CMS_validation_request*
                                                 const TC_CMS_credential_workspace* workspace,
                                                 size_t* work)
 {
-  return tc_cms_credential_validate_with_metadata(request, source, options, revocation, workspace,
-                                                  work, NULL, 0);
+  return tc_cms_credential_validate_internal(request, source, options, revocation, workspace, work,
+                                             NULL);
 }
 
 TC_TLV_result tc_cms_signer_matches(const TC_CMS_signer_info* signer, TC_TLV_profile profile,

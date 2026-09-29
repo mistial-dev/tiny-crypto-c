@@ -289,11 +289,10 @@ including the trailing `FE 00`. They exclude the outer `53` response wrapper.
 Keep the original tag and length bytes when hashing, including nonminimal
 length encodings accepted by the CHUID reader.
 
-`TC_CMS_signed_data_path_build_parts` accepts this array directly as detached
-content. Pass `chuid.signature` as the envelope and `chuid.signed_content` with
-a count of two. It selects the signer's hash, checks the envelope and content
-binding, and builds the certificate path with the same options and workspace
-as `TC_CMS_signed_data_path_build`. CHUID profile requirements and revocation
+`TC_CMS_signed_data_path_build` accepts this array directly as detached
+content. In its `TC_CMS_validation_request`, pass `chuid.signature` as the
+envelope and `chuid.signed_content` with a count of two. It selects the signer's
+hash, checks the envelope and content binding, and builds the certificate path. CHUID profile requirements and revocation
 checks belong to the credential-validation workflow.
 
 The combined example exposes `example_validate_cms_credential` for a held
@@ -489,9 +488,12 @@ that only parse or verify CMS signatures can omit this header and feature.
 
 `TC_CMS_signer_path_build` selects a certificate by issuer/serial or subject key
 identifier, verifies the CMS signature against a supplied content digest, and
-constructs a path to an application-provided trust anchor. Pass a parsed
-SignerInfo, the envelope's content type, the computed digest and
-`signed_data.certificates`. Use `{NULL, 0}` when certificates are external only.
+constructs a path to an application-provided trust anchor. Its
+`TC_CMS_signer_path_request` holds a parsed SignerInfo, the envelope's content
+type, the computed digest and `signed_data.certificates`. Use `{NULL, 0}` for
+the certificates when they are external only. Set `signer_certificate` to
+require one DER signer certificate. Other certificates remain available as
+issuers.
 
 The source supplies additional candidates and explicit trust anchors. Embedded
 certificates can supply the signer and intermediates. Trust anchors come only
@@ -543,8 +545,9 @@ signer's `digest_algorithm`. Cached digests can be reused across candidates.
 
 ## Validate a SignedData signer
 
-`TC_CMS_signed_data_path_build` accepts the complete encoded envelope and handles
-parsing, content hashing, signer selection and path construction. Use it when
+`TC_CMS_signed_data_path_build` takes a `TC_CMS_validation_request` holding the
+complete encoded envelope and handles parsing, content hashing, signer selection
+and path construction. Use it when
 the application has the whole CMS object and does not need cached digests.
 It uses the same options, workspace and trust source as the prehashed path API.
 
@@ -554,11 +557,11 @@ of `signerInfos` in encoded order. The function checks every signer's schema
 while checking the envelope version, but authenticates only the selected signer.
 An absent index returns `INVALID`, so an empty signer set cannot succeed.
 
-For attached content, pass `{NULL, 0}` as `detached_content`. The function hashes
-the envelope's OCTET STRING value, excluding BER headers and chunk markers.
-Supplying replacement bytes for an attached envelope returns `ERROR`. For a
-detached envelope, pass the raw application message. `{NULL, 0}` represents an
-empty message. Malformed attached content is never retried as detached content.
+For attached content, pass zero detached spans. The function hashes the
+envelope's OCTET STRING value, excluding BER headers and chunk markers.
+Supplying any detached span for an attached envelope returns `ERROR`. For a
+detached envelope, pass the raw application message as one or more spans,
+hashed in array order. Zero spans represent an empty message. Malformed attached content is never retried as detached content.
 
 The selected signer's digest must appear in `digestAlgorithms`. This is the
 validation policy permitted by [RFC 5652 section 5.1](https://www.rfc-editor.org/rfc/rfc5652.html#section-5.1).

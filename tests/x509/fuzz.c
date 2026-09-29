@@ -440,7 +440,12 @@ static void fuzz_cms_path(const uint8_t* data, size_t length)
     memcpy(&found, &saved, sizeof found);
     options.attributes = i ? TC_CMS_ATTRIBUTES_BER_DEFINITE_ORDER : TC_CMS_ATTRIBUTES_DER;
     TC_X509_path_status status = TC_CMS_signed_data_path_build(
-        (TC_bytes){data, length}, 0, (TC_bytes){data_type, sizeof data_type}, (TC_bytes){NULL, 0},
+        &(TC_CMS_validation_request){(TC_bytes){data, length},
+                                     0,
+                                     (TC_bytes){data_type, sizeof data_type},
+                                     NULL,
+                                     0,
+                                     {NULL, 0}},
         &source, &options, &workspace, &work, &found);
     /* Without a supplied anchor the path never validates, even when embedded
      * certificates parse. */

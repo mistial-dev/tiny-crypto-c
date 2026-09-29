@@ -50,16 +50,21 @@ TC_credential_status example_validate_cms_from_store(const TC_CMS_validation_req
                                                      size_t* work,
                                                      ExampleCMSCredentialWorkspace* storage);
 
-TC_X509_path_status example_find_cms_signer_path(
-    const TC_CMS_signer_info* signer, TC_bytes content_type, TC_bytes digest, TC_bytes certificates,
-    const TC_X509_store_source* source, const TC_CMS_path_options* options, size_t work_limit,
-    ExampleCMSPathWorkspace* storage, TC_X509_search_result* out);
+/* Build a trusted path for an already parsed signer and computed digest. */
+TC_X509_path_status example_find_cms_signer_path(const TC_CMS_signer_path_request* request,
+                                                 const TC_X509_store_source* source,
+                                                 const TC_CMS_path_options* options,
+                                                 size_t work_limit,
+                                                 ExampleCMSPathWorkspace* storage,
+                                                 TC_X509_search_result* out);
 
-TC_X509_path_status
-example_check_cms_signed_data(TC_bytes encoded, size_t signer_index, TC_bytes expected_type,
-                              TC_bytes detached_content, const TC_X509_store_source* source,
-                              const TC_CMS_path_options* options, size_t work_limit,
-                              ExampleCMSPathWorkspace* storage, TC_X509_search_result* out);
+/* Parse SignedData, bind its content and build the selected signer's path. */
+TC_X509_path_status example_check_cms_signed_data(const TC_CMS_validation_request* request,
+                                                  const TC_X509_store_source* source,
+                                                  const TC_CMS_path_options* options,
+                                                  size_t work_limit,
+                                                  ExampleCMSPathWorkspace* storage,
+                                                  TC_X509_search_result* out);
 
 #ifdef __cplusplus
 }

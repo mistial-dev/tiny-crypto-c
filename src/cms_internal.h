@@ -65,19 +65,19 @@ TC_credential_status tc_cms_path_revocation_check(const TC_X509_search_result* p
                                                   const TC_CMS_revocation_policy* revocation,
                                                   const TC_CMS_credential_workspace* workspace,
                                                   size_t* work);
-TC_credential_status tc_cms_credential_validate_prepared(
+/* Optional inputs of the shared validation engine. metadata spans preserve
+ * caller-owned configuration alias checks when public options are adapted on
+ * the stack. prepared supplies views already read from request->encoded. */
+typedef struct {
+  const TC_bytes* metadata;
+  size_t metadata_count;
+  const tc_cms_prepared_signed_data* prepared;
+} tc_cms_validation_extras;
+TC_credential_status tc_cms_credential_validate_internal(
     const TC_CMS_validation_request* request, const TC_X509_store_source* source,
     const TC_CMS_path_options* options, const TC_CMS_revocation_policy* revocation,
     const TC_CMS_credential_workspace* workspace, size_t* work,
-    const tc_cms_prepared_signed_data* prepared);
-
-/* Shared validation engine. Additional metadata spans preserve caller-owned
- * configuration alias checks when public options are adapted on the stack. */
-TC_credential_status tc_cms_credential_validate_with_metadata(
-    const TC_CMS_validation_request* request, const TC_X509_store_source* source,
-    const TC_CMS_path_options* options, const TC_CMS_revocation_policy* revocation,
-    const TC_CMS_credential_workspace* workspace, size_t* work, const TC_bytes* metadata,
-    size_t metadata_count);
+    const tc_cms_validation_extras* extras);
 /* Embedded [0] CertificateSet followed by external candidate records. Limits
  * bound total records and bytes, including the embedded collection framing.
  * Records/order and source metadata must stay stable throughout iteration.
@@ -118,13 +118,22 @@ TC_TLV_result tc_cms_path_source_init(const tc_cms_candidates* candidates,
  * Candidate/source bytes stay stable through result use. Search scratch may
  * change on failure. out changes only on VALID and borrows the selected path.
  * Work includes all candidate attempts. The candidate iterator is unchanged. */
-TC_X509_path_status
-tc_cms_signer_find(const tc_cms_candidates* candidates, const TC_CMS_signer_info* signer,
-                   TC_bytes content_type, TC_bytes digest, TC_CMS_verification_policy policy,
-                   const TC_X509_store_source* path_source, const TC_X509_path_options* options,
-                   const tc_pki_tree_workspace* tree, const TC_CMS_signature_workspace* signature,
-                   const TC_X509_path_workspace* validation, const TC_X509_search_workspace* search,
-                   TC_X509_search_result* out, tc_cms_signed_attrs_cache* signed_attrs);
+typedef struct {
+  const TC_CMS_signer_info* signer;
+  TC_bytes content_type, digest;
+  TC_CMS_verification_policy policy;
+  const TC_X509_store_source* path_source;
+  const TC_X509_path_options* options;
+  const tc_pki_tree_workspace* tree;
+  const TC_CMS_signature_workspace* signature;
+  const TC_X509_path_workspace* validation;
+  const TC_X509_search_workspace* search;
+  /* Optional signed-attribute digest cache shared across candidates. */
+  tc_cms_signed_attrs_cache* signed_attrs;
+} tc_cms_signer_search;
+TC_X509_path_status tc_cms_signer_find(const tc_cms_candidates* candidates,
+                                       const tc_cms_signer_search* search,
+                                       TC_X509_search_result* out);
 /* Shared parsed-certificate iterator. NULL filter yields every X.509 record.
  * Filters consume bounded work, return
  * OK with matched=0/1, and leave the certificate/limits unchanged. Context

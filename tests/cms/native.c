@@ -5027,9 +5027,12 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
     work = WORK_BUDGET;
     munit_assert_int(
         tc_cms_signer_find(
-            &candidates, &signer, container.content_type, content_digest,
-            (TC_CMS_verification_policy){TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
-            &indexed, &options, &tree, &signature, &validation, &search, &found, NULL),
+            &candidates,
+            &(tc_cms_signer_search){
+                &signer, container.content_type, content_digest,
+                (TC_CMS_verification_policy){TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
+                &indexed, &options, &tree, &signature, &validation, &search, NULL},
+            &found),
         ==, TC_X509_PATH_VALID);
     munit_assert_size(found.count, ==, 2);
     munit_assert_size(found.anchor_index, ==, 0);
@@ -5040,9 +5043,12 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
     work = required;
     munit_assert_int(
         tc_cms_signer_find(
-            &candidates, &signer, container.content_type, content_digest,
-            (TC_CMS_verification_policy){TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
-            &indexed, &options, &tree, &signature, &validation, &search, &found, NULL),
+            &candidates,
+            &(tc_cms_signer_search){
+                &signer, container.content_type, content_digest,
+                (TC_CMS_verification_policy){TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
+                &indexed, &options, &tree, &signature, &validation, &search, NULL},
+            &found),
         ==, TC_X509_PATH_VALID);
     munit_assert_size(work, ==, 0);
     {
@@ -5325,13 +5331,18 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
               memset(&found, 0xa5, sizeof found);
               TC_X509_search_result preserved;
               memcpy(&preserved, &found, sizeof found);
-              munit_assert_int(TC_CMS_signed_data_path_build(
-                                   compatible_input, 0, container.content_type, detached_input,
-                                   &external, &policy, &workspace, &work, &found),
-                               ==,
-                               invalid_policy ? TC_X509_PATH_ERROR
-                               : allow        ? TC_X509_PATH_VALID
-                                              : TC_X509_PATH_INVALID);
+              munit_assert_int(
+                  TC_CMS_signed_data_path_build(&(TC_CMS_validation_request){compatible_input,
+                                                                             0,
+                                                                             container.content_type,
+                                                                             &detached_input,
+                                                                             detached ? 1u : 0u,
+                                                                             {NULL, 0}},
+                                                &external, &policy, &workspace, &work, &found),
+                  ==,
+                  invalid_policy ? TC_X509_PATH_ERROR
+                  : allow        ? TC_X509_PATH_VALID
+                                 : TC_X509_PATH_INVALID);
               if (!allow)
                 munit_assert_memory_equal(sizeof found, &found, &preserved);
               if (invalid_policy)
@@ -5512,35 +5523,55 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
                          ==, TC_CREDENTIAL_ERROR);
       }
       work = WORK_BUDGET;
-      munit_assert_int(TC_CMS_signed_data_path_build(envelope, 0, container.content_type,
-                                                     detached_input, &external, &settings,
-                                                     &workspace, &work, &found),
-                       ==, TC_X509_PATH_VALID);
+      munit_assert_int(
+          TC_CMS_signed_data_path_build(&(TC_CMS_validation_request){envelope,
+                                                                     0,
+                                                                     container.content_type,
+                                                                     &detached_input,
+                                                                     detached ? 1u : 0u,
+                                                                     {NULL, 0}},
+                                        &external, &settings, &workspace, &work, &found),
+          ==, TC_X509_PATH_VALID);
       munit_assert_size(found.count, ==, 2);
       munit_assert_memory_equal(leaf_length, found.path[1].data, leaf_der);
       const size_t envelope_work = WORK_BUDGET - work;
       munit_assert_size(found.validation.work_used, ==, envelope_work);
       work = envelope_work;
-      munit_assert_int(TC_CMS_signed_data_path_build(envelope, 0, container.content_type,
-                                                     detached_input, &external, &settings,
-                                                     &workspace, &work, &found),
-                       ==, TC_X509_PATH_VALID);
+      munit_assert_int(
+          TC_CMS_signed_data_path_build(&(TC_CMS_validation_request){envelope,
+                                                                     0,
+                                                                     container.content_type,
+                                                                     &detached_input,
+                                                                     detached ? 1u : 0u,
+                                                                     {NULL, 0}},
+                                        &external, &settings, &workspace, &work, &found),
+          ==, TC_X509_PATH_VALID);
       munit_assert_size(work, ==, 0);
       {
         const size_t split = message_length / 2;
         TC_bytes parts[] = {{message, split}, {NULL, 0}, {message + split, message_length - split}};
         work = WORK_BUDGET;
-        munit_assert_int(TC_CMS_signed_data_path_build_parts(
-                             envelope, 0, container.content_type, detached ? parts : NULL,
-                             detached ? 3 : 0, &external, &settings, &workspace, &work, &found),
-                         ==, TC_X509_PATH_VALID);
+        munit_assert_int(
+            TC_CMS_signed_data_path_build(&(TC_CMS_validation_request){envelope,
+                                                                       0,
+                                                                       container.content_type,
+                                                                       detached ? parts : NULL,
+                                                                       detached ? 3 : 0,
+                                                                       {NULL, 0}},
+                                          &external, &settings, &workspace, &work, &found),
+            ==, TC_X509_PATH_VALID);
         const size_t parts_work = WORK_BUDGET - work;
         munit_assert_size(found.validation.work_used, ==, parts_work);
         work = parts_work;
-        munit_assert_int(TC_CMS_signed_data_path_build_parts(
-                             envelope, 0, container.content_type, detached ? parts : NULL,
-                             detached ? 3 : 0, &external, &settings, &workspace, &work, &found),
-                         ==, TC_X509_PATH_VALID);
+        munit_assert_int(
+            TC_CMS_signed_data_path_build(&(TC_CMS_validation_request){envelope,
+                                                                       0,
+                                                                       container.content_type,
+                                                                       detached ? parts : NULL,
+                                                                       detached ? 3 : 0,
+                                                                       {NULL, 0}},
+                                          &external, &settings, &workspace, &work, &found),
+            ==, TC_X509_PATH_VALID);
         munit_assert_size(work, ==, 0);
         for (unsigned failure = 0; failure < 6; ++failure) {
           const TC_bytes* supplied = parts;
@@ -5565,9 +5596,10 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
             count = SIZE_MAX;
           if (failure == 5)
             parts[0] = (TC_bytes){(const uint8_t*)&found, 1};
-          munit_assert_int(TC_CMS_signed_data_path_build_parts(
-                               envelope, 0, container.content_type, supplied, count, &external,
-                               &settings, &workspace, &work, &found),
+          munit_assert_int(TC_CMS_signed_data_path_build(
+                               &(TC_CMS_validation_request){
+                                   envelope, 0, container.content_type, supplied, count, {NULL, 0}},
+                               &external, &settings, &workspace, &work, &found),
                            ==, failure == 3 ? TC_X509_PATH_LIMIT : TC_X509_PATH_ERROR);
           munit_assert_memory_equal(sizeof found, &found, &saved);
           if (failure != 3)
@@ -5576,27 +5608,30 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
         parts[0] = (TC_bytes){message, split};
         if (!detached) {
           work = WORK_BUDGET;
-          munit_assert_int(TC_CMS_signed_data_path_build_parts(envelope, 0, container.content_type,
-                                                               parts, 3, &external, &settings,
-                                                               &workspace, &work, &found),
+          munit_assert_int(TC_CMS_signed_data_path_build(
+                               &(TC_CMS_validation_request){
+                                   envelope, 0, container.content_type, parts, 3, {NULL, 0}},
+                               &external, &settings, &workspace, &work, &found),
                            ==, TC_X509_PATH_ERROR);
         } else {
           static const uint8_t extra_byte = 0xff;
           parts[1] = (TC_bytes){&extra_byte, 1};
           work = WORK_BUDGET;
           memcpy(&found, &saved, sizeof found);
-          munit_assert_int(TC_CMS_signed_data_path_build_parts(envelope, 0, container.content_type,
-                                                               parts, 3, &external, &settings,
-                                                               &workspace, &work, &found),
+          munit_assert_int(TC_CMS_signed_data_path_build(
+                               &(TC_CMS_validation_request){
+                                   envelope, 0, container.content_type, parts, 3, {NULL, 0}},
+                               &external, &settings, &workspace, &work, &found),
                            ==, TC_X509_PATH_INVALID);
           munit_assert_memory_equal(sizeof found, &found, &saved);
           TC_CMS_path_options bounded = settings;
           bounded.path.parsing.max_input = envelope.length;
           const TC_bytes oversized[] = {envelope, envelope};
           work = WORK_BUDGET;
-          munit_assert_int(TC_CMS_signed_data_path_build_parts(envelope, 0, container.content_type,
-                                                               oversized, 2, &external, &bounded,
-                                                               &workspace, &work, &found),
+          munit_assert_int(TC_CMS_signed_data_path_build(
+                               &(TC_CMS_validation_request){
+                                   envelope, 0, container.content_type, oversized, 2, {NULL, 0}},
+                               &external, &bounded, &workspace, &work, &found),
                            ==, TC_X509_PATH_LIMIT);
           munit_assert_memory_equal(sizeof found, &found, &saved);
         }
@@ -5617,13 +5652,19 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
           type = (TC_bytes){other_type, sizeof other_type};
         if (failure == 4)
           supplied = (TC_bytes){bad_content, sizeof bad_content};
-        munit_assert_int(TC_CMS_signed_data_path_build(envelope, selected, type, supplied,
-                                                       &external, &settings, &workspace, &work,
-                                                       &found),
-                         ==,
-                         failure == 0                ? TC_X509_PATH_LIMIT
-                         : failure == 4 && !detached ? TC_X509_PATH_ERROR
-                                                     : TC_X509_PATH_INVALID);
+        munit_assert_int(
+            TC_CMS_signed_data_path_build(
+                &(TC_CMS_validation_request){envelope,
+                                             selected,
+                                             type,
+                                             &supplied,
+                                             supplied.data || supplied.length ? 1u : 0u,
+                                             {NULL, 0}},
+                &external, &settings, &workspace, &work, &found),
+            ==,
+            failure == 0                ? TC_X509_PATH_LIMIT
+            : failure == 4 && !detached ? TC_X509_PATH_ERROR
+                                        : TC_X509_PATH_INVALID);
         munit_assert_memory_equal(sizeof found, &found, &saved);
       }
       {
@@ -5657,8 +5698,13 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
           work = WORK_BUDGET;
           memcpy(&found, &saved, sizeof found);
           munit_assert_int(TC_CMS_signed_data_path_build(
-                               (TC_bytes){rewritten, rewritten_length}, 0, container.content_type,
-                               detached_input, &external, &settings, &workspace, &work, &found),
+                               &(TC_CMS_validation_request){(TC_bytes){rewritten, rewritten_length},
+                                                            0,
+                                                            container.content_type,
+                                                            &detached_input,
+                                                            detached ? 1u : 0u,
+                                                            {NULL, 0}},
+                               &external, &settings, &workspace, &work, &found),
                            ==, variants[i].status);
           if (variants[i].status != TC_X509_PATH_VALID)
             munit_assert_memory_equal(sizeof found, &found, &saved);
@@ -5681,43 +5727,106 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
         for (size_t selected = 0; selected < 3; ++selected) {
           work = WORK_BUDGET;
           memcpy(&found, &saved, sizeof found);
-          munit_assert_int(TC_CMS_signed_data_path_build((TC_bytes){rewritten, rewritten_length},
-                                                         selected, container.content_type,
-                                                         detached_input, &external, &settings,
-                                                         &workspace, &work, &found),
+          munit_assert_int(TC_CMS_signed_data_path_build(
+                               &(TC_CMS_validation_request){(TC_bytes){rewritten, rewritten_length},
+                                                            selected,
+                                                            container.content_type,
+                                                            &detached_input,
+                                                            detached ? 1u : 0u,
+                                                            {NULL, 0}},
+                               &external, &settings, &workspace, &work, &found),
                            ==, selected == 1 ? TC_X509_PATH_VALID : TC_X509_PATH_INVALID);
           if (selected != 1)
             munit_assert_memory_equal(sizeof found, &found, &saved);
         }
       }
       work = WORK_BUDGET;
-      munit_assert_int(TC_CMS_signer_path_build(&signer, container.content_type, content_digest,
-                                                container.certificates, &external, &settings,
-                                                &workspace, &work, &found),
-                       ==, TC_X509_PATH_VALID);
+      munit_assert_int(
+          TC_CMS_signer_path_build(&(TC_CMS_signer_path_request){&signer,
+                                                                 container.content_type,
+                                                                 content_digest,
+                                                                 container.certificates,
+                                                                 {NULL, 0}},
+                                   &external, &settings, &workspace, &work, &found),
+          ==, TC_X509_PATH_VALID);
       munit_assert_size(found.count, ==, 2);
       munit_assert_size(found.anchor_index, ==, 0);
       munit_assert_memory_equal(leaf_length, found.path[1].data, leaf_der);
       const size_t total = WORK_BUDGET - work;
       munit_assert_size(found.validation.work_used, ==, total);
+      /* A required signer certificate limits the signer search to that record.
+       * The leaf is selected. Another certificate cannot sign, so no path is
+       * found and the result is unchanged. */
+      const TC_bytes other_certificate = found.path[0];
+      TC_X509_search_result selected_path;
+      work = WORK_BUDGET;
+      munit_assert_int(
+          TC_CMS_signer_path_build(&(TC_CMS_signer_path_request){&signer,
+                                                                 container.content_type,
+                                                                 content_digest,
+                                                                 container.certificates,
+                                                                 {leaf_der, leaf_length}},
+                                   &external, &settings, &workspace, &work, &selected_path),
+          ==, TC_X509_PATH_VALID);
+      munit_assert_memory_equal(leaf_length, selected_path.path[1].data, leaf_der);
+      memcpy(&selected_path, &saved, sizeof selected_path);
+      work = WORK_BUDGET;
+      munit_assert_int(
+          TC_CMS_signer_path_build(
+              &(TC_CMS_signer_path_request){&signer, container.content_type, content_digest,
+                                            container.certificates, other_certificate},
+              &external, &settings, &workspace, &work, &selected_path),
+          ==, TC_X509_PATH_INVALID);
+      munit_assert_memory_equal(sizeof selected_path, &selected_path, &saved);
+      /* A half-empty signer certificate span and a missing detached span array
+       * are argument errors. */
+      work = WORK_BUDGET;
+      munit_assert_int(
+          TC_CMS_signer_path_build(&(TC_CMS_signer_path_request){&signer,
+                                                                 container.content_type,
+                                                                 content_digest,
+                                                                 container.certificates,
+                                                                 {NULL, 1}},
+                                   &external, &settings, &workspace, &work, &selected_path),
+          ==, TC_X509_PATH_ERROR);
+      munit_assert_size(work, ==, WORK_BUDGET);
+      munit_assert_int(
+          TC_CMS_signed_data_path_build(
+              &(TC_CMS_validation_request){envelope, 0, container.content_type, NULL, 1, {NULL, 0}},
+              &external, &settings, &workspace, &work, &selected_path),
+          ==, TC_X509_PATH_ERROR);
+      munit_assert_size(work, ==, WORK_BUDGET);
       ExampleCMSPathWorkspace example;
-      munit_assert_int(example_check_cms_signed_data(envelope, 0, container.content_type,
-                                                     detached_input, &external, &settings,
-                                                     WORK_BUDGET, &example, &found),
-                       ==, TC_X509_PATH_VALID);
+      munit_assert_int(
+          example_check_cms_signed_data(&(TC_CMS_validation_request){envelope,
+                                                                     0,
+                                                                     container.content_type,
+                                                                     &detached_input,
+                                                                     detached ? 1u : 0u,
+                                                                     {NULL, 0}},
+                                        &external, &settings, WORK_BUDGET, &example, &found),
+          ==, TC_X509_PATH_VALID);
       munit_assert_size(found.count, ==, 2);
       munit_assert_memory_equal(leaf_length, found.path[1].data, leaf_der);
-      munit_assert_int(example_find_cms_signer_path(&signer, container.content_type, content_digest,
-                                                    container.certificates, &external, &settings,
-                                                    WORK_BUDGET, &example, &found),
-                       ==, TC_X509_PATH_VALID);
+      munit_assert_int(
+          example_find_cms_signer_path(&(TC_CMS_signer_path_request){&signer,
+                                                                     container.content_type,
+                                                                     content_digest,
+                                                                     container.certificates,
+                                                                     {NULL, 0}},
+                                       &external, &settings, WORK_BUDGET, &example, &found),
+          ==, TC_X509_PATH_VALID);
       munit_assert_size(found.count, ==, 2);
       munit_assert_memory_equal(leaf_length, found.path[1].data, leaf_der);
       work = total;
-      munit_assert_int(TC_CMS_signer_path_build(&signer, container.content_type, content_digest,
-                                                container.certificates, &external, &settings,
-                                                &workspace, &work, &found),
-                       ==, TC_X509_PATH_VALID);
+      munit_assert_int(
+          TC_CMS_signer_path_build(&(TC_CMS_signer_path_request){&signer,
+                                                                 container.content_type,
+                                                                 content_digest,
+                                                                 container.certificates,
+                                                                 {NULL, 0}},
+                                   &external, &settings, &workspace, &work, &found),
+          ==, TC_X509_PATH_VALID);
       munit_assert_size(work, ==, 0);
       for (unsigned failure = 0; failure < 4; ++failure) {
         TC_CMS_path_options short_settings = settings;
@@ -5732,10 +5841,14 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
           short_settings.max_candidate_bytes = container.certificates.length - 1;
         if (failure == 3)
           short_workspace.certificate_capacity = INDEX_CAPACITY - 1;
-        munit_assert_int(TC_CMS_signer_path_build(&signer, container.content_type, content_digest,
-                                                  container.certificates, &external,
-                                                  &short_settings, &short_workspace, &work, &found),
-                         ==, TC_X509_PATH_LIMIT);
+        munit_assert_int(
+            TC_CMS_signer_path_build(&(TC_CMS_signer_path_request){&signer,
+                                                                   container.content_type,
+                                                                   content_digest,
+                                                                   container.certificates,
+                                                                   {NULL, 0}},
+                                     &external, &short_settings, &short_workspace, &work, &found),
+            ==, TC_X509_PATH_LIMIT);
         munit_assert_memory_equal(sizeof found, &found, &saved);
       }
       {
@@ -5743,10 +5856,14 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
         short_workspace.signed_digest_capacity = TC_CMS_SIGNED_DIGEST_BYTES - 1;
         work = WORK_BUDGET;
         memcpy(&found, &saved, sizeof found);
-        munit_assert_int(TC_CMS_signer_path_build(&signer, container.content_type, content_digest,
-                                                  container.certificates, &external, &settings,
-                                                  &short_workspace, &work, &found),
-                         ==, TC_X509_PATH_ERROR);
+        munit_assert_int(
+            TC_CMS_signer_path_build(&(TC_CMS_signer_path_request){&signer,
+                                                                   container.content_type,
+                                                                   content_digest,
+                                                                   container.certificates,
+                                                                   {NULL, 0}},
+                                     &external, &settings, &short_workspace, &work, &found),
+            ==, TC_X509_PATH_ERROR);
         munit_assert_memory_equal(sizeof found, &found, &saved);
       }
       TC_bytes writes[TC_X509_PATH_STORAGE_COUNT + 7];
@@ -5768,26 +5885,34 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
         void* before = munit_malloc(writes[i].length);
         memcpy(before, writes[i].data, writes[i].length);
         const TC_bytes aliased = {writes[i].data, 1};
-        munit_assert_int(TC_CMS_signer_path_build(&signer, container.content_type, aliased,
-                                                  container.certificates, &external, &settings,
-                                                  &workspace, &work, &found),
-                         ==, TC_X509_PATH_ERROR);
+        munit_assert_int(
+            TC_CMS_signer_path_build(
+                &(TC_CMS_signer_path_request){
+                    &signer, container.content_type, aliased, container.certificates, {NULL, 0}},
+                &external, &settings, &workspace, &work, &found),
+            ==, TC_X509_PATH_ERROR);
         munit_assert_memory_equal(writes[i].length, writes[i].data, before);
         munit_assert_size(work, ==, WORK_BUDGET);
         munit_assert_memory_equal(sizeof found, &found, &saved);
-        munit_assert_int(TC_CMS_signed_data_path_build(envelope, 0, aliased, detached_input,
-                                                       &external, &settings, &workspace, &work,
-                                                       &found),
-                         ==, TC_X509_PATH_ERROR);
+        munit_assert_int(
+            TC_CMS_signed_data_path_build(
+                &(TC_CMS_validation_request){
+                    envelope, 0, aliased, &detached_input, detached ? 1u : 0u, {NULL, 0}},
+                &external, &settings, &workspace, &work, &found),
+            ==, TC_X509_PATH_ERROR);
         munit_assert_memory_equal(writes[i].length, writes[i].data, before);
         munit_assert_size(work, ==, WORK_BUDGET);
         munit_assert_memory_equal(sizeof found, &found, &saved);
         free(before);
       }
       settings.path.max_work = WORK_BUDGET;
-      munit_assert_int(TC_CMS_signer_path_build(&signer, container.content_type, content_digest,
-                                                container.certificates, &external, &settings,
-                                                &workspace, &settings.path.max_work, &found),
+      munit_assert_int(TC_CMS_signer_path_build(
+                           &(TC_CMS_signer_path_request){&signer,
+                                                         container.content_type,
+                                                         content_digest,
+                                                         container.certificates,
+                                                         {NULL, 0}},
+                           &external, &settings, &workspace, &settings.path.max_work, &found),
                        ==, TC_X509_PATH_ERROR);
       munit_assert_size(settings.path.max_work, ==, WORK_BUDGET);
       /* Indexing checks external bytes before writing even the first span. */
@@ -5797,10 +5922,12 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
       TC_bytes saved_index[INDEX_CAPACITY];
       memcpy(saved_index, index, sizeof index);
       work = WORK_BUDGET;
-      munit_assert_int(TC_CMS_signer_path_build(&signer, container.content_type, content_digest,
-                                                (TC_bytes){NULL, 0}, &aliased_source, &settings,
-                                                &workspace, &work, &found),
-                       ==, TC_X509_PATH_ERROR);
+      munit_assert_int(
+          TC_CMS_signer_path_build(
+              &(TC_CMS_signer_path_request){
+                  &signer, container.content_type, content_digest, (TC_bytes){NULL, 0}, {NULL, 0}},
+              &aliased_source, &settings, &workspace, &work, &found),
+          ==, TC_X509_PATH_ERROR);
       munit_assert_memory_equal(sizeof index, index, saved_index);
       munit_assert_memory_equal(sizeof found, &found, &saved);
     }
@@ -5869,9 +5996,12 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
       }
       munit_assert_int(
           tc_cms_signer_find(
-              &candidates, &proposed, container.content_type, content_digest,
-              (TC_CMS_verification_policy){TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
-              &source, &checked, &tree, &signature, &validation, &search, &found, NULL),
+              &candidates,
+              &(tc_cms_signer_search){
+                  &proposed, container.content_type, content_digest,
+                  (TC_CMS_verification_policy){TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
+                  &source, &checked, &tree, &signature, &validation, &search, NULL},
+              &found),
           ==, failures[i].status);
       munit_assert_memory_equal(sizeof found, &found, &saved);
       if (failures[i].kind == BAD_CONTENT)
@@ -5903,9 +6033,12 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
         memcpy(&found, &saved, sizeof found);
         munit_assert_int(
             tc_cms_signer_find(
-                &retries, &signer, container.content_type, content_digest,
-                (TC_CMS_verification_policy){TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
-                &indexed, &checked, &tree, &signature, &validation, &search, &found, NULL),
+                &retries,
+                &(tc_cms_signer_search){
+                    &signer, container.content_type, content_digest,
+                    (TC_CMS_verification_policy){TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
+                    &indexed, &checked, &tree, &signature, &validation, &search, NULL},
+                &found),
             ==,
             retry_results[i] == TC_X509_SIGNATURE_ERROR ? TC_X509_PATH_ERROR : TC_X509_PATH_VALID);
         munit_assert_memory_equal(sizeof retries, &retries, &before);
@@ -6003,10 +6136,14 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
       TC_X509_search_result saved;
       memset(&saved, 0xa5, sizeof saved);
       memcpy(&found, &saved, sizeof found);
-      munit_assert_int(TC_CMS_signed_data_path_build((TC_bytes){encoded, (size_t)length}, 0,
-                                                     (TC_bytes){id_data, sizeof id_data},
-                                                     detached_input, &external, &settings,
-                                                     &workspace, &work, &found),
+      munit_assert_int(TC_CMS_signed_data_path_build(
+                           &(TC_CMS_validation_request){(TC_bytes){encoded, (size_t)length},
+                                                        0,
+                                                        (TC_bytes){id_data, sizeof id_data},
+                                                        &detached_input,
+                                                        detached ? 1u : 0u,
+                                                        {NULL, 0}},
+                           &external, &settings, &workspace, &work, &found),
                        ==, wrong_name ? TC_X509_PATH_INVALID : TC_X509_PATH_VALID);
       if (wrong_name)
         munit_assert_memory_equal(sizeof found, &found, &saved);

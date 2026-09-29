@@ -334,9 +334,9 @@ TC_credential_status TC_CMS_validate(const TC_CMS_validation_request* request,
     return TC_CREDENTIAL_ERROR;
   const TC_bytes metadata[] = {{(const uint8_t*)context, sizeof *context},
                                {(const uint8_t*)context->options, sizeof *context->options}};
-  return tc_cms_credential_validate_with_metadata(request, context->trust.certificates, &cms,
-                                                  &revocation, context->workspace, work, metadata,
-                                                  sizeof metadata / sizeof *metadata);
+  const tc_cms_validation_extras extras = {metadata, sizeof metadata / sizeof *metadata, NULL};
+  return tc_cms_credential_validate_internal(request, context->trust.certificates, &cms,
+                                             &revocation, context->workspace, work, &extras);
 }
 
 TC_credential_status tc_validation_status(TC_TLV_result status)
