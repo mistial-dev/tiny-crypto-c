@@ -103,9 +103,6 @@ static TC_GZIP_result little32(tc_inflate_bits* bits, uint32_t* out)
 TC_GZIP_result tc_gzip_decode(TC_bytes input, TC_GZIP_workspace* tables, tc_inflate_output* output,
                               size_t* work)
 {
-  if (!tables || !output || !work || (!input.data && input.length) ||
-      output->length > output->capacity || (!output->data && output->capacity))
-    return TC_GZIP_ARGUMENT;
   if (!input.length)
     return TC_GZIP_INVALID;
   tc_inflate_bits bits = {input, 0, 0, work};

@@ -590,7 +590,8 @@ add_test(NAME test_package_boundaries
     src/inflate_bits.c src/inflate_tables.c src/inflate.c src/gzip.c src/gzip_api.c)
   target_compile_definitions(tiny-crypto-c-test-gzip PUBLIC
     TC_ENABLE_GZIP=1 TC_ENABLE_AES=0 TC_ENABLE_SHA256=0)
-  tc_add_c_test(test_inflate tiny-crypto-c-test-gzip tests/piv/inflate.c)
+  tc_add_c_test(test_inflate tiny-crypto-c-test-gzip tests/gzip/inflate.c)
+  tc_add_c_test(test_gzip_decode tiny-crypto-c-test-gzip tests/gzip/decode.c)
   if(tc_build_cpp_tests)
     tc_add_linked_test(test_cpp_gzip tiny-crypto-c-test-gzip tests/cpp/gzip.cpp tests/cpp/main.cpp)
     target_include_directories(test_cpp_gzip PRIVATE tests/support)

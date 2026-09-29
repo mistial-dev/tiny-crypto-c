@@ -307,6 +307,60 @@ static MunitResult walks(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+struct borrowed {
+  const uint8_t* input;
+  size_t events, borrowed;
+};
+static void check_borrowed(void* user, const TC_TLV_event* e)
+{
+  struct borrowed* b = (struct borrowed*)user;
+  if (!e->bytes.length)
+    return;
+  ++b->events;
+  munit_assert_memory_equal(e->bytes.length, e->bytes.data, b->input + e->offset);
+  /* Every walk span, including BEGIN headers and EOC markers, points into input. */
+  if (e->bytes.data == b->input + e->offset)
+    ++b->borrowed;
+}
+
+static MunitResult walk_spans_borrow_input(const MunitParameter params[], void* user)
+{
+  (void)params;
+  (void)user;
+  static const uint8_t definite[] = {0x30, 9, 0x30, 3, 2, 1, 42, 4, 2, 0, 0};
+  TC_TLV_frame frames[4];
+  struct borrowed spans = {definite, 0, 0};
+  munit_assert(TC_TLV_walk(definite, sizeof definite, TC_TLV_DER, &limits,
+                           (TC_TLV_frames){frames, 4}, check_borrowed, &spans) == TC_TLV_OK);
+  /* Four headers and two primitive values. */
+  munit_assert_size(spans.events, ==, 6);
+  munit_assert_size(spans.borrowed, ==, spans.events);
+#if TC_TLV_ENABLE_STREAM
+  /* The header at offset 2 straddles the two chunks and comes from stream
+   * storage. Every other span borrows its fed chunk. */
+  TC_TLV_stream stream;
+  struct borrowed split = {definite, 0, 0};
+  munit_assert(TC_TLV_stream_init(&stream, TC_TLV_DER, &limits, (TC_TLV_frames){frames, 4}) ==
+               TC_TLV_OK);
+  munit_assert(TC_TLV_stream_feed(&stream, definite, 3, check_borrowed, &split) == TC_TLV_MORE);
+  munit_assert(TC_TLV_stream_feed(&stream, definite + 3, sizeof definite - 3, check_borrowed,
+                                  &split) == TC_TLV_OK);
+  munit_assert(TC_TLV_stream_finish(&stream) == TC_TLV_OK);
+  munit_assert_size(split.events, ==, 6);
+  munit_assert_size(split.borrowed, ==, 5);
+#endif
+#if TC_TLV_ENABLE_BER
+  static const uint8_t indefinite[] = {0x30, 0x80, 0x30, 0x80, 2, 1, 42, 0, 0, 4, 2, 0, 0, 0, 0};
+  struct borrowed ber = {indefinite, 0, 0};
+  munit_assert(TC_TLV_walk(indefinite, sizeof indefinite, TC_TLV_BER, &limits,
+                           (TC_TLV_frames){frames, 4}, check_borrowed, &ber) == TC_TLV_OK);
+  /* Four headers, two primitive values and two EOC markers. */
+  munit_assert_size(ber.events, ==, 8);
+  munit_assert_size(ber.borrowed, ==, ber.events);
+#endif
+  return MUNIT_OK;
+}
+
 #if TC_ENABLE_DER
 static MunitResult signatures(const MunitParameter params[], void* user)
 {
@@ -769,6 +823,7 @@ static MunitTest tests[] = {
     {"/cursor", cursor, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/child-reader", child_reader, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/walks", walks, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/walk-spans-borrow-input", walk_spans_borrow_input, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/tree-reads", tree_reads, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
 #if TC_ENABLE_DER
     {"/signatures", signatures, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

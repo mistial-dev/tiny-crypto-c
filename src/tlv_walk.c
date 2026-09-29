@@ -65,6 +65,15 @@ static void close_definite(TC_TLV_stream* s, TC_TLV_visit visit, void* user)
   }
 }
 
+/* Header bytes that ended at chunk position p. A header complete inside the
+ * current chunk borrows the caller's input. A header split across chunks
+ * uses the stream's accumulator, which lives only for the callback. */
+static const uint8_t* header_bytes(const TC_TLV_stream* s, const uint8_t* data, size_t p,
+                                   size_t used)
+{
+  return used <= p ? data + p - used : s->header;
+}
+
 static TC_TLV_result feed(TC_TLV_stream* s, const uint8_t* data, size_t length, TC_TLV_visit visit,
                           void* user)
 {
@@ -125,13 +134,16 @@ static TC_TLV_result feed(TC_TLV_stream* s, const uint8_t* data, size_t length, 
         return fail(s, TC_TLV_LIMIT);
       --s->depth;
       s->used = 0;
-      emit(visit, user, TC_TLV_CLOSE, s->offset - 2, s->depth, NULL, s->header, 2);
+      emit(visit, user, TC_TLV_CLOSE, s->offset - 2, s->depth, NULL, header_bytes(s, data, p, 2),
+           2);
       close_definite(s, visit, user);
       continue;
     }
 #endif
     /* Accumulate only the header; values are delivered from the input chunk. */
-    result = TC_TLV_header_read(s->header, s->used, s->profile, &s->limits, &h);
+    /* Stream init validated the profile and limits, and s->used <= s->offset
+     * <= max_input, so only framing is checked per byte. */
+    result = tc_tlv_header_parse(s->header, s->used, s->profile, s->limits.max_value, &h);
     if (result == TC_TLV_MORE)
       continue;
     if (result != TC_TLV_OK)
@@ -144,7 +156,8 @@ static TC_TLV_result feed(TC_TLV_stream* s, const uint8_t* data, size_t length, 
       return fail(s, TC_TLV_LIMIT);
     ++s->elements;
     start = s->offset - s->used;
-    emit(visit, user, TC_TLV_BEGIN, start, s->depth, &h, s->header, s->used);
+    emit(visit, user, TC_TLV_BEGIN, start, s->depth, &h, header_bytes(s, data, p, s->used),
+         s->used);
     s->used = 0;
     if (h.constructed) {
 #if TC_TLV_ENABLE_BER

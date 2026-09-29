@@ -6,9 +6,6 @@
 TC_GZIP_result tc_inflate_bits_read(tc_inflate_bits* bits, unsigned count, unsigned* out)
 {
   unsigned value = 0, shift = 0;
-  if (!bits || !out || !bits->work || count > 16 || bits->bit > 7 ||
-      bits->offset > bits->input.length || (!bits->input.data && bits->input.length))
-    return TC_GZIP_ARGUMENT;
   if (*bits->work < count)
     return TC_GZIP_LIMIT;
   *bits->work -= count;
@@ -35,8 +32,6 @@ TC_GZIP_result tc_inflate_bits_read(tc_inflate_bits* bits, unsigned count, unsig
 TC_GZIP_result tc_inflate_symbol(tc_inflate_bits* bits, const TC_GZIP_tree* tree, unsigned* out)
 {
   unsigned code = 0, first = 0, index = 0;
-  if (!tree || !tree->symbols || !out)
-    return TC_GZIP_ARGUMENT;
   /* Canonical codes of each length form a consecutive interval. */
   for (unsigned length = 1; length <= TC_GZIP_CODE_BITS; ++length) {
     unsigned bit;

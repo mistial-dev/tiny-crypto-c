@@ -77,7 +77,7 @@ validation.
 Run the focused tests with:
 
 ```sh
-ctest --test-dir build -R '^test_(inflate|gzip_differential|gzip_corpus)$' --output-on-failure
+ctest --test-dir build -R '^test_(inflate|gzip_decode|gzip_differential|gzip_corpus)$' --output-on-failure
 ```
 
 The differential test generates synthetic inputs with Python's zlib across

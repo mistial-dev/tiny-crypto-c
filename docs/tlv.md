@@ -105,6 +105,12 @@ primitive chunks and applies one element/depth budget across the input. The
 incremental stream API provides the same traversal for fragmented input when
 `TINY_CRYPTO_TLV_STREAM=ON` is enabled. Neither requires heap allocation.
 
+Every `TC_TLV_walk` event span points into the walked input at the event
+offset, so a visitor may keep BEGIN headers, VALUE chunks and EOC markers while
+that input stays alive and unchanged. Stream events borrow the fed chunk. A
+header or EOC split across two chunks is delivered from stream storage and is
+valid only during the callback.
+
 These APIs check framing only. A DER-framed object can still contain
 an invalid INTEGER, unordered SET, or missing certificate field. Use typed DER
 and object parsers for those checks.

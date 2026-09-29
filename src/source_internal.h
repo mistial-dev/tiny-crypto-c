@@ -22,7 +22,11 @@ TC_result tc_source_reader_init(tc_source_reader* reader, const TC_source* sourc
                                 uint64_t max_bytes, uint64_t max_reads);
 
 /* Borrow up to length bytes at offset. The span lasts until the next cache miss.
- * Range and budget failures preserve out. Storage failures also wipe the cache.
+ * reader was set up by tc_source_reader_init, which validated its storage, and
+ * is private afterward. The caller supplies a non-NULL out that is disjoint
+ * from reader and its window. Only the requested range is checked here.
+ * ARGUMENT reports a range beyond source.length. Range and budget failures
+ * preserve out. Storage failures also wipe the cache.
  * Zero length permits offset == source.length and returns an empty span. */
 TC_result tc_source_reader_view(tc_source_reader* reader, uint64_t offset, size_t length,
                                 TC_bytes* out);

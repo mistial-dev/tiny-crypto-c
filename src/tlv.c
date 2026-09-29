@@ -104,18 +104,12 @@ TC_TLV_result tc_tlv_header_read(const uint8_t* data, size_t length, TC_TLV_prof
   return TC_TLV_OK;
 }
 
-TC_TLV_result TC_TLV_header_read(const uint8_t* data, size_t length, TC_TLV_profile profile,
-                                 const TC_TLV_limits* limits, TC_TLV_header* out)
+TC_TLV_result tc_tlv_header_parse(const uint8_t* data, size_t length, TC_TLV_profile profile,
+                                  size_t max_value, TC_TLV_header* out)
 {
   tc_tlv_wide_header wide;
-  TC_TLV_result result = tc_tlv_config(profile, limits);
-  if (result != TC_TLV_OK)
-    return result;
-  if (!out || (!data && length))
-    return TC_TLV_ARGUMENT;
-  if (length > limits->max_input)
-    return TC_TLV_LIMIT;
-  result = tc_tlv_header_read(data, length, profile, sizeof(size_t), limits->max_value, &wide);
+  TC_TLV_result result =
+      tc_tlv_header_read(data, length, profile, sizeof(size_t), max_value, &wide);
   if (result != TC_TLV_OK)
     return result;
   TC_TLV_header parsed;
@@ -130,6 +124,19 @@ TC_TLV_result TC_TLV_header_read(const uint8_t* data, size_t length, TC_TLV_prof
   parsed.indefinite = wide.indefinite;
   *out = parsed;
   return TC_TLV_OK;
+}
+
+TC_TLV_result TC_TLV_header_read(const uint8_t* data, size_t length, TC_TLV_profile profile,
+                                 const TC_TLV_limits* limits, TC_TLV_header* out)
+{
+  TC_TLV_result result = tc_tlv_config(profile, limits);
+  if (result != TC_TLV_OK)
+    return result;
+  if (!out || (!data && length))
+    return TC_TLV_ARGUMENT;
+  if (length > limits->max_input)
+    return TC_TLV_LIMIT;
+  return tc_tlv_header_parse(data, length, profile, limits->max_value, out);
 }
 
 TC_TLV_result TC_TLV_read(const uint8_t* data, size_t length, TC_TLV_profile profile,

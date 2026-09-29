@@ -30,11 +30,8 @@ TC_result tc_source_reader_init(tc_source_reader* reader, const TC_source* sourc
 TC_result tc_source_reader_view(tc_source_reader* reader, uint64_t offset, size_t length,
                                 TC_bytes* out)
 {
-  if (!reader || !out || !reader->source.read || !reader->window.data || !reader->window.capacity ||
-      reader->available > reader->window.capacity ||
-      !tc_internal_ranges_disjoint(reader, sizeof *reader, out, sizeof *out) ||
-      !tc_internal_ranges_disjoint(reader->window.data, reader->window.capacity, out, sizeof *out))
-    return TC_RESULT_ARGUMENT;
+  /* tc_source_reader_init validated reader storage. The requested range
+   * comes from parsed data and is checked on every call. */
   if (offset > reader->source.length || length > reader->source.length - offset)
     return TC_RESULT_ARGUMENT;
   if (!length) {

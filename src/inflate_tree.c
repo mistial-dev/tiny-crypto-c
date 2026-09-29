@@ -9,10 +9,6 @@ TC_GZIP_result tc_inflate_tree_build(const uint8_t* lengths, size_t count,
 {
   uint16_t offsets[TC_GZIP_CODE_BITS + 1] = {0};
   unsigned remaining = 1, symbols = 0;
-  if (!lengths || !tree || !tree->symbols || !work || !count || count > TC_GZIP_LITERAL_CODES ||
-      (kind != TC_INFLATE_COMPLETE_TREE && kind != TC_INFLATE_LITERAL_TREE &&
-       kind != TC_INFLATE_DISTANCE_TREE))
-    return TC_GZIP_ARGUMENT;
   const size_t cost = 2 * count + TC_GZIP_CODE_BITS;
   if (*work < cost)
     return TC_GZIP_LIMIT;

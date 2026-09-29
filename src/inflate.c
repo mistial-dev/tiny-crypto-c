@@ -102,9 +102,6 @@ static TC_GZIP_result compressed(tc_inflate_bits* bits, const TC_GZIP_workspace*
 TC_GZIP_result tc_inflate_decode(tc_inflate_bits* bits, TC_GZIP_workspace* tables,
                                  tc_inflate_output* output)
 {
-  if (!bits || !bits->work || !tables || !output || output->length > output->capacity ||
-      (!output->data && output->capacity))
-    return TC_GZIP_ARGUMENT;
   const size_t history_start = output->length;
   unsigned final;
   do {

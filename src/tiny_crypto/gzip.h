@@ -17,12 +17,18 @@ typedef struct {
   uint16_t literal_symbols[TC_GZIP_LITERAL_CODES], distance_symbols[TC_GZIP_DISTANCE_CODES];
   uint8_t lengths[TC_GZIP_LITERAL_CODES + TC_GZIP_DISTANCE_CODES];
 } TC_GZIP_workspace;
+/* Results share the RSA and EC order.
+ *   TC_GZIP_INVALID      malformed framing, compressed data, or a CRC32 or
+ *                        size mismatch in the received input.
+ *   TC_GZIP_LIMIT        output capacity or the work budget ran out.
+ *   TC_GZIP_ARGUMENT     NULL pointers or overlapping storage.
+ *   TC_GZIP_UNSUPPORTED  a compression method other than deflate. */
 typedef enum {
   TC_GZIP_OK,
   TC_GZIP_INVALID,
   TC_GZIP_LIMIT,
-  TC_GZIP_UNSUPPORTED,
-  TC_GZIP_ARGUMENT
+  TC_GZIP_ARGUMENT,
+  TC_GZIP_UNSUPPORTED
 } TC_GZIP_result;
 
 /* Decode complete GZIP members with CRC and size checks. Concatenated members

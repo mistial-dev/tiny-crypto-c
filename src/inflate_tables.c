@@ -77,8 +77,6 @@ TC_GZIP_result tc_inflate_tables_read(tc_inflate_bits* bits, unsigned type,
                                       TC_GZIP_workspace* tables)
 {
   unsigned literals = TC_GZIP_LITERAL_CODES, distances = TC_GZIP_DISTANCE_CODES;
-  if (!bits || !bits->work || !tables || (type != 1 && type != 2))
-    return TC_GZIP_ARGUMENT;
   tables->literal.symbols = tables->literal_symbols;
   tables->distance.symbols = tables->distance_symbols;
   TC_GZIP_result result;

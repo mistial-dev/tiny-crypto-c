@@ -102,7 +102,10 @@ typedef struct {
   size_t offset, depth;
   /* Header is populated for BEGIN only. bytes contains the exact header.
    * VALUE borrows a chunk of primitive content. CLOSE bytes is empty for
-   * definite objects, or the two EOC bytes for indefinite objects. */
+   * definite objects, or the two EOC bytes for indefinite objects.
+   * TC_TLV_walk spans borrow its input, with bytes.data at input + offset.
+   * A stream span borrows the fed chunk, except a header or EOC split across
+   * chunks, which borrows stream storage for the callback's duration only. */
   TC_TLV_header header;
   TC_bytes bytes;
 } TC_TLV_event;
@@ -147,6 +150,7 @@ TC_TLV_result TC_TLV_stream_feed(TC_TLV_stream* stream, const uint8_t* data, siz
 TC_TLV_result TC_TLV_stream_finish(TC_TLV_stream* stream);
 #endif
 /* Walk checks all constructed boundaries with one shared element/depth budget.
+ * Event spans borrow data and stay valid while data is alive and unchanged.
  * A sequence of root objects is accepted. A schema needing exactly one root
  * must check that separately. NULL visit validates framing without callbacks. */
 TC_TLV_result TC_TLV_walk(const uint8_t* data, size_t length, TC_TLV_profile profile,
