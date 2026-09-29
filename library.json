@@ -1,8 +1,10 @@
 {
   "name": "tiny-crypto-c",
-  "version": "1.0.1",
-  "description": "Small, heap-free AES, DES, 3DES, SHA-1, SHA-2 (224/256/384/512), HMAC, and SP 800-108 KBKDF for embedded C",
-  "keywords": "cryptography,aes,des,sha1,sha2,sha224,sha256,sha384,sha512,hmac,kdf,kbkdf,sp800-108,embedded",
+  "version": "2.0.0",
+  "description":
+      "Small, heap-free cryptographic primitives for embedded C and C++: AES, DES, 3DES, SHA-1, SHA-2, MD5, HMAC, CMAC, KMAC, KDFs, DRBGs, RSA, ECDSA and ECDH, with optional X.509, CMS, and PIV/TWIC credential validation",
+  "keywords":
+      "cryptography,aes,des,sha1,sha2,hmac,cmac,kmac,kdf,kbkdf,hkdf,drbg,rsa,ecdsa,ecdh,x509,cms,piv,twic,embedded",
   "repository": {
     "type": "git",
     "url": "https://github.com/mistial-dev/tiny-crypto-c.git"
@@ -12,6 +14,14 @@
   "platforms": "*",
   "examples": "examples/*",
   "export": {
-    "include": ["src/*", "examples/*", "library.json", "library.properties", "LICENSE", "LICENSES/*", "README.md"]
+    "include": [
+      "src/*",
+      "examples/*",
+      "library.json",
+      "library.properties",
+      "LICENSE",
+      "LICENSES/*",
+      "README.md"
+    ]
   }
 }
