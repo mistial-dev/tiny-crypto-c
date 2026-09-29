@@ -18,6 +18,8 @@ set(tc_full_definitions
   TC_DES_ENABLE_OFB=1 TC_DES_ENABLE_CFB1=1 TC_DES_ENABLE_CFB8=1
   TC_DES_ENABLE_CFB64=1 TC_DES_ENABLE_TDES=1 TC_DES_ENABLE_CMAC=1
   TC_DES_ENABLE_ISO9797=1)
+# TC_AES_CAVP adds single-block AES entry points to the library. The DES, hash
+# and KDF switches are test-only and select the CAVP suites in tests/*/cavp.c.
 if(TINY_CRYPTO_TEST_FULL)
   list(APPEND tc_full_definitions TC_HASH_CAVP=1 TC_AES_CAVP=1 TC_DES_CAVP=1
        TC_KDF_CAVP=1)

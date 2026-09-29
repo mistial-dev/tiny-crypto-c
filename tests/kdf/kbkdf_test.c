@@ -706,6 +706,18 @@ MunitResult test_kbkdf_api(const MunitParameter params[], void* data)
                                                (TC_buffer){out, 16}),
                      ==, TC_OK);
   }
+  {
+    /* kdf.h derives the key-control value K(0) = PRF(KDK, fixed input) as a
+     * feedback derivation with an empty IV and no counter. */
+    const struct TC_KBKDF_params p = {0, 0, 0};
+    uint8_t k0[16];
+    munit_assert_int(TC_KBKDF_AES_CMAC_feedback((TC_bytes){key, TC_AES_KEYLEN}, &p,
+                                                (TC_bytes){NULL, 0}, (TC_bytes){fixed, 8},
+                                                (TC_buffer){out, 16}),
+                     ==, TC_OK);
+    munit_assert_int(TC_AES_CMAC(key, fixed, 8, k0, sizeof k0), ==, TC_OK);
+    munit_assert_memory_equal(sizeof k0, out, k0);
+  }
 #endif
 #if TC_KBKDF_HAVE_DES_CMAC
   {

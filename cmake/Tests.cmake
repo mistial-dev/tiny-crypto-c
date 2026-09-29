@@ -106,6 +106,12 @@ add_test(NAME test_package_boundaries
         -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/removed-switches
         -DC_COMPILER=${CMAKE_C_COMPILER}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/reject_removed_switches.cmake)
+    add_test(NAME test_header_config_rules
+      COMMAND ${CMAKE_COMMAND}
+        -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+        -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/header-config-rules
+        -DC_COMPILER=${CMAKE_C_COMPILER}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/header_config_rules.cmake)
   endif()
 
   # µunit uses C11 atomics when Clang exposes them in C99 mode. Keep the
@@ -314,7 +320,8 @@ add_test(NAME test_package_boundaries
         --reader $<TARGET_FILE:test_ec_0> --reader $<TARGET_FILE:test_ec_1>)
   endif()
   target_compile_definitions(tiny-crypto-c-test-sskdf PUBLIC
-    TC_ENABLE_AES=0 TC_ENABLE_SSKDF=1 TC_ENABLE_SHA256=1 TC_ENABLE_SHA384=1)
+    TC_ENABLE_AES=0 TC_ENABLE_SSKDF=1 TC_ENABLE_SHA1=1 TC_ENABLE_SHA224=1
+    TC_ENABLE_SHA256=1 TC_ENABLE_SHA384=1 TC_ENABLE_SHA512=1)
   tc_add_c_test(test_sskdf tiny-crypto-c-test-sskdf tests/kdf/sskdf_test.c)
   # SP 800-90A DRBGs with every mechanism, hash and AES key size available.
   tc_add_test_library(tiny-crypto-c-test-drbg
@@ -1315,6 +1322,27 @@ add_test(NAME test_package_boundaries
     target_compile_definitions(test_cpp_umbrella_${header_profile} PRIVATE ${header_profile_definitions})
     set_property(TARGET test_cpp_umbrella_${header_profile} PROPERTY CXX_STANDARD 11)
     tc_warnings(test_cpp_umbrella_${header_profile})
+  endforeach()
+
+  # Include feature headers directly with their features off. The probes fail
+  # to compile when a header declares an API that the profile does not build.
+  set(tc_feature_off_kdf
+    TC_ENABLE_SHA256=1 TC_ENABLE_SHA384=1 TC_ENABLE_HMAC=1 TC_ENABLE_AES=1
+    TC_AES_ENABLE_CMAC=1 TC_ENABLE_KDF=0 TC_ENABLE_SSKDF=0 TC_ENABLE_MD5=0)
+  set(tc_feature_off_no_sha
+    TC_ENABLE_SHA1=0 TC_ENABLE_SHA224=0 TC_ENABLE_SHA256=0 TC_ENABLE_SHA384=0
+    TC_ENABLE_SHA512=0 TC_ENABLE_HMAC=0 TC_ENABLE_KDF=0 TC_ENABLE_SSKDF=0
+    TC_ENABLE_MD5=0 TC_TEST_HEADER_NO_SHA=1)
+  foreach(feature_profile kdf no_sha)
+    foreach(language c cpp)
+      set(feature_target test_${language}_feature_off_${feature_profile})
+      add_library(${feature_target} OBJECT tests/headers/feature_off.${language})
+      target_include_directories(${feature_target} PRIVATE src)
+      target_compile_definitions(${feature_target} PRIVATE
+        ${tc_feature_off_${feature_profile}})
+      tc_warnings(${feature_target})
+    endforeach()
+    set_property(TARGET test_cpp_feature_off_${feature_profile} PROPERTY CXX_STANDARD 11)
   endforeach()
 
   add_library(test_cpp_headers_cxx17 OBJECT tests/cpp/header_compile.cpp)

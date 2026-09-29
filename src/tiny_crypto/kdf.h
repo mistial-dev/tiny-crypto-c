@@ -9,7 +9,7 @@
 
 /**
  * @file kdf.h
- * @brief NIST SP 800-108 key-based key derivation (KBKDF) in counter,
+ * @brief NIST SP 800-108r1 key-based key derivation (KBKDF) in counter,
  *        feedback and double-pipeline mode over HMAC and CMAC PRFs.
  *
  * Every derivation is a one-shot: it expands a key-derivation key
@@ -19,8 +19,9 @@
  * keyed PRF context, a working copy and chaining values live on the stack and
  * are wiped before return.
  *
- * Function families exist per PRF, each with _counter, _feedback and
- * _pipeline variants:
+ * The header declares its API only when TC_ENABLE_KDF is 1. Function families
+ * exist per PRF, each with _counter, _feedback and _pipeline variants, and
+ * each also needs TC_ENABLE_KDF:
  *
  *   TC_KBKDF_HMAC_SHA1_*    TC_ENABLE_HMAC && TC_ENABLE_SHA1
  *   TC_KBKDF_HMAC_SHA224_*  TC_ENABLE_HMAC && TC_ENABLE_SHA224
@@ -31,18 +32,21 @@
  *   TC_KBKDF_DES_CMAC_*     TC_ENABLE_DES && TC_DES_ENABLE_CMAC (legacy, 64-bit PRF)
  */
 
-/* PRF availability, resolved once so kdf.c, kdf.hpp and tests share it. */
-#define TC_KBKDF_HAVE_HMAC_SHA1 (TC_ENABLE_HMAC && TC_ENABLE_SHA1)
-#define TC_KBKDF_HAVE_HMAC_SHA224 (TC_ENABLE_HMAC && TC_ENABLE_SHA224)
-#define TC_KBKDF_HAVE_HMAC_SHA256 (TC_ENABLE_HMAC && TC_ENABLE_SHA256)
-#define TC_KBKDF_HAVE_HMAC_SHA384 (TC_ENABLE_HMAC && TC_ENABLE_SHA384)
-#define TC_KBKDF_HAVE_HMAC_SHA512 (TC_ENABLE_HMAC && TC_ENABLE_SHA512)
-#define TC_KBKDF_HAVE_AES_CMAC (TC_ENABLE_AES && TC_AES_ENABLE_CMAC)
-#define TC_KBKDF_HAVE_DES_CMAC (TC_ENABLE_DES && TC_DES_ENABLE_CMAC)
+/* PRF availability, resolved once so kdf.c, kdf.hpp and tests share it. Each
+ * macro is 0 when TC_ENABLE_KDF is 0. */
+#define TC_KBKDF_HAVE_HMAC_SHA1 (TC_ENABLE_KDF && TC_ENABLE_HMAC && TC_ENABLE_SHA1)
+#define TC_KBKDF_HAVE_HMAC_SHA224 (TC_ENABLE_KDF && TC_ENABLE_HMAC && TC_ENABLE_SHA224)
+#define TC_KBKDF_HAVE_HMAC_SHA256 (TC_ENABLE_KDF && TC_ENABLE_HMAC && TC_ENABLE_SHA256)
+#define TC_KBKDF_HAVE_HMAC_SHA384 (TC_ENABLE_KDF && TC_ENABLE_HMAC && TC_ENABLE_SHA384)
+#define TC_KBKDF_HAVE_HMAC_SHA512 (TC_ENABLE_KDF && TC_ENABLE_HMAC && TC_ENABLE_SHA512)
+#define TC_KBKDF_HAVE_AES_CMAC (TC_ENABLE_KDF && TC_ENABLE_AES && TC_AES_ENABLE_CMAC)
+#define TC_KBKDF_HAVE_DES_CMAC (TC_ENABLE_KDF && TC_ENABLE_DES && TC_DES_ENABLE_CMAC)
 
 #define TC_KBKDF_HAVE_HMAC                                                                         \
   (TC_KBKDF_HAVE_HMAC_SHA1 || TC_KBKDF_HAVE_HMAC_SHA224 || TC_KBKDF_HAVE_HMAC_SHA256 ||            \
    TC_KBKDF_HAVE_HMAC_SHA384 || TC_KBKDF_HAVE_HMAC_SHA512)
+
+#if TC_ENABLE_KDF
 
 #if TC_KBKDF_HAVE_HMAC
 #include <tiny_crypto/hash.h>
@@ -72,7 +76,7 @@
 #define TC_KBKDF_PRF_MAX 8
 #endif
 
-/* Counter width r in bits. SP 800-108 allows 8, 16, 24 or 32. */
+/* Counter width r in bits. SP 800-108r1 section 4 allows 8, 16, 24 or 32. */
 #define TC_KBKDF_COUNTER_8 8
 #define TC_KBKDF_COUNTER_16 16
 #define TC_KBKDF_COUNTER_24 24
@@ -115,7 +119,7 @@ extern "C" {
  * @brief Build the conventional fixed input Label || 0x00 || Context || [8*out_len]_32.
  *
  * Binds the purpose (label), the parties or session (context) and the
- * requested length in bits, big-endian, as SP 800-108 section 4 recommends.
+ * requested length in bits, big-endian, as SP 800-108r1 section 4 recommends.
  * The 0x00 separator only delimits unambiguously when label contains no zero
  * byte, so such labels are rejected.
  * @param label Label bytes in the application's encoding (typically ASCII).
@@ -155,23 +159,32 @@ TC_status TC_KBKDF_fixed_input(TC_bytes label, TC_bytes context, size_t out_len,
  * Return          TC_OK, or TC_ERROR on any violation. out is wiped if the
  *                 error is detected after derivation started.
  *
- * Counter mode (SP 800-108 section 5.1):
+ * Counter mode (SP 800-108r1 section 4.1):
  *   K(i) = PRF(KDK, before || [i]_r || after), i = 1..n
  *   before empty  ->  CAVP BEFORE_FIXED  ([i] || FixedInput)
  *   after  empty  ->  CAVP AFTER_FIXED   (FixedInput || [i])
  *   both present  ->  CAVP MIDDLE_FIXED  (DataBeforeCtr || [i] || DataAfterCtr)
  *
- * Feedback mode (section 5.2):
+ * Feedback mode (section 4.2):
  *   K(0) = iv (may be empty)
  *   K(i) = PRF(KDK, K(i-1) [|| [i]_r] || fixed), counter placed per
  *          params->counter_location when params->use_counter is non-zero
  *
- * Double-pipeline mode (section 5.3):
+ * Double-pipeline mode (section 4.3):
  *   A(0) = fixed, A(i) = PRF(KDK, A(i-1))
  *   K(i) = PRF(KDK, A(i) [|| [i]_r] || fixed), counter as in feedback mode
  *
  * The streaming PRF APIs always yield the full h-byte block, so
  * TC_HMAC_MIN_TAG_LEN and the CMAC minimum tag lengths do not apply here.
+ *
+ * CMAC key control: with a CMAC PRF, a party that knows the KDK and chooses
+ * part of the fixed input or IV can steer output blocks (SP 800-108r1 section
+ * 6.7 and Appendix B). When that matters, prefer an HMAC PRF or apply the
+ * mitigations of sections 4.1-4.3. Counter mode appends
+ * K(0) = PRF(KDK, fixed input) to the fixed input. Feedback mode uses that
+ * K(0) as the IV and a counter. Double-pipeline mode uses a counter. K(0)
+ * is the feedback-mode output for an empty IV, no counter and an out.capacity
+ * of h bytes.
  */
 
 #if TC_KBKDF_HAVE_HMAC_SHA1
@@ -266,4 +279,5 @@ TC_status TC_KBKDF_DES_CMAC_pipeline(TC_bytes key, const struct TC_KBKDF_params*
 }
 #endif
 
+#endif /* TC_ENABLE_KDF */
 #endif /* TINY_CRYPTO_KDF_H_ */

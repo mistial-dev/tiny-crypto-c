@@ -8,7 +8,7 @@
  *   mmt/  - Multi-block Message Tests (keying options 2 and 3)
  *   mct/  - Monte Carlo Tests per NIST SP 800-20 (keying options 2 and 3)
  *
- * Test-only translation unit. Enable with TC_DES_CAVP=1.
+ * Test-only translation unit. The test build enables it with TC_DES_CAVP=1.
  */
 
 #include <stdio.h>

@@ -1,4 +1,6 @@
-# NIST KAS 2014 single-step KDF vectors
+# Single-step KDF vectors
+
+## NIST KAS 2014
 
 `nist_kas_2014.inc` contains 18 passing KDFConcat records from NIST CAVP's
 [ECC](https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/keymgmt/KASTestVectorsECC2014.zip)
@@ -17,12 +19,41 @@ passing `Result` and independently satisfy
 `OI` as two spans, exercising the public SSKDF API's concatenation behavior.
 
 These are SP 800-56A KDFConcat answers using the same hash-based one-step
-construction specified by SP 800-56C Rev. 2. The public NIST ACVP-Server
-OneStep sample corpus currently exercises SHA2-224 and SHA2-512, but has no
-SHA2-256 or SHA2-384 groups. The KAS records provide NIST-produced SHA-256 and
-SHA-384 expected outputs for the exact construction implemented here. Their
-outputs range from 14 to 32 bytes. The separate SSKDF tests cover longer
-outputs and multiple counter blocks with a Python `hashlib` oracle.
+construction specified by SP 800-56C Rev. 2. They supply NIST-produced SHA-256
+and SHA-384 expected outputs of 14 to 32 bytes.
+
+## NIST ACVP KDA OneStep
+
+`acvp_onestep.inc` holds 24 hash-based one-step cases from the NIST
+[ACVP-Server](https://github.com/usnistgov/ACVP-Server) repository at commit
+`975de31eb83d87039ec88934fdc47d8c312b892d`, under
+`gen-val/json-files/KDA-OneStep-Sp800-56Cr1` and `KDA-OneStep-Sp800-56Cr2`.
+The source file SHA-256 hashes are:
+
+```
+Sp800-56Cr1/prompt.json           b8888716c8247debaef4ac8be301d16b863bf911c16e323d03ba1ea6a43b251f
+Sp800-56Cr1/expectedResults.json  0a11beb45da6383c71a10486efdd4844ec9b0cd14f5d18cb809b94856691c8ed
+Sp800-56Cr2/prompt.json           1633c34cf4e52e52d7d768052092771042ab7166a2be22b4ed36df0b81a193a4
+Sp800-56Cr2/expectedResults.json  9c8cdf62f0fa242fa04920c0f62e57447897619e3fc460d49eab52e4d418cc6b
+```
+
+The corpus exercises the SHA2-224 and SHA2-512 auxiliary functions. For each
+revision and hash, `extract_acvp_onestep.py` keeps the three AFT and the three
+VAL cases with the shortest `Z` and checks each one against `hashlib`. Each
+record keeps `Z`, the expected or supplied DKM, the VAL verdict and the six
+fixedInfo fields in pattern order: `t`, party U `partyId` and
+`ephemeralData`, party V `partyId` and `ephemeralData`, and `[L]_32`. Every
+case derives 1024 bits, which spans several digest blocks.
+
+Regenerate the file with the two unchanged ACVP directories:
+
+```
+python3 tests/vectors/kda/extract_acvp_onestep.py <Sp800-56Cr1 dir> <Sp800-56Cr2 dir>
+```
+
+NIST publishes no one-step SHA-1 vectors. `tests/kdf/sskdf_test.c` covers
+SHA-1 with a `hashlib` answer, and covers longer outputs and every counter
+block for all five hashes the same way.
 
 ## Checksums
 

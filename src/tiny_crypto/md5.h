@@ -3,6 +3,8 @@
 #ifndef TINY_CRYPTO_MD5_H_
 #define TINY_CRYPTO_MD5_H_
 #include <tiny_crypto/common.h>
+
+#if TC_ENABLE_MD5
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -32,4 +34,5 @@ void TC_MD5_ctx_clear(struct TC_MD5_ctx* ctx);
 #ifdef __cplusplus
 }
 #endif
+#endif /* TC_ENABLE_MD5 */
 #endif

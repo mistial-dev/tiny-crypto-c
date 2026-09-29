@@ -10,12 +10,8 @@
 #endif
 
 #include <tiny_crypto/common.hpp>
-#if TC_ENABLE_SHA1 || TC_ENABLE_SHA224 || TC_ENABLE_SHA256 || TC_ENABLE_SHA384 || TC_ENABLE_SHA512
 #include <tiny_crypto/hash.h>
-#endif
-#if TC_ENABLE_MD5
 #include <tiny_crypto/md5.h>
-#endif
 
 namespace tiny_crypto {
 namespace detail {

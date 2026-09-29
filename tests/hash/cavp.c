@@ -11,7 +11,7 @@
  *   hmac/HMAC.rsp                          - HMACVS groups [L=20/28/32/48/64]
  * Digest dispatch uses the digest length in bytes (20/28/32/48/64).
  *
- * Test-only translation unit. Enable with TC_HASH_CAVP=1.
+ * Test-only translation unit. The test build enables it with TC_HASH_CAVP=1.
  */
 
 #include <stdio.h>

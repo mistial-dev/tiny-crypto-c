@@ -758,7 +758,9 @@ to validate all 2,200 recorded keys. This takes hours. CAVP's seed-to-key
 candidate methods differ from the library's generator, so these records check
 private-key validation.
 
-The default `test_sskdf` includes 18 NIST KAS SHA-256/384 single-step answers.
+The default `test_sskdf` includes 18 NIST KAS SHA-256/384 single-step answers
+and 24 NIST ACVP KDA OneStep SHA2-224/512 cases, with the fixedInfo fields
+passed as separate spans. SHA-1 and longer outputs use `hashlib` answers.
 `test_kmac_acvp` includes the byte-aligned NIST ACVP case and six independently
 computed OpenSSL answers with customization and odd byte output lengths. The
 public KMAC API measures output in bytes and cannot represent bit-length tags.

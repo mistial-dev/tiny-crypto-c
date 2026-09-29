@@ -102,9 +102,10 @@ disjoint from additional input.
 ## Storage
 
 The caller owns the `TC_DRBG`. It holds the working state, one entropy buffer
-of `TC_DRBG_MAX_ENTROPY_BYTES` (64 by default) and scratch space for the
-largest enabled hash, HMAC or AES key schedule, so each call uses little
-stack. Place it in static or long-lived storage. Its fields are private.
+of `TC_DRBG_MAX_ENTROPY_BYTES` (64 by default, at least 48, set in `config.h`)
+and scratch space for the largest enabled hash, HMAC or AES key schedule, so
+each call uses little stack. Place it in static or long-lived storage. Its
+fields are private.
 
 | Configuration             | `sizeof(TC_DRBG)` on a 64-bit host | On AVR (ATmega2560) |
 | ------------------------- | ---------------------------------: | ------------------: |

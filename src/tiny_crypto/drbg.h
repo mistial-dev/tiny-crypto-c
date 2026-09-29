@@ -39,15 +39,9 @@ extern "C" {
 #define TC_DRBG_MAX_REQUEST_BYTES 65536u /* 2^19 bits per generate call */
 #define TC_DRBG_MAX_RESEED_INTERVAL ((uint64_t)1 << 48)
 
-/* Largest entropy input accepted per instantiate or reseed, including a
- * nonce drawn from the entropy source. The default covers every mechanism at
- * its full strength. */
-#ifndef TC_DRBG_MAX_ENTROPY_BYTES
-#define TC_DRBG_MAX_ENTROPY_BYTES 64u
-#endif
-#if TC_DRBG_MAX_ENTROPY_BYTES < 48u
-#error "TC_DRBG_MAX_ENTROPY_BYTES must hold a CTR_DRBG seed (48 bytes)"
-#endif
+/* TC_DRBG_MAX_ENTROPY_BYTES (config.h) is the largest entropy input accepted
+ * per instantiate or reseed, including a nonce drawn from the entropy source.
+ * It sizes TC_DRBG.input. */
 
 /* Largest personalization string, nonce or additional input. SP 800-90A
  * Tables 2 and 3 allow 2^35 bits. This bound also leaves room for the entropy

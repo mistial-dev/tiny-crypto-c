@@ -12,6 +12,7 @@
 #include <tiny_crypto/common.hpp>
 #include <tiny_crypto/kdf.h>
 
+#if TC_ENABLE_KDF
 namespace tiny_crypto {
 
 /* Plain aggregate. Brace-initialize as {counter_bits, counter_location,
@@ -72,5 +73,6 @@ TINY_CRYPTO_KBKDF_FAMILY(kbkdf_des_cmac, DES_CMAC)
 #undef TINY_CRYPTO_KBKDF_FAMILY
 
 } // namespace tiny_crypto
+#endif /* TC_ENABLE_KDF */
 
 #endif /* TINY_CRYPTO_KDF_HPP_ */

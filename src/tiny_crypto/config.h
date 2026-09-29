@@ -273,7 +273,7 @@
     (!TC_ENABLE_PIV_OBJECTS || !TC_ENABLE_PIV_CHUID || !TC_ENABLE_CMS_VALIDATION)
 #error "Credential composition requires PIV objects, CHUID, and CMS validation"
 #endif
-/* SP 800-108 KBKDF over the enabled HMAC / CMAC PRFs (kdf.c). */
+/* SP 800-108r1 KBKDF over the enabled HMAC / CMAC PRFs (kdf.c). */
 #ifndef TC_ENABLE_KDF
 #define TC_ENABLE_KDF TC_PROFILE_VALUE(0, 0, 0, 1)
 #endif
@@ -341,8 +341,9 @@
 #if TC_ENABLE_SSKDF != 0 && TC_ENABLE_SSKDF != 1
 #error "TC_ENABLE_SSKDF must be 0 or 1"
 #endif
-#if TC_ENABLE_SSKDF && !TC_ENABLE_SHA256 && !TC_ENABLE_SHA384
-#error "Single-step KDF requires SHA-256 or SHA-384"
+#if TC_ENABLE_SSKDF && !(TC_ENABLE_SHA1 || TC_ENABLE_SHA224 || TC_ENABLE_SHA256 ||                 \
+                         TC_ENABLE_SHA384 || TC_ENABLE_SHA512)
+#error "Single-step KDF requires an enabled SHA algorithm"
 #endif
 
 /* NIST SP 800-90A deterministic random bit generators. Each mechanism is
@@ -364,6 +365,16 @@
     (TC_DRBG_ENABLE_HMAC != 0 && TC_DRBG_ENABLE_HMAC != 1) ||                                      \
     (TC_DRBG_ENABLE_CTR != 0 && TC_DRBG_ENABLE_CTR != 1)
 #error "DRBG switches must be 0 or 1"
+#endif
+/* Largest DRBG entropy input per instantiate or reseed, in bytes, including a
+ * nonce drawn from the entropy source. The default covers every mechanism at
+ * its full strength. CTR_DRBG with AES-256 needs a 48-byte seed without a
+ * derivation function (SP 800-90A Table 3). */
+#ifndef TC_DRBG_MAX_ENTROPY_BYTES
+#define TC_DRBG_MAX_ENTROPY_BYTES 64u
+#endif
+#if TC_ENABLE_DRBG && TC_DRBG_MAX_ENTROPY_BYTES < 48u
+#error "TC_DRBG_MAX_ENTROPY_BYTES must hold a CTR_DRBG seed (48 bytes)"
 #endif
 
 /* Secret wiping and public argument checks are always enabled. Every final,
@@ -448,23 +459,13 @@
 #ifndef TC_AES_TINY
 #define TC_AES_TINY TC_PROFILE_VALUE(0, 1, 0, 0)
 #endif
-/* Known-answer test entry points (single-block AES/DES, raw hash and KDF
- * hooks) used by the CAVP harness. Production builds leave them off. */
+/* Single-block AES known-answer entry points used by the CAVP harness.
+ * Production builds leave them off. */
 #ifndef TC_AES_CAVP
 #define TC_AES_CAVP 0
 #endif
-#ifndef TC_DES_CAVP
-#define TC_DES_CAVP 0
-#endif
-#ifndef TC_HASH_CAVP
-#define TC_HASH_CAVP 0
-#endif
-#ifndef TC_KDF_CAVP
-#define TC_KDF_CAVP 0
-#endif
-#if (TC_AES_CAVP != 0 && TC_AES_CAVP != 1) || (TC_DES_CAVP != 0 && TC_DES_CAVP != 1) ||            \
-    (TC_HASH_CAVP != 0 && TC_HASH_CAVP != 1) || (TC_KDF_CAVP != 0 && TC_KDF_CAVP != 1)
-#error "CAVP test hooks must be 0 or 1"
+#if TC_AES_CAVP != 0 && TC_AES_CAVP != 1
+#error "TC_AES_CAVP must be 0 or 1"
 #endif
 /* GCM GHASH implementation profiles. */
 #define TC_AES_GCM_GHASH_MODE_AUTO 0

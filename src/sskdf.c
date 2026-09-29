@@ -14,7 +14,8 @@ typedef struct {
   uint8_t* digest;
 } sskdf_state;
 
-/* Derives exactly out.capacity bytes. */
+/* Derives exactly out.capacity bytes by the SP 800-56C Rev. 2 section 4.1
+ * process. The descriptor may name any enabled SHA. */
 static TC_status derive(const tc_hash_algorithm_info* hash, const sskdf_state* state,
                         TC_bytes secret, const TC_bytes* info, size_t count, TC_buffer out)
 {
@@ -42,10 +43,13 @@ static TC_status derive(const tc_hash_algorithm_info* hash, const sskdf_state* s
       return TC_ERROR;
     total += info[i].length;
   }
+  /* Step 4 bounds counter || Z || FixedInfo by max_H_inputBits. The bound
+   * used here, 2^64 - 1 bits, is the smallest in section 4.2 Table 1. */
 #if SIZE_MAX > UINT64_MAX / 8
   if (total > UINT64_MAX / 8)
     return TC_ERROR;
 #endif
+  /* Step 2 rejects more than 2^32 - 1 blocks. */
 #if SIZE_MAX > UINT32_MAX
   {
     size_t blocks = output_len / digest_length + (output_len % digest_length != 0);
@@ -88,10 +92,21 @@ done:
     const sskdf_state state = {&ctx, sizeof ctx, digest};                                          \
     return derive(&tc_sha##N##_info, &state, z, info, count, output);                              \
   }
+/* SP 800-56C Rev. 2 section 4.2 Table 1 approves each of these hashes for
+ * Option 1. */
+#if TC_ENABLE_SHA1
+TC_SSKDF_FAMILY(1, TC_SHA1_DIGESTLEN)
+#endif
+#if TC_ENABLE_SHA224
+TC_SSKDF_FAMILY(224, TC_SHA224_DIGESTLEN)
+#endif
 #if TC_ENABLE_SHA256
 TC_SSKDF_FAMILY(256, TC_SHA256_DIGESTLEN)
 #endif
 #if TC_ENABLE_SHA384
 TC_SSKDF_FAMILY(384, TC_SHA384_DIGESTLEN)
+#endif
+#if TC_ENABLE_SHA512
+TC_SSKDF_FAMILY(512, TC_SHA512_DIGESTLEN)
 #endif
 #endif

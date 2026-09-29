@@ -2,7 +2,7 @@
  * SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * NIST SP 800-108 KBKDF for tiny-crypto-c: counter, feedback and
+ * NIST SP 800-108r1 KBKDF for tiny-crypto-c: counter, feedback and
  * double-pipeline mode over the HMAC and CMAC PRFs compiled into the profile.
  *
  * One generic core drives every mode. A PRF is a tagged, typed descriptor:
@@ -148,7 +148,9 @@ static inline void tc_kdf_mac_clear(const struct tc_kdf_prf* prf, void* ctx)
 #endif
 }
 
-/* Begin from a cached keyed context and feed each segment in order. */
+/* Begin from a cached keyed context and feed each segment in order. The
+ * HMAC and CMAC PRFs share this one loop through the descriptor, so the HMAC
+ * arm does not route through tc_hmac_core_resume_parts. */
 static inline TC_status tc_kdf_prf_run(const struct tc_kdf_prf* prf, const void* initialized,
                                        void* ctx, const TC_bytes* segments, unsigned count,
                                        uint8_t* block)

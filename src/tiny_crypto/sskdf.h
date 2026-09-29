@@ -3,22 +3,47 @@
 #ifndef TINY_CRYPTO_SSKDF_H_
 #define TINY_CRYPTO_SSKDF_H_
 #include <tiny_crypto/common.h>
+
+#if TC_ENABLE_SSKDF
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* Hash-based single-step KDF: H(counter32be || Z || OtherInfo).
- * Z and output must be nonempty. OtherInfo is the concatenation of the spans.
- * Exactly output.capacity bytes are written. Output must not overlap inputs or
- * the span array. Invalid arguments leave output unchanged. A hash failure
- * wipes output. All lengths are bytes. */
+/* SP 800-56C Rev. 2 section 4.1 one-step KDF with H(x) = hash(x) (Option 1).
+ * Block i is hash([i]_32 || Z || FixedInfo) for i = 1..n, and the output is
+ * the leftmost output.capacity bytes of the concatenated blocks. One function
+ * exists per SHA enabled in the profile. Section 4.2 Table 1 approves each
+ * of these hashes.
+ *
+ * z               Shared secret. Must be nonempty.
+ * info, count     FixedInfo as the in-order concatenation of count spans.
+ *                 The span array is read in place and may be NULL when count
+ *                 is 0. A span may have NULL data only when its length is 0.
+ * output          Exactly output.capacity bytes are written. The capacity
+ *                 must be nonzero and at most (2^32 - 1) digests. output must
+ *                 not overlap z, any info span or the span array.
+ *
+ * Returns TC_OK, or TC_ERROR. Argument errors leave output unchanged. A hash
+ * failure after derivation starts wipes output. The hash context and digest
+ * block live on the stack and are wiped before return. All lengths are bytes. */
+#if TC_ENABLE_SHA1
+TC_status TC_SSKDF_SHA1(TC_bytes z, const TC_bytes* info, size_t count, TC_buffer output);
+#endif
+#if TC_ENABLE_SHA224
+TC_status TC_SSKDF_SHA224(TC_bytes z, const TC_bytes* info, size_t count, TC_buffer output);
+#endif
 #if TC_ENABLE_SHA256
 TC_status TC_SSKDF_SHA256(TC_bytes z, const TC_bytes* info, size_t count, TC_buffer output);
 #endif
 #if TC_ENABLE_SHA384
 TC_status TC_SSKDF_SHA384(TC_bytes z, const TC_bytes* info, size_t count, TC_buffer output);
 #endif
+#if TC_ENABLE_SHA512
+TC_status TC_SSKDF_SHA512(TC_bytes z, const TC_bytes* info, size_t count, TC_buffer output);
+#endif
+
 #ifdef __cplusplus
 }
 #endif
+#endif /* TC_ENABLE_SSKDF */
 #endif
