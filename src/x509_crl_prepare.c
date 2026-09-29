@@ -109,8 +109,11 @@ TC_TLV_result TC_X509_crl_prepare_begin(const TC_source* source, const TC_X509_c
       workspace->parsing.extension_capacity, &job->record.extensions);
   if (result != TC_TLV_OK)
     return result;
+  /* Keep INVALID/UNSUPPORTED CRL extension policy in the record, as index init
+   * does. The resolver skips such records (RFC 5280 section 5.2). */
   job->record.policy = tc_x509_crl_extension_policy(&job->record.extensions);
-  if (job->record.policy != TC_TLV_OK)
+  if (job->record.policy != TC_TLV_OK && job->record.policy != TC_TLV_INVALID &&
+      job->record.policy != TC_TLV_UNSUPPORTED)
     return job->record.policy;
   TC_signature_algorithm algorithm;
   result = tc_pki_signature_algorithm_read(&job->record.crl.signature_algorithm, TC_TLV_DER,
@@ -121,10 +124,13 @@ TC_TLV_result TC_X509_crl_prepare_begin(const TC_source* source, const TC_X509_c
                                        layout.tbs.length);
   if (hash != TC_RESULT_OK)
     return tc_source_status(hash);
-  tc_x509_crl_source_revoked revoked;
-  result = tc_x509_crl_source_revoked_init(&job->reader, layout.revoked, &job->record.crl,
-                                           &job->record.extensions, options->max_entries,
-                                           workspace->issuer, &revoked);
+  /* Entries of a CRL with unusable extensions cannot be interpreted. The zero
+   * iterator yields no entries, so every target completes unmatched. */
+  tc_x509_crl_source_revoked revoked = {0};
+  if (job->record.policy == TC_TLV_OK)
+    result = tc_x509_crl_source_revoked_init(&job->reader, layout.revoked, &job->record.crl,
+                                             &job->record.extensions, options->max_entries,
+                                             workspace->issuer, &revoked);
   if (result == TC_TLV_OK)
     result =
         tc_x509_crl_source_scan_init(&job->reader, &revoked, targets, count, workspace->matches,

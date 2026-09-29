@@ -124,6 +124,11 @@ entry and hash-byte limits and consumes a per-call work budget. Refill that
 budget before the next call. Physical read-byte and callback limits apply to the
 whole job. Preparation scans entries, then hashes the exact signed encoding.
 Individual metadata and entry limits stay independent of the complete CRL size.
+A CRL whose extensions fail policy, such as an unknown critical extension,
+still prepares. Its record keeps `TC_TLV_INVALID` or `TC_TLV_UNSUPPORTED` in
+`policy`, its entries are left unscanned and every target is unmatched. The
+resolver skips that record, as it does for the same CRL from
+`TC_X509_crl_index_init` (RFC 5280 section 5.2).
 
 After completion, `TC_X509_crl_prepare_finish` fills a `TC_X509_crl_record` for
 an index. Its digest and queried matches remain in job storage. The revocation

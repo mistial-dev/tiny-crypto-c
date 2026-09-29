@@ -141,8 +141,9 @@ static inline size_t cms_fixture_reverse_attributes(uint8_t* encoded, size_t len
   return (size_t)result;
 }
 
-static inline size_t encode_issuer_crl_entries(X509* issuer, EVP_PKEY* key, X509* revoked,
-                                               size_t filler_entries, uint8_t* out, size_t capacity)
+/* Unsigned v2 CRL from issuer with a CRL number, filler entries and an
+ * optional entry for revoked. */
+static inline X509_CRL* issuer_crl_new(X509* issuer, X509* revoked, size_t filler_entries)
 {
   X509_CRL* crl = X509_CRL_new();
   munit_assert_not_null(crl);
@@ -173,6 +174,12 @@ static inline size_t encode_issuer_crl_entries(X509* issuer, EVP_PKEY* key, X509
     munit_assert_int(X509_REVOKED_set_revocationDate(entry, X509_getm_notBefore(revoked)), ==, 1);
     munit_assert_int(X509_CRL_add0_revoked(crl, entry), ==, 1);
   }
+  return crl;
+}
+
+/* Sign, DER-encode and free crl. */
+static inline size_t crl_sign_encode(X509_CRL* crl, EVP_PKEY* key, uint8_t* out, size_t capacity)
+{
   munit_assert_int(X509_CRL_sign(crl, key, EVP_sha256()), >, 0);
   const int length = i2d_X509_CRL(crl, NULL);
   munit_assert_int(length, >, 0);
@@ -181,6 +188,32 @@ static inline size_t encode_issuer_crl_entries(X509* issuer, EVP_PKEY* key, X509
   munit_assert_int(i2d_X509_CRL(crl, &cursor), ==, length);
   X509_CRL_free(crl);
   return (size_t)length;
+}
+
+static inline size_t encode_issuer_crl_entries(X509* issuer, EVP_PKEY* key, X509* revoked,
+                                               size_t filler_entries, uint8_t* out, size_t capacity)
+{
+  return crl_sign_encode(issuer_crl_new(issuer, revoked, filler_entries), key, out, capacity);
+}
+
+/* Issuer CRL carrying a critical extension with the unassigned OID 1.2.3.99. */
+static inline size_t encode_unknown_critical_crl(X509* issuer, EVP_PKEY* key, X509* revoked,
+                                                 uint8_t* out, size_t capacity)
+{
+  static const unsigned char null_value[] = {5, 0};
+  X509_CRL* crl = issuer_crl_new(issuer, revoked, 0);
+  ASN1_OBJECT* oid = OBJ_txt2obj("1.2.3.99", 1);
+  ASN1_OCTET_STRING* value = ASN1_OCTET_STRING_new();
+  munit_assert_not_null(oid);
+  munit_assert_not_null(value);
+  munit_assert_int(ASN1_OCTET_STRING_set(value, null_value, sizeof null_value), ==, 1);
+  X509_EXTENSION* extension = X509_EXTENSION_create_by_OBJ(NULL, oid, 1, value);
+  munit_assert_not_null(extension);
+  munit_assert_int(X509_CRL_add_ext(crl, extension, -1), ==, 1);
+  X509_EXTENSION_free(extension);
+  ASN1_OCTET_STRING_free(value);
+  ASN1_OBJECT_free(oid);
+  return crl_sign_encode(crl, key, out, capacity);
 }
 
 static inline size_t encode_issuer_crl(X509* issuer, EVP_PKEY* key, X509* revoked, uint8_t* out,

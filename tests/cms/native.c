@@ -111,6 +111,30 @@ static TC_TLV_result probe_candidate_filter(const void* context,
   return probe->result;
 }
 
+/* Prepare one in-memory CRL through the source path. The returned job owns
+ * the record's digest and matches until TC_X509_crl_prepare_clear. */
+static TC_X509_crl_job* prepare_crl_record(const TC_bytes* encoded,
+                                           const TC_X509_crl_target* targets, size_t count,
+                                           const TC_X509_crl_prepare_options* options,
+                                           const TC_X509_crl_prepare_workspace* workspace,
+                                           TC_X509_crl_record* out)
+{
+  TC_bytes bytes = *encoded;
+  const TC_source source = {tc_source_memory_read, &bytes, bytes.length};
+  TC_X509_crl_job* job = NULL;
+  size_t work = 60000;
+  munit_assert_int(
+      TC_X509_crl_prepare_begin(&source, targets, count, options, workspace, &work, &job), ==,
+      TC_TLV_OK);
+  int complete = 0;
+  while (!complete) {
+    work = 60000;
+    munit_assert_int(TC_X509_crl_prepare_step(job, 4, 128, &work, &complete), ==, TC_TLV_OK);
+  }
+  munit_assert_int(TC_X509_crl_prepare_finish(job, out), ==, TC_TLV_OK);
+  return job;
+}
+
 typedef struct {
   TC_bytes signer;
   size_t anchor, calls;
@@ -5597,16 +5621,23 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
                   &trusted_signer);
               munit_assert_int(signer_status, ==, TC_X509_PATH_VALID);
             }
-            TC_X509_crl_storage job_storage[2][256];
-            TC_X509_crl_job* jobs[2];
-            uint8_t metadata[2][CERT_CAPACITY], window[64], entry[256], issuer_storage[256];
-            TC_X509_crl_match matches[2][3];
-            TC_X509_crl_record prepared_records[2];
-            for (size_t record = 0; record < 2; ++record) {
-              TC_bytes bytes = crls[record];
-              const TC_source source = {tc_source_memory_read, &bytes, bytes.length};
+            TC_X509_crl_storage job_storage[3][256];
+            TC_X509_crl_job* jobs[3];
+            uint8_t metadata[3][CERT_CAPACITY], window[64], entry[256], issuer_storage[256];
+            uint8_t unusable_crl[CERT_CAPACITY];
+            TC_X509_crl_match matches[3][3];
+            /* records 0-1 prepare the issuer and root CRLs. Record 2 is an
+             * issuer CRL with an unknown critical extension that omits the
+             * leaf. RFC 5280 section 5.2 forbids using it for status. */
+            TC_X509_crl_record prepared_records[3];
+            const TC_bytes sources[3] = {
+                crls[0],
+                crls[1],
+                {unusable_crl, encode_unknown_critical_crl(intermediate, intermediate_key, NULL,
+                                                           unusable_crl, sizeof unusable_crl)}};
+            for (size_t record = 0; record < 3; ++record) {
               const TC_X509_crl_prepare_options preparation_options = {
-                  limits, bytes.length, bytes.length * 4 + 1024, 4096, 128};
+                  limits, sources[record].length, sources[record].length * 4 + 1024, 4096, 128};
               const TC_X509_crl_prepare_workspace preparation = {
                   {(uint8_t*)job_storage[record], sizeof job_storage[record]},
                   {window, sizeof window},
@@ -5617,28 +5648,30 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
                   validation.names,
                   matches[record],
                   3};
-              work = 60000;
-              munit_assert_int(TC_X509_crl_prepare_begin(&source, targets, 3, &preparation_options,
-                                                         &preparation, &work, &jobs[record]),
-                               ==, TC_TLV_OK);
-              int complete = 0;
-              while (!complete) {
-                work = 60000;
-                munit_assert_int(TC_X509_crl_prepare_step(jobs[record], 4, 128, &work, &complete),
-                                 ==, TC_TLV_OK);
-              }
-              munit_assert_int(TC_X509_crl_prepare_finish(jobs[record], &prepared_records[record]),
-                               ==, TC_TLV_OK);
-              munit_assert_int(prepared_records[record].policy, ==, TC_TLV_OK);
+              jobs[record] = prepare_crl_record(&sources[record], targets, 3, &preparation_options,
+                                                &preparation, &prepared_records[record]);
+              munit_assert_int(prepared_records[record].policy, ==,
+                               record == 2 ? TC_TLV_UNSUPPORTED : TC_TLV_OK);
             }
-            const TC_X509_crl_index prepared_index = {prepared_records, 2, 0};
-            TC_CMS_revocation_policy prepared_policy = revocation;
-            prepared_policy.index = &prepared_index;
-            work = WORK_BUDGET;
-            munit_assert_int(example_validate_cms_credential(&request, held, &credential_settings,
-                                                             &prepared_policy, &work, &credential),
-                             ==, revoked ? TC_CREDENTIAL_REVOKED : TC_CREDENTIAL_VALID);
-            for (size_t record = 0; record < 2; ++record)
+            const TC_credential_status expected =
+                revoked ? TC_CREDENTIAL_REVOKED : TC_CREDENTIAL_VALID;
+            const TC_X509_crl_record with_issuer[] = {prepared_records[2], prepared_records[0],
+                                                      prepared_records[1]};
+            const TC_X509_crl_record without_issuer[] = {prepared_records[2], prepared_records[1]};
+            const TC_X509_crl_index prepared_indexes[] = {
+                {prepared_records, 2, 0}, {with_issuer, 3, 0}, {without_issuer, 2, 0}};
+            for (size_t chosen = 0; chosen < 3; ++chosen) {
+              TC_CMS_revocation_policy prepared_policy = revocation;
+              prepared_policy.index = &prepared_indexes[chosen];
+              work = WORK_BUDGET;
+              /* Without the issuer CRL the leaf has no usable evidence. A root
+               * revocation of the intermediate is found first. */
+              munit_assert_int(
+                  example_validate_cms_credential(&request, held, &credential_settings,
+                                                  &prepared_policy, &work, &credential),
+                  ==, chosen == 2 && revoked != 2 ? TC_CREDENTIAL_UNSUPPORTED : expected);
+            }
+            for (size_t record = 0; record < 3; ++record)
               TC_X509_crl_prepare_clear(jobs[record]);
           }
           /* Explicit signer selection must retain identity and revocation

@@ -36,7 +36,10 @@ size_t TC_X509_crl_prepare_alignment(void);
  * targets, their issuer/serial bytes and matches until the last record use.
  * Other scratch can be reused after completion. All regions are disjoint.
  * parsing limits bound individual metadata/entry objects. max_input bounds the
- * complete CRL. Work and scratch may change on failure. out changes only on OK. */
+ * complete CRL. An INVALID or UNSUPPORTED CRL extension policy is kept in the
+ * finished record's policy with no entry scan and zero matches. The resolver
+ * skips that record. Work and scratch may change on failure. out changes only
+ * on OK. */
 TC_TLV_result TC_X509_crl_prepare_begin(const TC_source* source, const TC_X509_crl_target* targets,
                                         size_t count, const TC_X509_crl_prepare_options* options,
                                         const TC_X509_crl_prepare_workspace* workspace,

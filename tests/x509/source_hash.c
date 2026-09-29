@@ -163,6 +163,135 @@ static MunitResult preparation(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+/* An unknown critical CRL extension leaves the CRL unusable (RFC 5280 section
+ * 5.2). Preparation keeps the policy status in the record, skips the entry
+ * scan and completes with zero matches, as TC_X509_crl_index_init does. */
+static MunitResult extension_policy(const MunitParameter params[], void* user)
+{
+  (void)params;
+  (void)user;
+  static const uint8_t encoded[] = {
+      0x30, 0x6c, 0x30, 0x57, 2,    1,    1,   0x30, 13,   6,    9,    0x2a, 0x86, 0x48,
+      0x86, 0xf7, 13,   1,    1,    11,   5,   0,    0x30, 12,   0x31, 10,   0x30, 8,
+      6,    3,    0x55, 4,    3,    0x0c, 1,   'A',  0x17, 13,   '2',  '6',  '0',  '1',
+      '0',  '1',  '0',  '0',  '0',  '0',  '0', '0',  'Z',  0x30, 0x14, 0x30, 0x12, 2,
+      1,    7,    0x17, 13,   '2',  '6',  '0', '1',  '0',  '1',  '0',  '0',  '0',  '0',
+      '0',  '0',  'Z',  0xa0, 0x10, 0x30, 14,  0x30, 12,   6,    3,    0x2a, 3,    99,
+      1,    1,    0xff, 4,    2,    5,    0,   0x30, 13,   6,    9,    0x2a, 0x86, 0x48,
+      0x86, 0xf7, 13,   1,    1,    11,   5,   0,    3,    2,    0,    1};
+  static const uint8_t serial[] = {7};
+  const TC_X509_crl_target target = {{serial, sizeof serial}, {encoded + 22, 14}};
+  TC_bytes bytes = {encoded, sizeof encoded};
+  TC_source source = {tc_source_memory_read, &bytes, bytes.length};
+  TC_X509_crl_storage state[256];
+  uint8_t window[16], metadata[256], scratch[256], issuer[64];
+  TC_TLV_frame frames[16];
+  TC_bytes oids[8];
+  uint32_t left[32], right[32];
+  uint8_t names[8];
+  TC_X509_crl_match match;
+  memset(&match, 0xa5, sizeof match);
+  const TC_X509_crl_prepare_workspace workspace = {{(uint8_t*)state, sizeof state},
+                                                   {window, sizeof window},
+                                                   {metadata, sizeof metadata},
+                                                   {scratch, sizeof scratch},
+                                                   {issuer, sizeof issuer},
+                                                   {frames, 16, oids, 8},
+                                                   {left, right, 32, names, 8},
+                                                   &match,
+                                                   1};
+  const TC_X509_crl_prepare_options options = {{256, 256, 128, 16}, sizeof encoded, 4096, 4096, 4};
+  TC_X509_crl_job* job = NULL;
+  size_t work = 60000;
+  munit_assert_int(
+      TC_X509_crl_prepare_begin(&source, &target, 1, &options, &workspace, &work, &job), ==,
+      TC_TLV_OK);
+  munit_assert_not_null(job);
+  int complete = 0;
+  while (!complete) {
+    work = 60000;
+    munit_assert_int(TC_X509_crl_prepare_step(job, 1, 16, &work, &complete), ==, TC_TLV_OK);
+  }
+  TC_X509_crl_record record;
+  munit_assert_int(TC_X509_crl_prepare_finish(job, &record), ==, TC_TLV_OK);
+  munit_assert_int(record.policy, ==, TC_TLV_UNSUPPORTED);
+  munit_assert_size(record.extensions.unknown_critical_oid.length, ==, 3);
+  munit_assert_not_null(record.crl.prepared);
+  munit_assert_size(record.crl.prepared->count, ==, 1);
+  munit_assert_int(match.found, ==, 0);
+  /* The RAM index records the same policy for the same bytes. */
+  TC_X509_crl_record indexed;
+  TC_X509_crl_index index;
+  const TC_X509_workspace parser = {frames, 16, oids, 8};
+  work = 60000;
+  munit_assert_int(
+      TC_X509_crl_index_init(&bytes, 1, &options.parsing, &parser, &work, &indexed, 1, &index), ==,
+      TC_TLV_OK);
+  munit_assert_int(indexed.policy, ==, record.policy);
+  /* Lookup on an unusable CRL never reports an unrevoked target. */
+  TC_X509_certificate certificate = {0};
+  certificate.serial = target.serial;
+  certificate.issuer = target.issuer;
+  TC_X509_crl_match found;
+  memset(&found, 0xa5, sizeof found);
+  const tc_pki_tree_workspace tree = {frames, 16, &work};
+  work = 60000;
+  munit_assert_int(tc_x509_crl_find(&record.crl, &record.extensions, &certificate,
+                                    &(tc_x509_crl_decode){&options.parsing, &tree, NULL, oids, 8},
+                                    &found),
+                   ==, TC_TLV_UNSUPPORTED);
+  TC_X509_crl_prepare_clear(job);
+  return MUNIT_OK;
+}
+
+/* State storage must meet TC_X509_crl_prepare_alignment. TC_X509_crl_storage
+ * provides it for static arrays. */
+static MunitResult alignment(const MunitParameter params[], void* user)
+{
+  (void)params;
+  (void)user;
+  const size_t required = TC_X509_crl_prepare_alignment();
+  munit_assert_size(required, >, 0);
+  munit_assert_size(required & (required - 1), ==, 0);
+  munit_assert_size(TC_X509_crl_prepare_size() % required, ==, 0);
+  typedef struct {
+    char byte;
+    TC_X509_crl_storage storage;
+  } storage_alignment;
+  munit_assert_size(offsetof(storage_alignment, storage) % required, ==, 0);
+  if (required == 1)
+    return MUNIT_OK;
+  static const uint8_t encoded[] = {0x30, 0};
+  TC_bytes bytes = {encoded, sizeof encoded};
+  TC_source source = {tc_source_memory_read, &bytes, bytes.length};
+  TC_X509_crl_storage state[257];
+  uint8_t window[16], metadata[256], scratch[256], issuer[64];
+  TC_TLV_frame frames[16];
+  TC_bytes oids[8];
+  uint32_t left[32], right[32];
+  uint8_t names[8];
+  const TC_X509_crl_prepare_workspace workspace = {{(uint8_t*)state + 1, sizeof state - 1},
+                                                   {window, sizeof window},
+                                                   {metadata, sizeof metadata},
+                                                   {scratch, sizeof scratch},
+                                                   {issuer, sizeof issuer},
+                                                   {frames, 16, oids, 8},
+                                                   {left, right, 32, names, 8},
+                                                   NULL,
+                                                   0};
+  const TC_X509_crl_prepare_options options = {{256, 256, 128, 16}, sizeof encoded, 4096, 4096, 0};
+  TC_X509_crl_job* job = NULL;
+  size_t work = 60000;
+  memset(state, 0xa5, sizeof state);
+  munit_assert_int(TC_X509_crl_prepare_begin(&source, NULL, 0, &options, &workspace, &work, &job),
+                   ==, TC_TLV_ARGUMENT);
+  munit_assert_null(job);
+  munit_assert_size(work, ==, 60000);
+  for (size_t i = 0; i < sizeof state; ++i)
+    munit_assert_uint8(((const uint8_t*)state)[i], ==, 0xa5);
+  return MUNIT_OK;
+}
+
 static TC_status file_read(void* context, uint64_t offset, uint8_t* output, size_t length)
 {
   file_source* source = (file_source*)context;
@@ -410,7 +539,9 @@ static MunitResult content_comparison(const MunitParameter params[], void* user)
 }
 
 static MunitTest tests[] = {
+    {"/alignment", alignment, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/content-comparison", content_comparison, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/extension-policy", extension_policy, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/hashing", hashing, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/preparation", preparation, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/public-crl", public_crl, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
