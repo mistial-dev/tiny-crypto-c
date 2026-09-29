@@ -76,7 +76,7 @@ static MunitResult verify(const MunitParameter params[], void* data)
                        ==, TC_EC_ARGUMENT);
       munit_assert_int(ecdsa_verify(curves[c], public_key, public_len, digest, digest_len,
                                     signature, 2 * bytes - 1, &workspace),
-                       ==, TC_EC_ARGUMENT);
+                       ==, TC_EC_INVALID);
       munit_assert_int(ecdsa_verify(curves[c], public_key, public_len, (const uint8_t*)&workspace,
                                     digest_len, signature, 2 * bytes, &workspace),
                        ==, TC_EC_ARGUMENT);

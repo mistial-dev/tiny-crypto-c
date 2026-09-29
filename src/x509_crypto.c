@@ -32,26 +32,9 @@ static TC_X509_signature_result tc_pki_verify_digest(const TC_signature_algorith
 #if TC_ENABLE_EC
     TC_DER_signature_pair pair;
     uint8_t raw[2 * TC_EC_MAX_BYTES];
-    size_t width;
-    switch (key->curve) {
-#if TC_EC_ENABLE_P192
-    case TC_EC_P192:
-      width = 24;
-      break;
-#endif
-#if TC_EC_ENABLE_P256
-    case TC_EC_P256:
-      width = 32;
-      break;
-#endif
-#if TC_EC_ENABLE_P384
-    case TC_EC_P384:
-      width = 48;
-      break;
-#endif
-    default:
+    const size_t width = TC_EC_coordinate_bytes(key->curve);
+    if (!width)
       return TC_X509_SIGNATURE_UNSUPPORTED;
-    }
     if (!ec)
       return TC_X509_SIGNATURE_ERROR;
     /* Reserve fixed public work for two scalar multiplies and inversions. */
@@ -68,10 +51,18 @@ static TC_X509_signature_result tc_pki_verify_digest(const TC_signature_algorith
     const TC_EC_result verified = TC_ECDSA_verify_digest(key->curve, key->key, digest,
                                                          (TC_bytes){raw, 2 * width}, ec, &budget);
     TC_secure_zero(raw, sizeof raw);
-    return verified == TC_EC_OK            ? TC_X509_SIGNATURE_VALID
-           : verified == TC_EC_INVALID     ? TC_X509_SIGNATURE_INVALID
-           : verified == TC_EC_UNSUPPORTED ? TC_X509_SIGNATURE_UNSUPPORTED
-                                           : TC_X509_SIGNATURE_ERROR;
+    switch (verified) {
+    case TC_EC_OK:
+      return TC_X509_SIGNATURE_VALID;
+    case TC_EC_INVALID:
+      return TC_X509_SIGNATURE_INVALID;
+    case TC_EC_LIMIT:
+      return TC_X509_SIGNATURE_LIMIT;
+    case TC_EC_UNSUPPORTED:
+      return TC_X509_SIGNATURE_UNSUPPORTED;
+    default:
+      return TC_X509_SIGNATURE_ERROR;
+    }
 #else
     (void)ec;
     return TC_X509_SIGNATURE_UNSUPPORTED;

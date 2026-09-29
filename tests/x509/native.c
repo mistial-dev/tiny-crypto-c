@@ -98,6 +98,15 @@ static MunitResult signatures(const MunitParameter params[], void* user)
           TC_X509_signature_verify_digest((TC_bytes){(const uint8_t*)&ec, DIGEST_BYTES}, &resolved,
                                           signed_value, &key, &provider, &work),
           ==, TC_X509_SIGNATURE_ERROR);
+      if (kind == 0) {
+        /* An EC point of the wrong length is bad key data. */
+        --key.key.length;
+        work = WORK_BUDGET;
+        munit_assert_int(TC_X509_signature_verify_digest(computed, &resolved, signed_value, &key,
+                                                         &provider, &work),
+                         ==, TC_X509_SIGNATURE_INVALID);
+        ++key.key.length;
+      }
       if (kind == 2) {
         ++resolved.salt_length;
         work = WORK_BUDGET;

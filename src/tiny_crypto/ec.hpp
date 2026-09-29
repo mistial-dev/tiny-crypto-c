@@ -14,6 +14,10 @@ typedef ::TC_ECDSA_workspace ecdsa_workspace;
 
 /* Thin wrappers over the C API. Contracts, statuses and work rules match
  * <tiny_crypto/ec.h>. Output arrays select their capacity from N. */
+TC_CPP_NODISCARD inline size_t ec_coordinate_bytes(ec_curve curve) noexcept
+{
+  return ::TC_EC_coordinate_bytes(curve);
+}
 TC_CPP_NODISCARD inline uint32_t ec_operation_work(ec_curve curve,
                                                    TC_EC_operation operation) noexcept
 {

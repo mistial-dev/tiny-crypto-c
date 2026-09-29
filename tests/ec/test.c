@@ -298,7 +298,7 @@ static MunitResult rejected_inputs(const MunitParameter params[], void* user)
     scalar[n - 1] = 1;
     munit_assert_size(tc_test_decode_hex(vectors[i].generator, point, sizeof point), ==, 1 + 2 * n);
     for (length = 0; length < 1 + 2 * n; ++length)
-      munit_assert_int(ec_validate(vectors[i].curve, point, length, &w), ==, TC_EC_ARGUMENT);
+      munit_assert_int(ec_validate(vectors[i].curve, point, length, &w), ==, TC_EC_INVALID);
     point[0] = 2;
     munit_assert_int(ec_dh(vectors[i].curve, scalar, n, point, 1 + 2 * n, output, n, &w), ==,
                      TC_EC_INVALID);
@@ -636,6 +636,122 @@ static MunitResult signing_answers(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+static MunitResult coordinate_bytes(const MunitParameter params[], void* user)
+{
+  (void)params;
+  (void)user;
+  munit_assert_size(TC_EC_coordinate_bytes(TC_EC_P192), ==, TC_EC_ENABLE_P192 ? 24 : 0);
+  munit_assert_size(TC_EC_coordinate_bytes(TC_EC_P256), ==, TC_EC_ENABLE_P256 ? 32 : 0);
+  munit_assert_size(TC_EC_coordinate_bytes(TC_EC_P384), ==, TC_EC_ENABLE_P384 ? 48 : 0);
+  munit_assert_size(TC_EC_coordinate_bytes((TC_EC_curve)0), ==, 0);
+  munit_assert_size(TC_EC_coordinate_bytes((TC_EC_curve)99), ==, 0);
+  for (size_t i = 0; i < sizeof vectors / sizeof vectors[0]; ++i) {
+    munit_assert_size(TC_EC_coordinate_bytes(vectors[i].curve), ==, vectors[i].bytes);
+    munit_assert_size(TC_EC_coordinate_bytes(vectors[i].curve), <=, TC_EC_MAX_BYTES);
+    munit_assert_uint32(TC_EC_operation_work(vectors[i].curve, TC_EC_OPERATION_PUBLIC_KEY), ==,
+                        16u * (uint32_t)vectors[i].bytes);
+  }
+  return MUNIT_OK;
+}
+
+/* A short caller output buffer returns LIMIT before any work, RNG request or
+ * output write. Received data of the wrong length returns INVALID. */
+static MunitResult short_output_and_lengths(const MunitParameter params[], void* user)
+{
+  TC_EC_workspace workspace;
+  TC_ECDSA_workspace signature_workspace;
+  uint8_t scalar[TC_EC_MAX_BYTES], point[1 + 2 * TC_EC_MAX_BYTES];
+  uint8_t output[1 + 2 * TC_EC_MAX_BYTES], digest[TC_EC_MAX_BYTES] = {1};
+  uint8_t signature[2 * TC_EC_MAX_BYTES] = {0}, generated[TC_EC_MAX_BYTES];
+  SignRandom random = {0, 0, 0};
+  TC_random_source source = {sign_nonce, &random};
+  (void)params;
+  (void)user;
+  for (size_t i = 0; i < sizeof vectors / sizeof vectors[0]; ++i) {
+    const TC_EC_curve curve = vectors[i].curve;
+    const size_t n = vectors[i].bytes;
+    TC_work_budget work = {UINT32_MAX};
+    memset(scalar, 0, sizeof scalar);
+    scalar[n - 1] = 1;
+    munit_assert_size(tc_test_decode_hex(vectors[i].generator, point, sizeof point), ==, 1 + 2 * n);
+    memset(output, 0xa5, sizeof output);
+    memset(&workspace, 0x5a, sizeof workspace);
+    memset(&signature_workspace, 0x5a, sizeof signature_workspace);
+
+    munit_assert_int(TC_EC_public_key(curve, (TC_bytes){scalar, n}, (TC_buffer){output, 2 * n},
+                                      &workspace, &work),
+                     ==, TC_EC_LIMIT);
+    munit_assert_int(TC_ECDH(curve, (TC_bytes){scalar, n}, (TC_bytes){point, 1 + 2 * n},
+                             (TC_buffer){output, n - 1}, &workspace, &work),
+                     ==, TC_EC_LIMIT);
+    TC_EC_execution execution = {source, 4, {UINT32_MAX}};
+    memset(generated, 0xa5, sizeof generated);
+    munit_assert_int(TC_EC_generate_key_pair(curve, (TC_buffer){generated, n - 1},
+                                             (TC_buffer){output, 1 + 2 * n}, &workspace,
+                                             &execution),
+                     ==, TC_EC_LIMIT);
+    munit_assert_int(TC_EC_generate_key_pair(curve, (TC_buffer){generated, n},
+                                             (TC_buffer){output, 2 * n}, &workspace, &execution),
+                     ==, TC_EC_LIMIT);
+    for (size_t j = 0; j < sizeof generated; ++j)
+      munit_assert_uint(generated[j], ==, 0xa5);
+    munit_assert_int(TC_ECDSA_sign_digest(curve, (TC_bytes){scalar, n},
+                                          (TC_bytes){point, 1 + 2 * n}, (TC_bytes){digest, n},
+                                          (TC_buffer){output, 2 * n - 1}, &signature_workspace,
+                                          &execution),
+                     ==, TC_EC_LIMIT);
+    munit_assert_uint32(work.remaining, ==, UINT32_MAX);
+    munit_assert_uint32(execution.work.remaining, ==, UINT32_MAX);
+    munit_assert_uint(random.calls, ==, 0);
+    for (size_t j = 0; j < sizeof output; ++j)
+      munit_assert_uint(output[j], ==, 0xa5);
+
+    /* Wrong-length keys and signatures are bad data. */
+    munit_assert_int(TC_EC_public_key(curve, (TC_bytes){scalar, n - 1},
+                                      (TC_buffer){output, sizeof output}, &workspace, &work),
+                     ==, TC_EC_INVALID);
+    munit_assert_int(TC_EC_validate_public_key(curve, (TC_bytes){point, 2 * n}, &workspace, &work),
+                     ==, TC_EC_INVALID);
+    munit_assert_int(TC_ECDH(curve, (TC_bytes){scalar, n}, (TC_bytes){point, 2 * n},
+                             (TC_buffer){output, n}, &workspace, &work),
+                     ==, TC_EC_INVALID);
+    munit_assert_int(TC_ECDSA_verify_digest(curve, (TC_bytes){point, 1 + 2 * n},
+                                            (TC_bytes){digest, n}, (TC_bytes){signature, 2 * n - 1},
+                                            &signature_workspace, &work),
+                     ==, TC_EC_INVALID);
+    munit_assert_int(TC_ECDSA_sign_digest(curve, (TC_bytes){scalar, n}, (TC_bytes){point, 2 * n},
+                                          (TC_bytes){digest, n}, (TC_buffer){output, 2 * n},
+                                          &signature_workspace, &execution),
+                     ==, TC_EC_INVALID);
+    /* Invalid data is reported before a short output buffer. */
+    munit_assert_int(TC_ECDH(curve, (TC_bytes){scalar, n}, (TC_bytes){point, 2 * n},
+                             (TC_buffer){output, n - 1}, &workspace, &work),
+                     ==, TC_EC_INVALID);
+    munit_assert_uint32(work.remaining, ==, UINT32_MAX);
+    munit_assert_uint(random.calls, ==, 0);
+    for (size_t j = 0; j < sizeof output; ++j)
+      munit_assert_uint(output[j], ==, 0xa5);
+    /* Checks before arithmetic leave both workspaces untouched. */
+    for (size_t j = 0; j < sizeof workspace; ++j)
+      munit_assert_uint(((const uint8_t*)&workspace)[j], ==, 0x5a);
+    for (size_t j = 0; j < sizeof signature_workspace; ++j)
+      munit_assert_uint(((const uint8_t*)&signature_workspace)[j], ==, 0x5a);
+
+    /* NULL pointers are argument errors, reported before curve and length. */
+    munit_assert_int(TC_ECDSA_verify_digest(curve, (TC_bytes){point, 1 + 2 * n},
+                                            (TC_bytes){NULL, n}, (TC_bytes){signature, 1},
+                                            &signature_workspace, &work),
+                     ==, TC_EC_ARGUMENT);
+    munit_assert_int(TC_EC_public_key((TC_EC_curve)0, (TC_bytes){NULL, 0},
+                                      (TC_buffer){output, sizeof output}, &workspace, &work),
+                     ==, TC_EC_ARGUMENT);
+    munit_assert_int(TC_EC_public_key((TC_EC_curve)0, (TC_bytes){scalar, 1}, (TC_buffer){output, 1},
+                                      &workspace, &work),
+                     ==, TC_EC_UNSUPPORTED);
+  }
+  return MUNIT_OK;
+}
+
 static MunitTest tests[] = {
     {"/wycheproof", wycheproof, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/known-answers", known_answers, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
@@ -646,6 +762,8 @@ static MunitTest tests[] = {
      MUNIT_TEST_OPTION_NONE, NULL},
     {"/generation-answers", generation_answers, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/rejected-inputs", rejected_inputs, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/coordinate-bytes", coordinate_bytes, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/short-output", short_output_and_lengths, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/captured-answer", captured_answer, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
 static const MunitSuite suite = {"/ec", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};

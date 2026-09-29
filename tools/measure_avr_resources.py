@@ -51,10 +51,28 @@ PROFILES = {
       if (TC_DRBG_instantiate(&drbg, &config, source, empty, empty) != TC_DRBG_OK) return 1;
       return TC_DRBG_generate(&drbg, out, sizeof(out), 0, empty) != TC_DRBG_OK;
     """, "TC_DRBG_generate"),
+    # P-256 with byte limbs. Signing includes TC_ECDSA_SIGN_VERIFY, so its call
+    # chain covers verification too.
+    "ecdsa_p256": (["TC_ENABLE_EC=1", "TC_EC_ENABLE_P384=0"], """
+      static TC_ECDSA_workspace workspace;
+      static uint8_t public_key[65], signature[64];
+      TC_EC_execution execution = {{entropy, 0}, 4, {UINT32_MAX}};
+      TC_work_budget work = {UINT32_MAX};
+      const TC_bytes point = {public_key, sizeof(public_key)};
+      const TC_bytes digest = {key, sizeof(key)};
+      if (TC_ECDSA_sign_digest(TC_EC_P256, (TC_bytes){key, sizeof(key)}, point, digest, (TC_buffer){signature, sizeof(signature)}, &workspace, &execution) != TC_EC_OK) return 1;
+      out[0] = signature[0];
+      return TC_ECDSA_verify_digest(TC_EC_P256, point, digest, (TC_bytes){signature, sizeof(signature)}, &workspace, &work) != TC_EC_OK;
+    """, "TC_ECDSA_sign_digest"),
 }
+# Public types whose AVR size a profile records, as {profile: {metric: type}}.
+TYPE_SIZES = {"ecdsa_p256": {"ecdsa_workspace_bytes": "TC_ECDSA_workspace"}}
 # Functions whose indirect call reaches an application-supplied callback. The
 # callback frame belongs to the application and is listed as excluded.
-APPLICATION_CALLBACK_SITES = {"read_entropy": "TC_random_source entropy callback"}
+APPLICATION_CALLBACK_SITES = {
+    "read_entropy": "TC_random_source entropy callback",
+    "TC_ECDSA_sign_digest": "TC_random_source nonce callback",
+}
 MAC_CIPHER_CALLBACKS = {"tc_aes_mac_encrypt", "tc_des_mac_encrypt"}
 # MAC core functions that call the block cipher through a tc_mac_cipher
 # descriptor. Their indirect call resolves to MAC_CIPHER_CALLBACKS.
@@ -107,7 +125,24 @@ def hash_descriptor_callbacks():
     return found
 
 
-def measure(directory, definitions, body, entry):
+def type_sizes(directory, flags, types):
+    """sizeof each public type under the profile flags, read from the emitted
+    .size directive of a probe array."""
+    sizes = {}
+    for metric, name in types.items():
+        source = directory / f"probe_{metric}.c"
+        source.write_text("#include <tiny_crypto/tiny_crypto.h>\n"
+                          f"unsigned char tc_probe[sizeof({name})] = {{1}};\n")
+        assembly = source.with_suffix(".s")
+        run([CC, *flags, "-S", str(source), "-o", str(assembly)])
+        match = re.search(r"\.size\s+tc_probe,\s*(\d+)", assembly.read_text())
+        if not match:
+            raise RuntimeError("Missing size probe for " + name)
+        sizes[metric] = int(match[1])
+    return sizes
+
+
+def measure(directory, definitions, body, entry, types=None):
     flags = BASE + ["-D" + item for item in definitions]
     frames, edges, objects, unknown_indirect = {}, {}, [], []
     hash_core_sites = set()
@@ -196,7 +231,7 @@ def measure(directory, definitions, body, entry):
         return frames[name] + size, [name] + path
 
     stack, path = chain(entry, set())
-    return {
+    report = {
         "flash": sections.get(".text", 0) + sections.get(".data", 0),
         "static_ram": sections.get(".data", 0) + sections.get(".bss", 0),
         "project_stack_estimate": stack,
@@ -205,6 +240,8 @@ def measure(directory, definitions, body, entry):
         "kdf_workspace_frame": frames.get("tc_kdf_HMAC_SHA256"),
         "flags": [flag.replace(str(ROOT) + "/", "") for flag in flags],
     }
+    report.update(type_sizes(directory, flags, types or {}))
+    return report
 
 
 def main():
@@ -218,7 +255,8 @@ def main():
         for name, (definitions, body, entry) in PROFILES.items():
             directory = Path(temporary) / name
             directory.mkdir()
-            report["profiles"][name] = measure(directory, definitions, body, entry)
+            report["profiles"][name] = measure(directory, definitions, body, entry,
+                                               TYPE_SIZES.get(name))
     if args.check:
         budgets = json.loads(args.check.read_text())
         for name, limits in budgets["profiles"].items():

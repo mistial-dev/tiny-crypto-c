@@ -36,12 +36,24 @@ typedef struct {
 extern "C" {
 #endif
 
-/* Status of every EC operation, in the same order as TC_RSA_result.
- * INVALID covers rejected scalars, points not on the curve and signatures that
- * do not verify. ARGUMENT covers NULL pointers, wrong lengths and overlapping
- * storage. UNSUPPORTED means the curve is unknown or disabled. LIMIT means
- * the work budget or the random-attempt limit ran out. ERROR reports a random
- * source failure or a signature that failed its own verification. */
+/* Results. Every EC function checks its arguments once, in this order, and
+ * reports the first problem it finds:
+ *
+ *   TC_EC_ARGUMENT     NULL pointers, an empty digest and overlapping storage.
+ *   TC_EC_UNSUPPORTED  a curve that is unknown or disabled in this build.
+ *   TC_EC_INVALID      a private key, public key or signature whose length
+ *                      does not match the curve.
+ *   TC_EC_LIMIT        a caller output buffer shorter than required, then
+ *                      too little work or too few random attempts.
+ *
+ * After these checks, TC_EC_INVALID also reports a private scalar outside
+ * [1, n - 1], a point that is not on the curve and a signature that does not
+ * verify. TC_EC_ERROR reports a random source failure or a signature that
+ * failed its own verification. Output buffers larger than required are
+ * accepted, and exactly the documented length is written. Outputs change only
+ * on TC_EC_OK. UNSUPPORTED and LIMIT never report success. Argument errors
+ * and limits found before arithmetic leave the workspace, the work budget and
+ * the random source untouched. */
 typedef enum {
   TC_EC_OK,
   TC_EC_INVALID,
@@ -76,11 +88,17 @@ typedef enum {
  * short. */
 uint32_t TC_EC_operation_work(TC_EC_curve curve, TC_EC_operation operation);
 
-/* Scalars and coordinates are fixed-width, big-endian (24, 32 or 48 bytes).
- * Public keys use SEC 1 uncompressed encoding, 04 || X || Y. Lengths must
- * match the selected curve exactly; output buffers need at least that
- * capacity. Output and workspace must not overlap each other or any input.
- * Outputs change only on TC_EC_OK. Scratch is wiped after use. Private-scalar
+/* Bytes in one coordinate or private scalar of curve: 24 for P-192, 32 for
+ * P-256 and 48 for P-384. Zero for a curve that is unknown or disabled in this
+ * build. A SEC 1 uncompressed public key is 1 + 2 * width bytes and a fixed
+ * r || s signature is 2 * width bytes. */
+size_t TC_EC_coordinate_bytes(TC_EC_curve curve);
+
+/* Scalars and coordinates are fixed-width, big-endian values of
+ * TC_EC_coordinate_bytes(curve) bytes. Public keys use SEC 1 uncompressed
+ * encoding, 04 || X || Y. Input lengths must match the curve exactly. Output
+ * buffers need at least the required capacity. Output and workspace must not
+ * overlap each other or any input. Scratch is wiped after use. Private-scalar
  * operations use constant-work point multiplication. */
 TC_EC_result TC_EC_public_key(TC_EC_curve curve, TC_bytes private_key, TC_buffer public_key,
                               TC_EC_workspace* workspace, TC_work_budget* work);

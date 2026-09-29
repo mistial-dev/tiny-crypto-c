@@ -23,6 +23,12 @@
       "flash": 10800,
       "static_ram": 400,
       "project_stack_estimate": 620
+    },
+    "ecdsa_p256": {
+      "flash": 10000,
+      "static_ram": 1500,
+      "project_stack_estimate": 330,
+      "ecdsa_workspace_bytes": 1218
     }
   }
 }

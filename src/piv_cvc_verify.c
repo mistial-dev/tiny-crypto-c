@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/piv_cvc.h>
 #if TC_ENABLE_PIV_CVC && TC_ENABLE_X509
+#include "pki_status_internal.h"
 #include "pki_storage_internal.h"
 #include "pki_extensions_internal.h"
 #include "pki_key_internal.h"
@@ -17,22 +18,6 @@ enum {
   DER_OID_HEADER_BYTES = 2,
   POINT_WORK_PER_BIT = 8
 };
-
-static TC_X509_signature_result parse_result(TC_TLV_result result)
-{
-  switch (result) {
-  case TC_TLV_OK:
-    return TC_X509_SIGNATURE_VALID;
-  case TC_TLV_ARGUMENT:
-    return TC_X509_SIGNATURE_ERROR;
-  case TC_TLV_LIMIT:
-    return TC_X509_SIGNATURE_LIMIT;
-  case TC_TLV_UNSUPPORTED:
-    return TC_X509_SIGNATURE_UNSUPPORTED;
-  default:
-    return TC_X509_SIGNATURE_INVALID;
-  }
-}
 
 static TC_TLV_result storage_check(const TC_PIV_CVC_chain_request* request,
                                    const TC_TLV_limits* limits,
@@ -74,21 +59,9 @@ static TC_X509_signature_result check_point(const TC_PIV_CVC* cvc, TC_EC_curve c
                                             TC_EC_workspace* points, size_t* work)
 {
 #if TC_ENABLE_EC
-  unsigned bits;
-  switch (curve) {
-#if TC_EC_ENABLE_P256
-  case TC_EC_P256:
-    bits = 256;
-    break;
-#endif
-#if TC_EC_ENABLE_P384
-  case TC_EC_P384:
-    bits = 384;
-    break;
-#endif
-  default:
+  const size_t bits = 8 * TC_EC_coordinate_bytes(curve);
+  if (!bits)
     return TC_X509_SIGNATURE_UNSUPPORTED;
-  }
   if (cvc->key_bits != bits)
     return TC_X509_SIGNATURE_INVALID;
   if (tc_pki_work_charge(work, bits * POINT_WORK_PER_BIT) != TC_TLV_OK)
@@ -132,7 +105,7 @@ TC_X509_signature_result TC_PIV_CVC_chain_verify(const TC_PIV_CVC_chain_request*
 {
   TC_TLV_result parsed = storage_check(request, limits, provider, point_workspace, work, out);
   if (parsed != TC_TLV_OK)
-    return parse_result(parsed);
+    return tc_pki_signature_error(parsed);
   if (request->curve != TC_EC_P256 && request->curve != TC_EC_P384)
     return TC_X509_SIGNATURE_UNSUPPORTED;
   if (request->card.length > limits->max_input ||
@@ -144,7 +117,7 @@ TC_X509_signature_result TC_PIV_CVC_chain_verify(const TC_PIV_CVC_chain_request*
     return TC_X509_SIGNATURE_LIMIT;
   parsed = TC_PIV_CVC_read(request->card.data, request->card.length, &card);
   if (parsed != TC_TLV_OK)
-    return parse_result(parsed);
+    return tc_pki_signature_error(parsed);
   if (card.role != TC_PIV_CVC_CARD_APPLICATION ||
       (request->card_uuid.length &&
        memcmp(card.subject.data, request->card_uuid.data, CARD_UUID_BYTES)))
@@ -152,7 +125,7 @@ TC_X509_signature_result TC_PIV_CVC_chain_verify(const TC_PIV_CVC_chain_request*
   TC_bytes issuer;
   parsed = tc_pki_subject_key_identifier(request->signer, limits, work, &issuer);
   if (parsed != TC_TLV_OK)
-    return parse_result(parsed);
+    return tc_pki_signature_error(parsed);
   if (issuer.length < ISSUER_BYTES)
     return TC_X509_SIGNATURE_INVALID;
   const TC_X509_public_key* signing_key = &request->signer->public_key;
@@ -165,7 +138,7 @@ TC_X509_signature_result TC_PIV_CVC_chain_verify(const TC_PIV_CVC_chain_request*
     parsed =
         TC_PIV_CVC_read(request->intermediate.data, request->intermediate.length, &intermediate);
     if (parsed != TC_TLV_OK)
-      return parse_result(parsed);
+      return tc_pki_signature_error(parsed);
     if (intermediate.role != TC_PIV_CVC_INTERMEDIATE ||
         memcmp(intermediate.issuer.data, issuer.data, ISSUER_BYTES) ||
         memcmp(card.issuer.data, intermediate.subject.data, ISSUER_BYTES))
