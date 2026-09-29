@@ -5,6 +5,9 @@ name: Full test suite
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   full:
     name: Full ${{ matrix.compiler }}
@@ -21,7 +24,7 @@ jobs:
       CC: ${{ matrix.cc }}
       CXX: ${{ matrix.cxx }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y libssl-dev
       - name: Fetch Unicode reference data
@@ -39,11 +42,11 @@ jobs:
           TINY_CRYPTO_TEST_UNICODE_DIR="$RUNNER_TEMP/unicode"
       - name: Full sanitizer suite
         run: >-
-          make test-sanitize-full TINY_CRYPTO_TEST_FULL=ON
+          make test-sanitize-full
           TINY_CRYPTO_TEST_OPENSSL=ON
           TINY_CRYPTO_TEST_UNICODE_DIR="$RUNNER_TEMP/unicode"
       - name: Full memory sanitizer suite
         if: matrix.compiler == 'clang'
         run: >-
-          make test-msan-full TINY_CRYPTO_TEST_FULL=ON
+          make test-msan-full
           TINY_CRYPTO_TEST_UNICODE_DIR="$RUNNER_TEMP/unicode"

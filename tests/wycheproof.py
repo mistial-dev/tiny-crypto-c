@@ -72,8 +72,20 @@ def ecdsa_records(document, bits, hash_name, encoding="p1363"):
     return "\n".join(records) + "\n", counts
 
 
-def oaep_records(document, exclusions=None):
+OAEP_KEY_SIZES = (1024, 2048, 3072, 4096)
+
+
+def oaep_records(document, exclusions=None, key_sizes=None):
+    """Return reader records for supported OAEP groups.
+
+    key_sizes selects one CTest shard. Supported groups of other sizes count
+    toward document coverage and are left to their own shard.
+    """
     hashes = {"SHA-1", "SHA-224", "SHA-256", "SHA-384", "SHA-512"}
+    if key_sizes is None:
+        key_sizes = set(OAEP_KEY_SIZES)
+    if not key_sizes or not set(key_sizes) <= set(OAEP_KEY_SIZES):
+        raise ValueError("Unsupported OAEP shard key size")
     if document["algorithm"] != "RSAES-OAEP":
         raise AssertionError("Unexpected OAEP algorithm")
     counts, records = Counter(), []
@@ -82,7 +94,7 @@ def oaep_records(document, exclusions=None):
         bits = group["keySize"]
         if group["type"] != "RsaesOaepDecrypt" or group["mgf"] != "MGF1":
             raise AssertionError("Unsupported OAEP group")
-        if (bits not in (1024, 2048, 3072, 4096) or group["sha"] not in hashes
+        if (bits not in OAEP_KEY_SIZES or group["sha"] not in hashes
                 or group["mgfSha"] not in hashes):
             if exclusions is None:
                 raise AssertionError("Unsupported OAEP group")
@@ -92,6 +104,9 @@ def oaep_records(document, exclusions=None):
             amount = len(group["tests"])
             exclusions[(bits, group["sha"], group["mgfSha"])] += amount
             excluded += amount
+            continue
+        if bits not in key_sizes:
+            excluded += len(group["tests"])
             continue
         key = group["privateKey"]
         components = []
@@ -278,6 +293,9 @@ def main():
     parser.add_argument("--rsa-generation-reader", type=Path, action="append", default=[])
     parser.add_argument("--primality-reader", type=Path, action="append", default=[])
     parser.add_argument("--rsa-oaep-reader", type=Path, action="append", default=[])
+    parser.add_argument("--rsa-oaep-key-size", type=int, action="append", default=[],
+                        choices=OAEP_KEY_SIZES,
+                        help="Run only OAEP groups of this modulus size (repeatable)")
     parser.add_argument("--kmac-reader", type=Path, action="append", default=[])
     parser.add_argument("--cmac-reader", type=Path, action="append", default=[])
     parser.add_argument("--hmac-reader", type=Path, action="append", default=[])
@@ -344,7 +362,8 @@ def main():
             for name in names_all:
                 if not name.startswith(prefix) or not name.endswith("_test.json"):
                     continue
-                records, counts = oaep_records(json.loads(read(name)), exclusions)
+                records, counts = oaep_records(json.loads(read(name)), exclusions,
+                                               args.rsa_oaep_key_size or None)
                 if records:
                     fixture = Path(temporary) / "rsa-oaep.txt"
                     fixture.write_text(records)

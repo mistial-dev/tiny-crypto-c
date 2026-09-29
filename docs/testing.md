@@ -57,26 +57,44 @@ hexadecimal checksum. `test_md5_0` and `test_md5_1` exercise the optional
 make test
 make test-full
 make test-sanitize
-make test-sanitize-full TINY_CRYPTO_TEST_FULL=ON
+make test-sanitize-full
 make test-msan CC=clang CXX=clang++
-make test-msan-full CC=clang CXX=clang++ TINY_CRYPTO_TEST_FULL=ON
+make test-msan-full CC=clang CXX=clang++
 ```
 
-Slow corpus, oracle, packaging and exhaustive tests carry the CTest label
-`extended`. `make test`, `make test-sanitize` and `make test-msan` skip them for
-quick local runs. Run the `-full` targets after completing a major change and
-before a release. They run every test, including the checked-in NIST CAVP,
-DSS, ECCCDH and Wycheproof vectors. Push CI runs the whole CTest suite, and
-the **Full test suite** workflow runs the `-full` targets. External parser and
-capture corpora below require their own paths.
-`test-sanitize` runs the core suite
-with AddressSanitizer and UndefinedBehaviorSanitizer. `test-sanitize-full` also
-runs tests labelled `extended`, including exhaustive RSA and corpus cases. The
-MemorySanitizer targets use the same core and full split on Linux with Clang.
+Tests that take more than a few seconds carry the CTest label `extended`.
+`make test`, `make test-sanitize` and `make test-msan` skip them for quick
+local runs. Run the `-full` targets after completing a major change and before
+a release. They set `TINY_CRYPTO_TEST_FULL=ON`, which adds the NIST CAVP
+definitions and suites, and run every configured test. Every target forwards
+`TINY_CRYPTO_*` variables to CMake and honors a `CTEST_LABELS` override.
+OpenSSL cross-checks need `TINY_CRYPTO_TEST_OPENSSL=ON` on any target.
 
-Push CI runs the core sanitizer suite with GCC and Clang. The **Full test suite**
-GitHub Actions workflow runs the vendored Wycheproof and NIST vectors in
-release and sanitizer builds when started through `workflow_dispatch`.
+The checked-in DSS, ECCCDH and Wycheproof vectors and the parser corpus under
+`tests/vectors` are configured by default. The parser corpus tests use
+`TINY_CRYPTO_TLV_CORPUS`, which defaults to `tests/vectors`. Set it to another
+root for an external corpus, or to an empty string to skip those tests. An
+existing build directory keeps its cached value.
+
+The slow OAEP suites run as CTest shards. `test_wycheproof_rsa_oaep_<limb>_<bits>`
+splits the Wycheproof corpus by limb profile (`0` native, `1` byte) and modulus
+size. `test_rsa_oaep_decrypt_<limb>_<bits>` passes `--param bits` to the
+OpenSSL decryption matrix. Run a whole suite with a prefix such as
+`ctest -R '^test_wycheproof_rsa_oaep_'`.
+
+GitHub Actions runs these configurations:
+
+| Job                                | Configuration                                                                              | Tests                                                                       |
+| ---------------------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
+| Push `host` (Ubuntu GCC and Clang) | Release, OpenSSL                                                                           | every configured test, including `extended` and the parser corpus           |
+| Push `host` (macOS, Windows)       | Release, no OpenSSL                                                                        | every configured test except the OpenSSL cross-checks                       |
+| Push `extended`                    | `make test-sanitize TINY_CRYPTO_TEST_OPENSSL=ON`, `make test-msan` (Clang)                 | tests without the `extended` label                                          |
+| Push `esp32p4`                     | ESP-IDF 5.5.1                                                                              | builds for both roles and for the `signed-rsa` and `signed-ecdsa` fragments |
+| Push `parser`                      | Clang fuzzers                                                                              | fixed fuzzing time for each harness with an empty seed corpus               |
+| Manual **Full test suite**         | `make test-full` and `make test-sanitize-full` with OpenSSL, `make test-msan-full` (Clang) | every configured test, including CAVP                                       |
+
+Push CI omits the `TINY_CRYPTO_TEST_FULL` CAVP suites, fuzz regression replay,
+and the external capture corpora described below.
 
 Use `act` to run the push sanitizer checks in Linux. `--bind` includes current
 working tree changes:
@@ -89,7 +107,7 @@ act workflow_dispatch --bind -W .github/act/cms-sanitizer.yml -j msan
 
 Several corpus readers skip when run directly without an input file. Their
 runner tests supply the vectors: `test_wycheproof_ecdsa`,
-`test_wycheproof_rsa_signatures`, `test_wycheproof_rsa_oaep`,
+`test_wycheproof_rsa_signatures`, the `test_wycheproof_rsa_oaep_*` shards,
 `test_wycheproof_aead`, and `test_cms_corpus`. Check that the relevant runner
 is configured and passes before treating a standalone reader skip as expected.
 The Wycheproof runners report accepted input categories and excluded parameters.
@@ -143,8 +161,8 @@ definite-order attributes, malformed values, duplicate/missing attributes,
 resource limits, and borrowed signature input. Signature verification has its
 own tests below.
 
-Configure `TINY_CRYPTO_TLV_CORPUS` with the parser corpus root to add
-`test_cms_corpus`. It extracts CMS from 70 captured CHUIDs, 69 Security
+With `TINY_CRYPTO_TLV_CORPUS` at its default `tests/vectors` root,
+`test_cms_corpus` extracts CMS from 70 captured CHUIDs, 69 Security
 Objects and 111 biometric objects, then checks envelope versions, content types,
 signer identifiers and
 signed attributes through the public readers. Both explicit attribute encoding
@@ -193,7 +211,7 @@ each scratch area and require rejection on the first callback, with the store
 snapshot released on return.
 
 ```sh
-cmake -S . -B build -DTINY_CRYPTO_TLV_CORPUS="$PWD/tests/vectors"
+cmake -S . -B build
 cmake --build build --target test_cms_corpus_reader
 ctest --test-dir build -R '^test_cms_corpus$' --output-on-failure
 ```
@@ -577,7 +595,7 @@ encodes v2, and the test follows its bytes. Fixture hashes and group
 counts are checked before running the reference cases.
 
 ```sh
-cmake -S . -B build -DTINY_CRYPTO_TLV_CORPUS="$PWD/tests/vectors"
+cmake -S . -B build
 cmake --build build --target test_x509_crl
 ctest --test-dir build -R '^test_x509_crl_corpus$' --output-on-failure
 ```
@@ -591,7 +609,7 @@ and the wrong anchor key.
 Path-discovery cases retrieve an intermediate through the public source
 callbacks, validate it with the native provider, and reject a tampered
 intermediate signature.
-When `TINY_CRYPTO_TLV_CORPUS` names the checked-in vector root,
+With the default `TINY_CRYPTO_TLV_CORPUS` root,
 `test_x509_path_corpus` runs seven pinned C2SP x509-limbo graphs through the
 native path builder and nine reviewed external revocation cases. The path slice
 covers a resolvable cross-sign cycle, an alternate path around an expired dead
@@ -711,7 +729,7 @@ Check the test listing before treating this as a full run. Expect
 be absent when their paths are unset or Python is unavailable.
 Also check for `test_wycheproof_ecdsa`, `test_wycheproof_rsa_signatures`,
 `test_wycheproof_rsa_generation`, `test_wycheproof_primality`,
-`test_wycheproof_rsa_oaep`, `test_cms_native`, and the OpenSSL RSA private-operation
+the `test_wycheproof_rsa_oaep_*` shards, `test_cms_native`, and the OpenSSL RSA private-operation
 tests. On macOS, this configuration includes `test_twic_authenticate_command`.
 
 The vendored FIPS 186 vectors enable `test_nist_dss_*`. ECDSA tests cover
@@ -859,8 +877,11 @@ The [ESP32-P4 target](esp32-p4.md)
 adds ESP-IDF cross-builds for both roles.
 
 On Linux with Clang, `make test-msan CC=clang CXX=clang++` enables
-MemorySanitizer for the core suite. Use `make test-msan-full CC=clang CXX=clang++ TINY_CRYPTO_TEST_FULL=ON` for extended tests. It needs a compatible
-instrumented runtime, which Apple Clang lacks.
+MemorySanitizer for the C suites. Use `make test-msan-full CC=clang CXX=clang++`
+for extended tests. It needs a compatible instrumented runtime, which Apple
+Clang lacks. MemorySanitizer builds skip the C++ doctest suites, which need an
+instrumented C++ standard library. CI runs them without OpenSSL, so the OpenSSL
+cross-checks are also outside MemorySanitizer coverage.
 
 ## PIV CVC verification
 
@@ -876,7 +897,7 @@ Run it with `ctest --test-dir build -R '^test_piv_cvc_verify$' --output-on-failu
 key confirmation and protected command/response traffic. Its negative cases
 cover altered signatures, UUIDs, cryptograms, transport status, and work limits.
 
-With `TINY_CRYPTO_TLV_CORPUS` set, `test_piv_cvc_corpus` checks 19 captured CVC
+With the default parser corpus, `test_piv_cvc_corpus` checks 19 captured CVC
 file instances. Three direct chains verify. Three intermediate chains have
 valid signatures but fail the required public-key subject binding. Captures
 without matching signers receive parsing checks only.
@@ -928,7 +949,8 @@ mkdir "$fuzz_dir/tlv" "$fuzz_dir/pki" "$fuzz_dir/sm" "$fuzz_dir/gzip"
 ## RSA arithmetic and encoding tests
 
 `test_rsa_oaep_decrypt_0` and `test_rsa_oaep_decrypt_1` check public OAEP
-decryption against OpenSSL ciphertexts at each RSA size. Independent `hash` and
+decryption against OpenSSL ciphertexts at each RSA size. CTest runs them as one
+shard per size, such as `test_rsa_oaep_decrypt_1_2048`. Independent `hash` and
 `mgf` parameters select SHA-1, SHA-224, SHA-256, SHA-384 or SHA-512. Cases cover
 empty, one-byte and maximum messages. Failure cases use the maximum message
 length. SHA-256 with MGF1-SHA-256 also checks RNG failure, zero work, zero
@@ -939,10 +961,12 @@ SHA-256 configuration at RSA-2048 and RSA-3072; focused tests cover RSA-4096
 with byte limbs to keep the extended corpus bounded.
 
 With `TINY_CRYPTO_TEST_WYCHEPROOF_DIR` configured, run
-`ctest --test-dir build -R '^test_wycheproof_rsa_oaep$' --output-on-failure`
-to check the pinned OAEP corpus with both limb profiles. The runner includes
+`ctest --test-dir build -R '^test_wycheproof_rsa_oaep_' --output-on-failure`
+to check the pinned OAEP corpus with both limb profiles. Each shard passes
+`--rsa-oaep-key-size` to the runner, and the shards together cover every
+supported size. The runner includes
 supported groups from mixed-parameter files and reports excluded parameter
-combinations. Coverage uses RSA-1024/2048/3072 and SHA-1/224/256/384/512.
+combinations. Coverage uses RSA-1024/2048/3072/4096 and SHA-1/224/256/384/512.
 SHA-512/224, SHA-512/256 and other RSA sizes are counted separately.
 
 With OpenSSL tests enabled, `test_cpp_rsa_openssl_0` and

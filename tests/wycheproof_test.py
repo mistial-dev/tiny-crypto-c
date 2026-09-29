@@ -184,6 +184,35 @@ class ReaderTests(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 wycheproof.oaep_records(bad)
 
+    def test_oaep_records_key_size_shard(self):
+        group = {"keySize": 1024, "type": "RsaesOaepDecrypt", "mgf": "MGF1",
+                 "sha": "SHA-256", "mgfSha": "SHA-1",
+                 "privateKey": {"modulus": "00ff", "publicExponent": "0003",
+                                "privateExponent": "03", "prime1": "05", "prime2": "07"},
+                 "tests": [{"tcId": 1, "label": "", "ct": "0001", "msg": "00", "result": "valid"},
+                           {"tcId": 2, "label": "00", "ct": "", "msg": "", "result": "invalid"}]}
+        wide = copy.deepcopy(group)
+        wide["keySize"] = 2048
+        wide["privateKey"]["modulus"] = "00fe"
+        unsupported = copy.deepcopy(group)
+        unsupported["keySize"] = 8192
+        document = {"algorithm": "RSAES-OAEP", "numberOfTests": 6,
+                    "testGroups": [group, wide, unsupported]}
+        exclusions = wycheproof.Counter()
+        records, counts = wycheproof.oaep_records(document, exclusions, key_sizes={2048})
+        self.assertEqual(counts, {"valid": 1, "invalid": 1})
+        self.assertEqual({len(line.split()[0]) for line in records.splitlines()}, {512})
+        # Supported groups outside the shard stay out of the exclusion counts.
+        self.assertEqual(exclusions, {(8192, "SHA-256", "SHA-1"): 2})
+        exclusions = wycheproof.Counter()
+        self.assertEqual(wycheproof.oaep_records(document, exclusions, key_sizes={3072}), ("", {}))
+        self.assertEqual(exclusions, {(8192, "SHA-256", "SHA-1"): 2})
+        document["numberOfTests"] = 7
+        with self.assertRaises(AssertionError):
+            wycheproof.oaep_records(document, wycheproof.Counter(), key_sizes={2048})
+        with self.assertRaises(ValueError):
+            wycheproof.oaep_records(document, wycheproof.Counter(), key_sizes={1536})
+
     def test_ecdsa_records(self):
         document = {"numberOfTests": 2, "testGroups": [{
             "publicKey": {"curve": "secp256r1", "uncompressed": "04"},

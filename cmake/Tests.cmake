@@ -222,11 +222,22 @@ add_test(NAME test_package_boundaries
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/wycheproof.py
         --vectors ${TINY_CRYPTO_TEST_WYCHEPROOF_DIR}
         --primality-reader $<TARGET_FILE:test_rsa_prime_0>)
-    add_test(NAME test_wycheproof_rsa_oaep
-      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/wycheproof.py
-        --vectors ${TINY_CRYPTO_TEST_WYCHEPROOF_DIR}
-        --rsa-oaep-reader $<TARGET_FILE:test_rsa_oaep_reader_0>
-        --rsa-oaep-reader $<TARGET_FILE:test_rsa_oaep_reader_1>)
+    # OAEP decryption dominates the Wycheproof run. Shards split it by limb
+    # width and modulus size. Together they cover every supported size.
+    foreach(small 0 1)
+      foreach(shard "1024;2048" "3072" "4096")
+        string(REPLACE ";" "_" shard_name "${shard}")
+        set(shard_arguments)
+        foreach(bits IN LISTS shard)
+          list(APPEND shard_arguments --rsa-oaep-key-size ${bits})
+        endforeach()
+        add_test(NAME test_wycheproof_rsa_oaep_${small}_${shard_name}
+          COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/wycheproof.py
+            --vectors ${TINY_CRYPTO_TEST_WYCHEPROOF_DIR} ${shard_arguments}
+            --rsa-oaep-reader $<TARGET_FILE:test_rsa_oaep_reader_${small}>)
+        list(APPEND tc_wycheproof_oaep_shards test_wycheproof_rsa_oaep_${small}_${shard_name})
+      endforeach()
+    endforeach()
     add_test(NAME test_wycheproof_ecdsa
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/wycheproof.py
         --vectors ${TINY_CRYPTO_TEST_WYCHEPROOF_DIR}
@@ -477,7 +488,14 @@ add_test(NAME test_package_boundaries
   target_link_libraries(test_tlv_corpus_reader PRIVATE tiny-crypto-c-test-tlv-full)
   tc_warnings(test_tlv_corpus_reader)
   tc_use_test_sanitizers(test_tlv_corpus_reader)
-  set(TINY_CRYPTO_TLV_CORPUS "" CACHE PATH "Optional external PIV/X.509 corpus root")
+  # Parser corpus tests default to the checked-in capture root. Set the option
+  # to another root for an external corpus, or to an empty string to skip them.
+  set(tc_default_tlv_corpus "")
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/x509")
+    set(tc_default_tlv_corpus "${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors")
+  endif()
+  set(TINY_CRYPTO_TLV_CORPUS "${tc_default_tlv_corpus}" CACHE PATH
+    "PIV/X.509 parser corpus root (empty skips the corpus tests)")
   tc_add_test_library(tiny-crypto-c-test-key-import
     src/common.c src/tlv.c src/tlv_walk.c src/der.c src/pki_key.c)
   target_compile_definitions(tiny-crypto-c-test-key-import PUBLIC
@@ -792,9 +810,6 @@ add_test(NAME test_package_boundaries
       examples/cms_reader.c examples/cms_validate.c examples/credential_object.c examples/x509_revocation.c
       examples/card_key_policy.c examples/credential_workflow.c src/twic_ccl.c)
     target_compile_definitions(test_cms_native PRIVATE TC_ENABLE_TWIC_CCL=1)
-    set_tests_properties(test_cms_native PROPERTIES LABELS extended)
-    add_test(NAME test_cms_revocation_limits COMMAND $<TARGET_FILE:test_cms_native>
-      --param group discovery --param outcome clear /cms/native/revocations)
     add_executable(cms_check examples/cms_check.c examples/cms_reader.c
       examples/cms_validate.c examples/pki_input.c)
     target_link_libraries(cms_check PRIVATE tiny-crypto-c-test-pki-native)
@@ -830,11 +845,17 @@ add_test(NAME test_package_boundaries
       endforeach()
     endforeach()
     foreach(small 0 1)
-      tc_add_c_test(test_rsa_oaep_decrypt_${small} tiny-crypto-c-test
+      tc_add_c_test_executable(test_rsa_oaep_decrypt_${small} tiny-crypto-c-test
         tests/rsa/oaep_decrypt_openssl.c ${tc_rsa_sources} src/pki_storage.c)
-      target_compile_definitions(test_rsa_oaep_decrypt_${small} PRIVATE TC_ENABLE_RSA=1 TC_RSA_SMALL=${small})
       target_link_libraries(test_rsa_oaep_decrypt_${small} PRIVATE OpenSSL::Crypto)
+      target_compile_definitions(test_rsa_oaep_decrypt_${small} PRIVATE TC_ENABLE_RSA=1 TC_RSA_SMALL=${small})
       set_property(TARGET test_rsa_oaep_decrypt_${small} PROPERTY NO_SYSTEM_FROM_IMPORTED TRUE)
+      # The OpenSSL OAEP matrix runs as one CTest shard per modulus size.
+      foreach(bits 1024 2048 3072 4096)
+        add_test(NAME test_rsa_oaep_decrypt_${small}_${bits}
+          COMMAND test_rsa_oaep_decrypt_${small} --param bits ${bits})
+        list(APPEND tc_rsa_oaep_decrypt_shards test_rsa_oaep_decrypt_${small}_${bits})
+      endforeach()
       tc_add_c_test(test_rsa_private_openssl_${small} tiny-crypto-c-test-rsa-${small}
         tests/rsa/private_openssl.c examples/rsa_validate.c examples/rsa_sign.c)
       target_link_libraries(test_rsa_private_openssl_${small} PRIVATE OpenSSL::Crypto)
@@ -1371,20 +1392,18 @@ add_test(NAME test_package_boundaries
         -o ${CMAKE_CURRENT_BINARY_DIR}/tiny-crypto-c-header-compile.o)
   endif()
 
+  # Tests that take more than a few seconds in a Release build. Faster vector
+  # suites stay in `make test` and the push sanitizer runs.
   set(tc_extended_tests
     test_rsa_validation_1
-    test_nist_dss_ec_0
-    test_nist_dss_ec_1
-    test_nist_dss_ecdsa_signatures_0
     test_nist_dss_ecdsa_signatures_1
     test_nist_dss_rsa_generation
-    test_nist_dss_rsa_signatures
     test_nist_dss_rsa_keygen_validation
     test_wycheproof_ec
     test_wycheproof_rsa_signatures
     test_wycheproof_rsa_generation
     test_wycheproof_primality
-    test_wycheproof_rsa_oaep
+    ${tc_wycheproof_oaep_shards}
     test_wycheproof_ecdsa
     test_ec_cavp
     test_trust_anchor_options
@@ -1400,8 +1419,7 @@ add_test(NAME test_package_boundaries
     test_rsa_oaep_openssl_small
     test_rsa_pss_openssl
     test_rsa_pss_openssl_small
-    test_rsa_oaep_decrypt_0
-    test_rsa_oaep_decrypt_1
+    ${tc_rsa_oaep_decrypt_shards}
     test_rsa_private_openssl_0
     test_rsa_private_openssl_1)
   foreach(tc_extended_test IN LISTS tc_extended_tests)

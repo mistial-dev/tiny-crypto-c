@@ -57,10 +57,18 @@ function(tc_add_linked_test target library)
   add_test(NAME ${target} COMMAND ${target})
 endfunction()
 
-function(tc_add_c_test target library)
-  tc_add_linked_test(${target} ${library} ${ARGN}
+# Builds a munit executable without registering a CTest entry. Callers that
+# split one executable into several CTest shards register each shard.
+function(tc_add_c_test_executable target library)
+  tc_add_test_executable(${target} ${ARGN}
     tests/support/cavp.c tests/support/test_util.c tests/support/munit.c)
+  target_link_libraries(${target} PRIVATE ${library})
   target_include_directories(${target} PRIVATE tests/support)
+endfunction()
+
+function(tc_add_c_test target library)
+  tc_add_c_test_executable(${target} ${library} ${ARGN})
+  add_test(NAME ${target} COMMAND ${target})
 endfunction()
 
 set(tc_test_sources src/common.c ${tc_aes_sources} ${tc_des_sources} ${tc_hash_sources}

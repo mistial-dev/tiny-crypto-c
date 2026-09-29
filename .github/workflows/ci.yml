@@ -10,13 +10,16 @@ on:
     branches: [master]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   format:
     name: Formatting
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.12'
       - name: Install pre-commit
@@ -25,22 +28,27 @@ jobs:
         run: pre-commit run --all-files --hook-stage manual
 
   esp32p4:
-    name: ESP32-P4 ${{ matrix.role }}
+    name: ESP32-P4 ${{ matrix.role }} ${{ matrix.config }}
     runs-on: ubuntu-latest
     container: espressif/idf:v5.5.1
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        role: [piv-acu, piv-pd]
+        include:
+          - {role: piv-acu, config: default, defaults: sdkconfig.defaults}
+          - {role: piv-pd, config: default, defaults: sdkconfig.defaults}
+          - {role: piv-acu, config: signed-rsa, defaults: 'sdkconfig.defaults;sdkconfig.signed-rsa'}
+          - {role: piv-acu, config: signed-ecdsa, defaults: 'sdkconfig.defaults;sdkconfig.signed-ecdsa'}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Build ESP-IDF target
         shell: bash
         run: |
           . "$IDF_PATH/export.sh"
           idf.py -C examples/esp32-p4 -B /tmp/tiny-crypto-esp32p4 \
-            -DTINY_CRYPTO_TARGET=${{ matrix.role }} build size-components
+            -DTINY_CRYPTO_TARGET=${{ matrix.role }} \
+            '-DSDKCONFIG_DEFAULTS=${{ matrix.defaults }}' build size-components
 
   host:
     name: ${{ matrix.os }} ${{ matrix.compiler }}
@@ -54,12 +62,19 @@ jobs:
           - {os: macos-latest, compiler: clang, cc: clang, cxx: clang++}
           - {os: windows-latest, compiler: msvc, cc: cl, cxx: cl}
     env:
+      CTEST_PARALLEL_LEVEL: 4
       CC: ${{ matrix.cc }}
       CXX: ${{ matrix.cxx }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Install OpenSSL development files
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev
       - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_COMPILE_WARNING_AS_ERROR=ON
+        shell: bash
+        run: >-
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_COMPILE_WARNING_AS_ERROR=ON
+          -DTINY_CRYPTO_TEST_OPENSSL=${{ runner.os == 'Linux' && 'ON' || 'OFF' }}
       - name: Build
         run: cmake --build build --config Release --parallel 4
       - name: Test
@@ -80,7 +95,7 @@ jobs:
       CC: ${{ matrix.cc }}
       CXX: ${{ matrix.cxx }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Install AVR compiler and emulator
         if: matrix.compiler == 'gcc'
         run: sudo apt-get update && sudo apt-get install -y gcc-avr avr-libc qemu-system-misc
@@ -116,14 +131,14 @@ jobs:
         run: make test BUILD_DIR=build-sha384 CMAKE_ARGS=-DCMAKE_COMPILE_WARNING_AS_ERROR=ON TINY_CRYPTO_ENABLE_SHA256=OFF TINY_CRYPTO_ENABLE_SHA384=ON TINY_CRYPTO_ENABLE_HMAC=ON
       - name: KDF shipped-library profile
         run: make test BUILD_DIR=build-kdf CMAKE_ARGS=-DCMAKE_COMPILE_WARNING_AS_ERROR=ON TINY_CRYPTO_ENABLE_KDF=ON TINY_CRYPTO_ENABLE_HMAC=ON TINY_CRYPTO_AES_CMAC=ON
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         if: matrix.compiler == 'gcc'
         with:
           python-version: '3.x'
       - name: PlatformIO example builds
         if: matrix.compiler == 'gcc'
         run: |
-          pip install --upgrade platformio
+          pip install platformio==6.1.19
           pio ci --lib="." --board=uno --board=esp32dev --board=nucleo_f401re examples/aes_ctr.cpp examples/arduino_main.h
           pio ci --lib="." --board=uno examples/kbkdf.cpp examples/arduino_main.h --project-option="build_flags=-DTC_ENABLE_HMAC=1 -DTC_ENABLE_KDF=1"
           pio ci --lib="." --board=uno --board=esp32dev examples/sha256.cpp examples/arduino_main.h
@@ -133,8 +148,8 @@ jobs:
     name: Embedded resource reports
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.x'
       - name: Install pinned measurement toolchain
@@ -143,7 +158,7 @@ jobs:
           pio pkg install --global --tool "platformio/toolchain-atmelavr@1.70300.191015"
           pio pkg install --global --tool "platformio/toolchain-gccarmnoneeabi@1.120301.0"
       - name: Checkout pinned Pico SDK
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           repository: raspberrypi/pico-sdk
           ref: 079c6f39023649b154152db30f1d781e884879bc
@@ -166,7 +181,7 @@ jobs:
           export AVR_CC="$HOME/.platformio/packages/toolchain-atmelavr/bin/avr-gcc"
           export AVR_SIZE="$HOME/.platformio/packages/toolchain-atmelavr/bin/avr-size"
           python3 tools/measure_avr_resources.py --check tests/budgets/avr.json --output avr-resources.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: embedded-resources
           path: |
@@ -178,7 +193,7 @@ jobs:
     name: Parser fuzz and external tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Fetch pinned ASN.1 length tests
         run: |
           curl --fail --location --retry 3 https://raw.githubusercontent.com/Mbed-TLS/mbedtls/091fd1b18806098d74bd58ace7aacb7f171bcb42/tests/suites/test_suite_asn1parse.data -o "$RUNNER_TEMP/asn1parse.data"

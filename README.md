@@ -502,8 +502,9 @@ vectors and optional external parser corpora.
 
 TLV tests cover framing, DER values, resource limits, and split input. The
 optional corpus adapter compares CVC fields with the supplied metadata and
-reads ASN.1 objects without evaluating certificate trust. Set
-`TINY_CRYPTO_TLV_CORPUS` to a directory containing `piv/` and `x509/` to run it.
+reads ASN.1 objects without evaluating certificate trust. It runs against
+`TINY_CRYPTO_TLV_CORPUS`, which defaults to the checked-in `tests/vectors`.
+Point it at another directory containing `piv/` and `x509/` for an external corpus.
 If `eac/cvc/` is present, the EAC tests also check certificate fields,
 inherited EC parameter widths, and malformed encodings.
 `TINY_CRYPTO_TLV_MBEDTLS_SUITE` selects an external, pinned ASN.1 test data file.
