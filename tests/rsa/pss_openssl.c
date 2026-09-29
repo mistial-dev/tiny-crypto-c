@@ -34,17 +34,11 @@ static TC_RSA_result verify_pss(const TC_RSA_public_key* key, TC_hash_algorithm 
   return TC_RSA_verify_pss_digest(key, &options, digest, signature, workspace, &budget);
 }
 
-static TC_RSA_result sign_pss(const TC_RSA_private_key* key, TC_hash_algorithm hash,
-                              TC_hash_algorithm mgf_hash, size_t salt_length, TC_bytes digest,
-                              uint8_t* signature, size_t signature_length, TC_random_fn random,
-                              void* context, size_t attempts, const TC_RSA_workspace* workspace,
-                              uint32_t work)
+static TC_RSA_result sign_pss(const TC_RSA_private_key* key, TC_RSA_pss_options options,
+                              TC_bytes digest, TC_buffer output, const TC_RSA_workspace* workspace,
+                              TC_RSA_execution execution)
 {
-  const TC_RSA_pss_options options = {hash, mgf_hash, salt_length};
-  TC_RSA_execution execution = {
-      {random, context}, attempts, {work > UINT32_MAX ? UINT32_MAX : (uint32_t)work}};
-  return TC_RSA_sign_pss_digest(key, &options, digest, workspace,
-                                (TC_buffer){signature, signature_length}, &execution);
+  return TC_RSA_sign_pss_digest(key, &options, digest, workspace, output, &execution);
 }
 
 static MunitResult signatures(const MunitParameter params[], void* user)
@@ -149,10 +143,11 @@ static MunitResult signatures(const MunitParameter params[], void* user)
                        ==, TC_RSA_LIMIT);
       EVP_PKEY_CTX_free(signer);
       random_source random = {0, 0};
-      munit_assert_int(sign_pss(&private_key, hash, mgf_hash, (size_t)salts[i],
-                                (TC_bytes){digest, digest_length}, signature, key.modulus.length,
-                                random_bytes, &random, 1, &workspace, UINT32_MAX),
-                       ==, TC_RSA_OK);
+      munit_assert_int(
+          sign_pss(&private_key, (TC_RSA_pss_options){hash, mgf_hash, (size_t)salts[i]},
+                   (TC_bytes){digest, digest_length}, (TC_buffer){signature, key.modulus.length},
+                   &workspace, (TC_RSA_execution){{random_bytes, &random}, 1, {UINT32_MAX}}),
+          ==, TC_RSA_OK);
       munit_assert_uint(random.calls, ==, salts[i] ? 2 : 1);
       munit_assert_true(tc_test_all_zero(
           scratch, TC_RSA_workspace_words(TC_RSA_OPERATION_SIGN, bits) * sizeof *scratch));
@@ -172,10 +167,11 @@ static MunitResult signatures(const MunitParameter params[], void* user)
         random = (random_source){0, fail_at};
         memset(signature, 0xa5, sizeof signature);
         memset(scratch, 0xa5, sizeof scratch);
-        munit_assert_int(sign_pss(&private_key, hash, mgf_hash, (size_t)salts[i],
-                                  (TC_bytes){digest, digest_length}, signature, key.modulus.length,
-                                  random_bytes, &random, 1, &workspace, UINT32_MAX),
-                         ==, TC_RSA_ERROR);
+        munit_assert_int(
+            sign_pss(&private_key, (TC_RSA_pss_options){hash, mgf_hash, (size_t)salts[i]},
+                     (TC_bytes){digest, digest_length}, (TC_buffer){signature, key.modulus.length},
+                     &workspace, (TC_RSA_execution){{random_bytes, &random}, 1, {UINT32_MAX}}),
+            ==, TC_RSA_ERROR);
         munit_assert_uint(random.calls, ==, fail_at);
         for (size_t j = 0; j < sizeof signature; ++j)
           munit_assert_uint(signature[j], ==, 0xa5);
@@ -187,10 +183,11 @@ static MunitResult signatures(const MunitParameter params[], void* user)
       random = (random_source){0, 0};
       memset(signature, 0xa5, sizeof signature);
       memset(scratch, 0xa5, sizeof scratch);
-      munit_assert_int(sign_pss(&private_key, hash, mgf_hash, (size_t)salts[i],
-                                (TC_bytes){digest, digest_length}, signature, key.modulus.length,
-                                random_bytes, &random, 1, &workspace, 0),
-                       ==, TC_RSA_LIMIT);
+      munit_assert_int(
+          sign_pss(&private_key, (TC_RSA_pss_options){hash, mgf_hash, (size_t)salts[i]},
+                   (TC_bytes){digest, digest_length}, (TC_buffer){signature, key.modulus.length},
+                   &workspace, (TC_RSA_execution){{random_bytes, &random}, 1, {0}}),
+          ==, TC_RSA_LIMIT);
       munit_assert_uint(random.calls, ==, 0);
       for (size_t j = 0; j < sizeof signature; ++j)
         munit_assert_uint(signature[j], ==, 0xa5);
@@ -198,10 +195,11 @@ static MunitResult signatures(const MunitParameter params[], void* user)
         munit_assert_uint(((uint8_t*)scratch)[j], ==, 0xa5);
       const size_t oversized_salts[] = {key.modulus.length - digest_length - 1, SIZE_MAX};
       for (size_t j = 0; j < sizeof oversized_salts / sizeof *oversized_salts; ++j) {
-        munit_assert_int(sign_pss(&private_key, hash, mgf_hash, oversized_salts[j],
-                                  (TC_bytes){digest, digest_length}, signature, key.modulus.length,
-                                  random_bytes, &random, 1, &workspace, UINT32_MAX),
-                         ==, TC_RSA_INVALID);
+        munit_assert_int(
+            sign_pss(&private_key, (TC_RSA_pss_options){hash, mgf_hash, oversized_salts[j]},
+                     (TC_bytes){digest, digest_length}, (TC_buffer){signature, key.modulus.length},
+                     &workspace, (TC_RSA_execution){{random_bytes, &random}, 1, {UINT32_MAX}}),
+            ==, TC_RSA_INVALID);
         munit_assert_uint(random.calls, ==, 0);
         for (size_t k = 0; k < sizeof signature; ++k)
           munit_assert_uint(signature[k], ==, 0xa5);
@@ -218,10 +216,12 @@ static MunitResult signatures(const MunitParameter params[], void* user)
         random = (random_source){0, 0};
         memset(signature, 0xa5, sizeof signature);
         memset(scratch, 0xa5, sizeof scratch);
-        munit_assert_int(sign_pss(&private_key, hash, mgf_hash, (size_t)salts[i],
-                                  (TC_bytes){digest, digest_length}, signature, key.modulus.length,
-                                  random_bytes, &random, 1, &workspace, exact_work - short_work),
-                         ==, short_work ? TC_RSA_LIMIT : TC_RSA_OK);
+        munit_assert_int(
+            sign_pss(&private_key, (TC_RSA_pss_options){hash, mgf_hash, (size_t)salts[i]},
+                     (TC_bytes){digest, digest_length}, (TC_buffer){signature, key.modulus.length},
+                     &workspace,
+                     (TC_RSA_execution){{random_bytes, &random}, 1, {exact_work - short_work}}),
+            ==, short_work ? TC_RSA_LIMIT : TC_RSA_OK);
         munit_assert_uint(random.calls, ==, (salts[i] != 0) + !short_work);
         munit_assert_true(tc_test_all_zero(
             scratch, TC_RSA_workspace_words(TC_RSA_OPERATION_SIGN, bits) * sizeof *scratch));

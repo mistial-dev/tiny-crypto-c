@@ -217,15 +217,39 @@ static inline void add_cms_octet_attribute(CMS_ContentInfo* cms, const char* ide
   ASN1_OBJECT_free(oid);
 }
 
-static inline size_t encode_biometric_record_parameters_flags(
-    X509* certificate, EVP_PKEY* key, int include_certificate, int omit_rsa_parameters,
-    TC_bytes fascn, TC_bytes guid, TC_bytes record, uint16_t format_type, uint32_t biometric_type,
-    uint8_t data_type, uint8_t* out, size_t capacity, unsigned extra_flags)
+/* Signer for a biometric fixture. extra_flags adds CMS_sign flags. */
+typedef struct {
+  X509* certificate;
+  EVP_PKEY* key;
+  int include_certificate;
+  int omit_rsa_parameters;
+  unsigned extra_flags;
+} biometric_signer;
+
+/* One CBEFF record and the identifiers bound into its signed attributes. */
+typedef struct {
+  TC_bytes fascn, guid, record;
+  uint16_t format_type;
+  uint32_t biometric_type;
+  uint8_t data_type;
+} biometric_record;
+
+/* Encode CBEFF header || record || detached CMS signature into output and
+ * return the encoded length. */
+static inline size_t encode_biometric_record(const biometric_signer* signing,
+                                             const biometric_record* biometric, TC_buffer output)
 {
+  X509* certificate = signing->certificate;
+  EVP_PKEY* key = signing->key;
+  const TC_bytes fascn = biometric->fascn, guid = biometric->guid, record = biometric->record;
+  const uint16_t format_type = biometric->format_type;
+  const uint32_t biometric_type = biometric->biometric_type;
+  uint8_t* out = output.data;
+  const size_t capacity = output.capacity;
   enum { HEADER_BYTES = 88, P256_SIGNATURE_BYTES = 72, MAX_SIGNATURE_ATTEMPTS = 128 };
   const size_t signed_bytes = HEADER_BYTES + record.length;
   const unsigned flags = CMS_BINARY | CMS_NOSMIMECAP | CMS_DETACHED |
-                         (include_certificate ? 0 : CMS_NOCERTS) | extra_flags;
+                         (signing->include_certificate ? 0 : CMS_NOCERTS) | signing->extra_flags;
   const size_t target_signature_length =
       EVP_PKEY_is_a(key, "RSA") ? (size_t)EVP_PKEY_get_size(key) : P256_SIGNATURE_BYTES;
   munit_assert_size(record.length, <=, UINT32_MAX);
@@ -249,7 +273,7 @@ static inline size_t encode_biometric_record_parameters_flags(
   out[36] = (uint8_t)(biometric_type >> 16);
   out[37] = (uint8_t)(biometric_type >> 8);
   out[38] = (uint8_t)biometric_type;
-  out[39] = data_type;
+  out[39] = biometric->data_type;
   memcpy(out + 59, fascn.data, fascn.length);
   memcpy(out + HEADER_BYTES, record.data, record.length);
   size_t expected = 0;
@@ -271,7 +295,7 @@ static inline size_t encode_biometric_record_parameters_flags(
     if (guid.length)
       add_cms_octet_attribute(cms, "1.3.6.1.1.16.4", guid.data, (int)guid.length);
     munit_assert_int(CMS_final(cms, input, NULL, flags), ==, 1);
-    if (omit_rsa_parameters)
+    if (signing->omit_rsa_parameters)
       cms_fixture_omit_rsa_parameters(cms);
     CMS_SignerInfo* signer = sk_CMS_SignerInfo_value(CMS_get0_SignerInfos(cms), 0);
     munit_assert_int(CMS_SignerInfo_verify(signer), ==, 1);
@@ -296,17 +320,6 @@ static inline size_t encode_biometric_record_parameters_flags(
   return 0;
 }
 
-static inline size_t
-encode_biometric_record_parameters(X509* certificate, EVP_PKEY* key, int include_certificate,
-                                   int omit_rsa_parameters, TC_bytes fascn, TC_bytes guid,
-                                   TC_bytes record, uint16_t format_type, uint32_t biometric_type,
-                                   uint8_t data_type, uint8_t* out, size_t capacity)
-{
-  return encode_biometric_record_parameters_flags(
-      certificate, key, include_certificate, omit_rsa_parameters, fascn, guid, record, format_type,
-      biometric_type, data_type, out, capacity, 0);
-}
-
 static inline size_t encode_biometric_parameters(X509* certificate, EVP_PKEY* key,
                                                  int include_certificate, int omit_rsa_parameters,
                                                  TC_bytes fascn, TC_bytes guid, uint8_t* out,
@@ -316,9 +329,9 @@ static inline size_t encode_biometric_parameters(X509* certificate, EVP_PKEY* ke
   static const uint8_t record[RECORD_BYTES] = {
       'F', 'M', 'R', 0, ' ', '2', '0', 0, 0, RECORD_BYTES, 0, 1, 0, 1, 0x80, 1,   1, 0, 1,
       0,   0,   197, 0, 197, 2,   0,   2, 0, 100,          0, 0, 0, 7, 0,    100, 0, 0, 0};
-  return encode_biometric_record_parameters(
-      certificate, key, include_certificate, omit_rsa_parameters, fascn, guid,
-      (TC_bytes){record, sizeof record}, 0x0201, 8, 0x80, out, capacity);
+  const biometric_signer signing = {certificate, key, include_certificate, omit_rsa_parameters, 0};
+  const biometric_record biometric = {fascn, guid, {record, sizeof record}, 0x0201, 8, 0x80};
+  return encode_biometric_record(&signing, &biometric, (TC_buffer){out, capacity});
 }
 static inline size_t encode_biometric(X509* certificate, EVP_PKEY* key, int include_certificate,
                                       TC_bytes fascn, TC_bytes guid, uint8_t* out, size_t capacity)

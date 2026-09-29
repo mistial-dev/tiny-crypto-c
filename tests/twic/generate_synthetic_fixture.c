@@ -575,10 +575,15 @@ static void make_profile(const char* profile, const char* directory, const char*
     fingerprint_record[minutia_offset++] = 0;
   }
   munit_assert_size(minutia_offset, ==, sizeof fingerprint_record);
-  size_t biometric_length = encode_biometric_record_parameters_flags(
-      signer, signer_key, 0, 0, (TC_bytes){fascn, sizeof fascn}, (TC_bytes){uuid, sizeof uuid},
-      (TC_bytes){fingerprint_record, sizeof fingerprint_record}, 0x0201, 8, 0x80, biometric,
-      sizeof biometric, CMS_NO_SIGNING_TIME);
+  const biometric_signer biometric_signing = {signer, signer_key, 0, 0, CMS_NO_SIGNING_TIME};
+  const biometric_record fingerprints = {{fascn, sizeof fascn},
+                                         {uuid, sizeof uuid},
+                                         {fingerprint_record, sizeof fingerprint_record},
+                                         0x0201,
+                                         8,
+                                         0x80};
+  size_t biometric_length = encode_biometric_record(&biometric_signing, &fingerprints,
+                                                    (TC_buffer){biometric, sizeof biometric});
   uint8_t piv_fingerprint[CAPACITY], piv_finger_body[CAPACITY];
   size_t piv_finger_body_length = field(piv_finger_body, 0xbc, biometric, biometric_length);
   piv_finger_body[piv_finger_body_length++] = 0xfe;
@@ -605,10 +610,14 @@ static void make_profile(const char* profile, const char* directory, const char*
   face_record[17] = (uint8_t)face_block;
   munit_assert_size(read_test_image(directory, face_record + 46, sizeof face_record - 46), ==,
                     sizeof face_record - 46);
-  biometric_length = encode_biometric_record_parameters_flags(
-      signer, signer_key, 0, 0, (TC_bytes){fascn, sizeof fascn}, (TC_bytes){uuid, sizeof uuid},
-      (TC_bytes){face_record, sizeof face_record}, 0x0501, 2, 0x20, biometric, sizeof biometric,
-      CMS_NO_SIGNING_TIME);
+  const biometric_record face = {{fascn, sizeof fascn},
+                                 {uuid, sizeof uuid},
+                                 {face_record, sizeof face_record},
+                                 0x0501,
+                                 2,
+                                 0x20};
+  biometric_length =
+      encode_biometric_record(&biometric_signing, &face, (TC_buffer){biometric, sizeof biometric});
   uint8_t piv_face[CAPACITY], piv_face_body[CAPACITY];
   size_t piv_face_body_length = field(piv_face_body, 0xbc, biometric, biometric_length);
   piv_face_body[piv_face_body_length++] = 0xfe;

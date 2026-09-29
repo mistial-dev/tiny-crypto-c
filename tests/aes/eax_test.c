@@ -62,22 +62,38 @@ static const struct eax_rfc_vector eax_rfc_vectors[] = {
 #endif
 
 #if TC_AES_KEY_BITS == 128
-static int eax_decode_vector(const struct eax_rfc_vector* vector, uint8_t* key, uint8_t* nonce,
-                             uint8_t* aad, uint8_t* msg, uint8_t* cipher, uint8_t* tag,
-                             size_t* key_len, size_t* nonce_len, size_t* aad_len, size_t* msg_len,
-                             size_t* cipher_len, size_t* tag_len)
+/* One decoded RFC vector. The views borrow the storage arrays. */
+typedef struct {
+  uint8_t key_bytes[32], nonce_bytes[2048], aad_bytes[2048], msg_bytes[2048];
+  uint8_t cipher_bytes[2048], tag_bytes[16];
+  TC_bytes key, nonce, aad, msg, cipher, tag;
+} eax_decoded;
+
+static int eax_decode_field(const char* hex, uint8_t* storage, size_t capacity, TC_bytes* out)
 {
-  *key_len = tc_test_decode_hex_relaxed(vector->key, key, 32);
-  *nonce_len = tc_test_decode_hex_relaxed(vector->nonce, nonce, 2048);
-  *aad_len = tc_test_decode_hex_relaxed(vector->aad, aad, 2048);
-  *msg_len = tc_test_decode_hex_relaxed(vector->msg, msg, 2048);
-  *cipher_len = tc_test_decode_hex_relaxed(vector->cipher_and_tag, cipher, 2048);
-  if (*key_len == SIZE_MAX || *nonce_len == SIZE_MAX || *aad_len == SIZE_MAX ||
-      *msg_len == SIZE_MAX || *cipher_len == SIZE_MAX || *cipher_len < 16)
+  const size_t length = tc_test_decode_hex_relaxed(hex, storage, capacity);
+  if (length == SIZE_MAX)
     return 0;
-  *tag_len = 16;
-  memcpy(tag, cipher + *cipher_len - *tag_len, *tag_len);
-  *cipher_len -= *tag_len;
+  *out = (TC_bytes){storage, length};
+  return 1;
+}
+
+/* The RFC vectors append the 16-byte tag to the ciphertext. */
+static int eax_decode_vector(const struct eax_rfc_vector* vector, eax_decoded* out)
+{
+  TC_bytes combined;
+  if (!eax_decode_field(vector->key, out->key_bytes, sizeof out->key_bytes, &out->key) ||
+      !eax_decode_field(vector->nonce, out->nonce_bytes, sizeof out->nonce_bytes, &out->nonce) ||
+      !eax_decode_field(vector->aad, out->aad_bytes, sizeof out->aad_bytes, &out->aad) ||
+      !eax_decode_field(vector->msg, out->msg_bytes, sizeof out->msg_bytes, &out->msg) ||
+      !eax_decode_field(vector->cipher_and_tag, out->cipher_bytes, sizeof out->cipher_bytes,
+                        &combined) ||
+      combined.length < sizeof out->tag_bytes)
+    return 0;
+  memcpy(out->tag_bytes, combined.data + combined.length - sizeof out->tag_bytes,
+         sizeof out->tag_bytes);
+  out->tag = (TC_bytes){out->tag_bytes, sizeof out->tag_bytes};
+  out->cipher = (TC_bytes){out->cipher_bytes, combined.length - sizeof out->tag_bytes};
   return 1;
 }
 #endif
@@ -93,24 +109,20 @@ static MunitResult test_eax_rfc(const MunitParameter params[], void* data)
 #endif
 #if TC_AES_KEY_BITS == 128
   for (i = 0; i < sizeof(eax_rfc_vectors) / sizeof(eax_rfc_vectors[0]); ++i) {
-    uint8_t key[32], nonce[2048], aad[2048], msg[2048];
-    uint8_t expected[2048], tag[16], generated[16], output[2048];
-    size_t key_len, nonce_len, aad_len, msg_len, cipher_len, tag_len;
+    static eax_decoded v;
+    uint8_t generated[16], output[2048];
 
-    munit_assert_true(eax_decode_vector(&eax_rfc_vectors[i], key, nonce, aad, msg, expected, tag,
-                                        &key_len, &nonce_len, &aad_len, &msg_len, &cipher_len,
-                                        &tag_len));
-    munit_assert_int(TC_AES_EAX_encrypt(key, (TC_bytes){nonce, nonce_len}, (TC_bytes){aad, aad_len},
-                                        (TC_bytes){msg, msg_len}, (TC_buffer){output, msg_len},
-                                        (TC_buffer){generated, tag_len}),
+    munit_assert_true(eax_decode_vector(&eax_rfc_vectors[i], &v));
+    munit_assert_int(TC_AES_EAX_encrypt(v.key_bytes, v.nonce, v.aad, v.msg,
+                                        (TC_buffer){output, v.msg.length},
+                                        (TC_buffer){generated, v.tag.length}),
                      ==, TC_OK);
-    munit_assert_memory_equal(cipher_len, output, expected);
-    munit_assert_memory_equal(tag_len, generated, tag);
-    munit_assert_int(TC_AES_EAX_decrypt(key, (TC_bytes){nonce, nonce_len}, (TC_bytes){aad, aad_len},
-                                        (TC_bytes){expected, cipher_len}, (TC_bytes){tag, tag_len},
-                                        (TC_buffer){output, cipher_len}),
+    munit_assert_memory_equal(v.cipher.length, output, v.cipher.data);
+    munit_assert_memory_equal(v.tag.length, generated, v.tag.data);
+    munit_assert_int(TC_AES_EAX_decrypt(v.key_bytes, v.nonce, v.aad, v.cipher, v.tag,
+                                        (TC_buffer){output, v.cipher.length}),
                      ==, TC_OK);
-    munit_assert_memory_equal(msg_len, output, msg);
+    munit_assert_memory_equal(v.msg.length, output, v.msg.data);
   }
 #else
   (void)i;

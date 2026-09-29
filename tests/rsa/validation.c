@@ -53,40 +53,25 @@ static TC_RSA_result validate_private_key(const TC_RSA_private_key* key, TC_rand
 }
 
 static TC_RSA_result sign_v15(const TC_RSA_private_key* key, TC_hash_algorithm hash,
-                              TC_bytes digest, uint8_t* output, size_t length, TC_random_fn random,
-                              void* context, size_t attempts, const TC_RSA_workspace* workspace,
-                              uint32_t work)
+                              TC_bytes digest, TC_buffer output, const TC_RSA_workspace* workspace,
+                              TC_RSA_execution execution)
 {
   const TC_RSA_v15_options options = {hash};
-  TC_RSA_execution execution = {
-      {random, context}, attempts, {work > UINT32_MAX ? UINT32_MAX : (uint32_t)work}};
-  return TC_RSA_sign_v15_digest(key, &options, digest, workspace, (TC_buffer){output, length},
-                                &execution);
+  return TC_RSA_sign_v15_digest(key, &options, digest, workspace, output, &execution);
 }
 
-static TC_RSA_result sign_pss(const TC_RSA_private_key* key, TC_hash_algorithm hash,
-                              TC_hash_algorithm mgf_hash, size_t salt_length, TC_bytes digest,
-                              uint8_t* output, size_t length, TC_random_fn random, void* context,
-                              size_t attempts, const TC_RSA_workspace* workspace, uint32_t work)
+static TC_RSA_result sign_pss(const TC_RSA_private_key* key, TC_RSA_pss_options options,
+                              TC_bytes digest, TC_buffer output, const TC_RSA_workspace* workspace,
+                              TC_RSA_execution execution)
 {
-  const TC_RSA_pss_options options = {hash, mgf_hash, salt_length};
-  TC_RSA_execution execution = {
-      {random, context}, attempts, {work > UINT32_MAX ? UINT32_MAX : (uint32_t)work}};
-  return TC_RSA_sign_pss_digest(key, &options, digest, workspace, (TC_buffer){output, length},
-                                &execution);
+  return TC_RSA_sign_pss_digest(key, &options, digest, workspace, output, &execution);
 }
 
-static TC_RSA_result decrypt_oaep(const TC_RSA_private_key* key, TC_hash_algorithm hash,
-                                  TC_hash_algorithm mgf_hash, TC_bytes label, TC_bytes ciphertext,
-                                  uint8_t* output, size_t capacity, size_t* length,
-                                  TC_random_fn random, void* context, size_t attempts,
-                                  const TC_RSA_workspace* workspace, uint32_t work)
+static TC_RSA_result decrypt_oaep(const TC_RSA_private_key* key, TC_RSA_oaep_options options,
+                                  TC_bytes ciphertext, TC_buffer output, size_t* length,
+                                  const TC_RSA_workspace* workspace, TC_RSA_execution execution)
 {
-  const TC_RSA_oaep_options options = {hash, mgf_hash, label};
-  TC_RSA_execution execution = {
-      {random, context}, attempts, {work > UINT32_MAX ? UINT32_MAX : (uint32_t)work}};
-  return TC_RSA_decrypt_oaep(key, &options, ciphertext, workspace, (TC_buffer){output, capacity},
-                             length, &execution);
+  return TC_RSA_decrypt_oaep(key, &options, ciphertext, workspace, output, length, &execution);
 }
 
 static MunitResult key_generation(const MunitParameter params[], void* user)
@@ -230,17 +215,21 @@ static MunitResult ranges(const MunitParameter params[], void* user)
       munit_assert_int(validate_private_key(&key, random_bytes, &calls, TC_RSA_VALIDATION_ROUNDS,
                                             &workspace, UINT32_MAX),
                        ==, TC_RSA_INVALID);
-      munit_assert_int(sign_v15(&key, TC_HASH_SHA256, (TC_bytes){digest, sizeof digest}, output,
-                                sizeof output, random_bytes, &calls, 1, &workspace, UINT32_MAX),
+      munit_assert_int(sign_v15(&key, TC_HASH_SHA256, (TC_bytes){digest, sizeof digest},
+                                (TC_buffer){output, sizeof output}, &workspace,
+                                (TC_RSA_execution){{random_bytes, &calls}, 1, {UINT32_MAX}}),
                        ==, TC_RSA_INVALID);
-      munit_assert_int(sign_pss(&key, TC_HASH_SHA256, TC_HASH_SHA256, sizeof digest,
-                                (TC_bytes){digest, sizeof digest}, output, sizeof output,
-                                random_bytes, &calls, 1, &workspace, UINT32_MAX),
-                       ==, TC_RSA_INVALID);
-      munit_assert_int(decrypt_oaep(&key, TC_HASH_SHA256, TC_HASH_SHA256, (TC_bytes){NULL, 0},
-                                    (TC_bytes){modulus, sizeof modulus}, output, sizeof output,
-                                    &recovered, random_bytes, &calls, 1, &workspace, UINT32_MAX),
-                       ==, TC_RSA_INVALID);
+      munit_assert_int(
+          sign_pss(&key, (TC_RSA_pss_options){TC_HASH_SHA256, TC_HASH_SHA256, sizeof digest},
+                   (TC_bytes){digest, sizeof digest}, (TC_buffer){output, sizeof output},
+                   &workspace, (TC_RSA_execution){{random_bytes, &calls}, 1, {UINT32_MAX}}),
+          ==, TC_RSA_INVALID);
+      munit_assert_int(
+          decrypt_oaep(
+              &key, (TC_RSA_oaep_options){TC_HASH_SHA256, TC_HASH_SHA256, (TC_bytes){NULL, 0}},
+              (TC_bytes){modulus, sizeof modulus}, (TC_buffer){output, sizeof output}, &recovered,
+              &workspace, (TC_RSA_execution){{random_bytes, &calls}, 1, {UINT32_MAX}}),
+          ==, TC_RSA_INVALID);
       munit_assert_size(recovered, ==, SIZE_MAX);
       munit_assert_memory_equal(sizeof shared, &shared, saved);
       for (size_t k = 0; k < sizeof output; ++k)
@@ -322,8 +311,9 @@ static MunitResult operation_ranges(const MunitParameter params[], void* user)
   (void)user;
   for (size_t i = 0; i < sizeof aliases / sizeof *aliases; ++i) {
     munit_assert_int(sign_v15(&fixture.key, TC_HASH_SHA256,
-                              (TC_bytes){fixture.digest, sizeof fixture.digest}, aliases[i], BYTES,
-                              random_bytes, &calls, 1, &fixture.workspace, 10000),
+                              (TC_bytes){fixture.digest, sizeof fixture.digest},
+                              (TC_buffer){aliases[i], BYTES}, &fixture.workspace,
+                              (TC_RSA_execution){{random_bytes, &calls}, 1, {10000}}),
                      ==, TC_RSA_ARGUMENT);
     munit_assert_memory_equal(sizeof fixture, &fixture, saved);
   }
@@ -341,35 +331,39 @@ static MunitResult operation_ranges(const MunitParameter params[], void* user)
                  {TC_HASH_SHA256, {fixture.digest, 32}, BYTES, 0, 10000, TC_RSA_LIMIT},
                  {TC_HASH_SHA256, {fixture.digest, 32}, BYTES, 1, 0, TC_RSA_LIMIT}};
   for (size_t i = 0; i < sizeof invalid / sizeof *invalid; ++i) {
-    munit_assert_int(sign_v15(&fixture.key, invalid[i].hash, invalid[i].digest, fixture.signature,
-                              invalid[i].length, random_bytes, &calls, invalid[i].attempts,
-                              &fixture.workspace, invalid[i].work),
+    munit_assert_int(sign_v15(&fixture.key, invalid[i].hash, invalid[i].digest,
+                              (TC_buffer){fixture.signature, invalid[i].length}, &fixture.workspace,
+                              (TC_RSA_execution){
+                                  {random_bytes, &calls}, invalid[i].attempts, {invalid[i].work}}),
                      ==, invalid[i].result);
     munit_assert_memory_equal(sizeof fixture, &fixture, saved);
   }
   munit_assert_int(sign_v15(&fixture.key, TC_HASH_SHA256,
-                            (TC_bytes){fixture.digest, sizeof fixture.digest}, NULL, BYTES,
-                            random_bytes, &calls, 1, &fixture.workspace, 10000),
+                            (TC_bytes){fixture.digest, sizeof fixture.digest},
+                            (TC_buffer){NULL, BYTES}, &fixture.workspace,
+                            (TC_RSA_execution){{random_bytes, &calls}, 1, {10000}}),
                    ==, TC_RSA_ARGUMENT);
   munit_assert_memory_equal(sizeof fixture, &fixture, saved);
   size_t recovered = SIZE_MAX;
   const TC_bytes label = {fixture.digest, sizeof fixture.digest};
   const TC_bytes ciphertext = {fixture.modulus, sizeof fixture.modulus};
   for (size_t i = 0; i < sizeof aliases / sizeof *aliases; ++i) {
-    munit_assert_int(decrypt_oaep(&fixture.key, TC_HASH_SHA256, TC_HASH_SHA256, label, ciphertext,
-                                  aliases[i], BYTES, &recovered, random_bytes, &calls, 1,
-                                  &fixture.workspace, 10000),
-                     ==, TC_RSA_ARGUMENT);
+    munit_assert_int(
+        decrypt_oaep(&fixture.key, (TC_RSA_oaep_options){TC_HASH_SHA256, TC_HASH_SHA256, label},
+                     ciphertext, (TC_buffer){aliases[i], BYTES}, &recovered, &fixture.workspace,
+                     (TC_RSA_execution){{random_bytes, &calls}, 1, {10000}}),
+        ==, TC_RSA_ARGUMENT);
     munit_assert_size(recovered, ==, SIZE_MAX);
     munit_assert_memory_equal(sizeof fixture, &fixture, saved);
     /* Select an aligned address so the overlap check is exercised directly. */
     if (aliases[i] != fixture.exponent) {
       uintptr_t address = (uintptr_t)aliases[i];
       address += (sizeof(size_t) - address % sizeof(size_t)) % sizeof(size_t);
-      munit_assert_int(decrypt_oaep(&fixture.key, TC_HASH_SHA256, TC_HASH_SHA256, label, ciphertext,
-                                    fixture.signature, BYTES, (size_t*)address, random_bytes,
-                                    &calls, 1, &fixture.workspace, 10000),
-                       ==, TC_RSA_ARGUMENT);
+      munit_assert_int(
+          decrypt_oaep(&fixture.key, (TC_RSA_oaep_options){TC_HASH_SHA256, TC_HASH_SHA256, label},
+                       ciphertext, (TC_buffer){fixture.signature, BYTES}, (size_t*)address,
+                       &fixture.workspace, (TC_RSA_execution){{random_bytes, &calls}, 1, {10000}}),
+          ==, TC_RSA_ARGUMENT);
       munit_assert_memory_equal(sizeof fixture, &fixture, saved);
     }
   }
@@ -377,10 +371,11 @@ static MunitResult operation_ranges(const MunitParameter params[], void* user)
   output_address += (sizeof(size_t) - output_address % sizeof(size_t)) % sizeof(size_t);
   size_t* invalid_lengths[] = {NULL, (size_t*)output_address, (size_t*)((uint8_t*)&recovered + 1)};
   for (size_t i = 0; i < sizeof invalid_lengths / sizeof *invalid_lengths; ++i) {
-    munit_assert_int(decrypt_oaep(&fixture.key, TC_HASH_SHA256, TC_HASH_SHA256, label, ciphertext,
-                                  fixture.signature, BYTES, invalid_lengths[i], random_bytes,
-                                  &calls, 1, &fixture.workspace, 10000),
-                     ==, TC_RSA_ARGUMENT);
+    munit_assert_int(
+        decrypt_oaep(&fixture.key, (TC_RSA_oaep_options){TC_HASH_SHA256, TC_HASH_SHA256, label},
+                     ciphertext, (TC_buffer){fixture.signature, BYTES}, invalid_lengths[i],
+                     &fixture.workspace, (TC_RSA_execution){{random_bytes, &calls}, 1, {10000}}),
+        ==, TC_RSA_ARGUMENT);
     munit_assert_size(recovered, ==, SIZE_MAX);
     munit_assert_memory_equal(sizeof fixture, &fixture, saved);
   }

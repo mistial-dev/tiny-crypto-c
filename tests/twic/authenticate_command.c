@@ -667,10 +667,13 @@ static void make_chuid(X509* root, EVP_PKEY* root_key, X509* issuer, EVP_PKEY* i
     face_record[34] = 0;
     face_record[36] = 1;
     face_record[37] = 18;
-    const size_t face_plaintext_length = encode_biometric_record_parameters(
+    const biometric_signer face_signer = {
         signing, signing_key, 0, scenario >= BIO_RSA_ABSENT && scenario <= BIO_RSA_ABSENT_TAMPERED,
-        (TC_bytes){content + 2, 25}, signed_guid, (TC_bytes){face_record, sizeof face_record},
-        0x0501, 2, 0x20, plaintext, sizeof plaintext);
+        0};
+    const biometric_record face = {
+        {content + 2, 25}, signed_guid, {face_record, sizeof face_record}, 0x0501, 2, 0x20};
+    const size_t face_plaintext_length =
+        encode_biometric_record(&face_signer, &face, (TC_buffer){plaintext, sizeof plaintext});
     face_length =
         encrypt_biometric(plaintext, face_plaintext_length, face_bytes, sizeof face_bytes);
   }

@@ -62,9 +62,12 @@ static TC_bytes load(const char* name, uint8_t* buffer)
 }
 
 /* DER tag and length, with one or two length bytes, followed by value. */
-static size_t der(uint8_t* out, unsigned tag, const uint8_t* value, size_t length)
+static size_t der(TC_buffer output, unsigned tag, const uint8_t* value, size_t length)
 {
+  uint8_t* out = output.data;
   size_t header = 2;
+  munit_assert_size(length, <, 65536);
+  munit_assert_size(output.capacity, >=, (length < 128 ? 2 : length < 256 ? 3 : 4) + length);
   out[0] = (uint8_t)tag;
   if (length < 128) {
     out[1] = (uint8_t)length;
@@ -73,7 +76,6 @@ static size_t der(uint8_t* out, unsigned tag, const uint8_t* value, size_t lengt
     out[2] = (uint8_t)length;
     header = 3;
   } else {
-    munit_assert_size(length, <, 65536);
     out[1] = 0x82;
     out[2] = (uint8_t)(length >> 8);
     out[3] = (uint8_t)length;
@@ -84,11 +86,11 @@ static size_t der(uint8_t* out, unsigned tag, const uint8_t* value, size_t lengt
 }
 
 /* One GeneralSubtree whose base is directoryName(Name of rdns). */
-static size_t directory_subtree(uint8_t* out, const uint8_t* rdns, size_t length)
+static size_t directory_subtree(TC_buffer out, const uint8_t* rdns, size_t length)
 {
   uint8_t name[128], base[132];
-  const size_t name_length = der(name, 0x30, rdns, length);
-  const size_t base_length = der(base, 0xa4, name, name_length);
+  const size_t name_length = der((TC_buffer){name, sizeof name}, 0x30, rdns, length);
+  const size_t base_length = der((TC_buffer){base, sizeof base}, 0xa4, name, name_length);
   return der(out, 0x30, base, base_length);
 }
 
@@ -146,10 +148,10 @@ static void setup_workspace(void)
 /* CertificatePolicies contents with one PolicyInformation for oid. This is
  * the form of TC_X509_store_anchor.policy_set and of the IMPLICIT
  * CertPathControls.policySet value. */
-static size_t policy_set(uint8_t* out, const uint8_t* oid, size_t length)
+static size_t policy_set(TC_buffer out, const uint8_t* oid, size_t length)
 {
   uint8_t element[32];
-  const size_t element_length = der(element, 0x06, oid, length);
+  const size_t element_length = der((TC_buffer){element, sizeof element}, 0x06, oid, length);
   return der(out, 0x30, element, element_length);
 }
 
@@ -182,23 +184,27 @@ static MunitResult policies(const MunitParameter params[], void* user)
 
   /* The anchor's policy set limits the acceptable policies. */
   anchor.policy_flags = TC_X509_PATH_REQUIRE_EXPLICIT_POLICY;
-  anchor.policy_set = (TC_bytes){set1, policy_set(set1, policy1, sizeof policy1)};
+  anchor.policy_set =
+      (TC_bytes){set1, policy_set((TC_buffer){set1, sizeof set1}, policy1, sizeof policy1)};
   munit_assert_int(
       validate("GoodCACert.crt", "ValidCertificatePathTest1EE.crt", &anchor, &options, &result), ==,
       TC_X509_PATH_VALID);
   munit_assert_size(result.policy_count, ==, 1);
   munit_assert_memory_equal(sizeof policy1, result.policies[0].data, policy1);
-  anchor.policy_set = (TC_bytes){set2, policy_set(set2, policy2, sizeof policy2)};
+  anchor.policy_set =
+      (TC_bytes){set2, policy_set((TC_buffer){set2, sizeof set2}, policy2, sizeof policy2)};
   munit_assert_int(
       validate("GoodCACert.crt", "ValidCertificatePathTest1EE.crt", &anchor, &options, &result), ==,
       TC_X509_PATH_INVALID);
-  anchor.policy_set = (TC_bytes){set_any, policy_set(set_any, any_policy, sizeof any_policy)};
+  anchor.policy_set = (TC_bytes){
+      set_any, policy_set((TC_buffer){set_any, sizeof set_any}, any_policy, sizeof any_policy)};
   munit_assert_int(
       validate("GoodCACert.crt", "ValidCertificatePathTest1EE.crt", &anchor, &options, &result), ==,
       TC_X509_PATH_VALID);
 
   /* The anchor set intersects the application's initial set. */
-  anchor.policy_set = (TC_bytes){set2, policy_set(set2, policy2, sizeof policy2)};
+  anchor.policy_set =
+      (TC_bytes){set2, policy_set((TC_buffer){set2, sizeof set2}, policy2, sizeof policy2)};
   anchor.policy_flags = 0;
   options.initial_policies = initial1;
   options.initial_policy_count = 1;
@@ -214,7 +220,8 @@ static MunitResult policies(const MunitParameter params[], void* user)
 
   /* 4.10.1: the path relies on mapping policy1 to policy2, which the
    * anchor's inhibitPolicyMapping flag forbids. */
-  anchor.policy_set = (TC_bytes){set1, policy_set(set1, policy1, sizeof policy1)};
+  anchor.policy_set =
+      (TC_bytes){set1, policy_set((TC_buffer){set1, sizeof set1}, policy1, sizeof policy1)};
   anchor.policy_flags = TC_X509_PATH_REQUIRE_EXPLICIT_POLICY;
   munit_assert_int(validate("Mapping1to2CACert.crt", "ValidPolicyMappingTest1EE.crt", &anchor,
                             &options, &result),
@@ -244,8 +251,10 @@ static MunitResult policies(const MunitParameter params[], void* user)
 static MunitResult names(const MunitParameter params[], void* user)
 {
   static uint8_t pkits[80], other[80];
-  const TC_bytes pkits_subtree = {pkits, directory_subtree(pkits, pkits_rdns, sizeof pkits_rdns)};
-  const TC_bytes other_subtree = {other, directory_subtree(other, other_rdns, sizeof other_rdns)};
+  const TC_bytes pkits_subtree = {
+      pkits, directory_subtree((TC_buffer){pkits, sizeof pkits}, pkits_rdns, sizeof pkits_rdns)};
+  const TC_bytes other_subtree = {
+      other, directory_subtree((TC_buffer){other, sizeof other}, other_rdns, sizeof other_rdns)};
   TC_X509_store_anchor anchor = pkits_anchor();
   TC_X509_path_options options = path_options(0);
   TC_X509_path_result result;
@@ -285,41 +294,41 @@ static MunitResult names(const MunitParameter params[], void* user)
 
 /* A TrustAnchorList holding one TrustAnchorInfo for the PKITS Trust Anchor,
  * with CertPathControls built from the given fields. */
-static size_t trust_anchor_info(uint8_t* out, const TC_X509_certificate* root,
-                                const uint8_t* policy, size_t policy_length, const uint8_t* flags,
-                                size_t flag_length, const uint8_t* subtree, size_t subtree_length,
-                                int path_length)
+/* NULL data omits a control. A negative path_length omits pathLenConstraint. */
+static size_t trust_anchor_info(TC_buffer out, const TC_X509_certificate* root, TC_bytes policy,
+                                TC_bytes flags, TC_bytes subtree, int path_length)
 {
   static const uint8_t key_id[] = {0x04, 0x04, 1, 2, 3, 4};
   static uint8_t controls[1024], info[2048], work[2048];
   size_t n = 0, m = 0, length;
   memcpy(controls, root->subject.data, root->subject.length);
   n = root->subject.length;
-  if (policy) {
+  if (policy.data) {
     uint8_t set[64];
-    const size_t set_length = policy_set(set, policy, policy_length);
-    n += der(controls + n, 0xa1, set, set_length);
+    const size_t set_length = policy_set((TC_buffer){set, sizeof set}, policy.data, policy.length);
+    n += der((TC_buffer){controls + n, sizeof controls - n}, 0xa1, set, set_length);
   }
-  if (flags)
-    n += der(controls + n, 0x82, flags, flag_length);
-  if (subtree) {
+  if (flags.data)
+    n += der((TC_buffer){controls + n, sizeof controls - n}, 0x82, flags.data, flags.length);
+  if (subtree.data) {
     uint8_t permitted[128];
-    if (subtree_length > sizeof permitted - 4u)
+    if (subtree.length > sizeof permitted - 4u)
       return 0;
-    const size_t permitted_length = der(permitted, 0xa0, subtree, subtree_length);
-    n += der(controls + n, 0xa3, permitted, permitted_length);
+    const size_t permitted_length =
+        der((TC_buffer){permitted, sizeof permitted}, 0xa0, subtree.data, subtree.length);
+    n += der((TC_buffer){controls + n, sizeof controls - n}, 0xa3, permitted, permitted_length);
   }
   if (path_length >= 0) {
     const uint8_t value = (uint8_t)path_length;
-    n += der(controls + n, 0x84, &value, 1);
+    n += der((TC_buffer){controls + n, sizeof controls - n}, 0x84, &value, 1);
   }
   memcpy(info, root->spki.data, root->spki.length);
   m = root->spki.length;
   memcpy(info + m, key_id, sizeof key_id);
   m += sizeof key_id;
-  m += der(info + m, 0x30, controls, n);
-  length = der(work, 0x30, info, m);
-  length = der(info, 0xa2, work, length);
+  m += der((TC_buffer){info + m, sizeof info - m}, 0x30, controls, n);
+  length = der((TC_buffer){work, sizeof work}, 0x30, info, m);
+  length = der((TC_buffer){info, sizeof info}, 0xa2, work, length);
   return der(out, 0x30, info, length);
 }
 
@@ -327,7 +336,8 @@ static MunitResult parsed_info(const MunitParameter params[], void* user)
 {
   static const uint8_t explicit_policy[] = {0x06, 0x40};
   static uint8_t list[4096], subtree[80];
-  const size_t subtree_length = directory_subtree(subtree, pkits_rdns, sizeof pkits_rdns);
+  const size_t subtree_length =
+      directory_subtree((TC_buffer){subtree, sizeof subtree}, pkits_rdns, sizeof pkits_rdns);
   TC_X509_certificate root;
   TC_X509_store_anchor anchor;
   TC_TLV_reader reader;
@@ -343,8 +353,9 @@ static MunitResult parsed_info(const MunitParameter params[], void* user)
 
   /* Decoded controls: policy1 required explicitly, PKITS names permitted and
    * one intermediate allowed. */
-  length = trust_anchor_info(list, &root, policy1, sizeof policy1, explicit_policy,
-                             sizeof explicit_policy, subtree, subtree_length, 1);
+  length = trust_anchor_info(
+      (TC_buffer){list, sizeof list}, &root, (TC_bytes){policy1, sizeof policy1},
+      (TC_bytes){explicit_policy, sizeof explicit_policy}, (TC_bytes){subtree, subtree_length}, 1);
   munit_assert_int(TC_X509_trust_anchor_list_init(&reader, list, length, &limits, &parser), ==,
                    TC_TLV_OK);
   munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &parser, &anchor), ==, TC_TLV_OK);
@@ -357,8 +368,9 @@ static MunitResult parsed_info(const MunitParameter params[], void* user)
       TC_X509_PATH_VALID);
 
   /* A policy set the path lacks. */
-  length = trust_anchor_info(list, &root, policy2, sizeof policy2, explicit_policy,
-                             sizeof explicit_policy, NULL, 0, -1);
+  length = trust_anchor_info(
+      (TC_buffer){list, sizeof list}, &root, (TC_bytes){policy2, sizeof policy2},
+      (TC_bytes){explicit_policy, sizeof explicit_policy}, (TC_bytes){NULL, 0}, -1);
   munit_assert_int(TC_X509_trust_anchor_list_init(&reader, list, length, &limits, &parser), ==,
                    TC_TLV_OK);
   munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &parser, &anchor), ==, TC_TLV_OK);
@@ -367,7 +379,8 @@ static MunitResult parsed_info(const MunitParameter params[], void* user)
       TC_X509_PATH_INVALID);
 
   /* pathLenConstraint 0 forbids the intermediate CA. */
-  length = trust_anchor_info(list, &root, NULL, 0, NULL, 0, NULL, 0, 0);
+  length = trust_anchor_info((TC_buffer){list, sizeof list}, &root, (TC_bytes){NULL, 0},
+                             (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0}, 0);
   munit_assert_int(TC_X509_trust_anchor_list_init(&reader, list, length, &limits, &parser), ==,
                    TC_TLV_OK);
   munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &parser, &anchor), ==, TC_TLV_OK);
@@ -376,8 +389,9 @@ static MunitResult parsed_info(const MunitParameter params[], void* user)
       TC_X509_PATH_INVALID);
 
   /* requireExplicitPolicy without a policySet is malformed (RFC 5914). */
-  length =
-      trust_anchor_info(list, &root, NULL, 0, explicit_policy, sizeof explicit_policy, NULL, 0, -1);
+  length = trust_anchor_info((TC_buffer){list, sizeof list}, &root, (TC_bytes){NULL, 0},
+                             (TC_bytes){explicit_policy, sizeof explicit_policy},
+                             (TC_bytes){NULL, 0}, -1);
   munit_assert_int(TC_X509_trust_anchor_list_init(&reader, list, length, &limits, &parser), ==,
                    TC_TLV_OK);
   munit_assert_int(TC_X509_trust_anchor_next(&reader, &limits, &parser, &anchor), ==,
@@ -400,7 +414,7 @@ static MunitResult workspace_limits(const MunitParameter params[], void* user)
   (void)user;
 
   /* A certificate choice: the list wraps the PKITS root certificate. */
-  length = der(list, 0x30, encoded.data, encoded.length);
+  length = der((TC_buffer){list, sizeof list}, 0x30, encoded.data, encoded.length);
   munit_assert_int(TC_X509_trust_anchor_list_init(&reader, list, length, &limits, &small_frames),
                    ==, TC_TLV_LIMIT);
   munit_assert_int(TC_X509_trust_anchor_list_init(&reader, list, length, &limits, &small_oids), ==,

@@ -415,37 +415,32 @@ static MunitResult test_ofb(const MunitParameter params[], void* data)
 
 #if TC_AES_ENABLE_CCM
 #if TC_AES_KEY_BITS == 128
-static void test_ccm_vector(const uint8_t* key, const uint8_t* nonce, size_t nonce_len,
-                            const uint8_t* aad, size_t aad_len, const uint8_t* plaintext,
-                            size_t plaintext_len, const uint8_t* ciphertext, const uint8_t* tag,
-                            size_t tag_len)
+static void test_ccm_vector(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes plaintext,
+                            const uint8_t* ciphertext, TC_bytes tag)
 {
   uint8_t buffer[64] = {0};
   uint8_t output[64] = {0};
   uint8_t generated_tag[16] = {0};
 
-  memcpy(buffer, plaintext, plaintext_len);
-  munit_assert_int(TC_AES_CCM_encrypt(key, (TC_bytes){nonce, nonce_len}, (TC_bytes){aad, aad_len},
-                                      (TC_bytes){buffer, plaintext_len},
-                                      (TC_buffer){output, plaintext_len},
-                                      (TC_buffer){generated_tag, tag_len}),
+  memcpy(buffer, plaintext.data, plaintext.length);
+  munit_assert_int(TC_AES_CCM_encrypt(key, nonce, aad, (TC_bytes){buffer, plaintext.length},
+                                      (TC_buffer){output, plaintext.length},
+                                      (TC_buffer){generated_tag, tag.length}),
                    ==, TC_OK);
-  munit_assert_memory_equal(plaintext_len, output, ciphertext);
-  munit_assert_memory_equal(tag_len, generated_tag, tag);
+  munit_assert_memory_equal(plaintext.length, output, ciphertext);
+  munit_assert_memory_equal(tag.length, generated_tag, tag.data);
 
   memset(buffer, 0, sizeof(buffer));
-  munit_assert_int(TC_AES_CCM_decrypt(key, (TC_bytes){nonce, nonce_len}, (TC_bytes){aad, aad_len},
-                                      (TC_bytes){output, plaintext_len}, (TC_bytes){tag, tag_len},
-                                      (TC_buffer){buffer, plaintext_len}),
+  munit_assert_int(TC_AES_CCM_decrypt(key, nonce, aad, (TC_bytes){output, plaintext.length}, tag,
+                                      (TC_buffer){buffer, plaintext.length}),
                    ==, TC_OK);
-  munit_assert_memory_equal(plaintext_len, buffer, plaintext);
+  munit_assert_memory_equal(plaintext.length, buffer, plaintext.data);
 
   generated_tag[0] ^= 1;
   memset(buffer, 0xa5, sizeof(buffer));
-  munit_assert_int(TC_AES_CCM_decrypt(key, (TC_bytes){nonce, nonce_len}, (TC_bytes){aad, aad_len},
-                                      (TC_bytes){output, plaintext_len},
-                                      (TC_bytes){generated_tag, tag_len},
-                                      (TC_buffer){buffer, plaintext_len}),
+  munit_assert_int(TC_AES_CCM_decrypt(key, nonce, aad, (TC_bytes){output, plaintext.length},
+                                      (TC_bytes){generated_tag, tag.length},
+                                      (TC_buffer){buffer, plaintext.length}),
                    ==, TC_MISMATCH);
   for (size_t i = 0; i < sizeof(buffer); ++i)
     munit_assert_uint8(buffer[i], ==, 0xa5);
@@ -462,18 +457,22 @@ static MunitResult test_ccm(const MunitParameter params[], void* data)
   test_initialize_sbox();
   for (i = 0; i < sizeof(nist_aad4); ++i)
     nist_aad4[i] = (uint8_t)i;
-  test_ccm_vector(ccm_nist_key, ccm_nist_nonce1, sizeof(ccm_nist_nonce1), ccm_nist_aad1,
-                  sizeof(ccm_nist_aad1), ccm_nist_plaintext1, sizeof(ccm_nist_plaintext1),
-                  ccm_nist_ciphertext1, ccm_nist_tag1, sizeof(ccm_nist_tag1));
-  test_ccm_vector(ccm_nist_key, ccm_nist_nonce2, sizeof(ccm_nist_nonce2), ccm_nist_aad2,
-                  sizeof(ccm_nist_aad2), ccm_nist_plaintext2, sizeof(ccm_nist_plaintext2),
-                  ccm_nist_ciphertext2, ccm_nist_tag2, sizeof(ccm_nist_tag2));
-  test_ccm_vector(ccm_nist_key, ccm_nist_nonce4, sizeof(ccm_nist_nonce4), nist_aad4,
-                  sizeof(nist_aad4), ccm_nist_plaintext4, sizeof(ccm_nist_plaintext4),
-                  ccm_nist_ciphertext4, ccm_nist_tag4, sizeof(ccm_nist_tag4));
-  test_ccm_vector(ccm_rfc_key, ccm_rfc_nonce, sizeof(ccm_rfc_nonce), ccm_rfc_aad,
-                  sizeof(ccm_rfc_aad), ccm_rfc_plaintext, sizeof(ccm_rfc_plaintext),
-                  ccm_rfc_ciphertext, ccm_rfc_tag, sizeof(ccm_rfc_tag));
+  test_ccm_vector(ccm_nist_key, (TC_bytes){ccm_nist_nonce1, sizeof(ccm_nist_nonce1)},
+                  (TC_bytes){ccm_nist_aad1, sizeof(ccm_nist_aad1)},
+                  (TC_bytes){ccm_nist_plaintext1, sizeof(ccm_nist_plaintext1)},
+                  ccm_nist_ciphertext1, (TC_bytes){ccm_nist_tag1, sizeof(ccm_nist_tag1)});
+  test_ccm_vector(ccm_nist_key, (TC_bytes){ccm_nist_nonce2, sizeof(ccm_nist_nonce2)},
+                  (TC_bytes){ccm_nist_aad2, sizeof(ccm_nist_aad2)},
+                  (TC_bytes){ccm_nist_plaintext2, sizeof(ccm_nist_plaintext2)},
+                  ccm_nist_ciphertext2, (TC_bytes){ccm_nist_tag2, sizeof(ccm_nist_tag2)});
+  test_ccm_vector(ccm_nist_key, (TC_bytes){ccm_nist_nonce4, sizeof(ccm_nist_nonce4)},
+                  (TC_bytes){nist_aad4, sizeof(nist_aad4)},
+                  (TC_bytes){ccm_nist_plaintext4, sizeof(ccm_nist_plaintext4)},
+                  ccm_nist_ciphertext4, (TC_bytes){ccm_nist_tag4, sizeof(ccm_nist_tag4)});
+  test_ccm_vector(ccm_rfc_key, (TC_bytes){ccm_rfc_nonce, sizeof(ccm_rfc_nonce)},
+                  (TC_bytes){ccm_rfc_aad, sizeof(ccm_rfc_aad)},
+                  (TC_bytes){ccm_rfc_plaintext, sizeof(ccm_rfc_plaintext)}, ccm_rfc_ciphertext,
+                  (TC_bytes){ccm_rfc_tag, sizeof(ccm_rfc_tag)});
   return MUNIT_OK;
 }
 

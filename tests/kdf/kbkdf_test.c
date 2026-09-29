@@ -145,16 +145,14 @@ MunitResult test_kbkdf_known(const MunitParameter params[], void* data)
 #if TC_KBKDF_HAVE_HMAC_SHA256
 
 /* HMAC-SHA-256 over up to four concatenated segments. */
-static void hmac256_cat(const uint8_t* key, size_t key_len, const uint8_t* a, size_t a_len,
-                        const uint8_t* b, size_t b_len, const uint8_t* c, size_t c_len,
-                        const uint8_t* d, size_t d_len, uint8_t* tag)
+/* HMAC-SHA-256 over the concatenation a || b || c || d. */
+static void hmac256_cat(TC_bytes key, TC_bytes a, TC_bytes b, TC_bytes c, TC_bytes d, uint8_t* tag)
 {
+  const TC_bytes parts[] = {a, b, c, d};
   struct TC_HMAC_SHA256_ctx ctx;
-  munit_assert_int(TC_HMAC_SHA256_init(&ctx, key, key_len), ==, TC_OK);
-  munit_assert_int(TC_HMAC_SHA256_update(&ctx, a, a_len), ==, TC_OK);
-  munit_assert_int(TC_HMAC_SHA256_update(&ctx, b, b_len), ==, TC_OK);
-  munit_assert_int(TC_HMAC_SHA256_update(&ctx, c, c_len), ==, TC_OK);
-  munit_assert_int(TC_HMAC_SHA256_update(&ctx, d, d_len), ==, TC_OK);
+  munit_assert_int(TC_HMAC_SHA256_init(&ctx, key.data, key.length), ==, TC_OK);
+  for (size_t i = 0; i < sizeof parts / sizeof *parts; ++i)
+    munit_assert_int(TC_HMAC_SHA256_update(&ctx, parts[i].data, parts[i].length), ==, TC_OK);
   munit_assert_int(TC_HMAC_SHA256_final(&ctx, tag), ==, TC_OK);
 }
 
@@ -191,8 +189,10 @@ MunitResult test_kbkdf_counter_encoding(const MunitParameter params[], void* dat
                          (TC_bytes){key, sizeof(key)}, &p, (TC_bytes){NULL, 0},
                          (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){out, sizeof(out)}),
                      ==, TC_OK);
-    hmac256_cat(key, sizeof(key), ctr1[r], ctr_len, fixed, sizeof(fixed), NULL, 0, NULL, 0, k1);
-    hmac256_cat(key, sizeof(key), ctr2[r], ctr_len, fixed, sizeof(fixed), NULL, 0, NULL, 0, k2);
+    hmac256_cat((TC_bytes){key, sizeof(key)}, (TC_bytes){ctr1[r], ctr_len},
+                (TC_bytes){fixed, sizeof(fixed)}, (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0}, k1);
+    hmac256_cat((TC_bytes){key, sizeof(key)}, (TC_bytes){ctr2[r], ctr_len},
+                (TC_bytes){fixed, sizeof(fixed)}, (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0}, k2);
     munit_assert_memory_equal(TC_SHA256_DIGESTLEN, out, k1);
     munit_assert_memory_equal(TC_SHA256_DIGESTLEN, out + TC_SHA256_DIGESTLEN, k2);
 
@@ -201,8 +201,10 @@ MunitResult test_kbkdf_counter_encoding(const MunitParameter params[], void* dat
                          (TC_bytes){key, sizeof(key)}, &p, (TC_bytes){fixed, sizeof(fixed)},
                          (TC_bytes){NULL, 0}, (TC_buffer){out, sizeof(out)}),
                      ==, TC_OK);
-    hmac256_cat(key, sizeof(key), fixed, sizeof(fixed), ctr1[r], ctr_len, NULL, 0, NULL, 0, k1);
-    hmac256_cat(key, sizeof(key), fixed, sizeof(fixed), ctr2[r], ctr_len, NULL, 0, NULL, 0, k2);
+    hmac256_cat((TC_bytes){key, sizeof(key)}, (TC_bytes){fixed, sizeof(fixed)},
+                (TC_bytes){ctr1[r], ctr_len}, (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0}, k1);
+    hmac256_cat((TC_bytes){key, sizeof(key)}, (TC_bytes){fixed, sizeof(fixed)},
+                (TC_bytes){ctr2[r], ctr_len}, (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0}, k2);
     munit_assert_memory_equal(TC_SHA256_DIGESTLEN, out, k1);
     munit_assert_memory_equal(TC_SHA256_DIGESTLEN, out + TC_SHA256_DIGESTLEN, k2);
 
@@ -211,10 +213,10 @@ MunitResult test_kbkdf_counter_encoding(const MunitParameter params[], void* dat
                          (TC_bytes){key, sizeof(key)}, &p, (TC_bytes){fixed, 10},
                          (TC_bytes){fixed + 10, sizeof(fixed) - 10}, (TC_buffer){out, sizeof(out)}),
                      ==, TC_OK);
-    hmac256_cat(key, sizeof(key), fixed, 10, ctr1[r], ctr_len, fixed + 10, sizeof(fixed) - 10, NULL,
-                0, k1);
-    hmac256_cat(key, sizeof(key), fixed, 10, ctr2[r], ctr_len, fixed + 10, sizeof(fixed) - 10, NULL,
-                0, k2);
+    hmac256_cat((TC_bytes){key, sizeof(key)}, (TC_bytes){fixed, 10}, (TC_bytes){ctr1[r], ctr_len},
+                (TC_bytes){fixed + 10, sizeof(fixed) - 10}, (TC_bytes){NULL, 0}, k1);
+    hmac256_cat((TC_bytes){key, sizeof(key)}, (TC_bytes){fixed, 10}, (TC_bytes){ctr2[r], ctr_len},
+                (TC_bytes){fixed + 10, sizeof(fixed) - 10}, (TC_bytes){NULL, 0}, k2);
     munit_assert_memory_equal(TC_SHA256_DIGESTLEN, out, k1);
     munit_assert_memory_equal(TC_SHA256_DIGESTLEN, out + TC_SHA256_DIGESTLEN, k2);
 
@@ -224,9 +226,11 @@ MunitResult test_kbkdf_counter_encoding(const MunitParameter params[], void* dat
                          (TC_bytes){key, sizeof(key)}, &p, (TC_bytes){iv, sizeof(iv)},
                          (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){out, sizeof(out)}),
                      ==, TC_OK);
-    hmac256_cat(key, sizeof(key), ctr1[r], ctr_len, iv, sizeof(iv), fixed, sizeof(fixed), NULL, 0,
+    hmac256_cat((TC_bytes){key, sizeof(key)}, (TC_bytes){ctr1[r], ctr_len},
+                (TC_bytes){iv, sizeof(iv)}, (TC_bytes){fixed, sizeof(fixed)}, (TC_bytes){NULL, 0},
                 k1);
-    hmac256_cat(key, sizeof(key), ctr2[r], ctr_len, k1, sizeof(k1), fixed, sizeof(fixed), NULL, 0,
+    hmac256_cat((TC_bytes){key, sizeof(key)}, (TC_bytes){ctr2[r], ctr_len},
+                (TC_bytes){k1, sizeof(k1)}, (TC_bytes){fixed, sizeof(fixed)}, (TC_bytes){NULL, 0},
                 k2);
     munit_assert_memory_equal(TC_SHA256_DIGESTLEN, out, k1);
     munit_assert_memory_equal(TC_SHA256_DIGESTLEN, out + TC_SHA256_DIGESTLEN, k2);
@@ -237,8 +241,10 @@ MunitResult test_kbkdf_counter_encoding(const MunitParameter params[], void* dat
                          (TC_bytes){key, sizeof(key)}, &p, (TC_bytes){NULL, 0},
                          (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){out, sizeof(out)}),
                      ==, TC_OK);
-    hmac256_cat(key, sizeof(key), ctr1[r], ctr_len, fixed, sizeof(fixed), NULL, 0, NULL, 0, k1);
-    hmac256_cat(key, sizeof(key), k1, sizeof(k1), ctr2[r], ctr_len, fixed, sizeof(fixed), NULL, 0,
+    hmac256_cat((TC_bytes){key, sizeof(key)}, (TC_bytes){ctr1[r], ctr_len},
+                (TC_bytes){fixed, sizeof(fixed)}, (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0}, k1);
+    hmac256_cat((TC_bytes){key, sizeof(key)}, (TC_bytes){k1, sizeof(k1)},
+                (TC_bytes){ctr2[r], ctr_len}, (TC_bytes){fixed, sizeof(fixed)}, (TC_bytes){NULL, 0},
                 k2);
     munit_assert_memory_equal(TC_SHA256_DIGESTLEN, out, k1);
     munit_assert_memory_equal(TC_SHA256_DIGESTLEN, out + TC_SHA256_DIGESTLEN, k2);
@@ -249,9 +255,11 @@ MunitResult test_kbkdf_counter_encoding(const MunitParameter params[], void* dat
                          (TC_bytes){key, sizeof(key)}, &p, (TC_bytes){iv, sizeof(iv)},
                          (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){out, sizeof(out)}),
                      ==, TC_OK);
-    hmac256_cat(key, sizeof(key), iv, sizeof(iv), fixed, sizeof(fixed), ctr1[r], ctr_len, NULL, 0,
+    hmac256_cat((TC_bytes){key, sizeof(key)}, (TC_bytes){iv, sizeof(iv)},
+                (TC_bytes){fixed, sizeof(fixed)}, (TC_bytes){ctr1[r], ctr_len}, (TC_bytes){NULL, 0},
                 k1);
-    hmac256_cat(key, sizeof(key), k1, sizeof(k1), fixed, sizeof(fixed), ctr2[r], ctr_len, NULL, 0,
+    hmac256_cat((TC_bytes){key, sizeof(key)}, (TC_bytes){k1, sizeof(k1)},
+                (TC_bytes){fixed, sizeof(fixed)}, (TC_bytes){ctr2[r], ctr_len}, (TC_bytes){NULL, 0},
                 k2);
     munit_assert_memory_equal(TC_SHA256_DIGESTLEN, out, k1);
     munit_assert_memory_equal(TC_SHA256_DIGESTLEN, out + TC_SHA256_DIGESTLEN, k2);
@@ -262,8 +270,10 @@ MunitResult test_kbkdf_counter_encoding(const MunitParameter params[], void* dat
                                                    (TC_bytes){fixed, sizeof(fixed)},
                                                    (TC_buffer){out, TC_SHA256_DIGESTLEN}),
                      ==, TC_OK);
-    hmac256_cat(key, sizeof(key), fixed, sizeof(fixed), NULL, 0, NULL, 0, NULL, 0, a1);
-    hmac256_cat(key, sizeof(key), ctr1[r], ctr_len, a1, sizeof(a1), fixed, sizeof(fixed), NULL, 0,
+    hmac256_cat((TC_bytes){key, sizeof(key)}, (TC_bytes){fixed, sizeof(fixed)}, (TC_bytes){NULL, 0},
+                (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0}, a1);
+    hmac256_cat((TC_bytes){key, sizeof(key)}, (TC_bytes){ctr1[r], ctr_len},
+                (TC_bytes){a1, sizeof(a1)}, (TC_bytes){fixed, sizeof(fixed)}, (TC_bytes){NULL, 0},
                 k1);
     munit_assert_memory_equal(TC_SHA256_DIGESTLEN, out, k1);
   }
@@ -277,8 +287,10 @@ MunitResult test_kbkdf_counter_encoding(const MunitParameter params[], void* dat
                        (TC_bytes){key, sizeof(key)}, &p, (TC_bytes){iv, sizeof(iv)},
                        (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){out, sizeof(out)}),
                    ==, TC_OK);
-  hmac256_cat(key, sizeof(key), iv, sizeof(iv), fixed, sizeof(fixed), NULL, 0, NULL, 0, k1);
-  hmac256_cat(key, sizeof(key), k1, sizeof(k1), fixed, sizeof(fixed), NULL, 0, NULL, 0, k2);
+  hmac256_cat((TC_bytes){key, sizeof(key)}, (TC_bytes){iv, sizeof(iv)},
+              (TC_bytes){fixed, sizeof(fixed)}, (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0}, k1);
+  hmac256_cat((TC_bytes){key, sizeof(key)}, (TC_bytes){k1, sizeof(k1)},
+              (TC_bytes){fixed, sizeof(fixed)}, (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0}, k2);
   munit_assert_memory_equal(TC_SHA256_DIGESTLEN, out, k1);
   munit_assert_memory_equal(TC_SHA256_DIGESTLEN, out + TC_SHA256_DIGESTLEN, k2);
 
@@ -288,11 +300,15 @@ MunitResult test_kbkdf_counter_encoding(const MunitParameter params[], void* dat
                                                  (TC_bytes){fixed, sizeof(fixed)},
                                                  (TC_buffer){out, sizeof(out)}),
                    ==, TC_OK);
-  hmac256_cat(key, sizeof(key), fixed, sizeof(fixed), NULL, 0, NULL, 0, NULL, 0, a1);
-  hmac256_cat(key, sizeof(key), a1, sizeof(a1), fixed, sizeof(fixed), NULL, 0, NULL, 0, k1);
+  hmac256_cat((TC_bytes){key, sizeof(key)}, (TC_bytes){fixed, sizeof(fixed)}, (TC_bytes){NULL, 0},
+              (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0}, a1);
+  hmac256_cat((TC_bytes){key, sizeof(key)}, (TC_bytes){a1, sizeof(a1)},
+              (TC_bytes){fixed, sizeof(fixed)}, (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0}, k1);
   munit_assert_memory_equal(TC_SHA256_DIGESTLEN, out, k1);
-  hmac256_cat(key, sizeof(key), a1, sizeof(a1), NULL, 0, NULL, 0, NULL, 0, k2); /* A(2) */
-  hmac256_cat(key, sizeof(key), k2, sizeof(k2), fixed, sizeof(fixed), NULL, 0, NULL, 0, k1);
+  hmac256_cat((TC_bytes){key, sizeof(key)}, (TC_bytes){a1, sizeof(a1)}, (TC_bytes){NULL, 0},
+              (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0}, k2); /* A(2) */
+  hmac256_cat((TC_bytes){key, sizeof(key)}, (TC_bytes){k2, sizeof(k2)},
+              (TC_bytes){fixed, sizeof(fixed)}, (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0}, k1);
   munit_assert_memory_equal(TC_SHA256_DIGESTLEN, out + TC_SHA256_DIGESTLEN, k1);
 
   return MUNIT_OK;

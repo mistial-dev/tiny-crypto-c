@@ -566,12 +566,29 @@ static int cavp_run_ccm_file(const char* filename)
 #endif
 
 #if TC_AES_ENABLE_GCM
-static int cavp_run_gcm_decrypt_record(const char* filename, size_t count, const uint8_t* key,
-                                       const uint8_t* iv, size_t iv_len, const uint8_t* aad,
-                                       size_t aad_len, const uint8_t* ct, size_t ct_len,
-                                       const uint8_t* tag, size_t tag_len, const uint8_t* pt,
-                                       size_t pt_len, int expected_fail)
+/* One GCM decrypt record. expected_fail marks a record without plaintext
+ * whose tag must be rejected. */
+typedef struct {
+  const uint8_t* key;
+  TC_bytes iv, aad, ciphertext, tag, plaintext;
+  int expected_fail;
+} cavp_gcm_record;
+
+static int cavp_run_gcm_decrypt_record(const char* filename, size_t count,
+                                       const cavp_gcm_record* record)
 {
+  const uint8_t* key = record->key;
+  const uint8_t* iv = record->iv.data;
+  const size_t iv_len = record->iv.length;
+  const uint8_t* aad = record->aad.data;
+  const size_t aad_len = record->aad.length;
+  const uint8_t* ct = record->ciphertext.data;
+  const size_t ct_len = record->ciphertext.length;
+  const uint8_t* tag = record->tag.data;
+  const size_t tag_len = record->tag.length;
+  const uint8_t* pt = record->plaintext.data;
+  const size_t pt_len = record->plaintext.length;
+  const int expected_fail = record->expected_fail;
   struct TC_AES_GCM_ctx ctx;
   uint8_t* output = ct_len == 0 ? NULL : (uint8_t*)malloc(ct_len);
   int result;
@@ -648,8 +665,9 @@ static int cavp_run_gcm_file(const char* filename)
       ok = cavp_take(&reader, &pt, &pt_len);
       if (ok && decrypt) {
         ++records_executed;
-        ok = cavp_run_gcm_decrypt_record(filename, count, key, iv, iv_len, aad, aad_len, ct, ct_len,
-                                         tag, tag_len, pt, pt_len, 0);
+        const cavp_gcm_record record = {
+            key, {iv, iv_len}, {aad, aad_len}, {ct, ct_len}, {tag, tag_len}, {pt, pt_len}, 0};
+        ok = cavp_run_gcm_decrypt_record(filename, count, &record);
       }
     } else if (tc_cavp_is(&reader, "AAD"))
       ok = cavp_take(&reader, &aad, &aad_len);
@@ -689,8 +707,9 @@ static int cavp_run_gcm_file(const char* filename)
       ++failed_records;
       if (decrypt) {
         ++records_executed;
-        ok = cavp_run_gcm_decrypt_record(filename, count, key, iv, iv_len, aad, aad_len, ct, ct_len,
-                                         tag, tag_len, NULL, 0, 1);
+        const cavp_gcm_record record = {
+            key, {iv, iv_len}, {aad, aad_len}, {ct, ct_len}, {tag, tag_len}, {NULL, 0}, 1};
+        ok = cavp_run_gcm_decrypt_record(filename, count, &record);
       }
     }
   }

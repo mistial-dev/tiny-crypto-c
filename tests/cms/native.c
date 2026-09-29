@@ -6599,13 +6599,37 @@ static TC_status workflow_card_proof(void* context, TC_PIV_card_profile profile,
                                                : TC_ERROR;
 }
 
-static void credential_public_workflow(X509* root, EVP_PKEY* root_key, X509* signer,
-                                       EVP_PKEY* signer_key, TC_PIV_card_profile profile,
-                                       unsigned ec_bits, TC_bytes chuid, TC_bytes security,
-                                       const TC_PIV_security_data* inventory,
-                                       size_t inventory_count, TC_bytes unsigned_chuid,
-                                       TC_bytes printed, const TC_validation_context* content)
+/* Synthetic issuing CA and content signer for the credential workflow. */
+typedef struct {
+  X509* root;
+  EVP_PKEY* root_key;
+  X509* signer;
+  EVP_PKEY* signer_key;
+} credential_issuers;
+
+/* Signed card objects. Empty unsigned_chuid and printed spans are omitted. */
+typedef struct {
+  TC_bytes chuid, security;
+  const TC_PIV_security_data* inventory;
+  size_t inventory_count;
+  TC_bytes unsigned_chuid, printed;
+} credential_objects;
+
+static void credential_public_workflow(const credential_issuers* issuers,
+                                       TC_PIV_card_profile profile, unsigned ec_bits,
+                                       const credential_objects* objects,
+                                       const TC_validation_context* content)
 {
+  X509* const root = issuers->root;
+  EVP_PKEY* const root_key = issuers->root_key;
+  X509* const signer = issuers->signer;
+  EVP_PKEY* const signer_key = issuers->signer_key;
+  const TC_bytes chuid = objects->chuid;
+  const TC_bytes security = objects->security;
+  const TC_PIV_security_data* inventory = objects->inventory;
+  const size_t inventory_count = objects->inventory_count;
+  const TC_bytes unsigned_chuid = objects->unsigned_chuid;
+  const TC_bytes printed = objects->printed;
   enum { OBJECT_BYTES = 4096, ARENA_UNITS = 1024, WORK = 2000000 };
   static TC_validation_storage arena[ARENA_UNITS];
   uint8_t certificate_bytes[OBJECT_BYTES], biometric[OBJECT_BYTES], face_biometric[OBJECT_BYTES],
@@ -6749,10 +6773,11 @@ static void credential_public_workflow(X509* root, EVP_PKEY* root_key, X509* sig
     face_record[36] = 1;
     face_record[37] = 18;
   }
-  const size_t face_length =
-      encode_biometric_record_parameters(signer, signer_key, 0, 0, parsed.fascn, parsed.card_uuid,
-                                         (TC_bytes){face_record, sizeof face_record}, 0x0501, 2,
-                                         0x20, face_biometric, sizeof face_biometric);
+  const size_t face_length = encode_biometric_record(
+      &(biometric_signer){signer, signer_key, 0, 0, 0},
+      &(biometric_record){
+          parsed.fascn, parsed.card_uuid, {face_record, sizeof face_record}, 0x0501, 2, 0x20},
+      (TC_buffer){face_biometric, sizeof face_biometric});
   TC_validation_capacity capacity;
   TC_validation_workspace workspace;
   munit_assert_int(TC_validation_capacity_init(TC_VALIDATION_MICRO, &capacity), ==, TC_RESULT_OK);
@@ -7354,10 +7379,11 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
               ExampleSecurityData full_inventory[] = {{full_containers[0], &full_contents[0], 1},
                                                       {full_containers[1], &full_contents[1], 1},
                                                       {full_containers[2], &full_contents[2], 1}};
-              credential_public_workflow(root, root_key, certificate, key, TC_TWIC_NEXGEN_CARD, 0,
-                                         contents[0], (TC_bytes){mixed_security, full_length},
-                                         full_inventory, 3, contents[1], full_contents[2],
-                                         &object_context);
+              credential_public_workflow(
+                  &(credential_issuers){root, root_key, certificate, key}, TC_TWIC_NEXGEN_CARD, 0,
+                  &(credential_objects){contents[0], (TC_bytes){mixed_security, full_length},
+                                        full_inventory, 3, contents[1], full_contents[2]},
+                  &object_context);
             }
             if (object_request.profile != TC_PIV_CARD) {
               TC_CMS_path_workspace security_path =
@@ -7425,25 +7451,31 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
                                    (TC_PIV_security_result*)security_storage.content),
                                ==, TC_CREDENTIAL_ERROR);
               munit_assert_size(work, ==, before_overlap);
-              credential_public_workflow(root, root_key, certificate, key, object_request.profile,
-                                         0, contents[0], (TC_bytes){security, security_length},
-                                         inventory, 2, contents[1], (TC_bytes){0}, &object_context);
+              credential_public_workflow(
+                  &(credential_issuers){root, root_key, certificate, key}, object_request.profile,
+                  0,
+                  &(credential_objects){contents[0], (TC_bytes){security, security_length},
+                                        inventory, 2, contents[1], (TC_bytes){0}},
+                  &object_context);
             }
             if (object_request.profile == TC_PIV_CARD)
-              credential_public_workflow(root, root_key, certificate, key, TC_PIV_CARD, 0,
-                                         contents[0], (TC_bytes){security, security_length},
-                                         inventory, 2, (TC_bytes){0}, (TC_bytes){0},
-                                         &object_context);
+              credential_public_workflow(
+                  &(credential_issuers){root, root_key, certificate, key}, TC_PIV_CARD, 0,
+                  &(credential_objects){contents[0], (TC_bytes){security, security_length},
+                                        inventory, 2, (TC_bytes){0}, (TC_bytes){0}},
+                  &object_context);
             if (object_request.profile == TC_PIV_CARD)
-              credential_public_workflow(root, root_key, certificate, key, TC_PIV_CARD, 256,
-                                         contents[0], (TC_bytes){security, security_length},
-                                         inventory, 2, (TC_bytes){0}, (TC_bytes){0},
-                                         &object_context);
+              credential_public_workflow(
+                  &(credential_issuers){root, root_key, certificate, key}, TC_PIV_CARD, 256,
+                  &(credential_objects){contents[0], (TC_bytes){security, security_length},
+                                        inventory, 2, (TC_bytes){0}, (TC_bytes){0}},
+                  &object_context);
             if (object_request.profile == TC_PIV_CARD)
-              credential_public_workflow(root, root_key, certificate, key, TC_PIV_CARD, 384,
-                                         contents[0], (TC_bytes){security, security_length},
-                                         inventory, 2, (TC_bytes){0}, (TC_bytes){0},
-                                         &object_context);
+              credential_public_workflow(
+                  &(credential_issuers){root, root_key, certificate, key}, TC_PIV_CARD, 384,
+                  &(credential_objects){contents[0], (TC_bytes){security, security_length},
+                                        inventory, 2, (TC_bytes){0}, (TC_bytes){0}},
+                  &object_context);
             enum {
               MISSING,
               EXTRA,

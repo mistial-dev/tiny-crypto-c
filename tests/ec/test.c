@@ -57,22 +57,21 @@ static TC_EC_result ecdsa_verify(TC_EC_curve curve, const uint8_t* public_key, s
 
 /* Signs with the public key derived from private_key, or a placeholder when
  * the private key is out of range. */
-static TC_EC_result ecdsa_sign(TC_EC_curve curve, const uint8_t* private_key, size_t private_length,
-                               const uint8_t* digest, size_t digest_length, uint8_t* signature,
-                               size_t signature_length, TC_random_source random, size_t attempts,
+/* Sign with the public key derived from private_key. A failed derivation
+ * leaves an invalid public key, which signing rejects. */
+static TC_EC_result ecdsa_sign(TC_EC_curve curve, TC_bytes private_key, TC_bytes digest,
+                               TC_buffer signature, TC_EC_execution execution,
                                TC_ECDSA_workspace* workspace)
 {
   static uint8_t public_key[1 + 2 * TC_EC_MAX_BYTES];
+  const size_t public_length = 1 + 2 * private_key.length;
   TC_EC_workspace key_workspace;
   memset(public_key, 0, sizeof public_key);
   public_key[0] = 4;
-  (void)ec_public(curve, private_key, private_length, public_key, 1 + 2 * private_length,
+  (void)ec_public(curve, private_key.data, private_key.length, public_key, public_length,
                   &key_workspace);
-  TC_EC_execution execution = {random, attempts, {UINT32_MAX}};
-  return TC_ECDSA_sign_digest(curve, (TC_bytes){private_key, private_length},
-                              (TC_bytes){public_key, 1 + 2 * private_length},
-                              (TC_bytes){digest, digest_length},
-                              (TC_buffer){signature, signature_length}, workspace, &execution);
+  return TC_ECDSA_sign_digest(curve, private_key, (TC_bytes){public_key, public_length}, digest,
+                              signature, workspace, &execution);
 }
 
 static const struct {
@@ -470,8 +469,9 @@ static MunitResult signing_rfc6979(const MunitParameter params[], void* user)
     munit_assert_size(tc_test_decode_hex(answers[i].nonce, nonce, sizeof nonce), ==, n);
     munit_assert_size(tc_test_decode_hex(answers[i].signature, expected, sizeof expected), ==,
                       2 * n);
-    munit_assert_int(ecdsa_sign(answers[i].curve, private_key, n, digest, n, signature, 2 * n,
-                                random, 1, &workspace),
+    munit_assert_int(ecdsa_sign(answers[i].curve, (TC_bytes){private_key, n}, (TC_bytes){digest, n},
+                                (TC_buffer){signature, 2 * n},
+                                (TC_EC_execution){random, 1, {UINT32_MAX}}, &workspace),
                      ==, TC_EC_OK);
     munit_assert_memory_equal(2 * n, signature, expected);
     munit_assert_true(tc_test_all_zero(&workspace, sizeof workspace));
@@ -490,35 +490,40 @@ static MunitResult signing_rejects_invalid_keys_and_aliasing(const MunitParamete
   (void)params;
   (void)user;
   memset(signature, 0xa5, sizeof signature);
-  munit_assert_int(
-      ecdsa_sign(TC_EC_P256, key, 32, digest, 32, signature, 64, source, 1, &workspace), ==,
-      TC_EC_INVALID);
+  munit_assert_int(ecdsa_sign(TC_EC_P256, (TC_bytes){key, 32}, (TC_bytes){digest, 32},
+                              (TC_buffer){signature, 64},
+                              (TC_EC_execution){source, 1, {UINT32_MAX}}, &workspace),
+                   ==, TC_EC_INVALID);
   munit_assert_true(tc_test_all_zero(&workspace, sizeof workspace));
   munit_assert_uint(random.calls, ==, 0);
   munit_assert_size(
       tc_test_decode_hex("FFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551", key,
                          sizeof key),
       ==, 32);
-  munit_assert_int(
-      ecdsa_sign(TC_EC_P256, key, 32, digest, 32, signature, 64, source, 1, &workspace), ==,
-      TC_EC_INVALID);
+  munit_assert_int(ecdsa_sign(TC_EC_P256, (TC_bytes){key, 32}, (TC_bytes){digest, 32},
+                              (TC_buffer){signature, 64},
+                              (TC_EC_execution){source, 1, {UINT32_MAX}}, &workspace),
+                   ==, TC_EC_INVALID);
   munit_assert_true(tc_test_all_zero(&workspace, sizeof workspace));
   munit_assert_uint(random.calls, ==, 0);
   for (size_t i = 0; i < sizeof signature; ++i)
     munit_assert_uint(signature[i], ==, 0xa5);
   overlapping[31] = 1;
-  munit_assert_int(
-      ecdsa_sign(TC_EC_P256, overlapping, 32, digest, 32, overlapping, 64, source, 1, &workspace),
-      ==, TC_EC_ARGUMENT);
+  munit_assert_int(ecdsa_sign(TC_EC_P256, (TC_bytes){overlapping, 32}, (TC_bytes){digest, 32},
+                              (TC_buffer){overlapping, 64},
+                              (TC_EC_execution){source, 1, {UINT32_MAX}}, &workspace),
+                   ==, TC_EC_ARGUMENT);
   munit_assert_uint(overlapping[31], ==, 1);
   munit_assert_uint(random.calls, ==, 0);
-  munit_assert_int(ecdsa_sign(TC_EC_P256, overlapping, 32, overlapping, 32, signature, 64, source,
-                              1, &workspace),
+  munit_assert_int(ecdsa_sign(TC_EC_P256, (TC_bytes){overlapping, 32}, (TC_bytes){overlapping, 32},
+                              (TC_buffer){signature, 64},
+                              (TC_EC_execution){source, 1, {UINT32_MAX}}, &workspace),
                    ==, TC_EC_ARGUMENT);
   munit_assert_uint(random.calls, ==, 0);
-  munit_assert_int(
-      ecdsa_sign(TC_EC_P256, overlapping, 32, digest, 32, signature, 64, source, 0, &workspace), ==,
-      TC_EC_LIMIT);
+  munit_assert_int(ecdsa_sign(TC_EC_P256, (TC_bytes){overlapping, 32}, (TC_bytes){digest, 32},
+                              (TC_buffer){signature, 64},
+                              (TC_EC_execution){source, 0, {UINT32_MAX}}, &workspace),
+                   ==, TC_EC_LIMIT);
   munit_assert_uint(random.calls, ==, 0);
 #else
   (void)params;
@@ -567,8 +572,10 @@ static MunitResult signing_answers(const MunitParameter params[], void* user)
     munit_assert_size(tc_test_decode_hex(signatures[i], expected, sizeof expected), ==, 2 * n);
     memset(signature, 0xa5, sizeof signature);
     random = (SignRandom){0, 1, 0};
-    munit_assert_int(ecdsa_sign(vectors[i].curve, private_key, n, digest, n == 48 ? 48 : 32,
-                                signature, 2 * n, source, 2, &workspace),
+    munit_assert_int(ecdsa_sign(vectors[i].curve, (TC_bytes){private_key, n},
+                                (TC_bytes){digest, n == 48 ? 48 : 32},
+                                (TC_buffer){signature, 2 * n},
+                                (TC_EC_execution){source, 2, {UINT32_MAX}}, &workspace),
                      ==, TC_EC_OK);
     munit_assert_uint(random.calls, ==, 2);
     munit_assert_memory_equal(2 * n, signature, expected);
@@ -582,16 +589,20 @@ static MunitResult signing_answers(const MunitParameter params[], void* user)
 
     memset(signature, 0xa5, sizeof signature);
     random = (SignRandom){0, 1, 0};
-    munit_assert_int(ecdsa_sign(vectors[i].curve, private_key, n, digest, n == 48 ? 48 : 32,
-                                signature, 2 * n, source, 1, &workspace),
+    munit_assert_int(ecdsa_sign(vectors[i].curve, (TC_bytes){private_key, n},
+                                (TC_bytes){digest, n == 48 ? 48 : 32},
+                                (TC_buffer){signature, 2 * n},
+                                (TC_EC_execution){source, 1, {UINT32_MAX}}, &workspace),
                      ==, TC_EC_LIMIT);
     munit_assert_uint(random.calls, ==, 1);
     for (size_t j = 0; j < sizeof signature; ++j)
       munit_assert_uint(signature[j], ==, 0xa5);
     munit_assert_true(tc_test_all_zero(&workspace, sizeof workspace));
     random = (SignRandom){0, 0, 1};
-    munit_assert_int(ecdsa_sign(vectors[i].curve, private_key, n, digest, n == 48 ? 48 : 32,
-                                signature, 2 * n, source, 2, &workspace),
+    munit_assert_int(ecdsa_sign(vectors[i].curve, (TC_bytes){private_key, n},
+                                (TC_bytes){digest, n == 48 ? 48 : 32},
+                                (TC_buffer){signature, 2 * n},
+                                (TC_EC_execution){source, 2, {UINT32_MAX}}, &workspace),
                      ==, TC_EC_ERROR);
     for (size_t j = 0; j < sizeof signature; ++j)
       munit_assert_uint(signature[j], ==, 0xa5);
@@ -609,9 +620,10 @@ static MunitResult signing_answers(const MunitParameter params[], void* user)
         ==, 32);
     munit_assert_size(tc_test_decode_hex(answer, expected, sizeof expected), ==, 48);
     random = (SignRandom){0, 0, 0};
-    munit_assert_int(
-        ecdsa_sign(TC_EC_P192, private_key, 24, digest, 32, signature, 48, source, 1, &workspace),
-        ==, TC_EC_OK);
+    munit_assert_int(ecdsa_sign(TC_EC_P192, (TC_bytes){private_key, 24}, (TC_bytes){digest, 32},
+                                (TC_buffer){signature, 48},
+                                (TC_EC_execution){source, 1, {UINT32_MAX}}, &workspace),
+                     ==, TC_EC_OK);
     munit_assert_memory_equal(48, signature, expected);
     munit_assert_true(tc_test_all_zero(&workspace, sizeof workspace));
     munit_assert_int(ec_public(TC_EC_P192, private_key, 24, public_key, 49, &key_workspace), ==,
