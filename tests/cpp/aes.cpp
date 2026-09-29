@@ -3,6 +3,7 @@
 
 #include <array>
 #include <cstring>
+#include <type_traits>
 #include <vector>
 
 #include "doctest.h"
@@ -42,12 +43,12 @@ const uint8_t* const kat_ofb = aes256_ofb_ciphertext;
 TEST_CASE("AES initialization returns status")
 {
   tiny_crypto::AES aes;
-  CHECK(aes.init(kat_key, TC_AES_KEYLEN) == TC_OK);
-  CHECK(aes.init(kat_key, TC_AES_KEYLEN - 1) == TC_ERROR);
-  CHECK(aes.init(nullptr, TC_AES_KEYLEN) == TC_ERROR);
+  CHECK(aes.init({kat_key, TC_AES_KEYLEN}) == TC_OK);
+  CHECK(aes.init({kat_key, TC_AES_KEYLEN - 1}) == TC_ERROR);
+  CHECK(aes.init({nullptr, TC_AES_KEYLEN}) == TC_ERROR);
 #if TC_AES_ENABLE_CBC || TC_AES_ENABLE_CTR || TC_AES_ENABLE_OFB
-  CHECK(aes.init(kat_key, TC_AES_KEYLEN, nist_iv, sizeof(nist_iv)) == TC_OK);
-  CHECK(aes.set_iv(nist_iv, sizeof(nist_iv) - 1) == TC_ERROR);
+  CHECK(aes.init({kat_key, TC_AES_KEYLEN}, {nist_iv, sizeof(nist_iv)}) == TC_OK);
+  CHECK(aes.set_iv({nist_iv, sizeof(nist_iv) - 1}) == TC_ERROR);
 #endif
 }
 
@@ -57,8 +58,8 @@ TEST_CASE("AES IV re-init with a NULL IV clears the previous key")
   tiny_crypto::AES aes;
   uint8_t data[TC_AES_BLOCKLEN];
   std::memcpy(data, nist_plaintext, sizeof(data));
-  REQUIRE(aes.init(kat_key, TC_AES_KEYLEN, nist_ctr_iv, sizeof(nist_ctr_iv)) == TC_OK);
-  CHECK(aes.init(kat_key, TC_AES_KEYLEN, nullptr, TC_AES_BLOCKLEN) == TC_ERROR);
+  REQUIRE(aes.init({kat_key, TC_AES_KEYLEN}, {nist_ctr_iv, sizeof(nist_ctr_iv)}) == TC_OK);
+  CHECK(aes.init({kat_key, TC_AES_KEYLEN}, {nullptr, TC_AES_BLOCKLEN}) == TC_ERROR);
   CHECK(aes.xcrypt_ctr(data) == TC_ERROR);
   CHECK(std::memcmp(data, nist_plaintext, sizeof(data)) == 0);
 }
@@ -69,7 +70,7 @@ TEST_CASE("AES ECB wrapper")
 {
   tiny_crypto::AES aes;
   uint8_t block[TC_AES_BLOCKLEN];
-  REQUIRE(aes.init(kat_key, TC_AES_KEYLEN) == TC_OK);
+  REQUIRE(aes.init({kat_key, TC_AES_KEYLEN}) == TC_OK);
   std::memcpy(block, nist_plaintext, sizeof(block));
   CHECK(aes.encrypt_ecb(block) == TC_OK);
   CHECK(std::memcmp(block, kat_ecb, sizeof(block)) == 0);
@@ -83,11 +84,11 @@ TEST_CASE("AES CBC wrapper")
 {
   tiny_crypto::AES aes;
   uint8_t data[64];
-  REQUIRE(aes.init(kat_key, TC_AES_KEYLEN, nist_iv, sizeof(nist_iv)) == TC_OK);
+  REQUIRE(aes.init({kat_key, TC_AES_KEYLEN}, {nist_iv, sizeof(nist_iv)}) == TC_OK);
   std::memcpy(data, nist_plaintext, sizeof(data));
   CHECK(aes.encrypt_cbc(data) == TC_OK);
   CHECK(std::memcmp(data, kat_cbc, sizeof(data)) == 0);
-  CHECK(aes.set_iv(nist_iv, sizeof(nist_iv)) == TC_OK);
+  CHECK(aes.set_iv({nist_iv, sizeof(nist_iv)}) == TC_OK);
   CHECK(aes.decrypt_cbc(data) == TC_OK);
   CHECK(std::memcmp(data, nist_plaintext, sizeof(data)) == 0);
   CHECK(aes.encrypt_cbc(data, 15) == TC_ERROR);
@@ -99,13 +100,13 @@ TEST_CASE("AES CTR wrapper")
 {
   tiny_crypto::AES aes;
   uint8_t data[64];
-  REQUIRE(aes.init(kat_key, TC_AES_KEYLEN, nist_ctr_iv, sizeof(nist_ctr_iv)) == TC_OK);
+  REQUIRE(aes.init({kat_key, TC_AES_KEYLEN}, {nist_ctr_iv, sizeof(nist_ctr_iv)}) == TC_OK);
   std::memcpy(data, nist_plaintext, sizeof(data));
   CHECK(aes.xcrypt_ctr(data) == TC_OK);
   CHECK(std::memcmp(data, kat_ctr, sizeof(data)) == 0);
 
   std::memcpy(data, nist_plaintext, sizeof(data));
-  REQUIRE(aes.set_iv(nist_ctr_iv, sizeof(nist_ctr_iv)) == TC_OK);
+  REQUIRE(aes.set_iv({nist_ctr_iv, sizeof(nist_ctr_iv)}) == TC_OK);
   CHECK(aes.xcrypt_ctr(data, 5) == TC_OK);
   CHECK(aes.xcrypt_ctr(data + 5, 27) == TC_OK);
   CHECK(aes.xcrypt_ctr(data + 32, 32) == TC_OK);
@@ -114,8 +115,20 @@ TEST_CASE("AES CTR wrapper")
   uint8_t top[TC_AES_BLOCKLEN];
   uint8_t two_blocks[2 * TC_AES_BLOCKLEN] = {0};
   std::memset(top, 0xff, sizeof(top));
-  REQUIRE(aes.set_iv(top, sizeof(top)) == TC_OK);
+  REQUIRE(aes.set_iv({top, sizeof(top)}) == TC_OK);
   CHECK(aes.xcrypt_ctr(two_blocks, sizeof(two_blocks)) == TC_ERROR);
+
+  /* Key and IV arrays deduce their lengths. A wrong key size clears the key. */
+  uint8_t key[TC_AES_KEYLEN];
+  std::memcpy(key, kat_key, sizeof key);
+  std::memcpy(data, nist_plaintext, sizeof(data));
+  REQUIRE(aes.init(key, nist_ctr_iv) == TC_OK);
+  CHECK(aes.xcrypt_ctr(data) == TC_OK);
+  CHECK(std::memcmp(data, kat_ctr, sizeof(data)) == 0);
+  const uint8_t short_key[TC_AES_KEYLEN - 1] = {0};
+  CHECK(aes.init(short_key, nist_ctr_iv) == TC_ERROR);
+  CHECK(aes.xcrypt_ctr(data) == TC_ERROR);
+  CHECK(noexcept(aes.init(key, nist_ctr_iv)));
 }
 #endif
 
@@ -124,11 +137,11 @@ TEST_CASE("AES OFB wrapper")
 {
   tiny_crypto::AES aes;
   uint8_t data[64];
-  REQUIRE(aes.init(kat_key, TC_AES_KEYLEN, nist_iv, sizeof(nist_iv)) == TC_OK);
+  REQUIRE(aes.init({kat_key, TC_AES_KEYLEN}, {nist_iv, sizeof(nist_iv)}) == TC_OK);
   std::memcpy(data, nist_plaintext, sizeof(data));
   CHECK(aes.xcrypt_ofb(data) == TC_OK);
   CHECK(std::memcmp(data, kat_ofb, sizeof(data)) == 0);
-  REQUIRE(aes.set_iv(nist_iv, sizeof(nist_iv)) == TC_OK);
+  REQUIRE(aes.set_iv({nist_iv, sizeof(nist_iv)}) == TC_OK);
   CHECK(aes.xcrypt_ofb(data, 7) == TC_OK);
   CHECK(aes.xcrypt_ofb(data + 7, sizeof(data) - 7) == TC_OK);
   CHECK(std::memcmp(data, nist_plaintext, sizeof(data)) == 0);
@@ -142,13 +155,13 @@ static void check_gcm_vector(const gcm_test_vector& v)
   std::vector<uint8_t> tag(v.tag_len);
   tiny_crypto::GCM gcm;
 
-  REQUIRE(gcm.init(v.key, v.key_len, {v.iv, v.iv_len}, v.tag_len) == TC_OK);
+  REQUIRE(gcm.init({v.key, v.key_len}, {v.iv, v.iv_len}, v.tag_len) == TC_OK);
   CHECK(gcm.tag_length() == v.tag_len);
-  CHECK(gcm.aad_update(v.aad, v.aad_len) == TC_OK);
+  CHECK(gcm.aad_update({v.aad, v.aad_len}) == TC_OK);
   const size_t split = v.length < 5 ? v.length : 5;
   CHECK(gcm.encrypt_update(data.data(), split) == TC_OK);
   CHECK(gcm.encrypt_update(data.data() + split, v.length - split) == TC_OK);
-  CHECK(gcm.encrypt_finish(tag.data(), tag.size()) == TC_OK);
+  CHECK(gcm.encrypt_finish({tag.data(), tag.size()}) == TC_OK);
   CHECK(std::memcmp(data.data(), v.ciphertext, v.length) == 0);
   CHECK(std::memcmp(tag.data(), v.tag, v.tag_len) == 0);
 
@@ -221,11 +234,11 @@ TEST_CASE("AES GCM known answers and state errors")
   CHECK(std::memcmp(output.data(), v->plaintext, v->length) == 0);
 
   tiny_crypto::GCM gcm;
-  REQUIRE(gcm.init(v->key, v->key_len, {v->iv, v->iv_len}, v->tag_len) == TC_OK);
+  REQUIRE(gcm.init({v->key, v->key_len}, {v->iv, v->iv_len}, v->tag_len) == TC_OK);
   CHECK(gcm.encrypt_update(data.data(), data.size()) == TC_OK);
-  CHECK(gcm.aad_update(v->aad, v->aad_len) == TC_ERROR);
-  CHECK(gcm.encrypt_finish(tag.data(), tag.size() - 1) == TC_ERROR);
-  CHECK(gcm.init(v->key, v->key_len - 1, {v->iv, v->iv_len}, v->tag_len) == TC_ERROR);
+  CHECK(gcm.aad_update({v->aad, v->aad_len}) == TC_ERROR);
+  CHECK(gcm.encrypt_finish({tag.data(), tag.size() - 1}) == TC_ERROR);
+  CHECK(gcm.init({v->key, v->key_len - 1}, {v->iv, v->iv_len}, v->tag_len) == TC_ERROR);
 }
 #endif
 
@@ -234,12 +247,13 @@ TEST_CASE("AES CMAC wrapper returns status")
 {
   uint8_t tag[TC_AES_BLOCKLEN];
   uint8_t expected[TC_AES_BLOCKLEN];
-  CHECK(tiny_crypto::aes_cmac(kat_key, TC_AES_KEYLEN, nullptr, 0, tag, sizeof(tag)) == TC_OK);
+  CHECK(tiny_crypto::aes_cmac({kat_key, TC_AES_KEYLEN}, {nullptr, 0}, {tag, sizeof(tag)}) == TC_OK);
   REQUIRE(TC_AES_CMAC(kat_key, nullptr, 0, expected, sizeof(expected)) == TC_OK);
   CHECK(std::memcmp(tag, expected, sizeof(tag)) == 0);
-  CHECK(tiny_crypto::aes_cmac(kat_key, TC_AES_KEYLEN - 1, nullptr, 0, tag, sizeof(tag)) ==
+  CHECK(tiny_crypto::aes_cmac({kat_key, TC_AES_KEYLEN - 1}, {nullptr, 0}, {tag, sizeof(tag)}) ==
         TC_ERROR);
-  CHECK(tiny_crypto::aes_cmac(kat_key, TC_AES_KEYLEN, nullptr, 1, tag, sizeof(tag)) == TC_ERROR);
+  CHECK(tiny_crypto::aes_cmac({kat_key, TC_AES_KEYLEN}, {nullptr, 1}, {tag, sizeof(tag)}) ==
+        TC_ERROR);
 }
 
 TEST_CASE("AES CMAC tag length boundary at TC_MIN_TAG_LEN")
@@ -247,17 +261,169 @@ TEST_CASE("AES CMAC tag length boundary at TC_MIN_TAG_LEN")
   const size_t below = TC_MIN_TAG_LEN - 1;
   uint8_t full[TC_AES_BLOCKLEN];
   uint8_t tag[TC_AES_BLOCKLEN];
-  REQUIRE(tiny_crypto::aes_cmac(kat_key, TC_AES_KEYLEN, nullptr, 0, full, sizeof(full)) == TC_OK);
-  CHECK(tiny_crypto::aes_cmac(kat_key, TC_AES_KEYLEN, nullptr, 0, tag, below) == TC_ERROR);
-  CHECK(tiny_crypto::aes_cmac(kat_key, TC_AES_KEYLEN, nullptr, 0, tag, TC_MIN_TAG_LEN) == TC_OK);
+  REQUIRE(tiny_crypto::aes_cmac({kat_key, TC_AES_KEYLEN}, {nullptr, 0}, {full, sizeof(full)}) ==
+          TC_OK);
+  CHECK(tiny_crypto::aes_cmac({kat_key, TC_AES_KEYLEN}, {nullptr, 0}, {tag, below}) == TC_ERROR);
+  CHECK(tiny_crypto::aes_cmac({kat_key, TC_AES_KEYLEN}, {nullptr, 0}, {tag, TC_MIN_TAG_LEN}) ==
+        TC_OK);
   CHECK(std::memcmp(tag, full, TC_MIN_TAG_LEN) == 0);
-  CHECK(tiny_crypto::aes_cmac_short_tag(kat_key, TC_AES_KEYLEN, nullptr, 0, tag, TC_MIN_TAG_LEN) ==
+  CHECK(tiny_crypto::aes_cmac_short_tag({kat_key, TC_AES_KEYLEN}, {nullptr, 0},
+                                        {tag, TC_MIN_TAG_LEN}) == TC_ERROR);
+  CHECK(tiny_crypto::aes_cmac_short_tag({kat_key, TC_AES_KEYLEN - 1}, {nullptr, 0}, {tag, below}) ==
         TC_ERROR);
-  CHECK(tiny_crypto::aes_cmac_short_tag(kat_key, TC_AES_KEYLEN - 1, nullptr, 0, tag, below) ==
+  CHECK(tiny_crypto::aes_cmac_short_tag({kat_key, TC_AES_KEYLEN}, {nullptr, 0}, {tag, 0}) ==
         TC_ERROR);
-  CHECK(tiny_crypto::aes_cmac_short_tag(kat_key, TC_AES_KEYLEN, nullptr, 0, tag, 0) == TC_ERROR);
-  REQUIRE(tiny_crypto::aes_cmac_short_tag(kat_key, TC_AES_KEYLEN, nullptr, 0, tag, below) == TC_OK);
+  REQUIRE(tiny_crypto::aes_cmac_short_tag({kat_key, TC_AES_KEYLEN}, {nullptr, 0}, {tag, below}) ==
+          TC_OK);
   CHECK(std::memcmp(tag, full, below) == 0);
+}
+#endif
+
+#if TC_AES_ENABLE_CMAC
+namespace {
+/* SP 800-38B Appendix D examples 3, 7 and 11: the first 40 bytes of the
+ * sample plaintext under the sample key of the configured size. */
+#if TC_AES_KEY_BITS == 128
+const uint8_t cmac_40_tag[16] = {0xdf, 0xa6, 0x67, 0x47, 0xde, 0x9a, 0xe6, 0x30,
+                                 0x30, 0xca, 0x32, 0x61, 0x14, 0x97, 0xc8, 0x27};
+#elif TC_AES_KEY_BITS == 192
+const uint8_t cmac_40_tag[16] = {0x8a, 0x1d, 0xe5, 0xbe, 0x2e, 0xb3, 0x1a, 0xad,
+                                 0x08, 0x9a, 0x82, 0xe6, 0xee, 0x90, 0x8b, 0x0e};
+#else
+const uint8_t cmac_40_tag[16] = {0xaa, 0xf3, 0xd8, 0xf1, 0xde, 0x56, 0x40, 0xc2,
+                                 0x32, 0xf5, 0xb1, 0x69, 0xb9, 0xc9, 0x11, 0xe6};
+#endif
+const size_t cmac_40_length = 40;
+} // namespace
+
+TEST_CASE("AES CMAC known answer and verify wrappers")
+{
+  const tiny_crypto::bytes key = {kat_key, TC_AES_KEYLEN};
+  const tiny_crypto::bytes message = {nist_plaintext, cmac_40_length};
+  uint8_t tag[TC_AES_CMAC_TAG_MAX];
+  CHECK(tiny_crypto::aes_cmac(key, message, {tag, sizeof tag}) == TC_OK);
+  CHECK(std::memcmp(tag, cmac_40_tag, sizeof tag) == 0);
+  CHECK(tiny_crypto::aes_cmac_verify(key, message, {cmac_40_tag, sizeof cmac_40_tag}) == TC_OK);
+  CHECK(tiny_crypto::aes_cmac_verify(key, message, {cmac_40_tag, TC_MIN_TAG_LEN}) == TC_OK);
+  tag[TC_MIN_TAG_LEN - 1] ^= 1;
+  CHECK(tiny_crypto::aes_cmac_verify(key, message, {tag, TC_MIN_TAG_LEN}) == TC_MISMATCH);
+  CHECK(tiny_crypto::aes_cmac_verify(key, message, {tag, TC_MIN_TAG_LEN - 1}) == TC_ERROR);
+  CHECK(tiny_crypto::aes_cmac_verify({kat_key, TC_AES_KEYLEN - 1}, message,
+                                     {cmac_40_tag, sizeof cmac_40_tag}) == TC_ERROR);
+  CHECK(tiny_crypto::aes_cmac_verify(key, {nullptr, 1}, {cmac_40_tag, sizeof cmac_40_tag}) ==
+        TC_ERROR);
+  CHECK(tiny_crypto::aes_cmac_verify_short_tag(key, message, {cmac_40_tag, 4}) == TC_OK);
+  CHECK(tiny_crypto::aes_cmac_verify_short_tag(key, message, {cmac_40_tag, TC_MIN_TAG_LEN}) ==
+        TC_ERROR);
+  CHECK(tiny_crypto::aes_cmac_verify_short_tag({kat_key, TC_AES_KEYLEN + 1}, message,
+                                               {cmac_40_tag, 4}) == TC_ERROR);
+
+  /* A wrong key length leaves the tag unchanged. */
+  std::memset(tag, 0x5a, sizeof tag);
+  CHECK(tiny_crypto::aes_cmac({kat_key, TC_AES_KEYLEN + 1}, message, {tag, sizeof tag}) ==
+        TC_ERROR);
+  for (uint8_t byte : tag)
+    CHECK(byte == 0x5a);
+  CHECK(noexcept(tiny_crypto::aes_cmac_verify(key, message, {tag, sizeof tag})));
+}
+
+TEST_CASE("AES CMAC streaming class")
+{
+  CHECK_FALSE(std::is_copy_constructible<tiny_crypto::AES_CMAC>::value);
+  CHECK_FALSE(std::is_copy_assignable<tiny_crypto::AES_CMAC>::value);
+  static_assert(tiny_crypto::AES_CMAC::tag_size == TC_AES_CMAC_TAG_MAX, "full tag size");
+  uint8_t tag[TC_AES_CMAC_TAG_MAX];
+
+  tiny_crypto::AES_CMAC unkeyed;
+  CHECK(unkeyed.update({nist_plaintext, 1}) == TC_ERROR);
+  CHECK(unkeyed.finish(tag) == TC_ERROR);
+
+  for (size_t split = 0; split <= cmac_40_length; ++split) {
+    CAPTURE(split);
+    tiny_crypto::AES_CMAC mac;
+    REQUIRE(mac.init({kat_key, TC_AES_KEYLEN}) == TC_OK);
+    CHECK(mac.update({nist_plaintext, split}) == TC_OK);
+    CHECK(mac.update({nist_plaintext + split, cmac_40_length - split}) == TC_OK);
+    CHECK(mac.finish(tag) == TC_OK);
+    CHECK(std::memcmp(tag, cmac_40_tag, sizeof tag) == 0);
+    /* finish consumes the key. */
+    CHECK(mac.update({nist_plaintext, 1}) == TC_ERROR);
+    CHECK(mac.finish(tag) == TC_ERROR);
+  }
+
+  /* A wrong key length on re-init leaves the object unkeyed. */
+  tiny_crypto::AES_CMAC mac;
+  REQUIRE(mac.init({kat_key, TC_AES_KEYLEN}) == TC_OK);
+  CHECK(mac.init({kat_key, TC_AES_KEYLEN - 1}) == TC_ERROR);
+  CHECK(mac.update({nist_plaintext, 1}) == TC_ERROR);
+  CHECK(mac.finish(tag) == TC_ERROR);
+  REQUIRE(mac.init({kat_key, TC_AES_KEYLEN}) == TC_OK);
+  CHECK(mac.init({nullptr, TC_AES_KEYLEN}) == TC_ERROR);
+  CHECK(mac.finish(tag) == TC_ERROR);
+
+  /* clear abandons the message. */
+  REQUIRE(mac.init({kat_key, TC_AES_KEYLEN}) == TC_OK);
+  CHECK(mac.update({nist_plaintext, 16}) == TC_OK);
+  mac.clear();
+  CHECK(mac.finish(tag) == TC_ERROR);
+
+  CHECK(noexcept(mac.init({kat_key, TC_AES_KEYLEN})));
+  CHECK(noexcept(mac.update({nist_plaintext, 1})));
+  CHECK(noexcept(mac.finish(tag)));
+}
+#endif
+
+#if TC_AES_ENABLE_ECB
+TEST_CASE("AES re-init with a wrong key length clears the previous key")
+{
+  tiny_crypto::AES aes;
+  uint8_t block[TC_AES_BLOCKLEN];
+  std::memcpy(block, nist_plaintext, sizeof block);
+  REQUIRE(aes.init({kat_key, TC_AES_KEYLEN}) == TC_OK);
+  CHECK(aes.init({kat_key, TC_AES_KEYLEN - 1}) == TC_ERROR);
+  CHECK(aes.encrypt_ecb(block) == TC_ERROR);
+  CHECK(std::memcmp(block, nist_plaintext, sizeof block) == 0);
+}
+#endif
+
+#if TC_AES_ENABLE_GCM
+TEST_CASE("AES GCM clear and failed re-init leave the object unkeyed")
+{
+  const gcm_test_vector* v = nullptr;
+  for (size_t i = 0; i < sizeof(gcm_test_vectors) / sizeof(gcm_test_vectors[0]); ++i)
+    if (gcm_test_vectors[i].key_len == TC_AES_KEYLEN) {
+      v = &gcm_test_vectors[i];
+      break;
+    }
+  REQUIRE(v != nullptr);
+  CHECK_FALSE(std::is_copy_constructible<tiny_crypto::GCM>::value);
+  uint8_t block[TC_AES_BLOCKLEN] = {0};
+  uint8_t tag[TC_AES_BLOCKLEN];
+  const tiny_crypto::bytes key = {v->key, v->key_len};
+  const tiny_crypto::bytes iv = {v->iv, v->iv_len};
+
+  tiny_crypto::GCM gcm;
+  REQUIRE(gcm.init(key, iv) == TC_OK);
+  CHECK(gcm.encrypt_update(block) == TC_OK);
+  gcm.clear();
+  CHECK(gcm.encrypt_update(block) == TC_ERROR);
+  CHECK(gcm.encrypt_finish(tag) == TC_ERROR);
+  CHECK(gcm.get_c_ctx().phase == 0);
+
+  REQUIRE(gcm.init(key, iv) == TC_OK);
+  CHECK(gcm.init({v->key, v->key_len + 1}, iv) == TC_ERROR);
+  CHECK(gcm.encrypt_update(block) == TC_ERROR);
+  REQUIRE(gcm.init(key, iv) == TC_OK);
+  CHECK(gcm.init_short_tag({v->key, v->key_len - 1}, iv, 8) == TC_ERROR);
+  CHECK(gcm.aad_update({block, 1}) == TC_ERROR);
+
+  /* The array overload of encrypt_finish needs exactly tag_length() bytes. */
+  REQUIRE(gcm.init(key, iv) == TC_OK);
+  uint8_t long_tag[TC_AES_BLOCKLEN + 1];
+  CHECK(gcm.encrypt_finish(long_tag) == TC_ERROR);
+  CHECK(gcm.encrypt_finish(tag) == TC_OK);
+  CHECK(gcm.encrypt_finish(tag) == TC_ERROR);
+  CHECK(noexcept(gcm.clear()));
 }
 #endif
 

@@ -34,6 +34,98 @@ TC_CPP_NODISCARD inline rsa_workspace rsa_workspace_for(TC_RSA_word (&words)[N])
   return workspace;
 }
 
+/* Sizing and preflight helpers. rsa_workspace_words returns the limbs an
+ * operation needs at a modulus size in bits, or 0 for an unsupported size or
+ * operation. The *_work helpers return the exact work units of one successful
+ * call as documented in rsa.h, or 0 for rejected parameters. */
+TC_CPP_NODISCARD inline size_t rsa_workspace_words(TC_RSA_operation operation, size_t bits) noexcept
+{
+  return ::TC_RSA_workspace_words(operation, bits);
+}
+
+TC_CPP_NODISCARD inline bool rsa_modulus_supported(size_t bits) noexcept
+{
+  return ::TC_RSA_modulus_supported(bits) != 0;
+}
+
+/* True for an odd exponent with 2^16 < e < 2^256 (FIPS 186-5 A.1.1). */
+TC_CPP_NODISCARD inline bool rsa_exponent_in_fips_range(bytes exponent) noexcept
+{
+  return ::TC_RSA_exponent_in_fips_range(exponent) != 0;
+}
+
+TC_CPP_NODISCARD inline uint32_t rsa_encode_v15_work(const rsa_v15_options& options,
+                                                     size_t modulus_bytes) noexcept
+{
+  return ::TC_RSA_encode_v15_work(&options, modulus_bytes);
+}
+
+TC_CPP_NODISCARD inline uint32_t rsa_encode_pss_work(const rsa_pss_options& options,
+                                                     size_t modulus_bytes) noexcept
+{
+  return ::TC_RSA_encode_pss_work(&options, modulus_bytes);
+}
+
+TC_CPP_NODISCARD inline uint32_t rsa_oaep_work(const rsa_oaep_options& options,
+                                               size_t modulus_bytes) noexcept
+{
+  return ::TC_RSA_oaep_work(&options, modulus_bytes);
+}
+
+TC_CPP_NODISCARD inline uint32_t rsa_public_work(const rsa_public_key& key) noexcept
+{
+  return ::TC_RSA_public_work(&key);
+}
+
+TC_CPP_NODISCARD inline uint32_t
+rsa_prepared_public_work(const rsa_prepared_public_key& setup) noexcept
+{
+  return ::TC_RSA_prepared_public_work(&setup);
+}
+
+TC_CPP_NODISCARD inline uint32_t rsa_private_work(const rsa_private_key& key,
+                                                  size_t attempts) noexcept
+{
+  return ::TC_RSA_private_work(&key, attempts);
+}
+
+/* Raw RSA over one formatted representative (RFC 8017 sections 5.1 and 5.2).
+ * The output needs the modulus length. A shorter buffer returns TC_RSA_LIMIT
+ * and an input at or above the modulus returns TC_RSA_INVALID. Output is
+ * written only on TC_RSA_OK. The array overloads take the capacity from the
+ * array. rsa.h documents the workspace, blinding and work contracts. */
+TC_CPP_NODISCARD inline rsa_result rsa_raw_public(const rsa_public_key& key, bytes input,
+                                                  const rsa_workspace& workspace, buffer output,
+                                                  TC_work_budget& work) noexcept
+{
+  return ::TC_RSA_raw_public(&key, input, &workspace, output, &work);
+}
+
+template <size_t N>
+TC_CPP_NODISCARD inline rsa_result
+rsa_raw_public(const rsa_public_key& key, bytes input, const rsa_workspace& workspace,
+               uint8_t (&output)[N], TC_work_budget& work) noexcept
+{
+  return rsa_raw_public(key, input, workspace, buffer{output, N}, work);
+}
+
+TC_CPP_NODISCARD inline rsa_result rsa_raw_private(const rsa_public_key& key,
+                                                   bytes private_exponent, bytes input,
+                                                   const rsa_workspace& workspace, buffer output,
+                                                   rsa_execution& execution) noexcept
+{
+  return ::TC_RSA_raw_private(&key, private_exponent, input, &workspace, output, &execution);
+}
+
+template <size_t N>
+TC_CPP_NODISCARD inline rsa_result
+rsa_raw_private(const rsa_public_key& key, bytes private_exponent, bytes input,
+                const rsa_workspace& workspace, uint8_t (&output)[N],
+                rsa_execution& execution) noexcept
+{
+  return rsa_raw_private(key, private_exponent, input, workspace, buffer{output, N}, execution);
+}
+
 TC_CPP_NODISCARD inline rsa_result rsa_keygen_init(rsa_keygen_state& state, size_t bits,
                                                    const rsa_keygen_output& output,
                                                    rsa_keygen_limits limits,

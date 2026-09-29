@@ -6,7 +6,8 @@
 
 int main()
 {
-  if (!TC_RSA_workspace_words(TC_RSA_OPERATION_VERIFY, 3072))
+  if (!tiny_crypto::rsa_workspace_words(TC_RSA_OPERATION_VERIFY, 3072) ||
+      !tiny_crypto::rsa_modulus_supported(3072))
     return 1;
   TC_X509_native_workspace native_scratch = {nullptr, nullptr,
                                              TC_X509_NATIVE_DEFAULT_SIGNATURE_WORK};
@@ -57,6 +58,37 @@ int main()
   if (tiny_crypto::rsa_verify_v15_digest(rsa_key, v15, {nullptr, 0}, {nullptr, 0}, rsa_workspace,
                                          rsa_work) != TC_RSA_ARGUMENT)
     return 1;
+  uint8_t raw_output[128];
+  rsa_work.remaining = UINT32_MAX;
+  if (tiny_crypto::rsa_raw_public(rsa_key, {nullptr, 0}, rsa_workspace, raw_output, rsa_work) !=
+      TC_RSA_ARGUMENT)
+    return 1;
+
+  /* Symmetric wrappers take key, IV and message spans. */
+  const uint8_t aes_key[TC_AES_KEYLEN] = {1}, aes_iv[TC_AES_BLOCKLEN] = {2};
+  uint8_t block[TC_AES_BLOCKLEN] = {3}, original[TC_AES_BLOCKLEN] = {3};
+  tiny_crypto::AES aes;
+  if (aes.init({aes_key, sizeof aes_key}, {aes_iv, sizeof aes_iv}) != TC_OK ||
+      aes.xcrypt_ctr(block) != TC_OK || aes.set_iv(aes_iv) != TC_OK ||
+      aes.xcrypt_ctr(block) != TC_OK)
+    return 1;
+  for (size_t i = 0; i < sizeof block; ++i)
+    if (block[i] != original[i])
+      return 1;
+  if (aes.init({aes_key, sizeof aes_key - 1}) != TC_ERROR || aes.xcrypt_ctr(block) != TC_ERROR)
+    return 1;
+  tiny_crypto::AES_dynamic_CMAC cmac;
+  uint8_t cmac_tag[16];
+  if (cmac.init({aes_key, sizeof aes_key}) != TC_OK || cmac.update(original) != TC_OK ||
+      cmac.final(cmac_tag) != TC_OK)
+    return 1;
+  uint8_t hmac_tag[TC_HMAC_MIN_TAG_LEN];
+  if (tiny_crypto::HMAC_SHA256::mac({aes_key, sizeof aes_key}, {original, sizeof original},
+                                    {hmac_tag, sizeof hmac_tag}) != TC_OK ||
+      tiny_crypto::HMAC_SHA256::verify({aes_key, sizeof aes_key}, {original, sizeof original},
+                                       {hmac_tag, sizeof hmac_tag}) != TC_OK)
+    return 1;
+
   uint8_t scalar[32] = {};
   uint8_t point[65];
   uint8_t derived[32];

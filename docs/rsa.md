@@ -188,6 +188,23 @@ The C++ key-generation wrappers expose the same caller-owned state and buffers:
 `rsa_keygen_init`, `rsa_keygen_step`, and `rsa_keygen_clear`. They allocate no
 memory and do not throw.
 
+`rsa_raw_public` and `rsa_raw_private` wrap the raw operations. Each takes the
+output as `tiny_crypto::buffer` or as a C array whose size sets the capacity.
+`rsa_workspace_words(operation, bits)` sizes a workspace, and
+`rsa_modulus_supported` and `rsa_exponent_in_fips_range` return `bool`. The
+work helpers `rsa_public_work`, `rsa_prepared_public_work`,
+`rsa_private_work`, `rsa_encode_v15_work`, `rsa_encode_pss_work` and
+`rsa_oaep_work` return the same units as their C functions.
+
+```cpp
+TC_RSA_word words[TC_RSA_RAW_PUBLIC_WORKSPACE_WORDS(2048)];
+const tiny_crypto::rsa_workspace workspace = tiny_crypto::rsa_workspace_for(words);
+uint8_t representative[256];
+TC_work_budget work = {tiny_crypto::rsa_public_work(key)};
+if (tiny_crypto::rsa_raw_public(key, signature, workspace, representative, work) != TC_RSA_OK)
+  return false; /* representative is unchanged */
+```
+
 `TC_RSA_verify_pss_digest` verifies a precomputed digest using explicit message
 and MGF hashes and salt length. Both hash implementations must be enabled.
 It uses the same caller-owned limb workspace as v1.5 verification, plus a local

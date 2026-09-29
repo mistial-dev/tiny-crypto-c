@@ -235,9 +235,16 @@ public:
     return finish(buffer{out, tag_size});
   }
 
+  /* out.capacity is TC_HMAC_MIN_TAG_LEN..tag_size. A shorter capacity keeps
+   * the leading bytes of the full tag. */
   TC_CPP_NODISCARD static TC_status mac(bytes key, bytes data, buffer out) noexcept
   {
     return Traits::digest(key, data, out);
+  }
+  TC_CPP_NODISCARD static TC_status mac(bytes key, bytes data,
+                                        uint8_t (&out)[Traits::digest_size]) noexcept
+  {
+    return mac(key, data, buffer{out, tag_size});
   }
 
   /* Compares tag in constant time. Returns TC_OK, TC_MISMATCH or TC_ERROR. */

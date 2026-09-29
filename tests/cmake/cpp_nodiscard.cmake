@@ -4,7 +4,7 @@
 # warning, and no other line may. C++11 uses warn_unused_result and C++17 uses
 # [[nodiscard]], so both standards are checked. GCC reports unused results
 # during code generation, so the check compiles an object in place of
-# -fsyntax-only.
+# -fsyntax-only. EXTRA_FLAGS adds target flags, for example for avr-g++.
 set(source "${SOURCE_DIR}/tests/cpp/nodiscard_compile.cpp")
 file(STRINGS "${source}" source_lines)
 set(expected "")
@@ -20,9 +20,10 @@ if(expected_count EQUAL 0)
   message(FATAL_ERROR "No DISCARDED lines found in ${source}")
 endif()
 
+file(MAKE_DIRECTORY "${BINARY_DIR}")
 foreach(standard 11 17)
   execute_process(
-    COMMAND "${CXX_COMPILER}" -std=c++${standard} -c -o "${BINARY_DIR}/nodiscard_compile_${standard}.o"
+    COMMAND "${CXX_COMPILER}" ${EXTRA_FLAGS} -std=c++${standard} -c -o "${BINARY_DIR}/nodiscard_compile_${standard}.o"
       -Wunused-result -fno-diagnostics-color -I "${SOURCE_DIR}/src" "${source}"
     RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE errors)
   if(result)

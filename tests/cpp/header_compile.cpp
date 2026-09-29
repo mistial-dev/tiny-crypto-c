@@ -2,6 +2,9 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include <tiny_crypto/tiny_crypto.hpp>
+#if TC_ENABLE_MD5
+#include <tiny_crypto/hash.hpp>
+#endif
 #if TC_ENABLE_X509
 #include <tiny_crypto/key_challenge.h>
 #include <tiny_crypto/x509_path.h>
@@ -12,8 +15,197 @@
 #include <tiny_crypto/rsa.hpp>
 #endif
 
-void tiny_crypto_cpp_header_compile(void)
+/* Explicit instantiation compiles every member of the hash and HMAC
+ * templates, including members a test does not call. */
+#if TC_ENABLE_MD5
+template class tiny_crypto::basic_hash<tiny_crypto::detail::tc_md5_traits>;
+#endif
+#if TC_ENABLE_SHA1
+template class tiny_crypto::basic_hash<tiny_crypto::detail::tc_sha1_traits>;
+#endif
+#if TC_ENABLE_SHA224
+template class tiny_crypto::basic_hash<tiny_crypto::detail::tc_sha224_traits>;
+#endif
+#if TC_ENABLE_SHA256
+template class tiny_crypto::basic_hash<tiny_crypto::detail::tc_sha256_traits>;
+#endif
+#if TC_ENABLE_SHA384
+template class tiny_crypto::basic_hash<tiny_crypto::detail::tc_sha384_traits>;
+#endif
+#if TC_ENABLE_SHA512
+template class tiny_crypto::basic_hash<tiny_crypto::detail::tc_sha512_traits>;
+#endif
+#if TC_ENABLE_HMAC && TC_ENABLE_SHA1
+template class tiny_crypto::basic_hmac<tiny_crypto::detail::tc_hmac_sha1_traits>;
+#endif
+#if TC_ENABLE_HMAC && TC_ENABLE_SHA224
+template class tiny_crypto::basic_hmac<tiny_crypto::detail::tc_hmac_sha224_traits>;
+#endif
+#if TC_ENABLE_HMAC && TC_ENABLE_SHA256
+template class tiny_crypto::basic_hmac<tiny_crypto::detail::tc_hmac_sha256_traits>;
+#endif
+#if TC_ENABLE_HMAC && TC_ENABLE_SHA384
+template class tiny_crypto::basic_hmac<tiny_crypto::detail::tc_hmac_sha384_traits>;
+#endif
+#if TC_ENABLE_HMAC && TC_ENABLE_SHA512
+template class tiny_crypto::basic_hmac<tiny_crypto::detail::tc_hmac_sha512_traits>;
+#endif
+
+/* Array-deduced function templates that the function below does not call. */
+#if TC_ENABLE_SHA256
+template TC_status tiny_crypto::SHA256::digest<16>(const uint8_t (&)[16],
+                                                   uint8_t (&)[TC_SHA256_DIGESTLEN]) noexcept;
+#if TC_ENABLE_HMAC
+template TC_status tiny_crypto::HMAC_SHA256::init<16>(const uint8_t (&)[16]) noexcept;
+#endif
+#endif
+#if TC_ENABLE_AES && TC_AES_ENABLE_CBC
+template TC_status tiny_crypto::AES::decrypt_cbc<16>(uint8_t (&)[16]) noexcept;
+#endif
+#if TC_ENABLE_DES && TC_DES_ENABLE_CFB1
+template TC_status tiny_crypto::DES::decrypt_cfb1<8>(uint8_t (&)[8], size_t) noexcept;
+#endif
+#if TC_ENABLE_RSA
+template tiny_crypto::rsa_result
+tiny_crypto::rsa_raw_private<128>(const tiny_crypto::rsa_public_key&, tiny_crypto::bytes,
+                                  tiny_crypto::bytes, const tiny_crypto::rsa_workspace&,
+                                  uint8_t (&)[128], tiny_crypto::rsa_execution&) noexcept;
+template tiny_crypto::rsa_result
+tiny_crypto::rsa_encode_v15_digest<128>(const tiny_crypto::rsa_v15_options&, tiny_crypto::bytes,
+                                        uint8_t (&)[128], TC_work_budget&) noexcept;
+template tiny_crypto::rsa_result
+tiny_crypto::rsa_encode_pss_digest<128>(const tiny_crypto::rsa_pss_options&, tiny_crypto::bytes,
+                                        tiny_crypto::bytes, uint8_t (&)[128],
+                                        TC_work_budget&) noexcept;
+#endif
+#if TC_ENABLE_EC
+template tiny_crypto::ec_result tiny_crypto::ec_public_key<65>(tiny_crypto::ec_curve,
+                                                               tiny_crypto::bytes, uint8_t (&)[65],
+                                                               tiny_crypto::ec_workspace&,
+                                                               TC_work_budget&) noexcept;
+template tiny_crypto::ec_result
+tiny_crypto::ec_generate_key_pair<32, 65>(tiny_crypto::ec_curve, uint8_t (&)[32], uint8_t (&)[65],
+                                          tiny_crypto::ec_workspace&,
+                                          tiny_crypto::ec_execution&) noexcept;
+template tiny_crypto::ec_result tiny_crypto::ecdh<32>(tiny_crypto::ec_curve, tiny_crypto::bytes,
+                                                      tiny_crypto::bytes, uint8_t (&)[32],
+                                                      tiny_crypto::ec_workspace&,
+                                                      TC_work_budget&) noexcept;
+template tiny_crypto::ec_result tiny_crypto::ecdsa_sign_digest<64>(
+    tiny_crypto::ec_curve, tiny_crypto::bytes, tiny_crypto::bytes, tiny_crypto::bytes,
+    uint8_t (&)[64], tiny_crypto::ecdsa_workspace&, tiny_crypto::ec_execution&) noexcept;
+#endif
+
+/* Instantiate every wrapper class and the array-deduced member templates.
+ * The object is compiled and never run, so each result is only returned. */
+int tiny_crypto_cpp_header_compile(uint8_t* data, size_t length)
 {
+  const tiny_crypto::bytes in = {data, length};
+  const tiny_crypto::buffer out = {data, length};
+  uint8_t block[16] = {0};
+  int failures = 0;
+  (void)in;
+  (void)out;
+  (void)block;
+#if TC_ENABLE_AES
+  tiny_crypto::AES aes;
+  failures += aes.init(block) != TC_OK;
+#if TC_AES_ENABLE_CBC || TC_AES_ENABLE_CTR || TC_AES_ENABLE_OFB
+  failures += aes.init(in, in) != TC_OK;
+  failures += aes.init(block, block) != TC_OK;
+  failures += aes.set_iv(block) != TC_OK;
+#endif
+#if TC_AES_ENABLE_CBC
+  failures += aes.encrypt_cbc(block) != TC_OK;
+#endif
+#if TC_AES_ENABLE_CTR
+  failures += aes.xcrypt_ctr(block) != TC_OK;
+#endif
+#if TC_AES_ENABLE_OFB
+  failures += aes.xcrypt_ofb(block) != TC_OK;
+#endif
+#if TC_AES_ENABLE_GCM
+  tiny_crypto::GCM gcm;
+  failures += gcm.init(in, in) != TC_OK;
+  failures += gcm.encrypt_update(block) != TC_OK;
+  failures += gcm.encrypt_finish(block) != TC_OK;
+  gcm.clear();
+#endif
+#if TC_AES_ENABLE_CMAC
+  tiny_crypto::AES_CMAC aes_cmac;
+  failures += aes_cmac.init(block) != TC_OK;
+  failures += aes_cmac.update(block) != TC_OK;
+  failures += aes_cmac.finish(block) != TC_OK;
+  failures += tiny_crypto::aes_cmac_verify(in, in, in) != TC_OK;
+#endif
+#if TC_AES_ENABLE_DYNAMIC
+  tiny_crypto::AES_dynamic dynamic;
+  failures += dynamic.init(block) != TC_OK;
+  tiny_crypto::AES_dynamic_CMAC dynamic_cmac;
+  failures += dynamic_cmac.init(block) != TC_OK;
+  failures += dynamic_cmac.update(block) != TC_OK;
+#endif
+#endif
+#if TC_ENABLE_DES
+  uint8_t des_block[8] = {0};
+  tiny_crypto::DES des;
+  failures += des.init(des_block) != TC_OK;
+#if TC_DES_NEEDS_IV
+  failures += des.init(in, in) != TC_OK;
+  failures += des.init(des_block, des_block) != TC_OK;
+  failures += des.set_iv(des_block) != TC_OK;
+#endif
+#if TC_DES_ENABLE_CFB1
+  failures += des.encrypt_cfb1(des_block, 8) != TC_OK;
+#endif
+#if TC_DES_ENABLE_CMAC
+  tiny_crypto::DES_CMAC des_cmac;
+  failures += des_cmac.init(des_block) != TC_OK;
+  failures += des_cmac.update(des_block) != TC_OK;
+  failures += des_cmac.finish(des_block) != TC_OK;
+  failures += tiny_crypto::des_cmac_verify(in, in, in) != TC_OK;
+#endif
+#if TC_DES_ENABLE_ISO9797
+  tiny_crypto::DES_ISO9797 iso9797;
+  failures += iso9797.init(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, block) != TC_OK;
+  failures += iso9797.update(des_block) != TC_OK;
+  failures += iso9797.finish(des_block) != TC_OK;
+  failures += tiny_crypto::des_iso9797_verify(TC_DES_ISO9797_ALG1, TC_DES_ISO9797_PAD1, in, in,
+                                              in) != TC_OK;
+#endif
+#endif
+#if TC_ENABLE_SHA256
+  tiny_crypto::SHA256 hash;
+  failures += hash.update(block) != TC_OK;
+#if TC_ENABLE_HMAC
+  tiny_crypto::HMAC_SHA256 hmac(block);
+  failures += hmac.update(block) != TC_OK;
+#endif
+#endif
+#if TC_ENABLE_MD5
+  tiny_crypto::MD5 md5;
+  failures += md5.update(block) != TC_OK;
+#endif
+#if TC_ENABLE_KMAC256
+  tiny_crypto::KMAC256 kmac;
+  failures += kmac.init(in) != TC_OK;
+#endif
+#if TC_ENABLE_GZIP
+  tiny_crypto::GZIPDecoder gzip;
+  (void)gzip;
+#endif
+#if TC_ENABLE_DRBG
+  tiny_crypto::drbg generator;
+  (void)generator;
+#endif
+#if TC_ENABLE_RSA
+  TC_RSA_word rsa_words[4];
+  const tiny_crypto::rsa_workspace rsa_workspace = tiny_crypto::rsa_workspace_for(rsa_words);
+  const tiny_crypto::rsa_public_key rsa_key = {in, in};
+  TC_work_budget rsa_work = {0};
+  failures += tiny_crypto::rsa_raw_public(rsa_key, in, rsa_workspace, block, rsa_work) != TC_RSA_OK;
+  failures += tiny_crypto::rsa_workspace_words(TC_RSA_OPERATION_RAW_PUBLIC, 1024) == 0;
+#endif
 #if TC_ENABLE_PIV_SM
   tiny_crypto::piv_sm session;
   (void)session;
@@ -32,6 +224,7 @@ void tiny_crypto_cpp_header_compile(void)
   static_assert(sizeof(uint32_t) == 4, "RSA validation work must be 32-bit");
 #endif
   TC_X509_public_key key = {};
+  (void)key;
   TC_key_challenge_options challenge_options = {};
   TC_key_challenge_workspace challenge_workspace = {};
   (void)challenge_options;
@@ -55,16 +248,5 @@ void tiny_crypto_cpp_header_compile(void)
   tiny_crypto::TLVReader reader;
   (void)reader;
 #endif
-#if TC_ENABLE_KMAC256
-  tiny_crypto::KMAC256 kmac;
-  (void)kmac;
-#endif
-#if TC_ENABLE_AES
-  tiny_crypto::AES aes;
-  (void)aes;
-#endif
-#if TC_ENABLE_SHA256
-  tiny_crypto::SHA256 hash;
-  (void)hash;
-#endif
+  return failures;
 }

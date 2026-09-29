@@ -73,6 +73,9 @@ template <class Hmac, size_t N> void check_hmac(const hmac_vector* vectors, size
     CAPTURE(i);
     CHECK(Hmac::mac(key, msg, buffer{tag, N}) == TC_OK);
     CHECK(std::memcmp(tag, v.tag, N) == 0);
+    uint8_t full[N];
+    CHECK(Hmac::mac(key, msg, full) == TC_OK);
+    CHECK(std::memcmp(full, v.tag, N) == 0);
     CHECK(Hmac::verify(key, msg, bytes{tag, N}) == TC_OK);
     CHECK(Hmac::verify(key, msg, bytes{tag, TC_HMAC_MIN_TAG_LEN}) == TC_OK);
     tag[TC_HMAC_MIN_TAG_LEN - 1] ^= 1;

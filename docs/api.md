@@ -262,18 +262,39 @@ if (status != TC_OK)
 ## C++ wrappers
 
 The C++11 wrappers in `tiny_crypto` return the C result types. Every call that
-returns a status or result enumerator is marked `[[nodiscard]]` in C++17 and
-`warn_unused_result` on GCC and Clang in C++11. Build with `-Wunused-result`
-enabled (the default on GCC and Clang) so a discarded verification or cipher
-result is reported. Wrapper calls are `noexcept`.
+returns a status, result enumerator, size or work value is marked
+`[[nodiscard]]` in C++17 and `warn_unused_result` on GCC and Clang in C++11.
+Build with `-Wunused-result` enabled (the default on GCC and Clang) so a
+discarded verification or cipher result is reported. Wrapper calls are
+`noexcept`, allocate nothing and need no standard library.
+
+Keys, IVs, AAD and messages are `bytes` spans. Outputs are `buffer` spans or
+fixed-size C arrays whose size is part of the type. Array overloads deduce the
+span length. Block-mode calls (`encrypt_cbc`, `xcrypt_ctr` and the others) and
+`GCM::encrypt_update` transform a caller buffer in place and take a pointer and
+length or an array. The wrappers check key and IV lengths before the C call. A
+wrong length returns `TC_ERROR`. Every argument error leaves outputs unchanged.
 
 Cipher, hash and MAC classes own their C context, clear it on destruction and
-delete their copy operations. A failed `init` of `AES`, `GCM`, `DES`,
-`AES_dynamic`, `AES_dynamic_CMAC` or an HMAC class leaves the object unkeyed.
-Later cipher, update and finish calls then return `TC_ERROR` until the next
-successful `init`.
-`basic_hash::finish` starts the next message. `basic_hmac::finish` consumes
-the key.
+delete their copy operations. Each follows init, update, finish or clear:
+
+| Class | Key | finish |
+| --- | --- | --- |
+| `AES` | `TC_AES_KEYLEN` bytes, optional 16-byte IV | none |
+| `GCM` | `TC_AES_KEYLEN` bytes and an IV | `encrypt_finish` writes `tag_length()` bytes and consumes the key |
+| `AES_CMAC` | `TC_AES_KEYLEN` bytes | writes a 16-byte tag and consumes the key |
+| `AES_dynamic`, `AES_dynamic_CMAC` | 16, 24 or 32 bytes | `final` writes a 16-byte tag and consumes the key |
+| `DES` | 8 bytes, or 16 or 24 with TDEA, optional 8-byte IV | none |
+| `DES_CMAC` | 8, 16 or 24 bytes | writes an 8-byte tag and consumes the key |
+| `DES_ISO9797` | algorithm, padding and 16 or 24 bytes | writes the 8-byte MAC and consumes the key |
+| HMAC classes | any length | writes `tag_size` bytes and consumes the key |
+| Hash classes | none | writes the digest and starts the next message |
+
+A default-constructed object, a failed `init`, a completed finish and `clear`
+all leave a keyed object unkeyed. Later update and finish calls return
+`TC_ERROR` until the next successful `init`. `clear` wipes the key schedule
+early, for example after an abandoned message. Compare a received tag with a
+`*_verify` wrapper or `tiny_crypto::ct_equal`, which run in constant time.
 
 Hash, HMAC, MD5 and KMAC256 inputs are `TC_bytes` spans in C and `bytes` in
 C++. Fixed-length digests and full HMAC tags go to digest-sized arrays. A
@@ -290,20 +311,36 @@ if (status != TC_OK)
   return status; /* tag is unchanged */
 ```
 
-The one-shot GCM, CCM, EAX, EAX' and SIV wrappers take the key as `bytes`.
-GCM, CCM, EAX and EAX' need `TC_AES_KEYLEN` bytes and SIV needs
-`TC_AES_SIV_KEYLEN`. Another length returns `TC_ERROR` before any output is
-written. `GCM` streams encryption only. Decrypt GCM with `gcm_decrypt` or
-`gcm_decrypt_short_tag`. The `ccm_*_short_tag`, `eax_*_short_tag`,
-`aes_cmac_short_tag` and `des_cmac_short_tag` wrappers follow the
-[tag length](#tag-lengths) rules of their C functions.
+The one-shot MAC wrappers are `aes_cmac`, `des_cmac` and `des_iso9797_mac`,
+each with `*_verify`, `*_short_tag` and `*_verify_short_tag` forms. They take
+the key, message and tag as spans and follow the [tag length](#tag-lengths)
+rules of their C functions. The one-shot GCM, CCM, EAX, EAX' and SIV wrappers
+take the key as `bytes`. GCM, CCM, EAX and EAX' need `TC_AES_KEYLEN` bytes and
+SIV needs `TC_AES_SIV_KEYLEN`. `GCM` streams encryption only. Decrypt GCM with
+`gcm_decrypt` or `gcm_decrypt_short_tag`, which verify the tag before any
+plaintext is released.
 
 ```cpp
-const tiny_crypto::bytes key = {key_bytes, sizeof key_bytes};
-if (tiny_crypto::ccm_decrypt(key, nonce, aad, ciphertext, tag, plaintext) != TC_OK) {
-  /* Reject the packet. */
+#include <tiny_crypto/des.hpp>
+
+/* Check a retail MAC (ISO/IEC 9797-1 algorithm 3) received with a message. */
+bool retail_mac_valid(const uint8_t (&key)[16], tiny_crypto::bytes message,
+                      const uint8_t (&received)[TC_DES_BLOCKLEN])
+{
+  tiny_crypto::DES_ISO9797 mac;
+  uint8_t computed[TC_DES_BLOCKLEN];
+  if (mac.init(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, key) != TC_OK ||
+      mac.update(message) != TC_OK || mac.finish(computed) != TC_OK)
+    return false; /* The destructor wipes the key schedule. */
+  const bool valid = tiny_crypto::ct_equal(computed, received, sizeof computed) == TC_OK;
+  TC_secure_zero(computed, sizeof computed);
+  return valid;
 }
 ```
+
+For a single buffer, `des_iso9797_verify(TC_DES_ISO9797_ALG3,
+TC_DES_ISO9797_PAD2, {key, 16}, message, {received, 8})` does the same in one
+call and returns `TC_OK`, `TC_MISMATCH` or `TC_ERROR`.
 
 ## Block cipher modes
 

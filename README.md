@@ -10,10 +10,10 @@
 
 tiny-crypto-c provides small, portable cryptographic primitives for embedded C
 and C++. Library code is heap free. Callers supply all memory. The C++11 wrappers
-take pointer-length pairs, `bytes` spans and C arrays, work without the standard
-library or exceptions, and return the C API's result types as `[[nodiscard]]`
-values. Disabled algorithms and
-modes are left out of the build.
+take `bytes` spans and C arrays, transform block-mode data in place, work
+without the standard library or exceptions, and return the C API's result types
+as `[[nodiscard]]` values. Disabled algorithms and modes are left out of the
+build.
 
 The default profile enables **AES-128 CTR and SHA-256**. DES, 3DES, SHA-1,
 SHA-224, SHA-384, SHA-512, HMAC, KMAC256, the NIST SP 800-108 key-based KDF,

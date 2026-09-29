@@ -1380,13 +1380,22 @@ add_test(NAME test_package_boundaries
     set_property(TARGET test_cpp_feature_off_${feature_profile} PROPERTY CXX_STANDARD 11)
   endforeach()
 
+  # header_compile.cpp instantiates every C++ wrapper. Both the C++17 object,
+  # where TC_CPP_NODISCARD is [[nodiscard]], and the AVR object enable every
+  # wrapper family and treat warnings as errors.
+  set(tc_cpp_header_definitions ${tc_full_definitions} TC_AES_KEY_BITS=128
+    TC_AES_ENABLE_EAX_PRIME=1 TC_AES_ENABLE_DYNAMIC=1 TC_ENABLE_MD5=1 TC_ENABLE_GZIP=1
+    TC_ENABLE_DRBG=1 TC_DRBG_ENABLE_HMAC=1 TC_ENABLE_RSA=1 TC_ENABLE_TLV=1 TC_ENABLE_DER=1 TC_ENABLE_X509=1
+    TC_ENABLE_PIV_CHUID=1 TC_ENABLE_PIV_CVC=1 TC_ENABLE_EAC_CVC=1 TC_ENABLE_PIV_SM=1
+    TC_ENABLE_EC=1 TC_ENABLE_SSKDF=1)
   add_library(test_cpp_headers_cxx17 OBJECT tests/cpp/header_compile.cpp)
   target_include_directories(test_cpp_headers_cxx17 PRIVATE src)
   set_property(TARGET test_cpp_headers_cxx17 PROPERTY CXX_STANDARD 17)
-  target_compile_definitions(test_cpp_headers_cxx17 PRIVATE
-    ${tc_full_definitions} TC_AES_KEY_BITS=128 TC_AES_ENABLE_EAX_PRIME=1 TC_ENABLE_TLV=1
-    TC_ENABLE_DER=1 TC_ENABLE_X509=1 TC_ENABLE_PIV_CHUID=1 TC_ENABLE_PIV_CVC=1 TC_ENABLE_EAC_CVC=1
-    TC_ENABLE_PIV_SM=1 TC_ENABLE_EC=1 TC_ENABLE_SSKDF=1 TC_ENABLE_SHA384=1 TC_AES_ENABLE_DYNAMIC=1)
+  target_compile_definitions(test_cpp_headers_cxx17 PRIVATE ${tc_cpp_header_definitions})
+  tc_warnings(test_cpp_headers_cxx17)
+  if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(test_cpp_headers_cxx17 PRIVATE -Werror)
+  endif()
 
   # Discarding a wrapper status must draw a compiler warning.
   if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
@@ -1473,15 +1482,18 @@ add_test(NAME test_package_boundaries
         -o ${CMAKE_CURRENT_BINARY_DIR}/tiny-crypto-c-sskdf-compile.o)
   endif()
   if(TC_AVR_CXX)
+    list(TRANSFORM tc_cpp_header_definitions PREPEND "-D" OUTPUT_VARIABLE tc_avr_cpp_flags)
     add_test(NAME test_cpp_headers_avr
-      COMMAND ${TC_AVR_CXX} -std=gnu++11 -fno-exceptions -fno-rtti
-        -DTC_ENABLE_KMAC256=1 -DTC_ENABLE_TLV=1
-        -DTC_ENABLE_DER=1 -DTC_ENABLE_X509=1 -DTC_ENABLE_PIV_CHUID=1 -DTC_ENABLE_PIV_CVC=1
-        -DTC_ENABLE_EAC_CVC=1 -DTC_ENABLE_SSKDF=1 -DTC_ENABLE_SHA384=1 -DTC_AES_ENABLE_DYNAMIC=1 -DTC_ENABLE_EC=1
-        -DTC_ENABLE_PIV_SM=1
-        -mmcu=atmega328p -I${CMAKE_CURRENT_SOURCE_DIR}/src
+      COMMAND ${TC_AVR_CXX} -std=gnu++11 -fno-exceptions -fno-rtti -Wall -Wextra -Werror -Os
+        ${tc_avr_cpp_flags} -mmcu=atmega2560 -I${CMAKE_CURRENT_SOURCE_DIR}/src
         -c ${CMAKE_CURRENT_SOURCE_DIR}/tests/cpp/header_compile.cpp
         -o ${CMAKE_CURRENT_BINARY_DIR}/tiny-crypto-c-header-compile.o)
+    # avr-g++ must also diagnose every discarded wrapper result.
+    add_test(NAME test_cpp_nodiscard_avr COMMAND ${CMAKE_COMMAND}
+      -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR} -DCXX_COMPILER=${TC_AVR_CXX}
+      -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/avr
+      "-DEXTRA_FLAGS=-mmcu=atmega2560;-fno-exceptions;-fno-rtti"
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/cpp_nodiscard.cmake)
   endif()
 
   # Tests that take more than a few seconds in a Release build. Faster vector

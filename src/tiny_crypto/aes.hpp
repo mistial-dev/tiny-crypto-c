@@ -12,6 +12,12 @@
 
 namespace tiny_crypto {
 
+/* AES block cipher for the configured TC_AES_KEYLEN. Keys and IVs are borrowed
+ * spans that must stay disjoint from the object. A wrong key or IV length
+ * returns TC_ERROR and clears the object, as does any other init failure.
+ * Later cipher calls then return TC_ERROR until the next successful init.
+ * Mode calls transform data in place under the rules of aes.h. The destructor
+ * clears the context. */
 class AES {
 public:
   AES() noexcept = default;
@@ -22,41 +28,48 @@ public:
   AES(const AES&) = delete;
   AES& operator=(const AES&) = delete;
 
-  TC_CPP_NODISCARD TC_status init(const uint8_t* key, size_t key_len) noexcept
+  TC_CPP_NODISCARD TC_status init(bytes key) noexcept
   {
-    if (key_len != TC_AES_KEYLEN) {
+    if (key.length != TC_AES_KEYLEN) {
       TC_AES_ctx_clear(&ctx_);
       return TC_ERROR;
     }
-    return TC_AES_init(&ctx_, key);
+    return TC_AES_init(&ctx_, key.data);
   }
   template <size_t N> TC_CPP_NODISCARD TC_status init(const uint8_t (&key)[N]) noexcept
   {
-    return init(key, N);
+    return init(bytes{key, N});
   }
 
 #if TC_AES_ENABLE_CBC || TC_AES_ENABLE_CTR || TC_AES_ENABLE_OFB
-  TC_CPP_NODISCARD TC_status init(const uint8_t* key, size_t key_len, const uint8_t* iv,
-                                  size_t iv_len) noexcept
+  /* Key the object and load the first IV of TC_AES_BLOCKLEN bytes. */
+  TC_CPP_NODISCARD TC_status init(bytes key, bytes iv) noexcept
   {
-    if (key_len != TC_AES_KEYLEN || iv_len != TC_AES_BLOCKLEN) {
+    if (key.length != TC_AES_KEYLEN || iv.length != TC_AES_BLOCKLEN) {
       TC_AES_ctx_clear(&ctx_);
       return TC_ERROR;
     }
-    TC_status status = TC_AES_init(&ctx_, key);
+    TC_status status = TC_AES_init(&ctx_, key.data);
     if (status == TC_OK)
-      status = TC_AES_set_iv(&ctx_, iv);
+      status = TC_AES_set_iv(&ctx_, iv.data);
     if (status != TC_OK)
       TC_AES_ctx_clear(&ctx_);
     return status;
   }
-  TC_CPP_NODISCARD TC_status set_iv(const uint8_t* iv, size_t iv_len) noexcept
+  template <size_t N>
+  TC_CPP_NODISCARD TC_status init(const uint8_t (&key)[N],
+                                  const uint8_t (&iv)[TC_AES_BLOCKLEN]) noexcept
   {
-    return iv_len == TC_AES_BLOCKLEN ? TC_AES_set_iv(&ctx_, iv) : TC_ERROR;
+    return init(bytes{key, N}, bytes{iv, TC_AES_BLOCKLEN});
   }
-  template <size_t N> TC_CPP_NODISCARD TC_status set_iv(const uint8_t (&iv)[N]) noexcept
+  /* Start a new message. A wrong length returns TC_ERROR and keeps the key. */
+  TC_CPP_NODISCARD TC_status set_iv(bytes iv) noexcept
   {
-    return set_iv(iv, N);
+    return iv.length == TC_AES_BLOCKLEN ? TC_AES_set_iv(&ctx_, iv.data) : TC_ERROR;
+  }
+  TC_CPP_NODISCARD TC_status set_iv(const uint8_t (&iv)[TC_AES_BLOCKLEN]) noexcept
+  {
+    return set_iv(bytes{iv, TC_AES_BLOCKLEN});
   }
 #endif
 
@@ -123,8 +136,13 @@ private:
 };
 
 #if TC_AES_ENABLE_GCM
-/* Streaming GCM encryption. Decrypt with the one-shot gcm_decrypt, which
- * verifies the tag before writing plaintext. */
+/* Streaming GCM encryption (SP 800-38D). init takes a TC_AES_KEYLEN-byte key
+ * and fixes the tag length. A wrong key length or any other init failure
+ * clears the object. Supply all AAD before the first encrypt_update, which
+ * encrypts data in place. encrypt_finish writes exactly tag_length() bytes
+ * and consumes the key. Decrypt with the one-shot gcm_decrypt, which verifies
+ * the tag before it releases plaintext. clear and the destructor wipe the key
+ * schedule and the authentication state. */
 class GCM {
 public:
   GCM() noexcept = default;
@@ -135,39 +153,53 @@ public:
   GCM(const GCM&) = delete;
   GCM& operator=(const GCM&) = delete;
 
-  TC_CPP_NODISCARD TC_status init(const uint8_t* key, size_t key_len, bytes iv,
-                                  size_t tag_len = TC_AES_BLOCKLEN) noexcept
+  /* tag_len is 12..16 bytes. */
+  TC_CPP_NODISCARD TC_status init(bytes key, bytes iv, size_t tag_len = TC_AES_BLOCKLEN) noexcept
   {
-    if (key_len != TC_AES_KEYLEN) {
+    if (key.length != TC_AES_KEYLEN) {
       TC_AES_GCM_ctx_clear(&ctx_);
       return TC_ERROR;
     }
-    return TC_AES_GCM_init(&ctx_, key, iv, tag_len);
+    return TC_AES_GCM_init(&ctx_, key.data, iv, tag_len);
   }
-  TC_CPP_NODISCARD TC_status init_short_tag(const uint8_t* key, size_t key_len, bytes iv,
-                                            size_t tag_len) noexcept
+  /* tag_len is 4 or 8 bytes under the SP 800-38D Appendix C packet limits. */
+  TC_CPP_NODISCARD TC_status init_short_tag(bytes key, bytes iv, size_t tag_len) noexcept
   {
-    if (key_len != TC_AES_KEYLEN) {
+    if (key.length != TC_AES_KEYLEN) {
       TC_AES_GCM_ctx_clear(&ctx_);
       return TC_ERROR;
     }
-    return TC_AES_GCM_init_short_tag(&ctx_, key, iv, tag_len);
+    return TC_AES_GCM_init_short_tag(&ctx_, key.data, iv, tag_len);
   }
-  TC_CPP_NODISCARD TC_status aad_update(const uint8_t* aad, size_t length) noexcept
+  TC_CPP_NODISCARD TC_status aad_update(bytes aad) noexcept
   {
-    return TC_AES_GCM_aad_update(&ctx_, aad, length);
+    return TC_AES_GCM_aad_update(&ctx_, aad.data, aad.length);
   }
   TC_CPP_NODISCARD TC_status encrypt_update(uint8_t* data, size_t length) noexcept
   {
     return TC_AES_GCM_encrypt_update(&ctx_, data, length);
   }
-  TC_CPP_NODISCARD TC_status encrypt_finish(uint8_t* tag, size_t tag_len) noexcept
+  template <size_t N> TC_CPP_NODISCARD TC_status encrypt_update(uint8_t (&data)[N]) noexcept
   {
-    return tag_len == ctx_.tag_len ? TC_AES_GCM_encrypt_finish(&ctx_, tag) : TC_ERROR;
+    return encrypt_update(data, N);
+  }
+  /* tag.capacity must equal tag_length(). Another capacity returns TC_ERROR
+   * and keeps the state. */
+  TC_CPP_NODISCARD TC_status encrypt_finish(buffer tag) noexcept
+  {
+    return tag.capacity == ctx_.tag_len ? TC_AES_GCM_encrypt_finish(&ctx_, tag.data) : TC_ERROR;
+  }
+  template <size_t N> TC_CPP_NODISCARD TC_status encrypt_finish(uint8_t (&tag)[N]) noexcept
+  {
+    return encrypt_finish(buffer{tag, N});
   }
   size_t tag_length() const noexcept
   {
     return ctx_.tag_len;
+  }
+  void clear() noexcept
+  {
+    TC_AES_GCM_ctx_clear(&ctx_);
   }
   const TC_AES_GCM_ctx& get_c_ctx() const noexcept
   {
@@ -180,20 +212,89 @@ private:
 #endif
 
 #if TC_AES_ENABLE_CMAC
-TC_CPP_NODISCARD inline TC_status aes_cmac(const uint8_t* key, size_t key_len,
-                                           const uint8_t* message, size_t message_len, uint8_t* tag,
-                                           size_t tag_len) noexcept
+/* One-shot AES-CMAC (SP 800-38B) over a TC_AES_KEYLEN-byte key. aes_cmac
+ * writes tag.capacity bytes, from TC_MIN_TAG_LEN to TC_AES_CMAC_TAG_MAX, and
+ * verify compares tag.length bytes in constant time. The _short_tag forms take
+ * 1..TC_MIN_TAG_LEN - 1 bytes. Status values follow TC_AES_CMAC and
+ * TC_AES_CMAC_verify. A wrong key length returns TC_ERROR, and every argument
+ * error leaves the tag unchanged. */
+TC_CPP_NODISCARD inline TC_status aes_cmac(bytes key, bytes message, buffer tag) noexcept
 {
-  return key_len == TC_AES_KEYLEN ? TC_AES_CMAC(key, message, message_len, tag, tag_len) : TC_ERROR;
+  if (key.length != TC_AES_KEYLEN)
+    return TC_ERROR;
+  return TC_AES_CMAC(key.data, message.data, message.length, tag.data, tag.capacity);
 }
-/* Short-tag form for tag_len in 1..TC_MIN_TAG_LEN - 1. */
-TC_CPP_NODISCARD inline TC_status aes_cmac_short_tag(const uint8_t* key, size_t key_len,
-                                                     const uint8_t* message, size_t message_len,
-                                                     uint8_t* tag, size_t tag_len) noexcept
+TC_CPP_NODISCARD inline TC_status aes_cmac_verify(bytes key, bytes message, bytes tag) noexcept
 {
-  return key_len == TC_AES_KEYLEN ? TC_AES_CMAC_short_tag(key, message, message_len, tag, tag_len)
-                                  : TC_ERROR;
+  if (key.length != TC_AES_KEYLEN)
+    return TC_ERROR;
+  return TC_AES_CMAC_verify(key.data, message.data, message.length, tag.data, tag.length);
 }
+TC_CPP_NODISCARD inline TC_status aes_cmac_short_tag(bytes key, bytes message, buffer tag) noexcept
+{
+  if (key.length != TC_AES_KEYLEN)
+    return TC_ERROR;
+  return TC_AES_CMAC_short_tag(key.data, message.data, message.length, tag.data, tag.capacity);
+}
+TC_CPP_NODISCARD inline TC_status aes_cmac_verify_short_tag(bytes key, bytes message,
+                                                            bytes tag) noexcept
+{
+  if (key.length != TC_AES_KEYLEN)
+    return TC_ERROR;
+  return TC_AES_CMAC_verify_short_tag(key.data, message.data, message.length, tag.data, tag.length);
+}
+
+/* Streaming AES-CMAC. init takes a TC_AES_KEYLEN-byte key. finish writes the
+ * full TC_AES_CMAC_TAG_MAX-byte tag and consumes the key. A failed init, a
+ * finish and clear leave the object unkeyed, and update and finish then
+ * return TC_ERROR until the next successful init. Compare a received tag with
+ * aes_cmac_verify or tiny_crypto::ct_equal. The destructor clears the
+ * context. */
+class AES_CMAC {
+public:
+  static const size_t tag_size = TC_AES_CMAC_TAG_MAX;
+
+  AES_CMAC() noexcept = default;
+  ~AES_CMAC() noexcept
+  {
+    TC_AES_CMAC_ctx_clear(&ctx_);
+  }
+  AES_CMAC(const AES_CMAC&) = delete;
+  AES_CMAC& operator=(const AES_CMAC&) = delete;
+
+  TC_CPP_NODISCARD TC_status init(bytes key) noexcept
+  {
+    TC_status status = TC_ERROR;
+    if (key.length == TC_AES_KEYLEN)
+      status = TC_AES_CMAC_init(&ctx_, key.data);
+    if (status != TC_OK)
+      TC_AES_CMAC_ctx_clear(&ctx_);
+    return status;
+  }
+  template <size_t N> TC_CPP_NODISCARD TC_status init(const uint8_t (&key)[N]) noexcept
+  {
+    return init(bytes{key, N});
+  }
+  TC_CPP_NODISCARD TC_status update(bytes data) noexcept
+  {
+    return TC_AES_CMAC_update(&ctx_, data.data, data.length);
+  }
+  template <size_t N> TC_CPP_NODISCARD TC_status update(const uint8_t (&data)[N]) noexcept
+  {
+    return update(bytes{data, N});
+  }
+  TC_CPP_NODISCARD TC_status finish(uint8_t (&tag)[TC_AES_CMAC_TAG_MAX]) noexcept
+  {
+    return TC_AES_CMAC_final(&ctx_, tag);
+  }
+  void clear() noexcept
+  {
+    TC_AES_CMAC_ctx_clear(&ctx_);
+  }
+
+private:
+  TC_AES_CMAC_ctx ctx_{};
+};
 #endif
 
 /* The one-shot AEAD wrappers take a sized key and check its length before the

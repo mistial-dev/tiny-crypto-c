@@ -125,6 +125,9 @@ Each optional module also has a smallest-supported C and C++ umbrella-header
 compile target, which catches accidental dependencies on unrelated features.
 `test_cpp_nodiscard` compiles `tests/cpp/nodiscard_compile.cpp` as C++11 and
 C++17 and requires an unused-result warning on each discarded wrapper result.
+`test_cpp_headers_cxx17` compiles `tests/cpp/header_compile.cpp`, which
+instantiates every wrapper class, with every wrapper family enabled and
+warnings treated as errors.
 These package checks are separate from sanitizer-instrumented unit tests.
 The install manifest is checked against the expected library, headers, CMake
 package files and license notices. Both installed license files must match the
@@ -1077,11 +1080,14 @@ failure. Run it with `./build/test_rsa_import`.
 
 When `avr-gcc` is available, CMake adds compile checks for the RSA implementation
 and validation/signing examples. They use ATmega2560's 16-bit `size_t` with warnings
-treated as errors. The AVR C++ header check also checks the validation API's
-32-bit work parameter. These checks require only the compiler.
+treated as errors. With `avr-g++`, `test_cpp_headers_avr` compiles
+`tests/cpp/header_compile.cpp` with every wrapper family enabled and
+`-Wall -Wextra -Werror`, and checks the validation API's 32-bit work
+parameter. `test_cpp_nodiscard_avr` runs the unused-result check with
+`avr-g++`. These checks require only the compilers.
 
 ```sh
-ctest --test-dir build -R '^test_(rsa(_validate|_sign)?_compile_avr|cpp_headers_avr)$' --output-on-failure
+ctest --test-dir build -R '^test_(rsa(_validate|_sign)?_compile_avr|cpp_(headers|nodiscard)_avr)$' --output-on-failure
 ```
 
 `test_rsa_private_openssl_0` and `test_rsa_private_openssl_1` compare the internal
