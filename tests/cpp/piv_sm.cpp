@@ -44,6 +44,12 @@ TEST_CASE("PIV SM authenticated exchange")
                       handshake.public_key.length) == 0);
     ExamplePIVSMResponse parsed{};
     REQUIRE(example_piv_sm_response_read(fixture.suite, fixture.response, &parsed) == TC_OK);
+    tiny_crypto::piv_sm_peer changed = parsed.peer;
+    changed.card_control = 1;
+    CHECK(session.finish(changed, fixture.public_key, workspace) == TC_ERROR);
+    CHECK(session.state() == TC_PIV_SM_IDLE);
+    REQUIRE(session.begin(fixture.suite, host, {scalar_one, nullptr}, handshake, workspace) ==
+            TC_OK);
     REQUIRE(session.finish(parsed.peer, fixture.public_key, workspace) == TC_OK);
     CHECK(session.state() == TC_PIV_SM_READY);
     uint8_t header[16] = {0x0c, 0x20, 0, 0x80, 0x80};

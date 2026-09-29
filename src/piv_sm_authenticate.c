@@ -48,7 +48,10 @@ TC_credential_status TC_PIV_SM_authenticate_response(TC_PIV_SM* session,
     TC_secure_zero(workspace, sizeof *workspace);
     return TC_CREDENTIAL_UNSUPPORTED;
   }
-  if (authentication->peer.nonce.length != settings->nonce_bytes ||
+  /* SP 800-73-5 Part 2 section 4.1 checks CB_ICC (step H4) before the CVC
+   * (step H5). */
+  if (authentication->peer.card_control != 0 ||
+      authentication->peer.nonce.length != settings->nonce_bytes ||
       authentication->peer.cryptogram.length != 16) {
     TC_PIV_SM_clear(session);
     TC_secure_zero(workspace, sizeof *workspace);

@@ -84,8 +84,9 @@ its workspace before returning.
 Hold the snapshot, issuer candidates, anchors, CRLs and credential bytes stable
 through the acceptance decision. Decode the GENERAL AUTHENTICATE response in the
 application layer, preserving the exact CVC bytes. `TC_PIV_SM_authenticate_response`
-accepts those decoded peer fields and the validated signer, verifies the response
-CVC chain, and completes key confirmation. Its point and session scratch share a
+accepts those decoded peer fields and the validated signer. It rejects a nonzero
+CB_ICC before any CVC work, verifies the response CVC chain, and completes key
+confirmation. Its point and session scratch share a
 caller-owned union because the phases run sequentially. EAC certificates use their
 own profile. Include `tiny_crypto/piv_sm_authenticate.h` for this combined helper.
 `tiny_crypto/piv_sm.h` builds independently of the CVC and X.509 modules.

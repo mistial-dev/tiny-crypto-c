@@ -833,7 +833,10 @@ passing full capture suite. CTest leaves this option disabled.
 
 `test_piv_sm_synthetic` and its CS2-only and CS7-only variants run generated
 sessions without external captures. They check the handshake and a protected
-exchange, including the malformed-handshake cases in the C replay test.
+exchange, including the malformed-handshake and nonzero CB_ICC cases in the C
+replay test. `test_piv_sm` also checks `TC_PIV_SM_ciphertext_size` at block
+boundaries and near `SIZE_MAX`, and the short-buffer unprotect retry through
+`TC_PIV_SM_get_state`.
 
 For an independent EC comparison, install Python's `cryptography` package in
 a virtual environment and configure with `TINY_CRYPTO_TEST_EC_ORACLE=ON` and
@@ -897,7 +900,8 @@ Run it with `ctest --test-dir build -R '^test_piv_cvc_verify$' --output-on-failu
 
 `test_piv_sm_authenticate` checks direct and intermediate CS2/CS7 chains through
 key confirmation and protected command/response traffic. Its negative cases
-cover altered signatures, UUIDs, cryptograms, transport status, and work limits.
+cover altered signatures, UUIDs, cryptograms, nonzero CB_ICC, transport status,
+and work limits.
 
 With the default parser corpus, `test_piv_cvc_corpus` checks 19 captured CVC
 file instances. Three direct chains verify. Three intermediate chains have

@@ -40,34 +40,38 @@ public:
   {
     ::TC_PIV_SM_clear(&session_);
   }
-  TC_PIV_SM_state state() const noexcept
+  TC_CPP_NODISCARD TC_PIV_SM_state state() const noexcept
   {
-    return static_cast<TC_PIV_SM_state>(session_.state);
+    return ::TC_PIV_SM_get_state(&session_);
   }
-  TC_status begin(piv_sm_suite suite, const uint8_t (&host_id)[8], TC_random_source random,
-                  piv_sm_handshake& handshake, piv_sm_workspace& workspace) noexcept
+  TC_CPP_NODISCARD TC_status begin(piv_sm_suite suite, const uint8_t (&host_id)[8],
+                                   TC_random_source random, piv_sm_handshake& handshake,
+                                   piv_sm_workspace& workspace) noexcept
   {
     return ::TC_PIV_SM_begin(&session_, suite, host_id, random, &handshake, &workspace);
   }
-  TC_status finish(const piv_sm_peer& peer, bytes authenticated_key,
-                   piv_sm_workspace& workspace) noexcept
+  TC_CPP_NODISCARD TC_status finish(const piv_sm_peer& peer, bytes authenticated_key,
+                                    piv_sm_workspace& workspace) noexcept
   {
     return ::TC_PIV_SM_finish(&session_, &peer, authenticated_key, &workspace);
   }
 #if TC_ENABLE_X509 && TC_ENABLE_PIV_CVC
+  TC_CPP_NODISCARD
   credential_status authenticate_response(const piv_sm_authentication& authentication, size_t& work,
                                           piv_sm_authentication_workspace& workspace) noexcept
   {
     return ::TC_PIV_SM_authenticate_response(&session_, &authentication, &work, &workspace);
   }
 #endif
-  TC_status protect(const piv_sm_protect_request& request, size_t& ciphertext_length,
-                    uint8_t (&tag)[8], piv_sm_workspace& workspace) noexcept
+  TC_CPP_NODISCARD TC_status protect(const piv_sm_protect_request& request,
+                                     size_t& ciphertext_length, uint8_t (&tag)[8],
+                                     piv_sm_workspace& workspace) noexcept
   {
     return ::TC_PIV_SM_protect(&session_, &request, &ciphertext_length, tag, &workspace);
   }
-  TC_status unprotect(const piv_sm_unprotect_request& request, uint8_t* output, size_t capacity,
-                      size_t& plaintext_length, piv_sm_workspace& workspace) noexcept
+  TC_CPP_NODISCARD TC_status unprotect(const piv_sm_unprotect_request& request, uint8_t* output,
+                                       size_t capacity, size_t& plaintext_length,
+                                       piv_sm_workspace& workspace) noexcept
   {
     return ::TC_PIV_SM_unprotect(&session_, &request, output, capacity, &plaintext_length,
                                  &workspace);

@@ -160,7 +160,7 @@ static MunitResult authenticate(const MunitParameter params[], void* user)
     }
     munit_assert_int(TC_PIV_SM_authenticate_response(&session, &request, &work, &workspace), ==,
                      TC_CREDENTIAL_VALID);
-    munit_assert_uint(session.state, ==, TC_PIV_SM_READY);
+    munit_assert_int(TC_PIV_SM_get_state(&session), ==, TC_PIV_SM_READY);
     munit_assert_true(tc_test_all_zero(&workspace, sizeof workspace));
     const size_t key_bytes = fixture->suite == TC_PIV_SM_CS2 ? 16 : 32;
     munit_assert_memory_equal(key_bytes, session.data.traffic.mac_key,
@@ -186,7 +186,7 @@ static MunitResult authenticate(const MunitParameter params[], void* user)
                      ==, TC_OK);
     munit_assert_size(reply.length, ==, 0);
     munit_assert_uint(reply.status, ==, 0x9000);
-    munit_assert_uint(session.state, ==, TC_PIV_SM_READY);
+    munit_assert_int(TC_PIV_SM_get_state(&session), ==, TC_PIV_SM_READY);
 
     begin_session(fixture, &session);
     request = authentication(fixture, &signer, &limits, &accepted);
@@ -241,6 +241,18 @@ static MunitResult authenticate(const MunitParameter params[], void* user)
     munit_assert_int(TC_PIV_SM_authenticate_response(&session, &request, &work, &workspace), ==,
                      TC_CREDENTIAL_INVALID);
     munit_assert_true(tc_test_all_zero(&session, sizeof session));
+
+    /* A nonzero CB_ICC fails before CVC verification consumes work. */
+    begin_session(fixture, &session);
+    request = authentication(fixture, &signer, &limits, &accepted);
+    request.peer.card_control = 0x80;
+    work = TEST_WORK;
+    munit_assert_int(TC_PIV_SM_authenticate_response(&session, &request, &work, &workspace), ==,
+                     TC_CREDENTIAL_INVALID);
+    munit_assert_size(work, ==, TEST_WORK);
+    munit_assert_int(TC_PIV_SM_get_state(&session), ==, TC_PIV_SM_IDLE);
+    munit_assert_true(tc_test_all_zero(&session, sizeof session));
+    munit_assert_true(tc_test_all_zero(&workspace, sizeof workspace));
   }
   return MUNIT_OK;
 }

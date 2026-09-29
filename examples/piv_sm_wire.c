@@ -88,8 +88,11 @@ TC_status example_piv_sm_response_read(TC_PIV_SM_suite suite, TC_bytes encoded,
       !tag_is(&value, 0x82) || value.encoded.length != outer.value.length)
     return TC_ERROR;
   prefix = 1 + nonce_bytes + 16;
-  if (value.value.length <= prefix || value.value.data[0] != 0)
+  if (value.value.length <= prefix)
     return TC_ERROR;
+  /* CB_ICC || N_ICC || AuthCryptogram_ICC || C_ICC. TC_PIV_SM_finish checks
+   * CB_ICC. */
+  parsed.peer.card_control = value.value.data[0];
   parsed.peer.nonce = (TC_bytes){value.value.data + 1, nonce_bytes};
   parsed.peer.cryptogram = (TC_bytes){value.value.data + 1 + nonce_bytes, 16};
   parsed.peer.certificate = (TC_bytes){value.value.data + prefix, value.value.length - prefix};
@@ -105,7 +108,7 @@ TC_status example_piv_sm_finish(TC_PIV_SM* session, TC_bytes encoded, uint16_t t
                                 TC_bytes authenticated_key, TC_PIV_SM_workspace* workspace)
 {
   ExamplePIVSMResponse response;
-  if (!session || !workspace || session->state != TC_PIV_SM_ESTABLISHING)
+  if (!session || !workspace || TC_PIV_SM_get_state(session) != TC_PIV_SM_ESTABLISHING)
     return TC_ERROR;
   if (transport_status != 0x9000 ||
       example_piv_sm_response_read((TC_PIV_SM_suite)session->suite, encoded, &response) != TC_OK) {
@@ -248,7 +251,7 @@ TC_status example_piv_sm_unprotect(TC_PIV_SM* session, TC_bytes encoded, uint16_
   size_t length;
   if (!session || !result || !workspace || (!output && capacity) || transport_status != 0x9000 ||
       !response_fields(encoded, &ciphertext, &authenticated, &tag, &status)) {
-    if (session && session->state == TC_PIV_SM_PENDING)
+    if (TC_PIV_SM_get_state(session) == TC_PIV_SM_PENDING)
       TC_PIV_SM_clear(session);
     if (workspace)
       TC_secure_zero(workspace, sizeof *workspace);

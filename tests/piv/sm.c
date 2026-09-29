@@ -85,14 +85,40 @@ static MunitResult begin_failures(const MunitParameter params[], void* user)
                    ==, TC_OK);
   munit_assert_uint(random.calls, ==, 2);
   munit_assert_size(written, ==, request_length);
-  munit_assert_uint(session.state, ==, TC_PIV_SM_ESTABLISHING);
+  munit_assert_int(TC_PIV_SM_get_state(&session), ==, TC_PIV_SM_ESTABLISHING);
   random.fail = 1;
   munit_assert_int(example_piv_sm_begin(&session, selected, host,
                                         (TC_random_source){fixed_random, &random}, request,
                                         sizeof request, &written, &w),
                    ==, TC_ERROR);
   munit_assert_true(tc_test_all_zero(&session, sizeof session));
+  munit_assert_int(TC_PIV_SM_get_state(&session), ==, TC_PIV_SM_IDLE);
+  munit_assert_int(TC_PIV_SM_get_state(NULL), ==, TC_PIV_SM_IDLE);
   TC_PIV_SM_clear(NULL);
+  return MUNIT_OK;
+}
+
+static MunitResult ciphertext_size(const MunitParameter params[], void* user)
+{
+  static const struct {
+    size_t plaintext, ciphertext;
+  } sizes[] = {{0, 0},   {1, 16},  {15, 16}, {16, 32},
+               {17, 32}, {31, 32}, {32, 48}, {SIZE_MAX - 16, SIZE_MAX - 15}};
+  static const size_t overflow[] = {SIZE_MAX - 15, SIZE_MAX - 1, SIZE_MAX};
+  size_t i, length;
+  (void)params;
+  (void)user;
+  for (i = 0; i < sizeof sizes / sizeof sizes[0]; ++i) {
+    length = 999;
+    munit_assert_int(TC_PIV_SM_ciphertext_size(sizes[i].plaintext, &length), ==, TC_OK);
+    munit_assert_size(length, ==, sizes[i].ciphertext);
+  }
+  for (i = 0; i < sizeof overflow / sizeof overflow[0]; ++i) {
+    length = 999;
+    munit_assert_int(TC_PIV_SM_ciphertext_size(overflow[i], &length), ==, TC_ERROR);
+    munit_assert_size(length, ==, 999);
+  }
+  munit_assert_int(TC_PIV_SM_ciphertext_size(16, NULL), ==, TC_ERROR);
   return MUNIT_OK;
 }
 
@@ -192,6 +218,7 @@ static MunitResult response_failures(const MunitParameter params[], void* user)
         munit_assert_int(example_piv_sm_unprotect(&session, (TC_bytes){response, length}, 0x9000,
                                                   output, lengths[i] - 1, &result, &w),
                          ==, TC_ERROR);
+        munit_assert_int(TC_PIV_SM_get_state(&session), ==, TC_PIV_SM_PENDING);
         munit_assert_memory_equal(sizeof session, &session, &saved);
         munit_assert_memory_equal(sizeof result, &result, &saved_result);
         munit_assert_memory_equal(sizeof output, output, expected);
@@ -201,6 +228,7 @@ static MunitResult response_failures(const MunitParameter params[], void* user)
                        ==, TC_OK);
       munit_assert_size(result.length, ==, lengths[i]);
       munit_assert_uint(result.status, ==, 0x9000);
+      munit_assert_int(TC_PIV_SM_get_state(&session), ==, TC_PIV_SM_READY);
       munit_assert_memory_equal(lengths[i], output, plain);
       munit_assert_uint8(output[lengths[i]], ==, 0xa5);
       munit_assert_true(tc_test_all_zero(&w, sizeof w));
@@ -217,6 +245,7 @@ static MunitResult response_failures(const MunitParameter params[], void* user)
                                                 output, sizeof output, &result, &w),
                        ==, TC_MISMATCH);
       response[length - 8 + i / 8] ^= (uint8_t)(1u << (i % 8));
+      munit_assert_int(TC_PIV_SM_get_state(&session), ==, TC_PIV_SM_IDLE);
       munit_assert_true(tc_test_all_zero(&session, sizeof session));
       munit_assert_true(tc_test_all_zero(&w, sizeof w));
       munit_assert_memory_equal(sizeof output, output, expected);
@@ -231,6 +260,21 @@ static MunitResult response_failures(const MunitParameter params[], void* user)
       munit_assert_true(tc_test_all_zero(&session, sizeof session));
       munit_assert_memory_equal(sizeof output, output, expected);
       munit_assert_memory_equal(sizeof result, &result, &saved_result);
+    }
+    {
+      /* An argument error in PENDING leaves the request retryable. */
+      const TC_PIV_SM_unprotect_request request = {{NULL, 0}, {response + length - 8, 7}, NULL, 0};
+      size_t plain_length = 999;
+      session = saved;
+      memset(&w, 0x5a, sizeof w);
+      munit_assert_int(
+          TC_PIV_SM_unprotect(&session, &request, output, sizeof output, &plain_length, &w), ==,
+          TC_ERROR);
+      munit_assert_int(TC_PIV_SM_get_state(&session), ==, TC_PIV_SM_PENDING);
+      munit_assert_memory_equal(sizeof session, &session, &saved);
+      munit_assert_size(plain_length, ==, 999);
+      munit_assert_uint8(((const uint8_t*)&w)[0], ==, 0x5a);
+      munit_assert_memory_equal(sizeof output, output, expected);
     }
     session = saved;
     munit_assert_int(example_piv_sm_unprotect(&session, (TC_bytes){response, length}, 0x6988,
@@ -322,6 +366,28 @@ static MunitResult replay(const MunitParameter params[], void* user)
         uint8_t wrong_key[97];
         TC_bytes authenticated = {wrong_key, parsed.cvc.public_key.length};
         size_t prefix, cryptogram = (size_t)(parsed.peer.cryptogram.data - data);
+        const size_t card_control = (size_t)(parsed.peer.nonce.data - data) - 1;
+        TC_PIV_SM_peer changed = parsed.peer;
+        munit_assert_uint8(parsed.peer.card_control, ==, 0);
+        /* SP 800-73-5 Part 2 section 4.1 step H4 rejects any nonzero CB_ICC. */
+        changed.card_control = 0x10;
+        trial = session;
+        munit_assert_int(TC_PIV_SM_finish(&trial, &changed, parsed.cvc.public_key, &w), ==,
+                         TC_ERROR);
+        munit_assert_int(TC_PIV_SM_get_state(&trial), ==, TC_PIV_SM_IDLE);
+        munit_assert_true(tc_test_all_zero(&trial, sizeof trial));
+        munit_assert_true(tc_test_all_zero(&w, sizeof w));
+        data[card_control] = 0x01;
+        munit_assert_int(example_piv_sm_response_read((TC_PIV_SM_suite)session.suite,
+                                                      (TC_bytes){data, length}, &probe),
+                         ==, TC_OK);
+        munit_assert_uint8(probe.peer.card_control, ==, 0x01);
+        trial = session;
+        munit_assert_int(example_piv_sm_finish(&trial, (TC_bytes){data, length}, 0x9000,
+                                               parsed.cvc.public_key, &w),
+                         ==, TC_ERROR);
+        data[card_control] = 0;
+        munit_assert_true(tc_test_all_zero(&trial, sizeof trial));
         memset(&unchanged, 0xa5, sizeof unchanged);
         for (prefix = 0; prefix < length; ++prefix) {
           probe = unchanged;
@@ -353,7 +419,7 @@ static MunitResult replay(const MunitParameter params[], void* user)
       munit_assert_int(example_piv_sm_finish(&session, (TC_bytes){data, length}, 0x9000,
                                              parsed.cvc.public_key, &w),
                        ==, TC_OK);
-      munit_assert_uint(session.state, ==, TC_PIV_SM_READY);
+      munit_assert_int(TC_PIV_SM_get_state(&session), ==, TC_PIV_SM_READY);
       munit_assert_memory_equal(key_length, session.data.traffic.mac_key, material + key_length);
       munit_assert_memory_equal(key_length, session.data.traffic.enc_key,
                                 material + 2 * key_length);
@@ -372,7 +438,7 @@ static MunitResult replay(const MunitParameter params[], void* user)
       munit_assert_int(
           example_piv_sm_protect(&session, &command, output, sizeof output, &written, &w), ==,
           TC_OK);
-      munit_assert_uint(session.state, ==, TC_PIV_SM_PENDING);
+      munit_assert_int(TC_PIV_SM_get_state(&session), ==, TC_PIV_SM_PENDING);
       munit_assert_size(written, ==, expected_length);
       munit_assert_memory_equal(written, output, expected);
     } else if (strcmp(fields[0], "response") == 0) {
@@ -388,7 +454,7 @@ static MunitResult replay(const MunitParameter params[], void* user)
       munit_assert_size(result.length, ==, expected_length);
       munit_assert_uint(result.status, ==, strtoul(fields[4], NULL, 16));
       munit_assert_memory_equal(result.length, output, expected);
-      munit_assert_uint(session.state, ==, TC_PIV_SM_READY);
+      munit_assert_int(TC_PIV_SM_get_state(&session), ==, TC_PIV_SM_READY);
     } else if (strcmp(fields[0], "state") == 0) {
       munit_assert_size(count, ==, 4);
       munit_assert_size(decode(fields[1], expected, sizeof expected), ==, 16);
@@ -410,6 +476,7 @@ static MunitResult replay(const MunitParameter params[], void* user)
 
 static MunitTest tests[] = {
     {"/begin-failures", begin_failures, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/ciphertext-size", ciphertext_size, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/response-failures", response_failures, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/replay", replay, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};

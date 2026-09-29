@@ -64,6 +64,11 @@ void TC_PIV_SM_clear(TC_PIV_SM* session)
     TC_secure_zero(session, sizeof *session);
 }
 
+TC_PIV_SM_state TC_PIV_SM_get_state(const TC_PIV_SM* session)
+{
+  return session ? (TC_PIV_SM_state)session->state : TC_PIV_SM_IDLE;
+}
+
 TC_status TC_PIV_SM_begin(TC_PIV_SM* session, TC_PIV_SM_suite suite, const uint8_t host_id[8],
                           TC_random_source random, TC_PIV_SM_handshake* handshake,
                           TC_PIV_SM_workspace* workspace)
@@ -109,13 +114,16 @@ TC_status TC_PIV_SM_begin(TC_PIV_SM* session, TC_PIV_SM_suite suite, const uint8
 static TC_status finish_response(TC_PIV_SM* session, const TC_PIV_SM_peer* parsed,
                                  TC_bytes authenticated_key, TC_PIV_SM_workspace* workspace)
 {
-  static const uint8_t host_control[] = {1, 0, 16}, card_control[] = {1, 0};
+  static const uint8_t host_control[] = {1, 0, 16}, card_control_length = 1;
   static const uint8_t id_length = 8, confirmation[] = {'K', 'C', '_', '1', '_', 'V'};
   const tc_sm_suite* settings;
   TC_status status = TC_ERROR;
   uint8_t nonce_length;
   settings = tc_sm_suite_get(session->suite);
   if (!settings)
+    goto done;
+  /* SP 800-73-5 Part 2 section 4.1 step H4: CB_ICC must be 0x00. */
+  if (parsed->card_control != 0)
     goto done;
   if (!authenticated_key.data || authenticated_key.length != 1 + 2 * settings->coordinate_bytes ||
       parsed->nonce.length != settings->nonce_bytes || parsed->cryptogram.length != 16 ||
@@ -138,12 +146,15 @@ static TC_status finish_response(TC_PIV_SM* session, const TC_PIV_SM_peer* parse
     goto done;
   nonce_length = (uint8_t)settings->nonce_bytes;
   {
-    const TC_bytes info[] = {{settings->prefix, 6}, {session->data.handshake.host_id, 8},
-                             {host_control, 3},     {session->data.handshake.public_key + 1, 16},
-                             {&id_length, 1},       {TC_SM_SYM(workspace).digest, 8},
-                             {&nonce_length, 1},    parsed->nonce,
-                             {card_control, 2}};
-    status = settings->derive((TC_bytes){workspace->secret, settings->coordinate_bytes}, info, 9,
+    const TC_bytes info[] = {
+        {settings->prefix, 6},     {session->data.handshake.host_id, 8},
+        {host_control, 3},         {session->data.handshake.public_key + 1, 16},
+        {&id_length, 1},           {TC_SM_SYM(workspace).digest, 8},
+        {&nonce_length, 1},        parsed->nonce,
+        {&card_control_length, 1}, {&parsed->card_control, 1}};
+    /* OtherInfo layout from SP 800-73-5 Part 2 section 4.1.6. */
+    status = settings->derive((TC_bytes){workspace->secret, settings->coordinate_bytes}, info,
+                              sizeof info / sizeof info[0],
                               (TC_buffer){TC_SM_SYM(workspace).material, 4 * settings->key_bytes});
   }
   TC_secure_zero(workspace->secret, sizeof workspace->secret);

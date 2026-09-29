@@ -28,8 +28,11 @@ extern "C" {
 /* Authenticate the peer CVC under signer, then complete key confirmation.
  * signer must already satisfy path, usage, policy, time and revocation checks.
  * Any peer or cryptographic failure clears the establishing session. Argument
- * and overlap errors leave it unchanged. Processing consumes work and clears
- * workspace. VALID leaves the session ready for protected requests. */
+ * and overlap errors leave it unchanged. A nonzero peer.card_control
+ * (SP 800-73-5 Part 2 section 4.1 step H4) or a wrongly sized nonce or
+ * cryptogram returns TC_CREDENTIAL_INVALID before any CVC work. Processing
+ * consumes work and clears workspace. VALID leaves the session ready for
+ * protected requests. */
 TC_credential_status TC_PIV_SM_authenticate_response(TC_PIV_SM* session,
                                                      const TC_PIV_SM_authentication* authentication,
                                                      size_t* work,
