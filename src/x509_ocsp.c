@@ -829,6 +829,8 @@ TC_TLV_result TC_OCSP_request_encode(const TC_OCSP_encode_request* request,
   }
 
   uint8_t name_hash[64], key_hash[64];
+  if (info.digest_length > sizeof name_hash)
+    return TC_TLV_UNSUPPORTED;
   status = digest(hash, issuer->name, name_hash, work);
   if (status == TC_TLV_OK)
     status = digest(hash, issuer->public_key.key, key_hash, work);

@@ -2,7 +2,9 @@
 # Checks that discarding a C++ wrapper status is diagnosed. Each line of
 # tests/cpp/nodiscard_compile.cpp marked DISCARDED must draw an unused-result
 # warning, and no other line may. C++11 uses warn_unused_result and C++17 uses
-# [[nodiscard]], so both standards are checked.
+# [[nodiscard]], so both standards are checked. GCC reports unused results
+# during code generation, so the check compiles an object in place of
+# -fsyntax-only.
 set(source "${SOURCE_DIR}/tests/cpp/nodiscard_compile.cpp")
 file(STRINGS "${source}" source_lines)
 set(expected "")
@@ -20,8 +22,8 @@ endif()
 
 foreach(standard 11 17)
   execute_process(
-    COMMAND "${CXX_COMPILER}" -std=c++${standard} -fsyntax-only -Wunused-result
-      -fno-diagnostics-color -I "${SOURCE_DIR}/src" "${source}"
+    COMMAND "${CXX_COMPILER}" -std=c++${standard} -c -o "${BINARY_DIR}/nodiscard_compile_${standard}.o"
+      -Wunused-result -fno-diagnostics-color -I "${SOURCE_DIR}/src" "${source}"
     RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE errors)
   if(result)
     message(FATAL_ERROR "C++${standard} compile failed:\n${output}${errors}")

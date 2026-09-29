@@ -1308,6 +1308,7 @@ add_test(NAME test_package_boundaries
   if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     add_test(NAME test_cpp_nodiscard COMMAND ${CMAKE_COMMAND}
       -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR} -DCXX_COMPILER=${CMAKE_CXX_COMPILER}
+      -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}
       -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/cpp_nodiscard.cmake)
   endif()
 
