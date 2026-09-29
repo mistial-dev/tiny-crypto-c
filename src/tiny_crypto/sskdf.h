@@ -9,15 +9,14 @@ extern "C" {
 
 /* Hash-based single-step KDF: H(counter32be || Z || OtherInfo).
  * Z and output must be nonempty. OtherInfo is the concatenation of the spans.
- * Output must not overlap inputs or the span array. Invalid arguments leave
- * output unchanged. A hash failure wipes output. All lengths are bytes. */
+ * Exactly output.capacity bytes are written. Output must not overlap inputs or
+ * the span array. Invalid arguments leave output unchanged. A hash failure
+ * wipes output. All lengths are bytes. */
 #if TC_ENABLE_SHA256
-TC_status TC_SSKDF_SHA256(const uint8_t* z, size_t z_len, const TC_bytes* info, size_t count,
-                          uint8_t* output, size_t output_len);
+TC_status TC_SSKDF_SHA256(TC_bytes z, const TC_bytes* info, size_t count, TC_buffer output);
 #endif
 #if TC_ENABLE_SHA384
-TC_status TC_SSKDF_SHA384(const uint8_t* z, size_t z_len, const TC_bytes* info, size_t count,
-                          uint8_t* output, size_t output_len);
+TC_status TC_SSKDF_SHA384(TC_bytes z, const TC_bytes* info, size_t count, TC_buffer output);
 #endif
 #ifdef __cplusplus
 }

@@ -47,36 +47,48 @@ static TC_status hkdf_extract(const tc_hash_algorithm_info* hash, void* context,
                             prk);
 }
 
+/* Caller-owned HMAC storage for one expansion. keyed and context each hold
+ * one HMAC context, and previous holds one digest of hash_len bytes. */
+typedef struct {
+  void* keyed;
+  void* context;
+  uint8_t* previous;
+  size_t hash_len;
+} hkdf_state;
+
 /* T(i) = HMAC(PRK, T(i-1) || info || i); output = T(1) || T(2) || ...
- * PRK is keyed once into keyed, and each block continues from it. */
-static TC_status hkdf_expand(const tc_hash_algorithm_info* hash, void* keyed, void* context,
-                             size_t hash_len, TC_bytes prk, TC_bytes info, uint8_t* previous,
-                             uint8_t* output, size_t output_len)
+ * PRK is keyed once into keyed, and each block continues from it. Exactly
+ * output.capacity bytes are written. */
+static TC_status hkdf_expand(const tc_hash_algorithm_info* hash, const hkdf_state* state,
+                             TC_bytes prk, TC_bytes info, TC_buffer output)
 {
-  TC_status status = tc_hmac_core_init(hash, keyed, prk.data, prk.length);
+  const size_t hash_len = state->hash_len;
+  uint8_t* previous = state->previous;
+  TC_status status = tc_hmac_core_init(hash, state->keyed, prk.data, prk.length);
   size_t offset = 0;
   uint8_t counter = 1;
-  while (status == TC_OK && offset < output_len) {
+  while (status == TC_OK && offset < output.capacity) {
     const TC_bytes parts[] = {{previous, offset ? hash_len : 0}, info, {&counter, 1}};
-    status = tc_hmac_core_resume_parts(hash, keyed, context, parts, 3, previous);
-    const size_t take = output_len - offset < hash_len ? output_len - offset : hash_len;
+    status = tc_hmac_core_resume_parts(hash, state->keyed, state->context, parts, 3, previous);
+    const size_t remaining = output.capacity - offset;
+    const size_t take = remaining < hash_len ? remaining : hash_len;
     if (status == TC_OK)
-      memcpy(output + offset, previous, take);
+      memcpy(output.data + offset, previous, take);
     offset += take;
     ++counter;
   }
-  tc_hmac_core_clear(hash, keyed);
+  tc_hmac_core_clear(hash, state->keyed);
   TC_secure_zero(previous, hash_len);
   if (status != TC_OK)
-    TC_secure_zero(output, output_len);
+    TC_secure_zero(output.data, output.capacity);
   return status;
 }
 
 #define TC_HKDF_DEFINE(N, DIGESTLEN)                                                               \
-  TC_status TC_HKDF_SHA##N##_extract(const uint8_t* salt, size_t salt_len, const TC_bytes* ikm,    \
-                                     size_t ikm_count, uint8_t* prk)                               \
+  TC_status TC_HKDF_SHA##N##_extract(TC_bytes salt, const TC_bytes* ikm, size_t ikm_count,         \
+                                     uint8_t prk[DIGESTLEN])                                       \
   {                                                                                                \
-    const hkdf_inputs in = {{salt, salt_len}, ikm, ikm_count, {NULL, 0}};                          \
+    const hkdf_inputs in = {salt, ikm, ikm_count, {NULL, 0}};                                      \
     struct TC_HMAC_SHA##N##_ctx ctx;                                                               \
     if (!hkdf_arguments(&in, prk, DIGESTLEN))                                                      \
       return TC_ERROR;                                                                             \
@@ -85,34 +97,34 @@ static TC_status hkdf_expand(const tc_hash_algorithm_info* hash, void* keyed, vo
       TC_secure_zero(prk, DIGESTLEN);                                                              \
     return status;                                                                                 \
   }                                                                                                \
-  TC_status TC_HKDF_SHA##N##_expand(const uint8_t* prk, size_t prk_len, const uint8_t* info,       \
-                                    size_t info_len, uint8_t* output, size_t output_len)           \
+  TC_status TC_HKDF_SHA##N##_expand(TC_bytes prk, TC_bytes info, TC_buffer output)                 \
   {                                                                                                \
-    const hkdf_inputs in = {{prk, prk_len}, NULL, 0, {info, info_len}};                            \
+    const hkdf_inputs in = {prk, NULL, 0, info};                                                   \
     struct TC_HMAC_SHA##N##_ctx keyed, ctx;                                                        \
     uint8_t previous[DIGESTLEN];                                                                   \
-    if (!prk || prk_len < DIGESTLEN || !hkdf_output_length_ok(DIGESTLEN, output_len) ||            \
-        !hkdf_arguments(&in, output, output_len))                                                  \
+    const hkdf_state state = {&keyed, &ctx, previous, DIGESTLEN};                                  \
+    if (!prk.data || prk.length < DIGESTLEN ||                                                     \
+        !hkdf_output_length_ok(DIGESTLEN, output.capacity) ||                                      \
+        !hkdf_arguments(&in, output.data, output.capacity))                                        \
       return TC_ERROR;                                                                             \
-    return hkdf_expand(&tc_sha##N##_info, &keyed, &ctx, DIGESTLEN, in.salt, in.info, previous,     \
-                       output, output_len);                                                        \
+    return hkdf_expand(&tc_sha##N##_info, &state, prk, info, output);                              \
   }                                                                                                \
-  TC_status TC_HKDF_SHA##N##_derive(const uint8_t* salt, size_t salt_len, const TC_bytes* ikm,     \
-                                    size_t ikm_count, const uint8_t* info, size_t info_len,        \
-                                    uint8_t* output, size_t output_len)                            \
+  TC_status TC_HKDF_SHA##N##_derive(TC_bytes salt, const TC_bytes* ikm, size_t ikm_count,          \
+                                    TC_bytes info, TC_buffer output)                               \
   {                                                                                                \
-    const hkdf_inputs in = {{salt, salt_len}, ikm, ikm_count, {info, info_len}};                   \
+    const hkdf_inputs in = {salt, ikm, ikm_count, info};                                           \
     struct TC_HMAC_SHA##N##_ctx keyed, ctx;                                                        \
     uint8_t prk[DIGESTLEN], previous[DIGESTLEN];                                                   \
-    if (!hkdf_output_length_ok(DIGESTLEN, output_len) || !hkdf_arguments(&in, output, output_len)) \
+    const hkdf_state state = {&keyed, &ctx, previous, DIGESTLEN};                                  \
+    if (!hkdf_output_length_ok(DIGESTLEN, output.capacity) ||                                      \
+        !hkdf_arguments(&in, output.data, output.capacity))                                        \
       return TC_ERROR;                                                                             \
     /* Extract reads every input before expand writes output. */                                   \
     TC_status status = hkdf_extract(&tc_sha##N##_info, &ctx, &in, prk);                            \
     if (status == TC_OK)                                                                           \
-      status = hkdf_expand(&tc_sha##N##_info, &keyed, &ctx, DIGESTLEN,                             \
-                           (TC_bytes){prk, sizeof prk}, in.info, previous, output, output_len);    \
+      status = hkdf_expand(&tc_sha##N##_info, &state, (TC_bytes){prk, sizeof prk}, info, output);  \
     else                                                                                           \
-      TC_secure_zero(output, output_len);                                                          \
+      TC_secure_zero(output.data, output.capacity);                                                \
     TC_secure_zero(prk, sizeof prk);                                                               \
     return status;                                                                                 \
   }

@@ -26,11 +26,12 @@ For several outputs from the same shared secret, call `extract` once, then
 `TC_secure_zero` after the last expansion. Limit its use to this derivation
 operation. Use domain-separated `info` values for different keys.
 
-All lengths are bytes. `extract` writes one hash digest to a caller-owned PRK
-buffer. `expand` needs a PRK of at least one digest and writes 1 through
-`255 * HashLen` bytes. A null salt, input span, or `info` pointer is accepted
-when its length is zero, and a zero `ikm_count` is an empty input. An omitted RFC salt has the standard all-zero HMAC key
-effect. Outputs must not overlap any input span. Invalid arguments return
+Inputs are `TC_bytes` spans and outputs are `TC_buffer` storage. All lengths
+are bytes. `extract` writes one hash digest to a caller-owned PRK array.
+`expand` and `derive` write exactly `output.capacity` bytes, 1 through
+`255 * HashLen`. `expand` needs a PRK of at least one digest. A span may have
+NULL data when its length is zero, and a zero `ikm_count` is an empty input.
+An empty salt has the RFC's all-zero HMAC key effect. Outputs must not overlap any input span. Invalid arguments return
 `TC_ERROR` without changing output. A failure after processing begins clears
 output. The caller owns every input and output buffer and keeps inputs stable
 until the function returns.

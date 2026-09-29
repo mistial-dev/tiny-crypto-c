@@ -16,12 +16,12 @@ struct family {
   int prf_id;
   size_t output_size;
   size_t key_len;
-  TC_status (*counter)(const uint8_t*, size_t, const tiny_crypto::kbkdf_params&, const uint8_t*,
-                       size_t, const uint8_t*, size_t, uint8_t*, size_t);
-  TC_status (*feedback)(const uint8_t*, size_t, const tiny_crypto::kbkdf_params&, const uint8_t*,
-                        size_t, const uint8_t*, size_t, uint8_t*, size_t);
-  TC_status (*pipeline)(const uint8_t*, size_t, const tiny_crypto::kbkdf_params&, const uint8_t*,
-                        size_t, uint8_t*, size_t);
+  TC_status (*counter)(tiny_crypto::bytes, const tiny_crypto::kbkdf_params&, tiny_crypto::bytes,
+                       tiny_crypto::bytes, tiny_crypto::buffer);
+  TC_status (*feedback)(tiny_crypto::bytes, const tiny_crypto::kbkdf_params&, tiny_crypto::bytes,
+                        tiny_crypto::bytes, tiny_crypto::buffer);
+  TC_status (*pipeline)(tiny_crypto::bytes, const tiny_crypto::kbkdf_params&, tiny_crypto::bytes,
+                        tiny_crypto::buffer);
 };
 
 #if TC_AES_KEY_BITS == 128
@@ -87,11 +87,11 @@ const family* find_family(int prf_id)
 TEST_CASE("KBKDF fixed input returns C status")
 {
   uint8_t fixed[sizeof(kbkdf_known_fixed)];
-  CHECK(tiny_crypto::kbkdf_fixed_input(kbkdf_known_label, sizeof(kbkdf_known_label),
-                                       kbkdf_known_context, sizeof(kbkdf_known_context), 32, fixed,
-                                       sizeof(fixed)) == TC_OK);
+  CHECK(tiny_crypto::kbkdf_fixed_input({kbkdf_known_label, sizeof(kbkdf_known_label)},
+                                       {kbkdf_known_context, sizeof(kbkdf_known_context)}, 32,
+                                       {fixed, sizeof(fixed)}) == TC_OK);
   CHECK(std::memcmp(fixed, kbkdf_known_fixed, sizeof(fixed)) == 0);
-  CHECK(tiny_crypto::kbkdf_fixed_input(nullptr, 1, nullptr, 0, 32, fixed, sizeof(fixed)) ==
+  CHECK(tiny_crypto::kbkdf_fixed_input({nullptr, 1}, {nullptr, 0}, 32, {fixed, sizeof(fixed)}) ==
         TC_ERROR);
 }
 
@@ -101,12 +101,12 @@ TEST_CASE("KBKDF HMAC-SHA-256 status wrapper")
   const tiny_crypto::kbkdf_params params = {TC_KBKDF_COUNTER_32, TC_KBKDF_CTR_BEFORE_ITER, 1};
   uint8_t out[32];
   CHECK(tiny_crypto::kbkdf_hmac_sha256_counter(
-            kbkdf_known_key, sizeof(kbkdf_known_key), params, nullptr, 0, kbkdf_known_fixed,
-            sizeof(kbkdf_known_fixed), out, sizeof(out)) == TC_OK);
+            {kbkdf_known_key, sizeof(kbkdf_known_key)}, params, {nullptr, 0},
+            {kbkdf_known_fixed, sizeof(kbkdf_known_fixed)}, {out, sizeof(out)}) == TC_OK);
   CHECK(std::memcmp(out, kbkdf_known_out, sizeof(out)) == 0);
-  CHECK(tiny_crypto::kbkdf_hmac_sha256_counter(nullptr, sizeof(kbkdf_known_key), params, nullptr, 0,
-                                               kbkdf_known_fixed, sizeof(kbkdf_known_fixed), out,
-                                               sizeof(out)) == TC_ERROR);
+  CHECK(tiny_crypto::kbkdf_hmac_sha256_counter(
+            {nullptr, sizeof(kbkdf_known_key)}, params, {nullptr, 0},
+            {kbkdf_known_fixed, sizeof(kbkdf_known_fixed)}, {out, sizeof(out)}) == TC_ERROR);
 }
 #endif
 
@@ -123,13 +123,14 @@ TEST_CASE("KBKDF generated vectors exercise every available C++ family")
     std::vector<uint8_t> out(v.out_len);
     TC_status status;
     if (v.mode == KBKDF_MODE_COUNTER)
-      status = f->counter(v.key, v.key_len, params, v.in1, v.in1_len, v.in2, v.in2_len, out.data(),
-                          out.size());
+      status = f->counter({v.key, v.key_len}, params, {v.in1, v.in1_len}, {v.in2, v.in2_len},
+                          {out.data(), out.size()});
     else if (v.mode == KBKDF_MODE_FEEDBACK)
-      status = f->feedback(v.key, v.key_len, params, v.iv, v.iv_len, v.in2, v.in2_len, out.data(),
-                           out.size());
+      status = f->feedback({v.key, v.key_len}, params, {v.iv, v.iv_len}, {v.in2, v.in2_len},
+                           {out.data(), out.size()});
     else
-      status = f->pipeline(v.key, v.key_len, params, v.in2, v.in2_len, out.data(), out.size());
+      status =
+          f->pipeline({v.key, v.key_len}, params, {v.in2, v.in2_len}, {out.data(), out.size()});
     CHECK(status == TC_OK);
     CHECK(std::memcmp(out.data(), v.out, v.out_len) == 0);
     ++ran;
@@ -155,44 +156,44 @@ TEST_CASE("KBKDF families enforce bounds, truncation and aliases")
     std::vector<uint8_t> full(3 * f.output_size);
     std::vector<uint8_t> part(f.output_size + 1);
 
-    REQUIRE(f.counter(key, f.key_len, params, nullptr, 0, fixed, sizeof(fixed), full.data(),
-                      full.size()) == TC_OK);
-    CHECK(f.counter(key, f.key_len, params, nullptr, 0, fixed, sizeof(fixed), part.data(),
-                    part.size()) == TC_OK);
+    REQUIRE(f.counter({key, f.key_len}, params, {nullptr, 0}, {fixed, sizeof(fixed)},
+                      {full.data(), full.size()}) == TC_OK);
+    CHECK(f.counter({key, f.key_len}, params, {nullptr, 0}, {fixed, sizeof(fixed)},
+                    {part.data(), part.size()}) == TC_OK);
     CHECK(std::memcmp(full.data(), part.data(), part.size()) == 0);
 
-    REQUIRE(f.feedback(key, f.key_len, params, iv, sizeof(iv), fixed, sizeof(fixed), full.data(),
-                       full.size()) == TC_OK);
-    CHECK(f.feedback(key, f.key_len, params, iv, sizeof(iv), fixed, sizeof(fixed), part.data(),
-                     part.size()) == TC_OK);
+    REQUIRE(f.feedback({key, f.key_len}, params, {iv, sizeof(iv)}, {fixed, sizeof(fixed)},
+                       {full.data(), full.size()}) == TC_OK);
+    CHECK(f.feedback({key, f.key_len}, params, {iv, sizeof(iv)}, {fixed, sizeof(fixed)},
+                     {part.data(), part.size()}) == TC_OK);
     CHECK(std::memcmp(full.data(), part.data(), part.size()) == 0);
 
-    REQUIRE(f.pipeline(key, f.key_len, params, fixed, sizeof(fixed), full.data(), full.size()) ==
-            TC_OK);
-    CHECK(f.pipeline(key, f.key_len, params, fixed, sizeof(fixed), part.data(), part.size()) ==
-          TC_OK);
+    REQUIRE(f.pipeline({key, f.key_len}, params, {fixed, sizeof(fixed)},
+                       {full.data(), full.size()}) == TC_OK);
+    CHECK(f.pipeline({key, f.key_len}, params, {fixed, sizeof(fixed)},
+                     {part.data(), part.size()}) == TC_OK);
     CHECK(std::memcmp(full.data(), part.data(), part.size()) == 0);
 
-    CHECK(f.feedback(key, f.key_len, params, nullptr, 0, fixed, sizeof(fixed), part.data(),
-                     part.size()) == TC_OK);
-    CHECK(f.feedback(key, f.key_len, params, nullptr, 1, fixed, sizeof(fixed), part.data(),
-                     part.size()) == TC_ERROR);
-    CHECK(f.counter(nullptr, f.key_len, params, nullptr, 0, fixed, sizeof(fixed), part.data(),
-                    part.size()) == TC_ERROR);
+    CHECK(f.feedback({key, f.key_len}, params, {nullptr, 0}, {fixed, sizeof(fixed)},
+                     {part.data(), part.size()}) == TC_OK);
+    CHECK(f.feedback({key, f.key_len}, params, {nullptr, 1}, {fixed, sizeof(fixed)},
+                     {part.data(), part.size()}) == TC_ERROR);
+    CHECK(f.counter({nullptr, f.key_len}, params, {nullptr, 0}, {fixed, sizeof(fixed)},
+                    {part.data(), part.size()}) == TC_ERROR);
 
     const tiny_crypto::kbkdf_params bad_bits = {12, TC_KBKDF_CTR_AFTER_ITER, 1};
-    CHECK(f.counter(key, f.key_len, bad_bits, nullptr, 0, fixed, sizeof(fixed), part.data(),
-                    part.size()) == TC_ERROR);
+    CHECK(f.counter({key, f.key_len}, bad_bits, {nullptr, 0}, {fixed, sizeof(fixed)},
+                    {part.data(), part.size()}) == TC_ERROR);
 
     const tiny_crypto::kbkdf_params r8 = {TC_KBKDF_COUNTER_8, TC_KBKDF_CTR_BEFORE_ITER, 1};
     std::vector<uint8_t> big(256 * f.output_size);
-    CHECK(f.counter(key, f.key_len, r8, nullptr, 0, fixed, sizeof(fixed), big.data(),
-                    255 * f.output_size) == TC_OK);
-    CHECK(f.counter(key, f.key_len, r8, nullptr, 0, fixed, sizeof(fixed), big.data(), big.size()) ==
-          TC_ERROR);
+    CHECK(f.counter({key, f.key_len}, r8, {nullptr, 0}, {fixed, sizeof(fixed)},
+                    {big.data(), 255 * f.output_size}) == TC_OK);
+    CHECK(f.counter({key, f.key_len}, r8, {nullptr, 0}, {fixed, sizeof(fixed)},
+                    {big.data(), big.size()}) == TC_ERROR);
 
     uint8_t shared[64] = {0};
-    CHECK(f.counter(key, f.key_len, params, nullptr, 0, shared, 8, shared, 8) == TC_ERROR);
+    CHECK(f.counter({key, f.key_len}, params, {nullptr, 0}, {shared, 8}, {shared, 8}) == TC_ERROR);
   }
 }
 
@@ -203,9 +204,10 @@ TEST_CASE("KBKDF AES-CMAC rejects the wrong key size")
   uint8_t key[TC_AES_KEYLEN] = {0};
   uint8_t fixed[4] = {1, 2, 3, 4};
   uint8_t out[16];
-  CHECK(tiny_crypto::kbkdf_aes_cmac_counter(key, sizeof(key), params, nullptr, 0, fixed,
-                                            sizeof(fixed), out, sizeof(out)) == TC_OK);
-  CHECK(tiny_crypto::kbkdf_aes_cmac_counter(key, sizeof(key) - 1, params, nullptr, 0, fixed,
-                                            sizeof(fixed), out, sizeof(out)) == TC_ERROR);
+  CHECK(tiny_crypto::kbkdf_aes_cmac_counter({key, sizeof(key)}, params, {nullptr, 0},
+                                            {fixed, sizeof(fixed)}, {out, sizeof(out)}) == TC_OK);
+  CHECK(tiny_crypto::kbkdf_aes_cmac_counter({key, sizeof(key) - 1}, params, {nullptr, 0},
+                                            {fixed, sizeof(fixed)},
+                                            {out, sizeof(out)}) == TC_ERROR);
 }
 #endif

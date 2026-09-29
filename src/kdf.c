@@ -245,18 +245,39 @@ static int tc_kdf_counter_bits_ok(unsigned bits)
          bits == TC_KBKDF_COUNTER_32;
 }
 
+/* Caller-owned PRF storage for one derivation. initialized and ctx each hold
+ * one PRF context. chain and block hold one PRF output. chain is NULL in
+ * counter mode. */
+struct tc_kdf_state {
+  void* initialized;
+  void* ctx;
+  uint8_t* chain;
+  uint8_t* block;
+};
+
 /*
- * in1 / in2 depend on the mode:
- *   counter   : in1 = data before the counter, in2 = data after the counter
- *   feedback  : in1 = IV (K(0)),               in2 = fixed input
- *   pipeline  : in1 unused,                     in2 = fixed input (= A(0))
+ * input1 / input2 depend on the mode:
+ *   counter   : input1 = data before the counter, input2 = data after the counter
+ *   feedback  : input1 = IV (K(0)),               input2 = fixed input
+ *   pipeline  : input1 unused,                     input2 = fixed input (= A(0))
+ * Exactly output.capacity bytes are derived.
  */
-static TC_status tc_kdf_derive(const struct tc_kdf_prf* prf, int mode, const uint8_t* key,
-                               size_t key_len, const struct TC_KBKDF_params* params,
-                               const uint8_t* in1, size_t in1_len, const uint8_t* in2,
-                               size_t in2_len, uint8_t* out, size_t out_len, void* initialized,
-                               void* ctx, uint8_t* chain, uint8_t* block)
+static TC_status tc_kdf_derive(const struct tc_kdf_prf* prf, int mode, TC_bytes kdk,
+                               const struct TC_KBKDF_params* params, TC_bytes input1,
+                               TC_bytes input2, TC_buffer output, const struct tc_kdf_state* state)
 {
+  const uint8_t* key = kdk.data;
+  const size_t key_len = kdk.length;
+  const uint8_t* in1 = input1.data;
+  const size_t in1_len = input1.length;
+  const uint8_t* in2 = input2.data;
+  const size_t in2_len = input2.length;
+  uint8_t* out = output.data;
+  const size_t out_len = output.capacity;
+  void* initialized = state->initialized;
+  void* ctx = state->ctx;
+  uint8_t* chain = state->chain;
+  uint8_t* block = state->block;
   uint8_t ctr[4];
   TC_bytes seg[3];
   const uint8_t* chain_p = NULL;
@@ -411,9 +432,14 @@ fail:
 /* Fixed-input helper                                                        */
 /*****************************************************************************/
 
-TC_status TC_KBKDF_fixed_input(const uint8_t* label, size_t label_len, const uint8_t* context,
-                               size_t context_len, size_t out_len, uint8_t* buf, size_t buf_len)
+TC_status TC_KBKDF_fixed_input(TC_bytes label_span, TC_bytes context_span, size_t out_len,
+                               TC_buffer output)
 {
+  const uint8_t* label = label_span.data;
+  const size_t label_len = label_span.length;
+  const uint8_t* context = context_span.data;
+  const size_t context_len = context_span.length;
+  uint8_t* buf = output.data;
   size_t needed;
 
   if (buf == NULL || !tc_internal_span_valid(label, label_len) ||
@@ -425,7 +451,7 @@ TC_status TC_KBKDF_fixed_input(const uint8_t* label, size_t label_len, const uin
   if (label_len > SIZE_MAX - 5u || context_len > SIZE_MAX - 5u - label_len)
     return TC_ERROR;
   needed = TC_KBKDF_FIXED_INPUT_LEN(label_len, context_len);
-  if (buf_len < needed)
+  if (output.capacity < needed)
     return TC_ERROR;
   if (!tc_kdf_output_disjoint(buf, needed, label, label_len) ||
       !tc_kdf_output_disjoint(buf, needed, context, context_len))
@@ -448,41 +474,34 @@ TC_status TC_KBKDF_fixed_input(const uint8_t* label, size_t label_len, const uin
 
 /* Typed storage keeps unrelated enabled PRFs out of this call's stack budget. */
 #define TC_KDF_DEFINE_FAMILY(NAME, PRF, CTX, DIGESTLEN)                                            \
-  static TC_status tc_kdf_##NAME(int mode, const uint8_t* key, size_t key_len,                     \
-                                 const struct TC_KBKDF_params* params, const uint8_t* in1,         \
-                                 size_t in1_len, const uint8_t* in2, size_t in2_len, uint8_t* out, \
-                                 size_t out_len)                                                   \
+  static TC_status tc_kdf_##NAME(int mode, TC_bytes key, const struct TC_KBKDF_params* params,     \
+                                 TC_bytes input1, TC_bytes input2, TC_buffer out)                  \
   {                                                                                                \
     CTX initialized, ctx;                                                                          \
     const struct tc_kdf_prf prf = PRF;                                                             \
     uint8_t chain[DIGESTLEN], block[DIGESTLEN];                                                    \
-    return tc_kdf_derive(&prf, mode, key, key_len, params, in1, in1_len, in2, in2_len, out,        \
-                         out_len, &initialized, &ctx, chain, block);                               \
+    const struct tc_kdf_state state = {&initialized, &ctx, chain, block};                          \
+    return tc_kdf_derive(&prf, mode, key, params, input1, input2, out, &state);                    \
   }                                                                                                \
-  TC_status TC_KBKDF_##NAME##_counter(const uint8_t* key, size_t key_len,                          \
-                                      const struct TC_KBKDF_params* params, const uint8_t* before, \
-                                      size_t before_len, const uint8_t* after, size_t after_len,   \
-                                      uint8_t* out, size_t out_len)                                \
+  /* Counter mode has no chaining value, so it needs no chain storage. */                          \
+  TC_status TC_KBKDF_##NAME##_counter(TC_bytes key, const struct TC_KBKDF_params* params,          \
+                                      TC_bytes before, TC_bytes after, TC_buffer out)              \
   {                                                                                                \
     CTX initialized, ctx;                                                                          \
     const struct tc_kdf_prf prf = PRF;                                                             \
     uint8_t block[DIGESTLEN];                                                                      \
-    return tc_kdf_derive(&prf, TC_KDF_MODE_COUNTER, key, key_len, params, before, before_len,      \
-                         after, after_len, out, out_len, &initialized, &ctx, NULL, block);         \
+    const struct tc_kdf_state state = {&initialized, &ctx, NULL, block};                           \
+    return tc_kdf_derive(&prf, TC_KDF_MODE_COUNTER, key, params, before, after, out, &state);      \
   }                                                                                                \
-  TC_status TC_KBKDF_##NAME##_feedback(                                                            \
-      const uint8_t* key, size_t key_len, const struct TC_KBKDF_params* params, const uint8_t* iv, \
-      size_t iv_len, const uint8_t* fixed, size_t fixed_len, uint8_t* out, size_t out_len)         \
+  TC_status TC_KBKDF_##NAME##_feedback(TC_bytes key, const struct TC_KBKDF_params* params,         \
+                                       TC_bytes iv, TC_bytes fixed, TC_buffer out)                 \
   {                                                                                                \
-    return tc_kdf_##NAME(TC_KDF_MODE_FEEDBACK, key, key_len, params, iv, iv_len, fixed, fixed_len, \
-                         out, out_len);                                                            \
+    return tc_kdf_##NAME(TC_KDF_MODE_FEEDBACK, key, params, iv, fixed, out);                       \
   }                                                                                                \
-  TC_status TC_KBKDF_##NAME##_pipeline(const uint8_t* key, size_t key_len,                         \
-                                       const struct TC_KBKDF_params* params, const uint8_t* fixed, \
-                                       size_t fixed_len, uint8_t* out, size_t out_len)             \
+  TC_status TC_KBKDF_##NAME##_pipeline(TC_bytes key, const struct TC_KBKDF_params* params,         \
+                                       TC_bytes fixed, TC_buffer out)                              \
   {                                                                                                \
-    return tc_kdf_##NAME(TC_KDF_MODE_PIPELINE, key, key_len, params, NULL, 0, fixed, fixed_len,    \
-                         out, out_len);                                                            \
+    return tc_kdf_##NAME(TC_KDF_MODE_PIPELINE, key, params, (TC_bytes){NULL, 0}, fixed, out);      \
   }
 
 #if TC_KBKDF_HAVE_HMAC_SHA1

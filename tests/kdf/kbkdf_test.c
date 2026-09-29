@@ -20,14 +20,11 @@
 /* PRF family table shared by the sub-tests                                  */
 /* ------------------------------------------------------------------------- */
 
-typedef TC_status (*kdf_counter_fn)(const uint8_t*, size_t, const struct TC_KBKDF_params*,
-                                    const uint8_t*, size_t, const uint8_t*, size_t, uint8_t*,
-                                    size_t);
-typedef TC_status (*kdf_feedback_fn)(const uint8_t*, size_t, const struct TC_KBKDF_params*,
-                                     const uint8_t*, size_t, const uint8_t*, size_t, uint8_t*,
-                                     size_t);
-typedef TC_status (*kdf_pipeline_fn)(const uint8_t*, size_t, const struct TC_KBKDF_params*,
-                                     const uint8_t*, size_t, uint8_t*, size_t);
+typedef TC_status (*kdf_counter_fn)(TC_bytes, const struct TC_KBKDF_params*, TC_bytes, TC_bytes,
+                                    TC_buffer);
+typedef TC_status (*kdf_feedback_fn)(TC_bytes, const struct TC_KBKDF_params*, TC_bytes, TC_bytes,
+                                     TC_buffer);
+typedef TC_status (*kdf_pipeline_fn)(TC_bytes, const struct TC_KBKDF_params*, TC_bytes, TC_buffer);
 
 struct kdf_family {
   const char* name;
@@ -95,36 +92,43 @@ MunitResult test_kbkdf_known(const MunitParameter params[], void* data)
     uint8_t out2[32];
 
     munit_assert_size(sizeof(fixed), ==, sizeof(kbkdf_known_fixed));
-    munit_assert_int(TC_KBKDF_fixed_input(kbkdf_known_label, sizeof(kbkdf_known_label),
-                                          kbkdf_known_context, sizeof(kbkdf_known_context),
-                                          sizeof(out), fixed, sizeof(fixed)),
-                     ==, TC_OK);
+    munit_assert_int(
+        TC_KBKDF_fixed_input((TC_bytes){kbkdf_known_label, sizeof(kbkdf_known_label)},
+                             (TC_bytes){kbkdf_known_context, sizeof(kbkdf_known_context)},
+                             sizeof(out), (TC_buffer){fixed, sizeof(fixed)}),
+        ==, TC_OK);
     munit_assert_memory_equal(sizeof(fixed), fixed, kbkdf_known_fixed);
 
     /* Label || 0x00 || Context || [256]_32: the encoded length ends 00 00 01 00. */
     munit_assert_uint8(fixed[sizeof(fixed) - 2], ==, 0x01);
     munit_assert_uint8(fixed[sizeof(fixed) - 1], ==, 0x00);
 
-    munit_assert_int(TC_KBKDF_HMAC_SHA256_counter(kbkdf_known_key, sizeof(kbkdf_known_key), &p,
-                                                  NULL, 0, fixed, sizeof(fixed), out, sizeof(out)),
-                     ==, TC_OK);
+    munit_assert_int(
+        TC_KBKDF_HMAC_SHA256_counter((TC_bytes){kbkdf_known_key, sizeof(kbkdf_known_key)}, &p,
+                                     (TC_bytes){NULL, 0}, (TC_bytes){fixed, sizeof(fixed)},
+                                     (TC_buffer){out, sizeof(out)}),
+        ==, TC_OK);
     munit_assert_memory_equal(sizeof(out), out, kbkdf_known_out);
 
     /* An explicit empty before-buffer is the same BEFORE_FIXED layout. */
-    munit_assert_int(TC_KBKDF_HMAC_SHA256_counter(kbkdf_known_key, sizeof(kbkdf_known_key), &p,
-                                                  out2, 0, fixed, sizeof(fixed), out2,
-                                                  sizeof(out2)),
-                     ==, TC_OK);
+    munit_assert_int(
+        TC_KBKDF_HMAC_SHA256_counter((TC_bytes){kbkdf_known_key, sizeof(kbkdf_known_key)}, &p,
+                                     (TC_bytes){out2, 0}, (TC_bytes){fixed, sizeof(fixed)},
+                                     (TC_buffer){out2, sizeof(out2)}),
+        ==, TC_OK);
     munit_assert_memory_equal(sizeof(out), out2, kbkdf_known_out);
 
     /* MIDDLE with an empty after-part is byte-identical to AFTER_FIXED. */
-    munit_assert_int(TC_KBKDF_HMAC_SHA256_counter(kbkdf_known_key, sizeof(kbkdf_known_key), &p,
-                                                  fixed, sizeof(fixed), NULL, 0, out, sizeof(out)),
-                     ==, TC_OK);
-    munit_assert_int(TC_KBKDF_HMAC_SHA256_counter(kbkdf_known_key, sizeof(kbkdf_known_key), &p,
-                                                  fixed, sizeof(fixed), fixed, 0, out2,
-                                                  sizeof(out2)),
-                     ==, TC_OK);
+    munit_assert_int(
+        TC_KBKDF_HMAC_SHA256_counter((TC_bytes){kbkdf_known_key, sizeof(kbkdf_known_key)}, &p,
+                                     (TC_bytes){fixed, sizeof(fixed)}, (TC_bytes){NULL, 0},
+                                     (TC_buffer){out, sizeof(out)}),
+        ==, TC_OK);
+    munit_assert_int(
+        TC_KBKDF_HMAC_SHA256_counter((TC_bytes){kbkdf_known_key, sizeof(kbkdf_known_key)}, &p,
+                                     (TC_bytes){fixed, sizeof(fixed)}, (TC_bytes){fixed, 0},
+                                     (TC_buffer){out2, sizeof(out2)}),
+        ==, TC_OK);
     munit_assert_memory_equal(sizeof(out), out, out2);
     munit_assert_false(memcmp(out, kbkdf_known_out, sizeof(out)) == 0);
   }
@@ -183,8 +187,9 @@ MunitResult test_kbkdf_counter_encoding(const MunitParameter params[], void* dat
     p.use_counter = 1;
 
     /* Counter mode, BEFORE_FIXED: K(i) = HMAC(K, [i]_r || F). */
-    munit_assert_int(TC_KBKDF_HMAC_SHA256_counter(key, sizeof(key), &p, NULL, 0, fixed,
-                                                  sizeof(fixed), out, sizeof(out)),
+    munit_assert_int(TC_KBKDF_HMAC_SHA256_counter(
+                         (TC_bytes){key, sizeof(key)}, &p, (TC_bytes){NULL, 0},
+                         (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){out, sizeof(out)}),
                      ==, TC_OK);
     hmac256_cat(key, sizeof(key), ctr1[r], ctr_len, fixed, sizeof(fixed), NULL, 0, NULL, 0, k1);
     hmac256_cat(key, sizeof(key), ctr2[r], ctr_len, fixed, sizeof(fixed), NULL, 0, NULL, 0, k2);
@@ -192,8 +197,9 @@ MunitResult test_kbkdf_counter_encoding(const MunitParameter params[], void* dat
     munit_assert_memory_equal(TC_SHA256_DIGESTLEN, out + TC_SHA256_DIGESTLEN, k2);
 
     /* Counter mode, AFTER_FIXED: K(i) = HMAC(K, F || [i]_r). */
-    munit_assert_int(TC_KBKDF_HMAC_SHA256_counter(key, sizeof(key), &p, fixed, sizeof(fixed), NULL,
-                                                  0, out, sizeof(out)),
+    munit_assert_int(TC_KBKDF_HMAC_SHA256_counter(
+                         (TC_bytes){key, sizeof(key)}, &p, (TC_bytes){fixed, sizeof(fixed)},
+                         (TC_bytes){NULL, 0}, (TC_buffer){out, sizeof(out)}),
                      ==, TC_OK);
     hmac256_cat(key, sizeof(key), fixed, sizeof(fixed), ctr1[r], ctr_len, NULL, 0, NULL, 0, k1);
     hmac256_cat(key, sizeof(key), fixed, sizeof(fixed), ctr2[r], ctr_len, NULL, 0, NULL, 0, k2);
@@ -201,8 +207,9 @@ MunitResult test_kbkdf_counter_encoding(const MunitParameter params[], void* dat
     munit_assert_memory_equal(TC_SHA256_DIGESTLEN, out + TC_SHA256_DIGESTLEN, k2);
 
     /* Counter mode, MIDDLE_FIXED: K(i) = HMAC(K, F[0..10] || [i]_r || F[10..]). */
-    munit_assert_int(TC_KBKDF_HMAC_SHA256_counter(key, sizeof(key), &p, fixed, 10, fixed + 10,
-                                                  sizeof(fixed) - 10, out, sizeof(out)),
+    munit_assert_int(TC_KBKDF_HMAC_SHA256_counter(
+                         (TC_bytes){key, sizeof(key)}, &p, (TC_bytes){fixed, 10},
+                         (TC_bytes){fixed + 10, sizeof(fixed) - 10}, (TC_buffer){out, sizeof(out)}),
                      ==, TC_OK);
     hmac256_cat(key, sizeof(key), fixed, 10, ctr1[r], ctr_len, fixed + 10, sizeof(fixed) - 10, NULL,
                 0, k1);
@@ -213,8 +220,9 @@ MunitResult test_kbkdf_counter_encoding(const MunitParameter params[], void* dat
 
     /* Feedback, BEFORE_ITER: K(1) = HMAC([1] || IV || F), K(2) = HMAC([2] || K(1) || F). */
     p.counter_location = TC_KBKDF_CTR_BEFORE_ITER;
-    munit_assert_int(TC_KBKDF_HMAC_SHA256_feedback(key, sizeof(key), &p, iv, sizeof(iv), fixed,
-                                                   sizeof(fixed), out, sizeof(out)),
+    munit_assert_int(TC_KBKDF_HMAC_SHA256_feedback(
+                         (TC_bytes){key, sizeof(key)}, &p, (TC_bytes){iv, sizeof(iv)},
+                         (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){out, sizeof(out)}),
                      ==, TC_OK);
     hmac256_cat(key, sizeof(key), ctr1[r], ctr_len, iv, sizeof(iv), fixed, sizeof(fixed), NULL, 0,
                 k1);
@@ -225,8 +233,9 @@ MunitResult test_kbkdf_counter_encoding(const MunitParameter params[], void* dat
 
     /* Feedback, AFTER_ITER, empty IV: K(1) = HMAC([1] || F), K(2) = HMAC(K(1) || [2] || F). */
     p.counter_location = TC_KBKDF_CTR_AFTER_ITER;
-    munit_assert_int(TC_KBKDF_HMAC_SHA256_feedback(key, sizeof(key), &p, NULL, 0, fixed,
-                                                   sizeof(fixed), out, sizeof(out)),
+    munit_assert_int(TC_KBKDF_HMAC_SHA256_feedback(
+                         (TC_bytes){key, sizeof(key)}, &p, (TC_bytes){NULL, 0},
+                         (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){out, sizeof(out)}),
                      ==, TC_OK);
     hmac256_cat(key, sizeof(key), ctr1[r], ctr_len, fixed, sizeof(fixed), NULL, 0, NULL, 0, k1);
     hmac256_cat(key, sizeof(key), k1, sizeof(k1), ctr2[r], ctr_len, fixed, sizeof(fixed), NULL, 0,
@@ -236,8 +245,9 @@ MunitResult test_kbkdf_counter_encoding(const MunitParameter params[], void* dat
 
     /* Feedback, AFTER_FIXED: K(1) = HMAC(IV || F || [1]), K(2) = HMAC(K(1) || F || [2]). */
     p.counter_location = TC_KBKDF_CTR_AFTER_FIXED;
-    munit_assert_int(TC_KBKDF_HMAC_SHA256_feedback(key, sizeof(key), &p, iv, sizeof(iv), fixed,
-                                                   sizeof(fixed), out, sizeof(out)),
+    munit_assert_int(TC_KBKDF_HMAC_SHA256_feedback(
+                         (TC_bytes){key, sizeof(key)}, &p, (TC_bytes){iv, sizeof(iv)},
+                         (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){out, sizeof(out)}),
                      ==, TC_OK);
     hmac256_cat(key, sizeof(key), iv, sizeof(iv), fixed, sizeof(fixed), ctr1[r], ctr_len, NULL, 0,
                 k1);
@@ -248,8 +258,9 @@ MunitResult test_kbkdf_counter_encoding(const MunitParameter params[], void* dat
 
     /* Pipeline, BEFORE_ITER: A(1) = HMAC(F), K(1) = HMAC([1] || A(1) || F). */
     p.counter_location = TC_KBKDF_CTR_BEFORE_ITER;
-    munit_assert_int(TC_KBKDF_HMAC_SHA256_pipeline(key, sizeof(key), &p, fixed, sizeof(fixed), out,
-                                                   TC_SHA256_DIGESTLEN),
+    munit_assert_int(TC_KBKDF_HMAC_SHA256_pipeline((TC_bytes){key, sizeof(key)}, &p,
+                                                   (TC_bytes){fixed, sizeof(fixed)},
+                                                   (TC_buffer){out, TC_SHA256_DIGESTLEN}),
                      ==, TC_OK);
     hmac256_cat(key, sizeof(key), fixed, sizeof(fixed), NULL, 0, NULL, 0, NULL, 0, a1);
     hmac256_cat(key, sizeof(key), ctr1[r], ctr_len, a1, sizeof(a1), fixed, sizeof(fixed), NULL, 0,
@@ -262,8 +273,9 @@ MunitResult test_kbkdf_counter_encoding(const MunitParameter params[], void* dat
   p.counter_bits = 7;
   p.counter_location = 9;
   p.use_counter = 0;
-  munit_assert_int(TC_KBKDF_HMAC_SHA256_feedback(key, sizeof(key), &p, iv, sizeof(iv), fixed,
-                                                 sizeof(fixed), out, sizeof(out)),
+  munit_assert_int(TC_KBKDF_HMAC_SHA256_feedback(
+                       (TC_bytes){key, sizeof(key)}, &p, (TC_bytes){iv, sizeof(iv)},
+                       (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){out, sizeof(out)}),
                    ==, TC_OK);
   hmac256_cat(key, sizeof(key), iv, sizeof(iv), fixed, sizeof(fixed), NULL, 0, NULL, 0, k1);
   hmac256_cat(key, sizeof(key), k1, sizeof(k1), fixed, sizeof(fixed), NULL, 0, NULL, 0, k2);
@@ -272,9 +284,10 @@ MunitResult test_kbkdf_counter_encoding(const MunitParameter params[], void* dat
 
   /* Pipeline without counter: A(1) = HMAC(F), A(2) = HMAC(A(1)),
      K(1) = HMAC(A(1) || F), K(2) = HMAC(A(2) || F). */
-  munit_assert_int(
-      TC_KBKDF_HMAC_SHA256_pipeline(key, sizeof(key), &p, fixed, sizeof(fixed), out, sizeof(out)),
-      ==, TC_OK);
+  munit_assert_int(TC_KBKDF_HMAC_SHA256_pipeline((TC_bytes){key, sizeof(key)}, &p,
+                                                 (TC_bytes){fixed, sizeof(fixed)},
+                                                 (TC_buffer){out, sizeof(out)}),
+                   ==, TC_OK);
   hmac256_cat(key, sizeof(key), fixed, sizeof(fixed), NULL, 0, NULL, 0, NULL, 0, a1);
   hmac256_cat(key, sizeof(key), a1, sizeof(a1), fixed, sizeof(fixed), NULL, 0, NULL, 0, k1);
   munit_assert_memory_equal(TC_SHA256_DIGESTLEN, out, k1);
@@ -317,8 +330,9 @@ MunitResult test_kbkdf_cmac_first_block(const MunitParameter params[], void* dat
   {
     uint8_t out[TC_AES_CMAC_TAG_MAX];
     uint8_t tag[TC_AES_CMAC_TAG_MAX];
-    munit_assert_int(TC_KBKDF_AES_CMAC_counter(key, TC_AES_KEYLEN, &p, NULL, 0, fixed + 1,
-                                               sizeof(fixed) - 1, out, sizeof(out)),
+    munit_assert_int(TC_KBKDF_AES_CMAC_counter(
+                         (TC_bytes){key, TC_AES_KEYLEN}, &p, (TC_bytes){NULL, 0},
+                         (TC_bytes){fixed + 1, sizeof(fixed) - 1}, (TC_buffer){out, sizeof(out)}),
                      ==, TC_OK);
     munit_assert_int(TC_AES_CMAC(key, fixed, sizeof(fixed), tag, sizeof(tag)), ==, TC_OK);
     munit_assert_memory_equal(sizeof(out), out, tag);
@@ -332,8 +346,9 @@ MunitResult test_kbkdf_cmac_first_block(const MunitParameter params[], void* dat
     for (k = 0; k < 3; ++k) {
       uint8_t out[TC_DES_CMAC_TAG_MAX];
       uint8_t tag[TC_DES_CMAC_TAG_MAX];
-      munit_assert_int(TC_KBKDF_DES_CMAC_counter(key, key_lens[k], &p, NULL, 0, fixed + 1,
-                                                 sizeof(fixed) - 1, out, sizeof(out)),
+      munit_assert_int(TC_KBKDF_DES_CMAC_counter(
+                           (TC_bytes){key, key_lens[k]}, &p, (TC_bytes){NULL, 0},
+                           (TC_bytes){fixed + 1, sizeof(fixed) - 1}, (TC_buffer){out, sizeof(out)}),
                        ==, TC_OK);
       munit_assert_int(TC_DES_CMAC(key, key_lens[k], fixed, sizeof(fixed), tag, sizeof(tag)), ==,
                        TC_OK);
@@ -387,15 +402,16 @@ MunitResult test_kbkdf_generated(const MunitParameter params[], void* data)
 
     switch (v->mode) {
     case KBKDF_MODE_COUNTER:
-      rc = f->counter(v->key, v->key_len, &p, v->in1, v->in1_len, v->in2, v->in2_len, out,
-                      v->out_len);
+      rc = f->counter((TC_bytes){v->key, v->key_len}, &p, (TC_bytes){v->in1, v->in1_len},
+                      (TC_bytes){v->in2, v->in2_len}, (TC_buffer){out, v->out_len});
       break;
     case KBKDF_MODE_FEEDBACK:
-      rc = f->feedback(v->key, v->key_len, &p, v->iv, v->iv_len, v->in2, v->in2_len, out,
-                       v->out_len);
+      rc = f->feedback((TC_bytes){v->key, v->key_len}, &p, (TC_bytes){v->iv, v->iv_len},
+                       (TC_bytes){v->in2, v->in2_len}, (TC_buffer){out, v->out_len});
       break;
     default:
-      rc = f->pipeline(v->key, v->key_len, &p, v->in2, v->in2_len, out, v->out_len);
+      rc = f->pipeline((TC_bytes){v->key, v->key_len}, &p, (TC_bytes){v->in2, v->in2_len},
+                       (TC_buffer){out, v->out_len});
       break;
     }
     if (rc != TC_OK)
@@ -423,7 +439,9 @@ MunitResult test_kbkdf_fixed_input(const MunitParameter params[], void* data)
 
   munit_assert_size(TC_KBKDF_FIXED_INPUT_LEN(3, 2), ==, 10);
 
-  munit_assert_int(TC_KBKDF_fixed_input(label, 3, context, 2, 32, buf, 10), ==, TC_OK);
+  munit_assert_int(
+      TC_KBKDF_fixed_input((TC_bytes){label, 3}, (TC_bytes){context, 2}, 32, (TC_buffer){buf, 10}),
+      ==, TC_OK);
   munit_assert_memory_equal(3, buf, label);
   munit_assert_uint8(buf[3], ==, 0x00);
   munit_assert_memory_equal(2, buf + 4, context);
@@ -434,27 +452,49 @@ MunitResult test_kbkdf_fixed_input(const MunitParameter params[], void* data)
 
   /* A larger buffer is accepted. The builder writes the exact encoded length. */
   memset(buf, 0xA5, sizeof(buf));
-  munit_assert_int(TC_KBKDF_fixed_input(label, 3, context, 2, 1, buf, sizeof(buf)), ==, TC_OK);
+  munit_assert_int(TC_KBKDF_fixed_input((TC_bytes){label, 3}, (TC_bytes){context, 2}, 1,
+                                        (TC_buffer){buf, sizeof(buf)}),
+                   ==, TC_OK);
   munit_assert_uint8(buf[9], ==, 0x08);
   munit_assert_uint8(buf[10], ==, 0xA5);
 
   /* Empty label and empty context are valid: 0x00 || [L]. */
-  munit_assert_int(TC_KBKDF_fixed_input(NULL, 0, NULL, 0, 0x1FFFFFFFu, buf, 5), ==, TC_OK);
+  munit_assert_int(TC_KBKDF_fixed_input((TC_bytes){NULL, 0}, (TC_bytes){NULL, 0}, 0x1FFFFFFFu,
+                                        (TC_buffer){buf, 5}),
+                   ==, TC_OK);
   munit_assert_uint8(buf[0], ==, 0x00);
   munit_assert_uint8(buf[1], ==, 0xFF);
   munit_assert_uint8(buf[4], ==, 0xF8);
 
-  munit_assert_int(TC_KBKDF_fixed_input(label, 3, context, 2, 32, buf, 9), ==, TC_ERROR);
-  munit_assert_int(TC_KBKDF_fixed_input(label, 3, context, 2, 32, NULL, 10), ==, TC_ERROR);
-  munit_assert_int(TC_KBKDF_fixed_input(NULL, 3, context, 2, 32, buf, 10), ==, TC_ERROR);
-  munit_assert_int(TC_KBKDF_fixed_input(label, 3, NULL, 2, 32, buf, 10), ==, TC_ERROR);
-  munit_assert_int(TC_KBKDF_fixed_input(label, 3, context, 2, 0, buf, 10), ==, TC_ERROR);
-  munit_assert_int(TC_KBKDF_fixed_input(label, 3, context, 2, 0x20000000u, buf, 10), ==, TC_ERROR);
-  munit_assert_int(TC_KBKDF_fixed_input(bad_label, 3, context, 2, 32, buf, 10), ==, TC_ERROR);
+  munit_assert_int(
+      TC_KBKDF_fixed_input((TC_bytes){label, 3}, (TC_bytes){context, 2}, 32, (TC_buffer){buf, 9}),
+      ==, TC_ERROR);
+  munit_assert_int(
+      TC_KBKDF_fixed_input((TC_bytes){label, 3}, (TC_bytes){context, 2}, 32, (TC_buffer){NULL, 10}),
+      ==, TC_ERROR);
+  munit_assert_int(
+      TC_KBKDF_fixed_input((TC_bytes){NULL, 3}, (TC_bytes){context, 2}, 32, (TC_buffer){buf, 10}),
+      ==, TC_ERROR);
+  munit_assert_int(
+      TC_KBKDF_fixed_input((TC_bytes){label, 3}, (TC_bytes){NULL, 2}, 32, (TC_buffer){buf, 10}), ==,
+      TC_ERROR);
+  munit_assert_int(
+      TC_KBKDF_fixed_input((TC_bytes){label, 3}, (TC_bytes){context, 2}, 0, (TC_buffer){buf, 10}),
+      ==, TC_ERROR);
+  munit_assert_int(TC_KBKDF_fixed_input((TC_bytes){label, 3}, (TC_bytes){context, 2}, 0x20000000u,
+                                        (TC_buffer){buf, 10}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_KBKDF_fixed_input((TC_bytes){bad_label, 3}, (TC_bytes){context, 2}, 32,
+                                        (TC_buffer){buf, 10}),
+                   ==, TC_ERROR);
   /* buf overlapping an input */
   memcpy(buf, label, 3);
-  munit_assert_int(TC_KBKDF_fixed_input(buf, 3, context, 2, 32, buf, 10), ==, TC_ERROR);
-  munit_assert_int(TC_KBKDF_fixed_input(label, 3, buf + 5, 2, 32, buf, 10), ==, TC_ERROR);
+  munit_assert_int(
+      TC_KBKDF_fixed_input((TC_bytes){buf, 3}, (TC_bytes){context, 2}, 32, (TC_buffer){buf, 10}),
+      ==, TC_ERROR);
+  munit_assert_int(
+      TC_KBKDF_fixed_input((TC_bytes){label, 3}, (TC_bytes){buf + 5, 2}, 32, (TC_buffer){buf, 10}),
+      ==, TC_ERROR);
 
   return MUNIT_OK;
 }
@@ -498,30 +538,51 @@ MunitResult test_kbkdf_api(const MunitParameter params[], void* data)
     p.use_counter = 1;
 
     /* Baseline success for all three modes. */
-    munit_assert_int(f->counter(key, klen, &p, NULL, 0, fixed, sizeof(fixed), out, 33), ==, TC_OK);
-    munit_assert_int(f->feedback(key, klen, &p, iv, sizeof(iv), fixed, sizeof(fixed), out, 33), ==,
-                     TC_OK);
-    munit_assert_int(f->pipeline(key, klen, &p, fixed, sizeof(fixed), out, 33), ==, TC_OK);
+    munit_assert_int(f->counter((TC_bytes){key, klen}, &p, (TC_bytes){NULL, 0},
+                                (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){out, 33}),
+                     ==, TC_OK);
+    munit_assert_int(f->feedback((TC_bytes){key, klen}, &p, (TC_bytes){iv, sizeof(iv)},
+                                 (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){out, 33}),
+                     ==, TC_OK);
+    munit_assert_int(f->pipeline((TC_bytes){key, klen}, &p, (TC_bytes){fixed, sizeof(fixed)},
+                                 (TC_buffer){out, 33}),
+                     ==, TC_OK);
 
     /* Argument errors leave the output untouched. */
     memset(out, 0xA5, sizeof(out));
-    munit_assert_int(f->counter(NULL, klen, &p, NULL, 0, fixed, sizeof(fixed), out, 32), ==,
-                     TC_ERROR);
-    munit_assert_int(f->counter(key, 0, &p, NULL, 0, fixed, sizeof(fixed), out, 32), ==, TC_ERROR);
-    munit_assert_int(f->counter(key, klen, NULL, NULL, 0, fixed, sizeof(fixed), out, 32), ==,
-                     TC_ERROR);
-    munit_assert_int(f->counter(key, klen, &p, NULL, 0, fixed, sizeof(fixed), NULL, 32), ==,
-                     TC_ERROR);
-    munit_assert_int(f->counter(key, klen, &p, NULL, 0, fixed, sizeof(fixed), out, 0), ==,
-                     TC_ERROR);
-    munit_assert_int(f->counter(key, klen, &p, NULL, 1, fixed, sizeof(fixed), out, 32), ==,
-                     TC_ERROR);
-    munit_assert_int(f->counter(key, klen, &p, NULL, 0, NULL, 1, out, 32), ==, TC_ERROR);
-    munit_assert_int(f->feedback(key, klen, &p, NULL, 1, fixed, sizeof(fixed), out, 32), ==,
-                     TC_ERROR);
-    munit_assert_int(f->feedback(key, klen, &p, iv, sizeof(iv), NULL, 1, out, 32), ==, TC_ERROR);
-    munit_assert_int(f->pipeline(key, klen, &p, NULL, 1, out, 32), ==, TC_ERROR);
-    munit_assert_int(f->pipeline(NULL, klen, &p, fixed, sizeof(fixed), out, 32), ==, TC_ERROR);
+    munit_assert_int(f->counter((TC_bytes){NULL, klen}, &p, (TC_bytes){NULL, 0},
+                                (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){out, 32}),
+                     ==, TC_ERROR);
+    munit_assert_int(f->counter((TC_bytes){key, 0}, &p, (TC_bytes){NULL, 0},
+                                (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){out, 32}),
+                     ==, TC_ERROR);
+    munit_assert_int(f->counter((TC_bytes){key, klen}, NULL, (TC_bytes){NULL, 0},
+                                (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){out, 32}),
+                     ==, TC_ERROR);
+    munit_assert_int(f->counter((TC_bytes){key, klen}, &p, (TC_bytes){NULL, 0},
+                                (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){NULL, 32}),
+                     ==, TC_ERROR);
+    munit_assert_int(f->counter((TC_bytes){key, klen}, &p, (TC_bytes){NULL, 0},
+                                (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){out, 0}),
+                     ==, TC_ERROR);
+    munit_assert_int(f->counter((TC_bytes){key, klen}, &p, (TC_bytes){NULL, 1},
+                                (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){out, 32}),
+                     ==, TC_ERROR);
+    munit_assert_int(f->counter((TC_bytes){key, klen}, &p, (TC_bytes){NULL, 0}, (TC_bytes){NULL, 1},
+                                (TC_buffer){out, 32}),
+                     ==, TC_ERROR);
+    munit_assert_int(f->feedback((TC_bytes){key, klen}, &p, (TC_bytes){NULL, 1},
+                                 (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){out, 32}),
+                     ==, TC_ERROR);
+    munit_assert_int(f->feedback((TC_bytes){key, klen}, &p, (TC_bytes){iv, sizeof(iv)},
+                                 (TC_bytes){NULL, 1}, (TC_buffer){out, 32}),
+                     ==, TC_ERROR);
+    munit_assert_int(
+        f->pipeline((TC_bytes){key, klen}, &p, (TC_bytes){NULL, 1}, (TC_buffer){out, 32}), ==,
+        TC_ERROR);
+    munit_assert_int(f->pipeline((TC_bytes){NULL, klen}, &p, (TC_bytes){fixed, sizeof(fixed)},
+                                 (TC_buffer){out, 32}),
+                     ==, TC_ERROR);
 
     /* Counter width must be 8/16/24/32 whenever a counter is used. */
     {
@@ -529,69 +590,104 @@ MunitResult test_kbkdf_api(const MunitParameter params[], void* data)
       size_t b;
       for (b = 0; b < sizeof(bad_bits); ++b) {
         p.counter_bits = bad_bits[b];
-        munit_assert_int(f->counter(key, klen, &p, NULL, 0, fixed, sizeof(fixed), out, 32), ==,
-                         TC_ERROR);
-        munit_assert_int(f->feedback(key, klen, &p, iv, sizeof(iv), fixed, sizeof(fixed), out, 32),
+        munit_assert_int(f->counter((TC_bytes){key, klen}, &p, (TC_bytes){NULL, 0},
+                                    (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){out, 32}),
                          ==, TC_ERROR);
-        munit_assert_int(f->pipeline(key, klen, &p, fixed, sizeof(fixed), out, 32), ==, TC_ERROR);
+        munit_assert_int(f->feedback((TC_bytes){key, klen}, &p, (TC_bytes){iv, sizeof(iv)},
+                                     (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){out, 32}),
+                         ==, TC_ERROR);
+        munit_assert_int(f->pipeline((TC_bytes){key, klen}, &p, (TC_bytes){fixed, sizeof(fixed)},
+                                     (TC_buffer){out, 32}),
+                         ==, TC_ERROR);
       }
       p.counter_bits = TC_KBKDF_COUNTER_32;
     }
     /* Counter location must be 1..3 for feedback / pipeline with a counter. */
     p.counter_location = 0;
-    munit_assert_int(f->feedback(key, klen, &p, iv, sizeof(iv), fixed, sizeof(fixed), out, 32), ==,
-                     TC_ERROR);
-    munit_assert_int(f->pipeline(key, klen, &p, fixed, sizeof(fixed), out, 32), ==, TC_ERROR);
+    munit_assert_int(f->feedback((TC_bytes){key, klen}, &p, (TC_bytes){iv, sizeof(iv)},
+                                 (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){out, 32}),
+                     ==, TC_ERROR);
+    munit_assert_int(f->pipeline((TC_bytes){key, klen}, &p, (TC_bytes){fixed, sizeof(fixed)},
+                                 (TC_buffer){out, 32}),
+                     ==, TC_ERROR);
     p.counter_location = 4;
-    munit_assert_int(f->feedback(key, klen, &p, iv, sizeof(iv), fixed, sizeof(fixed), out, 32), ==,
-                     TC_ERROR);
-    munit_assert_int(f->pipeline(key, klen, &p, fixed, sizeof(fixed), out, 32), ==, TC_ERROR);
+    munit_assert_int(f->feedback((TC_bytes){key, klen}, &p, (TC_bytes){iv, sizeof(iv)},
+                                 (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){out, 32}),
+                     ==, TC_ERROR);
+    munit_assert_int(f->pipeline((TC_bytes){key, klen}, &p, (TC_bytes){fixed, sizeof(fixed)},
+                                 (TC_buffer){out, 32}),
+                     ==, TC_ERROR);
     /* ... but counter mode ignores the location field entirely. */
-    munit_assert_int(f->counter(key, klen, &p, NULL, 0, fixed, sizeof(fixed), out2, 32), ==, TC_OK);
+    munit_assert_int(f->counter((TC_bytes){key, klen}, &p, (TC_bytes){NULL, 0},
+                                (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){out2, 32}),
+                     ==, TC_OK);
     munit_assert_true(all_bytes(out, sizeof(out), 0xA5));
 
     /* Aliasing between out and any input is rejected. */
     memcpy(scratch, fixed, sizeof(fixed));
-    munit_assert_int(f->counter(scratch, klen, &p, NULL, 0, fixed, sizeof(fixed), scratch, 32), ==,
-                     TC_ERROR);
-    munit_assert_int(
-        f->counter(key, klen, &p, NULL, 0, scratch, sizeof(fixed), scratch + sizeof(fixed) - 1, 32),
-        ==, TC_ERROR);
-    munit_assert_int(f->counter(key, klen, &p, scratch, 8, fixed, sizeof(fixed), scratch, 32), ==,
-                     TC_ERROR);
-    munit_assert_int(f->feedback(key, klen, &p, scratch, 8, fixed, sizeof(fixed), scratch, 32), ==,
-                     TC_ERROR);
-    munit_assert_int(f->pipeline(key, klen, &p, scratch, 8, scratch + 8, 32), ==, TC_ERROR);
+    munit_assert_int(f->counter((TC_bytes){scratch, klen}, &p, (TC_bytes){NULL, 0},
+                                (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){scratch, 32}),
+                     ==, TC_ERROR);
+    munit_assert_int(f->counter((TC_bytes){key, klen}, &p, (TC_bytes){NULL, 0},
+                                (TC_bytes){scratch, sizeof(fixed)},
+                                (TC_buffer){scratch + sizeof(fixed) - 1, 32}),
+                     ==, TC_ERROR);
+    munit_assert_int(f->counter((TC_bytes){key, klen}, &p, (TC_bytes){scratch, 8},
+                                (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){scratch, 32}),
+                     ==, TC_ERROR);
+    munit_assert_int(f->feedback((TC_bytes){key, klen}, &p, (TC_bytes){scratch, 8},
+                                 (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){scratch, 32}),
+                     ==, TC_ERROR);
+    munit_assert_int(f->pipeline((TC_bytes){key, klen}, &p, (TC_bytes){scratch, 8},
+                                 (TC_buffer){scratch + 8, 32}),
+                     ==, TC_ERROR);
     /* Adjacent, non-overlapping buffers are fine. */
-    munit_assert_int(f->counter(key, klen, &p, scratch, 8, scratch + 8, 8, scratch + 16, 32), ==,
-                     TC_OK);
+    munit_assert_int(f->counter((TC_bytes){key, klen}, &p, (TC_bytes){scratch, 8},
+                                (TC_bytes){scratch + 8, 8}, (TC_buffer){scratch + 16, 32}),
+                     ==, TC_OK);
 
     /* Without a counter the width and location are ignored, and an empty IV
        or empty fixed input is valid in every mode. */
     p.use_counter = 0;
     p.counter_bits = 7;
     p.counter_location = 9;
-    munit_assert_int(f->feedback(key, klen, &p, NULL, 0, fixed, sizeof(fixed), out, 32), ==, TC_OK);
-    munit_assert_int(f->feedback(key, klen, &p, iv, 0, fixed, sizeof(fixed), out2, 32), ==, TC_OK);
+    munit_assert_int(f->feedback((TC_bytes){key, klen}, &p, (TC_bytes){NULL, 0},
+                                 (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){out, 32}),
+                     ==, TC_OK);
+    munit_assert_int(f->feedback((TC_bytes){key, klen}, &p, (TC_bytes){iv, 0},
+                                 (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){out2, 32}),
+                     ==, TC_OK);
     munit_assert_memory_equal(32, out, out2);
-    munit_assert_int(f->feedback(key, klen, &p, iv, sizeof(iv), NULL, 0, out, 32), ==, TC_OK);
-    munit_assert_int(f->pipeline(key, klen, &p, NULL, 0, out, 32), ==, TC_OK);
+    munit_assert_int(f->feedback((TC_bytes){key, klen}, &p, (TC_bytes){iv, sizeof(iv)},
+                                 (TC_bytes){NULL, 0}, (TC_buffer){out, 32}),
+                     ==, TC_OK);
+    munit_assert_int(
+        f->pipeline((TC_bytes){key, klen}, &p, (TC_bytes){NULL, 0}, (TC_buffer){out, 32}), ==,
+        TC_OK);
     p.counter_bits = TC_KBKDF_COUNTER_16;
-    munit_assert_int(f->counter(key, klen, &p, NULL, 0, NULL, 0, out, 32), ==, TC_OK);
-    munit_assert_int(f->counter(key, klen, &p, fixed, 0, fixed, 0, out2, 32), ==, TC_OK);
+    munit_assert_int(f->counter((TC_bytes){key, klen}, &p, (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0},
+                                (TC_buffer){out, 32}),
+                     ==, TC_OK);
+    munit_assert_int(f->counter((TC_bytes){key, klen}, &p, (TC_bytes){fixed, 0},
+                                (TC_bytes){fixed, 0}, (TC_buffer){out2, 32}),
+                     ==, TC_OK);
     munit_assert_memory_equal(32, out, out2);
   }
 
 #if TC_KBKDF_HAVE_AES_CMAC
   {
     const struct TC_KBKDF_params p = {TC_KBKDF_COUNTER_32, 0, 0};
-    munit_assert_int(
-        TC_KBKDF_AES_CMAC_counter(key, TC_AES_KEYLEN + 1, &p, NULL, 0, fixed, 8, out, 16), ==,
-        TC_ERROR);
-    munit_assert_int(
-        TC_KBKDF_AES_CMAC_counter(key, TC_AES_KEYLEN - 1, &p, NULL, 0, fixed, 8, out, 16), ==,
-        TC_ERROR);
-    munit_assert_int(TC_KBKDF_AES_CMAC_counter(key, TC_AES_KEYLEN, &p, NULL, 0, fixed, 8, out, 16),
+    munit_assert_int(TC_KBKDF_AES_CMAC_counter((TC_bytes){key, TC_AES_KEYLEN + 1}, &p,
+                                               (TC_bytes){NULL, 0}, (TC_bytes){fixed, 8},
+                                               (TC_buffer){out, 16}),
+                     ==, TC_ERROR);
+    munit_assert_int(TC_KBKDF_AES_CMAC_counter((TC_bytes){key, TC_AES_KEYLEN - 1}, &p,
+                                               (TC_bytes){NULL, 0}, (TC_bytes){fixed, 8},
+                                               (TC_buffer){out, 16}),
+                     ==, TC_ERROR);
+    munit_assert_int(TC_KBKDF_AES_CMAC_counter((TC_bytes){key, TC_AES_KEYLEN}, &p,
+                                               (TC_bytes){NULL, 0}, (TC_bytes){fixed, 8},
+                                               (TC_buffer){out, 16}),
                      ==, TC_OK);
   }
 #endif
@@ -602,11 +698,13 @@ MunitResult test_kbkdf_api(const MunitParameter params[], void* data)
     static const size_t good[] = {8, 16, 24};
     size_t i;
     for (i = 0; i < sizeof(bad) / sizeof(bad[0]); ++i)
-      munit_assert_int(TC_KBKDF_DES_CMAC_counter(key, bad[i], &p, NULL, 0, fixed, 8, out, 8), ==,
-                       TC_ERROR);
+      munit_assert_int(TC_KBKDF_DES_CMAC_counter((TC_bytes){key, bad[i]}, &p, (TC_bytes){NULL, 0},
+                                                 (TC_bytes){fixed, 8}, (TC_buffer){out, 8}),
+                       ==, TC_ERROR);
     for (i = 0; i < sizeof(good) / sizeof(good[0]); ++i)
-      munit_assert_int(TC_KBKDF_DES_CMAC_counter(key, good[i], &p, NULL, 0, fixed, 8, out, 8), ==,
-                       TC_OK);
+      munit_assert_int(TC_KBKDF_DES_CMAC_counter((TC_bytes){key, good[i]}, &p, (TC_bytes){NULL, 0},
+                                                 (TC_bytes){fixed, 8}, (TC_buffer){out, 8}),
+                       ==, TC_OK);
   }
 #endif
   return MUNIT_OK;
@@ -639,34 +737,43 @@ MunitResult test_kbkdf_limits(const MunitParameter params[], void* data)
     /* r = 8: 255 blocks fit, 256 do not (in every mode that uses the counter). */
     p.counter_bits = TC_KBKDF_COUNTER_8;
     munit_assert_size(256 * h, <=, sizeof(out));
-    munit_assert_int(f->counter(key, f->key_len, &p, NULL, 0, fixed, sizeof(fixed), out, 255 * h),
+    munit_assert_int(f->counter((TC_bytes){key, f->key_len}, &p, (TC_bytes){NULL, 0},
+                                (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){out, 255 * h}),
                      ==, TC_OK);
-    munit_assert_int(
-        f->counter(key, f->key_len, &p, NULL, 0, fixed, sizeof(fixed), out, 255 * h + 1), ==,
-        TC_ERROR);
-    munit_assert_int(f->counter(key, f->key_len, &p, NULL, 0, fixed, sizeof(fixed), out, 256 * h),
+    munit_assert_int(f->counter((TC_bytes){key, f->key_len}, &p, (TC_bytes){NULL, 0},
+                                (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){out, 255 * h + 1}),
                      ==, TC_ERROR);
-    munit_assert_int(f->feedback(key, f->key_len, &p, NULL, 0, fixed, sizeof(fixed), out, 256 * h),
+    munit_assert_int(f->counter((TC_bytes){key, f->key_len}, &p, (TC_bytes){NULL, 0},
+                                (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){out, 256 * h}),
                      ==, TC_ERROR);
-    munit_assert_int(f->pipeline(key, f->key_len, &p, fixed, sizeof(fixed), out, 256 * h), ==,
-                     TC_ERROR);
+    munit_assert_int(f->feedback((TC_bytes){key, f->key_len}, &p, (TC_bytes){NULL, 0},
+                                 (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){out, 256 * h}),
+                     ==, TC_ERROR);
+    munit_assert_int(f->pipeline((TC_bytes){key, f->key_len}, &p, (TC_bytes){fixed, sizeof(fixed)},
+                                 (TC_buffer){out, 256 * h}),
+                     ==, TC_ERROR);
 
     /* r = 16 lifts the limit for the same request. */
     p.counter_bits = TC_KBKDF_COUNTER_16;
-    munit_assert_int(f->counter(key, f->key_len, &p, NULL, 0, fixed, sizeof(fixed), out, 256 * h),
+    munit_assert_int(f->counter((TC_bytes){key, f->key_len}, &p, (TC_bytes){NULL, 0},
+                                (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){out, 256 * h}),
                      ==, TC_OK);
-    munit_assert_int(f->feedback(key, f->key_len, &p, NULL, 0, fixed, sizeof(fixed), out, 256 * h),
+    munit_assert_int(f->feedback((TC_bytes){key, f->key_len}, &p, (TC_bytes){NULL, 0},
+                                 (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){out, 256 * h}),
                      ==, TC_OK);
-    munit_assert_int(f->pipeline(key, f->key_len, &p, fixed, sizeof(fixed), out, 256 * h), ==,
-                     TC_OK);
+    munit_assert_int(f->pipeline((TC_bytes){key, f->key_len}, &p, (TC_bytes){fixed, sizeof(fixed)},
+                                 (TC_buffer){out, 256 * h}),
+                     ==, TC_OK);
 
     /* No counter: no 2^r bound applies. */
     p.use_counter = 0;
     p.counter_bits = TC_KBKDF_COUNTER_8;
-    munit_assert_int(f->feedback(key, f->key_len, &p, NULL, 0, fixed, sizeof(fixed), out, 256 * h),
+    munit_assert_int(f->feedback((TC_bytes){key, f->key_len}, &p, (TC_bytes){NULL, 0},
+                                 (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){out, 256 * h}),
                      ==, TC_OK);
-    munit_assert_int(f->pipeline(key, f->key_len, &p, fixed, sizeof(fixed), out, 256 * h), ==,
-                     TC_OK);
+    munit_assert_int(f->pipeline((TC_bytes){key, f->key_len}, &p, (TC_bytes){fixed, sizeof(fixed)},
+                                 (TC_buffer){out, 256 * h}),
+                     ==, TC_OK);
   }
   return MUNIT_OK;
 }
@@ -704,26 +811,28 @@ MunitResult test_kbkdf_truncation(const MunitParameter params[], void* data)
     for (k = 0; k < 3; ++k) {
       size_t part_len = (k == 0) ? f->h + 1 : (k == 1) ? 2 * f->h - 1 : 1;
 
-      munit_assert_int(
-          f->counter(key, f->key_len, &p, NULL, 0, fixed, sizeof(fixed), full, full_len), ==,
-          TC_OK);
-      munit_assert_int(
-          f->counter(key, f->key_len, &p, NULL, 0, fixed, sizeof(fixed), part, part_len), ==,
-          TC_OK);
+      munit_assert_int(f->counter((TC_bytes){key, f->key_len}, &p, (TC_bytes){NULL, 0},
+                                  (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){full, full_len}),
+                       ==, TC_OK);
+      munit_assert_int(f->counter((TC_bytes){key, f->key_len}, &p, (TC_bytes){NULL, 0},
+                                  (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){part, part_len}),
+                       ==, TC_OK);
       munit_assert_memory_equal(part_len, part, full);
 
-      munit_assert_int(
-          f->feedback(key, f->key_len, &p, iv, sizeof(iv), fixed, sizeof(fixed), full, full_len),
-          ==, TC_OK);
-      munit_assert_int(
-          f->feedback(key, f->key_len, &p, iv, sizeof(iv), fixed, sizeof(fixed), part, part_len),
-          ==, TC_OK);
+      munit_assert_int(f->feedback((TC_bytes){key, f->key_len}, &p, (TC_bytes){iv, sizeof(iv)},
+                                   (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){full, full_len}),
+                       ==, TC_OK);
+      munit_assert_int(f->feedback((TC_bytes){key, f->key_len}, &p, (TC_bytes){iv, sizeof(iv)},
+                                   (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){part, part_len}),
+                       ==, TC_OK);
       munit_assert_memory_equal(part_len, part, full);
 
-      munit_assert_int(f->pipeline(key, f->key_len, &p, fixed, sizeof(fixed), full, full_len), ==,
-                       TC_OK);
-      munit_assert_int(f->pipeline(key, f->key_len, &p, fixed, sizeof(fixed), part, part_len), ==,
-                       TC_OK);
+      munit_assert_int(f->pipeline((TC_bytes){key, f->key_len}, &p,
+                                   (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){full, full_len}),
+                       ==, TC_OK);
+      munit_assert_int(f->pipeline((TC_bytes){key, f->key_len}, &p,
+                                   (TC_bytes){fixed, sizeof(fixed)}, (TC_buffer){part, part_len}),
+                       ==, TC_OK);
       munit_assert_memory_equal(part_len, part, full);
       (void)fractions;
     }

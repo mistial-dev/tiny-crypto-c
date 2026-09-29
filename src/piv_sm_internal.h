@@ -10,7 +10,7 @@ typedef struct {
   TC_EC_curve curve;
   size_t coordinate_bytes, key_bytes, nonce_bytes;
   uint8_t prefix[6];
-  TC_status (*derive)(const uint8_t*, size_t, const TC_bytes*, size_t, uint8_t*, size_t);
+  TC_status (*derive)(TC_bytes, const TC_bytes*, size_t, TC_buffer);
 } tc_sm_suite;
 
 const tc_sm_suite* tc_sm_suite_get(unsigned suite);

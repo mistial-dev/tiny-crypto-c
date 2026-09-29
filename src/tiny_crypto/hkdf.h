@@ -18,22 +18,21 @@ extern "C" {
  * TC_SHA*_DIGESTLEN bytes to prk. The input keying material is the
  * concatenation of ikm_count spans, read in order without copying; pass one
  * span for an ordinary secret, or Z and T for an SP 800-56C revision 2 hybrid
- * secret Z || T. An empty or NULL salt is the RFC's all-zero salt.
+ * secret Z || T. An empty salt is the RFC's all-zero salt.
  *
- * expand accepts a PRK at least one digest long and writes output_len bytes,
- * 1..255*HashLen. derive runs extract then expand and wipes its PRK.
+ * expand accepts a PRK at least one digest long and writes exactly
+ * output.capacity bytes, 1..255*HashLen. derive runs extract then expand and
+ * wipes its PRK.
  *
- * A NULL pointer is valid for an empty span. Output must be disjoint from
- * every input. Argument errors return TC_ERROR and leave output unchanged. A
- * failure after processing begins wipes output. */
+ * A span may have NULL data only when it is empty. Output must be disjoint
+ * from every input. Argument errors return TC_ERROR and leave output
+ * unchanged. A failure after processing begins wipes output. */
 #define TC_HKDF_DECLARE(N)                                                                         \
-  TC_status TC_HKDF_SHA##N##_extract(const uint8_t* salt, size_t salt_len, const TC_bytes* ikm,    \
-                                     size_t ikm_count, uint8_t* prk);                              \
-  TC_status TC_HKDF_SHA##N##_expand(const uint8_t* prk, size_t prk_len, const uint8_t* info,       \
-                                    size_t info_len, uint8_t* output, size_t output_len);          \
-  TC_status TC_HKDF_SHA##N##_derive(const uint8_t* salt, size_t salt_len, const TC_bytes* ikm,     \
-                                    size_t ikm_count, const uint8_t* info, size_t info_len,        \
-                                    uint8_t* output, size_t output_len)
+  TC_status TC_HKDF_SHA##N##_extract(TC_bytes salt, const TC_bytes* ikm, size_t ikm_count,         \
+                                     uint8_t prk[TC_SHA##N##_DIGESTLEN]);                          \
+  TC_status TC_HKDF_SHA##N##_expand(TC_bytes prk, TC_bytes info, TC_buffer output);                \
+  TC_status TC_HKDF_SHA##N##_derive(TC_bytes salt, const TC_bytes* ikm, size_t ikm_count,          \
+                                    TC_bytes info, TC_buffer output)
 
 #if TC_ENABLE_SHA1
 TC_HKDF_DECLARE(1);

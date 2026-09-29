@@ -5,7 +5,7 @@
 #include "test_util.h"
 #include <string.h>
 
-typedef TC_status (*derive_fn)(const uint8_t*, size_t, const TC_bytes*, size_t, uint8_t*, size_t);
+typedef TC_status (*derive_fn)(TC_bytes, const TC_bytes*, size_t, TC_buffer);
 static const derive_fn functions[] = {TC_SSKDF_SHA256, TC_SSKDF_SHA384};
 static char** capture;
 
@@ -41,7 +41,8 @@ static MunitResult nist_kas_answers(const MunitParameter params[], void* user)
     munit_assert_size(output_len, >, 0);
     munit_assert_size(output_len, <, sizeof output);
     memset(output, 0xa5, sizeof output);
-    munit_assert_int(functions[hash](z, z_len, info, 2, output, output_len), ==, TC_OK);
+    munit_assert_int(
+        functions[hash]((TC_bytes){z, z_len}, info, 2, (TC_buffer){output, output_len}), ==, TC_OK);
     munit_assert_memory_equal(output_len, output, expected);
     munit_assert_uint8(output[output_len], ==, 0xa5);
   }
@@ -68,7 +69,8 @@ static MunitResult captured_answer(const MunitParameter params[], void* user)
   munit_assert_size(length, >, 0);
   for (split = 0; split <= info.length; ++split) {
     const TC_bytes parts[] = {{other, split}, {other + split, info.length - split}};
-    munit_assert_int(functions[hash](z, z_len, parts, 2, output, length), ==, TC_OK);
+    munit_assert_int(functions[hash]((TC_bytes){z, z_len}, parts, 2, (TC_buffer){output, length}),
+                     ==, TC_OK);
     munit_assert_memory_equal(length, output, expected);
   }
   return MUNIT_OK;
@@ -103,7 +105,8 @@ static MunitResult known_answers(const MunitParameter params[], void* user)
       info[2].length = sizeof text - 1 - split;
       for (length = 1; length <= sizeof expected; ++length) {
         memset(output, 0xa5, sizeof output);
-        munit_assert_int(functions[f](z, sizeof z, info, 3, output, length), ==, TC_OK);
+        munit_assert_int(
+            functions[f]((TC_bytes){z, sizeof z}, info, 3, (TC_buffer){output, length}), ==, TC_OK);
         munit_assert_memory_equal(length, output, expected);
         munit_assert_uint8(output[length], ==, 0xa5);
       }
@@ -122,21 +125,31 @@ static MunitResult invalid_arguments(const MunitParameter params[], void* user)
   memset(buffer, 0xa5, sizeof buffer);
   memcpy(saved, buffer, sizeof saved);
   for (f = 0; f < 2; ++f) {
-    munit_assert_int(functions[f](NULL, 1, NULL, 0, buffer, 32), ==, TC_ERROR);
-    munit_assert_int(functions[f](buffer, 0, NULL, 0, buffer + 32, 32), ==, TC_ERROR);
-    munit_assert_int(functions[f](buffer, 32, NULL, 1, buffer + 32, 32), ==, TC_ERROR);
-    munit_assert_int(functions[f](buffer, 32, NULL, 0, NULL, 32), ==, TC_ERROR);
-    munit_assert_int(functions[f](buffer, 32, NULL, 0, buffer + 32, 0), ==, TC_ERROR);
-    munit_assert_int(functions[f](buffer, 32, NULL, 0, buffer + 16, 32), ==, TC_ERROR);
-    munit_assert_int(functions[f](buffer + 32, 32, &info, 1, buffer, 32), ==, TC_ERROR);
-    munit_assert_int(functions[f](buffer, 32, &info, 1, (uint8_t*)&info, sizeof info), ==,
+    munit_assert_int(functions[f]((TC_bytes){NULL, 1}, NULL, 0, (TC_buffer){buffer, 32}), ==,
                      TC_ERROR);
+    munit_assert_int(functions[f]((TC_bytes){buffer, 0}, NULL, 0, (TC_buffer){buffer + 32, 32}), ==,
+                     TC_ERROR);
+    munit_assert_int(functions[f]((TC_bytes){buffer, 32}, NULL, 1, (TC_buffer){buffer + 32, 32}),
+                     ==, TC_ERROR);
+    munit_assert_int(functions[f]((TC_bytes){buffer, 32}, NULL, 0, (TC_buffer){NULL, 32}), ==,
+                     TC_ERROR);
+    munit_assert_int(functions[f]((TC_bytes){buffer, 32}, NULL, 0, (TC_buffer){buffer + 32, 0}), ==,
+                     TC_ERROR);
+    munit_assert_int(functions[f]((TC_bytes){buffer, 32}, NULL, 0, (TC_buffer){buffer + 16, 32}),
+                     ==, TC_ERROR);
+    munit_assert_int(functions[f]((TC_bytes){buffer + 32, 32}, &info, 1, (TC_buffer){buffer, 32}),
+                     ==, TC_ERROR);
+    munit_assert_int(
+        functions[f]((TC_bytes){buffer, 32}, &info, 1, (TC_buffer){(uint8_t*)&info, sizeof info}),
+        ==, TC_ERROR);
     info.data = NULL;
     info.length = 1;
-    munit_assert_int(functions[f](buffer, 32, &info, 1, buffer + 32, 32), ==, TC_ERROR);
+    munit_assert_int(functions[f]((TC_bytes){buffer, 32}, &info, 1, (TC_buffer){buffer + 32, 32}),
+                     ==, TC_ERROR);
     info.data = buffer;
     info.length = SIZE_MAX;
-    munit_assert_int(functions[f](buffer, 32, &info, 1, buffer + 32, 32), ==, TC_ERROR);
+    munit_assert_int(functions[f]((TC_bytes){buffer, 32}, &info, 1, (TC_buffer){buffer + 32, 32}),
+                     ==, TC_ERROR);
     info.length = 16;
     munit_assert_memory_equal(sizeof buffer, buffer, saved);
   }

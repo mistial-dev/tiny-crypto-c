@@ -26,11 +26,11 @@ static int kbkdf_known_answer(void)
   uint8_t fixed[TC_KBKDF_FIXED_INPUT_LEN(sizeof(label) - 1, sizeof(context) - 1)];
   uint8_t out[32];
 
-  if (TC_KBKDF_fixed_input(label, sizeof(label) - 1, context, sizeof(context) - 1, sizeof(out),
-                           fixed, sizeof(fixed)) != TC_OK)
+  if (TC_KBKDF_fixed_input({label, sizeof(label) - 1}, {context, sizeof(context) - 1}, sizeof(out),
+                           {fixed, sizeof(fixed)}) != TC_OK)
     return 1;
-  if (TC_KBKDF_HMAC_SHA256_counter(kdk, sizeof(kdk), &params, NULL, 0, fixed, sizeof(fixed), out,
-                                   sizeof(out)) != TC_OK)
+  if (TC_KBKDF_HMAC_SHA256_counter({kdk, sizeof(kdk)}, &params, {NULL, 0}, {fixed, sizeof(fixed)},
+                                   {out, sizeof(out)}) != TC_OK)
     return 1;
   const int matched = memcmp(out, expected, sizeof(out)) == 0;
   TC_secure_zero(out, sizeof(out)); /* Derived keys are secret. */

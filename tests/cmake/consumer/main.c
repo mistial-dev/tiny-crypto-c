@@ -149,10 +149,12 @@ int main(void)
     return 1;
   if (TC_KMAC256_digest(key, sizeof(key), NULL, 0, NULL, 0, result, sizeof(result)) != TC_OK)
     return 1;
-  if (TC_SSKDF_SHA256(key, sizeof key, NULL, 0, result, sizeof result) != TC_OK)
+  if (TC_SSKDF_SHA256((TC_bytes){key, sizeof key}, NULL, 0, (TC_buffer){result, sizeof result}) !=
+      TC_OK)
     return 1;
   const TC_bytes secret = {key, sizeof key};
-  if (TC_HKDF_SHA256_derive(NULL, 0, &secret, 1, NULL, 0, result, sizeof result) != TC_OK)
+  if (TC_HKDF_SHA256_derive((TC_bytes){NULL, 0}, &secret, 1, (TC_bytes){NULL, 0},
+                            (TC_buffer){result, sizeof result}) != TC_OK)
     return 1;
   key[31] = 1;
   TC_work_budget work = {UINT32_MAX};

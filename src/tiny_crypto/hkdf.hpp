@@ -22,25 +22,22 @@ namespace tiny_crypto {
       bytes salt, const bytes* ikm, size_t ikm_count,                                              \
       uint8_t (&prk)[TC_SHA##N##_DIGESTLEN]) noexcept                                              \
   {                                                                                                \
-    return ::TC_HKDF_SHA##N##_extract(salt.data, salt.length, ikm, ikm_count, prk);                \
+    return ::TC_HKDF_SHA##N##_extract(salt, ikm, ikm_count, prk);                                  \
   }                                                                                                \
-  TC_CPP_NODISCARD inline TC_status hkdf_sha##N##_expand(bytes prk, bytes info, uint8_t* output,   \
-                                                         size_t output_len) noexcept               \
+  TC_CPP_NODISCARD inline TC_status hkdf_sha##N##_expand(bytes prk, bytes info,                    \
+                                                         buffer output) noexcept                   \
   {                                                                                                \
-    return ::TC_HKDF_SHA##N##_expand(prk.data, prk.length, info.data, info.length, output,         \
-                                     output_len);                                                  \
-  }                                                                                                \
-  TC_CPP_NODISCARD inline TC_status hkdf_sha##N##_derive(                                          \
-      bytes salt, const bytes* ikm, size_t ikm_count, bytes info, uint8_t* output,                 \
-      size_t output_len) noexcept                                                                  \
-  {                                                                                                \
-    return ::TC_HKDF_SHA##N##_derive(salt.data, salt.length, ikm, ikm_count, info.data,            \
-                                     info.length, output, output_len);                             \
+    return ::TC_HKDF_SHA##N##_expand(prk, info, output);                                           \
   }                                                                                                \
   TC_CPP_NODISCARD inline TC_status hkdf_sha##N##_derive(                                          \
-      bytes salt, bytes ikm, bytes info, uint8_t* output, size_t output_len) noexcept              \
+      bytes salt, const bytes* ikm, size_t ikm_count, bytes info, buffer output) noexcept          \
   {                                                                                                \
-    return hkdf_sha##N##_derive(salt, &ikm, 1, info, output, output_len);                          \
+    return ::TC_HKDF_SHA##N##_derive(salt, ikm, ikm_count, info, output);                          \
+  }                                                                                                \
+  TC_CPP_NODISCARD inline TC_status hkdf_sha##N##_derive(bytes salt, bytes ikm, bytes info,        \
+                                                         buffer output) noexcept                   \
+  {                                                                                                \
+    return hkdf_sha##N##_derive(salt, &ikm, 1, info, output);                                      \
   }
 
 #if TC_ENABLE_SHA1

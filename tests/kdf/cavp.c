@@ -26,14 +26,11 @@
 
 #if TC_KDF_CAVP && TC_ENABLE_KDF
 
-typedef TC_status (*kdf_counter_fn)(const uint8_t*, size_t, const struct TC_KBKDF_params*,
-                                    const uint8_t*, size_t, const uint8_t*, size_t, uint8_t*,
-                                    size_t);
-typedef TC_status (*kdf_feedback_fn)(const uint8_t*, size_t, const struct TC_KBKDF_params*,
-                                     const uint8_t*, size_t, const uint8_t*, size_t, uint8_t*,
-                                     size_t);
-typedef TC_status (*kdf_pipeline_fn)(const uint8_t*, size_t, const struct TC_KBKDF_params*,
-                                     const uint8_t*, size_t, uint8_t*, size_t);
+typedef TC_status (*kdf_counter_fn)(TC_bytes, const struct TC_KBKDF_params*, TC_bytes, TC_bytes,
+                                    TC_buffer);
+typedef TC_status (*kdf_feedback_fn)(TC_bytes, const struct TC_KBKDF_params*, TC_bytes, TC_bytes,
+                                     TC_buffer);
+typedef TC_status (*kdf_pipeline_fn)(TC_bytes, const struct TC_KBKDF_params*, TC_bytes, TC_buffer);
 
 struct kdf_cavp_prf {
   const char* name;
@@ -258,8 +255,9 @@ static void cavp_run_file(const char* relative, int mode, int has_counter,
           after_len = (size_t)rec.after_len;
         } else
           munit_errorf("%s: unknown CTRLOCATION %s", relative, location);
-        rc = prf->counter(rec.ki, (size_t)rec.ki_len, &p, before, before_len, after, after_len,
-                          actual, (size_t)ko_len);
+        rc =
+            prf->counter((TC_bytes){rec.ki, (size_t)rec.ki_len}, &p, (TC_bytes){before, before_len},
+                         (TC_bytes){after, after_len}, (TC_buffer){actual, (size_t)ko_len});
       } else {
         if (has_counter) {
           if (strcmp(location, "BEFORE_ITER") == 0)
@@ -272,11 +270,13 @@ static void cavp_run_file(const char* relative, int mode, int has_counter,
             munit_errorf("%s: unknown CTRLOCATION %s", relative, location);
         }
         if (mode == KDF_CAVP_MODE_FEEDBACK)
-          rc = prf->feedback(rec.ki, (size_t)rec.ki_len, &p, rec.iv, (size_t)rec.iv_len, rec.fixed,
-                             (size_t)rec.fixed_len, actual, (size_t)ko_len);
+          rc = prf->feedback(
+              (TC_bytes){rec.ki, (size_t)rec.ki_len}, &p, (TC_bytes){rec.iv, (size_t)rec.iv_len},
+              (TC_bytes){rec.fixed, (size_t)rec.fixed_len}, (TC_buffer){actual, (size_t)ko_len});
         else
-          rc = prf->pipeline(rec.ki, (size_t)rec.ki_len, &p, rec.fixed, (size_t)rec.fixed_len,
-                             actual, (size_t)ko_len);
+          rc = prf->pipeline((TC_bytes){rec.ki, (size_t)rec.ki_len}, &p,
+                             (TC_bytes){rec.fixed, (size_t)rec.fixed_len},
+                             (TC_buffer){actual, (size_t)ko_len});
       }
 
       if (rc != TC_OK)

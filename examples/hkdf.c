@@ -21,8 +21,8 @@ int main(void)
    * from SP 800-56C revision 2 passes as two entries. */
   const TC_bytes secret[] = {{ikm, sizeof ikm}};
   memset(ikm, 0x0b, sizeof ikm);
-  if (TC_HKDF_SHA256_derive(salt, sizeof salt, secret, 1, info, sizeof info, key, sizeof key) !=
-      TC_OK) {
+  if (TC_HKDF_SHA256_derive((TC_bytes){salt, sizeof salt}, secret, 1, (TC_bytes){info, sizeof info},
+                            (TC_buffer){key, sizeof key}) != TC_OK) {
     TC_secure_zero(ikm, sizeof ikm);
     return 1;
   }

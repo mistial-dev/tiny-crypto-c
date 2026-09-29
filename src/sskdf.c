@@ -6,11 +6,24 @@
 #if TC_ENABLE_SSKDF
 #include "hash_dispatch_internal.h"
 
-/* ctx is the typed context for info's algorithm, and digest holds one digest. */
-static TC_status derive(const tc_hash_algorithm_info* hash, void* ctx, size_t ctx_size,
-                        uint8_t* digest, const uint8_t* z, size_t z_len, const TC_bytes* info,
-                        size_t count, uint8_t* output, size_t output_len)
+/* Caller-owned hash storage for one derivation. ctx is the typed context for
+ * the algorithm, and digest holds one digest. */
+typedef struct {
+  void* ctx;
+  size_t ctx_size;
+  uint8_t* digest;
+} sskdf_state;
+
+/* Derives exactly out.capacity bytes. */
+static TC_status derive(const tc_hash_algorithm_info* hash, const sskdf_state* state,
+                        TC_bytes secret, const TC_bytes* info, size_t count, TC_buffer out)
 {
+  void* ctx = state->ctx;
+  uint8_t* digest = state->digest;
+  const uint8_t* z = secret.data;
+  const size_t z_len = secret.length;
+  uint8_t* output = out.data;
+  const size_t output_len = out.capacity;
   uint8_t counter[4];
   size_t total, i, offset = 0, take;
   uint32_t round = 1;
@@ -60,7 +73,7 @@ static TC_status derive(const tc_hash_algorithm_info* hash, void* ctx, size_t ct
   }
   status = TC_OK;
 done:
-  TC_secure_zero(ctx, ctx_size);
+  TC_secure_zero(ctx, state->ctx_size);
   TC_secure_zero(digest, digest_length);
   if (status != TC_OK)
     TC_secure_zero(output, output_len);
@@ -68,13 +81,12 @@ done:
 }
 
 #define TC_SSKDF_FAMILY(N, BYTES)                                                                  \
-  TC_status TC_SSKDF_SHA##N(const uint8_t* z, size_t z_len, const TC_bytes* info, size_t count,    \
-                            uint8_t* output, size_t output_len)                                    \
+  TC_status TC_SSKDF_SHA##N(TC_bytes z, const TC_bytes* info, size_t count, TC_buffer output)      \
   {                                                                                                \
     struct TC_SHA##N##_ctx ctx;                                                                    \
     uint8_t digest[BYTES];                                                                         \
-    return derive(&tc_sha##N##_info, &ctx, sizeof ctx, digest, z, z_len, info, count, output,      \
-                  output_len);                                                                     \
+    const sskdf_state state = {&ctx, sizeof ctx, digest};                                          \
+    return derive(&tc_sha##N##_info, &state, z, info, count, output);                              \
   }
 #if TC_ENABLE_SHA256
 TC_SSKDF_FAMILY(256, TC_SHA256_DIGESTLEN)

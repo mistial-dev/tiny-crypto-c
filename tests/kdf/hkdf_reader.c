@@ -8,8 +8,7 @@
 #include <tiny_crypto/hkdf.h>
 #include "test_util.h"
 
-typedef TC_status (*derive_fn)(const uint8_t*, size_t, const TC_bytes*, size_t, const uint8_t*,
-                               size_t, uint8_t*, size_t);
+typedef TC_status (*derive_fn)(TC_bytes, const TC_bytes*, size_t, TC_bytes, TC_buffer);
 
 static derive_fn select_hash(const char* name)
 {
@@ -72,8 +71,9 @@ int main(int argc, char** argv)
     return 2;
   const TC_bytes parts[] = {{ikm_len ? ikm : NULL, ikm_len},
                             {auxiliary_len ? auxiliary : NULL, auxiliary_len}};
-  status = derive(salt_len ? salt : NULL, salt_len, parts, argc == 7 ? 2 : 1,
-                  info_len ? info : NULL, info_len, output, (size_t)output_len);
+  status =
+      derive((TC_bytes){salt_len ? salt : NULL, salt_len}, parts, argc == 7 ? 2 : 1,
+             (TC_bytes){info_len ? info : NULL, info_len}, (TC_buffer){output, (size_t)output_len});
   if (status != TC_OK)
     return 1;
   if (fwrite(output, 1, (size_t)output_len, stdout) != (size_t)output_len)

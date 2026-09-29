@@ -142,8 +142,8 @@ static TC_status finish_response(TC_PIV_SM* session, const TC_PIV_SM_peer* parse
                              {&id_length, 1},       {TC_SM_SYM(workspace).digest, 8},
                              {&nonce_length, 1},    parsed->nonce,
                              {card_control, 2}};
-    status = settings->derive(workspace->secret, settings->coordinate_bytes, info, 9,
-                              TC_SM_SYM(workspace).material, 4 * settings->key_bytes);
+    status = settings->derive((TC_bytes){workspace->secret, settings->coordinate_bytes}, info, 9,
+                              (TC_buffer){TC_SM_SYM(workspace).material, 4 * settings->key_bytes});
   }
   TC_secure_zero(workspace->secret, sizeof workspace->secret);
   if (status != TC_OK)

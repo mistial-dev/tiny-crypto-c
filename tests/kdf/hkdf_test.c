@@ -19,10 +19,9 @@ struct hkdf_vector {
 struct hkdf_family {
   int hash;
   size_t hash_len;
-  TC_status (*extract)(const uint8_t*, size_t, const TC_bytes*, size_t, uint8_t*);
-  TC_status (*expand)(const uint8_t*, size_t, const uint8_t*, size_t, uint8_t*, size_t);
-  TC_status (*derive)(const uint8_t*, size_t, const TC_bytes*, size_t, const uint8_t*, size_t,
-                      uint8_t*, size_t);
+  TC_status (*extract)(TC_bytes, const TC_bytes*, size_t, uint8_t*);
+  TC_status (*expand)(TC_bytes, TC_bytes, TC_buffer);
+  TC_status (*derive)(TC_bytes, const TC_bytes*, size_t, TC_bytes, TC_buffer);
 };
 
 static const struct hkdf_family families[] = {
@@ -82,14 +81,18 @@ static MunitResult test_hkdf_vectors(const MunitParameter params[], void* data)
     output_len = decode(v->okm, expected, sizeof expected);
     munit_assert_size(prk_len, ==, f->hash_len);
     const TC_bytes ikm_part = {ikm_len ? ikm : NULL, ikm_len};
-    munit_assert_int(f->extract(salt_len ? salt : NULL, salt_len, &ikm_part, 1, prk), ==, TC_OK);
+    munit_assert_int(f->extract((TC_bytes){salt_len ? salt : NULL, salt_len}, &ikm_part, 1, prk),
+                     ==, TC_OK);
     munit_assert_memory_equal(prk_len, prk, expected_prk);
-    munit_assert_int(f->expand(prk, prk_len, info_len ? info : NULL, info_len, output, output_len),
+    munit_assert_int(f->expand((TC_bytes){prk, prk_len},
+                               (TC_bytes){info_len ? info : NULL, info_len},
+                               (TC_buffer){output, output_len}),
                      ==, TC_OK);
     munit_assert_memory_equal(output_len, output, expected);
     memset(output, 0, sizeof output);
-    munit_assert_int(f->derive(salt_len ? salt : NULL, salt_len, &ikm_part, 1,
-                               info_len ? info : NULL, info_len, output, output_len),
+    munit_assert_int(f->derive((TC_bytes){salt_len ? salt : NULL, salt_len}, &ikm_part, 1,
+                               (TC_bytes){info_len ? info : NULL, info_len},
+                               (TC_buffer){output, output_len}),
                      ==, TC_OK);
     munit_assert_memory_equal(output_len, output, expected);
   }
@@ -108,14 +111,20 @@ static MunitResult test_hkdf_limits(const MunitParameter params[], void* data)
     const struct hkdf_family* f = &families[i];
     size_t maximum = 255u * f->hash_len;
     memset(output, 0xa5, sizeof output);
-    munit_assert_int(f->expand(prk, f->hash_len, NULL, 0, output, maximum), ==, TC_OK);
+    munit_assert_int(
+        f->expand((TC_bytes){prk, f->hash_len}, (TC_bytes){NULL, 0}, (TC_buffer){output, maximum}),
+        ==, TC_OK);
     munit_assert_uchar(output[maximum], ==, 0xa5);
     munit_assert_uchar(output[maximum - 1u], !=, 0xa5);
     memset(output, 0xa5, sizeof output);
-    munit_assert_int(f->expand(prk, f->hash_len, NULL, 0, output, maximum + 1u), ==, TC_ERROR);
+    munit_assert_int(f->expand((TC_bytes){prk, f->hash_len}, (TC_bytes){NULL, 0},
+                               (TC_buffer){output, maximum + 1u}),
+                     ==, TC_ERROR);
     munit_assert_uchar(output[0], ==, 0xa5);
     munit_assert_uchar(output[maximum], ==, 0xa5);
-    munit_assert_int(f->expand(prk, f->hash_len, NULL, 0, output, SIZE_MAX), ==, TC_ERROR);
+    munit_assert_int(
+        f->expand((TC_bytes){prk, f->hash_len}, (TC_bytes){NULL, 0}, (TC_buffer){output, SIZE_MAX}),
+        ==, TC_ERROR);
     munit_assert_uchar(output[0], ==, 0xa5);
   }
   return MUNIT_OK;
@@ -134,27 +143,47 @@ static MunitResult test_hkdf_arguments(const MunitParameter params[], void* data
   for (i = 0; i < sizeof families / sizeof families[0]; ++i) {
     const struct hkdf_family* f = &families[i];
     memset(output, 0xa5, sizeof output);
-    munit_assert_int(f->extract(NULL, 1, &one, 1, output), ==, TC_ERROR);
+    munit_assert_int(f->extract((TC_bytes){NULL, 1}, &one, 1, output), ==, TC_ERROR);
     munit_assert_uchar(output[0], ==, 0xa5);
-    munit_assert_int(f->extract(input, 1, &missing, 1, output), ==, TC_ERROR);
-    munit_assert_int(f->extract(input, 1, NULL, 1, output), ==, TC_ERROR);
-    munit_assert_int(f->extract(input, 1, &one, 1, input), ==, TC_ERROR);
-    munit_assert_int(f->extract(NULL, 0, aliases_output, 1, output), ==, TC_ERROR);
+    munit_assert_int(f->extract((TC_bytes){input, 1}, &missing, 1, output), ==, TC_ERROR);
+    munit_assert_int(f->extract((TC_bytes){input, 1}, NULL, 1, output), ==, TC_ERROR);
+    munit_assert_int(f->extract((TC_bytes){input, 1}, &one, 1, input), ==, TC_ERROR);
+    munit_assert_int(f->extract((TC_bytes){NULL, 0}, aliases_output, 1, output), ==, TC_ERROR);
     munit_assert_uchar(output[0], ==, 0xa5);
-    munit_assert_int(f->extract(NULL, 0, NULL, 0, output), ==, TC_OK);
-    munit_assert_int(f->extract(NULL, 0, &empty, 1, output), ==, TC_OK);
-    munit_assert_int(f->expand(prk, f->hash_len - 1u, NULL, 0, output, 1), ==, TC_ERROR);
-    munit_assert_int(f->expand(prk, f->hash_len, NULL, 1, output, 1), ==, TC_ERROR);
-    munit_assert_int(f->expand(prk, f->hash_len, NULL, 0, output, 0), ==, TC_ERROR);
-    munit_assert_int(f->expand(prk, f->hash_len, input, 1, input, 1), ==, TC_ERROR);
-    munit_assert_int(f->expand(prk, f->hash_len, NULL, 0, prk, 1), ==, TC_ERROR);
+    munit_assert_int(f->extract((TC_bytes){NULL, 0}, NULL, 0, output), ==, TC_OK);
+    munit_assert_int(f->extract((TC_bytes){NULL, 0}, &empty, 1, output), ==, TC_OK);
+    munit_assert_int(
+        f->expand((TC_bytes){prk, f->hash_len - 1u}, (TC_bytes){NULL, 0}, (TC_buffer){output, 1}),
+        ==, TC_ERROR);
+    munit_assert_int(
+        f->expand((TC_bytes){prk, f->hash_len}, (TC_bytes){NULL, 1}, (TC_buffer){output, 1}), ==,
+        TC_ERROR);
+    munit_assert_int(
+        f->expand((TC_bytes){prk, f->hash_len}, (TC_bytes){NULL, 0}, (TC_buffer){output, 0}), ==,
+        TC_ERROR);
+    munit_assert_int(
+        f->expand((TC_bytes){prk, f->hash_len}, (TC_bytes){input, 1}, (TC_buffer){input, 1}), ==,
+        TC_ERROR);
+    munit_assert_int(
+        f->expand((TC_bytes){prk, f->hash_len}, (TC_bytes){NULL, 0}, (TC_buffer){prk, 1}), ==,
+        TC_ERROR);
     memset(output, 0xa5, sizeof output);
-    munit_assert_int(f->derive(input, 1, &one, 1, input, 1, input, 1), ==, TC_ERROR);
-    munit_assert_int(f->derive(NULL, 0, aliases_output, 1, NULL, 0, output, 1), ==, TC_ERROR);
-    munit_assert_int(f->derive(NULL, 0, NULL, 0, NULL, 0, output, 0), ==, TC_ERROR);
+    munit_assert_int(
+        f->derive((TC_bytes){input, 1}, &one, 1, (TC_bytes){input, 1}, (TC_buffer){input, 1}), ==,
+        TC_ERROR);
+    munit_assert_int(f->derive((TC_bytes){NULL, 0}, aliases_output, 1, (TC_bytes){NULL, 0},
+                               (TC_buffer){output, 1}),
+                     ==, TC_ERROR);
+    munit_assert_int(
+        f->derive((TC_bytes){NULL, 0}, NULL, 0, (TC_bytes){NULL, 0}, (TC_buffer){output, 0}), ==,
+        TC_ERROR);
     munit_assert_uchar(output[0], ==, 0xa5);
-    munit_assert_int(f->derive(NULL, 0, NULL, 0, NULL, 0, output, f->hash_len), ==, TC_OK);
-    munit_assert_int(f->expand(prk, f->hash_len + 1u, NULL, 0, output, 1), ==, TC_OK);
+    munit_assert_int(f->derive((TC_bytes){NULL, 0}, NULL, 0, (TC_bytes){NULL, 0},
+                               (TC_buffer){output, f->hash_len}),
+                     ==, TC_OK);
+    munit_assert_int(
+        f->expand((TC_bytes){prk, f->hash_len + 1u}, (TC_bytes){NULL, 0}, (TC_buffer){output, 1}),
+        ==, TC_OK);
   }
   return MUNIT_OK;
 }
@@ -175,26 +204,31 @@ static MunitResult test_hkdf_parts_and_multiple_expansions(const MunitParameter 
     const struct hkdf_family* f = &families[i];
     const TC_bytes whole = {combined, sizeof combined};
     uint8_t prk[64], ordinary_prk[64], first[77], second[77], expected[77];
-    munit_assert_int(f->extract(salt, sizeof salt, &whole, 1, ordinary_prk), ==, TC_OK);
+    munit_assert_int(f->extract((TC_bytes){salt, sizeof salt}, &whole, 1, ordinary_prk), ==, TC_OK);
     for (size_t split = 0; split <= sizeof combined; ++split) {
       const TC_bytes three[] = {
           {combined, split}, {NULL, 0}, {combined + split, sizeof combined - split}};
-      munit_assert_int(f->extract(salt, sizeof salt, three, 3, prk), ==, TC_OK);
+      munit_assert_int(f->extract((TC_bytes){salt, sizeof salt}, three, 3, prk), ==, TC_OK);
       munit_assert_memory_equal(f->hash_len, prk, ordinary_prk);
     }
-    munit_assert_int(
-        f->expand(prk, f->hash_len, first_info, sizeof first_info, first, sizeof first), ==, TC_OK);
-    munit_assert_int(
-        f->expand(prk, f->hash_len, second_info, sizeof second_info, second, sizeof second), ==,
-        TC_OK);
+    munit_assert_int(f->expand((TC_bytes){prk, f->hash_len},
+                               (TC_bytes){first_info, sizeof first_info},
+                               (TC_buffer){first, sizeof first}),
+                     ==, TC_OK);
+    munit_assert_int(f->expand((TC_bytes){prk, f->hash_len},
+                               (TC_bytes){second_info, sizeof second_info},
+                               (TC_buffer){second, sizeof second}),
+                     ==, TC_OK);
     munit_assert_memory_not_equal(sizeof first, first, second);
     const TC_bytes hybrid[] = {{combined, 3}, {combined + 3, 2}};
-    munit_assert_int(f->derive(salt, sizeof salt, hybrid, 2, first_info, sizeof first_info,
-                               expected, sizeof expected),
+    munit_assert_int(f->derive((TC_bytes){salt, sizeof salt}, hybrid, 2,
+                               (TC_bytes){first_info, sizeof first_info},
+                               (TC_buffer){expected, sizeof expected}),
                      ==, TC_OK);
     munit_assert_memory_equal(sizeof first, first, expected);
-    munit_assert_int(f->derive(salt, sizeof salt, hybrid, 2, second_info, sizeof second_info,
-                               expected, sizeof expected),
+    munit_assert_int(f->derive((TC_bytes){salt, sizeof salt}, hybrid, 2,
+                               (TC_bytes){second_info, sizeof second_info},
+                               (TC_buffer){expected, sizeof expected}),
                      ==, TC_OK);
     munit_assert_memory_equal(sizeof second, second, expected);
   }

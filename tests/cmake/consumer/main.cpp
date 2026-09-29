@@ -69,13 +69,12 @@ int main()
   if (tiny_crypto::ec_validate_public_key(TC_EC_P256, {point, sizeof point}, workspace, ec_work) !=
       TC_EC_OK)
     return 1;
-  if (tiny_crypto::sskdf_sha256({scalar, sizeof scalar}, nullptr, 0, derived, sizeof derived) !=
+  if (tiny_crypto::sskdf_sha256({scalar, sizeof scalar}, nullptr, 0, {derived, sizeof derived}) !=
       TC_OK)
     return 1;
-  if (tiny_crypto::hkdf_sha256_derive(tiny_crypto::bytes{nullptr, 0},
-                                      tiny_crypto::bytes{scalar, sizeof scalar},
-                                      tiny_crypto::bytes{nullptr, 0}, derived,
-                                      sizeof derived) != TC_OK)
+  if (tiny_crypto::hkdf_sha256_derive(
+          tiny_crypto::bytes{nullptr, 0}, tiny_crypto::bytes{scalar, sizeof scalar},
+          tiny_crypto::bytes{nullptr, 0}, {derived, sizeof derived}) != TC_OK)
     return 1;
   session.clear();
   return session.state() != TC_PIV_SM_IDLE;
