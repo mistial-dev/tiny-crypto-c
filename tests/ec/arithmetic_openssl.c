@@ -77,13 +77,13 @@ static MunitResult oracle(const MunitParameter params[], void* user)
       equal_bn(r2, length, expected);
       memset(one, 0, length);
       one[0] = 1;
-      tc_mp_montgomery(one, one, r2, p, n, factor, product, reduced);
-      tc_mp_montgomery(base, base, r2, p, n, factor, product, reduced);
-      tc_mp_power(out, base, exponent, exponent_length, one, p, n, factor, temporary, product,
-                  reduced);
+      const tc_mp_modulus field = {p, n, factor, product, reduced};
+      tc_mp_montgomery(one, one, r2, &field);
+      tc_mp_montgomery(base, base, r2, &field);
+      tc_mp_power(out, base, (TC_bytes){exponent, exponent_length}, one, &field, temporary);
       memset(one, 0, length);
       one[0] = 1;
-      tc_mp_montgomery(out, out, one, p, n, factor, product, reduced);
+      tc_mp_montgomery(out, out, one, &field);
       munit_assert_int(BN_mod_exp(expected, a, e, mod, context), ==, 1);
       equal_bn(out, length, expected);
       if (!sample) {

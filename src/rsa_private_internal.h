@@ -286,19 +286,17 @@ static inline TC_RSA_result tc_rsa_private_operation_magnitude(
   tc_mp_montgomery_r2(r2, p, n, reduced);
   memset(one, 0, length);
   one[0] = 1;
-  tc_mp_montgomery(one, one, r2, p, n, factor, product, reduced);
-  tc_mp_montgomery(blind, blind, r2, p, n, factor, product, reduced);
-  tc_mp_montgomery(inverse, inverse, r2, p, n, factor, product, reduced);
-  tc_mp_montgomery(c, c, r2, p, n, factor, product, reduced);
-  tc_mp_power(result, blind, exponent, exponent_length, one, p, n, factor, temporary, product,
-              reduced);
-  tc_mp_montgomery(blind, c, result, p, n, factor, product, reduced);
-  tc_mp_power_padded(result, blind, d.data, d.length, length, one, p, n, factor, temporary, product,
-                     reduced);
-  tc_mp_montgomery(result, result, inverse, p, n, factor, product, reduced);
+  const tc_mp_modulus field = {p, n, factor, product, reduced};
+  tc_mp_montgomery(one, one, r2, &field);
+  tc_mp_montgomery(blind, blind, r2, &field);
+  tc_mp_montgomery(inverse, inverse, r2, &field);
+  tc_mp_montgomery(c, c, r2, &field);
+  tc_mp_power(result, blind, (TC_bytes){exponent, exponent_length}, one, &field, temporary);
+  tc_mp_montgomery(blind, c, result, &field);
+  tc_mp_power_padded(result, blind, d, length, one, &field, temporary);
+  tc_mp_montgomery(result, result, inverse, &field);
   /* Verify in Montgomery form before converting or publishing the result. */
-  tc_mp_power(blind, result, exponent, exponent_length, one, p, n, factor, temporary, product,
-              reduced);
+  tc_mp_power(blind, result, (TC_bytes){exponent, exponent_length}, one, &field, temporary);
   tc_mp_word difference = 0;
   for (size_t i = 0; i < n; ++i)
     difference |= blind[i] ^ c[i];
@@ -308,7 +306,7 @@ static inline TC_RSA_result tc_rsa_private_operation_magnitude(
   }
   memset(one, 0, length);
   one[0] = 1;
-  tc_mp_montgomery(result, result, one, p, n, factor, product, reduced);
+  tc_mp_montgomery(result, result, one, &field);
   tc_mp_to_be(output, result, length);
 cleanup:
   TC_secure_zero(scratch, required * sizeof *scratch);
@@ -487,18 +485,18 @@ tc_rsa_crt_private_operation(const uint8_t* modulus, size_t length, const uint8_
   tc_mp_montgomery_r2(residues, n_words, n, reduced);
   memset(results, 0, length);
   results[0] = 1;
-  tc_mp_montgomery(results, results, residues, n_words, n, nf, product, reduced);
-  tc_mp_montgomery(blind, blind, residues, n_words, n, nf, product, reduced);
-  tc_mp_montgomery(c, c, residues, n_words, n, nf, product, reduced);
-  tc_mp_power(value, blind, exponent, exponent_length, results, n_words, n, nf, temporary, product,
-              reduced);
-  tc_mp_montgomery(value, c, value, n_words, n, nf, product, reduced);
+  const tc_mp_modulus field = {n_words, n, nf, product, reduced};
+  tc_mp_montgomery(results, results, residues, &field);
+  tc_mp_montgomery(blind, blind, residues, &field);
+  tc_mp_montgomery(c, c, residues, &field);
+  tc_mp_power(value, blind, (TC_bytes){exponent, exponent_length}, results, &field, temporary);
+  tc_mp_montgomery(value, c, value, &field);
   /* The encoded input remains available for the final fault check. Keep R² in
    * c while residues is reused for the two prime fields. */
   memcpy(c, residues, length);
   memset(temporary, 0, length);
   temporary[0] = 1;
-  tc_mp_montgomery(value, value, temporary, n_words, n, nf, product, reduced);
+  tc_mp_montgomery(value, value, temporary, &field);
 
   tc_mp_word* p = factors;
   tc_mp_word* q = factors + h;
@@ -524,14 +522,14 @@ tc_rsa_crt_private_operation(const uint8_t* modulus, size_t length, const uint8_
     tc_mp_montgomery_r2(half_r2, moduli[i], h, half_reduced);
     memset(half_one, 0, prime_length);
     half_one[0] = 1;
-    tc_mp_montgomery(half_one, half_one, half_r2, moduli[i], h, factor, half_product, half_reduced);
-    tc_mp_montgomery(bases[i], bases[i], half_r2, moduli[i], h, factor, half_product, half_reduced);
-    tc_mp_power_padded(outputs[i], bases[i], powers[i].data, powers[i].length, prime_length,
-                       half_one, moduli[i], h, factor, half_temporary, half_product, half_reduced);
+    const tc_mp_modulus half = {moduli[i], h, factor, half_product, half_reduced};
+    tc_mp_montgomery(half_one, half_one, half_r2, &half);
+    tc_mp_montgomery(bases[i], bases[i], half_r2, &half);
+    tc_mp_power_padded(outputs[i], bases[i], powers[i], prime_length, half_one, &half,
+                       half_temporary);
     memset(half_temporary, 0, prime_length);
     half_temporary[0] = 1;
-    tc_mp_montgomery(outputs[i], outputs[i], half_temporary, moduli[i], h, factor, half_product,
-                     half_reduced);
+    tc_mp_montgomery(outputs[i], outputs[i], half_temporary, &half);
   }
 
   /* Garner recombination: m2 + q * ((m1-m2) * qInv mod p). */
@@ -555,15 +553,14 @@ tc_rsa_crt_private_operation(const uint8_t* modulus, size_t length, const uint8_
   /* Unblind modulo n and verify with the public exponent before publication. */
   memset(results, 0, length);
   results[0] = 1;
-  tc_mp_montgomery(results, results, c, n_words, n, nf, product, reduced);
-  tc_mp_montgomery(value, value, c, n_words, n, nf, product, reduced);
-  tc_mp_montgomery(inverse, inverse, c, n_words, n, nf, product, reduced);
-  tc_mp_montgomery(value, value, inverse, n_words, n, nf, product, reduced);
-  tc_mp_power(residues, value, exponent, exponent_length, results, n_words, n, nf, temporary,
-              product, reduced);
+  tc_mp_montgomery(results, results, c, &field);
+  tc_mp_montgomery(value, value, c, &field);
+  tc_mp_montgomery(inverse, inverse, c, &field);
+  tc_mp_montgomery(value, value, inverse, &field);
+  tc_mp_power(residues, value, (TC_bytes){exponent, exponent_length}, results, &field, temporary);
   memset(temporary, 0, length);
   temporary[0] = 1;
-  tc_mp_montgomery(residues, residues, temporary, n_words, n, nf, product, reduced);
+  tc_mp_montgomery(residues, residues, temporary, &field);
   tc_mp_to_be((uint8_t*)temporary, residues, length);
   uint8_t difference = 0;
   for (size_t i = 0; i < length; ++i)
@@ -574,7 +571,7 @@ tc_rsa_crt_private_operation(const uint8_t* modulus, size_t length, const uint8_
   }
   memset(temporary, 0, length);
   temporary[0] = 1;
-  tc_mp_montgomery(value, value, temporary, n_words, n, nf, product, reduced);
+  tc_mp_montgomery(value, value, temporary, &field);
   tc_mp_to_be(output, value, length);
   status = TC_RSA_OK;
 cleanup:

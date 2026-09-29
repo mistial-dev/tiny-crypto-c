@@ -42,7 +42,8 @@ static inline size_t tc_mp_miller_rabin_prepare(const tc_mp_word* p, size_t n, t
   tc_mp_montgomery_r2(odd, p, n, reduced);
   memset(one, 0, length);
   one[0] = 1;
-  tc_mp_montgomery(one, one, odd, p, n, factor, product, reduced);
+  const tc_mp_modulus field = {p, n, factor, product, reduced};
+  tc_mp_montgomery(one, one, odd, &field);
   tc_mp_subtract(minus_one, p, one, n);
   return twos;
 }
@@ -62,14 +63,13 @@ static inline int tc_mp_miller_rabin_round(const tc_mp_word* p, const tc_mp_word
   tc_mp_word* temporary = encoded_base + n;
   tc_mp_word* reduced = temporary + n;
   tc_mp_word* product = reduced + n;
-  const tc_mp_word factor = tc_mp_montgomery_factor(p[0]);
-  tc_mp_montgomery(encoded_base, base, r2, p, n, factor, product, reduced);
-  tc_mp_power(value, encoded_base, exponent, length, one, p, n, factor, temporary, product,
-              reduced);
+  const tc_mp_modulus field = {p, n, tc_mp_montgomery_factor(p[0]), product, reduced};
+  tc_mp_montgomery(encoded_base, base, r2, &field);
+  tc_mp_power(value, encoded_base, (TC_bytes){exponent, length}, one, &field, temporary);
   unsigned passed = (unsigned)(tc_mp_equal(value, one, n) | tc_mp_equal(value, minus_one, n));
   /* Only the first twos-1 squares contribute to the round's result. */
   for (size_t step = 1; step < bits; ++step) {
-    tc_mp_montgomery(value, value, value, p, n, factor, product, reduced);
+    tc_mp_montgomery(value, value, value, &field);
     passed |= (unsigned)(step < twos) & (unsigned)tc_mp_equal(value, minus_one, n);
   }
   return (int)passed;

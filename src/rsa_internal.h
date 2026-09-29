@@ -133,12 +133,13 @@ static inline TC_RSA_result tc_rsa_public_operation(const uint8_t* modulus, size
   }
   memset(one, 0, length);
   one[0] = 1;
-  tc_mp_montgomery(one, one, prepared_r2, p, n, factor, product, reduced);
-  tc_mp_montgomery(base, base, prepared_r2, p, n, factor, product, reduced);
-  tc_mp_power_public(result, base, exponent, exponent_length, one, p, n, factor, product, reduced);
+  const tc_mp_modulus field = {p, n, factor, product, reduced};
+  tc_mp_montgomery(one, one, prepared_r2, &field);
+  tc_mp_montgomery(base, base, prepared_r2, &field);
+  tc_mp_power_public(result, base, (TC_bytes){exponent, exponent_length}, one, &field);
   memset(one, 0, length);
   one[0] = 1;
-  tc_mp_montgomery(result, result, one, p, n, factor, product, reduced);
+  tc_mp_montgomery(result, result, one, &field);
   tc_mp_to_be(out, result, length);
   TC_secure_zero(scratch, required * sizeof *scratch);
   return TC_RSA_OK;

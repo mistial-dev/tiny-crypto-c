@@ -65,10 +65,11 @@ static MunitResult montgomery(const MunitParameter params[], void* user)
         expected = (uint32_t)(((uint64_t)left * right % modulus) * reciprocal % modulus);
         encode(a, left, n);
         encode(b, right, n);
-        tc_mp_montgomery(out, a, b, p, n, n0, product, reduced);
+        const tc_mp_modulus field = {p, n, n0, product, reduced};
+        tc_mp_montgomery(out, a, b, &field);
         encode(reduced, expected, n);
         munit_assert_memory_equal(n * sizeof *out, out, reduced);
-        tc_mp_montgomery(a, a, b, p, n, n0, product, reduced);
+        tc_mp_montgomery(a, a, b, &field);
         munit_assert_memory_equal(n * sizeof *out, out, a);
       }
     }
@@ -95,15 +96,16 @@ static MunitResult full_width(const MunitParameter params[], void* user)
     munit_assert_memory_equal(n * sizeof *r2, r2, expected);
     memcpy(a, p, n * sizeof *a);
     --a[0];
-    tc_mp_montgomery(a, a, r2, p, n, factor, product, reduced);
+    const tc_mp_modulus field = {p, n, factor, product, reduced};
+    tc_mp_montgomery(a, a, r2, &field);
     memcpy(expected, p, n * sizeof *expected);
     expected[0] -= 45;
     munit_assert_memory_equal(n * sizeof *a, a, expected);
-    tc_mp_montgomery(a, a, a, p, n, factor, product, reduced);
+    tc_mp_montgomery(a, a, a, &field);
     encode(expected, 45, n);
     munit_assert_memory_equal(n * sizeof *a, a, expected);
     encode(expected, 1, n);
-    tc_mp_montgomery(a, a, expected, p, n, factor, product, reduced);
+    tc_mp_montgomery(a, a, expected, &field);
     munit_assert_memory_equal(n * sizeof *a, a, expected);
   }
   return MUNIT_OK;
@@ -123,27 +125,27 @@ static MunitResult exponentiation(const MunitParameter params[], void* user)
   for (unsigned bit = 0; bit < 32; ++bit)
     radix = radix * 2 % modulus;
   encode(one, (uint32_t)radix, N);
+  const tc_mp_modulus field = {p, N, factor, product, reduced};
   for (unsigned sample = 0; sample < 128; ++sample) {
     uint32_t value = sample ? (sample * 719u) % modulus : 0;
     uint32_t exponent = sample ? sample * 509u : 0;
     uint8_t encoded[] = {0, (uint8_t)(exponent >> 8), (uint8_t)exponent};
     encode(base, (uint32_t)(value * radix % modulus), N);
-    tc_mp_power(out, base, encoded, sizeof encoded, one, p, N, factor, temporary, product, reduced);
+    tc_mp_power(out, base, (TC_bytes){encoded, sizeof encoded}, one, &field, temporary);
     encode(temporary, (uint32_t)(power(value, exponent, modulus) * radix % modulus), N);
     munit_assert_memory_equal(sizeof out, out, temporary);
-    tc_mp_power(out, base, encoded + 1, 2, one, p, N, factor, temporary, product, reduced);
+    tc_mp_power(out, base, (TC_bytes){encoded + 1, 2}, one, &field, temporary);
     encode(temporary, (uint32_t)(power(value, exponent, modulus) * radix % modulus), N);
     munit_assert_memory_equal(sizeof out, out, temporary);
     for (size_t width = 2; width <= 5; ++width) {
-      tc_mp_power_padded(out, base, encoded + 1, 2, width, one, p, N, factor, temporary, product,
-                         reduced);
+      tc_mp_power_padded(out, base, (TC_bytes){encoded + 1, 2}, width, one, &field, temporary);
       encode(temporary, (uint32_t)(power(value, exponent, modulus) * radix % modulus), N);
       munit_assert_memory_equal(sizeof out, out, temporary);
     }
   }
-  tc_mp_power(out, base, NULL, 0, one, p, N, factor, temporary, product, reduced);
+  tc_mp_power(out, base, (TC_bytes){NULL, 0}, one, &field, temporary);
   munit_assert_memory_equal(sizeof out, out, one);
-  tc_mp_power_padded(out, base, NULL, 0, 4, one, p, N, factor, temporary, product, reduced);
+  tc_mp_power_padded(out, base, (TC_bytes){NULL, 0}, 4, one, &field, temporary);
   munit_assert_memory_equal(sizeof out, out, one);
   return MUNIT_OK;
 }

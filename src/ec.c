@@ -123,7 +123,8 @@ static void sub(ec_state* s, word* out, const word* a, const word* b)
  * -p^-1 mod 2^word_bits is 1. Carry propagation has a fixed loop bound. */
 static void mul(ec_state* s, word* out, const word* a, const word* b)
 {
-  tc_mp_montgomery(out, a, b, F(s, EC_P), s->words, 1, s->w->product, s->w->reduced);
+  const tc_mp_modulus field = {F(s, EC_P), s->words, 1, s->w->product, s->w->reduced};
+  tc_mp_montgomery(out, a, b, &field);
 }
 
 static void copy(ec_state* s, word* out, const word* in)
@@ -270,9 +271,10 @@ static void invert_prime(ec_state* s, word* out, const word* base, const word* o
     word exponent = prime[index];
     if (index == 0)
       exponent = (word)(exponent - 2u);
-    tc_mp_montgomery(out, out, out, prime, s->words, factor, s->w->product, s->w->reduced);
+    const tc_mp_modulus field = {prime, s->words, factor, s->w->product, s->w->reduced};
+    tc_mp_montgomery(out, out, out, &field);
     if ((exponent >> ((i - 1) % TC_EC_WORD_BITS)) & 1u)
-      tc_mp_montgomery(out, out, base, prime, s->words, factor, s->w->product, s->w->reduced);
+      tc_mp_montgomery(out, out, base, &field);
   }
 }
 
@@ -606,7 +608,8 @@ TC_EC_result TC_EC_validate_public_key(TC_EC_curve curve, TC_bytes public_key,
 /* Order arithmetic uses a different Montgomery factor than field arithmetic. */
 static void order_mul(ec_state* s, word* out, const word* a, const word* b)
 {
-  tc_mp_montgomery(out, a, b, F(s, EC_N), s->words, s->order_factor, s->w->product, s->w->reduced);
+  const tc_mp_modulus field = {F(s, EC_N), s->words, s->order_factor, s->w->product, s->w->reduced};
+  tc_mp_montgomery(out, a, b, &field);
 }
 
 static void digest_scalar(ec_state* s, word* out, const uint8_t* digest, size_t digest_len)
