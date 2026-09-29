@@ -33,6 +33,8 @@
 #include <tiny_crypto/x509_crypto.h>
 #include "x509_crl_harness.h"
 
+static const TC_CMS_verification_policy cms_policy = {.envelope = TC_CMS_ENVELOPE_BER};
+
 /* Verify through the native provider's digest callback. max_work is the
  * provider's per-signature budget, so 0 exercises its LIMIT path. */
 static TC_X509_signature_result verify_digest_native(const TC_signature_algorithm* algorithm,
@@ -393,10 +395,11 @@ static MunitResult content_signature(const MunitParameter params[], void* user)
     munit_assert_int(
         EVP_DigestSign(signer, signature, &signature_length, attributes, attributes_length), ==, 1);
     attributes[0] = 0xa0;
-    munit_assert_int(TC_CMS_signed_attributes_read((TC_bytes){attributes, attributes_length}, mode,
-                                                   &limits, (TC_TLV_frames){frames, FRAME_CAPACITY},
-                                                   &work, &parsed),
-                     ==, TC_TLV_OK);
+    munit_assert_int(
+        TC_CMS_signed_attributes_read((TC_bytes){attributes, attributes_length},
+                                      &(TC_CMS_verification_policy){.attributes = mode}, &limits,
+                                      (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &parsed),
+        ==, TC_TLV_OK);
     munit_assert_int(TC_CMS_content_digest((TC_bytes){content, sizeof content}, TC_HASH_SHA256,
                                            &limits, (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
                                            digest, sizeof digest),
@@ -427,16 +430,16 @@ static MunitResult content_signature(const MunitParameter params[], void* user)
       info.signed_attributes = (TC_bytes){attributes, attributes_length};
       info.signature = (TC_bytes){encoded_signature, signature_length + TLV_HEADER_BYTES};
       size_t verification_work = WORK_BUDGET;
-      munit_assert_int(
-          TC_CMS_signer_verify_digest(
-              &(TC_CMS_signer_verify_request){&info,
-                                              (TC_bytes){content_type, sizeof content_type},
-                                              {mode, TC_CMS_RSA_PARAMETERS_NULL},
-                                              &key,
-                                              &provider,
-                                              &limits},
-              (TC_bytes){digest, sizeof digest}, &verification, &verification_work),
-          ==, TC_X509_SIGNATURE_VALID);
+      munit_assert_int(TC_CMS_signer_verify_digest(
+                           &(TC_CMS_signer_verify_request){
+                               &info,
+                               (TC_bytes){content_type, sizeof content_type},
+                               {.attributes = mode, .rsa_parameters = TC_CMS_RSA_PARAMETERS_NULL},
+                               &key,
+                               &provider,
+                               &limits},
+                           (TC_bytes){digest, sizeof digest}, &verification, &verification_work),
+                       ==, TC_X509_SIGNATURE_VALID);
       {
         uint8_t cached_digest[TC_CMS_SIGNED_DIGEST_BYTES];
         tc_cms_signed_attrs_cache cache = {0};
@@ -448,35 +451,41 @@ static MunitResult content_signature(const MunitParameter params[], void* user)
         retry_provider.context = &retry;
         retry_provider.verify_digest = retry_digest;
         verification_work = WORK_BUDGET;
-        munit_assert_int(tc_cms_signer_verify(
-                             &(TC_CMS_signer_verify_request){
-                                 &info, (TC_bytes){content_type, sizeof content_type},
-                                 (TC_CMS_verification_policy){mode, TC_CMS_RSA_PARAMETERS_NULL},
-                                 &key, &retry_provider, &limits},
-                             (TC_bytes){digest, sizeof digest}, TC_CMS_VERIFY_DIGEST, &verification,
-                             &verification_work, NULL, &cache),
-                         ==, TC_X509_SIGNATURE_INVALID);
+        munit_assert_int(
+            tc_cms_signer_verify(
+                &(TC_CMS_signer_verify_request){
+                    &info, (TC_bytes){content_type, sizeof content_type},
+                    (TC_CMS_verification_policy){.attributes = mode,
+                                                 .rsa_parameters = TC_CMS_RSA_PARAMETERS_NULL},
+                    &key, &retry_provider, &limits},
+                (TC_bytes){digest, sizeof digest}, TC_CMS_VERIFY_DIGEST, &verification,
+                &verification_work, NULL, &cache),
+            ==, TC_X509_SIGNATURE_INVALID);
         munit_assert_int(cache.valid, ==, 1);
         verification_work = WORK_BUDGET;
-        munit_assert_int(tc_cms_signer_verify(
-                             &(TC_CMS_signer_verify_request){
-                                 &info, (TC_bytes){content_type, sizeof content_type},
-                                 (TC_CMS_verification_policy){mode, TC_CMS_RSA_PARAMETERS_NULL},
-                                 &key, &retry_provider, &limits},
-                             (TC_bytes){digest, sizeof digest}, TC_CMS_VERIFY_DIGEST, &verification,
-                             &verification_work, NULL, &cache),
-                         ==, TC_X509_SIGNATURE_VALID);
+        munit_assert_int(
+            tc_cms_signer_verify(
+                &(TC_CMS_signer_verify_request){
+                    &info, (TC_bytes){content_type, sizeof content_type},
+                    (TC_CMS_verification_policy){.attributes = mode,
+                                                 .rsa_parameters = TC_CMS_RSA_PARAMETERS_NULL},
+                    &key, &retry_provider, &limits},
+                (TC_bytes){digest, sizeof digest}, TC_CMS_VERIFY_DIGEST, &verification,
+                &verification_work, NULL, &cache),
+            ==, TC_X509_SIGNATURE_VALID);
         cached_remaining = verification_work;
         munit_assert_size(retry.calls, ==, 2);
         verification_work = WORK_BUDGET;
-        munit_assert_int(tc_cms_signer_verify(
-                             &(TC_CMS_signer_verify_request){
-                                 &info, (TC_bytes){content_type, sizeof content_type},
-                                 (TC_CMS_verification_policy){mode, TC_CMS_RSA_PARAMETERS_NULL},
-                                 &key, &provider, &limits},
-                             (TC_bytes){digest, sizeof digest}, TC_CMS_VERIFY_DIGEST, &verification,
-                             &verification_work, NULL, NULL),
-                         ==, TC_X509_SIGNATURE_VALID);
+        munit_assert_int(
+            tc_cms_signer_verify(
+                &(TC_CMS_signer_verify_request){
+                    &info, (TC_bytes){content_type, sizeof content_type},
+                    (TC_CMS_verification_policy){.attributes = mode,
+                                                 .rsa_parameters = TC_CMS_RSA_PARAMETERS_NULL},
+                    &key, &provider, &limits},
+                (TC_bytes){digest, sizeof digest}, TC_CMS_VERIFY_DIGEST, &verification,
+                &verification_work, NULL, NULL),
+            ==, TC_X509_SIGNATURE_VALID);
         uncached_remaining = verification_work;
         munit_assert_size(cached_remaining, >, uncached_remaining);
       }
@@ -486,7 +495,8 @@ static MunitResult content_signature(const MunitParameter params[], void* user)
             TC_CMS_signer_verify_digest(
                 &(TC_CMS_signer_verify_request){&info,
                                                 (TC_bytes){content_type, sizeof content_type},
-                                                {TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
+                                                {.attributes = TC_CMS_ATTRIBUTES_DER,
+                                                 .rsa_parameters = TC_CMS_RSA_PARAMETERS_NULL},
                                                 &key,
                                                 &provider,
                                                 &limits},
@@ -495,16 +505,16 @@ static MunitResult content_signature(const MunitParameter params[], void* user)
       }
       encoded_signature[signature_length + TLV_HEADER_BYTES - 1] ^= 1;
       verification_work = WORK_BUDGET;
-      munit_assert_int(
-          TC_CMS_signer_verify_digest(
-              &(TC_CMS_signer_verify_request){&info,
-                                              (TC_bytes){content_type, sizeof content_type},
-                                              {mode, TC_CMS_RSA_PARAMETERS_NULL},
-                                              &key,
-                                              &provider,
-                                              &limits},
-              (TC_bytes){digest, sizeof digest}, &verification, &verification_work),
-          ==, TC_X509_SIGNATURE_INVALID);
+      munit_assert_int(TC_CMS_signer_verify_digest(
+                           &(TC_CMS_signer_verify_request){
+                               &info,
+                               (TC_bytes){content_type, sizeof content_type},
+                               {.attributes = mode, .rsa_parameters = TC_CMS_RSA_PARAMETERS_NULL},
+                               &key,
+                               &provider,
+                               &limits},
+                           (TC_bytes){digest, sizeof digest}, &verification, &verification_work),
+                       ==, TC_X509_SIGNATURE_INVALID);
     }
 
     /* Changed content must fail binding even though signedAttrs still verify.
@@ -537,8 +547,8 @@ static MunitResult content_signature(const MunitParameter params[], void* user)
       memcpy(&saved, &parsed, sizeof saved);
       work = WORK_BUDGET;
       munit_assert_int(TC_CMS_signed_attributes_read(
-                           (TC_bytes){attributes, attributes_length}, TC_CMS_ATTRIBUTES_DER,
-                           &limits, (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &parsed),
+                           (TC_bytes){attributes, attributes_length}, &cms_policy, &limits,
+                           (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &parsed),
                        ==, TC_TLV_INVALID);
       munit_assert_memory_equal(sizeof parsed, &parsed, &saved);
     }
@@ -618,7 +628,8 @@ static MunitResult rsa_signature(const MunitParameter params[], void* user)
           TC_CMS_signer_verify_digest(
               &(TC_CMS_signer_verify_request){&info,
                                               (TC_bytes){data_type, sizeof data_type},
-                                              {TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
+                                              {.attributes = TC_CMS_ATTRIBUTES_DER,
+                                               .rsa_parameters = TC_CMS_RSA_PARAMETERS_NULL},
                                               &key,
                                               &provider,
                                               &limits},
@@ -630,7 +641,8 @@ static MunitResult rsa_signature(const MunitParameter params[], void* user)
           TC_CMS_signer_verify_digest(
               &(TC_CMS_signer_verify_request){&info,
                                               (TC_bytes){data_type, sizeof data_type},
-                                              {TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
+                                              {.attributes = TC_CMS_ATTRIBUTES_DER,
+                                               .rsa_parameters = TC_CMS_RSA_PARAMETERS_NULL},
                                               &key,
                                               &provider,
                                               &limits},
@@ -728,18 +740,18 @@ static MunitResult signed_data(const MunitParameter params[], void* user)
     munit_assert_size((size_t)encoded_length, <=, sizeof encoded);
     cursor = encoded;
     munit_assert_int(i2d_CMS_ContentInfo(cms, &cursor), ==, encoded_length);
-    munit_assert_int(tc_cms_signed_data_read((TC_bytes){encoded, (size_t)encoded_length}, &limits,
-                                             (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
-                                             &container),
-                     ==, TC_TLV_OK);
+    munit_assert_int(
+        tc_cms_signed_data_read((TC_bytes){encoded, (size_t)encoded_length}, TC_TLV_BER, &limits,
+                                (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &container),
+        ==, TC_TLV_OK);
     munit_assert_true(container.has_content);
-    munit_assert_int(tc_cms_signed_data_version_check(&container, &limits, &workspace), ==,
-                     TC_TLV_OK);
+    munit_assert_int(tc_cms_signed_data_version_check(&container, TC_TLV_BER, &limits, &workspace),
+                     ==, TC_TLV_OK);
     ++container.version;
-    munit_assert_int(tc_cms_signed_data_version_check(&container, &limits, &workspace), ==,
-                     TC_TLV_INVALID);
+    munit_assert_int(tc_cms_signed_data_version_check(&container, TC_TLV_BER, &limits, &workspace),
+                     ==, TC_TLV_INVALID);
     --container.version;
-    munit_assert_int(TC_CMS_signers_init(container.signers, &limits,
+    munit_assert_int(TC_CMS_signers_init(container.signers, &cms_policy, &limits,
                                          (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &signers),
                      ==, TC_TLV_OK);
     munit_assert_int(
@@ -830,9 +842,9 @@ static MunitResult signed_data(const MunitParameter params[], void* user)
     uint8_t content_digest_bytes[TC_SHA512_DIGESTLEN];
     memcpy(content_digest_bytes, digest, hash.digest_length);
     const TC_bytes computed_content = {content_digest_bytes, hash.digest_length};
-    munit_assert_int(TC_CMS_signed_attributes_read(signer.signed_attributes, TC_CMS_ATTRIBUTES_DER,
-                                                   &limits, (TC_TLV_frames){frames, FRAME_CAPACITY},
-                                                   &work, &attributes),
+    munit_assert_int(TC_CMS_signed_attributes_read(signer.signed_attributes, &cms_policy, &limits,
+                                                   (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
+                                                   &attributes),
                      ==, TC_TLV_OK);
     munit_assert_int(
         TC_CMS_content_digest_check(&attributes, container.content_type, algorithm.content_hash,
@@ -847,7 +859,8 @@ static MunitResult signed_data(const MunitParameter params[], void* user)
           TC_CMS_signer_verify_digest(
               &(TC_CMS_signer_verify_request){&signer,
                                               container.content_type,
-                                              {TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
+                                              {.attributes = TC_CMS_ATTRIBUTES_DER,
+                                               .rsa_parameters = TC_CMS_RSA_PARAMETERS_NULL},
                                               &key,
                                               &provider,
                                               &limits},
@@ -874,7 +887,8 @@ static MunitResult signed_data(const MunitParameter params[], void* user)
           TC_CMS_signer_verify_digest(
               &(TC_CMS_signer_verify_request){&signer,
                                               container.content_type,
-                                              {TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
+                                              {.attributes = TC_CMS_ATTRIBUTES_DER,
+                                               .rsa_parameters = TC_CMS_RSA_PARAMETERS_NULL},
                                               &key,
                                               &provider,
                                               &limits},
@@ -886,7 +900,8 @@ static MunitResult signed_data(const MunitParameter params[], void* user)
           TC_CMS_signer_verify_digest(
               &(TC_CMS_signer_verify_request){&signer,
                                               container.content_type,
-                                              {TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
+                                              {.attributes = TC_CMS_ATTRIBUTES_DER,
+                                               .rsa_parameters = TC_CMS_RSA_PARAMETERS_NULL},
                                               &key,
                                               &provider,
                                               &limits},
@@ -898,7 +913,8 @@ static MunitResult signed_data(const MunitParameter params[], void* user)
           TC_CMS_signer_verify_digest(
               &(TC_CMS_signer_verify_request){&signer,
                                               container.content_type,
-                                              {TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
+                                              {.attributes = TC_CMS_ATTRIBUTES_DER,
+                                               .rsa_parameters = TC_CMS_RSA_PARAMETERS_NULL},
                                               &key,
                                               &provider,
                                               &limits},
@@ -963,7 +979,7 @@ static MunitResult signed_data(const MunitParameter params[], void* user)
         signer_length += 2;
         work = WORK_BUDGET;
         munit_assert_int(
-            TC_CMS_signer_info_read((TC_bytes){signer_encoded, signer_length}, TC_TLV_BER, &limits,
+            TC_CMS_signer_info_read((TC_bytes){signer_encoded, signer_length}, &cms_policy, &limits,
                                     (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &parsed_chunks),
             ==, TC_TLV_OK);
         munit_assert_uint(parsed_chunks.version, ==, signer.version);
@@ -985,7 +1001,8 @@ static MunitResult signed_data(const MunitParameter params[], void* user)
             TC_CMS_signer_verify_digest(
                 &(TC_CMS_signer_verify_request){&parsed_chunks,
                                                 container.content_type,
-                                                {TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
+                                                {.attributes = TC_CMS_ATTRIBUTES_DER,
+                                                 .rsa_parameters = TC_CMS_RSA_PARAMETERS_NULL},
                                                 &key,
                                                 &provider,
                                                 &limits},
@@ -995,16 +1012,17 @@ static MunitResult signed_data(const MunitParameter params[], void* user)
           TC_CMS_signature_workspace short_workspace = verification;
           short_workspace.signature_capacity = signature.length - 1;
           verification_work = WORK_BUDGET;
-          munit_assert_int(TC_CMS_signer_verify_digest(
-                               &(TC_CMS_signer_verify_request){
-                                   &parsed_chunks,
-                                   container.content_type,
-                                   {TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
-                                   &key,
-                                   &provider,
-                                   &limits},
-                               computed_content, &short_workspace, &verification_work),
-                           ==, TC_X509_SIGNATURE_LIMIT);
+          munit_assert_int(
+              TC_CMS_signer_verify_digest(
+                  &(TC_CMS_signer_verify_request){&parsed_chunks,
+                                                  container.content_type,
+                                                  {.attributes = TC_CMS_ATTRIBUTES_DER,
+                                                   .rsa_parameters = TC_CMS_RSA_PARAMETERS_NULL},
+                                                  &key,
+                                                  &provider,
+                                                  &limits},
+                  computed_content, &short_workspace, &verification_work),
+              ==, TC_X509_SIGNATURE_LIMIT);
           munit_assert_ptr_equal(joined.data, scratch);
           scratch[joined.length - 1] ^= 1;
           munit_assert_int(verify_digest_native(&algorithm.signature, &key,
@@ -1250,11 +1268,12 @@ static MunitResult revocations(const MunitParameter params[], void* user)
     cursor = encoded;
     munit_assert_int(i2d_CMS_ContentInfo(cms, &cursor), ==, length);
     work = WORK_BUDGET;
-    munit_assert_int(tc_cms_signed_data_read((TC_bytes){encoded, (size_t)length}, &limits,
-                                             (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
-                                             &container),
+    munit_assert_int(tc_cms_signed_data_read((TC_bytes){encoded, (size_t)length}, TC_TLV_BER,
+                                             &limits, (TC_TLV_frames){frames, FRAME_CAPACITY},
+                                             &work, &container),
                      ==, TC_TLV_OK);
-    munit_assert_int(tc_cms_signed_data_version_check(&container, &limits, &tree), ==, TC_TLV_OK);
+    munit_assert_int(tc_cms_signed_data_version_check(&container, TC_TLV_BER, &limits, &tree), ==,
+                     TC_TLV_OK);
     munit_assert_int(
         tc_pki_tree_open(container.revocations, 0xa1, TC_TLV_BER, &limits, &tree, &records), ==,
         TC_TLV_OK);
@@ -5506,7 +5525,7 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
   const TC_bytes target = {leaf_der, leaf_length};
   munit_assert_int(TC_X509_path_build(target, &external, &options, &validation, &search, &found),
                    ==, TC_X509_PATH_INVALID);
-  munit_assert_int(tc_cms_signed_data_read((TC_bytes){encoded, (size_t)length}, &limits,
+  munit_assert_int(tc_cms_signed_data_read((TC_bytes){encoded, (size_t)length}, TC_TLV_BER, &limits,
                                            (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
                                            &container),
                    ==, TC_TLV_OK);
@@ -5534,7 +5553,7 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
     const TC_CMS_signature_workspace signature = {frames, FRAME_CAPACITY, NULL, 0};
     const TC_bytes content_digest = {digest, sizeof digest};
     work = WORK_BUDGET;
-    munit_assert_int(TC_CMS_signers_init(container.signers, &limits,
+    munit_assert_int(TC_CMS_signers_init(container.signers, &cms_policy, &limits,
                                          (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &signers),
                      ==, TC_TLV_OK);
     munit_assert_int(
@@ -5559,7 +5578,8 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
             &candidates,
             &(tc_cms_signer_search){
                 &signer, container.content_type, content_digest,
-                (TC_CMS_verification_policy){TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
+                (TC_CMS_verification_policy){.attributes = TC_CMS_ATTRIBUTES_DER,
+                                             .rsa_parameters = TC_CMS_RSA_PARAMETERS_NULL},
                 &indexed, &options, &tree, &signature, &validation, &search, NULL},
             &found),
         ==, TC_X509_PATH_VALID);
@@ -5575,7 +5595,8 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
             &candidates,
             &(tc_cms_signer_search){
                 &signer, container.content_type, content_digest,
-                (TC_CMS_verification_policy){TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
+                (TC_CMS_verification_policy){.attributes = TC_CMS_ATTRIBUTES_DER,
+                                             .rsa_parameters = TC_CMS_RSA_PARAMETERS_NULL},
                 &indexed, &options, &tree, &signature, &validation, &search, NULL},
             &found),
         ==, TC_X509_PATH_VALID);
@@ -5583,8 +5604,7 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
     {
       uint8_t signature_bytes[SIGNATURE_CAPACITY];
       uint8_t signed_digest[TC_CMS_SIGNED_DIGEST_BYTES];
-      TC_CMS_path_options settings = {options, INDEX_CAPACITY, CMS_CAPACITY, TC_CMS_ATTRIBUTES_DER,
-                                      TC_CMS_RSA_PARAMETERS_NULL};
+      TC_CMS_path_options settings = {options, INDEX_CAPACITY, CMS_CAPACITY, {0}};
       TC_CMS_path_workspace workspace = {validation,      search,
                                          index,           INDEX_CAPACITY,
                                          signature_bytes, sizeof signature_bytes,
@@ -5863,12 +5883,12 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
             for (unsigned variant = 0; variant < 4; ++variant) {
               const int allow = variant == 1, invalid_policy = variant >= 2;
               TC_CMS_path_options policy = credential_settings;
-              policy.rsa_parameters =
+              policy.verification.rsa_parameters =
                   allow ? TC_CMS_RSA_PARAMETERS_ALLOW_ABSENT : TC_CMS_RSA_PARAMETERS_NULL;
               if (variant == 2)
-                policy.rsa_parameters = (TC_CMS_rsa_parameters)-1;
+                policy.verification.rsa_parameters = (TC_CMS_rsa_parameters)-1;
               if (variant == 3)
-                policy.attributes = (TC_CMS_attribute_encoding)-1;
+                policy.verification.attributes = (TC_CMS_attribute_encoding)-1;
               work = WORK_BUDGET;
               memset(&found, 0xa5, sizeof found);
               TC_X509_search_result preserved;
@@ -6541,7 +6561,8 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
               &candidates,
               &(tc_cms_signer_search){
                   &proposed, container.content_type, content_digest,
-                  (TC_CMS_verification_policy){TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
+                  (TC_CMS_verification_policy){.attributes = TC_CMS_ATTRIBUTES_DER,
+                                               .rsa_parameters = TC_CMS_RSA_PARAMETERS_NULL},
                   &source, &checked, &tree, &signature, &validation, &search, NULL},
               &found),
           ==, failures[i].status);
@@ -6578,7 +6599,8 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
                 &retries,
                 &(tc_cms_signer_search){
                     &signer, container.content_type, content_digest,
-                    (TC_CMS_verification_policy){TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
+                    (TC_CMS_verification_policy){.attributes = TC_CMS_ATTRIBUTES_DER,
+                                                 .rsa_parameters = TC_CMS_RSA_PARAMETERS_NULL},
                     &indexed, &checked, &tree, &signature, &validation, &search, NULL},
                 &found),
             ==,
@@ -6662,18 +6684,51 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
     encoded[signature_offset] ^= 1;
   }
   {
+    /* Signed attributes beyond the interpreted set. RFC 6211 section 3.1
+     * applies its checks to validators that support the attribute, and
+     * RFC 5035 section 2 recommends recognizing the signing-certificate
+     * attributes. The default policy skips both. */
+    static const uint8_t algorithm_protection[] = {
+        0x30, 0x19, 0x30, 0x0b, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02,
+        0x01, 0xa1, 0x0a, 0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x04, 0x03, 0x02};
+    static const uint8_t signing_certificate_v2[] = {
+        0x30, 0x26, 0x30, 0x24, 0x30, 0x22, 0x04, 0x20, 1,  2,  3,  4,  5,  6,
+        7,    8,    9,    10,   11,   12,   13,   14,   15, 16, 17, 18, 19, 20,
+        21,   22,   23,   24,   25,   26,   27,   28,   29, 30, 31, 32};
+    enum {
+      NAMED,           /* pivSigner-DN matches the signer under PIV identifiers. */
+      WRONG_NAME,      /* pivSigner-DN names another certificate. */
+      LISTED,          /* Adds cmsAlgorithmProtection and signingCertificateV2. */
+      LISTED_REJECTED, /* The same attributes under TC_CMS_OTHER_ATTRIBUTES_REJECT. */
+      GENERIC_NAME,    /* pivSigner-DN outside the CMS identifiers. */
+      GENERIC_SKIPPED, /* The wrong pivSigner-DN skipped by SKIP_ALL under CMS identifiers. */
+      CASE_COUNT
+    };
     uint8_t signed_digest[TC_CMS_SIGNED_DIGEST_BYTES];
-    const TC_CMS_path_options settings = {options, INDEX_CAPACITY, CMS_CAPACITY,
-                                          TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL};
     const TC_CMS_path_workspace workspace = {
         validation, search, index, INDEX_CAPACITY, NULL, 0, signed_digest, sizeof signed_digest};
     static const uint8_t id_data[] = {0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 1, 7, 1};
-    for (unsigned wrong_name = 0; wrong_name < 2; ++wrong_name) {
+    for (unsigned scenario = 0; scenario < CASE_COUNT; ++scenario) {
+      const int wrong_name = scenario == WRONG_NAME || scenario == GENERIC_SKIPPED;
+      TC_CMS_path_options settings = {
+          options, INDEX_CAPACITY, CMS_CAPACITY, {.attribute_oids = TC_CMS_ATTRIBUTE_OIDS_PIV}};
+      if (scenario == LISTED_REJECTED)
+        settings.verification.other_attributes = TC_CMS_OTHER_ATTRIBUTES_REJECT;
+      if (scenario == GENERIC_NAME || scenario == GENERIC_SKIPPED)
+        settings.verification.attribute_oids = TC_CMS_ATTRIBUTE_OIDS_CMS;
+      if (scenario == GENERIC_SKIPPED)
+        settings.verification.other_attributes = TC_CMS_OTHER_ATTRIBUTES_SKIP_ALL;
       CMS_ContentInfo* named = CMS_sign(leaf, leaf_key, NULL, NULL, cms_flags | CMS_PARTIAL);
       BIO* named_content = BIO_new_mem_buf(message, (int)message_length);
       munit_assert_not_null(named);
       munit_assert_not_null(named_content);
       set_cms_signer_name(named, X509_get_subject_name(wrong_name ? root : leaf));
+      if (scenario == LISTED || scenario == LISTED_REJECTED) {
+        add_cms_sequence_attribute(named, "1.2.840.113549.1.9.52", algorithm_protection,
+                                   (int)sizeof algorithm_protection);
+        add_cms_sequence_attribute(named, "1.2.840.113549.1.9.16.2.47", signing_certificate_v2,
+                                   (int)sizeof signing_certificate_v2);
+      }
       munit_assert_int(CMS_add1_cert(named, intermediate), ==, 1);
       munit_assert_int(CMS_final(named, named_content, NULL, cms_flags), ==, 1);
       munit_assert_int(
@@ -6687,6 +6742,10 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
       TC_X509_search_result saved;
       memset(&saved, 0xa5, sizeof saved);
       memcpy(&found, &saved, sizeof found);
+      const TC_X509_path_status expected = scenario == WRONG_NAME ? TC_X509_PATH_INVALID
+                                           : scenario == LISTED_REJECTED || scenario == GENERIC_NAME
+                                               ? TC_X509_PATH_UNSUPPORTED
+                                               : TC_X509_PATH_VALID;
       munit_assert_int(TC_CMS_signed_data_path_build(
                            &(TC_CMS_validation_request){(TC_bytes){encoded, (size_t)length},
                                                         0,
@@ -6695,8 +6754,8 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
                                                         detached ? 1u : 0u,
                                                         {NULL, 0}},
                            &external, &settings, &workspace, &work, &found),
-                       ==, wrong_name ? TC_X509_PATH_INVALID : TC_X509_PATH_VALID);
-      if (wrong_name)
+                       ==, expected);
+      if (expected != TC_X509_PATH_VALID)
         munit_assert_memory_equal(sizeof found, &found, &saved);
       BIO_free(named_content);
       CMS_ContentInfo_free(named);
@@ -7312,9 +7371,10 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
     munit_assert_int(TC_PIV_CHUID_read((TC_bytes){encoded, length}, TC_PIV_CHUID_CONTENTS,
                                        (TC_PIV_CHUID_profile)profile, &chuid),
                      ==, TC_TLV_OK);
-    munit_assert_int(TC_PIV_CMS_read(chuid.signature, TC_PIV_CMS_CHUID, TC_PIV_OIDS_TWIC_COMPATIBLE,
-                                     TC_CMS_ATTRIBUTES_DER, &limits,
-                                     (TC_TLV_frames){frames, FRAME_COUNT}, &work, &object),
+    munit_assert_int(TC_PIV_CMS_read(chuid.signature, TC_PIV_CMS_CHUID,
+                                     &(TC_CMS_verification_policy){
+                                         .attribute_oids = TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC},
+                                     &limits, (TC_TLV_frames){frames, FRAME_COUNT}, &work, &object),
                      ==, TC_TLV_OK);
     TC_CMS_signer_info signer = object.signer;
     TC_CMS_signed_attributes attributes = object.attributes;
@@ -7354,7 +7414,7 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
                            TC_X509_PATH_INHIBIT_ANY_PURPOSE;
       options.max_candidates = EXAMPLE_CMS_CERTIFICATE_CAPACITY;
       options.max_candidate_bytes = OBJECT_BYTES;
-      options.attributes = TC_CMS_ATTRIBUTES_DER;
+      options.verification.attribute_oids = TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC;
       TC_X509_path_options crl_policy = options.path;
       crl_policy.purpose = (TC_bytes){NULL, 0};
       crl_policy.key_usage = TC_KEY_USAGE_CRL_SIGN;
@@ -7419,15 +7479,21 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
         TC_PIV_CHUID_result saved_chuid;
         memcpy(&saved_chuid, &accepted_chuid, sizeof saved_chuid);
         work = TRUST_WORK;
-        const int profile_rejected =
-            profile == TC_CHUID_PROFILE_PIV &&
-            (!strcmp(fascn_namespace, "twic") || strcmp(signing_policy, "required"));
+        /* twicFASC-N lies outside the PIV attribute identifiers, so the PIV
+         * profile reads it as an unsupported attribute. Altered content fails
+         * the card binding before the signature object is read. */
+        const int namespace_rejected = profile == TC_CHUID_PROFILE_PIV &&
+                                       !strcmp(fascn_namespace, "twic") &&
+                                       variant != ALTERED_CONTENT;
+        const int profile_rejected = namespace_rejected || (profile == TC_CHUID_PROFILE_PIV &&
+                                                            strcmp(signing_policy, "required"));
         const int purpose_rejected = profile == TC_CHUID_PROFILE_PIV && twic_purpose;
         memset(&storage, 0xa5, sizeof storage);
         const uint8_t* wiped = (const uint8_t*)&storage;
         munit_assert_int(
             TC_PIV_CHUID_validate(&object_request, &object_context, &work, &accepted_chuid), ==,
             purpose_rejected                        ? TC_CREDENTIAL_ERROR
+            : namespace_rejected                    ? TC_CREDENTIAL_UNSUPPORTED
             : profile_rejected || wrong_signer_name ? TC_CREDENTIAL_INVALID
             : variant == CLEAR                      ? TC_CREDENTIAL_VALID
             : variant == REVOKED                    ? TC_CREDENTIAL_REVOKED
@@ -8115,7 +8181,7 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
           TC_CMS_signer_verify_digest(
               &(TC_CMS_signer_verify_request){&signer,
                                               (TC_bytes){content_type, sizeof content_type},
-                                              {TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
+                                              {.attribute_oids = TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC},
                                               &signer_certificate.public_key,
                                               &provider,
                                               &limits},
@@ -8200,10 +8266,11 @@ static MunitResult legacy_chuid_key_map_signature(const MunitParameter params[],
   const TC_TLV_limits limits = {CAPACITY, CAPACITY, 256, FRAMES};
   TC_PIV_CMS_object object;
   size_t work = WORK;
-  munit_assert_int(TC_PIV_CMS_read(chuid.signature, TC_PIV_CMS_CHUID, TC_PIV_OIDS_ONLY,
-                                   TC_CMS_ATTRIBUTES_DER, &limits, (TC_TLV_frames){frames, FRAMES},
-                                   &work, &object),
-                   ==, TC_TLV_OK);
+  munit_assert_int(
+      TC_PIV_CMS_read(chuid.signature, TC_PIV_CMS_CHUID,
+                      &(TC_CMS_verification_policy){.attribute_oids = TC_CMS_ATTRIBUTE_OIDS_PIV},
+                      &limits, (TC_TLV_frames){frames, FRAMES}, &work, &object),
+      ==, TC_TLV_OK);
   TC_bytes oids[OIDS];
   TC_X509_workspace parser = {frames, FRAMES, oids, OIDS};
   TC_X509_certificate parsed_certificate;
@@ -8230,7 +8297,7 @@ static MunitResult legacy_chuid_key_map_signature(const MunitParameter params[],
         TC_CMS_signer_verify_digest(
             &(TC_CMS_signer_verify_request){&object.signer,
                                             (TC_bytes){content_type, sizeof content_type},
-                                            {TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
+                                            {.attribute_oids = TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC},
                                             &parsed_certificate.public_key,
                                             &provider,
                                             &limits},
@@ -8303,8 +8370,9 @@ static MunitResult security_profile(const MunitParameter params[], void* user)
       object = preserved;
       size_t work = WORK;
       const TC_TLV_result result = TC_PIV_CMS_read(
-          (TC_bytes){encoded, (size_t)length}, TC_PIV_CMS_SECURITY, TC_PIV_OIDS_TWIC_COMPATIBLE,
-          TC_CMS_ATTRIBUTES_DER, &limits, (TC_TLV_frames){frames, FRAMES}, &work, &object);
+          (TC_bytes){encoded, (size_t)length}, TC_PIV_CMS_SECURITY,
+          &(TC_CMS_verification_policy){.attribute_oids = TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC}, &limits,
+          (TC_TLV_frames){frames, FRAMES}, &work, &object);
       if (variant == VALID) {
         munit_assert_int(result, ==, TC_TLV_OK);
         munit_assert_uint(object.signer.version, ==, key_id ? 3 : 1);
@@ -8314,10 +8382,12 @@ static MunitResult security_profile(const MunitParameter params[], void* user)
         for (size_t budget = 0; budget <= required; ++budget) {
           work = budget;
           budget_object = preserved;
-          munit_assert_int(TC_PIV_CMS_read((TC_bytes){encoded, (size_t)length}, TC_PIV_CMS_SECURITY,
-                                           TC_PIV_OIDS_ONLY, TC_CMS_ATTRIBUTES_DER, &limits,
-                                           (TC_TLV_frames){frames, FRAMES}, &work, &budget_object),
-                           ==, budget == required ? TC_TLV_OK : TC_TLV_LIMIT);
+          munit_assert_int(
+              TC_PIV_CMS_read(
+                  (TC_bytes){encoded, (size_t)length}, TC_PIV_CMS_SECURITY,
+                  &(TC_CMS_verification_policy){.attribute_oids = TC_CMS_ATTRIBUTE_OIDS_PIV},
+                  &limits, (TC_TLV_frames){frames, FRAMES}, &work, &budget_object),
+              ==, budget == required ? TC_TLV_OK : TC_TLV_LIMIT);
           if (budget < required)
             munit_assert_memory_equal(sizeof budget_object, &budget_object, &preserved);
         }
@@ -8326,7 +8396,7 @@ static MunitResult security_profile(const MunitParameter params[], void* user)
             TC_CMS_signer_verify_content(
                 &(TC_CMS_signer_verify_request){&object.signer,
                                                 object.envelope.content_type,
-                                                {TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
+                                                {.attribute_oids = TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC},
                                                 &parsed_certificate.public_key,
                                                 &provider,
                                                 &limits},
@@ -8340,21 +8410,38 @@ static MunitResult security_profile(const MunitParameter params[], void* user)
             TC_CMS_signer_verify_content(
                 &(TC_CMS_signer_verify_request){&object.signer,
                                                 object.envelope.content_type,
-                                                {TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
+                                                {.attribute_oids = TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC},
                                                 &parsed_certificate.public_key,
                                                 &provider,
                                                 &limits},
                 object.envelope.content, TC_CMS_CONTENT_BER_OCTETS, &signature, &work),
             ==, TC_X509_SIGNATURE_INVALID);
         encoded[changed] ^= 1;
+        /* PIV objects need a PIV identifier set. Other policies are argument
+         * errors that leave work and out unchanged. */
+        const TC_CMS_verification_policy generic = {.attribute_oids = TC_CMS_ATTRIBUTE_OIDS_CMS};
+        const TC_CMS_verification_policy unknown_set = {.attribute_oids = (TC_CMS_attribute_oids)3};
+        const TC_CMS_verification_policy* rejected[] = {NULL, &generic, &unknown_set};
+        for (size_t i = 0; i < sizeof rejected / sizeof *rejected; ++i) {
+          work = WORK;
+          object = preserved;
+          munit_assert_int(TC_PIV_CMS_read((TC_bytes){encoded, (size_t)length}, TC_PIV_CMS_SECURITY,
+                                           rejected[i], &limits, (TC_TLV_frames){frames, FRAMES},
+                                           &work, &object),
+                           ==, TC_TLV_ARGUMENT);
+          munit_assert_size(work, ==, WORK);
+          munit_assert_memory_equal(sizeof object, &object, &preserved);
+        }
         /* The profile leaves LDS schema validation to TC_LDS_read. */
         for (size_t prefix = 0; prefix < (size_t)length; ++prefix) {
           work = WORK;
           object = preserved;
-          munit_assert_int(TC_PIV_CMS_read((TC_bytes){encoded, prefix}, TC_PIV_CMS_SECURITY,
-                                           TC_PIV_OIDS_ONLY, TC_CMS_ATTRIBUTES_DER, &limits,
-                                           (TC_TLV_frames){frames, FRAMES}, &work, &object),
-                           !=, TC_TLV_OK);
+          munit_assert_int(
+              TC_PIV_CMS_read(
+                  (TC_bytes){encoded, prefix}, TC_PIV_CMS_SECURITY,
+                  &(TC_CMS_verification_policy){.attribute_oids = TC_CMS_ATTRIBUTE_OIDS_PIV},
+                  &limits, (TC_TLV_frames){frames, FRAMES}, &work, &object),
+              !=, TC_TLV_OK);
           munit_assert_memory_equal(sizeof object, &object, &preserved);
         }
       } else {

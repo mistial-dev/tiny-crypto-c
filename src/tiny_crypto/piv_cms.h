@@ -69,20 +69,25 @@ typedef struct {
  * SECURITY follows section 3.1.7: attached LDS content (1.3.27.1.1.1) and an omitted signing
  * certificate. Both issuer/serial and subject-key-ID signers are supported.
  * Its signer name and card identifiers are optional signed attributes.
- * Select accepted OID namespaces and attribute encoding independently.
- * The signer's digest must be recognized and listed in digestAlgorithms with
- * valid parameters. Unknown selected hashes return UNSUPPORTED.
+ * policy selects the envelope and attribute encodings, the attribute handling
+ * and the identifier set. attribute_oids must be TC_CMS_ATTRIBUTE_OIDS_PIV or
+ * TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC. It also selects the content-type identifiers:
+ * PIV_TWIC accepts either identifier of each TWIC Part 2 v5 section 6 pair.
+ * Other values return ARGUMENT. The signer's digest must be recognized and
+ * listed in digestAlgorithms with valid parameters. Unknown selected hashes
+ * return UNSUPPORTED.
  *
  * Returns borrowed views, including the optional encoded certificate. Validate
  * that certificate with TC_X509_read. The application must authenticate the
  * content, bind identifiers, and validate signer usage, policy and trust.
  * A biometric signature without a certificate requires the CHUID signing key.
  *
- * Input, limits, frames, work and out must be disjoint. Bad storage preserves
- * caller state. Other errors may consume work/scratch. out changes only on OK.
+ * policy is copied at entry. Input, limits, frames, work and out must be
+ * disjoint. Bad storage preserves caller state. Other errors may consume
+ * work/scratch. out changes only on OK.
  * Requires X509 and BER support. */
-TC_TLV_result TC_PIV_CMS_read(TC_bytes encoded, TC_PIV_CMS_kind kind, TC_PIV_oid_profile oids,
-                              TC_CMS_attribute_encoding attributes, const TC_TLV_limits* limits,
+TC_TLV_result TC_PIV_CMS_read(TC_bytes encoded, TC_PIV_CMS_kind kind,
+                              const TC_CMS_verification_policy* policy, const TC_TLV_limits* limits,
                               TC_TLV_frames frames, size_t* work, TC_PIV_CMS_object* out);
 
 /* Match signed attributes against a credential's 25-byte FASC-N and

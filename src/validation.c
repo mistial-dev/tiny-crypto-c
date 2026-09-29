@@ -196,9 +196,8 @@ TC_result TC_validation_context_init(const TC_validation_trust* trust,
       !workspace->path || !out || !options->max_certificates || !options->max_input ||
       !options->max_candidates || !options->max_candidate_bytes ||
       TC_X509_time_check(&options->at) != TC_TLV_OK ||
-      !tc_cms_credential_options_valid(
-          (TC_CMS_verification_policy){options->attributes, options->rsa_parameters},
-          options->delta_policy, options->order_policy) ||
+      !tc_cms_credential_options_valid(options->verification, options->delta_policy,
+                                       options->order_policy) ||
       !tc_internal_ranges_disjoint(out, sizeof *out, trust, sizeof *trust) ||
       !tc_internal_ranges_disjoint(out, sizeof *out, trust->certificates,
                                    sizeof *trust->certificates) ||
@@ -240,8 +239,7 @@ int tc_validation_policies(const TC_validation_context* context, TC_CMS_path_opt
   cms->path = path_policy(options, &options->certificate);
   cms->max_candidates = options->max_candidates;
   cms->max_candidate_bytes = options->max_candidate_bytes;
-  cms->attributes = options->attributes;
-  cms->rsa_parameters = options->rsa_parameters;
+  cms->verification = options->verification;
   *crl = path_policy(options, &options->crl_signer);
   revocation->index = context->trust.crls;
   revocation->signer_policy = crl;

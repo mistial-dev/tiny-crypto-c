@@ -265,7 +265,7 @@ static void prepare(const char* profile)
                                      TC_X509_PATH_REQUIRE_EXTENDED_KEY_USAGE |
                                      TC_X509_PATH_INHIBIT_ANY_PURPOSE;
   state->options.crl_signer.key_usage = TC_KEY_USAGE_CRL_SIGN;
-  state->options.attributes = TC_CMS_ATTRIBUTES_DER;
+  state->options.verification.attributes = TC_CMS_ATTRIBUTES_DER;
   state->options.delta_policy = TC_X509_CRL_COMPLETE_ONLY;
   state->options.order_policy = TC_X509_CRL_ORDER_NUMBER;
   state->trust = (TC_validation_trust){&state->source, &state->crl_index};

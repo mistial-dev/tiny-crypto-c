@@ -32,8 +32,7 @@ TC_result example_validation_options(const TC_CMS_path_options* path,
       revocation->signer_policy->initial_policies, revocation->signer_policy->initial_policy_count,
       revocation->signer_policy->anchor_names,     revocation->signer_policy->purpose,
       revocation->signer_policy->key_usage,        revocation->signer_policy->flags};
-  converted.attributes = path->attributes;
-  converted.rsa_parameters = path->rsa_parameters;
+  converted.verification = path->verification;
   converted.delta_policy = revocation->delta_policy;
   converted.order_policy = revocation->order_policy;
   *out = converted;
@@ -113,8 +112,14 @@ TC_credential_status example_validate_cvc(const ExampleCVCRequest* request,
       TC_X509_time_compare(&options->at, &revocation->signer_policy->at, &order) != TC_TLV_OK ||
       order)
     return TC_CREDENTIAL_ERROR;
-  TC_CMS_path_options path = {*options, options->max_certificates, revocation->max_candidate_bytes,
-                              TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL};
+  TC_CMS_path_options path = {*options,
+                              options->max_certificates,
+                              revocation->max_candidate_bytes,
+                              {.attributes = TC_CMS_ATTRIBUTES_DER,
+                               .rsa_parameters = TC_CMS_RSA_PARAMETERS_NULL,
+                               .attribute_oids = request->profile == TC_PIV_CARD
+                                                     ? TC_CMS_ATTRIBUTE_OIDS_PIV
+                                                     : TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC}};
   const TC_CMS_revocation_policy crls = {revocation->index, revocation->signer_policy,
                                          revocation->max_candidate_bytes, revocation->delta_policy,
                                          revocation->order_policy};

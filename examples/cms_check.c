@@ -113,7 +113,8 @@ int main(int argc, char** argv)
   options.path.flags = TC_X509_PATH_REQUIRE_KEY_USAGE;
   options.max_candidates = EXAMPLE_CMS_CERTIFICATE_CAPACITY;
   options.max_candidate_bytes = OBJECT_BYTES;
-  options.attributes = TC_CMS_ATTRIBUTES_DER;
+  options.verification = (TC_CMS_verification_policy){.envelope = TC_CMS_ENVELOPE_BER,
+                                                      .attributes = TC_CMS_ATTRIBUTES_DER};
   TC_X509_path_options crl_policy = options.path;
   crl_policy.key_usage = TC_KEY_USAGE_CRL_SIGN;
   crl_policy.flags = 0;

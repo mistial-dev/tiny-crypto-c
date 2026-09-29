@@ -65,7 +65,8 @@ TC_X509_path_status tc_cms_signer_find(const tc_cms_candidates* candidates,
       !search->content_type.length || !search->digest.data || !search->digest.length ||
       !tc_cms_verification_policy_valid(search->policy))
     return TC_X509_PATH_ERROR;
-  const cms_signer_filter filter = {search->signer, TC_TLV_BER, &search->validation->names};
+  const cms_signer_filter filter = {search->signer, tc_cms_envelope_profile(search->policy),
+                                    &search->validation->names};
   const tc_pki_candidate_checks checks = {cms_signer_candidate, &filter, cms_signer_attempt,
                                           search};
   return tc_x509_path_status(tc_cms_certificate_search(
@@ -161,8 +162,7 @@ static int cms_path_arguments(const TC_X509_store_source* source,
          workspace->signed_digest_capacity >= TC_CMS_SIGNED_DIGEST_BYTES &&
          (!source->candidate_count || source->candidate) &&
          (!source->anchor_count || source->anchor) &&
-         tc_cms_verification_policy_valid(
-             (TC_CMS_verification_policy){options->attributes, options->rsa_parameters});
+         tc_cms_verification_policy_valid(options->verification);
 }
 
 static TC_TLV_result cms_selected_certificate(void* context, size_t index, size_t* work,
@@ -219,18 +219,17 @@ static TC_X509_path_status cms_signer_path_build(const TC_CMS_signer_path_reques
   tc_cms_signed_attrs_cache signed_attrs = {0};
   signed_attrs.digest = workspace->signed_digest;
   signed_attrs.capacity = workspace->signed_digest_capacity;
-  const tc_cms_signer_search search = {
-      request->signer,
-      request->content_type,
-      request->digest,
-      (TC_CMS_verification_policy){options->attributes, options->rsa_parameters},
-      &indexed,
-      &options->path,
-      &tree,
-      &signature,
-      &workspace->validation,
-      &workspace->search,
-      &signed_attrs};
+  const tc_cms_signer_search search = {request->signer,
+                                       request->content_type,
+                                       request->digest,
+                                       options->verification,
+                                       &indexed,
+                                       &options->path,
+                                       &tree,
+                                       &signature,
+                                       &workspace->validation,
+                                       &workspace->search,
+                                       &signed_attrs};
   const TC_X509_path_status status = tc_cms_signer_find(&candidates, &search, out);
   TC_secure_zero(workspace->signed_digest, TC_CMS_SIGNED_DIGEST_BYTES);
   return status;
@@ -325,6 +324,7 @@ static TC_X509_path_status cms_signed_data_path_build(const TC_CMS_validation_re
   if (result != TC_TLV_OK)
     return tc_x509_path_status(result);
   const TC_TLV_limits* limits = &options->path.parsing;
+  const TC_TLV_profile envelope = tc_cms_envelope_profile(options->verification);
   const tc_pki_tree_workspace tree = {workspace->validation.frames,
                                       workspace->validation.frame_capacity, work};
   if (tc_pki_work_charge(work, expected_type.length) != TC_TLV_OK)
@@ -338,8 +338,8 @@ static TC_X509_path_status cms_signed_data_path_build(const TC_CMS_validation_re
       return TC_X509_PATH_ERROR;
     data = *prepared->data;
   } else {
-    result = tc_cms_signed_data_read(encoded, limits, (TC_TLV_frames){tree.frames, tree.capacity},
-                                     work, &data);
+    result = tc_cms_signed_data_read(encoded, envelope, limits,
+                                     (TC_TLV_frames){tree.frames, tree.capacity}, work, &data);
     if (result != TC_TLV_OK)
       return tc_x509_path_status(result);
   }
@@ -353,7 +353,7 @@ static TC_X509_path_status cms_signed_data_path_build(const TC_CMS_validation_re
   if (prepared)
     signer = *prepared->signer;
   else {
-    result = tc_cms_signed_data_check(&data, limits, &tree, signer_index, &signer);
+    result = tc_cms_signed_data_check(&data, envelope, limits, &tree, signer_index, &signer);
     if (result != TC_TLV_OK)
       return tc_x509_path_status(result);
   }
@@ -468,9 +468,8 @@ TC_credential_status tc_cms_credential_validate_internal(
       !revocation->signer_policy ||
       !cms_path_arguments(source, options, workspace->path, work, &path) ||
       (revocation->index->count && !revocation->index->records) ||
-      !tc_cms_credential_options_valid(
-          (TC_CMS_verification_policy){options->attributes, options->rsa_parameters},
-          revocation->delta_policy, revocation->order_policy) ||
+      !tc_cms_credential_options_valid(options->verification, revocation->delta_policy,
+                                       revocation->order_policy) ||
       TC_X509_time_compare(&options->path.at, &revocation->signer_policy->at, &time_order) !=
           TC_TLV_OK ||
       time_order)

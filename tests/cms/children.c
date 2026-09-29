@@ -6,6 +6,8 @@
 #include "munit.h"
 #include <string.h>
 
+static const TC_CMS_verification_policy cms_policy = {.envelope = TC_CMS_ENVELOPE_BER};
+
 /* Wrap a SignedData body in indefinite-length ContentInfo, [0] and SignedData
  * headers and their end-of-contents markers. Returns the encoded length. */
 static size_t signed_data_envelope(const uint8_t* body, size_t body_length, uint8_t* out)
@@ -43,7 +45,7 @@ static MunitResult fields(const MunitParameter params[], void* user)
   (void)user;
   length = signed_data_envelope(body, sizeof body, input);
   work = WORK_BUDGET;
-  munit_assert_int(TC_CMS_signed_data_read((TC_bytes){input, length}, &limits,
+  munit_assert_int(TC_CMS_signed_data_read((TC_bytes){input, length}, &cms_policy, &limits,
                                            (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &result),
                    ==, TC_TLV_OK);
   munit_assert_uint(result.version, ==, 1);
@@ -63,21 +65,21 @@ static MunitResult fields(const MunitParameter params[], void* user)
   for (size_t budget = 0; budget < required; ++budget) {
     work = budget;
     memcpy(&result, &saved, sizeof result);
-    munit_assert_int(TC_CMS_signed_data_read((TC_bytes){input, length}, &limits,
+    munit_assert_int(TC_CMS_signed_data_read((TC_bytes){input, length}, &cms_policy, &limits,
                                              (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
                                              &result),
                      ==, TC_TLV_LIMIT);
     munit_assert_memory_equal(sizeof result, &result, &saved);
   }
   work = required;
-  munit_assert_int(TC_CMS_signed_data_read((TC_bytes){input, length}, &limits,
+  munit_assert_int(TC_CMS_signed_data_read((TC_bytes){input, length}, &cms_policy, &limits,
                                            (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &result),
                    ==, TC_TLV_OK);
   munit_assert_size(work, ==, 0);
   for (size_t truncated = 0; truncated < length; ++truncated) {
     work = WORK_BUDGET;
     memcpy(&result, &saved, sizeof result);
-    munit_assert_int(TC_CMS_signed_data_read((TC_bytes){input, truncated}, &limits,
+    munit_assert_int(TC_CMS_signed_data_read((TC_bytes){input, truncated}, &cms_policy, &limits,
                                              (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
                                              &result),
                      !=, TC_TLV_OK);
@@ -86,22 +88,23 @@ static MunitResult fields(const MunitParameter params[], void* user)
   /* A value after the ContentInfo is a second root. */
   memcpy(input + length, trailing, sizeof trailing);
   work = WORK_BUDGET;
-  munit_assert_int(TC_CMS_signed_data_read((TC_bytes){input, length + sizeof trailing}, &limits,
-                                           (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &result),
+  munit_assert_int(TC_CMS_signed_data_read((TC_bytes){input, length + sizeof trailing}, &cms_policy,
+                                           &limits, (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
+                                           &result),
                    ==, TC_TLV_INVALID);
   munit_assert_memory_equal(sizeof result, &result, &saved);
   /* RFC 5652 section 5.1 allows at most six SignedData fields. More fields
    * are malformed input and exceed no caller-supplied capacity. */
   length = signed_data_envelope(seven_fields, sizeof seven_fields, input);
   work = WORK_BUDGET;
-  munit_assert_int(TC_CMS_signed_data_read((TC_bytes){input, length}, &limits,
+  munit_assert_int(TC_CMS_signed_data_read((TC_bytes){input, length}, &cms_policy, &limits,
                                            (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &result),
                    ==, TC_TLV_INVALID);
   munit_assert_memory_equal(sizeof result, &result, &saved);
   /* The same six-field prefix without the extra SET is well formed. */
   length = signed_data_envelope(seven_fields, sizeof seven_fields - 2, input);
   work = WORK_BUDGET;
-  munit_assert_int(TC_CMS_signed_data_read((TC_bytes){input, length}, &limits,
+  munit_assert_int(TC_CMS_signed_data_read((TC_bytes){input, length}, &cms_policy, &limits,
                                            (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &result),
                    ==, TC_TLV_OK);
   return MUNIT_OK;
@@ -121,7 +124,7 @@ static MunitResult envelope(const MunitParameter params[], void* user)
     size_t length = sizeof encoded - (indefinite ? 0 : 2);
     encoded[1] = indefinite ? 0x80 : 35;
     work = 1000;
-    munit_assert_int(TC_CMS_signed_data_read((TC_bytes){encoded, length}, &limits,
+    munit_assert_int(TC_CMS_signed_data_read((TC_bytes){encoded, length}, &cms_policy, &limits,
                                              (TC_TLV_frames){frames, 8}, &work, &result),
                      ==, TC_TLV_OK);
     munit_assert_uint(result.version, ==, 1);
@@ -132,7 +135,7 @@ static MunitResult envelope(const MunitParameter params[], void* user)
     memcpy(&saved, &result, sizeof saved);
     for (size_t truncated = 0; truncated < length; ++truncated) {
       work = 1000;
-      munit_assert_int(TC_CMS_signed_data_read((TC_bytes){encoded, truncated}, &limits,
+      munit_assert_int(TC_CMS_signed_data_read((TC_bytes){encoded, truncated}, &cms_policy, &limits,
                                                (TC_TLV_frames){frames, 8}, &work, &result),
                        !=, TC_TLV_OK);
       munit_assert_memory_equal(sizeof result, &result, &saved);
@@ -140,8 +143,8 @@ static MunitResult envelope(const MunitParameter params[], void* user)
   }
   encoded[35] = 0x30;
   work = 1000;
-  munit_assert_int(TC_CMS_signed_data_read((TC_bytes){encoded, sizeof encoded}, &limits,
-                                           (TC_TLV_frames){frames, 8}, &work, &result),
+  munit_assert_int(TC_CMS_signed_data_read((TC_bytes){encoded, sizeof encoded}, &cms_policy,
+                                           &limits, (TC_TLV_frames){frames, 8}, &work, &result),
                    ==, TC_TLV_INVALID);
   munit_assert_memory_equal(sizeof result, &result, &saved);
   {
@@ -171,7 +174,7 @@ static MunitResult envelope(const MunitParameter params[], void* user)
       length += 6;
       memcpy(&result, &saved, sizeof result);
       work = 1000;
-      munit_assert_int(TC_CMS_signed_data_read((TC_bytes){input, length}, &limits,
+      munit_assert_int(TC_CMS_signed_data_read((TC_bytes){input, length}, &cms_policy, &limits,
                                                (TC_TLV_frames){frames, 8}, &work, &result),
                        ==, i < 2 ? TC_TLV_OK : TC_TLV_INVALID);
       if (i >= 2)
@@ -181,13 +184,13 @@ static MunitResult envelope(const MunitParameter params[], void* user)
         for (size_t budget = 0; budget < required; ++budget) {
           work = budget;
           memcpy(&result, &saved, sizeof result);
-          munit_assert_int(TC_CMS_signed_data_read((TC_bytes){input, length}, &limits,
+          munit_assert_int(TC_CMS_signed_data_read((TC_bytes){input, length}, &cms_policy, &limits,
                                                    (TC_TLV_frames){frames, 8}, &work, &result),
                            ==, TC_TLV_LIMIT);
           munit_assert_memory_equal(sizeof result, &result, &saved);
         }
         work = required;
-        munit_assert_int(TC_CMS_signed_data_read((TC_bytes){input, length}, &limits,
+        munit_assert_int(TC_CMS_signed_data_read((TC_bytes){input, length}, &cms_policy, &limits,
                                                  (TC_TLV_frames){frames, 8}, &work, &result),
                          ==, TC_TLV_OK);
         munit_assert_size(work, ==, 0);
@@ -239,36 +242,41 @@ static MunitResult versions(const MunitParameter params[], void* user)
           for (unsigned version = 0; version <= 6; ++version) {
             input.version = version;
             work = WORK_BUDGET;
-            munit_assert_int(tc_cms_signed_data_version_check(&input, &limits, &tree), ==,
-                             version == expected ? TC_TLV_OK : TC_TLV_INVALID);
+            munit_assert_int(tc_cms_signed_data_version_check(&input, TC_TLV_BER, &limits, &tree),
+                             ==, version == expected ? TC_TLV_OK : TC_TLV_INVALID);
           }
           input.version = expected;
           work = WORK_BUDGET;
-          munit_assert_int(tc_cms_signed_data_version_check(&input, &limits, &tree), ==, TC_TLV_OK);
+          munit_assert_int(tc_cms_signed_data_version_check(&input, TC_TLV_BER, &limits, &tree), ==,
+                           TC_TLV_OK);
           const size_t required = WORK_BUDGET - work;
           for (size_t budget = 0; budget < required; ++budget) {
             work = budget;
-            munit_assert_int(tc_cms_signed_data_version_check(&input, &limits, &tree), ==,
-                             TC_TLV_LIMIT);
+            munit_assert_int(tc_cms_signed_data_version_check(&input, TC_TLV_BER, &limits, &tree),
+                             ==, TC_TLV_LIMIT);
           }
           work = required;
-          munit_assert_int(tc_cms_signed_data_version_check(&input, &limits, &tree), ==, TC_TLV_OK);
+          munit_assert_int(tc_cms_signed_data_version_check(&input, TC_TLV_BER, &limits, &tree), ==,
+                           TC_TLV_OK);
           munit_assert_size(work, ==, 0);
         }
   /* A highest-version choice must not hide a later invalid choice. */
   const uint8_t bad_choices[] = {0xa0, 4, 0xa3, 0, 0xa4, 0};
   input.certificates = (TC_bytes){bad_choices, sizeof bad_choices};
   work = WORK_BUDGET;
-  munit_assert_int(tc_cms_signed_data_version_check(&input, &limits, &tree), ==, TC_TLV_INVALID);
+  munit_assert_int(tc_cms_signed_data_version_check(&input, TC_TLV_BER, &limits, &tree), ==,
+                   TC_TLV_INVALID);
   input.certificates = (TC_bytes){NULL, 0};
   revocations[2] = 0xa0;
   work = WORK_BUDGET;
-  munit_assert_int(tc_cms_signed_data_version_check(&input, &limits, &tree), ==, TC_TLV_INVALID);
+  munit_assert_int(tc_cms_signed_data_version_check(&input, TC_TLV_BER, &limits, &tree), ==,
+                   TC_TLV_INVALID);
   revocations[2] = 0xa1;
   for (size_t length = 0; length < sizeof key_id_signer; ++length) {
     input.signers.length = length;
     work = WORK_BUDGET;
-    munit_assert_int(tc_cms_signed_data_version_check(&input, &limits, &tree), !=, TC_TLV_OK);
+    munit_assert_int(tc_cms_signed_data_version_check(&input, TC_TLV_BER, &limits, &tree), !=,
+                     TC_TLV_OK);
   }
   return MUNIT_OK;
 }

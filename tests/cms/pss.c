@@ -13,6 +13,8 @@
 #include <openssl/x509.h>
 #include <string.h>
 
+static const TC_CMS_verification_policy cms_policy = {.envelope = TC_CMS_ENVELOPE_BER};
+
 enum {
   MAX_RSA_BITS = 3072,
   ENCODED_CAPACITY = 1024,
@@ -270,7 +272,7 @@ static MunitResult pss_signers(const MunitParameter params[], void* user)
                          ==, 1);
         size_t length = encode_signer(encoded, attrs, (TC_bytes){parameters, sizeof parameters},
                                       (TC_bytes){signature, signature_length});
-        munit_assert_int(TC_CMS_signer_info_read((TC_bytes){encoded, length}, TC_TLV_BER, &limits,
+        munit_assert_int(TC_CMS_signer_info_read((TC_bytes){encoded, length}, &cms_policy, &limits,
                                                  (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
                                                  &signer),
                          ==, TC_TLV_OK);
@@ -279,7 +281,8 @@ static MunitResult pss_signers(const MunitParameter params[], void* user)
             TC_CMS_signer_verify_digest(
                 &(TC_CMS_signer_verify_request){&signer,
                                                 type,
-                                                {TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
+                                                {.attributes = TC_CMS_ATTRIBUTES_DER,
+                                                 .rsa_parameters = TC_CMS_RSA_PARAMETERS_NULL},
                                                 &key,
                                                 &provider,
                                                 &limits},
@@ -294,53 +297,57 @@ static MunitResult pss_signers(const MunitParameter params[], void* user)
             size_t content_work = WORK_BUDGET;
             const TC_CMS_content_encoding format =
                 form ? TC_CMS_CONTENT_BER_OCTETS : TC_CMS_CONTENT_RAW;
-            munit_assert_int(TC_CMS_signer_verify_content(
-                                 &(TC_CMS_signer_verify_request){
-                                     &signer,
-                                     type,
-                                     {TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
-                                     &key,
-                                     &provider,
-                                     &limits},
-                                 inputs[form], format, &workspace, &content_work),
-                             ==, TC_X509_SIGNATURE_VALID);
+            munit_assert_int(
+                TC_CMS_signer_verify_content(
+                    &(TC_CMS_signer_verify_request){&signer,
+                                                    type,
+                                                    {.attributes = TC_CMS_ATTRIBUTES_DER,
+                                                     .rsa_parameters = TC_CMS_RSA_PARAMETERS_NULL},
+                                                    &key,
+                                                    &provider,
+                                                    &limits},
+                    inputs[form], format, &workspace, &content_work),
+                ==, TC_X509_SIGNATURE_VALID);
             const size_t content_required = WORK_BUDGET - content_work;
             content_work = content_required;
-            munit_assert_int(TC_CMS_signer_verify_content(
-                                 &(TC_CMS_signer_verify_request){
-                                     &signer,
-                                     type,
-                                     {TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
-                                     &key,
-                                     &provider,
-                                     &limits},
-                                 inputs[form], format, &workspace, &content_work),
-                             ==, TC_X509_SIGNATURE_VALID);
+            munit_assert_int(
+                TC_CMS_signer_verify_content(
+                    &(TC_CMS_signer_verify_request){&signer,
+                                                    type,
+                                                    {.attributes = TC_CMS_ATTRIBUTES_DER,
+                                                     .rsa_parameters = TC_CMS_RSA_PARAMETERS_NULL},
+                                                    &key,
+                                                    &provider,
+                                                    &limits},
+                    inputs[form], format, &workspace, &content_work),
+                ==, TC_X509_SIGNATURE_VALID);
             munit_assert_size(content_work, ==, 0);
             content_work = content_required - 1;
-            munit_assert_int(TC_CMS_signer_verify_content(
-                                 &(TC_CMS_signer_verify_request){
-                                     &signer,
-                                     type,
-                                     {TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
-                                     &key,
-                                     &provider,
-                                     &limits},
-                                 inputs[form], format, &workspace, &content_work),
-                             ==, TC_X509_SIGNATURE_LIMIT);
+            munit_assert_int(
+                TC_CMS_signer_verify_content(
+                    &(TC_CMS_signer_verify_request){&signer,
+                                                    type,
+                                                    {.attributes = TC_CMS_ATTRIBUTES_DER,
+                                                     .rsa_parameters = TC_CMS_RSA_PARAMETERS_NULL},
+                                                    &key,
+                                                    &provider,
+                                                    &limits},
+                    inputs[form], format, &workspace, &content_work),
+                ==, TC_X509_SIGNATURE_LIMIT);
           }
           size_t content_work = WORK_BUDGET;
-          munit_assert_int(TC_CMS_signer_verify_content(
-                               &(TC_CMS_signer_verify_request){
-                                   &signer,
-                                   type,
-                                   {TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
-                                   &key,
-                                   &provider,
-                                   &limits},
-                               (TC_bytes){changed_message, sizeof changed_message},
-                               TC_CMS_CONTENT_RAW, &workspace, &content_work),
-                           ==, TC_X509_SIGNATURE_INVALID);
+          munit_assert_int(
+              TC_CMS_signer_verify_content(
+                  &(TC_CMS_signer_verify_request){&signer,
+                                                  type,
+                                                  {.attributes = TC_CMS_ATTRIBUTES_DER,
+                                                   .rsa_parameters = TC_CMS_RSA_PARAMETERS_NULL},
+                                                  &key,
+                                                  &provider,
+                                                  &limits},
+                  (TC_bytes){changed_message, sizeof changed_message}, TC_CMS_CONTENT_RAW,
+                  &workspace, &content_work),
+              ==, TC_X509_SIGNATURE_INVALID);
         }
         const size_t required = WORK_BUDGET - work;
         work = required;
@@ -348,7 +355,8 @@ static MunitResult pss_signers(const MunitParameter params[], void* user)
             TC_CMS_signer_verify_digest(
                 &(TC_CMS_signer_verify_request){&signer,
                                                 type,
-                                                {TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
+                                                {.attributes = TC_CMS_ATTRIBUTES_DER,
+                                                 .rsa_parameters = TC_CMS_RSA_PARAMETERS_NULL},
                                                 &key,
                                                 &provider,
                                                 &limits},
@@ -360,7 +368,8 @@ static MunitResult pss_signers(const MunitParameter params[], void* user)
             TC_CMS_signer_verify_digest(
                 &(TC_CMS_signer_verify_request){&signer,
                                                 type,
-                                                {TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
+                                                {.attributes = TC_CMS_ATTRIBUTES_DER,
+                                                 .rsa_parameters = TC_CMS_RSA_PARAMETERS_NULL},
                                                 &key,
                                                 &provider,
                                                 &limits},
@@ -372,7 +381,8 @@ static MunitResult pss_signers(const MunitParameter params[], void* user)
             TC_CMS_signer_verify_digest(
                 &(TC_CMS_signer_verify_request){&signer,
                                                 type,
-                                                {TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
+                                                {.attributes = TC_CMS_ATTRIBUTES_DER,
+                                                 .rsa_parameters = TC_CMS_RSA_PARAMETERS_NULL},
                                                 &key,
                                                 &provider,
                                                 &limits},
@@ -393,20 +403,21 @@ static MunitResult pss_signers(const MunitParameter params[], void* user)
                             : change == 2 && restricted ? CONTENT_DIGEST_BYTES - 1
                                                         : (uint8_t)(saved ^ 1);
           work = WORK_BUDGET;
-          munit_assert_int(TC_CMS_signer_info_read((TC_bytes){encoded, length}, TC_TLV_BER, &limits,
-                                                   (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
-                                                   &signer),
+          munit_assert_int(TC_CMS_signer_info_read((TC_bytes){encoded, length}, &cms_policy,
+                                                   &limits, (TC_TLV_frames){frames, FRAME_CAPACITY},
+                                                   &work, &signer),
                            ==, TC_TLV_OK);
-          munit_assert_int(TC_CMS_signer_verify_digest(
-                               &(TC_CMS_signer_verify_request){
-                                   &signer,
-                                   type,
-                                   {TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
-                                   &key,
-                                   &provider,
-                                   &limits},
-                               computed, &workspace, &work),
-                           ==, TC_X509_SIGNATURE_INVALID);
+          munit_assert_int(
+              TC_CMS_signer_verify_digest(
+                  &(TC_CMS_signer_verify_request){&signer,
+                                                  type,
+                                                  {.attributes = TC_CMS_ATTRIBUTES_DER,
+                                                   .rsa_parameters = TC_CMS_RSA_PARAMETERS_NULL},
+                                                  &key,
+                                                  &provider,
+                                                  &limits},
+                  computed, &workspace, &work),
+              ==, TC_X509_SIGNATURE_INVALID);
           encoded[offset] = saved;
         }
         EVP_MD_CTX_free(signing);

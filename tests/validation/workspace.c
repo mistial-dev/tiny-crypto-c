@@ -199,15 +199,30 @@ static MunitResult context_setup(const MunitParameter params[], void* user)
                    ==, TC_RESULT_ARGUMENT);
   munit_assert_memory_equal(sizeof saved, &saved, &context);
   options.at.month = 1;
-  options.attributes = (TC_CMS_attribute_encoding)99;
+  options.verification.attributes = (TC_CMS_attribute_encoding)99;
   munit_assert_int(TC_validation_context_init(&trust, &options, &workspace.credential, &context),
                    ==, TC_RESULT_ARGUMENT);
-  options.attributes = TC_CMS_ATTRIBUTES_DER;
+  options.verification.attributes = TC_CMS_ATTRIBUTES_DER;
   /* Every policy enum rejects values on both sides of its range. */
   for (int bad = -1; bad <= 1; bad += 2) {
     TC_validation_options changed = options;
-    changed.rsa_parameters =
+    changed.verification.rsa_parameters =
         (TC_CMS_rsa_parameters)(bad < 0 ? bad : TC_CMS_RSA_PARAMETERS_ALLOW_ABSENT + bad);
+    munit_assert_int(TC_validation_context_init(&trust, &changed, &workspace.credential, &context),
+                     ==, TC_RESULT_ARGUMENT);
+    changed = options;
+    changed.verification.envelope =
+        (TC_CMS_envelope_encoding)(bad < 0 ? bad : TC_CMS_ENVELOPE_DER + bad);
+    munit_assert_int(TC_validation_context_init(&trust, &changed, &workspace.credential, &context),
+                     ==, TC_RESULT_ARGUMENT);
+    changed = options;
+    changed.verification.attribute_oids =
+        (TC_CMS_attribute_oids)(bad < 0 ? bad : TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC + bad);
+    munit_assert_int(TC_validation_context_init(&trust, &changed, &workspace.credential, &context),
+                     ==, TC_RESULT_ARGUMENT);
+    changed = options;
+    changed.verification.other_attributes =
+        (TC_CMS_other_attributes)(bad < 0 ? bad : TC_CMS_OTHER_ATTRIBUTES_SKIP_ALL + bad);
     munit_assert_int(TC_validation_context_init(&trust, &changed, &workspace.credential, &context),
                      ==, TC_RESULT_ARGUMENT);
     changed = options;

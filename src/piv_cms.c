@@ -172,22 +172,28 @@ static int cms_identifiers_present(TC_PIV_CMS_kind kind, TC_bytes fascn, TC_byte
          (fascn.data && (kind == TC_PIV_CMS_BIOMETRIC_LEGACY || uuid.data));
 }
 
-TC_TLV_result TC_PIV_CMS_read(TC_bytes encoded, TC_PIV_CMS_kind kind, TC_PIV_oid_profile oids,
-                              TC_CMS_attribute_encoding attributes, const TC_TLV_limits* limits,
+TC_TLV_result TC_PIV_CMS_read(TC_bytes encoded, TC_PIV_CMS_kind kind,
+                              const TC_CMS_verification_policy* policy, const TC_TLV_limits* limits,
                               TC_TLV_frames frames, size_t* work, TC_PIV_CMS_object* out)
 {
   TC_PIV_CMS_object parsed = {0};
   TC_TLV_reader reader;
   TC_TLV_element element;
   TC_TLV_result result;
-  if (!cms_kind_valid(kind) || (oids != TC_PIV_OIDS_ONLY && oids != TC_PIV_OIDS_TWIC_COMPATIBLE) ||
-      (attributes != TC_CMS_ATTRIBUTES_DER && attributes != TC_CMS_ATTRIBUTES_BER_DEFINITE_ORDER))
+  if (!cms_kind_valid(kind) || !policy || !tc_cms_verification_policy_valid(*policy) ||
+      (policy->attribute_oids != TC_CMS_ATTRIBUTE_OIDS_PIV &&
+       policy->attribute_oids != TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC))
     return TC_TLV_ARGUMENT;
+  const TC_CMS_verification_policy selected = *policy;
+  /* TWIC Part 2 v5 section 6: TWIC readers accept either identifier of a pair. */
+  const TC_PIV_oid_profile oids = selected.attribute_oids == TC_CMS_ATTRIBUTE_OIDS_PIV
+                                      ? TC_PIV_OIDS_ONLY
+                                      : TC_PIV_OIDS_TWIC_COMPATIBLE;
   result = tc_pki_reader_storage(encoded, limits, frames, work, out, sizeof *out);
   if (result != TC_TLV_OK)
     return result;
   const tc_pki_tree_workspace tree = {frames.data, frames.capacity, work};
-  result = TC_CMS_signed_data_read(encoded, limits, frames, work, &parsed.envelope);
+  result = TC_CMS_signed_data_read(encoded, &selected, limits, frames, work, &parsed.envelope);
   if (result != TC_TLV_OK)
     return result;
   const int security = kind == TC_PIV_CMS_SECURITY;
@@ -204,8 +210,8 @@ TC_TLV_result TC_PIV_CMS_read(TC_bytes encoded, TC_PIV_CMS_kind kind, TC_PIV_oid
              (kind == TC_PIV_CMS_CHUID ? TC_PIV_OID_CHUID_CONTENT : TC_PIV_OID_BIOMETRIC_CONTENT))
     return TC_TLV_INVALID;
   if (parsed.envelope.certificates.data) {
-    result =
-        tc_pki_tree_open(parsed.envelope.certificates, 0xa0, TC_TLV_BER, limits, &tree, &reader);
+    result = tc_pki_tree_open(parsed.envelope.certificates, 0xa0, tc_cms_envelope_profile(selected),
+                              limits, &tree, &reader);
     if (result != TC_TLV_OK)
       return result;
     result = tc_pki_tree_field(&reader, 0x30, &tree, &element);
@@ -217,7 +223,7 @@ TC_TLV_result TC_PIV_CMS_read(TC_bytes encoded, TC_PIV_CMS_kind kind, TC_PIV_oid
       return result == TC_TLV_OK ? TC_TLV_INVALID : result;
   } else if (kind == TC_PIV_CMS_CHUID)
     return TC_TLV_INVALID;
-  result = TC_CMS_signers_init(parsed.envelope.signers, limits, frames, work, &reader);
+  result = TC_CMS_signers_init(parsed.envelope.signers, &selected, limits, frames, work, &reader);
   if (result != TC_TLV_OK)
     return result;
   result = TC_CMS_signer_next(&reader, frames, work, &parsed.signer);
@@ -228,8 +234,8 @@ TC_TLV_result TC_PIV_CMS_read(TC_bytes encoded, TC_PIV_CMS_kind kind, TC_PIV_oid
   result = TC_CMS_signer_next(&reader, frames, work, &parsed.signer);
   if (result != TC_TLV_END)
     return result == TC_TLV_OK ? TC_TLV_INVALID : result;
-  result = TC_CMS_signed_attributes_read(parsed.signer.signed_attributes, attributes, limits,
-                                         frames, work, &parsed.attributes);
+  result = TC_CMS_signed_attributes_read(parsed.signer.signed_attributes, &selected, limits, frames,
+                                         work, &parsed.attributes);
   if (result != TC_TLV_OK)
     return result;
   result = tc_cms_digest_algorithms(parsed.envelope.digest_algorithms,
@@ -238,9 +244,6 @@ TC_TLV_result TC_PIV_CMS_read(TC_bytes encoded, TC_PIV_CMS_kind kind, TC_PIV_oid
     return result;
   if ((!security && !parsed.attributes.signer_name.data) ||
       !tc_pki_equal(parsed.attributes.content_type, parsed.envelope.content_type))
-    return TC_TLV_INVALID;
-  if (parsed.attributes.fascn_oid.data &&
-      TC_PIV_oid_identify(parsed.attributes.fascn_oid, oids) != TC_PIV_OID_FASCN)
     return TC_TLV_INVALID;
   if (!cms_identifiers_present(kind, parsed.attributes.fascn_octets,
                                parsed.attributes.entry_uuid_octets))

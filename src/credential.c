@@ -179,6 +179,12 @@ static TC_TLV_result biometric_signer_distinct(const TC_X509_public_key* embedde
   return TC_TLV_INVALID;
 }
 
+/* The CMS identifier set that matches a card's PIV OID profile. */
+static TC_CMS_attribute_oids credential_attribute_oids(TC_PIV_oid_profile oids)
+{
+  return oids == TC_PIV_OIDS_ONLY ? TC_CMS_ATTRIBUTE_OIDS_PIV : TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC;
+}
+
 TC_credential_status TC_PIV_CHUID_validate(const TC_PIV_CHUID_validation_request* request,
                                            const TC_validation_context* context, size_t* work,
                                            TC_PIV_CHUID_result* out)
@@ -237,8 +243,9 @@ TC_credential_status TC_PIV_CHUID_validate(const TC_PIV_CHUID_validation_request
     return TC_CREDENTIAL_INVALID;
 
   TC_PIV_CMS_object object;
-  parsed = TC_PIV_CMS_read(chuid.signature, TC_PIV_CMS_CHUID, oids, session.policy.attributes,
-                           limits, credential_frames(context), work, &object);
+  session.policy.verification.attribute_oids = credential_attribute_oids(oids);
+  parsed = TC_PIV_CMS_read(chuid.signature, TC_PIV_CMS_CHUID, &session.policy.verification, limits,
+                           credential_frames(context), work, &object);
   if (parsed != TC_TLV_OK)
     return tc_validation_status(parsed);
   parsed = TC_PIV_CMS_identifiers_match(&object, TC_PIV_CMS_CHUID, chuid.fascn, chuid.card_uuid,
@@ -348,9 +355,10 @@ TC_credential_status TC_PIV_biometric_validate(const TC_PIV_biometric_validation
     return status;
   TC_PIV_CMS_object object;
   int matched;
+  session.policy.verification.attribute_oids = credential_attribute_oids(session.oids);
   parsed =
-      TC_PIV_CMS_read(cbeff.signature, request->signature_profile, session.oids,
-                      session.policy.attributes, limits, credential_frames(context), work, &object);
+      TC_PIV_CMS_read(cbeff.signature, request->signature_profile, &session.policy.verification,
+                      limits, credential_frames(context), work, &object);
   if (parsed == TC_TLV_OK)
     parsed = TC_PIV_CMS_identifiers_match(&object, request->signature_profile, chuid->object.fascn,
                                           chuid->object.card_uuid, limits,
@@ -477,11 +485,11 @@ TC_credential_status TC_PIV_security_validate(const TC_PIV_security_validation_r
   TC_PIV_security_object container;
   TC_PIV_CMS_object object;
   TC_X509_certificate signer;
+  session.policy.verification.attribute_oids = credential_attribute_oids(session.oids);
   parsed = TC_PIV_security_read(request->encoded, request->encoding, &container);
   if (parsed == TC_TLV_OK)
-    parsed =
-        TC_PIV_CMS_read(container.cms, TC_PIV_CMS_SECURITY, session.oids, session.policy.attributes,
-                        limits, credential_frames(context), work, &object);
+    parsed = TC_PIV_CMS_read(container.cms, TC_PIV_CMS_SECURITY, &session.policy.verification,
+                             limits, credential_frames(context), work, &object);
   if (parsed == TC_TLV_OK)
     parsed = tc_credential_signer_read(signer_bytes, limits, scratch, work, &signer);
   if (parsed == TC_TLV_OK)

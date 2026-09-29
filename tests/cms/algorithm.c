@@ -391,6 +391,87 @@ static MunitResult digest_sets(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+static MunitResult digest_check(const MunitParameter params[], void* user)
+{
+  enum { FRAME_COUNT = 8, WORK_BUDGET = 4096 };
+  static const uint8_t sha256[] = {0x60, 0x86, 0x48, 1, 0x65, 3, 4, 2, 1};
+  static const uint8_t sha384[] = {0x60, 0x86, 0x48, 1, 0x65, 3, 4, 2, 2};
+  static const uint8_t unknown[] = {0x60, 0x86, 0x48, 1, 0x65, 3, 4, 2, 0x7f};
+  /* SET OF {sha256 NULL, unknown}: other signers may list unrecognized hashes. */
+  static const uint8_t encoded[] = {0x31, 28,   0x30, 13,   6, 9,    0x60, 0x86, 0x48, 1,
+                                    0x65, 3,    4,    2,    1, 5,    0,    0x30, 11,   6,
+                                    9,    0x60, 0x86, 0x48, 1, 0x65, 3,    4,    2,    0x7f};
+  const TC_TLV_limits limits = {WORK_BUDGET, WORK_BUDGET, 64, FRAME_COUNT};
+  TC_TLV_frame frames[FRAME_COUNT];
+  TC_CMS_signed_data data = {0};
+  data.digest_algorithms = (TC_bytes){encoded, sizeof encoded};
+  const TC_DER_algorithm selected = {{sha256, sizeof sha256}, {NULL, 0}};
+  TC_hash_algorithm hash = TC_HASH_UNKNOWN;
+  size_t work = WORK_BUDGET;
+  (void)params;
+  (void)user;
+  munit_assert_int(TC_CMS_digest_algorithms_check(&data, &selected, &limits,
+                                                  (TC_TLV_frames){frames, FRAME_COUNT}, &work,
+                                                  &hash),
+                   ==, TC_TLV_OK);
+  munit_assert_int(hash, ==, TC_HASH_SHA256);
+  const size_t required = WORK_BUDGET - work;
+  for (size_t budget = 0; budget < required; ++budget) {
+    work = budget;
+    hash = TC_HASH_UNKNOWN;
+    munit_assert_int(TC_CMS_digest_algorithms_check(&data, &selected, &limits,
+                                                    (TC_TLV_frames){frames, FRAME_COUNT}, &work,
+                                                    &hash),
+                     ==, TC_TLV_LIMIT);
+    munit_assert_int(hash, ==, TC_HASH_UNKNOWN);
+  }
+  /* RFC 5652 section 5.1: an unlisted signer digest is invalid. An unknown
+   * selected digest cannot be checked. */
+  const struct {
+    const uint8_t* oid;
+    TC_TLV_result expected;
+  } cases[] = {{sha384, TC_TLV_INVALID}, {unknown, TC_TLV_UNSUPPORTED}};
+  for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
+    const TC_DER_algorithm other = {{cases[i].oid, sizeof sha256}, {NULL, 0}};
+    work = WORK_BUDGET;
+    hash = TC_HASH_UNKNOWN;
+    munit_assert_int(TC_CMS_digest_algorithms_check(&data, &other, &limits,
+                                                    (TC_TLV_frames){frames, FRAME_COUNT}, &work,
+                                                    &hash),
+                     ==, cases[i].expected);
+    munit_assert_int(hash, ==, TC_HASH_UNKNOWN);
+  }
+  /* Argument errors leave work and out unchanged. */
+  TC_CMS_signed_data empty = {0};
+  const struct {
+    const TC_CMS_signed_data* data;
+    const TC_DER_algorithm* algorithm;
+    const TC_TLV_limits* limits;
+    TC_TLV_frames frames;
+    int work;
+    TC_hash_algorithm* out;
+  } arguments[] = {
+      {NULL, &selected, &limits, {frames, FRAME_COUNT}, 1, &hash},
+      {&data, NULL, &limits, {frames, FRAME_COUNT}, 1, &hash},
+      {&data, &selected, NULL, {frames, FRAME_COUNT}, 1, &hash},
+      {&data, &selected, &limits, {frames, FRAME_COUNT}, 0, &hash},
+      {&data, &selected, &limits, {frames, FRAME_COUNT}, 1, NULL},
+      {&empty, &selected, &limits, {frames, FRAME_COUNT}, 1, &hash},
+      {&data, &selected, &limits, {frames, FRAME_COUNT}, 1, (TC_hash_algorithm*)(void*)&data},
+      {&data, &selected, &limits, {(TC_TLV_frame*)(void*)&limits, 1}, 1, &hash}};
+  for (size_t i = 0; i < sizeof arguments / sizeof *arguments; ++i) {
+    work = WORK_BUDGET;
+    hash = TC_HASH_UNKNOWN;
+    munit_assert_int(TC_CMS_digest_algorithms_check(
+                         arguments[i].data, arguments[i].algorithm, arguments[i].limits,
+                         arguments[i].frames, arguments[i].work ? &work : NULL, arguments[i].out),
+                     ==, TC_TLV_ARGUMENT);
+    munit_assert_size(work, ==, WORK_BUDGET);
+    munit_assert_int(hash, ==, TC_HASH_UNKNOWN);
+  }
+  return MUNIT_OK;
+}
+
 int main(int argc, char** argv)
 {
   MunitTest tests[] = {
@@ -398,6 +479,7 @@ int main(int argc, char** argv)
       {"/rsa-parameter-policy", rsa_parameter_policy, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/hashes", hash_selection, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/digest-sets", digest_sets, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/digest-check", digest_check, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/ber-parameters", ber_parameters, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
   MunitSuite suite = {"/cms/algorithm", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};

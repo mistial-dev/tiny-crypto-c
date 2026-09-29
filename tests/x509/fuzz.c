@@ -444,7 +444,9 @@ static void fuzz_cms_path(const uint8_t* data, size_t length)
   for (size_t i = 0; i < sizeof budgets / sizeof *budgets; ++i) {
     size_t work = budgets[i];
     memcpy(&found, &saved, sizeof found);
-    options.attributes = i ? TC_CMS_ATTRIBUTES_BER_DEFINITE_ORDER : TC_CMS_ATTRIBUTES_DER;
+    options.verification.attributes =
+        i ? TC_CMS_ATTRIBUTES_BER_DEFINITE_ORDER : TC_CMS_ATTRIBUTES_DER;
+    options.verification.envelope = i ? TC_CMS_ENVELOPE_BER : TC_CMS_ENVELOPE_DER;
     TC_X509_path_status status = TC_CMS_signed_data_path_build(
         &(TC_CMS_validation_request){(TC_bytes){data, length},
                                      0,
@@ -473,14 +475,14 @@ static void fuzz_cms(const uint8_t* data, size_t length)
   fuzz_cms_path(data, length);
   memset(&container, 0xa5, sizeof container);
   memcpy(&saved_container, &container, sizeof container);
-  result = tc_cms_signed_data_read((TC_bytes){data, length}, &limits,
+  result = tc_cms_signed_data_read((TC_bytes){data, length}, TC_TLV_BER, &limits,
                                    (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &container);
   if (result != TC_TLV_OK && memcmp(&container, &saved_container, sizeof container))
     abort();
   if (result == TC_TLV_OK) {
     const tc_pki_tree_workspace tree = {frames, FRAME_CAPACITY, &work};
     work = WORK_BUDGET;
-    result = tc_cms_signed_data_version_check(&container, &limits, &tree);
+    result = tc_cms_signed_data_version_check(&container, TC_TLV_BER, &limits, &tree);
     if (work > WORK_BUDGET)
       abort();
     if (result == TC_TLV_OK && container.version != 1 && container.version != 3 &&
@@ -488,7 +490,7 @@ static void fuzz_cms(const uint8_t* data, size_t length)
       abort();
     work = length ? data[0] : 0;
     const size_t budget = work;
-    (void)tc_cms_signed_data_version_check(&container, &limits, &tree);
+    (void)tc_cms_signed_data_version_check(&container, TC_TLV_BER, &limits, &tree);
     if (work > budget)
       abort();
   }

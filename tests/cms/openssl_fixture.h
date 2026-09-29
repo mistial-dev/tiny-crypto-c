@@ -250,6 +250,17 @@ static inline void add_cms_octet_attribute(CMS_ContentInfo* cms, const char* ide
   ASN1_OBJECT_free(oid);
 }
 
+/* Add a signed attribute whose single value is the complete SEQUENCE in bytes. */
+static inline void add_cms_sequence_attribute(CMS_ContentInfo* cms, const char* identifier,
+                                              const uint8_t* bytes, int length)
+{
+  ASN1_OBJECT* oid = OBJ_txt2obj(identifier, 1);
+  munit_assert_not_null(oid);
+  CMS_SignerInfo* signer = sk_CMS_SignerInfo_value(CMS_get0_SignerInfos(cms), 0);
+  munit_assert_int(CMS_signed_add1_attr_by_OBJ(signer, oid, V_ASN1_SEQUENCE, bytes, length), ==, 1);
+  ASN1_OBJECT_free(oid);
+}
+
 /* Signer for a biometric fixture. extra_flags adds CMS_sign flags. */
 typedef struct {
   X509* certificate;

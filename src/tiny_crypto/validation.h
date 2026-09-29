@@ -70,8 +70,9 @@ typedef struct {
   TC_TLV_limits parsing;
   size_t max_certificates, max_input, max_candidates, max_candidate_bytes;
   TC_validation_certificate_policy certificate, crl_signer;
-  TC_CMS_attribute_encoding attributes;
-  TC_CMS_rsa_parameters rsa_parameters;
+  /* CMS encodings and attribute policy. PIV and TWIC validators replace
+   * attribute_oids with the identifier set of the card profile. */
+  TC_CMS_verification_policy verification;
   TC_X509_crl_delta_policy delta_policy;
   TC_X509_crl_order_policy order_policy;
 } TC_validation_options;

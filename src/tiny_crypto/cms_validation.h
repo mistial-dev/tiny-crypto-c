@@ -10,11 +10,13 @@
 extern "C" {
 #endif
 
+/* Signer path policy. path governs the signer certificate path. verification
+ * governs envelope parsing, signed attributes and the SignerInfo signature. The
+ * candidate limits bound the embedded and external certificates examined. */
 typedef struct {
   TC_X509_path_options path;
   size_t max_candidates, max_candidate_bytes;
-  TC_CMS_attribute_encoding attributes;
-  TC_CMS_rsa_parameters rsa_parameters;
+  TC_CMS_verification_policy verification;
 } TC_CMS_path_options;
 
 enum { TC_CMS_SIGNED_DIGEST_BYTES = 64 };

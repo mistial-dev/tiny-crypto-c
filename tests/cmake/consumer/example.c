@@ -159,8 +159,11 @@ int main(void)
       return 1;
     if (TC_TWIC_tpk_read(empty, TC_TWIC_TPK_CARD, &privacy_key) != TC_TLV_INVALID)
       return 1;
-    const TC_CMS_verification_policy cms_policy = {TC_CMS_ATTRIBUTES_DER,
-                                                   TC_CMS_RSA_PARAMETERS_ALLOW_ABSENT};
+    const TC_CMS_verification_policy cms_policy = {
+        TC_CMS_ENVELOPE_BER, TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_ALLOW_ABSENT,
+        TC_CMS_ATTRIBUTE_OIDS_CMS, TC_CMS_OTHER_ATTRIBUTES_SKIP_LISTED};
+    TC_CMS_verification_policy piv_policy = cms_policy;
+    piv_policy.attribute_oids = TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC;
     size_t work = 100;
     TC_PIV_CMS_object piv_object;
     TC_PIV_CBEFF biometric;
@@ -177,8 +180,8 @@ int main(void)
                                      &identifiers_match) != TC_TLV_ARGUMENT ||
         work != 100 || identifiers_match != -1)
       return 1;
-    if (TC_PIV_CMS_read(empty, TC_PIV_CMS_CHUID, TC_PIV_OIDS_TWIC_COMPATIBLE, TC_CMS_ATTRIBUTES_DER,
-                        NULL, (TC_TLV_frames){NULL, 0}, &work, &piv_object) != TC_TLV_ARGUMENT ||
+    if (TC_PIV_CMS_read(empty, TC_PIV_CMS_CHUID, &piv_policy, NULL, (TC_TLV_frames){NULL, 0}, &work,
+                        &piv_object) != TC_TLV_ARGUMENT ||
         work != 100)
       return 1;
     const TC_CMS_signer_verify_request no_signer = {NULL, empty, cms_policy, NULL, NULL, NULL};
@@ -428,8 +431,11 @@ int main(void)
     const TC_bytes signers = {empty_set, sizeof empty_set};
     const TC_TLV_limits limits = {4096, 4096, 64, EXAMPLE_CMS_FRAME_CAPACITY};
     TC_TLV_reader reader;
+    const TC_CMS_verification_policy envelope = {
+        TC_CMS_ENVELOPE_BER, TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL,
+        TC_CMS_ATTRIBUTE_OIDS_CMS, TC_CMS_OTHER_ATTRIBUTES_SKIP_LISTED};
     size_t work = 4096;
-    if (TC_CMS_signers_init(signers, &limits,
+    if (TC_CMS_signers_init(signers, &envelope, &limits,
                             (TC_TLV_frames){cms_storage.frames, EXAMPLE_CMS_FRAME_CAPACITY}, &work,
                             &reader) != TC_TLV_OK)
       return 17;

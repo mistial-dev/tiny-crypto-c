@@ -13,9 +13,22 @@ static inline int tc_cms_rsa_parameters_valid(TC_CMS_rsa_parameters policy)
 
 static inline int tc_cms_verification_policy_valid(TC_CMS_verification_policy policy)
 {
-  return (policy.attributes == TC_CMS_ATTRIBUTES_DER ||
+  return (policy.envelope == TC_CMS_ENVELOPE_BER || policy.envelope == TC_CMS_ENVELOPE_DER) &&
+         (policy.attributes == TC_CMS_ATTRIBUTES_DER ||
           policy.attributes == TC_CMS_ATTRIBUTES_BER_DEFINITE_ORDER) &&
-         tc_cms_rsa_parameters_valid(policy.rsa_parameters);
+         tc_cms_rsa_parameters_valid(policy.rsa_parameters) &&
+         (policy.attribute_oids == TC_CMS_ATTRIBUTE_OIDS_CMS ||
+          policy.attribute_oids == TC_CMS_ATTRIBUTE_OIDS_PIV ||
+          policy.attribute_oids == TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC) &&
+         (policy.other_attributes == TC_CMS_OTHER_ATTRIBUTES_SKIP_LISTED ||
+          policy.other_attributes == TC_CMS_OTHER_ATTRIBUTES_REJECT ||
+          policy.other_attributes == TC_CMS_OTHER_ATTRIBUTES_SKIP_ALL);
+}
+
+/* TLV profile of the SignedData and SignerInfo framing. */
+static inline TC_TLV_profile tc_cms_envelope_profile(TC_CMS_verification_policy policy)
+{
+  return policy.envelope == TC_CMS_ENVELOPE_DER ? TC_TLV_DER : TC_TLV_BER;
 }
 
 typedef enum {
@@ -30,10 +43,11 @@ enum { TC_CMS_SIGNER_SPAN_COUNT = 11 };
 TC_TLV_result tc_cms_digest_algorithms(TC_bytes encoded, const TC_DER_algorithm* required,
                                        const TC_TLV_limits* limits,
                                        const tc_pki_tree_workspace* tree, TC_hash_algorithm* out);
-TC_TLV_result tc_cms_signed_data_read(TC_bytes encoded, const TC_TLV_limits* limits,
-                                      TC_TLV_frames frames, size_t* work, TC_CMS_signed_data* out);
+TC_TLV_result tc_cms_signed_data_read(TC_bytes encoded, TC_TLV_profile profile,
+                                      const TC_TLV_limits* limits, TC_TLV_frames frames,
+                                      size_t* work, TC_CMS_signed_data* out);
 TC_TLV_result tc_cms_signed_data_version_check(const TC_CMS_signed_data* input,
-                                               const TC_TLV_limits* limits,
+                                               TC_TLV_profile profile, const TC_TLV_limits* limits,
                                                const tc_pki_tree_workspace* tree);
 TC_TLV_result tc_cms_signer_info_read(TC_bytes encoded, TC_TLV_profile profile,
                                       const TC_TLV_limits* limits, TC_TLV_frames frames,
@@ -65,7 +79,8 @@ TC_X509_signature_result tc_cms_signer_verify(const TC_CMS_signer_verify_request
                                               const TC_CMS_signature_workspace* workspace,
                                               size_t* work, TC_bytes* signer_name,
                                               tc_cms_signed_attrs_cache* cache);
-TC_TLV_result tc_cms_signed_data_check(const TC_CMS_signed_data* input, const TC_TLV_limits* limits,
+TC_TLV_result tc_cms_signed_data_check(const TC_CMS_signed_data* input, TC_TLV_profile profile,
+                                       const TC_TLV_limits* limits,
                                        const tc_pki_tree_workspace* tree, size_t signer_index,
                                        TC_CMS_signer_info* selected);
 TC_TLV_result tc_cms_classify_certificate(const TC_TLV_element* element,

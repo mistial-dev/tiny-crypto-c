@@ -62,8 +62,11 @@ The arena sizes CRL scope slots from `capacity.crls`, signer path spans from
 
 `TC_validation_options` holds one evaluation time, signature provider, parsing
 limits, and search bounds. Its `certificate` and `crl_signer` fields specify
-separate usage, policy, and name constraints. Select CMS BER compatibility and
-RSA parameter compatibility explicitly.
+separate usage, policy, and name constraints. `verification` holds the
+[CMS verification policy](cms.md#verification-policy): envelope and
+signed-attribute encodings, the RSA parameter rule and the handling of
+attributes outside the interpreted set. The PIV and TWIC validators set its
+attribute identifier set from the card profile.
 
 `TC_validation_trust` refers to a held certificate source and CRL index. Only
 source anchors establish trust. Keep both sources unchanged until the acceptance

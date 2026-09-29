@@ -23,8 +23,9 @@ int main()
       tree.value.length)
     return 1;
   TC_CMS_signed_attributes attributes;
+  const TC_CMS_verification_policy cms_policy{};
   size_t work = 4096;
-  if (TC_CMS_signed_attributes_read({nullptr, 0}, TC_CMS_ATTRIBUTES_DER, &cms_limits,
+  if (TC_CMS_signed_attributes_read({nullptr, 0}, &cms_policy, &cms_limits,
                                     TC_TLV_frames{frames, 8}, &work, &attributes) != TC_TLV_MORE)
     return 1;
   TC_RSA_word rsa_words[TC_RSA_VERIFY_WORKSPACE_WORDS(1024)];

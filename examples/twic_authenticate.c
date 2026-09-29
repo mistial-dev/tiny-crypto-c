@@ -491,7 +491,8 @@ static int content_crls_prepare(const Options* options, TC_bytes encoded,
     return 0;
   TC_X509_workspace parser = parser_workspace();
   TC_CMS_signed_data cms;
-  if (TC_CMS_signed_data_read(chuid.signature, limits,
+  const TC_CMS_verification_policy envelope = {.envelope = TC_CMS_ENVELOPE_BER};
+  if (TC_CMS_signed_data_read(chuid.signature, &envelope, limits,
                               (TC_TLV_frames){parser.frames, parser.frame_capacity}, work,
                               &cms) != TC_TLV_OK)
     return 0;
@@ -705,9 +706,9 @@ static int signed_objects_check(ExampleCardIO* io, const Options* options, TC_by
   validation.max_input = OBJECT_BYTES * EXAMPLE_X509_PATH_CAPACITY;
   validation.max_candidates = EXAMPLE_CMS_CERTIFICATE_CAPACITY;
   validation.max_candidate_bytes = OBJECT_BYTES * EXAMPLE_CMS_CERTIFICATE_CAPACITY;
-  validation.attributes =
+  validation.verification.attributes =
       options->chuid_ber ? TC_CMS_ATTRIBUTES_BER_DEFINITE_ORDER : TC_CMS_ATTRIBUTES_DER;
-  validation.rsa_parameters = options->cms_rsa_parameters;
+  validation.verification.rsa_parameters = options->cms_rsa_parameters;
   validation.certificate = (TC_validation_certificate_policy){
       card_policy->initial_policies, card_policy->initial_policy_count,
       card_policy->anchor_names,     {NULL, 0},

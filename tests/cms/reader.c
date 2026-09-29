@@ -5,6 +5,8 @@
 #include "munit.h"
 #include <string.h>
 
+static const TC_CMS_verification_policy cms_policy = {.envelope = TC_CMS_ENVELOPE_BER};
+
 enum { FRAME_CAPACITY = 8, INPUT_CAPACITY = 128, WORK_BUDGET = 4096 };
 static const uint8_t detached[] = {0x30, 35,   6,    9,    0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d,
                                    1,    7,    2,    0xa0, 22,   0x30, 20,   2,    1,    1,
@@ -29,7 +31,7 @@ static MunitResult read_envelope(const MunitParameter params[], void* user)
       encoded[1] = 0x80;
     const size_t length = sizeof detached + (indefinite ? 2 : 0);
     work = WORK_BUDGET;
-    munit_assert_int(TC_CMS_signed_data_read((TC_bytes){encoded, length}, &limits,
+    munit_assert_int(TC_CMS_signed_data_read((TC_bytes){encoded, length}, &cms_policy, &limits,
                                              (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
                                              &parsed),
                      ==, TC_TLV_OK);
@@ -44,14 +46,14 @@ static MunitResult read_envelope(const MunitParameter params[], void* user)
     for (size_t budget = 0; budget < required; ++budget) {
       work = budget;
       parsed = saved;
-      munit_assert_int(TC_CMS_signed_data_read((TC_bytes){encoded, length}, &limits,
+      munit_assert_int(TC_CMS_signed_data_read((TC_bytes){encoded, length}, &cms_policy, &limits,
                                                (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
                                                &parsed),
                        ==, TC_TLV_LIMIT);
       munit_assert_memory_equal(sizeof parsed, &parsed, &saved);
     }
     work = required;
-    munit_assert_int(TC_CMS_signed_data_read((TC_bytes){encoded, length}, &limits,
+    munit_assert_int(TC_CMS_signed_data_read((TC_bytes){encoded, length}, &cms_policy, &limits,
                                              (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
                                              &parsed),
                      ==, TC_TLV_OK);
@@ -77,7 +79,7 @@ static MunitResult read_envelope(const MunitParameter params[], void* user)
         capacity = 1;
       work = WORK_BUDGET;
       parsed = saved;
-      munit_assert_int(TC_CMS_signed_data_read((TC_bytes){encoded, length}, &bounded,
+      munit_assert_int(TC_CMS_signed_data_read((TC_bytes){encoded, length}, &cms_policy, &bounded,
                                                (TC_TLV_frames){frames, capacity}, &work, &parsed),
                        ==, TC_TLV_LIMIT);
       munit_assert_memory_equal(sizeof parsed, &parsed, &saved);
@@ -85,7 +87,7 @@ static MunitResult read_envelope(const MunitParameter params[], void* user)
     for (size_t truncated = 0; truncated < length; ++truncated) {
       work = WORK_BUDGET;
       parsed = saved;
-      munit_assert_int(TC_CMS_signed_data_read((TC_bytes){encoded, truncated}, &limits,
+      munit_assert_int(TC_CMS_signed_data_read((TC_bytes){encoded, truncated}, &cms_policy, &limits,
                                                (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
                                                &parsed),
                        !=, TC_TLV_OK);
@@ -94,7 +96,7 @@ static MunitResult read_envelope(const MunitParameter params[], void* user)
     encoded[VERSION_OFFSET] = 3;
     work = WORK_BUDGET;
     parsed = saved;
-    munit_assert_int(TC_CMS_signed_data_read((TC_bytes){encoded, length}, &limits,
+    munit_assert_int(TC_CMS_signed_data_read((TC_bytes){encoded, length}, &cms_policy, &limits,
                                              (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
                                              &parsed),
                      ==, TC_TLV_INVALID);
@@ -103,7 +105,9 @@ static MunitResult read_envelope(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static MunitResult embedded_content(const MunitParameter params[], void* user)
+/* Replace the detached envelope's EncapsulatedContentInfo with one holding
+ * content, an OCTET STRING in any form. Returns the encoded length. */
+static size_t embed_content(uint8_t encoded[INPUT_CAPACITY], TC_bytes content)
 {
   enum {
     CONTENT_OFFSET = 35,
@@ -114,11 +118,31 @@ static MunitResult embedded_content(const MunitParameter params[], void* user)
     ENCAP_LENGTH = 23,
     TYPE_LENGTH = 11
   };
-  static const uint8_t empty[] = {4, 0};
-  static const uint8_t primitive[] = {4, 3, 'a', 'b', 'c'};
-  static const uint8_t constructed[] = {0x24, 7, 4, 1, 'a', 4, 2, 'b', 'c'};
-  const TC_bytes forms[] = {
-      {empty, sizeof empty}, {primitive, sizeof primitive}, {constructed, sizeof constructed}};
+  size_t length = OCTETS_OFFSET + content.length;
+  munit_assert_size(length + 2, <=, INPUT_CAPACITY);
+  memcpy(encoded, detached, CONTENT_OFFSET);
+  encoded[CONTENT_OFFSET] = 0xa0;
+  encoded[CONTENT_OFFSET + 1] = (uint8_t)content.length;
+  memcpy(encoded + OCTETS_OFFSET, content.data, content.length);
+  encoded[length++] = 0x31;
+  encoded[length++] = 0;
+  encoded[OUTER_LENGTH] = (uint8_t)(length - OUTER_LENGTH - 1);
+  encoded[WRAPPER_LENGTH] = (uint8_t)(length - WRAPPER_LENGTH - 1);
+  encoded[SIGNED_DATA_LENGTH] = (uint8_t)(length - SIGNED_DATA_LENGTH - 1);
+  encoded[ENCAP_LENGTH] = (uint8_t)(TYPE_LENGTH + 2 + content.length);
+  return length;
+}
+
+static const uint8_t empty_content[] = {4, 0};
+static const uint8_t primitive_content[] = {4, 3, 'a', 'b', 'c'};
+static const uint8_t constructed_content[] = {0x24, 7, 4, 1, 'a', 4, 2, 'b', 'c'};
+
+static MunitResult embedded_content(const MunitParameter params[], void* user)
+{
+  enum { OCTETS_OFFSET = 37 };
+  const TC_bytes forms[] = {{empty_content, sizeof empty_content},
+                            {primitive_content, sizeof primitive_content},
+                            {constructed_content, sizeof constructed_content}};
   uint8_t encoded[INPUT_CAPACITY];
   TC_TLV_limits limits = {INPUT_CAPACITY, INPUT_CAPACITY, 32, FRAME_CAPACITY};
   TC_TLV_frame frames[FRAME_CAPACITY];
@@ -126,25 +150,107 @@ static MunitResult embedded_content(const MunitParameter params[], void* user)
   (void)params;
   (void)user;
   for (size_t i = 0; i < sizeof forms / sizeof forms[0]; ++i) {
-    size_t length = OCTETS_OFFSET + forms[i].length;
-    memcpy(encoded, detached, CONTENT_OFFSET);
-    encoded[CONTENT_OFFSET] = 0xa0;
-    encoded[CONTENT_OFFSET + 1] = (uint8_t)forms[i].length;
-    memcpy(encoded + OCTETS_OFFSET, forms[i].data, forms[i].length);
-    encoded[length++] = 0x31;
-    encoded[length++] = 0;
-    encoded[OUTER_LENGTH] = (uint8_t)(length - OUTER_LENGTH - 1);
-    encoded[WRAPPER_LENGTH] = (uint8_t)(length - WRAPPER_LENGTH - 1);
-    encoded[SIGNED_DATA_LENGTH] = (uint8_t)(length - SIGNED_DATA_LENGTH - 1);
-    encoded[ENCAP_LENGTH] = (uint8_t)(TYPE_LENGTH + 2 + forms[i].length);
+    const size_t length = embed_content(encoded, forms[i]);
     size_t work = WORK_BUDGET;
-    munit_assert_int(TC_CMS_signed_data_read((TC_bytes){encoded, length}, &limits,
+    munit_assert_int(TC_CMS_signed_data_read((TC_bytes){encoded, length}, &cms_policy, &limits,
                                              (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
                                              &parsed),
                      ==, TC_TLV_OK);
     munit_assert_true(parsed.has_content);
     munit_assert_ptr_equal(parsed.content.data, encoded + OCTETS_OFFSET);
     munit_assert_size(parsed.content.length, ==, forms[i].length);
+  }
+  return MUNIT_OK;
+}
+
+static MunitResult der_envelope(const MunitParameter params[], void* user)
+{
+  enum { PRIMITIVE, CONSTRUCTED, INDEFINITE, LONG_LENGTH, DETACHED, EMPTY_SET, CASE_COUNT };
+  static const TC_CMS_verification_policy der = {.envelope = TC_CMS_ENVELOPE_DER};
+  const TC_TLV_limits limits = {INPUT_CAPACITY, INPUT_CAPACITY, 32, FRAME_CAPACITY};
+  TC_TLV_frame frames[FRAME_CAPACITY];
+  uint8_t encoded[INPUT_CAPACITY];
+  TC_CMS_signed_data parsed, saved;
+  (void)params;
+  (void)user;
+  memset(&saved, 0xa5, sizeof saved);
+  for (unsigned kind = 0; kind < CASE_COUNT; ++kind) {
+    size_t length;
+    if (kind == PRIMITIVE || kind == CONSTRUCTED)
+      length = embed_content(
+          encoded, kind == PRIMITIVE ? (TC_bytes){primitive_content, sizeof primitive_content}
+                                     : (TC_bytes){constructed_content, sizeof constructed_content});
+    else {
+      memcpy(encoded, detached, sizeof detached);
+      length = sizeof detached;
+      if (kind == INDEFINITE) {
+        encoded[1] = 0x80;
+        encoded[length++] = 0;
+        encoded[length++] = 0;
+      } else if (kind == LONG_LENGTH) {
+        /* X.690 section 10.1 requires the shortest length form. */
+        memmove(encoded + 3, encoded + 2, length - 2);
+        encoded[1] = 0x81;
+        encoded[2] = (uint8_t)(length - 2);
+        ++length;
+      }
+    }
+    const int der_valid = kind == PRIMITIVE || kind == DETACHED || kind == EMPTY_SET;
+    for (unsigned policy = 0; policy < 2; ++policy) {
+      size_t work = WORK_BUDGET;
+      memcpy(&parsed, &saved, sizeof parsed);
+      const TC_CMS_verification_policy* selected = policy ? &der : &cms_policy;
+      if (kind == EMPTY_SET) {
+        TC_TLV_reader reader;
+        TC_CMS_signer_info signer;
+        munit_assert_int(
+            TC_CMS_signers_init((TC_bytes){detached + sizeof detached - 2, 2}, selected, &limits,
+                                (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &reader),
+            ==, TC_TLV_OK);
+        munit_assert_int(reader.profile, ==, policy ? TC_TLV_DER : TC_TLV_BER);
+        munit_assert_int(
+            TC_CMS_signer_next(&reader, (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &signer),
+            ==, TC_TLV_END);
+        continue;
+      }
+      munit_assert_int(TC_CMS_signed_data_read((TC_bytes){encoded, length}, selected, &limits,
+                                               (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
+                                               &parsed),
+                       ==, !policy || der_valid ? TC_TLV_OK : TC_TLV_INVALID);
+      if (policy && !der_valid)
+        munit_assert_memory_equal(sizeof parsed, &parsed, &saved);
+      else
+        munit_assert_ptr_equal(parsed.encoded.data, encoded);
+    }
+  }
+  /* A missing or invalid policy is an argument error before any parsing. */
+  const TC_CMS_verification_policy bad = {.envelope = (TC_CMS_envelope_encoding)2};
+  const TC_CMS_verification_policy* policies[] = {NULL, &bad};
+  for (size_t i = 0; i < sizeof policies / sizeof *policies; ++i) {
+    size_t work = WORK_BUDGET;
+    TC_TLV_reader reader, saved_reader;
+    TC_CMS_signer_info signer, saved_signer;
+    memset(&reader, 0xa5, sizeof reader);
+    memcpy(&saved_reader, &reader, sizeof reader);
+    memset(&signer, 0xa5, sizeof signer);
+    memcpy(&saved_signer, &signer, sizeof signer);
+    memcpy(&parsed, &saved, sizeof parsed);
+    munit_assert_int(TC_CMS_signed_data_read((TC_bytes){detached, sizeof detached}, policies[i],
+                                             &limits, (TC_TLV_frames){frames, FRAME_CAPACITY},
+                                             &work, &parsed),
+                     ==, TC_TLV_ARGUMENT);
+    munit_assert_int(TC_CMS_signers_init((TC_bytes){detached + sizeof detached - 2, 2}, policies[i],
+                                         &limits, (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
+                                         &reader),
+                     ==, TC_TLV_ARGUMENT);
+    munit_assert_int(TC_CMS_signer_info_read((TC_bytes){detached, sizeof detached}, policies[i],
+                                             &limits, (TC_TLV_frames){frames, FRAME_CAPACITY},
+                                             &work, &signer),
+                     ==, TC_TLV_ARGUMENT);
+    munit_assert_size(work, ==, WORK_BUDGET);
+    munit_assert_memory_equal(sizeof parsed, &parsed, &saved);
+    munit_assert_memory_equal(sizeof reader, &reader, &saved_reader);
+    munit_assert_memory_equal(sizeof signer, &signer, &saved_signer);
   }
   return MUNIT_OK;
 }
@@ -187,15 +293,15 @@ static MunitResult storage(const MunitParameter params[], void* user)
         const TC_bytes input = {pointers[INPUT], sizeof detached};
         TC_TLV_result result;
         if (reader == ATTRIBUTES)
-          result = TC_CMS_signed_attributes_read(input, TC_CMS_ATTRIBUTES_DER, pointers[LIMITS],
+          result = TC_CMS_signed_attributes_read(input, &cms_policy, pointers[LIMITS],
                                                  (TC_TLV_frames){pointers[FRAMES], FRAME_CAPACITY},
                                                  pointers[WORK], pointers[OUTPUT]);
         else if (reader == SIGNER)
-          result = TC_CMS_signer_info_read(input, TC_TLV_BER, pointers[LIMITS],
+          result = TC_CMS_signer_info_read(input, &cms_policy, pointers[LIMITS],
                                            (TC_TLV_frames){pointers[FRAMES], FRAME_CAPACITY},
                                            pointers[WORK], pointers[OUTPUT]);
         else if (reader == SIGNERS_INIT)
-          result = TC_CMS_signers_init(input, pointers[LIMITS],
+          result = TC_CMS_signers_init(input, &cms_policy, pointers[LIMITS],
                                        (TC_TLV_frames){pointers[FRAMES], FRAME_CAPACITY},
                                        pointers[WORK], pointers[OUTPUT]);
         else if (reader == SIGNER_NEXT)
@@ -207,7 +313,7 @@ static MunitResult storage(const MunitParameter params[], void* user)
                                          (TC_TLV_frames){pointers[FRAMES], FRAME_CAPACITY},
                                          pointers[WORK], pointers[OUTPUT], INPUT_CAPACITY);
         else
-          result = TC_CMS_signed_data_read(input, pointers[LIMITS],
+          result = TC_CMS_signed_data_read(input, &cms_policy, pointers[LIMITS],
                                            (TC_TLV_frames){pointers[FRAMES], FRAME_CAPACITY},
                                            pointers[WORK], pointers[OUTPUT]);
         munit_assert_int(result, ==, TC_TLV_ARGUMENT);
@@ -219,9 +325,9 @@ static MunitResult storage(const MunitParameter params[], void* user)
   memset(&unchanged, 0xa5, sizeof unchanged);
   output = unchanged;
   size_t work = WORK_BUDGET;
-  munit_assert_int(TC_CMS_signed_data_read((TC_bytes){detached, sizeof detached}, &limits,
-                                           (TC_TLV_frames){frames, SIZE_MAX / sizeof *frames + 1},
-                                           &work, &output),
+  munit_assert_int(TC_CMS_signed_data_read(
+                       (TC_bytes){detached, sizeof detached}, &cms_policy, &limits,
+                       (TC_TLV_frames){frames, SIZE_MAX / sizeof *frames + 1}, &work, &output),
                    ==, TC_TLV_ARGUMENT);
   munit_assert_size(work, ==, WORK_BUDGET);
   munit_assert_memory_equal(sizeof output, &output, &unchanged);
@@ -274,15 +380,15 @@ static MunitResult signer_iteration(const MunitParameter params[], void* user)
       const TC_bytes input = {encoded, length};
       ExampleCMSWorkspace example;
       munit_assert_int(example_parse_cms_signers(input, WORK_BUDGET, &example), ==, TC_TLV_OK);
-      munit_assert_int(TC_CMS_signers_init(input, &limits, (TC_TLV_frames){frames, FRAME_CAPACITY},
-                                           &work, &reader),
+      munit_assert_int(TC_CMS_signers_init(input, &cms_policy, &limits,
+                                           (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &reader),
                        ==, TC_TLV_OK);
       const size_t init_work = WORK_BUDGET - work;
       const TC_TLV_reader start = reader;
       for (size_t budget = 0; budget < init_work; ++budget) {
         reader = start;
         work = budget;
-        munit_assert_int(TC_CMS_signers_init(input, &limits,
+        munit_assert_int(TC_CMS_signers_init(input, &cms_policy, &limits,
                                              (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
                                              &reader),
                          ==, TC_TLV_LIMIT);
@@ -330,8 +436,8 @@ static MunitResult signer_iteration(const MunitParameter params[], void* user)
       munit_assert_memory_equal(sizeof frames, frames, saved_frames);
       munit_assert_size(work, ==, 0);
       work = total_work;
-      munit_assert_int(TC_CMS_signers_init(input, &limits, (TC_TLV_frames){frames, FRAME_CAPACITY},
-                                           &work, &reader),
+      munit_assert_int(TC_CMS_signers_init(input, &cms_policy, &limits,
+                                           (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, &reader),
                        ==, TC_TLV_OK);
       for (unsigned i = 0; i < 2; ++i)
         munit_assert_int(
@@ -358,7 +464,7 @@ static MunitResult signer_iteration(const MunitParameter params[], void* user)
       for (unsigned invalid_state = 0; invalid_state < 2; ++invalid_state) {
         reader = start;
         if (invalid_state)
-          reader.profile = TC_TLV_DER;
+          reader.profile = TC_TLV_ISO7816;
         else
           reader.offset = reader.input.length + 1;
         saved_reader = reader;
@@ -379,6 +485,7 @@ int main(int argc, char** argv)
 {
   MunitTest tests[] = {{"/envelope", read_envelope, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
                        {"/content", embedded_content, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+                       {"/der-envelope", der_envelope, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
                        {"/storage", storage, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
                        {"/signers", signer_iteration, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
                        {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};

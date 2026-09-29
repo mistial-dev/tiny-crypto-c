@@ -63,12 +63,14 @@ int main(void)
         tree.value.length)
       return 1;
     TC_CMS_signed_attributes attributes;
+    const TC_CMS_verification_policy cms_policy = {.attributes = TC_CMS_ATTRIBUTES_DER};
+    const TC_CMS_verification_policy cms_ber_order_policy = {
+        .attributes = TC_CMS_ATTRIBUTES_BER_DEFINITE_ORDER};
     size_t work = 4096;
-    if (TC_CMS_signed_attributes_read(empty, TC_CMS_ATTRIBUTES_DER, &cms_limits,
-                                      (TC_TLV_frames){frames, 8}, &work,
-                                      &attributes) != TC_TLV_MORE)
+    if (TC_CMS_signed_attributes_read(empty, &cms_policy, &cms_limits, (TC_TLV_frames){frames, 8},
+                                      &work, &attributes) != TC_TLV_MORE)
       return 1;
-    if (TC_CMS_signed_attributes_read(empty, TC_CMS_ATTRIBUTES_BER_DEFINITE_ORDER, &cms_limits,
+    if (TC_CMS_signed_attributes_read(empty, &cms_ber_order_policy, &cms_limits,
                                       (TC_TLV_frames){frames, 8}, &work,
                                       &attributes) != TC_TLV_MORE)
       return 1;

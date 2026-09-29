@@ -58,21 +58,21 @@ static void cms_fields_visit(void* user, const TC_TLV_event* event)
  * tag while validating the whole value. capacity covers the largest schema
  * read with it, so more fields are malformed input and return INVALID. fields may
  * change on failure. count changes only on OK. Spans borrow encoded. */
-static TC_TLV_result cms_fields(TC_bytes encoded, unsigned tag, const TC_TLV_limits* limits,
-                                const tc_pki_tree_workspace* tree, TC_TLV_element* fields,
-                                size_t capacity, size_t* count)
+static TC_TLV_result cms_fields(TC_bytes encoded, unsigned tag, TC_TLV_profile profile,
+                                const TC_TLV_limits* limits, const tc_pki_tree_workspace* tree,
+                                TC_TLV_element* fields, size_t capacity, size_t* count)
 {
   TC_TLV_element root;
   cms_fields_state state = {encoded, fields, capacity, 0, 0, 0};
   TC_TLV_result result =
-      TC_TLV_header_read(encoded.data, encoded.length, TC_TLV_BER, limits, &root.header);
+      TC_TLV_header_read(encoded.data, encoded.length, profile, limits, &root.header);
   if (result != TC_TLV_OK)
     return result;
   if (!root.header.constructed || !tc_pki_tag(&root, tag))
     return TC_TLV_INVALID;
   if (tc_pki_work_charge(tree->work, encoded.length) != TC_TLV_OK)
     return TC_TLV_LIMIT;
-  result = TC_TLV_walk(encoded.data, encoded.length, TC_TLV_BER, limits,
+  result = TC_TLV_walk(encoded.data, encoded.length, profile, limits,
                        (TC_TLV_frames){tree->frames, tree->capacity}, cms_fields_visit, &state);
   if (result != TC_TLV_OK)
     return result;
@@ -114,10 +114,6 @@ static TC_TLV_result cms_octets_hash(TC_bytes encoded, const TC_TLV_limits* limi
   TC_secure_zero(workspace, sizeof *workspace);
   return result;
 }
-
-TC_TLV_result tc_cms_signed_data_check(const TC_CMS_signed_data* input, const TC_TLV_limits* limits,
-                                       const tc_pki_tree_workspace* tree, size_t signer_index,
-                                       TC_CMS_signer_info* selected);
 
 /* Unknown hashes may belong to unused signers. When selecting a hash, compare
  * its OID and validate parameters. Equal parameters may have distinct BER encodings. */
@@ -254,7 +250,7 @@ static TC_X509_signature_result cms_verify_digest(const TC_CMS_signer_verify_req
       signed_digest = (TC_bytes){cache->digest, cache->digest_length};
     } else {
       checked = TC_CMS_signed_attributes_read(
-          signer->signed_attributes, request->policy.attributes, limits,
+          signer->signed_attributes, &request->policy, limits,
           (TC_TLV_frames){workspace->frames, workspace->frame_capacity}, work, &attributes);
       if (checked != TC_TLV_OK)
         return tc_pki_signature_error(checked);
@@ -296,7 +292,7 @@ static TC_X509_signature_result cms_verify_digest(const TC_CMS_signer_verify_req
       return TC_X509_SIGNATURE_INVALID;
   }
   checked = tc_pki_octets_contiguous(
-      signer->signature, 4, TC_TLV_BER, limits,
+      signer->signature, 4, tc_cms_envelope_profile(request->policy), limits,
       &(tc_pki_tree_workspace){workspace->frames, workspace->frame_capacity, work},
       (TC_buffer){workspace->signature, workspace->signature_capacity}, &signature);
   return checked == TC_TLV_OK
@@ -344,9 +340,9 @@ TC_X509_signature_result tc_cms_signer_verify(const TC_CMS_signer_verify_request
       (kind == TC_CMS_VERIFY_DIGEST && !input.data))
     return TC_X509_SIGNATURE_ERROR;
   const tc_pki_tree_workspace tree = {workspace->frames, workspace->frame_capacity, work};
-  checked =
-      tc_cms_signature_resolve_policy(request->signer, request->key, TC_TLV_BER, request->limits,
-                                      &tree, request->policy.rsa_parameters, &algorithm);
+  checked = tc_cms_signature_resolve_policy(
+      request->signer, request->key, tc_cms_envelope_profile(request->policy), request->limits,
+      &tree, request->policy.rsa_parameters, &algorithm);
   if (checked != TC_TLV_OK)
     return tc_pki_signature_error(checked);
   if (!tc_hash_info_get(algorithm.content_hash, &hash))
@@ -446,45 +442,70 @@ TC_TLV_result TC_CMS_content_digest(TC_bytes encoded, TC_hash_algorithm algorith
                          &scratch, digest);
 }
 
-TC_TLV_result TC_CMS_signed_data_read(TC_bytes encoded, const TC_TLV_limits* limits,
-                                      TC_TLV_frames frames, size_t* work, TC_CMS_signed_data* out)
+/* Copy and validate a reader policy. NULL and unknown values are ARGUMENT. */
+static TC_TLV_result cms_policy_read(const TC_CMS_verification_policy* policy,
+                                     TC_CMS_verification_policy* out)
+{
+  if (!policy || !tc_cms_verification_policy_valid(*policy))
+    return TC_TLV_ARGUMENT;
+  *out = *policy;
+  return TC_TLV_OK;
+}
+
+TC_TLV_result TC_CMS_signed_data_read(TC_bytes encoded, const TC_CMS_verification_policy* policy,
+                                      const TC_TLV_limits* limits, TC_TLV_frames frames,
+                                      size_t* work, TC_CMS_signed_data* out)
 {
   TC_CMS_signed_data parsed;
+  TC_CMS_verification_policy selected;
   const tc_pki_tree_workspace tree = {frames.data, frames.capacity, work};
-  TC_TLV_result result = tc_pki_reader_storage(encoded, limits, frames, work, out, sizeof *out);
+  TC_TLV_result result = cms_policy_read(policy, &selected);
   if (result != TC_TLV_OK)
     return result;
-  result = tc_cms_signed_data_read(encoded, limits, frames, work, &parsed);
+  result = tc_pki_reader_storage(encoded, limits, frames, work, out, sizeof *out);
   if (result != TC_TLV_OK)
     return result;
-  result = tc_cms_signed_data_version_check(&parsed, limits, &tree);
+  const TC_TLV_profile profile = tc_cms_envelope_profile(selected);
+  result = tc_cms_signed_data_read(encoded, profile, limits, frames, work, &parsed);
+  if (result != TC_TLV_OK)
+    return result;
+  result = tc_cms_signed_data_version_check(&parsed, profile, limits, &tree);
   if (result != TC_TLV_OK)
     return result;
   *out = parsed;
   return TC_TLV_OK;
 }
 
-TC_TLV_result TC_CMS_signer_info_read(TC_bytes encoded, TC_TLV_profile profile,
+TC_TLV_result TC_CMS_signer_info_read(TC_bytes encoded, const TC_CMS_verification_policy* policy,
                                       const TC_TLV_limits* limits, TC_TLV_frames frames,
                                       size_t* work, TC_CMS_signer_info* out)
 {
-  if (profile != TC_TLV_DER && profile != TC_TLV_BER)
-    return TC_TLV_ARGUMENT;
-  TC_TLV_result result = tc_pki_reader_storage(encoded, limits, frames, work, out, sizeof *out);
+  TC_CMS_verification_policy selected;
+  TC_TLV_result result = cms_policy_read(policy, &selected);
   if (result != TC_TLV_OK)
     return result;
-  return tc_cms_signer_info_read(encoded, profile, limits, frames, work, out);
+  result = tc_pki_reader_storage(encoded, limits, frames, work, out, sizeof *out);
+  if (result != TC_TLV_OK)
+    return result;
+  return tc_cms_signer_info_read(encoded, tc_cms_envelope_profile(selected), limits, frames, work,
+                                 out);
 }
 
-TC_TLV_result TC_CMS_signers_init(TC_bytes encoded, const TC_TLV_limits* limits,
-                                  TC_TLV_frames frames, size_t* work, TC_TLV_reader* out)
+TC_TLV_result TC_CMS_signers_init(TC_bytes encoded, const TC_CMS_verification_policy* policy,
+                                  const TC_TLV_limits* limits, TC_TLV_frames frames, size_t* work,
+                                  TC_TLV_reader* out)
 {
   TC_TLV_reader reader = {0};
+  TC_CMS_verification_policy selected;
   const tc_pki_tree_workspace tree = {frames.data, frames.capacity, work};
-  TC_TLV_result result = tc_pki_reader_storage(encoded, limits, frames, work, out, sizeof *out);
+  TC_TLV_result result = cms_policy_read(policy, &selected);
   if (result != TC_TLV_OK)
     return result;
-  result = tc_pki_tree_open(encoded, 0x31, TC_TLV_BER, limits, &tree, &reader);
+  result = tc_pki_reader_storage(encoded, limits, frames, work, out, sizeof *out);
+  if (result != TC_TLV_OK)
+    return result;
+  result =
+      tc_pki_tree_open(encoded, 0x31, tc_cms_envelope_profile(selected), limits, &tree, &reader);
   if (result != TC_TLV_OK)
     return result;
   *out = reader;
@@ -506,7 +527,8 @@ TC_TLV_result TC_CMS_signer_next(TC_TLV_reader* reader, TC_TLV_frames frames, si
                                        sizeof *out);
   if (result != TC_TLV_OK)
     return result;
-  if (reader->profile != TC_TLV_BER || reader->offset > reader->input.length)
+  if ((reader->profile != TC_TLV_BER && reader->profile != TC_TLV_DER) ||
+      reader->offset > reader->input.length)
     return TC_TLV_ARGUMENT;
   /* Exhaustion needs no parsing budget and leaves all caller storage alone. */
   if (tc_pki_end(reader))
@@ -518,8 +540,8 @@ TC_TLV_result TC_CMS_signer_next(TC_TLV_reader* reader, TC_TLV_frames frames, si
   result = tc_pki_tree_next(&next, &tree, &element);
   if (result != TC_TLV_OK)
     return result;
-  result =
-      tc_cms_signer_info_read(element.encoded, TC_TLV_BER, &next.limits, frames, work, &parsed);
+  result = tc_cms_signer_info_read(element.encoded, reader->profile, &next.limits, frames, work,
+                                   &parsed);
   if (result != TC_TLV_OK)
     return result;
   *reader = next;
@@ -527,8 +549,45 @@ TC_TLV_result TC_CMS_signer_next(TC_TLV_reader* reader, TC_TLV_frames frames, si
   return TC_TLV_OK;
 }
 
-TC_TLV_result tc_cms_signed_data_read(TC_bytes encoded, const TC_TLV_limits* limits,
-                                      TC_TLV_frames frames, size_t* work, TC_CMS_signed_data* out)
+TC_TLV_result TC_CMS_digest_algorithms_check(const TC_CMS_signed_data* signed_data,
+                                             const TC_DER_algorithm* digest_algorithm,
+                                             const TC_TLV_limits* limits, TC_TLV_frames frames,
+                                             size_t* work, TC_hash_algorithm* out)
+{
+  TC_bytes writes[3];
+  tc_pki_storage_plan plan;
+  TC_hash_algorithm hash;
+  if (!signed_data || !digest_algorithm || !limits || !work || !out ||
+      !signed_data->digest_algorithms.data || !digest_algorithm->oid.data)
+    return TC_TLV_ARGUMENT;
+  const TC_bytes fields[] = {signed_data->digest_algorithms, digest_algorithm->oid,
+                             digest_algorithm->parameters};
+  tc_pki_storage_plan_begin(&plan, writes, 3, SIZE_MAX);
+  TC_PKI_PLAN_WRITE(&plan, frames.data, frames.capacity);
+  TC_PKI_PLAN_WRITE(&plan, work, 1);
+  TC_PKI_PLAN_WRITE(&plan, out, 1);
+  tc_pki_storage_plan_seal(&plan);
+  TC_PKI_PLAN_INPUT(&plan, signed_data, 1);
+  TC_PKI_PLAN_INPUT(&plan, digest_algorithm, 1);
+  TC_PKI_PLAN_INPUT(&plan, limits, 1);
+  tc_pki_storage_plan_input_spans(&plan, fields, sizeof fields / sizeof *fields);
+  if (tc_pki_storage_plan_finish(&plan, NULL) != TC_TLV_OK)
+    return TC_TLV_ARGUMENT;
+  TC_TLV_result result = tc_pki_work_charge(work, tc_pki_storage_plan_used(&plan));
+  if (result != TC_TLV_OK)
+    return result;
+  result =
+      tc_cms_digest_algorithms(signed_data->digest_algorithms, digest_algorithm, limits,
+                               &(tc_pki_tree_workspace){frames.data, frames.capacity, work}, &hash);
+  if (result != TC_TLV_OK)
+    return result;
+  *out = hash;
+  return TC_TLV_OK;
+}
+
+TC_TLV_result tc_cms_signed_data_read(TC_bytes encoded, TC_TLV_profile profile,
+                                      const TC_TLV_limits* limits, TC_TLV_frames frames,
+                                      size_t* work, TC_CMS_signed_data* out)
 {
   static const uint8_t signed_data_oid[] = {0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 1, 7, 2};
   /* RFC 5652 section 5.1: SignedData has at most six fields. ContentInfo and
@@ -539,12 +598,12 @@ TC_TLV_result tc_cms_signed_data_read(TC_bytes encoded, const TC_TLV_limits* lim
   TC_CMS_signed_data parsed = {0};
   size_t count, index;
   TC_TLV_result result;
-  if (!out)
+  if (!out || (profile != TC_TLV_DER && profile != TC_TLV_BER))
     return TC_TLV_ARGUMENT;
   parsed.encoded = encoded;
   const tc_pki_tree_workspace tree = {frames.data, frames.capacity, work};
 #define CMS_FIELDS(input, tag)                                                                     \
-  cms_fields(input, tag, limits, &tree, fields, SIGNED_DATA_FIELDS, &count)
+  cms_fields(input, tag, profile, limits, &tree, fields, SIGNED_DATA_FIELDS, &count)
   result = CMS_FIELDS(encoded, 0x30);
   if (result != TC_TLV_OK)
     return result;
@@ -596,7 +655,7 @@ TC_TLV_result tc_cms_signed_data_read(TC_bytes encoded, const TC_TLV_limits* lim
       return TC_TLV_INVALID;
     parsed.has_content = 1;
     parsed.content = fields[0].encoded;
-    result = tc_pki_octets(parsed.content, TC_TLV_BER, limits, &tree, NULL, NULL);
+    result = tc_pki_octets(parsed.content, profile, limits, &tree, NULL, NULL);
     if (result != TC_TLV_OK)
       return result;
   }
@@ -626,7 +685,8 @@ TC_TLV_result tc_cms_classify_certificate(const TC_TLV_element* element,
   return TC_TLV_OK;
 }
 
-TC_TLV_result tc_cms_signed_data_check(const TC_CMS_signed_data* input, const TC_TLV_limits* limits,
+TC_TLV_result tc_cms_signed_data_check(const TC_CMS_signed_data* input, TC_TLV_profile profile,
+                                       const TC_TLV_limits* limits,
                                        const tc_pki_tree_workspace* tree, size_t signer_index,
                                        TC_CMS_signer_info* selected)
 {
@@ -645,7 +705,7 @@ TC_TLV_result tc_cms_signed_data_check(const TC_CMS_signed_data* input, const TC
                  ? BASE_VERSION
                  : EXTENDED_VERSION;
   if (input->certificates.length) {
-    result = tc_pki_tree_open(input->certificates, 0xa0, TC_TLV_BER, limits, tree, &reader);
+    result = tc_pki_tree_open(input->certificates, 0xa0, profile, limits, tree, &reader);
     if (result != TC_TLV_OK)
       return result;
     while (!tc_pki_end(&reader)) {
@@ -668,7 +728,7 @@ TC_TLV_result tc_cms_signed_data_check(const TC_CMS_signed_data* input, const TC
     }
   }
   if (input->revocations.length) {
-    result = tc_pki_tree_open(input->revocations, 0xa1, TC_TLV_BER, limits, tree, &reader);
+    result = tc_pki_tree_open(input->revocations, 0xa1, profile, limits, tree, &reader);
     if (result != TC_TLV_OK)
       return result;
     while (!tc_pki_end(&reader)) {
@@ -681,7 +741,7 @@ TC_TLV_result tc_cms_signed_data_check(const TC_CMS_signed_data* input, const TC
         return TC_TLV_INVALID;
     }
   }
-  result = tc_pki_tree_open(input->signers, 0x31, TC_TLV_BER, limits, tree, &reader);
+  result = tc_pki_tree_open(input->signers, 0x31, profile, limits, tree, &reader);
   if (result != TC_TLV_OK)
     return result;
   while (!tc_pki_end(&reader)) {
@@ -690,7 +750,7 @@ TC_TLV_result tc_cms_signed_data_check(const TC_CMS_signed_data* input, const TC
     if (result != TC_TLV_OK)
       return result;
     result =
-        tc_cms_signer_info_read(element.encoded, TC_TLV_BER, limits,
+        tc_cms_signer_info_read(element.encoded, profile, limits,
                                 (TC_TLV_frames){tree->frames, tree->capacity}, tree->work, &signer);
     if (result != TC_TLV_OK)
       return result;
@@ -709,10 +769,10 @@ TC_TLV_result tc_cms_signed_data_check(const TC_CMS_signed_data* input, const TC
 }
 
 TC_TLV_result tc_cms_signed_data_version_check(const TC_CMS_signed_data* input,
-                                               const TC_TLV_limits* limits,
+                                               TC_TLV_profile profile, const TC_TLV_limits* limits,
                                                const tc_pki_tree_workspace* tree)
 {
-  return tc_cms_signed_data_check(input, limits, tree, 0, NULL);
+  return tc_cms_signed_data_check(input, profile, limits, tree, 0, NULL);
 }
 
 static void cms_definite(void* user, const TC_TLV_event* event)
@@ -848,25 +908,135 @@ static TC_TLV_result cms_capabilities(TC_bytes encoded, TC_TLV_profile profile,
   return result == TC_TLV_END ? TC_TLV_OK : result;
 }
 
-TC_TLV_result TC_CMS_signed_attributes_read(TC_bytes encoded, TC_CMS_attribute_encoding encoding,
-                                            const TC_TLV_limits* limits, TC_TLV_frames frames,
-                                            size_t* work, TC_CMS_signed_attributes* out)
+typedef enum {
+  CMS_ATTRIBUTE_CONTENT_TYPE,
+  CMS_ATTRIBUTE_MESSAGE_DIGEST,
+  CMS_ATTRIBUTE_SIGNING_TIME,
+  CMS_ATTRIBUTE_SMIME_CAPABILITIES,
+  CMS_ATTRIBUTE_ENTRY_UUID,
+  CMS_ATTRIBUTE_SIGNER_NAME,
+  CMS_ATTRIBUTE_FASCN,
+  /* Recognized and skipped unless the policy rejects other attributes. */
+  CMS_ATTRIBUTE_LISTED,
+  /* twicFASC-N under the PIV set. Always UNSUPPORTED, so the alias of an
+   * interpreted identifier is never skipped past the card binding. */
+  CMS_ATTRIBUTE_EXCLUDED,
+  CMS_ATTRIBUTE_OTHER
+} cms_attribute_kind;
+
+/* Classify an attribute type under the selected identifier set. */
+static cms_attribute_kind cms_attribute_classify(TC_bytes oid, TC_CMS_attribute_oids oids)
 {
-  static const uint8_t set_tag = 0x31;
-  static const uint8_t attribute_prefix[] = {0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 1, 9};
-  static const uint8_t entry_uuid_oid[] = {0x2b, 6, 1, 1, 0x10, 4}; /* RFC 4530. */
+  /* pkcs-9 1.2.840.113549.1.9 and id-aa 1.2.840.113549.1.9.16.2. */
+  static const uint8_t pkcs9[] = {0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 1, 9};
+  static const uint8_t entry_uuid[] = {0x2b, 6, 1, 1, 0x10, 4}; /* RFC 4530 section 2.1. */
   enum {
     CONTENT_TYPE = 3,
     MESSAGE_DIGEST = 4,
     SIGNING_TIME = 5,
     SMIME_CAPABILITIES = 15,
-    SIGNER_NAME = 256,
-    FASCN,
-    ENTRY_UUID,
-    FASCN_BYTES = 25,
-    UUID_BYTES = 16
+    ID_AA = 16,
+    ALGORITHM_PROTECTION = 52,  /* RFC 6211 section 2. */
+    SIGNING_CERTIFICATE = 12,   /* ESS section 5.4.2, RFC 5035 section 5. */
+    SIGNING_CERTIFICATE_V2 = 47 /* ESS section 5.4.1, RFC 5035 section 3. */
   };
+  /* config.h makes CMS require TC_ENABLE_PIV_OIDS. */
+  if (oids != TC_CMS_ATTRIBUTE_OIDS_CMS) {
+    /* TWIC Part 2 v5 section 6 pairs twicFASC-N with pivFASC-N. */
+    const TC_PIV_oid identity = TC_PIV_oid_identify(oid, TC_PIV_OIDS_TWIC_COMPATIBLE);
+    if (identity == TC_PIV_OID_SIGNER_NAME)
+      return CMS_ATTRIBUTE_SIGNER_NAME;
+    if (identity == TC_PIV_OID_FASCN)
+      return oids == TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC ||
+                     TC_PIV_oid_identify(oid, TC_PIV_OIDS_ONLY) == TC_PIV_OID_FASCN
+                 ? CMS_ATTRIBUTE_FASCN
+                 : CMS_ATTRIBUTE_EXCLUDED;
+  }
+  if (tc_pki_equal(oid, (TC_bytes){entry_uuid, sizeof entry_uuid}))
+    return CMS_ATTRIBUTE_ENTRY_UUID;
+  if (oid.length <= sizeof pkcs9 || memcmp(oid.data, pkcs9, sizeof pkcs9))
+    return CMS_ATTRIBUTE_OTHER;
+  const uint8_t* arcs = oid.data + sizeof pkcs9;
+  if (oid.length == sizeof pkcs9 + 1) {
+    switch (arcs[0]) {
+    case CONTENT_TYPE:
+      return CMS_ATTRIBUTE_CONTENT_TYPE;
+    case MESSAGE_DIGEST:
+      return CMS_ATTRIBUTE_MESSAGE_DIGEST;
+    case SIGNING_TIME:
+      return CMS_ATTRIBUTE_SIGNING_TIME;
+    case SMIME_CAPABILITIES:
+      return CMS_ATTRIBUTE_SMIME_CAPABILITIES;
+    case ALGORITHM_PROTECTION:
+      return CMS_ATTRIBUTE_LISTED;
+    default:
+      return CMS_ATTRIBUTE_OTHER;
+    }
+  }
+  if (oid.length == sizeof pkcs9 + 3 && arcs[0] == ID_AA && arcs[1] == 2 &&
+      (arcs[2] == SIGNING_CERTIFICATE || arcs[2] == SIGNING_CERTIFICATE_V2))
+    return CMS_ATTRIBUTE_LISTED;
+  return CMS_ATTRIBUTE_OTHER;
+}
+
+/* INVALID when an attribute before stop in the SET value has type oid. The
+ * earlier members were parsed already, so their framing is valid. */
+static TC_TLV_result cms_attribute_repeated(TC_bytes set, const uint8_t* stop, TC_bytes oid,
+                                            TC_TLV_profile profile, const TC_TLV_limits* limits,
+                                            size_t* work)
+{
+  TC_TLV_reader attributes, fields;
+  TC_TLV_element attribute, type;
+  TC_TLV_result result =
+      TC_TLV_reader_init(&attributes, set.data, (size_t)(stop - set.data), profile, limits);
+  if (result != TC_TLV_OK)
+    return result;
+  while ((result = TC_TLV_next(&attributes, &attribute)) == TC_TLV_OK) {
+    result =
+        TC_TLV_reader_init(&fields, attribute.value.data, attribute.value.length, profile, limits);
+    if (result != TC_TLV_OK)
+      return result;
+    if (tc_pki_next(&fields, 6, &type) != TC_TLV_OK)
+      return TC_TLV_INVALID;
+    if (tc_pki_work_charge(work, type.value.length) != TC_TLV_OK)
+      return TC_TLV_LIMIT;
+    if (tc_pki_equal(type.value, oid))
+      return TC_TLV_INVALID;
+  }
+  return result == TC_TLV_END ? TC_TLV_OK : result;
+}
+
+/* X.690 section 11.6: DER orders the values of a SET OF by their encodings.
+ * BER keeps the signer's order. Work for these bytes was charged with the
+ * enclosing attribute. */
+static TC_TLV_result cms_attribute_values_order(TC_bytes values, TC_TLV_profile profile,
+                                                const TC_TLV_limits* limits)
+{
+  TC_TLV_reader reader;
+  TC_TLV_element value;
+  TC_bytes previous = {NULL, 0};
+  if (profile != TC_TLV_DER)
+    return TC_TLV_OK;
+  TC_TLV_result result = TC_TLV_reader_init(&reader, values.data, values.length, profile, limits);
+  if (result != TC_TLV_OK)
+    return result;
+  while ((result = TC_TLV_next(&reader, &value)) == TC_TLV_OK) {
+    if (previous.data && tc_pki_compare(previous, value.encoded) > 0)
+      return TC_TLV_INVALID;
+    previous = value.encoded;
+  }
+  return result == TC_TLV_END ? TC_TLV_OK : result;
+}
+
+TC_TLV_result TC_CMS_signed_attributes_read(TC_bytes encoded,
+                                            const TC_CMS_verification_policy* policy,
+                                            const TC_TLV_limits* limits, TC_TLV_frames frames,
+                                            size_t* work, TC_CMS_signed_attributes* out)
+{
+  static const uint8_t set_tag = 0x31;
+  enum { FASCN_BYTES = 25, UUID_BYTES = 16 };
   TC_CMS_signed_attributes parsed = {0};
+  TC_CMS_verification_policy selected;
   TC_TLV_element outer, attribute, element, value;
   TC_TLV_reader attributes, fields, values;
   TC_bytes previous = {NULL, 0}, oid;
@@ -874,11 +1044,13 @@ TC_TLV_result TC_CMS_signed_attributes_read(TC_bytes encoded, TC_CMS_attribute_e
   TC_TLV_profile profile;
   if (!limits || !work || !out)
     return TC_TLV_ARGUMENT;
-  if (encoding != TC_CMS_ATTRIBUTES_DER && encoding != TC_CMS_ATTRIBUTES_BER_DEFINITE_ORDER)
-    return TC_TLV_ARGUMENT;
+  result = cms_policy_read(policy, &selected);
+  if (result != TC_TLV_OK)
+    return result;
   result = tc_pki_reader_storage(encoded, limits, frames, work, out, sizeof *out);
   if (result != TC_TLV_OK)
     return result;
+  const TC_CMS_attribute_encoding encoding = selected.attributes;
   profile = encoding == TC_CMS_ATTRIBUTES_DER ? TC_TLV_DER : TC_TLV_BER;
   result = cms_open(encoded, 0xa0, profile, limits, frames, work, &outer);
   if (result != TC_TLV_OK)
@@ -887,7 +1059,6 @@ TC_TLV_result TC_CMS_signed_attributes_read(TC_bytes encoded, TC_CMS_attribute_e
   if (result != TC_TLV_OK)
     return result;
   while ((result = TC_TLV_next(&attributes, &attribute)) == TC_TLV_OK) {
-    unsigned kind;
     if (tc_pki_work_charge(work, attribute.encoded.length) != TC_TLV_OK)
       return TC_TLV_LIMIT;
     if (!tc_pki_tag(&attribute, 0x30) || (encoding == TC_CMS_ATTRIBUTES_DER && previous.data &&
@@ -905,46 +1076,49 @@ TC_TLV_result TC_CMS_signed_attributes_read(TC_bytes encoded, TC_CMS_attribute_e
     if (tc_pki_next(&fields, 0x31, &element) != TC_TLV_OK || !tc_pki_end(&fields) ||
         !element.value.length)
       return TC_TLV_INVALID;
-    const TC_PIV_oid identity = TC_PIV_oid_identify(oid, TC_PIV_OIDS_TWIC_COMPATIBLE);
-    if (identity == TC_PIV_OID_SIGNER_NAME)
-      kind = SIGNER_NAME;
-    else if (identity == TC_PIV_OID_FASCN)
-      kind = FASCN;
-    else if (tc_pki_equal(oid, (TC_bytes){entry_uuid_oid, sizeof entry_uuid_oid}))
-      kind = ENTRY_UUID;
-    else if (oid.length == sizeof attribute_prefix + 1 &&
-             !memcmp(oid.data, attribute_prefix, sizeof attribute_prefix))
-      kind = oid.data[sizeof attribute_prefix];
-    else
+    const cms_attribute_kind kind = cms_attribute_classify(oid, selected.attribute_oids);
+    const TC_CMS_other_attributes other = selected.other_attributes;
+    if (kind == CMS_ATTRIBUTE_EXCLUDED ||
+        (kind == CMS_ATTRIBUTE_LISTED && other == TC_CMS_OTHER_ATTRIBUTES_REJECT) ||
+        (kind == CMS_ATTRIBUTE_OTHER && other != TC_CMS_OTHER_ATTRIBUTES_SKIP_ALL))
       return TC_TLV_UNSUPPORTED;
-    if (kind != CONTENT_TYPE && kind != MESSAGE_DIGEST && kind != SIGNING_TIME &&
-        kind != SMIME_CAPABILITIES && kind != SIGNER_NAME && kind != FASCN && kind != ENTRY_UUID)
-      return TC_TLV_UNSUPPORTED;
+    if (kind == CMS_ATTRIBUTE_OTHER) {
+      /* Values stay opaque. cms_open checked their framing and the nonempty
+       * SET was checked above. */
+      result = cms_attribute_values_order(element.value, profile, limits);
+      if (result == TC_TLV_OK)
+        result =
+            cms_attribute_repeated(outer.value, attribute.encoded.data, oid, profile, limits, work);
+      if (result != TC_TLV_OK)
+        return result;
+      continue;
+    }
     result = TC_TLV_reader_init(&values, element.value.data, element.value.length, profile, limits);
     if (result != TC_TLV_OK)
       return result;
     if (TC_TLV_next(&values, &value) != TC_TLV_OK || !tc_pki_end(&values))
       return TC_TLV_INVALID;
-    if (kind == CONTENT_TYPE) {
+    if (kind == CMS_ATTRIBUTE_CONTENT_TYPE) {
       if (parsed.content_type.data || !tc_pki_tag(&value, 6) ||
           TC_DER_oid_contents(value.value.data, value.value.length) != TC_TLV_OK)
         return TC_TLV_INVALID;
       parsed.content_type = value.value;
-    } else if (kind == MESSAGE_DIGEST) {
+    } else if (kind == CMS_ATTRIBUTE_MESSAGE_DIGEST) {
       if (parsed.message_digest.data || !tc_pki_tag(&value, 4) || !value.value.length)
         return TC_TLV_INVALID;
       parsed.message_digest = value.value;
-    } else if (kind == SIGNING_TIME) {
+    } else if (kind == CMS_ATTRIBUTE_SIGNING_TIME) {
       if (parsed.has_signing_time || tc_x509_time_value(&value, &parsed.signing_time) != TC_TLV_OK)
         return TC_TLV_INVALID;
       if (tc_pki_tag(&value, 0x18) && parsed.signing_time.year >= 1950 &&
           parsed.signing_time.year <= 2049)
         return TC_TLV_INVALID;
       parsed.has_signing_time = 1;
-    } else if (kind == FASCN || kind == ENTRY_UUID) {
+    } else if (kind == CMS_ATTRIBUTE_FASCN || kind == CMS_ATTRIBUTE_ENTRY_UUID) {
       tc_pki_octets_storage octets = {{NULL, 0}, 0, 0, NULL, 0, work};
-      TC_bytes* destination = kind == FASCN ? &parsed.fascn_octets : &parsed.entry_uuid_octets;
-      const size_t required = kind == FASCN ? FASCN_BYTES : UUID_BYTES;
+      const int fascn = kind == CMS_ATTRIBUTE_FASCN;
+      TC_bytes* destination = fascn ? &parsed.fascn_octets : &parsed.entry_uuid_octets;
+      const size_t required = fascn ? FASCN_BYTES : UUID_BYTES;
       if (destination->data)
         return TC_TLV_INVALID;
       result = tc_pki_octets(value.encoded, profile, limits,
@@ -954,10 +1128,10 @@ TC_TLV_result TC_CMS_signed_attributes_read(TC_bytes encoded, TC_CMS_attribute_e
         return result;
       if (octets.length != required)
         return TC_TLV_INVALID;
-      if (kind == FASCN)
+      if (fascn)
         parsed.fascn_oid = oid;
       *destination = value.encoded;
-    } else if (kind == SIGNER_NAME) {
+    } else if (kind == CMS_ATTRIBUTE_SIGNER_NAME) {
       const tc_pki_tree_workspace tree = {frames.data, frames.capacity, work};
       if (parsed.signer_name.data)
         return TC_TLV_INVALID;
@@ -965,7 +1139,7 @@ TC_TLV_result TC_CMS_signed_attributes_read(TC_bytes encoded, TC_CMS_attribute_e
       if (result != TC_TLV_OK)
         return result;
       parsed.signer_name = value.encoded;
-    } else {
+    } else if (kind == CMS_ATTRIBUTE_SMIME_CAPABILITIES) {
       const tc_pki_tree_workspace tree = {frames.data, frames.capacity, work};
       if (parsed.smime_capabilities.data)
         return TC_TLV_INVALID;
@@ -973,6 +1147,15 @@ TC_TLV_result TC_CMS_signed_attributes_read(TC_bytes encoded, TC_CMS_attribute_e
       if (result != TC_TLV_OK)
         return result;
       parsed.smime_capabilities = value.encoded;
+    } else {
+      /* RFC 6211 section 2 and RFC 5035 sections 3 and 5: one SEQUENCE value
+       * and one instance per SignerInfo. */
+      if (!tc_pki_tag(&value, 0x30))
+        return TC_TLV_INVALID;
+      result =
+          cms_attribute_repeated(outer.value, attribute.encoded.data, oid, profile, limits, work);
+      if (result != TC_TLV_OK)
+        return result;
     }
   }
   if (result != TC_TLV_END)

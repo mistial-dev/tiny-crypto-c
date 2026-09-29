@@ -7,7 +7,9 @@
 Include `<tiny_crypto/cms.h>` and enable `TINY_CRYPTO_ENABLE_CMS`.
 This base layer parses metadata, hashes content, and verifies signatures with a
 caller-selected public key. It depends on X.509 key parsing, BER framing, and
-the small PIV/TWIC identifier classifier used by the supported signed attributes.
+the small PIV/TWIC identifier classifier used by the PIV signed attributes.
+Every reader and verifier takes a `TC_CMS_verification_policy`, described in
+[Verification policy](#verification-policy).
 
 Signer discovery, certificate paths, and revocation are an optional layer.
 Include `<tiny_crypto/cms_validation.h>` and enable
@@ -59,9 +61,11 @@ TWIC biometric objects using its `--tpk-hex` option.
 For PIV signed objects, include `<tiny_crypto/piv_cms.h>` and call
 `TC_PIV_CMS_read` with `TC_PIV_CMS_CHUID` or `TC_PIV_CMS_BIOMETRIC`.
 It checks the external-signature layout and required attributes from
-SP 800-73-5 Part 1 and SP 800-76-2. Choose the OID namespace policy and
-attribute encoding explicitly. `TC_PIV_CMS_BIOMETRIC` requires both FASC-N
-and entryUUID. Select `TC_PIV_CMS_BIOMETRIC_LEGACY` explicitly for the
+SP 800-73-5 Part 1 and SP 800-76-2. Its policy selects the attribute encoding
+and the identifier set. `attribute_oids` must be `TC_CMS_ATTRIBUTE_OIDS_PIV`
+for PIV cards or `TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC` for TWIC readers. The same
+selection applies to the content type, following TWIC Part 2 v5 section 6.
+`TC_PIV_CMS_BIOMETRIC` requires both FASC-N and entryUUID. Select `TC_PIV_CMS_BIOMETRIC_LEGACY` explicitly for the
 FIPS 201-1 signature profile: FASC-N remains mandatory and a present entryUUID
 must match CHUID. Use the same profile for identifier matching and set
 `TC_PIV_biometric_validation_request.signature_profile` when validating it.
@@ -114,8 +118,15 @@ return an error. Acceptance also requires signature and trust validation.
 `TC_CMS_signed_data_read` reads a complete ContentInfo carrying SignedData.
 It checks envelope framing, digest AlgorithmIdentifier syntax, and SignedData
 version consistency. Enable `TINY_CRYPTO_TLV_BER`: CMS envelopes allow both
-definite and indefinite BER lengths. The signed-attribute compatibility mode
-described below is a separate selection.
+definite and indefinite BER lengths. `policy.envelope` selects BER or DER
+framing. The signed-attribute encoding is a separate selection.
+
+`TC_CMS_digest_algorithms_check` checks that a signer's digest algorithm is
+listed in `digestAlgorithms` with valid parameters, as RFC 5652 section 5.1
+requires, and returns the recognized hash. An unlisted digest returns
+`TC_TLV_INVALID`. An unknown selected digest returns `TC_TLV_UNSUPPORTED`.
+Other listed digests need only valid syntax because they may belong to other
+signers. The signature-only verifiers leave this check to the caller.
 
 The returned spans borrow the original buffer. `content_type` contains the OID
 contents. The other fields retain their complete encodings. `content` is an
@@ -141,9 +152,9 @@ message's validity undetermined.
 ## SignerInfo
 
 `TC_CMS_signer_info_read` reads one complete SignerInfo. The collection reader
-below handles the signerInfos SET. Select `TC_TLV_BER` for CMS framing or
-`TC_TLV_DER` when the application requires DER. The signed-attribute
-compatibility mode is selected separately.
+below handles the signerInfos SET. `policy.envelope` selects BER framing for
+CMS or DER framing when the application requires DER. The signed-attribute
+encoding is selected separately.
 
 Version 1 identifies the signer by issuer Name and certificate serial number.
 Version 3 uses a subject key identifier. The reader checks that the identifier
@@ -159,10 +170,12 @@ checks. The SignerInfo signature covers only the signed attributes.
 The fixed-workspace example also provides `example_read_cms_signer`. It uses BER
 framing and the same bounds and borrowed-buffer lifetime as the envelope reader.
 
-To read a collection, pass `signed_data.signers` to `TC_CMS_signers_init`, then
-call `TC_CMS_signer_next` until it returns `TC_TLV_END`. Keep one work counter
-across those calls. Initialization checks the SET's BER framing. Each next call
-checks one SignerInfo. The reader position and output stay unchanged on failure.
+To read a collection, pass `signed_data.signers` and the policy to
+`TC_CMS_signers_init`, then call `TC_CMS_signer_next` until it returns
+`TC_TLV_END`. Keep one work counter across those calls. Initialization checks
+the SET's framing under `policy.envelope`. Each next call checks one
+SignerInfo with the same framing. The reader position and output stay unchanged
+on failure.
 An exhausted reader returns `END` even when its work budget is zero.
 
 The [example loop](../examples/cms_reader.c) in `example_parse_cms_signers`
@@ -171,53 +184,99 @@ Reader state, input bytes, frames, work counter and output must not overlap.
 Keep the input bytes stable while iterating or using returned spans. SignedData
 may contain no signers. Parsing an empty collection authenticates nothing.
 
-## RSA parameter compatibility
+## Verification policy
+
+`TC_CMS_verification_policy` holds every CMS encoding and attribute choice.
+Readers and verifiers copy it at entry. A zero-initialized policy selects the
+RFC 5652 defaults. Unknown enum values return an argument error.
+
+| Field | Default | Other values |
+|---|---|---|
+| `envelope` | `TC_CMS_ENVELOPE_BER` | `TC_CMS_ENVELOPE_DER` restricts SignedData and SignerInfo framing to DER |
+| `attributes` | `TC_CMS_ATTRIBUTES_DER` | `TC_CMS_ATTRIBUTES_BER_DEFINITE_ORDER` for signatures over unsorted attributes |
+| `rsa_parameters` | `TC_CMS_RSA_PARAMETERS_NULL` | `TC_CMS_RSA_PARAMETERS_ALLOW_ABSENT` |
+| `attribute_oids` | `TC_CMS_ATTRIBUTE_OIDS_CMS` | `TC_CMS_ATTRIBUTE_OIDS_PIV`, `TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC` |
+| `other_attributes` | `TC_CMS_OTHER_ATTRIBUTES_SKIP_LISTED` | `TC_CMS_OTHER_ATTRIBUTES_REJECT`, `TC_CMS_OTHER_ATTRIBUTES_SKIP_ALL` |
+
+`TC_CMS_path_options.verification` and `TC_validation_options.verification`
+embed the same policy. The PIV and TWIC credential validators replace
+`attribute_oids` with the identifier set of the card profile.
+
+### RSA parameters
 
 `TC_CMS_RSA_PARAMETERS_NULL` requires a `NULL` parameter for CMS
 `rsaEncryption`, as specified in RFC 3370 section 3.2. Some captured PIV
 biometric signatures omit that parameter. Applications can accept those by
-selecting `TC_CMS_RSA_PARAMETERS_ALLOW_ABSENT` in the verification request's
-policy:
+selecting `TC_CMS_RSA_PARAMETERS_ALLOW_ABSENT`:
 
 ```c
 TC_CMS_verification_policy policy = {
-    TC_CMS_ATTRIBUTES_DER,
-    TC_CMS_RSA_PARAMETERS_ALLOW_ABSENT
+    .attributes = TC_CMS_ATTRIBUTES_DER,
+    .rsa_parameters = TC_CMS_RSA_PARAMETERS_ALLOW_ABSENT,
+    .attribute_oids = TC_CMS_ATTRIBUTE_OIDS_PIV,
 };
 ```
 
-For path construction and credential validation, set
-`TC_CMS_path_options.rsa_parameters` to the same value. Zero-initialized options
-require `NULL`. Present parameters must still encode `NULL`. Certificate
-algorithms and RSA signature padding keep their standard checks. Signed
-attribute ordering is selected separately through `attributes`.
+Present parameters must still encode `NULL`. Certificate algorithms and RSA
+signature padding keep their standard checks.
+
+### Attribute identifiers
+
+`attribute_oids` selects the signed attributes the reader interprets.
+`TC_CMS_ATTRIBUTE_OIDS_CMS` covers contentType, messageDigest and signingTime
+(RFC 5652 section 11), SMIMECapabilities (RFC 8551 section 2.5.2) and entryUUID
+(RFC 4530). `TC_CMS_ATTRIBUTE_OIDS_PIV` adds pivSigner-DN and pivFASC-N from
+FIPS 201-3 Table B-2. `TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC` also accepts twicFASC-N,
+the TWIC Part 2 v5 section 6 pair of pivFASC-N. `TC_CMS_ATTRIBUTE_OIDS_PIV`
+returns `TC_TLV_UNSUPPORTED` for twicFASC-N under every `other_attributes`
+value, so a card identifier is never skipped. The PIV sets require
+`TINY_CRYPTO_ENABLE_PIV_OIDS`.
+
+`other_attributes` handles every attribute outside the selected set:
+
+- `TC_CMS_OTHER_ATTRIBUTES_SKIP_LISTED` skips cmsAlgorithmProtection
+  (RFC 6211) and signingCertificate and signingCertificateV2 (RFC 5035). Each
+  must carry one SEQUENCE value. Other attributes return `TC_TLV_UNSUPPORTED`.
+- `TC_CMS_OTHER_ATTRIBUTES_REJECT` returns `TC_TLV_UNSUPPORTED` for all of them.
+- `TC_CMS_OTHER_ATTRIBUTES_SKIP_ALL` also skips any other attribute with a
+  nonempty value set. DER attributes also need their values in SET OF order.
+
+RFC 6211 section 3.1 applies its algorithm comparison to validators that
+support the attribute. RFC 5035 section 2 recommends recognizing the
+signing-certificate attributes. An application that relies on them compares
+the signer certificate hash after validation, or selects
+`TC_CMS_OTHER_ATTRIBUTES_REJECT`. A skipped attribute stays covered by the
+signature. A repeated attribute type returns `TC_TLV_INVALID`. Under the CMS
+set, a PIV signer name or FASC-N is an attribute outside the set, so path
+building performs no signer-name binding when `SKIP_ALL` skips it.
 
 ## Signed attributes
 
 Pass the complete `SignerInfo.signedAttrs` field, including its implicit `[0]`
 tag, to `TC_CMS_signed_attributes_read`.
 
-Pass `TC_CMS_ATTRIBUTES_DER` for RFC 5652 encoding. An application that needs
-TWIC/MyID compatibility can select `TC_CMS_ATTRIBUTES_BER_DEFINITE_ORDER`
-instead, with `TINY_CRYPTO_TLV_BER=ON`. The library uses the selected mode as
-given, without card detection or a retry in another mode.
+Select `TC_CMS_ATTRIBUTES_DER` in `policy.attributes` for RFC 5652 encoding.
+An application that needs TWIC/MyID compatibility can select
+`TC_CMS_ATTRIBUTES_BER_DEFINITE_ORDER` instead, with `TINY_CRYPTO_TLV_BER=ON`.
+The library uses the selected mode as given, without card detection or a retry
+in another mode.
 
 The compatibility mode accepts definite BER lengths and preserves attribute
-order. It still rejects indefinite lengths, duplicate required attributes,
-missing content-type or message-digest, and malformed values. Optional
-signingTime, SMIMECapabilities and pivSigner-DN are accepted. Other attributes
-return `TC_TLV_UNSUPPORTED`.
+order. It still rejects indefinite lengths, duplicate attributes, missing
+content-type or message-digest, and malformed values. `policy.attribute_oids`
+and `policy.other_attributes` decide which other attributes are read, skipped
+or rejected.
 
 ```c
 #include <tiny_crypto/cms.h>
 
 TC_TLV_result read_attributes(TC_bytes input,
-    TC_CMS_attribute_encoding encoding, TC_CMS_signed_attributes *attributes)
+    const TC_CMS_verification_policy *policy, TC_CMS_signed_attributes *attributes)
 {
     const TC_TLV_limits limits = {4096, 4096, 64, 8};
     TC_TLV_frame frames[8];
     size_t work = 16384;
-    return TC_CMS_signed_attributes_read(input, encoding, &limits,
+    return TC_CMS_signed_attributes_read(input, policy, &limits,
         (TC_TLV_frames){frames, 8}, &work, attributes);
 }
 ```
@@ -237,18 +296,19 @@ policy ignore it. Interpret advertised capabilities only after trust
 and signature validation.
 
 `signer_name` borrows the Name encoded in `pivSigner-DN`
-(`2.16.840.1.101.3.6.5`). The reader validates its X.509 name structure and
-requires a single attribute value. CMS path building also matches this name
+(`2.16.840.1.101.3.6.5`), read under the PIV identifier sets. The reader
+validates its X.509 name structure and requires a single attribute value. CMS path building also matches this name
 against the candidate certificate's subject, using the shared name-comparison
 rules. The signature-only APIs accept a public key. Callers using those APIs
 must perform the certificate/name binding themselves. A PIV CHUID profile must
 require this attribute in addition to the general CMS checks.
 
-`fascn_oid` preserves the PIV or TWIC FASC-N identifier. Apply the application's
-namespace policy with `TC_PIV_oid_identify`. `fascn_octets` borrows the encoded
+`fascn_oid` preserves the PIV or TWIC FASC-N identifier that matched
+`policy.attribute_oids`. twicFASC-N is read only under
+`TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC`. `fascn_octets` borrows the encoded
 OCTET STRING, including its tag and length. The reader requires 25 value bytes
 and rejects duplicate FASC-N attributes, including a PIV/TWIC pair. DER requires
-a primitive value; the explicit BER mode also accepts definite-length chunks.
+a primitive value. The explicit BER mode also accepts definite-length chunks.
 Use the TLV reader for a primitive value or walk the primitive OCTET STRING
 chunks in order for a fragmented value. Compare the authenticated identifier
 with the credential's CHUID FASC-N before relying on the binding.
@@ -273,7 +333,9 @@ Select `TC_PIV_OIDS_ONLY` for PIV identifiers or
 [TWIC Part 2 v5, section 6](https://www.tsa.gov/sites/default/files/twic-nexgen-_-legacy-part-2-card-specification-v5.pdf).
 The choice belongs to the application and applies to objects from either card
 application. Enable the helper with `TINY_CRYPTO_ENABLE_PIV_OIDS`
-(`TC_ENABLE_PIV_OIDS`). CMS support requires it.
+(`TC_ENABLE_PIV_OIDS`). CMS support requires it. The CMS policy's
+`TC_CMS_ATTRIBUTE_OIDS_PIV` and `TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC` map to these
+two profiles.
 
 The result identifies certificate-policy, FASC-N, content-signing, card-authentication
 and background-check OIDs. Each `TC_PIV_oid` value names one PIV/TWIC pair from
@@ -474,9 +536,7 @@ provider and the parsing limits:
 
 ```c
 const TC_CMS_signer_verify_request request = {
-    &signer, signed_data.content_type,
-    {TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL},
-    &key, &provider, &limits};
+    &signer, signed_data.content_type, policy, &key, &provider, &limits};
 TC_X509_signature_result result = TC_CMS_signer_verify_content(
     &request, signed_data.content, TC_CMS_CONTENT_BER_OCTETS, &workspace, &work);
 ```
@@ -628,8 +688,8 @@ The compiled `example_check_cms_signed_data` in
 [cms_validate.c](../examples/cms_validate.c) initializes the workspace and propagates
 the result. Supply application-specific time, usage, policy and providers in
 `options.path`, candidate bounds in `options.max_candidates` and
-`options.max_candidate_bytes`, and the explicit attribute encoding in
-`options.attributes`. Keep the source snapshot and result storage alive until
+`options.max_candidate_bytes`, and the CMS encodings and attribute handling in
+`options.verification`. Keep the source snapshot and result storage alive until
 you finish using the returned signer path.
 
 Only `TC_X509_PATH_VALID` confirms the selected signature and certificate path.
