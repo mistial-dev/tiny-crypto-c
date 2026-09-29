@@ -116,17 +116,28 @@ static inline TC_RSA_result tc_rsa_pss_cost(size_t length, size_t bits, TC_hash_
   return TC_RSA_OK;
 }
 
+/* Check PSS arguments and report the encode or verify cost without charging
+ * it. info and cost are valid on OK. */
+static inline TC_RSA_result tc_rsa_pss_plan(size_t length, size_t bits, TC_hash_algorithm hash,
+                                            TC_hash_algorithm mgf_hash, size_t digest_length,
+                                            size_t salt_length, tc_hash_info* info, size_t* cost)
+{
+  TC_RSA_result result =
+      tc_rsa_pss_parameters(length, bits, hash, mgf_hash, salt_length, info, cost);
+  /* A digest of the wrong size is a caller error and outranks parameter
+   * problems in the encoded-message shape. */
+  if (result != TC_RSA_UNSUPPORTED && digest_length != info->digest_length)
+    return TC_RSA_ARGUMENT;
+  return result;
+}
+
 static inline TC_RSA_result tc_rsa_pss_prepare(size_t length, size_t bits, TC_hash_algorithm hash,
                                                TC_hash_algorithm mgf_hash, size_t digest_length,
                                                size_t salt_length, uint32_t* work, tc_hash_info* info)
 {
   size_t cost;
   TC_RSA_result result =
-      tc_rsa_pss_parameters(length, bits, hash, mgf_hash, salt_length, info, &cost);
-  /* A digest of the wrong size is a caller error and outranks parameter
-   * problems in the encoded-message shape. */
-  if (result != TC_RSA_UNSUPPORTED && digest_length != info->digest_length)
-    return TC_RSA_ARGUMENT;
+      tc_rsa_pss_plan(length, bits, hash, mgf_hash, digest_length, salt_length, info, &cost);
   if (result != TC_RSA_OK)
     return result;
   if (cost > *work)
@@ -224,9 +235,11 @@ static inline TC_RSA_result tc_rsa_pss_check(uint8_t* encoded, size_t length, si
   return difference ? TC_RSA_INVALID : TC_RSA_OK;
 }
 
-static inline TC_RSA_result tc_rsa_oaep_prepare(size_t length, TC_hash_algorithm hash,
-                                                TC_hash_algorithm mgf_hash, TC_bytes label,
-                                                uint32_t* work, tc_hash_info* info)
+/* Check OAEP arguments and report the encode or decode cost without charging
+ * it. info and cost are valid on OK. */
+static inline TC_RSA_result tc_rsa_oaep_plan(size_t length, TC_hash_algorithm hash,
+                                             TC_hash_algorithm mgf_hash, TC_bytes label,
+                                             tc_hash_info* info, size_t* cost)
 {
   if (!tc_hash_info_get(hash, info) || !tc_hash_available(hash) || !tc_hash_available(mgf_hash))
     return TC_RSA_UNSUPPORTED;
@@ -234,7 +247,18 @@ static inline TC_RSA_result tc_rsa_oaep_prepare(size_t length, TC_hash_algorithm
     return TC_RSA_INVALID;
   if (length == SIZE_MAX || label.length > SIZE_MAX - length - 1)
     return TC_RSA_LIMIT;
-  const size_t cost = length + label.length + 1;
+  *cost = length + label.length + 1;
+  return TC_RSA_OK;
+}
+
+static inline TC_RSA_result tc_rsa_oaep_prepare(size_t length, TC_hash_algorithm hash,
+                                                TC_hash_algorithm mgf_hash, TC_bytes label,
+                                                uint32_t* work, tc_hash_info* info)
+{
+  size_t cost;
+  TC_RSA_result result = tc_rsa_oaep_plan(length, hash, mgf_hash, label, info, &cost);
+  if (result != TC_RSA_OK)
+    return result;
   if (cost > *work)
     return TC_RSA_LIMIT;
   *work -= cost;

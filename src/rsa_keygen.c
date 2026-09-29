@@ -314,17 +314,8 @@ static TC_RSA_result tc_rsa_keygen_step(TC_RSA_keygen_state* state, TC_random_fn
       if (status != TC_RSA_OK)
         TC_RSA_KEYGEN_RETURN(tc_rsa_keygen_stop(state, status));
       const uint8_t* candidate_bytes = state->phase == TC_RSA_KEYGEN_P_ROUND ? p : q;
-      uint8_t* bytes = (uint8_t*)temporary;
-      tc_rsa_mask_candidate_width(bytes, candidate_bytes, prime_length, prime_length);
-      tc_mp_from_be(base, bytes, prime_length);
-      TC_RSA_word* last = scratch + 7 * h;
-      memcpy(last, scratch, prime_length);
-      --last[0];
-      const TC_RSA_word below_last = tc_mp_subtract(temporary, base, last, h);
-      TC_RSA_word above_one = (TC_RSA_word)(base[0] & ~1u);
-      for (size_t i = 1; i < h; ++i)
-        above_one |= base[i];
-      if (!below_last || !above_one)
+      if (!tc_rsa_witness_sample(base, (uint8_t*)temporary, candidate_bytes, prime_length,
+                                 prime_length, scratch, scratch + 7 * h, temporary, h))
         continue;
       if (!tc_mp_miller_rabin_round(scratch, base, h, state->twos, scratch + 2 * h)) {
         state->phase =

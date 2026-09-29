@@ -177,8 +177,7 @@ static TC_RSA_result tc_rsa_verify_pss_digest_impl(const TC_RSA_public_key* key,
   TC_hash_context hash_workspace;
   uint8_t block[64];
   uint8_t* encoded;
-  size_t length, words, needed;
-  uint32_t validation_work = UINT32_MAX;
+  size_t length, words, needed, verify_cost;
   tc_hash_info info;
   if (!options || !work)
     return TC_RSA_ARGUMENT;
@@ -196,8 +195,8 @@ static TC_RSA_result tc_rsa_verify_pss_digest_impl(const TC_RSA_public_key* key,
     return TC_RSA_INVALID;
   if (!digest.data)
     return TC_RSA_ARGUMENT;
-  result = tc_rsa_pss_prepare(length, length * 8 - 1, options->hash, options->mgf_hash,
-                              digest.length, options->salt_length, &validation_work, &info);
+  result = tc_rsa_pss_plan(length, length * 8 - 1, options->hash, options->mgf_hash,
+                           digest.length, options->salt_length, &info, &verify_cost);
   if (result != TC_RSA_OK)
     return result;
   words = length / sizeof(TC_RSA_word);

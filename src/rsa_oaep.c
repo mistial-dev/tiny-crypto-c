@@ -57,15 +57,16 @@ static TC_RSA_result tc_rsa_encrypt_oaep(const TC_RSA_public_key* key, TC_hash_a
   if (ciphertext_length != length)
     return TC_RSA_INVALID;
   tc_hash_info info;
-  uint32_t validation_work = UINT32_MAX;
-  status = tc_rsa_oaep_prepare(length, hash, mgf_hash, label, &validation_work, &info);
+  size_t encode_cost;
+  status = tc_rsa_oaep_plan(length, hash, mgf_hash, label, &info, &encode_cost);
   if (status != TC_RSA_OK)
     return status;
   if (plaintext.length > length - 2 * info.digest_length - 2)
     return TC_RSA_INVALID;
   const size_t n = length / sizeof(TC_RSA_word), arithmetic_words = 8 * n + 2;
   const size_t required = arithmetic_words + n;
-  if (workspace->capacity < required || max_work <= UINT32_MAX - validation_work)
+  /* One unit for the seed request, then the encoding cost. */
+  if (workspace->capacity < required || max_work <= encode_cost)
     return TC_RSA_LIMIT;
   TC_hash_context hash_workspace;
   uint8_t block[64];
@@ -118,7 +119,7 @@ static TC_RSA_result tc_rsa_decrypt_oaep(const TC_RSA_private_key* key, const TC
 {
   uint32_t max_work = *work;
   tc_hash_info info;
-  uint32_t validation_work = UINT32_MAX;
+  size_t decode_cost;
   if (!random)
     return TC_RSA_ARGUMENT;
   TC_RSA_result status = tc_rsa_decrypt_inputs(key, ciphertext, label, plaintext,
@@ -137,26 +138,18 @@ static TC_RSA_result tc_rsa_decrypt_oaep(const TC_RSA_private_key* key, const TC
     return status;
   if (ciphertext.length != length)
     return TC_RSA_INVALID;
-  status = tc_rsa_oaep_prepare(length, hash, mgf_hash, label, &validation_work, &info);
+  status = tc_rsa_oaep_plan(length, hash, mgf_hash, label, &info, &decode_cost);
   if (status != TC_RSA_OK)
     return status;
   const size_t n = length / sizeof(TC_RSA_word), required = 14 * n;
-  if (!max_attempts || workspace->capacity < required || max_work < UINT32_MAX - validation_work)
+  if (!max_attempts || workspace->capacity < required || max_work < decode_cost)
     return TC_RSA_LIMIT;
   TC_hash_context hash_workspace;
   uint8_t block[64];
   uint8_t* encoded = (uint8_t*)(workspace->words + 13 * n);
   TC_bytes message = {0};
-  if (crt)
-    status = tc_rsa_crt_private_operation(
-        key->public_key.modulus.data, length, key->public_key.exponent.data,
-        key->public_key.exponent.length, key->p, key->q, crt, ciphertext.data, encoded, random,
-        random_context, max_attempts, workspace->words, 13 * n, &max_work);
-  else
-    status = tc_rsa_private_operation_magnitude(
-        key->public_key.modulus.data, length, key->public_key.exponent.data,
-        key->public_key.exponent.length, key->d, ciphertext.data, encoded, random, random_context,
-        max_attempts, workspace->words, 13 * n, &max_work);
+  status = tc_rsa_private_apply(key, crt, ciphertext.data, encoded, random, random_context,
+                                max_attempts, workspace->words, 13 * n, &max_work);
   if (status == TC_RSA_OK)
     status = tc_rsa_oaep_decode(encoded, length, hash, mgf_hash, label, block, &hash_workspace,
                                 &max_work, &message);

@@ -24,6 +24,26 @@ static inline void tc_rsa_mask_candidate_width(uint8_t* sampled, const uint8_t* 
   }
 }
 
+/* Turn random octets into a Miller-Rabin base for odd p. The octets are
+ * masked to the candidate's bit width, and the base is accepted only when
+ * 1 < base < p - 1 (FIPS 186-5 B.3.1). last and temporary are n-limb scratch;
+ * bytes may alias temporary. */
+static inline int tc_rsa_witness_sample(tc_mp_word* base, uint8_t* bytes, const uint8_t* candidate,
+                                        size_t candidate_length, size_t length,
+                                        const tc_mp_word* p, tc_mp_word* last,
+                                        tc_mp_word* temporary, size_t n)
+{
+  tc_rsa_mask_candidate_width(bytes, candidate, candidate_length, length);
+  tc_mp_from_be(base, bytes, length);
+  memcpy(last, p, length);
+  --last[0];
+  const tc_mp_word below_last = tc_mp_subtract(temporary, base, last, n);
+  tc_mp_word above_one = (tc_mp_word)(base[0] & ~1u);
+  for (size_t i = 1; i < n; ++i)
+    above_one |= base[i];
+  return below_last && above_one;
+}
+
 /* Test an odd candidate using independent uniformly random bases.
  * length selects the working width, a limb multiple at most TC_RSA_MAX_MODULUS_BYTES.
  * The candidate fits that width; leading zero bytes are accepted.
@@ -69,17 +89,8 @@ tc_rsa_probable_prime_magnitude(TC_bytes candidate, size_t length, size_t rounds
       status = TC_RSA_ERROR;
       break;
     }
-    /* Mask to the candidate's bit width before rejection sampling. */
-    uint8_t* bytes = (uint8_t*)temporary;
-    tc_rsa_mask_candidate_width(bytes, candidate.data, candidate.length, length);
-    tc_mp_from_be(base, (const uint8_t*)temporary, length);
-    memcpy(last, p, length);
-    --last[0];
-    const tc_mp_word below_last = tc_mp_subtract(temporary, base, last, n);
-    tc_mp_word above_one = (tc_mp_word)(base[0] & ~1u);
-    for (size_t i = 1; i < n; ++i)
-      above_one |= base[i];
-    if (!below_last || !above_one)
+    if (!tc_rsa_witness_sample(base, (uint8_t*)temporary, candidate.data, candidate.length,
+                               length, p, last, temporary, n))
       continue;
     *work -= round_work;
     if (!tc_mp_miller_rabin_round(p, base, n, twos, arena)) {

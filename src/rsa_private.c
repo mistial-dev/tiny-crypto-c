@@ -267,17 +267,10 @@ static TC_RSA_result tc_rsa_sign_encoded(const TC_RSA_private_key* key, const TC
                                          void* random_context, size_t max_attempts,
                                          const TC_RSA_workspace* workspace, uint32_t* work)
 {
-  const size_t length = key->public_key.modulus.length, n = length / sizeof(TC_RSA_word);
-  if (crt)
-    return tc_rsa_crt_private_operation(
-        key->public_key.modulus.data, length, key->public_key.exponent.data,
-        key->public_key.exponent.length, key->p, key->q, crt,
-        (const uint8_t*)(workspace->words + 13 * n), signature, random, random_context,
-        max_attempts, workspace->words, 13 * n, work);
-  return tc_rsa_private_operation_magnitude(
-      key->public_key.modulus.data, length, key->public_key.exponent.data,
-      key->public_key.exponent.length, key->d, (const uint8_t*)(workspace->words + 13 * n),
-      signature, random, random_context, max_attempts, workspace->words, 13 * n, work);
+  const size_t n = key->public_key.modulus.length / sizeof(TC_RSA_word);
+  /* The encoded message occupies the last n limbs. */
+  return tc_rsa_private_apply(key, crt, (const uint8_t*)(workspace->words + 13 * n), signature,
+                              random, random_context, max_attempts, workspace->words, 13 * n, work);
 }
 
 static TC_RSA_result tc_rsa_sign_v15_digest(const TC_RSA_private_key* key, const TC_RSA_crt* crt,
@@ -348,7 +341,7 @@ static TC_RSA_result tc_rsa_sign_pss_digest(const TC_RSA_private_key* key, const
 {
   uint32_t max_work = *work;
   tc_hash_info info;
-  uint32_t validation_work = UINT32_MAX;
+  size_t encode_cost;
   TC_RSA_result status =
       tc_rsa_sign_inputs(key, digest, signature, signature_length, random, max_attempts, workspace);
   if (status != TC_RSA_OK)
@@ -359,13 +352,14 @@ static TC_RSA_result tc_rsa_sign_pss_digest(const TC_RSA_private_key* key, const
       return status;
   }
   const size_t length = key->public_key.modulus.length, n = length / sizeof(TC_RSA_word);
-  status = tc_rsa_pss_prepare(length, length * 8 - 1, hash, mgf_hash, digest.length, salt_length,
-                              &validation_work, &info);
+  status = tc_rsa_pss_plan(length, length * 8 - 1, hash, mgf_hash, digest.length, salt_length,
+                           &info, &encode_cost);
   if (status != TC_RSA_OK)
     return status;
   if (!digest.data)
     return TC_RSA_ARGUMENT;
-  if (max_work < UINT32_MAX - validation_work + (salt_length != 0))
+  /* The encoding cost, plus one unit for a salt request. */
+  if (max_work < encode_cost + (salt_length != 0))
     return TC_RSA_LIMIT;
   TC_hash_context hash_workspace;
   uint8_t block[64];

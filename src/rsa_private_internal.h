@@ -294,6 +294,21 @@ static inline TC_RSA_result tc_rsa_crt_consistent(size_t length, TC_bytes d_byte
   return matches ? TC_RSA_OK : TC_RSA_INVALID;
 }
 
+/* Strip leading zero octets so a factor or CRT value fits half the modulus
+ * width. Returns 0 for an empty field, one longer than the modulus, or a
+ * value wider than length / 2 octets. */
+static inline int tc_rsa_half_width_field(TC_bytes* field, size_t length)
+{
+  const size_t prime_length = length / 2;
+  if (!field->length || field->length > length)
+    return 0;
+  while (field->length > prime_length && !*field->data) {
+    ++field->data;
+    --field->length;
+  }
+  return field->length <= prime_length;
+}
+
 /* Derive fixed-width CRT values from validated d, p and q magnitudes. Scratch
  * needs 8n limbs. Results stay in scratch until the caller publishes all three. */
 static inline TC_RSA_result tc_rsa_crt_derive(size_t length, TC_bytes d_bytes, TC_bytes p_bytes,
@@ -312,13 +327,7 @@ static inline TC_RSA_result tc_rsa_crt_derive(size_t length, TC_bytes d_bytes, T
   if (!d_bytes.length || d_bytes.length > length)
     return TC_RSA_INVALID;
   for (size_t i = 0; i < 2; ++i) {
-    if (!fields[i].length || fields[i].length > length)
-      return TC_RSA_INVALID;
-    while (fields[i].length > prime_length && *fields[i].data == 0) {
-      ++fields[i].data;
-      --fields[i].length;
-    }
-    if (fields[i].length > prime_length)
+    if (!tc_rsa_half_width_field(&fields[i], length))
       return TC_RSA_INVALID;
   }
   if (scratch_words < required || *work < cost)
@@ -376,13 +385,7 @@ tc_rsa_crt_private_operation(const uint8_t* modulus, size_t length, const uint8_
   const size_t operations = 48 * length + 32 * exponent_length + 12;
   TC_bytes fields[] = {p_bytes, q_bytes, crt->dp, crt->dq, crt->q_inverse};
   for (size_t i = 0; i < sizeof fields / sizeof *fields; ++i) {
-    if (!fields[i].length || fields[i].length > length)
-      return TC_RSA_INVALID;
-    while (fields[i].length > prime_length && *fields[i].data == 0) {
-      ++fields[i].data;
-      --fields[i].length;
-    }
-    if (fields[i].length > prime_length)
+    if (!tc_rsa_half_width_field(&fields[i], length))
       return TC_RSA_INVALID;
   }
   if (!max_attempts || scratch_words < required || *work < operations)
@@ -510,5 +513,25 @@ tc_rsa_crt_private_operation(const uint8_t* modulus, size_t length, const uint8_
 cleanup:
   TC_secure_zero(scratch, required * sizeof *scratch);
   return status;
+}
+/* Private operation for a validated key: the CRT form when crt is set,
+ * otherwise full-width exponentiation with d. Storage, cost and output rules
+ * match the selected operation. */
+static inline TC_RSA_result tc_rsa_private_apply(const TC_RSA_private_key* key, const TC_RSA_crt* crt,
+                                                 const uint8_t* input, uint8_t* output,
+                                                 TC_random_fn random, void* random_context,
+                                                 size_t max_attempts, tc_mp_word* scratch,
+                                                 size_t scratch_words, uint32_t* work)
+{
+  const TC_RSA_public_key* public_key = &key->public_key;
+  if (crt)
+    return tc_rsa_crt_private_operation(public_key->modulus.data, public_key->modulus.length,
+                                        public_key->exponent.data, public_key->exponent.length,
+                                        key->p, key->q, crt, input, output, random,
+                                        random_context, max_attempts, scratch, scratch_words, work);
+  return tc_rsa_private_operation_magnitude(
+      public_key->modulus.data, public_key->modulus.length, public_key->exponent.data,
+      public_key->exponent.length, key->d, input, output, random, random_context, max_attempts,
+      scratch, scratch_words, work);
 }
 #endif
