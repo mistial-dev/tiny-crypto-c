@@ -110,13 +110,18 @@ static MunitResult signer_search(const MunitParameter params[], void* user)
     signer_cursor cursor = {results[i], 0};
     int failed = 0;
     out = saved;
-    munit_assert_int(tc_x509_crl_search_candidates(&cursor, signer_next, &crl, &extensions, &trust,
-                                                   NULL, NULL, &out, &failed),
-                     ==, TC_TLV_ARGUMENT);
+    munit_assert_int(
+        tc_x509_crl_search_candidates(&cursor, signer_next,
+                                      &(tc_x509_crl_signer_query){&crl, &extensions, NULL, NULL},
+                                      &trust, &out, &failed),
+        ==, TC_TLV_ARGUMENT);
     munit_assert_uint(cursor.calls, ==, 0);
-    munit_assert_int(tc_x509_crl_search_candidates(&cursor, signer_next, &crl, &extensions, &trust,
-                                                   tc_x509_crl_check_signer, NULL, &out, &failed),
-                     ==, results[i] == TC_TLV_END ? TC_TLV_INVALID : results[i]);
+    munit_assert_int(
+        tc_x509_crl_search_candidates(
+            &cursor, signer_next,
+            &(tc_x509_crl_signer_query){&crl, &extensions, tc_x509_crl_check_signer, NULL}, &trust,
+            &out, &failed),
+        ==, results[i] == TC_TLV_END ? TC_TLV_INVALID : results[i]);
     munit_assert_uint(cursor.calls, ==, 1);
     munit_assert_int(failed, ==, results[i] != TC_TLV_END);
     munit_assert_memory_equal(sizeof out, &out, &saved);
@@ -684,11 +689,15 @@ static MunitResult scope_inputs(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
-static TC_TLV_result unexpected_search(const void* candidates, const TC_X509_crl* crl,
-                                       const TC_X509_crl_extensions* extensions,
-                                       const tc_x509_crl_trust* trust, tc_x509_crl_attempt attempt,
-                                       const void* context, TC_X509_search_result* out, int* failed)
+static TC_TLV_result unexpected_search(const void* candidates,
+                                       const tc_x509_crl_signer_query* query,
+                                       const tc_x509_crl_trust* trust, TC_X509_search_result* out,
+                                       int* failed)
 {
+  const TC_X509_crl* crl = query->crl;
+  const TC_X509_crl_extensions* extensions = query->extensions;
+  tc_x509_crl_attempt attempt = query->attempt;
+  const void* context = query->context;
   (void)candidates;
   (void)crl;
   (void)extensions;
@@ -1323,9 +1332,11 @@ static MunitResult store_search(const MunitParameter params[], void* user)
     const tc_pki_store_candidates initial = cursor;
     int failed = 0;
     out = saved;
-    munit_assert_int(tc_x509_crl_store_search(&cursor, &crl, &extensions, &trust,
-                                              tc_x509_crl_check_signer, NULL, &out, &failed),
-                     ==, expected[scenario]);
+    munit_assert_int(
+        tc_x509_crl_store_search(
+            &cursor, &(tc_x509_crl_signer_query){&crl, &extensions, tc_x509_crl_check_signer, NULL},
+            &trust, &out, &failed),
+        ==, expected[scenario]);
     munit_assert_memory_equal(sizeof cursor, &cursor, &initial);
     munit_assert_memory_equal(sizeof out, &out, &saved);
     munit_assert_int(failed, ==, scenario != EMPTY);
@@ -1342,9 +1353,11 @@ static MunitResult store_search(const MunitParameter params[], void* user)
     failed = 0;
     work = scenario == NO_WORK ? 0 : WORK_BUDGET;
     out = saved;
-    munit_assert_int(tc_x509_crl_source_search(&bound, &crl, &extensions, &trust,
-                                               tc_x509_crl_check_signer, NULL, &out, &failed),
-                     ==, expected[scenario]);
+    munit_assert_int(
+        tc_x509_crl_source_search(
+            &bound, &(tc_x509_crl_signer_query){&crl, &extensions, tc_x509_crl_check_signer, NULL},
+            &trust, &out, &failed),
+        ==, expected[scenario]);
     munit_assert_memory_equal(sizeof cursor, &cursor, &unbound);
     munit_assert_memory_equal(sizeof out, &out, &saved);
     munit_assert_int(failed, ==, scenario != EMPTY);
@@ -1355,21 +1368,27 @@ static MunitResult store_search(const MunitParameter params[], void* user)
                           : 1);
     bound.search = NULL;
     const unsigned calls = fixture.calls;
-    munit_assert_int(tc_x509_crl_source_search(&bound, &crl, &extensions, &trust,
-                                               tc_x509_crl_check_signer, NULL, &out, &failed),
-                     ==, TC_TLV_ARGUMENT);
+    munit_assert_int(
+        tc_x509_crl_source_search(
+            &bound, &(tc_x509_crl_signer_query){&crl, &extensions, tc_x509_crl_check_signer, NULL},
+            &trust, &out, &failed),
+        ==, TC_TLV_ARGUMENT);
     munit_assert_uint(fixture.calls, ==, calls);
     munit_assert_memory_equal(sizeof out, &out, &saved);
   }
   return MUNIT_OK;
 }
 
-static TC_TLV_result
-guarded_scope_search(const void* candidates, const TC_X509_store_source* external,
-                     const TC_X509_crl* crl, const TC_X509_crl_extensions* extensions,
-                     const tc_x509_crl_trust* trust, tc_x509_crl_attempt attempt,
-                     const void* context, TC_X509_search_result* out, int* source_failed)
+static TC_TLV_result guarded_scope_search(const void* candidates,
+                                          const TC_X509_store_source* external,
+                                          const tc_x509_crl_signer_query* query,
+                                          const tc_x509_crl_trust* trust,
+                                          TC_X509_search_result* out, int* source_failed)
 {
+  const TC_X509_crl* crl = query->crl;
+  const TC_X509_crl_extensions* extensions = query->extensions;
+  tc_x509_crl_attempt attempt = query->attempt;
+  const void* context = query->context;
   (void)crl;
   (void)extensions;
   (void)attempt;

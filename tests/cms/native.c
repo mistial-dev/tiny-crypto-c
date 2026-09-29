@@ -1335,9 +1335,15 @@ static MunitResult revocations(const MunitParameter params[], void* user)
       memset(&saved, 0xa5, sizeof saved);
       memcpy(&found, &saved, sizeof found);
       work = TRUST_WORK_BUDGET;
-      munit_assert_int(tc_x509_crl_signer_validate(&parsed, &signer, &source, 1, &options,
-                                                   &validation, &search, &work, &found),
-                       ==, TC_X509_PATH_VALID);
+      munit_assert_int(
+          tc_x509_crl_signer_validate(
+              &parsed, &signer,
+              &(tc_x509_crl_trust){
+                  &source, 1, &options,
+                  &(tc_pki_tree_workspace){validation.frames, validation.frame_capacity, &work},
+                  &validation, &search},
+              &found),
+          ==, TC_X509_PATH_VALID);
       munit_assert_size(found.anchor_index, ==, 1);
       munit_assert_size(found.count, ==, 1);
       munit_assert_ptr_equal(found.path[0].data, signer_der);
@@ -1360,18 +1366,29 @@ static MunitResult revocations(const MunitParameter params[], void* user)
         if (failure == 4)
           encoded[(size_t)(parsed.signature.data - encoded) + parsed.signature.length - 1] ^= 1;
         memcpy(&found, &saved, sizeof found);
-        munit_assert_int(tc_x509_crl_signer_validate(&parsed, &signer, &source, anchor_index,
-                                                     &rejected, &validation, &search, &work,
-                                                     &found),
-                         ==, failure == 3 ? TC_X509_PATH_LIMIT : TC_X509_PATH_INVALID);
+        munit_assert_int(
+            tc_x509_crl_signer_validate(
+                &parsed, &signer,
+                &(tc_x509_crl_trust){
+                    &source, anchor_index, &rejected,
+                    &(tc_pki_tree_workspace){validation.frames, validation.frame_capacity, &work},
+                    &validation, &search},
+                &found),
+            ==, failure == 3 ? TC_X509_PATH_LIMIT : TC_X509_PATH_INVALID);
         munit_assert_memory_equal(sizeof found, &found, &saved);
         if (failure == 4)
           encoded[(size_t)(parsed.signature.data - encoded) + parsed.signature.length - 1] ^= 1;
       }
       work = required;
-      munit_assert_int(tc_x509_crl_signer_validate(&parsed, &signer, &source, 1, &options,
-                                                   &validation, &search, &work, &found),
-                       ==, TC_X509_PATH_VALID);
+      munit_assert_int(
+          tc_x509_crl_signer_validate(
+              &parsed, &signer,
+              &(tc_x509_crl_trust){
+                  &source, 1, &options,
+                  &(tc_pki_tree_workspace){validation.frames, validation.frame_capacity, &work},
+                  &validation, &search},
+              &found),
+          ==, TC_X509_PATH_VALID);
       munit_assert_size(work, ==, 0);
       {
         TC_X509_certificate denied_signer;
@@ -1379,20 +1396,38 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                          ==, TC_TLV_OK);
         work = TRUST_WORK_BUDGET;
         memcpy(&found, &saved, sizeof found);
-        munit_assert_int(tc_x509_crl_signer_validate(&parsed, &denied_signer, &source, 1, &options,
-                                                     &validation, &search, &work, &found),
-                         ==, TC_X509_PATH_INVALID);
+        munit_assert_int(
+            tc_x509_crl_signer_validate(
+                &parsed, &denied_signer,
+                &(tc_x509_crl_trust){
+                    &source, 1, &options,
+                    &(tc_pki_tree_workspace){validation.frames, validation.frame_capacity, &work},
+                    &validation, &search},
+                &found),
+            ==, TC_X509_PATH_INVALID);
         munit_assert_memory_equal(sizeof found, &found, &saved);
         work = TRUST_WORK_BUDGET;
-        munit_assert_int(tc_x509_crl_signer_validate(&parsed, &signer, &source, source.anchor_count,
-                                                     &options, &validation, &search, &work, &found),
-                         ==, TC_X509_PATH_ERROR);
+        munit_assert_int(
+            tc_x509_crl_signer_validate(
+                &parsed, &signer,
+                &(tc_x509_crl_trust){
+                    &source, source.anchor_count, &options,
+                    &(tc_pki_tree_workspace){validation.frames, validation.frame_capacity, &work},
+                    &validation, &search},
+                &found),
+            ==, TC_X509_PATH_ERROR);
         munit_assert_memory_equal(sizeof found, &found, &saved);
         munit_assert_size(work, ==, TRUST_WORK_BUDGET);
         options.signatures.verify = NULL;
-        munit_assert_int(tc_x509_crl_signer_validate(&parsed, &signer, &source, 1, &options,
-                                                     &validation, &search, &work, &found),
-                         ==, TC_X509_PATH_UNSUPPORTED);
+        munit_assert_int(
+            tc_x509_crl_signer_validate(
+                &parsed, &signer,
+                &(tc_x509_crl_trust){
+                    &source, 1, &options,
+                    &(tc_pki_tree_workspace){validation.frames, validation.frame_capacity, &work},
+                    &validation, &search},
+                &found),
+            ==, TC_X509_PATH_UNSUPPORTED);
         munit_assert_memory_equal(sizeof found, &found, &saved);
       }
       {
@@ -1928,13 +1963,18 @@ static MunitResult revocations(const MunitParameter params[], void* user)
                                    ==, TC_TLV_OK);
                   for (unsigned reference = 0; reference < PARTITIONS; ++reference) {
                     const unsigned generation = order ? PARTITIONS - 1 - reference : reference;
-                    munit_assert_int(tc_x509_crl_signer_validate(
-                                         &rows[reference].crl,
-                                         generation ? &replacement_view : &signer, &source, 1,
-                                         &rollover_options, &validation, &search, &work, &found),
-                                     ==,
-                                     generation && kind == BAD_SIGNATURE ? TC_X509_PATH_INVALID
-                                                                         : TC_X509_PATH_VALID);
+                    munit_assert_int(
+                        tc_x509_crl_signer_validate(
+                            &rows[reference].crl, generation ? &replacement_view : &signer,
+                            &(tc_x509_crl_trust){&source, 1, &rollover_options,
+                                                 &(tc_pki_tree_workspace){validation.frames,
+                                                                          validation.frame_capacity,
+                                                                          &work},
+                                                 &validation, &search},
+                            &found),
+                        ==,
+                        generation && kind == BAD_SIGNATURE ? TC_X509_PATH_INVALID
+                                                            : TC_X509_PATH_VALID);
                   }
                   crl_path_probe probe = {{NULL, 0}, 1, 0, TC_X509_PATH_VALID, 0, NULL, 0};
                   const tc_x509_crl_path_check check = {&probe, check_crl_path};
@@ -5238,8 +5278,12 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
               TC_X509_search_result trusted_signer;
               work = WORK_BUDGET;
               TC_X509_path_status signer_status = tc_x509_crl_signer_validate(
-                  &records[record].crl, &target_certificates[record + 1], &held->source, 0,
-                  &options, &validation, &search, &work, &trusted_signer);
+                  &records[record].crl, &target_certificates[record + 1],
+                  &(tc_x509_crl_trust){
+                      &held->source, 0, &options,
+                      &(tc_pki_tree_workspace){validation.frames, validation.frame_capacity, &work},
+                      &validation, &search},
+                  &trusted_signer);
               munit_assert_int(signer_status, ==, TC_X509_PATH_VALID);
             }
             TC_X509_crl_storage job_storage[2][256];

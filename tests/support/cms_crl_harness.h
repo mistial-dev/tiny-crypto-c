@@ -67,16 +67,12 @@ TC_TLV_result tc_cms_crl_signer_candidate_next(tc_cms_candidates* reader, const 
                                                TC_X509_certificate* scratch, TC_bytes* out);
 /* CRL signer search with an explicit external store. */
 TC_TLV_result tc_cms_crl_source_search(const void* candidates, const TC_X509_store_source* external,
-                                       const TC_X509_crl* crl,
-                                       const TC_X509_crl_extensions* extensions,
-                                       const tc_x509_crl_trust* trust, tc_x509_crl_attempt attempt,
-                                       const void* context, TC_X509_search_result* out,
+                                       const tc_x509_crl_signer_query* query,
+                                       const tc_x509_crl_trust* trust, TC_X509_search_result* out,
                                        int* source_failed);
 /* tc_x509_crl_search callback: candidates is a tc_cms_candidates. */
-TC_TLV_result tc_cms_crl_search(const void* candidates, const TC_X509_crl* crl,
-                                const TC_X509_crl_extensions* extensions,
-                                const tc_x509_crl_trust* trust, tc_x509_crl_attempt attempt,
-                                const void* context, TC_X509_search_result* out,
+TC_TLV_result tc_cms_crl_search(const void* candidates, const tc_x509_crl_signer_query* query,
+                                const tc_x509_crl_trust* trust, TC_X509_search_result* out,
                                 int* source_failed);
 /* Find a candidate with a valid CRL signature and path to the selected anchor.
  * Candidates remain unchanged. Failed candidate paths do not end the search.

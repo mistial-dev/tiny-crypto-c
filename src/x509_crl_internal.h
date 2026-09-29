@@ -7,6 +7,17 @@
 #include "pki_names_internal.h"
 #include "pki_distribution_internal.h"
 
+/* Borrowed path state shared by CRL signer searches and dependency resolution.
+ * tree->work is the operation's work budget. */
+typedef struct {
+  const TC_X509_store_source* source;
+  size_t anchor_index;
+  const TC_X509_path_options* options;
+  const tc_pki_tree_workspace* tree;
+  const TC_X509_path_workspace* validation;
+  const TC_X509_search_workspace* search;
+} tc_x509_crl_trust;
+
 /* Decoding resources shared by CRL entry, scope and evidence checks. tree
  * holds the frames and work budget. oids holds up to oid_capacity extension
  * OIDs for duplicate detection and may be NULL/0 where no extensions are read.
@@ -78,11 +89,10 @@ tc_x509_crl_signer_check(const TC_X509_crl* crl, const TC_X509_certificate* sign
  * must match its unchanged encoded bytes. All inputs, scratch, work and output
  * are disjoint. Work is shared/consumed on failure. out changes only on VALID.
  * Result spans borrow inputs/path workspace. anchor_index uses source indexing. */
-TC_X509_path_status tc_x509_crl_signer_validate(
-    const TC_X509_crl* crl, const TC_X509_certificate* signer, const TC_X509_store_source* source,
-    size_t anchor_index, const TC_X509_path_options* options,
-    const TC_X509_path_workspace* validation, const TC_X509_search_workspace* search, size_t* work,
-    TC_X509_search_result* out);
+TC_X509_path_status tc_x509_crl_signer_validate(const TC_X509_crl* crl,
+                                                const TC_X509_certificate* signer,
+                                                const tc_x509_crl_trust* trust,
+                                                TC_X509_search_result* out);
 
 /* Parse into provisional storage after the caller has checked overlap. */
 TC_TLV_result tc_x509_crl_record_read(TC_bytes encoded, const TC_TLV_limits* limits,
@@ -305,14 +315,11 @@ TC_TLV_result tc_x509_crl_query_matches(const tc_x509_crl_revoked_entry* entry,
                                         const TC_TLV_limits* limits,
                                         const tc_pki_tree_workspace* tree,
                                         const TC_X509_name_workspace* names, int* matched);
-/* Validate a signer path for a selected CRL pair to anchor_index. */
+/* Validate a signer path for a selected CRL pair to trust->anchor_index.
+ * trust->source is already restricted to that anchor. */
 TC_TLV_result tc_x509_crl_selected_path(const tc_x509_crl_selected* selected,
                                         const TC_X509_certificate* signer,
-                                        const TC_X509_store_source* restricted, size_t anchor_index,
-                                        const TC_X509_path_options* options,
-                                        const TC_X509_path_workspace* validation,
-                                        const TC_X509_search_workspace* search, size_t* work,
-                                        TC_X509_search_result* out);
+                                        const tc_x509_crl_trust* trust, TC_X509_search_result* out);
 /* Reason coverage a selected CRL pair adds for query. */
 TC_TLV_result tc_x509_crl_selected_coverage(const tc_x509_crl_selected* selected,
                                             const tc_x509_crl_query* query, const TC_X509_time* at,

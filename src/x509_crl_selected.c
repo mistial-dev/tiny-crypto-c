@@ -10,48 +10,43 @@
 #include "pki_source_internal.h"
 #include "pki_signature_internal.h"
 
+/* Build the signer's path through restricted, requiring cRLSign, and report
+ * trust->anchor_index as the anchor. */
 static TC_X509_path_status crl_signer_path(const TC_X509_certificate* signer,
                                            const TC_X509_store_source* restricted,
-                                           size_t anchor_index, const TC_X509_path_options* options,
-                                           const TC_X509_path_workspace* validation,
-                                           const TC_X509_search_workspace* search, size_t* work,
+                                           const tc_x509_crl_trust* trust,
                                            TC_X509_search_result* out)
 {
-  TC_X509_path_options signer_options = *options;
+  TC_X509_path_options signer_options = *trust->options;
   TC_X509_search_result found;
   signer_options.key_usage |= TC_KEY_USAGE_CRL_SIGN;
-  TC_X509_path_status status = tc_x509_path_build_work(signer->encoded, restricted, &signer_options,
-                                                       validation, search, work, &found);
+  TC_X509_path_status status =
+      tc_x509_path_build_work(signer->encoded, restricted, &signer_options, trust->validation,
+                              trust->search, trust->tree->work, &found);
   if (status != TC_X509_PATH_VALID)
     return status;
-  found.anchor_index = anchor_index;
+  found.anchor_index = trust->anchor_index;
   *out = found;
   return TC_X509_PATH_VALID;
 }
 
 TC_TLV_result tc_x509_crl_selected_path(const tc_x509_crl_selected* selected,
                                         const TC_X509_certificate* signer,
-                                        const TC_X509_store_source* restricted, size_t anchor_index,
-                                        const TC_X509_path_options* options,
-                                        const TC_X509_path_workspace* validation,
-                                        const TC_X509_search_workspace* search, size_t* work,
-                                        TC_X509_search_result* out)
+                                        const tc_x509_crl_trust* trust, TC_X509_search_result* out)
 {
-  const tc_pki_tree_workspace tree = {validation->frames, validation->frame_capacity, work};
+  const TC_X509_path_options* options = trust->options;
   TC_TLV_result result = tc_x509_crl_selected_authenticate(
       selected, signer, &options->signatures,
-      &(tc_x509_crl_decode){&options->parsing, &tree, &validation->names, NULL, 0});
+      &(tc_x509_crl_decode){&options->parsing, trust->tree, &trust->validation->names, NULL, 0});
   if (result != TC_TLV_OK)
     return result;
-  return tc_x509_path_result_status(
-      crl_signer_path(signer, restricted, anchor_index, options, validation, search, work, out));
+  return tc_x509_path_result_status(crl_signer_path(signer, trust->source, trust, out));
 }
 
-TC_X509_path_status tc_x509_crl_signer_validate(
-    const TC_X509_crl* crl, const TC_X509_certificate* signer, const TC_X509_store_source* source,
-    size_t anchor_index, const TC_X509_path_options* options,
-    const TC_X509_path_workspace* validation, const TC_X509_search_workspace* search, size_t* work,
-    TC_X509_search_result* out)
+TC_X509_path_status tc_x509_crl_signer_validate(const TC_X509_crl* crl,
+                                                const TC_X509_certificate* signer,
+                                                const tc_x509_crl_trust* trust,
+                                                TC_X509_search_result* out)
 {
   tc_pki_anchor_source selected;
   TC_X509_store_source restricted;
@@ -60,18 +55,19 @@ TC_X509_path_status tc_x509_crl_signer_validate(
   TC_X509_signature_result signature;
   TC_TLV_result result;
   size_t initial_work;
-  if (!crl || !signer || !options || !validation || !search || !work || !out)
+  if (!crl || !signer || !trust || !trust->options || !trust->tree || !trust->tree->work ||
+      !trust->validation || !trust->search || !out)
     return TC_X509_PATH_ERROR;
-  result = tc_pki_source_select_anchor(source, anchor_index, &selected, &restricted);
+  size_t* work = trust->tree->work;
+  result = tc_pki_source_select_anchor(trust->source, trust->anchor_index, &selected, &restricted);
   if (result != TC_TLV_OK)
     return tc_x509_path_status(result);
   initial_work = *work;
-  signature = tc_x509_crl_signer_check(crl, signer, &options->signatures, &options->parsing,
-                                       &validation->names, work);
+  signature = tc_x509_crl_signer_check(crl, signer, &trust->options->signatures,
+                                       &trust->options->parsing, &trust->validation->names, work);
   if (signature != TC_X509_SIGNATURE_VALID)
     return tc_x509_path_status(tc_pki_signature_status(signature));
-  status =
-      crl_signer_path(signer, &restricted, anchor_index, options, validation, search, work, &found);
+  status = crl_signer_path(signer, &restricted, trust, &found);
   if (status != TC_X509_PATH_VALID)
     return status;
   found.validation.work_used = initial_work - *work;

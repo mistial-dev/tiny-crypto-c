@@ -88,10 +88,9 @@ TC_TLV_result tc_x509_crl_check_signer(const void* context, const TC_X509_certif
                                        const tc_x509_crl_trust* trust, TC_X509_search_result* out);
 
 /* candidates points to a guarded store cursor snapshot, reused across searches. */
-TC_TLV_result tc_x509_crl_store_search(const void* candidates, const TC_X509_crl* crl,
-                                       const TC_X509_crl_extensions* extensions,
-                                       const tc_x509_crl_trust* trust, tc_x509_crl_attempt attempt,
-                                       const void* context, TC_X509_search_result* out,
+TC_TLV_result tc_x509_crl_store_search(const void* candidates,
+                                       const tc_x509_crl_signer_query* query,
+                                       const tc_x509_crl_trust* trust, TC_X509_search_result* out,
                                        int* source_failed);
 
 /* Caller validates the index, base, query and trust before candidate search.

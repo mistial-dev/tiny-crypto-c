@@ -120,31 +120,29 @@ TC_TLV_result tc_x509_crl_scope_execute(const tc_x509_crl_operation_source* cand
   return result;
 }
 
-TC_TLV_result tc_x509_crl_source_search(const void* candidates, const TC_X509_crl* crl,
-                                        const TC_X509_crl_extensions* extensions,
-                                        const tc_x509_crl_trust* trust, tc_x509_crl_attempt attempt,
-                                        const void* context, TC_X509_search_result* out,
+TC_TLV_result tc_x509_crl_source_search(const void* candidates,
+                                        const tc_x509_crl_signer_query* query,
+                                        const tc_x509_crl_trust* trust, TC_X509_search_result* out,
                                         int* source_failed)
 {
   const tc_x509_crl_candidate_source* source = candidates;
   if (!source || !source->search)
     return TC_TLV_ARGUMENT;
-  return source->search(source->context, source->external, crl, extensions, trust, attempt, context,
-                        out, source_failed);
+  return source->search(source->context, source->external, query, trust, out, source_failed);
 }
 
-TC_TLV_result
-tc_x509_crl_store_source_search(const void* candidates, const TC_X509_store_source* external,
-                                const TC_X509_crl* crl, const TC_X509_crl_extensions* extensions,
-                                const tc_x509_crl_trust* trust, tc_x509_crl_attempt attempt,
-                                const void* context, TC_X509_search_result* out, int* source_failed)
+TC_TLV_result tc_x509_crl_store_source_search(const void* candidates,
+                                              const TC_X509_store_source* external,
+                                              const tc_x509_crl_signer_query* query,
+                                              const tc_x509_crl_trust* trust,
+                                              TC_X509_search_result* out, int* source_failed)
 {
   if (!candidates)
     return TC_TLV_ARGUMENT;
   tc_pki_store_candidates cursor = *(const tc_pki_store_candidates*)candidates;
   cursor.source = external;
-  return tc_x509_crl_search_candidates(&cursor, tc_pki_store_candidate_next, crl, extensions, trust,
-                                       attempt, context, out, source_failed);
+  return tc_x509_crl_search_candidates(&cursor, tc_pki_store_candidate_next, query, trust, out,
+                                       source_failed);
 }
 
 TC_TLV_result tc_x509_crl_filter_match(const void* context, const TC_X509_certificate* candidate,
@@ -160,8 +158,7 @@ TC_TLV_result tc_x509_crl_filter_match(const void* context, const TC_X509_certif
 
 typedef struct {
   const tc_x509_crl_trust* trust;
-  tc_x509_crl_attempt attempt;
-  const void* context;
+  const tc_x509_crl_signer_query* query;
 } x509_crl_search_context;
 
 static TC_TLV_result x509_crl_attempt_candidate(const void* context,
@@ -169,20 +166,19 @@ static TC_TLV_result x509_crl_attempt_candidate(const void* context,
                                                 TC_X509_search_result* out)
 {
   const x509_crl_search_context* search = context;
-  return search->attempt(search->context, candidate, search->trust, out);
+  return search->query->attempt(search->query->context, candidate, search->trust, out);
 }
 
 TC_TLV_result tc_x509_crl_search_candidates(void* cursor, tc_pki_candidate_next next,
-                                            const TC_X509_crl* crl,
-                                            const TC_X509_crl_extensions* extensions,
+                                            const tc_x509_crl_signer_query* query,
                                             const tc_x509_crl_trust* trust,
-                                            tc_x509_crl_attempt attempt, const void* context,
                                             TC_X509_search_result* out, int* source_failed)
 {
-  if (!crl || !extensions || !attempt || !tc_x509_crl_trust_valid(trust))
+  if (!query || !query->crl || !query->extensions || !query->attempt ||
+      !tc_x509_crl_trust_valid(trust))
     return TC_TLV_ARGUMENT;
-  const tc_x509_crl_filter filter = {crl, extensions, &trust->validation->names};
-  const x509_crl_search_context search = {trust, attempt, context};
+  const tc_x509_crl_filter filter = {query->crl, query->extensions, &trust->validation->names};
+  const x509_crl_search_context search = {trust, query};
   const tc_pki_candidate_checks checks = {tc_x509_crl_filter_match, &filter,
                                           x509_crl_attempt_candidate, &search};
   return tc_pki_certificate_search(cursor, next, &checks, &trust->options->parsing, trust->tree,
@@ -286,9 +282,11 @@ TC_TLV_result tc_x509_crl_scopes(const void* candidates, tc_x509_crl_search sear
               result = tc_x509_crl_evidence_add(&pending, chosen.evidence.reasons,
                                                 &chosen.evidence.revocation);
           }
-        } else if (result == TC_TLV_OK)
-          result = search_candidates(candidates, &record->crl, &record->extensions, trust,
-                                     tc_x509_crl_scope_attempt, &processing, &found, source_failed);
+        } else if (result == TC_TLV_OK) {
+          const tc_x509_crl_signer_query query = {&record->crl, &record->extensions,
+                                                  tc_x509_crl_scope_attempt, &processing};
+          result = search_candidates(candidates, &query, trust, &found, source_failed);
+        }
       }
       if (result == TC_TLV_OK) {
         contributed = 1;
@@ -454,8 +452,9 @@ TC_TLV_result tc_x509_crl_group(const void* candidates, tc_x509_crl_search searc
     attempt.evidence = &empty;
     attempt.proposal = &candidate;
     attempt.unresolved = &unresolved;
-    result = search(candidates, &record->crl, &record->extensions, trust, tc_x509_crl_scope_attempt,
-                    &attempt, &path, source_failed);
+    const tc_x509_crl_signer_query query = {&record->crl, &record->extensions,
+                                            tc_x509_crl_scope_attempt, &attempt};
+    result = search(candidates, &query, trust, &path, source_failed);
     if (*source_failed || result == TC_TLV_ARGUMENT || result == TC_TLV_LIMIT)
       return result;
     if (unresolved.selected.base && result != TC_TLV_OK) {
@@ -523,10 +522,8 @@ TC_TLV_result tc_x509_crl_scope_attempt(const void* context, const TC_X509_certi
                                               processing->capacity, trust->tree->work, &cache);
     if (result != TC_TLV_OK)
       return result;
-    result = tc_x509_path_result_status(
-        tc_x509_crl_signer_validate(&processing->index->records[processing->reference].crl, signer,
-                                    trust->source, trust->anchor_index, trust->options,
-                                    trust->validation, trust->search, trust->tree->work, &found));
+    result = tc_x509_path_result_status(tc_x509_crl_signer_validate(
+        &processing->index->records[processing->reference].crl, signer, trust, &found));
     if (result != TC_TLV_OK)
       return result;
     /* Signer validation already checked this signature with the cache's provider. */

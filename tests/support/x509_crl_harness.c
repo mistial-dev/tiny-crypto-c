@@ -54,8 +54,13 @@ TC_TLV_result tc_x509_crl_process(const tc_x509_crl_selected* selected,
       &coverage);
   if (result != TC_TLV_OK)
     return result;
-  result = tc_x509_crl_selected_path(selected, signer, &restricted, anchor_index, options,
-                                     validation, search, work, &found);
+  result = tc_x509_crl_selected_path(
+      selected, signer,
+      &(tc_x509_crl_trust){
+          &restricted, anchor_index, options,
+          &(tc_pki_tree_workspace){validation->frames, validation->frame_capacity, work},
+          validation, search},
+      &found);
   if (result != TC_TLV_OK)
     return result;
   /* Entry scans can be large; defer them until a signer path succeeds. */
@@ -108,8 +113,13 @@ TC_TLV_result tc_x509_crl_selected_validate(const tc_x509_crl_selected* selected
   if (result != TC_TLV_OK)
     return result;
   const size_t initial_work = *work;
-  result = tc_x509_crl_selected_path(selected, signer, &restricted, anchor_index, options,
-                                     validation, search, work, &found);
+  result = tc_x509_crl_selected_path(
+      selected, signer,
+      &(tc_x509_crl_trust){
+          &restricted, anchor_index, options,
+          &(tc_pki_tree_workspace){validation->frames, validation->frame_capacity, work},
+          validation, search},
+      &found);
   if (result != TC_TLV_OK)
     return result;
   found.validation.work_used = initial_work - *work;
@@ -136,22 +146,18 @@ TC_X509_signature_result tc_x509_crl_signer_digest_check(
 TC_TLV_result tc_x509_crl_check_signer(const void* context, const TC_X509_certificate* candidate,
                                        const tc_x509_crl_trust* trust, TC_X509_search_result* out)
 {
-  return tc_x509_path_result_status(tc_x509_crl_signer_validate(
-      context, candidate, trust->source, trust->anchor_index, trust->options, trust->validation,
-      trust->search, trust->tree->work, out));
+  return tc_x509_path_result_status(tc_x509_crl_signer_validate(context, candidate, trust, out));
 }
 
-TC_TLV_result tc_x509_crl_store_search(const void* candidates, const TC_X509_crl* crl,
-                                       const TC_X509_crl_extensions* extensions,
-                                       const tc_x509_crl_trust* trust, tc_x509_crl_attempt attempt,
-                                       const void* context, TC_X509_search_result* out,
+TC_TLV_result tc_x509_crl_store_search(const void* candidates,
+                                       const tc_x509_crl_signer_query* query,
+                                       const tc_x509_crl_trust* trust, TC_X509_search_result* out,
                                        int* source_failed)
 {
   if (!candidates)
     return TC_TLV_ARGUMENT;
   const tc_pki_store_candidates* cursor = candidates;
-  return tc_x509_crl_store_source_search(cursor, cursor->source, crl, extensions, trust, attempt,
-                                         context, out, source_failed);
+  return tc_x509_crl_store_source_search(cursor, cursor->source, query, trust, out, source_failed);
 }
 
 TC_TLV_result tc_x509_crl_index_attempt(const void* context, const TC_X509_certificate* signer,

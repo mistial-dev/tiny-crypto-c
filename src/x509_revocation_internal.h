@@ -6,16 +6,6 @@
 #include "x509_path_internal.h"
 #include "pki_candidate_internal.h"
 
-/* Borrowed path state shared by CRL signer searches and dependency resolution. */
-typedef struct {
-  const TC_X509_store_source* source;
-  size_t anchor_index;
-  const TC_X509_path_options* options;
-  const tc_pki_tree_workspace* tree;
-  const TC_X509_path_workspace* validation;
-  const TC_X509_search_workspace* search;
-} tc_x509_crl_trust;
-
 static inline int tc_x509_crl_trust_valid(const tc_x509_crl_trust* trust)
 {
   return trust && trust->source && trust->options && trust->tree && trust->tree->work &&
@@ -28,11 +18,21 @@ typedef TC_TLV_result (*tc_x509_crl_attempt)(const void* context,
                                              const tc_x509_crl_trust* trust,
                                              TC_X509_search_result* out);
 
-typedef TC_TLV_result (*tc_x509_crl_source_search_fn)(
-    const void* candidates, const TC_X509_store_source* external, const TC_X509_crl* crl,
-    const TC_X509_crl_extensions* extensions, const tc_x509_crl_trust* trust,
-    tc_x509_crl_attempt attempt, const void* context, TC_X509_search_result* out,
-    int* source_failed);
+/* One CRL whose signer is searched. attempt validates each matching
+ * candidate and receives context. */
+typedef struct {
+  const TC_X509_crl* crl;
+  const TC_X509_crl_extensions* extensions;
+  tc_x509_crl_attempt attempt;
+  const void* context;
+} tc_x509_crl_signer_query;
+
+typedef TC_TLV_result (*tc_x509_crl_source_search_fn)(const void* candidates,
+                                                      const TC_X509_store_source* external,
+                                                      const tc_x509_crl_signer_query* query,
+                                                      const tc_x509_crl_trust* trust,
+                                                      TC_X509_search_result* out,
+                                                      int* source_failed);
 
 /* The adapter borrows its cursor snapshot and uses the operation's guarded source. */
 typedef struct {
@@ -49,18 +49,15 @@ typedef struct {
   size_t metadata_count;
 } tc_x509_crl_operation_source;
 
-TC_TLV_result tc_x509_crl_source_search(const void* candidates, const TC_X509_crl* crl,
-                                        const TC_X509_crl_extensions* extensions,
-                                        const tc_x509_crl_trust* trust, tc_x509_crl_attempt attempt,
-                                        const void* context, TC_X509_search_result* out,
+TC_TLV_result tc_x509_crl_source_search(const void* candidates,
+                                        const tc_x509_crl_signer_query* query,
+                                        const tc_x509_crl_trust* trust, TC_X509_search_result* out,
                                         int* source_failed);
 
 TC_TLV_result tc_x509_crl_store_source_search(const void* candidates,
                                               const TC_X509_store_source* external,
-                                              const TC_X509_crl* crl,
-                                              const TC_X509_crl_extensions* extensions,
+                                              const tc_x509_crl_signer_query* query,
                                               const tc_x509_crl_trust* trust,
-                                              tc_x509_crl_attempt attempt, const void* context,
                                               TC_X509_search_result* out, int* source_failed);
 
 typedef struct {
@@ -76,10 +73,8 @@ TC_TLV_result tc_x509_crl_filter_match(const void* context, const TC_X509_certif
 /* Search a guarded cursor for a matching CRL signer and attempt validation.
  * Cursor and scratch are provisional; output is published on success. */
 TC_TLV_result tc_x509_crl_search_candidates(void* cursor, tc_pki_candidate_next next,
-                                            const TC_X509_crl* crl,
-                                            const TC_X509_crl_extensions* extensions,
+                                            const tc_x509_crl_signer_query* query,
                                             const tc_x509_crl_trust* trust,
-                                            tc_x509_crl_attempt attempt, const void* context,
                                             TC_X509_search_result* out, int* source_failed);
 
 typedef struct {
@@ -167,10 +162,9 @@ TC_TLV_result tc_x509_crl_scope_arguments(const tc_x509_crl_scope_processing* pr
 TC_TLV_result tc_x509_crl_scope_attempt(const void* context, const TC_X509_certificate* signer,
                                         const tc_x509_crl_trust* trust, TC_X509_search_result* out);
 
-typedef TC_TLV_result (*tc_x509_crl_search)(const void* candidates, const TC_X509_crl* crl,
-                                            const TC_X509_crl_extensions* extensions,
+typedef TC_TLV_result (*tc_x509_crl_search)(const void* candidates,
+                                            const tc_x509_crl_signer_query* query,
                                             const tc_x509_crl_trust* trust,
-                                            tc_x509_crl_attempt attempt, const void* context,
                                             TC_X509_search_result* out, int* source_failed);
 
 TC_TLV_result tc_x509_crl_same_scope(const tc_x509_crl_scope_processing* processing, size_t other,

@@ -143,10 +143,8 @@ TC_TLV_result tc_cms_crl_index_init(const tc_cms_revocations* reader,
 }
 
 TC_TLV_result tc_cms_crl_source_search(const void* candidates, const TC_X509_store_source* external,
-                                       const TC_X509_crl* crl,
-                                       const TC_X509_crl_extensions* extensions,
-                                       const tc_x509_crl_trust* trust, tc_x509_crl_attempt attempt,
-                                       const void* context, TC_X509_search_result* out,
+                                       const tc_x509_crl_signer_query* query,
+                                       const tc_x509_crl_trust* trust, TC_X509_search_result* out,
                                        int* source_failed)
 {
   if (!candidates)
@@ -158,20 +156,17 @@ TC_TLV_result tc_cms_crl_source_search(const void* candidates, const TC_X509_sto
     storage.store.source = external;
   else
     storage.collection.external = external;
-  return tc_x509_crl_search_candidates(cursor, next, crl, extensions, trust, attempt, context, out,
-                                       source_failed);
+  return tc_x509_crl_search_candidates(cursor, next, query, trust, out, source_failed);
 }
 
-TC_TLV_result tc_cms_crl_search(const void* candidates, const TC_X509_crl* crl,
-                                const TC_X509_crl_extensions* extensions,
-                                const tc_x509_crl_trust* trust, tc_x509_crl_attempt attempt,
-                                const void* context, TC_X509_search_result* out, int* source_failed)
+TC_TLV_result tc_cms_crl_search(const void* candidates, const tc_x509_crl_signer_query* query,
+                                const tc_x509_crl_trust* trust, TC_X509_search_result* out,
+                                int* source_failed)
 {
   const tc_cms_candidates* source = candidates;
   if (!source)
     return TC_TLV_ARGUMENT;
-  return tc_cms_crl_source_search(source, source->external, crl, extensions, trust, attempt,
-                                  context, out, source_failed);
+  return tc_cms_crl_source_search(source, source->external, query, trust, out, source_failed);
 }
 
 TC_TLV_result tc_cms_crl_signer_candidate_next(tc_cms_candidates* reader, const TC_X509_crl* crl,
@@ -197,8 +192,9 @@ tc_cms_crl_signer_find(const tc_cms_candidates* candidates, const TC_X509_crl* c
                        const TC_X509_search_workspace* search, TC_X509_search_result* out)
 {
   const tc_x509_crl_trust trust = {path_source, anchor_index, options, tree, validation, search};
-  return tc_x509_path_status(tc_cms_crl_search(candidates, crl, extensions, &trust,
-                                               tc_x509_crl_check_signer, crl, out, NULL));
+  return tc_x509_path_status(tc_cms_crl_search(
+      candidates, &(tc_x509_crl_signer_query){crl, extensions, tc_x509_crl_check_signer, crl},
+      &trust, out, NULL));
 }
 
 TC_TLV_result
@@ -223,8 +219,10 @@ tc_cms_crl_process(const tc_cms_candidates* candidates, const tc_x509_crl_select
   if (status != TC_X509_CRL_UNDETERMINED)
     return TC_TLV_END;
   const tc_x509_crl_processing processing = {selected, query, evidence};
-  return tc_cms_crl_search(candidates, selected->base, selected->base_info, &trust,
-                           tc_x509_crl_process_candidate, &processing, out, NULL);
+  return tc_cms_crl_search(candidates,
+                           &(tc_x509_crl_signer_query){selected->base, selected->base_info,
+                                                       tc_x509_crl_process_candidate, &processing},
+                           &trust, out, NULL);
 }
 
 TC_TLV_result tc_cms_crl_index_process(
@@ -251,8 +249,10 @@ TC_TLV_result tc_cms_crl_index_process(
   if (status != TC_X509_CRL_UNDETERMINED)
     return TC_TLV_END;
   const tc_x509_crl_index_processing processing = {index, base, delta_policy, query, evidence};
-  return tc_cms_crl_search(candidates, &record->crl, &record->extensions, &trust,
-                           tc_x509_crl_index_attempt, &processing, out, NULL);
+  return tc_cms_crl_search(candidates,
+                           &(tc_x509_crl_signer_query){&record->crl, &record->extensions,
+                                                       tc_x509_crl_index_attempt, &processing},
+                           &trust, out, NULL);
 }
 
 static TC_TLV_result cms_crl_operation_source(const tc_cms_candidates* candidates,
