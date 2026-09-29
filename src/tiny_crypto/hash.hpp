@@ -24,23 +24,23 @@ namespace detail {
   struct name {                                                                                    \
     using context = context_type;                                                                  \
     static constexpr size_t digest_size = digest_len;                                              \
-    static TC_status init(context* ctx)                                                            \
+    static TC_status init(context* ctx) noexcept                                                   \
     {                                                                                              \
       return TC_##C_NAME##_init(ctx);                                                              \
     }                                                                                              \
-    static TC_status update(context* ctx, const uint8_t* data, size_t length)                      \
+    static TC_status update(context* ctx, const uint8_t* data, size_t length) noexcept             \
     {                                                                                              \
       return TC_##C_NAME##_update(ctx, data, length);                                              \
     }                                                                                              \
-    static TC_status final(context* ctx, uint8_t* digest)                                          \
+    static TC_status final(context* ctx, uint8_t* digest) noexcept                                 \
     {                                                                                              \
       return TC_##C_NAME##_final(ctx, digest);                                                     \
     }                                                                                              \
-    static TC_status digest(const uint8_t* data, size_t length, uint8_t* out)                      \
+    static TC_status digest(const uint8_t* data, size_t length, uint8_t* out) noexcept             \
     {                                                                                              \
       return TC_##C_NAME##_digest(data, length, out);                                              \
     }                                                                                              \
-    static void clear(context* ctx)                                                                \
+    static void clear(context* ctx) noexcept                                                       \
     {                                                                                              \
       TC_##C_NAME##_ctx_clear(ctx);                                                                \
     }                                                                                              \
@@ -50,29 +50,29 @@ namespace detail {
   struct name {                                                                                    \
     using context = context_type;                                                                  \
     static constexpr size_t digest_size = digest_len;                                              \
-    static TC_status init(context* ctx, const uint8_t* key, size_t length)                         \
+    static TC_status init(context* ctx, const uint8_t* key, size_t length) noexcept                \
     {                                                                                              \
       return TC_HMAC_##C_NAME##_init(ctx, key, length);                                            \
     }                                                                                              \
-    static TC_status update(context* ctx, const uint8_t* data, size_t length)                      \
+    static TC_status update(context* ctx, const uint8_t* data, size_t length) noexcept             \
     {                                                                                              \
       return TC_HMAC_##C_NAME##_update(ctx, data, length);                                         \
     }                                                                                              \
-    static TC_status final(context* ctx, uint8_t* tag)                                             \
+    static TC_status final(context* ctx, uint8_t* tag) noexcept                                    \
     {                                                                                              \
       return TC_HMAC_##C_NAME##_final(ctx, tag);                                                   \
     }                                                                                              \
     static TC_status digest(const uint8_t* key, size_t key_len, const uint8_t* data,               \
-                            size_t length, uint8_t* tag)                                           \
+                            size_t length, uint8_t* tag) noexcept                                  \
     {                                                                                              \
       return TC_HMAC_##C_NAME##_digest(key, key_len, data, length, tag, digest_size);              \
     }                                                                                              \
     static TC_status verify(const uint8_t* key, size_t key_len, const uint8_t* data,               \
-                            size_t length, const uint8_t* tag, size_t tag_len)                     \
+                            size_t length, const uint8_t* tag, size_t tag_len) noexcept            \
     {                                                                                              \
       return TC_HMAC_##C_NAME##_verify(key, key_len, data, length, tag, tag_len);                  \
     }                                                                                              \
-    static void clear(context* ctx)                                                                \
+    static void clear(context* ctx) noexcept                                                       \
     {                                                                                              \
       TC_HMAC_##C_NAME##_ctx_clear(ctx);                                                           \
     }                                                                                              \
@@ -118,37 +118,40 @@ TINY_CRYPTO_HMAC_TRAITS(tc_hmac_sha512_traits, SHA512, TC_HMAC_SHA512_ctx, TC_SH
 
 } // namespace detail
 
-/* Each hash retains its concrete C context. */
+/* Streaming hash over its concrete C context. The constructor starts a
+ * message. finish writes the digest and starts the next message, so one
+ * object hashes many messages. The destructor clears the context. */
 template <class Traits> class basic_hash {
 public:
   static const size_t digest_size = Traits::digest_size;
 
-  basic_hash()
+  basic_hash() noexcept
   {
     (void)Traits::init(&ctx_);
   }
-  ~basic_hash()
+  ~basic_hash() noexcept
   {
     Traits::clear(&ctx_);
   }
   basic_hash(const basic_hash&) = delete;
   basic_hash& operator=(const basic_hash&) = delete;
 
-  TC_status reset()
+  TC_CPP_NODISCARD TC_status reset() noexcept
   {
     return Traits::init(&ctx_);
   }
 
-  TC_status update(const uint8_t* data, size_t length)
+  TC_CPP_NODISCARD TC_status update(const uint8_t* data, size_t length) noexcept
   {
     return Traits::update(&ctx_, data, length);
   }
-  template <size_t N> TC_status update(const uint8_t (&data)[N])
+  template <size_t N> TC_CPP_NODISCARD TC_status update(const uint8_t (&data)[N]) noexcept
   {
     return update(data, N);
   }
 
-  TC_status finish(uint8_t* out, size_t out_len)
+  /* out_len must equal digest_size. */
+  TC_CPP_NODISCARD TC_status finish(uint8_t* out, size_t out_len) noexcept
   {
     if (out_len != digest_size)
       return TC_ERROR;
@@ -157,99 +160,103 @@ public:
       status = Traits::init(&ctx_);
     return status;
   }
-  template <size_t N> TC_status finish(uint8_t (&out)[N])
+  template <size_t N> TC_CPP_NODISCARD TC_status finish(uint8_t (&out)[N]) noexcept
   {
     return finish(out, N);
   }
 
-  static TC_status digest(const uint8_t* data, size_t length, uint8_t* out, size_t out_len)
+  TC_CPP_NODISCARD static TC_status digest(const uint8_t* data, size_t length, uint8_t* out,
+                                           size_t out_len) noexcept
   {
     if (out_len != digest_size)
       return TC_ERROR;
     return Traits::digest(data, length, out);
   }
   template <size_t InLen, size_t OutLen>
-  static TC_status digest(const uint8_t (&data)[InLen], uint8_t (&out)[OutLen])
+  TC_CPP_NODISCARD static TC_status digest(const uint8_t (&data)[InLen],
+                                           uint8_t (&out)[OutLen]) noexcept
   {
     return digest(data, InLen, out, OutLen);
   }
 
 private:
-  typename Traits::context ctx_;
+  typename Traits::context ctx_{};
 };
 
+/* Streaming HMAC over its concrete C context. The C context records whether
+ * a key is loaded. A default-constructed object, a failed init and a
+ * completed finish all leave it unkeyed, and update and finish then return
+ * TC_ERROR until the next successful init. The destructor clears the context. */
 template <class Traits> class basic_hmac {
 public:
   static const size_t tag_size = Traits::digest_size;
 
-  basic_hmac() : active_(false)
-  {}
-  basic_hmac(const uint8_t* key, size_t key_len) : active_(false)
+  basic_hmac() noexcept = default;
+  basic_hmac(const uint8_t* key, size_t key_len) noexcept
   {
-    active_ = Traits::init(&ctx_, key, key_len) == TC_OK;
+    (void)Traits::init(&ctx_, key, key_len);
   }
-  template <size_t N> explicit basic_hmac(const uint8_t (&key)[N]) : active_(false)
+  template <size_t N> explicit basic_hmac(const uint8_t (&key)[N]) noexcept
   {
-    active_ = Traits::init(&ctx_, key, N) == TC_OK;
+    (void)Traits::init(&ctx_, key, N);
   }
 
-  ~basic_hmac()
+  ~basic_hmac() noexcept
   {
     Traits::clear(&ctx_);
   }
   basic_hmac(const basic_hmac&) = delete;
   basic_hmac& operator=(const basic_hmac&) = delete;
 
-  TC_CPP_NODISCARD TC_status init(const uint8_t* key, size_t key_len)
+  TC_CPP_NODISCARD TC_status init(const uint8_t* key, size_t key_len) noexcept
   {
-    const TC_status status = Traits::init(&ctx_, key, key_len);
-    active_ = status == TC_OK;
-    return status;
+    return Traits::init(&ctx_, key, key_len);
   }
-  template <size_t N> TC_CPP_NODISCARD TC_status init(const uint8_t (&key)[N])
+  template <size_t N> TC_CPP_NODISCARD TC_status init(const uint8_t (&key)[N]) noexcept
   {
     return init(key, N);
   }
 
-  TC_status update(const uint8_t* data, size_t length)
+  TC_CPP_NODISCARD TC_status update(const uint8_t* data, size_t length) noexcept
   {
-    return active_ ? Traits::update(&ctx_, data, length) : TC_ERROR;
+    return Traits::update(&ctx_, data, length);
   }
-  template <size_t N> TC_status update(const uint8_t (&data)[N])
+  template <size_t N> TC_CPP_NODISCARD TC_status update(const uint8_t (&data)[N]) noexcept
   {
     return update(data, N);
   }
 
-  TC_status finish(uint8_t* out, size_t out_len)
+  /* out_len must equal tag_size. finish consumes the key. */
+  TC_CPP_NODISCARD TC_status finish(uint8_t* out, size_t out_len) noexcept
   {
-    if (!active_ || out_len != tag_size)
+    if (out_len != tag_size)
       return TC_ERROR;
-    const TC_status status = Traits::final(&ctx_, out);
-    active_ = false;
-    return status;
+    return Traits::final(&ctx_, out);
   }
-  template <size_t N> TC_status finish(uint8_t (&out)[N])
+  template <size_t N> TC_CPP_NODISCARD TC_status finish(uint8_t (&out)[N]) noexcept
   {
     return finish(out, N);
   }
 
-  static TC_status mac(const uint8_t* key, size_t key_len, const uint8_t* data, size_t length,
-                       uint8_t* out, size_t out_len)
+  TC_CPP_NODISCARD static TC_status mac(const uint8_t* key, size_t key_len, const uint8_t* data,
+                                        size_t length, uint8_t* out, size_t out_len) noexcept
   {
     if (out_len != tag_size)
       return TC_ERROR;
     return Traits::digest(key, key_len, data, length, out);
   }
 
-  static TC_status verify(const uint8_t* key, size_t key_len, const uint8_t* data, size_t length,
-                          const uint8_t* tag, size_t tag_len)
+  /* Compares tag in constant time. tag_len runs from TC_HMAC_MIN_TAG_LEN to
+   * tag_size. Returns TC_OK, TC_MISMATCH or TC_ERROR. */
+  TC_CPP_NODISCARD static TC_status verify(const uint8_t* key, size_t key_len, const uint8_t* data,
+                                           size_t length, const uint8_t* tag,
+                                           size_t tag_len) noexcept
   {
     return Traits::verify(key, key_len, data, length, tag, tag_len);
   }
 
 private:
-  typename Traits::context ctx_;
-  bool active_;
+  typename Traits::context ctx_{};
 };
 
 #if TC_ENABLE_MD5

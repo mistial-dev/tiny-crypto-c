@@ -1304,6 +1304,13 @@ add_test(NAME test_package_boundaries
     TC_ENABLE_DER=1 TC_ENABLE_X509=1 TC_ENABLE_PIV_CHUID=1 TC_ENABLE_PIV_CVC=1 TC_ENABLE_EAC_CVC=1
     TC_ENABLE_PIV_SM=1 TC_ENABLE_EC=1 TC_ENABLE_SSKDF=1 TC_ENABLE_SHA384=1 TC_AES_ENABLE_DYNAMIC=1)
 
+  # Discarding a wrapper status must draw a compiler warning.
+  if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    add_test(NAME test_cpp_nodiscard COMMAND ${CMAKE_COMMAND}
+      -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR} -DCXX_COMPILER=${CMAKE_CXX_COMPILER}
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/cpp_nodiscard.cmake)
+  endif()
+
   find_program(TC_AVR_CXX NAMES avr-g++)
   find_program(TC_AVR_CC NAMES avr-gcc)
   if(TC_AVR_CC)

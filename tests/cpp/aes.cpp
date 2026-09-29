@@ -204,12 +204,13 @@ TEST_CASE("AES CMAC wrapper returns status")
 #if TC_AES_ENABLE_CCM
 TEST_CASE("AES CCM authentication status")
 {
-  const uint8_t* const key =
+  const tiny_crypto::bytes key = {
 #if TC_AES_KEY_BITS == 128
-      ccm_rfc_key;
+      ccm_rfc_key,
 #else
-      kat_key;
+      kat_key,
 #endif
+      TC_AES_KEYLEN};
   uint8_t ciphertext[sizeof(ccm_rfc_plaintext)];
   uint8_t recovered[sizeof(ccm_rfc_plaintext)];
   uint8_t tag[sizeof(ccm_rfc_tag)];
@@ -231,6 +232,24 @@ TEST_CASE("AES CCM authentication status")
                                  {ccm_rfc_aad, sizeof(ccm_rfc_aad)},
                                  {ciphertext, sizeof(ciphertext)}, {tag, sizeof(tag)},
                                  {recovered, sizeof(ciphertext)}) == TC_MISMATCH);
+
+  uint8_t untouched[sizeof(ccm_rfc_plaintext)];
+  uint8_t untouched_tag[sizeof(ccm_rfc_tag)];
+  std::memset(untouched, 0xa5, sizeof(untouched));
+  std::memset(untouched_tag, 0xa5, sizeof(untouched_tag));
+  const tiny_crypto::bytes short_key = {key.data, TC_AES_KEYLEN - 1};
+  CHECK(tiny_crypto::ccm_encrypt(
+            short_key, {ccm_rfc_nonce, sizeof(ccm_rfc_nonce)}, {ccm_rfc_aad, sizeof(ccm_rfc_aad)},
+            {ccm_rfc_plaintext, sizeof(ccm_rfc_plaintext)}, {untouched, sizeof(untouched)},
+            {untouched_tag, sizeof(untouched_tag)}) == TC_ERROR);
+  CHECK(tiny_crypto::ccm_decrypt(short_key, {ccm_rfc_nonce, sizeof(ccm_rfc_nonce)},
+                                 {ccm_rfc_aad, sizeof(ccm_rfc_aad)},
+                                 {ciphertext, sizeof(ciphertext)}, {tag, sizeof(tag)},
+                                 {untouched, sizeof(untouched)}) == TC_ERROR);
+  for (size_t i = 0; i < sizeof(untouched); ++i)
+    CHECK(untouched[i] == 0xa5);
+  for (size_t i = 0; i < sizeof(untouched_tag); ++i)
+    CHECK(untouched_tag[i] == 0xa5);
 }
 #endif
 
@@ -243,20 +262,36 @@ TEST_CASE("AES EAX wrappers round trip and preserve mismatch")
   uint8_t ciphertext[sizeof(plaintext)];
   uint8_t recovered[sizeof(plaintext)];
   uint8_t tag[16];
-  REQUIRE(tiny_crypto::eax_encrypt(kat_key, {nonce, sizeof(nonce)}, {aad, sizeof(aad)},
+  const tiny_crypto::bytes key = {kat_key, TC_AES_KEYLEN};
+  REQUIRE(tiny_crypto::eax_encrypt(key, {nonce, sizeof(nonce)}, {aad, sizeof(aad)},
                                    {plaintext, sizeof(plaintext)}, {ciphertext, sizeof(plaintext)},
                                    {tag, sizeof(tag)}) == TC_OK);
-  CHECK(tiny_crypto::eax_decrypt(kat_key, {nonce, sizeof(nonce)}, {aad, sizeof(aad)},
+  CHECK(tiny_crypto::eax_decrypt(key, {nonce, sizeof(nonce)}, {aad, sizeof(aad)},
                                  {ciphertext, sizeof(ciphertext)}, {tag, sizeof(tag)},
                                  {recovered, sizeof(ciphertext)}) == TC_OK);
   CHECK(std::memcmp(recovered, plaintext, sizeof(plaintext)) == 0);
   tag[0] ^= 1;
-  CHECK(tiny_crypto::eax_decrypt(kat_key, {nonce, sizeof(nonce)}, {aad, sizeof(aad)},
+  CHECK(tiny_crypto::eax_decrypt(key, {nonce, sizeof(nonce)}, {aad, sizeof(aad)},
                                  {ciphertext, sizeof(ciphertext)}, {tag, sizeof(tag)},
                                  {recovered, sizeof(ciphertext)}) == TC_MISMATCH);
-  CHECK(tiny_crypto::eax_encrypt(kat_key, {nonce, sizeof(nonce)}, {aad, sizeof(aad)},
+  CHECK(tiny_crypto::eax_encrypt(key, {nonce, sizeof(nonce)}, {aad, sizeof(aad)},
                                  {plaintext, sizeof(plaintext)}, {ciphertext, sizeof(plaintext)},
                                  {tag, TC_AES_EAX_MIN_TAG_LEN - 1}) == TC_ERROR);
+
+  uint8_t untouched[sizeof(plaintext)];
+  std::memset(untouched, 0xa5, sizeof(untouched));
+  uint8_t long_key_bytes[TC_AES_KEYLEN + 1];
+  std::memcpy(long_key_bytes, kat_key, TC_AES_KEYLEN);
+  long_key_bytes[TC_AES_KEYLEN] = 0;
+  const tiny_crypto::bytes long_key = {long_key_bytes, sizeof(long_key_bytes)};
+  CHECK(tiny_crypto::eax_encrypt(long_key, {nonce, sizeof(nonce)}, {aad, sizeof(aad)},
+                                 {plaintext, sizeof(plaintext)}, {untouched, sizeof(untouched)},
+                                 {tag, sizeof(tag)}) == TC_ERROR);
+  CHECK(tiny_crypto::eax_decrypt(long_key, {nonce, sizeof(nonce)}, {aad, sizeof(aad)},
+                                 {ciphertext, sizeof(ciphertext)}, {tag, sizeof(tag)},
+                                 {untouched, sizeof(untouched)}) == TC_ERROR);
+  for (size_t i = 0; i < sizeof(untouched); ++i)
+    CHECK(untouched[i] == 0xa5);
 }
 #endif
 
@@ -268,17 +303,34 @@ TEST_CASE("AES EAX-prime wrappers round trip and preserve mismatch")
   uint8_t ciphertext[sizeof(plaintext)];
   uint8_t recovered[sizeof(plaintext)];
   uint8_t tag[TC_AES_EAX_PRIME_TAG_LEN];
-  REQUIRE(tiny_crypto::eax_prime_encrypt(kat_key, {cleartext, sizeof(cleartext)},
+  const tiny_crypto::bytes key = {kat_key, TC_AES_KEYLEN};
+  REQUIRE(tiny_crypto::eax_prime_encrypt(key, {cleartext, sizeof(cleartext)},
                                          {plaintext, sizeof(plaintext)},
                                          {ciphertext, sizeof(plaintext)}, tag) == TC_OK);
-  CHECK(tiny_crypto::eax_prime_decrypt(kat_key, {cleartext, sizeof(cleartext)},
+  CHECK(tiny_crypto::eax_prime_decrypt(key, {cleartext, sizeof(cleartext)},
                                        {ciphertext, sizeof(ciphertext)}, tag,
                                        {recovered, sizeof(ciphertext)}) == TC_OK);
   CHECK(std::memcmp(recovered, plaintext, sizeof(plaintext)) == 0);
   tag[0] ^= 1;
-  CHECK(tiny_crypto::eax_prime_decrypt(kat_key, {cleartext, sizeof(cleartext)},
+  CHECK(tiny_crypto::eax_prime_decrypt(key, {cleartext, sizeof(cleartext)},
                                        {ciphertext, sizeof(ciphertext)}, tag,
                                        {recovered, sizeof(ciphertext)}) == TC_MISMATCH);
+
+  uint8_t untouched[sizeof(plaintext)];
+  uint8_t untouched_tag[TC_AES_EAX_PRIME_TAG_LEN];
+  std::memset(untouched, 0xa5, sizeof(untouched));
+  std::memset(untouched_tag, 0xa5, sizeof(untouched_tag));
+  const tiny_crypto::bytes short_key = {kat_key, TC_AES_KEYLEN - 1};
+  CHECK(tiny_crypto::eax_prime_encrypt(short_key, {cleartext, sizeof(cleartext)},
+                                       {plaintext, sizeof(plaintext)},
+                                       {untouched, sizeof(untouched)}, untouched_tag) == TC_ERROR);
+  CHECK(tiny_crypto::eax_prime_decrypt(short_key, {cleartext, sizeof(cleartext)},
+                                       {ciphertext, sizeof(ciphertext)}, tag,
+                                       {untouched, sizeof(untouched)}) == TC_ERROR);
+  for (size_t i = 0; i < sizeof(untouched); ++i)
+    CHECK(untouched[i] == 0xa5);
+  for (size_t i = 0; i < sizeof(untouched_tag); ++i)
+    CHECK(untouched_tag[i] == 0xa5);
 }
 #endif
 
@@ -295,14 +347,31 @@ TEST_CASE("AES SIV wrappers bind associated data")
   uint8_t synthetic_iv[TC_AES_SIV_V_LEN];
   for (size_t i = 0; i < key.size(); ++i)
     key[i] = static_cast<uint8_t>(0x20u + i);
-  REQUIRE(tiny_crypto::siv_encrypt(key.data(), ad, 2, {plaintext, sizeof(plaintext)}, synthetic_iv,
-                                   {ciphertext, sizeof(plaintext)}) == TC_OK);
-  CHECK(tiny_crypto::siv_decrypt(key.data(), ad, 2, synthetic_iv, {ciphertext, sizeof(ciphertext)},
+  REQUIRE(tiny_crypto::siv_encrypt({key.data(), key.size()}, ad, 2, {plaintext, sizeof(plaintext)},
+                                   synthetic_iv, {ciphertext, sizeof(plaintext)}) == TC_OK);
+  CHECK(tiny_crypto::siv_decrypt({key.data(), key.size()}, ad, 2, synthetic_iv,
+                                 {ciphertext, sizeof(ciphertext)},
                                  {recovered, sizeof(ciphertext)}) == TC_OK);
   CHECK(std::memcmp(recovered, plaintext, sizeof(plaintext)) == 0);
-  CHECK(tiny_crypto::siv_decrypt(key.data(), ad, 1, synthetic_iv, {ciphertext, sizeof(ciphertext)},
+  CHECK(tiny_crypto::siv_decrypt({key.data(), key.size()}, ad, 1, synthetic_iv,
+                                 {ciphertext, sizeof(ciphertext)},
                                  {recovered, sizeof(ciphertext)}) == TC_MISMATCH);
   for (size_t i = 0; i < sizeof(recovered); ++i)
     CHECK(recovered[i] == 0);
+
+  /* SIV takes two AES keys. One AES key is the wrong length. */
+  uint8_t untouched[sizeof(plaintext)];
+  uint8_t untouched_iv[TC_AES_SIV_V_LEN];
+  std::memset(untouched, 0xa5, sizeof(untouched));
+  std::memset(untouched_iv, 0xa5, sizeof(untouched_iv));
+  const tiny_crypto::bytes single_key = {key.data(), TC_AES_KEYLEN};
+  CHECK(tiny_crypto::siv_encrypt(single_key, ad, 2, {plaintext, sizeof(plaintext)}, untouched_iv,
+                                 {untouched, sizeof(untouched)}) == TC_ERROR);
+  CHECK(tiny_crypto::siv_decrypt(single_key, ad, 2, synthetic_iv, {ciphertext, sizeof(ciphertext)},
+                                 {untouched, sizeof(untouched)}) == TC_ERROR);
+  for (size_t i = 0; i < sizeof(untouched); ++i)
+    CHECK(untouched[i] == 0xa5);
+  for (size_t i = 0; i < sizeof(untouched_iv); ++i)
+    CHECK(untouched_iv[i] == 0xa5);
 }
 #endif

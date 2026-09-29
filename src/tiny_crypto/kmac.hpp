@@ -12,32 +12,33 @@ class KMAC256 {
   TC_KMAC256_ctx ctx_{};
 
 public:
-  KMAC256() = default;
+  KMAC256() noexcept = default;
   KMAC256(const KMAC256&) = delete;
   KMAC256& operator=(const KMAC256&) = delete;
-  ~KMAC256()
+  ~KMAC256() noexcept
   {
     clear();
   }
   TC_CPP_NODISCARD TC_status init(const uint8_t* key, size_t key_len,
-                                  const uint8_t* custom = nullptr, size_t custom_len = 0)
+                                  const uint8_t* custom = nullptr, size_t custom_len = 0) noexcept
   {
     return TC_KMAC256_init(&ctx_, key, key_len, custom, custom_len);
   }
-  TC_status update(const uint8_t* data, size_t len)
+  TC_CPP_NODISCARD TC_status update(const uint8_t* data, size_t len) noexcept
   {
     return TC_KMAC256_update(&ctx_, data, len);
   }
-  TC_status final(uint8_t* out, size_t len)
+  TC_CPP_NODISCARD TC_status final(uint8_t* out, size_t len) noexcept
   {
     return TC_KMAC256_final(&ctx_, out, len);
   }
-  void clear()
+  void clear() noexcept
   {
     TC_KMAC256_ctx_clear(&ctx_);
   }
-  static TC_status digest(const uint8_t* key, size_t key_len, const uint8_t* data, size_t len,
-                          const uint8_t* custom, size_t custom_len, uint8_t* out, size_t out_len)
+  TC_CPP_NODISCARD static TC_status digest(const uint8_t* key, size_t key_len, const uint8_t* data,
+                                           size_t len, const uint8_t* custom, size_t custom_len,
+                                           uint8_t* out, size_t out_len) noexcept
   {
     return TC_KMAC256_digest(key, key_len, data, len, custom, custom_len, out, out_len);
   }

@@ -168,6 +168,33 @@ work counters may change. Secret-producing operations also specify wiping
 behavior. Clear application-held keys and plaintext with `TC_secure_zero` when
 their lifetime ends. Release acquired snapshots on every exit path.
 
+## C++ wrappers
+
+The C++11 wrappers in `tiny_crypto` return the C result types. Every call that
+returns a status or result enumerator is marked `[[nodiscard]]` in C++17 and
+`warn_unused_result` on GCC and Clang in C++11. Build with `-Wunused-result`
+enabled (the default on GCC and Clang) so a discarded verification or cipher
+result is reported. Wrapper calls are `noexcept`.
+
+Cipher, hash and MAC classes own their C context, clear it on destruction and
+delete their copy operations. A failed `init` of `AES`, `GCM`, `DES`, `DES3`,
+`AES_dynamic`, `AES_dynamic_CMAC` or an HMAC class leaves the object unkeyed.
+Later cipher, update and finish calls then return `TC_ERROR` until the next
+successful `init`.
+`basic_hash::finish` starts the next message. `basic_hmac::finish` consumes
+the key.
+
+The one-shot CCM, EAX, EAX' and SIV wrappers take the key as `bytes`. CCM, EAX
+and EAX' need `TC_AES_KEYLEN` bytes and SIV needs `TC_AES_SIV_KEYLEN`. Another
+length returns `TC_ERROR` before any output is written.
+
+```cpp
+const tiny_crypto::bytes key = {key_bytes, sizeof key_bytes};
+if (tiny_crypto::ccm_decrypt(key, nonce, aad, ciphertext, tag, plaintext) != TC_OK) {
+  /* Reject the packet. */
+}
+```
+
 ## DES message authentication
 
 Enable both `TINY_CRYPTO_ENABLE_DES=ON` and `TINY_CRYPTO_DES_ISO9797=ON` to use

@@ -45,60 +45,60 @@ public:
     }
     return TC_AES_init_ctx_iv(&ctx_, key, iv);
   }
-  TC_status set_iv(const uint8_t* iv, size_t iv_len) noexcept
+  TC_CPP_NODISCARD TC_status set_iv(const uint8_t* iv, size_t iv_len) noexcept
   {
     return iv_len == TC_AES_BLOCKLEN ? TC_AES_ctx_set_iv(&ctx_, iv) : TC_ERROR;
   }
-  template <size_t N> TC_status set_iv(const uint8_t (&iv)[N]) noexcept
+  template <size_t N> TC_CPP_NODISCARD TC_status set_iv(const uint8_t (&iv)[N]) noexcept
   {
     return set_iv(iv, N);
   }
 #endif
 
 #if TC_AES_ENABLE_ECB
-  TC_status encrypt_ecb(uint8_t* block) const noexcept
+  TC_CPP_NODISCARD TC_status encrypt_ecb(uint8_t* block) const noexcept
   {
     return TC_AES_ECB_encrypt(&ctx_.key, block);
   }
-  TC_status decrypt_ecb(uint8_t* block) const noexcept
+  TC_CPP_NODISCARD TC_status decrypt_ecb(uint8_t* block) const noexcept
   {
     return TC_AES_ECB_decrypt(&ctx_.key, block);
   }
 #endif
 #if TC_AES_ENABLE_CBC
-  TC_status encrypt_cbc(uint8_t* data, size_t length) noexcept
+  TC_CPP_NODISCARD TC_status encrypt_cbc(uint8_t* data, size_t length) noexcept
   {
     return TC_AES_CBC_encrypt(&ctx_, data, length);
   }
-  TC_status decrypt_cbc(uint8_t* data, size_t length) noexcept
+  TC_CPP_NODISCARD TC_status decrypt_cbc(uint8_t* data, size_t length) noexcept
   {
     return TC_AES_CBC_decrypt(&ctx_, data, length);
   }
-  template <size_t N> TC_status encrypt_cbc(uint8_t (&data)[N]) noexcept
+  template <size_t N> TC_CPP_NODISCARD TC_status encrypt_cbc(uint8_t (&data)[N]) noexcept
   {
     return encrypt_cbc(data, N);
   }
-  template <size_t N> TC_status decrypt_cbc(uint8_t (&data)[N]) noexcept
+  template <size_t N> TC_CPP_NODISCARD TC_status decrypt_cbc(uint8_t (&data)[N]) noexcept
   {
     return decrypt_cbc(data, N);
   }
 #endif
 #if TC_AES_ENABLE_CTR
-  TC_status xcrypt_ctr(uint8_t* data, size_t length) noexcept
+  TC_CPP_NODISCARD TC_status xcrypt_ctr(uint8_t* data, size_t length) noexcept
   {
     return TC_AES_CTR_crypt(&ctx_, data, length);
   }
-  template <size_t N> TC_status xcrypt_ctr(uint8_t (&data)[N]) noexcept
+  template <size_t N> TC_CPP_NODISCARD TC_status xcrypt_ctr(uint8_t (&data)[N]) noexcept
   {
     return xcrypt_ctr(data, N);
   }
 #endif
 #if TC_AES_ENABLE_OFB
-  TC_status xcrypt_ofb(uint8_t* data, size_t length) noexcept
+  TC_CPP_NODISCARD TC_status xcrypt_ofb(uint8_t* data, size_t length) noexcept
   {
     return TC_AES_OFB_crypt(&ctx_, data, length);
   }
-  template <size_t N> TC_status xcrypt_ofb(uint8_t (&data)[N]) noexcept
+  template <size_t N> TC_CPP_NODISCARD TC_status xcrypt_ofb(uint8_t (&data)[N]) noexcept
   {
     return xcrypt_ofb(data, N);
   }
@@ -146,23 +146,23 @@ public:
     }
     return TC_AES_GCM_init_short_tag(&ctx_, key, iv, tag_len);
   }
-  TC_status aad_update(const uint8_t* aad, size_t length) noexcept
+  TC_CPP_NODISCARD TC_status aad_update(const uint8_t* aad, size_t length) noexcept
   {
     return TC_AES_GCM_aad_update(&ctx_, aad, length);
   }
-  TC_status encrypt_update(uint8_t* data, size_t length) noexcept
+  TC_CPP_NODISCARD TC_status encrypt_update(uint8_t* data, size_t length) noexcept
   {
     return TC_AES_GCM_encrypt_update(&ctx_, data, length);
   }
-  TC_status decrypt_update(uint8_t* data, size_t length) noexcept
+  TC_CPP_NODISCARD TC_status decrypt_update(uint8_t* data, size_t length) noexcept
   {
     return TC_AES_GCM_decrypt_update(&ctx_, data, length);
   }
-  TC_status encrypt_finish(uint8_t* tag, size_t tag_len) noexcept
+  TC_CPP_NODISCARD TC_status encrypt_finish(uint8_t* tag, size_t tag_len) noexcept
   {
     return tag_len == ctx_.tag_len ? TC_AES_GCM_encrypt_finish(&ctx_, tag) : TC_ERROR;
   }
-  TC_status decrypt_finish(const uint8_t* tag, size_t tag_len) noexcept
+  TC_CPP_NODISCARD TC_status decrypt_finish(const uint8_t* tag, size_t tag_len) noexcept
   {
     return tag_len == ctx_.tag_len ? TC_AES_GCM_decrypt_finish(&ctx_, tag) : TC_ERROR;
   }
@@ -181,72 +181,87 @@ private:
 #endif
 
 #if TC_AES_ENABLE_CMAC
-inline TC_status aes_cmac(const uint8_t* key, size_t key_len, const uint8_t* message,
-                          size_t message_len, uint8_t* tag, size_t tag_len) noexcept
+TC_CPP_NODISCARD inline TC_status aes_cmac(const uint8_t* key, size_t key_len,
+                                           const uint8_t* message, size_t message_len, uint8_t* tag,
+                                           size_t tag_len) noexcept
 {
   return key_len == TC_AES_KEYLEN ? TC_AES_CMAC(key, message, message_len, tag, tag_len) : TC_ERROR;
 }
 #endif
 
+/* The one-shot AEAD wrappers take a sized key and check its length before the
+ * C call. A wrong length returns TC_ERROR and leaves every output unchanged.
+ * CCM, EAX and EAX' take TC_AES_KEYLEN bytes. SIV takes TC_AES_SIV_KEYLEN. */
 #if TC_AES_ENABLE_CCM
-TC_CPP_NODISCARD inline TC_status ccm_encrypt(const uint8_t* key, bytes nonce, bytes aad,
-                                              bytes plaintext, buffer ciphertext,
-                                              buffer tag) noexcept
+TC_CPP_NODISCARD inline TC_status ccm_encrypt(bytes key, bytes nonce, bytes aad, bytes plaintext,
+                                              buffer ciphertext, buffer tag) noexcept
 {
-  return TC_AES_CCM_encrypt(key, nonce, aad, plaintext, ciphertext, tag);
+  if (key.length != TC_AES_KEYLEN)
+    return TC_ERROR;
+  return TC_AES_CCM_encrypt(key.data, nonce, aad, plaintext, ciphertext, tag);
 }
-TC_CPP_NODISCARD inline TC_status ccm_decrypt(const uint8_t* key, bytes nonce, bytes aad,
-                                              bytes ciphertext, bytes tag,
-                                              buffer plaintext) noexcept
+TC_CPP_NODISCARD inline TC_status ccm_decrypt(bytes key, bytes nonce, bytes aad, bytes ciphertext,
+                                              bytes tag, buffer plaintext) noexcept
 {
-  return TC_AES_CCM_decrypt(key, nonce, aad, ciphertext, tag, plaintext);
+  if (key.length != TC_AES_KEYLEN)
+    return TC_ERROR;
+  return TC_AES_CCM_decrypt(key.data, nonce, aad, ciphertext, tag, plaintext);
 }
 #endif
 
 #if TC_AES_ENABLE_EAX
-TC_CPP_NODISCARD inline TC_status eax_encrypt(const uint8_t* key, bytes nonce, bytes aad,
-                                              bytes plaintext, buffer ciphertext,
-                                              buffer tag) noexcept
+TC_CPP_NODISCARD inline TC_status eax_encrypt(bytes key, bytes nonce, bytes aad, bytes plaintext,
+                                              buffer ciphertext, buffer tag) noexcept
 {
-  return TC_AES_EAX_encrypt(key, nonce, aad, plaintext, ciphertext, tag);
+  if (key.length != TC_AES_KEYLEN)
+    return TC_ERROR;
+  return TC_AES_EAX_encrypt(key.data, nonce, aad, plaintext, ciphertext, tag);
 }
-TC_CPP_NODISCARD inline TC_status eax_decrypt(const uint8_t* key, bytes nonce, bytes aad,
-                                              bytes ciphertext, bytes tag,
-                                              buffer plaintext) noexcept
+TC_CPP_NODISCARD inline TC_status eax_decrypt(bytes key, bytes nonce, bytes aad, bytes ciphertext,
+                                              bytes tag, buffer plaintext) noexcept
 {
-  return TC_AES_EAX_decrypt(key, nonce, aad, ciphertext, tag, plaintext);
+  if (key.length != TC_AES_KEYLEN)
+    return TC_ERROR;
+  return TC_AES_EAX_decrypt(key.data, nonce, aad, ciphertext, tag, plaintext);
 }
 #endif
 
 #if TC_AES_ENABLE_EAX_PRIME
 TC_CPP_NODISCARD inline TC_status
-eax_prime_encrypt(const uint8_t* key, bytes cleartext, bytes plaintext, buffer ciphertext,
+eax_prime_encrypt(bytes key, bytes cleartext, bytes plaintext, buffer ciphertext,
                   uint8_t (&tag)[TC_AES_EAX_PRIME_TAG_LEN]) noexcept
 {
-  return TC_AES_EAX_PRIME_encrypt(key, cleartext, plaintext, ciphertext, tag);
+  if (key.length != TC_AES_KEYLEN)
+    return TC_ERROR;
+  return TC_AES_EAX_PRIME_encrypt(key.data, cleartext, plaintext, ciphertext, tag);
 }
-TC_CPP_NODISCARD inline TC_status eax_prime_decrypt(const uint8_t* key, bytes cleartext,
-                                                    bytes ciphertext,
+TC_CPP_NODISCARD inline TC_status eax_prime_decrypt(bytes key, bytes cleartext, bytes ciphertext,
                                                     const uint8_t (&tag)[TC_AES_EAX_PRIME_TAG_LEN],
                                                     buffer plaintext) noexcept
 {
-  return TC_AES_EAX_PRIME_decrypt(key, cleartext, ciphertext, tag, plaintext);
+  if (key.length != TC_AES_KEYLEN)
+    return TC_ERROR;
+  return TC_AES_EAX_PRIME_decrypt(key.data, cleartext, ciphertext, tag, plaintext);
 }
 #endif
 
 #if TC_AES_ENABLE_SIV
-TC_CPP_NODISCARD inline TC_status siv_encrypt(const uint8_t* key, const bytes* ad, size_t ad_count,
+TC_CPP_NODISCARD inline TC_status siv_encrypt(bytes key, const bytes* ad, size_t ad_count,
                                               bytes plaintext,
                                               uint8_t (&synthetic_iv)[TC_AES_SIV_V_LEN],
                                               buffer ciphertext) noexcept
 {
-  return TC_AES_SIV_encrypt(key, ad, ad_count, plaintext, synthetic_iv, ciphertext);
+  if (key.length != TC_AES_SIV_KEYLEN)
+    return TC_ERROR;
+  return TC_AES_SIV_encrypt(key.data, ad, ad_count, plaintext, synthetic_iv, ciphertext);
 }
-TC_CPP_NODISCARD inline TC_status siv_decrypt(const uint8_t* key, const bytes* ad, size_t ad_count,
+TC_CPP_NODISCARD inline TC_status siv_decrypt(bytes key, const bytes* ad, size_t ad_count,
                                               const uint8_t (&synthetic_iv)[TC_AES_SIV_V_LEN],
                                               bytes ciphertext, buffer plaintext) noexcept
 {
-  return TC_AES_SIV_decrypt(key, ad, ad_count, synthetic_iv, ciphertext, plaintext);
+  if (key.length != TC_AES_SIV_KEYLEN)
+    return TC_ERROR;
+  return TC_AES_SIV_decrypt(key.data, ad, ad_count, synthetic_iv, ciphertext, plaintext);
 }
 #endif
 

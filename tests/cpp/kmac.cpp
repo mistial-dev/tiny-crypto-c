@@ -21,3 +21,16 @@ TEST_CASE("KMAC256 streaming and lifecycle")
   ctx.clear();
   CHECK(ctx.update(nullptr, 0) == TC_ERROR);
 }
+
+TEST_CASE("KMAC256 members do not throw")
+{
+  tiny_crypto::KMAC256 ctx;
+  uint8_t out[32];
+  CHECK(noexcept(tiny_crypto::KMAC256()));
+  CHECK(noexcept(ctx.init(out, sizeof(out))));
+  CHECK(noexcept(ctx.update(out, sizeof(out))));
+  CHECK(noexcept(ctx.final(out, sizeof(out))));
+  CHECK(noexcept(ctx.clear()));
+  CHECK(noexcept(
+      tiny_crypto::KMAC256::digest(out, sizeof(out), out, 0, nullptr, 0, out, sizeof(out))));
+}

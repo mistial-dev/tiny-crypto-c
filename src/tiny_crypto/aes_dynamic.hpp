@@ -2,6 +2,11 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #ifndef TINY_CRYPTO_AES_DYNAMIC_HPP_
 #define TINY_CRYPTO_AES_DYNAMIC_HPP_
+
+#ifndef __cplusplus
+#error Do not include aes_dynamic.hpp in a C project, include aes_dynamic.h instead
+#endif
+
 #include <tiny_crypto/common.hpp>
 #include <tiny_crypto/aes_dynamic.h>
 
@@ -13,7 +18,7 @@ class AES_dynamic {
 public:
   AES_dynamic() noexcept : ctx_{}
   {}
-  ~AES_dynamic()
+  ~AES_dynamic() noexcept
   {
     clear();
   }
@@ -27,19 +32,21 @@ public:
   {
     ::TC_AES_dynamic_key_clear(&ctx_);
   }
-  TC_status encrypt(uint8_t (&block)[16]) const noexcept
+  TC_CPP_NODISCARD TC_status encrypt(uint8_t (&block)[16]) const noexcept
   {
     return ::TC_AES_dynamic_encrypt(&ctx_, block);
   }
-  TC_status decrypt(uint8_t (&block)[16]) const noexcept
+  TC_CPP_NODISCARD TC_status decrypt(uint8_t (&block)[16]) const noexcept
   {
     return ::TC_AES_dynamic_decrypt(&ctx_, block);
   }
-  TC_status cbc_encrypt(uint8_t (&iv)[16], uint8_t* buffer, size_t length) const noexcept
+  TC_CPP_NODISCARD TC_status cbc_encrypt(uint8_t (&iv)[16], uint8_t* buffer,
+                                         size_t length) const noexcept
   {
     return ::TC_AES_dynamic_CBC_encrypt(&ctx_, iv, buffer, length);
   }
-  TC_status cbc_decrypt(uint8_t (&iv)[16], uint8_t* buffer, size_t length) const noexcept
+  TC_CPP_NODISCARD TC_status cbc_decrypt(uint8_t (&iv)[16], uint8_t* buffer,
+                                         size_t length) const noexcept
   {
     return ::TC_AES_dynamic_CBC_decrypt(&ctx_, iv, buffer, length);
   }
@@ -51,7 +58,7 @@ class AES_dynamic_CMAC {
 public:
   AES_dynamic_CMAC() noexcept : ctx_{}
   {}
-  ~AES_dynamic_CMAC()
+  ~AES_dynamic_CMAC() noexcept
   {
     clear();
   }
@@ -61,11 +68,11 @@ public:
   {
     return ::TC_AES_dynamic_CMAC_init(&ctx_, key, length);
   }
-  TC_status update(const uint8_t* data, size_t length) noexcept
+  TC_CPP_NODISCARD TC_status update(const uint8_t* data, size_t length) noexcept
   {
     return ::TC_AES_dynamic_CMAC_update(&ctx_, data, length);
   }
-  TC_status final(uint8_t (&tag)[16]) noexcept
+  TC_CPP_NODISCARD TC_status final(uint8_t (&tag)[16]) noexcept
   {
     return ::TC_AES_dynamic_CMAC_final(&ctx_, tag);
   }

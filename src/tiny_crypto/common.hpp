@@ -26,7 +26,8 @@ typedef ::TC_buffer buffer;
 typedef ::TC_credential_status credential_status;
 
 /* The byte count is public. Timing depends on the length and is independent of content. */
-inline TC_status ct_equal(const uint8_t* a, const uint8_t* b, size_t length) noexcept
+TC_CPP_NODISCARD inline TC_status ct_equal(const uint8_t* a, const uint8_t* b,
+                                           size_t length) noexcept
 {
   return ::TC_ct_equal(a, b, length);
 }

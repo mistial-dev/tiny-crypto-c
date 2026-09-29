@@ -123,6 +123,8 @@ verifies RNG failure, unchanged ciphertext and scratch cleanup through the
 installed API.
 Each optional module also has a smallest-supported C and C++ umbrella-header
 compile target, which catches accidental dependencies on unrelated features.
+`test_cpp_nodiscard` compiles `tests/cpp/nodiscard_compile.cpp` as C++11 and
+C++17 and requires an unused-result warning on each discarded wrapper result.
 These package checks are separate from sanitizer-instrumented unit tests.
 The install manifest is checked against the expected library, headers, CMake
 package files and license notices. Both installed license files must match the

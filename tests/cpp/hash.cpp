@@ -47,6 +47,12 @@ void check_hash(const uint8_t (&expected)[N], const uint8_t (&boundary)[BOUNDARY
   CHECK(hash.update(fips_abc_msg, FIPS_ABC_LEN) == TC_OK);
   CHECK(hash.finish(streamed) == TC_OK);
   CHECK(std::memcmp(streamed, expected, N) == 0);
+
+  CHECK(noexcept(Hash()));
+  CHECK(noexcept(hash.reset()));
+  CHECK(noexcept(hash.update(message, 1)));
+  CHECK(noexcept(hash.finish(streamed)));
+  CHECK(noexcept(Hash::digest(message, 1, one_shot, sizeof(one_shot))));
 }
 
 template <class Hmac, size_t N> void check_hmac(const hmac_vector* vectors, size_t count)
@@ -73,7 +79,26 @@ template <class Hmac, size_t N> void check_hmac(const hmac_vector* vectors, size
     CHECK(hmac.finish(streamed) == TC_OK);
     CHECK(std::memcmp(streamed, v.tag, N) == 0);
     CHECK(hmac.finish(streamed) == TC_ERROR);
+    CHECK(hmac.update(v.msg, v.msg_len) == TC_ERROR);
   }
+
+  /* A default-constructed object holds no key. */
+  Hmac unkeyed;
+  CHECK(unkeyed.update(vectors[0].msg, vectors[0].msg_len) == TC_ERROR);
+  CHECK(unkeyed.finish(streamed) == TC_ERROR);
+
+  /* A failed re-init leaves the object unkeyed. */
+  Hmac rekeyed(vectors[0].key, vectors[0].key_len);
+  CHECK(rekeyed.update(vectors[0].msg, vectors[0].msg_len) == TC_OK);
+  CHECK(rekeyed.init(nullptr, 1) == TC_ERROR);
+  CHECK(rekeyed.update(vectors[0].msg, vectors[0].msg_len) == TC_ERROR);
+  CHECK(rekeyed.finish(streamed) == TC_ERROR);
+
+  CHECK(noexcept(unkeyed.update(vectors[0].msg, vectors[0].msg_len)));
+  CHECK(noexcept(unkeyed.finish(streamed)));
+  CHECK(noexcept(Hmac::verify(nullptr, 0, nullptr, 0, nullptr, 0)));
+  CHECK(noexcept(Hmac::mac(nullptr, 0, nullptr, 0, tag, sizeof(tag))));
+  CHECK(noexcept(Hmac(vectors[0].key, vectors[0].key_len)));
   CHECK(Hmac::mac(vectors[0].key, vectors[0].key_len, nullptr, 1, tag, sizeof(tag)) == TC_ERROR);
   CHECK(Hmac::verify(vectors[0].key, vectors[0].key_len, vectors[0].msg, vectors[0].msg_len, tag,
                      TC_HMAC_MIN_TAG_LEN - 1) == TC_ERROR);
