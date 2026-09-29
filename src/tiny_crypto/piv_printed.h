@@ -1,5 +1,10 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* PIV printed information and decrypted TWIC DFC109 reader.
+ * Standards: SP 800-73-5 Part 1, TWIC Part 2 v5.
+ * Configuration: TC_ENABLE_PIV_OBJECTS.
+ * Limitations: parsing only. Expiration checks follow CHUID authentication.
+ * Contracts: docs/api.md. */
 #ifndef TINY_CRYPTO_PIV_PRINTED_H_
 #define TINY_CRYPTO_PIV_PRINTED_H_
 #include <tiny_crypto/tlv.h>

@@ -8,10 +8,15 @@
 
 #include <tiny_crypto/common.h>
 
-/**
- * @file des.h
- * @brief Portable C implementation of DES and Triple-DES (3DES / TDEA).
- */
+/* DES and TDEA block ciphers with ECB, CBC, CTR, OFB and CFB modes, TDEA-CMAC
+ * and the ISO/IEC 9797-1 MAC algorithms 1 and 3.
+ * Standards: FIPS 46-3, SP 800-67 Rev. 2, SP 800-38A, SP 800-38B,
+ * ISO/IEC 9797-1:2011.
+ * Configuration: TC_ENABLE_DES, TC_DES_ENABLE_* per mode, TC_DES_ENABLE_TDES,
+ * TC_DES_REJECT_WEAK_KEYS and TC_MIN_TAG_LEN.
+ * Limitations: DES has a 56-bit key and its table lookups have no
+ * cache-timing protection. Use it for legacy interoperability.
+ * Contracts: docs/api.md, including its block-mode and DES sections. */
 
 /*
  * Mode selection (define to 1/0 before including this header, or via -D).

@@ -2,6 +2,12 @@
  * SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
+/* Build configuration. Each TC_* macro selects an algorithm, mode or
+ * implementation, with defaults from the resource profile in
+ * resource_profile.h. The checks at the end stop the build with an #error
+ * for a value outside its range or a missing dependency.
+ * Configuration: CMake maps each TINY_CRYPTO_* option to one macro here.
+ * Contracts: docs/api.md. Options: README.md. */
 #ifndef TINY_CRYPTO_CONFIG_H_
 #define TINY_CRYPTO_CONFIG_H_
 /* An installed library records its configuration here, so installed headers

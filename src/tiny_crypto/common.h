@@ -2,6 +2,10 @@
  * SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
+/* Shared types for every module: TC_bytes and TC_buffer spans, random
+ * sources, TC_work_budget, the common result enums and constant-time helpers.
+ * Configuration: includes config.h.
+ * Contracts: docs/api.md. */
 #ifndef TINY_CRYPTO_COMMON_H_
 #define TINY_CRYPTO_COMMON_H_
 

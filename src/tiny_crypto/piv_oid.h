@@ -1,5 +1,10 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* Registered PIV and TWIC object identifiers and their paired classification.
+ * Standards: FIPS 201-3, TWIC Part 2 v5 section 6.
+ * Configuration: TC_ENABLE_PIV_OIDS.
+ * Limitations: unlisted aliases classify as unknown.
+ * Contracts: docs/api.md. */
 #ifndef TINY_CRYPTO_PIV_OID_H_
 #define TINY_CRYPTO_PIV_OID_H_
 #include <tiny_crypto/common.h>

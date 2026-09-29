@@ -17,7 +17,7 @@
  * The fixed input is opaque to the library. TC_KBKDF_fixed_input builds
  * the conventional Label || 0x00 || Context || [L]_32 encoding. A cached
  * keyed PRF context, a working copy and chaining values live on the stack and
- * are wiped before return.
+ * are wiped before return. Library-wide contracts: docs/api.md.
  *
  * The header declares its API only when TC_ENABLE_KDF is 1. Function families
  * exist per PRF, each with _counter, _feedback and _pipeline variants, and

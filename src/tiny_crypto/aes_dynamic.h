@@ -1,5 +1,10 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* AES with the key length chosen per context: 128, 192 or 256-bit keys for
+ * single blocks, CBC and CMAC. aes.h provides the fixed-size AES API.
+ * Standards: FIPS 197, SP 800-38A (CBC), SP 800-38B (CMAC).
+ * Configuration: TC_ENABLE_AES and TC_AES_ENABLE_DYNAMIC.
+ * Contracts: docs/api.md. */
 #ifndef TINY_CRYPTO_AES_DYNAMIC_H_
 #define TINY_CRYPTO_AES_DYNAMIC_H_
 #include <tiny_crypto/aes.h>

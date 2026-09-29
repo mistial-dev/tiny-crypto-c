@@ -1,5 +1,10 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* ANSI AAMVA barcode payloads: subfile directory and text field lookup for
+ * the DL/ID data carried in PDF417 barcodes, including TWIC barcodes.
+ * Configuration: TC_ENABLE_AAMVA. Limitations: image decoding, PDF417
+ * recognition and field interpretation belong to the application.
+ * Contracts: docs/api.md. Guide: docs/twic-barcode.md. */
 #ifndef TINY_CRYPTO_AAMVA_H_
 #define TINY_CRYPTO_AAMVA_H_
 #include <tiny_crypto/tlv.h>

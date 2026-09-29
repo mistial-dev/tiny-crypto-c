@@ -1,5 +1,8 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* AES_dynamic and AES_dynamic_CMAC classes for aes_dynamic.h.
+ * Contracts, statuses and lifetimes follow the C header. Conventions:
+ * docs/cpp.md. Library-wide contracts: docs/api.md. */
 #ifndef TINY_CRYPTO_AES_DYNAMIC_HPP_
 #define TINY_CRYPTO_AES_DYNAMIC_HPP_
 

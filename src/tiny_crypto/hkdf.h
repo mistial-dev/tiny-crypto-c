@@ -1,5 +1,9 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* HKDF extract, expand and one-shot derive over each enabled HMAC-SHA family.
+ * Standards: RFC 5869, SP 800-56C Rev. 2 section 5.
+ * Configuration: TC_ENABLE_HKDF with TC_ENABLE_HMAC and TC_ENABLE_SHA*.
+ * Contracts: docs/api.md. Guide: docs/hkdf.md. */
 #ifndef TINY_CRYPTO_HKDF_H_
 #define TINY_CRYPTO_HKDF_H_
 
@@ -16,7 +20,7 @@ extern "C" {
  *
  * extract computes PRK = HMAC(salt, IKM) and writes exactly
  * TC_SHA*_DIGESTLEN bytes to prk. The input keying material is the
- * concatenation of ikm_count spans, read in order without copying; pass one
+ * concatenation of ikm_count spans, read in order without copying. Pass one
  * span for an ordinary secret, or Z and T for an SP 800-56C revision 2 hybrid
  * secret Z || T. An empty salt is the RFC's all-zero salt.
  *

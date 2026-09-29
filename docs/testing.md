@@ -35,6 +35,29 @@ checks, card proof and cleanup. Cases include compressed certificates, root
 CA/key-usage/path/name constraints, expiry during the exchange, and argument
 rejection before reader access. These tests use no connected credential.
 
+## Test options
+
+These CMake cache options select test inputs. The build options that enable
+tests, benchmarks, fuzzers and sanitizers are listed in the
+[README](../README.md#build-and-test-options).
+
+| Option                              | Default                             | Purpose                                                                |
+| ----------------------------------- | ----------------------------------- | ---------------------------------------------------------------------- |
+| `TINY_CRYPTO_TEST_FULL`             | OFF                                 | Run the checked-in CAVP corpora                                        |
+| `TINY_CRYPTO_TEST_OPENSSL`          | OFF                                 | OpenSSL 3 cross-checks for PKI and multiprecision arithmetic           |
+| `TINY_CRYPTO_TEST_EC_ORACLE`        | OFF                                 | Compare EC results with Python `cryptography`                          |
+| `TINY_CRYPTO_TEST_WYCHEPROOF_DIR`   | `tests/vectors/wycheproof`          | Pinned C2SP Wycheproof vectors, the directory holding `testvectors_v1` |
+| `TINY_CRYPTO_TEST_EC_CAVP_DIR`      | `tests/vectors/nist_ecccdh`         | NIST ECC CDH component vectors                                         |
+| `TINY_CRYPTO_TEST_ECDSA_DSS_DIR`    | `tests/vectors/nist_dss/186-4ecdsa` | NIST FIPS 186-4 ECDSA vectors                                          |
+| `TINY_CRYPTO_TEST_RSA_DSS_DIR`      | `tests/vectors/nist_dss/186-3rsa`   | NIST FIPS 186-3 RSA vectors                                            |
+| `TINY_CRYPTO_TEST_SM_CAPTURE_DIR`   | empty                               | PIV secure-messaging capture directory                                 |
+| `TINY_CRYPTO_TEST_UNICODE_DIR`      | empty                               | Unicode 3.2 data and the RFC 3454 and RFC 4518 references              |
+| `TINY_CRYPTO_TEST_ESP_SIGNED_IMAGE` | empty                               | Espressif RSA-3072 signed application fixture                          |
+| `TINY_CRYPTO_TLV_CORPUS`            | `tests/vectors`                     | Parser corpus root with `piv/` and `x509/`, or empty to skip           |
+| `TINY_CRYPTO_TLV_MBEDTLS_SUITE`     | empty                               | External pinned ASN.1 test data file                                   |
+
+An empty directory option skips the tests that need it.
+
 ## Checked-in suites
 
 `test_x509_trust_anchor`, `test_x509_anchor_constraints`, and
@@ -812,8 +835,10 @@ cmake --build /tmp/tiny-crypto-full --parallel
 ctest --test-dir /tmp/tiny-crypto-full --output-on-failure
 ```
 
-After a failure, use `ctest --test-dir /tmp/tiny-crypto-full --rerun-failed --output-on-failure` to retry the failed tests. CTest keeps detailed output
-in `/tmp/tiny-crypto-full/Testing/Temporary/LastTest.log`. Run the whole suite
+After a failure, use
+`ctest --test-dir /tmp/tiny-crypto-full --rerun-failed --output-on-failure`
+to retry the failed tests. CTest keeps detailed output in
+`/tmp/tiny-crypto-full/Testing/Temporary/LastTest.log`. Run the whole suite
 again after fixing the failure.
 
 The external Wycheproof adapter covers P-256 and P-384 ECDH, with

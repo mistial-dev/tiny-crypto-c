@@ -1,5 +1,10 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* TWIC Privacy Key (TPK) containers from the card or barcode, and
+ * TWIC private-object decryption.
+ * Standards: TWIC Part 2 v5 sections 4.6.2 and 4.9.
+ * Configuration: TC_ENABLE_TWIC_TPK and TC_ENABLE_TWIC_OBJECT_CRYPTO.
+ * Contracts: docs/api.md. Guide: docs/twic-barcode.md. */
 #ifndef TINY_CRYPTO_TWIC_TPK_H_
 #define TINY_CRYPTO_TWIC_TPK_H_
 #include <tiny_crypto/common.h>

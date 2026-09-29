@@ -10,7 +10,7 @@
  * with the value the installed archive was built with. config.h includes it
  * again at its end with TC_BUILD_CONFIG_VERIFY defined, and a -D definition
  * with a different value fails with "<macro> differs from the installed library
- * configuration". */
+ * configuration". Options: README.md. Contracts: docs/api.md. */
 #ifndef TINY_CRYPTO_BUILD_CONFIG_H_
 #define TINY_CRYPTO_BUILD_CONFIG_H_
 #endif

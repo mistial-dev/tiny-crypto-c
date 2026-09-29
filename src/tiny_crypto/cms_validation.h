@@ -1,5 +1,12 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* CMS signer discovery and path validation: candidate certificates from the
+ * envelope and held sources, signer path construction and CRL revocation.
+ * Standards: RFC 5652 section 5, RFC 5280 section 6.
+ * Configuration: TC_ENABLE_CMS_VALIDATION.
+ * Limitations: revocation uses CRL evidence. validation.h composes these
+ * steps with a shared arena.
+ * Contracts: docs/api.md. Guides: docs/cms.md, docs/validation.md. */
 #ifndef TINY_CRYPTO_CMS_VALIDATION_H_
 #define TINY_CRYPTO_CMS_VALIDATION_H_
 #include <tiny_crypto/cms.h>

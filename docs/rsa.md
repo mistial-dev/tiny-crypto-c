@@ -328,10 +328,19 @@ width, then the FIPS 186-5 appendix A.1.1 criteria:
 odd `3 <= e < n` for keys outside FIPS 186-5, such as test vectors with
 `e = 3`. Every other criterion applies under both policies. The GCD, LCM and
 comparisons on secret values run in time that depends only on the key size.
-Each factor then receives 65 Miller-Rabin rounds at the factor width. Three is handled exactly. Supply an independent cryptographically secure
-random source and a request limit of at least `TC_RSA_VALIDATION_ROUNDS` per
-factor. Rejection sampling can require extra requests. `TC_RSA_LIMIT` reports
-exhausted requests, work, or storage. `TC_RSA_ERROR` reports RNG failure.
+Each factor then receives 65 Miller-Rabin rounds at the factor width. Three is
+handled exactly. Supply an independent cryptographically secure random source
+and a request limit of at least `TC_RSA_VALIDATION_ROUNDS` per factor.
+Rejection sampling can require extra requests. `TC_RSA_LIMIT` reports exhausted
+requests, work, or storage. `TC_RSA_ERROR` reports RNG failure.
+
+Validation returns `TC_RSA_INVALID` at the first failed public check or
+structural check. These are a public exponent outside the selected policy, a
+factor that is not half the modulus width, a private exponent that is zero,
+even or at least `n`, an even, equal or unit factor, and `n != p*q`. The
+remaining FIPS 186-5 criteria are accumulated as masks without branching.
+Miller-Rabin stops at the first factor found composite. The time of an early
+return can reveal which check rejected the key. Each of those keys is invalid.
 
 For a fixed composite candidate, the Miller-Rabin bound is `4^-rounds`.
 The 65-round policy gives a conservative combined bound of `2^-129` across two

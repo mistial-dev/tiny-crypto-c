@@ -2,6 +2,9 @@
  * SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
+/* Umbrella header for the configured build. It includes the header of every
+ * enabled module.
+ * Contracts: docs/api.md. */
 #ifndef TINY_CRYPTO_H_
 #define TINY_CRYPTO_H_
 

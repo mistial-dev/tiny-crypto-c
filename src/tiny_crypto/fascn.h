@@ -1,5 +1,10 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* FASC-N readers and writers for the 200-bit PACS encoding.
+ * Standards: PACS TIG v2.3 sections 6.1-6.3.
+ * Configuration: TC_ENABLE_FASCN.
+ * Limitations: category and other numeric values need application policy.
+ * Contracts: docs/api.md. Guide: docs/fascn.md. */
 #ifndef TINY_CRYPTO_FASCN_H_
 #define TINY_CRYPTO_FASCN_H_
 #include <tiny_crypto/tlv.h>

@@ -1,5 +1,13 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* Bounded TLV readers for DER, ISO/IEC 7816-4 and ASN.1 BER: single objects,
+ * sibling readers, tree checks, whole-tree walks and an incremental stream.
+ * Standards: ITU-T X.690 (02/2021), ISO/IEC 7816-4:2020 sections 6.4 and
+ * 8.1.2.
+ * Configuration: TC_ENABLE_TLV, TC_TLV_ENABLE_BER and TC_TLV_ENABLE_STREAM.
+ * Limitations: framing checks only. der.h and the object readers check
+ * values and schemas.
+ * Contracts: docs/api.md. Guide: docs/tlv.md. */
 #ifndef TINY_CRYPTO_TLV_H_
 #define TINY_CRYPTO_TLV_H_
 

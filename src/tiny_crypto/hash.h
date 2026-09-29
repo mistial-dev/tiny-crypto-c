@@ -16,6 +16,7 @@
  * The profile in config.h selects the digests with TC_ENABLE_SHA1 through
  * TC_ENABLE_SHA512 and HMAC with TC_ENABLE_HMAC. This header declares only
  * the enabled algorithms and is empty when no SHA is enabled.
+ * Library-wide contracts: docs/api.md. C++ classes: hash.hpp and docs/cpp.md.
  *
  * Inputs are borrowed TC_bytes spans. A span may have NULL data only when its
  * length is 0. Fixed-length digests and full HMAC tags are written to arrays of

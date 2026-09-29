@@ -1,5 +1,11 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* PIV secure-messaging card verifiable certificates: the 7F21 reader and
+ * chain verification under a validated content-signing certificate.
+ * Standards: SP 800-73-5 Part 2 section 4.1.5.
+ * Configuration: TC_ENABLE_PIV_CVC, with X.509 chain checks from
+ * TC_ENABLE_X509.
+ * Contracts: docs/api.md. Guide: docs/piv-cvc.md. */
 #ifndef TINY_CRYPTO_PIV_CVC_H_
 #define TINY_CRYPTO_PIV_CVC_H_
 #include <tiny_crypto/der.h>

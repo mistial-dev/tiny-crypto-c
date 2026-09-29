@@ -65,9 +65,10 @@ SP 800-73-5 Part 1 and SP 800-76-2. Its policy selects the attribute encoding
 and the identifier set. `attribute_oids` must be `TC_CMS_ATTRIBUTE_OIDS_PIV`
 for PIV cards or `TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC` for TWIC readers. The same
 selection applies to the content type, following TWIC Part 2 v5 section 6.
-`TC_PIV_CMS_BIOMETRIC` requires both FASC-N and entryUUID. Select `TC_PIV_CMS_BIOMETRIC_LEGACY` explicitly for the
-FIPS 201-1 signature profile: FASC-N remains mandatory and a present entryUUID
-must match CHUID. Use the same profile for identifier matching and set
+`TC_PIV_CMS_BIOMETRIC` requires both FASC-N and entryUUID. Select
+`TC_PIV_CMS_BIOMETRIC_LEGACY` explicitly for the FIPS 201-1 signature profile:
+FASC-N remains mandatory and a present entryUUID must match CHUID. Use the
+same profile for identifier matching and set
 `TC_PIV_biometric_validation_request.signature_profile` when validating it.
 The reader also checks the selected digest's parameters and membership in
 `digestAlgorithms`. Unknown selected hashes return `TC_TLV_UNSUPPORTED`.
@@ -297,11 +298,12 @@ and signature validation.
 
 `signer_name` borrows the Name encoded in `pivSigner-DN`
 (`2.16.840.1.101.3.6.5`), read under the PIV identifier sets. The reader
-validates its X.509 name structure and requires a single attribute value. CMS path building also matches this name
-against the candidate certificate's subject, using the shared name-comparison
-rules. The signature-only APIs accept a public key. Callers using those APIs
-must perform the certificate/name binding themselves. A PIV CHUID profile must
-require this attribute in addition to the general CMS checks.
+validates its X.509 name structure and requires a single attribute value.
+CMS path building also matches this name against the candidate certificate's
+subject, using the shared name-comparison rules. The signature-only APIs
+accept a public key. Callers using those APIs must perform the
+certificate/name binding themselves. A PIV CHUID profile must require this
+attribute in addition to the general CMS checks.
 
 `fascn_oid` preserves the PIV or TWIC FASC-N identifier that matched
 `policy.attribute_oids`. twicFASC-N is read only under
@@ -366,8 +368,9 @@ length encodings accepted by the CHUID reader.
 `TC_CMS_signed_data_path_build` accepts this array directly as detached
 content. In its `TC_CMS_validation_request`, pass `chuid.signature` as the
 envelope and `chuid.signed_content` with a count of two. It selects the signer's
-hash, checks the envelope and content binding, and builds the certificate path. CHUID profile requirements and revocation
-checks belong to the credential-validation workflow.
+hash, checks the envelope and content binding, and builds the certificate path.
+CHUID profile requirements and revocation checks belong to the
+credential-validation workflow.
 
 The combined example exposes `example_validate_cms_credential` for a held
 snapshot and `example_validate_cms_from_store` for a store. Both accept a
@@ -669,7 +672,8 @@ For attached content, pass zero detached spans. The function hashes the
 envelope's OCTET STRING value, excluding BER headers and chunk markers.
 Supplying any detached span for an attached envelope returns `ERROR`. For a
 detached envelope, pass the raw application message as one or more spans,
-hashed in array order. Zero spans represent an empty message. Malformed attached content is never retried as detached content.
+hashed in array order. Zero spans represent an empty message. Malformed
+attached content is never retried as detached content.
 
 The selected signer's digest must appear in `digestAlgorithms`. This is the
 validation policy permitted by [RFC 5652 section 5.1](https://www.rfc-editor.org/rfc/rfc5652.html#section-5.1).

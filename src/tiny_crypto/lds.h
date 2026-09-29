@@ -1,5 +1,11 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* LDS security object reader and data-group hash checks for PIV and TWIC
+ * security objects.
+ * Standards: ICAO Doc 9303 Part 10, SP 800-73-5 Part 1.
+ * Configuration: TC_ENABLE_PIV_OBJECTS.
+ * Limitations: the reader parses content. CMS authentication is separate.
+ * Contracts: docs/api.md, including its size_t work units. Guide: docs/lds.md. */
 #ifndef TINY_CRYPTO_LDS_H_
 #define TINY_CRYPTO_LDS_H_
 #include <tiny_crypto/der.h>

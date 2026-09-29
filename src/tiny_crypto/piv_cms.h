@@ -1,5 +1,11 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* PIV and TWIC signed-object envelopes: CBEFF biometric framing and the
+ * CMS profiles for CHUID, biometric and security objects.
+ * Standards: SP 800-73-5 Part 1, SP 800-76-2 section 9.3, FIPS 201-3,
+ * TWIC Part 2 v5.
+ * Configuration: TC_ENABLE_PIV_OBJECTS.
+ * Contracts: docs/api.md. Guide: docs/cms.md. */
 #ifndef TINY_CRYPTO_PIV_CMS_H_
 #define TINY_CRYPTO_PIV_CMS_H_
 #include <tiny_crypto/cms.h>

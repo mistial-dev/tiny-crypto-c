@@ -5,9 +5,95 @@
 # Working with the API
 
 Include the public header for the operation you need. The C headers support
-C99 and C++11. C++ wrappers live in `tiny_crypto`. Build options determine which
-implementations are linked. See the [configuration options](../README.md#configuration)
-and [installed examples](testing.md).
+C99 and C++11. Build options determine which implementations are linked. See
+the [configuration options](../README.md#configuration) and
+[installed examples](testing.md). The C++11 wrappers are described in
+[C++ wrappers](cpp.md).
+
+This page holds the contracts shared by every module: results, failure and
+wipe rules, input stability, work budgets, naming and argument order. Each
+public header opens with a module block that links here and states its scope,
+standards, configuration macros and limitations. Function comments in the
+headers give the exceptions and the conditions behind each status.
+
+## Result model
+
+Each module returns a named result type. Compare against the exact success
+value. Avoid treating a result as a Boolean or converting between enums
+numerically.
+
+| Result type | Returned by | Success |
+| --- | --- | --- |
+| `TC_status` | AES, DES, hashes, HMAC, MD5, KMAC256, KBKDF, HKDF, SSKDF, PIV SM | `TC_OK` |
+| `TC_EC_result`, `TC_RSA_result`, `TC_GZIP_result`, `TC_key_challenge_result` | EC, RSA, GZIP, key challenges | `*_OK` |
+| `TC_DRBG_result` | SP 800-90A DRBGs | `TC_DRBG_OK` |
+| `TC_TLV_result` | TLV, DER, X.509, CMS, CRL, OCSP, CVC and PIV/TWIC readers | `TC_TLV_OK` |
+| `TC_X509_signature_result`, `TC_X509_path_status` | signature providers, path validation | `*_VALID` |
+| `TC_credential_status` | CMS, CHUID, biometric, security-object and SM validation | `TC_CREDENTIAL_VALID` |
+| `TC_TWIC_CCL_result` | TWIC canceled card lists | `TC_TWIC_CCL_OK` |
+| `TC_result` | workspace sizing and setup helpers | `TC_RESULT_OK` |
+
+`TC_status` has three values. `TC_MISMATCH` reports a failed authentication or
+comparison: a tag, MAC or constant-time comparison that differs. `TC_ERROR`
+reports every other failure, including a NULL pointer, a bad length, a short
+output, an overlap, a missing IV or key, and a backend failure.
+
+The richer result types use shared names with one meaning:
+
+- `INVALID`: received data is malformed or fails a check. Examples are a bad
+  encoding, a signature that fails verification and a point off the curve.
+- `LIMIT`: a caller-supplied bound ran out. Examples are a short output
+  buffer, too little workspace or frames, an exhausted work budget, too few
+  random attempts and a `TC_TLV_limits` bound. More resources may succeed.
+- `ARGUMENT`: a caller error. Examples are a NULL pointer, a span with NULL
+  data and a nonzero length, a forbidden overlap and a parameter outside the
+  function's domain.
+- `UNSUPPORTED`: well-formed input that uses an algorithm, size, version or
+  feature outside this library or build.
+- `ERROR`: a random source, signature provider, cipher backend or internal
+  self-check failed.
+
+EC, RSA, GZIP and key challenges order their values OK, INVALID, LIMIT,
+ARGUMENT, UNSUPPORTED, ERROR, so one handler can cover them. GZIP has no ERROR.
+RSA adds `TC_RSA_IN_PROGRESS` and `TC_RSA_CANCELLED` for stepwise key
+generation. `TC_DRBG_ENTROPY` reports a failed entropy source with the DRBG
+state unchanged. `TC_TLV_END` and `TC_TLV_MORE` are reader states: no more
+siblings, or a root reader that needs more input. `TC_TLV_IO` reports backing
+storage that failed to supply bytes. `TC_X509_REVOCATION_UNDETERMINED` means
+no evidence covers a certificate. `TC_CREDENTIAL_REVOKED` and
+`TC_CREDENTIAL_UNAVAILABLE` distinguish revoked credentials from missing trust
+or evidence.
+
+UNSUPPORTED and LIMIT never report success. A validation that cannot finish
+because of an unsupported feature or an exhausted limit fails closed.
+
+## Failure state and wiping
+
+These rules hold for every public function unless its header states an
+exception:
+
+1. Each public entry checks its arguments once, before any write. An argument
+   error leaves every output, context, workspace, work budget and random
+   source unchanged. So does a capacity or work preflight that returns LIMIT
+   before processing starts.
+2. Readers and parsers write their result only on success. A failed read
+   leaves `out` unchanged.
+3. After the argument checks, a failure wipes any output that could hold
+   partial plaintext, keys or unauthenticated data. The output then holds
+   zero bytes. In-place callers lose the input.
+4. Frames, workspaces and other scratch are provisional. Any failure may
+   change them. Scratch that held secrets is wiped before return.
+5. Work budgets decrease by the work completed, on success and on failure.
+6. A final or finish call consumes its context and wipes it. A failure while
+   processing clears the context, so no partial chaining value or key stays
+   usable. `*_clear` functions always wipe and accept a NULL context.
+7. Key schedules, MAC states and stack secrets are wiped before return.
+
+Wiping is unconditional, and defining `TC_ZEROIZE` or `TC_STRICT` stops the
+build with an `#error`. `TC_secure_zero` is a best-effort wipe for
+application buffers. Copies held in CPU registers remain. Clear
+application-held keys and plaintext with `TC_secure_zero` when their lifetime
+ends, and release acquired snapshots on every exit path.
 
 ## Buffers and lifetimes
 
@@ -27,15 +113,28 @@ or copy the specific bytes your application needs to retain.
 
 Output arrays use explicit capacities. A returned length describes the bytes
 written. Spare capacity follows the operation's documented contract.
-Check each declaration for permitted in-place use and overlap restrictions.
 For key derivation, see the [HKDF guide](hkdf.md) for PRK lifetime, output
 limits, and hybrid shared-secret inputs.
 
 `TC_buffer` pairs writable `data` with byte `capacity`. `TC_random_source` pairs
 a random-fill callback with its context. Random callbacks must fill the entire
-requested buffer before returning `TC_OK`. `TC_work_budget.remaining` is a
-shared 32-bit operation allowance. Calls reduce it by work completed on success
-and failure.
+requested buffer before returning `TC_OK`.
+
+### Input stability and overlap
+
+- Keep every input stable for the duration of the call. No other thread,
+  interrupt handler or DMA transfer may write it. Some operations read an
+  input twice. GCM, CCM, EAX and EAX' decryption authenticate the ciphertext
+  and then decrypt it.
+- Keep parsed input stable while any borrowed view of it is in use.
+- Inputs may share storage with each other.
+- Outputs, contexts, workspaces and work counters must be disjoint from the
+  inputs and from each other unless the header permits in-place use. The
+  block-mode, AEAD, KMAC and MD5 functions list their permitted in-place and
+  overlap cases.
+- Checked overlaps return the module's argument error before any write. An
+  overlap that a function cannot detect, such as one through a separate
+  mapping of the same memory, is undefined behavior.
 
 ## Workspaces and limits
 
@@ -52,10 +151,91 @@ contexts and disjoint scratch can be used concurrently, subject to provider and
 storage callback requirements.
 
 Parsing limits bound input size, value size, element count and nesting depth.
-Where an operation takes a work counter, initialize it before the operation and
-reuse it across the related calls. A limit result requires an explicit application
-decision about retrying with additional resources. Work units follow the API's
-accounting rules and are independent of elapsed time.
+A limit result requires an explicit application decision about retrying with
+additional resources.
+
+## Work budgets
+
+Operations that can run long take an explicit work budget. Two types exist,
+with different units.
+
+`TC_work_budget` holds a `uint32_t remaining` count of algorithm units. EC,
+RSA and key challenges take it, usually inside an execution descriptor.
+
+- EC: one unit per curve bit for each scalar multiplication or modular
+  inversion, and one unit per point validation and random request.
+  `TC_EC_operation_work(curve, operation)` returns the exact cost of one
+  operation or one attempt of a randomized operation.
+- RSA: modular operations and encoding comparisons. `TC_RSA_public_work`,
+  `TC_RSA_private_work`, `TC_RSA_encode_v15_work`, `TC_RSA_encode_pss_work`,
+  `TC_RSA_oaep_work`, `TC_RSA_VALIDATE_WORK` and `TC_RSA_KEYGEN_STEP_WORK`
+  give the exact or sufficient costs. See [RSA work budgets](rsa.md#work-budgets).
+- These operations check their full cost before arithmetic or any random
+  request. A short budget returns LIMIT with outputs, work and the random
+  source unchanged.
+
+`size_t* work` is a remaining count of processing units for parsing and
+validation. X.509, CMS, CRL, OCSP, path validation, credential validation,
+LDS, PIV card identifiers, PIV CVC chains, SM authentication and GZIP take it.
+
+- A unit is one byte examined or one element, candidate, comparison or
+  decoding step. Each header names what its function charges, such as
+  traversed bytes, digest input or table entries.
+- Charges are incremental. A charge larger than the remaining budget returns
+  the module's LIMIT value, and no later step runs. The PKI modules then set
+  `*work` to zero. GZIP leaves the unspent remainder in `*work`.
+- Signature verification inside these APIs first charges one unit plus the
+  signed bytes, signature and key encoding, then the provider consumes its own
+  work and never increases it. The native provider reserves
+  `TC_X509_native_workspace.signature_work` for each attempt, and
+  `TC_X509_NATIVE_DEFAULT_SIGNATURE_WORK` covers the supported curves and RSA
+  sizes with ordinary exponents.
+- Share one counter across related calls, such as the init and next calls of
+  a reader or the steps of one credential decision, so the whole operation has
+  one bound.
+
+Size a `size_t` budget from the input size and the number of passes. Start
+with a few times the total input bytes plus one signature reservation per
+signature the operation can check, then tune it against the largest inputs the
+application accepts. Work units are independent of elapsed time.
+
+## Naming and argument order
+
+Public C names start with `TC_` and a module prefix, such as `TC_AES_`,
+`TC_X509_` or `TC_PIV_SM_`. Types use a lowercase noun after the prefix, such
+as `TC_X509_certificate` and `TC_EC_workspace`. Enumerators and macros are
+uppercase. Configuration macros are `TC_ENABLE_*` for a module and
+`TC_<MODULE>_ENABLE_*` for a mode or variant. The matching CMake options start
+with `TINY_CRYPTO_`. C++ wrappers use lowercase functions and classes named
+for the algorithm in namespace `tiny_crypto`.
+
+Function names end with the operation:
+
+- `init`, `update`, `final` or `finish`, and `ctx_clear` or `clear` for
+  stateful contexts. `set_iv` loads an IV for the next message.
+- `read` parses one object into borrowed views. `next` returns the next item
+  from a reader, and `END` reports the end.
+- `write` and `encode` produce an encoding into a caller buffer.
+- `verify` checks a signature, MAC or tag. `validate` applies a policy or a
+  complete path, key or credential check. `check` tests one property or one
+  kind of evidence, such as revocation.
+- `_work`, `_size`, `_BYTES` and `_WORDS` return the cost or storage a call
+  needs, so callers can size budgets and buffers before the call.
+- `_short_tag` selects tag lengths below the default minimum.
+
+Arguments follow the operation:
+
+1. The context, session or reader, when the call has one.
+2. Configuration: algorithm, profile, options or policy.
+3. Inputs, as `TC_bytes` spans or input structures.
+4. For parsers and validators: limits, frames, workspace and the `size_t`
+   work counter, then the output last.
+5. For cryptographic one-shots: outputs after the inputs. EC and RSA then take
+   the workspace and the `TC_work_budget` or execution descriptor last.
+
+A call that needs more than eight parameters takes a `*_request` structure
+and a context, such as `TC_CMS_validation_request` with a
+`TC_validation_context`. No public function takes more than eight parameters.
 
 ## Parsing, signatures and trust
 
@@ -73,29 +253,7 @@ revocation are part of the application. `<tiny_crypto/validation.h>` adds the
 shared arena and policy context for complete CMS and X.509 validation. Both
 validation headers are selected by `TINY_CRYPTO_ENABLE_CMS_VALIDATION`.
 
-`<tiny_crypto/x509_ocsp.h>` encodes bounded OCSP requests and verifies complete
-DER OCSP responses, including stapled responses. Supply the certificate and its
-issuer from a validated path, a signature provider, a `TC_X509_revocation_time`
-and a `TC_X509_path_workspace`. The BasicOCSPResponse inside the response is
-parsed under the same `TC_TLV_limits` as the outer response. A delegated
-responder is validated as a one-certificate path below the issuer with the
-OCSPSigning purpose. `responder_certificate` then borrows its certificate and
-`responder_nocheck` reports `id-pkix-ocsp-nocheck`. Without nocheck, the caller
-establishes the delegate's revocation status (RFC 6960 4.2.2.2.1).
-`TC_X509_ocsp_request_encode` reports the required size with `TC_TLV_LIMIT`
-for a short or empty buffer. OCSP requires SHA-1.
-
-`TC_X509_ocsp_response_verify` returns `TC_TLV_OK` only for an authenticated,
-fresh GOOD or REVOKED status, with the CRLReason when the response has one. An
-authenticated unknown status and the unsigned error responses (internalError,
-tryLater, sigRequired, unauthorized) return `TC_TLV_UNSUPPORTED`. CRL and OCSP
-results share `TC_X509_revocation_status` and the freshness rule of
-`TC_X509_revocation_time`. `TC_X509_path_check_revocation` accepts one OCSP
-response per path member and falls back to CRLs for a member without an
-accepted response. It accepts a delegate without nocheck only when the CRL
-index proves that delegate unrevoked. The CMS and credential validation APIs
-use CRL evidence only. See [X.509 OCSP](x509-ocsp.md) for request encoding,
-responder authorization, workspace sizing and the example.
+See [Revocation](#revocation) for CRL and OCSP evidence.
 
 PIV/TWIC object policy and the final access decision require their own checks.
 Select compatibility options explicitly, including TWIC signed/unsigned CHUID
@@ -161,12 +319,9 @@ authorization.
 
 ## Results and cleanup
 
-Use the named results for the operation you called. `TC_status`, parser results,
-signature results and credential verdicts have distinct contracts. Compare
-against the exact success or acceptance enumerator. Avoid treating a result as
-a Boolean or converting between enums numerically.
-
-Setup helpers return `TC_result`. Successful setup returns `TC_RESULT_OK`.
+Use the named results for the operation you called. See the
+[result model](#result-model). Setup helpers return `TC_result`, and successful
+setup returns `TC_RESULT_OK`.
 
 Handle malformed input, unsupported algorithms, exhausted limits and unavailable
 evidence explicitly. A successful parse supplies structure for later checks.
@@ -176,9 +331,39 @@ Accept a credential only after every required authentication and policy check
 has succeeded.
 
 Public declarations specify which outputs survive failure and which scratch or
-work counters may change. Secret-producing operations also specify wiping
-behavior. Clear application-held keys and plaintext with `TC_secure_zero` when
-their lifetime ends. Release acquired snapshots on every exit path.
+work counters may change, following the
+[failure and wipe rules](#failure-state-and-wiping).
+
+## Revocation
+
+CRL and OCSP evidence share `TC_X509_revocation_status` and the freshness rule
+of `TC_X509_revocation_time`. `TC_X509_path_check_revocation` checks a
+validated path, anchor-issued certificate first and target last. See
+[X.509 path revocation](x509-revocation.md) for configuration and results.
+
+`<tiny_crypto/x509_ocsp.h>` encodes bounded OCSP requests and verifies complete
+DER OCSP responses, including stapled responses. Supply the certificate and its
+issuer from a validated path, a signature provider, a `TC_X509_revocation_time`
+and a `TC_X509_path_workspace`. The BasicOCSPResponse inside the response is
+parsed under the same `TC_TLV_limits` as the outer response. A delegated
+responder is validated as a one-certificate path below the issuer with the
+OCSPSigning purpose. `responder_certificate` then borrows its certificate and
+`responder_nocheck` reports `id-pkix-ocsp-nocheck`. Without nocheck, the caller
+establishes the delegate's revocation status (RFC 6960 4.2.2.2.1).
+`TC_X509_ocsp_request_encode` reports the required size with `TC_TLV_LIMIT`
+for a short or empty buffer. OCSP requires SHA-1.
+
+`TC_X509_ocsp_response_verify` returns `TC_TLV_OK` only for an authenticated,
+fresh GOOD or REVOKED status, with the CRLReason when the response has one. An
+authenticated unknown status and the unsigned error responses (internalError,
+tryLater, sigRequired, unauthorized) return `TC_TLV_UNSUPPORTED`. CRL and OCSP
+results share `TC_X509_revocation_status` and the freshness rule of
+`TC_X509_revocation_time`. `TC_X509_path_check_revocation` accepts one OCSP
+response per path member and falls back to CRLs for a member without an
+accepted response. It accepts a delegate without nocheck only when the CRL
+index proves that delegate unrevoked. The CMS and credential validation APIs
+use CRL evidence only. See [X.509 OCSP](x509-ocsp.md) for request encoding,
+responder authorization, workspace sizing and the example.
 
 ## Authenticated encryption
 
@@ -261,94 +446,9 @@ if (status != TC_OK)
 
 ## C++ wrappers
 
-The C++11 wrappers in `tiny_crypto` return the C result types. Every call that
-returns a status, result enumerator, size or work value is marked
-`[[nodiscard]]` in C++17 and `warn_unused_result` on GCC and Clang in C++11.
-Build with `-Wunused-result` enabled (the default on GCC and Clang) so a
-discarded verification or cipher result is reported. Wrapper calls are
-`noexcept`, allocate nothing and need no standard library.
-
-Keys, IVs, AAD, messages and received tags are `bytes` spans. Outputs are
-`buffer` spans or fixed-size C arrays whose size is part of the type. Array
-overloads deduce the span length. Two kinds of call take a pointer. Block-mode
-calls (`encrypt_cbc`, `xcrypt_ctr` and the others), `AES_dynamic` CBC and
-`GCM::encrypt_update` transform a caller buffer in place and take a pointer and
-length or an array. `encrypt_ecb` and `decrypt_ecb` transform one block in
-place. The wrappers check key and IV lengths before the C call. A wrong length
-returns `TC_ERROR`. Every argument error leaves outputs unchanged.
-
-`tiny_crypto::ct_equal(a, b)` compares two `bytes` spans. It returns `TC_OK`
-for equal contents and lengths, `TC_MISMATCH` when the contents or the lengths
-differ, and `TC_ERROR` for a span with NULL data and a nonzero length. Lengths
-are public. Timing depends on the shorter length and is independent of content.
-
-Cipher, hash and MAC classes own their C context, clear it on destruction and
-delete their copy operations. Each follows init, update, finish or clear:
-
-| Class | Key | finish |
-| --- | --- | --- |
-| `AES` | `TC_AES_KEYLEN` bytes, optional 16-byte IV | none |
-| `GCM` | `TC_AES_KEYLEN` bytes and an IV | `encrypt_finish` writes `tag_length()` bytes and consumes the key |
-| `AES_CMAC` | `TC_AES_KEYLEN` bytes | writes a 16-byte tag and consumes the key |
-| `AES_dynamic`, `AES_dynamic_CMAC` | 16, 24 or 32 bytes | `final` writes a 16-byte tag and consumes the key |
-| `DES` | 8 bytes, or 16 or 24 with TDEA, optional 8-byte IV | none |
-| `DES_CMAC` | 8, 16 or 24 bytes | writes an 8-byte tag and consumes the key |
-| `DES_ISO9797` | algorithm, padding and 16 or 24 bytes | writes the 8-byte MAC and consumes the key |
-| HMAC classes | any length | writes `tag_size` bytes and consumes the key |
-| Hash classes | none | writes the digest and starts the next message |
-
-A default-constructed object, a failed `init`, a completed finish and `clear`
-all leave a keyed object unkeyed. Later update and finish calls return
-`TC_ERROR` until the next successful `init`. `clear` wipes the key schedule
-early, for example after an abandoned message. Compare a received tag with a
-`*_verify` wrapper or `tiny_crypto::ct_equal`, which run in constant time.
-
-Hash, HMAC, MD5 and KMAC256 inputs are `TC_bytes` spans in C and `bytes` in
-C++. Fixed-length digests and full HMAC tags go to digest-sized arrays. A
-one-shot HMAC writes `tag.capacity` bytes, from `TC_HMAC_MIN_TAG_LEN` to the
-digest length, and verification compares `tag.length` bytes. KMAC256 writes
-`out.capacity` bytes, and that length is part of the MAC input.
-
-```c
-uint8_t tag[16];
-TC_status status = TC_HMAC_SHA256_digest((TC_bytes){key, sizeof key},
-                                         (TC_bytes){message, message_length},
-                                         (TC_buffer){tag, sizeof tag});
-if (status != TC_OK)
-  return status; /* tag is unchanged */
-```
-
-The one-shot MAC wrappers are `aes_cmac`, `des_cmac` and `des_iso9797_mac`,
-each with `*_verify`, `*_short_tag` and `*_verify_short_tag` forms. They take
-the key, message and tag as spans and follow the [tag length](#tag-lengths)
-rules of their C functions. The one-shot GCM, CCM, EAX, EAX' and SIV wrappers
-take the key as `bytes`. GCM, CCM, EAX and EAX' need `TC_AES_KEYLEN` bytes and
-SIV needs `TC_AES_SIV_KEYLEN`. `GCM` streams encryption only. Decrypt GCM with
-`gcm_decrypt` or `gcm_decrypt_short_tag`, which verify the tag before any
-plaintext is released.
-
-```cpp
-#include <tiny_crypto/des.hpp>
-
-/* Check a retail MAC (ISO/IEC 9797-1 algorithm 3) received with a message. */
-bool retail_mac_valid(const uint8_t (&key)[16], tiny_crypto::bytes message,
-                      const uint8_t (&received)[TC_DES_BLOCKLEN])
-{
-  tiny_crypto::DES_ISO9797 mac;
-  uint8_t computed[TC_DES_BLOCKLEN];
-  if (mac.init(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, key) != TC_OK ||
-      mac.update(message) != TC_OK || mac.finish(computed) != TC_OK)
-    return false; /* The destructor wipes the key schedule. */
-  const bool valid = tiny_crypto::ct_equal({computed, sizeof computed},
-                                           {received, sizeof received}) == TC_OK;
-  TC_secure_zero(computed, sizeof computed);
-  return valid;
-}
-```
-
-For a single buffer, `des_iso9797_verify(TC_DES_ISO9797_ALG3,
-TC_DES_ISO9797_PAD2, {key, 16}, message, {received, 8})` does the same in one
-call and returns `TC_OK`, `TC_MISMATCH` or `TC_ERROR`.
+The C++11 wrappers in namespace `tiny_crypto` return the C result types, take
+`bytes` and `buffer` spans, and own and wipe their contexts. See
+[C++ wrappers](cpp.md) for conventions, lifecycles and examples.
 
 ## Block cipher modes
 
@@ -486,5 +586,9 @@ int main(void)
 - [TWIC cancellation lists](twic-ccl.md) covers import, lookup and freshness.
 - [Credential reader](credential-reader.md) describes the supported card checks.
 - [GZIP decoding](gzip.md) shows bounded output and caller-owned scratch.
+- [TLV parsing](tlv.md) and [DER values](der.md) cover bounded readers.
+- [HKDF](hkdf.md), [DRBG](drbg.md), [RSA](rsa.md) and
+  [elliptic curves](ec.md) cover the cryptographic modules.
+- [C++ wrappers](cpp.md) covers the C++11 API.
 
 Run the [documented test suites](testing.md) for the features your build enables.

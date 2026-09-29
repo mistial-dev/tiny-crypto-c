@@ -1,4 +1,10 @@
-/* SPDX-License-Identifier: GPL-2.0-or-later */
+/* SPDX-FileCopyrightText: Mistial Dev
+ * SPDX-License-Identifier: GPL-2.0-or-later */
+/* KMAC256 with a caller-chosen output length and customization string.
+ * Standards: SP 800-185 section 4.
+ * Configuration: TC_ENABLE_KMAC256.
+ * Limitations: fixed-output KMAC256 only.
+ * Contracts: docs/api.md. */
 #ifndef TINY_CRYPTO_KMAC_H_
 #define TINY_CRYPTO_KMAC_H_
 

@@ -1,5 +1,12 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* PIV biometric record readers: INCITS 378 fingerprint minutiae and
+ * INCITS 385 facial images under the PIV and TWIC profiles.
+ * Standards: SP 800-76-2, INCITS 378-2004, INCITS 385-2004.
+ * Configuration: TC_ENABLE_PIV_OBJECTS.
+ * Limitations: structural validation only. Matching belongs to the
+ * application. Iris records are unsupported.
+ * Contracts: docs/api.md. */
 #ifndef TINY_CRYPTO_PIV_BIOMETRIC_H_
 #define TINY_CRYPTO_PIV_BIOMETRIC_H_
 #include <tiny_crypto/tlv.h>

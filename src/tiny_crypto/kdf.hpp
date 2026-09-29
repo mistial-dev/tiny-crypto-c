@@ -2,6 +2,9 @@
  * SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
+/* KBKDF wrappers for kdf.h.
+ * Contracts, statuses and lifetimes follow the C header. Conventions:
+ * docs/cpp.md. Library-wide contracts: docs/api.md. */
 #ifndef TINY_CRYPTO_KDF_HPP_
 #define TINY_CRYPTO_KDF_HPP_
 

@@ -1,5 +1,14 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* DER value readers: INTEGER, BIT STRING, OBJECT IDENTIFIER, BOOLEAN, NULL,
+ * SEQUENCE, SET and the AlgorithmIdentifier, SubjectPublicKeyInfo, PKCS #1,
+ * PKCS #8 and ECDSA-Sig-Value structures.
+ * Standards: ITU-T X.690 (02/2021) clauses 8 and 10-11, RFC 5280, RFC 8017,
+ * RFC 5958, RFC 3279.
+ * Configuration: TC_ENABLE_DER, which requires TC_ENABLE_TLV.
+ * Limitations: readers check encodings. Schema, key and signature
+ * validation are separate steps. No encoders.
+ * Contracts: docs/api.md. Guide: docs/der.md. */
 #ifndef TINY_CRYPTO_DER_H_
 #define TINY_CRYPTO_DER_H_
 #include <tiny_crypto/tlv.h>
@@ -16,25 +25,39 @@ extern "C" {
  *   UNSUPPORTED a recognised version that this reader does not handle.
  *   ARGUMENT    a NULL output, or a span with NULL data and a nonzero length.
  * Outputs are unchanged on every failure. END and MORE are never returned. */
+/* INTEGER as its two's-complement contents (X.690 section 8.3). A needed sign
+ * octet stays in the span. negative is 1 for a negative value. */
 TC_TLV_result TC_DER_integer(TC_bytes encoded, TC_bytes* twos_complement, int* negative);
-/* Strictly positive INTEGER as a borrowed unsigned magnitude. */
+/* Strictly positive INTEGER as a borrowed unsigned magnitude without the sign
+ * octet. Zero and negative values return INVALID. */
 TC_TLV_result TC_DER_positive_integer(TC_bytes encoded, TC_bytes* magnitude);
 /* Validate an IMPLICIT INTEGER's contents without limiting its width or sign. */
 TC_TLV_result TC_DER_integer_contents(TC_bytes contents);
+/* Nonnegative INTEGER that fits a uint32_t. Negative values return INVALID and
+ * values above UINT32_MAX return LIMIT. */
 TC_TLV_result TC_DER_uint32(TC_bytes encoded, uint32_t* out);
 /* Contents-only form for an IMPLICIT-tagged nonnegative INTEGER.
  * DER sign/minimality rules still apply. Values above UINT32_MAX return LIMIT. */
 TC_TLV_result TC_DER_uint32_contents(TC_bytes contents, uint32_t* out);
+/* BIT STRING payload after the initial octet, and its unused-bit count. The
+ * count is 0..7, 0 for an empty payload, and the unused bits must be zero
+ * (X.690 sections 8.6.2 and 11.2). */
 TC_TLV_result TC_DER_bit_string(TC_bytes encoded, TC_bytes* bits, unsigned* unused);
-/* OID contents remain encoded, so arcs of any size need no integer conversion. */
+/* OBJECT IDENTIFIER contents with minimal base-128 subidentifiers (X.690
+ * section 8.19). The contents remain encoded, so arcs of any size need no
+ * integer conversion. */
 TC_TLV_result TC_DER_oid(TC_bytes encoded, TC_bytes* oid);
 /* Contents-only form for an IMPLICIT-tagged OBJECT IDENTIFIER. */
 TC_TLV_result TC_DER_oid_contents(TC_bytes contents);
+/* BOOLEAN with one contents octet, 00 or FF (X.690 section 11.1). out is 0 or
+ * 1. */
 TC_TLV_result TC_DER_boolean(TC_bytes encoded, int* out);
+/* NULL with empty contents. */
 TC_TLV_result TC_DER_null(TC_bytes encoded);
+/* SEQUENCE or SET contents octets, unparsed. The caller reads the members and
+ * checks SET OF sorting and schema-dependent SET/DEFAULT rules. */
 TC_TLV_result TC_DER_sequence(TC_bytes encoded, TC_bytes* contents);
 TC_TLV_result TC_DER_set(TC_bytes encoded, TC_bytes* contents);
-/* The caller checks SET OF sorting and schema-dependent SET/DEFAULT rules. */
 
 typedef struct {
   TC_bytes oid;

@@ -1,5 +1,11 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* Bounded GZIP decompression of complete members with CRC32 and ISIZE checks.
+ * Standards: RFC 1952 (GZIP), RFC 1951 (DEFLATE).
+ * Configuration: TC_ENABLE_GZIP.
+ * Limitations: complete input only. The output buffer holds the whole
+ * decoded result and doubles as back-reference history.
+ * Contracts: docs/api.md, including its size_t work units. Guide: docs/gzip.md. */
 #ifndef TINY_CRYPTO_GZIP_H_
 #define TINY_CRYPTO_GZIP_H_
 #include <tiny_crypto/common.h>

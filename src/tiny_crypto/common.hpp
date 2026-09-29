@@ -2,6 +2,9 @@
  * SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
+/* Shared C++ types: bytes, buffer, ct_equal and TC_CPP_NODISCARD.
+ * Contracts, statuses and lifetimes follow the C header. Conventions:
+ * docs/cpp.md. Library-wide contracts: docs/api.md. */
 #ifndef TINY_CRYPTO_COMMON_HPP_
 #define TINY_CRYPTO_COMMON_HPP_
 

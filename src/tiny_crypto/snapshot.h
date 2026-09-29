@@ -1,5 +1,9 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* Snapshot slot states shared by the certificate store and TWIC canceled
+ * card lists: prepare, publish, acquire, release and retire.
+ * Limitations: the caller serializes store calls with its own lock.
+ * Contracts: docs/api.md. Guide: docs/x509-store.md. */
 #ifndef TINY_CRYPTO_SNAPSHOT_H_
 #define TINY_CRYPTO_SNAPSHOT_H_
 

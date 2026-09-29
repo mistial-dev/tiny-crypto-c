@@ -1,5 +1,12 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* X.509 certification path validation against an explicit trust anchor, and
+ * path discovery from a certificate store.
+ * Standards: RFC 5280 section 6, RFC 5937.
+ * Configuration: TC_ENABLE_X509_PATH.
+ * Limitations: revocation is in x509_revocation.h.
+ * Contracts: docs/api.md, including its size_t work units.
+ * Guide: docs/x509-path.md. */
 #ifndef TINY_CRYPTO_X509_PATH_H_
 #define TINY_CRYPTO_X509_PATH_H_
 #include <tiny_crypto/x509.h>

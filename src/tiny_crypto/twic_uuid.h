@@ -1,5 +1,9 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* TWIC NEXGEN card UUID readers, writers and FASC-N comparison.
+ * Standards: TWIC Part 2 v5 appendix D.
+ * Configuration: TC_ENABLE_TWIC_UUID, which requires TC_ENABLE_FASCN.
+ * Contracts: docs/api.md. */
 #ifndef TINY_CRYPTO_TWIC_UUID_H_
 #define TINY_CRYPTO_TWIC_UUID_H_
 #include <tiny_crypto/fascn.h>

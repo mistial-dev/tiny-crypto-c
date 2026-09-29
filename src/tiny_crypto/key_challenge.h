@@ -1,5 +1,13 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* Public-key proof-of-possession challenges: fresh random challenges and
+ * verification of the signed response under a validated public key.
+ * Standards: FIPS 186-5, RFC 8017 signature schemes.
+ * Configuration: TC_ENABLE_KEY_CHALLENGE, with RSA from TC_ENABLE_RSA.
+ * Limitations: card commands, slot policy and transport identifiers belong
+ * to protocol code.
+ * Contracts: docs/api.md, including its TC_work_budget units.
+ * Guide: docs/credential-reader.md. */
 #ifndef TINY_CRYPTO_KEY_CHALLENGE_H_
 #define TINY_CRYPTO_KEY_CHALLENGE_H_
 #include <tiny_crypto/x509.h>

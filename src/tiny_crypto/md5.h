@@ -1,5 +1,11 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* MD5 for legacy download checksums.
+ * Standards: RFC 1321.
+ * Configuration: TC_ENABLE_MD5.
+ * Limitations: MD5 has broken collision resistance. Establish authenticity
+ * through trusted transport or provisioning.
+ * Contracts: docs/api.md. Guide: docs/md5.md. */
 #ifndef TINY_CRYPTO_MD5_H_
 #define TINY_CRYPTO_MD5_H_
 #include <tiny_crypto/common.h>

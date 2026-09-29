@@ -1,5 +1,10 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* Stepwise CRL preparation from a byte source: bounded reads, parsing and a
+ * prepared lookup structure.
+ * Standards: RFC 5280 section 5.
+ * Configuration: TC_ENABLE_X509_REVOCATION.
+ * Contracts: docs/api.md. Guide: docs/x509-crl.md. */
 #ifndef TINY_CRYPTO_X509_CRL_SOURCE_H_
 #define TINY_CRYPTO_X509_CRL_SOURCE_H_
 #include <tiny_crypto/source.h>

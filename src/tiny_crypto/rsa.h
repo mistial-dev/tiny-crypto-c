@@ -1,5 +1,13 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* RSA public and private-key operations: PKCS #1 v1.5 and PSS signatures,
+ * OAEP, raw operations, key validation, CRT derivation and stepwise key
+ * generation.
+ * Standards: RFC 8017, FIPS 186-5 appendices A.1 and C.
+ * Configuration: TC_ENABLE_RSA and TC_RSA_SMALL.
+ * Limitations: two-prime keys of 1024, 2048, 3072 or 4096 bits.
+ * Contracts: docs/api.md, including its TC_work_budget units.
+ * Guide: docs/rsa.md. */
 #ifndef TINY_CRYPTO_RSA_H_
 #define TINY_CRYPTO_RSA_H_
 #include <tiny_crypto/common.h>

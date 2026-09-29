@@ -1,5 +1,10 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* RFC 5914 TrustAnchorList reader.
+ * Standards: RFC 5914, RFC 5937.
+ * Configuration: TC_ENABLE_TRUST_ANCHOR_FORMAT and the TC_TAF_ENABLE_*
+ * choices.
+ * Contracts: docs/api.md. Guide: docs/x509-trust-anchors.md. */
 #ifndef TINY_CRYPTO_X509_TRUST_ANCHOR_H_
 #define TINY_CRYPTO_X509_TRUST_ANCHOR_H_
 #include <tiny_crypto/x509_store.h>

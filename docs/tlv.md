@@ -42,8 +42,9 @@ Errors leave `object` unchanged. Frame scratch may change.
 `object.encoded` includes the whole object, including its end-of-contents bytes
 when present. `object.value` excludes the outer header and end-of-contents bytes.
 For an indefinite object, take its content size from `value.length`.
-`header.length` holds the encoded length field, which the indefinite form omits. To require exactly one object, also check that
-`encoded.length` equals the input length.
+`header.length` holds the encoded length field, which the indefinite form
+omits. To require exactly one object, also check that `encoded.length` equals
+the input length.
 
 ## Sibling readers
 
@@ -114,5 +115,5 @@ header or EOC split across two chunks is delivered from stream storage and is
 valid only during the callback.
 
 These APIs check framing only. A DER-framed object can still contain
-an invalid INTEGER, unordered SET, or missing certificate field. Use typed DER
-and object parsers for those checks.
+an invalid INTEGER, unordered SET, or missing certificate field. Use the typed
+[DER readers](der.md) and object parsers for those checks.

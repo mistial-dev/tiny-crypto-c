@@ -1,3 +1,7 @@
+<!-- SPDX-FileCopyrightText: Mistial Dev -->
+
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
+
 # PIV secure messaging
 
 `<tiny_crypto/piv_sm.h>` implements the client application side of PIV secure

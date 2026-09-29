@@ -1,5 +1,10 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* Certificate store: published certificate sources, trust anchors with path
+ * controls, snapshot lifetimes and anchors built from root certificates.
+ * Standards: RFC 5914 section 2.5, RFC 5937.
+ * Configuration: TC_ENABLE_X509_PATH.
+ * Contracts: docs/api.md. Guide: docs/x509-store.md. */
 #ifndef TINY_CRYPTO_X509_STORE_H_
 #define TINY_CRYPTO_X509_STORE_H_
 #include <tiny_crypto/x509.h>

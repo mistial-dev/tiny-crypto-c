@@ -1,5 +1,11 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* PIV and TWIC security object container reader: data-group mapping and the
+ * CMS value.
+ * Standards: SP 800-73-5 Part 1.
+ * Configuration: TC_ENABLE_PIV_OBJECTS.
+ * Limitations: schema checks only. Authenticate the CMS before using the map.
+ * Contracts: docs/api.md. */
 #ifndef TINY_CRYPTO_PIV_SECURITY_H
 #define TINY_CRYPTO_PIV_SECURITY_H
 #include <tiny_crypto/tlv.h>

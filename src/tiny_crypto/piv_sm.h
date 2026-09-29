@@ -1,5 +1,13 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* Client-side PIV secure messaging: key establishment, key confirmation and
+ * command and response protection for cipher suites 2 and 7.
+ * Standards: SP 800-73-5 Part 2 section 4, SP 800-56A Rev. 3, SP 800-38B.
+ * Configuration: TC_ENABLE_PIV_SM, TC_PIV_SM_ENABLE_CS2 and
+ * TC_PIV_SM_ENABLE_CS7.
+ * Limitations: APDU framing, chaining and status words belong to the
+ * application. CVC authentication is in piv_sm_authenticate.h.
+ * Contracts: docs/api.md. Guide: docs/piv-sm.md. */
 #ifndef TINY_CRYPTO_PIV_SM_H_
 #define TINY_CRYPTO_PIV_SM_H_
 #include <tiny_crypto/aes_dynamic.h>

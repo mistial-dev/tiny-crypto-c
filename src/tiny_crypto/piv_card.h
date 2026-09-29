@@ -1,5 +1,10 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* Card identifiers from the card-authentication certificate: FASC-N, card
+ * UUID and cardholder UUID in the subjectAltName, per PIV or TWIC profile.
+ * Standards: FIPS 201-3, SP 800-73-5 Part 1, TWIC Part 2 v5.
+ * Configuration: TC_ENABLE_PIV_OBJECTS.
+ * Contracts: docs/api.md, including its size_t work units. */
 #ifndef TINY_CRYPTO_PIV_CARD_H_
 #define TINY_CRYPTO_PIV_CARD_H_
 #include <tiny_crypto/piv_oid.h>

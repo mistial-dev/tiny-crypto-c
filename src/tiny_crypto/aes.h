@@ -2,6 +2,15 @@
  * SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
+/* AES block cipher and modes: CTR, CBC, ECB, OFB, GCM, CCM, EAX, EAX', SIV
+ * and CMAC with a key size fixed by TC_AES_KEY_BITS.
+ * Standards: FIPS 197, SP 800-38A (CTR, CBC, ECB, OFB), SP 800-38B (CMAC),
+ * SP 800-38C (CCM), SP 800-38D (GCM), RFC 5297 (SIV), ANSI C12.22 (EAX').
+ * Configuration: TC_ENABLE_AES, TC_AES_KEY_BITS, TC_AES_ENABLE_* per mode,
+ * TC_AES_SBOX_MODE, TC_AES_GCM_GHASH_MODE, TC_AES_TINY and TC_MIN_TAG_LEN.
+ * Limitations: GCM streams encryption only. The fast S-box and fast-table
+ * GHASH have no cache-timing protection.
+ * Contracts: docs/api.md, including its AEAD, tag-length and block-mode rules. */
 #ifndef TINY_CRYPTO_AES_H_
 #define TINY_CRYPTO_AES_H_
 

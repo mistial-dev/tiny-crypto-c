@@ -1,5 +1,11 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* Elliptic-curve operations on P-192, P-256 and P-384: key generation,
+ * public-key derivation and validation, ECDH and ECDSA.
+ * Standards: FIPS 186-5, SP 800-186, SP 800-56A Rev. 3, SEC 1.
+ * Configuration: TC_ENABLE_EC, TC_EC_ENABLE_P192/P256/P384 and TC_EC_SMALL.
+ * Limitations: uncompressed SEC 1 points only. P-192 is off by default.
+ * Contracts: docs/api.md, including its TC_work_budget units. Guide: docs/ec.md. */
 #ifndef TINY_CRYPTO_EC_H_
 #define TINY_CRYPTO_EC_H_
 #include <tiny_crypto/common.h>

@@ -1,4 +1,8 @@
-/* SPDX-License-Identifier: GPL-2.0-or-later */
+/* SPDX-FileCopyrightText: Mistial Dev
+ * SPDX-License-Identifier: GPL-2.0-or-later */
+/* The KMAC256 class for kmac.h.
+ * Contracts, statuses and lifetimes follow the C header. Conventions:
+ * docs/cpp.md. Library-wide contracts: docs/api.md. */
 #ifndef TINY_CRYPTO_KMAC_HPP_
 #define TINY_CRYPTO_KMAC_HPP_
 #ifndef __cplusplus
@@ -8,6 +12,12 @@
 #include <tiny_crypto/common.hpp>
 #if TC_ENABLE_KMAC256
 namespace tiny_crypto {
+/* Streaming KMAC256. init takes a key and an optional customization string.
+ * final writes out.capacity bytes, a length that is part of the MAC input,
+ * and consumes the key. final and clear leave the object unkeyed, and update
+ * and final then return TC_ERROR until the next successful init. A rejected
+ * init leaves the object unchanged. Compare a received tag with
+ * tiny_crypto::ct_equal. The destructor clears the context. */
 class KMAC256 {
   TC_KMAC256_ctx ctx_{};
 

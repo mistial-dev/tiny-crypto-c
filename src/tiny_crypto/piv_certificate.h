@@ -1,5 +1,11 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* PIV certificate container reader: certificate, optional secure-messaging
+ * intermediate CVC and MSCUID, with optional GZIP compression.
+ * Standards: SP 800-73-5 Part 1.
+ * Configuration: TC_ENABLE_PIV_OBJECTS.
+ * Limitations: the MSCUID lies outside the signed certificate.
+ * Contracts: docs/api.md. */
 #ifndef TINY_CRYPTO_PIV_CERTIFICATE_H_
 #define TINY_CRYPTO_PIV_CERTIFICATE_H_
 #include <tiny_crypto/tlv.h>

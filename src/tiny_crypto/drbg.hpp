@@ -1,8 +1,10 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later
- *
- * C++ wrapper for the SP 800-90A DRBGs. The object owns one TC_DRBG and
- * uninstantiates it on destruction. Results are the C TC_DRBG_result values. */
+ */
+/* C++ wrapper for the SP 800-90A DRBGs. The drbg object owns one TC_DRBG and
+ * uninstantiates it on destruction. Results are the C TC_DRBG_result values.
+ * Contracts, statuses and lifetimes follow drbg.h. Conventions: docs/cpp.md.
+ * Library-wide contracts: docs/api.md. */
 #ifndef TINY_CRYPTO_DRBG_HPP_
 #define TINY_CRYPTO_DRBG_HPP_
 

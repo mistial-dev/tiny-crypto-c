@@ -12,7 +12,10 @@
  * strong as that source.
  *
  * All storage is caller-owned. A TC_DRBG holds the working state and the
- * scratch space its operations need, so calls use little stack. */
+ * scratch space its operations need, so calls use little stack.
+ *
+ * Configuration: TC_ENABLE_DRBG and TC_DRBG_ENABLE_HASH, _HMAC and _CTR.
+ * Contracts: docs/api.md. Guide: docs/drbg.md. */
 #ifndef TINY_CRYPTO_DRBG_H_
 #define TINY_CRYPTO_DRBG_H_
 

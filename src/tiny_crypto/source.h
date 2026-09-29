@@ -1,5 +1,9 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* Random-access byte sources for CRL preparation: a read callback over
+ * files or flash.
+ * Configuration: TC_ENABLE_X509_REVOCATION.
+ * Contracts: docs/api.md. Guide: docs/x509-crl.md. */
 #ifndef TINY_CRYPTO_SOURCE_H_
 #define TINY_CRYPTO_SOURCE_H_
 

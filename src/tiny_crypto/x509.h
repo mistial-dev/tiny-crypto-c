@@ -1,5 +1,13 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* X.509 certificate and public-key readers, extension decoders, name
+ * handling and signature verification through a provider.
+ * Standards: RFC 5280, RFC 5480, RFC 4055, RFC 8017.
+ * Configuration: TC_ENABLE_X509, which requires TC_ENABLE_DER.
+ * Limitations: readers parse DER. Trust, validity and revocation are
+ * separate steps.
+ * Contracts: docs/api.md, including its size_t work units.
+ * Guide: docs/x509-path.md. */
 #ifndef TINY_CRYPTO_X509_H_
 #define TINY_CRYPTO_X509_H_
 #include <tiny_crypto/key.h>

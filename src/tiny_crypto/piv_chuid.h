@@ -1,5 +1,12 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* Card Holder Unique Identifier reader for the PIV, signed and unsigned TWIC,
+ * and legacy key-map profiles.
+ * Standards: SP 800-73-4 Part 1 Table 9, SP 800-73-2 Part 1 Table 8,
+ * TWIC Part 2 v5.
+ * Configuration: TC_ENABLE_PIV_CHUID.
+ * Limitations: parsing only. credential.h authenticates the signature.
+ * Contracts: docs/api.md. */
 #ifndef TINY_CRYPTO_PIV_CHUID_H_
 #define TINY_CRYPTO_PIV_CHUID_H_
 #include <tiny_crypto/tlv.h>

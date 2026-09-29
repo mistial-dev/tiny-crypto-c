@@ -43,13 +43,20 @@ if(TINY_CRYPTO_BUILD_TESTS)
     add_test(NAME test_unicode_tables
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_unicode_tables.py)
     add_test(NAME test_work_budget_width
-  COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_work_budget_width.py)
-add_test(NAME test_package_boundaries
+      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_work_budget_width.py)
+    add_test(NAME test_package_boundaries
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_package_boundaries.py)
     add_test(NAME test_vector_manifests
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_vector_manifests.py)
     add_test(NAME test_doc_sync
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_doc_sync.py)
+    # Self-contained documentation code blocks compile with GCC-compatible
+    # drivers. MSVC and clang-cl run the text checks only.
+    if(NOT MSVC AND CMAKE_C_COMPILER_ID MATCHES "GNU|Clang" AND
+       CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+      set_tests_properties(test_doc_sync PROPERTIES ENVIRONMENT
+        "TC_DOC_SYNC_CC=${CMAKE_C_COMPILER};TC_DOC_SYNC_CXX=${CMAKE_CXX_COMPILER}")
+    endif()
   endif()
 
   add_test(NAME test_installed_consumer

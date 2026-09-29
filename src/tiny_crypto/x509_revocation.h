@@ -5,8 +5,11 @@
 
 /* Revocation checking for a validated path from CRLs (RFC 5280 sections 5
  * and 6.3) and OCSP responses (RFC 6960). The status and time types are
- * shared with <tiny_crypto/x509_ocsp.h>. Requires TC_ENABLE_X509_REVOCATION.
- * See docs/x509-revocation.md. */
+ * shared with <tiny_crypto/x509_ocsp.h>. Requires TC_ENABLE_X509_REVOCATION,
+ * with OCSP evidence from TC_ENABLE_X509_OCSP. CMS and credential validation
+ * use CRL evidence only.
+ * Contracts: docs/api.md, including its size_t work units. Guide:
+ * docs/x509-revocation.md. */
 
 #include <tiny_crypto/x509_crl.h>
 #include <tiny_crypto/x509_path.h>

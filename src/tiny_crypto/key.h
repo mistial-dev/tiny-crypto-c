@@ -1,5 +1,9 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* Public-key and signature algorithm identifiers shared by X.509, CMS, key
+ * challenges and the signature providers.
+ * Configuration: needs TC_ENABLE_DER for the DER-backed types.
+ * Contracts: docs/api.md. */
 #ifndef TINY_CRYPTO_KEY_H_
 #define TINY_CRYPTO_KEY_H_
 #include <tiny_crypto/der.h>

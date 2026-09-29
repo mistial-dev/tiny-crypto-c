@@ -1,5 +1,12 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* PIV secure-messaging response authentication: verifies the card CVC chain
+ * under a validated content-signing certificate and completes key
+ * confirmation in one call.
+ * Standards: SP 800-73-5 Part 2 section 4.1.
+ * Configuration: TC_ENABLE_PIV_SM, TC_ENABLE_PIV_CVC and TC_ENABLE_X509.
+ * Contracts: docs/api.md, including its size_t work units.
+ * Guide: docs/piv-sm.md. */
 #ifndef TINY_CRYPTO_PIV_SM_AUTHENTICATE_H_
 #define TINY_CRYPTO_PIV_SM_AUTHENTICATE_H_
 #include <tiny_crypto/piv_cvc.h>

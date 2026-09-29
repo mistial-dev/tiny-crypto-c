@@ -1,5 +1,12 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* EAC card verifiable certificates: certificate, public-key and extension
+ * readers for the BSI TR-03110 profile, and issuer-dependent width checks.
+ * Standards: BSI TR-03110 Part 3.
+ * Configuration: TC_ENABLE_EAC_CVC, which requires TC_ENABLE_DER.
+ * Limitations: readers parse encodings. Signature, key validity, trust and
+ * expiration checks belong to the caller.
+ * Contracts: docs/api.md. */
 #ifndef TINY_CRYPTO_EAC_CVC_H_
 #define TINY_CRYPTO_EAC_CVC_H_
 #include <tiny_crypto/der.h>

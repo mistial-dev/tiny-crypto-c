@@ -1,5 +1,12 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* X.509 CRL reader, extension decoding, entry lookup and CRL indexes.
+ * Standards: RFC 5280 sections 5 and 6.3.
+ * Configuration: TC_ENABLE_X509_REVOCATION.
+ * Limitations: parsing and lookup. x509_revocation.h authenticates CRLs and
+ * applies them to a path.
+ * Contracts: docs/api.md, including its size_t work units.
+ * Guide: docs/x509-crl.md. */
 #ifndef TINY_CRYPTO_X509_CRL_H_
 #define TINY_CRYPTO_X509_CRL_H_
 #include <tiny_crypto/x509.h>

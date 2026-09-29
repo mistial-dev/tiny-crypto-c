@@ -13,8 +13,9 @@ handle compressed card certificates.
 
 `TC_GZIP_decode` takes the complete input as `TC_bytes`, a
 `TC_GZIP_workspace`, a remaining work budget, output storage as `TC_buffer` and
-an output-length pointer. These storage regions must be separate. Workspace needs no initialization and
-can be reused after each call. Use `sizeof(TC_GZIP_workspace)` when sizing it.
+an output-length pointer. These storage regions must be separate. Workspace
+needs no initialization and can be reused after each call. Use
+`sizeof(TC_GZIP_workspace)` when sizing it.
 
 ```c
 enum { CERTIFICATE_CAPACITY = 4096, DECODE_WORK_LIMIT = 100000 };

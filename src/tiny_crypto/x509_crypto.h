@@ -1,5 +1,12 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* Native signature provider for the X.509 APIs: ECDSA and RSA PKCS #1 v1.5
+ * and PSS verification over caller workspaces.
+ * Standards: FIPS 186-5, RFC 8017, RFC 5758, RFC 4055.
+ * Configuration: TC_ENABLE_X509 with TC_ENABLE_EC or TC_ENABLE_RSA and the
+ * hashes the certificates use.
+ * Contracts: docs/api.md, including its size_t work units.
+ * Guide: docs/x509-crypto.md. */
 #ifndef TINY_CRYPTO_X509_CRYPTO_H_
 #define TINY_CRYPTO_X509_CRYPTO_H_
 #include <tiny_crypto/x509.h>

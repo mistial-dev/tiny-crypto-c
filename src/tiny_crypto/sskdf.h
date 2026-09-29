@@ -1,5 +1,11 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* One-step key derivation with a hash function over each enabled SHA.
+ * Standards: SP 800-56C Rev. 2 section 4.1, option 1.
+ * Configuration: TC_ENABLE_SSKDF with TC_ENABLE_SHA*.
+ * Limitations: the HMAC and KMAC auxiliary functions of section 4.1 are
+ * unsupported.
+ * Contracts: docs/api.md. */
 #ifndef TINY_CRYPTO_SSKDF_H_
 #define TINY_CRYPTO_SSKDF_H_
 #include <tiny_crypto/common.h>

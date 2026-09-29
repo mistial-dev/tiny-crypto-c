@@ -1,5 +1,13 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* CMS SignedData parsing and signer verification: envelopes, SignerInfo,
+ * signed attributes, content binding and the SignerInfo signature.
+ * Standards: RFC 5652, RFC 3370, RFC 5035, RFC 6211.
+ * Configuration: TC_ENABLE_CMS, with BER envelopes from TC_TLV_ENABLE_BER.
+ * Limitations: unsigned attributes, including countersignatures, are
+ * unauthenticated and ignored. Signer paths and revocation are in
+ * cms_validation.h.
+ * Contracts: docs/api.md. Guide: docs/cms.md. */
 #ifndef TINY_CRYPTO_CMS_H_
 #define TINY_CRYPTO_CMS_H_
 #include <tiny_crypto/x509.h>

@@ -1,5 +1,8 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* The piv_sm session class for piv_sm.h and piv_sm_authenticate.h.
+ * Contracts, statuses and lifetimes follow the C header. Conventions:
+ * docs/cpp.md. Library-wide contracts: docs/api.md. */
 #ifndef TINY_CRYPTO_PIV_SM_HPP_
 #define TINY_CRYPTO_PIV_SM_HPP_
 

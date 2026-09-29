@@ -1,5 +1,12 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* TWIC canceled card list import, lookup and freshness from the TSA CSV feed.
+ * Standards: TWIC Reader Specification Part 3 sections 4.4.3 and 4.4.4,
+ * 33 CFR 101.525.
+ * Configuration: TC_ENABLE_TWIC_CCL.
+ * Limitations: download authenticity comes from the application's transport
+ * or provisioning.
+ * Contracts: docs/api.md. Guide: docs/twic-ccl.md. */
 #ifndef TINY_CRYPTO_TWIC_CCL_H_
 #define TINY_CRYPTO_TWIC_CCL_H_
 #include <tiny_crypto/common.h>

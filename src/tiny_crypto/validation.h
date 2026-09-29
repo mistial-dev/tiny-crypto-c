@@ -1,5 +1,13 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* Shared validation context and arena for complete X.509 and CMS
+ * validation: capacity presets, workspace sizing and the composed CMS and
+ * certificate checks.
+ * Standards: RFC 5280 section 6, RFC 5652.
+ * Configuration: TC_ENABLE_CMS_VALIDATION.
+ * Limitations: revocation uses CRL evidence.
+ * Contracts: docs/api.md, including its size_t work units.
+ * Guide: docs/validation.md. */
 #ifndef TINY_CRYPTO_VALIDATION_H_
 #define TINY_CRYPTO_VALIDATION_H_
 

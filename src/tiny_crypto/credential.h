@@ -1,5 +1,14 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* Composed PIV and TWIC credential validation: signed CHUID, biometric
+ * objects, the security object and PIV secure-messaging signer CVCs, bound to
+ * an accepted CHUID and a shared validation context.
+ * Standards: SP 800-73-5 Part 1, SP 800-76-2, FIPS 201-3, TWIC Part 2 v5.
+ * Configuration: TC_ENABLE_CREDENTIAL, with CVC checks from
+ * TC_ENABLE_PIV_CVC.
+ * Limitations: card transport, cancellation status and the access decision
+ * belong to the application. Iris records are unsupported.
+ * Contracts: docs/api.md. Guides: docs/cms.md, docs/credential-validation.md. */
 #ifndef TINY_CRYPTO_CREDENTIAL_H_
 #define TINY_CRYPTO_CREDENTIAL_H_
 

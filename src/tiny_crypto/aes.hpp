@@ -1,5 +1,8 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+/* AES, GCM and AES-CMAC classes and the one-shot AEAD and MAC functions for aes.h.
+ * Contracts, statuses and lifetimes follow the C header. Conventions:
+ * docs/cpp.md. Library-wide contracts: docs/api.md. */
 #ifndef TINY_CRYPTO_AES_HPP_
 #define TINY_CRYPTO_AES_HPP_
 
