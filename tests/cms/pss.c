@@ -107,7 +107,7 @@ static void check_envelope_path(TC_bytes signer, EVP_PKEY* key, TC_RSA_workspace
       TC_X509_read(root_der, root_length, &options.path.parsing, &parser, &parsed_root), ==,
       TC_TLV_OK);
   PssSource records = {{leaf_der, leaf_length},
-                       {{parsed_root.subject, parsed_root.public_key}, {{NULL, 0}, {NULL, 0}}}};
+                       {.trust = {parsed_root.subject, parsed_root.public_key}}};
   const TC_X509_store_source source = {&records, 1, 1, pss_candidate, pss_anchor};
   signers[0] = 0x31;
   signers[1] = 0x80;

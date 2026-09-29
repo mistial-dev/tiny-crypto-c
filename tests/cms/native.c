@@ -4901,8 +4901,7 @@ static MunitResult embedded_path(const MunitParameter params[], void* user)
   munit_assert_int(i2d_CMS_ContentInfo(cms, &cursor), ==, length);
   munit_assert_int(TC_X509_read(root_der, root_length, &limits, &parser, &parsed_root), ==,
                    TC_TLV_OK);
-  TC_X509_store_anchor anchor = {{parsed_root.subject, parsed_root.public_key},
-                                 {{NULL, 0}, {NULL, 0}}};
+  TC_X509_store_anchor anchor = {.trust = {parsed_root.subject, parsed_root.public_key}};
   const TC_X509_store_source external = {&anchor, 0, 1, NULL, crl_trust_anchor};
   options.at = (TC_X509_time){2026, 1, 1, 0, 0, 0};
   options.parsing = limits;
@@ -6150,8 +6149,8 @@ static void credential_public_workflow(X509* root, EVP_PKEY* root_key, X509* sig
   munit_assert_int(TC_X509_read(wrong_root_bytes, wrong_root_length, &content->options->parsing,
                                 &crl_parser, &parsed_wrong_root),
                    ==, TC_TLV_OK);
-  TC_X509_store_anchor wrong_anchor = {{parsed_wrong_root.subject, parsed_wrong_root.public_key},
-                                       {{NULL, 0}, {NULL, 0}}};
+  TC_X509_store_anchor wrong_anchor = {
+      .trust = {parsed_wrong_root.subject, parsed_wrong_root.public_key}};
   const TC_X509_store_source wrong_trust = {&wrong_anchor, 0, 1, NULL, crl_trust_anchor};
   X509_free(wrong_root);
   TC_PIV_CHUID parsed;
@@ -6540,8 +6539,7 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
       TC_X509_certificate parsed_root;
       munit_assert_int(TC_X509_read(root_der.data, root_der.length, &limits, &parser, &parsed_root),
                        ==, TC_TLV_OK);
-      TC_X509_store_anchor anchor = {{parsed_root.subject, parsed_root.public_key},
-                                     {{NULL, 0}, {NULL, 0}}};
+      TC_X509_store_anchor anchor = {.trust = {parsed_root.subject, parsed_root.public_key}};
       const TC_X509_store_source anchors = {&anchor, 0, 1, NULL, crl_trust_anchor};
       candidate_source supplied = {&root_der, 1, 0, TC_TLV_OK, 0};
       const TC_X509_store_source issuers = {&supplied, 1, 0, read_candidate, NULL};

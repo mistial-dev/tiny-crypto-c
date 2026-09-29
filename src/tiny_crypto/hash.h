@@ -256,7 +256,7 @@ TC_status TC_SHA1_update(struct TC_SHA1_ctx* ctx, const uint8_t* data, size_t le
  * @param digest Output buffer of TC_SHA1_DIGESTLEN bytes.
  * @return TC_OK, or TC_ERROR on a TC_STRICT NULL failure.
  */
-TC_status TC_SHA1_final(struct TC_SHA1_ctx* ctx, uint8_t* digest);
+TC_status TC_SHA1_final(struct TC_SHA1_ctx* ctx, uint8_t digest[TC_SHA1_DIGESTLEN]);
 
 /* Wipe a SHA-1 context (state, byte count and pending block). */
 void TC_SHA1_ctx_clear(struct TC_SHA1_ctx* ctx);
@@ -268,7 +268,7 @@ void TC_SHA1_ctx_clear(struct TC_SHA1_ctx* ctx);
  * @param digest Output buffer of TC_SHA1_DIGESTLEN bytes.
  * @return TC_OK, or TC_ERROR on invalid arguments.
  */
-TC_status TC_SHA1_digest(const uint8_t* data, size_t len, uint8_t* digest);
+TC_status TC_SHA1_digest(const uint8_t* data, size_t len, uint8_t digest[TC_SHA1_DIGESTLEN]);
 #endif /* TC_ENABLE_SHA1 */
 
 #if TC_ENABLE_SHA224
@@ -299,7 +299,7 @@ TC_status TC_SHA224_update(struct TC_SHA224_ctx* ctx, const uint8_t* data, size_
  * @param digest Output buffer of TC_SHA224_DIGESTLEN bytes.
  * @return TC_OK, or TC_ERROR on a TC_STRICT NULL failure.
  */
-TC_status TC_SHA224_final(struct TC_SHA224_ctx* ctx, uint8_t* digest);
+TC_status TC_SHA224_final(struct TC_SHA224_ctx* ctx, uint8_t digest[TC_SHA224_DIGESTLEN]);
 
 /* Wipe a SHA-224 context (state, byte count and pending block). */
 void TC_SHA224_ctx_clear(struct TC_SHA224_ctx* ctx);
@@ -311,7 +311,7 @@ void TC_SHA224_ctx_clear(struct TC_SHA224_ctx* ctx);
  * @param digest Output buffer of TC_SHA224_DIGESTLEN bytes.
  * @return TC_OK, or TC_ERROR on invalid arguments.
  */
-TC_status TC_SHA224_digest(const uint8_t* data, size_t len, uint8_t* digest);
+TC_status TC_SHA224_digest(const uint8_t* data, size_t len, uint8_t digest[TC_SHA224_DIGESTLEN]);
 #endif /* TC_ENABLE_SHA224 */
 
 #if TC_ENABLE_SHA256
@@ -342,7 +342,7 @@ TC_status TC_SHA256_update(struct TC_SHA256_ctx* ctx, const uint8_t* data, size_
  * @param digest Output buffer of TC_SHA256_DIGESTLEN bytes.
  * @return TC_OK, or TC_ERROR on a TC_STRICT NULL failure.
  */
-TC_status TC_SHA256_final(struct TC_SHA256_ctx* ctx, uint8_t* digest);
+TC_status TC_SHA256_final(struct TC_SHA256_ctx* ctx, uint8_t digest[TC_SHA256_DIGESTLEN]);
 
 /* Wipe a SHA-256 context (state, byte count and pending block). */
 void TC_SHA256_ctx_clear(struct TC_SHA256_ctx* ctx);
@@ -354,7 +354,7 @@ void TC_SHA256_ctx_clear(struct TC_SHA256_ctx* ctx);
  * @param digest Output buffer of TC_SHA256_DIGESTLEN bytes.
  * @return TC_OK, or TC_ERROR on invalid arguments.
  */
-TC_status TC_SHA256_digest(const uint8_t* data, size_t len, uint8_t* digest);
+TC_status TC_SHA256_digest(const uint8_t* data, size_t len, uint8_t digest[TC_SHA256_DIGESTLEN]);
 #endif /* TC_ENABLE_SHA256 */
 
 #if TC_ENABLE_SHA384
@@ -385,7 +385,7 @@ TC_status TC_SHA384_update(struct TC_SHA384_ctx* ctx, const uint8_t* data, size_
  * @param digest Output buffer of TC_SHA384_DIGESTLEN bytes.
  * @return TC_OK, or TC_ERROR on a TC_STRICT NULL failure.
  */
-TC_status TC_SHA384_final(struct TC_SHA384_ctx* ctx, uint8_t* digest);
+TC_status TC_SHA384_final(struct TC_SHA384_ctx* ctx, uint8_t digest[TC_SHA384_DIGESTLEN]);
 
 /* Wipe a SHA-384 context (state, byte count and pending block). */
 void TC_SHA384_ctx_clear(struct TC_SHA384_ctx* ctx);
@@ -397,7 +397,7 @@ void TC_SHA384_ctx_clear(struct TC_SHA384_ctx* ctx);
  * @param digest Output buffer of TC_SHA384_DIGESTLEN bytes.
  * @return TC_OK, or TC_ERROR on invalid arguments.
  */
-TC_status TC_SHA384_digest(const uint8_t* data, size_t len, uint8_t* digest);
+TC_status TC_SHA384_digest(const uint8_t* data, size_t len, uint8_t digest[TC_SHA384_DIGESTLEN]);
 #endif /* TC_ENABLE_SHA384 */
 
 #if TC_ENABLE_SHA512
@@ -428,7 +428,7 @@ TC_status TC_SHA512_update(struct TC_SHA512_ctx* ctx, const uint8_t* data, size_
  * @param digest Output buffer of TC_SHA512_DIGESTLEN bytes.
  * @return TC_OK, or TC_ERROR on a TC_STRICT NULL failure.
  */
-TC_status TC_SHA512_final(struct TC_SHA512_ctx* ctx, uint8_t* digest);
+TC_status TC_SHA512_final(struct TC_SHA512_ctx* ctx, uint8_t digest[TC_SHA512_DIGESTLEN]);
 
 /* Wipe a SHA-512 context (state, byte count and pending block). */
 void TC_SHA512_ctx_clear(struct TC_SHA512_ctx* ctx);
@@ -440,7 +440,7 @@ void TC_SHA512_ctx_clear(struct TC_SHA512_ctx* ctx);
  * @param digest Output buffer of TC_SHA512_DIGESTLEN bytes.
  * @return TC_OK, or TC_ERROR on invalid arguments.
  */
-TC_status TC_SHA512_digest(const uint8_t* data, size_t len, uint8_t* digest);
+TC_status TC_SHA512_digest(const uint8_t* data, size_t len, uint8_t digest[TC_SHA512_DIGESTLEN]);
 #endif /* TC_ENABLE_SHA512 */
 
 #if TC_ENABLE_HMAC

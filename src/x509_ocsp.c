@@ -708,6 +708,8 @@ TC_TLV_result TC_OCSP_request_encode(TC_bytes certificate, const TC_X509_trust_a
     return TC_TLV_LIMIT;
 
   uint8_t name_hash[64], key_hash[64];
+  if (info.digest_length > sizeof name_hash)
+    return TC_TLV_UNSUPPORTED;
   status = digest(hash, issuer->name, name_hash, work);
   if (status == TC_TLV_OK)
     status = digest(hash, issuer->public_key.key, key_hash, work);

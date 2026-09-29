@@ -35,6 +35,8 @@ static MunitResult raw_operations(const MunitParameter params[], void* user)
     return MUNIT_SKIP;
 #endif
   const size_t width = bits / 8;
+  if (width == 0 || width > MAX_BYTES)
+    return MUNIT_ERROR;
   uint8_t modulus[MAX_BYTES], private_exponent[MAX_BYTES];
   uint8_t representative[MAX_BYTES] = {0}, transformed[MAX_BYTES], recovered[MAX_BYTES];
   uint8_t expected[MAX_BYTES], unchanged[MAX_BYTES];

@@ -185,7 +185,7 @@ TC_status tc_hmac_core_verify(const tc_hash_algorithm_info* info, void* workspac
   {                                                                                                \
     return tc_hash_core_update(&tc_##name##_info, ctx, data, length);                              \
   }                                                                                                \
-  TC_status TC_##NAME##_final(struct TC_##NAME##_ctx* ctx, uint8_t* digest)                        \
+  TC_status TC_##NAME##_final(struct TC_##NAME##_ctx* ctx, uint8_t digest[TC_##NAME##_DIGESTLEN])  \
   {                                                                                                \
     return tc_hash_core_final(&tc_##name##_info, ctx, digest);                                     \
   }                                                                                                \
@@ -193,7 +193,8 @@ TC_status tc_hmac_core_verify(const tc_hash_algorithm_info* info, void* workspac
   {                                                                                                \
     tc_hash_core_clear(&tc_##name##_info, ctx);                                                    \
   }                                                                                                \
-  TC_status TC_##NAME##_digest(const uint8_t* data, size_t length, uint8_t* digest)                \
+  TC_status TC_##NAME##_digest(const uint8_t* data, size_t length,                                 \
+                               uint8_t digest[TC_##NAME##_DIGESTLEN])                              \
   {                                                                                                \
     struct TC_##NAME##_ctx ctx;                                                                    \
     return tc_hash_core_digest(&tc_##name##_info, &ctx, data, length, digest);                     \
