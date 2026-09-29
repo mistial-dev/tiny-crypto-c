@@ -315,7 +315,8 @@ PIV secure messaging follows the same transport boundary. The library returns
 decoded handshake fields and protects caller-supplied authenticated spans. APDU
 headers, `7C/81/82` handshake objects, `87/97/99/8E` protected objects, instruction
 policy, command chaining and status words belong to the reader application. See
-`examples/piv_sm_wire.h` for a bounded implementation of that framing.
+`examples/piv_sm_wire.h` for a bounded implementation of that framing and
+[PIV secure messaging](piv-sm.md) for the span layouts.
 
 `EXAMPLE_CARD_KEY_VERIFIED` reports possession of the supplied public key's
 private counterpart. Preserve the separate trust and credential-policy decisions

@@ -162,7 +162,7 @@ selected.
 | `TINY_CRYPTO_ENABLE_PIV_CHUID`          |     OFF | PIV CHUID reader, requires TLV                                         |
 | `TINY_CRYPTO_ENABLE_PIV_CVC`            |     OFF | PIV secure messaging CVC reader, requires DER                          |
 | `TINY_CRYPTO_ENABLE_EAC_CVC`            |     OFF | TR-03110 EAC CVC reader, requires DER                                  |
-| `TINY_CRYPTO_ENABLE_PIV_SM`             |     OFF | PD-side PIV secure messaging, CS2 and CS7                              |
+| `TINY_CRYPTO_ENABLE_PIV_SM`             |     OFF | Client-side PIV secure messaging, CS2 and CS7                          |
 | `TINY_CRYPTO_ENABLE_FASCN`              |     OFF | FASC-N readers and writers                                             |
 | `TINY_CRYPTO_ENABLE_TWIC_UUID`          |     OFF | TWIC NEXGEN UUID helpers, requires FASC-N                              |
 | `TINY_CRYPTO_ENABLE_TWIC_CCL`           |     OFF | TWIC canceled card list reader                                         |
@@ -430,44 +430,35 @@ enforces flash and stack budgets. The checked-in report is refreshed for release
 
 ## PIV secure messaging
 
-`TINY_CRYPTO_ENABLE_PIV_SM` enables the peripheral-device side of CS2 and CS7.
-The library handles ECDH, session-key derivation, confirmation, command
-protection, response authentication, and CVC chain verification. Applications
-supply APDU transport and an X.509 content-signing certificate accepted through
-their trust, policy, time, and revocation checks.
+`TINY_CRYPTO_ENABLE_PIV_SM` enables the client side of SP 800-73-5 Part 2
+section 4 secure messaging for CS2 (P-256, AES-128) and CS7 (P-384, AES-256).
+The library performs ECDH, session-key derivation, key confirmation, command
+protection and response authentication. The application supplies the APDU
+transport, the data-object framing and an X.509 content-signing certificate
+accepted through its trust, policy, time and revocation checks.
 
-The desktop profile enables its dependencies. For a smaller build, enable
-AES with `TINY_CRYPTO_AES_DYNAMIC`, SHA-256, EC, SSKDF, TLV, DER, and PIV CVC
-parsing. CS7 also needs SHA-384 and P-384. CS2 needs P-256. Disable a suite with
-`TINY_CRYPTO_PIV_SM_CS2=OFF` or `TINY_CRYPTO_PIV_SM_CS7=OFF` and disable its
-unused curve separately with `TINY_CRYPTO_EC_P256` or `TINY_CRYPTO_EC_P384`.
+The workflow in `<tiny_crypto/piv_sm.h>` follows the protocol:
 
-Start with a zero-initialized `TC_PIV_SM` and caller-owned
-`TC_PIV_SM_workspace`. `TC_PIV_SM_begin` takes a `TC_random_source` and returns
-the host identifier and ephemeral public key for the GENERAL AUTHENTICATE
-request. Decode the card response into a `TC_PIV_SM_peer`: the CVC, the nonce,
-the cryptogram and the received CB_ICC control byte. Verify the CVC signature
-and trust chain, then pass its authenticated public key and the unchanged peer
-fields to `TC_PIV_SM_finish`. It rejects a nonzero CB_ICC as required by
-SP 800-73-5 Part 2 section 4.1 step H4. With X.509 enabled,
-`TC_PIV_SM_authenticate_response` combines CVC verification and key
-confirmation. Its request takes the decoded peer fields, accepted content
-signer, optional intermediate CVC, expected card UUID, parsing limits and
-signature provider.
+1. `TC_PIV_SM_begin` starts a session and fills a `TC_PIV_SM_handshake` with the
+   host identifier and ephemeral public key.
+2. The application encodes them into GENERAL AUTHENTICATE and decodes the
+   card's response into a `TC_PIV_SM_peer`: the exact CVC bytes, nonce,
+   cryptogram and received CB_ICC byte.
+3. `TC_PIV_SM_finish` takes the CVC public key after the application has
+   authenticated it. `TC_PIV_SM_authenticate_response` in
+   `<tiny_crypto/piv_sm_authenticate.h>` verifies the CVC chain and completes key
+   confirmation in one call.
+4. `TC_PIV_SM_protect` encrypts command data and tags the caller's ordered
+   authenticated spans. `TC_PIV_SM_ciphertext_size` gives the padded length.
+5. `TC_PIV_SM_unprotect` authenticates the response spans and then decrypts.
 
-`TC_PIV_SM_protect` encrypts command data and computes the tag over the
-caller's framed spans. `TC_PIV_SM_ciphertext_size` gives the padded length.
-`TC_PIV_SM_unprotect` authenticates and decrypts the response. Only one command
-may be pending. Argument errors leave the session unchanged. Peer
-authentication, padding and cipher failures clear it. A short output buffer
-returns `TC_ERROR` and leaves `TC_PIV_SM_get_state` at `TC_PIV_SM_PENDING`, so
-the same response can be retried. Clear the session when the card is removed or
-command delivery is uncertain. `examples/piv_sm_wire.h` encodes and decodes the
-APDU data objects around these calls.
-
-The C++11 `tiny_crypto::piv_sm` wrapper clears its session on destruction and
-cannot be copied or moved. Both APIs keep workspace outside the session so it
-can be reused between operations.
+The caller owns the zero-initialized `TC_PIV_SM` and the `TC_PIV_SM_workspace`.
+Only one command may be pending. `TC_PIV_SM_get_state` tells a retryable
+unprotect error from one that ended the session. `examples/piv_sm_wire.h`
+implements the `7C/81/82` and `87/97/99/8E` framing. The C++11
+`tiny_crypto::piv_sm` wrapper clears its session on destruction and cannot be
+copied or moved. See [PIV secure messaging](docs/piv-sm.md) for build options,
+span layouts, state transitions and every result.
 
 The underlying `TC_ECDH`, `TC_EC_public_key`, and `TC_EC_validate_public_key`
 APIs take fixed-width scalars and uncompressed SEC1 public keys as spans, plus a

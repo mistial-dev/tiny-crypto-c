@@ -90,3 +90,4 @@ confirmation. Its point and session scratch share a
 caller-owned union because the phases run sequentially. EAC certificates use their
 own profile. Include `tiny_crypto/piv_sm_authenticate.h` for this combined helper.
 `tiny_crypto/piv_sm.h` builds independently of the CVC and X.509 modules.
+See [PIV secure messaging](piv-sm.md) for the session workflow.

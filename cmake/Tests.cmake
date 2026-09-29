@@ -48,6 +48,8 @@ add_test(NAME test_package_boundaries
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_package_boundaries.py)
     add_test(NAME test_vector_manifests
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_vector_manifests.py)
+    add_test(NAME test_doc_sync
+      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_doc_sync.py)
   endif()
 
   add_test(NAME test_installed_consumer

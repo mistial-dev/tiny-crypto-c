@@ -330,8 +330,13 @@ CHUID buffer, trust source and CRL index through the decision.
 
 ```c
 TC_PIV_CHUID_validation_request request = {
-    encoded_chuid, TC_PIV_CHUID_CONTAINER, TC_TWIC_NEXGEN_CARD,
-    &card_identifiers, &card_certificate.not_after
+    .encoded = encoded_chuid,
+    .encoding = TC_PIV_CHUID_CONTAINER,
+    .profile = TC_TWIC_NEXGEN_CARD,
+    .chuid_profile = TC_CHUID_PROFILE_TWIC_SIGNED,
+    .twic_reader_policy = 0,
+    .card = &card_identifiers,
+    .card_expiration = &card_certificate.not_after
 };
 TC_CMS_path_workspace path_workspace = /* caller-owned arrays and capacities */;
 TC_CMS_credential_workspace workspace = {
@@ -354,6 +359,11 @@ if (status != TC_CREDENTIAL_VALID) {
     return status;
 }
 ```
+
+`profile` selects the card OID policy and `chuid_profile` selects the CHUID
+schema. `card` and `card_expiration` bind the CHUID to the validated card
+certificate. Set `twic_reader_policy` to 1 to accept the registered TWIC
+aliases and reader identifier rules for a PIV application.
 
 The operation uses one `TC_validation_options` value for time, provider,
 certificate policy, CRL-signer policy, limits and CMS compatibility. It checks

@@ -132,6 +132,12 @@ source copies byte for byte.
 Direct-source checks compile and link every product `.c` file in AES-only,
 TLV-only, and EC-only builds, with SHA-256 disabled.
 
+`test_doc_sync` checks `README.md` and `docs/*.md` against the source tree. Every
+`TC_`, `TINY_CRYPTO_` and `example_` name must exist, relative links must
+resolve, and struct initializers in C code blocks must match the public
+headers. A positional initializer sets every member. A designated initializer
+names only existing members.
+
 To run the installation checks after configuring a build:
 
 ```sh
