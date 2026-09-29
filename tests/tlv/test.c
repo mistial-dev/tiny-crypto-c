@@ -124,6 +124,73 @@ static MunitResult cursor(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+/* ISO/IEC 7816-4:2020 section 6.4: a constructed template holds nested data
+ * objects without padding. Padding is a root-level property of the reader. */
+static MunitResult child_reader(const MunitParameter params[], void* user)
+{
+  (void)params;
+  (void)user;
+  static const uint8_t padded[] = {0, 0x30, 3, 0, 4, 0, 0xff};
+  static const uint8_t nested[] = {0x30, 4, 4, 0, 4, 0};
+  static const uint8_t other[] = {0x30, 0};
+  TC_TLV_reader root, child, saved;
+  TC_TLV_element sequence, e, old;
+  munit_assert(TC_TLV_reader_init(&root, padded, sizeof padded, TC_TLV_ISO7816_PAD_ZERO_FF,
+                                  &limits) == TC_TLV_OK);
+  munit_assert(TC_TLV_next(&root, &sequence) == TC_TLV_OK && sequence.value.data == padded + 3);
+  munit_assert(TC_TLV_next(&root, &e) == TC_TLV_END);
+  munit_assert(TC_TLV_reader_child(&child, &root, &sequence) == TC_TLV_OK);
+  munit_assert(child.profile == TC_TLV_ISO7816_PAD_ZERO_FF && child.offset == 0 &&
+               child.elements == 0 && child.input.data == sequence.value.data &&
+               child.input.length == sequence.value.length);
+  saved = child;
+  memset(&e, 0xa5, sizeof e);
+  old = e;
+  munit_assert(TC_TLV_next(&child, &e) == TC_TLV_INVALID);
+  munit_assert(memcmp(&child, &saved, sizeof child) == 0 && memcmp(&e, &old, sizeof e) == 0);
+
+  /* Children of an unpadded template read normally and inherit limits. */
+  TC_TLV_limits small = limits;
+  small.max_elements = 1;
+  munit_assert(TC_TLV_reader_init(&root, nested, sizeof nested, TC_TLV_DER, &small) == TC_TLV_OK);
+  munit_assert(TC_TLV_next(&root, &sequence) == TC_TLV_OK);
+  munit_assert(TC_TLV_reader_child(&child, &root, &sequence) == TC_TLV_OK);
+  munit_assert(child.limits.max_elements == 1);
+  munit_assert(TC_TLV_next(&child, &e) == TC_TLV_OK && e.value.data == nested + 4);
+  munit_assert(TC_TLV_next(&child, &e) == TC_TLV_LIMIT);
+
+  /* A child template is complete, so a truncated nested element is malformed. */
+  static const uint8_t overrun[] = {0x30, 2, 4, 1};
+  munit_assert(TC_TLV_reader_init(&root, overrun, sizeof overrun, TC_TLV_DER, &limits) ==
+               TC_TLV_OK);
+  munit_assert(TC_TLV_next(&root, &sequence) == TC_TLV_OK);
+  munit_assert(TC_TLV_reader_init(&saved, sequence.value.data, sequence.value.length, TC_TLV_DER,
+                                  &limits) == TC_TLV_OK);
+  munit_assert(TC_TLV_next(&saved, &e) == TC_TLV_MORE);
+  munit_assert(TC_TLV_reader_child(&child, &root, &sequence) == TC_TLV_OK);
+  munit_assert(TC_TLV_next(&child, &e) == TC_TLV_INVALID);
+  munit_assert(TC_TLV_reader_init(&root, nested, sizeof nested, TC_TLV_DER, &small) == TC_TLV_OK);
+  munit_assert(TC_TLV_next(&root, &sequence) == TC_TLV_OK);
+  munit_assert(TC_TLV_reader_child(&child, &root, &sequence) == TC_TLV_OK);
+  munit_assert(TC_TLV_next(&child, &e) == TC_TLV_OK);
+
+  /* Nested readers stay nonroot. */
+  munit_assert(TC_TLV_reader_child(&saved, &child, &e) == TC_TLV_OK);
+  munit_assert(TC_TLV_next(&saved, &e) == TC_TLV_END);
+
+  /* The element must lie inside the parent input. Failures leave child unchanged. */
+  munit_assert(TC_TLV_reader_init(&root, other, sizeof other, TC_TLV_DER, &limits) == TC_TLV_OK);
+  munit_assert(TC_TLV_next(&root, &e) == TC_TLV_OK);
+  memset(&child, 0x5a, sizeof child);
+  saved = child;
+  munit_assert(TC_TLV_reader_child(&child, &root, &sequence) == TC_TLV_ARGUMENT);
+  munit_assert(TC_TLV_reader_child(NULL, &root, &e) == TC_TLV_ARGUMENT);
+  munit_assert(TC_TLV_reader_child(&child, NULL, &e) == TC_TLV_ARGUMENT);
+  munit_assert(TC_TLV_reader_child(&child, &root, NULL) == TC_TLV_ARGUMENT);
+  munit_assert(memcmp(&child, &saved, sizeof child) == 0);
+  return MUNIT_OK;
+}
+
 struct events {
   uint32_t bytes;
   size_t begins, closes, max_depth;
@@ -277,7 +344,7 @@ static MunitResult signatures(const MunitParameter params[], void* user)
   munit_assert(TC_DER_ecdsa_signature(negative_s, sizeof negative_s, &pair) == TC_TLV_INVALID);
   munit_assert(TC_DER_ecdsa_signature(missing_s, sizeof missing_s, &pair) == TC_TLV_INVALID);
   for (i = 0; i < sizeof signature; ++i)
-    munit_assert(TC_DER_ecdsa_signature(signature, i, &pair) == TC_TLV_MORE);
+    munit_assert(TC_DER_ecdsa_signature(signature, i, &pair) == TC_TLV_INVALID);
   munit_assert(memcmp(&pair, &saved_pair, sizeof pair) == 0);
   munit_assert(TC_DER_ecdsa_signature(signature, sizeof signature, NULL) == TC_TLV_ARGUMENT);
   return MUNIT_OK;
@@ -295,7 +362,7 @@ static MunitResult rsa_public_key(const MunitParameter params[], void* user)
   munit_assert_ptr_equal(key.exponent.data, encoded + 8);
   const TC_DER_rsa_public_key saved = key;
   for (size_t end = 0; end < sizeof encoded; ++end) {
-    munit_assert_int(TC_DER_rsa_public(encoded, end, &key), !=, TC_TLV_OK);
+    munit_assert_int(TC_DER_rsa_public(encoded, end, &key), ==, TC_TLV_INVALID);
     munit_assert_memory_equal(sizeof key, &key, &saved);
   }
   const uint8_t bad_exponents[] = {0, 128, 255};
@@ -337,7 +404,7 @@ static MunitResult private_key_info(const MunitParameter params[], void* user)
   memset(&key, 0xa5, sizeof key);
   memset(&saved, 0xa5, sizeof saved);
   for (size_t i = 0; i < sizeof encoded; ++i) {
-    munit_assert_int(TC_DER_private_key_info(encoded, i, &key), !=, TC_TLV_OK);
+    munit_assert_int(TC_DER_private_key_info(encoded, i, &key), ==, TC_TLV_INVALID);
     munit_assert_memory_equal(sizeof key, &key, &saved);
   }
   const size_t tags[] = {0, 2, 5, 7, 10, 13};
@@ -368,7 +435,7 @@ static MunitResult private_key_info(const MunitParameter params[], void* user)
   memset(&key, 0xa5, sizeof key);
   memset(&public_saved, 0xa5, sizeof public_saved);
   for (size_t end = 0; end < sizeof with_public; ++end) {
-    munit_assert_int(TC_DER_private_key_info(with_public, end, &key), !=, TC_TLV_OK);
+    munit_assert_int(TC_DER_private_key_info(with_public, end, &key), ==, TC_TLV_INVALID);
     munit_assert_memory_equal(sizeof key, &key, &public_saved);
   }
   /* Version and public-key presence must agree. */
@@ -398,6 +465,104 @@ static MunitResult private_key_info(const MunitParameter params[], void* user)
   with_public[1] += 2;
   munit_assert_int(TC_DER_private_key_info(with_public, sizeof with_public, &key), ==,
                    TC_TLV_INVALID);
+  return MUNIT_OK;
+}
+
+/* The complete-input readers report truncation as malformed input. */
+static MunitResult der_truncation(const MunitParameter params[], void* user)
+{
+  (void)params;
+  (void)user;
+  static const uint8_t integer[] = {2, 5, 0};
+  static const uint8_t short_header[] = {2};
+  static const uint8_t long_length[] = {4, 0x82, 1};
+  static const uint8_t algorithm[] = {0x30, 5, 6, 1, 42};
+  TC_bytes v = {NULL, 0};
+  TC_DER_algorithm parsed;
+  uint32_t n = 7;
+  int sign = 3;
+  unsigned unused = 5;
+  munit_assert_int(TC_DER_integer(integer, sizeof integer, &v, &sign), ==, TC_TLV_INVALID);
+  munit_assert_int(TC_DER_integer(short_header, sizeof short_header, &v, &sign), ==,
+                   TC_TLV_INVALID);
+  munit_assert_int(TC_DER_integer(integer, 0, &v, &sign), ==, TC_TLV_INVALID);
+  munit_assert_int(TC_DER_uint32(integer, sizeof integer, &n), ==, TC_TLV_INVALID);
+  munit_assert_int(TC_DER_bit_string(long_length, sizeof long_length, &v, &unused), ==,
+                   TC_TLV_INVALID);
+  munit_assert_int(TC_DER_oid(integer, 1, &v), ==, TC_TLV_INVALID);
+  munit_assert_int(TC_DER_boolean(integer, 1, &sign), ==, TC_TLV_INVALID);
+  munit_assert_int(TC_DER_null(integer, 1), ==, TC_TLV_INVALID);
+  munit_assert_int(TC_DER_sequence(algorithm, 1, &v), ==, TC_TLV_INVALID);
+  munit_assert_int(TC_DER_set(algorithm, 1, &v), ==, TC_TLV_INVALID);
+  munit_assert_int(TC_DER_algorithm_identifier(algorithm, sizeof algorithm, &parsed), ==,
+                   TC_TLV_INVALID);
+  munit_assert(!v.data && !v.length && n == 7 && sign == 3 && unused == 5);
+  munit_assert_int(TC_DER_integer(NULL, 3, &v, &sign), ==, TC_TLV_ARGUMENT);
+  return MUNIT_OK;
+}
+
+/* RFC 5280 section 4.1.2.7 SubjectPublicKeyInfo. */
+static MunitResult subject_public_key(const MunitParameter params[], void* user)
+{
+  (void)params;
+  (void)user;
+  static const uint8_t valid[] = {0x30, 9, 0x30, 3, 6, 1, 42, 3, 2, 0, 7};
+  static const uint8_t unused_bits[] = {0x30, 9, 0x30, 3, 6, 1, 42, 3, 2, 1, 6};
+  static const uint8_t empty_key[] = {0x30, 8, 0x30, 3, 6, 1, 42, 3, 1, 0};
+  static const uint8_t trailing[] = {0x30, 11, 0x30, 3, 6, 1, 42, 3, 2, 0, 7, 5, 0};
+  static const uint8_t missing_key[] = {0x30, 5, 0x30, 3, 6, 1, 42};
+  static const uint8_t octet_key[] = {0x30, 9, 0x30, 3, 6, 1, 42, 4, 2, 0, 7};
+  static const uint8_t bad_algorithm[] = {0x30, 9, 0x30, 3, 6, 1, 0x80, 3, 2, 0, 7};
+  TC_DER_public_key key, saved;
+  munit_assert_int(TC_DER_subject_public_key(valid, sizeof valid, &key), ==, TC_TLV_OK);
+  munit_assert_ptr_equal(key.algorithm.oid.data, valid + 6);
+  munit_assert_size(key.algorithm.oid.length, ==, 1);
+  munit_assert_null(key.algorithm.parameters.data);
+  munit_assert_ptr_equal(key.key.data, valid + 10);
+  munit_assert_size(key.key.length, ==, 1);
+  saved = key;
+  munit_assert_int(TC_DER_subject_public_key(unused_bits, sizeof unused_bits, &key), ==,
+                   TC_TLV_INVALID);
+  munit_assert_int(TC_DER_subject_public_key(empty_key, sizeof empty_key, &key), ==,
+                   TC_TLV_INVALID);
+  munit_assert_int(TC_DER_subject_public_key(trailing, sizeof trailing, &key), ==, TC_TLV_INVALID);
+  munit_assert_int(TC_DER_subject_public_key(missing_key, sizeof missing_key, &key), ==,
+                   TC_TLV_INVALID);
+  munit_assert_int(TC_DER_subject_public_key(octet_key, sizeof octet_key, &key), ==,
+                   TC_TLV_INVALID);
+  munit_assert_int(TC_DER_subject_public_key(bad_algorithm, sizeof bad_algorithm, &key), ==,
+                   TC_TLV_INVALID);
+  for (size_t end = 0; end < sizeof valid; ++end)
+    munit_assert_int(TC_DER_subject_public_key(valid, end, &key), ==, TC_TLV_INVALID);
+  munit_assert_memory_equal(sizeof key, &key, &saved);
+  munit_assert_int(TC_DER_subject_public_key(valid, sizeof valid, NULL), ==, TC_TLV_ARGUMENT);
+  munit_assert_int(TC_DER_subject_public_key(NULL, sizeof valid, &key), ==, TC_TLV_ARGUMENT);
+  munit_assert_memory_equal(sizeof key, &key, &saved);
+  return MUNIT_OK;
+}
+
+/* X.690 section 8.19.2: base-128 subidentifiers with minimal leading octets. */
+static MunitResult oid_contents(const MunitParameter params[], void* user)
+{
+  (void)params;
+  (void)user;
+  static const uint8_t rsa[] = {0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 1, 1, 1};
+  static const uint8_t large_arc[] = {0x2a, 0xff, 0xff, 0xff, 0xff, 0xff,
+                                      0xff, 0xff, 0xff, 0xff, 0xff, 0x7f};
+  static const uint8_t continuation_end[] = {0x2a, 0x81};
+  static const uint8_t leading_arc[] = {0x2a, 0x80, 1};
+  static const uint8_t leading_first[] = {0x80, 0x2a};
+  munit_assert_int(TC_DER_oid_contents(rsa, sizeof rsa), ==, TC_TLV_OK);
+  munit_assert_int(TC_DER_oid_contents(rsa, 1), ==, TC_TLV_OK);
+  munit_assert_int(TC_DER_oid_contents(large_arc, sizeof large_arc), ==, TC_TLV_OK);
+  munit_assert_int(TC_DER_oid_contents(rsa, 0), ==, TC_TLV_INVALID);
+  munit_assert_int(TC_DER_oid_contents(NULL, 0), ==, TC_TLV_INVALID);
+  munit_assert_int(TC_DER_oid_contents(continuation_end, sizeof continuation_end), ==,
+                   TC_TLV_INVALID);
+  munit_assert_int(TC_DER_oid_contents(rsa, 2), ==, TC_TLV_INVALID);
+  munit_assert_int(TC_DER_oid_contents(leading_arc, sizeof leading_arc), ==, TC_TLV_INVALID);
+  munit_assert_int(TC_DER_oid_contents(leading_first, sizeof leading_first), ==, TC_TLV_INVALID);
+  munit_assert_int(TC_DER_oid_contents(NULL, 1), ==, TC_TLV_ARGUMENT);
   return MUNIT_OK;
 }
 
@@ -438,7 +603,7 @@ static MunitResult der(const MunitParameter params[], void* user)
     munit_assert(key.coefficient.data == encoded + 28 && key.coefficient.length == 1);
     const TC_DER_rsa_private_key saved = key;
     for (size_t i = 0; i < sizeof encoded; ++i) {
-      munit_assert(TC_DER_rsa_private(encoded, i, &key) != TC_TLV_OK);
+      munit_assert(TC_DER_rsa_private(encoded, i, &key) == TC_TLV_INVALID);
       munit_assert_memory_equal(sizeof key, &key, &saved);
     }
     for (size_t i = 7; i < sizeof encoded; i += 3) {
@@ -602,11 +767,15 @@ static MunitTest tests[] = {
     {"/headers", headers, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/lengths", lengths, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/cursor", cursor, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/child-reader", child_reader, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/walks", walks, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/tree-reads", tree_reads, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
 #if TC_ENABLE_DER
     {"/signatures", signatures, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/der", der, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/der-truncation", der_truncation, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/subject-public-key", subject_public_key, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/oid-contents", oid_contents, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/private-key-info", private_key_info, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/rsa-public-key", rsa_public_key, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
 #endif

@@ -6,8 +6,16 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-/* Pass the complete DER encoding, including tag and length.
- * Outputs are unchanged on error. */
+/* Readers take the complete DER encoding, including tag and length, and
+ * return spans that borrow it. The input must stay unchanged while a span is
+ * used. The *_contents forms take only an IMPLICIT value.
+ * Every reader returns one of:
+ *   OK          the encoding is valid and outputs are written.
+ *   INVALID     malformed, truncated or trailing input, or a wrong tag.
+ *   LIMIT       a value exceeds the output type, such as UINT32_MAX.
+ *   UNSUPPORTED a recognised version that this reader does not handle.
+ *   ARGUMENT    a NULL output, or NULL data with a nonzero length.
+ * Outputs are unchanged on every failure. END and MORE are never returned. */
 TC_TLV_result TC_DER_integer(const uint8_t* data, size_t length, TC_bytes* twos_complement,
                              int* negative);
 /* Strictly positive INTEGER as a borrowed unsigned magnitude. */

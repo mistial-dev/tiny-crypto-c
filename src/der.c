@@ -10,6 +10,9 @@ static TC_TLV_result value(const uint8_t* data, size_t length, uint8_t tag, TC_b
   TC_TLV_limits limits = {SIZE_MAX, SIZE_MAX, 1, 1};
   TC_TLV_element e;
   TC_TLV_result result = TC_TLV_read(data, length, TC_TLV_DER, &limits, &e);
+  /* Input is the complete encoding, so a truncated object is malformed. */
+  if (result == TC_TLV_MORE)
+    return TC_TLV_INVALID;
   if (result != TC_TLV_OK)
     return result;
   if (e.encoded.length != length || e.header.tag_length != 1 || e.header.tag[0] != tag)

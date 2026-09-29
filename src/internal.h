@@ -161,10 +161,10 @@ static inline size_t tc_internal_counter_blocks_needed(size_t length, size_t blo
   return uncached / block_length + (uncached % block_length != 0);
 }
 
-/* A fresh zero counter has the full 2^(8*length) block space remaining,
- * which may exceed size_t. Other counters use (2^n - counter) as the
- * available count. exhausted is set once the counter has wrapped, so a zero
- * counter left by a wrap has no blocks remaining. */
+/* A fresh zero counter has the full 2^(8*length) block space remaining.
+ * That count fits size_t only when length < sizeof(size_t). Other counters use
+ * (2^n - counter) as the available count. exhausted is set once the counter
+ * has wrapped, so a zero counter left by a wrap has no blocks remaining. */
 static inline int tc_internal_counter_has_blocks(const uint8_t* counter, size_t length,
                                                  size_t needed, uint8_t exhausted)
 {
@@ -187,7 +187,7 @@ static inline int tc_internal_counter_has_blocks(const uint8_t* counter, size_t 
     all_zero &= (uint8_t)(counter[index] == 0);
   }
   if (all_zero)
-    return 1;
+    return length >= sizeof(size_t) || needed <= ((size_t)1 << (8u * length));
 
   first_size_byte = length > sizeof(size_t) ? length - sizeof(size_t) : 0;
   for (i = 0; i < first_size_byte; ++i)

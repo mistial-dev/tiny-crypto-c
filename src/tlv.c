@@ -172,7 +172,36 @@ TC_TLV_result TC_TLV_reader_init(TC_TLV_reader* reader, const uint8_t* data, siz
   r.input.length = length;
   r.profile = profile;
   r.limits = *limits;
+  r.root = 1;
   *reader = r;
+  return TC_TLV_OK;
+}
+
+TC_TLV_result TC_TLV_reader_child(TC_TLV_reader* child, const TC_TLV_reader* parent,
+                                  const TC_TLV_element* element)
+{
+  TC_TLV_reader r;
+  const uint8_t* start;
+  size_t offset;
+  if (!child || !parent || !element || (!parent->input.data && parent->input.length) ||
+      (!element->value.data && element->value.length))
+    return TC_TLV_ARGUMENT;
+  /* Compare by offset so the containment test never forms an out-of-range pointer. */
+  start = parent->input.data;
+  if (element->value.length) {
+    if ((uintptr_t)element->value.data < (uintptr_t)start)
+      return TC_TLV_ARGUMENT;
+    offset = (size_t)((uintptr_t)element->value.data - (uintptr_t)start);
+    if (offset > parent->input.length || element->value.length > parent->input.length - offset)
+      return TC_TLV_ARGUMENT;
+  }
+  /* root stays zero. ISO/IEC 7816-4:2020 section 6.4: a template is nested DOs
+   * without padding. */
+  memset(&r, 0, sizeof r);
+  r.input = element->value;
+  r.profile = parent->profile;
+  r.limits = parent->limits;
+  *child = r;
   return TC_TLV_OK;
 }
 
@@ -185,7 +214,9 @@ TC_TLV_result TC_TLV_next(TC_TLV_reader* reader, TC_TLV_element* out)
       (!reader->input.data && reader->input.length))
     return TC_TLV_ARGUMENT;
   p = reader->offset;
-  while (p < reader->input.length && tc_tlv_padding(reader->profile, reader->input.data[p]))
+  /* ISO/IEC 7816-4:2020 section 8.1.2 permits padding between root DOs only. */
+  while (reader->root && p < reader->input.length &&
+         tc_tlv_padding(reader->profile, reader->input.data[p]))
     ++p;
   if (p == reader->input.length) {
     reader->offset = p;
@@ -195,6 +226,9 @@ TC_TLV_result TC_TLV_next(TC_TLV_reader* reader, TC_TLV_element* out)
     return TC_TLV_LIMIT;
   result = TC_TLV_read(reader->input.data + p, reader->input.length - p, reader->profile,
                        &reader->limits, &e);
+  /* A child template is a complete value, so a truncated element is malformed. */
+  if (result == TC_TLV_MORE && !reader->root)
+    return TC_TLV_INVALID;
   if (result != TC_TLV_OK)
     return result;
   /* Commit together so callers can retry a short read without losing position. */

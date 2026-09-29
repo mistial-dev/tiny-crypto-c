@@ -122,7 +122,7 @@ static MunitResult test_key_encodings(const MunitParameter params[], void* user)
   munit_assert(key.exponent.length == 1 && key.exponent.data[0] == 17);
   saved = key;
   for (i = 0; i < sizeof rsa; ++i) {
-    munit_assert(TC_X509_subject_public_key(rsa, i, &key) == TC_TLV_MORE);
+    munit_assert(TC_X509_subject_public_key(rsa, i, &key) == TC_TLV_INVALID);
     munit_assert(memcmp(&key, &saved, sizeof key) == 0);
   }
   rsa[25] = 0xa0;

@@ -21,7 +21,8 @@ typedef struct {
 } TC_X509_public_key;
 
 /* Decode SubjectPublicKeyInfo. Unknown algorithms retain their OID and key
- * bytes with type UNKNOWN. The caller checks EC coordinates for curve membership. */
+ * bytes with type UNKNOWN. The caller checks EC coordinates for curve membership.
+ * Input is the complete encoding, so truncation returns INVALID. */
 TC_TLV_result TC_X509_subject_public_key(const uint8_t* data, size_t length,
                                          TC_X509_public_key* out);
 

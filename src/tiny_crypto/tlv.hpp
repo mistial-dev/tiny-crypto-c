@@ -21,6 +21,20 @@ public:
       ready_ = true;
     return result;
   }
+  /* Read the template of an element returned by parent. Padding and
+   * truncation inside the template return TC_TLV_INVALID. parent may be this
+   * reader. A failure leaves this reader unusable. */
+  TC_TLV_result init_child(const TLVReader& parent, const TC_TLV_element& element)
+  {
+    const bool parent_ready = parent.ready_;
+    ready_ = false;
+    if (!parent_ready)
+      return TC_TLV_ARGUMENT;
+    TC_TLV_result result = TC_TLV_reader_child(&reader_, &parent.reader_, &element);
+    if (result == TC_TLV_OK)
+      ready_ = true;
+    return result;
+  }
   TC_TLV_result next(TC_TLV_element& element)
   {
     return ready_ ? TC_TLV_next(&reader_, &element) : TC_TLV_ARGUMENT;

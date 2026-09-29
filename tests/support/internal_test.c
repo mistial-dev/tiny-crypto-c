@@ -36,9 +36,21 @@ static MunitResult counters(const MunitParameter params[], void* user)
   counter[0] = counter[1] = counter[2] = 0xff;
   munit_assert_true(tc_internal_counter_has_blocks(counter, 4, 3, 0));
   munit_assert_false(tc_internal_counter_has_blocks(counter, 4, 4, 0));
-  /* A fresh zero counter has the whole space; an exhausted one has none. */
+  /* A fresh zero counter has the whole 2^(8*length) space. An exhausted one has none. */
   counter[0] = counter[1] = counter[2] = counter[3] = 0;
+#if SIZE_MAX > UINT32_MAX
+  munit_assert_true(tc_internal_counter_has_blocks(counter, 4, (size_t)1 << 32, 0));
+  munit_assert_false(tc_internal_counter_has_blocks(counter, 4, ((size_t)1 << 32) + 1, 0));
+#else
   munit_assert_true(tc_internal_counter_has_blocks(counter, 4, SIZE_MAX, 0));
+#endif
+  munit_assert_true(tc_internal_counter_has_blocks(counter, 1, 256, 0));
+  munit_assert_false(tc_internal_counter_has_blocks(counter, 1, 257, 0));
+  {
+    static const uint8_t zero_block[16] = {0};
+    munit_assert_true(tc_internal_counter_has_blocks(zero_block, 16, SIZE_MAX, 0));
+    munit_assert_true(tc_internal_counter_has_blocks(zero_block, 8, SIZE_MAX, 0));
+  }
   munit_assert_false(tc_internal_counter_has_blocks(counter, 4, 1, 1));
   munit_assert_true(tc_internal_counter_has_blocks(counter, 4, 0, 1));
   return MUNIT_OK;

@@ -24,7 +24,8 @@ typedef enum {
   TC_TLV_DER = 0,
   TC_TLV_ISO7816 = 1,
   TC_TLV_BER = 2,
-  /* Padding is accepted only between root objects. */
+  /* ISO/IEC 7816-4 section 8.1.2 padding bytes, accepted only between root
+   * objects. Section 6.4 forbids padding inside a constructed template. */
   TC_TLV_ISO7816_PAD_ZERO = 3,
   TC_TLV_ISO7816_PAD_ZERO_FF = 4
 } TC_TLV_profile;
@@ -63,17 +64,36 @@ TC_TLV_result TC_TLV_header_read(const uint8_t* data, size_t length, TC_TLV_prof
 TC_TLV_result TC_TLV_read(const uint8_t* data, size_t length, TC_TLV_profile profile,
                           const TC_TLV_limits* limits, TC_TLV_element* out);
 
+/* Sibling cursor over borrowed input. Treat members as read-only and start it
+ * with TC_TLV_reader_init or TC_TLV_reader_child. root is set by
+ * TC_TLV_reader_init and cleared by TC_TLV_reader_child. Only a root reader
+ * skips padding for the padded ISO 7816 profiles. */
 typedef struct {
   TC_bytes input;
   TC_TLV_limits limits;
   size_t offset, elements;
   TC_TLV_profile profile;
+  uint8_t root;
 } TC_TLV_reader;
+/* Start a root reader over a complete data field or payload. Limits are copied.
+ * Returns ARGUMENT for NULL reader/limits, NULL data with a length or an
+ * unknown profile, UNSUPPORTED for BER when disabled and LIMIT when length
+ * exceeds max_input. Failure leaves reader unchanged. */
 TC_TLV_result TC_TLV_reader_init(TC_TLV_reader* reader, const uint8_t* data, size_t length,
                                  TC_TLV_profile profile, const TC_TLV_limits* limits);
-/* END means no more siblings. Failure leaves reader and out unchanged.
- * A child reader can be initialized from an element's bounded value span.
- * Use walk to enforce a shared budget across an entire tree. */
+/* Start a reader over the template of an element read from parent. The child
+ * inherits the parent's profile and limits, starts its own element count and
+ * rejects padding. Its template is complete, so a truncated nested element
+ * returns INVALID. The element value must lie inside the parent input.
+ * Returns ARGUMENT for NULL pointers or an element outside the parent, and
+ * leaves child unchanged on failure. child may reuse the parent's storage. */
+TC_TLV_result TC_TLV_reader_child(TC_TLV_reader* child, const TC_TLV_reader* parent,
+                                  const TC_TLV_element* element);
+/* Read the next sibling. END means no more siblings. MORE means a root
+ * reader's next element is truncated. INVALID covers bad framing, and padding
+ * or truncation in a child reader. LIMIT means max_elements or max_value was
+ * exceeded. Failure leaves reader and out unchanged. Use walk to enforce a
+ * shared budget across an entire tree. */
 TC_TLV_result TC_TLV_next(TC_TLV_reader* reader, TC_TLV_element* out);
 
 typedef enum { TC_TLV_BEGIN, TC_TLV_VALUE, TC_TLV_CLOSE } TC_TLV_event_kind;

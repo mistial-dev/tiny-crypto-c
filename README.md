@@ -319,21 +319,24 @@ if (result == TC_TLV_OK) {
 
 The limits are input bytes, value bytes, element count, and nesting depth.
 A zero limit permits zero bytes or elements. The reader advances through
-siblings without descending into their values. `TC_TLV_walk` checks nested
-containers using a caller-provided frame array and one shared budget for the
-whole input.
+siblings without descending into their values. `TC_TLV_reader_child` opens a
+reader on one element's template with the same profile and limits.
+`TC_TLV_walk` checks nested containers using a caller-provided frame array and
+one shared budget for the whole input.
 
 Choose DER, ISO 7816, or optional ASN.1 BER explicitly. ISO padding has separate
-profiles and is accepted only between root objects. `TC_TLV_read` and the
-sibling reader handle definite lengths. Use the walker or incremental reader
+profiles and is accepted only between root objects. A child reader rejects it
+(ISO/IEC 7816-4:2020 section 6.4). `TC_TLV_read` and the sibling reader handle
+definite lengths. Use the walker or incremental reader
 for indefinite BER. `TC_TLV_read_tree` reads one definite or indefinite object,
 checks its constructed boundaries, and leaves following siblings unread.
 See [TLV parsing](docs/tlv.md) for workspace setup and borrowed-span usage.
 For SignedData envelopes and signed attributes, see [CMS parsing](docs/cms.md).
 
-`TC_TLV_END` means the sibling reader is exhausted. `TC_TLV_MORE` means it needs
-more input. Other results distinguish malformed input, resource
-limits, unsupported features, and invalid arguments. Bounds checks remain on
+`TC_TLV_END` means the sibling reader is exhausted. `TC_TLV_MORE` means a root
+reader needs more input. A child reader reports truncation as `TC_TLV_INVALID`.
+Other results distinguish malformed input, resource limits, unsupported
+features, and invalid arguments. Bounds checks remain on
 with `TC_STRICT=0`.
 
 Returned spans borrow the input. Keep that buffer unchanged while using
@@ -342,9 +345,9 @@ them. Incremental callbacks borrow bytes only during the callback. Call
 stream after an error or reinitialize it for a new message.
 
 `<tiny_crypto/der.h>` adds INTEGER, BIT STRING, OID, BOOLEAN, NULL, SEQUENCE,
-and SET helpers. They take complete encoded values. Framing checks cover
-encoding structure. Schema, certificate, and signature validation are separate
-steps. C++11 code can use `tiny_crypto::TLVReader` from `<tiny_crypto/tlv.hpp>`.
+and SET helpers. They take complete encoded values and report truncation as
+`TC_TLV_INVALID`. Framing checks cover encoding structure. Schema, certificate,
+and signature validation are separate steps. C++11 code can use `tiny_crypto::TLVReader` from `<tiny_crypto/tlv.hpp>`.
 
 ## Certificates and PIV objects
 

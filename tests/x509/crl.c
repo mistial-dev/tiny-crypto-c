@@ -3149,7 +3149,7 @@ static MunitResult certificate_fields(const MunitParameter params[], void* user)
   munit_assert_int(fields.ca, ==, 0);
   memcpy(&saved, &fields, sizeof fields);
   extension.value = (TC_bytes){malformed, sizeof malformed};
-  munit_assert_int(tc_x509_crl_certificate_extension(&fields, &extension), ==, TC_TLV_MORE);
+  munit_assert_int(tc_x509_crl_certificate_extension(&fields, &extension), ==, TC_TLV_INVALID);
   munit_assert_memory_equal(sizeof fields, &fields, &saved);
 
   /* Distribution-point framing is checked by the later list traversal. */
