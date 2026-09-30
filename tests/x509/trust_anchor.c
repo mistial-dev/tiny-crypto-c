@@ -602,6 +602,8 @@ TC_TEST(next_overlap)
   const size_t length = make_info(encoded, NULL, 0, 0, 1, 0, 0);
   TC_X509_trust_anchor_reader reader;
   TC_X509_store_anchor anchor;
+  /* next_rejected compares every byte of out, so start from a known pattern. */
+  memset(&anchor, 0x5a, sizeof anchor);
   /* out inside the list bytes. */
   {
     union {
