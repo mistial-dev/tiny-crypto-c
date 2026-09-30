@@ -645,6 +645,9 @@ TC_TEST(test_snapshots)
   munit_assert_int(TC_TWIC_CCL_store_release(second), ==, TC_TWIC_CCL_OK);
   munit_assert_int(slots[0].state, ==, TC_SNAPSHOT_FREE);
   munit_assert(!slots[0].index.source.read);
+  munit_assert_null(slots[0].index.source.context);
+  munit_assert_uint64(slots[0].metadata.published_at, ==, 0);
+  munit_assert_uint64(slots[0].metadata.received_at, ==, 0);
   munit_assert_int(TC_TWIC_CCL_store_release(current), ==, TC_TWIC_CCL_OK);
   munit_assert_int(slots[1].state, ==, TC_SNAPSHOT_CURRENT);
   /* Publishing a replacement preserves the current publication floor. */
@@ -753,6 +756,95 @@ TC_TEST(test_snapshot_failures)
   munit_assert_int(TC_TWIC_CCL_store_release(NULL), ==, TC_TWIC_CCL_ARGUMENT);
   munit_assert_int(TC_TWIC_CCL_store_publish(NULL, 0, &slot), ==, TC_TWIC_CCL_ARGUMENT);
   munit_assert_int(TC_TWIC_CCL_store_acquire(NULL, &reader), ==, TC_TWIC_CCL_ARGUMENT);
+  return MUNIT_OK;
+}
+
+/* State-machine edges shared with the X.509 store (tests/x509/store.c), plus
+ * the order of the CCL publication-date rule. */
+TC_TEST(test_snapshot_contract)
+{
+  key_source keys;
+  TC_TWIC_CCL_index index;
+  TC_TWIC_CCL_store store = {0};
+  TC_TWIC_CCL_snapshot slots[2] = {0}, *reader = NULL;
+  TC_TWIC_CCL_metadata old_metadata = {100, 101}, new_metadata = {110, 111};
+  source_init(&keys);
+  TC_TWIC_CCL_source source = {&keys, 1, source_key};
+  munit_assert_int(TC_TWIC_CCL_index_prepare(&source, 1, &index), ==, TC_TWIC_CCL_OK);
+  /* prepare needs a FREE slot without readers. */
+  slots[0].readers = 1;
+  munit_assert_int(TC_TWIC_CCL_store_prepare(&slots[0], &index, &old_metadata), ==,
+                   TC_TWIC_CCL_LIMIT);
+  munit_assert_int(slots[0].state, ==, TC_SNAPSHOT_FREE);
+  munit_assert(!slots[0].index.source.read);
+  slots[0].readers = 0;
+  munit_assert_int(TC_TWIC_CCL_store_prepare(&slots[0], &index, &old_metadata), ==, TC_TWIC_CCL_OK);
+  /* A PREPARED slot with readers can be neither published, discarded nor
+   * released. */
+  slots[0].readers = 1;
+  munit_assert_int(TC_TWIC_CCL_store_publish(&store, 0, &slots[0]), ==, TC_TWIC_CCL_ARGUMENT);
+  munit_assert_null(store.current);
+  munit_assert_size(store.revision, ==, 0);
+  munit_assert_int(TC_TWIC_CCL_store_discard(&slots[0]), ==, TC_TWIC_CCL_ARGUMENT);
+  munit_assert_int(TC_TWIC_CCL_store_release(&slots[0]), ==, TC_TWIC_CCL_ARGUMENT);
+  munit_assert_size(slots[0].readers, ==, 1);
+  munit_assert_int(slots[0].state, ==, TC_SNAPSHOT_PREPARED);
+  munit_assert(slots[0].index.source.read == source_key);
+  slots[0].readers = 0;
+  munit_assert_int(TC_TWIC_CCL_store_publish(&store, 0, &slots[0]), ==, TC_TWIC_CCL_OK);
+  /* A revision that predates the last publication is stale. */
+  munit_assert_int(TC_TWIC_CCL_store_prepare(&slots[1], &index, &new_metadata), ==, TC_TWIC_CCL_OK);
+  munit_assert_int(TC_TWIC_CCL_store_publish(&store, 0, &slots[1]), ==, TC_TWIC_CCL_INVALID);
+  munit_assert_ptr_equal(store.current, &slots[0]);
+  munit_assert_size(store.revision, ==, 1);
+  munit_assert_int(slots[0].state, ==, TC_SNAPSHOT_CURRENT);
+  munit_assert_int(slots[1].state, ==, TC_SNAPSHOT_PREPARED);
+  /* An older publication date outranks a stale revision. */
+  slots[1].metadata.published_at = 99;
+  munit_assert_int(TC_TWIC_CCL_store_publish(&store, 0, &slots[1]), ==, TC_TWIC_CCL_STALE);
+  slots[1].metadata.published_at = new_metadata.published_at;
+  /* A published slot outside CURRENT blocks publish and acquire. */
+  slots[0].state = TC_SNAPSHOT_RETIRED;
+  munit_assert_int(TC_TWIC_CCL_store_publish(&store, 1, &slots[1]), ==, TC_TWIC_CCL_ARGUMENT);
+  munit_assert_int(TC_TWIC_CCL_store_acquire(&store, &reader), ==, TC_TWIC_CCL_ARGUMENT);
+  munit_assert_null(reader);
+  munit_assert_size(slots[0].readers, ==, 0);
+  munit_assert_int(slots[1].state, ==, TC_SNAPSHOT_PREPARED);
+  munit_assert_size(store.revision, ==, 1);
+  slots[0].state = TC_SNAPSHOT_CURRENT;
+  /* The acquire result must not overlap the published slot. */
+  munit_assert_int(TC_TWIC_CCL_store_acquire(
+                       &store, (TC_TWIC_CCL_snapshot**)(void*)&slots[0].index.source.context),
+                   ==, TC_TWIC_CCL_ARGUMENT);
+  munit_assert_ptr_equal(slots[0].index.source.context, &keys);
+  munit_assert_size(slots[0].readers, ==, 0);
+  /* Publishing over an unread slot frees it and clears its payload. */
+  munit_assert_int(TC_TWIC_CCL_store_publish(&store, 1, &slots[1]), ==, TC_TWIC_CCL_OK);
+  munit_assert_size(store.revision, ==, 2);
+  munit_assert_int(slots[0].state, ==, TC_SNAPSHOT_FREE);
+  munit_assert(!slots[0].index.source.read);
+  munit_assert_null(slots[0].index.source.context);
+  munit_assert_uint64(slots[0].metadata.published_at, ==, 0);
+  munit_assert_uint64(slots[0].metadata.received_at, ==, 0);
+  /* discard clears the payload. A FREE slot accepts no release. */
+  munit_assert_int(TC_TWIC_CCL_store_prepare(&slots[0], &index, &new_metadata), ==, TC_TWIC_CCL_OK);
+  munit_assert_int(TC_TWIC_CCL_store_discard(&slots[0]), ==, TC_TWIC_CCL_OK);
+  munit_assert_int(slots[0].state, ==, TC_SNAPSHOT_FREE);
+  munit_assert(!slots[0].index.source.read);
+  munit_assert_uint64(slots[0].metadata.published_at, ==, 0);
+  slots[0].readers = 1;
+  munit_assert_int(TC_TWIC_CCL_store_release(&slots[0]), ==, TC_TWIC_CCL_ARGUMENT);
+  munit_assert_size(slots[0].readers, ==, 1);
+  slots[0].readers = 0;
+  /* Releasing the last reader of the CURRENT slot keeps it published. */
+  munit_assert_int(TC_TWIC_CCL_store_acquire(&store, &reader), ==, TC_TWIC_CCL_OK);
+  munit_assert_ptr_equal(reader, &slots[1]);
+  munit_assert_int(TC_TWIC_CCL_store_release(reader), ==, TC_TWIC_CCL_OK);
+  munit_assert_int(slots[1].state, ==, TC_SNAPSHOT_CURRENT);
+  munit_assert(slots[1].index.source.read == source_key);
+  munit_assert_int(TC_TWIC_CCL_store_publish(&store, 2, NULL), ==, TC_TWIC_CCL_ARGUMENT);
+  munit_assert_int(TC_TWIC_CCL_store_acquire(&store, NULL), ==, TC_TWIC_CCL_ARGUMENT);
+  munit_assert_size(slots[1].readers, ==, 0);
   return MUNIT_OK;
 }
 
@@ -939,6 +1031,7 @@ static MunitTest tests[] = {
     {"/freshness", test_freshness, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/snapshots", test_snapshots, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/snapshot-failures", test_snapshot_failures, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/snapshot-contract", test_snapshot_contract, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/check-example", test_check_example, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/import", test_import, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/external", test_external, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

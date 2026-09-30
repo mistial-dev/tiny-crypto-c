@@ -111,6 +111,84 @@ TC_TEST(failures)
   return MUNIT_OK;
 }
 
+/* State-machine edges shared with the TWIC CCL store (tests/twic/ccl.c). */
+TC_TEST(snapshot_contract)
+{
+  int first_context, second_context;
+  TC_X509_store_source first = {&first_context, 0, 0, NULL, NULL};
+  TC_X509_store_source second = {&second_context, 0, 0, NULL, NULL};
+  TC_X509_store store = {0};
+  TC_X509_store_snapshot slots[2] = {0}, *reader = NULL;
+  /* prepare needs a FREE slot without readers. */
+  slots[0].readers = 1;
+  munit_assert_int(TC_X509_store_prepare(&slots[0], &first), ==, TC_TLV_LIMIT);
+  munit_assert_int(slots[0].state, ==, TC_SNAPSHOT_FREE);
+  munit_assert_null(slots[0].source.context);
+  slots[0].readers = 0;
+  munit_assert_int(TC_X509_store_prepare(&slots[0], &first), ==, TC_TLV_OK);
+  /* A PREPARED slot with readers can be neither published, discarded nor
+   * released. */
+  slots[0].readers = 1;
+  munit_assert_int(TC_X509_store_publish(&store, 0, &slots[0]), ==, TC_TLV_ARGUMENT);
+  munit_assert_null(store.current);
+  munit_assert_size(store.revision, ==, 0);
+  munit_assert_int(TC_X509_store_discard(&slots[0]), ==, TC_TLV_ARGUMENT);
+  munit_assert_int(TC_X509_store_release(&slots[0]), ==, TC_TLV_ARGUMENT);
+  munit_assert_size(slots[0].readers, ==, 1);
+  munit_assert_int(slots[0].state, ==, TC_SNAPSHOT_PREPARED);
+  munit_assert_ptr_equal(slots[0].source.context, &first_context);
+  slots[0].readers = 0;
+  munit_assert_int(TC_X509_store_publish(&store, 0, &slots[0]), ==, TC_TLV_OK);
+  /* A revision that predates the last publication is stale. */
+  munit_assert_int(TC_X509_store_prepare(&slots[1], &second), ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_store_publish(&store, 0, &slots[1]), ==, TC_TLV_INVALID);
+  munit_assert_ptr_equal(store.current, &slots[0]);
+  munit_assert_size(store.revision, ==, 1);
+  munit_assert_int(slots[0].state, ==, TC_SNAPSHOT_CURRENT);
+  munit_assert_int(slots[1].state, ==, TC_SNAPSHOT_PREPARED);
+  /* A published slot outside CURRENT blocks publish and acquire. */
+  slots[0].state = TC_SNAPSHOT_RETIRED;
+  munit_assert_int(TC_X509_store_publish(&store, 1, &slots[1]), ==, TC_TLV_ARGUMENT);
+  munit_assert_int(TC_X509_store_acquire(&store, &reader), ==, TC_TLV_ARGUMENT);
+  munit_assert_null(reader);
+  munit_assert_size(slots[0].readers, ==, 0);
+  munit_assert_int(slots[1].state, ==, TC_SNAPSHOT_PREPARED);
+  munit_assert_size(store.revision, ==, 1);
+  slots[0].state = TC_SNAPSHOT_CURRENT;
+  /* The acquire result must not overlap the published slot. */
+  munit_assert_int(
+      TC_X509_store_acquire(&store, (TC_X509_store_snapshot**)(void*)&slots[0].source.context), ==,
+      TC_TLV_ARGUMENT);
+  munit_assert_ptr_equal(slots[0].source.context, &first_context);
+  munit_assert_size(slots[0].readers, ==, 0);
+  /* Publishing over an unread slot frees it and clears its payload. */
+  munit_assert_int(TC_X509_store_publish(&store, 1, &slots[1]), ==, TC_TLV_OK);
+  munit_assert_size(store.revision, ==, 2);
+  munit_assert_int(slots[0].state, ==, TC_SNAPSHOT_FREE);
+  munit_assert_null(slots[0].source.context);
+  /* discard clears the payload. A FREE slot accepts no release. */
+  munit_assert_int(TC_X509_store_prepare(&slots[0], &first), ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_store_discard(&slots[0]), ==, TC_TLV_OK);
+  munit_assert_int(slots[0].state, ==, TC_SNAPSHOT_FREE);
+  munit_assert_null(slots[0].source.context);
+  slots[0].readers = 1;
+  munit_assert_int(TC_X509_store_release(&slots[0]), ==, TC_TLV_ARGUMENT);
+  munit_assert_size(slots[0].readers, ==, 1);
+  slots[0].readers = 0;
+  /* Releasing the last reader of the CURRENT slot keeps it published. */
+  munit_assert_int(TC_X509_store_acquire(&store, &reader), ==, TC_TLV_OK);
+  munit_assert_ptr_equal(reader, &slots[1]);
+  munit_assert_int(TC_X509_store_release(reader), ==, TC_TLV_OK);
+  munit_assert_int(slots[1].state, ==, TC_SNAPSHOT_CURRENT);
+  munit_assert_ptr_equal(slots[1].source.context, &second_context);
+  munit_assert_int(TC_X509_store_publish(&store, 2, NULL), ==, TC_TLV_ARGUMENT);
+  munit_assert_int(TC_X509_store_publish(NULL, 2, &slots[0]), ==, TC_TLV_ARGUMENT);
+  munit_assert_int(TC_X509_store_acquire(&store, NULL), ==, TC_TLV_ARGUMENT);
+  munit_assert_int(TC_X509_store_discard(NULL), ==, TC_TLV_ARGUMENT);
+  munit_assert_size(slots[1].readers, ==, 0);
+  return MUNIT_OK;
+}
+
 typedef struct {
   TC_bytes candidate;
   TC_X509_store_anchor anchor;
@@ -324,6 +402,7 @@ int main(int argc, char** argv)
   MunitTest tests[] = {
       {"/lifecycle", lifecycle, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/failures", failures, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/snapshot-contract", snapshot_contract, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/source-guards", source_guards, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/source-status", source_status, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/search-preflight", search_preflight, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

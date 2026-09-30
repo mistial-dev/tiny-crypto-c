@@ -270,97 +270,73 @@ static TC_TWIC_CCL_result snapshot_result(TC_TLV_result result)
   }
 }
 
-static void recycle_snapshot(TC_TWIC_CCL_snapshot* slot)
-{
-  memset(&slot->index, 0, sizeof slot->index);
-  memset(&slot->metadata, 0, sizeof slot->metadata);
-}
-
 TC_TWIC_CCL_result TC_TWIC_CCL_store_prepare(TC_TWIC_CCL_snapshot* slot,
                                              const TC_TWIC_CCL_index* index,
                                              const TC_TWIC_CCL_metadata* metadata)
 {
+  const tc_snapshot_slot view = TC_SNAPSHOT_SLOT(slot);
   if (!slot || !index || !metadata || !index->source.read || !index->source.count ||
       !tc_pki_storage_separate(slot, sizeof *slot, index, sizeof *index) ||
       !tc_pki_storage_separate(slot, sizeof *slot, metadata, sizeof *metadata))
     return TC_TWIC_CCL_ARGUMENT;
   if (metadata->published_at > metadata->received_at)
     return TC_TWIC_CCL_INVALID;
-  TC_TWIC_CCL_result result = snapshot_result(tc_snapshot_prepare(&slot->state, slot->readers));
-  if (result != TC_TWIC_CCL_OK)
-    return result;
-  slot->index = *index;
-  slot->metadata = *metadata;
-  return TC_TWIC_CCL_OK;
+  TC_TWIC_CCL_result result = snapshot_result(tc_snapshot_prepare(&view));
+  if (result == TC_TWIC_CCL_OK) {
+    slot->index = *index;
+    slot->metadata = *metadata;
+  }
+  return result;
 }
 
 TC_TWIC_CCL_result TC_TWIC_CCL_store_discard(TC_TWIC_CCL_snapshot* slot)
 {
-  if (!slot)
-    return TC_TWIC_CCL_ARGUMENT;
-  TC_TWIC_CCL_result result = snapshot_result(tc_snapshot_discard(&slot->state, slot->readers));
-  if (result == TC_TWIC_CCL_OK)
-    recycle_snapshot(slot);
-  return result;
+  const tc_snapshot_slot view = TC_SNAPSHOT_SLOT(slot);
+  return snapshot_result(tc_snapshot_discard(&view));
 }
 
 TC_TWIC_CCL_result TC_TWIC_CCL_store_publish(TC_TWIC_CCL_store* store, size_t revision,
                                              TC_TWIC_CCL_snapshot* slot)
 {
-  TC_TWIC_CCL_snapshot* previous;
-  if (!store || !slot)
-    return TC_TWIC_CCL_ARGUMENT;
-  previous = store->current;
-  if (!tc_snapshot_publish_separate(store, sizeof *store, slot, sizeof *slot, previous,
-                                    sizeof *previous))
-    return TC_TWIC_CCL_ARGUMENT;
-  /* State errors outrank staleness. */
-  if (tc_snapshot_publish_check(slot->state, slot->readers, previous ? &previous->state : NULL) !=
-      TC_TLV_OK)
-    return TC_TWIC_CCL_ARGUMENT;
-  if (previous && slot->metadata.published_at < previous->metadata.published_at)
-    return TC_TWIC_CCL_STALE;
-  TC_TWIC_CCL_result result = snapshot_result(
-      tc_snapshot_publish(&slot->state, slot->readers, previous ? &previous->state : NULL,
-                          previous ? previous->readers : 0, revision, &store->revision));
-  if (result != TC_TWIC_CCL_OK)
-    return result;
-  store->current = slot;
-  if (previous && previous->state == TC_SNAPSHOT_FREE)
-    recycle_snapshot(previous);
-  return TC_TWIC_CCL_OK;
+  const tc_snapshot_store store_view = TC_SNAPSHOT_STORE(store);
+  const tc_snapshot_slot next = TC_SNAPSHOT_SLOT(slot);
+  TC_TWIC_CCL_snapshot* current = store ? store->current : NULL;
+  const tc_snapshot_slot previous = TC_SNAPSHOT_SLOT(current);
+  /* State errors outrank staleness, which outranks a stale revision. */
+  TC_TWIC_CCL_result result =
+      snapshot_result(tc_snapshot_publish_check(&store_view, &next, &previous));
+  if (result == TC_TWIC_CCL_OK && current &&
+      slot->metadata.published_at < current->metadata.published_at)
+    result = TC_TWIC_CCL_STALE;
+  if (result == TC_TWIC_CCL_OK)
+    result = snapshot_result(tc_snapshot_publish_commit(&store_view, &next, &previous, revision));
+  if (result == TC_TWIC_CCL_OK)
+    store->current = slot;
+  return result;
 }
 
 TC_TWIC_CCL_result TC_TWIC_CCL_store_acquire(TC_TWIC_CCL_store* store, TC_TWIC_CCL_snapshot** out)
 {
-  if (!store || !out || !tc_pki_storage_separate(store, sizeof *store, out, sizeof *out))
-    return TC_TWIC_CCL_ARGUMENT;
-  TC_TWIC_CCL_snapshot* slot = store->current;
-  if (!slot)
+  const tc_snapshot_store store_view = TC_SNAPSHOT_STORE(store);
+  const tc_snapshot_slot current = TC_SNAPSHOT_SLOT(store ? store->current : NULL);
+  const TC_TLV_result result = tc_snapshot_acquire(&store_view, &current, out, sizeof *out);
+  if (result == TC_TLV_END)
     return TC_TWIC_CCL_UNAVAILABLE;
-  if (!tc_snapshot_acquire_separate(store, sizeof *store, slot, sizeof *slot, out, sizeof *out))
-    return TC_TWIC_CCL_ARGUMENT;
-  TC_TWIC_CCL_result result = snapshot_result(tc_snapshot_acquire(slot->state, &slot->readers));
-  if (result == TC_TWIC_CCL_OK)
-    *out = slot;
-  return result;
+  if (result == TC_TLV_OK)
+    *out = store->current;
+  return snapshot_result(result);
 }
 
 TC_TWIC_CCL_result TC_TWIC_CCL_store_release(TC_TWIC_CCL_snapshot* slot)
 {
-  if (!slot)
-    return TC_TWIC_CCL_ARGUMENT;
-  TC_TWIC_CCL_result result = snapshot_result(tc_snapshot_release(&slot->state, &slot->readers));
-  if (result == TC_TWIC_CCL_OK && slot->state == TC_SNAPSHOT_FREE)
-    recycle_snapshot(slot);
-  return result;
+  const tc_snapshot_slot view = TC_SNAPSHOT_SLOT(slot);
+  return snapshot_result(tc_snapshot_release(&view));
 }
 
 TC_TWIC_CCL_result TC_TWIC_CCL_snapshot_contains(const TC_TWIC_CCL_snapshot* slot, TC_bytes fascn,
                                                  size_t max_reads, int* listed)
 {
-  if (!slot || !listed || !slot->readers ||
-      (slot->state != TC_SNAPSHOT_CURRENT && slot->state != TC_SNAPSHOT_RETIRED) ||
+  if (!slot || !listed || !tc_snapshot_held(slot->state, slot->readers) ||
       !tc_pki_storage_separate(slot, sizeof *slot, listed, sizeof *listed))
     return TC_TWIC_CCL_ARGUMENT;
   if (slot->state == TC_SNAPSHOT_RETIRED)
