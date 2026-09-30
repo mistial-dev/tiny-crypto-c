@@ -136,6 +136,10 @@ static TC_TWIC_tpk tc_header_tpk;
 #error "The C umbrella must expose the PIV key proof header"
 #endif
 
+#if defined(TC_TEST_HEADER_PIV_CARD_CHECK) && !defined(TINY_CRYPTO_PIV_CARD_CHECK_H_)
+#error "The C umbrella must expose the PIV card check header"
+#endif
+
 #if defined(TC_TEST_HEADER_TWIC_CCL) && !defined(TINY_CRYPTO_TWIC_CCL_H_)
 #error "The C umbrella must expose enabled TWIC CCL declarations"
 #endif

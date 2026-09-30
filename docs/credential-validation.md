@@ -37,8 +37,9 @@ result exposes borrowed printed fields through `result.printed` and sets
 
 The shared sequence is:
 
-1. Validate the selected card-key certificate under card-key trust.
-1. Read and bind the certificate identifiers.
+1. Validate the selected card-key certificate under card-key trust and read its
+   identifiers with `TC_PIV_card_certificate_validate`
+   ([card check](piv-card-check.md#retained-certificates)).
 1. For TWIC, check the held canceled-card-list snapshot and its freshness metadata.
 1. Ask the application to perform a fresh proof with the accepted public key.
 1. Validate the signed CHUID under separate content-signer trust.
@@ -86,9 +87,12 @@ The wrapper enforces NEXGEN RSA-2048 and accepts Legacy RSA-1024 only when
 `allow_legacy_rsa1024` is set explicitly.
 
 The card context may provide an exact card-authentication purpose OID. With an
-empty purpose, the example derives one exact PIV/TWIC-compatible purpose from
-the certificate. It always requires digital-signature key usage, extended key
-usage and an explicit purpose match before accepting the path.
+empty purpose, `TC_PIV_card_certificate_validate` derives one exact
+PIV/TWIC-compatible purpose from the certificate. It always requires
+digital-signature key usage, extended key usage and an explicit purpose match
+before accepting the path. For a live card, the
+[card check](piv-card-check.md) composes the same validators over an
+inventory and reports each check separately.
 
 All encoded inputs and trust sources are borrowed. Keep the certificate, CHUID,
 object inventory, applicable CCL snapshot, and their backing storage immutable

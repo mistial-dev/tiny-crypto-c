@@ -51,6 +51,12 @@
 #define TC_ENABLE_PIV_CATALOG 1
 #define TC_ENABLE_KEY_CHALLENGE 1
 #define TC_ENABLE_PIV_KEY_PROOF 1
+#define TC_ENABLE_X509_PATH 1
+#define TC_ENABLE_X509_REVOCATION 1
+#define TC_ENABLE_CMS_VALIDATION 1
+#define TC_ENABLE_PIV_CHUID 1
+#define TC_ENABLE_CREDENTIAL 1
+#define TC_ENABLE_PIV_CARD_CHECK 1
 #define TC_ENABLE_DRBG 1
 #define TC_DRBG_ENABLE_HASH 1
 #define TC_DRBG_ENABLE_HMAC 1
@@ -71,6 +77,7 @@
 #include <tiny_crypto/gzip.hpp>
 #include <tiny_crypto/hash.hpp>
 #include <tiny_crypto/kmac.hpp>
+#include <tiny_crypto/piv_card_check.hpp>
 #include <tiny_crypto/piv_catalog.hpp>
 #include <tiny_crypto/piv_command.hpp>
 #include <tiny_crypto/piv_key_proof.hpp>
@@ -282,6 +289,16 @@ void tiny_crypto_nodiscard_compile(uint8_t* data, size_t length)
   TC_work_budget proof_work = {0};
   piv_key_parameters_select(certificate, proof.policy, parameters);       /* DISCARDED */
   piv_key_prove(link, proof, rng, provider, proof_workspace, proof_work); /* DISCARDED */
+  static piv_card_report report;
+  static piv_card_check_workspace check_workspace;
+  const piv_card_check_request check = {};
+  const piv_check_requirement required[] = {{TC_PIV_CHECK_CHUID, 0, 0}};
+  const piv_card_proof_request keys = {};
+  size_t check_work = 0;
+  piv_card_check(check, check_workspace, check_work, report);           /* DISCARDED */
+  piv_card_report_find(report, required[0]);                            /* DISCARDED */
+  piv_card_report_accepts(report, required);                            /* DISCARDED */
+  piv_card_prove_keys(link, keys, proof_workspace, proof_work, report); /* DISCARDED */
 
   /* Clearing stays unmarked. */
   aes.clear();

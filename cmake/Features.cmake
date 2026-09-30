@@ -56,6 +56,12 @@ tc_module_feature(TINY_CRYPTO_ENABLE_PIV_KEY_PROOF TC_ENABLE_PIV_KEY_PROOF
   "Build PIV and TWIC card key proofs over GENERAL AUTHENTICATE")
 set(tc_module_sources_TC_ENABLE_PIV_KEY_PROOF src/piv_key_policy.c src/piv_key_proof.c)
 
+tc_module_feature(TINY_CRYPTO_ENABLE_PIV_CARD_CHECK TC_ENABLE_PIV_CARD_CHECK
+  "Build the composed PIV and TWIC card check")
+set(tc_module_sources_TC_ENABLE_PIV_CARD_CHECK
+  src/piv_card_check.c src/piv_card_check_certificates.c src/piv_card_check_signed.c
+  src/piv_card_check_keys.c src/piv_card_check_report.c)
+
 tc_module_feature(TINY_CRYPTO_ENABLE_PIV_OIDS TC_ENABLE_PIV_OIDS
   "Build registered PIV and TWIC identifier classification")
 set(tc_module_sources_TC_ENABLE_PIV_OIDS src/piv_oid.c)
@@ -105,7 +111,7 @@ set(tc_module_sources_TC_ENABLE_PIV_OBJECTS
 tc_module_feature(TINY_CRYPTO_ENABLE_CREDENTIAL TC_ENABLE_CREDENTIAL
   "Build composed PIV and TWIC credential validation")
 set(tc_module_sources_TC_ENABLE_CREDENTIAL src/credential.c src/credential_policy.c
-  src/credential_session.c src/credential_security.c)
+  src/credential_session.c src/credential_security.c src/credential_signer.c)
 
 function(tc_append_module_sources output)
   set(sources ${${output}})

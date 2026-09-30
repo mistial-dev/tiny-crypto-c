@@ -762,6 +762,21 @@
 #error "PIV key proofs require PIV card commands, key challenges and the X.509 reader"
 #endif
 
+/* Composed card check: a report of every check on a card inventory, key
+ * proofs and requirement-based acceptance. */
+#ifndef TC_ENABLE_PIV_CARD_CHECK
+#define TC_ENABLE_PIV_CARD_CHECK TC_PROFILE_VALUE(0, 0, 0, 1)
+#endif
+#if TC_ENABLE_PIV_CARD_CHECK != 0 && TC_ENABLE_PIV_CARD_CHECK != 1
+#error "TC_ENABLE_PIV_CARD_CHECK must be 0 or 1"
+#endif
+#if TC_ENABLE_PIV_CARD_CHECK &&                                                                    \
+    (!TC_ENABLE_CREDENTIAL || !TC_ENABLE_PIV_CATALOG || !TC_ENABLE_X509_PATH ||                    \
+     !TC_ENABLE_X509_REVOCATION || !TC_ENABLE_GZIP)
+#error                                                                                             \
+    "The PIV card check requires credentials, the PIV catalog, X.509 paths and revocation, and GZIP"
+#endif
+
 /* DRBG mechanism dependencies, checked after every option is defined. */
 #if TC_ENABLE_DRBG
 #if !TC_DRBG_ENABLE_HASH && !TC_DRBG_ENABLE_HMAC && !TC_DRBG_ENABLE_CTR

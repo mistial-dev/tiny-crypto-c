@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
  * Validation context over vendored certificates and CRLs for the credential
- * tests. One anchor certificate, untrusted candidates and an optional CRL
+ * tests. Anchor certificates, untrusted candidates and an optional CRL
  * index feed a TC_validation_context with the native signature provider.
  * The fixture points into itself, so keep it in place (a static object). */
 #ifndef TC_TEST_CREDENTIAL_VALIDATION_FIXTURE_H_
@@ -21,6 +21,7 @@ enum {
   FIXTURE_OIDS = 64,
   FIXTURE_CANDIDATES = 4,
   FIXTURE_CRLS = 4,
+  FIXTURE_ANCHORS = 2,
   FIXTURE_ARENA_BYTES = 1024 * 1024,
   FIXTURE_WORK = 200000000
 };
@@ -36,7 +37,7 @@ typedef struct {
   TC_X509_native_workspace native;
   TC_validation_storage arena[FIXTURE_ARENA_BYTES / sizeof(TC_validation_storage)];
   TC_validation_workspace workspace;
-  TC_X509_store_anchor anchor;
+  TC_X509_store_anchor anchors[FIXTURE_ANCHORS];
   TC_bytes candidates[FIXTURE_CANDIDATES];
   TC_X509_store_array array;
   TC_X509_store_source source;
@@ -59,15 +60,31 @@ static inline TC_bytes fixture_read(const char* path, uint8_t bytes[FIXTURE_FILE
   return (TC_bytes){bytes, length};
 }
 
-/* Build the context: anchor is trusted, candidates are untrusted issuers and
- * crls are indexed. CRL signer searches read only candidates, so list the
- * anchor certificate among them when it signs a CRL. All spans borrow
- * caller bytes that stay unchanged. */
-static inline void validation_fixture_init(validation_fixture* fixture, TC_bytes anchor,
-                                           const TC_bytes* candidates, size_t candidate_count,
-                                           const TC_bytes* crls, size_t crl_count, TC_X509_time at,
-                                           TC_validation_revocation revocation)
+/* The trust inputs of a fixture: trusted anchors, untrusted candidate
+ * issuers and indexed CRLs. */
+typedef struct {
+  const TC_bytes* anchors;
+  size_t anchor_count;
+  const TC_bytes* candidates;
+  size_t candidate_count;
+  const TC_bytes* crls;
+  size_t crl_count;
+} validation_fixture_trust;
+
+/* Build the context from trust. CRL signer searches read only candidates,
+ * so list an anchor certificate among them when it signs a CRL. All spans
+ * borrow caller bytes that stay unchanged. */
+static inline void validation_fixture_init_trust(validation_fixture* fixture,
+                                                 const validation_fixture_trust* trust_inputs,
+                                                 TC_X509_time at,
+                                                 TC_validation_revocation revocation)
 {
+  const TC_bytes* candidates = trust_inputs->candidates;
+  const size_t candidate_count = trust_inputs->candidate_count;
+  const TC_bytes* crls = trust_inputs->crls;
+  const size_t crl_count = trust_inputs->crl_count;
+  munit_assert_size(trust_inputs->anchor_count, >=, 1);
+  munit_assert_size(trust_inputs->anchor_count, <=, FIXTURE_ANCHORS);
   munit_assert_size(candidate_count, <=, FIXTURE_CANDIDATES);
   munit_assert_size(crl_count, <=, FIXTURE_CRLS);
   fixture->limits = (TC_TLV_limits){FIXTURE_FILE_BYTES, FIXTURE_FILE_BYTES, 512, FIXTURE_FRAMES};
@@ -84,14 +101,19 @@ static inline void validation_fixture_init(validation_fixture* fixture, TC_bytes
                        &fixture->workspace),
                    ==, TC_RESULT_OK);
 
-  TC_X509_certificate view;
-  munit_assert_int(TC_X509_read(anchor, &fixture->limits, &fixture->parser, &view), ==, TC_TLV_OK);
-  munit_assert_int(TC_X509_store_anchor_from_certificate(&view, &fixture->limits, &fixture->parser,
-                                                         &fixture->anchor),
-                   ==, TC_TLV_OK);
+  for (size_t i = 0; i < trust_inputs->anchor_count; ++i) {
+    TC_X509_certificate view;
+    munit_assert_int(
+        TC_X509_read(trust_inputs->anchors[i], &fixture->limits, &fixture->parser, &view), ==,
+        TC_TLV_OK);
+    munit_assert_int(TC_X509_store_anchor_from_certificate(&view, &fixture->limits,
+                                                           &fixture->parser, &fixture->anchors[i]),
+                     ==, TC_TLV_OK);
+  }
   for (size_t i = 0; i < candidate_count; ++i)
     fixture->candidates[i] = candidates[i];
-  fixture->array = (TC_X509_store_array){fixture->candidates, candidate_count, &fixture->anchor, 1};
+  fixture->array = (TC_X509_store_array){fixture->candidates, candidate_count, fixture->anchors,
+                                         trust_inputs->anchor_count};
   munit_assert_int(TC_X509_store_array_source(&fixture->array, &fixture->source), ==, TC_TLV_OK);
   for (size_t i = 0; i < crl_count; ++i)
     fixture->crls[i] = crls[i];
@@ -114,6 +136,16 @@ static inline void validation_fixture_init(validation_fixture* fixture, TC_bytes
   munit_assert_int(TC_validation_context_init(&trust, &fixture->options,
                                               &fixture->workspace.credential, &fixture->context),
                    ==, TC_RESULT_OK);
+}
+
+/* Build the context with one anchor. */
+static inline void validation_fixture_init(validation_fixture* fixture, TC_bytes anchor,
+                                           const TC_bytes* candidates, size_t candidate_count,
+                                           const TC_bytes* crls, size_t crl_count, TC_X509_time at,
+                                           TC_validation_revocation revocation)
+{
+  const validation_fixture_trust trust = {&anchor, 1, candidates, candidate_count, crls, crl_count};
+  validation_fixture_init_trust(fixture, &trust, at, revocation);
 }
 
 /* Read the card identifiers from the subjectAltName of a validated Card

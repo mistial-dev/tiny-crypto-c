@@ -4,6 +4,7 @@
 #define EXAMPLE_CREDENTIAL_WORKFLOW_H_
 
 #include <tiny_crypto/credential.h>
+#include <tiny_crypto/piv_card_check.h>
 #include <tiny_crypto/piv_key_proof.h>
 #include <tiny_crypto/piv_printed.h>
 #include <tiny_crypto/twic_ccl.h>

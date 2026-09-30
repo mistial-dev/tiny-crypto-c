@@ -420,8 +420,17 @@ TC_credential_status tc_cms_path_revocation_check(const TC_X509_search_result* p
 {
   for (size_t i = 0; i < path->count; ++i)
     workspace->held_path[i] = path->path[i];
-  /* CRL freshness uses the signer policy's time and clock skew, with no age
-   * bound. CMS credential validation takes no OCSP responses. */
+  /* Freshness uses the signer policy's time and clock skew, with no age
+   * bound. An OCSP response, when supplied, covers the end-entity member. */
+  TC_bytes responses[TC_CMS_OCSP_PATH_MAX] = {{NULL, 0}};
+  TC_X509_revocation_ocsp ocsp = {NULL, 0, 0, 0};
+  if (evidence && evidence->ocsp.length) {
+    if (path->count > TC_CMS_OCSP_PATH_MAX)
+      return TC_CREDENTIAL_LIMIT;
+    responses[path->count - 1] = evidence->ocsp;
+    ocsp = (TC_X509_revocation_ocsp){responses, path->count, evidence->ocsp_max_responses,
+                                     evidence->ocsp_max_certificates};
+  }
   const TC_X509_revocation_time time = {revocation->signer_policy->at,
                                         revocation->signer_policy->clock_skew_seconds, 0};
   const TC_X509_revocation_options policy = {revocation->index,
@@ -432,7 +441,7 @@ TC_credential_status tc_cms_path_revocation_check(const TC_X509_search_result* p
                                              revocation->delta_policy,
                                              revocation->order_policy,
                                              time,
-                                             {NULL, 0, 0, 0}};
+                                             ocsp};
   const TC_X509_revocation_workspace scratch = {&workspace->path->validation,
                                                 &workspace->path->search,
                                                 workspace->crl_states,

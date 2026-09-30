@@ -111,20 +111,29 @@ typedef struct {
 } tc_cms_prepared_signed_data;
 
 /* Revocation evidence rule of one validation. evidence_optional set to 1
- * accepts a path member without CRL evidence, as
+ * accepts a path member without evidence, as
  * TC_VALIDATION_REVOCATION_WHEN_AVAILABLE does. checked, when not NULL,
- * receives 1 on VALID when CRL evidence covered every member and 0 when a
- * member had none. */
+ * receives 1 on VALID when evidence covered every member and 0 when a
+ * member had none. ocsp, when nonempty, is a DER OCSPResponse for the last
+ * path member, the end-entity certificate, verified with the limits
+ * ocsp_max_responses and ocsp_max_certificates of TC_X509_revocation_ocsp.
+ * The other members use CRLs. */
 typedef struct {
   int evidence_optional;
   uint8_t* checked;
+  TC_bytes ocsp;
+  size_t ocsp_max_responses, ocsp_max_certificates;
 } tc_cms_revocation_evidence;
 
-/* Check every member of a built path against the CRL index (RFC 5280
- * section 6.3). REVOKED for a revoked member. A member without evidence
- * returns UNAVAILABLE unless evidence->evidence_optional is 1. A NULL
- * evidence requires evidence for every member. Other failures map the
- * revocation check result. */
+/* Longest path that can carry an end-entity OCSP response. */
+enum { TC_CMS_OCSP_PATH_MAX = 8 };
+
+/* Check every member of a built path against the CRL index and the optional
+ * end-entity OCSP response (RFC 5280 section 6.3, RFC 6960). REVOKED for a
+ * revoked member. A member without evidence returns UNAVAILABLE unless
+ * evidence->evidence_optional is 1. A NULL evidence requires evidence for
+ * every member. LIMIT for an OCSP response on a path longer than
+ * TC_CMS_OCSP_PATH_MAX. Other failures map the revocation check result. */
 TC_credential_status tc_cms_path_revocation_check(const TC_X509_search_result* path,
                                                   const TC_X509_store_source* source,
                                                   const TC_CMS_revocation_policy* revocation,

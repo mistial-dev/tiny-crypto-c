@@ -30,6 +30,18 @@ TC_TLV_result tc_validation_storage(const TC_validation_context* context, const 
 tc_cms_revocation_evidence tc_validation_evidence(const TC_validation_context* context,
                                                   uint8_t* checked);
 
+/* TC_X509_validate under an explicit evidence rule. evidence->ocsp adds an
+ * OCSP response for the certificate itself. *path_valid, when path_valid is
+ * not NULL, is set to 1 once the path is valid, so a caller can tell path
+ * failures from revocation failures. Statuses, work and failure behavior
+ * match TC_X509_validate, with UNAVAILABLE only when
+ * evidence->evidence_optional is 0. */
+TC_credential_status tc_x509_validate_evidence(TC_bytes encoded,
+                                               const TC_validation_context* context,
+                                               const tc_cms_revocation_evidence* evidence,
+                                               size_t* work, TC_X509_validation_result* out,
+                                               int* path_valid);
+
 /* Adapt shared execution settings to the path and revocation engines. Returns
  * 0 for an incomplete context or an unknown revocation policy. */
 int tc_validation_policies(const TC_validation_context* context, TC_CMS_path_options* cms,

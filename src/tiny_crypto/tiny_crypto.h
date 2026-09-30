@@ -48,6 +48,9 @@
 #if TC_ENABLE_PIV_KEY_PROOF
 #include <tiny_crypto/piv_key_proof.h>
 #endif
+#if TC_ENABLE_PIV_CARD_CHECK
+#include <tiny_crypto/piv_card_check.h>
+#endif
 #if TC_ENABLE_AAMVA
 #include <tiny_crypto/aamva.h>
 #endif

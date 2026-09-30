@@ -104,8 +104,13 @@ They remain usable after another operation reuses the arena.
 `TC_CMS_validate` checks one selected signer, attached or detached content, its
 certificate path, and revocation. Application-specific object checks follow it.
 
-`TC_PIV_CVC_validate` validates the X.509 signer and its CRLs, then verifies the
-card's CVC chain. Secure-messaging key confirmation completes session setup.
+`TC_PIV_content_signer_validate` validates a content signer certificate, such
+as the secure messaging Certificate Signer of container `5FC122`, under the
+content-signing policy of the CHUID signer for the card profile.
+`TC_PIV_CVC_validate` validates the X.509 signer the same way, then verifies
+the card's CVC chain. Secure-messaging key confirmation completes session
+setup. The [card check](piv-card-check.md) composes these validators over a
+card inventory.
 
 For signed card objects:
 

@@ -342,5 +342,17 @@ int tiny_crypto_cpp_header_compile(uint8_t* data, size_t length)
       ++failures;
   }
 #endif
+#if TC_ENABLE_PIV_CARD_CHECK
+  {
+    static tiny_crypto::piv_card_report report;
+    static tiny_crypto::piv_card_check_workspace workspace;
+    const tiny_crypto::piv_card_check_request request{};
+    const tiny_crypto::piv_check_requirement required[] = {{TC_PIV_CHECK_CHUID, 0, 0}};
+    size_t work = 0;
+    if (tiny_crypto::piv_card_check(request, workspace, work, report) != TC_PIV_ARGUMENT ||
+        tiny_crypto::piv_card_report_accepts(report, required))
+      ++failures;
+  }
+#endif
   return failures;
 }

@@ -700,7 +700,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
       tiny-crypto-c-test-twic-cipher-${profile} tests/twic/cipher.c)
   endforeach()
   set(tc_pki_sources src/common.c src/tlv.c src/tlv_walk.c src/der.c src/x509_crl.c src/x509_crl_extensions.c src/x509_crl_selected.c src/x509_crl_evidence.c src/x509_crl_entries.c src/pki_storage.c src/piv_oid.c src/piv_container_internal.c src/credential_text_internal.c src/piv_cms.c src/piv_biometric.c src/piv_certificate.c src/piv_card.c src/piv_printed.c src/key_challenge.c src/lds.c src/piv_security.c src/fascn.c src/twic_uuid.c
-    src/piv_cvc.c src/piv_cvc_verify.c src/piv_chuid.c src/credential.c src/credential_policy.c src/credential_session.c src/credential_security.c src/validation.c src/x509.c src/x509_crypto.c src/x509_time.c src/x509_key.c src/pki_key.c src/pki_signature_oid.c src/x509_ext.c src/x509_name.c src/x509_name_constraints.c src/x509_path.c src/x509_path_extensions.c src/x509_path_workspace.c src/x509_search.c src/x509_store.c src/x509_store_anchor.c src/snapshot.c src/cms.c src/cms_collections.c src/cms_path.c src/x509_revocation.c src/x509_crl_scope.c src/x509_crl_scope_storage.c src/x509_crl_delta.c src/x509_policy.c src/asn1_string.c src/unicode.c src/eac_cvc.c)
+    src/piv_cvc.c src/piv_cvc_verify.c src/piv_chuid.c src/credential.c src/credential_policy.c src/credential_session.c src/credential_security.c src/credential_signer.c src/validation.c src/x509.c src/x509_crypto.c src/x509_time.c src/x509_key.c src/pki_key.c src/pki_signature_oid.c src/x509_ext.c src/x509_name.c src/x509_name_constraints.c src/x509_path.c src/x509_path_extensions.c src/x509_path_workspace.c src/x509_search.c src/x509_store.c src/x509_store_anchor.c src/snapshot.c src/cms.c src/cms_collections.c src/cms_path.c src/x509_revocation.c src/x509_crl_scope.c src/x509_crl_scope_storage.c src/x509_crl_delta.c src/x509_policy.c src/asn1_string.c src/unicode.c src/eac_cvc.c)
   list(APPEND tc_pki_sources src/source.c src/source_der.c src/x509_crl_source.c src/x509_crl_prepare.c)
   tc_add_test_library(tiny-crypto-c-test-pki ${tc_pki_sources})
   target_compile_definitions(tiny-crypto-c-test-pki PUBLIC
@@ -856,8 +856,9 @@ if(TINY_CRYPTO_BUILD_TESTS)
   set(tc_native_card_sources ${tc_piv_command_sources} src/piv_sm_apdu.c
     src/piv_sm_key_request.c src/piv_discovery.c src/piv_discovery_get.c src/piv_vci.c
     src/piv_catalog.c src/piv_inventory.c src/piv_key_policy.c src/piv_key_proof.c
-    src/inflate_tree.c src/inflate_bits.c src/inflate_tables.c src/inflate.c src/gzip.c
-    src/gzip_api.c src/piv_certificate_decode.c)
+    src/piv_card_check.c src/piv_card_check_certificates.c src/piv_card_check_signed.c
+    src/piv_card_check_keys.c src/piv_card_check_report.c src/inflate_tree.c src/inflate_bits.c src/inflate_tables.c src/inflate.c src/gzip.c
+    src/gzip_api.c src/piv_certificate_decode.c src/piv_bit_group.c src/piv_card_objects_internal.c)
   list(REMOVE_ITEM tc_native_card_sources ${tc_native_pki_sources})
   tc_add_test_library(tiny-crypto-c-test-pki-native ${tc_native_pki_sources}
     src/x509_trust_anchor.c src/x509_ocsp.c
@@ -875,7 +876,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
     TC_ENABLE_CMS_VALIDATION=1 TC_ENABLE_PIV_OBJECTS=1
     TC_ENABLE_CREDENTIAL=1 TC_ENABLE_APDU=1 TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_PIV_SM_APDU=1
     TC_ENABLE_PIV_VCI=1 TC_ENABLE_PIV_CATALOG=1 TC_ENABLE_PIV_KEY_PROOF=1 TC_ENABLE_GZIP=1
-    TC_AES_ENABLE_DYNAMIC=1 TC_ENABLE_SSKDF=1 TC_ENABLE_PIV_SM=1
+    TC_ENABLE_PIV_CARD_CHECK=1 TC_AES_ENABLE_DYNAMIC=1 TC_ENABLE_SSKDF=1 TC_ENABLE_PIV_SM=1
     TC_PIV_SM_ENABLE_CS2=1 TC_PIV_SM_ENABLE_CS7=1 TC_EC_ENABLE_P192=1 TC_EC_ENABLE_P256=1 TC_EC_ENABLE_P384=1
     TC_ENABLE_EC=1 TC_ENABLE_RSA=1 TC_ENABLE_SHA1=1 TC_ENABLE_SHA224=1
     TC_ENABLE_SHA256=1 TC_ENABLE_SHA384=1 TC_ENABLE_SHA512=1)
@@ -890,6 +891,12 @@ if(TINY_CRYPTO_BUILD_TESTS)
     ${tc_card_simulator_sources} tests/support/scripted_transport.c)
   target_compile_definitions(test_piv_key_proof PRIVATE
     TC_CARD_FIXTURE_DIR="${PROJECT_SOURCE_DIR}/tests/vectors/piv/sm_captures/fixtures")
+  # The composed card check over the SD 33 simulators, CRLs and OCSP.
+  tc_add_c_test(test_piv_card_check tiny-crypto-c-test-pki-native tests/piv/card_check.c
+    ${tc_card_simulator_sources})
+  target_compile_definitions(test_piv_card_check PRIVATE
+    TC_CARD_FIXTURE_DIR="${PROJECT_SOURCE_DIR}/tests/vectors/piv/sm_captures/fixtures"
+    TC_VECTOR_DIR="${PROJECT_SOURCE_DIR}/tests/vectors")
   # Revocation evidence policy and Security Object digests over vendored PKIs.
   tc_add_c_test(test_credential_revocation_policy tiny-crypto-c-test-pki-native
     tests/credential/revocation_policy.c)
@@ -1220,6 +1227,9 @@ if(TINY_CRYPTO_BUILD_TESTS)
     target_include_directories(test_cpp_piv_key_proof PRIVATE tests/support)
     target_compile_definitions(test_cpp_piv_key_proof PRIVATE
       TC_CARD_FIXTURE_DIR="${PROJECT_SOURCE_DIR}/tests/vectors/piv/sm_captures/fixtures")
+    tc_add_linked_test(test_cpp_piv_card_check tiny-crypto-c-test-pki-native
+      tests/cpp/piv_card_check.cpp tests/cpp/main.cpp)
+    target_include_directories(test_cpp_piv_card_check PRIVATE tests/support)
     tc_add_linked_test(test_cpp_piv_sm_apdu tiny-crypto-c-test-piv-sm
       tests/cpp/piv_sm_apdu.cpp tests/support/sm_card.c tests/support/sm_card_session.c
       tests/cpp/main.cpp)
@@ -1464,7 +1474,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   # This catches accidental feature coupling and keeps their C API surface equal.
   foreach(header_profile rsa tlv apdu piv_command aamva fascn twic_uuid twic_tpk twic_object hkdf aes_kw
       piv_oids x509 key_challenge x509_path x509_revocation x509_ocsp cms cms_validation piv_objects credential piv_cvc piv_chuid
-      piv_sm piv_sm_apdu piv_vci piv_catalog piv_key_proof twic_ccl)
+      piv_sm piv_sm_apdu piv_vci piv_catalog piv_key_proof piv_card_check twic_ccl)
     set(header_profile_definitions TC_ENABLE_AES=0 TC_ENABLE_SHA256=0)
     if(header_profile STREQUAL "hkdf")
       list(REMOVE_ITEM header_profile_definitions TC_ENABLE_SHA256=0)
@@ -1491,6 +1501,13 @@ if(TINY_CRYPTO_BUILD_TESTS)
       list(APPEND header_profile_definitions TC_ENABLE_APDU=1 TC_ENABLE_TLV=1 TC_ENABLE_DER=1
         TC_ENABLE_X509=1 TC_ENABLE_KEY_CHALLENGE=1 TC_ENABLE_PIV_COMMAND=1
         TC_ENABLE_PIV_KEY_PROOF=1 TC_TEST_HEADER_PIV_KEY_PROOF=1)
+    elseif(header_profile STREQUAL "piv_card_check")
+      list(APPEND header_profile_definitions TC_ENABLE_APDU=1 TC_ENABLE_TLV=1 TC_ENABLE_DER=1
+        TC_TLV_ENABLE_BER=1 TC_ENABLE_X509=1 TC_ENABLE_PIV_OIDS=1 TC_ENABLE_X509_PATH=1
+        TC_ENABLE_X509_REVOCATION=1 TC_ENABLE_CMS=1 TC_ENABLE_CMS_VALIDATION=1 TC_ENABLE_FASCN=1
+        TC_ENABLE_TWIC_UUID=1 TC_ENABLE_PIV_OBJECTS=1 TC_ENABLE_PIV_CHUID=1 TC_ENABLE_CREDENTIAL=1
+        TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_PIV_CATALOG=1 TC_ENABLE_GZIP=1
+        TC_ENABLE_PIV_CARD_CHECK=1 TC_TEST_HEADER_PIV_CARD_CHECK=1)
     elseif(header_profile STREQUAL "aamva")
       list(APPEND header_profile_definitions TC_ENABLE_AAMVA=1 TC_TEST_HEADER_AAMVA=1)
     elseif(header_profile STREQUAL "fascn")

@@ -129,6 +129,20 @@ Legacy TWIC application, argument errors including inputs inside the link
 storage, the exchange, work and random-source failures, and a lost secure messaging
 session. `test_cpp_piv_key_proof` runs the C++ wrappers.
 
+`test_piv_card_check` covers the [card check](piv-card-check.md) over the card
+simulator with the SD 33 fixtures, the pinned issuing CAs, the CRLs of
+`tests/vectors/x509/crl/sd33` and the OCSP responses of
+`tests/vectors/x509/ocsp/sd33` at 2026-09-29T18:00:00Z. Card 2 runs on contact
+and on contactless under secure messaging with the VCI, with and without the
+PIN, and card 4 on contactless. It covers every check kind, the REQUIRED and
+WHEN_AVAILABLE revocation policies with partial and missing evidence, absent,
+denied and changed objects that fail only the checks over them, a missing
+Security Object under the Discovery consistency, a changed CVC and plain copy,
+the TWIC rule for the PIV application, key proofs with a refused 9A on
+contactless without the VCI, exhausted work, the report limit, acceptance,
+retained certificates and argument errors. `test_cpp_piv_card_check` runs the
+C++ wrappers.
+
 `test_piv_card_simulator` covers `tests/support/card_simulator.c`, a PIV card
 model for the card-level suites. It answers from the SD 33 card 2 and card 4
 fixtures in `tests/vectors/piv/sm_captures/fixtures` and applies the SP
@@ -589,6 +603,8 @@ reads their entries, and verifies their signatures with the native provider.
 Signer checks cover subject linkage, cRLSign permission, altered signatures,
 missing providers and short work budgets. These checks use the signer
 certificate's public key. Its trust path is validated separately.
+A signer that is the pinned trust anchor itself validates with an empty path
+only when its certificate is current and permits cRLSign.
 Selected-CRL lookup tests verify complete and delta signatures with the same
 signer key, then check entry overrides and removals. They reject a delta signed
 by another key despite matching authority identifiers, incompatible numbers,

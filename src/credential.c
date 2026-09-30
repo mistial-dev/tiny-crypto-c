@@ -1,11 +1,12 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * PIV and TWIC credential validators: CHUID, biometric, unsigned TWIC CHUID
- * and card verifiable certificate. Each validator checks request storage,
+ * PIV and TWIC credential validators: CHUID, biometric and unsigned TWIC
+ * CHUID. Each validator checks request storage,
  * verifies the signed object, builds and validates the signer path and maps
  * the outcome to TC_credential_status. The Security Object validators are in
- * credential_security.c. */
+ * credential_security.c, the content signer and CVC validators in
+ * credential_signer.c. */
 #include "internal.h"
 #include "pki_budget_internal.h"
 #include "credential_session_internal.h"
@@ -375,53 +376,4 @@ TC_TWIC_unsigned_CHUID_validate(const TC_TWIC_unsigned_CHUID_validation_request*
   return matched ? TC_CREDENTIAL_VALID : TC_CREDENTIAL_INVALID;
 }
 
-#if TC_ENABLE_PIV_CVC
-TC_credential_status TC_PIV_CVC_validate(const TC_PIV_CVC_validation_request* request,
-                                         const TC_validation_context* context,
-                                         TC_EC_workspace* point, size_t* work, TC_PIV_CVC* out)
-{
-  tc_credential_session session;
-  if (!request || !request->card.data || !request->card.length ||
-      !request->signer_certificate.data || !request->signer_certificate.length || !point || !work ||
-      !out || !tc_credential_session_open(&session, context, request->profile))
-    return TC_CREDENTIAL_ERROR;
-  const TC_bytes inputs[] = {request->card,
-                             request->intermediate,
-                             request->expected_uuid,
-                             request->signer_certificate,
-                             {(const uint8_t*)request, sizeof *request}};
-  const tc_credential_storage storage = {
-      inputs, sizeof inputs / sizeof *inputs, out, sizeof *out, NULL, 0, NULL, 0};
-  TC_TLV_result checked = tc_credential_session_bind(&session, context, &storage, work);
-  TC_X509_certificate parsed_signer;
-  if (checked == TC_TLV_OK)
-    checked = tc_credential_signer_read(request->signer_certificate, &session.policy.path.parsing,
-                                        tc_credential_scratch(context), work, &parsed_signer);
-  if (checked == TC_TLV_OK)
-    checked =
-        tc_credential_signer_policy(&parsed_signer, session.piv, !session.piv, NULL,
-                                    &session.policy.path, tc_credential_scratch(context), work);
-  if (checked != TC_TLV_OK)
-    return tc_validation_status(checked);
-  const TC_X509_path_options* path = &session.policy.path;
-  TC_validation_options options = *context->options;
-  options.certificate =
-      (TC_validation_certificate_policy){path->initial_policies, path->initial_policy_count,
-                                         path->anchor_names,     path->purpose,
-                                         path->key_usage,        path->flags};
-  TC_validation_context signer_context = *context;
-  signer_context.options = &options;
-  signer_context.trust.certificates = &session.source;
-  TC_X509_validation_result signer;
-  TC_credential_status status =
-      TC_X509_validate(request->signer_certificate, &signer_context, work, &signer);
-  if (status != TC_CREDENTIAL_VALID)
-    return status;
-  const TC_PIV_CVC_chain_request chain = {request->card, request->intermediate,
-                                          request->expected_uuid, request->curve,
-                                          &signer.certificate};
-  return tc_credential_signature_status(
-      TC_PIV_CVC_chain_verify(&chain, &options.parsing, &options.signatures, point, work, out));
-}
-#endif
 #endif

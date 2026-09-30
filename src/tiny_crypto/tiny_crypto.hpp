@@ -48,6 +48,9 @@
 #if TC_ENABLE_PIV_KEY_PROOF
 #include <tiny_crypto/piv_key_proof.hpp>
 #endif
+#if TC_ENABLE_PIV_CARD_CHECK
+#include <tiny_crypto/piv_card_check.hpp>
+#endif
 
 #if TC_ENABLE_KMAC256
 #include <tiny_crypto/kmac.hpp>

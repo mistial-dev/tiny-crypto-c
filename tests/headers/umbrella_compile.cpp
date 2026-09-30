@@ -145,6 +145,11 @@ static TC_TWIC_tpk tc_header_tpk;
 #error "The C++ umbrella must expose the PIV key proof wrapper"
 #endif
 
+#if defined(TC_TEST_HEADER_PIV_CARD_CHECK) &&                                                      \
+    (!defined(TINY_CRYPTO_PIV_CARD_CHECK_H_) || !defined(TINY_CRYPTO_PIV_CARD_CHECK_HPP_))
+#error "The C++ umbrella must expose the PIV card check wrapper"
+#endif
+
 #if defined(TC_TEST_HEADER_TWIC_CCL) && !defined(TINY_CRYPTO_TWIC_CCL_H_)
 #error "The C++ umbrella must expose the enabled TWIC CCL C API"
 #endif

@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/validation.h>
+#include <string.h>
 #include "cms_internal.h"
 #include "credential_status_internal.h"
 #include "internal.h"
@@ -330,8 +331,11 @@ TC_credential_status TC_CMS_validate(const TC_CMS_validation_request* request,
 tc_cms_revocation_evidence tc_validation_evidence(const TC_validation_context* context,
                                                   uint8_t* checked)
 {
-  const tc_cms_revocation_evidence evidence = {
-      context->options->revocation == TC_VALIDATION_REVOCATION_WHEN_AVAILABLE, checked};
+  tc_cms_revocation_evidence evidence;
+  memset(&evidence, 0, sizeof evidence);
+  evidence.evidence_optional =
+      context->options->revocation == TC_VALIDATION_REVOCATION_WHEN_AVAILABLE;
+  evidence.checked = checked;
   return evidence;
 }
 
@@ -340,20 +344,28 @@ TC_credential_status tc_validation_status(TC_TLV_result status)
   return tc_credential_tlv_status(status, &tc_credential_tlv_validation);
 }
 
-TC_credential_status TC_X509_validate(TC_bytes encoded, const TC_validation_context* context,
-                                      size_t* work, TC_X509_validation_result* out)
+TC_credential_status tc_x509_validate_evidence(TC_bytes encoded,
+                                               const TC_validation_context* context,
+                                               const tc_cms_revocation_evidence* evidence,
+                                               size_t* work, TC_X509_validation_result* out,
+                                               int* path_valid)
 {
   TC_CMS_path_options cms;
   TC_X509_path_options crl;
   TC_CMS_revocation_policy revocation;
-  if (!encoded.data || !encoded.length || !out || !work ||
+  if (!encoded.data || !encoded.length || !out || !work || !evidence ||
       !tc_validation_policies(context, &cms, &crl, &revocation))
     return TC_CREDENTIAL_ERROR;
   if (context->trust.certificates->candidate_count > cms.max_candidates)
     return TC_CREDENTIAL_LIMIT;
+  const TC_bytes inputs[] = {encoded, evidence->ocsp};
   TC_bytes writes[TC_VALIDATION_WRITES];
-  TC_TLV_result status =
-      tc_validation_storage(context, &encoded, 1, work, out, sizeof *out, writes);
+  TC_TLV_result status = tc_validation_storage(context, inputs, evidence->ocsp.length ? 2 : 1, work,
+                                               out, sizeof *out, writes);
+  if (status == TC_TLV_OK && evidence->checked &&
+      (!tc_internal_ranges_disjoint(evidence->checked, 1, out, sizeof *out) ||
+       !tc_internal_ranges_disjoint(evidence->checked, 1, work, sizeof *work)))
+    status = TC_TLV_ARGUMENT;
   if (status != TC_TLV_OK)
     return tc_validation_status(status);
   tc_pki_source_guard guard = {context->trust.certificates, writes, TC_VALIDATION_WRITES};
@@ -365,21 +377,34 @@ TC_credential_status TC_X509_validate(TC_bytes encoded, const TC_validation_cont
                               &workspace->path->search, work, &path);
   if (found != TC_X509_PATH_VALID)
     return tc_validation_status(tc_x509_path_result_status(found));
+  if (path_valid)
+    *path_valid = 1;
 
   TC_X509_validation_result result;
   /* Revocation signer searches reuse the certificate cache. Hold the target
    * descriptor while its encoded bytes remain owned by the caller. */
   result.certificate = workspace->path->validation.certificates[path.count - 1];
-  const tc_cms_revocation_evidence evidence =
-      tc_validation_evidence(context, &result.revocation_checked);
+  tc_cms_revocation_evidence rule = *evidence;
+  rule.checked = &result.revocation_checked;
   TC_credential_status revocation_status =
-      tc_cms_path_revocation_check(&path, &source, &revocation, workspace, &evidence, work);
+      tc_cms_path_revocation_check(&path, &source, &revocation, workspace, &rule, work);
   if (revocation_status != TC_CREDENTIAL_VALID)
     return revocation_status;
   result.at = context->options->at;
   result.anchor_index = path.anchor_index;
+  if (evidence->checked)
+    *evidence->checked = result.revocation_checked;
   *out = result;
   return TC_CREDENTIAL_VALID;
+}
+
+TC_credential_status TC_X509_validate(TC_bytes encoded, const TC_validation_context* context,
+                                      size_t* work, TC_X509_validation_result* out)
+{
+  if (!context || !context->options)
+    return TC_CREDENTIAL_ERROR;
+  const tc_cms_revocation_evidence evidence = tc_validation_evidence(context, NULL);
+  return tc_x509_validate_evidence(encoded, context, &evidence, work, out, NULL);
 }
 
 #endif

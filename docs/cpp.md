@@ -134,6 +134,11 @@ Copying and moving are deleted. `piv_catalog_count`, `piv_catalog_at` and
 provider, the workspace and the work budget by reference.
 `piv_key_parameters_select` wraps the key policy.
 
+`piv_card_check` in `piv_card_check.hpp` takes the request, the workspace, the
+work counter and the report by reference. The report borrows the inventory
+pool and the workspace buffers. `piv_card_report_accepts` takes a requirement
+array, and `piv_card_prove_keys` takes the `piv_link`.
+
 ## GCM streaming
 
 `GCM` streams encryption only. Supply all AAD before the first

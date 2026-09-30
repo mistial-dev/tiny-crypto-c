@@ -884,6 +884,82 @@ static MunitResult discovery_signer_validate(const MunitParameter params[], void
   return MUNIT_OK;
 }
 
+/* Encode a certificate for the fixture key named "CRL issuer" and issued by
+ * an unheld root, so that the pinned anchor itself signs the CRL. usage is
+ * the keyUsage value, or NULL for none. */
+static size_t anchored_signer_encode(revocation_fixture* f, const char* usage,
+                                     const char* not_after, uint8_t* der, size_t capacity)
+{
+  X509* root = make_certificate(f->other_key, "Unheld root", NULL);
+  X509* issued = make_certificate(f->generated, "CRL issuer", root);
+  add_extension(issued, NID_subject_key_identifier, "hash");
+  if (usage)
+    add_extension(issued, NID_key_usage, usage);
+  if (not_after)
+    munit_assert_int(ASN1_TIME_set_string_X509(X509_getm_notAfter(issued), not_after), ==, 1);
+  const size_t length = encode_certificate(issued, f->other_key, EVP_sha256(), der, capacity);
+  X509_free(issued);
+  X509_free(root);
+  return length;
+}
+
+/* RFC 5280 section 6.3.3 (f): a CRL signed by the trust anchor itself, a
+ * pinned issuing CA whose issuer is not held, validates with an empty signer
+ * path. The anchor certificate must be current and carry cRLSign, and the
+ * anchor must be the target's anchor. */
+static MunitResult discovery_anchor_signer(const MunitParameter params[], void* user)
+{
+  revocation_fixture* f = user;
+  TC_X509_path_workspace validation = f->validation;
+  TC_X509_search_workspace search = f->search;
+  TC_X509_workspace parser = f->parser;
+  const TC_X509_store_source source = f->source;
+  const TC_X509_path_options options = f->options;
+  TC_X509_crl parsed = f->parsed;
+  static uint8_t der[ENCODED_CAPACITY];
+  (void)params;
+  const struct {
+    const char* usage;
+    const char* not_after;
+    size_t anchor_index;
+    TC_X509_path_status expected;
+  } cases[] = {
+      {"critical,cRLSign", NULL, 1, TC_X509_PATH_VALID},
+      {"critical,keyCertSign,cRLSign", NULL, 1, TC_X509_PATH_VALID},
+      {"critical,cRLSign", NULL, 0, TC_X509_PATH_INVALID},
+      {"critical,keyCertSign", NULL, 1, TC_X509_PATH_INVALID},
+      {NULL, NULL, 1, TC_X509_PATH_INVALID},
+      {"critical,cRLSign", "20250101000000Z", 1, TC_X509_PATH_INVALID},
+  };
+  for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
+    const size_t length =
+        anchored_signer_encode(f, cases[i].usage, cases[i].not_after, der, sizeof der);
+    TC_X509_certificate signer;
+    munit_assert_int(TC_X509_read((TC_bytes){der, length}, &f->limits, &parser, &signer), ==,
+                     TC_TLV_OK);
+    TC_X509_search_result found, saved;
+    memset(&saved, 0xa5, sizeof saved);
+    memcpy(&found, &saved, sizeof found);
+    size_t work = TRUST_WORK_BUDGET;
+    munit_assert_int(
+        tc_x509_crl_signer_validate(
+            &parsed, &signer,
+            &(tc_x509_crl_trust){
+                &source, cases[i].anchor_index, &options,
+                &(tc_pki_tree_workspace){validation.frames.data, validation.frames.capacity, &work},
+                &validation, &search, &(TC_X509_revocation_time){options.at, 0, 0}},
+            &found),
+        ==, cases[i].expected);
+    if (cases[i].expected == TC_X509_PATH_VALID) {
+      munit_assert_size(found.count, ==, 0);
+      munit_assert_size(found.anchor_index, ==, 1);
+      munit_assert_size(found.validation.work_used, ==, TRUST_WORK_BUDGET - work);
+    } else
+      munit_assert_memory_equal(sizeof found, &found, &saved);
+  }
+  return MUNIT_OK;
+}
+
 /* CRL signer search and scope processing with store candidates: exact and
  * short budgets, retries, reason filters, source failures and overlaps. */
 static MunitResult discovery_scope(const MunitParameter params[], void* user)
@@ -4883,6 +4959,8 @@ int main(int argc, char** argv)
                         revocation_teardown, MUNIT_TEST_OPTION_NONE, outcome_params},
                        {"/discovery/signer-validate", discovery_signer_validate, revocation_setup,
                         revocation_teardown, MUNIT_TEST_OPTION_NONE, outcome_params},
+                       {"/discovery/anchor-signer", discovery_anchor_signer, revocation_setup,
+                        revocation_teardown, MUNIT_TEST_OPTION_NONE, clear_params},
                        {"/discovery/scope", discovery_scope, revocation_setup, revocation_teardown,
                         MUNIT_TEST_OPTION_NONE, outcome_params},
                        {"/discovery/issuer-rollover", discovery_issuer_rollover, revocation_setup,

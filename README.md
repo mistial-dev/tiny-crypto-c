@@ -219,6 +219,7 @@ algorithm is enabled.
 | `TINY_CRYPTO_ENABLE_PIV_VCI`            | OFF     | OFF   | OFF  | ON      | PIV VCI, requires SM framing and PIV objects      |
 | `TINY_CRYPTO_ENABLE_PIV_CATALOG`        | OFF     | OFF   | OFF  | ON      | PIV and TWIC catalogs and card inventory          |
 | `TINY_CRYPTO_ENABLE_PIV_KEY_PROOF`      | OFF     | OFF   | OFF  | ON      | PIV and TWIC card key proofs                      |
+| `TINY_CRYPTO_ENABLE_PIV_CARD_CHECK`     | OFF     | OFF   | OFF  | ON      | Composed PIV and TWIC card check report           |
 | `TINY_CRYPTO_PIV_SM_CS2`                | ON      | ON    | ON   | ON      | Cipher suite 2 (P-256, AES-128)                   |
 | `TINY_CRYPTO_PIV_SM_CS7`                | ON      | ON    | ON   | ON      | Cipher suite 7 (P-384, AES-256)                   |
 | `TINY_CRYPTO_ENABLE_FASCN`              | OFF     | OFF   | OFF  | ON      | FASC-N readers and writers                        |
@@ -531,6 +532,13 @@ oversized. `TINY_CRYPTO_ENABLE_PIV_KEY_PROOF` adds `<tiny_crypto/piv_key_proof.h
 AUTHENTICATE and verifies the signature under its validated certificate, with
 the SP 800-78-5 algorithm policy of `TC_PIV_key_parameters_select`. See
 [PIV card commands](docs/piv-card.md).
+`TINY_CRYPTO_ENABLE_PIV_CARD_CHECK` adds `<tiny_crypto/piv_card_check.h>`:
+`TC_PIV_card_check` turns an inventory into a report of certificate paths,
+revocation evidence, the CHUID, Security Object digests, biometrics, the
+secure messaging signer and CVC, and plain copies. Each entry passed, failed
+or is not checkable with a reason. `TC_PIV_card_prove_keys` adds the key
+proofs, and `TC_PIV_card_report_accepts` compares the report with the
+application's requirements. See [PIV card check](docs/piv-card-check.md).
 
 ## PIV secure messaging
 

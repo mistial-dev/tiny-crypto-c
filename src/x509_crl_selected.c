@@ -10,6 +10,10 @@
 #include "pki_status_internal.h"
 #include "pki_source_internal.h"
 #include "pki_signature_internal.h"
+#include "pki_internal.h"
+#include "pki_budget_internal.h"
+#include "x509_time_internal.h"
+#include <string.h>
 
 /* Build the signer's path through restricted, requiring cRLSign, and report
  * trust->anchor_index as the anchor. */
@@ -29,6 +33,44 @@ static TC_X509_path_status crl_signer_path(const TC_X509_certificate* signer,
   found.anchor_index = trust->anchor_index;
   *out = found;
   return TC_X509_PATH_VALID;
+}
+
+/* Set *anchored when signer is the selected trust anchor itself: the same
+ * subject name and public key, and a certificate that is not self-issued and
+ * is valid at the policy time. A pinned issuing CA that signs its own CRLs
+ * is such a signer. A self-issued anchor certificate keeps its
+ * one-certificate path. tc_x509_crl_signer_check has already required
+ * cRLSign (RFC 5280 section 6.3.3 (f), RFC 10007 section 4). Charges the
+ * name comparisons and the key bytes. */
+static TC_TLV_result crl_signer_is_anchor(const TC_X509_certificate* signer,
+                                          const TC_X509_store_source* restricted,
+                                          const tc_x509_crl_trust* trust, int* anchored)
+{
+  TC_X509_store_anchor anchor;
+  memset(&anchor, 0, sizeof anchor);
+  size_t* work = trust->tree->work;
+  TC_TLV_result result = restricted->anchor(restricted->context, 0, work, &anchor);
+  if (result != TC_TLV_OK)
+    return result;
+  *anchored = 0;
+  if (!anchor.trust.name.length || anchor.trust.public_key.type != signer->public_key.type)
+    return TC_TLV_OK;
+  result = tc_pki_work_charge(work, signer->public_key.key.length);
+  if (result != TC_TLV_OK || !tc_pki_equal(anchor.trust.public_key.key, signer->public_key.key))
+    return result;
+  const TC_X509_path_options* options = trust->options;
+  int equal = 0, self_issued = 1, current = 0;
+  result = TC_X509_name_equal(signer->subject, anchor.trust.name, &options->parsing,
+                              &trust->validation->names, work, &equal);
+  if (result == TC_TLV_OK && equal)
+    result = TC_X509_name_equal(signer->subject, signer->issuer, &options->parsing,
+                                &trust->validation->names, work, &self_issued);
+  if (result == TC_TLV_OK && equal && !self_issued)
+    result = tc_x509_time_window(&options->at, options->clock_skew_seconds, &signer->not_before,
+                                 &signer->not_after, &current);
+  if (result == TC_TLV_OK)
+    *anchored = equal && !self_issued && current;
+  return result;
 }
 
 TC_X509_path_status tc_x509_crl_signer_validate(const TC_X509_crl* crl,
@@ -56,6 +98,20 @@ TC_X509_path_status tc_x509_crl_signer_validate(const TC_X509_crl* crl,
   if (signature != TC_X509_SIGNATURE_VALID)
     return tc_x509_path_status(tc_pki_signature_status(signature));
   status = crl_signer_path(signer, &restricted, trust, &found);
+  if (status == TC_X509_PATH_INVALID) {
+    /* RFC 5280 section 6.3.3 (f): the CRL issuer path ends at the trust
+     * anchor of the target. A signer that is the anchor itself, such as a
+     * pinned issuing CA whose own issuer is not held, has an empty path. */
+    int anchored = 0;
+    result = crl_signer_is_anchor(signer, &restricted, trust, &anchored);
+    if (result != TC_TLV_OK)
+      return tc_x509_path_status(result);
+    if (anchored) {
+      memset(&found, 0, sizeof found);
+      found.anchor_index = trust->anchor_index;
+      status = TC_X509_PATH_VALID;
+    }
+  }
   if (status != TC_X509_PATH_VALID)
     return status;
   found.validation.work_used = initial_work - *work;

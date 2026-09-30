@@ -303,6 +303,27 @@ TC_credential_status
 TC_TWIC_unsigned_CHUID_validate(const TC_TWIC_unsigned_CHUID_validation_request* request,
                                 const TC_validation_context* context, size_t* work);
 
+/* Validate a content signer certificate, such as the secure-messaging
+ * Certificate Signer of container 5FC122 (SP 800-73-5 Part 1 section 3.3.7),
+ * under the content-signer policy of TC_PIV_CHUID_validate for profile: a
+ * content-signing EKU for the profile, digitalSignature, and for PIV
+ * id-fpki-common-piv-contentSigning. TC_X509_validate then checks the path
+ * and revocation under the context. certificate must be DER, stable and
+ * disjoint from work and out. out->certificate borrows certificate.
+ *
+ * Work: one unit per storage comparison, the certificate and its policy
+ * scan, then the path and revocation steps.
+ * Returns VALID with out written, including revocation_checked. ERROR for
+ * NULL or empty arguments, an unknown profile, a certificate purpose other
+ * than content signing, an incomplete context or overlap, with work
+ * unchanged. INVALID for a signer outside the policy or a failed path.
+ * REVOKED, UNAVAILABLE, UNSUPPORTED and LIMIT follow TC_X509_validate. out
+ * changes only on VALID. */
+TC_credential_status TC_PIV_content_signer_validate(TC_bytes certificate,
+                                                    TC_PIV_card_profile profile,
+                                                    const TC_validation_context* context,
+                                                    size_t* work, TC_X509_validation_result* out);
+
 #if TC_ENABLE_PIV_CVC
 typedef struct {
   TC_bytes card, intermediate, expected_uuid, signer_certificate;
@@ -310,8 +331,8 @@ typedef struct {
   TC_PIV_card_profile profile;
 } TC_PIV_CVC_validation_request;
 
-/* Validate the X.509 signer of a PIV secure-messaging CVC chain as a content
- * signer with TC_X509_validate, then verify the chain with
+/* Validate the X.509 signer of a PIV secure-messaging CVC chain with
+ * TC_PIV_content_signer_validate, then verify the chain with
  * TC_PIV_CVC_chain_verify (SP 800-73-5 Part 1 section 3.3.7, Part 2 section
  * 4.1.5). The card profile selects the accepted content-signing OIDs. point
  * is EC scratch, cleared after each point check.

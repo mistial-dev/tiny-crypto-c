@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "credential_workflow.h"
 #include <string.h>
-#include <tiny_crypto/piv_oid.h>
 
 enum { EXAMPLE_PRINTED_CONTAINER = 0x3001 };
 
@@ -24,62 +23,6 @@ static ExampleCredentialVerdict credential_verdict(TC_credential_status status)
   default:
     return EXAMPLE_CREDENTIAL_ERROR;
   }
-}
-
-static ExampleCredentialVerdict
-card_identifiers(const TC_X509_validation_result* card, TC_PIV_card_profile profile,
-                 ExampleCredentialCardKey card_key, int twic_reader_policy, TC_bytes card_guid,
-                 const TC_validation_context* context, size_t* work, TC_PIV_card_identifiers* out)
-{
-  const TC_X509_path_workspace* storage = &context->workspace->path->validation;
-  if (card->certificate.extensions.length > *work)
-    return EXAMPLE_CREDENTIAL_LIMIT;
-  *work -= card->certificate.extensions.length;
-  TC_TLV_reader extensions;
-  TC_TLV_result status = TC_X509_extensions_init(&extensions, card->certificate.extensions,
-                                                 &context->options->parsing);
-  if (status != TC_TLV_OK)
-    goto done;
-  static const uint8_t san_oid[] = {0x55, 0x1d, 17};
-  TC_X509_extension extension;
-  int found = 0;
-  while ((status = TC_X509_extension_next(&extensions, &extension)) == TC_TLV_OK) {
-    if (extension.oid.length != sizeof san_oid ||
-        memcmp(extension.oid.data, san_oid, sizeof san_oid))
-      continue;
-    if (found) {
-      status = TC_TLV_INVALID;
-      break;
-    }
-    if (card_key == EXAMPLE_CREDENTIAL_PIV_AUTHENTICATION)
-      status = twic_reader_policy
-                   ? TC_TWIC_authentication_identifiers_read(extension.value, card_guid,
-                                                             &context->options->parsing,
-                                                             storage->frames, work, out)
-                   : TC_PIV_authentication_identifiers_read(extension.value, card_guid,
-                                                            &context->options->parsing,
-                                                            storage->frames, work, out);
-    else
-      status =
-          profile == TC_PIV_CARD
-              ? TC_PIV_card_identifiers_read(extension.value, profile, &context->options->parsing,
-                                             storage->frames, work, out)
-              : TC_TWIC_card_identifiers_read(extension.value, profile, &context->options->parsing,
-                                              storage->frames, work, out);
-    if (status != TC_TLV_OK)
-      break;
-    found = 1;
-  }
-  if (status == TC_TLV_END)
-    status = found ? TC_TLV_OK : TC_TLV_INVALID;
-done:
-  if (status == TC_TLV_OK)
-    return EXAMPLE_CREDENTIAL_VALID;
-  if (status == TC_TLV_LIMIT)
-    return EXAMPLE_CREDENTIAL_LIMIT;
-  if (status == TC_TLV_UNSUPPORTED)
-    return EXAMPLE_CREDENTIAL_UNSUPPORTED;
-  return status == TC_TLV_ARGUMENT ? EXAMPLE_CREDENTIAL_ERROR : EXAMPLE_CREDENTIAL_INVALID;
 }
 
 static ExampleCredentialVerdict tlv_verdict(TC_TLV_result status)
@@ -170,66 +113,6 @@ static int evidence_available(const ExampleCredentialValidationRequest* request,
   return biometric_formats(request, available);
 }
 
-static ExampleCredentialVerdict card_policy(const ExampleCredentialValidationRequest* request,
-                                            const TC_validation_context* context, size_t* work,
-                                            TC_validation_options* out)
-{
-  *out = *context->options;
-  const TC_PIV_oid_profile oids =
-      request->profile == TC_PIV_CARD ? TC_PIV_OIDS_ONLY : TC_PIV_OIDS_TWIC_COMPATIBLE;
-  if (out->certificate.purpose.length) {
-    if (TC_PIV_oid_identify(out->certificate.purpose, oids) != TC_PIV_OID_CARD_AUTHENTICATION)
-      return EXAMPLE_CREDENTIAL_ERROR;
-  }
-  if (request->profile != TC_PIV_CARD)
-    out->certificate.purpose = (TC_bytes){NULL, 0};
-  if (!out->certificate.purpose.length) {
-    if (!context->workspace->path)
-      return EXAMPLE_CREDENTIAL_ERROR;
-    const TC_X509_path_workspace* storage = &context->workspace->path->validation;
-    if (request->certificate.length > *work / 2)
-      return EXAMPLE_CREDENTIAL_LIMIT;
-    *work -= request->certificate.length * 2;
-    TC_X509_workspace parser = {storage->frames, storage->oids, storage->oid_capacity};
-    TC_X509_certificate certificate;
-    TC_TLV_result status = TC_X509_read(request->certificate, &out->parsing, &parser, &certificate);
-    if (status != TC_TLV_OK)
-      return tlv_verdict(status);
-    static const uint8_t eku_oid[] = {0x55, 0x1d, 37};
-    TC_TLV_reader extensions;
-    status = TC_X509_extensions_init(&extensions, certificate.extensions, &out->parsing);
-    if (status != TC_TLV_OK)
-      return tlv_verdict(status);
-    TC_X509_extension extension;
-    while ((status = TC_X509_extension_next(&extensions, &extension)) == TC_TLV_OK) {
-      if (extension.oid.length != sizeof eku_oid ||
-          memcmp(extension.oid.data, eku_oid, sizeof eku_oid))
-        continue;
-      size_t count;
-      status = TC_X509_extended_key_usage_read(extension.value, &out->parsing, storage->oids,
-                                               storage->oid_capacity, &count);
-      if (status != TC_TLV_OK)
-        return tlv_verdict(status);
-      for (size_t i = 0; i < count; ++i) {
-        if (TC_PIV_oid_identify(storage->oids[i], oids) != TC_PIV_OID_CARD_AUTHENTICATION)
-          continue;
-        if (out->certificate.purpose.length)
-          return EXAMPLE_CREDENTIAL_INVALID;
-        out->certificate.purpose = storage->oids[i];
-      }
-    }
-    if (status != TC_TLV_END)
-      return tlv_verdict(status);
-    if (!out->certificate.purpose.length)
-      return EXAMPLE_CREDENTIAL_INVALID;
-  }
-  out->certificate.key_usage |= TC_KEY_USAGE_DIGITAL_SIGNATURE;
-  out->certificate.flags |= TC_X509_PATH_REQUIRE_KEY_USAGE |
-                            TC_X509_PATH_REQUIRE_EXTENDED_KEY_USAGE |
-                            TC_X509_PATH_INHIBIT_ANY_PURPOSE;
-  return EXAMPLE_CREDENTIAL_VALID;
-}
-
 static ExampleCredentialVerdict
 cancellation_check(const ExampleCredentialValidationRequest* request, TC_bytes fascn)
 {
@@ -293,17 +176,6 @@ example_credential_validate(const ExampleCredentialValidationRequest* request,
     return EXAMPLE_CREDENTIAL_ERROR;
 
   ExampleCredentialValidationResult accepted = {0};
-  TC_validation_options card_options;
-  ExampleCredentialVerdict verdict = card_policy(request, card_context, work, &card_options);
-  if (verdict != EXAMPLE_CREDENTIAL_VALID)
-    return verdict;
-  TC_validation_context constrained_card = *card_context;
-  constrained_card.options = &card_options;
-  TC_credential_status status =
-      TC_X509_validate(request->certificate, &constrained_card, work, &accepted.card);
-  verdict = credential_verdict(status);
-  if (verdict != EXAMPLE_CREDENTIAL_VALID)
-    return verdict;
   TC_bytes card_guid = {NULL, 0};
   if (request->card_key == EXAMPLE_CREDENTIAL_PIV_AUTHENTICATION) {
     TC_PIV_CHUID structural;
@@ -313,11 +185,21 @@ example_credential_validate(const ExampleCredentialValidationRequest* request,
       return tlv_verdict(parsed);
     card_guid = structural.card_uuid;
   }
-  verdict = card_identifiers(&accepted.card, request->profile, request->card_key,
-                             request->twic_reader_policy, card_guid, &constrained_card, work,
-                             &accepted.identifiers);
+  /* The library applies the card key's path purpose and reads the
+   * subjectAltName identifiers. */
+  const TC_PIV_card_certificate_request card = {
+      request->certificate, request->profile,
+      request->card_key == EXAMPLE_CREDENTIAL_PIV_AUTHENTICATION ? TC_PIV_KEY_PIV_AUTHENTICATION
+                                                                 : TC_PIV_KEY_CARD_AUTHENTICATION,
+      (uint8_t)request->twic_reader_policy, card_guid};
+  TC_PIV_card_certificate_result validated;
+  TC_credential_status status =
+      TC_PIV_card_certificate_validate(&card, card_context, work, &validated);
+  ExampleCredentialVerdict verdict = credential_verdict(status);
   if (verdict != EXAMPLE_CREDENTIAL_VALID)
     return verdict;
+  accepted.card = validated.certificate;
+  accepted.identifiers = validated.identifiers;
   if (!piv) {
     verdict = cancellation_check(request, accepted.identifiers.fascn);
     if (verdict != EXAMPLE_CREDENTIAL_VALID)
