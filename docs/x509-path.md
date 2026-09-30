@@ -72,15 +72,59 @@ exception. The target receives none.
 
 ## Workspace and buffer lifetime
 
-Allocate the typed arrays listed in `TC_X509_path_workspace` and set each
-capacity as an element count. The certificate array needs at least one
-entry per path certificate. A shorter array returns `TC_X509_PATH_LIMIT`.
-The node, edge and expected-policy arrays belong to the validator. Treat
-their working fields as private.
+The validator needs twelve caller-owned scratch arrays. Most applications
+describe their element counts in a `TC_X509_path_capacity` and let the library
+partition one arena:
 
-`TC_X509_PATH_WORKSPACE_INIT` fills the workspace from arrays and infers their
-capacities. Pass arrays, including array members of a storage structure. Pointers
-lose the array size. The smaller of the two name arrays sets the scalar capacity.
+```c
+#include <tiny_crypto/x509_path.h>
+
+static TC_X509_path_storage arena[1024];
+
+TC_result prepare_path_workspace(TC_X509_path_workspace* workspace)
+{
+    static const TC_X509_path_capacity capacity = {
+        .frames = 16, .oids = 16, .name_scalars = 64, .name_attributes = 8,
+        .policy_nodes = 32, .policy_edges = 64, .policy_expected = 64,
+        .policy_mappings = 16, .policies = 16, .path = 4};
+    const TC_buffer storage = {(uint8_t*)arena, sizeof arena};
+    size_t required;
+    TC_result status = TC_X509_path_workspace_size(&capacity, &required);
+    if (status != TC_RESULT_OK)
+        return status;
+    if (required > sizeof arena)
+        return TC_RESULT_LIMIT;
+    return TC_X509_path_workspace_init(&capacity, storage, workspace);
+}
+```
+
+`TC_X509_path_workspace_size` reports the exact arena bytes, including the
+padding that aligns each array. `TC_X509_path_workspace_alignment` reports the
+required base alignment, and an array of `TC_X509_path_storage` meets it.
+`TC_X509_path_workspace_init` rejects a misaligned base with
+`TC_RESULT_ARGUMENT` and a short arena with `TC_RESULT_LIMIT`. Both failures
+leave the workspace unchanged. Initialization writes only the workspace
+descriptor, and the arena contents stay untouched until validation.
+`capacity.path` sizes the certificate views and extension summaries, one
+entry per path certificate. `name_scalars` sizes both name buffers. Zero policy
+counts leave those arrays NULL. Validation returns `TC_X509_PATH_LIMIT` when a
+policy array runs out. The policy tree always holds its anyPolicy root, so
+`policy_nodes` needs at least one entry.
+
+The workspace borrows the arena. Keep the arena alive while the workspace or a
+result that borrows it is in use, and give each concurrent validation its own
+arena.
+
+For fixed array locations, set each field of `TC_X509_path_workspace` directly
+with capacities as element counts. `TC_X509_PATH_WORKSPACE_INIT` fills the
+workspace from arrays and infers their capacities. Pass arrays, including array
+members of a storage structure. Pointers lose the array size. The smaller of the
+two name arrays sets the scalar capacity. [examples/x509_workspace.h](../examples/x509_workspace.h)
+uses this form.
+
+The certificate array needs at least one entry per path certificate. A
+shorter array returns `TC_X509_PATH_LIMIT`. The node, edge and expected-policy
+arrays belong to the validator. Treat their working fields as private.
 
 One OID array is reused for extension decoding, policy decoding and EKU checks.
 The returned policy array is separate. The two name buffers hold prepared
@@ -96,8 +140,7 @@ certificate. Each certificate's extensions are scanned once per validation,
 and the subject and issuer of each intermediate are compared once. Every pass
 reads the summary. A NULL or shorter summary array returns
 `TC_X509_PATH_LIMIT`. The validator owns the summary fields. Size the array
-like the certificate array. `TC_X509_PATH_WORKSPACE_INIT` takes it as the last
-argument.
+like the certificate array.
 
 Workspace arrays must not overlap each other, the inputs or the result object.
 The signature provider's context must also be separate from workspace and the
@@ -118,20 +161,24 @@ Keep those buffers and the source snapshot alive.
 ## Client-certificate example
 
 [examples/x509_client.c](../examples/x509_client.c) configures a client-authentication
-purpose and digital-signature key usage. Its [header](../examples/x509_client.h)
-defines caller-owned typed storage. The example accepts up to four certificates
-of 4096 bytes each. Its graph and name capacities are explicit in the storage type.
-Adjust those limits to the certificates and memory available in your application.
+purpose and digital-signature key usage. It lays out its validation workspace
+in a caller-supplied arena with `TC_X509_path_workspace_init`. The example
+accepts up to four certificates of 4096 bytes each. Its graph and name
+capacities are explicit in its `TC_X509_path_capacity`. Adjust those limits to
+the certificates and memory available in your application.
 
 Compile the example source with your application and link `tiny-crypto-c`. Supply
 the trusted anchor, UTC validation time, signature provider and work budget to
-`example_check_client_certificate`. It returns the same statuses as the library
-API and leaves the result unchanged on failure. Consume the result only after
+`example_check_client_certificate`. Check the arena once at startup against
+`example_client_workspace_size`. The example returns the same statuses as the
+library API and leaves the result unchanged on failure. A short arena returns
+`TC_X509_PATH_LIMIT`, and a NULL or misaligned arena returns
+`TC_X509_PATH_ERROR`. Consume the result only after
 `TC_X509_PATH_VALID`. Handle unsupported operations and limit failures separately
 from invalid certificates.
 
-Place `ExampleX509Workspace` in application-owned storage outside a small
-task stack. Use a separate workspace for concurrent validations. Keep it
+Place the arena in application-owned storage outside a small task stack. Use a
+separate arena for concurrent validations. Keep it
 and the original certificate buffers alive while using the result. Revocation
 evidence must be checked separately before granting application access.
 

@@ -79,10 +79,11 @@ the successful path. Exhausted resources return `TC_X509_PATH_LIMIT`.
 
 [example_find_client_path](../examples/x509_client.c) shows a four-certificate
 search using the client-authentication policy shared with the ordered-chain
-example. Allocate `ExampleX509SearchWorkspace` outside a small task stack,
-provide a signature verifier and current time, and pass the acquired snapshot's
-source. The example leaves snapshot locking and release to the caller so its
-returned certificate and policy spans remain usable.
+example. Allocate its validation arena and a search workspace of
+`EXAMPLE_CLIENT_PATH_CAPACITY` entries outside a small task stack, provide a
+signature verifier and current time, and pass the acquired snapshot's source.
+The example leaves snapshot locking and release to the caller so its returned
+certificate and policy spans remain usable.
 
 The result's `path` references search storage in anchor-issued-first order, with
 the target last. `anchor_index` identifies the selected source anchor. Keep the

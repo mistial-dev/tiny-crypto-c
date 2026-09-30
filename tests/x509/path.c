@@ -5,6 +5,7 @@
 #include "../../src/x509_policy_internal.h"
 #include "munit.h"
 #include "test_util.h"
+#include <stddef.h>
 #include <string.h>
 
 typedef struct {
@@ -909,6 +910,209 @@ TC_TEST(entry_option_checks)
   return MUNIT_OK;
 }
 
+static TC_X509_path_storage path_arena[256];
+
+/* A small capacity with every array present. */
+static TC_X509_path_capacity arena_capacity(void)
+{
+  TC_X509_path_capacity capacity;
+  capacity.frames = 4;
+  capacity.oids = 3;
+  capacity.name_scalars = 9;
+  capacity.name_attributes = 3;
+  capacity.policy_nodes = 5;
+  capacity.policy_edges = 6;
+  capacity.policy_expected = 7;
+  capacity.policy_mappings = 2;
+  capacity.policies = 3;
+  capacity.path = 2;
+  return capacity;
+}
+
+static void assert_workspace_equal(const TC_X509_path_workspace* a, const TC_X509_path_workspace* b)
+{
+  munit_assert_ptr_equal(a->frames.data, b->frames.data);
+  munit_assert_size(a->frames.capacity, ==, b->frames.capacity);
+  munit_assert_ptr_equal(a->oids, b->oids);
+  munit_assert_size(a->oid_capacity, ==, b->oid_capacity);
+  munit_assert_ptr_equal(a->names.left, b->names.left);
+  munit_assert_ptr_equal(a->names.right, b->names.right);
+  munit_assert_size(a->names.scalar_capacity, ==, b->names.scalar_capacity);
+  munit_assert_ptr_equal(a->names.matched, b->names.matched);
+  munit_assert_size(a->names.attribute_capacity, ==, b->names.attribute_capacity);
+  munit_assert_ptr_equal(a->nodes, b->nodes);
+  munit_assert_size(a->node_capacity, ==, b->node_capacity);
+  munit_assert_ptr_equal(a->edges, b->edges);
+  munit_assert_size(a->edge_capacity, ==, b->edge_capacity);
+  munit_assert_ptr_equal(a->expected, b->expected);
+  munit_assert_size(a->expected_capacity, ==, b->expected_capacity);
+  munit_assert_ptr_equal(a->mappings, b->mappings);
+  munit_assert_size(a->mapping_capacity, ==, b->mapping_capacity);
+  munit_assert_ptr_equal(a->policies, b->policies);
+  munit_assert_size(a->policy_capacity, ==, b->policy_capacity);
+  munit_assert_ptr_equal(a->certificates, b->certificates);
+  munit_assert_size(a->certificate_capacity, ==, b->certificate_capacity);
+  munit_assert_ptr_equal(a->summaries, b->summaries);
+  munit_assert_size(a->summary_capacity, ==, b->summary_capacity);
+}
+
+/* Alignment of each element type, from the offset after a leading char. */
+#define ALIGNMENT_PROBE(name, type)                                                                \
+  typedef struct {                                                                                 \
+    char byte;                                                                                     \
+    type element;                                                                                  \
+  } name
+ALIGNMENT_PROBE(frame_probe, TC_TLV_frame);
+ALIGNMENT_PROBE(span_probe, TC_bytes);
+ALIGNMENT_PROBE(scalar_probe, uint32_t);
+ALIGNMENT_PROBE(node_probe, TC_X509_policy_node);
+ALIGNMENT_PROBE(edge_probe, TC_X509_policy_edge);
+ALIGNMENT_PROBE(expected_probe, TC_X509_policy_expected);
+ALIGNMENT_PROBE(mapping_probe, TC_X509_policy_mapping);
+ALIGNMENT_PROBE(certificate_probe, TC_X509_certificate);
+ALIGNMENT_PROBE(summary_probe, TC_X509_extension_summary);
+
+/* The exact size succeeds, and the twelve arrays are ordered, aligned,
+ * disjoint and end at the reported size. */
+TC_TEST(workspace_arena_layout)
+{
+  const TC_X509_path_capacity capacity = arena_capacity();
+  const size_t alignment = TC_X509_path_workspace_alignment();
+  const size_t element_alignments[] = {
+      offsetof(frame_probe, element),   offsetof(span_probe, element),
+      offsetof(scalar_probe, element),  offsetof(node_probe, element),
+      offsetof(edge_probe, element),    offsetof(expected_probe, element),
+      offsetof(mapping_probe, element), offsetof(certificate_probe, element),
+      offsetof(summary_probe, element)};
+  TC_X509_path_workspace workspace;
+  size_t bytes = 0;
+  munit_assert_size(alignment, >, 0);
+  for (size_t i = 0; i < sizeof element_alignments / sizeof *element_alignments; ++i)
+    munit_assert_size(alignment % element_alignments[i], ==, 0);
+  munit_assert_int(TC_X509_path_workspace_size(&capacity, &bytes), ==, TC_RESULT_OK);
+  munit_assert_size(bytes, <=, sizeof path_arena);
+  memset(path_arena, 0xa5, sizeof path_arena);
+  munit_assert_int(
+      TC_X509_path_workspace_init(&capacity, (TC_buffer){(uint8_t*)path_arena, bytes}, &workspace),
+      ==, TC_RESULT_OK);
+  munit_assert_true(tc_test_all_value(path_arena, sizeof path_arena, 0xa5));
+  munit_assert_size(workspace.frames.capacity, ==, capacity.frames);
+  munit_assert_size(workspace.oid_capacity, ==, capacity.oids);
+  munit_assert_size(workspace.names.scalar_capacity, ==, capacity.name_scalars);
+  munit_assert_size(workspace.names.attribute_capacity, ==, capacity.name_attributes);
+  munit_assert_size(workspace.node_capacity, ==, capacity.policy_nodes);
+  munit_assert_size(workspace.edge_capacity, ==, capacity.policy_edges);
+  munit_assert_size(workspace.expected_capacity, ==, capacity.policy_expected);
+  munit_assert_size(workspace.mapping_capacity, ==, capacity.policy_mappings);
+  munit_assert_size(workspace.policy_capacity, ==, capacity.policies);
+  munit_assert_size(workspace.certificate_capacity, ==, capacity.path);
+  munit_assert_size(workspace.summary_capacity, ==, capacity.path);
+  {
+    const struct {
+      const void* start;
+      size_t bytes;
+    } arrays[] = {{workspace.frames.data, capacity.frames * sizeof(TC_TLV_frame)},
+                  {workspace.oids, capacity.oids * sizeof(TC_bytes)},
+                  {workspace.names.left, capacity.name_scalars * sizeof(uint32_t)},
+                  {workspace.names.right, capacity.name_scalars * sizeof(uint32_t)},
+                  {workspace.names.matched, capacity.name_attributes},
+                  {workspace.nodes, capacity.policy_nodes * sizeof(TC_X509_policy_node)},
+                  {workspace.edges, capacity.policy_edges * sizeof(TC_X509_policy_edge)},
+                  {workspace.expected, capacity.policy_expected * sizeof(TC_X509_policy_expected)},
+                  {workspace.mappings, capacity.policy_mappings * sizeof(TC_X509_policy_mapping)},
+                  {workspace.policies, capacity.policies * sizeof(TC_bytes)},
+                  {workspace.certificates, capacity.path * sizeof(TC_X509_certificate)},
+                  {workspace.summaries, capacity.path * sizeof(TC_X509_extension_summary)}};
+    uintptr_t end = (uintptr_t)path_arena;
+    for (size_t i = 0; i < sizeof arrays / sizeof *arrays; ++i) {
+      const uintptr_t start = (uintptr_t)arrays[i].start;
+      munit_assert_not_null(arrays[i].start);
+      munit_assert_size((size_t)(start % alignment), ==, 0);
+      munit_assert_true(start >= end);
+      munit_assert_size((size_t)(start - end), <, alignment);
+      end = start + arrays[i].bytes;
+    }
+    munit_assert_size((size_t)(end - (uintptr_t)path_arena), ==, bytes);
+  }
+  return MUNIT_OK;
+}
+
+/* A short arena is LIMIT and bad storage is ARGUMENT, both leaving out
+ * unchanged. Zero policy counts leave those arrays NULL. */
+TC_TEST(workspace_arena_failures)
+{
+  TC_X509_path_capacity capacity = arena_capacity();
+  const size_t alignment = TC_X509_path_workspace_alignment();
+  TC_X509_path_workspace workspace, saved;
+  uint8_t* base = (uint8_t*)path_arena;
+  size_t bytes = 0, untouched = 123;
+  munit_assert_int(TC_X509_path_workspace_size(&capacity, &bytes), ==, TC_RESULT_OK);
+  memset(&workspace, 0x5a, sizeof workspace);
+  saved = workspace;
+  munit_assert_int(TC_X509_path_workspace_init(&capacity, (TC_buffer){base, bytes - 1}, &workspace),
+                   ==, TC_RESULT_LIMIT);
+  assert_workspace_equal(&workspace, &saved);
+  if (alignment > 1)
+    munit_assert_int(
+        TC_X509_path_workspace_init(&capacity, (TC_buffer){base + 1, bytes}, &workspace), ==,
+        TC_RESULT_ARGUMENT);
+  munit_assert_int(TC_X509_path_workspace_init(&capacity, (TC_buffer){NULL, bytes}, &workspace), ==,
+                   TC_RESULT_ARGUMENT);
+  munit_assert_int(TC_X509_path_workspace_init(NULL, (TC_buffer){base, bytes}, &workspace), ==,
+                   TC_RESULT_ARGUMENT);
+  munit_assert_int(TC_X509_path_workspace_init(&capacity, (TC_buffer){base, bytes}, NULL), ==,
+                   TC_RESULT_ARGUMENT);
+  munit_assert_int(TC_X509_path_workspace_init(&capacity, (TC_buffer){base, SIZE_MAX}, &workspace),
+                   ==, TC_RESULT_ARGUMENT);
+  munit_assert_int(TC_X509_path_workspace_init(
+                       &capacity, (TC_buffer){(uint8_t*)&workspace, sizeof workspace}, &workspace),
+                   ==, TC_RESULT_ARGUMENT);
+  {
+    TC_X509_path_capacity* inside = (TC_X509_path_capacity*)(void*)path_arena;
+    *inside = capacity;
+    munit_assert_int(
+        TC_X509_path_workspace_init(inside, (TC_buffer){base, sizeof path_arena}, &workspace), ==,
+        TC_RESULT_ARGUMENT);
+  }
+  assert_workspace_equal(&workspace, &saved);
+
+  /* Required counts. */
+  for (unsigned field = 0; field < 5; ++field) {
+    TC_X509_path_capacity zero = capacity;
+    size_t* counts[] = {&zero.frames, &zero.oids, &zero.name_scalars, &zero.name_attributes,
+                        &zero.path};
+    *counts[field] = 0;
+    munit_assert_int(TC_X509_path_workspace_size(&zero, &untouched), ==, TC_RESULT_ARGUMENT);
+    munit_assert_int(
+        TC_X509_path_workspace_init(&zero, (TC_buffer){base, sizeof path_arena}, &workspace), ==,
+        TC_RESULT_ARGUMENT);
+  }
+  munit_assert_int(TC_X509_path_workspace_size(NULL, &untouched), ==, TC_RESULT_ARGUMENT);
+  munit_assert_int(TC_X509_path_workspace_size(&capacity, NULL), ==, TC_RESULT_ARGUMENT);
+  capacity.frames = SIZE_MAX;
+  munit_assert_int(TC_X509_path_workspace_size(&capacity, &untouched), ==, TC_RESULT_LIMIT);
+  munit_assert_int(
+      TC_X509_path_workspace_init(&capacity, (TC_buffer){base, sizeof path_arena}, &workspace), ==,
+      TC_RESULT_LIMIT);
+  capacity.frames = 4;
+  munit_assert_size(untouched, ==, 123);
+  assert_workspace_equal(&workspace, &saved);
+
+  capacity.policy_nodes = capacity.policy_edges = capacity.policy_expected = 0;
+  capacity.policy_mappings = capacity.policies = 0;
+  munit_assert_int(TC_X509_path_workspace_size(&capacity, &bytes), ==, TC_RESULT_OK);
+  munit_assert_int(TC_X509_path_workspace_init(&capacity, (TC_buffer){base, bytes}, &workspace), ==,
+                   TC_RESULT_OK);
+  munit_assert_null(workspace.nodes);
+  munit_assert_null(workspace.edges);
+  munit_assert_null(workspace.expected);
+  munit_assert_null(workspace.mappings);
+  munit_assert_null(workspace.policies);
+  munit_assert_size(workspace.node_capacity, ==, 0);
+  munit_assert_not_null(workspace.summaries);
+  return MUNIT_OK;
+}
+
 /* A storage source that failed to supply bytes is a source failure. */
 TC_TEST(status_mapping)
 {
@@ -933,6 +1137,9 @@ int main(int argc, char** argv)
       {"/usage", usage, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/entry-option-checks", entry_option_checks, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/status-mapping", status_mapping, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/workspace-arena-layout", workspace_arena_layout, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/workspace-arena-failures", workspace_arena_failures, NULL, NULL, MUNIT_TEST_OPTION_NONE,
+       NULL},
       {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
   MunitSuite suite = {"/x509/path", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};
   return munit_suite_main(&suite, NULL, argc, argv);

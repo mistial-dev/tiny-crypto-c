@@ -107,6 +107,55 @@ typedef struct {
    (summaries_),                                                                                   \
    TC_X509_PATH_ARRAY_COUNT_(summaries_)}
 
+/* Element counts for a workspace laid out in one arena. name_scalars sizes
+ * both name buffers. path sizes the certificate views and the extension
+ * summaries, one entry per path certificate. A zero policy count leaves that
+ * array NULL, and validation returns LIMIT when a policy array runs out.
+ * The policy tree always holds its anyPolicy root, so validation with zero
+ * policy_nodes returns LIMIT. */
+typedef struct {
+  size_t frames, oids, name_scalars, name_attributes;
+  size_t policy_nodes, policy_edges, policy_expected, policy_mappings, policies;
+  size_t path;
+} TC_X509_path_capacity;
+
+/* An array of this union meets TC_X509_path_workspace_alignment, for static
+ * arena storage. Size the array with TC_X509_path_workspace_size. */
+typedef union {
+  TC_TLV_frame frame;
+  TC_bytes span;
+  TC_X509_policy_node node;
+  TC_X509_policy_edge edge;
+  TC_X509_policy_expected expected;
+  TC_X509_policy_mapping mapping;
+  size_t count;
+  uint32_t scalar;
+} TC_X509_path_storage;
+
+/* Return the byte alignment that TC_X509_path_workspace_init requires of the
+ * arena. Every array starts at a multiple of it. */
+size_t TC_X509_path_workspace_alignment(void);
+/* Write the arena bytes for capacity to bytes, including the padding that
+ * aligns each array. The size is exact for an arena that meets
+ * TC_X509_path_workspace_alignment. Charges no work.
+ * Returns OK with bytes written. ARGUMENT for NULL arguments or a zero frames,
+ * oids, name_scalars, name_attributes or path count. LIMIT when the size
+ * overflows size_t. bytes changes only on OK. */
+TC_result TC_X509_path_workspace_size(const TC_X509_path_capacity* capacity, size_t* bytes);
+/* Partition arena into the twelve workspace arrays and write their pointers
+ * and capacities to out. Arrays follow the TC_X509_path_workspace field order
+ * and are mutually disjoint. The workspace borrows arena, so keep it alive and
+ * reserved for one validation at a time. Initialization leaves the arena
+ * bytes untouched. capacity, arena and out must be disjoint. Charges no work.
+ * Returns OK with out written. ARGUMENT for NULL arguments, an arena that is
+ * misaligned for TC_X509_path_workspace_alignment or wraps the address space,
+ * overlap, or an invalid capacity as in TC_X509_path_workspace_size. LIMIT
+ * for an arena smaller than TC_X509_path_workspace_size reports or a size
+ * overflow. Failure leaves out and arena unchanged. For fixed array locations,
+ * use TC_X509_PATH_WORKSPACE_INIT or fill the fields directly. */
+TC_result TC_X509_path_workspace_init(const TC_X509_path_capacity* capacity, TC_buffer arena,
+                                      TC_X509_path_workspace* out);
+
 enum {
   TC_X509_PATH_REQUIRE_EXPLICIT_POLICY = 1u,
   TC_X509_PATH_INHIBIT_MAPPING = 2u,

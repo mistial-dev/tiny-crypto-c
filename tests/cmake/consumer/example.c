@@ -374,30 +374,35 @@ int main(void)
     if (TC_KEY_rsa_private_signature_check(&key, &operation) != TC_TLV_OK)
       return 1;
   }
-  static ExampleX509Workspace storage;
+  static TC_X509_path_storage storage[1024];
+  const TC_buffer arena = {(uint8_t*)storage, sizeof storage};
+  const TC_buffer no_arena = {NULL, 0};
   const uint8_t invalid_certificate[] = {0x30, 0};
   const TC_bytes chain = {invalid_certificate, sizeof invalid_certificate};
   const TC_X509_time at = {2026, 1, 1, 0, 0, 0};
   TC_X509_trust_anchor anchor;
   TC_X509_signature_provider verifier;
   TC_X509_path_result result, unchanged;
+  size_t arena_bytes = 0;
   memset(&anchor, 0, sizeof anchor);
   memset(&verifier, 0, sizeof verifier);
   memset(&result, 0xa5, sizeof result);
   memcpy(&unchanged, &result, sizeof result);
 
-  if (example_check_client_certificate(&chain, 1, &anchor, &at, &verifier, 65535, &storage,
-                                       &result) != TC_X509_PATH_INVALID)
+  if (example_client_workspace_size(&arena_bytes) != TC_RESULT_OK || arena_bytes > sizeof storage)
+    return 1;
+  if (example_check_client_certificate(&chain, 1, &anchor, &at, &verifier, 65535, arena, &result) !=
+      TC_X509_PATH_INVALID)
     return 1;
   if (memcmp(&result, &unchanged, sizeof result))
     return 2;
-  if (example_check_client_certificate(&chain, 1, &anchor, &at, &verifier, 0, &storage, &result) !=
+  if (example_check_client_certificate(&chain, 1, &anchor, &at, &verifier, 0, arena, &result) !=
       TC_X509_PATH_LIMIT)
     return 3;
   if (memcmp(&result, &unchanged, sizeof result))
     return 4;
-  if (example_check_client_certificate(&chain, 1, &anchor, &at, &verifier, 65535, NULL, &result) !=
-      TC_X509_PATH_ERROR)
+  if (example_check_client_certificate(&chain, 1, &anchor, &at, &verifier, 65535, no_arena,
+                                       &result) != TC_X509_PATH_ERROR)
     return 5;
   if (memcmp(&result, &unchanged, sizeof result))
     return 6;

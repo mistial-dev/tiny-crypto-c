@@ -1404,30 +1404,35 @@ TC_TEST(paths)
         }
       }
       if (scenario == 0 || scenario == 1 || scenario == 5) {
-        ExampleX509SearchWorkspace search_storage;
+        static TC_X509_path_storage client_arena[1024];
+        const TC_buffer arena = {(uint8_t*)client_arena, sizeof client_arena};
+        TC_bytes search_path[EXAMPLE_CLIENT_PATH_CAPACITY];
+        TC_X509_search_frame search_frames[EXAMPLE_CLIENT_PATH_CAPACITY];
+        const TC_X509_search_workspace search = {search_path, search_frames,
+                                                 EXAMPLE_CLIENT_PATH_CAPACITY};
+        const TC_buffer no_arena = {NULL, 0};
         TC_X509_search_result found, saved_search;
         test_search_store records = {encoded_path,          &anchor, TC_TLV_OK, 0, 0, 0, 0,
                                      {{NULL, 0}, {NULL, 0}}};
         TC_X509_store_source source = {&records, 3, 1, store_candidate, store_anchor};
-        ExampleX509Workspace storage;
         TC_X509_path_result result, unchanged;
         memset(&result, 0xa5, sizeof result);
         memcpy(&unchanged, &result, sizeof result);
         munit_assert_int(example_check_client_certificate(encoded_path, 3, &anchor, &at, &provider,
-                                                          1000000, &storage, &result),
+                                                          1000000, arena, &result),
                          ==, scenario == 0 ? TC_X509_PATH_VALID : TC_X509_PATH_INVALID);
         if (scenario == 0) {
           munit_assert_ptr_equal(result.public_key.key.data, parsed[3].public_key.key.data);
           memcpy(&unchanged, &result, sizeof result);
           munit_assert_int(example_check_client_certificate(encoded_path, 3, &anchor, &at,
-                                                            &provider, 0, &storage, &result),
+                                                            &provider, 0, arena, &result),
                            ==, TC_X509_PATH_LIMIT);
         }
         munit_assert_memory_equal(sizeof result, &result, &unchanged);
         memset(&found, 0xa5, sizeof found);
         memcpy(&saved_search, &found, sizeof found);
         munit_assert_int(example_find_client_path(encoded_path[2], &source, &at, &provider, 2000000,
-                                                  &search_storage, &found),
+                                                  arena, &search, &found),
                          ==, scenario == 0 ? TC_X509_PATH_VALID : TC_X509_PATH_INVALID);
         if (scenario == 0) {
           munit_assert_size(found.count, ==, 3);
@@ -1437,11 +1442,11 @@ TC_TEST(paths)
         }
         munit_assert_memory_equal(sizeof found, &found, &saved_search);
         munit_assert_int(example_find_client_path(encoded_path[2], &source, &at, &provider, 0,
-                                                  &search_storage, &found),
+                                                  arena, &search, &found),
                          ==, TC_X509_PATH_LIMIT);
         munit_assert_memory_equal(sizeof found, &found, &saved_search);
         munit_assert_int(example_find_client_path(encoded_path[2], &source, &at, &provider, 2000000,
-                                                  NULL, &found),
+                                                  no_arena, &search, &found),
                          ==, TC_X509_PATH_ERROR);
         munit_assert_memory_equal(sizeof found, &found, &saved_search);
       }
