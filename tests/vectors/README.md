@@ -10,6 +10,7 @@ license and retained scope, and its `SHA256SUMS` lists every file's digest.
 | `aes/cavp/` | NIST CAVP AES ECB, CBC, OFB, GCM and CCM response files |
 | `aes/cmac/` | NIST CAVP AES CMAC response files |
 | `aes/eax/` | EAX paper vectors and EAX' worked examples |
+| `aes/kw/` | NIST CAVP KWVS AES KW and KWP files |
 | `des/` | NIST CAVP TDES KAT, MMT, MCT and CMAC files, and generated edge cases |
 | `drbg/` | NIST CAVP SP 800-90A Hash_DRBG, HMAC_DRBG and CTR_DRBG answers |
 | `hash/` | NIST CAVP SHA and HMAC response files |

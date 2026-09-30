@@ -391,8 +391,9 @@ if(TINY_CRYPTO_BUILD_TESTS)
   endif()
   tc_add_test_library(tiny-crypto-c-test-aes-dynamic src/common.c ${tc_aes_sources})
   target_compile_definitions(tiny-crypto-c-test-aes-dynamic PUBLIC
-    TC_AES_ENABLE_DYNAMIC=1 TC_AES_ENABLE_CTR=0 TC_ENABLE_SHA256=0)
-  tc_add_c_test(test_aes_dynamic tiny-crypto-c-test-aes-dynamic tests/aes/dynamic_test.c)
+    TC_AES_ENABLE_DYNAMIC=1 TC_AES_ENABLE_CTR=0 TC_AES_ENABLE_KW=1 TC_ENABLE_SHA256=0)
+  tc_add_c_test(test_aes_dynamic tiny-crypto-c-test-aes-dynamic tests/aes/dynamic_test.c
+    tests/aes/kw_test.c)
   tc_add_c_test(test_idf_bootloader_hash tiny-crypto-c-test
     tests/esp_idf/bootloader_hash.c ports/esp-idf/bootloader_hash.c)
   foreach(scheme rsa ecdsa)
@@ -491,11 +492,12 @@ if(TINY_CRYPTO_BUILD_TESTS)
     tc_aes_cipher=tc_test_cipher)
   tc_add_c_test(test_aes_backend_failure tiny-crypto-c-test-aes-dynamic
     tests/aes/backend_failure.c src/aes_mac.c src/aes_cmac.c src/aes_eax.c src/aes_siv.c
-    src/aes_ccm.c src/aes_ghash.c src/aes_gcm.c)
+    src/aes_ccm.c src/aes_ghash.c src/aes_gcm.c src/aes_kw.c)
   target_compile_definitions(test_aes_backend_failure PRIVATE
     TC_AES_ENABLE_CMAC=1 TC_AES_ENABLE_SIV=1 TC_AES_ENABLE_EAX=1 TC_AES_ENABLE_EAX_PRIME=1
-    TC_AES_ENABLE_CCM=1 TC_AES_ENABLE_GCM=1
-    tc_aes_cipher_rounds=tc_test_cipher_rounds tc_aes_cipher=tc_test_cipher)
+    TC_AES_ENABLE_CCM=1 TC_AES_ENABLE_GCM=1 TC_AES_ENABLE_KW=1
+    tc_aes_cipher_rounds=tc_test_cipher_rounds tc_aes_inverse_rounds=tc_test_inverse_rounds
+    tc_aes_cipher=tc_test_cipher)
   foreach(bits 128 192 256)
     if(bits EQUAL 128)
       set(aead_library tiny-crypto-c-test)
@@ -503,13 +505,18 @@ if(TINY_CRYPTO_BUILD_TESTS)
       set(aead_library tiny-crypto-c-test-aes${bits})
     endif()
     tc_add_c_test(test_wycheproof_aead_${bits} ${aead_library} tests/aes/wycheproof.c)
+    tc_add_c_test(test_wycheproof_keywrap_${bits} ${aead_library} tests/aes/kw_wycheproof.c)
   endforeach()
+  tc_add_c_test(test_wycheproof_keywrap_dynamic tiny-crypto-c-test-aes-dynamic
+    tests/aes/kw_wycheproof.c)
   # Archive runners supply fixtures to these executables.
   set_tests_properties(
     test_ecdsa_reader_0 test_ecdsa_reader_1
     test_rsa_signature_reader test_rsa_signature_reader_small
     test_rsa_oaep_reader_0 test_rsa_oaep_reader_1
     test_wycheproof_aead_128 test_wycheproof_aead_192 test_wycheproof_aead_256
+    test_wycheproof_keywrap_128 test_wycheproof_keywrap_192 test_wycheproof_keywrap_256
+    test_wycheproof_keywrap_dynamic
     PROPERTIES SKIP_REGULAR_EXPRESSION "No tests run, 1 .* skipped")
   if(TINY_CRYPTO_TEST_WYCHEPROOF_DIR)
     add_test(NAME test_wycheproof_aead
@@ -518,6 +525,13 @@ if(TINY_CRYPTO_BUILD_TESTS)
         --aead-reader 128:$<TARGET_FILE:test_wycheproof_aead_128>
         --aead-reader 192:$<TARGET_FILE:test_wycheproof_aead_192>
         --aead-reader 256:$<TARGET_FILE:test_wycheproof_aead_256>)
+    add_test(NAME test_wycheproof_keywrap
+      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/wycheproof.py
+        --vectors ${TINY_CRYPTO_TEST_WYCHEPROOF_DIR}
+        --keywrap-reader 128:$<TARGET_FILE:test_wycheproof_keywrap_128>
+        --keywrap-reader 192:$<TARGET_FILE:test_wycheproof_keywrap_192>
+        --keywrap-reader 256:$<TARGET_FILE:test_wycheproof_keywrap_256>
+        --keywrap-dynamic-reader $<TARGET_FILE:test_wycheproof_keywrap_dynamic>)
   endif()
 
   foreach(profile full core)
@@ -1168,14 +1182,15 @@ if(TINY_CRYPTO_BUILD_TESTS)
 
   function(tc_add_aes_test target library)
     tc_add_c_test(${target} ${library} tests/aes/test.c tests/aes/cavp.c
-      tests/aes/eax_test.c tests/aes/siv_test.c tests/aes/cmac_test.c)
+      tests/aes/eax_test.c tests/aes/siv_test.c tests/aes/cmac_test.c tests/aes/kw_test.c)
     target_include_directories(${target} PRIVATE tests/aes)
     target_compile_definitions(${target} PRIVATE
       CAVP_VECTOR_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/aes/cavp"
       EAX_VECTOR_FILE="${tc_wycheproof_vectors}/aes_eax_test.json"
       SIV_VECTOR_FILE="${tc_wycheproof_vectors}/aead_aes_siv_cmac_test.json"
       CMAC_WYCHEPROOF_FILE="${tc_wycheproof_vectors}/aes_cmac_test.json"
-      CMAC_CAVP_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/aes/cmac")
+      CMAC_CAVP_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/aes/cmac"
+      KW_CAVP_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/aes/kw")
   endfunction()
 
   tc_add_aes_test(test_aes tiny-crypto-c-test)
@@ -1230,6 +1245,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   tc_add_c_test(test_hkdf tiny-crypto-c-test tests/kdf/hkdf_test.c)
   target_include_directories(test_hkdf PRIVATE tests/kdf)
   tc_add_linked_test(test_hkdf_example tiny-crypto-c-test examples/hkdf.c)
+  tc_add_linked_test(test_aes_kw_example tiny-crypto-c-test examples/aes_kw.c)
   if(Python3_Interpreter_FOUND)
     tc_add_test_executable(test_hkdf_reader tests/kdf/hkdf_reader.c
       tests/support/cavp.c tests/support/munit.c)
@@ -1276,6 +1292,9 @@ if(TINY_CRYPTO_BUILD_TESTS)
     tc_add_linked_test(test_cpp_hkdf tiny-crypto-c-test
       tests/cpp/hkdf.cpp tests/cpp/main.cpp)
     target_include_directories(test_cpp_hkdf PRIVATE tests/support)
+    tc_add_linked_test(test_cpp_aes_kw tiny-crypto-c-test
+      tests/cpp/aes_kw.cpp tests/cpp/main.cpp)
+    target_include_directories(test_cpp_aes_kw PRIVATE tests/support)
     tc_add_linked_test(test_cpp_drbg tiny-crypto-c-test-drbg
       tests/cpp/drbg.cpp tests/cpp/main.cpp)
     target_include_directories(test_cpp_drbg PRIVATE tests/support)
@@ -1293,7 +1312,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
 
   # Compile both umbrellas with each feature family's smallest legal profile.
   # This catches accidental feature coupling and keeps their C API surface equal.
-  foreach(header_profile rsa tlv aamva fascn twic_uuid twic_tpk twic_object hkdf
+  foreach(header_profile rsa tlv aamva fascn twic_uuid twic_tpk twic_object hkdf aes_kw
       piv_oids x509 key_challenge x509_path x509_revocation x509_ocsp cms cms_validation piv_objects credential piv_cvc piv_chuid
       piv_sm twic_ccl)
     set(header_profile_definitions TC_ENABLE_AES=0 TC_ENABLE_SHA256=0)
@@ -1302,6 +1321,10 @@ if(TINY_CRYPTO_BUILD_TESTS)
       list(APPEND header_profile_definitions
         TC_ENABLE_SHA256=1 TC_ENABLE_HMAC=1 TC_ENABLE_HKDF=1 TC_ENABLE_KDF=0
         TC_TEST_HEADER_HKDF=1)
+    elseif(header_profile STREQUAL "aes_kw")
+      list(REMOVE_ITEM header_profile_definitions TC_ENABLE_AES=0)
+      list(APPEND header_profile_definitions
+        TC_ENABLE_AES=1 TC_AES_ENABLE_CTR=0 TC_AES_ENABLE_KW=1 TC_TEST_HEADER_AES_KW=1)
     elseif(header_profile STREQUAL "rsa")
       list(APPEND header_profile_definitions TC_ENABLE_RSA=1 TC_TEST_HEADER_RSA=1)
     elseif(header_profile STREQUAL "tlv")
@@ -1506,6 +1529,14 @@ if(TINY_CRYPTO_BUILD_TESTS)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/avr/aes_known_answer.c
             ${CMAKE_CURRENT_SOURCE_DIR}/src/aes.c ${CMAKE_CURRENT_SOURCE_DIR}/src/aes_modes.c
             ${CMAKE_CURRENT_SOURCE_DIR}/src/block_modes.c ${CMAKE_CURRENT_SOURCE_DIR}/src/common.c)
+        add_test(NAME test_aes_kw_sbox_${sbox_mode}_qemu_avr
+          COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/avr/run_qemu.py
+            --cc ${TC_AVR_CC} --qemu ${TC_QEMU_AVR} --expect KW-OK
+            --include ${CMAKE_CURRENT_SOURCE_DIR}/src
+            --define TC_AES_SBOX_MODE=${sbox_mode} --define TC_AES_ENABLE_KW=1
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/avr/aes_kw_known_answer.c
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/aes.c ${CMAKE_CURRENT_SOURCE_DIR}/src/aes_kw.c
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/common.c)
       endforeach()
     endif()
     # The key challenge carries a 32-bit work budget across size_t PKI code.

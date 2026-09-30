@@ -5,6 +5,10 @@
 #error "The C umbrella must expose enabled HKDF declarations"
 #endif
 
+#if defined(TC_TEST_HEADER_AES_KW) && !defined(TINY_CRYPTO_AES_KW_H_)
+#error "The C umbrella must expose the enabled AES key wrap declarations"
+#endif
+
 #if defined(TC_TEST_HEADER_RSA)
 #ifndef TINY_CRYPTO_RSA_H_
 #error "The C umbrella must expose enabled RSA declarations"

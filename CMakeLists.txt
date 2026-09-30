@@ -66,6 +66,7 @@ tc_profile_option(TINY_CRYPTO_AES_EAX TC_AES_ENABLE_EAX "Build AES-EAX")
 tc_profile_option(TINY_CRYPTO_AES_EAX_PRIME TC_AES_ENABLE_EAX_PRIME "Build ANSI C12.22 EAX-prime")
 tc_profile_option(TINY_CRYPTO_AES_SIV TC_AES_ENABLE_SIV "Build AES-SIV")
 tc_profile_option(TINY_CRYPTO_AES_CMAC TC_AES_ENABLE_CMAC "Build AES-CMAC")
+tc_profile_option(TINY_CRYPTO_AES_KW TC_AES_ENABLE_KW "Build AES key wrap (KW and KWP)")
 set(TINY_CRYPTO_AES_SBOX "constant-time" CACHE STRING
     "AES S-box: constant-time, runtime, or fast")
 set_property(CACHE TINY_CRYPTO_AES_SBOX PROPERTY STRINGS constant-time runtime fast)
@@ -149,7 +150,8 @@ endfunction()
 # block_modes.c holds the CBC, CTR and OFB cores shared by AES and DES. A
 # target that lists both families compiles it once.
 set(tc_aes_sources src/aes.c src/aes_modes.c src/block_modes.c src/aes_ghash.c src/aes_gcm.c
-  src/aes_ccm.c src/aes_mac.c src/aes_cmac.c src/aes_eax.c src/aes_siv.c src/mac_core.c)
+  src/aes_ccm.c src/aes_mac.c src/aes_cmac.c src/aes_eax.c src/aes_siv.c src/aes_kw.c
+  src/mac_core.c)
 set(tc_des_sources src/des.c src/des_modes.c src/block_modes.c src/des_mac.c)
 set(tc_hash_sources src/hash.c src/sha512.c src/hash_core.c)
 set(tc_drbg_sources src/drbg.c src/drbg_hash.c src/drbg_hmac.c src/drbg_ctr.c src/drbg_random.c)

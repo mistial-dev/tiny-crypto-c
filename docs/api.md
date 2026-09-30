@@ -146,8 +146,8 @@ requested buffer before returning `TC_OK`.
 - Inputs may share storage with each other.
 - Outputs, contexts, workspaces and work counters must be disjoint from the
   inputs and from each other unless the header permits in-place use. The
-  block-mode, AEAD, KMAC and MD5 functions list their permitted in-place and
-  overlap cases.
+  block-mode, AEAD, key wrap, KMAC and MD5 functions list their permitted
+  in-place and overlap cases.
 - Checked overlaps return the module's argument error before any write. An
   overlap that a function cannot detect, such as one through a separate
   mapping of the same memory, is undefined behavior.
@@ -238,6 +238,7 @@ Function names end with the operation:
 - `_work`, `_size`, `_BYTES` and `_WORDS` return the cost or storage a call
   needs, so callers can size budgets and buffers before the call.
 - `_short_tag` selects tag lengths below the default minimum.
+- `wrap` and `unwrap` protect and recover key data under a key-encryption key.
 
 Arguments follow the operation:
 
@@ -425,6 +426,15 @@ if (status != TC_OK)
   return status; /* packet holds no plaintext */
 ```
 
+## Key wrap
+
+`<tiny_crypto/aes_kw.h>` provides one-shot SP 800-38F KW and KWP wrap and
+unwrap. Unwrap uses the output as its working area and checks the integrity
+value after the inverse wrapping function. Every failure after the argument
+checks wipes that area. A failed integrity, length indicator or padding check
+returns `TC_MISMATCH`. Inputs and outputs may overlap in any way. See
+[AES key wrap](aes-kw.md) for KEK lengths, buffer sizes and limits.
+
 ## Tag lengths
 
 `TC_MIN_TAG_LEN` in `config.h` sets one minimum tag length for CCM, EAX,
@@ -603,6 +613,8 @@ int main(void)
 - [Credential reader](credential-reader.md) describes the supported card checks.
 - [GZIP decoding](gzip.md) shows bounded output and caller-owned scratch.
 - [TLV parsing](tlv.md) and [DER values](der.md) cover bounded readers.
+- [AES key wrap](aes-kw.md) covers KEK lengths, buffer sizing and unwrap
+  failure.
 - [HKDF](hkdf.md), [DRBG](drbg.md), [RSA](rsa.md) and
   [elliptic curves](ec.md) cover the cryptographic modules.
 - [C++ wrappers](cpp.md) covers the C++11 API.

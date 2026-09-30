@@ -77,6 +77,9 @@ MunitResult test_siv(const MunitParameter params[], void* data);
 #if TC_AES_ENABLE_CMAC
 MunitResult test_cmac(const MunitParameter params[], void* data);
 #endif
+#if TC_AES_ENABLE_KW
+MunitResult test_kw(const MunitParameter params[], void* data);
+#endif
 
 TC_TEST(test_key_schedule)
 {
@@ -1444,6 +1447,9 @@ static MunitTest test_suite_tests[] = {
 #endif
 #if TC_AES_ENABLE_EAX_PRIME
     {"/eax-prime", test_eax_prime, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+#endif
+#if TC_AES_ENABLE_KW
+    {"/kw", test_kw, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
 #endif
     {"/secure-zero-clear", test_secure_zero_and_clear, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/key-schedule", test_key_schedule, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

@@ -131,8 +131,9 @@ act workflow_dispatch --bind -W .github/act/cms-sanitizer.yml -j msan
 Several corpus readers skip when run directly without an input file. Their
 runner tests supply the vectors: `test_wycheproof_ecdsa`,
 `test_wycheproof_rsa_signatures`, the `test_wycheproof_rsa_oaep_*` shards,
-`test_wycheproof_aead`, and `test_cms_corpus`. Check that the relevant runner
-is configured and passes before treating a standalone reader skip as expected.
+`test_wycheproof_aead`, `test_wycheproof_keywrap`, and `test_cms_corpus`.
+Check that the relevant runner is configured and passes before treating a
+standalone reader skip as expected.
 The Wycheproof runners report accepted input categories and excluded parameters.
 
 C tests use [µunit](https://nemequ.github.io/munit/). C++ tests use
@@ -144,9 +145,10 @@ Test code decodes hex through one helper in `tests/support/cavp.c`.
 field or separated-byte syntax. `test_support_hex` covers both.
 Fault seams exercise failure paths that the shipped ciphers cannot reach.
 `test_aes_backend_failure` and `test_aes_mode_failure` fail chosen AES block
-calls. `test_des_mac_failure` builds the DES MACs with `TC_TEST_DES_FAULT` and
-fails each DES block call of CMAC and ISO/IEC 9797-1 in turn. Every failure
-must return `TC_ERROR`, wipe the context and leave the tag untouched.
+calls, including every KW and KWP block operation. `test_des_mac_failure`
+builds the DES MACs with `TC_TEST_DES_FAULT` and fails each DES block call of
+CMAC and ISO/IEC 9797-1 in turn. Every failure must return `TC_ERROR`, wipe
+the context and leave the tag untouched.
 The installed-consumer check builds a separate Release library, installs it,
 and compiles isolated C99 and C++11 callers against that installation. It also
 builds the X.509, CMS, TWIC validation and RSA encryption examples. The isolated
@@ -802,9 +804,10 @@ ctest --test-dir /tmp/tiny-crypto-full --output-on-failure
 
 Check the test listing before treating this as a full run. Expect
 `test_wycheproof_ec`, `test_wycheproof_kmac`, `test_wycheproof_dynamic_cmac`,
-`test_wycheproof_hmac`, `test_wycheproof_aead`, `test_ec_cavp`, `test_sm_primitives_corpus`,
-`test_tlv_external_lengths`, and the parser corpus tests. Optional tests can
-be absent when their paths are unset or Python is unavailable.
+`test_wycheproof_hmac`, `test_wycheproof_aead`, `test_wycheproof_keywrap`,
+`test_ec_cavp`, `test_sm_primitives_corpus`, `test_tlv_external_lengths`, and
+the parser corpus tests. Optional tests can be absent when their paths are
+unset or Python is unavailable.
 Also check for `test_wycheproof_ecdsa`, `test_wycheproof_rsa_signatures`,
 `test_wycheproof_rsa_generation`, `test_wycheproof_primality`,
 the `test_wycheproof_rsa_oaep_*` shards, `test_cms_native`, `test_cms_path`,
@@ -880,6 +883,25 @@ AES-CMAC minimum tag lengths outside 1 to 16.
 The two SIV formats differ in their associated-data components and whether the
 synthetic IV prefixes the ciphertext.
 
+AES key wrap has its own suite, `test_kw`, in `test_aes`, `test_aes_192`,
+`test_aes_256` and `test_aes_dynamic`. It runs the RFC 3394 section 4 and
+RFC 5649 section 6 examples out of place, in place and aliased, and checks
+that a build without a vector's KEK size rejects it with outputs unchanged.
+Argument cases cover every rejected KEK length, NULL spans, lengths outside
+the SP 800-38F domains, short capacities, a KWP length output inside the
+working area and the `size_t` overflow bounds. Every single-bit change of a
+wrapped key must return `TC_MISMATCH` with the working area zero. Chosen KWP
+inputs cover each ICV2 byte, every length indicator inside and outside
+`8(n-2) < MLI <= 8(n-1)` and a nonzero byte at each padding position for two to
+four semiblocks. Full runs add the NIST CAVP KWVS files in
+`tests/vectors/aes/kw/`. `test_wycheproof_keywrap` runs `aes_wrap_test.json`
+and `aes_kwp_test.json` with one reader per KEK size and the dynamic-key
+reader over all of them. The three 8-byte KW `ShortKey` cases that Wycheproof
+rates acceptable run as invalid, because SP 800-38F Table 1 requires two
+semiblocks. `test_aes_kw_example` runs the example, and
+`tiny-crypto-c-profile-aes-kw-minimal` compiles key wrap with every other AES
+mode off.
+
 The AES and DES mode suites pass buffers, IVs and tags that lie inside the
 context or run into its first byte. Every mode, `set_iv` and MAC entry must
 return `TC_ERROR` and leave the context unchanged. The `iv-required` and
@@ -898,7 +920,7 @@ hybrid secrets, multi-expansion, and invalid validation outputs. The other
 hash families in the original ACVP files are skipped explicitly.
 
 The pinned Wycheproof tree also contains algorithms and formats outside this API:
-PKCS#5-padded CBC, AES key wrap, XTS, FF1, GCM-SIV, chunked encryption,
+PKCS#5-padded CBC, XTS, FF1, GCM-SIV, chunked encryption,
 PBKDF2, KMAC128, SHA-3 HMAC, and signature operations. The adapter excludes them from its counts.
 Raw CBC has no padding-validation API to test against PKCS#5 rejection cases.
 ECDH PEM and WebCrypto import formats are also outside the API. The raw-point
@@ -1148,6 +1170,10 @@ treated as errors. With `avr-g++`, `test_cpp_headers_avr` compiles
 `-Wall -Wextra -Werror`, and checks the validation API's 32-bit work
 parameter. `test_cpp_nodiscard_avr` runs the unused-result check with
 `avr-g++`. These checks require only the compilers.
+With `qemu-system-avr`, `test_aes_sbox_*_qemu_avr` and
+`test_aes_kw_sbox_*_qemu_avr` run AES and key wrap known answers on an
+emulated ATmega328P in each S-box mode. The key wrap program includes a
+392-byte wrap whose step counter exceeds 255.
 
 ```sh
 ctest --test-dir build -R '^test_(rsa(_validate|_sign)?_compile_avr|cpp_(headers|nodiscard)_avr)$' --output-on-failure

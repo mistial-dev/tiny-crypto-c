@@ -11,7 +11,7 @@ set(tc_full_definitions
   TC_AES_ENABLE_CBC=1 TC_AES_ENABLE_ECB=1 TC_AES_ENABLE_CTR=1
   TC_AES_ENABLE_OFB=1 TC_AES_ENABLE_GCM=1
   TC_AES_ENABLE_CCM=1 TC_AES_ENABLE_EAX=1
-  TC_AES_ENABLE_SIV=1 TC_AES_ENABLE_CMAC=1
+  TC_AES_ENABLE_SIV=1 TC_AES_ENABLE_CMAC=1 TC_AES_ENABLE_KW=1
   TC_AES_SBOX_MODE=1
   TC_AES_GCM_GHASH_MODE=0 TC_AES_WIDE_OPS=0 TC_AES_TINY=0
   TC_DES_ENABLE_ECB=1 TC_DES_ENABLE_CBC=1 TC_DES_ENABLE_CTR=1
@@ -99,7 +99,7 @@ foreach(key_bits 192 256)
     TC_AES_ENABLE_CBC=1 TC_AES_ENABLE_ECB=1 TC_AES_ENABLE_CTR=1
     TC_AES_ENABLE_OFB=1 TC_AES_ENABLE_GCM=1 TC_AES_ENABLE_CCM=1
     TC_AES_ENABLE_EAX=1 TC_AES_ENABLE_EAX_PRIME=0 TC_AES_ENABLE_SIV=1
-    TC_AES_ENABLE_CMAC=1 ${tc_min_tag_definition}
+    TC_AES_ENABLE_CMAC=1 TC_AES_ENABLE_KW=1 ${tc_min_tag_definition}
     TC_AES_SBOX_MODE=1 TC_AES_GCM_GHASH_MODE=0 TC_AES_WIDE_OPS=0
     TC_AES_TINY=0 TC_AES_CAVP=$<BOOL:${TINY_CRYPTO_TEST_FULL}>
     TC_KDF_CAVP=$<BOOL:${TINY_CRYPTO_TEST_FULL}>)
@@ -130,7 +130,7 @@ tc_add_c_test(test_des_mac_failure tiny-crypto-c-test-des-fault tests/des/mac_fa
 tc_add_test_library(tiny-crypto-c-test-aes-runtime-sbox
   src/common.c ${tc_aes_sources})
 target_compile_definitions(tiny-crypto-c-test-aes-runtime-sbox PUBLIC
-  TC_AES_KEY_BITS=128 TC_AES_SBOX_MODE=2 TC_AES_ENABLE_CMAC=1)
+  TC_AES_KEY_BITS=128 TC_AES_SBOX_MODE=2 TC_AES_ENABLE_CMAC=1 TC_AES_ENABLE_KW=1)
 
 # Compile-only profile matrix for legal feature-gate combinations.
 function(tc_add_compile_profile name)
@@ -178,6 +178,15 @@ target_compile_definitions(tiny-crypto-c-profile-aes-cmac-minimal PRIVATE
   TC_AES_ENABLE_OFB=0 TC_AES_ENABLE_GCM=0 TC_AES_ENABLE_CCM=0
   TC_AES_ENABLE_EAX=0 TC_AES_ENABLE_EAX_PRIME=0 TC_AES_ENABLE_SIV=0
   TC_AES_ENABLE_CMAC=1)
+
+# Key wrap alone pulls in the forward and inverse ciphers.
+tc_add_compile_profile(tiny-crypto-c-profile-aes-kw-minimal ${tc_aes_sources})
+target_compile_definitions(tiny-crypto-c-profile-aes-kw-minimal PRIVATE
+  TC_ENABLE_AES=1 TC_ENABLE_DES=0 TC_ENABLE_SHA256=0
+  TC_AES_ENABLE_CBC=0 TC_AES_ENABLE_ECB=0 TC_AES_ENABLE_CTR=0
+  TC_AES_ENABLE_OFB=0 TC_AES_ENABLE_GCM=0 TC_AES_ENABLE_CCM=0
+  TC_AES_ENABLE_EAX=0 TC_AES_ENABLE_EAX_PRIME=0 TC_AES_ENABLE_SIV=0
+  TC_AES_ENABLE_CMAC=0 TC_AES_ENABLE_KW=1 TC_AES_ENABLE_DYNAMIC=0)
 
 # HKDF remains available without KBKDF, AES or DES, with only one HMAC hash.
 tc_add_compile_profile(tiny-crypto-c-profile-hkdf-sha256

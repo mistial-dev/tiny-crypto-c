@@ -246,6 +246,49 @@ class ReaderTests(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 wycheproof.ecdsa_records(bad, 256, "sha256")
 
+    def test_keywrap_records(self):
+        def case(tc_id, result, flags, msg="00" * 16, ct="11" * 24, key="22" * 16):
+            return {"tcId": tc_id, "key": key, "msg": msg, "ct": ct, "result": result,
+                    "flags": flags}
+        document = {"numberOfTests": 7, "testGroups": [
+            {"keySize": 128, "tests": [case(1, "valid", ["Normal"]),
+                                       case(2, "acceptable", ["ShortKey"], msg="00" * 8, ct="11" * 16),
+                                       case(3, "invalid", ["ModifiedIv"])]},
+            {"keySize": 192, "tests": [case(4, "valid", [], key="22" * 24),
+                                       case(5, "invalid", ["EmptyKey"], msg="", ct="11" * 8,
+                                            key="22" * 24)]},
+            {"keySize": 256, "tests": [case(6, "valid", [], key="22" * 32),
+                                       case(7, "invalid", [], key="22" * 32)]}]}
+        records, counts, derived = wycheproof.keywrap_records(document, "kw")
+        self.assertEqual(records[128][1], "kw 2 invalid " + "22" * 16 + " " + "00" * 8 + " " + "11" * 16)
+        self.assertEqual(records[192][1], "kw 5 invalid " + "22" * 24 + " - " + "11" * 8)
+        self.assertEqual([len(records[bits]) for bits in (128, 192, 256)], [3, 2, 2])
+        self.assertEqual(counts[(128, "invalid")], 2)
+        self.assertEqual(derived, {128: 1})
+        # Only KW ShortKey cases may be acceptable.
+        with self.assertRaises(AssertionError):
+            wycheproof.keywrap_records(document, "kwp")
+        bad = copy.deepcopy(document)
+        bad["testGroups"][0]["tests"][2]["flags"] = ["ShortKey", "Other"]
+        bad["testGroups"][0]["tests"][2]["result"] = "acceptable"
+        with self.assertRaises(AssertionError):
+            wycheproof.keywrap_records(bad, "kw")
+        # Every KEK size needs valid and invalid cases, and counts must add up.
+        bad = copy.deepcopy(document)
+        del bad["testGroups"][2]["tests"][1]
+        bad["numberOfTests"] = 6
+        with self.assertRaises(AssertionError):
+            wycheproof.keywrap_records(bad, "kw")
+        bad = copy.deepcopy(document)
+        bad["numberOfTests"] = 8
+        with self.assertRaises(AssertionError):
+            wycheproof.keywrap_records(bad, "kw")
+        # A KEK length must match its group.
+        bad = copy.deepcopy(document)
+        bad["testGroups"][1]["tests"][0]["key"] = "22" * 16
+        with self.assertRaises(AssertionError):
+            wycheproof.keywrap_records(bad, "kw")
+
     def test_requires_one_successful_test(self):
         summary = "1 of 1 (100%) tests successful, 0 (0%) test skipped."
         cases = ((0, summary, True),

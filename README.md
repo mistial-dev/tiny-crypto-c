@@ -167,6 +167,7 @@ algorithm is enabled.
 | `TINY_CRYPTO_AES_EAX_PRIME`        | OFF     | OFF   | OFF  | ON      | ANSI C12.22 EAX'                                 |
 | `TINY_CRYPTO_AES_SIV`              | OFF     | OFF   | OFF  | ON      | AES-SIV (RFC 5297)                               |
 | `TINY_CRYPTO_AES_CMAC`             | OFF     | OFF   | OFF  | ON      | AES-CMAC                                         |
+| `TINY_CRYPTO_AES_KW`               | OFF     | OFF   | OFF  | ON      | AES key wrap, KW and KWP (SP 800-38F)            |
 | `TINY_CRYPTO_AES_WIDE_OPS`         | OFF     | OFF   | ON   | ON      | Native-width AES helpers                         |
 | `TINY_CRYPTO_AES_TINY`             | OFF     | ON    | OFF  | OFF     | Reject the 256-byte `fast-table` GHASH context   |
 | `TINY_CRYPTO_DES_CTR`              | ON      | ON    | ON   | ON      | DES-CTR                                          |
@@ -241,8 +242,10 @@ requests, response verification and responder authorization.
 
 `TINY_CRYPTO_AES_KEY_BITS` fixes the key size of the `aes.h` API, including
 AES-CMAC keys used by KBKDF. `TINY_CRYPTO_AES_DYNAMIC` adds per-context key
-sizes. `constant-time` computes the S-box algebraically. `runtime` builds it in
-RAM and reads it with a masked scan. `fast` uses direct table lookups and has
+sizes. The key wrap KEK follows `TINY_CRYPTO_AES_KEY_BITS`, and
+`TINY_CRYPTO_AES_DYNAMIC` adds 128, 192 and 256-bit KEKs. `constant-time`
+computes the S-box algebraically. `runtime` builds it in RAM and reads it with
+a masked scan. `fast` uses direct table lookups and has
 no cache-timing protection.
 
 `TINY_CRYPTO_AES_GHASH=profile` selects `auto` for the default and mini builds,
@@ -294,6 +297,11 @@ describes the SP 800-108r1 key-control mitigations for the CMAC PRFs.
 The C and C++ APIs provide extract, expand, and one-shot derive operations.
 They also accept a revision 2 hybrid secret as separate `Z` and `T` spans.
 See [HKDF usage](docs/hkdf.md) and the [C example](examples/hkdf.c).
+
+`TINY_CRYPTO_AES_KW` builds the SP 800-38F AES key wrap functions KW
+(RFC 3394) and KWP (RFC 5649) for storing and transporting keys under a
+key-encryption key. See [AES key wrap](docs/aes-kw.md) and the
+[C example](examples/aes_kw.c).
 
 ## API behavior
 

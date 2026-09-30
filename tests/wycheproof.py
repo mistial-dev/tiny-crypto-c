@@ -283,6 +283,48 @@ def primality_records(document):
     return "\n".join(records) + "\n", counts, derived, exclusions
 
 
+KEYWRAP_KEY_SIZES = (128, 192, 256)
+KEYWRAP_DOCUMENTS = (("kw", "aes_wrap_test.json"), ("kwp", "aes_kwp_test.json"))
+
+
+def keywrap_records(document, mode):
+    """Split an AES-KW or AES-KWP document into records per KEK size.
+
+    Each record is "mode tcId verdict key msg ct" with "-" for an empty
+    field. Wycheproof rates 8-byte KW key data (ShortKey) acceptable. SP
+    800-38F section 5.3.1 Table 1 requires at least two semiblocks, so those
+    cases run as invalid and are counted as derived verdicts."""
+    records = {bits: [] for bits in KEYWRAP_KEY_SIZES}
+    counts, derived = Counter(), Counter()
+    for group in document["testGroups"]:
+        bits = group["keySize"]
+        if bits not in records:
+            raise AssertionError("Unexpected key wrap KEK size")
+        for case in group["tests"]:
+            if len(bytes.fromhex(case["key"])) * 8 != bits:
+                raise AssertionError("Unexpected key wrap KEK length")
+            verdict = case["result"]
+            if verdict == "acceptable":
+                if mode != "kw" or case["flags"] != ["ShortKey"] or len(case["msg"]) != 16:
+                    raise AssertionError("Unexpected acceptable key wrap case")
+                verdict = "invalid"
+                derived[bits] += 1
+            elif verdict not in ("valid", "invalid"):
+                raise AssertionError("Unexpected key wrap verdict")
+            for field in ("msg", "ct"):
+                if len(bytes.fromhex(case[field])) > 1024:
+                    raise AssertionError("Key wrap field exceeds reader capacity")
+            records[bits].append(f"{mode} {case['tcId']} {verdict} {case['key']} "
+                                 f"{case['msg'] or '-'} {case['ct'] or '-'}")
+            counts[(bits, verdict)] += 1
+    if sum(counts.values()) != document["numberOfTests"]:
+        raise AssertionError("Incomplete key wrap coverage")
+    for bits in KEYWRAP_KEY_SIZES:
+        if not counts[(bits, "valid")] or not counts[(bits, "invalid")]:
+            raise AssertionError(f"Key wrap coverage lacks a verdict for {bits}-bit KEKs")
+    return records, counts, derived
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--vectors", type=Path, required=True,
@@ -300,9 +342,14 @@ def main():
     parser.add_argument("--cmac-reader", type=Path, action="append", default=[])
     parser.add_argument("--hmac-reader", type=Path, action="append", default=[])
     parser.add_argument("--aead-reader", action="append", default=[], metavar="BITS:PATH")
+    parser.add_argument("--keywrap-reader", action="append", default=[], metavar="BITS:PATH",
+                        help="AES-KW/KWP reader for one KEK size (one each for 128, 192, 256)")
+    parser.add_argument("--keywrap-dynamic-reader", type=Path, action="append", default=[],
+                        help="AES-KW/KWP reader that receives every KEK size")
     args = parser.parse_args()
     if not any((args.ec_reader, args.ecdsa_reader, args.rsa_signature_reader, args.rsa_generation_reader, args.primality_reader, args.rsa_oaep_reader,
-                args.kmac_reader, args.cmac_reader, args.hmac_reader, args.aead_reader)):
+                args.kmac_reader, args.cmac_reader, args.hmac_reader, args.aead_reader,
+                args.keywrap_reader, args.keywrap_dynamic_reader)):
         parser.error("At least one reader is required")
     vectors = args.vectors / "testvectors_v1"
     names_all = sorted(path.name for path in vectors.iterdir())
@@ -451,6 +498,26 @@ def main():
                     fixture.write_text("\n".join(records[bits]) + "\n")
                     run_reader([reader, "--vectors", fixture])
                 print(f"{name}: {counts['valid']} valid, {counts['invalid']} invalid", flush=True)
+        if args.keywrap_reader or args.keywrap_dynamic_reader:
+            readers = {int(pair.split(":", 1)[0]): Path(pair.split(":", 1)[1])
+                       for pair in args.keywrap_reader}
+            if set(readers) != set(KEYWRAP_KEY_SIZES) or len(args.keywrap_reader) != 3:
+                raise AssertionError("Key wrap coverage requires one reader for each AES key size")
+            for mode, name in KEYWRAP_DOCUMENTS:
+                records, counts, derived = keywrap_records(json.loads(read(name)), mode)
+                fixture = Path(temporary) / "keywrap.txt"
+                for bits, reader in readers.items():
+                    fixture.write_text("\n".join(records[bits]) + "\n")
+                    run_reader([reader, "--vectors", fixture])
+                for reader in args.keywrap_dynamic_reader:
+                    fixture.write_text("\n".join(line for bits in KEYWRAP_KEY_SIZES
+                                                 for line in records[bits]) + "\n")
+                    run_reader([reader, "--vectors", fixture])
+                summary = ", ".join(f"{bits}: {counts[(bits, 'valid')]} valid, "
+                                    f"{counts[(bits, 'invalid')]} invalid"
+                                    for bits in KEYWRAP_KEY_SIZES)
+                print(f"{name}: {summary}; acceptable ShortKey run as invalid: {dict(derived)}",
+                      flush=True)
         if args.hmac_reader:
             for bits in (1, 224, 256, 384, 512):
                 name = f"hmac_sha{bits}_test.json"

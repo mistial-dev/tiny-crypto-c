@@ -5,6 +5,7 @@
  * that still declares a disabled API compiles cleanly and then fails at link
  * time, so each probe below redeclares a public name as an object. The
  * redeclaration is a compile error whenever the header declares that name. */
+#include <tiny_crypto/aes_kw.h>
 #include <tiny_crypto/hash.h>
 #include <tiny_crypto/kdf.h>
 #include <tiny_crypto/md5.h>
@@ -13,6 +14,12 @@
 #if TC_ENABLE_MD5 || TC_ENABLE_SSKDF || TC_ENABLE_KDF
 #error "this probe needs MD5, SSKDF and KBKDF disabled"
 #endif
+
+#if TC_AES_ENABLE_KW
+#error "this probe needs AES key wrap disabled"
+#endif
+int TC_AES_KW_wrap;
+int TC_AES_KWP_unwrap;
 
 int TC_MD5_init;
 int TC_MD5_digest;

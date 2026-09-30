@@ -40,6 +40,9 @@
 #if TC_AES_ENABLE_DYNAMIC
 #include <tiny_crypto/aes_dynamic.hpp>
 #endif
+#if TC_AES_ENABLE_KW
+#include <tiny_crypto/aes_kw.hpp>
+#endif
 #endif
 
 #if TC_ENABLE_DES

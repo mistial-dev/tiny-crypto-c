@@ -6,6 +6,11 @@
 #error "The C++ umbrella must expose the enabled HKDF wrapper"
 #endif
 
+#if defined(TC_TEST_HEADER_AES_KW) &&                                                              \
+    (!defined(TINY_CRYPTO_AES_KW_H_) || !defined(TINY_CRYPTO_AES_KW_HPP_))
+#error "The C++ umbrella must expose the enabled AES key wrap wrapper"
+#endif
+
 #if defined(TC_TEST_HEADER_RSA)
 #if !defined(TINY_CRYPTO_RSA_H_) || !defined(TINY_CRYPTO_RSA_HPP_)
 #error "The C++ umbrella must expose the enabled C and C++ RSA declarations"

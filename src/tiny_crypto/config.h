@@ -477,6 +477,10 @@
 #ifndef TC_AES_ENABLE_CMAC
 #define TC_AES_ENABLE_CMAC TC_PROFILE_VALUE(0, 0, 0, 1)
 #endif
+/* SP 800-38F KW and KWP key wrap (aes_kw.c). */
+#ifndef TC_AES_ENABLE_KW
+#define TC_AES_ENABLE_KW TC_PROFILE_VALUE(0, 0, 0, 1)
+#endif
 #ifndef TC_AES_TINY
 #define TC_AES_TINY TC_PROFILE_VALUE(0, 1, 0, 0)
 #endif
@@ -540,6 +544,9 @@
 #endif
 #if TC_AES_ENABLE_CMAC != 0 && TC_AES_ENABLE_CMAC != 1
 #error "TC_AES_ENABLE_CMAC must be 0 or 1"
+#endif
+#if TC_AES_ENABLE_KW != 0 && TC_AES_ENABLE_KW != 1
+#error "TC_AES_ENABLE_KW must be 0 or 1"
 #endif
 #if TC_AES_TINY != 0 && TC_AES_TINY != 1
 #error "TC_AES_TINY must be 0 or 1"

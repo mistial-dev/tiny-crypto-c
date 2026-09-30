@@ -30,6 +30,16 @@ PROFILES = {
       if (TC_AES_init(&ctx, key) != TC_OK || TC_AES_set_iv(&ctx, iv) != TC_OK) return 1;
       return TC_AES_CTR_crypt(&ctx, out, sizeof(out)) != TC_OK;
     """, "TC_AES_CTR_crypt"),
+    # KW and KWP at AES-128 with fixed keys. Each call expands the KEK on the
+    # stack. Unwrap is the deepest entry.
+    "aes_kw": (["TC_AES_ENABLE_KW=1", "TC_AES_ENABLE_CTR=0"], """
+      const TC_bytes kek = {key, 16};
+      size_t length;
+      if (TC_AES_KW_wrap(kek, (TC_bytes){iv, 16}, (TC_buffer){out, 24}) != TC_OK) return 1;
+      if (TC_AES_KW_unwrap(kek, (TC_bytes){out, 24}, (TC_buffer){iv, 16}) != TC_OK) return 1;
+      if (TC_AES_KWP_wrap(kek, (TC_bytes){iv, 7}, (TC_buffer){out, 16}) != TC_OK) return 1;
+      return TC_AES_KWP_unwrap(kek, (TC_bytes){out, 16}, (TC_buffer){iv, 8}, &length) != TC_OK;
+    """, "TC_AES_KWP_unwrap"),
     "kdf_sha256": (["TC_ENABLE_HMAC=1", "TC_ENABLE_KDF=1"], """
       struct TC_KBKDF_params p = {32, 1, 0};
       return TC_KBKDF_HMAC_SHA256_counter((TC_bytes){key, sizeof(key)}, &p, (TC_bytes){NULL, 0}, (TC_bytes){iv, sizeof(iv)}, (TC_buffer){out, sizeof(out)}) != TC_OK;
@@ -81,7 +91,10 @@ BLOCK_CIPHER_CALLBACKS = {"tc_aes_block_encrypt", "tc_aes_block_decrypt",
 # descriptor. Their indirect call resolves to BLOCK_CIPHER_CALLBACKS.
 BLOCK_DESCRIPTOR_SITES = {"tc_mac_cbc_block", "tc_mac_derive_subkeys",
                           "tc_block_cbc_encrypt", "tc_block_cbc_decrypt",
-                          "tc_block_ctr_crypt", "tc_block_ofb_crypt"}
+                          "tc_block_ctr_crypt", "tc_block_ofb_crypt",
+                          "tc_aes_kw_seal", "tc_aes_kw_open", "tc_aes_kw_wrap",
+                          "tc_aes_kw_unwrap", "TC_AES_KW_wrap", "TC_AES_KW_unwrap",
+                          "TC_AES_KWP_wrap", "TC_AES_KWP_unwrap"}
 SOURCE = """
 #include <tiny_crypto/tiny_crypto.h>
 static uint8_t key[32], iv[16], out[32];

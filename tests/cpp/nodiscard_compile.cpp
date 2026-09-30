@@ -17,6 +17,7 @@
 #define TC_AES_ENABLE_SIV 1
 #define TC_AES_ENABLE_CMAC 1
 #define TC_AES_ENABLE_DYNAMIC 1
+#define TC_AES_ENABLE_KW 1
 #define TC_ENABLE_DES 1
 #define TC_DES_ENABLE_ECB 1
 #define TC_DES_ENABLE_CBC 1
@@ -47,6 +48,7 @@
 
 #include <tiny_crypto/aes.hpp>
 #include <tiny_crypto/aes_dynamic.hpp>
+#include <tiny_crypto/aes_kw.hpp>
 #include <tiny_crypto/des.hpp>
 #include <tiny_crypto/drbg.hpp>
 #include <tiny_crypto/gzip.hpp>
@@ -181,6 +183,11 @@ void tiny_crypto_nodiscard_compile(uint8_t* data, size_t length)
   dynamic_cmac.init(in);     /* DISCARDED */
   dynamic_cmac.update(in);   /* DISCARDED */
   dynamic_cmac.final(block); /* DISCARDED */
+  size_t kw_length = 0;
+  aes_kw_wrap(in, in, out);               /* DISCARDED */
+  aes_kw_unwrap(in, in, out);             /* DISCARDED */
+  aes_kwp_wrap(in, in, out);              /* DISCARDED */
+  aes_kwp_unwrap(in, in, out, kw_length); /* DISCARDED */
 
   /* Generator and secure messaging results. */
   drbg generator;

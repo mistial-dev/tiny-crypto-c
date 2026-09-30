@@ -147,6 +147,13 @@ int tiny_crypto_cpp_header_compile(uint8_t* data, size_t length)
   failures += dynamic_cmac.init(block) != TC_OK;
   failures += dynamic_cmac.update(block) != TC_OK;
 #endif
+#if TC_AES_ENABLE_KW
+  size_t kw_length = 0;
+  failures += tiny_crypto::aes_kw_wrap(in, in, {block, sizeof block}) != TC_OK;
+  failures += tiny_crypto::aes_kw_unwrap(in, in, {block, sizeof block}) != TC_OK;
+  failures += tiny_crypto::aes_kwp_wrap(in, in, {block, sizeof block}) != TC_OK;
+  failures += tiny_crypto::aes_kwp_unwrap(in, in, {block, sizeof block}, kw_length) != TC_OK;
+#endif
 #endif
 #if TC_ENABLE_DES
   uint8_t des_block[8] = {0};

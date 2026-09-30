@@ -143,7 +143,14 @@ TC_TEST(wycheproof)
   return tc_test_mac_vectors(vector_path, vector_cmac);
 }
 
+#if TC_AES_ENABLE_KW
+MunitResult test_kw(const MunitParameter params[], void* data);
+#endif
+
 static MunitTest tests[] = {
+#if TC_AES_ENABLE_KW
+    {"/kw", test_kw, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+#endif
     {"/wycheproof", wycheproof, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/block-vectors", block_vectors, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/cbc-cmac-vectors", cbc_and_cmac_vectors, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

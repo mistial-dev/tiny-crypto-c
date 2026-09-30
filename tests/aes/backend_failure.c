@@ -1,11 +1,14 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "aes_internal.h"
+#include <tiny_crypto/aes_kw.h>
 #include "munit.h"
 #include "test_util.h"
 #include <string.h>
 
 #undef tc_aes_cipher_rounds
+#undef tc_aes_inverse_rounds
 TC_status tc_aes_cipher_rounds(state_t*, const uint8_t*, uint8_t);
+TC_status tc_aes_inverse_rounds(state_t*, const uint8_t*, uint8_t);
 
 static unsigned calls, fail_at;
 
@@ -17,6 +20,16 @@ TC_status tc_test_cipher_rounds(state_t* state, const uint8_t* key, uint8_t roun
     return TC_ERROR;
   }
   return tc_aes_cipher_rounds(state, key, rounds);
+}
+
+TC_status tc_test_inverse_rounds(state_t* state, const uint8_t* key, uint8_t rounds)
+{
+  ++calls;
+  if (calls == fail_at) {
+    memset(state, 0xa5, sizeof *state);
+    return TC_ERROR;
+  }
+  return tc_aes_inverse_rounds(state, key, rounds);
 }
 
 TC_status tc_test_cipher(state_t* state, const uint8_t* key)
@@ -308,11 +321,89 @@ TC_TEST(gcm_failures)
   return MUNIT_OK;
 }
 
+/* Fail every block call of each key wrap entry in turn: the KWP single-block
+ * paths, the first and middle W steps and the last W^-1 step before the
+ * integrity check. Each failure returns TC_ERROR, wipes the written region
+ * and leaves the KWP length unchanged. */
+TC_TEST(kw_failures)
+{
+  static const struct {
+    int padded;
+    size_t length;
+  } cases[] = {{0, 16}, {0, 24}, {1, 7}, {1, 20}};
+  uint8_t kek[16] = {0}, key_data[24], wrapped[32], output[40];
+  size_t index;
+  memset(key_data, 0x3c, sizeof key_data);
+  for (index = 0; index < sizeof cases / sizeof cases[0]; ++index) {
+    const int padded = cases[index].padded;
+    const TC_bytes k = {kek, sizeof kek};
+    const TC_bytes data = {key_data, cases[index].length};
+    const size_t wrapped_length =
+        padded ? TC_AES_KWP_WRAPPED_BYTES(data.length) : TC_AES_KW_WRAPPED_BYTES(data.length);
+    const size_t area = wrapped_length - 8u;
+    unsigned wrap_total, unwrap_total, stage;
+    size_t length = 0;
+    calls = 0;
+    fail_at = 0;
+    munit_assert_int(padded ? TC_AES_KWP_wrap(k, data, (TC_buffer){wrapped, wrapped_length})
+                            : TC_AES_KW_wrap(k, data, (TC_buffer){wrapped, wrapped_length}),
+                     ==, TC_OK);
+    wrap_total = calls;
+    calls = 0;
+    munit_assert_int(padded ? TC_AES_KWP_unwrap(k, (TC_bytes){wrapped, wrapped_length},
+                                                (TC_buffer){output, area}, &length)
+                            : TC_AES_KW_unwrap(k, (TC_bytes){wrapped, wrapped_length},
+                                               (TC_buffer){output, area}),
+                     ==, TC_OK);
+    unwrap_total = calls;
+    /* One block for two semiblocks, 6(n - 1) otherwise. */
+    munit_assert_uint(wrap_total, ==, wrapped_length == 16 ? 1u : 6u * (unsigned)(area / 8u));
+    munit_assert_uint(unwrap_total, ==, wrap_total);
+    for (stage = 1; stage <= wrap_total; ++stage) {
+      calls = 0;
+      fail_at = stage;
+      memset(output, 0x5a, sizeof output);
+      munit_assert_int(padded ? TC_AES_KWP_wrap(k, data, (TC_buffer){output, wrapped_length})
+                              : TC_AES_KW_wrap(k, data, (TC_buffer){output, wrapped_length}),
+                       ==, TC_ERROR);
+      munit_assert_true(tc_test_all_zero(output, wrapped_length));
+      munit_assert_true(
+          tc_test_all_value(output + wrapped_length, sizeof output - wrapped_length, 0x5a));
+
+      calls = 0;
+      length = SIZE_MAX;
+      memset(output, 0x5a, sizeof output);
+      munit_assert_int(padded ? TC_AES_KWP_unwrap(k, (TC_bytes){wrapped, wrapped_length},
+                                                  (TC_buffer){output, area}, &length)
+                              : TC_AES_KW_unwrap(k, (TC_bytes){wrapped, wrapped_length},
+                                                 (TC_buffer){output, area}),
+                       ==, TC_ERROR);
+      munit_assert_true(tc_test_all_zero(output, area));
+      munit_assert_true(tc_test_all_value(output + area, sizeof output - area, 0x5a));
+      munit_assert_size(length, ==, SIZE_MAX);
+
+      /* In place, the caller loses the wrapped input. */
+      calls = 0;
+      memcpy(output, wrapped, wrapped_length);
+      munit_assert_int(padded ? TC_AES_KWP_unwrap(k, (TC_bytes){output, wrapped_length},
+                                                  (TC_buffer){output, area}, &length)
+                              : TC_AES_KW_unwrap(k, (TC_bytes){output, wrapped_length},
+                                                 (TC_buffer){output, area}),
+                       ==, TC_ERROR);
+      munit_assert_true(tc_test_all_zero(output, area));
+      munit_assert_size(length, ==, SIZE_MAX);
+    }
+  }
+  fail_at = 0;
+  return MUNIT_OK;
+}
+
 static MunitTest tests[] = {{"/cmac", failures, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
                             {"/siv", siv_failures, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
                             {"/eax", eax_failures, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
                             {"/ccm", ccm_failures, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
                             {"/gcm", gcm_failures, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+                            {"/kw", kw_failures, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
                             {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
 
 int main(int argc, char** argv)

@@ -140,6 +140,11 @@ rules of their C functions. The one-shot GCM, CCM, EAX, EAX' and SIV wrappers
 take the key as `bytes`. GCM, CCM, EAX and EAX' need `TC_AES_KEYLEN` bytes and
 SIV needs `TC_AES_SIV_KEYLEN`.
 
+The key wrap functions `aes_kw_wrap`, `aes_kw_unwrap`, `aes_kwp_wrap` and
+`aes_kwp_unwrap` take the KEK, input and output as spans. `aes_kwp_unwrap`
+reports the key data length through a `size_t&`. The KEK length follows the
+build policy that `TC_AES_KW_KEK_LENGTH_SUPPORTED` reports.
+
 The KDF wrappers `hkdf_sha*_extract`, `hkdf_sha*_expand`, `hkdf_sha*_derive`,
 the `sskdf_sha*` functions and the KBKDF families forward to their C functions
 with the same span arguments. The EC and RSA wrappers in `ec.hpp` and

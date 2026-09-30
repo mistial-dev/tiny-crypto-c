@@ -19,7 +19,7 @@ out. Every file is unmodified, and `SHA256SUMS` lists its digest.
 `tests/wycheproof.py` selects the documents for the enabled algorithms and
 feeds them to the C readers. It covers ECDH, ECDSA, RSA PKCS #1 v1.5 and PSS
 signatures, RSA signature generation, OAEP, primality, AES-GCM/CCM/GMAC/EAX
-and SIV, AES-CMAC, HMAC and KMAC256. The runner reports per-document verdict
+and SIV, AES-CMAC, AES-KW/KWP, HMAC and KMAC256. The runner reports per-document verdict
 counts and the out-of-scope parameters it skips.
 
 `tests/test_vector_manifests.py` checks the digests in `SHA256SUMS`.
