@@ -413,160 +413,199 @@ TC_TLV_result tc_x509_crl_invalidity_date_read(TC_bytes encoded, TC_X509_time* o
   return tc_x509_time_value(&element, out);
 }
 
+/* Presence and criticality bookkeeping shared by both extension scopes.
+ * flag 0 marks an extension the scope does not recognize. The first such
+ * critical OID is kept for the policy step. */
+static void crl_extension_note(const TC_X509_extension* extension, unsigned flag, unsigned* present,
+                               unsigned* critical, TC_bytes* unknown_critical)
+{
+  if (!flag) {
+    if (extension->critical && !unknown_critical->length)
+      *unknown_critical = extension->oid;
+    return;
+  }
+  *present |= flag;
+  if (extension->critical)
+    *critical |= flag;
+}
+
+/* Charge a scalar or name value before decoding it. */
+static TC_TLV_result crl_extension_charge(const TC_X509_extension* extension,
+                                          const tc_pki_tree_workspace* tree)
+{
+  return tc_pki_work_charge(tree->work, extension->value.length) == TC_TLV_OK ? TC_TLV_OK
+                                                                              : TC_TLV_LIMIT;
+}
+
+/* GeneralNames SEQUENCE. out borrows its contents and changes only on OK. */
+static TC_TLV_result crl_general_names_read(TC_bytes encoded, const TC_TLV_limits* limits,
+                                            const tc_pki_tree_workspace* tree, TC_bytes* out)
+{
+  TC_bytes contents;
+  TC_TLV_result result = TC_DER_sequence(encoded, &contents);
+  if (result != TC_TLV_OK)
+    return result;
+  result = tc_pki_general_names_contents_check(contents, limits, tree);
+  if (result != TC_TLV_OK)
+    return result;
+  *out = contents;
+  return TC_TLV_OK;
+}
+
+/* CRL-level FreshestCRL. RFC 5280 5.2.6 permits only distribution names. */
+static TC_TLV_result crl_freshest_check(TC_bytes encoded, const TC_TLV_limits* limits,
+                                        const tc_pki_tree_workspace* tree)
+{
+  TC_TLV_reader points;
+  tc_pki_distribution_point point;
+  TC_TLV_result result = tc_pki_distribution_points_init(encoded, limits, tree, &points);
+  if (result != TC_TLV_OK)
+    return result;
+  while (!tc_pki_end(&points)) {
+    result = tc_pki_distribution_point_next(&points, tree, &point);
+    if (result != TC_TLV_OK)
+      return result;
+    if (point.has_reasons || point.issuer.length)
+      return TC_TLV_INVALID;
+  }
+  return TC_TLV_OK;
+}
+
+/* AuthorityKeyIdentifier with a validated authorityCertIssuer when present. */
+static TC_TLV_result crl_authority_read(TC_bytes encoded, const TC_TLV_limits* limits,
+                                        const tc_pki_tree_workspace* tree,
+                                        TC_X509_authority_key_identifier* out)
+{
+  TC_X509_authority_key_identifier identifier;
+  TC_TLV_result result = TC_X509_authority_key_identifier_read(encoded, limits, &identifier);
+  if (result != TC_TLV_OK)
+    return result;
+  if (identifier.issuer.length) {
+    result = tc_pki_general_names_contents_check(identifier.issuer, limits, tree);
+    if (result != TC_TLV_OK)
+      return result;
+  }
+  *out = identifier;
+  return TC_TLV_OK;
+}
+
+static unsigned crl_extension_flag(unsigned id)
+{
+  switch (id) {
+  case TC_PKI_EXT_CRL_NUMBER:
+    return TC_X509_CRL_EXT_NUMBER;
+  case TC_PKI_EXT_DELTA_CRL_INDICATOR:
+    return TC_X509_CRL_EXT_DELTA;
+  case TC_PKI_EXT_AUTHORITY_KEY_IDENTIFIER:
+    return TC_X509_CRL_EXT_AUTHORITY;
+  case TC_PKI_EXT_ISSUING_DISTRIBUTION_POINT:
+    return TC_X509_CRL_EXT_DISTRIBUTION;
+  case TC_PKI_EXT_FRESHEST_CRL:
+    return TC_X509_CRL_EXT_FRESHEST;
+  case TC_PKI_EXT_ISSUER_ALT_NAME:
+    return TC_X509_CRL_EXT_ISSUER_ALT;
+  default:
+    return 0;
+  }
+}
+
+static unsigned crl_entry_extension_flag(unsigned id)
+{
+  switch (id) {
+  case TC_PKI_EXT_REASON_CODE:
+    return TC_CRL_ENTRY_REASON;
+  case TC_PKI_EXT_INVALIDITY_DATE:
+    return TC_CRL_ENTRY_INVALIDITY;
+  case TC_PKI_EXT_CERTIFICATE_ISSUER:
+    return TC_CRL_ENTRY_ISSUER;
+  default:
+    return 0;
+  }
+}
+
 typedef struct {
-  int entry;
   const TC_TLV_limits* limits;
   const tc_pki_tree_workspace* tree;
-  TC_X509_crl_extensions* info;
-  tc_x509_crl_entry_info* entry_info;
-} crl_extension_context;
+  TC_X509_crl_extensions* out;
+} crl_extensions_context;
 
-static TC_TLV_result crl_extension_value(void* context, const TC_X509_extension* extension)
+/* One CRL extension (RFC 5280 5.2). Entry extensions are unrecognized here.
+ * Writes go to provisional storage owned by tc_x509_crl_extension_info_read. */
+static TC_TLV_result crl_extension_visit(void* context, const TC_X509_extension* extension)
 {
-  crl_extension_context* state = context;
+  const crl_extensions_context* state = context;
+  TC_X509_crl_extensions* out = state->out;
   const unsigned id = tc_pki_extension_id(extension);
-  const int number =
-      !state->entry && (id == TC_PKI_EXT_CRL_NUMBER || id == TC_PKI_EXT_DELTA_CRL_INDICATOR);
-  const int authority = !state->entry && id == TC_PKI_EXT_AUTHORITY_KEY_IDENTIFIER;
-  const int names =
-      state->entry ? id == TC_PKI_EXT_CERTIFICATE_ISSUER : id == TC_PKI_EXT_ISSUER_ALT_NAME;
-  TC_X509_crl_extensions* info = state->info;
-  tc_x509_crl_entry_info* entry_info = state->entry_info;
-  if (entry_info) {
-    unsigned flag = 0;
-    switch (id) {
-    case TC_PKI_EXT_REASON_CODE:
-      flag = TC_CRL_ENTRY_REASON;
-      break;
-    case TC_PKI_EXT_INVALIDITY_DATE:
-      flag = TC_CRL_ENTRY_INVALIDITY;
-      break;
-    case TC_PKI_EXT_CERTIFICATE_ISSUER:
-      flag = TC_CRL_ENTRY_ISSUER;
-      break;
-    default:
-      if (extension->critical && !entry_info->unknown_critical_oid.length)
-        entry_info->unknown_critical_oid = extension->oid;
-      break;
-    }
-    entry_info->present |= flag;
-    if (extension->critical)
-      entry_info->critical |= flag;
-  }
-  if (info) {
-    unsigned flag = 0;
-    switch (id) {
-    case TC_PKI_EXT_CRL_NUMBER:
-      flag = TC_X509_CRL_EXT_NUMBER;
-      break;
-    case TC_PKI_EXT_DELTA_CRL_INDICATOR:
-      flag = TC_X509_CRL_EXT_DELTA;
-      break;
-    case TC_PKI_EXT_AUTHORITY_KEY_IDENTIFIER:
-      flag = TC_X509_CRL_EXT_AUTHORITY;
-      break;
-    case TC_PKI_EXT_ISSUING_DISTRIBUTION_POINT:
-      flag = TC_X509_CRL_EXT_DISTRIBUTION;
-      break;
-    case TC_PKI_EXT_FRESHEST_CRL:
-      flag = TC_X509_CRL_EXT_FRESHEST;
-      break;
-    case TC_PKI_EXT_ISSUER_ALT_NAME:
-      flag = TC_X509_CRL_EXT_ISSUER_ALT;
-      break;
-    default:
-      if (extension->critical && !info->unknown_critical_oid.length)
-        info->unknown_critical_oid = extension->oid;
-      break;
-    }
-    info->present |= flag;
-    if (extension->critical)
-      info->critical |= flag;
-  }
-  if (!state->entry && id == TC_PKI_EXT_FRESHEST_CRL) {
-    TC_TLV_reader points;
-    tc_pki_distribution_point point;
-    TC_TLV_result result =
-        tc_pki_distribution_points_init(extension->value, state->limits, state->tree, &points);
+  TC_TLV_result result;
+  crl_extension_note(extension, crl_extension_flag(id), &out->present, &out->critical,
+                     &out->unknown_critical_oid);
+  switch (id) {
+  case TC_PKI_EXT_FRESHEST_CRL:
+    result = crl_freshest_check(extension->value, state->limits, state->tree);
+    if (result == TC_TLV_OK)
+      out->freshest = extension->value;
+    return result;
+  case TC_PKI_EXT_ISSUING_DISTRIBUTION_POINT:
+    result = tc_x509_crl_distribution_read(extension->value, state->limits, state->tree,
+                                           &out->distribution);
+    if (result == TC_TLV_OK)
+      out->distribution_encoded = extension->value;
+    return result;
+  case TC_PKI_EXT_AUTHORITY_KEY_IDENTIFIER:
+    result = crl_extension_charge(extension, state->tree);
     if (result != TC_TLV_OK)
       return result;
-    while (!tc_pki_end(&points)) {
-      result = tc_pki_distribution_point_next(&points, state->tree, &point);
-      if (result != TC_TLV_OK)
-        return result;
-      /* RFC 5280 5.2.6 permits only names in a CRL's FreshestCRL. */
-      if (point.has_reasons || point.issuer.length)
-        return TC_TLV_INVALID;
-    }
-    if (info)
-      info->freshest = extension->value;
-    return TC_TLV_OK;
-  }
-  if (!state->entry && id == TC_PKI_EXT_ISSUING_DISTRIBUTION_POINT) {
-    TC_X509_crl_distribution distribution;
-    TC_TLV_result result =
-        tc_x509_crl_distribution_read(extension->value, state->limits, state->tree, &distribution);
-    if (result == TC_TLV_OK && info) {
-      info->distribution = distribution;
-      info->distribution_encoded = extension->value;
-    }
-    return result;
-  }
-  if (!number && !authority && !names &&
-      (!state->entry || (id != TC_PKI_EXT_REASON_CODE && id != TC_PKI_EXT_INVALIDITY_DATE)))
-    return TC_TLV_OK;
-  if (tc_pki_work_charge(state->tree->work, extension->value.length) != TC_TLV_OK)
-    return TC_TLV_LIMIT;
-  if (authority) {
-    TC_X509_authority_key_identifier identifier;
-    TC_TLV_result result =
-        TC_X509_authority_key_identifier_read(extension->value, state->limits, &identifier);
+    return crl_authority_read(extension->value, state->limits, state->tree, &out->authority);
+  case TC_PKI_EXT_ISSUER_ALT_NAME:
+    result = crl_extension_charge(extension, state->tree);
     if (result != TC_TLV_OK)
       return result;
-    if (identifier.issuer.length) {
-      result = tc_pki_general_names_contents_check(identifier.issuer, state->limits, state->tree);
-      if (result != TC_TLV_OK)
-        return result;
-    }
-    if (info)
-      info->authority = identifier;
-    return TC_TLV_OK;
-  }
-  if (names) {
-    TC_bytes contents;
-    TC_TLV_result result = TC_DER_sequence(extension->value, &contents);
+    return crl_general_names_read(extension->value, state->limits, state->tree, &out->issuer_alt);
+  case TC_PKI_EXT_CRL_NUMBER:
+    result = crl_extension_charge(extension, state->tree);
     if (result != TC_TLV_OK)
       return result;
-    result = tc_pki_general_names_contents_check(contents, state->limits, state->tree);
-    if (result == TC_TLV_OK && info)
-      info->issuer_alt = contents;
-    if (result == TC_TLV_OK && entry_info)
-      entry_info->issuer = contents;
-    return result;
+    return tc_x509_crl_number_read(extension->value, &out->number);
+  case TC_PKI_EXT_DELTA_CRL_INDICATOR:
+    result = crl_extension_charge(extension, state->tree);
+    if (result != TC_TLV_OK)
+      return result;
+    return tc_x509_crl_number_read(extension->value, &out->base_number);
+  default:
+    return TC_TLV_OK;
   }
-  if (number) {
-    TC_bytes value;
-    TC_TLV_result result = tc_x509_crl_number_read(extension->value, &value);
-    if (result == TC_TLV_OK && info) {
-      if (id == TC_PKI_EXT_CRL_NUMBER)
-        info->number = value;
-      else
-        info->base_number = value;
-    }
+}
+
+typedef struct {
+  const TC_TLV_limits* limits;
+  const tc_pki_tree_workspace* tree;
+  tc_x509_crl_entry_info* out;
+} crl_entry_extensions_context;
+
+/* One CRL entry extension (RFC 5280 5.3). CRL-level extensions are
+ * unrecognized here. Writes go to provisional storage owned by
+ * tc_x509_crl_entry_info_read. */
+static TC_TLV_result crl_entry_extension_visit(void* context, const TC_X509_extension* extension)
+{
+  const crl_entry_extensions_context* state = context;
+  tc_x509_crl_entry_info* out = state->out;
+  const unsigned id = tc_pki_extension_id(extension);
+  const unsigned flag = crl_entry_extension_flag(id);
+  TC_TLV_result result;
+  crl_extension_note(extension, flag, &out->present, &out->critical, &out->unknown_critical_oid);
+  if (!flag)
+    return TC_TLV_OK;
+  result = crl_extension_charge(extension, state->tree);
+  if (result != TC_TLV_OK)
     return result;
+  switch (id) {
+  case TC_PKI_EXT_REASON_CODE:
+    return tc_pki_crl_reason_read(extension->value, &out->reason);
+  case TC_PKI_EXT_INVALIDITY_DATE:
+    return tc_x509_crl_invalidity_date_read(extension->value, &out->invalidity_date);
+  default:
+    return crl_general_names_read(extension->value, state->limits, state->tree, &out->issuer);
   }
-  if (id == TC_PKI_EXT_REASON_CODE) {
-    unsigned reason;
-    TC_TLV_result result = tc_pki_crl_reason_read(extension->value, &reason);
-    if (result == TC_TLV_OK && entry_info)
-      entry_info->reason = reason;
-    return result;
-  }
-  TC_X509_time date;
-  TC_TLV_result result = tc_x509_crl_invalidity_date_read(extension->value, &date);
-  if (result == TC_TLV_OK && entry_info)
-    entry_info->invalidity_date = date;
-  return result;
 }
 
 TC_TLV_result tc_x509_crl_entry_info_read(TC_bytes encoded, const TC_TLV_limits* limits,
@@ -574,12 +613,12 @@ TC_TLV_result tc_x509_crl_entry_info_read(TC_bytes encoded, const TC_TLV_limits*
                                           size_t capacity, tc_x509_crl_entry_info* out)
 {
   tc_x509_crl_entry_info parsed = {0};
-  crl_extension_context context = {1, limits, tree, NULL, &parsed};
+  crl_entry_extensions_context context = {limits, tree, &parsed};
   TC_TLV_result result;
   if (!out)
     return TC_TLV_ARGUMENT;
-  result =
-      tc_pki_extensions_visit(encoded, limits, tree, oids, capacity, crl_extension_value, &context);
+  result = tc_pki_extensions_visit(encoded, limits, tree, oids, capacity, crl_entry_extension_visit,
+                                   &context);
   if (result != TC_TLV_OK)
     return result;
   *out = parsed;
@@ -591,12 +630,12 @@ TC_TLV_result tc_x509_crl_extension_info_read(TC_bytes encoded, const TC_TLV_lim
                                               size_t capacity, TC_X509_crl_extensions* out)
 {
   TC_X509_crl_extensions parsed = {0};
-  crl_extension_context context = {0, limits, tree, &parsed, NULL};
+  crl_extensions_context context = {limits, tree, &parsed};
   TC_TLV_result result;
   if (!out)
     return TC_TLV_ARGUMENT;
   result =
-      tc_pki_extensions_visit(encoded, limits, tree, oids, capacity, crl_extension_value, &context);
+      tc_pki_extensions_visit(encoded, limits, tree, oids, capacity, crl_extension_visit, &context);
   if (result != TC_TLV_OK)
     return result;
   *out = parsed;

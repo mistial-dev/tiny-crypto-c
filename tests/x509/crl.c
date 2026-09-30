@@ -1845,6 +1845,173 @@ TC_TEST(entry_info)
   return MUNIT_OK;
 }
 
+typedef struct {
+  unsigned present, critical;
+  TC_bytes unknown_critical_oid;
+  size_t work;
+} scope_result;
+
+/* Read one extension list as CRL extensions (entry == 0) or as CRL entry
+ * extensions with a work budget. Fields of absent extensions must stay empty. */
+static TC_TLV_result scope_read_budget(int entry, TC_bytes encoded, size_t budget,
+                                       scope_result* out)
+{
+  TC_TLV_frame frames[FRAME_CAPACITY];
+  TC_bytes oids[4];
+  const TC_TLV_limits limits = {FIXTURE_CAPACITY, FIXTURE_CAPACITY, 128, FRAME_CAPACITY};
+  size_t work = budget;
+  const tc_pki_tree_workspace tree = {frames, FRAME_CAPACITY, &work};
+  TC_TLV_result result;
+  if (entry) {
+    tc_x509_crl_entry_info info = {0};
+    result = tc_x509_crl_entry_info_read(encoded, &limits, &tree, oids, 4, &info);
+    if (!(info.present & TC_CRL_ENTRY_REASON))
+      munit_assert_uint(info.reason, ==, 0);
+    if (!(info.present & TC_CRL_ENTRY_INVALIDITY))
+      munit_assert_uint(info.invalidity_date.year, ==, 0);
+    if (!(info.present & TC_CRL_ENTRY_ISSUER))
+      munit_assert_size(info.issuer.length, ==, 0);
+    *out = (scope_result){info.present, info.critical, info.unknown_critical_oid, 0};
+  } else {
+    TC_X509_crl_extensions info = {0};
+    result = tc_x509_crl_extension_info_read(encoded, &limits, &tree, oids, 4, &info);
+    if (!(info.present & TC_X509_CRL_EXT_NUMBER))
+      munit_assert_size(info.number.length, ==, 0);
+    if (!(info.present & TC_X509_CRL_EXT_DELTA))
+      munit_assert_size(info.base_number.length, ==, 0);
+    if (!(info.present & TC_X509_CRL_EXT_AUTHORITY))
+      munit_assert_size(info.authority.key_identifier.length, ==, 0);
+    if (!(info.present & TC_X509_CRL_EXT_DISTRIBUTION)) {
+      munit_assert_size(info.distribution_encoded.length, ==, 0);
+      munit_assert_int(info.distribution.indirect, ==, 0);
+    }
+    if (!(info.present & TC_X509_CRL_EXT_FRESHEST))
+      munit_assert_size(info.freshest.length, ==, 0);
+    if (!(info.present & TC_X509_CRL_EXT_ISSUER_ALT))
+      munit_assert_size(info.issuer_alt.length, ==, 0);
+    *out = (scope_result){info.present, info.critical, info.unknown_critical_oid, 0};
+  }
+  out->work = budget - work;
+  return result;
+}
+
+static TC_TLV_result scope_read(int entry, TC_bytes encoded, scope_result* out)
+{
+  return scope_read_budget(entry, encoded, WORK_BUDGET, out);
+}
+
+static TC_bytes extension_list(fixture* out, uint8_t arc, int critical, TC_bytes value,
+                               size_t copies)
+{
+  const uint8_t sequence[] = {0x30, 0};
+  *out = (fixture){0};
+  append(out, sequence, sizeof sequence);
+  for (size_t i = 0; i < copies; ++i)
+    append_extension(out, arc, critical, value);
+  out->bytes[1] = (uint8_t)(out->length - 2);
+  return (TC_bytes){out->bytes, out->length};
+}
+
+/* Each extension kind read in both scopes (RFC 5280 sections 5.2 and 5.3).
+ * A reader decodes only its own scope's extensions. Others are treated as
+ * unrecognized: ignored when noncritical, reported when critical, and never
+ * decoded. Duplicates are invalid in every scope (section 4.2). The work
+ * figures pin the decoding cost of each known value. */
+TC_TEST(extension_scopes)
+{
+  enum { SCOPE_NONE = -1, SCOPE_CRL = 0, SCOPE_ENTRY = 1, UNKNOWN_ARC = 127, CRITICAL_WORK = 3 };
+  static const struct {
+    uint8_t arc, length;
+    uint8_t value[17];
+    int scope;
+    unsigned flag;
+    size_t work; /* noncritical, in scope */
+  } kinds[] = {
+      {20, 3, {2, 1, 9}, SCOPE_CRL, TC_X509_CRL_EXT_NUMBER, 21},
+      {27, 3, {2, 1, 7}, SCOPE_CRL, TC_X509_CRL_EXT_DELTA, 21},
+      {35, 5, {0x30, 3, 0x80, 1, 42}, SCOPE_CRL, TC_X509_CRL_EXT_AUTHORITY, 27},
+      {28, 5, {0x30, 3, 0x84, 1, 0xff}, SCOPE_CRL, TC_X509_CRL_EXT_DISTRIBUTION, 30},
+      {46,
+       11,
+       {0x30, 9, 0x30, 7, 0xa0, 5, 0xa0, 3, 0x82, 1, 'a'},
+       SCOPE_CRL,
+       TC_X509_CRL_EXT_FRESHEST,
+       82},
+      {18, 5, {0x30, 3, 0x82, 1, 'a'}, SCOPE_CRL, TC_X509_CRL_EXT_ISSUER_ALT, 34},
+      {21, 3, {10, 1, 8}, SCOPE_ENTRY, TC_CRL_ENTRY_REASON, 21},
+      {24,
+       17,
+       {0x18, 15, '2', '0', '2', '4', '0', '2', '2', '9', '0', '0', '0', '0', '0', '0', 'Z'},
+       SCOPE_ENTRY,
+       TC_CRL_ENTRY_INVALIDITY,
+       63},
+      {29, 5, {0x30, 3, 0x82, 1, 'a'}, SCOPE_ENTRY, TC_CRL_ENTRY_ISSUER, 34},
+      /* subjectAltName belongs to certificates only. */
+      {17, 5, {0x30, 3, 0x82, 1, 'a'}, SCOPE_NONE, 0, 0},
+      {UNKNOWN_ARC, 3, {2, 1, 9}, SCOPE_NONE, 0, 0}};
+  for (size_t i = 0; i < sizeof kinds / sizeof kinds[0]; ++i) {
+    uint8_t malformed[sizeof kinds[i].value];
+    memcpy(malformed, kinds[i].value, kinds[i].length);
+    malformed[0] = 5;
+    const TC_bytes value = {kinds[i].value, kinds[i].length};
+    const TC_bytes bad_value = {malformed, kinds[i].length};
+    for (int entry = 0; entry < 2; ++entry) {
+      const int known = kinds[i].scope == entry;
+      for (int critical = 0; critical < 2; ++critical) {
+        fixture input, reference;
+        scope_result result, unknown;
+        TC_bytes encoded = extension_list(&input, kinds[i].arc, critical, value, 1);
+        munit_assert_int(scope_read(entry, encoded, &result), ==, TC_TLV_OK);
+        munit_assert_uint(result.present, ==, known ? kinds[i].flag : 0);
+        munit_assert_uint(result.critical, ==, known && critical ? kinds[i].flag : 0);
+        if (!known && critical)
+          munit_assert_ptr_equal(result.unknown_critical_oid.data, input.bytes + 6);
+        else
+          munit_assert_size(result.unknown_critical_oid.length, ==, 0);
+        /* An unrecognized extension costs the same as an unknown OID. */
+        const TC_bytes same_shape = extension_list(&reference, UNKNOWN_ARC, critical, value, 1);
+        munit_assert_int(scope_read(entry, same_shape, &unknown), ==, TC_TLV_OK);
+        if (known)
+          munit_assert_size(result.work, ==, kinds[i].work + CRITICAL_WORK * (size_t)critical);
+        else
+          munit_assert_size(result.work, ==, unknown.work);
+        /* One unit short of the measured cost fails closed. */
+        munit_assert_int(scope_read_budget(entry, encoded, result.work - 1, &unknown), ==,
+                         TC_TLV_LIMIT);
+
+        /* Only in-scope values are decoded. */
+        encoded = extension_list(&input, kinds[i].arc, critical, bad_value, 1);
+        munit_assert_int(scope_read(entry, encoded, &result), ==,
+                         known ? TC_TLV_INVALID : TC_TLV_OK);
+
+        encoded = extension_list(&input, kinds[i].arc, critical, value, 2);
+        munit_assert_int(scope_read(entry, encoded, &result), ==, TC_TLV_INVALID);
+      }
+    }
+  }
+
+  /* The first unrecognized critical extension is reported. */
+  const uint8_t number[] = {2, 1, 9};
+  for (int entry = 0; entry < 2; ++entry) {
+    fixture input = {0};
+    scope_result result;
+    const uint8_t sequence[] = {0x30, 0};
+    append(&input, sequence, sizeof sequence);
+    append_extension(&input, 126, 0, (TC_bytes){number, sizeof number});
+    const size_t first = input.length;
+    append_extension(&input, entry ? 20 : 21, 1, (TC_bytes){number, sizeof number});
+    append_extension(&input, UNKNOWN_ARC, 1, (TC_bytes){number, sizeof number});
+    input.bytes[1] = (uint8_t)(input.length - 2);
+    munit_assert_int(scope_read(entry, (TC_bytes){input.bytes, input.length}, &result), ==,
+                     TC_TLV_OK);
+    munit_assert_uint(result.present, ==, 0);
+    munit_assert_uint(result.critical, ==, 0);
+    munit_assert_ptr_equal(result.unknown_critical_oid.data, input.bytes + first + 4);
+    munit_assert_size(result.unknown_critical_oid.length, ==, 3);
+  }
+  return MUNIT_OK;
+}
+
 TC_TEST(extension_policy)
 {
   static const struct {
@@ -3210,6 +3377,7 @@ int main(int argc, char** argv)
       {"/extension-info", extension_info, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/extension-policy", extension_policy, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/entry-info", entry_info, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/extension-scopes", extension_scopes, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/entry-policy", entry_policy, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/issuer-inheritance", issuer_inheritance, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/delta-pairing", delta_pairing, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

@@ -189,9 +189,11 @@ tc_x509_crl_scope_equal(const TC_X509_crl* left, const TC_X509_crl_extensions* l
 /* Compare validated nonnegative DER INTEGER contents, including sign padding.
  * Output changes only on OK; work is consumed on failure. */
 TC_TLV_result tc_x509_crl_number_compare(TC_bytes left, TC_bytes right, size_t* work, int* order);
-/* Entry extension metadata. Missing reason defaults to unspecified (0), and
- * present distinguishes an absent value. Issuer borrows GeneralNames contents.
- * Output changes only on OK. OID scratch/work are provisional. */
+/* Entry extension metadata (RFC 5280 5.3). Missing reason defaults to
+ * unspecified (0), and present distinguishes an absent value. Issuer borrows
+ * GeneralNames contents. CRL-level extensions are unrecognized in this scope
+ * and are never decoded. Output changes only on OK. OID scratch/work are
+ * provisional. */
 TC_TLV_result tc_x509_crl_entry_info_read(TC_bytes encoded, const TC_TLV_limits* limits,
                                           const tc_pki_tree_workspace* tree, TC_bytes* oids,
                                           size_t capacity, tc_x509_crl_entry_info* out);
@@ -199,9 +201,10 @@ TC_TLV_result tc_x509_crl_entry_info_read(TC_bytes encoded, const TC_TLV_limits*
  * UNSUPPORTED. Issuer-name validation/inheritance is a separate step. */
 TC_TLV_result tc_x509_crl_entry_policy(const TC_X509_crl_extensions* crl,
                                        const tc_x509_crl_entry_info* entry);
-/* Decode CRL-level extensions in one pass, retaining presence and criticality.
- * Unknown critical OIDs are reported as unrecognized. Spans are borrowed.
- * Output changes only on OK. OID scratch/work are provisional. */
+/* Decode CRL-level extensions (RFC 5280 5.2) in one pass, retaining presence
+ * and criticality. Entry extensions are unrecognized in this scope and are
+ * never decoded. The first unrecognized critical OID is reported. Spans are
+ * borrowed. Output changes only on OK. OID scratch/work are provisional. */
 TC_TLV_result tc_x509_crl_extension_info_read(TC_bytes encoded, const TC_TLV_limits* limits,
                                               const tc_pki_tree_workspace* tree, TC_bytes* oids,
                                               size_t capacity, TC_X509_crl_extensions* out);
