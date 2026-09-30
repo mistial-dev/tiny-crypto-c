@@ -212,10 +212,12 @@ if (tiny_crypto::rsa_raw_public(key, signature, workspace, representative, work)
 `TC_RSA_verify_pss_digest` verifies a precomputed digest using explicit message
 and MGF hashes and salt length. Both hash implementations must be enabled.
 It uses the same caller-owned limb workspace as v1.5 verification, plus a local
-hash context and 64-byte digest buffer. Its work is \`TC_RSA_public_work(&key)
+hash context and 64-byte digest buffer. Its work covers PSS hashing and mask
+generation:
 
-- TC_RSA_encode_pss_work(&options, L)\`, which covers PSS hashing and mask
-  generation.
+```c
+TC_RSA_public_work(&key) + TC_RSA_encode_pss_work(&options, L)
+```
 
 The public RSA API provides v1.5 and PSS signing and signature verification,
 OAEP encryption/decryption, and private-key component validation. The

@@ -128,8 +128,10 @@ in use.
 ## C++
 
 Include `<tiny_crypto/drbg.hpp>` and use `tiny_crypto::drbg`. Its
-`instantiate`, `reseed`, `generate` and `random_source` members forward to the
-C API and return its `TC_DRBG_result`. The destructor uninstantiates. The
+`instantiate`, `reseed` and `generate` members forward to the C API and return
+its `TC_DRBG_result`. `random_source()` returns the `TC_random_source` of
+`TC_DRBG_random_source`, and the object must outlive it. The destructor
+uninstantiates. The
 class has copying and moving disabled, because a copy would repeat the
 original's output.
 

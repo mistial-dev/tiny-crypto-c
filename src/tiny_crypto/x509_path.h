@@ -182,10 +182,12 @@ typedef struct {
  *
  * Work: options.max_work bounds one units counter across all branches. It
  * covers the storage comparisons, candidate reads, Name comparisons, cycle
- * checks and each validation. validation.work_used reports the units spent.
+ * checks and each validation. out->validation.work_used reports the units
+ * spent.
  * Returns VALID with out written. ERROR for NULL arguments, unknown flags, a
- * source with NULL arrays and nonzero counts, overlap, a callback that
- * returns an empty record or an argument error found while searching.
+ * source with a NULL candidate or anchor callback and a nonzero count, overlap,
+ * a callback that returns an empty record or an argument error found while
+ * searching.
  * LIMIT when max_work, search capacity or a path bound runs out, or when
  * that was the most severe candidate failure. UNSUPPORTED and INVALID
  * report the most severe failure among the attempted candidates. out changes

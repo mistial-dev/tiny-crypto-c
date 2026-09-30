@@ -93,8 +93,9 @@ typedef struct {
  * charge their own reads.
  * Returns VALID with out written. ERROR for NULL arguments, an empty content
  * type or digest, a signer_certificate span with NULL data and a length or
- * the reverse, a short signed_digest, a source with NULL arrays and nonzero
- * counts, an unknown policy value or overlap, with all state unchanged.
+ * the reverse, a short signed_digest, a source with a NULL candidate or anchor
+ * callback and a nonzero count, an unknown policy value or overlap, with all
+ * state unchanged.
  * LIMIT for exhausted work, parsing, candidate or workspace capacities.
  * UNSUPPORTED when the best candidate failed on an unsupported algorithm or
  * feature. INVALID when no candidate yields a valid signature and path. out
@@ -114,8 +115,9 @@ TC_X509_path_status TC_CMS_signer_path_build(const TC_CMS_signer_path_request* r
  *   hashed from request->detached_content in array order. The content digest
  *   uses a stack buffer and hash context that are wiped on return.
  * Storage, borrowing, workspace and work rules match
- * TC_CMS_signer_path_build. Work also covers the envelope parse, the version
- * and signer passes and the hashed content bytes.
+ * TC_CMS_signer_path_build: out->path and the policy spans borrow workspace
+ * scratch, so copy them before reusing the workspace. Work also covers the
+ * envelope parse, the version and signer passes and the hashed content bytes.
  * Returns VALID with out written. ERROR for the argument errors of
  * TC_CMS_signer_path_build, an empty envelope or expected type, NULL
  * detached spans with a count, an expected type with malformed OID

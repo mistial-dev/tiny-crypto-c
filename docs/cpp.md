@@ -174,7 +174,8 @@ For a single buffer, one call does the same and returns `TC_OK`,
 `TC_MISMATCH` or `TC_ERROR`:
 
 ```cpp
-des_iso9797_verify(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, {key, 16}, message, {received, 8});
+tiny_crypto::des_iso9797_verify(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, {key, 16}, message,
+                                {received, 8});
 ```
 
 ## Testing
