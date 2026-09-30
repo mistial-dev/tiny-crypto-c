@@ -5,8 +5,8 @@
  * Standards: SP 800-73-5 Part 2 section 4, SP 800-56A Rev. 3, SP 800-38B.
  * Configuration: TC_ENABLE_PIV_SM, TC_PIV_SM_ENABLE_CS2 and
  * TC_PIV_SM_ENABLE_CS7.
- * Limitations: APDU framing, chaining and status words belong to the
- * application. CVC authentication is in piv_sm_authenticate.h.
+ * Limitations: APDU framing, chaining and status words are in
+ * piv_sm_apdu.h. CVC authentication is in piv_sm_authenticate.h.
  * Contracts: docs/api.md. Guide: docs/piv-sm.md. */
 #ifndef TINY_CRYPTO_PIV_SM_H_
 #define TINY_CRYPTO_PIV_SM_H_
@@ -106,7 +106,8 @@ extern "C" {
 #endif
 
 /* Keep writable objects disjoint from each other and from inputs, except for
- * protect's ciphertext spans. Sessions retain no input pointers.
+ * protect's ciphertext spans and unprotect's exact in-place alias. Sessions
+ * retain no input pointers.
  *
  * The status-returning functions return TC_ERROR for NULL, overlapping or
  * malformed arguments and for a call made in the wrong state. Those argument
@@ -170,6 +171,10 @@ TC_status TC_PIV_SM_protect(TC_PIV_SM* session, const TC_PIV_SM_protect_request*
 /* Authenticate ordered response spans, then decrypt and check padding
  * (SP 800-73-5 Part 2 sections 4.2.5 and 4.2.6).
  * Plaintext is released only after authentication. Requires PENDING.
+ * plaintext is disjoint from every input, or exactly request->ciphertext.data
+ * with a capacity of at most request->ciphertext.length. That exact alias
+ * decrypts in place and overwrites the ciphertext and the authenticated span
+ * holding it. Every other overlap is an argument error.
  * TC_OK: READY. Writes plaintext and *plaintext_length.
  * TC_MISMATCH: the response tag differs. IDLE.
  * TC_ERROR with state PENDING: an argument error, or capacity below the
@@ -177,7 +182,9 @@ TC_status TC_PIV_SM_protect(TC_PIV_SM* session, const TC_PIV_SM_protect_request*
  * the same response can be retried with corrected arguments or a larger
  * buffer. A capacity of request->ciphertext.length always suffices.
  * TC_ERROR with state IDLE: malformed padding, an exhausted counter or cipher
- * failure. *plaintext_length is unchanged and written plaintext is wiped. */
+ * failure. *plaintext_length is unchanged and written plaintext is wiped. A
+ * padding failure is found before any plaintext is written, so in place the
+ * ciphertext stays unchanged. */
 TC_status TC_PIV_SM_unprotect(TC_PIV_SM* session, const TC_PIV_SM_unprotect_request* request,
                               uint8_t* plaintext, size_t capacity, size_t* plaintext_length,
                               TC_PIV_SM_workspace* workspace);

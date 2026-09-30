@@ -714,6 +714,18 @@
 #endif
 #endif
 
+/* PIV secure messaging framing on a PIV card link: key establishment,
+ * protected commands and responses. */
+#ifndef TC_ENABLE_PIV_SM_APDU
+#define TC_ENABLE_PIV_SM_APDU TC_PROFILE_VALUE(0, 0, 0, 1)
+#endif
+#if TC_ENABLE_PIV_SM_APDU != 0 && TC_ENABLE_PIV_SM_APDU != 1
+#error "TC_ENABLE_PIV_SM_APDU must be 0 or 1"
+#endif
+#if TC_ENABLE_PIV_SM_APDU && (!TC_ENABLE_PIV_COMMAND || !TC_ENABLE_PIV_SM || !TC_ENABLE_PIV_CVC)
+#error "PIV secure messaging framing requires PIV card commands, PIV SM and PIV CVC"
+#endif
+
 /* DRBG mechanism dependencies, checked after every option is defined. */
 #if TC_ENABLE_DRBG
 #if !TC_DRBG_ENABLE_HASH && !TC_DRBG_ENABLE_HMAC && !TC_DRBG_ENABLE_CTR

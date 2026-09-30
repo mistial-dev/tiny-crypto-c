@@ -23,7 +23,9 @@ enum {
   RETRIES_FLOOR = 2,
   RETRIES_MAXIMUM = 15,
   RETRY_STATUS = 0x63c0,
-  NO_COUNT_STATUS = 0x6300
+  NO_COUNT_STATUS = 0x6300,
+  /* DO 99 (4), DO 8E (10) and SW1 SW2. */
+  VERIFY_ANSWER_BYTES = 4 + 10 + TC_APDU_STATUS_BYTES
 };
 
 static int pin_reference(uint8_t reference)
@@ -43,23 +45,30 @@ static TC_PIV_result verify_allowed(const TC_PIV_link* link, uint8_t reference)
     return TC_PIV_UNSUPPORTED;
   if (link->interface != TC_PIV_CONTACTLESS)
     return TC_PIV_OK;
+  /* The VCI exists only on a secured link (Part 1 Table 2 footnote 9). */
   if (pin_reference(reference))
-    return link->flags & TC_PIV_LINK_VCI ? TC_PIV_OK : TC_PIV_REFUSED;
+    return (link->flags & TC_PIV_LINK_VCI) && (link->flags & TC_PIV_LINK_SECURED) ? TC_PIV_OK
+                                                                                  : TC_PIV_REFUSED;
   return link->flags & TC_PIV_LINK_SECURED ? TC_PIV_OK : TC_PIV_REFUSED;
 }
 
-/* Send one VERIFY with P1 00 and no Le. The answer carries SW1 SW2 only. */
+/* Send one VERIFY with P1 00 and no Le. The answer carries SW1 SW2, and
+ * under secure messaging 99 02 SW 8E 08 MAC before them (Part 2 4.2.6). */
 static TC_PIV_result verify_send(TC_PIV_link* link, uint8_t reference, TC_bytes data, uint16_t* sw)
 {
-  uint8_t answer_bytes[TC_APDU_STATUS_BYTES];
+  uint8_t answer_bytes[VERIFY_ANSWER_BYTES];
   const TC_APDU_command command = {data, 0, TC_PIV_PLAIN_CLA, VERIFY, 0x00, reference};
   TC_APDU_response answer;
+  const TC_buffer buffer = {answer_bytes, sizeof answer_bytes};
   const TC_PIV_result result =
-      tc_piv_link_transceive(link, TC_PIV_COMMAND_VERIFY, &command,
-                             (TC_buffer){answer_bytes, sizeof answer_bytes}, &answer);
-  if (result == TC_PIV_OK)
-    *sw = answer.sw;
-  return result;
+      tc_piv_link_transceive(link, TC_PIV_COMMAND_VERIFY, &command, buffer, &answer);
+  if (result != TC_PIV_OK)
+    return result;
+  /* VERIFY answers carry no data (Part 2 3.2.1). */
+  if (answer.data.length)
+    return tc_piv_link_fail(link, buffer, 0, TC_PIV_INVALID);
+  *sw = answer.sw;
+  return TC_PIV_OK;
 }
 
 /* Record the card's answer for a PIN reference: only 9000 means its

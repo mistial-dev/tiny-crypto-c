@@ -1,7 +1,11 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
-#include <tiny_crypto/piv_sm.h>
-#include "../../examples/piv_sm_wire.h"
+/* PIV secure messaging responses: the session's R-MAC, padding and
+ * capacity rules, and the link's SM DO framing and session-loss rule on
+ * arbitrary answers (SP 800-73-5 Part 2 4.2.5 to 4.3). */
+#include <tiny_crypto/piv_sm_apdu.h>
+#include "piv_link_internal.h"
+#include "piv_sm_apdu_internal.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -24,7 +28,6 @@ static void authenticated_response(TC_PIV_SM_suite suite, const uint8_t* data, s
   TC_PIV_SM_workspace workspace;
   TC_AES_dynamic_key aes;
   TC_AES_dynamic_CMAC cmac;
-  ExamplePIVSMResult result, saved_result;
   uint8_t wire[1060], output[1024], key[32] = {0}, iv[16] = {0}, mac[16];
   size_t padded, position = 0, cipher_start, capacity, key_length;
   int short_buffer;
@@ -76,21 +79,21 @@ static void authenticated_response(TC_PIV_SM_suite suite, const uint8_t* data, s
   session.state = TC_PIV_SM_PENDING;
   session.data.traffic.counter[15] = 2;
   memcpy(&saved_session, &session, sizeof session);
-  memset(&saved_result, 0xa5, sizeof saved_result);
+  const TC_bytes authenticated = {wire, position - 10};
+  const TC_PIV_SM_unprotect_request request = {
+      {wire + cipher_start, padded}, {wire + position - 8, 8}, &authenticated, 1};
   short_buffer = length && (data[0] & 1);
   capacity = short_buffer ? length - 1 : sizeof output;
   for (;;) {
+    size_t plain_length = 999;
     memset(output, 0xa5, sizeof output);
-    memcpy(&result, &saved_result, sizeof result);
     memset(&workspace, 0xa5, sizeof workspace);
-    status = example_piv_sm_unprotect(&session, (TC_bytes){wire, position}, 0x9000, output,
-                                      capacity, &result, &workspace);
+    status = TC_PIV_SM_unprotect(&session, &request, output, capacity, &plain_length, &workspace);
     if (!all_zero(&workspace, sizeof workspace))
       abort();
     if (bad_padding) {
       size_t i;
-      if (status != TC_ERROR || !all_zero(&session, sizeof session) ||
-          memcmp(&result, &saved_result, sizeof result))
+      if (status != TC_ERROR || !all_zero(&session, sizeof session) || plain_length != 999)
         abort();
       for (i = 0; i < sizeof output; ++i)
         if (output[i] != 0xa5)
@@ -99,7 +102,7 @@ static void authenticated_response(TC_PIV_SM_suite suite, const uint8_t* data, s
     } else if (short_buffer) {
       size_t i;
       if (status != TC_ERROR || memcmp(&session, &saved_session, sizeof session) ||
-          memcmp(&result, &saved_result, sizeof result))
+          plain_length != 999)
         abort();
       for (i = 0; i < sizeof output; ++i)
         if (output[i] != 0xa5)
@@ -108,9 +111,8 @@ static void authenticated_response(TC_PIV_SM_suite suite, const uint8_t* data, s
       capacity = sizeof output;
     } else {
       size_t i;
-      if (status != TC_OK || result.length != length || result.status != 0x9000 ||
-          memcmp(output, data, length) || session.state != TC_PIV_SM_READY ||
-          memcmp(session.data.traffic.response_mcv, mac, 16))
+      if (status != TC_OK || plain_length != length || memcmp(output, data, length) ||
+          session.state != TC_PIV_SM_READY || memcmp(session.data.traffic.response_mcv, mac, 16))
         abort();
       for (i = length; i < sizeof output; ++i)
         if (output[i] != 0xa5)
@@ -121,52 +123,82 @@ static void authenticated_response(TC_PIV_SM_suite suite, const uint8_t* data, s
   TC_PIV_SM_clear(&session);
 }
 
+/* A transport that answers every command with the fuzz input and 9000. */
+typedef struct {
+  const uint8_t* data;
+  size_t length;
+} fuzz_card;
+
+static TC_status fuzz_transmit(void* context, TC_bytes command, TC_buffer response, size_t* length)
+{
+  const fuzz_card* card = context;
+  (void)command;
+  if (card->length + 2 > response.capacity)
+    return TC_ERROR;
+  if (card->length)
+    memcpy(response.data, card->data, card->length);
+  response.data[card->length] = 0x90;
+  response.data[card->length + 1] = 0x00;
+  *length = card->length + 2;
+  return TC_OK;
+}
+
+/* Send GET DATA on a secured link whose card answers with data. Any answer
+ * either authenticates with the session READY or ends it with the response
+ * wiped and the link marked lost. */
+static void link_response(TC_PIV_SM_suite suite, const uint8_t* data, size_t length)
+{
+  static uint8_t response[8200], scratch[TC_APDU_SHORT_COMMAND_MAX_BYTES], sm_scratch[128];
+  static const uint8_t tag_list[] = {0x5c, 0x01, 0x7e};
+  const TC_PIV_link_options options = {{TC_APDU_SHORT, 0, 64, 0, 0}, TC_PIV_CONTACT, 0};
+  const TC_APDU_command command = {{tag_list, sizeof tag_list}, 256, 0x00, 0xcb, 0x3f, 0xff};
+  fuzz_card card = {data, length};
+  TC_PIV_link link;
+  TC_PIV_SM session;
+  TC_PIV_SM_workspace workspace;
+  TC_APDU_response out;
+  if (TC_PIV_link_init(&link, (TC_APDU_transport){fuzz_transmit, &card}, &options,
+                       (TC_buffer){scratch, sizeof scratch}) != TC_PIV_OK)
+    abort();
+  /* Bind a synthetic READY session with zero keys, as TC_PIV_SM_key_request
+   * and TC_PIV_link_secure would. */
+  memset(&session, 0, sizeof session);
+  session.suite = (uint8_t)suite;
+  session.state = TC_PIV_SM_READY;
+  session.data.traffic.counter[15] = 1;
+  link.security = &tc_piv_sm_security;
+  link.sm = &session;
+  link.sm_workspace = &workspace;
+  link.sm_scratch = sm_scratch;
+  link.sm_scratch_capacity = sizeof sm_scratch;
+  link.flags |= TC_PIV_LINK_SECURED;
+  memset(response, 0xa5, sizeof response);
+  const TC_PIV_result result = tc_piv_link_transceive(&link, TC_PIV_COMMAND_GET_DATA, &command,
+                                                      (TC_buffer){response, sizeof response}, &out);
+  if (result == TC_PIV_OK) {
+    if (session.state != TC_PIV_SM_READY || (out.data.length && out.data.data < response) ||
+        out.data.length > length)
+      abort();
+  } else {
+    TC_PIV_link_info info;
+    TC_PIV_link_info_get(&link, &info);
+    if (!all_zero(&session, sizeof session) || !all_zero(response, sizeof response) ||
+        !info.sm_lost || info.secured)
+      abort();
+  }
+  TC_PIV_link_clear(&link);
+}
+
 int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
 {
   const TC_PIV_SM_suite suites[] = {TC_PIV_SM_CS2, TC_PIV_SM_CS7};
-  TC_PIV_SM session;
-  TC_PIV_SM_workspace workspace;
-  ExamplePIVSMResponse response, saved_response;
-  ExamplePIVSMResult result, saved_result;
-  uint8_t output[8192], saved_output[8192];
   size_t i;
-  if (length > sizeof output)
+  if (length > 8192)
     return 0;
-  memset(saved_output, 0xa5, sizeof saved_output);
-  memset(&saved_response, 0xa5, sizeof saved_response);
-  memset(&saved_result, 0xa5, sizeof saved_result);
   for (i = 0; i < sizeof suites / sizeof suites[0]; ++i) {
-    TC_status status;
     authenticated_response(suites[i], data, length, 0);
     authenticated_response(suites[i], data, length, 1);
-    memcpy(&response, &saved_response, sizeof response);
-    status = example_piv_sm_response_read(suites[i], (TC_bytes){data, length}, &response);
-    if (status != TC_OK && memcmp(&response, &saved_response, sizeof response))
-      abort();
-
-    memset(&session, 0, sizeof session);
-    session.suite = (uint8_t)suites[i];
-    session.state = TC_PIV_SM_PENDING;
-    session.data.traffic.counter[15] = 2;
-    memcpy(&result, &saved_result, sizeof result);
-    memcpy(output, saved_output, sizeof output);
-    memset(&workspace, 0xa5, sizeof workspace);
-    status = example_piv_sm_unprotect(&session, (TC_bytes){data, length}, 0x9000, output,
-                                      sizeof output, &result, &workspace);
-    if (status == TC_OK) {
-      if (session.state != TC_PIV_SM_READY || result.length > length)
-        abort();
-      if (memcmp(output + result.length, saved_output + result.length,
-                 sizeof output - result.length))
-        abort();
-    } else {
-      if (!all_zero(&session, sizeof session) || memcmp(&result, &saved_result, sizeof result) ||
-          memcmp(output, saved_output, sizeof output))
-        abort();
-    }
-    if (!all_zero(&workspace, sizeof workspace))
-      abort();
-    TC_PIV_SM_clear(&session);
+    link_response(suites[i], data, length);
   }
   return 0;
 }

@@ -37,6 +37,9 @@
 #define TC_ENABLE_TLV 1
 #define TC_ENABLE_APDU 1
 #define TC_ENABLE_PIV_COMMAND 1
+#define TC_ENABLE_DER 1
+#define TC_ENABLE_PIV_CVC 1
+#define TC_ENABLE_PIV_SM_APDU 1
 #define TC_ENABLE_DRBG 1
 #define TC_DRBG_ENABLE_HASH 1
 #define TC_DRBG_ENABLE_HMAC 1
@@ -59,6 +62,7 @@
 #include <tiny_crypto/kmac.hpp>
 #include <tiny_crypto/piv_command.hpp>
 #include <tiny_crypto/piv_sm.hpp>
+#include <tiny_crypto/piv_sm_apdu.hpp>
 #include <tiny_crypto/rsa.hpp>
 #include <tiny_crypto/tlv.hpp>
 
@@ -237,6 +241,13 @@ void tiny_crypto_nodiscard_compile(uint8_t* data, size_t length)
   link.native();                                                              /* DISCARDED */
   piv_application_read(in, TC_PIV_APPLICATION_PIV, 0, application);           /* DISCARDED */
   piv_status_classify(0x9000, TC_PIV_COMMAND_SELECT, TC_PIV_APPLICATION_PIV); /* DISCARDED */
+  const uint8_t id[8] = {};
+  const TC_random_source rng = {};
+  piv_sm_peer peer = {};
+  session.native(); /* DISCARDED */
+  piv_sm_workspace& w = sm_workspace;
+  piv_sm_key_request(link, session, TC_PIV_SM_CS2, id, rng, out, peer, w); /* DISCARDED */
+  piv_link_secure(link, sm_workspace, out);                                /* DISCARDED */
 
   /* Clearing stays unmarked. */
   aes.clear();
@@ -249,5 +260,6 @@ void tiny_crypto_nodiscard_compile(uint8_t* data, size_t length)
   dynamic.clear();
   generator.uninstantiate();
   session.clear();
+  piv_link_unsecure(link);
   link.clear();
 }

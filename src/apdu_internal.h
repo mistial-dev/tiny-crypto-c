@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
-/* Command field layout shared by TC_APDU_command_encode and the channel. */
+/* Command field layout shared by TC_APDU_command_encode and the channel, and
+ * the channel entries used by the PIV secure messaging layer. */
 #ifndef TC_APDU_INTERNAL_H_
 #define TC_APDU_INTERNAL_H_
 #include <tiny_crypto/apdu.h>
@@ -31,4 +32,17 @@ TC_APDU_result tc_apdu_form_get(size_t nc, uint32_t ne, TC_APDU_length_format fo
 /* Write command in form to out, which holds form->size bytes and is
  * disjoint from the command data. */
 void tc_apdu_write(const TC_APDU_command* command, const tc_apdu_form* form, uint8_t* out);
+
+/* Check before any transmit that a command of nc data bytes, with Le when ne
+ * is nonzero, fits channel in format: every encoded fragment within the
+ * scratch and max_command_bytes, and the exchange budget covering every
+ * fragment. ARGUMENT for values outside the format, LIMIT otherwise. */
+TC_APDU_result tc_apdu_channel_fits(const TC_APDU_channel* channel, TC_APDU_length_format format,
+                                    size_t nc, uint32_t ne);
+/* TC_APDU_transceive with the length fields of format in place of the
+ * channel format. SP 800-73-5 Part 2 footnote 22 fixes SHORT for secure
+ * messaging on an EXTENDED link. */
+TC_APDU_result tc_apdu_transceive_format(TC_APDU_channel* channel, TC_APDU_length_format format,
+                                         const TC_APDU_command* command, TC_buffer response,
+                                         TC_APDU_response* out);
 #endif

@@ -17,6 +17,7 @@ or what a card returned; nothing here was generated. Assembled 2026-09-06.
 | `cvc/` | 20 | 10 distinct secure-messaging CVCs from the SD 33 cards, with parsed-field JSON |
 | `vci_trust_anchors/` | 27 | SM Certificate Signer objects, intermediate CVCs and VCI trust-anchor records for cards 2, 3, 4, 5, 16 |
 | `piv_auto_demo/` | 7 | PIV Auto simulator payloads (CVCs, SMCS, trust anchor record, PIV status/mode payloads) |
+| `sm_captures/` | 4 | Secure messaging captures from SD 33 cards 2 and 4 for wire-level replay (see its README) |
 
 ## `icam_cards/<NN_card_name>/`
 
@@ -72,8 +73,10 @@ and 16 contain the same PIV Authentication and Card Authentication certificate
 objects already stored here as `card01`, `card02`, `card03`, `card04`, and
 `card10`, respectively. Their CHUID, Security Object, facial image, printed
 information, and key history objects also match the corresponding files byte
-for byte. The full v2 JSON captures contain PIN and pairing code material and
-are not part of this corpus. Those captures contain no OCSP responses.
+for byte. The v2 JSON captures for cards 2 and 4 are vendored in `sm_captures/`
+with the capturer's permission, recorded in its README. They contain the
+published SD 33 test PIN and pairing codes. Those captures contain no OCSP
+responses.
 
 ## `cvc/`
 

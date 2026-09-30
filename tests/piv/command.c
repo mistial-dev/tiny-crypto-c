@@ -708,13 +708,14 @@ TC_TEST(verify_status)
 
 /* Part 2 3.2.1: VERIFY 80 or 00 fails outside the contact interface and the
  * VCI, and 98 without secure messaging on contactless. The library refuses
- * those commands before sending. */
+ * those commands before sending. The VCI exists only on a secured link, and
+ * a secured link sends VERIFY protected, so no VERIFY reaches a contactless
+ * card in plaintext. tests/piv/sm_apdu.c covers the protected path. */
 TC_TEST(verify_contactless)
 {
-  const tc_script_step steps[] = {STEP(PIV_SELECT, PIV_APT "9000"), STEP("00200080", "6983"),
-                                  STEP("00200098", "6300")};
+  const tc_script_step steps[] = {STEP(PIV_SELECT, PIV_APT "9000")};
   TC_PIV_link link;
-  link_start(&link, steps, 3, TC_PIV_CONTACTLESS);
+  link_start(&link, steps, 1, TC_PIV_CONTACTLESS);
   select_application(&link, TC_PIV_APPLICATION_PIV);
   TC_PIV_reference_status out;
   static const uint8_t pin[] = "123456";
@@ -724,14 +725,31 @@ TC_TEST(verify_contactless)
   munit_assert_int(TC_PIV_pin_verify(&link, 0x80, span(pin, 6), 3, &out), ==, TC_PIV_REFUSED);
   munit_assert_size(script.next, ==, 1);
   munit_assert_uint16(TC_PIV_link_status(&link), ==, 0x9000);
-  /* With the VCI the retry query goes out. A contactless intermediate
-   * retry value answers 6983 (Part 2 3.2.1). */
+  /* A VCI mark without a secured link, and a secured mark without a bound
+   * session, send nothing. */
   link.flags |= TC_PIV_LINK_VCI;
-  munit_assert_int(TC_PIV_verify_status(&link, 0x80, &out), ==, TC_PIV_CARD_STATUS);
-  munit_assert_uint16(TC_PIV_link_status(&link), ==, 0x6983);
-  link.flags = TC_PIV_LINK_SECURED;
   munit_assert_int(TC_PIV_verify_status(&link, 0x80, &out), ==, TC_PIV_REFUSED);
-  munit_assert_int(TC_PIV_verify_status(&link, 0x98, &out), ==, TC_PIV_OK);
+  munit_assert_int(TC_PIV_pin_verify(&link, 0x80, span(pin, 6), 3, &out), ==, TC_PIV_REFUSED);
+  link.flags = TC_PIV_LINK_SECURED | TC_PIV_LINK_VCI;
+  munit_assert_int(TC_PIV_verify_status(&link, 0x80, &out), ==, TC_PIV_REFUSED);
+  munit_assert_int(TC_PIV_verify_status(&link, 0x98, &out), ==, TC_PIV_REFUSED);
+  link.flags = TC_PIV_LINK_SM_LOST;
+  munit_assert_int(TC_PIV_verify_status(&link, 0x98, &out), ==, TC_PIV_REFUSED);
+  munit_assert_uint16(TC_PIV_link_status(&link), ==, 0x9000);
+  assert_script_done();
+  return MUNIT_OK;
+}
+
+/* VERIFY answers carry no data (Part 2 3.2.1). */
+TC_TEST(verify_answer_data)
+{
+  const tc_script_step steps[] = {STEP(PIV_SELECT, PIV_APT "9000"), STEP("00200080", "01029000")};
+  TC_PIV_link link;
+  link_start(&link, steps, 2, TC_PIV_CONTACT);
+  select_application(&link, TC_PIV_APPLICATION_PIV);
+  TC_PIV_reference_status out;
+  munit_assert_int(TC_PIV_verify_status(&link, 0x80, &out), ==, TC_PIV_INVALID);
+  munit_assert_uint16(TC_PIV_link_status(&link), ==, 0);
   assert_script_done();
   return MUNIT_OK;
 }
@@ -1160,6 +1178,7 @@ int main(int argc, char** argv)
       {"/get-data/extended", get_data_extended, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/get-data/arguments", get_data_arguments, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/verify/status", verify_status, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/verify/answer-data", verify_answer_data, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/verify/contactless", verify_contactless, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/verify/twic", verify_twic, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/pin/verify", pin_verify, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 import unittest
 from copy import deepcopy
-from sm_corpus import apdu, elements, transcript, normalize_events
+from sm_corpus import (apdu, chunked_answer, elements, normalize_events, short_fragments,
+                       transcript)
 
 
 class ApduTests(unittest.TestCase):
@@ -46,25 +47,59 @@ class ElementTests(unittest.TestCase):
 
 
 class TranscriptTests(unittest.TestCase):
-    def test_response_state_is_checked_after_response(self):
+    def setUp(self):
         initial = {"counter": "01", "cmd_mcv": "00", "resp_mcv": "00"}
-        after = {"counter": "02", "cmd_mcv": "aa", "resp_mcv": "bb"}
-        data = {
+        self.after = {"counter": "02", "cmd_mcv": "aa", "resp_mcv": "bb"}
+        self.data = {
             "opacity": {"cipher_suite_id": "0x27", "ephemeral_private_key_d": "01",
                         "id_sH": "00", "general_authenticate_command": "00",
                         "general_authenticate_response": "00", "derived_key_material": "00"},
             "sm_session": {"initial_state": initial},
-            "apdu_exchanges": [{
-                "command": "0c200080018e00", "plain_command": "00200080",
-                "response": "990290008e080000000000000000", "sw": "9000",
-                "sm_state_after_unwrap": after,
-            }],
+            "apdu_exchanges": [
+                {"command": "00A4040000", "response": "61", "sw": "9000"},
+                {"command": "0c2000800a8e08000000000000000000", "plain_command": "00200080",
+                 "response": "990290008e080000000000000000", "sw": "9000",
+                 "sm_state_after_unwrap": self.after},
+            ],
         }
-        text, count = transcript(data)
+
+    def test_records(self):
+        text, count = transcript(self.data)
         self.assertEqual(count, 1)
         lines = text.splitlines()
-        self.assertTrue(lines[-2].startswith("response 9000 "))
-        self.assertEqual(lines[-1], "state 02 aa bb")
+        self.assertEqual(lines[0], "select 00a4040000 619000")
+        self.assertEqual(lines[4], "command 20 00 80 0 - - 9000")
+        self.assertEqual(lines[5], "wire 0c2000800a8e08000000000000000000 "
+                         "990290008e0800000000000000009000")
+        self.assertEqual(lines[6:], ["end", "state 02 aa bb"])
+
+    def test_state_after_protection(self):
+        record = self.data["apdu_exchanges"][1]
+        del record["sm_state_after_unwrap"]
+        record["sm_state"] = {"counter": "01", "cmd_mcv": "aa", "resp_mcv": "00"}
+        lines = transcript(self.data)[0].splitlines()
+        self.assertEqual(lines[-1], f"state {2:032x} aa -")
+
+    def test_long_answers_are_chunked(self):
+        exchanges = chunked_answer(b"\x0c", bytes(600), b"\x90\x00")
+        self.assertEqual([len(answer) for _, answer in exchanges], [258, 258, 90])
+        self.assertEqual(exchanges[0][1][-2:], b"\x61\x00")
+        self.assertEqual(exchanges[1], (bytes.fromhex("00c0000000"), bytes(256) + b"\x61\x58"))
+        self.assertEqual(exchanges[2][0], bytes.fromhex("00c0000058"))
+
+    def test_extended_fields_become_short_chains(self):
+        commands = short_fragments(bytes.fromhex("0c87079a"), bytes(range(256)) * 2)
+        self.assertEqual([command[:5].hex() for command in commands],
+                         ["1c87079aff", "1c87079aff", "0c87079a02"])
+        self.assertEqual(commands[-1][-1], 0)
+        self.assertEqual(b"".join(command[5:5 + command[4]] for command in commands),
+                         bytes(range(256)) * 2)
+
+    def test_interrupted_chain(self):
+        self.data["apdu_exchanges"].insert(1, {"command": "1c200080018e", "response": "",
+                                               "sw": "6883"})
+        with self.assertRaises(AssertionError):
+            transcript(self.data)
 
 
 class EventTests(unittest.TestCase):

@@ -300,9 +300,14 @@ static TC_PIV_result template_result(TC_TLV_result result)
   }
 }
 
-/* A new selection resets the PIV security statuses (Part 2 3.1.1). */
-static void selection_reset(TC_PIV_link* link)
+/* A new selection resets the PIV security statuses (Part 2 3.1.1). Secure
+ * messaging belongs to the PIV application, so selecting another application
+ * ends a bound session. Reselecting PIV keeps it, since Part 2 4.3 names no
+ * SELECT among the events that destroy the session keys. */
+static void selection_reset(TC_PIV_link* link, TC_PIV_application_id application)
 {
+  if (link->application != (uint8_t)application)
+    tc_piv_link_unbind(link);
   link->application = TC_PIV_APPLICATION_NONE;
   link->profile = TC_PIV_CARD;
   link->sm_suite = 0;
@@ -342,7 +347,7 @@ TC_PIV_result TC_PIV_select(TC_PIV_link* link, TC_PIV_application_id application
                            : (TC_bytes){prefix, TC_PIV_AID_PREFIX_BYTES};
   const TC_APDU_command command = {aid,    TC_APDU_SHORT_MAX_NE, TC_PIV_PLAIN_CLA,
                                    SELECT, SELECT_BY_NAME,       0x00};
-  selection_reset(link);
+  selection_reset(link, application);
   TC_APDU_response answer;
   TC_PIV_result result =
       tc_piv_link_transceive(link, TC_PIV_COMMAND_SELECT, &command, response, &answer);

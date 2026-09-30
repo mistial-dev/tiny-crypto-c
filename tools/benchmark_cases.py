@@ -9,10 +9,21 @@ SKETCH = '''#include <tiny_crypto/tiny_crypto.h>
 static volatile uint8_t sink;
 static void consume(const uint8_t* p, size_t n) { size_t i; for (i = 0; i < n; ++i) sink ^= p[i]; }
 static uint8_t key[32], buf[64], iv[16], tag[64];
-#if TC_ENABLE_PIV_SM
-#include "piv_sm_wire.h"
+#if TC_ENABLE_PIV_SM_APDU
 static TC_status fixture_random(void* user, uint8_t* output, size_t length) {
   (void)user; memset(output,0,length); output[length-1]=1; return TC_OK;
+}
+/* A card answering SELECT, key establishment and the protected VERIFY query. */
+typedef struct { TC_bytes select, key, reply; } fixture_card;
+static TC_status fixture_transmit(void* context, TC_bytes command, TC_buffer response,
+                                  size_t* length) {
+  const fixture_card* card = (const fixture_card*)context;
+  const TC_bytes answer = command.data[1] == 0xa4 ? card->select
+                          : command.data[1] == 0x87 ? card->key : card->reply;
+  if (answer.length + 2 > response.capacity) return TC_ERROR;
+  memcpy(response.data, answer.data, answer.length);
+  response.data[answer.length] = 0x90; response.data[answer.length + 1] = 0;
+  *length = answer.length + 2; return TC_OK;
 }
 #endif
 #define CHECK(call) do { if ((call) != TC_OK) return 1; } while (0)
@@ -171,25 +182,39 @@ for bits in (256, 384):
         RP2350_FEATURES.append((f"ECDH P-{bits}, {'byte' if small else 'native'} limbs", body, flags))
 
 
+# SD 33 card 2 application property template with the suite byte at index 40.
+SM_APT = bytes.fromhex("612a4f0ba00000030800001000010079074f05a000000308500a49442d4f6e6520504956"
+                       "ac068001270601007f6608020203f802027fff")
+
 for bits in (256, 384):
     fixture = sm_session(bits)
     arrays = "".join(c_array(value, name) for name, value in fixture.items())
     suite = "TC_PIV_SM_CS2" if bits == 256 else "TC_PIV_SM_CS7"
-    body = (arrays + "static TC_PIV_SM_workspace work; TC_PIV_SM state={0}; uint8_t host[8]={0}, output[256]; "
-            "size_t written; ExamplePIVSMResult result; TC_bytes trusted={public_key,sizeof public_key}; "
-            "ExamplePIVSMCommand cmd={{NULL,0},0x20,0,0x80,0}; "
-            f"CHECK(example_piv_sm_begin(&state,{suite},host,(TC_random_source){{fixture_random,NULL}},output,sizeof output,&written,&work)); "
-            "if(written!=sizeof request || memcmp(output,request,written)) return 1; "
-            "TC_bytes response_bytes={response,sizeof response}, reply_bytes={reply,sizeof reply}; "
-            "CHECK(example_piv_sm_finish(&state,response_bytes,0x9000,trusted,&work)); "
-            f"if(memcmp(state.data.traffic.mac_key,material+{16 if bits == 256 else 32},{16 if bits == 256 else 32})) return 1; "
-            "CHECK(example_piv_sm_protect(&state,&cmd,output,sizeof output,&written,&work)); "
-            "if(written!=sizeof command || memcmp(output,command,written)) return 1; "
-            "CHECK(example_piv_sm_unprotect(&state,reply_bytes,0x9000,output,sizeof output,&result,&work)); "
-            "if(result.length!=0 || result.status!=0x9000) return 1; consume((const uint8_t*)&state,sizeof state); "
-            "TC_PIV_SM_clear(&state);")
+    apt = bytearray(SM_APT)
+    apt[40] = 0x27 if bits == 256 else 0x2e
+    key_bytes = 16 if bits == 256 else 32
+    body = (arrays + c_array(bytes(apt), "apt") +
+            "static uint8_t scratch[261], sm_scratch[128], answer[400]; static TC_PIV_SM state; "
+            "static TC_PIV_SM_workspace work; TC_PIV_link link; TC_PIV_application app; "
+            "TC_PIV_SM_peer peer; TC_PIV_reference_status status; uint8_t host[8]={0}; "
+            "TC_bytes trusted={public_key,sizeof public_key}; "
+            "fixture_card card={{apt,sizeof apt},{response,sizeof response},{reply,sizeof reply}}; "
+            "TC_PIV_link_options options={{TC_APDU_SHORT,0,8,0,0},TC_PIV_CONTACT,0}; "
+            "if(TC_PIV_link_init(&link,(TC_APDU_transport){fixture_transmit,&card},&options,"
+            "(TC_buffer){scratch,sizeof scratch})!=TC_PIV_OK) return 1; "
+            "if(TC_PIV_select(&link,TC_PIV_APPLICATION_PIV,0,(TC_buffer){answer,sizeof answer},&app)"
+            "!=TC_PIV_OK) return 1; "
+            f"if(TC_PIV_SM_key_request(&link,&state,{suite},host,(TC_random_source){{fixture_random,NULL}},"
+            "(TC_buffer){answer,sizeof answer},&peer,&work)!=TC_PIV_OK) return 1; "
+            "CHECK(TC_PIV_SM_finish(&state,&peer,trusted,&work)); "
+            f"if(memcmp(state.data.traffic.mac_key,material+{key_bytes},{key_bytes})) return 1; "
+            "if(TC_PIV_link_secure(&link,&work,(TC_buffer){sm_scratch,sizeof sm_scratch})!=TC_PIV_OK) "
+            "return 1; "
+            "if(TC_PIV_verify_status(&link,0x80,&status)!=TC_PIV_OK || !status.verified) return 1; "
+            "consume((const uint8_t*)&state,sizeof state); TC_PIV_link_clear(&link);")
     flags = (AES + " -DTC_ENABLE_PIV_SM=1 -DTC_AES_ENABLE_DYNAMIC=1 -DTC_ENABLE_EC=1 -DTC_ENABLE_SSKDF=1"
              " -DTC_ENABLE_TLV=1 -DTC_ENABLE_DER=1 -DTC_ENABLE_PIV_CVC=1"
+             " -DTC_ENABLE_APDU=1 -DTC_ENABLE_PIV_COMMAND=1 -DTC_ENABLE_PIV_SM_APDU=1"
              f" -DTC_ENABLE_SHA384={int(bits == 384)}"
              f" -DTC_PIV_SM_ENABLE_CS2={int(bits == 256)} -DTC_PIV_SM_ENABLE_CS7={int(bits == 384)}"
              f" -DTC_EC_ENABLE_P256={int(bits == 256)} -DTC_EC_ENABLE_P384={int(bits == 384)}")

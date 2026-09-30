@@ -166,6 +166,12 @@ if(TINY_CRYPTO_BUILD_TESTS)
   foreach(feature AES TLV EC)
     tc_add_c_test(test_direct_${feature}_consumer test_direct_${feature} tests/default_profile.c)
   endforeach()
+  # PIV card commands: the APDU channel, the TLV readers and the command sources.
+  set(tc_piv_command_sources
+    src/apdu_encode.c src/apdu_response.c src/apdu_channel.c
+    src/tlv.c src/tlv_walk.c src/tlv_write.c src/piv_container_internal.c src/piv_aid.c
+    src/piv_link.c src/piv_select.c src/piv_get_data.c src/piv_verify.c src/piv_status.c
+    src/piv_template_internal.c)
   foreach(sm_profile dual cs2 cs7 micro mini)
     if(sm_profile STREQUAL "dual")
       set(sm_suffix "")
@@ -173,8 +179,9 @@ if(TINY_CRYPTO_BUILD_TESTS)
       set(sm_suffix "-${sm_profile}")
     endif()
   tc_add_test_library(tiny-crypto-c-test-piv-sm${sm_suffix} src/common.c ${tc_aes_sources}
-    ${tc_hash_sources} src/sskdf.c src/ec.c src/tlv.c src/der.c src/piv_cvc.c
-    src/piv_sm.c src/piv_sm_message.c examples/piv_sm_wire.c)
+    ${tc_hash_sources} src/sskdf.c src/ec.c src/der.c src/piv_cvc.c
+    src/piv_sm.c src/piv_sm_message.c ${tc_piv_command_sources}
+    src/piv_sm_apdu.c src/piv_sm_key_request.c)
   target_compile_definitions(tiny-crypto-c-test-piv-sm${sm_suffix} PUBLIC
     TC_RESOURCE_PROFILE=$<IF:$<STREQUAL:${sm_profile},micro>,1,$<IF:$<STREQUAL:${sm_profile},mini>,2,0>>
     TC_ENABLE_PIV_SM=1 TC_AES_ENABLE_DYNAMIC=1 TC_ENABLE_EC=1 TC_ENABLE_SSKDF=1
@@ -183,8 +190,15 @@ if(TINY_CRYPTO_BUILD_TESTS)
     TC_PIV_SM_ENABLE_CS7=$<NOT:$<STREQUAL:${sm_profile},cs2>>
     TC_EC_ENABLE_P256=$<NOT:$<STREQUAL:${sm_profile},cs7>>
     TC_EC_ENABLE_P384=$<NOT:$<STREQUAL:${sm_profile},cs2>>
-    TC_ENABLE_TLV=1 TC_ENABLE_DER=1 TC_ENABLE_PIV_CVC=1)
+    TC_ENABLE_TLV=1 TC_ENABLE_DER=1 TC_ENABLE_PIV_CVC=1
+    TC_ENABLE_APDU=1 TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_PIV_SM_APDU=1)
   tc_add_c_test(test_piv_sm${sm_suffix} tiny-crypto-c-test-piv-sm${sm_suffix} tests/piv/sm.c)
+  tc_add_c_test(test_piv_sm_apdu${sm_suffix} tiny-crypto-c-test-piv-sm${sm_suffix}
+    tests/piv/sm_apdu.c tests/support/sm_card.c)
+  tc_sm_fixture_header(test_piv_sm_apdu${sm_suffix})
+  # Driven by tests/piv/synthetic_sm.py and tests/piv/sm_corpus.py.
+  tc_add_c_test_executable(test_piv_sm_apdu_replay${sm_suffix}
+    tiny-crypto-c-test-piv-sm${sm_suffix} tests/piv/sm_apdu_replay.c)
     if(Python3_Interpreter_FOUND)
       set(sm_fixture_args)
       if(NOT sm_profile STREQUAL "cs7")
@@ -195,7 +209,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
       endif()
       add_test(NAME test_piv_sm_synthetic${sm_suffix}
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/piv/synthetic_sm.py
-          --reader $<TARGET_FILE:test_piv_sm${sm_suffix}> ${sm_fixture_args})
+          --reader $<TARGET_FILE:test_piv_sm_apdu_replay${sm_suffix}> ${sm_fixture_args})
     endif()
   endforeach()
   foreach(small 0 1)
@@ -381,16 +395,23 @@ if(TINY_CRYPTO_BUILD_TESTS)
   if(Python3_Interpreter_FOUND)
     add_test(NAME test_sm_capture_adapter
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/piv/sm_corpus_test.py)
-  endif()
-  if(TINY_CRYPTO_TEST_SM_CAPTURE_DIR)
-    if(NOT Python3_Interpreter_FOUND)
-      message(FATAL_ERROR "PIV capture tests require Python 3")
+    # The vendored SD 33 captures replay wire exchanges through the library
+    # link. TINY_CRYPTO_TEST_SM_CAPTURE_DIR adds an external capture set.
+    set(tc_sm_corpus_dirs ${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/piv/sm_captures)
+    if(TINY_CRYPTO_TEST_SM_CAPTURE_DIR)
+      list(APPEND tc_sm_corpus_dirs ${TINY_CRYPTO_TEST_SM_CAPTURE_DIR})
     endif()
-    add_test(NAME test_sm_primitives_corpus
-      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/piv/sm_corpus.py
-        --reader $<TARGET_FILE:test_sskdf> --corpus ${TINY_CRYPTO_TEST_SM_CAPTURE_DIR}
-        --ec-reader $<TARGET_FILE:test_ec_0> --ec-reader $<TARGET_FILE:test_ec_1>
-        --sm-reader $<TARGET_FILE:test_piv_sm>)
+    set(tc_sm_corpus_suffix "")
+    foreach(corpus IN LISTS tc_sm_corpus_dirs)
+      add_test(NAME test_sm_primitives_corpus${tc_sm_corpus_suffix}
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/piv/sm_corpus.py
+          --reader $<TARGET_FILE:test_sskdf> --corpus ${corpus}
+          --ec-reader $<TARGET_FILE:test_ec_0> --ec-reader $<TARGET_FILE:test_ec_1>
+          --sm-reader $<TARGET_FILE:test_piv_sm_apdu_replay>)
+      set(tc_sm_corpus_suffix "_external")
+    endforeach()
+  elseif(TINY_CRYPTO_TEST_SM_CAPTURE_DIR)
+    message(FATAL_ERROR "PIV capture tests require Python 3")
   endif()
   tc_add_test_library(tiny-crypto-c-test-aes-dynamic src/common.c ${tc_aes_sources})
   target_compile_definitions(tiny-crypto-c-test-aes-dynamic PUBLIC
@@ -583,11 +604,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
     tests/support/scripted_transport.c)
 
   # PIV card commands need the APDU channel and the TLV readers.
-  tc_add_test_library(tiny-crypto-c-test-piv-command
-    src/common.c src/apdu_encode.c src/apdu_response.c src/apdu_channel.c
-    src/tlv.c src/tlv_walk.c src/tlv_write.c src/piv_container_internal.c src/piv_aid.c
-    src/piv_link.c src/piv_select.c src/piv_get_data.c src/piv_verify.c src/piv_status.c
-    src/piv_template_internal.c)
+  tc_add_test_library(tiny-crypto-c-test-piv-command src/common.c ${tc_piv_command_sources})
   target_compile_definitions(tiny-crypto-c-test-piv-command PUBLIC
     TC_ENABLE_APDU=1 TC_ENABLE_TLV=1 TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_AES=0 TC_ENABLE_SHA256=0)
   tc_add_c_test(test_piv_command tiny-crypto-c-test-piv-command tests/piv/command.c
@@ -792,8 +809,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
     src/x509_trust_anchor.c src/x509_ocsp.c src/tlv_write.c
     ${tc_hash_sources} src/ec.c ${tc_rsa_sources} src/pki_storage.c ${tc_aes_sources} src/sskdf.c
     src/piv_sm.c src/piv_sm_message.c src/piv_sm_authenticate.c
-    src/twic_cipher.c src/twic_tpk.c
-    examples/piv_sm_wire.c)
+    src/twic_cipher.c src/twic_tpk.c)
   target_compile_definitions(tiny-crypto-c-test-pki-native PUBLIC
     TC_ENABLE_AES=1 TC_AES_ENABLE_ECB=1 TC_ENABLE_TLV=1 TC_TLV_ENABLE_BER=1 TC_ENABLE_DER=1 TC_ENABLE_X509=1
     TC_ENABLE_KEY_CHALLENGE=1
@@ -1125,6 +1141,10 @@ if(TINY_CRYPTO_BUILD_TESTS)
     tc_add_linked_test(test_cpp_apdu tiny-crypto-c-test-apdu tests/cpp/apdu.cpp tests/cpp/main.cpp)
     tc_add_linked_test(test_cpp_piv_command tiny-crypto-c-test-piv-command
       tests/cpp/piv_command.cpp tests/cpp/main.cpp)
+    tc_add_linked_test(test_cpp_piv_sm_apdu tiny-crypto-c-test-piv-sm
+      tests/cpp/piv_sm_apdu.cpp tests/support/sm_card.c tests/cpp/main.cpp)
+    target_include_directories(test_cpp_piv_sm_apdu PRIVATE tests/support)
+    tc_sm_fixture_header(test_cpp_piv_sm_apdu)
     target_include_directories(test_cpp_piv_command PRIVATE tests/support)
     target_include_directories(test_cpp_apdu PRIVATE tests/support)
     target_include_directories(test_cpp_tlv PRIVATE tests/support)
@@ -1359,7 +1379,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   # This catches accidental feature coupling and keeps their C API surface equal.
   foreach(header_profile rsa tlv apdu piv_command aamva fascn twic_uuid twic_tpk twic_object hkdf aes_kw
       piv_oids x509 key_challenge x509_path x509_revocation x509_ocsp cms cms_validation piv_objects credential piv_cvc piv_chuid
-      piv_sm twic_ccl)
+      piv_sm piv_sm_apdu twic_ccl)
     set(header_profile_definitions TC_ENABLE_AES=0 TC_ENABLE_SHA256=0)
     if(header_profile STREQUAL "hkdf")
       list(REMOVE_ITEM header_profile_definitions TC_ENABLE_SHA256=0)
@@ -1450,6 +1470,14 @@ if(TINY_CRYPTO_BUILD_TESTS)
         TC_ENABLE_SSKDF=1 TC_ENABLE_EC=1 TC_EC_ENABLE_P256=1
         TC_ENABLE_PIV_SM=1 TC_PIV_SM_ENABLE_CS2=1 TC_PIV_SM_ENABLE_CS7=0
         TC_TEST_HEADER_PIV_SM=1)
+    elseif(header_profile STREQUAL "piv_sm_apdu")
+      list(REMOVE_ITEM header_profile_definitions TC_ENABLE_AES=0 TC_ENABLE_SHA256=0)
+      list(APPEND header_profile_definitions
+        TC_ENABLE_AES=1 TC_AES_ENABLE_DYNAMIC=1 TC_ENABLE_SHA256=1
+        TC_ENABLE_SSKDF=1 TC_ENABLE_EC=1 TC_EC_ENABLE_P256=1
+        TC_ENABLE_PIV_SM=1 TC_PIV_SM_ENABLE_CS2=1 TC_PIV_SM_ENABLE_CS7=0
+        TC_ENABLE_TLV=1 TC_ENABLE_DER=1 TC_ENABLE_PIV_CVC=1 TC_ENABLE_APDU=1
+        TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_PIV_SM_APDU=1 TC_TEST_HEADER_PIV_SM_APDU=1)
     elseif(header_profile STREQUAL "twic_ccl")
       list(APPEND header_profile_definitions TC_ENABLE_TWIC_CCL=1 TC_TEST_HEADER_TWIC_CCL=1)
     endif()
@@ -1494,7 +1522,8 @@ if(TINY_CRYPTO_BUILD_TESTS)
     TC_AES_ENABLE_EAX_PRIME=1 TC_AES_ENABLE_DYNAMIC=1 TC_ENABLE_MD5=1 TC_ENABLE_GZIP=1
     TC_ENABLE_DRBG=1 TC_DRBG_ENABLE_HMAC=1 TC_ENABLE_RSA=1 TC_ENABLE_TLV=1 TC_ENABLE_DER=1 TC_ENABLE_X509=1
     TC_ENABLE_PIV_CHUID=1 TC_ENABLE_PIV_CVC=1 TC_ENABLE_EAC_CVC=1 TC_ENABLE_PIV_SM=1
-    TC_ENABLE_EC=1 TC_ENABLE_SSKDF=1 TC_ENABLE_APDU=1 TC_ENABLE_PIV_COMMAND=1)
+    TC_ENABLE_EC=1 TC_ENABLE_SSKDF=1 TC_ENABLE_APDU=1 TC_ENABLE_PIV_COMMAND=1
+    TC_ENABLE_PIV_SM_APDU=1)
   add_library(test_cpp_headers_cxx17 OBJECT tests/cpp/header_compile.cpp)
   target_include_directories(test_cpp_headers_cxx17 PRIVATE src)
   set_property(TARGET test_cpp_headers_cxx17 PROPERTY CXX_STANDARD 17)
@@ -1557,12 +1586,15 @@ if(TINY_CRYPTO_BUILD_TESTS)
           -c ${CMAKE_CURRENT_SOURCE_DIR}/${rsa_source}
           -o ${CMAKE_CURRENT_BINARY_DIR}/tiny-crypto-c-${rsa_name}-compile.o)
     endforeach()
-    foreach(sm_source piv_sm piv_sm_message)
+    # The secure messaging framing sources build with the session and the PIV
+    # card commands for a 16-bit size_t.
+    foreach(sm_source piv_sm piv_sm_message piv_sm_apdu piv_sm_key_request)
       add_test(NAME test_${sm_source}_compile_avr
         COMMAND ${TC_AVR_CC} -std=c99 -Wall -Wextra -Werror -Os -mmcu=atmega328p
           -DTC_RESOURCE_PROFILE=1 -DTC_ENABLE_PIV_SM=1 -DTC_ENABLE_EC=1
           -DTC_ENABLE_SSKDF=1 -DTC_ENABLE_SHA384=1 -DTC_AES_ENABLE_DYNAMIC=1
           -DTC_ENABLE_TLV=1 -DTC_ENABLE_DER=1 -DTC_ENABLE_PIV_CVC=1
+          -DTC_ENABLE_APDU=1 -DTC_ENABLE_PIV_COMMAND=1 -DTC_ENABLE_PIV_SM_APDU=1
           -I${CMAKE_CURRENT_SOURCE_DIR}/src
           -c ${CMAKE_CURRENT_SOURCE_DIR}/src/${sm_source}.c
           -o ${CMAKE_CURRENT_BINARY_DIR}/tiny-crypto-c-${sm_source}-compile.o)

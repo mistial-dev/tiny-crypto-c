@@ -8,7 +8,7 @@
  * Appendix D.3, ISO/IEC 7816-4:2020 12.8.1.
  * Configuration: TC_ENABLE_PIV_COMMAND (requires TC_ENABLE_APDU and
  * TC_ENABLE_TLV).
- * Limitations: commands travel in plaintext. CHANGE REFERENCE DATA, RESET
+ * Limitations: secure messaging is in piv_sm_apdu.h. CHANGE REFERENCE DATA, RESET
  * RETRY COUNTER, PUT DATA, GENERATE ASYMMETRIC KEY PAIR and OCC VERIFY (96,
  * 97) are outside this module. The library owns no I/O, reader selection or
  * PIN entry.
@@ -30,7 +30,9 @@ extern "C" {
  * CARD_STATUS means the card completed the command with a status other than
  * success. TC_PIV_link_status returns that status and TC_PIV_status_classify
  * gives its meaning. REFUSED means a safety or state precondition failed
- * before the command, and nothing was sent. */
+ * before the command, and nothing was sent. On a secured link GET DATA,
+ * VERIFY and GENERAL AUTHENTICATE also return the session-loss results of
+ * piv_sm_apdu.h. */
 typedef enum {
   TC_PIV_OK,
   TC_PIV_INVALID,
@@ -87,9 +89,17 @@ typedef struct {
 
 /* Card session over one transport. Members are private. Do not copy an
  * initialized link. The link borrows the command scratch buffer and the
- * transport context until TC_PIV_link_clear. */
+ * transport context until TC_PIV_link_clear. With TC_ENABLE_PIV_SM_APDU it
+ * also borrows a bound secure messaging session, its workspace and scratch
+ * (piv_sm_apdu.h). */
+struct tc_piv_link_security;
 typedef struct {
   TC_APDU_channel channel;
+  const struct tc_piv_link_security* security;
+  void* sm;
+  void* sm_workspace;
+  uint8_t* sm_scratch;
+  size_t sm_scratch_capacity;
   uint32_t response_ne;
   uint16_t status;
   uint8_t interface, application, profile, command, sm_suite, flags;
@@ -124,13 +134,17 @@ TC_PIV_result TC_PIV_link_init(TC_PIV_link* link, TC_APDU_transport transport,
 void TC_PIV_link_info_get(const TC_PIV_link* link, TC_PIV_link_info* out);
 
 /* Status word of the last command the card completed, as returned with
- * TC_PIV_OK or TC_PIV_CARD_STATUS. After a PIN refusal for the retry floor it
- * holds the answer to the retry query. 0 before any command, after a
- * malformed answer, a transport failure or LIMIT, and for a NULL link. A call
- * rejected or refused before sending leaves it unchanged. */
+ * TC_PIV_OK or TC_PIV_CARD_STATUS. Under secure messaging it is the
+ * authenticated status inside DO 99, or the outer status when the card
+ * reported a secure messaging error (piv_sm_apdu.h). After a PIN refusal for
+ * the retry floor it holds the answer to the retry query. 0 before any
+ * command, after a malformed or unauthenticated answer, a transport failure or
+ * LIMIT, and for a NULL link. A call rejected or refused before sending
+ * leaves it unchanged. */
 uint16_t TC_PIV_link_status(const TC_PIV_link* link);
 
-/* Wipe the scratch buffer and the link state. Accepts NULL. */
+/* Wipe the scratch buffer and the link state, and clear a bound secure
+ * messaging session and its scratch. Accepts NULL. */
 void TC_PIV_link_clear(TC_PIV_link* link);
 
 /* Accept a TWIC application version 01 with a sub-version other than 01
@@ -190,7 +204,9 @@ TC_TLV_result TC_PIV_application_read(TC_bytes response, TC_PIV_application_id e
  * command is always plain. Selecting another application sets the card's
  * security statuses to FALSE, and reselecting the PIV application keeps them
  * (Part 2 3.1.1). The link clears its VCI and PIN status in both cases, so
- * query the PIN again with TC_PIV_verify_status. On success the link records
+ * query the PIN again with TC_PIV_verify_status. Selecting an application
+ * other than the selected one also clears a bound secure messaging session.
+ * On success the link records
  * the application and profile, applies the DO 7F66 limits to the channel and
  * sets the GET RESPONSE flags: PIV TC_APDU_GET_RESPONSE_PLAIN_CLA (Part 2
  * 4.2.6, A.4.1), TWIC PLAIN_CLA and TC_APDU_GET_RESPONSE_LE_FF (TWIC Part 2
@@ -199,8 +215,8 @@ TC_TLV_result TC_PIV_application_read(TC_bytes response, TC_PIV_application_id e
  *
  * TC_PIV_ARGUMENT     NULL link or out, a cleared link, an unknown
  *                     application or flag, response with NULL data or below
- *                     2 bytes, or response overlapping *link, the command
- *                     scratch or *out.
+ *                     2 bytes, or response overlapping *link, its scratch
+ *                     buffers or *out.
  * TC_PIV_CARD_STATUS  the card answered other than 9000, such as 6A82.
  * TC_PIV_INVALID, TC_PIV_LIMIT, TC_PIV_UNSUPPORTED
  *                     TC_PIV_application_read results, or channel results.
@@ -226,7 +242,9 @@ typedef struct {
 } TC_PIV_data_object;
 
 /* GET DATA for one tag of 1 to 3 bytes (SP 800-73-5 Part 2 3.1.2): CLA 00,
- * INS CB, P1 P2 3F FF, data 5C L tag and Ne = response_ne. The answer to 9000
+ * INS CB, P1 P2 3F FF, data 5C L tag and Ne = response_ne. A secured link
+ * sends it under secure messaging and frames the decrypted answer, which
+ * stays in the response buffer (piv_sm_apdu.h). The answer to 9000
  * or 6282 (ISO/IEC 7816-4 Table 7, TWIC Part 2 v5 5.2) must be exactly one
  * TLV spanning the data field.
  *
@@ -239,8 +257,9 @@ typedef struct {
  * TC_PIV_ARGUMENT     NULL link or out, a cleared link, a tag other than one
  *                     complete ISO/IEC 7816-4 tag of 1 to 3 bytes, response
  *                     with NULL data or below 2 bytes, or response overlapping
- *                     *link, the command scratch, *out or the tag.
- * TC_PIV_REFUSED      no application is selected.
+ *                     *link, its scratch buffers, *out or the tag.
+ * TC_PIV_REFUSED      no application is selected, or the link lost its
+ *                     secure messaging session.
  * TC_PIV_CARD_STATUS  another status, such as 6982, 6A81, 6A82 or 6A88.
  * TC_PIV_INVALID      framing other than above, or trailing bytes.
  * TC_PIV_LIMIT, TC_PIV_ERROR
@@ -270,8 +289,9 @@ typedef struct {
  * TC_PIV_ARGUMENT     NULL link or out, a cleared link, or another reference.
  * TC_PIV_UNSUPPORTED  OCC references 96 and 97, or the TWIC application.
  * TC_PIV_REFUSED      no application is selected, reference 80 or 00 on a
- *                     contactless link without the VCI (Part 2 3.2.1), or 98
- *                     on a contactless link without secure messaging.
+ *                     contactless link without the VCI (Part 2 3.2.1), 98
+ *                     on a contactless link without secure messaging, or a
+ *                     link that lost its secure messaging session.
  * TC_PIV_CARD_STATUS  another status, such as 6983 (blocked, or the
  *                     contactless intermediate retry value) or 6A88.
  * TC_PIV_INVALID, TC_PIV_LIMIT, TC_PIV_ERROR
@@ -287,16 +307,17 @@ TC_PIV_result TC_PIV_verify_status(TC_PIV_link* link, uint8_t reference,
  * Otherwise the PIN is sent once, padded with FF to 8 bytes, only when the
  * query reported at least minimum_retries tries, so the last tries stay
  * unspent. The padded PIN lives in a stack array and the channel scratch,
- * and both are wiped. On success the link marks the PIN verified. A rejected
+ * and on a secured link in the secure messaging scratch, and all are wiped. On success the link marks the PIN verified. A rejected
  * submission clears that mark.
  *
  * TC_PIV_ARGUMENT     NULL link or out, a cleared link, another reference,
  *                     pin with NULL data, a length outside 6 to 8, a
- *                     non-digit, or overlapping *link, the command scratch or
+ *                     non-digit, or overlapping *link, its scratch buffers or
  *                     *out, or minimum_retries outside 2 to 15.
  * TC_PIV_UNSUPPORTED  the TWIC application.
  * TC_PIV_REFUSED      no application is selected, a contactless link
- *                     without the VCI (Part 1 Table 4), or a query reporting
+ *                     without the VCI (Part 1 Table 4), a link that lost its
+ *                     secure messaging session, or a query reporting
  *                     fewer than minimum_retries tries or no count. The PIN
  *                     never reached the card.
  * TC_PIV_CARD_STATUS  the query or the submission answered another status,

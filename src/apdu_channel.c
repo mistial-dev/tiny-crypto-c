@@ -25,6 +25,7 @@ typedef struct {
   size_t used;       /* response data bytes kept */
   size_t high_water; /* end of the bytes the transport reported */
   uint16_t sw;
+  uint8_t format; /* length-field format of this exchange */
 } exchange_state;
 
 static int limits_valid(size_t max_command_bytes, size_t max_response_bytes)
@@ -83,7 +84,7 @@ static TC_APDU_result exchange(TC_APDU_channel* channel, const TC_APDU_command* 
 {
   tc_apdu_form form = {0, 0};
   TC_APDU_result result =
-      tc_apdu_form_get(step->data.length, step->ne, (TC_APDU_length_format)channel->format, &form);
+      tc_apdu_form_get(step->data.length, step->ne, (TC_APDU_length_format)state->format, &form);
   if (result != TC_APDU_OK)
     return result;
   const size_t offered = state->response.capacity - state->used;
@@ -221,13 +222,29 @@ static TC_APDU_result chain_check(const TC_APDU_channel* channel, size_t nc, uin
   return TC_APDU_OK;
 }
 
+TC_APDU_result tc_apdu_channel_fits(const TC_APDU_channel* channel, TC_APDU_length_format format,
+                                    size_t nc, uint32_t ne)
+{
+  if (format == TC_APDU_SHORT && nc > TC_APDU_SHORT_MAX_NC && nc <= TC_APDU_MAX_NC)
+    return chain_check(channel, nc, ne);
+  tc_apdu_form form = {0, 0};
+  const TC_APDU_result result = tc_apdu_form_get(nc, ne, format, &form);
+  if (result != TC_APDU_OK)
+    return result;
+  if (form.size > channel->scratch_capacity ||
+      (channel->max_command_bytes && form.size > channel->max_command_bytes) ||
+      !channel->exchanges_left)
+    return TC_APDU_LIMIT;
+  return TC_APDU_OK;
+}
+
 static TC_APDU_result transceive_run(TC_APDU_channel* channel, const TC_APDU_command* command,
                                      exchange_state* state)
 {
   TC_APDU_command step = *command;
   size_t offset = 0;
   int chained = 0, done = 0;
-  if (channel->format == TC_APDU_SHORT && command->data.length > TC_APDU_SHORT_MAX_NC) {
+  if (state->format == TC_APDU_SHORT && command->data.length > TC_APDU_SHORT_MAX_NC) {
     chained = 1;
     TC_APDU_result result = chain_check(channel, command->data.length, command->ne);
     if (result == TC_APDU_OK)
@@ -243,7 +260,7 @@ static TC_APDU_result transceive_run(TC_APDU_channel* channel, const TC_APDU_com
 }
 
 /* Argument checks at the public entry. */
-static TC_APDU_result transceive_check(const TC_APDU_channel* channel,
+static TC_APDU_result transceive_check(const TC_APDU_channel* channel, TC_APDU_length_format format,
                                        const TC_APDU_command* command, TC_buffer response,
                                        const TC_APDU_response* out)
 {
@@ -255,10 +272,9 @@ static TC_APDU_result transceive_check(const TC_APDU_channel* channel,
   /* SHORT sends data above 255 bytes as a chain, so only its Le bound
    * applies to the whole command. */
   size_t nc = command->data.length;
-  if (channel->format == TC_APDU_SHORT && nc > TC_APDU_SHORT_MAX_NC && nc <= TC_APDU_MAX_NC)
+  if (format == TC_APDU_SHORT && nc > TC_APDU_SHORT_MAX_NC && nc <= TC_APDU_MAX_NC)
     nc = TC_APDU_SHORT_MAX_NC;
-  TC_APDU_result result =
-      tc_apdu_form_get(nc, command->ne, (TC_APDU_length_format)channel->format, &form);
+  TC_APDU_result result = tc_apdu_form_get(nc, command->ne, format, &form);
   if (result == TC_APDU_OK)
     result = tc_apdu_class_check(command->cla);
   if (result != TC_APDU_OK)
@@ -278,15 +294,16 @@ static TC_APDU_result transceive_check(const TC_APDU_channel* channel,
   return TC_APDU_OK;
 }
 
-TC_APDU_result TC_APDU_transceive(TC_APDU_channel* channel, const TC_APDU_command* command,
-                                  TC_buffer response, TC_APDU_response* out)
+TC_APDU_result tc_apdu_transceive_format(TC_APDU_channel* channel, TC_APDU_length_format format,
+                                         const TC_APDU_command* command, TC_buffer response,
+                                         TC_APDU_response* out)
 {
-  const TC_APDU_result checked = transceive_check(channel, command, response, out);
+  const TC_APDU_result checked = transceive_check(channel, format, command, response, out);
   if (checked != TC_APDU_OK)
     return checked;
   if (channel->stopped)
     return TC_APDU_ERROR;
-  exchange_state state = {response, 0, 0, 0};
+  exchange_state state = {response, 0, 0, 0, (uint8_t)format};
   const TC_APDU_result result = transceive_run(channel, command, &state);
   if (result != TC_APDU_OK) {
     /* The buffer may hold a partial, unauthenticated or secret answer. */
@@ -300,6 +317,15 @@ TC_APDU_result TC_APDU_transceive(TC_APDU_channel* channel, const TC_APDU_comman
   out->data.length = state.used;
   out->sw = state.sw;
   return TC_APDU_OK;
+}
+
+TC_APDU_result TC_APDU_transceive(TC_APDU_channel* channel, const TC_APDU_command* command,
+                                  TC_buffer response, TC_APDU_response* out)
+{
+  if (!channel)
+    return TC_APDU_ARGUMENT;
+  return tc_apdu_transceive_format(channel, (TC_APDU_length_format)channel->format, command,
+                                   response, out);
 }
 
 size_t TC_APDU_channel_exchanges_left(const TC_APDU_channel* channel)

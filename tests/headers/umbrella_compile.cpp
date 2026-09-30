@@ -125,6 +125,11 @@ static TC_TWIC_tpk tc_header_tpk;
 #error "The C++ umbrella must expose the standalone PIV secure messaging wrapper"
 #endif
 
+#if defined(TC_TEST_HEADER_PIV_SM_APDU) &&                                                         \
+    (!defined(TINY_CRYPTO_PIV_SM_APDU_H_) || !defined(TINY_CRYPTO_PIV_SM_APDU_HPP_))
+#error "The C++ umbrella must expose the PIV secure messaging framing wrapper"
+#endif
+
 #if defined(TC_TEST_HEADER_TWIC_CCL) && !defined(TINY_CRYPTO_TWIC_CCL_H_)
 #error "The C++ umbrella must expose the enabled TWIC CCL C API"
 #endif

@@ -56,6 +56,43 @@ static int spans_contain(const TC_bytes* spans, size_t count, TC_bytes required)
   return !required.length;
 }
 
+/* Writable storage must be disjoint from the inputs. The one exception is
+ * exact-alias decryption: plaintext == ciphertext.data with a capacity within
+ * the ciphertext may overwrite the ciphertext and the authenticated spans that
+ * contain it. */
+static int unprotect_disjoint(const TC_PIV_SM* session, const TC_PIV_SM_unprotect_request* request,
+                              const uint8_t* plaintext, size_t capacity,
+                              const size_t* plaintext_length, const TC_PIV_SM_workspace* workspace)
+{
+  const TC_bytes writable[] = {{(const uint8_t*)session, sizeof *session},
+                               {(const uint8_t*)workspace, sizeof *workspace},
+                               {(const uint8_t*)plaintext_length, sizeof *plaintext_length},
+                               {plaintext, capacity}};
+  const TC_bytes input[] = {{(const uint8_t*)request, sizeof *request},
+                            request->tag,
+                            {(const uint8_t*)request->authenticated,
+                             request->authenticated_count * sizeof *request->authenticated},
+                            request->ciphertext};
+  const int in_place =
+      plaintext && plaintext == request->ciphertext.data && capacity <= request->ciphertext.length;
+  size_t i;
+  if (!in_place)
+    return tc_sm_disjoint(writable, 4, input, 4) &&
+           tc_sm_disjoint(writable, 4, request->authenticated, request->authenticated_count);
+  /* The plaintext is checked last, against every input except the
+   * ciphertext and the spans that hold it. */
+  if (!tc_sm_disjoint(writable, 3, input, 4) ||
+      !tc_sm_disjoint(writable, 3, request->authenticated, request->authenticated_count) ||
+      !tc_sm_disjoint(writable, 4, input, 3))
+    return 0;
+  for (i = 0; i < request->authenticated_count; ++i)
+    if (!span_contains(request->authenticated[i], request->ciphertext) &&
+        !tc_internal_ranges_disjoint(plaintext, capacity, request->authenticated[i].data,
+                                     request->authenticated[i].length))
+      return 0;
+  return 1;
+}
+
 TC_status TC_PIV_SM_ciphertext_size(size_t plaintext_length, size_t* ciphertext_length)
 {
   size_t padding;
@@ -177,21 +214,8 @@ TC_status TC_PIV_SM_unprotect(TC_PIV_SM* session, const TC_PIV_SM_unprotect_requ
       !spans_contain(request->authenticated, request->authenticated_count, request->ciphertext) ||
       session->state != TC_PIV_SM_PENDING)
     return TC_ERROR;
-  {
-    const TC_bytes writable[] = {{(const uint8_t*)session, sizeof *session},
-                                 {(const uint8_t*)workspace, sizeof *workspace},
-                                 {plaintext, capacity},
-                                 {(const uint8_t*)plaintext_length, sizeof *plaintext_length}};
-    const TC_bytes input[] = {{(const uint8_t*)request, sizeof *request},
-                              request->ciphertext,
-                              request->tag,
-                              {(const uint8_t*)request->authenticated,
-                               request->authenticated_count * sizeof *request->authenticated}};
-    if (!tc_sm_disjoint(writable, 4, input, 4))
-      return TC_ERROR;
-    if (!tc_sm_disjoint(writable, 4, request->authenticated, request->authenticated_count))
-      return TC_ERROR;
-  }
+  if (!unprotect_disjoint(session, request, plaintext, capacity, plaintext_length, workspace))
+    return TC_ERROR;
   suite = tc_sm_suite_get(session->suite);
   if (!suite || !counter_nonzero(session->data.traffic.counter))
     goto done;
@@ -226,6 +250,9 @@ TC_status TC_PIV_SM_unprotect(TC_PIV_SM* session, const TC_PIV_SM_unprotect_requ
     preserve_session = 1;
     goto done;
   }
+  /* The final block was decrypted from intact ciphertext above. Each earlier
+   * block is read before its plaintext is written, so plaintext may replace
+   * the ciphertext in place. */
   if (request->ciphertext.length) {
     const size_t last = request->ciphertext.length - 16;
     if (length > last)

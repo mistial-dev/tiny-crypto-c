@@ -2,9 +2,9 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/piv_sm.h>
 #include <tiny_crypto/piv_sm_authenticate.h>
-#include "../../examples/piv_sm_wire.h"
 #include "munit.h"
 #include "test_util.h"
+#include "sm_fixture_peer.h"
 #include "sm_fixtures.h"
 #include <string.h>
 
@@ -94,20 +94,29 @@ static void signer_key(const struct tc_sm_fixture* fixture, TC_X509_certificate*
                                      : (TC_bytes){p384_parameters + 2, sizeof p384_parameters - 2};
 }
 
+/* Begin the fixture session. The request APDU carries Q_eH after
+ * 00 87 P1 04 Lc 7C L 81 L 00 ID_sH (SP 800-73-5 Part 2 4.1.8). */
 static void begin_session(const struct tc_sm_fixture* fixture, TC_PIV_SM* session)
 {
   TC_PIV_SM_workspace workspace;
+  TC_PIV_SM_handshake handshake;
   fixed_random_state random = {fixture->suite == TC_PIV_SM_CS2 ? 32u : 48u};
-  uint8_t request[118];
-  size_t written = 0;
   static const uint8_t host_id[8] = {0};
   memset(session, 0, sizeof *session);
-  munit_assert_int(example_piv_sm_begin(session, fixture->suite, host_id,
-                                        (TC_random_source){fixed_scalar, &random}, request,
-                                        sizeof request, &written, &workspace),
+  munit_assert_int(TC_PIV_SM_begin(session, fixture->suite, host_id,
+                                   (TC_random_source){fixed_scalar, &random}, &handshake,
+                                   &workspace),
                    ==, TC_OK);
-  munit_assert_size(written, ==, fixture->request.length);
-  munit_assert_memory_equal(written, request, fixture->request.data);
+  munit_assert_size(handshake.public_key.length, ==, fixture->public_key.length);
+  munit_assert_memory_equal(handshake.public_key.length, handshake.public_key.data,
+                            fixture->request.data + 18);
+}
+
+static TC_PIV_SM_peer fixture_peer(const struct tc_sm_fixture* fixture)
+{
+  TC_PIV_SM_peer peer;
+  munit_assert_true(tc_sm_fixture_peer(fixture->suite, fixture->response, &peer));
+  return peer;
 }
 
 static TC_PIV_SM_authentication authentication(const struct tc_sm_fixture* fixture,
@@ -115,11 +124,8 @@ static TC_PIV_SM_authentication authentication(const struct tc_sm_fixture* fixtu
                                                const TC_TLV_limits* limits,
                                                const TC_X509_signature_provider* signatures)
 {
-  ExamplePIVSMResponse response;
-  munit_assert_int(example_piv_sm_response_read(fixture->suite, fixture->response, &response), ==,
-                   TC_OK);
-  TC_PIV_SM_authentication value = {response.peer, fixture->intermediate, {NULL, 0}, signer, limits,
-                                    signatures};
+  TC_PIV_SM_authentication value = {
+      fixture_peer(fixture), fixture->intermediate, {NULL, 0}, signer, limits, signatures};
   return value;
 }
 
@@ -140,13 +146,11 @@ TC_TEST(authenticate)
     begin_session(fixture, &session);
     TC_PIV_SM_authentication request = authentication(fixture, &signer, &limits, &accepted);
     if (fixture->intermediate.length) {
-      ExamplePIVSMResponse parsed;
+      const TC_PIV_SM_peer parsed = fixture_peer(fixture);
       TC_PIV_CVC checked;
       TC_EC_workspace points;
       size_t chain_work = TEST_WORK;
-      munit_assert_int(example_piv_sm_response_read(fixture->suite, fixture->response, &parsed), ==,
-                       TC_OK);
-      const TC_PIV_CVC_chain_request chain = {parsed.peer.certificate,
+      const TC_PIV_CVC_chain_request chain = {parsed.certificate,
                                               fixture->intermediate,
                                               {NULL, 0},
                                               fixture->suite == TC_PIV_SM_CS2 ? TC_EC_P256
@@ -170,20 +174,26 @@ TC_TEST(authenticate)
     const size_t required_work = TEST_WORK - work;
     munit_assert_size(required_work, >, 0);
 
-    ExamplePIVSMCommand command = {{NULL, 0}, 0x20, 0, 0x80, 0};
-    uint8_t protected_command[16];
-    size_t written = 0;
-    munit_assert_int(example_piv_sm_protect(&session, &command, protected_command,
-                                            sizeof protected_command, &written, &workspace.session),
-                     ==, TC_OK);
-    munit_assert_size(written, ==, fixture->command.length);
-    munit_assert_memory_equal(written, protected_command, fixture->command.data);
-    ExamplePIVSMResult reply;
-    munit_assert_int(example_piv_sm_unprotect(&session, fixture->reply, 0x9000, NULL, 0, &reply,
-                                              &workspace.session),
-                     ==, TC_OK);
-    munit_assert_size(reply.length, ==, 0);
-    munit_assert_uint(reply.status, ==, 0x9000);
+    /* VERIFY retry query: the C-MAC covers the header block alone, and the
+     * reply is 99 02 90 00 8E 08 MAC (Part 2 4.2.3, 4.2.5). */
+    static const uint8_t header[16] = {0x0c, 0x20, 0x00, 0x80, 0x80};
+    const TC_bytes header_span[] = {{header, sizeof header}};
+    const TC_PIV_SM_protect_request command = {{NULL, 0}, NULL, 0, header_span, 1};
+    uint8_t tag[8];
+    size_t written = 99;
+    munit_assert_int(TC_PIV_SM_protect(&session, &command, &written, tag, &workspace.session), ==,
+                     TC_OK);
+    munit_assert_size(written, ==, 0);
+    munit_assert_size(fixture->command.length, ==, 10);
+    munit_assert_memory_equal(8, tag, fixture->command.data + 2);
+    const TC_bytes status_span = {fixture->reply.data, 4};
+    const TC_PIV_SM_unprotect_request reply = {
+        {NULL, 0}, {fixture->reply.data + 6, 8}, &status_span, 1};
+    size_t plain_length = 99;
+    munit_assert_int(
+        TC_PIV_SM_unprotect(&session, &reply, NULL, 0, &plain_length, &workspace.session), ==,
+        TC_OK);
+    munit_assert_size(plain_length, ==, 0);
     munit_assert_int(TC_PIV_SM_get_state(&session), ==, TC_PIV_SM_READY);
 
     begin_session(fixture, &session);
@@ -196,20 +206,17 @@ TC_TEST(authenticate)
     uint8_t changed_response[512];
     munit_assert_size(fixture->response.length, <=, sizeof changed_response);
     memcpy(changed_response, fixture->response.data, fixture->response.length);
-    ExamplePIVSMResponse parsed;
-    munit_assert_int(example_piv_sm_response_read(fixture->suite, fixture->response, &parsed), ==,
-                     TC_OK);
-    const size_t cryptogram_offset = (size_t)(parsed.peer.cryptogram.data - fixture->response.data);
+    const TC_PIV_SM_peer parsed = fixture_peer(fixture);
+    const size_t cryptogram_offset = (size_t)(parsed.cryptogram.data - fixture->response.data);
     changed_response[cryptogram_offset] ^= 1;
     begin_session(fixture, &session);
     request = authentication(fixture, &signer, &limits, &accepted);
     request.peer.cryptogram = (TC_bytes){changed_response + cryptogram_offset, 16};
     request.peer.certificate =
-        (TC_bytes){changed_response + (parsed.peer.certificate.data - fixture->response.data),
-                   parsed.peer.certificate.length};
-    request.peer.nonce =
-        (TC_bytes){changed_response + (parsed.peer.nonce.data - fixture->response.data),
-                   parsed.peer.nonce.length};
+        (TC_bytes){changed_response + (parsed.certificate.data - fixture->response.data),
+                   parsed.certificate.length};
+    request.peer.nonce = (TC_bytes){changed_response + (parsed.nonce.data - fixture->response.data),
+                                    parsed.nonce.length};
     work = TEST_WORK;
     munit_assert_int(TC_PIV_SM_authenticate_response(&session, &request, &work, &workspace), ==,
                      TC_CREDENTIAL_INVALID);

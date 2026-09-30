@@ -1,10 +1,10 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/tiny_crypto.hpp>
-#include "../../examples/piv_sm_wire.h"
 #include "doctest.h"
 #include <cstring>
 #if TC_TEST_SM_FIXTURES
+#include "sm_fixture_peer.h"
 #include "sm_fixtures.h"
 #endif
 
@@ -38,15 +38,15 @@ TEST_CASE("PIV SM authenticated exchange")
     CHECK(handshake.public_key.length == fixture.public_key.length);
     CHECK(std::memcmp(handshake.public_key.data, fixture.request.data + 18,
                       handshake.public_key.length) == 0);
-    ExamplePIVSMResponse parsed{};
-    REQUIRE(example_piv_sm_response_read(fixture.suite, fixture.response, &parsed) == TC_OK);
-    tiny_crypto::piv_sm_peer changed = parsed.peer;
+    tiny_crypto::piv_sm_peer parsed{};
+    REQUIRE(tc_sm_fixture_peer(fixture.suite, fixture.response, &parsed));
+    tiny_crypto::piv_sm_peer changed = parsed;
     changed.card_control = 1;
     CHECK(session.finish(changed, fixture.public_key, workspace) == TC_ERROR);
     CHECK(session.state() == TC_PIV_SM_IDLE);
     REQUIRE(session.begin(fixture.suite, host, {scalar_one, nullptr}, handshake, workspace) ==
             TC_OK);
-    REQUIRE(session.finish(parsed.peer, fixture.public_key, workspace) == TC_OK);
+    REQUIRE(session.finish(parsed, fixture.public_key, workspace) == TC_OK);
     CHECK(session.state() == TC_PIV_SM_READY);
     uint8_t header[16] = {0x0c, 0x20, 0, 0x80, 0x80};
     const TC_bytes command_mac[] = {{header, sizeof header}, {nullptr, 0}};

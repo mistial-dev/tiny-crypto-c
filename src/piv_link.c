@@ -5,6 +5,9 @@
 #if TC_ENABLE_PIV_COMMAND
 #include "internal.h"
 #include "piv_link_internal.h"
+#if TC_ENABLE_PIV_SM_APDU
+#include <tiny_crypto/piv_sm.h>
+#endif
 
 /* Smallest command scratch for format: every SHORT fragment, or the largest
  * EXTENDED command of this module within the card limit. */
@@ -44,6 +47,11 @@ TC_PIV_result TC_PIV_link_init(TC_PIV_link* link, TC_APDU_transport transport,
   if (TC_APDU_channel_init(&link->channel, transport, &options->channel, command_scratch) !=
       TC_APDU_OK)
     return TC_PIV_ARGUMENT;
+  link->security = NULL;
+  link->sm = NULL;
+  link->sm_workspace = NULL;
+  link->sm_scratch = NULL;
+  link->sm_scratch_capacity = 0;
   link->response_ne = options->response_ne ? options->response_ne : TC_APDU_SHORT_MAX_NE;
   link->status = 0;
   link->interface = (uint8_t)options->interface;
@@ -74,10 +82,25 @@ uint16_t TC_PIV_link_status(const TC_PIV_link* link)
   return link ? link->status : 0;
 }
 
+void tc_piv_link_unbind(TC_PIV_link* link)
+{
+  if (link->security)
+    link->security->unbind(link);
+  link->flags &= (uint8_t)~TC_PIV_LINK_SECURED;
+}
+
+void tc_piv_link_session_lost(TC_PIV_link* link)
+{
+  tc_piv_link_unbind(link);
+  link->flags |= TC_PIV_LINK_SM_LOST;
+  link->flags &= (uint8_t)~(TC_PIV_LINK_VCI | TC_PIV_LINK_PIN_VERIFIED);
+}
+
 void TC_PIV_link_clear(TC_PIV_link* link)
 {
   if (!link)
     return;
+  tc_piv_link_unbind(link);
   TC_APDU_channel_clear(&link->channel);
   TC_secure_zero(link, sizeof *link);
 }
@@ -89,9 +112,20 @@ int tc_piv_link_ready(const TC_PIV_link* link)
 
 int tc_piv_link_disjoint(const TC_PIV_link* link, const void* data, size_t length)
 {
-  return tc_internal_ranges_disjoint(data, length, link, sizeof *link) &&
-         tc_internal_ranges_disjoint(data, length, link->channel.scratch,
-                                     link->channel.scratch_capacity);
+  if (!tc_internal_ranges_disjoint(data, length, link, sizeof *link) ||
+      !tc_internal_ranges_disjoint(data, length, link->channel.scratch,
+                                   link->channel.scratch_capacity))
+    return 0;
+#if TC_ENABLE_PIV_SM_APDU
+  /* A bound session and its storage change during every protected command. */
+  if (link->sm &&
+      (!tc_internal_ranges_disjoint(data, length, link->sm, sizeof(TC_PIV_SM)) ||
+       !tc_internal_ranges_disjoint(data, length, link->sm_workspace,
+                                    link->sm_workspace ? sizeof(TC_PIV_SM_workspace) : 0) ||
+       !tc_internal_ranges_disjoint(data, length, link->sm_scratch, link->sm_scratch_capacity)))
+    return 0;
+#endif
+  return 1;
 }
 
 int tc_piv_response_valid(const TC_PIV_link* link, TC_buffer response, const void* out,
@@ -102,8 +136,7 @@ int tc_piv_response_valid(const TC_PIV_link* link, TC_buffer response, const voi
          tc_internal_ranges_disjoint(response.data, response.capacity, out, out_length);
 }
 
-/* The APDU and PIV results share their first six values and meanings. */
-static TC_PIV_result channel_result(TC_APDU_result result)
+TC_PIV_result tc_piv_channel_result(TC_APDU_result result)
 {
   switch (result) {
   case TC_APDU_OK:
@@ -121,16 +154,33 @@ static TC_PIV_result channel_result(TC_APDU_result result)
   }
 }
 
+static int sm_eligible(uint8_t ins)
+{
+  return ins == TC_PIV_INS_GET_DATA || ins == TC_PIV_INS_VERIFY ||
+         ins == TC_PIV_INS_GENERAL_AUTHENTICATE;
+}
+
 TC_PIV_result tc_piv_link_transceive(TC_PIV_link* link, TC_PIV_command kind,
                                      const TC_APDU_command* command, TC_buffer response,
                                      TC_APDU_response* out)
 {
+  /* A secured link, or one whose session was lost, never sends these
+   * commands in plaintext (SP 800-73-5 Part 2 4.2 and 4.3). */
+  const int protect =
+      sm_eligible(command->ins) && (link->flags & (TC_PIV_LINK_SECURED | TC_PIV_LINK_SM_LOST)) != 0;
+  if (protect && (!(link->flags & TC_PIV_LINK_SECURED) || !link->security))
+    return TC_PIV_REFUSED;
   link->command = (uint8_t)kind;
   link->status = 0;
   const TC_PIV_result result =
-      channel_result(TC_APDU_transceive(&link->channel, command, response, out));
+      protect ? link->security->transceive(link, command, response, out)
+              : tc_piv_channel_result(TC_APDU_transceive(&link->channel, command, response, out));
   if (result == TC_PIV_OK)
     link->status = out->sw;
+  /* The stopped channel cannot carry the session further, so its keys go now
+   * (Part 2 4.3). */
+  else if (result == TC_PIV_ERROR && link->security)
+    tc_piv_link_session_lost(link);
   return result;
 }
 

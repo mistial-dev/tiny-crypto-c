@@ -4,26 +4,30 @@
 
 # PIV secure messaging
 
-`<tiny_crypto/piv_sm.h>` implements the client application side of PIV secure
-messaging from SP 800-73-5 Part 2 section 4. It covers key establishment
-(section 4.1) and command and response protection (section 4.2) for cipher
-suites CS2 and CS7.
+The library implements the client application side of PIV secure messaging
+from SP 800-73-5 Part 2 section 4 for cipher suites CS2 and CS7, in two
+layers:
 
-The library owns the cryptography: the ephemeral key pair, ECDH, session-key
-derivation, key confirmation, the encryption counter, the MAC chaining values
-and padding. The application owns the card protocol: APDU headers, the
-`7C/81/82` key-establishment objects, the `87/97/99/8E` secure messaging
-objects, command chaining, GET RESPONSE and status words.
-`examples/piv_sm_wire.h` is a bounded implementation of that framing for
-single-APDU commands.
+- `<tiny_crypto/piv_sm.h>` is the session: the ephemeral key pair, ECDH,
+  session-key derivation, key confirmation, the encryption counter, the MAC
+  chaining values and padding (sections 4.1 and 4.2).
+- `<tiny_crypto/piv_sm_apdu.h>` puts the session on a
+  [PIV card link](piv-card.md): the key establishment command, the
+  `87/97/99/8E` wire format of protected commands and responses, command
+  chaining and the session-loss rule (sections 4.1.8 and 4.2 to 4.3). GET DATA
+  and VERIFY on a secured link are protected with no change to their calls.
+
+The application owns I/O, the trust decision for the content signer and the
+choice of when to secure the link.
 
 ## Build configuration
 
 Enable `TINY_CRYPTO_ENABLE_PIV_SM`. The desktop profile enables it with its
 dependencies. The session module needs AES with `TINY_CRYPTO_AES_DYNAMIC`,
 SHA-256, SSKDF and EC. `TC_PIV_SM_authenticate_response` also needs X.509 and
-PIV CVC parsing, and `examples/piv_sm_wire.c` needs TLV and PIV CVC parsing.
-The suites follow Table 18.
+PIV CVC parsing. `TINY_CRYPTO_ENABLE_PIV_SM_APDU` adds the link layer and
+needs the PIV card commands, the session and PIV CVC parsing. The suites
+follow Table 18.
 
 | Suite | P1   | Curve | KDF hash | Session keys | Nonce    |
 | ----- | ---- | ----- | -------- | ------------ | -------- |
@@ -44,6 +48,11 @@ size the session for the largest enabled suite.
 | `TC_PIV_SM_workspace` | caller | One call. Processed calls wipe it before returning.   |
 | `TC_PIV_SM_handshake` | caller | Borrows session storage until the session changes.    |
 | `TC_PIV_SM_peer`      | caller | Borrows the received response for `TC_PIV_SM_finish`. |
+
+On a link, the link borrows the session from `TC_PIV_SM_key_request`, and the
+workspace and a secure messaging scratch buffer from `TC_PIV_link_secure`,
+until the session is unbound. Keep all three alive and unshared while the
+link holds them.
 
 Treat `TC_PIV_SM` members as private. Read the state with `TC_PIV_SM_get_state`.
 Never copy a live session, because the copy would reuse keys and counters.
@@ -66,19 +75,140 @@ The session moves through four states.
 the previous session. Call `TC_PIV_SM_clear` when the card is removed or when
 command delivery becomes uncertain.
 
+## Secure messaging on a card link
+
+The flow follows section 4.1.1 on a link that selected the PIV application:
+
+1. Read the Secure Messaging Certificate Signer `5FC122` and the CHUID `5FC102`
+   in plaintext, both readable on either interface (Part 1 Table 2). Decode the
+   content-signing certificate with `TC_PIV_certificate_decode` and validate
+   its path, usage, policy, time and revocation status.
+1. `TC_PIV_SM_key_request` starts the session with the suite from the
+   application property template, sends GENERAL AUTHENTICATE with CLA `00`,
+   INS `87`, P1 set to the suite and P2 `04`, and decodes the answer into a
+   `TC_PIV_SM_peer`. The session is bound to the link.
+1. `TC_PIV_SM_authenticate_response` verifies the card CVC under the content
+   signer, binds the card UUID from the CHUID and completes key confirmation.
+1. `TC_PIV_link_secure` protects the commands that follow. SELECT and GET
+   RESPONSE stay plain.
+1. `TC_PIV_link_unsecure`, `TC_PIV_link_clear` or a SELECT of another
+   application clears the session.
+
+```c
+#include <tiny_crypto/piv_sm_apdu.h>
+#include <tiny_crypto/piv_sm_authenticate.h>
+
+/* The link borrows the session, workspace and scratch while it is secured. */
+typedef struct {
+  TC_PIV_SM session;
+  TC_PIV_SM_workspace workspace;
+  uint8_t sm_scratch[TC_PIV_SM_COMMAND_DATA_BYTES(TC_PIV_COMMAND_MAX_NC)];
+  uint8_t response[TC_PIV_SM_KEY_RESPONSE_BYTES];
+} secure_storage;
+
+/* Secure a link that selected the PIV application. signer is the validated
+ * content-signing certificate from 5FC122 and card_uuid the CHUID GUID. */
+TC_PIV_result secure_link(TC_PIV_link* link, const TC_PIV_application* application,
+                          secure_storage* storage, TC_random_source random,
+                          const TC_X509_certificate* signer, TC_bytes card_uuid,
+                          const TC_X509_signature_provider* signatures)
+{
+  static const uint8_t host_id[8] = {0};
+  const TC_TLV_limits limits = {4096, 4096, 64, 8};
+  TC_PIV_SM_peer peer;
+  if (!application->sm_suite)
+    return TC_PIV_UNSUPPORTED; /* the card offers no secure messaging */
+  TC_PIV_result result = TC_PIV_SM_key_request(
+      link, &storage->session, (TC_PIV_SM_suite)application->sm_suite, host_id, random,
+      (TC_buffer){storage->response, sizeof storage->response}, &peer, &storage->workspace);
+  if (result != TC_PIV_OK)
+    return result; /* the session is IDLE */
+  const TC_PIV_SM_authentication authentication = {peer,   {NULL, 0}, card_uuid,
+                                                   signer, &limits,   signatures};
+  TC_PIV_SM_authentication_workspace verification;
+  size_t work = 2000000; /* bounds the CVC signature check */
+  if (TC_PIV_SM_authenticate_response(&storage->session, &authentication, &work,
+                                      &verification) != TC_CREDENTIAL_VALID) {
+    TC_PIV_link_unsecure(link); /* unbinds the IDLE session */
+    return TC_PIV_INVALID;
+  }
+  return TC_PIV_link_secure(link, &storage->workspace,
+                            (TC_buffer){storage->sm_scratch, sizeof storage->sm_scratch});
+}
+```
+
+The key establishment answer needs `TC_PIV_SM_KEY_RESPONSE_BYTES` (326) of
+response buffer, the size of the CS7 answer with the largest card CVC of Table
+19\. `TC_PIV_SM_key_request` refuses a link that is secured or lost its session
+and returns `TC_PIV_UNSUPPORTED` for a suite the build lacks or the card did
+not announce. Those results change nothing. Every later failure clears the
+session.
+
+### Protected command and response format
+
+A protected command carries CLA `0C` and the SM data field
+`[87 L 01 ciphertext] [97 01 00] 8E 08 MAC` with a one-byte Le `00`
+(sections 4.2.3 and 4.2.4, footnote 22). `87` is present when the command has
+data, and `97 01 00` when the plain command has Le. The C-MAC covers the MAC
+chaining value, the header block `0C INS P1 P2 80 00 .. 00` and the `87` and
+`97` objects. An SM data field above 255 bytes goes out as `1C` fragments of
+255 bytes and a final `0C` fragment. Every link sends secure messaging with
+SHORT length fields, since footnote 22 fixes a one-byte Le and ISO/IEC 7816-4
+5.2 never mixes short and extended fields. `TC_PIV_SM_COMMAND_DATA_BYTES(nc)`
+bounds the SM data field for `nc` plain bytes. `TC_PIV_SM_MAX_PLAIN_NC`
+(65503) is the largest plain data field.
+
+The answer must be `[87 L 01 ciphertext] 99 02 SW 8E 08 MAC` with nothing after
+it (sections 4.2.5 and 4.2.6). The channel collects `61XX` chunks with plain
+GET RESPONSE `00 C0 00 00 XX`, which leaves the counter unchanged (4.2.2). The
+link checks the R-MAC before it decrypts, and the plaintext replaces the
+ciphertext in the caller's response buffer, so no second buffer is needed.
+GET DATA frames the decrypted object in place and returns spans into the
+response buffer. The status inside `99` becomes the command status and
+`TC_PIV_link_status`. An inner status other than `9000`, such as `6982` before
+the PIN, returns `TC_PIV_CARD_STATUS` and keeps the session.
+
+### Session loss
+
+Section 4.3 and footnote 25 end the session on any secure messaging error.
+Once a command is protected, the link ends the session on every other
+outcome:
+
+| Outcome                                                                                              | Result               | `TC_PIV_link_status` |
+| ---------------------------------------------------------------------------------------------------- | -------------------- | -------------------- |
+| Outer status other than `9000`, such as `6882`, `6987`, `6988`, `6CXX`, or `6883` on a `1C` fragment | `TC_PIV_CARD_STATUS` | the outer status     |
+| Malformed SM objects, `87` on a VERIFY answer, a failed R-MAC or padding                             | `TC_PIV_INVALID`     | 0                    |
+| Response capacity or exchange budget exhausted during the exchange                                   | `TC_PIV_LIMIT`       | 0                    |
+| Transport failure                                                                                    | `TC_PIV_ERROR`       | 0                    |
+
+A transport failure on a plain command, such as SELECT, ends a bound session
+the same way, since the stopped link cannot continue it.
+
+The session is cleared, the VCI and PIN status are cleared, the response
+buffer and the secure messaging scratch are wiped, and `TC_PIV_link_info_get`
+reports `sm_lost`. The link then refuses GET DATA, VERIFY and GENERAL
+AUTHENTICATE with `TC_PIV_REFUSED` and never falls back to plaintext. Call
+`TC_PIV_link_unsecure` to continue in plaintext or to establish a new session.
+A command that needs more scratch, more channel scratch or more budget than
+remains returns `TC_PIV_LIMIT` before it is protected, and the session stays
+READY.
+
+On a contactless link a PIN reaches the card only under secure messaging with
+the VCI, and VERIFY and GET DATA on a secured link are always protected
+(Part 1 Table 4, Part 2 section 3.2.1).
+
 ## Key establishment
 
-The flow maps to the client steps in section 4.1.1.
+The session steps map to the client steps in section 4.1.1.
+`TC_PIV_SM_key_request` runs steps 1 to 3 below on a link.
 
 1. `TC_PIV_SM_begin` sets CB_H to zero (H1), generates the ephemeral key pair
    for the selected suite (H2) and returns the host identifier and the
    uncompressed ephemeral public key in a `TC_PIV_SM_handshake`.
-1. The application sends GENERAL AUTHENTICATE with CLA `00`, INS `87`, P1 set to
-   the suite and P2 `04`. The data field is
-   `7C { 81 { CB_H || ID_sH || Q_eH } 82 00 }` (section 4.1.8).
-1. The application checks the status word and decodes
-   `7C { 82 { CB_ICC || N_ICC || AuthCryptogram_ICC || C_ICC } }` into a
-   `TC_PIV_SM_peer`. `certificate` holds the exact encoded CVC, because the
+1. GENERAL AUTHENTICATE with CLA `00`, INS `87`, P1 set to the suite and P2
+   `04` carries `7C { 81 { CB_H || ID_sH || Q_eH } 82 00 }` (section 4.1.8).
+1. The answer `7C { 82 { CB_ICC || N_ICC || AuthCryptogram_ICC || C_ICC } }`
+   is decoded into a `TC_PIV_SM_peer`. `certificate` holds the exact encoded CVC, because the
    derivation hashes those bytes into ID_sICC (H6). `card_control` holds the
    received CB_ICC byte.
 1. The application verifies the CVC signature and the content-signing
@@ -145,9 +275,12 @@ IDLE. Argument errors leave it ESTABLISHING and unchanged.
 
 ## Protected commands
 
+The link layer builds these spans itself. This section and the next describe
+the session calls for framing outside `<tiny_crypto/piv_sm_apdu.h>`.
+
 Section 4.2.3 computes the command MAC over the MAC chaining value, a 16-byte
 encoded header, the `87` object and the `97` object. The session supplies the
-chaining value. The application supplies the rest as ordered spans in
+chaining value. The caller supplies the rest as ordered spans in
 `TC_PIV_SM_protect_request.authenticated`, up to
 `TC_PIV_SM_AUTHENTICATED_SPANS_MAX` spans.
 
@@ -191,7 +324,7 @@ if (TC_PIV_SM_protect(&session, &request, &ciphertext_length, tag,
 ```
 
 The example uses a one-byte `87` length, which covers ciphertext up to 112
-bytes. `examples/piv_sm_wire.c` encodes longer BER lengths.
+bytes. Longer ciphertext needs the `81` or `82` length forms.
 
 ## Protected responses
 
@@ -204,7 +337,15 @@ authenticated span and its length must be a multiple of 16.
 `TC_PIV_SM_unprotect` checks the tag before it decrypts, so plaintext is
 released only after authentication. The status word inside the `99` object is
 authenticated. The outer SW1-SW2 of the response APDU is transport status, and
-the application checks it before calling unprotect.
+the caller checks it before calling unprotect.
+
+The plaintext buffer is disjoint from every input, or exactly
+`request.ciphertext.data` with a capacity of at most
+`request.ciphertext.length`. That exact alias decrypts in place: the final
+block is decrypted first from intact ciphertext, and each earlier block is
+read before its plaintext is written. Any other overlap is an argument error.
+A padding failure is detected before any plaintext is written, so the
+ciphertext stays unchanged.
 
 | Result        | State   | Meaning                                                            |
 | ------------- | ------- | ------------------------------------------------------------------ |
@@ -239,12 +380,24 @@ establishment.
 `tiny_crypto::piv_sm` in `<tiny_crypto/piv_sm.hpp>` wraps one session. It clears
 the session on destruction and cannot be copied or moved. Its member functions
 match the C calls and take the same request types through references. Workspace
-stays outside the object so it can be shared with other operations.
+stays outside the object so it can be shared with other operations. `native()`
+returns the `TC_PIV_SM` for the C layers.
+
+`<tiny_crypto/piv_sm_apdu.hpp>` adds `piv_sm_key_request`, `piv_link_secure`
+and `piv_link_unsecure` over a `piv_link` and a `piv_sm`. The link holds a
+pointer to the session while it is bound, so declare the `piv_sm` before the
+`piv_link`. The link is then destroyed first, and its destructor clears the
+bound session while the session still exists.
 
 ## Tests
 
 `test_piv_sm` covers the suites, state transitions, `TC_PIV_SM_ciphertext_size`
-limits and argument errors. `test_piv_sm_synthetic` runs generated card
-responses through `examples/piv_sm_wire.c`. `test_piv_sm_authenticate` checks
-CVC chains through the combined helper. `fuzz_piv_sm` exercises response
-parsing. See [Running the tests](testing.md).
+limits, argument errors and in-place decryption. `test_piv_sm_apdu` drives the
+link layer against the card model in `tests/support/sm_card.c`: the wire
+format, `87` lengths of one to three octets, `1C` chaining, GET RESPONSE, the
+key establishment framing and every session-loss case. `test_piv_sm_synthetic`
+replays generated sessions, and `test_sm_primitives_corpus` replays the
+recorded NIST SD 33 exchanges of `tests/vectors/piv/sm_captures` byte for byte
+through the link. `test_piv_sm_authenticate` checks CVC chains through the
+combined helper. `fuzz_piv_sm` exercises response authentication and the link
+framing. See [Running the tests](testing.md).

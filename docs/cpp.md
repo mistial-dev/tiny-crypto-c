@@ -114,6 +114,13 @@ layers built on it. The destructor calls `TC_PIV_link_clear`, which wipes the
 borrowed command scratch, so the scratch buffer and the transport context
 outlive the object.
 
+`piv_sm_key_request`, `piv_link_secure` and `piv_link_unsecure` in
+`piv_sm_apdu.hpp` take a `piv_link` and a `piv_sm` by reference. A secured
+link borrows the session, the workspace and the secure messaging scratch.
+Declare the `piv_sm` before the `piv_link`, so the link is destroyed first and
+clears the bound session while it exists. `piv_sm::native` returns the
+`TC_PIV_SM`.
+
 ## GCM streaming
 
 `GCM` streams encryption only. Supply all AAD before the first

@@ -36,6 +36,9 @@
 #if TC_ENABLE_PIV_COMMAND
 #include <tiny_crypto/piv_command.h>
 #endif
+#if TC_ENABLE_PIV_SM_APDU
+#include <tiny_crypto/piv_sm_apdu.h>
+#endif
 #if TC_ENABLE_AAMVA
 #include <tiny_crypto/aamva.h>
 #endif

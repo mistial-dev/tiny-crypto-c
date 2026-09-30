@@ -292,5 +292,18 @@ int tiny_crypto_cpp_header_compile(uint8_t* data, size_t length)
       ++failures;
   }
 #endif
+#if TC_ENABLE_PIV_SM_APDU
+  {
+    // The session outlives the link that borrows it.
+    tiny_crypto::piv_sm link_session;
+    tiny_crypto::piv_link link;
+    tiny_crypto::piv_sm_workspace link_workspace{};
+    if (link_session.native() == nullptr ||
+        tiny_crypto::piv_link_secure(link, link_workspace, tiny_crypto::buffer{data, length}) !=
+            TC_PIV_ARGUMENT)
+      ++failures;
+    tiny_crypto::piv_link_unsecure(link);
+  }
+#endif
   return failures;
 }

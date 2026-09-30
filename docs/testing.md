@@ -84,6 +84,15 @@ TWIC Legacy and NEXGEN templates, GET DATA framing for each application, the
 VERIFY retry query, the PIN retry floor, the contactless refusals and the
 status meanings of each command.
 
+`test_piv_sm_apdu` covers [secure messaging on the link](piv-sm.md) against
+`tests/support/sm_card.c`, a card model that checks every C-MAC and chain and
+builds protected answers with injected faults: the wire format and `87`
+lengths, `1C` chaining on SHORT and EXTENDED links, GET RESPONSE, inner
+statuses, each session-loss outcome, the LIMIT cases before and after
+protection, the contactless PIN rules and the key establishment framing with
+the recorded SD 33 card 2 exchange. `test_cpp_piv_sm_apdu` runs the C++
+wrappers over the same model.
+
 `test_piv_card_objects` covers the [card object readers](piv-card.md#card-object-readers)
 with recorded SD 33 and ICAM bytes from `tests/vectors/piv`: Discovery
 Objects under both profiles and every first policy byte, the SD 33 and ICAM
@@ -809,7 +818,10 @@ curl --fail --location \
 Set the two corpus paths to your local copies. The parser corpus root contains
 `piv/`, `x509/`, and optionally `eac/cvc/`. The SM adapter reads the original
 `sm_vci_vectors` format and the event-based `nist_sd_33_vectors` and
-`nist_sd_33_vectors_v2` formats. Run each capture directory separately.
+`nist_sd_33_vectors_v2` formats. `test_sm_primitives_corpus` always replays the
+vendored captures in `tests/vectors/piv/sm_captures`, and
+`TINY_CRYPTO_TEST_SM_CAPTURE_DIR` adds `test_sm_primitives_corpus_external`
+for one further capture directory.
 
 ```sh
 cmake -S . -B /tmp/tiny-crypto-full \
@@ -949,31 +961,28 @@ Raw CBC has no padding-validation API to test against PKCS#5 rejection cases.
 ECDH PEM and WebCrypto import formats are also outside the API. The raw-point
 and DER suites exercise the supported key inputs.
 
-Capture replay checks key derivation, handshake messages, protected commands,
-responses, and session state. Parser corpus tests check structure and fields.
-Signature and trust checks have separate suites.
+Capture replay checks key derivation, the key establishment command and
+answer, and every protected command at the wire level through the library
+link: `tests/piv/sm_corpus.py` writes the expected APDUs and
+`test_piv_sm_apdu_replay` compares each transmitted command byte for byte and
+checks the decrypted answer, the inner status and the session state. The
+captures merge the card's `61XX` chunks, so the adapter splits long answers
+into 256-byte chunks with plain GET RESPONSE. The v2 captures send extended
+length secure messaging, which SP 800-73-5 Part 2 footnote 22 excludes. Their
+SM data fields replay as the SHORT `1C` chains the library sends, and the
+recorded C-MAC, which covers the unfragmented field, must still match. Parser
+corpus tests check structure and fields. Signature and trust checks have
+separate suites.
 
-Some event-based captures retain derivation data for only their last session.
-The adapter fails if an earlier session lacks that data. To inspect the
-available sessions, run it directly with `--allow-incomplete`:
+The event-based captures hold derivation data for one session. The adapter
+replays that session and reports the other event IDs, whose objects serve as
+recorded plaintext only.
 
-```sh
-python3 tests/piv/sm_corpus.py \
-  --reader /tmp/tiny-crypto-full/test_sskdf \
-  --sm-reader /tmp/tiny-crypto-full/test_piv_sm \
-  --corpus /absolute/path/to/nist_sd_33_vectors_v2 \
-  --allow-incomplete
-```
-
-This prints the missing session IDs. A partial replay does not count as a
-passing full capture suite. CTest leaves this option disabled.
-
-`test_piv_sm_synthetic` and its CS2-only and CS7-only variants run generated
-sessions without external captures. They check the handshake and a protected
-exchange, including the malformed-handshake and nonzero CB_ICC cases in the C
-replay test. `test_piv_sm` also checks `TC_PIV_SM_ciphertext_size` at block
-boundaries and near `SIZE_MAX`, and the short-buffer unprotect retry through
-`TC_PIV_SM_get_state`.
+`test_piv_sm_synthetic` and its CS2-only, CS7-only, micro and mini variants
+replay generated sessions through the same replay reader. `test_piv_sm` also
+checks `TC_PIV_SM_ciphertext_size` at block boundaries and near `SIZE_MAX`,
+the short-buffer unprotect retry through `TC_PIV_SM_get_state` and the
+in-place decryption alias.
 
 For an independent EC comparison, install Python's `cryptography` package in
 a virtual environment and configure with `TINY_CRYPTO_TEST_EC_ORACLE=ON` and
@@ -1062,7 +1071,7 @@ toolchain lacks the libFuzzer runtime. Set the C and C++ compiler paths to its
 | `fuzz_tlv`    | BER and DER TLV readers, walkers and streams                                 |
 | `fuzz_pki`    | certificates, CRLs, CMS, names, PIV and EAC objects, TrustAnchorList records |
 | `fuzz_ocsp`   | OCSP responses for the ICAM fixture certificates and OCSP request encoding   |
-| `fuzz_piv_sm` | PIV secure messaging responses                                               |
+| `fuzz_piv_sm` | PIV secure messaging responses: session authentication and link framing      |
 | `fuzz_gzip`   | GZIP certificate decompression                                               |
 | `fuzz_twic`   | TSA canceled card list CSV and index images, AAMVA payloads, TWIC TPK        |
 

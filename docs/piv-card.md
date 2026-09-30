@@ -72,7 +72,9 @@ v4 Appendix D.3), with Le `00`. SELECT is always plain (Part 2 section 4.2).
 Selecting another application sets the card's security statuses to FALSE,
 and reselecting the PIV application keeps them (Part 2 section 3.1.1). The link
 clears its VCI and PIN status on every SELECT, so query the PIN again with
-`TC_PIV_verify_status` when the application needs it. After a successful SELECT
+`TC_PIV_verify_status` when the application needs it. Selecting another
+application also ends a bound secure messaging session, and reselecting the
+PIV application keeps it. After a successful SELECT
 the link records the application and profile. It applies the `7F66` limits to the channel
 and sets the GET RESPONSE flags. The PIV application uses a plain CLA `00`
 (Part 2 sections 4.2.6 and A.4.1). The TWIC application also requests `FF`
@@ -125,7 +127,9 @@ section 3.2.1.1).
 The card rejects VERIFY for `80` and `00` outside the contact interface and the
 VCI, and `98` on contactless without secure messaging (Part 2 section 3.2.1).
 The library refuses those commands before sending, so a PIN never crosses the
-contactless interface in plaintext (Part 1 Table 4). On contactless the card may
+contactless interface in plaintext (Part 1 Table 4). The VCI requires a
+secured link, and a secured link sends GET DATA and VERIFY under
+[secure messaging](piv-sm.md#secure-messaging-on-a-card-link). On contactless the card may
 answer `6983` at an issuer-defined intermediate retry value. The TWIC
 application defines no VERIFY, so both functions return `TC_PIV_UNSUPPORTED`
 there.

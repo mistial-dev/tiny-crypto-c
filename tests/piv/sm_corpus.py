@@ -143,17 +143,81 @@ def apdu(hex_string):
     return raw[:4], raw[start:start + length], bool(le)
 
 
+CHUNK = 256
+SHORT_FRAGMENT = 255
+
+
+def short_fragments(header, field):
+    """SHORT command APDUs for one SM data field: 1C fragments of 255 bytes,
+    then the 0C command with the new Le 00 (SP 800-73-5 Part 2 4.2.4,
+    footnote 22)."""
+    commands = []
+    while len(field) > SHORT_FRAGMENT:
+        commands.append(bytes((0x1c,)) + header[1:] + bytes((SHORT_FRAGMENT,)) +
+                        field[:SHORT_FRAGMENT])
+        field = field[SHORT_FRAGMENT:]
+    commands.append(bytes((0x0c,)) + header[1:] + bytes((len(field),)) + field + b"\0")
+    return commands
+
+
+def chunked_answer(command, response, status):
+    """Wire exchanges for the final command of one SM chain. Captures merge
+    the card's 61XX chunks, so the answer is split again into 256-byte chunks
+    followed by plain GET RESPONSE 00 C0 00 00 XX (4.2.6)."""
+    exchanges = []
+    while True:
+        chunk, response = response[:CHUNK], response[CHUNK:]
+        if not response:
+            exchanges.append((command, chunk + status))
+            return exchanges
+        more = min(len(response), CHUNK) & 0xff
+        exchanges.append((command, chunk + bytes((0x61, more))))
+        command = bytes((0, 0xc0, 0, 0, more))
+
+
+def hex_or_dash(data):
+    return data.hex() if data else "-"
+
+
+def state_line(state, known=("counter", "cmd_mcv", "resp_mcv"), advance=False):
+    fields = []
+    for name in ("counter", "cmd_mcv", "resp_mcv"):
+        if name not in known:
+            fields.append("-")
+        elif name == "counter" and advance:
+            fields.append(f"{int(state[name], 16) + 1:032x}")
+        else:
+            fields.append(state[name].lower())
+    return "state " + " ".join(fields)
+
+
+def select_record(records):
+    for record in records:
+        if record["command"].upper().startswith("00A40400"):
+            return record
+    raise AssertionError("Capture has no SELECT")
+
+
 def transcript(data):
+    """Write the wire transcript that tests/piv/sm_apdu_replay.c replays.
+
+    Recorded 1C and 0C fragments are replayed byte for byte. An extended
+    length SM command, which SP 800-73-5 Part 2 footnote 22 excludes, is
+    replayed as the SHORT chain of its SM data field, which the C-MAC covers
+    unfragmented (4.2.3)."""
     op = data["opacity"]
     suite = int(op["cipher_suite_id"], 0)
-    lines = [f"begin {suite:02x} {op['ephemeral_private_key_d']} {op['id_sH']} "
+    records = data["apdu_exchanges"]
+    select = select_record(records)
+    lines = [f"select {select['command'].lower()} "
+             f"{select['response'].lower()}{select['sw'].lower()}",
+             f"begin {suite:02x} {op['ephemeral_private_key_d']} {op['id_sH']} "
              f"{op['general_authenticate_command']}",
-             f"finish {op['general_authenticate_response']} {op['derived_key_material']}"]
-    state = data["sm_session"]["initial_state"]
-    lines.append(f"state {state['counter']} {state['cmd_mcv']} {state['resp_mcv']}")
-    fragments, pending_header = bytearray(), None
+             f"finish {op['general_authenticate_response']} {op['derived_key_material']}",
+             state_line(data["sm_session"]["initial_state"])]
+    fragments, pending_header = [], None
     commands = 0
-    for record in data["apdu_exchanges"]:
+    for record in records:
         command = bytes.fromhex(record["command"])
         if command[0] not in (0x0c, 0x1c):
             if fragments:
@@ -162,7 +226,7 @@ def transcript(data):
         header, body, le = apdu(record["command"])
         if pending_header is not None and header[1:] != pending_header:
             raise AssertionError("Command chain changed its header")
-        fragments.extend(body)
+        fragments.append((command, header, body))
         if header[0] == 0x1c:
             if le or record["response"] or record["sw"] != "9000":
                 raise AssertionError("Unexpected intermediate command result")
@@ -173,22 +237,30 @@ def transcript(data):
         plain_header, plain, plain_le = apdu(record["plain_command"])
         if plain_header[1:] != header[1:]:
             raise AssertionError("Plain/protected command headers differ")
-        lines.append(f"command {header[1]:02x} {header[2]:02x} {header[3]:02x} "
-                     f"{int(plain_le)} {plain.hex() or '-'} {fragments.hex()}")
-        if "sm_state" in record:
-            state = record["sm_state"]
-            # Captures record the counter used for this command, before advancing it.
-            next_counter = int(state["counter"], 16) + 1
-            lines.append(f"state {next_counter:032x} {state['cmd_mcv']} {state['resp_mcv']}")
+        field = b"".join(body for _, _, body in fragments)
+        extended = any(len(raw) > 5 and raw[4] == 0 for raw, _, _ in fragments)
+        if extended:
+            wire = short_fragments(header, field)
+        else:
+            wire = [raw for raw, _, _ in fragments]
+        exchanges = [(raw, bytes.fromhex("9000")) for raw in wire[:-1]]
         response = bytes.fromhex(record["response"])
+        exchanges += chunked_answer(wire[-1], response, bytes.fromhex(record["sw"]))
         if response[-14:-12] != b"\x99\x02" or response[-10:-8] != b"\x8e\x08":
             raise AssertionError("Missing authenticated response status")
         status = response[-12:-10].hex()
-        lines.append(f"response {record['sw']} {response.hex()} "
-                     f"{record.get('plain_response') or '-'} {status}")
+        plain_response = bytes.fromhex(record.get("plain_response") or "")
+        lines.append(f"command {header[1]:02x} {header[2]:02x} {header[3]:02x} "
+                     f"{256 if plain_le else 0} {hex_or_dash(plain)} "
+                     f"{hex_or_dash(plain_response)} {status}")
+        lines += [f"wire {raw.hex()} {answer.hex()}" for raw, answer in exchanges]
+        lines.append("end")
         if record.get("sm_state_after_unwrap"):
-            state = record["sm_state_after_unwrap"]
-            lines.append(f"state {state['counter']} {state['cmd_mcv']} {state['resp_mcv']}")
+            lines.append(state_line(record["sm_state_after_unwrap"]))
+        elif record.get("sm_state"):
+            # The capture records the state after protection: the counter
+            # this command used and the new command MCV.
+            lines.append(state_line(record["sm_state"], ("counter", "cmd_mcv"), advance=True))
         fragments.clear()
         pending_header = None
         commands += 1
@@ -203,8 +275,6 @@ def main():
     parser.add_argument("--ec-reader", action="append", type=Path, default=[])
     parser.add_argument("--sm-reader", type=Path)
     parser.add_argument("--corpus", required=True, type=Path)
-    parser.add_argument("--allow-incomplete", action="store_true",
-                        help="Replay available sessions and report missing derivation data")
     args = parser.parse_args()
     count = commands = 0
     suites = set()
@@ -213,10 +283,9 @@ def main():
         if "sm" in data and "opacity" in data["sm"]:
             data, missing = normalize_events(data)
             if missing:
-                detail = f"{path}: missing derivation data for events {missing}"
-                if not args.allow_incomplete:
-                    raise AssertionError(detail)
-                print("INCOMPLETE: " + detail, flush=True)
+                # The v2 captures hold derivation data for one event. The
+                # other events replay as recorded plaintext only.
+                print(f"{path.name}: no derivation data for events {missing}", flush=True)
         if "opacity" not in data:
             continue
         op = data["opacity"]

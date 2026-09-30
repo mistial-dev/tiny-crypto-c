@@ -48,6 +48,11 @@ public:
   {
     ::TC_PIV_SM_clear(&session_);
   }
+  // The C session, for the layers that take a TC_PIV_SM pointer.
+  TC_CPP_NODISCARD ::TC_PIV_SM* native() noexcept
+  {
+    return &session_;
+  }
   TC_CPP_NODISCARD TC_PIV_SM_state state() const noexcept
   {
     return ::TC_PIV_SM_get_state(&session_);

@@ -47,8 +47,6 @@ def validate_host(directory, name, body, flags):
     command += ["-std=c99", "-O1", "-g", "-fsanitize=address,undefined",
                 "-fno-omit-frame-pointer", "-I" + str(ROOT / "src")]
     command += ["-D" + k + "=" + v for k, v in definitions(flags).items()]
-    if definitions(flags).get("TC_ENABLE_PIV_SM") == "1":
-        command += ["-I" + str(ROOT / "examples"), ROOT / "examples/piv_sm_wire.c"]
     command += [source, *sorted((ROOT / "src").glob("*.c")), "-o", executable]
     run(command)
     run([executable])

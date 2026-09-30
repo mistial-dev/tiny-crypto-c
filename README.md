@@ -215,6 +215,7 @@ algorithm is enabled.
 | `TINY_CRYPTO_ENABLE_PIV_CVC`            | OFF     | OFF   | OFF  | ON      | PIV secure-messaging CVC reader                   |
 | `TINY_CRYPTO_ENABLE_EAC_CVC`            | OFF     | OFF   | OFF  | ON      | BSI TR-03110 EAC CVC reader                       |
 | `TINY_CRYPTO_ENABLE_PIV_SM`             | OFF     | OFF   | OFF  | ON      | Client-side PIV secure messaging                  |
+| `TINY_CRYPTO_ENABLE_PIV_SM_APDU`        | OFF     | OFF   | OFF  | ON      | PIV SM framing, requires PIV command, SM and CVC  |
 | `TINY_CRYPTO_PIV_SM_CS2`                | ON      | ON    | ON   | ON      | Cipher suite 2 (P-256, AES-128)                   |
 | `TINY_CRYPTO_PIV_SM_CS7`                | ON      | ON    | ON   | ON      | Cipher suite 7 (P-384, AES-256)                   |
 | `TINY_CRYPTO_ENABLE_FASCN`              | OFF     | OFF   | OFF  | ON      | FASC-N readers and writers                        |
@@ -526,8 +527,8 @@ retry floor and refuse a plaintext PIN on the contactless interface.
 section 4 secure messaging for CS2 (P-256, AES-128) and CS7 (P-384, AES-256).
 The library performs ECDH, session-key derivation, key confirmation, command
 protection and response authentication. The application supplies the APDU
-transport, the data-object framing and an X.509 content-signing certificate
-accepted through its trust, policy, time and revocation checks.
+transport and an X.509 content-signing certificate accepted through its
+trust, policy, time and revocation checks.
 
 The workflow in `<tiny_crypto/piv_sm.h>` follows the protocol:
 
@@ -546,8 +547,15 @@ The workflow in `<tiny_crypto/piv_sm.h>` follows the protocol:
 
 The caller owns the zero-initialized `TC_PIV_SM` and the `TC_PIV_SM_workspace`.
 Only one command may be pending. `TC_PIV_SM_get_state` tells a retryable
-unprotect error from one that ended the session. `examples/piv_sm_wire.h`
-implements the `7C/81/82` and `87/97/99/8E` framing. The C++11
+unprotect error from one that ended the session.
+
+`TINY_CRYPTO_ENABLE_PIV_SM_APDU` adds `<tiny_crypto/piv_sm_apdu.h>`, the
+secure messaging layer of a PIV card link. `TC_PIV_SM_key_request` sends the
+key establishment command and binds the session, and `TC_PIV_link_secure`
+protects every later GET DATA, VERIFY and GENERAL AUTHENTICATE with the
+`87/97/99/8E` wire format, `1C` chaining and in-place decryption. Any secure
+messaging failure ends the session, and the link refuses protected commands
+until `TC_PIV_link_unsecure`. The C++11
 `tiny_crypto::piv_sm` wrapper clears its session on destruction and cannot be
 copied or moved. See [PIV secure messaging](docs/piv-sm.md) for build options,
 span layouts, state transitions and every result.

@@ -40,6 +40,10 @@ set(tc_module_sources_TC_ENABLE_PIV_COMMAND
   src/piv_aid.c src/piv_link.c src/piv_select.c src/piv_get_data.c src/piv_verify.c
   src/piv_status.c src/piv_template_internal.c src/piv_container_internal.c)
 
+tc_module_feature(TINY_CRYPTO_ENABLE_PIV_SM_APDU TC_ENABLE_PIV_SM_APDU
+  "Build PIV secure messaging framing on the card link")
+set(tc_module_sources_TC_ENABLE_PIV_SM_APDU src/piv_sm_apdu.c src/piv_sm_key_request.c)
+
 tc_module_feature(TINY_CRYPTO_ENABLE_PIV_OIDS TC_ENABLE_PIV_OIDS
   "Build registered PIV and TWIC identifier classification")
 set(tc_module_sources_TC_ENABLE_PIV_OIDS src/piv_oid.c)
