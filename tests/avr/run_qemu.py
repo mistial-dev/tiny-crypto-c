@@ -19,6 +19,8 @@ def main():
     parser.add_argument("--expect", required=True)
     parser.add_argument("--define", action="append", default=[])
     parser.add_argument("--include", required=True)
+    # Seconds before a program that never reports is killed.
+    parser.add_argument("--timeout", type=float, default=20)
     parser.add_argument("sources", nargs="+")
     args = parser.parse_args()
     with tempfile.TemporaryDirectory() as directory:
@@ -32,7 +34,7 @@ def main():
         process = subprocess.Popen([args.qemu, "-machine", "uno", "-bios", str(elf),
                                     "-nographic", "-serial", "stdio", "-monitor", "none"],
                                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
-        timer = threading.Timer(20, process.kill)
+        timer = threading.Timer(args.timeout, process.kill)
         timer.start()
         try:
             output = process.stdout.readline()

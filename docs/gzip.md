@@ -59,11 +59,16 @@ It owns one reusable workspace. `decode` takes the same input and output spans
 as the C function, with work and output length passed by reference:
 
 ```cpp
-tiny_crypto::GZIPDecoder decoder;
-uint8_t decoded[4096];
-size_t work = 100000, length;
-TC_GZIP_result result = decoder.decode(compressed, work,
-    TC_buffer{decoded, sizeof decoded}, length);
+#include <tiny_crypto/gzip.hpp>
+
+/* The decoder owns its workspace, so keep it out of small stacks. */
+static tiny_crypto::GZIPDecoder decoder;
+
+TC_GZIP_result inflate(TC_bytes compressed, uint8_t (&decoded)[4096], size_t& length)
+{
+  size_t work = 100000;
+  return decoder.decode(compressed, work, TC_buffer{decoded, sizeof decoded}, length);
+}
 ```
 
 For C arrays, `decoder.decode(compressed, work, decoded, length)` infers both sizes.

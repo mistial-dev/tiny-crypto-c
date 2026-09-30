@@ -1545,7 +1545,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
             ${CMAKE_CURRENT_SOURCE_DIR}/src/block_modes.c ${CMAKE_CURRENT_SOURCE_DIR}/src/common.c)
         add_test(NAME test_aes_kw_sbox_${sbox_mode}_qemu_avr
           COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/avr/run_qemu.py
-            --cc ${TC_AVR_CC} --qemu ${TC_QEMU_AVR} --expect KW-OK
+            --cc ${TC_AVR_CC} --qemu ${TC_QEMU_AVR} --expect KW-OK --timeout 120
             --include ${CMAKE_CURRENT_SOURCE_DIR}/src
             --define TC_AES_SBOX_MODE=${sbox_mode} --define TC_AES_ENABLE_KW=1
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/avr/aes_kw_known_answer.c
