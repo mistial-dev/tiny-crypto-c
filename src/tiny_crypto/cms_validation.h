@@ -83,7 +83,10 @@ typedef struct {
  *   certificates holds one span per indexed candidate, signature holds a
  *   signature split across BER chunks, and signed_digest holds at least
  *   TC_CMS_SIGNED_DIGEST_BYTES. signed_digest is wiped before return.
- * - out borrows certificate and source bytes and survives workspace reuse.
+ * - On VALID, out follows TC_X509_path_build: out->path borrows the
+ *   workspace search path and the policy spans borrow validation scratch.
+ *   Copy the path and policy span arrays before reusing the workspace. The
+ *   certificate and source bytes they point to stay in place.
  *
  * Work: one unit per storage comparison, the candidate scan, one unit per
  * candidate, each signature attempt and each path build. The source callbacks
