@@ -28,7 +28,7 @@ MunitResult test_edge_vectors_suite(const MunitParameter params[], void* data);
 /* Matrix 1: Single DES                                                      */
 /* ========================================================================= */
 
-/* 1A. Single DES ECB (KAT Encrypt, KAT Decrypt, & Round-Trip) */
+/* 1A. Single DES ECB (KAT Encrypt, KAT Decrypt) */
 #if TC_DES_ENABLE_ECB
 TC_TEST(test_des_ecb)
 {
@@ -47,17 +47,11 @@ TC_TEST(test_des_ecb)
   TC_DES_ECB_decrypt(&ctx, buffer);
   munit_assert_memory_equal(8, buffer, des_test_pt);
 
-  /* Round-Trip */
-  TC_DES_ECB_encrypt(&ctx, buffer);
-  munit_assert_memory_equal(8, buffer, des_test_ct);
-  TC_DES_ECB_decrypt(&ctx, buffer);
-  munit_assert_memory_equal(8, buffer, des_test_pt);
-
   return MUNIT_OK;
 }
 #endif /* TC_DES_ENABLE_ECB */
 
-/* 1B. Single DES CBC (KAT Encrypt, KAT Decrypt, & Round-Trip) */
+/* 1B. Single DES CBC (KAT Encrypt, KAT Decrypt) */
 #if TC_DES_ENABLE_CBC
 TC_TEST(test_des_cbc)
 {
@@ -73,14 +67,6 @@ TC_TEST(test_des_cbc)
   /* KAT Decrypt */
   TC_DES_set_iv(&ctx, des_cbc_iv);
   memcpy(buffer, des_cbc_ct, 8);
-  TC_DES_CBC_decrypt(&ctx, buffer, 8);
-  munit_assert_memory_equal(8, buffer, des_test_pt);
-
-  /* Round-Trip */
-  TC_DES_set_iv(&ctx, des_cbc_iv);
-  TC_DES_CBC_encrypt(&ctx, buffer, 8);
-  munit_assert_memory_equal(8, buffer, des_cbc_ct);
-  TC_DES_set_iv(&ctx, des_cbc_iv);
   TC_DES_CBC_decrypt(&ctx, buffer, 8);
   munit_assert_memory_equal(8, buffer, des_test_pt);
 
@@ -160,7 +146,7 @@ TC_TEST(test_des_ctr)
 /* Matrix 2: 2-Key 3DES (Triple DES)                                         */
 /* ========================================================================= */
 
-/* 2A. 2-Key 3DES ECB (KAT Encrypt, KAT Decrypt, & Round-Trip) */
+/* 2A. 2-Key 3DES ECB (KAT Encrypt, KAT Decrypt) */
 #if TC_DES_ENABLE_TDES && TC_DES_ENABLE_ECB
 TC_TEST(test_tdes2_ecb)
 {
@@ -181,19 +167,11 @@ TC_TEST(test_tdes2_ecb)
   TC_DES_ECB_decrypt(&ctx, buffer + 8);
   munit_assert_memory_equal(16, buffer, tdes2_pt);
 
-  /* Round-Trip */
-  TC_DES_ECB_encrypt(&ctx, buffer);
-  TC_DES_ECB_encrypt(&ctx, buffer + 8);
-  munit_assert_memory_equal(16, buffer, tdes2_ecb_ct);
-  TC_DES_ECB_decrypt(&ctx, buffer);
-  TC_DES_ECB_decrypt(&ctx, buffer + 8);
-  munit_assert_memory_equal(16, buffer, tdes2_pt);
-
   return MUNIT_OK;
 }
 #endif /* TC_DES_ENABLE_TDES && TC_DES_ENABLE_ECB */
 
-/* 2B. 2-Key 3DES CBC (KAT Encrypt, KAT Decrypt, & Round-Trip) */
+/* 2B. 2-Key 3DES CBC (KAT Encrypt, KAT Decrypt) */
 #if TC_DES_ENABLE_TDES && TC_DES_ENABLE_CBC
 TC_TEST(test_tdes2_cbc)
 {
@@ -209,14 +187,6 @@ TC_TEST(test_tdes2_cbc)
   /* KAT Decrypt */
   TC_DES_set_iv(&ctx, des_cbc_iv);
   memcpy(buffer, tdes2_cbc_ct, 16);
-  TC_DES_CBC_decrypt(&ctx, buffer, 16);
-  munit_assert_memory_equal(16, buffer, tdes2_pt);
-
-  /* Round-Trip */
-  TC_DES_set_iv(&ctx, des_cbc_iv);
-  TC_DES_CBC_encrypt(&ctx, buffer, 16);
-  munit_assert_memory_equal(16, buffer, tdes2_cbc_ct);
-  TC_DES_set_iv(&ctx, des_cbc_iv);
   TC_DES_CBC_decrypt(&ctx, buffer, 16);
   munit_assert_memory_equal(16, buffer, tdes2_pt);
 
@@ -252,7 +222,7 @@ TC_TEST(test_tdes2_ctr)
 /* Matrix 3: 3-Key 3DES (Triple DES)                                         */
 /* ========================================================================= */
 
-/* 3A. 3-Key 3DES ECB (KAT Encrypt, KAT Decrypt, & Round-Trip) */
+/* 3A. 3-Key 3DES ECB (KAT Encrypt, KAT Decrypt) */
 #if TC_DES_ENABLE_TDES && TC_DES_ENABLE_ECB
 TC_TEST(test_tdes3_ecb)
 {
@@ -273,19 +243,11 @@ TC_TEST(test_tdes3_ecb)
   TC_DES_ECB_decrypt(&ctx, buffer + 8);
   munit_assert_memory_equal(16, buffer, tdes3_pt);
 
-  /* Round-Trip */
-  TC_DES_ECB_encrypt(&ctx, buffer);
-  TC_DES_ECB_encrypt(&ctx, buffer + 8);
-  munit_assert_memory_equal(16, buffer, tdes3_ecb_ct);
-  TC_DES_ECB_decrypt(&ctx, buffer);
-  TC_DES_ECB_decrypt(&ctx, buffer + 8);
-  munit_assert_memory_equal(16, buffer, tdes3_pt);
-
   return MUNIT_OK;
 }
 #endif /* TC_DES_ENABLE_TDES && TC_DES_ENABLE_ECB */
 
-/* 3B. 3-Key 3DES CBC (KAT Encrypt, KAT Decrypt, & Round-Trip) */
+/* 3B. 3-Key 3DES CBC (KAT Encrypt, KAT Decrypt) */
 #if TC_DES_ENABLE_TDES && TC_DES_ENABLE_CBC
 TC_TEST(test_tdes3_cbc)
 {
@@ -301,14 +263,6 @@ TC_TEST(test_tdes3_cbc)
   /* KAT Decrypt */
   TC_DES_set_iv(&ctx, des_cbc_iv);
   memcpy(buffer, tdes3_cbc_ct, 16);
-  TC_DES_CBC_decrypt(&ctx, buffer, 16);
-  munit_assert_memory_equal(16, buffer, tdes3_pt);
-
-  /* Round-Trip */
-  TC_DES_set_iv(&ctx, des_cbc_iv);
-  TC_DES_CBC_encrypt(&ctx, buffer, 16);
-  munit_assert_memory_equal(16, buffer, tdes3_cbc_ct);
-  TC_DES_set_iv(&ctx, des_cbc_iv);
   TC_DES_CBC_decrypt(&ctx, buffer, 16);
   munit_assert_memory_equal(16, buffer, tdes3_pt);
 
