@@ -32,6 +32,7 @@ numerically.
 | `TC_credential_status`                                                       | CMS, CHUID, biometric, security-object and SM validation         | `TC_CREDENTIAL_VALID` |
 | `TC_TWIC_CCL_result`                                                         | TWIC canceled card lists                                         | `TC_TWIC_CCL_OK`      |
 | `TC_APDU_result`                                                             | ISO/IEC 7816-4 APDU encoding and exchange                        | `TC_APDU_OK`          |
+| `TC_PIV_result`                                                              | PIV and TWIC card commands                                       | `TC_PIV_OK`           |
 | `TC_result`                                                                  | workspace sizing and setup helpers                               | `TC_RESULT_OK`        |
 
 `TC_status` has three values. `TC_MISMATCH` reports a failed authentication or
@@ -54,10 +55,12 @@ The richer result types use shared names with one meaning:
 - `ERROR`: a random source, signature provider, cipher backend, storage
   source or internal self-check failed.
 
-EC, RSA, GZIP, key challenges and APDUs order their values OK, INVALID, LIMIT,
-ARGUMENT, UNSUPPORTED, ERROR, so one handler can cover them. GZIP has no ERROR.
-RSA adds `TC_RSA_IN_PROGRESS` and `TC_RSA_CANCELLED` for stepwise key
-generation. `TC_DRBG_ENTROPY` reports a failed entropy source with the DRBG
+EC, RSA, GZIP, key challenges, APDUs and PIV card commands order their values
+OK, INVALID, LIMIT, ARGUMENT, UNSUPPORTED, ERROR, so one handler can cover them.
+GZIP has no ERROR. RSA adds `TC_RSA_IN_PROGRESS` and `TC_RSA_CANCELLED` for
+stepwise key generation. PIV card commands add `TC_PIV_CARD_STATUS`, a card
+answer other than success, and `TC_PIV_REFUSED`, a safety rule that stopped a
+command before it was sent. `TC_DRBG_ENTROPY` reports a failed entropy source with the DRBG
 state unchanged. `TC_TLV_END` and `TC_TLV_MORE` are reader states: no more
 siblings, or a root reader that needs more input. `TC_TLV_IO` reports backing
 storage that failed to supply bytes, and path and credential validation

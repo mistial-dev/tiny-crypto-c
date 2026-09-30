@@ -77,6 +77,13 @@ capacity and budget limits, and transport failures. The channel suite drives
 script and records the offered capacity and scratch wiping. `test_tlv_write_core`
 and `test_tlv_write_full` check the shared TLV header writer.
 
+`test_piv_command` and `test_cpp_piv_command` cover the
+[PIV card commands](piv-card.md) over the same scripted transport: the recorded
+SD 33 card 2 application property template with its `7F66` limits, synthetic
+TWIC Legacy and NEXGEN templates, GET DATA framing for each application, the
+VERIFY retry query, the PIN retry floor, the contactless refusals and the
+status meanings of each command.
+
 TWIC CCL parsing and lookup use `test_twic_ccl`. See the
 [CCL guide](twic-ccl.md#tests) for testing a downloaded TSA feed. Its external
 file case skips when `TC_TEST_TWIC_CCL` is unset. Synthetic cases always run.

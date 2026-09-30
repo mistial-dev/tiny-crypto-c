@@ -34,6 +34,12 @@ tc_module_feature(TINY_CRYPTO_ENABLE_APDU TC_ENABLE_APDU
   "Build ISO/IEC 7816-4 APDU encoding and exchange")
 set(tc_module_sources_TC_ENABLE_APDU src/apdu_encode.c src/apdu_response.c src/apdu_channel.c)
 
+tc_module_feature(TINY_CRYPTO_ENABLE_PIV_COMMAND TC_ENABLE_PIV_COMMAND
+  "Build PIV and TWIC card commands over the APDU channel")
+set(tc_module_sources_TC_ENABLE_PIV_COMMAND
+  src/piv_link.c src/piv_select.c src/piv_get_data.c src/piv_verify.c src/piv_status.c
+  src/piv_template_internal.c src/piv_container_internal.c)
+
 tc_module_feature(TINY_CRYPTO_ENABLE_PIV_OIDS TC_ENABLE_PIV_OIDS
   "Build registered PIV and TWIC identifier classification")
 set(tc_module_sources_TC_ENABLE_PIV_OIDS src/piv_oid.c)

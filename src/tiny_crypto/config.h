@@ -198,6 +198,17 @@
 #if TC_ENABLE_APDU != 0 && TC_ENABLE_APDU != 1
 #error "TC_ENABLE_APDU must be 0 or 1"
 #endif
+/* PIV and TWIC card commands (SELECT, GET DATA, VERIFY) over the APDU
+ * channel. */
+#ifndef TC_ENABLE_PIV_COMMAND
+#define TC_ENABLE_PIV_COMMAND TC_PROFILE_VALUE(0, 0, 0, 1)
+#endif
+#if TC_ENABLE_PIV_COMMAND != 0 && TC_ENABLE_PIV_COMMAND != 1
+#error "TC_ENABLE_PIV_COMMAND must be 0 or 1"
+#endif
+#if TC_ENABLE_PIV_COMMAND && (!TC_ENABLE_APDU || !TC_ENABLE_TLV)
+#error "PIV card commands require the APDU codec and TLV readers"
+#endif
 
 /* Certificate processing layers. TC_ENABLE_X509 covers borrowed certificate
  * views; path, revocation, CMS, CMS validation, and credential composition are

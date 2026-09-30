@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/common.h>
-#if TC_ENABLE_TLV && (TC_ENABLE_PIV_CHUID || TC_ENABLE_PIV_OBJECTS)
+#if TC_ENABLE_TLV && (TC_ENABLE_PIV_CHUID || TC_ENABLE_PIV_OBJECTS || TC_ENABLE_PIV_COMMAND)
 #include "piv_container_internal.h"
 
 TC_TLV_result tc_piv_container_contents(TC_bytes encoded, const TC_TLV_limits* limits,

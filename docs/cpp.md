@@ -70,12 +70,12 @@ are public. Timing depends on the shorter length and is independent of content.
 
 ## Object lifecycle
 
-Cipher, hash, MAC, DRBG, GZIP and PIV SM classes own their C state. They
-delete their copy operations, so key material and generator state are never
-duplicated. `TLVReader` holds only a cursor over borrowed input, so it may be
-copied, and a copy acts as a saved position. `drbg` and `piv_sm` also delete
-their move operations. Destruction clears the context. Keyed classes follow
-init, update, finish or clear:
+Cipher, hash, MAC, DRBG, GZIP, PIV SM and PIV link classes own their C state.
+They delete their copy operations, so key material and generator state are
+never duplicated. `TLVReader` holds only a cursor over borrowed input, so it
+may be copied, and a copy acts as a saved position. `drbg`, `piv_sm` and
+`piv_link` also delete their move operations. Destruction clears the context.
+Keyed classes follow init, update, finish or clear:
 
 | Class              | Key                                                | finish                                                            |
 | ------------------ | -------------------------------------------------- | ----------------------------------------------------------------- |
@@ -106,6 +106,13 @@ constant time.
 `next` on an unusable reader returns `TC_TLV_ARGUMENT`. `GZIPDecoder` owns
 reusable decoding scratch, and input and output stay caller-owned. The
 `piv_sm` session is cleared on destruction.
+
+`piv_link` follows init, commands and clear. `init`, `select`, `get_data`,
+`verify_status` and `pin_verify` forward to the C functions, `status` and
+`info` report the link state, and `native` returns the `TC_PIV_link` for the C
+layers built on it. The destructor calls `TC_PIV_link_clear`, which wipes the
+borrowed command scratch, so the scratch buffer and the transport context
+outlive the object.
 
 ## GCM streaming
 
@@ -148,7 +155,8 @@ build policy that `TC_AES_KW_KEK_LENGTH_SUPPORTED` reports.
 The APDU functions `apdu_command_size`, `apdu_command_encode`,
 `apdu_response_read` and `apdu_status_classify` forward to the
 [APDU codec](apdu.md). Commands and responses keep the C structures, named
-`apdu_command` and `apdu_response`.
+`apdu_command` and `apdu_response`. The [PIV card command](piv-card.md) functions
+`piv_application_read` and `piv_status_classify` forward to their C functions.
 
 The KDF wrappers `hkdf_sha*_extract`, `hkdf_sha*_expand`, `hkdf_sha*_derive`,
 the `sskdf_sha*` functions and the KBKDF families forward to their C functions

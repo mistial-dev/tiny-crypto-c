@@ -36,6 +36,7 @@
 #define TC_ENABLE_GZIP 1
 #define TC_ENABLE_TLV 1
 #define TC_ENABLE_APDU 1
+#define TC_ENABLE_PIV_COMMAND 1
 #define TC_ENABLE_DRBG 1
 #define TC_DRBG_ENABLE_HASH 1
 #define TC_DRBG_ENABLE_HMAC 1
@@ -56,6 +57,7 @@
 #include <tiny_crypto/gzip.hpp>
 #include <tiny_crypto/hash.hpp>
 #include <tiny_crypto/kmac.hpp>
+#include <tiny_crypto/piv_command.hpp>
 #include <tiny_crypto/piv_sm.hpp>
 #include <tiny_crypto/rsa.hpp>
 #include <tiny_crypto/tlv.hpp>
@@ -220,6 +222,21 @@ void tiny_crypto_nodiscard_compile(uint8_t* data, size_t length)
   apdu_command_encode(command, TC_APDU_SHORT, out, apdu_size); /* DISCARDED */
   apdu_response_read(in, response);                            /* DISCARDED */
   apdu_status_classify(0x9000);                                /* DISCARDED */
+  piv_link link;
+  piv_application application = {};
+  piv_data_object object = {};
+  piv_reference_status reference = {};
+  const piv_link_options link_options = {};
+  link.init(apdu_transport{}, link_options, out);                             /* DISCARDED */
+  link.select(TC_PIV_APPLICATION_PIV, 0, out, application);                   /* DISCARDED */
+  link.get_data(in, out, object);                                             /* DISCARDED */
+  link.verify_status(0x80, reference);                                        /* DISCARDED */
+  link.pin_verify(0x80, in, 3, reference);                                    /* DISCARDED */
+  link.status();                                                              /* DISCARDED */
+  link.info();                                                                /* DISCARDED */
+  link.native();                                                              /* DISCARDED */
+  piv_application_read(in, TC_PIV_APPLICATION_PIV, 0, application);           /* DISCARDED */
+  piv_status_classify(0x9000, TC_PIV_COMMAND_SELECT, TC_PIV_APPLICATION_PIV); /* DISCARDED */
 
   /* Clearing stays unmarked. */
   aes.clear();
@@ -232,4 +249,5 @@ void tiny_crypto_nodiscard_compile(uint8_t* data, size_t length)
   dynamic.clear();
   generator.uninstantiate();
   session.clear();
+  link.clear();
 }

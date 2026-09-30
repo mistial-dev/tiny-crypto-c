@@ -283,5 +283,14 @@ int tiny_crypto_cpp_header_compile(uint8_t* data, size_t length)
       ++failures;
   }
 #endif
+#if TC_ENABLE_PIV_COMMAND
+  {
+    tiny_crypto::piv_link link;
+    if (link.status() != 0 || link.info().application != TC_PIV_APPLICATION_NONE ||
+        tiny_crypto::piv_status_classify(0x6a82, TC_PIV_COMMAND_GET_DATA, TC_PIV_APPLICATION_PIV) !=
+            TC_PIV_SW_NOT_FOUND)
+      ++failures;
+  }
+#endif
   return failures;
 }

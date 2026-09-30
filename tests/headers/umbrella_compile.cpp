@@ -53,6 +53,11 @@ static TC_PIV_card_identifiers tc_header_card_identifiers;
 #error "The C++ umbrella must expose the APDU wrapper"
 #endif
 
+#if defined(TC_TEST_HEADER_PIV_COMMAND) &&                                                         \
+    (!defined(TINY_CRYPTO_PIV_COMMAND_H_) || !defined(TINY_CRYPTO_PIV_COMMAND_HPP_))
+#error "The C++ umbrella must expose the PIV command wrapper"
+#endif
+
 #if defined(TC_TEST_HEADER_AAMVA) && !defined(TINY_CRYPTO_AAMVA_H_)
 #error "The C++ umbrella must expose the AAMVA C API"
 #endif

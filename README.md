@@ -205,6 +205,7 @@ algorithm is enabled.
 | Option                                  | Default | micro | mini | desktop | Purpose                                           |
 | --------------------------------------- | ------- | ----- | ---- | ------- | ------------------------------------------------- |
 | `TINY_CRYPTO_ENABLE_APDU`               | OFF     | OFF   | OFF  | ON      | ISO/IEC 7816-4 APDU encoding and exchange         |
+| `TINY_CRYPTO_ENABLE_PIV_COMMAND`        | OFF     | OFF   | OFF  | ON      | PIV and TWIC card commands, requires APDU and TLV |
 | `TINY_CRYPTO_ENABLE_PIV_OIDS`           | OFF     | OFF   | OFF  | ON      | PIV and TWIC identifier classification            |
 | `TINY_CRYPTO_ENABLE_CMS`                | OFF     | OFF   | OFF  | ON      | CMS parsing and signer verification, requires BER |
 | `TINY_CRYPTO_ENABLE_CMS_VALIDATION`     | OFF     | OFF   | OFF  | ON      | CMS signer paths and revocation                   |
@@ -505,6 +506,15 @@ chains long SHORT commands, follows `61XX` with GET RESPONSE, applies one `6CXX`
 correction per step and collects the response in a caller buffer. The channel
 honours the card's DO `7F66` size limits and a fixed exchange budget. See
 [Smart-card APDUs](docs/apdu.md).
+
+`TINY_CRYPTO_ENABLE_PIV_COMMAND` adds `<tiny_crypto/piv_command.h>`, the PIV and
+TWIC card commands of SP 800-73-5 Part 2 on a `TC_PIV_link`. `TC_PIV_select`
+reads the application property template and applies its size limits.
+`TC_PIV_get_data` checks the object framing of each application.
+`TC_PIV_verify_status` and `TC_PIV_pin_verify` query and verify the PIN with a
+retry floor and refuse a plaintext PIN on the contactless interface.
+`TC_PIV_status_classify` gives each status word its PIV or TWIC meaning. See
+[PIV card commands](docs/piv-card.md).
 
 ## PIV secure messaging
 
