@@ -42,7 +42,7 @@ TC_TLV_result tc_source_der_read(tc_source_reader* reader, uint64_t offset, uint
 {
   enum { HEADER_CAPACITY = TC_TLV_TAG_BYTES + 1 + sizeof(uint64_t) };
   uint8_t encoded[HEADER_CAPACITY];
-  tc_source_der_element parsed;
+  tc_source_der_element parsed = {0};
   if (!reader || !out || offset > end || end > reader->source.length ||
       !tc_internal_ranges_disjoint(out, sizeof *out, reader, sizeof *reader) ||
       !tc_internal_ranges_disjoint(out, sizeof *out, reader->window.data, reader->window.capacity))
