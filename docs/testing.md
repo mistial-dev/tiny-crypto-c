@@ -101,6 +101,21 @@ messaging failures on the pairing VERIFY, the refusals before anything is
 sent, argument errors, and the SELECT, unsecure, session-loss and key-request
 events that clear the VCI. `test_cpp_piv_vci` runs the C++ wrappers.
 
+`test_piv_inventory` covers the [catalog and inventory](piv-card.md#catalog-and-inventory):
+the SP 800-73-5 Part 1 Table 3 order with the Table 2 rules and Table 8 IDs,
+the TWIC Legacy and NEXGEN catalogs, and the inventory over the card simulator
+on contact and contactless, plain and under secure messaging with the VCI and
+the PIN, and over an EXTENDED link bounded by the card's `7F66` limit. It
+checks every object against the fixture, that restricted and skipped objects
+reach no command, the absent, denied and oversized states, the
+secure messaging abort, the work, object and exchange limits, argument errors
+and the wipes. Scripted TWIC answers cover the bare `9000` of optional objects
+and `6A88`. `test_cpp_piv_catalog` runs the C++ wrapper.
+`test_twic_apdu_replay` replays the synthetic TWIC transcripts of
+`tests/twic/apdu_replay.py` through the TWIC application inventory, the
+observed absent and denied objects, the PIV application, the PIN and GENERAL
+AUTHENTICATE, byte for byte.
+
 `test_piv_card_simulator` covers `tests/support/card_simulator.c`, a PIV card
 model for the card-level suites. It answers from the SD 33 card 2 and card 4
 fixtures in `tests/vectors/piv/sm_captures/fixtures` and applies the SP

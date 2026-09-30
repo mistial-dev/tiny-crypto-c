@@ -9,7 +9,8 @@
 #if !TC_ENABLE_AES || !TC_AES_ENABLE_GCM || !TC_AES_ENABLE_CMAC || !TC_AES_ENABLE_DYNAMIC ||       \
     !TC_ENABLE_DES || !TC_DES_ENABLE_CMAC || !TC_DES_ENABLE_ISO9797 || !TC_ENABLE_MD5 ||           \
     !TC_ENABLE_SHA256 || !TC_ENABLE_HMAC || !TC_ENABLE_KMAC256 || !TC_ENABLE_GZIP ||               \
-    !TC_ENABLE_DRBG || !TC_ENABLE_PIV_SM || !TC_ENABLE_TLV || !TC_ENABLE_PIV_COMMAND
+    !TC_ENABLE_DRBG || !TC_ENABLE_PIV_SM || !TC_ENABLE_TLV || !TC_ENABLE_PIV_COMMAND ||            \
+    !TC_ENABLE_PIV_CATALOG
 #error copy_contract.cpp needs every wrapper family enabled
 #endif
 
@@ -18,7 +19,7 @@
   static_assert(!std::is_copy_constructible<type>::value, #type " must not copy-construct");       \
   static_assert(!std::is_copy_assignable<type>::value, #type " must not copy-assign")
 
-/* drbg, piv_sm and piv_link also delete both move operations. */
+/* drbg, piv_sm, piv_link and piv_inventory also delete both move operations. */
 #define TC_ASSERT_NOT_MOVABLE(type)                                                                \
   static_assert(!std::is_move_constructible<type>::value, #type " must not move-construct");       \
   static_assert(!std::is_move_assignable<type>::value, #type " must not move-assign")
@@ -43,6 +44,8 @@ TC_ASSERT_NOT_COPYABLE(tiny_crypto::piv_sm);
 TC_ASSERT_NOT_MOVABLE(tiny_crypto::piv_sm);
 TC_ASSERT_NOT_COPYABLE(tiny_crypto::piv_link);
 TC_ASSERT_NOT_MOVABLE(tiny_crypto::piv_link);
+TC_ASSERT_NOT_COPYABLE(tiny_crypto::piv_inventory);
+TC_ASSERT_NOT_MOVABLE(tiny_crypto::piv_inventory);
 
 /* TLVReader holds a cursor over borrowed input, and a copy is a saved
  * position. tests/cpp/tlv.cpp checks that a copy continues independently. */

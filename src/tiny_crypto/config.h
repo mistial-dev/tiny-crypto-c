@@ -738,6 +738,17 @@
 #error "The PIV virtual contact interface requires PIV secure messaging framing and PIV objects"
 #endif
 
+/* PIV and TWIC data object catalogs and the access-rule-aware inventory. */
+#ifndef TC_ENABLE_PIV_CATALOG
+#define TC_ENABLE_PIV_CATALOG TC_PROFILE_VALUE(0, 0, 0, 1)
+#endif
+#if TC_ENABLE_PIV_CATALOG != 0 && TC_ENABLE_PIV_CATALOG != 1
+#error "TC_ENABLE_PIV_CATALOG must be 0 or 1"
+#endif
+#if TC_ENABLE_PIV_CATALOG && !TC_ENABLE_PIV_COMMAND
+#error "The PIV catalog requires PIV card commands"
+#endif
+
 /* DRBG mechanism dependencies, checked after every option is defined. */
 #if TC_ENABLE_DRBG
 #if !TC_DRBG_ENABLE_HASH && !TC_DRBG_ENABLE_HMAC && !TC_DRBG_ENABLE_CTR

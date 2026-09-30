@@ -217,6 +217,7 @@ algorithm is enabled.
 | `TINY_CRYPTO_ENABLE_PIV_SM`             | OFF     | OFF   | OFF  | ON      | Client-side PIV secure messaging                  |
 | `TINY_CRYPTO_ENABLE_PIV_SM_APDU`        | OFF     | OFF   | OFF  | ON      | PIV SM framing, requires PIV command, SM and CVC  |
 | `TINY_CRYPTO_ENABLE_PIV_VCI`            | OFF     | OFF   | OFF  | ON      | PIV VCI, requires SM framing and PIV objects      |
+| `TINY_CRYPTO_ENABLE_PIV_CATALOG`        | OFF     | OFF   | OFF  | ON      | PIV and TWIC catalogs and card inventory          |
 | `TINY_CRYPTO_PIV_SM_CS2`                | ON      | ON    | ON   | ON      | Cipher suite 2 (P-256, AES-128)                   |
 | `TINY_CRYPTO_PIV_SM_CS7`                | ON      | ON    | ON   | ON      | Cipher suite 7 (P-384, AES-256)                   |
 | `TINY_CRYPTO_ENABLE_FASCN`              | OFF     | OFF   | OFF  | ON      | FASC-N readers and writers                        |
@@ -519,8 +520,12 @@ reads the application property template and applies its size limits.
 `TC_PIV_get_data` checks the object framing of each application.
 `TC_PIV_verify_status` and `TC_PIV_pin_verify` query and verify the PIN with a
 retry floor and refuse a plaintext PIN on the contactless interface.
-`TC_PIV_status_classify` gives each status word its PIV or TWIC meaning. See
-[PIV card commands](docs/piv-card.md).
+`TC_PIV_status_classify` gives each status word its PIV or TWIC meaning.
+`TINY_CRYPTO_ENABLE_PIV_CATALOG` adds `<tiny_crypto/piv_catalog.h>`: the SP
+800-73-5 and TWIC Part 2 data object catalogs with their access rules, and
+`TC_PIV_inventory_read`, which reads every object the link state allows into
+one caller pool and reports the others as restricted, denied, absent or
+oversized. See [PIV card commands](docs/piv-card.md).
 
 ## PIV secure messaging
 

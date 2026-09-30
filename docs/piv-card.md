@@ -215,6 +215,92 @@ int inspect_objects(const TC_PIV_data_object* discovery_object,
 }
 ```
 
+## Catalog and inventory
+
+`TINY_CRYPTO_ENABLE_PIV_CATALOG` adds `<tiny_crypto/piv_catalog.h>`. It needs
+the card commands only. `TC_PIV_catalog_count`, `TC_PIV_catalog_at` and
+`TC_PIV_catalog_find` return constant `TC_PIV_object_info` entries: the tag,
+container ID, object kind, access rule per interface, presence requirement,
+key reference, capacity and the `TC_PIV_OBJECT_SECRET` flag.
+
+| Application | Profile               | Catalog                                                  |
+| ----------- | --------------------- | -------------------------------------------------------- |
+| PIV         | `TC_PIV_CARD`         | 36 objects of SP 800-73-5 Part 1 Table 3, Tables 2 and 8 |
+| TWIC        | `TC_TWIC_LEGACY_CARD` | `5FC102`, `5FC104`, `DFC101`, `DFC103`, `DFC10F`         |
+| TWIC        | `TC_TWIC_NEXGEN_CARD` | the 12 readable objects of TWIC Part 2 v5 section 4.5    |
+
+The Pairing Code container `5FC123` needs the PIN, and the VCI on
+contactless (Part 1 Table 2). The TWIC Privacy Key container `DFC101` reads
+on contact only (TWIC Part 2 v5 section 4.5). Both are secret. On the TWIC
+application `DFC001`, `DFC002` and `DFC121` are optional and every other entry
+is mandatory. Keys and the TWIC E-stickers are outside the catalogs.
+
+`TC_PIV_inventory_read` reads the catalog of the selected application and
+profile into one caller pool. It checks each rule against the link state
+before sending anything: `PIN` needs a verified PIN, `VCI` needs the virtual
+contact interface, and OCC is never available. Each object gets a state:
+
+| State        | Meaning                                                                  |
+| ------------ | ------------------------------------------------------------------------ |
+| `PRESENT`    | read, with a nonempty value                                              |
+| `EMPTY`      | `53 00`, a TWIC empty form, or a bare TWIC `9000` for an optional object |
+| `ABSENT`     | `6A82`, or `6A88` on the TWIC application                                |
+| `RESTRICTED` | the rule is unmet in the link state, and nothing was sent                |
+| `DENIED`     | the rule was met, and the card answered `6982` or `6A81`                 |
+| `OVERSIZED`  | the answer did not fit, and the plain link stayed usable                 |
+| `SKIPPED`    | the pairing code without `TC_PIV_INVENTORY_PAIRING_CODE`                 |
+
+Any other outcome aborts the read and wipes the pool bytes offered to the card
+and the object array. That covers malformed answers, another card status,
+transport failures, an exhausted exchange budget and any secure messaging
+failure. Under secure messaging an answer that does not fit ends the session,
+so it aborts too.
+
+Set `objects` and `capacity` before the call. The array needs
+`TC_PIV_catalog_count` entries, and a smaller array returns `TC_PIV_LIMIT`
+before anything is sent. Answers arrive at the next free pool byte. A secured
+read decrypts in place, so the value stays behind its secure messaging header.
+`max_object_bytes` in the plan caps one object at
+`TC_PIV_RESPONSE_BYTES(max_object_bytes)` pool bytes. A read goes out only when
+its region can take one full answer of Ne bytes, or 256 bytes under secure
+messaging, bounded by the card's DO `7F66` response limit. A smaller region is
+`OVERSIZED`. `TC_PIV_INVENTORY_POOL_BYTES`
+covers every PIV object at its Table 8 capacity. The capacities are floors, so
+treat it as a starting point. SD 33 card 2 needs about 26 KiB. Work costs one
+unit per catalog entry and one per kept pool byte.
+
+The entries borrow the pool until `TC_PIV_inventory_clear`, which wipes the
+used bytes and the array. The pool holds PIN-gated data and possibly the
+pairing code or the TWIC Privacy Key, so clear it on every exit path. The
+inventory records the link state it used in `link`.
+
+```c
+#include <tiny_crypto/piv_catalog.h>
+
+/* Read the catalog of the application selected on link. objects holds
+ * TC_PIV_CATALOG_PIV_OBJECTS entries. On TC_PIV_OK *restricted counts the
+ * objects to read again after the PIN or the VCI, and the caller clears the
+ * inventory when done with it. */
+TC_PIV_result read_inventory(TC_PIV_link* link, TC_PIV_object* objects, uint8_t* pool,
+                             size_t pool_capacity, TC_PIV_inventory* inventory,
+                             size_t* restricted)
+{
+  /* Leave the pairing code out and cap one object at 16 KiB. */
+  const TC_PIV_inventory_plan plan = {0, 16384};
+  size_t work = TC_PIV_CATALOG_PIV_OBJECTS + pool_capacity;
+  inventory->objects = objects;
+  inventory->capacity = TC_PIV_CATALOG_PIV_OBJECTS;
+  const TC_PIV_result result =
+      TC_PIV_inventory_read(link, &plan, (TC_buffer){pool, pool_capacity}, &work, inventory);
+  if (result != TC_PIV_OK)
+    return result; /* an abort wiped the pool and the objects */
+  *restricted = 0;
+  for (size_t i = 0; i < inventory->count; ++i)
+    *restricted += inventory->objects[i].state == TC_PIV_OBJECT_RESTRICTED;
+  return TC_PIV_OK;
+}
+```
+
 ## Example
 
 ```c
@@ -253,7 +339,8 @@ TC_PIV_result read_chuid(TC_APDU_transport transport, TC_PIV_interface interface
 
 The C++11 class `tiny_crypto::piv_link` in `<tiny_crypto/piv_command.hpp>` owns a
 link and clears it on destruction. `piv_application_read` and
-`piv_status_classify` wrap the free functions.
+`piv_status_classify` wrap the free functions. `tiny_crypto::piv_inventory` in
+`<tiny_crypto/piv_catalog.hpp>` clears its inventory on destruction.
 
 ## Limits
 

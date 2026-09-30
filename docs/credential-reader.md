@@ -273,8 +273,10 @@ including GET RESPONSE and read-length correction. The separate PIN helper
 requires a validated contact/PIV selection and a per-run guard retained across
 connections. The command leaves it unused.
 
-`test_twic_apdu_replay` and `test_twic_command` exercise these helpers over
-recorded and synthetic command/response scripts. On macOS,
+`test_twic_command` exercises these helpers over recorded and synthetic
+command/response scripts. `test_twic_apdu_replay` replays the synthetic TWIC
+scripts through the library's card commands and the TWIC
+[catalog inventory](piv-card.md#catalog-and-inventory). On macOS,
 `test_twic_pcsc` replaces the PC/SC service calls to test cleanup and transport
 failures. These tests require no reader. The standalone example's CTest entries
 exercise help and argument handling only.

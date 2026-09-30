@@ -122,6 +122,14 @@ clears the bound session while it exists. `piv_sm::native` returns the
 `TC_PIV_SM`. `piv_discovery_get` and `piv_vci_establish` in `piv_vci.hpp` take
 the `piv_link` by reference and follow the same lifetime.
 
+`piv_inventory` in `piv_catalog.hpp` wraps a `TC_PIV_inventory` over a caller
+object array. `read` takes the `piv_link`, an optional plan, the pool and the
+work counter. `find`, `size` and `operator[]` return the entries, which borrow
+the pool. The destructor calls `TC_PIV_inventory_clear`, which wipes the pool
+bytes the objects use and the object array, so both outlive the object.
+Copying and moving are deleted. `piv_catalog_count`, `piv_catalog_at` and
+`piv_catalog_find` wrap the catalog lookups.
+
 ## GCM streaming
 
 `GCM` streams encryption only. Supply all AAD before the first

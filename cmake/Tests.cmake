@@ -239,6 +239,23 @@ if(TINY_CRYPTO_BUILD_TESTS)
     ${tc_card_simulator_sources})
   target_compile_definitions(test_piv_card_simulator PRIVATE
     TC_CARD_FIXTURE_DIR="${PROJECT_SOURCE_DIR}/tests/vectors/piv/sm_captures/fixtures")
+  # The catalog and inventory over the simulator, plain and secured.
+  tc_add_test_library(tiny-crypto-c-test-piv-catalog ${tc_piv_sm_link_sources}
+    src/piv_discovery.c src/piv_discovery_get.c src/piv_vci.c src/piv_catalog.c
+    src/piv_inventory.c)
+  target_compile_definitions(tiny-crypto-c-test-piv-catalog PUBLIC
+    TC_ENABLE_PIV_SM=1 TC_AES_ENABLE_DYNAMIC=1 TC_ENABLE_EC=1 TC_ENABLE_SSKDF=1
+    TC_ENABLE_SHA384=1 TC_PIV_SM_ENABLE_CS2=1 TC_PIV_SM_ENABLE_CS7=1
+    TC_EC_ENABLE_P256=1 TC_EC_ENABLE_P384=1
+    TC_ENABLE_TLV=1 TC_ENABLE_DER=1 TC_ENABLE_PIV_CVC=1
+    TC_ENABLE_APDU=1 TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_PIV_SM_APDU=1
+    TC_TLV_ENABLE_BER=1 TC_ENABLE_X509=1 TC_ENABLE_PIV_OIDS=1 TC_ENABLE_CMS=1
+    TC_ENABLE_FASCN=1 TC_ENABLE_TWIC_UUID=1 TC_ENABLE_PIV_OBJECTS=1 TC_ENABLE_PIV_VCI=1
+    TC_ENABLE_PIV_CATALOG=1)
+  tc_add_c_test(test_piv_inventory tiny-crypto-c-test-piv-catalog tests/piv/inventory.c
+    ${tc_card_simulator_sources} tests/support/scripted_transport.c)
+  target_compile_definitions(test_piv_inventory PRIVATE
+    TC_CARD_FIXTURE_DIR="${PROJECT_SOURCE_DIR}/tests/vectors/piv/sm_captures/fixtures")
   if(Python3_Interpreter_FOUND)
     add_test(NAME test_piv_capture_fixtures COMMAND ${Python3_EXECUTABLE}
       ${PROJECT_SOURCE_DIR}/tests/piv/capture_fixture.py --check)
@@ -634,10 +651,13 @@ if(TINY_CRYPTO_BUILD_TESTS)
   tc_add_c_test(test_apdu_channel tiny-crypto-c-test-apdu tests/apdu/channel.c
     tests/support/scripted_transport.c)
 
-  # PIV card commands need the APDU channel and the TLV readers.
-  tc_add_test_library(tiny-crypto-c-test-piv-command src/common.c ${tc_piv_command_sources})
+  # PIV card commands need the APDU channel and the TLV readers. The catalog
+  # needs nothing more, so the plain inventory builds here too.
+  tc_add_test_library(tiny-crypto-c-test-piv-command src/common.c ${tc_piv_command_sources}
+    src/piv_catalog.c src/piv_inventory.c)
   target_compile_definitions(tiny-crypto-c-test-piv-command PUBLIC
-    TC_ENABLE_APDU=1 TC_ENABLE_TLV=1 TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_AES=0 TC_ENABLE_SHA256=0)
+    TC_ENABLE_APDU=1 TC_ENABLE_TLV=1 TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_PIV_CATALOG=1
+    TC_ENABLE_AES=0 TC_ENABLE_SHA256=0)
   tc_add_c_test(test_piv_command tiny-crypto-c-test-piv-command tests/piv/command.c
     tests/support/scripted_transport.c)
 
@@ -651,9 +671,8 @@ if(TINY_CRYPTO_BUILD_TESTS)
     TC_ENABLE_AES=1 TC_AES_ENABLE_ECB=1 TC_ENABLE_TWIC_OBJECT_CRYPTO=1
     TC_ENABLE_SHA256=0)
   tc_add_c_test(test_twic_cipher tiny-crypto-c-test-twic-cipher tests/twic/cipher.c)
-  tc_add_c_test(test_twic_apdu_replay tiny-crypto-c-test-twic-cipher
-    tests/twic/apdu_replay.c examples/credential_io.c src/tlv.c src/tlv_walk.c)
-  target_compile_definitions(test_twic_apdu_replay PRIVATE TC_ENABLE_TLV=1
+  tc_add_c_test(test_twic_apdu_replay tiny-crypto-c-test-piv-command tests/twic/apdu_replay.c)
+  target_compile_definitions(test_twic_apdu_replay PRIVATE
     TC_TWIC_VECTOR_DIR="${PROJECT_SOURCE_DIR}/tests/vectors/twic/synthetic")
   if(Python3_Interpreter_FOUND)
     add_test(NAME test_twic_apdu_corpus COMMAND ${Python3_EXECUTABLE}
@@ -1172,6 +1191,9 @@ if(TINY_CRYPTO_BUILD_TESTS)
     tc_add_linked_test(test_cpp_apdu tiny-crypto-c-test-apdu tests/cpp/apdu.cpp tests/cpp/main.cpp)
     tc_add_linked_test(test_cpp_piv_command tiny-crypto-c-test-piv-command
       tests/cpp/piv_command.cpp tests/cpp/main.cpp)
+    tc_add_linked_test(test_cpp_piv_catalog tiny-crypto-c-test-piv-command
+      tests/cpp/piv_catalog.cpp tests/cpp/main.cpp)
+    target_include_directories(test_cpp_piv_catalog PRIVATE tests/support)
     tc_add_linked_test(test_cpp_piv_sm_apdu tiny-crypto-c-test-piv-sm
       tests/cpp/piv_sm_apdu.cpp tests/support/sm_card.c tests/support/sm_card_session.c
       tests/cpp/main.cpp)
@@ -1416,7 +1438,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   # This catches accidental feature coupling and keeps their C API surface equal.
   foreach(header_profile rsa tlv apdu piv_command aamva fascn twic_uuid twic_tpk twic_object hkdf aes_kw
       piv_oids x509 key_challenge x509_path x509_revocation x509_ocsp cms cms_validation piv_objects credential piv_cvc piv_chuid
-      piv_sm piv_sm_apdu piv_vci twic_ccl)
+      piv_sm piv_sm_apdu piv_vci piv_catalog twic_ccl)
     set(header_profile_definitions TC_ENABLE_AES=0 TC_ENABLE_SHA256=0)
     if(header_profile STREQUAL "hkdf")
       list(REMOVE_ITEM header_profile_definitions TC_ENABLE_SHA256=0)
@@ -1436,6 +1458,9 @@ if(TINY_CRYPTO_BUILD_TESTS)
     elseif(header_profile STREQUAL "piv_command")
       list(APPEND header_profile_definitions TC_ENABLE_APDU=1 TC_ENABLE_TLV=1
         TC_ENABLE_PIV_COMMAND=1 TC_TEST_HEADER_PIV_COMMAND=1)
+    elseif(header_profile STREQUAL "piv_catalog")
+      list(APPEND header_profile_definitions TC_ENABLE_APDU=1 TC_ENABLE_TLV=1
+        TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_PIV_CATALOG=1 TC_TEST_HEADER_PIV_CATALOG=1)
     elseif(header_profile STREQUAL "aamva")
       list(APPEND header_profile_definitions TC_ENABLE_AAMVA=1 TC_TEST_HEADER_AAMVA=1)
     elseif(header_profile STREQUAL "fascn")
@@ -1571,7 +1596,8 @@ if(TINY_CRYPTO_BUILD_TESTS)
     TC_ENABLE_PIV_CHUID=1 TC_ENABLE_PIV_CVC=1 TC_ENABLE_EAC_CVC=1 TC_ENABLE_PIV_SM=1
     TC_ENABLE_EC=1 TC_ENABLE_SSKDF=1 TC_ENABLE_APDU=1 TC_ENABLE_PIV_COMMAND=1
     TC_ENABLE_PIV_SM_APDU=1 TC_TLV_ENABLE_BER=1 TC_ENABLE_PIV_OIDS=1 TC_ENABLE_CMS=1
-    TC_ENABLE_FASCN=1 TC_ENABLE_TWIC_UUID=1 TC_ENABLE_PIV_OBJECTS=1 TC_ENABLE_PIV_VCI=1)
+    TC_ENABLE_FASCN=1 TC_ENABLE_TWIC_UUID=1 TC_ENABLE_PIV_OBJECTS=1 TC_ENABLE_PIV_VCI=1
+    TC_ENABLE_PIV_CATALOG=1)
   add_library(test_cpp_headers_cxx17 OBJECT tests/cpp/header_compile.cpp)
   target_include_directories(test_cpp_headers_cxx17 PRIVATE src)
   set_property(TARGET test_cpp_headers_cxx17 PROPERTY CXX_STANDARD 17)
@@ -1740,6 +1766,14 @@ if(TINY_CRYPTO_BUILD_TESTS)
         ${CMAKE_CURRENT_SOURCE_DIR}/src/piv_get_data.c ${CMAKE_CURRENT_SOURCE_DIR}/src/piv_verify.c
         ${CMAKE_CURRENT_SOURCE_DIR}/src/piv_status.c
         ${CMAKE_CURRENT_SOURCE_DIR}/src/piv_template_internal.c
+      WORKING_DIRECTORY ${tc_avr_piv_command_dir})
+    # The catalog tables and the inventory need only the card commands.
+    add_test(NAME test_piv_catalog_compile_avr
+      COMMAND ${TC_AVR_CC} -std=c99 -Wall -Wextra -Werror -Os -mmcu=atmega2560
+        -DTC_ENABLE_APDU=1 -DTC_ENABLE_TLV=1 -DTC_ENABLE_PIV_COMMAND=1
+        -DTC_ENABLE_PIV_CATALOG=1 -I${CMAKE_CURRENT_SOURCE_DIR}/src
+        -c ${CMAKE_CURRENT_SOURCE_DIR}/src/piv_catalog.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/piv_inventory.c
       WORKING_DIRECTORY ${tc_avr_piv_command_dir})
     add_test(NAME test_sskdf_compile_avr
       COMMAND ${TC_AVR_CC} -std=c99 -Wall -Wextra -Werror -mmcu=atmega328p

@@ -1,6 +1,11 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
-#include "../../examples/credential_io.h"
+/* The synthetic TWIC APDU replays of tests/twic/apdu_replay.py through the
+ * library: TWIC SELECT and the TWIC application inventory (TWIC Part 2 v5
+ * 4.5 and 5), the observed absent and denied objects, the PIV application
+ * of the card, its PIN and GENERAL AUTHENTICATE through an APDU channel on
+ * the same transport. Every command must equal the replay byte for byte. */
+#include <tiny_crypto/piv_catalog.h>
 #include "munit.h"
 #include "test_util.h"
 #include <stdio.h>
@@ -10,11 +15,23 @@
 #error "TC_TWIC_VECTOR_DIR must name the synthetic TWIC corpus"
 #endif
 
-enum { MAX_OBJECT = 20000, POOL_SIZE = 120000, LINE_SIZE = 1200 };
+enum {
+  MAX_OBJECT = 20000,
+  RESPONSE_SIZE = MAX_OBJECT + 32,
+  POOL_SIZE = 120000,
+  LINE_SIZE = 1200,
+  WIRE_SIZE = 300,
+  EXCHANGES = 1000,
+  TWIC_OBJECTS = 12
+};
+
+/* The replay transport. With empty_tag set, GET DATA of that tag answers
+ * 53 00 and the recorded GET RESPONSE steps of its answer are skipped. */
 typedef struct {
   FILE* file;
   size_t exchanges;
   uint8_t empty_tag[3];
+  int skip_get_response;
 } Replay;
 
 static int nibble(char value)
@@ -26,10 +43,10 @@ static int nibble(char value)
   return -1;
 }
 
-static size_t decode(char* value, uint8_t* bytes, size_t capacity)
+static size_t decode(const char* value, uint8_t* bytes, size_t capacity)
 {
   size_t length = 0;
-  while (value[0] && value[0] != '\n' && value[0] != '\r') {
+  while (value[0] && value[0] != '\n' && value[0] != '\r' && value[0] != ' ') {
     munit_assert_size(length, <, capacity);
     const int high = nibble(value[0]);
     const int low = nibble(value[1]);
@@ -52,34 +69,37 @@ static char* next_line(FILE* file, char* line, size_t capacity)
   return NULL;
 }
 
-static int transmit(void* context, const uint8_t* command, size_t command_length, uint8_t* response,
-                    size_t capacity, size_t* length)
+static TC_status transmit(void* context, TC_bytes command, TC_buffer response, size_t* length)
 {
   Replay* replay = context;
   char line[LINE_SIZE];
-  uint8_t expected_command[300], expected_response[300];
-  munit_assert_not_null(next_line(replay->file, line, sizeof line));
-  char* separator = strchr(line, ' ');
-  munit_assert_not_null(separator);
-  *separator++ = 0;
-  const size_t command_size = decode(line, expected_command, sizeof expected_command);
-  const size_t response_size = decode(separator, expected_response, sizeof expected_response);
-  munit_assert_size(command_length, ==, command_size);
-  munit_assert_memory_equal(command_size, command, expected_command);
-  if (command_size == 11 && command[1] == 0xcb && replay->empty_tag[0] &&
-      !memcmp(command + 7, replay->empty_tag, 3)) {
-    static const uint8_t empty[] = {0x53, 0, 0x90, 0};
-    munit_assert_size(sizeof empty, <=, capacity);
-    memcpy(response, empty, sizeof empty);
-    *length = sizeof empty;
-    ++replay->exchanges;
-    return 1;
-  }
-  munit_assert_size(response_size, <=, capacity);
-  memcpy(response, expected_response, response_size);
-  *length = response_size;
+  uint8_t expected_command[WIRE_SIZE], expected_response[WIRE_SIZE];
+  char* separator = NULL;
+  size_t command_size = 0;
+  do {
+    munit_assert_not_null(next_line(replay->file, line, sizeof line));
+    separator = strchr(line, ' ');
+    munit_assert_not_null(separator);
+    command_size = decode(line, expected_command, sizeof expected_command);
+  } while (replay->skip_get_response && expected_command[1] == 0xc0 && command.data[1] != 0xc0);
+  replay->skip_get_response = 0;
+  const size_t response_size = decode(separator + 1, expected_response, sizeof expected_response);
+  munit_assert_size(command.length, ==, command_size);
+  munit_assert_memory_equal(command_size, command.data, expected_command);
   ++replay->exchanges;
-  return 1;
+  if (command_size == 11 && command.data[1] == 0xcb && replay->empty_tag[0] &&
+      !memcmp(command.data + 7, replay->empty_tag, 3)) {
+    static const uint8_t empty[] = {0x53, 0, 0x90, 0};
+    munit_assert_size(sizeof empty, <=, response.capacity);
+    memcpy(response.data, empty, sizeof empty);
+    *length = sizeof empty;
+    replay->skip_get_response = 1;
+    return TC_OK;
+  }
+  munit_assert_size(response_size, <=, response.capacity);
+  memcpy(response.data, expected_response, response_size);
+  *length = response_size;
+  return TC_OK;
 }
 
 static void fixture_path(char* path, size_t capacity, const char* profile, const char* name)
@@ -102,368 +122,343 @@ static size_t fixture_read(const char* profile, const char* name, uint8_t* bytes
   return length;
 }
 
-static void compare_inventory(const char* profile, const ExampleTWICInventory* inventory)
+static uint8_t scratch[TC_APDU_SHORT_COMMAND_MAX_BYTES];
+static uint8_t response[RESPONSE_SIZE];
+static uint8_t pool[POOL_SIZE];
+static TC_PIV_object objects[TWIC_OBJECTS];
+static uint8_t expected[MAX_OBJECT];
+
+/* An empty inventory over the objects array. */
+static TC_PIV_inventory inventory_start(void)
 {
-  static const char* const objects[] = {"signed-chuid.bin", "unsigned-chuid.bin", "fingerprint.bin",
-                                        "face.bin",         "printed.bin",        "iris.bin",
-                                        "personal.bin",     "handwritten.bin"};
-  uint8_t bytes[MAX_OBJECT];
-  const size_t required = strcmp(profile, "legacy") ? 8 : 3;
-  munit_assert_size(inventory->count, ==, required);
-  const TC_TLV_limits limits = {MAX_OBJECT, MAX_OBJECT, 1, 1};
-  for (size_t i = 0; i < required; ++i) {
-    const size_t length = fixture_read(profile, objects[i], bytes, sizeof bytes);
-    TC_TLV_element field;
-    munit_assert_int(TC_TLV_read((TC_bytes){bytes, length}, TC_TLV_ISO7816, &limits, &field), ==,
-                     TC_TLV_OK);
-    munit_assert_size(field.encoded.length, ==, length);
-    munit_assert_uint(field.header.tag[0], ==, 0x53);
-    munit_assert_size(inventory->objects[i].contents.length, ==, field.value.length);
-    munit_assert_memory_equal(field.value.length, inventory->objects[i].contents.data,
-                              field.value.data);
-  }
-  const size_t security_length = fixture_read(profile, "security.bin", bytes, sizeof bytes);
-  munit_assert_size(inventory->security.length, ==, security_length);
-  munit_assert_memory_equal(security_length, inventory->security.data, bytes);
+  TC_PIV_inventory inventory;
+  memset(&inventory, 0, sizeof inventory);
+  inventory.objects = objects;
+  inventory.capacity = TWIC_OBJECTS;
+  return inventory;
 }
 
-static void authenticate(ExampleCardIO* io, const char* profile, int invalid, uint8_t* buffer,
-                         size_t capacity)
+static TC_buffer response_buffer(void)
 {
-  uint8_t challenge[256], signature[256];
+  return (TC_buffer){response, sizeof response};
+}
+
+static FILE* replay_open(const char* profile, const char* name)
+{
+  char path[512];
+  fixture_path(path, sizeof path, profile, name);
+  FILE* file = fopen(path, "rb");
+  munit_assert_not_null(file);
+  return file;
+}
+
+static void link_open(TC_PIV_link* link, Replay* replay, TC_PIV_interface interface)
+{
+  const TC_PIV_link_options options = {{TC_APDU_SHORT, 0, EXCHANGES, 0, 0}, interface, 0};
+  munit_assert_int(TC_PIV_link_init(link, (TC_APDU_transport){transmit, replay}, &options,
+                                    (TC_buffer){scratch, sizeof scratch}),
+                   ==, TC_PIV_OK);
+}
+
+static void select_application(TC_PIV_link* link, TC_PIV_application_id id,
+                               TC_PIV_card_profile profile)
+{
+  TC_PIV_application application;
+  munit_assert_int(TC_PIV_select(link, id, 0, response_buffer(), &application), ==, TC_PIV_OK);
+  munit_assert_int(application.profile, ==, profile);
+  munit_assert_size(application.max_command_bytes, ==, 0x400);
+  munit_assert_size(application.max_response_bytes, ==, 0x800);
+}
+
+/* GET DATA of tag answers the fixture object named name. */
+static void read_object(TC_PIV_link* link, const char* profile, const char* name, TC_bytes tag)
+{
+  TC_PIV_data_object object;
+  const size_t length = fixture_read(profile, name, expected, sizeof expected);
+  munit_assert_int(TC_PIV_get_data(link, tag, response_buffer(), &object), ==, TC_PIV_OK);
+  munit_assert_size(object.encoded.length, ==, length);
+  munit_assert_memory_equal(length, object.encoded.data, expected);
+}
+
+/* GET DATA of tag is answered with sw alone. */
+static void read_status(TC_PIV_link* link, TC_bytes tag, uint16_t sw)
+{
+  TC_PIV_data_object object;
+  munit_assert_int(TC_PIV_get_data(link, tag, response_buffer(), &object), ==, TC_PIV_CARD_STATUS);
+  munit_assert_uint16(TC_PIV_link_status(link), ==, sw);
+}
+
+static void read_status_tags(TC_PIV_link* link, const uint8_t prefix[2], const uint8_t* last,
+                             size_t count, uint16_t sw)
+{
+  for (size_t i = 0; i < count; ++i) {
+    const uint8_t tag[] = {prefix[0], prefix[1], last[i]};
+    read_status(link, (TC_bytes){tag, sizeof tag}, sw);
+  }
+}
+
+static void read_e_stickers(TC_PIV_link* link)
+{
+  for (unsigned tag = 0xe1; tag <= 0xfd; ++tag) {
+    if (tag > 0xea && tag < 0xfa)
+      continue;
+    const uint8_t encoded = (uint8_t)tag;
+    read_status(link, (TC_bytes){&encoded, 1}, 0x6a82);
+  }
+}
+
+/* Every present TWIC object equals its fixture. The TWIC Privacy Key reads
+ * on contact only (TWIC Part 2 v5 4.5). */
+static void check_twic_inventory(const TC_PIV_inventory* inventory, const char* profile,
+                                 TC_PIV_interface interface)
+{
+  static const struct {
+    const char* name;
+    uint16_t container;
+  } names[] = {{"card-auth-cert.bin", 0x0500},
+               {"signed-chuid.bin", 0x3000},
+               {"unsigned-chuid.bin", 0x3002},
+               {"discovery.bin", 0x6050},
+               {"personal.bin", 0x6011},
+               {"handwritten.bin", 0x6012},
+               {"tpk.bin", 0x2001},
+               {"fingerprint.bin", 0x2003},
+               {"face.bin", 0x6030},
+               {"printed.bin", 0x3001},
+               {"security.bin", 0x9000},
+               {"iris.bin", 0x1015}};
+  const int nexgen = strcmp(profile, "legacy") != 0;
+  munit_assert_size(inventory->count, ==, nexgen ? 12 : 5);
+  munit_assert_int(inventory->link.application, ==, TC_PIV_APPLICATION_TWIC);
+  for (size_t i = 0; i < sizeof names / sizeof *names; ++i) {
+    const TC_PIV_object* object = TC_PIV_inventory_find(inventory, names[i].container);
+    if (!nexgen && !object)
+      continue;
+    munit_assert_not_null(object);
+    if (names[i].container == 0x2001 && interface == TC_PIV_CONTACTLESS) {
+      munit_assert_int(object->state, ==, TC_PIV_OBJECT_RESTRICTED);
+      continue;
+    }
+    const size_t length = fixture_read(profile, names[i].name, expected, sizeof expected);
+    munit_assert_int(object->state, ==, length == 2 ? TC_PIV_OBJECT_EMPTY : TC_PIV_OBJECT_PRESENT);
+    munit_assert_size(object->encoded.length, ==, length);
+    munit_assert_memory_equal(length, object->encoded.data, expected);
+  }
+}
+
+/* GENERAL AUTHENTICATE 9E with the fixture challenge (SP 800-73-5 Part 2
+ * A.4.1): 7C {82 00, 81 challenge} in a SHORT chain, answered with
+ * 7C {82 signature} over GET RESPONSE. */
+static void authenticate(Replay* replay, const char* profile, int invalid)
+{
+  uint8_t challenge[256], signature[256], request[266];
+  TC_APDU_channel channel;
+  TC_APDU_response answer;
+  uint8_t channel_scratch[TC_APDU_SHORT_COMMAND_MAX_BYTES];
   munit_assert_size(fixture_read(profile, "ga-challenge.bin", challenge, sizeof challenge), ==,
                     sizeof challenge);
   munit_assert_size(fixture_read(profile, "ga-signature.bin", signature, sizeof signature), ==,
                     sizeof signature);
   if (invalid)
     signature[sizeof signature - 1] ^= 1;
-  ExampleCardResponse response = {0};
-  munit_assert_int(example_card_authenticate(
-                       io, EXAMPLE_CARD_ALGORITHM_RSA_2048, EXAMPLE_CARD_KEY_CARD_AUTHENTICATION,
-                       (TC_bytes){challenge, sizeof challenge}, buffer, capacity, &response),
-                   ==, EXAMPLE_CARD_OK);
-  munit_assert_uint(response.status, ==, 0x9000);
-  munit_assert_size(response.length, ==, 264);
+  static const uint8_t header[] = {0x7c, 0x82, 0x01, 0x06, 0x82, 0x00, 0x81, 0x82, 0x01, 0x00};
+  memcpy(request, header, sizeof header);
+  memcpy(request + sizeof header, challenge, sizeof challenge);
+  const TC_APDU_channel_options options = {TC_APDU_SHORT, TC_APDU_GET_RESPONSE_PLAIN_CLA, 8, 0, 0};
+  munit_assert_int(TC_APDU_channel_init(&channel, (TC_APDU_transport){transmit, replay}, &options,
+                                        (TC_buffer){channel_scratch, sizeof channel_scratch}),
+                   ==, TC_APDU_OK);
+  const TC_APDU_command command = {{request, sizeof request}, 256, 0x00, 0x87, 0x07, 0x9e};
+  munit_assert_int(TC_APDU_transceive(&channel, &command, response_buffer(), &answer), ==,
+                   TC_APDU_OK);
+  TC_APDU_channel_clear(&channel);
+  munit_assert_uint16(answer.sw, ==, 0x9000);
+  munit_assert_size(answer.data.length, ==, 264);
   static const uint8_t prefix[] = {0x7c, 0x82, 0x01, 0x04, 0x82, 0x82, 0x01, 0x00};
-  munit_assert_memory_equal(sizeof prefix, buffer, prefix);
-  munit_assert_memory_equal(sizeof signature, buffer + sizeof prefix, signature);
+  munit_assert_memory_equal(sizeof prefix, answer.data.data, prefix);
+  munit_assert_memory_equal(sizeof signature, answer.data.data + sizeof prefix, signature);
 }
 
-static MunitResult replay_profile(const char* profile, const char* interface)
+static void twic_application(TC_PIV_link* link, const char* profile, TC_PIV_interface interface)
 {
-  char path[512], name[64];
-  const int size = snprintf(name, sizeof name, "apdu-%s.txt", interface);
-  munit_assert_int(size, >, 0);
-  munit_assert_size((size_t)size, <, sizeof name);
-  fixture_path(path, sizeof path, profile, name);
-  FILE* file = fopen(path, "rb");
-  munit_assert_not_null(file);
-  Replay replay = {file, 0, {0}};
-  ExampleCardIO io = {transmit, &replay, 1000, 0};
-  static uint8_t pool[POOL_SIZE], buffer[MAX_OBJECT + EXAMPLE_CARD_STATUS_BYTES];
-  ExampleTWICInventory inventory;
-  size_t work = sizeof pool;
-  const ExampleCardModel model =
-      strcmp(profile, "legacy") ? EXAMPLE_CARD_MODEL_TWIC_NEXGEN : EXAMPLE_CARD_MODEL_TWIC_LEGACY;
-  munit_assert_int(example_twic_inventory_read(&io, model, EXAMPLE_CARD_READ_SHORT, pool,
-                                               sizeof pool, MAX_OBJECT, &work, &inventory),
-                   ==, EXAMPLE_CARD_OK);
-  compare_inventory(profile, &inventory);
-
-  const uint8_t tpk_tag[] = {0xdf, 0xc1, 0x01};
-  ExampleCardResponse response = {0};
-  const ExampleCardResult result = example_card_object_read(
-      &io, EXAMPLE_CARD_READ_SHORT, tpk_tag, sizeof tpk_tag, buffer, sizeof buffer, &response);
-  if (!strcmp(interface, "contact")) {
-    uint8_t tpk[MAX_OBJECT];
-    const size_t length = fixture_read(profile, "tpk.bin", tpk, sizeof tpk);
-    munit_assert_int(result, ==, EXAMPLE_CARD_OK);
-    munit_assert_size(response.length, ==, length);
-    munit_assert_memory_equal(length, buffer, tpk);
+  static const uint8_t tag_privacy_key[] = {0xdf, 0xc1, 0x01};
+  const int legacy = !strcmp(profile, "legacy");
+  TC_PIV_inventory inventory = inventory_start();
+  size_t work = POOL_SIZE;
+  select_application(link, TC_PIV_APPLICATION_TWIC,
+                     legacy ? TC_TWIC_LEGACY_CARD : TC_TWIC_NEXGEN_CARD);
+  munit_assert_int(
+      TC_PIV_inventory_read(link, NULL, (TC_buffer){pool, sizeof pool}, &work, &inventory), ==,
+      TC_PIV_OK);
+  check_twic_inventory(&inventory, profile, interface);
+  TC_PIV_inventory_clear(&inventory);
+  /* The observed contactless refusal of the TWIC Privacy Key. */
+  if (interface == TC_PIV_CONTACTLESS)
+    read_status(link, (TC_bytes){tag_privacy_key, sizeof tag_privacy_key},
+                legacy ? 0x6a81 : 0x6982);
+  if (legacy) {
+    static const uint8_t pivs[] = {0x01}, twics[] = {0x08, 0x09};
+    static const uint8_t piv_prefix[] = {0x5f, 0xc1}, twic_prefix[] = {0xdf, 0xc1};
+    read_status_tags(link, piv_prefix, pivs, sizeof pivs, 0x6a82);
+    read_status_tags(link, twic_prefix, twics, sizeof twics, 0x6a82);
+    if (interface == TC_PIV_CONTACTLESS) {
+      static const uint8_t discovery = 0x7e, iris[] = {0x21}, personal[] = {0x01, 0x02};
+      static const uint8_t personal_prefix[] = {0xdf, 0xc0};
+      read_status(link, (TC_bytes){&discovery, 1}, 0x6a82);
+      read_status_tags(link, twic_prefix, iris, sizeof iris, 0x6a82);
+      read_status_tags(link, personal_prefix, personal, sizeof personal, 0x6a82);
+      read_e_stickers(link);
+    }
   } else {
-    munit_assert_int(result, ==, EXAMPLE_CARD_STATUS);
-    munit_assert_uint(response.status, ==, strcmp(profile, "legacy") ? 0x6982 : 0x6a81);
-    munit_assert_size(response.length, ==, 0);
+    read_e_stickers(link);
   }
-  if (!strcmp(profile, "legacy")) {
-    static const uint8_t absent[][3] = {{0x5f, 0xc1, 0x01}, {0xdf, 0xc1, 0x08}, {0xdf, 0xc1, 0x09}};
-    for (size_t i = 0; i < sizeof absent / sizeof *absent; ++i) {
-      munit_assert_int(example_card_object_read(&io, EXAMPLE_CARD_READ_SHORT, absent[i],
-                                                sizeof absent[i], buffer, sizeof buffer, &response),
-                       ==, EXAMPLE_CARD_STATUS);
-      munit_assert_uint(response.status, ==, 0x6a82);
-      munit_assert_size(response.length, ==, 0);
+}
+
+static void piv_application(TC_PIV_link* link, Replay* replay, const char* profile,
+                            TC_PIV_interface interface)
+{
+  static const uint8_t piv_prefix[] = {0x5f, 0xc1};
+  static const uint8_t tag_chuid[] = {0x5f, 0xc1, 0x02}, tag_card_auth[] = {0x5f, 0xc1, 0x01};
+  static const uint8_t discovery = 0x7e;
+  const int legacy = !strcmp(profile, "legacy");
+  const int contact = interface == TC_PIV_CONTACT;
+  select_application(link, TC_PIV_APPLICATION_PIV, TC_PIV_CARD);
+  read_object(link, profile, "piv-signed-chuid.bin", (TC_bytes){tag_chuid, sizeof tag_chuid});
+  read_object(link, profile, "piv-card-auth-cert.bin",
+              (TC_bytes){tag_card_auth, sizeof tag_card_auth});
+  authenticate(replay, profile, 0);
+  static const struct {
+    const char* name;
+    uint8_t last;
+  } certificates[] = {{"piv-auth-cert.bin", 0x05},
+                      {"piv-discovery.bin", 0x07},
+                      {"piv-sign-cert.bin", 0x0a},
+                      {"piv-key-management-cert.bin", 0x0b}};
+  if (legacy && contact) {
+    for (size_t i = 0; i < sizeof certificates / sizeof *certificates; ++i) {
+      const uint8_t tag[] = {0x5f, 0xc1, certificates[i].last};
+      read_object(link, profile, certificates[i].name, (TC_bytes){tag, sizeof tag});
     }
-    if (!strcmp(interface, "contactless")) {
-      static const struct {
-        uint8_t tag[3];
-        size_t length;
-      } absent_rf[] = {{{0x7e, 0, 0}, 1},
-                       {{0xdf, 0xc1, 0x21}, 3},
-                       {{0xdf, 0xc0, 0x01}, 3},
-                       {{0xdf, 0xc0, 0x02}, 3}};
-      for (size_t i = 0; i < sizeof absent_rf / sizeof *absent_rf; ++i) {
-        munit_assert_int(example_card_object_read(&io, EXAMPLE_CARD_READ_SHORT, absent_rf[i].tag,
-                                                  absent_rf[i].length, buffer, sizeof buffer,
-                                                  &response),
-                         ==, EXAMPLE_CARD_STATUS);
-        munit_assert_uint(response.status, ==, 0x6a82);
-      }
-      for (unsigned tag = 0xe1; tag <= 0xfd; ++tag) {
-        if (tag > 0xea && tag < 0xfa)
-          continue;
-        const uint8_t encoded = (uint8_t)tag;
-        munit_assert_int(example_card_object_read(&io, EXAMPLE_CARD_READ_SHORT, &encoded, 1, buffer,
-                                                  sizeof buffer, &response),
-                         ==, EXAMPLE_CARD_STATUS);
-        munit_assert_uint(response.status, ==, 0x6a82);
-      }
-    }
-  } else if (!strcmp(profile, "nexgen")) {
-    static const struct {
-      const char* name;
-      uint8_t tag[3];
-      size_t tag_length;
-    } objects[] = {{"card-auth-cert.bin", {0x5f, 0xc1, 0x01}, 3},
-                   {"discovery.bin", {0x7e, 0, 0}, 1}};
-    for (size_t i = 0; i < sizeof objects / sizeof *objects; ++i) {
-      uint8_t expected[MAX_OBJECT];
-      const size_t length = fixture_read(profile, objects[i].name, expected, sizeof expected);
-      const ExampleCardResult status =
-          objects[i].tag[0] == 0x7e
-              ? example_card_read(&io, objects[i].tag, objects[i].tag_length, buffer, sizeof buffer,
-                                  &response)
-              : example_card_object_read(&io, EXAMPLE_CARD_READ_SHORT, objects[i].tag,
-                                         objects[i].tag_length, buffer, sizeof buffer, &response);
-      munit_assert_int(status, ==, EXAMPLE_CARD_OK);
-      munit_assert_size(response.length, ==, length);
-      munit_assert_memory_equal(length, buffer, expected);
-    }
-    for (unsigned tag = 0xe1; tag <= 0xfd; ++tag) {
-      if (tag > 0xea && tag < 0xfa)
-        continue;
-      const uint8_t encoded = (uint8_t)tag;
-      munit_assert_int(example_card_object_read(&io, EXAMPLE_CARD_READ_SHORT, &encoded, 1, buffer,
-                                                sizeof buffer, &response),
-                       ==, EXAMPLE_CARD_STATUS);
-      munit_assert_uint(response.status, ==, 0x6a82);
-      munit_assert_size(response.length, ==, 0);
-    }
+  } else if (legacy) {
+    static const uint8_t denied[] = {0x05, 0x07, 0x0a, 0x0b}, absent[] = {0x0c, 0x0d, 0x0e, 0x0f};
+    read_status_tags(link, piv_prefix, denied, sizeof denied, 0x6a81);
+    read_status_tags(link, piv_prefix, absent, sizeof absent, 0x6a82);
+    read_status(link, (TC_bytes){&discovery, 1}, 0x6a82);
+    return;
   }
-  {
-    munit_assert_int(example_card_select(&io, EXAMPLE_CARD_PIV, buffer, sizeof buffer, &response),
-                     ==, EXAMPLE_CARD_OK);
-    ExampleCardModel piv_model = EXAMPLE_CARD_MODEL_TWIC_LEGACY;
-    munit_assert_int(
-        example_card_identity((TC_bytes){buffer, response.length}, EXAMPLE_CARD_PIV, &piv_model),
-        ==, TC_TLV_OK);
-    munit_assert_int(piv_model, ==, EXAMPLE_CARD_MODEL_PIV);
-    static const struct {
-      const char* name;
-      uint8_t tag[3];
-    } piv_objects[] = {{"piv-signed-chuid.bin", {0x5f, 0xc1, 0x02}},
-                       {"piv-card-auth-cert.bin", {0x5f, 0xc1, 0x01}}};
-    for (size_t i = 0; i < sizeof piv_objects / sizeof *piv_objects; ++i) {
-      uint8_t expected[MAX_OBJECT];
-      const size_t length = fixture_read(profile, piv_objects[i].name, expected, sizeof expected);
-      munit_assert_int(example_card_object_read(&io, EXAMPLE_CARD_READ_SHORT, piv_objects[i].tag,
-                                                sizeof piv_objects[i].tag, buffer, sizeof buffer,
-                                                &response),
-                       ==, EXAMPLE_CARD_OK);
-      munit_assert_size(response.length, ==, length);
-      munit_assert_memory_equal(length, buffer, expected);
+  if (legacy)
+    return;
+  if (contact)
+    for (size_t i = 0; i < 2; ++i) {
+      const uint8_t tag[] = {0x5f, 0xc1, certificates[i].last};
+      read_object(link, profile, certificates[i].name, (TC_bytes){tag, sizeof tag});
     }
-    authenticate(&io, profile, 0, buffer, sizeof buffer);
-    if (!strcmp(profile, "legacy")) {
-      if (!strcmp(interface, "contact")) {
-        static const struct {
-          const char* name;
-          uint8_t tag[3];
-        } legacy_certs[] = {{"piv-auth-cert.bin", {0x5f, 0xc1, 0x05}},
-                            {"piv-discovery.bin", {0x5f, 0xc1, 0x07}},
-                            {"piv-sign-cert.bin", {0x5f, 0xc1, 0x0a}},
-                            {"piv-key-management-cert.bin", {0x5f, 0xc1, 0x0b}}};
-        for (size_t i = 0; i < sizeof legacy_certs / sizeof *legacy_certs; ++i) {
-          uint8_t expected[MAX_OBJECT];
-          const size_t length =
-              fixture_read(profile, legacy_certs[i].name, expected, sizeof expected);
-          munit_assert_int(example_card_object_read(&io, EXAMPLE_CARD_READ_SHORT,
-                                                    legacy_certs[i].tag, sizeof legacy_certs[i].tag,
-                                                    buffer, sizeof buffer, &response),
-                           ==, EXAMPLE_CARD_OK);
-          munit_assert_size(response.length, ==, length);
-          munit_assert_memory_equal(length, buffer, expected);
-        }
-      } else {
-        static const uint8_t restricted[] = {0x05, 0x07, 0x0a, 0x0b};
-        for (size_t i = 0; i < sizeof restricted; ++i) {
-          const uint8_t tag[] = {0x5f, 0xc1, restricted[i]};
-          munit_assert_int(example_card_object_read(&io, EXAMPLE_CARD_READ_SHORT, tag, sizeof tag,
-                                                    buffer, sizeof buffer, &response),
-                           ==, EXAMPLE_CARD_STATUS);
-          munit_assert_uint(response.status, ==, 0x6a81);
-        }
-        for (unsigned last = 0x0c; last <= 0x0f; ++last) {
-          const uint8_t tag[] = {0x5f, 0xc1, (uint8_t)last};
-          munit_assert_int(example_card_object_read(&io, EXAMPLE_CARD_READ_SHORT, tag, sizeof tag,
-                                                    buffer, sizeof buffer, &response),
-                           ==, EXAMPLE_CARD_STATUS);
-          munit_assert_uint(response.status, ==, 0x6a82);
-        }
-        const uint8_t discovery = 0x7e;
-        munit_assert_int(example_card_object_read(&io, EXAMPLE_CARD_READ_SHORT, &discovery, 1,
-                                                  buffer, sizeof buffer, &response),
-                         ==, EXAMPLE_CARD_STATUS);
-        munit_assert_uint(response.status, ==, 0x6a82);
-      }
-    }
-    if (!strcmp(profile, "nexgen")) {
-      static const struct {
-        const char* name;
-        uint8_t tag[3];
-        size_t tag_length;
-      } extra[] = {{"piv-auth-cert.bin", {0x5f, 0xc1, 0x05}, 3},
-                   {"piv-discovery.bin", {0x5f, 0xc1, 0x07}, 3},
-                   {"piv-twic-discovery.bin", {0x7e, 0, 0}, 1}};
-      for (size_t i = 0; i < sizeof extra / sizeof *extra; ++i) {
-        if (strcmp(interface, "contact") && i < 2)
-          continue;
-        uint8_t expected[MAX_OBJECT];
-        const size_t length = fixture_read(profile, extra[i].name, expected, sizeof expected);
-        const ExampleCardResult status =
-            extra[i].tag[0] == 0x7e
-                ? example_card_read(&io, extra[i].tag, extra[i].tag_length, buffer, sizeof buffer,
-                                    &response)
-                : example_card_object_read(&io, EXAMPLE_CARD_READ_SHORT, extra[i].tag,
-                                           extra[i].tag_length, buffer, sizeof buffer, &response);
-        munit_assert_int(status, ==, EXAMPLE_CARD_OK);
-        munit_assert_size(response.length, ==, length);
-        munit_assert_memory_equal(length, buffer, expected);
-      }
-      if (!strcmp(interface, "contact")) {
-        static const uint8_t invented_pin[] = "31415926";
-        ExampleCardPIN guard = {0};
-        uint16_t pin_status = 0;
-        munit_assert_int(example_card_verify_pin(&io, &guard, invented_pin, 8, &pin_status), ==,
-                         EXAMPLE_CARD_OK);
-        munit_assert_uint(pin_status, ==, 0x9000);
-        munit_assert_int(guard.used, ==, 1);
-        static const struct {
-          const char* name;
-          uint8_t tag[3];
-        } gated[] = {{"piv-fingerprint.bin", {0x5f, 0xc1, 0x03}},
-                     {"piv-face.bin", {0x5f, 0xc1, 0x08}},
-                     {"piv-security.bin", {0x5f, 0xc1, 0x06}},
-                     {"piv-printed.bin", {0x5f, 0xc1, 0x09}}};
-        for (size_t i = 0; i < sizeof gated / sizeof *gated; ++i) {
-          uint8_t expected[MAX_OBJECT];
-          const size_t length = fixture_read(profile, gated[i].name, expected, sizeof expected);
-          munit_assert_int(example_card_object_read(&io, EXAMPLE_CARD_READ_SHORT, gated[i].tag,
-                                                    sizeof gated[i].tag, buffer, sizeof buffer,
-                                                    &response),
-                           ==, EXAMPLE_CARD_OK);
-          munit_assert_size(response.length, ==, length);
-          munit_assert_memory_equal(length, buffer, expected);
-        }
-        for (unsigned last = 0x0a; last <= 0x0f; ++last) {
-          char object_file[] = "piv-5fc100.bin";
-          const char digits[] = "0123456789abcdef";
-          object_file[8] = digits[last >> 4];
-          object_file[9] = digits[last & 15];
-          uint8_t expected[MAX_OBJECT];
-          const size_t length = fixture_read(profile, object_file, expected, sizeof expected);
-          const uint8_t tag[] = {0x5f, 0xc1, (uint8_t)last};
-          munit_assert_int(example_card_object_read(&io, EXAMPLE_CARD_READ_SHORT, tag, sizeof tag,
-                                                    buffer, sizeof buffer, &response),
-                           ==, EXAMPLE_CARD_OK);
-          munit_assert_size(response.length, ==, length);
-          munit_assert_memory_equal(length, buffer, expected);
-        }
-      } else {
-        static const uint8_t denied[] = {0x05, 0x07, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f};
-        for (size_t i = 0; i < sizeof denied; ++i) {
-          const uint8_t tag[] = {0x5f, 0xc1, denied[i]};
-          munit_assert_int(example_card_object_read(&io, EXAMPLE_CARD_READ_SHORT, tag, sizeof tag,
-                                                    buffer, sizeof buffer, &response),
-                           ==, EXAMPLE_CARD_STATUS);
-          munit_assert_uint(response.status, ==, 0x6982);
-          munit_assert_size(response.length, ==, 0);
-        }
-      }
-    }
+  read_object(link, profile, "piv-twic-discovery.bin", (TC_bytes){&discovery, 1});
+  if (!contact) {
+    static const uint8_t denied[] = {0x05, 0x07, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f};
+    read_status_tags(link, piv_prefix, denied, sizeof denied, 0x6982);
+    return;
   }
+  /* Query 63C3, then one submission of the invented PIN (Part 2 3.2.1). */
+  static const uint8_t invented_pin[] = "31415926";
+  TC_PIV_reference_status status;
+  munit_assert_int(TC_PIV_pin_verify(link, 0x80, (TC_bytes){invented_pin, 8}, 3, &status), ==,
+                   TC_PIV_OK);
+  munit_assert_uint8(status.submitted, ==, 1);
+  static const struct {
+    const char* name;
+    uint8_t last;
+  } gated[] = {{"piv-fingerprint.bin", 0x03}, {"piv-face.bin", 0x08},   {"piv-security.bin", 0x06},
+               {"piv-printed.bin", 0x09},     {"piv-5fc10a.bin", 0x0a}, {"piv-5fc10b.bin", 0x0b},
+               {"piv-5fc10c.bin", 0x0c},      {"piv-5fc10d.bin", 0x0d}, {"piv-5fc10e.bin", 0x0e},
+               {"piv-5fc10f.bin", 0x0f}};
+  for (size_t i = 0; i < sizeof gated / sizeof *gated; ++i) {
+    const uint8_t tag[] = {0x5f, 0xc1, gated[i].last};
+    read_object(link, profile, gated[i].name, (TC_bytes){tag, sizeof tag});
+  }
+}
+
+static MunitResult replay_profile(const char* profile, TC_PIV_interface interface)
+{
+  Replay replay = {replay_open(profile, interface == TC_PIV_CONTACT ? "apdu-contact.txt"
+                                                                    : "apdu-contactless.txt"),
+                   0,
+                   {0},
+                   0};
+  TC_PIV_link link;
+  link_open(&link, &replay, interface);
+  twic_application(&link, profile, interface);
+  piv_application(&link, &replay, profile, interface);
   char tail[LINE_SIZE];
-  munit_assert_null(next_line(file, tail, sizeof tail));
-  munit_assert_int(fclose(file), ==, 0);
-  munit_assert_int(io.stopped, ==, 0);
-  munit_assert_size(replay.exchanges, >, inventory.count + 2);
+  munit_assert_null(next_line(replay.file, tail, sizeof tail));
+  munit_assert_int(fclose(replay.file), ==, 0);
+  TC_PIV_link_clear(&link);
   return MUNIT_OK;
 }
 
 TC_TEST(legacy_contact)
 {
-  return replay_profile("legacy", "contact");
+  return replay_profile("legacy", TC_PIV_CONTACT);
 }
 TC_TEST(legacy_contactless)
 {
-  return replay_profile("legacy", "contactless");
+  return replay_profile("legacy", TC_PIV_CONTACTLESS);
 }
 TC_TEST(nexgen_contact)
 {
-  return replay_profile("nexgen", "contact");
+  return replay_profile("nexgen", TC_PIV_CONTACT);
 }
 TC_TEST(nexgen_contactless)
 {
-  return replay_profile("nexgen", "contactless");
+  return replay_profile("nexgen", TC_PIV_CONTACTLESS);
 }
 
-TC_TEST(required_nonempty)
+/* A mandatory NEXGEN object answered 53 00 reads as EMPTY. The inventory
+ * completes, and the card check reports the missing content. */
+TC_TEST(required_empty)
 {
-  static const uint8_t required[][3] = {{0x5f, 0xc1, 0x02}, {0xdf, 0xc1, 0x03}, {0xdf, 0xc1, 0x0f}};
-  char path[512];
-  fixture_path(path, sizeof path, "nexgen", "apdu-contact.txt");
-  static uint8_t pool[POOL_SIZE];
+  static const struct {
+    uint8_t tag[3];
+    uint16_t container;
+  } required[] = {
+      {{0x5f, 0xc1, 0x02}, 0x3000}, {{0xdf, 0xc1, 0x03}, 0x2003}, {{0xdf, 0xc1, 0x0f}, 0x9000}};
   for (size_t i = 0; i < sizeof required / sizeof *required; ++i) {
-    FILE* file = fopen(path, "rb");
-    munit_assert_not_null(file);
-    Replay replay = {file, 0, {0}};
-    memcpy(replay.empty_tag, required[i], 3);
-    ExampleCardIO io = {transmit, &replay, 1000, 0};
-    ExampleTWICInventory inventory, preserved;
-    memset(&inventory, 0xa5, sizeof inventory);
-    preserved = inventory;
-    memset(pool, 0xa5, sizeof pool);
-    size_t work = sizeof pool;
-    munit_assert_int(example_twic_inventory_read(&io, EXAMPLE_CARD_MODEL_TWIC_NEXGEN,
-                                                 EXAMPLE_CARD_READ_SHORT, pool, sizeof pool,
-                                                 MAX_OBJECT, &work, &inventory),
-                     ==, EXAMPLE_CARD_PROTOCOL);
-    munit_assert_int(io.stopped, ==, 1);
-    munit_assert_memory_equal(sizeof inventory, &inventory, &preserved);
-    for (size_t n = 0; n < sizeof pool; ++n)
-      munit_assert_uint(pool[n], ==, 0);
-    munit_assert_int(fclose(file), ==, 0);
+    Replay replay = {replay_open("nexgen", "apdu-contact.txt"), 0, {0}, 0};
+    memcpy(replay.empty_tag, required[i].tag, 3);
+    TC_PIV_link link;
+    TC_PIV_inventory inventory = inventory_start();
+    size_t work = POOL_SIZE;
+    link_open(&link, &replay, TC_PIV_CONTACT);
+    select_application(&link, TC_PIV_APPLICATION_TWIC, TC_TWIC_NEXGEN_CARD);
+    munit_assert_int(
+        TC_PIV_inventory_read(&link, NULL, (TC_buffer){pool, sizeof pool}, &work, &inventory), ==,
+        TC_PIV_OK);
+    const TC_PIV_object* object = TC_PIV_inventory_find(&inventory, required[i].container);
+    munit_assert_int(object->state, ==, TC_PIV_OBJECT_EMPTY);
+    munit_assert_int(object->info->requirement, ==, TC_PIV_MANDATORY);
+    TC_PIV_inventory_clear(&inventory);
+    TC_PIV_link_clear(&link);
+    munit_assert_int(fclose(replay.file), ==, 0);
   }
   return MUNIT_OK;
 }
 
+/* A flipped signature travels unchanged. Verification belongs to the key
+ * proof. */
 TC_TEST(invalid_legacy_proof)
 {
-  char path[512];
-  fixture_path(path, sizeof path, "legacy", "apdu-ga-invalid.txt");
-  FILE* file = fopen(path, "rb");
-  munit_assert_not_null(file);
-  Replay replay = {file, 0, {0}};
-  ExampleCardIO io = {transmit, &replay, 8, 0};
-  static uint8_t buffer[MAX_OBJECT + EXAMPLE_CARD_STATUS_BYTES];
-  ExampleCardResponse selected = {0};
-  munit_assert_int(example_card_select(&io, EXAMPLE_CARD_PIV, buffer, sizeof buffer, &selected), ==,
-                   EXAMPLE_CARD_OK);
-  authenticate(&io, "legacy", 1, buffer, sizeof buffer);
+  Replay replay = {replay_open("legacy", "apdu-ga-invalid.txt"), 0, {0}, 0};
+  TC_PIV_link link;
+  link_open(&link, &replay, TC_PIV_CONTACT);
+  TC_PIV_application application;
+  munit_assert_int(TC_PIV_select(&link, TC_PIV_APPLICATION_PIV, 0, response_buffer(), &application),
+                   ==, TC_PIV_OK);
+  authenticate(&replay, "legacy", 1);
   char tail[LINE_SIZE];
-  munit_assert_null(next_line(file, tail, sizeof tail));
-  munit_assert_int(fclose(file), ==, 0);
+  munit_assert_null(next_line(replay.file, tail, sizeof tail));
+  munit_assert_int(fclose(replay.file), ==, 0);
   munit_assert_size(replay.exchanges, ==, 4);
+  TC_PIV_link_clear(&link);
   return MUNIT_OK;
 }
 
@@ -474,7 +469,7 @@ int main(int argc, char** argv)
       {"/legacy-contactless", legacy_contactless, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/nexgen-contact", nexgen_contact, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/nexgen-contactless", nexgen_contactless, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-      {"/required-nonempty", required_nonempty, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/required-empty", required_empty, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/invalid-legacy-proof", invalid_legacy_proof, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
   MunitSuite suite = {"/twic-apdu-replay", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};

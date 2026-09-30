@@ -24,7 +24,10 @@ TWIC objects encrypt. NEXGEN's PIV face does the same.
 Raw real-card APDUs and contents are kept in the restricted private capture
 workspace for review. The committed APDU command/response replays contain only
 these synthetic payloads. `tests/twic/apdu_replay.py` regenerates all four
-transcript files and `--check` verifies them. Contact and contactless status
+transcript files and `--check` verifies them. The transcripts follow the
+library's command order: GET DATA and SELECT with Le `00`, the TWIC catalog
+inventory, and GET RESPONSE with Le `FF` after `61 00` on the TWIC
+application. Contact and contactless status
 and chaining patterns follow identity-bound captures with synthetic payloads.
 
 Routine CTest runs use the committed binary vectors and require no OpenSSL,

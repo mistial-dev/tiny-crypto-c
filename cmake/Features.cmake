@@ -48,6 +48,10 @@ tc_module_feature(TINY_CRYPTO_ENABLE_PIV_VCI TC_ENABLE_PIV_VCI
   "Build the PIV virtual contact interface on a secured card link")
 set(tc_module_sources_TC_ENABLE_PIV_VCI src/piv_discovery_get.c src/piv_vci.c)
 
+tc_module_feature(TINY_CRYPTO_ENABLE_PIV_CATALOG TC_ENABLE_PIV_CATALOG
+  "Build the PIV and TWIC data object catalogs and the card inventory")
+set(tc_module_sources_TC_ENABLE_PIV_CATALOG src/piv_catalog.c src/piv_inventory.c)
+
 tc_module_feature(TINY_CRYPTO_ENABLE_PIV_OIDS TC_ENABLE_PIV_OIDS
   "Build registered PIV and TWIC identifier classification")
 set(tc_module_sources_TC_ENABLE_PIV_OIDS src/piv_oid.c)

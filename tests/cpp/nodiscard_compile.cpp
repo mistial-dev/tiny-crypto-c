@@ -48,6 +48,7 @@
 #define TC_ENABLE_TWIC_UUID 1
 #define TC_ENABLE_PIV_OBJECTS 1
 #define TC_ENABLE_PIV_VCI 1
+#define TC_ENABLE_PIV_CATALOG 1
 #define TC_ENABLE_DRBG 1
 #define TC_DRBG_ENABLE_HASH 1
 #define TC_DRBG_ENABLE_HMAC 1
@@ -68,6 +69,7 @@
 #include <tiny_crypto/gzip.hpp>
 #include <tiny_crypto/hash.hpp>
 #include <tiny_crypto/kmac.hpp>
+#include <tiny_crypto/piv_catalog.hpp>
 #include <tiny_crypto/piv_command.hpp>
 #include <tiny_crypto/piv_sm.hpp>
 #include <tiny_crypto/piv_sm_apdu.hpp>
@@ -261,6 +263,14 @@ void tiny_crypto_nodiscard_compile(uint8_t* data, size_t length)
   piv_vci_mode mode = TC_PIV_VCI_PAIRED;
   piv_discovery_get(link, TC_PIV_DISCOVERY_PIV, out, discovery); /* DISCARDED */
   piv_vci_establish(link, discovery, in, mode);                  /* DISCARDED */
+  piv_object objects[1];
+  piv_inventory inventory(objects);
+  size_t inventory_work = 0;
+  inventory.read(link, nullptr, out, inventory_work);        /* DISCARDED */
+  inventory.find(0x3000);                                    /* DISCARDED */
+  piv_catalog_count(TC_PIV_APPLICATION_PIV, TC_PIV_CARD);    /* DISCARDED */
+  piv_catalog_at(TC_PIV_APPLICATION_PIV, TC_PIV_CARD, 0);    /* DISCARDED */
+  piv_catalog_find(TC_PIV_APPLICATION_PIV, TC_PIV_CARD, in); /* DISCARDED */
 
   /* Clearing stays unmarked. */
   aes.clear();

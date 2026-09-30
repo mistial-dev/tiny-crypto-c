@@ -318,5 +318,17 @@ int tiny_crypto_cpp_header_compile(uint8_t* data, size_t length)
       ++failures;
   }
 #endif
+#if TC_ENABLE_PIV_CATALOG
+  {
+    tiny_crypto::piv_link link;
+    tiny_crypto::piv_object objects[TC_PIV_CATALOG_PIV_OBJECTS];
+    tiny_crypto::piv_inventory inventory(objects);
+    size_t work = 0;
+    if (inventory.read(link, nullptr, tiny_crypto::buffer{data, length}, work) != TC_PIV_ARGUMENT ||
+        tiny_crypto::piv_catalog_count(TC_PIV_APPLICATION_PIV, TC_PIV_CARD) !=
+            TC_PIV_CATALOG_PIV_OBJECTS)
+      ++failures;
+  }
+#endif
   return failures;
 }

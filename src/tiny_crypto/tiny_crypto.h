@@ -42,6 +42,9 @@
 #if TC_ENABLE_PIV_VCI
 #include <tiny_crypto/piv_vci.h>
 #endif
+#if TC_ENABLE_PIV_CATALOG
+#include <tiny_crypto/piv_catalog.h>
+#endif
 #if TC_ENABLE_AAMVA
 #include <tiny_crypto/aamva.h>
 #endif
