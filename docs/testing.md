@@ -1166,7 +1166,10 @@ failure. Run it with `./build/test_rsa_import`.
 
 When `avr-gcc` is available, CMake adds compile checks for the RSA implementation
 and validation/signing examples. They use ATmega2560's 16-bit `size_t` with warnings
-treated as errors. With `avr-g++`, `test_cpp_headers_avr` compiles
+treated as errors. The RSA, EC and key-challenge checks also enable `-Wconversion`,
+so copying a 32-bit work budget into a `size_t` fails to build. They keep
+`-Wno-sign-conversion` because sign changes keep the width. With `avr-g++`,
+`test_cpp_headers_avr` compiles
 `tests/cpp/header_compile.cpp` with every wrapper family enabled and
 `-Wall -Wextra -Werror`, and checks the validation API's 32-bit work
 parameter. `test_cpp_nodiscard_avr` runs the unused-result check with
@@ -1178,6 +1181,26 @@ emulated ATmega328P in each S-box mode. The key wrap program includes a
 
 ```sh
 ctest --test-dir build -R '^test_(rsa(_validate|_sign)?_compile_avr|cpp_(headers|nodiscard)_avr)$' --output-on-failure
+```
+
+RSA, EC and key-challenge work budgets count 32-bit units on every target.
+`test_work_budget_types` compiles `tests/work_budget/types.c` with `-Werror`.
+The file pins `TC_work_budget.remaining` to `uint32_t`, the `work` member of the
+RSA and EC execution descriptors, the cost functions, and the exact function
+type of every public entry point and header helper that takes a budget. A helper
+that takes `size_t*` fails even when a pointer cast hides it at the call site.
+The test also scans the RSA, EC and key-challenge headers and fails when a
+declaration with a `work` or `TC_work_budget*` parameter has no check in that
+file, or when the scan misses a known budget function. Each negative fixture in
+`tests/work_budget/fixtures` must compile in its correct form and fail with a
+`size_t` budget, which proves every guard fires. `test_work_budget_types_avr`
+repeats the check with `avr-gcc` and the narrowing flags and adds the `size_t`
+alias fixture. The extended CI job installs `avr-gcc` and runs it with the RSA,
+EC and key-challenge AVR compile checks. Code review covers explicit value casts
+such as `(size_t)budget->remaining`, which both guards accept.
+
+```sh
+ctest --test-dir build -R '^test_work_budget_types' --output-on-failure
 ```
 
 `test_rsa_private_openssl_0` and `test_rsa_private_openssl_1` compare the internal

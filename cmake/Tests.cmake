@@ -50,8 +50,6 @@ if(TINY_CRYPTO_BUILD_TESTS)
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_benchmark_report.py)
     add_test(NAME test_unicode_tables
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_unicode_tables.py)
-    add_test(NAME test_work_budget_width
-      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_work_budget_width.py)
     add_test(NAME test_package_boundaries
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_package_boundaries.py)
     add_test(NAME test_vector_manifests
@@ -1482,14 +1480,31 @@ if(TINY_CRYPTO_BUILD_TESTS)
       -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/cpp_headers_reject_c.cmake)
   endif()
 
+  # RSA, EC and key-challenge work budgets keep exact 32-bit types.
+  if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    add_test(NAME test_work_budget_types COMMAND ${CMAKE_COMMAND}
+      -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR} -DC_COMPILER=${CMAKE_C_COMPILER}
+      -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/work_budget
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/work_budget_width.cmake)
+  endif()
+
   find_program(TC_AVR_CXX NAMES avr-g++)
   find_program(TC_AVR_CC NAMES avr-gcc)
   if(TC_AVR_CC)
+    # size_t is 16 bits on AVR. Width-changing conversions are errors in the
+    # RSA, EC and key-challenge compile checks, so copying a 32-bit budget
+    # into a size_t fails. Sign conversions keep the width and stay allowed.
+    set(tc_avr_work_width_flags -Wconversion -Wno-sign-conversion)
+    add_test(NAME test_work_budget_types_avr COMMAND ${CMAKE_COMMAND}
+      -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR} -DC_COMPILER=${TC_AVR_CC}
+      -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/work_budget_avr
+      "-DFLAGS=-Os;-mmcu=atmega2560;${tc_avr_work_width_flags}" -DNARROWING=ON
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/work_budget_width.cmake)
     foreach(rsa_source ${tc_rsa_sources} examples/rsa_validate.c examples/rsa_sign.c examples/rsa_encrypt.c)
       get_filename_component(rsa_name ${rsa_source} NAME_WE)
       add_test(NAME test_${rsa_name}_compile_avr
-        COMMAND ${TC_AVR_CC} -std=c99 -Wall -Wextra -Werror -Os -mmcu=atmega2560
-          -DTC_ENABLE_RSA=1 -I${CMAKE_CURRENT_SOURCE_DIR}/src
+        COMMAND ${TC_AVR_CC} -std=c99 -Wall -Wextra -Werror ${tc_avr_work_width_flags} -Os
+          -mmcu=atmega2560 -DTC_ENABLE_RSA=1 -I${CMAKE_CURRENT_SOURCE_DIR}/src
           -c ${CMAKE_CURRENT_SOURCE_DIR}/${rsa_source}
           -o ${CMAKE_CURRENT_BINARY_DIR}/tiny-crypto-c-${rsa_name}-compile.o)
     endforeach()
@@ -1514,8 +1529,8 @@ if(TINY_CRYPTO_BUILD_TESTS)
           -o ${CMAKE_CURRENT_BINARY_DIR}/tiny-crypto-c-${hash_source}-compile.o)
     endforeach()
     add_test(NAME test_ec_compile_avr
-      COMMAND ${TC_AVR_CC} -std=c99 -Wall -Wextra -Werror -Os -mmcu=atmega328p
-        -DTC_ENABLE_EC=1 -I${CMAKE_CURRENT_SOURCE_DIR}/src
+      COMMAND ${TC_AVR_CC} -std=c99 -Wall -Wextra -Werror ${tc_avr_work_width_flags} -Os
+        -mmcu=atmega328p -DTC_ENABLE_EC=1 -I${CMAKE_CURRENT_SOURCE_DIR}/src
         -c ${CMAKE_CURRENT_SOURCE_DIR}/src/ec.c
         -o ${CMAKE_CURRENT_BINARY_DIR}/tiny-crypto-c-ec-compile.o)
     # CTR_DRBG needs dynamic AES; every hash is on so HMAC and Hash_DRBG
@@ -1555,9 +1570,9 @@ if(TINY_CRYPTO_BUILD_TESTS)
     endif()
     # The key challenge carries a 32-bit work budget across size_t PKI code.
     add_test(NAME test_key_challenge_compile_avr
-      COMMAND ${TC_AVR_CC} -std=c99 -Wall -Wextra -Werror -Os -mmcu=atmega2560
-        -DTC_ENABLE_KEY_CHALLENGE=1 -DTC_ENABLE_X509=1 -DTC_ENABLE_TLV=1 -DTC_ENABLE_DER=1
-        -DTC_ENABLE_RSA=1 -DTC_ENABLE_EC=1 -I${CMAKE_CURRENT_SOURCE_DIR}/src
+      COMMAND ${TC_AVR_CC} -std=c99 -Wall -Wextra -Werror ${tc_avr_work_width_flags} -Os
+        -mmcu=atmega2560 -DTC_ENABLE_KEY_CHALLENGE=1 -DTC_ENABLE_X509=1 -DTC_ENABLE_TLV=1
+        -DTC_ENABLE_DER=1 -DTC_ENABLE_RSA=1 -DTC_ENABLE_EC=1 -I${CMAKE_CURRENT_SOURCE_DIR}/src
         -c ${CMAKE_CURRENT_SOURCE_DIR}/src/key_challenge.c
         -o ${CMAKE_CURRENT_BINARY_DIR}/tiny-crypto-c-key_challenge-compile.o)
     add_test(NAME test_sskdf_compile_avr

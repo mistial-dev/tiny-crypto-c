@@ -41,7 +41,7 @@ static TC_key_challenge_result challenge_parameters(const TC_X509_public_key* ke
       if (signature->salt_length > TC_KEY_CHALLENGE_MAX_SALT_BYTES)
         return TC_KEY_CHALLENGE_UNSUPPORTED;
       const TC_RSA_pss_options rsa_options = {signature->hash, signature->mgf_hash,
-                                              signature->salt_length};
+                                              (size_t)signature->salt_length};
       *encoding_work = TC_RSA_encode_pss_work(&rsa_options, *challenge_length);
     } else {
       const TC_RSA_v15_options rsa_options = {signature->hash};
@@ -113,8 +113,10 @@ TC_key_challenge_result TC_key_challenge_prepare(const TC_X509_public_key* key,
       challenge_parameters(key, options, &digest_length, &challenge_length, &encoding_work);
   if (result != TC_KEY_CHALLENGE_OK)
     return result;
-  const size_t salt_length =
-      options->signature.scheme == TC_SIGNATURE_RSA_PSS ? options->signature.salt_length : 0;
+  /* challenge_parameters bounded the salt by TC_KEY_CHALLENGE_MAX_SALT_BYTES. */
+  const size_t salt_length = options->signature.scheme == TC_SIGNATURE_RSA_PSS
+                                 ? (size_t)options->signature.salt_length
+                                 : 0;
   const uint32_t random_work = (uint32_t)(digest_length + salt_length);
   if (work->remaining < random_work || work->remaining - random_work < encoding_work)
     return TC_KEY_CHALLENGE_LIMIT;

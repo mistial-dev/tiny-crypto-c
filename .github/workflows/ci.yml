@@ -118,6 +118,11 @@ jobs:
       - name: AVR C++ header gate
         if: matrix.compiler == 'gcc'
         run: ctest --test-dir build-full --output-on-failure -R test_cpp_headers_avr
+      - name: AVR 32-bit work budget gate
+        if: matrix.compiler == 'gcc'
+        run: >-
+          ctest --test-dir build-full --output-on-failure
+          -R '^test_(work_budget_types_avr|rsa_[a-z]+_compile_avr|ec_compile_avr|key_challenge_compile_avr)$'
       - name: Address and undefined behavior sanitizers
         run: make test-sanitize TINY_CRYPTO_TEST_OPENSSL=ON
       - name: Sanitizer benchmark linkage

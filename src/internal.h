@@ -196,7 +196,7 @@ static inline int tc_internal_counter_has_blocks(const uint8_t* counter, size_t 
     const unsigned diff = (unsigned)(0u - (unsigned)counter[index] - (unsigned)carry);
     remaining[index] = (uint8_t)diff;
     carry = (uint8_t)(counter[index] != 0 || carry != 0);
-    all_zero &= (uint8_t)(counter[index] == 0);
+    all_zero = (uint8_t)(all_zero & (counter[index] == 0));
   }
   if (all_zero)
     return length >= sizeof(size_t) || needed <= ((size_t)1 << (8u * length));

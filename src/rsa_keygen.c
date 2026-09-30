@@ -181,15 +181,27 @@ TC_RSA_result TC_RSA_keygen_init(TC_RSA_keygen_state* state, size_t bits,
   return TC_RSA_OK;
 }
 
+/* The state's key size. TC_RSA_keygen_init stores a supported size, which
+ * fits size_t. A larger value maps to 0, which no operation supports. */
+static size_t tc_rsa_keygen_bits(const TC_RSA_keygen_state* state)
+{
+#if SIZE_MAX < UINT32_MAX
+  if (state->bits > SIZE_MAX)
+    return 0;
+#endif
+  return (size_t)state->bits;
+}
+
 void TC_RSA_keygen_clear(TC_RSA_keygen_state* state)
 {
   if (!state)
     return;
+  const size_t bits = tc_rsa_keygen_bits(state);
   if (state->marker == TC_RSA_KEYGEN_MARKER &&
-      TC_RSA_workspace_words(TC_RSA_OPERATION_KEYGEN, state->bits) && state->workspace.words &&
-      state->workspace.capacity >= TC_RSA_KEYGEN_WORKSPACE_WORDS(state->bits))
+      TC_RSA_workspace_words(TC_RSA_OPERATION_KEYGEN, bits) && state->workspace.words &&
+      state->workspace.capacity >= TC_RSA_KEYGEN_WORKSPACE_WORDS(bits))
     TC_secure_zero(state->workspace.words,
-                   TC_RSA_KEYGEN_WORKSPACE_WORDS(state->bits) * sizeof *state->workspace.words);
+                   TC_RSA_KEYGEN_WORKSPACE_WORDS(bits) * sizeof *state->workspace.words);
   TC_secure_zero(state, sizeof *state);
 }
 
@@ -221,14 +233,16 @@ static TC_RSA_result tc_rsa_keygen_step(TC_RSA_keygen_state* state, TC_random_fn
     *work = max_work;                                                                              \
     return tc_rsa_keygen_result;                                                                   \
   } while (0)
-  if (!state || !random || state->marker != TC_RSA_KEYGEN_MARKER ||
-      !TC_RSA_workspace_words(TC_RSA_OPERATION_KEYGEN, state->bits))
+  if (!state || !random || state->marker != TC_RSA_KEYGEN_MARKER)
+    TC_RSA_KEYGEN_RETURN(TC_RSA_ARGUMENT);
+  const size_t bits = tc_rsa_keygen_bits(state);
+  if (!TC_RSA_workspace_words(TC_RSA_OPERATION_KEYGEN, bits))
     TC_RSA_KEYGEN_RETURN(TC_RSA_ARGUMENT);
   if (state->phase < TC_RSA_KEYGEN_P_NEW || state->phase > TC_RSA_KEYGEN_DERIVE)
     TC_RSA_KEYGEN_RETURN(tc_rsa_keygen_stop(state, TC_RSA_ARGUMENT));
-  const size_t length = state->bits / 8, prime_length = length / 2;
+  const size_t length = bits / 8, prime_length = length / 2;
   const size_t n = length / sizeof(TC_RSA_word), h = n / 2;
-  const size_t required = TC_RSA_KEYGEN_WORKSPACE_WORDS(state->bits);
+  const size_t required = TC_RSA_KEYGEN_WORKSPACE_WORDS(bits);
   if (!state->workspace.words || state->workspace.capacity < required)
     TC_RSA_KEYGEN_RETURN(tc_rsa_keygen_stop(state, TC_RSA_ARGUMENT));
   uint8_t* p = (uint8_t*)state->workspace.words;

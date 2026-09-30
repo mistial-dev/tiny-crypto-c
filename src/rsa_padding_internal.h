@@ -387,8 +387,8 @@ static inline TC_RSA_result tc_rsa_oaep_decode(const TC_RSA_oaep_options* option
   size_t start = 0;
   unsigned searching = 1;
   for (size_t i = h; i < db_length; ++i) {
-    const unsigned zero = ((uint32_t)db[i] - 1u) >> 31;
-    const unsigned one = ((uint32_t)(db[i] ^ 1u) - 1u) >> 31;
+    const unsigned zero = (unsigned)(((uint32_t)db[i] - 1u) >> 31);
+    const unsigned one = (unsigned)(((uint32_t)(db[i] ^ 1u) - 1u) >> 31);
     const size_t take = (size_t)0 - (size_t)(searching & one);
     start = (start & ~take) | ((i + 1) & take);
     difference |= searching & ((zero | one) ^ 1u);
