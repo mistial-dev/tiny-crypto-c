@@ -6,7 +6,7 @@
   {                                                                                                \
     static const uint8_t input[16384] = {0};                                                       \
     uint8_t output[TC_SHA##N##_DIGESTLEN];                                                         \
-    TC_status status = TC_SHA##N##_digest(input, length, output);                                  \
+    TC_status status = TC_SHA##N##_digest((TC_bytes){input, length}, output);                      \
     if (status == TC_OK)                                                                           \
       tc_benchmark_consume(output);                                                                \
     return status;                                                                                 \
@@ -27,7 +27,8 @@
     static const uint8_t input[16384] = {0}, key[32] = {0};                                        \
     uint8_t output[TC_SHA##N##_DIGESTLEN];                                                         \
     TC_status status =                                                                             \
-        TC_HMAC_SHA##N##_digest(key, sizeof(key), input, length, output, sizeof(output));          \
+        TC_HMAC_SHA##N##_digest((TC_bytes){key, sizeof(key)}, (TC_bytes){input, length},           \
+                                (TC_buffer){output, sizeof(output)});                              \
     if (status == TC_OK)                                                                           \
       tc_benchmark_consume(output);                                                                \
     return status;                                                                                 \
@@ -36,7 +37,7 @@
   {                                                                                                \
     struct TC_HMAC_SHA##N##_ctx ctx;                                                               \
     static const uint8_t key[32] = {0};                                                            \
-    TC_status status = TC_HMAC_SHA##N##_init(&ctx, key, sizeof(key));                              \
+    TC_status status = TC_HMAC_SHA##N##_init(&ctx, (TC_bytes){key, sizeof(key)});                  \
     (void)unused;                                                                                  \
     if (status == TC_OK)                                                                           \
       tc_benchmark_consume(&ctx);                                                                  \

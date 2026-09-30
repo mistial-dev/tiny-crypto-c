@@ -168,8 +168,9 @@ def measure_pico(directory, body, flags, toolchain, env):
     source = directory / "fixture.c"
     source.write_text(host_source(body), encoding="utf-8")
     # Read the option names from CMake rather than maintaining a second list.
-    mapping = {macro: option for option, macro in re.findall(
-        r'"(TINY_CRYPTO_\w+);(TC_\w+)"', (ROOT / "CMakeLists.txt").read_text())}
+    sources = [ROOT / "CMakeLists.txt", *sorted((ROOT / "cmake").glob("*.cmake"))]
+    mapping = {macro: option for source in sources for option, macro in re.findall(
+        r"tc_profile_option\((TINY_CRYPTO_\w+)\s+(TC_\w+)", source.read_text())}
     options = []
     for macro, value in definitions(flags).items():
         if macro == "TC_AES_GCM_GHASH_MODE":
