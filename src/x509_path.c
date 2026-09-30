@@ -798,9 +798,10 @@ static TC_X509_path_status path_initial_subtrees(const path_validation* v,
     return tc_x509_path_status(result);
   for (i = 0; i < v->count; ++i) {
     int accepted = 0;
-    const TC_X509_path_status status = path_pass_status(
-        path_constraint_target(&v->input, i, 0, constraints, &v->names, v->work, &accepted),
-        accepted);
+    /* Sequence the pass before reading accepted: argument order is unspecified. */
+    const TC_TLV_result pass =
+        path_constraint_target(&v->input, i, 0, constraints, &v->names, v->work, &accepted);
+    const TC_X509_path_status status = path_pass_status(pass, accepted);
     if (status != TC_X509_PATH_VALID)
       return status;
   }
@@ -813,8 +814,8 @@ static TC_X509_path_status path_initial_subtrees(const path_validation* v,
 static TC_X509_path_status path_names_phase(const path_validation* v)
 {
   int accepted = 0;
-  TC_X509_path_status status =
-      path_pass_status(tc_x509_path_names(&v->input, &v->names, v->work, &accepted), accepted);
+  const TC_TLV_result result = tc_x509_path_names(&v->input, &v->names, v->work, &accepted);
+  TC_X509_path_status status = path_pass_status(result, accepted);
   if (status == TC_X509_PATH_VALID)
     status = path_initial_subtrees(v, &v->options->anchor_names);
   if (status == TC_X509_PATH_VALID)
@@ -880,9 +881,9 @@ static TC_X509_path_status path_usage_phase(const path_validation* v)
   extension_workspace.oids = v->workspace->oids;
   extension_workspace.oid_capacity = v->workspace->oid_capacity;
   extension_workspace.names = v->names;
-  return path_pass_status(
-      tc_x509_path_extensions(&v->input, &usage, &extension_workspace, v->work, &accepted),
-      accepted);
+  const TC_TLV_result result =
+      tc_x509_path_extensions(&v->input, &usage, &extension_workspace, v->work, &accepted);
+  return path_pass_status(result, accepted);
 }
 
 /* Write the outputs of RFC 5280 section 6.1.6: the target's public key and
