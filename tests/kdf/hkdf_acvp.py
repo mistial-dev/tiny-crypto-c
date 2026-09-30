@@ -27,11 +27,11 @@ def fixed_info(test):
 def derive(reader, hash_name, params, info, length_bits):
     if length_bits <= 0 or length_bits % 8:
         raise AssertionError(f"unexpected output length: {length_bits}")
-    args = [reader, hash_name, params["z"], params["salt"], info,
-            str(length_bits // 8)]
+    fields = [params["z"], params["salt"], info, str(length_bits // 8)]
     if "t" in params:
-        args.append(params["t"])
-    result = subprocess.run(args, capture_output=True, check=False)
+        fields.append(params["t"])
+    result = subprocess.run([reader, hash_name], input="\n".join(fields).encode() + b"\n",
+                            capture_output=True, check=False)
     if result.returncode != 0:
         raise AssertionError(f"HKDF reader failed: {result.returncode}, {result.stderr!r}")
     return result.stdout.hex().upper()

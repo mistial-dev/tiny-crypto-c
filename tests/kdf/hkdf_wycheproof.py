@@ -24,15 +24,10 @@ def main() -> int:
         if len(tests) != corpus["numberOfTests"]:
             raise AssertionError(f"{filename}: declared case count differs")
         for test in tests:
+            fields = [test["ikm"], test["salt"], test["info"], str(test["size"])]
             result = subprocess.run(
-                [
-                    reader,
-                    hash_name,
-                    test["ikm"],
-                    test["salt"],
-                    test["info"],
-                    str(test["size"]),
-                ],
+                [reader, hash_name],
+                input="\n".join(fields).encode() + b"\n",
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 check=False,
