@@ -29,6 +29,9 @@
 #include <tiny_crypto/aamva.h>
 #include <tiny_crypto/twic_tpk.h>
 
+/* Named spans: this file also builds as C++, which has no compound literals. */
+static const TC_TLV_frames example_no_frames = {NULL, 0};
+
 static TC_status unavailable_random(void* context, uint8_t* output, size_t length)
 {
   (void)output;
@@ -67,12 +70,12 @@ int main(void)
     const TC_bytes empty = {NULL, 0}, identifier = {guid, sizeof guid};
     TC_PIV_card_identifiers identifiers;
     size_t work = 1;
-    if (TC_PIV_authentication_identifiers_read(empty, identifier, NULL, (TC_TLV_frames){NULL, 0},
-                                               &work, &identifiers) != TC_TLV_ARGUMENT ||
+    if (TC_PIV_authentication_identifiers_read(empty, identifier, NULL, example_no_frames, &work,
+                                               &identifiers) != TC_TLV_ARGUMENT ||
         work != 1)
       return 1;
-    if (TC_TWIC_authentication_identifiers_read(empty, identifier, NULL, (TC_TLV_frames){NULL, 0},
-                                                &work, &identifiers) != TC_TLV_ARGUMENT ||
+    if (TC_TWIC_authentication_identifiers_read(empty, identifier, NULL, example_no_frames, &work,
+                                                &identifiers) != TC_TLV_ARGUMENT ||
         work != 1)
       return 1;
   }
@@ -176,11 +179,11 @@ int main(void)
     if (TC_PIV_CBEFF_format_identify(NULL) != TC_PIV_CBEFF_FORMAT_UNKNOWN)
       return 1;
     if (TC_PIV_CMS_identifiers_match(NULL, TC_PIV_CMS_BIOMETRIC, empty, empty, NULL,
-                                     (TC_TLV_frames){NULL, 0}, &work,
+                                     example_no_frames, &work,
                                      &identifiers_match) != TC_TLV_ARGUMENT ||
         work != 100 || identifiers_match != -1)
       return 1;
-    if (TC_PIV_CMS_read(empty, TC_PIV_CMS_CHUID, &piv_policy, NULL, (TC_TLV_frames){NULL, 0}, &work,
+    if (TC_PIV_CMS_read(empty, TC_PIV_CMS_CHUID, &piv_policy, NULL, example_no_frames, &work,
                         &piv_object) != TC_TLV_ARGUMENT ||
         work != 100)
       return 1;
@@ -195,8 +198,7 @@ int main(void)
     memset(&store, 0, sizeof store);
     memset(&slot, 0, sizeof slot);
     const TC_CMS_validation_request request = {empty, 0, empty, NULL, 0, empty};
-    if (TC_LDS_read(empty, NULL, (TC_TLV_frames){NULL, 0}, &work, NULL) != TC_TLV_ARGUMENT ||
-        work != 100)
+    if (TC_LDS_read(empty, NULL, example_no_frames, &work, NULL) != TC_TLV_ARGUMENT || work != 100)
       return 1;
     if (TC_FASCN_read(empty, NULL) != TC_TLV_ARGUMENT ||
         TC_FASCN_write(NULL, NULL, 0) != TC_TLV_ARGUMENT)
@@ -205,14 +207,14 @@ int main(void)
         TC_TWIC_uuid_write(0, NULL, 0) != TC_TLV_ARGUMENT ||
         TC_TWIC_uuid_match(empty, NULL, NULL) != TC_TLV_ARGUMENT)
       return 1;
-    if (TC_LDS_read_content(empty, NULL, (TC_TLV_frames){NULL, 0}, &work, NULL, 0, NULL) !=
+    if (TC_LDS_read_content(empty, NULL, example_no_frames, &work, NULL, 0, NULL) !=
             TC_TLV_ARGUMENT ||
         work != 100)
       return 1;
-    if (TC_LDS_hash_find(NULL, 1, NULL, (TC_TLV_frames){NULL, 0}, &work, NULL) != TC_TLV_ARGUMENT ||
+    if (TC_LDS_hash_find(NULL, 1, NULL, example_no_frames, &work, NULL) != TC_TLV_ARGUMENT ||
         work != 100)
       return 1;
-    if (TC_LDS_hash_check(NULL, 1, NULL, 0, NULL, (TC_TLV_frames){NULL, 0}, &work, NULL) !=
+    if (TC_LDS_hash_check(NULL, 1, NULL, 0, NULL, example_no_frames, &work, NULL) !=
             TC_TLV_ARGUMENT ||
         work != 100)
       return 1;
@@ -318,8 +320,9 @@ int main(void)
     ExampleTwicCclImport import_state;
     const TC_TWIC_CCL_source staged_source = {staged_key, 1, read_ccl_key};
     TC_TWIC_CCL_snapshot proposed;
+    const TC_bytes csv_bytes = {csv, sizeof csv - 1};
     memset(&proposed, 0, sizeof proposed);
-    if (TC_MD5_digest((TC_bytes){csv, sizeof csv - 1}, checksum) != TC_OK ||
+    if (TC_MD5_digest(csv_bytes, checksum) != TC_OK ||
         example_twic_ccl_import_init(&import_state, checksum, sizeof csv - 1, 1, append_ccl_key,
                                      staged_key) != TC_TWIC_CCL_OK ||
         example_twic_ccl_import_update(&import_state, input) != TC_TWIC_CCL_OK ||
@@ -400,6 +403,7 @@ int main(void)
     return 6;
   {
     static ExampleCMSWorkspace cms_storage;
+    const TC_TLV_frames cms_frames = {cms_storage.frames, EXAMPLE_CMS_FRAME_CAPACITY};
     const TC_bytes empty = {NULL, 0};
     TC_CMS_signed_data cms, saved;
     memset(&cms, 0xa5, sizeof cms);
@@ -435,13 +439,10 @@ int main(void)
         TC_CMS_ENVELOPE_BER, TC_CMS_ATTRIBUTES_DER, TC_CMS_RSA_PARAMETERS_NULL,
         TC_CMS_ATTRIBUTE_OIDS_CMS, TC_CMS_OTHER_ATTRIBUTES_SKIP_LISTED};
     size_t work = 4096;
-    if (TC_CMS_signers_init(signers, &envelope, &limits,
-                            (TC_TLV_frames){cms_storage.frames, EXAMPLE_CMS_FRAME_CAPACITY}, &work,
-                            &reader) != TC_TLV_OK)
+    if (TC_CMS_signers_init(signers, &envelope, &limits, cms_frames, &work, &reader) != TC_TLV_OK)
       return 17;
     work = 0;
-    if (TC_CMS_signer_next(&reader, (TC_TLV_frames){cms_storage.frames, EXAMPLE_CMS_FRAME_CAPACITY},
-                           &work, &signer) != TC_TLV_END)
+    if (TC_CMS_signer_next(&reader, cms_frames, &work, &signer) != TC_TLV_END)
       return 18;
     if (memcmp(&signer, &saved_signer, sizeof signer) || work)
       return 19;
@@ -477,16 +478,14 @@ int main(void)
         0xc8, 0x99, 0x6f, 0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b,
         0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55};
     work = 4096;
-    if (TC_CMS_content_digest(encoded_content, TC_HASH_SHA256, &limits,
-                              (TC_TLV_frames){cms_storage.frames, EXAMPLE_CMS_FRAME_CAPACITY},
-                              &work, digest, sizeof digest) != TC_TLV_OK)
+    if (TC_CMS_content_digest(encoded_content, TC_HASH_SHA256, &limits, cms_frames, &work, digest,
+                              sizeof digest) != TC_TLV_OK)
       return 24;
     if (memcmp(digest, sha256_empty, sizeof digest))
       return 25;
     work = 0;
-    if (TC_CMS_content_digest(encoded_content, TC_HASH_SHA256, &limits,
-                              (TC_TLV_frames){cms_storage.frames, EXAMPLE_CMS_FRAME_CAPACITY},
-                              &work, digest, sizeof digest) != TC_TLV_LIMIT)
+    if (TC_CMS_content_digest(encoded_content, TC_HASH_SHA256, &limits, cms_frames, &work, digest,
+                              sizeof digest) != TC_TLV_LIMIT)
       return 26;
     if (memcmp(digest, sha256_empty, sizeof digest))
       return 27;
