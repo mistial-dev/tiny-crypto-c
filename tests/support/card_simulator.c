@@ -346,7 +346,7 @@ static uint16_t pairing_submit(tc_card_simulator* card, size_t index, TC_bytes c
   return card->pairing_verified ? SW_SUCCESS : SW_WARNING_NO_COUNTER;
 }
 
-/* VERIFY (Part 2 3.2.1; Part 1 Table 4 for the interface rules). */
+/* VERIFY (Part 2 3.2.1, with the interface rules of Part 1 Table 4). */
 static card_answer verify_command(tc_card_simulator* card, const card_command* command)
 {
   const uint8_t reference = command->p2;

@@ -144,7 +144,7 @@ TC_PIV_result secure_link(TC_PIV_link* link, const TC_PIV_application* applicati
 
 The key establishment answer needs `TC_PIV_SM_KEY_RESPONSE_BYTES` (326) of
 response buffer, the size of the CS7 answer with the largest card CVC of Table
-19\. `TC_PIV_SM_key_request` refuses a link that is secured or lost its session
+19\. `TC_PIV_SM_key_request` refuses a link that is secured or has lost its session
 and returns `TC_PIV_UNSUPPORTED` for a suite the build lacks or the card did
 not announce. Those results change nothing. Every later failure clears the
 session.
@@ -455,6 +455,17 @@ pointer to the session while it is bound, so declare the `piv_sm` before the
 `piv_link`. The link is then destroyed first, and its destructor clears the
 bound session while the session still exists. `<tiny_crypto/piv_vci.hpp>`
 adds `piv_discovery_get` and `piv_vci_establish` over a `piv_link`.
+
+## Resource use
+
+The framing adds no static state and allocates nothing. The link borrows the
+session, the workspace and the secure messaging scratch from the caller. On
+AVR with avr-gcc 7.3.0 at `-Os`, the `piv_sm_cs2` profile of
+`tests/budgets/avr.json` records the framing code of `piv_sm_apdu.c` and
+`piv_sm_key_request.c` at about 3.6 KB within about 35 KB for CS2 key
+establishment and one protected GET DATA. That exceeds the ATmega328P flash,
+so plan secure messaging for larger parts
+([AVR builds and budgets](testing.md#avr-builds-and-budgets)).
 
 ## Tests
 

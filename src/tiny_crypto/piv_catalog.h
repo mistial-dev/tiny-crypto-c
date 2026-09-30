@@ -3,7 +3,7 @@
 /* PIV and TWIC data object catalogs and an inventory that reads every
  * catalog object the link's access state allows into one caller pool.
  * Standards: NIST SP 800-73-5 Part 1 sections 3.5 and 4.1.1, Tables 2, 3 and
- * 8, Part 2 section 3.1.2; TWIC Part 2 v5 sections 3.3.6, 4.5, 4.6, 4.7 and
+ * 8, Part 2 section 3.1.2. TWIC Part 2 v5 sections 3.3.6, 4.5, 4.6, 4.7 and
  * 5.2.
  * Configuration: TC_ENABLE_PIV_CATALOG (requires TC_ENABLE_PIV_COMMAND).
  * Limitations: the catalogs hold the readable objects only. Keys, the TWIC

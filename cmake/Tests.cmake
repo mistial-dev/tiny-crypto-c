@@ -1116,6 +1116,18 @@ if(TINY_CRYPTO_BUILD_TESTS)
       set_property(TARGET test_twic_authenticate_command PROPERTY NO_SYSTEM_FROM_IMPORTED TRUE)
     endif()
     target_link_libraries(test_x509_native PRIVATE OpenSSL::Crypto)
+    # The TWIC synthetic fixture builder must keep reproducing the checked-in
+    # vectors byte for byte.
+    tc_add_test_executable(twic_synthetic_fixture_builder
+      tests/twic/generate_synthetic_fixture.c tests/support/munit.c)
+    target_include_directories(twic_synthetic_fixture_builder PRIVATE tests/support src)
+    target_link_libraries(twic_synthetic_fixture_builder PRIVATE OpenSSL::Crypto)
+    set_property(TARGET twic_synthetic_fixture_builder PROPERTY NO_SYSTEM_FROM_IMPORTED TRUE)
+    add_test(NAME test_twic_synthetic_fixture_builder COMMAND ${CMAKE_COMMAND}
+      -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+      -DBUILDER=$<TARGET_FILE:twic_synthetic_fixture_builder>
+      -DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/twic-synthetic-fixture
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/twic_fixture_builder.cmake)
     set_property(TARGET test_x509_native PROPERTY NO_SYSTEM_FROM_IMPORTED TRUE)
     tc_add_c_test(test_lds_native tiny-crypto-c-test-pki-native tests/cms/lds.c)
     # native.c covers SignedData, CHUID and security objects, path.c the
@@ -1899,6 +1911,20 @@ if(TINY_CRYPTO_BUILD_TESTS)
             ${CMAKE_CURRENT_SOURCE_DIR}/src/aes.c ${CMAKE_CURRENT_SOURCE_DIR}/src/aes_kw.c
             ${CMAKE_CURRENT_SOURCE_DIR}/src/common.c)
       endforeach()
+      # APDU lengths with a 16-bit size_t and a scripted plain PIV read, built
+      # from the apdu_piv_read profile sources.
+      set(tc_avr_apdu_piv_read_sources
+        apdu_encode apdu_response apdu_channel piv_aid piv_link piv_select piv_get_data
+        piv_verify piv_status piv_template_internal piv_container_internal tlv tlv_walk
+        tlv_write common)
+      list(TRANSFORM tc_avr_apdu_piv_read_sources
+        REPLACE "(.+)" "${CMAKE_CURRENT_SOURCE_DIR}/src/\\1.c")
+      add_test(NAME test_apdu_piv_read_qemu_avr
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/avr/run_qemu.py
+          --cc ${TC_AVR_CC} --qemu ${TC_QEMU_AVR} --expect APDU-OK
+          --include ${CMAKE_CURRENT_SOURCE_DIR}/src
+          --define TC_ENABLE_APDU=1 --define TC_ENABLE_TLV=1 --define TC_ENABLE_PIV_COMMAND=1
+          ${CMAKE_CURRENT_SOURCE_DIR}/tests/avr/apdu_piv_read.c ${tc_avr_apdu_piv_read_sources})
     endif()
     # The key challenge carries a 32-bit work budget across size_t PKI code.
     add_test(NAME test_key_challenge_compile_avr

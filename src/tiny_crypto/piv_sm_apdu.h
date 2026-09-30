@@ -4,7 +4,7 @@
  * securing and the 87/97/99/8E wire format of protected commands and
  * responses. TC_PIV_SM performs the cryptography.
  * Standards: NIST SP 800-73-5 Part 2 sections 4.1.1, 4.1.8 and 4.2 to 4.3,
- * Table 19 and footnotes 20, 22 and 25; ISO/IEC 7816-4:2020 5.3.3.
+ * Table 19 and footnotes 20, 22 and 25. ISO/IEC 7816-4:2020 5.3.3.
  * Configuration: TC_ENABLE_PIV_SM_APDU (requires TC_ENABLE_PIV_COMMAND,
  * TC_ENABLE_PIV_SM and TC_ENABLE_PIV_CVC).
  * Limitations: SHORT length fields with 1C command chaining only. Extended

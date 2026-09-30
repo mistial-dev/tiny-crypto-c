@@ -7,8 +7,8 @@
 Enable `TINY_CRYPTO_ENABLE_APDU=ON` and include `<tiny_crypto/apdu.h>`. The
 module encodes ISO/IEC 7816-4:2020 command APDUs, reads response APDUs, classifies
 status words and runs one command-response exchange over a caller transport. It
-depends on no other module, allocates nothing and uses a few dozen bytes of
-stack. Card application commands, such as the PIV commands of SP 800-73-5 Part
+depends on no other module, allocates nothing and uses about 120 bytes of
+stack on AVR. Card application commands, such as the PIV commands of SP 800-73-5 Part
 2, build on this layer.
 
 ## Commands and responses
@@ -145,3 +145,13 @@ the codec.
 - The exchange budget bounds the number of C-RPs for the channel lifetime.
 - T=0 TPDU handling, extended-length chaining, proprietary classes, logical
   channels above 3 and secure messaging belong to other layers.
+
+## Resource use
+
+The channel keeps no static state. The caller owns the channel, the scratch
+buffer and the response buffer. On an ATmega328P with avr-gcc 7.3.0 at `-Os`,
+`TC_APDU_transceive` needs about 120 bytes of project stack, excluding the
+transport callback. The `apdu_piv_read` profile of `tests/budgets/avr.json`
+records the codec with the PIV card commands, and
+`test_apdu_piv_read_qemu_avr` runs the 16-bit length cases on an emulated
+Arduino Uno ([AVR builds and budgets](testing.md#avr-builds-and-budgets)).

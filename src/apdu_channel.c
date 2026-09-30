@@ -79,8 +79,8 @@ TC_APDU_result TC_APDU_channel_restrict(TC_APDU_channel* channel, size_t max_com
 
 /* Encode step into scratch, transmit it and check the transport contract.
  * The answer lands at response + state->used with the remaining capacity. */
-static TC_APDU_result exchange(TC_APDU_channel* channel, const TC_APDU_command* step,
-                               exchange_state* state, size_t* received)
+static TC_APDU_result transmit_step(TC_APDU_channel* channel, const TC_APDU_command* step,
+                                    exchange_state* state, size_t* received)
 {
   tc_apdu_form form = {0, 0};
   TC_APDU_result result =
@@ -130,7 +130,7 @@ static TC_APDU_result chain_send(TC_APDU_channel* channel, const TC_APDU_command
     fragment.data = (TC_bytes){command->data.data + *offset, TC_APDU_SHORT_MAX_NC};
     size_t received = 0;
     TC_APDU_response answer = {0};
-    TC_APDU_result result = exchange(channel, &fragment, state, &received);
+    TC_APDU_result result = transmit_step(channel, &fragment, state, &received);
     if (result == TC_APDU_OK)
       result = answer_read(state, received, &answer);
     if (result != TC_APDU_OK)
@@ -177,7 +177,7 @@ static TC_APDU_result response_collect(TC_APDU_channel* channel, TC_APDU_command
       return TC_APDU_LIMIT;
     size_t received = 0;
     TC_APDU_response answer = {0};
-    TC_APDU_result result = exchange(channel, &step, state, &received);
+    TC_APDU_result result = transmit_step(channel, &step, state, &received);
     if (result == TC_APDU_OK)
       result = answer_read(state, received, &answer);
     if (result != TC_APDU_OK)

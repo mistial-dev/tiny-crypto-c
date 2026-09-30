@@ -433,8 +433,32 @@ link and clears it on destruction. `piv_application_read` and
   levels. The card object readers accept one level and at most 16 elements.
 - The card object readers check structure only. Authenticate the objects with
   the Security Object before relying on them.
-- Commands travel in plaintext. Secure messaging, the VCI, CHANGE REFERENCE
-  DATA, RESET RETRY COUNTER, PUT DATA, GENERATE ASYMMETRIC KEY PAIR and OCC
-  VERIFY (`96`, `97`) are outside this module.
+- The card commands travel in plaintext until
+  [secure messaging](piv-sm.md#secure-messaging-on-a-card-link) secures the
+  link. CHANGE REFERENCE DATA, RESET RETRY COUNTER, PUT DATA, GENERATE
+  ASYMMETRIC KEY PAIR and OCC VERIFY (`96`, `97`) are outside the library.
 - The response buffer holds the whole answer and SW1 SW2.
   `TC_PIV_RESPONSE_BYTES(nr)` sizes a buffer for nr data bytes on any link.
+- Three TWIC NEXGEN behaviours follow the specification text and await
+  confirmation on a NEXGEN card: the `FF` request after `61 00` (TWIC Part 2 v5
+  section 5.2 note 3a), the `9E` key of section 5.3, and a TWIC AID in the
+  Discovery Object of the PIV application (section 4.7.5).
+
+## Resource use
+
+The card commands keep no mutable static state and allocate nothing. The
+caller owns the link, the command scratch and every response buffer.
+`sizeof(TC_PIV_link)` is 40 bytes on AVR, and a SHORT link needs 261 bytes of
+command scratch. The `apdu_piv_read` profile of `tests/budgets/avr.json`
+measures a plain SELECT, GET DATA and VERIFY query on an ATmega328P with
+avr-gcc 7.3.0 at `-Os`:
+
+| Resource   | Budget      | Largest parts                                    |
+| ---------- | ----------- | ------------------------------------------------ |
+| Flash      | 13500 bytes | template reader, channel, TLV reader, GET DATA   |
+| Static RAM | 110 bytes   | AID tables and TLV limits, plus 36 harness bytes |
+| Stack      | 560 bytes   | SELECT through the template reader and TLV walk  |
+
+The catalog, the inventory and the key proofs are larger and target
+ESP32-class and desktop devices. They build for AVR in the compile checks
+([AVR builds and budgets](testing.md#avr-builds-and-budgets)).

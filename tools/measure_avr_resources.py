@@ -76,15 +76,90 @@ PROFILES = {
       out[0] = signature[0];
       return TC_ECDSA_verify_digest(TC_EC_P256, point, digest, (TC_bytes){signature, sizeof(signature)}, &workspace, &work) != TC_EC_OK;
     """, "TC_ECDSA_sign_digest"),
+    # Plain PIV reads: SELECT, GET DATA and a VERIFY query on a SHORT link.
+    # The link, the 261-byte command scratch and the response buffer are
+    # application storage, recorded as piv_link_bytes and outside the stack.
+    "apdu_piv_read": (["TC_ENABLE_APDU=1", "TC_ENABLE_TLV=1", "TC_ENABLE_PIV_COMMAND=1"], """
+      static const uint8_t chuid[3] = {0x5f, 0xc1, 0x02};
+      const TC_PIV_link_options options = {{TC_APDU_SHORT, 0, 8, 0, 0}, TC_PIV_CONTACT, 0};
+      uint8_t scratch[TC_APDU_SHORT_COMMAND_MAX_BYTES], response[64];
+      TC_PIV_link link;
+      TC_PIV_application application;
+      TC_PIV_data_object object;
+      TC_PIV_reference_status status;
+      TC_PIV_result result = TC_PIV_link_init(&link, (TC_APDU_transport){card, 0}, &options,
+                                              (TC_buffer){scratch, sizeof(scratch)});
+      if (result == TC_PIV_OK)
+        result = TC_PIV_select(&link, TC_PIV_APPLICATION_PIV, 0, (TC_buffer){response, sizeof(response)}, &application);
+      if (result == TC_PIV_OK)
+        result = TC_PIV_get_data(&link, (TC_bytes){chuid, sizeof(chuid)}, (TC_buffer){response, sizeof(response)}, &object);
+      if (result == TC_PIV_OK)
+        result = TC_PIV_verify_status(&link, 0x80, &status);
+      out[0] = response[0];
+      TC_PIV_link_clear(&link);
+      return result != TC_PIV_OK;
+    """, ("TC_PIV_link_init", "TC_PIV_select", "TC_PIV_get_data", "TC_PIV_verify_status",
+          "TC_PIV_link_clear")),
+    # Secure messaging CS2 on the micro resource profile: key establishment,
+    # link_secure and one protected GET DATA. The session, the workspace and
+    # both scratch buffers are application storage.
+    "piv_sm_cs2": ([
+        "TC_RESOURCE_PROFILE=1", "TC_ENABLE_APDU=1", "TC_ENABLE_TLV=1", "TC_ENABLE_DER=1",
+        "TC_ENABLE_PIV_COMMAND=1", "TC_ENABLE_PIV_SM=1", "TC_ENABLE_PIV_SM_APDU=1",
+        "TC_ENABLE_PIV_CVC=1", "TC_ENABLE_EC=1", "TC_EC_ENABLE_P384=0", "TC_ENABLE_SSKDF=1",
+        "TC_AES_ENABLE_DYNAMIC=1", "TC_PIV_SM_ENABLE_CS2=1", "TC_PIV_SM_ENABLE_CS7=0",
+    ], """
+      static const uint8_t chuid[3] = {0x5f, 0xc1, 0x02};
+      TC_PIV_SM session;
+      TC_PIV_SM_workspace workspace;
+      uint8_t scratch[TC_APDU_SHORT_COMMAND_MAX_BYTES], sm_scratch[64], response[400];
+      const TC_PIV_link_options options = {{TC_APDU_SHORT, 0, 16, 0, 0}, TC_PIV_CONTACT, 0};
+      const uint8_t host[8] = {0};
+      TC_PIV_link link;
+      TC_PIV_SM_peer peer;
+      TC_PIV_data_object object;
+      TC_PIV_result result = TC_PIV_link_init(&link, (TC_APDU_transport){card, 0}, &options,
+                                              (TC_buffer){scratch, sizeof(scratch)});
+      if (result == TC_PIV_OK)
+        result = TC_PIV_SM_key_request(&link, &session, TC_PIV_SM_CS2, host,
+                                       (TC_random_source){entropy, 0},
+                                       (TC_buffer){response, sizeof(response)}, &peer, &workspace);
+      if (result == TC_PIV_OK && TC_PIV_SM_finish(&session, &peer, (TC_bytes){key, sizeof(key)}, &workspace) != TC_OK)
+        result = TC_PIV_INVALID;
+      if (result == TC_PIV_OK)
+        result = TC_PIV_link_secure(&link, &workspace, (TC_buffer){sm_scratch, sizeof(sm_scratch)});
+      if (result == TC_PIV_OK)
+        result = TC_PIV_get_data(&link, (TC_bytes){chuid, sizeof(chuid)}, (TC_buffer){response, sizeof(response)}, &object);
+      out[0] = response[0];
+      TC_PIV_link_clear(&link);
+      return result != TC_PIV_OK;
+    """, ("TC_PIV_link_init", "TC_PIV_SM_key_request", "TC_PIV_SM_finish",
+          "TC_PIV_link_secure", "TC_PIV_get_data", "TC_PIV_link_clear")),
 }
 # Public types whose AVR size a profile records, as {profile: {metric: type}}.
-TYPE_SIZES = {"ecdsa_p256": {"ecdsa_workspace_bytes": "TC_ECDSA_workspace"}}
+TYPE_SIZES = {"ecdsa_p256": {"ecdsa_workspace_bytes": "TC_ECDSA_workspace"},
+              "apdu_piv_read": {"piv_link_bytes": "TC_PIV_link"},
+              "piv_sm_cs2": {"sm_workspace_bytes": "TC_PIV_SM_workspace"}}
+# Linked code of named translation units, as {profile: {metric: sources}}.
+UNIT_FLASH = {"piv_sm_cs2": {"sm_framing_flash": ("piv_sm_apdu", "piv_sm_key_request")}}
 # Functions whose indirect call reaches an application-supplied callback. The
 # callback frame belongs to the application and is listed as excluded.
 APPLICATION_CALLBACK_SITES = {
     "read_entropy": "TC_random_source entropy callback",
     "TC_ECDSA_sign_digest": "TC_random_source nonce callback",
+    "transmit_step": "TC_APDU_transport transmit callback",
+    # TC_TLV_walk and the stream reader call the caller's visitor. The PIV
+    # command profile passes none.
+    "emit": "TC_TLV_visit callback",
+    "close_definite": "TC_TLV_visit callback",
+    "feed": "TC_TLV_visit callback",
 }
+# PIV link functions that call the secure messaging table installed by
+# TC_PIV_SM_key_request. Their indirect calls resolve to the table entries
+# that survive --gc-sections. Without PIV_SM_APDU no table exists and the
+# link never sets one.
+# Each site calls one member, given as its position in the initializer.
+PIV_SECURITY_SITES = {"tc_piv_link_transceive": 0, "tc_piv_link_unbind": 1}
 BLOCK_CIPHER_CALLBACKS = {"tc_aes_block_encrypt", "tc_aes_block_decrypt",
                           "tc_des_block_encrypt", "tc_des_block_decrypt"}
 # Mode and MAC cores that call the block cipher through a tc_block_cipher
@@ -101,6 +176,14 @@ static uint8_t key[32], iv[16], out[32];
 static volatile uint8_t sink;
 static TC_status entropy(void* user, uint8_t* output, size_t length)
 { (void)user; while (length--) output[length] = key[length %% sizeof(key)]; return TC_OK; }
+#if TC_ENABLE_APDU
+static TC_status card(void* context, TC_bytes command, TC_buffer response, size_t* length)
+{
+  (void)context; (void)command;
+  if (response.capacity < 2) return TC_ERROR;
+  response.data[0] = 0x90; response.data[1] = 0x00; *length = 2; return TC_OK;
+}
+#endif
 static int feature(void) { %s }
 int main(void) { int status = feature(); sink = out[0]; return status; }
 """
@@ -139,6 +222,28 @@ def block_cipher_callbacks():
     return found
 
 
+def piv_security_callbacks(linked=None):
+    """Functions named in tc_piv_link_security table initializers, as
+    {member position: names}.
+
+    With linked symbols given, only linked tables count, and a linked table
+    whose member is missing from the link raises. A silent empty set would
+    drop the secure messaging frames from the stack estimate."""
+    found = {}
+    for source in (ROOT / "src").glob("*.c"):
+        for table, fields in re.findall(
+                r"struct\s+tc_piv_link_security\s+(\w+)\s*=\s*\{([^}]*)\}",
+                source.read_text()):
+            if linked is not None and table not in linked:
+                continue
+            for position, field in enumerate(fields.split(",")):
+                member = field.strip()
+                if linked is not None and member not in linked:
+                    raise RuntimeError(f"Unresolved PIV security table member: {table} {member}")
+                found.setdefault(position, set()).add(member)
+    return found
+
+
 def hash_descriptor_callbacks():
     """Functions named in tc_hash_algorithm_info descriptors.
 
@@ -172,7 +277,23 @@ def type_sizes(directory, flags, types):
     return sizes
 
 
-def measure(directory, definitions, body, entry, types=None):
+def unit_flash(directory, elf, units):
+    """Linked .text bytes of the functions defined in each unit's object."""
+    linked = {}
+    for line in run([NM, "-S", str(elf)]).splitlines():
+        fields = line.split()
+        if len(fields) == 4 and fields[2] in "tT":
+            linked[fields[3]] = int(fields[1], 16)
+    total = 0
+    for unit in units:
+        for line in run([NM, "--defined-only", str(directory / (unit + ".o"))]).splitlines():
+            fields = line.split()
+            if len(fields) == 3 and fields[1] in "tT":
+                total += linked.get(fields[2], 0)
+    return total
+
+
+def measure(directory, definitions, body, entry, types=None, units=None):
     flags = BASE + ["-D" + item for item in definitions]
     frames, edges, objects, unknown_indirect = {}, {}, [], []
     hash_core_sites = set()
@@ -239,6 +360,7 @@ def measure(directory, definitions, body, entry, types=None):
               if line.strip()}
     block_targets = block_cipher_callbacks() & all_address_taken & linked
     hash_targets = hash_descriptor_callbacks() & set(frames)
+    security_targets = piv_security_callbacks(linked)
     for site in hash_core_sites:
         edges[site].update(hash_targets)
 
@@ -252,7 +374,8 @@ def measure(directory, definitions, body, entry, types=None):
             return 0, []
         if name in APPLICATION_CALLBACK_SITES:
             unknown.add(APPLICATION_CALLBACK_SITES[name])
-        elif name in unknown_indirect and name not in BLOCK_DESCRIPTOR_SITES:
+        elif (name in unknown_indirect and name not in BLOCK_DESCRIPTOR_SITES
+              and name not in PIV_SECURITY_SITES):
             raise RuntimeError("Unresolved indirect call: " + name)
         if (name in BLOCK_DESCRIPTOR_SITES and name in unknown_indirect and name in linked
                 and not block_targets):
@@ -260,11 +383,15 @@ def measure(directory, definitions, body, entry, types=None):
         callees = set(edges.get(name, ()))
         if name in BLOCK_DESCRIPTOR_SITES:
             callees.update(block_targets)
+        if name in PIV_SECURITY_SITES:
+            callees.update(security_targets.get(PIV_SECURITY_SITES[name], ()))
         children = [chain(child, active | {name}) for child in sorted(callees)]
         size, path = max(children, default=(0, []), key=lambda item: item[0])
         return frames[name] + size, [name] + path
 
-    stack, path = chain(entry, set())
+    # A profile with several public calls reports the deepest of them.
+    entries = entry if isinstance(entry, tuple) else (entry,)
+    stack, path = max((chain(name, set()) for name in entries), key=lambda item: item[0])
     report = {
         "flash": sections.get(".text", 0) + sections.get(".data", 0),
         "static_ram": sections.get(".data", 0) + sections.get(".bss", 0),
@@ -275,6 +402,8 @@ def measure(directory, definitions, body, entry, types=None):
         "flags": [flag.replace(str(ROOT) + "/", "") for flag in flags],
     }
     report.update(type_sizes(directory, flags, types or {}))
+    for metric, names in (units or {}).items():
+        report[metric] = unit_flash(directory, elf, names)
     return report
 
 
@@ -311,7 +440,7 @@ def main():
             directory = Path(temporary) / name
             directory.mkdir()
             report["profiles"][name] = measure(directory, definitions, body, entry,
-                                               TYPE_SIZES.get(name))
+                                               TYPE_SIZES.get(name), UNIT_FLASH.get(name))
     if args.check:
         check_budgets(report, json.loads(args.check.read_text()))
     text = json.dumps(report, indent=2) + "\n"

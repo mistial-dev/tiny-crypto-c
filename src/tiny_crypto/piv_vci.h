@@ -4,7 +4,7 @@
  * Discovery Object read over the link and the pairing-code VERIFY that
  * establishes the VCI.
  * Standards: NIST SP 800-73-5 Part 1 sections 3.3.2 and 5.5, Table 2
- * footnote 9 and Table 4; Part 2 sections 3.2.1, 3.2.1.3 and Appendix A.6.
+ * footnote 9 and Table 4. Part 2 sections 3.2.1, 3.2.1.3 and Appendix A.6.
  * Configuration: TC_ENABLE_PIV_VCI (requires TC_ENABLE_PIV_SM_APDU and
  * TC_ENABLE_PIV_OBJECTS).
  * Limitations: the library owns no pairing-code entry or storage. OCC is

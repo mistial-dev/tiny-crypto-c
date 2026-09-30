@@ -621,14 +621,14 @@ static void make_profile(const char* profile, const char* directory, const char*
   face_record[17] = (uint8_t)face_block;
   munit_assert_size(read_test_image(directory, face_record + 46, sizeof face_record - 46), ==,
                     sizeof face_record - 46);
-  const biometric_record face = {{fascn, sizeof fascn},
-                                 {uuid, sizeof uuid},
-                                 {face_record, sizeof face_record},
-                                 0x0501,
-                                 2,
-                                 0x20};
-  biometric_length =
-      encode_biometric_record(&biometric_signing, &face, (TC_buffer){biometric, sizeof biometric});
+  const biometric_record face_biometric = {{fascn, sizeof fascn},
+                                           {uuid, sizeof uuid},
+                                           {face_record, sizeof face_record},
+                                           0x0501,
+                                           2,
+                                           0x20};
+  biometric_length = encode_biometric_record(&biometric_signing, &face_biometric,
+                                             (TC_buffer){biometric, sizeof biometric});
   uint8_t piv_face[CAPACITY], piv_face_body[CAPACITY];
   size_t piv_face_body_length = field(piv_face_body, 0xbc, biometric, biometric_length);
   piv_face_body[piv_face_body_length++] = 0xfe;

@@ -464,5 +464,5 @@ The BER case signs reversed attribute order with an independent fixture key.
 It succeeds with `--chuid-ber`, fails under DER policy, and rejects a changed
 signature with compatibility enabled.
 RSA fixtures cover omitted CMS algorithm parameters in CHUID, biometric and
-Security Object signatures. Each requires `--cms-rsa-parameters allow-absent`;
-changed signatures or signed content fail with that policy enabled.
+Security Object signatures. Each requires `--cms-rsa-parameters allow-absent`.
+Changed signatures or signed content fail with that policy enabled.

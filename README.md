@@ -524,7 +524,10 @@ reads the application property template and applies its size limits.
 `TC_PIV_verify_status` and `TC_PIV_pin_verify` query and verify the PIN with a
 retry floor and refuse a plaintext PIN on the contactless interface.
 `TC_PIV_status_classify` gives each status word its PIV or TWIC meaning.
-`TINY_CRYPTO_ENABLE_PIV_CATALOG` adds `<tiny_crypto/piv_catalog.h>`: the SP
+`TINY_CRYPTO_ENABLE_PIV_OBJECTS` adds readers for the Discovery Object, the
+Card Capability Container, Key History, the BIT group and the Pairing Code
+container, and `TC_PIV_certificate_decode` for plain and GZIP certificate
+containers. `TINY_CRYPTO_ENABLE_PIV_CATALOG` adds `<tiny_crypto/piv_catalog.h>`: the SP
 800-73-5 and TWIC Part 2 data object catalogs with their access rules, and
 `TC_PIV_inventory_read`, which reads every object the link state allows into
 one caller pool and reports the others as restricted, denied, absent or

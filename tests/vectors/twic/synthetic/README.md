@@ -49,6 +49,9 @@ python3 tests/twic/apdu_replay.py
 python3 tests/twic/apdu_replay.py --check
 ```
 
+With `TINY_CRYPTO_TEST_OPENSSL=ON`, `test_twic_synthetic_fixture_builder`
+builds the generator and checks that its output equals the committed files.
+
 The Python validator independently checks X.509 signatures, extension OIDs and
 criticality, RFC 5914 encodings, CMS signatures, Security Object hashes, AES
 decrypt/re-encrypt, CBEFF records, JPEG decoding, and PIV/TWIC shared-data

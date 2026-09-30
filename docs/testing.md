@@ -69,7 +69,9 @@ combinations and rejects invalid settings. `test_twic_synthetic_fixture` and
 `test_twic_apdu_corpus` check credential objects and APDU replay. These tests
 use native crypto and run without OpenSSL. The optional fixture generator and
 independent oracle are described in the
-[synthetic corpus README](../tests/vectors/twic/synthetic/README.md).
+[synthetic corpus README](../tests/vectors/twic/synthetic/README.md). With
+`TINY_CRYPTO_TEST_OPENSSL=ON`, `test_twic_synthetic_fixture_builder` builds the
+generator and checks that it reproduces every file it writes byte for byte.
 
 `test_apdu_encode`, `test_apdu_response` and `test_apdu_channel` cover the
 [APDU codec](apdu.md): every ISO/IEC 7816-4 length case, recorded SD 33
@@ -1161,6 +1163,42 @@ for extended tests. It needs a compatible instrumented runtime, which Apple
 Clang lacks. MemorySanitizer builds skip the C++ doctest suites, which need an
 instrumented C++ standard library. CI runs them without OpenSSL, so the OpenSSL
 cross-checks are also outside MemorySanitizer coverage.
+
+### AVR builds and budgets
+
+With `avr-gcc`, CMake compiles the card layers for a 16-bit `size_t` with
+warnings treated as errors: `test_apdu_compile_avr`,
+`test_apdu_channel_compile_avr`, `test_piv_command_compile_avr`,
+`test_piv_catalog_compile_avr`, `test_piv_key_proof_compile_avr`, and one
+`test_<source>_compile_avr` per secure messaging and VCI source. With
+`qemu-system-avr` as well, `tests/avr/run_qemu.py` runs programs on an emulated
+Arduino Uno and reads one result line from USART0. The `test_aes_sbox_*_qemu_avr`
+tests run the AES known answer in each S-box mode.
+`test_apdu_piv_read_qemu_avr` encodes Ne 65536 as extended `0000` and Ne 256
+as short `00`, checks that an EXTENDED size above `SIZE_MAX` reports
+`TC_APDU_LIMIT`, and runs SELECT, GET DATA and a VERIFY query against a
+scripted card with the SD 33 card 2 SELECT answer.
+
+```sh
+ctest --test-dir build -R '_(compile|qemu)_avr$' --output-on-failure
+python3 tools/measure_avr_resources.py --check tests/budgets/avr.json
+```
+
+`tools/measure_avr_resources.py` links each profile for the ATmega328P and
+compares linked flash, static RAM and the project stack estimate with
+`tests/budgets/avr.json`. CI runs it with the PlatformIO avr-gcc 7.3.0.
+
+| Profile         | Flash | Static RAM | Stack | Contents                                       |
+| --------------- | ----- | ---------- | ----- | ---------------------------------------------- |
+| `apdu_piv_read` | 13500 | 110        | 560   | plain SELECT, GET DATA and VERIFY query        |
+| `piv_sm_cs2`    | 36500 | 150        | 750   | CS2 key establishment and a protected GET DATA |
+
+The card profiles keep the link, the scratch buffers and the secure messaging
+session in application storage, and their stack excludes the transport
+callback. `piv_link_bytes` records `sizeof(TC_PIV_link)`, 40 bytes on AVR.
+`piv_sm_cs2` exceeds the ATmega328P flash and serves as a code-size measure for
+larger parts. Its `sm_framing_flash`, at most 3800 bytes, is the linked code of
+`piv_sm_apdu.c` and `piv_sm_key_request.c`.
 
 ## PIV card hardware tests
 

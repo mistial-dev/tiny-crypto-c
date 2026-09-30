@@ -1,7 +1,7 @@
 {
   "avr_gcc_version": "7.3.0",
   "description":
-      "ATmega328P, -Os without LTO. Rounded headroom over the recorded baseline. Stack covers project call chains, excluding application/libc/interrupt frames. Figures include the unconditional secret wiping and argument checks, which cost at most 50 bytes of flash and 4 bytes of stack in these profiles. aes_ctr runs on the CBC/CTR/OFB core shared with DES, so it includes the block cipher descriptor call and the buffer and context overlap check. aes_kw measures KW and KWP at AES-128 with fixed keys and the constant-time S-box. Its stack is the deepest entry, TC_AES_KWP_unwrap. The fast S-box adds a 256-byte inverse table in flash, and the runtime S-box adds 512 bytes of static RAM.",
+      "ATmega328P, -Os without LTO. Rounded headroom over the recorded baseline. Stack covers project call chains, excluding application/libc/interrupt frames. Figures include the unconditional secret wiping and argument checks, which cost at most 50 bytes of flash and 4 bytes of stack in these profiles. aes_ctr runs on the CBC/CTR/OFB core shared with DES, so it includes the block cipher descriptor call and the buffer and context overlap check. aes_kw measures KW and KWP at AES-128 with fixed keys and the constant-time S-box. Its stack is the deepest entry, TC_AES_KWP_unwrap. The fast S-box adds a 256-byte inverse table in flash, and the runtime S-box adds 512 bytes of static RAM. apdu_piv_read and piv_sm_cs2 keep the link, the scratch buffers and the SM session in application storage, and exclude the transport callback. Their static RAM holds the AID tables, the TLV limits and 36 bytes of harness storage. piv_sm_cs2 exceeds the ATmega328P flash and measures code size for larger parts. sm_framing_flash is the linked code of piv_sm_apdu.c and piv_sm_key_request.c.",
   "profiles": {
     "aes_ctr": {
       "flash": 2400,
@@ -35,6 +35,19 @@
       "flash": 4800,
       "static_ram": 150,
       "project_stack_estimate": 330
+    },
+    "apdu_piv_read": {
+      "flash": 13500,
+      "static_ram": 110,
+      "project_stack_estimate": 560,
+      "piv_link_bytes": 40
+    },
+    "piv_sm_cs2": {
+      "flash": 36500,
+      "static_ram": 150,
+      "project_stack_estimate": 750,
+      "sm_framing_flash": 3800,
+      "sm_workspace_bytes": 1090
     }
   }
 }
