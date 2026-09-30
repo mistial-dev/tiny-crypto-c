@@ -257,11 +257,7 @@ void tc_validation_plan_writes(tc_pki_storage_plan* plan, const TC_validation_co
     tc_pki_storage_plan_fail(plan, TC_TLV_ARGUMENT);
     return;
   }
-  const TC_CMS_credential_workspace* w = context->workspace;
-  tc_cms_path_workspace_plan_writes(plan, w->path);
-  TC_PKI_PLAN_WRITE(plan, w->held_path, w->path_capacity);
-  TC_PKI_PLAN_WRITE(plan, w->crl_states, w->crl_capacity);
-  TC_PKI_PLAN_WRITE(plan, w->nodes, w->node_capacity);
+  tc_cms_credential_workspace_plan_writes(plan, context->workspace);
   TC_PKI_PLAN_WRITE(plan, work, 1);
   TC_PKI_PLAN_WRITE(plan, (uint8_t*)out, out_size);
 }
@@ -291,8 +287,9 @@ void tc_validation_plan_inputs(tc_pki_storage_plan* plan, const TC_validation_co
                                &policies[i]->anchor_names);
   tc_pki_storage_plan_input_spans(plan, inputs, input_count);
   tc_x509_crl_index_plan_inputs(plan, context->trust.crls);
-  if (w->path_capacity < w->path->search.capacity || w->crl_capacity < context->trust.crls->count)
-    tc_pki_storage_plan_fail(plan, TC_TLV_LIMIT);
+  const TC_TLV_result capacity = tc_cms_credential_workspace_check(w, context->trust.crls->count);
+  if (capacity != TC_TLV_OK)
+    tc_pki_storage_plan_fail(plan, capacity);
 }
 
 TC_TLV_result tc_validation_storage(const TC_validation_context* context, const TC_bytes* inputs,

@@ -19,11 +19,45 @@ static inline int tc_cms_credential_options_valid(TC_CMS_verification_policy ver
          x509_crl_order_policy_valid(order);
 }
 
-/* Record the TC_CMS_path_workspace writes: path validation storage, search
- * path and frames, certificate index, signature scratch and signed digest.
- * Callers add their own result, work and credential writes. */
+/* Storage plan slots of the CMS path and credential workspaces, after the
+ * X.509 path storage slots. Plans that add a result or work write size their
+ * write arrays from these counts. */
+enum {
+  TC_CMS_WRITE_SEARCH_PATH = TC_X509_PATH_STORAGE_COUNT,
+  TC_CMS_WRITE_SEARCH_FRAMES,
+  TC_CMS_WRITE_CERTIFICATES,
+  TC_CMS_WRITE_SIGNATURE,
+  TC_CMS_WRITE_SIGNED_DIGEST,
+  TC_CMS_PATH_WORKSPACE_WRITES,
+  TC_CMS_WRITE_HELD_PATH = TC_CMS_PATH_WORKSPACE_WRITES,
+  TC_CMS_WRITE_CRL_STATES,
+  TC_CMS_WRITE_REVOCATION_NODES,
+  TC_CMS_WRITE_REVOCATION_SCOPES,
+  TC_CMS_WRITE_SIGNER_PATH,
+  TC_CMS_WRITE_SIGNER_POLICIES,
+  TC_CMS_CREDENTIAL_WORKSPACE_WRITES
+};
+
+/* Record the TC_CMS_path_workspace writes in TC_CMS_WRITE_* slot order: path
+ * validation storage, search path and frames, certificate index, signature
+ * scratch and signed digest. Callers add their own result and work writes. */
 void tc_cms_path_workspace_plan_writes(tc_pki_storage_plan* plan,
                                        const TC_CMS_path_workspace* workspace);
+
+/* Record the path workspace and every credential scratch array that path
+ * building and revocation processing write: held_path, crl_states, nodes,
+ * scopes, signer_path and signer_policies, each at its full capacity. */
+void tc_cms_credential_workspace_plan_writes(tc_pki_storage_plan* plan,
+                                             const TC_CMS_credential_workspace* workspace);
+
+/* Check the credential scratch against the path workspace and a CRL index of
+ * crl_count records before any work. Returns ARGUMENT for a missing path,
+ * scopes, signer_path or signer_policies array. LIMIT when held_path or
+ * signer_path holds fewer spans than path->search.capacity, crl_states or
+ * scopes fewer entries than crl_count, nodes is empty, or signer_policies
+ * holds fewer spans than path->validation.policy_capacity. */
+TC_TLV_result tc_cms_credential_workspace_check(const TC_CMS_credential_workspace* workspace,
+                                                size_t crl_count);
 
 typedef enum { TC_CMS_OTHER_CERTIFICATE, TC_CMS_OTHER_REVOCATION } tc_cms_other_kind;
 typedef struct {

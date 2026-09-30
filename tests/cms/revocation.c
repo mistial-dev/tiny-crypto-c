@@ -2299,6 +2299,51 @@ static MunitResult discovery_dependencies(const MunitParameter params[], void* u
         munit_assert_size(signer_source.calls, ==, 0);
         munit_assert_memory_equal(sizeof path_evidence, &path_evidence, &path_sentinel);
         public_workspace.states = states;
+        {
+          /* The result, the chain spans or a second scratch array sharing
+           * bytes with scopes, signer_path or signer_policies is ARGUMENT
+           * before any work or source read. */
+          enum { SHARED_RESULT, SHARED_CHAIN, SHARED_SCRATCH, SHARE_COUNT };
+          for (unsigned area = 0; area < 3; ++area)
+            for (unsigned share = 0; share < SHARE_COUNT; ++share) {
+              union {
+                TC_X509_revocation_result result;
+                TC_bytes chain[DEPENDENCIES];
+                TC_X509_revocation_scope scopes[DEPENDENCIES];
+                TC_bytes signer_path[PATH_CAPACITY];
+                TC_bytes signer_policies[POLICY_CAPACITY];
+              } shared;
+              memset(&shared, 0xa5, sizeof shared);
+              TC_X509_revocation_workspace aliased = public_workspace;
+              if (area == 0 || (share == SHARED_SCRATCH && area == 2))
+                aliased.scopes = shared.scopes;
+              if (area == 1 || (share == SHARED_SCRATCH && area == 0))
+                aliased.signer_path = shared.signer_path;
+              if (area == 2 || (share == SHARED_SCRATCH && area == 1))
+                aliased.signer_policies = shared.signer_policies;
+              const TC_bytes* checked_chain = chain;
+              TC_X509_revocation_result* result = &path_evidence;
+              if (share == SHARED_RESULT)
+                result = &shared.result;
+              if (share == SHARED_CHAIN) {
+                memcpy(shared.chain, chain, sizeof shared.chain);
+                checked_chain = shared.chain;
+              }
+              uint8_t saved_shared[sizeof shared];
+              memcpy(saved_shared, &shared, sizeof shared);
+              path_evidence = path_sentinel;
+              signer_source.calls = 0;
+              work = TRUST_WORK_BUDGET;
+              munit_assert_int(TC_X509_path_check_revocation(checked_chain, DEPENDENCIES,
+                                                             &public_options, &aliased, &work,
+                                                             result),
+                               ==, TC_TLV_ARGUMENT);
+              munit_assert_size(work, ==, TRUST_WORK_BUDGET);
+              munit_assert_size(signer_source.calls, ==, 0);
+              munit_assert_memory_equal(sizeof shared, &shared, saved_shared);
+              munit_assert_memory_equal(sizeof path_evidence, &path_evidence, &path_sentinel);
+            }
+        }
         munit_assert_int(
             TC_X509_path_check_revocation(chain, DEPENDENCIES, &public_options, &public_workspace,
                                           &public_options.max_candidate_bytes, &path_evidence),

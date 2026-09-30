@@ -73,16 +73,7 @@ TC_X509_path_status tc_cms_signer_find(const tc_cms_candidates* candidates,
       candidates, &checks, &search->options->parsing, search->tree, search->validation, out, NULL));
 }
 
-enum {
-  CMS_PATH_WRITE = TC_X509_PATH_STORAGE_COUNT,
-  CMS_SEARCH_WRITE,
-  CMS_INDEX_WRITE,
-  CMS_SIGNATURE_WRITE,
-  CMS_SIGNED_DIGEST_WRITE,
-  CMS_RESULT_WRITE,
-  CMS_WORK_WRITE,
-  CMS_PATH_WRITE_COUNT
-};
+enum { CMS_RESULT_WRITE = TC_CMS_PATH_WORKSPACE_WRITES, CMS_WORK_WRITE, CMS_PATH_WRITE_COUNT };
 
 void tc_cms_path_workspace_plan_writes(tc_pki_storage_plan* plan,
                                        const TC_CMS_path_workspace* workspace)
@@ -93,6 +84,35 @@ void tc_cms_path_workspace_plan_writes(tc_pki_storage_plan* plan,
   TC_PKI_PLAN_WRITE(plan, workspace->certificates, workspace->certificate_capacity);
   TC_PKI_PLAN_WRITE(plan, workspace->signature, workspace->signature_capacity);
   TC_PKI_PLAN_WRITE(plan, workspace->signed_digest, workspace->signed_digest_capacity);
+}
+
+void tc_cms_credential_workspace_plan_writes(tc_pki_storage_plan* plan,
+                                             const TC_CMS_credential_workspace* workspace)
+{
+  tc_cms_path_workspace_plan_writes(plan, workspace->path);
+  TC_PKI_PLAN_WRITE(plan, workspace->held_path, workspace->path_capacity);
+  TC_PKI_PLAN_WRITE(plan, workspace->crl_states, workspace->crl_capacity);
+  TC_PKI_PLAN_WRITE(plan, workspace->nodes, workspace->node_capacity);
+  TC_PKI_PLAN_WRITE(plan, workspace->scopes, workspace->scope_capacity);
+  TC_PKI_PLAN_WRITE(plan, workspace->signer_path, workspace->signer_path_capacity);
+  TC_PKI_PLAN_WRITE(plan, workspace->signer_policies, workspace->signer_policy_capacity);
+}
+
+TC_TLV_result tc_cms_credential_workspace_check(const TC_CMS_credential_workspace* workspace,
+                                                size_t crl_count)
+{
+  if (!workspace || !workspace->path || !workspace->scopes || !workspace->signer_path ||
+      !workspace->signer_policies)
+    return TC_TLV_ARGUMENT;
+  /* The same bounds TC_X509_path_check_revocation applies, checked here
+   * before the path build spends work. */
+  const TC_CMS_path_workspace* path = workspace->path;
+  if (workspace->path_capacity < path->search.capacity || workspace->crl_capacity < crl_count ||
+      !workspace->node_capacity || workspace->scope_capacity < crl_count ||
+      workspace->signer_path_capacity < path->search.capacity ||
+      workspace->signer_policy_capacity < path->validation.policy_capacity)
+    return TC_TLV_LIMIT;
+  return TC_TLV_OK;
 }
 
 /* Record path workspace, result and work writes in CMS_*_WRITE slot order. */
@@ -444,7 +464,7 @@ TC_credential_status tc_cms_credential_validate_internal(
   const TC_bytes* metadata = extras ? extras->metadata : NULL;
   const size_t metadata_count = extras ? extras->metadata_count : 0;
   const tc_cms_prepared_signed_data* prepared = extras ? extras->prepared : NULL;
-  enum { HELD_PATH = CMS_PATH_WRITE_COUNT, CRL_STATES, CRL_NODES, WRITE_COUNT };
+  enum { RESULT_WRITE = TC_CMS_CREDENTIAL_WORKSPACE_WRITES, WORK_WRITE, WRITE_COUNT };
   TC_bytes writes[WRITE_COUNT];
   TC_X509_search_result path;
   TC_TLV_result result;
@@ -474,17 +494,16 @@ TC_credential_status tc_cms_credential_validate_internal(
           TC_TLV_OK ||
       time_order)
     return TC_CREDENTIAL_ERROR;
-  if (workspace->path_capacity < workspace->path->search.capacity ||
-      workspace->crl_capacity < revocation->index->count)
-    return TC_CREDENTIAL_LIMIT;
+  result = tc_cms_credential_workspace_check(workspace, revocation->index->count);
+  if (result != TC_TLV_OK)
+    return cms_credential_error(result);
   const TC_bytes inputs[] = {encoded, expected_type, selected};
   size_t budget;
   tc_pki_storage_plan plan;
   tc_pki_storage_plan_begin(&plan, writes, WRITE_COUNT, *work);
-  cms_path_plan_writes(&plan, workspace->path, work, &path);
-  TC_PKI_PLAN_WRITE(&plan, workspace->held_path, workspace->path_capacity);
-  TC_PKI_PLAN_WRITE(&plan, workspace->crl_states, workspace->crl_capacity);
-  TC_PKI_PLAN_WRITE(&plan, workspace->nodes, workspace->node_capacity);
+  tc_cms_credential_workspace_plan_writes(&plan, workspace);
+  TC_PKI_PLAN_WRITE(&plan, &path, 1);
+  TC_PKI_PLAN_WRITE(&plan, work, 1);
   tc_pki_storage_plan_seal(&plan);
   const cms_path_inputs path_inputs = {
       request,          sizeof *request, NULL, inputs, sizeof inputs / sizeof *inputs,

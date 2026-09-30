@@ -3,9 +3,10 @@
 #ifndef TC_VALIDATION_INTERNAL_H_
 #define TC_VALIDATION_INTERNAL_H_
 #include <tiny_crypto/validation.h>
-#include "x509_path_internal.h"
+#include "cms_internal.h"
 
-enum { TC_VALIDATION_WRITES = TC_X509_PATH_STORAGE_COUNT + 10 };
+/* Credential workspace writes plus work and the caller's result. */
+enum { TC_VALIDATION_WRITES = TC_CMS_CREDENTIAL_WORKSPACE_WRITES + 2 };
 TC_credential_status tc_validation_status(TC_TLV_result status);
 /* Validation storage preflight. The two plan steps let a caller add its own
  * writes before seal and its own inputs after it. tc_validation_storage runs

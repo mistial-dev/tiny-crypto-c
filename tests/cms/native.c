@@ -1540,6 +1540,36 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
           munit_assert_ptr_equal(signer_result.certificate.encoded.data,
                                  accepted_chuid.signer.data);
           munit_assert_int(signer_result.at.year, ==, object_options.at.year);
+          /* A result sharing bytes with the scopes, signer_path or
+           * signer_policies scratch is ERROR before any work. */
+          for (unsigned area = 0; area < 3; ++area) {
+            union {
+              TC_PIV_CHUID_result result;
+              TC_X509_revocation_scope scopes[EXAMPLE_CMS_CRL_CAPACITY];
+              TC_bytes signer_path[EXAMPLE_X509_PATH_CAPACITY];
+              TC_bytes signer_policies[EXAMPLE_X509_POLICY_CAPACITY];
+            } shared;
+            TC_CMS_credential_workspace result_alias = object_workspace;
+            if (area == 0)
+              result_alias.scopes = shared.scopes;
+            if (area == 1)
+              result_alias.signer_path = shared.signer_path;
+            if (area == 2)
+              result_alias.signer_policies = shared.signer_policies;
+            TC_validation_context result_context;
+            munit_assert_int(TC_validation_context_init(&object_trust, &object_options,
+                                                        &result_alias, &result_context),
+                             ==, TC_RESULT_OK);
+            uint8_t saved_shared[sizeof shared];
+            memset(&shared, 0xa5, sizeof shared);
+            memcpy(saved_shared, &shared, sizeof shared);
+            size_t alias_work = TRUST_WORK;
+            munit_assert_int(TC_PIV_CHUID_validate(&object_request, &result_context, &alias_work,
+                                                   &shared.result),
+                             ==, TC_CREDENTIAL_ERROR);
+            munit_assert_size(alias_work, ==, TRUST_WORK);
+            munit_assert_memory_equal(sizeof shared, &shared, saved_shared);
+          }
           if (object_request.profile != TC_PIV_CARD) {
             TC_validation_options alias_options = object_options;
             alias_options.certificate.purpose =

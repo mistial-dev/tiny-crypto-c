@@ -350,6 +350,152 @@ static MunitResult signer_find(const MunitParameter params[], void* user)
   return MUNIT_OK;
 }
 
+/* Context validation with the result, a CRL record or the CMS work counter
+ * placed inside the scopes, signer_path or signer_policies scratch. Each
+ * overlap is ERROR before any work, with the result and storage unchanged. */
+static void validation_context_aliasing(ExampleCMSCredentialWorkspace* storage,
+                                        const TC_X509_store_source* source,
+                                        const TC_CMS_path_options* path,
+                                        const TC_CMS_revocation_policy* revocation,
+                                        const TC_CMS_validation_request* request, TC_bytes leaf)
+{
+  enum { SCOPES, SIGNER_PATH, SIGNER_POLICIES, AREA_COUNT };
+  TC_validation_options options;
+  munit_assert_int(example_validation_options(path, revocation, &options), ==, TC_RESULT_OK);
+  TC_CMS_path_workspace cms = example_cms_path_workspace(&storage->cms);
+  const TC_CMS_credential_workspace workspace = example_cms_credential_workspace(storage, &cms);
+  const TC_validation_trust trust = {source, revocation->index};
+  TC_validation_context context;
+  munit_assert_int(TC_validation_context_init(&trust, &options, &workspace, &context), ==,
+                   TC_RESULT_OK);
+  TC_X509_validation_result accepted;
+  size_t work = WORK_BUDGET;
+  munit_assert_int(TC_X509_validate(leaf, &context, &work, &accepted), ==, TC_CREDENTIAL_VALID);
+  void* const arrays[] = {storage->scopes, storage->signer_path, storage->signer_policies};
+  for (unsigned area = 0; area < AREA_COUNT; ++area) {
+    /* The result shares its first bytes with one scratch array. */
+    union {
+      TC_X509_validation_result result;
+      TC_X509_revocation_scope scopes[EXAMPLE_CMS_CRL_CAPACITY];
+      TC_bytes signer_path[EXAMPLE_X509_PATH_CAPACITY];
+      TC_bytes signer_policies[EXAMPLE_X509_POLICY_CAPACITY];
+    } shared;
+    TC_CMS_credential_workspace result_alias = workspace;
+    if (area == SCOPES)
+      result_alias.scopes = shared.scopes;
+    if (area == SIGNER_PATH)
+      result_alias.signer_path = shared.signer_path;
+    if (area == SIGNER_POLICIES)
+      result_alias.signer_policies = shared.signer_policies;
+    TC_validation_context result_context;
+    munit_assert_int(TC_validation_context_init(&trust, &options, &result_alias, &result_context),
+                     ==, TC_RESULT_OK);
+    uint8_t saved_shared[sizeof shared];
+    memset(&shared, 0xa5, sizeof shared);
+    memcpy(saved_shared, &shared, sizeof shared);
+    work = WORK_BUDGET;
+    munit_assert_int(TC_X509_validate(leaf, &result_context, &work, &shared.result), ==,
+                     TC_CREDENTIAL_ERROR);
+    munit_assert_size(work, ==, WORK_BUDGET);
+    munit_assert_memory_equal(sizeof shared, &shared, saved_shared);
+
+    /* A CRL record whose encoding lies inside the scratch array. */
+    TC_X509_crl_record record = revocation->index->records[0];
+    record.crl.encoded = (TC_bytes){arrays[area], 1};
+    const TC_X509_crl_index index = {&record, 1, 0};
+    const TC_validation_trust input_trust = {source, &index};
+    TC_validation_context input_context;
+    munit_assert_int(TC_validation_context_init(&input_trust, &options, &workspace, &input_context),
+                     ==, TC_RESULT_OK);
+    TC_X509_validation_result result;
+    uint8_t saved_result[sizeof result];
+    static uint8_t saved_storage[sizeof *storage];
+    memset(&result, 0xa5, sizeof result);
+    memcpy(saved_result, &result, sizeof result);
+    memcpy(saved_storage, storage, sizeof *storage);
+    work = WORK_BUDGET;
+    munit_assert_int(TC_X509_validate(leaf, &input_context, &work, &result), ==,
+                     TC_CREDENTIAL_ERROR);
+    munit_assert_size(work, ==, WORK_BUDGET);
+    munit_assert_memory_equal(sizeof result, &result, saved_result);
+    munit_assert_memory_equal(sizeof *storage, storage, saved_storage);
+    work = WORK_BUDGET;
+    munit_assert_int(TC_CMS_validate(request, &input_context, &work), ==, TC_CREDENTIAL_ERROR);
+    munit_assert_size(work, ==, WORK_BUDGET);
+    munit_assert_memory_equal(sizeof *storage, storage, saved_storage);
+  }
+}
+
+/* Missing or undersized revocation scratch is rejected at both credential
+ * entries before any work: ERROR for a missing array, then LIMIT for a
+ * capacity below the path, policy or CRL index size. */
+static void credential_workspace_bounds(ExampleCMSCredentialWorkspace* storage,
+                                        const TC_X509_store_source* source,
+                                        const TC_CMS_path_options* path,
+                                        const TC_CMS_revocation_policy* revocation,
+                                        const TC_CMS_validation_request* request, TC_bytes leaf)
+{
+  enum {
+    NO_SCOPES,
+    NO_SIGNER_PATH,
+    NO_SIGNER_POLICIES,
+    NO_SCOPES_OR_CAPACITY,
+    NO_NODES,
+    FEW_SCOPES,
+    SHORT_SIGNER_PATH,
+    FEW_SIGNER_POLICIES,
+    BOUND_COUNT
+  };
+  TC_validation_options options;
+  munit_assert_int(example_validation_options(path, revocation, &options), ==, TC_RESULT_OK);
+  munit_assert_size(revocation->index->count, >, 1);
+  TC_CMS_path_workspace cms = example_cms_path_workspace(&storage->cms);
+  const TC_CMS_credential_workspace complete = example_cms_credential_workspace(storage, &cms);
+  const TC_validation_trust trust = {source, revocation->index};
+  for (unsigned bound = 0; bound < BOUND_COUNT; ++bound) {
+    TC_CMS_credential_workspace workspace = complete;
+    if (bound == NO_SCOPES)
+      workspace.scopes = NULL;
+    if (bound == NO_SIGNER_PATH)
+      workspace.signer_path = NULL;
+    if (bound == NO_SIGNER_POLICIES)
+      workspace.signer_policies = NULL;
+    if (bound == NO_SCOPES_OR_CAPACITY) {
+      workspace.scopes = NULL;
+      workspace.scope_capacity = 0;
+    }
+    if (bound == NO_NODES)
+      workspace.node_capacity = 0;
+    if (bound == FEW_SCOPES)
+      workspace.scope_capacity = revocation->index->count - 1;
+    if (bound == SHORT_SIGNER_PATH)
+      workspace.signer_path_capacity = cms.search.capacity - 1;
+    if (bound == FEW_SIGNER_POLICIES)
+      workspace.signer_policy_capacity = cms.validation.policy_capacity - 1;
+    const TC_credential_status expected =
+        bound <= NO_SCOPES_OR_CAPACITY ? TC_CREDENTIAL_ERROR : TC_CREDENTIAL_LIMIT;
+    static uint8_t saved_storage[sizeof *storage];
+    memcpy(saved_storage, storage, sizeof *storage);
+    size_t work = WORK_BUDGET;
+    munit_assert_int(
+        TC_CMS_credential_validate(request, source, path, revocation, &workspace, &work), ==,
+        expected);
+    munit_assert_size(work, ==, WORK_BUDGET);
+    munit_assert_memory_equal(sizeof *storage, storage, saved_storage);
+    TC_validation_context context;
+    munit_assert_int(TC_validation_context_init(&trust, &options, &workspace, &context), ==,
+                     TC_RESULT_OK);
+    TC_X509_validation_result result;
+    uint8_t saved_result[sizeof result];
+    memset(&result, 0xa5, sizeof result);
+    memcpy(saved_result, &result, sizeof result);
+    munit_assert_int(TC_X509_validate(leaf, &context, &work, &result), ==, expected);
+    munit_assert_size(work, ==, WORK_BUDGET);
+    munit_assert_memory_equal(sizeof result, &result, saved_result);
+    munit_assert_memory_equal(sizeof *storage, storage, saved_storage);
+  }
+}
+
 /* The combined credential example over a held trust snapshot, with issuer
  * and root CRLs, revoked signers and intermediates and exhausted work. */
 static MunitResult credential_workflow(const MunitParameter params[], void* user)
@@ -747,7 +893,17 @@ static MunitResult credential_workflow(const MunitParameter params[], void* user
               munit_assert_size(work, ==, 0);
             munit_assert_size(slot.readers, ==, 1);
           }
-          enum { CRL_RECORDS, CMS_SCRATCH, HELD_PATH, CRL_STATES, CRL_NODES, ALIAS_COUNT };
+          enum {
+            CRL_RECORDS,
+            CMS_SCRATCH,
+            HELD_PATH,
+            CRL_STATES,
+            CRL_NODES,
+            CRL_SCOPES,
+            SIGNER_PATH,
+            SIGNER_POLICIES,
+            ALIAS_COUNT
+          };
           for (unsigned alias = 0; alias < ALIAS_COUNT; ++alias) {
             TC_X509_crl_record aliased_record = records[0];
             TC_X509_crl_index aliased_index = {&aliased_record, 1, 0};
@@ -760,6 +916,12 @@ static MunitResult credential_workflow(const MunitParameter params[], void* user
               overlapping = credential.crl_states;
             if (alias == CRL_NODES)
               overlapping = credential.nodes;
+            if (alias == CRL_SCOPES)
+              overlapping = credential.scopes;
+            if (alias == SIGNER_PATH)
+              overlapping = credential.signer_path;
+            if (alias == SIGNER_POLICIES)
+              overlapping = credential.signer_policies;
             if (alias == CRL_RECORDS)
               aliased_index.records = (const TC_X509_crl_record*)&credential.cms;
             else
@@ -775,6 +937,28 @@ static MunitResult credential_workflow(const MunitParameter params[], void* user
             munit_assert_size(slot.readers, ==, 1);
             munit_assert_memory_equal(sizeof credential, &credential, saved_storage);
           }
+          {
+            /* The work counter placed inside each revocation scratch array is
+             * rejected before the path build charges it. */
+            void* const scratch_arrays[] = {credential.scopes, credential.signer_path,
+                                            credential.signer_policies};
+            for (size_t area = 0; area < sizeof scratch_arrays / sizeof *scratch_arrays; ++area) {
+              size_t* const inside = scratch_arrays[area];
+              uint8_t saved_storage[sizeof credential];
+              *inside = WORK_BUDGET;
+              memcpy(saved_storage, &credential, sizeof credential);
+              munit_assert_int(example_validate_cms_from_store(&fragmented, &store,
+                                                               &credential_settings, &revocation,
+                                                               inside, &credential),
+                               ==, TC_CREDENTIAL_ERROR);
+              munit_assert_size(slot.readers, ==, 1);
+              munit_assert_memory_equal(sizeof credential, &credential, saved_storage);
+            }
+          }
+          validation_context_aliasing(&credential, &held->source, &credential_settings, &revocation,
+                                      &fragmented, (TC_bytes){leaf_der, leaf_length});
+          credential_workspace_bounds(&credential, &held->source, &credential_settings, &revocation,
+                                      &fragmented, (TC_bytes){leaf_der, leaf_length});
           {
             const void* targets[] = {&credential.cms, credential.held_path, credential.crl_states,
                                      credential.nodes};
