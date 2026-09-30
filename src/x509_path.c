@@ -642,26 +642,44 @@ static int path_options_valid(const TC_X509_path_options* options, size_t* bytes
   return 1;
 }
 
-TC_X509_path_status tc_x509_path_validate_anchor(const TC_bytes* chain, size_t count,
-                                                 const TC_X509_store_anchor* anchor,
-                                                 const TC_X509_path_options* options,
-                                                 const TC_X509_path_workspace* workspace,
-                                                 size_t* work, TC_X509_path_result* out)
-{
+/* One validation of an ordered chain against a stored anchor (RFC 5280
+ * section 6.1). The entry records the caller's inputs and the phases share
+ * the workspace views, the caller's work counter and the policy result. */
+typedef struct {
+  const TC_bytes* chain;
+  size_t count;
+  const TC_X509_store_anchor* anchor;
+  const TC_X509_path_options* options;
+  const TC_X509_path_workspace* workspace;
+  /* Remaining work units, charged by the phases. */
+  size_t* work;
+  /* Views of the workspace arrays. input reads the chain through parser into
+   * workspace->certificates until the basic phase fills that cache. */
   TC_X509_workspace parser;
   TC_X509_constraint_workspace names;
   tc_x509_path_input input;
-  tc_x509_policy_graph graph;
-  tc_x509_policy_options policy_options;
-  tc_x509_policy_workspace policy_workspace;
-  tc_x509_path_usage usage;
-  tc_x509_extension_workspace extension_workspace;
-  const TC_X509_certificate* target;
-  TC_X509_path_result validated;
-  TC_TLV_result result;
-  size_t i, set, initial_work, total = 0, policy_count, option_bytes;
-  int accepted;
-  if (!chain || !anchor || !options || !workspace || !work || !out ||
+  /* Valid policy count in workspace->policies after the policy phase. */
+  size_t policy_count;
+} path_validation;
+
+/* Status of a pass that reports a result and an acceptance verdict. VALID
+ * lets the next phase run. */
+static TC_X509_path_status path_pass_status(TC_TLV_result result, int accepted)
+{
+  if (result != TC_TLV_OK)
+    return tc_x509_path_status(result);
+  return accepted ? TC_X509_PATH_VALID : TC_X509_PATH_INVALID;
+}
+
+/* Validate the caller's arguments once, before any work is charged.
+ * option_bytes receives the option OID bytes examined. */
+static TC_X509_path_status
+path_arguments_check(const path_validation* v, const TC_X509_path_result* out, size_t* option_bytes)
+{
+  const TC_X509_store_anchor* anchor = v->anchor;
+  const TC_X509_path_options* options = v->options;
+  const TC_X509_path_workspace* workspace = v->workspace;
+  if (!v->chain || !anchor || !options || !workspace || !v->work || !out ||
       (options->flags & ~(unsigned)TC_X509_PATH_SUPPORTED_FLAGS))
     return TC_X509_PATH_ERROR;
   if (anchor->x509_unusable)
@@ -673,89 +691,151 @@ TC_X509_path_status tc_x509_path_validate_anchor(const TC_bytes* chain, size_t c
        ~(unsigned)(TC_X509_ANCHOR_REPLACED_POLICY_SET | TC_X509_ANCHOR_REPLACED_POLICY_FLAGS |
                    TC_X509_ANCHOR_REPLACED_NAMES | TC_X509_ANCHOR_REPLACED_PATH_LEN)))
     return TC_X509_PATH_ERROR;
-  if (!count)
+  if (!v->count)
     return TC_X509_PATH_INVALID;
-  if (count > options->max_certificates || count > SIZE_MAX / sizeof *chain ||
+  if (v->count > options->max_certificates || v->count > SIZE_MAX / sizeof *v->chain ||
       options->initial_policy_count > options->parsing.max_elements)
     return TC_X509_PATH_LIMIT;
-  if (!workspace->certificates || count > workspace->certificate_capacity ||
-      !workspace->summaries || count > workspace->summary_capacity)
+  if (!workspace->certificates || v->count > workspace->certificate_capacity ||
+      !workspace->summaries || v->count > workspace->summary_capacity)
     return TC_X509_PATH_LIMIT;
-  if (!path_options_valid(options, &option_bytes))
+  if (!path_options_valid(options, option_bytes))
     return TC_X509_PATH_ERROR;
-  initial_work = *work;
-  result = path_storage(chain, count, anchor, options, workspace, out, work);
-  if (result != TC_TLV_OK)
-    return tc_x509_path_status(result);
-  result = anchor_extensions_check(anchor, anchor->extensions, 1, &options->parsing, work);
-  if (result != TC_TLV_OK)
-    return tc_x509_path_status(result);
-  result =
-      anchor_extensions_check(anchor, anchor->certificate_extensions, 0, &options->parsing, work);
-  if (result != TC_TLV_OK)
-    return tc_x509_path_status(result);
-  for (i = 0; i < count; ++i) {
-    if (tc_pki_work_charge(work, 1) != TC_TLV_OK)
+  return TC_X509_PATH_VALID;
+}
+
+/* Check the stored anchor's extension lists, which supply the trust anchor
+ * information of RFC 5280 section 6.1.1(d). TrustAnchorInfo exts come first,
+ * then the anchor certificate's extensions. */
+static TC_X509_path_status path_anchor_check(const path_validation* v)
+{
+  const TC_TLV_limits* limits = &v->options->parsing;
+  TC_TLV_result result =
+      anchor_extensions_check(v->anchor, v->anchor->extensions, 1, limits, v->work);
+  if (result == TC_TLV_OK)
+    result =
+        anchor_extensions_check(v->anchor, v->anchor->certificate_extensions, 0, limits, v->work);
+  return tc_x509_path_status(result);
+}
+
+/* Charge one unit per chain entry and bound the total DER bytes by
+ * max_input. Then charge the option OID bytes the entry examined. */
+static TC_X509_path_status path_chain_check(const path_validation* v, size_t option_bytes)
+{
+  size_t i, total = 0;
+  for (i = 0; i < v->count; ++i) {
+    if (tc_pki_work_charge(v->work, 1) != TC_TLV_OK)
       return TC_X509_PATH_LIMIT;
-    if (!chain[i].length)
+    if (!v->chain[i].length)
       return TC_X509_PATH_INVALID;
-    if (chain[i].length > options->max_input - total)
+    if (v->chain[i].length > v->options->max_input - total)
       return TC_X509_PATH_LIMIT;
-    total += chain[i].length;
+    total += v->chain[i].length;
   }
-  /* The entry checked the option OIDs. Charge the bytes it examined. */
-  if (tc_pki_work_charge(work, option_bytes) != TC_TLV_OK)
+  if (tc_pki_work_charge(v->work, option_bytes) != TC_TLV_OK)
     return TC_X509_PATH_LIMIT;
-  parser.frames = workspace->frames;
-  parser.extension_oids = workspace->oids;
-  parser.extension_capacity = workspace->oid_capacity;
-  names.frames = workspace->frames;
-  names.names = &workspace->names;
-  memset(&input, 0, sizeof input);
-  input.count = count;
-  input.max_certificates = options->max_certificates;
-  input.max_input = options->max_input;
-  input.anchor = &anchor->trust;
-  input.at = &options->at;
-  input.clock_skew_seconds = options->clock_skew_seconds;
-  input.signatures = &options->signatures;
-  input.anchor_path_len = anchor->path_len;
-  input.has_anchor_path_len = anchor->has_path_len;
-  input.limits = &options->parsing;
-  input.encoded = chain;
-  input.parser = &parser;
-  input.cache = workspace->certificates;
-  /* Each validation fills the summary cache afresh, so clear stale entries. */
-  for (i = 0; i < count; ++i)
+  return TC_X509_PATH_VALID;
+}
+
+/* Build the parser, name-constraint and pass-input views over the workspace
+ * and clear the summary cache that the passes fill afresh. Charges no work. */
+static void path_views_init(path_validation* v)
+{
+  const TC_X509_path_workspace* workspace = v->workspace;
+  const TC_X509_path_options* options = v->options;
+  tc_x509_path_input* input = &v->input;
+  size_t i;
+  v->parser.frames = workspace->frames;
+  v->parser.extension_oids = workspace->oids;
+  v->parser.extension_capacity = workspace->oid_capacity;
+  v->names.frames = workspace->frames;
+  v->names.names = &workspace->names;
+  memset(input, 0, sizeof *input);
+  input->count = v->count;
+  input->max_certificates = options->max_certificates;
+  input->max_input = options->max_input;
+  input->anchor = &v->anchor->trust;
+  input->at = &options->at;
+  input->clock_skew_seconds = options->clock_skew_seconds;
+  input->signatures = &options->signatures;
+  input->anchor_path_len = v->anchor->path_len;
+  input->has_anchor_path_len = v->anchor->has_path_len;
+  input->limits = &options->parsing;
+  input->encoded = v->chain;
+  input->parser = &v->parser;
+  input->cache = workspace->certificates;
+  for (i = 0; i < v->count; ++i)
     workspace->summaries[i].ready = 0;
-  input.summaries = workspace->summaries;
-  result = tc_x509_path_basic(&input, &workspace->names, work, &accepted);
+  input->summaries = workspace->summaries;
+}
+
+/* Basic certificate processing: signature, validity and issuer name
+ * (RFC 5280 section 6.1.3(a)), and CA status, keyCertSign and path length
+ * for intermediates (6.1.4(k) to (n)). The pass parses every certificate into
+ * the cache, so later phases read the cached views. */
+static TC_X509_path_status path_basic_phase(path_validation* v)
+{
+  int accepted = 0;
+  const TC_TLV_result result =
+      tc_x509_path_basic(&v->input, &v->workspace->names, v->work, &accepted);
+  const TC_X509_path_status status = path_pass_status(result, accepted);
+  if (status == TC_X509_PATH_VALID)
+    v->input.certificates = v->workspace->certificates;
+  return status;
+}
+
+/* Apply one initial subtree set to every path certificate (RFC 5280 section
+ * 6.1.1(b), (c)). An empty set applies no constraint. */
+static TC_X509_path_status path_initial_subtrees(const path_validation* v,
+                                                 const TC_X509_name_constraints* constraints)
+{
+  size_t i;
+  TC_TLV_result result;
+  if (!constraints->permitted.length && !constraints->excluded.length)
+    return TC_X509_PATH_VALID;
+  result = tc_x509_path_constraint_distances(constraints, v->input.limits, &v->names, v->work);
   if (result != TC_TLV_OK)
     return tc_x509_path_status(result);
-  if (!accepted)
-    return TC_X509_PATH_INVALID;
-  input.certificates = workspace->certificates;
-  result = tc_x509_path_names(&input, &names, work, &accepted);
-  if (result != TC_TLV_OK)
-    return tc_x509_path_status(result);
-  if (!accepted)
-    return TC_X509_PATH_INVALID;
-  /* Apply application and stored-anchor constraints independently. */
-  for (set = 0; set < 2; ++set) {
-    const TC_X509_name_constraints* constraints = set ? &anchor->names : &options->anchor_names;
-    if (!constraints || (!constraints->permitted.length && !constraints->excluded.length))
-      continue;
-    result = tc_x509_path_constraint_distances(constraints, input.limits, &names, work);
-    if (result != TC_TLV_OK)
-      return tc_x509_path_status(result);
-    for (i = 0; i < count; ++i) {
-      result = path_constraint_target(&input, i, 0, constraints, &names, work, &accepted);
-      if (result != TC_TLV_OK)
-        return tc_x509_path_status(result);
-      if (!accepted)
-        return TC_X509_PATH_INVALID;
-    }
+  for (i = 0; i < v->count; ++i) {
+    int accepted = 0;
+    const TC_X509_path_status status = path_pass_status(
+        path_constraint_target(&v->input, i, 0, constraints, &v->names, v->work, &accepted),
+        accepted);
+    if (status != TC_X509_PATH_VALID)
+      return status;
   }
+  return TC_X509_PATH_VALID;
+}
+
+/* Name constraints (RFC 5280 section 6.1.3(b), (c) and 6.1.4(g)): each
+ * intermediate's nameConstraints, then the application's and the stored
+ * anchor's subtrees, each applied independently. */
+static TC_X509_path_status path_names_phase(const path_validation* v)
+{
+  int accepted = 0;
+  TC_X509_path_status status =
+      path_pass_status(tc_x509_path_names(&v->input, &v->names, v->work, &accepted), accepted);
+  if (status == TC_X509_PATH_VALID)
+    status = path_initial_subtrees(v, &v->options->anchor_names);
+  if (status == TC_X509_PATH_VALID)
+    status = path_initial_subtrees(v, &v->anchor->names);
+  return status;
+}
+
+/* Certificate policies (RFC 5280 sections 6.1.1(e) to (i), 6.1.3(d) to (f),
+ * 6.1.4(a), (b), (h) to (j) and 6.1.5(a), (b), (g)). The caller's flags and
+ * the anchor's policy flags both set the initial inhibit and explicit-policy
+ * inputs. The valid policy set lands in workspace->policies. */
+static TC_X509_path_status path_policy_phase(path_validation* v)
+{
+  const TC_X509_path_workspace* workspace = v->workspace;
+  const TC_X509_path_options* options = v->options;
+  const unsigned flags = options->flags | v->anchor->policy_flags;
+  tc_x509_policy_graph graph;
+  tc_x509_policy_options policy_options;
+  tc_x509_policy_workspace policy_workspace;
+  TC_TLV_result result;
+  int accepted = 0;
   memset(&graph, 0, sizeof graph);
   graph.nodes = workspace->nodes;
   graph.node_capacity = workspace->node_capacity;
@@ -765,12 +845,9 @@ TC_X509_path_status tc_x509_path_validate_anchor(const TC_bytes* chain, size_t c
   graph.expected_capacity = workspace->expected_capacity;
   policy_options.initial = options->initial_policies;
   policy_options.initial_count = options->initial_policy_count;
-  policy_options.require_explicit =
-      ((options->flags | anchor->policy_flags) & TC_X509_PATH_REQUIRE_EXPLICIT_POLICY) != 0;
-  policy_options.inhibit_mapping =
-      ((options->flags | anchor->policy_flags) & TC_X509_PATH_INHIBIT_MAPPING) != 0;
-  policy_options.inhibit_any =
-      ((options->flags | anchor->policy_flags) & TC_X509_PATH_INHIBIT_ANY_POLICY) != 0;
+  policy_options.require_explicit = (flags & TC_X509_PATH_REQUIRE_EXPLICIT_POLICY) != 0;
+  policy_options.inhibit_mapping = (flags & TC_X509_PATH_INHIBIT_MAPPING) != 0;
+  policy_options.inhibit_any = (flags & TC_X509_PATH_INHIBIT_ANY_POLICY) != 0;
   policy_workspace.graph = &graph;
   policy_workspace.policies = workspace->oids;
   policy_workspace.policy_capacity = workspace->oid_capacity;
@@ -780,35 +857,93 @@ TC_X509_path_status tc_x509_path_validate_anchor(const TC_bytes* chain, size_t c
   policy_workspace.output_capacity = workspace->policy_capacity;
   policy_workspace.names = &workspace->names;
   policy_workspace.frames = workspace->frames;
-  result = tc_x509_path_policies(&input, &policy_options, anchor->policy_set, &policy_workspace,
-                                 work, &policy_count, &accepted);
-  if (result != TC_TLV_OK)
-    return tc_x509_path_status(result);
-  if (!accepted)
-    return TC_X509_PATH_INVALID;
+  result = tc_x509_path_policies(&v->input, &policy_options, v->anchor->policy_set,
+                                 &policy_workspace, v->work, &v->policy_count, &accepted);
+  return path_pass_status(result, accepted);
+}
+
+/* Target usage and the remaining critical extensions: keyUsage and
+ * extendedKeyUsage against the caller's purpose (RFC 5280 sections 4.2.1.3
+ * and 4.2.1.12), and unrecognized critical extensions (6.1.4(o), 6.1.5(f)). */
+static TC_X509_path_status path_usage_phase(const path_validation* v)
+{
+  const TC_X509_path_options* options = v->options;
+  tc_x509_path_usage usage;
+  tc_x509_extension_workspace extension_workspace;
+  int accepted = 0;
   usage.purpose = options->purpose;
   usage.key_usage = options->key_usage;
   usage.require_key_usage = (options->flags & TC_X509_PATH_REQUIRE_KEY_USAGE) != 0;
   usage.require_extended_key_usage =
       (options->flags & TC_X509_PATH_REQUIRE_EXTENDED_KEY_USAGE) != 0;
   usage.inhibit_any_purpose = (options->flags & TC_X509_PATH_INHIBIT_ANY_PURPOSE) != 0;
-  extension_workspace.oids = workspace->oids;
-  extension_workspace.oid_capacity = workspace->oid_capacity;
-  extension_workspace.names = names;
-  result = tc_x509_path_extensions(&input, &usage, &extension_workspace, work, &accepted);
+  extension_workspace.oids = v->workspace->oids;
+  extension_workspace.oid_capacity = v->workspace->oid_capacity;
+  extension_workspace.names = v->names;
+  return path_pass_status(
+      tc_x509_path_extensions(&v->input, &usage, &extension_workspace, v->work, &accepted),
+      accepted);
+}
+
+/* Write the outputs of RFC 5280 section 6.1.6: the target's public key and
+ * the valid policy set. work_used counts the units spent since initial_work. */
+static TC_X509_path_status path_result_write(const path_validation* v, size_t initial_work,
+                                             TC_X509_path_result* out)
+{
+  const TC_X509_certificate* target = NULL;
+  TC_X509_path_result validated;
+  const TC_TLV_result result = tc_x509_path_certificate(&v->input, v->count - 1, v->work, &target);
   if (result != TC_TLV_OK)
     return tc_x509_path_status(result);
-  if (!accepted)
-    return TC_X509_PATH_INVALID;
-  result = tc_x509_path_certificate(&input, count - 1, work, &target);
-  if (result != TC_TLV_OK)
-    return tc_x509_path_status(result);
+  /* Assemble the result before the single write to out. */
   validated.public_key = target->public_key;
-  validated.policies = workspace->policies;
-  validated.policy_count = policy_count;
-  validated.work_used = initial_work - *work;
+  validated.policies = v->workspace->policies;
+  validated.policy_count = v->policy_count;
+  validated.work_used = initial_work - *v->work;
   *out = validated;
   return TC_X509_PATH_VALID;
+}
+
+/* Run the validation phases in order. Each phase returns VALID to continue,
+ * and the first other status ends validation with out unchanged. */
+TC_X509_path_status tc_x509_path_validate_anchor(const TC_bytes* chain, size_t count,
+                                                 const TC_X509_store_anchor* anchor,
+                                                 const TC_X509_path_options* options,
+                                                 const TC_X509_path_workspace* workspace,
+                                                 size_t* work, TC_X509_path_result* out)
+{
+  path_validation v;
+  size_t initial_work, option_bytes = 0;
+  TC_X509_path_status status;
+  v.chain = chain;
+  v.count = count;
+  v.anchor = anchor;
+  v.options = options;
+  v.workspace = workspace;
+  v.work = work;
+  v.policy_count = 0;
+  status = path_arguments_check(&v, out, &option_bytes);
+  if (status != TC_X509_PATH_VALID)
+    return status;
+  initial_work = *work;
+  status = tc_x509_path_status(path_storage(chain, count, anchor, options, workspace, out, work));
+  if (status == TC_X509_PATH_VALID)
+    status = path_anchor_check(&v);
+  if (status == TC_X509_PATH_VALID)
+    status = path_chain_check(&v, option_bytes);
+  if (status != TC_X509_PATH_VALID)
+    return status;
+  path_views_init(&v);
+  status = path_basic_phase(&v);
+  if (status == TC_X509_PATH_VALID)
+    status = path_names_phase(&v);
+  if (status == TC_X509_PATH_VALID)
+    status = path_policy_phase(&v);
+  if (status == TC_X509_PATH_VALID)
+    status = path_usage_phase(&v);
+  if (status == TC_X509_PATH_VALID)
+    status = path_result_write(&v, initial_work, out);
+  return status;
 }
 
 TC_X509_path_status tc_x509_path_validate_budget(const TC_bytes* chain, size_t count,

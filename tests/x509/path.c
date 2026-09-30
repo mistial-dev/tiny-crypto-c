@@ -6,6 +6,7 @@
 #include "munit.h"
 #include "test_util.h"
 #include <stddef.h>
+#include <stdio.h>
 #include <string.h>
 
 typedef struct {
@@ -1125,6 +1126,249 @@ TC_TEST(status_mapping)
   return MUNIT_OK;
 }
 
+#ifndef TC_PKITS_DIR
+#error "TC_PKITS_DIR must name the vendored PKITS certificate directory"
+#endif
+
+enum { PKITS_FILE_CAPACITY = 2048 };
+
+static const TC_TLV_limits pkits_limits = {PKITS_FILE_CAPACITY, PKITS_FILE_CAPACITY, 512, 16};
+static uint8_t pkits_der[3][PKITS_FILE_CAPACITY];
+static TC_X509_path_storage validation_arena[2048];
+
+static TC_bytes pkits_load(const char* name, uint8_t* buffer)
+{
+  char path[512];
+  FILE* file;
+  size_t length;
+  munit_assert_int(snprintf(path, sizeof path, "%s/%s", TC_PKITS_DIR, name), >, 0);
+  file = fopen(path, "rb");
+  munit_assert_not_null(file);
+  length = fread(buffer, 1, PKITS_FILE_CAPACITY, file);
+  munit_assert_int(ferror(file), ==, 0);
+  munit_assert_int(fgetc(file), ==, EOF);
+  munit_assert_int(fclose(file), ==, 0);
+  return (TC_bytes){buffer, length};
+}
+
+/* One validation scenario, with the status and the exact work units spent. */
+typedef struct {
+  const char* ca;
+  const char* ee;
+  unsigned flags;
+  int initial_policy2;
+  int purpose;
+  int anchor_excludes_pkits;
+  int critical_anchor_extension;
+  int empty_entry;
+  int unusable_anchor;
+  TC_X509_signature_result signature;
+  TC_X509_path_status status;
+  size_t work, policy_count;
+} path_phase_case;
+
+/* Pin the status and work spent when each validation phase decides the
+ * outcome: argument checks, anchor checks, chain charge, basic processing (RFC 5280 section
+ * 6.1.3(a)), certificate and initial name constraints (6.1.1(b), (c) and
+ * 6.1.3(b), (c)), policies (6.1.3(d) to (f), 6.1.4(a), (b)) and target
+ * usage (4.2.1.12). Every budget one unit short returns LIMIT with out
+ * unchanged. */
+TC_TEST(validation_phases)
+{
+  static const uint8_t policy2[] = {0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x02, 0x01, 0x30, 0x02};
+  static const uint8_t purpose[] = {0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x01};
+  /* C=US, O=Test Certificates 2011 as an excluded directoryName subtree. */
+  static const uint8_t pkits_subtree[] = {
+      0x30, 0x34, 0xa4, 0x32, 0x30, 0x30, 0x31, 0x0b, 0x30, 0x09, 0x06, 0x03, 0x55,
+      0x04, 0x06, 0x13, 0x02, 0x55, 0x53, 0x31, 0x1f, 0x30, 0x1d, 0x06, 0x03, 0x55,
+      0x04, 0x0a, 0x13, 0x16, 'T',  'e',  's',  't',  ' ',  'C',  'e',  'r',  't',
+      'i',  'f',  'i',  'c',  'a',  't',  'e',  's',  ' ',  '2',  '0',  '1',  '1'};
+  /* Extensions contents with one critical extension of unknown OID. */
+  static const uint8_t unknown_extension[] = {0x30, 10, 6, 3, 0x55, 0x1d, 99, 1, 1, 0xff, 4, 0};
+  static const path_phase_case cases[] = {
+      /* Every phase accepts. */
+      {.ca = "GoodCACert.crt",
+       .ee = "ValidCertificatePathTest1EE.crt",
+       .status = TC_X509_PATH_VALID,
+       .work = 9869,
+       .policy_count = 1},
+      /* Argument checks charge no work: an unsupported flag and an anchor
+       * marked unusable for X.509. */
+      {.ca = "GoodCACert.crt",
+       .ee = "ValidCertificatePathTest1EE.crt",
+       .flags = 1u << 31,
+       .status = TC_X509_PATH_ERROR,
+       .work = 0},
+      {.ca = "GoodCACert.crt",
+       .ee = "ValidCertificatePathTest1EE.crt",
+       .unusable_anchor = 1,
+       .status = TC_X509_PATH_INVALID,
+       .work = 0},
+      /* Anchor preflight: an unimplemented critical anchor extension. */
+      {.ca = "GoodCACert.crt",
+       .ee = "ValidCertificatePathTest1EE.crt",
+       .critical_anchor_extension = 1,
+       .status = TC_X509_PATH_UNSUPPORTED,
+       .work = 378},
+      /* Chain charge: an empty chain entry. */
+      {.ca = "GoodCACert.crt",
+       .ee = "ValidCertificatePathTest1EE.crt",
+       .empty_entry = 1,
+       .status = TC_X509_PATH_INVALID,
+       .work = 379},
+      /* Basic processing: a bad signature and an expired target. */
+      {.ca = "GoodCACert.crt",
+       .ee = "ValidCertificatePathTest1EE.crt",
+       .signature = TC_X509_SIGNATURE_INVALID,
+       .status = TC_X509_PATH_INVALID,
+       .work = 5215},
+      {.ca = "GoodCACert.crt",
+       .ee = "InvalidEEnotAfterDateTest6EE.crt",
+       .status = TC_X509_PATH_INVALID,
+       .work = 7203},
+      /* Certificate name constraints, then the application's anchor names. */
+      {.ca = "nameConstraintsDN1CACert.crt",
+       .ee = "ValidDNnameConstraintsTest1EE.crt",
+       .status = TC_X509_PATH_VALID,
+       .work = 12881,
+       .policy_count = 1},
+      {.ca = "nameConstraintsDN1CACert.crt",
+       .ee = "InvalidDNnameConstraintsTest2EE.crt",
+       .status = TC_X509_PATH_INVALID,
+       .work = 12147},
+      {.ca = "GoodCACert.crt",
+       .ee = "ValidCertificatePathTest1EE.crt",
+       .anchor_excludes_pkits = 1,
+       .status = TC_X509_PATH_INVALID,
+       .work = 9263},
+      /* Policies: a mapping, a filtered initial set and inhibited mapping. */
+      {.ca = "Mapping1to2CACert.crt",
+       .ee = "ValidPolicyMappingTest1EE.crt",
+       .status = TC_X509_PATH_VALID,
+       .work = 10543,
+       .policy_count = 1},
+      {.ca = "Mapping1to2CACert.crt",
+       .ee = "ValidPolicyMappingTest1EE.crt",
+       .flags = TC_X509_PATH_REQUIRE_EXPLICIT_POLICY,
+       .initial_policy2 = 1,
+       .status = TC_X509_PATH_INVALID,
+       .work = 10065},
+      {.ca = "Mapping1to2CACert.crt",
+       .ee = "ValidPolicyMappingTest1EE.crt",
+       .flags = TC_X509_PATH_REQUIRE_EXPLICIT_POLICY | TC_X509_PATH_INHIBIT_MAPPING,
+       .status = TC_X509_PATH_INVALID,
+       .work = 10009},
+      {.ca = "GoodCACert.crt",
+       .ee = "ValidCertificatePathTest1EE.crt",
+       .flags = TC_X509_PATH_REQUIRE_EXPLICIT_POLICY,
+       .initial_policy2 = 1,
+       .status = TC_X509_PATH_INVALID,
+       .work = 9460},
+      /* Usage: a required purpose that the target lacks, then an optional one. */
+      {.ca = "GoodCACert.crt",
+       .ee = "ValidCertificatePathTest1EE.crt",
+       .flags = TC_X509_PATH_REQUIRE_EXTENDED_KEY_USAGE,
+       .purpose = 1,
+       .status = TC_X509_PATH_INVALID,
+       .work = 9877},
+      {.ca = "GoodCACert.crt",
+       .ee = "ValidCertificatePathTest1EE.crt",
+       .purpose = 1,
+       .status = TC_X509_PATH_VALID,
+       .work = 9877,
+       .policy_count = 1},
+  };
+
+  TC_X509_path_capacity capacity;
+  TC_X509_path_workspace workspace;
+  TC_X509_workspace parser;
+  TC_X509_certificate root;
+  TC_X509_store_anchor anchor;
+  size_t bytes, i;
+  capacity.frames = 32;
+  capacity.oids = 32;
+  capacity.name_scalars = 256;
+  capacity.name_attributes = 32;
+  capacity.policy_nodes = 32;
+  capacity.policy_edges = 32;
+  capacity.policy_expected = 32;
+  capacity.policy_mappings = 8;
+  capacity.policies = 8;
+  capacity.path = 4;
+  munit_assert_int(TC_X509_path_workspace_size(&capacity, &bytes), ==, TC_RESULT_OK);
+  munit_assert_size(bytes, <=, sizeof validation_arena);
+  munit_assert_int(TC_X509_path_workspace_init(
+                       &capacity, (TC_buffer){(uint8_t*)validation_arena, bytes}, &workspace),
+                   ==, TC_RESULT_OK);
+  parser.frames = workspace.frames;
+  parser.extension_oids = workspace.oids;
+  parser.extension_capacity = workspace.oid_capacity;
+  munit_assert_int(TC_X509_read(pkits_load("TrustAnchorRootCertificate.crt", pkits_der[2]),
+                                &pkits_limits, &parser, &root),
+                   ==, TC_TLV_OK);
+  for (i = 0; i < sizeof cases / sizeof *cases; ++i) {
+    const path_phase_case* scenario = &cases[i];
+    const TC_bytes policy = {policy2, sizeof policy2};
+    Provider provider = {0, scenario->signature};
+    TC_X509_path_options options;
+    TC_X509_path_result out;
+    TC_bytes chain[2];
+    size_t work = 1000000, spent;
+    memset(&anchor, 0, sizeof anchor);
+    anchor.trust.name = root.subject;
+    anchor.trust.public_key = root.public_key;
+    anchor.x509_unusable = (uint8_t)scenario->unusable_anchor;
+    if (scenario->critical_anchor_extension)
+      anchor.certificate_extensions = (TC_bytes){unknown_extension, sizeof unknown_extension};
+    memset(&options, 0, sizeof options);
+    options.at = (TC_X509_time){2020, 1, 1, 0, 0, 0};
+    options.parsing = pkits_limits;
+    options.max_certificates = 4;
+    options.max_input = 2 * PKITS_FILE_CAPACITY;
+    options.flags = scenario->flags;
+    options.signatures = (TC_X509_signature_provider){verify, &provider, NULL};
+    if (scenario->initial_policy2) {
+      options.initial_policies = &policy;
+      options.initial_policy_count = 1;
+    }
+    if (scenario->purpose)
+      options.purpose = (TC_bytes){purpose, sizeof purpose};
+    if (scenario->anchor_excludes_pkits)
+      options.anchor_names.excluded = (TC_bytes){pkits_subtree, sizeof pkits_subtree};
+    chain[0] = pkits_load(scenario->ca, pkits_der[0]);
+    chain[1] = pkits_load(scenario->ee, pkits_der[1]);
+    if (scenario->empty_entry)
+      chain[1].length = 0;
+    memset(&out, 0xa5, sizeof out);
+    munit_assert_int(
+        tc_x509_path_validate_anchor(chain, 2, &anchor, &options, &workspace, &work, &out), ==,
+        scenario->status);
+    spent = 1000000 - work;
+    munit_assert_size(spent, ==, scenario->work);
+    if (scenario->status == TC_X509_PATH_VALID) {
+      munit_assert_size(out.work_used, ==, spent);
+      /* The key borrows the target DER and policies borrow the workspace. */
+      munit_assert_true(out.public_key.key.data >= chain[1].data &&
+                        out.public_key.key.data + out.public_key.key.length <=
+                            chain[1].data + chain[1].length);
+      munit_assert_ptr_equal(out.policies, workspace.policies);
+      munit_assert_size(out.policy_count, ==, scenario->policy_count);
+      memset(&out, 0xa5, sizeof out);
+    } else {
+      munit_assert_true(tc_test_all_value(&out, sizeof out, 0xa5));
+    }
+    /* One unit short of the spend fails on LIMIT, leaving out unchanged. */
+    if (spent) {
+      work = spent - 1;
+      munit_assert_int(
+          tc_x509_path_validate_anchor(chain, 2, &anchor, &options, &workspace, &work, &out), ==,
+          TC_X509_PATH_LIMIT);
+      munit_assert_true(tc_test_all_value(&out, sizeof out, 0xa5));
+    }
+  }
+  return MUNIT_OK;
+}
+
 int main(int argc, char** argv)
 {
   MunitTest tests[] = {
@@ -1136,6 +1380,7 @@ int main(int argc, char** argv)
       {"/qualifiers", qualifiers, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/usage", usage, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/entry-option-checks", entry_option_checks, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/validation-phases", validation_phases, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/status-mapping", status_mapping, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/workspace-arena-layout", workspace_arena_layout, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/workspace-arena-failures", workspace_arena_failures, NULL, NULL, MUNIT_TEST_OPTION_NONE,

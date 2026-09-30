@@ -724,6 +724,8 @@ if(TINY_CRYPTO_BUILD_TESTS)
   tc_add_c_test(test_x509_crl tiny-crypto-c-test-pki tests/x509/crl.c tests/support/cms_crl_harness.c tests/support/x509_crl_harness.c)
   tc_add_c_test(test_source tiny-crypto-c-test-pki tests/x509/source.c)
   tc_add_c_test(test_x509_path tiny-crypto-c-test-pki tests/x509/path.c)
+  target_compile_definitions(test_x509_path PRIVATE
+    TC_PKITS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/x509/nist/pkits/certs")
   tc_add_c_test(test_x509_anchor_constraints tiny-crypto-c-test-pki-native
     tests/x509/anchor_constraints.c)
   target_compile_definitions(test_x509_anchor_constraints PRIVATE
