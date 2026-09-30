@@ -70,23 +70,26 @@ are public. Timing depends on the shorter length and is independent of content.
 
 ## Object lifecycle
 
-Cipher, hash, MAC, DRBG, TLV, GZIP and PIV SM classes own their C state. They
+Cipher, hash, MAC, DRBG, GZIP and PIV SM classes own their C state. They
 delete their copy operations, so key material and generator state are never
-duplicated. `drbg` and `piv_sm` also delete their move operations. Destruction
-clears the context. Keyed classes follow init, update, finish or clear:
+duplicated. `TLVReader` holds only a cursor over borrowed input, so it may be
+copied, and a copy acts as a saved position. `drbg` and `piv_sm` also delete
+their move operations. Destruction clears the context. Keyed classes follow
+init, update, finish or clear:
 
-| Class                             | Key                                                | finish                                                            |
-| --------------------------------- | -------------------------------------------------- | ----------------------------------------------------------------- |
-| `AES`                             | `TC_AES_KEYLEN` bytes, optional 16-byte IV         | none                                                              |
-| `GCM`                             | `TC_AES_KEYLEN` bytes and an IV                    | `encrypt_finish` writes `tag_length()` bytes and consumes the key |
-| `AES_CMAC`                        | `TC_AES_KEYLEN` bytes                              | writes a 16-byte tag and consumes the key                         |
-| `AES_dynamic`, `AES_dynamic_CMAC` | 16, 24 or 32 bytes                                 | `final` writes a 16-byte tag and consumes the key                 |
-| `DES`                             | 8 bytes, or 16 or 24 with TDEA, optional 8-byte IV | none                                                              |
-| `DES_CMAC`                        | 8, 16 or 24 bytes                                  | writes an 8-byte tag and consumes the key                         |
-| `DES_ISO9797`                     | algorithm, padding and 16 or 24 bytes              | writes the 8-byte MAC and consumes the key                        |
-| `HMAC_SHA*`                       | any length                                         | writes `tag_size` bytes and consumes the key                      |
-| `KMAC256`                         | any length, optional customization                 | `final` writes `out.capacity` bytes and consumes the key          |
-| `SHA*`, `MD5`                     | none                                               | writes the digest and starts the next message                     |
+| Class              | Key                                                | finish                                                            |
+| ------------------ | -------------------------------------------------- | ----------------------------------------------------------------- |
+| `AES`              | `TC_AES_KEYLEN` bytes, optional 16-byte IV         | none                                                              |
+| `GCM`              | `TC_AES_KEYLEN` bytes and an IV                    | `encrypt_finish` writes `tag_length()` bytes and consumes the key |
+| `AES_CMAC`         | `TC_AES_KEYLEN` bytes                              | writes a 16-byte tag and consumes the key                         |
+| `AES_dynamic`      | 16, 24 or 32 bytes                                 | none                                                              |
+| `AES_dynamic_CMAC` | 16, 24 or 32 bytes                                 | `final` writes a 16-byte tag and consumes the key                 |
+| `DES`              | 8 bytes, or 16 or 24 with TDEA, optional 8-byte IV | none                                                              |
+| `DES_CMAC`         | 8, 16 or 24 bytes                                  | writes an 8-byte tag and consumes the key                         |
+| `DES_ISO9797`      | algorithm, padding and 16 or 24 bytes              | writes the 8-byte MAC and consumes the key                        |
+| `HMAC_SHA*`        | any length                                         | writes `tag_size` bytes and consumes the key                      |
+| `KMAC256`          | any length, optional customization                 | `final` writes `out.capacity` bytes and consumes the key          |
+| `SHA*`, `MD5`      | none                                               | writes the digest and starts the next message                     |
 
 A default-constructed object, a failed `init`, a completed finish and `clear`
 all leave a keyed object unkeyed. `KMAC256` is the exception for `init`: a
