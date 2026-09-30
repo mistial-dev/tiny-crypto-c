@@ -184,8 +184,8 @@ TC_TEST(dates)
   for (size_t i = 0; i < sizeof accepted / sizeof *accepted; ++i) {
     munit_assert_int(read_with_date(accepted[i].profile, accepted[i].date, &parsed), ==, TC_TLV_OK);
     munit_assert_uint(parsed.expiration.year, ==, accepted[i].year);
-    munit_assert_uint8(parsed.expiration.month, ==, accepted[i].month);
-    munit_assert_uint8(parsed.expiration.day, ==, accepted[i].day);
+    munit_assert_uint(parsed.expiration.month, ==, accepted[i].month);
+    munit_assert_uint(parsed.expiration.day, ==, accepted[i].day);
     munit_assert_uint8(parsed.expiration.hour, ==, 0);
     munit_assert_size(parsed.expiration_text.length, ==, DATE_BYTES);
   }

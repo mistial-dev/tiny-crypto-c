@@ -934,8 +934,8 @@ TC_TEST(test_gcm)
   munit_assert_memory_equal(vector->tag_len, tag, vector->tag);
   /* Finish consumes the context and wipes its key-dependent state. */
   {
-    static const struct TC_AES_key_ctx zero_key;
-    static const uint8_t zero_block[TC_AES_BLOCKLEN];
+    static const struct TC_AES_key_ctx zero_key = {0};
+    static const uint8_t zero_block[TC_AES_BLOCKLEN] = {0};
     munit_assert_memory_equal(sizeof zero_key, &ctx.key, &zero_key);
     munit_assert_memory_equal(sizeof zero_block, ctx.h, zero_block);
     munit_assert_memory_equal(sizeof zero_block, ctx.s, zero_block);

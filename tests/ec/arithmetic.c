@@ -149,7 +149,8 @@ TC_TEST(public_operation)
 {
   uint8_t modulus[128], input[128] = {0}, output[128], saved[128], exponent[] = {3};
   tc_mp_word scratch[8 * 128 / sizeof(tc_mp_word) + 2];
-  const size_t capacity = sizeof scratch / sizeof *scratch, cost = 16 * 128 + 16 + 4;
+  const size_t capacity = sizeof scratch / sizeof *scratch;
+  const uint32_t cost = 16 * 128 + 16 + 4;
   uint32_t work;
   memset(modulus, 0xff, sizeof modulus);
   modulus[127] = 0xd3;

@@ -15,8 +15,8 @@ static const uint8_t* text(const char* value)
 static void assert_time(const TC_X509_time* actual, unsigned year, unsigned month, unsigned day)
 {
   munit_assert_uint(actual->year, ==, year);
-  munit_assert_uint8(actual->month, ==, month);
-  munit_assert_uint8(actual->day, ==, day);
+  munit_assert_uint(actual->month, ==, month);
+  munit_assert_uint(actual->day, ==, day);
   munit_assert_uint8(actual->hour, ==, 0);
   munit_assert_uint8(actual->minute, ==, 0);
   munit_assert_uint8(actual->second, ==, 0);

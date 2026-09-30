@@ -568,7 +568,7 @@ TC_TEST(certificate_builder)
   munit_assert_int(TC_X509_store_anchor_from_certificate(&certificate, &limits, &small, &built), ==,
                    TC_TLV_LIMIT);
   {
-    static const uint8_t zero[sizeof built];
+    static const uint8_t zero[sizeof built] = {0};
     munit_assert_memory_equal(sizeof built, &built, zero);
   }
   return MUNIT_OK;
