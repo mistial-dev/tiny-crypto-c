@@ -19,6 +19,9 @@
 #include <tiny_crypto/apdu.h>
 #include <tiny_crypto/piv_card.h>
 #include <tiny_crypto/tlv.h>
+#if TC_ENABLE_PIV_KEY_PROOF
+#include <tiny_crypto/key_challenge.h>
+#endif
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -63,9 +66,15 @@ typedef enum {
   TC_PIV_COMMAND_GENERAL_AUTHENTICATE
 } TC_PIV_command;
 
-/* Largest command data field the commands of this header send: SELECT 11,
- * GET DATA 5 and VERIFY 8 bytes. */
+/* Largest command data field a link sends. SELECT sends 11, GET DATA 5 and
+ * VERIFY 8 bytes. With TC_ENABLE_PIV_KEY_PROOF a key proof sends a 7C
+ * template of up to TC_KEY_CHALLENGE_MAX_INPUT_BYTES + 12 bytes
+ * (piv_key_proof.h). */
+#if TC_ENABLE_PIV_KEY_PROOF
+#define TC_PIV_COMMAND_MAX_NC ((size_t)TC_KEY_CHALLENGE_MAX_INPUT_BYTES + 12u)
+#else
 #define TC_PIV_COMMAND_MAX_NC 32u
+#endif
 /* Response buffer bytes for nr plain data bytes on any link, plain or secure
  * messaging: nr padded to whole AES blocks, the 87 header (5), 99 04, 8E 0A
  * and SW1 SW2 (SP 800-73-5 Part 2 4.2.5). Valid while the sum fits size_t. */

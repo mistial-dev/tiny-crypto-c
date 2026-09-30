@@ -749,6 +749,19 @@
 #error "The PIV catalog requires PIV card commands"
 #endif
 
+/* Key proofs: a card key signs a fresh challenge over GENERAL AUTHENTICATE
+ * under the SP 800-78-5 key policy. */
+#ifndef TC_ENABLE_PIV_KEY_PROOF
+#define TC_ENABLE_PIV_KEY_PROOF TC_PROFILE_VALUE(0, 0, 0, 1)
+#endif
+#if TC_ENABLE_PIV_KEY_PROOF != 0 && TC_ENABLE_PIV_KEY_PROOF != 1
+#error "TC_ENABLE_PIV_KEY_PROOF must be 0 or 1"
+#endif
+#if TC_ENABLE_PIV_KEY_PROOF &&                                                                     \
+    (!TC_ENABLE_PIV_COMMAND || !TC_ENABLE_KEY_CHALLENGE || !TC_ENABLE_X509)
+#error "PIV key proofs require PIV card commands, key challenges and the X.509 reader"
+#endif
+
 /* DRBG mechanism dependencies, checked after every option is defined. */
 #if TC_ENABLE_DRBG
 #if !TC_DRBG_ENABLE_HASH && !TC_DRBG_ENABLE_HMAC && !TC_DRBG_ENABLE_CTR

@@ -221,31 +221,28 @@ These checks run again over the retained bytes at the final validation time.
 With `--tpk-hex`, decryption reuses the collected biometric objects.
 Each inventory object is read once.
 
-Responses are bounded to 16 KiB per object. A locked pool reserves room for nine
-responses plus transfer headroom. Decompression, card validation and signed-object
-validation share scratch storage across their sequential phases. Encoded objects
-and decrypted biometric records stay in separate buffers through the final checks.
-All credential storage is wiped on exit. The command fails when a
-required object is missing, an object exceeds its limit, or the signed hash list
-differs from the collected inventory. Decrypting and interpreting the remaining
-NEXGEN objects requires additional application handling.
+Responses are bounded to 16 KiB per object. A locked pool reserves room for the
+12 NEXGEN catalog objects plus one more answer. Decompression, card validation
+and signed-object validation share scratch storage across their sequential
+phases. Encoded objects and decrypted biometric records stay in separate buffers
+through the final checks. All credential storage is wiped on exit. The command
+fails when a required object is missing, an object is denied or exceeds its
+limit, or the signed hash list differs from the collected inventory. Decrypting
+and interpreting the remaining NEXGEN objects requires additional application
+handling.
 
-`example_twic_inventory_read` in `examples/credential_io.c` selects and checks
-the expected TWIC application, then reads its stored objects and security
-object into a caller-owned pool. Legacy requires signed CHUID, unsigned CHUID
-and fingerprints. NEXGEN also requires facial image and printed information;
-iris, personal information and handwritten signature are probed as optional
-objects. An optional object is absent only when GET DATA returns `6A82` with
-an empty body. Other failures stop collection.
-
-Set `max_object` to the largest accepted response and provide enough pool space
-for retained responses plus transfer/status headroom. The returned inventory
-borrows inner object contents from the pool, including ciphertext and TLV fields.
-Its `security` span retains the complete `53` response. Only success writes the
-inventory. Processing failures wipe the pool and stop the IO session. Keep the
-pool stable while passing its entries to `TC_PIV_security_validate`. Validate
-the collected signed CHUID against the card identity before selecting its signer.
-Use `TC_TWIC_unsigned_CHUID_validate` when container `3002` must also bind the
+The command reads the inventory with `TC_PIV_inventory_read` over the TWIC
+[catalog](piv-card.md#catalog-and-inventory) of the selected application.
+Legacy requires the signed CHUID, the unsigned CHUID and the fingerprints.
+NEXGEN also requires the facial image. Every object must be present or absent
+(`6A82` or `6A88`). The Security Object check takes the present stored data
+objects, whose values borrow the pool, including ciphertext and TLV fields, and
+the complete `53` answer of the Security Object. The certificate, the
+Discovery Object and the TWIC Privacy Key stay outside the signed map. Keep the
+pool stable while passing its entries to `TC_PIV_security_validate`, and clear
+it with `TC_PIV_inventory_clear`. Validate the collected signed CHUID against
+the card identity before selecting its signer. Use
+`TC_TWIC_unsigned_CHUID_validate` when container `3002` must also bind the
 unsigned CHUID's identifiers and expiration through the authenticated inventory.
 
 ## Inspect both applications
@@ -267,14 +264,13 @@ Transport failures end processing. Responses share one exchange budget, and
 partial objects stay within the response buffer. An oversized object fails with
 a resource limit. Cleanup requests `SCARD_LEAVE_CARD`.
 
-APDU construction and PC/SC access live in `examples/credential_io.c` and
-`examples/credential_pcsc.c`. The command performs SELECT and GET DATA,
-including GET RESPONSE and read-length correction. The separate PIN helper
-requires a validated contact/PIV selection and a per-run guard retained across
-connections. The command leaves it unused.
+Card commands come from the library: `TC_PIV_select`, `TC_PIV_get_data` and
+their GET RESPONSE and length correction steps on a `TC_PIV_link`
+([PIV card commands](piv-card.md)). `examples/credential_pcsc.c` supplies the
+PC/SC transport as a `TC_APDU_transmit`. The command sends no PIN.
 
-`test_twic_command` exercises these helpers over recorded and synthetic
-command/response scripts. `test_twic_apdu_replay` replays the synthetic TWIC
+`test_twic_command` runs the command over synthetic command/response
+scripts. `test_twic_apdu_replay` replays the synthetic TWIC
 scripts through the library's card commands and the TWIC
 [catalog inventory](piv-card.md#catalog-and-inventory). On macOS,
 `test_twic_pcsc` replaces the PC/SC service calls to test cleanup and transport
@@ -283,45 +279,41 @@ exercise help and argument handling only.
 
 ## Card-key authentication
 
-`card_key_policy.h` applies PIV/TWIC certificate-use and subject-key policy
-without card commands. `credential_auth.h` supplies `example_card_check_key`
-for the card-authentication key in slot 9E. Call it after validating the
-certificate path and credential identifiers. Keep the reader transaction and
-certificate buffer held throughout the check. `twic_authenticate` uses this
-helper through the combined TWIC workflow.
+`TC_PIV_key_prove` in `<tiny_crypto/piv_key_proof.h>` proves possession of a
+card key ([key proofs](piv-card.md#key-proofs)). Call it after validating the
+certificate path and credential identifiers, and keep the reader transaction
+and certificate buffer held throughout the proof. `example_twic_authenticate`
+uses it for the card authentication key 9E through the combined TWIC workflow.
 
-The helper uses the generic `<tiny_crypto/key_challenge.h>` API to request a
-fresh random digest, prepare the RSA representative or EC digest, and verify
-the proof. Example code then sends GENERAL AUTHENTICATE and parses its 7C/82
-response. The crypto API contains no APDU identifiers or card policy. Use a
-cryptographically secure RNG. A failed RNG request ends processing before any
-card command is sent.
+The library draws a fresh random digest with `<tiny_crypto/key_challenge.h>`,
+prepares the RSA encoded message or EC digest, sends GENERAL AUTHENTICATE and
+verifies the `7C {82}` answer. Use a cryptographically secure RNG. A failed RNG
+request ends processing before any card command is sent.
 
-PIV selection supports RSA-2048/3072 and P-256/P-384. RSA-1024 requires the
-explicit `allow_rsa1024` policy. TWIC NEXGEN selects RSA-2048. TWIC Legacy uses
-its separate PIV application for this operation. The application retains control
-of certificate validity, legacy-algorithm policy, cancellation and authorization.
+`TC_PIV_key_parameters_select` applies the key policy: keyUsage with
+digitalSignature, RSA-2048/3072 and P-256/P-384 under SP 800-78-5 Tables 9 and
+10, and RSA-1024 only with `allow_rsa1024` on TWIC Legacy. TWIC NEXGEN takes
+RSA-2048. TWIC Legacy uses its PIV application for this operation, with the
+TWIC Legacy policy named in the request. The application retains control of
+certificate validity, legacy-algorithm policy, cancellation and authorization.
 
-Supply `ExampleCardKeyWorkspace` in caller-owned storage. It contains a 64-byte
-digest buffer, 384-byte RSA representative and 514-byte response buffer. The
-helper clears this storage after processing. It also uses bounded command
-storage on the stack. Provider scratch is supplied separately. Sharing either
-workspace across concurrent calls requires application serialization.
+Supply `TC_PIV_key_proof_workspace` in caller-owned storage. It holds the
+challenge, the request template and the answer, and every proof wipes it.
+Provider scratch is supplied separately. Sharing either workspace across
+concurrent calls requires application serialization.
 
-RSA representatives use the library's `TC_RSA_encode_v15_digest` implementation.
 The transport follows SP 800-73-5 Part 2 Appendix A.4 and TWIC Part 2 v5 section
 5.3: short-command chaining, status-only intermediate replies and GET RESPONSE.
-GENERAL AUTHENTICATE is never replayed for a 6C response. A failed chain stops
-the session. The helper sends commands only to slot 9E and leaves the PIN alone.
+The example sends commands only to slot 9E and leaves the PIN alone.
 
 PIV secure messaging runs on a PIV card link. `TC_PIV_SM_key_request` and
 `TC_PIV_link_secure` in `<tiny_crypto/piv_sm_apdu.h>` own the handshake
 objects, the `87/97/99/8E` protected objects, command chaining and the
 session-loss rule. See [PIV secure messaging](piv-sm.md).
 
-`EXAMPLE_CARD_KEY_VERIFIED` reports possession of the supplied public key's
-private counterpart. Preserve the separate trust and credential-policy decisions
-when reporting the overall result.
+`TC_PIV_OK` reports possession of the certificate key's private counterpart.
+Preserve the separate trust and credential-policy decisions when reporting the
+overall result.
 
 ### Certificate identifiers
 

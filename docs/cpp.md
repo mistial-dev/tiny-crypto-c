@@ -130,6 +130,10 @@ bytes the objects use and the object array, so both outlive the object.
 Copying and moving are deleted. `piv_catalog_count`, `piv_catalog_at` and
 `piv_catalog_find` wrap the catalog lookups.
 
+`piv_key_prove` in `piv_key_proof.hpp` takes the `piv_link`, the request, the
+provider, the workspace and the work budget by reference.
+`piv_key_parameters_select` wraps the key policy.
+
 ## GCM streaming
 
 `GCM` streams encryption only. Supply all AAD before the first

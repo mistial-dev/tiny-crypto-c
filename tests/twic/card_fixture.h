@@ -3,7 +3,6 @@
 #ifndef TEST_TWIC_CARD_FIXTURE_H_
 #define TEST_TWIC_CARD_FIXTURE_H_
 #include "fascn_fixture.h"
-#include "../../examples/credential_auth.h"
 #include "../../examples/credential_validate.h"
 #include "../../examples/pki_input.h"
 #include "../../examples/x509_workspace.h"
@@ -30,7 +29,8 @@ typedef enum {
 } CardMode;
 typedef struct {
   EVP_PKEY* key;
-  uint8_t algorithm, reference, pss, request[512], reply[512], saved_reply[512];
+  /* legacy selects TWIC sub-version 01 (Legacy) in place of 03 (NEXGEN). */
+  uint8_t algorithm, reference, pss, legacy, request[512], reply[512], saved_reply[512];
   size_t request_length, reply_length, reply_offset, saved_length;
   size_t calls, signatures, fail_at;
   CardMode mode;
@@ -63,19 +63,19 @@ static void make_reply(SyntheticCard* card)
   static const uint8_t p384[] = {0x7c, 52, 0x82, 0, 0x81, 48};
   const uint8_t* header = p256;
   size_t header_length = sizeof p256;
-  if (card->algorithm == EXAMPLE_CARD_ALGORITHM_RSA_1024) {
+  if (card->algorithm == TC_PIV_ALGORITHM_RSA_1024) {
     header = rsa1024;
     header_length = sizeof rsa1024;
   }
-  if (card->algorithm == EXAMPLE_CARD_ALGORITHM_RSA_2048) {
+  if (card->algorithm == TC_PIV_ALGORITHM_RSA_2048) {
     header = rsa2048;
     header_length = sizeof rsa2048;
   }
-  if (card->algorithm == EXAMPLE_CARD_ALGORITHM_RSA_3072) {
+  if (card->algorithm == TC_PIV_ALGORITHM_RSA_3072) {
     header = rsa3072;
     header_length = sizeof rsa3072;
   }
-  if (card->algorithm == EXAMPLE_CARD_ALGORITHM_EC_P384) {
+  if (card->algorithm == TC_PIV_ALGORITHM_ECC_P384) {
     header = p384;
     header_length = sizeof p384;
   }
@@ -92,8 +92,7 @@ static void make_reply(SyntheticCard* card)
     munit_assert_int(EVP_PKEY_CTX_set_rsa_padding(signer, RSA_NO_PADDING), ==, 1);
     munit_assert_size(challenge_length, ==, (size_t)EVP_PKEY_get_size(card->key));
   } else {
-    const EVP_MD* hash =
-        card->algorithm == EXAMPLE_CARD_ALGORITHM_EC_P384 ? EVP_sha384() : EVP_sha256();
+    const EVP_MD* hash = card->algorithm == TC_PIV_ALGORITHM_ECC_P384 ? EVP_sha384() : EVP_sha256();
     munit_assert_int(EVP_PKEY_CTX_set_signature_md(signer, hash), ==, 1);
     munit_assert_size(challenge_length, ==, (size_t)EVP_MD_get_size(hash));
   }
@@ -145,8 +144,45 @@ static void make_reply(SyntheticCard* card)
   }
 }
 
-static int transmit(void* context, const uint8_t* command, size_t command_length, uint8_t* response,
-                    size_t capacity, size_t* length)
+/* SELECT answers the application property template of the PIV AID or of the
+ * TWIC AID prefix with its version (SP 800-73-5 Part 2 3.1.1, TWIC Part 2 v5
+ * 5.1): 61 {4F AID, 79 {4F RID}}. */
+static TC_status select_answer(const SyntheticCard* card, TC_bytes command, TC_buffer response,
+                               size_t* length)
+{
+  munit_assert_size(command.length, >=, 6);
+  const size_t aid_length = command.data[4];
+  munit_assert_size(command.length, ==, 5 + aid_length + 1);
+  const int twic = aid_length == 9;
+  munit_assert_true(twic || aid_length == 11);
+  uint8_t* out = response.data;
+  munit_assert_size(response.capacity, >=, 26);
+  size_t used = 0;
+  out[used++] = 0x61;
+  out[used++] = 22;
+  out[used++] = 0x4f;
+  out[used++] = 11;
+  memcpy(out + used, command.data + 5, aid_length);
+  used += aid_length;
+  if (twic) {
+    out[used++] = 0x01;
+    out[used++] = card->legacy ? 0x01 : 0x03;
+  }
+  out[used++] = 0x79;
+  out[used++] = 7;
+  out[used++] = 0x4f;
+  out[used++] = 5;
+  memcpy(out + used, command.data + 5, 5);
+  used += 5;
+  out[used++] = 0x90;
+  out[used++] = 0;
+  *length = used;
+  return TC_OK;
+}
+
+/* GENERAL AUTHENTICATE with 7C {82 00, 81 challenge}, SHORT with CLA 10
+ * chaining or one EXTENDED command, and GET RESPONSE of the answer. */
+static TC_status transmit(void* context, TC_bytes command, TC_buffer response, size_t* length)
 {
   SyntheticCard* card = context;
   ++card->calls;
@@ -156,55 +192,74 @@ static int transmit(void* context, const uint8_t* command, size_t command_length
                                                card->replacement),
                      ==, TC_TWIC_CCL_OK);
   if (card->mode == TRANSPORT_ERROR || card->calls == card->fail_at)
-    return 0;
-  munit_assert_size(command_length, >=, 5);
-  if (command[1] == 0x87) {
-    munit_assert_uint(command[2], ==, card->algorithm);
-    munit_assert_uint(command[3], ==,
-                      card->reference ? card->reference : EXAMPLE_CARD_KEY_CARD_AUTHENTICATION);
-    const int chained = command[0] == 0x10;
-    const size_t chunk = command[4];
-    munit_assert_size(command_length, ==, 5 + chunk + (chained ? 0 : 1));
+    return TC_ERROR;
+  munit_assert_size(command.length, >=, 5);
+  if (command.data[1] == 0xa4)
+    return select_answer(card, command, response, length);
+  size_t requested = command.data[command.length - 1];
+  if (command.data[1] == 0x87) {
+    munit_assert_uint(command.data[2], ==, card->algorithm);
+    munit_assert_uint(command.data[3], ==,
+                      card->reference ? card->reference : TC_PIV_KEY_CARD_AUTHENTICATION);
+    const int chained = command.data[0] == 0x10;
+    const int extended = command.data[4] == 0 && command.length > 7;
+    const size_t chunk =
+        extended ? (size_t)command.data[5] << 8 | command.data[6] : command.data[4];
+    const uint8_t* data = command.data + (extended ? 7 : 5);
+    munit_assert_size(command.length, ==,
+                      (extended ? 7 : 5) + chunk +
+                          (chained    ? 0
+                           : extended ? 2
+                                      : 1));
     munit_assert_size(card->request_length + chunk, <=, sizeof card->request);
-    memcpy(card->request + card->request_length, command + 5, chunk);
+    const size_t before = card->request_length;
+    memcpy(card->request + card->request_length, data, chunk);
     card->request_length += chunk;
     if (chained) {
+      munit_assert_false(extended);
       munit_assert_size(chunk, ==, 255);
-      munit_assert_size(capacity, >=, 2);
-      response[0] = card->mode == CHAIN_STATUS_ERROR ? 0x69 : 0x90;
-      response[1] = card->mode == CHAIN_STATUS_ERROR ? 0x82 : 0;
+      munit_assert_size(response.capacity, >=, 2);
+      response.data[0] = card->mode == CHAIN_STATUS_ERROR ? 0x69 : 0x90;
+      response.data[1] = card->mode == CHAIN_STATUS_ERROR ? 0x82 : 0;
       *length = 2;
-      return 1;
+      return TC_OK;
     }
-    munit_assert_uint(command[0], ==, 0);
-    munit_assert_uint(command[command_length - 1], ==, 0);
+    munit_assert_uint(command.data[0], ==, 0);
+    /* Le 00 (Part 2 A.4.1), or the link's extended Ne. */
+    if (extended) {
+      requested = (size_t)command.data[command.length - 2] << 8 | command.data[command.length - 1];
+      if (!requested)
+        requested = 65536;
+    } else
+      munit_assert_uint(command.data[command.length - 1], ==, 0);
     if (card->mode == SIGN_LENGTH_ERROR) {
-      response[0] = 0x6c;
-      response[1] = 0;
+      /* The channel may send this step again with Le = SW2. */
+      card->request_length = before;
+      response.data[0] = 0x6c;
+      response.data[1] = 0;
       *length = 2;
-      return 1;
+      return TC_OK;
     }
     make_reply(card);
   } else {
     static const uint8_t get_response[] = {0, 0xc0, 0, 0};
-    munit_assert_size(command_length, ==, 5);
-    munit_assert_memory_equal(sizeof get_response, command, get_response);
+    munit_assert_size(command.length, ==, 5);
+    munit_assert_memory_equal(sizeof get_response, command.data, get_response);
     munit_assert_size(card->reply_offset, >, 0);
   }
   size_t chunk = card->reply_length - card->reply_offset;
-  size_t requested = command[command_length - 1];
   if (!requested)
     requested = 256;
   if (chunk > requested)
     chunk = requested;
-  munit_assert_size(chunk + 2, <=, capacity);
-  memcpy(response, card->reply + card->reply_offset, chunk);
+  munit_assert_size(chunk + 2, <=, response.capacity);
+  memcpy(response.data, card->reply + card->reply_offset, chunk);
   card->reply_offset += chunk;
   const size_t remaining = card->reply_length - card->reply_offset;
-  response[chunk] = remaining ? 0x61 : 0x90;
-  response[chunk + 1] = (uint8_t)remaining;
+  response.data[chunk] = remaining ? 0x61 : 0x90;
+  response.data[chunk + 1] = (uint8_t)remaining;
   *length = chunk + 2;
-  return 1;
+  return TC_OK;
 }
 
 #endif

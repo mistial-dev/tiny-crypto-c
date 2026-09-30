@@ -4,6 +4,7 @@
 #include <tiny_crypto/gzip.h>
 #include <tiny_crypto/piv_certificate.h>
 #include <tiny_crypto/piv_chuid.h>
+#include <tiny_crypto/piv_command.h>
 #include <tiny_crypto/x509.h>
 #include <stdio.h>
 #include <string.h>
@@ -20,16 +21,20 @@ enum {
 };
 static struct {
   uint8_t response[RESPONSE_CAPACITY], certificate[CERTIFICATE_CAPACITY];
+  uint8_t scratch[TC_APDU_SHORT_COMMAND_MAX_BYTES];
   TC_GZIP_workspace gzip;
 } storage;
-#define response_buffer storage.response
 
-static int inspect_certificate(size_t length, ExampleCardApplication application)
+static TC_buffer response_buffer(void)
+{
+  return (TC_buffer){storage.response, sizeof storage.response};
+}
+
+static int inspect_certificate(TC_bytes input, TC_PIV_application_id application)
 {
   TC_PIV_certificate container;
-  const TC_bytes input = {response_buffer, length};
   const TC_PIV_certificate_profile profile =
-      application == EXAMPLE_CARD_PIV ? TC_PIV_CERTIFICATE_SLOT : TC_PIV_CERTIFICATE_TWIC;
+      application == TC_PIV_APPLICATION_PIV ? TC_PIV_CERTIFICATE_SLOT : TC_PIV_CERTIFICATE_TWIC;
   size_t work = DECODE_WORK_LIMIT;
   if (TC_PIV_certificate_decode(input, profile, TC_PIV_CERTIFICATE_RECOMMENDED_BYTES, &storage.gzip,
                                 &work, (TC_buffer){storage.certificate, sizeof storage.certificate},
@@ -44,7 +49,16 @@ static int inspect_certificate(size_t length, ExampleCardApplication application
   return TC_X509_read(encoded, &limits, &workspace, &certificate) == TC_TLV_OK;
 }
 
-static int inspect_application(ExampleCardIO* io, ExampleCardApplication application,
+/* 1 when the card completed command with a status meaning absent. */
+static int absent(const TC_PIV_link* link, TC_PIV_result result, TC_PIV_command command,
+                  TC_PIV_application_id application)
+{
+  return result == TC_PIV_CARD_STATUS &&
+         TC_PIV_status_classify(TC_PIV_link_status(link), command, application, NULL) ==
+             TC_PIV_SW_NOT_FOUND;
+}
+
+static int inspect_application(TC_PIV_link* link, TC_PIV_application_id application,
                                TC_PIV_CHUID_profile chuid_profile, int* found)
 {
   enum { OBJECT_CHUID, OBJECT_CERTIFICATE };
@@ -54,47 +68,40 @@ static int inspect_application(ExampleCardIO* io, ExampleCardApplication applica
     int kind;
   } objects[] = {{"CHUID", {0x5f, 0xc1, 0x02}, OBJECT_CHUID},
                  {"Card authentication certificate", {0x5f, 0xc1, 0x01}, OBJECT_CERTIFICATE}};
-  const char* name = application == EXAMPLE_CARD_PIV ? "PIV" : "TWIC";
-  ExampleCardResponse response;
-  ExampleCardResult result =
-      example_card_select(io, application, response_buffer, sizeof response_buffer, &response);
-  if (result == EXAMPLE_CARD_STATUS && response.status == 0x6a82) {
+  const char* name = application == TC_PIV_APPLICATION_PIV ? "PIV" : "TWIC";
+  TC_PIV_application selected;
+  TC_PIV_result result = TC_PIV_select(link, application, 0, response_buffer(), &selected);
+  if (absent(link, result, TC_PIV_COMMAND_SELECT, application)) {
     printf("%s: application absent\n", name);
     return 1;
   }
-  if (result != EXAMPLE_CARD_OK) {
-    fprintf(stderr, "%s: selection failed\n", name);
-    return 0;
-  }
-  ExampleCardModel model;
-  TC_bytes selection = {response_buffer, response.length};
-  if (example_card_identity(selection, application, &model) != TC_TLV_OK) {
-    fprintf(stderr, "%s: unsupported or malformed application identity\n", name);
+  if (result != TC_PIV_OK) {
+    fprintf(stderr, "%s: selection failed or unsupported application identity\n", name);
     return 0;
   }
   ++*found;
   printf("%s: %s selected\n", name,
-         model == EXAMPLE_CARD_MODEL_PIV           ? "PIV 1.0"
-         : model == EXAMPLE_CARD_MODEL_TWIC_LEGACY ? "Legacy"
+         selected.profile == TC_PIV_CARD           ? "PIV 1.0"
+         : selected.profile == TC_TWIC_LEGACY_CARD ? "Legacy"
                                                    : "NEXGEN");
-  TC_secure_zero(response_buffer, sizeof response_buffer);
+  TC_secure_zero(storage.response, sizeof storage.response);
   for (size_t i = 0; i < sizeof objects / sizeof *objects; ++i) {
-    result = example_card_read(io, objects[i].tag, sizeof objects[i].tag, response_buffer,
-                               sizeof response_buffer, &response);
-    if (result == EXAMPLE_CARD_STATUS && response.status == 0x6a88) {
+    TC_PIV_data_object object;
+    result = TC_PIV_get_data(link, (TC_bytes){objects[i].tag, sizeof objects[i].tag},
+                             response_buffer(), &object);
+    if (absent(link, result, TC_PIV_COMMAND_GET_DATA, application)) {
       printf("  %s: absent\n", objects[i].name);
-      TC_secure_zero(response_buffer, sizeof response_buffer);
       continue;
     }
-    if (result != EXAMPLE_CARD_OK) {
+    if (result != TC_PIV_OK) {
       fprintf(stderr, "  %s: read failed\n", objects[i].name);
       return 0;
     }
     TC_PIV_CHUID chuid;
     int valid = objects[i].kind == OBJECT_CHUID
-                    ? TC_PIV_CHUID_read((TC_bytes){response_buffer, response.length},
-                                        TC_PIV_CHUID_CONTAINER, chuid_profile, &chuid) == TC_TLV_OK
-                    : inspect_certificate(response.length, application);
+                    ? TC_PIV_CHUID_read(object.encoded, TC_PIV_CHUID_CONTAINER, chuid_profile,
+                                        &chuid) == TC_TLV_OK
+                    : inspect_certificate(object.encoded, application);
     if (!valid) {
       fprintf(stderr, "  %s: malformed or oversized object\n", objects[i].name);
       return 0;
@@ -104,7 +111,9 @@ static int inspect_application(ExampleCardIO* io, ExampleCardApplication applica
             ? "unsigned"
             : "signature unverified";
     printf("  %s: structure checked; %s\n", objects[i].name, authentication);
-    TC_secure_zero(&storage, sizeof storage);
+    TC_secure_zero(storage.response, sizeof storage.response);
+    TC_secure_zero(storage.certificate, sizeof storage.certificate);
+    TC_secure_zero(&storage.gzip, sizeof storage.gzip);
   }
   return 1;
 }
@@ -129,17 +138,26 @@ int main(int argc, char** argv)
     return 1;
   }
   ExampleCardPCSC connection = {0};
+  TC_PIV_link link;
   int found = 0, ok = 0;
+  memset(&link, 0, sizeof link);
   if (!example_card_pcsc_open(&connection, argv[2])) {
     fputs("Unable to acquire the reader transaction\n", stderr);
     goto cleanup;
   }
-  ExampleCardIO io = {example_card_pcsc_transmit, &connection, EXCHANGE_BUDGET, 0};
+  /* No PIN is sent, so the interface rules of VERIFY never apply. The budget
+   * covers both SELECTs, the GET DATA commands and their GET RESPONSE steps. */
+  const TC_PIV_link_options options = {
+      {TC_APDU_SHORT, 0, EXCHANGE_BUDGET, 0, 0}, TC_PIV_CONTACT, 0};
+  if (TC_PIV_link_init(&link, (TC_APDU_transport){example_card_pcsc_transmit, &connection},
+                       &options, (TC_buffer){storage.scratch, sizeof storage.scratch}) != TC_PIV_OK)
+    goto cleanup;
   const TC_PIV_CHUID_profile twic_profile =
       argc == 4 ? TC_CHUID_PROFILE_TWIC_UNSIGNED : TC_CHUID_PROFILE_TWIC_SIGNED;
-  ok = inspect_application(&io, EXAMPLE_CARD_TWIC, twic_profile, &found) &&
-       inspect_application(&io, EXAMPLE_CARD_PIV, TC_CHUID_PROFILE_PIV, &found) && found;
+  ok = inspect_application(&link, TC_PIV_APPLICATION_TWIC, twic_profile, &found) &&
+       inspect_application(&link, TC_PIV_APPLICATION_PIV, TC_CHUID_PROFILE_PIV, &found) && found;
 cleanup:
+  TC_PIV_link_clear(&link);
   if (!example_card_pcsc_close(&connection)) {
     fputs("Reader cleanup failed\n", stderr);
     ok = 0;

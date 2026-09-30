@@ -3,8 +3,8 @@
 #ifndef EXAMPLE_CREDENTIAL_WORKFLOW_H_
 #define EXAMPLE_CREDENTIAL_WORKFLOW_H_
 
-#include "card_key_policy.h"
 #include <tiny_crypto/credential.h>
+#include <tiny_crypto/piv_key_proof.h>
 #include <tiny_crypto/piv_printed.h>
 #include <tiny_crypto/twic_ccl.h>
 
@@ -41,7 +41,7 @@ typedef enum {
 
 /* Perform a fresh card-key proof at the application transport boundary.
  * TC_MISMATCH rejects the card; other nonzero values report an API/transport
- * failure. The wrapper enforces the profile's key algorithm policy before the
+ * failure. The wrapper applies TC_PIV_key_parameters_select before the
  * callback and supplies the selected key reference and challenge policy. The
  * callback must consume no validation scratch. */
 typedef TC_status (*ExampleCredentialProof)(void* context, TC_PIV_card_profile profile,
@@ -85,9 +85,9 @@ typedef struct {
   const TC_TWIC_CCL_snapshot* ccl;
   TC_TWIC_CCL_freshness_policy freshness;
   size_t ccl_reads;
-  int allow_legacy_rsa1024;
+  uint8_t allow_legacy_rsa1024;
   /* RSA representative encoding for the fresh proof. EC ignores this field. */
-  ExampleCardRSAPadding rsa_padding;
+  TC_PIV_rsa_padding rsa_padding;
   ExampleCredentialProof proof;
   void* proof_context;
   /* Application policy for evidence that must be present in this decision. */

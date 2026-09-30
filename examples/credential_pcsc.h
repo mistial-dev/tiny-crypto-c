@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #ifndef EXAMPLE_CREDENTIAL_PCSC_H_
 #define EXAMPLE_CREDENTIAL_PCSC_H_
-#include "credential_io.h"
+#include <tiny_crypto/apdu.h>
 #if defined(__APPLE__)
 #include <PCSC/winscard.h>
 typedef uint32_t ExamplePCSCSize;
@@ -25,8 +25,9 @@ int example_card_pcsc_open(ExampleCardPCSC* state, const char* reader);
 /* Release every acquired resource, leaving card contents and PIN unchanged.
  * Returns zero if any release failed. State is cleared on every close. */
 int example_card_pcsc_close(ExampleCardPCSC* state);
-/* Use as ExampleCardIO.transmit with state as its context. A failed transfer
- * disables further transfers on this connection. No reconnect is attempted. */
-int example_card_pcsc_transmit(void* context, const uint8_t* command, size_t command_length,
-                               uint8_t* response, size_t capacity, size_t* length);
+/* A TC_APDU_transmit with state as its context. A failed transfer wipes the
+ * response buffer and disables further transfers on this connection. No
+ * reconnect is attempted. */
+TC_status example_card_pcsc_transmit(void* context, TC_bytes command, TC_buffer response,
+                                     size_t* length);
 #endif

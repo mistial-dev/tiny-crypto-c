@@ -403,41 +403,76 @@ static void object_reply(uint8_t* response, size_t capacity, size_t* length)
   *length = chunk + 2;
 }
 
-int example_card_pcsc_transmit(void* context, const uint8_t* command, size_t length,
-                               uint8_t* response, size_t capacity, size_t* out)
+/* SELECT answers 61 {4F AID, 79 {4F RID}} with the TWIC version of the
+ * scenario (TWIC Part 2 v5 4.1). */
+static void select_reply(const uint8_t* command, size_t length, uint8_t* response, size_t capacity,
+                         size_t* out)
 {
+  const int twic = command[9] == 0x67;
+  munit_assert_size(length, ==, twic ? 15 : 17);
+  munit_assert_size(capacity, >=, 26);
+  selected_twic = (unsigned)twic;
+  size_t used = 0;
+  response[used++] = 0x61;
+  response[used++] = 22;
+  response[used++] = 0x4f;
+  response[used++] = 11;
+  memcpy(response + used, command + 5, 9);
+  used += 9;
+  response[used++] = 1;
+  response[used++] = twic ? (legacy() ? 1 : 3) : 0;
+  response[used++] = 0x79;
+  response[used++] = 7;
+  response[used++] = 0x4f;
+  response[used++] = 5;
+  memcpy(response + used, command + 5, 5);
+  used += 5;
+  response[used++] = 0x90;
+  response[used++] = 0;
+  *out = used;
+}
+
+static void status_reply(uint16_t sw, uint8_t* response, size_t* out)
+{
+  response[0] = (uint8_t)(sw >> 8);
+  response[1] = (uint8_t)sw;
+  *out = 2;
+}
+
+TC_status example_card_pcsc_transmit(void* context, TC_bytes wire, TC_buffer buffer, size_t* out)
+{
+  const uint8_t* command = wire.data;
+  size_t length = wire.length;
+  uint8_t* response = buffer.data;
+  const size_t capacity = buffer.capacity;
   munit_assert_int(((ExampleCardPCSC*)context)->transaction, ==, 1);
   ++commands;
   if (command[1] == 0xa4) {
     if (scenario == SELECT_FAILURE)
-      return 0;
-    munit_assert_size(length, ==, 15);
-    munit_assert_size(capacity, >=, 17);
-    const int twic = command[9] == 0x67;
-    selected_twic = (unsigned)twic;
-    response[0] = 0x61;
-    response[1] = 13;
-    response[2] = 0x4f;
-    response[3] = 11;
-    memcpy(response + 4, command + 5, 9);
-    response[13] = 1;
-    response[14] = twic ? (legacy() ? 1 : 3) : 0;
-    response[15] = 0x90;
-    response[16] = 0;
-    *out = 17;
-    return 1;
+      return TC_ERROR;
+    select_reply(command, length, response, capacity, out);
+    return TC_OK;
   }
   if (command[1] == 0xcb) {
     if (scenario == READ_FAILURE)
-      return 0;
+      return TC_ERROR;
+    /* The TWIC catalog also names the Discovery Object 7E and the TWIC
+     * Privacy Key DFC101, which these cards lack (6A88, TWIC Part 2 v5 5.2). */
+    const uint8_t* list = command + (extended_reads ? 7 : 5);
+    if (list[1] != 3 || (list[2] == 0xdf && list[3] == 0xc1 && list[4] == 0x01)) {
+      munit_assert_uint(selected_twic, ==, 1);
+      status_reply(0x6a88, response, out);
+      return TC_OK;
+    }
     uint8_t short_command[11];
     if (extended_reads) {
       munit_assert_size(length, ==, 14);
       munit_assert_uint(command[4], ==, 0);
       munit_assert_uint(command[5], ==, 0);
       munit_assert_uint(command[6], ==, 5);
+      /* The example asks for one whole object of up to 16384 bytes. */
       const size_t requested = (size_t)command[12] << 8 | command[13];
-      munit_assert_size(requested + EXAMPLE_CARD_STATUS_BYTES, ==, capacity);
+      munit_assert_size(requested, ==, 16384);
       /* Reuse the object-selection fixture after checking extended framing. */
       memcpy(short_command, command, 4);
       short_command[4] = command[6];
@@ -452,16 +487,12 @@ int example_card_pcsc_transmit(void* context, const uint8_t* command, size_t len
       munit_assert_uint(selected_twic, ==, 1);
       const int optional = command[9] == 0x21 || command[8] == 0xc0;
       if (optional && scenario == SECURITY_OPTIONAL_DENIED) {
-        response[0] = 0x69;
-        response[1] = 0x82;
-        *out = 2;
-        return 1;
+        status_reply(0x6982, response, out);
+        return TC_OK;
       }
       if ((optional && !optional_objects()) || (scenario == SECURITY_MISSING && command[9] == 8)) {
-        response[0] = 0x6a;
-        response[1] = 0x82;
-        *out = 2;
-        return 1;
+        status_reply(0x6a82, response, out);
+        return TC_OK;
       }
       const uint8_t* bytes = command[9] == 4      ? unsigned_chuid_bytes
                              : command[9] == 8    ? face_bytes
@@ -479,7 +510,7 @@ int example_card_pcsc_transmit(void* context, const uint8_t* command, size_t len
       memcpy(object, bytes, object_length);
       object_offset = 0;
       object_reply(response, capacity, out);
-      return 1;
+      return TC_OK;
     }
     if (command[9] == 3 || command[9] == 8) {
       munit_assert_true(with_biometric());
@@ -488,19 +519,19 @@ int example_card_pcsc_transmit(void* context, const uint8_t* command, size_t len
       munit_assert_memory_equal(sizeof biometric_tag, command + 7, biometric_tag);
       ++biometric_reads;
       if (scenario == BIO_READ_FAILURE)
-        return 0;
+        return TC_ERROR;
       const uint8_t* bytes = command[9] == 3 ? biometric_bytes : face_bytes;
       object_length = command[9] == 3 ? biometric_length : face_length;
       munit_assert_size(object_length, <=, sizeof object);
       memcpy(object, bytes, object_length);
       object_offset = 0;
       object_reply(response, capacity, out);
-      return 1;
+      return TC_OK;
     }
     if (command[9] == 2) {
       munit_assert_true(with_chuid());
       if (scenario == CHUID_READ_FAILURE)
-        return 0;
+        return TC_ERROR;
       static const uint8_t chuid_tag[] = {0x5f, 0xc1, 2};
       munit_assert_memory_equal(sizeof chuid_tag, command + 7, chuid_tag);
       munit_assert_size(chuid_length, <=, sizeof object);
@@ -508,7 +539,7 @@ int example_card_pcsc_transmit(void* context, const uint8_t* command, size_t len
       object_length = chuid_length;
       object_offset = 0;
       object_reply(response, capacity, out);
-      return 1;
+      return TC_OK;
     }
     static const uint8_t tag[] = {0x5f, 0xc1, 1};
     munit_assert_memory_equal(sizeof tag, command + 7, tag);
@@ -536,13 +567,13 @@ int example_card_pcsc_transmit(void* context, const uint8_t* command, size_t len
     object_length = used;
     object_offset = 0;
     object_reply(response, capacity, out);
-    return 1;
+    return TC_OK;
   }
   if (command[1] == 0xc0 && object_offset < object_length) {
     object_reply(response, capacity, out);
-    return 1;
+    return TC_OK;
   }
-  return transmit(&card, command, length, response, capacity, out);
+  return transmit(&card, wire, buffer, out);
 }
 
 static void make_chuid(X509* root, EVP_PKEY* root_key, X509* issuer, EVP_PKEY* issuer_key,
@@ -845,7 +876,7 @@ static MunitResult command_workflow(const MunitParameter params[], void* context
     }
     memset(&card, 0, sizeof card);
     card.key = scenario == WRONG_CARD_KEY ? other_card_key : card_key;
-    card.algorithm = EXAMPLE_CARD_ALGORITHM_RSA_2048;
+    card.algorithm = TC_PIV_ALGORITHM_RSA_2048;
     card.pss = extended_reads;
     card.mode = scenario == BAD_REPLY ? TAMPERED : NORMAL;
     entropy = (Entropy){1, scenario == RNG_FAILURE, 0};

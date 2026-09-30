@@ -54,34 +54,46 @@ int example_card_pcsc_close(ExampleCardPCSC* state)
   state->transaction = 0;
   return !close_failure;
 }
-int example_card_pcsc_transmit(void* context, const uint8_t* command, size_t length,
-                               uint8_t* response, size_t capacity, size_t* out)
+/* Applications as the bit positions of absent and unsigned_chuid. */
+enum { CARD_PIV, CARD_TWIC };
+
+TC_status example_card_pcsc_transmit(void* context, TC_bytes wire, TC_buffer buffer, size_t* out)
 {
   ExampleCardPCSC* state = context;
+  const uint8_t* command = wire.data;
+  const size_t length = wire.length;
+  uint8_t* response = buffer.data;
   munit_assert_int(state->transaction, ==, 1);
   ++transfers;
   if (transfers == fail_transfer)
-    return 0;
-  munit_assert_size(capacity, >=, 17);
+    return TC_ERROR;
+  munit_assert_size(buffer.capacity, >=, 26);
   if (command[1] == 0xa4) {
-    munit_assert_size(length, ==, 15);
-    selected = command[9] == 0x67 ? EXAMPLE_CARD_TWIC : EXAMPLE_CARD_PIV;
+    selected = command[9] == 0x67 ? CARD_TWIC : CARD_PIV;
+    /* The complete PIV AID, or the 9-byte TWIC prefix (TWIC Part 2 v5 5.1). */
+    munit_assert_size(length, ==, selected == CARD_TWIC ? 15 : 17);
     if (absent & (1u << selected)) {
       response[0] = 0x6a;
       response[1] = 0x82;
       *out = 2;
-      return 1;
+      return TC_OK;
     }
+    /* 61 {4F AID, 79 {4F RID}} */
     response[0] = 0x61;
-    response[1] = 13;
+    response[1] = 22;
     response[2] = 0x4f;
     response[3] = 11;
     memcpy(response + 4, command + 5, 9);
     response[13] = bad_identity ? 99 : 1;
-    response[14] = selected == EXAMPLE_CARD_TWIC ? 3 : 0;
-    response[15] = 0x90;
-    response[16] = 0;
-    *out = 17;
+    response[14] = selected == CARD_TWIC ? 3 : 0;
+    response[15] = 0x79;
+    response[16] = 7;
+    response[17] = 0x4f;
+    response[18] = 5;
+    memcpy(response + 19, command + 5, 5);
+    response[24] = 0x90;
+    response[25] = 0;
+    *out = 26;
   } else {
     munit_assert_uint(command[1], ==, 0xcb);
     munit_assert_size(length, ==, 11);
@@ -89,10 +101,11 @@ int example_card_pcsc_transmit(void* context, const uint8_t* command, size_t len
     munit_assert_uint(command[8], ==, 0xc1);
     munit_assert_true(command[9] == 1 || command[9] == 2);
     if (absent_objects & (1u << (command[9] - 1))) {
+      /* Absent objects: 6A88 on TWIC (TWIC Part 2 v5 5.2), 6A82 on PIV. */
       response[0] = 0x6a;
-      response[1] = 0x88;
+      response[1] = selected == CARD_TWIC ? 0x88 : 0x82;
       *out = 2;
-      return 1;
+      return TC_OK;
     }
     if (command[9] == 1) {
       /* tools/pki_fixtures.py certificate(); signature is a placeholder. */
@@ -132,7 +145,7 @@ int example_card_pcsc_transmit(void* context, const uint8_t* command, size_t len
       response[bytes++] = 0x71;
       response[bytes++] = 1;
       response[bytes++] = certificate_case == 4 ? 2 : (uint8_t)gzip;
-      if (selected == EXAMPLE_CARD_PIV) {
+      if (selected == CARD_PIV) {
         response[bytes++] = 0xfe;
         response[bytes++] = 0;
       }
@@ -140,7 +153,7 @@ int example_card_pcsc_transmit(void* context, const uint8_t* command, size_t len
       response[bytes] = 0x90;
       response[bytes + 1] = 0;
       *out = bytes + 2;
-      return 1;
+      return TC_OK;
     }
     size_t bytes = 2;
     response[0] = bad_object ? 0x54 : 0x53;
@@ -169,7 +182,7 @@ int example_card_pcsc_transmit(void* context, const uint8_t* command, size_t len
     response[bytes++] = 0;
     *out = bytes;
   }
-  return 1;
+  return TC_OK;
 }
 static void reset(void)
 {
@@ -235,11 +248,11 @@ TC_TEST(workflow)
     munit_assert_uint(unlocks, ==, 1);
   }
   reset();
-  unsigned_chuid = 1 << EXAMPLE_CARD_TWIC;
+  unsigned_chuid = 1 << CARD_TWIC;
   munit_assert_int(run(), ==, 1);
   munit_assert_uint(transfers, ==, 2);
   reset();
-  unsigned_chuid = 1 << EXAMPLE_CARD_TWIC;
+  unsigned_chuid = 1 << CARD_TWIC;
   unsigned_option = 1;
   munit_assert_int(run(), ==, 0);
   munit_assert_uint(transfers, ==, 6);
@@ -248,7 +261,7 @@ TC_TEST(workflow)
   munit_assert_int(run(), ==, 1);
   munit_assert_uint(transfers, ==, 2);
   reset();
-  unsigned_chuid = (1 << EXAMPLE_CARD_PIV) | (1 << EXAMPLE_CARD_TWIC);
+  unsigned_chuid = (1 << CARD_PIV) | (1 << CARD_TWIC);
   unsigned_option = 1;
   munit_assert_int(run(), ==, 1);
   munit_assert_uint(transfers, ==, 5);

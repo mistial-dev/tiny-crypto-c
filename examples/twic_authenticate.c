@@ -12,6 +12,7 @@
 #include <sys/resource.h>
 #include <tiny_crypto/gzip.h>
 #include <tiny_crypto/hash.h>
+#include <tiny_crypto/piv_catalog.h>
 #include <tiny_crypto/piv_certificate.h>
 #include <tiny_crypto/piv_cms.h>
 #include <tiny_crypto/piv_printed.h>
@@ -21,7 +22,6 @@
 
 enum {
   CERTIFICATE_BYTES = 8192,
-  RESPONSE_BYTES = 4096,
   ISSUERS = 3,
   CRLS = 4,
   OBJECT_BYTES = 16384,
@@ -32,9 +32,20 @@ enum {
   MAX_DURATION = 30,
   CCL_READS = 32
 };
+/* The TWIC NEXGEN catalog holds 12 objects (TWIC Part 2 v5 4.5). The pool
+ * keeps each at up to OBJECT_BYTES with room for one more answer, since the
+ * inventory reads only into a region that fits a full answer. */
 enum {
-  INVENTORY_BYTES = (EXAMPLE_TWIC_OBJECTS + 1) * OBJECT_BYTES + EXAMPLE_CARD_RESPONSE_BYTES +
-                    EXAMPLE_CARD_STATUS_BYTES
+  /* One GET DATA answer of up to OBJECT_BYTES with its status bytes and any
+   * secure messaging overhead. */
+  RESPONSE_BYTES = TC_PIV_RESPONSE_BYTES(OBJECT_BYTES),
+  TWIC_OBJECTS = 12,
+  INVENTORY_BYTES = (TWIC_OBJECTS + 1) * RESPONSE_BYTES,
+  /* One command fragment in either length format. */
+  SCRATCH_BYTES =
+      TC_APDU_EXTENDED_COMMAND_BYTES(TC_PIV_COMMAND_MAX_NC) > TC_APDU_SHORT_COMMAND_MAX_BYTES
+          ? TC_APDU_EXTENDED_COMMAND_BYTES(TC_PIV_COMMAND_MAX_NC)
+          : TC_APDU_SHORT_COMMAND_MAX_BYTES
 };
 enum {
   CRL_TARGETS = ISSUERS + 10,
@@ -48,14 +59,18 @@ enum {
 };
 static struct {
   uint8_t response[RESPONSE_BYTES], decoded[CERTIFICATE_BYTES];
-  uint8_t chuid[OBJECT_BYTES];
-  uint8_t fingerprints[OBJECT_BYTES], face[OBJECT_BYTES], stored_fingerprints[OBJECT_BYTES],
-      stored_face[OBJECT_BYTES], tpk_hex[96];
+  uint8_t chuid[RESPONSE_BYTES];
+  uint8_t fingerprints[OBJECT_BYTES], face[OBJECT_BYTES], stored_fingerprints[RESPONSE_BYTES],
+      stored_face[RESPONSE_BYTES], tpk_hex[96];
   TC_bytes fingerprint_object, face_object;
   uint8_t printed[OBJECT_BYTES];
   TC_bytes printed_plaintext;
-  uint8_t inventory_bytes[INVENTORY_BYTES];
-  ExampleTWICInventory inventory;
+  uint8_t inventory_bytes[INVENTORY_BYTES], scratch_bytes[SCRATCH_BYTES];
+  /* SELECT answers. The certificate stays in response meanwhile. */
+  uint8_t selection[TC_PIV_RESPONSE_BYTES(TC_APDU_SHORT_MAX_NE)];
+  TC_PIV_object objects[TWIC_OBJECTS];
+  TC_PIV_inventory inventory;
+  TC_PIV_link link;
   TC_TWIC_tpk tpk;
   /* Sequential phases share scratch. Borrowed results point into input buffers.
    */
@@ -113,9 +128,9 @@ typedef struct {
   uint64_t marsec_level, max_age, minimum_publication;
   unsigned seen;
   int allow_rsa1024;
-  ExampleCardRSAPadding rsa_padding;
+  TC_PIV_rsa_padding rsa_padding;
   TC_CMS_rsa_parameters cms_rsa_parameters;
-  ExampleCardReadMode read_mode;
+  TC_APDU_length_format read_mode;
   int piv_certificate_envelope;
 } Options;
 
@@ -184,9 +199,9 @@ static int options_read(int argc, char** argv, Options* out)
       continue;
     }
     if (!strcmp(option, "--extended-reads")) {
-      if (out->read_mode == EXAMPLE_CARD_READ_EXTENDED)
+      if (out->read_mode == TC_APDU_EXTENDED)
         return 0;
-      out->read_mode = EXAMPLE_CARD_READ_EXTENDED;
+      out->read_mode = TC_APDU_EXTENDED;
       continue;
     }
     if (!strcmp(option, "--piv-certificate-envelope")) {
@@ -273,9 +288,9 @@ static int options_read(int argc, char** argv, Options* out)
     } else if (!strcmp(option, "--rsa-padding")) {
       flag = RSA_PADDING;
       if (!strcmp(value, "v15"))
-        out->rsa_padding = EXAMPLE_CARD_RSA_V15;
+        out->rsa_padding = TC_PIV_RSA_PKCS1_V15;
       else if (!strcmp(value, "pss"))
-        out->rsa_padding = EXAMPLE_CARD_RSA_PSS;
+        out->rsa_padding = TC_PIV_RSA_PSS;
       else
         return 0;
     } else if (!strcmp(option, "--marsec-level")) {
@@ -581,7 +596,6 @@ static int encrypted_object_decode(TC_bytes encoded, TC_buffer output, TC_bytes*
 }
 #endif
 
-/* Read and decrypt one protected TWIC object. plaintext borrows output. */
 /* One encrypted TWIC biometric object. encoded holds the stored BC field once
  * read, stored holds the card response, and output receives the plaintext. */
 typedef struct {
@@ -590,45 +604,39 @@ typedef struct {
   TC_buffer stored, output;
 } protected_object;
 
-static int protected_object_read(ExampleCardIO* io, ExampleCardReadMode mode,
-                                 TC_PIV_card_profile profile, const protected_object* object,
-                                 TC_bytes* plaintext, size_t* work)
+/* Select the TWIC application and check that it reports profile. */
+static int twic_select(TC_PIV_link* link, TC_PIV_card_profile profile)
+{
+  TC_PIV_application application;
+  return TC_PIV_select(link, TC_PIV_APPLICATION_TWIC, 0,
+                       (TC_buffer){sensitive.selection, sizeof sensitive.selection},
+                       &application) == TC_PIV_OK &&
+         application.profile == profile;
+}
+
+/* Read and decrypt one protected TWIC object. plaintext borrows output. */
+static int protected_object_read(TC_PIV_link* link, TC_PIV_card_profile profile,
+                                 const protected_object* object, TC_bytes* plaintext, size_t* work)
 {
 #if TC_ENABLE_AES && TC_AES_ENABLE_ECB && TC_AES_KEY_BITS == 128
   const uint8_t tag_id = object->tag_id;
   TC_bytes* encoded = object->encoded;
   const TC_buffer stored = object->stored, output = object->output;
-  const TC_TLV_limits limits = {OBJECT_BYTES, OBJECT_BYTES, 4, 2};
   if (!encoded->data) {
-    ExampleCardResponse response;
-    ExampleCardModel model;
-    if (example_card_select(io, EXAMPLE_CARD_TWIC, stored.data, stored.capacity, &response) !=
-            EXAMPLE_CARD_OK ||
-        example_card_identity((TC_bytes){stored.data, response.length}, EXAMPLE_CARD_TWIC,
-                              &model) != TC_TLV_OK ||
-        model != (profile == TC_TWIC_LEGACY_CARD ? EXAMPLE_CARD_MODEL_TWIC_LEGACY
-                                                 : EXAMPLE_CARD_MODEL_TWIC_NEXGEN))
-      return 0;
     const uint8_t tag[] = {0xdf, 0xc1, tag_id};
-    if (example_card_object_read(io, mode, tag, sizeof tag, stored.data, stored.capacity,
-                                 &response) != EXAMPLE_CARD_OK)
+    TC_PIV_data_object read;
+    if (!twic_select(link, profile) ||
+        TC_PIV_get_data(link, (TC_bytes){tag, sizeof tag}, stored, &read) != TC_PIV_OK ||
+        read.form != TC_PIV_FORM_CONTAINER || read.encoded.length > *work / 2)
       return 0;
-    TC_TLV_element outer;
-    if (response.length > *work / 2)
-      return 0;
-    *work -= response.length * 2;
-    if (TC_TLV_read((TC_bytes){stored.data, response.length}, TC_TLV_ISO7816, &limits, &outer) !=
-            TC_TLV_OK ||
-        outer.encoded.length != response.length || outer.encoded.data[0] != 0x53)
-      return 0;
+    *work -= read.encoded.length * 2;
     /* Security-object hashes cover the stored BC field, including ciphertext.
      */
-    *encoded = outer.value;
+    *encoded = read.value;
   }
   return encrypted_object_decode(*encoded, output, plaintext, work);
 #else
-  (void)io;
-  (void)mode;
+  (void)link;
   (void)profile;
   (void)object;
   (void)plaintext;
@@ -643,7 +651,57 @@ typedef struct {
   TC_bytes chuid, fingerprints, face;
 } signed_objects;
 
-static int signed_objects_check(ExampleCardIO* io, const Options* options, TC_bytes certificate,
+/* 1 when kind is a stored data object of the TWIC Security Object map. The
+ * certificate, the Discovery Object and the TWIC Privacy Key stay outside
+ * it. */
+static int twic_signed_kind(uint8_t kind)
+{
+  return kind == TC_PIV_KIND_CHUID || kind == TC_PIV_KIND_UNSIGNED_CHUID ||
+         kind == TC_PIV_KIND_FINGERPRINTS || kind == TC_PIV_KIND_FACE ||
+         kind == TC_PIV_KIND_PRINTED || kind == TC_PIV_KIND_IRIS ||
+         kind == TC_PIV_KIND_TWIC_PERSONAL || kind == TC_PIV_KIND_TWIC_SIGNATURE_IMAGE;
+}
+
+/* Read the TWIC application inventory. Every object must be present or
+ * absent, and the Security Object, CHUID, unsigned CHUID and fingerprints
+ * present, with the face on NEXGEN. The spans borrow the pool. */
+static int twic_inventory_read(TC_PIV_link* link, TC_PIV_card_profile profile, size_t* work)
+{
+  const TC_PIV_inventory_plan plan = {0, OBJECT_BYTES};
+  TC_PIV_inventory* inventory = &sensitive.inventory;
+  inventory->objects = sensitive.objects;
+  inventory->capacity = TWIC_OBJECTS;
+  if (!twic_select(link, profile) ||
+      TC_PIV_inventory_read(
+          link, &plan, (TC_buffer){sensitive.inventory_bytes, sizeof sensitive.inventory_bytes},
+          work, inventory) != TC_PIV_OK)
+    return 0;
+  unsigned present = 0;
+  for (size_t i = 0; i < inventory->count; ++i) {
+    const TC_PIV_object* object = &inventory->objects[i];
+    if (object->state != TC_PIV_OBJECT_PRESENT && object->state != TC_PIV_OBJECT_ABSENT)
+      return 0;
+    if (object->state == TC_PIV_OBJECT_PRESENT)
+      present |= 1u << object->info->kind;
+  }
+  unsigned required = 1u << TC_PIV_KIND_SECURITY | 1u << TC_PIV_KIND_CHUID |
+                      1u << TC_PIV_KIND_UNSIGNED_CHUID | 1u << TC_PIV_KIND_FINGERPRINTS;
+  if (profile == TC_TWIC_NEXGEN_CARD)
+    required |= 1u << TC_PIV_KIND_FACE;
+  return (present & required) == required;
+}
+
+/* The present inventory object of kind. */
+static const TC_PIV_object* twic_object(uint8_t kind)
+{
+  for (size_t i = 0; i < sensitive.inventory.count; ++i)
+    if (sensitive.inventory.objects[i].info->kind == kind &&
+        sensitive.inventory.objects[i].state == TC_PIV_OBJECT_PRESENT)
+      return &sensitive.inventory.objects[i];
+  return NULL;
+}
+
+static int signed_objects_check(TC_PIV_link* link, const Options* options, TC_bytes certificate,
                                 TC_PIV_card_profile profile,
                                 const TC_X509_path_options* card_policy,
                                 signed_objects* card_objects, size_t* work)
@@ -661,31 +719,19 @@ static int signed_objects_check(ExampleCardIO* io, const Options* options, TC_by
   /* Keep the certificate in its original buffer while reading the CHUID. */
   if (!encoded->data) {
     if (options->security_object) {
-      const ExampleCardModel model = profile == TC_TWIC_LEGACY_CARD
-                                         ? EXAMPLE_CARD_MODEL_TWIC_LEGACY
-                                         : EXAMPLE_CARD_MODEL_TWIC_NEXGEN;
-      if (example_twic_inventory_read(io, model, options->read_mode, sensitive.inventory_bytes,
-                                      sizeof sensitive.inventory_bytes, OBJECT_BYTES, work,
-                                      &sensitive.inventory) != EXAMPLE_CARD_OK)
+      if (!twic_inventory_read(link, profile, work))
         return 0;
-      for (size_t i = 0; i < sensitive.inventory.count; ++i) {
-        if (sensitive.inventory.objects[i].container == EXAMPLE_TWIC_CHUID)
-          *encoded = sensitive.inventory.objects[i].contents;
-        if (sensitive.inventory.objects[i].container == EXAMPLE_TWIC_FINGERPRINTS)
-          sensitive.fingerprint_object = sensitive.inventory.objects[i].contents;
-        if (sensitive.inventory.objects[i].container == EXAMPLE_TWIC_FACE)
-          sensitive.face_object = sensitive.inventory.objects[i].contents;
-      }
-      if (!encoded->data || !sensitive.fingerprint_object.data ||
-          (profile == TC_TWIC_NEXGEN_CARD && !sensitive.face_object.data))
-        return 0;
+      *encoded = twic_object(TC_PIV_KIND_CHUID)->value;
+      sensitive.fingerprint_object = twic_object(TC_PIV_KIND_FINGERPRINTS)->value;
+      if (profile == TC_TWIC_NEXGEN_CARD)
+        sensitive.face_object = twic_object(TC_PIV_KIND_FACE)->value;
     } else {
       static const uint8_t tag[] = {0x5f, 0xc1, 2};
-      ExampleCardResponse response;
-      if (example_card_object_read(io, options->read_mode, tag, sizeof tag, sensitive.chuid,
-                                   sizeof sensitive.chuid, &response) != EXAMPLE_CARD_OK)
+      TC_PIV_data_object read;
+      if (TC_PIV_get_data(link, (TC_bytes){tag, sizeof tag},
+                          (TC_buffer){sensitive.chuid, sizeof sensitive.chuid}, &read) != TC_PIV_OK)
         return 0;
-      *encoded = (TC_bytes){sensitive.chuid, response.length};
+      *encoded = read.encoded;
     }
   }
   const TC_PIV_CHUID_encoding encoding =
@@ -724,38 +770,42 @@ static int signed_objects_check(ExampleCardIO* io, const Options* options, TC_by
       TC_PIV_CHUID_validate(&request, &chuid_context, work, &accepted) != TC_CREDENTIAL_VALID)
     return 0;
   if (options->security_object) {
-    TC_PIV_security_data entries[EXAMPLE_TWIC_OBJECTS];
+    TC_PIV_security_data entries[TWIC_OBJECTS];
+    size_t count = 0;
     int printed_found = 0;
     TC_bytes unsigned_chuid = {NULL, 0};
     for (size_t i = 0; i < sensitive.inventory.count; ++i) {
-      entries[i] = (TC_PIV_security_data){sensitive.inventory.objects[i].container,
-                                          &sensitive.inventory.objects[i].contents, 1};
-      if (options->printed_plaintext && entries[i].container == EXAMPLE_TWIC_PRINTED) {
+      TC_PIV_object* object = &sensitive.inventory.objects[i];
+      if (object->state != TC_PIV_OBJECT_PRESENT || !twic_signed_kind(object->info->kind))
+        continue;
+      TC_PIV_security_data* entry = &entries[count++];
+      *entry = (TC_PIV_security_data){object->info->container, &object->value, 1};
+      if (options->printed_plaintext && object->info->kind == TC_PIV_KIND_PRINTED) {
         printed_found = 1;
 #if TC_ENABLE_AES && TC_AES_ENABLE_ECB && TC_AES_KEY_BITS == 128
         /* Both validation passes hash the same retained plaintext. */
         if (!sensitive.printed_plaintext.data &&
-            !encrypted_object_decode(sensitive.inventory.objects[i].contents,
+            !encrypted_object_decode(object->value,
                                      (TC_buffer){sensitive.printed, sizeof sensitive.printed},
                                      &sensitive.printed_plaintext, work))
           return 0;
-        entries[i].parts = &sensitive.printed_plaintext;
+        entry->parts = &sensitive.printed_plaintext;
 #else
         return 0;
 #endif
       }
-      if (entries[i].container == TC_TWIC_UNSIGNED_CHUID_CONTAINER)
-        unsigned_chuid = sensitive.inventory.objects[i].contents;
+      if (object->info->kind == TC_PIV_KIND_UNSIGNED_CHUID)
+        unsigned_chuid = object->value;
     }
     if (options->printed_plaintext && !printed_found)
       return 0;
-    const TC_PIV_security_validation_request security = {sensitive.inventory.security,
+    const TC_PIV_security_validation_request security = {twic_object(TC_PIV_KIND_SECURITY)->encoded,
                                                          TC_PIV_SECURITY_CONTAINER,
                                                          profile,
                                                          &accepted,
                                                          &card.expiration,
                                                          entries,
-                                                         sensitive.inventory.count};
+                                                         count};
     TC_CMS_path_workspace security_path =
         example_cms_path_workspace(&sensitive.scratch.security_validation.credential.cms);
     const TC_CMS_credential_workspace security_credential = example_cms_credential_workspace(
@@ -796,11 +846,11 @@ static int signed_objects_check(ExampleCardIO* io, const Options* options, TC_by
                                         &sensitive.face_object,
                                         {sensitive.stored_face, sizeof sensitive.stored_face},
                                         {sensitive.face, sizeof sensitive.face}};
-  if (!fingerprints->data && !protected_object_read(io, options->read_mode, profile,
-                                                    &fingerprint_object, fingerprints, work))
+  if (!fingerprints->data &&
+      !protected_object_read(link, profile, &fingerprint_object, fingerprints, work))
     return 0;
   if (profile == TC_TWIC_NEXGEN_CARD && !face->data &&
-      !protected_object_read(io, options->read_mode, profile, &face_object, face, work))
+      !protected_object_read(link, profile, &face_object, face, work))
     return 0;
   const TC_PIV_CMS_kind signature_profile =
       options->legacy_biometric ? TC_PIV_CMS_BIOMETRIC_LEGACY : TC_PIV_CMS_BIOMETRIC;
@@ -819,38 +869,32 @@ static int signed_objects_check(ExampleCardIO* io, const Options* options, TC_by
   return 1;
 }
 
-static int card_certificate(ExampleCardIO* io, const Options* options, TC_PIV_card_profile* profile,
+/* Read the card authentication certificate: from the TWIC application on
+ * NEXGEN cards, and from the PIV application on Legacy cards, which stays
+ * selected for the key proof. */
+static int card_certificate(TC_PIV_link* link, const Options* options, TC_PIV_card_profile* profile,
                             TC_bytes* encoded, size_t* work)
 {
-  ExampleCardResponse response;
-  if (example_card_select(io, EXAMPLE_CARD_TWIC, sensitive.response, sizeof sensitive.response,
-                          &response) != EXAMPLE_CARD_OK)
-    return 0;
-  ExampleCardModel model;
-  if (example_card_identity((TC_bytes){sensitive.response, response.length}, EXAMPLE_CARD_TWIC,
-                            &model) != TC_TLV_OK)
+  const TC_buffer selection = {sensitive.selection, sizeof sensitive.selection};
+  const TC_buffer response = {sensitive.response, sizeof sensitive.response};
+  TC_PIV_application application;
+  if (TC_PIV_select(link, TC_PIV_APPLICATION_TWIC, 0, selection, &application) != TC_PIV_OK)
     return 0;
   TC_PIV_certificate_profile container_profile = TC_PIV_CERTIFICATE_TWIC;
-  if (model == EXAMPLE_CARD_MODEL_TWIC_LEGACY) {
-    *profile = TC_TWIC_LEGACY_CARD;
-    if (example_card_select(io, EXAMPLE_CARD_PIV, sensitive.response, sizeof sensitive.response,
-                            &response) != EXAMPLE_CARD_OK ||
-        example_card_identity((TC_bytes){sensitive.response, response.length}, EXAMPLE_CARD_PIV,
-                              &model) != TC_TLV_OK)
+  *profile = application.profile;
+  if (application.profile == TC_TWIC_LEGACY_CARD) {
+    if (TC_PIV_select(link, TC_PIV_APPLICATION_PIV, 0, selection, &application) != TC_PIV_OK)
       return 0;
     container_profile = TC_PIV_CERTIFICATE_SLOT;
-  } else if (model == EXAMPLE_CARD_MODEL_TWIC_NEXGEN)
-    *profile = TC_TWIC_NEXGEN_CARD;
-  else
-    return 0;
+  }
   if (options->piv_certificate_envelope)
     container_profile = TC_PIV_CERTIFICATE_SLOT;
   static const uint8_t tag[] = {0x5f, 0xc1, 1};
-  if (example_card_object_read(io, options->read_mode, tag, sizeof tag, sensitive.response,
-                               sizeof sensitive.response, &response) != EXAMPLE_CARD_OK)
+  TC_PIV_data_object read;
+  if (TC_PIV_get_data(link, (TC_bytes){tag, sizeof tag}, response, &read) != TC_PIV_OK)
     return 0;
   TC_PIV_certificate container;
-  if (TC_PIV_certificate_decode((TC_bytes){sensitive.response, response.length}, container_profile,
+  if (TC_PIV_certificate_decode(read.encoded, container_profile,
                                 TC_PIV_CERTIFICATE_RECOMMENDED_BYTES, &sensitive.scratch.gzip, work,
                                 (TC_buffer){sensitive.decoded, sizeof sensitive.decoded},
                                 &container) != TC_TLV_OK)
@@ -962,25 +1006,36 @@ int main(int argc, char** argv)
   failure = "Unable to acquire the reader transaction";
   if (!example_card_pcsc_open(&connection, options.reader))
     goto cleanup;
-  ExampleCardIO io = {example_card_pcsc_transmit, &connection, EXCHANGES, 0};
+  /* GET DATA asks for Le 00, or for one whole object with extended length.
+   * The contact interface carries no PIN here. */
+  const TC_PIV_link_options link_options = {{options.read_mode, 0, EXCHANGES, 0, 0},
+                                            TC_PIV_CONTACT,
+                                            options.read_mode == TC_APDU_EXTENDED ? OBJECT_BYTES
+                                                                                  : 0};
+  TC_PIV_link* link = &sensitive.link;
+  failure = "Unable to start the card link";
+  if (TC_PIV_link_init(
+          link, (TC_APDU_transport){example_card_pcsc_transmit, &connection}, &link_options,
+          (TC_buffer){sensitive.scratch_bytes, sizeof sensitive.scratch_bytes}) != TC_PIV_OK)
+    goto cleanup;
   TC_PIV_card_profile profile;
   TC_bytes certificate;
   failure = "Unable to read a supported card-authentication certificate";
-  if (!card_certificate(&io, &options, &profile, &certificate, &work) ||
+  if (!card_certificate(link, &options, &profile, &certificate, &work) ||
       !purpose_read(certificate, TC_PIV_OID_CARD_AUTHENTICATION, &limits, &work, &path.purpose))
     goto cleanup;
   const ExampleTWICRequest request = {certificate,
                                       &trust,
                                       &path,
                                       profile,
-                                      options.allow_rsa1024,
+                                      (uint8_t)options.allow_rsa1024,
                                       held,
                                       options.max_age,
                                       options.minimum_publication,
                                       CCL_READS,
                                       options.rsa_padding};
   const ExampleTWICResult result =
-      example_twic_authenticate(&io, &request, (TC_random_source){example_card_random, NULL},
+      example_twic_authenticate(link, &request, (TC_random_source){example_card_random, NULL},
                                 &sensitive.scratch.validation, &work);
   static const char* results[] = {"Authenticated",
                                   "Certificate or card proof invalid",
@@ -989,15 +1044,14 @@ int main(int argc, char** argv)
                                   "CCL unavailable",
                                   "Unsupported credential algorithm or profile",
                                   "Validation resource limit reached",
-                                  "Card transport failed",
-                                  "Validation API or provider failure"};
+                                  "Card, transport, API or provider failure"};
   failure = (unsigned)result < sizeof results / sizeof *results ? results[result]
                                                                 : "Unexpected validation result";
   if (result != EXAMPLE_TWIC_AUTHENTICATED)
     goto cleanup;
   signed_objects card_objects = {{NULL, 0}, {NULL, 0}, {NULL, 0}};
   failure = "Signed credential object validation failed";
-  if (!signed_objects_check(&io, &options, certificate, profile, &path, &card_objects, &work))
+  if (!signed_objects_check(link, &options, certificate, profile, &path, &card_objects, &work))
     goto cleanup;
   /* Recheck time-sensitive decisions after the physical card exchange. */
   failure = "Clock failure, rollback or transaction time limit";
@@ -1064,11 +1118,13 @@ int main(int argc, char** argv)
     }
   }
   if (accepted &&
-      !signed_objects_check(&io, &options, certificate, profile, &path, &card_objects, &work)) {
+      !signed_objects_check(link, &options, certificate, profile, &path, &card_objects, &work)) {
     accepted = 0;
     failure = "Signed credential object failed its final time check";
   }
 cleanup:
+  TC_PIV_inventory_clear(&sensitive.inventory);
+  TC_PIV_link_clear(&sensitive.link);
   for (size_t i = 0; i < CRLS; ++i)
     if (sensitive.crl.jobs[i])
       TC_X509_crl_prepare_clear(sensitive.crl.jobs[i]);

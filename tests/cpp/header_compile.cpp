@@ -330,5 +330,17 @@ int tiny_crypto_cpp_header_compile(uint8_t* data, size_t length)
       ++failures;
   }
 #endif
+#if TC_ENABLE_PIV_KEY_PROOF
+  {
+    tiny_crypto::piv_link link;
+    const tiny_crypto::piv_key_proof_request request{};
+    const TC_X509_signature_provider provider{};
+    static tiny_crypto::piv_key_proof_workspace proof_workspace;
+    TC_work_budget work{0};
+    if (tiny_crypto::piv_key_prove(link, request, TC_random_source{nullptr, nullptr}, provider,
+                                   proof_workspace, work) != TC_PIV_ARGUMENT)
+      ++failures;
+  }
+#endif
   return failures;
 }

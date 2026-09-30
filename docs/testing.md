@@ -14,9 +14,10 @@ and sanitizer runs, or [external vectors](#cryptographic-vectors) to include the
 pinned vectors and capture corpora. The sections below describe focused suites.
 
 The OpenSSL-enabled `test_card_authentication` target exercises synthetic
-card-certificate validation followed by a fresh 9E challenge and native signature
-verification. It covers RSA-1024/2048/3072, P-256/P-384, replay, altered replies,
-framing errors, RNG failure, transport failures and exchange limits. See the
+card-certificate validation followed by a `TC_PIV_key_prove` proof and native
+signature verification. It covers RSA-1024/2048/3072 with PKCS #1 v1.5 and
+PSS, P-256/P-384, keys 9A and 9E, replay, altered replies, framing errors, card
+statuses, RNG failure, transport failures and exchange limits. See the
 [credential reader guide](credential-reader.md#synthetic-authentication-tests)
 for the focused command. Generated keys and certificates stay in test memory.
 
@@ -113,8 +114,20 @@ and the wipes. Scripted TWIC answers cover the bare `9000` of optional objects
 and `6A88`. `test_cpp_piv_catalog` runs the C++ wrapper.
 `test_twic_apdu_replay` replays the synthetic TWIC transcripts of
 `tests/twic/apdu_replay.py` through the TWIC application inventory, the
-observed absent and denied objects, the PIV application, the PIN and GENERAL
-AUTHENTICATE, byte for byte.
+observed absent and denied objects, the PIV application, the PIN and the
+card authentication key proof, byte for byte.
+
+`test_piv_key_proof` covers the [key proofs](piv-card.md#key-proofs): the SP
+800-78-5 Table 9 identifiers and the Table 10 end of RSA-2048 under each
+profile, keyUsage and exponent checks, and proofs over the card simulator with
+the digests the SD 33 cards signed in the captures. Card 2 (RSA-2048) proves 9E
+and 9A on contact in the Part 2 A.4.1 template order and on contactless as `1C`
+chains under secure messaging after the VCI. Card 4 (P-256) proves 9E, 9C right
+after a PIN submission and 9A. It also covers `6982` before the PIN, damaged
+answers, refusals before sending, the TWIC application rules including the
+Legacy TWIC application, argument errors including inputs inside the link
+storage, the exchange, work and random-source failures, and a lost secure messaging
+session. `test_cpp_piv_key_proof` runs the C++ wrappers.
 
 `test_piv_card_simulator` covers `tests/support/card_simulator.c`, a PIV card
 model for the card-level suites. It answers from the SD 33 card 2 and card 4

@@ -218,6 +218,7 @@ algorithm is enabled.
 | `TINY_CRYPTO_ENABLE_PIV_SM_APDU`        | OFF     | OFF   | OFF  | ON      | PIV SM framing, requires PIV command, SM and CVC  |
 | `TINY_CRYPTO_ENABLE_PIV_VCI`            | OFF     | OFF   | OFF  | ON      | PIV VCI, requires SM framing and PIV objects      |
 | `TINY_CRYPTO_ENABLE_PIV_CATALOG`        | OFF     | OFF   | OFF  | ON      | PIV and TWIC catalogs and card inventory          |
+| `TINY_CRYPTO_ENABLE_PIV_KEY_PROOF`      | OFF     | OFF   | OFF  | ON      | PIV and TWIC card key proofs                      |
 | `TINY_CRYPTO_PIV_SM_CS2`                | ON      | ON    | ON   | ON      | Cipher suite 2 (P-256, AES-128)                   |
 | `TINY_CRYPTO_PIV_SM_CS7`                | ON      | ON    | ON   | ON      | Cipher suite 7 (P-384, AES-256)                   |
 | `TINY_CRYPTO_ENABLE_FASCN`              | OFF     | OFF   | OFF  | ON      | FASC-N readers and writers                        |
@@ -525,7 +526,11 @@ retry floor and refuse a plaintext PIN on the contactless interface.
 800-73-5 and TWIC Part 2 data object catalogs with their access rules, and
 `TC_PIV_inventory_read`, which reads every object the link state allows into
 one caller pool and reports the others as restricted, denied, absent or
-oversized. See [PIV card commands](docs/piv-card.md).
+oversized. `TINY_CRYPTO_ENABLE_PIV_KEY_PROOF` adds `<tiny_crypto/piv_key_proof.h>`:
+`TC_PIV_key_prove` has a card key sign a fresh challenge with GENERAL
+AUTHENTICATE and verifies the signature under its validated certificate, with
+the SP 800-78-5 algorithm policy of `TC_PIV_key_parameters_select`. See
+[PIV card commands](docs/piv-card.md).
 
 ## PIV secure messaging
 

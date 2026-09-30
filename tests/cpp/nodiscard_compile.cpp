@@ -49,6 +49,8 @@
 #define TC_ENABLE_PIV_OBJECTS 1
 #define TC_ENABLE_PIV_VCI 1
 #define TC_ENABLE_PIV_CATALOG 1
+#define TC_ENABLE_KEY_CHALLENGE 1
+#define TC_ENABLE_PIV_KEY_PROOF 1
 #define TC_ENABLE_DRBG 1
 #define TC_DRBG_ENABLE_HASH 1
 #define TC_DRBG_ENABLE_HMAC 1
@@ -71,6 +73,7 @@
 #include <tiny_crypto/kmac.hpp>
 #include <tiny_crypto/piv_catalog.hpp>
 #include <tiny_crypto/piv_command.hpp>
+#include <tiny_crypto/piv_key_proof.hpp>
 #include <tiny_crypto/piv_sm.hpp>
 #include <tiny_crypto/piv_sm_apdu.hpp>
 #include <tiny_crypto/piv_vci.hpp>
@@ -271,6 +274,14 @@ void tiny_crypto_nodiscard_compile(uint8_t* data, size_t length)
   piv_catalog_count(TC_PIV_APPLICATION_PIV, TC_PIV_CARD);    /* DISCARDED */
   piv_catalog_at(TC_PIV_APPLICATION_PIV, TC_PIV_CARD, 0);    /* DISCARDED */
   piv_catalog_find(TC_PIV_APPLICATION_PIV, TC_PIV_CARD, in); /* DISCARDED */
+  const TC_X509_certificate certificate = {};
+  const TC_X509_signature_provider provider = {};
+  piv_key_parameters parameters = {};
+  piv_key_proof_request proof = {};
+  static piv_key_proof_workspace proof_workspace;
+  TC_work_budget proof_work = {0};
+  piv_key_parameters_select(certificate, proof.policy, parameters);       /* DISCARDED */
+  piv_key_prove(link, proof, rng, provider, proof_workspace, proof_work); /* DISCARDED */
 
   /* Clearing stays unmarked. */
   aes.clear();

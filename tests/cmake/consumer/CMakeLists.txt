@@ -13,8 +13,7 @@ add_test(NAME consumer_cpp COMMAND consumer_cpp)
 add_library(consumer_example_impl STATIC example/x509_client.c example/cms_reader.c
   example/cms_validate.c example/credential_object.c
   example/rsa_encrypt.c example/twic_ccl_storage.c example/twic_ccl_import.c
-  example/card_key_policy.c example/credential_auth.c example/credential_validate.c
-  example/credential_io.c example/pki_input.c example/x509_ocsp.c)
+  example/credential_validate.c example/pki_input.c example/x509_ocsp.c)
 target_sources(consumer_example_impl PRIVATE example/credential_workflow.c)
 set_target_properties(consumer_example_impl PROPERTIES C_STANDARD 99
   C_STANDARD_REQUIRED ON C_EXTENSIONS OFF)

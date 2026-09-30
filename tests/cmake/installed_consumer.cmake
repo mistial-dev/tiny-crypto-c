@@ -17,6 +17,8 @@ run("${CMAKE_COMMAND}" -S "${SOURCE_DIR}" -B "${BINARY_DIR}/library"
   -DTINY_CRYPTO_TLV_BER=ON
   -DTINY_CRYPTO_ENABLE_X509=ON -DTINY_CRYPTO_ENABLE_PIV_CVC=ON
   -DTINY_CRYPTO_ENABLE_KEY_CHALLENGE=ON
+  -DTINY_CRYPTO_ENABLE_APDU=ON -DTINY_CRYPTO_ENABLE_PIV_COMMAND=ON
+  -DTINY_CRYPTO_ENABLE_PIV_CATALOG=ON -DTINY_CRYPTO_ENABLE_PIV_KEY_PROOF=ON
   -DTINY_CRYPTO_ENABLE_X509_PATH=ON
   -DTINY_CRYPTO_ENABLE_X509_REVOCATION=ON
   -DTINY_CRYPTO_ENABLE_X509_OCSP=ON -DTINY_CRYPTO_ENABLE_SHA1=ON
@@ -105,10 +107,7 @@ file(COPY "${SOURCE_DIR}/examples/x509_client.c" "${SOURCE_DIR}/examples/x509_cl
   "${SOURCE_DIR}/examples/credential_object.c" "${SOURCE_DIR}/examples/credential_object.h"
   "${SOURCE_DIR}/examples/cms_check.c"
   "${SOURCE_DIR}/examples/pki_input.c" "${SOURCE_DIR}/examples/pki_input.h"
-  "${SOURCE_DIR}/examples/card_key_policy.c" "${SOURCE_DIR}/examples/card_key_policy.h"
-  "${SOURCE_DIR}/examples/credential_auth.c" "${SOURCE_DIR}/examples/credential_auth.h"
   "${SOURCE_DIR}/examples/credential_validate.c" "${SOURCE_DIR}/examples/credential_validate.h"
-  "${SOURCE_DIR}/examples/credential_io.c" "${SOURCE_DIR}/examples/credential_io.h"
   "${SOURCE_DIR}/examples/rsa_encrypt.c" "${SOURCE_DIR}/examples/rsa_encrypt.h"
   "${SOURCE_DIR}/examples/twic_ccl_storage.c" "${SOURCE_DIR}/examples/twic_ccl_storage.h"
   "${SOURCE_DIR}/examples/twic_ccl_import.c" "${SOURCE_DIR}/examples/twic_ccl_import.h"
@@ -139,13 +138,10 @@ if(CMAKE_HOST_APPLE)
     "${SOURCE_DIR}/examples/cms_reader.c" "${SOURCE_DIR}/examples/cms_reader.h"
     "${SOURCE_DIR}/examples/cms_validate.c" "${SOURCE_DIR}/examples/cms_validate.h"
     "${SOURCE_DIR}/examples/credential_system.c" "${SOURCE_DIR}/examples/credential_system.h"
-    "${SOURCE_DIR}/examples/card_key_policy.c" "${SOURCE_DIR}/examples/card_key_policy.h"
-    "${SOURCE_DIR}/examples/credential_auth.c" "${SOURCE_DIR}/examples/credential_auth.h"
     "${SOURCE_DIR}/examples/credential_validate.c" "${SOURCE_DIR}/examples/credential_validate.h"
     "${SOURCE_DIR}/examples/x509_workspace.h"
     "${SOURCE_DIR}/examples/x509_revocation.c" "${SOURCE_DIR}/examples/x509_revocation.h"
     "${SOURCE_DIR}/examples/pki_input.c" "${SOURCE_DIR}/examples/pki_input.h"
-    "${SOURCE_DIR}/examples/credential_io.c" "${SOURCE_DIR}/examples/credential_io.h"
     "${SOURCE_DIR}/examples/credential_pcsc.c" "${SOURCE_DIR}/examples/credential_pcsc.h"
     DESTINATION "${BINARY_DIR}/credential-source")
   file(COPY "${SOURCE_DIR}/examples/credential_check/"

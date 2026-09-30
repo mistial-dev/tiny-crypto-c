@@ -47,7 +47,9 @@ TC_TLV_result example_read_card_identity(TC_bytes encoded, TC_PIV_card_profile p
   TC_TLV_result status = TC_X509_read(encoded, limits, &parser, &certificate);
   if (status != TC_TLV_OK)
     return status;
-  ExampleCardIdentity identity = {0};
+  ExampleCardIdentity identity;
+  memset(&identity, 0, sizeof identity);
+  identity.certificate = certificate;
   identity.expiration = certificate.not_after;
   TC_TLV_reader extensions;
   status = TC_X509_extensions_init(&extensions, certificate.extensions, limits);
@@ -79,15 +81,31 @@ TC_TLV_result example_read_card_identity(TC_bytes encoded, TC_PIV_card_profile p
   return TC_TLV_OK;
 }
 
-ExampleTWICResult example_twic_authenticate(ExampleCardIO* io, const ExampleTWICRequest* request,
+/* The key proof results as workflow results. A card status is a failed
+ * proof. */
+static ExampleTWICResult proof_result(TC_PIV_result result)
+{
+  switch (result) {
+  case TC_PIV_OK:
+    return EXAMPLE_TWIC_AUTHENTICATED;
+  case TC_PIV_INVALID:
+  case TC_PIV_CARD_STATUS:
+    return EXAMPLE_TWIC_INVALID;
+  case TC_PIV_UNSUPPORTED:
+    return EXAMPLE_TWIC_UNSUPPORTED;
+  case TC_PIV_LIMIT:
+    return EXAMPLE_TWIC_LIMIT;
+  default:
+    return EXAMPLE_TWIC_ERROR;
+  }
+}
+
+ExampleTWICResult example_twic_authenticate(TC_PIV_link* link, const ExampleTWICRequest* request,
                                             TC_random_source random,
                                             ExampleTWICWorkspace* workspace, size_t* work)
 {
-  if (!io || !io->transmit || !request || !request->certificate.data ||
-      !request->certificate.length || !request->trust || !request->path || !random.fill ||
-      !workspace || !work || (request->allow_rsa1024 != 0 && request->allow_rsa1024 != 1) ||
-      (request->rsa_padding != EXAMPLE_CARD_RSA_V15 &&
-       request->rsa_padding != EXAMPLE_CARD_RSA_PSS))
+  if (!link || !request || !request->certificate.data || !request->certificate.length ||
+      !request->trust || !request->path || !random.fill || !workspace || !work)
     return EXAMPLE_TWIC_ERROR;
   if (request->profile != TC_TWIC_LEGACY_CARD && request->profile != TC_TWIC_NEXGEN_CARD)
     return EXAMPLE_TWIC_UNSUPPORTED;
@@ -148,32 +166,21 @@ ExampleTWICResult example_twic_authenticate(ExampleCardIO* io, const ExampleTWIC
                                            identity.identifiers.fascn);
   if (result != EXAMPLE_TWIC_AUTHENTICATED)
     goto cleanup;
-  const ExampleCardKeyPolicy policy = {request->profile, TC_KEY_USAGE_DIGITAL_SIGNATURE,
-                                       request->allow_rsa1024, request->rsa_padding};
-  switch (example_card_check_key(io, EXAMPLE_CARD_KEY_CARD_AUTHENTICATION,
-                                 &path.validation.public_key, &policy, &options.signatures, random,
-                                 &workspace->challenge, work)) {
-  case EXAMPLE_CARD_KEY_VERIFIED:
-    /* A publication during card I/O supersedes the held cancellation list. */
+  /* TC_PIV_key_prove applies the SP 800-78-5 and TWIC key policy to the
+   * validated certificate. */
+  const TC_PIV_key_proof_request proof = {
+      &identity.certificate,
+      {request->profile, options.at, request->rsa_padding, request->allow_rsa1024},
+      TC_PIV_KEY_CARD_AUTHENTICATION};
+  TC_work_budget budget = {*work > UINT32_MAX ? UINT32_MAX : (uint32_t)*work};
+  const uint32_t before = budget.remaining;
+  result = proof_result(
+      TC_PIV_key_prove(link, &proof, random, &options.signatures, &workspace->proof, &budget));
+  *work -= before - budget.remaining;
+  /* A publication during card I/O supersedes the held cancellation list. */
+  if (result == EXAMPLE_TWIC_AUTHENTICATED)
     result = example_twic_cancellation_check(request->ccl, &freshness, request->ccl_reads,
                                              identity.identifiers.fascn);
-    break;
-  case EXAMPLE_CARD_KEY_INVALID:
-    result = EXAMPLE_TWIC_INVALID;
-    break;
-  case EXAMPLE_CARD_KEY_UNSUPPORTED:
-    result = EXAMPLE_TWIC_UNSUPPORTED;
-    break;
-  case EXAMPLE_CARD_KEY_LIMIT:
-    result = EXAMPLE_TWIC_LIMIT;
-    break;
-  case EXAMPLE_CARD_KEY_TRANSPORT:
-    result = EXAMPLE_TWIC_TRANSPORT;
-    break;
-  default:
-    result = EXAMPLE_TWIC_ERROR;
-    break;
-  }
 cleanup:
   TC_secure_zero(workspace, sizeof *workspace);
   return result;

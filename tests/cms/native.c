@@ -1153,7 +1153,7 @@ static void credential_public_workflow(const credential_issuers* issuers,
       request.required_objects |= EXAMPLE_CREDENTIAL_REQUIRE_UNSIGNED_CHUID;
     if (printed.length)
       request.required_objects |= EXAMPLE_CREDENTIAL_REQUIRE_PRINTED;
-    request.rsa_padding = variant == RSA_PSS ? EXAMPLE_CARD_RSA_PSS : EXAMPLE_CARD_RSA_V15;
+    request.rsa_padding = variant == RSA_PSS ? TC_PIV_RSA_PSS : TC_PIV_RSA_PKCS1_V15;
     request.security = (ExampleCredentialSecurityInput){security,
                                                         TC_PIV_SECURITY_CONTENTS,
                                                         inventory,

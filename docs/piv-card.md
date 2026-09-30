@@ -29,7 +29,8 @@ The command scratch buffer holds one encoded command and is wiped after every
 transmit, since VERIFY carries PIN digits. SHORT links need
 `TC_APDU_SHORT_COMMAND_MAX_BYTES` (261) bytes. EXTENDED links need
 `TC_APDU_EXTENDED_COMMAND_BYTES(TC_PIV_COMMAND_MAX_NC)`, or the card limit when
-smaller.
+smaller. `TC_PIV_COMMAND_MAX_NC` is 32, or the key proof template size with
+`TINY_CRYPTO_ENABLE_PIV_KEY_PROOF`.
 
 `TC_PIV_link_info_get` reports the interface, the selected application and
 profile, the secure messaging suite the application announced, and whether the
@@ -300,6 +301,90 @@ TC_PIV_result read_inventory(TC_PIV_link* link, TC_PIV_object* objects, uint8_t*
   return TC_PIV_OK;
 }
 ```
+
+## Key proofs
+
+`TINY_CRYPTO_ENABLE_PIV_KEY_PROOF` adds `<tiny_crypto/piv_key_proof.h>`. It needs
+the card commands, key challenges and the X.509 reader. `TC_PIV_key_prove` has
+a card key sign a fresh challenge and verifies the signature under the key of
+its validated certificate. Validate the certificate path, revocation and
+identifiers first. The proof checks the card's possession of the key only.
+
+`TC_PIV_key_parameters_select` applies the key policy of `TC_PIV_key_policy`
+before anything is sent or drawn:
+
+| Key                | Identifier (SP 800-78-5 Table 9) | Profiles                                       |
+| ------------------ | -------------------------------- | ---------------------------------------------- |
+| RSA-2048           | `07`                             | all, and `TC_PIV_CARD` only through 2030-12-31 |
+| RSA-3072           | `05`                             | `TC_PIV_CARD` and `TC_TWIC_LEGACY_CARD`        |
+| RSA-1024           | `06`                             | `TC_TWIC_LEGACY_CARD` with `allow_rsa1024`     |
+| P-256 with SHA-256 | `11`                             | `TC_PIV_CARD` and `TC_TWIC_LEGACY_CARD`        |
+| P-384 with SHA-384 | `14`                             | `TC_PIV_CARD` and `TC_TWIC_LEGACY_CARD`        |
+
+The certificate must assert digitalSignature in keyUsage, and an RSA key needs
+an exponent of 65537 to 2^256 - 1 (SP 800-78-5 section 3.1). The Table 10 end
+of RSA-2048 uses the policy time. TWIC profiles follow the TWIC reader policy,
+and `TC_TWIC_NEXGEN_CARD` accepts only the RSA-2048 key `9E07` (TWIC Part 2 v5
+sections 4.5 and 5.3). RSA challenges use SHA-256 with PKCS #1 v1.5, or PSS
+with MGF1 and a 32-byte salt.
+
+The command is GENERAL AUTHENTICATE with `7C {82 00, 81 L challenge}` in the
+order of SP 800-73-5 Part 2 Appendix A.4.1 and the Le of the link, `00` on a
+SHORT link. The channel chains a template above 255 bytes, and a secured link
+sends it under secure messaging as `1C` fragments. The answer must be exactly
+`7C {82 L signature}`.
+
+| Key  | Application  | Contact    | Contactless        |
+| ---- | ------------ | ---------- | ------------------ |
+| `9A` | PIV          | PIN        | VCI and PIN        |
+| `9C` | PIV          | PIN Always | VCI and PIN Always |
+| `9E` | PIV and TWIC | Always     | Always             |
+
+The link refuses `9A` and `9C` on contactless without the VCI before sending
+(Part 1 Table 5). The card enforces the PIN and answers `6982`, returned as
+`TC_PIV_CARD_STATUS`. `9C` is PIN Always, so verify the PIN immediately before
+its proof. `TC_PIV_pin_verify` submits the PIN only while the card reports it
+unverified, so prove `9C` directly after the PIN submission of the card session.
+The TWIC application proves only `9E` under the profile of its SELECT, and only
+on NEXGEN cards (TWIC Part 2 v5 section 5.3). The Legacy TWIC application
+returns `TC_PIV_UNSUPPORTED` before sending. TWIC Part 2 v5 section 5.3 names
+`9A` in its prose and `9E` in its command syntax. The library follows the syntax
+table and TWIC Part 3 v4 section 4.4.4. A TWIC Legacy card proves its card key
+on its PIV application, which reports `TC_PIV_CARD`, so the request names
+`TC_TWIC_LEGACY_CARD`. The key management key, retired keys and symmetric keys
+are outside this module.
+
+`TC_PIV_key_proof_workspace` holds the challenge, the request and the answer.
+Argument errors, refusals, the Legacy TWIC application and a provider without
+`verify_digest` leave it unchanged, and every other return wipes it. The
+certificate, its key bytes, the request and the provider must lie outside the
+link and its scratch buffers, since every exchange rewrites them. Work covers
+the challenge and the signature verification. The exchange budget covers the
+chain fragments and the GET RESPONSE steps.
+
+```c
+#include <tiny_crypto/piv_key_proof.h>
+
+/* Prove the card authentication key 9E on the application selected on link.
+ * certificate is the validated certificate of container 5FC101 and now the
+ * policy time. On TC_PIV_CARD_STATUS the card refused, and
+ * TC_PIV_link_status(link) holds its answer. */
+TC_PIV_result prove_card_authentication(TC_PIV_link* link, const TC_X509_certificate* certificate,
+                                        const TC_X509_time* now, TC_random_source random,
+                                        const TC_X509_signature_provider* provider,
+                                        TC_PIV_key_proof_workspace* workspace)
+{
+  const TC_PIV_key_proof_request request = {
+      certificate, {TC_PIV_CARD, *now, TC_PIV_RSA_PKCS1_V15, 0}, TC_PIV_KEY_CARD_AUTHENTICATION};
+  TC_work_budget work = {1000000};
+  /* Only TC_PIV_OK proves possession. Every return after the argument and
+   * state checks wipes the workspace. */
+  return TC_PIV_key_prove(link, &request, random, provider, workspace, &work);
+}
+```
+
+`tiny_crypto::piv_key_prove` in `<tiny_crypto/piv_key_proof.hpp>` takes a
+`piv_link`.
 
 ## Example
 

@@ -52,6 +52,10 @@ tc_module_feature(TINY_CRYPTO_ENABLE_PIV_CATALOG TC_ENABLE_PIV_CATALOG
   "Build the PIV and TWIC data object catalogs and the card inventory")
 set(tc_module_sources_TC_ENABLE_PIV_CATALOG src/piv_catalog.c src/piv_inventory.c)
 
+tc_module_feature(TINY_CRYPTO_ENABLE_PIV_KEY_PROOF TC_ENABLE_PIV_KEY_PROOF
+  "Build PIV and TWIC card key proofs over GENERAL AUTHENTICATE")
+set(tc_module_sources_TC_ENABLE_PIV_KEY_PROOF src/piv_key_policy.c src/piv_key_proof.c)
+
 tc_module_feature(TINY_CRYPTO_ENABLE_PIV_OIDS TC_ENABLE_PIV_OIDS
   "Build registered PIV and TWIC identifier classification")
 set(tc_module_sources_TC_ENABLE_PIV_OIDS src/piv_oid.c)

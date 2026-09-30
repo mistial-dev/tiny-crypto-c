@@ -3,9 +3,11 @@
 /* The synthetic TWIC APDU replays of tests/twic/apdu_replay.py through the
  * library: TWIC SELECT and the TWIC application inventory (TWIC Part 2 v5
  * 4.5 and 5), the observed absent and denied objects, the PIV application
- * of the card, its PIN and GENERAL AUTHENTICATE through an APDU channel on
- * the same transport. Every command must equal the replay byte for byte. */
+ * of the card, its PIN and the card authentication key proof. Every command must equal the replay byte for byte. */
 #include <tiny_crypto/piv_catalog.h>
+#include <tiny_crypto/piv_certificate.h>
+#include <tiny_crypto/piv_key_proof.h>
+#include <tiny_crypto/x509_crypto.h>
 #include "munit.h"
 #include "test_util.h"
 #include <stdio.h>
@@ -246,37 +248,51 @@ static void check_twic_inventory(const TC_PIV_inventory* inventory, const char* 
   }
 }
 
-/* GENERAL AUTHENTICATE 9E with the fixture challenge (SP 800-73-5 Part 2
- * A.4.1): 7C {82 00, 81 challenge} in a SHORT chain, answered with
- * 7C {82 signature} over GET RESPONSE. */
-static void authenticate(Replay* replay, const char* profile, int invalid)
+static TC_status fixture_digest(void* context, uint8_t* output, size_t length)
 {
-  uint8_t challenge[256], signature[256], request[266];
-  TC_APDU_channel channel;
-  TC_APDU_response answer;
-  uint8_t channel_scratch[TC_APDU_SHORT_COMMAND_MAX_BYTES];
-  munit_assert_size(fixture_read(profile, "ga-challenge.bin", challenge, sizeof challenge), ==,
-                    sizeof challenge);
-  munit_assert_size(fixture_read(profile, "ga-signature.bin", signature, sizeof signature), ==,
-                    sizeof signature);
-  if (invalid)
-    signature[sizeof signature - 1] ^= 1;
-  static const uint8_t header[] = {0x7c, 0x82, 0x01, 0x06, 0x82, 0x00, 0x81, 0x82, 0x01, 0x00};
-  memcpy(request, header, sizeof header);
-  memcpy(request + sizeof header, challenge, sizeof challenge);
-  const TC_APDU_channel_options options = {TC_APDU_SHORT, TC_APDU_GET_RESPONSE_PLAIN_CLA, 8, 0, 0};
-  munit_assert_int(TC_APDU_channel_init(&channel, (TC_APDU_transport){transmit, replay}, &options,
-                                        (TC_buffer){channel_scratch, sizeof channel_scratch}),
-                   ==, TC_APDU_OK);
-  const TC_APDU_command command = {{request, sizeof request}, 256, 0x00, 0x87, 0x07, 0x9e};
-  munit_assert_int(TC_APDU_transceive(&channel, &command, response_buffer(), &answer), ==,
-                   TC_APDU_OK);
-  TC_APDU_channel_clear(&channel);
-  munit_assert_uint16(answer.sw, ==, 0x9000);
-  munit_assert_size(answer.data.length, ==, 264);
-  static const uint8_t prefix[] = {0x7c, 0x82, 0x01, 0x04, 0x82, 0x82, 0x01, 0x00};
-  munit_assert_memory_equal(sizeof prefix, answer.data.data, prefix);
-  munit_assert_memory_equal(sizeof signature, answer.data.data + sizeof prefix, signature);
+  (void)context;
+  munit_assert_size(length, ==, 32);
+  for (size_t i = 0; i < length; ++i)
+    output[i] = (uint8_t)(0x5a ^ i);
+  return TC_OK;
+}
+
+/* Card authentication 9E with TC_PIV_key_prove (SP 800-73-5 Part 2 A.4.1,
+ * TWIC Part 2 v5 5.3): 7C {82 00, 81 challenge} in a SHORT chain, answered
+ * with 7C {82 signature} over GET RESPONSE. The fixture challenge is the
+ * PKCS #1 v1.5 encoded message of the digest fixture_digest returns, and
+ * the certificate is piv-card-auth-cert.bin. */
+static TC_PIV_result authenticate(TC_PIV_link* link, const char* profile)
+{
+  static uint8_t container[2048];
+  static TC_TLV_frame frames[16];
+  static TC_bytes oids[32];
+  static TC_ECDSA_workspace ec;
+  static TC_RSA_word words[TC_RSA_VERIFY_WORKSPACE_WORDS(2048)];
+  static TC_PIV_key_proof_workspace workspace;
+  const TC_TLV_limits limits = {sizeof container, sizeof container, 512, 16};
+  TC_X509_workspace parser = {{frames, 16}, oids, 32};
+  TC_PIV_certificate stored;
+  TC_X509_certificate certificate;
+  const size_t length =
+      fixture_read(profile, "piv-card-auth-cert.bin", container, sizeof container);
+  munit_assert_int(TC_PIV_certificate_read((TC_bytes){container, length}, TC_PIV_CERTIFICATE_SLOT,
+                                           sizeof container, &stored),
+                   ==, TC_TLV_OK);
+  munit_assert_int(TC_X509_read(stored.certificate, &limits, &parser, &certificate), ==, TC_TLV_OK);
+  const TC_RSA_workspace rsa = {words, sizeof words / sizeof *words};
+  const TC_X509_native_workspace native = {&ec, &rsa, TC_X509_NATIVE_DEFAULT_SIGNATURE_WORK};
+  const TC_X509_signature_provider provider = TC_X509_native_provider(&native);
+  const TC_PIV_key_proof_request request = {
+      &certificate,
+      {!strcmp(profile, "legacy") ? TC_TWIC_LEGACY_CARD : TC_TWIC_NEXGEN_CARD,
+       {2026, 9, 9, 0, 0, 0},
+       TC_PIV_RSA_PKCS1_V15,
+       0},
+      TC_PIV_KEY_CARD_AUTHENTICATION};
+  TC_work_budget work = {1000000};
+  return TC_PIV_key_prove(link, &request, (TC_random_source){fixture_digest, NULL}, &provider,
+                          &workspace, &work);
 }
 
 static void twic_application(TC_PIV_link* link, const char* profile, TC_PIV_interface interface)
@@ -314,8 +330,7 @@ static void twic_application(TC_PIV_link* link, const char* profile, TC_PIV_inte
   }
 }
 
-static void piv_application(TC_PIV_link* link, Replay* replay, const char* profile,
-                            TC_PIV_interface interface)
+static void piv_application(TC_PIV_link* link, const char* profile, TC_PIV_interface interface)
 {
   static const uint8_t piv_prefix[] = {0x5f, 0xc1};
   static const uint8_t tag_chuid[] = {0x5f, 0xc1, 0x02}, tag_card_auth[] = {0x5f, 0xc1, 0x01};
@@ -326,7 +341,7 @@ static void piv_application(TC_PIV_link* link, Replay* replay, const char* profi
   read_object(link, profile, "piv-signed-chuid.bin", (TC_bytes){tag_chuid, sizeof tag_chuid});
   read_object(link, profile, "piv-card-auth-cert.bin",
               (TC_bytes){tag_card_auth, sizeof tag_card_auth});
-  authenticate(replay, profile, 0);
+  munit_assert_int(authenticate(link, profile), ==, TC_PIV_OK);
   static const struct {
     const char* name;
     uint8_t last;
@@ -388,7 +403,7 @@ static MunitResult replay_profile(const char* profile, TC_PIV_interface interfac
   TC_PIV_link link;
   link_open(&link, &replay, interface);
   twic_application(&link, profile, interface);
-  piv_application(&link, &replay, profile, interface);
+  piv_application(&link, profile, interface);
   char tail[LINE_SIZE];
   munit_assert_null(next_line(replay.file, tail, sizeof tail));
   munit_assert_int(fclose(replay.file), ==, 0);
@@ -443,8 +458,7 @@ TC_TEST(required_empty)
   return MUNIT_OK;
 }
 
-/* A flipped signature travels unchanged. Verification belongs to the key
- * proof. */
+/* A flipped signature fails the key proof. */
 TC_TEST(invalid_legacy_proof)
 {
   Replay replay = {replay_open("legacy", "apdu-ga-invalid.txt"), 0, {0}, 0};
@@ -453,7 +467,7 @@ TC_TEST(invalid_legacy_proof)
   TC_PIV_application application;
   munit_assert_int(TC_PIV_select(&link, TC_PIV_APPLICATION_PIV, 0, response_buffer(), &application),
                    ==, TC_PIV_OK);
-  authenticate(&replay, "legacy", 1);
+  munit_assert_int(authenticate(&link, "legacy"), ==, TC_PIV_INVALID);
   char tail[LINE_SIZE];
   munit_assert_null(next_line(replay.file, tail, sizeof tail));
   munit_assert_int(fclose(replay.file), ==, 0);

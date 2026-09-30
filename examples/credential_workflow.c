@@ -268,9 +268,6 @@ example_credential_validate(const ExampleCredentialValidationRequest* request,
                  request->freshness.max_age || request->freshness.minimum_publication
            : !request->ccl) ||
       !request->proof || !evidence_available(request, &available) ||
-      (request->allow_legacy_rsa1024 != 0 && request->allow_legacy_rsa1024 != 1) ||
-      (request->rsa_padding != EXAMPLE_CARD_RSA_V15 &&
-       request->rsa_padding != EXAMPLE_CARD_RSA_PSS) ||
       (request->profile != TC_PIV_CARD && request->profile != TC_TWIC_LEGACY_CARD &&
        request->profile != TC_TWIC_NEXGEN_CARD) ||
       (request->card_key != EXAMPLE_CREDENTIAL_CARD_AUTHENTICATION &&
@@ -327,16 +324,15 @@ example_credential_validate(const ExampleCredentialValidationRequest* request,
       return verdict;
   }
 
-  const ExampleCardKeyPolicy key_policy = {request->profile, TC_KEY_USAGE_DIGITAL_SIGNATURE,
-                                           request->allow_legacy_rsa1024, request->rsa_padding};
-  ExampleCardKeyParameters key_parameters;
-  switch (example_card_key_parameters_select(&accepted.card.certificate.public_key, &key_policy,
-                                             &key_parameters)) {
-  case EXAMPLE_CARD_KEY_POLICY_OK:
+  const TC_PIV_key_policy key_policy = {request->profile, card_context->options->at,
+                                        request->rsa_padding, request->allow_legacy_rsa1024};
+  TC_PIV_key_parameters key_parameters;
+  switch (TC_PIV_key_parameters_select(&accepted.card.certificate, &key_policy, &key_parameters)) {
+  case TC_PIV_OK:
     break;
-  case EXAMPLE_CARD_KEY_POLICY_INVALID:
+  case TC_PIV_INVALID:
     return EXAMPLE_CREDENTIAL_INVALID;
-  case EXAMPLE_CARD_KEY_POLICY_UNSUPPORTED:
+  case TC_PIV_UNSUPPORTED:
     return EXAMPLE_CREDENTIAL_UNSUPPORTED;
   default:
     return EXAMPLE_CREDENTIAL_ERROR;

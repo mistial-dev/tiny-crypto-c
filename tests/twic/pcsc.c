@@ -115,20 +115,16 @@ TC_TEST(transport)
     reset();
     selected_protocol = protocol;
     munit_assert_int(example_card_pcsc_open(&state, "synthetic reader"), ==, 1);
-    munit_assert_int(example_card_pcsc_transmit(&state, command, sizeof command, response,
-                                                sizeof response, &length),
-                     ==, 1);
+    const TC_bytes wire = {command, sizeof command};
+    const TC_buffer buffer = {response, sizeof response};
+    munit_assert_int(example_card_pcsc_transmit(&state, wire, buffer, &length), ==, TC_OK);
     munit_assert_size(length, ==, 2);
     fail_call = calls + 1;
     length = SIZE_MAX;
-    munit_assert_int(example_card_pcsc_transmit(&state, command, sizeof command, response,
-                                                sizeof response, &length),
-                     ==, 0);
+    munit_assert_int(example_card_pcsc_transmit(&state, wire, buffer, &length), ==, TC_ERROR);
     munit_assert_size(length, ==, SIZE_MAX);
     munit_assert_memory_equal(sizeof response, response, zero);
-    munit_assert_int(example_card_pcsc_transmit(&state, command, sizeof command, response,
-                                                sizeof response, &length),
-                     ==, 0);
+    munit_assert_int(example_card_pcsc_transmit(&state, wire, buffer, &length), ==, TC_ERROR);
     munit_assert_uint(transfers, ==, 2);
     munit_assert_int(example_card_pcsc_close(&state), ==, 1);
   }

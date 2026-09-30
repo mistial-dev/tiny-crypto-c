@@ -46,25 +46,25 @@ failed:
   return 0;
 }
 
-int example_card_pcsc_transmit(void* context, const uint8_t* command, size_t command_length,
-                               uint8_t* response, size_t capacity, size_t* length)
+TC_status example_card_pcsc_transmit(void* context, TC_bytes command, TC_buffer response,
+                                     size_t* length)
 {
   ExampleCardPCSC* state = context;
   const size_t max_transfer = (ExamplePCSCSize)-1;
-  if (!state || !state->transaction || state->failed || !command || !command_length || !response ||
-      !length || capacity < EXAMPLE_CARD_STATUS_BYTES || command_length > max_transfer ||
-      capacity > max_transfer)
-    return 0;
-  ExamplePCSCSize received = (ExamplePCSCSize)capacity;
+  if (!state || !state->transaction || state->failed || !command.data || !command.length ||
+      !response.data || !length || response.capacity < TC_APDU_STATUS_BYTES ||
+      command.length > max_transfer || response.capacity > max_transfer)
+    return TC_ERROR;
+  ExamplePCSCSize received = (ExamplePCSCSize)response.capacity;
   const SCARD_IO_REQUEST* protocol =
       state->protocol == SCARD_PROTOCOL_T0 ? SCARD_PCI_T0 : SCARD_PCI_T1;
-  if (SCardTransmit(state->card, protocol, command, (ExamplePCSCSize)command_length, NULL, response,
-                    &received) != SCARD_S_SUCCESS ||
-      received < EXAMPLE_CARD_STATUS_BYTES || received > capacity) {
+  if (SCardTransmit(state->card, protocol, command.data, (ExamplePCSCSize)command.length, NULL,
+                    response.data, &received) != SCARD_S_SUCCESS ||
+      received < TC_APDU_STATUS_BYTES || received > response.capacity) {
     state->failed = 1;
-    TC_secure_zero(response, capacity);
-    return 0;
+    TC_secure_zero(response.data, response.capacity);
+    return TC_ERROR;
   }
   *length = received;
-  return 1;
+  return TC_OK;
 }

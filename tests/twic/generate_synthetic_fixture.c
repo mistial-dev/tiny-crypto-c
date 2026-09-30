@@ -32,12 +32,23 @@ static EVP_PKEY* read_key(const char* directory, const char* name)
   return key;
 }
 
+/* The card authentication proof of TC_PIV_key_prove: the RSA-2048 card key
+ * signs the SHA-256 PKCS #1 v1.5 encoded message (RFC 8017 9.2) of a fixed
+ * digest, digest byte i = 5A ^ i. */
 static void write_card_authentication_proof(const char* directory, EVP_PKEY* card_key)
 {
+  static const uint8_t digest_info[] = {0x30, 0x31, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01,
+                                        0x65, 0x03, 0x04, 0x02, 0x01, 0x05, 0x00, 0x04, 0x20};
+  enum { DIGEST_BYTES = 32 };
   uint8_t challenge[256], signature[256];
+  const size_t padding = sizeof challenge - sizeof digest_info - DIGEST_BYTES;
   challenge[0] = 0;
-  for (size_t i = 1; i < sizeof challenge; ++i)
-    challenge[i] = (uint8_t)(0x5a ^ (uint8_t)i);
+  challenge[1] = 1;
+  memset(challenge + 2, 0xff, padding - 3);
+  challenge[padding - 1] = 0;
+  memcpy(challenge + padding, digest_info, sizeof digest_info);
+  for (size_t i = 0; i < DIGEST_BYTES; ++i)
+    challenge[padding + sizeof digest_info + i] = (uint8_t)(0x5a ^ i);
   EVP_PKEY_CTX* context = EVP_PKEY_CTX_new(card_key, NULL);
   munit_assert_not_null(context);
   munit_assert_int(EVP_PKEY_sign_init(context), ==, 1);

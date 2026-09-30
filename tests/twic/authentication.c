@@ -3,11 +3,29 @@
 #include "card_fixture.h"
 #include "test_util.h"
 
-static void assert_cleared(const ExampleCardKeyWorkspace* scratch)
+static void assert_cleared(const TC_PIV_key_proof_workspace* scratch)
 {
-  const uint8_t* bytes = (const uint8_t*)scratch;
-  for (size_t i = 0; i < sizeof *scratch; ++i)
-    munit_assert_uint(bytes[i], ==, 0);
+  munit_assert_true(tc_test_all_zero(scratch, sizeof *scratch));
+}
+
+/* Start a SHORT contact link over card with application selected. The
+ * budget covers exchanges after SELECT, and card counts calls from 0. */
+static void card_link(TC_PIV_link* link, SyntheticCard* card, TC_PIV_application_id application,
+                      size_t exchanges)
+{
+  static uint8_t scratch[TC_APDU_SHORT_COMMAND_MAX_BYTES], selection[64];
+  const TC_PIV_link_options options = {{TC_APDU_SHORT, 0, exchanges + 1, 0, 0}, TC_PIV_CONTACT, 0};
+  TC_PIV_application selected;
+  TC_TWIC_CCL_snapshot* replacement = card->replacement;
+  card->replacement = NULL;
+  munit_assert_int(TC_PIV_link_init(link, (TC_APDU_transport){transmit, card}, &options,
+                                    (TC_buffer){scratch, sizeof scratch}),
+                   ==, TC_PIV_OK);
+  munit_assert_int(
+      TC_PIV_select(link, application, 0, (TC_buffer){selection, sizeof selection}, &selected), ==,
+      TC_PIV_OK);
+  card->replacement = replacement;
+  card->calls = 0;
 }
 
 typedef struct {
@@ -78,7 +96,7 @@ static void authentication_workflow(EVP_PKEY* key, TC_bytes leaf,
     munit_assert_int(TC_TWIC_CCL_store_acquire(&store, &held), ==, TC_TWIC_CCL_OK);
     SyntheticCard card = {0};
     card.key = key;
-    card.algorithm = EXAMPLE_CARD_ALGORITHM_RSA_2048;
+    card.algorithm = TC_PIV_ALGORITHM_RSA_2048;
     card.mode = scenario == BAD_PROOF ? TAMPERED : NORMAL;
     if (scenario == SUPERSEDED) {
       const TC_TWIC_CCL_metadata newer = {evaluation_time, evaluation_time};
@@ -86,7 +104,8 @@ static void authentication_workflow(EVP_PKEY* key, TC_bytes leaf,
       card.replacement_store = &store;
       card.replacement = &replacement;
     }
-    ExampleCardIO io = {transmit, &card, 16, 0};
+    TC_PIV_link link;
+    card_link(&link, &card, TC_PIV_APPLICATION_TWIC, 16);
     TC_X509_path_options options = *path;
     TC_X509_store_anchor trusted_anchor = {0};
     trusted_anchor.trust = *anchor;
@@ -101,7 +120,7 @@ static void authentication_workflow(EVP_PKEY* key, TC_bytes leaf,
                                   &options, TC_TWIC_NEXGEN_CARD,
                                   0,        held,
                                   10,       evaluation_time - 2,
-                                  1,        EXAMPLE_CARD_RSA_V15};
+                                  1,        TC_PIV_RSA_PKCS1_V15};
     if (scenario == STALE)
       request.ccl_max_age = 1;
     if (scenario == UNAVAILABLE)
@@ -138,7 +157,8 @@ static void authentication_workflow(EVP_PKEY* key, TC_bytes leaf,
     Entropy entropy = {1, 0, 0};
     size_t work = scenario == NO_WORK ? 0 : WORK_LIMIT;
     const ExampleTWICResult result = example_twic_authenticate(
-        &io, &request, (TC_random_source){random_digest, &entropy}, &scratch, &work);
+        &link, &request, (TC_random_source){random_digest, &entropy}, &scratch, &work);
+    TC_PIV_link_clear(&link);
     if (scenario == BAD_SIGNATURE)
       mutable_leaf[leaf.length - 1] ^= 1;
     munit_assert_int(result, ==, expected[scenario]);
@@ -156,7 +176,8 @@ static void authentication_workflow(EVP_PKEY* key, TC_bytes leaf,
 }
 
 static void validated_key(EVP_PKEY* card_key, const TC_X509_signature_provider* provider,
-                          uint8_t* encoded, size_t capacity, TC_X509_public_key* key)
+                          uint8_t* encoded, size_t capacity, TC_X509_public_key* key,
+                          TC_X509_certificate* certificate)
 {
   static const uint8_t card_auth_oid[] = {0x60, 0x86, 0x48, 1, 0x65, 3, 6, 8};
   static const uint8_t client_auth_oid[] = {0x2b, 6, 1, 5, 5, 7, 3, 2};
@@ -249,6 +270,7 @@ static void validated_key(EVP_PKEY* card_key, const TC_X509_signature_provider* 
   static const uint8_t san_oid[] = {0x55, 0x1d, 17};
   munit_assert_int(TC_X509_read((TC_bytes){encoded, card_length}, &limits, &parser, &parsed_card),
                    ==, TC_TLV_OK);
+  *certificate = parsed_card;
   munit_assert_int(TC_X509_extensions_init(&extensions, parsed_card.extensions, &limits), ==,
                    TC_TLV_OK);
   unsigned found = 0;
@@ -332,23 +354,23 @@ static TC_status random_salt_failure(void* context, uint8_t* output, size_t leng
 static MunitResult possession(const MunitParameter params[], void* context)
 {
   const char* kind = munit_parameters_get(params, "key");
-  const ExampleCardKeyReference reference = !strcmp(munit_parameters_get(params, "reference"), "9a")
-                                                ? EXAMPLE_CARD_KEY_PIV_AUTHENTICATION
-                                                : EXAMPLE_CARD_KEY_CARD_AUTHENTICATION;
+  const uint8_t reference = !strcmp(munit_parameters_get(params, "reference"), "9a")
+                                ? TC_PIV_KEY_PIV_AUTHENTICATION
+                                : TC_PIV_KEY_CARD_AUTHENTICATION;
   EVP_PKEY* generated;
   uint8_t algorithm;
   if (!strcmp(kind, "p256")) {
     generated = EVP_EC_gen("prime256v1");
-    algorithm = EXAMPLE_CARD_ALGORITHM_EC_P256;
+    algorithm = TC_PIV_ALGORITHM_ECC_P256;
   } else if (!strcmp(kind, "p384")) {
     generated = EVP_EC_gen("secp384r1");
-    algorithm = EXAMPLE_CARD_ALGORITHM_EC_P384;
+    algorithm = TC_PIV_ALGORITHM_ECC_P384;
   } else {
     const unsigned bits = !strcmp(kind, "rsa1024") ? 1024 : !strcmp(kind, "rsa2048") ? 2048 : 3072;
     generated = EVP_RSA_gen(bits);
-    algorithm = bits == 1024   ? EXAMPLE_CARD_ALGORITHM_RSA_1024
-                : bits == 2048 ? EXAMPLE_CARD_ALGORITHM_RSA_2048
-                               : EXAMPLE_CARD_ALGORITHM_RSA_3072;
+    algorithm = bits == 1024   ? TC_PIV_ALGORITHM_RSA_1024
+                : bits == 2048 ? TC_PIV_ALGORITHM_RSA_2048
+                               : TC_PIV_ALGORITHM_RSA_3072;
   }
   munit_assert_not_null(generated);
   TC_ECDSA_workspace ec;
@@ -356,9 +378,11 @@ static MunitResult possession(const MunitParameter params[], void* context)
   const TC_RSA_workspace rsa = {words, sizeof words / sizeof *words};
   const TC_X509_native_workspace native = {&ec, &rsa, TC_X509_NATIVE_DEFAULT_SIGNATURE_WORK};
   const TC_X509_signature_provider provider = TC_X509_native_provider(&native);
-  uint8_t certificate[BUFFER_CAPACITY];
+  uint8_t certificate_bytes[BUFFER_CAPACITY];
   TC_X509_public_key key;
-  validated_key(generated, &provider, certificate, sizeof certificate, &key);
+  TC_X509_certificate certificate;
+  validated_key(generated, &provider, certificate_bytes, sizeof certificate_bytes, &key,
+                &certificate);
   if (key.type == TC_KEY_RSA) {
     uint8_t digest[32] = {0}, salt[32] = {1}, encoded[384], signature[384];
     const TC_RSA_pss_options options = {TC_HASH_SHA256, TC_HASH_SHA256, sizeof salt};
@@ -440,127 +464,137 @@ static MunitResult possession(const MunitParameter params[], void* context)
                                              &provider, &challenge_workspace, &budget),
                      ==, TC_KEY_CHALLENGE_OK);
   }
-  ExampleCardKeyWorkspace scratch;
+  static TC_PIV_key_proof_workspace scratch;
   SyntheticCard card = {0};
   card.key = generated;
   card.algorithm = algorithm;
-  card.reference = (uint8_t)reference;
+  card.reference = reference;
   card.pss = !strcmp(munit_parameters_get(params, "padding"), "pss");
   Entropy entropy = {1, 0, 0};
-  ExampleCardKeyPolicy policy = {TC_TWIC_LEGACY_CARD, TC_KEY_USAGE_DIGITAL_SIGNATURE, 1,
-                                 card.pss ? EXAMPLE_CARD_RSA_PSS : EXAMPLE_CARD_RSA_V15};
+  /* A TWIC Legacy card's PIV application, which permits RSA-1024. */
+  TC_PIV_key_proof_request request = {&certificate,
+                                      {TC_TWIC_LEGACY_CARD,
+                                       {2026, 9, 9, 0, 0, 0},
+                                       card.pss ? TC_PIV_RSA_PSS : TC_PIV_RSA_PKCS1_V15,
+                                       1},
+                                      reference};
+  const TC_random_source random = {random_digest, &entropy};
+  /* RSA-2048 and RSA-3072 templates exceed 255 bytes and go in two
+   * fragments. The channel corrects a 6CXX once on an unchained command. */
+  const size_t fragments = key.type == TC_KEY_RSA && key.bits >= 2048 ? 2 : 1;
   const CardMode modes[] = {NORMAL,   TAMPERED,          REPLAY,         WRONG_TAG,
                             TRAILING, SIGN_LENGTH_ERROR, TRANSPORT_ERROR};
-  const ExampleCardKeyResult outcomes[] = {EXAMPLE_CARD_KEY_VERIFIED, EXAMPLE_CARD_KEY_INVALID,
-                                           EXAMPLE_CARD_KEY_INVALID,  EXAMPLE_CARD_KEY_INVALID,
-                                           EXAMPLE_CARD_KEY_INVALID,  EXAMPLE_CARD_KEY_TRANSPORT,
-                                           EXAMPLE_CARD_KEY_TRANSPORT};
+  const TC_PIV_result outcomes[] = {TC_PIV_OK,      TC_PIV_INVALID, TC_PIV_INVALID,
+                                    TC_PIV_INVALID, TC_PIV_INVALID, TC_PIV_CARD_STATUS,
+                                    TC_PIV_ERROR};
   size_t normal_calls = 0;
   for (size_t i = 0; i < sizeof modes / sizeof *modes; ++i) {
+    TC_PIV_link link;
+    card.mode = NORMAL;
+    card_link(&link, &card, TC_PIV_APPLICATION_PIV, 8);
     card.mode = modes[i];
-    card.request_length = card.calls = 0;
-    ExampleCardIO io = {transmit, &card, 8, 0};
-    size_t work = WORK_LIMIT;
+    card.request_length = 0;
+    TC_work_budget work = {WORK_LIMIT};
     memset(&scratch, 0x5a, sizeof scratch);
     const size_t signatures = card.signatures;
-    munit_assert_int(example_card_check_key(&io, reference, &key, &policy, &provider,
-                                            (TC_random_source){random_digest, &entropy}, &scratch,
-                                            &work),
-                     ==, outcomes[i]);
+    munit_assert_int(TC_PIV_key_prove(&link, &request, random, &provider, &scratch, &work), ==,
+                     outcomes[i]);
     assert_cleared(&scratch);
     if (modes[i] == NORMAL)
       normal_calls = card.calls;
-    if (modes[i] == SIGN_LENGTH_ERROR || modes[i] == TRANSPORT_ERROR) {
-      munit_assert_int(io.stopped, ==, 1);
+    if (modes[i] == SIGN_LENGTH_ERROR) {
+      munit_assert_uint16(TC_PIV_link_status(&link), ==, 0x6c00);
       munit_assert_size(card.signatures, ==, signatures);
-      munit_assert_size(
-          card.calls, ==,
-          modes[i] == TRANSPORT_ERROR || key.bits < 2048 || key.type == TC_KEY_EC ? 1 : 2);
+      munit_assert_size(card.calls, ==, 2);
+    } else if (modes[i] == TRANSPORT_ERROR) {
+      munit_assert_size(card.signatures, ==, signatures);
+      munit_assert_size(card.calls, ==, 1);
     } else
       munit_assert_size(card.signatures, ==, signatures + 1);
+    TC_PIV_link_clear(&link);
   }
+  /* A transport failure at each step stops the link. */
   for (size_t step = 1; step <= normal_calls; ++step) {
+    TC_PIV_link link;
     card.mode = NORMAL;
-    card.request_length = card.calls = 0;
+    card_link(&link, &card, TC_PIV_APPLICATION_PIV, 8);
+    card.request_length = 0;
     card.fail_at = step;
-    ExampleCardIO failed_io = {transmit, &card, 8, 0};
-    size_t remaining = WORK_LIMIT;
-    munit_assert_int(example_card_check_key(&failed_io, reference, &key, &policy, &provider,
-                                            (TC_random_source){random_digest, &entropy}, &scratch,
-                                            &remaining),
-                     ==, EXAMPLE_CARD_KEY_TRANSPORT);
-    munit_assert_int(failed_io.stopped, ==, 1);
+    TC_work_budget work = {WORK_LIMIT};
+    munit_assert_int(TC_PIV_key_prove(&link, &request, random, &provider, &scratch, &work), ==,
+                     TC_PIV_ERROR);
     munit_assert_size(card.calls, ==, step);
     assert_cleared(&scratch);
+    TC_PIV_link_clear(&link);
   }
   card.fail_at = 0;
+  /* A budget below the fragments stops before the first one. A larger one
+   * runs out during GET RESPONSE. */
   for (size_t budget = 1; budget < normal_calls; ++budget) {
+    TC_PIV_link link;
     card.mode = NORMAL;
-    card.request_length = card.calls = 0;
-    ExampleCardIO limited_io = {transmit, &card, budget, 0};
-    size_t remaining = WORK_LIMIT;
-    munit_assert_int(example_card_check_key(&limited_io, reference, &key, &policy, &provider,
-                                            (TC_random_source){random_digest, &entropy}, &scratch,
-                                            &remaining),
-                     ==, EXAMPLE_CARD_KEY_LIMIT);
-    munit_assert_int(limited_io.stopped, ==, 1);
-    munit_assert_size(card.calls, ==, budget);
+    card_link(&link, &card, TC_PIV_APPLICATION_PIV, budget);
+    card.request_length = 0;
+    TC_work_budget work = {WORK_LIMIT};
+    munit_assert_int(TC_PIV_key_prove(&link, &request, random, &provider, &scratch, &work), ==,
+                     TC_PIV_LIMIT);
+    munit_assert_size(card.calls, ==, budget < fragments ? 0 : budget);
     assert_cleared(&scratch);
+    TC_PIV_link_clear(&link);
   }
-  if (normal_calls > 1) {
+  TC_PIV_link link;
+  if (fragments > 1) {
+    /* An intermediate chain answer ends the chain. */
+    card.mode = NORMAL;
+    card_link(&link, &card, TC_PIV_APPLICATION_PIV, 8);
     card.mode = CHAIN_STATUS_ERROR;
-    card.request_length = card.calls = 0;
-    ExampleCardIO failed_io = {transmit, &card, 8, 0};
-    size_t remaining = WORK_LIMIT;
-    munit_assert_int(example_card_check_key(&failed_io, reference, &key, &policy, &provider,
-                                            (TC_random_source){random_digest, &entropy}, &scratch,
-                                            &remaining),
-                     ==, EXAMPLE_CARD_KEY_INVALID);
-    munit_assert_int(failed_io.stopped, ==, 1);
+    card.request_length = 0;
+    TC_work_budget work = {WORK_LIMIT};
+    munit_assert_int(TC_PIV_key_prove(&link, &request, random, &provider, &scratch, &work), ==,
+                     TC_PIV_CARD_STATUS);
+    munit_assert_uint16(TC_PIV_link_status(&link), ==, 0x6982);
     munit_assert_size(card.calls, ==, 1);
     assert_cleared(&scratch);
+    TC_PIV_link_clear(&link);
   }
-  /* RNG failure occurs before any card command and clears partial entropy. */
-  card.calls = 0;
-  ExampleCardIO io = {transmit, &card, 8, 0};
-  size_t work = WORK_LIMIT;
+  /* Argument and RNG failures happen before any card command. */
+  card.mode = NORMAL;
+  card_link(&link, &card, TC_PIV_APPLICATION_PIV, 8);
+  TC_work_budget work = {WORK_LIMIT};
   const size_t entropy_calls = entropy.calls;
-  munit_assert_int(example_card_check_key(&io, (ExampleCardKeyReference)0, &key, &policy, &provider,
-                                          (TC_random_source){random_digest, &entropy}, &scratch,
-                                          &work),
-                   ==, EXAMPLE_CARD_KEY_ERROR);
+  request.key_reference = 0;
+  memset(&scratch, 0x5a, sizeof scratch);
+  munit_assert_int(TC_PIV_key_prove(&link, &request, random, &provider, &scratch, &work), ==,
+                   TC_PIV_ARGUMENT);
+  munit_assert_true(tc_test_all_value(&scratch, sizeof scratch, 0x5a));
   munit_assert_size(card.calls, ==, 0);
   munit_assert_size(entropy.calls, ==, entropy_calls);
-  munit_assert_size(work, ==, WORK_LIMIT);
+  munit_assert_uint32(work.remaining, ==, WORK_LIMIT);
+  request.key_reference = reference;
   entropy.fail = 1;
-  munit_assert_int(example_card_check_key(&io, reference, &key, &policy, &provider,
-                                          (TC_random_source){random_digest, &entropy}, &scratch,
-                                          &work),
-                   ==, EXAMPLE_CARD_KEY_ERROR);
+  munit_assert_int(TC_PIV_key_prove(&link, &request, random, &provider, &scratch, &work), ==,
+                   TC_PIV_ERROR);
   munit_assert_size(card.calls, ==, 0);
   assert_cleared(&scratch);
   entropy.fail = 0;
-  policy.allow_legacy_rsa1024 = 0;
+  request.policy.allow_rsa1024 = 0;
   if (key.type == TC_KEY_RSA && key.bits == 1024) {
-    work = WORK_LIMIT;
-    munit_assert_int(example_card_check_key(&io, reference, &key, &policy, &provider,
-                                            (TC_random_source){random_digest, &entropy}, &scratch,
-                                            &work),
-                     ==, EXAMPLE_CARD_KEY_UNSUPPORTED);
+    work.remaining = WORK_LIMIT;
+    munit_assert_int(TC_PIV_key_prove(&link, &request, random, &provider, &scratch, &work), ==,
+                     TC_PIV_UNSUPPORTED);
     munit_assert_size(card.calls, ==, 0);
-    munit_assert_size(work, ==, WORK_LIMIT);
+    munit_assert_uint32(work.remaining, ==, WORK_LIMIT);
   }
-  policy.profile = TC_TWIC_NEXGEN_CARD;
-  card.mode = NORMAL;
+  /* A NEXGEN card's keys are RSA-2048 (TWIC Part 2 v5 4.5). */
+  request.policy.profile = TC_TWIC_NEXGEN_CARD;
   card.request_length = 0;
-  work = WORK_LIMIT;
+  work.remaining = WORK_LIMIT;
   const int nexgen = key.type == TC_KEY_RSA && key.bits == 2048;
-  munit_assert_int(example_card_check_key(&io, reference, &key, &policy, &provider,
-                                          (TC_random_source){random_digest, &entropy}, &scratch,
-                                          &work),
-                   ==, nexgen ? EXAMPLE_CARD_KEY_VERIFIED : EXAMPLE_CARD_KEY_UNSUPPORTED);
+  munit_assert_int(TC_PIV_key_prove(&link, &request, random, &provider, &scratch, &work), ==,
+                   nexgen ? TC_PIV_OK : TC_PIV_UNSUPPORTED);
   if (!nexgen)
     munit_assert_size(card.calls, ==, 0);
+  TC_PIV_link_clear(&link);
   EVP_PKEY_free(generated);
   (void)context;
   return MUNIT_OK;

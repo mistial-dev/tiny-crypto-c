@@ -671,9 +671,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
     TC_ENABLE_AES=1 TC_AES_ENABLE_ECB=1 TC_ENABLE_TWIC_OBJECT_CRYPTO=1
     TC_ENABLE_SHA256=0)
   tc_add_c_test(test_twic_cipher tiny-crypto-c-test-twic-cipher tests/twic/cipher.c)
-  tc_add_c_test(test_twic_apdu_replay tiny-crypto-c-test-piv-command tests/twic/apdu_replay.c)
-  target_compile_definitions(test_twic_apdu_replay PRIVATE
-    TC_TWIC_VECTOR_DIR="${PROJECT_SOURCE_DIR}/tests/vectors/twic/synthetic")
+
   if(Python3_Interpreter_FOUND)
     add_test(NAME test_twic_apdu_corpus COMMAND ${Python3_EXECUTABLE}
       ${PROJECT_SOURCE_DIR}/tests/twic/apdu_replay.py --check)
@@ -682,16 +680,14 @@ if(TINY_CRYPTO_BUILD_TESTS)
     tc_add_c_test(test_twic_pcsc tiny-crypto-c-test-twic-cipher
       tests/twic/pcsc.c examples/credential_pcsc.c)
     add_library(test_credential_command_entry OBJECT examples/credential_check.c)
-    target_link_libraries(test_credential_command_entry PRIVATE tiny-crypto-c-test-pki tiny-crypto-c-test-gzip)
+    target_link_libraries(test_credential_command_entry PRIVATE tiny-crypto-c-test-pki-native)
     target_compile_definitions(test_credential_command_entry PRIVATE
       main=example_credential_main setrlimit=example_test_setrlimit
       mlock=example_test_mlock munlock=example_test_munlock)
     tc_warnings(test_credential_command_entry)
     tc_use_test_sanitizers(test_credential_command_entry)
-    tc_add_c_test(test_twic_command tiny-crypto-c-test-pki
-      tests/twic/command.c examples/credential_io.c src/piv_certificate_decode.c
-      $<TARGET_OBJECTS:test_credential_command_entry>)
-    target_link_libraries(test_twic_command PRIVATE tiny-crypto-c-test-gzip)
+    tc_add_c_test(test_twic_command tiny-crypto-c-test-pki-native
+      tests/twic/command.c $<TARGET_OBJECTS:test_credential_command_entry>)
   endif()
   foreach(profile IN ITEMS runtime fast)
     tc_add_test_library(tiny-crypto-c-test-twic-cipher-${profile}
@@ -790,9 +786,9 @@ if(TINY_CRYPTO_BUILD_TESTS)
   tc_add_c_test(test_piv_card_identifiers tiny-crypto-c-test-pki tests/piv/card.c)
   tc_add_c_test(test_validation_workspace tiny-crypto-c-test-pki
     tests/validation/workspace.c)
-  add_library(test_credential_workflow_entry OBJECT
-    examples/credential_workflow.c examples/card_key_policy.c)
-  target_link_libraries(test_credential_workflow_entry PRIVATE tiny-crypto-c-test-pki)
+  # The workflow applies the key policy of the key proofs.
+  add_library(test_credential_workflow_entry OBJECT examples/credential_workflow.c)
+  target_link_libraries(test_credential_workflow_entry PRIVATE tiny-crypto-c-test-pki-native)
   tc_warnings(test_credential_workflow_entry)
   tc_use_test_sanitizers(test_credential_workflow_entry)
   tc_add_test_library(tiny-crypto-c-test-ccl src/twic_ccl.c src/snapshot.c src/credential_text_internal.c)
@@ -855,11 +851,19 @@ if(TINY_CRYPTO_BUILD_TESTS)
     tests/support/cms_crl_harness.c tests/support/x509_crl_harness.c)
   tc_add_c_test(test_cms_reader tiny-crypto-c-test-pki tests/cms/reader.c examples/cms_reader.c)
   get_target_property(tc_native_pki_sources tiny-crypto-c-test-pki SOURCES)
+  # The native PKI library also carries the PIV card stack up to key proofs,
+  # so card tests can verify with the native signature provider.
+  set(tc_native_card_sources ${tc_piv_command_sources} src/piv_sm_apdu.c
+    src/piv_sm_key_request.c src/piv_discovery.c src/piv_discovery_get.c src/piv_vci.c
+    src/piv_catalog.c src/piv_inventory.c src/piv_key_policy.c src/piv_key_proof.c
+    src/inflate_tree.c src/inflate_bits.c src/inflate_tables.c src/inflate.c src/gzip.c
+    src/gzip_api.c src/piv_certificate_decode.c)
+  list(REMOVE_ITEM tc_native_card_sources ${tc_native_pki_sources})
   tc_add_test_library(tiny-crypto-c-test-pki-native ${tc_native_pki_sources}
-    src/x509_trust_anchor.c src/x509_ocsp.c src/tlv_write.c
+    src/x509_trust_anchor.c src/x509_ocsp.c
     ${tc_hash_sources} src/ec.c ${tc_rsa_sources} src/pki_storage.c ${tc_aes_sources} src/sskdf.c
     src/piv_sm.c src/piv_sm_message.c src/piv_sm_authenticate.c
-    src/twic_cipher.c src/twic_tpk.c)
+    src/twic_cipher.c src/twic_tpk.c ${tc_native_card_sources})
   target_compile_definitions(tiny-crypto-c-test-pki-native PUBLIC
     TC_ENABLE_AES=1 TC_AES_ENABLE_ECB=1 TC_ENABLE_TLV=1 TC_TLV_ENABLE_BER=1 TC_ENABLE_DER=1 TC_ENABLE_X509=1
     TC_ENABLE_KEY_CHALLENGE=1
@@ -869,13 +873,23 @@ if(TINY_CRYPTO_BUILD_TESTS)
     TC_ENABLE_TRUST_ANCHOR_FORMAT=1
     TC_ENABLE_X509_REVOCATION=1 TC_ENABLE_X509_OCSP=1 TC_ENABLE_CMS=1
     TC_ENABLE_CMS_VALIDATION=1 TC_ENABLE_PIV_OBJECTS=1
-    TC_ENABLE_CREDENTIAL=1
+    TC_ENABLE_CREDENTIAL=1 TC_ENABLE_APDU=1 TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_PIV_SM_APDU=1
+    TC_ENABLE_PIV_VCI=1 TC_ENABLE_PIV_CATALOG=1 TC_ENABLE_PIV_KEY_PROOF=1 TC_ENABLE_GZIP=1
     TC_AES_ENABLE_DYNAMIC=1 TC_ENABLE_SSKDF=1 TC_ENABLE_PIV_SM=1
     TC_PIV_SM_ENABLE_CS2=1 TC_PIV_SM_ENABLE_CS7=1 TC_EC_ENABLE_P192=1 TC_EC_ENABLE_P256=1 TC_EC_ENABLE_P384=1
     TC_ENABLE_EC=1 TC_ENABLE_RSA=1 TC_ENABLE_SHA1=1 TC_ENABLE_SHA224=1
     TC_ENABLE_SHA256=1 TC_ENABLE_SHA384=1 TC_ENABLE_SHA512=1)
   tc_add_c_test(test_key_challenge_rsa tiny-crypto-c-test-pki-native
     tests/x509/key_challenge_rsa.c)
+  # The TWIC replays verify the card authentication proof.
+  tc_add_c_test(test_twic_apdu_replay tiny-crypto-c-test-pki-native tests/twic/apdu_replay.c)
+  target_compile_definitions(test_twic_apdu_replay PRIVATE
+    TC_TWIC_VECTOR_DIR="${PROJECT_SOURCE_DIR}/tests/vectors/twic/synthetic")
+  # Key proofs over the SD 33 simulators with the native provider.
+  tc_add_c_test(test_piv_key_proof tiny-crypto-c-test-pki-native tests/piv/key_proof.c
+    ${tc_card_simulator_sources} tests/support/scripted_transport.c)
+  target_compile_definitions(test_piv_key_proof PRIVATE
+    TC_CARD_FIXTURE_DIR="${PROJECT_SOURCE_DIR}/tests/vectors/piv/sm_captures/fixtures")
   tc_add_c_test(test_x509_native_sizes tiny-crypto-c-test-pki-native tests/x509/native_sizes.c)
   tc_add_c_test(test_x509_ocsp_sd33 tiny-crypto-c-test-pki-native tests/x509/ocsp_sd33.c
     examples/x509_ocsp.c)
@@ -955,9 +969,8 @@ if(TINY_CRYPTO_BUILD_TESTS)
     target_link_libraries(test_piv_cvc_verify PRIVATE OpenSSL::Crypto)
     set_property(TARGET test_piv_cvc_verify PROPERTY NO_SYSTEM_FROM_IMPORTED TRUE)
     tc_add_c_test(test_card_authentication tiny-crypto-c-test-pki-native
-      tests/twic/authentication.c examples/card_key_policy.c
-      examples/credential_auth.c examples/credential_validate.c
-      examples/credential_io.c examples/pki_input.c src/twic_ccl.c)
+      tests/twic/authentication.c examples/credential_validate.c
+      examples/pki_input.c src/twic_ccl.c)
     target_compile_definitions(test_card_authentication PRIVATE TC_ENABLE_TWIC_CCL=1)
     target_link_libraries(test_card_authentication PRIVATE OpenSSL::Crypto)
     set_property(TARGET test_card_authentication PROPERTY NO_SYSTEM_FROM_IMPORTED TRUE)
@@ -965,7 +978,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
       find_package(ZLIB REQUIRED)
       add_library(twic_authenticate_command OBJECT examples/twic_authenticate.c)
       target_link_libraries(twic_authenticate_command PRIVATE tiny-crypto-c-test-pki-native)
-      target_compile_definitions(twic_authenticate_command PRIVATE TC_ENABLE_TWIC_CCL=1 TC_ENABLE_GZIP=1
+      target_compile_definitions(twic_authenticate_command PRIVATE TC_ENABLE_TWIC_CCL=1
         main=example_twic_command_main setrlimit=example_twic_setrlimit
         mlock=example_twic_mlock munlock=example_twic_munlock example_read_file=example_twic_read_file
         example_read_created_file=example_twic_read_created_file
@@ -975,13 +988,10 @@ if(TINY_CRYPTO_BUILD_TESTS)
       tc_use_test_sanitizers(twic_authenticate_command)
       tc_add_c_test(test_twic_authenticate_command tiny-crypto-c-test-pki-native
         tests/twic/authenticate_command.c $<TARGET_OBJECTS:twic_authenticate_command>
-        examples/card_key_policy.c examples/credential_auth.c
-        examples/credential_validate.c examples/credential_io.c
-        examples/credential_object.c examples/cms_reader.c examples/cms_validate.c examples/pki_input.c
+        examples/credential_validate.c examples/credential_object.c examples/cms_reader.c examples/cms_validate.c examples/pki_input.c
         examples/x509_revocation.c
-        src/twic_ccl.c src/piv_certificate_decode.c src/inflate_tree.c src/inflate_bits.c
-        src/inflate_tables.c src/inflate.c src/gzip.c src/gzip_api.c)
-      target_compile_definitions(test_twic_authenticate_command PRIVATE TC_ENABLE_TWIC_CCL=1 TC_ENABLE_GZIP=1)
+        src/twic_ccl.c)
+      target_compile_definitions(test_twic_authenticate_command PRIVATE TC_ENABLE_TWIC_CCL=1)
       target_link_libraries(test_twic_authenticate_command PRIVATE OpenSSL::Crypto ${ZLIB_LIBRARIES})
       target_include_directories(test_twic_authenticate_command SYSTEM PRIVATE ${ZLIB_INCLUDE_DIRS})
       set_property(TARGET test_twic_authenticate_command PROPERTY NO_SYSTEM_FROM_IMPORTED TRUE)
@@ -995,7 +1005,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
       tc_add_c_test(test_cms_${cms_suite} tiny-crypto-c-test-pki-native tests/cms/${cms_suite}.c
         tests/support/cms_crl_harness.c tests/support/x509_crl_harness.c
         examples/cms_reader.c examples/cms_validate.c examples/credential_object.c
-        examples/x509_revocation.c examples/card_key_policy.c examples/credential_workflow.c
+        examples/x509_revocation.c examples/credential_workflow.c
         src/twic_ccl.c)
       target_compile_definitions(test_cms_${cms_suite} PRIVATE TC_ENABLE_TWIC_CCL=1)
       target_link_libraries(test_cms_${cms_suite} PRIVATE OpenSSL::Crypto)
@@ -1194,6 +1204,12 @@ if(TINY_CRYPTO_BUILD_TESTS)
     tc_add_linked_test(test_cpp_piv_catalog tiny-crypto-c-test-piv-command
       tests/cpp/piv_catalog.cpp tests/cpp/main.cpp)
     target_include_directories(test_cpp_piv_catalog PRIVATE tests/support)
+    tc_add_linked_test(test_cpp_piv_key_proof tiny-crypto-c-test-pki-native
+      tests/cpp/piv_key_proof.cpp ${tc_card_simulator_sources} tests/support/cavp.c
+      tests/support/munit.c tests/cpp/main.cpp)
+    target_include_directories(test_cpp_piv_key_proof PRIVATE tests/support)
+    target_compile_definitions(test_cpp_piv_key_proof PRIVATE
+      TC_CARD_FIXTURE_DIR="${PROJECT_SOURCE_DIR}/tests/vectors/piv/sm_captures/fixtures")
     tc_add_linked_test(test_cpp_piv_sm_apdu tiny-crypto-c-test-piv-sm
       tests/cpp/piv_sm_apdu.cpp tests/support/sm_card.c tests/support/sm_card_session.c
       tests/cpp/main.cpp)
@@ -1438,7 +1454,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   # This catches accidental feature coupling and keeps their C API surface equal.
   foreach(header_profile rsa tlv apdu piv_command aamva fascn twic_uuid twic_tpk twic_object hkdf aes_kw
       piv_oids x509 key_challenge x509_path x509_revocation x509_ocsp cms cms_validation piv_objects credential piv_cvc piv_chuid
-      piv_sm piv_sm_apdu piv_vci piv_catalog twic_ccl)
+      piv_sm piv_sm_apdu piv_vci piv_catalog piv_key_proof twic_ccl)
     set(header_profile_definitions TC_ENABLE_AES=0 TC_ENABLE_SHA256=0)
     if(header_profile STREQUAL "hkdf")
       list(REMOVE_ITEM header_profile_definitions TC_ENABLE_SHA256=0)
@@ -1461,6 +1477,10 @@ if(TINY_CRYPTO_BUILD_TESTS)
     elseif(header_profile STREQUAL "piv_catalog")
       list(APPEND header_profile_definitions TC_ENABLE_APDU=1 TC_ENABLE_TLV=1
         TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_PIV_CATALOG=1 TC_TEST_HEADER_PIV_CATALOG=1)
+    elseif(header_profile STREQUAL "piv_key_proof")
+      list(APPEND header_profile_definitions TC_ENABLE_APDU=1 TC_ENABLE_TLV=1 TC_ENABLE_DER=1
+        TC_ENABLE_X509=1 TC_ENABLE_KEY_CHALLENGE=1 TC_ENABLE_PIV_COMMAND=1
+        TC_ENABLE_PIV_KEY_PROOF=1 TC_TEST_HEADER_PIV_KEY_PROOF=1)
     elseif(header_profile STREQUAL "aamva")
       list(APPEND header_profile_definitions TC_ENABLE_AAMVA=1 TC_TEST_HEADER_AAMVA=1)
     elseif(header_profile STREQUAL "fascn")
@@ -1597,7 +1617,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
     TC_ENABLE_EC=1 TC_ENABLE_SSKDF=1 TC_ENABLE_APDU=1 TC_ENABLE_PIV_COMMAND=1
     TC_ENABLE_PIV_SM_APDU=1 TC_TLV_ENABLE_BER=1 TC_ENABLE_PIV_OIDS=1 TC_ENABLE_CMS=1
     TC_ENABLE_FASCN=1 TC_ENABLE_TWIC_UUID=1 TC_ENABLE_PIV_OBJECTS=1 TC_ENABLE_PIV_VCI=1
-    TC_ENABLE_PIV_CATALOG=1)
+    TC_ENABLE_PIV_CATALOG=1 TC_ENABLE_KEY_CHALLENGE=1 TC_ENABLE_PIV_KEY_PROOF=1)
   add_library(test_cpp_headers_cxx17 OBJECT tests/cpp/header_compile.cpp)
   target_include_directories(test_cpp_headers_cxx17 PRIVATE src)
   set_property(TARGET test_cpp_headers_cxx17 PROPERTY CXX_STANDARD 17)
@@ -1774,6 +1794,16 @@ if(TINY_CRYPTO_BUILD_TESTS)
         -DTC_ENABLE_PIV_CATALOG=1 -I${CMAKE_CURRENT_SOURCE_DIR}/src
         -c ${CMAKE_CURRENT_SOURCE_DIR}/src/piv_catalog.c
         ${CMAKE_CURRENT_SOURCE_DIR}/src/piv_inventory.c
+      WORKING_DIRECTORY ${tc_avr_piv_command_dir})
+    # The key policy and the key proof need the card commands, key
+    # challenges and the X.509 reader.
+    add_test(NAME test_piv_key_proof_compile_avr
+      COMMAND ${TC_AVR_CC} -std=c99 -Wall -Wextra -Werror -Os -mmcu=atmega2560
+        -DTC_ENABLE_APDU=1 -DTC_ENABLE_TLV=1 -DTC_ENABLE_DER=1 -DTC_ENABLE_X509=1
+        -DTC_ENABLE_KEY_CHALLENGE=1 -DTC_ENABLE_PIV_COMMAND=1 -DTC_ENABLE_PIV_KEY_PROOF=1
+        -I${CMAKE_CURRENT_SOURCE_DIR}/src
+        -c ${CMAKE_CURRENT_SOURCE_DIR}/src/piv_key_policy.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/piv_key_proof.c
       WORKING_DIRECTORY ${tc_avr_piv_command_dir})
     add_test(NAME test_sskdf_compile_avr
       COMMAND ${TC_AVR_CC} -std=c99 -Wall -Wextra -Werror -mmcu=atmega328p

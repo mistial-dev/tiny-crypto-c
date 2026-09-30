@@ -1,7 +1,6 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "cms_reader.h"
-#include "credential_auth.h"
 #include "credential_object.h"
 #include "credential_validate.h"
 #include "credential_workflow.h"
@@ -123,8 +122,7 @@ int main(void)
     if (TC_RSA_encode_pss_digest(&pss, input, salt_bytes, output, &work) != TC_RSA_OK ||
         (encoded[0] & 0x80) || encoded[sizeof encoded - 1] != 0xbc)
       return 1;
-    if (example_card_check_key(NULL, EXAMPLE_CARD_KEY_CARD_AUTHENTICATION, NULL, NULL, NULL,
-                               no_random, NULL, NULL) != EXAMPLE_CARD_KEY_ERROR)
+    if (TC_PIV_key_prove(NULL, NULL, no_random, NULL, NULL, &work) != TC_PIV_ARGUMENT)
       return 1;
   }
   {
@@ -243,10 +241,6 @@ int main(void)
         work != 100)
       return 1;
     if (example_validate_security(NULL, NULL, NULL, NULL, &work, NULL) != TC_CREDENTIAL_ERROR ||
-        work != 100)
-      return 1;
-    if (example_twic_inventory_read(NULL, EXAMPLE_CARD_MODEL_TWIC_NEXGEN, EXAMPLE_CARD_READ_SHORT,
-                                    NULL, 0, 0, &work, NULL) != EXAMPLE_CARD_ARGUMENT ||
         work != 100)
       return 1;
     if (example_read_card_identity(empty, TC_TWIC_NEXGEN_CARD, NULL, NULL, &work, NULL) !=

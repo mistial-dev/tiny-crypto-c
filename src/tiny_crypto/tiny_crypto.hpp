@@ -45,6 +45,9 @@
 #if TC_ENABLE_PIV_CATALOG
 #include <tiny_crypto/piv_catalog.hpp>
 #endif
+#if TC_ENABLE_PIV_KEY_PROOF
+#include <tiny_crypto/piv_key_proof.hpp>
+#endif
 
 #if TC_ENABLE_KMAC256
 #include <tiny_crypto/kmac.hpp>
