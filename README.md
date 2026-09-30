@@ -635,7 +635,7 @@ inherited EC parameter widths, and malformed encodings.
 CI downloads that file into its temporary directory.
 
 Clang builds can enable `TINY_CRYPTO_BUILD_FUZZERS` and run `fuzz_tlv`,
-`fuzz_pki`, `fuzz_ocsp`, `fuzz_piv_sm`, `fuzz_gzip` and `fuzz_twic`. The
+`fuzz_pki`, `fuzz_ocsp`, `fuzz_piv_apdu`, `fuzz_gzip` and `fuzz_twic`. The
 `test_fuzz_*_regression` tests replay the corpora in `tests/fuzz`.
 Keep its writable corpus and failure artifacts outside the source tree.
 

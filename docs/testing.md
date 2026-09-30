@@ -1180,14 +1180,14 @@ artifacts outside the source tree. On macOS, use Homebrew LLVM if the Apple
 toolchain lacks the libFuzzer runtime. Set the C and C++ compiler paths to its
 `clang` and `clang++` executables.
 
-| Harness       | Inputs                                                                       |
-| ------------- | ---------------------------------------------------------------------------- |
-| `fuzz_tlv`    | BER and DER TLV readers, walkers and streams                                 |
-| `fuzz_pki`    | certificates, CRLs, CMS, names, PIV and EAC objects, TrustAnchorList records |
-| `fuzz_ocsp`   | OCSP responses for the ICAM fixture certificates and OCSP request encoding   |
-| `fuzz_piv_sm` | PIV secure messaging responses: session authentication and link framing      |
-| `fuzz_gzip`   | GZIP certificate decompression                                               |
-| `fuzz_twic`   | TSA canceled card list CSV and index images, AAMVA payloads, TWIC TPK        |
+| Harness         | Inputs                                                                       |
+| --------------- | ---------------------------------------------------------------------------- |
+| `fuzz_tlv`      | BER and DER TLV readers, walkers and streams                                 |
+| `fuzz_pki`      | certificates, CRLs, CMS, names, PIV and EAC objects, TrustAnchorList records |
+| `fuzz_ocsp`     | OCSP responses for the ICAM fixture certificates and OCSP request encoding   |
+| `fuzz_piv_apdu` | PIV and TWIC card answers from APDU exchanges to key proofs                  |
+| `fuzz_gzip`     | GZIP certificate decompression                                               |
+| `fuzz_twic`     | TSA canceled card list CSV and index images, AAMVA payloads, TWIC TPK        |
 
 Each harness has a regression corpus in `tests/fuzz/<name>`, where `<name>` is
 the harness name without the `fuzz_` prefix. The fuzzer build registers
@@ -1216,9 +1216,22 @@ The OCSP harness verifies each input as a response for the ICAM fixture
 certificates, with a store delegate and a full and a small work budget. It
 requires zeroed results on failure and borrowed responder spans on success. It
 also encodes a request for each input as a certificate with varied capacity.
-The SM harness tests raw malformed responses and builds authenticated CS2/CS7
-responses from fuzz input to exercise decryption, invalid padding, and
-output-buffer retries.
+The PIV card harness treats each input as a card answer: as sent, followed
+by 90 00, and as a script of answers with 2-byte lengths. It drives
+`TC_APDU_transceive` with chaining, GET RESPONSE and 6CXX correction in both
+length formats, `TC_APDU_response_read`, `TC_PIV_application_read`, SELECT and
+GET DATA on the PIV and TWIC applications, the card object readers and
+`TC_PIV_certificate_decode`. On links secured with the `tools/sm_fixtures.py`
+handshakes it sends raw answers, authenticated answers built by the card model
+in `tests/support/sm_card.c` around the input, and damaged authenticated
+answers. It also reads the Discovery Object under secure messaging and
+establishes the VCI, reads the PIV inventory, and runs key proofs against
+synthetic RSA and P-256 keys. Card data must never produce ARGUMENT or
+REFUSED. Outputs change only on success, failures wipe the documented
+buffers, and a failed protected exchange ends the session. The regression
+test also replays the SD 33 card 1 objects in `tests/vectors/piv/sd33/card01`.
+The cipher, hash and big-number sources carry no coverage instrumentation in
+this harness, since their rounds add run time without new paths.
 The GZIP harness checks decoding with varied capacity and work limits, including
 failure wiping, workspace cleanup and output boundaries.
 The TWIC harness reads the input as one CCL record, as a complete CCL stream in
@@ -1232,17 +1245,18 @@ outputs on failure.
 cmake -S . -B /tmp/tiny-crypto-fuzz \
   -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
   -DTINY_CRYPTO_BUILD_FUZZERS=ON
-cmake --build /tmp/tiny-crypto-fuzz --target fuzz_tlv fuzz_pki fuzz_piv_sm fuzz_gzip \
+cmake --build /tmp/tiny-crypto-fuzz --target fuzz_tlv fuzz_pki fuzz_piv_apdu fuzz_gzip \
   fuzz_ocsp fuzz_twic --parallel
 ctest --test-dir /tmp/tiny-crypto-fuzz -R '^test_fuzz_' --output-on-failure
 fuzz_dir=$(mktemp -d /tmp/tiny-crypto-fuzz-inputs.XXXXXX)
-for name in tlv pki piv_sm gzip ocsp twic; do
+for name in tlv pki piv_apdu gzip ocsp twic; do
   mkdir "$fuzz_dir/$name"
   cp tests/fuzz/$name/* "$fuzz_dir/$name/"
 done
 cp tests/vectors/x509/ocsp/*/*.der "$fuzz_dir/ocsp/"
 cp tests/vectors/twic/synthetic/*/trust-anchor*.der "$fuzz_dir/pki/"
-for name in tlv pki piv_sm gzip ocsp twic; do
+cp tests/vectors/piv/sd33/card01/* "$fuzz_dir/piv_apdu/"
+for name in tlv pki piv_apdu gzip ocsp twic; do
   /tmp/tiny-crypto-fuzz/fuzz_$name "$fuzz_dir/$name" \
     -artifact_prefix="$fuzz_dir/" -max_total_time=300
 done

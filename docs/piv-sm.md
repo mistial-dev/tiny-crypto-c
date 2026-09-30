@@ -469,5 +469,5 @@ through the link. `test_piv_vci` covers the Discovery Object read on plain
 and secured links, pairing, pairing-free policies, rejected codes, refusals and
 the events that clear the VCI, and `test_cpp_piv_vci` runs the C++ wrappers.
 `test_piv_sm_authenticate` checks CVC chains through the
-combined helper. `fuzz_piv_sm` exercises response authentication and the link
-framing. See [Running the tests](testing.md).
+combined helper. `fuzz_piv_apdu` sends raw and authenticated secure messaging answers
+through the link and checks the session-loss rule. See [Running the tests](testing.md).

@@ -864,7 +864,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
     src/piv_card_check.c src/piv_card_check_certificates.c src/piv_card_check_signed.c
     src/piv_card_check_keys.c src/piv_card_check_report.c src/inflate_tree.c src/inflate_bits.c src/inflate_tables.c src/inflate.c src/gzip.c
     src/gzip_api.c src/piv_certificate_decode.c src/piv_bit_group.c src/piv_ccc.c
-    src/piv_key_history.c src/piv_card_objects_internal.c)
+    src/piv_key_history.c src/piv_pairing_code.c src/piv_card_objects_internal.c)
   list(REMOVE_ITEM tc_native_card_sources ${tc_native_pki_sources})
   tc_add_test_library(tiny-crypto-c-test-pki-native ${tc_native_pki_sources}
     src/x509_trust_anchor.c src/x509_ocsp.c
@@ -1327,11 +1327,26 @@ if(TINY_CRYPTO_BUILD_TESTS)
     tc_add_fuzz_regression(ocsp ${tc_vectors}/x509/ocsp/icam ${tc_vectors}/x509/ocsp/local
       ${tc_vectors}/x509/ocsp/sd33)
 
-    get_target_property(sm_fuzz_sources tiny-crypto-c-test-piv-sm SOURCES)
-    get_target_property(sm_fuzz_definitions tiny-crypto-c-test-piv-sm COMPILE_DEFINITIONS)
-    tc_add_fuzzer(fuzz_piv_sm tests/piv/sm_fuzz.c ${sm_fuzz_sources})
-    target_compile_definitions(fuzz_piv_sm PRIVATE ${sm_fuzz_definitions})
-    tc_add_fuzz_regression(piv_sm)
+    # The PIV card stack on arbitrary card answers. Secured links use the
+    # tools/sm_fixtures.py handshakes and the card model in tests/support.
+    get_target_property(piv_apdu_fuzz_sources tiny-crypto-c-test-pki-native SOURCES)
+    get_target_property(piv_apdu_fuzz_definitions tiny-crypto-c-test-pki-native
+      COMPILE_DEFINITIONS)
+    tc_add_fuzzer(fuzz_piv_apdu tests/piv/apdu_fuzz.c tests/support/sm_card.c
+      tests/support/sm_card_session.c ${piv_apdu_fuzz_sources})
+    target_include_directories(fuzz_piv_apdu PRIVATE tests/support)
+    target_compile_definitions(fuzz_piv_apdu PRIVATE ${piv_apdu_fuzz_definitions})
+    tc_sm_fixture_header(fuzz_piv_apdu)
+    # Coverage feedback from wiping loops and the cipher, hash and
+    # big-number rounds finds no new paths and dominates the run time, so
+    # those sources stay without it.
+    set(piv_apdu_ignorelist ${CMAKE_CURRENT_BINARY_DIR}/fuzz_piv_apdu_ignorelist.txt)
+    file(WRITE ${piv_apdu_ignorelist} "src:*/src/common.c\nsrc:*/src/aes*.c\n"
+      "src:*/src/mac_core.c\nsrc:*/src/block_modes.c\nsrc:*/src/hash*.c\nsrc:*/src/sha512.c\n"
+      "src:*/src/ec.c\nsrc:*/src/rsa_*.c\n")
+    target_compile_options(fuzz_piv_apdu PRIVATE
+      -fsanitize-coverage-ignorelist=${piv_apdu_ignorelist})
+    tc_add_fuzz_regression(piv_apdu ${tc_vectors}/piv/sd33/card01)
 
     tc_add_fuzzer(fuzz_twic tests/twic/fuzz.c src/common.c src/tlv.c src/tlv_walk.c src/der.c
       src/credential_text_internal.c src/twic_ccl.c src/snapshot.c src/aamva.c src/twic_tpk.c)
