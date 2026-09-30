@@ -101,6 +101,26 @@ messaging failures on the pairing VERIFY, the refusals before anything is
 sent, argument errors, and the SELECT, unsecure, session-loss and key-request
 events that clear the VCI. `test_cpp_piv_vci` runs the C++ wrappers.
 
+`test_piv_card_simulator` covers `tests/support/card_simulator.c`, a PIV card
+model for the card-level suites. It answers from the SD 33 card 2 and card 4
+fixtures in `tests/vectors/piv/sm_captures/fixtures` and applies the SP
+800-73-5 rules on each interface: SELECT with the full or truncated AID, the
+Part 1 Table 2 read rules, VERIFY retry counters, the query and P1 `FF`, the
+Part 1 Table 5 key rules with PIN Always for `9C`, the VCI condition, command
+chaining, `61XX` chunks with plain GET RESPONSE, and secure messaging. Its
+card-side secure messaging in `tests/support/sm_card_session.c` shares only
+AES and CMAC with the library, and `tests/support/sm_card.c` uses the same
+file. Every recorded session replays against the model byte for byte,
+protected answers included. The library then reads contact and contactless
+objects, pairs the VCI and verifies the PIN through it. The model counts host
+behaviour that the library never produces, such as plaintext reference data
+on contactless, a broken chain or extended length secure messaging, as
+violations. Every secure messaging error status and every key establishment
+request ends the card session (SP 800-73-5 Part 2 4.3). Tests can override
+container answers, the Discovery Object included, and reset the card.
+`test_piv_capture_fixtures` checks that `tests/piv/capture_fixture.py`
+reproduces the committed fixtures.
+
 `test_piv_card_objects` covers the [card object readers](piv-card.md#card-object-readers)
 with recorded SD 33 and ICAM bytes from `tests/vectors/piv`: Discovery
 Objects under both profiles and every first policy byte, the SD 33 and ICAM

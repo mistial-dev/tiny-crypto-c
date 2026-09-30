@@ -196,7 +196,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
     TC_ENABLE_APDU=1 TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_PIV_SM_APDU=1)
   tc_add_c_test(test_piv_sm${sm_suffix} tiny-crypto-c-test-piv-sm${sm_suffix} tests/piv/sm.c)
   tc_add_c_test(test_piv_sm_apdu${sm_suffix} tiny-crypto-c-test-piv-sm${sm_suffix}
-    tests/piv/sm_apdu.c tests/support/sm_card.c)
+    tests/piv/sm_apdu.c tests/support/sm_card.c tests/support/sm_card_session.c)
   tc_sm_fixture_header(test_piv_sm_apdu${sm_suffix})
   # Driven by tests/piv/synthetic_sm.py and tests/piv/sm_corpus.py.
   tc_add_c_test_executable(test_piv_sm_apdu_replay${sm_suffix}
@@ -228,8 +228,21 @@ if(TINY_CRYPTO_BUILD_TESTS)
     TC_TLV_ENABLE_BER=1 TC_ENABLE_X509=1 TC_ENABLE_PIV_OIDS=1 TC_ENABLE_CMS=1
     TC_ENABLE_FASCN=1 TC_ENABLE_TWIC_UUID=1 TC_ENABLE_PIV_OBJECTS=1 TC_ENABLE_PIV_VCI=1)
   tc_add_c_test(test_piv_vci tiny-crypto-c-test-piv-vci tests/piv/vci.c
-    tests/support/sm_card.c tests/support/scripted_transport.c)
+    tests/support/sm_card.c tests/support/sm_card_session.c
+    tests/support/scripted_transport.c)
   tc_sm_fixture_header(test_piv_vci)
+  # The PIV card simulator on the SD 33 fixtures written by
+  # tests/piv/capture_fixture.py.
+  set(tc_card_simulator_sources tests/support/card_simulator.c tests/support/card_fixture.c
+    tests/support/sm_card_session.c)
+  tc_add_c_test(test_piv_card_simulator tiny-crypto-c-test-piv-vci tests/piv/card_simulator.c
+    ${tc_card_simulator_sources})
+  target_compile_definitions(test_piv_card_simulator PRIVATE
+    TC_CARD_FIXTURE_DIR="${PROJECT_SOURCE_DIR}/tests/vectors/piv/sm_captures/fixtures")
+  if(Python3_Interpreter_FOUND)
+    add_test(NAME test_piv_capture_fixtures COMMAND ${Python3_EXECUTABLE}
+      ${PROJECT_SOURCE_DIR}/tests/piv/capture_fixture.py --check)
+  endif()
   foreach(small 0 1)
     tc_add_test_library(tiny-crypto-c-test-ec-${small} src/common.c src/ec.c ${tc_rsa_sources} src/pki_storage.c src/tlv.c src/tlv_walk.c src/der.c src/x509_key.c src/pki_key.c)
     target_compile_definitions(tiny-crypto-c-test-ec-${small} PUBLIC
@@ -1160,12 +1173,14 @@ if(TINY_CRYPTO_BUILD_TESTS)
     tc_add_linked_test(test_cpp_piv_command tiny-crypto-c-test-piv-command
       tests/cpp/piv_command.cpp tests/cpp/main.cpp)
     tc_add_linked_test(test_cpp_piv_sm_apdu tiny-crypto-c-test-piv-sm
-      tests/cpp/piv_sm_apdu.cpp tests/support/sm_card.c tests/cpp/main.cpp)
+      tests/cpp/piv_sm_apdu.cpp tests/support/sm_card.c tests/support/sm_card_session.c
+      tests/cpp/main.cpp)
     target_include_directories(test_cpp_piv_sm_apdu PRIVATE tests/support)
     tc_sm_fixture_header(test_cpp_piv_sm_apdu)
     target_include_directories(test_cpp_piv_command PRIVATE tests/support)
     tc_add_linked_test(test_cpp_piv_vci tiny-crypto-c-test-piv-vci
-      tests/cpp/piv_vci.cpp tests/support/sm_card.c tests/cpp/main.cpp)
+      tests/cpp/piv_vci.cpp tests/support/sm_card.c tests/support/sm_card_session.c
+      tests/cpp/main.cpp)
     target_include_directories(test_cpp_piv_vci PRIVATE tests/support)
     tc_sm_fixture_header(test_cpp_piv_vci)
     target_include_directories(test_cpp_apdu PRIVATE tests/support)

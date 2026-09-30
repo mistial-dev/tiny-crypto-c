@@ -17,7 +17,7 @@ or what a card returned; nothing here was generated. Assembled 2026-09-06.
 | `cvc/` | 20 | 10 distinct secure-messaging CVCs from the SD 33 cards, with parsed-field JSON |
 | `vci_trust_anchors/` | 27 | SM Certificate Signer objects, intermediate CVCs and VCI trust-anchor records for cards 2, 3, 4, 5, 16 |
 | `piv_auto_demo/` | 7 | PIV Auto simulator payloads (CVCs, SMCS, trust anchor record, PIV status/mode payloads) |
-| `sm_captures/` | 4 | Secure messaging captures from SD 33 cards 2 and 4 for wire-level replay (see its README) |
+| `sm_captures/` | 6 | Secure messaging captures from SD 33 cards 2 and 4 for wire-level replay, and the card simulator fixtures generated from them (see its README) |
 
 ## `icam_cards/<NN_card_name>/`
 

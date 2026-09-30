@@ -9,7 +9,7 @@ Byte-exact copies of four PIV secure messaging captures from physical NIST
 Special Database 33 cards, replayed at the wire level by
 `test_sm_primitives_corpus` (`tests/piv/sm_corpus.py` and
 `tests/piv/sm_apdu_replay.c`). Vendored 2026-09-30. `SHA256SUMS` lists every
-file.
+file, the generated fixtures included.
 
 | File | Source | Captured | Card | Interface | Suite |
 | --- | --- | --- | --- | --- | --- |
@@ -21,6 +21,29 @@ file.
 The PIV Authentication, Card Authentication and signing keys of these cards
 are RSA-2048. `vci_contactless_card01.json` records the GENERAL AUTHENTICATE
 chains for keys 9E and 9A fragment by fragment.
+
+## Card simulator fixtures
+
+`fixtures/sd33_card2.txt` and `fixtures/sd33_card4.txt` describe one card
+each for `tests/support/card_simulator.c`. `tests/piv/capture_fixture.py`
+writes them from the captures of that card, and its docstring defines the
+record format. Each fixture holds the SELECT answer, every container read in
+full, the VERIFY reference data with the recorded retry counts, the GENERAL
+AUTHENTICATE input and answer pairs, the recorded key establishment sessions
+with their key material, and each keyed session as library-form wire
+exchanges. `vci_contactless_card01.json` and `vci_vectors_card01.json` are
+captures of SD 33 card 2 and join its fixture.
+
+Both fixtures start with a `Secret test material` line because they hold the
+published SD 33 test PIN and pairing code. Regenerate them after a capture
+changes, then update `SHA256SUMS`:
+
+```sh
+python3 tests/piv/capture_fixture.py
+```
+
+`test_piv_capture_fixtures` runs the generator with `--check` and fails when
+a committed fixture differs from the generated text.
 
 ## Licence
 
