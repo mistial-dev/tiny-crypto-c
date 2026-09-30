@@ -56,6 +56,8 @@ endfunction()
 # AUTO follows the application target, then the resource profile. Macros in
 # tc_platform_features, set by a platform port, have a floor of 1.
 function(tc_profile_option name macro description)
+  # One list of every feature option, for checks that build all features.
+  set_property(GLOBAL APPEND PROPERTY TC_FEATURE_OPTIONS ${name})
   set(${name} AUTO CACHE STRING "${description} (AUTO follows the resource profile)")
   set_property(CACHE ${name} PROPERTY STRINGS AUTO ON OFF)
   string(TOUPPER "${${name}}" choice)

@@ -10,6 +10,14 @@ if(TINY_CRYPTO_BUILD_TESTS)
     add_test(NAME test_heap_free COMMAND ${CMAKE_COMMAND}
       -DNM=${CMAKE_NM} -DARCHIVE=$<TARGET_FILE:tiny-crypto-c>
       -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/heap_free.cmake)
+    get_property(tc_feature_options GLOBAL PROPERTY TC_FEATURE_OPTIONS)
+    string(REPLACE ";" "," tc_feature_option_list "${tc_feature_options}")
+    add_test(NAME test_heap_free_all_features COMMAND ${CMAKE_COMMAND}
+      -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR} -DOPTIONS=${tc_feature_option_list}
+      -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/heap-free-all
+      -DC_COMPILER=${CMAKE_C_COMPILER} -DNM=${CMAKE_NM} -DAR=${CMAKE_AR}
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/heap_free_all.cmake)
+    set_tests_properties(test_heap_free_all_features PROPERTIES LABELS extended)
   endif()
   # Direct-source consumers compile disabled translation units too.
   file(GLOB tc_direct_sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c")
