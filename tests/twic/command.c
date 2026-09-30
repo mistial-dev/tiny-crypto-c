@@ -39,14 +39,23 @@ int example_test_munlock(const void* buffer, size_t capacity)
   ++unlocks;
   return 0;
 }
-int example_card_pcsc_open(ExampleCardPCSC* state, const char* reader)
+ExampleCardPCSCResult example_card_pcsc_open(ExampleCardPCSC* state,
+                                             const ExampleCardPCSCOptions* options)
 {
+  const char* reader = options->reader;
+  munit_assert_int(options->interface, ==, EXAMPLE_PCSC_DETECT);
+  munit_assert_null(options->guard);
   munit_assert_int(protected_memory, ==, 1);
   munit_assert_uint(locks, ==, 1);
   munit_assert_string_equal(reader, "synthetic reader");
   ++opens;
   state->transaction = !open_failure;
-  return !open_failure;
+  return open_failure ? EXAMPLE_PCSC_FAILED : EXAMPLE_PCSC_OPENED;
+}
+TC_PIV_interface example_card_pcsc_interface(const ExampleCardPCSC* state)
+{
+  munit_assert_int(state->transaction, ==, 1);
+  return TC_PIV_CONTACT;
 }
 int example_card_pcsc_close(ExampleCardPCSC* state)
 {

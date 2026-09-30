@@ -18,6 +18,7 @@ run("${CMAKE_COMMAND}" -S "${SOURCE_DIR}" -B "${BINARY_DIR}/library"
   -DTINY_CRYPTO_ENABLE_X509=ON -DTINY_CRYPTO_ENABLE_PIV_CVC=ON
   -DTINY_CRYPTO_ENABLE_KEY_CHALLENGE=ON
   -DTINY_CRYPTO_ENABLE_APDU=ON -DTINY_CRYPTO_ENABLE_PIV_COMMAND=ON
+  -DTINY_CRYPTO_ENABLE_PIV_SM_APDU=ON -DTINY_CRYPTO_ENABLE_PIV_VCI=ON
   -DTINY_CRYPTO_ENABLE_PIV_CATALOG=ON -DTINY_CRYPTO_ENABLE_PIV_KEY_PROOF=ON
   -DTINY_CRYPTO_ENABLE_PIV_CARD_CHECK=ON
   -DTINY_CRYPTO_ENABLE_X509_PATH=ON
@@ -36,6 +37,7 @@ run("${CMAKE_COMMAND}" -S "${SOURCE_DIR}" -B "${BINARY_DIR}/library"
   -DTINY_CRYPTO_ENABLE_GZIP=ON
   -DTINY_CRYPTO_ENABLE_EAC_CVC=ON
   -DTINY_CRYPTO_ENABLE_PIV_SM=ON -DTINY_CRYPTO_ENABLE_EC=ON
+  -DTINY_CRYPTO_PIV_SM_CS2=ON -DTINY_CRYPTO_PIV_SM_CS7=ON
   -DTINY_CRYPTO_ENABLE_SSKDF=ON -DTINY_CRYPTO_ENABLE_SHA384=ON
   -DTINY_CRYPTO_AES_DYNAMIC=ON -DTINY_CRYPTO_AES_ECB=ON
   "-DCMAKE_INSTALL_PREFIX=${BINARY_DIR}/prefix"
@@ -144,6 +146,12 @@ if(CMAKE_HOST_APPLE)
     "${SOURCE_DIR}/examples/x509_revocation.c" "${SOURCE_DIR}/examples/x509_revocation.h"
     "${SOURCE_DIR}/examples/pki_input.c" "${SOURCE_DIR}/examples/pki_input.h"
     "${SOURCE_DIR}/examples/credential_pcsc.c" "${SOURCE_DIR}/examples/credential_pcsc.h"
+    "${SOURCE_DIR}/examples/piv_inspect.c" "${SOURCE_DIR}/examples/piv_inspect.h"
+    "${SOURCE_DIR}/examples/piv_inspect_main.c" "${SOURCE_DIR}/examples/piv_inspect_trust.c"
+    "${SOURCE_DIR}/examples/piv_inspect_trust.h" "${SOURCE_DIR}/examples/piv_inspect_print.h"
+    "${SOURCE_DIR}/examples/piv_inspect_print_objects.c"
+    "${SOURCE_DIR}/examples/piv_inspect_print_certificates.c"
+    "${SOURCE_DIR}/examples/piv_inspect_print_report.c"
     DESTINATION "${BINARY_DIR}/credential-source")
   file(COPY "${SOURCE_DIR}/examples/credential_check/"
     DESTINATION "${BINARY_DIR}/credential-source/credential_check")
@@ -152,5 +160,13 @@ if(CMAKE_HOST_APPLE)
     "-DCMAKE_C_COMPILER=${C_COMPILER}" "-DCMAKE_PREFIX_PATH=${BINARY_DIR}/prefix")
   run("${CMAKE_COMMAND}" --build "${BINARY_DIR}/credential-consumer" --config Release)
   run("${CMAKE_CTEST_COMMAND}" --test-dir "${BINARY_DIR}/credential-consumer"
+    -C Release --output-on-failure)
+  file(COPY "${SOURCE_DIR}/examples/piv_inspect/"
+    DESTINATION "${BINARY_DIR}/credential-source/piv_inspect")
+  run("${CMAKE_COMMAND}" -S "${BINARY_DIR}/credential-source/piv_inspect"
+    -B "${BINARY_DIR}/piv-inspect-consumer" -DCMAKE_BUILD_TYPE=Release
+    "-DCMAKE_C_COMPILER=${C_COMPILER}" "-DCMAKE_PREFIX_PATH=${BINARY_DIR}/prefix")
+  run("${CMAKE_COMMAND}" --build "${BINARY_DIR}/piv-inspect-consumer" --config Release)
+  run("${CMAKE_CTEST_COMMAND}" --test-dir "${BINARY_DIR}/piv-inspect-consumer"
     -C Release --output-on-failure)
 endif()

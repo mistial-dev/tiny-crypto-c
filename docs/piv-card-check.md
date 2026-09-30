@@ -235,6 +235,77 @@ int check_card(const TC_PIV_link* link, const TC_PIV_inventory* inventory,
 `piv_card_report_accepts`, `piv_card_certificate_validate` and
 `piv_card_prove_keys`, which takes a `piv_link`.
 
+## Inspect a card
+
+`examples/piv_inspect.c` runs the whole flow on any `TC_APDU_transport` and
+prints the report. `example_piv_inspect_run` takes the interface, the length
+format, the PIN and pairing code, the trust anchors, CRLs and OCSP responses,
+the revocation policy, the evaluation time and a random source. It selects the
+TWIC application and inventories it plain when present, then on the PIV
+application:
+
+1. reads `5FC122` and the CHUID plain and validates the secure messaging signer,
+1. establishes secure messaging with `TC_PIV_SM_key_request`,
+   `TC_PIV_SM_authenticate_response` under that signer and the CHUID GUID, and
+   `TC_PIV_link_secure`,
+1. reads the Discovery Object and establishes the VCI on contactless,
+1. verifies the PIN with the reference the Discovery Object prefers,
+1. reads the inventory, runs `TC_PIV_card_check` with the plain copies and the
+   card CVC, and proves `9E`, and `9A` after the PIN, with
+   `TC_PIV_card_prove_keys`.
+
+A TWIC card makes the checks of the PIV application use its TWIC profile. A
+card without secure messaging runs plain, and on contactless without the VCI
+only the Always objects are read. The example never proves `9C`, since the
+card accepts a PIN Always key only directly after a PIN submission.
+
+The example accepts the card when no entry is `FAILED`, the card accepted every
+PIN and pairing code supplied, and these requirements pass:
+
+| Condition              | Requirements                                                       |
+| ---------------------- | ------------------------------------------------------------------ |
+| always                 | `9E` path, `REVOCATION` of `0500`, `9E` key proof, CHUID           |
+| contact or VCI         | `SECURITY_SIGNATURE`                                               |
+| secure messaging suite | `SM_SIGNER`, `SM_CVC`, `COPY_MATCH`                                |
+| PIN verified           | `9A` key proof, every `SECURITY_DIGEST`, `BIOMETRIC` 6010 and 6030 |
+
+A card whose application template offers a secure messaging suite must complete
+key establishment, so a refused or failed establishment rejects the card.
+
+It returns 0 for an accepted card, 1 for a rejected card or a failed step and 2
+for invalid options. Objects flagged `TC_PIV_OBJECT_SECRET` are never printed
+or passed to the dump callback, and the inventory skips the pairing code. The
+run clears the inventory, the link and the session and wipes its storage on
+every return.
+
+`examples/piv_inspect/CMakeLists.txt` builds the `piv_inspect` command against
+an installed package with the PC/SC transport of `examples/credential_pcsc.c`.
+The library needs the card check, key proofs, secure messaging framing and the
+VCI. Run it on SD 33 card 2 with the pinned issuing CAs:
+
+```sh
+cmake -S examples/piv_inspect -B build/piv-inspect \
+  -DCMAKE_PREFIX_PATH=/path/to/tiny-crypto-install
+cmake --build build/piv-inspect
+build/piv-inspect/piv_inspect --reader 'ACR1552 1S CL Reader PICC' \
+  --anchor tests/vectors/x509/ocsp/sd33/card01_issuer.der \
+  --anchor tests/vectors/x509/ocsp/sd33/card04_issuer.der \
+  --crl tests/vectors/x509/crl/sd33/RSA3072IssuingCA.crl \
+  --crl tests/vectors/x509/crl/sd33/ECCP384IssuingCA.crl \
+  --revocation when-available --pin-prompt
+```
+
+`--reader` defaults to `TC_PIV_READER` and must match exactly one reader name.
+The PC/SC transport refuses reader names and ATRs that name a Yubico device
+before it connects, and refuses a contact request on a reader whose ATR shows a
+contactless card. `--interface` defaults to the interface the ATR shows. The
+PIN and pairing code come from `TC_PIV_PIN` and `TC_PIV_PAIRING_CODE`, or from
+a prompt without echo. A PIN makes the reader reset the card on disconnect,
+which clears its PIN status. `--anchor-sha256` pins the preceding anchor,
+`--ocsp 9a|9c|9d|9e FILE` supplies the OCSP response of one slot, `--at` sets
+the evaluation time, `--extended` selects extended length and `--dump-dir`
+writes each present object to a directory only its owner can read.
+
 ## Limits
 
 - A report holds `TC_PIV_CARD_CHECKS_MAX` entries. More return `TC_PIV_LIMIT`

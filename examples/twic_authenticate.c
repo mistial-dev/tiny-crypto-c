@@ -1004,12 +1004,13 @@ int main(int argc, char** argv)
   ExampleX509Source arrays = {candidates, options.issuer_count + 1, &anchor, 1};
   const TC_X509_store_source trust = example_x509_source(&arrays);
   failure = "Unable to acquire the reader transaction";
-  if (!example_card_pcsc_open(&connection, options.reader))
+  const ExampleCardPCSCOptions reader = {options.reader, EXAMPLE_PCSC_DETECT, NULL};
+  if (example_card_pcsc_open(&connection, &reader) != EXAMPLE_PCSC_OPENED)
     goto cleanup;
   /* GET DATA asks for Le 00, or for one whole object with extended length.
-   * The contact interface carries no PIN here. */
+   * No PIN is sent. The link takes the interface the ATR shows. */
   const TC_PIV_link_options link_options = {{options.read_mode, 0, EXCHANGES, 0, 0},
-                                            TC_PIV_CONTACT,
+                                            example_card_pcsc_interface(&connection),
                                             options.read_mode == TC_APDU_EXTENDED ? OBJECT_BYTES
                                                                                   : 0};
   TC_PIV_link* link = &sensitive.link;

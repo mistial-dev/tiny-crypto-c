@@ -269,12 +269,24 @@ their GET RESPONSE and length correction steps on a `TC_PIV_link`
 ([PIV card commands](piv-card.md)). `examples/credential_pcsc.c` supplies the
 PC/SC transport as a `TC_APDU_transmit`. The command sends no PIN.
 
+`example_card_pcsc_open` takes the reader as a substring that must match
+exactly one reader name. It refuses reader names and ATRs that contain
+`yubico` or `yubikey` in any letter case, reading the ATR with
+`SCardGetStatusChange` before any connect, so an attached YubiKey receives no
+command. A PC/SC contactless ATR (`3B 8X 80 01`) refuses a contact request, and
+`example_card_pcsc_interface` reports the interface for the link. An optional
+`ExampleCardPCSCGuard` sees every command before it is sent and every answer.
+`example_card_pcsc_reset_on_close` makes the close reset the card, which
+clears its PIN status. `piv_inspect` ([PIV card check](piv-card-check.md#inspect-a-card))
+uses the same transport.
+
 `test_twic_command` runs the command over synthetic command/response
 scripts. `test_twic_apdu_replay` replays the synthetic TWIC
 scripts through the library's card commands and the TWIC
 [catalog inventory](piv-card.md#catalog-and-inventory). On macOS,
-`test_twic_pcsc` replaces the PC/SC service calls to test cleanup and transport
-failures. These tests require no reader. The standalone example's CTest entries
+`test_twic_pcsc` replaces the PC/SC service calls to test cleanup, transport
+failures, the reader filter, the Yubico refusals, the interface check, the
+guard and the reset on close. These tests require no reader. The standalone example's CTest entries
 exercise help and argument handling only.
 
 ## Card-key authentication

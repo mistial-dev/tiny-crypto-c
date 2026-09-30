@@ -688,6 +688,11 @@ if(TINY_CRYPTO_BUILD_TESTS)
     tc_use_test_sanitizers(test_credential_command_entry)
     tc_add_c_test(test_twic_command tiny-crypto-c-test-pki-native
       tests/twic/command.c $<TARGET_OBJECTS:test_credential_command_entry>)
+    # The piv_inspect command builds here for its warnings. The installed
+    # consumer links and runs it.
+    add_library(test_piv_inspect_main OBJECT examples/piv_inspect_main.c)
+    target_link_libraries(test_piv_inspect_main PRIVATE tiny-crypto-c-test-pki-native)
+    tc_warnings(test_piv_inspect_main)
   endif()
   foreach(profile IN ITEMS runtime fast)
     tc_add_test_library(tiny-crypto-c-test-twic-cipher-${profile}
@@ -858,7 +863,8 @@ if(TINY_CRYPTO_BUILD_TESTS)
     src/piv_catalog.c src/piv_inventory.c src/piv_key_policy.c src/piv_key_proof.c
     src/piv_card_check.c src/piv_card_check_certificates.c src/piv_card_check_signed.c
     src/piv_card_check_keys.c src/piv_card_check_report.c src/inflate_tree.c src/inflate_bits.c src/inflate_tables.c src/inflate.c src/gzip.c
-    src/gzip_api.c src/piv_certificate_decode.c src/piv_bit_group.c src/piv_card_objects_internal.c)
+    src/gzip_api.c src/piv_certificate_decode.c src/piv_bit_group.c src/piv_ccc.c
+    src/piv_key_history.c src/piv_card_objects_internal.c)
   list(REMOVE_ITEM tc_native_card_sources ${tc_native_pki_sources})
   tc_add_test_library(tiny-crypto-c-test-pki-native ${tc_native_pki_sources}
     src/x509_trust_anchor.c src/x509_ocsp.c
@@ -897,6 +903,32 @@ if(TINY_CRYPTO_BUILD_TESTS)
   target_compile_definitions(test_piv_card_check PRIVATE
     TC_CARD_FIXTURE_DIR="${PROJECT_SOURCE_DIR}/tests/vectors/piv/sm_captures/fixtures"
     TC_VECTOR_DIR="${PROJECT_SOURCE_DIR}/tests/vectors")
+  # examples/piv_inspect over the SD 33 simulators, compared with the golden
+  # outputs in tests/vectors/piv/inspect. The PIN and pairing codes are the
+  # published SD 33 test values.
+  set(tc_piv_inspect_sources examples/piv_inspect.c examples/piv_inspect_trust.c
+    examples/piv_inspect_print_objects.c examples/piv_inspect_print_certificates.c
+    examples/piv_inspect_print_report.c)
+  tc_add_c_test_executable(test_piv_inspect_replay tiny-crypto-c-test-pki-native
+    tests/piv/inspect_replay.c ${tc_piv_inspect_sources} ${tc_card_simulator_sources})
+  target_compile_definitions(test_piv_inspect_replay PRIVATE
+    TC_CARD_FIXTURE_DIR="${PROJECT_SOURCE_DIR}/tests/vectors/piv/sm_captures/fixtures"
+    TC_VECTOR_DIR="${PROJECT_SOURCE_DIR}/tests/vectors")
+  add_test(NAME test_example_piv_inspect COMMAND test_piv_inspect_replay
+    /piv/inspect/card2-without-pin /piv/inspect/card2-tampered
+    /piv/inspect/card2-unrequired-failure /piv/inspect/card2-key-establishment-refused
+    /piv/inspect/arguments)
+  foreach(case IN ITEMS card2_contactless card2_contact card4_contactless card2_wrong_pin)
+    string(REPLACE "_" "-" case_name "${case}")
+    set(case_pairing 00000002)
+    if(case MATCHES "^card4")
+      set(case_pairing 00000004)
+    endif()
+    add_test(NAME test_example_piv_inspect_${case}
+      COMMAND test_piv_inspect_replay /piv/inspect/${case_name})
+    set_tests_properties(test_example_piv_inspect_${case} PROPERTIES
+      ENVIRONMENT "TC_PIV_PIN=123456;TC_PIV_PAIRING_CODE=${case_pairing}")
+  endforeach()
   # Revocation evidence policy and Security Object digests over vendored PKIs.
   tc_add_c_test(test_credential_revocation_policy tiny-crypto-c-test-pki-native
     tests/credential/revocation_policy.c)

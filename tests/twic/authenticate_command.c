@@ -369,13 +369,23 @@ TC_status example_card_random(void* context, uint8_t* out, size_t length)
   return random_digest(&entropy, out, length);
 }
 
-int example_card_pcsc_open(ExampleCardPCSC* connection, const char* reader)
+ExampleCardPCSCResult example_card_pcsc_open(ExampleCardPCSC* connection,
+                                             const ExampleCardPCSCOptions* options)
 {
+  const char* reader = options->reader;
+  munit_assert_int(options->interface, ==, EXAMPLE_PCSC_DETECT);
+  munit_assert_null(options->guard);
   munit_assert_string_equal(reader, "synthetic");
   munit_assert_uint(locked, ==, 1);
   ++opened;
   connection->transaction = scenario != OPEN_FAILURE;
-  return connection->transaction;
+  return connection->transaction ? EXAMPLE_PCSC_OPENED : EXAMPLE_PCSC_FAILED;
+}
+
+TC_PIV_interface example_card_pcsc_interface(const ExampleCardPCSC* connection)
+{
+  munit_assert_int(connection->transaction, ==, 1);
+  return TC_PIV_CONTACT;
 }
 
 int example_card_pcsc_close(ExampleCardPCSC* connection)

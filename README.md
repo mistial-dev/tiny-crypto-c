@@ -539,6 +539,8 @@ secure messaging signer and CVC, and plain copies. Each entry passed, failed
 or is not checkable with a reason. `TC_PIV_card_prove_keys` adds the key
 proofs, and `TC_PIV_card_report_accepts` compares the report with the
 application's requirements. See [PIV card check](docs/piv-card-check.md).
+`examples/piv_inspect` runs the complete flow on a PC/SC reader and prints the
+report ([piv_inspect](docs/piv-card-check.md#inspect-a-card)).
 
 ## PIV secure messaging
 

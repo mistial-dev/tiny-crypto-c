@@ -143,6 +143,20 @@ contactless without the VCI, exhausted work, the report limit, acceptance,
 retained certificates and argument errors. `test_cpp_piv_card_check` runs the
 C++ wrappers.
 
+`test_example_piv_inspect_card2_contactless`, `_card2_contact` and
+`_card4_contactless` run `examples/piv_inspect.c` over the card simulator with
+the same trust inputs and compare its output with
+`tests/vectors/piv/inspect`. CTest sets `TC_PIV_PIN` and `TC_PIV_PAIRING_CODE`
+to the published SD 33 test values, and the random source replays the recorded
+key establishment scalar and key proof challenges. Each run must accept the
+card with no failed check, and the output must hold neither secret.
+`test_example_piv_inspect_card2_wrong_pin` checks that a refused PIN rejects
+the card. `test_example_piv_inspect` covers a run without the PIN or pairing
+code, a changed CHUID and a changed Key History that reject the card, a refused
+key establishment that rejects the card, and invalid options. A mismatch writes the
+output to `<name>.actual` in the test directory. Review it and copy it over the
+golden file when the change is intended.
+
 `test_piv_card_simulator` covers `tests/support/card_simulator.c`, a PIV card
 model for the card-level suites. It answers from the SD 33 card 2 and card 4
 fixtures in `tests/vectors/piv/sm_captures/fixtures` and applies the SP

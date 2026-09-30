@@ -18,6 +18,7 @@ or what a card returned; nothing here was generated. Assembled 2026-09-06.
 | `vci_trust_anchors/` | 27 | SM Certificate Signer objects, intermediate CVCs and VCI trust-anchor records for cards 2, 3, 4, 5, 16 |
 | `piv_auto_demo/` | 7 | PIV Auto simulator payloads (CVCs, SMCS, trust anchor record, PIV status/mode payloads) |
 | `sm_captures/` | 6 | Secure messaging captures from SD 33 cards 2 and 4 for wire-level replay, and the card simulator fixtures generated from them (see its README) |
+| `inspect/` | 3 | Expected output of `examples/piv_inspect.c` over the card simulator, written by the example (see its README) |
 
 ## `icam_cards/<NN_card_name>/`
 

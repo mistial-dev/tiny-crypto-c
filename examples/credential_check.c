@@ -141,14 +141,15 @@ int main(int argc, char** argv)
   TC_PIV_link link;
   int found = 0, ok = 0;
   memset(&link, 0, sizeof link);
-  if (!example_card_pcsc_open(&connection, argv[2])) {
+  const ExampleCardPCSCOptions reader = {argv[2], EXAMPLE_PCSC_DETECT, NULL};
+  if (example_card_pcsc_open(&connection, &reader) != EXAMPLE_PCSC_OPENED) {
     fputs("Unable to acquire the reader transaction\n", stderr);
     goto cleanup;
   }
-  /* No PIN is sent, so the interface rules of VERIFY never apply. The budget
+  /* No PIN is sent. The link takes the interface the ATR shows. The budget
    * covers both SELECTs, the GET DATA commands and their GET RESPONSE steps. */
   const TC_PIV_link_options options = {
-      {TC_APDU_SHORT, 0, EXCHANGE_BUDGET, 0, 0}, TC_PIV_CONTACT, 0};
+      {TC_APDU_SHORT, 0, EXCHANGE_BUDGET, 0, 0}, example_card_pcsc_interface(&connection), 0};
   if (TC_PIV_link_init(&link, (TC_APDU_transport){example_card_pcsc_transmit, &connection},
                        &options, (TC_buffer){storage.scratch, sizeof storage.scratch}) != TC_PIV_OK)
     goto cleanup;
