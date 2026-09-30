@@ -91,7 +91,9 @@
 #include <tiny_crypto/piv_biometric.h>
 #include <tiny_crypto/piv_certificate.h>
 #include <tiny_crypto/piv_card.h>
+#include <tiny_crypto/piv_card_objects.h>
 #include <tiny_crypto/piv_cms.h>
+#include <tiny_crypto/piv_discovery.h>
 #include <tiny_crypto/piv_printed.h>
 #include <tiny_crypto/lds.h>
 #include <tiny_crypto/piv_security.h>

@@ -585,7 +585,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   # PIV card commands need the APDU channel and the TLV readers.
   tc_add_test_library(tiny-crypto-c-test-piv-command
     src/common.c src/apdu_encode.c src/apdu_response.c src/apdu_channel.c
-    src/tlv.c src/tlv_walk.c src/tlv_write.c src/piv_container_internal.c
+    src/tlv.c src/tlv_walk.c src/tlv_write.c src/piv_container_internal.c src/piv_aid.c
     src/piv_link.c src/piv_select.c src/piv_get_data.c src/piv_verify.c src/piv_status.c
     src/piv_template_internal.c)
   target_compile_definitions(tiny-crypto-c-test-piv-command PUBLIC
@@ -622,7 +622,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
     tc_warnings(test_credential_command_entry)
     tc_use_test_sanitizers(test_credential_command_entry)
     tc_add_c_test(test_twic_command tiny-crypto-c-test-pki
-      tests/twic/command.c examples/credential_io.c
+      tests/twic/command.c examples/credential_io.c src/piv_certificate_decode.c
       $<TARGET_OBJECTS:test_credential_command_entry>)
     target_link_libraries(test_twic_command PRIVATE tiny-crypto-c-test-gzip)
   endif()
@@ -697,6 +697,22 @@ if(TINY_CRYPTO_BUILD_TESTS)
     add_test(NAME test_gzip_differential COMMAND ${Python3_EXECUTABLE}
       ${CMAKE_CURRENT_SOURCE_DIR}/tests/gzip/differential.py $<TARGET_FILE:test_gzip_reader>)
   endif()
+  # The card object readers need only the TLV readers, the shared AID table
+  # and GZIP for compressed certificates.
+  tc_add_test_library(tiny-crypto-c-test-piv-objects
+    src/common.c src/tlv.c src/tlv_walk.c src/piv_container_internal.c src/piv_aid.c
+    src/piv_discovery.c src/piv_ccc.c src/piv_key_history.c src/piv_bit_group.c
+    src/piv_pairing_code.c src/piv_certificate.c src/piv_certificate_decode.c
+    src/piv_card_objects_internal.c)
+  target_compile_definitions(tiny-crypto-c-test-piv-objects PUBLIC
+    TC_ENABLE_TLV=1 TC_ENABLE_DER=1 TC_TLV_ENABLE_BER=1 TC_ENABLE_X509=1 TC_ENABLE_PIV_OIDS=1
+    TC_ENABLE_CMS=1 TC_ENABLE_FASCN=1 TC_ENABLE_TWIC_UUID=1 TC_ENABLE_PIV_OBJECTS=1
+    TC_ENABLE_GZIP=1
+    TC_ENABLE_AES=0 TC_ENABLE_SHA256=0)
+  target_link_libraries(tiny-crypto-c-test-piv-objects PUBLIC tiny-crypto-c-test-gzip)
+  tc_add_c_test(test_piv_card_objects tiny-crypto-c-test-piv-objects tests/piv/card_objects.c)
+  target_compile_definitions(test_piv_card_objects PRIVATE
+    TC_PIV_VECTOR_DIR="${PROJECT_SOURCE_DIR}/tests/vectors/piv")
   tc_add_c_test(test_piv_cms_identifiers tiny-crypto-c-test-pki tests/piv/cms_identifiers.c)
   tc_add_c_test(test_lds tiny-crypto-c-test-pki tests/cms/lds.c)
   tc_add_c_test(test_piv_security tiny-crypto-c-test-pki tests/piv/security.c)
@@ -897,7 +913,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
         examples/credential_validate.c examples/credential_io.c
         examples/credential_object.c examples/cms_reader.c examples/cms_validate.c examples/pki_input.c
         examples/x509_revocation.c
-        src/twic_ccl.c src/inflate_tree.c src/inflate_bits.c
+        src/twic_ccl.c src/piv_certificate_decode.c src/inflate_tree.c src/inflate_bits.c
         src/inflate_tables.c src/inflate.c src/gzip.c src/gzip_api.c)
       target_compile_definitions(test_twic_authenticate_command PRIVATE TC_ENABLE_TWIC_CCL=1 TC_ENABLE_GZIP=1)
       target_link_libraries(test_twic_authenticate_command PRIVATE OpenSSL::Crypto ${ZLIB_LIBRARIES})
@@ -1626,7 +1642,8 @@ if(TINY_CRYPTO_BUILD_TESTS)
       COMMAND ${TC_AVR_CC} -std=c99 -Wall -Wextra -Werror -Os -mmcu=atmega2560
         -DTC_ENABLE_APDU=1 -DTC_ENABLE_TLV=1 -DTC_ENABLE_PIV_COMMAND=1
         -I${CMAKE_CURRENT_SOURCE_DIR}/src
-        -c ${CMAKE_CURRENT_SOURCE_DIR}/src/piv_link.c ${CMAKE_CURRENT_SOURCE_DIR}/src/piv_select.c
+        -c ${CMAKE_CURRENT_SOURCE_DIR}/src/piv_aid.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/piv_link.c ${CMAKE_CURRENT_SOURCE_DIR}/src/piv_select.c
         ${CMAKE_CURRENT_SOURCE_DIR}/src/piv_get_data.c ${CMAKE_CURRENT_SOURCE_DIR}/src/piv_verify.c
         ${CMAKE_CURRENT_SOURCE_DIR}/src/piv_status.c
         ${CMAKE_CURRENT_SOURCE_DIR}/src/piv_template_internal.c

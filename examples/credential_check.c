@@ -30,18 +30,12 @@ static int inspect_certificate(size_t length, ExampleCardApplication application
   const TC_bytes input = {response_buffer, length};
   const TC_PIV_certificate_profile profile =
       application == EXAMPLE_CARD_PIV ? TC_PIV_CERTIFICATE_SLOT : TC_PIV_CERTIFICATE_TWIC;
-  if (TC_PIV_certificate_read(input, profile, TC_PIV_CERTIFICATE_RECOMMENDED_BYTES, &container) !=
-      TC_TLV_OK)
+  size_t work = DECODE_WORK_LIMIT;
+  if (TC_PIV_certificate_decode(input, profile, TC_PIV_CERTIFICATE_RECOMMENDED_BYTES, &storage.gzip,
+                                &work, (TC_buffer){storage.certificate, sizeof storage.certificate},
+                                &container) != TC_TLV_OK)
     return 0;
-  TC_bytes encoded = container.certificate;
-  if (container.compression == TC_PIV_CERTIFICATE_GZIP) {
-    size_t work = DECODE_WORK_LIMIT, decoded;
-    if (TC_GZIP_decode(encoded, &storage.gzip, &work,
-                       (TC_buffer){storage.certificate, sizeof storage.certificate},
-                       &decoded) != TC_GZIP_OK)
-      return 0;
-    encoded = (TC_bytes){storage.certificate, decoded};
-  }
+  const TC_bytes encoded = container.certificate;
   const TC_TLV_limits limits = {CERTIFICATE_CAPACITY, CERTIFICATE_CAPACITY, 512, FRAME_CAPACITY};
   TC_TLV_frame frames[FRAME_CAPACITY];
   TC_bytes extensions[EXTENSION_CAPACITY];

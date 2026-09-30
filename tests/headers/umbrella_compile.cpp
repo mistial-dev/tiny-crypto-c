@@ -36,7 +36,8 @@ static tiny_crypto::rsa_public_key tc_header_rsa_key;
     !defined(TINY_CRYPTO_PIV_CERTIFICATE_H_) || !defined(TINY_CRYPTO_PIV_CARD_H_) ||               \
     !defined(TINY_CRYPTO_PIV_CMS_H_) || !defined(TINY_CRYPTO_LDS_H_) ||                            \
     !defined(TINY_CRYPTO_FASCN_H_) || !defined(TINY_CRYPTO_TWIC_UUID_H_) ||                        \
-    !defined(TINY_CRYPTO_PIV_SECURITY_H)
+    !defined(TINY_CRYPTO_PIV_SECURITY_H) || !defined(TINY_CRYPTO_PIV_DISCOVERY_H_) ||              \
+    !defined(TINY_CRYPTO_PIV_CARD_OBJECTS_H_)
 #error "The C++ umbrella must expose the PIV object C API"
 #endif
 static TC_PIV_card_identifiers tc_header_card_identifiers;

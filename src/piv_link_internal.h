@@ -4,6 +4,7 @@
 #ifndef TC_PIV_LINK_INTERNAL_H_
 #define TC_PIV_LINK_INTERNAL_H_
 #include <tiny_crypto/piv_command.h>
+#include "piv_aid_internal.h"
 
 /* TC_PIV_link.flags bits. */
 enum {
@@ -19,13 +20,6 @@ enum {
   TC_PIV_PLAIN_CLA = 0x00
 };
 
-/* The PIV AID prefix (SP 800-73-5 Part 1 2.2) and the TWIC AID prefix (TWIC
- * Part 2 v5 4.1), each followed by two version bytes in a complete AID. */
-#define TC_PIV_AID_PREFIX_BYTES 9u
-#define TC_PIV_AID_BYTES (TC_PIV_AID_PREFIX_BYTES + 2u)
-extern const uint8_t tc_piv_aid_prefixes[2][TC_PIV_AID_PREFIX_BYTES];
-/* The complete PIV AID with version 01 00. */
-extern const uint8_t tc_piv_aid[TC_PIV_AID_BYTES];
 /* Prefix for application PIV or TWIC, NULL for another value. */
 const uint8_t* tc_piv_aid_prefix(TC_PIV_application_id application);
 

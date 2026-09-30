@@ -455,6 +455,10 @@ CVC and the optional historic MSCUID. The MSCUID lies outside the signed
 certificate and is unauthenticated. Pass
 `TC_PIV_CERTIFICATE_RECOMMENDED_BYTES` (1856) as the certificate bound, or a
 larger application limit. SP 800-73-5 treats 1856 bytes as a recommendation.
+`TC_PIV_certificate_decode` adds GZIP decompression into a caller buffer and
+returns one DER certificate. The [card object readers](docs/piv-card.md#card-object-readers)
+cover the Discovery Object, CCC, Key History, BIT group and Pairing Code
+container.
 
 `TC_PIV_CVC_read` reads card and intermediate secure messaging CVCs as defined
 in SP 800-73-5 Part 2, section 4.1.5. Its `signed_data` span contains the

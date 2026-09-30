@@ -77,10 +77,11 @@ Keep input, output, decoder storage, work and length disjoint. Each call consume
 the supplied work budget. Refill it before starting another independent operation.
 
 For PIV certificate containers, `TC_PIV_certificate_read` identifies compressed
-certificate bytes through `TC_PIV_CERTIFICATE_GZIP`. After decompression, require
-the X.509 parser to consume the entire result. GZIP checksums detect accidental
-corruption. Credential authentication requires signature and trust
-validation.
+certificate bytes through `TC_PIV_CERTIFICATE_GZIP`. `TC_PIV_certificate_decode`
+reads the container, decompresses a GZIP certificate and checks that the result
+is one DER SEQUENCE. Require the X.509 parser to consume the entire result.
+GZIP checksums detect accidental corruption. Credential authentication requires
+signature and trust validation.
 
 Run the focused tests with:
 

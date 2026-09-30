@@ -1,7 +1,6 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
-/* SELECT, the application property template reader and the PIV/TWIC AID
- * table. */
+/* SELECT and the application property template reader. */
 #include <tiny_crypto/piv_command.h>
 #if TC_ENABLE_PIV_COMMAND
 #include "internal.h"
@@ -22,22 +21,11 @@ enum {
   LIMITS = 0x7f66, /* extended length information (ISO/IEC 7816-4 12.8.1) */
   SUITE_CS2 = 0x27,
   SUITE_CS7 = 0x2e,
-  VERSION_ONE = 0x01,
-  TWIC_LEGACY = 0x01,
-  TWIC_NEXGEN = 0x03,
   /* ISO/IEC 7816-4 12.8.1 limits the channel can apply: a header, and SW1
    * SW2 with one byte. */
   MIN_COMMAND_BYTES = TC_APDU_HEADER_BYTES,
   MIN_RESPONSE_BYTES = TC_APDU_STATUS_BYTES + 1
 };
-
-/* The PIV AID prefix (SP 800-73-5 Part 1 2.2) and the TWIC AID prefix (TWIC
- * Part 2 v5 4.1, Appendix C). Discovery and replay tools mirror this table. */
-const uint8_t tc_piv_aid_prefixes[2][TC_PIV_AID_PREFIX_BYTES] = {
-    {0xa0, 0x00, 0x00, 0x03, 0x08, 0x00, 0x00, 0x10, 0x00},
-    {0xa0, 0x00, 0x00, 0x03, 0x67, 0x20, 0x00, 0x00, 0x01}};
-const uint8_t tc_piv_aid[TC_PIV_AID_BYTES] = {0xa0, 0x00, 0x00, 0x03, 0x08, 0x00,
-                                              0x00, 0x10, 0x00, 0x01, 0x00};
 
 const uint8_t* tc_piv_aid_prefix(TC_PIV_application_id application)
 {
@@ -214,15 +202,16 @@ static TC_TLV_result template_read(const TC_TLV_reader* parent, const TC_TLV_ele
 static TC_TLV_result profile_get(const uint8_t* version, TC_PIV_application_id expected,
                                  unsigned flags, TC_PIV_card_profile* out)
 {
-  if (version[0] != VERSION_ONE)
+  if (version[0] != TC_PIV_AID_VERSION)
     return TC_TLV_UNSUPPORTED;
   if (expected == TC_PIV_APPLICATION_PIV) {
     if (version[1])
       return TC_TLV_UNSUPPORTED;
     *out = TC_PIV_CARD;
-  } else if (version[1] == TWIC_NEXGEN)
+  } else if (version[1] == TC_TWIC_AID_SUBVERSION_NEXGEN)
     *out = TC_TWIC_NEXGEN_CARD;
-  else if (version[1] == TWIC_LEGACY || (flags & TC_PIV_SELECT_TWIC_SUBVERSION_COMPATIBLE))
+  else if (version[1] == TC_TWIC_AID_SUBVERSION_LEGACY ||
+           (flags & TC_PIV_SELECT_TWIC_SUBVERSION_COMPATIBLE))
     *out = TC_TWIC_LEGACY_CARD;
   else
     return TC_TLV_UNSUPPORTED;

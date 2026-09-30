@@ -37,8 +37,8 @@ set(tc_module_sources_TC_ENABLE_APDU src/apdu_encode.c src/apdu_response.c src/a
 tc_module_feature(TINY_CRYPTO_ENABLE_PIV_COMMAND TC_ENABLE_PIV_COMMAND
   "Build PIV and TWIC card commands over the APDU channel")
 set(tc_module_sources_TC_ENABLE_PIV_COMMAND
-  src/piv_link.c src/piv_select.c src/piv_get_data.c src/piv_verify.c src/piv_status.c
-  src/piv_template_internal.c src/piv_container_internal.c)
+  src/piv_aid.c src/piv_link.c src/piv_select.c src/piv_get_data.c src/piv_verify.c
+  src/piv_status.c src/piv_template_internal.c src/piv_container_internal.c)
 
 tc_module_feature(TINY_CRYPTO_ENABLE_PIV_OIDS TC_ENABLE_PIV_OIDS
   "Build registered PIV and TWIC identifier classification")
@@ -81,8 +81,10 @@ set(tc_module_sources_TC_ENABLE_CMS_VALIDATION
 tc_module_feature(TINY_CRYPTO_ENABLE_PIV_OBJECTS TC_ENABLE_PIV_OBJECTS
   "Build PIV and TWIC credential-object readers")
 set(tc_module_sources_TC_ENABLE_PIV_OBJECTS
-  src/piv_cms.c src/piv_biometric.c src/piv_certificate.c src/piv_card.c
-  src/lds.c src/piv_security.c src/piv_printed.c)
+  src/piv_cms.c src/piv_biometric.c src/piv_certificate.c src/piv_certificate_decode.c
+  src/piv_card.c src/lds.c src/piv_security.c src/piv_printed.c src/piv_aid.c
+  src/piv_discovery.c src/piv_ccc.c src/piv_key_history.c src/piv_bit_group.c
+  src/piv_pairing_code.c src/piv_card_objects_internal.c)
 
 tc_module_feature(TINY_CRYPTO_ENABLE_CREDENTIAL TC_ENABLE_CREDENTIAL
   "Build composed PIV and TWIC credential validation")

@@ -850,18 +850,12 @@ static int card_certificate(ExampleCardIO* io, const Options* options, TC_PIV_ca
                                sizeof sensitive.response, &response) != EXAMPLE_CARD_OK)
     return 0;
   TC_PIV_certificate container;
-  if (TC_PIV_certificate_read((TC_bytes){sensitive.response, response.length}, container_profile,
-                              TC_PIV_CERTIFICATE_RECOMMENDED_BYTES, &container) != TC_TLV_OK)
+  if (TC_PIV_certificate_decode((TC_bytes){sensitive.response, response.length}, container_profile,
+                                TC_PIV_CERTIFICATE_RECOMMENDED_BYTES, &sensitive.scratch.gzip, work,
+                                (TC_buffer){sensitive.decoded, sizeof sensitive.decoded},
+                                &container) != TC_TLV_OK)
     return 0;
   *encoded = container.certificate;
-  if (container.compression == TC_PIV_CERTIFICATE_GZIP) {
-    size_t decoded;
-    if (TC_GZIP_decode(*encoded, &sensitive.scratch.gzip, work,
-                       (TC_buffer){sensitive.decoded, sizeof sensitive.decoded},
-                       &decoded) != TC_GZIP_OK)
-      return 0;
-    *encoded = (TC_bytes){sensitive.decoded, decoded};
-  }
   return 1;
 }
 

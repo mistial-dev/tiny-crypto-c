@@ -84,6 +84,13 @@ TWIC Legacy and NEXGEN templates, GET DATA framing for each application, the
 VERIFY retry query, the PIN retry floor, the contactless refusals and the
 status meanings of each command.
 
+`test_piv_card_objects` covers the [card object readers](piv-card.md#card-object-readers)
+with recorded SD 33 and ICAM bytes from `tests/vectors/piv`: Discovery
+Objects under both profiles and every first policy byte, the SD 33 and ICAM
+CCCs with the SP 800-73-4 legacy elements, Key History counts and URLs up to
+the 118-byte bound, BIT groups, a synthetic pairing code, and the GZIP SD 33
+content signer certificate decoded to its DER file with the wipe rules.
+
 TWIC CCL parsing and lookup use `test_twic_ccl`. See the
 [CCL guide](twic-ccl.md#tests) for testing a downloaded TSA feed. Its external
 file case skips when `TC_TEST_TWIC_CCL` is unset. Synthetic cases always run.

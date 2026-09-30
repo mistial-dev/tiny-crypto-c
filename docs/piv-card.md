@@ -137,6 +137,77 @@ to a `TC_PIV_status` by Part 1 section 5.6 Table 7. `6A88` means a missing key
 or data reference, except on TWIC GET DATA, where it reports a missing object
 (TWIC Part 2 v5 section 5.2). `63CX` on VERIFY writes X to `retries`.
 
+## Card object readers
+
+`TINY_CRYPTO_ENABLE_PIV_OBJECTS` adds readers for the objects that drive the
+card session. Pass them the `encoded` span of a `TC_PIV_data_object`. They check
+one complete object against its table, return views borrowed from the input,
+charge no work and write their output only on `TC_TLV_OK`.
+
+| Object                    | Tag      | Header                             | Reader                      |
+| ------------------------- | -------- | ---------------------------------- | --------------------------- |
+| Discovery Object          | `7E`     | `<tiny_crypto/piv_discovery.h>`    | `TC_PIV_discovery_read`     |
+| Card Capability Container | `5FC107` | `<tiny_crypto/piv_card_objects.h>` | `TC_PIV_CCC_read`           |
+| Key History               | `5FC10C` | `<tiny_crypto/piv_card_objects.h>` | `TC_PIV_key_history_read`   |
+| BIT group template        | `7F61`   | `<tiny_crypto/piv_card_objects.h>` | `TC_PIV_bit_group_read`     |
+| Pairing Code container    | `5FC123` | `<tiny_crypto/piv_card_objects.h>` | `TC_PIV_pairing_code_read`  |
+| Certificate containers    | `5FC1xx` | `<tiny_crypto/piv_certificate.h>`  | `TC_PIV_certificate_decode` |
+
+- Discovery (Part 1 section 3.3.2 and Table 1) must be exactly
+  `7E 12 {4F 0B AID} {5F2F 02 xx yy}`. `TC_PIV_DISCOVERY_PIV` requires the PIV
+  AID and a Table 1 policy. `TC_PIV_DISCOVERY_TWIC` reads a TWIC card, where
+  the PIV application reports `40 00` or `04 00` and the TWIC application
+  `00 00` under a TWIC AID (TWIC Part 2 v5 sections 4.2 and 4.7.5).
+  `TC_PIV_discovery_pin_reference` returns `00` when the Global PIN is enabled
+  and preferred, and `80` otherwise. Integrity comes from the Security Object
+  or from reading the object under secure messaging.
+- The CCC, Key History and Pairing Code readers take `TC_PIV_CONTAINER` for the
+  `53` object or `TC_PIV_CONTENTS` for its value. The CCC follows Part 1 Table
+  9 and accepts the optional `E3` and `B4` elements of SP 800-73-4 Part 1 Table
+  8 found on older cards. Key History checks the counts and the
+  `http://<DNS name>/<SHA-256 hex>` URL of Part 1 section 3.3.3, at most 118
+  bytes.
+- The BIT group holds 0 to 2 finger templates of at most 28 bytes. A nonempty
+  group requires the Discovery OCC bit (Part 1 section 3.3.6). Compare the two
+  objects after reading both.
+- The pairing code is PIN-gated secret material (Part 1 Table 2). The returned
+  span borrows the response buffer, so wipe that buffer when done.
+- `TC_PIV_certificate_decode` reads a certificate container and returns one
+  DER certificate. A plain certificate borrows the container. A GZIP
+  certificate, such as the SD 33 SMCS object with CertInfo `01`, is decoded into
+  the caller's `der` buffer. Every failure after the argument checks wipes
+  `der`. It needs `TINY_CRYPTO_ENABLE_GZIP`.
+
+```c
+#include <tiny_crypto/piv_card_objects.h>
+#include <tiny_crypto/piv_certificate.h>
+#include <tiny_crypto/piv_command.h>
+#include <tiny_crypto/piv_discovery.h>
+
+/* Choose the PIN reference from a Discovery Object and decode a certificate
+ * object, both read with TC_PIV_get_data. On success, certificate borrows the
+ * certificate object or der. */
+int inspect_objects(const TC_PIV_data_object* discovery_object,
+                    const TC_PIV_data_object* certificate_object, uint8_t* der,
+                    size_t der_capacity, uint8_t* pin_reference, TC_bytes* certificate)
+{
+  static TC_GZIP_workspace gzip;
+  TC_PIV_discovery discovery;
+  TC_PIV_certificate container;
+  size_t work = 200000; /* bounds the GZIP decoder */
+  if (TC_PIV_discovery_read(discovery_object->encoded, TC_PIV_DISCOVERY_PIV, &discovery) !=
+      TC_TLV_OK)
+    return 0;
+  *pin_reference = TC_PIV_discovery_pin_reference(&discovery);
+  if (TC_PIV_certificate_decode(certificate_object->encoded, TC_PIV_CERTIFICATE_SLOT,
+                                TC_PIV_CERTIFICATE_RECOMMENDED_BYTES, &gzip, &work,
+                                (TC_buffer){der, der_capacity}, &container) != TC_TLV_OK)
+    return 0; /* der is wiped */
+  *certificate = container.certificate;
+  return 1;
+}
+```
+
 ## Example
 
 ```c
@@ -180,7 +251,9 @@ link and clears it on destruction. `piv_application_read` and
 ## Limits
 
 - The template reader accepts at most 4096 bytes, 64 elements and 4 nesting
-  levels.
+  levels. The card object readers accept one level and at most 16 elements.
+- The card object readers check structure only. Authenticate the objects with
+  the Security Object before relying on them.
 - Commands travel in plaintext. Secure messaging, the VCI, CHANGE REFERENCE
   DATA, RESET RETRY COUNTER, PUT DATA, GENERATE ASYMMETRIC KEY PAIR and OCC
   VERIFY (`96`, `97`) are outside this module.
