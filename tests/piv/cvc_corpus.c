@@ -5,12 +5,9 @@
 #include <tiny_crypto/hash.h>
 #include "munit.h"
 #include "test_util.h"
+#include "binary_stdio.h"
 #include <stdio.h>
 #include <string.h>
-#ifdef _WIN32
-#include <fcntl.h>
-#include <io.h>
-#endif
 
 enum {
   RECORD_HEADER = 40,
@@ -196,10 +193,8 @@ TC_TEST(records)
 
 int main(int argc, char** argv)
 {
-#ifdef _WIN32
-  if (_setmode(_fileno(stdin), _O_BINARY) == -1)
+  if (!tc_test_binary_stdio())
     return 1;
-#endif
   MunitTest tests[] = {{"/records", records, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
                        {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
   MunitSuite suite = {"/piv/cvc-corpus", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};

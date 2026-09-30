@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  * Byte-output adapter for the vendored Wycheproof HKDF corpus. */
 #include <errno.h>
+#include "binary_stdio.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -54,7 +55,7 @@ int main(int argc, char** argv)
 
   /* argv: hash ikm salt info length [auxiliary]. A sixth argument is the
    * SP 800-56C revision 2 hybrid secret T, which follows Z as a second part. */
-  if (argc != 6 && argc != 7)
+  if ((argc != 6 && argc != 7) || !tc_test_binary_stdio())
     return 2;
   derive = select_hash(argv[1]);
   if (derive == NULL || !read_hex(argv[2], ikm, sizeof ikm, &ikm_len) ||

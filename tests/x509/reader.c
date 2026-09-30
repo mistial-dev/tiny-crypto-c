@@ -1,13 +1,10 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/x509.h>
+#include "binary_stdio.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#ifdef _WIN32
-#include <fcntl.h>
-#include <io.h>
-#endif
 
 static void field(const char* name, TC_bytes value)
 {
@@ -54,10 +51,8 @@ int main(int argc, char** argv)
   file = strcmp(argv[1], "-") == 0 ? stdin : fopen(argv[1], "rb");
   if (!file)
     return 2;
-#ifdef _WIN32
-  if (file == stdin && _setmode(_fileno(stdin), _O_BINARY) == -1)
+  if (file == stdin && !tc_test_binary_stdio())
     return 2;
-#endif
   length = fread(bytes, 1, sizeof bytes, file);
   if (ferror(file) || !feof(file)) {
     fclose(file);

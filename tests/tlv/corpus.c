@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/tlv.h>
+#include "binary_stdio.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -21,6 +22,8 @@ static void node(void* user, const TC_TLV_event* e)
 int main(void)
 {
   uint8_t header[5];
+  if (!tc_test_binary_stdio())
+    return 2;
   const TC_TLV_limits limits = {65535, 65535, 8192, 32};
   const size_t chunks[] = {1, 17, 257};
   for (;;) {

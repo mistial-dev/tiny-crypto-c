@@ -3,12 +3,9 @@
 #include <tiny_crypto/gzip.h>
 #include "munit.h"
 #include "test_util.h"
+#include "binary_stdio.h"
 #include <stdio.h>
 #include <string.h>
-#if defined(_WIN32)
-#include <fcntl.h>
-#include <io.h>
-#endif
 
 enum { INPUT_CAPACITY = 262144, OUTPUT_CAPACITY = 131072 };
 static uint8_t input[INPUT_CAPACITY], expected[OUTPUT_CAPACITY], output[OUTPUT_CAPACITY + 1];
@@ -64,10 +61,8 @@ TC_TEST(vectors)
 }
 int main(int argc, char** argv)
 {
-#if defined(_WIN32)
-  if (_setmode(_fileno(stdin), _O_BINARY) == -1)
+  if (!tc_test_binary_stdio())
     return 1;
-#endif
   MunitTest tests[] = {{"/vectors", vectors, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
                        {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
   MunitSuite suite = {"/gzip", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};
