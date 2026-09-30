@@ -164,7 +164,10 @@ charge no work and write their output only on `TC_TLV_OK`.
   `00 00` under a TWIC AID (TWIC Part 2 v5 sections 4.2 and 4.7.5).
   `TC_PIV_discovery_pin_reference` returns `00` when the Global PIN is enabled
   and preferred, and `80` otherwise. Integrity comes from the Security Object
-  or from reading the object under secure messaging.
+  or from reading the object under secure messaging. `TC_PIV_discovery_get`
+  in `<tiny_crypto/piv_vci.h>` reads the object over the link and records in
+  `secured` whether it arrived under secure messaging
+  ([virtual contact interface](piv-sm.md#virtual-contact-interface)).
 - The CCC, Key History and Pairing Code readers take `TC_PIV_CONTAINER` for the
   `53` object or `TC_PIV_CONTENTS` for its value. The CCC follows Part 1 Table
   9 and accepts the optional `E3` and `B4` elements of SP 800-73-4 Part 1 Table

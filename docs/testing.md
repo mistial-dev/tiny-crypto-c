@@ -93,6 +93,14 @@ protection, the contactless PIN rules and the key establishment framing with
 the recorded SD 33 card 2 exchange. `test_cpp_piv_sm_apdu` runs the C++
 wrappers over the same model.
 
+`test_piv_vci` covers the [virtual contact interface](piv-sm.md#virtual-contact-interface)
+over the same model and the scripted transport: the Discovery Object read on
+plain and secured links, the TWIC `53` form and empty object, pairing with the
+Part 2 Table 25 example code, pairing-free policies, rejected codes, secure
+messaging failures on the pairing VERIFY, the refusals before anything is
+sent, argument errors, and the SELECT, unsecure, session-loss and key-request
+events that clear the VCI. `test_cpp_piv_vci` runs the C++ wrappers.
+
 `test_piv_card_objects` covers the [card object readers](piv-card.md#card-object-readers)
 with recorded SD 33 and ICAM bytes from `tests/vectors/piv`: Discovery
 Objects under both profiles and every first policy byte, the SD 33 and ICAM

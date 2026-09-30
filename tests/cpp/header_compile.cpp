@@ -305,5 +305,18 @@ int tiny_crypto_cpp_header_compile(uint8_t* data, size_t length)
     tiny_crypto::piv_link_unsecure(link);
   }
 #endif
+#if TC_ENABLE_PIV_VCI
+  {
+    tiny_crypto::piv_link link;
+    tiny_crypto::piv_discovery discovery{};
+    tiny_crypto::piv_vci_mode mode = TC_PIV_VCI_PAIRED;
+    if (tiny_crypto::piv_discovery_get(link, TC_PIV_DISCOVERY_PIV,
+                                       tiny_crypto::buffer{data, length},
+                                       discovery) != TC_PIV_ARGUMENT ||
+        tiny_crypto::piv_vci_establish(link, discovery, tiny_crypto::bytes{nullptr, 0}, mode) !=
+            TC_PIV_ARGUMENT)
+      ++failures;
+  }
+#endif
   return failures;
 }

@@ -40,6 +40,14 @@
 #define TC_ENABLE_DER 1
 #define TC_ENABLE_PIV_CVC 1
 #define TC_ENABLE_PIV_SM_APDU 1
+#define TC_TLV_ENABLE_BER 1
+#define TC_ENABLE_X509 1
+#define TC_ENABLE_PIV_OIDS 1
+#define TC_ENABLE_CMS 1
+#define TC_ENABLE_FASCN 1
+#define TC_ENABLE_TWIC_UUID 1
+#define TC_ENABLE_PIV_OBJECTS 1
+#define TC_ENABLE_PIV_VCI 1
 #define TC_ENABLE_DRBG 1
 #define TC_DRBG_ENABLE_HASH 1
 #define TC_DRBG_ENABLE_HMAC 1
@@ -63,6 +71,7 @@
 #include <tiny_crypto/piv_command.hpp>
 #include <tiny_crypto/piv_sm.hpp>
 #include <tiny_crypto/piv_sm_apdu.hpp>
+#include <tiny_crypto/piv_vci.hpp>
 #include <tiny_crypto/rsa.hpp>
 #include <tiny_crypto/tlv.hpp>
 
@@ -248,6 +257,10 @@ void tiny_crypto_nodiscard_compile(uint8_t* data, size_t length)
   piv_sm_workspace& w = sm_workspace;
   piv_sm_key_request(link, session, TC_PIV_SM_CS2, id, rng, out, peer, w); /* DISCARDED */
   piv_link_secure(link, sm_workspace, out);                                /* DISCARDED */
+  piv_discovery discovery = {};
+  piv_vci_mode mode = TC_PIV_VCI_PAIRED;
+  piv_discovery_get(link, TC_PIV_DISCOVERY_PIV, out, discovery); /* DISCARDED */
+  piv_vci_establish(link, discovery, in, mode);                  /* DISCARDED */
 
   /* Clearing stays unmarked. */
   aes.clear();

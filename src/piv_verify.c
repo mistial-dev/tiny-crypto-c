@@ -129,26 +129,33 @@ TC_PIV_result TC_PIV_verify_status(TC_PIV_link* link, uint8_t reference,
   return result;
 }
 
-static int pin_valid(TC_bytes pin)
+int tc_piv_digits_valid(TC_bytes digits, size_t minimum)
 {
-  if (!pin.data || pin.length < PIN_MIN_DIGITS || pin.length > PIN_BYTES)
+  if (!digits.data || digits.length < minimum || digits.length > PIN_BYTES)
     return 0;
-  for (size_t i = 0; i < pin.length; ++i)
-    if (pin.data[i] < '0' || pin.data[i] > '9')
+  for (size_t i = 0; i < digits.length; ++i)
+    if (digits.data[i] < '0' || digits.data[i] > '9')
       return 0;
   return 1;
+}
+
+TC_PIV_result tc_piv_verify_submit(TC_PIV_link* link, uint8_t reference, TC_bytes digits,
+                                   uint16_t* sw)
+{
+  uint8_t padded[PIN_BYTES];
+  memset(padded, PIN_PADDING, sizeof padded);
+  memcpy(padded, digits.data, digits.length);
+  const TC_PIV_result result = verify_send(link, reference, (TC_bytes){padded, sizeof padded}, sw);
+  TC_secure_zero(padded, sizeof padded);
+  return result;
 }
 
 /* Submit the padded PIN once. No retry and no length correction. */
 static TC_PIV_result pin_submit(TC_PIV_link* link, uint8_t reference, TC_bytes pin,
                                 TC_PIV_reference_status* status)
 {
-  uint8_t padded[PIN_BYTES];
-  memset(padded, PIN_PADDING, sizeof padded);
-  memcpy(padded, pin.data, pin.length);
   uint16_t sw = 0;
-  TC_PIV_result result = verify_send(link, reference, (TC_bytes){padded, sizeof padded}, &sw);
-  TC_secure_zero(padded, sizeof padded);
+  const TC_PIV_result result = tc_piv_verify_submit(link, reference, pin, &sw);
   if (result != TC_PIV_OK)
     return result;
   pin_status_record(link, reference, sw);
@@ -165,9 +172,9 @@ static TC_PIV_result pin_submit(TC_PIV_link* link, uint8_t reference, TC_bytes p
 TC_PIV_result TC_PIV_pin_verify(TC_PIV_link* link, uint8_t reference, TC_bytes pin,
                                 unsigned minimum_retries, TC_PIV_reference_status* out)
 {
-  if (!tc_piv_link_ready(link) || !out || !pin_reference(reference) || !pin_valid(pin) ||
-      minimum_retries < RETRIES_FLOOR || minimum_retries > RETRIES_MAXIMUM ||
-      !tc_piv_link_disjoint(link, pin.data, pin.length) ||
+  if (!tc_piv_link_ready(link) || !out || !pin_reference(reference) ||
+      !tc_piv_digits_valid(pin, PIN_MIN_DIGITS) || minimum_retries < RETRIES_FLOOR ||
+      minimum_retries > RETRIES_MAXIMUM || !tc_piv_link_disjoint(link, pin.data, pin.length) ||
       !tc_internal_ranges_disjoint(pin.data, pin.length, out, sizeof *out))
     return TC_PIV_ARGUMENT;
   TC_PIV_result result = verify_allowed(link, reference);

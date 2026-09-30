@@ -36,6 +36,8 @@ typedef struct {
   uint8_t policy;     /* first PIN usage policy byte */
   uint8_t preference; /* second PIN usage policy byte */
   uint8_t profile;    /* the TC_PIV_discovery_profile the object was read under */
+  uint8_t secured;    /* 1 when TC_PIV_discovery_get read it under secure
+                         messaging (piv_vci.h), 0 from TC_PIV_discovery_read */
 } TC_PIV_discovery;
 
 /* Read a complete Discovery Object, 7E 12 {4F 0B AID} {5F2F 02 policy
@@ -55,8 +57,9 @@ typedef struct {
  * length, an unknown profile or overlap. MORE when encoded ends inside the 7E
  * object. INVALID for another tag or length, a different layout, trailing
  * bytes, or an AID or policy outside the profile. out changes only on OK.
- * Integrity comes from the Security Object (Part 1 section 3.3.2) or from
- * reading the object under secure messaging. */
+ * out->secured is 0. Integrity comes from the Security Object (Part 1
+ * section 3.3.2) or from reading the object under secure messaging with
+ * TC_PIV_discovery_get. */
 TC_TLV_result TC_PIV_discovery_read(TC_bytes encoded, TC_PIV_discovery_profile profile,
                                     TC_PIV_discovery* out);
 

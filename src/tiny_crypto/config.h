@@ -726,6 +726,18 @@
 #error "PIV secure messaging framing requires PIV card commands, PIV SM and PIV CVC"
 #endif
 
+/* PIV virtual contact interface: the Discovery Object read over the link and
+ * the pairing-code VERIFY under secure messaging. */
+#ifndef TC_ENABLE_PIV_VCI
+#define TC_ENABLE_PIV_VCI TC_PROFILE_VALUE(0, 0, 0, 1)
+#endif
+#if TC_ENABLE_PIV_VCI != 0 && TC_ENABLE_PIV_VCI != 1
+#error "TC_ENABLE_PIV_VCI must be 0 or 1"
+#endif
+#if TC_ENABLE_PIV_VCI && (!TC_ENABLE_PIV_SM_APDU || !TC_ENABLE_PIV_OBJECTS)
+#error "The PIV virtual contact interface requires PIV secure messaging framing and PIV objects"
+#endif
+
 /* DRBG mechanism dependencies, checked after every option is defined. */
 #if TC_ENABLE_DRBG
 #if !TC_DRBG_ENABLE_HASH && !TC_DRBG_ENABLE_HMAC && !TC_DRBG_ENABLE_CTR

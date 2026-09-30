@@ -16,6 +16,9 @@ layers:
   `87/97/99/8E` wire format of protected commands and responses, command
   chaining and the session-loss rule (sections 4.1.8 and 4.2 to 4.3). GET DATA
   and VERIFY on a secured link are protected with no change to their calls.
+- `<tiny_crypto/piv_vci.h>` establishes the
+  [virtual contact interface](#virtual-contact-interface) on a secured link
+  (Part 1 section 5.5).
 
 The application owns I/O, the trust decision for the content signer and the
 choice of when to secure the link.
@@ -26,7 +29,9 @@ Enable `TINY_CRYPTO_ENABLE_PIV_SM`. The desktop profile enables it with its
 dependencies. The session module needs AES with `TINY_CRYPTO_AES_DYNAMIC`,
 SHA-256, SSKDF and EC. `TC_PIV_SM_authenticate_response` also needs X.509 and
 PIV CVC parsing. `TINY_CRYPTO_ENABLE_PIV_SM_APDU` adds the link layer and
-needs the PIV card commands, the session and PIV CVC parsing. The suites
+needs the PIV card commands, the session and PIV CVC parsing.
+`TINY_CRYPTO_ENABLE_PIV_VCI` adds the virtual contact interface and needs the
+link layer and the PIV object readers. The suites
 follow Table 18.
 
 | Suite | P1   | Curve | KDF hash | Session keys | Nonce    |
@@ -196,6 +201,67 @@ READY.
 On a contactless link a PIN reaches the card only under secure messaging with
 the VCI, and VERIFY and GET DATA on a secured link are always protected
 (Part 1 Table 4, Part 2 section 3.2.1).
+
+## Virtual contact interface
+
+Over contactless, the PIV PIN, the PIV Authentication key and the objects
+marked VCI in Part 1 Table 2 need the virtual contact interface. Part 1
+section 5.5 and Table 2 footnote 9 define it as a security condition: the
+command travels under secure messaging, the Discovery Object is present with
+policy bit 4 set, and either the pairing code was verified or policy bit 3
+waives it.
+
+1. Secure the link as above.
+1. `TC_PIV_discovery_get` reads the Discovery Object `7E` with GET DATA. On a
+   secured link the answer arrives under secure messaging, and the result
+   records `secured = 1`. The object carries no signature of its own, so the
+   VCI and PIN-reference decisions use this protected read (Part 1 section
+   3.3.2). `TC_PIV_discovery_pin_reference` gives the PIN reference for
+   VERIFY.
+1. `TC_PIV_vci_establish` checks the policy. With bit 3 set nothing is sent,
+   and the mode is `TC_PIV_VCI_WITHOUT_PAIRING`. Otherwise VERIFY `98` goes
+   out under secure messaging with the 8-digit pairing code (Part 2 section
+   3.2.1.3 and Table 25), and `9000` gives `TC_PIV_VCI_PAIRED`.
+1. `TC_PIV_link_info_get` then reports `vci = 1`, and `TC_PIV_pin_verify` may
+   send the PIN on the contactless link.
+
+```c
+#include <tiny_crypto/piv_vci.h>
+
+/* Open the VCI on a secured link. pairing_code holds the 8 digits, or is
+ * empty for a card whose policy waives pairing. discovery_response must stay
+ * unchanged while discovery->aid is used. */
+TC_PIV_result open_vci(TC_PIV_link* link, TC_bytes pairing_code, uint8_t* discovery_response,
+                       size_t response_capacity, TC_PIV_discovery* discovery)
+{
+  TC_PIV_vci_mode mode;
+  TC_PIV_result result =
+      TC_PIV_discovery_get(link, TC_PIV_DISCOVERY_PIV,
+                           (TC_buffer){discovery_response, response_capacity}, discovery);
+  if (result != TC_PIV_OK)
+    return result; /* CARD_STATUS 6A82: the card has no Discovery Object */
+  /* TC_PIV_UNSUPPORTED: the card has no VCI. TC_PIV_CARD_STATUS with
+   * TC_PIV_link_status 6300: a wrong pairing code, and the session stays
+   * READY. */
+  return TC_PIV_vci_establish(link, discovery, pairing_code, &mode);
+}
+```
+
+`TC_PIV_DISCOVERY_RESPONSE_BYTES` sizes the response buffer for the Discovery
+Object on any link. The results follow `<tiny_crypto/piv_vci.h>`:
+
+| Result               | Meaning                                                                                            |
+| -------------------- | -------------------------------------------------------------------------------------------------- |
+| `TC_PIV_UNSUPPORTED` | the TWIC application or profile, or policy bit 4 clear                                             |
+| `TC_PIV_REFUSED`     | an unsecured link, a lost session, or a Discovery Object read without secure messaging             |
+| `TC_PIV_ARGUMENT`    | a code other than 8 ASCII digits, an empty code when pairing is required, or overlap with the link |
+| `TC_PIV_CARD_STATUS` | a rejected code, such as `6300`, clears the VCI. An outer SM status also ends the session          |
+
+The VCI ends with the conditions it depends on: a SELECT, `TC_PIV_link_unsecure`,
+a session loss and a new key request all clear it. The pairing code is secret
+material. The library copies it to a stack array and the secure messaging
+scratch, and wipes both. The contact interface accepts the call too, where it
+serves no purpose (Part 1 Table 4 footnote 11).
 
 ## Key establishment
 
@@ -387,7 +453,8 @@ returns the `TC_PIV_SM` for the C layers.
 and `piv_link_unsecure` over a `piv_link` and a `piv_sm`. The link holds a
 pointer to the session while it is bound, so declare the `piv_sm` before the
 `piv_link`. The link is then destroyed first, and its destructor clears the
-bound session while the session still exists.
+bound session while the session still exists. `<tiny_crypto/piv_vci.hpp>`
+adds `piv_discovery_get` and `piv_vci_establish` over a `piv_link`.
 
 ## Tests
 
@@ -398,6 +465,9 @@ format, `87` lengths of one to three octets, `1C` chaining, GET RESPONSE, the
 key establishment framing and every session-loss case. `test_piv_sm_synthetic`
 replays generated sessions, and `test_sm_primitives_corpus` replays the
 recorded NIST SD 33 exchanges of `tests/vectors/piv/sm_captures` byte for byte
-through the link. `test_piv_sm_authenticate` checks CVC chains through the
+through the link. `test_piv_vci` covers the Discovery Object read on plain
+and secured links, pairing, pairing-free policies, rejected codes, refusals and
+the events that clear the VCI, and `test_cpp_piv_vci` runs the C++ wrappers.
+`test_piv_sm_authenticate` checks CVC chains through the
 combined helper. `fuzz_piv_sm` exercises response authentication and the link
 framing. See [Running the tests](testing.md).

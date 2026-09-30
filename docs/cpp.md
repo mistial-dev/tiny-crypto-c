@@ -119,7 +119,8 @@ outlive the object.
 link borrows the session, the workspace and the secure messaging scratch.
 Declare the `piv_sm` before the `piv_link`, so the link is destroyed first and
 clears the bound session while it exists. `piv_sm::native` returns the
-`TC_PIV_SM`.
+`TC_PIV_SM`. `piv_discovery_get` and `piv_vci_establish` in `piv_vci.hpp` take
+the `piv_link` by reference and follow the same lifetime.
 
 ## GCM streaming
 

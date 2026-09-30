@@ -172,16 +172,18 @@ if(TINY_CRYPTO_BUILD_TESTS)
     src/tlv.c src/tlv_walk.c src/tlv_write.c src/piv_container_internal.c src/piv_aid.c
     src/piv_link.c src/piv_select.c src/piv_get_data.c src/piv_verify.c src/piv_status.c
     src/piv_template_internal.c)
+  # Secure messaging on the card link: the session, CVC reader and commands.
+  set(tc_piv_sm_link_sources src/common.c ${tc_aes_sources}
+    ${tc_hash_sources} src/sskdf.c src/ec.c src/der.c src/piv_cvc.c
+    src/piv_sm.c src/piv_sm_message.c ${tc_piv_command_sources}
+    src/piv_sm_apdu.c src/piv_sm_key_request.c)
   foreach(sm_profile dual cs2 cs7 micro mini)
     if(sm_profile STREQUAL "dual")
       set(sm_suffix "")
     else()
       set(sm_suffix "-${sm_profile}")
     endif()
-  tc_add_test_library(tiny-crypto-c-test-piv-sm${sm_suffix} src/common.c ${tc_aes_sources}
-    ${tc_hash_sources} src/sskdf.c src/ec.c src/der.c src/piv_cvc.c
-    src/piv_sm.c src/piv_sm_message.c ${tc_piv_command_sources}
-    src/piv_sm_apdu.c src/piv_sm_key_request.c)
+  tc_add_test_library(tiny-crypto-c-test-piv-sm${sm_suffix} ${tc_piv_sm_link_sources})
   target_compile_definitions(tiny-crypto-c-test-piv-sm${sm_suffix} PUBLIC
     TC_RESOURCE_PROFILE=$<IF:$<STREQUAL:${sm_profile},micro>,1,$<IF:$<STREQUAL:${sm_profile},mini>,2,0>>
     TC_ENABLE_PIV_SM=1 TC_AES_ENABLE_DYNAMIC=1 TC_ENABLE_EC=1 TC_ENABLE_SSKDF=1
@@ -212,6 +214,22 @@ if(TINY_CRYPTO_BUILD_TESTS)
           --reader $<TARGET_FILE:test_piv_sm_apdu_replay${sm_suffix}> ${sm_fixture_args})
     endif()
   endforeach()
+  # The virtual contact interface adds the Discovery Object reader. The
+  # object-reader switches satisfy config.h, and only piv_discovery.c of that
+  # module is linked.
+  tc_add_test_library(tiny-crypto-c-test-piv-vci ${tc_piv_sm_link_sources}
+    src/piv_discovery.c src/piv_discovery_get.c src/piv_vci.c)
+  target_compile_definitions(tiny-crypto-c-test-piv-vci PUBLIC
+    TC_ENABLE_PIV_SM=1 TC_AES_ENABLE_DYNAMIC=1 TC_ENABLE_EC=1 TC_ENABLE_SSKDF=1
+    TC_ENABLE_SHA384=1 TC_PIV_SM_ENABLE_CS2=1 TC_PIV_SM_ENABLE_CS7=1
+    TC_EC_ENABLE_P256=1 TC_EC_ENABLE_P384=1
+    TC_ENABLE_TLV=1 TC_ENABLE_DER=1 TC_ENABLE_PIV_CVC=1
+    TC_ENABLE_APDU=1 TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_PIV_SM_APDU=1
+    TC_TLV_ENABLE_BER=1 TC_ENABLE_X509=1 TC_ENABLE_PIV_OIDS=1 TC_ENABLE_CMS=1
+    TC_ENABLE_FASCN=1 TC_ENABLE_TWIC_UUID=1 TC_ENABLE_PIV_OBJECTS=1 TC_ENABLE_PIV_VCI=1)
+  tc_add_c_test(test_piv_vci tiny-crypto-c-test-piv-vci tests/piv/vci.c
+    tests/support/sm_card.c tests/support/scripted_transport.c)
+  tc_sm_fixture_header(test_piv_vci)
   foreach(small 0 1)
     tc_add_test_library(tiny-crypto-c-test-ec-${small} src/common.c src/ec.c ${tc_rsa_sources} src/pki_storage.c src/tlv.c src/tlv_walk.c src/der.c src/x509_key.c src/pki_key.c)
     target_compile_definitions(tiny-crypto-c-test-ec-${small} PUBLIC
@@ -1146,6 +1164,10 @@ if(TINY_CRYPTO_BUILD_TESTS)
     target_include_directories(test_cpp_piv_sm_apdu PRIVATE tests/support)
     tc_sm_fixture_header(test_cpp_piv_sm_apdu)
     target_include_directories(test_cpp_piv_command PRIVATE tests/support)
+    tc_add_linked_test(test_cpp_piv_vci tiny-crypto-c-test-piv-vci
+      tests/cpp/piv_vci.cpp tests/support/sm_card.c tests/cpp/main.cpp)
+    target_include_directories(test_cpp_piv_vci PRIVATE tests/support)
+    tc_sm_fixture_header(test_cpp_piv_vci)
     target_include_directories(test_cpp_apdu PRIVATE tests/support)
     target_include_directories(test_cpp_tlv PRIVATE tests/support)
   endif()
@@ -1379,7 +1401,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   # This catches accidental feature coupling and keeps their C API surface equal.
   foreach(header_profile rsa tlv apdu piv_command aamva fascn twic_uuid twic_tpk twic_object hkdf aes_kw
       piv_oids x509 key_challenge x509_path x509_revocation x509_ocsp cms cms_validation piv_objects credential piv_cvc piv_chuid
-      piv_sm piv_sm_apdu twic_ccl)
+      piv_sm piv_sm_apdu piv_vci twic_ccl)
     set(header_profile_definitions TC_ENABLE_AES=0 TC_ENABLE_SHA256=0)
     if(header_profile STREQUAL "hkdf")
       list(REMOVE_ITEM header_profile_definitions TC_ENABLE_SHA256=0)
@@ -1478,6 +1500,16 @@ if(TINY_CRYPTO_BUILD_TESTS)
         TC_ENABLE_PIV_SM=1 TC_PIV_SM_ENABLE_CS2=1 TC_PIV_SM_ENABLE_CS7=0
         TC_ENABLE_TLV=1 TC_ENABLE_DER=1 TC_ENABLE_PIV_CVC=1 TC_ENABLE_APDU=1
         TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_PIV_SM_APDU=1 TC_TEST_HEADER_PIV_SM_APDU=1)
+    elseif(header_profile STREQUAL "piv_vci")
+      list(REMOVE_ITEM header_profile_definitions TC_ENABLE_AES=0 TC_ENABLE_SHA256=0)
+      list(APPEND header_profile_definitions
+        TC_ENABLE_AES=1 TC_AES_ENABLE_DYNAMIC=1 TC_ENABLE_SHA256=1
+        TC_ENABLE_SSKDF=1 TC_ENABLE_EC=1 TC_EC_ENABLE_P256=1
+        TC_ENABLE_PIV_SM=1 TC_PIV_SM_ENABLE_CS2=1 TC_PIV_SM_ENABLE_CS7=0
+        TC_ENABLE_TLV=1 TC_ENABLE_DER=1 TC_ENABLE_PIV_CVC=1 TC_ENABLE_APDU=1
+        TC_ENABLE_PIV_COMMAND=1 TC_ENABLE_PIV_SM_APDU=1 TC_TLV_ENABLE_BER=1 TC_ENABLE_X509=1
+        TC_ENABLE_PIV_OIDS=1 TC_ENABLE_CMS=1 TC_ENABLE_FASCN=1 TC_ENABLE_TWIC_UUID=1
+        TC_ENABLE_PIV_OBJECTS=1 TC_ENABLE_PIV_VCI=1 TC_TEST_HEADER_PIV_VCI=1)
     elseif(header_profile STREQUAL "twic_ccl")
       list(APPEND header_profile_definitions TC_ENABLE_TWIC_CCL=1 TC_TEST_HEADER_TWIC_CCL=1)
     endif()
@@ -1523,7 +1555,8 @@ if(TINY_CRYPTO_BUILD_TESTS)
     TC_ENABLE_DRBG=1 TC_DRBG_ENABLE_HMAC=1 TC_ENABLE_RSA=1 TC_ENABLE_TLV=1 TC_ENABLE_DER=1 TC_ENABLE_X509=1
     TC_ENABLE_PIV_CHUID=1 TC_ENABLE_PIV_CVC=1 TC_ENABLE_EAC_CVC=1 TC_ENABLE_PIV_SM=1
     TC_ENABLE_EC=1 TC_ENABLE_SSKDF=1 TC_ENABLE_APDU=1 TC_ENABLE_PIV_COMMAND=1
-    TC_ENABLE_PIV_SM_APDU=1)
+    TC_ENABLE_PIV_SM_APDU=1 TC_TLV_ENABLE_BER=1 TC_ENABLE_PIV_OIDS=1 TC_ENABLE_CMS=1
+    TC_ENABLE_FASCN=1 TC_ENABLE_TWIC_UUID=1 TC_ENABLE_PIV_OBJECTS=1 TC_ENABLE_PIV_VCI=1)
   add_library(test_cpp_headers_cxx17 OBJECT tests/cpp/header_compile.cpp)
   target_include_directories(test_cpp_headers_cxx17 PRIVATE src)
   set_property(TARGET test_cpp_headers_cxx17 PROPERTY CXX_STANDARD 17)
@@ -1598,6 +1631,19 @@ if(TINY_CRYPTO_BUILD_TESTS)
           -I${CMAKE_CURRENT_SOURCE_DIR}/src
           -c ${CMAKE_CURRENT_SOURCE_DIR}/src/${sm_source}.c
           -o ${CMAKE_CURRENT_BINARY_DIR}/tiny-crypto-c-${sm_source}-compile.o)
+    endforeach()
+    foreach(vci_source piv_discovery_get piv_vci)
+      add_test(NAME test_${vci_source}_compile_avr
+        COMMAND ${TC_AVR_CC} -std=c99 -Wall -Wextra -Werror -Os -mmcu=atmega328p
+          -DTC_RESOURCE_PROFILE=1 -DTC_ENABLE_PIV_SM=1 -DTC_ENABLE_EC=1
+          -DTC_ENABLE_SSKDF=1 -DTC_ENABLE_SHA384=1 -DTC_AES_ENABLE_DYNAMIC=1
+          -DTC_ENABLE_TLV=1 -DTC_ENABLE_DER=1 -DTC_ENABLE_PIV_CVC=1
+          -DTC_ENABLE_APDU=1 -DTC_ENABLE_PIV_COMMAND=1 -DTC_ENABLE_PIV_SM_APDU=1
+          -DTC_TLV_ENABLE_BER=1 -DTC_ENABLE_X509=1 -DTC_ENABLE_PIV_OIDS=1 -DTC_ENABLE_CMS=1
+          -DTC_ENABLE_FASCN=1 -DTC_ENABLE_TWIC_UUID=1 -DTC_ENABLE_PIV_OBJECTS=1
+          -DTC_ENABLE_PIV_VCI=1 -I${CMAKE_CURRENT_SOURCE_DIR}/src
+          -c ${CMAKE_CURRENT_SOURCE_DIR}/src/${vci_source}.c
+          -o ${CMAKE_CURRENT_BINARY_DIR}/tiny-crypto-c-${vci_source}-compile.o)
     endforeach()
     # Hash descriptors live in flash on AVR; build every hash source with all
     # digests and HMAC enabled so program-memory access stays covered.

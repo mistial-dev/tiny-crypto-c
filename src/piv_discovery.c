@@ -82,6 +82,7 @@ TC_TLV_result TC_PIV_discovery_read(TC_bytes encoded, TC_PIV_discovery_profile p
   out->policy = policy;
   out->preference = preference;
   out->profile = (uint8_t)profile;
+  out->secured = 0;
   return TC_TLV_OK;
 }
 

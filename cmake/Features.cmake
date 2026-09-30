@@ -44,6 +44,10 @@ tc_module_feature(TINY_CRYPTO_ENABLE_PIV_SM_APDU TC_ENABLE_PIV_SM_APDU
   "Build PIV secure messaging framing on the card link")
 set(tc_module_sources_TC_ENABLE_PIV_SM_APDU src/piv_sm_apdu.c src/piv_sm_key_request.c)
 
+tc_module_feature(TINY_CRYPTO_ENABLE_PIV_VCI TC_ENABLE_PIV_VCI
+  "Build the PIV virtual contact interface on a secured card link")
+set(tc_module_sources_TC_ENABLE_PIV_VCI src/piv_discovery_get.c src/piv_vci.c)
+
 tc_module_feature(TINY_CRYPTO_ENABLE_PIV_OIDS TC_ENABLE_PIV_OIDS
   "Build registered PIV and TWIC identifier classification")
 set(tc_module_sources_TC_ENABLE_PIV_OIDS src/piv_oid.c)

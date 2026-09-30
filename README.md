@@ -216,6 +216,7 @@ algorithm is enabled.
 | `TINY_CRYPTO_ENABLE_EAC_CVC`            | OFF     | OFF   | OFF  | ON      | BSI TR-03110 EAC CVC reader                       |
 | `TINY_CRYPTO_ENABLE_PIV_SM`             | OFF     | OFF   | OFF  | ON      | Client-side PIV secure messaging                  |
 | `TINY_CRYPTO_ENABLE_PIV_SM_APDU`        | OFF     | OFF   | OFF  | ON      | PIV SM framing, requires PIV command, SM and CVC  |
+| `TINY_CRYPTO_ENABLE_PIV_VCI`            | OFF     | OFF   | OFF  | ON      | PIV VCI, requires SM framing and PIV objects      |
 | `TINY_CRYPTO_PIV_SM_CS2`                | ON      | ON    | ON   | ON      | Cipher suite 2 (P-256, AES-128)                   |
 | `TINY_CRYPTO_PIV_SM_CS7`                | ON      | ON    | ON   | ON      | Cipher suite 7 (P-384, AES-256)                   |
 | `TINY_CRYPTO_ENABLE_FASCN`              | OFF     | OFF   | OFF  | ON      | FASC-N readers and writers                        |
@@ -555,8 +556,11 @@ key establishment command and binds the session, and `TC_PIV_link_secure`
 protects every later GET DATA, VERIFY and GENERAL AUTHENTICATE with the
 `87/97/99/8E` wire format, `1C` chaining and in-place decryption. Any secure
 messaging failure ends the session, and the link refuses protected commands
-until `TC_PIV_link_unsecure`. The C++11
-`tiny_crypto::piv_sm` wrapper clears its session on destruction and cannot be
+until `TC_PIV_link_unsecure`. `TINY_CRYPTO_ENABLE_PIV_VCI` adds
+`<tiny_crypto/piv_vci.h>`: `TC_PIV_discovery_get` reads the Discovery Object
+over the secured link, and `TC_PIV_vci_establish` opens the virtual contact
+interface with the pairing code, or without it when the card's policy allows.
+The C++11 `tiny_crypto::piv_sm` wrapper clears its session on destruction and cannot be
 copied or moved. See [PIV secure messaging](docs/piv-sm.md) for build options,
 span layouts, state transitions and every result.
 

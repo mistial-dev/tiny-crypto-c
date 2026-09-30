@@ -73,6 +73,17 @@ void tc_piv_link_unbind(TC_PIV_link* link);
  * refused until TC_PIV_link_unsecure (Part 2 4.3, footnote 25). */
 void tc_piv_link_session_lost(TC_PIV_link* link);
 
+/* 1 when digits holds minimum to 8 ASCII digits 30 to 39 (SP 800-73-5 Part 2
+ * 2.4.3). */
+int tc_piv_digits_valid(TC_bytes digits, size_t minimum);
+/* Send VERIFY P1 00 for reference with digits padded with FF to 8 bytes
+ * (Part 2 2.4.3, 3.2.1). The padded copy lives in a stack array that is
+ * wiped. The caller checked digits with tc_piv_digits_valid and the
+ * reference rules. On TC_PIV_OK *sw holds the card status, and VERIFY
+ * answers with data are INVALID. */
+TC_PIV_result tc_piv_verify_submit(TC_PIV_link* link, uint8_t reference, TC_bytes digits,
+                                   uint16_t* sw);
+
 /* The APDU and PIV results share their first six values and meanings. */
 TC_PIV_result tc_piv_channel_result(TC_APDU_result result);
 

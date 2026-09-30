@@ -39,6 +39,9 @@
 #if TC_ENABLE_PIV_SM_APDU
 #include <tiny_crypto/piv_sm_apdu.hpp>
 #endif
+#if TC_ENABLE_PIV_VCI
+#include <tiny_crypto/piv_vci.hpp>
+#endif
 
 #if TC_ENABLE_KMAC256
 #include <tiny_crypto/kmac.hpp>

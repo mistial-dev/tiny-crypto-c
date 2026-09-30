@@ -84,6 +84,7 @@ static void discovery_same(const TC_PIV_discovery* a, const TC_PIV_discovery* b)
   munit_assert_uint8(a->policy, ==, b->policy);
   munit_assert_uint8(a->preference, ==, b->preference);
   munit_assert_uint8(a->profile, ==, b->profile);
+  munit_assert_uint8(a->secured, ==, b->secured);
 }
 
 static void ccc_same(const TC_PIV_CCC* a, const TC_PIV_CCC* b)
@@ -165,6 +166,7 @@ TC_TEST(discovery_recorded)
   munit_assert_uint8(parsed.policy, ==, TC_PIV_POLICY_PIV_PIN | TC_PIV_POLICY_VCI);
   munit_assert_uint8(parsed.preference, ==, 0);
   munit_assert_uint8(parsed.profile, ==, TC_PIV_DISCOVERY_PIV);
+  munit_assert_uint8(parsed.secured, ==, 0);
   munit_assert_uint8(TC_PIV_discovery_pin_reference(&parsed), ==, 0x80);
 
   /* ICAM cards: 40 00, 60 10 and 60 20. */
