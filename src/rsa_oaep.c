@@ -86,7 +86,7 @@ TC_RSA_result TC_RSA_decrypt_oaep(const TC_RSA_private_key* key, const TC_RSA_oa
                                   TC_buffer plaintext, size_t* plaintext_length,
                                   TC_RSA_execution* execution)
 {
-  tc_rsa_private_view view;
+  tc_rsa_private_view view = {0};
   tc_rsa_storage storage;
   if (!options || (uintptr_t)plaintext_length % sizeof *plaintext_length)
     return TC_RSA_ARGUMENT;

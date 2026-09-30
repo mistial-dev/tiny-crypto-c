@@ -484,7 +484,7 @@ TC_credential_status TC_PIV_security_validate(const TC_PIV_security_validation_r
 
   TC_PIV_security_object container;
   TC_PIV_CMS_object object = {0};
-  TC_X509_certificate signer;
+  TC_X509_certificate signer = {0};
   session.policy.verification.attribute_oids = credential_attribute_oids(session.oids);
   parsed = TC_PIV_security_read(request->encoded, request->encoding, &container);
   if (parsed == TC_TLV_OK)

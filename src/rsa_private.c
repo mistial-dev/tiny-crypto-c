@@ -130,7 +130,7 @@ TC_RSA_result TC_RSA_raw_private(const TC_RSA_public_key* key, TC_bytes private_
 TC_RSA_result TC_RSA_validate_crt(const TC_RSA_private_key* key, const TC_RSA_crt* crt,
                                   const TC_RSA_workspace* workspace, TC_work_budget* work)
 {
-  tc_rsa_private_view view;
+  tc_rsa_private_view view = {0};
   tc_rsa_storage storage;
   tc_rsa_storage_begin(&storage, workspace);
   tc_rsa_storage_write(&storage, work, sizeof *work);
@@ -149,7 +149,7 @@ TC_RSA_result TC_RSA_validate_crt(const TC_RSA_private_key* key, const TC_RSA_cr
 TC_RSA_result TC_RSA_derive_crt(const TC_RSA_private_key* key, const TC_RSA_crt_output* output,
                                 const TC_RSA_workspace* workspace, TC_work_budget* work)
 {
-  tc_rsa_private_view view;
+  tc_rsa_private_view view = {0};
   tc_rsa_storage storage;
   if (!output)
     return TC_RSA_ARGUMENT;
@@ -194,7 +194,7 @@ TC_RSA_result TC_RSA_validate_private_key(const TC_RSA_private_key* key,
                                           const TC_RSA_workspace* workspace,
                                           TC_RSA_execution* execution)
 {
-  tc_rsa_private_view view;
+  tc_rsa_private_view view = {0};
   tc_rsa_storage storage;
   if (exponent_policy != TC_RSA_EXPONENT_FIPS && exponent_policy != TC_RSA_EXPONENT_ANY_ODD)
     return TC_RSA_ARGUMENT;
@@ -297,7 +297,7 @@ TC_RSA_result TC_RSA_sign_v15_digest(const TC_RSA_private_key* key,
                                      TC_RSA_execution* execution)
 {
   tc_hash_info info;
-  tc_rsa_private_view view;
+  tc_rsa_private_view view = {0};
   if (!options)
     return TC_RSA_ARGUMENT;
   const tc_rsa_sign_call call = {key,           {(const uint8_t*)options, sizeof *options},
@@ -331,7 +331,7 @@ TC_RSA_result TC_RSA_sign_pss_digest(const TC_RSA_private_key* key,
                                      const TC_RSA_workspace* workspace, TC_buffer signature,
                                      TC_RSA_execution* execution)
 {
-  tc_rsa_private_view view;
+  tc_rsa_private_view view = {0};
   size_t encode_cost;
   if (!options)
     return TC_RSA_ARGUMENT;

@@ -402,7 +402,7 @@ static TC_TLV_result x509_ocsp_issuer(const x509_crl_path_context* path, size_t 
     return result;
   }
   TC_X509_workspace parser = {validation->frames, validation->oids, validation->oid_capacity};
-  TC_X509_certificate issuer;
+  TC_X509_certificate issuer = {0};
   const TC_bytes encoded = ocsp->chain[index - 1];
   result = tc_pki_work_charge(work, encoded.length);
   if (result == TC_TLV_OK)
