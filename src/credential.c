@@ -1,15 +1,14 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * PIV and TWIC credential validators: CHUID, biometric, security object,
- * unsigned TWIC CHUID and card verifiable certificate. Each validator checks
- * request storage, verifies the signed object, builds and validates the
- * signer path and maps the outcome to TC_credential_status. */
+ * PIV and TWIC credential validators: CHUID, biometric, unsigned TWIC CHUID
+ * and card verifiable certificate. Each validator checks request storage,
+ * verifies the signed object, builds and validates the signer path and maps
+ * the outcome to TC_credential_status. The Security Object validators are in
+ * credential_security.c. */
 #include "internal.h"
 #include "pki_budget_internal.h"
-#include "pki_source_internal.h"
-#include "validation_internal.h"
-#include "cms_internal.h"
+#include "credential_session_internal.h"
 #include "credential_status_internal.h"
 #include "credential_policy_internal.h"
 #include "x509_time_internal.h"
@@ -19,127 +18,6 @@
 #include <tiny_crypto/piv_cms.h>
 
 #if TC_ENABLE_CREDENTIAL
-
-/* Per-call state shared by the credential validators: path and revocation
- * policy from the context, the card profile, and the trust source guarded
- * against every write range. The guard and source refer to this struct, so it
- * stays in place for the whole call. */
-enum { SESSION_WRITES = TC_VALIDATION_WRITES + 1 };
-typedef struct {
-  TC_CMS_path_options policy;
-  TC_X509_path_options crl_policy;
-  TC_CMS_revocation_policy revocation;
-  int piv;
-  TC_PIV_oid_profile oids;
-  TC_bytes writes[SESSION_WRITES];
-  tc_pki_source_guard guard;
-  TC_X509_store_source source;
-} credential_session;
-
-/* Caller buffers checked by credential_session_bind. scratch is an optional
- * extra write range. objects adds each inventory part as an input. */
-typedef struct {
-  const TC_bytes* inputs;
-  size_t input_count;
-  void* out;
-  size_t out_size;
-  uint8_t* scratch;
-  size_t scratch_size;
-  const TC_PIV_security_data* objects;
-  size_t object_count;
-} credential_storage;
-
-/* Resolve policies and the card profile. Returns 0 for an incomplete context,
- * an unknown profile or a purpose the profile does not accept. */
-static int credential_session_open(credential_session* session,
-                                   const TC_validation_context* context,
-                                   TC_PIV_card_profile profile)
-{
-  return tc_validation_policies(context, &session->policy, &session->crl_policy,
-                                &session->revocation) &&
-         tc_credential_profile(profile, context->options, &session->piv, &session->oids);
-}
-
-/* Check every write range against the others and every input against the
- * writes, commit the preflight work, then guard the trust source. */
-static TC_TLV_result credential_session_bind(credential_session* session,
-                                             const TC_validation_context* context,
-                                             const credential_storage* storage, size_t* work)
-{
-  tc_pki_storage_plan plan;
-  tc_pki_storage_plan_begin(&plan, session->writes, SESSION_WRITES, *work);
-  tc_validation_plan_writes(&plan, context, work, storage->out, storage->out_size);
-  if (storage->scratch)
-    tc_pki_storage_plan_write(&plan, storage->scratch, storage->scratch_size, 1);
-  tc_pki_storage_plan_seal(&plan);
-  tc_validation_plan_inputs(&plan, context, storage->inputs, storage->input_count);
-  if (storage->objects)
-    TC_PKI_PLAN_INPUT(&plan, storage->objects, storage->object_count);
-  for (size_t i = 0; plan.status == TC_TLV_OK && i < storage->object_count; ++i) {
-    TC_PKI_PLAN_INPUT(&plan, storage->objects[i].parts, storage->objects[i].count);
-    tc_pki_storage_plan_input_spans(&plan, storage->objects[i].parts, storage->objects[i].count);
-  }
-  TC_TLV_result result = tc_pki_storage_plan_finish(&plan, work);
-  if (result != TC_TLV_OK)
-    return result;
-  session->guard = (tc_pki_source_guard){context->trust.certificates, session->writes, plan.count};
-  session->source = tc_pki_source_guard_bind(&session->guard);
-  return TC_TLV_OK;
-}
-
-/* Charge the encoded object against the input limit and work. */
-static TC_TLV_result credential_session_input(const credential_session* session, TC_bytes encoded,
-                                              size_t* work)
-{
-  if (encoded.length > session->policy.path.parsing.max_input)
-    return TC_TLV_LIMIT;
-  return tc_pki_work_charge(work, encoded.length);
-}
-
-static const TC_X509_path_workspace* credential_storage_of(const TC_validation_context* context)
-{
-  return &context->workspace->path->validation;
-}
-
-static TC_TLV_frames credential_frames(const TC_validation_context* context)
-{
-  const TC_X509_path_workspace* storage = credential_storage_of(context);
-  return storage->frames;
-}
-
-/* Verify the CMS signature and the signer path with the prepared envelope. */
-static TC_credential_status credential_session_verify(credential_session* session,
-                                                      const TC_validation_context* context,
-                                                      const TC_CMS_validation_request* cms,
-                                                      const TC_PIV_CMS_object* object, size_t* work)
-{
-  const tc_cms_prepared_signed_data prepared = {&object->envelope, &object->signer};
-  const tc_cms_validation_extras extras = {NULL, 0, &prepared};
-  return tc_cms_credential_validate_internal(cms, &session->source, &session->policy,
-                                             &session->revocation, context->workspace, work,
-                                             &extras);
-}
-
-/* A dependent object binds to a result accepted under the same card profile
- * at the context's evaluation time. */
-static int credential_result_current(TC_PIV_card_profile result_profile,
-                                     const TC_X509_time* result_at, TC_PIV_card_profile profile,
-                                     const TC_validation_context* context)
-{
-  int order;
-  return result_profile == profile &&
-         TC_X509_time_compare(&context->options->at, result_at, &order) == TC_TLV_OK && !order;
-}
-
-static int chuid_result_bound(const TC_PIV_CHUID_result* chuid, TC_PIV_card_profile profile,
-                              const TC_validation_context* context)
-{
-  enum { FASCN_BYTES = 25, GUID_BYTES = 16 };
-  return chuid && chuid->object.fascn.data && chuid->object.fascn.length == FASCN_BYTES &&
-         chuid->object.card_uuid.data && chuid->object.card_uuid.length == GUID_BYTES &&
-         chuid->signer.data && chuid->signer.length &&
-         credential_result_current(chuid->profile, &chuid->at, profile, context);
-}
 
 /* SP 800-76-2 section 9.3: a biometric signed with the CHUID key omits the
  * certificate, so an embedded certificate must carry a different key. Returns
@@ -179,17 +57,11 @@ static TC_TLV_result biometric_signer_distinct(const TC_X509_public_key* embedde
   return TC_TLV_INVALID;
 }
 
-/* The CMS identifier set that matches a card's PIV OID profile. */
-static TC_CMS_attribute_oids credential_attribute_oids(TC_PIV_oid_profile oids)
-{
-  return oids == TC_PIV_OIDS_ONLY ? TC_CMS_ATTRIBUTE_OIDS_PIV : TC_CMS_ATTRIBUTE_OIDS_PIV_TWIC;
-}
-
 TC_credential_status TC_PIV_CHUID_validate(const TC_PIV_CHUID_validation_request* request,
                                            const TC_validation_context* context, size_t* work,
                                            TC_PIV_CHUID_result* out)
 {
-  credential_session session;
+  tc_credential_session session;
   if (!request || !request->encoded.data || !request->encoded.length || !request->card ||
       !request->card_expiration || !context || !work || !out ||
       (request->twic_reader_policy != 0 && request->twic_reader_policy != 1) ||
@@ -198,7 +70,7 @@ TC_credential_status TC_PIV_CHUID_validate(const TC_PIV_CHUID_validation_request
            ? request->chuid_profile != TC_CHUID_PROFILE_PIV &&
                  request->chuid_profile != TC_CHUID_PROFILE_LEGACY_KEY_MAP
            : request->chuid_profile != TC_CHUID_PROFILE_TWIC_SIGNED) ||
-      !credential_session_open(&session, context, request->profile))
+      !tc_credential_session_open(&session, context, request->profile))
     return TC_CREDENTIAL_ERROR;
   const int strict_piv = session.piv && !request->twic_reader_policy;
   const TC_PIV_oid_profile oids =
@@ -212,11 +84,11 @@ TC_credential_status TC_PIV_CHUID_validate(const TC_PIV_CHUID_validation_request
       request->card->fascn,
       request->card->uuid_urn,
       request->card->fascn_oid};
-  const credential_storage storage = {
+  const tc_credential_storage storage = {
       inputs, sizeof inputs / sizeof *inputs, out, sizeof *out, NULL, 0, NULL, 0};
-  TC_TLV_result parsed = credential_session_bind(&session, context, &storage, work);
+  TC_TLV_result parsed = tc_credential_session_bind(&session, context, &storage, work);
   if (parsed == TC_TLV_OK)
-    parsed = credential_session_input(&session, request->encoded, work);
+    parsed = tc_credential_session_input(&session, request->encoded, work);
   if (parsed != TC_TLV_OK)
     return tc_validation_status(parsed);
   const TC_TLV_limits* limits = &session.policy.path.parsing;
@@ -243,33 +115,34 @@ TC_credential_status TC_PIV_CHUID_validate(const TC_PIV_CHUID_validation_request
     return TC_CREDENTIAL_INVALID;
 
   TC_PIV_CMS_object object;
-  session.policy.verification.attribute_oids = credential_attribute_oids(oids);
+  session.policy.verification.attribute_oids = tc_credential_attribute_oids(oids);
   parsed = TC_PIV_CMS_read(chuid.signature, TC_PIV_CMS_CHUID, &session.policy.verification, limits,
-                           credential_frames(context), work, &object);
+                           tc_credential_frames(context), work, &object);
   if (parsed != TC_TLV_OK)
     return tc_validation_status(parsed);
   parsed = TC_PIV_CMS_identifiers_match(&object, TC_PIV_CMS_CHUID, chuid.fascn, chuid.card_uuid,
-                                        limits, credential_frames(context), work, &matched);
+                                        limits, tc_credential_frames(context), work, &matched);
   if (parsed != TC_TLV_OK)
     return tc_validation_status(parsed);
   if (!matched)
     return TC_CREDENTIAL_INVALID;
   TC_X509_certificate signer;
-  parsed = tc_credential_signer_read(object.certificate, limits, credential_storage_of(context),
+  parsed = tc_credential_signer_read(object.certificate, limits, tc_credential_scratch(context),
                                      work, &signer);
   if (parsed == TC_TLV_OK)
     parsed = tc_credential_signer_policy(
         &signer, session.piv, request->twic_reader_policy || !session.piv, request->card_expiration,
-        &session.policy.path, credential_storage_of(context), work);
+        &session.policy.path, tc_credential_scratch(context), work);
   if (parsed != TC_TLV_OK)
     return tc_validation_status(parsed);
 
   const TC_CMS_validation_request cms = {chuid.signature,      0, object.envelope.content_type,
                                          chuid.signed_content, 2, object.certificate};
-  TC_credential_status status = credential_session_verify(&session, context, &cms, &object, work);
+  TC_credential_status status =
+      tc_credential_session_verify(&session, context, &cms, &object, work);
   if (status == TC_CREDENTIAL_VALID) {
     const TC_PIV_CHUID_result result = {chuid, object.certificate, context->options->at,
-                                        request->profile};
+                                        request->profile, session.revocation_checked};
     *out = result;
   }
   return status;
@@ -317,15 +190,15 @@ TC_credential_status TC_PIV_biometric_validate(const TC_PIV_biometric_validation
                                                const TC_validation_context* context, size_t* work,
                                                TC_PIV_biometric_result* out)
 {
-  credential_session session;
+  tc_credential_session session;
   if (!request || !request->encoded.data || !request->encoded.length ||
       (request->signature_profile != TC_PIV_CMS_BIOMETRIC &&
        request->signature_profile != TC_PIV_CMS_BIOMETRIC_LEGACY) ||
       (request->format != TC_PIV_CBEFF_FINGERPRINT_TEMPLATE &&
        request->format != TC_PIV_CBEFF_FACE_IMAGE && request->format != TC_PIV_CBEFF_IRIS_IMAGE) ||
       !request->card_expiration || !work || !out ||
-      !credential_session_open(&session, context, request->profile) ||
-      !chuid_result_bound(request->chuid, request->profile, context))
+      !tc_credential_session_open(&session, context, request->profile) ||
+      !tc_credential_chuid_bound(request->chuid, request->profile, context))
     return TC_CREDENTIAL_ERROR;
   if (request->format == TC_PIV_CBEFF_IRIS_IMAGE)
     return TC_CREDENTIAL_UNSUPPORTED;
@@ -338,15 +211,15 @@ TC_credential_status TC_PIV_biometric_validate(const TC_PIV_biometric_validation
       {(const uint8_t*)request, sizeof *request},
       {(const uint8_t*)chuid, sizeof *chuid},
       {(const uint8_t*)request->card_expiration, sizeof *request->card_expiration}};
-  const credential_storage storage = {
+  const tc_credential_storage storage = {
       inputs, sizeof inputs / sizeof *inputs, out, sizeof *out, NULL, 0, NULL, 0};
-  TC_TLV_result parsed = credential_session_bind(&session, context, &storage, work);
+  TC_TLV_result parsed = tc_credential_session_bind(&session, context, &storage, work);
   if (parsed == TC_TLV_OK)
-    parsed = credential_session_input(&session, request->encoded, work);
+    parsed = tc_credential_session_input(&session, request->encoded, work);
   if (parsed != TC_TLV_OK)
     return tc_validation_status(parsed);
   const TC_TLV_limits* limits = &session.policy.path.parsing;
-  const TC_X509_path_workspace* scratch = credential_storage_of(context);
+  const TC_X509_path_workspace* scratch = tc_credential_scratch(context);
 
   TC_PIV_CBEFF cbeff;
   TC_PIV_CBEFF_metadata metadata;
@@ -355,14 +228,14 @@ TC_credential_status TC_PIV_biometric_validate(const TC_PIV_biometric_validation
     return status;
   TC_PIV_CMS_object object;
   int matched = 0;
-  session.policy.verification.attribute_oids = credential_attribute_oids(session.oids);
+  session.policy.verification.attribute_oids = tc_credential_attribute_oids(session.oids);
   parsed =
       TC_PIV_CMS_read(cbeff.signature, request->signature_profile, &session.policy.verification,
-                      limits, credential_frames(context), work, &object);
+                      limits, tc_credential_frames(context), work, &object);
   if (parsed == TC_TLV_OK)
     parsed = TC_PIV_CMS_identifiers_match(&object, request->signature_profile, chuid->object.fascn,
                                           chuid->object.card_uuid, limits,
-                                          credential_frames(context), work, &matched);
+                                          tc_credential_frames(context), work, &matched);
   if (parsed != TC_TLV_OK)
     return tc_validation_status(parsed);
   if (!matched)
@@ -387,132 +260,13 @@ TC_credential_status TC_PIV_biometric_validate(const TC_PIV_biometric_validation
     return tc_validation_status(parsed);
   const TC_CMS_validation_request cms = {cbeff.signature,       0, object.envelope.content_type,
                                          &cbeff.signed_content, 1, signer->encoded};
-  status = credential_session_verify(&session, context, &cms, &object, work);
+  status = tc_credential_session_verify(&session, context, &cms, &object, work);
   if (status == TC_CREDENTIAL_VALID) {
-    const TC_PIV_biometric_result result = {request->format,  metadata,
-                                            cbeff.record,     signer->encoded,
-                                            request->profile, context->options->at};
+    const TC_PIV_biometric_result result = {
+        request->format,           metadata,         cbeff.record,
+        signer->encoded,           request->profile, context->options->at,
+        session.revocation_checked};
     *out = result;
-  }
-  return status;
-}
-
-/* Check each signed LDS digest against the supplied inventory. Every signed
- * group must be supplied exactly once. */
-static TC_credential_status
-security_inventory_check(const TC_PIV_security_validation_request* request,
-                         const TC_PIV_security_object* container, const TC_LDS_security_object* lds,
-                         const TC_validation_context* context, const TC_TLV_limits* limits,
-                         size_t* work)
-{
-  if (container->groups != lds->groups)
-    return TC_CREDENTIAL_INVALID;
-  uint16_t checked = 0;
-  for (size_t i = 0; i < request->count; ++i) {
-    unsigned group;
-    int matched;
-    TC_TLV_result parsed =
-        TC_PIV_security_group_find(container, request->objects[i].container, &group);
-    if (parsed == TC_TLV_END)
-      return TC_CREDENTIAL_INVALID;
-    if (parsed != TC_TLV_OK)
-      return tc_validation_status(parsed);
-    const uint16_t bit = (uint16_t)(1u << (group - 1));
-    if (checked & bit)
-      return TC_CREDENTIAL_INVALID;
-    parsed = TC_LDS_hash_check(lds, group, request->objects[i].parts, request->objects[i].count,
-                               limits, credential_frames(context), work, &matched);
-    if (parsed != TC_TLV_OK)
-      return tc_validation_status(parsed);
-    if (!matched)
-      return TC_CREDENTIAL_INVALID;
-    checked |= bit;
-  }
-  return checked == lds->groups ? TC_CREDENTIAL_VALID : TC_CREDENTIAL_INVALID;
-}
-
-TC_credential_status TC_PIV_security_validate(const TC_PIV_security_validation_request* request,
-                                              const TC_validation_context* context,
-                                              const TC_PIV_security_validation_workspace* workspace,
-                                              size_t* work, TC_PIV_security_result* out)
-{
-  credential_session session;
-  if (request && request->count > TC_LDS_MAX_GROUPS)
-    return TC_CREDENTIAL_LIMIT;
-  if (!request || !request->encoded.data || !request->encoded.length || !request->card_expiration ||
-      !request->objects || !request->count || !workspace || !workspace->content ||
-      !workspace->content_capacity || !work || !out ||
-      (request->encoding != TC_PIV_SECURITY_CONTENTS &&
-       request->encoding != TC_PIV_SECURITY_CONTAINER) ||
-      !credential_session_open(&session, context, request->profile) ||
-      !chuid_result_bound(request->chuid, request->profile, context))
-    return TC_CREDENTIAL_ERROR;
-  if (request->count < 2)
-    return TC_CREDENTIAL_INVALID;
-  for (size_t i = 0; i < request->count; ++i) {
-    if (!request->objects[i].parts || !request->objects[i].count)
-      return TC_CREDENTIAL_ERROR;
-    for (size_t j = 0; j < i; ++j)
-      if (request->objects[i].container == request->objects[j].container)
-        return TC_CREDENTIAL_INVALID;
-  }
-  const TC_bytes signer_bytes = request->chuid->signer;
-  const TC_bytes inputs[] = {
-      request->encoded,
-      signer_bytes,
-      {(const uint8_t*)request, sizeof *request},
-      {(const uint8_t*)request->chuid, sizeof *request->chuid},
-      {(const uint8_t*)workspace, sizeof *workspace},
-      {(const uint8_t*)request->card_expiration, sizeof *request->card_expiration}};
-  /* The content decoder writes only after every signature and inventory
-   * input has been checked for overlap with its buffer. */
-  const credential_storage storage = {inputs,
-                                      sizeof inputs / sizeof *inputs,
-                                      out,
-                                      sizeof *out,
-                                      workspace->content,
-                                      workspace->content_capacity,
-                                      request->objects,
-                                      request->count};
-  TC_TLV_result parsed = credential_session_bind(&session, context, &storage, work);
-  if (parsed == TC_TLV_OK)
-    parsed = credential_session_input(&session, request->encoded, work);
-  if (parsed != TC_TLV_OK)
-    return tc_validation_status(parsed);
-  const TC_TLV_limits* limits = &session.policy.path.parsing;
-  const TC_X509_path_workspace* scratch = credential_storage_of(context);
-
-  TC_PIV_security_object container;
-  TC_PIV_CMS_object object = {0};
-  TC_X509_certificate signer = {0};
-  session.policy.verification.attribute_oids = credential_attribute_oids(session.oids);
-  parsed = TC_PIV_security_read(request->encoded, request->encoding, &container);
-  if (parsed == TC_TLV_OK)
-    parsed = TC_PIV_CMS_read(container.cms, TC_PIV_CMS_SECURITY, &session.policy.verification,
-                             limits, credential_frames(context), work, &object);
-  if (parsed == TC_TLV_OK)
-    parsed = tc_credential_signer_read(signer_bytes, limits, scratch, work, &signer);
-  if (parsed == TC_TLV_OK)
-    parsed =
-        tc_credential_signer_policy(&signer, session.piv, !session.piv, request->card_expiration,
-                                    &session.policy.path, scratch, work);
-  if (parsed != TC_TLV_OK)
-    return tc_validation_status(parsed);
-  const TC_CMS_validation_request cms = {container.cms, 0, object.envelope.content_type,
-                                         NULL,          0, signer_bytes};
-  TC_credential_status status = credential_session_verify(&session, context, &cms, &object, work);
-  if (status != TC_CREDENTIAL_VALID)
-    return status;
-  TC_LDS_security_object lds;
-  parsed = TC_LDS_read_content(object.envelope.content, limits, credential_frames(context), work,
-                               workspace->content, workspace->content_capacity, &lds);
-  if (parsed != TC_TLV_OK)
-    return tc_validation_status(parsed);
-  status = security_inventory_check(request, &container, &lds, context, limits, work);
-  if (status == TC_CREDENTIAL_VALID) {
-    const TC_PIV_security_result accepted = {request->objects, request->count, signer_bytes,
-                                             request->profile, context->options->at};
-    *out = accepted;
   }
   return status;
 }
@@ -588,8 +342,8 @@ TC_TWIC_unsigned_CHUID_validate(const TC_TWIC_unsigned_CHUID_validation_request*
       (request->profile != TC_TWIC_LEGACY_CARD && request->profile != TC_TWIC_NEXGEN_CARD) ||
       !context || !context->options || !work || !request->security->objects ||
       !request->security->count || request->security->count > TC_LDS_MAX_GROUPS ||
-      !credential_result_current(request->security->profile, &request->security->at,
-                                 request->profile, context))
+      !tc_credential_result_current(request->security->profile, &request->security->at,
+                                    request->profile, context))
     return TC_CREDENTIAL_ERROR;
   TC_TLV_result parsed = unsigned_chuid_storage(request, context, work);
   if (parsed != TC_TLV_OK)
@@ -626,27 +380,27 @@ TC_credential_status TC_PIV_CVC_validate(const TC_PIV_CVC_validation_request* re
                                          const TC_validation_context* context,
                                          TC_EC_workspace* point, size_t* work, TC_PIV_CVC* out)
 {
-  credential_session session;
+  tc_credential_session session;
   if (!request || !request->card.data || !request->card.length ||
       !request->signer_certificate.data || !request->signer_certificate.length || !point || !work ||
-      !out || !credential_session_open(&session, context, request->profile))
+      !out || !tc_credential_session_open(&session, context, request->profile))
     return TC_CREDENTIAL_ERROR;
   const TC_bytes inputs[] = {request->card,
                              request->intermediate,
                              request->expected_uuid,
                              request->signer_certificate,
                              {(const uint8_t*)request, sizeof *request}};
-  const credential_storage storage = {
+  const tc_credential_storage storage = {
       inputs, sizeof inputs / sizeof *inputs, out, sizeof *out, NULL, 0, NULL, 0};
-  TC_TLV_result checked = credential_session_bind(&session, context, &storage, work);
+  TC_TLV_result checked = tc_credential_session_bind(&session, context, &storage, work);
   TC_X509_certificate parsed_signer;
   if (checked == TC_TLV_OK)
     checked = tc_credential_signer_read(request->signer_certificate, &session.policy.path.parsing,
-                                        credential_storage_of(context), work, &parsed_signer);
+                                        tc_credential_scratch(context), work, &parsed_signer);
   if (checked == TC_TLV_OK)
     checked =
         tc_credential_signer_policy(&parsed_signer, session.piv, !session.piv, NULL,
-                                    &session.policy.path, credential_storage_of(context), work);
+                                    &session.policy.path, tc_credential_scratch(context), work);
   if (checked != TC_TLV_OK)
     return tc_validation_status(checked);
   const TC_X509_path_options* path = &session.policy.path;

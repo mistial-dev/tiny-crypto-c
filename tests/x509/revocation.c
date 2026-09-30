@@ -339,6 +339,19 @@ TC_TEST(dependency_status)
   munit_assert_size(count, ==, 1);
   munit_assert_int(node.status, ==, TC_X509_REVOCATION_UNDETERMINED);
   munit_assert_ptr_equal(node.certificate.data, encoded);
+
+  /* An uncovered signer stays unresolved unless the caller reports
+   * uncovered members, which records that the signer was accepted. */
+  node.status = (TC_X509_revocation_status)TC_X509_CRL_NODE_UNCOVERED;
+  count = 1;
+  munit_assert_int(tc_x509_crl_dependencies_path(&path, &workspace, &count, NULL, 0, &work), ==,
+                   TC_X509_PATH_UNSUPPORTED);
+  uint8_t uncovered_used = 0;
+  workspace.uncovered_used = &uncovered_used;
+  munit_assert_int(tc_x509_crl_dependencies_path(&path, &workspace, &count, NULL, 0, &work), ==,
+                   TC_X509_PATH_VALID);
+  munit_assert_uint8(uncovered_used, ==, 1);
+  munit_assert_int(node.status, ==, TC_X509_CRL_NODE_UNCOVERED);
   return MUNIT_OK;
 }
 
@@ -397,6 +410,7 @@ enum {
   RESOLVE_PARTIAL,
   RESOLVE_INVALID,
   RESOLVE_LIMIT,
+  RESOLVE_NO_EVIDENCE,
   RESOLVE_CASE_COUNT
 };
 typedef struct {
@@ -443,6 +457,8 @@ static TC_TLV_result evaluate_node(void* context, size_t index, TC_X509_crl_evid
     return TC_TLV_LIMIT;
   if (state->scenario == RESOLVE_CYCLE)
     return TC_TLV_UNSUPPORTED;
+  if (state->scenario == RESOLVE_NO_EVIDENCE)
+    return TC_TLV_END;
   if (index == 0 && *state->count == 1) {
     *state->count = 2;
     return TC_TLV_UNSUPPORTED;
@@ -458,7 +474,7 @@ TC_TEST(resolution)
   const TC_TLV_result expected[] = {TC_TLV_OK,       TC_TLV_UNSUPPORTED, TC_TLV_INVALID,
                                     TC_TLV_ARGUMENT, TC_TLV_ARGUMENT,    TC_TLV_ARGUMENT,
                                     TC_TLV_ARGUMENT, TC_TLV_ARGUMENT,    TC_TLV_UNSUPPORTED,
-                                    TC_TLV_INVALID,  TC_TLV_LIMIT};
+                                    TC_TLV_INVALID,  TC_TLV_LIMIT,       TC_TLV_END};
   for (unsigned scenario = RESOLVE_CHAIN; scenario < RESOLVE_CASE_COUNT; ++scenario) {
     TC_X509_revocation_node nodes[2] = {0};
     size_t count = 1, work = 100;
@@ -486,6 +502,7 @@ typedef struct {
   size_t calls, fail_at, revoked_at;
   TC_TLV_result result;
   int complete;
+  size_t uncovered_at;
 } path_fixture;
 
 static TC_TLV_result resolve_certificate(void* context, size_t index, TC_bytes certificate,
@@ -495,6 +512,10 @@ static TC_TLV_result resolve_certificate(void* context, size_t index, TC_bytes c
   munit_assert_size(certificate.length, ==, 1);
   munit_assert_size(index, ==, state->calls);
   munit_assert_size(certificate.data[0], ==, state->calls);
+  if (state->calls == state->uncovered_at) {
+    ++state->calls;
+    return TC_TLV_END;
+  }
   if (state->calls++ == state->fail_at)
     return state->result;
   if (state->complete)
@@ -515,12 +536,16 @@ TC_TEST(held_path)
     const size_t revoked_at = scenario == FIRST_REVOKED  ? 0
                               : scenario == LAST_REVOKED ? 1
                                                          : SIZE_MAX;
-    path_fixture state = {0, scenario == LATER_LIMIT ? 1 : SIZE_MAX, revoked_at, TC_TLV_LIMIT,
-                          scenario != INCOMPLETE};
+    path_fixture state = {0,
+                          scenario == LATER_LIMIT ? 1 : SIZE_MAX,
+                          revoked_at,
+                          TC_TLV_LIMIT,
+                          scenario != INCOMPLETE,
+                          SIZE_MAX};
     TC_X509_revocation_result out, saved;
     memset(&out, 0xa5, sizeof out);
     memcpy(&saved, &out, sizeof out);
-    munit_assert_int(tc_x509_crl_path_resolve(chain, 2, resolve_certificate, &state, &out), ==,
+    munit_assert_int(tc_x509_crl_path_resolve(chain, 2, resolve_certificate, &state, 0, &out), ==,
                      scenario == LATER_LIMIT  ? TC_TLV_LIMIT
                      : scenario == INCOMPLETE ? TC_TLV_UNSUPPORTED
                                               : TC_TLV_OK);
@@ -536,6 +561,56 @@ TC_TEST(held_path)
       munit_assert_uint(out.evidence.revocation.revoked_at.second, ==, 5);
     } else
       munit_assert_memory_equal(sizeof out, &out, &saved);
+  }
+  return MUNIT_OK;
+}
+
+/* A member without evidence (END from its resolver, or incomplete reasons)
+ * fails the whole path unless the caller asks for uncovered members to be
+ * reported. Reporting still checks every later member, and REVOKED or a
+ * later failure takes precedence over the uncovered member. */
+TC_TEST(held_path_uncovered)
+{
+  enum { LATER_GOOD, LATER_REVOKED, LATER_LIMIT, INCOMPLETE, CASE_COUNT };
+  static const uint8_t bytes[] = {0, 1};
+  const TC_bytes chain[] = {{bytes, 1}, {bytes + 1, 1}};
+  for (unsigned scenario = 0; scenario < CASE_COUNT; ++scenario) {
+    for (int report = 0; report <= 1; ++report) {
+      path_fixture state = {0,
+                            scenario == LATER_LIMIT ? 1 : SIZE_MAX,
+                            scenario == LATER_REVOKED ? 1 : SIZE_MAX,
+                            TC_TLV_LIMIT,
+                            scenario != INCOMPLETE,
+                            scenario == INCOMPLETE ? SIZE_MAX : 0};
+      TC_X509_revocation_result out, saved;
+      memset(&out, 0xa5, sizeof out);
+      memcpy(&saved, &out, sizeof out);
+      const TC_TLV_result result =
+          tc_x509_crl_path_resolve(chain, 2, resolve_certificate, &state, report, &out);
+      if (!report) {
+        munit_assert_int(result, ==, TC_TLV_UNSUPPORTED);
+        munit_assert_size(state.calls, ==, 1);
+        munit_assert_memory_equal(sizeof out, &out, &saved);
+        continue;
+      }
+      munit_assert_size(state.calls, ==, 2);
+      if (scenario == LATER_LIMIT) {
+        munit_assert_int(result, ==, TC_TLV_LIMIT);
+        munit_assert_memory_equal(sizeof out, &out, &saved);
+        continue;
+      }
+      munit_assert_int(result, ==, TC_TLV_OK);
+      if (scenario == LATER_REVOKED) {
+        munit_assert_int(out.status, ==, TC_X509_REVOCATION_REVOKED);
+        munit_assert_size(out.certificate_index, ==, 1);
+        munit_assert_int(out.evidence.revocation.found, ==, 1);
+      } else {
+        munit_assert_int(out.status, ==, TC_X509_REVOCATION_UNDETERMINED);
+        munit_assert_size(out.certificate_index, ==, 0);
+        munit_assert_uint(out.evidence.reasons, ==, 0);
+        munit_assert_int(out.evidence.revocation.found, ==, 0);
+      }
+    }
   }
   return MUNIT_OK;
 }
@@ -879,8 +954,9 @@ TC_TEST(dependency_context)
   size_t work = 100, index = SIZE_MAX;
   munit_assert_int(tc_x509_crl_dependencies_check(NULL, &path, NULL, &work), ==,
                    TC_X509_PATH_ERROR);
+  /* No current pair: nothing to establish, and the scope result stands. */
   munit_assert_int(tc_x509_crl_dependencies_check(&dependencies, &path, NULL, &work), ==,
-                   TC_X509_PATH_UNSUPPORTED);
+                   TC_X509_PATH_VALID);
   path.anchor_index = 1;
   munit_assert_int(tc_x509_crl_dependencies_check(&dependencies, &path, NULL, &work), ==,
                    TC_X509_PATH_ERROR);
@@ -1499,6 +1575,7 @@ int main(int argc, char** argv)
       {"/dependency-failures", dependency_failures, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/resolution", resolution, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/held-path", held_path, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/held-path-uncovered", held_path_uncovered, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/storage-spans", storage_spans, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/record-storage", record_storage, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/scope-inputs", scope_inputs, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

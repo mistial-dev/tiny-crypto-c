@@ -1085,7 +1085,7 @@ static void credential_public_workflow(const credential_issuers* issuers,
       EXAMPLE_CREDENTIAL_VALID,       EXAMPLE_CREDENTIAL_PROOF_FAILED,
       EXAMPLE_CREDENTIAL_CANCELLED,   EXAMPLE_CREDENTIAL_STALE,
       EXAMPLE_CREDENTIAL_INVALID,     EXAMPLE_CREDENTIAL_LIMIT,
-      EXAMPLE_CREDENTIAL_UNSUPPORTED, EXAMPLE_CREDENTIAL_VALID,
+      EXAMPLE_CREDENTIAL_UNAVAILABLE, EXAMPLE_CREDENTIAL_VALID,
       EXAMPLE_CREDENTIAL_STALE,       EXAMPLE_CREDENTIAL_VALID,
       EXAMPLE_CREDENTIAL_REVOKED,     EXAMPLE_CREDENTIAL_INVALID,
       EXAMPLE_CREDENTIAL_INVALID,     EXAMPLE_CREDENTIAL_INVALID,
@@ -1596,7 +1596,7 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
           /* The CHUID accepted in this evaluation, as TC_PIV_CHUID_validate
            * reports it. Dependent objects take identifiers and the signer from it. */
           TC_PIV_CHUID_result bound_chuid = {chuid, object.certificate, object_options.at,
-                                             object_request.profile};
+                                             object_request.profile, 1};
           TC_PIV_biometric_result biometric_result;
           {
             uint8_t security[OBJECT_BYTES];

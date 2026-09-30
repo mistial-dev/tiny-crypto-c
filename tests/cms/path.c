@@ -420,7 +420,8 @@ static void validation_context_aliasing(ExampleCMSCredentialWorkspace* storage,
     munit_assert_memory_equal(sizeof result, &result, saved_result);
     munit_assert_memory_equal(sizeof *storage, storage, saved_storage);
     work = WORK_BUDGET;
-    munit_assert_int(TC_CMS_validate(request, &input_context, &work), ==, TC_CREDENTIAL_ERROR);
+    munit_assert_int(TC_CMS_validate(request, &input_context, &work, NULL), ==,
+                     TC_CREDENTIAL_ERROR);
     munit_assert_size(work, ==, WORK_BUDGET);
     munit_assert_memory_equal(sizeof *storage, storage, saved_storage);
   }
@@ -658,7 +659,7 @@ static MunitResult credential_workflow(const MunitParameter params[], void* user
       /* A valid CMS path still requires revocation evidence. */
       munit_assert_int(example_validate_cms_credential(&request, held, &credential_settings,
                                                        &revocation, &work, &credential),
-                       ==, TC_CREDENTIAL_UNSUPPORTED);
+                       ==, TC_CREDENTIAL_UNAVAILABLE);
       work = 0;
       munit_assert_int(example_validate_cms_credential(&request, held, &credential_settings,
                                                        &revocation, &work, &credential),

@@ -198,6 +198,7 @@ TC_result TC_validation_context_init(const TC_validation_trust* trust,
       TC_X509_time_check(&options->at) != TC_TLV_OK ||
       !tc_cms_credential_options_valid(options->verification, options->delta_policy,
                                        options->order_policy) ||
+      !tc_validation_revocation_valid(options->revocation) ||
       !tc_internal_ranges_disjoint(out, sizeof *out, trust, sizeof *trust) ||
       !tc_internal_ranges_disjoint(out, sizeof *out, trust->certificates,
                                    sizeof *trust->certificates) ||
@@ -233,7 +234,8 @@ int tc_validation_policies(const TC_validation_context* context, TC_CMS_path_opt
                            TC_X509_path_options* crl, TC_CMS_revocation_policy* revocation)
 {
   if (!context || !context->options || !context->trust.certificates || !context->trust.crls ||
-      !context->workspace || !context->workspace->path)
+      !context->workspace || !context->workspace->path ||
+      !tc_validation_revocation_valid(context->options->revocation))
     return 0;
   const TC_validation_options* options = context->options;
   cms->path = path_policy(options, &options->certificate);
@@ -307,7 +309,8 @@ TC_TLV_result tc_validation_storage(const TC_validation_context* context, const 
 }
 
 TC_credential_status TC_CMS_validate(const TC_CMS_validation_request* request,
-                                     const TC_validation_context* context, size_t* work)
+                                     const TC_validation_context* context, size_t* work,
+                                     uint8_t* revocation_checked)
 {
   TC_CMS_path_options cms;
   TC_X509_path_options crl;
@@ -318,9 +321,18 @@ TC_credential_status TC_CMS_validate(const TC_CMS_validation_request* request,
     return TC_CREDENTIAL_ERROR;
   const TC_bytes metadata[] = {{(const uint8_t*)context, sizeof *context},
                                {(const uint8_t*)context->options, sizeof *context->options}};
-  const tc_cms_validation_extras extras = {metadata, sizeof metadata / sizeof *metadata, NULL};
+  const tc_cms_validation_extras extras = {metadata, sizeof metadata / sizeof *metadata, NULL,
+                                           tc_validation_evidence(context, revocation_checked)};
   return tc_cms_credential_validate_internal(request, context->trust.certificates, &cms,
                                              &revocation, context->workspace, work, &extras);
+}
+
+tc_cms_revocation_evidence tc_validation_evidence(const TC_validation_context* context,
+                                                  uint8_t* checked)
+{
+  const tc_cms_revocation_evidence evidence = {
+      context->options->revocation == TC_VALIDATION_REVOCATION_WHEN_AVAILABLE, checked};
+  return evidence;
 }
 
 TC_credential_status tc_validation_status(TC_TLV_result status)
@@ -358,8 +370,10 @@ TC_credential_status TC_X509_validate(TC_bytes encoded, const TC_validation_cont
   /* Revocation signer searches reuse the certificate cache. Hold the target
    * descriptor while its encoded bytes remain owned by the caller. */
   result.certificate = workspace->path->validation.certificates[path.count - 1];
+  const tc_cms_revocation_evidence evidence =
+      tc_validation_evidence(context, &result.revocation_checked);
   TC_credential_status revocation_status =
-      tc_cms_path_revocation_check(&path, &source, &revocation, workspace, work);
+      tc_cms_path_revocation_check(&path, &source, &revocation, workspace, &evidence, work);
   if (revocation_status != TC_CREDENTIAL_VALID)
     return revocation_status;
   result.at = context->options->at;

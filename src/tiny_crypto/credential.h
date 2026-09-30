@@ -42,12 +42,15 @@ typedef struct {
 
 /* Borrowed views of an accepted CHUID. The profile and time record the
  * validation that produced the result. Dependent validators take the FASC-N,
- * GUID and signer from it and reject a result from another profile or time. */
+ * GUID and signer from it and reject a result from another profile or time.
+ * revocation_checked is 1 when CRL evidence covered the signer path and 0
+ * when TC_VALIDATION_REVOCATION_WHEN_AVAILABLE accepted it without. */
 typedef struct {
   TC_PIV_CHUID object;
   TC_bytes signer;
   TC_X509_time at;
   TC_PIV_card_profile profile;
+  uint8_t revocation_checked;
 } TC_PIV_CHUID_result;
 
 /* Authenticate a signed CHUID and bind it to the validated card certificate
@@ -60,7 +63,8 @@ typedef struct {
  *   time, and it includes the final second of its UTC date.
  * - The signer certificate needs a content-signing EKU for the profile and,
  *   for PIV, id-fpki-common-piv-contentSigning and a notAfter no earlier than
- *   card_expiration. Its path and CRL status use the context policies.
+ *   card_expiration. Its path and CRL status use the context policies,
+ *   including the revocation evidence policy.
  * - Request, card, context objects and their bytes stay stable and disjoint
  *   from the workspace, work and out. out borrows the CHUID and signer bytes.
  *
@@ -73,8 +77,9 @@ typedef struct {
  * length above parsing.max_input or exhausted work or capacities. INVALID
  * for a malformed or expired CHUID, identifiers that differ from the card, a
  * signer outside the content-signer policy, or a failed signature or path.
- * UNSUPPORTED for unsupported algorithms or missing CRL evidence. out
- * changes only on VALID. */
+ * UNAVAILABLE for a signer path member without CRL evidence under
+ * TC_VALIDATION_REVOCATION_REQUIRED. UNSUPPORTED for unsupported algorithms
+ * or CRLs. out changes only on VALID. */
 TC_credential_status TC_PIV_CHUID_validate(const TC_PIV_CHUID_validation_request* request,
                                            const TC_validation_context* context, size_t* work,
                                            TC_PIV_CHUID_result* out);
@@ -96,7 +101,8 @@ typedef struct {
 
 /* Borrowed views of an authenticated biometric object. record and
  * metadata.creator borrow request->encoded. signer borrows the embedded CMS
- * certificate or the CHUID signer. */
+ * certificate or the CHUID signer. revocation_checked follows
+ * TC_PIV_CHUID_result. */
 typedef struct {
   TC_PIV_CBEFF_format format;
   TC_PIV_CBEFF_metadata metadata;
@@ -104,6 +110,7 @@ typedef struct {
   TC_bytes signer;
   TC_PIV_card_profile profile;
   TC_X509_time at;
+  uint8_t revocation_checked;
 } TC_PIV_biometric_result;
 
 /* Authenticate a biometric object's CBEFF header and record and bind the
@@ -122,8 +129,9 @@ typedef struct {
  * unknown profile, format or signature profile, an incomplete context, a
  * CHUID result that is incomplete or whose profile or time differs from the
  * request and context, or overlap, with work unchanged. UNSUPPORTED for iris
- * images, before any work, and for unsupported algorithms or missing CRL
- * evidence. LIMIT for an encoded length above parsing.max_input or exhausted
+ * images, before any work, and for unsupported algorithms or CRLs.
+ * UNAVAILABLE as in TC_PIV_CHUID_validate. LIMIT for an encoded length above
+ * parsing.max_input or exhausted
  * work or capacities. INVALID for malformed or mismatched object data, a
  * record outside its profile, an expired period, a reused CHUID key or a
  * failed signature or path. REVOKED for a revoked signer path member. out
@@ -132,11 +140,87 @@ TC_credential_status TC_PIV_biometric_validate(const TC_PIV_biometric_validation
                                                const TC_validation_context* context, size_t* work,
                                                TC_PIV_biometric_result* out);
 
+/* One card object as hashed for the Security Object (SP 800-73-5 Part 1
+ * section 3.1.7). parts supply its bytes in hash order. */
 typedef struct {
   uint16_t container;
   const TC_bytes* parts;
   size_t count;
 } TC_PIV_security_data;
+
+typedef struct {
+  /* Decoded LDS content scratch. Capacity is bounded by the application. */
+  uint8_t* content;
+  size_t content_capacity;
+} TC_PIV_security_validation_workspace;
+
+typedef struct {
+  TC_bytes encoded;
+  TC_PIV_security_encoding encoding;
+  /* Must equal chuid->profile. */
+  TC_PIV_card_profile profile;
+  /* Accepted CHUID from TC_PIV_CHUID_validate at context->options->at. */
+  const TC_PIV_CHUID_result* chuid;
+  const TC_X509_time* card_expiration;
+} TC_PIV_security_signature_request;
+
+/* An authenticated Security Object: its container map, the signed LDS
+ * digests and the parsing limits used for digest checks. object borrows the
+ * request's encoded bytes. lds borrows those bytes or workspace->content.
+ * Keep both stable and unchanged while the map is in use. The map survives
+ * reuse of the validation workspace. revocation_checked follows
+ * TC_PIV_CHUID_result. */
+typedef struct {
+  TC_PIV_security_object object;
+  TC_LDS_security_object lds;
+  TC_TLV_limits limits;
+  TC_bytes signer;
+  TC_PIV_card_profile profile;
+  TC_X509_time at;
+  uint8_t revocation_checked;
+} TC_PIV_security_map;
+
+/* Authenticate a Security Object with the accepted CHUID signer and decode
+ * its signed LDS digests (SP 800-73-5 Part 1 section 3.1.7). The container
+ * map must name exactly the signed data groups. Objects are checked
+ * separately with TC_PIV_security_digest_check, so a partial inventory, such
+ * as one read without the PIN, can still be checked container by container.
+ * - workspace->content receives the decoded LDS content. Size it for the
+ *   largest LDSSecurityObject the application accepts. It must be disjoint
+ *   from every input.
+ * - Request, CHUID, context objects and their bytes stay stable and disjoint
+ *   from the workspace, work and out.
+ *
+ * Work: one unit per storage comparison, the encoded length, then the CMS,
+ * signer, path, revocation and LDS decoding steps.
+ * Returns VALID with out written. ERROR for NULL or empty arguments, an
+ * unknown encoding or profile, an incomplete context, a CHUID result whose
+ * profile or time differs, or overlap, with work unchanged. LIMIT for an
+ * encoded length above parsing.max_input or exhausted work or capacities.
+ * INVALID for malformed data, a failed signature or path, or a container map
+ * whose groups differ from the signed LDS groups. REVOKED, UNAVAILABLE and
+ * UNSUPPORTED come from the signer path and revocation checks as in
+ * TC_PIV_CHUID_validate. out changes only on VALID. */
+TC_credential_status TC_PIV_security_authenticate(
+    const TC_PIV_security_signature_request* request, const TC_validation_context* context,
+    const TC_PIV_security_validation_workspace* workspace, size_t* work, TC_PIV_security_map* out);
+
+/* Check one object against the signed digest of its container in an
+ * authenticated map. object->parts supply the bytes in hash order, usually
+ * the value of the GET DATA 53 container. The map, the object, its parts and
+ * their bytes stay stable and disjoint from work. Parse frames and hash
+ * scratch live on the stack. The hash scratch is wiped on return.
+ *
+ * Work: one unit per storage comparison, the map lookup, the digest scan and
+ * the hashed bytes.
+ * Returns VALID for a matching digest. INVALID for a different digest.
+ * UNAVAILABLE when the signed map does not name object->container. ERROR for
+ * NULL arguments, an object without parts, a map whose group sets differ, or
+ * overlap, with work unchanged. LIMIT for more parts than
+ * map->limits.max_elements or exhausted work. UNSUPPORTED for a digest
+ * algorithm this build disables. */
+TC_credential_status TC_PIV_security_digest_check(const TC_PIV_security_map* map,
+                                                  const TC_PIV_security_data* object, size_t* work);
 
 typedef struct {
   TC_bytes encoded;
@@ -151,25 +235,21 @@ typedef struct {
   size_t count;
 } TC_PIV_security_validation_request;
 
-typedef struct {
-  /* Decoded LDS content scratch. Capacity is bounded by the application. */
-  uint8_t* content;
-  size_t content_capacity;
-} TC_PIV_security_validation_workspace;
-
 /* Inventory descriptors and their bytes remain borrowed and immutable through
- * subsequent checks. This result survives reuse of the validation workspace. */
+ * subsequent checks. This result survives reuse of the validation workspace.
+ * revocation_checked follows TC_PIV_CHUID_result. */
 typedef struct {
   const TC_PIV_security_data* objects;
   size_t count;
   TC_bytes signer;
   TC_PIV_card_profile profile;
   TC_X509_time at;
+  uint8_t revocation_checked;
 } TC_PIV_security_result;
 
-/* Authenticate a Security Object with the accepted CHUID signer, then check
- * the exact inventory against its signed LDS digests (SP 800-73-5 Part 1
- * section 3.1.7). Each object's parts supply its bytes in hash order. Every
+/* Authenticate a Security Object with TC_PIV_security_authenticate, then
+ * check the exact inventory against its signed LDS digests with
+ * TC_PIV_security_digest_check (SP 800-73-5 Part 1 section 3.1.7). Every
  * signed data group must appear once in the inventory.
  * - workspace->content receives the decoded LDS content. Size it for the
  *   largest LDSSecurityObject the application accepts. It must be disjoint
@@ -186,8 +266,8 @@ typedef struct {
  * context, a CHUID result whose profile or time differs, or overlap. INVALID
  * for fewer than two objects or duplicate containers, before any work, and
  * for malformed data or an inventory that differs from the signed digests.
- * REVOKED and UNSUPPORTED come from the signer path and revocation checks.
- * out changes only on VALID. */
+ * REVOKED, UNAVAILABLE and UNSUPPORTED come from the signer path and
+ * revocation checks. out changes only on VALID. */
 TC_credential_status TC_PIV_security_validate(const TC_PIV_security_validation_request* request,
                                               const TC_validation_context* context,
                                               const TC_PIV_security_validation_workspace* workspace,
@@ -243,9 +323,12 @@ typedef struct {
  * Returns VALID with out written. ERROR for NULL or empty arguments, an
  * unknown profile, a certificate purpose other than content signing, an
  * incomplete context or overlap, with work unchanged. The signer statuses
- * follow TC_X509_validate. The chain statuses follow TC_PIV_CVC_chain_verify,
- * mapped to the credential status of the same name. out changes only on
- * VALID. Secure messaging also requires key confirmation. */
+ * follow TC_X509_validate, including the revocation evidence policy.
+ * TC_PIV_CVC holds no revocation flag. Under
+ * TC_VALIDATION_REVOCATION_WHEN_AVAILABLE, read revocation_checked from
+ * TC_X509_validate on the signer. The chain statuses follow TC_PIV_CVC_chain_verify, mapped
+ * to the credential status of the same name. out changes only on VALID.
+ * Secure messaging also requires key confirmation. */
 TC_credential_status TC_PIV_CVC_validate(const TC_PIV_CVC_validation_request* request,
                                          const TC_validation_context* context,
                                          TC_EC_workspace* point, size_t* work, TC_PIV_CVC* out);

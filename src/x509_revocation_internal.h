@@ -193,6 +193,8 @@ typedef struct {
   TC_bytes metadata[CRL_PATH_METADATA_COUNT];
   const TC_bytes* ocsp;
   size_t ocsp_count;
+  /* 1: a member without evidence gives UNDETERMINED in out. */
+  uint8_t report_uncovered;
 } tc_x509_crl_held_path;
 
 /* Caller guards the path object before this checks its borrowed inputs. */
@@ -232,7 +234,16 @@ typedef struct {
   TC_X509_revocation_scope* scopes;
   size_t scope_capacity;
   tc_x509_crl_signer_cache* signer_cache;
+  /* NULL: a CRL signer path member without evidence leaves the CRL
+   * unresolved. Otherwise such a member is accepted and *uncovered_used is
+   * set to 1 (tc_x509_path_revocation_coverage). */
+  uint8_t* uncovered_used;
 } tc_x509_crl_resolution_workspace;
+
+/* Node status of a certificate that no indexed CRL covers. It is stable for
+ * the operation, since the index and the evaluation time are fixed. The
+ * value extends TC_X509_revocation_status inside the resolver only. */
+enum { TC_X509_CRL_NODE_UNCOVERED = TC_X509_REVOCATION_REVOKED + 1 };
 
 typedef struct {
   const tc_x509_crl_operation_source* candidates;
@@ -277,7 +288,9 @@ void tc_x509_crl_extra_plan_inputs(tc_pki_storage_plan* plan,
 TC_TLV_result tc_x509_crl_dependency_add(tc_x509_crl_dependencies* dependencies,
                                          TC_bytes certificate, size_t* work, size_t* index);
 
-/* Anchor signatures establish a root; other signer paths need resolved dependencies. */
+/* Anchor signatures establish a root. Other signer paths need resolved
+ * dependencies. A NULL selected (no current pair in scope) returns VALID, since
+ * the attempt keeps its END or failure result and publishes nothing. */
 TC_X509_path_status tc_x509_crl_dependencies_check(void* context, const TC_X509_search_result* path,
                                                    const tc_x509_crl_selected* selected,
                                                    size_t* work);
@@ -310,7 +323,9 @@ typedef TC_TLV_result (*tc_x509_crl_node_evaluate)(void* context, size_t index,
                                                    TC_X509_crl_evidence* evidence, int* stop);
 /* Retry pending nodes while evaluation discovers dependencies or resolves nodes.
  * Evaluators append within capacity and consume work. Nodes remain provisional;
- * OK publishes determined root evidence. stop marks an operation-wide failure. */
+ * OK publishes determined root evidence. stop marks an operation-wide failure.
+ * An evaluator result of END (no indexed CRL applies) marks the node
+ * TC_X509_CRL_NODE_UNCOVERED, and returns END at once for the root. */
 TC_TLV_result tc_x509_crl_nodes_resolve(TC_X509_revocation_node* nodes, size_t capacity,
                                         size_t* count, size_t root, size_t* work,
                                         tc_x509_crl_node_evaluate evaluate, void* context,
@@ -329,10 +344,30 @@ typedef TC_TLV_result (*tc_x509_crl_certificate_resolve)(void* context, size_t i
                                                          TC_bytes certificate,
                                                          TC_X509_crl_evidence* evidence);
 /* Resolve an anchor-issued-first chain. resolve guards the whole held chain
- * before reading bytes or using scratch. Publish only determined evidence. */
+ * before reading bytes or using scratch. It returns END, or OK with
+ * incomplete evidence, for a member without evidence. With report_uncovered
+ * zero such a member returns UNSUPPORTED at once. Otherwise the remaining
+ * members are still resolved: a REVOKED member or a failure takes
+ * precedence, and else out holds UNDETERMINED with the index of the first
+ * uncovered member and zero evidence. out changes only on OK. */
 TC_TLV_result tc_x509_crl_path_resolve(const TC_bytes* chain, size_t count,
                                        tc_x509_crl_certificate_resolve resolve, void* context,
-                                       TC_X509_revocation_result* out);
+                                       int report_uncovered, TC_X509_revocation_result* out);
+
+/* TC_X509_path_check_revocation with uncovered members reported. A member
+ * with no accepted OCSP response and no current indexed CRL in its scope
+ * gives OK with out->status UNDETERMINED and out->certificate_index naming
+ * the first such member, once every other member is settled. A REVOKED member takes
+ * precedence. A CRL signer without evidence is accepted, and a member whose
+ * evidence relied on one counts as uncovered unless it is REVOKED. A
+ * candidate CRL that is unsupported or invalid, an unsupported CRL anywhere
+ * in the index and a dependency cycle keep their UNSUPPORTED or INVALID
+ * result. The validation layer uses this for its revocation evidence
+ * policy. */
+TC_TLV_result tc_x509_path_revocation_coverage(const TC_bytes* chain, size_t count,
+                                               const TC_X509_revocation_options* options,
+                                               const TC_X509_revocation_workspace* workspace,
+                                               size_t* work, TC_X509_revocation_result* out);
 
 enum {
   CRL_SCOPE_PATH = TC_X509_PATH_STORAGE_COUNT,

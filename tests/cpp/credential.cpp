@@ -12,6 +12,10 @@ static_assert(std::is_standard_layout<TC_PIV_security_validation_request>::value
               "Security requests remain ordinary C++ aggregate data");
 static_assert(std::is_standard_layout<TC_PIV_biometric_result>::value,
               "Biometric results remain ordinary C++ aggregate data");
+static_assert(std::is_standard_layout<TC_PIV_security_signature_request>::value,
+              "Security signature requests remain ordinary C++ aggregate data");
+static_assert(std::is_standard_layout<TC_PIV_security_map>::value,
+              "Security maps remain ordinary C++ aggregate data");
 
 TEST_CASE("CHUID validation rejects incomplete requests atomically")
 {
@@ -26,6 +30,10 @@ TEST_CASE("Credential object validation rejects incomplete requests atomically")
   CHECK(TC_PIV_biometric_validate(nullptr, nullptr, &work, nullptr) == TC_CREDENTIAL_ERROR);
   CHECK(work == 100);
   CHECK(TC_PIV_security_validate(nullptr, nullptr, nullptr, &work, nullptr) == TC_CREDENTIAL_ERROR);
+  CHECK(work == 100);
+  CHECK(TC_PIV_security_authenticate(nullptr, nullptr, nullptr, &work, nullptr) ==
+        TC_CREDENTIAL_ERROR);
+  CHECK(TC_PIV_security_digest_check(nullptr, nullptr, &work) == TC_CREDENTIAL_ERROR);
   CHECK(work == 100);
   CHECK(TC_TWIC_unsigned_CHUID_validate(nullptr, nullptr, &work) == TC_CREDENTIAL_ERROR);
   CHECK(work == 100);
@@ -51,4 +59,10 @@ TEST_CASE("Validation context retains caller-owned views")
   CHECK(context.options == &options);
   CHECK(context.trust.crls == &index);
   CHECK(context.workspace == &workspace);
+
+  options.revocation = static_cast<TC_validation_revocation>(2);
+  TC_validation_context rejected{};
+  CHECK(TC_validation_context_init(&trust, &options, &workspace, &rejected) == TC_RESULT_ARGUMENT);
+  options.revocation = TC_VALIDATION_REVOCATION_WHEN_AVAILABLE;
+  CHECK(TC_validation_context_init(&trust, &options, &workspace, &rejected) == TC_RESULT_OK);
 }

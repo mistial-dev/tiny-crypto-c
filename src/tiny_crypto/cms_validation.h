@@ -175,16 +175,16 @@ typedef struct {
  * Work: one unit per storage comparison, charged before any parsing, then the
  * path build and the revocation check.
  * Returns VALID when the signature, path and unrevoked status all hold.
- * REVOKED when a path member is revoked. UNSUPPORTED when no CRL covers a
- * member, or for an unsupported algorithm or CRL feature. ERROR for NULL
- * arguments or workspace arrays, invalid policy values, a path time that
- * differs from signer_policy->at or overlap, with work unchanged. LIMIT before
- * any work for a held_path or signer_path capacity below
- * path->search.capacity, a crl_states or scopes capacity below the index
- * count, no nodes, or a signer_policies capacity below
- * path->validation.policy_capacity, and later for exhausted work or
- * capacities. INVALID for a malformed message or failed signature, path or
- * CRL check. */
+ * REVOKED when a path member is revoked. UNAVAILABLE when no current CRL
+ * covers a member. UNSUPPORTED for an unsupported algorithm or CRL feature,
+ * including an unsupported CRL in the index. ERROR for NULL arguments or
+ * workspace arrays, invalid policy values, a path time that differs from
+ * signer_policy->at or overlap, with work unchanged. LIMIT before any work for
+ * a held_path or signer_path capacity below path->search.capacity, a
+ * crl_states or scopes capacity below the index count, no nodes, or a
+ * signer_policies capacity below path->validation.policy_capacity, and later
+ * for exhausted work or capacities. INVALID for a malformed message or failed
+ * signature, path or CRL check. */
 TC_credential_status TC_CMS_credential_validate(const TC_CMS_validation_request* request,
                                                 const TC_X509_store_source* source,
                                                 const TC_CMS_path_options* options,

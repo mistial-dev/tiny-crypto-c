@@ -110,18 +110,36 @@ typedef struct {
   const TC_CMS_signer_info* signer;
 } tc_cms_prepared_signed_data;
 
+/* Revocation evidence rule of one validation. evidence_optional set to 1
+ * accepts a path member without CRL evidence, as
+ * TC_VALIDATION_REVOCATION_WHEN_AVAILABLE does. checked, when not NULL,
+ * receives 1 on VALID when CRL evidence covered every member and 0 when a
+ * member had none. */
+typedef struct {
+  int evidence_optional;
+  uint8_t* checked;
+} tc_cms_revocation_evidence;
+
+/* Check every member of a built path against the CRL index (RFC 5280
+ * section 6.3). REVOKED for a revoked member. A member without evidence
+ * returns UNAVAILABLE unless evidence->evidence_optional is 1. A NULL
+ * evidence requires evidence for every member. Other failures map the
+ * revocation check result. */
 TC_credential_status tc_cms_path_revocation_check(const TC_X509_search_result* path,
                                                   const TC_X509_store_source* source,
                                                   const TC_CMS_revocation_policy* revocation,
                                                   const TC_CMS_credential_workspace* workspace,
+                                                  const tc_cms_revocation_evidence* evidence,
                                                   size_t* work);
 /* Optional inputs of the shared validation engine. metadata spans preserve
  * caller-owned configuration alias checks when public options are adapted on
- * the stack. prepared supplies views already read from request->encoded. */
+ * the stack. prepared supplies views already read from request->encoded.
+ * evidence selects the revocation evidence rule. Zero requires evidence. */
 typedef struct {
   const TC_bytes* metadata;
   size_t metadata_count;
   const tc_cms_prepared_signed_data* prepared;
+  tc_cms_revocation_evidence evidence;
 } tc_cms_validation_extras;
 TC_credential_status tc_cms_credential_validate_internal(
     const TC_CMS_validation_request* request, const TC_X509_store_source* source,

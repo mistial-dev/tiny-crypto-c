@@ -415,6 +415,7 @@ TC_credential_status tc_cms_path_revocation_check(const TC_X509_search_result* p
                                                   const TC_X509_store_source* source,
                                                   const TC_CMS_revocation_policy* revocation,
                                                   const TC_CMS_credential_workspace* workspace,
+                                                  const tc_cms_revocation_evidence* evidence,
                                                   size_t* work)
 {
   for (size_t i = 0; i < path->count; ++i)
@@ -445,14 +446,20 @@ TC_credential_status tc_cms_path_revocation_check(const TC_X509_search_result* p
                                                 workspace->signer_policies,
                                                 workspace->signer_policy_capacity};
   TC_X509_revocation_result checked;
-  TC_TLV_result result = TC_X509_path_check_revocation(workspace->held_path, path->count, &policy,
-                                                       &scratch, work, &checked);
+  TC_TLV_result result = tc_x509_path_revocation_coverage(workspace->held_path, path->count,
+                                                          &policy, &scratch, work, &checked);
   if (result != TC_TLV_OK)
     return cms_credential_error(result);
   if (checked.status == TC_X509_REVOCATION_REVOKED)
     return TC_CREDENTIAL_REVOKED;
-  return checked.status == TC_X509_REVOCATION_GOOD ? TC_CREDENTIAL_VALID
-                                                   : TC_CREDENTIAL_UNSUPPORTED;
+  const int covered = checked.status == TC_X509_REVOCATION_GOOD;
+  /* RFC 5280 6.3.3 leaves an uncovered member UNDETERMINED. The evidence
+   * rule decides whether that blocks acceptance. */
+  if (!covered && (!evidence || !evidence->evidence_optional))
+    return TC_CREDENTIAL_UNAVAILABLE;
+  if (evidence && evidence->checked)
+    *evidence->checked = (uint8_t)covered;
+  return TC_CREDENTIAL_VALID;
 }
 
 TC_credential_status tc_cms_credential_validate_internal(
@@ -464,7 +471,12 @@ TC_credential_status tc_cms_credential_validate_internal(
   const TC_bytes* metadata = extras ? extras->metadata : NULL;
   const size_t metadata_count = extras ? extras->metadata_count : 0;
   const tc_cms_prepared_signed_data* prepared = extras ? extras->prepared : NULL;
-  enum { RESULT_WRITE = TC_CMS_CREDENTIAL_WORKSPACE_WRITES, WORK_WRITE, WRITE_COUNT };
+  enum {
+    RESULT_WRITE = TC_CMS_CREDENTIAL_WORKSPACE_WRITES,
+    WORK_WRITE,
+    CHECKED_WRITE,
+    WRITE_COUNT
+  };
   TC_bytes writes[WRITE_COUNT];
   TC_X509_search_result path;
   TC_TLV_result result;
@@ -504,6 +516,8 @@ TC_credential_status tc_cms_credential_validate_internal(
   tc_cms_credential_workspace_plan_writes(&plan, workspace);
   TC_PKI_PLAN_WRITE(&plan, &path, 1);
   TC_PKI_PLAN_WRITE(&plan, work, 1);
+  uint8_t* checked = extras ? extras->evidence.checked : NULL;
+  TC_PKI_PLAN_WRITE(&plan, checked, checked ? 1 : 0);
   tc_pki_storage_plan_seal(&plan);
   const cms_path_inputs path_inputs = {
       request,          sizeof *request, NULL, inputs, sizeof inputs / sizeof *inputs,
@@ -532,7 +546,8 @@ TC_credential_status tc_cms_credential_validate_internal(
       request, prepared, &guarded, options, workspace->path, work, &path));
   if (status != TC_CREDENTIAL_VALID)
     return status;
-  return tc_cms_path_revocation_check(&path, &guarded, revocation, workspace, work);
+  return tc_cms_path_revocation_check(&path, &guarded, revocation, workspace,
+                                      extras ? &extras->evidence : NULL, work);
 }
 
 TC_credential_status TC_CMS_credential_validate(const TC_CMS_validation_request* request,

@@ -5,7 +5,8 @@
  * certificate checks.
  * Standards: RFC 5280 section 6, RFC 5652.
  * Configuration: TC_ENABLE_CMS_VALIDATION.
- * Limitations: revocation uses CRL evidence.
+ * Limitations: revocation uses CRL evidence. The application selects
+ * whether that evidence is required (TC_validation_revocation).
  * Contracts: docs/api.md, including its size_t work units.
  * Guide: docs/validation.md. */
 #ifndef TINY_CRYPTO_VALIDATION_H_
@@ -86,6 +87,25 @@ typedef struct {
   unsigned flags;
 } TC_validation_certificate_policy;
 
+/* Revocation evidence policy (RFC 5280 section 6.3.3). A path member lacks
+ * evidence when no current CRL in the index covers it. A CRL past its
+ * nextUpdate is no evidence (section 6.3.3 (a)). A CRL whose signer lacks
+ * evidence still applies, and the members it covers count as lacking
+ * evidence unless it lists them. A covering CRL with a failed signature, an
+ * unsupported CRL in the index and a dependency cycle still fail as INVALID
+ * or UNSUPPORTED under both values.
+ * - REQUIRED (zero): a member without evidence returns
+ *   TC_CREDENTIAL_UNAVAILABLE.
+ * - WHEN_AVAILABLE: a member without evidence is accepted and the result
+ *   reports revocation_checked 0. Covering CRLs are still checked, so a
+ *   revoked member still returns TC_CREDENTIAL_REVOKED.
+ * Select WHEN_AVAILABLE explicitly and treat revocation_checked 0 as
+ * missing evidence in the acceptance decision. */
+typedef enum {
+  TC_VALIDATION_REVOCATION_REQUIRED,
+  TC_VALIDATION_REVOCATION_WHEN_AVAILABLE
+} TC_validation_revocation;
+
 typedef struct {
   TC_X509_time at;
   TC_X509_signature_provider signatures;
@@ -97,6 +117,7 @@ typedef struct {
   TC_CMS_verification_policy verification;
   TC_X509_crl_delta_policy delta_policy;
   TC_X509_crl_order_policy order_policy;
+  TC_validation_revocation revocation;
 } TC_validation_options;
 
 /* Hold both sources stable through validation and the acceptance decision. */
@@ -120,7 +141,8 @@ typedef struct {
  * Returns OK with out written. ARGUMENT for NULL arguments or sources, a NULL
  * workspace->path, a zero max_certificates, max_input, max_candidates or
  * max_candidate_bytes, an invalid options->at, an unknown verification,
- * delta or order policy value, or overlap. out changes only on OK. */
+ * delta, order or revocation policy value, or overlap. out changes only on
+ * OK. */
 TC_result TC_validation_context_init(const TC_validation_trust* trust,
                                      const TC_validation_options* options,
                                      const TC_CMS_credential_workspace* workspace,
@@ -128,40 +150,52 @@ TC_result TC_validation_context_init(const TC_validation_trust* trust,
 
 /* Validate CMS content, signer path and CRL revocation under the context's
  * time, provider and policies. options->certificate governs the signer path
- * and options->crl_signer the CRL signer paths. request follows
- * TC_CMS_validation_request. Inputs and source bytes stay borrowed, stable
- * and disjoint from the workspace. The workspace is reusable on return.
- * Work, statuses and failure behavior match TC_CMS_credential_validate. A
- * NULL or incomplete context also returns ERROR before any work. */
+ * and options->crl_signer the CRL signer paths. options->revocation selects
+ * the evidence policy. request follows TC_CMS_validation_request. Inputs and
+ * source bytes stay borrowed, stable and disjoint from the workspace. The
+ * workspace is reusable on return.
+ * - revocation_checked may be NULL. On VALID it receives 1 when CRL evidence
+ *   covered every signer path member and 0 when WHEN_AVAILABLE accepted a
+ *   member without it. It must be disjoint from every input and workspace
+ *   array.
+ * Work, statuses and failure behavior match TC_CMS_credential_validate,
+ * including UNAVAILABLE under REQUIRED. A NULL or incomplete context also
+ * returns ERROR before any work. revocation_checked changes only on VALID. */
 TC_credential_status TC_CMS_validate(const TC_CMS_validation_request* request,
-                                     const TC_validation_context* context, size_t* work);
+                                     const TC_validation_context* context, size_t* work,
+                                     uint8_t* revocation_checked);
 
 typedef struct {
   TC_X509_certificate certificate;
   TC_X509_time at;
   size_t anchor_index;
+  /* 1 when CRL evidence covered every path member. 0 when
+   * TC_VALIDATION_REVOCATION_WHEN_AVAILABLE accepted a member without it. */
+  uint8_t revocation_checked;
 } TC_X509_validation_result;
 
-/* Build a trusted path for the DER certificate in encoded and require CRL
+/* Build a trusted path for the DER certificate in encoded and check CRL
  * evidence that every path member is unrevoked at options->at (RFC 5280
  * sections 6.1 and 6.3). options->certificate governs the path and
- * options->crl_signer the CRL signer paths. The context's source supplies
- * issuers and anchors.
+ * options->crl_signer the CRL signer paths. options->revocation decides
+ * whether a member without CRL evidence blocks acceptance. The context's
+ * source supplies issuers and anchors.
  * - encoded and the held trust snapshot stay stable through the acceptance
  *   decision. They must be disjoint from the workspace, work and out.
  * - out: certificate borrows encoded and survives workspace reuse. at is the
- *   evaluation time and anchor_index names the anchor in the source.
+ *   evaluation time, anchor_index names the anchor in the source and
+ *   revocation_checked records the evidence.
  *
  * Work: one unit per storage comparison, charged before any parsing, then the
  * path build and the revocation check.
  * Returns VALID with out written. REVOKED when a path member is revoked.
- * UNSUPPORTED when no CRL covers a member, or for an unsupported algorithm or
- * feature. ERROR for NULL or empty arguments, an incomplete context or
- * overlap, with work unchanged. LIMIT for more source candidates than
- * max_candidates or workspace capacities below the path or CRL index size,
- * before any work, and for exhausted work or capacities. INVALID for a
- * malformed certificate or a failed path or CRL check. out changes only on
- * VALID. */
+ * UNAVAILABLE under REQUIRED when a member has no CRL evidence. UNSUPPORTED
+ * for an unsupported algorithm, CRL or feature. ERROR for NULL or empty
+ * arguments, an incomplete context or overlap, with work unchanged. LIMIT for
+ * more source candidates than max_candidates or workspace capacities below
+ * the path or CRL index size, before any work, and for exhausted work or
+ * capacities. INVALID for a malformed certificate or a failed path or CRL
+ * check. out changes only on VALID. */
 TC_credential_status TC_X509_validate(TC_bytes encoded, const TC_validation_context* context,
                                       size_t* work, TC_X509_validation_result* out);
 

@@ -104,7 +104,8 @@ set(tc_module_sources_TC_ENABLE_PIV_OBJECTS
 
 tc_module_feature(TINY_CRYPTO_ENABLE_CREDENTIAL TC_ENABLE_CREDENTIAL
   "Build composed PIV and TWIC credential validation")
-set(tc_module_sources_TC_ENABLE_CREDENTIAL src/credential.c src/credential_policy.c)
+set(tc_module_sources_TC_ENABLE_CREDENTIAL src/credential.c src/credential_policy.c
+  src/credential_session.c src/credential_security.c)
 
 function(tc_append_module_sources output)
   set(sources ${${output}})

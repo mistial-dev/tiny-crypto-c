@@ -700,7 +700,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
       tiny-crypto-c-test-twic-cipher-${profile} tests/twic/cipher.c)
   endforeach()
   set(tc_pki_sources src/common.c src/tlv.c src/tlv_walk.c src/der.c src/x509_crl.c src/x509_crl_extensions.c src/x509_crl_selected.c src/x509_crl_evidence.c src/x509_crl_entries.c src/pki_storage.c src/piv_oid.c src/piv_container_internal.c src/credential_text_internal.c src/piv_cms.c src/piv_biometric.c src/piv_certificate.c src/piv_card.c src/piv_printed.c src/key_challenge.c src/lds.c src/piv_security.c src/fascn.c src/twic_uuid.c
-    src/piv_cvc.c src/piv_cvc_verify.c src/piv_chuid.c src/credential.c src/credential_policy.c src/validation.c src/x509.c src/x509_crypto.c src/x509_time.c src/x509_key.c src/pki_key.c src/pki_signature_oid.c src/x509_ext.c src/x509_name.c src/x509_name_constraints.c src/x509_path.c src/x509_path_extensions.c src/x509_path_workspace.c src/x509_search.c src/x509_store.c src/x509_store_anchor.c src/snapshot.c src/cms.c src/cms_collections.c src/cms_path.c src/x509_revocation.c src/x509_crl_scope.c src/x509_crl_scope_storage.c src/x509_crl_delta.c src/x509_policy.c src/asn1_string.c src/unicode.c src/eac_cvc.c)
+    src/piv_cvc.c src/piv_cvc_verify.c src/piv_chuid.c src/credential.c src/credential_policy.c src/credential_session.c src/credential_security.c src/validation.c src/x509.c src/x509_crypto.c src/x509_time.c src/x509_key.c src/pki_key.c src/pki_signature_oid.c src/x509_ext.c src/x509_name.c src/x509_name_constraints.c src/x509_path.c src/x509_path_extensions.c src/x509_path_workspace.c src/x509_search.c src/x509_store.c src/x509_store_anchor.c src/snapshot.c src/cms.c src/cms_collections.c src/cms_path.c src/x509_revocation.c src/x509_crl_scope.c src/x509_crl_scope_storage.c src/x509_crl_delta.c src/x509_policy.c src/asn1_string.c src/unicode.c src/eac_cvc.c)
   list(APPEND tc_pki_sources src/source.c src/source_der.c src/x509_crl_source.c src/x509_crl_prepare.c)
   tc_add_test_library(tiny-crypto-c-test-pki ${tc_pki_sources})
   target_compile_definitions(tiny-crypto-c-test-pki PUBLIC
@@ -890,6 +890,16 @@ if(TINY_CRYPTO_BUILD_TESTS)
     ${tc_card_simulator_sources} tests/support/scripted_transport.c)
   target_compile_definitions(test_piv_key_proof PRIVATE
     TC_CARD_FIXTURE_DIR="${PROJECT_SOURCE_DIR}/tests/vectors/piv/sm_captures/fixtures")
+  # Revocation evidence policy and Security Object digests over vendored PKIs.
+  tc_add_c_test(test_credential_revocation_policy tiny-crypto-c-test-pki-native
+    tests/credential/revocation_policy.c)
+  target_compile_definitions(test_credential_revocation_policy PRIVATE
+    TC_PKITS_DIR="${PROJECT_SOURCE_DIR}/tests/vectors/x509/nist/pkits")
+  tc_add_c_test(test_credential_security_digest tiny-crypto-c-test-pki-native
+    tests/credential/security_digest.c tests/support/card_fixture.c)
+  target_compile_definitions(test_credential_security_digest PRIVATE
+    TC_CARD_FIXTURE_DIR="${PROJECT_SOURCE_DIR}/tests/vectors/piv/sm_captures/fixtures"
+    TC_VECTOR_DIR="${PROJECT_SOURCE_DIR}/tests/vectors")
   tc_add_c_test(test_x509_native_sizes tiny-crypto-c-test-pki-native tests/x509/native_sizes.c)
   tc_add_c_test(test_x509_ocsp_sd33 tiny-crypto-c-test-pki-native tests/x509/ocsp_sd33.c
     examples/x509_ocsp.c)

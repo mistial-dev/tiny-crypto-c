@@ -362,6 +362,16 @@ of `TC_X509_revocation_time`. `TC_X509_path_check_revocation` checks a
 validated path, anchor-issued certificate first and target last. See
 [X.509 path revocation](x509-revocation.md) for configuration and results.
 
+`TC_validation_options.revocation` selects the revocation evidence policy of
+the CMS, X.509 and credential validators (`TC_validation_revocation`). The zero
+value, `TC_VALIDATION_REVOCATION_REQUIRED`, returns `TC_CREDENTIAL_UNAVAILABLE`
+when a path member has no current CRL evidence.
+`TC_VALIDATION_REVOCATION_WHEN_AVAILABLE` accepts such a member and reports
+`revocation_checked` 0 in the result. Covering CRLs are still checked under
+both values, so a revoked member returns `TC_CREDENTIAL_REVOKED`, and an
+unsupported CRL returns `TC_CREDENTIAL_UNSUPPORTED`. Select the policy at the
+application boundary and treat `revocation_checked` 0 as missing evidence.
+
 `<tiny_crypto/x509_ocsp.h>` encodes bounded OCSP requests and verifies complete
 DER OCSP responses, including stapled responses. Supply the certificate and its
 issuer from a validated path, a signature provider, a `TC_X509_revocation_time`

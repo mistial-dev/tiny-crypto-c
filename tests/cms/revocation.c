@@ -1589,7 +1589,8 @@ static MunitResult discovery_issuer_rollover(const MunitParameter params[], void
                   &rollover_options,       1,      TC_X509_CRL_COMPLETE_ONLY,
                   TC_X509_CRL_ORDER_NUMBER};
               const tc_x509_crl_resolution_workspace workspace = {
-                  &tree, &validation, &search, states, sizeof states, nodes, 1, 0, NULL, 0, NULL};
+                  &tree, &validation, &search, states, sizeof states, nodes,
+                  1,     0,           NULL,    0,      NULL,          NULL};
               evidence = empty;
               work = TRUST_WORK_BUDGET;
               munit_assert_int(
@@ -2011,7 +2012,7 @@ static MunitResult discovery_dependencies(const MunitParameter params[], void* u
             TC_X509_CRL_ORDER_NUMBER};
         tc_x509_crl_resolution_workspace workspace = {
             &tree,        &validation, &search, states, sizeof states, nodes,
-            DEPENDENCIES, 0,           NULL,    0,      NULL};
+            DEPENDENCIES, 0,           NULL,    0,      NULL,          NULL};
         const TC_X509_crl_evidence empty = {0};
         TC_X509_revocation_result path_evidence, path_sentinel;
         memset(&path_sentinel, 0xa5, sizeof path_sentinel);
@@ -2511,11 +2512,16 @@ static MunitResult discovery_dependencies(const MunitParameter params[], void* u
           work = TRUST_WORK_BUDGET;
           munit_assert_int(tc_cms_crl_resolve(&leaf_view, &incomplete, &workspace, &evidence), ==,
                            TC_TLV_UNSUPPORTED);
-          munit_assert_int(nodes[0].status, ==, TC_X509_REVOCATION_UNDETERMINED);
+          /* rows[0] covers the leaf and rows[1] its issuer. A leaf without
+           * a CRL is recorded as uncovered. */
+          munit_assert_int(nodes[0].status, ==,
+                           available ? TC_X509_CRL_NODE_UNCOVERED
+                                     : TC_X509_REVOCATION_UNDETERMINED);
           munit_assert_memory_equal(sizeof evidence, &evidence, &empty);
           if (!available) {
+            /* No indexed CRL covers the issuer, which the resolver records. */
             munit_assert_ptr_equal(nodes[1].certificate.data, issuer_der);
-            munit_assert_int(nodes[1].status, ==, TC_X509_REVOCATION_UNDETERMINED);
+            munit_assert_int(nodes[1].status, ==, TC_X509_CRL_NODE_UNCOVERED);
           }
         }
         const TC_X509_crl_record swap = rows[0];
@@ -2928,7 +2934,7 @@ static MunitResult discovery_partitions(const MunitParameter params[], void* use
                                                           TC_X509_CRL_ORDER_NUMBER};
                 tc_x509_crl_resolution_workspace resolve_workspace = {
                     &tree,         &validation, &search, states, sizeof states, dependencies,
-                    PATH_CAPACITY, 0,           NULL,    0,      NULL};
+                    PATH_CAPACITY, 0,           NULL,    0,      NULL,          NULL};
                 evidence = empty;
                 work = TRUST_WORK_BUDGET;
                 const TC_TLV_result resolved_result =

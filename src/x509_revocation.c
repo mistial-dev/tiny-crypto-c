@@ -38,6 +38,8 @@ TC_TLV_result tc_x509_crl_resolve_dependencies(TC_bytes target,
     *out = evidence;
     return TC_TLV_OK;
   }
+  if ((int)workspace->nodes[root].status == TC_X509_CRL_NODE_UNCOVERED)
+    return TC_TLV_END;
   result = tc_x509_crl_nodes_resolve(workspace->nodes, workspace->node_capacity,
                                      &dependencies->count, root, work, evaluate, context, out);
   /* Keep nodes added by an unresolved target too. Their lookup links stay in
@@ -96,8 +98,11 @@ TC_X509_path_status tc_x509_crl_dependencies_check(void* context, const TC_X509_
   const TC_X509_path_options* options = dependencies->options;
   if (path->anchor_index != dependencies->anchor_index)
     return TC_X509_PATH_ERROR;
+  /* No current base/delta pair in scope: the scope result is END or a
+   * failure, and this CRL has no signer dependencies to establish. END then
+   * marks the target without CRL evidence (RFC 5280 section 6.3.3 (a)). */
   if (!selected)
-    return TC_X509_PATH_UNSUPPORTED;
+    return TC_X509_PATH_VALID;
   TC_X509_signature_result signature = tc_x509_crl_selected_anchor_check(
       selected, dependencies->anchor, &options->signatures, &options->parsing,
       &dependencies->workspace->validation->names, work);
@@ -113,7 +118,7 @@ TC_X509_path_status tc_x509_crl_dependencies_check(void* context, const TC_X509_
 
 TC_TLV_result tc_x509_crl_path_resolve(const TC_bytes* chain, size_t count,
                                        tc_x509_crl_certificate_resolve resolve, void* context,
-                                       TC_X509_revocation_result* out)
+                                       int report_uncovered, TC_X509_revocation_result* out)
 {
   TC_bytes storage;
   if (!chain || !count || !resolve || !out)
@@ -122,17 +127,24 @@ TC_TLV_result tc_x509_crl_path_resolve(const TC_bytes* chain, size_t count,
   if (result != TC_TLV_OK)
     return result;
   TC_X509_revocation_result proposed = {TC_X509_REVOCATION_GOOD, SIZE_MAX, {0}};
+  size_t uncovered = SIZE_MAX;
   for (size_t i = 0; i < count; ++i) {
     TC_X509_crl_evidence evidence = {0};
+    TC_X509_revocation_status status = TC_X509_REVOCATION_UNDETERMINED;
     result = resolve(context, i, chain[i], &evidence);
+    if (result == TC_TLV_OK)
+      result = tc_x509_crl_evidence_status(&evidence, &status);
+    else if (result == TC_TLV_END)
+      result = TC_TLV_OK; /* No evidence: status stays UNDETERMINED. */
     if (result != TC_TLV_OK)
       return result;
-    TC_X509_revocation_status status;
-    result = tc_x509_crl_evidence_status(&evidence, &status);
-    if (result != TC_TLV_OK)
-      return result;
-    if (status == TC_X509_REVOCATION_UNDETERMINED)
-      return TC_TLV_UNSUPPORTED;
+    if (status == TC_X509_REVOCATION_UNDETERMINED) {
+      if (!report_uncovered)
+        return TC_TLV_UNSUPPORTED;
+      if (uncovered == SIZE_MAX)
+        uncovered = i;
+      continue;
+    }
     if (status == TC_X509_REVOCATION_REVOKED) {
       proposed.status = status;
       proposed.certificate_index = i;
@@ -140,6 +152,9 @@ TC_TLV_result tc_x509_crl_path_resolve(const TC_bytes* chain, size_t count,
       break;
     }
   }
+  /* A revoked member outranks an uncovered one (RFC 5280 section 6.3.3). */
+  if (proposed.status == TC_X509_REVOCATION_GOOD && uncovered != SIZE_MAX)
+    proposed = (TC_X509_revocation_result){TC_X509_REVOCATION_UNDETERMINED, uncovered, {0}};
   *out = proposed;
   return TC_TLV_OK;
 }
@@ -173,6 +188,14 @@ TC_TLV_result tc_x509_crl_nodes_resolve(TC_X509_revocation_node* nodes, size_t c
         return result == TC_TLV_OK ? TC_TLV_ARGUMENT : result;
       if (result == TC_TLV_ARGUMENT || result == TC_TLV_LIMIT)
         return result;
+      if (result == TC_TLV_END) {
+        /* No indexed CRL applies. That stays true for this operation. */
+        nodes[i].status = (TC_X509_revocation_status)TC_X509_CRL_NODE_UNCOVERED;
+        if (i == root)
+          return TC_TLV_END;
+        ++resolved;
+        continue;
+      }
       if (i == root)
         root_result = result;
       if (result != TC_TLV_OK)
@@ -365,7 +388,8 @@ TC_TLV_result tc_x509_crl_resolve(const TC_X509_certificate* target,
   TC_TLV_result result = x509_crl_prepare(target, resolution, workspace, NULL, out, &prepared);
   if (result != TC_TLV_OK)
     return result;
-  return x509_crl_resolve_target(&prepared, target->encoded, out);
+  result = x509_crl_resolve_target(&prepared, target->encoded, out);
+  return result == TC_TLV_END ? TC_TLV_UNSUPPORTED : result;
 }
 
 /* OCSP evidence for the members of one path check. writes records the
@@ -473,10 +497,9 @@ static TC_TLV_result x509_ocsp_member(const x509_crl_path_context* path, size_t 
 }
 #endif
 
-static TC_TLV_result x509_crl_path_certificate(void* context, size_t index, TC_bytes encoded,
-                                               TC_X509_crl_evidence* evidence)
+static TC_TLV_result x509_member_evidence(const x509_crl_path_context* path, size_t index,
+                                          TC_bytes encoded, TC_X509_crl_evidence* evidence)
 {
-  const x509_crl_path_context* path = context;
 #if !TC_ENABLE_X509_OCSP
   /* The callback type passes index for OCSP response lookup. */
   (void)index;
@@ -491,6 +514,25 @@ static TC_TLV_result x509_crl_path_certificate(void* context, size_t index, TC_b
   }
 #endif
   return x509_crl_resolve_target(path->prepared, encoded, evidence);
+}
+
+/* Resolve one held path member. When uncovered members are reported, a
+ * member whose evidence relied on a CRL signer without evidence counts as
+ * uncovered too, unless that evidence shows it revoked. */
+static TC_TLV_result x509_crl_path_certificate(void* context, size_t index, TC_bytes encoded,
+                                               TC_X509_crl_evidence* evidence)
+{
+  const x509_crl_path_context* path = context;
+  uint8_t* uncovered_used = path->prepared->workspace->uncovered_used;
+  if (uncovered_used)
+    *uncovered_used = 0;
+  TC_X509_crl_evidence found = {0};
+  TC_TLV_result result = x509_member_evidence(path, index, encoded, &found);
+  if (result == TC_TLV_OK && uncovered_used && *uncovered_used && !found.revocation.found)
+    return TC_TLV_END;
+  if (result == TC_TLV_OK)
+    *evidence = found;
+  return result;
 }
 
 /* Prepare the resolution once for the whole held path, then resolve each
@@ -508,7 +550,7 @@ static TC_TLV_result x509_crl_path_run(tc_x509_crl_held_path* held,
     return result;
   x509_crl_path_context context = {&prepared, ocsp};
   return tc_x509_crl_path_resolve(held->chain, held->count, x509_crl_path_certificate, &context,
-                                  held->out);
+                                  held->report_uncovered, held->out);
 }
 
 TC_TLV_result tc_x509_crl_path_operation(tc_x509_crl_held_path* held,
@@ -537,10 +579,11 @@ static TC_TLV_result x509_ocsp_preflight(x509_ocsp_members* ocsp, size_t count,
   return tc_pki_storage_plan_finish(&plan, work);
 }
 
-TC_TLV_result TC_X509_path_check_revocation(const TC_bytes* chain, size_t count,
-                                            const TC_X509_revocation_options* options,
-                                            const TC_X509_revocation_workspace* workspace,
-                                            size_t* work, TC_X509_revocation_result* out)
+static TC_TLV_result x509_path_check_revocation(const TC_bytes* chain, size_t count,
+                                                const TC_X509_revocation_options* options,
+                                                const TC_X509_revocation_workspace* workspace,
+                                                size_t* work, int report_uncovered,
+                                                TC_X509_revocation_result* out)
 {
   if (!options || !options->source || !options->signer_policy || !workspace ||
       !workspace->validation || !workspace->search || !workspace->scopes ||
@@ -585,6 +628,7 @@ TC_TLV_result TC_X509_path_check_revocation(const TC_bytes* chain, size_t count,
                                            workspace->signer_policies,
                                            workspace->signer_policy_capacity,
                                            0};
+  uint8_t uncovered_used = 0;
   const tc_x509_crl_resolution_workspace scratch = {&tree,
                                                     workspace->validation,
                                                     workspace->search,
@@ -595,7 +639,8 @@ TC_TLV_result TC_X509_path_check_revocation(const TC_bytes* chain, size_t count,
                                                     1,
                                                     workspace->scopes,
                                                     workspace->scope_capacity,
-                                                    &signer_cache};
+                                                    &signer_cache,
+                                                    report_uncovered ? &uncovered_used : NULL};
   tc_x509_crl_held_path held = {0};
   held.chain = chain;
   held.count = count;
@@ -604,7 +649,24 @@ TC_TLV_result TC_X509_path_check_revocation(const TC_bytes* chain, size_t count,
   held.metadata[CRL_PATH_WORKSPACE] = (TC_bytes){(const uint8_t*)workspace, sizeof *workspace};
   held.ocsp = options->ocsp.responses;
   held.ocsp_count = options->ocsp.count;
+  held.report_uncovered = (uint8_t)report_uncovered;
   return x509_crl_path_run(&held, &resolution, &scratch, options->ocsp.count ? &ocsp : NULL);
+}
+
+TC_TLV_result TC_X509_path_check_revocation(const TC_bytes* chain, size_t count,
+                                            const TC_X509_revocation_options* options,
+                                            const TC_X509_revocation_workspace* workspace,
+                                            size_t* work, TC_X509_revocation_result* out)
+{
+  return x509_path_check_revocation(chain, count, options, workspace, work, 0, out);
+}
+
+TC_TLV_result tc_x509_path_revocation_coverage(const TC_bytes* chain, size_t count,
+                                               const TC_X509_revocation_options* options,
+                                               const TC_X509_revocation_workspace* workspace,
+                                               size_t* work, TC_X509_revocation_result* out)
+{
+  return x509_path_check_revocation(chain, count, options, workspace, work, 1, out);
 }
 
 TC_X509_path_status tc_x509_crl_dependencies_path(const TC_X509_search_result* path,
@@ -629,13 +691,20 @@ TC_X509_path_status tc_x509_crl_dependencies_path(const TC_X509_search_result* p
                                                path->path[i], work, &index);
     if (result != TC_TLV_OK)
       return tc_x509_path_status(result);
-    switch (workspace->nodes[index].status) {
+    switch ((int)workspace->nodes[index].status) {
     case TC_X509_REVOCATION_REVOKED:
       return TC_X509_PATH_INVALID;
     case TC_X509_REVOCATION_UNDETERMINED:
       unresolved = 1;
       break;
     case TC_X509_REVOCATION_GOOD:
+      break;
+    case TC_X509_CRL_NODE_UNCOVERED:
+      /* Accepted only when the caller reports uncovered members. */
+      if (workspace->uncovered_used)
+        *workspace->uncovered_used = 1;
+      else
+        unresolved = 1;
       break;
     default:
       return TC_X509_PATH_ERROR;

@@ -153,14 +153,15 @@ TC_TEST(context_setup)
   munit_assert_size(workspace.path.signature_capacity, >=, sizeof context);
   TC_validation_context* alias_context = (TC_validation_context*)workspace.path.signature;
   *alias_context = context;
-  munit_assert_int(TC_CMS_validate(&cms_request, alias_context, &work), ==, TC_CREDENTIAL_ERROR);
+  munit_assert_int(TC_CMS_validate(&cms_request, alias_context, &work, NULL), ==,
+                   TC_CREDENTIAL_ERROR);
   munit_assert_size(work, ==, 10000);
   munit_assert_size(workspace.path.signature_capacity, >=, sizeof options);
   TC_validation_options* alias_options = (TC_validation_options*)workspace.path.signature;
   *alias_options = options;
   TC_validation_context alias_options_context = context;
   alias_options_context.options = alias_options;
-  munit_assert_int(TC_CMS_validate(&cms_request, &alias_options_context, &work), ==,
+  munit_assert_int(TC_CMS_validate(&cms_request, &alias_options_context, &work, NULL), ==,
                    TC_CREDENTIAL_ERROR);
   munit_assert_size(work, ==, 10000);
   memcpy(&saved, &context, sizeof saved);

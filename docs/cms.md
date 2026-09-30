@@ -736,8 +736,8 @@ The returned status contains no borrowed certificate views. The workspace is
 scratch and can be reused once the call returns.
 
 Only `TC_CREDENTIAL_VALID` confirms the selected signature, path and
-unrevoked status. Revoked credentials return `TC_CREDENTIAL_REVOKED`;
-missing CRL evidence returns `TC_CREDENTIAL_UNSUPPORTED`. Invalid,
+unrevoked status. Revoked credentials return `TC_CREDENTIAL_REVOKED`, and
+missing CRL evidence returns `TC_CREDENTIAL_UNAVAILABLE`. Invalid,
 resource-limit and operational failures have separate results. Apply the
 protocol's object profile, credential identifiers and access policy separately.
 

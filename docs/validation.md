@@ -73,8 +73,27 @@ source anchors establish trust. Keep both sources unchanged until the acceptance
 decision and all uses of their borrowed results finish.
 
 Use separate contexts for card and content-signing trust when they have different
-anchors or policies. Sequential contexts can share the same arena. Missing CRL
-evidence prevents a valid result.
+anchors or policies. Sequential contexts can share the same arena.
+
+`revocation` selects the revocation evidence policy (RFC 5280 section 6.3.3).
+A path member lacks evidence when no current CRL in the index covers it. A CRL
+past its nextUpdate is no evidence, so held CRLs that expire leave members
+without evidence. A covering CRL with a failed signature returns
+`TC_CREDENTIAL_INVALID` under both values.
+
+| Policy                                     | Member without CRL evidence   | Covering CRL lists the member | Unsupported CRL             |
+| :----------------------------------------- | :---------------------------- | :---------------------------- | :-------------------------- |
+| `TC_VALIDATION_REVOCATION_REQUIRED` (zero) | `TC_CREDENTIAL_UNAVAILABLE`   | `TC_CREDENTIAL_REVOKED`       | `TC_CREDENTIAL_UNSUPPORTED` |
+| `TC_VALIDATION_REVOCATION_WHEN_AVAILABLE`  | valid, `revocation_checked` 0 | `TC_CREDENTIAL_REVOKED`       | `TC_CREDENTIAL_UNSUPPORTED` |
+
+A revoked member outranks a member without evidence. Under
+`WHEN_AVAILABLE`, a CRL whose signer has no evidence still applies, and the
+members it covers report `revocation_checked` 0. `TC_X509_validation_result`,
+`TC_PIV_CHUID_result`, `TC_PIV_biometric_result`, `TC_PIV_security_map` and
+`TC_PIV_security_result` carry `revocation_checked`, and `TC_CMS_validate`
+writes it through an optional pointer. Choose `WHEN_AVAILABLE` explicitly, for
+example after the held CRLs expire, and treat `revocation_checked` 0 as
+missing evidence in the acceptance decision.
 
 ## Validate and reuse results
 
@@ -96,6 +115,45 @@ For signed card objects:
    and Security Object requests. Use the same card profile and evaluation time.
 1. Pass a successful `TC_PIV_security_result` as the `security` field of
    `TC_TWIC_unsigned_CHUID_validate` to check container 3002.
+
+`TC_PIV_security_validate` requires the complete inventory of signed
+containers. For a partial inventory, such as objects read without the PIN,
+authenticate the Security Object once with `TC_PIV_security_authenticate`.
+It returns a `TC_PIV_security_map` with the container map, the signed LDS
+digests and the parsing limits. Then check each object that was read with
+`TC_PIV_security_digest_check`, which returns `TC_CREDENTIAL_VALID` for a
+matching digest, `TC_CREDENTIAL_INVALID` for a different one and
+`TC_CREDENTIAL_UNAVAILABLE` for a container outside the signed map. The map
+borrows the Security Object bytes and the LDS scratch in its workspace. It
+survives reuse of the validation arena.
+
+```c
+#include <tiny_crypto/credential.h>
+
+/* Authenticate the Security Object into map, then check each object that was
+ * read. results[i] receives the status of objects[i]. */
+TC_credential_status check_read_objects(const TC_PIV_security_signature_request* request,
+    const TC_validation_context* context,
+    const TC_PIV_security_validation_workspace* lds,
+    const TC_PIV_security_data* objects, size_t count,
+    size_t* work, TC_PIV_security_map* map, TC_credential_status* results)
+{
+    TC_credential_status status =
+        TC_PIV_security_authenticate(request, context, lds, work, map);
+    if (status != TC_CREDENTIAL_VALID) return status;
+    for (size_t i = 0; i < count; ++i) {
+        results[i] = TC_PIV_security_digest_check(map, &objects[i], work);
+        if (results[i] == TC_CREDENTIAL_LIMIT || results[i] == TC_CREDENTIAL_ERROR)
+            return results[i];
+    }
+    return TC_CREDENTIAL_VALID;
+}
+```
+
+A `TC_CREDENTIAL_VALID` return here says that the Security Object is authentic.
+Each entry of `results` still decides its own object. Treat
+`TC_CREDENTIAL_UNAVAILABLE` as an object the issuer did not sign. Read
+`map->revocation_checked` before relying on the signer's revocation status.
 
 CHUID and Security Object results borrow original buffers and inventory
 descriptors. Keep those buffers unchanged while using the results. Encrypted

@@ -461,6 +461,34 @@ wrong or absent trust anchors, expiration, wrong key usage, changed signatures,
 missing signers, mismatched policy times, unheld snapshots and exhausted work.
 These run with both signer-ID forms and attached, detached and empty content.
 
+`test_credential_revocation_policy` checks the revocation evidence policy of
+`TC_validation_options` over the NIST PKITS path Trust Anchor, Good CA and an
+end entity, with each CRL indexed or left out. `REQUIRED` returns
+`TC_CREDENTIAL_UNAVAILABLE` for a member without a CRL, and `WHEN_AVAILABLE`
+returns a valid result with `revocation_checked` 0. The revoked end entity of
+PKITS Invalid Revoked EE Test3 stays `TC_CREDENTIAL_REVOKED` under both, also
+when Good CA itself has no CRL. The expired CRL of PKITS Invalid Old CRL
+nextUpdate Test11 counts as missing evidence. A Good CA CRL with a changed
+signature byte stays `TC_CREDENTIAL_INVALID` and a CRL with an unknown critical
+extension stays `TC_CREDENTIAL_UNSUPPORTED` under both policies. An unknown
+policy value is rejected at the context entry and by `TC_X509_validate`.
+
+`test_credential_security_digest` accepts SD 33 card 2 from its capture
+fixture with the issuing CA pinned as the anchor: the card authentication
+certificate, its identifiers and the CHUID, under `WHEN_AVAILABLE` without
+CRLs. It authenticates the Security Object with
+`TC_PIV_security_authenticate` and checks every mapped container with
+`TC_PIV_security_digest_check`, the Discovery Object included. Unmapped
+containers return `TC_CREDENTIAL_UNAVAILABLE`, and a changed byte fails only
+its container. `REQUIRED` returns `TC_CREDENTIAL_UNAVAILABLE` for the card
+certificate, the CHUID and the Security Object. The suite also checks the
+argument and overlap rules and the complete-inventory contract of
+`TC_PIV_security_validate`.
+
+```sh
+ctest --test-dir build -R '^test_credential_(revocation_policy|security_digest)$' --output-on-failure
+```
+
 The public envelope path API runs against attached, detached and empty messages
 with both signer-ID forms. Tests check expected content type, missing signer
 indices, explicit second-signer selection, absent/NULL/BER NULL digest parameters,
