@@ -3,7 +3,6 @@
 #include <tiny_crypto/tiny_crypto.hpp>
 #include "../../examples/piv_sm_wire.h"
 #include "doctest.h"
-#include <type_traits>
 #include <cstring>
 #if TC_TEST_SM_FIXTURES
 #include "sm_fixtures.h"
@@ -15,9 +14,6 @@ static TC_status scalar_one(void*, uint8_t* output, size_t length)
   output[length - 1] = 1;
   return TC_OK;
 }
-
-static_assert(!std::is_copy_constructible<tiny_crypto::piv_sm>::value, "Session must not copy");
-static_assert(!std::is_move_constructible<tiny_crypto::piv_sm>::value, "Session must not move");
 
 #if TC_TEST_SM_FIXTURES
 TEST_CASE("PIV SM authenticated exchange")

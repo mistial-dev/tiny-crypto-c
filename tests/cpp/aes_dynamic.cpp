@@ -3,15 +3,12 @@
 #include <tiny_crypto/tiny_crypto.hpp>
 #include <doctest.h>
 #include <cstring>
-#include <type_traits>
 
 TEST_CASE("Dynamic AES wrappers and lifecycle")
 {
   tiny_crypto::AES_dynamic cipher;
   tiny_crypto::AES_dynamic_CMAC mac;
   uint8_t key[32] = {}, block[16] = {}, original[16] = {}, iv[16] = {};
-  CHECK_FALSE(std::is_copy_constructible<tiny_crypto::AES_dynamic>::value);
-  CHECK_FALSE(std::is_copy_constructible<tiny_crypto::AES_dynamic_CMAC>::value);
   CHECK(cipher.encrypt(block) == TC_ERROR);
   CHECK(mac.final(block) == TC_ERROR);
   for (size_t length = 16; length <= 32; length += 8) {

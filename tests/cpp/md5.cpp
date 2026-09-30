@@ -4,10 +4,7 @@
 #include "doctest.h"
 #include <tiny_crypto/tiny_crypto.hpp>
 #include <cstring>
-#include <type_traits>
 
-static_assert(!std::is_copy_constructible<tiny_crypto::MD5>::value,
-              "Hash contexts require explicit ownership");
 static_assert(sizeof(tiny_crypto::MD5) == sizeof(TC_MD5_ctx), "The wrapper retains one C context");
 
 TEST_CASE("MD5 streaming, reuse and argument errors")

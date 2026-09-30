@@ -3,7 +3,6 @@
 
 #include <array>
 #include <cstring>
-#include <type_traits>
 #include <vector>
 
 #include "doctest.h"
@@ -367,8 +366,6 @@ TEST_CASE("AES CMAC known answer and verify wrappers")
 
 TEST_CASE("AES CMAC streaming class")
 {
-  CHECK_FALSE(std::is_copy_constructible<tiny_crypto::AES_CMAC>::value);
-  CHECK_FALSE(std::is_copy_assignable<tiny_crypto::AES_CMAC>::value);
   static_assert(tiny_crypto::AES_CMAC::tag_size == TC_AES_CMAC_TAG_MAX, "full tag size");
   uint8_t tag[TC_AES_CMAC_TAG_MAX];
 
@@ -434,7 +431,6 @@ TEST_CASE("AES GCM clear and failed re-init leave the object unkeyed")
       break;
     }
   REQUIRE(v != nullptr);
-  CHECK_FALSE(std::is_copy_constructible<tiny_crypto::GCM>::value);
   uint8_t block[TC_AES_BLOCKLEN] = {0};
   uint8_t tag[TC_AES_BLOCKLEN];
   const tiny_crypto::bytes key = {v->key, v->key_len};

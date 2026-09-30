@@ -174,16 +174,23 @@ For a single buffer, one call does the same and returns `TC_OK`,
 `TC_MISMATCH` or `TC_ERROR`:
 
 ```cpp
-tiny_crypto::des_iso9797_verify(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, {key, 16}, message,
-                                {received, 8});
+#include <tiny_crypto/des.hpp>
+
+TC_status retail_mac_check(const uint8_t (&key)[16], tiny_crypto::bytes message,
+                           const uint8_t (&received)[TC_DES_BLOCKLEN])
+{
+  return tiny_crypto::des_iso9797_verify(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, {key, 16},
+                                         message, {received, 8});
+}
 ```
 
 ## Testing
 
 The doctest suites in `tests/cpp` run as `test_cpp_*`. The build compiles
 `tests/cpp/header_compile.cpp`, which instantiates every wrapper, as C++17 with
-warnings treated as errors. `test_cpp_nodiscard` checks that a discarded
-result is diagnosed. Run them with:
+warnings treated as errors. `tests/cpp/copy_contract.cpp` asserts the copy and
+move rules of [Object lifecycle](#object-lifecycle) in C++11.
+`test_cpp_nodiscard` checks that a discarded result is diagnosed. Run them with:
 
 ```sh
 ctest --test-dir build -R '^test_cpp_' --output-on-failure

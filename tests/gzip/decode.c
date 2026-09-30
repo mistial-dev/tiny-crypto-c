@@ -90,11 +90,36 @@ TC_TEST(decode)
   return MUNIT_OK;
 }
 
+TC_TEST(spare_capacity)
+{
+  /* docs/gzip.md: success leaves bytes beyond the decoded length unchanged.
+   * Two members, each with a back reference, decode into a larger buffer. */
+  static const uint8_t member[] = {0x1f, 0x8b, 8,    0,    0,    0,    0,    0, 2,
+                                   0xff, 0x4b, 0x4c, 0x4a, 0x4e, 0x44, 0x45, 0, 4,
+                                   0xc0, 0x26, 0xdc, 18,   0,    0,    0};
+  uint8_t input[2 * sizeof member], output[64];
+  memcpy(input, member, sizeof member);
+  memcpy(input + sizeof member, member, sizeof member);
+  memset(output, 0x5a, sizeof output);
+  TC_GZIP_workspace workspace;
+  size_t work = SIZE_MAX, length = SIZE_MAX;
+  munit_assert_int(TC_GZIP_decode((TC_bytes){input, sizeof input}, &workspace, &work,
+                                  (TC_buffer){output, sizeof output}, &length),
+                   ==, TC_GZIP_OK);
+  munit_assert_size(length, ==, 36);
+  munit_assert_memory_equal(length, output, "abcabcabcabcabcabcabcabcabcabcabcabc");
+  for (size_t i = length; i < sizeof output; ++i)
+    munit_assert_uint8(output[i], ==, 0x5a);
+  return MUNIT_OK;
+}
+
 int main(int argc, char** argv)
 {
-  MunitTest tests[] = {{"/result-order", result_order, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-                       {"/decode", decode, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
-                       {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
+  MunitTest tests[] = {
+      {"/result-order", result_order, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/decode", decode, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/spare-capacity", spare_capacity, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
   MunitSuite suite = {"/gzip", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};
   return munit_suite_main(&suite, NULL, argc, argv);
 }

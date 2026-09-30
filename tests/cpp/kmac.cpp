@@ -2,7 +2,6 @@
 #include <tiny_crypto/tiny_crypto.hpp>
 #include <doctest.h>
 #include <cstring>
-#include <type_traits>
 
 using tiny_crypto::buffer;
 using tiny_crypto::bytes;
@@ -12,7 +11,6 @@ TEST_CASE("KMAC256 streaming and lifecycle")
   tiny_crypto::KMAC256 ctx;
   uint8_t key[32] = {}, out[48], expected[48];
   const bytes empty = {nullptr, 0};
-  CHECK_FALSE(std::is_copy_constructible<tiny_crypto::KMAC256>::value);
   CHECK(ctx.update(empty) == TC_ERROR);
   REQUIRE(ctx.init(bytes{key, sizeof(key)}) == TC_OK);
   REQUIRE(ctx.update(bytes{key, 13}) == TC_OK);

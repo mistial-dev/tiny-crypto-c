@@ -143,6 +143,7 @@ Test code decodes hex through one helper in `tests/support/cavp.c`.
 `tc_test_hex` decodes a well-formed fixture and fails the test otherwise.
 `tc_test_hex_decode` reports malformed values from external files and selects
 field or separated-byte syntax. `test_support_hex` covers both.
+`test_support_record` checks the record reader that the CAVP suites share.
 Fault seams exercise failure paths that the shipped ciphers cannot reach.
 `test_aes_backend_failure` and `test_aes_mode_failure` fail chosen AES block
 calls, including every KW and KWP block operation. `test_des_mac_failure`

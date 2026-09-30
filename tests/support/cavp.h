@@ -35,7 +35,8 @@ typedef enum {
   TC_CAVP_HEADER,     /* name is the header text without brackets */
   TC_CAVP_RECORD_END, /* a blank line or the end of file closed a record */
   TC_CAVP_END,        /* end of file */
-  TC_CAVP_FAILURE     /* unreadable file or a line longer than the buffer */
+  TC_CAVP_FAILURE     /* unreadable file, a line longer than the buffer, or a
+                       * header without its closing ']' */
 } tc_cavp_event;
 
 typedef struct {

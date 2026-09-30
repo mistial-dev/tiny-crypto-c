@@ -3,12 +3,9 @@
 #include "doctest.h"
 #include <tiny_crypto/tiny_crypto.hpp>
 #include <cstring>
-#include <type_traits>
 
 static_assert(sizeof(tiny_crypto::GZIPDecoder) == sizeof(TC_GZIP_workspace),
               "The decoder retains one workspace");
-static_assert(!std::is_copy_constructible<tiny_crypto::GZIPDecoder>::value,
-              "Decoder scratch has one owner");
 
 TEST_CASE("GZIP decoder reuse, limits and arguments")
 {

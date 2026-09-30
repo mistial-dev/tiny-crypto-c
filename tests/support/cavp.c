@@ -38,6 +38,16 @@ int tc_cavp_open(tc_cavp_reader* reader, const char* directory, const char* rela
   return reader->file != NULL;
 }
 
+/* True when no byte follows in file. A byte that follows is pushed back. */
+static int at_end_of_file(FILE* file)
+{
+  const int next = getc(file);
+  if (next == EOF)
+    return !ferror(file);
+  ungetc(next, file);
+  return 0;
+}
+
 static void record_header(tc_cavp_reader* reader, const char* text)
 {
   if (!reader->in_header_group)
@@ -60,8 +70,10 @@ tc_cavp_event tc_cavp_next(tc_cavp_reader* reader)
     char* equals;
 
     ++reader->line_number;
-    /* A full buffer without a line ending means the line was cut. */
-    if (length == reader->capacity - 1 && line[length - 1] != '\n' && !feof(reader->file))
+    /* A full buffer without a line ending holds a cut line, unless the file
+     * ends right after it. fgets stops before reaching the end in that case,
+     * so read one more byte to tell the two apart. */
+    if (length == reader->capacity - 1 && line[length - 1] != '\n' && !at_end_of_file(reader->file))
       return TC_CAVP_FAILURE;
     line = trim(line, line + length);
     if (*line == '#')

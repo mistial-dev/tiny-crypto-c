@@ -4,7 +4,6 @@
 #include <doctest.h>
 #include <cstdio>
 #include <cstring>
-#include <type_traits>
 
 namespace {
 // Serves one fixed entropy input, as the DRBGVS test harness does.
@@ -45,9 +44,6 @@ TEST_CASE("HMAC_DRBG SHA-256 CAVP answer and lifecycle")
         "07694bb7547bb0995f70de25d6b29e2d3011bb19d27676c07162c8b5ccde0668"
         "961df86803482cb37ed6d5c0bb8d50cf1f50d476aa0458bdaba806f48be9dcb8",
         expected);
-
-  CHECK_FALSE(std::is_copy_constructible<tiny_crypto::drbg>::value);
-  CHECK_FALSE(std::is_move_constructible<tiny_crypto::drbg>::value);
 
   fixed_entropy source = {entropy, sizeof(entropy), false};
   tiny_crypto::drbg_config config = {};

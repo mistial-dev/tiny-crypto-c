@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include <cstring>
-#include <type_traits>
 
 #include "doctest.h"
 #include <tiny_crypto/des.hpp>
@@ -379,8 +378,6 @@ TEST_CASE("DES-CMAC one-shot and verify wrappers")
 TEST_CASE("DES-CMAC streaming class")
 {
   using tiny_crypto::bytes;
-  CHECK_FALSE(std::is_copy_constructible<tiny_crypto::DES_CMAC>::value);
-  CHECK_FALSE(std::is_copy_assignable<tiny_crypto::DES_CMAC>::value);
   static_assert(tiny_crypto::DES_CMAC::tag_size == TC_DES_CMAC_TAG_MAX, "full tag size");
   uint8_t tag[TC_DES_CMAC_TAG_MAX];
 
@@ -555,8 +552,6 @@ TEST_CASE("ISO 9797-1 one-shot wrappers match Annex B")
 
 TEST_CASE("ISO 9797-1 streaming class")
 {
-  CHECK_FALSE(std::is_copy_constructible<tiny_crypto::DES_ISO9797>::value);
-  CHECK_FALSE(std::is_copy_assignable<tiny_crypto::DES_ISO9797>::value);
   static_assert(tiny_crypto::DES_ISO9797::tag_size == TC_DES_BLOCKLEN, "full tag size");
   uint8_t tag[TC_DES_BLOCKLEN];
 

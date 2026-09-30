@@ -150,6 +150,9 @@ if(TINY_CRYPTO_BUILD_TESTS)
 
   include(${CMAKE_CURRENT_LIST_DIR}/TestProfiles.cmake)
   tc_add_c_test(test_support_hex tiny-crypto-c-test tests/support/hex_test.c)
+  tc_add_c_test(test_support_record tiny-crypto-c-test tests/support/record_test.c)
+  target_compile_definitions(test_support_record PRIVATE
+    TC_TEST_RECORD_DIR="${CMAKE_CURRENT_BINARY_DIR}")
   tc_add_c_test(test_hash_dispatch tiny-crypto-c-test tests/hash/dispatch.c)
   tc_add_c_test(test_rsa_mgf tiny-crypto-c-test tests/rsa/mgf.c)
   tc_add_c_test(test_rsa_pss tiny-crypto-c-test tests/rsa/pss.c)
@@ -1452,6 +1455,17 @@ if(TINY_CRYPTO_BUILD_TESTS)
   tc_warnings(test_cpp_headers_cxx17)
   if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(test_cpp_headers_cxx17 PRIVATE -Werror)
+  endif()
+
+  # copy_contract.cpp asserts the documented copy and move rules of every
+  # wrapper class in C++11. avr-g++ has no <type_traits>, so it runs on the host.
+  add_library(test_cpp_copy_contract OBJECT tests/cpp/copy_contract.cpp)
+  target_include_directories(test_cpp_copy_contract PRIVATE src)
+  set_property(TARGET test_cpp_copy_contract PROPERTY CXX_STANDARD 11)
+  target_compile_definitions(test_cpp_copy_contract PRIVATE ${tc_cpp_header_definitions})
+  tc_warnings(test_cpp_copy_contract)
+  if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(test_cpp_copy_contract PRIVATE -Werror)
   endif()
 
   # Discarding a wrapper status must draw a compiler warning.
