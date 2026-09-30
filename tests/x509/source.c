@@ -147,9 +147,55 @@ TC_TEST(framing)
   return MUNIT_OK;
 }
 
+/* A header read stops once the header is complete. Through a one-byte window
+ * each header byte costs one physical read, so a budget of exactly the header
+ * length succeeds and the value bytes are never read. A window that holds the
+ * header needs one read. */
+TC_TEST(header_cost)
+{
+  const uint8_t short_form[] = {0x04, 0x03, 0xaa, 0xbb, 0xcc};
+  const uint8_t long_form[] = {0x04, 0x81, 0x80};
+  const struct {
+    const uint8_t* data;
+    size_t length, header_length;
+    uint64_t value_length;
+  } cases[] = {{short_form, sizeof short_form, 2, 3}, {long_form, sizeof long_form, 3, 0x80}};
+  uint8_t window[16];
+  tc_source_reader reader;
+  tc_source_der_element element;
+  for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
+    TC_bytes bytes = {cases[i].data, cases[i].length};
+    const TC_source source = {read_header, &bytes, cases[i].header_length + cases[i].value_length};
+    munit_assert_int(tc_source_reader_init(&reader, &source, (TC_buffer){window, 1},
+                                           cases[i].header_length, cases[i].header_length),
+                     ==, TC_RESULT_OK);
+    munit_assert_int(tc_source_der_read(&reader, 0, source.length, UINT64_MAX, &element), ==,
+                     TC_TLV_OK);
+    munit_assert_size(element.header.header_length, ==, cases[i].header_length);
+    munit_assert_true(element.header.length == cases[i].value_length);
+    munit_assert_true(reader.reads_remaining == 0);
+    munit_assert_true(reader.bytes_remaining == 0);
+    /* One read short of the header is a LIMIT. */
+    munit_assert_int(tc_source_reader_init(&reader, &source, (TC_buffer){window, 1},
+                                           cases[i].header_length, cases[i].header_length - 1),
+                     ==, TC_RESULT_OK);
+    munit_assert_int(tc_source_der_read(&reader, 0, source.length, UINT64_MAX, &element), ==,
+                     TC_TLV_LIMIT);
+    munit_assert_int(tc_source_reader_init(&reader, &source, (TC_buffer){window, sizeof window},
+                                           sizeof window, 1),
+                     ==, TC_RESULT_OK);
+    munit_assert_int(tc_source_der_read(&reader, 0, source.length, UINT64_MAX, &element), ==,
+                     TC_TLV_OK);
+    munit_assert_size(element.header.header_length, ==, cases[i].header_length);
+    munit_assert_true(reader.reads_remaining == 0);
+  }
+  return MUNIT_OK;
+}
+
 static MunitTest tests[] = {{"/reads", reads, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
                             {"/failures", failures, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
                             {"/framing", framing, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+                            {"/header-cost", header_cost, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
                             {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
 static const MunitSuite suite = {"/source", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};
 int main(int argc, char* argv[])

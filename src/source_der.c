@@ -49,13 +49,22 @@ TC_TLV_result tc_source_der_read(tc_source_reader* reader, uint64_t offset, uint
     return TC_TLV_ARGUMENT;
   if (offset == end)
     return TC_TLV_END;
-  /* Load the longest possible header, or the rest of the parent, once. */
+  /* Parse after each window chunk and stop once the header is complete, so
+   * physical reads cover only header bytes the window did not already hold.
+   * A header longer than the parent or than HEADER_CAPACITY stays MORE. */
   const size_t available = end - offset < sizeof encoded ? (size_t)(end - offset) : sizeof encoded;
-  TC_TLV_result result = tc_source_reader_copy(reader, offset, available, encoded);
-  if (result != TC_TLV_OK)
-    return result;
-  result = tc_tlv_header_read(encoded, available, TC_TLV_DER, sizeof(uint64_t), max_value,
-                              &parsed.header);
+  size_t used = 0;
+  TC_TLV_result result = TC_TLV_MORE;
+  while (result == TC_TLV_MORE && used < available) {
+    TC_bytes chunk;
+    const TC_result read = tc_source_reader_view(reader, offset + used, available - used, &chunk);
+    if (read != TC_RESULT_OK)
+      return tc_source_status(read);
+    memcpy(encoded + used, chunk.data, chunk.length);
+    used += chunk.length;
+    result =
+        tc_tlv_header_read(encoded, used, TC_TLV_DER, sizeof(uint64_t), max_value, &parsed.header);
+  }
   if (result == TC_TLV_MORE)
     return available < sizeof encoded ? TC_TLV_INVALID : TC_TLV_LIMIT;
   if (result != TC_TLV_OK)
