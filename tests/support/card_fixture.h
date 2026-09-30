@@ -86,6 +86,13 @@ const tc_card_object* tc_card_fixture_object(const tc_card_fixture* fixture, uin
 const tc_card_reference* tc_card_fixture_reference(const tc_card_fixture* fixture,
                                                    uint8_t reference);
 
+/* The key proof challenge that reproduces the recorded GENERAL
+ * AUTHENTICATE of key: the SHA-256 digest ending a PKCS #1 v1.5 encoded
+ * message for RSA, the recorded input for ECDSA (SP 800-78-5 Table 9: 11
+ * P-256, 14 P-384). Empty when the fixture holds none, as for a raw RSA
+ * input. The span borrows the fixture. */
+TC_bytes tc_card_fixture_challenge(const tc_card_fixture* fixture, uint8_t key);
+
 /* The replay called name, or NULL. */
 const tc_card_replay* tc_card_fixture_replay(const tc_card_fixture* fixture, const char* name);
 

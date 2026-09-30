@@ -22,6 +22,17 @@
 
 enum { FILE_BYTES = 16384, SECRET_BYTES = 16 };
 
+#if defined(EXAMPLE_PIV_INSPECT_GUARD)
+/* Test builds link a transmit guard provider, such as
+ * tests/piv/hardware/inspect_live.c. It returns NULL when it has none. */
+const ExampleCardPCSCGuard* example_piv_inspect_guard(void);
+#else
+static const ExampleCardPCSCGuard* example_piv_inspect_guard(void)
+{
+  return NULL;
+}
+#endif
+
 static const char usage[] =
     "Usage: piv_inspect --reader NAME --anchor CA.der [--anchor-sha256 HEX]\n"
     "  [--anchor CA.der [--anchor-sha256 HEX]]... [--crl ISSUER.crl]...\n"
@@ -33,6 +44,8 @@ static const char usage[] =
     "example 'ACR1552 1S CL Reader PICC'. Yubico readers are refused.\n"
     "The PIN and pairing code come from TC_PIV_PIN and TC_PIV_PAIRING_CODE, or\n"
     "from a prompt without echo. An empty answer sends none.\n"
+    "TC_PIV_HARDWARE_GUARD=1 installs the hardware test transmit guard, which\n"
+    "only test builds provide.\n"
     "Exit status: 0 accepted, 1 rejected or failed, 2 invalid arguments.\n";
 
 static struct {
@@ -336,8 +349,19 @@ static int inspect(const Arguments* arguments)
     options.dump = dump;
     options.dump_context = (void*)arguments->dump_dir;
   }
+  /* TC_PIV_HARDWARE_GUARD=1 requires the guard, so a build without one
+   * refuses to run. */
+  const char* guarded = getenv("TC_PIV_HARDWARE_GUARD");
+  const ExampleCardPCSCGuard* guard = NULL;
+  if (guarded && strcmp(guarded, "0")) {
+    guard = example_piv_inspect_guard();
+    if (!guard) {
+      fputs("TC_PIV_HARDWARE_GUARD is set, and this build has no transmit guard\n", stderr);
+      return 2;
+    }
+  }
   ExampleCardPCSC connection = {0};
-  const ExampleCardPCSCOptions reader = {arguments->reader, arguments->interface, NULL};
+  const ExampleCardPCSCOptions reader = {arguments->reader, arguments->interface, guard};
   const ExampleCardPCSCResult opened = example_card_pcsc_open(&connection, &reader);
   if (opened != EXAMPLE_PCSC_OPENED) {
     fprintf(stderr, "%s\n", open_failure(opened));

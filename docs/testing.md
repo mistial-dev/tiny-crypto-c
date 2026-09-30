@@ -56,6 +56,7 @@ tests, benchmarks, fuzzers and sanitizers are listed in the
 | `TINY_CRYPTO_TEST_ESP_SIGNED_IMAGE` | empty                               | Espressif RSA-3072 signed application fixture                          |
 | `TINY_CRYPTO_TLV_CORPUS`            | `tests/vectors`                     | Parser corpus root with `piv/` and `x509/`, or empty to skip           |
 | `TINY_CRYPTO_TLV_MBEDTLS_SUITE`     | empty                               | External pinned ASN.1 test data file                                   |
+| `TINY_CRYPTO_TEST_PIV_CARD`         | OFF                                 | [PIV card hardware tests](#piv-card-hardware-tests) over PC/SC         |
 
 An empty directory option skips the tests that need it.
 
@@ -156,6 +157,19 @@ code, a changed CHUID and a changed Key History that reject the card, a refused
 key establishment that rejects the card, and invalid options. A mismatch writes the
 output to `<name>.actual` in the test directory. Review it and copy it over the
 golden file when the change is intended.
+
+`test_piv_hardware_guard` covers the transmit guard of the
+[PIV card hardware tests](#piv-card-hardware-tests): the allowed commands,
+GET RESPONSE and chaining, the identity binding, the PIN and pairing code
+budgets, SM VERIFY classification, the contactless refusal of plain reference
+data, 9C after a PIN submission and the guarded transport.
+`test_piv_card_simulated_card2_contactless`, `_card2_contact` and
+`_card4_contactless` run the hardware scenarios over the card simulator with
+the guard in front of it. The card 2 contact run adds extended length and the
+REQUIRED revocation policy. `test_example_piv_inspect_card2_guarded` runs
+`examples/piv_inspect.c` through the guard, and
+`test_example_piv_inspect_card2_guard_identity` checks that a CHUID other than
+the expected one keeps the pairing code and the PIN off the card.
 
 `test_piv_card_simulator` covers `tests/support/card_simulator.c`, a PIV card
 model for the card-level suites. It answers from the SD 33 card 2 and card 4
@@ -1147,6 +1161,111 @@ for extended tests. It needs a compatible instrumented runtime, which Apple
 Clang lacks. MemorySanitizer builds skip the C++ doctest suites, which need an
 instrumented C++ standard library. CI runs them without OpenSSL, so the OpenSSL
 cross-checks are also outside MemorySanitizer coverage.
+
+## PIV card hardware tests
+
+`tests/piv/hardware` drives the library against one PIV card on a PC/SC
+reader. `-DTINY_CRYPTO_TEST_PIV_CARD=ON` builds `test_piv_card_hardware` and
+`test_piv_inspect_live` on macOS and Linux. No CI workflow sets the option.
+Both tests carry the CTest label `hardware`, run serially and skip with status
+77 unless `TC_PIV_CARD_READER` is set. The library neither installs nor links
+anything from `tests/piv/hardware`.
+
+| Variable                  | Meaning                                                                   |
+| ------------------------- | ------------------------------------------------------------------------- |
+| `TC_PIV_CARD_READER`      | Substring of exactly one reader name, such as `ACR1552 1S CL Reader PICC` |
+| `TC_PIV_CARD_INTERFACE`   | `contact` or `contactless`. Unset takes the interface the ATR shows       |
+| `TC_PIV_PIN`              | The PIN, 6 to 8 digits. Unset sends no PIN                                |
+| `TC_PIV_PAIRING_CODE`     | The pairing code, 8 digits. Unset sends none                              |
+| `TC_PIV_CARD_MIN_RETRIES` | PIN tries the card must report before a submission, 2 to 15, default 3    |
+| `TC_PIV_CARD_EXPECT`      | `sd33-card2` or `sd33-card4`. Reference data and 9C need it               |
+| `TC_PIV_CARD_ROOT`        | An extra DER trust anchor, pinned by `TC_PIV_CARD_ROOT_SHA256`            |
+| `TC_PIV_CARD_CRL_DIR`     | A directory whose `*.crl` files replace the vendored CRLs                 |
+| `TC_PIV_CARD_REVOCATION`  | `required` or `when-available`, the default                               |
+| `TC_PIV_CARD_EXTENDED`    | `1` adds the extended-length scenario                                     |
+| `TC_PIV_CARD_DUMP_DIR`    | A directory only its owner can read, for object dumps                     |
+
+The reader transport is `examples/credential_pcsc.c`. It lists the readers,
+takes the one whose name contains `TC_PIV_CARD_READER`, and refuses reader
+names that contain `yubico` or `yubikey` in any letter case. It reads the ATR
+with `SCardGetStatusChange` before `SCardConnect` and refuses an ATR whose
+bytes spell `yubikey` in any letter case, such as the YubiKey 4 ATR
+`3B F8 13 00 00 81 31 FE 15 59 75 62 69 6B 65 79 34 D4`. A refused or
+ambiguous reader ends the run before connect, so an attached YubiKey receives
+no connect and no command. A PC/SC contactless ATR (`3B 8X 80 01`) refuses a
+contact request. On exit the reader resets the card, which clears its PIN
+status.
+
+`tests/piv/hardware/guard.h` checks every command before the reader sends it
+and every answer after. It passes SELECT of the PIV and TWIC AIDs, GET DATA
+`3F FF`, GET RESPONSE after `61XX`, VERIFY of `80`, `00` and `98` with P1
+`00`, key establishment with a plain CLA, and GENERAL AUTHENTICATE of `9A`,
+`9C` and `9E` with the PIV algorithms. It refuses everything else before
+transmit, such as INS `24`, `2C`, `DB` and `47`, VERIFY P1 `FF`, key
+references `9B` and `9D`, retired keys, plain reference data on contactless
+and an SM VERIFY whose field holds a DO outside `87`, `97` and `8E`. A
+refusal stops the connection and fails the test. The guard binds the card
+identity when a plain CHUID or Card Authentication certificate answer
+equals the `TC_PIV_CARD_EXPECT` capture fixture, and any differing answer
+blocks the binding. The PIN budget of a connection:
+
+- `test_piv_card_hardware` submits the PIN at most once, after a data-less
+  query in the same session that showed at least `TC_PIV_CARD_MIN_RETRIES`
+  tries, and proves 9C directly after it. `TC_PIV_pin_verify` submits only
+  while the card reports the PIN unverified, so a second submission before 9C
+  would need a card reset.
+- `test_piv_inspect_live` submits the PIN at most once and proves no 9C.
+- Either test submits the pairing code at most once.
+- Reference data and 9C need the identity binding, and a failed submission
+  ends all later ones.
+
+The library adds its own layer: the retry floor, the contactless refusal and
+no retry after a failure.
+
+The scenarios run in this order, and a scenario whose prerequisites are
+missing skips. Scenarios 1 to 9 open with SELECT. From the VCI on the session
+continues, since a SELECT ends the link's VCI and PIN state.
+
+| Scenario                  | Checks                                                                                                  |
+| ------------------------- | ------------------------------------------------------------------------------------------------------- |
+| 1 `select-piv`            | SELECT with the complete AID, the template, the suite and the DO 7F66 limits in the channel             |
+| 2 `select-truncated`      | SELECT with the 9-byte AID prefix answers the complete AID (Part 2 3.1.1)                               |
+| 3 `discovery-plain`       | Contact only: the Discovery Object in plaintext                                                         |
+| 4 `plain-objects`         | 5FC102, 5FC101, 7F61 and 5FC122, on contact also 5FC107, 5FC105, 5FC106 and 5FC10C, through the readers |
+| 5 `get-response-chain`    | A SHORT CHUID read with GET RESPONSE CLA 00 and Le = SW2, then LIMIT for one byte less                  |
+| 6 `extended`              | With `TC_PIV_CARD_EXTENDED=1`: the same CHUID over EXTENDED within the DO 7F66 limits                   |
+| 7 `not-found`             | 5FC121 and 5FC120 absent, empty or PIN-gated, and RESTRICTED on contactless before the VCI              |
+| 8 `sm-establish`          | The signer of 5FC122 validated, key establishment, CVC authentication with the CHUID GUID, SM reads     |
+| 9 `vci`                   | Contactless: the PIN query refused before the VCI, the VCI with the pairing code, then 5FC105 under SM  |
+| 10 `retry-query`          | The data-less VERIFY, or REFUSED with nothing sent on contactless without the VCI                       |
+| 11 `pin`                  | The PIN submission, 9C directly after it, then 5FC103, 5FC108 and 5FC109 through the readers            |
+| 12 `key-proofs`           | 9E against the validated 5FC101, and 9A after the PIN                                                   |
+| 13 `inventory-and-report` | The inventory, `TC_PIV_card_check` and 9E and 9A proofs with no FAILED check                            |
+| `test_piv_inspect_live`   | `piv_inspect` in a fresh connection with `TC_PIV_HARDWARE_GUARD=1`, exit 0 or 1 with no FAILED check    |
+
+With `TC_PIV_CARD_EXPECT`, the objects must equal the capture fixture, and
+scenario 13 requires PASSED for the card authentication path, the CHUID and
+the 9E proof. Once SM is up it also requires the SM signer, the card CVC and
+the plain copies, and on contact or with the VCI the Security Object
+signature. With the PIN it requires the PIV Authentication path, the 9A proof
+and every signed digest. Revocation stays unrequired, since missing evidence
+is NOT_CHECKABLE after the vendored CRLs expire. The output holds labels and counts. Objects reach
+`TC_PIV_CARD_DUMP_DIR` only when it is set, and secret objects never do.
+
+The SD 33 root is unavailable, so the default trust points are the vendored
+issuing CAs pinned by SHA-256: `card01_issuer.der` and `card04_issuer.der` for
+card 2, whose secure messaging signer "Test PIV Content Signer 4" chains to
+the P-384 CA, and `card03_issuer.der` for card 4. The vendored CRLs expire on
+2026-10-01, so the runs default to `when-available`, which reports missing
+evidence as NOT_CHECKABLE.
+
+```sh
+cmake -S . -B build-card -DTINY_CRYPTO_TEST_PIV_CARD=ON
+cmake --build build-card --target test_piv_card_hardware test_piv_inspect_live
+TC_PIV_CARD_READER='ACR1552 1S CL Reader PICC' TC_PIV_CARD_EXPECT=sd33-card2 \
+  TC_PIV_PIN="$PIN" TC_PIV_PAIRING_CODE="$PAIRING_CODE" \
+  ctest --test-dir build-card -L hardware --output-on-failure
+```
 
 ## PIV CVC verification
 

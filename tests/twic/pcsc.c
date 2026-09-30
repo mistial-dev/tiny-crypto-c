@@ -314,7 +314,8 @@ TC_TEST(transport)
 /* The guard sees every command before transmission and every answer after
  * it. A refused command never reaches the reader and stops the connection. */
 static struct {
-  unsigned checks, observed, allow;
+  unsigned checks, observed, allow, connected;
+  TC_PIV_interface interface;
   uint8_t last_answer[2];
 } guard_log;
 static int guard_check(void* context, TC_bytes command)
@@ -333,10 +334,21 @@ static void guard_observe(void* context, TC_bytes command, TC_bytes answer)
   ++guard_log.observed;
 }
 
+/* The guard learns the interface once the reader connected, before any
+ * command. */
+static void guard_connected(void* context, TC_PIV_interface interface)
+{
+  munit_assert_ptr_equal(context, &guard_log);
+  munit_assert_uint(guard_log.checks, ==, 0);
+  munit_assert_uint(connects, ==, 1);
+  guard_log.interface = interface;
+  ++guard_log.connected;
+}
+
 TC_TEST(guard)
 {
   const uint8_t command[] = {0, 0x20, 0, 0x80};
-  const ExampleCardPCSCGuard guard = {guard_check, guard_observe, &guard_log};
+  const ExampleCardPCSCGuard guard = {guard_check, guard_observe, &guard_log, NULL};
   ExampleCardPCSC state = {0};
   uint8_t response[8], zero[8] = {0};
   size_t length = SIZE_MAX;
@@ -362,11 +374,30 @@ TC_TEST(guard)
   munit_assert_int(example_card_pcsc_transmit(&state, wire, buffer, &length), ==, TC_ERROR);
   munit_assert_uint(guard_log.checks, ==, 2);
   munit_assert_int(example_card_pcsc_close(&state), ==, 1);
+  munit_assert_uint(guard_log.connected, ==, 0);
+  /* The connected callback reports the interface the ATR shows. */
+  const ExampleCardPCSCGuard informed = {guard_check, guard_observe, &guard_log, guard_connected};
+  reset();
+  ATR(contactless_atr);
+  memset(&guard_log, 0, sizeof guard_log);
+  guard_log.interface = TC_PIV_CONTACT;
+  options.guard = &informed;
+  munit_assert_int(example_card_pcsc_open(&state, &options), ==, EXAMPLE_PCSC_OPENED);
+  munit_assert_uint(guard_log.connected, ==, 1);
+  munit_assert_int(guard_log.interface, ==, TC_PIV_CONTACTLESS);
+  munit_assert_int(example_card_pcsc_close(&state), ==, 1);
+  /* A refused open never reports a connection. */
+  reset();
+  memset(&guard_log, 0, sizeof guard_log);
+  READERS("Yubico YubiKey 4\0");
+  const ExampleCardPCSCOptions yubico = {"Yubi", EXAMPLE_PCSC_DETECT, &informed};
+  munit_assert_int(example_card_pcsc_open(&state, &yubico), ==, EXAMPLE_PCSC_REFUSED);
+  munit_assert_uint(guard_log.connected, ==, 0);
   /* A guard without its check is an argument error. */
-  const ExampleCardPCSCGuard broken = {NULL, guard_observe, &guard_log};
+  const ExampleCardPCSCGuard broken = {NULL, guard_observe, &guard_log, NULL};
   options.guard = &broken;
   munit_assert_int(example_card_pcsc_open(&state, &options), ==, EXAMPLE_PCSC_FAILED);
-  munit_assert_uint(connects, ==, 1);
+  munit_assert_uint(connects, ==, 0);
   return MUNIT_OK;
 }
 

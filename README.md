@@ -272,6 +272,7 @@ configuration time. `hardware` needs a platform GHASH hook, declared in
 | `TINY_CRYPTO_SANITIZE`         | empty                                | Test sanitizers, such as `address,undefined` |
 | `TINY_CRYPTO_TEST_FULL`        | OFF                                  | Run the checked-in CAVP corpora              |
 | `TINY_CRYPTO_TEST_OPENSSL`     | OFF                                  | OpenSSL 3 cross-checks                       |
+| `TINY_CRYPTO_TEST_PIV_CARD`    | OFF                                  | PIV card hardware tests over PC/SC           |
 
 [Running the tests](docs/testing.md#test-options) lists the corpus and fixture
 options.

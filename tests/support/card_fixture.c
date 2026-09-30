@@ -272,3 +272,20 @@ const tc_card_replay* tc_card_fixture_replay(const tc_card_fixture* fixture, con
       return &fixture->replays[i];
   return NULL;
 }
+
+TC_bytes tc_card_fixture_challenge(const tc_card_fixture* fixture, uint8_t key)
+{
+  enum { DIGEST_BYTES = 32, ALGORITHM_P256 = 0x11, ALGORITHM_P384 = 0x14, WITNESS = 0x81 };
+  for (size_t i = 0; i < fixture->authentication_count; ++i) {
+    const tc_card_authentication* entry = &fixture->authentications[i];
+    if (entry->key != key || entry->tag != WITNESS)
+      continue;
+    if (entry->algorithm == ALGORITHM_P256 || entry->algorithm == ALGORITHM_P384)
+      return entry->input;
+    /* EMSA-PKCS1-v1_5: 00 01 FF .. 00 DigestInfo, the digest last. */
+    if (entry->input.length > DIGEST_BYTES && entry->input.data[0] == 0 &&
+        entry->input.data[1] == 1)
+      return (TC_bytes){entry->input.data + entry->input.length - DIGEST_BYTES, DIGEST_BYTES};
+  }
+  return (TC_bytes){NULL, 0};
+}

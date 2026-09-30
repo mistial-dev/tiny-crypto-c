@@ -122,6 +122,7 @@ else()
   option(TINY_CRYPTO_BUILD_TESTS "Build host tests" OFF)
 endif()
 option(TINY_CRYPTO_TEST_FULL "Run checked-in CAVP corpora" OFF)
+option(TINY_CRYPTO_TEST_PIV_CARD "Build the opt-in PIV card hardware tests over PC/SC" OFF)
 set(TINY_CRYPTO_SANITIZE "" CACHE STRING
     "Test sanitizers, for example address,undefined")
 

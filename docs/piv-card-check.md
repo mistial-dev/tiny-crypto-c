@@ -305,6 +305,10 @@ which clears its PIN status. `--anchor-sha256` pins the preceding anchor,
 `--ocsp 9a|9c|9d|9e FILE` supplies the OCSP response of one slot, `--at` sets
 the evaluation time, `--extended` selects extended length and `--dump-dir`
 writes each present object to a directory only its owner can read.
+`TC_PIV_HARDWARE_GUARD=1` installs the transmit guard of the
+[PIV card hardware tests](testing.md#piv-card-hardware-tests). Only the
+`test_piv_inspect_live` build provides that guard, so another build exits
+with status 2.
 
 ## Limits
 

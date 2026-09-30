@@ -6,9 +6,12 @@
  * code come from TC_PIV_PIN and TC_PIV_PAIRING_CODE, which CTest sets to the
  * published SD 33 test values. The random source replays the recorded key
  * establishment scalar and the recorded key proof challenges. The trust
- * inputs and the evaluation time follow tests/piv/card_check.c. */
+ * inputs and the evaluation time follow tests/piv/card_check.c. The guarded
+ * runs put the hardware transmit guard of tests/piv/hardware/guard.h
+ * between the example and the card. */
 #include "../../examples/piv_inspect.h"
 #include "card_simulator.h"
+#include "hardware/guard.h"
 #include "test_io.h"
 #include "test_util.h"
 #include <stdlib.h>
@@ -77,22 +80,12 @@ static void entropy_push(TC_bytes entry)
   entropy.entries[entropy.count++] = entry;
 }
 
-/* The challenge that reproduces the recorded GENERAL AUTHENTICATE of key:
- * the SHA-256 digest ending a PKCS #1 v1.5 encoded message for RSA, the
- * recorded input for ECDSA. */
 static TC_bytes recorded_challenge(uint8_t key)
 {
-  for (size_t i = 0; i < fixture.authentication_count; ++i) {
-    const tc_card_authentication* entry = &fixture.authentications[i];
-    if (entry->key != key || entry->tag != 0x81)
-      continue;
-    if (entry->algorithm == TC_PIV_ALGORITHM_ECC_P256)
-      return entry->input;
-    if (entry->input.length > 32 && entry->input.data[0] == 0 && entry->input.data[1] == 1)
-      return (TC_bytes){entry->input.data + entry->input.length - 32, 32};
-  }
-  munit_errorf("no recorded challenge for key %02x", key);
-  return (TC_bytes){NULL, 0};
+  const TC_bytes challenge = tc_card_fixture_challenge(&fixture, key);
+  if (!challenge.length)
+    munit_errorf("no recorded challenge for key %02x", key);
+  return challenge;
 }
 
 /* ---- Runs ---- */
@@ -155,14 +148,13 @@ static ExamplePIVInspectOptions options_for(int card4, TC_PIV_interface interfac
   return options;
 }
 
-/* Run the example into output and return its exit status. */
-static int run(const ExamplePIVInspectOptions* options)
+/* Run the example over transport into output and return its exit status. */
+static int run_over(const ExamplePIVInspectOptions* options, TC_APDU_transport transport)
 {
   FILE* stream = tmpfile();
   munit_assert_not_null(stream);
   memset(&report, 0xa5, sizeof report);
-  const int status =
-      example_piv_inspect_run(options, tc_card_simulator_transport(&card), stream, &report);
+  const int status = example_piv_inspect_run(options, transport, stream, &report);
   const long length = ftell(stream);
   munit_assert_long(length, >=, 0);
   munit_assert_long(length, <, OUTPUT_BYTES);
@@ -171,6 +163,11 @@ static int run(const ExamplePIVInspectOptions* options)
   output[length] = 0;
   munit_assert_int(fclose(stream), ==, 0);
   return status;
+}
+
+static int run(const ExamplePIVInspectOptions* options)
+{
+  return run_over(options, tc_card_simulator_transport(&card));
 }
 
 /* Compare output with tests/vectors/piv/inspect/name.txt. A mismatch writes
@@ -410,6 +407,89 @@ TC_TEST(card2_key_establishment_refused)
   return MUNIT_OK;
 }
 
+/* ---- Hardware guard ---- */
+
+static tc_piv_guard guard;
+static tc_piv_guarded_transport guarded;
+
+/* The guard of test_piv_inspect_live over the card simulator: one PIN
+ * submission, one pairing code and no 9C, with the identity of the
+ * fixture. */
+static TC_APDU_transport guard_start(TC_bytes chuid)
+{
+  const tc_card_object* certificate = tc_card_fixture_object(&fixture, 0x5fc101);
+  munit_assert_not_null(certificate);
+  tc_piv_guard_policy policy;
+  memset(&policy, 0, sizeof policy);
+  policy.identity[TC_PIV_GUARD_CHUID] = chuid;
+  policy.identity[TC_PIV_GUARD_CARD_CERTIFICATE] = certificate->data;
+  policy.minimum_retries = 3;
+  policy.pin_submissions = 1;
+  policy.pairing_submissions = 1;
+  munit_assert_int(tc_piv_guard_init(&guard, &policy), ==, 1);
+  tc_piv_guard_connected(&guard, card.interface);
+  return tc_piv_guarded_transport_init(&guarded, &guard, tc_card_simulator_transport(&card));
+}
+
+/* The complete contactless run passes the guard: the plain CHUID binds the
+ * identity before the pairing code and the PIN. */
+TC_TEST(card2_guarded)
+{
+  const TC_bytes pin = secret("TC_PIV_PIN"), pairing = secret("TC_PIV_PAIRING_CODE");
+  if (!pin.length || !pairing.length)
+    return MUNIT_SKIP;
+  TC_bytes anchors[2], crls[2];
+  load("sd33_card2");
+  tc_card_simulator_init(&card, &fixture, TC_PIV_CONTACTLESS);
+  ExamplePIVInspectOptions options = options_for(0, TC_PIV_CONTACTLESS, anchors, crls);
+  options.pin = pin;
+  options.pairing_code = pairing;
+  entropy_push(recorded_challenge(0x9a));
+  entropy_push(recorded_challenge(0x9e));
+  const tc_card_object* chuid = tc_card_fixture_object(&fixture, 0x5fc102);
+  munit_assert_not_null(chuid);
+  munit_assert_int(run_over(&options, guard_start(chuid->data)), ==, 0);
+  expect_golden("sd33_card2_contactless");
+  expect_clean(pin, pairing);
+  munit_assert_size(guard.counts.refusals, ==, 0);
+  munit_assert_int(tc_piv_guard_identity_bound(&guard), ==, 1);
+  munit_assert_size(guard.counts.pin_submissions, ==, 1);
+  munit_assert_size(guard.counts.pairing_submissions, ==, 1);
+  munit_assert_size(guard.counts.exchanges, ==, card.transmits);
+  munit_assert_size(guard.counts.get_response_le_mismatches, ==, 0);
+  return MUNIT_OK;
+}
+
+/* A CHUID that differs from the expected identity keeps the pairing code
+ * and the PIN off the card. The first refused command stops the
+ * transport. */
+TC_TEST(card2_guard_identity)
+{
+  static uint8_t expected[FILE_BYTES];
+  const TC_bytes pin = secret("TC_PIV_PIN"), pairing = secret("TC_PIV_PAIRING_CODE");
+  if (!pin.length || !pairing.length)
+    return MUNIT_SKIP;
+  TC_bytes anchors[2], crls[2];
+  load("sd33_card2");
+  tc_card_simulator_init(&card, &fixture, TC_PIV_CONTACTLESS);
+  ExamplePIVInspectOptions options = options_for(0, TC_PIV_CONTACTLESS, anchors, crls);
+  options.pin = pin;
+  options.pairing_code = pairing;
+  const tc_card_object* chuid = tc_card_fixture_object(&fixture, 0x5fc102);
+  munit_assert_not_null(chuid);
+  memcpy(expected, chuid->data.data, chuid->data.length);
+  expected[chuid->data.length - 3] ^= 1;
+  munit_assert_int(run_over(&options, guard_start((TC_bytes){expected, chuid->data.length})), ==,
+                   1);
+  munit_assert_int(tc_piv_guard_identity_bound(&guard), ==, 0);
+  munit_assert_size(guard.counts.refusals, ==, 1);
+  munit_assert_string_equal(guard.counts.refusal, "pairing code before the card identity matched");
+  munit_assert_size(card.pin_submissions, ==, 0);
+  munit_assert_size(card.pairing_submissions, ==, 0);
+  munit_assert_size(card.violations, ==, 0);
+  return MUNIT_OK;
+}
+
 /* Invalid options return 2 before any command. */
 TC_TEST(arguments)
 {
@@ -458,6 +538,8 @@ int main(int argc, char** argv)
        NULL},
       {"/card2-key-establishment-refused", card2_key_establishment_refused, NULL, NULL,
        MUNIT_TEST_OPTION_NONE, NULL},
+      {"/card2-guarded", card2_guarded, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/card2-guard-identity", card2_guard_identity, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/arguments", arguments, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
   MunitSuite suite = {"/piv/inspect", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};

@@ -162,6 +162,8 @@ ExampleCardPCSCResult example_card_pcsc_open(ExampleCardPCSC* state,
   state->failed = 0;
   state->guard = options->guard;
   memset(names, 0, sizeof names);
+  if (state->guard && state->guard->connected)
+    state->guard->connected(state->guard->context, state->interface);
   return EXAMPLE_PCSC_OPENED;
 failed:
   memset(names, 0, sizeof names);

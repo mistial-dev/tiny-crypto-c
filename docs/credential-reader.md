@@ -286,8 +286,9 @@ scripts through the library's card commands and the TWIC
 [catalog inventory](piv-card.md#catalog-and-inventory). On macOS,
 `test_twic_pcsc` replaces the PC/SC service calls to test cleanup, transport
 failures, the reader filter, the Yubico refusals, the interface check, the
-guard and the reset on close. These tests require no reader. The standalone example's CTest entries
-exercise help and argument handling only.
+guard with its connection callback and the reset on close. These tests
+require no reader. The standalone example's CTest entries exercise help and
+argument handling only.
 
 ## Card-key authentication
 

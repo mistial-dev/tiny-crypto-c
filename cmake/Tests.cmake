@@ -910,7 +910,8 @@ if(TINY_CRYPTO_BUILD_TESTS)
     examples/piv_inspect_print_objects.c examples/piv_inspect_print_certificates.c
     examples/piv_inspect_print_report.c)
   tc_add_c_test_executable(test_piv_inspect_replay tiny-crypto-c-test-pki-native
-    tests/piv/inspect_replay.c ${tc_piv_inspect_sources} ${tc_card_simulator_sources})
+    tests/piv/inspect_replay.c ${tc_piv_inspect_sources} ${tc_card_simulator_sources}
+    tests/piv/hardware/guard.c)
   target_compile_definitions(test_piv_inspect_replay PRIVATE
     TC_CARD_FIXTURE_DIR="${PROJECT_SOURCE_DIR}/tests/vectors/piv/sm_captures/fixtures"
     TC_VECTOR_DIR="${PROJECT_SOURCE_DIR}/tests/vectors")
@@ -918,7 +919,8 @@ if(TINY_CRYPTO_BUILD_TESTS)
     /piv/inspect/card2-without-pin /piv/inspect/card2-tampered
     /piv/inspect/card2-unrequired-failure /piv/inspect/card2-key-establishment-refused
     /piv/inspect/arguments)
-  foreach(case IN ITEMS card2_contactless card2_contact card4_contactless card2_wrong_pin)
+  foreach(case IN ITEMS card2_contactless card2_contact card4_contactless card2_wrong_pin
+      card2_guarded card2_guard_identity)
     string(REPLACE "_" "-" case_name "${case}")
     set(case_pairing 00000002)
     if(case MATCHES "^card4")
@@ -929,6 +931,74 @@ if(TINY_CRYPTO_BUILD_TESTS)
     set_tests_properties(test_example_piv_inspect_${case} PROPERTIES
       ENVIRONMENT "TC_PIV_PIN=123456;TC_PIV_PAIRING_CODE=${case_pairing}")
   endforeach()
+  # The PIV card hardware scenarios over the SD 33 simulators, with the
+  # transmit guard in front of the card. The PIN and pairing codes are the
+  # published SD 33 test values.
+  set(tc_piv_card_sources tests/piv/hardware/piv_card.c tests/piv/hardware/guard.c
+    tests/piv/hardware/card_config.c examples/piv_inspect_trust.c examples/pki_input.c)
+  if(NOT WIN32)
+    tc_add_c_test_executable(test_piv_card_simulated tiny-crypto-c-test-pki-native
+      ${tc_piv_card_sources} tests/piv/hardware/backend_simulated.c ${tc_card_simulator_sources})
+    target_compile_definitions(test_piv_card_simulated PRIVATE
+      TC_CARD_FIXTURE_DIR="${PROJECT_SOURCE_DIR}/tests/vectors/piv/sm_captures/fixtures"
+      TC_VECTOR_DIR="${PROJECT_SOURCE_DIR}/tests/vectors")
+    foreach(case IN ITEMS card2_contactless card2_contact card4_contactless)
+      string(REGEX MATCH "^card[0-9]" case_card "${case}")
+      string(REGEX REPLACE "^card[0-9]_" "" case_interface "${case}")
+      string(REPLACE "card" "" case_number "${case_card}")
+      set(case_environment "TC_PIV_PIN=123456;TC_PIV_PAIRING_CODE=0000000${case_number}"
+        "TC_PIV_CARD_EXPECT=sd33-${case_card};TC_PIV_CARD_INTERFACE=${case_interface}")
+      if(case STREQUAL "card2_contact")
+        list(APPEND case_environment TC_PIV_CARD_EXTENDED=1 TC_PIV_CARD_REVOCATION=required)
+      endif()
+      add_test(NAME test_piv_card_simulated_${case} COMMAND test_piv_card_simulated)
+      set_tests_properties(test_piv_card_simulated_${case} PROPERTIES
+        ENVIRONMENT "${case_environment}")
+    endforeach()
+  endif()
+  # The same scenarios and examples/piv_inspect against a card on a PC/SC
+  # reader. Nothing sets this option in CI. The tests skip unless
+  # TC_PIV_CARD_READER names a reader (docs/testing.md).
+  if(TINY_CRYPTO_TEST_PIV_CARD AND NOT WIN32)
+    if(APPLE)
+      find_library(TC_PCSC_LIBRARY PCSC REQUIRED)
+      set(tc_pcsc_link ${TC_PCSC_LIBRARY})
+    else()
+      find_package(PkgConfig REQUIRED)
+      pkg_check_modules(TC_PCSC REQUIRED IMPORTED_TARGET libpcsclite)
+      set(tc_pcsc_link PkgConfig::TC_PCSC)
+    endif()
+    set(tc_piv_card_host_sources examples/credential_pcsc.c examples/credential_system.c
+      tests/support/card_fixture.c)
+    tc_add_c_test_executable(test_piv_card_hardware tiny-crypto-c-test-pki-native
+      ${tc_piv_card_sources} tests/piv/hardware/backend_pcsc.c ${tc_piv_card_host_sources})
+    target_compile_definitions(test_piv_card_hardware PRIVATE
+      TC_CARD_FIXTURE_DIR="${PROJECT_SOURCE_DIR}/tests/vectors/piv/sm_captures/fixtures"
+      TC_VECTOR_DIR="${PROJECT_SOURCE_DIR}/tests/vectors")
+    target_link_libraries(test_piv_card_hardware PRIVATE ${tc_pcsc_link})
+    add_library(test_piv_inspect_live_main OBJECT examples/piv_inspect_main.c)
+    target_link_libraries(test_piv_inspect_live_main PRIVATE tiny-crypto-c-test-pki-native)
+    target_compile_definitions(test_piv_inspect_live_main PRIVATE
+      main=example_piv_inspect_main EXAMPLE_PIV_INSPECT_GUARD=1)
+    tc_warnings(test_piv_inspect_live_main)
+    tc_add_c_test_executable(test_piv_inspect_live tiny-crypto-c-test-pki-native
+      tests/piv/hardware/inspect_live.c tests/piv/hardware/guard.c
+      tests/piv/hardware/card_config.c examples/pki_input.c ${tc_piv_inspect_sources}
+      ${tc_piv_card_host_sources} $<TARGET_OBJECTS:test_piv_inspect_live_main>)
+    target_compile_definitions(test_piv_inspect_live PRIVATE
+      TC_CARD_FIXTURE_DIR="${PROJECT_SOURCE_DIR}/tests/vectors/piv/sm_captures/fixtures"
+      TC_VECTOR_DIR="${PROJECT_SOURCE_DIR}/tests/vectors")
+    target_link_libraries(test_piv_inspect_live PRIVATE ${tc_pcsc_link})
+    add_test(NAME test_piv_card_hardware COMMAND test_piv_card_hardware)
+    add_test(NAME test_piv_inspect_live COMMAND test_piv_inspect_live)
+    set_tests_properties(test_piv_card_hardware test_piv_inspect_live PROPERTIES
+      LABELS hardware RUN_SERIAL TRUE SKIP_RETURN_CODE 77)
+    set_tests_properties(test_piv_inspect_live PROPERTIES
+      DEPENDS test_piv_card_hardware FAIL_REGULAR_EXPRESSION "  FAILED  ")
+  endif()
+  # Rules of the PIV hardware transmit guard. The guard needs no reader.
+  tc_add_c_test(test_piv_hardware_guard tiny-crypto-c-test-piv-command tests/piv/hardware_guard.c
+    tests/piv/hardware/guard.c)
   # Revocation evidence policy and Security Object digests over vendored PKIs.
   tc_add_c_test(test_credential_revocation_policy tiny-crypto-c-test-pki-native
     tests/credential/revocation_policy.c)

@@ -14,11 +14,14 @@ typedef DWORD ExamplePCSCSize;
 /* Optional transmit guard, such as the hardware test guard. check sees each
  * command APDU before transmission and returns 1 to send it or 0 to refuse
  * it. observe, when set, sees each command with its complete answer. Both
- * run synchronously inside example_card_pcsc_transmit. */
+ * run synchronously inside example_card_pcsc_transmit. connected, when set,
+ * receives the interface of the connection once example_card_pcsc_open
+ * connected, before any command. */
 typedef struct {
   int (*check)(void* context, TC_bytes command);
   void (*observe)(void* context, TC_bytes command, TC_bytes answer);
   void* context;
+  void (*connected)(void* context, TC_PIV_interface interface);
 } ExampleCardPCSCGuard;
 
 /* The interface the application expects. DETECT takes the interface the ATR
