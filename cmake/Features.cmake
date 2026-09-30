@@ -30,6 +30,10 @@ tc_module_feature(TINY_CRYPTO_ENABLE_TWIC_OBJECT_CRYPTO
   TC_ENABLE_TWIC_OBJECT_CRYPTO "Build TWIC private-object encryption")
 set(tc_module_sources_TC_ENABLE_TWIC_OBJECT_CRYPTO src/twic_cipher.c)
 
+tc_module_feature(TINY_CRYPTO_ENABLE_APDU TC_ENABLE_APDU
+  "Build ISO/IEC 7816-4 APDU encoding and exchange")
+set(tc_module_sources_TC_ENABLE_APDU src/apdu_encode.c src/apdu_response.c src/apdu_channel.c)
+
 tc_module_feature(TINY_CRYPTO_ENABLE_PIV_OIDS TC_ENABLE_PIV_OIDS
   "Build registered PIV and TWIC identifier classification")
 set(tc_module_sources_TC_ENABLE_PIV_OIDS src/piv_oid.c)

@@ -19,4 +19,16 @@ TC_TLV_result tc_tlv_header_parse(const uint8_t* data, size_t length, TC_TLV_pro
                                   size_t max_value, TC_TLV_header* out);
 TC_TLV_result tc_tlv_config(TC_TLV_profile profile, const TC_TLV_limits* limits);
 int tc_tlv_padding(TC_TLV_profile profile, uint8_t byte);
+
+/* Size of a TLV header with a tag of tag_length bytes and the minimal
+ * definite length field for value_length (X.690 8.1.3, DER 10.1, ISO/IEC
+ * 7816-4 6.3). The length field takes one to four octets, so value_length is
+ * at most FFFFFF. Returns 0 for a tag outside 1..TC_TLV_TAG_BYTES bytes or a
+ * longer value. */
+size_t tc_tlv_header_size(size_t tag_length, size_t value_length);
+/* Write the tag bytes and the minimal length field and return the byte after
+ * the header. The caller checked tc_tlv_header_size and provides that many
+ * bytes at out. tag and out must not overlap. */
+uint8_t* tc_tlv_header_write(uint8_t* out, const uint8_t* tag, size_t tag_length,
+                             size_t value_length);
 #endif

@@ -46,6 +46,10 @@ static TC_PIV_card_identifiers tc_header_card_identifiers;
 #endif
 #endif
 
+#if defined(TC_TEST_HEADER_APDU) && !defined(TINY_CRYPTO_APDU_H_)
+#error "The C umbrella must expose the APDU header"
+#endif
+
 #if defined(TC_TEST_HEADER_AAMVA) && !defined(TINY_CRYPTO_AAMVA_H_)
 #error "The C umbrella must expose the AAMVA header"
 #endif

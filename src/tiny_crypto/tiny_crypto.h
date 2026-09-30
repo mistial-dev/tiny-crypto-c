@@ -30,6 +30,9 @@
 #if TC_ENABLE_TLV
 #include <tiny_crypto/tlv.h>
 #endif
+#if TC_ENABLE_APDU
+#include <tiny_crypto/apdu.h>
+#endif
 #if TC_ENABLE_AAMVA
 #include <tiny_crypto/aamva.h>
 #endif

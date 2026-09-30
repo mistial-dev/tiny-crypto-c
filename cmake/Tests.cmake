@@ -539,7 +539,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
 
   foreach(profile full core)
     tc_add_test_library(tiny-crypto-c-test-tlv-${profile}
-      src/tlv.c src/tlv_walk.c src/der.c src/aamva.c src/credential_text_internal.c)
+      src/tlv.c src/tlv_walk.c src/tlv_write.c src/der.c src/aamva.c src/credential_text_internal.c)
     target_compile_definitions(tiny-crypto-c-test-tlv-${profile} PUBLIC
       TC_ENABLE_TLV=1 TC_ENABLE_AAMVA=1 TC_ENABLE_AES=0 TC_ENABLE_SHA256=0)
     if(profile STREQUAL "core")
@@ -550,6 +550,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
         TC_ENABLE_DER=1 TC_TLV_ENABLE_BER=1 TC_TLV_ENABLE_STREAM=1)
     endif()
     tc_add_c_test(test_tlv_${profile} tiny-crypto-c-test-tlv-${profile} tests/tlv/test.c)
+    tc_add_c_test(test_tlv_write_${profile} tiny-crypto-c-test-tlv-${profile} tests/tlv/write.c)
   endforeach()
   add_executable(test_tlv_corpus_reader tests/tlv/corpus.c)
   target_link_libraries(test_tlv_corpus_reader PRIVATE tiny-crypto-c-test-tlv-full)
@@ -570,6 +571,16 @@ if(TINY_CRYPTO_BUILD_TESTS)
     TC_ENABLE_AES=0 TC_ENABLE_SHA256=0 TC_ENABLE_X509=0
     TC_ENABLE_TLV=1 TC_ENABLE_DER=1 TC_TLV_ENABLE_BER=0)
   tc_add_c_test(test_rsa_import tiny-crypto-c-test-key-import tests/rsa/import.c)
+
+  # The APDU codec depends on no other module (ISO/IEC 7816-4 5.2 to 5.6).
+  tc_add_test_library(tiny-crypto-c-test-apdu
+    src/common.c src/apdu_encode.c src/apdu_response.c src/apdu_channel.c)
+  target_compile_definitions(tiny-crypto-c-test-apdu PUBLIC
+    TC_ENABLE_APDU=1 TC_ENABLE_AES=0 TC_ENABLE_SHA256=0)
+  tc_add_c_test(test_apdu_encode tiny-crypto-c-test-apdu tests/apdu/encode.c)
+  tc_add_c_test(test_apdu_response tiny-crypto-c-test-apdu tests/apdu/response.c)
+  tc_add_c_test(test_apdu_channel tiny-crypto-c-test-apdu tests/apdu/channel.c
+    tests/support/scripted_transport.c)
 
   tc_add_c_test(test_aamva tiny-crypto-c-test-tlv-full tests/twic/aamva.c
     src/twic_tpk.c src/common.c)
@@ -754,7 +765,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   tc_add_c_test(test_cms_reader tiny-crypto-c-test-pki tests/cms/reader.c examples/cms_reader.c)
   get_target_property(tc_native_pki_sources tiny-crypto-c-test-pki SOURCES)
   tc_add_test_library(tiny-crypto-c-test-pki-native ${tc_native_pki_sources}
-    src/x509_trust_anchor.c src/x509_ocsp.c
+    src/x509_trust_anchor.c src/x509_ocsp.c src/tlv_write.c
     ${tc_hash_sources} src/ec.c ${tc_rsa_sources} src/pki_storage.c ${tc_aes_sources} src/sskdf.c
     src/piv_sm.c src/piv_sm_message.c src/piv_sm_authenticate.c
     src/twic_cipher.c src/twic_tpk.c
@@ -1087,6 +1098,8 @@ if(TINY_CRYPTO_BUILD_TESTS)
       tc_sm_fixture_header(test_cpp_piv_sm_${suite})
     endforeach()
     tc_add_linked_test(test_cpp_tlv tiny-crypto-c-test-tlv-full tests/cpp/tlv.cpp tests/cpp/main.cpp)
+    tc_add_linked_test(test_cpp_apdu tiny-crypto-c-test-apdu tests/cpp/apdu.cpp tests/cpp/main.cpp)
+    target_include_directories(test_cpp_apdu PRIVATE tests/support)
     target_include_directories(test_cpp_tlv PRIVATE tests/support)
   endif()
   option(TINY_CRYPTO_BUILD_FUZZERS "Build libFuzzer targets (Clang only)" OFF)
@@ -1317,7 +1330,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
 
   # Compile both umbrellas with each feature family's smallest legal profile.
   # This catches accidental feature coupling and keeps their C API surface equal.
-  foreach(header_profile rsa tlv aamva fascn twic_uuid twic_tpk twic_object hkdf aes_kw
+  foreach(header_profile rsa tlv apdu aamva fascn twic_uuid twic_tpk twic_object hkdf aes_kw
       piv_oids x509 key_challenge x509_path x509_revocation x509_ocsp cms cms_validation piv_objects credential piv_cvc piv_chuid
       piv_sm twic_ccl)
     set(header_profile_definitions TC_ENABLE_AES=0 TC_ENABLE_SHA256=0)
@@ -1334,6 +1347,8 @@ if(TINY_CRYPTO_BUILD_TESTS)
       list(APPEND header_profile_definitions TC_ENABLE_RSA=1 TC_TEST_HEADER_RSA=1)
     elseif(header_profile STREQUAL "tlv")
       list(APPEND header_profile_definitions TC_ENABLE_TLV=1 TC_TEST_HEADER_TLV=1)
+    elseif(header_profile STREQUAL "apdu")
+      list(APPEND header_profile_definitions TC_ENABLE_APDU=1 TC_TEST_HEADER_APDU=1)
     elseif(header_profile STREQUAL "aamva")
       list(APPEND header_profile_definitions TC_ENABLE_AAMVA=1 TC_TEST_HEADER_AAMVA=1)
     elseif(header_profile STREQUAL "fascn")
@@ -1449,7 +1464,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
     TC_AES_ENABLE_EAX_PRIME=1 TC_AES_ENABLE_DYNAMIC=1 TC_ENABLE_MD5=1 TC_ENABLE_GZIP=1
     TC_ENABLE_DRBG=1 TC_DRBG_ENABLE_HMAC=1 TC_ENABLE_RSA=1 TC_ENABLE_TLV=1 TC_ENABLE_DER=1 TC_ENABLE_X509=1
     TC_ENABLE_PIV_CHUID=1 TC_ENABLE_PIV_CVC=1 TC_ENABLE_EAC_CVC=1 TC_ENABLE_PIV_SM=1
-    TC_ENABLE_EC=1 TC_ENABLE_SSKDF=1)
+    TC_ENABLE_EC=1 TC_ENABLE_SSKDF=1 TC_ENABLE_APDU=1)
   add_library(test_cpp_headers_cxx17 OBJECT tests/cpp/header_compile.cpp)
   target_include_directories(test_cpp_headers_cxx17 PRIVATE src)
   set_property(TARGET test_cpp_headers_cxx17 PROPERTY CXX_STANDARD 17)
@@ -1579,6 +1594,17 @@ if(TINY_CRYPTO_BUILD_TESTS)
         -DTC_ENABLE_DER=1 -DTC_ENABLE_RSA=1 -DTC_ENABLE_EC=1 -I${CMAKE_CURRENT_SOURCE_DIR}/src
         -c ${CMAKE_CURRENT_SOURCE_DIR}/src/key_challenge.c
         -o ${CMAKE_CURRENT_BINARY_DIR}/tiny-crypto-c-key_challenge-compile.o)
+    # TC_APDU_command.ne holds 65536 with a 16-bit size_t.
+    add_test(NAME test_apdu_compile_avr
+      COMMAND ${TC_AVR_CC} -std=c99 -Wall -Wextra -Werror -Os -mmcu=atmega2560
+        -DTC_ENABLE_APDU=1 -I${CMAKE_CURRENT_SOURCE_DIR}/src
+        -c ${CMAKE_CURRENT_SOURCE_DIR}/src/apdu_encode.c
+        -o ${CMAKE_CURRENT_BINARY_DIR}/tiny-crypto-c-apdu_encode-compile.o)
+    add_test(NAME test_apdu_channel_compile_avr
+      COMMAND ${TC_AVR_CC} -std=c99 -Wall -Wextra -Werror -Os -mmcu=atmega2560
+        -DTC_ENABLE_APDU=1 -I${CMAKE_CURRENT_SOURCE_DIR}/src
+        -c ${CMAKE_CURRENT_SOURCE_DIR}/src/apdu_channel.c
+        -o ${CMAKE_CURRENT_BINARY_DIR}/tiny-crypto-c-apdu_channel-compile.o)
     add_test(NAME test_sskdf_compile_avr
       COMMAND ${TC_AVR_CC} -std=c99 -Wall -Wextra -Werror -mmcu=atmega328p
         -DTC_ENABLE_SSKDF=1 -DTC_ENABLE_SHA384=1 -I${CMAKE_CURRENT_SOURCE_DIR}/src

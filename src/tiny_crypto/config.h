@@ -190,6 +190,14 @@
 #if !TC_ENABLE_TLV && (TC_ENABLE_DER || TC_TLV_ENABLE_BER || TC_TLV_ENABLE_STREAM)
 #error "DER, BER, and incremental parsing require TC_ENABLE_TLV"
 #endif
+/* ISO/IEC 7816-4 command and response APDUs with a bounded exchange channel.
+ * The codec depends on no other module. */
+#ifndef TC_ENABLE_APDU
+#define TC_ENABLE_APDU TC_PROFILE_VALUE(0, 0, 0, 1)
+#endif
+#if TC_ENABLE_APDU != 0 && TC_ENABLE_APDU != 1
+#error "TC_ENABLE_APDU must be 0 or 1"
+#endif
 
 /* Certificate processing layers. TC_ENABLE_X509 covers borrowed certificate
  * views; path, revocation, CMS, CMS validation, and credential composition are

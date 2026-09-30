@@ -270,5 +270,18 @@ int tiny_crypto_cpp_header_compile(uint8_t* data, size_t length)
   tiny_crypto::TLVReader reader;
   (void)reader;
 #endif
+#if TC_ENABLE_APDU
+  {
+    static const uint8_t answer[] = {0x90, 0x00};
+    const tiny_crypto::apdu_command command = {{answer, 0}, 0, 0x00, 0xa4, 0x04, 0x00};
+    uint8_t encoded[TC_APDU_HEADER_BYTES];
+    size_t written = 0;
+    tiny_crypto::apdu_response response = {};
+    if (tiny_crypto::apdu_command_encode(command, TC_APDU_SHORT, encoded, written) != TC_APDU_OK ||
+        tiny_crypto::apdu_response_read({answer, sizeof answer}, response) != TC_APDU_OK ||
+        tiny_crypto::apdu_status_classify(response.sw) != TC_APDU_SW_SUCCESS)
+      ++failures;
+  }
+#endif
   return failures;
 }

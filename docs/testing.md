@@ -69,6 +69,14 @@ use native crypto and run without OpenSSL. The optional fixture generator and
 independent oracle are described in the
 [synthetic corpus README](../tests/vectors/twic/synthetic/README.md).
 
+`test_apdu_encode`, `test_apdu_response` and `test_apdu_channel` cover the
+[APDU codec](apdu.md): every ISO/IEC 7816-4 length case, recorded SD 33
+commands, status classes, command and response chaining, 6CXX correction,
+capacity and budget limits, and transport failures. The channel suite drives
+`tests/support/scripted_transport.c`, which checks each command against a
+script and records the offered capacity and scratch wiping. `test_tlv_write_core`
+and `test_tlv_write_full` check the shared TLV header writer.
+
 TWIC CCL parsing and lookup use `test_twic_ccl`. See the
 [CCL guide](twic-ccl.md#tests) for testing a downloaded TSA feed. Its external
 file case skips when `TC_TEST_TWIC_CCL` is unset. Synthetic cases always run.

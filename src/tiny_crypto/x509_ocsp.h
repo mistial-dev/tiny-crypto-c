@@ -143,7 +143,8 @@ typedef struct {
  * ARGUMENT: a required pointer or issuer span is NULL, the nonce length is
  *   outside 32..128, or encoded overlaps an input, request, work or length.
  *   Outputs unchanged.
- * UNSUPPORTED: hash is other than SHA-1 or SHA-256, or is disabled.
+ * UNSUPPORTED: hash is other than SHA-1 or SHA-256, or is disabled, or the
+ *   request would exceed 16 MiB (a length field above three octets).
  * INVALID: the certificate is malformed or its issuer differs from
  *   issuer->name.
  * LIMIT: encoded is too small, with *length set to the required size, or

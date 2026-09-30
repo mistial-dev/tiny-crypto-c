@@ -35,6 +35,7 @@
 #define TC_ENABLE_RSA 1
 #define TC_ENABLE_GZIP 1
 #define TC_ENABLE_TLV 1
+#define TC_ENABLE_APDU 1
 #define TC_ENABLE_DRBG 1
 #define TC_DRBG_ENABLE_HASH 1
 #define TC_DRBG_ENABLE_HMAC 1
@@ -47,6 +48,7 @@
 #define TC_PIV_SM_ENABLE_CS7 0
 
 #include <tiny_crypto/aes.hpp>
+#include <tiny_crypto/apdu.hpp>
 #include <tiny_crypto/aes_dynamic.hpp>
 #include <tiny_crypto/aes_kw.hpp>
 #include <tiny_crypto/des.hpp>
@@ -211,6 +213,13 @@ void tiny_crypto_nodiscard_compile(uint8_t* data, size_t length)
   TC_TLV_element element = {};
   reader.init(TC_bytes{data, length}, TC_TLV_DER, limits); /* DISCARDED */
   reader.next(element);                                    /* DISCARDED */
+  apdu_command command = {in, 0, 0, 0, 0, 0};
+  apdu_response response = {};
+  size_t apdu_size = 0;
+  apdu_command_size(command, TC_APDU_SHORT, apdu_size);        /* DISCARDED */
+  apdu_command_encode(command, TC_APDU_SHORT, out, apdu_size); /* DISCARDED */
+  apdu_response_read(in, response);                            /* DISCARDED */
+  apdu_status_classify(0x9000);                                /* DISCARDED */
 
   /* Clearing stays unmarked. */
   aes.clear();

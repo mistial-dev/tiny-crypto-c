@@ -161,7 +161,7 @@ set(tc_rsa_sources src/rsa_workspace.c src/rsa_keygen.c src/rsa_private.c src/rs
 # consistent across algorithms, and avoids duplicate code in firmware images.
 set(tc_sources src/common.c)
 if(TINY_CRYPTO_ENABLE_TLV)
-  list(APPEND tc_sources src/tlv.c src/tlv_walk.c)
+  list(APPEND tc_sources src/tlv.c src/tlv_walk.c src/tlv_write.c)
 endif()
 if(TINY_CRYPTO_ENABLE_DER)
   list(APPEND tc_sources src/der.c src/pki_key.c)

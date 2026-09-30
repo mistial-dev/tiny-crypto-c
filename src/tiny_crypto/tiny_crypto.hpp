@@ -30,6 +30,9 @@
 #if TC_ENABLE_TLV
 #include <tiny_crypto/tlv.hpp>
 #endif
+#if TC_ENABLE_APDU
+#include <tiny_crypto/apdu.hpp>
+#endif
 
 #if TC_ENABLE_KMAC256
 #include <tiny_crypto/kmac.hpp>

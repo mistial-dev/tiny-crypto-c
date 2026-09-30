@@ -14,6 +14,7 @@
 #include "hash_dispatch_internal.h"
 #include "x509_path_internal.h"
 #include "x509_time_internal.h"
+#include "tlv_internal.h"
 #include "internal.h"
 #include <string.h>
 
@@ -701,36 +702,17 @@ TC_TLV_result TC_X509_ocsp_response_verify(const TC_X509_ocsp_verify_request* re
   return status;
 }
 
+/* Size of one element with a one-byte tag. Request contents stay far below
+ * the FFFFFF bound of the shared header writer. request_sizes checks the
+ * outer size, which bounds every inner one. */
 static size_t der_size(size_t content)
 {
-  size_t length_octets = 1;
-  if (content >= 128) {
-    size_t value = content;
-    length_octets = 1;
-    do {
-      ++length_octets;
-      value >>= 8;
-    } while (value);
-  }
-  return content <= SIZE_MAX - 1 - length_octets ? 1 + length_octets + content : 0;
+  return tc_tlv_header_size(1, content) + content;
 }
 
 static uint8_t* der_header(uint8_t* out, uint8_t tag, size_t content)
 {
-  *out++ = tag;
-  if (content < 128) {
-    *out++ = (uint8_t)content;
-    return out;
-  }
-  size_t octets = 0, value = content;
-  do {
-    ++octets;
-    value >>= 8;
-  } while (value);
-  *out++ = (uint8_t)(0x80 | octets);
-  for (size_t i = octets; i; --i)
-    *out++ = (uint8_t)(content >> (8 * (i - 1)));
-  return out;
+  return tc_tlv_header_write(out, &tag, 1, content);
 }
 
 static uint8_t* der_bytes(uint8_t* out, uint8_t tag, TC_bytes bytes)
@@ -766,7 +748,7 @@ static request_layout request_sizes(const tc_hash_info* info, size_t serial_leng
   }
   layout.tbs_content = der_size(layout.request) + extensions_wrapper;
   layout.tbs = der_size(layout.tbs_content);
-  layout.total = der_size(layout.tbs);
+  layout.total = tc_tlv_header_size(1, layout.tbs) ? der_size(layout.tbs) : 0;
   return layout;
 }
 
@@ -813,8 +795,11 @@ TC_TLV_result TC_X509_ocsp_request_encode(const TC_X509_ocsp_encode_request* req
       TC_X509_name_equal(target.issuer, issuer->name, parsing, &workspace->names, work, &matched);
   if (status != TC_TLV_OK || !matched)
     return status == TC_TLV_OK ? TC_TLV_INVALID : status;
-  /* The serial is bounded by the certificate, so the sizes cannot overflow. */
+  /* The serial is bounded by the certificate, so the sizes cannot overflow.
+   * A request above the writer's FFFFFF length bound reports no layout. */
   const request_layout layout = request_sizes(&info, target.serial.length, nonce.length);
+  if (!layout.total)
+    return TC_TLV_UNSUPPORTED;
   if (layout.total > encoded.capacity) {
     *length = layout.total;
     return TC_TLV_LIMIT;

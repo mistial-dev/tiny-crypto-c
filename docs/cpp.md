@@ -145,6 +145,11 @@ The key wrap functions `aes_kw_wrap`, `aes_kw_unwrap`, `aes_kwp_wrap` and
 reports the key data length through a `size_t&`. The KEK length follows the
 build policy that `TC_AES_KW_KEK_LENGTH_SUPPORTED` reports.
 
+The APDU functions `apdu_command_size`, `apdu_command_encode`,
+`apdu_response_read` and `apdu_status_classify` forward to the
+[APDU codec](apdu.md). Commands and responses keep the C structures, named
+`apdu_command` and `apdu_response`.
+
 The KDF wrappers `hkdf_sha*_extract`, `hkdf_sha*_expand`, `hkdf_sha*_derive`,
 the `sskdf_sha*` functions and the KBKDF families forward to their C functions
 with the same span arguments. The EC and RSA wrappers in `ec.hpp` and

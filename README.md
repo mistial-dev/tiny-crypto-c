@@ -204,6 +204,7 @@ algorithm is enabled.
 
 | Option                                  | Default | micro | mini | desktop | Purpose                                           |
 | --------------------------------------- | ------- | ----- | ---- | ------- | ------------------------------------------------- |
+| `TINY_CRYPTO_ENABLE_APDU`               | OFF     | OFF   | OFF  | ON      | ISO/IEC 7816-4 APDU encoding and exchange         |
 | `TINY_CRYPTO_ENABLE_PIV_OIDS`           | OFF     | OFF   | OFF  | ON      | PIV and TWIC identifier classification            |
 | `TINY_CRYPTO_ENABLE_CMS`                | OFF     | OFF   | OFF  | ON      | CMS parsing and signer verification, requires BER |
 | `TINY_CRYPTO_ENABLE_CMS_VALIDATION`     | OFF     | OFF   | OFF  | ON      | CMS signer paths and revocation                   |
@@ -493,6 +494,17 @@ Run `make benchmark-report` to regenerate the report, or
 needs a connected board. Use `make benchmark` to measure throughput on the host
 with the current build configuration. PR CI uploads a fresh resource report and
 enforces flash and stack budgets. The checked-in report is refreshed for releases.
+
+## Smart-card APDUs
+
+`TINY_CRYPTO_ENABLE_APDU` adds `<tiny_crypto/apdu.h>`, an ISO/IEC 7816-4 command
+and response codec with a bounded exchange channel. `TC_APDU_command_encode`
+writes short or extended commands, and `TC_APDU_response_read` checks the status
+bytes. `TC_APDU_transceive` sends a command over a caller transport callback,
+chains long SHORT commands, follows `61XX` with GET RESPONSE, applies one `6CXX`
+correction per step and collects the response in a caller buffer. The channel
+honours the card's DO `7F66` size limits and a fixed exchange budget. See
+[Smart-card APDUs](docs/apdu.md).
 
 ## PIV secure messaging
 
