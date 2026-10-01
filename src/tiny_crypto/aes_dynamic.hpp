@@ -51,17 +51,23 @@ public:
   {
     return ::TC_AES_dynamic_decrypt(&ctx_, TC_buffer{block, TC_AES_BLOCKLEN});
   }
-  TC_CPP_NODISCARD TC_status cbc_encrypt(uint8_t (&iv)[16], uint8_t* buffer,
-                                         size_t length) const noexcept
+  TC_CPP_NODISCARD TC_status cbc_encrypt(uint8_t (&iv)[16], buffer data) const noexcept
   {
-    return ::TC_AES_dynamic_CBC_encrypt(&ctx_, TC_buffer{iv, TC_AES_BLOCKLEN},
-                                        TC_buffer{buffer, length});
+    return ::TC_AES_dynamic_CBC_encrypt(&ctx_, TC_buffer{iv, TC_AES_BLOCKLEN}, data);
   }
-  TC_CPP_NODISCARD TC_status cbc_decrypt(uint8_t (&iv)[16], uint8_t* buffer,
-                                         size_t length) const noexcept
+  TC_CPP_NODISCARD TC_status cbc_decrypt(uint8_t (&iv)[16], buffer data) const noexcept
   {
-    return ::TC_AES_dynamic_CBC_decrypt(&ctx_, TC_buffer{iv, TC_AES_BLOCKLEN},
-                                        TC_buffer{buffer, length});
+    return ::TC_AES_dynamic_CBC_decrypt(&ctx_, TC_buffer{iv, TC_AES_BLOCKLEN}, data);
+  }
+  template <size_t N>
+  TC_CPP_NODISCARD TC_status cbc_encrypt(uint8_t (&iv)[16], uint8_t (&data)[N]) const noexcept
+  {
+    return cbc_encrypt(iv, buffer{data, N});
+  }
+  template <size_t N>
+  TC_CPP_NODISCARD TC_status cbc_decrypt(uint8_t (&iv)[16], uint8_t (&data)[N]) const noexcept
+  {
+    return cbc_decrypt(iv, buffer{data, N});
   }
 };
 

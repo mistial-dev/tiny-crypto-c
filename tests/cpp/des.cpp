@@ -49,7 +49,7 @@ TEST_CASE("DES IV re-init with a wrong key length clears the previous key")
           TC_OK);
   CHECK(des.init({des_test_key, sizeof(des_test_key) + 1}, {des_ctr_iv, sizeof(des_ctr_iv)}) ==
         TC_ERROR);
-  CHECK(des.xcrypt_ctr(data, sizeof(data)) == TC_ERROR);
+  CHECK(des.xcrypt_ctr({data, sizeof(data)}) == TC_ERROR);
   CHECK(std::memcmp(data, des_test_pt, sizeof(data)) == 0);
 }
 #endif
@@ -63,7 +63,7 @@ TEST_CASE("DES IV re-init with a NULL IV clears the previous key")
   REQUIRE(des.init({des_test_key, sizeof(des_test_key)}, {des_ctr_iv, sizeof(des_ctr_iv)}) ==
           TC_OK);
   CHECK(des.init({des_test_key, sizeof(des_test_key)}, {nullptr, TC_DES_BLOCKLEN}) == TC_ERROR);
-  CHECK(des.xcrypt_ctr(data, sizeof(data)) == TC_ERROR);
+  CHECK(des.xcrypt_ctr({data, sizeof(data)}) == TC_ERROR);
   CHECK(std::memcmp(data, des_test_pt, sizeof(data)) == 0);
 }
 #endif
@@ -87,23 +87,23 @@ TEST_CASE("DES IV modes fail after a key-only init until set_iv")
   };
   (void)expect_iv_required;
 #if TC_DES_ENABLE_CBC
-  expect_iv_required([](tiny_crypto::DES& d, uint8_t* p) { return d.encrypt_cbc(p, 8); },
+  expect_iv_required([](tiny_crypto::DES& d, uint8_t* p) { return d.encrypt_cbc({p, 8}); },
                      des_cbc_ct);
   std::memcpy(data, des_test_pt, sizeof data);
   REQUIRE(des.init(des_test_key) == TC_OK);
-  CHECK(des.decrypt_cbc(data, sizeof data) == TC_ERROR);
+  CHECK(des.decrypt_cbc({data, sizeof data}) == TC_ERROR);
   CHECK(std::memcmp(data, des_test_pt, sizeof data) == 0);
 #endif
 #if TC_DES_ENABLE_OFB
-  expect_iv_required([](tiny_crypto::DES& d, uint8_t* p) { return d.xcrypt_ofb(p, 8); },
+  expect_iv_required([](tiny_crypto::DES& d, uint8_t* p) { return d.xcrypt_ofb({p, 8}); },
                      des_ofb_ct);
 #endif
 #if TC_DES_ENABLE_CFB64
-  expect_iv_required([](tiny_crypto::DES& d, uint8_t* p) { return d.encrypt_cfb64(p, 8); },
+  expect_iv_required([](tiny_crypto::DES& d, uint8_t* p) { return d.encrypt_cfb64({p, 8}); },
                      des_cfb64_ct);
 #endif
 #if TC_DES_ENABLE_CFB8
-  expect_iv_required([](tiny_crypto::DES& d, uint8_t* p) { return d.encrypt_cfb8(p, 8); },
+  expect_iv_required([](tiny_crypto::DES& d, uint8_t* p) { return d.encrypt_cfb8({p, 8}); },
                      des_cfb8_ct);
 #endif
 #if TC_DES_ENABLE_CFB1
@@ -118,10 +118,10 @@ TEST_CASE("DES IV modes fail after a key-only init until set_iv")
   uint8_t counter_data[sizeof des_ctr_pt];
   std::memcpy(counter_data, des_ctr_pt, sizeof counter_data);
   REQUIRE(des.init(des_test_key) == TC_OK);
-  CHECK(des.xcrypt_ctr(counter_data, sizeof counter_data) == TC_ERROR);
+  CHECK(des.xcrypt_ctr({counter_data, sizeof counter_data}) == TC_ERROR);
   CHECK(std::memcmp(counter_data, des_ctr_pt, sizeof counter_data) == 0);
   REQUIRE(des.set_iv(des_ctr_iv) == TC_OK);
-  CHECK(des.xcrypt_ctr(counter_data, sizeof counter_data) == TC_OK);
+  CHECK(des.xcrypt_ctr({counter_data, sizeof counter_data}) == TC_OK);
   CHECK(std::memcmp(counter_data, des_ctr_ct, sizeof counter_data) == 0);
 #endif
 }
@@ -149,12 +149,12 @@ TEST_CASE("DES CBC wrapper")
   REQUIRE(des.init({des_test_key, sizeof(des_test_key)}, {des_cbc_iv, sizeof(des_cbc_iv)}) ==
           TC_OK);
   std::memcpy(block, des_test_pt, sizeof(block));
-  CHECK(des.encrypt_cbc(block, sizeof(block)) == TC_OK);
+  CHECK(des.encrypt_cbc({block, sizeof(block)}) == TC_OK);
   CHECK(std::memcmp(block, des_cbc_ct, sizeof(block)) == 0);
   CHECK(des.set_iv(des_cbc_iv) == TC_OK);
-  CHECK(des.decrypt_cbc(block, sizeof(block)) == TC_OK);
+  CHECK(des.decrypt_cbc({block, sizeof(block)}) == TC_OK);
   CHECK(std::memcmp(block, des_test_pt, sizeof(block)) == 0);
-  CHECK(des.encrypt_cbc(block, sizeof(block) - 1) == TC_ERROR);
+  CHECK(des.encrypt_cbc({block, sizeof(block) - 1}) == TC_ERROR);
 }
 #endif
 
@@ -168,26 +168,26 @@ TEST_CASE("DES CTR round trip")
     data[i] = original[i] = static_cast<uint8_t>(i);
   REQUIRE(des.init({des_test_key, sizeof(des_test_key)}, {des_ctr_iv, sizeof(des_ctr_iv)}) ==
           TC_OK);
-  CHECK(des.xcrypt_ctr(data, sizeof(data)) == TC_OK);
+  CHECK(des.xcrypt_ctr({data, sizeof(data)}) == TC_OK);
   CHECK(des.set_iv({des_ctr_iv, sizeof(des_ctr_iv)}) == TC_OK);
-  CHECK(des.xcrypt_ctr(data, sizeof(data)) == TC_OK);
+  CHECK(des.xcrypt_ctr({data, sizeof(data)}) == TC_OK);
   CHECK(std::memcmp(data, original, sizeof(data)) == 0);
 
   uint8_t known[sizeof(des_ctr_pt)];
   std::memcpy(known, des_ctr_pt, sizeof(known));
   REQUIRE(des.set_iv({des_ctr_iv, sizeof(des_ctr_iv)}) == TC_OK);
-  CHECK(des.xcrypt_ctr(known, 5) == TC_OK);
-  CHECK(des.xcrypt_ctr(known + 5, sizeof(known) - 5) == TC_OK);
+  CHECK(des.xcrypt_ctr({known, 5}) == TC_OK);
+  CHECK(des.xcrypt_ctr({known + 5, sizeof(known) - 5}) == TC_OK);
   CHECK(std::memcmp(known, des_ctr_ct, sizeof(known)) == 0);
 
   /* Key and IV arrays deduce their lengths. A wrong key size clears the key. */
   std::memcpy(known, des_ctr_pt, sizeof(known));
   REQUIRE(des.init(des_test_key, des_ctr_iv) == TC_OK);
-  CHECK(des.xcrypt_ctr(known, sizeof(known)) == TC_OK);
+  CHECK(des.xcrypt_ctr({known, sizeof(known)}) == TC_OK);
   CHECK(std::memcmp(known, des_ctr_ct, sizeof(known)) == 0);
   const uint8_t short_key[TC_DES_KEYLEN - 1] = {0};
   CHECK(des.init(short_key, des_ctr_iv) == TC_ERROR);
-  CHECK(des.xcrypt_ctr(known, sizeof(known)) == TC_ERROR);
+  CHECK(des.xcrypt_ctr({known, sizeof(known)}) == TC_ERROR);
   CHECK(noexcept(des.init(des_test_key, des_ctr_iv)));
 }
 #endif
@@ -200,10 +200,10 @@ TEST_CASE("DES CFB64 wrapper known answer")
   REQUIRE(des.init({des_test_key, sizeof(des_test_key)}, {des_cbc_iv, sizeof(des_cbc_iv)}) ==
           TC_OK);
   std::memcpy(data, des_test_pt, sizeof(data));
-  CHECK(des.encrypt_cfb64(data, sizeof(data)) == TC_OK);
+  CHECK(des.encrypt_cfb64({data, sizeof(data)}) == TC_OK);
   CHECK(std::memcmp(data, des_cfb64_ct, sizeof(data)) == 0);
   REQUIRE(des.set_iv({des_cbc_iv, sizeof(des_cbc_iv)}) == TC_OK);
-  CHECK(des.decrypt_cfb64(data, sizeof(data)) == TC_OK);
+  CHECK(des.decrypt_cfb64({data, sizeof(data)}) == TC_OK);
   CHECK(std::memcmp(data, des_test_pt, sizeof(data)) == 0);
 }
 #endif
@@ -216,10 +216,10 @@ TEST_CASE("DES CFB8 wrapper known answer")
   REQUIRE(des.init({des_test_key, sizeof(des_test_key)}, {des_cbc_iv, sizeof(des_cbc_iv)}) ==
           TC_OK);
   std::memcpy(data, des_test_pt, sizeof(data));
-  CHECK(des.encrypt_cfb8(data, sizeof(data)) == TC_OK);
+  CHECK(des.encrypt_cfb8({data, sizeof(data)}) == TC_OK);
   CHECK(std::memcmp(data, des_cfb8_ct, sizeof(data)) == 0);
   REQUIRE(des.set_iv({des_cbc_iv, sizeof(des_cbc_iv)}) == TC_OK);
-  CHECK(des.decrypt_cfb8(data, sizeof(data)) == TC_OK);
+  CHECK(des.decrypt_cfb8({data, sizeof(data)}) == TC_OK);
   CHECK(std::memcmp(data, des_test_pt, sizeof(data)) == 0);
 }
 #endif
@@ -232,7 +232,7 @@ TEST_CASE("DES OFB wrapper known answer")
   REQUIRE(des.init({des_test_key, sizeof(des_test_key)}, {des_cbc_iv, sizeof(des_cbc_iv)}) ==
           TC_OK);
   std::memcpy(data, des_test_pt, sizeof(data));
-  CHECK(des.xcrypt_ofb(data, sizeof(data)) == TC_OK);
+  CHECK(des.xcrypt_ofb({data, sizeof(data)}) == TC_OK);
   CHECK(std::memcmp(data, des_ofb_ct, sizeof(data)) == 0);
 }
 #endif
@@ -258,7 +258,7 @@ TEST_CASE("TDEA CTR wrapper known answer")
   uint8_t data[sizeof(des_ctr_pt)];
   REQUIRE(des.init({tdes3_key, sizeof(tdes3_key)}, {des_ctr_iv, sizeof(des_ctr_iv)}) == TC_OK);
   std::memcpy(data, des_ctr_pt, sizeof(data));
-  CHECK(des.xcrypt_ctr(data, sizeof(data)) == TC_OK);
+  CHECK(des.xcrypt_ctr({data, sizeof(data)}) == TC_OK);
   CHECK(std::memcmp(data, tdes3_ctr_ct, sizeof(data)) == 0);
 }
 #endif
@@ -283,10 +283,10 @@ TEST_CASE("DES CFB64 short segment ends the message")
   uint8_t data[TC_DES_BLOCKLEN] = {0};
   REQUIRE(des.init({des_test_key, sizeof(des_test_key)}, {des_cbc_iv, sizeof(des_cbc_iv)}) ==
           TC_OK);
-  CHECK(des.encrypt_cfb64(data, 3) == TC_OK);
-  CHECK(des.encrypt_cfb64(data + 3, 5) == TC_ERROR);
+  CHECK(des.encrypt_cfb64({data, 3}) == TC_OK);
+  CHECK(des.encrypt_cfb64({data + 3, 5}) == TC_ERROR);
   REQUIRE(des.set_iv({des_cbc_iv, sizeof(des_cbc_iv)}) == TC_OK);
-  CHECK(des.encrypt_cfb64(data, sizeof(data)) == TC_OK);
+  CHECK(des.encrypt_cfb64({data, sizeof(data)}) == TC_OK);
 }
 #endif
 

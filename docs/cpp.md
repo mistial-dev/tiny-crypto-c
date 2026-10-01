@@ -56,10 +56,10 @@ and [`kbkdf.cpp`](../examples/kbkdf.cpp) build and run on the host as
   Keys, IVs, AAD, messages and received tags are `bytes` spans. Outputs are
   `buffer` spans or fixed-size C arrays whose size is part of the type. Array
   overloads deduce the span length.
-- Two kinds of call take a pointer. Block-mode calls (`encrypt_cbc`,
-  `xcrypt_ctr` and the others), `AES_dynamic` CBC and `GCM::encrypt_update`
-  transform a caller buffer in place and take a pointer and length or an
-  array. `encrypt_ecb` and `decrypt_ecb` transform one block in place.
+- In-place block-mode calls (`encrypt_cbc`, `xcrypt_ctr` and the others),
+  `AES_dynamic` CBC and `GCM::encrypt_update` take a `buffer`. Array overloads
+  deduce the capacity. `encrypt_ecb` and `decrypt_ecb` transform one fixed-size
+  block in place.
 - Wrappers add length checks before the C call. A wrong key or IV length, or a
   digest buffer whose capacity differs from the digest size, returns
   `TC_ERROR`. Every argument error leaves outputs unchanged.

@@ -128,7 +128,7 @@ TEST_CASE("AES CBC wrapper")
   CHECK(aes.set_iv({nist_iv, sizeof(nist_iv)}) == TC_OK);
   CHECK(aes.decrypt_cbc(data) == TC_OK);
   CHECK(std::memcmp(data, nist_plaintext, sizeof(data)) == 0);
-  CHECK(aes.encrypt_cbc(data, 15) == TC_ERROR);
+  CHECK(aes.encrypt_cbc({data, 15}) == TC_ERROR);
 }
 #endif
 
@@ -144,16 +144,16 @@ TEST_CASE("AES CTR wrapper")
 
   std::memcpy(data, nist_plaintext, sizeof(data));
   REQUIRE(aes.set_iv({nist_ctr_iv, sizeof(nist_ctr_iv)}) == TC_OK);
-  CHECK(aes.xcrypt_ctr(data, 5) == TC_OK);
-  CHECK(aes.xcrypt_ctr(data + 5, 27) == TC_OK);
-  CHECK(aes.xcrypt_ctr(data + 32, 32) == TC_OK);
+  CHECK(aes.xcrypt_ctr({data, 5}) == TC_OK);
+  CHECK(aes.xcrypt_ctr({data + 5, 27}) == TC_OK);
+  CHECK(aes.xcrypt_ctr({data + 32, 32}) == TC_OK);
   CHECK(std::memcmp(data, kat_ctr, sizeof(data)) == 0);
 
   uint8_t top[TC_AES_BLOCKLEN];
   uint8_t two_blocks[2 * TC_AES_BLOCKLEN] = {0};
   std::memset(top, 0xff, sizeof(top));
   REQUIRE(aes.set_iv({top, sizeof(top)}) == TC_OK);
-  CHECK(aes.xcrypt_ctr(two_blocks, sizeof(two_blocks)) == TC_ERROR);
+  CHECK(aes.xcrypt_ctr({two_blocks, sizeof(two_blocks)}) == TC_ERROR);
 
   /* Key and IV arrays deduce their lengths. A wrong key size clears the key. */
   uint8_t key[TC_AES_KEYLEN];
@@ -179,8 +179,8 @@ TEST_CASE("AES OFB wrapper")
   CHECK(aes.xcrypt_ofb(data) == TC_OK);
   CHECK(std::memcmp(data, kat_ofb, sizeof(data)) == 0);
   REQUIRE(aes.set_iv({nist_iv, sizeof(nist_iv)}) == TC_OK);
-  CHECK(aes.xcrypt_ofb(data, 7) == TC_OK);
-  CHECK(aes.xcrypt_ofb(data + 7, sizeof(data) - 7) == TC_OK);
+  CHECK(aes.xcrypt_ofb({data, 7}) == TC_OK);
+  CHECK(aes.xcrypt_ofb({data + 7, sizeof(data) - 7}) == TC_OK);
   CHECK(std::memcmp(data, nist_plaintext, sizeof(data)) == 0);
 }
 #endif
@@ -196,8 +196,8 @@ static void check_gcm_vector(const gcm_test_vector& v)
   CHECK(gcm.tag_length() == v.tag_len);
   CHECK(gcm.aad_update({v.aad, v.aad_len}) == TC_OK);
   const size_t split = v.length < 5 ? v.length : 5;
-  CHECK(gcm.encrypt_update(data.data(), split) == TC_OK);
-  CHECK(gcm.encrypt_update(data.data() + split, v.length - split) == TC_OK);
+  CHECK(gcm.encrypt_update({data.data(), split}) == TC_OK);
+  CHECK(gcm.encrypt_update({data.data() + split, v.length - split}) == TC_OK);
   CHECK(gcm.encrypt_finish({tag.data(), tag.size()}) == TC_OK);
   CHECK(std::memcmp(data.data(), v.ciphertext, v.length) == 0);
   CHECK(std::memcmp(tag.data(), v.tag, v.tag_len) == 0);
@@ -272,7 +272,7 @@ TEST_CASE("AES GCM known answers and state errors")
 
   tiny_crypto::GCM gcm;
   REQUIRE(gcm.init({v->key, v->key_len}, {v->iv, v->iv_len}, v->tag_len) == TC_OK);
-  CHECK(gcm.encrypt_update(data.data(), data.size()) == TC_OK);
+  CHECK(gcm.encrypt_update({data.data(), data.size()}) == TC_OK);
   CHECK(gcm.aad_update({v->aad, v->aad_len}) == TC_ERROR);
   CHECK(gcm.encrypt_finish({tag.data(), tag.size() - 1}) == TC_ERROR);
   CHECK(gcm.init({v->key, v->key_len - 1}, {v->iv, v->iv_len}, v->tag_len) == TC_ERROR);
@@ -481,7 +481,7 @@ TEST_CASE("AES GCM array key overloads deduce the key length")
   REQUIRE(gcm.init(key, iv) == TC_OK);
   CHECK(gcm.tag_length() == TC_AES_BLOCKLEN);
   CHECK(gcm.aad_update({v->aad, v->aad_len}) == TC_OK);
-  CHECK(gcm.encrypt_update(data.data(), data.size()) == TC_OK);
+  CHECK(gcm.encrypt_update({data.data(), data.size()}) == TC_OK);
   CHECK(gcm.encrypt_finish(tag) == TC_OK);
   CHECK(std::memcmp(data.data(), v->ciphertext, v->length) == 0);
   CHECK(std::memcmp(tag, v->tag, sizeof tag) == 0);

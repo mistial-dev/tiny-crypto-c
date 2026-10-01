@@ -89,41 +89,41 @@ public:
   }
 #endif
 #if TC_AES_ENABLE_CBC
-  TC_CPP_NODISCARD TC_status encrypt_cbc(uint8_t* data, size_t length) noexcept
+  TC_CPP_NODISCARD TC_status encrypt_cbc(buffer data) noexcept
   {
-    return TC_AES_CBC_encrypt(&ctx_, TC_buffer{data, length});
+    return TC_AES_CBC_encrypt(&ctx_, data);
   }
-  TC_CPP_NODISCARD TC_status decrypt_cbc(uint8_t* data, size_t length) noexcept
+  TC_CPP_NODISCARD TC_status decrypt_cbc(buffer data) noexcept
   {
-    return TC_AES_CBC_decrypt(&ctx_, TC_buffer{data, length});
+    return TC_AES_CBC_decrypt(&ctx_, data);
   }
   template <size_t N> TC_CPP_NODISCARD TC_status encrypt_cbc(uint8_t (&data)[N]) noexcept
   {
-    return encrypt_cbc(data, N);
+    return encrypt_cbc(buffer{data, N});
   }
   template <size_t N> TC_CPP_NODISCARD TC_status decrypt_cbc(uint8_t (&data)[N]) noexcept
   {
-    return decrypt_cbc(data, N);
+    return decrypt_cbc(buffer{data, N});
   }
 #endif
 #if TC_AES_ENABLE_CTR
-  TC_CPP_NODISCARD TC_status xcrypt_ctr(uint8_t* data, size_t length) noexcept
+  TC_CPP_NODISCARD TC_status xcrypt_ctr(buffer data) noexcept
   {
-    return TC_AES_CTR_crypt(&ctx_, TC_buffer{data, length});
+    return TC_AES_CTR_crypt(&ctx_, data);
   }
   template <size_t N> TC_CPP_NODISCARD TC_status xcrypt_ctr(uint8_t (&data)[N]) noexcept
   {
-    return xcrypt_ctr(data, N);
+    return xcrypt_ctr(buffer{data, N});
   }
 #endif
 #if TC_AES_ENABLE_OFB
-  TC_CPP_NODISCARD TC_status xcrypt_ofb(uint8_t* data, size_t length) noexcept
+  TC_CPP_NODISCARD TC_status xcrypt_ofb(buffer data) noexcept
   {
-    return TC_AES_OFB_crypt(&ctx_, TC_buffer{data, length});
+    return TC_AES_OFB_crypt(&ctx_, data);
   }
   template <size_t N> TC_CPP_NODISCARD TC_status xcrypt_ofb(uint8_t (&data)[N]) noexcept
   {
-    return xcrypt_ofb(data, N);
+    return xcrypt_ofb(buffer{data, N});
   }
 #endif
 
@@ -192,13 +192,13 @@ public:
   {
     return TC_AES_GCM_aad_update(&ctx_, TC_bytes{aad.data, aad.length});
   }
-  TC_CPP_NODISCARD TC_status encrypt_update(uint8_t* data, size_t length) noexcept
+  TC_CPP_NODISCARD TC_status encrypt_update(buffer data) noexcept
   {
-    return TC_AES_GCM_encrypt_update(&ctx_, TC_buffer{data, length});
+    return TC_AES_GCM_encrypt_update(&ctx_, data);
   }
   template <size_t N> TC_CPP_NODISCARD TC_status encrypt_update(uint8_t (&data)[N]) noexcept
   {
-    return encrypt_update(data, N);
+    return encrypt_update(buffer{data, N});
   }
   /* tag.capacity must equal tag_length(). Another capacity returns TC_ERROR
    * and keeps the state. */

@@ -82,68 +82,98 @@ public:
   }
 #endif
 #if TC_DES_ENABLE_CBC
-  TC_CPP_NODISCARD TC_status encrypt_cbc(uint8_t* data, size_t n) noexcept
+  TC_CPP_NODISCARD TC_status encrypt_cbc(buffer data) noexcept
   {
-    return TC_DES_CBC_encrypt(&ctx_, TC_buffer{data, n});
+    return TC_DES_CBC_encrypt(&ctx_, data);
   }
-  TC_CPP_NODISCARD TC_status decrypt_cbc(uint8_t* data, size_t n) noexcept
+  TC_CPP_NODISCARD TC_status decrypt_cbc(buffer data) noexcept
   {
-    return TC_DES_CBC_decrypt(&ctx_, TC_buffer{data, n});
+    return TC_DES_CBC_decrypt(&ctx_, data);
+  }
+  template <size_t N> TC_CPP_NODISCARD TC_status encrypt_cbc(uint8_t (&data)[N]) noexcept
+  {
+    return encrypt_cbc(buffer{data, N});
+  }
+  template <size_t N> TC_CPP_NODISCARD TC_status decrypt_cbc(uint8_t (&data)[N]) noexcept
+  {
+    return decrypt_cbc(buffer{data, N});
   }
 #endif
 #if TC_DES_ENABLE_CTR
-  TC_CPP_NODISCARD TC_status xcrypt_ctr(uint8_t* data, size_t n) noexcept
+  TC_CPP_NODISCARD TC_status xcrypt_ctr(buffer data) noexcept
   {
-    return TC_DES_CTR_crypt(&ctx_, TC_buffer{data, n});
+    return TC_DES_CTR_crypt(&ctx_, data);
+  }
+  template <size_t N> TC_CPP_NODISCARD TC_status xcrypt_ctr(uint8_t (&data)[N]) noexcept
+  {
+    return xcrypt_ctr(buffer{data, N});
   }
 #endif
 #if TC_DES_ENABLE_CFB64
   /* A call whose length is not a multiple of 8 ends the message. See des.h. */
-  TC_CPP_NODISCARD TC_status encrypt_cfb64(uint8_t* data, size_t n) noexcept
+  TC_CPP_NODISCARD TC_status encrypt_cfb64(buffer data) noexcept
   {
-    return TC_DES_CFB64_encrypt(&ctx_, TC_buffer{data, n});
+    return TC_DES_CFB64_encrypt(&ctx_, data);
   }
-  TC_CPP_NODISCARD TC_status decrypt_cfb64(uint8_t* data, size_t n) noexcept
+  TC_CPP_NODISCARD TC_status decrypt_cfb64(buffer data) noexcept
   {
-    return TC_DES_CFB64_decrypt(&ctx_, TC_buffer{data, n});
+    return TC_DES_CFB64_decrypt(&ctx_, data);
+  }
+  template <size_t N> TC_CPP_NODISCARD TC_status encrypt_cfb64(uint8_t (&data)[N]) noexcept
+  {
+    return encrypt_cfb64(buffer{data, N});
+  }
+  template <size_t N> TC_CPP_NODISCARD TC_status decrypt_cfb64(uint8_t (&data)[N]) noexcept
+  {
+    return decrypt_cfb64(buffer{data, N});
   }
 #endif
 #if TC_DES_ENABLE_CFB8
-  TC_CPP_NODISCARD TC_status encrypt_cfb8(uint8_t* data, size_t n) noexcept
+  TC_CPP_NODISCARD TC_status encrypt_cfb8(buffer data) noexcept
   {
-    return TC_DES_CFB8_encrypt(&ctx_, TC_buffer{data, n});
+    return TC_DES_CFB8_encrypt(&ctx_, data);
   }
-  TC_CPP_NODISCARD TC_status decrypt_cfb8(uint8_t* data, size_t n) noexcept
+  TC_CPP_NODISCARD TC_status decrypt_cfb8(buffer data) noexcept
   {
-    return TC_DES_CFB8_decrypt(&ctx_, TC_buffer{data, n});
+    return TC_DES_CFB8_decrypt(&ctx_, data);
+  }
+  template <size_t N> TC_CPP_NODISCARD TC_status encrypt_cfb8(uint8_t (&data)[N]) noexcept
+  {
+    return encrypt_cfb8(buffer{data, N});
+  }
+  template <size_t N> TC_CPP_NODISCARD TC_status decrypt_cfb8(uint8_t (&data)[N]) noexcept
+  {
+    return decrypt_cfb8(buffer{data, N});
   }
 #endif
 #if TC_DES_ENABLE_CFB1
-  TC_CPP_NODISCARD TC_status encrypt_cfb1(uint8_t* data, size_t data_len, size_t bits) noexcept
+  TC_CPP_NODISCARD TC_status encrypt_cfb1(buffer data, size_t bits) noexcept
   {
-    return cfb1_fits(data_len, bits) ? TC_DES_CFB1_encrypt(&ctx_, TC_buffer{data, data_len}, bits)
-                                     : TC_ERROR;
+    return cfb1_fits(data.capacity, bits) ? TC_DES_CFB1_encrypt(&ctx_, data, bits) : TC_ERROR;
   }
-  TC_CPP_NODISCARD TC_status decrypt_cfb1(uint8_t* data, size_t data_len, size_t bits) noexcept
+  TC_CPP_NODISCARD TC_status decrypt_cfb1(buffer data, size_t bits) noexcept
   {
-    return cfb1_fits(data_len, bits) ? TC_DES_CFB1_decrypt(&ctx_, TC_buffer{data, data_len}, bits)
-                                     : TC_ERROR;
+    return cfb1_fits(data.capacity, bits) ? TC_DES_CFB1_decrypt(&ctx_, data, bits) : TC_ERROR;
   }
   template <size_t N>
   TC_CPP_NODISCARD TC_status encrypt_cfb1(uint8_t (&data)[N], size_t bits) noexcept
   {
-    return encrypt_cfb1(data, N, bits);
+    return encrypt_cfb1(buffer{data, N}, bits);
   }
   template <size_t N>
   TC_CPP_NODISCARD TC_status decrypt_cfb1(uint8_t (&data)[N], size_t bits) noexcept
   {
-    return decrypt_cfb1(data, N, bits);
+    return decrypt_cfb1(buffer{data, N}, bits);
   }
 #endif
 #if TC_DES_ENABLE_OFB
-  TC_CPP_NODISCARD TC_status xcrypt_ofb(uint8_t* data, size_t n) noexcept
+  TC_CPP_NODISCARD TC_status xcrypt_ofb(buffer data) noexcept
   {
-    return TC_DES_OFB_crypt(&ctx_, TC_buffer{data, n});
+    return TC_DES_OFB_crypt(&ctx_, data);
+  }
+  template <size_t N> TC_CPP_NODISCARD TC_status xcrypt_ofb(uint8_t (&data)[N]) noexcept
+  {
+    return xcrypt_ofb(buffer{data, N});
   }
 #endif
   void clear() noexcept

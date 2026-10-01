@@ -133,19 +133,19 @@ void tiny_crypto_nodiscard_compile(uint8_t* data, size_t length)
 
   /* Cipher, hash and MAC status results. */
   AES aes;
-  aes.init(in);                  /* DISCARDED */
-  aes.init(in, in);              /* DISCARDED */
-  aes.xcrypt_ctr(data, length);  /* DISCARDED */
-  aes.decrypt_cbc(data, length); /* DISCARDED */
-  aes.set_iv(block);             /* DISCARDED */
-  aes.set_iv(in);                /* DISCARDED */
-  aes.init(block, block);        /* DISCARDED */
+  aes.init(in);                    /* DISCARDED */
+  aes.init(in, in);                /* DISCARDED */
+  aes.xcrypt_ctr({data, length});  /* DISCARDED */
+  aes.decrypt_cbc({data, length}); /* DISCARDED */
+  aes.set_iv(block);               /* DISCARDED */
+  aes.set_iv(in);                  /* DISCARDED */
+  aes.init(block, block);          /* DISCARDED */
   GCM gcm;
   gcm.init(in, in);                                /* DISCARDED */
   gcm.init(block, in);                             /* DISCARDED */
   gcm.init_short_tag(block, in, 8);                /* DISCARDED */
   gcm.init_short_tag(in, in, 8);                   /* DISCARDED */
-  gcm.encrypt_update(data, length);                /* DISCARDED */
+  gcm.encrypt_update({data, length});              /* DISCARDED */
   gcm_encrypt(in, in, in, in, out, out);           /* DISCARDED */
   gcm.encrypt_finish(out);                         /* DISCARDED */
   gcm.encrypt_finish(block);                       /* DISCARDED */
@@ -168,7 +168,7 @@ void tiny_crypto_nodiscard_compile(uint8_t* data, size_t length)
   des.init(in, in);                      /* DISCARDED */
   des.init(des_block, des_block);        /* DISCARDED */
   des.encrypt_ecb(block);                /* DISCARDED */
-  des.xcrypt_ctr(data, length);          /* DISCARDED */
+  des.xcrypt_ctr({data, length});        /* DISCARDED */
   des.set_iv(in);                        /* DISCARDED */
   des_cmac(in, in, out);                 /* DISCARDED */
   des_cmac_verify(in, in, in);           /* DISCARDED */
@@ -209,8 +209,8 @@ void tiny_crypto_nodiscard_compile(uint8_t* data, size_t length)
   dynamic.init(in);       /* DISCARDED */
   dynamic.encrypt(block); /* DISCARDED */
   AES_dynamic_CMAC dynamic_cmac;
-  dynamic_cmac.init(in);     /* DISCARDED */
-  dynamic_cmac.update(in);   /* DISCARDED */
+  dynamic_cmac.init(in);      /* DISCARDED */
+  dynamic_cmac.update(in);    /* DISCARDED */
   dynamic_cmac.finish(block); /* DISCARDED */
   size_t kw_length = 0;
   aes_kw_wrap(in, in, out);               /* DISCARDED */
@@ -250,9 +250,9 @@ void tiny_crypto_nodiscard_compile(uint8_t* data, size_t length)
   apdu_channel channel;
   channel.init(apdu_transport{}, apdu_channel_options{}, out); /* DISCARDED */
   channel.restrict(0, 0, 0);                                   /* DISCARDED */
-  channel.transceive(command, out, response);                   /* DISCARDED */
+  channel.transceive(command, out, response);                  /* DISCARDED */
   channel.exchanges_left();                                    /* DISCARDED */
-  channel.native();                                             /* DISCARDED */
+  channel.native();                                            /* DISCARDED */
   piv_link link;
   piv_application application = {};
   piv_data_object object = {};

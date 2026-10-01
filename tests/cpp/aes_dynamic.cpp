@@ -17,9 +17,9 @@ TEST_CASE("Dynamic AES wrappers and lifecycle")
     REQUIRE(cipher.decrypt(block) == TC_OK);
     CHECK(std::memcmp(block, original, 16) == 0);
     std::memset(iv, 0, sizeof iv);
-    REQUIRE(cipher.cbc_encrypt(iv, block, 16) == TC_OK);
+    REQUIRE(cipher.cbc_encrypt(iv, block) == TC_OK);
     std::memset(iv, 0, sizeof iv);
-    REQUIRE(cipher.cbc_decrypt(iv, block, 16) == TC_OK);
+    REQUIRE(cipher.cbc_decrypt(iv, block) == TC_OK);
     CHECK(std::memcmp(block, original, 16) == 0);
     REQUIRE(mac.init({key, length}) == TC_OK);
     REQUIRE(mac.update({block, 16}) == TC_OK);
