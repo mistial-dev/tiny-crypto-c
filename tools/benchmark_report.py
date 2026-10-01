@@ -302,7 +302,7 @@ def render(report):
              "use. Run host throughput tests with `make benchmark`.", "",
              "## Updating the numbers", "",
              "Run `make benchmark-report` to rebuild this page, or",
-             "`make benchmark-report-check` to check that it's up to date.",
+             "`make benchmark-report-check` to check that it is up to date.",
              "Both validate fixtures on the host and cross-compile for each board.",
              "Boards can remain disconnected.", "",
              "Install PlatformIO 6.1.19 and Arm GCC 12.3.Rel1. Set",
@@ -375,10 +375,15 @@ def render(report):
     lines += ["## Feature definitions", "",
               "These are the build settings for each row. Options not listed use the",
               "library defaults.", ""]
-    for row in report["boards"]["uno"]["rows"]:
-        lines += ["### " + row["feature"], "", "```text"]
-        lines += [k + "=" + v for k, v in sorted(row["definitions"].items())]
-        lines += ["```", ""]
+    rendered = set()
+    for board in ("uno", "pico2"):
+        for row in report["boards"][board]["rows"]:
+            if row["feature"] in rendered:
+                continue
+            rendered.add(row["feature"])
+            lines += ["### " + row["feature"], "", "```text"]
+            lines += [k + "=" + v for k, v in sorted(row["definitions"].items())]
+            lines += ["```", ""]
     return "\n".join(lines)
 
 

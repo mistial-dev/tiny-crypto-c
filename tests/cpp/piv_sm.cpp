@@ -50,7 +50,7 @@ TEST_CASE("PIV SM authenticated exchange")
     CHECK(session.state() == TC_PIV_SM_READY);
     uint8_t header[16] = {0x0c, 0x20, 0, 0x80, 0x80};
     const TC_bytes command_mac[] = {{header, sizeof header}, {nullptr, 0}};
-    tiny_crypto::piv_sm_protect_request command = {{nullptr, 0}, nullptr, 0, command_mac, 2};
+    tiny_crypto::piv_sm_protect_request command = {{nullptr, 0}, {nullptr, 0}, command_mac, 2};
     uint8_t tag[8];
     size_t ciphertext_length = 99;
     REQUIRE(session.protect(command, ciphertext_length, tag, workspace) == TC_OK);

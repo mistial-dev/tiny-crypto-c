@@ -11,10 +11,11 @@ static bool self_test()
   uint8_t original[sizeof data];
   struct TC_AES_ctx context;
   memcpy(original, data, sizeof data);
-  if (TC_AES_init(&context, key) != TC_OK || TC_AES_set_iv(&context, iv) != TC_OK ||
-      TC_AES_CTR_crypt(&context, data, sizeof data) != TC_OK ||
-      TC_AES_set_iv(&context, iv) != TC_OK ||
-      TC_AES_CTR_crypt(&context, data, sizeof data) != TC_OK) {
+  if (TC_AES_init(&context, (TC_bytes){key, sizeof key}) != TC_OK ||
+      TC_AES_set_iv(&context, (TC_bytes){iv, sizeof iv}) != TC_OK ||
+      TC_AES_CTR_crypt(&context, (TC_buffer){data, sizeof data}) != TC_OK ||
+      TC_AES_set_iv(&context, (TC_bytes){iv, sizeof iv}) != TC_OK ||
+      TC_AES_CTR_crypt(&context, (TC_buffer){data, sizeof data}) != TC_OK) {
     TC_AES_ctx_clear(&context);
     return false;
   }

@@ -212,7 +212,7 @@ public:
   {
     return encrypt_finish(buffer{tag, N});
   }
-  size_t tag_length() const noexcept
+  TC_CPP_NODISCARD size_t tag_length() const noexcept
   {
     return ctx_.tag_len;
   }

@@ -507,7 +507,7 @@ TC_status tc_aes_cipher(state_t* state, const uint8_t* round_key)
 TC_status TC_AES_CAVP_encrypt_block(TC_bytes key, TC_buffer block)
 {
   struct TC_AES_key_ctx schedule;
-  TC_status status = TC_AES_key_init(&schedule, (TC_bytes){key, TC_AES_KEYLEN});
+  TC_status status = TC_AES_key_init(&schedule, key);
   if (status == TC_OK && block.capacity == TC_AES_BLOCKLEN)
     status = tc_aes_cipher((state_t*)block.data, schedule.round_key);
   else
@@ -542,7 +542,7 @@ TC_status tc_aes_inverse_rounds(state_t* state, const uint8_t* round_key, uint8_
 TC_status TC_AES_CAVP_decrypt_block(TC_bytes key, TC_buffer block)
 {
   struct TC_AES_key_ctx schedule;
-  TC_status status = TC_AES_key_init(&schedule, (TC_bytes){key, TC_AES_KEYLEN});
+  TC_status status = TC_AES_key_init(&schedule, key);
   if (status == TC_OK && block.capacity == TC_AES_BLOCKLEN)
     status = tc_aes_inverse_rounds((state_t*)block.data, schedule.round_key, Nr);
   else

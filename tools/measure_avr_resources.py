@@ -32,8 +32,9 @@ PROFILE_MCU = {"apdu_piv_read": "atmega2560", "piv_sm_cs2": "atmega2560"}
 PROFILES = {
     "aes_ctr": ([], """
       struct TC_AES_ctx ctx;
-      if (TC_AES_init(&ctx, key) != TC_OK || TC_AES_set_iv(&ctx, iv) != TC_OK) return 1;
-      return TC_AES_CTR_crypt(&ctx, out, sizeof(out)) != TC_OK;
+      if (TC_AES_init(&ctx, (TC_bytes){key, 16}) != TC_OK ||
+          TC_AES_set_iv(&ctx, (TC_bytes){iv, 16}) != TC_OK) return 1;
+      return TC_AES_CTR_crypt(&ctx, (TC_buffer){out, sizeof(out)}) != TC_OK;
     """, "TC_AES_CTR_crypt"),
     # KW and KWP at AES-128 with fixed keys. Each call expands the KEK on the
     # stack. Unwrap is the deepest entry.
@@ -66,7 +67,7 @@ PROFILES = {
       TC_DRBG_config config = {TC_DRBG_HMAC, TC_HASH_SHA256, 0, 0, 0, 0, 0};
       TC_random_source source = {entropy, 0};
       if (TC_DRBG_instantiate(&drbg, &config, source, empty, empty) != TC_DRBG_OK) return 1;
-      return TC_DRBG_generate(&drbg, out, sizeof(out), 0, empty) != TC_DRBG_OK;
+      return TC_DRBG_generate(&drbg, (TC_buffer){out, sizeof(out)}, 0, empty) != TC_DRBG_OK;
     """, "TC_DRBG_generate"),
     # P-256 with byte limbs. Signing includes TC_ECDSA_SIGN_VERIFY, so its call
     # chain covers verification too.

@@ -468,7 +468,7 @@ static int cavp_run_ccm_case(const char* file, const struct cavp_ccm_record* rec
       return 0;
     }
     result = (short_tag ? TC_AES_CCM_decrypt_short_tag : TC_AES_CCM_decrypt)(
-        record->key, (TC_bytes){record->nonce, record->nonce_len},
+        (TC_bytes){record->key, record->key_len}, (TC_bytes){record->nonce, record->nonce_len},
         (TC_bytes){record->aad, record->aad_len}, (TC_bytes){record->ct, record->payload_len},
         (TC_bytes){record->ct + record->payload_len, record->tag_len},
         (TC_buffer){output, record->payload_len});
@@ -478,7 +478,7 @@ static int cavp_run_ccm_case(const char* file, const struct cavp_ccm_record* rec
                                    memcmp(output, record->payload, record->payload_len) == 0);
   } else {
     result = (short_tag ? TC_AES_CCM_encrypt_short_tag : TC_AES_CCM_encrypt)(
-        record->key, (TC_bytes){record->nonce, record->nonce_len},
+        (TC_bytes){record->key, record->key_len}, (TC_bytes){record->nonce, record->nonce_len},
         (TC_bytes){record->aad, record->aad_len}, (TC_bytes){record->payload, record->payload_len},
         (TC_buffer){output, record->payload_len}, (TC_buffer){tag, record->tag_len});
     ok = !record->expected_fail && result == TC_OK &&
@@ -715,15 +715,16 @@ static int cavp_run_gcm_file(const char* filename)
         if (pt_len != 0)
           memcpy(output, pt, pt_len);
         cavp_initialize_sbox();
-        result = tag_len < 12
-                     ? TC_AES_GCM_init_short_tag(&ctx, key, (TC_bytes){iv, iv_len}, tag_len)
-                     : TC_AES_GCM_init(&ctx, key, (TC_bytes){iv, iv_len}, tag_len);
+        result = tag_len < 12 ? TC_AES_GCM_init_short_tag(&ctx, (TC_bytes){key, key_len},
+                                                          (TC_bytes){iv, iv_len}, tag_len)
+                              : TC_AES_GCM_init(&ctx, (TC_bytes){key, key_len},
+                                                (TC_bytes){iv, iv_len}, tag_len);
         if (result == TC_OK)
           result = TC_AES_GCM_aad_update(&ctx, (TC_bytes){aad, aad_len});
         if (result == TC_OK)
           result = TC_AES_GCM_encrypt_update(&ctx, (TC_buffer){output, pt_len});
         if (result == TC_OK)
-          result = TC_AES_GCM_encrypt_finish(&ctx, (TC_buffer){actual_tag, &ctx->tag_len});
+          result = TC_AES_GCM_encrypt_finish(&ctx, (TC_buffer){actual_tag, ctx.tag_len});
         ok = result == TC_OK && cavp_compare(filename, count, "CT", output, pt_len, ct, ct_len) &&
              cavp_compare(filename, count, "Tag", actual_tag, tag_len, tag, tag_len);
         if (!ok)

@@ -50,15 +50,18 @@ static void run_case(const response* record, int verify, int pass, unsigned* cry
   ++*cryptographic;
   if (verify) {
     const TC_status status = (short_tag ? TC_DES_CMAC_verify_short_tag : TC_DES_CMAC_verify)(
-        record->key, key_length, record->message_length ? message : NULL, record->message_length,
-        record->mac, record->tag_length);
+        (TC_bytes){record->key, key_length},
+        (TC_bytes){record->message_length ? message : NULL, record->message_length},
+        (TC_bytes){record->mac, record->tag_length});
     if (status != (pass ? TC_OK : TC_MISMATCH))
       munit_errorf("TDES%zu CMACVer Count %u: status %d", record->key_count, record->count, status);
   } else {
-    munit_assert_int((short_tag ? TC_DES_CMAC_short_tag : TC_DES_CMAC)(
-                         record->key, key_length, record->message_length ? message : NULL,
-                         record->message_length, tag, record->tag_length),
-                     ==, TC_OK);
+    munit_assert_int(
+        (short_tag ? TC_DES_CMAC_short_tag : TC_DES_CMAC)(
+            (TC_bytes){record->key, key_length},
+            (TC_bytes){record->message_length ? message : NULL, record->message_length},
+            (TC_buffer){tag, record->tag_length}),
+        ==, TC_OK);
     if (memcmp(tag, record->mac, record->tag_length))
       munit_errorf("TDES%zu CMACGen Count %u: tag mismatch", record->key_count, record->count);
   }
