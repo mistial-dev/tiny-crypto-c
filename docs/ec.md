@@ -101,10 +101,12 @@ wiped after use. Argument rejection leaves it untouched. Use
 configured curves and limb width.
 
 On AVR the library uses byte limbs. `tests/budgets/avr.json` records an
-ATmega328P ECDSA P-256 sign-and-verify profile, with P-384 disabled and
-`TC_ECDSA_SIGN_VERIFY` on: at most 10000 bytes of flash, 1500 bytes of static
-RAM including a static `TC_ECDSA_workspace` of 1218 bytes, and 330 bytes of
-project stack. Check it with
+ATmega2560 ECDSA P-256 profile, with P-384 disabled and
+`TC_ECDSA_SIGN_VERIFY` on. It exercises deterministic signing and standalone
+verification: at most 18000 bytes of flash, 1500 bytes of static RAM including
+a static `TC_ECDSA_workspace` of 1218 bytes, and 1000 bytes of project stack.
+The profile is not supported on the ATmega328P because its 2 KiB RAM cannot
+hold the measured static data and worst-case project call chain. Check it with
 `python3 tools/measure_avr_resources.py --check tests/budgets/avr.json`.
 The file's `avr_gcc_version` names the toolchain the budgets were measured
 with. The check prints it beside the version in use and accepts either.

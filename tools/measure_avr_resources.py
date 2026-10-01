@@ -24,11 +24,15 @@ SIZE = os.environ.get("AVR_SIZE", "avr-size")
 NM = os.environ.get("AVR_NM", "avr-nm")
 BASE = ["-std=c99", "-Os", "-ffunction-sections", "-fdata-sections", "-fstack-usage",
         "-I" + str(ROOT / "src")]
-# Target part of each profile. Primitives measure on the ATmega328P (32 KiB
-# flash, 2 KiB RAM). A PIV reader needs the flash and RAM of an ATmega2560
-# (256 KiB flash, 8 KiB RAM).
+# Target part of each profile. Small primitives measure on the ATmega328P
+# (32 KiB flash, 2 KiB RAM). Deterministic ECDSA and a PIV reader need the
+# larger flash and RAM of an ATmega2560 (256 KiB flash, 8 KiB RAM).
 DEFAULT_MCU = "atmega328p"
-PROFILE_MCU = {"apdu_piv_read": "atmega2560", "piv_sm_cs2": "atmega2560"}
+PROFILE_MCU = {
+    "ecdsa_p256": "atmega2560",
+    "apdu_piv_read": "atmega2560",
+    "piv_sm_cs2": "atmega2560",
+}
 PROFILES = {
     "aes_ctr": ([], """
       struct TC_AES_ctx ctx;
@@ -69,19 +73,19 @@ PROFILES = {
       if (TC_DRBG_instantiate(&drbg, &config, source, empty, empty) != TC_DRBG_OK) return 1;
       return TC_DRBG_generate(&drbg, (TC_buffer){out, sizeof(out)}, 0, empty) != TC_DRBG_OK;
     """, "TC_DRBG_generate"),
-    # P-256 with byte limbs. Signing includes TC_ECDSA_SIGN_VERIFY, so its call
-    # chain covers verification too.
+    # P-256 with byte limbs. The default deterministic API includes its own
+    # signature verification; the second call measures standalone verification.
     "ecdsa_p256": (["TC_ENABLE_EC=1", "TC_EC_ENABLE_P384=0"], """
       static TC_ECDSA_workspace workspace;
       static uint8_t public_key[65], signature[64];
-      TC_EC_execution execution = {{entropy, 0}, 4, {UINT32_MAX}};
       TC_work_budget work = {UINT32_MAX};
+      const TC_ECDSA_sign_options options = {TC_HASH_SHA256, 4};
       const TC_bytes point = {public_key, sizeof(public_key)};
       const TC_bytes digest = {key, sizeof(key)};
-      if (TC_ECDSA_sign_digest_external_random(TC_EC_P256, (TC_bytes){key, sizeof(key)}, point, digest, (TC_buffer){signature, sizeof(signature)}, &workspace, &execution) != TC_EC_OK) return 1;
+      if (TC_ECDSA_sign_digest(TC_EC_P256, &options, (TC_bytes){key, sizeof(key)}, point, digest, (TC_buffer){signature, sizeof(signature)}, &workspace, &work) != TC_EC_OK) return 1;
       out[0] = signature[0];
       return TC_ECDSA_verify_digest(TC_EC_P256, point, digest, (TC_bytes){signature, sizeof(signature)}, &workspace, &work) != TC_EC_OK;
-    """, "TC_ECDSA_sign_digest_external_random"),
+    """, "TC_ECDSA_sign_digest"),
     # Plain PIV reads: SELECT, GET DATA of the CHUID and a VERIFY query on a
     # SHORT link. The link, the 261-byte command scratch and a response
     # buffer for a CHUID at its SP 800-73-5 Part 1 Table 8 capacity of 2881
