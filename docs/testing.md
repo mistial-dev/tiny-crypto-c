@@ -324,7 +324,10 @@ against the tree. Every feature macro yields its option by the naming rule.
 Every `src/*.c` has exactly one owner: the core, one feature or one
 shared-source entry. Every `config.h` feature macro has an option, and every
 `TINY_CRYPTO_*` name in a document, workflow, script or build file is a
-registered or build option. `test_minimal_core` configures the library with
+registered or build option. Each retired option in the registry maps to an
+existing option or to none. `test_option_names` configures with a renamed, a
+removed and a misspelled option and requires each to stop configuration with
+its message. `test_minimal_core` configures the library with
 every switch `OFF`, builds it with warnings as errors and requires an archive
 that holds only `common.c`. The extended `test_single_features` builds each
 top-level feature with the smallest set of other features that `config.h`

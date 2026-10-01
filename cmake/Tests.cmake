@@ -23,6 +23,11 @@ if(TINY_CRYPTO_BUILD_TESTS)
       -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/minimal-core
       -DC_COMPILER=${CMAKE_C_COMPILER} -DAR=${CMAKE_AR}
       -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/minimal_core.cmake)
+    add_test(NAME test_option_names COMMAND ${CMAKE_COMMAND}
+      -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+      -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/option-names
+      -DC_COMPILER=${CMAKE_C_COMPILER}
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/option_names.cmake)
   endif()
   # Direct-source consumers compile disabled translation units too.
   file(GLOB tc_direct_sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c")

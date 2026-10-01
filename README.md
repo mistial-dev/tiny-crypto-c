@@ -122,7 +122,9 @@ Each feature option is `TINY_CRYPTO_` followed by its `config.h` macro without
 the `TC_` prefix. `TINY_CRYPTO_AES_ENABLE_CBC` sets `TC_AES_ENABLE_CBC`, and
 `TINY_CRYPTO_AES_GCM_GHASH_MODE` sets `TC_AES_GCM_GHASH_MODE`.
 [`cmake/features.json`](cmake/features.json) lists every feature with its
-description, parent, value set and the sources it compiles.
+description, parent, value set and the sources it compiles. Configuration stops
+on a `TINY_CRYPTO_*` name that is not an option, and names the replacement of a
+retired one.
 
 The tables give the `AUTO` value for each profile. Default is the build with
 no profile selected. Mode, TDEA and curve options take effect only when their

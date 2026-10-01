@@ -5,8 +5,8 @@
 The registry is the one list of build features. These checks fail when a
 feature macro breaks the option naming rule, a library source has no owner,
 a config.h feature macro has no option, a CMake file declares a feature option
-outside the registry, or a document, workflow, script or build file names an
-option that does not exist.
+outside the registry, a retired option maps to an unknown replacement, or a
+document, workflow, script or build file names an option that does not exist.
 """
 from collections import Counter
 from pathlib import Path
@@ -30,6 +30,8 @@ INTERNAL_NAMES = {"TINY_CRYPTO_PUBLIC_DEFINITIONS", "TINY_CRYPTO_PUBLIC_MACROS",
 # An option name, also directly after -D. A trailing underscore names a family.
 OPTION_TOKEN = re.compile(r"(?:(?<=-D)|(?<![A-Za-z0-9_]))(TINY_CRYPTO_[A-Za-z0-9_]*)")
 HEADER_GUARD = re.compile(r"_(H|HPP)_?$")
+# Files that name retired options: the registry map and the configure check test.
+RETIRED_NAME_FILES = {"cmake/features.json", "tests/cmake/option_names.cmake"}
 # Option names are read from every tracked file outside the library sources and
 # the third-party corpora.
 SCANNED_EXCLUDE = re.compile(r"^(src/|tests/vectors/|tests/fuzz/|ports/esp-idf/vendor/)")
@@ -64,6 +66,7 @@ class RegistryTests(unittest.TestCase):
         self.registry = feature_registry.load()
         self.features = self.registry["features"]
         self.options = {feature_registry.option_name(f["macro"]) for f in self.features}
+        self.retired = self.registry["retired_options"]
 
     def test_macros_follow_the_naming_rule(self):
         macros = [feature["macro"] for feature in self.features]
@@ -138,8 +141,11 @@ class RegistryTests(unittest.TestCase):
                 text = path.read_text()
             except (UnicodeDecodeError, OSError):
                 continue
+            retired_allowed = path.relative_to(ROOT).as_posix() in RETIRED_NAME_FILES
             for name in sorted(set(OPTION_TOKEN.findall(text))):
                 if HEADER_GUARD.search(name) or name in INTERNAL_NAMES:
+                    continue
+                if retired_allowed and name in self.retired:
                     continue
                 if name.endswith("_"):
                     known = any(option.startswith(name) for option in self.options) or \
@@ -148,6 +154,15 @@ class RegistryTests(unittest.TestCase):
                     known = name in self.options or NON_FEATURE_OPTION.match(name)
                 self.assertTrue(known, "%s names unknown option %s"
                                 % (path.relative_to(ROOT), name))
+
+    def test_retired_options_name_their_replacements(self):
+        for name, replacement in self.retired.items():
+            self.assertNotIn(name, self.options, name + " is retired and registered")
+            self.assertFalse(NON_FEATURE_OPTION.match(name), name + " is retired and in use")
+            if replacement:
+                self.assertTrue(replacement in self.options or
+                                NON_FEATURE_OPTION.match(replacement),
+                                "%s names unknown replacement %s" % (name, replacement))
 
 
 if __name__ == "__main__":

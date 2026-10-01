@@ -31,7 +31,10 @@ while its parent feature is on.
 
 `config.h` owns the defaults and the dependency rules. CMake compiles it with
 the selected values, so an invalid combination stops configuration with the
-same `#error` text that a direct-source build reports.
+same `#error` text that a direct-source build reports. A `TINY_CRYPTO_*` cache
+entry that names no option also stops configuration. A retired name reports
+its replacement from the registry's `retired_options` map. Remove such an entry
+with `cmake -U <name>` or start a new build directory.
 
 The minimal core is `src/common.c`: secret wiping, constant-time comparison and
 the span helpers shared by every module. A build with every switch `OFF`
