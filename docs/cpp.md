@@ -80,19 +80,19 @@ Stateful classes use `init`, `update`, `finish` and `clear` where those stages
 apply. More specific operations keep a descriptive verb, such as
 `encrypt_finish`, `decode`, `transceive` and `unprotect`.
 
-| Class              | Key                                                | finish                                                            |
-| ------------------ | -------------------------------------------------- | ----------------------------------------------------------------- |
-| `AES`              | `TC_AES_KEYLEN` bytes, optional 16-byte IV         | none                                                              |
-| `GCM`              | `TC_AES_KEYLEN` bytes and an IV                    | `encrypt_finish` writes `tag_length()` bytes and consumes the key |
-| `AESCMAC`          | `TC_AES_KEYLEN` bytes                              | writes a 16-byte tag and consumes the key                         |
-| `AESDynamic`       | 16, 24 or 32 bytes                                 | none                                                              |
-| `AESDynamicCMAC`   | 16, 24 or 32 bytes                                 | writes a 16-byte tag and consumes the key                         |
-| `DES`              | 8 bytes, or 16 or 24 with TDEA, optional 8-byte IV | none                                                              |
-| `DESCMAC`          | 8, 16 or 24 bytes                                  | writes an 8-byte tag and consumes the key                         |
-| `DESISO9797`       | standard ALG3: 16; three-key extension: 24 bytes   | writes the 8-byte MAC and consumes the key                        |
-| `HMAC_SHA*`        | any length                                         | writes `tag_size` bytes and consumes the key                      |
-| `KMAC256`          | any length, optional customization                 | writes `out.capacity` bytes and consumes the key                  |
-| `SHA*`, `MD5`      | none                                               | writes the digest and starts the next message                     |
+| Class            | Key                                                | finish                                                            |
+| ---------------- | -------------------------------------------------- | ----------------------------------------------------------------- |
+| `AES`            | `TC_AES_KEYLEN` bytes, optional 16-byte IV         | none                                                              |
+| `GCM`            | `TC_AES_KEYLEN` bytes and an IV                    | `encrypt_finish` writes `tag_length()` bytes and consumes the key |
+| `AESCMAC`        | `TC_AES_KEYLEN` bytes                              | writes a 16-byte tag and consumes the key                         |
+| `AESDynamic`     | 16, 24 or 32 bytes                                 | none                                                              |
+| `AESDynamicCMAC` | 16, 24 or 32 bytes                                 | writes a 16-byte tag and consumes the key                         |
+| `DES`            | 8 bytes, or 16 or 24 with TDEA, optional 8-byte IV | none                                                              |
+| `DESCMAC`        | 8, 16 or 24 bytes                                  | writes an 8-byte tag and consumes the key                         |
+| `DESISO9797`     | standard ALG3: 16; three-key extension: 24 bytes   | writes the 8-byte MAC and consumes the key                        |
+| `HMAC_SHA*`      | any length                                         | writes `tag_size` bytes and consumes the key                      |
+| `KMAC256`        | any length, optional customization                 | writes `out.capacity` bytes and consumes the key                  |
+| `SHA*`, `MD5`    | none                                               | writes the digest and starts the next message                     |
 
 A default-constructed object, a failed `init`, a completed finish and `clear`
 all leave a keyed object unkeyed. Later update and finish calls return
