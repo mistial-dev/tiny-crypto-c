@@ -160,6 +160,25 @@ static unsigned decimal(const char* text, size_t count)
   return value;
 }
 
+int example_dump_path(char* out, size_t capacity, const char* directory, TC_bytes tag)
+{
+  /* Three-byte PIV tags and one-byte ISO tags, as hex. */
+  enum { TAG_MAX = 8 };
+  char hex[2 * TAG_MAX + 1];
+  if (!out || !directory || !tag.data || !tag.length || tag.length > TAG_MAX)
+    return 0;
+  for (size_t i = 0; i < tag.length; ++i)
+    snprintf(hex + 2 * i, 3, "%02x", tag.data[i]);
+  /* One bounded format of the whole name. The result decides truncation
+   * before any use of the buffer. */
+  char name[4096];
+  const int length = snprintf(name, sizeof name, "%s/%s.bin", directory, hex);
+  if (length < 0 || (size_t)length >= sizeof name || (size_t)length >= capacity)
+    return 0;
+  memcpy(out, name, (size_t)length + 1);
+  return 1;
+}
+
 int example_time_parse(const char* text, TC_X509_time* out)
 {
   /* 0 marks a required digit. Every other byte must match exactly. */

@@ -22,6 +22,11 @@ int example_read_file(const char* path, uint8_t* buffer, size_t capacity, TC_byt
 int example_read_created_file(const char* path, uint8_t* buffer, size_t capacity, TC_bytes* out,
                               uint64_t* created);
 
+/* Write the dump file name DIR/<tag in lowercase hex>.bin into out. Returns 1
+ * when the whole name and its NUL fit in capacity, and 0 for NULL arguments,
+ * an empty tag or truncation, with out unchanged. */
+int example_dump_path(char* out, size_t capacity, const char* directory, TC_bytes tag);
+
 /* Parse an ISO 8601 UTC time of exactly the form YYYY-MM-DDTHH:MM:SSZ, with
  * every field zero-padded, into out. Returns 1 on success. out changes only on
  * success. A NULL argument, other forms, other zones and invalid calendar

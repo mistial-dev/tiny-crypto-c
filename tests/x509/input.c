@@ -257,9 +257,43 @@ TC_TEST(time_text)
   return MUNIT_OK;
 }
 
+/* Dump file names: DIR/<tag>.bin, or 0 with the buffer unchanged when the
+ * name does not fit. A directory that fills the buffer used to push the
+ * append offset past its end. */
+TC_TEST(dump_path)
+{
+  static const uint8_t tag[] = {0x5f, 0xc1, 0x02};
+  char path[1024];
+  munit_assert_int(example_dump_path(path, sizeof path, "/tmp/d", (TC_bytes){tag, 3}), ==, 1);
+  munit_assert_string_equal(path, "/tmp/d/5fc102.bin");
+  /* "/tmp/d/5fc102.bin" is 17 characters and needs 18 bytes. */
+  memset(path, 0x5a, sizeof path);
+  munit_assert_int(example_dump_path(path, 17, "/tmp/d", (TC_bytes){tag, 3}), ==, 0);
+  munit_assert_true(tc_test_all_value(path, sizeof path, 0x5a));
+  munit_assert_int(example_dump_path(path, 18, "/tmp/d", (TC_bytes){tag, 3}), ==, 1);
+  static char directory[5000];
+  for (size_t length = 1012; length < 1024; ++length) {
+    memset(directory, 'a', length);
+    directory[0] = '/';
+    directory[length] = '\0';
+    memset(path, 0x5a, sizeof path);
+    const int fits = length + 1 + 6 + 4 < sizeof path;
+    munit_assert_int(example_dump_path(path, sizeof path, directory, (TC_bytes){tag, 3}), ==, fits);
+    if (!fits)
+      munit_assert_true(tc_test_all_value(path, sizeof path, 0x5a));
+  }
+  memset(directory, 'a', sizeof directory - 1);
+  directory[sizeof directory - 1] = '\0';
+  munit_assert_int(example_dump_path(path, sizeof path, directory, (TC_bytes){tag, 3}), ==, 0);
+  munit_assert_int(example_dump_path(path, sizeof path, NULL, (TC_bytes){tag, 3}), ==, 0);
+  munit_assert_int(example_dump_path(path, sizeof path, "/tmp", (TC_bytes){NULL, 0}), ==, 0);
+  return MUNIT_OK;
+}
+
 int main(int argc, char** argv)
 {
   MunitTest tests[] = {
+      {"/dump-path", dump_path, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/streams", streams, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/stream-source", stream_source, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/files", files, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

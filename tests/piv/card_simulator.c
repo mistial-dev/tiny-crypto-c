@@ -414,12 +414,18 @@ TC_TEST(authenticate_rules)
   /* 7C 82 01 06 {82 00, 81 82 01 00 input} as an extended command. */
   for (size_t k = 0; k < 2; ++k) {
     const tc_card_authentication* entry = k ? signing : card_key;
+    /* Each append is checked before the next one uses its length. */
     int at =
         snprintf(command, sizeof command, "0087%02X%02X00010A7C8201068200818201", 7, entry->key);
+    munit_assert_true(at > 0 && (size_t)at < sizeof command);
     at += snprintf(command + at, sizeof command - (size_t)at, "00");
-    for (size_t i = 0; i < entry->input.length; ++i)
+    munit_assert_true((size_t)at < sizeof command);
+    for (size_t i = 0; i < entry->input.length; ++i) {
       at += snprintf(command + at, sizeof command - (size_t)at, "%02X", entry->input.data[i]);
-    snprintf(command + at, sizeof command - (size_t)at, "0000");
+      munit_assert_true((size_t)at < sizeof command);
+    }
+    at += snprintf(command + at, sizeof command - (size_t)at, "0000");
+    munit_assert_true((size_t)at < sizeof command);
     if (!k) {
       munit_assert_uint16(raw(command, &length), ==, 0x9000);
       munit_assert_size(length, ==, entry->answer.length);

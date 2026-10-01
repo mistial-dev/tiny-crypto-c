@@ -235,12 +235,11 @@ static void dump(void* context, const TC_PIV_object* object)
 {
   const char* directory = context;
   char path[1024];
-  int length = snprintf(path, sizeof path, "%s/", directory);
-  for (size_t i = 0; length > 0 && i < object->info->tag_length; ++i)
-    length += snprintf(path + length, sizeof path - (size_t)length, "%02x", object->info->tag[i]);
-  if (length <= 0 || (size_t)length + 5 > sizeof path)
+  if (!example_dump_path(path, sizeof path, directory,
+                         (TC_bytes){object->info->tag, object->info->tag_length})) {
+    fputs("Dump path is too long\n", stderr);
     return;
-  memcpy(path + length, ".bin", 5);
+  }
   const int file = open(path, O_WRONLY | O_CREAT | O_EXCL, 0600);
   if (file < 0) {
     fprintf(stderr, "Unable to create %s: %s\n", path, strerror(errno));

@@ -761,11 +761,8 @@ static void dump_objects(const char* directory)
     if (object->state != TC_PIV_OBJECT_PRESENT || object->info->flags & TC_PIV_OBJECT_SECRET)
       continue;
     char path[TC_PIV_CARD_PATH_BYTES];
-    int length = snprintf(path, sizeof path, "%s/", directory);
-    for (size_t j = 0; length > 0 && j < object->info->tag_length; ++j)
-      length += snprintf(path + length, sizeof path - (size_t)length, "%02x", object->info->tag[j]);
-    munit_assert_true(length > 0 && (size_t)length + 5 <= sizeof path);
-    memcpy(path + length, ".bin", 5);
+    munit_assert_true(example_dump_path(path, sizeof path, directory,
+                                        (TC_bytes){object->info->tag, object->info->tag_length}));
     const int file = open(path, O_WRONLY | O_CREAT | O_EXCL, 0600);
     munit_assert_int(file, >=, 0);
     const ssize_t written = write(file, object->encoded.data, object->encoded.length);
