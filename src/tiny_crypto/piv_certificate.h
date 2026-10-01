@@ -43,7 +43,8 @@ typedef struct {
  *   MSCUID lies outside the signed certificate and is unauthenticated.
  * - SM_SIGNER: 70, 71, optional 7F21 intermediate CVC (value <=601 bytes),
  *   empty FE (Table 43).
- * - TWIC: 70 and 71 only.
+ * - TWIC: 70, 71 and an optional empty FE (TWIC Part 2 v5 4.7.1, which a
+ *   NEXGEN card ends with the PIV form's FE).
  * max_certificate_bytes bounds the encoded certificate value, compressed or
  * plain. Pass TC_PIV_CERTIFICATE_RECOMMENDED_BYTES unless the application
  * accepts larger certificates. Decompress GZIP before parsing X.509. This

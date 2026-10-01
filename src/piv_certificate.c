@@ -45,8 +45,11 @@ static TC_TLV_result read_container(TC_bytes input, TC_PIV_certificate_profile p
   if (element.value.length != 1 || element.value.data[0] > 1)
     return TC_TLV_INVALID;
   out->compression = element.value.data[0] ? TC_PIV_CERTIFICATE_GZIP : TC_PIV_CERTIFICATE_PLAIN;
-  if (profile == TC_PIV_CERTIFICATE_TWIC)
-    return tc_pki_end(&reader) ? TC_TLV_OK : TC_TLV_INVALID;
+  /* TWIC Part 2 v5 4.7.1 lists 70 and 71 and calls the structure similar to
+   * the PIV one without the MSCUID. NEXGEN cards end it with the empty FE of
+   * the PIV form. */
+  if (profile == TC_PIV_CERTIFICATE_TWIC && tc_pki_end(&reader))
+    return TC_TLV_OK;
   result = TC_TLV_next(&reader, &element);
   if (result != TC_TLV_OK)
     return result;

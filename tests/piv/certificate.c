@@ -37,7 +37,8 @@ TC_TEST(containers)
       munit_assert_memory_equal(sizeof out, &out, &saved);
     }
     for (size_t j = 0; j < 3; ++j) {
-      if (i == j || (i == 0 && j == 2))
+      /* The PIV slot form 70, 71, FE also reads as SM signer and TWIC. */
+      if (i == j || (i == 0 && j != 0))
         continue;
       munit_assert_int(
           TC_PIV_certificate_read(input, profiles[j], TC_PIV_CERTIFICATE_RECOMMENDED_BYTES, &out),
@@ -69,6 +70,37 @@ TC_TEST(containers)
   munit_assert_memory_equal(sizeof saved, alias.bytes, saved);
   return MUNIT_OK;
 }
+/* TWIC Part 2 v5 4.7.1 lists 70 and 71 and calls the structure similar to
+ * the PIV one without the MSCUID. A NEXGEN card sends the empty FE of the
+ * PIV form after 71. */
+TC_TEST(twic_error_detection_code)
+{
+  static const uint8_t accepted[] = {0x53, 8, 0x70, 1, 0x30, 0x71, 1, 0, 0xfe, 0};
+  static const uint8_t rejected[][16] = {
+      {0x53, 9, 0x70, 1, 0x30, 0x71, 1, 0, 0xfe, 1, 0},
+      {0x53, 11, 0x70, 1, 0x30, 0x71, 1, 0, 0x72, 1, 0x5c, 0xfe, 0},
+      {0x53, 10, 0x70, 1, 0x30, 0x71, 1, 0, 0xfe, 0, 0xfe, 0},
+      {0x53, 8, 0x70, 1, 0x30, 0x71, 1, 0, 0x72, 0}};
+  const size_t lengths[] = {11, 13, 12, 10};
+  TC_PIV_certificate out;
+  munit_assert_int(TC_PIV_certificate_read((TC_bytes){accepted, sizeof accepted},
+                                           TC_PIV_CERTIFICATE_TWIC,
+                                           TC_PIV_CERTIFICATE_RECOMMENDED_BYTES, &out),
+                   ==, TC_TLV_OK);
+  munit_assert_ptr_equal(out.certificate.data, accepted + 4);
+  munit_assert_null(out.mscuid.data);
+  for (size_t i = 0; i < sizeof lengths / sizeof *lengths; ++i) {
+    memset(&out, 0x5a, sizeof out);
+    TC_PIV_certificate saved = out;
+    munit_assert_int(TC_PIV_certificate_read((TC_bytes){rejected[i], lengths[i]},
+                                             TC_PIV_CERTIFICATE_TWIC,
+                                             TC_PIV_CERTIFICATE_RECOMMENDED_BYTES, &out),
+                     ==, TC_TLV_INVALID);
+    munit_assert_memory_equal(sizeof out, &out, &saved);
+  }
+  return MUNIT_OK;
+}
+
 TC_TEST(boundaries)
 {
   uint8_t buffer[2048];
@@ -258,6 +290,8 @@ TC_TEST(caller_bound)
 int main(int argc, char** argv)
 {
   MunitTest tests[] = {{"/containers", containers, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+                       {"/twic-error-detection-code", twic_error_detection_code, NULL, NULL,
+                        MUNIT_TEST_OPTION_NONE, NULL},
                        {"/boundaries", boundaries, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
                        {"/malformed", malformed, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
                        {"/mscuid", mscuid, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
