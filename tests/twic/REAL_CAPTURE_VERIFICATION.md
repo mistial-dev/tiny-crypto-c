@@ -56,7 +56,8 @@ root can be supplied with `--issuer-bundle-dir`; the tool never fetches AIA
 URLs.
 
 Certificate dates and anchored paths are evaluated at a fixed time, by default
-2026-09-27T12:00:00Z, the day the private captures were verified. `--at`
+2026-09-27T12:00:00Z. That instant is a synthetic evaluation time inside the
+certificates' validity, since the capture date is not recorded. `--at`
 selects another instant as `YYYY-MM-DDTHH:MM:SSZ`, and the anchored OpenSSL
 check receives it as `-attime`.
 
