@@ -12,6 +12,7 @@
 
 #include <tiny_crypto/common.hpp>
 #include <tiny_crypto/gzip.h>
+#if TC_ENABLE_GZIP
 
 namespace tiny_crypto {
 /* Owns reusable scratch. Input and output remain caller-owned. */
@@ -44,4 +45,5 @@ private:
   TC_GZIP_workspace workspace_;
 };
 } // namespace tiny_crypto
+#endif
 #endif

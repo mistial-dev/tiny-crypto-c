@@ -86,6 +86,7 @@ typedef enum {
   TC_EC_OPERATION_GENERATE /* one scalar attempt */
 } TC_EC_operation;
 
+#if TC_ENABLE_EC
 /* Work units for one operation, or one attempt of a randomized operation, on
  * curve. A scalar multiplication or a modular inversion costs one unit per
  * curve bit; point validation and each random request cost one unit. Zero for
@@ -99,6 +100,7 @@ uint32_t TC_EC_operation_work(TC_EC_curve curve, TC_EC_operation operation);
  * build. A SEC 1 uncompressed public key is 1 + 2 * width bytes and a fixed
  * r || s signature is 2 * width bytes. */
 size_t TC_EC_coordinate_bytes(TC_EC_curve curve);
+#endif
 
 /* Shared conventions for the functions below. Scalars and coordinates are
  * fixed-width, big-endian values of TC_EC_coordinate_bytes(curve) bytes, w
@@ -110,6 +112,7 @@ size_t TC_EC_coordinate_bytes(TC_EC_curve curve);
  * failure. Each call first checks its cost from TC_EC_operation_work. After
  * that check, the charged work stays consumed whatever the result. */
 
+#if TC_ENABLE_EC
 /* Derive the SEC 1 public key Q = dG for private scalar d (SEC 1 section
  * 3.2.1). public_key.capacity is at least 1 + 2w, and exactly 1 + 2w bytes are
  * written, only on TC_EC_OK. Point multiplication runs in constant work.
@@ -228,6 +231,7 @@ TC_EC_result TC_ECDSA_verify_digest(TC_EC_curve curve, TC_bytes public_key, TC_b
 TC_EC_result TC_ECDSA_sign_digest(TC_EC_curve curve, TC_bytes private_key, TC_bytes public_key,
                                   TC_bytes digest, TC_buffer signature,
                                   TC_ECDSA_workspace* workspace, TC_EC_execution* execution);
+#endif
 
 #ifdef __cplusplus
 }

@@ -12,6 +12,7 @@
 
 #include <tiny_crypto/common.hpp>
 #include <tiny_crypto/rsa.h>
+#if TC_ENABLE_RSA
 
 namespace tiny_crypto {
 typedef ::TC_RSA_result rsa_result;
@@ -290,4 +291,5 @@ rsa_decrypt_oaep(const rsa_private_key& key, const rsa_oaep_options& options, by
                                &execution);
 }
 } // namespace tiny_crypto
+#endif
 #endif

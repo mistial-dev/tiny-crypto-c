@@ -25,6 +25,7 @@ typedef struct {
   uint8_t mac[16], buffer[16], k1[16], k2[16], used;
 } TC_AES_dynamic_CMAC;
 
+#if TC_ENABLE_AES && TC_AES_ENABLE_DYNAMIC
 /* Expand a 16, 24 or 32-byte key (FIPS 197 section 5.2). key must be
  * disjoint from ctx. Returns TC_OK, or TC_ERROR for a NULL argument, another
  * key length, a key that overlaps ctx, or, in the runtime S-box profile, a
@@ -72,6 +73,7 @@ TC_status TC_AES_dynamic_CMAC_init(TC_AES_dynamic_CMAC* ctx, const uint8_t* key,
 TC_status TC_AES_dynamic_CMAC_update(TC_AES_dynamic_CMAC* ctx, const uint8_t* data, size_t length);
 TC_status TC_AES_dynamic_CMAC_final(TC_AES_dynamic_CMAC* ctx, uint8_t tag[16]);
 void TC_AES_dynamic_CMAC_clear(TC_AES_dynamic_CMAC* ctx);
+#endif
 #ifdef __cplusplus
 }
 #endif

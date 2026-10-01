@@ -12,6 +12,7 @@
 
 #include <tiny_crypto/common.hpp>
 #include <tiny_crypto/des.h>
+#if TC_ENABLE_DES
 
 namespace tiny_crypto {
 
@@ -334,4 +335,5 @@ private:
 
 } /* namespace tiny_crypto */
 
+#endif
 #endif /* TINY_CRYPTO_DES_HPP_ */

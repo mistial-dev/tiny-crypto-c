@@ -44,7 +44,7 @@
     },
     "piv_sm_cs2": {
       "mcu": "atmega2560",
-      "flash": 36500,
+      "flash": 36700,
       "static_ram": 4700,
       "project_stack_estimate": 750,
       "sm_framing_flash": 3800,

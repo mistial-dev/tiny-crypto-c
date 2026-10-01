@@ -141,6 +141,7 @@ typedef struct {
   uint8_t secured, sm_lost, vci, pin_verified, sm_suite;
 } TC_PIV_link_info;
 
+#if TC_ENABLE_PIV_COMMAND
 /* Start a link. command_scratch holds one encoded command fragment and is
  * wiped after every transmit. SHORT needs TC_APDU_SHORT_COMMAND_MAX_BYTES.
  * EXTENDED needs TC_PIV_EXTENDED_SCRATCH_BYTES, or the channel's
@@ -172,6 +173,7 @@ uint16_t TC_PIV_link_status(const TC_PIV_link* link);
 /* Wipe the scratch buffer and the link state, and clear a bound secure
  * messaging session and its scratch. Accepts NULL. */
 void TC_PIV_link_clear(TC_PIV_link* link);
+#endif
 
 /* Accept a TWIC application version 01 with a sub-version other than 01
  * (Legacy) and 03 (NEXGEN) as TC_TWIC_LEGACY_CARD. TWIC Part 3 v4 Appendix
@@ -197,6 +199,7 @@ typedef struct {
   uint8_t sm_suite;
 } TC_PIV_application;
 
+#if TC_ENABLE_PIV_COMMAND
 /* Read a SELECT response data field for the expected application (SP
  * 800-73-5 Part 2 3.1.1 Tables 3 to 5, TWIC Part 2 v5 5.1.1). Framing uses the
  * ISO/IEC 7816-4 profile with at most 4096 bytes, 64 elements and depth 4.
@@ -252,6 +255,7 @@ TC_TLV_result TC_PIV_application_read(TC_bytes response, TC_PIV_application_id e
  * the argument checks wipes response. */
 TC_PIV_result TC_PIV_select(TC_PIV_link* link, TC_PIV_application_id application, unsigned flags,
                             TC_buffer response, TC_PIV_application* out);
+#endif
 
 /* Form of a GET DATA answer. CONTAINER is 53, TEMPLATE is a DO with the
  * requested tag, NONE is a TWIC 9000 without data. */
@@ -267,6 +271,7 @@ typedef struct {
   uint8_t form;
 } TC_PIV_data_object;
 
+#if TC_ENABLE_PIV_COMMAND
 /* GET DATA for one tag of 1 to 3 bytes (SP 800-73-5 Part 2 3.1.2): CLA 00,
  * INS CB, P1 P2 3F FF, data 5C L tag and Ne = response_ne. A secured link
  * sends it under secure messaging and frames the decrypted answer, which
@@ -295,6 +300,7 @@ typedef struct {
  * the argument checks wipes response. */
 TC_PIV_result TC_PIV_get_data(TC_PIV_link* link, TC_bytes tag, TC_buffer response,
                               TC_PIV_data_object* out);
+#endif
 
 /* Verification state of one key reference. verified is 1 when the security
  * status is TRUE. retries holds X of 63CX when retries_known is 1. submitted
@@ -304,6 +310,7 @@ typedef struct {
   uint8_t verified, submitted, retries_known;
 } TC_PIV_reference_status;
 
+#if TC_ENABLE_PIV_COMMAND
 /* VERIFY without data (SP 800-73-5 Part 2 3.2.1): P1 00, no Lc, no Le. It
  * reports whether reference is verified or how many retries remain.
  * reference is 80 (PIV PIN), 00 (Global PIN) or 98 (pairing code). 9000 sets
@@ -355,6 +362,7 @@ TC_PIV_result TC_PIV_verify_status(TC_PIV_link* link, uint8_t reference,
  * out changes only on TC_PIV_OK. */
 TC_PIV_result TC_PIV_pin_verify(TC_PIV_link* link, uint8_t reference, TC_bytes pin,
                                 unsigned minimum_retries, TC_PIV_reference_status* out);
+#endif
 
 /* Meanings of PIV and TWIC status words (SP 800-73-5 Part 1 5.6 Table 7). */
 typedef enum {
@@ -375,6 +383,7 @@ typedef enum {
   TC_PIV_SW_OTHER
 } TC_PIV_status;
 
+#if TC_ENABLE_PIV_COMMAND
 /* Classify sw as the answer to command on application. 6A88 is
  * REFERENCE_NOT_FOUND except on TWIC GET DATA, where it means the object is
  * absent (TWIC Part 2 v5 5.2). 63CX on VERIFY writes X to *retries when
@@ -382,6 +391,7 @@ typedef enum {
  * code has no counter (Part 2 footnote 7). */
 TC_PIV_status TC_PIV_status_classify(uint16_t sw, TC_PIV_command command,
                                      TC_PIV_application_id application, unsigned* retries);
+#endif
 
 #ifdef __cplusplus
 }

@@ -76,6 +76,7 @@ struct TC_AES_ctx {
 #endif
 };
 
+#if TC_ENABLE_AES
 /* Expand a TC_AES_KEYLEN-byte key into the key schedule used by ECB
  * (FIPS 197 section 5.2). key must be disjoint from ctx.
  * Returns TC_OK, or TC_ERROR for a NULL argument, a key that overlaps ctx,
@@ -96,20 +97,21 @@ void TC_AES_ctx_clear(struct TC_AES_ctx* ctx);
  * Returns TC_OK, or TC_ERROR under the TC_AES_key_init conditions. A NULL
  * ctx is left alone. Every other failure wipes ctx. */
 TC_status TC_AES_init(struct TC_AES_ctx* ctx, const uint8_t* key);
-#if TC_AES_CAVP
+#endif
+#if TC_ENABLE_AES && TC_AES_CAVP
 /* Test-only single-block hooks used by the AESAVS harness. They return
  * TC_ERROR, leaving block unchanged, when the key cannot be scheduled. */
 TC_status TC_AES_CAVP_encrypt_block(const uint8_t* key, uint8_t block[TC_AES_BLOCKLEN]);
 TC_status TC_AES_CAVP_decrypt_block(const uint8_t* key, uint8_t block[TC_AES_BLOCKLEN]);
 #endif
-#if TC_AES_SBOX_MODE == TC_AES_SBOX_MODE_RUNTIME
+#if TC_ENABLE_AES && TC_AES_SBOX_MODE == TC_AES_SBOX_MODE_RUNTIME
 /* Build the S-boxes in RAM. Call it once before any key init. Until then,
  * every key init returns TC_ERROR. Each call rebuilds the tables with the
  * same values. A call writes the shared tables, so make it before sharing
  * AES across threads and never while another thread uses AES. */
 void TC_AES_init_sbox(void);
 #endif
-#if TC_AES_HAVE_IV
+#if TC_ENABLE_AES && TC_AES_HAVE_IV
 /* Start a message: copy a 16-byte IV into ctx and reset the CTR and OFB
  * stream state. Call it after TC_AES_init and before each new message. Mode
  * calls after it continue that message: CBC chains from the last ciphertext
@@ -133,7 +135,7 @@ TC_status TC_AES_set_iv(struct TC_AES_ctx* ctx, const uint8_t* iv);
  * const key schedule, so its failure wipes buf only.
  */
 
-#if TC_AES_ENABLE_ECB
+#if TC_ENABLE_AES && TC_AES_ENABLE_ECB
 /* Encrypt or decrypt one TC_AES_BLOCKLEN-byte block in place (FIPS 197
  * sections 5.1 and 5.3, SP 800-38A section 6.1). ECB leaks equal blocks,
  * so use it only as a building block. */
@@ -141,7 +143,7 @@ TC_status TC_AES_ECB_encrypt(const struct TC_AES_key_ctx* ctx, uint8_t* buf);
 TC_status TC_AES_ECB_decrypt(const struct TC_AES_key_ctx* ctx, uint8_t* buf);
 #endif
 
-#if TC_AES_ENABLE_CBC
+#if TC_ENABLE_AES && TC_AES_ENABLE_CBC
 /*
  * CBC (SP 800-38A section 6.2). length must be a multiple of
  * TC_AES_BLOCKLEN, and an unaligned length is an argument error. The caller
@@ -152,7 +154,7 @@ TC_status TC_AES_CBC_encrypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length
 TC_status TC_AES_CBC_decrypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length);
 #endif
 
-#if TC_AES_ENABLE_CTR
+#if TC_ENABLE_AES && TC_AES_ENABLE_CTR
 /*
  * CTR (SP 800-38A section 6.5). Encrypt and decrypt are the same operation.
  * The IV is the big-endian counter block. It increments for every block, and
@@ -164,7 +166,7 @@ TC_status TC_AES_CBC_decrypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length
 TC_status TC_AES_CTR_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length);
 #endif
 
-#if TC_AES_ENABLE_OFB
+#if TC_ENABLE_AES && TC_AES_ENABLE_OFB
 /*
  * OFB (SP 800-38A section 6.4). Encrypt and decrypt are the same operation.
  * Unused output-block bytes serve the next call. OFB provides
@@ -248,6 +250,7 @@ struct TC_AES_GCM_ctx {
   uint8_t phase;
 };
 
+#if TC_ENABLE_AES
 /*
  * Streaming GCM encryption (SP 800-38D section 7.1). Decryption is one-shot
  * (TC_AES_GCM_decrypt), so the tag is verified before any plaintext is
@@ -305,10 +308,11 @@ TC_status TC_AES_GCM_decrypt_short_tag(const uint8_t* key, TC_bytes iv, TC_bytes
 /* Wipe the key schedule, hash subkey and authentication state. NULL is
  * ignored. */
 void TC_AES_GCM_ctx_clear(struct TC_AES_GCM_ctx* ctx);
+#endif
 
 #endif /* TC_AES_ENABLE_GCM */
 
-#if TC_AES_ENABLE_CCM
+#if TC_ENABLE_AES && TC_AES_ENABLE_CCM
 
 /* CCM (SP 800-38C sections 6.1 and 6.2) is a packet mode. Payload and AAD
  * lengths are known at entry. Follows the one-shot AEAD contract above. The
@@ -328,7 +332,7 @@ TC_status TC_AES_CCM_decrypt_short_tag(const uint8_t* key, TC_bytes nonce, TC_by
 
 #endif
 
-#if TC_AES_ENABLE_EAX
+#if TC_ENABLE_AES && TC_AES_ENABLE_EAX
 
 /* EAX one-shot AEAD (Bellare, Rogaway and Wagner, "The EAX Mode of
  * Operation"). Follows the one-shot AEAD contract above. The tag is the
@@ -351,6 +355,7 @@ TC_status TC_AES_EAX_decrypt_short_tag(const uint8_t* key, TC_bytes nonce, TC_by
 
 #define TC_AES_EAX_PRIME_TAG_LEN 4
 
+#if TC_ENABLE_AES
 /* ANSI C12.22 EAX'. Follows the one-shot AEAD contract above. The protocol
  * fixes the tag at four bytes, so EAX' is exempt from TC_MIN_TAG_LEN and has
  * no _short_tag form. The cleartext header is authenticated and serves as
@@ -360,6 +365,7 @@ TC_status TC_AES_EAX_PRIME_encrypt(const uint8_t* key, TC_bytes cleartext, TC_by
 TC_status TC_AES_EAX_PRIME_decrypt(const uint8_t* key, TC_bytes cleartext, TC_bytes ciphertext,
                                    const uint8_t tag[TC_AES_EAX_PRIME_TAG_LEN],
                                    TC_buffer plaintext);
+#endif
 
 #endif
 
@@ -368,6 +374,7 @@ TC_status TC_AES_EAX_PRIME_decrypt(const uint8_t* key, TC_bytes cleartext, TC_by
 /* Full CMAC tag is one AES block. Shorter tags are the leading tag_len bytes. */
 #define TC_AES_CMAC_TAG_MAX TC_AES_BLOCKLEN
 
+#if TC_ENABLE_AES
 /*
  * One-shot AES-CMAC (SP 800-38B section 6.2) over a TC_AES_KEYLEN-byte key.
  * tag_len must be in TC_MIN_TAG_LEN..TC_AES_CMAC_TAG_MAX. Truncation keeps
@@ -396,6 +403,7 @@ TC_status TC_AES_CMAC_short_tag(const uint8_t* key, const uint8_t* msg, size_t m
                                 uint8_t* tag, size_t tag_len);
 TC_status TC_AES_CMAC_verify_short_tag(const uint8_t* key, const uint8_t* msg, size_t msg_len,
                                        const uint8_t* tag, size_t tag_len);
+#endif
 
 /*
  * Streaming AES-CMAC (SP 800-38B sections 6.1 and 6.2). The most recent
@@ -415,6 +423,7 @@ struct TC_AES_CMAC_ctx {
   uint8_t active;
 };
 
+#if TC_ENABLE_AES
 /* init keys ctx and derives the subkeys. key is TC_AES_KEYLEN bytes and
  * must be disjoint from ctx. It returns TC_OK, or TC_ERROR for a NULL
  * argument, an overlap or a key init failure. A NULL ctx is left alone, and
@@ -431,6 +440,7 @@ TC_status TC_AES_CMAC_init(struct TC_AES_CMAC_ctx* ctx, const uint8_t* key);
 TC_status TC_AES_CMAC_update(struct TC_AES_CMAC_ctx* ctx, const uint8_t* data, size_t len);
 TC_status TC_AES_CMAC_final(struct TC_AES_CMAC_ctx* ctx, uint8_t tag[TC_AES_CMAC_TAG_MAX]);
 void TC_AES_CMAC_ctx_clear(struct TC_AES_CMAC_ctx* ctx);
+#endif
 
 #endif
 
@@ -442,6 +452,7 @@ void TC_AES_CMAC_ctx_clear(struct TC_AES_CMAC_ctx* ctx);
 /* RFC §7: at most 126 associated-data components (plaintext is the last S2V input). */
 #define TC_AES_SIV_MAX_AD 126u
 
+#if TC_ENABLE_AES
 /*
  * One-shot SIV (RFC 5297 sections 2.6 and 2.7). Follows the one-shot AEAD
  * contract above. key is TC_AES_SIV_KEYLEN bytes: the S2V CMAC key, then the
@@ -460,6 +471,7 @@ TC_status TC_AES_SIV_encrypt(const uint8_t* key, const TC_bytes* ad, size_t ad_c
 TC_status TC_AES_SIV_decrypt(const uint8_t* key, const TC_bytes* ad, size_t ad_count,
                              const uint8_t v[TC_AES_SIV_V_LEN], TC_bytes ciphertext,
                              TC_buffer plaintext);
+#endif
 
 #endif
 

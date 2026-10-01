@@ -60,6 +60,7 @@ typedef struct {
   uint8_t x509_unusable;
 } TC_X509_store_anchor;
 
+#if TC_ENABLE_X509_PATH
 /* Build an anchor record from a parsed anchor certificate with the rules of
  * the RFC 5914 TrustAnchorList certificate choice. certificatePolicies,
  * nameConstraints, policyConstraints, inhibitAnyPolicy and the
@@ -79,6 +80,7 @@ TC_TLV_result TC_X509_store_anchor_from_certificate(const TC_X509_certificate* c
                                                     const TC_TLV_limits* limits,
                                                     const TC_X509_workspace* workspace,
                                                     TC_X509_store_anchor* out);
+#endif
 
 /* Array-backed source for a fixed, caller-owned snapshot. All records and
  * their borrowed DER must remain stable until readers release the snapshot. */
@@ -100,6 +102,7 @@ typedef struct {
   TC_TLV_result (*candidate)(void* context, size_t index, size_t* work, TC_bytes* out);
   TC_TLV_result (*anchor)(void* context, size_t index, size_t* work, TC_X509_store_anchor* out);
 } TC_X509_store_source;
+#if TC_ENABLE_X509_PATH
 /* Describe a TC_X509_store_array as a source. out->context points at array,
  * so keep the array and its records stable while the source is used. Each
  * record read charges one work unit. Charges no work itself.
@@ -108,6 +111,7 @@ typedef struct {
  * OK. */
 TC_TLV_result TC_X509_store_array_source(const TC_X509_store_array* array,
                                          TC_X509_store_source* out);
+#endif
 
 /* Zero-initialize these objects. Fields are managed by the store functions.
  * state follows the TC_snapshot_state lifecycle in snapshot.h. */
@@ -121,6 +125,7 @@ typedef struct {
   size_t revision;
 } TC_X509_store;
 
+#if TC_ENABLE_X509_PATH
 /* Snapshot store. Serialize every call with the application's lock. Store,
  * slots, source and result pointers occupy disjoint storage. publish and
  * acquire check the store, the published slot and their arguments for overlap.
@@ -165,6 +170,7 @@ TC_TLV_result TC_X509_store_acquire(TC_X509_store* store, TC_X509_store_snapshot
  * Returns OK, or ARGUMENT for a NULL slot, no readers, or a slot outside
  * CURRENT and RETIRED, with the slot unchanged. */
 TC_TLV_result TC_X509_store_release(TC_X509_store_snapshot* slot);
+#endif
 #ifdef __cplusplus
 }
 #endif

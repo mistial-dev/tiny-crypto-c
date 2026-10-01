@@ -13,6 +13,7 @@
 #include <tiny_crypto/common.hpp>
 #include <tiny_crypto/piv_command.hpp>
 #include <tiny_crypto/piv_vci.h>
+#if TC_ENABLE_PIV_VCI
 
 namespace tiny_crypto {
 
@@ -36,4 +37,5 @@ TC_CPP_NODISCARD inline piv_result piv_vci_establish(piv_link& link, const piv_d
 }
 
 } // namespace tiny_crypto
+#endif
 #endif

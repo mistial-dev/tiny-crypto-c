@@ -8,6 +8,12 @@
  * (2.16.840.1.101.3.2.1.3.39) as an explicit policy for PIV cards, and the
  * card-expiration bound on the signer. Signature and path checks run
  * afterwards in the validators. */
+#include <string.h>
+#include <tiny_crypto/credential.h>
+#include <tiny_crypto/piv_biometric.h>
+#include <tiny_crypto/piv_cms.h>
+
+#if TC_ENABLE_CREDENTIAL
 #include "internal.h"
 #include "pki_budget_internal.h"
 #include "pki_extensions_internal.h"
@@ -18,12 +24,6 @@
 #include "credential_status_internal.h"
 #include "credential_policy_internal.h"
 #include "credential_text_internal.h"
-#include <string.h>
-#include <tiny_crypto/credential.h>
-#include <tiny_crypto/piv_biometric.h>
-#include <tiny_crypto/piv_cms.h>
-
-#if TC_ENABLE_CREDENTIAL
 
 /* What one pass over the signer's extensions looks for and found. */
 typedef struct {

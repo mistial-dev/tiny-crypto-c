@@ -3,12 +3,13 @@
  *
  * Shared validator session: context policies, storage preflight, the
  * guarded trust source and the signed-object verification step. */
+#include <tiny_crypto/credential.h>
+
+#if TC_ENABLE_CREDENTIAL
 #include "internal.h"
 #include "credential_session_internal.h"
 #include "credential_policy_internal.h"
 #include "pki_budget_internal.h"
-
-#if TC_ENABLE_CREDENTIAL
 
 int tc_credential_session_open(tc_credential_session* session, const TC_validation_context* context,
                                TC_PIV_card_profile profile)

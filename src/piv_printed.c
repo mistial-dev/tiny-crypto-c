@@ -60,7 +60,7 @@ static int printed_date(TC_bytes value, TC_PIV_printed_profile profile, TC_X509_
       !tc_credential_decimal(value.data + 7, 2, 31, &day))
     return 0;
   month = tc_credential_month3(value.data + 4, 0);
-  if (!tc_pki_date((unsigned)year, month, (unsigned)day))
+  if (!tc_internal_calendar_date((unsigned)year, month, (unsigned)day))
     return 0;
   *out = (TC_X509_time){(unsigned)year, (uint8_t)month, (uint8_t)day, 0, 0, 0};
   return 1;

@@ -229,18 +229,6 @@ int tc_x509_attribute_type(TC_bytes oid, unsigned tag, size_t length);
 /* Consume nonempty DER RDN contents, including SET OF ordering. */
 TC_TLV_result tc_x509_rdn_contents(TC_TLV_reader* attributes);
 
-static inline int tc_pki_date(unsigned year, unsigned month, unsigned day)
-{
-  unsigned days;
-  if (!year || month < 1 || month > 12 || !day)
-    return 0;
-  if (month == 2)
-    days = 28 + (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0));
-  else
-    days = (month == 4 || month == 6 || month == 9 || month == 11) ? 30 : 31;
-  return day <= days;
-}
-
 /* Named curves from RFC 5480 section 2.1.1.1, plus the Brainpool curves.
  * X9.62 prime curves are 1.2.840.10045.3.1.{1 secp192r1, 7 secp256r1}. */
 static inline TC_EC_curve tc_pki_curve(TC_bytes oid, unsigned* bits)

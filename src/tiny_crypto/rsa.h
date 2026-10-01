@@ -177,6 +177,7 @@ typedef enum {
  * before release. A failed RNG request or a failed release check returns
  * TC_RSA_ERROR. */
 
+#if TC_ENABLE_RSA
 /* Workspace limbs for operation at a key size in bits. Zero for an
  * unsupported key size or an unknown operation. Charges no work. */
 size_t TC_RSA_workspace_words(TC_RSA_operation operation, size_t bits);
@@ -276,6 +277,7 @@ TC_RSA_result TC_RSA_raw_private(const TC_RSA_public_key* key, TC_bytes private_
 
 /* Return 1 when bits names a supported modulus size, otherwise 0. */
 int TC_RSA_modulus_supported(size_t bits);
+#endif
 
 /* Work contracts. TC_work_budget counts public work units: modular
  * operations, encoded and masked bytes, hash invocations and RNG requests. It
@@ -303,6 +305,7 @@ int TC_RSA_modulus_supported(size_t bits);
  * execution.random_attempts to cover every attempt. Verification consumes
  * work up to the point where it detects an invalid signature. */
 
+#if TC_ENABLE_RSA
 /* EMSA-PKCS1-v1_5 and EMSA-PSS encoding for a modulus of modulus_bytes. The
  * same cost covers PSS encoding and PSS verification. */
 uint32_t TC_RSA_encode_v15_work(const TC_RSA_v15_options* options, size_t modulus_bytes);
@@ -570,6 +573,7 @@ TC_RSA_result TC_RSA_verify_pss_prepared(const TC_RSA_prepared_public_key* setup
                                          const TC_RSA_pss_options* options, TC_bytes digest,
                                          TC_bytes signature, const TC_RSA_workspace* workspace,
                                          TC_work_budget* work);
+#endif
 #ifdef __cplusplus
 }
 #endif

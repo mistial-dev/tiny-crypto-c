@@ -26,6 +26,7 @@ typedef struct {
   uint8_t role;
 } TC_PIV_CVC;
 
+#if TC_ENABLE_PIV_CVC
 /* Read one complete 7F21 card verifiable certificate with the fixed field
  * order of SP 800-73-5 Part 2 section 4.1.5. All spans borrow encoded, which
  * must stay unchanged while they are used. encoded and out must be disjoint.
@@ -37,6 +38,7 @@ typedef struct {
  * out unchanged. Signature verification and curve-membership checks are
  * separate. */
 TC_TLV_result TC_PIV_CVC_read(TC_bytes encoded, TC_PIV_CVC* out);
+#endif
 
 typedef struct {
   TC_bytes card, intermediate, card_uuid;
@@ -45,6 +47,7 @@ typedef struct {
   const TC_X509_certificate* signer;
 } TC_PIV_CVC_chain_request;
 
+#if TC_ENABLE_PIV_CVC && TC_ENABLE_X509
 /* Verify the card CVC and optional intermediate under the supplied signer
  * (SP 800-73-5 Part 2 section 4.1.5). Check the signer's path,
  * content-signing usage, policy, time and revocation before calling, or use
@@ -75,6 +78,7 @@ TC_X509_signature_result TC_PIV_CVC_chain_verify(const TC_PIV_CVC_chain_request*
                                                  const TC_X509_signature_provider* provider,
                                                  TC_EC_workspace* point_workspace, size_t* work,
                                                  TC_PIV_CVC* out);
+#endif
 
 #ifdef __cplusplus
 }

@@ -41,6 +41,7 @@ typedef enum {
   TC_PIV_OID_POLICY_CONTENT_SIGNING
 } TC_PIV_oid;
 
+#if TC_ENABLE_PIV_OIDS
 /* Classify exact OID contents, excluding the ASN.1 tag and length.
  * TWIC compatibility accepts the pairs in TWIC Part 2 v5 section 6 from
  * either card application. TC_PIV_OIDS_ONLY accepts the PIV identifier of
@@ -50,6 +51,7 @@ typedef enum {
  * unknown profile. Keep original OIDs for signatures and X.509 policy
  * processing. Recognition conveys no trust. */
 TC_PIV_oid TC_PIV_oid_identify(TC_bytes oid, TC_PIV_oid_profile profile);
+#endif
 
 #ifdef __cplusplus
 }

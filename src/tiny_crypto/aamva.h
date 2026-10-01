@@ -13,6 +13,7 @@
 extern "C" {
 #endif
 
+#if TC_ENABLE_AAMVA
 /* Find a two-letter subfile designator in an ANSI AAMVA payload of version 01
  * or later (AAMVA DL/ID Card Design Standard 2025 sections D.12.3 and
  * D.12.4). Checks the header, the 1..99 directory entries, their uppercase
@@ -39,6 +40,7 @@ TC_TLV_result TC_AAMVA_subfile_find(TC_bytes encoded, const char designator[2], 
  * requested element. out changes only on OK. Field interpretation belongs to
  * the application. */
 TC_TLV_result TC_AAMVA_field_find(TC_bytes subfile, const char identifier[3], TC_bytes* out);
+#endif
 
 #ifdef __cplusplus
 }

@@ -13,6 +13,7 @@
 #include <tiny_crypto/common.hpp>
 #include <tiny_crypto/piv_command.hpp>
 #include <tiny_crypto/piv_key_proof.h>
+#if TC_ENABLE_PIV_KEY_PROOF
 
 namespace tiny_crypto {
 
@@ -40,4 +41,5 @@ piv_key_prove(piv_link& link, const piv_key_proof_request& request, TC_random_so
 }
 
 } // namespace tiny_crypto
+#endif
 #endif

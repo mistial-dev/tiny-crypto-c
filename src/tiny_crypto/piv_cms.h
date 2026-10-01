@@ -25,6 +25,7 @@ typedef struct {
   TC_bytes signed_content, record, signature, fascn;
 } TC_PIV_CBEFF;
 
+#if TC_ENABLE_PIV_OBJECTS
 /* Split the value of a PIV biometric object's BC field using the CBEFF
  * header of SP 800-76-2 section 9.2 and Table 14. The 88-byte header is part
  * of signed_content. Record and CMS signature blocks must be nonempty and
@@ -37,6 +38,7 @@ typedef struct {
  * short header or block lengths that leave the input unfilled. out changes only
  * on OK. */
 TC_TLV_result TC_PIV_CBEFF_read(TC_bytes encoded, TC_PIV_CBEFF* out);
+#endif
 
 typedef struct {
   TC_X509_time created, valid_from, valid_until;
@@ -47,6 +49,7 @@ typedef struct {
   int quality, encrypted;
 } TC_PIV_CBEFF_metadata;
 
+#if TC_ENABLE_PIV_OBJECTS
 /* Read the SP 800-76-2 Table 14 metadata from a complete BC value. Checks the
  * framing of TC_PIV_CBEFF_read, the signed or signed-and-encrypted security
  * options, calendar values and the order creation <= validity start <=
@@ -59,6 +62,7 @@ typedef struct {
  * TC_PIV_CBEFF_read. INVALID for framing or any metadata check. out changes
  * only on OK. */
 TC_TLV_result TC_PIV_CBEFF_metadata_read(TC_bytes encoded, TC_PIV_CBEFF_metadata* out);
+#endif
 
 typedef enum {
   TC_PIV_CBEFF_FORMAT_UNKNOWN,
@@ -68,11 +72,13 @@ typedef enum {
   TC_PIV_CBEFF_FACE_IMAGE
 } TC_PIV_CBEFF_format;
 
+#if TC_ENABLE_PIV_OBJECTS
 /* Identify the SP 800-76-2 Table 15 header tuple of format owner, format
  * type, biometric type and processing level. NULL and unrecognized tuples
  * return UNKNOWN. Record contents, encryption and quality need separate
  * checks. Charges no work. */
 TC_PIV_CBEFF_format TC_PIV_CBEFF_format_identify(const TC_PIV_CBEFF_metadata* metadata);
+#endif
 
 typedef struct {
   TC_CMS_signed_data envelope;
@@ -81,6 +87,7 @@ typedef struct {
   TC_bytes certificate;
 } TC_PIV_CMS_object;
 
+#if TC_ENABLE_PIV_OBJECTS
 /* Read a single-signer PIV or TWIC CMS profile.
  * - CHUID: SP 800-73-5 Part 1 section 3.1.2.1. Detached content, one
  *   embedded certificate and a version 1 signer.
@@ -141,6 +148,7 @@ TC_TLV_result TC_PIV_CMS_identifiers_match(const TC_PIV_CMS_object* object, TC_P
                                            TC_bytes fascn, TC_bytes uuid,
                                            const TC_TLV_limits* limits, TC_TLV_frames frames,
                                            size_t* work, int* matched);
+#endif
 
 #ifdef __cplusplus
 }

@@ -48,6 +48,7 @@ typedef struct {
   TC_CMS_credential_workspace credential;
 } TC_validation_workspace;
 
+#if TC_ENABLE_CMS_VALIDATION
 /* Write the capacity preset of profile to out. Presets select storage
  * capacities only. Algorithms and trust policy are configured separately.
  * Charges no work. Returns OK, or ARGUMENT for a NULL out or an unknown
@@ -77,6 +78,7 @@ TC_result TC_validation_workspace_size(const TC_validation_capacity* capacity, s
  * locations, fill the workspace fields directly. */
 TC_result TC_validation_workspace_init(const TC_validation_capacity* capacity, TC_buffer arena,
                                        TC_validation_workspace* out);
+#endif
 
 typedef struct {
   const TC_bytes* initial_policies;
@@ -136,6 +138,7 @@ typedef struct {
   const TC_CMS_credential_workspace* workspace;
 } TC_validation_context;
 
+#if TC_ENABLE_CMS_VALIDATION
 /* Bind trust sources, options and workspace for later validation calls. The
  * context borrows all three. Keep them alive and unchanged while the context
  * is in use. out must be disjoint from trust, both sources, options,
@@ -166,6 +169,7 @@ TC_result TC_validation_context_init(const TC_validation_trust* trust,
 TC_credential_status TC_CMS_validate(const TC_CMS_validation_request* request,
                                      const TC_validation_context* context, size_t* work,
                                      uint8_t* revocation_checked);
+#endif
 
 typedef struct {
   TC_X509_certificate certificate;
@@ -176,6 +180,7 @@ typedef struct {
   uint8_t revocation_checked;
 } TC_X509_validation_result;
 
+#if TC_ENABLE_CMS_VALIDATION
 /* Build a trusted path for the DER certificate in encoded and check CRL
  * evidence that every path member is unrevoked at options->at (RFC 5280
  * sections 6.1 and 6.3). options->certificate governs the path and
@@ -200,6 +205,7 @@ typedef struct {
  * check. out changes only on VALID. */
 TC_credential_status TC_X509_validate(TC_bytes encoded, const TC_validation_context* context,
                                       size_t* work, TC_X509_validation_result* out);
+#endif
 
 #ifdef __cplusplus
 }

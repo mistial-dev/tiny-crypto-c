@@ -12,6 +12,7 @@
 
 #include <tiny_crypto/apdu.h>
 #include <tiny_crypto/common.hpp>
+#if TC_ENABLE_APDU
 
 namespace tiny_crypto {
 
@@ -60,4 +61,5 @@ TC_CPP_NODISCARD inline apdu_status_class apdu_status_classify(uint16_t sw) noex
 }
 
 } // namespace tiny_crypto
+#endif
 #endif

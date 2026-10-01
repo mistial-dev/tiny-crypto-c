@@ -38,6 +38,7 @@ extern "C" {
  * Outputs are unchanged on every failure. END and MORE are never returned.
  * The guide lists the X.690 clause behind each rule. */
 
+#if TC_ENABLE_DER
 /* INTEGER as its two's-complement contents (X.690 sections 8.3.2 and 10.1).
  * A needed sign octet stays in the span, so signed data stays byte-exact.
  * *negative is 1 for a negative value, otherwise 0. */
@@ -76,23 +77,28 @@ TC_TLV_result TC_DER_null(TC_bytes encoded);
  * DEFAULT rules (section 11.5). */
 TC_TLV_result TC_DER_sequence(TC_bytes encoded, TC_bytes* contents);
 TC_TLV_result TC_DER_set(TC_bytes encoded, TC_bytes* contents);
+#endif
 
 typedef struct {
   TC_bytes oid;
   /* Complete parameter encoding, or {NULL, 0} when absent. */
   TC_bytes parameters;
 } TC_DER_algorithm;
+#if TC_ENABLE_DER
 /* AlgorithmIdentifier (RFC 5280 section 4.1.1.2): an OID and at most one
  * parameters element, returned with its tag and length. Parameter rules
  * depend on the OID and are checked by the caller. */
 TC_TLV_result TC_DER_algorithm_identifier(TC_bytes encoded, TC_DER_algorithm* out);
+#endif
 typedef struct {
   TC_DER_algorithm algorithm;
   TC_bytes key;
 } TC_DER_public_key;
+#if TC_ENABLE_DER
 /* SubjectPublicKeyInfo (RFC 5280 section 4.1.2.7). key is the BIT STRING
  * payload, which must be nonempty with no unused bits. */
 TC_TLV_result TC_DER_subject_public_key(TC_bytes encoded, TC_DER_public_key* out);
+#endif
 
 typedef struct {
   TC_DER_algorithm algorithm;
@@ -103,6 +109,7 @@ typedef struct {
   TC_bytes public_key;
   unsigned public_key_unused;
 } TC_DER_private_key;
+#if TC_ENABLE_DER
 /* PKCS #8 PrivateKeyInfo or OneAsymmetricKey (RFC 5958 section 2). Version 0
  * must omit publicKey and version 1 must carry it, otherwise the result is
  * INVALID. Later versions return UNSUPPORTED. key is the privateKey OCTET
@@ -110,6 +117,7 @@ typedef struct {
  * material. Callers validate algorithm parameters, key contents,
  * public/private consistency and attribute schemas. */
 TC_TLV_result TC_DER_private_key_info(TC_bytes encoded, TC_DER_private_key* out);
+#endif
 
 typedef struct {
   TC_bytes r, s;
@@ -117,14 +125,17 @@ typedef struct {
 typedef struct {
   TC_bytes modulus, exponent;
 } TC_DER_rsa_public_key;
+#if TC_ENABLE_DER
 /* PKCS #1 RSAPublicKey (RFC 8017 appendix A.1.1) as positive, borrowed
  * magnitudes. Zero or negative components return INVALID. Validate modulus
  * and exponent constraints before cryptographic use. */
 TC_TLV_result TC_DER_rsa_public(TC_bytes encoded, TC_DER_rsa_public_key* out);
+#endif
 typedef struct {
   TC_bytes modulus, public_exponent, private_exponent;
   TC_bytes prime1, prime2, exponent1, exponent2, coefficient;
 } TC_DER_rsa_private_key;
+#if TC_ENABLE_DER
 /* PKCS #1 two-prime RSAPrivateKey (RFC 8017 appendix A.1.2) as eight
  * positive, borrowed magnitudes. Version 1 (multi-prime) returns
  * UNSUPPORTED. Any other version, a zero or negative component or
@@ -135,6 +146,7 @@ TC_TLV_result TC_DER_rsa_private(TC_bytes encoded, TC_DER_rsa_private_key* out);
  * sign octet removed. Zero or negative r or s returns INVALID. The caller
  * checks r and s against the signing key's group order. */
 TC_TLV_result TC_DER_ecdsa_signature(TC_bytes encoded, TC_DER_signature_pair* out);
+#endif
 #ifdef __cplusplus
 }
 #endif

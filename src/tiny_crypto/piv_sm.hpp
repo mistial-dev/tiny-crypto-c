@@ -15,6 +15,7 @@
 #if TC_ENABLE_X509 && TC_ENABLE_PIV_CVC
 #include <tiny_crypto/piv_sm_authenticate.h>
 #endif
+#if TC_ENABLE_PIV_SM
 
 namespace tiny_crypto {
 typedef ::TC_PIV_SM_workspace piv_sm_workspace;
@@ -92,4 +93,5 @@ public:
   }
 };
 } // namespace tiny_crypto
+#endif
 #endif

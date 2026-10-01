@@ -13,6 +13,7 @@
 #include <tiny_crypto/apdu.hpp>
 #include <tiny_crypto/common.hpp>
 #include <tiny_crypto/piv_command.h>
+#if TC_ENABLE_PIV_COMMAND
 
 namespace tiny_crypto {
 
@@ -107,4 +108,5 @@ public:
 };
 
 } // namespace tiny_crypto
+#endif
 #endif

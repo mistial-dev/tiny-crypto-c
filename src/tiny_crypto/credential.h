@@ -53,6 +53,7 @@ typedef struct {
   uint8_t revocation_checked;
 } TC_PIV_CHUID_result;
 
+#if TC_ENABLE_CREDENTIAL
 /* Authenticate a signed CHUID and bind it to the validated card certificate
  * (SP 800-73-5 Part 1 sections 3.1.2 and 3.1.2.1, TWIC Part 2 v5 section 6).
  * - request->profile selects the card profile. PIV takes the PIV or
@@ -85,6 +86,7 @@ typedef struct {
 TC_credential_status TC_PIV_CHUID_validate(const TC_PIV_CHUID_validation_request* request,
                                            const TC_validation_context* context, size_t* work,
                                            TC_PIV_CHUID_result* out);
+#endif
 
 typedef struct {
   /* Complete BC value, after any outer TWIC privacy-key decryption. */
@@ -115,6 +117,7 @@ typedef struct {
   uint8_t revocation_checked;
 } TC_PIV_biometric_result;
 
+#if TC_ENABLE_CREDENTIAL
 /* Authenticate a biometric object's CBEFF header and record and bind the
  * FASC-N and GUID of the accepted CHUID (SP 800-76-2 sections 9.2 and 9.3).
  * An omitted CMS certificate selects the CHUID signer. An embedded
@@ -141,6 +144,7 @@ typedef struct {
 TC_credential_status TC_PIV_biometric_validate(const TC_PIV_biometric_validation_request* request,
                                                const TC_validation_context* context, size_t* work,
                                                TC_PIV_biometric_result* out);
+#endif
 
 /* One card object as hashed for the Security Object (SP 800-73-5 Part 1
  * section 3.1.7). parts supply its bytes in hash order. */
@@ -182,6 +186,7 @@ typedef struct {
   uint8_t revocation_checked;
 } TC_PIV_security_map;
 
+#if TC_ENABLE_CREDENTIAL
 /* Authenticate a Security Object with the accepted CHUID signer and decode
  * its signed LDS digests (SP 800-73-5 Part 1 section 3.1.7). The container
  * map must name exactly the signed data groups. Objects are checked
@@ -223,6 +228,7 @@ TC_credential_status TC_PIV_security_authenticate(
  * algorithm this build disables. */
 TC_credential_status TC_PIV_security_digest_check(const TC_PIV_security_map* map,
                                                   const TC_PIV_security_data* object, size_t* work);
+#endif
 
 typedef struct {
   TC_bytes encoded;
@@ -249,6 +255,7 @@ typedef struct {
   uint8_t revocation_checked;
 } TC_PIV_security_result;
 
+#if TC_ENABLE_CREDENTIAL
 /* Authenticate a Security Object with TC_PIV_security_authenticate, then
  * check the exact inventory against its signed LDS digests with
  * TC_PIV_security_digest_check (SP 800-73-5 Part 1 section 3.1.7). Every
@@ -274,6 +281,7 @@ TC_credential_status TC_PIV_security_validate(const TC_PIV_security_validation_r
                                               const TC_validation_context* context,
                                               const TC_PIV_security_validation_workspace* workspace,
                                               size_t* work, TC_PIV_security_result* out);
+#endif
 
 enum { TC_TWIC_UNSIGNED_CHUID_CONTAINER = 0x3002 };
 
@@ -287,6 +295,7 @@ typedef struct {
   const TC_PIV_security_result* security;
 } TC_TWIC_unsigned_CHUID_validation_request;
 
+#if TC_ENABLE_CREDENTIAL
 /* Check an unsigned TWIC CHUID against an inventory accepted by
  * TC_PIV_security_validate at the same evaluation time. Container 3002 of the
  * inventory must match encoded byte for byte. The CHUID must be current and
@@ -304,7 +313,9 @@ typedef struct {
 TC_credential_status
 TC_TWIC_unsigned_CHUID_validate(const TC_TWIC_unsigned_CHUID_validation_request* request,
                                 const TC_validation_context* context, size_t* work);
+#endif
 
+#if TC_ENABLE_CREDENTIAL
 /* Validate a content signer certificate, such as the secure-messaging
  * Certificate Signer of container 5FC122 (SP 800-73-5 Part 1 section 3.3.7),
  * under the content-signer policy of TC_PIV_CHUID_validate for profile: a
@@ -325,6 +336,7 @@ TC_credential_status TC_PIV_content_signer_validate(TC_bytes certificate,
                                                     TC_PIV_card_profile profile,
                                                     const TC_validation_context* context,
                                                     size_t* work, TC_X509_validation_result* out);
+#endif
 
 #if TC_ENABLE_PIV_CVC
 typedef struct {
@@ -333,6 +345,7 @@ typedef struct {
   TC_PIV_card_profile profile;
 } TC_PIV_CVC_validation_request;
 
+#if TC_ENABLE_CREDENTIAL
 /* Validate the X.509 signer of a PIV secure-messaging CVC chain with
  * TC_PIV_content_signer_validate, then verify the chain with
  * TC_PIV_CVC_chain_verify (SP 800-73-5 Part 1 section 3.3.7, Part 2 section
@@ -355,6 +368,7 @@ typedef struct {
 TC_credential_status TC_PIV_CVC_validate(const TC_PIV_CVC_validation_request* request,
                                          const TC_validation_context* context,
                                          TC_EC_workspace* point, size_t* work, TC_PIV_CVC* out);
+#endif
 #endif
 
 #ifdef __cplusplus

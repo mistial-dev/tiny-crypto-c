@@ -32,6 +32,7 @@ typedef struct {
   size_t signature_work;
 } TC_X509_native_workspace;
 
+#if TC_ENABLE_X509
 /* Return a provider for TC_X509_signature_verify, the message and digest
  * verifiers and path validation. It verifies ECDSA with DER ECDSA-Sig-Value
  * signatures (RFC 5758 section 3.2, FIPS 186-5 section 6.4.2) and RSA PKCS #1
@@ -67,6 +68,7 @@ typedef struct {
  * scratch follows the RSA verification rules. Trust and application policy
  * are separate steps. */
 TC_X509_signature_provider TC_X509_native_provider(const TC_X509_native_workspace* workspace);
+#endif
 
 #ifdef __cplusplus
 }

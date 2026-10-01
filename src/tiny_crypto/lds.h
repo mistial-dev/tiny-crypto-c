@@ -21,6 +21,7 @@ typedef struct {
   unsigned version;
 } TC_LDS_security_object;
 
+#if TC_ENABLE_PIV_OBJECTS
 /* Read the DER LDSSecurityObject from CMS eContent (ICAO Doc 9303 Part 10,
  * SP 800-73-5 Part 1 section 3.1.7). Supports versions 0 and 1 with 2..16
  * distinct data groups numbered 1..16. Digest lengths follow the declared
@@ -97,6 +98,7 @@ TC_TLV_result TC_LDS_hash_find(const TC_LDS_security_object* object, unsigned nu
 TC_TLV_result TC_LDS_hash_check(const TC_LDS_security_object* object, unsigned number,
                                 const TC_bytes* parts, size_t count, const TC_TLV_limits* limits,
                                 TC_TLV_frames frames, size_t* work, int* matched);
+#endif
 
 #ifdef __cplusplus
 }

@@ -88,6 +88,7 @@ typedef struct {
  * X.690 section 10.1 definite minimal lengths. Typed and schema checks
  * belong to der.h and the object readers. */
 
+#if TC_ENABLE_TLV
 /* Read only the tag and length octets at the start of input. */
 TC_TLV_result TC_TLV_header_read(TC_bytes input, TC_TLV_profile profile,
                                  const TC_TLV_limits* limits, TC_TLV_header* out);
@@ -97,6 +98,7 @@ TC_TLV_result TC_TLV_header_read(TC_bytes input, TC_TLV_profile profile,
  * TC_TLV_read_tree, the walk or the stream for indefinite BER. */
 TC_TLV_result TC_TLV_read(TC_bytes input, TC_TLV_profile profile, const TC_TLV_limits* limits,
                           TC_TLV_element* out);
+#endif
 
 /* Sibling cursor over borrowed input. Treat members as read-only and start it
  * with TC_TLV_reader_init or TC_TLV_reader_child. root is set by
@@ -109,6 +111,7 @@ typedef struct {
   TC_TLV_profile profile;
   uint8_t root;
 } TC_TLV_reader;
+#if TC_ENABLE_TLV
 /* Start a root reader over a complete data field or payload. Limits are copied.
  * input is borrowed for the reader's lifetime.
  * Returns ARGUMENT for NULL reader/limits, NULL input data with a length, a
@@ -134,6 +137,7 @@ TC_TLV_result TC_TLV_reader_child(TC_TLV_reader* child, const TC_TLV_reader* par
  * unchanged. Each call reads one level. Use walk to enforce a shared budget
  * across an entire tree. */
 TC_TLV_result TC_TLV_next(TC_TLV_reader* reader, TC_TLV_element* out);
+#endif
 
 typedef enum { TC_TLV_BEGIN, TC_TLV_VALUE, TC_TLV_CLOSE } TC_TLV_event_kind;
 typedef struct {
@@ -177,7 +181,7 @@ typedef struct {
   uint8_t used, primitive, finished;
 } TC_TLV_stream;
 
-#if TC_TLV_ENABLE_STREAM
+#if TC_ENABLE_TLV && TC_TLV_ENABLE_STREAM
 /* Start an incremental decode of a sequence of root objects. Limits are
  * copied. frames is borrowed until the decode ends. ARGUMENT for a NULL
  * stream or NULL frames with a capacity, plus the shared checks. */
@@ -197,6 +201,7 @@ TC_TLV_result TC_TLV_stream_feed(TC_TLV_stream* stream, TC_bytes chunk, TC_TLV_v
  * feed error is returned unchanged. */
 TC_TLV_result TC_TLV_stream_finish(TC_TLV_stream* stream);
 #endif
+#if TC_ENABLE_TLV
 /* Walk checks all constructed boundaries with one shared element/depth budget.
  * Event spans borrow input and stay valid while input is alive and unchanged.
  * A sequence of root objects is accepted. A schema needing exactly one root
@@ -214,6 +219,7 @@ TC_TLV_result TC_TLV_walk(TC_bytes input, TC_TLV_profile profile, const TC_TLV_l
  * disjoint. Root padding after the object is left unread. */
 TC_TLV_result TC_TLV_read_tree(TC_bytes input, TC_TLV_profile profile, const TC_TLV_limits* limits,
                                TC_TLV_frames frames, TC_TLV_element* out);
+#endif
 
 #ifdef __cplusplus
 }

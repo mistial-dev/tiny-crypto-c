@@ -86,6 +86,7 @@ typedef enum {
   TC_APDU_SW_INVALID      /* 60XX and every value outside 6XXX and 9XXX */
 } TC_APDU_status_class;
 
+#if TC_ENABLE_APDU
 /* Encoded size of command in format (ISO/IEC 7816-4 5.2, cases 1 to 4E).
  *
  * TC_APDU_ARGUMENT     NULL command or size, a span with NULL data and a
@@ -123,6 +124,7 @@ TC_APDU_result TC_APDU_response_read(TC_bytes encoded, TC_APDU_response* out);
 
 /* Classify sw by ISO/IEC 7816-4 5.6 Table 6. */
 TC_APDU_status_class TC_APDU_status_classify(uint16_t sw);
+#endif
 
 /* Send one command APDU and receive one complete response APDU (data, SW1,
  * SW2) into response. Write at most response.capacity bytes and set *length
@@ -174,6 +176,7 @@ typedef struct {
   uint8_t format, stopped;
 } TC_APDU_channel;
 
+#if TC_ENABLE_APDU
 /* Start a channel. scratch holds one encoded command fragment and is wiped
  * after every transmit. TC_APDU_SHORT_COMMAND_MAX_BYTES covers every SHORT
  * command, and TC_APDU_EXTENDED_COMMAND_BYTES(nc) an EXTENDED command with nc
@@ -259,6 +262,7 @@ size_t TC_APDU_channel_exchanges_left(const TC_APDU_channel* channel);
 
 /* Wipe the scratch buffer and the channel state. Accepts NULL. */
 void TC_APDU_channel_clear(TC_APDU_channel* channel);
+#endif
 
 #ifdef __cplusplus
 }

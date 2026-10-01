@@ -69,6 +69,7 @@ extern "C" {
  * wipes the whole written region. In-place callers lose the input.
  */
 
+#if TC_ENABLE_AES
 /* KW-AE (SP 800-38F section 6.2 Algorithm 3, RFC 3394 section 2.2.1).
  * key_data is 16 to TC_AES_KW_MAX_KEY_DATA_BYTES bytes, a multiple of 8.
  * wrapped needs TC_AES_KW_WRAPPED_BYTES(key_data.length) bytes of capacity,
@@ -109,6 +110,7 @@ TC_status TC_AES_KWP_wrap(TC_bytes kek, TC_bytes key_data, TC_buffer wrapped);
  * area and leaves *key_data_length unchanged. */
 TC_status TC_AES_KWP_unwrap(TC_bytes kek, TC_bytes wrapped, TC_buffer key_data,
                             size_t* key_data_length);
+#endif
 
 #endif
 

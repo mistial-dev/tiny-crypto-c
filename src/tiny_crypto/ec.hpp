@@ -12,6 +12,7 @@
 
 #include <tiny_crypto/common.hpp>
 #include <tiny_crypto/ec.h>
+#if TC_ENABLE_EC
 
 namespace tiny_crypto {
 typedef ::TC_EC_curve ec_curve;
@@ -77,4 +78,5 @@ ecdsa_sign_digest(ec_curve curve, bytes private_key, bytes public_key, bytes dig
                                 &workspace, &execution);
 }
 } // namespace tiny_crypto
+#endif
 #endif

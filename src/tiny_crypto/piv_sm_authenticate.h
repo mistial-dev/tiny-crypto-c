@@ -32,6 +32,7 @@ typedef union {
 extern "C" {
 #endif
 
+#if TC_ENABLE_PIV_SM
 /* Authenticate the peer CVC under signer with TC_PIV_CVC_chain_verify, then
  * complete key confirmation with TC_PIV_SM_finish (SP 800-73-5 Part 2
  * section 4.1.1, steps H4 onward). signer must already satisfy path, usage,
@@ -56,6 +57,7 @@ TC_credential_status TC_PIV_SM_authenticate_response(TC_PIV_SM* session,
                                                      const TC_PIV_SM_authentication* authentication,
                                                      size_t* work,
                                                      TC_PIV_SM_authentication_workspace* workspace);
+#endif
 
 #ifdef __cplusplus
 }

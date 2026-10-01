@@ -38,6 +38,7 @@ typedef struct {
   TC_key_type type;
 } TC_KEY_rsa_private_key;
 
+#if TC_ENABLE_DER
 /* Read a DER PKCS #8 RSA private key (RFC 5958 section 2) holding a PKCS #1
  * RSAPrivateKey (RFC 8017 appendix A.1.2). The algorithm is rsaEncryption
  * with NULL parameters (RFC 3279 section 2.3.1) or id-RSASSA-PSS with
@@ -74,6 +75,7 @@ TC_TLV_result TC_KEY_rsa_private_read(TC_bytes encoded, TC_KEY_rsa_private_key* 
  * Apply application policy and validate key mathematics before signing. */
 TC_TLV_result TC_KEY_rsa_private_signature_check(const TC_KEY_rsa_private_key* key,
                                                  const TC_signature_algorithm* signature);
+#endif
 #ifdef __cplusplus
 }
 #endif

@@ -69,6 +69,7 @@ typedef struct {
   const TC_X509_signature_provider* signatures;
 } TC_X509_ocsp_verify_request;
 
+#if TC_ENABLE_X509_OCSP
 /* Verify a complete DER OCSPResponse, including one received by stapling
  * (RFC 6960 section 4.2). Response, certificate, store records and issuer
  * remain borrowed and unchanged during the call and while
@@ -116,6 +117,7 @@ typedef struct {
 TC_TLV_result TC_X509_ocsp_response_verify(const TC_X509_ocsp_verify_request* request,
                                            const TC_X509_path_workspace* workspace, size_t* work,
                                            TC_X509_ocsp_result* out);
+#endif
 
 /* One OCSPRequest for a single certificate. issuer names and holds the key
  * of the certificate's issuer. hash selects the CertID hash: SHA-256 is
@@ -129,6 +131,7 @@ typedef struct {
   const TC_TLV_limits* parsing;
 } TC_X509_ocsp_encode_request;
 
+#if TC_ENABLE_X509_OCSP
 /* Encode one unsigned OCSPRequest (RFC 6960 4.1.1) into encoded and write its
  * size to length. The certificate, issuer and nonce stay borrowed and unchanged
  * during the call and must be disjoint from encoded. workspace supplies frames,
@@ -155,6 +158,7 @@ typedef struct {
 TC_TLV_result TC_X509_ocsp_request_encode(const TC_X509_ocsp_encode_request* request,
                                           const TC_X509_path_workspace* workspace, size_t* work,
                                           TC_buffer encoded, size_t* length);
+#endif
 
 #ifdef __cplusplus
 }

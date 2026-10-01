@@ -8,7 +8,9 @@ turned off, with its sub-features, in reverse registry order while config.h
 still accepts the combination. That leaves a minimal set that config.h
 requires. The library is then configured with exactly that set and built with
 warnings as errors. Its archive must define every library symbol it
-references. Value options keep their defaults.
+references and every function the public headers declare under that
+configuration, so any program that calls a declared function links. Value
+options keep their defaults.
 
 Usage: feature_builds.py --cc CC --nm NM --binary-dir DIR [--feature MACRO ...]
 """
@@ -73,7 +75,9 @@ def minimal_selection(compiler, macros, target):
     return values
 
 
-def undefined_library_symbols(nm, archive):
+def library_symbols(nm, archive):
+    """The defined and undefined library symbols of archive, without the
+    object-format underscore."""
     defined, undefined = set(), set()
     listing = subprocess.run([nm, "-g", str(archive)], capture_output=True, text=True,
                              check=True).stdout
@@ -81,8 +85,47 @@ def undefined_library_symbols(nm, archive):
         fields = line.split()
         if len(fields) < 2 or not LIBRARY_SYMBOL.match(fields[-1]):
             continue
-        (undefined if fields[-2] == "U" else defined).add(fields[-1])
-    return sorted(undefined - defined)
+        name = fields[-1][1:] if fields[-1].startswith("_") else fields[-1]
+        (undefined if fields[-2] == "U" else defined).add(name)
+    return defined, undefined
+
+
+def library_definitions(directory):
+    """The -D flags the build compiles the library with. src/tiny_crypto/config.h
+    reads the source tree's build_config.h stub, so probes take these."""
+    flags = next(directory.glob("**/tiny-crypto-c.dir/flags.make")).read_text()
+    match = re.search(r"^C_DEFINES = (.*)$", flags, re.M)
+    return match.group(1).split() if match else []
+
+
+def declared_functions(compiler, directory):
+    """Every TC_ function that the public C headers declare under the build's
+    configuration. Inline definitions end with a body and are not counted."""
+    probe = directory / "declarations.c"
+    probe.write_text("".join("#include <tiny_crypto/%s>\n" % header.name
+                             for header in sorted((ROOT / "src" / "tiny_crypto").glob("*.h"))))
+    preprocessed = subprocess.run(
+        [compiler, "-std=c99", "-E", "-P", *library_definitions(directory), "-I", str(ROOT / "src"),
+         str(probe)], capture_output=True, text=True)
+    if preprocessed.returncode:
+        raise RuntimeError(preprocessed.stderr)
+    # A prototype names the function before its parameter list. A function
+    # pointer type such as TC_status (*read)(...) is skipped.
+    return set(re.findall(r"\b(TC_[A-Za-z0-9_]+)\s*\((?!\s*\*)[^;{}]*\)\s*;",
+                          preprocessed.stdout))
+
+
+def wrappers_compile(compiler, directory):
+    """Compile every public C++ wrapper header under the build's configuration.
+    Returns the compiler output on failure."""
+    probe = directory / "wrappers.cpp"
+    probe.write_text("".join("#include <tiny_crypto/%s>\n" % header.name
+                             for header in sorted((ROOT / "src" / "tiny_crypto").glob("*.hpp"))))
+    compiled = subprocess.run(
+        [compiler, "-std=c++17", "-fsyntax-only", "-Wall", "-Wextra", "-Werror",
+         *library_definitions(directory), "-I", str(ROOT / "src"), str(probe)],
+        capture_output=True, text=True)
+    return compiled.stderr if compiled.returncode else None
 
 
 def build(arguments, target, values, directory):
@@ -104,9 +147,20 @@ def build(arguments, target, values, directory):
     archives = list(directory.glob("**/*tiny-crypto-c.a"))
     if len(archives) != 1:
         return "%s: expected one archive, found %s" % (target, archives)
-    missing = undefined_library_symbols(arguments.nm, archives[0])
+    defined, undefined = library_symbols(arguments.nm, archives[0])
+    missing = sorted(undefined - defined)
     if missing:
         return "%s: archive references undefined %s" % (target, ", ".join(missing))
+    # A program that calls any declared function must link.
+    unlinked = sorted(declared_functions(arguments.cc, directory) - defined)
+    if unlinked:
+        return "%s: headers declare functions the archive lacks: %s" % (target,
+                                                                        ", ".join(unlinked))
+    # The C++ wrappers compile against the same configuration.
+    if arguments.cxx:
+        failure = wrappers_compile(arguments.cxx, directory)
+        if failure:
+            return "%s: C++ wrappers do not compile\n%s" % (target, failure)
     shutil.rmtree(directory)
     return None
 
@@ -115,6 +169,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--cc", required=True)
     parser.add_argument("--nm", required=True)
+    parser.add_argument("--cxx", help="also compile the C++ wrapper headers with this compiler")
     parser.add_argument("--binary-dir", required=True, type=Path)
     parser.add_argument("--feature", action="append", help="limit the run to these macros")
     arguments = parser.parse_args()
@@ -122,15 +177,20 @@ def main():
     features = feature_registry.features()
     macros = switch_macros()
     targets = arguments.feature or [macro for macro in macros if not features[macro].get("parent")]
+    # The minimal core: every switch off.
+    core = "core" if not arguments.feature or "core" in arguments.feature else None
+    targets = [target for target in targets if target != "core"]
     with ThreadPoolExecutor(max_workers=4) as pool:
         selections = list(pool.map(lambda target: minimal_selection(arguments.cc, macros, target),
                                    targets))
     jobs = [(target, values, arguments.binary_dir / target)
             for target, values in zip(targets, selections)]
+    if core:
+        jobs.append(("core", {macro: 0 for macro in macros}, arguments.binary_dir / "core"))
     with ThreadPoolExecutor(max_workers=2) as pool:
         failures = [failure for failure in
                     pool.map(lambda job: build(arguments, *job), jobs) if failure]
-    for target, values in zip(targets, selections):
+    for target, values in [job[:2] for job in jobs]:
         enabled = [macro for macro, value in values.items() if value]
         print("%s: %s" % (target, " ".join(enabled)))
     for failure in failures:

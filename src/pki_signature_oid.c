@@ -1,5 +1,7 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
+#include <tiny_crypto/common.h>
+#if TC_ENABLE_X509
 #include "pki_signature_oid_internal.h"
 #include <stddef.h>
 
@@ -67,3 +69,4 @@ tc_pki_signature_oid_info tc_pki_signature_oid_classify(TC_bytes oid)
   }
   return unknown;
 }
+#endif

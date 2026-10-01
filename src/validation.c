@@ -2,6 +2,8 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include <tiny_crypto/validation.h>
 #include <string.h>
+
+#if TC_ENABLE_CMS_VALIDATION
 #include "cms_internal.h"
 #include "credential_status_internal.h"
 #include "internal.h"
@@ -10,8 +12,6 @@
 #include "pki_source_internal.h"
 #include "x509_path_workspace_internal.h"
 #include "x509_revocation_internal.h"
-
-#if TC_ENABLE_CMS_VALIDATION
 
 typedef struct {
   char byte;

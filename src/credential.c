@@ -7,18 +7,18 @@
  * the outcome to TC_credential_status. The Security Object validators are in
  * credential_security.c, the content signer and CVC validators in
  * credential_signer.c. */
-#include "internal.h"
-#include "pki_budget_internal.h"
-#include "credential_session_internal.h"
-#include "credential_status_internal.h"
-#include "credential_policy_internal.h"
-#include "x509_time_internal.h"
 #include <string.h>
 #include <tiny_crypto/credential.h>
 #include <tiny_crypto/piv_biometric.h>
 #include <tiny_crypto/piv_cms.h>
 
 #if TC_ENABLE_CREDENTIAL
+#include "internal.h"
+#include "pki_budget_internal.h"
+#include "credential_session_internal.h"
+#include "credential_status_internal.h"
+#include "credential_policy_internal.h"
+#include "x509_time_internal.h"
 
 /* SP 800-76-2 section 9.3: a biometric signed with the CHUID key omits the
  * certificate, so an embedded certificate must carry a different key. Returns

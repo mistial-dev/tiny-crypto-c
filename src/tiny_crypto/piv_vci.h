@@ -25,6 +25,7 @@ extern "C" {
  * 22 in the TWIC 53 form. */
 #define TC_PIV_DISCOVERY_RESPONSE_BYTES TC_PIV_RESPONSE_BYTES(22u)
 
+#if TC_ENABLE_PIV_VCI
 /* Read the Discovery Object with GET DATA 7E on the selected application
  * and check it with TC_PIV_discovery_read under profile. A secured link
  * reads it under secure messaging, and out->secured records that. The VCI
@@ -50,11 +51,13 @@ extern "C" {
  * after the argument checks wipes response. */
 TC_PIV_result TC_PIV_discovery_get(TC_PIV_link* link, TC_PIV_discovery_profile profile,
                                    TC_buffer response, TC_PIV_discovery* out);
+#endif
 
 /* How the VCI was established. PAIRED sent the pairing code. WITHOUT_PAIRING
  * needed no command, since policy bit 3 is set (Part 1 section 5.5). */
 typedef enum { TC_PIV_VCI_PAIRED, TC_PIV_VCI_WITHOUT_PAIRING } TC_PIV_vci_mode;
 
+#if TC_ENABLE_PIV_VCI
 /* Establish the VCI on a secured PIV link (Part 1 section 5.5 and Table 2
  * footnote 9): secure messaging, a Discovery Object with policy bit 4, and
  * either policy bit 3 or a pairing status of TRUE. discovery must come from
@@ -93,6 +96,7 @@ typedef enum { TC_PIV_VCI_PAIRED, TC_PIV_VCI_WITHOUT_PAIRING } TC_PIV_vci_mode;
  * *out changes only on TC_PIV_OK. */
 TC_PIV_result TC_PIV_vci_establish(TC_PIV_link* link, const TC_PIV_discovery* discovery,
                                    TC_bytes pairing_code, TC_PIV_vci_mode* out);
+#endif
 
 #ifdef __cplusplus
 }

@@ -12,6 +12,7 @@
 
 #include <tiny_crypto/common.hpp>
 #include <tiny_crypto/tlv.h>
+#if TC_ENABLE_TLV
 
 namespace tiny_crypto {
 /* This wrapper owns the cursor. The caller owns the bytes it reads. Explicit init
@@ -66,4 +67,5 @@ private:
   bool ready_;
 };
 } // namespace tiny_crypto
+#endif
 #endif

@@ -14,6 +14,7 @@
 #include <tiny_crypto/piv_command.hpp>
 #include <tiny_crypto/piv_sm.hpp>
 #include <tiny_crypto/piv_sm_apdu.h>
+#if TC_ENABLE_PIV_SM_APDU
 
 namespace tiny_crypto {
 
@@ -45,4 +46,5 @@ inline void piv_link_unsecure(piv_link& link) noexcept
 }
 
 } // namespace tiny_crypto
+#endif
 #endif

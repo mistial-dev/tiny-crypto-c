@@ -5,6 +5,7 @@
  * single blocks and CBC over dynamic-length keys. CBC, CTR and OFB run on the
  * shared cores in block_modes.c. */
 #include <tiny_crypto/aes.h>
+#if TC_ENABLE_AES
 #include "aes_internal.h"
 
 /* Every fixed-key entry validates once: tc_block_mode_args on the buffer,
@@ -173,4 +174,5 @@ TC_status TC_AES_dynamic_CBC_decrypt(const TC_AES_dynamic_key* ctx, uint8_t iv[1
   const tc_block_cipher cipher = tc_aes_block_cipher_inverse(&key);
   return tc_block_cbc_decrypt(&cipher, iv, buffer, length);
 }
+#endif
 #endif

@@ -72,9 +72,13 @@ if(TINY_CRYPTO_BUILD_TESTS)
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_feature_registry.py)
     if(CMAKE_NM AND NOT MSVC)
       # Each top-level feature alone, with the dependencies config.h requires.
+      set(tc_feature_build_cxx)
+      if(CMAKE_CXX_COMPILER)
+        set(tc_feature_build_cxx --cxx ${CMAKE_CXX_COMPILER})
+      endif()
       add_test(NAME test_single_features
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/feature_builds.py
-          --cc ${CMAKE_C_COMPILER} --nm ${CMAKE_NM}
+          --cc ${CMAKE_C_COMPILER} --nm ${CMAKE_NM} ${tc_feature_build_cxx}
           --binary-dir ${CMAKE_CURRENT_BINARY_DIR}/single-features)
       set_tests_properties(test_single_features PROPERTIES LABELS extended)
     endif()
@@ -490,6 +494,12 @@ if(TINY_CRYPTO_BUILD_TESTS)
     tests/aes/kw_test.c)
   tc_add_c_test(test_idf_bootloader_hash tiny-crypto-c-test
     tests/esp_idf/bootloader_hash.c ports/esp-idf/bootloader_hash.c)
+  # The vendored ESP-IDF source tests sdkconfig macros it may leave undefined.
+  if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    set_source_files_properties(
+      ports/esp-idf/vendor/bootloader_support/src/secure_boot_v2/secure_boot_signatures_app.c
+      PROPERTIES COMPILE_OPTIONS -Wno-undef)
+  endif()
   foreach(scheme rsa ecdsa)
     foreach(mode efuse single)
       set(policy_target test_idf_signature_policy_${scheme}_${mode})
@@ -816,6 +826,8 @@ if(TINY_CRYPTO_BUILD_TESTS)
   # The workflow applies the key policy of the key proofs.
   add_library(test_credential_workflow_entry OBJECT examples/credential_workflow.c)
   target_link_libraries(test_credential_workflow_entry PRIVATE tiny-crypto-c-test-pki-native)
+  # The workflow checks the TWIC canceled card list, which tiny-crypto-c-test-ccl links.
+  target_compile_definitions(test_credential_workflow_entry PRIVATE TC_ENABLE_TWIC_CCL=1)
   tc_warnings(test_credential_workflow_entry)
   tc_use_test_sanitizers(test_credential_workflow_entry)
   tc_add_test_library(tiny-crypto-c-test-ccl src/twic_ccl.c src/snapshot.c src/credential_text_internal.c)
@@ -1827,7 +1839,11 @@ if(TINY_CRYPTO_BUILD_TESTS)
   foreach(language c cpp)
     add_library(test_${language}_const_descriptors OBJECT tests/headers/const_descriptors.${language})
     target_include_directories(test_${language}_const_descriptors PRIVATE src)
-    target_compile_definitions(test_${language}_const_descriptors PRIVATE ${tc_cpp_header_definitions})
+    # The probe calls the path, revocation, trust-anchor, CMS validation,
+    # credential and OCSP entries, so their features are on.
+    target_compile_definitions(test_${language}_const_descriptors PRIVATE ${tc_cpp_header_definitions}
+      TC_ENABLE_X509_PATH=1 TC_ENABLE_X509_REVOCATION=1 TC_ENABLE_TRUST_ANCHOR_FORMAT=1
+      TC_ENABLE_CMS_VALIDATION=1 TC_ENABLE_CREDENTIAL=1 TC_ENABLE_X509_OCSP=1)
     tc_warnings(test_${language}_const_descriptors)
     if(language STREQUAL "c")
       set(compiler_id ${CMAKE_C_COMPILER_ID})

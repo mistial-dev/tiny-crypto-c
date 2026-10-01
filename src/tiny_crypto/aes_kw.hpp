@@ -12,6 +12,7 @@
 
 #include <tiny_crypto/common.hpp>
 #include <tiny_crypto/aes_kw.h>
+#if TC_ENABLE_AES && TC_AES_ENABLE_KW
 
 namespace tiny_crypto {
 
@@ -40,4 +41,5 @@ TC_CPP_NODISCARD inline TC_status aes_kwp_unwrap(bytes kek, bytes wrapped, buffe
 
 } // namespace tiny_crypto
 
+#endif
 #endif

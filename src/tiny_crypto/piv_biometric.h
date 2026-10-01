@@ -24,6 +24,7 @@ typedef struct {
   uint8_t view_count;
 } TC_PIV_fingerprint_record;
 
+#if TC_ENABLE_PIV_OBJECTS
 /* Validate an INCITS 378-2004 minutiae record against the PIV card profile
  * (SP 800-76-2 section 4.4). Checks the FMR header, the record length, a
  * nonzero product and CBEFF-registered capture equipment, 197 pixels/cm
@@ -34,6 +35,7 @@ typedef struct {
  * overlap. INVALID for any structural or profile failure. out changes only on
  * OK. Matching belongs to the application. */
 TC_TLV_result TC_PIV_fingerprint_read(TC_bytes input, TC_PIV_fingerprint_record* out);
+#endif
 
 typedef enum { TC_PIV_FACE_PROFILE_PIV, TC_PIV_FACE_PROFILE_TWIC } TC_PIV_face_profile;
 
@@ -56,6 +58,7 @@ typedef struct {
   uint8_t source_type;
 } TC_PIV_face_image;
 
+#if TC_ENABLE_PIV_OBJECTS
 /* Validate the framing and every image block of an INCITS 385-2004 facial
  * record (SP 800-76-2 section 7.2). TC_PIV_FACE_PROFILE_PIV requires Full
  * Frontal images at least 421 pixels wide. TC_PIV_FACE_PROFILE_TWIC accepts
@@ -78,6 +81,7 @@ TC_TLV_result TC_PIV_face_read(TC_bytes input, TC_PIV_face_profile profile,
  * record bytes changed after TC_PIV_face_read. out changes only on OK. */
 TC_TLV_result TC_PIV_face_image_read(const TC_PIV_face_record* record, size_t index,
                                      TC_PIV_face_image* out);
+#endif
 
 #ifdef __cplusplus
 }

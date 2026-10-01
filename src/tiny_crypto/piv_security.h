@@ -20,6 +20,7 @@ typedef struct {
   uint16_t groups;
 } TC_PIV_security_object;
 
+#if TC_ENABLE_PIV_OBJECTS
 /* Read the BA, BB and FE fields of a PIV or TWIC Security Object
  * (SP 800-73-5 Part 1 section 3.1.7). CONTAINER includes the outer 53 TLV.
  * CONTENTS starts at BA. The mapping holds 1 to TC_LDS_MAX_GROUPS three-byte
@@ -45,6 +46,7 @@ TC_TLV_result TC_PIV_security_read(TC_bytes encoded, TC_PIV_security_encoding en
  * checking hashes. */
 TC_TLV_result TC_PIV_security_group_find(const TC_PIV_security_object* object, uint16_t container,
                                          unsigned* number);
+#endif
 
 #ifdef __cplusplus
 }

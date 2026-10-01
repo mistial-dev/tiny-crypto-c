@@ -40,6 +40,7 @@ typedef struct {
   TC_TLV_frames frames;
 } TC_EAC_CVC_workspace;
 
+#if TC_ENABLE_EAC_CVC
 /* Parse and bounds-check one complete TR-03110 certificate (tag 7F21) as
  * encoded (BSI TR-03110 Part 3 appendix C.1). Checks the profile identifier,
  * certification authority and holder references, the public key, the
@@ -75,10 +76,12 @@ TC_TLV_result TC_EAC_CVC_public_key_read(TC_bytes encoded, const TC_TLV_limits* 
 TC_TLV_result TC_EAC_CVC_check_encoding(const TC_EAC_CVC* certificate,
                                         const TC_EAC_CVC_public_key* issuer,
                                         const TC_EAC_CVC_public_key* inherited);
+#endif
 
 typedef struct {
   TC_bytes oid, fields;
 } TC_EAC_CVC_extension;
+#if TC_ENABLE_EAC_CVC
 /* Start reading the extension templates (BSI TR-03110 Part 3 appendix C.3)
  * of certificate.extensions, or pass
  * {NULL, 0} when absent to get an empty reader. The iterator counts
@@ -97,6 +100,7 @@ TC_TLV_result TC_EAC_CVC_extensions_init(TC_TLV_reader* reader, TC_bytes encoded
  * INVALID for a wrong tag, a malformed OID, no fields or a field outside the
  * context-specific class. The reader and out change only on OK. */
 TC_TLV_result TC_EAC_CVC_extension_next(TC_TLV_reader* reader, TC_EAC_CVC_extension* out);
+#endif
 #ifdef __cplusplus
 }
 #endif

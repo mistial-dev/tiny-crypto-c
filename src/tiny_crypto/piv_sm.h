@@ -117,6 +117,7 @@ extern "C" {
  * for that result. These functions take no work budget. Their EC steps run
  * under the exact TC_EC_operation_work cost of one operation. */
 
+#if TC_ENABLE_PIV_SM
 /* Wipe session keys and counters and return to IDLE (SP 800-73-5 Part 2
  * section 4.3). Accepts NULL. */
 void TC_PIV_SM_clear(TC_PIV_SM* session);
@@ -188,6 +189,7 @@ TC_status TC_PIV_SM_protect(TC_PIV_SM* session, const TC_PIV_SM_protect_request*
 TC_status TC_PIV_SM_unprotect(TC_PIV_SM* session, const TC_PIV_SM_unprotect_request* request,
                               uint8_t* plaintext, size_t capacity, size_t* plaintext_length,
                               TC_PIV_SM_workspace* workspace);
+#endif
 
 #ifdef __cplusplus
 }

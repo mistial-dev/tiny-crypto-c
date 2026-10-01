@@ -12,6 +12,7 @@
 
 #include <tiny_crypto/aes.h>
 #include <tiny_crypto/common.hpp>
+#if TC_ENABLE_AES
 
 namespace tiny_crypto {
 
@@ -457,4 +458,5 @@ TC_CPP_NODISCARD inline TC_status siv_decrypt(bytes key, const bytes* ad, size_t
 
 } /* namespace tiny_crypto */
 
+#endif
 #endif /* TINY_CRYPTO_AES_HPP_ */

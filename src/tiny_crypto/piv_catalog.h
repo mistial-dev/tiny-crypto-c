@@ -104,6 +104,7 @@ typedef struct {
  * The tables are constant. The returned pointers stay valid for the life of
  * the program. */
 
+#if TC_ENABLE_PIV_CATALOG
 /* Entries in the catalog, or 0 when the pair has none. */
 size_t TC_PIV_catalog_count(TC_PIV_application_id application, TC_PIV_card_profile profile);
 
@@ -116,6 +117,7 @@ const TC_PIV_object_info* TC_PIV_catalog_at(TC_PIV_application_id application,
  * found. */
 const TC_PIV_object_info* TC_PIV_catalog_find(TC_PIV_application_id application,
                                               TC_PIV_card_profile profile, TC_bytes tag);
+#endif
 
 /* Result of reading one catalog object.
  * PRESENT     the card returned the object, with a nonempty value.
@@ -193,6 +195,7 @@ typedef struct {
  * card may store more. SD 33 card 2 needs about 26 KiB. */
 #define TC_PIV_INVENTORY_POOL_BYTES 77620ul
 
+#if TC_ENABLE_PIV_CATALOG
 /* Read the catalog of the application selected on link, in catalog order,
  * with TC_PIV_get_data. Each object's rule for the link interface is checked
  * against the link state first: PIN needs pin_verified, VCI needs vci, and
@@ -256,6 +259,7 @@ const TC_PIV_object* TC_PIV_inventory_find(const TC_PIV_inventory* inventory, ui
  * be read again. The pool holds PIN-gated data and possibly the pairing code
  * or the TWIC Privacy Key, so call this on every exit path. Accepts NULL. */
 void TC_PIV_inventory_clear(TC_PIV_inventory* inventory);
+#endif
 
 #ifdef __cplusplus
 }

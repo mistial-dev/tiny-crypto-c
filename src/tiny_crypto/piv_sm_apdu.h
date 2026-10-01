@@ -37,6 +37,7 @@ extern "C" {
 #define TC_PIV_SM_KEY_RESPONSE_BYTES                                                               \
   (4u + 4u + 1u + 24u + 16u + TC_PIV_SM_CARD_CVC_MAX_BYTES + TC_APDU_STATUS_BYTES)
 
+#if TC_ENABLE_PIV_SM_APDU
 /* Start key establishment on the selected PIV application and bind session
  * to the link (Part 2 4.1.1 steps H1 to H3, 4.1.8). The call runs
  * TC_PIV_SM_begin, sends GENERAL AUTHENTICATE CLA 00 INS 87 P1 suite P2 04
@@ -130,6 +131,7 @@ TC_PIV_result TC_PIV_link_secure(TC_PIV_link* link, TC_PIV_SM_workspace* workspa
  * secured, sm_lost and VCI state, so the next commands travel in plaintext.
  * Accepts NULL and an unsecured link. */
 void TC_PIV_link_unsecure(TC_PIV_link* link);
+#endif
 
 #ifdef __cplusplus
 }

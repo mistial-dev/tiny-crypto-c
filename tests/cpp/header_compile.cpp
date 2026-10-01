@@ -256,6 +256,7 @@ int tiny_crypto_cpp_header_compile(uint8_t* data, size_t length)
       TC_X509_PATH_WORKSPACE_INIT(frames, oids, left, right, matched, nodes, edges, expected,
                                   mappings, policies, certificates, summaries);
   (void)workspace;
+#if TC_ENABLE_X509_PATH
   static TC_X509_path_storage path_arena[256];
   const TC_X509_path_capacity path_capacity = {4, 4, 8, 2, 4, 4, 4, 4, 4, 4};
   const TC_buffer path_buffer = {reinterpret_cast<uint8_t*>(path_arena), sizeof path_arena};
@@ -265,6 +266,7 @@ int tiny_crypto_cpp_header_compile(uint8_t* data, size_t length)
       path_bytes > sizeof path_arena ||
       TC_X509_path_workspace_init(&path_capacity, path_buffer, &arena_workspace) != TC_RESULT_OK)
     ++failures;
+#endif
 #endif
 #if TC_ENABLE_TLV
   tiny_crypto::TLVReader reader;

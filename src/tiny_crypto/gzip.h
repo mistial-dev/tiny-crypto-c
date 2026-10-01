@@ -37,6 +37,7 @@ typedef enum {
   TC_GZIP_UNSUPPORTED
 } TC_GZIP_result;
 
+#if TC_ENABLE_GZIP
 /* Decode one or more complete GZIP members (RFC 1952 section 2.3) holding
  * DEFLATE data (RFC 1951 section 3.2), and check each member's CRC32 and
  * ISIZE. FHCRC, when present, is checked too.
@@ -73,6 +74,7 @@ typedef enum {
  * leaves output_length unchanged. */
 TC_GZIP_result TC_GZIP_decode(TC_bytes input, TC_GZIP_workspace* workspace, size_t* work,
                               TC_buffer output, size_t* output_length);
+#endif
 #ifdef __cplusplus
 }
 #endif

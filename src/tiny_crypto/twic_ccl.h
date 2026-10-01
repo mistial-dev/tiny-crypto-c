@@ -37,6 +37,7 @@ typedef struct {
   uint8_t month, day;
 } TC_TWIC_CCL_record;
 
+#if TC_ENABLE_TWIC_CCL
 /* Read one CSV record without its line ending: 50 hexadecimal FASC-N digits,
  * a comma and the date the card was listed as DDMmmYYYY, for example
  * 29Feb2024 (TWIC Part 3 section 4.4.3). line is borrowed for the call and
@@ -45,6 +46,7 @@ typedef struct {
  * length. INVALID for another length, a missing comma, a bad digit or an
  * invalid date. out changes only on OK. */
 TC_TWIC_CCL_result TC_TWIC_CCL_read(TC_bytes line, TC_TWIC_CCL_record* out);
+#endif
 
 /* The record is valid during the call. Copy it into staging storage as needed.
  * Return TC_OK after accepting it. Any other value aborts the import. */
@@ -60,6 +62,7 @@ typedef struct {
   uint8_t finished;
 } TC_TWIC_CCL_stream;
 
+#if TC_ENABLE_TWIC_CCL
 /* Initialize stream for an import of at most max_bytes bytes and max_records
  * records. Limits are inclusive, and zero permits none. visit receives each
  * record. The callback must avoid reentering or modifying the stream. Its
@@ -99,6 +102,7 @@ TC_TWIC_CCL_result TC_TWIC_CCL_stream_finish(TC_TWIC_CCL_stream* stream);
  * separately. */
 TC_TWIC_CCL_result TC_TWIC_CCL_contains(TC_bytes csv, TC_bytes fascn, size_t max_records,
                                         int* listed);
+#endif
 
 /* Keys are sorted by unsigned byte order. A successful read returns exactly
  * 25 bytes, borrowed until the next read. The callback may reuse a read buffer.
@@ -115,6 +119,7 @@ typedef struct {
   TC_TWIC_CCL_source source;
 } TC_TWIC_CCL_index;
 
+#if TC_ENABLE_TWIC_CCL
 /* Validate every key of source and their ascending order with one read per
  * key. Duplicate keys are accepted. The index copies the source descriptor,
  * so its context, count and key bytes stay stable throughout index use.
@@ -147,6 +152,7 @@ TC_TWIC_CCL_result TC_TWIC_CCL_index_from_memory(const TC_bytes* image, size_t m
  * a key without 25 bytes. listed changes only on OK. */
 TC_TWIC_CCL_result TC_TWIC_CCL_index_contains(const TC_TWIC_CCL_index* index, TC_bytes fascn,
                                               size_t max_reads, int* listed);
+#endif
 
 /* Unix seconds from trusted provisioning metadata and the local clock.
  * published_at describes the list. received_at records completed retrieval. */
@@ -159,6 +165,7 @@ typedef struct {
   uint64_t minimum_publication;
 } TC_TWIC_CCL_freshness_policy;
 
+#if TC_ENABLE_TWIC_CCL
 /* Check trusted list metadata against the freshness policy (TWIC Part 3
  * section 4.4.4). Age is measured from publication and includes max_age.
  * Zero permits only publication at now. Metadata authenticity is supplied by
@@ -168,6 +175,7 @@ typedef struct {
  * than minimum_publication or max_age. */
 TC_TWIC_CCL_result TC_TWIC_CCL_check_freshness(const TC_TWIC_CCL_metadata* metadata,
                                                const TC_TWIC_CCL_freshness_policy* policy);
+#endif
 
 /* Zero-initialize stores and slots. These fields are managed by the API.
  * state follows the TC_snapshot_state lifecycle in snapshot.h. */
@@ -182,6 +190,7 @@ typedef struct {
   size_t revision;
 } TC_TWIC_CCL_store;
 
+#if TC_ENABLE_TWIC_CCL
 /* Snapshot store. Serialize store and snapshot operations with the
  * application's lock and keep store, slots, inputs and outputs disjoint. Keep
  * backing keys and context stable until their slot becomes FREE. A prepared
@@ -230,6 +239,7 @@ TC_TWIC_CCL_result TC_TWIC_CCL_store_release(TC_TWIC_CCL_snapshot* slot);
  * only on OK. */
 TC_TWIC_CCL_result TC_TWIC_CCL_snapshot_contains(const TC_TWIC_CCL_snapshot* slot, TC_bytes fascn,
                                                  size_t max_reads, int* listed);
+#endif
 
 #ifdef __cplusplus
 }

@@ -22,6 +22,7 @@ typedef struct {
   const TC_X509_workspace* workspace;
 } TC_X509_trust_anchor_reader;
 
+#if TC_ENABLE_TRUST_ANCHOR_FORMAT
 /* Bind a DER TrustAnchorList, a SEQUENCE of one or more TrustAnchorChoice
  * values (RFC 5914 section 4), to reader. init walks the complete list under
  * limits, so every anchor fits them, and limits also apply to each anchor
@@ -51,6 +52,7 @@ TC_TLV_result TC_X509_trust_anchor_list_init(TC_X509_trust_anchor_reader* reader
  * scratch may change on failure. */
 TC_TLV_result TC_X509_trust_anchor_next(TC_X509_trust_anchor_reader* reader,
                                         TC_X509_store_anchor* out);
+#endif
 
 #ifdef __cplusplus
 }

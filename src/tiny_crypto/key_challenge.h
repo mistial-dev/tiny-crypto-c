@@ -58,6 +58,7 @@ typedef struct {
   uint32_t state;
 } TC_key_challenge_workspace;
 
+#if TC_ENABLE_KEY_CHALLENGE
 /* Start a challenge: draw a fresh random digest from random and prepare the
  * input for the card's private-key operation. For RSA, *out is the encoded
  * message of the modulus length: EMSA-PKCS1-v1_5 (RFC 8017 section 9.2) or
@@ -122,6 +123,7 @@ TC_key_challenge_result TC_key_challenge_verify(const TC_X509_public_key* key, T
 /* Abandon an active challenge and wipe the whole workspace. Accepts NULL.
  * Charges no work. */
 void TC_key_challenge_clear(TC_key_challenge_workspace* workspace);
+#endif
 
 #ifdef __cplusplus
 }

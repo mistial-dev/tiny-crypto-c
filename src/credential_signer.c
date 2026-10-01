@@ -4,13 +4,13 @@
  * Content signer validation and the secure-messaging CVC chain built on it.
  * The signer certificate gets the content-signing policy of the card
  * profile, then TC_X509_validate checks its path and revocation. */
+#include <tiny_crypto/credential.h>
+
+#if TC_ENABLE_CREDENTIAL
 #include "internal.h"
 #include "credential_session_internal.h"
 #include "credential_status_internal.h"
 #include "credential_policy_internal.h"
-#include <tiny_crypto/credential.h>
-
-#if TC_ENABLE_CREDENTIAL
 
 /* Apply the content-signer policy of the session profile to certificate and
  * validate it under options, a copy of the context options that receives

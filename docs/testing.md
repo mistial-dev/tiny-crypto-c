@@ -333,9 +333,12 @@ every switch `OFF`, builds it with warnings as errors and requires an archive
 that holds only `common.c`. The extended `test_single_features` builds each
 top-level feature with the smallest set of other features that `config.h`
 accepts, found by switching features off in reverse registry order. Each
-archive must build without warnings and define every library symbol it
-references. `test_heap_free_all_features` builds every switch `ON`, with value
-options at their defaults, and checks the archive for allocator calls. It then
+archive must build without warnings, define every library symbol it
+references and define every function the public headers declare under its
+configuration, and every C++ wrapper header must compile against it. The same
+checks run with every switch `OFF`. `test_heap_free_all_features` builds every
+switch `ON`, with value options at their defaults, and checks the archive for
+allocator calls. It then
 builds each other value of each value option with only that option's parent
 feature family on, under the desktop profile, and applies the same check.
 
@@ -1234,7 +1237,7 @@ measured part differs.
 | Profile         | Part       | Flash | Static RAM | Stack | Contents                                                |
 | --------------- | ---------- | ----- | ---------- | ----- | ------------------------------------------------------- |
 | `apdu_piv_read` | ATmega2560 | 13500 | 3400       | 560   | plain SELECT, GET DATA of the CHUID and VERIFY query    |
-| `piv_sm_cs2`    | ATmega2560 | 36500 | 4700       | 750   | CS2 key establishment and a protected GET DATA of CHUID |
+| `piv_sm_cs2`    | ATmega2560 | 36700 | 4700       | 750   | CS2 key establishment and a protected GET DATA of CHUID |
 
 The card profiles hold the link, the scratch buffers, the secure messaging
 session and workspace and a response buffer for a CHUID at its SP 800-73-5

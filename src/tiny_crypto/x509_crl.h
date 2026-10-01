@@ -79,6 +79,7 @@ typedef struct {
   size_t other_count;
 } TC_X509_crl_index;
 
+#if TC_ENABLE_X509_REVOCATION
 /* Read a DER CertificateList and check every revoked entry (RFC 5280
  * sections 5.1 and 5.3). Spans borrow the unchanged input. revoked and
  * extensions keep their SEQUENCE wrappers. Read CRL extensions with
@@ -138,6 +139,7 @@ TC_TLV_result TC_X509_crl_index_init(const TC_bytes* encoded, size_t count,
                                      const TC_X509_workspace* workspace, size_t* work,
                                      TC_X509_crl_record* records, size_t capacity,
                                      TC_X509_crl_index* out);
+#endif
 
 #ifdef __cplusplus
 }

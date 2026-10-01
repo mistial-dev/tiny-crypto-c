@@ -40,6 +40,7 @@ typedef struct {
                          messaging (piv_vci.h), 0 from TC_PIV_discovery_read */
 } TC_PIV_discovery;
 
+#if TC_ENABLE_PIV_OBJECTS
 /* Read a complete Discovery Object, 7E 12 {4F 0B AID} {5F2F 02 policy
  * preference}, as GET DATA returns it with its own tag (Part 1 Table 19).
  * The encoding must be exactly these 20 bytes.
@@ -67,6 +68,7 @@ TC_TLV_result TC_PIV_discovery_read(TC_bytes encoded, TC_PIV_discovery_profile p
  * 00 for the Global PIN when policy bit 6 is set and the preference byte is
  * 20, otherwise 80 for the PIV PIN. A NULL discovery returns 80. */
 uint8_t TC_PIV_discovery_pin_reference(const TC_PIV_discovery* discovery);
+#endif
 
 #ifdef __cplusplus
 }

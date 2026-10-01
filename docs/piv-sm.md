@@ -467,7 +467,7 @@ avr-gcc 7.3.0 at `-Os`
 
 | Resource   | Budget      | Contents                                                       |
 | ---------- | ----------- | -------------------------------------------------------------- |
-| Flash      | 36500 bytes | EC P-256, AES, CMAC, SSKDF, the CVC reader and the PIV link    |
+| Flash      | 36700 bytes | EC P-256, AES, CMAC, SSKDF, the CVC reader and the PIV link    |
 | Static RAM | 4700 bytes  | link, session, 1090-byte workspace, scratch and CHUID response |
 | Stack      | 750 bytes   | key establishment through ECDH                                 |
 

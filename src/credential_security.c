@@ -4,14 +4,14 @@
  * PIV and TWIC Security Object validation (SP 800-73-5 Part 1 section
  * 3.1.7): signature authentication into a container map, per-container
  * digest checks and the complete-inventory validator built on both. */
+#include <tiny_crypto/credential.h>
+
+#if TC_ENABLE_CREDENTIAL
 #include "internal.h"
 #include "credential_session_internal.h"
 #include "credential_policy_internal.h"
 #include "credential_status_internal.h"
 #include "pki_budget_internal.h"
-#include <tiny_crypto/credential.h>
-
-#if TC_ENABLE_CREDENTIAL
 
 /* The LDS hash sequence nests two levels: SEQUENCE OF DataGroupHash. */
 enum { SECURITY_DIGEST_FRAMES = 4 };

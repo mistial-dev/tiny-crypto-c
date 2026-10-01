@@ -43,6 +43,12 @@ hash core, `block_modes.c`, `mac_core.c` and the PKI storage planner, compile
 while at least one feature that uses them is on. Applications that need a small
 image start from the all-off build and enable features one at a time.
 
+A public header declares a function only in configurations that compile it.
+Calling a function of a disabled feature fails at compile time with an
+undeclared function, before any link step. A source of a disabled feature
+compiles to nothing, so a build may compile every `src/*.c` file and still
+link only the enabled code.
+
 ## Result model
 
 Each module returns a named result type. Compare against the exact success

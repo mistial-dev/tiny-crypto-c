@@ -34,6 +34,7 @@ typedef struct {
  * 16-18 and 21-40. Their footnotes allow larger certificates. */
 #define TC_PIV_CERTIFICATE_RECOMMENDED_BYTES 1856
 
+#if TC_ENABLE_PIV_OBJECTS
 /* Read a complete tag-53 certificate container. Requires X.509 support.
  * Field order follows SP 800-73-5 Part 1:
  * - SLOT: 70, 71, optional MSCUID (72, 1..38 bytes), empty FE. SP 800-73-4
@@ -56,8 +57,9 @@ typedef struct {
  * changes only on OK. */
 TC_TLV_result TC_PIV_certificate_read(TC_bytes input, TC_PIV_certificate_profile profile,
                                       size_t max_certificate_bytes, TC_PIV_certificate* out);
+#endif
 
-#if TC_ENABLE_GZIP
+#if TC_ENABLE_PIV_OBJECTS && TC_ENABLE_GZIP
 /* Read a certificate container with TC_PIV_certificate_read and return the
  * DER certificate in out->certificate. A PLAIN certificate borrows container
  * and leaves der unused. A GZIP certificate (CertInfo 71 01 01) is decoded

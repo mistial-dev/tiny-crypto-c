@@ -19,6 +19,7 @@ typedef struct {
   TC_bytes fascn, fascn_oid, uuid_urn, cardholder_uuid_urn;
 } TC_PIV_card_identifiers;
 
+#if TC_ENABLE_PIV_OBJECTS
 /* Read the FASC-N and card UUID from the DER GeneralNames value of a Card
  * Authentication certificate's subjectAltName (SP 800-73-5 Part 1 sections
  * 3.1.4 and 3.4.1, TWIC Part 2 v5 section 6).
@@ -100,6 +101,7 @@ TC_TLV_result TC_TWIC_authentication_identifiers_read(TC_bytes subject_alt_name,
 TC_TLV_result TC_TWIC_card_identifiers_match(const TC_PIV_card_identifiers* identifiers,
                                              TC_bytes fascn, TC_bytes guid, size_t* work,
                                              int* matched);
+#endif
 
 #ifdef __cplusplus
 }

@@ -52,9 +52,16 @@ foreach(mask RANGE 1 7)
   if(NOT result EQUAL 0)
     message(FATAL_ERROR "mask ${mask} should build: ${output}\n${error}")
   endif()
-  file(GLOB_RECURSE archive "${BINARY_DIR}/mask-${mask}/*tiny-crypto-c.a")
-  execute_process(COMMAND "${C_COMPILER}" -std=c99
-      -I "${BINARY_DIR}/mask-${mask}/install-include" -I "${SOURCE_DIR}/src"
+  # Compile against the installed headers, whose build_config.h records the
+  # mask, as a consumer does.
+  set(prefix "${BINARY_DIR}/mask-${mask}/prefix")
+  execute_process(COMMAND "${CMAKE_COMMAND}" --install "${BINARY_DIR}/mask-${mask}"
+      --prefix "${prefix}" OUTPUT_QUIET ERROR_VARIABLE error RESULT_VARIABLE result)
+  if(NOT result EQUAL 0)
+    message(FATAL_ERROR "mask ${mask} should install: ${error}")
+  endif()
+  file(GLOB_RECURSE archive "${prefix}/*tiny-crypto-c.a")
+  execute_process(COMMAND "${C_COMPILER}" -std=c99 -I "${prefix}/include"
       "${BINARY_DIR}/link.c" ${archive} -o "${BINARY_DIR}/mask-${mask}/link"
       OUTPUT_VARIABLE output ERROR_VARIABLE error RESULT_VARIABLE result)
   if(NOT result EQUAL 0)

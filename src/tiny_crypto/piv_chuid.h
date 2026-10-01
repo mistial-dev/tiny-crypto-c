@@ -30,6 +30,7 @@ typedef struct {
   TC_bytes signed_content[2];
 } TC_PIV_CHUID;
 
+#if TC_ENABLE_PIV_CHUID
 /* Read a CHUID. CONTAINER includes the outer 53 object. CONTENTS starts with
  * its first field. Select the profile from the application's card-object
  * policy. Field order and sizes follow the profile:
@@ -54,6 +55,7 @@ typedef struct {
  * out changes only on OK. */
 TC_TLV_result TC_PIV_CHUID_read(TC_bytes encoded, TC_PIV_CHUID_encoding encoding,
                                 TC_PIV_CHUID_profile profile, TC_PIV_CHUID* out);
+#endif
 
 #ifdef __cplusplus
 }

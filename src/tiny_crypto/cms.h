@@ -85,6 +85,7 @@ typedef struct {
   int has_content;
 } TC_CMS_signed_data;
 
+#if TC_ENABLE_CMS
 /* Read a ContentInfo carrying SignedData and check the SignedData version
  * against its contents (RFC 5652 sections 3 and 5.1).
  * - encoded: the complete ContentInfo. policy->envelope selects BER or DER
@@ -110,6 +111,7 @@ typedef struct {
 TC_TLV_result TC_CMS_signed_data_read(TC_bytes encoded, const TC_CMS_verification_policy* policy,
                                       const TC_TLV_limits* limits, TC_TLV_frames frames,
                                       size_t* work, TC_CMS_signed_data* out);
+#endif
 
 typedef struct {
   TC_bytes encoded;
@@ -120,6 +122,7 @@ typedef struct {
   int serial_negative;
 } TC_CMS_signer_info;
 
+#if TC_ENABLE_CMS
 /* Read one complete SignerInfo under policy->envelope (RFC 5652 section 5.3).
  * Version 1 identifies the signer by issuer and serial, version 3 by
  * subject_key_id. issuer is an encoded Name. serial keeps INTEGER contents,
@@ -187,6 +190,7 @@ TC_TLV_result TC_CMS_digest_algorithms_check(const TC_CMS_signed_data* signed_da
                                              const TC_DER_algorithm* digest_algorithm,
                                              const TC_TLV_limits* limits, TC_TLV_frames frames,
                                              size_t* work, TC_hash_algorithm* out);
+#endif
 
 typedef struct {
   TC_bytes content_type, message_digest;
@@ -203,6 +207,7 @@ typedef struct {
   TC_bytes entry_uuid_octets;
 } TC_CMS_signed_attributes;
 
+#if TC_ENABLE_CMS
 /* Read the complete IMPLICIT [0] signedAttrs field (RFC 5652 sections 5.3
  * and 11).
  * - policy->attributes selects DER, or BER_DEFINITE_ORDER for signatures made
@@ -276,6 +281,7 @@ TC_TLV_result TC_CMS_content_digest(TC_bytes encoded, TC_hash_algorithm algorith
 TC_TLV_result TC_CMS_content_digest_check(const TC_CMS_signed_attributes* attributes,
                                           TC_bytes expected_type, TC_hash_algorithm algorithm,
                                           TC_bytes digest, size_t* work, int* matched);
+#endif
 
 typedef struct {
   /* One frame per constructed nesting level of the deepest object parsed. */
@@ -304,6 +310,7 @@ typedef struct {
   const TC_TLV_limits* limits;
 } TC_CMS_signer_verify_request;
 
+#if TC_ENABLE_CMS
 /* Verify one parsed SignerInfo against an independently computed digest of
  * the content under SignerInfo.digest_algorithm. For PSS, the
  * signed-attribute hash may differ. Checks algorithm and key compatibility,
@@ -339,9 +346,11 @@ TC_X509_signature_result TC_CMS_signer_verify_digest(const TC_CMS_signer_verify_
                                                      TC_bytes digest,
                                                      const TC_CMS_signature_workspace* workspace,
                                                      size_t* work);
+#endif
 
 typedef enum { TC_CMS_CONTENT_RAW, TC_CMS_CONTENT_BER_OCTETS } TC_CMS_content_encoding;
 
+#if TC_ENABLE_CMS
 /* Hash content and verify one parsed signer. The hash comes from
  * SignerInfo.digest_algorithm. RAW takes application content, including
  * NULL/0 for an empty message, bounded by limits->max_input and max_value.
@@ -359,6 +368,7 @@ TC_X509_signature_result TC_CMS_signer_verify_content(const TC_CMS_signer_verify
                                                       TC_CMS_content_encoding encoding,
                                                       const TC_CMS_signature_workspace* workspace,
                                                       size_t* work);
+#endif
 
 #ifdef __cplusplus
 }

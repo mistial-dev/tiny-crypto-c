@@ -12,6 +12,7 @@
 
 #include <tiny_crypto/common.hpp>
 #include <tiny_crypto/aes_dynamic.h>
+#if TC_ENABLE_AES && TC_AES_ENABLE_DYNAMIC
 
 namespace tiny_crypto {
 
@@ -103,4 +104,5 @@ public:
   }
 };
 } // namespace tiny_crypto
+#endif
 #endif

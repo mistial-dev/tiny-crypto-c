@@ -217,4 +217,18 @@ static inline void tc_internal_xor(uint8_t* dst, const uint8_t* src, size_t leng
     dst[i] ^= src[i];
 }
 
+/* 1 when year, month and day name a Gregorian calendar date with a nonzero
+ * year. */
+static inline int tc_internal_calendar_date(unsigned year, unsigned month, unsigned day)
+{
+  unsigned days;
+  if (!year || month < 1 || month > 12 || !day)
+    return 0;
+  if (month == 2)
+    days = 28 + (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0));
+  else
+    days = (month == 4 || month == 6 || month == 9 || month == 11) ? 30 : 31;
+  return day <= days;
+}
+
 #endif /* TINY_CRYPTO_INTERNAL_H_ */

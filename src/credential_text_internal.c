@@ -1,10 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
-#include "credential_text_internal.h"
-#include "pki_internal.h"
-#include <tiny_crypto/config.h>
+#include <tiny_crypto/common.h>
 
 #if TC_ENABLE_PIV_OBJECTS || TC_ENABLE_PIV_CHUID || TC_ENABLE_TWIC_CCL || TC_ENABLE_TWIC_TPK ||    \
     TC_ENABLE_AAMVA
+#include "credential_text_internal.h"
+#include "internal.h"
 #if defined(__AVR__) && TC_AVR_PROGMEM
 #include <avr/pgmspace.h>
 #define TC_TEXT_STORAGE PROGMEM
@@ -76,7 +76,7 @@ int tc_credential_day_month_year(const uint8_t value[9], int title_case, TC_X509
       !tc_credential_decimal(value + 5, 4, 9999, &year))
     return 0;
   month = tc_credential_month3(value + 2, title_case);
-  if (!tc_pki_date((unsigned)year, month, (unsigned)day))
+  if (!tc_internal_calendar_date((unsigned)year, month, (unsigned)day))
     return 0;
   *out = (TC_X509_time){(unsigned)year, (uint8_t)month, (uint8_t)day, 0, 0, 0};
   return 1;
@@ -89,7 +89,7 @@ int tc_credential_yyyymmdd(const uint8_t* value, size_t length, unsigned* year, 
   if (length != 8 || !tc_credential_decimal(value, 4, 9999, &y) ||
       !tc_credential_decimal(value + 4, 2, 12, &m) || !tc_credential_decimal(value + 6, 2, 31, &d))
     return 0;
-  if (!tc_pki_date((unsigned)y, (unsigned)m, (unsigned)d))
+  if (!tc_internal_calendar_date((unsigned)y, (unsigned)m, (unsigned)d))
     return 0;
   if (year)
     *year = (unsigned)y;

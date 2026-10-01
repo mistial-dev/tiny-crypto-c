@@ -132,6 +132,7 @@ typedef union {
   uint32_t scalar;
 } TC_X509_path_storage;
 
+#if TC_ENABLE_X509_PATH
 /* Return the byte alignment that TC_X509_path_workspace_init requires of the
  * arena. Every array starts at a multiple of it. */
 size_t TC_X509_path_workspace_alignment(void);
@@ -155,6 +156,7 @@ TC_result TC_X509_path_workspace_size(const TC_X509_path_capacity* capacity, siz
  * use TC_X509_PATH_WORKSPACE_INIT or fill the fields directly. */
 TC_result TC_X509_path_workspace_init(const TC_X509_path_capacity* capacity, TC_buffer arena,
                                       TC_X509_path_workspace* out);
+#endif
 
 enum {
   TC_X509_PATH_REQUIRE_EXPLICIT_POLICY = 1u,
@@ -212,6 +214,7 @@ typedef struct {
   TC_X509_path_result validation;
 } TC_X509_search_result;
 
+#if TC_ENABLE_X509_PATH
 /* Construct and validate a path from target to an explicit source anchor
  * (RFC 5280 section 6.1, with discovery as in RFC 4158). Candidates come only
  * from source. The depth-first search compares issuer and subject Names,
@@ -295,6 +298,7 @@ TC_X509_path_status TC_X509_path_validate_with_anchor(const TC_bytes* chain, siz
                                                       const TC_X509_path_options* options,
                                                       const TC_X509_path_workspace* workspace,
                                                       TC_X509_path_result* out);
+#endif
 #ifdef __cplusplus
 }
 #endif

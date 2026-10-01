@@ -39,6 +39,7 @@ typedef struct {
   unsigned bits;
 } TC_X509_public_key;
 
+#if TC_ENABLE_X509
 /* Decode SubjectPublicKeyInfo (RFC 5280 section 4.1.2.7) and classify the
  * key. RSA keys (RFC 3279 section 2.3.1, RFC 4055 section 1.2) need an odd
  * modulus and an odd exponent with 3 <= e < n. EC keys (RFC 5480 section 2)
@@ -60,6 +61,7 @@ typedef struct {
  *
  * out changes only on OK. */
 TC_TLV_result TC_X509_subject_public_key(TC_bytes encoded, TC_X509_public_key* out);
+#endif
 
 typedef struct {
   /* One frame per constructed nesting level of the deepest object parsed. */
@@ -78,6 +80,7 @@ typedef struct {
   int serial_negative;
 } TC_X509_certificate;
 
+#if TC_ENABLE_X509
 /* Parse one DER certificate (RFC 5280 section 4.1). Returned spans borrow
  * encoded. The reader checks the TBSCertificate schema, versions 1 to 3,
  * unique identifiers only in v2 and v3, extensions only in v3, matching
@@ -108,12 +111,14 @@ typedef struct {
  * Frames and OID slots may change on failure. out changes only on OK. */
 TC_TLV_result TC_X509_read(TC_bytes encoded, const TC_TLV_limits* limits,
                            const TC_X509_workspace* workspace, TC_X509_certificate* out);
+#endif
 /* Time helpers. A valid TC_X509_time is a Gregorian UTC calendar time in
  * years 1..9999 with hour <= 23, minute <= 59 and second <= 59, without leap
  * seconds (RFC 5280 section 4.1.2.5). Each returns ARGUMENT for a NULL
  * pointer or an output overlapping an input, INVALID for an invalid time and
  * OK otherwise. Outputs change only on OK. */
 
+#if TC_ENABLE_X509
 /* *order receives -1, 0 or 1 as left is before, equal to or after right. */
 TC_TLV_result TC_X509_time_compare(const TC_X509_time* left, const TC_X509_time* right, int* order);
 /* Check value alone. ARGUMENT only for NULL. */
@@ -127,6 +132,7 @@ TC_TLV_result TC_X509_time_to_unix(const TC_X509_time* value, int64_t* seconds);
  * the validity interval alone. */
 TC_TLV_result TC_X509_valid_at(const TC_X509_certificate* certificate, const TC_X509_time* at,
                                int* valid);
+#endif
 
 typedef enum {
   TC_X509_SIGNATURE_VALID,
@@ -155,6 +161,7 @@ typedef struct {
   TC_bytes name;
   TC_X509_public_key public_key;
 } TC_X509_trust_anchor;
+#if TC_ENABLE_X509
 /* Signature verification through a provider. Results:
  *
  *   VALID        the provider verified the signature under the key.
@@ -198,7 +205,9 @@ TC_X509_signature_result TC_X509_signature_verify(const TC_X509_certificate* cer
 TC_X509_signature_result TC_X509_signature_verify_message(
     const TC_bytes* message, size_t count, const TC_DER_algorithm* algorithm, TC_bytes signature,
     const TC_X509_public_key* issuer_key, const TC_X509_signature_provider* provider, size_t* work);
+#endif
 
+#if TC_ENABLE_X509
 /* Verify a digest as supplied through provider->verify_digest. algorithm
  * describes the signature, including its digest hash and PSS MGF hash and
  * salt length. digest.length must equal the hash's digest length, otherwise
@@ -210,10 +219,12 @@ TC_X509_signature_result
 TC_X509_signature_verify_digest(TC_bytes digest, const TC_signature_algorithm* algorithm,
                                 TC_bytes signature, const TC_X509_public_key* issuer_key,
                                 const TC_X509_signature_provider* provider, size_t* work);
+#endif
 
 typedef struct {
   TC_bytes encoded, oid, value;
 } TC_X509_name_attribute;
+#if TC_ENABLE_X509
 /* Iterate a DER Name (RFC 5280 section 4.1.2.4). init takes the complete
  * Name SEQUENCE and starts reader, which must lie outside encoded.
  * rdn_next returns the next RDN, a nonempty SET of DER-sorted attributes, as
@@ -233,6 +244,7 @@ TC_TLV_result TC_X509_name_init(TC_TLV_reader* reader, TC_bytes encoded,
                                 const TC_TLV_limits* limits);
 TC_TLV_result TC_X509_rdn_next(TC_TLV_reader* reader, TC_bytes* out);
 TC_TLV_result TC_X509_attribute_next(TC_TLV_reader* reader, TC_X509_name_attribute* out);
+#endif
 
 typedef struct {
   uint32_t *left, *right;
@@ -240,6 +252,7 @@ typedef struct {
   uint8_t* matched;
   size_t attribute_capacity;
 } TC_X509_name_workspace;
+#if TC_ENABLE_X509
 /* Compare DER Names using RFC 5280 section 7.1. name_equal requires the same
  * RDN sequence. name_within reports whether subtree is a leading prefix of
  * name, the directoryName constraint rule of RFC 5280 section 4.2.1.10.
@@ -271,6 +284,8 @@ TC_TLV_result TC_X509_name_equal(TC_bytes left, TC_bytes right, const TC_TLV_lim
 TC_TLV_result TC_X509_name_within(TC_bytes name, TC_bytes subtree, const TC_TLV_limits* limits,
                                   const TC_X509_name_workspace* workspace, size_t* work,
                                   int* matched);
+#endif
+#if TC_ENABLE_X509
 /* Check one issuer link: certificate->issuer equals issuer_name under
  * TC_X509_name_equal, then TC_X509_signature_verify with issuer_key (RFC
  * 5280 section 6.1.3 steps (a)(1) and (a)(4)). issuer_name and issuer_key
@@ -287,6 +302,7 @@ TC_X509_issuer_check(const TC_X509_certificate* certificate, TC_bytes issuer_nam
                      const TC_X509_public_key* issuer_key,
                      const TC_X509_signature_provider* provider, const TC_TLV_limits* limits,
                      const TC_X509_name_workspace* workspace, size_t* work);
+#endif
 
 typedef struct {
   TC_bytes oid, value;
@@ -310,6 +326,7 @@ typedef struct {
  * ARGUMENT, as does a reader inside its input at init. next returns END after
  * the last item. Outputs, and reader state for next, change only on OK. */
 
+#if TC_ENABLE_X509
 /* AuthorityKeyIdentifier (RFC 5280 section 4.2.1.1) and
  * SubjectKeyIdentifier (section 4.2.1.2). Identifiers have no assumed hash
  * or fixed length. Authority issuer and serial must occur together, and an
@@ -322,6 +339,7 @@ TC_TLV_result TC_X509_authority_key_identifier_read(TC_bytes value, const TC_TLV
                                                     TC_X509_authority_key_identifier* out);
 TC_TLV_result TC_X509_subject_key_identifier_read(TC_bytes value, const TC_TLV_limits* limits,
                                                   TC_bytes* out);
+#endif
 typedef struct {
   unsigned type;
   TC_bytes encoded, value;
@@ -347,6 +365,7 @@ typedef struct {
   TC_TLV_reader reader;
   TC_TLV_frames frames;
 } TC_X509_general_names_reader;
+#if TC_ENABLE_X509
 /* encoded is a complete, nonempty GeneralNames SEQUENCE, such as a
  * subjectAltName or issuerAltName extension value. */
 TC_TLV_result TC_X509_general_names_init(TC_X509_general_names_reader* reader, TC_bytes encoded,
@@ -359,15 +378,18 @@ TC_TLV_result TC_X509_general_names_contents_init(TC_X509_general_names_reader* 
                                                   TC_TLV_frames frames);
 TC_TLV_result TC_X509_general_name_next(TC_X509_general_names_reader* reader,
                                         TC_X509_general_name* out);
+#endif
 typedef struct {
   TC_bytes permitted, excluded;
 } TC_X509_name_constraints;
+#if TC_ENABLE_X509
 /* NameConstraints (RFC 5280 section 4.2.1.10): the two optional, nonempty
  * subtree lists, at least one present. Spans contain the IMPLICIT sequence
  * contents, without a SEQUENCE wrapper. Decode them with
  * TC_X509_general_subtrees_init. out is unchanged on failure. */
 TC_TLV_result TC_X509_name_constraints_read(TC_bytes value, const TC_TLV_limits* limits,
                                             TC_X509_name_constraints* out);
+#endif
 typedef struct {
   TC_X509_general_name base;
   uint32_t minimum, maximum;
@@ -385,6 +407,7 @@ typedef struct {
   TC_TLV_reader reader;
   TC_TLV_frames frames;
 } TC_X509_general_subtrees_reader;
+#if TC_ENABLE_X509
 TC_TLV_result TC_X509_general_subtrees_init(TC_X509_general_subtrees_reader* reader,
                                             TC_bytes contents, const TC_TLV_limits* limits,
                                             TC_TLV_frames frames);
@@ -420,10 +443,12 @@ TC_TLV_result TC_X509_general_name_within(const TC_X509_general_name* name,
                                           const TC_TLV_limits* limits,
                                           const TC_X509_name_workspace* workspace, size_t* work,
                                           int* matched);
+#endif
 typedef struct {
   TC_TLV_frames frames;
   const TC_X509_name_workspace* names;
 } TC_X509_constraint_workspace;
+#if TC_ENABLE_X509
 /* Check one decoded name against one certificate's constraint lists. A name
  * must match at least one permitted subtree of its form, if any, and no
  * excluded subtree. Both lists are fully parsed. Empty spans mean no
@@ -463,10 +488,12 @@ TC_TLV_result TC_X509_certificate_names_check(const TC_X509_certificate* certifi
 TC_TLV_result TC_X509_extensions_init(TC_TLV_reader* reader, TC_bytes encoded,
                                       const TC_TLV_limits* limits);
 TC_TLV_result TC_X509_extension_next(TC_TLV_reader* reader, TC_X509_extension* out);
+#endif
 
 typedef struct {
   TC_bytes issuer_policy, subject_policy;
 } TC_X509_policy_mapping;
+#if TC_ENABLE_X509
 /* Pass the PolicyMappings extension value (RFC 5280 section 4.2.1.5). init
  * checks the outer, nonempty sequence. next validates each OID pair and
  * returns INVALID for a mapping to or from anyPolicy. Consume through END to
@@ -474,6 +501,7 @@ typedef struct {
 TC_TLV_result TC_X509_policy_mappings_init(TC_TLV_reader* reader, TC_bytes value,
                                            const TC_TLV_limits* limits);
 TC_TLV_result TC_X509_policy_mapping_next(TC_TLV_reader* reader, TC_X509_policy_mapping* out);
+#endif
 
 typedef struct {
   TC_bytes oid, qualifiers;
@@ -483,6 +511,7 @@ typedef struct {
   TC_bytes* seen;
   size_t capacity, count;
 } TC_X509_policy_reader;
+#if TC_ENABLE_X509
 /* Pass the CertificatePolicies extension value (RFC 5280 section 4.2.1.4).
  * seen has one slot per policy, used to reject duplicate identifiers with
  * INVALID. More policies than capacity return LIMIT. Input, seen, reader and
@@ -494,10 +523,12 @@ typedef struct {
 TC_TLV_result TC_X509_policies_init(TC_X509_policy_reader* reader, TC_bytes value,
                                     const TC_TLV_limits* limits, TC_bytes* seen, size_t capacity);
 TC_TLV_result TC_X509_policy_next(TC_X509_policy_reader* reader, TC_X509_policy* out);
+#endif
 
 typedef struct {
   TC_bytes oid, value;
 } TC_X509_policy_qualifier;
+#if TC_ENABLE_X509
 /* Pass policy.qualifiers, including {NULL, 0} when absent, which returns END
  * from the first next. Each PolicyQualifierInfo (RFC 5280 section 4.2.1.4)
  * holds an OID and one value. value retains its DER tag and length and
@@ -506,6 +537,7 @@ typedef struct {
 TC_TLV_result TC_X509_policy_qualifiers_init(TC_TLV_reader* reader, TC_bytes qualifiers,
                                              const TC_TLV_limits* limits);
 TC_TLV_result TC_X509_policy_qualifier_next(TC_TLV_reader* reader, TC_X509_policy_qualifier* out);
+#endif
 
 typedef struct {
   int ca, has_path_length;
@@ -517,12 +549,14 @@ typedef struct {
   TC_bytes encoded, contents;
   int relative;
 } TC_X509_distribution_name;
+#if TC_ENABLE_X509
 /* BasicConstraints (RFC 5280 section 4.2.1.9). An explicit cA must be TRUE
  * because DER omits the DEFAULT, and pathLenConstraint requires cA, otherwise
  * the result is INVALID. A path length above UINT32_MAX returns LIMIT. The
  * empty sequence gives ca 0. */
 TC_TLV_result TC_X509_basic_constraints_read(TC_bytes value, const TC_TLV_limits* limits,
                                              TC_X509_basic_constraints* out);
+#endif
 /* Mask bit n is ASN.1 KeyUsage bit n, independent of encoded byte order. */
 enum {
   TC_KEY_USAGE_DIGITAL_SIGNATURE = 1u << 0,
@@ -536,6 +570,7 @@ enum {
   TC_KEY_USAGE_DECIPHER_ONLY = 1u << 8,
   TC_KEY_USAGE_ALL = (1u << 9) - 1
 };
+#if TC_ENABLE_X509
 /* KeyUsage (RFC 5280 section 4.2.1.3) as a combination of the masks above.
  * At least one bit must be set, and the DER named-bit rules apply: no
  * trailing zero bits and at most nine bits. Violations return INVALID. */
@@ -548,17 +583,20 @@ TC_TLV_result TC_X509_key_usage_read(TC_bytes value, const TC_TLV_limits* limits
  * neither output changes. Unknown purpose OIDs are retained. */
 TC_TLV_result TC_X509_extended_key_usage_read(TC_bytes value, const TC_TLV_limits* limits,
                                               TC_bytes* oids, size_t capacity, size_t* count);
+#endif
 
 typedef struct {
   int has_require_explicit_policy, has_inhibit_policy_mapping;
   uint32_t require_explicit_policy, inhibit_policy_mapping;
 } TC_X509_policy_constraints;
+#if TC_ENABLE_X509
 /* PolicyConstraints (RFC 5280 section 4.2.1.11). At least one field must be
  * present, otherwise the result is INVALID. Counts above UINT32_MAX return
  * LIMIT. A present zero count applies immediately. An absent field adds no
  * constraint. */
 TC_TLV_result TC_X509_policy_constraints_read(TC_bytes value, const TC_TLV_limits* limits,
                                               TC_X509_policy_constraints* out);
+#endif
 /* InhibitAnyPolicy is a nonnegative INTEGER. Decode it with TC_DER_uint32. */
 
 #ifdef __cplusplus

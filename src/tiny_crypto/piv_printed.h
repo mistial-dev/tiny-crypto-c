@@ -28,6 +28,7 @@ typedef struct {
   TC_X509_time expiration;
 } TC_PIV_printed;
 
+#if TC_ENABLE_PIV_OBJECTS
 /* Parse a PIV Printed Information object (SP 800-73-5 Part 1 section 3.3.1
  * and Table 15) or decrypted TWIC DFC109 contents (TWIC Part 2 v5 section
  * 4.7.2). CONTAINER includes the outer 53 object and CONTENTS starts with the
@@ -60,6 +61,7 @@ TC_TLV_result TC_PIV_printed_read(TC_bytes input, TC_PIV_printed_encoding encodi
 TC_TLV_result TC_PIV_printed_expiration_check(const TC_PIV_printed* printed,
                                               TC_bytes chuid_expiration, const TC_X509_time* at,
                                               int* valid);
+#endif
 
 #ifdef __cplusplus
 }

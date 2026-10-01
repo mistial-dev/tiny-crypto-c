@@ -20,6 +20,7 @@ typedef struct {
   uint8_t series, issue, category, association;
 } TC_FASCN;
 
+#if TC_ENABLE_FASCN
 /* Decode the 200-bit FASC-N in PACS TIG v2.3 sections 6.1-6.3. Checks odd
  * character parity, the start, separator and end sentinels, decimal digits
  * and the LRC. Values keep their fixed decimal widths through the field
@@ -36,6 +37,7 @@ TC_TLV_result TC_FASCN_read(TC_bytes encoded, TC_FASCN* out);
  * a field above its decimal width, checked before the capacity. LIMIT for a
  * capacity below TC_FASCN_BYTES. out changes only on OK. */
 TC_TLV_result TC_FASCN_write(const TC_FASCN* value, uint8_t* out, size_t capacity);
+#endif
 
 #ifdef __cplusplus
 }

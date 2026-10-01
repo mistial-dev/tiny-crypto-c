@@ -65,6 +65,7 @@ typedef struct {
   uint8_t algorithm;
 } TC_PIV_key_parameters;
 
+#if TC_ENABLE_PIV_KEY_PROOF
 /* Select the proof parameters for the subject key of certificate under
  * policy. The certificate is one returned by TC_X509_read, usually after
  * path validation.
@@ -92,6 +93,7 @@ typedef struct {
 TC_PIV_result TC_PIV_key_parameters_select(const TC_X509_certificate* certificate,
                                            const TC_PIV_key_policy* policy,
                                            TC_PIV_key_parameters* out);
+#endif
 
 /* Command and answer sizes. The request is 7C {82 00, 81 L challenge} with
  * length fields of up to three octets (Part 2 A.4.1). The answer is 7C {82 L signature}: an
@@ -122,6 +124,7 @@ typedef struct {
   uint8_t key_reference;
 } TC_PIV_key_proof_request;
 
+#if TC_ENABLE_PIV_KEY_PROOF
 /* Prove that the card holds the private key of request->certificate.
  * TC_PIV_key_parameters_select chooses the parameters.
  * TC_key_challenge_prepare draws a fresh challenge from random. The command
@@ -171,6 +174,7 @@ typedef struct {
 TC_PIV_result TC_PIV_key_prove(TC_PIV_link* link, const TC_PIV_key_proof_request* request,
                                TC_random_source random, const TC_X509_signature_provider* provider,
                                TC_PIV_key_proof_workspace* workspace, TC_work_budget* work);
+#endif
 
 #ifdef __cplusplus
 }

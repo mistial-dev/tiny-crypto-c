@@ -164,7 +164,7 @@ static int eac_date(TC_bytes value, TC_EAC_date* out)
   year = 2000 + 10 * value.data[0] + value.data[1];
   month = 10 * value.data[2] + value.data[3];
   day = 10 * value.data[4] + value.data[5];
-  if (!tc_pki_date(year, month, day))
+  if (!tc_internal_calendar_date(year, month, day))
     return 0;
   out->year = year;
   out->month = (uint8_t)month;

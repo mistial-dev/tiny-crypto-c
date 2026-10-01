@@ -8,7 +8,7 @@
 
 static int time_valid(const TC_X509_time* value)
 {
-  return value->year <= 9999 && tc_pki_date(value->year, value->month, value->day) &&
+  return value->year <= 9999 && tc_internal_calendar_date(value->year, value->month, value->day) &&
          value->hour <= 23 && value->minute <= 59 && value->second <= 59;
 }
 
@@ -42,7 +42,7 @@ TC_TLV_result TC_X509_time_to_unix(const TC_X509_time* value, int64_t* seconds)
   /* Count complete Gregorian years, then the elapsed days in this year. */
   int64_t days = (int64_t)previous_year * 365 + previous_year / 4 - previous_year / 100 +
                  previous_year / 400 + before_month[value->month - 1] + value->day - 1;
-  if (value->month > 2 && tc_pki_date(value->year, 2, 29))
+  if (value->month > 2 && tc_internal_calendar_date(value->year, 2, 29))
     ++days;
   *seconds = (days - DAYS_TO_UNIX_EPOCH) * SECONDS_PER_DAY +
              (int64_t)value->hour * SECONDS_PER_HOUR + value->minute * SECONDS_PER_MINUTE +

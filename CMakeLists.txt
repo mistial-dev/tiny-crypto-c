@@ -41,7 +41,7 @@ function(tc_warnings target)
   if(MSVC)
     target_compile_options(${target} PRIVATE /W4)
   elseif(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic -Wundef)
   endif()
 endfunction()
 

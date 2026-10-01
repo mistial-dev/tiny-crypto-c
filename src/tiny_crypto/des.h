@@ -92,8 +92,10 @@ struct TC_DES_ctx {
 extern "C" {
 #endif
 
+#if TC_ENABLE_DES
 /* Wipe a DES context (subkeys and IV when present). NULL is a no-op. */
 void TC_DES_ctx_clear(struct TC_DES_ctx* ctx);
+#endif
 
 /*
  * The ECB, CBC, CTR, CFB and OFB entry points share one argument contract.
@@ -107,6 +109,7 @@ void TC_DES_ctx_clear(struct TC_DES_ctx* ctx);
  * names another failure.
  */
 
+#if TC_ENABLE_DES
 /**
  * @brief Initialize a DES or TDEA context with a key.
  *
@@ -127,8 +130,9 @@ void TC_DES_ctx_clear(struct TC_DES_ctx* ctx);
  *       DES. K1 = K3 remains valid two-key TDEA.
  */
 TC_status TC_DES_init(struct TC_DES_ctx* ctx, const uint8_t* key, size_t keylen);
+#endif
 
-#if TC_DES_NEEDS_IV
+#if TC_ENABLE_DES && TC_DES_NEEDS_IV
 /**
  * @brief Start a new message under the same key.
  *
@@ -152,7 +156,7 @@ TC_status TC_DES_init(struct TC_DES_ctx* ctx, const uint8_t* key, size_t keylen)
 TC_status TC_DES_set_iv(struct TC_DES_ctx* ctx, const uint8_t* iv);
 #endif
 
-#if TC_DES_ENABLE_ECB
+#if TC_ENABLE_DES && TC_DES_ENABLE_ECB
 /**
  * @brief Encrypt one 8-byte block in ECB mode (SP 800-38A section 6.1).
  * ECB leaks equal blocks, so use it only as a building block.
@@ -171,7 +175,7 @@ TC_status TC_DES_ECB_encrypt(const struct TC_DES_ctx* ctx, uint8_t* buf);
 TC_status TC_DES_ECB_decrypt(const struct TC_DES_ctx* ctx, uint8_t* buf);
 #endif
 
-#if TC_DES_ENABLE_CBC
+#if TC_ENABLE_DES && TC_DES_ENABLE_CBC
 /**
  * @brief Encrypt a buffer in CBC mode (SP 800-38A section 6.2). The IV
  * carries the chaining value and advances to the last ciphertext block.
@@ -195,7 +199,7 @@ TC_status TC_DES_CBC_encrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length
 TC_status TC_DES_CBC_decrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
 #endif
 
-#if TC_DES_ENABLE_CTR
+#if TC_ENABLE_DES && TC_DES_ENABLE_CTR
 /**
  * @brief Encrypt or decrypt a buffer in CTR mode (SP 800-38A section 6.5).
  * Unused keystream bytes serve the next call.
@@ -220,6 +224,7 @@ TC_status TC_DES_CTR_crypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
  * Split a message at multiples of 8 bytes to get the same output as one call.
  */
 
+#if TC_ENABLE_DES
 /**
  * @brief Encrypt a buffer in CFB64 mode.
  * @param ctx Initialized context (IV holds the feedback register).
@@ -240,8 +245,9 @@ TC_status TC_DES_CFB64_encrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t leng
  */
 TC_status TC_DES_CFB64_decrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
 #endif
+#endif
 
-#if TC_DES_ENABLE_CFB8
+#if TC_ENABLE_DES && TC_DES_ENABLE_CFB8
 /**
  * @brief Encrypt a buffer in CFB8 mode (SP 800-38A section 6.3, s = 8).
  * @param ctx Initialized context (IV holds the feedback register).
@@ -261,7 +267,7 @@ TC_status TC_DES_CFB8_encrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t lengt
 TC_status TC_DES_CFB8_decrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
 #endif
 
-#if TC_DES_ENABLE_CFB1
+#if TC_ENABLE_DES && TC_DES_ENABLE_CFB1
 /**
  * @brief Encrypt bits in CFB1 mode (SP 800-38A section 6.3, s = 1).
  *
@@ -286,7 +292,7 @@ TC_status TC_DES_CFB1_encrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t bit_l
 TC_status TC_DES_CFB1_decrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t bit_length);
 #endif
 
-#if TC_DES_ENABLE_OFB
+#if TC_ENABLE_DES && TC_DES_ENABLE_OFB
 /**
  * @brief Encrypt or decrypt a buffer in OFB mode (SP 800-38A section 6.4).
  * Unused output-block bytes serve the next call.
@@ -305,6 +311,7 @@ TC_status TC_DES_OFB_crypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
 /* Full CMAC tag is one DES block. Shorter tags are the leading tag_len bytes. */
 #define TC_DES_CMAC_TAG_MAX TC_DES_BLOCKLEN
 
+#if TC_ENABLE_DES
 /*
  * DES/3DES-CMAC (NIST SP 800-38B). One-shot.
  * keylen must be 8 (single DES), 16 (2-key TDEA), or 24 (3-key TDEA).
@@ -336,6 +343,7 @@ TC_status TC_DES_CMAC_short_tag(const uint8_t* key, size_t keylen, const uint8_t
                                 size_t msg_len, uint8_t* tag, size_t tag_len);
 TC_status TC_DES_CMAC_verify_short_tag(const uint8_t* key, size_t keylen, const uint8_t* msg,
                                        size_t msg_len, const uint8_t* tag, size_t tag_len);
+#endif
 
 /*
  * Streaming DES/3DES-CMAC (SP 800-38B sections 6.1 and 6.2). Holds its own
@@ -357,6 +365,7 @@ struct TC_DES_CMAC_ctx {
   uint8_t active;
 };
 
+#if TC_ENABLE_DES
 /* init keys ctx and derives the subkeys. keylen must be TC_DES_KEYLEN,
  * TC_DES_KEYLEN_2KEY (K1, K2, K1) or TC_DES_KEYLEN_3KEY, and key must be
  * disjoint from ctx. It returns TC_OK, or TC_ERROR for a NULL argument,
@@ -374,6 +383,7 @@ TC_status TC_DES_CMAC_init(struct TC_DES_CMAC_ctx* ctx, const uint8_t* key, size
 TC_status TC_DES_CMAC_update(struct TC_DES_CMAC_ctx* ctx, const uint8_t* data, size_t len);
 TC_status TC_DES_CMAC_final(struct TC_DES_CMAC_ctx* ctx, uint8_t tag[TC_DES_CMAC_TAG_MAX]);
 void TC_DES_CMAC_ctx_clear(struct TC_DES_CMAC_ctx* ctx);
+#endif
 
 #endif /* TC_DES_ENABLE_CMAC */
 
@@ -425,6 +435,7 @@ struct TC_DES_ISO9797_ctx {
   uint8_t nonempty;
 };
 
+#if TC_ENABLE_DES
 /* keylen is TC_DES_KEYLEN_2KEY or TC_DES_KEYLEN_3KEY for both algorithms.
  * Returns TC_OK, or TC_ERROR for a NULL argument, an unknown algorithm or
  * padding, another key length, a key that overlaps ctx or a key refused
@@ -465,6 +476,7 @@ TC_status TC_DES_ISO9797_verify_short_tag(TC_DES_ISO9797_algorithm algorithm,
                                           TC_DES_ISO9797_padding padding, const uint8_t* key,
                                           size_t keylen, const uint8_t* msg, size_t msg_len,
                                           const uint8_t* tag, size_t tag_len);
+#endif
 #endif /* TC_DES_ENABLE_ISO9797 */
 
 #ifdef __cplusplus

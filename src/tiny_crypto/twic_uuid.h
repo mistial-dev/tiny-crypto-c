@@ -12,6 +12,7 @@ extern "C" {
 #endif
 
 enum { TC_TWIC_UUID_BYTES = 16 };
+#if TC_ENABLE_TWIC_UUID
 /* Read a NEXGEN card UUID (TWIC Part 2 v5 Appendix D). number is the 14-digit
  * decimal concatenation of agency, system and credential, stored in the
  * final 48 bits. The first 10 bytes hold the fixed namespace, version and
@@ -38,6 +39,7 @@ TC_TLV_result TC_TWIC_uuid_write(uint64_t number, uint8_t* out, size_t capacity)
  * their decimal widths or a UUID that TC_TWIC_uuid_read rejects. matched
  * changes only on OK. */
 TC_TLV_result TC_TWIC_uuid_match(TC_bytes encoded, const TC_FASCN* fascn, int* matched);
+#endif
 
 #ifdef __cplusplus
 }

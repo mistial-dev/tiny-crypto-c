@@ -69,6 +69,7 @@ typedef struct {
   TC_bytes signer_certificate;
 } TC_CMS_validation_request;
 
+#if TC_ENABLE_CMS_VALIDATION
 /* Find the signer certificate of one parsed SignerInfo, verify the signature
  * with it and build a trusted path (RFC 5652 section 5.3, RFC 5280 section
  * 6). Embedded certificates precede source candidates. The SignerInfo
@@ -132,6 +133,7 @@ TC_X509_path_status TC_CMS_signed_data_path_build(const TC_CMS_validation_reques
                                                   const TC_CMS_path_options* options,
                                                   const TC_CMS_path_workspace* workspace,
                                                   size_t* work, TC_X509_search_result* out);
+#endif
 
 typedef struct {
   const TC_X509_crl_index* index;
@@ -158,6 +160,7 @@ typedef struct {
   size_t signer_policy_capacity;
 } TC_CMS_credential_workspace;
 
+#if TC_ENABLE_CMS_VALIDATION
 /* Run TC_CMS_signed_data_path_build and check every path member against the
  * CRL index with TC_X509_path_check_revocation (RFC 5280 sections 6.3 and
  * 5). CRL signer paths use revocation->signer_policy with the selected
@@ -191,6 +194,7 @@ TC_credential_status TC_CMS_credential_validate(const TC_CMS_validation_request*
                                                 const TC_CMS_revocation_policy* revocation,
                                                 const TC_CMS_credential_workspace* workspace,
                                                 size_t* work);
+#endif
 
 #ifdef __cplusplus
 }

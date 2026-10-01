@@ -32,6 +32,7 @@ typedef struct {
   size_t match_capacity;
 } TC_X509_crl_prepare_workspace;
 
+#if TC_ENABLE_X509_REVOCATION
 /* Bytes and alignment that workspace.state needs for one job. An array of
  * TC_X509_crl_storage meets the alignment. Both charge no work. */
 size_t TC_X509_crl_prepare_size(void);
@@ -93,6 +94,7 @@ TC_TLV_result TC_X509_crl_prepare_step(TC_X509_crl_job* job, size_t max_entries,
 TC_TLV_result TC_X509_crl_prepare_finish(const TC_X509_crl_job* job, TC_X509_crl_record* out);
 /* Wipe the job and invalidate every record borrowed from it. Accepts NULL. */
 void TC_X509_crl_prepare_clear(TC_X509_crl_job* job);
+#endif
 
 #ifdef __cplusplus
 }

@@ -13,6 +13,7 @@
 #include <tiny_crypto/common.hpp>
 #include <tiny_crypto/piv_catalog.h>
 #include <tiny_crypto/piv_command.hpp>
+#if TC_ENABLE_PIV_CATALOG
 
 namespace tiny_crypto {
 
@@ -104,4 +105,5 @@ public:
 };
 
 } // namespace tiny_crypto
+#endif
 #endif
