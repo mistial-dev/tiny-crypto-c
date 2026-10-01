@@ -18,7 +18,7 @@
 static TC_credential_status signer_validate(TC_bytes certificate, tc_credential_session* session,
                                             const TC_validation_context* context,
                                             TC_validation_options* options, size_t* work,
-                                            TC_X509_validation_result* out)
+                                            TC_X509_validation_report* out)
 {
   TC_X509_certificate parsed;
   TC_TLV_result checked = tc_credential_signer_read(certificate, &session->policy.path.parsing,
@@ -44,7 +44,7 @@ static TC_credential_status signer_validate(TC_bytes certificate, tc_credential_
 TC_credential_status TC_PIV_content_signer_validate(TC_bytes certificate,
                                                     TC_PIV_card_profile profile,
                                                     const TC_validation_context* context,
-                                                    size_t* work, TC_X509_validation_result* out)
+                                                    size_t* work, TC_X509_validation_report* out)
 {
   tc_credential_session session;
   if (!certificate.data || !certificate.length || !work || !out ||
@@ -79,7 +79,7 @@ TC_credential_status TC_PIV_CVC_validate(const TC_PIV_CVC_validation_request* re
   if (checked != TC_TLV_OK)
     return tc_validation_status(checked);
   TC_validation_options options;
-  TC_X509_validation_result signer;
+  TC_X509_validation_report signer;
   TC_credential_status status =
       signer_validate(request->signer_certificate, &session, context, &options, work, &signer);
   if (status != TC_CREDENTIAL_VALID)

@@ -1129,7 +1129,7 @@ TC_TEST(card_certificate)
   const TC_bytes card_auth = vector("x509/piv/sd33/card01_card_auth_cert.der", der[0]);
   const TC_bytes piv_auth = vector("x509/piv/sd33/card01_piv_auth_cert.der", der[1]);
   TC_PIV_card_certificate_request request = {card_auth, TC_PIV_CARD, 0x9e, 0, {NULL, 0}};
-  TC_PIV_card_certificate_result result, unchanged;
+  TC_PIV_card_certificate_report result, unchanged;
   size_t work = CHECK_WORK;
   munit_assert_int(TC_PIV_card_certificate_validate(&request, &card_trust.context, &work, &result),
                    ==, TC_CREDENTIAL_VALID);

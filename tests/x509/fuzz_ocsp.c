@@ -77,7 +77,7 @@ static void check_verify(TC_bytes response, TC_bytes certificate, size_t budget)
   TC_X509_ocsp_verify_request request =
       ocsp_request(&fixture, response, certificate, &issuer, fuzz_at);
   request.certificates = &store;
-  TC_X509_ocsp_result result;
+  TC_X509_ocsp_report result;
   memset(&result, 0x5a, sizeof result);
   size_t work = budget;
   const TC_TLV_result status =

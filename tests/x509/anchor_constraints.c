@@ -100,7 +100,7 @@ static void check_certificate_controls(const char* profile, const TC_bytes* chai
   TC_X509_workspace parser = {{frames, 32}, oids, 32};
   TC_X509_certificate issuer, root;
   TC_X509_store_anchor bare = {0}, built;
-  TC_X509_path_result result;
+  TC_X509_path_report result;
   uint8_t extension[FILE_CAPACITY], list[FILE_CAPACITY];
   size_t length;
   const TC_bytes encoded_root = fixture(profile, "root.der", root_der);
@@ -247,7 +247,7 @@ static void check_replaced_controls(const TC_bytes* chain, const TC_bytes encode
   TC_X509_workspace parser = {{frames, 32}, oids, 32};
   TC_X509_certificate root;
   TC_X509_store_anchor built, anchor;
-  TC_X509_path_result result;
+  TC_X509_path_report result;
   TC_X509_trust_anchor_reader reader;
   uint8_t extension[64];
   munit_assert_int(TC_X509_read(encoded_root, &limits, &parser, &root), ==, TC_TLV_OK);
@@ -315,8 +315,8 @@ static void check_profile(const char* profile)
   TC_validation_capacity capacity;
   TC_validation_workspace storage;
   TC_X509_path_options options = {0};
-  TC_X509_path_result result;
-  TC_X509_search_result found;
+  TC_X509_path_report result;
+  TC_X509_search_report found;
   TC_X509_search_frame frames[3];
   TC_X509_search_workspace search;
   TC_X509_store_array array;

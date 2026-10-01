@@ -212,7 +212,7 @@ static void biometric_check(tc_piv_check_run* run, uint8_t kind, TC_PIV_CBEFF_fo
                                                            TC_PIV_CMS_BIOMETRIC,
                                                            format,
                                                            0};
-      TC_PIV_biometric_result result;
+      TC_PIV_biometric_report result;
       if (!tc_piv_check_status(
               run, &check,
               TC_PIV_biometric_validate(&request, run->request->content, run->work, &result)))

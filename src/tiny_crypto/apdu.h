@@ -25,14 +25,13 @@ extern "C" {
  * or a value outside the function's domain. UNSUPPORTED is a CLA outside the
  * first interindustry values. ERROR is a transport failure or a stopped
  * channel. */
-typedef enum {
-  TC_APDU_OK,
-  TC_APDU_INVALID,
-  TC_APDU_LIMIT,
-  TC_APDU_ARGUMENT,
-  TC_APDU_UNSUPPORTED,
-  TC_APDU_ERROR
-} TC_APDU_result;
+typedef TC_result TC_APDU_result;
+#define TC_APDU_OK TC_RESULT_OK
+#define TC_APDU_INVALID TC_RESULT_INVALID
+#define TC_APDU_LIMIT TC_RESULT_LIMIT
+#define TC_APDU_ARGUMENT TC_RESULT_ARGUMENT
+#define TC_APDU_UNSUPPORTED TC_RESULT_UNSUPPORTED
+#define TC_APDU_ERROR TC_RESULT_ERROR
 
 /* Length-field format (ISO/IEC 7816-4 5.2). SHORT uses one-byte Lc and Le
  * and chains longer command data. EXTENDED uses the short form whenever

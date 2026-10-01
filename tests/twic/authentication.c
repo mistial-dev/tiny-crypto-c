@@ -224,7 +224,7 @@ static void validated_key(EVP_PKEY* card_key, const TC_X509_signature_provider* 
   options.flags = TC_X509_PATH_REQUIRE_KEY_USAGE | TC_X509_PATH_REQUIRE_EXTENDED_KEY_USAGE |
                   TC_X509_PATH_INHIBIT_ANY_PURPOSE;
   const TC_bytes leaf = {encoded, card_length};
-  TC_X509_path_result result;
+  TC_X509_path_report result;
   munit_assert_int(TC_X509_path_validate(&leaf, 1, &anchor, &options, &workspace, &result), ==,
                    TC_X509_PATH_VALID);
   *key = result.public_key;

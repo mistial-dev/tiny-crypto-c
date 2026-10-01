@@ -69,7 +69,7 @@ TC_TLV_result example_ocsp_request(TC_bytes certificate, const TC_X509_trust_anc
  * verification and leaves result unchanged. storage holds parser views only
  * and is wiped after every verification failure. */
 ExampleOcspStatus example_ocsp_check(const ExampleOcspCheck* check, ExampleX509Workspace* storage,
-                                     TC_X509_ocsp_result* result);
+                                     TC_X509_ocsp_report* result);
 
 #ifdef __cplusplus
 }

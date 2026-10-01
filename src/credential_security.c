@@ -172,7 +172,7 @@ TC_credential_status TC_PIV_security_digest_check(const TC_PIV_security_map* map
 TC_credential_status TC_PIV_security_validate(const TC_PIV_security_validation_request* request,
                                               const TC_validation_context* context,
                                               const TC_PIV_security_validation_workspace* workspace,
-                                              size_t* work, TC_PIV_security_result* out)
+                                              size_t* work, TC_PIV_security_report* out)
 {
   if (request && request->count > TC_LDS_MAX_GROUPS)
     return TC_CREDENTIAL_LIMIT;
@@ -219,7 +219,7 @@ TC_credential_status TC_PIV_security_validate(const TC_PIV_security_validation_r
   }
   if (checked != map.lds.groups)
     return TC_CREDENTIAL_INVALID;
-  const TC_PIV_security_result accepted = {request->objects, request->count,
+  const TC_PIV_security_report accepted = {request->objects, request->count,
                                            map.signer,       request->profile,
                                            map.at,           map.revocation_checked};
   *out = accepted;

@@ -224,7 +224,7 @@ static void check_arena_matches_explicit(const TC_bytes* chain, size_t count,
       fixed.certificate_capacity};
   TC_X509_path_workspace arranged;
   TC_X509_path_options options;
-  TC_X509_path_result by_arena, by_arrays;
+  TC_X509_path_report by_arena, by_arrays;
   size_t bytes = 0;
   munit_assert_size(fixed.summary_capacity, ==, fixed.certificate_capacity);
   munit_assert_int(TC_X509_path_workspace_size(&capacity, &bytes), ==, TC_RESULT_OK);
@@ -250,7 +250,7 @@ static void check_arena_matches_explicit(const TC_bytes* chain, size_t count,
      * policy tree needs its anyPolicy root (RFC 5280 section 6.1.2(a)). */
     TC_X509_path_capacity no_policies = capacity;
     TC_X509_path_workspace policy_free;
-    TC_X509_path_result unchanged, limited;
+    TC_X509_path_report unchanged, limited;
     no_policies.policy_nodes = no_policies.policy_edges = no_policies.policy_expected = 0;
     no_policies.policy_mappings = no_policies.policies = 0;
     munit_assert_int(TC_X509_path_workspace_init(
@@ -299,7 +299,7 @@ TC_TEST(paths)
     size_t leaf_length =
         encode_certificate(leaf, root_key, EVP_sha256(), leaf_der, sizeof leaf_der);
     TC_X509_certificate parsed_root, parsed_leaf;
-    TC_X509_path_result result;
+    TC_X509_path_report result;
     munit_assert_int(
         TC_X509_read((TC_bytes){root_der, root_length}, &limits, &parser, &parsed_root), ==,
         TC_TLV_OK);
@@ -348,7 +348,7 @@ TC_TEST(paths)
       TC_X509_search_frame search_frames[EXAMPLE_CLIENT_PATH_CAPACITY];
       const TC_X509_search_workspace search = {search_path, search_frames,
                                                EXAMPLE_CLIENT_PATH_CAPACITY};
-      TC_X509_search_result found;
+      TC_X509_search_report found;
       certificate_source records = {0};
       TC_X509_store_source source = {&records, 1, 1, source_candidate, source_anchor};
       add_extension(intermediate, NID_basic_constraints, "critical,CA:TRUE,pathlen:0");

@@ -33,7 +33,7 @@ TC_result example_validation_options(const TC_CMS_path_options* path,
 TC_credential_status example_validate_biometric(
     const TC_PIV_biometric_validation_request* request, const TC_X509_store_snapshot* snapshot,
     const TC_CMS_path_options* options, const TC_CMS_revocation_policy* revocation, size_t* work,
-    ExampleCMSCredentialWorkspace* workspace, TC_PIV_biometric_result* out);
+    ExampleCMSCredentialWorkspace* workspace, TC_PIV_biometric_report* out);
 TC_credential_status example_validate_security(const TC_PIV_security_validation_request* request,
                                                const TC_X509_store_snapshot* snapshot,
                                                const TC_CMS_path_options* options,

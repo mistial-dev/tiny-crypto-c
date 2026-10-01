@@ -29,7 +29,7 @@ typedef enum { OCSP_GOOD, OCSP_REVOKED, OCSP_UNKNOWN } ocsp_cert_status;
 typedef struct {
   TC_bytes tbs, signature, responder, embedded, nonce;
   TC_DER_algorithm algorithm;
-  TC_X509_ocsp_result result;
+  TC_X509_ocsp_report result;
   ocsp_cert_status status;
   int responder_by_key, matched, nonce_present;
 } ocsp_response;
@@ -178,7 +178,7 @@ static TC_TLV_result extensions(TC_bytes wrapper, const TC_X509_ocsp_verify_requ
  * CRLReason OPTIONAL (RFC 6960 4.2.1). removeFromCRL appears only in delta
  * CRLs (RFC 5280 5.3.1), so a response that carries it is INVALID. */
 static TC_TLV_result revoked_info(TC_bytes contents, const TC_TLV_limits* limits,
-                                  TC_X509_ocsp_result* result)
+                                  TC_X509_ocsp_report* result)
 {
   TC_TLV_reader revoked;
   TC_TLV_element field;
@@ -203,7 +203,7 @@ static TC_TLV_result single_response(TC_bytes encoded, const TC_X509_certificate
 {
   TC_TLV_reader reader;
   TC_TLV_element field;
-  TC_X509_ocsp_result result = {0};
+  TC_X509_ocsp_report result = {0};
   ocsp_cert_status cert_status;
   int matched;
   TC_TLV_result status = sequence(encoded, request->parsing, &reader);
@@ -436,7 +436,7 @@ static TC_TLV_result parse_response(const TC_X509_ocsp_verify_request* request,
  * at. A response without nextUpdate is fresh only under a nonzero
  * max_age_seconds. Response times that cannot be converted are INVALID. */
 static TC_TLV_result time_check(const TC_X509_ocsp_verify_request* request,
-                                const TC_X509_ocsp_result* result)
+                                const TC_X509_ocsp_report* result)
 {
   int64_t now, produced;
   tc_x509_freshness freshness;
@@ -497,7 +497,7 @@ static TC_TLV_result delegate_path(TC_bytes encoded, const TC_X509_ocsp_verify_r
                                    TC_X509_public_key* key)
 {
   TC_X509_path_options options;
-  TC_X509_path_result validated;
+  TC_X509_path_report validated;
   memset(&options, 0, sizeof options);
   options.at = request->time.at;
   options.clock_skew_seconds = request->time.clock_skew_seconds;
@@ -640,7 +640,7 @@ static int trust_anchor_present(const TC_X509_trust_anchor* issuer)
 /* Verify after the entry checks. out is written only on OK. */
 static TC_TLV_result verify_response(const TC_X509_ocsp_verify_request* request,
                                      const TC_X509_path_workspace* workspace, size_t* work,
-                                     TC_X509_ocsp_result* out)
+                                     TC_X509_ocsp_report* out)
 {
   if (request->response.length > *work)
     return TC_TLV_LIMIT;
@@ -683,7 +683,7 @@ static TC_TLV_result verify_response(const TC_X509_ocsp_verify_request* request,
 
 TC_TLV_result TC_X509_ocsp_response_verify(const TC_X509_ocsp_verify_request* request,
                                            const TC_X509_path_workspace* workspace, size_t* work,
-                                           TC_X509_ocsp_result* out)
+                                           TC_X509_ocsp_report* out)
 {
   if (!request || !workspace || !work || !out || !request->response.data ||
       !request->certificate.data || !trust_anchor_present(request->issuer) || !request->parsing ||

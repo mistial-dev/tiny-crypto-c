@@ -472,7 +472,7 @@ void tc_x509_path_options_plan_inputs(tc_pki_storage_plan* plan,
 static TC_TLV_result path_storage(const TC_bytes* chain, size_t count,
                                   const TC_X509_store_anchor* anchor,
                                   const TC_X509_path_options* options,
-                                  const TC_X509_path_workspace* workspace, TC_X509_path_result* out,
+                                  const TC_X509_path_workspace* workspace, TC_X509_path_report* out,
                                   size_t* work)
 {
   TC_bytes writes[TC_X509_PATH_STORAGE_COUNT + 1];
@@ -674,7 +674,7 @@ static TC_X509_path_status path_pass_status(TC_TLV_result result, int accepted)
 /* Validate the caller's arguments once, before any work is charged.
  * option_bytes receives the option OID bytes examined. */
 static TC_X509_path_status
-path_arguments_check(const path_validation* v, const TC_X509_path_result* out, size_t* option_bytes)
+path_arguments_check(const path_validation* v, const TC_X509_path_report* out, size_t* option_bytes)
 {
   const TC_X509_store_anchor* anchor = v->anchor;
   const TC_X509_path_options* options = v->options;
@@ -889,10 +889,10 @@ static TC_X509_path_status path_usage_phase(const path_validation* v)
 /* Write the outputs of RFC 5280 section 6.1.6: the target's public key and
  * the valid policy set. work_used counts the units spent since initial_work. */
 static TC_X509_path_status path_result_write(const path_validation* v, size_t initial_work,
-                                             TC_X509_path_result* out)
+                                             TC_X509_path_report* out)
 {
   const TC_X509_certificate* target = NULL;
-  TC_X509_path_result validated;
+  TC_X509_path_report validated;
   const TC_TLV_result result = tc_x509_path_certificate(&v->input, v->count - 1, v->work, &target);
   if (result != TC_TLV_OK)
     return tc_x509_path_status(result);
@@ -911,7 +911,7 @@ TC_X509_path_status tc_x509_path_validate_anchor(const TC_bytes* chain, size_t c
                                                  const TC_X509_store_anchor* anchor,
                                                  const TC_X509_path_options* options,
                                                  const TC_X509_path_workspace* workspace,
-                                                 size_t* work, TC_X509_path_result* out)
+                                                 size_t* work, TC_X509_path_report* out)
 {
   path_validation v;
   size_t initial_work, option_bytes = 0;
@@ -951,7 +951,7 @@ TC_X509_path_status tc_x509_path_validate_budget(const TC_bytes* chain, size_t c
                                                  const TC_X509_trust_anchor* anchor,
                                                  const TC_X509_path_options* options,
                                                  const TC_X509_path_workspace* workspace,
-                                                 size_t* work, TC_X509_path_result* out)
+                                                 size_t* work, TC_X509_path_report* out)
 {
   TC_X509_store_anchor stored = {0};
   if (!anchor)
@@ -964,7 +964,7 @@ TC_X509_path_status TC_X509_path_validate_with_anchor(const TC_bytes* chain, siz
                                                       const TC_X509_store_anchor* anchor,
                                                       const TC_X509_path_options* options,
                                                       const TC_X509_path_workspace* workspace,
-                                                      TC_X509_path_result* out)
+                                                      TC_X509_path_report* out)
 {
   size_t work;
   if (!options)
@@ -977,7 +977,7 @@ TC_X509_path_status TC_X509_path_validate(const TC_bytes* chain, size_t count,
                                           const TC_X509_trust_anchor* anchor,
                                           const TC_X509_path_options* options,
                                           const TC_X509_path_workspace* workspace,
-                                          TC_X509_path_result* out)
+                                          TC_X509_path_report* out)
 {
   size_t work;
   if (!options)

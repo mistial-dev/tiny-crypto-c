@@ -37,14 +37,14 @@ TC_X509_signature_result tc_x509_crl_signer_digest_check(
 }
 
 TC_TLV_result tc_x509_crl_check_signer(const void* context, const TC_X509_certificate* candidate,
-                                       const tc_x509_crl_trust* trust, TC_X509_search_result* out)
+                                       const tc_x509_crl_trust* trust, TC_X509_search_report* out)
 {
   return tc_x509_path_result_status(tc_x509_crl_signer_validate(context, candidate, trust, out));
 }
 
 TC_TLV_result tc_x509_crl_store_search(const void* candidates,
                                        const tc_x509_crl_signer_query* query,
-                                       const tc_x509_crl_trust* trust, TC_X509_search_result* out,
+                                       const tc_x509_crl_trust* trust, TC_X509_search_report* out,
                                        int* source_failed)
 {
   if (!candidates)

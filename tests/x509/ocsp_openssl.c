@@ -325,7 +325,7 @@ static TC_X509_ocsp_verify_request target_request(TC_bytes response)
 
 /* Verify and check the documented output state: a wiped result on failure. */
 static TC_TLV_result verify_with(const TC_X509_ocsp_verify_request* request,
-                                 TC_X509_ocsp_result* result)
+                                 TC_X509_ocsp_report* result)
 {
   size_t work = 20000000;
   memset(result, 0x5a, sizeof *result);
@@ -337,7 +337,7 @@ static TC_TLV_result verify_with(const TC_X509_ocsp_verify_request* request,
 }
 
 static TC_TLV_result verify(const response_spec* spec, const TC_X509_store_source* store,
-                            TC_X509_ocsp_result* result)
+                            TC_X509_ocsp_report* result)
 {
   TC_X509_ocsp_verify_request request = target_request(build_response(spec, response_bytes));
   request.certificates = store;
@@ -360,7 +360,7 @@ static void assert_time_equal(const TC_X509_time* actual, const TC_X509_time* ex
 TC_TEST(ca_signed)
 {
   const unsigned long forms[] = {OCSP_NOCERTS, OCSP_NOCERTS | OCSP_RESPID_KEY, 0};
-  TC_X509_ocsp_result result;
+  TC_X509_ocsp_report result;
   hierarchy_init();
   for (size_t i = 0; i < sizeof forms / sizeof *forms; ++i) {
     response_spec spec = response_by(pki.ca, pki.ca_key);
@@ -440,7 +440,7 @@ TC_TEST(ca_signed)
  * UNSUPPORTED. A CertID naming another issuer covers no certificate. */
 TC_TEST(cert_id)
 {
-  TC_X509_ocsp_result result;
+  TC_X509_ocsp_report result;
   hierarchy_init();
   response_spec spec = response_by(pki.ca, pki.ca_key);
   spec.flags = OCSP_NOCERTS;
@@ -463,7 +463,7 @@ TC_TEST(cert_id)
 TC_TEST(delegates)
 {
   const unsigned long forms[] = {0, OCSP_RESPID_KEY};
-  TC_X509_ocsp_result result;
+  TC_X509_ocsp_report result;
   hierarchy_init();
   for (int nocheck = 0; nocheck < 2; ++nocheck) {
     certificate_spec authorized = delegate_spec();
@@ -514,7 +514,7 @@ TC_TEST(delegates)
 TC_TEST(delegate_rejections)
 {
   enum { CASES = 8 };
-  TC_X509_ocsp_result result;
+  TC_X509_ocsp_report result;
   hierarchy_init();
   for (int i = 0; i < CASES; ++i) {
     certificate_spec rejected = delegate_spec();
@@ -566,7 +566,7 @@ TC_TEST(delegate_rejections)
  * appear once. max_responses bounds every SingleResponse read. */
 TC_TEST(single_responses)
 {
-  TC_X509_ocsp_result result;
+  TC_X509_ocsp_report result;
   hierarchy_init();
   response_spec spec = response_by(pki.ca, pki.ca_key);
   spec.flags = OCSP_NOCERTS;
@@ -594,7 +594,7 @@ TC_TEST(single_responses)
  * (RFC 9654 2.1). */
 TC_TEST(extensions)
 {
-  TC_X509_ocsp_result result;
+  TC_X509_ocsp_report result;
   hierarchy_init();
   response_spec spec = response_by(pki.ca, pki.ca_key);
   spec.flags = OCSP_NOCERTS;
@@ -630,7 +630,7 @@ TC_TEST(extensions)
 TC_TEST(nonce)
 {
   uint8_t nonce_bytes[130], encoded[512];
-  TC_X509_ocsp_result result;
+  TC_X509_ocsp_report result;
   hierarchy_init();
   for (size_t i = 0; i < sizeof nonce_bytes; ++i)
     nonce_bytes[i] = (uint8_t)(0x40 + i);
@@ -708,7 +708,7 @@ TC_TEST(nonce)
 /* Run request with budget and require LIMIT with a wiped result. */
 static void assert_work_limit(const TC_X509_ocsp_verify_request* request, size_t budget)
 {
-  TC_X509_ocsp_result result;
+  TC_X509_ocsp_report result;
   memset(&result, 0x5a, sizeof result);
   size_t work = budget;
   munit_assert_int(TC_X509_ocsp_response_verify(request, &fixture.workspace, &work, &result), ==,
@@ -723,7 +723,7 @@ static void assert_work_limit(const TC_X509_ocsp_verify_request* request, size_t
  * and parsing capacities are LIMIT too. */
 TC_TEST(work_limits)
 {
-  TC_X509_ocsp_result result;
+  TC_X509_ocsp_report result;
   hierarchy_init();
   X509* delegate;
   {
@@ -780,7 +780,7 @@ TC_TEST(unsuccessful)
 {
   const TC_TLV_result expected[] = {TC_TLV_INVALID, TC_TLV_UNSUPPORTED, TC_TLV_UNSUPPORTED,
                                     TC_TLV_INVALID, TC_TLV_UNSUPPORTED, TC_TLV_UNSUPPORTED};
-  TC_X509_ocsp_result result;
+  TC_X509_ocsp_report result;
   hierarchy_init();
   for (int status = 1; status <= 6; ++status) {
     OCSP_RESPONSE* response = OCSP_response_create(status, NULL);
@@ -845,7 +845,7 @@ static uint8_t crl_bytes[OCSP_FILE_CAPACITY];
 /* Check the one-certificate path CA -> target with a CRL selector from the
  * enum above. delegate, when present, is a source candidate. */
 static TC_TLV_result check_path(TC_bytes response, int crl, const TC_bytes* delegate,
-                                TC_X509_revocation_result* result)
+                                TC_X509_revocation_report* result)
 {
   const long serial = crl == CRL_REVOKES_TARGET     ? TARGET_SERIAL
                       : crl == CRL_REVOKES_DELEGATE ? DELEGATE_SERIAL
@@ -867,7 +867,7 @@ static TC_TLV_result check_path(TC_bytes response, int crl, const TC_bytes* dele
  * report REVOKED, while GOOD requires proof that the delegate is unrevoked. */
 TC_TEST(path_fallback)
 {
-  TC_X509_revocation_result result;
+  TC_X509_revocation_report result;
   hierarchy_init();
   response_spec spec = response_by(pki.ca, pki.ca_key);
   spec.flags = OCSP_NOCERTS;

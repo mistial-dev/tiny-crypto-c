@@ -57,7 +57,7 @@ static TC_TLV_result filter_candidate(const void* context, const TC_X509_certifi
 }
 
 static TC_TLV_result attempt_candidate(const void* context, const TC_X509_certificate* candidate,
-                                       TC_X509_search_result* out)
+                                       TC_X509_search_report* out)
 {
   fixture* state = (fixture*)context;
   (void)candidate;
@@ -85,7 +85,7 @@ TC_TEST(callbacks)
     size_t work = 3;
     fixture state = {scenario, 0, 0, &work};
     const tc_pki_tree_workspace tree = {NULL, 0, &work};
-    TC_X509_search_result out, saved;
+    TC_X509_search_report out, saved;
     int source_failed = 0;
     memset(&out, 0xa5, sizeof out);
     memcpy(&saved, &out, sizeof out);

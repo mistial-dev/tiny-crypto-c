@@ -39,7 +39,7 @@ tc_cms_revocation_evidence tc_validation_evidence(const TC_validation_context* c
 TC_credential_status tc_x509_validate_evidence(TC_bytes encoded,
                                                const TC_validation_context* context,
                                                const tc_cms_revocation_evidence* evidence,
-                                               size_t* work, TC_X509_validation_result* out,
+                                               size_t* work, TC_X509_validation_report* out,
                                                int* path_valid);
 
 /* Adapt shared execution settings to the path and revocation engines. Returns

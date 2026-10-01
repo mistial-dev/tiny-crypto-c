@@ -97,7 +97,7 @@ static struct {
   int has_chuid;
   uint8_t signer_der[COPY_BYTES];
   TC_PIV_certificate signer;
-  TC_X509_validation_result signer_result;
+  TC_X509_validation_report signer_result;
   TC_GZIP_workspace gzip;
   /* Secure messaging and the VCI */
   TC_PIV_SM session;
@@ -643,7 +643,7 @@ static TC_bytes biometric_record(TC_bytes value)
 }
 
 /* A validated certificate view of a card certificate container. */
-static void certificate_validate(TC_bytes encoded, uint8_t key, TC_X509_validation_result* out)
+static void certificate_validate(TC_bytes encoded, uint8_t key, TC_X509_validation_report* out)
 {
   const TC_PIV_certificate certificate =
       certificate_decode(encoded, TC_PIV_CERTIFICATE_SLOT, run.certificate_der);
@@ -655,7 +655,7 @@ static void certificate_validate(TC_bytes encoded, uint8_t key, TC_X509_validati
     const TC_PIV_card_certificate_request request = {certificate.certificate, TC_PIV_CARD, key, 0,
                                                      key == 0x9a ? run.chuid.card_uuid
                                                                  : (TC_bytes){NULL, 0}};
-    TC_PIV_card_certificate_result result;
+    TC_PIV_card_certificate_report result;
     status = TC_PIV_card_certificate_validate(&request, &run.trust.context, &work, &result);
     if (status == TC_CREDENTIAL_VALID)
       *out = result.certificate;
@@ -664,7 +664,7 @@ static void certificate_validate(TC_bytes encoded, uint8_t key, TC_X509_validati
     munit_errorf("certificate %02x: %d", key, status);
 }
 
-static void prove(uint8_t key, const TC_X509_validation_result* certificate)
+static void prove(uint8_t key, const TC_X509_validation_report* certificate)
 {
   tc_piv_card_backend_proofs(&run.backend, &key, 1);
   const TC_PIV_key_proof_request request = {
@@ -686,7 +686,7 @@ TC_TEST(pin)
   if (!tc_piv_guard_identity_bound(&run.guard))
     munit_error("the card identity did not match, so no PIN is sent");
   int sign = run.backend.signature_proofs;
-  TC_X509_validation_result signing;
+  TC_X509_validation_report signing;
   memset(&signing, 0, sizeof signing);
   if (sign) {
     TC_PIV_data_object object;
@@ -739,7 +739,7 @@ TC_TEST(key_proofs)
 {
   if (!run.copies[COPY_CARD_CERTIFICATE].present)
     return MUNIT_SKIP;
-  TC_X509_validation_result certificate;
+  TC_X509_validation_report certificate;
   certificate_validate(run.copies[COPY_CARD_CERTIFICATE].object.encoded, 0x9e, &certificate);
   prove(0x9e, &certificate);
   if (run.pin_verified) {

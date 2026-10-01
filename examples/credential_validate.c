@@ -129,7 +129,7 @@ ExampleTWICResult example_twic_authenticate(TC_PIV_link* link, const ExampleTWIC
   const TC_X509_path_workspace validation =
       example_x509_workspace(&workspace->certificate.validation);
   const TC_X509_search_workspace search = example_x509_search_workspace(&workspace->certificate);
-  TC_X509_search_result path;
+  TC_X509_search_report path;
   const TC_X509_path_status checked = TC_X509_path_build(request->certificate, request->trust,
                                                          &options, &validation, &search, &path);
   if (checked != TC_X509_PATH_VALID) {

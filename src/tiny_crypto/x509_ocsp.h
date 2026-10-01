@@ -39,7 +39,7 @@ typedef struct {
    * delegate means the caller must establish the delegate's own revocation
    * status before relying on the result (RFC 6960 4.2.2.2.1). */
   int responder_nocheck;
-} TC_X509_ocsp_result;
+} TC_X509_ocsp_report;
 
 typedef struct {
   /* A complete DER OCSPResponse and the certificate it should cover. */
@@ -116,7 +116,7 @@ typedef struct {
  * verification. Work and scratch may change on every result. */
 TC_TLV_result TC_X509_ocsp_response_verify(const TC_X509_ocsp_verify_request* request,
                                            const TC_X509_path_workspace* workspace, size_t* work,
-                                           TC_X509_ocsp_result* out);
+                                           TC_X509_ocsp_report* out);
 #endif
 
 /* One OCSPRequest for a single certificate. issuer names and holds the key

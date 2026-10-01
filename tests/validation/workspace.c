@@ -393,7 +393,7 @@ TC_TEST(context_setup)
     munit_assert_int(TC_validation_context_init(&trust, &changed, &workspace.credential, &context),
                      ==, TC_RESULT_ARGUMENT);
   }
-  TC_X509_validation_result result, unchanged;
+  TC_X509_validation_report result, unchanged;
   memset(&result, 0xa5, sizeof result);
   memcpy(&unchanged, &result, sizeof result);
   work = 0;
@@ -403,7 +403,7 @@ TC_TEST(context_setup)
   munit_assert_memory_equal(sizeof result, &unchanged, &result);
   work = 10000;
   munit_assert_int(TC_X509_validate((TC_bytes){empty_sequence, sizeof empty_sequence}, &context,
-                                    &work, (TC_X509_validation_result*)arena),
+                                    &work, (TC_X509_validation_report*)arena),
                    ==, TC_CREDENTIAL_ERROR);
   munit_assert_size(work, ==, 10000);
   return MUNIT_OK;

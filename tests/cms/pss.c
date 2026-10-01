@@ -86,7 +86,7 @@ static void check_envelope_path(TC_bytes signer, EVP_PKEY* key, const TC_RSA_wor
                               workspace.validation.oid_capacity};
   TC_CMS_path_options options = {0};
   TC_X509_certificate parsed_root;
-  TC_X509_search_result found, saved;
+  TC_X509_search_report found, saved;
   TC_CMS_signed_data data = {0};
   EVP_PKEY* root_key = EVP_EC_gen("prime256v1");
   munit_assert_not_null(root_key);

@@ -74,7 +74,7 @@ typedef struct {
   TC_PIV_application application;
   TC_PIV_card_profile profile; /* the credential profile of the checks */
   TC_PIV_certificate signer;   /* 5FC122 read plain */
-  TC_X509_validation_result signer_result;
+  TC_X509_validation_report signer_result;
   TC_PIV_CHUID chuid; /* 5FC102 read plain */
   TC_PIV_discovery discovery;
   TC_PIV_object copies[2]; /* plain copies for COPY_MATCH */

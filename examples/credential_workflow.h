@@ -101,15 +101,15 @@ typedef struct {
 } ExampleCredentialValidationRequest;
 
 typedef struct {
-  TC_X509_validation_result card;
+  TC_X509_validation_report card;
   TC_PIV_card_identifiers identifiers;
-  TC_PIV_CHUID_result chuid;
-  TC_PIV_security_result security;
+  TC_PIV_CHUID_report chuid;
+  TC_PIV_security_report security;
   int has_security;
   TC_PIV_printed printed;
   int has_printed;
   /* One result per request biometric, in request order. */
-  TC_PIV_biometric_result biometrics[EXAMPLE_CREDENTIAL_BIOMETRICS];
+  TC_PIV_biometric_report biometrics[EXAMPLE_CREDENTIAL_BIOMETRICS];
   size_t biometric_count;
 } ExampleCredentialValidationResult;
 

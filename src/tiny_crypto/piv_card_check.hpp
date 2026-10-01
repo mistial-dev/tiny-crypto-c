@@ -27,7 +27,7 @@ typedef ::TC_PIV_card_check_ocsp piv_card_check_ocsp;
 typedef ::TC_PIV_card_check_request piv_card_check_request;
 typedef ::TC_PIV_card_check_workspace piv_card_check_workspace;
 typedef ::TC_PIV_card_certificate_request piv_card_certificate_request;
-typedef ::TC_PIV_card_certificate_result piv_card_certificate_result;
+typedef ::TC_PIV_card_certificate_report piv_card_certificate_result;
 
 /* TC_PIV_card_check. */
 TC_CPP_NODISCARD inline piv_result piv_card_check(const piv_card_check_request& request,

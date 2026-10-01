@@ -764,7 +764,7 @@ static int signed_objects_check(TC_PIV_link* link, const Options* options, TC_by
   const TC_CMS_credential_workspace chuid_workspace =
       example_cms_credential_workspace(&sensitive.scratch.object_validation, &chuid_path);
   TC_validation_context chuid_context;
-  TC_PIV_CHUID_result accepted;
+  TC_PIV_CHUID_report accepted;
   if (TC_validation_context_init(&trust, &validation, &chuid_workspace, &chuid_context) !=
           TC_RESULT_OK ||
       TC_PIV_CHUID_validate(&request, &chuid_context, work, &accepted) != TC_CREDENTIAL_VALID)
@@ -814,7 +814,7 @@ static int signed_objects_check(TC_PIV_link* link, const Options* options, TC_by
     const TC_PIV_security_validation_workspace security_workspace = {
         sensitive.scratch.security_validation.content,
         sizeof sensitive.scratch.security_validation.content};
-    TC_PIV_security_result accepted_security;
+    TC_PIV_security_report accepted_security;
     const TC_TWIC_unsigned_CHUID_validation_request unsigned_request = {
         unsigned_chuid, TC_PIV_CHUID_CONTENTS, profile, &card.identifiers, &accepted_security};
     if (TC_validation_context_init(&trust, &validation, &security_credential, &security_context) !=
@@ -861,7 +861,7 @@ static int signed_objects_check(TC_PIV_link* link, const Options* options, TC_by
   for (size_t i = 0; i < object_count; ++i) {
     const TC_PIV_biometric_validation_request biometric = {
         objects[i], profile, &accepted, &card.expiration, signature_profile, formats[i], 1};
-    TC_PIV_biometric_result authenticated;
+    TC_PIV_biometric_report authenticated;
     if (TC_PIV_biometric_validate(&biometric, &chuid_context, work, &authenticated) !=
         TC_CREDENTIAL_VALID)
       return 0;
@@ -1080,7 +1080,7 @@ int main(int argc, char** argv)
       example_x509_workspace(&sensitive.scratch.validation.certificate.validation);
   const TC_X509_search_workspace search =
       example_x509_search_workspace(&sensitive.scratch.validation.certificate);
-  TC_X509_search_result final_path;
+  TC_X509_search_report final_path;
   failure = "Certificate path failed its final time check";
   accepted = TC_X509_path_build(certificate, &trust, &path, &validation, &search, &final_path) ==
              TC_X509_PATH_VALID;
@@ -1111,7 +1111,7 @@ int main(int argc, char** argv)
                                                      TC_X509_CRL_ORDER_NUMBER,
                                                      {path.at, path.clock_skew_seconds, 0},
                                                      {NULL, 0, 0, 0}};
-      TC_X509_revocation_result result;
+      TC_X509_revocation_report result;
       failure = "Card certificate revocation check failed";
       const TC_TLV_result checked = example_check_path_revocation(
           chain, final_path.count, &revocation, &work, &sensitive.scratch.revocation, &result);

@@ -51,11 +51,12 @@ link only the enabled code.
 
 ## Result model
 
-Each module returns a named result type. Compare against the exact success
-value. Avoid treating a result as a Boolean or converting between enums
-numerically.
+Every public status-returning operation uses `TC_result`. Module typedefs and value names
+keep calls descriptive while allowing one handler to receive results from
+different modules. Compare against the named success value and avoid treating
+a result as a Boolean.
 
-| Result type                                                                  | Returned by                                                      | Success               |
+| Result name                                                                  | Returned by                                                      | Success               |
 | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------- |
 | `TC_status`                                                                  | AES, DES, hashes, HMAC, MD5, KMAC256, KBKDF, HKDF, SSKDF, PIV SM | `TC_OK`               |
 | `TC_EC_result`, `TC_RSA_result`, `TC_GZIP_result`, `TC_key_challenge_result` | EC, RSA, GZIP, key challenges                                    | `*_OK`                |
@@ -68,12 +69,17 @@ numerically.
 | `TC_PIV_result`                                                              | PIV and TWIC card commands                                       | `TC_PIV_OK`           |
 | `TC_result`                                                                  | workspace sizing and setup helpers                               | `TC_RESULT_OK`        |
 
-`TC_status` has three values. `TC_MISMATCH` reports a failed authentication or
-comparison: a tag, MAC or constant-time comparison that differs. `TC_ERROR`
-reports every other failure, including a NULL pointer, a bad length, a short
-output, an overlap, a missing IV or key, and a backend failure.
+The names in the table are typedef aliases of `TC_result`. `TC_status` uses
+`TC_MISMATCH`, an alias of `TC_RESULT_INVALID`, for a failed authentication or
+comparison. It uses `TC_ERROR`, an alias of `TC_RESULT_ERROR`, for every other
+failure, including a NULL pointer, a bad length, a short output, an overlap, a
+missing IV or key, and a backend failure.
 
-The richer result types use shared names with one meaning:
+Data returned by validation and parsing uses the `_report` suffix. For
+example, `TC_X509_path_report` contains a selected key and policies, while the
+function that fills it returns `TC_X509_path_status`, an alias of `TC_result`.
+
+The shared values have one meaning:
 
 - `INVALID`: received data is malformed or fails a check. Examples are a bad
   encoding, a signature that fails verification and a point off the curve.
@@ -88,11 +94,9 @@ The richer result types use shared names with one meaning:
 - `ERROR`: a random source, signature provider, cipher backend, storage
   source or internal self-check failed.
 
-EC, RSA, GZIP, key challenges, APDUs and PIV card commands order their values
-OK, INVALID, LIMIT, ARGUMENT, UNSUPPORTED, ERROR, so one handler can cover them.
-GZIP has no ERROR. RSA adds `TC_RSA_IN_PROGRESS` and `TC_RSA_CANCELLED` for
-stepwise key generation. PIV card commands add `TC_PIV_CARD_STATUS`, a card
-answer other than success, and `TC_PIV_REFUSED`, a safety rule that stopped a
+RSA adds `TC_RSA_IN_PROGRESS` and `TC_RSA_CANCELLED` for stepwise key
+generation. PIV card commands add `TC_PIV_CARD_STATUS`, a card answer other
+than success, and `TC_PIV_REFUSED`, a safety rule that stopped a
 command before it was sent. `TC_DRBG_ENTROPY` reports a failed entropy source with the DRBG
 state unchanged. `TC_TLV_END` and `TC_TLV_MORE` are reader states: no more
 siblings, or a root reader that needs more input. `TC_TLV_IO` reports backing
@@ -371,7 +375,7 @@ validated card certificate, with an explicit PIV, TWIC Legacy, or TWIC NEXGEN
 profile. `TC_validation_options` provides one evaluation time and signature
 provider plus separate certificate and CRL-signer policies. Initialize a
 `TC_validation_context` with held certificate/CRL trust and a sized
-`TC_CMS_credential_workspace`. A successful `TC_PIV_CHUID_result` supplies the
+`TC_CMS_credential_workspace`. A successful `TC_PIV_CHUID_report` supplies the
 authenticated object and signer to dependent biometric and Security Object
 requests, which reject a result from another profile or evaluation time.
 Callers retain responsibility for transport, cancellation status, and

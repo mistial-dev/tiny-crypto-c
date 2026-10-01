@@ -185,18 +185,17 @@ typedef struct {
   unsigned flags;
 } TC_X509_path_options;
 
-typedef enum {
-  TC_X509_PATH_VALID,
-  TC_X509_PATH_INVALID,
-  TC_X509_PATH_UNSUPPORTED,
-  TC_X509_PATH_LIMIT,
-  TC_X509_PATH_ERROR
-} TC_X509_path_status;
+typedef TC_result TC_X509_path_status;
+#define TC_X509_PATH_VALID TC_RESULT_OK
+#define TC_X509_PATH_INVALID TC_RESULT_INVALID
+#define TC_X509_PATH_UNSUPPORTED TC_RESULT_UNSUPPORTED
+#define TC_X509_PATH_LIMIT TC_RESULT_LIMIT
+#define TC_X509_PATH_ERROR TC_RESULT_ERROR
 typedef struct {
   TC_X509_public_key public_key;
   const TC_bytes* policies;
   size_t policy_count, work_used;
-} TC_X509_path_result;
+} TC_X509_path_report;
 
 /* Search scratch fields are managed by the library. */
 typedef struct {
@@ -211,8 +210,8 @@ typedef struct {
 typedef struct {
   const TC_bytes* path;
   size_t count, anchor_index;
-  TC_X509_path_result validation;
-} TC_X509_search_result;
+  TC_X509_path_report validation;
+} TC_X509_search_report;
 
 #if TC_ENABLE_X509_PATH
 /* Construct and validate a path from target to an explicit source anchor
@@ -248,7 +247,7 @@ TC_X509_path_status TC_X509_path_build(TC_bytes target, const TC_X509_store_sour
                                        const TC_X509_path_options* options,
                                        const TC_X509_path_workspace* validation,
                                        const TC_X509_search_workspace* search,
-                                       TC_X509_search_result* out);
+                                       TC_X509_search_report* out);
 
 /* Validate an ordered chain against one trust anchor (RFC 5280 section
  * 6.1): anchor-issued certificate first and target last, with the anchor
@@ -281,7 +280,7 @@ TC_X509_path_status TC_X509_path_validate(const TC_bytes* chain, size_t count,
                                           const TC_X509_trust_anchor* anchor,
                                           const TC_X509_path_options* options,
                                           const TC_X509_path_workspace* workspace,
-                                          TC_X509_path_result* out);
+                                          TC_X509_path_report* out);
 /* Validate against one explicit store anchor, including its path controls
  * (RFC 5937 section 3). anchor->policy_set, policy_flags, names and path_len
  * add their constraints to options. The anchor and its borrowed spans stay
@@ -297,7 +296,7 @@ TC_X509_path_status TC_X509_path_validate_with_anchor(const TC_bytes* chain, siz
                                                       const TC_X509_store_anchor* anchor,
                                                       const TC_X509_path_options* options,
                                                       const TC_X509_path_workspace* workspace,
-                                                      TC_X509_path_result* out);
+                                                      TC_X509_path_report* out);
 #endif
 #ifdef __cplusplus
 }

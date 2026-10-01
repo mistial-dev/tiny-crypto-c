@@ -1490,9 +1490,9 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
         munit_assert_int(TC_validation_context_init(&object_trust, &object_options,
                                                     &object_workspace, &object_context),
                          ==, TC_RESULT_OK);
-        TC_PIV_CHUID_result accepted_chuid;
+        TC_PIV_CHUID_report accepted_chuid;
         memset(&accepted_chuid, 0xa5, sizeof accepted_chuid);
-        TC_PIV_CHUID_result saved_chuid;
+        TC_PIV_CHUID_report saved_chuid;
         memcpy(&saved_chuid, &accepted_chuid, sizeof saved_chuid);
         work = TRUST_WORK;
         /* twicFASC-N lies outside the PIV attribute identifiers, so the PIV
@@ -1532,7 +1532,7 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
           munit_assert_memory_equal(accepted_chuid.signer.length, accepted_chuid.signer.data,
                                     object.certificate.data);
           munit_assert_int(accepted_chuid.profile, ==, object_request.profile);
-          TC_X509_validation_result signer_result;
+          TC_X509_validation_report signer_result;
           size_t certificate_work = TRUST_WORK;
           munit_assert_int(TC_X509_validate(accepted_chuid.signer, &object_context,
                                             &certificate_work, &signer_result),
@@ -1544,7 +1544,7 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
            * signer_policies scratch is ERROR before any work. */
           for (unsigned area = 0; area < 3; ++area) {
             union {
-              TC_PIV_CHUID_result result;
+              TC_PIV_CHUID_report result;
               TC_X509_revocation_scope scopes[EXAMPLE_CMS_CRL_CAPACITY];
               TC_bytes signer_path[EXAMPLE_X509_PATH_CAPACITY];
               TC_bytes signer_policies[EXAMPLE_X509_POLICY_CAPACITY];
@@ -1579,7 +1579,7 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
             munit_assert_int(TC_validation_context_init(&object_trust, &alias_options,
                                                         &object_workspace, &alias_context),
                              ==, TC_RESULT_OK);
-            TC_PIV_CHUID_result alias_result;
+            TC_PIV_CHUID_report alias_result;
             size_t alias_work = TRUST_WORK;
             munit_assert_int(
                 TC_PIV_CHUID_validate(&object_request, &alias_context, &alias_work, &alias_result),
@@ -1595,9 +1595,9 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
           const size_t chuid_work = work;
           /* The CHUID accepted in this evaluation, as TC_PIV_CHUID_validate
            * reports it. Dependent objects take identifiers and the signer from it. */
-          TC_PIV_CHUID_result bound_chuid = {chuid, object.certificate, object_options.at,
+          TC_PIV_CHUID_report bound_chuid = {chuid, object.certificate, object_options.at,
                                              object_request.profile, 1};
-          TC_PIV_biometric_result biometric_result;
+          TC_PIV_biometric_report biometric_result;
           {
             uint8_t security[OBJECT_BYTES];
             uint8_t unsigned_chuid[PREFIX_BYTES + 2];
@@ -1700,7 +1700,7 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
               const TC_PIV_security_validation_workspace security_workspace = {
                   security_storage.content, sizeof security_storage.content};
               TC_validation_context security_context;
-              TC_PIV_security_result accepted_security;
+              TC_PIV_security_report accepted_security;
               const TC_TWIC_unsigned_CHUID_validation_request unsigned_request = {
                   contents[1], TC_PIV_CHUID_CONTENTS, object_request.profile, &card,
                   &accepted_security};
@@ -1753,7 +1753,7 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
               const size_t before_overlap = work;
               munit_assert_int(TC_PIV_security_validate(
                                    &security_request, &security_context, &security_workspace, &work,
-                                   (TC_PIV_security_result*)security_storage.content),
+                                   (TC_PIV_security_report*)security_storage.content),
                                ==, TC_CREDENTIAL_ERROR);
               munit_assert_size(work, ==, before_overlap);
               credential_public_workflow(
@@ -1806,7 +1806,7 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
                 inventory[0].count = 0;
               if (failure == OMITTED_CHECK)
                 inventory[1].parts = &without_check;
-              TC_PIV_CHUID_result wrong_signer = bound_chuid;
+              TC_PIV_CHUID_report wrong_signer = bound_chuid;
               wrong_signer.signer = root_der;
               security_request.chuid = failure == WRONG_SIGNER ? &wrong_signer : &bound_chuid;
               if (failure == WRONG_MAP)
@@ -1906,7 +1906,7 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
           };
           for (unsigned check = 0; check < BIO_CASES; ++check) {
             ExampleBiometricRequest changed = biometric_request;
-            TC_PIV_CHUID_result changed_chuid = bound_chuid;
+            TC_PIV_CHUID_report changed_chuid = bound_chuid;
             changed.chuid = &changed_chuid;
             uint8_t other_guid[16];
             memcpy(other_guid, chuid.card_uuid.data, sizeof other_guid);

@@ -134,7 +134,7 @@ enum { TC_CMS_OCSP_PATH_MAX = 8 };
  * evidence->evidence_optional is 1. A NULL evidence requires evidence for
  * every member. LIMIT for an OCSP response on a path longer than
  * TC_CMS_OCSP_PATH_MAX. Other failures map the revocation check result. */
-TC_credential_status tc_cms_path_revocation_check(const TC_X509_search_result* path,
+TC_credential_status tc_cms_path_revocation_check(const TC_X509_search_report* path,
                                                   const TC_X509_store_source* source,
                                                   const TC_CMS_revocation_policy* revocation,
                                                   const TC_CMS_credential_workspace* workspace,
@@ -210,7 +210,7 @@ typedef struct {
 } tc_cms_signer_search;
 TC_X509_path_status tc_cms_signer_find(const tc_cms_candidates* candidates,
                                        const tc_cms_signer_search* search,
-                                       TC_X509_search_result* out);
+                                       TC_X509_search_report* out);
 /* Shared parsed-certificate iterator. NULL filter yields every X.509 record.
  * Filters consume bounded work, return
  * OK with matched=0/1, and leave the certificate/limits unchanged. Context
@@ -236,5 +236,5 @@ TC_TLV_result tc_cms_certificate_search(const tc_cms_candidates* candidates,
                                         const TC_TLV_limits* limits,
                                         const tc_pki_tree_workspace* tree,
                                         const TC_X509_path_workspace* validation,
-                                        TC_X509_search_result* out, int* source_failed);
+                                        TC_X509_search_report* out, int* source_failed);
 #endif

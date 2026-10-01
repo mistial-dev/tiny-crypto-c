@@ -76,14 +76,13 @@ typedef enum {
 
 /* A DRBG that returned TC_DRBG_ERROR stays unusable. Later reseed and
  * generate calls return TC_DRBG_ARGUMENT until it is instantiated again. */
-typedef enum {
-  TC_DRBG_OK,
-  TC_DRBG_ARGUMENT,    /* invalid argument, overlap, state or configuration */
-  TC_DRBG_UNSUPPORTED, /* mechanism or hash absent from this build */
-  TC_DRBG_LIMIT,       /* request larger than TC_DRBG_MAX_REQUEST_BYTES */
-  TC_DRBG_ENTROPY,     /* the entropy source failed and the state is unchanged */
-  TC_DRBG_ERROR        /* a primitive failed, so uninstantiate the DRBG */
-} TC_DRBG_result;
+typedef TC_result TC_DRBG_result;
+#define TC_DRBG_OK TC_RESULT_OK
+#define TC_DRBG_ARGUMENT TC_RESULT_ARGUMENT       /* invalid argument or state */
+#define TC_DRBG_UNSUPPORTED TC_RESULT_UNSUPPORTED /* mechanism absent from build */
+#define TC_DRBG_LIMIT TC_RESULT_LIMIT             /* request exceeds configured bound */
+#define TC_DRBG_ENTROPY TC_RESULT_ENTROPY         /* entropy source failed */
+#define TC_DRBG_ERROR TC_RESULT_ERROR             /* primitive failed; state destroyed */
 
 /* Instantiation parameters. Zero-initialize, then set the fields for the
  * chosen mechanism. The security strength is the mechanism's maximum:

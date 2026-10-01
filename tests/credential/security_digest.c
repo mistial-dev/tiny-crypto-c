@@ -28,9 +28,9 @@ static const TC_X509_time at = {2026, 9, 29, 18, 0, 0};
 
 /* An accepted card: its authentication certificate, identifiers and CHUID. */
 typedef struct {
-  TC_X509_validation_result certificate;
+  TC_X509_validation_report certificate;
   TC_PIV_card_identifiers identifiers;
-  TC_PIV_CHUID_result chuid;
+  TC_PIV_CHUID_report chuid;
 } accepted_card;
 static accepted_card accepted;
 
@@ -167,7 +167,7 @@ TC_TEST(authenticate)
       TC_PIV_security_authenticate(&request, &fixture.context, &lds_workspace, &work, &unchanged),
       ==, TC_CREDENTIAL_UNAVAILABLE);
   munit_assert_true(tc_test_all_value(&unchanged, sizeof unchanged, 0xa5));
-  TC_X509_validation_result certificate;
+  TC_X509_validation_report certificate;
   work = FIXTURE_WORK;
   munit_assert_int(TC_X509_validate(accepted.certificate.certificate.encoded, &fixture.context,
                                     &work, &certificate),
@@ -179,7 +179,7 @@ TC_TEST(authenticate)
                                                  0,
                                                  &accepted.identifiers,
                                                  &accepted.certificate.certificate.not_after};
-  TC_PIV_CHUID_result chuid_result;
+  TC_PIV_CHUID_report chuid_result;
   work = FIXTURE_WORK;
   munit_assert_int(TC_PIV_CHUID_validate(&chuid, &fixture.context, &work, &chuid_result), ==,
                    TC_CREDENTIAL_UNAVAILABLE);
@@ -342,7 +342,7 @@ TC_TEST(validate_inventory)
                                                 &accepted.certificate.certificate.not_after,
                                                 card2_inventory,
                                                 CARD2_MAPPED};
-  TC_PIV_security_result result;
+  TC_PIV_security_report result;
   size_t work = FIXTURE_WORK;
   munit_assert_int(
       TC_PIV_security_validate(&request, &fixture.context, &lds_workspace, &work, &result), ==,
@@ -351,7 +351,7 @@ TC_TEST(validate_inventory)
   munit_assert_size(result.count, ==, CARD2_MAPPED);
   munit_assert_uint8(result.revocation_checked, ==, 0);
 
-  TC_PIV_security_result unchanged;
+  TC_PIV_security_report unchanged;
   memset(&unchanged, 0xa5, sizeof unchanged);
   /* One changed container fails the complete inventory. */
   const TC_bytes fingerprints = card2_parts[2];

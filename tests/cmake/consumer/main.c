@@ -114,7 +114,7 @@ int main(void)
     TC_bytes path[1];
     TC_X509_search_frame frames[1];
     TC_X509_search_workspace search = {path, frames, 1};
-    TC_X509_search_result found;
+    TC_X509_search_report found;
     TC_bytes target = {spki, sizeof spki};
     options.max_work = 10000;
     options.max_certificates = 1;

@@ -280,7 +280,7 @@ TC_TLV_result tc_cms_certificate_search(const tc_cms_candidates* candidates,
                                         const TC_TLV_limits* limits,
                                         const tc_pki_tree_workspace* tree,
                                         const TC_X509_path_workspace* validation,
-                                        TC_X509_search_result* out, int* source_failed)
+                                        TC_X509_search_report* out, int* source_failed)
 {
   if (!candidates)
     return TC_TLV_ARGUMENT;

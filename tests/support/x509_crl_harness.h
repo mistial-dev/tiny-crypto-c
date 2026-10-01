@@ -43,12 +43,12 @@ TC_X509_signature_result tc_x509_crl_signer_digest_check(
 
 /* Candidate callbacks borrow validated search state for the whole attempt. */
 TC_TLV_result tc_x509_crl_check_signer(const void* context, const TC_X509_certificate* candidate,
-                                       const tc_x509_crl_trust* trust, TC_X509_search_result* out);
+                                       const tc_x509_crl_trust* trust, TC_X509_search_report* out);
 
 /* candidates points to a guarded store cursor snapshot, reused across searches. */
 TC_TLV_result tc_x509_crl_store_search(const void* candidates,
                                        const tc_x509_crl_signer_query* query,
-                                       const tc_x509_crl_trust* trust, TC_X509_search_result* out,
+                                       const tc_x509_crl_trust* trust, TC_X509_search_report* out,
                                        int* source_failed);
 
 /* Copy matches after the complete entry scan. Signature, signer trust, freshness

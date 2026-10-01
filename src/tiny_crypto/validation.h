@@ -178,7 +178,7 @@ typedef struct {
   /* 1 when CRL evidence covered every path member. 0 when
    * TC_VALIDATION_REVOCATION_WHEN_AVAILABLE accepted a member without it. */
   uint8_t revocation_checked;
-} TC_X509_validation_result;
+} TC_X509_validation_report;
 
 #if TC_ENABLE_CMS_VALIDATION
 /* Build a trusted path for the DER certificate in encoded and check CRL
@@ -204,7 +204,7 @@ typedef struct {
  * capacities. INVALID for a malformed certificate or a failed path or CRL
  * check. out changes only on VALID. */
 TC_credential_status TC_X509_validate(TC_bytes encoded, const TC_validation_context* context,
-                                      size_t* work, TC_X509_validation_result* out);
+                                      size_t* work, TC_X509_validation_report* out);
 #endif
 
 #ifdef __cplusplus

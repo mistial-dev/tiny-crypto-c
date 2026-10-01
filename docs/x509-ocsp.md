@@ -45,7 +45,7 @@ check.nonce = (TC_bytes){nonce, sizeof nonce};
 check.response = response;
 check.at = now;
 check.verifier = &verifier;
-TC_X509_ocsp_result result;
+TC_X509_ocsp_report result;
 switch (example_ocsp_check(&check, &storage, &result)) {
 case EXAMPLE_OCSP_GOOD:
     return accept(&result);

@@ -154,7 +154,7 @@ workspace can overwrite the returned policy array.
 
 Path discovery also returns its path-span array in search workspace. Before
 reusing either workspace, copy any path and policy spans you still need into
-caller-owned arrays. Copying only `TC_X509_search_result` leaves its pointers in
+caller-owned arrays. Copying only `TC_X509_search_report` leaves its pointers in
 the original scratch arrays. The certificate DER stays in its shared buffers.
 Keep those buffers and the source snapshot alive.
 

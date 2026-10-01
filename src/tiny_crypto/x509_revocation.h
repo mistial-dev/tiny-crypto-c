@@ -106,7 +106,7 @@ typedef struct {
   TC_X509_revocation_status status;
   size_t certificate_index;
   TC_X509_crl_evidence evidence;
-} TC_X509_revocation_result;
+} TC_X509_revocation_report;
 
 #if TC_ENABLE_X509_REVOCATION
 /* Check a previously validated path, anchor-issued first, anchor excluded.
@@ -161,7 +161,7 @@ typedef struct {
 TC_TLV_result TC_X509_path_check_revocation(const TC_bytes* chain, size_t count,
                                             const TC_X509_revocation_options* options,
                                             const TC_X509_revocation_workspace* workspace,
-                                            size_t* work, TC_X509_revocation_result* out);
+                                            size_t* work, TC_X509_revocation_report* out);
 #endif
 
 #ifdef __cplusplus

@@ -60,14 +60,13 @@ extern "C" {
  * on TC_EC_OK. UNSUPPORTED and LIMIT never report success. Argument errors
  * and limits found before arithmetic leave the workspace, the work budget and
  * the random source untouched. */
-typedef enum {
-  TC_EC_OK,
-  TC_EC_INVALID,
-  TC_EC_LIMIT,
-  TC_EC_ARGUMENT,
-  TC_EC_UNSUPPORTED,
-  TC_EC_ERROR
-} TC_EC_result;
+typedef TC_result TC_EC_result;
+#define TC_EC_OK TC_RESULT_OK
+#define TC_EC_INVALID TC_RESULT_INVALID
+#define TC_EC_LIMIT TC_RESULT_LIMIT
+#define TC_EC_ARGUMENT TC_RESULT_ARGUMENT
+#define TC_EC_UNSUPPORTED TC_RESULT_UNSUPPORTED
+#define TC_EC_ERROR TC_RESULT_ERROR
 
 /* Randomized operations draw from random, making at most random_attempts
  * requests. Work is reduced by the units completed on success and failure. */

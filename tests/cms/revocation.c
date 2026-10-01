@@ -83,7 +83,7 @@ typedef struct {
   size_t accept_calls;
 } crl_path_probe;
 
-static TC_X509_path_status check_crl_path(void* context, const TC_X509_search_result* path,
+static TC_X509_path_status check_crl_path(void* context, const TC_X509_search_report* path,
                                           const tc_x509_crl_selected* selected, size_t* work)
 {
   crl_path_probe* probe = context;
@@ -121,7 +121,7 @@ typedef struct {
   size_t pairs;
 } selected_crl_probe;
 
-static TC_X509_path_status check_selected_crl_path(void* context, const TC_X509_search_result* path,
+static TC_X509_path_status check_selected_crl_path(void* context, const TC_X509_search_report* path,
                                                    const tc_x509_crl_selected* selected,
                                                    size_t* work)
 {
@@ -144,7 +144,7 @@ typedef struct {
 } unresolved_crl_probe;
 
 static TC_X509_path_status check_unresolved_crl_path(void* context,
-                                                     const TC_X509_search_result* path,
+                                                     const TC_X509_search_report* path,
                                                      const tc_x509_crl_selected* selected,
                                                      size_t* work)
 {
@@ -164,7 +164,7 @@ static TC_X509_path_status check_unresolved_crl_path(void* context,
 static TC_TLV_result crl_signer_scope(const TC_X509_crl_record* record, TC_bytes signer,
                                       const tc_x509_crl_query* query,
                                       const tc_x509_crl_trust* trust,
-                                      TC_X509_crl_evidence* evidence, TC_X509_search_result* out)
+                                      TC_X509_crl_evidence* evidence, TC_X509_search_report* out)
 {
   candidate_source records = {&signer, 1, 0, TC_TLV_OK, 0};
   const TC_X509_store_source external = {&records, 1, 0, read_candidate, NULL};
@@ -200,7 +200,7 @@ static TC_TLV_result cms_crl_scope_check(const tc_cms_candidates* reader,
                                          TC_X509_crl_delta_policy delta_policy,
                                          const tc_x509_crl_query* query,
                                          const tc_x509_crl_trust* trust,
-                                         TC_X509_crl_evidence* evidence, TC_X509_search_result* out)
+                                         TC_X509_crl_evidence* evidence, TC_X509_search_report* out)
 {
   uint8_t states[8];
   munit_assert_size(index->count, <=, sizeof states);
@@ -492,7 +492,7 @@ typedef struct {
   TC_X509_crl_record indexed_record;
   TC_X509_crl_index crl_index;
   TC_X509_crl_evidence initial;
-  TC_X509_search_result found, saved;
+  TC_X509_search_report found, saved;
 } crl_scope_context;
 
 static void crl_scope_init(revocation_fixture* f, const tc_pki_tree_workspace* tree,
@@ -776,7 +776,7 @@ static MunitResult discovery_signer_validate(const MunitParameter params[], void
   size_t work = 0;
   (void)params;
   {
-    TC_X509_search_result found, saved;
+    TC_X509_search_report found, saved;
     memset(&saved, 0xa5, sizeof saved);
     memcpy(&found, &saved, sizeof found);
     work = TRUST_WORK_BUDGET;
@@ -937,7 +937,7 @@ static MunitResult discovery_anchor_signer(const MunitParameter params[], void* 
     TC_X509_certificate signer;
     munit_assert_int(TC_X509_read((TC_bytes){der, length}, &f->limits, &parser, &signer), ==,
                      TC_TLV_OK);
-    TC_X509_search_result found, saved;
+    TC_X509_search_report found, saved;
     memset(&saved, 0xa5, sizeof saved);
     memcpy(&found, &saved, sizeof found);
     size_t work = TRUST_WORK_BUDGET;
@@ -997,7 +997,7 @@ static MunitResult discovery_scope(const MunitParameter params[], void* user)
   const tc_pki_tree_workspace tree = {f->frames, FRAME_CAPACITY, &work};
   (void)params;
   {
-    TC_X509_search_result found, saved;
+    TC_X509_search_report found, saved;
     memset(&saved, 0xa5, sizeof saved);
     memcpy(&found, &saved, sizeof found);
     {
@@ -2009,7 +2009,7 @@ static MunitResult discovery_dependencies(const MunitParameter params[], void* u
           TC_X509_read((TC_bytes){leaf_der, leaf_length}, &limits, &parser, &leaf_view), ==,
           TC_TLV_OK);
       const TC_bytes chain[] = {{issuer_der, issuer_length}, {leaf_der, leaf_length}};
-      TC_X509_path_result validated;
+      TC_X509_path_report validated;
       work = TRUST_WORK_BUDGET;
       munit_assert_int(tc_x509_path_validate_budget(chain, DEPENDENCIES, &anchors[1].trust,
                                                     &options, &validation, &work, &validated),
@@ -2090,7 +2090,7 @@ static MunitResult discovery_dependencies(const MunitParameter params[], void* u
             &tree,        &validation, &search, states, sizeof states, nodes,
             DEPENDENCIES, 0,           NULL,    0,      NULL,          NULL};
         const TC_X509_crl_evidence empty = {0};
-        TC_X509_revocation_result path_evidence, path_sentinel;
+        TC_X509_revocation_report path_evidence, path_sentinel;
         memset(&path_sentinel, 0xa5, sizeof path_sentinel);
         TC_X509_revocation_options public_options = {&index,
                                                      &complete_source,
@@ -2135,7 +2135,7 @@ static MunitResult discovery_dependencies(const MunitParameter params[], void* u
                                                   NULL,
                                                   NULL,
                                                   &signer_cache};
-          TC_X509_search_result first, second;
+          TC_X509_search_report first, second;
           work = TRUST_WORK_BUDGET;
           munit_assert_int(tc_x509_crl_scope_attempt(&attempt, &signer, &trusted, &first), ==,
                            TC_TLV_OK);
@@ -2330,7 +2330,7 @@ static MunitResult discovery_dependencies(const MunitParameter params[], void* u
           const TC_X509_revocation_options* options;
           const TC_X509_revocation_workspace* workspace;
           size_t* budget;
-          TC_X509_revocation_result* result;
+          TC_X509_revocation_report* result;
         } missing_inputs[] = {
             {NULL, DEPENDENCIES, &public_options, &public_workspace, &work, &path_evidence},
             {chain, 0, &public_options, &public_workspace, &work, &path_evidence},
@@ -2384,7 +2384,7 @@ static MunitResult discovery_dependencies(const MunitParameter params[], void* u
           for (unsigned area = 0; area < 3; ++area)
             for (unsigned share = 0; share < SHARE_COUNT; ++share) {
               union {
-                TC_X509_revocation_result result;
+                TC_X509_revocation_report result;
                 TC_bytes chain[DEPENDENCIES];
                 TC_X509_revocation_scope scopes[DEPENDENCIES];
                 TC_bytes signer_path[PATH_CAPACITY];
@@ -2399,7 +2399,7 @@ static MunitResult discovery_dependencies(const MunitParameter params[], void* u
               if (area == 2 || (share == SHARED_SCRATCH && area == 1))
                 aliased.signer_policies = shared.signer_policies;
               const TC_bytes* checked_chain = chain;
-              TC_X509_revocation_result* result = &path_evidence;
+              TC_X509_revocation_report* result = &path_evidence;
               if (share == SHARED_RESULT)
                 result = &shared.result;
               if (share == SHARED_CHAIN) {
@@ -2465,7 +2465,7 @@ static MunitResult discovery_dependencies(const MunitParameter params[], void* u
           size_t count;
           const tc_cms_crl_resolution* resolution;
           const tc_x509_crl_resolution_workspace* workspace;
-          TC_X509_revocation_result* out;
+          TC_X509_revocation_report* out;
         } invalid_paths[] = {{NULL, DEPENDENCIES, &resolution, &workspace, &path_evidence},
                              {chain, 0, &resolution, &workspace, &path_evidence},
                              {chain, SIZE_MAX, &resolution, &workspace, &path_evidence},
@@ -2503,7 +2503,7 @@ static MunitResult discovery_dependencies(const MunitParameter params[], void* u
           munit_assert_memory_equal(sizeof nodes, nodes, saved_nodes);
         }
         union {
-          TC_X509_revocation_result result;
+          TC_X509_revocation_report result;
           TC_X509_revocation_node nodes[DEPENDENCIES];
         } overlapping;
         uint8_t saved_overlap[sizeof overlapping];
@@ -3344,7 +3344,7 @@ static MunitResult selection_lookup(const MunitParameter params[], void* user)
       enum { KEY_COMPROMISE_REASONS = 1u << 1 };
       TC_X509_crl_evidence evidence = {0};
       TC_X509_revocation_status status;
-      TC_X509_search_result trusted, unchanged;
+      TC_X509_search_report trusted, unchanged;
       signature_retry_probe probe = {provider, 0, 0, TC_X509_SIGNATURE_ERROR};
       TC_X509_path_options checked = options;
       checked.signatures = (TC_X509_signature_provider){retry_signature, &probe, NULL};
@@ -3627,7 +3627,7 @@ static MunitResult selection_delta(const MunitParameter params[], void* user)
         selection.selected.delta_info = &delta_info;
         {
           TC_X509_crl_evidence evidence = {0}, empty = {0};
-          TC_X509_search_result trusted, unchanged;
+          TC_X509_search_report trusted, unchanged;
           TC_X509_path_options updated = options;
           signature_retry_probe probe = {provider, 0, 0, TC_X509_SIGNATURE_ERROR};
           updated.signatures = (TC_X509_signature_provider){retry_signature, &probe, NULL};
@@ -4907,7 +4907,7 @@ static MunitResult entries_and_signer(const MunitParameter params[], void* user)
       const tc_x509_crl_query query = {&target, &point, 0};
       TC_X509_crl_evidence initial = {0}, evidence;
       initial.reasons = 1u << 1;
-      TC_X509_search_result found, saved;
+      TC_X509_search_report found, saved;
       memset(&saved, 0xa5, sizeof saved);
       enum { WRONG_ANCHOR, TRUSTED, EXPIRED, CASE_COUNT };
       for (unsigned scenario = 0; scenario < CASE_COUNT; ++scenario) {

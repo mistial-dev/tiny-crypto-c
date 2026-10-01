@@ -40,7 +40,7 @@ static int bytes_equal(TC_bytes first, TC_bytes second)
          (!first.length || !memcmp(first.data, second.data, first.length));
 }
 
-static int printed_is_authenticated(const TC_PIV_security_result* security, TC_bytes printed)
+static int printed_is_authenticated(const TC_PIV_security_report* security, TC_bytes printed)
 {
   for (size_t i = 0; i < security->count; ++i) {
     const TC_PIV_security_data* object = &security->objects[i];
@@ -192,7 +192,7 @@ example_credential_validate(const ExampleCredentialValidationRequest* request,
       request->card_key == EXAMPLE_CREDENTIAL_PIV_AUTHENTICATION ? TC_PIV_KEY_PIV_AUTHENTICATION
                                                                  : TC_PIV_KEY_CARD_AUTHENTICATION,
       (uint8_t)request->twic_reader_policy, card_guid};
-  TC_PIV_card_certificate_result validated;
+  TC_PIV_card_certificate_report validated;
   TC_credential_status status =
       TC_PIV_card_certificate_validate(&card, card_context, work, &validated);
   ExampleCredentialVerdict verdict = credential_verdict(status);

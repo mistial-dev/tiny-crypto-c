@@ -99,7 +99,7 @@ All encoded inputs and trust sources are borrowed. Keep the certificate, CHUID,
 object inventory, applicable CCL snapshot, and their backing storage immutable
 until the acceptance decision is complete. `ExampleCredentialValidationResult`
 retains borrowed views into those inputs. Its `biometrics` array holds one
-`TC_PIV_biometric_result` per supplied biometric, in request order, with the
+`TC_PIV_biometric_report` per supplied biometric, in request order, with the
 authenticated record for a matcher.
 
 `example_credential_validate` returns a typed verdict for invalid credentials,

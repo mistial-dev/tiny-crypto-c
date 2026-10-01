@@ -36,16 +36,15 @@ extern "C" {
  * before the command, and nothing was sent. On a secured link GET DATA,
  * VERIFY and GENERAL AUTHENTICATE also return the session-loss results of
  * piv_sm_apdu.h. */
-typedef enum {
-  TC_PIV_OK,
-  TC_PIV_INVALID,
-  TC_PIV_LIMIT,
-  TC_PIV_ARGUMENT,
-  TC_PIV_UNSUPPORTED,
-  TC_PIV_ERROR,
-  TC_PIV_CARD_STATUS,
-  TC_PIV_REFUSED
-} TC_PIV_result;
+typedef TC_result TC_PIV_result;
+#define TC_PIV_OK TC_RESULT_OK
+#define TC_PIV_INVALID TC_RESULT_INVALID
+#define TC_PIV_LIMIT TC_RESULT_LIMIT
+#define TC_PIV_ARGUMENT TC_RESULT_ARGUMENT
+#define TC_PIV_UNSUPPORTED TC_RESULT_UNSUPPORTED
+#define TC_PIV_ERROR TC_RESULT_ERROR
+#define TC_PIV_CARD_STATUS TC_RESULT_CARD_STATUS
+#define TC_PIV_REFUSED TC_RESULT_REFUSED
 
 /* Card interface of the link. The application states it, since the PIN and
  * pairing-code rules depend on it (SP 800-73-5 Part 1 Table 4). */

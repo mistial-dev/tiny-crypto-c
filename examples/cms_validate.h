@@ -56,7 +56,7 @@ TC_X509_path_status example_find_cms_signer_path(const TC_CMS_signer_path_reques
                                                  const TC_CMS_path_options* options,
                                                  size_t work_limit,
                                                  ExampleCMSPathWorkspace* storage,
-                                                 TC_X509_search_result* out);
+                                                 TC_X509_search_report* out);
 
 /* Parse SignedData, bind its content and build the selected signer's path. */
 TC_X509_path_status example_check_cms_signed_data(const TC_CMS_validation_request* request,
@@ -64,7 +64,7 @@ TC_X509_path_status example_check_cms_signed_data(const TC_CMS_validation_reques
                                                   const TC_CMS_path_options* options,
                                                   size_t work_limit,
                                                   ExampleCMSPathWorkspace* storage,
-                                                  TC_X509_search_result* out);
+                                                  TC_X509_search_report* out);
 
 #ifdef __cplusplus
 }

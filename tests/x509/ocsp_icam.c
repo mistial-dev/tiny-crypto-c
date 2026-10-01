@@ -45,7 +45,7 @@ TC_TEST(content_signer)
     TC_X509_ocsp_verify_request request =
         ocsp_request(&fixture, response, certificate, &anchor, content_signer_at);
     size_t work = 20000000;
-    TC_X509_ocsp_result result;
+    TC_X509_ocsp_report result;
     memset(&result, 0x5a, sizeof result);
     if (i == 2) {
       munit_assert_int(TC_X509_ocsp_response_verify(&request, &fixture.workspace, &work, &result),
@@ -85,7 +85,7 @@ TC_TEST(content_signer)
   return MUNIT_OK;
 }
 
-static TC_X509_ocsp_result verify_card(unsigned card, const char* response_name,
+static TC_X509_ocsp_report verify_card(unsigned card, const char* response_name,
                                        const TC_X509_trust_anchor* anchor,
                                        const TC_X509_store_source* store, TC_TLV_result expected)
 {
@@ -100,7 +100,7 @@ static TC_X509_ocsp_result verify_card(unsigned card, const char* response_name,
       ocsp_request(&fixture, response, certificate, anchor, card_at);
   request.certificates = store;
   size_t work = 20000000;
-  TC_X509_ocsp_result result;
+  TC_X509_ocsp_report result;
   memset(&result, 0x5a, sizeof result);
   munit_assert_int(TC_X509_ocsp_response_verify(&request, &fixture.workspace, &work, &result), ==,
                    expected);
@@ -120,7 +120,7 @@ TC_TEST(delegate_nocheck)
   ocsp_fixture_init(&fixture);
   const TC_X509_trust_anchor anchor = read_issuer();
 
-  TC_X509_ocsp_result result = verify_card(43, "card43_delegate_nocheck", &anchor, NULL, TC_TLV_OK);
+  TC_X509_ocsp_report result = verify_card(43, "card43_delegate_nocheck", &anchor, NULL, TC_TLV_OK);
   munit_assert_true(ocsp_span_within(result.responder_certificate,
                                      (TC_bytes){response_bytes, sizeof response_bytes}));
   munit_assert_true(result.responder_nocheck);
@@ -150,7 +150,7 @@ TC_TEST(store_delegate)
   TC_X509_store_source store;
   munit_assert_int(TC_X509_store_array_source(&array, &store), ==, TC_TLV_OK);
 
-  TC_X509_ocsp_result result =
+  TC_X509_ocsp_report result =
       verify_card(44, "card44_delegate_no_certs", &anchor, &store, TC_TLV_OK);
   munit_assert_ptr_equal(result.responder_certificate.data, signer.data);
   munit_assert_size(result.responder_certificate.length, ==, signer.length);
@@ -197,7 +197,7 @@ static void verify_argument(const TC_X509_trust_anchor* anchor, const TC_X509_st
       ocsp_request(&fixture, response, certificate, anchor, card_at);
   request.certificates = store;
   size_t work = 20000000;
-  TC_X509_ocsp_result result;
+  TC_X509_ocsp_report result;
   memset(&result, 0x5a, sizeof result);
   munit_assert_int(TC_X509_ocsp_response_verify(&request, &fixture.workspace, &work, &result), ==,
                    TC_TLV_ARGUMENT);
@@ -245,7 +245,7 @@ TC_TEST(issuer_signed)
       ocsp_request(&fixture, response, certificate, &anchor, card_at);
   request.max_certificates = 0;
   size_t work = 20000000;
-  TC_X509_ocsp_result result;
+  TC_X509_ocsp_report result;
   memset(&result, 0x5a, sizeof result);
   munit_assert_int(TC_X509_ocsp_response_verify(&request, &fixture.workspace, &work, &result), ==,
                    TC_TLV_OK);
@@ -276,7 +276,7 @@ TC_TEST(bounded_inner_response)
         ocsp_request(&fixture, response, certificate, &anchor, content_signer_at);
     request.parsing = limits[i];
     size_t work = 20000000;
-    TC_X509_ocsp_result result;
+    TC_X509_ocsp_report result;
     memset(&result, 0x5a, sizeof result);
     munit_assert_int(TC_X509_ocsp_response_verify(&request, &fixture.workspace, &work, &result), ==,
                      TC_TLV_LIMIT);
@@ -307,7 +307,7 @@ TC_TEST(local_responses)
       ocsp_request(&fixture, response, certificate, &anchor, local_at);
   request.max_certificates = 0;
   size_t work = 20000000;
-  TC_X509_ocsp_result result;
+  TC_X509_ocsp_report result;
   memset(&result, 0x5a, sizeof result);
   munit_assert_int(TC_X509_ocsp_response_verify(&request, &fixture.workspace, &work, &result), ==,
                    TC_TLV_OK);
@@ -383,7 +383,7 @@ static TC_X509_revocation_options revocation_options(TC_X509_time at, const TC_b
 /* Check the path Signing CA -> member. responses[0] is empty, so the
  * Signing CA always uses the Root CA CRL. */
 static TC_TLV_result check_member(const char* certificate_name, const char* response_name,
-                                  int with_crl, TC_X509_time at, TC_X509_revocation_result* out)
+                                  int with_crl, TC_X509_time at, TC_X509_revocation_report* out)
 {
   char path[512];
   revocation_init(with_crl, at);
@@ -403,9 +403,9 @@ static TC_TLV_result check_member(const char* certificate_name, const char* resp
   return TC_X509_path_check_revocation(chain, 2, &options, &revocation.workspace, &work, out);
 }
 
-static void assert_unchanged(const TC_X509_revocation_result* result)
+static void assert_unchanged(const TC_X509_revocation_report* result)
 {
-  TC_X509_revocation_result sentinel;
+  TC_X509_revocation_report sentinel;
   memset(&sentinel, 0xa5, sizeof sentinel);
   munit_assert_memory_equal(sizeof *result, result, &sentinel);
 }
@@ -415,7 +415,7 @@ static void assert_unchanged(const TC_X509_revocation_result* result)
  * it unrevoked (RFC 6960 4.2.2.2.1). Other outcomes fall back to CRLs. */
 TC_TEST(path_ocsp)
 {
-  TC_X509_revocation_result result;
+  TC_X509_revocation_report result;
   /* Card 43's delegate carries nocheck, so OCSP alone decides. */
   munit_assert_int(
       check_member("card43_piv_auth_cert", "card43_delegate_nocheck", 0, card_at, &result), ==,
@@ -467,7 +467,7 @@ TC_TEST(path_ocsp_arguments)
   const TC_bytes responses[] = {
       {NULL, 0}, ocsp_read_path(TC_ICAM_OCSP_ROOT "/card44_delegate.der", response_bytes)};
   TC_X509_revocation_options options = revocation_options(card_at, responses);
-  TC_X509_revocation_result result;
+  TC_X509_revocation_report result;
   size_t work = 20000000;
   memset(&result, 0xa5, sizeof result);
 
@@ -534,7 +534,7 @@ TC_TEST(path_crl_time)
       revocation.candidates[1],
       ocsp_read_path(TC_ICAM_OCSP_ROOT "/card44_piv_auth_cert.der", certificate_bytes)};
   TC_X509_revocation_options options = revocation_options(early, NULL);
-  TC_X509_revocation_result result;
+  TC_X509_revocation_report result;
   size_t work = 20000000;
   options.time.clock_skew_seconds = 9;
   munit_assert_int(

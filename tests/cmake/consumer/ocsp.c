@@ -54,7 +54,7 @@ int main(void)
   ExampleOcspCheck check = {
       {target, target_length}, &anchor,   {NULL, 0}, {response, response_length},
       {2026, 9, 30, 0, 0, 0},  &verifier, NULL};
-  TC_X509_ocsp_result result;
+  TC_X509_ocsp_report result;
   if (example_ocsp_check(&check, &storage, &result) != EXAMPLE_OCSP_REVOKED || !result.has_reason ||
       result.reason != 1)
     return 4;

@@ -103,16 +103,16 @@ static inline TC_X509_ocsp_verify_request ocsp_request(const ocsp_fixture* fixtu
 }
 
 /* Failures after the argument checks zero the result. */
-static inline void ocsp_assert_wiped(const TC_X509_ocsp_result* result)
+static inline void ocsp_assert_wiped(const TC_X509_ocsp_report* result)
 {
-  TC_X509_ocsp_result zero;
+  TC_X509_ocsp_report zero;
   memset(&zero, 0, sizeof zero);
   munit_assert_memory_equal(sizeof *result, result, &zero);
 }
 
 /* Entry argument errors leave a result filled with 0x5a unchanged. The
  * check reads bytes, so padding needs no struct copy. */
-static inline void ocsp_assert_untouched(const TC_X509_ocsp_result* result)
+static inline void ocsp_assert_untouched(const TC_X509_ocsp_report* result)
 {
   const uint8_t* bytes = (const uint8_t*)result;
   for (size_t i = 0; i < sizeof *result; ++i)

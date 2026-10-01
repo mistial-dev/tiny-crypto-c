@@ -172,7 +172,7 @@ static int request_valid(const TC_PIV_card_certificate_request* request)
 TC_credential_status
 TC_PIV_card_certificate_validate(const TC_PIV_card_certificate_request* request,
                                  const TC_validation_context* context, size_t* work,
-                                 TC_PIV_card_certificate_result* out)
+                                 TC_PIV_card_certificate_report* out)
 {
   if (!request || !work || !out || !context || !context->options || !context->workspace ||
       !context->workspace->path || !request_valid(request) ||
@@ -192,7 +192,7 @@ TC_PIV_card_certificate_validate(const TC_PIV_card_certificate_request* request,
                                           : TC_CREDENTIAL_INVALID;
   TC_validation_context constrained = *context;
   constrained.options = &options;
-  TC_PIV_card_certificate_result result;
+  TC_PIV_card_certificate_report result;
   const TC_credential_status validated =
       TC_X509_validate(request->encoded, &constrained, work, &result.certificate);
   if (validated != TC_CREDENTIAL_VALID)
@@ -282,7 +282,7 @@ static TC_credential_status tlv_credential(TC_TLV_result status)
  * card identifiers. 9A reads against the CHUID GUID and matches its FASC-N
  * too. */
 static void slot_identifiers(tc_piv_check_run* run, size_t slot,
-                             const TC_X509_validation_result* validated, TC_PIV_check* check)
+                             const TC_X509_validation_report* validated, TC_PIV_check* check)
 {
   TC_PIV_card_report* report = run->report;
   const TC_validation_context* context = run->request->card;
@@ -368,7 +368,7 @@ static void slot_check(tc_piv_check_run* run, size_t slot)
     evidence.ocsp_max_responses = request->ocsp->max_responses;
     evidence.ocsp_max_certificates = request->ocsp->max_certificates;
   }
-  TC_X509_validation_result validated;
+  TC_X509_validation_report validated;
   int path_valid = 0;
   const TC_credential_status status = tc_x509_validate_evidence(
       container_fields.certificate, &constrained, &evidence, run->work, &validated, &path_valid);

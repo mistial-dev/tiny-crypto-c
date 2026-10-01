@@ -52,7 +52,7 @@ static TC_bytes end_entity(int which)
 }
 
 /* Validate one end entity. A failure leaves the 0xa5 result unchanged. */
-static TC_credential_status validate(int which, TC_X509_validation_result* out)
+static TC_credential_status validate(int which, TC_X509_validation_report* out)
 {
   const TC_bytes encoded = end_entity(which);
   size_t work = FIXTURE_WORK;
@@ -69,7 +69,7 @@ static TC_credential_status validate(int which, TC_X509_validation_result* out)
  * member is UNAVAILABLE, and a revoked member outranks a missing CRL. */
 TC_TEST(required)
 {
-  TC_X509_validation_result result;
+  TC_X509_validation_report result;
   pkits_init(ROOT_CRL | CA_CRL, TC_VALIDATION_REVOCATION_REQUIRED);
   munit_assert_int(validate(GOOD, &result), ==, TC_CREDENTIAL_VALID);
   munit_assert_uint8(result.revocation_checked, ==, 1);
@@ -92,7 +92,7 @@ TC_TEST(required)
  * are still checked, so the revoked end entity stays REVOKED. */
 TC_TEST(when_available)
 {
-  TC_X509_validation_result result;
+  TC_X509_validation_report result;
   pkits_init(0, TC_VALIDATION_REVOCATION_WHEN_AVAILABLE);
   munit_assert_int(validate(GOOD, &result), ==, TC_CREDENTIAL_VALID);
   munit_assert_uint8(result.revocation_checked, ==, 0);
@@ -130,7 +130,7 @@ TC_TEST(unsupported_crl)
                              pkits("crls/UnknownCRLExtensionCACRL.crl", crl_bytes[1])};
     validation_fixture_init(&fixture, anchor, &ca, 1, crls, 2, at, policies[i]);
     const TC_bytes encoded = pkits("certs/InvalidUnknownCRLExtensionTest10EE.crt", good_bytes);
-    TC_X509_validation_result result;
+    TC_X509_validation_report result;
     size_t work = FIXTURE_WORK;
     memset(&result, 0xa5, sizeof result);
     munit_assert_int(TC_X509_validate(encoded, &fixture.context, &work, &result), ==,
@@ -159,7 +159,7 @@ static void crl_case(const char* ca_name, const char* crl_name, const char* end_
                             when_available ? TC_VALIDATION_REVOCATION_WHEN_AVAILABLE
                                            : TC_VALIDATION_REVOCATION_REQUIRED);
     const TC_bytes encoded = pkits(end_entity_name, good_bytes);
-    TC_X509_validation_result result;
+    TC_X509_validation_report result;
     size_t work = FIXTURE_WORK;
     memset(&result, 0xa5, sizeof result);
     results[when_available] = TC_X509_validate(encoded, &fixture.context, &work, &result);
@@ -218,7 +218,7 @@ TC_TEST(policy_value)
   context = fixture.context;
   context.options = &options;
   const TC_bytes encoded = end_entity(GOOD);
-  TC_X509_validation_result result;
+  TC_X509_validation_report result;
   size_t work = FIXTURE_WORK;
   memset(&result, 0xa5, sizeof result);
   munit_assert_int(TC_X509_validate(encoded, &context, &work, &result), ==, TC_CREDENTIAL_ERROR);

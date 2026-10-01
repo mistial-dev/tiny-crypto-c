@@ -338,12 +338,13 @@ key-encryption key. See [AES key wrap](docs/aes-kw.md) and the
 See [Working with the API](docs/api.md) for buffer lifetimes, workspace setup,
 result handling and complete workflow guides.
 
-Each module returns its own result type. Symmetric ciphers, hashes, MACs and
-KDFs return `TC_status`: `TC_OK`, `TC_MISMATCH` for a failed authentication or
-comparison, and `TC_ERROR` otherwise. EC, RSA, GZIP and key challenges share
-one six-value order, and parsers return `TC_TLV_result`. Compare against the
-exact success value. The [result model](docs/api.md#result-model) lists every
-result type and the meaning of each value.
+Every public status-returning operation uses `TC_result`. Module typedefs and names keep the
+call site descriptive: symmetric cryptography uses `TC_status`, RSA uses
+`TC_RSA_result`, and parsers use `TC_TLV_result`. They are aliases of the same
+type and share values for OK, invalid input, resource limits, caller errors,
+unsupported input and internal errors. The
+[result model](docs/api.md#result-model) lists the additional state-machine and
+protocol results.
 
 One-shot AEAD functions take inputs as `TC_bytes` and outputs as `TC_buffer`.
 The tag buffer capacity selects the tag length. The text output must hold the

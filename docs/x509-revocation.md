@@ -128,7 +128,7 @@ the example with unrevoked and revoked issuer paths.
 After configuring `options` and preserving `held_path`:
 
 ```c
-TC_X509_revocation_result result;
+TC_X509_revocation_report result;
 TC_TLV_result status = example_check_path_revocation(
     held_path, path_count, &options, &work, storage, &result);
 int accepted = status == TC_TLV_OK && result.status == TC_X509_REVOCATION_GOOD;

@@ -45,16 +45,15 @@ typedef uint32_t TC_RSA_word;
  * UNSUPPORTED and LIMIT never report success. Argument errors and limits
  * found before arithmetic leave every output, the workspace and the work
  * budget unchanged. */
-typedef enum {
-  TC_RSA_OK,
-  TC_RSA_INVALID,
-  TC_RSA_LIMIT,
-  TC_RSA_ARGUMENT,
-  TC_RSA_UNSUPPORTED,
-  TC_RSA_ERROR, /* Random-source, hash or private-operation verification failure. */
-  TC_RSA_IN_PROGRESS,
-  TC_RSA_CANCELLED
-} TC_RSA_result;
+typedef TC_result TC_RSA_result;
+#define TC_RSA_OK TC_RESULT_OK
+#define TC_RSA_INVALID TC_RESULT_INVALID
+#define TC_RSA_LIMIT TC_RESULT_LIMIT
+#define TC_RSA_ARGUMENT TC_RESULT_ARGUMENT
+#define TC_RSA_UNSUPPORTED TC_RESULT_UNSUPPORTED
+#define TC_RSA_ERROR TC_RESULT_ERROR
+#define TC_RSA_IN_PROGRESS TC_RESULT_IN_PROGRESS
+#define TC_RSA_CANCELLED TC_RESULT_CANCELLED
 typedef struct {
   TC_bytes modulus, exponent;
 } TC_RSA_public_key;

@@ -321,7 +321,7 @@ TC_TEST(search_preflight)
   TC_X509_path_options options = {0}, saved_options;
   TC_X509_path_workspace validation = {0};
   TC_X509_search_workspace search = {0};
-  TC_X509_search_result out, saved_out;
+  TC_X509_search_report out, saved_out;
   TC_bytes target = {NULL, 0};
   size_t work;
   memset(&out, 0xa5, sizeof out);

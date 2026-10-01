@@ -73,7 +73,7 @@ int tc_credential_result_current(TC_PIV_card_profile result_profile, const TC_X5
 
 /* An accepted CHUID result: a 25-byte FASC-N, a 16-byte GUID, a signer and
  * the same profile and evaluation time. */
-int tc_credential_chuid_bound(const TC_PIV_CHUID_result* chuid, TC_PIV_card_profile profile,
+int tc_credential_chuid_bound(const TC_PIV_CHUID_report* chuid, TC_PIV_card_profile profile,
                               const TC_validation_context* context);
 
 /* The CMS identifier set that matches a card's PIV OID profile. */

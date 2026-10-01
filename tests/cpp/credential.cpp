@@ -10,7 +10,7 @@ static_assert(std::is_standard_layout<TC_PIV_biometric_validation_request>::valu
               "Biometric requests remain ordinary C++ aggregate data");
 static_assert(std::is_standard_layout<TC_PIV_security_validation_request>::value,
               "Security requests remain ordinary C++ aggregate data");
-static_assert(std::is_standard_layout<TC_PIV_biometric_result>::value,
+static_assert(std::is_standard_layout<TC_PIV_biometric_report>::value,
               "Biometric results remain ordinary C++ aggregate data");
 static_assert(std::is_standard_layout<TC_PIV_security_signature_request>::value,
               "Security signature requests remain ordinary C++ aggregate data");

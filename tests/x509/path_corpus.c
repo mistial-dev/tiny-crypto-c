@@ -143,7 +143,7 @@ TC_TEST(corpus_case)
   TC_X509_native_workspace native = {&ec, &rsa, TC_X509_NATIVE_DEFAULT_SIGNATURE_WORK};
   TC_X509_signature_provider signatures = TC_X509_native_provider(&native);
   TC_X509_path_options options = path_options(&signatures);
-  TC_X509_search_result result;
+  TC_X509_search_report result;
   size_t crl_count, anchor_count, work;
 
   munit_assert_not_null(target_path);
@@ -182,7 +182,7 @@ TC_TEST(corpus_case)
   /* Validation needs one extension summary per path certificate. */
   if (path_status == TC_X509_PATH_VALID) {
     TC_X509_path_workspace short_cache = validation;
-    TC_X509_search_result limited;
+    TC_X509_search_report limited;
     short_cache.summary_capacity = result.count - 1;
     munit_assert_int(TC_X509_path_build(target, &source, &options, &short_cache, &search, &limited),
                      ==, TC_X509_PATH_LIMIT);
@@ -225,7 +225,7 @@ TC_TEST(corpus_case)
     TC_X509_revocation_workspace workspace = {
         &validation, &search,  states,      sizeof states,    dependencies,    MAX_CERTIFICATES,
         scopes,      MAX_CRLS, signer_path, MAX_CERTIFICATES, signer_policies, 64};
-    TC_X509_revocation_result evidence, saved_evidence;
+    TC_X509_revocation_report evidence, saved_evidence;
     TC_TLV_result expected_checked;
     if (strcmp(expected_revocation, "unsupported") == 0)
       expected_checked = TC_TLV_UNSUPPORTED;

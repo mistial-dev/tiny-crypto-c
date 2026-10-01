@@ -26,6 +26,8 @@ namespace tiny_crypto {
 
 typedef ::TC_bytes bytes;
 typedef ::TC_buffer buffer;
+typedef ::TC_result result;
+typedef ::TC_status status;
 typedef ::TC_credential_status credential_status;
 
 /* Compare two byte spans. Returns TC_OK when both hold the same bytes and

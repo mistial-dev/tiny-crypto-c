@@ -17,7 +17,7 @@ TC_TLV_result tc_x509_crl_scope_run(const tc_x509_crl_candidate_source* candidat
                                     const tc_x509_crl_trust* trust,
                                     const tc_x509_crl_scope_selection* selection,
                                     const TC_bytes writes[CRL_SCOPE_WRITES], int* source_failed,
-                                    TC_X509_search_result* out)
+                                    TC_X509_search_report* out)
 {
   const TC_bytes* points = selection->points;
   const TC_X509_path_options* options = trust->options;
@@ -62,7 +62,7 @@ TC_TLV_result tc_x509_crl_scope_prepare(const tc_x509_crl_operation_source* cand
                                         const tc_x509_crl_trust* trust, const TC_bytes* points,
                                         const tc_x509_crl_extra_storage* extra,
                                         const tc_x509_crl_held_path* path,
-                                        TC_X509_search_result* out,
+                                        TC_X509_search_report* out,
                                         TC_bytes writes[CRL_SCOPE_WRITES])
 {
   tc_pki_storage_plan plan;
@@ -90,7 +90,7 @@ TC_TLV_result tc_x509_crl_scope_execute(const tc_x509_crl_operation_source* cand
                                         const tc_x509_crl_scope_processing* processing,
                                         const tc_x509_crl_trust* trust,
                                         const tc_x509_crl_scope_selection* selection,
-                                        TC_X509_search_result* out)
+                                        TC_X509_search_report* out)
 {
   if (!selection)
     return TC_TLV_ARGUMENT;
@@ -115,7 +115,7 @@ TC_TLV_result tc_x509_crl_scope_execute(const tc_x509_crl_operation_source* cand
 
 TC_TLV_result tc_x509_crl_source_search(const void* candidates,
                                         const tc_x509_crl_signer_query* query,
-                                        const tc_x509_crl_trust* trust, TC_X509_search_result* out,
+                                        const tc_x509_crl_trust* trust, TC_X509_search_report* out,
                                         int* source_failed)
 {
   const tc_x509_crl_candidate_source* source = candidates;
@@ -128,7 +128,7 @@ TC_TLV_result tc_x509_crl_store_source_search(const void* candidates,
                                               const TC_X509_store_source* external,
                                               const tc_x509_crl_signer_query* query,
                                               const tc_x509_crl_trust* trust,
-                                              TC_X509_search_result* out, int* source_failed)
+                                              TC_X509_search_report* out, int* source_failed)
 {
   if (!candidates)
     return TC_TLV_ARGUMENT;
@@ -156,7 +156,7 @@ typedef struct {
 
 static TC_TLV_result x509_crl_attempt_candidate(const void* context,
                                                 const TC_X509_certificate* candidate,
-                                                TC_X509_search_result* out)
+                                                TC_X509_search_report* out)
 {
   const x509_crl_search_context* search = context;
   return search->query->attempt(search->query->context, candidate, search->trust, out);
@@ -165,7 +165,7 @@ static TC_TLV_result x509_crl_attempt_candidate(const void* context,
 TC_TLV_result tc_x509_crl_search_candidates(void* cursor, tc_pki_candidate_next next,
                                             const tc_x509_crl_signer_query* query,
                                             const tc_x509_crl_trust* trust,
-                                            TC_X509_search_result* out, int* source_failed)
+                                            TC_X509_search_report* out, int* source_failed)
 {
   if (!query || !query->crl || !query->extensions || !query->attempt ||
       !tc_x509_crl_trust_valid(trust))
@@ -183,7 +183,7 @@ TC_TLV_result tc_x509_crl_scopes(const tc_x509_crl_searcher* searcher,
                                  const tc_x509_crl_trust* trust,
                                  const tc_x509_crl_certificate_fields* fields,
                                  TC_TLV_reader* point_reader, int all_scopes, int* source_failed,
-                                 TC_X509_search_result* out)
+                                 TC_X509_search_report* out)
 {
   if (!searcher || !searcher->search || !input || !fields || !point_reader || !source_failed ||
       !tc_x509_crl_index_arguments(input->index, input->query, trust, out))
@@ -208,7 +208,7 @@ TC_TLV_result tc_x509_crl_scopes(const tc_x509_crl_searcher* searcher,
   const TC_X509_path_workspace* validation = trust->validation;
   tc_pki_distribution_point point;
   TC_X509_crl_evidence pending = *evidence;
-  TC_X509_search_result found = {0};
+  TC_X509_search_report found = {0};
   TC_TLV_result failure = TC_TLV_END;
   int contributed = 0;
   processing.evidence = &pending;
@@ -436,7 +436,7 @@ TC_TLV_result tc_x509_crl_group(const tc_x509_crl_searcher* searcher,
       continue;
     TC_X509_crl_evidence empty = {0};
     tc_x509_crl_proposal candidate = {0}, unresolved = {0};
-    TC_X509_search_result path;
+    TC_X509_search_report path;
     tc_x509_crl_scope_processing attempt = *processing;
     attempt.reference = i;
     attempt.evidence = &empty;
@@ -480,11 +480,11 @@ TC_TLV_result tc_x509_crl_group(const tc_x509_crl_searcher* searcher,
 }
 
 TC_TLV_result tc_x509_crl_scope_attempt(const void* context, const TC_X509_certificate* signer,
-                                        const tc_x509_crl_trust* trust, TC_X509_search_result* out)
+                                        const tc_x509_crl_trust* trust, TC_X509_search_report* out)
 {
   const tc_x509_crl_scope_processing* processing = context;
   tc_x509_crl_signature_cache cache;
-  TC_X509_search_result found = {0};
+  TC_X509_search_report found = {0};
   tc_x509_crl_signer_cache* saved = processing->signer_cache;
   int reuse = 0;
   if (saved && saved->valid && saved->signer.length == signer->encoded.length) {

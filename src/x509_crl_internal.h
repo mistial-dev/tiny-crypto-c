@@ -93,7 +93,7 @@ tc_x509_crl_signer_check(const TC_X509_crl* crl, const TC_X509_certificate* sign
 TC_X509_path_status tc_x509_crl_signer_validate(const TC_X509_crl* crl,
                                                 const TC_X509_certificate* signer,
                                                 const tc_x509_crl_trust* trust,
-                                                TC_X509_search_result* out);
+                                                TC_X509_search_report* out);
 
 /* Parse into provisional storage after the caller has checked overlap. */
 TC_TLV_result tc_x509_crl_record_read(TC_bytes encoded, const TC_TLV_limits* limits,

@@ -74,14 +74,16 @@ TC_TEST(dispatch)
   TC_X509_public_key key;
   ProviderState state = {&certificate, &key, TC_X509_SIGNATURE_VALID, 0, 0};
   TC_X509_signature_provider provider = {verify, &state, NULL};
+  static const TC_X509_signature_result results[] = {
+      TC_X509_SIGNATURE_VALID, TC_X509_SIGNATURE_INVALID, TC_X509_SIGNATURE_UNSUPPORTED,
+      TC_X509_SIGNATURE_ERROR, TC_X509_SIGNATURE_LIMIT};
   size_t work;
-  unsigned result;
   fixture(&certificate, &key);
-  for (result = TC_X509_SIGNATURE_VALID; result <= TC_X509_SIGNATURE_LIMIT; ++result) {
-    state.result = (TC_X509_signature_result)result;
+  for (size_t i = 0; i < sizeof results / sizeof *results; ++i) {
+    state.result = results[i];
     state.calls = 0;
     work = 100;
-    munit_assert_int(TC_X509_signature_verify(&certificate, &key, &provider, &work), ==, result);
+    munit_assert_int(TC_X509_signature_verify(&certificate, &key, &provider, &work), ==, results[i]);
     munit_assert_uint(state.calls, ==, 1);
     munit_assert_size(work, <, 100);
   }
@@ -217,6 +219,9 @@ TC_TEST(digests)
   TC_X509_public_key key;
   ProviderState state = {&certificate, &key, TC_X509_SIGNATURE_VALID, 0, 0};
   TC_X509_signature_provider provider = {NULL, &state, verify_digest};
+  static const TC_X509_signature_result results[] = {
+      TC_X509_SIGNATURE_VALID, TC_X509_SIGNATURE_INVALID, TC_X509_SIGNATURE_UNSUPPORTED,
+      TC_X509_SIGNATURE_ERROR, TC_X509_SIGNATURE_LIMIT};
   size_t work = WORK_BUDGET;
   fixture(&certificate, &key);
   munit_assert_int(TC_X509_signature_verify_digest(digest, &algorithm, certificate.signature, &key,
@@ -236,12 +241,12 @@ TC_TEST(digests)
                                                    &provider, &work),
                    ==, TC_X509_SIGNATURE_VALID);
   munit_assert_size(work, ==, 0);
-  for (unsigned result = TC_X509_SIGNATURE_VALID; result <= TC_X509_SIGNATURE_LIMIT; ++result) {
-    state.result = (TC_X509_signature_result)result;
+  for (size_t i = 0; i < sizeof results / sizeof *results; ++i) {
+    state.result = results[i];
     work = WORK_BUDGET;
     munit_assert_int(TC_X509_signature_verify_digest(digest, &algorithm, certificate.signature,
                                                      &key, &provider, &work),
-                     ==, result);
+                     ==, results[i]);
   }
   state.result = (TC_X509_signature_result)99;
   work = WORK_BUDGET;

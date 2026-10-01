@@ -395,7 +395,7 @@ static void fuzz_path(const uint8_t* data, size_t length, const TC_X509_certific
                                   mappings, policies, certificates, summaries);
   TC_X509_path_options options = {0};
   TC_X509_trust_anchor anchor = {0};
-  TC_X509_path_result output, saved;
+  TC_X509_path_report output, saved;
   TC_X509_path_status status;
   options.at.year = 2026;
   options.at.month = 1;
@@ -436,7 +436,7 @@ static void fuzz_path(const uint8_t* data, size_t length, const TC_X509_certific
     TC_bytes candidates[4], path[4];
     TC_X509_search_frame search_frames[4];
     TC_X509_search_workspace search = {path, search_frames, 4};
-    TC_X509_search_result found, unchanged;
+    TC_X509_search_report found, unchanged;
     TC_X509_workspace parser = {{frames, 16}, oids, 16};
     TC_X509_certificate selected;
     size_t count = 0, work;
@@ -510,7 +510,7 @@ static void fuzz_cms_path(const uint8_t* data, size_t length)
                                      sizeof signed_digest};
   TC_CMS_path_options options = {0};
   const TC_X509_store_source source = {0};
-  TC_X509_search_result found, saved;
+  TC_X509_search_report found, saved;
   options.path.parsing =
       (TC_TLV_limits){MAX_BYTES, MAX_BYTES, MAX_ELEMENTS, workspace.validation.frames.capacity};
   options.path.at = (TC_X509_time){2026, 1, 1, 0, 0, 0};

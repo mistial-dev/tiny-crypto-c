@@ -34,7 +34,7 @@ CHUID signing certificate. Keep that certificate's backing buffer stable while
 validating the biometric signature.
 
 `TC_PIV_biometric_validate` in `<tiny_crypto/credential.h>` provides this
-workflow. Pass a complete CBEFF `BC` value, the `TC_PIV_CHUID_result` from
+workflow. Pass a complete CBEFF `BC` value, the `TC_PIV_CHUID_report` from
 `TC_PIV_CHUID_validate`, and the validated card certificate's expiration. The
 FASC-N, GUID and CHUID signer come from that result. The request profile and
 the context's evaluation time must equal the result's `profile` and `at`.
@@ -42,7 +42,7 @@ Otherwise the operation returns `TC_CREDENTIAL_ERROR` before any work is
 charged. It checks header metadata, binds the header and signed identifiers,
 and validates the CMS signature, signer path and revocation. It shares the
 CHUID operation's content-signing policy and caller-owned context/workspace.
-On `TC_CREDENTIAL_VALID`, `TC_PIV_biometric_result` reports the format, CBEFF
+On `TC_CREDENTIAL_VALID`, `TC_PIV_biometric_report` reports the format, CBEFF
 metadata, borrowed record, signer certificate, profile and evaluation time.
 An embedded biometric certificate must carry a different signing key from
 CHUID. This comparison uses RSA modulus/exponent or the named EC curve and
@@ -428,7 +428,7 @@ if (TC_validation_context_init(&trust, &validation_options,
         &workspace, &context) != TC_RESULT_OK) {
     return TC_CREDENTIAL_ERROR;
 }
-TC_PIV_CHUID_result accepted;
+TC_PIV_CHUID_report accepted;
 TC_credential_status status = TC_PIV_CHUID_validate(
     &request, &context, &work, &accepted);
 if (status != TC_CREDENTIAL_VALID) {
@@ -464,7 +464,7 @@ TC_PIV_biometric_validation_request biometric = {
     .format = TC_PIV_CBEFF_FINGERPRINT_TEMPLATE,
     .require_current = 1
 };
-TC_PIV_biometric_result fingerprint;
+TC_PIV_biometric_report fingerprint;
 status = TC_PIV_biometric_validate(&biometric, &context, &work, &fingerprint);
 if (status != TC_CREDENTIAL_VALID) {
     return status;

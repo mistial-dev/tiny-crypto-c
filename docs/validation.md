@@ -88,9 +88,9 @@ without evidence. A covering CRL with a failed signature returns
 
 A revoked member outranks a member without evidence. Under
 `WHEN_AVAILABLE`, a CRL whose signer has no evidence still applies, and the
-members it covers report `revocation_checked` 0. `TC_X509_validation_result`,
-`TC_PIV_CHUID_result`, `TC_PIV_biometric_result`, `TC_PIV_security_map` and
-`TC_PIV_security_result` carry `revocation_checked`, and `TC_CMS_validate`
+members it covers report `revocation_checked` 0. `TC_X509_validation_report`,
+`TC_PIV_CHUID_report`, `TC_PIV_biometric_report`, `TC_PIV_security_map` and
+`TC_PIV_security_report` carry `revocation_checked`, and `TC_CMS_validate`
 writes it through an optional pointer. Choose `WHEN_AVAILABLE` explicitly, for
 example after the held CRLs expire, and treat `revocation_checked` 0 as
 missing evidence in the acceptance decision.
@@ -116,9 +116,9 @@ For signed card objects:
 
 1. Validate the card certificate and read its identifiers.
 1. Pass the identifiers and card expiration to `TC_PIV_CHUID_validate`.
-1. Pass the returned `TC_PIV_CHUID_result` as the `chuid` field of biometric
+1. Pass the returned `TC_PIV_CHUID_report` as the `chuid` field of biometric
    and Security Object requests. Use the same card profile and evaluation time.
-1. Pass a successful `TC_PIV_security_result` as the `security` field of
+1. Pass a successful `TC_PIV_security_report` as the `security` field of
    `TC_TWIC_unsigned_CHUID_validate` to check container 3002.
 
 `TC_PIV_security_validate` requires the complete inventory of signed

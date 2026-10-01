@@ -124,7 +124,7 @@ static TC_X509_store_anchor pkits_anchor(void)
 static TC_X509_path_status validate(const char* ca, const char* ee,
                                     const TC_X509_store_anchor* anchor,
                                     const TC_X509_path_options* options,
-                                    TC_X509_path_result* result)
+                                    TC_X509_path_report* result)
 {
   const TC_bytes chain[CHAIN] = {load(ca, chain_der[0]), load(ee, chain_der[1])};
   return TC_X509_path_validate_with_anchor(chain, CHAIN, anchor, options, &storage.path.validation,
@@ -162,7 +162,7 @@ TC_TEST(policies)
   const TC_bytes initial1[] = {{policy1, sizeof policy1}};
   TC_X509_store_anchor anchor = pkits_anchor();
   TC_X509_path_options options = path_options(0);
-  TC_X509_path_result result;
+  TC_X509_path_report result;
   setup_workspace();
 
   /* 4.1.1: the unconstrained anchor accepts the path. With no initial
@@ -256,7 +256,7 @@ TC_TEST(names)
       other, directory_subtree((TC_buffer){other, sizeof other}, other_rdns, sizeof other_rdns)};
   TC_X509_store_anchor anchor = pkits_anchor();
   TC_X509_path_options options = path_options(0);
-  TC_X509_path_result result;
+  TC_X509_path_report result;
   setup_workspace();
 
   /* Permitted and excluded subtrees from the anchor apply to every
@@ -339,7 +339,7 @@ TC_TEST(parsed_info)
   TC_X509_store_anchor anchor;
   TC_X509_trust_anchor_reader reader;
   TC_X509_path_options options = path_options(0);
-  TC_X509_path_result result;
+  TC_X509_path_report result;
   const TC_bytes encoded = load("TrustAnchorRootCertificate.crt", anchor_der);
   size_t length;
   setup_workspace();
@@ -427,7 +427,7 @@ TC_TEST(workspace_limits)
   setup_workspace();
   anchor = pkits_anchor();
   const TC_X509_path_options options = path_options(0);
-  TC_X509_path_result result;
+  TC_X509_path_report result;
   TC_X509_path_workspace* validation = &storage.path.validation;
   TC_X509_extension_summary* summaries = validation->summaries;
   munit_assert_int(

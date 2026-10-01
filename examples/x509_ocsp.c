@@ -21,7 +21,7 @@ TC_TLV_result example_ocsp_request(TC_bytes certificate, const TC_X509_trust_anc
 }
 
 ExampleOcspStatus example_ocsp_check(const ExampleOcspCheck* check, ExampleX509Workspace* storage,
-                                     TC_X509_ocsp_result* result)
+                                     TC_X509_ocsp_report* result)
 {
   if (!check || !storage || !result || !check->verifier)
     return EXAMPLE_OCSP_ERROR;

@@ -327,7 +327,7 @@ TC_credential_status tc_validation_status(TC_TLV_result status)
 TC_credential_status tc_x509_validate_evidence(TC_bytes encoded,
                                                const TC_validation_context* context,
                                                const tc_cms_revocation_evidence* evidence,
-                                               size_t* work, TC_X509_validation_result* out,
+                                               size_t* work, TC_X509_validation_report* out,
                                                int* path_valid)
 {
   TC_CMS_path_options cms;
@@ -351,7 +351,7 @@ TC_credential_status tc_x509_validate_evidence(TC_bytes encoded,
   tc_pki_source_guard guard = {context->trust.certificates, writes, TC_VALIDATION_WRITES};
   const TC_X509_store_source source = tc_pki_source_guard_bind(&guard);
   const TC_CMS_credential_workspace* workspace = context->workspace;
-  TC_X509_search_result path;
+  TC_X509_search_report path;
   const TC_X509_path_status found =
       tc_x509_path_build_work(encoded, &source, &cms.path, &workspace->path->validation,
                               &workspace->path->search, work, &path);
@@ -360,7 +360,7 @@ TC_credential_status tc_x509_validate_evidence(TC_bytes encoded,
   if (path_valid)
     *path_valid = 1;
 
-  TC_X509_validation_result result;
+  TC_X509_validation_report result;
   /* Revocation signer searches reuse the certificate cache. Hold the target
    * descriptor while its encoded bytes remain owned by the caller. */
   result.certificate = workspace->path->validation.certificates[path.count - 1];
@@ -379,7 +379,7 @@ TC_credential_status tc_x509_validate_evidence(TC_bytes encoded,
 }
 
 TC_credential_status TC_X509_validate(TC_bytes encoded, const TC_validation_context* context,
-                                      size_t* work, TC_X509_validation_result* out)
+                                      size_t* work, TC_X509_validation_report* out)
 {
   if (!context || !context->options)
     return TC_CREDENTIAL_ERROR;

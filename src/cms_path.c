@@ -28,7 +28,7 @@ static TC_TLV_result cms_signer_candidate(const void* context, const TC_X509_cer
 }
 
 static TC_TLV_result cms_signer_attempt(const void* context, const TC_X509_certificate* candidate,
-                                        TC_X509_search_result* out)
+                                        TC_X509_search_report* out)
 {
   const tc_cms_signer_search* trust = context;
   TC_bytes signer_name = {NULL, 0};
@@ -58,7 +58,7 @@ static TC_TLV_result cms_signer_attempt(const void* context, const TC_X509_certi
 
 TC_X509_path_status tc_cms_signer_find(const tc_cms_candidates* candidates,
                                        const tc_cms_signer_search* search,
-                                       TC_X509_search_result* out)
+                                       TC_X509_search_report* out)
 {
   if (!search || !search->signer || !search->path_source || !search->options ||
       !search->signature || !search->validation || !search->search || !search->content_type.data ||
@@ -117,7 +117,7 @@ TC_TLV_result tc_cms_credential_workspace_check(const TC_CMS_credential_workspac
 
 /* Record path workspace, result and work writes in CMS_*_WRITE slot order. */
 static void cms_path_plan_writes(tc_pki_storage_plan* plan, const TC_CMS_path_workspace* workspace,
-                                 size_t* work, TC_X509_search_result* out)
+                                 size_t* work, TC_X509_search_report* out)
 {
   tc_cms_path_workspace_plan_writes(plan, workspace);
   TC_PKI_PLAN_WRITE(plan, out, 1);
@@ -162,7 +162,7 @@ static void cms_path_plan_inputs(tc_pki_storage_plan* plan, const cms_path_input
 static TC_TLV_result cms_path_storage(const cms_path_inputs* in, const TC_X509_store_source* source,
                                       const TC_CMS_path_options* options,
                                       const TC_CMS_path_workspace* workspace, size_t* work,
-                                      TC_X509_search_result* out,
+                                      TC_X509_search_report* out,
                                       TC_bytes writes[CMS_PATH_WRITE_COUNT], size_t* remaining)
 {
   tc_pki_storage_plan plan;
@@ -176,7 +176,7 @@ static TC_TLV_result cms_path_storage(const cms_path_inputs* in, const TC_X509_s
 static int cms_path_arguments(const TC_X509_store_source* source,
                               const TC_CMS_path_options* options,
                               const TC_CMS_path_workspace* workspace, size_t* work,
-                              TC_X509_search_result* out)
+                              TC_X509_search_report* out)
 {
   return source && options && workspace && work && out && workspace->signed_digest &&
          workspace->signed_digest_capacity >= TC_CMS_SIGNED_DIGEST_BYTES &&
@@ -201,7 +201,7 @@ static TC_X509_path_status cms_signer_path_build(const TC_CMS_signer_path_reques
                                                  const TC_X509_store_source* source,
                                                  const TC_CMS_path_options* options,
                                                  const TC_CMS_path_workspace* workspace,
-                                                 size_t* work, TC_X509_search_result* out,
+                                                 size_t* work, TC_X509_search_report* out,
                                                  const TC_bytes writes[CMS_PATH_WRITE_COUNT])
 {
   /* The single-record source borrows this copy as its context. */
@@ -259,7 +259,7 @@ TC_X509_path_status TC_CMS_signer_path_build(const TC_CMS_signer_path_request* r
                                              const TC_X509_store_source* source,
                                              const TC_CMS_path_options* options,
                                              const TC_CMS_path_workspace* workspace, size_t* work,
-                                             TC_X509_search_result* out)
+                                             TC_X509_search_report* out)
 {
   TC_bytes writes[CMS_PATH_WRITE_COUNT];
   TC_TLV_result result;
@@ -307,7 +307,7 @@ static TC_X509_path_status cms_signed_data_path_build(const TC_CMS_validation_re
                                                       const TC_X509_store_source* source,
                                                       const TC_CMS_path_options* options,
                                                       const TC_CMS_path_workspace* workspace,
-                                                      size_t* work, TC_X509_search_result* out)
+                                                      size_t* work, TC_X509_search_report* out)
 {
   if (!request)
     return TC_X509_PATH_ERROR;
@@ -401,7 +401,7 @@ TC_X509_path_status TC_CMS_signed_data_path_build(const TC_CMS_validation_reques
                                                   const TC_X509_store_source* source,
                                                   const TC_CMS_path_options* options,
                                                   const TC_CMS_path_workspace* workspace,
-                                                  size_t* work, TC_X509_search_result* out)
+                                                  size_t* work, TC_X509_search_report* out)
 {
   return cms_signed_data_path_build(request, NULL, source, options, workspace, work, out);
 }
@@ -411,7 +411,7 @@ static TC_credential_status cms_credential_error(TC_TLV_result result)
   return tc_credential_tlv_status(result, &tc_credential_tlv_cms);
 }
 
-TC_credential_status tc_cms_path_revocation_check(const TC_X509_search_result* path,
+TC_credential_status tc_cms_path_revocation_check(const TC_X509_search_report* path,
                                                   const TC_X509_store_source* source,
                                                   const TC_CMS_revocation_policy* revocation,
                                                   const TC_CMS_credential_workspace* workspace,
@@ -454,7 +454,7 @@ TC_credential_status tc_cms_path_revocation_check(const TC_X509_search_result* p
                                                 workspace->signer_path_capacity,
                                                 workspace->signer_policies,
                                                 workspace->signer_policy_capacity};
-  TC_X509_revocation_result checked;
+  TC_X509_revocation_report checked;
   TC_TLV_result result = tc_x509_path_revocation_coverage(workspace->held_path, path->count,
                                                           &policy, &scratch, work, &checked);
   if (result != TC_TLV_OK)
@@ -487,7 +487,7 @@ TC_credential_status tc_cms_credential_validate_internal(
     WRITE_COUNT
   };
   TC_bytes writes[WRITE_COUNT];
-  TC_X509_search_result path;
+  TC_X509_search_report path;
   TC_TLV_result result;
   int time_order;
   if (!request || (metadata_count && !metadata))

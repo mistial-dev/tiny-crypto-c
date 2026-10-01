@@ -77,7 +77,7 @@ void tc_piv_check_secure_messaging(tc_piv_check_run* run)
   TC_PIV_check revocation = tc_piv_check_make(TC_PIV_CHECK_REVOCATION, container, 0);
   TC_PIV_check cvc = tc_piv_check_make(TC_PIV_CHECK_SM_CVC, container, 0);
   TC_PIV_certificate fields;
-  TC_X509_validation_result validated;
+  TC_X509_validation_report validated;
   const TC_X509_certificate* signer = NULL;
   memset(&fields, 0, sizeof fields);
   if (object->state != TC_PIV_OBJECT_PRESENT) {

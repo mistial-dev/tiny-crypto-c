@@ -134,13 +134,12 @@ TC_TLV_result TC_X509_valid_at(const TC_X509_certificate* certificate, const TC_
                                int* valid);
 #endif
 
-typedef enum {
-  TC_X509_SIGNATURE_VALID,
-  TC_X509_SIGNATURE_INVALID,
-  TC_X509_SIGNATURE_UNSUPPORTED,
-  TC_X509_SIGNATURE_ERROR,
-  TC_X509_SIGNATURE_LIMIT
-} TC_X509_signature_result;
+typedef TC_result TC_X509_signature_result;
+#define TC_X509_SIGNATURE_VALID TC_RESULT_OK
+#define TC_X509_SIGNATURE_INVALID TC_RESULT_INVALID
+#define TC_X509_SIGNATURE_UNSUPPORTED TC_RESULT_UNSUPPORTED
+#define TC_X509_SIGNATURE_ERROR TC_RESULT_ERROR
+#define TC_X509_SIGNATURE_LIMIT TC_RESULT_LIMIT
 typedef TC_X509_signature_result (*TC_X509_signature_verify_fn)(
     void* context, const TC_bytes* message, size_t count, const TC_DER_algorithm* algorithm,
     TC_bytes signature, const TC_X509_public_key* issuer_key, size_t* work);

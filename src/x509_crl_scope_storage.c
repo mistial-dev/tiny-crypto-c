@@ -13,7 +13,7 @@
 
 TC_TLV_result tc_x509_crl_scope_arguments(const tc_x509_crl_scope_processing* processing,
                                           const tc_x509_crl_trust* trust, int all_scopes,
-                                          TC_X509_search_result* out)
+                                          TC_X509_search_report* out)
 {
   TC_bytes storage;
   TC_X509_revocation_status status;
@@ -189,7 +189,7 @@ void tc_x509_crl_index_plan_inputs(tc_pki_storage_plan* plan, const TC_X509_crl_
 
 void tc_x509_crl_scope_plan_writes(tc_pki_storage_plan* plan,
                                    const tc_x509_crl_scope_processing* processing,
-                                   const tc_x509_crl_trust* trust, TC_X509_search_result* out)
+                                   const tc_x509_crl_trust* trust, TC_X509_search_report* out)
 {
   if (!processing || !tc_x509_crl_trust_valid(trust) || !out) {
     tc_pki_storage_plan_fail(plan, TC_TLV_ARGUMENT);

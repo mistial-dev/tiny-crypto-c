@@ -29,13 +29,12 @@ typedef struct {
  *   TC_GZIP_LIMIT        output capacity or the work budget ran out.
  *   TC_GZIP_ARGUMENT     NULL pointers or overlapping storage.
  *   TC_GZIP_UNSUPPORTED  a compression method other than deflate. */
-typedef enum {
-  TC_GZIP_OK,
-  TC_GZIP_INVALID,
-  TC_GZIP_LIMIT,
-  TC_GZIP_ARGUMENT,
-  TC_GZIP_UNSUPPORTED
-} TC_GZIP_result;
+typedef TC_result TC_GZIP_result;
+#define TC_GZIP_OK TC_RESULT_OK
+#define TC_GZIP_INVALID TC_RESULT_INVALID
+#define TC_GZIP_LIMIT TC_RESULT_LIMIT
+#define TC_GZIP_ARGUMENT TC_RESULT_ARGUMENT
+#define TC_GZIP_UNSUPPORTED TC_RESULT_UNSUPPORTED
 
 #if TC_ENABLE_GZIP
 /* Decode one or more complete GZIP members (RFC 1952 section 2.3) holding

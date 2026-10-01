@@ -144,7 +144,7 @@ TC_TLV_result tc_cms_crl_index_init(const tc_cms_revocations* reader,
 
 TC_TLV_result tc_cms_crl_source_search(const void* candidates, const TC_X509_store_source* external,
                                        const tc_x509_crl_signer_query* query,
-                                       const tc_x509_crl_trust* trust, TC_X509_search_result* out,
+                                       const tc_x509_crl_trust* trust, TC_X509_search_report* out,
                                        int* source_failed)
 {
   if (!candidates)
@@ -160,7 +160,7 @@ TC_TLV_result tc_cms_crl_source_search(const void* candidates, const TC_X509_sto
 }
 
 TC_TLV_result tc_cms_crl_search(const void* candidates, const tc_x509_crl_signer_query* query,
-                                const tc_x509_crl_trust* trust, TC_X509_search_result* out,
+                                const tc_x509_crl_trust* trust, TC_X509_search_report* out,
                                 int* source_failed)
 {
   const tc_cms_candidates* source = candidates;
@@ -187,7 +187,7 @@ TC_X509_path_status tc_cms_crl_signer_find(const tc_cms_candidates* candidates,
                                            const TC_X509_crl* crl,
                                            const TC_X509_crl_extensions* extensions,
                                            const tc_x509_crl_trust* trust,
-                                           TC_X509_search_result* out)
+                                           TC_X509_search_report* out)
 {
   return tc_x509_path_status(tc_cms_crl_search(
       candidates, &(tc_x509_crl_signer_query){crl, extensions, tc_x509_crl_check_signer, crl},
@@ -203,7 +203,7 @@ static TC_TLV_result cms_crl_scope_run(const tc_cms_candidates* candidates,
                                        const tc_x509_crl_scope_processing* processing,
                                        const tc_x509_crl_trust* trust,
                                        const tc_x509_crl_scope_selection* selection,
-                                       TC_X509_search_result* out)
+                                       TC_X509_search_report* out)
 {
   if (!candidates)
     return TC_TLV_ARGUMENT;
@@ -218,7 +218,7 @@ static TC_TLV_result cms_crl_scope_run(const tc_cms_candidates* candidates,
 
 TC_TLV_result tc_cms_crl_scope_process(const tc_cms_candidates* candidates,
                                        const tc_x509_crl_scope_processing* processing,
-                                       const tc_x509_crl_trust* trust, TC_X509_search_result* out)
+                                       const tc_x509_crl_trust* trust, TC_X509_search_report* out)
 {
   if (!processing)
     return TC_TLV_ARGUMENT;
@@ -230,7 +230,7 @@ TC_TLV_result tc_cms_crl_point_process(const tc_cms_candidates* candidates,
                                        const tc_x509_crl_scope_processing* processing,
                                        const tc_x509_crl_trust* trust)
 {
-  TC_X509_search_result scratch;
+  TC_X509_search_report scratch;
   if (!processing || !processing->check || !processing->check->verify)
     return TC_TLV_ARGUMENT;
   return cms_crl_scope_run(candidates, processing, trust,
@@ -241,7 +241,7 @@ TC_TLV_result tc_cms_crl_points_process(const tc_cms_candidates* candidates,
                                         const tc_x509_crl_scope_processing* processing,
                                         TC_bytes points, const tc_x509_crl_trust* trust)
 {
-  TC_X509_search_result scratch;
+  TC_X509_search_report scratch;
   if (!processing || !processing->check || !processing->check->verify)
     return TC_TLV_ARGUMENT;
   return cms_crl_scope_run(candidates, processing, trust,
@@ -253,7 +253,7 @@ TC_TLV_result tc_cms_crl_certificate_process(const tc_cms_candidates* candidates
                                              const TC_X509_certificate* certificate,
                                              const tc_x509_crl_trust* trust)
 {
-  TC_X509_search_result scratch;
+  TC_X509_search_report scratch;
   const tc_pki_distribution_point fallback = {0};
   const tc_x509_crl_query query = {certificate, &fallback, 0};
   if (!processing || !processing->check || !processing->check->verify)
@@ -336,7 +336,7 @@ TC_TLV_result tc_cms_crl_resolve(const TC_X509_certificate* target,
 TC_TLV_result tc_cms_crl_path_resolve(const TC_bytes* chain, size_t count,
                                       const tc_cms_crl_resolution* resolution,
                                       const tc_x509_crl_resolution_workspace* workspace,
-                                      TC_X509_revocation_result* out)
+                                      TC_X509_revocation_report* out)
 {
   tc_pki_store_candidates store;
   TC_bytes metadata[3];

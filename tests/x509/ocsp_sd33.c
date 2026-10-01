@@ -53,7 +53,7 @@ TC_TEST(captured_responses)
         }
       }
       size_t work = 20000000;
-      TC_X509_ocsp_result result = {0};
+      TC_X509_ocsp_report result = {0};
       munit_assert_int(TC_X509_ocsp_response_verify(&request, &fixture.workspace, &work, &result),
                        ==, TC_TLV_OK);
       munit_assert_int(result.status, ==, TC_X509_REVOCATION_GOOD);
@@ -120,7 +120,7 @@ TC_TEST(time_arguments)
       read_fixture(TC_SD33_CERT_ROOT, 1, "piv_auth_cert", certificate_bytes);
   TC_X509_ocsp_verify_request request = ocsp_request(
       &fixture, (TC_bytes){unavailable, sizeof unavailable}, certificate, &anchor, captured_at);
-  TC_X509_ocsp_result result;
+  TC_X509_ocsp_report result;
   memset(&result, 0x5a, sizeof result);
   size_t work = 20000000;
 
@@ -252,7 +252,7 @@ TC_TEST(example)
       {NULL, 0},   read_fixture(TC_SD33_OCSP_ROOT, 4, "response", response_bytes),
       captured_at, &fixture.signatures,
       NULL};
-  TC_X509_ocsp_result result;
+  TC_X509_ocsp_report result;
   munit_assert_int(example_ocsp_check(&check, &example_storage, &result), ==, EXAMPLE_OCSP_GOOD);
   munit_assert_int(result.status, ==, TC_X509_REVOCATION_GOOD);
   munit_assert_true(result.responder_nocheck);

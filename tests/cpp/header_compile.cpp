@@ -5,6 +5,26 @@
 #if TC_ENABLE_MD5
 #include <tiny_crypto/hash.hpp>
 #endif
+
+template <typename Left, typename Right> struct same_type {
+  enum { value = 0 };
+};
+template <typename Type> struct same_type<Type, Type> {
+  enum { value = 1 };
+};
+static_assert(same_type<TC_result, TC_status>::value, "TC_status must be the shared result");
+static_assert(same_type<TC_result, TC_EC_result>::value, "EC must use the shared result");
+static_assert(same_type<TC_result, TC_RSA_result>::value, "RSA must use the shared result");
+static_assert(same_type<TC_result, TC_TLV_result>::value, "TLV must use the shared result");
+static_assert(same_type<tiny_crypto::result, tiny_crypto::status>::value,
+              "C++ result aliases must be identical");
+static_assert(TC_TLV_INVALID < TC_TLV_OK && TC_TLV_END > TC_TLV_OK,
+              "TLV error and flow-control signs are public parser behavior");
+static_assert(TC_DRBG_ENTROPY != TC_DRBG_ERROR, "entropy failure must remain distinguishable");
+static_assert(TC_CREDENTIAL_REVOKED != TC_CREDENTIAL_INVALID,
+              "revocation must remain distinguishable from invalid input");
+static_assert(TC_PIV_CARD_STATUS != TC_PIV_REFUSED,
+              "card status must remain distinguishable from a local refusal");
 #if TC_ENABLE_X509
 #include <tiny_crypto/key_challenge.h>
 #include <tiny_crypto/x509_path.h>

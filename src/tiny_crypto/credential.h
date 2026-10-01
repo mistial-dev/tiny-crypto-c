@@ -51,7 +51,7 @@ typedef struct {
   TC_X509_time at;
   TC_PIV_card_profile profile;
   uint8_t revocation_checked;
-} TC_PIV_CHUID_result;
+} TC_PIV_CHUID_report;
 
 #if TC_ENABLE_CREDENTIAL
 /* Authenticate a signed CHUID and bind it to the validated card certificate
@@ -85,7 +85,7 @@ typedef struct {
  * or CRLs. out changes only on VALID. */
 TC_credential_status TC_PIV_CHUID_validate(const TC_PIV_CHUID_validation_request* request,
                                            const TC_validation_context* context, size_t* work,
-                                           TC_PIV_CHUID_result* out);
+                                           TC_PIV_CHUID_report* out);
 #endif
 
 typedef struct {
@@ -94,7 +94,7 @@ typedef struct {
   /* Must equal chuid->profile. */
   TC_PIV_card_profile profile;
   /* Accepted CHUID from TC_PIV_CHUID_validate at context->options->at. */
-  const TC_PIV_CHUID_result* chuid;
+  const TC_PIV_CHUID_report* chuid;
   const TC_X509_time* card_expiration;
   /* Select the current or legacy biometric CMS profile explicitly. */
   TC_PIV_CMS_kind signature_profile;
@@ -106,7 +106,7 @@ typedef struct {
 /* Borrowed views of an authenticated biometric object. record and
  * metadata.creator borrow request->encoded. signer borrows the embedded CMS
  * certificate or the CHUID signer. revocation_checked follows
- * TC_PIV_CHUID_result. */
+ * TC_PIV_CHUID_report. */
 typedef struct {
   TC_PIV_CBEFF_format format;
   TC_PIV_CBEFF_metadata metadata;
@@ -115,7 +115,7 @@ typedef struct {
   TC_PIV_card_profile profile;
   TC_X509_time at;
   uint8_t revocation_checked;
-} TC_PIV_biometric_result;
+} TC_PIV_biometric_report;
 
 #if TC_ENABLE_CREDENTIAL
 /* Authenticate a biometric object's CBEFF header and record and bind the
@@ -143,7 +143,7 @@ typedef struct {
  * changes only on VALID. */
 TC_credential_status TC_PIV_biometric_validate(const TC_PIV_biometric_validation_request* request,
                                                const TC_validation_context* context, size_t* work,
-                                               TC_PIV_biometric_result* out);
+                                               TC_PIV_biometric_report* out);
 #endif
 
 /* One card object as hashed for the Security Object (SP 800-73-5 Part 1
@@ -166,7 +166,7 @@ typedef struct {
   /* Must equal chuid->profile. */
   TC_PIV_card_profile profile;
   /* Accepted CHUID from TC_PIV_CHUID_validate at context->options->at. */
-  const TC_PIV_CHUID_result* chuid;
+  const TC_PIV_CHUID_report* chuid;
   const TC_X509_time* card_expiration;
 } TC_PIV_security_signature_request;
 
@@ -175,7 +175,7 @@ typedef struct {
  * request's encoded bytes. lds borrows those bytes or workspace->content.
  * Keep both stable and unchanged while the map is in use. The map survives
  * reuse of the validation workspace. revocation_checked follows
- * TC_PIV_CHUID_result. */
+ * TC_PIV_CHUID_report. */
 typedef struct {
   TC_PIV_security_object object;
   TC_LDS_security_object lds;
@@ -236,7 +236,7 @@ typedef struct {
   /* Must equal chuid->profile. */
   TC_PIV_card_profile profile;
   /* Accepted CHUID from TC_PIV_CHUID_validate at context->options->at. */
-  const TC_PIV_CHUID_result* chuid;
+  const TC_PIV_CHUID_report* chuid;
   const TC_X509_time* card_expiration;
   /* Complete inventory. Container IDs must be unique, and each object has parts. */
   const TC_PIV_security_data* objects;
@@ -245,7 +245,7 @@ typedef struct {
 
 /* Inventory descriptors and their bytes remain borrowed and immutable through
  * subsequent checks. This result survives reuse of the validation workspace.
- * revocation_checked follows TC_PIV_CHUID_result. */
+ * revocation_checked follows TC_PIV_CHUID_report. */
 typedef struct {
   const TC_PIV_security_data* objects;
   size_t count;
@@ -253,7 +253,7 @@ typedef struct {
   TC_PIV_card_profile profile;
   TC_X509_time at;
   uint8_t revocation_checked;
-} TC_PIV_security_result;
+} TC_PIV_security_report;
 
 #if TC_ENABLE_CREDENTIAL
 /* Authenticate a Security Object with TC_PIV_security_authenticate, then
@@ -280,7 +280,7 @@ typedef struct {
 TC_credential_status TC_PIV_security_validate(const TC_PIV_security_validation_request* request,
                                               const TC_validation_context* context,
                                               const TC_PIV_security_validation_workspace* workspace,
-                                              size_t* work, TC_PIV_security_result* out);
+                                              size_t* work, TC_PIV_security_report* out);
 #endif
 
 enum { TC_TWIC_UNSIGNED_CHUID_CONTAINER = 0x3002 };
@@ -292,7 +292,7 @@ typedef struct {
   TC_PIV_card_profile profile;
   const TC_PIV_card_identifiers* card;
   /* Accepted inventory from TC_PIV_security_validate at context->options->at. */
-  const TC_PIV_security_result* security;
+  const TC_PIV_security_report* security;
 } TC_TWIC_unsigned_CHUID_validation_request;
 
 #if TC_ENABLE_CREDENTIAL
@@ -335,7 +335,7 @@ TC_TWIC_unsigned_CHUID_validate(const TC_TWIC_unsigned_CHUID_validation_request*
 TC_credential_status TC_PIV_content_signer_validate(TC_bytes certificate,
                                                     TC_PIV_card_profile profile,
                                                     const TC_validation_context* context,
-                                                    size_t* work, TC_X509_validation_result* out);
+                                                    size_t* work, TC_X509_validation_report* out);
 #endif
 
 #if TC_ENABLE_PIV_CVC

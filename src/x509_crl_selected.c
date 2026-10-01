@@ -20,10 +20,10 @@
 static TC_X509_path_status crl_signer_path(const TC_X509_certificate* signer,
                                            const TC_X509_store_source* restricted,
                                            const tc_x509_crl_trust* trust,
-                                           TC_X509_search_result* out)
+                                           TC_X509_search_report* out)
 {
   TC_X509_path_options signer_options = *trust->options;
-  TC_X509_search_result found;
+  TC_X509_search_report found;
   signer_options.key_usage |= TC_KEY_USAGE_CRL_SIGN;
   TC_X509_path_status status =
       tc_x509_path_build_work(signer->encoded, restricted, &signer_options, trust->validation,
@@ -76,11 +76,11 @@ static TC_TLV_result crl_signer_is_anchor(const TC_X509_certificate* signer,
 TC_X509_path_status tc_x509_crl_signer_validate(const TC_X509_crl* crl,
                                                 const TC_X509_certificate* signer,
                                                 const tc_x509_crl_trust* trust,
-                                                TC_X509_search_result* out)
+                                                TC_X509_search_report* out)
 {
   tc_pki_anchor_source selected;
   TC_X509_store_source restricted;
-  TC_X509_search_result found;
+  TC_X509_search_report found;
   TC_X509_path_status status;
   TC_X509_signature_result signature;
   TC_TLV_result result;

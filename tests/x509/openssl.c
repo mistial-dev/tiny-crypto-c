@@ -324,7 +324,7 @@ static TC_X509_path_status array_path_build(TC_bytes target, const TC_X509_store
                                             const TC_X509_path_options* options,
                                             const TC_X509_path_workspace* validation,
                                             const TC_X509_search_workspace* search, size_t* work,
-                                            TC_X509_search_result* out)
+                                            TC_X509_search_report* out)
 {
   TC_X509_store_source source;
   if (TC_X509_store_array_source(array, &source) != TC_TLV_OK)
@@ -342,7 +342,7 @@ static void snapshot_discovery(TC_bytes target, const TC_X509_store_source* sour
   TC_bytes paths[3], retained_key;
   TC_X509_search_frame frames[3];
   TC_X509_search_workspace search = {paths, frames, 3};
-  TC_X509_search_result result, saved;
+  TC_X509_search_report result, saved;
   TC_X509_path_options bounded = *options;
   bounded.max_work = 2000000;
   untrusted.anchor_count = 0;
@@ -412,7 +412,7 @@ static void alternate_issuers(X509* const certs[4], EVP_PKEY* const keys[4], con
   TC_bytes candidates[3], slots[3];
   TC_X509_search_frame frames[3];
   TC_X509_search_workspace search = {slots, frames, 3};
-  TC_X509_search_result found, saved;
+  TC_X509_search_report found, saved;
   TC_X509_trust_anchor anchors[2] = {*anchor, *anchor};
   const TC_X509_store_anchor array_anchor = anchor_record(*anchor);
   TC_X509_store_anchor array_anchors[2] = {anchor_record(*anchor), anchor_record(*anchor)};
@@ -719,7 +719,7 @@ static void cross_signed_issuer(X509* const certs[4], const char* group, const E
   TC_bytes candidates[3], slots[3];
   TC_X509_search_frame frames[3];
   TC_X509_search_workspace search = {slots, frames, 3};
-  TC_X509_search_result found, saved;
+  TC_X509_search_report found, saved;
   TC_X509_certificate root;
   TC_X509_trust_anchor foreign_anchor;
   TC_X509_workspace parser = {workspace->frames, workspace->oids, workspace->oid_capacity};
@@ -986,7 +986,7 @@ TC_TEST(paths)
             TC_X509_PATH_WORKSPACE_INIT(frames, oids, left, right, used, nodes, edges, expected,
                                         mappings, policies, certificate_cache, summaries);
         TC_X509_path_options options;
-        TC_X509_path_result result, unchanged;
+        TC_X509_path_report result, unchanged;
         TC_X509_path_status wanted = TC_X509_PATH_INVALID;
         memset(&options, 0, sizeof options);
         options.at = at;
@@ -1088,7 +1088,7 @@ TC_TEST(paths)
             TC_X509_search_workspace search = {discovered, search_frames, 3};
             TC_X509_store_array array = {candidates, 2, anchors, 2};
             TC_X509_store_source source;
-            TC_X509_search_result found;
+            TC_X509_search_report found;
             anchors[0].policy_set = (TC_bytes){anchor_policy_b, sizeof anchor_policy_b};
             munit_assert_int(TC_X509_store_array_source(&array, &source), ==, TC_TLV_OK);
             munit_assert_int(
@@ -1111,7 +1111,7 @@ TC_TEST(paths)
         if (wanted == TC_X509_PATH_VALID) {
           TC_X509_path_workspace short_cache = workspace;
           short_cache.certificate_capacity = 2;
-          TC_X509_path_result untouched;
+          TC_X509_path_report untouched;
           memset(&untouched, 0xa5, sizeof untouched);
           munit_assert_int(
               TC_X509_path_validate(encoded_path, 3, &anchor, &options, &short_cache, &untouched),
@@ -1128,7 +1128,7 @@ TC_TEST(paths)
         }
         if (scenario >= USAGE_VALID) {
           const unsigned original_flags = options.flags;
-          TC_X509_path_result explicit_result;
+          TC_X509_path_report explicit_result;
           memcpy(&explicit_result, &unchanged, sizeof explicit_result);
           options.flags |=
               TC_X509_PATH_INHIBIT_ANY_PURPOSE | TC_X509_PATH_REQUIRE_EXTENDED_KEY_USAGE;
@@ -1141,7 +1141,7 @@ TC_TEST(paths)
           TC_bytes discovered[3], candidates[2] = {encoded_path[1], encoded_path[0]};
           TC_X509_search_frame search_frames[3];
           TC_X509_search_workspace search = {discovered, search_frames, 3};
-          TC_X509_search_result found, preserved;
+          TC_X509_search_report found, preserved;
           size_t budget = 2000000;
           memset(&preserved, 0xa5, sizeof preserved);
           memcpy(&found, &preserved, sizeof found);
@@ -1159,7 +1159,7 @@ TC_TEST(paths)
           options.flags = original_flags;
         }
         {
-          TC_X509_path_result candidate;
+          TC_X509_path_report candidate;
           size_t remaining = 2000000, spent, before;
           memcpy(&candidate, &unchanged, sizeof candidate);
           munit_assert_int(tc_x509_path_validate_budget(encoded_path, 3, &anchor, &options,
@@ -1221,7 +1221,7 @@ TC_TEST(paths)
                 candidates[3] = {encoded_path[1], encoded_path[2], encoded_path[0]};
             TC_X509_search_frame search_frames[4];
             TC_X509_search_workspace search = {path_slots, search_frames, 4};
-            TC_X509_search_result found, saved;
+            TC_X509_search_report found, saved;
             size_t budget = 2000000, consumed;
             memset(&found, 0xa5, sizeof found);
             memcpy(&saved, &found, sizeof saved);
@@ -1411,11 +1411,11 @@ TC_TEST(paths)
         const TC_X509_search_workspace search = {search_path, search_frames,
                                                  EXAMPLE_CLIENT_PATH_CAPACITY};
         const TC_buffer no_arena = {NULL, 0};
-        TC_X509_search_result found, saved_search;
+        TC_X509_search_report found, saved_search;
         test_search_store records = {encoded_path,          &anchor, TC_TLV_OK, 0, 0, 0, 0,
                                      {{NULL, 0}, {NULL, 0}}};
         TC_X509_store_source source = {&records, 3, 1, store_candidate, store_anchor};
-        TC_X509_path_result result, unchanged;
+        TC_X509_path_report result, unchanged;
         memset(&result, 0xa5, sizeof result);
         memcpy(&unchanged, &result, sizeof result);
         munit_assert_int(example_check_client_certificate(encoded_path, 3, &anchor, &at, &provider,

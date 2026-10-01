@@ -21,14 +21,13 @@ extern "C" {
  * storage or verify without an active challenge. UNSUPPORTED is a key, scheme
  * or size outside the supported set. ERROR is a random-source or provider
  * failure. */
-typedef enum {
-  TC_KEY_CHALLENGE_OK,
-  TC_KEY_CHALLENGE_INVALID,
-  TC_KEY_CHALLENGE_LIMIT,
-  TC_KEY_CHALLENGE_ARGUMENT,
-  TC_KEY_CHALLENGE_UNSUPPORTED,
-  TC_KEY_CHALLENGE_ERROR
-} TC_key_challenge_result;
+typedef TC_result TC_key_challenge_result;
+#define TC_KEY_CHALLENGE_OK TC_RESULT_OK
+#define TC_KEY_CHALLENGE_INVALID TC_RESULT_INVALID
+#define TC_KEY_CHALLENGE_LIMIT TC_RESULT_LIMIT
+#define TC_KEY_CHALLENGE_ARGUMENT TC_RESULT_ARGUMENT
+#define TC_KEY_CHALLENGE_UNSUPPORTED TC_RESULT_UNSUPPORTED
+#define TC_KEY_CHALLENGE_ERROR TC_RESULT_ERROR
 
 typedef struct {
   TC_signature_algorithm signature;

@@ -5,7 +5,7 @@
 TC_TLV_result example_check_path_revocation(const TC_bytes* chain, size_t count,
                                             const TC_X509_revocation_options* options, size_t* work,
                                             ExampleX509RevocationWorkspace* storage,
-                                            TC_X509_revocation_result* result)
+                                            TC_X509_revocation_report* result)
 {
   if (!storage)
     return TC_TLV_ARGUMENT;

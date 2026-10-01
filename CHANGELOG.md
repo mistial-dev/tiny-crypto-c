@@ -24,8 +24,9 @@
 
 - Expanded checked byte spans across one-shot cryptography, protocol parsers,
   FASC-N and UUID writers. Standardized C++ lifecycle names and added the APDU
-  channel wrapper. Result types remain module-specific as documented in
-  `docs/api.md`.
+  channel wrapper. Unified public operation statuses under `TC_result`; existing
+  module result type and value names remain descriptive aliases. Renamed
+  validation output records from `_result` to `_report`.
 - Removed `TC_ZEROIZE` and `TC_STRICT`; their checks are always enabled.
 - Renamed CMake feature switches and added independent RSA modulus-size gates.
   See `docs/migration-2.0.md` for the complete mapping.

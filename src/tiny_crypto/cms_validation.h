@@ -105,7 +105,7 @@ TC_X509_path_status TC_CMS_signer_path_build(const TC_CMS_signer_path_request* r
                                              const TC_X509_store_source* source,
                                              const TC_CMS_path_options* options,
                                              const TC_CMS_path_workspace* workspace, size_t* work,
-                                             TC_X509_search_result* out);
+                                             TC_X509_search_report* out);
 
 /* Parse SignedData, check its content type and the signer's digest listing,
  * hash the attached or detached content, then run TC_CMS_signer_path_build
@@ -132,7 +132,7 @@ TC_X509_path_status TC_CMS_signed_data_path_build(const TC_CMS_validation_reques
                                                   const TC_X509_store_source* source,
                                                   const TC_CMS_path_options* options,
                                                   const TC_CMS_path_workspace* workspace,
-                                                  size_t* work, TC_X509_search_result* out);
+                                                  size_t* work, TC_X509_search_report* out);
 #endif
 
 typedef struct {

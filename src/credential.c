@@ -60,7 +60,7 @@ static TC_TLV_result biometric_signer_distinct(const TC_X509_public_key* embedde
 
 TC_credential_status TC_PIV_CHUID_validate(const TC_PIV_CHUID_validation_request* request,
                                            const TC_validation_context* context, size_t* work,
-                                           TC_PIV_CHUID_result* out)
+                                           TC_PIV_CHUID_report* out)
 {
   tc_credential_session session;
   if (!request || !request->encoded.data || !request->encoded.length || !request->card ||
@@ -142,7 +142,7 @@ TC_credential_status TC_PIV_CHUID_validate(const TC_PIV_CHUID_validation_request
   TC_credential_status status =
       tc_credential_session_verify(&session, context, &cms, &object, work);
   if (status == TC_CREDENTIAL_VALID) {
-    const TC_PIV_CHUID_result result = {chuid, object.certificate, context->options->at,
+    const TC_PIV_CHUID_report result = {chuid, object.certificate, context->options->at,
                                         request->profile, session.revocation_checked};
     *out = result;
   }
@@ -189,7 +189,7 @@ biometric_contents_check(const TC_PIV_biometric_validation_request* request,
 
 TC_credential_status TC_PIV_biometric_validate(const TC_PIV_biometric_validation_request* request,
                                                const TC_validation_context* context, size_t* work,
-                                               TC_PIV_biometric_result* out)
+                                               TC_PIV_biometric_report* out)
 {
   tc_credential_session session;
   if (!request || !request->encoded.data || !request->encoded.length ||
@@ -203,7 +203,7 @@ TC_credential_status TC_PIV_biometric_validate(const TC_PIV_biometric_validation
     return TC_CREDENTIAL_ERROR;
   if (request->format == TC_PIV_CBEFF_IRIS_IMAGE)
     return TC_CREDENTIAL_UNSUPPORTED;
-  const TC_PIV_CHUID_result* chuid = request->chuid;
+  const TC_PIV_CHUID_report* chuid = request->chuid;
   const TC_bytes inputs[] = {
       request->encoded,
       chuid->object.fascn,
@@ -263,7 +263,7 @@ TC_credential_status TC_PIV_biometric_validate(const TC_PIV_biometric_validation
                                          &cbeff.signed_content, 1, signer->encoded};
   status = tc_credential_session_verify(&session, context, &cms, &object, work);
   if (status == TC_CREDENTIAL_VALID) {
-    const TC_PIV_biometric_result result = {
+    const TC_PIV_biometric_report result = {
         request->format,           metadata,         cbeff.record,
         signer->encoded,           request->profile, context->options->at,
         session.revocation_checked};
@@ -272,7 +272,7 @@ TC_credential_status TC_PIV_biometric_validate(const TC_PIV_biometric_validation
   return status;
 }
 
-static TC_TLV_result security_object_equals(const TC_PIV_security_result* security,
+static TC_TLV_result security_object_equals(const TC_PIV_security_report* security,
                                             uint16_t container, TC_bytes expected, size_t* work,
                                             int* matched)
 {
@@ -310,7 +310,7 @@ static TC_TLV_result
 unsigned_chuid_storage(const TC_TWIC_unsigned_CHUID_validation_request* request,
                        const TC_validation_context* context, size_t* work)
 {
-  const TC_PIV_security_result* security = request->security;
+  const TC_PIV_security_report* security = request->security;
   /* The only write is the caller's work counter. */
   TC_bytes counter;
   tc_pki_storage_plan plan;

@@ -164,7 +164,7 @@ typedef struct {
   size_t count;
   TC_PIV_card_identifiers card;
   TC_X509_time card_expiration, at;
-  TC_PIV_CHUID_result chuid;
+  TC_PIV_CHUID_report chuid;
   TC_PIV_security_map security;
   TC_X509_certificate certificates[TC_PIV_CARD_CERTIFICATES];
   TC_PIV_card_profile profile;
@@ -385,9 +385,9 @@ typedef struct {
 } TC_PIV_card_certificate_request;
 
 typedef struct {
-  TC_X509_validation_result certificate;
+  TC_X509_validation_report certificate;
   TC_PIV_card_identifiers identifiers;
-} TC_PIV_card_certificate_result;
+} TC_PIV_card_certificate_report;
 
 /* Validate a card certificate under context with the purpose of its key and
  * read its identifiers (SP 800-73-5 Part 1 sections 3.1.3, 3.1.4 and 3.4,
@@ -420,7 +420,7 @@ typedef struct {
 TC_credential_status
 TC_PIV_card_certificate_validate(const TC_PIV_card_certificate_request* request,
                                  const TC_validation_context* context, size_t* work,
-                                 TC_PIV_card_certificate_result* out);
+                                 TC_PIV_card_certificate_report* out);
 
 #if TC_ENABLE_PIV_KEY_PROOF
 /* TC_PIV_card_proof_request.keys bits. */

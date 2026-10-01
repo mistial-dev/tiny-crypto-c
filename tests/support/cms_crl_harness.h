@@ -68,11 +68,11 @@ TC_TLV_result tc_cms_crl_signer_candidate_next(tc_cms_candidates* reader, const 
 /* CRL signer search with an explicit external store. */
 TC_TLV_result tc_cms_crl_source_search(const void* candidates, const TC_X509_store_source* external,
                                        const tc_x509_crl_signer_query* query,
-                                       const tc_x509_crl_trust* trust, TC_X509_search_result* out,
+                                       const tc_x509_crl_trust* trust, TC_X509_search_report* out,
                                        int* source_failed);
 /* tc_x509_crl_search callback: candidates is a tc_cms_candidates. */
 TC_TLV_result tc_cms_crl_search(const void* candidates, const tc_x509_crl_signer_query* query,
-                                const tc_x509_crl_trust* trust, TC_X509_search_result* out,
+                                const tc_x509_crl_trust* trust, TC_X509_search_report* out,
                                 int* source_failed);
 /* Find a candidate with a valid CRL signature and path to the selected anchor.
  * Candidates remain unchanged. Failed candidate paths do not end the search.
@@ -87,7 +87,7 @@ TC_X509_path_status tc_cms_crl_signer_find(const tc_cms_candidates* candidates,
                                            const TC_X509_crl* crl,
                                            const TC_X509_crl_extensions* extensions,
                                            const tc_x509_crl_trust* trust,
-                                           TC_X509_search_result* out);
+                                           TC_X509_search_report* out);
 /* Process all indexed scopes for one distribution point. check is required.
  * OK publishes new evidence, which may still have incomplete reason coverage.
  * END means no contribution or terminal input evidence. Failures preserve
@@ -146,7 +146,7 @@ TC_TLV_result tc_cms_crl_resolve(const TC_X509_certificate* target,
 TC_TLV_result tc_cms_crl_path_resolve(const TC_bytes* chain, size_t count,
                                       const tc_cms_crl_resolution* resolution,
                                       const tc_x509_crl_resolution_workspace* workspace,
-                                      TC_X509_revocation_result* out);
+                                      TC_X509_revocation_report* out);
 /* Find a trusted signer for the reference CRL, then select/apply its scope.
  * The reference may be complete or delta; its signature identifies the signer.
  * Scopes with no new reason coverage return END before signer discovery.
@@ -159,5 +159,5 @@ TC_TLV_result tc_cms_crl_path_resolve(const TC_bytes* chain, size_t count,
  * Candidate/index views stay unchanged. Signer-path revocation is separate. */
 TC_TLV_result tc_cms_crl_scope_process(const tc_cms_candidates* candidates,
                                        const tc_x509_crl_scope_processing* processing,
-                                       const tc_x509_crl_trust* trust, TC_X509_search_result* out);
+                                       const tc_x509_crl_trust* trust, TC_X509_search_report* out);
 #endif

@@ -13,8 +13,15 @@ Pass immutable byte ranges as `TC_bytes` and writable ranges as `TC_buffer`
 where the function declares a span. One-shot authenticated encryption, key
 wrap, hash and KDF interfaces use spans, as do protocol parsers and writers.
 In-place block-mode and some streaming cipher/MAC functions retain pointer and
-length parameters. Result types remain module-specific; use the result table
-in `docs/api.md` rather than converting values between enums.
+length parameters. Public operation statuses now share `TC_result`. Existing names,
+such as `TC_status`, `TC_RSA_result` and `TC_TLV_result`, are aliases, and their
+value names remain available. Code may use the module names at call sites or a
+single `TC_result` handler across modules.
+
+Parsed and validated output records now use the `_report` suffix, including
+`TC_X509_path_report`, `TC_X509_validation_report`, `TC_X509_ocsp_report`,
+`TC_X509_revocation_report`, and the PIV credential reports. The `_result` and
+`_status` suffixes are reserved for operation status aliases and domain state.
 
 Streaming C contexts use `init`, `update`, `final` and `ctx_clear`. C++ owners
 use `finish` and clear their state on destruction. One-shot functions name the

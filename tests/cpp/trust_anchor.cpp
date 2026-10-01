@@ -70,7 +70,7 @@ TEST_CASE("Constrained trust anchor from C++")
   options.max_input = capacity;
   options.max_work = 2000000;
   options.signatures = TC_X509_native_provider(&native);
-  TC_X509_path_result result;
+  TC_X509_path_report result;
   CHECK(TC_X509_path_validate_with_anchor(chain, 2, &anchor, &options, &storage.path.validation,
                                           &result) == TC_X509_PATH_VALID);
 

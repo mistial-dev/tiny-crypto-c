@@ -139,7 +139,7 @@ static void* path_setup(const MunitParameter params[], void* user)
   tc_cms_path_source context;
   TC_X509_store_source indexed;
   TC_X509_certificate parsed_root;
-  TC_X509_search_result found;
+  TC_X509_search_report found;
   unsigned char* cursor;
   (void)user;
   munit_assert_not_null(f);
@@ -253,7 +253,7 @@ static void path_teardown(void* fixture)
 typedef struct {
   TC_TLV_reader signers;
   TC_CMS_signer_info signer;
-  TC_X509_search_result saved;
+  TC_X509_search_report saved;
   uint8_t digest[TC_SHA256_DIGESTLEN];
   TC_CMS_signature_workspace signature;
   TC_bytes content_digest;
@@ -303,7 +303,7 @@ static MunitResult signer_find(const MunitParameter params[], void* user)
   const size_t leaf_length = f->leaf_length;
   size_t work = WORK_BUDGET;
   const tc_pki_tree_workspace tree = {f->frames, FRAME_CAPACITY, &work};
-  TC_X509_search_result found;
+  TC_X509_search_report found;
   tc_cms_candidates candidates;
   tc_cms_path_source context;
   TC_X509_store_source indexed;
@@ -311,7 +311,7 @@ static MunitResult signer_find(const MunitParameter params[], void* user)
   signer_context signing;
   signer_context_init(f, &tree, &signing);
   TC_CMS_signer_info signer = signing.signer;
-  TC_X509_search_result saved = signing.saved;
+  TC_X509_search_report saved = signing.saved;
   const TC_CMS_signature_workspace signature = signing.signature;
   const TC_bytes content_digest = signing.content_digest;
   (void)params;
@@ -368,14 +368,14 @@ static void validation_context_aliasing(ExampleCMSCredentialWorkspace* storage,
   TC_validation_context context;
   munit_assert_int(TC_validation_context_init(&trust, &options, &workspace, &context), ==,
                    TC_RESULT_OK);
-  TC_X509_validation_result accepted;
+  TC_X509_validation_report accepted;
   size_t work = WORK_BUDGET;
   munit_assert_int(TC_X509_validate(leaf, &context, &work, &accepted), ==, TC_CREDENTIAL_VALID);
   void* const arrays[] = {storage->scopes, storage->signer_path, storage->signer_policies};
   for (unsigned area = 0; area < AREA_COUNT; ++area) {
     /* The result shares its first bytes with one scratch array. */
     union {
-      TC_X509_validation_result result;
+      TC_X509_validation_report result;
       TC_X509_revocation_scope scopes[EXAMPLE_CMS_CRL_CAPACITY];
       TC_bytes signer_path[EXAMPLE_X509_PATH_CAPACITY];
       TC_bytes signer_policies[EXAMPLE_X509_POLICY_CAPACITY];
@@ -407,7 +407,7 @@ static void validation_context_aliasing(ExampleCMSCredentialWorkspace* storage,
     TC_validation_context input_context;
     munit_assert_int(TC_validation_context_init(&input_trust, &options, &workspace, &input_context),
                      ==, TC_RESULT_OK);
-    TC_X509_validation_result result;
+    TC_X509_validation_report result;
     uint8_t saved_result[sizeof result];
     static uint8_t saved_storage[sizeof *storage];
     memset(&result, 0xa5, sizeof result);
@@ -486,7 +486,7 @@ static void credential_workspace_bounds(ExampleCMSCredentialWorkspace* storage,
     TC_validation_context context;
     munit_assert_int(TC_validation_context_init(&trust, &options, &workspace, &context), ==,
                      TC_RESULT_OK);
-    TC_X509_validation_result result;
+    TC_X509_validation_report result;
     uint8_t saved_result[sizeof result];
     memset(&result, 0xa5, sizeof result);
     memcpy(saved_result, &result, sizeof result);
@@ -532,7 +532,7 @@ static MunitResult credential_workflow(const MunitParameter params[], void* user
   const TC_X509_store_source external = f->external;
   size_t work = WORK_BUDGET;
   const tc_pki_tree_workspace tree = {f->frames, FRAME_CAPACITY, &work};
-  TC_X509_search_result found;
+  TC_X509_search_report found;
   tc_cms_candidates candidates;
   tc_cms_path_source context;
   TC_X509_store_source indexed;
@@ -710,7 +710,7 @@ static MunitResult credential_workflow(const MunitParameter params[], void* user
                                                    target_certificates[target].issuer};
           }
           for (size_t record = 0; record < 2; ++record) {
-            TC_X509_search_result trusted_signer;
+            TC_X509_search_report trusted_signer;
             work = WORK_BUDGET;
             TC_X509_path_status signer_status = tc_x509_crl_signer_validate(
                 &records[record].crl, &target_certificates[record + 1],
@@ -828,7 +828,7 @@ static MunitResult credential_workflow(const MunitParameter params[], void* user
               policy.verification.attributes = (TC_CMS_attribute_encoding)-1;
             work = WORK_BUDGET;
             memset(&found, 0xa5, sizeof found);
-            TC_X509_search_result preserved;
+            TC_X509_search_report preserved;
             memcpy(&preserved, &found, sizeof found);
             munit_assert_int(
                 TC_CMS_signed_data_path_build(&(TC_CMS_validation_request){compatible_input,
@@ -1083,11 +1083,11 @@ static MunitResult signer_path_build(const MunitParameter params[], void* user)
   const TC_X509_store_source external = f->external;
   size_t work = WORK_BUDGET;
   const tc_pki_tree_workspace tree = {f->frames, FRAME_CAPACITY, &work};
-  TC_X509_search_result found;
+  TC_X509_search_report found;
   signer_context signing;
   signer_context_init(f, &tree, &signing);
   TC_CMS_signer_info signer = signing.signer;
-  TC_X509_search_result saved = signing.saved;
+  TC_X509_search_report saved = signing.saved;
   const TC_bytes content_digest = signing.content_digest;
   (void)params;
   {
@@ -1332,7 +1332,7 @@ static MunitResult signer_path_build(const MunitParameter params[], void* user)
        * The leaf is selected. Another certificate cannot sign, so no path is
        * found and the result is unchanged. */
     const TC_bytes other_certificate = found.path[0];
-    TC_X509_search_result selected_path;
+    TC_X509_search_report selected_path;
     work = WORK_BUDGET;
     munit_assert_int(
         TC_CMS_signer_path_build(&(TC_CMS_signer_path_request){&signer,
@@ -1517,7 +1517,7 @@ static MunitResult signer_path_failures(const MunitParameter params[], void* use
   const TC_X509_store_source external = f->external;
   size_t work = WORK_BUDGET;
   const tc_pki_tree_workspace tree = {f->frames, FRAME_CAPACITY, &work};
-  TC_X509_search_result found;
+  TC_X509_search_report found;
   tc_cms_candidates candidates;
   tc_cms_path_source context;
   TC_X509_store_source indexed;
@@ -1525,7 +1525,7 @@ static MunitResult signer_path_failures(const MunitParameter params[], void* use
   signer_context signing;
   signer_context_init(f, &tree, &signing);
   TC_CMS_signer_info signer = signing.signer;
-  TC_X509_search_result saved = signing.saved;
+  TC_X509_search_report saved = signing.saved;
   uint8_t* const digest = signing.digest;
   const TC_CMS_signature_workspace signature = signing.signature;
   const TC_bytes content_digest = signing.content_digest;
@@ -1645,7 +1645,7 @@ static MunitResult signer_retries(const MunitParameter params[], void* user)
   const TC_bytes target = f->target;
   size_t work = WORK_BUDGET;
   const tc_pki_tree_workspace tree = {f->frames, FRAME_CAPACITY, &work};
-  TC_X509_search_result found;
+  TC_X509_search_report found;
   tc_cms_candidates candidates;
   tc_cms_path_source context;
   TC_X509_store_source indexed;
@@ -1653,7 +1653,7 @@ static MunitResult signer_retries(const MunitParameter params[], void* user)
   signer_context signing;
   signer_context_init(f, &tree, &signing);
   TC_CMS_signer_info signer = signing.signer;
-  TC_X509_search_result saved = signing.saved;
+  TC_X509_search_report saved = signing.saved;
   const TC_CMS_signature_workspace signature = signing.signature;
   const TC_bytes content_digest = signing.content_digest;
   (void)params;
@@ -1723,7 +1723,7 @@ static MunitResult revocations(const MunitParameter params[], void* user)
   const TC_X509_store_source external = f->external;
   size_t work = WORK_BUDGET;
   const tc_pki_tree_workspace tree = {f->frames, FRAME_CAPACITY, &work};
-  TC_X509_search_result found;
+  TC_X509_search_report found;
   tc_cms_candidates candidates;
   tc_cms_path_source context;
   TC_X509_store_source indexed;
@@ -1734,7 +1734,7 @@ static MunitResult revocations(const MunitParameter params[], void* user)
     tc_cms_revocation_choice record;
     TC_X509_crl parsed_crl;
     TC_X509_crl_extensions extensions;
-    TC_X509_search_result saved;
+    TC_X509_search_report saved;
     work = WORK_BUDGET;
     munit_assert_int(tc_cms_revocations_init(container.revocations, NULL, 1, CMS_CAPACITY, &limits,
                                              &tree, &revocations),
@@ -1819,7 +1819,7 @@ static MunitResult signed_attributes(const MunitParameter params[], void* user)
   int length = f->length;
   const TC_X509_store_source external = f->external;
   size_t work = WORK_BUDGET;
-  TC_X509_search_result found;
+  TC_X509_search_report found;
   unsigned char* cursor;
   (void)params;
   {
@@ -1878,7 +1878,7 @@ static MunitResult signed_attributes(const MunitParameter params[], void* user)
       cursor = encoded;
       munit_assert_int(i2d_CMS_ContentInfo(named, &cursor), ==, length);
       work = WORK_BUDGET;
-      TC_X509_search_result saved;
+      TC_X509_search_report saved;
       memset(&saved, 0xa5, sizeof saved);
       memcpy(&found, &saved, sizeof found);
       const TC_X509_path_status expected = scenario == WRONG_NAME ? TC_X509_PATH_INVALID

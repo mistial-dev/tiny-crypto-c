@@ -881,7 +881,7 @@ TC_TEST(entry_option_checks)
                                   mappings, policies, certificates, summaries);
   TC_X509_trust_anchor anchor;
   TC_X509_path_options options;
-  TC_X509_path_result out;
+  TC_X509_path_report out;
   unsigned scenario;
   memset(&anchor, 0, sizeof anchor);
   for (scenario = 0; scenario < 3; ++scenario) {
@@ -1311,7 +1311,7 @@ TC_TEST(validation_phases)
     const TC_bytes policy = {policy2, sizeof policy2};
     Provider provider = {0, scenario->signature};
     TC_X509_path_options options;
-    TC_X509_path_result out;
+    TC_X509_path_report out;
     TC_bytes chain[2];
     size_t work = 1000000, spent;
     memset(&anchor, 0, sizeof anchor);

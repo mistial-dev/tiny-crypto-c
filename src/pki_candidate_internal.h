@@ -53,7 +53,7 @@ typedef TC_TLV_result (*tc_pki_candidate_filter)(const void* context,
                                                  const tc_pki_tree_workspace* tree, int* matched);
 typedef TC_TLV_result (*tc_pki_candidate_attempt)(const void* context,
                                                   const TC_X509_certificate* candidate,
-                                                  TC_X509_search_result* out);
+                                                  TC_X509_search_report* out);
 typedef TC_TLV_result (*tc_pki_candidate_next)(void* context, const tc_pki_tree_workspace* tree,
                                                const TC_X509_workspace* parser,
                                                TC_X509_certificate* out);
@@ -74,7 +74,7 @@ typedef struct {
 static inline TC_TLV_result tc_pki_certificate_search(
     void* cursor, tc_pki_candidate_next next, const tc_pki_candidate_checks* checks,
     const TC_TLV_limits* limits, const tc_pki_tree_workspace* tree,
-    const TC_X509_path_workspace* validation, TC_X509_search_result* out, int* source_failed)
+    const TC_X509_path_workspace* validation, TC_X509_search_report* out, int* source_failed)
 {
   if (!next || !checks || !checks->filter || !checks->attempt || !limits || !tree || !tree->work ||
       !validation || !out)
@@ -84,7 +84,7 @@ static inline TC_TLV_result tc_pki_certificate_search(
   const size_t initial_work = *tree->work;
   for (;;) {
     TC_X509_certificate candidate;
-    TC_X509_search_result found;
+    TC_X509_search_report found;
     size_t before = *tree->work;
     TC_TLV_result result = next(cursor, tree, &parser, &candidate);
     if (*tree->work > before) {

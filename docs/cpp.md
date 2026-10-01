@@ -48,9 +48,10 @@ and [`kbkdf.cpp`](../examples/kbkdf.cpp) build and run on the host as
   `warn_unused_result` on GCC and Clang in C++11. Build with
   `-Wunused-result` enabled, the default on GCC and Clang, so a discarded
   verification or cipher result is reported.
-- Results are the C result types, such as `TC_status`, `TC_EC_result`,
-  `TC_RSA_result` and `TC_TLV_result`. Typedefs such as `ec_result` and
-  `rsa_result` name them in the namespace.
+- Public operations share `TC_result`. The C module aliases, such as
+  `TC_status`, `TC_EC_result`, `TC_RSA_result` and `TC_TLV_result`, remain
+  available. `tiny_crypto::result` and `tiny_crypto::status` name the shared
+  type in the namespace.
 - `tiny_crypto::bytes` is `TC_bytes` and `tiny_crypto::buffer` is `TC_buffer`.
   Keys, IVs, AAD, messages and received tags are `bytes` spans. Outputs are
   `buffer` spans or fixed-size C arrays whose size is part of the type. Array

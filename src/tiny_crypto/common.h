@@ -18,11 +18,39 @@
 extern "C" {
 #endif
 
-/* Result of the symmetric, hash, MAC and KDF APIs: TC_OK, TC_MISMATCH for a
- * tag or comparison that differs, and TC_ERROR for every other failure.
- * Authentication failures stay separate from argument errors so protocols
- * can reject hostile packets without treating them as internal errors. */
-typedef int TC_status;
+/* One result type is shared by every public status-returning operation.
+ * Modules expose descriptive compatibility names, such as TC_RSA_INVALID and
+ * TC_TLV_MORE, for these values. Domain state, such as a card status word or
+ * a revocation decision, remains a separate enum. */
+typedef enum {
+  TC_RESULT_ERROR = -6,
+  TC_RESULT_IO = -5,
+  TC_RESULT_ARGUMENT = -4,
+  TC_RESULT_UNSUPPORTED = -3,
+  TC_RESULT_LIMIT = -2,
+  TC_RESULT_INVALID = -1,
+  TC_RESULT_OK = 0,
+  TC_RESULT_END = 1,
+  TC_RESULT_MORE = 2,
+  TC_RESULT_IN_PROGRESS,
+  TC_RESULT_CANCELLED,
+  TC_RESULT_CARD_STATUS,
+  TC_RESULT_REFUSED,
+  TC_RESULT_ENTROPY,
+  TC_RESULT_REVOKED,
+  TC_RESULT_UNAVAILABLE,
+  TC_RESULT_STALE,
+  TC_RESULT_CHECKSUM_MISMATCH,
+  TC_RESULT_SINK_ERROR,
+  TC_RESULT_SOURCE_ERROR
+} TC_result;
+
+/* Symmetric, hash, MAC and KDF APIs use the shared result type with compact
+ * names. A failed authentication or comparison is INVALID. */
+typedef TC_result TC_status;
+#define TC_ERROR TC_RESULT_ERROR
+#define TC_OK TC_RESULT_OK
+#define TC_MISMATCH TC_RESULT_INVALID
 /* Random-fill callback. user is the TC_random_source context. Fill all
  * length bytes of output from a cryptographically secure source and return
  * TC_OK, or return another status when the request cannot be filled in
@@ -63,26 +91,16 @@ typedef struct {
   TC_work_budget work;
 } TC_execution;
 
-/* Setup and resource-management results. */
-typedef enum {
-  TC_RESULT_OK,
-  TC_RESULT_ARGUMENT,
-  TC_RESULT_LIMIT,
-  TC_RESULT_UNSUPPORTED,
-  TC_RESULT_ERROR
-} TC_result;
-
 /* Credential validation combines signatures, trust policy and status evidence. */
-typedef enum {
-  TC_CREDENTIAL_VALID,
-  TC_CREDENTIAL_INVALID,
-  TC_CREDENTIAL_REVOKED,
-  TC_CREDENTIAL_UNSUPPORTED,
-  TC_CREDENTIAL_LIMIT,
-  TC_CREDENTIAL_ERROR,
-  /* A required trust or evidence source is unavailable. */
-  TC_CREDENTIAL_UNAVAILABLE
-} TC_credential_status;
+typedef TC_result TC_credential_status;
+#define TC_CREDENTIAL_VALID TC_RESULT_OK
+#define TC_CREDENTIAL_INVALID TC_RESULT_INVALID
+#define TC_CREDENTIAL_REVOKED TC_RESULT_REVOKED
+#define TC_CREDENTIAL_UNSUPPORTED TC_RESULT_UNSUPPORTED
+#define TC_CREDENTIAL_LIMIT TC_RESULT_LIMIT
+#define TC_CREDENTIAL_ERROR TC_RESULT_ERROR
+/* A required trust or evidence source is unavailable. */
+#define TC_CREDENTIAL_UNAVAILABLE TC_RESULT_UNAVAILABLE
 
 /* Each identifier exists whether or not its hash is enabled. */
 typedef enum {
@@ -106,10 +124,6 @@ typedef enum {
   TC_EC_BRAINPOOL_P512,
   TC_EC_P192
 } TC_EC_curve;
-
-#define TC_ERROR (-1)
-#define TC_OK 0
-#define TC_MISMATCH 1
 
 /* Best-effort secret wipe: write zero to length bytes of memory through
  * volatile stores. GCC and Clang builds add a compiler memory barrier. This

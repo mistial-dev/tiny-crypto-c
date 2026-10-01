@@ -26,7 +26,7 @@ TC_X509_path_status example_check_client_certificate(const TC_bytes* chain, size
                                                      const TC_X509_time* at,
                                                      const TC_X509_signature_provider* verifier,
                                                      size_t work_limit, TC_buffer arena,
-                                                     TC_X509_path_result* result);
+                                                     TC_X509_path_report* result);
 /* Discover and validate a client path from source. search holds the path
  * spans and is disjoint from arena. Hold the source snapshot, arena and
  * search storage until all result use finishes. Arena statuses match
@@ -36,7 +36,7 @@ TC_X509_path_status example_find_client_path(TC_bytes target, const TC_X509_stor
                                              const TC_X509_signature_provider* verifier,
                                              size_t work_limit, TC_buffer arena,
                                              const TC_X509_search_workspace* search,
-                                             TC_X509_search_result* result);
+                                             TC_X509_search_report* result);
 #ifdef __cplusplus
 }
 #endif

@@ -15,13 +15,13 @@ TC_X509_path_status tc_x509_path_validate_budget(const TC_bytes* chain, size_t c
                                                  const TC_X509_trust_anchor* anchor,
                                                  const TC_X509_path_options* options,
                                                  const TC_X509_path_workspace* workspace,
-                                                 size_t* work, TC_X509_path_result* out);
+                                                 size_t* work, TC_X509_path_report* out);
 /* Additional borrowed constraints are disjoint from scratch and all outputs. */
 TC_X509_path_status tc_x509_path_validate_anchor(const TC_bytes* chain, size_t count,
                                                  const TC_X509_store_anchor* anchor,
                                                  const TC_X509_path_options* options,
                                                  const TC_X509_path_workspace* workspace,
-                                                 size_t* work, TC_X509_path_result* out);
+                                                 size_t* work, TC_X509_path_report* out);
 
 enum {
   TC_X509_PATH_STORAGE_FRAMES,
@@ -54,7 +54,7 @@ TC_X509_path_status tc_x509_path_search_source(TC_bytes target, const TC_X509_st
                                                const TC_X509_path_options* options,
                                                const TC_X509_path_workspace* validation,
                                                const TC_X509_search_workspace* search, size_t* work,
-                                               TC_X509_search_result* out);
+                                               TC_X509_search_report* out);
 
 typedef struct {
   /* Anchor-issued certificate first, target last. Optional parsed-view cache. */
@@ -209,5 +209,5 @@ TC_X509_path_status tc_x509_path_build_work(TC_bytes target, const TC_X509_store
                                             const TC_X509_path_options* options,
                                             const TC_X509_path_workspace* validation,
                                             const TC_X509_search_workspace* search, size_t* work,
-                                            TC_X509_search_result* out);
+                                            TC_X509_search_report* out);
 #endif

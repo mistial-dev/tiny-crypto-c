@@ -86,7 +86,7 @@ TC_TLV_result tc_x509_crl_dependency_add(tc_x509_crl_dependencies* dependencies,
                                      &dependencies->count, certificate, work, index);
 }
 
-TC_X509_path_status tc_x509_crl_dependencies_check(void* context, const TC_X509_search_result* path,
+TC_X509_path_status tc_x509_crl_dependencies_check(void* context, const TC_X509_search_report* path,
                                                    const tc_x509_crl_selected* selected,
                                                    size_t* work)
 {
@@ -118,7 +118,7 @@ TC_X509_path_status tc_x509_crl_dependencies_check(void* context, const TC_X509_
 
 TC_TLV_result tc_x509_crl_path_resolve(const TC_bytes* chain, size_t count,
                                        tc_x509_crl_certificate_resolve resolve, void* context,
-                                       int report_uncovered, TC_X509_revocation_result* out)
+                                       int report_uncovered, TC_X509_revocation_report* out)
 {
   TC_bytes storage;
   if (!chain || !count || !resolve || !out)
@@ -126,7 +126,7 @@ TC_TLV_result tc_x509_crl_path_resolve(const TC_bytes* chain, size_t count,
   TC_TLV_result result = tc_pki_storage_span(chain, count, sizeof *chain, &storage);
   if (result != TC_TLV_OK)
     return result;
-  TC_X509_revocation_result proposed = {TC_X509_REVOCATION_GOOD, SIZE_MAX, {0}};
+  TC_X509_revocation_report proposed = {TC_X509_REVOCATION_GOOD, SIZE_MAX, {0}};
   size_t uncovered = SIZE_MAX;
   for (size_t i = 0; i < count; ++i) {
     TC_X509_crl_evidence evidence = {0};
@@ -154,7 +154,7 @@ TC_TLV_result tc_x509_crl_path_resolve(const TC_bytes* chain, size_t count,
   }
   /* A revoked member outranks an uncovered one (RFC 5280 section 6.3.3). */
   if (proposed.status == TC_X509_REVOCATION_GOOD && uncovered != SIZE_MAX)
-    proposed = (TC_X509_revocation_result){TC_X509_REVOCATION_UNDETERMINED, uncovered, {0}};
+    proposed = (TC_X509_revocation_report){TC_X509_REVOCATION_UNDETERMINED, uncovered, {0}};
   *out = proposed;
   return TC_TLV_OK;
 }
@@ -229,7 +229,7 @@ typedef struct {
   TC_X509_store_anchor anchor;
   /* Evidence and discarded signer path of the node being evaluated. */
   TC_X509_crl_evidence pending;
-  TC_X509_search_result scratch;
+  TC_X509_search_report scratch;
   int source_failed;
 } x509_crl_prepared;
 
@@ -479,7 +479,7 @@ static TC_TLV_result x509_ocsp_member(const x509_crl_path_context* path, size_t 
                                                options->ocsp.max_certificates,
                                                &options->signer_policy->parsing,
                                                &options->signer_policy->signatures};
-  TC_X509_ocsp_result verified;
+  TC_X509_ocsp_report verified;
   result = TC_X509_ocsp_response_verify(&request, validation, work, &verified);
   if (result != TC_TLV_OK)
     return result;
@@ -606,7 +606,7 @@ static TC_TLV_result x509_path_check_revocation(const TC_bytes* chain, size_t co
                                                 const TC_X509_revocation_options* options,
                                                 const TC_X509_revocation_workspace* workspace,
                                                 size_t* work, int report_uncovered,
-                                                TC_X509_revocation_result* out)
+                                                TC_X509_revocation_report* out)
 {
   if (!options || !options->source || !options->signer_policy || !workspace ||
       !workspace->validation || !workspace->search || !workspace->scopes ||
@@ -679,7 +679,7 @@ static TC_TLV_result x509_path_check_revocation(const TC_bytes* chain, size_t co
 TC_TLV_result TC_X509_path_check_revocation(const TC_bytes* chain, size_t count,
                                             const TC_X509_revocation_options* options,
                                             const TC_X509_revocation_workspace* workspace,
-                                            size_t* work, TC_X509_revocation_result* out)
+                                            size_t* work, TC_X509_revocation_report* out)
 {
   return x509_path_check_revocation(chain, count, options, workspace, work, 0, out);
 }
@@ -687,12 +687,12 @@ TC_TLV_result TC_X509_path_check_revocation(const TC_bytes* chain, size_t count,
 TC_TLV_result tc_x509_path_revocation_coverage(const TC_bytes* chain, size_t count,
                                                const TC_X509_revocation_options* options,
                                                const TC_X509_revocation_workspace* workspace,
-                                               size_t* work, TC_X509_revocation_result* out)
+                                               size_t* work, TC_X509_revocation_report* out)
 {
   return x509_path_check_revocation(chain, count, options, workspace, work, 1, out);
 }
 
-TC_X509_path_status tc_x509_crl_dependencies_path(const TC_X509_search_result* path,
+TC_X509_path_status tc_x509_crl_dependencies_path(const TC_X509_search_report* path,
                                                   const tc_x509_crl_resolution_workspace* workspace,
                                                   size_t* count, const TC_bytes* writes,
                                                   size_t write_count, size_t* work)

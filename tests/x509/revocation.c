@@ -68,7 +68,7 @@ static TC_TLV_result extra_inputs_result(const tc_x509_crl_extra_storage* extra,
 
 /* Record the scope writes through CRL_SCOPE_SIGNER_POLICIES. */
 static TC_TLV_result scope_writes_result(const tc_x509_crl_scope_processing* processing,
-                                         const tc_x509_crl_trust* trust, TC_X509_search_result* out,
+                                         const tc_x509_crl_trust* trust, TC_X509_search_report* out,
                                          TC_bytes writes[CRL_SCOPE_WRITES])
 {
   tc_pki_storage_plan plan;
@@ -100,7 +100,7 @@ TC_TEST(signer_search)
   const TC_X509_crl crl = {0};
   const TC_X509_crl_extensions extensions = {0};
   const TC_TLV_result results[] = {TC_TLV_END, TC_TLV_INVALID, TC_TLV_LIMIT, TC_TLV_ARGUMENT};
-  TC_X509_search_result out, saved;
+  TC_X509_search_report out, saved;
   memset(&saved, 0xa5, sizeof saved);
   for (size_t i = 0; i < sizeof results / sizeof *results; ++i) {
     size_t work = 100;
@@ -317,7 +317,7 @@ TC_TEST(dependency_status)
                                                 (TC_X509_revocation_status)-1};
   const TC_X509_path_status expected[] = {TC_X509_PATH_VALID, TC_X509_PATH_INVALID,
                                           TC_X509_PATH_UNSUPPORTED, TC_X509_PATH_ERROR};
-  TC_X509_search_result path = {0};
+  TC_X509_search_report path = {0};
   path.path = &certificate;
   path.count = 1;
   TC_X509_revocation_node node = {.certificate = certificate,
@@ -376,7 +376,7 @@ TC_TEST(dependency_failures)
     TC_X509_revocation_node node = {.certificate = certificate, .status = TC_X509_REVOCATION_GOOD},
                             saved;
     memcpy(&saved, &node, sizeof node);
-    TC_X509_search_result path = {0};
+    TC_X509_search_report path = {0};
     path.path = scenario == PATH_BYTES ? NULL : &certificate;
     path.count = 1;
     tc_x509_crl_resolution_workspace workspace = {0};
@@ -542,7 +542,7 @@ TC_TEST(held_path)
                           TC_TLV_LIMIT,
                           scenario != INCOMPLETE,
                           SIZE_MAX};
-    TC_X509_revocation_result out, saved;
+    TC_X509_revocation_report out, saved;
     memset(&out, 0xa5, sizeof out);
     memcpy(&saved, &out, sizeof out);
     munit_assert_int(tc_x509_crl_path_resolve(chain, 2, resolve_certificate, &state, 0, &out), ==,
@@ -582,7 +582,7 @@ TC_TEST(held_path_uncovered)
                             TC_TLV_LIMIT,
                             scenario != INCOMPLETE,
                             scenario == INCOMPLETE ? SIZE_MAX : 0};
-      TC_X509_revocation_result out, saved;
+      TC_X509_revocation_report out, saved;
       memset(&out, 0xa5, sizeof out);
       memcpy(&saved, &out, sizeof out);
       const TC_TLV_result result =
@@ -644,7 +644,7 @@ TC_TEST(storage_spans)
     processing.states = scenario == MISSING_STATES ? NULL : states;
     processing.capacity = sizeof states;
     processing.evidence = &evidence;
-    TC_X509_search_result out;
+    TC_X509_search_report out;
     TC_bytes writes[CRL_SCOPE_WRITES], saved[CRL_SCOPE_WRITES];
     memset(writes, 0xa5, sizeof writes);
     memcpy(saved, writes, sizeof writes);
@@ -769,7 +769,7 @@ TC_TEST(scope_inputs)
 
 static TC_TLV_result unexpected_search(const void* candidates,
                                        const tc_x509_crl_signer_query* query,
-                                       const tc_x509_crl_trust* trust, TC_X509_search_result* out,
+                                       const tc_x509_crl_trust* trust, TC_X509_search_report* out,
                                        int* failed)
 {
   const TC_X509_crl* crl = query->crl;
@@ -806,7 +806,7 @@ TC_TEST(scope_traversal)
   tc_x509_crl_query query = {0};
   query.certificate = &certificate;
   query.point = &point;
-  TC_X509_search_result out, saved;
+  TC_X509_search_report out, saved;
   memset(&saved, 0xa5, sizeof saved);
   for (unsigned scenario = EMPTY; scenario < CASE_COUNT; ++scenario) {
     size_t work = scenario == NO_WORK ? 0 : 100;
@@ -950,7 +950,7 @@ TC_TEST(dependency_context)
   workspace.nodes = nodes;
   workspace.node_capacity = 1;
   tc_x509_crl_dependencies dependencies = {&options, 0, &workspace, &anchor, NULL, 0, 0};
-  TC_X509_search_result path = {0};
+  TC_X509_search_report path = {0};
   size_t work = 100, index = SIZE_MAX;
   munit_assert_int(tc_x509_crl_dependencies_check(NULL, &path, NULL, &work), ==,
                    TC_X509_PATH_ERROR);
@@ -1178,7 +1178,7 @@ TC_TEST(scope_arguments)
   const TC_X509_certificate certificate = {0};
   const tc_pki_distribution_point point = {0};
   const tc_x509_crl_path_check check = {0};
-  TC_X509_search_result out, saved;
+  TC_X509_search_report out, saved;
   memset(&saved, 0xa5, sizeof saved);
   for (unsigned scenario = VALID; scenario < CASE_COUNT; ++scenario) {
     size_t work = 100;
@@ -1278,7 +1278,7 @@ TC_TEST(scope_storage_check)
     CASE_COUNT
   };
   uint8_t bytes[3];
-  TC_X509_revocation_result output = {0};
+  TC_X509_revocation_report output = {0};
   for (unsigned scenario = VALID; scenario < CASE_COUNT; ++scenario) {
     TC_bytes writes[CRL_SCOPE_WRITES] = {{NULL, 0}};
     const TC_bytes prefix = {bytes, 1};
@@ -1373,7 +1373,7 @@ TC_TEST(store_search)
   validation.frames.data = frames;
   validation.frames.capacity = FRAME_CAPACITY;
   const TC_X509_search_workspace search = {0};
-  TC_X509_search_result out, saved;
+  TC_X509_search_report out, saved;
   memset(&saved, 0xa5, sizeof saved);
   for (unsigned scenario = EMPTY; scenario < CASE_COUNT; ++scenario) {
     size_t work = scenario == NO_WORK ? 0 : WORK_BUDGET;
@@ -1464,7 +1464,7 @@ static TC_TLV_result guarded_scope_search(const void* candidates,
                                           const TC_X509_store_source* external,
                                           const tc_x509_crl_signer_query* query,
                                           const tc_x509_crl_trust* trust,
-                                          TC_X509_search_result* out, int* source_failed)
+                                          TC_X509_search_report* out, int* source_failed)
 {
   const TC_X509_crl* crl = query->crl;
   const TC_X509_crl_extensions* extensions = query->extensions;
@@ -1495,7 +1495,7 @@ TC_TEST(scope_operation)
   validation.frames.data = frames;
   validation.frames.capacity = FRAME_CAPACITY;
   const TC_X509_search_workspace search = {0};
-  TC_X509_search_result out, saved;
+  TC_X509_search_report out, saved;
   memset(&saved, 0xa5, sizeof saved);
   for (unsigned scenario = VALID; scenario < CASE_COUNT; ++scenario) {
     size_t work = scenario == NO_WORK ? 0 : WORK_BUDGET;

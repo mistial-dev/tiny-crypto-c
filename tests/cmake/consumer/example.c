@@ -376,7 +376,7 @@ int main(void)
   const TC_X509_time at = {2026, 1, 1, 0, 0, 0};
   TC_X509_trust_anchor anchor;
   TC_X509_signature_provider verifier;
-  TC_X509_path_result result, unchanged;
+  TC_X509_path_report result, unchanged;
   size_t arena_bytes = 0;
   memset(&anchor, 0, sizeof anchor);
   memset(&verifier, 0, sizeof verifier);
@@ -520,7 +520,7 @@ int main(void)
     static ExampleCMSPathWorkspace path_storage;
     TC_CMS_path_options settings;
     TC_X509_store_source source;
-    TC_X509_search_result path_result, saved_path;
+    TC_X509_search_report path_result, saved_path;
     memset(&settings, 0, sizeof settings);
     memset(&source, 0, sizeof source);
     memset(&path_result, 0xa5, sizeof path_result);

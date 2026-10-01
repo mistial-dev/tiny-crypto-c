@@ -17,16 +17,15 @@
 extern "C" {
 #endif
 
-typedef enum {
-  TC_TLV_OK = 0,
-  TC_TLV_END = 1,
-  TC_TLV_MORE = 2,
-  TC_TLV_INVALID = -1,
-  TC_TLV_LIMIT = -2,
-  TC_TLV_UNSUPPORTED = -3,
-  TC_TLV_ARGUMENT = -4,
-  TC_TLV_IO = -5 /* Backing storage could not supply the requested bytes. */
-} TC_TLV_result;
+typedef TC_result TC_TLV_result;
+#define TC_TLV_OK TC_RESULT_OK
+#define TC_TLV_END TC_RESULT_END
+#define TC_TLV_MORE TC_RESULT_MORE
+#define TC_TLV_INVALID TC_RESULT_INVALID
+#define TC_TLV_LIMIT TC_RESULT_LIMIT
+#define TC_TLV_UNSUPPORTED TC_RESULT_UNSUPPORTED
+#define TC_TLV_ARGUMENT TC_RESULT_ARGUMENT
+#define TC_TLV_IO TC_RESULT_IO /* Backing storage could not supply requested bytes. */
 
 typedef enum {
   TC_TLV_DER = 0,

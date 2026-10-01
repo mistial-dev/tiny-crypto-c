@@ -74,7 +74,7 @@ int tc_credential_result_current(TC_PIV_card_profile result_profile, const TC_X5
          TC_X509_time_compare(&context->options->at, result_at, &order) == TC_TLV_OK && !order;
 }
 
-int tc_credential_chuid_bound(const TC_PIV_CHUID_result* chuid, TC_PIV_card_profile profile,
+int tc_credential_chuid_bound(const TC_PIV_CHUID_report* chuid, TC_PIV_card_profile profile,
                               const TC_validation_context* context)
 {
   enum { FASCN_BYTES = 25, GUID_BYTES = 16 };

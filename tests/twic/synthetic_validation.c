@@ -288,7 +288,7 @@ static MunitResult validate(const MunitParameter params[], void* user_data)
                                              0,
                                              &state->identifiers,
                                              &state->card_expiration};
-  TC_PIV_CHUID_result chuid;
+  TC_PIV_CHUID_report chuid;
   size_t work = WORK;
   /* The PIV application CHUID of a TWIC card carries an empty
    * Authentication Key Map (3D 00). The key-map profile accepts it under
@@ -319,7 +319,7 @@ static MunitResult validate(const MunitParameter params[], void* user_data)
       TC_PIV_CMS_BIOMETRIC,
       TC_PIV_CBEFF_FINGERPRINT_TEMPLATE,
       0};
-  TC_PIV_biometric_result biometric;
+  TC_PIV_biometric_report biometric;
   work = WORK;
   munit_assert_int(TC_PIV_biometric_validate(&fingerprint, &state->context, &work, &biometric), ==,
                    TC_CREDENTIAL_VALID);
@@ -351,7 +351,7 @@ static MunitResult validate(const MunitParameter params[], void* user_data)
                                                          objects,
                                                          count};
   TC_PIV_security_validation_workspace security_workspace = {state->lds, sizeof state->lds};
-  TC_PIV_security_result security;
+  TC_PIV_security_report security;
   work = WORK;
   munit_assert_int(TC_PIV_security_validate(&security_request, &state->context, &security_workspace,
                                             &work, &security),
@@ -447,7 +447,7 @@ static MunitResult chuid_binding(const MunitParameter params[], void* user_data)
                                                    0,
                                                    &state->identifiers,
                                                    &state->card_expiration};
-  TC_PIV_CHUID_result chuid;
+  TC_PIV_CHUID_report chuid;
   size_t work = WORK;
   munit_assert_int(TC_PIV_CHUID_validate(&request, &state->context, &work, &chuid), ==,
                    TC_CREDENTIAL_VALID);
@@ -460,7 +460,7 @@ static MunitResult chuid_binding(const MunitParameter params[], void* user_data)
       TC_PIV_CMS_BIOMETRIC,
       TC_PIV_CBEFF_FINGERPRINT_TEMPLATE,
       0};
-  TC_PIV_biometric_result biometric;
+  TC_PIV_biometric_report biometric;
   work = WORK;
   munit_assert_int(TC_PIV_biometric_validate(&fingerprint, &state->context, &work, &biometric), ==,
                    TC_CREDENTIAL_VALID);
@@ -476,14 +476,14 @@ static MunitResult chuid_binding(const MunitParameter params[], void* user_data)
                    TC_PIV_CBEFF_FINGERPRINT_TEMPLATE);
 
   /* Each rejected binding leaves work and the result unchanged. */
-  TC_PIV_biometric_result saved = biometric;
-  TC_PIV_CHUID_result later = chuid;
+  TC_PIV_biometric_report saved = biometric;
+  TC_PIV_CHUID_report later = chuid;
   later.at.second = (uint8_t)(later.at.second + 1);
-  TC_PIV_CHUID_result other = chuid;
+  TC_PIV_CHUID_report other = chuid;
   other.profile = other_profile;
-  TC_PIV_CHUID_result piv = chuid;
+  TC_PIV_CHUID_report piv = chuid;
   piv.profile = TC_PIV_CARD;
-  const TC_PIV_CHUID_result* results[] = {&later, &other, &piv, NULL};
+  const TC_PIV_CHUID_report* results[] = {&later, &other, &piv, NULL};
   for (size_t i = 0; i < sizeof results / sizeof *results; ++i) {
     TC_PIV_biometric_validation_request changed = fingerprint;
     changed.chuid = results[i];
@@ -507,7 +507,7 @@ static MunitResult chuid_binding(const MunitParameter params[], void* user_data)
   munit_assert_size(chuid.object.card_uuid.length, ==, sizeof other_guid);
   memcpy(other_guid, chuid.object.card_uuid.data, sizeof other_guid);
   other_guid[0] ^= 1;
-  TC_PIV_CHUID_result other_card = chuid;
+  TC_PIV_CHUID_report other_card = chuid;
   other_card.object.card_uuid = (TC_bytes){other_guid, sizeof other_guid};
   mismatched = fingerprint;
   mismatched.chuid = &other_card;
@@ -541,7 +541,7 @@ static MunitResult chuid_binding(const MunitParameter params[], void* user_data)
   /* The result must stay disjoint from the request and the accepted CHUID. */
   work = WORK;
   munit_assert_int(TC_PIV_biometric_validate(&fingerprint, &state->context, &work,
-                                             (TC_PIV_biometric_result*)(void*)&chuid),
+                                             (TC_PIV_biometric_report*)(void*)&chuid),
                    ==, TC_CREDENTIAL_ERROR);
   munit_assert_size(work, ==, WORK);
   munit_assert_int(TC_PIV_biometric_validate(&fingerprint, &state->context, &work, NULL), ==,
@@ -574,7 +574,7 @@ static MunitResult chuid_binding(const MunitParameter params[], void* user_data)
       objects,
       count};
   const TC_PIV_security_validation_workspace security_workspace = {state->lds, sizeof state->lds};
-  TC_PIV_security_result security;
+  TC_PIV_security_report security;
   work = WORK;
   munit_assert_int(TC_PIV_security_validate(&security_request, &state->context, &security_workspace,
                                             &work, &security),
@@ -584,7 +584,7 @@ static MunitResult chuid_binding(const MunitParameter params[], void* user_data)
   for (size_t i = 0; i < sizeof results / sizeof *results; ++i) {
     TC_PIV_security_validation_request changed = security_request;
     changed.chuid = results[i];
-    TC_PIV_security_result untouched = security;
+    TC_PIV_security_report untouched = security;
     work = WORK;
     munit_assert_int(
         TC_PIV_security_validate(&changed, &state->context, &security_workspace, &work, &untouched),
@@ -606,9 +606,9 @@ static MunitResult chuid_binding(const MunitParameter params[], void* user_data)
   work = WORK;
   munit_assert_int(TC_TWIC_unsigned_CHUID_validate(&unsigned_request, &state->context, &work), ==,
                    TC_CREDENTIAL_VALID);
-  TC_PIV_security_result later_security = security;
+  TC_PIV_security_report later_security = security;
   later_security.at.second = (uint8_t)(later_security.at.second + 1);
-  const TC_PIV_security_result* inventories[] = {&later_security, NULL};
+  const TC_PIV_security_report* inventories[] = {&later_security, NULL};
   for (size_t i = 0; i < sizeof inventories / sizeof *inventories; ++i) {
     TC_TWIC_unsigned_CHUID_validation_request changed = unsigned_request;
     changed.security = inventories[i];

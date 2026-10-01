@@ -73,7 +73,7 @@ TC_X509_path_status tc_x509_path_search_source(TC_bytes target, const TC_X509_st
                                                const TC_X509_path_options* options,
                                                const TC_X509_path_workspace* validation,
                                                const TC_X509_search_workspace* search, size_t* work,
-                                               TC_X509_search_result* out)
+                                               TC_X509_search_report* out)
 {
   TC_X509_certificate certificate;
   TC_X509_path_status failure = TC_X509_PATH_INVALID, status;
@@ -108,7 +108,7 @@ TC_X509_path_status tc_x509_path_search_source(TC_bytes target, const TC_X509_st
       size_t anchor = frame->anchor++;
       size_t before = *work;
       TC_X509_store_anchor trust = {0};
-      TC_X509_search_result found;
+      TC_X509_search_report found;
       parsed = source->anchor(source->context, anchor, work, &trust);
       status = source_status(parsed, before, work);
       if (status != TC_X509_PATH_VALID)
@@ -219,7 +219,7 @@ TC_X509_path_status tc_x509_path_build_work(TC_bytes target, const TC_X509_store
                                             const TC_X509_path_options* options,
                                             const TC_X509_path_workspace* validation,
                                             const TC_X509_search_workspace* search, size_t* work,
-                                            TC_X509_search_result* out)
+                                            TC_X509_search_report* out)
 {
   TC_bytes writes[SEARCH_WRITE_COUNT];
   tc_pki_source_guard checked = {source, writes, SEARCH_WRITE_COUNT};
@@ -265,7 +265,7 @@ TC_X509_path_status TC_X509_path_build(TC_bytes target, const TC_X509_store_sour
                                        const TC_X509_path_options* options,
                                        const TC_X509_path_workspace* validation,
                                        const TC_X509_search_workspace* search,
-                                       TC_X509_search_result* out)
+                                       TC_X509_search_report* out)
 {
   size_t work;
   if (!options)
