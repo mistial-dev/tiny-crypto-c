@@ -79,13 +79,21 @@ static uint16_t mapped_container(const TC_PIV_security_object* object, size_t in
 
 /* SECURITY_DIGEST of one mapped container. The signed map proves the object
  * exists, so a missing, denied or empty object fails. */
+/* The TWIC application Security Object hashes the plaintext printed
+ * information (TWIC Part 2 v5 4.6.5 note 1). The card stores it TPK
+ * encrypted in DFC109, so its digest needs the TWIC Privacy Key. */
+static int printed_encrypted(const tc_piv_check_run* run, uint16_t container)
+{
+  return container == 0x3001 && run->report->application == TC_PIV_APPLICATION_TWIC;
+}
+
 static void digest_check(tc_piv_check_run* run, uint16_t container, int authenticated)
 {
   TC_PIV_check check = tc_piv_check_make(TC_PIV_CHECK_SECURITY_DIGEST, container, 0);
   const TC_PIV_object* object = TC_PIV_inventory_find(run->request->inventory, container);
   if (!authenticated)
     tc_piv_check_not_checkable(&check, TC_PIV_REASON_DEPENDENCY);
-  else if (!object)
+  else if (!object || printed_encrypted(run, container))
     tc_piv_check_not_checkable(&check, TC_PIV_REASON_UNSUPPORTED);
   else if (object->state != TC_PIV_OBJECT_PRESENT)
     tc_piv_check_unread(run, &check, object, 1);

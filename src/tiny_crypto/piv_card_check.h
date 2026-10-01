@@ -252,7 +252,10 @@ typedef struct {
  * - SECURITY_SIGNATURE with TC_PIV_security_authenticate, REVOCATION 9000,
  *   and SECURITY_DIGEST for every mapped container. The map proves the
  *   object exists, so ABSENT, DENIED and EMPTY fail. The digest covers the
- *   value of the 53 container, or of 7E for the Discovery Object.
+ *   value of the 53 container, or of 7E for the Discovery Object. On the
+ *   TWIC application the 3001 digest covers the plaintext printed
+ *   information (TWIC Part 2 v5 4.6.5 note 1), which the card stores TPK
+ *   encrypted, so it is NOT_CHECKABLE/UNSUPPORTED.
  * - BIOMETRIC for fingerprints and the facial image with
  *   TC_PIV_biometric_validate, and NOT_CHECKABLE/UNSUPPORTED for iris and
  *   the TWIC Privacy Key encrypted objects of the TWIC application.

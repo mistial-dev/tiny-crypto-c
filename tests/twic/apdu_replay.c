@@ -4,10 +4,12 @@
  * library: TWIC SELECT and the TWIC application inventory (TWIC Part 2 v5
  * 4.5 and 5), the observed absent and denied objects, the PIV application
  * of the card, its PIN and the card authentication key proof. Every command must equal the replay byte for byte. */
+#include <tiny_crypto/piv_card_check.h>
 #include <tiny_crypto/piv_catalog.h>
 #include <tiny_crypto/piv_certificate.h>
 #include <tiny_crypto/piv_key_proof.h>
 #include <tiny_crypto/x509_crypto.h>
+#include "../credential/validation_fixture.h"
 #include "munit.h"
 #include "test_util.h"
 #include <stdio.h>
@@ -111,7 +113,7 @@ static void fixture_path(char* path, size_t capacity, const char* profile, const
   munit_assert_size((size_t)result, <, capacity);
 }
 
-static size_t fixture_read(const char* profile, const char* name, uint8_t* bytes, size_t capacity)
+static size_t corpus_read(const char* profile, const char* name, uint8_t* bytes, size_t capacity)
 {
   char path[512];
   fixture_path(path, sizeof path, profile, name);
@@ -176,7 +178,7 @@ static void select_application(TC_PIV_link* link, TC_PIV_application_id id,
 static void read_object(TC_PIV_link* link, const char* profile, const char* name, TC_bytes tag)
 {
   TC_PIV_data_object object;
-  const size_t length = fixture_read(profile, name, expected, sizeof expected);
+  const size_t length = corpus_read(profile, name, expected, sizeof expected);
   munit_assert_int(TC_PIV_get_data(link, tag, response_buffer(), &object), ==, TC_PIV_OK);
   munit_assert_size(object.encoded.length, ==, length);
   munit_assert_memory_equal(length, object.encoded.data, expected);
@@ -241,7 +243,7 @@ static void check_twic_inventory(const TC_PIV_inventory* inventory, const char* 
       munit_assert_int(object->state, ==, TC_PIV_OBJECT_RESTRICTED);
       continue;
     }
-    const size_t length = fixture_read(profile, names[i].name, expected, sizeof expected);
+    const size_t length = corpus_read(profile, names[i].name, expected, sizeof expected);
     munit_assert_int(object->state, ==, length == 2 ? TC_PIV_OBJECT_EMPTY : TC_PIV_OBJECT_PRESENT);
     munit_assert_size(object->encoded.length, ==, length);
     munit_assert_memory_equal(length, object->encoded.data, expected);
@@ -274,8 +276,7 @@ static TC_PIV_result authenticate(TC_PIV_link* link, const char* profile)
   TC_X509_workspace parser = {{frames, 16}, oids, 32};
   TC_PIV_certificate stored;
   TC_X509_certificate certificate;
-  const size_t length =
-      fixture_read(profile, "piv-card-auth-cert.bin", container, sizeof container);
+  const size_t length = corpus_read(profile, "piv-card-auth-cert.bin", container, sizeof container);
   munit_assert_int(TC_PIV_certificate_read((TC_bytes){container, length}, TC_PIV_CERTIFICATE_SLOT,
                                            sizeof container, &stored),
                    ==, TC_TLV_OK);
@@ -295,6 +296,66 @@ static TC_PIV_result authenticate(TC_PIV_link* link, const char* profile)
                           &workspace, &work);
 }
 
+static validation_fixture trust;
+static uint8_t trust_bytes[4][FIXTURE_FILE_BYTES];
+static uint8_t check_certificates[16384], check_lds[4096];
+static TC_PIV_card_report report;
+
+static TC_bytes trust_read(const char* profile, const char* name, uint8_t* bytes)
+{
+  return (TC_bytes){bytes, corpus_read(profile, name, bytes, FIXTURE_FILE_BYTES)};
+}
+
+static void expect_check(uint8_t kind, uint16_t container, uint8_t outcome, uint8_t reason)
+{
+  const TC_PIV_check_requirement requirement = {kind, 0, container};
+  const TC_PIV_check* check = TC_PIV_card_report_find(&report, &requirement);
+  if (!check)
+    munit_errorf("no check kind %u container %04x", kind, container);
+  if (check->outcome != outcome || check->reason != reason)
+    munit_errorf("check kind %u container %04x: outcome %u reason %u status %d, expected %u %u",
+                 kind, container, check->outcome, check->reason, (int)check->status, outcome,
+                 reason);
+}
+
+/* The composed card check of the NEXGEN TWIC application under the
+ * synthetic root and its CRLs. The Security Object hashes the plaintext
+ * printed information (TWIC Part 2 v5 4.6.5 note 1), and the card stores
+ * it TPK encrypted, so its digest is NOT_CHECKABLE/UNSUPPORTED. */
+static void twic_check(const TC_PIV_link* link, const TC_PIV_inventory* inventory,
+                       const char* profile)
+{
+  const TC_bytes root = trust_read(profile, "root.der", trust_bytes[0]);
+  const TC_bytes candidates[] = {trust_read(profile, "issuer.der", trust_bytes[1]), root};
+  const TC_bytes crls[] = {trust_read(profile, "root-crl.der", trust_bytes[2]),
+                           trust_read(profile, "issuer-crl.der", trust_bytes[3])};
+  const validation_fixture_trust inputs = {&root, 1, candidates, 2, crls, 2};
+  validation_fixture_init_trust(&trust, &inputs, (TC_X509_time){2026, 9, 9, 0, 0, 0},
+                                TC_VALIDATION_REVOCATION_REQUIRED);
+  TC_PIV_card_check_ocsp ocsp;
+  memset(&ocsp, 0, sizeof ocsp);
+  TC_PIV_card_check_request request;
+  memset(&request, 0, sizeof request);
+  request.inventory = inventory;
+  request.link = link;
+  request.profile = TC_TWIC_NEXGEN_CARD;
+  request.card = &trust.context;
+  request.content = &trust.context;
+  request.ocsp = &ocsp;
+  TC_PIV_card_check_workspace workspace;
+  memset(&workspace, 0, sizeof workspace);
+  workspace.certificates = (TC_buffer){check_certificates, sizeof check_certificates};
+  workspace.lds_content = (TC_buffer){check_lds, sizeof check_lds};
+  size_t work = 400000000;
+  munit_assert_int(TC_PIV_card_check(&request, &workspace, &work, &report), ==, TC_PIV_OK);
+  expect_check(TC_PIV_CHECK_SECURITY_SIGNATURE, 0x9000, TC_PIV_CHECK_PASSED, TC_PIV_REASON_NONE);
+  static const uint16_t hashed[] = {0x3002, 0x3000, 0x6030, 0x2003};
+  for (size_t i = 0; i < sizeof hashed / sizeof *hashed; ++i)
+    expect_check(TC_PIV_CHECK_SECURITY_DIGEST, hashed[i], TC_PIV_CHECK_PASSED, TC_PIV_REASON_NONE);
+  expect_check(TC_PIV_CHECK_SECURITY_DIGEST, 0x3001, TC_PIV_CHECK_NOT_CHECKABLE,
+               TC_PIV_REASON_UNSUPPORTED);
+}
+
 static void twic_application(TC_PIV_link* link, const char* profile, TC_PIV_interface interface)
 {
   static const uint8_t tag_privacy_key[] = {0xdf, 0xc1, 0x01};
@@ -307,6 +368,8 @@ static void twic_application(TC_PIV_link* link, const char* profile, TC_PIV_inte
       TC_PIV_inventory_read(link, NULL, (TC_buffer){pool, sizeof pool}, &work, &inventory), ==,
       TC_PIV_OK);
   check_twic_inventory(&inventory, profile, interface);
+  if (!legacy)
+    twic_check(link, &inventory, profile);
   TC_PIV_inventory_clear(&inventory);
   /* The observed contactless refusal of the TWIC Privacy Key. */
   if (interface == TC_PIV_CONTACTLESS)

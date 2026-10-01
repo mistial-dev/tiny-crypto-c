@@ -122,7 +122,8 @@ and `6A88`. `test_cpp_piv_catalog` runs the C++ wrapper.
 `test_twic_apdu_replay` replays the synthetic TWIC transcripts of
 `tests/twic/apdu_replay.py` through the TWIC application inventory, the
 observed absent and denied objects, the PIV application, the PIN and the
-card authentication key proof, byte for byte.
+card authentication key proof, byte for byte. On the NEXGEN TWIC application it
+also runs `TC_PIV_card_check` under the synthetic root and CRLs.
 
 `test_piv_key_proof` covers the [key proofs](piv-card.md#key-proofs): the SP
 800-78-5 Table 9 identifiers and the Table 10 end of RSA-2048 under each
