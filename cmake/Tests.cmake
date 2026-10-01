@@ -18,6 +18,11 @@ if(TINY_CRYPTO_BUILD_TESTS)
       -DC_COMPILER=${CMAKE_C_COMPILER} -DNM=${CMAKE_NM} -DAR=${CMAKE_AR}
       -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/heap_free_all.cmake)
     set_tests_properties(test_heap_free_all_features PROPERTIES LABELS extended)
+    add_test(NAME test_minimal_core COMMAND ${CMAKE_COMMAND}
+      -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR} -DOPTIONS=${tc_feature_option_list}
+      -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/minimal-core
+      -DC_COMPILER=${CMAKE_C_COMPILER} -DAR=${CMAKE_AR}
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/minimal_core.cmake)
   endif()
   # Direct-source consumers compile disabled translation units too.
   file(GLOB tc_direct_sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c")
@@ -58,6 +63,16 @@ if(TINY_CRYPTO_BUILD_TESTS)
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_argument_order.py)
     add_test(NAME test_no_wall_clock
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_no_wall_clock.py)
+    add_test(NAME test_feature_registry
+      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_feature_registry.py)
+    if(CMAKE_NM AND NOT MSVC)
+      # Each top-level feature alone, with the dependencies config.h requires.
+      add_test(NAME test_single_features
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/feature_builds.py
+          --cc ${CMAKE_C_COMPILER} --nm ${CMAKE_NM}
+          --binary-dir ${CMAKE_CURRENT_BINARY_DIR}/single-features)
+      set_tests_properties(test_single_features PROPERTIES LABELS extended)
+    endif()
     add_test(NAME test_doc_sync
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_doc_sync.py)
     # Self-contained documentation code blocks compile with GCC-compatible
@@ -159,11 +174,11 @@ if(TINY_CRYPTO_BUILD_TESTS)
   tc_add_c_test(test_rsa_mgf tiny-crypto-c-test tests/rsa/mgf.c)
   tc_add_c_test(test_rsa_pss tiny-crypto-c-test tests/rsa/pss.c)
   tc_add_c_test(test_rsa_oaep tiny-crypto-c-test tests/rsa/oaep.c)
-  tc_add_c_test(test_rsa_oaep_arguments tiny-crypto-c-test tests/rsa/oaep_arguments.c ${tc_rsa_sources} src/pki_storage.c)
+  tc_add_c_test(test_rsa_oaep_arguments tiny-crypto-c-test tests/rsa/oaep_arguments.c ${tc_rsa_sources})
   target_compile_definitions(test_rsa_oaep_arguments PRIVATE TC_ENABLE_RSA=1)
-  tc_add_c_test(test_rsa_work tiny-crypto-c-test tests/rsa/work.c ${tc_rsa_sources} src/pki_storage.c)
+  tc_add_c_test(test_rsa_work tiny-crypto-c-test tests/rsa/work.c ${tc_rsa_sources})
   target_compile_definitions(test_rsa_work PRIVATE TC_ENABLE_RSA=1)
-  tc_add_c_test(test_rsa_work_small tiny-crypto-c-test tests/rsa/work.c ${tc_rsa_sources} src/pki_storage.c)
+  tc_add_c_test(test_rsa_work_small tiny-crypto-c-test tests/rsa/work.c ${tc_rsa_sources})
   target_compile_definitions(test_rsa_work_small PRIVATE TC_ENABLE_RSA=1 TC_RSA_SMALL=1)
   foreach(feature AES TLV EC)
     tc_add_c_test(test_direct_${feature}_consumer test_direct_${feature} tests/default_profile.c)
@@ -263,7 +278,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
       ${PROJECT_SOURCE_DIR}/tests/piv/capture_fixture.py --check)
   endif()
   foreach(small 0 1)
-    tc_add_test_library(tiny-crypto-c-test-ec-${small} src/common.c src/ec.c ${tc_rsa_sources} src/pki_storage.c src/tlv.c src/tlv_walk.c src/der.c src/x509_key.c src/pki_key.c)
+    tc_add_test_library(tiny-crypto-c-test-ec-${small} src/common.c src/ec.c ${tc_rsa_sources} src/tlv.c src/tlv_walk.c src/der.c src/x509_key.c src/pki_key.c)
     target_compile_definitions(tiny-crypto-c-test-ec-${small} PUBLIC
       TC_ENABLE_EC=1 TC_EC_ENABLE_P192=1 TC_EC_SMALL=${small} TC_ENABLE_AES=0 TC_ENABLE_SHA256=0
       TC_ENABLE_RSA=1 TC_RSA_SMALL=${small}
@@ -283,7 +298,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
     endforeach()
   endforeach()
   foreach(small 0 1)
-    tc_add_test_library(tiny-crypto-c-test-rsa-${small} src/common.c ${tc_rsa_sources} src/pki_storage.c)
+    tc_add_test_library(tiny-crypto-c-test-rsa-${small} src/common.c ${tc_rsa_sources})
     target_compile_definitions(tiny-crypto-c-test-rsa-${small} PUBLIC
       TC_ENABLE_RSA=1 TC_RSA_SMALL=${small} TC_ENABLE_AES=0 TC_ENABLE_SHA256=0)
     tc_add_c_test(test_rsa_public_${small} tiny-crypto-c-test-rsa-${small} tests/rsa/public.c)
@@ -294,7 +309,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   endforeach()
   tc_add_c_test(test_rsa_oaep_disabled tiny-crypto-c-test-rsa-0 tests/rsa/oaep_arguments.c)
   foreach(small 0 1)
-    tc_add_c_test(test_rsa_oaep_reader_${small} tiny-crypto-c-test tests/rsa/oaep_reader.c ${tc_rsa_sources} src/pki_storage.c)
+    tc_add_c_test(test_rsa_oaep_reader_${small} tiny-crypto-c-test tests/rsa/oaep_reader.c ${tc_rsa_sources})
     target_compile_definitions(test_rsa_oaep_reader_${small} PRIVATE TC_ENABLE_RSA=1 TC_RSA_SMALL=${small})
   endforeach()
   foreach(curve 256 384)
@@ -491,14 +506,14 @@ if(TINY_CRYPTO_BUILD_TESTS)
   target_include_directories(test_idf_bootloader_hash PRIVATE
     tests/esp_idf/include ports/esp-idf/vendor/bootloader_support/private_include)
   tc_add_c_test(test_idf_signed_rsa tiny-crypto-c-test
-    tests/esp_idf/signed_image.c ports/esp-idf/signed_update_rsa.c ${tc_rsa_sources} src/pki_storage.c)
-  tc_add_c_test(test_rsa_signature_reader tiny-crypto-c-test tests/rsa/signature_reader.c ${tc_rsa_sources} src/pki_storage.c)
+    tests/esp_idf/signed_image.c ports/esp-idf/signed_update_rsa.c ${tc_rsa_sources})
+  tc_add_c_test(test_rsa_signature_reader tiny-crypto-c-test tests/rsa/signature_reader.c ${tc_rsa_sources})
   target_compile_definitions(test_rsa_signature_reader PRIVATE TC_ENABLE_RSA=1)
-  tc_add_c_test(test_rsa_signature_reader_small tiny-crypto-c-test tests/rsa/signature_reader.c ${tc_rsa_sources} src/pki_storage.c)
+  tc_add_c_test(test_rsa_signature_reader_small tiny-crypto-c-test tests/rsa/signature_reader.c ${tc_rsa_sources})
   target_compile_definitions(test_rsa_signature_reader_small PRIVATE TC_ENABLE_RSA=1 TC_RSA_SMALL=1)
-  tc_add_c_test(test_rsa_generation_reader tiny-crypto-c-test tests/rsa/generation_reader.c ${tc_rsa_sources} src/pki_storage.c)
+  tc_add_c_test(test_rsa_generation_reader tiny-crypto-c-test tests/rsa/generation_reader.c ${tc_rsa_sources})
   target_compile_definitions(test_rsa_generation_reader PRIVATE TC_ENABLE_RSA=1)
-  tc_add_c_test(test_rsa_keygen_reader tiny-crypto-c-test tests/rsa/keygen_reader.c ${tc_rsa_sources} src/pki_storage.c)
+  tc_add_c_test(test_rsa_keygen_reader tiny-crypto-c-test tests/rsa/keygen_reader.c ${tc_rsa_sources})
   target_compile_definitions(test_rsa_keygen_reader PRIVATE TC_ENABLE_RSA=1)
   target_compile_definitions(test_idf_signed_rsa PRIVATE TC_ENABLE_RSA=1)
   target_include_directories(test_idf_signed_rsa PRIVATE tests/esp_idf/include
@@ -523,7 +538,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
       target_sources(${policy_target} PRIVATE src/ec.c)
       target_compile_definitions(${policy_target} PRIVATE TC_TEST_IDF_ECDSA=1 TC_ENABLE_EC=1 TC_EC_ENABLE_P192=1)
     else()
-      target_sources(${policy_target} PRIVATE ${tc_rsa_sources} src/pki_storage.c)
+      target_sources(${policy_target} PRIVATE ${tc_rsa_sources})
       target_compile_definitions(${policy_target} PRIVATE TC_ENABLE_RSA=1)
     endif()
     target_include_directories(${policy_target} PRIVATE tests/esp_idf/policy_include
@@ -634,7 +649,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors/x509")
     set(tc_default_tlv_corpus "${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors")
   endif()
-  set(TINY_CRYPTO_TLV_CORPUS "${tc_default_tlv_corpus}" CACHE PATH
+  set(TINY_CRYPTO_TEST_TLV_CORPUS "${tc_default_tlv_corpus}" CACHE PATH
     "PIV/X.509 parser corpus root (empty skips the corpus tests)")
   tc_add_test_library(tiny-crypto-c-test-key-import
     src/common.c src/tlv.c src/tlv_walk.c src/der.c src/pki_key.c)
@@ -870,7 +885,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   list(REMOVE_ITEM tc_native_card_sources ${tc_native_pki_sources})
   tc_add_test_library(tiny-crypto-c-test-pki-native ${tc_native_pki_sources}
     src/x509_trust_anchor.c src/x509_ocsp.c
-    ${tc_hash_sources} src/ec.c ${tc_rsa_sources} src/pki_storage.c ${tc_aes_sources} src/sskdf.c
+    ${tc_hash_sources} src/ec.c ${tc_rsa_sources} ${tc_aes_sources} src/sskdf.c
     src/piv_sm.c src/piv_sm_message.c src/piv_sm_authenticate.c
     src/twic_cipher.c src/twic_tpk.c ${tc_native_card_sources})
   target_compile_definitions(tiny-crypto-c-test-pki-native PUBLIC
@@ -1183,7 +1198,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
         if(rsa_profile STREQUAL "small")
           string(APPEND rsa_test "_small")
         endif()
-        tc_add_c_test(${rsa_test} tiny-crypto-c-test tests/rsa/${rsa_scheme}_openssl.c ${tc_rsa_sources} src/pki_storage.c)
+        tc_add_c_test(${rsa_test} tiny-crypto-c-test tests/rsa/${rsa_scheme}_openssl.c ${tc_rsa_sources})
         if(rsa_scheme STREQUAL "oaep")
           target_sources(${rsa_test} PRIVATE examples/rsa_encrypt.c)
         endif()
@@ -1195,7 +1210,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
     endforeach()
     foreach(small 0 1)
       tc_add_c_test_executable(test_rsa_oaep_decrypt_${small} tiny-crypto-c-test
-        tests/rsa/oaep_decrypt_openssl.c ${tc_rsa_sources} src/pki_storage.c)
+        tests/rsa/oaep_decrypt_openssl.c ${tc_rsa_sources})
       target_link_libraries(test_rsa_oaep_decrypt_${small} PRIVATE OpenSSL::Crypto)
       target_compile_definitions(test_rsa_oaep_decrypt_${small} PRIVATE TC_ENABLE_RSA=1 TC_RSA_SMALL=${small})
       set_property(TARGET test_rsa_oaep_decrypt_${small} PROPERTY NO_SYSTEM_FROM_IMPORTED TRUE)
@@ -1271,53 +1286,53 @@ if(TINY_CRYPTO_BUILD_TESTS)
   endif()
   tc_add_test_executable(test_piv_object_reader tests/piv/object_reader.c)
   target_link_libraries(test_piv_object_reader PRIVATE tiny-crypto-c-test-pki)
-  if(TINY_CRYPTO_TLV_CORPUS AND Python3_Interpreter_FOUND)
+  if(TINY_CRYPTO_TEST_TLV_CORPUS AND Python3_Interpreter_FOUND)
     add_test(NAME test_gzip_corpus COMMAND ${Python3_EXECUTABLE}
       ${CMAKE_CURRENT_SOURCE_DIR}/tests/gzip/corpus.py
-      --reader $<TARGET_FILE:test_gzip_reader> --corpus ${TINY_CRYPTO_TLV_CORPUS}/piv)
+      --reader $<TARGET_FILE:test_gzip_reader> --corpus ${TINY_CRYPTO_TEST_TLV_CORPUS}/piv)
     add_test(NAME test_piv_certificate_corpus COMMAND ${Python3_EXECUTABLE}
       ${CMAKE_CURRENT_SOURCE_DIR}/tests/piv/certificate_corpus.py
-      --reader $<TARGET_FILE:test_piv_certificate_corpus_reader> --corpus ${TINY_CRYPTO_TLV_CORPUS}/piv)
-    if(EXISTS "${TINY_CRYPTO_TLV_CORPUS}/piv/vci_trust_anchors")
+      --reader $<TARGET_FILE:test_piv_certificate_corpus_reader> --corpus ${TINY_CRYPTO_TEST_TLV_CORPUS}/piv)
+    if(EXISTS "${TINY_CRYPTO_TEST_TLV_CORPUS}/piv/vci_trust_anchors")
       add_test(NAME test_piv_cvc_corpus COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/piv/cvc_corpus.py
-        --reader $<TARGET_FILE:test_piv_cvc_corpus_reader> --corpus ${TINY_CRYPTO_TLV_CORPUS}/piv)
+        --reader $<TARGET_FILE:test_piv_cvc_corpus_reader> --corpus ${TINY_CRYPTO_TEST_TLV_CORPUS}/piv)
     endif()
-    if(EXISTS "${TINY_CRYPTO_TLV_CORPUS}/eac/cvc")
+    if(EXISTS "${TINY_CRYPTO_TEST_TLV_CORPUS}/eac/cvc")
       add_test(NAME test_eac_corpus COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/eac/corpus.py
-        --reader $<TARGET_FILE:test_eac_reader> --corpus ${TINY_CRYPTO_TLV_CORPUS}/eac/cvc)
+        --reader $<TARGET_FILE:test_eac_reader> --corpus ${TINY_CRYPTO_TEST_TLV_CORPUS}/eac/cvc)
     endif()
     add_test(NAME test_x509_corpus COMMAND ${Python3_EXECUTABLE}
       ${CMAKE_CURRENT_SOURCE_DIR}/tests/x509/corpus.py
-      --reader $<TARGET_FILE:test_x509_reader> --corpus ${TINY_CRYPTO_TLV_CORPUS}/x509)
+      --reader $<TARGET_FILE:test_x509_reader> --corpus ${TINY_CRYPTO_TEST_TLV_CORPUS}/x509)
     add_test(NAME test_x509_malformed COMMAND ${Python3_EXECUTABLE}
       ${CMAKE_CURRENT_SOURCE_DIR}/tests/x509/synthetic.py
-      --reader $<TARGET_FILE:test_x509_reader> --corpus ${TINY_CRYPTO_TLV_CORPUS}/x509/synthetic)
+      --reader $<TARGET_FILE:test_x509_reader> --corpus ${TINY_CRYPTO_TEST_TLV_CORPUS}/x509/synthetic)
     add_test(NAME test_x509_crl_corpus COMMAND ${Python3_EXECUTABLE}
       ${CMAKE_CURRENT_SOURCE_DIR}/tests/x509/crl_corpus.py
-      --reader $<TARGET_FILE:test_x509_crl> --corpus ${TINY_CRYPTO_TLV_CORPUS}/x509/synthetic
-      --reference-corpus ${TINY_CRYPTO_TLV_CORPUS}/x509)
+      --reader $<TARGET_FILE:test_x509_crl> --corpus ${TINY_CRYPTO_TEST_TLV_CORPUS}/x509/synthetic
+      --reference-corpus ${TINY_CRYPTO_TEST_TLV_CORPUS}/x509)
     add_test(NAME test_x509_path_corpus COMMAND ${Python3_EXECUTABLE}
       ${CMAKE_CURRENT_SOURCE_DIR}/tests/x509/path_corpus.py
-      --reader $<TARGET_FILE:test_x509_path_corpus_reader> --corpus ${TINY_CRYPTO_TLV_CORPUS}/x509)
+      --reader $<TARGET_FILE:test_x509_path_corpus_reader> --corpus ${TINY_CRYPTO_TEST_TLV_CORPUS}/x509)
     add_test(NAME test_piv_corpus COMMAND ${Python3_EXECUTABLE}
       ${CMAKE_CURRENT_SOURCE_DIR}/tests/piv/corpus.py
-      --reader $<TARGET_FILE:test_piv_object_reader> --corpus ${TINY_CRYPTO_TLV_CORPUS}/piv)
+      --reader $<TARGET_FILE:test_piv_object_reader> --corpus ${TINY_CRYPTO_TEST_TLV_CORPUS}/piv)
     add_test(NAME test_cms_corpus COMMAND ${Python3_EXECUTABLE}
       ${CMAKE_CURRENT_SOURCE_DIR}/tests/cms/corpus.py
-      --reader $<TARGET_FILE:test_cms_corpus_reader> --corpus ${TINY_CRYPTO_TLV_CORPUS}/piv)
+      --reader $<TARGET_FILE:test_cms_corpus_reader> --corpus ${TINY_CRYPTO_TEST_TLV_CORPUS}/piv)
   endif()
-  set(TINY_CRYPTO_TLV_MBEDTLS_SUITE "" CACHE FILEPATH "Optional external ASN.1 test data file")
-  if(TINY_CRYPTO_TLV_MBEDTLS_SUITE AND Python3_Interpreter_FOUND)
+  set(TINY_CRYPTO_TEST_TLV_MBEDTLS_SUITE "" CACHE FILEPATH "Optional external ASN.1 test data file")
+  if(TINY_CRYPTO_TEST_TLV_MBEDTLS_SUITE AND Python3_Interpreter_FOUND)
     add_test(NAME test_tlv_external_lengths COMMAND ${Python3_EXECUTABLE}
       ${CMAKE_CURRENT_SOURCE_DIR}/tests/tlv/corpus.py
-      --reader $<TARGET_FILE:test_tlv_corpus_reader> --mbedtls-suite ${TINY_CRYPTO_TLV_MBEDTLS_SUITE})
+      --reader $<TARGET_FILE:test_tlv_corpus_reader> --mbedtls-suite ${TINY_CRYPTO_TEST_TLV_MBEDTLS_SUITE})
   endif()
-  if(TINY_CRYPTO_TLV_CORPUS AND Python3_Interpreter_FOUND)
+  if(TINY_CRYPTO_TEST_TLV_CORPUS AND Python3_Interpreter_FOUND)
     add_test(NAME test_tlv_corpus COMMAND ${Python3_EXECUTABLE}
       ${CMAKE_CURRENT_SOURCE_DIR}/tests/tlv/corpus.py
-      --reader $<TARGET_FILE:test_tlv_corpus_reader> --corpus ${TINY_CRYPTO_TLV_CORPUS})
+      --reader $<TARGET_FILE:test_tlv_corpus_reader> --corpus ${TINY_CRYPTO_TEST_TLV_CORPUS})
   endif()
   if(tc_build_cpp_tests)
     foreach(small 0 1)
@@ -1326,7 +1341,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
       target_include_directories(test_cpp_rsa_${small} PRIVATE tests/support)
       if(TINY_CRYPTO_TEST_OPENSSL)
         tc_add_linked_test(test_cpp_rsa_openssl_${small} tiny-crypto-c-test
-          tests/cpp/rsa_openssl.cpp tests/cpp/main.cpp ${tc_rsa_sources} src/pki_storage.c)
+          tests/cpp/rsa_openssl.cpp tests/cpp/main.cpp ${tc_rsa_sources})
         target_compile_definitions(test_cpp_rsa_openssl_${small} PRIVATE TC_ENABLE_RSA=1 TC_RSA_SMALL=${small})
         target_include_directories(test_cpp_rsa_openssl_${small} PRIVATE tests/support)
         target_link_libraries(test_cpp_rsa_openssl_${small} PRIVATE OpenSSL::Crypto)
@@ -1514,7 +1529,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
 
   if(TINY_CRYPTO_TEST_FULL)
     tc_add_test_library(tiny-crypto-c-test-des-cmac-cavp
-      src/common.c ${tc_des_sources} src/mac_core.c)
+      src/common.c ${tc_des_sources})
     target_compile_definitions(tiny-crypto-c-test-des-cmac-cavp PUBLIC
       TC_ENABLE_AES=0 TC_ENABLE_SHA256=0 TC_ENABLE_DES=1
       TC_DES_ENABLE_TDES=1 TC_DES_ENABLE_CMAC=1 TC_DES_REJECT_WEAK_KEYS=0)

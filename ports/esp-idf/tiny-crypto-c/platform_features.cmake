@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 #
 # Primitives the ESP-IDF integration needs with any TINY_CRYPTO_TARGET,
-# including none. Profiles.cmake treats each listed macro as a floor: AUTO
+# including none. cmake/Features.cmake treats each listed macro as a floor: AUTO
 # selects it and an explicit OFF fails configuration.
 
 # The vendored bootloader_support component hashes images with SHA-256,

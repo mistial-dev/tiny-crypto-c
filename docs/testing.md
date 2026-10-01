@@ -42,21 +42,21 @@ These CMake cache options select test inputs. The build options that enable
 tests, benchmarks, fuzzers and sanitizers are listed in the
 [README](../README.md#build-and-test-options).
 
-| Option                              | Default                             | Purpose                                                                |
-| ----------------------------------- | ----------------------------------- | ---------------------------------------------------------------------- |
-| `TINY_CRYPTO_TEST_FULL`             | OFF                                 | Run the checked-in CAVP corpora                                        |
-| `TINY_CRYPTO_TEST_OPENSSL`          | OFF                                 | OpenSSL 3 cross-checks for PKI and multiprecision arithmetic           |
-| `TINY_CRYPTO_TEST_EC_ORACLE`        | OFF                                 | Compare EC results with Python `cryptography`                          |
-| `TINY_CRYPTO_TEST_WYCHEPROOF_DIR`   | `tests/vectors/wycheproof`          | Pinned C2SP Wycheproof vectors, the directory holding `testvectors_v1` |
-| `TINY_CRYPTO_TEST_EC_CAVP_DIR`      | `tests/vectors/nist_ecccdh`         | NIST ECC CDH component vectors                                         |
-| `TINY_CRYPTO_TEST_ECDSA_DSS_DIR`    | `tests/vectors/nist_dss/186-4ecdsa` | NIST FIPS 186-4 ECDSA vectors                                          |
-| `TINY_CRYPTO_TEST_RSA_DSS_DIR`      | `tests/vectors/nist_dss/186-3rsa`   | NIST FIPS 186-3 RSA vectors                                            |
-| `TINY_CRYPTO_TEST_SM_CAPTURE_DIR`   | empty                               | PIV secure-messaging capture directory                                 |
-| `TINY_CRYPTO_TEST_UNICODE_DIR`      | empty                               | Unicode 3.2 data and the RFC 3454 and RFC 4518 references              |
-| `TINY_CRYPTO_TEST_ESP_SIGNED_IMAGE` | empty                               | Espressif RSA-3072 signed application fixture                          |
-| `TINY_CRYPTO_TLV_CORPUS`            | `tests/vectors`                     | Parser corpus root with `piv/` and `x509/`, or empty to skip           |
-| `TINY_CRYPTO_TLV_MBEDTLS_SUITE`     | empty                               | External pinned ASN.1 test data file                                   |
-| `TINY_CRYPTO_TEST_PIV_CARD`         | OFF                                 | [PIV card hardware tests](#piv-card-hardware-tests) over PC/SC         |
+| Option                               | Default                             | Purpose                                                                |
+| ------------------------------------ | ----------------------------------- | ---------------------------------------------------------------------- |
+| `TINY_CRYPTO_TEST_FULL`              | OFF                                 | Run the checked-in CAVP corpora                                        |
+| `TINY_CRYPTO_TEST_OPENSSL`           | OFF                                 | OpenSSL 3 cross-checks for PKI and multiprecision arithmetic           |
+| `TINY_CRYPTO_TEST_EC_ORACLE`         | OFF                                 | Compare EC results with Python `cryptography`                          |
+| `TINY_CRYPTO_TEST_WYCHEPROOF_DIR`    | `tests/vectors/wycheproof`          | Pinned C2SP Wycheproof vectors, the directory holding `testvectors_v1` |
+| `TINY_CRYPTO_TEST_EC_CAVP_DIR`       | `tests/vectors/nist_ecccdh`         | NIST ECC CDH component vectors                                         |
+| `TINY_CRYPTO_TEST_ECDSA_DSS_DIR`     | `tests/vectors/nist_dss/186-4ecdsa` | NIST FIPS 186-4 ECDSA vectors                                          |
+| `TINY_CRYPTO_TEST_RSA_DSS_DIR`       | `tests/vectors/nist_dss/186-3rsa`   | NIST FIPS 186-3 RSA vectors                                            |
+| `TINY_CRYPTO_TEST_SM_CAPTURE_DIR`    | empty                               | PIV secure-messaging capture directory                                 |
+| `TINY_CRYPTO_TEST_UNICODE_DIR`       | empty                               | Unicode 3.2 data and the RFC 3454 and RFC 4518 references              |
+| `TINY_CRYPTO_TEST_ESP_SIGNED_IMAGE`  | empty                               | Espressif RSA-3072 signed application fixture                          |
+| `TINY_CRYPTO_TEST_TLV_CORPUS`        | `tests/vectors`                     | Parser corpus root with `piv/` and `x509/`, or empty to skip           |
+| `TINY_CRYPTO_TEST_TLV_MBEDTLS_SUITE` | empty                               | External pinned ASN.1 test data file                                   |
+| `TINY_CRYPTO_TEST_PIV_CARD`          | OFF                                 | [PIV card hardware tests](#piv-card-hardware-tests) over PC/SC         |
 
 An empty directory option skips the tests that need it.
 
@@ -230,7 +230,7 @@ OpenSSL cross-checks need `TINY_CRYPTO_TEST_OPENSSL=ON` on any target.
 
 The checked-in DSS, ECCCDH and Wycheproof vectors and the parser corpus under
 `tests/vectors` are configured by default. The parser corpus tests use
-`TINY_CRYPTO_TLV_CORPUS`, which defaults to `tests/vectors`. Set it to another
+`TINY_CRYPTO_TEST_TLV_CORPUS`, which defaults to `tests/vectors`. Set it to another
 root for an external corpus, or to an empty string to skip those tests. An
 existing build directory keeps its cached value.
 
@@ -319,6 +319,22 @@ platform feature.
 Direct-source checks compile and link every product `.c` file in AES-only,
 TLV-only, and EC-only builds, with SHA-256 disabled.
 
+`test_feature_registry` checks [`cmake/features.json`](../cmake/features.json)
+against the tree. Every feature macro yields its option by the naming rule.
+Every `src/*.c` has exactly one owner: the core, one feature or one
+shared-source entry. Every `config.h` feature macro has an option, and every
+`TINY_CRYPTO_*` name in a document, workflow, script or build file is a
+registered or build option. `test_minimal_core` configures the library with
+every switch `OFF`, builds it with warnings as errors and requires an archive
+that holds only `common.c`. The extended `test_single_features` builds each
+top-level feature with the smallest set of other features that `config.h`
+accepts, found by switching features off in reverse registry order. Each
+archive must build without warnings and define every library symbol it
+references. `test_heap_free_all_features` builds every switch `ON`, with value
+options at their defaults, and checks the archive for allocator calls. It then
+builds each other value of each value option with only that option's parent
+feature family on, under the desktop profile, and applies the same check.
+
 `test_doc_sync` checks `README.md` and `docs/*.md` against the source tree. Every
 `TC_`, `TINY_CRYPTO_` and `example_` name must exist, relative links must
 resolve, and struct initializers in C code blocks must match the public
@@ -368,7 +384,7 @@ definite-order attributes, malformed values, duplicate/missing attributes,
 resource limits, and borrowed signature input. Signature verification has its
 own tests below.
 
-With `TINY_CRYPTO_TLV_CORPUS` at its default `tests/vectors` root,
+With `TINY_CRYPTO_TEST_TLV_CORPUS` at its default `tests/vectors` root,
 `test_cms_corpus` extracts CMS from 70 captured CHUIDs, 69 Security
 Objects and 111 biometric objects, then checks envelope versions, content types,
 signer identifiers and
@@ -870,7 +886,7 @@ and the wrong anchor key.
 Path-discovery cases retrieve an intermediate through the public source
 callbacks, validate it with the native provider, and reject a tampered
 intermediate signature.
-With the default `TINY_CRYPTO_TLV_CORPUS` root,
+With the default `TINY_CRYPTO_TEST_TLV_CORPUS` root,
 `test_x509_path_corpus` runs seven pinned C2SP x509-limbo graphs through the
 native path builder and nine reviewed external revocation cases. The path slice
 covers a resolvable cross-sign cycle, an alternate path around an expired dead
@@ -978,8 +994,8 @@ cmake -S . -B /tmp/tiny-crypto-full \
   -DTINY_CRYPTO_TEST_FULL=ON \
   -DTINY_CRYPTO_TEST_OPENSSL=ON \
   -DTINY_CRYPTO_SANITIZE=address,undefined \
-  -DTINY_CRYPTO_TLV_MBEDTLS_SUITE="$vector_dir/asn1parse.data" \
-  -DTINY_CRYPTO_TLV_CORPUS="/absolute/path/to/parser-corpus" \
+  -DTINY_CRYPTO_TEST_TLV_MBEDTLS_SUITE="$vector_dir/asn1parse.data" \
+  -DTINY_CRYPTO_TEST_TLV_CORPUS="/absolute/path/to/parser-corpus" \
   -DTINY_CRYPTO_TEST_SM_CAPTURE_DIR="/absolute/path/to/sm_vci_vectors"
 cmake --build /tmp/tiny-crypto-full --parallel
 ctest --test-dir /tmp/tiny-crypto-full --show-only

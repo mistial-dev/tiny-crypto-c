@@ -6,7 +6,7 @@
 
 Enable `TINY_CRYPTO_ENABLE_TLV=ON` and include `<tiny_crypto/tlv.h>`.
 Select the encoding explicitly: DER, ISO 7816, or BER. BER additionally needs
-`TINY_CRYPTO_TLV_BER=ON`.
+`TINY_CRYPTO_TLV_ENABLE_BER=ON`.
 
 `TC_TLV_read` reads one definite-length object without checking its children.
 `TC_TLV_read_tree` checks constructed boundaries and also handles indefinite
@@ -106,7 +106,7 @@ reader and element unchanged.
 Use `TC_TLV_walk` for a whole tree or sequence of roots. It visits borrowed
 primitive chunks and applies one element/depth budget across the input. The
 incremental stream API provides the same traversal for fragmented input when
-`TINY_CRYPTO_TLV_STREAM=ON` is enabled. Neither requires heap allocation.
+`TINY_CRYPTO_TLV_ENABLE_STREAM=ON` is enabled. Neither requires heap allocation.
 
 Every `TC_TLV_walk` event span points into the walked input at the event
 offset, so a visitor may keep BEGIN headers, VALUE chunks and EOC markers while

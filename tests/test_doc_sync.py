@@ -16,10 +16,13 @@ import os
 import re
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tools"))
+import feature_registry  # noqa: E402
 DOCUMENTS = [ROOT / "README.md"] + sorted((ROOT / "docs").glob("*.md"))
 # Documented identifiers must appear in one of these trees. tests and tools
 # hold the environment variables and generators that docs/testing.md names.
@@ -38,6 +41,8 @@ MAX_PROSE_COLUMNS = 100
 # Definitions for compiling code blocks: the desktop profile plus the options
 # it leaves off.
 SNIPPET_DEFINITIONS = ("-DTC_RESOURCE_PROFILE=3", "-DTC_DES_ENABLE_ISO9797=1")
+# README.md cell text for an AUTO value that follows another feature.
+FOLLOWED_LABELS = {"TC_ENABLE_TRUST_ANCHOR_FORMAT": "format"}
 # Code blocks meet the library's own warning flags.
 SNIPPET_WARNINGS = ("-Wall", "-Wextra", "-Wpedantic", "-Werror")
 
@@ -122,7 +127,8 @@ def initializer_items(body):
 
 
 def defined_identifiers():
-    names = set()
+    # Feature options are derived from their macros by the registry naming rule.
+    names = {feature_registry.option_name(macro) for macro in feature_registry.features()}
     for tree in DEFINITION_TREES:
         path = ROOT / tree
         files = [path] if path.is_file() else [f for f in path.rglob("*") if f.is_file()]
@@ -224,15 +230,33 @@ def cmake_sources():
 
 
 def profile_options():
-    """Map each profile-driven option to (macro, default, micro, mini, desktop)."""
+    """Map each AUTO/ON/OFF option to its (default, micro, mini, desktop) AUTO values.
+
+    The registry names the options. config.h holds the profile values, or names
+    the feature an option follows. README.md shows a followed feature by the
+    label in FOLLOWED_LABELS."""
     config = (ROOT / "src" / "tiny_crypto" / "config.h").read_text()
     values = {m.group(1): tuple("ON" if v == "1" else "OFF" for v in m.groups()[1:])
               for m in re.finditer(r"#define (TC_\w+) TC_PROFILE_VALUE\((\d+), (\d+), (\d+), (\d+)\)",
                                    config)}
+    follows = dict(re.findall(r"^#define (TC_\w+) (TC_ENABLE_\w+)$", config, re.M))
     options = {}
-    for match in re.finditer(r"tc_(profile_option|module_feature)\((\w+)\s+(\w+)", cmake_sources()):
-        options[match.group(2)] = values[match.group(3)]
+    for macro, feature in feature_registry.features().items():
+        if not feature_registry.is_switch(feature):
+            continue
+        if macro in values:
+            options[feature_registry.option_name(macro)] = values[macro]
+        else:
+            options[feature_registry.option_name(macro)] = (FOLLOWED_LABELS[follows[macro]],) * 4
     return options
+
+
+def value_options():
+    """Map each value option to its (value names, default name)."""
+    return {feature_registry.option_name(macro): ([v["name"] for v in feature["values"]],
+                                                  feature["default"])
+            for macro, feature in feature_registry.features().items()
+            if not feature_registry.is_switch(feature)}
 
 
 def readme_option_rows():
@@ -361,18 +385,27 @@ class DocumentationTests(unittest.TestCase):
 
     def test_readme_lists_every_option(self):
         rows = readme_option_rows()
-        profiles = profile_options()
-        for name, values in sorted(profiles.items()):
+        for name, values in sorted(profile_options().items()):
             self.assertIn(name, rows, "README.md lacks option " + name)
             self.assertEqual(tuple(rows[name][:4]), values,
                              "README.md %s defaults must be default, micro, mini, desktop %s"
                              % (name, "/".join(values)))
+        for name, (names, default) in sorted(value_options().items()):
+            self.assertIn(name, rows, "README.md lacks option " + name)
+            documented = re.findall(r"`([^`]+)`", rows[name][0])
+            self.assertEqual(documented, names, "README.md %s values must be %s"
+                             % (name, ", ".join(names)))
+            self.assertEqual(rows[name][1], "`" + default + "`",
+                             "README.md %s default must be %s" % (name, default))
         documented = (ROOT / "README.md").read_text() + (ROOT / "docs" / "testing.md").read_text()
         sources = cmake_sources()
-        declared = re.findall(r"(?:option|tc_taf_choice_option)\((TINY_CRYPTO_\w+)", sources)
+        declared = re.findall(r"option\((TINY_CRYPTO_\w+)", sources)
         declared += re.findall(r"set\((TINY_CRYPTO_\w+)\s[^)]*?\bCACHE\b", sources)
         for name in sorted(set(declared)):
             self.assertTrue("`" + name in documented, "README.md and docs/testing.md lack " + name)
+        for name in sorted(rows):
+            self.assertTrue(name in profile_options() or name in value_options() or
+                            name in declared, "README.md documents unknown option " + name)
 
     def test_code_blocks_compile(self):
         compilers = {"c": os.environ.get("TC_DOC_SYNC_CC"), "cpp": os.environ.get("TC_DOC_SYNC_CXX")}

@@ -61,24 +61,26 @@ set(der ${tlv} TINY_CRYPTO_ENABLE_DER=ON)
 set(x509 ${der} TINY_CRYPTO_ENABLE_X509=ON)
 set(path ${x509} TINY_CRYPTO_ENABLE_X509_PATH=ON)
 set(revocation ${path} TINY_CRYPTO_ENABLE_X509_REVOCATION=ON)
-set(cms ${x509} TINY_CRYPTO_TLV_BER=ON TINY_CRYPTO_ENABLE_PIV_OIDS=ON TINY_CRYPTO_ENABLE_CMS=ON)
+set(cms ${x509} TINY_CRYPTO_TLV_ENABLE_BER=ON TINY_CRYPTO_ENABLE_PIV_OIDS=ON TINY_CRYPTO_ENABLE_CMS=ON)
 set(cms_validation ${cms} ${revocation} TINY_CRYPTO_ENABLE_CMS_VALIDATION=ON)
 set(piv_objects ${cms} TINY_CRYPTO_ENABLE_FASCN=ON TINY_CRYPTO_ENABLE_TWIC_UUID=ON
   TINY_CRYPTO_ENABLE_PIV_OBJECTS=ON)
 set(no_sha TINY_CRYPTO_ENABLE_SHA1=OFF TINY_CRYPTO_ENABLE_SHA224=OFF
   TINY_CRYPTO_ENABLE_SHA256=OFF TINY_CRYPTO_ENABLE_SHA384=OFF TINY_CRYPTO_ENABLE_SHA512=OFF)
-set(no_des_modes TINY_CRYPTO_DES_ECB=OFF TINY_CRYPTO_DES_CBC=OFF TINY_CRYPTO_DES_CTR=OFF
-  TINY_CRYPTO_DES_OFB=OFF TINY_CRYPTO_DES_CFB1=OFF TINY_CRYPTO_DES_CFB8=OFF
-  TINY_CRYPTO_DES_CFB64=OFF TINY_CRYPTO_DES_CMAC=OFF TINY_CRYPTO_DES_ISO9797=OFF)
-set(piv_sm TINY_CRYPTO_ENABLE_PIV_SM=ON TINY_CRYPTO_AES_DYNAMIC=ON TINY_CRYPTO_ENABLE_SSKDF=ON
-  TINY_CRYPTO_ENABLE_EC=ON TINY_CRYPTO_ENABLE_SHA384=ON)
+set(no_des_modes TINY_CRYPTO_DES_ENABLE_ECB=OFF TINY_CRYPTO_DES_ENABLE_CBC=OFF
+  TINY_CRYPTO_DES_ENABLE_CTR=OFF TINY_CRYPTO_DES_ENABLE_OFB=OFF TINY_CRYPTO_DES_ENABLE_CFB1=OFF
+  TINY_CRYPTO_DES_ENABLE_CFB8=OFF TINY_CRYPTO_DES_ENABLE_CFB64=OFF TINY_CRYPTO_DES_ENABLE_CMAC=OFF
+  TINY_CRYPTO_DES_ENABLE_ISO9797=OFF)
+set(piv_sm TINY_CRYPTO_ENABLE_PIV_SM=ON TINY_CRYPTO_AES_ENABLE_DYNAMIC=ON
+  TINY_CRYPTO_ENABLE_SSKDF=ON TINY_CRYPTO_ENABLE_EC=ON TINY_CRYPTO_ENABLE_SHA384=ON)
 
-# Rules owned by CMake itself.
-tc_reject(nothing_enabled
-  "TINY_CRYPTO_ENABLE_AES=OFF;${no_sha}" "Enable at least one algorithm or parser")
+# Rules owned by the feature registry. CMake wraps long messages, so the value
+# checks match the start of the message.
 tc_reject(bad_choice "TINY_CRYPTO_ENABLE_MD5=maybe" "TINY_CRYPTO_ENABLE_MD5 must be AUTO, ON, or OFF")
-tc_reject(bad_sbox "TINY_CRYPTO_AES_SBOX=table" "Unknown TINY_CRYPTO_AES_SBOX value")
-tc_reject(bad_ghash "TINY_CRYPTO_AES_GHASH=table" "Unknown TINY_CRYPTO_AES_GHASH value")
+tc_reject(bad_sbox "TINY_CRYPTO_AES_SBOX_MODE=table" "TINY_CRYPTO_AES_SBOX_MODE must be one of:")
+tc_reject(bad_ghash "TINY_CRYPTO_AES_GCM_GHASH_MODE=table"
+  "TINY_CRYPTO_AES_GCM_GHASH_MODE must be one of:")
+tc_reject(aes_key_bits "TINY_CRYPTO_AES_KEY_BITS=100" "TINY_CRYPTO_AES_KEY_BITS must be one of:")
 
 # Rules owned by config.h, in header order.
 tc_reject(hmac_without_sha "TINY_CRYPTO_ENABLE_HMAC=ON;${no_sha}"
@@ -99,9 +101,9 @@ tc_reject(der_without_tlv "TINY_CRYPTO_ENABLE_DER=ON"
   "DER, BER, and incremental parsing require TC_ENABLE_TLV")
 tc_reject(taf_without_path "${x509};TINY_CRYPTO_ENABLE_TRUST_ANCHOR_FORMAT=ON"
   "Trust-anchor format requires X.509 path support")
-tc_reject(taf_without_choice "${path};TINY_CRYPTO_ENABLE_TRUST_ANCHOR_FORMAT=ON;TINY_CRYPTO_TAF_CERTIFICATE=OFF;TINY_CRYPTO_TAF_TBS_CERTIFICATE=OFF;TINY_CRYPTO_TAF_TRUST_ANCHOR_INFO=OFF"
+tc_reject(taf_without_choice "${path};TINY_CRYPTO_ENABLE_TRUST_ANCHOR_FORMAT=ON;TINY_CRYPTO_TAF_ENABLE_CERTIFICATE=OFF;TINY_CRYPTO_TAF_ENABLE_TBS_CERTIFICATE=OFF;TINY_CRYPTO_TAF_ENABLE_TRUST_ANCHOR_INFO=OFF"
   "Trust-anchor format requires at least one choice")
-tc_reject(taf_choice_without_format "${path};TINY_CRYPTO_TAF_CERTIFICATE=ON"
+tc_reject(taf_choice_without_format "${path};TINY_CRYPTO_TAF_ENABLE_CERTIFICATE=ON"
   "Trust-anchor choices require trust-anchor format")
 tc_reject(path_without_x509 "${der};TINY_CRYPTO_ENABLE_X509_PATH=ON"
   "X.509 path validation requires the X.509 reader")
@@ -110,7 +112,7 @@ tc_reject(revocation_without_path "${x509};TINY_CRYPTO_ENABLE_X509_REVOCATION=ON
 tc_reject(ocsp_without_path "${x509};TINY_CRYPTO_ENABLE_SHA1=ON;TINY_CRYPTO_ENABLE_X509_OCSP=ON"
   "X.509 OCSP requires path validation")
 tc_reject(ocsp_without_sha1 "${path};TINY_CRYPTO_ENABLE_X509_OCSP=ON" "X.509 OCSP requires SHA-1")
-tc_reject(cms_without_ber "${cms};TINY_CRYPTO_TLV_BER=OFF"
+tc_reject(cms_without_ber "${cms};TINY_CRYPTO_TLV_ENABLE_BER=OFF"
   "CMS requires X.509, BER parsing, and PIV/TWIC identifier classification")
 tc_reject(cms_validation_without_revocation "${cms};TINY_CRYPTO_ENABLE_CMS_VALIDATION=ON"
   "CMS validation requires CMS and X.509 revocation support")
@@ -120,17 +122,16 @@ tc_reject(credential_without_chuid "${piv_objects};${cms_validation};TINY_CRYPTO
   "Credential composition requires PIV objects, CHUID, and CMS validation")
 tc_reject(hkdf_without_hmac "TINY_CRYPTO_ENABLE_HKDF=ON"
   "HKDF requires HMAC and an enabled SHA algorithm")
-tc_reject(ec_without_curve "TINY_CRYPTO_ENABLE_EC=ON;TINY_CRYPTO_EC_P256=OFF;TINY_CRYPTO_EC_P384=OFF"
+tc_reject(ec_without_curve "TINY_CRYPTO_ENABLE_EC=ON;TINY_CRYPTO_EC_ENABLE_P256=OFF;TINY_CRYPTO_EC_ENABLE_P384=OFF"
   "EC requires at least one curve")
 tc_reject(sskdf_without_sha "TINY_CRYPTO_ENABLE_SSKDF=ON;${no_sha}"
   "Single-step KDF requires an enabled SHA algorithm")
-tc_reject(dynamic_without_aes "TINY_CRYPTO_ENABLE_AES=OFF;TINY_CRYPTO_AES_DYNAMIC=ON"
+tc_reject(dynamic_without_aes "TINY_CRYPTO_ENABLE_AES=OFF;TINY_CRYPTO_AES_ENABLE_DYNAMIC=ON"
   "Dynamic AES requires TC_ENABLE_AES")
-tc_reject(aes_key_bits "TINY_CRYPTO_AES_KEY_BITS=100" "TC_AES_KEY_BITS must be 128, 192, or 256")
-tc_reject(tiny_fast_table "TINY_CRYPTO_AES_TINY=ON;TINY_CRYPTO_AES_GHASH=fast-table"
+tc_reject(tiny_fast_table "TINY_CRYPTO_AES_TINY=ON;TINY_CRYPTO_AES_GCM_GHASH_MODE=fast-table"
   "TC_AES_TINY forbids the 256-byte fast GHASH table")
 tc_reject(twic_object_aes256
-  "TINY_CRYPTO_ENABLE_TWIC_OBJECT_CRYPTO=ON;TINY_CRYPTO_AES_ECB=ON;TINY_CRYPTO_AES_KEY_BITS=256"
+  "TINY_CRYPTO_ENABLE_TWIC_OBJECT_CRYPTO=ON;TINY_CRYPTO_AES_ENABLE_ECB=ON;TINY_CRYPTO_AES_KEY_BITS=256"
   "TWIC object encryption requires AES-128 ECB")
 tc_reject(des_without_mode "TINY_CRYPTO_ENABLE_DES=ON;${no_des_modes}"
   "DES requires at least one enabled mode or MAC")
@@ -138,27 +139,27 @@ tc_reject(kdf_without_prf "TINY_CRYPTO_ENABLE_KDF=ON"
   "TC_ENABLE_KDF needs a PRF: HMAC with an enabled SHA, TC_AES_ENABLE_CMAC or TC_DES_ENABLE_CMAC")
 tc_reject(piv_sm_without_sskdf "${piv_sm};TINY_CRYPTO_ENABLE_SSKDF=OFF"
   "PIV SM requires dynamic AES, SHA-256, single-step KDF, and EC")
-tc_reject(piv_sm_without_suite "${piv_sm};TINY_CRYPTO_PIV_SM_CS2=OFF;TINY_CRYPTO_PIV_SM_CS7=OFF"
+tc_reject(piv_sm_without_suite "${piv_sm};TINY_CRYPTO_PIV_SM_ENABLE_CS2=OFF;TINY_CRYPTO_PIV_SM_ENABLE_CS7=OFF"
   "PIV SM requires at least one cipher suite")
-tc_reject(cs2_without_p256 "${piv_sm};TINY_CRYPTO_EC_P256=OFF" "CS2 requires P-256")
+tc_reject(cs2_without_p256 "${piv_sm};TINY_CRYPTO_EC_ENABLE_P256=OFF" "CS2 requires P-256")
 tc_reject(cs7_without_sha384 "${piv_sm};TINY_CRYPTO_ENABLE_SHA384=OFF"
   "CS7 requires P-384 and SHA-384")
 tc_reject(drbg_without_mechanism "TINY_CRYPTO_ENABLE_DRBG=ON"
   "DRBG requires at least one mechanism")
 tc_reject(hash_drbg_without_sha
-  "TINY_CRYPTO_ENABLE_DRBG=ON;TINY_CRYPTO_DRBG_HASH=ON;${no_sha}"
+  "TINY_CRYPTO_ENABLE_DRBG=ON;TINY_CRYPTO_DRBG_ENABLE_HASH=ON;${no_sha}"
   "Hash_DRBG requires a SHA algorithm")
-tc_reject(hmac_drbg_without_hmac "TINY_CRYPTO_ENABLE_DRBG=ON;TINY_CRYPTO_DRBG_HMAC=ON"
+tc_reject(hmac_drbg_without_hmac "TINY_CRYPTO_ENABLE_DRBG=ON;TINY_CRYPTO_DRBG_ENABLE_HMAC=ON"
   "HMAC_DRBG requires TC_ENABLE_HMAC")
-tc_reject(ctr_drbg_without_dynamic "TINY_CRYPTO_ENABLE_DRBG=ON;TINY_CRYPTO_DRBG_CTR=ON"
+tc_reject(ctr_drbg_without_dynamic "TINY_CRYPTO_ENABLE_DRBG=ON;TINY_CRYPTO_DRBG_ENABLE_CTR=ON"
   "CTR_DRBG requires TC_ENABLE_AES and TC_AES_ENABLE_DYNAMIC")
 
 # Edge profiles that config.h accepts.
 tc_accept(ec_p192_only
-  "TINY_CRYPTO_ENABLE_EC=ON;TINY_CRYPTO_EC_P192=ON;TINY_CRYPTO_EC_P256=OFF;TINY_CRYPTO_EC_P384=OFF")
+  "TINY_CRYPTO_ENABLE_EC=ON;TINY_CRYPTO_EC_ENABLE_P192=ON;TINY_CRYPTO_EC_ENABLE_P256=OFF;TINY_CRYPTO_EC_ENABLE_P384=OFF")
 tc_accept(sha384_only
   "TINY_CRYPTO_ENABLE_AES=OFF;${no_sha};TINY_CRYPTO_ENABLE_SHA384=ON")
 tc_accept(des_iso9797_only
-  "TINY_CRYPTO_ENABLE_AES=OFF;${no_sha};TINY_CRYPTO_ENABLE_DES=ON;${no_des_modes};TINY_CRYPTO_DES_ISO9797=ON")
+  "TINY_CRYPTO_ENABLE_AES=OFF;${no_sha};TINY_CRYPTO_ENABLE_DES=ON;${no_des_modes};TINY_CRYPTO_DES_ENABLE_ISO9797=ON")
 tc_accept(sskdf_sha1_only
   "TINY_CRYPTO_ENABLE_SSKDF=ON;${no_sha};TINY_CRYPTO_ENABLE_SHA1=ON")

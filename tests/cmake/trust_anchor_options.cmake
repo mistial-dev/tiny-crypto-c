@@ -10,12 +10,12 @@ file(WRITE "${BINARY_DIR}/probe.c" "#include <tiny_crypto/x509_trust_anchor.h>\n
 function(configure_case label expected master cert tbs info path)
   execute_process(COMMAND "${CMAKE_COMMAND}" -S "${SOURCE_DIR}"
       -B "${BINARY_DIR}/${label}"
-      -DTINY_CRYPTO_BUILD_TESTS=OFF
+      -DTINY_CRYPTO_BUILD_TESTS=OFF -DCMAKE_COMPILE_WARNING_AS_ERROR=ON
       -DTINY_CRYPTO_RESOURCE_PROFILE=desktop
       -DTINY_CRYPTO_ENABLE_TRUST_ANCHOR_FORMAT=${master}
-      -DTINY_CRYPTO_TAF_CERTIFICATE=${cert}
-      -DTINY_CRYPTO_TAF_TBS_CERTIFICATE=${tbs}
-      -DTINY_CRYPTO_TAF_TRUST_ANCHOR_INFO=${info}
+      -DTINY_CRYPTO_TAF_ENABLE_CERTIFICATE=${cert}
+      -DTINY_CRYPTO_TAF_ENABLE_TBS_CERTIFICATE=${tbs}
+      -DTINY_CRYPTO_TAF_ENABLE_TRUST_ANCHOR_INFO=${info}
       -DTINY_CRYPTO_ENABLE_X509_PATH=${path}
       OUTPUT_VARIABLE output ERROR_VARIABLE error RESULT_VARIABLE result)
   if(expected STREQUAL "pass" AND NOT result EQUAL 0)

@@ -78,7 +78,10 @@ Keep the library suitable for small firmware:
 - Use the shared `TC_status` result model for fallible APIs.
 
 CMake owns the build logic. The Makefile must remain a thin frontend that
-forwards `TINY_CRYPTO_*` options.
+forwards `TINY_CRYPTO_*` options. A new feature gets a `config.h` macro with
+its default and dependency rules, and one entry in
+[`cmake/features.json`](cmake/features.json) that names the macro and the
+sources it compiles. The CMake option follows from the macro name.
 
 Generated vectors belong under `tests/vectors/`; generators belong under
 `tools/`. Preserve third-party copyright and license notices.

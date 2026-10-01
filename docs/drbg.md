@@ -7,15 +7,15 @@
 Include `<tiny_crypto/drbg.h>` and enable `TINY_CRYPTO_ENABLE_DRBG=ON`. The
 library provides the three NIST SP 800-90A Rev. 1 mechanisms:
 
-| Mechanism | Option                  | Primitives                                  | Security strength    |
-| --------- | ----------------------- | ------------------------------------------- | -------------------- |
-| Hash_DRBG | `TINY_CRYPTO_DRBG_HASH` | SHA-1, SHA-224, SHA-256, SHA-384 or SHA-512 | 128, 192 or 256 bits |
-| HMAC_DRBG | `TINY_CRYPTO_DRBG_HMAC` | HMAC with the same hashes                   | 128, 192 or 256 bits |
-| CTR_DRBG  | `TINY_CRYPTO_DRBG_CTR`  | AES-128, AES-192 or AES-256                 | the AES key size     |
+| Mechanism | Option                         | Primitives                                  | Security strength    |
+| --------- | ------------------------------ | ------------------------------------------- | -------------------- |
+| Hash_DRBG | `TINY_CRYPTO_DRBG_ENABLE_HASH` | SHA-1, SHA-224, SHA-256, SHA-384 or SHA-512 | 128, 192 or 256 bits |
+| HMAC_DRBG | `TINY_CRYPTO_DRBG_ENABLE_HMAC` | HMAC with the same hashes                   | 128, 192 or 256 bits |
+| CTR_DRBG  | `TINY_CRYPTO_DRBG_ENABLE_CTR`  | AES-128, AES-192 or AES-256                 | the AES key size     |
 
 The desktop profile enables all three. A mechanism needs its primitives:
 HMAC_DRBG needs `TINY_CRYPTO_ENABLE_HMAC`, and CTR_DRBG needs
-`TINY_CRYPTO_ENABLE_AES` with `TINY_CRYPTO_AES_DYNAMIC`, which selects the AES
+`TINY_CRYPTO_ENABLE_AES` with `TINY_CRYPTO_AES_ENABLE_DYNAMIC`, which selects the AES
 key size at run time. The strength is always the mechanism's maximum: 128
 bits for SHA-1, 192 for SHA-224 and 256 for SHA-256, SHA-384 and SHA-512.
 

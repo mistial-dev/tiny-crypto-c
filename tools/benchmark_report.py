@@ -17,6 +17,7 @@ import sys
 import tempfile
 
 from benchmark_cases import FEATURES, RP2350_FEATURES, SKETCH, definitions, features_for_board
+import feature_registry
 
 ROOT = Path(__file__).resolve().parents[1]
 SDK_REVISION = "079c6f39023649b154152db30f1d781e884879bc"
@@ -165,16 +166,8 @@ def pico_environment():
 def measure_pico(directory, body, flags, toolchain, env):
     source = directory / "fixture.c"
     source.write_text(host_source(body), encoding="utf-8")
-    # Read the option names from CMake rather than maintaining a second list.
-    sources = [ROOT / "CMakeLists.txt", *sorted((ROOT / "cmake").glob("*.cmake"))]
-    mapping = {macro: option for source in sources for option, macro in re.findall(
-        r"(?:tc_profile_option|tc_module_feature)\((TINY_CRYPTO_\w+)\s+(TC_\w+)", source.read_text())}
-    options = []
-    for macro, value in definitions(flags).items():
-        if macro == "TC_AES_GCM_GHASH_MODE":
-            options.append("-DTINY_CRYPTO_AES_GHASH=" + ["auto", "bitwise", "wide", "fast-table", "hardware"][int(value)])
-        else:
-            options.append("-D" + mapping[macro] + "=" + ("ON" if value == "1" else "OFF"))
+    options = [feature_registry.cmake_definition(macro, value)
+               for macro, value in definitions(flags).items()]
     build = directory / "build"
     run(["cmake", "-S", ROOT / "benchmarks/pico", "-B", build,
          "-DCMAKE_BUILD_TYPE=Release", "-DTC_MEASUREMENT_SOURCE=" + str(source),

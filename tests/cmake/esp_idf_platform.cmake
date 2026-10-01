@@ -34,7 +34,7 @@ if(NOT result EQUAL 0)
 endif()
 
 # An explicit OFF for a platform feature fails instead of dropping it.
-foreach(option TINY_CRYPTO_ENABLE_SHA384 TINY_CRYPTO_ENABLE_RSA TINY_CRYPTO_EC_P192)
+foreach(option TINY_CRYPTO_ENABLE_SHA384 TINY_CRYPTO_ENABLE_RSA TINY_CRYPTO_EC_ENABLE_P192)
   tc_platform_configure(result output "-D${option}=OFF")
   if(result EQUAL 0)
     message(FATAL_ERROR "${option}=OFF was accepted with the platform floor")

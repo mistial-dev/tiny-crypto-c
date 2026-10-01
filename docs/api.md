@@ -16,6 +16,30 @@ public header opens with a module block that links here and states its scope,
 standards, configuration macros and limitations. Function comments in the
 headers give the exceptions and the conditions behind each status.
 
+## Build configuration
+
+Each algorithm, mode, parser and protocol module is a feature with one
+`config.h` macro and one CMake option. The option is `TINY_CRYPTO_` followed by
+the macro name without `TC_`, so `TINY_CRYPTO_ENABLE_X509_PATH` sets
+`TC_ENABLE_X509_PATH`.
+[`cmake/features.json`](../cmake/features.json) is the registry. It gives each
+feature its description, its parent and the sources it compiles. A switch
+takes `AUTO`, `ON` or `OFF`. A value option, such as
+`TINY_CRYPTO_AES_SBOX_MODE`, takes one of the names listed for it. A
+sub-feature, such as `TINY_CRYPTO_AES_ENABLE_GCM`, compiles its code only
+while its parent feature is on.
+
+`config.h` owns the defaults and the dependency rules. CMake compiles it with
+the selected values, so an invalid combination stops configuration with the
+same `#error` text that a direct-source build reports.
+
+The minimal core is `src/common.c`: secret wiping, constant-time comparison and
+the span helpers shared by every module. A build with every switch `OFF`
+configures, compiles and archives only that file. Shared helpers, such as the
+hash core, `block_modes.c`, `mac_core.c` and the PKI storage planner, compile
+while at least one feature that uses them is on. Applications that need a small
+image start from the all-off build and enable features one at a time.
+
 ## Result model
 
 Each module returns a named result type. Compare against the exact success
@@ -230,9 +254,10 @@ Public C names start with `TC_` and a module prefix, such as `TC_AES_`,
 `TC_X509_` or `TC_PIV_SM_`. Types use a lowercase noun after the prefix, such
 as `TC_X509_certificate` and `TC_EC_workspace`. Enumerators and macros are
 uppercase. Configuration macros are `TC_ENABLE_*` for a module and
-`TC_<MODULE>_ENABLE_*` for a mode or variant. The matching CMake options start
-with `TINY_CRYPTO_`. C++ wrappers use lowercase functions and classes named
-for the algorithm in namespace `tiny_crypto`.
+`TC_<MODULE>_ENABLE_*` for a mode or variant. Each CMake option is
+`TINY_CRYPTO_` followed by its macro name without `TC_`. C++ wrappers use
+lowercase functions and classes named for the algorithm in namespace
+`tiny_crypto`.
 
 Function names end with the operation:
 
@@ -533,7 +558,7 @@ Enable `TINY_CRYPTO_ENABLE_DES=ON` and include `<tiny_crypto/des.h>`. One
 `struct TC_DES_ctx` serves single DES and TDEA. The key length passed to
 `TC_DES_init` selects the cipher. `TC_DES_KEYLEN` (8 bytes) selects single
 DES. `TC_DES_KEYLEN_2KEY` (16) and `TC_DES_KEYLEN_3KEY` (24) select two- and
-three-key TDEA when `TINY_CRYPTO_DES_TDES` is on. Every mode function takes the
+three-key TDEA when `TINY_CRYPTO_DES_ENABLE_TDES` is on. Every mode function takes the
 same context. A failed init wipes the context, so an earlier key cannot be used
 after a failed re-init. `TC_DES_set_iv` loads the IV for the first message and
 starts each later message under the same key.
@@ -568,7 +593,7 @@ int main(void)
 
 ## DES message authentication
 
-Enable both `TINY_CRYPTO_ENABLE_DES=ON` and `TINY_CRYPTO_DES_ISO9797=ON` to use
+Enable both `TINY_CRYPTO_ENABLE_DES=ON` and `TINY_CRYPTO_DES_ENABLE_ISO9797=ON` to use
 ISO/IEC 9797-1 MAC algorithms 1 and 3. Include `<tiny_crypto/des.h>`.
 Algorithm 1 accepts 16 or 24-byte TDEA keys. Algorithm 3, the retail MAC,
 accepts a 16-byte two-key input and finishes with D(K2) then E(K1). A 24-byte

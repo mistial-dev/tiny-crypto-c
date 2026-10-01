@@ -118,7 +118,7 @@ return an error. Acceptance also requires signature and trust validation.
 
 `TC_CMS_signed_data_read` reads a complete ContentInfo carrying SignedData.
 It checks envelope framing, digest AlgorithmIdentifier syntax, and SignedData
-version consistency. Enable `TINY_CRYPTO_TLV_BER`: CMS envelopes allow both
+version consistency. Enable `TINY_CRYPTO_TLV_ENABLE_BER`: CMS envelopes allow both
 definite and indefinite BER lengths. `policy.envelope` selects BER or DER
 framing. The signed-attribute encoding is a separate selection.
 
@@ -258,7 +258,7 @@ tag, to `TC_CMS_signed_attributes_read`.
 
 Select `TC_CMS_ATTRIBUTES_DER` in `policy.attributes` for RFC 5652 encoding.
 An application that needs TWIC/MyID compatibility can select
-`TC_CMS_ATTRIBUTES_BER_DEFINITE_ORDER` instead, with `TINY_CRYPTO_TLV_BER=ON`.
+`TC_CMS_ATTRIBUTES_BER_DEFINITE_ORDER` instead, with `TINY_CRYPTO_TLV_ENABLE_BER=ON`.
 The library uses the selected mode as given, without card detection or a retry
 in another mode.
 

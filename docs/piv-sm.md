@@ -26,7 +26,7 @@ choice of when to secure the link.
 ## Build configuration
 
 Enable `TINY_CRYPTO_ENABLE_PIV_SM`. The desktop profile enables it with its
-dependencies. The session module needs AES with `TINY_CRYPTO_AES_DYNAMIC`,
+dependencies. The session module needs AES with `TINY_CRYPTO_AES_ENABLE_DYNAMIC`,
 SHA-256, SSKDF and EC. `TC_PIV_SM_authenticate_response` also needs X.509 and
 PIV CVC parsing. `TINY_CRYPTO_ENABLE_PIV_SM_APDU` adds the link layer and
 needs the PIV card commands, the session and PIV CVC parsing.
@@ -39,10 +39,10 @@ follow Table 18.
 | CS2   | `27` | P-256 | SHA-256  | AES-128      | 16 bytes |
 | CS7   | `2E` | P-384 | SHA-384  | AES-256      | 24 bytes |
 
-`TINY_CRYPTO_PIV_SM_CS2` and `TINY_CRYPTO_PIV_SM_CS7` select the suites. Both
+`TINY_CRYPTO_PIV_SM_ENABLE_CS2` and `TINY_CRYPTO_PIV_SM_ENABLE_CS7` select the suites. Both
 are ON in every profile. CS2 needs P-256. CS7 needs P-384 and SHA-384. Disable
-an unused curve separately with `TINY_CRYPTO_EC_P256` or
-`TINY_CRYPTO_EC_P384`. `TC_PIV_SM_KEY_BYTES` and `TC_PIV_SM_COORDINATE_BYTES`
+an unused curve separately with `TINY_CRYPTO_EC_ENABLE_P256` or
+`TINY_CRYPTO_EC_ENABLE_P384`. `TC_PIV_SM_KEY_BYTES` and `TC_PIV_SM_COORDINATE_BYTES`
 size the session for the largest enabled suite.
 
 ## Objects and storage

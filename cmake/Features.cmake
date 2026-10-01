@@ -1,125 +1,237 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
+#
+# Feature registry. cmake/features.json lists every feature with its config.h
+# macro, description, parent, value set and the sources it compiles. This file
+# declares one cache option per feature, registers the resolved macro value
+# and selects the library sources. config.h owns the defaults and dependency
+# rules, and ConfigCheck.cmake applies them to the resolved values.
+#
+# Naming rule: the option is TINY_CRYPTO_ followed by the macro name without
+# its TC_ prefix, so TC_AES_ENABLE_CBC is set with TINY_CRYPTO_AES_ENABLE_CBC.
+#
+# After inclusion:
+#   TC_FEATURE_OPTIONS   global property, every AUTO/ON/OFF option
+#   TC_VALUE_OPTIONS     global property, every option with a named value set
+#   <option>             0 or 1 for an AUTO/ON/OFF option, the name for a value option
+#   tc_registry_sources(<out>)                  library sources for the selected features
+#   tc_registry_family_sources(<out> <macro>...) every source the named features and
+#                                               their sub-features can compile
 
-# Module options and translation units. config.h owns the dependency rules,
-# and ConfigCheck.cmake applies them to the selected options.
-set(tc_module_features)
+set(tc_registry_file "${CMAKE_CURRENT_LIST_DIR}/features.json")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${tc_registry_file}")
+file(READ "${tc_registry_file}" tc_registry)
 
-macro(tc_module_feature option macro_name description)
-  tc_profile_option(${option} ${macro_name} "${description}")
-  list(APPEND tc_module_features ${macro_name})
-  set(tc_module_option_${macro_name} ${option})
-endmacro()
+function(tc_feature_option_name macro output)
+  if(NOT macro MATCHES "^TC_[A-Z0-9_]+$")
+    message(FATAL_ERROR "Feature macro ${macro} must start with TC_")
+  endif()
+  string(REGEX REPLACE "^TC_" "TINY_CRYPTO_" name "${macro}")
+  set(${output} ${name} PARENT_SCOPE)
+endfunction()
 
-tc_module_feature(TINY_CRYPTO_ENABLE_AAMVA TC_ENABLE_AAMVA
-  "Build ANSI AAMVA payload readers")
-set(tc_module_sources_TC_ENABLE_AAMVA src/aamva.c)
+# Read a registry member, or default when the member is absent.
+function(tc_registry_member output default)
+  string(JSON value ERROR_VARIABLE missing GET "${tc_registry}" ${ARGN})
+  if(missing)
+    set(value "${default}")
+  endif()
+  set(${output} "${value}" PARENT_SCOPE)
+endfunction()
 
-tc_module_feature(TINY_CRYPTO_ENABLE_FASCN TC_ENABLE_FASCN
-  "Build FASC-N readers and writers")
-set(tc_module_sources_TC_ENABLE_FASCN src/fascn.c)
+# Read a registry array of strings as a CMake list.
+function(tc_registry_strings output)
+  set(items)
+  string(JSON count ERROR_VARIABLE missing LENGTH "${tc_registry}" ${ARGN})
+  if(NOT missing AND count GREATER 0)
+    math(EXPR last "${count} - 1")
+    foreach(index RANGE ${last})
+      string(JSON item GET "${tc_registry}" ${ARGN} ${index})
+      list(APPEND items "${item}")
+    endforeach()
+  endif()
+  set(${output} "${items}" PARENT_SCOPE)
+endfunction()
 
-tc_module_feature(TINY_CRYPTO_ENABLE_TWIC_UUID TC_ENABLE_TWIC_UUID
-  "Build TWIC NEXGEN UUID helpers")
-set(tc_module_sources_TC_ENABLE_TWIC_UUID src/twic_uuid.c)
+# Resolve an AUTO/ON/OFF option to 0 or 1. AUTO follows the application
+# target, then the config.h default: a resource-profile value, or the value of
+# the feature that config.h names. Macros in tc_platform_features, set by a
+# platform port, have a floor of 1.
+function(tc_resolve_switch option macro description output)
+  set(${option} AUTO CACHE STRING "${description} (AUTO follows the resource profile)")
+  set_property(CACHE ${option} PROPERTY STRINGS AUTO ON OFF)
+  string(TOUPPER "${${option}}" choice)
+  tc_target_default(${macro} role_default)
+  set(platform_floor OFF)
+  if(macro IN_LIST tc_platform_features)
+    set(platform_floor ON)
+  endif()
+  if(choice STREQUAL "AUTO")
+    if(DEFINED tc_profile_default_${macro})
+      set(value ${tc_profile_default_${macro}})
+    elseif(DEFINED tc_profile_follows_${macro})
+      get_property(value GLOBAL PROPERTY TC_FEATURE_VALUE_${tc_profile_follows_${macro}})
+      if(value STREQUAL "")
+        message(FATAL_ERROR "${macro} follows ${tc_profile_follows_${macro}}, which is registered later")
+      endif()
+    else()
+      message(FATAL_ERROR "config.h has no default for ${macro}")
+    endif()
+    if(NOT role_default STREQUAL "")
+      set(value ${role_default})
+    endif()
+    if(platform_floor)
+      set(value 1)
+    endif()
+  elseif(choice MATCHES "^(ON|TRUE|YES|1)$")
+    set(value 1)
+  elseif(choice MATCHES "^(OFF|FALSE|NO|0)$")
+    set(value 0)
+  else()
+    message(FATAL_ERROR "${option} must be AUTO, ON, or OFF")
+  endif()
+  if(NOT role_default STREQUAL "" AND NOT value EQUAL role_default)
+    message(FATAL_ERROR "${option} conflicts with ${TINY_CRYPTO_TARGET}; use AUTO or an unscoped target")
+  endif()
+  if(platform_floor AND value EQUAL 0)
+    message(FATAL_ERROR "${option} is required by the platform port; use AUTO or ON")
+  endif()
+  set(${output} ${value} PARENT_SCOPE)
+endfunction()
 
-tc_module_feature(TINY_CRYPTO_ENABLE_TWIC_TPK TC_ENABLE_TWIC_TPK
-  "Build TWIC Privacy Key container readers")
-set(tc_module_sources_TC_ENABLE_TWIC_TPK src/twic_tpk.c)
+# Resolve a value option to the number of the selected name. A name without a
+# number selects the resource-profile default from config.h.
+function(tc_resolve_value option macro description index output)
+  tc_registry_member(default "" features ${index} default)
+  string(JSON count LENGTH "${tc_registry}" features ${index} values)
+  math(EXPR last "${count} - 1")
+  set(names)
+  foreach(entry RANGE ${last})
+    string(JSON name GET "${tc_registry}" features ${index} values ${entry} name)
+    tc_registry_member(number "" features ${index} values ${entry} value)
+    list(APPEND names "${name}")
+    set(number_${name} "${number}")
+  endforeach()
+  set(${option} "${default}" CACHE STRING "${description}")
+  set_property(CACHE ${option} PROPERTY STRINGS ${names})
+  set(choice "${${option}}")
+  if(NOT choice IN_LIST names)
+    list(JOIN names ", " allowed)
+    message(FATAL_ERROR "${option} must be one of: ${allowed}")
+  endif()
+  set(value "${number_${choice}}")
+  if(value STREQUAL "")
+    set(value "${tc_profile_default_${macro}}")
+  endif()
+  set(${output} ${value} PARENT_SCOPE)
+endfunction()
 
-tc_module_feature(TINY_CRYPTO_ENABLE_TWIC_OBJECT_CRYPTO
-  TC_ENABLE_TWIC_OBJECT_CRYPTO "Build TWIC private-object encryption")
-set(tc_module_sources_TC_ENABLE_TWIC_OBJECT_CRYPTO src/twic_cipher.c)
+# Declare the option for feature index, register its macro and record whether
+# its sources compile: a feature is active when it is on and its parent is
+# active.
+function(tc_register_feature index)
+  string(JSON macro GET "${tc_registry}" features ${index} macro)
+  string(JSON description GET "${tc_registry}" features ${index} description)
+  tc_registry_member(parent "" features ${index} parent)
+  tc_registry_strings(sources features ${index} sources)
+  tc_feature_option_name(${macro} option)
+  if(NOT parent STREQUAL "")
+    get_property(parent_registered GLOBAL PROPERTY TC_FEATURE_VALUE_${parent} SET)
+    if(NOT parent_registered)
+      message(FATAL_ERROR "${macro} names parent ${parent}, which is not registered before it")
+    endif()
+  endif()
 
-tc_module_feature(TINY_CRYPTO_ENABLE_APDU TC_ENABLE_APDU
-  "Build ISO/IEC 7816-4 APDU encoding and exchange")
-set(tc_module_sources_TC_ENABLE_APDU src/apdu_encode.c src/apdu_response.c src/apdu_channel.c)
+  string(JSON kind ERROR_VARIABLE scalar TYPE "${tc_registry}" features ${index} values)
+  if(scalar)
+    set_property(GLOBAL APPEND PROPERTY TC_FEATURE_OPTIONS ${option})
+    tc_resolve_switch(${option} ${macro} "${description}" value)
+    set(enabled ${value})
+    # A plain variable holding 0 or 1 lets later CMake code test the option.
+    set(${option} ${value} PARENT_SCOPE)
+  else()
+    set_property(GLOBAL APPEND PROPERTY TC_VALUE_OPTIONS ${option})
+    tc_resolve_value(${option} ${macro} "${description}" ${index} value)
+    set(enabled 1)
+  endif()
+  tc_register_definition(${macro} ${value})
 
-tc_module_feature(TINY_CRYPTO_ENABLE_PIV_COMMAND TC_ENABLE_PIV_COMMAND
-  "Build PIV and TWIC card commands over the APDU channel")
-set(tc_module_sources_TC_ENABLE_PIV_COMMAND
-  src/piv_aid.c src/piv_link.c src/piv_select.c src/piv_get_data.c src/piv_verify.c
-  src/piv_status.c src/piv_template_internal.c src/piv_container_internal.c)
+  set(active ${enabled})
+  if(active AND NOT parent STREQUAL "")
+    get_property(active GLOBAL PROPERTY TC_FEATURE_ACTIVE_${parent})
+  endif()
+  set_property(GLOBAL APPEND PROPERTY TC_FEATURE_MACROS ${macro})
+  set_property(GLOBAL PROPERTY TC_FEATURE_VALUE_${macro} ${value})
+  set_property(GLOBAL PROPERTY TC_FEATURE_ACTIVE_${macro} ${active})
+  set_property(GLOBAL PROPERTY TC_FEATURE_PARENT_${macro} "${parent}")
+  set_property(GLOBAL PROPERTY TC_FEATURE_SOURCES_${macro} "${sources}")
+endfunction()
 
-tc_module_feature(TINY_CRYPTO_ENABLE_PIV_SM_APDU TC_ENABLE_PIV_SM_APDU
-  "Build PIV secure messaging framing on the card link")
-set(tc_module_sources_TC_ENABLE_PIV_SM_APDU src/piv_sm_apdu.c src/piv_sm_key_request.c)
+set_property(GLOBAL PROPERTY TC_FEATURE_OPTIONS "")
+set_property(GLOBAL PROPERTY TC_VALUE_OPTIONS "")
+set_property(GLOBAL PROPERTY TC_FEATURE_MACROS "")
+string(JSON tc_feature_count LENGTH "${tc_registry}" features)
+math(EXPR tc_feature_last "${tc_feature_count} - 1")
+foreach(tc_feature_index RANGE ${tc_feature_last})
+  tc_register_feature(${tc_feature_index})
+endforeach()
 
-tc_module_feature(TINY_CRYPTO_ENABLE_PIV_VCI TC_ENABLE_PIV_VCI
-  "Build the PIV virtual contact interface on a secured card link")
-set(tc_module_sources_TC_ENABLE_PIV_VCI src/piv_discovery_get.c src/piv_vci.c)
-
-tc_module_feature(TINY_CRYPTO_ENABLE_PIV_CATALOG TC_ENABLE_PIV_CATALOG
-  "Build the PIV and TWIC data object catalogs and the card inventory")
-set(tc_module_sources_TC_ENABLE_PIV_CATALOG src/piv_catalog.c src/piv_inventory.c)
-
-tc_module_feature(TINY_CRYPTO_ENABLE_PIV_KEY_PROOF TC_ENABLE_PIV_KEY_PROOF
-  "Build PIV and TWIC card key proofs over GENERAL AUTHENTICATE")
-set(tc_module_sources_TC_ENABLE_PIV_KEY_PROOF src/piv_key_policy.c src/piv_key_proof.c)
-
-tc_module_feature(TINY_CRYPTO_ENABLE_PIV_CARD_CHECK TC_ENABLE_PIV_CARD_CHECK
-  "Build the composed PIV and TWIC card check")
-set(tc_module_sources_TC_ENABLE_PIV_CARD_CHECK
-  src/piv_card_check.c src/piv_card_check_certificates.c src/piv_card_check_signed.c
-  src/piv_card_check_keys.c src/piv_card_check_report.c)
-
-tc_module_feature(TINY_CRYPTO_ENABLE_PIV_OIDS TC_ENABLE_PIV_OIDS
-  "Build registered PIV and TWIC identifier classification")
-set(tc_module_sources_TC_ENABLE_PIV_OIDS src/piv_oid.c)
-
-# TC_ENABLE_X509 selects the certificate reader. The layers below opt into
-# path construction, revocation, and CMS independently.
-tc_module_feature(TINY_CRYPTO_ENABLE_KEY_CHALLENGE TC_ENABLE_KEY_CHALLENGE
-  "Build generic public-key proof-of-possession challenges")
-set(tc_module_sources_TC_ENABLE_KEY_CHALLENGE src/key_challenge.c)
-
-tc_module_feature(TINY_CRYPTO_ENABLE_X509_PATH TC_ENABLE_X509_PATH
-  "Build X.509 path validation and stores")
-set(tc_module_sources_TC_ENABLE_X509_PATH
-  src/x509_path.c src/x509_path_extensions.c src/x509_path_workspace.c src/x509_search.c src/x509_store.c src/x509_store_anchor.c
-  src/x509_policy.c)
-
-tc_module_feature(TINY_CRYPTO_ENABLE_TRUST_ANCHOR_FORMAT TC_ENABLE_TRUST_ANCHOR_FORMAT
-  "Build RFC 5914 trust-anchor format reader")
-set(tc_module_sources_TC_ENABLE_TRUST_ANCHOR_FORMAT src/x509_trust_anchor.c)
-
-tc_module_feature(TINY_CRYPTO_ENABLE_X509_REVOCATION TC_ENABLE_X509_REVOCATION
-  "Build X.509 CRL and revocation validation")
-set(tc_module_sources_TC_ENABLE_X509_REVOCATION
-  src/x509_crl.c src/x509_crl_extensions.c src/x509_crl_selected.c src/x509_crl_evidence.c src/x509_crl_entries.c src/x509_revocation.c src/x509_crl_scope.c src/x509_crl_scope_storage.c src/x509_crl_delta.c src/source.c src/source_der.c src/x509_crl_source.c src/x509_crl_prepare.c)
-
-tc_module_feature(TINY_CRYPTO_ENABLE_X509_OCSP TC_ENABLE_X509_OCSP
-  "Build X.509 OCSP request and response processing")
-set(tc_module_sources_TC_ENABLE_X509_OCSP src/x509_ocsp.c)
-
-tc_module_feature(TINY_CRYPTO_ENABLE_CMS TC_ENABLE_CMS
-  "Build CMS parsing and signature verification")
-set(tc_module_sources_TC_ENABLE_CMS src/cms.c)
-
-tc_module_feature(TINY_CRYPTO_ENABLE_CMS_VALIDATION TC_ENABLE_CMS_VALIDATION
-  "Build CMS path and revocation validation")
-set(tc_module_sources_TC_ENABLE_CMS_VALIDATION
-  src/cms_collections.c src/cms_path.c src/validation.c)
-
-tc_module_feature(TINY_CRYPTO_ENABLE_PIV_OBJECTS TC_ENABLE_PIV_OBJECTS
-  "Build PIV and TWIC credential-object readers")
-set(tc_module_sources_TC_ENABLE_PIV_OBJECTS
-  src/piv_cms.c src/piv_biometric.c src/piv_certificate.c src/piv_certificate_decode.c
-  src/piv_card.c src/lds.c src/piv_security.c src/piv_printed.c src/piv_aid.c
-  src/piv_discovery.c src/piv_ccc.c src/piv_key_history.c src/piv_bit_group.c
-  src/piv_pairing_code.c src/piv_card_objects_internal.c)
-
-tc_module_feature(TINY_CRYPTO_ENABLE_CREDENTIAL TC_ENABLE_CREDENTIAL
-  "Build composed PIV and TWIC credential validation")
-set(tc_module_sources_TC_ENABLE_CREDENTIAL src/credential.c src/credential_policy.c
-  src/credential_session.c src/credential_security.c src/credential_signer.c)
-
-function(tc_append_module_sources output)
-  set(sources ${${output}})
-  foreach(macro_name IN LISTS tc_module_features)
-    set(option_name ${tc_module_option_${macro_name}})
-    if(${option_name})
-      list(APPEND sources ${tc_module_sources_${macro_name}})
+# Sources of the features in scope, and of each shared-source entry that lists
+# one of them. scope_property names the per-feature property that says whether
+# a feature is in scope.
+function(tc_registry_collect output scope_property)
+  tc_registry_strings(sources core_sources)
+  get_property(macros GLOBAL PROPERTY TC_FEATURE_MACROS)
+  foreach(macro IN LISTS macros)
+    get_property(in_scope GLOBAL PROPERTY ${scope_property}_${macro})
+    if(in_scope)
+      get_property(owned GLOBAL PROPERTY TC_FEATURE_SOURCES_${macro})
+      list(APPEND sources ${owned})
     endif()
   endforeach()
+  string(JSON count LENGTH "${tc_registry}" shared_sources)
+  math(EXPR last "${count} - 1")
+  foreach(entry RANGE ${last})
+    tc_registry_strings(users shared_sources ${entry} features)
+    foreach(macro IN LISTS users)
+      get_property(registered GLOBAL PROPERTY TC_FEATURE_VALUE_${macro} SET)
+      if(NOT registered)
+        message(FATAL_ERROR "Shared sources name unregistered feature ${macro}")
+      endif()
+      get_property(in_scope GLOBAL PROPERTY ${scope_property}_${macro})
+      if(in_scope)
+        tc_registry_strings(shared shared_sources ${entry} sources)
+        list(APPEND sources ${shared})
+        break()
+      endif()
+    endforeach()
+  endforeach()
+  list(REMOVE_DUPLICATES sources)
+  set(${output} ${sources} PARENT_SCOPE)
+endfunction()
+
+function(tc_registry_sources output)
+  tc_registry_collect(sources TC_FEATURE_ACTIVE)
+  set(${output} ${sources} PARENT_SCOPE)
+endfunction()
+
+# Test libraries compile whole families and select modes with definitions.
+function(tc_registry_family_sources output)
+  get_property(macros GLOBAL PROPERTY TC_FEATURE_MACROS)
+  foreach(macro IN LISTS macros)
+    set(ancestor ${macro})
+    set(in_family 0)
+    while(NOT ancestor STREQUAL "")
+      if(ancestor IN_LIST ARGN)
+        set(in_family 1)
+        break()
+      endif()
+      get_property(ancestor GLOBAL PROPERTY TC_FEATURE_PARENT_${ancestor})
+    endwhile()
+    set_property(GLOBAL PROPERTY TC_FEATURE_FAMILY_${macro} ${in_family})
+  endforeach()
+  tc_registry_collect(sources TC_FEATURE_FAMILY)
+  # The core sources belong to every build. Test targets list them themselves.
+  tc_registry_strings(core core_sources)
+  list(REMOVE_ITEM sources ${core})
   set(${output} ${sources} PARENT_SCOPE)
 endfunction()

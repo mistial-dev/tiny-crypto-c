@@ -58,13 +58,13 @@ make size
 Make passes all `TINY_CRYPTO_*` command-line variables to CMake:
 
 ```sh
-make TINY_CRYPTO_ENABLE_HMAC=ON TINY_CRYPTO_AES_GCM=ON
+make TINY_CRYPTO_ENABLE_HMAC=ON TINY_CRYPTO_AES_ENABLE_GCM=ON
 ```
 
 Or build with CMake directly:
 
 ```sh
-cmake -S . -B build -DTINY_CRYPTO_ENABLE_HMAC=ON -DTINY_CRYPTO_AES_GCM=ON
+cmake -S . -B build -DTINY_CRYPTO_ENABLE_HMAC=ON -DTINY_CRYPTO_AES_ENABLE_GCM=ON
 cmake --build build
 ```
 
@@ -118,87 +118,103 @@ combinations. Projects that compile the C files directly define the matching
 a profile with `TC_RESOURCE_PROFILE=TC_RESOURCE_MICRO`, `TC_RESOURCE_MINI`, or
 `TC_RESOURCE_DESKTOP`.
 
+Each feature option is `TINY_CRYPTO_` followed by its `config.h` macro without
+the `TC_` prefix. `TINY_CRYPTO_AES_ENABLE_CBC` sets `TC_AES_ENABLE_CBC`, and
+`TINY_CRYPTO_AES_GCM_GHASH_MODE` sets `TC_AES_GCM_GHASH_MODE`.
+[`cmake/features.json`](cmake/features.json) lists every feature with its
+description, parent, value set and the sources it compiles.
+
 The tables give the `AUTO` value for each profile. Default is the build with
 no profile selected. Mode, TDEA and curve options take effect only when their
 algorithm is enabled.
 
+### Minimal build
+
+Every algorithm, mode, parser and protocol module is a feature. With every
+feature option `OFF`, the archive holds only `src/common.c`, which provides
+secret wiping, constant-time comparison and the span helpers every module
+uses. Shared helpers, such as the hash core, the block-mode core and the PKI
+storage planner, compile only while a feature that uses them is on. Start from
+that build and enable the features an application needs. Configuration names
+each dependency that `config.h` requires.
+
 ### Algorithms
 
-| Option                       | Default | micro | mini | desktop | Purpose                                                            |
-| ---------------------------- | ------- | ----- | ---- | ------- | ------------------------------------------------------------------ |
-| `TINY_CRYPTO_ENABLE_AES`     | ON      | ON    | ON   | ON      | AES block cipher with the key size from `TINY_CRYPTO_AES_KEY_BITS` |
-| `TINY_CRYPTO_AES_DYNAMIC`    | OFF     | OFF   | OFF  | ON      | Per-context AES-128/192/256 keys, CBC and CMAC                     |
-| `TINY_CRYPTO_ENABLE_DES`     | OFF     | OFF   | OFF  | ON      | DES, with TDEA and the DES modes below                             |
-| `TINY_CRYPTO_DES_TDES`       | ON      | ON    | ON   | ON      | Two- and three-key TDEA                                            |
-| `TINY_CRYPTO_ENABLE_EC`      | OFF     | OFF   | OFF  | ON      | ECDH, ECDSA and key generation on the enabled curves               |
-| `TINY_CRYPTO_EC_P192`        | OFF     | OFF   | OFF  | OFF     | P-192 for legacy protocols                                         |
-| `TINY_CRYPTO_EC_P256`        | ON      | ON    | ON   | ON      | P-256                                                              |
-| `TINY_CRYPTO_EC_P384`        | ON      | ON    | ON   | ON      | P-384                                                              |
-| `TINY_CRYPTO_EC_SMALL`       | OFF     | ON    | OFF  | OFF     | Byte limbs for EC arithmetic (always used on AVR)                  |
-| `TINY_CRYPTO_ENABLE_RSA`     | OFF     | OFF   | OFF  | ON      | RSA verification, signing, OAEP, key validation and key generation |
-| `TINY_CRYPTO_RSA_SMALL`      | OFF     | ON    | OFF  | OFF     | Byte limbs for RSA arithmetic (always used on AVR)                 |
-| `TINY_CRYPTO_ENABLE_SHA1`    | OFF     | OFF   | OFF  | ON      | SHA-1                                                              |
-| `TINY_CRYPTO_ENABLE_SHA224`  | OFF     | OFF   | OFF  | ON      | SHA-224 on the SHA-256 core                                        |
-| `TINY_CRYPTO_ENABLE_SHA256`  | ON      | ON    | ON   | ON      | SHA-256                                                            |
-| `TINY_CRYPTO_ENABLE_SHA384`  | OFF     | OFF   | OFF  | ON      | SHA-384 on the SHA-512 core                                        |
-| `TINY_CRYPTO_ENABLE_SHA512`  | OFF     | OFF   | OFF  | ON      | SHA-512                                                            |
-| `TINY_CRYPTO_ENABLE_MD5`     | OFF     | OFF   | OFF  | ON      | MD5 checksums for legacy data                                      |
-| `TINY_CRYPTO_ENABLE_HMAC`    | OFF     | OFF   | OFF  | ON      | HMAC over the enabled SHA algorithms                               |
-| `TINY_CRYPTO_ENABLE_KMAC256` | OFF     | OFF   | OFF  | ON      | Fixed-output KMAC256 with customization                            |
-| `TINY_CRYPTO_ENABLE_KDF`     | OFF     | OFF   | OFF  | ON      | SP 800-108r1 KBKDF over the enabled HMAC and CMAC PRFs             |
-| `TINY_CRYPTO_ENABLE_HKDF`    | OFF     | OFF   | OFF  | ON      | RFC 5869 HKDF over the enabled HMAC-SHA algorithms                 |
-| `TINY_CRYPTO_ENABLE_SSKDF`   | OFF     | OFF   | OFF  | ON      | SP 800-56C one-step hash KDF over the enabled SHA algorithms       |
-| `TINY_CRYPTO_ENABLE_DRBG`    | OFF     | OFF   | OFF  | ON      | [SP 800-90A DRBGs](docs/drbg.md)                                   |
-| `TINY_CRYPTO_DRBG_HASH`      | OFF     | OFF   | OFF  | ON      | Hash_DRBG over the enabled SHA algorithms                          |
-| `TINY_CRYPTO_DRBG_HMAC`      | OFF     | OFF   | OFF  | ON      | HMAC_DRBG, requires HMAC                                           |
-| `TINY_CRYPTO_DRBG_CTR`       | OFF     | OFF   | OFF  | ON      | CTR_DRBG, requires `TINY_CRYPTO_AES_DYNAMIC`                       |
+| Option                           | Default | micro | mini | desktop | Purpose                                                            |
+| -------------------------------- | ------- | ----- | ---- | ------- | ------------------------------------------------------------------ |
+| `TINY_CRYPTO_ENABLE_AES`         | ON      | ON    | ON   | ON      | AES block cipher with the key size from `TINY_CRYPTO_AES_KEY_BITS` |
+| `TINY_CRYPTO_AES_ENABLE_DYNAMIC` | OFF     | OFF   | OFF  | ON      | Per-context AES-128/192/256 keys, CBC and CMAC                     |
+| `TINY_CRYPTO_ENABLE_DES`         | OFF     | OFF   | OFF  | ON      | DES, with TDEA and the DES modes below                             |
+| `TINY_CRYPTO_DES_ENABLE_TDES`    | ON      | ON    | ON   | ON      | Two- and three-key TDEA                                            |
+| `TINY_CRYPTO_ENABLE_EC`          | OFF     | OFF   | OFF  | ON      | ECDH, ECDSA and key generation on the enabled curves               |
+| `TINY_CRYPTO_EC_ENABLE_P192`     | OFF     | OFF   | OFF  | OFF     | P-192 for legacy protocols                                         |
+| `TINY_CRYPTO_EC_ENABLE_P256`     | ON      | ON    | ON   | ON      | P-256                                                              |
+| `TINY_CRYPTO_EC_ENABLE_P384`     | ON      | ON    | ON   | ON      | P-384                                                              |
+| `TINY_CRYPTO_EC_SMALL`           | OFF     | ON    | OFF  | OFF     | Byte limbs for EC arithmetic (always used on AVR)                  |
+| `TINY_CRYPTO_ENABLE_RSA`         | OFF     | OFF   | OFF  | ON      | RSA verification, signing, OAEP, key validation and key generation |
+| `TINY_CRYPTO_RSA_SMALL`          | OFF     | ON    | OFF  | OFF     | Byte limbs for RSA arithmetic (always used on AVR)                 |
+| `TINY_CRYPTO_ENABLE_SHA1`        | OFF     | OFF   | OFF  | ON      | SHA-1                                                              |
+| `TINY_CRYPTO_ENABLE_SHA224`      | OFF     | OFF   | OFF  | ON      | SHA-224 on the SHA-256 core                                        |
+| `TINY_CRYPTO_ENABLE_SHA256`      | ON      | ON    | ON   | ON      | SHA-256                                                            |
+| `TINY_CRYPTO_ENABLE_SHA384`      | OFF     | OFF   | OFF  | ON      | SHA-384 on the SHA-512 core                                        |
+| `TINY_CRYPTO_ENABLE_SHA512`      | OFF     | OFF   | OFF  | ON      | SHA-512                                                            |
+| `TINY_CRYPTO_ENABLE_MD5`         | OFF     | OFF   | OFF  | ON      | MD5 checksums for legacy data                                      |
+| `TINY_CRYPTO_ENABLE_HMAC`        | OFF     | OFF   | OFF  | ON      | HMAC over the enabled SHA algorithms                               |
+| `TINY_CRYPTO_ENABLE_KMAC256`     | OFF     | OFF   | OFF  | ON      | Fixed-output KMAC256 with customization                            |
+| `TINY_CRYPTO_ENABLE_KDF`         | OFF     | OFF   | OFF  | ON      | SP 800-108r1 KBKDF over the enabled HMAC and CMAC PRFs             |
+| `TINY_CRYPTO_ENABLE_HKDF`        | OFF     | OFF   | OFF  | ON      | RFC 5869 HKDF over the enabled HMAC-SHA algorithms                 |
+| `TINY_CRYPTO_ENABLE_SSKDF`       | OFF     | OFF   | OFF  | ON      | SP 800-56C one-step hash KDF over the enabled SHA algorithms       |
+| `TINY_CRYPTO_ENABLE_DRBG`        | OFF     | OFF   | OFF  | ON      | [SP 800-90A DRBGs](docs/drbg.md)                                   |
+| `TINY_CRYPTO_DRBG_ENABLE_HASH`   | OFF     | OFF   | OFF  | ON      | Hash_DRBG over the enabled SHA algorithms                          |
+| `TINY_CRYPTO_DRBG_ENABLE_HMAC`   | OFF     | OFF   | OFF  | ON      | HMAC_DRBG, requires HMAC                                           |
+| `TINY_CRYPTO_DRBG_ENABLE_CTR`    | OFF     | OFF   | OFF  | ON      | CTR_DRBG, requires `TINY_CRYPTO_AES_ENABLE_DYNAMIC`                |
 
 ### Block-cipher modes
 
 | Option                             | Default | micro | mini | desktop | Purpose                                          |
 | ---------------------------------- | ------- | ----- | ---- | ------- | ------------------------------------------------ |
-| `TINY_CRYPTO_AES_CTR`              | ON      | ON    | ON   | ON      | AES-CTR                                          |
-| `TINY_CRYPTO_AES_CBC`              | OFF     | OFF   | OFF  | ON      | AES-CBC                                          |
-| `TINY_CRYPTO_AES_ECB`              | OFF     | OFF   | OFF  | ON      | AES-ECB                                          |
-| `TINY_CRYPTO_AES_OFB`              | OFF     | OFF   | OFF  | ON      | AES-OFB                                          |
-| `TINY_CRYPTO_AES_GCM`              | OFF     | OFF   | OFF  | ON      | AES-GCM                                          |
-| `TINY_CRYPTO_AES_CCM`              | OFF     | OFF   | OFF  | ON      | AES-CCM                                          |
-| `TINY_CRYPTO_AES_EAX`              | OFF     | OFF   | OFF  | ON      | AES-EAX                                          |
-| `TINY_CRYPTO_AES_EAX_PRIME`        | OFF     | OFF   | OFF  | ON      | ANSI C12.22 EAX'                                 |
-| `TINY_CRYPTO_AES_SIV`              | OFF     | OFF   | OFF  | ON      | AES-SIV (RFC 5297)                               |
-| `TINY_CRYPTO_AES_CMAC`             | OFF     | OFF   | OFF  | ON      | AES-CMAC                                         |
-| `TINY_CRYPTO_AES_KW`               | OFF     | OFF   | OFF  | ON      | AES key wrap, KW and KWP (SP 800-38F)            |
+| `TINY_CRYPTO_AES_ENABLE_CTR`       | ON      | ON    | ON   | ON      | AES-CTR                                          |
+| `TINY_CRYPTO_AES_ENABLE_CBC`       | OFF     | OFF   | OFF  | ON      | AES-CBC                                          |
+| `TINY_CRYPTO_AES_ENABLE_ECB`       | OFF     | OFF   | OFF  | ON      | AES-ECB                                          |
+| `TINY_CRYPTO_AES_ENABLE_OFB`       | OFF     | OFF   | OFF  | ON      | AES-OFB                                          |
+| `TINY_CRYPTO_AES_ENABLE_GCM`       | OFF     | OFF   | OFF  | ON      | AES-GCM                                          |
+| `TINY_CRYPTO_AES_ENABLE_CCM`       | OFF     | OFF   | OFF  | ON      | AES-CCM                                          |
+| `TINY_CRYPTO_AES_ENABLE_EAX`       | OFF     | OFF   | OFF  | ON      | AES-EAX                                          |
+| `TINY_CRYPTO_AES_ENABLE_EAX_PRIME` | OFF     | OFF   | OFF  | ON      | ANSI C12.22 EAX'                                 |
+| `TINY_CRYPTO_AES_ENABLE_SIV`       | OFF     | OFF   | OFF  | ON      | AES-SIV (RFC 5297)                               |
+| `TINY_CRYPTO_AES_ENABLE_CMAC`      | OFF     | OFF   | OFF  | ON      | AES-CMAC                                         |
+| `TINY_CRYPTO_AES_ENABLE_KW`        | OFF     | OFF   | OFF  | ON      | AES key wrap, KW and KWP (SP 800-38F)            |
 | `TINY_CRYPTO_AES_WIDE_OPS`         | OFF     | OFF   | ON   | ON      | Native-width AES helpers                         |
 | `TINY_CRYPTO_AES_TINY`             | OFF     | ON    | OFF  | OFF     | Reject the 256-byte `fast-table` GHASH context   |
-| `TINY_CRYPTO_DES_CTR`              | ON      | ON    | ON   | ON      | DES-CTR                                          |
-| `TINY_CRYPTO_DES_ECB`              | OFF     | OFF   | OFF  | ON      | DES-ECB                                          |
-| `TINY_CRYPTO_DES_CBC`              | OFF     | OFF   | OFF  | ON      | DES-CBC                                          |
-| `TINY_CRYPTO_DES_OFB`              | OFF     | OFF   | OFF  | ON      | DES-OFB                                          |
-| `TINY_CRYPTO_DES_CFB1`             | OFF     | OFF   | OFF  | ON      | DES-CFB1                                         |
-| `TINY_CRYPTO_DES_CFB8`             | OFF     | OFF   | OFF  | ON      | DES-CFB8                                         |
-| `TINY_CRYPTO_DES_CFB64`            | OFF     | OFF   | OFF  | ON      | DES-CFB64                                        |
-| `TINY_CRYPTO_DES_CMAC`             | OFF     | OFF   | OFF  | ON      | TDEA-CMAC                                        |
-| `TINY_CRYPTO_DES_ISO9797`          | OFF     | OFF   | OFF  | OFF     | ISO/IEC 9797-1 MAC algorithms 1 and 3            |
+| `TINY_CRYPTO_DES_ENABLE_CTR`       | ON      | ON    | ON   | ON      | DES-CTR                                          |
+| `TINY_CRYPTO_DES_ENABLE_ECB`       | OFF     | OFF   | OFF  | ON      | DES-ECB                                          |
+| `TINY_CRYPTO_DES_ENABLE_CBC`       | OFF     | OFF   | OFF  | ON      | DES-CBC                                          |
+| `TINY_CRYPTO_DES_ENABLE_OFB`       | OFF     | OFF   | OFF  | ON      | DES-OFB                                          |
+| `TINY_CRYPTO_DES_ENABLE_CFB1`      | OFF     | OFF   | OFF  | ON      | DES-CFB1                                         |
+| `TINY_CRYPTO_DES_ENABLE_CFB8`      | OFF     | OFF   | OFF  | ON      | DES-CFB8                                         |
+| `TINY_CRYPTO_DES_ENABLE_CFB64`     | OFF     | OFF   | OFF  | ON      | DES-CFB64                                        |
+| `TINY_CRYPTO_DES_ENABLE_CMAC`      | OFF     | OFF   | OFF  | ON      | TDEA-CMAC                                        |
+| `TINY_CRYPTO_DES_ENABLE_ISO9797`   | OFF     | OFF   | OFF  | OFF     | ISO/IEC 9797-1 MAC algorithms 1 and 3            |
 | `TINY_CRYPTO_DES_REJECT_WEAK_KEYS` | OFF     | OFF   | OFF  | OFF     | Reject weak DES keys and degenerate TDEA bundles |
 
 ### Formats, compression and trust
 
-| Option                                   | Default | micro  | mini   | desktop | Purpose                                                |
-| ---------------------------------------- | ------- | ------ | ------ | ------- | ------------------------------------------------------ |
-| `TINY_CRYPTO_ENABLE_TLV`                 | OFF     | OFF    | OFF    | ON      | Bounded TLV readers and tree traversal                 |
-| `TINY_CRYPTO_TLV_BER`                    | OFF     | OFF    | OFF    | ON      | ASN.1 BER, including indefinite lengths                |
-| `TINY_CRYPTO_TLV_STREAM`                 | OFF     | OFF    | OFF    | ON      | Incremental TLV reader                                 |
-| `TINY_CRYPTO_ENABLE_DER`                 | OFF     | OFF    | OFF    | ON      | DER value readers, requires TLV                        |
-| `TINY_CRYPTO_ENABLE_X509`                | OFF     | OFF    | OFF    | ON      | X.509 certificate and public-key readers, requires DER |
-| `TINY_CRYPTO_ENABLE_X509_PATH`           | OFF     | OFF    | OFF    | ON      | Path validation and trust stores                       |
-| `TINY_CRYPTO_ENABLE_TRUST_ANCHOR_FORMAT` | OFF     | OFF    | OFF    | ON      | RFC 5914 trust-anchor lists                            |
-| `TINY_CRYPTO_TAF_CERTIFICATE`            | format  | format | format | format  | Certificate choice in RFC 5914 lists                   |
-| `TINY_CRYPTO_TAF_TBS_CERTIFICATE`        | format  | format | format | format  | TBSCertificate choice in RFC 5914 lists                |
-| `TINY_CRYPTO_TAF_TRUST_ANCHOR_INFO`      | format  | format | format | format  | TrustAnchorInfo choice in RFC 5914 lists               |
-| `TINY_CRYPTO_ENABLE_X509_REVOCATION`     | OFF     | OFF    | OFF    | ON      | CRL parsing and path revocation                        |
-| `TINY_CRYPTO_ENABLE_X509_OCSP`           | OFF     | OFF    | OFF    | ON      | OCSP requests and responses, requires SHA-1            |
-| `TINY_CRYPTO_ENABLE_KEY_CHALLENGE`       | OFF     | OFF    | OFF    | ON      | Public-key proof-of-possession challenges              |
-| `TINY_CRYPTO_ENABLE_GZIP`                | OFF     | OFF    | OFF    | ON      | Bounded GZIP decompression                             |
+| Option                                     | Default | micro  | mini   | desktop | Purpose                                                |
+| ------------------------------------------ | ------- | ------ | ------ | ------- | ------------------------------------------------------ |
+| `TINY_CRYPTO_ENABLE_TLV`                   | OFF     | OFF    | OFF    | ON      | Bounded TLV readers and tree traversal                 |
+| `TINY_CRYPTO_TLV_ENABLE_BER`               | OFF     | OFF    | OFF    | ON      | ASN.1 BER, including indefinite lengths                |
+| `TINY_CRYPTO_TLV_ENABLE_STREAM`            | OFF     | OFF    | OFF    | ON      | Incremental TLV reader                                 |
+| `TINY_CRYPTO_ENABLE_DER`                   | OFF     | OFF    | OFF    | ON      | DER value readers, requires TLV                        |
+| `TINY_CRYPTO_ENABLE_X509`                  | OFF     | OFF    | OFF    | ON      | X.509 certificate and public-key readers, requires DER |
+| `TINY_CRYPTO_ENABLE_X509_PATH`             | OFF     | OFF    | OFF    | ON      | Path validation and trust stores                       |
+| `TINY_CRYPTO_ENABLE_TRUST_ANCHOR_FORMAT`   | OFF     | OFF    | OFF    | ON      | RFC 5914 trust-anchor lists                            |
+| `TINY_CRYPTO_TAF_ENABLE_CERTIFICATE`       | format  | format | format | format  | Certificate choice in RFC 5914 lists                   |
+| `TINY_CRYPTO_TAF_ENABLE_TBS_CERTIFICATE`   | format  | format | format | format  | TBSCertificate choice in RFC 5914 lists                |
+| `TINY_CRYPTO_TAF_ENABLE_TRUST_ANCHOR_INFO` | format  | format | format | format  | TrustAnchorInfo choice in RFC 5914 lists               |
+| `TINY_CRYPTO_ENABLE_X509_REVOCATION`       | OFF     | OFF    | OFF    | ON      | CRL parsing and path revocation                        |
+| `TINY_CRYPTO_ENABLE_X509_OCSP`             | OFF     | OFF    | OFF    | ON      | OCSP requests and responses, requires SHA-1            |
+| `TINY_CRYPTO_ENABLE_KEY_CHALLENGE`         | OFF     | OFF    | OFF    | ON      | Public-key proof-of-possession challenges              |
+| `TINY_CRYPTO_ENABLE_GZIP`                  | OFF     | OFF    | OFF    | ON      | Bounded GZIP decompression                             |
 
 ### PIV, TWIC and credentials
 
@@ -220,8 +236,8 @@ algorithm is enabled.
 | `TINY_CRYPTO_ENABLE_PIV_CATALOG`        | OFF     | OFF   | OFF  | ON      | PIV and TWIC catalogs and card inventory          |
 | `TINY_CRYPTO_ENABLE_PIV_KEY_PROOF`      | OFF     | OFF   | OFF  | ON      | PIV and TWIC card key proofs                      |
 | `TINY_CRYPTO_ENABLE_PIV_CARD_CHECK`     | OFF     | OFF   | OFF  | ON      | Composed PIV and TWIC card check report           |
-| `TINY_CRYPTO_PIV_SM_CS2`                | ON      | ON    | ON   | ON      | Cipher suite 2 (P-256, AES-128)                   |
-| `TINY_CRYPTO_PIV_SM_CS7`                | ON      | ON    | ON   | ON      | Cipher suite 7 (P-384, AES-256)                   |
+| `TINY_CRYPTO_PIV_SM_ENABLE_CS2`         | ON      | ON    | ON   | ON      | Cipher suite 2 (P-256, AES-128)                   |
+| `TINY_CRYPTO_PIV_SM_ENABLE_CS7`         | ON      | ON    | ON   | ON      | Cipher suite 7 (P-384, AES-256)                   |
 | `TINY_CRYPTO_ENABLE_FASCN`              | OFF     | OFF   | OFF  | ON      | FASC-N readers and writers                        |
 | `TINY_CRYPTO_ENABLE_TWIC_UUID`          | OFF     | OFF   | OFF  | ON      | TWIC NEXGEN UUID helpers                          |
 | `TINY_CRYPTO_ENABLE_TWIC_CCL`           | OFF     | OFF   | OFF  | ON      | TWIC canceled card list reader                    |
@@ -230,7 +246,7 @@ algorithm is enabled.
 | `TINY_CRYPTO_ENABLE_AAMVA`              | OFF     | OFF   | OFF  | ON      | ANSI AAMVA payload readers                        |
 | `TINY_CRYPTO_AVR_PROGMEM`               | ON      | ON    | ON   | ON      | Keep constant tables in AVR flash                 |
 
-The three `TINY_CRYPTO_TAF_*` choices follow
+The three `TINY_CRYPTO_TAF_ENABLE_*` choices follow
 `TINY_CRYPTO_ENABLE_TRUST_ANCHOR_FORMAT` under `AUTO`. At least one choice must
 be enabled when the format is enabled. See
 [Trust anchors](docs/x509-trust-anchors.md) for importing authenticated lists
@@ -239,23 +255,23 @@ requests, response verification and responder authorization.
 
 ### Value options
 
-| Option                         | Values                                                         | Default         |
-| ------------------------------ | -------------------------------------------------------------- | --------------- |
-| `TINY_CRYPTO_RESOURCE_PROFILE` | empty, `micro`, `mini`, `desktop`                              | empty           |
-| `TINY_CRYPTO_TARGET`           | empty, `piv-acu`, `piv-pd`                                     | empty           |
-| `TINY_CRYPTO_AES_KEY_BITS`     | `128`, `192`, `256`                                            | `128`           |
-| `TINY_CRYPTO_AES_SBOX`         | `constant-time`, `runtime`, `fast`                             | `constant-time` |
-| `TINY_CRYPTO_AES_GHASH`        | `profile`, `auto`, `bitwise`, `wide`, `fast-table`, `hardware` | `profile`       |
+| Option                           | Values                                                         | Default         |
+| -------------------------------- | -------------------------------------------------------------- | --------------- |
+| `TINY_CRYPTO_RESOURCE_PROFILE`   | empty, `micro`, `mini`, `desktop`                              | empty           |
+| `TINY_CRYPTO_TARGET`             | empty, `piv-acu`, `piv-pd`                                     | empty           |
+| `TINY_CRYPTO_AES_KEY_BITS`       | `128`, `192`, `256`                                            | `128`           |
+| `TINY_CRYPTO_AES_SBOX_MODE`      | `constant-time`, `runtime`, `fast`                             | `constant-time` |
+| `TINY_CRYPTO_AES_GCM_GHASH_MODE` | `profile`, `auto`, `bitwise`, `wide`, `fast-table`, `hardware` | `profile`       |
 
 `TINY_CRYPTO_AES_KEY_BITS` fixes the key size of the `aes.h` API, including
-AES-CMAC keys used by KBKDF. `TINY_CRYPTO_AES_DYNAMIC` adds per-context key
+AES-CMAC keys used by KBKDF. `TINY_CRYPTO_AES_ENABLE_DYNAMIC` adds per-context key
 sizes. The key wrap KEK follows `TINY_CRYPTO_AES_KEY_BITS`, and
-`TINY_CRYPTO_AES_DYNAMIC` adds 128, 192 and 256-bit KEKs. `constant-time`
+`TINY_CRYPTO_AES_ENABLE_DYNAMIC` adds 128, 192 and 256-bit KEKs. `constant-time`
 computes the S-box algebraically. `runtime` builds it in RAM and reads it with
 a masked scan. `fast` uses direct table lookups and has
 no cache-timing protection.
 
-`TINY_CRYPTO_AES_GHASH=profile` selects `auto` for the default and mini builds,
+`TINY_CRYPTO_AES_GCM_GHASH_MODE=profile` selects `auto` for the default and mini builds,
 `bitwise` for micro and `wide` for desktop. `fast-table` uses key-dependent
 table lookups and adds 256 bytes to each GCM context. Set
 `TINY_CRYPTO_AES_TINY=ON`, the micro default, to reject `fast-table` at
@@ -295,8 +311,8 @@ independently.
 
 `TINY_CRYPTO_ENABLE_KDF` builds the SP 800-108r1 key-based key derivation
 function in counter, feedback and double-pipeline mode. It needs at least one
-PRF: HMAC with an enabled SHA digest, `TINY_CRYPTO_AES_CMAC`, or
-`TINY_CRYPTO_DES_CMAC`. Each PRF gets its own function family
+PRF: HMAC with an enabled SHA digest, `TINY_CRYPTO_AES_ENABLE_CMAC`, or
+`TINY_CRYPTO_DES_ENABLE_CMAC`. Each PRF gets its own function family
 (`TC_KBKDF_HMAC_SHA256_counter`, `TC_KBKDF_AES_CMAC_feedback`, ...), so unused
 PRFs compile out. TDEA-CMAC is kept for legacy interoperability only. `kdf.h`
 describes the SP 800-108r1 key-control mitigations for the CMAC PRFs.
@@ -306,7 +322,7 @@ The C and C++ APIs provide extract, expand, and one-shot derive operations.
 They also accept a revision 2 hybrid secret as separate `Z` and `T` spans.
 See [HKDF usage](docs/hkdf.md) and the [C example](examples/hkdf.c).
 
-`TINY_CRYPTO_AES_KW` builds the SP 800-38F AES key wrap functions KW
+`TINY_CRYPTO_AES_ENABLE_KW` builds the SP 800-38F AES key wrap functions KW
 (RFC 3394) and KWP (RFC 5649) for storing and transporting keys under a
 key-encryption key. See [AES key wrap](docs/aes-kw.md) and the
 [C example](examples/aes_kw.c).
@@ -389,12 +405,12 @@ after the final expansion.
 ## TLV and DER parsing
 
 Enable `TINY_CRYPTO_ENABLE_TLV` and include `<tiny_crypto/tlv.h>` for bounded
-readers over DER, ISO/IEC 7816-4 and, with `TINY_CRYPTO_TLV_BER`, ASN.1 BER.
+readers over DER, ISO/IEC 7816-4 and, with `TINY_CRYPTO_TLV_ENABLE_BER`, ASN.1 BER.
 Select the encoding explicitly. `TC_TLV_limits` bound input bytes, value bytes,
 element count and nesting depth. The sibling reader, `TC_TLV_read_tree` and
 `TC_TLV_walk` take the input as a borrowed `TC_bytes` span, return spans into
 it, and allocate nothing. Decoders that check nesting take caller-owned
-`TC_TLV_frames`. `TINY_CRYPTO_TLV_STREAM` adds an incremental reader for
+`TC_TLV_frames`. `TINY_CRYPTO_TLV_ENABLE_STREAM` adds an incremental reader for
 fragmented input. See [TLV parsing](docs/tlv.md) for profiles, results and
 examples.
 
@@ -631,11 +647,11 @@ vectors and optional external parser corpora.
 TLV tests cover framing, DER values, resource limits, and split input. The
 optional corpus adapter compares CVC fields with the supplied metadata and
 reads ASN.1 objects without evaluating certificate trust. It runs against
-`TINY_CRYPTO_TLV_CORPUS`, which defaults to the checked-in `tests/vectors`.
+`TINY_CRYPTO_TEST_TLV_CORPUS`, which defaults to the checked-in `tests/vectors`.
 Point it at another directory containing `piv/` and `x509/` for an external corpus.
 If `eac/cvc/` is present, the EAC tests also check certificate fields,
 inherited EC parameter widths, and malformed encodings.
-`TINY_CRYPTO_TLV_MBEDTLS_SUITE` selects an external, pinned ASN.1 test data file.
+`TINY_CRYPTO_TEST_TLV_MBEDTLS_SUITE` selects an external, pinned ASN.1 test data file.
 CI downloads that file into its temporary directory.
 
 Clang builds can enable `TINY_CRYPTO_BUILD_FUZZERS` and run `fuzz_tlv`,

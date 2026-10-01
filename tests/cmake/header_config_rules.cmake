@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 #
-# Checks configuration rules that config.h owns for the hash, SSKDF and DRBG
+# Checks configuration rules that config.h owns for the hash, SSKDF, DRBG and AES
 # headers. Each probe includes one header with a -D profile and expects the
 # build to pass, or to fail with the named config.h message.
 
@@ -50,3 +50,8 @@ set(drbg TC_ENABLE_DRBG=1 TC_DRBG_ENABLE_HASH=1)
 tc_header_probe(drbg_entropy_47 common.h "${drbg};TC_DRBG_MAX_ENTROPY_BYTES=47u"
   "TC_DRBG_MAX_ENTROPY_BYTES must hold a CTR_DRBG seed")
 tc_header_probe(drbg_entropy_48 drbg.h "${drbg};TC_DRBG_MAX_ENTROPY_BYTES=48u" "")
+
+# CMake rejects an unlisted key size before config.h runs. Direct-source
+# builds reach the config.h rule.
+tc_header_probe(aes_key_bits_100 aes.h "TC_AES_KEY_BITS=100"
+  "TC_AES_KEY_BITS must be 128, 192, or 256")

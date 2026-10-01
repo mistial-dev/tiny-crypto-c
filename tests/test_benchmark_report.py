@@ -22,6 +22,24 @@ class ResourceTests(unittest.TestCase):
             with self.subTest(line=line), self.assertRaises(ValueError):
                 report.stack_frame_size(line)
 
+    def test_pico_options_follow_the_registry(self):
+        """Every benchmark definition maps to a registered CMake option."""
+        import feature_registry
+        for name, _, flags in report.FEATURES + report.RP2350_FEATURES:
+            for macro, value in report.definitions(flags).items():
+                with self.subTest(case=name, macro=macro):
+                    definition = feature_registry.cmake_definition(macro, value)
+                    self.assertTrue(definition.startswith("-DTINY_CRYPTO_" + macro[3:] + "="))
+        self.assertEqual(feature_registry.cmake_definition("TC_AES_GCM_GHASH_MODE", "1"),
+                         "-DTINY_CRYPTO_AES_GCM_GHASH_MODE=bitwise")
+        self.assertEqual(feature_registry.cmake_definition("TC_AES_ENABLE_CBC", "0"),
+                         "-DTINY_CRYPTO_AES_ENABLE_CBC=OFF")
+        for macro, value in (("TC_AES_GCM_GHASH_MODE", "9"), ("TC_AES_ENABLE_CBC", "2")):
+            with self.assertRaises(ValueError):
+                feature_registry.cmake_definition(macro, value)
+        with self.assertRaises(KeyError):
+            feature_registry.cmake_definition("TC_NOT_A_FEATURE", "1")
+
     def test_uno_library_excludes_build_output(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

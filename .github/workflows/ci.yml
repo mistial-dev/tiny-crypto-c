@@ -135,7 +135,7 @@ jobs:
       - name: SHA-384-only core gating under -Werror
         run: make test BUILD_DIR=build-sha384 CMAKE_ARGS=-DCMAKE_COMPILE_WARNING_AS_ERROR=ON TINY_CRYPTO_ENABLE_SHA256=OFF TINY_CRYPTO_ENABLE_SHA384=ON TINY_CRYPTO_ENABLE_HMAC=ON
       - name: KDF shipped-library profile
-        run: make test BUILD_DIR=build-kdf CMAKE_ARGS=-DCMAKE_COMPILE_WARNING_AS_ERROR=ON TINY_CRYPTO_ENABLE_KDF=ON TINY_CRYPTO_ENABLE_HMAC=ON TINY_CRYPTO_AES_CMAC=ON
+        run: make test BUILD_DIR=build-kdf CMAKE_ARGS=-DCMAKE_COMPILE_WARNING_AS_ERROR=ON TINY_CRYPTO_ENABLE_KDF=ON TINY_CRYPTO_ENABLE_HMAC=ON TINY_CRYPTO_AES_ENABLE_CMAC=ON
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         if: matrix.compiler == 'gcc'
         with:
@@ -208,7 +208,7 @@ jobs:
           cmake -S . -B build-parser
           -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
           -DTINY_CRYPTO_BUILD_FUZZERS=ON
-          -DTINY_CRYPTO_TLV_MBEDTLS_SUITE="$RUNNER_TEMP/asn1parse.data"
+          -DTINY_CRYPTO_TEST_TLV_MBEDTLS_SUITE="$RUNNER_TEMP/asn1parse.data"
       - name: Build
         run: >-
           cmake --build build-parser --target

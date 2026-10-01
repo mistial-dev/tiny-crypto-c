@@ -6,7 +6,8 @@
  * implementation, with defaults from the resource profile in
  * resource_profile.h. The checks at the end stop the build with an #error
  * for a value outside its range or a missing dependency.
- * Configuration: CMake maps each TINY_CRYPTO_* option to one macro here.
+ * Configuration: cmake/features.json registers each feature macro here. Its
+ * CMake option is TINY_CRYPTO_ followed by the macro name without TC_.
  * Contracts: docs/api.md. Options: README.md. */
 #ifndef TINY_CRYPTO_CONFIG_H_
 #define TINY_CRYPTO_CONFIG_H_

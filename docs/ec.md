@@ -9,7 +9,7 @@ public-key derivation and validation, ECDH, and ECDSA signing and
 verification. Each curve must be enabled in the build. Public keys use SEC 1
 uncompressed encoding: `04 || X || Y`. Coordinates and private scalars are
 fixed-width big-endian values, 32 bytes for P-256 and 48 bytes for P-384.
-P-192 uses 24 bytes and is disabled by default. Enable `TINY_CRYPTO_EC_P192`
+P-192 uses 24 bytes and is disabled by default. Enable `TINY_CRYPTO_EC_ENABLE_P192`
 for protocols that require it.
 
 `TC_EC_coordinate_bytes(curve)` returns that width, or 0 for a curve that is

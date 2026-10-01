@@ -93,7 +93,7 @@ The differential test generates synthetic inputs with Python's zlib across
 compression levels and strategies. It checks decoded bytes, corrupted checksums,
 concatenated members and insufficient output capacity.
 
-With the default `TINY_CRYPTO_TLV_CORPUS` of `tests/vectors`, `test_gzip_corpus` also
+With the default `TINY_CRYPTO_TEST_TLV_CORPUS` of `tests/vectors`, `test_gzip_corpus` also
 checks the SD33 compressed certificate objects against Python's decoder and
 rejects checksum mutations. See [Testing](testing.md#fuzzing) for the bounded
 decoder fuzz harness.

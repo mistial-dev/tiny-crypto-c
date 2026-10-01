@@ -4,7 +4,7 @@
 
 # AES key wrap
 
-Enable `TINY_CRYPTO_ENABLE_AES` and `TINY_CRYPTO_AES_KW` in CMake. Include
+Enable `TINY_CRYPTO_ENABLE_AES` and `TINY_CRYPTO_AES_ENABLE_KW` in CMake. Include
 `<tiny_crypto/aes_kw.h>` for C or `<tiny_crypto/aes_kw.hpp>` for C++.
 
 The API implements the NIST SP 800-38F key wrap functions with AES as the
@@ -49,10 +49,10 @@ wrap fails a KWP unwrap and the reverse.
 
 ## Key-encryption keys
 
-| Build                         | Accepted KEK lengths  |
-| ----------------------------- | --------------------- |
-| `TINY_CRYPTO_AES_DYNAMIC=OFF` | `TC_AES_KEYLEN` bytes |
-| `TINY_CRYPTO_AES_DYNAMIC=ON`  | 16, 24 or 32 bytes    |
+| Build                                | Accepted KEK lengths  |
+| ------------------------------------ | --------------------- |
+| `TINY_CRYPTO_AES_ENABLE_DYNAMIC=OFF` | `TC_AES_KEYLEN` bytes |
+| `TINY_CRYPTO_AES_ENABLE_DYNAMIC=ON`  | 16, 24 or 32 bytes    |
 
 `TC_AES_KW_KEK_LENGTH_SUPPORTED(n)` expands to the same rule, so an
 application can check its KEK size at compile time. Fixed-key builds keep one

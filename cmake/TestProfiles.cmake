@@ -106,7 +106,7 @@ foreach(key_bits 192 256)
 endforeach()
 
 tc_add_test_library(tiny-crypto-c-test-des-reject-weak
-  src/common.c ${tc_des_sources} src/mac_core.c)
+  src/common.c ${tc_des_sources})
 target_compile_definitions(tiny-crypto-c-test-des-reject-weak PUBLIC
   TC_ENABLE_AES=0 TC_ENABLE_DES=1 TC_ENABLE_SHA1=0 TC_ENABLE_SHA224=0
   TC_ENABLE_SHA256=0 TC_ENABLE_SHA384=0 TC_ENABLE_SHA512=0
@@ -118,7 +118,7 @@ target_compile_definitions(tiny-crypto-c-test-des-reject-weak PUBLIC
 
 # DES MACs over a forward cipher that fails on request (TC_TEST_DES_FAULT).
 tc_add_test_library(tiny-crypto-c-test-des-fault
-  src/common.c ${tc_des_sources} src/mac_core.c)
+  src/common.c ${tc_des_sources})
 target_compile_definitions(tiny-crypto-c-test-des-fault PUBLIC
   TC_ENABLE_AES=0 TC_ENABLE_DES=1 TC_ENABLE_SHA1=0 TC_ENABLE_SHA224=0
   TC_ENABLE_SHA256=0 TC_ENABLE_SHA384=0 TC_ENABLE_SHA512=0
@@ -149,7 +149,7 @@ target_compile_definitions(tiny-crypto-c-profile-des-ecb PRIVATE
   TC_DES_ENABLE_OFB=0 TC_DES_ENABLE_CFB1=0 TC_DES_ENABLE_CFB8=0
   TC_DES_ENABLE_CFB64=0 TC_DES_ENABLE_TDES=0 TC_DES_ENABLE_CMAC=0)
 
-tc_add_compile_profile(tiny-crypto-c-profile-des-cmac ${tc_des_sources} src/mac_core.c)
+tc_add_compile_profile(tiny-crypto-c-profile-des-cmac ${tc_des_sources})
 target_compile_definitions(tiny-crypto-c-profile-des-cmac PRIVATE
   TC_ENABLE_AES=0 TC_ENABLE_DES=1 TC_ENABLE_SHA256=0
   TC_DES_ENABLE_ECB=0 TC_DES_ENABLE_CBC=0 TC_DES_ENABLE_CTR=0

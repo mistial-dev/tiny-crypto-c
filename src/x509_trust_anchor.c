@@ -10,6 +10,8 @@
 #include "pki_bits_internal.h"
 #include "x509_store_anchor_internal.h"
 
+/* Helpers for the TrustAnchorInfo choice. */
+#if TC_TAF_ENABLE_TRUST_ANCHOR_INFO
 static TC_TLV_result contents_reader(TC_TLV_reader* reader, TC_bytes bytes,
                                      const TC_TLV_limits* limits)
 {
@@ -289,6 +291,7 @@ TC_TLV_result TC_X509_trust_anchor_list_init(TC_X509_trust_anchor_reader* reader
   *reader = parsed;
   return TC_TLV_OK;
 }
+#endif
 
 /* next advances the reader and fills out and both workspace arrays while it
  * reads the list and the workspace struct. out joins the disjoint set that

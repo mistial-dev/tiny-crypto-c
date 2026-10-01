@@ -181,7 +181,7 @@ Add `--tpk-hex /path/to/ZTA.txt` to the signed-CHUID command.
 The file contains the hexadecimal ZTA field from an already-decoded TWIC
 barcode. A trailing newline is accepted. It contains a privacy key, so keep it
 outside the repository with access restricted to the reader application.
-Enable `TINY_CRYPTO_ENABLE_AES=ON` and `TINY_CRYPTO_AES_ECB=ON` with a 128-bit
+Enable `TINY_CRYPTO_ENABLE_AES=ON` and `TINY_CRYPTO_AES_ENABLE_ECB=ON` with a 128-bit
 AES build. The option requires the content-signer trust and CRL inputs above.
 
 The command loads the TPK into locked memory before opening the reader. After

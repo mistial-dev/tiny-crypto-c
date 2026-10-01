@@ -6,7 +6,7 @@
 
 Enable `TINY_CRYPTO_ENABLE_TRUST_ANCHOR_FORMAT` to read RFC 5914
 `TrustAnchorList` DER. The list accepts certificate, TBS certificate, and
-`TrustAnchorInfo` choices when their corresponding `TINY_CRYPTO_TAF_*` build
+`TrustAnchorInfo` choices when their corresponding `TINY_CRYPTO_TAF_ENABLE_*` build
 options are enabled. The format reader returns views that borrow the original DER.
 
 RFC 5914 defines the encoded anchor and its path controls. RFC 5937 describes
