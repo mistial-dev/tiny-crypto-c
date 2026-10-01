@@ -1283,7 +1283,8 @@ static void iso9797_reference_mac(TC_DES_ISO9797_algorithm algorithm,
                    ==, TC_OK);
   munit_assert_int(TC_DES_CBC_encrypt(&ctx, blocks, padded), ==, TC_OK);
   memcpy(out, blocks + padded - TC_DES_BLOCKLEN, TC_DES_BLOCKLEN);
-  if (algorithm == TC_DES_ISO9797_ALG3) {
+  if (algorithm == TC_DES_ISO9797_ALG3 ||
+      algorithm == TC_DES_ISO9797_ALG3_3KEY_EXTENSION) {
     munit_assert_int(TC_DES_init(&ctx, key + TC_DES_KEYLEN, TC_DES_KEYLEN), ==, TC_OK);
     munit_assert_int(TC_DES_ECB_decrypt(&ctx, out), ==, TC_OK);
     munit_assert_int(TC_DES_init(&ctx,
@@ -1306,12 +1307,12 @@ TC_TEST(test_iso9797_three_key_reference)
   iso9797_reference_mac(TC_DES_ISO9797_ALG1, TC_DES_ISO9797_PAD1, iso9797_key3, sizeof iso9797_key3,
                         msg, sizeof msg - 2, expected);
   munit_assert_memory_equal(8, expected, alg1_3key_pad1);
-  iso9797_reference_mac(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, iso9797_key3, sizeof iso9797_key3,
+  iso9797_reference_mac(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, TC_DES_ISO9797_PAD2, iso9797_key3, sizeof iso9797_key3,
                         msg, sizeof msg - 2, expected);
   munit_assert_memory_equal(8, expected, alg3_3key_pad2);
 
   for (a = 0; a < 2; ++a) {
-    const TC_DES_ISO9797_algorithm algorithm = a ? TC_DES_ISO9797_ALG3 : TC_DES_ISO9797_ALG1;
+    const TC_DES_ISO9797_algorithm algorithm = a ? TC_DES_ISO9797_ALG3_3KEY_EXTENSION : TC_DES_ISO9797_ALG1;
     for (p = 0; p < 2; ++p) {
       for (l = 0; l < sizeof lengths / sizeof lengths[0]; ++l) {
         iso9797_reference_mac(algorithm, paddings[p], iso9797_key3, sizeof iso9797_key3, msg,
@@ -1342,10 +1343,10 @@ TC_TEST(test_iso9797_three_key_api)
 
   for (p = 0; p < 3; ++p) {
     const size_t len = paddings[p] == TC_DES_ISO9797_PAD_NONE ? 24 : 22;
-    munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3, paddings[p], iso9797_key3,
+    munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, paddings[p], iso9797_key3,
                                         sizeof iso9797_key3, msg, len, oneshot, sizeof oneshot),
                      ==, TC_OK);
-    munit_assert_int(TC_DES_ISO9797_init(&ctx, TC_DES_ISO9797_ALG3, paddings[p], iso9797_key3,
+    munit_assert_int(TC_DES_ISO9797_init(&ctx, TC_DES_ISO9797_ALG3_3KEY_EXTENSION, paddings[p], iso9797_key3,
                                          sizeof iso9797_key3),
                      ==, TC_OK);
     for (i = 0; i < len; ++i)
@@ -1354,14 +1355,14 @@ TC_TEST(test_iso9797_three_key_api)
     munit_assert_memory_equal(8, streamed, oneshot);
     munit_assert_uint8(ctx.active, ==, 0);
 
-    munit_assert_int(TC_DES_ISO9797_verify(TC_DES_ISO9797_ALG3, paddings[p], iso9797_key3,
+    munit_assert_int(TC_DES_ISO9797_verify(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, paddings[p], iso9797_key3,
                                            sizeof iso9797_key3, msg, len, oneshot, 8),
                      ==, TC_OK);
     streamed[7] ^= 0x01u;
-    munit_assert_int(TC_DES_ISO9797_verify(TC_DES_ISO9797_ALG3, paddings[p], iso9797_key3,
+    munit_assert_int(TC_DES_ISO9797_verify(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, paddings[p], iso9797_key3,
                                            sizeof iso9797_key3, msg, len, streamed, 8),
                      ==, TC_MISMATCH);
-    munit_assert_int(TC_DES_ISO9797_verify_short_tag(TC_DES_ISO9797_ALG3, paddings[p], iso9797_key3,
+    munit_assert_int(TC_DES_ISO9797_verify_short_tag(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, paddings[p], iso9797_key3,
                                                      sizeof iso9797_key3, msg, len, oneshot, 4),
                      ==, TC_OK);
   }
@@ -1369,7 +1370,7 @@ TC_TEST(test_iso9797_three_key_api)
   /* With K3 = K1 the three-key form equals the two-key Algorithm 3. */
   memcpy(key_k3_is_k1, iso9797_key3, 16);
   memcpy(key_k3_is_k1 + 16, iso9797_key3, 8);
-  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, key_k3_is_k1,
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, TC_DES_ISO9797_PAD2, key_k3_is_k1,
                                       sizeof key_k3_is_k1, msg, 22, oneshot, sizeof oneshot),
                    ==, TC_OK);
   munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, iso9797_key3, 16,
@@ -1379,38 +1380,38 @@ TC_TEST(test_iso9797_three_key_api)
 
   /* Argument errors return TC_ERROR and leave the tag untouched. */
   memset(guard, 0xa5, sizeof guard);
-  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, NULL, 24, msg, 22,
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, TC_DES_ISO9797_PAD2, NULL, 24, msg, 22,
                                       guard, sizeof guard),
                    ==, TC_ERROR);
-  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3, (TC_DES_ISO9797_padding)3, iso9797_key3,
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, (TC_DES_ISO9797_padding)3, iso9797_key3,
                                       sizeof iso9797_key3, msg, 22, guard, sizeof guard),
                    ==, TC_ERROR);
-  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, iso9797_key3, 23,
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, TC_DES_ISO9797_PAD2, iso9797_key3, 23,
                                       msg, 22, guard, sizeof guard),
                    ==, TC_ERROR);
-  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, iso9797_key3,
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, TC_DES_ISO9797_PAD2, iso9797_key3,
                                       sizeof iso9797_key3, msg, 22, guard, 7),
                    ==, TC_ERROR);
-  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, iso9797_key3,
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, TC_DES_ISO9797_PAD2, iso9797_key3,
                                       sizeof iso9797_key3, msg, 22, guard, 9),
                    ==, TC_ERROR);
   for (i = 0; i < sizeof guard; ++i)
     munit_assert_uint8(guard[i], ==, 0xa5);
-  munit_assert_int(TC_DES_ISO9797_verify(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, iso9797_key3,
+  munit_assert_int(TC_DES_ISO9797_verify(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, TC_DES_ISO9797_PAD2, iso9797_key3,
                                          sizeof iso9797_key3, msg, 22, oneshot, 7),
                    ==, TC_ERROR);
-  munit_assert_int(TC_DES_ISO9797_verify(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, iso9797_key3,
+  munit_assert_int(TC_DES_ISO9797_verify(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, TC_DES_ISO9797_PAD2, iso9797_key3,
                                          sizeof iso9797_key3, msg, 22, oneshot, 9),
                    ==, TC_ERROR);
-  munit_assert_int(TC_DES_ISO9797_verify(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, NULL, 24, msg,
+  munit_assert_int(TC_DES_ISO9797_verify(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, TC_DES_ISO9797_PAD2, NULL, 24, msg,
                                          22, oneshot, 8),
                    ==, TC_ERROR);
   /* A failed re-init of a keyed context wipes the earlier key schedule. */
-  munit_assert_int(TC_DES_ISO9797_init(&ctx, TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, iso9797_key3,
+  munit_assert_int(TC_DES_ISO9797_init(&ctx, TC_DES_ISO9797_ALG3_3KEY_EXTENSION, TC_DES_ISO9797_PAD2, iso9797_key3,
                                        sizeof iso9797_key3),
                    ==, TC_OK);
   munit_assert_int(TC_DES_ISO9797_update(&ctx, msg, 8), ==, TC_OK);
-  munit_assert_int(TC_DES_ISO9797_init(&ctx, TC_DES_ISO9797_ALG3, (TC_DES_ISO9797_padding)3,
+  munit_assert_int(TC_DES_ISO9797_init(&ctx, TC_DES_ISO9797_ALG3_3KEY_EXTENSION, (TC_DES_ISO9797_padding)3,
                                        iso9797_key3, sizeof iso9797_key3),
                    ==, TC_ERROR);
   munit_assert_uint8(ctx.active, ==, 0);
@@ -1420,7 +1421,7 @@ TC_TEST(test_iso9797_three_key_api)
     munit_assert_uint8(ctx.mac[i], ==, 0);
   munit_assert_int(TC_DES_ISO9797_update(&ctx, msg, 8), ==, TC_ERROR);
   munit_assert_int(TC_DES_ISO9797_final(&ctx, guard), ==, TC_ERROR);
-  munit_assert_int(TC_DES_ISO9797_init(NULL, TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, iso9797_key3,
+  munit_assert_int(TC_DES_ISO9797_init(NULL, TC_DES_ISO9797_ALG3_3KEY_EXTENSION, TC_DES_ISO9797_PAD2, iso9797_key3,
                                        sizeof iso9797_key3),
                    ==, TC_ERROR);
   return MUNIT_OK;
@@ -1464,7 +1465,8 @@ TC_TEST(test_des_iso9797)
                                       sizeof iso9797_key3, msg, sizeof msg - 2, tag, sizeof tag),
                    ==, TC_OK);
   munit_assert_memory_equal(8, tag, alg1_3key_pad1);
-  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, iso9797_key3,
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3_3KEY_EXTENSION,
+                                      TC_DES_ISO9797_PAD2, iso9797_key3,
                                       sizeof iso9797_key3, msg, sizeof msg - 2, tag, sizeof tag),
                    ==, TC_OK);
   munit_assert_memory_equal(8, tag, alg3_3key_pad2);

@@ -4,8 +4,9 @@
  * Standards: SP 800-185 section 4.
  * Configuration: TC_ENABLE_KMAC256.
  * Limitations: fixed-output KMAC256 only.
- * Work: every function charges no work budget. The functions return TC_OK
- * or TC_ERROR. Compare received tags with TC_ct_equal.
+ * Work: every function charges no work budget. Default output and verify
+ * calls require at least TC_MIN_TAG_LEN bytes. Explicit _short_tag calls
+ * accept 1..TC_MIN_TAG_LEN - 1 bytes.
  * Contracts: docs/api.md. */
 #ifndef TINY_CRYPTO_KMAC_H_
 #define TINY_CRYPTO_KMAC_H_
@@ -50,6 +51,8 @@ TC_status TC_KMAC256_update(struct TC_KMAC256_ctx* ctx, TC_bytes data);
  * capacity, or output that overlaps ctx. On error, neither ctx nor out
  * changes. */
 TC_status TC_KMAC256_final(struct TC_KMAC256_ctx* ctx, TC_buffer out);
+/* Finish with an explicitly short authentication tag. */
+TC_status TC_KMAC256_final_short_tag(struct TC_KMAC256_ctx* ctx, TC_buffer out);
 /* Wipe the context, including its key-dependent state. NULL is accepted. */
 void TC_KMAC256_ctx_clear(struct TC_KMAC256_ctx* ctx);
 /* One-shot KMAC256(key, data, out.capacity * 8, custom). Returns TC_OK, or
@@ -58,6 +61,10 @@ void TC_KMAC256_ctx_clear(struct TC_KMAC256_ctx* ctx);
  * because all input is read before any output is written. The internal
  * context lives on the stack and is wiped before return. */
 TC_status TC_KMAC256_digest(TC_bytes key, TC_bytes data, TC_bytes custom, TC_buffer out);
+TC_status TC_KMAC256_digest_short_tag(TC_bytes key, TC_bytes data, TC_bytes custom, TC_buffer out);
+/* Compute KMAC with tag.length as L and compare in constant time. */
+TC_status TC_KMAC256_verify(TC_bytes key, TC_bytes data, TC_bytes custom, TC_bytes tag);
+TC_status TC_KMAC256_verify_short_tag(TC_bytes key, TC_bytes data, TC_bytes custom, TC_bytes tag);
 
 #ifdef __cplusplus
 }

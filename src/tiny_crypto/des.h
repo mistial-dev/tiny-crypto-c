@@ -404,8 +404,10 @@ void TC_DES_CMAC_ctx_clear(struct TC_DES_CMAC_ctx* ctx);
  * one zero block. The caller must authenticate a fixed or separately
  * authenticated length when using NONE or padding 1.
  *
- * With TC_DES_REJECT_WEAK_KEYS=1, init rejects weak and semi-weak component
- * keys and K1 = K2 or K2 = K3. Clause 7.4 requires independent K and K'.
+ * Algorithm 3 requires a 16-byte K1 || K2 bundle. The separately named
+ * three-key extension requires 24 bytes. Both reject parity-equivalent
+ * adjacent component keys in every build because they collapse a DES stage.
+ * TC_DES_REJECT_WEAK_KEYS additionally rejects weak and semi-weak components.
  *
  * The context is caller-owned and final consumes it. Input, key and tag
  * buffers must be disjoint from the context. Overlap is an argument error. A
@@ -415,7 +417,8 @@ void TC_DES_CMAC_ctx_clear(struct TC_DES_CMAC_ctx* ctx);
  */
 typedef enum TC_DES_ISO9797_algorithm {
   TC_DES_ISO9797_ALG1 = 1,
-  TC_DES_ISO9797_ALG3 = 3
+  TC_DES_ISO9797_ALG3 = 3,
+  TC_DES_ISO9797_ALG3_3KEY_EXTENSION = 0x103
 } TC_DES_ISO9797_algorithm;
 
 typedef enum TC_DES_ISO9797_padding {
@@ -429,14 +432,15 @@ struct TC_DES_ISO9797_ctx {
   uint8_t mac[TC_DES_BLOCKLEN];
   uint8_t buf[TC_DES_BLOCKLEN];
   uint8_t used;
-  uint8_t algorithm;
+  uint16_t algorithm;
   uint8_t padding;
   uint8_t active;
   uint8_t nonempty;
 };
 
 #if TC_ENABLE_DES
-/* keylen is TC_DES_KEYLEN_2KEY or TC_DES_KEYLEN_3KEY for both algorithms.
+/* Algorithm 1 takes a 16- or 24-byte TDEA bundle, Algorithm 3 takes exactly
+ * 16 bytes, and ALG3_3KEY_EXTENSION takes exactly 24 bytes.
  * Returns TC_OK, or TC_ERROR for a NULL argument, an unknown algorithm or
  * padding, another key length, a key that overlaps ctx or a key refused
  * under TC_DES_REJECT_WEAK_KEYS. A NULL ctx is left alone. */

@@ -164,12 +164,12 @@ TC_status tc_hmac_core_resume_parts(const tc_hash_algorithm_info* info, const vo
  * the caller's HMAC context. Once the arguments pass their checks, workspace
  * is wiped before return. */
 TC_status tc_hmac_core_digest(const tc_hash_algorithm_info* info, void* workspace, TC_bytes key,
-                              TC_bytes message, TC_buffer tag);
+                              TC_bytes message, TC_buffer tag, int short_tag);
 /* Recompute a tag of tag.length bytes and compare it with TC_ct_equal.
  * Returns TC_OK on a match, TC_MISMATCH otherwise, and TC_ERROR for invalid
  * arguments. The computed tag is wiped before return. */
 TC_status tc_hmac_core_verify(const tc_hash_algorithm_info* info, void* workspace, TC_bytes key,
-                              TC_bytes message, TC_bytes tag);
+                              TC_bytes message, TC_bytes tag, int short_tag);
 #endif
 
 /* Public wrappers for one algorithm. NAME is the public name (SHA256) and
@@ -218,12 +218,22 @@ TC_status tc_hmac_core_verify(const tc_hash_algorithm_info* info, void* workspac
   TC_status TC_HMAC_##NAME##_digest(TC_bytes key, TC_bytes message, TC_buffer tag)                 \
   {                                                                                                \
     struct TC_HMAC_##NAME##_ctx ctx;                                                               \
-    return tc_hmac_core_digest(&tc_##name##_info, &ctx, key, message, tag);                        \
+    return tc_hmac_core_digest(&tc_##name##_info, &ctx, key, message, tag, 0);                     \
+  }                                                                                                \
+  TC_status TC_HMAC_##NAME##_digest_short_tag(TC_bytes key, TC_bytes message, TC_buffer tag)       \
+  {                                                                                                \
+    struct TC_HMAC_##NAME##_ctx ctx;                                                               \
+    return tc_hmac_core_digest(&tc_##name##_info, &ctx, key, message, tag, 1);                     \
   }                                                                                                \
   TC_status TC_HMAC_##NAME##_verify(TC_bytes key, TC_bytes message, TC_bytes tag)                  \
   {                                                                                                \
     struct TC_HMAC_##NAME##_ctx ctx;                                                               \
-    return tc_hmac_core_verify(&tc_##name##_info, &ctx, key, message, tag);                        \
+    return tc_hmac_core_verify(&tc_##name##_info, &ctx, key, message, tag, 0);                     \
+  }                                                                                                \
+  TC_status TC_HMAC_##NAME##_verify_short_tag(TC_bytes key, TC_bytes message, TC_bytes tag)        \
+  {                                                                                                \
+    struct TC_HMAC_##NAME##_ctx ctx;                                                               \
+    return tc_hmac_core_verify(&tc_##name##_info, &ctx, key, message, tag, 1);                     \
   }
 
 /* Serialize the leading words of a chaining state into digest. These are the

@@ -120,8 +120,12 @@ static int tc_kmac_output(TC_buffer out)
 
 TC_status TC_KMAC256_init(struct TC_KMAC256_ctx* ctx, TC_bytes key, TC_bytes custom)
 {
-  if (!ctx || !tc_kmac_input(ctx, key) || !tc_kmac_input(ctx, custom))
+  if (!ctx)
     return TC_ERROR;
+  if (!tc_kmac_input(ctx, key) || !tc_kmac_input(ctx, custom)) {
+    TC_KMAC256_ctx_clear(ctx);
+    return TC_ERROR;
+  }
   memset(ctx, 0, sizeof(*ctx));
   /* SP 800-185 section 4.3: newX = bytepad(encode_string(K), 136) || X,
    * absorbed by cSHAKE256 with N = "KMAC" and S = custom. The cSHAKE prefix
@@ -157,11 +161,12 @@ TC_status TC_KMAC256_update(struct TC_KMAC256_ctx* ctx, TC_bytes data)
   return TC_OK;
 }
 
-TC_status TC_KMAC256_final(struct TC_KMAC256_ctx* ctx, TC_buffer out)
+static TC_status tc_kmac_final(struct TC_KMAC256_ctx* ctx, TC_buffer out, int short_tag)
 {
   size_t i;
   unsigned p = 0;
-  if (!ctx || !tc_kmac_output(out) || !tc_kmac_live(ctx) ||
+  if (!ctx || !tc_kmac_output(out) ||
+      !tc_internal_tag_length_allowed(out.capacity, SIZE_MAX, short_tag) || !tc_kmac_live(ctx) ||
       !tc_internal_ranges_disjoint(ctx, sizeof(*ctx), out.data, out.capacity))
     return TC_ERROR;
   /* X || right_encode(L), then the cSHAKE domain suffix and pad10*1. */
@@ -181,26 +186,103 @@ TC_status TC_KMAC256_final(struct TC_KMAC256_ctx* ctx, TC_buffer out)
   return TC_OK;
 }
 
+TC_status TC_KMAC256_final(struct TC_KMAC256_ctx* ctx, TC_buffer out)
+{
+  return tc_kmac_final(ctx, out, 0);
+}
+
+TC_status TC_KMAC256_final_short_tag(struct TC_KMAC256_ctx* ctx, TC_buffer out)
+{
+  return tc_kmac_final(ctx, out, 1);
+}
+
 void TC_KMAC256_ctx_clear(struct TC_KMAC256_ctx* ctx)
 {
   if (ctx)
     TC_secure_zero(ctx, sizeof(*ctx));
 }
 
-TC_status TC_KMAC256_digest(TC_bytes key, TC_bytes data, TC_bytes custom, TC_buffer out)
+static TC_status tc_kmac_digest(TC_bytes key, TC_bytes data, TC_bytes custom, TC_buffer out,
+                                int short_tag)
 {
   struct TC_KMAC256_ctx ctx;
   TC_status status;
   if (!tc_kmac_span(key.data, key.length) || !tc_internal_span_valid(data.data, data.length) ||
-      !tc_kmac_span(custom.data, custom.length) || !tc_kmac_output(out))
+      !tc_kmac_span(custom.data, custom.length) || !tc_kmac_output(out) ||
+      !tc_internal_tag_length_allowed(out.capacity, SIZE_MAX, short_tag))
     return TC_ERROR;
   /* The local context holds the keyed sponge. It is wiped on every path. */
   status = TC_KMAC256_init(&ctx, key, custom);
   if (status == TC_OK)
     status = TC_KMAC256_update(&ctx, data);
   if (status == TC_OK)
-    status = TC_KMAC256_final(&ctx, out);
+    status = tc_kmac_final(&ctx, out, short_tag);
   TC_KMAC256_ctx_clear(&ctx);
   return status;
+}
+
+
+TC_status TC_KMAC256_digest(TC_bytes key, TC_bytes data, TC_bytes custom, TC_buffer out)
+{
+  return tc_kmac_digest(key, data, custom, out, 0);
+}
+
+TC_status TC_KMAC256_digest_short_tag(TC_bytes key, TC_bytes data, TC_bytes custom, TC_buffer out)
+{
+  return tc_kmac_digest(key, data, custom, out, 1);
+}
+
+static TC_status tc_kmac_verify(TC_bytes key, TC_bytes data, TC_bytes custom, TC_bytes tag,
+                                int short_tag)
+{
+  uint8_t computed[TC_MIN_TAG_LEN > 1 ? TC_MIN_TAG_LEN - 1 : 1];
+  uint8_t* candidate = computed;
+  TC_status status;
+
+  if (!tc_kmac_span(tag.data, tag.length) ||
+      !tc_internal_tag_length_allowed(tag.length, SIZE_MAX, short_tag))
+    return TC_ERROR;
+  /* Default tags can be arbitrarily long. Reuse the caller's comparison
+   * storage only for the bounded short-tag case; default verification uses
+   * a streaming context below to avoid a variable-length stack object. */
+  if (!short_tag) {
+    struct TC_KMAC256_ctx ctx;
+    size_t i;
+    unsigned p = 0;
+    status = TC_KMAC256_init(&ctx, key, custom);
+    if (status == TC_OK)
+      status = TC_KMAC256_update(&ctx, data);
+    if (status != TC_OK) {
+      TC_KMAC256_ctx_clear(&ctx);
+      return status;
+    }
+    tc_kmac_encode(&ctx, (uint64_t)tag.length * 8, 1);
+    ctx.state[ctx.position / 8] ^= UINT64_C(0x04) << (8 * (ctx.position % 8));
+    ctx.state[(TC_KMAC_RATE - 1) / 8] ^= UINT64_C(0x80) << 56;
+    tc_kmac_permute(ctx.state);
+    uint8_t different = 0;
+    for (i = 0; i < tag.length; ++i) {
+      if (p == TC_KMAC_RATE) {
+        tc_kmac_permute(ctx.state);
+        p = 0;
+      }
+      different |= (uint8_t)((ctx.state[p / 8] >> (8 * (p % 8))) ^ tag.data[i]);
+      ++p;
+    }
+    TC_KMAC256_ctx_clear(&ctx);
+    return different == 0 ? TC_OK : TC_MISMATCH;
+  }
+  status = tc_kmac_digest(key, data, custom, (TC_buffer){candidate, tag.length}, 1);
+  return tc_internal_verify_tag(status, candidate, sizeof computed, tag.data, tag.length);
+}
+
+TC_status TC_KMAC256_verify(TC_bytes key, TC_bytes data, TC_bytes custom, TC_bytes tag)
+{
+  return tc_kmac_verify(key, data, custom, tag, 0);
+}
+
+TC_status TC_KMAC256_verify_short_tag(TC_bytes key, TC_bytes data, TC_bytes custom, TC_bytes tag)
+{
+  return tc_kmac_verify(key, data, custom, tag, 1);
 }
 #endif

@@ -48,8 +48,7 @@ public:
   TC_CPP_NODISCARD TC_DRBG_result generate(buffer output, bool prediction_resistance = false,
                                            bytes additional = bytes{nullptr, 0}) noexcept
   {
-    return ::TC_DRBG_generate(&state_, output.data, output.capacity, prediction_resistance ? 1 : 0,
-                              additional);
+    return ::TC_DRBG_generate(&state_, output, prediction_resistance ? 1 : 0, additional);
   }
   void uninstantiate() noexcept
   {

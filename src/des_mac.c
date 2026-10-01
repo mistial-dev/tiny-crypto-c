@@ -178,12 +178,19 @@ TC_status TC_DES_ISO9797_init(struct TC_DES_ISO9797_ctx* ctx, TC_DES_ISO9797_alg
   if (ctx == NULL)
     return TC_ERROR;
   TC_DES_ISO9797_ctx_clear(ctx);
-  /* Algorithm 1 uses TDEA and Algorithm 3 uses K1 with K2 (and K3). Both
-   * take a 16- or 24-byte bundle. */
-  if (key == NULL || (algorithm != TC_DES_ISO9797_ALG1 && algorithm != TC_DES_ISO9797_ALG3) ||
+  if (key == NULL ||
+      (algorithm != TC_DES_ISO9797_ALG1 && algorithm != TC_DES_ISO9797_ALG3 &&
+       algorithm != TC_DES_ISO9797_ALG3_3KEY_EXTENSION) ||
       !tc_des_iso9797_padding_known(padding) ||
-      (keylen != TC_DES_KEYLEN_2KEY && keylen != TC_DES_KEYLEN_3KEY) ||
+      (algorithm == TC_DES_ISO9797_ALG3 && keylen != TC_DES_KEYLEN_2KEY) ||
+      (algorithm == TC_DES_ISO9797_ALG3_3KEY_EXTENSION && keylen != TC_DES_KEYLEN_3KEY) ||
+      (algorithm == TC_DES_ISO9797_ALG1 && keylen != TC_DES_KEYLEN_2KEY &&
+       keylen != TC_DES_KEYLEN_3KEY) ||
       !tc_internal_ranges_disjoint(ctx, sizeof(*ctx), key, keylen))
+    return TC_ERROR;
+  if (tc_des_keys_equal(key, key + TC_DES_KEYLEN) ||
+      (keylen == TC_DES_KEYLEN_3KEY &&
+       tc_des_keys_equal(key + TC_DES_KEYLEN, key + TC_DES_KEYLEN_2KEY)))
     return TC_ERROR;
 #if TC_DES_REJECT_WEAK_KEYS
   /* Clause 7.4 requires independent K and K'. K1 = K2 or K2 = K3 cancels a
@@ -192,7 +199,7 @@ TC_status TC_DES_ISO9797_init(struct TC_DES_ISO9797_ctx* ctx, TC_DES_ISO9797_alg
     return TC_ERROR;
 #endif
   tc_des_schedule_key(ctx->keys.schedule, key, keylen);
-  ctx->algorithm = (uint8_t)algorithm;
+  ctx->algorithm = (uint16_t)algorithm;
   ctx->padding = (uint8_t)padding;
   ctx->active = 1;
   return TC_OK;
@@ -245,7 +252,8 @@ TC_status TC_DES_ISO9797_final(struct TC_DES_ISO9797_ctx* ctx, uint8_t tag[TC_DE
     TC_DES_ISO9797_ctx_clear(ctx);
     return TC_ERROR;
   }
-  if (ctx->algorithm == TC_DES_ISO9797_ALG3)
+  if (ctx->algorithm == TC_DES_ISO9797_ALG3 ||
+      ctx->algorithm == TC_DES_ISO9797_ALG3_3KEY_EXTENSION)
     tc_des_iso9797_output_transformation3(ctx, ctx->mac);
   memcpy(tag, ctx->mac, TC_DES_BLOCKLEN);
   TC_DES_ISO9797_ctx_clear(ctx);

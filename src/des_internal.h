@@ -12,6 +12,8 @@
 /* Reject weak and semi-weak component keys and bundles that collapse to
  * single DES. keylen is 8, 16 or 24. */
 int tc_des_bundle_is_rejected(const uint8_t* key, size_t keylen);
+/* Compare effective DES keys while ignoring parity bits. */
+int tc_des_keys_equal(const uint8_t* left, const uint8_t* right);
 /* Expand one 8-byte key into 16 round subkeys of 6 bytes. */
 void tc_des_key_schedule(uint8_t (*sk)[6], const uint8_t* key);
 /* Expand an 8-byte key into 16 subkeys, or a 16- or 24-byte TDEA bundle into

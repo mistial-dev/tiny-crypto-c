@@ -385,7 +385,7 @@ void tc_hmac_core_clear(const tc_hash_algorithm_info* stored, void* context)
 
 /* One-shot HMAC with an optional truncated tag of at least TC_HMAC_MIN_TAG_LEN. */
 TC_status tc_hmac_core_digest(const tc_hash_algorithm_info* stored, void* workspace, TC_bytes key,
-                              TC_bytes message, TC_buffer tag)
+                              TC_bytes message, TC_buffer tag, int short_tag)
 {
   tc_hash_algorithm_info local;
   const tc_hash_algorithm_info* info = load_info(stored, &local);
@@ -394,7 +394,9 @@ TC_status tc_hmac_core_digest(const tc_hash_algorithm_info* stored, void* worksp
 
   /* SP 800-107: a truncated tag keeps the leftmost bytes, and
    * TC_HMAC_MIN_TAG_LEN sets the shortest length accepted. */
-  if (tag.data == NULL || tag.capacity < TC_HMAC_MIN_TAG_LEN || tag.capacity > info->digest_bytes ||
+  const size_t minimum = TC_HMAC_MIN_TAG_LEN > TC_MIN_TAG_LEN ? TC_HMAC_MIN_TAG_LEN : TC_MIN_TAG_LEN;
+  if (tag.data == NULL || tag.capacity > info->digest_bytes ||
+      (short_tag ? tag.capacity == 0 || tag.capacity >= minimum : tag.capacity < minimum) ||
       (message.length != 0 && message.data == NULL))
     return TC_ERROR;
   status = tc_hmac_core_init(stored, workspace, key.data, key.length);
@@ -410,13 +412,14 @@ TC_status tc_hmac_core_digest(const tc_hash_algorithm_info* stored, void* worksp
 }
 
 TC_status tc_hmac_core_verify(const tc_hash_algorithm_info* stored, void* workspace, TC_bytes key,
-                              TC_bytes message, TC_bytes tag)
+                              TC_bytes message, TC_bytes tag, int short_tag)
 {
   uint8_t computed[TC_HASH_CORE_MAX_DIGEST];
   TC_status status;
   if (tag.data == NULL)
     return TC_ERROR;
-  status = tc_hmac_core_digest(stored, workspace, key, message, (TC_buffer){computed, tag.length});
+  status = tc_hmac_core_digest(stored, workspace, key, message, (TC_buffer){computed, tag.length},
+                               short_tag);
   return tc_internal_verify_tag(status, computed, sizeof computed, tag.data, tag.length);
 }
 

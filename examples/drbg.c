@@ -22,7 +22,7 @@ TC_DRBG_result example_random_session_key(ExampleRandom* random, TC_bytes label,
   TC_DRBG_result result;
   if (random == NULL || key == NULL)
     return TC_DRBG_ARGUMENT;
-  result = TC_DRBG_generate(&random->drbg, key, 32, 0, label);
+  result = TC_DRBG_generate(&random->drbg, (TC_buffer){key, 32}, 0, label);
   /* A primitive failure leaves the generator unusable, so stop it. Entropy
    * failures during an automatic reseed leave it usable for a later retry. */
   if (result == TC_DRBG_ERROR)

@@ -153,6 +153,16 @@ static const uint8_t SHIFTS[16] TC_DES_TABLE_STORAGE = {1, 1, 2, 2, 2, 2, 2, 2,
 /* Private Helper Functions                                                  */
 /*****************************************************************************/
 
+int tc_des_keys_equal(const uint8_t* left, const uint8_t* right)
+{
+  uint8_t diff = 0;
+  size_t i;
+
+  for (i = 0; i < TC_DES_KEYLEN; ++i)
+    diff |= (uint8_t)((left[i] ^ right[i]) & 0xfeu);
+  return diff == 0;
+}
+
 #if TC_DES_REJECT_WEAK_KEYS
 /* The four weak and twelve semi-weak DES keys. Parity bits are ignored when
  * comparing, so equivalent encodings are rejected too. */
@@ -187,16 +197,6 @@ static int tc_des_key_is_weak(const uint8_t* key)
     weak |= (uint8_t)(diff == 0);
   }
   return weak != 0;
-}
-
-static int tc_des_keys_equal(const uint8_t* left, const uint8_t* right)
-{
-  uint8_t diff = 0;
-  size_t i;
-
-  for (i = 0; i < TC_DES_KEYLEN; ++i)
-    diff |= (uint8_t)((left[i] ^ right[i]) & 0xfeu);
-  return diff == 0;
 }
 
 int tc_des_bundle_is_rejected(const uint8_t* key, size_t keylen)

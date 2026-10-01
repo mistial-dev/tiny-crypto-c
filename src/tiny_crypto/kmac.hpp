@@ -13,11 +13,10 @@
 #if TC_ENABLE_KMAC256
 namespace tiny_crypto {
 /* Streaming KMAC256. init takes a key and an optional customization string.
- * final writes out.capacity bytes, a length that is part of the MAC input,
- * and consumes the key. final and clear leave the object unkeyed, and update
- * and final then return TC_ERROR until the next successful init. A rejected
- * init leaves the object unchanged. Compare a received tag with
- * tiny_crypto::ct_equal. The destructor clears the context. */
+ * finish writes out.capacity bytes, a length that is part of the MAC input,
+ * and consumes the key. finish and clear leave the object unkeyed, and update
+ * and finish then return TC_ERROR until the next successful init. A rejected
+ * init wipes the prior keyed state. The destructor clears the context. */
 class KMAC256 {
   TC_KMAC256_ctx ctx_{};
 
@@ -38,9 +37,13 @@ public:
   {
     return TC_KMAC256_update(&ctx_, data);
   }
-  TC_CPP_NODISCARD TC_status final(buffer out) noexcept
+  TC_CPP_NODISCARD TC_status finish(buffer out) noexcept
   {
     return TC_KMAC256_final(&ctx_, out);
+  }
+  TC_CPP_NODISCARD TC_status finish_short_tag(buffer out) noexcept
+  {
+    return TC_KMAC256_final_short_tag(&ctx_, out);
   }
   void clear() noexcept
   {
@@ -49,6 +52,20 @@ public:
   TC_CPP_NODISCARD static TC_status digest(bytes key, bytes data, bytes custom, buffer out) noexcept
   {
     return TC_KMAC256_digest(key, data, custom, out);
+  }
+  TC_CPP_NODISCARD static TC_status digest_short_tag(bytes key, bytes data, bytes custom,
+                                                      buffer out) noexcept
+  {
+    return TC_KMAC256_digest_short_tag(key, data, custom, out);
+  }
+  TC_CPP_NODISCARD static TC_status verify(bytes key, bytes data, bytes custom, bytes tag) noexcept
+  {
+    return TC_KMAC256_verify(key, data, custom, tag);
+  }
+  TC_CPP_NODISCARD static TC_status verify_short_tag(bytes key, bytes data, bytes custom,
+                                                      bytes tag) noexcept
+  {
+    return TC_KMAC256_verify_short_tag(key, data, custom, tag);
   }
 };
 } // namespace tiny_crypto

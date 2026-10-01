@@ -45,11 +45,25 @@ static int expect_iso9797_status(const uint8_t* key, size_t keylen, int accepted
   const TC_status alg1 =
       TC_DES_ISO9797_init(&ctx, TC_DES_ISO9797_ALG1, TC_DES_ISO9797_PAD2, key, keylen);
   const TC_status alg3 =
-      TC_DES_ISO9797_init(&ctx, TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, key, keylen);
+      TC_DES_ISO9797_init(&ctx, keylen == TC_DES_KEYLEN_3KEY
+                                    ? TC_DES_ISO9797_ALG3_3KEY_EXTENSION
+                                    : TC_DES_ISO9797_ALG3,
+                          TC_DES_ISO9797_PAD2, key, keylen);
   TC_DES_ISO9797_ctx_clear(&ctx);
   if (accepted)
     return alg1 == TC_OK && alg3 == TC_OK;
   return expect_key_status(alg1) && expect_key_status(alg3);
+}
+
+static int iso9797_rejects_degenerate(const uint8_t* key, size_t keylen)
+{
+  struct TC_DES_ISO9797_ctx ctx;
+  const TC_DES_ISO9797_algorithm alg3 = keylen == TC_DES_KEYLEN_3KEY
+                                            ? TC_DES_ISO9797_ALG3_3KEY_EXTENSION
+                                            : TC_DES_ISO9797_ALG3;
+  return TC_DES_ISO9797_init(&ctx, TC_DES_ISO9797_ALG1, TC_DES_ISO9797_PAD2, key, keylen) ==
+             TC_ERROR &&
+         TC_DES_ISO9797_init(&ctx, alg3, TC_DES_ISO9797_PAD2, key, keylen) == TC_ERROR;
 }
 
 /* ISO/IEC 9797-1:2011 clause 7.4 requires independent K and K'. Weak
@@ -72,14 +86,14 @@ static void check_iso9797_profile(const uint8_t* k1, const uint8_t* k2, const ui
 
   /* K1 = K2 reduces Algorithm 3 to Algorithm 1. */
   memcpy(key + TC_DES_KEYLEN, k1, TC_DES_KEYLEN);
-  munit_assert(expect_iso9797_status(key, TC_DES_KEYLEN_2KEY, 0));
+  munit_assert(iso9797_rejects_degenerate(key, TC_DES_KEYLEN_2KEY));
   memcpy(key + TC_DES_KEYLEN_2KEY, k3, TC_DES_KEYLEN);
-  munit_assert(expect_iso9797_status(key, TC_DES_KEYLEN_3KEY, 0));
+  munit_assert(iso9797_rejects_degenerate(key, TC_DES_KEYLEN_3KEY));
 
   /* K2 = K3 cancels the output transformation. */
   memcpy(key + TC_DES_KEYLEN, k2, TC_DES_KEYLEN);
   memcpy(key + TC_DES_KEYLEN_2KEY, k2, TC_DES_KEYLEN);
-  munit_assert(expect_iso9797_status(key, TC_DES_KEYLEN_3KEY, 0));
+  munit_assert(iso9797_rejects_degenerate(key, TC_DES_KEYLEN_3KEY));
 
   /* A weak component key in each position. */
   memcpy(key + TC_DES_KEYLEN_2KEY, k3, TC_DES_KEYLEN);
@@ -94,9 +108,9 @@ static void check_iso9797_profile(const uint8_t* k1, const uint8_t* k2, const ui
 
   /* The one-shot MAC applies the same policy. */
   memcpy(key + TC_DES_KEYLEN, k1, TC_DES_KEYLEN);
-  munit_assert(
-      expect_key_status(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD_NONE, key,
-                                           TC_DES_KEYLEN_2KEY, msg, sizeof msg, tag, sizeof tag)));
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD_NONE, key,
+                                      TC_DES_KEYLEN_2KEY, msg, sizeof msg, tag, sizeof tag),
+                   ==, TC_ERROR);
 }
 #endif
 

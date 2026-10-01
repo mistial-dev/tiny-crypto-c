@@ -388,11 +388,13 @@ void TC_HMAC_SHA1_ctx_clear(struct TC_HMAC_SHA1_ctx* ctx);
 /* One-shot HMAC-SHA-1 truncated to tag.capacity bytes, from
  * TC_HMAC_MIN_TAG_LEN to TC_SHA1_DIGESTLEN. */
 TC_status TC_HMAC_SHA1_digest(TC_bytes key, TC_bytes message, TC_buffer tag);
+TC_status TC_HMAC_SHA1_digest_short_tag(TC_bytes key, TC_bytes message, TC_buffer tag);
 
 /* Recompute the tag, truncated to tag.length bytes, and compare in
  * constant time. Returns TC_OK, TC_MISMATCH or TC_ERROR under the verify
  * contract. */
 TC_status TC_HMAC_SHA1_verify(TC_bytes key, TC_bytes message, TC_bytes tag);
+TC_status TC_HMAC_SHA1_verify_short_tag(TC_bytes key, TC_bytes message, TC_bytes tag);
 #endif /* TC_ENABLE_SHA1 */
 
 #if TC_ENABLE_SHA224
@@ -414,11 +416,13 @@ void TC_HMAC_SHA224_ctx_clear(struct TC_HMAC_SHA224_ctx* ctx);
 /* One-shot HMAC-SHA-224 truncated to tag.capacity bytes, from
  * TC_HMAC_MIN_TAG_LEN to TC_SHA224_DIGESTLEN. */
 TC_status TC_HMAC_SHA224_digest(TC_bytes key, TC_bytes message, TC_buffer tag);
+TC_status TC_HMAC_SHA224_digest_short_tag(TC_bytes key, TC_bytes message, TC_buffer tag);
 
 /* Recompute the tag, truncated to tag.length bytes, and compare in
  * constant time. Returns TC_OK, TC_MISMATCH or TC_ERROR under the verify
  * contract. */
 TC_status TC_HMAC_SHA224_verify(TC_bytes key, TC_bytes message, TC_bytes tag);
+TC_status TC_HMAC_SHA224_verify_short_tag(TC_bytes key, TC_bytes message, TC_bytes tag);
 #endif /* TC_ENABLE_SHA224 */
 
 #if TC_ENABLE_SHA256
@@ -440,11 +444,13 @@ void TC_HMAC_SHA256_ctx_clear(struct TC_HMAC_SHA256_ctx* ctx);
 /* One-shot HMAC-SHA-256 truncated to tag.capacity bytes, from
  * TC_HMAC_MIN_TAG_LEN to TC_SHA256_DIGESTLEN. */
 TC_status TC_HMAC_SHA256_digest(TC_bytes key, TC_bytes message, TC_buffer tag);
+TC_status TC_HMAC_SHA256_digest_short_tag(TC_bytes key, TC_bytes message, TC_buffer tag);
 
 /* Recompute the tag, truncated to tag.length bytes, and compare in
  * constant time. Returns TC_OK, TC_MISMATCH or TC_ERROR under the verify
  * contract. */
 TC_status TC_HMAC_SHA256_verify(TC_bytes key, TC_bytes message, TC_bytes tag);
+TC_status TC_HMAC_SHA256_verify_short_tag(TC_bytes key, TC_bytes message, TC_bytes tag);
 #endif /* TC_ENABLE_SHA256 */
 
 #if TC_ENABLE_SHA384
@@ -466,11 +472,13 @@ void TC_HMAC_SHA384_ctx_clear(struct TC_HMAC_SHA384_ctx* ctx);
 /* One-shot HMAC-SHA-384 truncated to tag.capacity bytes, from
  * TC_HMAC_MIN_TAG_LEN to TC_SHA384_DIGESTLEN. */
 TC_status TC_HMAC_SHA384_digest(TC_bytes key, TC_bytes message, TC_buffer tag);
+TC_status TC_HMAC_SHA384_digest_short_tag(TC_bytes key, TC_bytes message, TC_buffer tag);
 
 /* Recompute the tag, truncated to tag.length bytes, and compare in
  * constant time. Returns TC_OK, TC_MISMATCH or TC_ERROR under the verify
  * contract. */
 TC_status TC_HMAC_SHA384_verify(TC_bytes key, TC_bytes message, TC_bytes tag);
+TC_status TC_HMAC_SHA384_verify_short_tag(TC_bytes key, TC_bytes message, TC_bytes tag);
 #endif /* TC_ENABLE_SHA384 */
 
 #if TC_ENABLE_SHA512
@@ -492,11 +500,13 @@ void TC_HMAC_SHA512_ctx_clear(struct TC_HMAC_SHA512_ctx* ctx);
 /* One-shot HMAC-SHA-512 truncated to tag.capacity bytes, from
  * TC_HMAC_MIN_TAG_LEN to TC_SHA512_DIGESTLEN. */
 TC_status TC_HMAC_SHA512_digest(TC_bytes key, TC_bytes message, TC_buffer tag);
+TC_status TC_HMAC_SHA512_digest_short_tag(TC_bytes key, TC_bytes message, TC_buffer tag);
 
 /* Recompute the tag, truncated to tag.length bytes, and compare in
  * constant time. Returns TC_OK, TC_MISMATCH or TC_ERROR under the verify
  * contract. */
 TC_status TC_HMAC_SHA512_verify(TC_bytes key, TC_bytes message, TC_bytes tag);
+TC_status TC_HMAC_SHA512_verify_short_tag(TC_bytes key, TC_bytes message, TC_bytes tag);
 #endif /* TC_ENABLE_SHA512 */
 
 #endif /* TC_ENABLE_HMAC */

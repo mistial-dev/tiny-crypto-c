@@ -234,15 +234,16 @@ TC_DRBG_result TC_DRBG_reseed(TC_DRBG* drbg, TC_bytes additional)
 
 /* Argument checks and the request-size preflight run before any write, so
  * a rejected request leaves the output and the state unchanged. */
-TC_DRBG_result TC_DRBG_generate(TC_DRBG* drbg, uint8_t* output, size_t length,
-                                int prediction_resistance, TC_bytes additional)
+TC_DRBG_result TC_DRBG_generate(TC_DRBG* drbg, TC_buffer output, int prediction_resistance,
+                                TC_bytes additional)
 {
   TC_DRBG_result result;
+  const size_t length = output.capacity;
 
-  if ((output == NULL && length != 0) || !live(drbg) ||
+  if ((output.data == NULL && length != 0) || !live(drbg) ||
       !tc_internal_span_valid(additional.data, additional.length) ||
-      !outside(drbg, output, length) || !outside(drbg, additional.data, additional.length) ||
-      !tc_internal_ranges_disjoint(output, length, additional.data, additional.length) ||
+      !outside(drbg, output.data, length) || !outside(drbg, additional.data, additional.length) ||
+      !tc_internal_ranges_disjoint(output.data, length, additional.data, additional.length) ||
       !input_length_valid(drbg, additional.length) ||
       (prediction_resistance && !drbg->prediction_resistance))
     return TC_DRBG_ARGUMENT;
@@ -257,14 +258,14 @@ TC_DRBG_result TC_DRBG_generate(TC_DRBG* drbg, uint8_t* output, size_t length,
     const TC_bytes empty = {NULL, 0};
     result = reseed(drbg, additional);
     if (result != TC_DRBG_OK) {
-      TC_secure_zero(output, length);
+      TC_secure_zero(output.data, length);
       return result;
     }
     additional = empty;
   }
-  result = record(drbg, mechanism_generate(drbg, output, length, additional));
+  result = record(drbg, mechanism_generate(drbg, output.data, length, additional));
   if (result != TC_DRBG_OK) {
-    TC_secure_zero(output, length);
+    TC_secure_zero(output.data, length);
     return result;
   }
   ++drbg->reseed_counter;

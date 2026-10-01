@@ -65,9 +65,17 @@ namespace detail {
     {                                                                                              \
       return TC_HMAC_##C_NAME##_digest(key, data, tag);                                            \
     }                                                                                              \
+    static TC_status digest_short_tag(bytes key, bytes data, buffer tag) noexcept                  \
+    {                                                                                              \
+      return TC_HMAC_##C_NAME##_digest_short_tag(key, data, tag);                                  \
+    }                                                                                              \
     static TC_status verify(bytes key, bytes data, bytes tag) noexcept                             \
     {                                                                                              \
       return TC_HMAC_##C_NAME##_verify(key, data, tag);                                            \
+    }                                                                                              \
+    static TC_status verify_short_tag(bytes key, bytes data, bytes tag) noexcept                   \
+    {                                                                                              \
+      return TC_HMAC_##C_NAME##_verify_short_tag(key, data, tag);                                  \
     }                                                                                              \
     static void clear(context* ctx) noexcept                                                       \
     {                                                                                              \
@@ -254,6 +262,14 @@ public:
   TC_CPP_NODISCARD static TC_status verify(bytes key, bytes data, bytes tag) noexcept
   {
     return Traits::verify(key, data, tag);
+  }
+  TC_CPP_NODISCARD static TC_status mac_short_tag(bytes key, bytes data, buffer out) noexcept
+  {
+    return Traits::digest_short_tag(key, data, out);
+  }
+  TC_CPP_NODISCARD static TC_status verify_short_tag(bytes key, bytes data, bytes tag) noexcept
+  {
+    return Traits::verify_short_tag(key, data, tag);
   }
 
 private:

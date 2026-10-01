@@ -487,7 +487,7 @@ const iso9797_case iso9797_cases[] = {
      {iso9797_key3, 24},
      {iso9797_message1, 23},
      iso9797_alg1_3key_pad1},
-    {TC_DES_ISO9797_ALG3,
+    {TC_DES_ISO9797_ALG3_3KEY_EXTENSION,
      TC_DES_ISO9797_PAD2,
      {iso9797_key3, 24},
      {iso9797_message1, 23},

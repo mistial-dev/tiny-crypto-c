@@ -67,6 +67,27 @@ TC_TEST(test_profile)
   munit_assert(TC_KMAC256_digest((TC_bytes){NULL, 0}, (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0},
                                  (TC_buffer){stream, 48}) == TC_OK);
   munit_assert(memcmp(out, stream, 32) != 0);
+  munit_assert(TC_KMAC256_digest((TC_bytes){key, 32}, (TC_bytes){data, 4},
+                                 (TC_bytes){NULL, 0}, (TC_buffer){out, TC_MIN_TAG_LEN}) == TC_OK);
+  munit_assert(TC_KMAC256_verify((TC_bytes){key, 32}, (TC_bytes){data, 4},
+                                 (TC_bytes){NULL, 0},
+                                 (TC_bytes){out, TC_MIN_TAG_LEN}) == TC_OK);
+  out[TC_MIN_TAG_LEN - 1] ^= 1;
+  munit_assert(TC_KMAC256_verify((TC_bytes){key, 32}, (TC_bytes){data, 4},
+                                 (TC_bytes){NULL, 0},
+                                 (TC_bytes){out, TC_MIN_TAG_LEN}) == TC_MISMATCH);
+  munit_assert(TC_KMAC256_digest((TC_bytes){key, 32}, (TC_bytes){data, 4},
+                                 (TC_bytes){NULL, 0},
+                                 (TC_buffer){out, TC_MIN_TAG_LEN - 1}) == TC_ERROR);
+  munit_assert(TC_KMAC256_digest_short_tag((TC_bytes){key, 32}, (TC_bytes){data, 4},
+                                           (TC_bytes){NULL, 0},
+                                           (TC_buffer){out, TC_MIN_TAG_LEN - 1}) == TC_OK);
+  munit_assert(TC_KMAC256_verify_short_tag((TC_bytes){key, 32}, (TC_bytes){data, 4},
+                                           (TC_bytes){NULL, 0},
+                                           (TC_bytes){out, TC_MIN_TAG_LEN - 1}) == TC_OK);
+  munit_assert(TC_KMAC256_digest_short_tag((TC_bytes){key, 32}, (TC_bytes){data, 4},
+                                           (TC_bytes){NULL, 0},
+                                           (TC_buffer){out, TC_MIN_TAG_LEN}) == TC_ERROR);
   munit_assert(TC_KMAC256_digest((TC_bytes){key, 32}, (TC_bytes){data, 32}, (TC_bytes){NULL, 0},
                                  (TC_buffer){want, 32}) == TC_OK);
   memcpy(out, data, 32);
@@ -82,6 +103,7 @@ TC_TEST(test_profile)
   munit_assert(TC_KMAC256_final(&ctx, (TC_buffer){out, 0}) == TC_ERROR);
   munit_assert(TC_KMAC256_init(&ctx, (TC_bytes){(const uint8_t*)&ctx, 32}, (TC_bytes){NULL, 0}) ==
                TC_ERROR);
+  memset(&saved, 0, sizeof(saved));
   munit_assert(kmac_ctx_equal(&saved, &ctx));
   munit_assert(memcmp(want, out, sizeof(out)) == 0);
   /* NULL pointers with nonzero lengths are argument errors that leave the

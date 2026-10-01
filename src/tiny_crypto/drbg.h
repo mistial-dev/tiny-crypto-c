@@ -175,8 +175,8 @@ TC_DRBG_result TC_DRBG_instantiate(TC_DRBG* drbg, const TC_DRBG_config* config,
  * unchanged, or TC_DRBG_ERROR. */
 TC_DRBG_result TC_DRBG_reseed(TC_DRBG* drbg, TC_bytes additional);
 
-/* Write length bytes of output (section 9.3). length is at most
- * TC_DRBG_MAX_REQUEST_BYTES, and output may be NULL only when length is 0.
+/* Fill output.capacity bytes (section 9.3), at most
+ * TC_DRBG_MAX_REQUEST_BYTES. output.data may be NULL only when capacity is 0.
  * A prediction-resistant request reseeds first and needs a DRBG
  * instantiated with prediction_resistance. When the reseed interval is
  * exhausted, the DRBG reseeds itself from its entropy source. A reseed
@@ -189,8 +189,8 @@ TC_DRBG_result TC_DRBG_reseed(TC_DRBG* drbg, TC_bytes additional);
  * reseed with the state unchanged, or TC_DRBG_ERROR. ARGUMENT is checked
  * before LIMIT, and both leave the output and the state unchanged. ENTROPY
  * and ERROR wipe the output. */
-TC_DRBG_result TC_DRBG_generate(TC_DRBG* drbg, uint8_t* output, size_t length,
-                                int prediction_resistance, TC_bytes additional);
+TC_DRBG_result TC_DRBG_generate(TC_DRBG* drbg, TC_buffer output, int prediction_resistance,
+                                TC_bytes additional);
 
 /* Wipe the whole context (section 9.4). NULL is accepted. */
 void TC_DRBG_uninstantiate(TC_DRBG* drbg);

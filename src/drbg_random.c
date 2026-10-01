@@ -28,7 +28,7 @@ TC_status TC_DRBG_random(void* user, uint8_t* output, size_t length)
     const size_t chunk = length - offset; /* every size_t length fits one request */
 #endif
     const TC_DRBG_result result =
-        TC_DRBG_generate(drbg, output == NULL ? NULL : output + offset, chunk, 0, empty);
+        TC_DRBG_generate(drbg, (TC_buffer){output == NULL ? NULL : output + offset, chunk}, 0, empty);
     /* Every chunk has the same arguments, so an argument error can only come
      * from the first chunk, before any byte is written. Later failures wipe
      * the chunks already generated. */
