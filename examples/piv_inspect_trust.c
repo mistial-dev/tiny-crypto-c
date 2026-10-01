@@ -3,13 +3,10 @@
 #include "piv_inspect_trust.h"
 #include <string.h>
 
-enum { TRUST_WORK = 200000000 };
-
 int example_piv_inspect_trust_init(ExamplePIVInspectTrust* trust,
                                    const ExamplePIVInspectOptions* options)
 {
-  if (!options->anchor_count || options->anchor_count > EXAMPLE_PIV_INSPECT_ANCHORS ||
-      options->crl_count > EXAMPLE_PIV_INSPECT_CRLS)
+  if (!options->anchor_count || options->anchor_count > EXAMPLE_PIV_INSPECT_ANCHORS)
     return 0;
   const TC_TLV_limits limits = {EXAMPLE_PIV_TRUST_CERTIFICATE_BYTES,
                                 EXAMPLE_PIV_TRUST_CERTIFICATE_BYTES, 512, EXAMPLE_PIV_TRUST_FRAMES};
@@ -34,12 +31,7 @@ int example_piv_inspect_trust_init(ExamplePIVInspectTrust* trust,
   /* The anchor certificates are also the candidates of CRL signer searches. */
   trust->array = (TC_X509_store_array){options->anchors, options->anchor_count, trust->anchors,
                                        options->anchor_count};
-  static const TC_bytes no_crl = {NULL, 0};
-  size_t work = TRUST_WORK;
-  if (TC_X509_store_array_source(&trust->array, &trust->source) != TC_TLV_OK ||
-      TC_X509_crl_index_init(options->crl_count ? options->crls : &no_crl, options->crl_count,
-                             &limits, &trust->parser, &work, trust->records,
-                             EXAMPLE_PIV_INSPECT_CRLS, &trust->index) != TC_TLV_OK)
+  if (TC_X509_store_array_source(&trust->array, &trust->source) != TC_TLV_OK)
     return 0;
   memset(&trust->options, 0, sizeof trust->options);
   trust->options.at = options->at;
@@ -54,7 +46,14 @@ int example_piv_inspect_trust_init(ExamplePIVInspectTrust* trust,
   trust->options.max_candidate_bytes =
       trust->options.max_candidates * EXAMPLE_PIV_TRUST_CERTIFICATE_BYTES;
   trust->options.revocation = options->revocation;
-  const TC_validation_trust sources = {&trust->source, &trust->index};
+  static const TC_X509_crl_index no_crls = {NULL, 0, 0};
+  return example_piv_inspect_trust_revocation(trust, &no_crls);
+}
+
+int example_piv_inspect_trust_revocation(ExamplePIVInspectTrust* trust,
+                                         const TC_X509_crl_index* index)
+{
+  const TC_validation_trust sources = {&trust->source, index};
   return TC_validation_context_init(&sources, &trust->options, &trust->workspace.credential,
                                     &trust->context) == TC_RESULT_OK;
 }

@@ -8,6 +8,7 @@
 #ifndef EXAMPLE_PIV_INSPECT_H_
 #define EXAMPLE_PIV_INSPECT_H_
 #include <tiny_crypto/piv_card_check.h>
+#include <tiny_crypto/source.h>
 #include <stdio.h>
 
 #ifdef __cplusplus
@@ -30,7 +31,9 @@ typedef void (*ExamplePIVInspectDump)(void* context, const TC_PIV_object* object
  *                  least 2.
  * anchors          DER trust anchors for the card certificates and the
  *                  content signers, 1 to EXAMPLE_PIV_INSPECT_ANCHORS.
- * crls             DER CRLs, up to EXAMPLE_PIV_INSPECT_CRLS.
+ * crls             DER CRL byte sources, up to EXAMPLE_PIV_INSPECT_CRLS, of any
+ *                  size. Each is prepared once for the certificates the
+ *                  check queries (examples/piv_inspect_crl.h).
  * ocsp             one DER OCSP response per TC_PIV_CARD_SLOT_*, or empty.
  * revocation       the revocation evidence policy of both contexts.
  * at               the evaluation time.
@@ -44,7 +47,7 @@ typedef struct {
   unsigned minimum_retries;
   const TC_bytes* anchors;
   size_t anchor_count;
-  const TC_bytes* crls;
+  const TC_source* crls;
   size_t crl_count;
   TC_bytes ocsp[TC_PIV_CARD_CERTIFICATES];
   TC_validation_revocation revocation;

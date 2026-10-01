@@ -928,7 +928,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   # examples/piv_inspect over the SD 33 simulators, compared with the golden
   # outputs in tests/vectors/piv/inspect. The PIN and pairing codes are the
   # published SD 33 test values.
-  set(tc_piv_inspect_sources examples/piv_inspect.c examples/piv_inspect_trust.c
+  set(tc_piv_inspect_sources examples/piv_inspect.c examples/piv_inspect_trust.c examples/piv_inspect_crl.c
     examples/piv_inspect_print_objects.c examples/piv_inspect_print_certificates.c
     examples/piv_inspect_print_report.c)
   tc_add_c_test_executable(test_piv_inspect_replay tiny-crypto-c-test-pki-native

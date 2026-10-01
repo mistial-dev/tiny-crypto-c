@@ -153,6 +153,7 @@ if(CMAKE_HOST_APPLE)
     "${SOURCE_DIR}/examples/credential_pcsc.c" "${SOURCE_DIR}/examples/credential_pcsc.h"
     "${SOURCE_DIR}/examples/piv_inspect.c" "${SOURCE_DIR}/examples/piv_inspect.h"
     "${SOURCE_DIR}/examples/piv_inspect_main.c" "${SOURCE_DIR}/examples/piv_inspect_trust.c"
+    "${SOURCE_DIR}/examples/piv_inspect_crl.c" "${SOURCE_DIR}/examples/piv_inspect_crl.h"
     "${SOURCE_DIR}/examples/piv_inspect_trust.h" "${SOURCE_DIR}/examples/piv_inspect_print.h"
     "${SOURCE_DIR}/examples/piv_inspect_print_objects.c"
     "${SOURCE_DIR}/examples/piv_inspect_print_certificates.c"

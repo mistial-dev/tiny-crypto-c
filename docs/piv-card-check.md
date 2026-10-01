@@ -277,6 +277,12 @@ application:
    card CVC, and proves `9E`, and `9A` after the PIN, with
    `TC_PIV_card_prove_keys`.
 
+CRLs are byte sources of any size. `examples/piv_inspect_crl.c` prepares each
+one for the secure messaging signer before key establishment, then again for
+every target of the inventory before the check ([Large CRLs](#large-crls)).
+The `piv_inspect` command reads each `--crl` file from disk in pieces, so the
+17 MB TWIC CA 1 CRL needs no more memory than a small one.
+
 A TWIC card makes the checks of the PIV application use its TWIC profile. A
 card without secure messaging runs plain, and on contactless without the VCI
 only the Always objects are read. The example never proves `9C`, since the

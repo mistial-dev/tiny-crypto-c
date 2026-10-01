@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
 /* Validation context of examples/piv_inspect.c over caller trust anchors and
- * CRLs, with the native signature provider. */
+ * a CRL index, with the native signature provider. */
 #ifndef EXAMPLE_PIV_INSPECT_TRUST_H_
 #define EXAMPLE_PIV_INSPECT_TRUST_H_
 #include "piv_inspect.h"
@@ -32,17 +32,20 @@ typedef struct {
   TC_X509_store_anchor anchors[EXAMPLE_PIV_INSPECT_ANCHORS];
   TC_X509_store_array array;
   TC_X509_store_source source;
-  TC_X509_crl_record records[EXAMPLE_PIV_INSPECT_CRLS];
-  TC_X509_crl_index index;
   TC_validation_options options;
   TC_validation_context context;
 } ExamplePIVInspectTrust;
 
-/* Build trust->context from the anchors, CRLs, time and revocation policy of
- * options. The anchors also serve as CRL signer candidates, since a pinned
- * issuing CA signs its own CRLs. Spans stay borrowed. Returns 1 on success
- * and 0 for a malformed anchor or CRL or too many of them. */
+/* Build trust->context from the anchors, time and revocation policy of
+ * options, with no CRLs. The anchors also serve as CRL signer candidates,
+ * since a pinned issuing CA signs its own CRLs. Spans stay borrowed. Returns
+ * 1 on success and 0 for a malformed anchor or too many of them. */
 int example_piv_inspect_trust_init(ExamplePIVInspectTrust* trust,
                                    const ExamplePIVInspectOptions* options);
+
+/* Rebuild trust->context with the CRLs of index, which stays borrowed and
+ * unchanged while the context is used. Returns 1 on success. */
+int example_piv_inspect_trust_revocation(ExamplePIVInspectTrust* trust,
+                                         const TC_X509_crl_index* index);
 
 #endif

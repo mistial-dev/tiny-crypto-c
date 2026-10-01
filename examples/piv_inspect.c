@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: Mistial Dev
  * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "piv_inspect.h"
+#include "piv_inspect_crl.h"
 #include "piv_inspect_print.h"
 #include "piv_inspect_trust.h"
 #include <tiny_crypto/piv_sm_apdu.h>
@@ -57,6 +58,7 @@ static struct {
   TC_PIV_object objects[TC_PIV_CATALOG_PIV_OBJECTS];
   TC_PIV_inventory inventory;
   ExamplePIVInspectTrust trust;
+  ExamplePIVInspectCRLs crls;
   TC_PIV_card_check_workspace check;
   uint8_t certificates[CERTIFICATE_BYTES];
   uint8_t lds[LDS_BYTES];
@@ -166,6 +168,28 @@ static int plain_read(Inspect* inspect, const uint8_t tag[3], size_t index)
   return copy->info != NULL;
 }
 
+/* Prepare the CRLs for the certificates of inventory and print a failure.
+ * Returns 1 when the trust context holds them. */
+static int crls_prepare(const Inspect* inspect, const TC_PIV_inventory* inventory)
+{
+  if (example_piv_inspect_crls_prepare(&storage.crls, inspect->options, inventory, &storage.trust))
+    return 1;
+  fputs("CRLs: unreadable or malformed\n", inspect->out);
+  return 0;
+}
+
+/* Prepare the CRLs for the secure messaging signer alone, before secure
+ * messaging reads the rest. */
+static int signer_crls_prepare(Inspect* inspect)
+{
+  TC_PIV_inventory signer;
+  memset(&signer, 0, sizeof signer);
+  signer.objects = &inspect->copies[COPY_SIGNER];
+  signer.capacity = signer.count = 1;
+  signer.link.application = TC_PIV_APPLICATION_PIV;
+  return crls_prepare(inspect, &signer);
+}
+
 /* Read the secure messaging signer 5FC122 and the CHUID in plaintext, both
  * Always readable (Part 1 Table 2), and validate the signer. Key
  * establishment binds the card CVC to both. */
@@ -178,7 +202,8 @@ static void plain_reads(Inspect* inspect)
       TC_PIV_certificate_decode(inspect->copies[COPY_SIGNER].encoded, TC_PIV_CERTIFICATE_SM_SIGNER,
                                 sizeof storage.signer_der, &storage.gzip, &work,
                                 (TC_buffer){storage.signer_der, sizeof storage.signer_der},
-                                &inspect->signer) == TC_TLV_OK) {
+                                &inspect->signer) == TC_TLV_OK &&
+      signer_crls_prepare(inspect)) {
     const TC_credential_status status = TC_PIV_content_signer_validate(
         inspect->signer.certificate, inspect->profile, context, &work, &inspect->signer_result);
     inspect->has_signer = status == TC_CREDENTIAL_VALID;
@@ -397,7 +422,7 @@ static int inspect_card(Inspect* inspect, TC_APDU_transport transport, TC_PIV_ca
   secure(inspect);
   discovery_vci(inspect);
   pin(inspect);
-  if (inventory_read(inspect) != TC_PIV_OK)
+  if (inventory_read(inspect) != TC_PIV_OK || !crls_prepare(inspect, &storage.inventory))
     return 1;
   const TC_PIV_result checked = check(inspect, report);
   if (checked != TC_PIV_OK) {
@@ -426,6 +451,7 @@ int example_piv_inspect_run(const ExamplePIVInspectOptions* options, TC_APDU_tra
   TC_PIV_inventory_clear(&storage.inventory);
   TC_PIV_link_clear(&storage.link);
   TC_PIV_SM_clear(&storage.session);
+  example_piv_inspect_crls_clear(&storage.crls);
   TC_secure_zero(&storage, sizeof storage);
   TC_secure_zero(&inspect, sizeof inspect);
   return status;

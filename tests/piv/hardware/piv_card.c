@@ -82,6 +82,9 @@ static struct {
   TC_bytes anchors[TC_PIV_CARD_TRUST_FILES], crls[TC_PIV_CARD_TRUST_FILES];
   ExamplePIVInspectOptions trust_inputs;
   ExamplePIVInspectTrust trust;
+  /* The vendored CRLs are small, so they are indexed from memory. */
+  TC_X509_crl_record crl_records[TC_PIV_CARD_TRUST_FILES];
+  TC_X509_crl_index crl_index;
   /* Link */
   TC_PIV_link link, extended;
   uint8_t command_scratch[COMMAND_SCRATCH_BYTES], extended_scratch[COMMAND_SCRATCH_BYTES];
@@ -896,13 +899,18 @@ static const char* trust_load(void)
   memset(&run.trust_inputs, 0, sizeof run.trust_inputs);
   run.trust_inputs.anchors = run.anchors;
   run.trust_inputs.anchor_count = paths->anchor_count;
-  run.trust_inputs.crls = run.crls;
-  run.trust_inputs.crl_count = paths->crl_count;
   run.trust_inputs.revocation = run.config.revocation;
   run.trust_inputs.at = run.backend.at;
-  return example_piv_inspect_trust_init(&run.trust, &run.trust_inputs)
-             ? NULL
-             : "a trust anchor or CRL is malformed";
+  if (!example_piv_inspect_trust_init(&run.trust, &run.trust_inputs))
+    return "a trust anchor is malformed";
+  size_t work = SIZE_MAX;
+  static const TC_bytes no_crl = {NULL, 0};
+  if (TC_X509_crl_index_init(paths->crl_count ? run.crls : &no_crl, paths->crl_count,
+                             &run.trust.options.parsing, &run.trust.parser, &work, run.crl_records,
+                             TC_PIV_CARD_TRUST_FILES, &run.crl_index) != TC_TLV_OK ||
+      !example_piv_inspect_trust_revocation(&run.trust, &run.crl_index))
+    return "a CRL is malformed";
+  return NULL;
 }
 
 /* The guard policy: reference data and 9C only with a known identity. */

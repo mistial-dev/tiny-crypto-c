@@ -4,7 +4,7 @@ project(piv_inspect LANGUAGES C)
 find_package(tiny-crypto-c CONFIG REQUIRED)
 # The flow and its text output. Card commands and checks come from the
 # library.
-add_library(piv_inspect_flow STATIC ../piv_inspect.c ../piv_inspect_trust.c
+add_library(piv_inspect_flow STATIC ../piv_inspect.c ../piv_inspect_trust.c ../piv_inspect_crl.c
   ../piv_inspect_print_objects.c ../piv_inspect_print_certificates.c
   ../piv_inspect_print_report.c)
 target_link_libraries(piv_inspect_flow PUBLIC tiny-crypto-c::tiny-crypto-c)

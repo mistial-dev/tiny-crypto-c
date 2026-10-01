@@ -50,8 +50,9 @@ static const char usage[] =
 
 static struct {
   uint8_t anchors[EXAMPLE_PIV_INSPECT_ANCHORS][FILE_BYTES];
-  uint8_t crls[EXAMPLE_PIV_INSPECT_CRLS][FILE_BYTES];
   uint8_t ocsp[TC_PIV_CARD_CERTIFICATES][FILE_BYTES];
+  /* CRLs stay on disk and are read as byte sources during the run. */
+  FILE* crls[EXAMPLE_PIV_INSPECT_CRLS];
 } inputs;
 
 /* PIN and pairing code, locked in memory and wiped on exit. */
@@ -258,8 +259,9 @@ static int dump_dir_private(const char* path)
          info.st_uid == geteuid();
 }
 
-/* Load the trust and evidence files named by arguments into options. */
-static int inputs_load(const Arguments* arguments, TC_bytes* anchors, TC_bytes* crls,
+/* Load the trust and evidence files named by arguments into options. Each
+ * CRL file stays open as a byte source of any size until inputs_close. */
+static int inputs_load(const Arguments* arguments, TC_bytes* anchors, TC_source* crls,
                        ExamplePIVInspectOptions* options)
 {
   for (size_t i = 0; i < arguments->anchor_count; ++i) {
@@ -269,11 +271,13 @@ static int inputs_load(const Arguments* arguments, TC_bytes* anchors, TC_bytes* 
       return 0;
     }
   }
-  for (size_t i = 0; i < arguments->crl_count; ++i)
-    if (!example_read_file(arguments->crls[i], inputs.crls[i], FILE_BYTES, &crls[i])) {
-      fprintf(stderr, "Unable to load CRL %s\n", arguments->crls[i]);
+  for (size_t i = 0; i < arguments->crl_count; ++i) {
+    inputs.crls[i] = fopen(arguments->crls[i], "rb");
+    if (!inputs.crls[i] || !example_stream_source(inputs.crls[i], UINT64_MAX, &crls[i])) {
+      fprintf(stderr, "Unable to open CRL %s\n", arguments->crls[i]);
       return 0;
     }
+  }
   for (size_t i = 0; i < TC_PIV_CARD_CERTIFICATES; ++i)
     if (arguments->ocsp[i] &&
         !example_read_file(arguments->ocsp[i], inputs.ocsp[i], FILE_BYTES, &options->ocsp[i])) {
@@ -285,6 +289,16 @@ static int inputs_load(const Arguments* arguments, TC_bytes* anchors, TC_bytes* 
   options->crls = crls;
   options->crl_count = arguments->crl_count;
   return 1;
+}
+
+static int inputs_close(void)
+{
+  int closed = 1;
+  for (size_t i = 0; i < EXAMPLE_PIV_INSPECT_CRLS; ++i)
+    if (inputs.crls[i] && fclose(inputs.crls[i]))
+      closed = 0;
+  TC_secure_zero(&inputs, sizeof inputs);
+  return closed;
 }
 
 static const char* open_failure(ExampleCardPCSCResult result)
@@ -307,7 +321,8 @@ static const char* open_failure(ExampleCardPCSCResult result)
 
 static int inspect(const Arguments* arguments)
 {
-  static TC_bytes anchors[EXAMPLE_PIV_INSPECT_ANCHORS], crls[EXAMPLE_PIV_INSPECT_CRLS];
+  static TC_bytes anchors[EXAMPLE_PIV_INSPECT_ANCHORS];
+  static TC_source crls[EXAMPLE_PIV_INSPECT_CRLS];
   ExamplePIVInspectOptions options;
   memset(&options, 0, sizeof options);
   options.format = arguments->format;
@@ -382,9 +397,10 @@ int main(int argc, char** argv)
     fputs("Unable to protect credential memory\n", stderr);
     return 1;
   }
-  const int status = inspect(&arguments);
+  int status = inspect(&arguments);
   TC_secure_zero(&secrets, sizeof secrets);
-  TC_secure_zero(&inputs, sizeof inputs);
+  if (!inputs_close() && !status)
+    status = 1;
   if (munlock(&secrets, sizeof secrets))
     return 1;
   return status;

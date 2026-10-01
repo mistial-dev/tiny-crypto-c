@@ -108,10 +108,27 @@ static void dump(void* context, const TC_PIV_object* object)
   dumped.secret += (object->info->flags & TC_PIV_OBJECT_SECRET) != 0;
 }
 
+/* CRL bytes read through a byte source, as a file would be. */
+static TC_bytes crl_spans[2];
+
+static TC_status memory_read(void* context, uint64_t offset, uint8_t* destination, size_t length)
+{
+  const TC_bytes* bytes = context;
+  if (offset > bytes->length || length > bytes->length - offset)
+    return TC_ERROR;
+  memcpy(destination, bytes->data + offset, length);
+  return TC_OK;
+}
+
+static TC_source memory_source(const TC_bytes* bytes)
+{
+  return (TC_source){memory_read, (void*)bytes, bytes->length};
+}
+
 /* Options for card 2 or card 4 with the pinned issuing CAs, their CRLs and
  * OCSP responses. */
 static ExamplePIVInspectOptions options_for(int card4, TC_PIV_interface interface,
-                                            TC_bytes anchors[2], TC_bytes crls[2])
+                                            TC_bytes anchors[2], TC_source crls[2])
 {
   ExamplePIVInspectOptions options;
   memset(&options, 0, sizeof options);
@@ -120,18 +137,20 @@ static ExamplePIVInspectOptions options_for(int card4, TC_PIV_interface interfac
       vector(card4 ? "x509/ocsp/sd33/card03_response.der" : "x509/ocsp/sd33/card01_response.der");
   if (card4) {
     anchors[0] = vector("x509/ocsp/sd33/card03_issuer.der");
-    crls[0] = vector("x509/crl/sd33/ECCP256IssuingCA.crl");
+    crl_spans[0] = vector("x509/crl/sd33/ECCP256IssuingCA.crl");
   } else {
     anchors[0] = vector("x509/ocsp/sd33/card01_issuer.der");
     anchors[1] = vector("x509/ocsp/sd33/card04_issuer.der");
-    crls[0] = vector("x509/crl/sd33/RSA3072IssuingCA.crl");
-    crls[1] = vector("x509/crl/sd33/ECCP384IssuingCA.crl");
+    crl_spans[0] = vector("x509/crl/sd33/RSA3072IssuingCA.crl");
+    crl_spans[1] = vector("x509/crl/sd33/ECCP384IssuingCA.crl");
   }
   options.interface = interface;
   options.format = TC_APDU_SHORT;
   options.minimum_retries = 3;
   options.anchors = anchors;
   options.anchor_count = card4 ? 1 : 2;
+  for (size_t i = 0; i < 2; ++i)
+    crls[i] = memory_source(&crl_spans[i]);
   options.crls = crls;
   options.crl_count = card4 ? 1 : 2;
   options.ocsp[TC_PIV_CARD_SLOT_PIV_AUTHENTICATION] = response;
@@ -230,7 +249,8 @@ TC_TEST(card2_contactless)
   const TC_bytes pin = secret("TC_PIV_PIN"), pairing = secret("TC_PIV_PAIRING_CODE");
   if (!pin.length || !pairing.length)
     return MUNIT_SKIP;
-  TC_bytes anchors[2], crls[2];
+  TC_bytes anchors[2];
+  TC_source crls[2];
   load("sd33_card2");
   tc_card_simulator_init(&card, &fixture, TC_PIV_CONTACTLESS);
   ExamplePIVInspectOptions options = options_for(0, TC_PIV_CONTACTLESS, anchors, crls);
@@ -254,7 +274,8 @@ TC_TEST(card2_contact)
   const TC_bytes pin = secret("TC_PIV_PIN");
   if (!pin.length)
     return MUNIT_SKIP;
-  TC_bytes anchors[2], crls[2];
+  TC_bytes anchors[2];
+  TC_source crls[2];
   load("sd33_card2");
   tc_card_simulator_init(&card, &fixture, TC_PIV_CONTACT);
   ExamplePIVInspectOptions options = options_for(0, TC_PIV_CONTACT, anchors, crls);
@@ -276,7 +297,8 @@ TC_TEST(card4_contactless)
   const TC_bytes pin = secret("TC_PIV_PIN"), pairing = secret("TC_PIV_PAIRING_CODE");
   if (!pin.length || !pairing.length)
     return MUNIT_SKIP;
-  TC_bytes anchors[2], crls[2];
+  TC_bytes anchors[2];
+  TC_source crls[2];
   load("sd33_card4");
   tc_card_simulator_init(&card, &fixture, TC_PIV_CONTACTLESS);
   ExamplePIVInspectOptions options = options_for(1, TC_PIV_CONTACTLESS, anchors, crls);
@@ -296,7 +318,8 @@ TC_TEST(card4_contactless)
  * messaging requirements still accept the card. */
 TC_TEST(card2_without_pin)
 {
-  TC_bytes anchors[2], crls[2];
+  TC_bytes anchors[2];
+  TC_source crls[2];
   load("sd33_card2");
   tc_card_simulator_init(&card, &fixture, TC_PIV_CONTACTLESS);
   const ExamplePIVInspectOptions options = options_for(0, TC_PIV_CONTACTLESS, anchors, crls);
@@ -319,7 +342,8 @@ TC_TEST(card2_without_pin)
 TC_TEST(card2_tampered)
 {
   static uint8_t changed[FILE_BYTES];
-  TC_bytes anchors[2], crls[2];
+  TC_bytes anchors[2];
+  TC_source crls[2];
   load("sd33_card2");
   tc_card_simulator_init(&card, &fixture, TC_PIV_CONTACT);
   const tc_card_object* chuid = tc_card_fixture_object(&fixture, 0x5fc102);
@@ -346,7 +370,8 @@ TC_TEST(card2_wrong_pin)
   if (!pairing.length)
     return MUNIT_SKIP;
   static const uint8_t wrong[] = "999999";
-  TC_bytes anchors[2], crls[2];
+  TC_bytes anchors[2];
+  TC_source crls[2];
   load("sd33_card2");
   tc_card_simulator_init(&card, &fixture, TC_PIV_CONTACTLESS);
   ExamplePIVInspectOptions options = options_for(0, TC_PIV_CONTACTLESS, anchors, crls);
@@ -367,7 +392,8 @@ TC_TEST(card2_wrong_pin)
 TC_TEST(card2_unrequired_failure)
 {
   static uint8_t changed[FILE_BYTES];
-  TC_bytes anchors[2], crls[2];
+  TC_bytes anchors[2];
+  TC_source crls[2];
   load("sd33_card2");
   tc_card_simulator_init(&card, &fixture, TC_PIV_CONTACT);
   const tc_card_object* history = tc_card_fixture_object(&fixture, 0x5fc10c);
@@ -392,7 +418,8 @@ TC_TEST(card2_unrequired_failure)
  * rejected, although the plain baseline passes. */
 TC_TEST(card2_key_establishment_refused)
 {
-  TC_bytes anchors[2], crls[2];
+  TC_bytes anchors[2];
+  TC_source crls[2];
   load("sd33_card2");
   tc_card_simulator_init(&card, &fixture, TC_PIV_CONTACTLESS);
   ExamplePIVInspectOptions options = options_for(0, TC_PIV_CONTACTLESS, anchors, crls);
@@ -438,7 +465,8 @@ TC_TEST(card2_guarded)
   const TC_bytes pin = secret("TC_PIV_PIN"), pairing = secret("TC_PIV_PAIRING_CODE");
   if (!pin.length || !pairing.length)
     return MUNIT_SKIP;
-  TC_bytes anchors[2], crls[2];
+  TC_bytes anchors[2];
+  TC_source crls[2];
   load("sd33_card2");
   tc_card_simulator_init(&card, &fixture, TC_PIV_CONTACTLESS);
   ExamplePIVInspectOptions options = options_for(0, TC_PIV_CONTACTLESS, anchors, crls);
@@ -469,7 +497,8 @@ TC_TEST(card2_guard_identity)
   const TC_bytes pin = secret("TC_PIV_PIN"), pairing = secret("TC_PIV_PAIRING_CODE");
   if (!pin.length || !pairing.length)
     return MUNIT_SKIP;
-  TC_bytes anchors[2], crls[2];
+  TC_bytes anchors[2];
+  TC_source crls[2];
   load("sd33_card2");
   tc_card_simulator_init(&card, &fixture, TC_PIV_CONTACTLESS);
   ExamplePIVInspectOptions options = options_for(0, TC_PIV_CONTACTLESS, anchors, crls);
@@ -493,7 +522,8 @@ TC_TEST(card2_guard_identity)
 /* Invalid options return 2 before any command. */
 TC_TEST(arguments)
 {
-  TC_bytes anchors[2], crls[2];
+  TC_bytes anchors[2];
+  TC_source crls[2];
   load("sd33_card2");
   tc_card_simulator_init(&card, &fixture, TC_PIV_CONTACT);
   const ExamplePIVInspectOptions valid = options_for(0, TC_PIV_CONTACT, anchors, crls);
