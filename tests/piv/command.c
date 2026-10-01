@@ -640,13 +640,18 @@ TC_TEST(get_data_extended)
 
 TC_TEST(get_data_arguments)
 {
-  const tc_script_step steps[] = {STEP(PIV_SELECT, PIV_APT "9000")};
+  const tc_script_step steps[] = {STEP(PIV_SELECT, PIV_APT "9000"),
+                                  STEP("00CB3FFF035C017E00", "7E124F0BA00000030800"
+                                                             "6120")};
   TC_PIV_link link;
-  link_start(&link, steps, 1, TC_PIV_CONTACT);
+  link_start(&link, steps, 2, TC_PIV_CONTACT);
   TC_PIV_data_object out, preserved;
   memset(&out, 0x5a, sizeof out);
   preserved = out;
+  /* A refusal after the argument checks wipes the response. */
+  memset(response_bytes, 0xee, 64);
   munit_assert_int(get_data_hex(&link, "7E", 64, &out), ==, TC_PIV_REFUSED);
+  munit_assert_true(tc_test_all_zero(response_bytes, 64));
   select_application(&link, TC_PIV_APPLICATION_PIV);
   static const char* const tags[] = {"",     "5FC1020A", "5F", "5FC1", "5F80",
                                      "7E01", "00",       "FF", "1F"};
@@ -668,6 +673,12 @@ TC_TEST(get_data_arguments)
   response_bytes[10] = 0x7e;
   munit_assert_int(TC_PIV_get_data(&link, span(response_bytes + 10, 1), response_buffer(64), &out),
                    ==, TC_PIV_ARGUMENT);
+  munit_assert_memory_equal(sizeof out, &out, &preserved);
+  /* A continuation the response cannot hold is LIMIT, and the partial
+   * answer is wiped. */
+  memset(response_bytes, 0xee, 20);
+  munit_assert_int(get_data_hex(&link, "7E", 20, &out), ==, TC_PIV_LIMIT);
+  munit_assert_true(tc_test_all_zero(response_bytes, 20));
   munit_assert_memory_equal(sizeof out, &out, &preserved);
   assert_script_done();
   return MUNIT_OK;

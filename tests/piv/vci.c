@@ -9,6 +9,7 @@
 #include <tiny_crypto/piv_vci.h>
 #include "cavp.h"
 #include "munit.h"
+#include "piv_link_internal.h"
 #include "scripted_transport.h"
 #include "sm_card.h"
 #include "test_util.h"
@@ -215,6 +216,13 @@ TC_TEST(discovery_arguments)
                                         (TC_buffer){(uint8_t*)&discovery, sizeof discovery},
                                         &discovery),
                    ==, TC_PIV_ARGUMENT);
+  munit_assert_uint8(discovery.policy, ==, 0xa5);
+  /* A link whose session was lost refuses the read and wipes the
+   * response (Part 2 4.3). */
+  link.flags |= TC_PIV_LINK_SM_LOST;
+  munit_assert_int(TC_PIV_discovery_get(&link, TC_PIV_DISCOVERY_PIV, response_buffer(), &discovery),
+                   ==, TC_PIV_REFUSED);
+  munit_assert_true(tc_test_all_zero(response_bytes, sizeof response_bytes));
   munit_assert_uint8(discovery.policy, ==, 0xa5);
   munit_assert_size(script.next, ==, 1);
   TC_PIV_link_clear(&link);

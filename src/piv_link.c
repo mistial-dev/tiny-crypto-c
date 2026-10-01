@@ -168,19 +168,26 @@ TC_PIV_result tc_piv_link_transceive(TC_PIV_link* link, TC_PIV_command kind,
    * commands in plaintext (SP 800-73-5 Part 2 4.2 and 4.3). */
   const int protect =
       sm_eligible(command->ins) && (link->flags & (TC_PIV_LINK_SECURED | TC_PIV_LINK_SM_LOST)) != 0;
-  if (protect && (!(link->flags & TC_PIV_LINK_SECURED) || !link->security))
+  /* Nothing is sent, so the last card status stays. */
+  if (protect && (!(link->flags & TC_PIV_LINK_SECURED) || !link->security)) {
+    TC_secure_zero(response.data, response.capacity);
     return TC_PIV_REFUSED;
+  }
   link->command = (uint8_t)kind;
   link->status = 0;
   const TC_PIV_result result =
       protect ? link->security->transceive(link, command, response, out)
               : tc_piv_channel_result(TC_APDU_transceive(&link->channel, command, response, out));
-  if (result == TC_PIV_OK)
+  if (result == TC_PIV_OK) {
     link->status = out->sw;
+    return result;
+  }
   /* The stopped channel cannot carry the session further, so its keys go now
    * (Part 2 4.3). */
-  else if (result == TC_PIV_ERROR && link->security)
+  if (result == TC_PIV_ERROR && link->security)
     tc_piv_link_session_lost(link);
+  /* Every failed exchange leaves no partial answer in the response. */
+  TC_secure_zero(response.data, response.capacity);
   return result;
 }
 

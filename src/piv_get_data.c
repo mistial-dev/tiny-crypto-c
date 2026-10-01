@@ -121,8 +121,10 @@ TC_PIV_result TC_PIV_get_data(TC_PIV_link* link, TC_bytes tag, TC_buffer respons
       !tc_piv_response_valid(link, response, out, sizeof *out) ||
       !tc_internal_ranges_disjoint(response.data, response.capacity, tag.data, tag.length))
     return TC_PIV_ARGUMENT;
-  if (link->application == TC_PIV_APPLICATION_NONE)
+  if (link->application == TC_PIV_APPLICATION_NONE) {
+    TC_secure_zero(response.data, response.capacity);
     return TC_PIV_REFUSED;
+  }
   /* Data field: 5C L tag (Part 2 Table 6). */
   static const uint8_t tag_list = TAG_LIST;
   uint8_t data[MAX_DATA_BYTES];

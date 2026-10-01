@@ -361,10 +361,12 @@ TC_TEST(outer_status)
       assert_lost(&link, statuses[i]);
       munit_assert_true(tc_test_all_zero(response_bytes, RESPONSE_BYTES));
       munit_assert_size(card.transmits, ==, 3);
-      /* Nothing protected goes out, and nothing falls back to plaintext. */
+      /* Nothing protected goes out, and nothing falls back to plaintext.
+       * The refusal wipes the response. */
       munit_assert_int(TC_PIV_get_data(&link, (TC_bytes){tag, sizeof tag},
                                        response_buffer(RESPONSE_BYTES), &out),
                        ==, TC_PIV_REFUSED);
+      munit_assert_true(tc_test_all_zero(response_bytes, RESPONSE_BYTES));
       munit_assert_int(TC_PIV_verify_status(&link, 0x98, &status), ==, TC_PIV_REFUSED);
       munit_assert_int(TC_PIV_SM_key_request(&link, &session, suites[s], host_id,
                                              (TC_random_source){scalar_one, NULL},
