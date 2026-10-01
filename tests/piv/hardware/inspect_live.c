@@ -4,11 +4,11 @@
  * test_piv_inspect_live: examples/piv_inspect on the live card in a fresh
  * connection, with the hardware guard installed through the example's
  * TC_PIV_HARDWARE_GUARD hook. The environment is that of piv_card.c
- * (card_config.h). The guard allows one PIN submission and one pairing
- * code, both only for a card that matches TC_PIV_CARD_EXPECT, and no 9C.
- * Without TC_PIV_CARD_EXPECT the example runs with neither. Exit status 0
- * or 1 of the example passes. CTest fails the run on a printed FAILED
- * check. */
+ * (card_config.h), and TC_PIV_CARD_TIME reaches the example as --at. The
+ * guard allows one PIN submission and one pairing code, both only for a
+ * card that matches TC_PIV_CARD_EXPECT, and no 9C. Without
+ * TC_PIV_CARD_EXPECT the example runs with neither. Exit status 0 or 1 of
+ * the example passes. CTest fails the run on a printed FAILED check. */
 #include "../../../examples/credential_pcsc.h"
 #include "card_config.h"
 #include "card_fixture.h"
@@ -72,6 +72,7 @@ int main(void)
 {
   enum { ARGUMENTS = 48 };
   static char minimum[8];
+  static char evaluation_time[32];
   static char* arguments[ARGUMENTS];
   const char* malformed = tc_piv_card_config_read(&config, TC_VECTOR_DIR);
   if (malformed) {
@@ -114,6 +115,14 @@ int main(void)
   for (size_t i = 0; i < config.trust.crl_count; ++i) {
     arguments[count++] = (char*)"--crl";
     arguments[count++] = config.trust.crls[i];
+  }
+  /* piv_inspect reads the host clock only without --at. */
+  if (!config.host_clock) {
+    const TC_X509_time* at = &config.at;
+    snprintf(evaluation_time, sizeof evaluation_time, "%04u-%02u-%02uT%02u:%02u:%02uZ", at->year,
+             at->month, at->day, at->hour, at->minute, at->second);
+    arguments[count++] = (char*)"--at";
+    arguments[count++] = evaluation_time;
   }
   if (config.dump_dir) {
     arguments[count++] = (char*)"--dump-dir";

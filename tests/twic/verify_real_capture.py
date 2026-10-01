@@ -32,6 +32,20 @@ from cryptography.x509.oid import ExtensionOID
 from PIL import Image, UnidentifiedImageError
 
 
+# The default evaluation time of certificate dates and anchored paths: the
+# day the private captures were verified. --at selects another instant.
+CAPTURE_TIME = datetime.datetime(2026, 9, 27, 12, 0, 0, tzinfo=datetime.timezone.utc)
+
+
+def utc_time(text: str) -> datetime.datetime:
+    """Parse YYYY-MM-DDTHH:MM:SSZ for --at."""
+    try:
+        value = datetime.datetime.strptime(text, "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError as error:
+        raise argparse.ArgumentTypeError("expected YYYY-MM-DDTHH:MM:SSZ") from error
+    return value.replace(tzinfo=datetime.timezone.utc)
+
+
 class VerificationError(Exception):
     """A failed check with a label that contains no card material."""
 
@@ -146,7 +160,7 @@ def cms_verify(cms: bytes, signer: x509.Certificate, content: bytes | None) -> b
 
 
 def verify_paths(directory: Path, bundle_dir: Path | None, anchor_file: Path | None,
-                 signer: x509.Certificate) -> str:
+                 signer: x509.Certificate, at: datetime.datetime) -> str:
     source = bundle_dir or directory
     content_bundle = source / "content-issuer-0.bin"
     card_bundle = source / "card-issuer-0.bin"
@@ -160,7 +174,6 @@ def verify_paths(directory: Path, bundle_dir: Path | None, anchor_file: Path | N
         require(len(anchors) > 0, "trust anchors empty")
     card_field = find(object_fields(directory, "PIV-5fc101.bin"), b"\x70")
     card = x509.load_der_x509_certificate(card_field.value)
-    now = datetime.datetime.now(datetime.timezone.utc)
     states = []
     for label, leaf, path in (("signer", signer, content_bundle),
                               ("card", card, card_bundle)):
@@ -179,7 +192,7 @@ def verify_paths(directory: Path, bundle_dir: Path | None, anchor_file: Path | N
             require(fingerprint not in fingerprints and len(chain) <= 12,
                     label + " chain loop/depth")
             fingerprints.add(fingerprint)
-            dates_valid &= current.not_valid_before_utc <= now <= current.not_valid_after_utc
+            dates_valid &= current.not_valid_before_utc <= at <= current.not_valid_after_utc
             if len(chain) == 1:
                 usage = current.extensions.get_extension_for_oid(ExtensionOID.KEY_USAGE).value
                 require(usage.digital_signature, label + " digitalSignature usage")
@@ -233,6 +246,7 @@ def verify_paths(directory: Path, bundle_dir: Path | None, anchor_file: Path | N
                 (workspace / "issuers.pem").write_bytes(b"".join(
                     item.public_bytes(Encoding.PEM) for item in issuers))
                 result = subprocess.run(["openssl", "verify", "-purpose", "any",
+                                         "-attime", str(int(at.timestamp())),
                                          "-policy_check", "-CAfile", str(anchor_file),
                                          "-untrusted", str(workspace / "issuers.pem"),
                                          str(workspace / "leaf.pem")],
@@ -949,7 +963,8 @@ def verify_synthetic_structure(capture_root: Path, synthetic_root: Path) -> None
 
 def verify_profile(directory: Path, profile: str,
                    issuer_bundle_dir: Path | None = None,
-                   trust_anchors: Path | None = None) -> dict[str, object]:
+                   trust_anchors: Path | None = None,
+                   at: datetime.datetime = CAPTURE_TIME) -> dict[str, object]:
     apdus = verify_apdus(directory, profile)
     signed = object_fields(directory, "TWIC-5fc102.bin")
     unsigned = object_fields(directory, "TWIC-5fc104.bin")
@@ -968,7 +983,7 @@ def verify_profile(directory: Path, profile: str,
     bundle_dir = issuer_bundle_dir
     if bundle_dir is not None and (bundle_dir / f"{profile}-contact").is_dir():
         bundle_dir = bundle_dir / f"{profile}-contact"
-    path_status = verify_paths(directory, bundle_dir, trust_anchors, signer)
+    path_status = verify_paths(directory, bundle_dir, trust_anchors, signer, at)
     # The signature covers the original TLV encodings, including the LRC.
     content = b"".join(item.encoded for item in signed if item.tag != b"\x3e")
     cms_verify(signed[3].value, signer, content)
@@ -1021,7 +1036,10 @@ def main() -> int:
     parser.add_argument("--trust-anchors", type=Path,
                         help="explicit PEM trust anchors; never obtained from AIA")
     parser.add_argument("--require-current-trust", action="store_true",
-                        help="require both paths to validate to explicit anchors today")
+                        help="require both paths to validate to explicit anchors at --at")
+    parser.add_argument("--at", type=utc_time, default=CAPTURE_TIME,
+                        help="evaluation time YYYY-MM-DDTHH:MM:SSZ, default "
+                             + CAPTURE_TIME.strftime("%Y-%m-%dT%H:%M:%SZ"))
     parser.add_argument("--synthetic-root", type=Path,
                         help="compare public fixture structure and reject copied card bytes")
     args = parser.parse_args()
@@ -1032,7 +1050,7 @@ def main() -> int:
         invalid_card_proof = False
         for profile in profiles:
             result = verify_profile(args.capture_root / f"{profile}-contact", profile,
-                                    args.issuer_bundle_dir, args.trust_anchors)
+                                    args.issuer_bundle_dir, args.trust_anchors, args.at)
             invalid_card_proof |= result["card_key_proof"] in (
                 "INVALID", "MISATTRIBUTED TO NEXGEN")
             print(f"{profile}: verified {result['apdus']['present']} objects, "

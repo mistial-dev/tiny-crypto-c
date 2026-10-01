@@ -22,6 +22,12 @@ int example_read_file(const char* path, uint8_t* buffer, size_t capacity, TC_byt
 int example_read_created_file(const char* path, uint8_t* buffer, size_t capacity, TC_bytes* out,
                               uint64_t* created);
 
+/* Parse an ISO 8601 UTC time of exactly the form YYYY-MM-DDTHH:MM:SSZ, with
+ * every field zero-padded, into out. Returns 1 on success. out changes only on
+ * success. A NULL argument, other forms, other zones and invalid calendar
+ * times return 0. */
+int example_time_parse(const char* text, TC_X509_time* out);
+
 /* Borrow a seekable binary stream for bounded source reads. Keep the file open
  * and immutable until processing finishes. Serialize access to its seek position.
  * The size must fit both max_bytes and the host's long file offsets. Setup

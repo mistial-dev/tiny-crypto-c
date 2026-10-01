@@ -18,6 +18,9 @@
  * TC_PIV_CARD_REVOCATION   required or when-available (default).
  * TC_PIV_CARD_EXTENDED     1 adds the extended-length scenario.
  * TC_PIV_CARD_DUMP_DIR     a directory of mode 0700 for object dumps.
+ * TC_PIV_CARD_TIME         the evaluation time as YYYY-MM-DDTHH:MM:SSZ, or
+ *                          now for the host clock (reader only). Unset
+ *                          takes TC_PIV_CARD_FIXTURE_TIME.
  *
  * The default trust points are the vendored SD 33 issuing CAs with pinned
  * SHA-256 digests, since the SD 33 root is unavailable. */
@@ -28,6 +31,11 @@
 
 #define TC_PIV_CARD_TRUST_FILES 4u
 #define TC_PIV_CARD_PATH_BYTES 1024u
+
+/* The instant the SD 33 captures and the vendored CRLs and OCSP responses
+ * were taken, 2026-09-29T18:00:00Z. Runs evaluate at it by default, so the
+ * expiry of those fixtures leaves the results unchanged. */
+#define TC_PIV_CARD_FIXTURE_TIME ((TC_X509_time){2026, 9, 29, 18, 0, 0})
 
 typedef enum {
   TC_PIV_CARD_DETECT,
@@ -56,7 +64,9 @@ typedef struct {
 } tc_piv_card_trust_paths;
 
 /* The parsed environment. Strings borrow the environment. expect is NULL
- * without TC_PIV_CARD_EXPECT. */
+ * without TC_PIV_CARD_EXPECT. at is the evaluation time. host_clock is 1
+ * for TC_PIV_CARD_TIME=now, and the reader backend then replaces at with
+ * the host clock when it opens the card. */
 typedef struct {
   const char* reader;
   tc_piv_card_interface interface;
@@ -66,6 +76,8 @@ typedef struct {
   TC_validation_revocation revocation;
   int extended;
   const char* dump_dir;
+  TC_X509_time at;
+  int host_clock;
   tc_piv_card_trust_paths trust;
 } tc_piv_card_config;
 

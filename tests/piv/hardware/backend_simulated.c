@@ -2,8 +2,9 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 /* The SD 33 card simulator behind the hardware scenarios, with the guard
  * in front of it. The random source replays the recorded key establishment
- * scalar and the recorded proof challenges, and the evaluation time is the
- * one of the vendored CRLs and OCSP responses. */
+ * scalar and the recorded proof challenges. The evaluation time is
+ * TC_PIV_CARD_TIME, by default the fixture instant of the captures and the
+ * vendored CRLs and OCSP responses. The simulator has no host clock. */
 #include "card_backend.h"
 #include "card_simulator.h"
 #include <stdio.h>
@@ -53,6 +54,8 @@ const char* tc_piv_card_backend_open(tc_piv_card_backend* backend, const tc_piv_
   memset(backend, 0, sizeof *backend);
   if (!config->expect)
     return "TC_PIV_CARD_EXPECT is unset";
+  if (config->host_clock)
+    return "TC_PIV_CARD_TIME=now needs a reader";
   if (snprintf(path, sizeof path, "%s/%s.txt", TC_CARD_FIXTURE_DIR, config->expect->fixture) <= 0 ||
       tc_card_fixture_load(&fixture, path) || !fixture.session_count)
     return "unable to load the capture fixture";
@@ -66,7 +69,7 @@ const char* tc_piv_card_backend_open(tc_piv_card_backend* backend, const tc_piv_
   backend->interface = interface;
   backend->random = (TC_random_source){replay, NULL};
   memcpy(backend->host_id, fixture.sessions[0].host_id.data, sizeof backend->host_id);
-  backend->at = (TC_X509_time){2026, 9, 29, 18, 0, 0};
+  backend->at = config->at;
   backend->signature_proofs = tc_card_fixture_challenge(&fixture, 0x9c).length != 0;
   return NULL;
 }

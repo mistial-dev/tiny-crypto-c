@@ -168,6 +168,7 @@ golden file when the change is intended.
 GET RESPONSE and chaining, the identity binding, the PIN and pairing code
 budgets, SM VERIFY classification, the contactless refusal of plain reference
 data, 9C after a PIN submission and the guarded transport.
+`test_piv_hardware_config` covers the `TC_PIV_CARD_TIME` evaluation time.
 `test_piv_card_simulated_card2_contactless`, `_card2_contact` and
 `_card4_contactless` run the hardware scenarios over the card simulator with
 the guard in front of it. The card 2 contact run adds extended length and the
@@ -323,6 +324,17 @@ TLV-only, and EC-only builds, with SHA-256 disabled.
 resolve, and struct initializers in C code blocks must match the public
 headers. A positional initializer sets every member. A designated initializer
 names only existing members.
+
+Tests evaluate certificates, CRLs and OCSP responses at fixed times, so the
+expiry of a vendored fixture leaves every result unchanged. `test_no_wall_clock`
+scans the C, C++, Python and CMake files below `tests/` and fails on a read of
+the current time: `time(NULL)`, `gmtime`, `localtime`, `clock_gettime`,
+`gettimeofday`, `timespec_get`, `std::chrono::system_clock`, `datetime.now`,
+`time.time()`, OpenSSL `X509_gmtime_adj`, `X509_cmp_current_time` and
+`X509_time_adj` with a NULL time, and CMake `string(TIMESTAMP)`. The vendored
+munit and doctest sources and `tests/vectors` are skipped. The `ALLOWED` table
+in the script names any remaining use with its reason. Examples that model a
+device, such as `examples/credential_system.c`, keep the platform clock.
 
 To run the installation checks after configuring a build:
 
@@ -736,7 +748,10 @@ budgets. CRL freshness tests pin the clock-skew and max-age boundaries in
 `test_x509_ocsp_sd33` verifies the NIST SD 33 captured responses, compares
 encoded requests with OpenSSL-generated ones and runs `examples/x509_ocsp.c`.
 With `TINY_CRYPTO_TEST_OPENSSL=ON`, `test_x509_ocsp_openssl` generates P-256
-responses at run time. It covers issuer-signed byName and byKey responses,
+responses at run time. Every certificate, CRL and OCSP time is an offset from
+the fixed epoch 2026-06-15T12:00:00Z, which is also the evaluation time. The
+test sets producedAt to the epoch and signs the response again, since
+`OCSP_basic_sign` stamps the current time. It covers issuer-signed byName and byKey responses,
 embedded and store-supplied delegates with and without nocheck, and delegates
 rejected for a missing or wrong EKU, anyExtendedKeyUsage, another issuer, a
 bad certificate signature, expiry, a key usage without digitalSignature and an
@@ -1226,6 +1241,7 @@ anything from `tests/piv/hardware`.
 | `TC_PIV_CARD_REVOCATION`  | `required` or `when-available`, the default                               |
 | `TC_PIV_CARD_EXTENDED`    | `1` adds the extended-length scenario                                     |
 | `TC_PIV_CARD_DUMP_DIR`    | A directory only its owner can read, for object dumps                     |
+| `TC_PIV_CARD_TIME`        | Evaluation time `YYYY-MM-DDTHH:MM:SSZ`, or `now` for the host clock       |
 
 The reader transport is `examples/credential_pcsc.c`. It lists the readers,
 takes the one whose name contains `TC_PIV_CARD_READER`, and refuses reader
@@ -1291,15 +1307,23 @@ the 9E proof. Once SM is up it also requires the SM signer, the card CVC and
 the plain copies, and on contact or with the VCI the Security Object
 signature. With the PIN it requires the PIV Authentication path, the 9A proof
 and every signed digest. Revocation stays unrequired, since missing evidence
-is NOT_CHECKABLE after the vendored CRLs expire. The output holds labels and counts. Objects reach
-`TC_PIV_CARD_DUMP_DIR` only when it is set, and secret objects never do.
+is NOT_CHECKABLE at a `TC_PIV_CARD_TIME` after the vendored CRLs expire. The
+output holds labels and counts. Objects reach `TC_PIV_CARD_DUMP_DIR` only
+when it is set, and secret objects never do.
 
 The SD 33 root is unavailable, so the default trust points are the vendored
 issuing CAs pinned by SHA-256: `card01_issuer.der` and `card04_issuer.der` for
 card 2, whose secure messaging signer "Test PIV Content Signer 4" chains to
-the P-384 CA, and `card03_issuer.der` for card 4. The vendored CRLs expire on
-2026-10-01, so the runs default to `when-available`, which reports missing
-evidence as NOT_CHECKABLE.
+the P-384 CA, and `card03_issuer.der` for card 4.
+
+The runs evaluate every certificate, CRL and OCSP response at
+2026-09-29T18:00:00Z, the instant the SD 33 captures and the vendored CRLs were
+taken, so the results stay the same after the CRLs expire on 2026-10-01.
+`TC_PIV_CARD_TIME` selects another instant, and `now` reads the host clock
+through `example_card_now`. `test_piv_inspect_live` passes the time to
+`piv_inspect` as `--at`. The simulated runs have no host clock and refuse
+`now`. Revocation defaults to `when-available`, so a later time with the
+vendored CRLs still passes.
 
 ```sh
 cmake -S . -B build-card -DTINY_CRYPTO_TEST_PIV_CARD=ON

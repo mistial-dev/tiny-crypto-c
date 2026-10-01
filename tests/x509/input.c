@@ -217,6 +217,46 @@ TC_TEST(stream_source)
   return MUNIT_OK;
 }
 
+/* ISO 8601 UTC times as piv_inspect --at and TC_PIV_CARD_TIME take them. */
+TC_TEST(time_text)
+{
+  TC_X509_time at = {2000, 1, 1, 0, 0, 0};
+  munit_assert_true(example_time_parse("2026-09-29T18:00:00Z", &at));
+  munit_assert_uint(at.year, ==, 2026);
+  munit_assert_uint(at.month, ==, 9);
+  munit_assert_uint(at.day, ==, 29);
+  munit_assert_uint(at.hour, ==, 18);
+  munit_assert_uint(at.minute, ==, 0);
+  munit_assert_uint(at.second, ==, 0);
+  munit_assert_true(example_time_parse("2024-02-29T23:59:59Z", &at));
+  munit_assert_uint(at.day, ==, 29);
+  static const char* const rejected[] = {"",
+                                         "now",
+                                         "2026-09-29T18:00:00",
+                                         "2026-09-29T18:00:00+01",
+                                         "2026-09-29T18:00:00Zx",
+                                         "2026-13-01T00:00:00Z",
+                                         "2025-02-29T00:00:00Z",
+                                         "2026-09-29T24:00:00Z",
+                                         "2026-09-29T18:60:00Z",
+                                         "2026-09-29T18:00:60Z",
+                                         "2026-09-29 18:00:00Z",
+                                         "2026-9-29T18:00:00Z",
+                                         "2026-09-29T8:00:00Z",
+                                         " 2026-09-29T18:00:00Z",
+                                         "2026-+9-29T18:00:00Z",
+                                         "2026-09-29T18:00:00z"};
+  for (size_t i = 0; i < sizeof rejected / sizeof *rejected; ++i) {
+    at = (TC_X509_time){2000, 1, 1, 0, 0, 0};
+    munit_assert_false(example_time_parse(rejected[i], &at));
+    munit_assert_uint(at.year, ==, 2000);
+    munit_assert_uint(at.day, ==, 1);
+  }
+  munit_assert_false(example_time_parse(NULL, &at));
+  munit_assert_false(example_time_parse("2026-09-29T18:00:00Z", NULL));
+  return MUNIT_OK;
+}
+
 int main(int argc, char** argv)
 {
   MunitTest tests[] = {
@@ -226,6 +266,7 @@ int main(int argc, char** argv)
       {"/created-files", created_files, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/source", source, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/cancellation-image", cancellation_image, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/time-text", time_text, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};
   MunitSuite suite = {"/pki/input", tests, NULL, 1, MUNIT_SUITE_OPTION_NONE};
   return munit_suite_main(&suite, NULL, argc, argv);

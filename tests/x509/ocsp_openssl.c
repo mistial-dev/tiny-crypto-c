@@ -4,10 +4,8 @@
  * OCSP responses generated with OpenSSL from throwaway P-256 keys. The cases
  * cover CA-signed and delegated responders, delegate rejections, response
  * structure, nonces, work limits and CRL fallback in the composed path check.
- * OCSP_basic_sign stamps producedAt with the wall clock, so every time is
- * relative to the clock read by hierarchy_init. */
-/* gmtime_r is POSIX. glibc declares it only on request under -std=c99. */
-#define _POSIX_C_SOURCE 200809L
+ * Every certificate, CRL and OCSP time is an offset from the fixed epoch
+ * 2026-06-15T12:00:00Z, which is also the evaluation time. */
 #include "ocsp_fixture.h"
 #include "test_util.h"
 #include "openssl_fixture.h"
@@ -18,6 +16,19 @@
 static ocsp_fixture fixture;
 
 enum { DAY = 86400, TARGET_SERIAL = 0x1234, OTHER_SERIAL = 0x4321, DELEGATE_SERIAL = 7 };
+
+/* The fixed epoch 2026-06-15T12:00:00Z as Unix seconds and as the evaluation
+ * time. hierarchy_init checks that the two agree. */
+static time_t epoch = 1781524800;
+static const TC_X509_time epoch_time = {2026, 6, 15, 12, 0, 0};
+
+/* out, or a new ASN1_TIME when out is NULL, set to epoch + seconds. */
+static ASN1_TIME* epoch_offset(ASN1_TIME* out, long seconds)
+{
+  ASN1_TIME* value = X509_time_adj_ex(out, 0, seconds, &epoch);
+  munit_assert_not_null(value);
+  return value;
+}
 
 typedef struct {
   EVP_PKEY *ca_key, *responder_key, *other_key;
@@ -65,10 +76,8 @@ static X509* issue(const certificate_spec* spec)
 {
   X509* certificate = make_certificate(spec->key, spec->name, spec->issuer);
   munit_assert_int(ASN1_INTEGER_set(X509_get_serialNumber(certificate), spec->serial), ==, 1);
-  munit_assert_not_null(
-      X509_gmtime_adj(X509_getm_notBefore(certificate), spec->expired ? -60L * DAY : -30L * DAY));
-  munit_assert_not_null(
-      X509_gmtime_adj(X509_getm_notAfter(certificate), spec->expired ? -1L * DAY : 365L * DAY));
+  epoch_offset(X509_getm_notBefore(certificate), spec->expired ? -60L * DAY : -30L * DAY);
+  epoch_offset(X509_getm_notAfter(certificate), spec->expired ? -1L * DAY : 365L * DAY);
   if (spec->ca)
     add_extension(certificate, NID_basic_constraints, "critical,CA:TRUE");
   if (spec->key_usage)
@@ -94,15 +103,6 @@ static TC_bytes certificate_der(X509* certificate, uint8_t der[OCSP_FILE_CAPACIT
   munit_assert_int(length, <=, OCSP_FILE_CAPACITY);
   munit_assert_int(i2d_X509(certificate, &cursor), ==, length);
   return (TC_bytes){der, (size_t)length};
-}
-
-static TC_X509_time utc_time(time_t seconds)
-{
-  struct tm fields;
-  munit_assert_not_null(gmtime_r(&seconds, &fields));
-  return (TC_X509_time){
-      (unsigned)(fields.tm_year + 1900), (uint8_t)(fields.tm_mon + 1), (uint8_t)fields.tm_mday,
-      (uint8_t)fields.tm_hour,           (uint8_t)fields.tm_min,       (uint8_t)fields.tm_sec};
 }
 
 /* A CA, a target it issued with serial 0x1234 and an unrelated CA. */
@@ -145,7 +145,10 @@ static void hierarchy_init(void)
   munit_assert_int(TC_X509_read(pki.ca_bytes, &fixture.limits, &fixture.parser, &view), ==,
                    TC_TLV_OK);
   pki.anchor = (TC_X509_trust_anchor){view.subject, view.public_key};
-  pki.at = utc_time(time(NULL));
+  int64_t seconds = 0;
+  munit_assert_int(TC_X509_time_to_unix(&epoch_time, &seconds), ==, TC_TLV_OK);
+  munit_assert_int64(seconds, ==, (int64_t)epoch);
+  pki.at = epoch_time;
 }
 
 static void hierarchy_free(void)
@@ -235,11 +238,9 @@ static void add_extensions(int kind, OCSP_BASICRESP* basic, OCSP_SINGLERESP* sin
 static OCSP_SINGLERESP* add_status(OCSP_BASICRESP* basic, OCSP_CERTID* id,
                                    const response_spec* spec)
 {
-  ASN1_TIME* this_update = X509_gmtime_adj(NULL, -3600);
-  ASN1_TIME* next_update = spec->no_next_update ? NULL : X509_gmtime_adj(NULL, DAY);
-  ASN1_TIME* revoked = X509_gmtime_adj(NULL, -7L * DAY);
-  munit_assert_not_null(this_update);
-  munit_assert_not_null(revoked);
+  ASN1_TIME* this_update = epoch_offset(NULL, -3600);
+  ASN1_TIME* next_update = spec->no_next_update ? NULL : epoch_offset(NULL, DAY);
+  ASN1_TIME* revoked = epoch_offset(NULL, -7L * DAY);
   OCSP_SINGLERESP* single = OCSP_basic_add1_status(basic, id, spec->status, spec->reason, revoked,
                                                    this_update, next_update);
   munit_assert_not_null(single);
@@ -247,6 +248,23 @@ static OCSP_SINGLERESP* add_status(OCSP_BASICRESP* basic, OCSP_CERTID* id,
   ASN1_TIME_free(next_update);
   ASN1_TIME_free(revoked);
   return single;
+}
+
+/* OCSP_basic_sign stamps producedAt with the wall clock and offers no way to
+ * choose it. Set producedAt to the epoch and sign tbsResponseData again with
+ * the same key, digest and signatureAlgorithm (RFC 6960 4.2.1). OpenSSL
+ * returns these fields as const views of the mutable response. */
+static void produced_at_epoch(OCSP_BASICRESP* basic, EVP_PKEY* key)
+{
+  ASN1_GENERALIZEDTIME* produced =
+      (ASN1_GENERALIZEDTIME*)(uintptr_t)OCSP_resp_get0_produced_at(basic);
+  X509_ALGOR* algorithm = (X509_ALGOR*)(uintptr_t)OCSP_resp_get0_tbs_sigalg(basic);
+  ASN1_BIT_STRING* signature = (ASN1_BIT_STRING*)(uintptr_t)OCSP_resp_get0_signature(basic);
+  void* data = (void*)(uintptr_t)OCSP_resp_get0_respdata(basic);
+  munit_assert_not_null(ASN1_GENERALIZEDTIME_set(produced, epoch));
+  munit_assert_int(ASN1_item_sign(ASN1_ITEM_rptr(OCSP_RESPDATA), algorithm, NULL, signature, data,
+                                  key, EVP_sha256()),
+                   >, 0);
 }
 
 static TC_bytes build_response(const response_spec* spec, uint8_t out[OCSP_FILE_CAPACITY])
@@ -282,6 +300,7 @@ static TC_bytes build_response(const response_spec* spec, uint8_t out[OCSP_FILE_
   add_extensions(spec->response_extension, basic, NULL);
   munit_assert_int(OCSP_basic_sign(basic, spec->signer, spec->key, EVP_sha256(), NULL, spec->flags),
                    ==, 1);
+  produced_at_epoch(basic, spec->key);
   OCSP_RESPONSE* response = OCSP_response_create(OCSP_RESPONSE_STATUS_SUCCESSFUL, basic);
   munit_assert_not_null(response);
   OCSP_BASICRESP_free(basic);
@@ -325,6 +344,17 @@ static TC_TLV_result verify(const response_spec* spec, const TC_X509_store_sourc
   return verify_with(&request, result);
 }
 
+/* Compare the fields of two times. */
+static void assert_time_equal(const TC_X509_time* actual, const TC_X509_time* expected)
+{
+  munit_assert_uint(actual->year, ==, expected->year);
+  munit_assert_uint(actual->month, ==, expected->month);
+  munit_assert_uint(actual->day, ==, expected->day);
+  munit_assert_uint(actual->hour, ==, expected->hour);
+  munit_assert_uint(actual->minute, ==, expected->minute);
+  munit_assert_uint(actual->second, ==, expected->second);
+}
+
 /* A response signed by the CA itself, identified byName or byKey (RFC 6960
  * 4.2.1 and 4.2.2.2), reports its status and no delegate. */
 TC_TEST(ca_signed)
@@ -341,6 +371,12 @@ TC_TEST(ca_signed)
     munit_assert_false(result.has_reason);
     munit_assert_null(result.responder_certificate.data);
     munit_assert_false(result.responder_nocheck);
+    /* producedAt is the epoch and the status times are fixed offsets. */
+    const TC_X509_time this_update = {2026, 6, 15, 11, 0, 0};
+    const TC_X509_time next_update = {2026, 6, 16, 12, 0, 0};
+    assert_time_equal(&result.produced_at, &epoch_time);
+    assert_time_equal(&result.this_update, &this_update);
+    assert_time_equal(&result.next_update, &next_update);
   }
 
   /* revokedInfo with and without a CRLReason (RFC 6960 4.2.1). */
@@ -352,10 +388,8 @@ TC_TEST(ca_signed)
   munit_assert_int(result.status, ==, TC_X509_REVOCATION_REVOKED);
   munit_assert_true(result.has_reason);
   munit_assert_uint(result.reason, ==, 1);
-  const TC_X509_time week_ago = utc_time(time(NULL) - 7L * DAY);
-  munit_assert_uint(result.revocation_time.year, ==, week_ago.year);
-  munit_assert_uint(result.revocation_time.month, ==, week_ago.month);
-  munit_assert_uint(result.revocation_time.day, ==, week_ago.day);
+  const TC_X509_time week_ago = {2026, 6, 8, 12, 0, 0};
+  assert_time_equal(&result.revocation_time, &week_ago);
   spec.reason = OCSP_REVOKED_STATUS_NOSTATUS;
   munit_assert_int(verify(&spec, NULL, &result), ==, TC_TLV_OK);
   munit_assert_int(result.status, ==, TC_X509_REVOCATION_REVOKED);
@@ -382,7 +416,7 @@ TC_TEST(ca_signed)
   munit_assert_int(verify_with(&request, &result), ==, TC_TLV_INVALID);
   /* The evaluation time must follow producedAt within the clock skew. */
   request.time.max_age_seconds = 0;
-  request.time.at = utc_time(time(NULL) - 2 * 3600);
+  request.time.at = (TC_X509_time){2026, 6, 15, 10, 0, 0};
   munit_assert_int(verify_with(&request, &result), ==, TC_TLV_INVALID);
 
   /* A bad signature under the matching issuer name finds no signer. */
@@ -773,8 +807,8 @@ static TC_bytes crl_der(long serial, uint8_t out[OCSP_FILE_CAPACITY])
   munit_assert_not_null(crl);
   munit_assert_int(X509_CRL_set_version(crl, 1), ==, 1);
   munit_assert_int(X509_CRL_set_issuer_name(crl, X509_get_subject_name(pki.ca)), ==, 1);
-  ASN1_TIME* last = X509_gmtime_adj(NULL, -3600);
-  ASN1_TIME* next = X509_gmtime_adj(NULL, DAY);
+  ASN1_TIME* last = epoch_offset(NULL, -3600);
+  ASN1_TIME* next = epoch_offset(NULL, DAY);
   munit_assert_int(X509_CRL_set1_lastUpdate(crl, last), ==, 1);
   munit_assert_int(X509_CRL_set1_nextUpdate(crl, next), ==, 1);
   if (serial) {

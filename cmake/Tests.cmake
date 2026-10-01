@@ -56,6 +56,8 @@ if(TINY_CRYPTO_BUILD_TESTS)
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_vector_manifests.py)
     add_test(NAME test_argument_order
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_argument_order.py)
+    add_test(NAME test_no_wall_clock
+      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_no_wall_clock.py)
     add_test(NAME test_doc_sync
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_doc_sync.py)
     # Self-contained documentation code blocks compile with GCC-compatible
@@ -995,6 +997,13 @@ if(TINY_CRYPTO_BUILD_TESTS)
       LABELS hardware RUN_SERIAL TRUE SKIP_RETURN_CODE 77)
     set_tests_properties(test_piv_inspect_live PROPERTIES
       DEPENDS test_piv_card_hardware FAIL_REGULAR_EXPRESSION "  FAILED  ")
+  endif()
+  # The evaluation time the PIV hardware environment selects.
+  if(NOT WIN32)
+    tc_add_c_test(test_piv_hardware_config tiny-crypto-c-test-pki-native tests/piv/hardware_config.c
+      tests/piv/hardware/card_config.c examples/pki_input.c)
+    target_compile_definitions(test_piv_hardware_config PRIVATE
+      TC_VECTOR_DIR="${PROJECT_SOURCE_DIR}/tests/vectors")
   endif()
   # Rules of the PIV hardware transmit guard. The guard needs no reader.
   tc_add_c_test(test_piv_hardware_guard tiny-crypto-c-test-piv-command tests/piv/hardware_guard.c

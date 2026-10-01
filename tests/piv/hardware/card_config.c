@@ -4,6 +4,7 @@
 #define _POSIX_C_SOURCE 200809L
 #endif
 #include "card_config.h"
+#include "../../../examples/pki_input.h"
 #include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -162,6 +163,12 @@ const char* tc_piv_card_config_read(tc_piv_card_config* out, const char* vector_
     return "TC_PIV_CARD_DUMP_DIR";
   if (out->dump_dir && !*out->dump_dir)
     out->dump_dir = NULL;
+  out->at = TC_PIV_CARD_FIXTURE_TIME;
+  const char* at = getenv("TC_PIV_CARD_TIME");
+  if (at && !strcmp(at, "now"))
+    out->host_clock = 1;
+  else if (at && *at && !example_time_parse(at, &out->at))
+    return "TC_PIV_CARD_TIME";
   return trust_read(out, vector_dir);
 }
 

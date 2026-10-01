@@ -5,6 +5,7 @@
 #endif
 #include "pki_input.h"
 #include <limits.h>
+#include <string.h>
 #include <sys/stat.h>
 #if defined(__APPLE__) || defined(__linux__)
 #include <fcntl.h>
@@ -148,4 +149,38 @@ TC_X509_store_source example_x509_source(ExampleX509Source* source)
   const TC_X509_store_source view = {source, source ? source->candidate_count : 0,
                                      source ? source->anchor_count : 0, candidate, anchor};
   return view;
+}
+
+/* The value of count decimal digits at text. The caller checked the digits. */
+static unsigned decimal(const char* text, size_t count)
+{
+  unsigned value = 0;
+  for (size_t i = 0; i < count; ++i)
+    value = value * 10u + (unsigned)(text[i] - '0');
+  return value;
+}
+
+int example_time_parse(const char* text, TC_X509_time* out)
+{
+  /* 0 marks a required digit. Every other byte must match exactly. */
+  static const char form[] = "0000-00-00T00:00:00Z";
+  if (!text || !out || strlen(text) != sizeof form - 1)
+    return 0;
+  for (size_t i = 0; i < sizeof form - 1; ++i) {
+    const int digit = text[i] >= '0' && text[i] <= '9';
+    if (form[i] == '0' ? !digit : text[i] != form[i])
+      return 0;
+  }
+  /* Two digits fit the uint8_t fields. TC_X509_time_check rejects the
+   * out-of-range values. */
+  const TC_X509_time value = {decimal(text, 4),
+                              (uint8_t)decimal(text + 5, 2),
+                              (uint8_t)decimal(text + 8, 2),
+                              (uint8_t)decimal(text + 11, 2),
+                              (uint8_t)decimal(text + 14, 2),
+                              (uint8_t)decimal(text + 17, 2)};
+  if (TC_X509_time_check(&value) != TC_TLV_OK)
+    return 0;
+  *out = value;
+  return 1;
 }

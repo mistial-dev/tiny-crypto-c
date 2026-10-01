@@ -55,6 +55,11 @@ expired chains without treating them as trusted. An alternate local bundle
 root can be supplied with `--issuer-bundle-dir`; the tool never fetches AIA
 URLs.
 
+Certificate dates and anchored paths are evaluated at a fixed time, by default
+2026-09-27T12:00:00Z, the day the private captures were verified. `--at`
+selects another instant as `YYYY-MM-DDTHH:MM:SSZ`, and the anchored OpenSSL
+check receives it as `-attime`.
+
 To validate both paths to an explicitly selected trust anchor, provide a PEM
 file containing the trusted root certificates:
 

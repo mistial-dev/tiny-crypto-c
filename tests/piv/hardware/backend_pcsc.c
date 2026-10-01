@@ -2,7 +2,8 @@
  * SPDX-License-Identifier: GPL-2.0-or-later */
 /* The PC/SC reader behind the hardware scenarios. The reader filter,
  * the Yubico refusal before connect and the ATR interface check are those
- * of examples/credential_pcsc.c. */
+ * of examples/credential_pcsc.c. The evaluation time is TC_PIV_CARD_TIME,
+ * by default the fixture instant TC_PIV_CARD_FIXTURE_TIME. */
 #include "../../../examples/credential_pcsc.h"
 #include "../../../examples/credential_system.h"
 #include "card_backend.h"
@@ -48,8 +49,10 @@ const char* tc_piv_card_backend_open(tc_piv_card_backend* backend, const tc_piv_
   backend->interface = example_card_pcsc_interface(&connection);
   backend->random = (TC_random_source){example_card_random, NULL};
   backend->signature_proofs = 1;
+  /* The fixed evaluation time, or the host clock for TC_PIV_CARD_TIME=now. */
+  backend->at = config->at;
   if (example_card_random(NULL, backend->host_id, sizeof backend->host_id) != TC_OK ||
-      !example_card_now(&backend->at)) {
+      (config->host_clock && !example_card_now(&backend->at))) {
     (void)example_card_pcsc_close(&connection);
     return "no entropy or clock";
   }

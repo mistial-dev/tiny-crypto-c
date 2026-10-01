@@ -154,24 +154,6 @@ static int arguments_parse(int argc, char** argv, Arguments* out)
   return out->reader && *out->reader && out->anchor_count;
 }
 
-/* YYYY-MM-DDTHH:MM:SSZ. */
-static int time_parse(const char* text, TC_X509_time* out)
-{
-  unsigned year, month, day, hour, minute, second;
-  char zone, extra;
-  if (sscanf(text, "%4u-%2u-%2uT%2u:%2u:%2u%c%c", &year, &month, &day, &hour, &minute, &second,
-             &zone, &extra) != 7 ||
-      zone != 'Z')
-    return 0;
-  const TC_X509_time value = {year,          (uint8_t)month,  (uint8_t)day,
-                              (uint8_t)hour, (uint8_t)minute, (uint8_t)second};
-  if (month > 12 || day > 31 || hour > 23 || minute > 59 || second > 59 ||
-      TC_X509_time_check(&value) != TC_TLV_OK)
-    return 0;
-  *out = value;
-  return 1;
-}
-
 static int hex_nibble(char value, uint8_t* out)
 {
   if (value >= '0' && value <= '9')
@@ -334,7 +316,8 @@ static int inspect(const Arguments* arguments)
   options.random = (TC_random_source){example_card_random, NULL};
   const int ask = arguments->pin_prompt || (!getenv("TC_PIV_PIN") && isatty(STDIN_FILENO));
   if (!inputs_load(arguments, anchors, crls, &options) ||
-      (arguments->at ? !time_parse(arguments->at, &options.at) : !example_card_now(&options.at)) ||
+      (arguments->at ? !example_time_parse(arguments->at, &options.at)
+                     : !example_card_now(&options.at)) ||
       (arguments->dump_dir && !dump_dir_private(arguments->dump_dir)) ||
       !secret_get("TC_PIV_PIN", "PIN (empty for none): ", ask, secrets.pin, sizeof secrets.pin) ||
       !secret_get("TC_PIV_PAIRING_CODE", "Pairing code (empty for none): ", ask, secrets.pairing,
