@@ -36,7 +36,8 @@ apply the selected PIV/TWIC identifier policy before using the identifier.
 
 ## NEXGEN TWIC UUIDs
 
-Include `<tiny_crypto/twic_uuid.h>`. `TC_TWIC_uuid_read` checks the NEXGEN
+Include `<tiny_crypto/twic_uuid.h>` and enable `TINY_CRYPTO_ENABLE_TWIC_UUID`, which requires
+FASC-N support. `TC_TWIC_uuid_read` checks the NEXGEN
 namespace, version, variant and reserved bits, then returns the 14-digit decimal
 agency/system/credential number as `uint64_t`. `TC_TWIC_uuid_write` produces
 the corresponding 16-byte UUID. The number must be at most 99999999999999,

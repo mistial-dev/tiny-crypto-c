@@ -130,7 +130,7 @@ typedef struct {
   uint8_t kind, outcome, reason, key_reference;
 } TC_PIV_check;
 
-/* Report capacity. A full card needs about 60 entries. */
+/* Report capacity. A full card currently needs 40 entries. */
 #define TC_PIV_CARD_CHECKS_MAX 96u
 
 /* Certificate slots of TC_PIV_card_report and TC_PIV_card_check_ocsp. */

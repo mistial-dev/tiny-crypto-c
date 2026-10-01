@@ -8,8 +8,8 @@ Enable `TINY_CRYPTO_ENABLE_GZIP` and include `<tiny_crypto/gzip.h>`.
 Direct-source builds use `TC_ENABLE_GZIP=1`. The desktop resource profile enables
 it by default. GZIP decoding can be built independently of the cryptographic
 algorithms and certificate parsers.
-The `piv-acu` and `piv-pd` targets enable it across all resource profiles to
-handle compressed card certificates.
+`TINY_CRYPTO_TARGET=piv-acu` and `TINY_CRYPTO_TARGET=piv-pd` enable it in every
+resource profile to handle compressed card certificates.
 
 `TC_GZIP_decode` takes the complete input as `TC_bytes`, a
 `TC_GZIP_workspace`, a remaining work budget, output storage as `TC_buffer` and

@@ -27,10 +27,10 @@ In the reader utility, supply `--printed-plaintext`, `--security-object` and
 the stored object and decrypted fields in separate buffers. Both remain in
 locked memory until the final check finishes.
 
-For TWIC NEXGEN, `example_credential_validate` also parses the authenticated DFC109
-contents with `TC_PIV_printed_read`. It checks the field order and limits from
-TWIC Part 2 section 4.7.2, including the eight-digit card serial and `7099`
-issuer prefix. It then requires the `DDMMMYYYY` date to match the signed CHUID
+When `security.printed` is supplied, `example_credential_validate` requires it to equal the
+authenticated container `0x3001` bytes and parses it with `TC_PIV_printed_read`. TWIC profiles
+use the DFC109 rules of TWIC Part 2 section 4.7.2, including the field order, the eight-digit
+card serial and the `7099` issuer prefix. The printed expiration must match the signed CHUID
 expiration and remain current at the shared validation time. The accepted
 result exposes borrowed printed fields through `result.printed` and sets
 `result.has_printed`.
@@ -43,16 +43,19 @@ The shared sequence is:
 1. For TWIC, check the held canceled-card-list snapshot and its freshness metadata.
 1. Ask the application to perform a fresh proof with the accepted public key.
 1. Validate the signed CHUID under separate content-signer trust.
-1. When supplied, validate the Security Object and its retained object inventory,
-   then bind the unsigned CHUID to that accepted inventory.
+1. When supplied, validate the Security Object and its retained object inventory.
 1. When supplied, parse authenticated printed information and check its
    expiration against the signed CHUID.
+1. When supplied, bind the unsigned TWIC CHUID to the accepted inventory.
 1. When supplied, check each biometric format and authenticate every biometric
    object against the accepted CHUID.
+1. For TWIC, check the held canceled-card-list snapshot again.
 
 The request selects PIV, TWIC Legacy, or TWIC NEXGEN and its signed CHUID
-schema. `TC_CHUID_PROFILE_LEGACY_KEY_MAP` is the explicit PIV-shaped option for
-the historical `3D` field. TWIC profiles take it for the PIV application of a
+schema. TWIC profiles take `TC_CHUID_PROFILE_TWIC_SIGNED`. The PIV profile takes
+`TC_CHUID_PROFILE_PIV` or `TC_CHUID_PROFILE_LEGACY_KEY_MAP`, the explicit PIV-shaped
+option for the historical `3D` field. `TC_PIV_CHUID_validate` also accepts
+`TC_CHUID_PROFILE_LEGACY_KEY_MAP` under TWIC profiles for the PIV application of a
 TWIC card, where a NEXGEN card sends an empty `3D`. PIV uses strict PIV
 identifier and OID rules. TWIC identity binding follows Part 3 section 4.4.4:
 the signed certificate FASC-N identifies the credential. The certificate may
@@ -65,12 +68,13 @@ OID and passes the certificate's exact encoded OID into path validation. PIV
 accepts the PIV OID.
 
 `card_key` selects slot 9E Card Authentication or slot 9A PIV Authentication.
-For slot 9A, the workflow reads the signed CHUID GUID before certificate
-identifier selection. Strict PIV requires that Card UUID in the certificate.
-A TWIC application can set `twic_reader_policy` to accept either registered
-FASC-N OID and report an absent Card UUID while still checking any UUIDs that
-are present. The proof callback receives the selected key reference so its
-transport can address the correct slot.
+Slot 9A requires the `TC_PIV_CARD` profile. For slot 9A, the workflow reads the
+signed CHUID GUID before certificate identifier selection. Strict PIV requires
+that Card UUID in the certificate. A TWIC reader using the PIV application can set
+`twic_reader_policy` with slot 9A to accept either registered FASC-N OID and report
+an absent Card UUID while still checking any UUIDs that are present. The proof
+callback receives the selected key reference so its transport can address the
+correct slot.
 
 `required_objects` states which evidence the application needs for its decision.
 It can require the Security Object, unsigned CHUID, printed information, or each
@@ -89,9 +93,9 @@ The wrapper enforces NEXGEN RSA-2048 and accepts Legacy RSA-1024 only when
 
 The card context may provide an exact card-authentication purpose OID. With an
 empty purpose, `TC_PIV_card_certificate_validate` derives one exact
-PIV/TWIC-compatible purpose from the certificate. It always requires
+PIV/TWIC-compatible purpose from the certificate. Slot 9E requires
 digital-signature key usage, extended key usage and an explicit purpose match
-before accepting the path. For a live card, the
+before accepting the path. Slot 9A requires digital-signature key usage. For a live card, the
 [card check](piv-card-check.md) composes the same validators over an
 inventory and reports each check separately.
 

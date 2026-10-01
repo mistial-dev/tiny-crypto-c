@@ -95,7 +95,10 @@ extra, and repeated containers, unequal mapping/LDS group sets, and digest
 mismatches.
 
 Supply the shared `TC_validation_context` plus a bounded
-`TC_PIV_security_validation_workspace` LDS content buffer. Keep the request,
+`TC_PIV_security_validation_workspace` LDS content buffer. For a partial inventory, such as
+objects read without the PIN, `TC_PIV_security_authenticate` authenticates the Security
+Object into a `TC_PIV_security_map`. `TC_PIV_security_digest_check` then checks one
+`TC_PIV_security_data` record at a time against that map. Keep the request,
 object data, trust source, CRLs, policy and work counter separate from mutable
 scratch. Accept only `TC_CREDENTIAL_VALID`. Applications must select the required
 inventory and exact protocol-defined hash inputs, including any framing or
@@ -108,9 +111,9 @@ inventory, compare its exact ordered parts with the supplied CHUID, and bind the
 authenticated FASC-N, GUID and expiration to the card certificate. The ordinary
 `TC_PIV_CHUID_validate` operation requires a signed CHUID.
 
-For TWIC, the [TSA reader/card specification, section 11.2 note 4](https://www.ports.org/files/PDFs/TWIC%20Reader%20Hardware%20%26%20Card%20Application%20Specification.pdf)
-defines hashes over stored object contents. Section 11.3 wraps those contents in
-`53` for GET DATA. Hash the response's value bytes, retaining the inner field
+For TWIC, the [TSA reader/card specification, section 11.3 note 4](https://www.ports.org/files/PDFs/TWIC%20Reader%20Hardware%20%26%20Card%20Application%20Specification.pdf)
+defines hashes over stored object contents. The GET DATA response of section 11.5.2 wraps
+those contents in `53`. Hash the response's value bytes, retaining the inner field
 tags and lengths, including CHUID's `FE 00`. Keep encrypted fields in their
 stored form for this check. Privacy-key decryption uses separate working storage
 when the encrypted bytes are still needed for validation.

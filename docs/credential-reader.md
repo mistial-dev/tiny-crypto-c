@@ -13,9 +13,10 @@ a credential acceptance decision.
 
 Build against an installed tiny-crypto-c package. The `desktop` resource profile
 enables the algorithms and parsers used by both commands, including legacy SHA-1.
-For a custom profile, enable TLV, DER, PIV CHUID, X.509, GZIP, TWIC CCL,
-RSA and EC,
-plus the hashes needed by the certificates:
+For a custom profile, enable TLV with BER, DER, APDU, PIV commands, PIV CHUID, PIV objects,
+PIV OIDs, FASC-N, TWIC UUID, TWIC TPK, TWIC CCL, X.509 with path validation and revocation,
+CMS with validation, credential validation, the PIV catalog, key challenges, PIV key proofs,
+GZIP, RSA and EC, plus the hashes needed by the certificates:
 
 ```sh
 cmake -S examples/credential_check -B build/credential-check \

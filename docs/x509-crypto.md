@@ -50,7 +50,8 @@ Path validation and application rules determine trusted issuers, permitted
 uses, validity, and accepted algorithms. Missing compiled algorithms return
 `UNSUPPORTED`.
 
-With OpenSSL tests enabled, run the provider's comparison tests with:
+Configure with `-DTINY_CRYPTO_TEST_OPENSSL=ON` to build the OpenSSL comparison test
+`test_x509_native`, then run the provider tests with:
 
 ```sh
 ctest --test-dir build -R '^test_x509_(native|signature)$' --output-on-failure

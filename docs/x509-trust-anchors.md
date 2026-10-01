@@ -54,10 +54,10 @@ authorize an X.509 path.
 
 Certificate, TBS certificate and embedded `CertPathControls` certificates
 follow the `TC_X509_read` field rules. An anchor also needs a non-empty
-subject, because it issues certificates (RFC 5280 section 4.1.2.6), and a
-validity period whose start does not follow its end. Other records are
-`TC_TLV_INVALID`. The anchor's validity period is not checked against the
-validation time.
+subject, because it issues certificates (RFC 5280 section 4.1.2.6), a
+validity period that starts at or before its end, and keyCertSign in a
+present keyUsage extension. Other records are `TC_TLV_INVALID`. Path
+validation ignores the anchor's validity period.
 
 Keep the DER and record array immutable while any validation uses them.
 `TC_X509_store_array_source` turns the records and untrusted candidate
@@ -102,9 +102,10 @@ publication, and path validation against a constrained anchor.
 ## Path controls
 
 An anchor's policies intersect the application's initial policies. A
-`TrustAnchorInfo` policySet lists unique policy identifiers without
-policyQualifiers (RFC 5914 section 2.5), and an anchor certificate's
-certificatePolicies extension must also list unique identifiers. Its
+`TrustAnchorInfo` policySet lists unique policy identifiers (RFC 5280
+section 4.2.1.4) without policyQualifiers (RFC 5914 section 2.5), and an
+anchor certificate's certificatePolicies extension must also list unique
+identifiers. Its
 permitted names intersect the application's permitted names, and excluded
 names from both sources apply. Restrictive policy flags combine with the
 application flags. An anchor path-length limit counts non-self-issued

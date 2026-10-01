@@ -6,9 +6,9 @@
 
 Include the public header for the operation you need. The C headers support
 C99 and C++11. Build options determine which implementations are linked. See
-the [configuration options](../README.md#configuration) and
-[installed examples](testing.md). The C++11 wrappers are described in
-[C++ wrappers](cpp.md).
+the [configuration options](../README.md#configuration) and the
+[test guide](testing.md), which also builds the examples. The C++11 wrappers
+are described in [C++ wrappers](cpp.md).
 
 This page holds the contracts shared by every module: results, failure and
 wipe rules, input stability, work budgets, naming and argument order. Each
@@ -511,7 +511,7 @@ tag holds at most 8 bytes.
 | HMAC       | `max(TC_HMAC_MIN_TAG_LEN, TC_MIN_TAG_LEN)`..digest length | 1..default minimum - 1                         |
 | KMAC256    | `TC_MIN_TAG_LEN`..`UINT64_MAX / 8`                        | 1..`TC_MIN_TAG_LEN - 1`                        |
 
-Each length has exactly one entry point. The other entry point returns
+Each accepted length has exactly one entry point. The other entry point returns
 `TC_ERROR` and leaves every output unchanged. A zero-length tag is never
 accepted. Short tags are the leading bytes of the full tag. Call a
 `_short_tag` form only when the protocol fixes that tag length and limits the
@@ -610,14 +610,15 @@ int main(void)
 
 Enable both `TINY_CRYPTO_ENABLE_DES=ON` and `TINY_CRYPTO_DES_ENABLE_ISO9797=ON` to use
 ISO/IEC 9797-1 MAC algorithms 1 and 3. Include `<tiny_crypto/des.h>`.
-Algorithm 1 accepts 16 or 24-byte TDEA keys. `TC_DES_ISO9797_ALG3`, the
-standard retail MAC, accepts only a 16-byte two-key input and finishes with
-D(K2) then E(K1). Select `TC_DES_ISO9797_ALG3_3KEY_EXTENSION` explicitly for
-the non-standard 24-byte three-key form, which finishes with E(K3).
+`TC_DES_ISO9797_ALG1` accepts 16 or 24-byte TDEA keys. `TC_DES_ISO9797_ALG3`,
+the retail MAC, accepts exactly 16 bytes, K1 || K2, and finishes with D(K2)
+then E(K1). `TC_DES_ISO9797_ALG3_3KEY_EXTENSION` takes exactly 24 bytes and
+finishes with E(K3). That extension is outside ISO/IEC 9797-1.
 ISO/IEC 9797-1:2011 clause 5 restricts single DES to Algorithms 3 and 4.
-ISO 9797 always rejects K1 = K2 and, for the three-key extension, K2 = K3,
-because clause 7.4 requires independent keys. `TINY_CRYPTO_DES_REJECT_WEAK_KEYS=ON`
-also rejects weak component keys.
+Every build rejects a key with K1 = K2 or K2 = K3, compared without parity
+bits, since such a key cancels a DES stage and clause 7.4 requires independent
+keys. `TINY_CRYPTO_DES_REJECT_WEAK_KEYS=ON` also rejects weak and semi-weak
+component keys.
 Choose no padding for block-aligned input, method 1
 for zero padding of a partial block, or method 2 for an `0x80` byte followed by
 zeroes. Method 1 processes an empty message as one zero block. No padding

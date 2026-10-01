@@ -117,13 +117,13 @@ typedef struct {
  * and its at must equal signer_policy->at. max_candidate_bytes bounds the
  * candidate collection.
  *
- * Each member uses its OCSP response when one is supplied and accepted. A
- * response signed by a delegate without id-pkix-ocsp-nocheck is accepted only
- * when the CRL index proves the delegate unrevoked (RFC 6960 section
- * 4.2.2.2.1). A member without an accepted response falls back to CRLs,
- * including when its response is malformed, unauthorized, stale, UNKNOWN or
- * unavailable, or its delegate lacks that proof. A build without
- * TC_ENABLE_X509_OCSP uses CRLs for every member.
+ * An authenticated REVOKED response settles the member. GOOD from a delegate
+ * without id-pkix-ocsp-nocheck requires the CRL index to prove the delegate
+ * unrevoked (RFC 6960 section 4.2.2.2.1). After GOOD, current CRLs covering
+ * the member are still checked and revocation wins. A member falls back to
+ * CRLs when its response is malformed, unauthorized, stale, UNKNOWN or
+ * unavailable, or when GOOD lacks the required delegate proof. A build
+ * without TC_ENABLE_X509_OCSP uses CRLs for every member.
  *
  * states needs one byte per indexed CRL. nodes covers the path, OCSP
  * delegates without nocheck and distinct signer dependencies. Each node is

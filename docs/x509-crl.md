@@ -111,7 +111,8 @@ checks signature validity, freshness and trust.
 
 Include `<tiny_crypto/x509_crl_source.h>` for CRLs held outside RAM. A `TC_source`
 supplies a 64-bit length and an exact read-at callback. Return `TC_ERROR` for a
-short read or storage failure. Keep the source unchanged throughout preparation.
+short read or storage failure, and the preparation call returns `TC_TLV_IO`.
+Keep the source unchanged throughout preparation.
 
 `TC_X509_crl_prepare_begin` takes the source, target serial/issuer pairs, limits
 and a caller-owned workspace. Use `TC_X509_crl_prepare_size` and

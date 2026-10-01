@@ -31,13 +31,13 @@ typedef uint32_t TC_RSA_word;
  *
  *   TC_RSA_ARGUMENT     NULL pointers, overlapping or misaligned storage, and
  *                       a digest whose length differs from its known hash.
- *   TC_RSA_UNSUPPORTED  a modulus size, hash or option the build does not
- *                       implement.
  *   TC_RSA_INVALID      a malformed key or CRT value, out-of-range scheme
  *                       parameters, then received data: a signature,
  *                       ciphertext or raw input of the wrong length.
  *   TC_RSA_LIMIT        a caller output buffer shorter than required, then
  *                       too little workspace, RNG attempts or work.
+ *   TC_RSA_UNSUPPORTED  a modulus size, hash or option the build does not
+ *                       implement.
  *
  * The arithmetic finds a representative at or above the modulus and returns
  * TC_RSA_INVALID after the limit checks pass. Output buffers larger than

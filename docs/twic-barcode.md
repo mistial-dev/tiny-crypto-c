@@ -17,11 +17,13 @@ requested subfile or field is absent. Duplicate requested fields are invalid.
 
 Pass the ZTA value to `TC_TWIC_tpk_read` with `TC_TWIC_TPK_BARCODE_HEX`. This mode
 accepts hexadecimal DFC101 containers and the DCF101 prefix shown in TWIC's
-barcode example. The decoder checks the C0 key, C1 algorithm and C2 key-index
-fields before returning an AES-128 key. Applications that remove the outer
-container can pass the C0/C1/C2 fields with `TC_TWIC_TPK_CONTENTS`.
-Card containers use `TC_TWIC_TPK_CARD`
-and require DFC101. Strip transport framing before passing a card container.
+barcode example. The container length must equal its encoded C0/C1/C2 fields. The
+length byte `28` printed in the section 4.9 example exceeds its 24 content bytes and
+returns `TC_TLV_INVALID`. The decoder checks the C0 key, C1 algorithm and C2 key-index
+fields before returning an AES-128 key.
+
+A card GET DATA response carries the C0/C1/C2 fields inside `53`. Pass the `53` value
+with `TC_TWIC_TPK_CONTENTS`. `TC_TWIC_TPK_CARD` takes a complete binary `DFC101` TLV.
 
 The TPK result owns its 16 key bytes. Wipe it with
 `TC_secure_zero(&key, sizeof key)`

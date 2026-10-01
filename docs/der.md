@@ -121,8 +121,8 @@ packages) and RFC 3279 section 2.2.3 (ECDSA signatures).
 ## Tests
 
 `test_tlv_full` runs the DER reader tests, including malformed, truncated and
-unsupported-version encodings. `test_tlv_core` checks a build without DER.
-`fuzz_tlv` exercises the DER readers under libFuzzer. Run the
+unsupported-version encodings. `test_tlv_core` checks a build without DER, BER and the
+stream reader. `fuzz_tlv` exercises the DER readers under libFuzzer. Run the
 unit tests with:
 
 ```sh

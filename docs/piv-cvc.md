@@ -31,10 +31,10 @@ key confirmation must succeed before accepting the card session.
 
 ## Calling the verifier
 
-Enable `TINY_CRYPTO_ENABLE_PIV_CVC`, `TINY_CRYPTO_ENABLE_X509`,
-`TINY_CRYPTO_ENABLE_EC` and the selected curve. An intermediate also requires
-`TINY_CRYPTO_ENABLE_SHA1`. Configure the signature provider for the required
-RSA/ECDSA and SHA algorithms.
+Enable `TINY_CRYPTO_ENABLE_PIV_CVC`, `TINY_CRYPTO_ENABLE_DER`,
+`TINY_CRYPTO_ENABLE_X509`, `TINY_CRYPTO_ENABLE_EC` and the selected curve. An
+intermediate also requires `TINY_CRYPTO_ENABLE_SHA1`. Configure the signature
+provider for the required RSA/ECDSA and SHA algorithms.
 
 ```c
 #include <tiny_crypto/piv_cvc.h>
@@ -65,8 +65,8 @@ and `ERROR` explicitly. Each ends this validation attempt.
 
 `TC_PIV_CVC_validate` in `<tiny_crypto/credential.h>` combines signer path
 discovery, content-signing policy, revocation and CVC verification through a
-`TC_validation_context`. `example_validate_cvc` adapts the focused example's
-path and CRL policy inputs to that public operation.
+`TC_validation_context`. `example_validate_cvc` in `examples/credential_object.c`
+adapts path and CRL policy inputs to that public operation.
 
 For PIV, the helper requires `id-fpki-common-piv-contentSigning`, digitalSignature
 key usage and the content-signing EKU. The signer must be valid at the evaluation
@@ -77,9 +77,9 @@ and CRL policies must use the same evaluation time.
 Both operations return `TC_credential_status`, shared with CMS credential validation.
 Only `TC_CREDENTIAL_VALID` writes the borrowed CVC result. Revoked, unavailable,
 unsupported, invalid, limit and API-error outcomes remain distinct. Path and
-point checks can share scratch across sequential phases. The example uses the
-micro validation capacity with four certificate and four CRL slots, then clears
-its workspace before returning.
+point checks can share scratch across sequential phases. `example_validate_cvc`
+uses the micro validation capacity with four certificate and four CRL slots,
+then clears its workspace before returning.
 
 Hold the snapshot, issuer candidates, anchors, CRLs and credential bytes stable
 through the acceptance decision. Decode the GENERAL AUTHENTICATE response in the

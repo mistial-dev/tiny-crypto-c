@@ -48,7 +48,7 @@ them unchanged while the report is in use.
 | `profile`                          | the credential profile (see below)                                          |
 | `card`                             | trust, CRLs, time and revocation policy for the card certificates           |
 | `content`                          | trust, CRLs, time and revocation policy for the signed objects and `5FC122` |
-| `ocsp`                             | one DER OCSP response per card certificate slot, or `NULL`                  |
+| `ocsp`                             | one DER OCSP response per card certificate slot and its bounds, or `NULL`   |
 | `sm_card_cvc`                      | the card CVC of the secure messaging session, or empty                      |
 | `plain_copies`, `plain_copy_count` | objects read before secure messaging, for `COPY_MATCH`                      |
 
@@ -132,9 +132,9 @@ reports secured with no lost session, with the curve of its suite. Key
 confirmation took place when the session was established, so the check
 re-verifies the CVC chain under the signer it validated itself.
 
-On the PIV application of a TWIC card the objects are Never on contactless
-(TWIC Part 2 v5 section 4.2). A contactless denial there is `NOT_CHECKABLE`
-under a TWIC profile and `FAILED` under `TC_PIV_CARD`.
+On the PIV application of a TWIC card every object except the Discovery Object
+is Never on contactless (TWIC Part 2 v5 section 4.2). A contactless denial there
+is `NOT_CHECKABLE` under a TWIC profile and `FAILED` under `TC_PIV_CARD`.
 
 ## Outcomes and reasons
 
@@ -331,7 +331,7 @@ build/piv-inspect/piv_inspect --reader 'ACR1552 1S CL Reader PICC' \
   --revocation when-available --pin-prompt
 ```
 
-`--reader` defaults to `TC_PIV_READER` and must match exactly one reader name.
+`--reader` defaults to `TC_PIV_READER`. Exactly one reader name must contain it.
 The PC/SC transport refuses reader names and ATRs that name a Yubico device
 before it connects, and refuses a contact request on a reader whose ATR shows a
 contactless card. `--interface` defaults to the interface the ATR shows. The
@@ -339,9 +339,10 @@ PIN and pairing code come from `TC_PIV_PIN` and `TC_PIV_PAIRING_CODE`, or from
 a prompt without echo. A PIN makes the reader reset the card on disconnect,
 which clears its PIN status. `--anchor-sha256` pins the preceding anchor,
 `--ocsp 9a|9c|9d|9e FILE` supplies the OCSP response of one slot, `--at` sets
-the evaluation time as `YYYY-MM-DDTHH:MM:SSZ`, `--extended` selects extended
-length and `--dump-dir` writes each present object to a directory only its
-owner can read.
+the evaluation time as `YYYY-MM-DDTHH:MM:SSZ`, `--min-retries` sets the PIN
+retry floor of `TC_PIV_pin_verify` from 2 to 15 with a default of 3,
+`--extended` selects extended length and `--dump-dir` writes each present
+object to a directory only its owner can read.
 `TC_PIV_HARDWARE_GUARD=1` installs the transmit guard of the
 [PIV card hardware tests](testing.md#piv-card-hardware-tests). Only the
 `test_piv_inspect_live` build provides that guard, so another build exits
@@ -350,7 +351,8 @@ with status 2.
 ## Limits
 
 - A report holds `TC_PIV_CARD_CHECKS_MAX` entries. More return `TC_PIV_LIMIT`
-  with the report wiped. A full SD 33 card needs about 60.
+  with the report wiped. SD 33 card 2 on contactless with secure messaging, the
+  VCI, the PIN and two key proofs fills 40.
 - Iris records, TWIC Privacy Key decryption and the TWIC cancelled card list
   stay with the application.
 - The card context of the certificate slots takes one OCSP response per slot.

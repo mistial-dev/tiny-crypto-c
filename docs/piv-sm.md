@@ -184,7 +184,7 @@ outcome:
 | Outer status other than `9000`, such as `6882`, `6987`, `6988`, `6CXX`, or `6883` on a `1C` fragment | `TC_PIV_CARD_STATUS` | the outer status     |
 | Malformed SM objects, `87` on a VERIFY answer, a failed R-MAC or padding                             | `TC_PIV_INVALID`     | 0                    |
 | Response capacity or exchange budget exhausted during the exchange                                   | `TC_PIV_LIMIT`       | 0                    |
-| Transport failure                                                                                    | `TC_PIV_ERROR`       | 0                    |
+| Transport failure, or a protect failure such as an exhausted counter                                 | `TC_PIV_ERROR`       | 0                    |
 
 A transport failure on a plain command, such as SELECT, ends a bound session
 the same way, since the stopped link cannot continue it.

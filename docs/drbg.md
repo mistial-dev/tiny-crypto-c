@@ -111,13 +111,13 @@ fields are private.
 | Configuration             | `sizeof(TC_DRBG)` on a 64-bit host | On AVR (ATmega2560) |
 | ------------------------- | ---------------------------------: | ------------------: |
 | HMAC_DRBG, SHA-256 only   |                                328 |                 302 |
-| Hash_DRBG, SHA-256 only   |                                344 |                     |
+| Hash_DRBG, SHA-256 only   |                                344 |                 316 |
 | CTR_DRBG only             |                                624 |                 598 |
-| All mechanisms and hashes |                                656 |                     |
+| All mechanisms and hashes |                                656 |                 623 |
 
 ## Random sources for other APIs
 
-`TC_DRBG_random_source(&DRBG)` returns a `TC_random_source` for RSA key
+`TC_DRBG_random_source(&drbg)` returns a `TC_random_source` for RSA key
 generation, EC key generation and signing, key challenges and PIV secure
 messaging. `TC_DRBG_random` splits large requests into maximum-size calls. It
 rejects a NULL or uninstantiated DRBG and output that overlaps the DRBG before
@@ -131,9 +131,8 @@ Include `<tiny_crypto/drbg.hpp>` and use `tiny_crypto::DRBG`. Its
 `instantiate`, `reseed` and `generate` members forward to the C API and return
 its `TC_DRBG_result`. `random_source()` returns the `TC_random_source` of
 `TC_DRBG_random_source`, and the object must outlive it. The destructor
-uninstantiates. The
-class has copying and moving disabled, because a copy would repeat the
-original's output.
+uninstantiates. The class has copying and moving disabled, because a copy
+would repeat the original's output.
 
 ## Example
 

@@ -15,14 +15,15 @@ stack on AVR. Card application commands, such as the PIV commands of SP 800-73-5
 
 A `TC_APDU_command` holds CLA, INS, P1, P2, the command data as a borrowed span
 (Nc bytes) and `ne`, the expected response length Ne. `ne` 0 omits the Le field.
-`ne` 256 encodes the short Le `00` and 65536 the extended Le `0000` (section
-5.2). `ne` is a `uint32_t`, so 65536 fits on targets with a 16-bit `size_t`.
+`ne` 256 encodes the short Le `00` and 65536 the extended Le `0000`, or `000000` without
+command data (section 5.2). `ne` is a `uint32_t`, so 65536 fits on targets with a 16-bit
+`size_t`.
 
 `TC_APDU_SHORT` uses one-byte Lc and Le fields and accepts Nc up to 255 and Ne
 up to 256. `TC_APDU_EXTENDED` keeps the short form whenever both fields fit it,
 and otherwise writes the 3-byte extended Lc with a 2-byte Le, or a 3-byte Le
 without data. Select `TC_APDU_EXTENDED` only for a card that states extended
-length support (sections 5.1 and 12.8.1). `TC_APDU_command_size` reports the
+length support (sections 5.2 and 12.8.1). `TC_APDU_command_size` reports the
 encoded size, and `TC_APDU_EXTENDED_COMMAND_BYTES(nc)` gives an upper bound.
 
 The module accepts the first interindustry CLA values `00` to `1F` (section 5.4.1

@@ -16,13 +16,19 @@ The vendored component is pinned to ESP-IDF 5.5. Select `piv-acu` or `piv-pd` wi
 
 ## Role selection
 
-Both roles enable AES block and CBC operations for OSDP, SHA-1/256/384,
-KMAC256 for PIV Auto, RSA and P-256/P-384 for signature verification, and
-TLV, DER, BER, X.509 and CHUID parsing. GZIP handles compressed certificates.
+Both roles enable AES-128 ECB and CBC for OSDP and TWIC object encryption,
+SHA-1/256/384, KMAC256 for PIV Auto, the key-challenge helpers, RSA-2048/3072/4096 and
+P-256/P-384 for signature verification, and TLV, DER and BER parsing. They also enable
+X.509 parsing, path validation, CRL and OCSP revocation, CMS and CMS validation, PIV/TWIC
+identifiers and objects, CHUID parsing, credential validation, FASC-N and TWIC UUID
+helpers, AAMVA barcode fields and TWIC privacy keys. GZIP handles compressed certificates.
 CMS needs BER framing support. Signed-attribute compatibility remains an explicit
-application option. The PD also enables dynamic AES and the single-step KDF,
-PIV CVC parsing, and CS2/CS7 Secure Messaging. The ACU omits these card-channel
-operations because the PD establishes VCI.
+application option. The PD also enables dynamic AES, the single-step KDF, PIV CVC
+parsing, and CS2/CS7 Secure Messaging cryptography for the card channel.
+
+The role lists exclude APDU and PIV card commands, key proofs, the PIV catalog and card
+check, Secure Messaging APDU framing, VCI and the TWIC CCL reader. A role build reports a
+configuration error when one of these is set to `ON`.
 
 SHA-1 supports legacy TWIC signatures described in TWIC Part 2 section 3.3.4.
 Applications must enforce their accepted signature algorithms and legacy policy.
@@ -69,7 +75,7 @@ idf.py -C examples/esp32-p4 -B /tmp/tiny-crypto-esp32p4-acu size-components
 idf.py -C examples/esp32-p4 -B /tmp/tiny-crypto-esp32p4-acu -p PORT flash monitor
 ```
 
-The example times KMAC256 and, for the PD, P-256/P-384 public-key generation.
+The example times KMAC256 and P-256/P-384 public-key generation in both roles.
 It prints internal heap availability and the main task's unused stack.
 Timing requires a board. These timings cover individual operations and exclude
 a complete PIV transaction. Unused library functions are removed from the linked

@@ -58,8 +58,10 @@ TWIC biometric objects using its `--tpk-hex` option.
 
 ## SignedData envelopes
 
-For PIV signed objects, include `<tiny_crypto/piv_cms.h>` and call
-`TC_PIV_CMS_read` with `TC_PIV_CMS_CHUID` or `TC_PIV_CMS_BIOMETRIC`.
+For PIV signed objects, enable `TINY_CRYPTO_ENABLE_PIV_OBJECTS`, include
+`<tiny_crypto/piv_cms.h>` and call `TC_PIV_CMS_read` with `TC_PIV_CMS_CHUID` or
+`TC_PIV_CMS_BIOMETRIC`. `TC_PIV_CMS_SECURITY` reads the Security Object profile,
+which carries attached LDS content.
 It checks the external-signature layout and required attributes from
 SP 800-73-5 Part 1 and SP 800-76-2. Its policy selects the attribute encoding
 and the identifier set. `attribute_oids` must be `TC_CMS_ATTRIBUTE_OIDS_PIV`
@@ -394,7 +396,7 @@ and CRL. They cover a valid signer path, signer revocation, an unrelated trust
 key and changed detached content, with optional PIV/TWIC identifier attributes.
 Validly signed objects naming the wrong signer are rejected during credential
 validation. Both registered content-signing purpose OIDs are exercised under
-TWIC policy; the PIV profile accepts its registered namespace. Unsigned TWIC
+TWIC policy. The PIV profile accepts its registered namespace. Unsigned TWIC
 objects are checked against their parsing schema before testing rejection by
 the signed-object validator.
 
@@ -614,7 +616,8 @@ fetching.
 
 `TC_CMS_path_options.path` takes the same time, usage, policy, provider and path
 limits as [X.509 path validation](x509-path.md). Set these for the object being
-authenticated. `attributes` selects DER or the explicit BER compatibility mode.
+authenticated. `verification` holds the [verification policy](#verification-policy),
+including DER or the explicit BER compatibility mode for signed attributes.
 `max_candidates` bounds all embedded choices plus external candidates.
 `max_candidate_bytes` bounds their combined encoding size, including embedded
 collection framing. The supplied work counter covers indexing and all candidate
@@ -746,11 +749,13 @@ protocol's object profile, credential identifiers and access policy separately.
 [cms_check.c](../examples/cms_check.c) loads a SignedData object, an explicitly
 trusted root, one intermediate certificate, and their two complete CRLs. It
 checks signer zero with the native crypto provider at the supplied UTC time.
-The expected content type is `id-data`; the signer must have digital-signature
+The expected content type is `id-data`. The signer must have digital-signature
 key usage. Supply DER files and an attached CMS payload.
-Supported signed attributes are content type, message digest, signing time,
-S/MIME capabilities, pivSigner-DN, PIV/TWIC FASC-N and entryUUID.
-Other attributes return `unsupported`.
+The example uses the CMS identifier set with DER signed attributes. It reads
+content type, message digest, signing time, S/MIME capabilities and entryUUID,
+and skips cmsAlgorithmProtection, signingCertificate and signingCertificateV2.
+Other attributes, including pivSigner-DN and the PIV/TWIC FASC-N, return
+`unsupported`.
 
 Build against an installed library with X.509, EC and RSA enabled:
 
@@ -780,5 +785,13 @@ and field bindings.
 Run CMS checks with:
 
 ```sh
-ctest --test-dir build -R '^test_cms_(reader|attributes|signer_info|content|verify|verify_content|pss|native)$' --output-on-failure
+cmake -S . -B build -DTINY_CRYPTO_BUILD_TESTS=ON -DTINY_CRYPTO_RESOURCE_PROFILE=desktop \
+  -DTINY_CRYPTO_TEST_OPENSSL=ON -DTINY_CRYPTO_TEST_EC_ORACLE=ON
+cmake --build build --parallel 4
+ctest --test-dir build -R '^test_(cms_|piv_oid$|piv_cms_identifiers$)' --output-on-failure
 ```
+
+`test_cms_native`, `test_cms_path`, `test_cms_revocation` and `test_cms_pss` compare
+against OpenSSL and need `TINY_CRYPTO_TEST_OPENSSL=ON`. `test_cms_command` runs the
+command-line example with fixtures from Python `cryptography` and also needs
+`TINY_CRYPTO_TEST_EC_ORACLE=ON`.

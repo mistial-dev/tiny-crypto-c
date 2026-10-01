@@ -141,8 +141,9 @@ response or the store record, and `responder_nocheck` reports
 `id-pkix-ocsp-nocheck`. Without nocheck the caller must establish the
 delegate's own revocation status before relying on the result (RFC 6960
 section 4.2.2.2.1). `TC_X509_path_check_revocation` does this with the CRL
-index and fails closed with `TC_TLV_UNSUPPORTED` when no CRL evidence covers
-the delegate. For an issuer-signed response `responder_certificate` is empty
+index. When no CRL evidence covers the delegate, the member falls back to its
+own CRL evidence, and a member without that evidence returns
+`TC_TLV_UNSUPPORTED`. For an issuer-signed response `responder_certificate` is empty
 and `responder_nocheck` is zero.
 
 ## Results

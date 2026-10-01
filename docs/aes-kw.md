@@ -155,5 +155,6 @@ indicator and padding case for two to four semiblocks, and overlap. With
 `aes_wrap_test.json` and `aes_kwp_test.json` suites against each KEK size.
 `test_aes_backend_failure` fails each block operation in turn,
 `test_aes_runtime_sbox` checks calls before `TC_AES_init_sbox`, and
-`test_aes_kw_sbox_*_qemu_avr` runs the examples and a 392-byte wrap on an
-emulated ATmega328P.
+`test_aes_kw_sbox_*_qemu_avr` runs on an emulated ATmega328P when
+`qemu-system-avr` is installed. It checks the RFC 3394 section 4.1 example, KWP
+round trips and an in-place unwrap and rewrap of a 392-byte Wycheproof vector.

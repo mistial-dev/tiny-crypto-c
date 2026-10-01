@@ -11,6 +11,8 @@ stay in caller storage.
 A source provides separate callbacks for untrusted candidate certificates and
 explicit trust anchors. Each anchor can carry path constraints. Source callbacks
 return borrowed spans and charge reads against the supplied work budget.
+`TC_X509_store_array_source` describes a fixed `TC_X509_store_array` of candidate
+spans and anchor records as a source. Each record read charges one work unit.
 An RFC 5914 list can supply anchors through the
 [trust-anchor reader](x509-trust-anchors.md). Build an anchor record from a
 single parsed root certificate with `TC_X509_store_anchor_from_certificate`,
@@ -52,9 +54,11 @@ argument objects overlap.
 
 ## Reader lifetimes
 
-Acquire the current snapshot with `TC_X509_store_acquire`. Keep the reference until
-all uses of its certificate bytes and borrowed validation results finish, then
-call `TC_X509_store_release` exactly once. Do not use a released reference.
+Acquire the current snapshot with `TC_X509_store_acquire`. It returns `TC_TLV_END`
+when no source is published. Keep the reference until all uses of its certificate
+bytes and borrowed validation results finish, then call `TC_X509_store_release`
+exactly once. Releasing a slot without readers returns `TC_TLV_ARGUMENT`.
+Do not use a released reference.
 
 Publication retires the previous snapshot. Its backing storage can be reused only
 when its state becomes `TC_SNAPSHOT_FREE`. Allocate enough slots for the

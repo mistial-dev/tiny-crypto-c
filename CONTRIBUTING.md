@@ -75,7 +75,7 @@ Keep the library suitable for small firmware:
 - Wipe secret state with `TC_secure_zero` on every return path.
 - Add comments where a security contract, lifetime rule, or embedded tradeoff
   is easy to miss. Avoid comments that only repeat the code.
-- Use the shared `TC_status` result model for fallible APIs.
+- Use the shared `TC_result` result model for fallible APIs.
 
 CMake owns the build logic. The Makefile must remain a thin frontend that
 forwards `TINY_CRYPTO_*` options. A new feature gets a `config.h` macro with

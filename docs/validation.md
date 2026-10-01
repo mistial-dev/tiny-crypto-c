@@ -81,12 +81,14 @@ past its nextUpdate is no evidence, so held CRLs that expire leave members
 without evidence. A covering CRL with a failed signature returns
 `TC_CREDENTIAL_INVALID` under both values.
 
-| Policy                                     | Member without CRL evidence   | Covering CRL lists the member | Unsupported CRL             |
+| Policy                                     | Member without CRL evidence   | Covering CRL lists the member | Only unsupported CRLs cover |
 | :----------------------------------------- | :---------------------------- | :---------------------------- | :-------------------------- |
 | `TC_VALIDATION_REVOCATION_REQUIRED` (zero) | `TC_CREDENTIAL_UNAVAILABLE`   | `TC_CREDENTIAL_REVOKED`       | `TC_CREDENTIAL_UNSUPPORTED` |
 | `TC_VALIDATION_REVOCATION_WHEN_AVAILABLE`  | valid, `revocation_checked` 0 | `TC_CREDENTIAL_REVOKED`       | `TC_CREDENTIAL_UNSUPPORTED` |
 
-A revoked member outranks a member without evidence. Under
+A revoked member outranks a member without evidence. An unsupported CRL, such
+as one with an unknown critical extension, is skipped when another current CRL
+covers the member. Under
 `WHEN_AVAILABLE`, a CRL whose signer has no evidence still applies, and the
 members it covers report `revocation_checked` 0. `TC_X509_validation_report`,
 `TC_PIV_CHUID_report`, `TC_PIV_biometric_report`, `TC_PIV_security_map` and

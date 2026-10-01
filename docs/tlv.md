@@ -56,7 +56,7 @@ parent's profile and limits, and starts its own element count.
 
 The padded ISO 7816 profiles skip `00` (and `FF` for
 `TC_TLV_ISO7816_PAD_ZERO_FF`) only in a root reader. ISO/IEC 7816-4:2020
-section 8.1.2 permits padding between root data objects, and section 6.4
+sections 8.1.2 and 8.1.3 permit padding between root data objects, and section 6.4
 requires a constructed template to hold nested data objects without padding. A
 child reader therefore returns `TC_TLV_INVALID` for a padding byte. A child
 template is a complete value, so a truncated nested element also returns

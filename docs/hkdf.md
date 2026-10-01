@@ -71,11 +71,11 @@ An empty salt has the RFC's all-zero HMAC key effect.
 
 ## Failure behavior
 
-Outputs must not overlap any input span. Invalid arguments return `TC_ERROR`
-without changing output. A failure after processing begins clears output. The
-caller owns every input and output buffer and keeps inputs stable until the
-function returns. The functions return `TC_OK` or `TC_ERROR`. See the
-[failure and wipe rules](api.md#failure-state-and-wiping).
+Outputs stay disjoint from every input span and from the `ikm` array.
+Invalid arguments return `TC_ERROR` and leave output unchanged. A failure after
+processing begins clears output. The caller owns every input and output buffer
+and keeps inputs stable until the function returns. The functions return
+`TC_OK` or `TC_ERROR`. See the [failure and wipe rules](api.md#failure-state-and-wiping).
 
 ## Conformance and limitations
 

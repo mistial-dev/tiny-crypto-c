@@ -275,7 +275,7 @@ its region can take one full answer of Ne bytes, or 256 bytes under secure
 messaging, bounded by the card's DO `7F66` response limit. A smaller region is
 `OVERSIZED`. `TC_PIV_INVENTORY_POOL_BYTES`
 covers every PIV object at its Table 8 capacity. The capacities are floors, so
-treat it as a starting point. SD 33 card 2 needs about 26 KiB. Work costs one
+treat it as a starting point. SD 33 card 2 needs about 25 KiB. Work costs one
 unit per catalog entry and one per kept pool byte.
 
 The entries borrow the pool until `TC_PIV_inventory_clear`, which wipes the

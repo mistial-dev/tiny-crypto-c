@@ -8,8 +8,8 @@
  * 4.2.1).
  * Limitations: status and freshness use the shared revocation model of
  * x509_revocation.h, and TC_X509_path_check_revocation consumes responses
- * for a whole path. The caller establishes the revocation status of a
- * delegate without id-pkix-ocsp-nocheck.
+ * for a whole path. Before trusting GOOD, the caller establishes the
+ * revocation status of a delegate without id-pkix-ocsp-nocheck.
  * Contracts: docs/api.md. Guides: docs/x509-ocsp.md,
  * docs/x509-revocation.md. */
 #ifndef TINY_CRYPTO_X509_OCSP_H_
@@ -89,8 +89,9 @@ typedef struct {
  * issuer at time.at with time.clock_skew_seconds, with id-kp-OCSPSigning in
  * its extended key usage and digitalSignature in a present key usage
  * (RFC 6960 4.2.2.2). The result names that delegate and reports
- * id-pkix-ocsp-nocheck. The caller establishes the delegate's own
- * revocation status, using responder_nocheck for RFC 6960 4.2.2.2.1.
+ * id-pkix-ocsp-nocheck. Before trusting GOOD, the caller establishes the
+ * delegate's own revocation status, using responder_nocheck for RFC 6960
+ * 4.2.2.2.1. An authenticated REVOKED status remains revocation evidence.
  *
  * OK: the response is authenticated, fresh and echoes a present nonce, and
  *   out->status is GOOD or REVOKED.

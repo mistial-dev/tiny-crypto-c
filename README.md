@@ -123,8 +123,7 @@ the `TC_` prefix. `TINY_CRYPTO_AES_ENABLE_CBC` sets `TC_AES_ENABLE_CBC`, and
 `TINY_CRYPTO_AES_GCM_GHASH_MODE` sets `TC_AES_GCM_GHASH_MODE`.
 [`cmake/features.json`](cmake/features.json) lists every feature with its
 description, parent, value set and the sources it compiles. Configuration stops
-on a `TINY_CRYPTO_*` name that is not an option, and names the replacement of a
-retired one.
+on an unknown `TINY_CRYPTO_*` name and names the replacement of a retired one.
 
 The tables give the `AUTO` value for each profile. Default is the build with
 no profile selected. Mode, TDEA and curve options take effect only when their
@@ -524,9 +523,11 @@ the sizes in bytes and as percentages of each board's flash and RAM capacity.
 The figures are linked firmware sizes and exclude peak runtime stack use.
 
 Run `make benchmark-report` to regenerate the report, or
-`make benchmark-report-check` to check that it is up to date. Neither command
-needs a connected board. Use `make benchmark` to measure throughput on the host
-with the current build configuration. PR CI uploads a fresh resource report and
+`make benchmark-report-check` to check that it is up to date. Both commands
+build the board firmware without a connected board and need the toolchains
+listed in [Updating the numbers](docs/benchmarks.md#updating-the-numbers). Use
+`make benchmark` to measure throughput on the host with the current build
+configuration. PR CI uploads a fresh resource report and
 enforces flash and stack budgets. The checked-in report is refreshed for releases.
 
 ## Smart-card APDUs

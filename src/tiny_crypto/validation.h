@@ -93,9 +93,10 @@ typedef struct {
  * evidence when no current CRL in the index covers it. A CRL past its
  * nextUpdate is no evidence (section 6.3.3 (a)). A CRL whose signer lacks
  * evidence still applies, and the members it covers count as lacking
- * evidence unless it lists them. A covering CRL with a failed signature, an
- * unsupported CRL in the index and a dependency cycle still fail as INVALID
- * or UNSUPPORTED under both values.
+ * evidence unless it lists them. A covering CRL with a failed signature and a
+ * dependency cycle still fail under both values. An unsupported CRL is skipped
+ * when another current CRL covers the member; otherwise it fails as
+ * UNSUPPORTED.
  * - REQUIRED (zero): a member without evidence returns
  *   TC_CREDENTIAL_UNAVAILABLE.
  * - WHEN_AVAILABLE: a member without evidence is accepted and the result

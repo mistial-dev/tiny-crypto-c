@@ -81,13 +81,16 @@ so a repeated or restored random source cannot expose the private key.
 `TC_ECDSA_sign_digest_external_random` is the advanced API for protocols that
 must supply nonces externally. Each attempt draws an independent secret nonce
 from its execution object. Repeating a nonce across different digests exposes
-the private key. With `TC_ECDSA_SIGN_VERIFY`
-set, the default, the new signature is verified against the public key before
-it is written. A fault during signing, or a public key from another key pair,
-then returns `TC_EC_ERROR` with the output unchanged. Set
-`TC_ECDSA_SIGN_VERIFY=0` only where the verification cost is unacceptable
-and faults are handled another way. Key generation, public-key derivation,
-ECDH and signing use constant-work multiplication for secret scalars.
+the private key.
+
+With `TC_ECDSA_SIGN_VERIFY` set, the default, both signing functions verify the
+new signature against the public key before writing it. A fault during
+signing, or a public key from another key pair, then returns `TC_EC_ERROR`
+with the output unchanged. `TC_ECDSA_SIGN_VERIFY` is a compile definition with
+no CMake option. Set `TC_ECDSA_SIGN_VERIFY=0` only where the verification cost
+is unacceptable and faults are handled another way. Key generation,
+public-key derivation, ECDH and signing use constant-work multiplication for
+secret scalars.
 
 ## Storage
 
@@ -108,14 +111,21 @@ with. The check prints it beside the version in use and accepts either.
 
 The C++11 equivalents are in `<tiny_crypto/ec.hpp>`, including
 `ec_coordinate_bytes`. They take `bytes` inputs, fixed-size output arrays and
-references to the workspace and budget. The explicitly named
-`ecdsa_sign_digest_external_random` wrapper takes an execution object. They
-return the same `TC_EC_result` values and do not allocate or throw exceptions.
+references to the workspace and budget. `ec_generate_key_pair` and
+`ecdsa_sign_digest_external_random` take an execution object, and
+`ecdsa_sign_digest` takes its options after the workspace. They return the
+same `TC_EC_result` values, use no heap and are `noexcept`.
 
 ## Tests
 
+`test_ec_0` and `test_ec_1` cover each limb width. `test_ec_p256`,
+`test_ec_p384` and `test_ec_rfc6979` check single-curve builds and the RFC 6979
+answers. The extended `test_ec_cavp`, `test_wycheproof_ec` and
+`test_wycheproof_ecdsa` run the NIST CAVP and Wycheproof suites.
+
 Configure with `-DTINY_CRYPTO_TEST_OPENSSL=ON` to build the OpenSSL 3
-comparison tests. After building, run:
+comparison tests. Set `OPENSSL_ROOT_DIR` when the default OpenSSL is older
+than 3. After building, run:
 
 ```sh
 ctest --test-dir build -R '^test_ecdsa_openssl_' --output-on-failure

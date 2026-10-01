@@ -6,9 +6,8 @@
 
 Enable `TINY_CRYPTO_ENABLE_RSA=ON` and include `<tiny_crypto/rsa.h>`.
 `TC_RSA_verify_v15_digest` verifies a precomputed SHA-1, SHA-224, SHA-256,
-SHA-384 or SHA-512 digest using PKCS#1 v1.5. Supported modulus sizes are
-1024, 2048, 3072 and 4096 bits. The caller decides which sizes and hashes its protocol
-accepts and applies its trust policy separately.
+SHA-384 or SHA-512 digest using PKCS#1 v1.5. The caller decides which sizes and hashes its
+protocol accepts and applies its trust policy separately.
 
 Pass modulus and exponent as unsigned big-endian bytes, without ASN.1 INTEGER
 sign padding. Signature length must match the modulus length. The digest length
@@ -20,10 +19,12 @@ and returns borrowed modulus and exponent magnitudes with sign padding removed.
 It checks integer encoding and positivity. Apply key-strength policy and use
 the RSA API to check arithmetic constraints. X.509 key parsing uses this reader.
 
-Supported moduli are 1024, 2048, 3072 and 4096 bits. `TC_RSA_modulus_supported(bits)`
-reports whether a size is supported, and `TC_RSA_MAX_MODULUS_BYTES` (512) sizes
-caller storage that holds one modulus-length value, such as a signature or an
-encoded message.
+The supported moduli are 1024, 2048, 3072 and 4096 bits. RSA enables 2048, 3072 and 4096 by
+default. RSA-1024 is a legacy size and needs `TINY_CRYPTO_RSA_ENABLE_1024=ON`. Each size has a
+`TINY_CRYPTO_RSA_ENABLE_<bits>` option. A disabled size returns `TC_RSA_UNSUPPORTED`, and the
+size and work helpers return zero for it. `TC_RSA_modulus_supported(bits)` reports whether a
+size is enabled, and `TC_RSA_MAX_MODULUS_BYTES` (512) sizes caller storage that holds one
+modulus-length value, such as a signature or an encoded message.
 
 Allocate `TC_RSA_word` storage using the limb count returned by
 `TC_RSA_workspace_words(TC_RSA_OPERATION_VERIFY, bits)`, or the matching
@@ -55,7 +56,7 @@ this order:
 1. `TC_RSA_UNSUPPORTED` or `TC_RSA_INVALID` for the key: an unsupported modulus
    size, or a malformed modulus, exponent, private component or CRT value.
 1. `TC_RSA_UNSUPPORTED` or `TC_RSA_INVALID` for the scheme: a disabled or
-   unknown hash, or parameters such as a salt or label that do not fit.
+   unknown hash, or parameters such as a salt or label too long for the modulus.
 1. `TC_RSA_INVALID` for received data: a signature, ciphertext or raw input of
    the wrong length.
 1. `TC_RSA_LIMIT`: a caller output buffer shorter than the modulus or the
@@ -75,35 +76,35 @@ For repeated verification with one key, initialize a caller-owned
 a cache of one modulus width of limbs, a temporary workspace of two modulus
 widths, and a budget of `16 * modulus_bytes + 1`. It wipes temporary storage
 on success. Keep the borrowed modulus, exponent, and cache storage alive and
-unchanged until `TC_RSA_prepared_public_key_clear`. Clear wipes only the setup;
-the caller still owns the cache, which contains public data derived from the
-modulus.
+unchanged until `TC_RSA_prepared_public_key_clear`. Clear wipes only the setup. The caller
+still owns the cache, which contains public data derived from the modulus.
 Use `TC_RSA_verify_v15_prepared` or `TC_RSA_verify_pss_prepared` with a separate
 verification workspace. `TC_RSA_prepared_public_work(&setup)` replaces
 `TC_RSA_public_work` in the verification budget because the cached `R^2`
 skips the setup work. The one-shot functions remain useful when the key is
 used only once.
 
-`TINY_CRYPTO_RSA_SMALL=ON` selects byte limbs. Native builds otherwise use
-32-bit limbs. AVR uses byte limbs. RSA verification needs neither EC nor a
-hash implementation when the caller supplies the digest.
+`TINY_CRYPTO_RSA_SMALL=ON` selects byte limbs, and the micro resource profile enables it by
+default. Native builds otherwise use 32-bit limbs. AVR always uses byte limbs. RSA
+verification needs neither EC nor a hash implementation when the caller supplies the digest.
 
 ## Encoding for card and hardware signing
 
 For card or hardware signing, `TC_RSA_encode_v15_digest` produces the complete
 EMSA-PKCS1-v1_5 representative from a precomputed digest. Supply 128, 256,
-384, or 512 output bytes for RSA-1024, RSA-2048, RSA-3072, or RSA-4096 and a work budget
-covering that length. Keep output and the work budget separate from the options,
+384, or 512 output bytes for an enabled RSA-1024, RSA-2048, RSA-3072, or RSA-4096 size and a
+work budget covering that length. Keep output and the work budget separate from the options,
 the digest and each other. Failures preserve the output.
 The function shares the software signer's encoding implementation and requires
-no hash context or RSA workspace. See [card-key authentication](credential-reader.md#card-key-authentication)
+no hash context or RSA workspace. See
+[card-key authentication](credential-reader.md#card-key-authentication)
 for an example that submits this representative to a card.
 
 `TC_RSA_encode_pss_digest` builds an EMSA-PSS representative with explicit
 message and MGF hashes and caller-supplied salt. Enable both hashes and obtain
 the salt from a cryptographic random source. The salt length must match the
-options. Output capacity is 128, 256, 384, or 512 bytes, with `emBits` one less than
-the modulus width in bits. Keep output and the work budget separate from all
+options. Output capacity is 128, 256, 384, or 512 bytes for an enabled size, with `emBits`
+one less than the modulus width in bits. Keep output and the work budget separate from all
 inputs. Preflight errors preserve both. A failure during encoding wipes the
 output and consumes work. The card transport submits the resulting bytes to
 the private-key operation.
@@ -119,7 +120,7 @@ does this so that a short budget fails before any RNG use.
 
 `TC_work_budget.remaining` is a `uint32_t` count of public work units:
 modular operations, encoded and masked bytes, hash invocations and RNG
-requests. It does not measure time. The work functions return the exact cost
+requests. The count is independent of elapsed time. The work functions return the exact cost
 of one successful call, or zero when the operation would reject the arguments
 or the cost exceeds `UINT32_MAX`:
 
@@ -154,8 +155,8 @@ validation `32*L + 1`, CRT derivation `48*L + 3`, and private-key validation
 
 ## Raw operations
 
-`TC_RSA_raw_public` and `TC_RSA_raw_private` apply RSAEP/RSAVP1 and
-RSADP/RSASP1 ([RFC 8017, sections 5.1 and 5.2](https://www.rfc-editor.org/rfc/rfc8017.html#section-5))
+`TC_RSA_raw_public` and `TC_RSA_raw_private` apply RSAEP/RSAVP1 and RSADP/RSASP1
+([RFC 8017, sections 5.1 and 5.2](https://www.rfc-editor.org/rfc/rfc8017.html#section-5))
 to one caller-formatted representative. They add no padding, so the caller
 selects and checks its protocol's encoding. The input has the modulus length
 and must be less than the modulus, otherwise the result is `TC_RSA_INVALID`.
@@ -192,7 +193,7 @@ the same caller-owned cache and borrowed-key lifetime as the C API.
 rejection limit, and remaining work.
 The C++ key-generation wrappers expose the same caller-owned state and buffers:
 `rsa_keygen_init`, `rsa_keygen_step`, and `rsa_keygen_clear`. They allocate no
-memory and do not throw.
+memory and throw no exceptions.
 
 `rsa_raw_public` and `rsa_raw_private` wrap the raw operations. Each takes the
 output as `tiny_crypto::buffer` or as a C array whose size sets the capacity.
@@ -252,13 +253,12 @@ cancellation callback is checked between units. Cancellation returns
 
 The generator follows FIPS 186-5 appendix A.1.1:
 
-- it sets the top two bits of each prime, which exceeds the
-  `sqrt(2) * 2^(nlen/2 - 1)` lower bound;
-- it rejects small-prime factors and any prime with `p - 1` divisible by
-  65537;
-- it requires `|p - q| > 2^(nlen/2 - 100)`;
-- it performs 65 independent Miller-Rabin rounds on each accepted candidate;
-- it sets `d = e^-1 mod LCM(p - 1, q - 1)` and generates new primes in the
+- It sets the top two bits of each prime, which exceeds the
+  `sqrt(2) * 2^(nlen/2 - 1)` lower bound.
+- It rejects small-prime factors and any prime with `p - 1` divisible by 65537.
+- It requires `|p - q| > 2^(nlen/2 - 100)`.
+- It performs 65 independent Miller-Rabin rounds on each accepted candidate.
+- It sets `d = e^-1 mod LCM(p - 1, q - 1)` and generates new primes in the
   rare case `d <= 2^(nlen/2)`.
 
 Residue checks on candidates, the prime-distance comparison, the GCD, the LCM
@@ -315,8 +315,8 @@ the key permits v1.5 signatures.
 SHA-256/MGF1-SHA-256 and a 32-byte salt. It checks those choices against the
 imported key's restrictions before validation or RNG use.
 Its key components borrow the DER buffer. For repeated signing, retain the parsed
-key and validate it once while its bytes remain unchanged. The signing operation
-uses full-width exponentiation with `n`, `e`, `d`, `p`, and `q`.
+key and validate it once while its bytes remain unchanged. The example sets
+`TC_RSA_private_key.crt` to the validated CRT values, so signing uses the CRT kernel.
 
 `TC_RSA_validate_private_key` checks a borrowed `TC_RSA_private_key`. Its public
 modulus and exponent use the encodings described above. `d`, `p`, and `q` are
@@ -328,10 +328,10 @@ validation runs. Allocate `TC_RSA_VALIDATE_WORKSPACE_WORDS(bits)` limbs, or use
 Validation checks `n = p*q` with distinct odd factors of half the modulus
 width, then the FIPS 186-5 appendix A.1.1 criteria:
 
-- `sqrt(2) * 2^(nlen/2 - 1) <= p, q`, checked exactly as `p^2 >= 2^(nlen - 1)`;
-- `|p - q| > 2^(nlen/2 - 100)`;
-- `2^(nlen/2) < d < LCM(p - 1, q - 1)` and `e*d = 1 mod LCM(p - 1, q - 1)`;
-- the public exponent range selected by `TC_RSA_exponent_policy`.
+- `sqrt(2) * 2^(nlen/2 - 1) <= p, q`, checked exactly as `p^2 >= 2^(nlen - 1)`.
+- `|p - q| > 2^(nlen/2 - 100)`.
+- `2^(nlen/2) < d < LCM(p - 1, q - 1)` and `e*d = 1 mod LCM(p - 1, q - 1)`.
+- The public exponent range selected by `TC_RSA_exponent_policy`.
 
 `TC_RSA_EXPONENT_FIPS` requires an odd `2^16 < e < 2^256`, which
 `TC_RSA_exponent_in_fips_range` tests. `TC_RSA_EXPONENT_ANY_ODD` accepts any
@@ -346,7 +346,7 @@ requests, work, or storage. `TC_RSA_ERROR` reports RNG failure.
 
 Validation returns `TC_RSA_INVALID` at the first failed public check or
 structural check. These are a public exponent outside the selected policy, a
-factor that is not half the modulus width, a private exponent that is zero,
+factor of another width than half the modulus, a private exponent that is zero,
 even or at least `n`, an even, equal or unit factor, and `n != p*q`. The
 remaining FIPS 186-5 criteria are accumulated as masks without branching.
 Miller-Rabin stops at the first factor found composite. The time of an early

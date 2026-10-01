@@ -74,8 +74,9 @@ are public. Timing depends on the shorter length and is independent of content.
 Cipher, hash, MAC, DRBG, GZIP, APDU, PIV SM and PIV link classes own their C state.
 They delete their copy operations, so key material and generator state are
 never duplicated. `TLVReader` holds only a cursor over borrowed input, so it
-may be copied, and a copy acts as a saved position. `DRBG`, `PIVSM` and
-`PIVLink` also delete their move operations. Destruction clears the context.
+may be copied, and a copy acts as a saved position. `DRBG`, `APDUChannel`,
+`PIVSM`, `PIVLink` and `PIVInventory` also delete their move operations.
+Destruction clears the context.
 Stateful classes use `init`, `update`, `finish` and `clear` where those stages
 apply. More specific operations keep a descriptive verb, such as
 `encrypt_finish`, `decode`, `transceive` and `unprotect`.
@@ -106,8 +107,8 @@ constant time.
 `TC_random_source` for the C APIs, and the `DRBG` object must outlive it.
 `TLVReader::init` and `init_child` leave the reader unusable on failure, and
 `next` on an unusable reader returns `TC_TLV_ARGUMENT`. `GZIPDecoder` owns
-reusable decoding scratch, and input and output stay caller-owned. The
-`PIVSM` session is cleared on destruction.
+reusable decoding scratch, wipes it after each decode, and keeps input and
+output caller-owned. The `PIVSM` session is cleared on destruction.
 
 `PIVLink` follows init, commands and clear. `init`, `select`, `get_data`,
 `verify_status` and `pin_verify` forward to the C functions, `status` and
@@ -137,8 +138,8 @@ bytes the objects use and the object array, so both outlive the object.
 Copying and moving are deleted. `piv_catalog_count`, `piv_catalog_at` and
 `piv_catalog_find` wrap the catalog lookups.
 
-`piv_key_prove` in `piv_key_proof.hpp` takes the `PIVLink`, the request, the
-provider, the workspace and the work budget by reference.
+`piv_key_prove` in `piv_key_proof.hpp` takes the `PIVLink`, the request, a
+`TC_random_source` by value, the workspace and the work budget by reference.
 `piv_key_parameters_select` wraps the key policy.
 
 `piv_card_check` in `piv_card_check.hpp` takes the request, the workspace, the
@@ -159,8 +160,9 @@ plaintext is released. A `GCM` object initialized with a short tag uses the
 
 Hash, HMAC, MD5 and KMAC256 inputs are `TC_bytes` spans in C and `bytes` in
 C++. Fixed-length digests and full HMAC tags go to digest-sized arrays. A
-one-shot HMAC writes `tag.capacity` bytes, from `TC_HMAC_MIN_TAG_LEN` to the
-digest length, and verification compares `tag.length` bytes. KMAC256 writes
+one-shot HMAC writes `tag.capacity` bytes, from the greater of
+`TC_HMAC_MIN_TAG_LEN` and `TC_MIN_TAG_LEN` to the digest length, and
+verification compares `tag.length` bytes. KMAC256 writes
 `out.capacity` bytes, and that length is part of the MAC input.
 
 ```c
@@ -199,7 +201,7 @@ execution descriptors and work rules.
 ## C-only APIs
 
 The C++ layer does not yet wrap X.509, CRL, OCSP, CMS, credential validation,
-EAC CVC, PIV object codecs, PIV biometrics, TWIC codecs, AAMVA, LDS, resource
+EAC CVC, PIV object codecs, PIV biometrics, FASC-N, TWIC codecs, AAMVA, LDS, resource
 profiles, snapshots or streaming sources. Include their `.h` headers and call
 the C API from C++ code. `der.h` is used through higher-level C APIs, while
 `md5.h` is wrapped by `hash.hpp`.

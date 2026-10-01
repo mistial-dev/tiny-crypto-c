@@ -166,10 +166,10 @@ authentication, expiration and access-right checks.
 ## Staged import example
 
 [twic_ccl_import.c](../examples/twic_ccl_import.c) combines CSV parsing and MD5
-verification. Enable both CCL and MD5 support. Initialize its caller-owned state
-with the decoded expected checksum, byte/record limits, and a callback that
-appends each parsed key to private staging storage. Feed the exact download
-chunks through `example_twic_ccl_import_update`.
+verification. Enable both CCL and MD5 support. Initialize its caller-owned state with
+`example_twic_ccl_import_init`, passing the decoded expected checksum, byte/record
+limits, and a callback that appends each parsed key to private staging storage. Feed the
+exact download chunks through `example_twic_ccl_import_update`.
 
 After a complete download, sort the staged keys and expose them as an immutable
 `TC_TWIC_CCL_source`. Retain duplicates in this example: the source count must
@@ -181,8 +181,8 @@ truncated exactly at a valid row boundary.
 On success, persist the completed image and its metadata, apply update policy,
 and publish under the store lock. On failure, keep the active list, discard the
 staged image and issue an application warning with the returned error. Clear the
-import state before releasing its storage. Metadata and the expected checksum
-must come from trusted retrieval or provisioning.
+import state with `example_twic_ccl_import_clear` before releasing its storage.
+Metadata and the expected checksum must come from trusted retrieval or provisioning.
 
 ## Tests
 

@@ -65,12 +65,16 @@ authorization.
 Each response is verified with `TC_X509_ocsp_response_verify` against the
 member's issuer: the selected anchor for the first member and the previous
 member otherwise. Delegate candidates come from `source`, after the certs in
-the response. The composed check verifies responses without a nonce. An accepted GOOD or REVOKED
-response settles the member. A response signed by a delegate without
+the response. The composed check verifies responses without a nonce. An
+accepted REVOKED response settles the member. After an accepted GOOD response
+the member's CRLs are also consulted, and a CRL that lists the member revoked
+takes precedence. A GOOD response signed by a delegate without
 `id-pkix-ocsp-nocheck` is accepted only when the CRL index proves the delegate
 unrevoked (RFC 6960 section 4.2.2.2.1). The delegate then takes one dependency
-node. A member whose response is missing, malformed, unauthorized, stale,
-UNKNOWN or unavailable falls back to CRLs. Exhausted limits and argument errors
+node. A REVOKED response from such a delegate is accepted unless the CRL index
+shows the delegate revoked. A member whose response is missing, malformed,
+unauthorized, stale, UNKNOWN or unavailable, or whose delegate lacks that
+proof, falls back to CRLs. Exhausted limits and argument errors
 stop the call. Responses must stay unchanged during the call and must not
 overlap any workspace array. A build without `TINY_CRYPTO_ENABLE_X509_OCSP`
 uses CRLs for every member.
@@ -100,8 +104,8 @@ its candidate CRLs failed as invalid data, with none unsupported. Causes
 include a CRL signature that does not verify, no signer candidate with a valid
 path to the anchor, a revoked CRL signer, conflicting CRLs in one scope and
 malformed CRL entries. An invalid `time.at`, a `time.at` that differs from
-`signer_policy->at`, or an `ocsp.count` other than zero or the path length
-returns `TC_TLV_ARGUMENT`.
+`signer_policy->at`, an `ocsp.count` other than zero or the path length, or
+OCSP responses with a zero `ocsp.max_responses` returns `TC_TLV_ARGUMENT`.
 Input bytes, options, source records and workspace metadata must remain stable
 while the call runs.
 
@@ -122,8 +126,8 @@ member index and zero evidence.
 
 [examples/x509_revocation.c](../examples/x509_revocation.c) sets up the typed
 workspaces from [caller-owned storage](../examples/x509_revocation.h). It supports
-four indexed CRLs and eight dependency nodes. The native tests compile and run
-the example with unrevoked and revoked issuer paths.
+four indexed CRLs and eight dependency nodes. `test_cms_revocation` compiles
+and runs the example with unrevoked and revoked issuer paths.
 
 After configuring `options` and preserving `held_path`:
 
