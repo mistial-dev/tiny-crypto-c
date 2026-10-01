@@ -97,13 +97,16 @@ static TC_status command_protect(TC_PIV_link* link, const TC_APDU_command* comma
   }
   const TC_bytes authenticated[] = {{header, sizeof header}, {field, layout->authenticated_length}};
   const TC_PIV_SM_protect_request request = {
-      command->data, layout->ciphertext_length ? field + layout->ciphertext_offset : NULL,
-      layout->ciphertext_length, authenticated, 2};
+      command->data,
+      {layout->ciphertext_length ? field + layout->ciphertext_offset : NULL,
+       layout->ciphertext_length},
+      authenticated, 2};
   uint8_t* mac = field + layout->authenticated_length;
   size_t written = 0;
   mac[0] = MAC_OBJECT;
   mac[1] = MAC_BYTES;
-  return TC_PIV_SM_protect((TC_PIV_SM*)link->sm, &request, &written, mac + 2,
+  return TC_PIV_SM_protect((TC_PIV_SM*)link->sm, &request, &written,
+                           (TC_buffer){mac + 2, MAC_BYTES},
                            (TC_PIV_SM_workspace*)link->sm_workspace);
 }
 

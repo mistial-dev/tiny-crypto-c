@@ -136,14 +136,15 @@ static void pending_session(TC_PIV_SM* session, TC_PIV_SM_suite suite)
   TC_PIV_SM_workspace w;
   static const uint8_t header[16] = {0x0c, 0x20, 0x00, 0x80, 0x80};
   const TC_bytes authenticated[] = {{header, sizeof header}};
-  const TC_PIV_SM_protect_request request = {{NULL, 0}, NULL, 0, authenticated, 1};
+  const TC_PIV_SM_protect_request request = {{NULL, 0}, {NULL, 0}, authenticated, 1};
   uint8_t tag[8];
   size_t written = 99;
   memset(session, 0, sizeof *session);
   session->suite = (uint8_t)suite;
   session->state = TC_PIV_SM_READY;
   session->data.traffic.counter[15] = 1;
-  munit_assert_int(TC_PIV_SM_protect(session, &request, &written, tag, &w), ==, TC_OK);
+  munit_assert_int(TC_PIV_SM_protect(session, &request, &written,
+                                     (TC_buffer){tag, sizeof tag}, &w), ==, TC_OK);
   munit_assert_size(written, ==, 0);
 }
 
@@ -291,17 +292,19 @@ TC_TEST(response_failures)
     {
       static const uint8_t header[16] = {0x0c, 0x20, 0x00, 0x80, 0x80};
       const TC_bytes authenticated[] = {{header, sizeof header}};
-      const TC_PIV_SM_protect_request request = {{NULL, 0}, NULL, 0, authenticated, 1};
+      const TC_PIV_SM_protect_request request = {{NULL, 0}, {NULL, 0}, authenticated, 1};
       uint8_t tag[8];
       size_t written = 999;
       /* One protected command may be pending. */
-      munit_assert_int(TC_PIV_SM_protect(&session, &request, &written, tag, &w), ==, TC_ERROR);
+      munit_assert_int(TC_PIV_SM_protect(&session, &request, &written,
+                                         (TC_buffer){tag, sizeof tag}, &w), ==, TC_ERROR);
       munit_assert_memory_equal(sizeof session, &session, &saved);
       munit_assert_size(written, ==, 999);
       /* The counter stops before the low 120 bits repeat. */
       session.state = TC_PIV_SM_READY;
       session.data.traffic.counter[0] = 1;
-      munit_assert_int(TC_PIV_SM_protect(&session, &request, &written, tag, &w), ==, TC_ERROR);
+      munit_assert_int(TC_PIV_SM_protect(&session, &request, &written,
+                                         (TC_buffer){tag, sizeof tag}, &w), ==, TC_ERROR);
       munit_assert_true(tc_test_all_zero(&session, sizeof session));
       munit_assert_size(written, ==, 999);
     }

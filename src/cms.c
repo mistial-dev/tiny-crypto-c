@@ -429,21 +429,21 @@ TC_TLV_result TC_CMS_content_digest_check(const TC_CMS_signed_attributes* attrib
 
 TC_TLV_result TC_CMS_content_digest(TC_bytes encoded, TC_hash_algorithm algorithm,
                                     const TC_TLV_limits* limits, TC_TLV_frames frames, size_t* work,
-                                    uint8_t* digest, size_t digest_capacity)
+                                    TC_buffer digest)
 {
   TC_hash_context scratch;
   tc_hash_info info;
   TC_TLV_result result =
-      tc_pki_reader_storage(encoded, limits, frames, work, digest, digest_capacity);
+      tc_pki_reader_storage(encoded, limits, frames, work, digest.data, digest.capacity);
   if (result != TC_TLV_OK)
     return result;
   if (!tc_hash_available(algorithm) || !tc_hash_info_get(algorithm, &info))
     return TC_TLV_UNSUPPORTED;
-  if (digest_capacity < info.digest_length)
+  if (digest.capacity < info.digest_length)
     return TC_TLV_LIMIT;
   return cms_octets_hash(encoded, limits,
                          &(tc_pki_tree_workspace){frames.data, frames.capacity, work}, algorithm,
-                         &scratch, digest);
+                         &scratch, digest.data);
 }
 
 /* Copy and validate a reader policy. NULL and unknown values are ARGUMENT. */

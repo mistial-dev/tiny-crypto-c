@@ -139,7 +139,7 @@ TC_TEST(content_signature)
         ==, TC_TLV_OK);
     munit_assert_int(TC_CMS_content_digest((TC_bytes){content, sizeof content}, TC_HASH_SHA256,
                                            &limits, (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
-                                           digest, sizeof digest),
+                                           (TC_buffer){digest, sizeof digest}),
                      ==, TC_TLV_OK);
     munit_assert_int(TC_CMS_content_digest_check(
                          &parsed, (TC_bytes){content_type, sizeof content_type}, TC_HASH_SHA256,
@@ -260,7 +260,7 @@ TC_TEST(content_signature)
     work = WORK_BUDGET;
     munit_assert_int(TC_CMS_content_digest((TC_bytes){content, sizeof content}, TC_HASH_SHA256,
                                            &limits, (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
-                                           digest, sizeof digest),
+                                           (TC_buffer){digest, sizeof digest}),
                      ==, TC_TLV_OK);
     munit_assert_int(TC_CMS_content_digest_check(
                          &parsed, (TC_bytes){content_type, sizeof content_type}, TC_HASH_SHA256,
@@ -570,8 +570,7 @@ TC_TEST(signed_data)
                      ==, TC_TLV_OK);
     munit_assert_true(tc_hash_info_get(algorithm.content_hash, &hash));
     munit_assert_int(TC_CMS_content_digest(container.content, algorithm.content_hash, &limits,
-                                           (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, digest,
-                                           sizeof digest),
+                                           (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, (TC_buffer){digest, sizeof digest}),
                      ==, TC_TLV_OK);
     uint8_t content_digest_bytes[TC_SHA512_DIGESTLEN];
     memcpy(content_digest_bytes, digest, hash.digest_length);

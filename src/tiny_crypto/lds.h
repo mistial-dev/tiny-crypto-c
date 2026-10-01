@@ -58,8 +58,8 @@ TC_TLV_result TC_LDS_read(TC_bytes encoded, const TC_TLV_limits* limits, TC_TLV_
  * TC_LDS_read. out changes only on OK. buffer, frames and work are
  * provisional on failure. Authenticate the CMS separately. */
 TC_TLV_result TC_LDS_read_content(TC_bytes octets, const TC_TLV_limits* limits,
-                                  TC_TLV_frames frames, size_t* work, uint8_t* buffer,
-                                  size_t buffer_capacity, TC_LDS_security_object* out);
+                                  TC_TLV_frames frames, size_t* work, TC_buffer buffer,
+                                  TC_LDS_security_object* out);
 
 /* Find the digest of group number 1..16 in an object from TC_LDS_read. Scans
  * the borrowed hash sequence in place and checks that the group set still

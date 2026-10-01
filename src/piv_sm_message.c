@@ -110,29 +110,29 @@ TC_status TC_PIV_SM_ciphertext_size(size_t plaintext_length, size_t* ciphertext_
 }
 
 TC_status TC_PIV_SM_protect(TC_PIV_SM* session, const TC_PIV_SM_protect_request* request,
-                            size_t* ciphertext_length, uint8_t tag[8],
+                            size_t* ciphertext_length, TC_buffer tag,
                             TC_PIV_SM_workspace* workspace)
 {
   const tc_sm_suite* suite;
   size_t needed = 0;
   TC_status status = TC_ERROR;
-  if (!session || !request || !ciphertext_length || !tag || !workspace ||
+  if (!session || !request || !ciphertext_length || !tag.data || tag.capacity < 8 || !workspace ||
       ((!request->plaintext.data) && request->plaintext.length) ||
-      ((!request->ciphertext) && request->ciphertext_capacity) ||
+      ((!request->ciphertext.data) && request->ciphertext.capacity) ||
       request->authenticated_count > TC_PIV_SM_AUTHENTICATED_SPANS_MAX ||
       !tc_sm_disjoint(NULL, 0, request->authenticated, request->authenticated_count) ||
       session->state != TC_PIV_SM_READY ||
       TC_PIV_SM_ciphertext_size(request->plaintext.length, &needed) != TC_OK ||
-      request->ciphertext_capacity < needed ||
+      request->ciphertext.capacity < needed ||
       !spans_contain(request->authenticated, request->authenticated_count,
-                     (TC_bytes){request->ciphertext, needed}))
+                     (TC_bytes){request->ciphertext.data, needed}))
     return TC_ERROR;
   {
     const TC_bytes writable[] = {{(const uint8_t*)session, sizeof *session},
                                  {(const uint8_t*)workspace, sizeof *workspace},
-                                 {request->ciphertext, request->ciphertext_capacity},
+                                 {request->ciphertext.data, request->ciphertext.capacity},
                                  {(const uint8_t*)ciphertext_length, sizeof *ciphertext_length},
-                                 {tag, 8}};
+                                 {tag.data, tag.capacity}};
     const TC_bytes input[] = {{(const uint8_t*)request, sizeof *request},
                               request->plaintext,
                               {(const uint8_t*)request->authenticated,
@@ -152,9 +152,9 @@ TC_status TC_PIV_SM_protect(TC_PIV_SM* session, const TC_PIV_SM_protect_request*
     return TC_ERROR;
   }
   if (needed) {
-    memcpy(request->ciphertext, request->plaintext.data, request->plaintext.length);
-    request->ciphertext[request->plaintext.length] = 0x80;
-    memset(request->ciphertext + request->plaintext.length + 1, 0,
+    memcpy(request->ciphertext.data, request->plaintext.data, request->plaintext.length);
+    request->ciphertext.data[request->plaintext.length] = 0x80;
+    memset(request->ciphertext.data + request->plaintext.length + 1, 0,
            needed - request->plaintext.length - 1);
     if (prepare_cipher(session, suite, workspace, 0) != TC_OK ||
         TC_AES_dynamic_CBC_encrypt(&TC_SM_SYM(workspace).cipher.aes, TC_SM_SYM(workspace).material,
@@ -167,7 +167,7 @@ TC_status TC_PIV_SM_protect(TC_PIV_SM* session, const TC_PIV_SM_protect_request*
                      request->authenticated_count, TC_SM_SYM(workspace).digest);
   if (status != TC_OK)
     goto done;
-  memcpy(tag, TC_SM_SYM(workspace).digest, 8);
+  memcpy(tag.data, TC_SM_SYM(workspace).digest, 8);
   memcpy(session->data.traffic.command_mcv, TC_SM_SYM(workspace).digest, 16);
   tc_internal_increment_be(session->data.traffic.counter, 16);
   session->state = TC_PIV_SM_PENDING;
@@ -175,8 +175,8 @@ TC_status TC_PIV_SM_protect(TC_PIV_SM* session, const TC_PIV_SM_protect_request*
   status = TC_OK;
 done:
   if (status != TC_OK) {
-    if (request->ciphertext && needed)
-      TC_secure_zero(request->ciphertext, needed);
+    if (request->ciphertext.data && needed)
+      TC_secure_zero(request->ciphertext.data, needed);
     TC_PIV_SM_clear(session);
   }
   TC_secure_zero(workspace, sizeof *workspace);

@@ -210,7 +210,7 @@ static void fuzz_lds(TC_bytes input)
       memcpy(&object, &saved, sizeof object);
       TC_TLV_result result =
           wrapped ? TC_LDS_read_content(input, &limits, (TC_TLV_frames){frames, FRAMES}, &work,
-                                        content, sizeof content, &object)
+                                        (TC_buffer){content, sizeof content}, &object)
                   : TC_LDS_read(input, &limits, (TC_TLV_frames){frames, FRAMES}, &work, &object);
       if (work > budgets[i])
         abort();

@@ -375,14 +375,14 @@ const TC_bytes authenticated[] = {
 };
 TC_PIV_SM_protect_request request = {
     .plaintext = command_data,
-    .ciphertext = ciphertext,
-    .ciphertext_capacity = padded,
+    .ciphertext = {ciphertext, padded},
     .authenticated = authenticated,
     .authenticated_count = 4
 };
 size_t ciphertext_length;
 uint8_t tag[8];
-if (TC_PIV_SM_protect(&session, &request, &ciphertext_length, tag,
+if (TC_PIV_SM_protect(&session, &request, &ciphertext_length,
+                      (TC_buffer){tag, sizeof tag},
                       &workspace) != TC_OK) {
     /* Argument errors leave the session unchanged. Other failures end it. */
     return TC_ERROR;

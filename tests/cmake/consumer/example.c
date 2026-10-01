@@ -205,7 +205,7 @@ int main(void)
         TC_TWIC_uuid_write(0, (TC_buffer){NULL, 0}) != TC_TLV_LIMIT ||
         TC_TWIC_uuid_match(empty, NULL, NULL) != TC_TLV_ARGUMENT)
       return 1;
-    if (TC_LDS_read_content(empty, NULL, example_no_frames, &work, NULL, 0, NULL) !=
+    if (TC_LDS_read_content(empty, NULL, example_no_frames, &work, (TC_buffer){NULL, 0}, NULL) !=
             TC_TLV_ARGUMENT ||
         work != 100)
       return 1;
@@ -477,14 +477,12 @@ int main(void)
         0xc8, 0x99, 0x6f, 0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b,
         0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55};
     work = 4096;
-    if (TC_CMS_content_digest(encoded_content, TC_HASH_SHA256, &limits, cms_frames, &work, digest,
-                              sizeof digest) != TC_TLV_OK)
+    if (TC_CMS_content_digest(encoded_content, TC_HASH_SHA256, &limits, cms_frames, &work, (TC_buffer){digest, sizeof digest}) != TC_TLV_OK)
       return 24;
     if (memcmp(digest, sha256_empty, sizeof digest))
       return 25;
     work = 0;
-    if (TC_CMS_content_digest(encoded_content, TC_HASH_SHA256, &limits, cms_frames, &work, digest,
-                              sizeof digest) != TC_TLV_LIMIT)
+    if (TC_CMS_content_digest(encoded_content, TC_HASH_SHA256, &limits, cms_frames, &work, (TC_buffer){digest, sizeof digest}) != TC_TLV_LIMIT)
       return 26;
     if (memcmp(digest, sha256_empty, sizeof digest))
       return 27;

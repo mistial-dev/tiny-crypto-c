@@ -89,8 +89,7 @@ typedef struct {
  * header, ciphertext and trailing fields without copying. */
 typedef struct {
   TC_bytes plaintext;
-  uint8_t* ciphertext;
-  size_t ciphertext_capacity;
+  TC_buffer ciphertext;
   const TC_bytes* authenticated;
   size_t authenticated_count;
 } TC_PIV_SM_protect_request;
@@ -164,13 +163,13 @@ TC_status TC_PIV_SM_ciphertext_size(size_t plaintext_length, size_t* ciphertext_
  * places the ciphertext span in authenticated where its protocol requires it.
  * Ciphertext storage may overlap authenticated spans. Keep plaintext
  * separate. Requires READY, so only one protected request
- * may be pending. A ciphertext_capacity below TC_PIV_SM_ciphertext_size is an
+ * may be pending. A ciphertext.capacity below TC_PIV_SM_ciphertext_size is an
  * argument error.
  * TC_OK: PENDING. Writes ciphertext, *ciphertext_length and tag.
  * TC_ERROR after validation: IDLE with ciphertext wiped. Causes are an
  * exhausted message counter and cipher failure. */
 TC_status TC_PIV_SM_protect(TC_PIV_SM* session, const TC_PIV_SM_protect_request* request,
-                            size_t* ciphertext_length, uint8_t tag[8],
+                            size_t* ciphertext_length, TC_buffer tag,
                             TC_PIV_SM_workspace* workspace);
 
 /* Authenticate ordered response spans, then decrypt and check padding

@@ -276,7 +276,7 @@ static void signer_context_init(path_fixture* f, const tc_pki_tree_workspace* tr
   if (f->container.has_content) {
     munit_assert_int(TC_CMS_content_digest(f->container.content, TC_HASH_SHA256, &f->limits,
                                            (TC_TLV_frames){f->frames, FRAME_CAPACITY}, tree->work,
-                                           signing->digest, sizeof signing->digest),
+                                           (TC_buffer){signing->digest, sizeof signing->digest}),
                      ==, TC_TLV_OK);
   } else {
     unsigned digest_length;

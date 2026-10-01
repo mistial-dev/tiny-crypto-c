@@ -92,7 +92,7 @@ static TC_credential_status security_authenticate(
     return status;
   TC_LDS_security_object lds;
   parsed = TC_LDS_read_content(object.envelope.content, limits, tc_credential_frames(context), work,
-                               workspace->content, workspace->content_capacity, &lds);
+                               (TC_buffer){workspace->content, workspace->content_capacity}, &lds);
   if (parsed != TC_TLV_OK)
     return tc_validation_status(parsed);
   /* The container map and the signed LDS must name the same data groups. */

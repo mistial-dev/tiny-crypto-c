@@ -304,7 +304,7 @@ TC_TEST(storage)
         else if (reader == DIGEST)
           result = TC_CMS_content_digest(input, TC_HASH_SHA256, pointers[LIMITS],
                                          (TC_TLV_frames){pointers[FRAMES], FRAME_CAPACITY},
-                                         pointers[WORK], pointers[OUTPUT], INPUT_CAPACITY);
+                                         pointers[WORK], (TC_buffer){pointers[OUTPUT], INPUT_CAPACITY});
         else
           result = TC_CMS_signed_data_read(input, &cms_policy, pointers[LIMITS],
                                            (TC_TLV_frames){pointers[FRAMES], FRAME_CAPACITY},
@@ -330,7 +330,7 @@ TC_TEST(storage)
   work = WORK_BUDGET;
   munit_assert_int(TC_CMS_content_digest((TC_bytes){detached, sizeof detached}, TC_HASH_SHA256,
                                          &limits, (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
-                                         digest, sizeof digest),
+                                         (TC_buffer){digest, sizeof digest}),
                    ==, TC_TLV_UNSUPPORTED);
   munit_assert_memory_equal(sizeof digest, digest, saved_digest);
   return MUNIT_OK;

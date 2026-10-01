@@ -178,11 +178,11 @@ TC_TEST(authenticate)
      * reply is 99 02 90 00 8E 08 MAC (Part 2 4.2.3, 4.2.5). */
     static const uint8_t header[16] = {0x0c, 0x20, 0x00, 0x80, 0x80};
     const TC_bytes header_span[] = {{header, sizeof header}};
-    const TC_PIV_SM_protect_request command = {{NULL, 0}, NULL, 0, header_span, 1};
+    const TC_PIV_SM_protect_request command = {{NULL, 0}, {NULL, 0}, header_span, 1};
     uint8_t tag[8];
     size_t written = 99;
-    munit_assert_int(TC_PIV_SM_protect(&session, &command, &written, tag, &workspace.session), ==,
-                     TC_OK);
+    munit_assert_int(TC_PIV_SM_protect(&session, &command, &written,
+                                       (TC_buffer){tag, sizeof tag}, &workspace.session), ==, TC_OK);
     munit_assert_size(written, ==, 0);
     munit_assert_size(fixture->command.length, ==, 10);
     munit_assert_memory_equal(8, tag, fixture->command.data + 2);

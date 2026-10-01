@@ -145,8 +145,8 @@ TC_TLV_result TC_LDS_read(TC_bytes encoded, const TC_TLV_limits* limits, TC_TLV_
 }
 
 TC_TLV_result TC_LDS_read_content(TC_bytes octets, const TC_TLV_limits* limits,
-                                  TC_TLV_frames frames, size_t* work, uint8_t* buffer,
-                                  size_t buffer_capacity, TC_LDS_security_object* out)
+                                  TC_TLV_frames frames, size_t* work, TC_buffer buffer,
+                                  TC_LDS_security_object* out)
 {
   TC_bytes writes[4], content;
   tc_pki_storage_plan plan;
@@ -156,7 +156,7 @@ TC_TLV_result TC_LDS_read_content(TC_bytes octets, const TC_TLV_limits* limits,
   TC_PKI_PLAN_WRITE(&plan, frames.data, frames.capacity);
   TC_PKI_PLAN_WRITE(&plan, work, 1);
   TC_PKI_PLAN_WRITE(&plan, out, 1);
-  TC_PKI_PLAN_WRITE(&plan, buffer, buffer_capacity);
+  TC_PKI_PLAN_WRITE(&plan, buffer.data, buffer.capacity);
   tc_pki_storage_plan_seal(&plan);
   TC_PKI_PLAN_INPUT(&plan, limits, 1);
   tc_pki_storage_plan_input_span(&plan, octets);
@@ -168,7 +168,7 @@ TC_TLV_result TC_LDS_read_content(TC_bytes octets, const TC_TLV_limits* limits,
   /* CMS permits nested BER chunks. The reconstructed LDS remains DER. */
   result = tc_pki_octets_contiguous(octets, 4, TC_TLV_BER, limits,
                                     &(tc_pki_tree_workspace){frames.data, frames.capacity, work},
-                                    (TC_buffer){buffer, buffer_capacity}, &content);
+                                    buffer, &content);
   if (result != TC_TLV_OK)
     return result;
   return TC_LDS_read(content, limits, frames, work, out);

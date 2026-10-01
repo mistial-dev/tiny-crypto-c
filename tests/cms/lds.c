@@ -275,7 +275,8 @@ TC_TEST(content_read)
   const size_t length = fixture(der, 0, 2, 0, 32, 0);
   size_t used = field(encoded, 4, der, length), work = WORK;
   munit_assert_int(TC_LDS_read_content((TC_bytes){encoded, used}, &limits,
-                                       (TC_TLV_frames){frames, FRAMES}, &work, NULL, 0, &object),
+                                       (TC_TLV_frames){frames, FRAMES}, &work,
+                                       (TC_buffer){NULL, 0}, &object),
                    ==, TC_TLV_OK);
   munit_assert_ptr_equal(object.encoded.data, encoded + used - length);
   for (size_t split = 0; split <= length; ++split) {
@@ -285,7 +286,8 @@ TC_TEST(content_read)
     work = WORK;
     memset(buffer, 0xa5, sizeof buffer);
     munit_assert_int(TC_LDS_read_content((TC_bytes){encoded, used}, &limits,
-                                         (TC_TLV_frames){frames, FRAMES}, &work, buffer, length,
+                                         (TC_TLV_frames){frames, FRAMES}, &work,
+                                         (TC_buffer){buffer, length},
                                          &object),
                      ==, TC_TLV_OK);
     munit_assert_memory_equal(length, object.encoded.data, der);
@@ -297,7 +299,8 @@ TC_TEST(content_read)
     work = WORK;
     object = preserved;
     munit_assert_int(TC_LDS_read_content((TC_bytes){encoded, used}, &limits,
-                                         (TC_TLV_frames){frames, FRAMES}, &work, NULL, 0, &object),
+                                         (TC_TLV_frames){frames, FRAMES}, &work,
+                                         (TC_buffer){NULL, 0}, &object),
                      ==, copied ? TC_TLV_LIMIT : TC_TLV_OK);
     if (copied)
       munit_assert_memory_equal(sizeof object, &object, &preserved);
@@ -312,7 +315,8 @@ TC_TEST(content_read)
   encoded[used++] = 0;
   work = WORK;
   munit_assert_int(TC_LDS_read_content((TC_bytes){encoded, used}, &limits,
-                                       (TC_TLV_frames){frames, FRAMES}, &work, buffer, length,
+                                       (TC_TLV_frames){frames, FRAMES}, &work,
+                                       (TC_buffer){buffer, length},
                                        &object),
                    ==, TC_TLV_OK);
   munit_assert_memory_equal(length, object.encoded.data, der);
@@ -321,7 +325,8 @@ TC_TEST(content_read)
     work = budget;
     object = preserved;
     munit_assert_int(TC_LDS_read_content((TC_bytes){encoded, used}, &limits,
-                                         (TC_TLV_frames){frames, FRAMES}, &work, buffer, length,
+                                         (TC_TLV_frames){frames, FRAMES}, &work,
+                                         (TC_buffer){buffer, length},
                                          &object),
                      ==, budget == required ? TC_TLV_OK : TC_TLV_LIMIT);
     if (budget < required)
@@ -331,20 +336,22 @@ TC_TEST(content_read)
     work = WORK;
     object = preserved;
     munit_assert_int(TC_LDS_read_content((TC_bytes){encoded, prefix}, &limits,
-                                         (TC_TLV_frames){frames, FRAMES}, &work, buffer, length,
+                                         (TC_TLV_frames){frames, FRAMES}, &work,
+                                         (TC_buffer){buffer, length},
                                          &object),
                      !=, TC_TLV_OK);
     munit_assert_memory_equal(sizeof object, &object, &preserved);
   }
   work = WORK;
   munit_assert_int(TC_LDS_read_content((TC_bytes){encoded, used}, &limits,
-                                       (TC_TLV_frames){frames, FRAMES}, &work, buffer, length - 1,
+                                       (TC_TLV_frames){frames, FRAMES}, &work,
+                                       (TC_buffer){buffer, length - 1},
                                        &object),
                    ==, TC_TLV_LIMIT);
   work = WORK;
   munit_assert_int(TC_LDS_read_content((TC_bytes){encoded, used}, &limits,
-                                       (TC_TLV_frames){frames, FRAMES}, &work, encoded,
-                                       sizeof encoded, &object),
+                                       (TC_TLV_frames){frames, FRAMES}, &work,
+                                       (TC_buffer){encoded, sizeof encoded}, &object),
                    ==, TC_TLV_ARGUMENT);
   munit_assert_size(work, ==, WORK);
   munit_assert_memory_equal(sizeof object, &object, &preserved);

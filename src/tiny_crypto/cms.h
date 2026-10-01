@@ -261,7 +261,7 @@ TC_TLV_result TC_CMS_signed_attributes_read(TC_bytes encoded,
  * STRING or bad framing. digest changes only on OK. */
 TC_TLV_result TC_CMS_content_digest(TC_bytes encoded, TC_hash_algorithm algorithm,
                                     const TC_TLV_limits* limits, TC_TLV_frames frames, size_t* work,
-                                    uint8_t* digest, size_t digest_capacity);
+                                    TC_buffer digest);
 
 /* Compare parsed signed attributes with the expected content type OID
  * contents and a digest computed over the content value bytes (RFC 5652
