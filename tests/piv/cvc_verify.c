@@ -83,7 +83,8 @@ static void trusted_chain(const ExampleCVCRequest* request, X509* root, EVP_PKEY
   TC_X509_certificate parsed_signer;
   munit_assert_int(TC_X509_read(request->signer_certificate, &limits, &parser, &parsed_signer), ==,
                    TC_TLV_OK);
-  TC_X509_store_anchor anchor = {.trust = {parsed_root.subject, parsed_root.public_key}};
+  TC_X509_store_anchor anchor = {.trust = {parsed_root.subject, parsed_root.public_key},
+                                 .usage = TC_X509_ANCHOR_USAGE_CRL_SIGN};
   ExampleX509Source arrays = {&root_der, 1, &anchor, 1};
   const TC_X509_store_source source = example_x509_source(&arrays);
   TC_X509_store store = {0};
