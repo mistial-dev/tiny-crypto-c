@@ -37,6 +37,26 @@ static int read_time(const char* text, TC_X509_time* out)
   return 1;
 }
 
+static const char* credential_status_name(TC_credential_status status)
+{
+  switch (status) {
+  case TC_CREDENTIAL_VALID:
+    return "valid";
+  case TC_CREDENTIAL_INVALID:
+    return "invalid";
+  case TC_CREDENTIAL_REVOKED:
+    return "revoked";
+  case TC_CREDENTIAL_UNSUPPORTED:
+    return "unsupported";
+  case TC_CREDENTIAL_LIMIT:
+    return "limit";
+  case TC_CREDENTIAL_UNAVAILABLE:
+    return "unavailable";
+  default:
+    return "error";
+  }
+}
+
 int main(int argc, char** argv)
 {
   if (argc != 7) {
@@ -125,8 +145,6 @@ int main(int argc, char** argv)
   /* This single-threaded caller owns the store and all source buffers. */
   TC_credential_status result =
       example_validate_cms_from_store(&request, &store, &options, &revocation, &work, &scratch);
-  static const char* names[] = {"valid", "invalid", "revoked",    "unsupported",
-                                "limit", "error",   "unavailable"};
-  printf("%s\n", names[result]);
+  printf("%s\n", credential_status_name(result));
   return result == TC_CREDENTIAL_VALID ? 0 : 1;
 }
