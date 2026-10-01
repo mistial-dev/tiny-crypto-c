@@ -175,11 +175,11 @@ jobs:
           python3 tools/stage_embedded_package.py "$RUNNER_TEMP/tiny-crypto-c-embedded"
           pio pkg pack "$RUNNER_TEMP/tiny-crypto-c-embedded" --output "$RUNNER_TEMP/tiny-crypto-c.tar.gz"
           python3 tests/test_package_boundaries.py --archive "$RUNNER_TEMP/tiny-crypto-c.tar.gz"
-      - name: Validate fixtures and generate benchmark report
+      - name: Validate fixtures and check benchmark report
         run: |
           export PICO_SDK_PATH="$GITHUB_WORKSPACE/build-tools/pico-sdk"
           export PICO_TOOLCHAIN_PATH="$HOME/.platformio/packages/toolchain-gccarmnoneeabi/bin"
-          make benchmark-report
+          make benchmark-report-check
       - name: Enforce linked flash and stack budgets
         run: |
           export AVR_CC="$HOME/.platformio/packages/toolchain-atmelavr/bin/avr-gcc"

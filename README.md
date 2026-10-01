@@ -94,8 +94,9 @@ Use `<tiny_crypto/tiny_crypto.hpp>` for the C++11 wrappers in the
 
 All options are CMake cache variables. With no profile selected, the build
 enables AES-128 CTR and SHA-256. Secret wiping and public argument checks are
-always on. Finals, one-shot calls and failure paths wipe contexts and stack
-secrets, and every public entry validates its pointers.
+always on. Stateful finals, one-shot operations and documented failure paths
+clear their secret state. Status-returning operations validate required spans
+and pointers before processing input.
 
 `TINY_CRYPTO_RESOURCE_PROFILE=micro` favors small code and byte-limb EC and
 RSA arithmetic. `mini` uses native arithmetic while keeping optional algorithms
