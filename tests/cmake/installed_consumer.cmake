@@ -1,4 +1,9 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
+if(NOT SOURCE_DIR OR NOT BINARY_DIR)
+  message(FATAL_ERROR "SOURCE_DIR and BINARY_DIR are required")
+endif()
+# Start from fresh trees so cache entries from earlier runs cannot apply.
+file(REMOVE_RECURSE "${BINARY_DIR}")
 function(run)
   execute_process(COMMAND ${ARGV} RESULT_VARIABLE status
     OUTPUT_VARIABLE output ERROR_VARIABLE error)

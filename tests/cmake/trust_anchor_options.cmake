@@ -4,6 +4,8 @@
 if(NOT SOURCE_DIR OR NOT BINARY_DIR OR NOT C_COMPILER)
   message(FATAL_ERROR "SOURCE_DIR, BINARY_DIR and C_COMPILER are required")
 endif()
+# Start from fresh trees so cache entries from earlier runs cannot apply.
+file(REMOVE_RECURSE "${BINARY_DIR}")
 file(MAKE_DIRECTORY "${BINARY_DIR}")
 file(WRITE "${BINARY_DIR}/probe.c" "#include <tiny_crypto/x509_trust_anchor.h>\nint main(void) { return 0; }\n")
 
