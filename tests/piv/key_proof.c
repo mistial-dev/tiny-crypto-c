@@ -516,13 +516,15 @@ TC_TEST(card2_contactless)
  * signed directly. */
 static TC_random_source card4_digest(uint8_t key)
 {
-  for (size_t i = 0; i < fixture.authentication_count; ++i) {
+  const tc_card_authentication* found = NULL;
+  for (size_t i = 0; i < fixture.authentication_count && !found; ++i) {
     const tc_card_authentication* entry = &fixture.authentications[i];
     if (entry->algorithm == TC_PIV_ALGORITHM_ECC_P256 && entry->key == key && entry->tag == 0x81)
-      return digest_source(entry->input.data, entry->input.length);
+      found = entry;
   }
-  munit_error("no recorded input");
-  return digest_source(NULL, 0);
+  /* Assert, then return, so no code follows a call that does not return. */
+  munit_assert_not_null(found);
+  return digest_source(found->input.data, found->input.length);
 }
 
 /* Card 4 (P-256) on contact: 9E, then 9C right after a PIN submission

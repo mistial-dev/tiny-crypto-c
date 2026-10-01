@@ -95,11 +95,12 @@ static void link_info(const TC_PIV_link* link, TC_PIV_link_info* info)
 #if TC_TEST_SM_FIXTURES
 static const struct tc_sm_fixture* fixture_for(TC_PIV_SM_suite suite)
 {
-  for (size_t i = 0; i < sizeof sm_fixtures / sizeof *sm_fixtures; ++i)
+  const struct tc_sm_fixture* found = NULL;
+  for (size_t i = 0; i < sizeof sm_fixtures / sizeof *sm_fixtures && !found; ++i)
     if (sm_fixtures[i].suite == suite && !sm_fixtures[i].intermediate.length)
-      return &sm_fixtures[i];
-  munit_error("missing fixture");
-  return NULL;
+      found = &sm_fixtures[i];
+  munit_assert_not_null(found);
+  return found;
 }
 
 static const char* suite_hex(TC_PIV_SM_suite suite)

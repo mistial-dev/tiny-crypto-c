@@ -398,7 +398,7 @@ static void verify_answer(tc_piv_guard* guard, TC_bytes answer)
   switch (guard->pending_kind) {
   case KIND_PIN_QUERY:
     guard->query_ready[reference == REFERENCE_PIN ? 0 : 1] =
-        (status & 0xfff0) == 0x63c0 && (status & 0x0f) >= guard->policy.minimum_retries;
+        (status & 0xfff0) == 0x63c0 && (unsigned)(status & 0x0f) >= guard->policy.minimum_retries;
     break;
   case KIND_PIN_SUBMISSION:
     guard->pin_outcome_pending = 0;

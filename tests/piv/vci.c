@@ -245,12 +245,13 @@ TC_TEST(unsecured)
 #if TC_TEST_SM_FIXTURES
 static const struct tc_sm_fixture* fixture(void)
 {
-  for (size_t i = 0; i < sizeof sm_fixtures / sizeof *sm_fixtures; ++i)
+  const struct tc_sm_fixture* found = NULL;
+  for (size_t i = 0; i < sizeof sm_fixtures / sizeof *sm_fixtures && !found; ++i)
     if (!sm_fixtures[i].intermediate.length &&
         (sm_fixtures[i].suite == TC_PIV_SM_CS2 ? TC_PIV_SM_ENABLE_CS2 : TC_PIV_SM_ENABLE_CS7))
-      return &sm_fixtures[i];
-  munit_error("missing fixture");
-  return NULL;
+      found = &sm_fixtures[i];
+  munit_assert_not_null(found);
+  return found;
 }
 
 static TC_status scalar_one(void* context, uint8_t* output, size_t length)

@@ -628,14 +628,15 @@ static TC_bytes biometric_record(TC_bytes value)
   TC_TLV_reader reader;
   TC_TLV_element element;
   munit_assert_int(TC_TLV_reader_init(&reader, value, TC_TLV_ISO7816, &limits), ==, TC_TLV_OK);
-  while (TC_TLV_next(&reader, &element) == TC_TLV_OK)
+  int found = 0;
+  TC_PIV_CBEFF cbeff;
+  while (!found && TC_TLV_next(&reader, &element) == TC_TLV_OK)
     if (element.header.tag_length == 1 && element.header.tag[0] == 0xbc) {
-      TC_PIV_CBEFF cbeff;
       munit_assert_int(TC_PIV_CBEFF_read(element.value, &cbeff), ==, TC_TLV_OK);
-      return cbeff.record;
+      found = 1;
     }
-  munit_error("no BC element");
-  return (TC_bytes){NULL, 0};
+  munit_assert_true(found);
+  return cbeff.record;
 }
 
 /* A validated certificate view of a card certificate container. */
