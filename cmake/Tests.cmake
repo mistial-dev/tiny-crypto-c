@@ -67,6 +67,9 @@ if(TINY_CRYPTO_BUILD_TESTS)
     add_test(NAME test_cavp_rsp
       COMMAND ${Python3_EXECUTABLE} -m unittest tests.test_cavp_rsp)
     set_tests_properties(test_cavp_rsp PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    add_test(NAME test_c_emitter
+      COMMAND ${Python3_EXECUTABLE} -m unittest tests.test_c_emitter)
+    set_tests_properties(test_c_emitter PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
     add_test(NAME test_argument_order
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_argument_order.py)
     add_test(NAME test_no_wall_clock

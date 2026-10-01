@@ -17,6 +17,8 @@ import os
 import subprocess
 import sys
 
+from c_emitter import byte_array
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HEADER_PATH = os.path.join(ROOT, "tests", "hash", "test_vectors.h")
 
@@ -98,17 +100,6 @@ def mac(algorithm, key, data):
     return expected
 
 
-def c_array(name, data):
-    if len(data) == 0:
-        return f"static const uint8_t {name}[1] = {{ 0x00 }}; /* empty, length 0 */\n"
-    lines = []
-    for offset in range(0, len(data), 12):
-        chunk = data[offset:offset + 12]
-        lines.append("  " + ", ".join(f"0x{b:02x}" for b in chunk) + ",")
-    body = "\n".join(lines).rstrip(",")
-    return f"static const uint8_t {name}[{len(data)}] = {{\n{body}\n}};\n"
-
-
 def main():
     out = []
     out.append("/*\n * SPDX-FileCopyrightText: Mistial Dev\n * SPDX-License-Identifier: GPL-2.0-or-later\n */\n\n")
@@ -117,16 +108,16 @@ def main():
 
     out.append("/* --- FIPS 180-4 examples --- */\n")
     for name, message in FIPS_MESSAGES:
-        out.append(c_array(f"fips_{name}_msg", message))
+        out.append(byte_array(f"fips_{name}_msg", message))
         out.append(f"#define FIPS_{name.upper()}_LEN {len(message)}\n")
         for algorithm, _ in ALGORITHMS:
-            out.append(c_array(f"fips_{name}_{algorithm}", digest(algorithm, message)))
+            out.append(byte_array(f"fips_{name}_{algorithm}", digest(algorithm, message)))
         out.append("\n")
 
     million = b"a" * 1000000
     out.append("/* One million repetitions of 'a' */\n")
     for algorithm, _ in ALGORITHMS:
-        out.append(c_array(f"million_a_{algorithm}", digest(algorithm, million)))
+        out.append(byte_array(f"million_a_{algorithm}", digest(algorithm, million)))
     out.append("\n")
 
     out.append("/* --- Padding boundary lengths over the pattern (i & 0xFF) --- */\n")
@@ -143,9 +134,9 @@ def main():
     out.append("/* --- RFC 2202 HMAC-SHA-1 test cases 1-7 --- */\n")
     out.append("struct hmac_vector { const uint8_t* key; size_t key_len; const uint8_t* msg; size_t msg_len; const uint8_t* tag; };\n")
     for index, (key, message) in enumerate(RFC2202, start=1):
-        out.append(c_array(f"rfc2202_{index}_key", key))
-        out.append(c_array(f"rfc2202_{index}_msg", message))
-        out.append(c_array(f"rfc2202_{index}_tag", mac("sha1", key, message)))
+        out.append(byte_array(f"rfc2202_{index}_key", key))
+        out.append(byte_array(f"rfc2202_{index}_msg", message))
+        out.append(byte_array(f"rfc2202_{index}_tag", mac("sha1", key, message)))
     out.append(f"#define RFC2202_COUNT {len(RFC2202)}\n")
     out.append("static const struct hmac_vector rfc2202[RFC2202_COUNT] = {\n")
     for index, (key, message) in enumerate(RFC2202, start=1):
@@ -155,11 +146,11 @@ def main():
     out.append("/* --- RFC 4231 HMAC-SHA-224/256/384/512 test cases 1-7 --- */\n")
     out.append("/* rfc4231[] keeps the SHA-256 tags; the other digests get their own tables. */\n")
     for index, (key, message) in enumerate(RFC4231, start=1):
-        out.append(c_array(f"rfc4231_{index}_key", key))
-        out.append(c_array(f"rfc4231_{index}_msg", message))
-        out.append(c_array(f"rfc4231_{index}_tag", mac("sha256", key, message)))
+        out.append(byte_array(f"rfc4231_{index}_key", key))
+        out.append(byte_array(f"rfc4231_{index}_msg", message))
+        out.append(byte_array(f"rfc4231_{index}_tag", mac("sha256", key, message)))
         for algorithm in ("sha224", "sha384", "sha512"):
-            out.append(c_array(f"rfc4231_{index}_tag_{algorithm}", mac(algorithm, key, message)))
+            out.append(byte_array(f"rfc4231_{index}_tag_{algorithm}", mac(algorithm, key, message)))
     out.append(f"#define RFC4231_COUNT {len(RFC4231)}\n")
     out.append("static const struct hmac_vector rfc4231[RFC4231_COUNT] = {\n")
     for index, (key, message) in enumerate(RFC4231, start=1):
@@ -174,7 +165,7 @@ def main():
 
     out.append("/* --- HMAC key-length cases: key = pattern(k), msg = pattern(37) --- */\n")
     keymsg = pattern(37)
-    out.append(c_array("hmac_keylen_msg", keymsg))
+    out.append(byte_array("hmac_keylen_msg", keymsg))
     out.append(f"#define HMAC_KEYLEN_COUNT {len(HMAC_KEY_LENGTHS)}\n")
     out.append("static const size_t hmac_key_lengths[HMAC_KEYLEN_COUNT] = { " +
                ", ".join(str(n) for n in HMAC_KEY_LENGTHS) + " };\n")
