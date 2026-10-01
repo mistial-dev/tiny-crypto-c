@@ -8,7 +8,6 @@
 #include "piv_link_internal.h"
 #include "piv_sm_apdu_internal.h"
 #include "piv_template_internal.h"
-#include "tlv_internal.h"
 
 enum {
   KEY_ESTABLISHMENT = 0x04, /* P2 of the key establishment GENERAL AUTHENTICATE */
@@ -19,8 +18,7 @@ enum {
   REQUEST_MAX_BYTES = 2 + 2 + CONTROL_BYTES + ID_BYTES + 97 + 2
 };
 
-static const uint8_t template_tag = TC_PIV_TEMPLATE_TAG;
-static const uint8_t challenge_tag = TC_PIV_TEMPLATE_CHALLENGE;
+static const uint8_t host_control = 0x00; /* CB_H (H1) */
 static const uint8_t response_tag = TC_PIV_TEMPLATE_RESPONSE;
 static const uint8_t card_cvc_tag[] = {0x7f, 0x21};
 
@@ -34,21 +32,15 @@ static int suite_built(TC_PIV_SM_suite suite)
   return suite == TC_PIV_SM_CS2 ? TC_PIV_SM_ENABLE_CS2 : TC_PIV_SM_ENABLE_CS7;
 }
 
-/* 7C {81 {CB_H 00 || ID_sH || Q_eH}, 82 00} (4.1.8). Returns the length. */
+/* 7C {81 {CB_H 00 || ID_sH || Q_eH}, 82 00} (4.1.8). Returns the length,
+ * at most REQUEST_MAX_BYTES for both suites. */
 static size_t request_write(const TC_PIV_SM_handshake* handshake, uint8_t* out)
 {
-  const size_t value_length =
-      CONTROL_BYTES + handshake->host_identifier.length + handshake->public_key.length;
-  const size_t contents = tc_tlv_header_size(1, value_length) + value_length + 2;
-  uint8_t* at = tc_tlv_header_write(out, &template_tag, 1, contents);
-  at = tc_tlv_header_write(at, &challenge_tag, 1, value_length);
-  *at++ = 0x00; /* CB_H (H1) */
-  memcpy(at, handshake->host_identifier.data, handshake->host_identifier.length);
-  at += handshake->host_identifier.length;
-  memcpy(at, handshake->public_key.data, handshake->public_key.length);
-  at += handshake->public_key.length;
-  at = tc_tlv_header_write(at, &response_tag, 1, 0);
-  return (size_t)(at - out);
+  const tc_piv_template_item items[] = {
+      {TC_PIV_TEMPLATE_CHALLENGE,
+       {{&host_control, CONTROL_BYTES}, handshake->host_identifier, handshake->public_key}},
+      {TC_PIV_TEMPLATE_RESPONSE, {{NULL, 0}}}};
+  return (size_t)(tc_piv_template_write(out, items, 2) - out);
 }
 
 /* 7C {82 {CB_ICC || N_ICC || AuthCryptogram_ICC || C_ICC}} with C_ICC one

@@ -9,15 +9,28 @@
 
 static const uint8_t template_tag = TC_PIV_TEMPLATE_TAG;
 
+/* Value length of one DO, or SIZE_MAX when its parts overflow size_t. */
+static size_t value_length(const tc_piv_template_item* item)
+{
+  size_t length = 0;
+  for (size_t i = 0; i < TC_PIV_TEMPLATE_MAX_PARTS; ++i) {
+    if (item->parts[i].length > SIZE_MAX - 1 - length)
+      return SIZE_MAX;
+    length += item->parts[i].length;
+  }
+  return length;
+}
+
 /* Size of the DOs inside 7C, or 0 when one exceeds the writer bound. */
 static size_t contents_size(const tc_piv_template_item* items, size_t count)
 {
   size_t total = 0;
   for (size_t i = 0; i < count; ++i) {
-    const size_t header = tc_tlv_header_size(1, items[i].value.length);
-    if (!header || items[i].value.length > SIZE_MAX - header - total)
+    const size_t length = value_length(&items[i]);
+    const size_t header = length == SIZE_MAX ? 0 : tc_tlv_header_size(1, length);
+    if (!header || length > SIZE_MAX - header - total)
       return 0;
-    total += header + items[i].value.length;
+    total += header + length;
   }
   return total;
 }
@@ -35,10 +48,13 @@ uint8_t* tc_piv_template_write(uint8_t* out, const tc_piv_template_item* items, 
 {
   out = tc_tlv_header_write(out, &template_tag, 1, contents_size(items, count));
   for (size_t i = 0; i < count; ++i) {
-    out = tc_tlv_header_write(out, &items[i].tag, 1, items[i].value.length);
-    if (items[i].value.length)
-      memcpy(out, items[i].value.data, items[i].value.length);
-    out += items[i].value.length;
+    out = tc_tlv_header_write(out, &items[i].tag, 1, value_length(&items[i]));
+    for (size_t j = 0; j < TC_PIV_TEMPLATE_MAX_PARTS; ++j) {
+      const TC_bytes part = items[i].parts[j];
+      if (part.length)
+        memcpy(out, part.data, part.length);
+      out += part.length;
+    }
   }
   return out;
 }

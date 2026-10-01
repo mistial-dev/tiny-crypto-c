@@ -114,8 +114,8 @@ static TC_PIV_result sign_challenge(TC_PIV_link* link, uint8_t algorithm, uint8_
                                     TC_bytes challenge, TC_PIV_key_proof_workspace* workspace,
                                     TC_bytes* signature)
 {
-  const tc_piv_template_item items[] = {{TC_PIV_TEMPLATE_RESPONSE, {NULL, 0}},
-                                        {TC_PIV_TEMPLATE_CHALLENGE, challenge}};
+  const tc_piv_template_item items[] = {{TC_PIV_TEMPLATE_RESPONSE, {{NULL, 0}}},
+                                        {TC_PIV_TEMPLATE_CHALLENGE, {challenge}}};
   const size_t request_length = tc_piv_template_size(items, 2);
   if (!request_length || request_length > sizeof workspace->request)
     return TC_PIV_LIMIT;

@@ -1128,8 +1128,8 @@ TC_TEST(template)
   uint8_t challenge[256];
   for (size_t i = 0; i < sizeof challenge; ++i)
     challenge[i] = (uint8_t)i;
-  const tc_piv_template_item items[] = {{TC_PIV_TEMPLATE_RESPONSE, {NULL, 0}},
-                                        {TC_PIV_TEMPLATE_CHALLENGE, {challenge, 256}}};
+  const tc_piv_template_item items[] = {{TC_PIV_TEMPLATE_RESPONSE, {{NULL, 0}}},
+                                        {TC_PIV_TEMPLATE_CHALLENGE, {{challenge, 256}}}};
   munit_assert_size(tc_piv_template_size(items, 2), ==, 4 + 2 + 4 + 256);
   uint8_t out[300];
   memset(out, 0xee, sizeof out);
@@ -1138,6 +1138,15 @@ TC_TEST(template)
   munit_assert_memory_equal(10, out, "\x7c\x82\x01\x06\x82\x00\x81\x82\x01\x00");
   munit_assert_memory_equal(256, out + 10, challenge);
   munit_assert_uint8(out[266], ==, 0xee);
+  /* A value joined from parts, as in key establishment: 81 {00 || id || q}. */
+  static const uint8_t control = 0x00, id[] = {1, 2, 3}, q[] = {4, 5};
+  const tc_piv_template_item joined[] = {
+      {TC_PIV_TEMPLATE_CHALLENGE, {{&control, 1}, {id, 3}, {q, 2}}},
+      {TC_PIV_TEMPLATE_RESPONSE, {{NULL, 0}}}};
+  uint8_t joined_out[16];
+  munit_assert_size(tc_piv_template_size(joined, 2), ==, 12);
+  munit_assert_ptr_equal(tc_piv_template_write(joined_out, joined, 2), joined_out + 12);
+  munit_assert_memory_equal(12, joined_out, "\x7c\x0a\x81\x06\x00\x01\x02\x03\x04\x05\x82\x00");
   const uint8_t tags[] = {TC_PIV_TEMPLATE_RESPONSE, TC_PIV_TEMPLATE_CHALLENGE};
   TC_bytes values[2] = {{NULL, 7}, {NULL, 7}};
   munit_assert_int(tc_piv_template_read(span(out, 266), tags, 2, values), ==, TC_TLV_OK);
