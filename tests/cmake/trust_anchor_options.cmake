@@ -8,6 +8,19 @@ endif()
 file(REMOVE_RECURSE "${BINARY_DIR}")
 file(MAKE_DIRECTORY "${BINARY_DIR}")
 file(WRITE "${BINARY_DIR}/probe.c" "#include <tiny_crypto/x509_trust_anchor.h>\nint main(void) { return 0; }\n")
+# The generic list reader serves every choice. Each reduced profile must
+# link it against the archive.
+file(WRITE "${BINARY_DIR}/link.c" "#include <tiny_crypto/x509_trust_anchor.h>
+#include <string.h>
+int main(void)
+{
+  TC_X509_trust_anchor_reader reader;
+  TC_X509_store_anchor anchor;
+  memset(&reader, 0, sizeof reader);
+  return TC_X509_trust_anchor_list_init(&reader, (TC_bytes){0, 0}, 0, 0) != TC_TLV_ARGUMENT ||
+         TC_X509_trust_anchor_next(&reader, &anchor) == TC_TLV_OK;
+}
+")
 
 function(configure_case label expected master cert tbs info path)
   execute_process(COMMAND "${CMAKE_COMMAND}" -S "${SOURCE_DIR}"
@@ -38,6 +51,18 @@ foreach(mask RANGE 1 7)
       OUTPUT_VARIABLE output ERROR_VARIABLE error RESULT_VARIABLE result)
   if(NOT result EQUAL 0)
     message(FATAL_ERROR "mask ${mask} should build: ${output}\n${error}")
+  endif()
+  file(GLOB_RECURSE archive "${BINARY_DIR}/mask-${mask}/*tiny-crypto-c.a")
+  execute_process(COMMAND "${C_COMPILER}" -std=c99
+      -I "${BINARY_DIR}/mask-${mask}/install-include" -I "${SOURCE_DIR}/src"
+      "${BINARY_DIR}/link.c" ${archive} -o "${BINARY_DIR}/mask-${mask}/link"
+      OUTPUT_VARIABLE output ERROR_VARIABLE error RESULT_VARIABLE result)
+  if(NOT result EQUAL 0)
+    message(FATAL_ERROR "mask ${mask} should link the list reader: ${output}\n${error}")
+  endif()
+  execute_process(COMMAND "${BINARY_DIR}/mask-${mask}/link" RESULT_VARIABLE result)
+  if(NOT result EQUAL 0)
+    message(FATAL_ERROR "mask ${mask} list reader rejected its arguments wrongly")
   endif()
 endforeach()
 configure_case(none fail ON OFF OFF OFF ON)

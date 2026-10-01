@@ -65,7 +65,8 @@ An empty directory option skips the tests that need it.
 `test_x509_trust_anchor`, `test_x509_anchor_constraints`, and
 `test_twic_synthetic_validation` use vendored RFC 5914 and synthetic
 Legacy/NEXGEN DER. `test_trust_anchor_options` builds all seven enabled choice
-combinations and rejects invalid settings. `test_twic_synthetic_fixture` and
+combinations, links a program that calls the list reader against each archive
+and rejects invalid settings. `test_twic_synthetic_fixture` and
 `test_twic_apdu_corpus` check credential objects and APDU replay. These tests
 use native crypto and run without OpenSSL. The optional fixture generator and
 independent oracle are described in the

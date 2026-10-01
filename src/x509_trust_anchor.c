@@ -256,7 +256,9 @@ static TC_TLV_result trust_anchor_info(TC_bytes contents, const TC_TLV_limits* l
   }
   return result == TC_TLV_END ? TC_TLV_OK : result;
 }
+#endif
 
+/* The list reader serves every enabled choice. */
 TC_TLV_result TC_X509_trust_anchor_list_init(TC_X509_trust_anchor_reader* reader, TC_bytes encoded,
                                              const TC_TLV_limits* limits,
                                              const TC_X509_workspace* workspace)
@@ -291,7 +293,6 @@ TC_TLV_result TC_X509_trust_anchor_list_init(TC_X509_trust_anchor_reader* reader
   *reader = parsed;
   return TC_TLV_OK;
 }
-#endif
 
 /* next advances the reader and fills out and both workspace arrays while it
  * reads the list and the workspace struct. out joins the disjoint set that
