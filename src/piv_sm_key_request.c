@@ -14,9 +14,18 @@ enum {
   CONTROL_BYTES = 1,        /* CB_H and CB_ICC */
   ID_BYTES = 8,             /* ID_sH */
   CRYPTOGRAM_BYTES = 16,    /* AuthCryptogram_ICC */
-  /* 7C 6E 81 6A {CB_H, ID_sH, Q_eH (97)} 82 00 for CS7. */
-  REQUEST_MAX_BYTES = 2 + 2 + CONTROL_BYTES + ID_BYTES + 97 + 2
+  /* 7C L 81 L {CB_H, ID_sH, Q_eH} 82 00 with the largest built point. */
+  REQUEST_MAX_BYTES = TC_PIV_SM_KEY_REQUEST_BYTES,
+  POINT_BYTES = 1 + 2 * TC_PIV_SM_COORDINATE_BYTES
 };
+/* The advertised command scratch, TC_PIV_EXTENDED_SCRATCH_BYTES, holds the
+ * request. */
+typedef char tc_key_request_size_check[REQUEST_MAX_BYTES == 2 + 2 + CONTROL_BYTES + ID_BYTES +
+                                                                POINT_BYTES + 2 &&
+                                               TC_APDU_EXTENDED_COMMAND_BYTES(REQUEST_MAX_BYTES) <=
+                                                   TC_PIV_EXTENDED_SCRATCH_BYTES
+                                           ? 1
+                                           : -1];
 
 static const uint8_t host_control = 0x00; /* CB_H (H1) */
 static const uint8_t response_tag = TC_PIV_TEMPLATE_RESPONSE;

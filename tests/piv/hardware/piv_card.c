@@ -46,8 +46,8 @@
 #define SKIP_STATUS 77
 
 #define COMMAND_SCRATCH_BYTES                                                                      \
-  (TC_APDU_EXTENDED_COMMAND_BYTES(TC_PIV_COMMAND_MAX_NC) > TC_APDU_SHORT_COMMAND_MAX_BYTES         \
-       ? TC_APDU_EXTENDED_COMMAND_BYTES(TC_PIV_COMMAND_MAX_NC)                                     \
+  (TC_PIV_EXTENDED_SCRATCH_BYTES > TC_APDU_SHORT_COMMAND_MAX_BYTES                                 \
+       ? TC_PIV_EXTENDED_SCRATCH_BYTES                                                             \
        : TC_APDU_SHORT_COMMAND_MAX_BYTES)
 
 enum {

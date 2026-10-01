@@ -15,7 +15,7 @@ static size_t scratch_minimum(const TC_APDU_channel_options* options)
 {
   if (options->format == TC_APDU_SHORT)
     return TC_APDU_SHORT_COMMAND_MAX_BYTES;
-  const size_t largest = TC_APDU_EXTENDED_COMMAND_BYTES(TC_PIV_COMMAND_MAX_NC);
+  const size_t largest = TC_PIV_EXTENDED_SCRATCH_BYTES;
   return options->max_command_bytes && options->max_command_bytes < largest
              ? options->max_command_bytes
              : largest;

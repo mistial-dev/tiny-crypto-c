@@ -66,15 +66,32 @@ typedef enum {
   TC_PIV_COMMAND_GENERAL_AUTHENTICATE
 } TC_PIV_command;
 
-/* Largest command data field a link sends. SELECT sends 11, GET DATA 5 and
- * VERIFY 8 bytes. With TC_ENABLE_PIV_KEY_PROOF a key proof sends a 7C
- * template of up to TC_KEY_CHALLENGE_MAX_INPUT_BYTES + 12 bytes
- * (piv_key_proof.h). */
+/* Data field of secure messaging key establishment, 7C {81 {CB_H, ID_sH,
+ * Q_eH}, 82 00}: 80 bytes with a P-256 point (CS2) and 112 with a P-384
+ * point (CS7) (SP 800-73-5 Part 2 4.1.8). 0 without TC_ENABLE_PIV_SM_APDU. */
+#if TC_ENABLE_PIV_SM_APDU && TC_PIV_SM_ENABLE_CS7
+#define TC_PIV_SM_KEY_REQUEST_BYTES 112u
+#elif TC_ENABLE_PIV_SM_APDU
+#define TC_PIV_SM_KEY_REQUEST_BYTES 80u
+#else
+#define TC_PIV_SM_KEY_REQUEST_BYTES 0u
+#endif
+/* Largest command data field that a link may protect with secure messaging.
+ * SELECT sends 11, GET DATA 5 and VERIFY 8 bytes. With TC_ENABLE_PIV_KEY_PROOF
+ * a key proof sends a 7C template of up to TC_KEY_CHALLENGE_MAX_INPUT_BYTES +
+ * 12 bytes (piv_key_proof.h). */
 #if TC_ENABLE_PIV_KEY_PROOF
 #define TC_PIV_COMMAND_MAX_NC ((size_t)TC_KEY_CHALLENGE_MAX_INPUT_BYTES + 12u)
 #else
 #define TC_PIV_COMMAND_MAX_NC 32u
 #endif
+/* Command scratch of an EXTENDED link: one encoded command of the larger of
+ * TC_PIV_COMMAND_MAX_NC and the plain key establishment request. A SHORT link
+ * needs TC_APDU_SHORT_COMMAND_MAX_BYTES, which covers both. */
+#define TC_PIV_EXTENDED_SCRATCH_BYTES                                                              \
+  TC_APDU_EXTENDED_COMMAND_BYTES((size_t)TC_PIV_COMMAND_MAX_NC > TC_PIV_SM_KEY_REQUEST_BYTES       \
+                                     ? (size_t)TC_PIV_COMMAND_MAX_NC                               \
+                                     : TC_PIV_SM_KEY_REQUEST_BYTES)
 /* Response buffer bytes for nr plain data bytes on any link, plain or secure
  * messaging: nr padded to whole AES blocks, the 87 header (5), 99 04, 8E 0A
  * and SW1 SW2 (SP 800-73-5 Part 2 4.2.5). Valid while the sum fits size_t. */
@@ -126,8 +143,8 @@ typedef struct {
 
 /* Start a link. command_scratch holds one encoded command fragment and is
  * wiped after every transmit. SHORT needs TC_APDU_SHORT_COMMAND_MAX_BYTES.
- * EXTENDED needs TC_APDU_EXTENDED_COMMAND_BYTES(TC_PIV_COMMAND_MAX_NC), or the
- * channel's max_command_bytes when smaller. No application is selected until
+ * EXTENDED needs TC_PIV_EXTENDED_SCRATCH_BYTES, or the channel's
+ * max_command_bytes when smaller. No application is selected until
  * TC_PIV_select succeeds.
  *
  * TC_PIV_ARGUMENT  NULL link or options, an unknown interface, response_ne

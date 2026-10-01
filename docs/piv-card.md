@@ -28,8 +28,11 @@ A `TC_PIV_link` is one card session over a transport. `TC_PIV_link_init` takes
 The command scratch buffer holds one encoded command and is wiped after every
 transmit, since VERIFY carries PIN digits. SHORT links need
 `TC_APDU_SHORT_COMMAND_MAX_BYTES` (261) bytes. EXTENDED links need
-`TC_APDU_EXTENDED_COMMAND_BYTES(TC_PIV_COMMAND_MAX_NC)`, or the card limit when
-smaller. `TC_PIV_COMMAND_MAX_NC` is 32, or the key proof template size with
+`TC_PIV_EXTENDED_SCRATCH_BYTES`, or the card limit when smaller. It holds one
+command of `TC_PIV_COMMAND_MAX_NC` data bytes or the plain secure messaging key
+establishment request of `TC_PIV_SM_KEY_REQUEST_BYTES` (80 for CS2, 112 for
+CS7), whichever is larger. `TC_PIV_COMMAND_MAX_NC` is the largest command that
+a link protects: 32 bytes, or the key proof template size with
 `TINY_CRYPTO_ENABLE_PIV_KEY_PROOF`.
 
 `TC_PIV_link_info_get` reports the interface, the selected application and

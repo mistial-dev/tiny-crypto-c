@@ -785,6 +785,38 @@ TC_TEST(key_request)
   return MUNIT_OK;
 }
 
+/* The advertised minimum command scratch of an EXTENDED link carries key
+ * establishment for every built suite (Part 2 4.1.8). */
+TC_TEST(minimum_scratch)
+{
+  static uint8_t minimum[TC_PIV_EXTENDED_SCRATCH_BYTES];
+  for (size_t s = 0; s < sizeof suites / sizeof *suites; ++s) {
+    const struct tc_sm_fixture* fixture = fixture_for(suites[s]);
+    char apt[160];
+    tc_sm_card_init(&card);
+    memcpy(apt, APT("00"), sizeof APT("00"));
+    memcpy(strstr(apt, "AC068001") + 8, suite_hex(suites[s]), 2);
+    card.select_answer = (TC_bytes){select_bytes, hex(apt, select_bytes, sizeof select_bytes)};
+    const TC_PIV_link_options options = {{TC_APDU_EXTENDED, 0, EXCHANGES, 0, 0}, TC_PIV_CONTACT, 0};
+    TC_PIV_link link;
+    TC_PIV_application application;
+    TC_PIV_SM_peer peer;
+    munit_assert_int(TC_PIV_link_init(&link, tc_sm_card_transport(&card), &options,
+                                      (TC_buffer){minimum, sizeof minimum}),
+                     ==, TC_PIV_OK);
+    munit_assert_int(TC_PIV_select(&link, TC_PIV_APPLICATION_PIV, 0,
+                                   response_buffer(RESPONSE_BYTES), &application),
+                     ==, TC_PIV_OK);
+    key_answer_set(fixture);
+    munit_assert_int(TC_PIV_SM_key_request(&link, &session, fixture->suite, host_id,
+                                           (TC_random_source){scalar_one, NULL},
+                                           response_buffer(RESPONSE_BYTES), &peer, &workspace),
+                     ==, TC_PIV_OK);
+    TC_PIV_link_clear(&link);
+  }
+  return MUNIT_OK;
+}
+
 /* TC_PIV_link_secure needs the READY session bound by the key request. */
 TC_TEST(secure_arguments)
 {
@@ -936,6 +968,7 @@ static MunitTest tests[] = {
     {"/pin-contactless", pin_contactless, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/unbind", unbind, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/key-request", key_request, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+    {"/minimum-scratch", minimum_scratch, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
     {"/secure-arguments", secure_arguments, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
 #endif
     {"/key-request-recorded", key_request_recorded, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

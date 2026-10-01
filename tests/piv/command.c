@@ -1102,16 +1102,13 @@ TC_TEST(link_init)
                    TC_PIV_ARGUMENT);
   options.response_ne = 65536;
   /* EXTENDED needs room for the largest command, or the card limit. */
-  munit_assert_int(
-      TC_PIV_link_init(
-          &link, transport, &options,
-          (TC_buffer){scratch, TC_APDU_EXTENDED_COMMAND_BYTES(TC_PIV_COMMAND_MAX_NC) - 1}),
-      ==, TC_PIV_ARGUMENT);
+  munit_assert_int(TC_PIV_link_init(&link, transport, &options,
+                                    (TC_buffer){scratch, TC_PIV_EXTENDED_SCRATCH_BYTES - 1}),
+                   ==, TC_PIV_ARGUMENT);
   munit_assert_memory_equal(sizeof link, &link, &preserved);
-  munit_assert_int(
-      TC_PIV_link_init(&link, transport, &options,
-                       (TC_buffer){scratch, TC_APDU_EXTENDED_COMMAND_BYTES(TC_PIV_COMMAND_MAX_NC)}),
-      ==, TC_PIV_OK);
+  munit_assert_int(TC_PIV_link_init(&link, transport, &options,
+                                    (TC_buffer){scratch, TC_PIV_EXTENDED_SCRATCH_BYTES}),
+                   ==, TC_PIV_OK);
   options.channel.max_command_bytes = 20;
   munit_assert_int(TC_PIV_link_init(&link, transport, &options, (TC_buffer){scratch, 20}), ==,
                    TC_PIV_OK);
