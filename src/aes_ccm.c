@@ -118,7 +118,7 @@ static TC_status tc_aes_ccm_crypt(const uint8_t* key, TC_bytes nonce_span, TC_by
   memcpy(st.work + 1, nonce, nonce_len);
   tc_aes_ccm_store_length(st.work + 1 + nonce_len, (uint64_t)input_len, q);
 
-  if (TC_AES_key_init(&st.aes, key) != TC_OK)
+  if (TC_AES_key_init(&st.aes, (TC_bytes){key, TC_AES_KEYLEN}) != TC_OK)
     goto done;
   if (tc_mac_cbc_block(&mac_cipher, st.mac, st.work) != TC_OK)
     goto done;
@@ -233,28 +233,36 @@ static TC_status tc_aes_ccm_decrypt_with_policy(const uint8_t* key, TC_bytes non
   return tc_aes_ccm_crypt(key, nonce, aad, ciphertext, plaintext, tag.data, NULL, tag.length);
 }
 
-TC_status TC_AES_CCM_encrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes plaintext,
+TC_status TC_AES_CCM_encrypt(TC_bytes key, TC_bytes nonce, TC_bytes aad, TC_bytes plaintext,
                              TC_buffer ciphertext, TC_buffer tag)
 {
-  return tc_aes_ccm_encrypt_with_policy(key, nonce, aad, plaintext, ciphertext, tag, 0);
+  if (key.length != TC_AES_KEYLEN)
+    return TC_ERROR;
+  return tc_aes_ccm_encrypt_with_policy(key.data, nonce, aad, plaintext, ciphertext, tag, 0);
 }
 
-TC_status TC_AES_CCM_decrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes ciphertext,
+TC_status TC_AES_CCM_decrypt(TC_bytes key, TC_bytes nonce, TC_bytes aad, TC_bytes ciphertext,
                              TC_bytes tag, TC_buffer plaintext)
 {
-  return tc_aes_ccm_decrypt_with_policy(key, nonce, aad, ciphertext, tag, plaintext, 0);
+  if (key.length != TC_AES_KEYLEN)
+    return TC_ERROR;
+  return tc_aes_ccm_decrypt_with_policy(key.data, nonce, aad, ciphertext, tag, plaintext, 0);
 }
 
-TC_status TC_AES_CCM_encrypt_short_tag(const uint8_t* key, TC_bytes nonce, TC_bytes aad,
+TC_status TC_AES_CCM_encrypt_short_tag(TC_bytes key, TC_bytes nonce, TC_bytes aad,
                                        TC_bytes plaintext, TC_buffer ciphertext, TC_buffer tag)
 {
-  return tc_aes_ccm_encrypt_with_policy(key, nonce, aad, plaintext, ciphertext, tag, 1);
+  if (key.length != TC_AES_KEYLEN)
+    return TC_ERROR;
+  return tc_aes_ccm_encrypt_with_policy(key.data, nonce, aad, plaintext, ciphertext, tag, 1);
 }
 
-TC_status TC_AES_CCM_decrypt_short_tag(const uint8_t* key, TC_bytes nonce, TC_bytes aad,
+TC_status TC_AES_CCM_decrypt_short_tag(TC_bytes key, TC_bytes nonce, TC_bytes aad,
                                        TC_bytes ciphertext, TC_bytes tag, TC_buffer plaintext)
 {
-  return tc_aes_ccm_decrypt_with_policy(key, nonce, aad, ciphertext, tag, plaintext, 1);
+  if (key.length != TC_AES_KEYLEN)
+    return TC_ERROR;
+  return tc_aes_ccm_decrypt_with_policy(key.data, nonce, aad, ciphertext, tag, plaintext, 1);
 }
 
 #endif

@@ -47,13 +47,13 @@ TC_status tc_sm_mac(TC_PIV_SM_workspace* w, const uint8_t* key, size_t key_len, 
 {
   size_t i;
   TC_AES_dynamic_CMAC* mac = &TC_SM_SYM(w).cipher.cmac;
-  TC_status status = TC_AES_dynamic_CMAC_init(mac, key, key_len);
+  TC_status status = TC_AES_dynamic_CMAC_init(mac, (TC_bytes){key, key_len});
   if (status == TC_OK && prefix.length)
-    status = TC_AES_dynamic_CMAC_update(mac, prefix.data, prefix.length);
+    status = TC_AES_dynamic_CMAC_update(mac, (TC_bytes){prefix.data, prefix.length});
   for (i = 0; i < count && status == TC_OK; ++i)
-    status = TC_AES_dynamic_CMAC_update(mac, input[i].data, input[i].length);
+    status = TC_AES_dynamic_CMAC_update(mac, (TC_bytes){input[i].data, input[i].length});
   if (status == TC_OK)
-    status = TC_AES_dynamic_CMAC_final(mac, output);
+    status = TC_AES_dynamic_CMAC_final(mac, (TC_buffer){output, TC_AES_BLOCKLEN});
   TC_AES_dynamic_CMAC_clear(mac);
   return status;
 }
@@ -198,7 +198,8 @@ int TC_PIV_SM_peer_matches(const TC_PIV_SM* session, TC_bytes certificate)
       (session->state != TC_PIV_SM_READY && session->state != TC_PIV_SM_PENDING) ||
       TC_SHA256_digest(certificate, digest) != TC_OK)
     return 0;
-  const int matches = TC_ct_equal(digest, session->data.traffic.peer_digest, sizeof digest) == TC_OK;
+  const int matches =
+      TC_ct_equal(digest, session->data.traffic.peer_digest, sizeof digest) == TC_OK;
   TC_secure_zero(digest, sizeof digest);
   return matches;
 }

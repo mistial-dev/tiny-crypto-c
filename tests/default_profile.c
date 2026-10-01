@@ -52,9 +52,9 @@ TC_TEST(test_profile)
 #if TC_AES_SBOX_MODE == TC_AES_SBOX_MODE_RUNTIME
   TC_AES_init_sbox();
 #endif
-  munit_assert_int(TC_AES_init(&aes, key), ==, TC_OK);
-  munit_assert_int(TC_AES_set_iv(&aes, iv), ==, TC_OK);
-  munit_assert_int(TC_AES_CTR_crypt(&aes, block, sizeof(block)), ==, TC_OK);
+  munit_assert_int(TC_AES_init(&aes, (TC_bytes){key, TC_AES_KEYLEN}), ==, TC_OK);
+  munit_assert_int(TC_AES_set_iv(&aes, (TC_bytes){iv, TC_AES_BLOCKLEN}), ==, TC_OK);
+  munit_assert_int(TC_AES_CTR_crypt(&aes, (TC_buffer){block, sizeof(block)}), ==, TC_OK);
   munit_assert(bytes_equal(block, expected, sizeof(expected)));
 #endif
 

@@ -342,7 +342,9 @@ TC_TEST_SHARED(test_kbkdf_cmac_first_block)
                          (TC_bytes){key, TC_AES_KEYLEN}, &p, (TC_bytes){NULL, 0},
                          (TC_bytes){fixed + 1, sizeof(fixed) - 1}, (TC_buffer){out, sizeof(out)}),
                      ==, TC_OK);
-    munit_assert_int(TC_AES_CMAC(key, fixed, sizeof(fixed), tag, sizeof(tag)), ==, TC_OK);
+    munit_assert_int(TC_AES_CMAC((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){fixed, sizeof(fixed)},
+                                 (TC_buffer){tag, sizeof(tag)}),
+                     ==, TC_OK);
     munit_assert_memory_equal(sizeof(out), out, tag);
     ran = 1;
   }
@@ -702,7 +704,9 @@ TC_TEST_SHARED(test_kbkdf_api)
                                                 (TC_bytes){NULL, 0}, (TC_bytes){fixed, 8},
                                                 (TC_buffer){out, 16}),
                      ==, TC_OK);
-    munit_assert_int(TC_AES_CMAC(key, fixed, 8, k0, sizeof k0), ==, TC_OK);
+    munit_assert_int(TC_AES_CMAC((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){fixed, 8},
+                                 (TC_buffer){k0, sizeof k0}),
+                     ==, TC_OK);
     munit_assert_memory_equal(sizeof k0, out, k0);
   }
 #endif

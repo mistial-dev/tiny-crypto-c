@@ -112,8 +112,8 @@ static TC_status tc_aes_siv_crypt(const uint8_t* key, const TC_bytes* ad, size_t
       return TC_ERROR;
   }
 
-  if (TC_AES_key_init(&st.k1, key) != TC_OK ||
-      TC_AES_key_init(&st.k2, key + TC_AES_KEYLEN) != TC_OK)
+  if (TC_AES_key_init(&st.k1, (TC_bytes){key, TC_AES_KEYLEN}) != TC_OK ||
+      TC_AES_key_init(&st.k2, (TC_bytes){key + TC_AES_KEYLEN, TC_AES_KEYLEN}) != TC_OK)
     goto done;
 
   if (decrypt) {
@@ -138,40 +138,39 @@ done:
   return status;
 }
 
-TC_status TC_AES_SIV_encrypt(const uint8_t* key, const TC_bytes* ad, size_t ad_count,
-                             TC_bytes plaintext, uint8_t v[TC_AES_SIV_V_LEN], TC_buffer ciphertext)
+TC_status TC_AES_SIV_encrypt(TC_bytes key, const TC_bytes* ad, size_t ad_count, TC_bytes plaintext,
+                             TC_buffer v, TC_buffer ciphertext)
 {
   uint8_t local_v[TC_AES_SIV_V_LEN];
   TC_status status;
 
-  if (v == NULL)
+  if (key.length != TC_AES_SIV_KEYLEN || v.data == NULL || v.capacity < TC_AES_SIV_V_LEN)
     return TC_ERROR;
   /*
    * V is written after ciphertext. If they overlap, the post-encrypt copy
    * would clobber ciphertext (exact or partial). Stage V for pt alias only.
    */
-  if (!tc_internal_ranges_disjoint(v, TC_AES_SIV_V_LEN, ciphertext.data, plaintext.length))
+  if (!tc_internal_ranges_disjoint(v.data, TC_AES_SIV_V_LEN, ciphertext.data, plaintext.length))
     return TC_ERROR;
-  status = tc_aes_siv_crypt(key, ad, ad_count, plaintext, ciphertext, local_v, 0);
+  status = tc_aes_siv_crypt(key.data, ad, ad_count, plaintext, ciphertext, local_v, 0);
   if (status == TC_OK)
-    memcpy(v, local_v, TC_AES_SIV_V_LEN);
+    memcpy(v.data, local_v, TC_AES_SIV_V_LEN);
   TC_secure_zero(local_v, sizeof(local_v));
   return status;
 }
 
-TC_status TC_AES_SIV_decrypt(const uint8_t* key, const TC_bytes* ad, size_t ad_count,
-                             const uint8_t v[TC_AES_SIV_V_LEN], TC_bytes ciphertext,
-                             TC_buffer plaintext)
+TC_status TC_AES_SIV_decrypt(TC_bytes key, const TC_bytes* ad, size_t ad_count, TC_bytes v,
+                             TC_bytes ciphertext, TC_buffer plaintext)
 {
   uint8_t local_v[TC_AES_SIV_V_LEN];
   TC_status status;
 
-  if (v == NULL)
+  if (key.length != TC_AES_SIV_KEYLEN || v.data == NULL || v.length != TC_AES_SIV_V_LEN)
     return TC_ERROR;
-  if (!tc_internal_ranges_disjoint(v, TC_AES_SIV_V_LEN, plaintext.data, ciphertext.length))
+  if (!tc_internal_ranges_disjoint(v.data, TC_AES_SIV_V_LEN, plaintext.data, ciphertext.length))
     return TC_ERROR;
-  memcpy(local_v, v, TC_AES_SIV_V_LEN);
-  status = tc_aes_siv_crypt(key, ad, ad_count, ciphertext, plaintext, local_v, 1);
+  memcpy(local_v, v.data, TC_AES_SIV_V_LEN);
+  status = tc_aes_siv_crypt(key.data, ad, ad_count, ciphertext, plaintext, local_v, 1);
   TC_secure_zero(local_v, sizeof(local_v));
   return status;
 }

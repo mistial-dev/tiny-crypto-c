@@ -173,15 +173,15 @@ static TC_status tc_kdf_aes_cmac_init(void* ctx, const uint8_t* key, size_t key_
 {
   /* key_ok checked the length. The PRF init type passes it for DES keys. */
   (void)key_len;
-  return TC_AES_CMAC_init((struct TC_AES_CMAC_ctx*)ctx, key);
+  return TC_AES_CMAC_init((struct TC_AES_CMAC_ctx*)ctx, (TC_bytes){key, key_len});
 }
 static TC_status tc_kdf_aes_cmac_update(void* ctx, const uint8_t* data, size_t len)
 {
-  return TC_AES_CMAC_update((struct TC_AES_CMAC_ctx*)ctx, data, len);
+  return TC_AES_CMAC_update((struct TC_AES_CMAC_ctx*)ctx, (TC_bytes){data, len});
 }
 static TC_status tc_kdf_aes_cmac_final(void* ctx, uint8_t* out)
 {
-  return TC_AES_CMAC_final((struct TC_AES_CMAC_ctx*)ctx, out);
+  return TC_AES_CMAC_final((struct TC_AES_CMAC_ctx*)ctx, (TC_buffer){out, TC_AES_CMAC_TAG_MAX});
 }
 static void tc_kdf_aes_cmac_clear(void* ctx)
 {

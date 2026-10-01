@@ -6,7 +6,7 @@ static const uint8_t key[TC_AES_KEYLEN] = {0};
 static TC_status setup(size_t unused)
 {
   struct TC_AES_key_ctx ctx;
-  TC_status status = TC_AES_key_init(&ctx, key);
+  TC_status status = TC_AES_key_init(&ctx, (TC_bytes){key, TC_AES_KEYLEN});
   (void)unused;
   if (status == TC_OK)
     tc_benchmark_consume(ctx.round_key);
@@ -19,11 +19,11 @@ static TC_status ctr(size_t length)
   static uint8_t buffer[16384];
   static const uint8_t iv[16] = {0};
   struct TC_AES_ctx ctx;
-  TC_status status = TC_AES_init(&ctx, key);
+  TC_status status = TC_AES_init(&ctx, (TC_bytes){key, TC_AES_KEYLEN});
   if (status == TC_OK)
-    status = TC_AES_set_iv(&ctx, iv);
+    status = TC_AES_set_iv(&ctx, (TC_bytes){iv, TC_AES_BLOCKLEN});
   if (status == TC_OK)
-    status = TC_AES_CTR_crypt(&ctx, buffer, length);
+    status = TC_AES_CTR_crypt(&ctx, (TC_buffer){buffer, length});
   tc_benchmark_consume(buffer);
   TC_AES_ctx_clear(&ctx);
   return status;
@@ -35,7 +35,7 @@ static TC_status gcm(size_t length)
   static uint8_t buffer[16384];
   static const uint8_t iv[12] = {0}, aad[16] = {0};
   uint8_t tag[16];
-  TC_status status = TC_AES_GCM_encrypt(key, (TC_bytes){iv, sizeof(iv)},
+  TC_status status = TC_AES_GCM_encrypt((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){iv, sizeof(iv)},
                                         (TC_bytes){aad, sizeof(aad)}, (TC_bytes){buffer, length},
                                         (TC_buffer){buffer, length}, (TC_buffer){tag, sizeof(tag)});
   if (status == TC_OK)

@@ -20,15 +20,15 @@ TC_TEST(block_vectors)
   for (i = 0; i < 3; ++i) {
     munit_assert_size(tc_test_hex(answers[i], expected, 16), ==, 16);
     memcpy(block, plain, 16);
-    munit_assert_int(TC_AES_dynamic_key_init(&ctx, key, 16 + 8 * i), ==, TC_OK);
-    munit_assert_int(TC_AES_dynamic_encrypt(&ctx, block), ==, TC_OK);
+    munit_assert_int(TC_AES_dynamic_key_init(&ctx, (TC_bytes){key, 16 + 8 * i}), ==, TC_OK);
+    munit_assert_int(TC_AES_dynamic_encrypt(&ctx, (TC_buffer){block, TC_AES_BLOCKLEN}), ==, TC_OK);
     munit_assert_memory_equal(16, block, expected);
-    munit_assert_int(TC_AES_dynamic_decrypt(&ctx, block), ==, TC_OK);
+    munit_assert_int(TC_AES_dynamic_decrypt(&ctx, (TC_buffer){block, TC_AES_BLOCKLEN}), ==, TC_OK);
     munit_assert_memory_equal(16, block, plain);
   }
   TC_AES_dynamic_key_clear(&ctx);
   munit_assert_true(tc_test_all_zero(&ctx, sizeof ctx));
-  munit_assert_int(TC_AES_dynamic_encrypt(&ctx, block), ==, TC_ERROR);
+  munit_assert_int(TC_AES_dynamic_encrypt(&ctx, (TC_buffer){block, TC_AES_BLOCKLEN}), ==, TC_ERROR);
   return MUNIT_OK;
 }
 
@@ -52,25 +52,32 @@ TC_TEST(cbc_and_cmac_vectors)
     length = tc_test_hex(keys[i], key, sizeof key);
     munit_assert_size(length, ==, 16 + 8 * i);
     munit_assert_size(tc_test_hex(cbc[i], expected, 16), ==, 16);
-    munit_assert_int(TC_AES_dynamic_key_init(&ctx, key, length), ==, TC_OK);
+    munit_assert_int(TC_AES_dynamic_key_init(&ctx, (TC_bytes){key, length}), ==, TC_OK);
     tc_test_fill_incrementing(iv, sizeof iv);
     memcpy(block, plain, 16);
-    munit_assert_int(TC_AES_dynamic_CBC_encrypt(&ctx, iv, block, 16), ==, TC_OK);
+    munit_assert_int(
+        TC_AES_dynamic_CBC_encrypt(&ctx, (TC_buffer){iv, TC_AES_BLOCKLEN}, (TC_buffer){block, 16}),
+        ==, TC_OK);
     munit_assert_memory_equal(16, block, expected);
     munit_assert_memory_equal(16, iv, expected);
     tc_test_fill_incrementing(iv, sizeof iv);
-    munit_assert_int(TC_AES_dynamic_CBC_decrypt(&ctx, iv, block, 16), ==, TC_OK);
+    munit_assert_int(
+        TC_AES_dynamic_CBC_decrypt(&ctx, (TC_buffer){iv, TC_AES_BLOCKLEN}, (TC_buffer){block, 16}),
+        ==, TC_OK);
     munit_assert_memory_equal(16, block, plain);
     munit_assert_memory_equal(16, iv, expected);
     munit_assert_size(tc_test_hex(tags[i], expected, 16), ==, 16);
     for (split = 0; split <= 16; ++split) {
-      munit_assert_int(TC_AES_dynamic_CMAC_init(&mac, key, length), ==, TC_OK);
-      munit_assert_int(TC_AES_dynamic_CMAC_update(&mac, plain, split), ==, TC_OK);
-      munit_assert_int(TC_AES_dynamic_CMAC_update(&mac, plain + split, 16 - split), ==, TC_OK);
-      munit_assert_int(TC_AES_dynamic_CMAC_final(&mac, tag), ==, TC_OK);
+      munit_assert_int(TC_AES_dynamic_CMAC_init(&mac, (TC_bytes){key, length}), ==, TC_OK);
+      munit_assert_int(TC_AES_dynamic_CMAC_update(&mac, (TC_bytes){plain, split}), ==, TC_OK);
+      munit_assert_int(TC_AES_dynamic_CMAC_update(&mac, (TC_bytes){plain + split, 16 - split}), ==,
+                       TC_OK);
+      munit_assert_int(TC_AES_dynamic_CMAC_final(&mac, (TC_buffer){tag, TC_AES_BLOCKLEN}), ==,
+                       TC_OK);
       munit_assert_memory_equal(16, tag, expected);
       munit_assert_true(tc_test_all_zero(&mac, sizeof mac));
-      munit_assert_int(TC_AES_dynamic_CMAC_final(&mac, tag), ==, TC_ERROR);
+      munit_assert_int(TC_AES_dynamic_CMAC_final(&mac, (TC_buffer){tag, TC_AES_BLOCKLEN}), ==,
+                       TC_ERROR);
     }
   }
   return MUNIT_OK;
@@ -88,35 +95,46 @@ TC_TEST(invalid_arguments)
     if (i == 16 || i == 24 || i == 32)
       continue;
     memset(&key, 0xa5, sizeof key);
-    munit_assert_int(TC_AES_dynamic_key_init(&key, raw, i), ==, TC_ERROR);
+    munit_assert_int(TC_AES_dynamic_key_init(&key, (TC_bytes){raw, i}), ==, TC_ERROR);
     munit_assert_true(tc_test_all_zero(&key, sizeof key));
   }
-  munit_assert_int(TC_AES_dynamic_key_init(&key, key.round_key, 16), ==, TC_ERROR);
-  munit_assert_int(TC_AES_dynamic_key_init(&key, NULL, 16), ==, TC_ERROR);
-  munit_assert_int(TC_AES_dynamic_key_init(&key, raw, 16), ==, TC_OK);
+  munit_assert_int(TC_AES_dynamic_key_init(&key, (TC_bytes){key.round_key, 16}), ==, TC_ERROR);
+  munit_assert_int(TC_AES_dynamic_key_init(&key, (TC_bytes){NULL, 16}), ==, TC_ERROR);
+  munit_assert_int(TC_AES_dynamic_key_init(&key, (TC_bytes){raw, 16}), ==, TC_OK);
   saved = key;
-  munit_assert_int(TC_AES_dynamic_encrypt(&key, key.round_key), ==, TC_ERROR);
-  munit_assert_int(TC_AES_dynamic_CBC_encrypt(&key, iv, block, 15), ==, TC_ERROR);
-  munit_assert_int(TC_AES_dynamic_CBC_encrypt(&key, iv, iv, 16), ==, TC_ERROR);
-  munit_assert_int(TC_AES_dynamic_CBC_decrypt(&key, key.round_key, block, 16), ==, TC_ERROR);
-  munit_assert_int(TC_AES_dynamic_CBC_encrypt(&key, iv, NULL, 0), ==, TC_OK);
+  munit_assert_int(TC_AES_dynamic_encrypt(&key, (TC_buffer){key.round_key, TC_AES_BLOCKLEN}), ==,
+                   TC_ERROR);
+  munit_assert_int(
+      TC_AES_dynamic_CBC_encrypt(&key, (TC_buffer){iv, TC_AES_BLOCKLEN}, (TC_buffer){block, 15}),
+      ==, TC_ERROR);
+  munit_assert_int(
+      TC_AES_dynamic_CBC_encrypt(&key, (TC_buffer){iv, TC_AES_BLOCKLEN}, (TC_buffer){iv, 16}), ==,
+      TC_ERROR);
+  munit_assert_int(TC_AES_dynamic_CBC_decrypt(&key, (TC_buffer){key.round_key, TC_AES_BLOCKLEN},
+                                              (TC_buffer){block, 16}),
+                   ==, TC_ERROR);
+  munit_assert_int(
+      TC_AES_dynamic_CBC_encrypt(&key, (TC_buffer){iv, TC_AES_BLOCKLEN}, (TC_buffer){NULL, 0}), ==,
+      TC_OK);
   munit_assert_memory_equal(sizeof key, &key, &saved);
   munit_assert_true(tc_test_all_zero(iv, sizeof iv));
   munit_assert_true(tc_test_all_zero(block, sizeof block));
-  munit_assert_int(TC_AES_dynamic_CMAC_init(&mac, raw, 16), ==, TC_OK);
+  munit_assert_int(TC_AES_dynamic_CMAC_init(&mac, (TC_bytes){raw, 16}), ==, TC_OK);
   saved_mac = mac;
-  munit_assert_int(TC_AES_dynamic_CMAC_update(&mac, NULL, 1), ==, TC_ERROR);
-  munit_assert_int(TC_AES_dynamic_CMAC_update(&mac, mac.buffer, 1), ==, TC_ERROR);
-  munit_assert_int(TC_AES_dynamic_CMAC_final(&mac, mac.buffer), ==, TC_ERROR);
+  munit_assert_int(TC_AES_dynamic_CMAC_update(&mac, (TC_bytes){NULL, 1}), ==, TC_ERROR);
+  munit_assert_int(TC_AES_dynamic_CMAC_update(&mac, (TC_bytes){mac.buffer, 1}), ==, TC_ERROR);
+  munit_assert_int(TC_AES_dynamic_CMAC_final(&mac, (TC_buffer){mac.buffer, TC_AES_BLOCKLEN}), ==,
+                   TC_ERROR);
   munit_assert_memory_equal(sizeof mac, &mac, &saved_mac);
   /* A failed re-init ends the previous session. */
-  munit_assert_int(TC_AES_dynamic_CMAC_update(&mac, raw, 3), ==, TC_OK);
-  munit_assert_int(TC_AES_dynamic_CMAC_init(&mac, raw, 15), ==, TC_ERROR);
-  munit_assert_int(TC_AES_dynamic_CMAC_update(&mac, raw, 1), ==, TC_ERROR);
-  munit_assert_int(TC_AES_dynamic_CMAC_final(&mac, block), ==, TC_ERROR);
-  munit_assert_int(TC_AES_dynamic_CMAC_init(&mac, raw, 16), ==, TC_OK);
-  munit_assert_int(TC_AES_dynamic_CMAC_init(&mac, mac.buffer, 16), ==, TC_ERROR);
-  munit_assert_int(TC_AES_dynamic_CMAC_update(&mac, raw, 1), ==, TC_ERROR);
+  munit_assert_int(TC_AES_dynamic_CMAC_update(&mac, (TC_bytes){raw, 3}), ==, TC_OK);
+  munit_assert_int(TC_AES_dynamic_CMAC_init(&mac, (TC_bytes){raw, 15}), ==, TC_ERROR);
+  munit_assert_int(TC_AES_dynamic_CMAC_update(&mac, (TC_bytes){raw, 1}), ==, TC_ERROR);
+  munit_assert_int(TC_AES_dynamic_CMAC_final(&mac, (TC_buffer){block, TC_AES_BLOCKLEN}), ==,
+                   TC_ERROR);
+  munit_assert_int(TC_AES_dynamic_CMAC_init(&mac, (TC_bytes){raw, 16}), ==, TC_OK);
+  munit_assert_int(TC_AES_dynamic_CMAC_init(&mac, (TC_bytes){mac.buffer, 16}), ==, TC_ERROR);
+  munit_assert_int(TC_AES_dynamic_CMAC_update(&mac, (TC_bytes){raw, 1}), ==, TC_ERROR);
   return MUNIT_OK;
 }
 
@@ -125,16 +143,16 @@ static TC_status vector_cmac(const uint8_t* key, size_t key_length, const uint8_
                              size_t message_length, uint8_t* output, size_t tag_length)
 {
   TC_AES_dynamic_CMAC ctx;
-  TC_status status = TC_AES_dynamic_CMAC_init(&ctx, key, key_length);
+  TC_status status = TC_AES_dynamic_CMAC_init(&ctx, (TC_bytes){key, key_length});
   if (status != TC_OK)
     return status;
   if (tag_length != 16) {
     TC_AES_dynamic_CMAC_clear(&ctx);
     return TC_ERROR;
   }
-  status = TC_AES_dynamic_CMAC_update(&ctx, message, message_length);
+  status = TC_AES_dynamic_CMAC_update(&ctx, (TC_bytes){message, message_length});
   if (status == TC_OK)
-    status = TC_AES_dynamic_CMAC_final(&ctx, output);
+    status = TC_AES_dynamic_CMAC_final(&ctx, (TC_buffer){output, TC_AES_BLOCKLEN});
   TC_AES_dynamic_CMAC_clear(&ctx);
   return status;
 }

@@ -18,8 +18,9 @@ TC_TEST(test_profile)
   const TC_bytes kek = {key, sizeof key};
   size_t length = SIZE_MAX;
 
-  munit_assert_false(TC_AES_init(&ctx, key) != TC_ERROR);
-  munit_assert_false(TC_AES_CMAC(key, NULL, 0, tag, sizeof(tag)) != TC_ERROR);
+  munit_assert_false(TC_AES_init(&ctx, (TC_bytes){key, TC_AES_KEYLEN}) != TC_ERROR);
+  munit_assert_false(TC_AES_CMAC((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){NULL, 0},
+                                 (TC_buffer){tag, sizeof(tag)}) != TC_ERROR);
   /* Key wrap schedules its KEK before the first output write. */
   memset(wrapped, 0xa5, sizeof wrapped);
   munit_assert_int(TC_AES_KW_wrap(kek, (TC_bytes){key_data, sizeof key_data},
@@ -33,8 +34,9 @@ TC_TEST(test_profile)
   munit_assert_true(tc_test_all_value(unwrapped, sizeof unwrapped, 0xa5));
   munit_assert_size(length, ==, SIZE_MAX);
   TC_AES_init_sbox();
-  munit_assert_false(TC_AES_init(&ctx, key) != TC_OK);
-  munit_assert_false(TC_AES_CMAC(key, NULL, 0, tag, sizeof(tag)) != TC_OK);
+  munit_assert_false(TC_AES_init(&ctx, (TC_bytes){key, TC_AES_KEYLEN}) != TC_OK);
+  munit_assert_false(TC_AES_CMAC((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){NULL, 0},
+                                 (TC_buffer){tag, sizeof(tag)}) != TC_OK);
   munit_assert_int(
       TC_AES_KWP_wrap(kek, (TC_bytes){key_data, 13}, (TC_buffer){wrapped, sizeof wrapped}), ==,
       TC_OK);

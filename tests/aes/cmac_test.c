@@ -67,23 +67,37 @@ TC_TEST(test_cmac_sp800_38b)
     static const uint8_t t3[16] = {0x51, 0xf0, 0xbe, 0xbf, 0x7e, 0x3b, 0x9d, 0x92,
                                    0xfc, 0x49, 0x74, 0x17, 0x79, 0x36, 0x3c, 0xfe};
 
-    munit_assert_int(TC_AES_CMAC(key, NULL, 0, tag, 16), ==, TC_OK);
+    munit_assert_int(
+        TC_AES_CMAC((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){NULL, 0}, (TC_buffer){tag, 16}), ==,
+        TC_OK);
     munit_assert_memory_equal(16, tag, t0);
-    munit_assert_int(TC_AES_CMAC_verify(key, NULL, 0, t0, 16), ==, TC_OK);
+    munit_assert_int(
+        TC_AES_CMAC_verify((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){NULL, 0}, (TC_bytes){t0, 16}),
+        ==, TC_OK);
 
-    munit_assert_int(TC_AES_CMAC(key, m1, sizeof(m1), tag, 16), ==, TC_OK);
+    munit_assert_int(TC_AES_CMAC((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){m1, sizeof(m1)},
+                                 (TC_buffer){tag, 16}),
+                     ==, TC_OK);
     munit_assert_memory_equal(16, tag, t1);
 
-    munit_assert_int(TC_AES_CMAC(key, m2, sizeof(m2), tag, 16), ==, TC_OK);
+    munit_assert_int(TC_AES_CMAC((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){m2, sizeof(m2)},
+                                 (TC_buffer){tag, 16}),
+                     ==, TC_OK);
     munit_assert_memory_equal(16, tag, t2);
 
-    munit_assert_int(TC_AES_CMAC(key, m3, sizeof(m3), tag, 16), ==, TC_OK);
+    munit_assert_int(TC_AES_CMAC((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){m3, sizeof(m3)},
+                                 (TC_buffer){tag, 16}),
+                     ==, TC_OK);
     munit_assert_memory_equal(16, tag, t3);
 
     /* Truncation: leading octets of T */
-    munit_assert_int(TC_AES_CMAC(key, m1, sizeof(m1), tag, 8), ==, TC_OK);
+    munit_assert_int(TC_AES_CMAC((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){m1, sizeof(m1)},
+                                 (TC_buffer){tag, 8}),
+                     ==, TC_OK);
     munit_assert_memory_equal(8, tag, t1);
-    munit_assert_int(TC_AES_CMAC_verify(key, m1, sizeof(m1), t1, 8), ==, TC_OK);
+    munit_assert_int(TC_AES_CMAC_verify((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){m1, sizeof(m1)},
+                                        (TC_bytes){t1, 8}),
+                     ==, TC_OK);
   }
 #elif TC_AES_KEY_BITS == 192
   {
@@ -111,13 +125,21 @@ TC_TEST(test_cmac_sp800_38b)
     static const uint8_t t3[16] = {0xa1, 0xd5, 0xdf, 0x0e, 0xed, 0x79, 0x0f, 0x79,
                                    0x4d, 0x77, 0x58, 0x96, 0x59, 0xf3, 0x9a, 0x11};
 
-    munit_assert_int(TC_AES_CMAC(key, NULL, 0, tag, 16), ==, TC_OK);
+    munit_assert_int(
+        TC_AES_CMAC((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){NULL, 0}, (TC_buffer){tag, 16}), ==,
+        TC_OK);
     munit_assert_memory_equal(16, tag, t0);
-    munit_assert_int(TC_AES_CMAC(key, m1, sizeof(m1), tag, 16), ==, TC_OK);
+    munit_assert_int(TC_AES_CMAC((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){m1, sizeof(m1)},
+                                 (TC_buffer){tag, 16}),
+                     ==, TC_OK);
     munit_assert_memory_equal(16, tag, t1);
-    munit_assert_int(TC_AES_CMAC(key, m2, sizeof(m2), tag, 16), ==, TC_OK);
+    munit_assert_int(TC_AES_CMAC((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){m2, sizeof(m2)},
+                                 (TC_buffer){tag, 16}),
+                     ==, TC_OK);
     munit_assert_memory_equal(16, tag, t2);
-    munit_assert_int(TC_AES_CMAC(key, m3, sizeof(m3), tag, 16), ==, TC_OK);
+    munit_assert_int(TC_AES_CMAC((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){m3, sizeof(m3)},
+                                 (TC_buffer){tag, 16}),
+                     ==, TC_OK);
     munit_assert_memory_equal(16, tag, t3);
   }
 #else /* TC_AES_KEY_BITS == 256 */
@@ -147,13 +169,21 @@ TC_TEST(test_cmac_sp800_38b)
     static const uint8_t t3[16] = {0xe1, 0x99, 0x21, 0x90, 0x54, 0x9f, 0x6e, 0xd5,
                                    0x69, 0x6a, 0x2c, 0x05, 0x6c, 0x31, 0x54, 0x10};
 
-    munit_assert_int(TC_AES_CMAC(key, NULL, 0, tag, 16), ==, TC_OK);
+    munit_assert_int(
+        TC_AES_CMAC((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){NULL, 0}, (TC_buffer){tag, 16}), ==,
+        TC_OK);
     munit_assert_memory_equal(16, tag, t0);
-    munit_assert_int(TC_AES_CMAC(key, m1, sizeof(m1), tag, 16), ==, TC_OK);
+    munit_assert_int(TC_AES_CMAC((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){m1, sizeof(m1)},
+                                 (TC_buffer){tag, 16}),
+                     ==, TC_OK);
     munit_assert_memory_equal(16, tag, t1);
-    munit_assert_int(TC_AES_CMAC(key, m2, sizeof(m2), tag, 16), ==, TC_OK);
+    munit_assert_int(TC_AES_CMAC((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){m2, sizeof(m2)},
+                                 (TC_buffer){tag, 16}),
+                     ==, TC_OK);
     munit_assert_memory_equal(16, tag, t2);
-    munit_assert_int(TC_AES_CMAC(key, m3, sizeof(m3), tag, 16), ==, TC_OK);
+    munit_assert_int(TC_AES_CMAC((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){m3, sizeof(m3)},
+                                 (TC_buffer){tag, 16}),
+                     ==, TC_OK);
     munit_assert_memory_equal(16, tag, t3);
   }
 #endif
@@ -170,20 +200,40 @@ TC_TEST(test_cmac_api)
   memset(key, 0x11, sizeof(key));
   memset(msg, 0x22, sizeof(msg));
 
-  munit_assert_int(TC_AES_CMAC(NULL, msg, sizeof(msg), tag, 16), ==, TC_ERROR);
-  munit_assert_int(TC_AES_CMAC(key, msg, sizeof(msg), NULL, 16), ==, TC_ERROR);
-  munit_assert_int(TC_AES_CMAC(key, msg, sizeof(msg), tag, 0), ==, TC_ERROR);
-  munit_assert_int(TC_AES_CMAC(key, msg, sizeof(msg), tag, 17), ==, TC_ERROR);
-  munit_assert_int(TC_AES_CMAC(key, NULL, 1, tag, 16), ==, TC_ERROR);
-  munit_assert_int(TC_AES_CMAC(key, msg, sizeof(msg), tag, 16), ==, TC_OK);
-  munit_assert_int(TC_AES_CMAC_verify(key, msg, sizeof(msg), tag, 16), ==, TC_OK);
+  munit_assert_int(TC_AES_CMAC((TC_bytes){NULL, TC_AES_KEYLEN}, (TC_bytes){msg, sizeof(msg)},
+                               (TC_buffer){tag, 16}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_AES_CMAC((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){msg, sizeof(msg)},
+                               (TC_buffer){NULL, 16}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_AES_CMAC((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){msg, sizeof(msg)},
+                               (TC_buffer){tag, 0}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_AES_CMAC((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){msg, sizeof(msg)},
+                               (TC_buffer){tag, 17}),
+                   ==, TC_ERROR);
+  munit_assert_int(
+      TC_AES_CMAC((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){NULL, 1}, (TC_buffer){tag, 16}), ==,
+      TC_ERROR);
+  munit_assert_int(TC_AES_CMAC((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){msg, sizeof(msg)},
+                               (TC_buffer){tag, 16}),
+                   ==, TC_OK);
+  munit_assert_int(TC_AES_CMAC_verify((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){msg, sizeof(msg)},
+                                      (TC_bytes){tag, 16}),
+                   ==, TC_OK);
 
   tag[0] ^= 1u;
-  munit_assert_int(TC_AES_CMAC_verify(key, msg, sizeof(msg), tag, 16), ==, TC_MISMATCH);
+  munit_assert_int(TC_AES_CMAC_verify((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){msg, sizeof(msg)},
+                                      (TC_bytes){tag, 16}),
+                   ==, TC_MISMATCH);
   tag[0] ^= 1u;
 
-  munit_assert_int(TC_AES_CMAC_verify(key, msg, sizeof(msg), NULL, 16), ==, TC_ERROR);
-  munit_assert_int(TC_AES_CMAC_verify(key, msg, sizeof(msg), tag, 0), ==, TC_ERROR);
+  munit_assert_int(TC_AES_CMAC_verify((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){msg, sizeof(msg)},
+                                      (TC_bytes){NULL, 16}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_AES_CMAC_verify((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){msg, sizeof(msg)},
+                                      (TC_bytes){tag, 0}),
+                   ==, TC_ERROR);
 
   return MUNIT_OK;
 }
@@ -201,40 +251,79 @@ TC_TEST(test_cmac_tag_policy)
 
   memset(key, 0x3c, sizeof(key));
   memset(msg, 0x5a, sizeof(msg));
-  munit_assert_int(TC_AES_CMAC(key, msg, sizeof(msg), full, sizeof(full)), ==, TC_OK);
+  munit_assert_int(TC_AES_CMAC((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){msg, sizeof(msg)},
+                               (TC_buffer){full, sizeof(full)}),
+                   ==, TC_OK);
 
   /* Default entry: min - 1 is rejected, min is accepted. */
   memset(tag, 0xa5, sizeof(tag));
-  munit_assert_int(TC_AES_CMAC(key, msg, sizeof(msg), tag, below), ==, TC_ERROR);
+  munit_assert_int(TC_AES_CMAC((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){msg, sizeof(msg)},
+                               (TC_buffer){tag, below}),
+                   ==, TC_ERROR);
   munit_assert_true(tc_test_all_value(tag, sizeof(tag), 0xa5));
-  munit_assert_int(TC_AES_CMAC_verify(key, msg, sizeof(msg), full, below), ==, TC_ERROR);
-  munit_assert_int(TC_AES_CMAC(key, msg, sizeof(msg), tag, TC_MIN_TAG_LEN), ==, TC_OK);
+  munit_assert_int(TC_AES_CMAC_verify((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){msg, sizeof(msg)},
+                                      (TC_bytes){full, below}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_AES_CMAC((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){msg, sizeof(msg)},
+                               (TC_buffer){tag, TC_MIN_TAG_LEN}),
+                   ==, TC_OK);
   munit_assert_memory_equal(TC_MIN_TAG_LEN, tag, full);
-  munit_assert_int(TC_AES_CMAC_verify(key, msg, sizeof(msg), full, TC_MIN_TAG_LEN), ==, TC_OK);
+  munit_assert_int(TC_AES_CMAC_verify((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){msg, sizeof(msg)},
+                                      (TC_bytes){full, TC_MIN_TAG_LEN}),
+                   ==, TC_OK);
 
   /* Short-tag entry: 1..min - 1 are accepted, 0 and min are rejected. */
   memset(tag, 0xa5, sizeof(tag));
-  munit_assert_int(TC_AES_CMAC_short_tag(key, msg, sizeof(msg), tag, 0), ==, TC_ERROR);
-  munit_assert_int(TC_AES_CMAC_short_tag(key, msg, sizeof(msg), tag, TC_MIN_TAG_LEN), ==, TC_ERROR);
-  munit_assert_int(TC_AES_CMAC_short_tag(NULL, msg, sizeof(msg), tag, below), ==, TC_ERROR);
-  munit_assert_int(TC_AES_CMAC_short_tag(key, NULL, 1, tag, below), ==, TC_ERROR);
+  munit_assert_int(TC_AES_CMAC_short_tag((TC_bytes){key, TC_AES_KEYLEN},
+                                         (TC_bytes){msg, sizeof(msg)}, (TC_buffer){tag, 0}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_AES_CMAC_short_tag((TC_bytes){key, TC_AES_KEYLEN},
+                                         (TC_bytes){msg, sizeof(msg)},
+                                         (TC_buffer){tag, TC_MIN_TAG_LEN}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_AES_CMAC_short_tag((TC_bytes){NULL, TC_AES_KEYLEN},
+                                         (TC_bytes){msg, sizeof(msg)}, (TC_buffer){tag, below}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_AES_CMAC_short_tag((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){NULL, 1},
+                                         (TC_buffer){tag, below}),
+                   ==, TC_ERROR);
   munit_assert_true(tc_test_all_value(tag, sizeof(tag), 0xa5));
-  munit_assert_int(TC_AES_CMAC_short_tag(key, msg, sizeof(msg), NULL, below), ==, TC_ERROR);
-  munit_assert_int(TC_AES_CMAC_short_tag(key, msg, sizeof(msg), tag, 1), ==, TC_OK);
+  munit_assert_int(TC_AES_CMAC_short_tag((TC_bytes){key, TC_AES_KEYLEN},
+                                         (TC_bytes){msg, sizeof(msg)}, (TC_buffer){NULL, below}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_AES_CMAC_short_tag((TC_bytes){key, TC_AES_KEYLEN},
+                                         (TC_bytes){msg, sizeof(msg)}, (TC_buffer){tag, 1}),
+                   ==, TC_OK);
   munit_assert_uint8(tag[0], ==, full[0]);
-  munit_assert_int(TC_AES_CMAC_short_tag(key, msg, sizeof(msg), tag, below), ==, TC_OK);
+  munit_assert_int(TC_AES_CMAC_short_tag((TC_bytes){key, TC_AES_KEYLEN},
+                                         (TC_bytes){msg, sizeof(msg)}, (TC_buffer){tag, below}),
+                   ==, TC_OK);
   munit_assert_memory_equal(below, tag, full);
   munit_assert_true(tc_test_all_value(tag + below, sizeof(tag) - below, 0xa5));
 
-  munit_assert_int(TC_AES_CMAC_verify_short_tag(key, msg, sizeof(msg), full, 1), ==, TC_OK);
-  munit_assert_int(TC_AES_CMAC_verify_short_tag(key, msg, sizeof(msg), full, below), ==, TC_OK);
-  munit_assert_int(TC_AES_CMAC_verify_short_tag(key, msg, sizeof(msg), full, 0), ==, TC_ERROR);
-  munit_assert_int(TC_AES_CMAC_verify_short_tag(key, msg, sizeof(msg), full, TC_MIN_TAG_LEN), ==,
-                   TC_ERROR);
-  munit_assert_int(TC_AES_CMAC_verify_short_tag(key, msg, sizeof(msg), NULL, below), ==, TC_ERROR);
+  munit_assert_int(TC_AES_CMAC_verify_short_tag((TC_bytes){key, TC_AES_KEYLEN},
+                                                (TC_bytes){msg, sizeof(msg)}, (TC_bytes){full, 1}),
+                   ==, TC_OK);
+  munit_assert_int(TC_AES_CMAC_verify_short_tag((TC_bytes){key, TC_AES_KEYLEN},
+                                                (TC_bytes){msg, sizeof(msg)},
+                                                (TC_bytes){full, below}),
+                   ==, TC_OK);
+  munit_assert_int(TC_AES_CMAC_verify_short_tag((TC_bytes){key, TC_AES_KEYLEN},
+                                                (TC_bytes){msg, sizeof(msg)}, (TC_bytes){full, 0}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_AES_CMAC_verify_short_tag((TC_bytes){key, TC_AES_KEYLEN},
+                                                (TC_bytes){msg, sizeof(msg)},
+                                                (TC_bytes){full, TC_MIN_TAG_LEN}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_AES_CMAC_verify_short_tag((TC_bytes){key, TC_AES_KEYLEN},
+                                                (TC_bytes){msg, sizeof(msg)},
+                                                (TC_bytes){NULL, below}),
+                   ==, TC_ERROR);
   full[below - 1u] ^= 0x01u;
-  munit_assert_int(TC_AES_CMAC_verify_short_tag(key, msg, sizeof(msg), full, below), ==,
-                   TC_MISMATCH);
+  munit_assert_int(TC_AES_CMAC_verify_short_tag((TC_bytes){key, TC_AES_KEYLEN},
+                                                (TC_bytes){msg, sizeof(msg)},
+                                                (TC_bytes){full, below}),
+                   ==, TC_MISMATCH);
   return MUNIT_OK;
 }
 
@@ -258,44 +347,46 @@ TC_TEST(test_cmac_streaming)
 
   for (li = 0; li < sizeof(lengths) / sizeof(lengths[0]); ++li) {
     const size_t len = lengths[li];
-    munit_assert_int(TC_AES_CMAC(key, msg, len, expected, 16), ==, TC_OK);
+    munit_assert_int(TC_AES_CMAC((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){msg, len},
+                                 (TC_buffer){expected, 16}),
+                     ==, TC_OK);
 
     /* Single update. */
-    munit_assert_int(TC_AES_CMAC_init(&ctx, key), ==, TC_OK);
-    munit_assert_int(TC_AES_CMAC_update(&ctx, msg, len), ==, TC_OK);
-    munit_assert_int(TC_AES_CMAC_final(&ctx, tag), ==, TC_OK);
+    munit_assert_int(TC_AES_CMAC_init(&ctx, (TC_bytes){key, TC_AES_KEYLEN}), ==, TC_OK);
+    munit_assert_int(TC_AES_CMAC_update(&ctx, (TC_bytes){msg, len}), ==, TC_OK);
+    munit_assert_int(TC_AES_CMAC_final(&ctx, (TC_buffer){tag, TC_AES_CMAC_TAG_MAX}), ==, TC_OK);
     munit_assert_memory_equal(16, tag, expected);
 
     /* Fixed-size chunks of every split size. */
     for (si = 0; si < sizeof(splits) / sizeof(splits[0]); ++si) {
       size_t pos = 0;
-      munit_assert_int(TC_AES_CMAC_init(&ctx, key), ==, TC_OK);
+      munit_assert_int(TC_AES_CMAC_init(&ctx, (TC_bytes){key, TC_AES_KEYLEN}), ==, TC_OK);
       while (pos < len) {
         const size_t take = (len - pos) < splits[si] ? (len - pos) : splits[si];
-        munit_assert_int(TC_AES_CMAC_update(&ctx, msg + pos, take), ==, TC_OK);
+        munit_assert_int(TC_AES_CMAC_update(&ctx, (TC_bytes){msg + pos, take}), ==, TC_OK);
         pos += take;
       }
       /* Zero-length updates must be no-ops anywhere in the stream. */
-      munit_assert_int(TC_AES_CMAC_update(&ctx, NULL, 0), ==, TC_OK);
-      munit_assert_int(TC_AES_CMAC_final(&ctx, tag), ==, TC_OK);
+      munit_assert_int(TC_AES_CMAC_update(&ctx, (TC_bytes){NULL, 0}), ==, TC_OK);
+      munit_assert_int(TC_AES_CMAC_final(&ctx, (TC_buffer){tag, TC_AES_CMAC_TAG_MAX}), ==, TC_OK);
       munit_assert_memory_equal(16, tag, expected);
     }
   }
 
-  munit_assert_int(TC_AES_CMAC_init(NULL, key), ==, TC_ERROR);
-  munit_assert_int(TC_AES_CMAC_init(&ctx, NULL), ==, TC_ERROR);
+  munit_assert_int(TC_AES_CMAC_init(NULL, (TC_bytes){key, TC_AES_KEYLEN}), ==, TC_ERROR);
+  munit_assert_int(TC_AES_CMAC_init(&ctx, (TC_bytes){NULL, TC_AES_KEYLEN}), ==, TC_ERROR);
   memset(&ctx, 0, sizeof ctx);
-  munit_assert_int(TC_AES_CMAC_update(&ctx, msg, 1), ==, TC_ERROR);
-  munit_assert_int(TC_AES_CMAC_final(&ctx, tag), ==, TC_ERROR);
-  munit_assert_int(TC_AES_CMAC_init(&ctx, key), ==, TC_OK);
-  munit_assert_int(TC_AES_CMAC_final(&ctx, tag), ==, TC_OK);
-  munit_assert_int(TC_AES_CMAC_update(&ctx, msg, 1), ==, TC_ERROR);
-  munit_assert_int(TC_AES_CMAC_final(&ctx, tag), ==, TC_ERROR);
+  munit_assert_int(TC_AES_CMAC_update(&ctx, (TC_bytes){msg, 1}), ==, TC_ERROR);
+  munit_assert_int(TC_AES_CMAC_final(&ctx, (TC_buffer){tag, TC_AES_CMAC_TAG_MAX}), ==, TC_ERROR);
+  munit_assert_int(TC_AES_CMAC_init(&ctx, (TC_bytes){key, TC_AES_KEYLEN}), ==, TC_OK);
+  munit_assert_int(TC_AES_CMAC_final(&ctx, (TC_buffer){tag, TC_AES_CMAC_TAG_MAX}), ==, TC_OK);
+  munit_assert_int(TC_AES_CMAC_update(&ctx, (TC_bytes){msg, 1}), ==, TC_ERROR);
+  munit_assert_int(TC_AES_CMAC_final(&ctx, (TC_buffer){tag, TC_AES_CMAC_TAG_MAX}), ==, TC_ERROR);
   TC_AES_CMAC_ctx_clear(&ctx);
-  munit_assert_int(TC_AES_CMAC_final(&ctx, tag), ==, TC_ERROR);
-  munit_assert_int(TC_AES_CMAC_init(&ctx, key), ==, TC_OK);
-  munit_assert_int(TC_AES_CMAC_update(&ctx, NULL, 1), ==, TC_ERROR);
-  munit_assert_int(TC_AES_CMAC_final(&ctx, NULL), ==, TC_ERROR);
+  munit_assert_int(TC_AES_CMAC_final(&ctx, (TC_buffer){tag, TC_AES_CMAC_TAG_MAX}), ==, TC_ERROR);
+  munit_assert_int(TC_AES_CMAC_init(&ctx, (TC_bytes){key, TC_AES_KEYLEN}), ==, TC_OK);
+  munit_assert_int(TC_AES_CMAC_update(&ctx, (TC_bytes){NULL, 1}), ==, TC_ERROR);
+  munit_assert_int(TC_AES_CMAC_final(&ctx, (TC_buffer){NULL, TC_AES_CMAC_TAG_MAX}), ==, TC_ERROR);
   TC_AES_CMAC_ctx_clear(&ctx);
   TC_AES_CMAC_ctx_clear(NULL);
 
@@ -306,12 +397,12 @@ TC_TEST(test_cmac_streaming)
     uint8_t* const staged_mac = (uint8_t*)&ctx + offsetof(struct TC_AES_CMAC_ctx, mac);
 
     memcpy(staged_k1, key, sizeof key);
-    munit_assert_int(TC_AES_CMAC_init(&ctx, staged_k1), ==, TC_ERROR);
+    munit_assert_int(TC_AES_CMAC_init(&ctx, (TC_bytes){staged_k1, TC_AES_KEYLEN}), ==, TC_ERROR);
     munit_assert_int(ctx.active, ==, 0);
-    munit_assert_int(TC_AES_CMAC_update(&ctx, msg, 1), ==, TC_ERROR);
+    munit_assert_int(TC_AES_CMAC_update(&ctx, (TC_bytes){msg, 1}), ==, TC_ERROR);
     memcpy(staged_mac, key, sizeof key);
-    munit_assert_int(TC_AES_CMAC_init(&ctx, staged_mac), ==, TC_ERROR);
-    munit_assert_int(TC_AES_CMAC_final(&ctx, tag), ==, TC_ERROR);
+    munit_assert_int(TC_AES_CMAC_init(&ctx, (TC_bytes){staged_mac, TC_AES_KEYLEN}), ==, TC_ERROR);
+    munit_assert_int(TC_AES_CMAC_final(&ctx, (TC_buffer){tag, TC_AES_CMAC_TAG_MAX}), ==, TC_ERROR);
   }
 
   /* Message bytes inside the context change while the MAC reads them, and a
@@ -324,22 +415,24 @@ TC_TEST(test_cmac_streaming)
       uint8_t after[TC_AES_CMAC_TAG_MAX];
     } frame;
     struct TC_AES_CMAC_ctx saved;
-    munit_assert_int(TC_AES_CMAC_init(&ctx, key), ==, TC_OK);
-    munit_assert_int(TC_AES_CMAC_update(&ctx, msg, 3), ==, TC_OK);
+    munit_assert_int(TC_AES_CMAC_init(&ctx, (TC_bytes){key, TC_AES_KEYLEN}), ==, TC_OK);
+    munit_assert_int(TC_AES_CMAC_update(&ctx, (TC_bytes){msg, 3}), ==, TC_OK);
     memcpy(&saved, &ctx, sizeof saved);
-    munit_assert_int(TC_AES_CMAC_update(&ctx, ctx.buf, 1), ==, TC_ERROR);
-    munit_assert_int(TC_AES_CMAC_update(&ctx, ctx.k1, sizeof ctx.k1), ==, TC_ERROR);
-    munit_assert_int(TC_AES_CMAC_final(&ctx, ctx.mac), ==, TC_ERROR);
-    memcpy(&frame.cmac, &ctx, sizeof ctx);
-    munit_assert_int(TC_AES_CMAC_final(&frame.cmac, (uint8_t*)&frame + sizeof frame.cmac - 1), ==,
+    munit_assert_int(TC_AES_CMAC_update(&ctx, (TC_bytes){ctx.buf, 1}), ==, TC_ERROR);
+    munit_assert_int(TC_AES_CMAC_update(&ctx, (TC_bytes){ctx.k1, sizeof ctx.k1}), ==, TC_ERROR);
+    munit_assert_int(TC_AES_CMAC_final(&ctx, (TC_buffer){ctx.mac, TC_AES_CMAC_TAG_MAX}), ==,
                      TC_ERROR);
+    memcpy(&frame.cmac, &ctx, sizeof ctx);
+    munit_assert_int(
+        TC_AES_CMAC_final(&frame.cmac, (TC_buffer){(uint8_t*)&frame + sizeof frame.cmac - 1, 1}),
+        ==, TC_ERROR);
     munit_assert_uint8(frame.cmac.active, ==, 1);
     TC_AES_CMAC_ctx_clear(&frame.cmac);
     munit_assert_memory_equal(sizeof ctx.mac, ctx.mac, saved.mac);
     munit_assert_memory_equal(sizeof ctx.buf, ctx.buf, saved.buf);
     munit_assert_uint8(ctx.buf_len, ==, saved.buf_len);
     munit_assert_uint8(ctx.active, ==, 1);
-    munit_assert_int(TC_AES_CMAC_final(&ctx, tag), ==, TC_OK);
+    munit_assert_int(TC_AES_CMAC_final(&ctx, (TC_buffer){tag, TC_AES_CMAC_TAG_MAX}), ==, TC_OK);
   }
 
   return MUNIT_OK;
@@ -465,12 +558,17 @@ TC_TEST(test_cmac_wycheproof)
         } else if (!tag_decoded || tag_len != TC_AES_CMAC_TAG_MAX) {
           ++failed;
         } else if (expect_ok) {
-          if (TC_AES_CMAC(key, msg_len ? msg : NULL, msg_len, out, tag_len) != TC_OK ||
+          if (TC_AES_CMAC((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){msg_len ? msg : NULL, msg_len},
+                          (TC_buffer){out, tag_len}) != TC_OK ||
               memcmp(out, tag, tag_len) != 0 ||
-              TC_AES_CMAC_verify(key, msg_len ? msg : NULL, msg_len, tag, tag_len) != TC_OK)
+              TC_AES_CMAC_verify((TC_bytes){key, TC_AES_KEYLEN},
+                                 (TC_bytes){msg_len ? msg : NULL, msg_len},
+                                 (TC_bytes){tag, tag_len}) != TC_OK)
             ++failed;
         } else {
-          if (TC_AES_CMAC_verify(key, msg_len ? msg : NULL, msg_len, tag, tag_len) != TC_MISMATCH)
+          if (TC_AES_CMAC_verify((TC_bytes){key, TC_AES_KEYLEN},
+                                 (TC_bytes){msg_len ? msg : NULL, msg_len},
+                                 (TC_bytes){tag, tag_len}) != TC_MISMATCH)
             ++failed;
         }
         have = 0;
@@ -497,15 +595,21 @@ TC_TEST(test_cmac_wycheproof)
 static TC_status cmac_cavp_generate(const uint8_t* key, const uint8_t* msg, size_t msg_len,
                                     uint8_t* tag, size_t tag_len)
 {
-  return tag_len < TC_MIN_TAG_LEN ? TC_AES_CMAC_short_tag(key, msg, msg_len, tag, tag_len)
-                                  : TC_AES_CMAC(key, msg, msg_len, tag, tag_len);
+  return tag_len < TC_MIN_TAG_LEN
+             ? TC_AES_CMAC_short_tag((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){msg, msg_len},
+                                     (TC_buffer){tag, tag_len})
+             : TC_AES_CMAC((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){msg, msg_len},
+                           (TC_buffer){tag, tag_len});
 }
 
 static TC_status cmac_cavp_verify(const uint8_t* key, const uint8_t* msg, size_t msg_len,
                                   const uint8_t* tag, size_t tag_len)
 {
-  return tag_len < TC_MIN_TAG_LEN ? TC_AES_CMAC_verify_short_tag(key, msg, msg_len, tag, tag_len)
-                                  : TC_AES_CMAC_verify(key, msg, msg_len, tag, tag_len);
+  return tag_len < TC_MIN_TAG_LEN
+             ? TC_AES_CMAC_verify_short_tag((TC_bytes){key, TC_AES_KEYLEN},
+                                            (TC_bytes){msg, msg_len}, (TC_bytes){tag, tag_len})
+             : TC_AES_CMAC_verify((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){msg, msg_len},
+                                  (TC_bytes){tag, tag_len});
 }
 
 /* Parse one full CAVP .rsp for the active TC_AES_KEYLEN. Mlen=0 → empty message. */

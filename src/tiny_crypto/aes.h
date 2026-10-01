@@ -83,7 +83,7 @@ struct TC_AES_ctx {
  * or, in the runtime S-box profile, a call before TC_AES_init_sbox. A NULL
  * ctx is left alone. Every other failure wipes ctx, so a previous key is
  * unusable after a failed re-init. */
-TC_status TC_AES_key_init(struct TC_AES_key_ctx* ctx, const uint8_t* key);
+TC_status TC_AES_key_init(struct TC_AES_key_ctx* ctx, TC_bytes key);
 /* Wipe a key schedule. NULL is ignored. */
 void TC_AES_key_ctx_clear(struct TC_AES_key_ctx* ctx);
 
@@ -96,13 +96,13 @@ void TC_AES_ctx_clear(struct TC_AES_ctx* ctx);
  * TC_AES_set_iv loads one. key must be disjoint from ctx.
  * Returns TC_OK, or TC_ERROR under the TC_AES_key_init conditions. A NULL
  * ctx is left alone. Every other failure wipes ctx. */
-TC_status TC_AES_init(struct TC_AES_ctx* ctx, const uint8_t* key);
+TC_status TC_AES_init(struct TC_AES_ctx* ctx, TC_bytes key);
 #endif
 #if TC_ENABLE_AES && TC_AES_CAVP
 /* Test-only single-block hooks used by the AESAVS harness. They return
  * TC_ERROR, leaving block unchanged, when the key cannot be scheduled. */
-TC_status TC_AES_CAVP_encrypt_block(const uint8_t* key, uint8_t block[TC_AES_BLOCKLEN]);
-TC_status TC_AES_CAVP_decrypt_block(const uint8_t* key, uint8_t block[TC_AES_BLOCKLEN]);
+TC_status TC_AES_CAVP_encrypt_block(TC_bytes key, TC_buffer block);
+TC_status TC_AES_CAVP_decrypt_block(TC_bytes key, TC_buffer block);
 #endif
 #if TC_ENABLE_AES && TC_AES_SBOX_MODE == TC_AES_SBOX_MODE_RUNTIME
 /* Build the S-boxes in RAM. Call it once before any key init. Until then,
@@ -121,7 +121,7 @@ void TC_AES_init_sbox(void);
  * per message, and Appendix B unique CTR counter blocks under one key.
  * Returns TC_OK, or TC_ERROR with ctx unchanged for a NULL argument, a
  * context without a key or an IV that overlaps ctx. */
-TC_status TC_AES_set_iv(struct TC_AES_ctx* ctx, const uint8_t* iv);
+TC_status TC_AES_set_iv(struct TC_AES_ctx* ctx, TC_bytes iv);
 #endif
 
 /*
@@ -139,8 +139,8 @@ TC_status TC_AES_set_iv(struct TC_AES_ctx* ctx, const uint8_t* iv);
 /* Encrypt or decrypt one TC_AES_BLOCKLEN-byte block in place (FIPS 197
  * sections 5.1 and 5.3, SP 800-38A section 6.1). ECB leaks equal blocks,
  * so use it only as a building block. */
-TC_status TC_AES_ECB_encrypt(const struct TC_AES_key_ctx* ctx, uint8_t* buf);
-TC_status TC_AES_ECB_decrypt(const struct TC_AES_key_ctx* ctx, uint8_t* buf);
+TC_status TC_AES_ECB_encrypt(const struct TC_AES_key_ctx* ctx, TC_buffer buf);
+TC_status TC_AES_ECB_decrypt(const struct TC_AES_key_ctx* ctx, TC_buffer buf);
 #endif
 
 #if TC_ENABLE_AES && TC_AES_ENABLE_CBC
@@ -150,8 +150,8 @@ TC_status TC_AES_ECB_decrypt(const struct TC_AES_key_ctx* ctx, uint8_t* buf);
  * applies padding. The IV in ctx advances to the last ciphertext block, so
  * the next call continues the message.
  */
-TC_status TC_AES_CBC_encrypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length);
-TC_status TC_AES_CBC_decrypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length);
+TC_status TC_AES_CBC_encrypt(struct TC_AES_ctx* ctx, TC_buffer buf);
+TC_status TC_AES_CBC_decrypt(struct TC_AES_ctx* ctx, TC_buffer buf);
 #endif
 
 #if TC_ENABLE_AES && TC_AES_ENABLE_CTR
@@ -163,7 +163,7 @@ TC_status TC_AES_CBC_decrypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length
  * space. Once the counter wraps, further calls fail until TC_AES_set_iv
  * supplies a new IV. Unused keystream bytes serve the next call.
  */
-TC_status TC_AES_CTR_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length);
+TC_status TC_AES_CTR_crypt(struct TC_AES_ctx* ctx, TC_buffer buf);
 #endif
 
 #if TC_ENABLE_AES && TC_AES_ENABLE_OFB
@@ -173,7 +173,7 @@ TC_status TC_AES_CTR_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length);
  * confidentiality only. A context whose stream position is corrupted
  * returns TC_ERROR with buf unchanged.
  */
-TC_status TC_AES_OFB_crypt(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length);
+TC_status TC_AES_OFB_crypt(struct TC_AES_ctx* ctx, TC_buffer buf);
 #endif
 
 /*
@@ -267,9 +267,8 @@ struct TC_AES_GCM_ctx {
  * or a key init failure. A NULL ctx is left alone. Every other failure wipes
  * ctx.
  */
-TC_status TC_AES_GCM_init(struct TC_AES_GCM_ctx* ctx, const uint8_t* key, TC_bytes iv,
-                          size_t tag_len);
-TC_status TC_AES_GCM_init_short_tag(struct TC_AES_GCM_ctx* ctx, const uint8_t* key, TC_bytes iv,
+TC_status TC_AES_GCM_init(struct TC_AES_GCM_ctx* ctx, TC_bytes key, TC_bytes iv, size_t tag_len);
+TC_status TC_AES_GCM_init_short_tag(struct TC_AES_GCM_ctx* ctx, TC_bytes key, TC_bytes iv,
                                     size_t tag_len);
 
 /* aad_update absorbs AAD, and encrypt_update encrypts buf in place and
@@ -281,29 +280,29 @@ TC_status TC_AES_GCM_init_short_tag(struct TC_AES_GCM_ctx* ctx, const uint8_t* k
  * an overlap, or a total above TC_AES_GCM_MAX_AAD_BYTES,
  * TC_AES_GCM_MAX_PLAINTEXT_BYTES or the short-tag packet limit. A cipher
  * backend failure wipes buf, clears ctx and returns TC_ERROR. */
-TC_status TC_AES_GCM_aad_update(struct TC_AES_GCM_ctx* ctx, const uint8_t* aad, size_t length);
-TC_status TC_AES_GCM_encrypt_update(struct TC_AES_GCM_ctx* ctx, uint8_t* buf, size_t length);
+TC_status TC_AES_GCM_aad_update(struct TC_AES_GCM_ctx* ctx, TC_bytes aad);
+TC_status TC_AES_GCM_encrypt_update(struct TC_AES_GCM_ctx* ctx, TC_buffer buf);
 
 /* Write the tag_len-byte tag chosen at init (section 7.1 steps 5 and 6).
  * tag must be disjoint from ctx. Returns TC_OK, or TC_ERROR with tag and ctx
  * unchanged for a NULL argument, an overlap, or a context that was never
  * initialized or is finished. Otherwise finish consumes ctx and wipes it,
  * and a cipher backend failure returns TC_ERROR with tag unchanged. */
-TC_status TC_AES_GCM_encrypt_finish(struct TC_AES_GCM_ctx* ctx, uint8_t* tag);
+TC_status TC_AES_GCM_encrypt_finish(struct TC_AES_GCM_ctx* ctx, TC_buffer tag);
 
 /* One-shot GCM (SP 800-38D sections 7.1 and 7.2). Follows the one-shot
  * AEAD contract above. iv.length is 1..TC_AES_GCM_MAX_IV_BYTES. The default
  * forms take 12..16-byte tags and the _short_tag forms 4 or 8 bytes, under
  * the Appendix C packet limits. Text above TC_AES_GCM_MAX_PLAINTEXT_BYTES
  * returns TC_ERROR. */
-TC_status TC_AES_GCM_encrypt(const uint8_t* key, TC_bytes iv, TC_bytes aad, TC_bytes plaintext,
+TC_status TC_AES_GCM_encrypt(TC_bytes key, TC_bytes iv, TC_bytes aad, TC_bytes plaintext,
                              TC_buffer ciphertext, TC_buffer tag);
-TC_status TC_AES_GCM_decrypt(const uint8_t* key, TC_bytes iv, TC_bytes aad, TC_bytes ciphertext,
+TC_status TC_AES_GCM_decrypt(TC_bytes key, TC_bytes iv, TC_bytes aad, TC_bytes ciphertext,
                              TC_bytes tag, TC_buffer plaintext);
-TC_status TC_AES_GCM_encrypt_short_tag(const uint8_t* key, TC_bytes iv, TC_bytes aad,
-                                       TC_bytes plaintext, TC_buffer ciphertext, TC_buffer tag);
-TC_status TC_AES_GCM_decrypt_short_tag(const uint8_t* key, TC_bytes iv, TC_bytes aad,
-                                       TC_bytes ciphertext, TC_bytes tag, TC_buffer plaintext);
+TC_status TC_AES_GCM_encrypt_short_tag(TC_bytes key, TC_bytes iv, TC_bytes aad, TC_bytes plaintext,
+                                       TC_buffer ciphertext, TC_buffer tag);
+TC_status TC_AES_GCM_decrypt_short_tag(TC_bytes key, TC_bytes iv, TC_bytes aad, TC_bytes ciphertext,
+                                       TC_bytes tag, TC_buffer plaintext);
 
 /* Wipe the key schedule, hash subkey and authentication state. NULL is
  * ignored. */
@@ -321,13 +320,13 @@ void TC_AES_GCM_ctx_clear(struct TC_AES_GCM_ctx* ctx);
  * TC_MIN_TAG_LEN (8, 10, 12, 14 or 16 by default). The _short_tag forms take
  * those below it (4 or 6 by default). Any other tag length returns TC_ERROR.
  * The payload length must fit the 15 - nonce length byte length field. */
-TC_status TC_AES_CCM_encrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes plaintext,
+TC_status TC_AES_CCM_encrypt(TC_bytes key, TC_bytes nonce, TC_bytes aad, TC_bytes plaintext,
                              TC_buffer ciphertext, TC_buffer tag);
-TC_status TC_AES_CCM_decrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes ciphertext,
+TC_status TC_AES_CCM_decrypt(TC_bytes key, TC_bytes nonce, TC_bytes aad, TC_bytes ciphertext,
                              TC_bytes tag, TC_buffer plaintext);
-TC_status TC_AES_CCM_encrypt_short_tag(const uint8_t* key, TC_bytes nonce, TC_bytes aad,
+TC_status TC_AES_CCM_encrypt_short_tag(TC_bytes key, TC_bytes nonce, TC_bytes aad,
                                        TC_bytes plaintext, TC_buffer ciphertext, TC_buffer tag);
-TC_status TC_AES_CCM_decrypt_short_tag(const uint8_t* key, TC_bytes nonce, TC_bytes aad,
+TC_status TC_AES_CCM_decrypt_short_tag(TC_bytes key, TC_bytes nonce, TC_bytes aad,
                                        TC_bytes ciphertext, TC_bytes tag, TC_buffer plaintext);
 
 #endif
@@ -340,13 +339,13 @@ TC_status TC_AES_CCM_decrypt_short_tag(const uint8_t* key, TC_bytes nonce, TC_by
  * TC_MIN_TAG_LEN..16 bytes. The _short_tag forms take 1..TC_MIN_TAG_LEN - 1
  * bytes. Other tag lengths, including 0, return TC_ERROR. The nonce may have
  * any length, including zero. */
-TC_status TC_AES_EAX_encrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes plaintext,
+TC_status TC_AES_EAX_encrypt(TC_bytes key, TC_bytes nonce, TC_bytes aad, TC_bytes plaintext,
                              TC_buffer ciphertext, TC_buffer tag);
-TC_status TC_AES_EAX_decrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes ciphertext,
+TC_status TC_AES_EAX_decrypt(TC_bytes key, TC_bytes nonce, TC_bytes aad, TC_bytes ciphertext,
                              TC_bytes tag, TC_buffer plaintext);
-TC_status TC_AES_EAX_encrypt_short_tag(const uint8_t* key, TC_bytes nonce, TC_bytes aad,
+TC_status TC_AES_EAX_encrypt_short_tag(TC_bytes key, TC_bytes nonce, TC_bytes aad,
                                        TC_bytes plaintext, TC_buffer ciphertext, TC_buffer tag);
-TC_status TC_AES_EAX_decrypt_short_tag(const uint8_t* key, TC_bytes nonce, TC_bytes aad,
+TC_status TC_AES_EAX_decrypt_short_tag(TC_bytes key, TC_bytes nonce, TC_bytes aad,
                                        TC_bytes ciphertext, TC_bytes tag, TC_buffer plaintext);
 
 #endif
@@ -360,11 +359,10 @@ TC_status TC_AES_EAX_decrypt_short_tag(const uint8_t* key, TC_bytes nonce, TC_by
  * fixes the tag at four bytes, so EAX' is exempt from TC_MIN_TAG_LEN and has
  * no _short_tag form. The cleartext header is authenticated and serves as
  * the nonce. A NULL tag returns TC_ERROR. */
-TC_status TC_AES_EAX_PRIME_encrypt(const uint8_t* key, TC_bytes cleartext, TC_bytes plaintext,
-                                   TC_buffer ciphertext, uint8_t tag[TC_AES_EAX_PRIME_TAG_LEN]);
-TC_status TC_AES_EAX_PRIME_decrypt(const uint8_t* key, TC_bytes cleartext, TC_bytes ciphertext,
-                                   const uint8_t tag[TC_AES_EAX_PRIME_TAG_LEN],
-                                   TC_buffer plaintext);
+TC_status TC_AES_EAX_PRIME_encrypt(TC_bytes key, TC_bytes cleartext, TC_bytes plaintext,
+                                   TC_buffer ciphertext, TC_buffer tag);
+TC_status TC_AES_EAX_PRIME_decrypt(TC_bytes key, TC_bytes cleartext, TC_bytes ciphertext,
+                                   TC_bytes tag, TC_buffer plaintext);
 #endif
 
 #endif
@@ -385,24 +383,20 @@ TC_status TC_AES_EAX_PRIME_decrypt(const uint8_t* key, TC_bytes cleartext, TC_by
  *         length, a tag length outside the range, or a key init or cipher
  *         failure. Every failure leaves tag unchanged.
  */
-TC_status TC_AES_CMAC(const uint8_t* key, const uint8_t* msg, size_t msg_len, uint8_t* tag,
-                      size_t tag_len);
+TC_status TC_AES_CMAC(TC_bytes key, TC_bytes msg, TC_buffer tag);
 
 /* Recompute the CMAC and compare tag_len bytes in constant time
  * (SP 800-38B section 6.3), with the same length range as TC_AES_CMAC.
  * @return TC_OK when the tag matches, TC_MISMATCH when it differs, or
  *         TC_ERROR as for TC_AES_CMAC. */
-TC_status TC_AES_CMAC_verify(const uint8_t* key, const uint8_t* msg, size_t msg_len,
-                             const uint8_t* tag, size_t tag_len);
+TC_status TC_AES_CMAC_verify(TC_bytes key, TC_bytes msg, TC_bytes tag);
 
 /* Short-tag AES-CMAC and verify. tag_len must be in 1..TC_MIN_TAG_LEN - 1.
  * Use them only when the protocol fixes the short tag and limits failed
  * verifications for the key (SP 800-38B Appendix A.2). Status values follow
  * TC_AES_CMAC and TC_AES_CMAC_verify. */
-TC_status TC_AES_CMAC_short_tag(const uint8_t* key, const uint8_t* msg, size_t msg_len,
-                                uint8_t* tag, size_t tag_len);
-TC_status TC_AES_CMAC_verify_short_tag(const uint8_t* key, const uint8_t* msg, size_t msg_len,
-                                       const uint8_t* tag, size_t tag_len);
+TC_status TC_AES_CMAC_short_tag(TC_bytes key, TC_bytes msg, TC_buffer tag);
+TC_status TC_AES_CMAC_verify_short_tag(TC_bytes key, TC_bytes msg, TC_bytes tag);
 #endif
 
 /*
@@ -436,9 +430,9 @@ struct TC_AES_CMAC_ctx {
  * TC_OK, or TC_ERROR with ctx unchanged for a NULL argument, an overlap or a
  * context without a key. Otherwise final wipes ctx.
  * ctx_clear wipes ctx and ignores NULL. */
-TC_status TC_AES_CMAC_init(struct TC_AES_CMAC_ctx* ctx, const uint8_t* key);
-TC_status TC_AES_CMAC_update(struct TC_AES_CMAC_ctx* ctx, const uint8_t* data, size_t len);
-TC_status TC_AES_CMAC_final(struct TC_AES_CMAC_ctx* ctx, uint8_t tag[TC_AES_CMAC_TAG_MAX]);
+TC_status TC_AES_CMAC_init(struct TC_AES_CMAC_ctx* ctx, TC_bytes key);
+TC_status TC_AES_CMAC_update(struct TC_AES_CMAC_ctx* ctx, TC_bytes data);
+TC_status TC_AES_CMAC_final(struct TC_AES_CMAC_ctx* ctx, TC_buffer tag);
 void TC_AES_CMAC_ctx_clear(struct TC_AES_CMAC_ctx* ctx);
 #endif
 
@@ -466,11 +460,10 @@ void TC_AES_CMAC_ctx_clear(struct TC_AES_CMAC_ctx* ctx);
  * Decrypt writes candidate plaintext, then verifies. A mismatch returns
  * TC_MISMATCH and wipes the output.
  */
-TC_status TC_AES_SIV_encrypt(const uint8_t* key, const TC_bytes* ad, size_t ad_count,
-                             TC_bytes plaintext, uint8_t v[TC_AES_SIV_V_LEN], TC_buffer ciphertext);
-TC_status TC_AES_SIV_decrypt(const uint8_t* key, const TC_bytes* ad, size_t ad_count,
-                             const uint8_t v[TC_AES_SIV_V_LEN], TC_bytes ciphertext,
-                             TC_buffer plaintext);
+TC_status TC_AES_SIV_encrypt(TC_bytes key, const TC_bytes* ad, size_t ad_count, TC_bytes plaintext,
+                             TC_buffer v, TC_buffer ciphertext);
+TC_status TC_AES_SIV_decrypt(TC_bytes key, const TC_bytes* ad, size_t ad_count, TC_bytes v,
+                             TC_bytes ciphertext, TC_buffer plaintext);
 #endif
 
 #endif

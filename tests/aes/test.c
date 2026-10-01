@@ -57,8 +57,8 @@ static void test_initialize_sbox(void)
 /* Key the context, then start a message with iv. */
 static TC_status aes_init_with_iv(struct TC_AES_ctx* ctx, const uint8_t* key, const uint8_t* iv)
 {
-  TC_status status = TC_AES_init(ctx, key);
-  return status == TC_OK ? TC_AES_set_iv(ctx, iv) : status;
+  TC_status status = TC_AES_init(ctx, (TC_bytes){key, TC_AES_KEYLEN});
+  return status == TC_OK ? TC_AES_set_iv(ctx, (TC_bytes){iv, TC_AES_BLOCKLEN}) : status;
 }
 #endif
 
@@ -122,7 +122,7 @@ TC_TEST(test_key_schedule)
 
   test_initialize_sbox();
   munit_assert_size(sizeof(expected) - 1u, ==, 2u * TC_AES_KEY_EXP_SIZE);
-  munit_assert_int(TC_AES_key_init(&ctx, TEST_KEY), ==, TC_OK);
+  munit_assert_int(TC_AES_key_init(&ctx, (TC_bytes){TEST_KEY, TC_AES_KEYLEN}), ==, TC_OK);
   munit_assert_size(tc_test_hex(expected, schedule, sizeof schedule), ==, sizeof schedule);
   for (i = 0; i < TC_AES_KEY_EXP_SIZE; ++i)
     munit_assert_uint8(ctx.round_key[i], ==, schedule[i]);
@@ -138,38 +138,38 @@ TC_TEST(test_invalid_key_state)
   test_initialize_sbox();
   memcpy(saved, block, sizeof block);
 #if TC_AES_ENABLE_ECB
-  munit_assert_int(TC_AES_ECB_encrypt(&key, block), ==, TC_ERROR);
+  munit_assert_int(TC_AES_ECB_encrypt(&key, (TC_buffer){block, TC_AES_BLOCKLEN}), ==, TC_ERROR);
   munit_assert_memory_equal(sizeof block, block, saved);
 #endif
 #if TC_AES_ENABLE_CBC
-  munit_assert_int(TC_AES_CBC_encrypt(&ctx, block, sizeof block), ==, TC_ERROR);
-  munit_assert_int(TC_AES_CBC_encrypt(&ctx, NULL, 0), ==, TC_ERROR);
+  munit_assert_int(TC_AES_CBC_encrypt(&ctx, (TC_buffer){block, sizeof block}), ==, TC_ERROR);
+  munit_assert_int(TC_AES_CBC_encrypt(&ctx, (TC_buffer){NULL, 0}), ==, TC_ERROR);
 #endif
 #if TC_AES_ENABLE_CTR
-  munit_assert_int(TC_AES_CTR_crypt(&ctx, block, sizeof block), ==, TC_ERROR);
+  munit_assert_int(TC_AES_CTR_crypt(&ctx, (TC_buffer){block, sizeof block}), ==, TC_ERROR);
 #endif
 #if TC_AES_ENABLE_OFB
-  munit_assert_int(TC_AES_OFB_crypt(&ctx, block, sizeof block), ==, TC_ERROR);
+  munit_assert_int(TC_AES_OFB_crypt(&ctx, (TC_buffer){block, sizeof block}), ==, TC_ERROR);
 #endif
   munit_assert_memory_equal(sizeof block, block, saved);
-  munit_assert_int(TC_AES_key_init(&key, TEST_KEY), ==, TC_OK);
+  munit_assert_int(TC_AES_key_init(&key, (TC_bytes){TEST_KEY, TC_AES_KEYLEN}), ==, TC_OK);
   TC_AES_key_ctx_clear(&key);
 #if TC_AES_ENABLE_ECB
-  munit_assert_int(TC_AES_ECB_encrypt(&key, block), ==, TC_ERROR);
+  munit_assert_int(TC_AES_ECB_encrypt(&key, (TC_buffer){block, TC_AES_BLOCKLEN}), ==, TC_ERROR);
 #endif
-  munit_assert_int(TC_AES_init(&ctx, TEST_KEY), ==, TC_OK);
+  munit_assert_int(TC_AES_init(&ctx, (TC_bytes){TEST_KEY, TC_AES_KEYLEN}), ==, TC_OK);
   TC_AES_ctx_clear(&ctx);
 #if TC_AES_ENABLE_CTR
-  munit_assert_int(TC_AES_CTR_crypt(&ctx, block, 1), ==, TC_ERROR);
+  munit_assert_int(TC_AES_CTR_crypt(&ctx, (TC_buffer){block, 1}), ==, TC_ERROR);
 #endif
 #if TC_AES_HAVE_IV
   /* set_iv needs a keyed context. */
-  munit_assert_int(TC_AES_set_iv(&ctx, nist_iv), ==, TC_ERROR);
+  munit_assert_int(TC_AES_set_iv(&ctx, (TC_bytes){nist_iv, TC_AES_BLOCKLEN}), ==, TC_ERROR);
   munit_assert_uint8(ctx.iv[0], ==, 0);
 #endif
-  munit_assert_int(TC_AES_init(&ctx, NULL), ==, TC_ERROR);
+  munit_assert_int(TC_AES_init(&ctx, (TC_bytes){NULL, TC_AES_KEYLEN}), ==, TC_ERROR);
 #if TC_AES_ENABLE_CBC
-  munit_assert_int(TC_AES_CBC_decrypt(&ctx, block, sizeof block), ==, TC_ERROR);
+  munit_assert_int(TC_AES_CBC_decrypt(&ctx, (TC_buffer){block, sizeof block}), ==, TC_ERROR);
 #endif
   return MUNIT_OK;
 }
@@ -191,7 +191,7 @@ static void assert_aes_ctx_equal(const struct TC_AES_ctx* a, const struct TC_AES
 #endif
 }
 
-typedef TC_status (*aes_mode_fn)(struct TC_AES_ctx* ctx, uint8_t* buf, size_t length);
+typedef TC_status (*aes_mode_fn)(struct TC_AES_ctx* ctx, TC_buffer buffer);
 
 /* A buffer that overlaps the context would overwrite the round keys or the
  * chaining value while the mode reads them. The mode must reject it and leave
@@ -215,7 +215,7 @@ static void check_mode_overlap(aes_mode_fn mode, size_t length)
   memcpy(before, frame.before, sizeof before);
   memcpy(&saved, &frame.ctx, sizeof saved);
   for (i = 0; i < sizeof inside / sizeof inside[0]; ++i) {
-    munit_assert_int(mode(&frame.ctx, inside[i], length), ==, TC_ERROR);
+    munit_assert_int(mode(&frame.ctx, (TC_buffer){inside[i], length}), ==, TC_ERROR);
     assert_aes_ctx_equal(&frame.ctx, &saved);
     munit_assert_memory_equal(sizeof before, frame.before, before);
   }
@@ -240,10 +240,13 @@ TC_TEST(test_mode_overlap)
   check_mode_overlap(TC_AES_OFB_crypt, TC_AES_BLOCKLEN);
 #endif
 #if TC_AES_ENABLE_ECB
-  munit_assert_int(TC_AES_init(&ctx, TEST_KEY), ==, TC_OK);
+  munit_assert_int(TC_AES_init(&ctx, (TC_bytes){TEST_KEY, TC_AES_KEYLEN}), ==, TC_OK);
   memcpy(&saved, &ctx, sizeof saved);
-  munit_assert_int(TC_AES_ECB_encrypt(&ctx.key, ctx.key.round_key + 8), ==, TC_ERROR);
-  munit_assert_int(TC_AES_ECB_decrypt(&ctx.key, ctx.key.round_key), ==, TC_ERROR);
+  munit_assert_int(
+      TC_AES_ECB_encrypt(&ctx.key, (TC_buffer){ctx.key.round_key + 8, TC_AES_BLOCKLEN}), ==,
+      TC_ERROR);
+  munit_assert_int(TC_AES_ECB_decrypt(&ctx.key, (TC_buffer){ctx.key.round_key, TC_AES_BLOCKLEN}),
+                   ==, TC_ERROR);
   assert_aes_ctx_equal(&ctx, &saved);
 #endif
 
@@ -252,13 +255,14 @@ TC_TEST(test_mode_overlap)
    * material into the IV. */
   munit_assert_int(aes_init_with_iv(&ctx, TEST_KEY, nist_iv), ==, TC_OK);
   memcpy(&saved, &ctx, sizeof saved);
-  munit_assert_int(TC_AES_set_iv(&ctx, ctx.iv), ==, TC_ERROR);
-  munit_assert_int(TC_AES_set_iv(&ctx, ctx.iv + 1), ==, TC_ERROR);
-  munit_assert_int(TC_AES_set_iv(&ctx, ctx.key.round_key), ==, TC_ERROR);
+  munit_assert_int(TC_AES_set_iv(&ctx, (TC_bytes){ctx.iv, TC_AES_BLOCKLEN}), ==, TC_ERROR);
+  munit_assert_int(TC_AES_set_iv(&ctx, (TC_bytes){ctx.iv + 1, TC_AES_BLOCKLEN}), ==, TC_ERROR);
+  munit_assert_int(TC_AES_set_iv(&ctx, (TC_bytes){ctx.key.round_key, TC_AES_BLOCKLEN}), ==,
+                   TC_ERROR);
   assert_aes_ctx_equal(&ctx, &saved);
-  munit_assert_int(TC_AES_set_iv(&ctx, NULL), ==, TC_ERROR);
-  munit_assert_int(TC_AES_set_iv(NULL, nist_iv), ==, TC_ERROR);
-  munit_assert_int(TC_AES_set_iv(&ctx, nist_ctr_iv), ==, TC_OK);
+  munit_assert_int(TC_AES_set_iv(&ctx, (TC_bytes){NULL, TC_AES_BLOCKLEN}), ==, TC_ERROR);
+  munit_assert_int(TC_AES_set_iv(NULL, (TC_bytes){nist_iv, TC_AES_BLOCKLEN}), ==, TC_ERROR);
+  munit_assert_int(TC_AES_set_iv(&ctx, (TC_bytes){nist_ctr_iv, TC_AES_BLOCKLEN}), ==, TC_OK);
   munit_assert_memory_equal(sizeof ctx.iv, ctx.iv, nist_ctr_iv);
   TC_AES_ctx_clear(&ctx);
   return MUNIT_OK;
@@ -278,27 +282,27 @@ static void check_mode_requires_iv(aes_mode_fn mode, size_t length)
 
   memset(buf, 0x3c, sizeof buf);
   memcpy(before, buf, sizeof buf);
-  munit_assert_int(TC_AES_init(&ctx, TEST_KEY), ==, TC_OK);
+  munit_assert_int(TC_AES_init(&ctx, (TC_bytes){TEST_KEY, TC_AES_KEYLEN}), ==, TC_OK);
   memcpy(&saved, &ctx, sizeof saved);
-  munit_assert_int(mode(&ctx, buf, length), ==, TC_ERROR);
-  munit_assert_int(mode(&ctx, NULL, 0), ==, TC_ERROR);
+  munit_assert_int(mode(&ctx, (TC_buffer){buf, length}), ==, TC_ERROR);
+  munit_assert_int(mode(&ctx, (TC_buffer){NULL, 0}), ==, TC_ERROR);
   munit_assert_memory_equal(sizeof buf, buf, before);
   assert_aes_ctx_equal(&ctx, &saved);
 
   /* A rejected set_iv loads nothing. */
-  munit_assert_int(TC_AES_set_iv(&ctx, NULL), ==, TC_ERROR);
-  munit_assert_int(mode(&ctx, buf, length), ==, TC_ERROR);
+  munit_assert_int(TC_AES_set_iv(&ctx, (TC_bytes){NULL, TC_AES_BLOCKLEN}), ==, TC_ERROR);
+  munit_assert_int(mode(&ctx, (TC_buffer){buf, length}), ==, TC_ERROR);
   munit_assert_memory_equal(sizeof buf, buf, before);
   assert_aes_ctx_equal(&ctx, &saved);
 
-  munit_assert_int(TC_AES_set_iv(&ctx, nist_iv), ==, TC_OK);
-  munit_assert_int(mode(&ctx, buf, length), ==, TC_OK);
+  munit_assert_int(TC_AES_set_iv(&ctx, (TC_bytes){nist_iv, TC_AES_BLOCKLEN}), ==, TC_OK);
+  munit_assert_int(mode(&ctx, (TC_buffer){buf, length}), ==, TC_OK);
   munit_assert_memory_not_equal(length, buf, before);
 
   /* A re-init starts without an IV again. */
   memcpy(buf, before, sizeof buf);
-  munit_assert_int(TC_AES_init(&ctx, TEST_KEY), ==, TC_OK);
-  munit_assert_int(mode(&ctx, buf, length), ==, TC_ERROR);
+  munit_assert_int(TC_AES_init(&ctx, (TC_bytes){TEST_KEY, TC_AES_KEYLEN}), ==, TC_OK);
+  munit_assert_int(mode(&ctx, (TC_buffer){buf, length}), ==, TC_ERROR);
   munit_assert_memory_equal(sizeof buf, buf, before);
   TC_AES_ctx_clear(&ctx);
 }
@@ -333,7 +337,7 @@ TC_TEST(test_secure_zero_and_clear)
   for (i = 0; i < sizeof(buffer); ++i)
     munit_assert_uint8(buffer[i], ==, 0);
 
-  TC_AES_init(&ctx, TEST_KEY);
+  TC_AES_init(&ctx, (TC_bytes){TEST_KEY, TC_AES_KEYLEN});
   TC_AES_ctx_clear(&ctx);
   for (i = 0; i < sizeof(ctx); ++i)
     munit_assert_uint8(((const uint8_t*)&ctx)[i], ==, 0);
@@ -358,12 +362,12 @@ TC_TEST(test_ecb)
   uint8_t buffer[TC_AES_BLOCKLEN];
 
   test_initialize_sbox();
-  TC_AES_init(&ctx, TEST_KEY);
+  TC_AES_init(&ctx, (TC_bytes){TEST_KEY, TC_AES_KEYLEN});
   memcpy(buffer, nist_plaintext, TC_AES_BLOCKLEN);
-  munit_assert_int(TC_AES_ECB_encrypt(&ctx.key, buffer), ==, TC_OK);
+  munit_assert_int(TC_AES_ECB_encrypt(&ctx.key, (TC_buffer){buffer, TC_AES_BLOCKLEN}), ==, TC_OK);
   munit_assert_memory_equal(TC_AES_BLOCKLEN, buffer, TEST_ECB_CIPHERTEXT);
 
-  munit_assert_int(TC_AES_ECB_decrypt(&ctx.key, buffer), ==, TC_OK);
+  munit_assert_int(TC_AES_ECB_decrypt(&ctx.key, (TC_buffer){buffer, TC_AES_BLOCKLEN}), ==, TC_OK);
   munit_assert_memory_equal(TC_AES_BLOCKLEN, buffer, nist_plaintext);
 
   return MUNIT_OK;
@@ -379,11 +383,11 @@ TC_TEST(test_cbc)
   test_initialize_sbox();
   aes_init_with_iv(&ctx, TEST_KEY, nist_iv);
   memcpy(buffer, nist_plaintext, sizeof(buffer));
-  munit_assert_int(TC_AES_CBC_encrypt(&ctx, buffer, sizeof(buffer)), ==, TC_OK);
+  munit_assert_int(TC_AES_CBC_encrypt(&ctx, (TC_buffer){buffer, sizeof(buffer)}), ==, TC_OK);
   munit_assert_memory_equal(sizeof(buffer), buffer, TEST_CBC_CIPHERTEXT);
 
-  TC_AES_set_iv(&ctx, nist_iv);
-  munit_assert_int(TC_AES_CBC_decrypt(&ctx, buffer, sizeof(buffer)), ==, TC_OK);
+  TC_AES_set_iv(&ctx, (TC_bytes){nist_iv, TC_AES_BLOCKLEN});
+  munit_assert_int(TC_AES_CBC_decrypt(&ctx, (TC_buffer){buffer, sizeof(buffer)}), ==, TC_OK);
   munit_assert_memory_equal(sizeof(buffer), buffer, nist_plaintext);
 
   return MUNIT_OK;
@@ -397,9 +401,10 @@ TC_TEST(test_cbc_alignment)
   test_initialize_sbox();
   aes_init_with_iv(&ctx, TEST_KEY, nist_iv);
   memset(buffer, 0x5a, sizeof(buffer));
-  munit_assert_int(TC_AES_CBC_encrypt(&ctx, buffer, TC_AES_BLOCKLEN + 1), ==, TC_ERROR);
-  munit_assert_int(TC_AES_CBC_decrypt(&ctx, buffer, 1), ==, TC_ERROR);
-  munit_assert_int(TC_AES_CBC_encrypt(&ctx, buffer, 0), ==, TC_OK);
+  munit_assert_int(TC_AES_CBC_encrypt(&ctx, (TC_buffer){buffer, TC_AES_BLOCKLEN + 1}), ==,
+                   TC_ERROR);
+  munit_assert_int(TC_AES_CBC_decrypt(&ctx, (TC_buffer){buffer, 1}), ==, TC_ERROR);
+  munit_assert_int(TC_AES_CBC_encrypt(&ctx, (TC_buffer){buffer, 0}), ==, TC_OK);
 
   return MUNIT_OK;
 }
@@ -414,11 +419,11 @@ TC_TEST(test_ctr)
   test_initialize_sbox();
   aes_init_with_iv(&ctx, TEST_KEY, nist_ctr_iv);
   memcpy(buffer, nist_plaintext, sizeof(buffer));
-  munit_assert_int(TC_AES_CTR_crypt(&ctx, buffer, sizeof(buffer)), ==, TC_OK);
+  munit_assert_int(TC_AES_CTR_crypt(&ctx, (TC_buffer){buffer, sizeof(buffer)}), ==, TC_OK);
   munit_assert_memory_equal(sizeof(buffer), buffer, TEST_CTR_CIPHERTEXT);
 
-  TC_AES_set_iv(&ctx, nist_ctr_iv);
-  munit_assert_int(TC_AES_CTR_crypt(&ctx, buffer, sizeof(buffer)), ==, TC_OK);
+  TC_AES_set_iv(&ctx, (TC_bytes){nist_ctr_iv, TC_AES_BLOCKLEN});
+  munit_assert_int(TC_AES_CTR_crypt(&ctx, (TC_buffer){buffer, sizeof(buffer)}), ==, TC_OK);
   munit_assert_memory_equal(sizeof(buffer), buffer, nist_plaintext);
 
   return MUNIT_OK;
@@ -433,13 +438,15 @@ TC_TEST(test_ctr_unaligned)
   test_initialize_sbox();
   aes_init_with_iv(&ctx, TEST_KEY, nist_ctr_iv);
   memcpy(buffer, nist_plaintext, sizeof(nist_plaintext));
-  munit_assert_int(TC_AES_CTR_crypt(&ctx, buffer, 5), ==, TC_OK);
-  munit_assert_int(TC_AES_CTR_crypt(&ctx, buffer + 5, sizeof(nist_plaintext) - 5), ==, TC_OK);
+  munit_assert_int(TC_AES_CTR_crypt(&ctx, (TC_buffer){buffer, 5}), ==, TC_OK);
+  munit_assert_int(TC_AES_CTR_crypt(&ctx, (TC_buffer){buffer + 5, sizeof(nist_plaintext) - 5}), ==,
+                   TC_OK);
   munit_assert_memory_equal(sizeof(nist_plaintext), buffer, TEST_CTR_CIPHERTEXT);
 
-  TC_AES_set_iv(&ctx, nist_ctr_iv);
-  munit_assert_int(TC_AES_CTR_crypt(&ctx, buffer, 7), ==, TC_OK);
-  munit_assert_int(TC_AES_CTR_crypt(&ctx, buffer + 7, sizeof(nist_plaintext) - 7), ==, TC_OK);
+  TC_AES_set_iv(&ctx, (TC_bytes){nist_ctr_iv, TC_AES_BLOCKLEN});
+  munit_assert_int(TC_AES_CTR_crypt(&ctx, (TC_buffer){buffer, 7}), ==, TC_OK);
+  munit_assert_int(TC_AES_CTR_crypt(&ctx, (TC_buffer){buffer + 7, sizeof(nist_plaintext) - 7}), ==,
+                   TC_OK);
   munit_assert_memory_equal(sizeof(nist_plaintext), buffer, nist_plaintext);
 
   return MUNIT_OK;
@@ -462,32 +469,32 @@ TC_TEST(test_ctr_wrap)
   memcpy(saved_iv, ctx.iv, sizeof(saved_iv));
 
   /* Two blocks from an all-0xff counter would wrap past 2^128. */
-  munit_assert_int(TC_AES_CTR_crypt(&ctx, buffer, sizeof(buffer)), ==, TC_ERROR);
+  munit_assert_int(TC_AES_CTR_crypt(&ctx, (TC_buffer){buffer, sizeof(buffer)}), ==, TC_ERROR);
   munit_assert_memory_equal(sizeof(buffer), buffer, saved_buffer);
   munit_assert_memory_equal(sizeof(saved_iv), ctx.iv, saved_iv);
 
   /* A single block at max counter is allowed; IV then wraps to zero. */
-  munit_assert_int(TC_AES_CTR_crypt(&ctx, buffer, TC_AES_BLOCKLEN), ==, TC_OK);
+  munit_assert_int(TC_AES_CTR_crypt(&ctx, (TC_buffer){buffer, TC_AES_BLOCKLEN}), ==, TC_OK);
   for (i = 0; i < TC_AES_BLOCKLEN; ++i)
     munit_assert_uint8(ctx.iv[i], ==, 0);
 
   /* The wrapped counter is exhausted. A later call must not restart the
    * counter at zero, which would reuse the IV=0 keystream. */
   memcpy(saved_buffer, buffer, sizeof(buffer));
-  munit_assert_int(TC_AES_CTR_crypt(&ctx, buffer, TC_AES_BLOCKLEN), ==, TC_ERROR);
-  munit_assert_int(TC_AES_CTR_crypt(&ctx, buffer, 1), ==, TC_ERROR);
+  munit_assert_int(TC_AES_CTR_crypt(&ctx, (TC_buffer){buffer, TC_AES_BLOCKLEN}), ==, TC_ERROR);
+  munit_assert_int(TC_AES_CTR_crypt(&ctx, (TC_buffer){buffer, 1}), ==, TC_ERROR);
   munit_assert_memory_equal(sizeof(buffer), buffer, saved_buffer);
 
   /* Bytes still cached from the last block remain usable. */
   aes_init_with_iv(&ctx, TEST_KEY, iv);
-  munit_assert_int(TC_AES_CTR_crypt(&ctx, buffer, 8), ==, TC_OK);
-  munit_assert_int(TC_AES_CTR_crypt(&ctx, buffer + 8, 8), ==, TC_OK);
-  munit_assert_int(TC_AES_CTR_crypt(&ctx, buffer + 16, 1), ==, TC_ERROR);
+  munit_assert_int(TC_AES_CTR_crypt(&ctx, (TC_buffer){buffer, 8}), ==, TC_OK);
+  munit_assert_int(TC_AES_CTR_crypt(&ctx, (TC_buffer){buffer + 8, 8}), ==, TC_OK);
+  munit_assert_int(TC_AES_CTR_crypt(&ctx, (TC_buffer){buffer + 16, 1}), ==, TC_ERROR);
 
   /* A new IV restores the full counter space. */
   memset(iv, 0, sizeof(iv));
-  munit_assert_int(TC_AES_set_iv(&ctx, iv), ==, TC_OK);
-  munit_assert_int(TC_AES_CTR_crypt(&ctx, buffer, sizeof(buffer)), ==, TC_OK);
+  munit_assert_int(TC_AES_set_iv(&ctx, (TC_bytes){iv, TC_AES_BLOCKLEN}), ==, TC_OK);
+  munit_assert_int(TC_AES_CTR_crypt(&ctx, (TC_buffer){buffer, sizeof(buffer)}), ==, TC_OK);
 
   return MUNIT_OK;
 }
@@ -509,39 +516,41 @@ TC_TEST(test_ofb)
 
   aes_init_with_iv(&ctx, TEST_KEY, nist_iv);
   memcpy(buffer, nist_plaintext, sizeof(buffer));
-  munit_assert_int(TC_AES_OFB_crypt(&ctx, buffer, 0), ==, TC_OK);
+  munit_assert_int(TC_AES_OFB_crypt(&ctx, (TC_buffer){buffer, 0}), ==, TC_OK);
   munit_assert_memory_equal(sizeof(buffer), buffer, nist_plaintext);
-  munit_assert_int(TC_AES_OFB_crypt(&ctx, buffer, sizeof(buffer)), ==, TC_OK);
+  munit_assert_int(TC_AES_OFB_crypt(&ctx, (TC_buffer){buffer, sizeof(buffer)}), ==, TC_OK);
   munit_assert_memory_equal(sizeof(buffer), buffer, TEST_OFB_CIPHERTEXT);
 
-  TC_AES_set_iv(&ctx, nist_iv);
-  munit_assert_int(TC_AES_OFB_crypt(&ctx, buffer, sizeof(buffer)), ==, TC_OK);
+  TC_AES_set_iv(&ctx, (TC_bytes){nist_iv, TC_AES_BLOCKLEN});
+  munit_assert_int(TC_AES_OFB_crypt(&ctx, (TC_buffer){buffer, sizeof(buffer)}), ==, TC_OK);
   munit_assert_memory_equal(sizeof(buffer), buffer, nist_plaintext);
 
-  TC_AES_set_iv(&ctx, nist_iv);
+  TC_AES_set_iv(&ctx, (TC_bytes){nist_iv, TC_AES_BLOCKLEN});
   memcpy(buffer, nist_plaintext, sizeof(buffer));
   offset = 0;
   for (i = 0; i < sizeof(encrypt_chunks) / sizeof(encrypt_chunks[0]); ++i) {
-    munit_assert_int(TC_AES_OFB_crypt(&ctx, buffer + offset, encrypt_chunks[i]), ==, TC_OK);
+    munit_assert_int(TC_AES_OFB_crypt(&ctx, (TC_buffer){buffer + offset, encrypt_chunks[i]}), ==,
+                     TC_OK);
     offset += encrypt_chunks[i];
   }
   munit_assert_memory_equal(sizeof(buffer), buffer, TEST_OFB_CIPHERTEXT);
 
-  TC_AES_set_iv(&ctx, nist_iv);
+  TC_AES_set_iv(&ctx, (TC_bytes){nist_iv, TC_AES_BLOCKLEN});
   offset = 0;
   for (i = 0; i < sizeof(decrypt_chunks) / sizeof(decrypt_chunks[0]); ++i) {
-    munit_assert_int(TC_AES_OFB_crypt(&ctx, buffer + offset, decrypt_chunks[i]), ==, TC_OK);
+    munit_assert_int(TC_AES_OFB_crypt(&ctx, (TC_buffer){buffer + offset, decrypt_chunks[i]}), ==,
+                     TC_OK);
     offset += decrypt_chunks[i];
   }
   munit_assert_memory_equal(sizeof(buffer), buffer, nist_plaintext);
 
-  TC_AES_set_iv(&ctx, nist_iv);
+  TC_AES_set_iv(&ctx, (TC_bytes){nist_iv, TC_AES_BLOCKLEN});
   memcpy(unaligned, nist_plaintext, sizeof(nist_plaintext));
-  munit_assert_int(TC_AES_OFB_crypt(&ctx, unaligned, 37), ==, TC_OK);
+  munit_assert_int(TC_AES_OFB_crypt(&ctx, (TC_buffer){unaligned, 37}), ==, TC_OK);
   munit_assert_memory_equal(37, unaligned, TEST_OFB_CIPHERTEXT);
 
-  TC_AES_set_iv(&ctx, nist_iv);
-  munit_assert_int(TC_AES_OFB_crypt(&ctx, unaligned, 37), ==, TC_OK);
+  TC_AES_set_iv(&ctx, (TC_bytes){nist_iv, TC_AES_BLOCKLEN});
+  munit_assert_int(TC_AES_OFB_crypt(&ctx, (TC_buffer){unaligned, 37}), ==, TC_OK);
   munit_assert_memory_equal(37, unaligned, nist_plaintext);
 
   return MUNIT_OK;
@@ -559,31 +568,32 @@ static void test_ccm_vector(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC
 
   /* SP 800-38C examples 1 and 2 use 4- and 6-byte tags. */
   const int short_tag = tag.length < TC_MIN_TAG_LEN;
-  TC_status (*const encrypt)(const uint8_t*, TC_bytes, TC_bytes, TC_bytes, TC_buffer, TC_buffer) =
+  TC_status (*const encrypt)(TC_bytes, TC_bytes, TC_bytes, TC_bytes, TC_buffer, TC_buffer) =
       short_tag ? TC_AES_CCM_encrypt_short_tag : TC_AES_CCM_encrypt;
-  TC_status (*const decrypt)(const uint8_t*, TC_bytes, TC_bytes, TC_bytes, TC_bytes, TC_buffer) =
+  TC_status (*const decrypt)(TC_bytes, TC_bytes, TC_bytes, TC_bytes, TC_bytes, TC_buffer) =
       short_tag ? TC_AES_CCM_decrypt_short_tag : TC_AES_CCM_decrypt;
 
   memcpy(buffer, plaintext.data, plaintext.length);
-  munit_assert_int(encrypt(key, nonce, aad, (TC_bytes){buffer, plaintext.length},
-                           (TC_buffer){output, plaintext.length},
-                           (TC_buffer){generated_tag, tag.length}),
-                   ==, TC_OK);
+  munit_assert_int(
+      encrypt((TC_bytes){key, TC_AES_KEYLEN}, nonce, aad, (TC_bytes){buffer, plaintext.length},
+              (TC_buffer){output, plaintext.length}, (TC_buffer){generated_tag, tag.length}),
+      ==, TC_OK);
   munit_assert_memory_equal(plaintext.length, output, ciphertext);
   munit_assert_memory_equal(tag.length, generated_tag, tag.data);
 
   memset(buffer, 0, sizeof(buffer));
-  munit_assert_int(decrypt(key, nonce, aad, (TC_bytes){output, plaintext.length}, tag,
+  munit_assert_int(decrypt((TC_bytes){key, TC_AES_KEYLEN}, nonce, aad,
+                           (TC_bytes){output, plaintext.length}, tag,
                            (TC_buffer){buffer, plaintext.length}),
                    ==, TC_OK);
   munit_assert_memory_equal(plaintext.length, buffer, plaintext.data);
 
   generated_tag[0] ^= 1;
   memset(buffer, 0xa5, sizeof(buffer));
-  munit_assert_int(decrypt(key, nonce, aad, (TC_bytes){output, plaintext.length},
-                           (TC_bytes){generated_tag, tag.length},
-                           (TC_buffer){buffer, plaintext.length}),
-                   ==, TC_MISMATCH);
+  munit_assert_int(
+      decrypt((TC_bytes){key, TC_AES_KEYLEN}, nonce, aad, (TC_bytes){output, plaintext.length},
+              (TC_bytes){generated_tag, tag.length}, (TC_buffer){buffer, plaintext.length}),
+      ==, TC_MISMATCH);
   /* A mismatch wipes the text output and leaves spare capacity alone. */
   for (size_t i = 0; i < sizeof(buffer); ++i)
     munit_assert_uint8(buffer[i], ==, i < plaintext.length ? 0 : 0xa5);
@@ -637,112 +647,121 @@ TC_TEST(test_ccm_api)
   memcpy(bad_nonce, ccm_nist_nonce1, sizeof(bad_nonce));
   memcpy(bad_tag, ccm_nist_tag1, sizeof(bad_tag));
 
-  munit_assert_int(
-      TC_AES_CCM_encrypt_short_tag(ccm_nist_key, (TC_bytes){ccm_nist_nonce1, 6},
-                                   (TC_bytes){ccm_nist_aad1, sizeof(ccm_nist_aad1)},
-                                   (TC_bytes){ccm_nist_plaintext1, sizeof(ccm_nist_plaintext1)},
-                                   (TC_buffer){ciphertext, sizeof(ccm_nist_plaintext1)},
-                                   (TC_buffer){tag, sizeof(ccm_nist_tag1)}),
-      ==, TC_ERROR);
-  munit_assert_int(
-      TC_AES_CCM_encrypt_short_tag(ccm_nist_key, (TC_bytes){ccm_nist_nonce1, 14},
-                                   (TC_bytes){ccm_nist_aad1, sizeof(ccm_nist_aad1)},
-                                   (TC_bytes){ccm_nist_plaintext1, sizeof(ccm_nist_plaintext1)},
-                                   (TC_buffer){ciphertext, sizeof(ccm_nist_plaintext1)},
-                                   (TC_buffer){tag, sizeof(ccm_nist_tag1)}),
-      ==, TC_ERROR);
+  munit_assert_int(TC_AES_CCM_encrypt_short_tag(
+                       (TC_bytes){ccm_nist_key, TC_AES_KEYLEN}, (TC_bytes){ccm_nist_nonce1, 6},
+                       (TC_bytes){ccm_nist_aad1, sizeof(ccm_nist_aad1)},
+                       (TC_bytes){ccm_nist_plaintext1, sizeof(ccm_nist_plaintext1)},
+                       (TC_buffer){ciphertext, sizeof(ccm_nist_plaintext1)},
+                       (TC_buffer){tag, sizeof(ccm_nist_tag1)}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_AES_CCM_encrypt_short_tag(
+                       (TC_bytes){ccm_nist_key, TC_AES_KEYLEN}, (TC_bytes){ccm_nist_nonce1, 14},
+                       (TC_bytes){ccm_nist_aad1, sizeof(ccm_nist_aad1)},
+                       (TC_bytes){ccm_nist_plaintext1, sizeof(ccm_nist_plaintext1)},
+                       (TC_buffer){ciphertext, sizeof(ccm_nist_plaintext1)},
+                       (TC_buffer){tag, sizeof(ccm_nist_tag1)}),
+                   ==, TC_ERROR);
   for (i = 0; i <= 18; ++i) {
     if (i == 4 || i == 6 || i == 8 || i == 10 || i == 12 || i == 14 || i == 16)
       continue;
     munit_assert_int(TC_AES_CCM_encrypt(
-                         ccm_nist_key, (TC_bytes){ccm_nist_nonce1, sizeof(ccm_nist_nonce1)},
+                         (TC_bytes){ccm_nist_key, TC_AES_KEYLEN},
+                         (TC_bytes){ccm_nist_nonce1, sizeof(ccm_nist_nonce1)},
                          (TC_bytes){ccm_nist_aad1, sizeof(ccm_nist_aad1)},
                          (TC_bytes){ccm_nist_plaintext1, sizeof(ccm_nist_plaintext1)},
                          (TC_buffer){ciphertext, sizeof(ccm_nist_plaintext1)}, (TC_buffer){tag, i}),
                      ==, TC_ERROR);
   }
 
-  munit_assert_int(TC_AES_CCM_encrypt(NULL, (TC_bytes){ccm_nist_nonce1, sizeof(ccm_nist_nonce1)},
+  munit_assert_int(TC_AES_CCM_encrypt((TC_bytes){NULL, TC_AES_KEYLEN},
+                                      (TC_bytes){ccm_nist_nonce1, sizeof(ccm_nist_nonce1)},
                                       (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0},
                                       (TC_buffer){NULL, 0}, (TC_buffer){tag, sizeof(tag)}),
                    ==, TC_ERROR);
-  munit_assert_int(TC_AES_CCM_encrypt(ccm_nist_key, (TC_bytes){NULL, sizeof(ccm_nist_nonce1)},
+  munit_assert_int(TC_AES_CCM_encrypt((TC_bytes){ccm_nist_key, TC_AES_KEYLEN},
+                                      (TC_bytes){NULL, sizeof(ccm_nist_nonce1)},
                                       (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0},
                                       (TC_buffer){NULL, 0}, (TC_buffer){tag, sizeof(tag)}),
                    ==, TC_ERROR);
-  munit_assert_int(TC_AES_CCM_encrypt(ccm_nist_key,
+  munit_assert_int(TC_AES_CCM_encrypt((TC_bytes){ccm_nist_key, TC_AES_KEYLEN},
                                       (TC_bytes){ccm_nist_nonce1, sizeof(ccm_nist_nonce1)},
                                       (TC_bytes){ccm_nist_aad1, 1}, (TC_bytes){NULL, 0},
                                       (TC_buffer){NULL, 0}, (TC_buffer){tag, sizeof(tag)}),
                    ==, TC_OK);
-  munit_assert_int(TC_AES_CCM_encrypt(ccm_nist_key,
+  munit_assert_int(TC_AES_CCM_encrypt((TC_bytes){ccm_nist_key, TC_AES_KEYLEN},
                                       (TC_bytes){ccm_nist_nonce1, sizeof(ccm_nist_nonce1)},
                                       (TC_bytes){NULL, 1}, (TC_bytes){NULL, 0},
                                       (TC_buffer){NULL, 0}, (TC_buffer){tag, sizeof(tag)}),
                    ==, TC_ERROR);
-  munit_assert_int(TC_AES_CCM_encrypt(ccm_nist_key,
+  munit_assert_int(TC_AES_CCM_encrypt((TC_bytes){ccm_nist_key, TC_AES_KEYLEN},
                                       (TC_bytes){ccm_nist_nonce1, sizeof(ccm_nist_nonce1)},
                                       (TC_bytes){NULL, 0}, (TC_bytes){&one, 1},
                                       (TC_buffer){NULL, 1}, (TC_buffer){tag, sizeof(tag)}),
                    ==, TC_ERROR);
-  munit_assert_int(TC_AES_CCM_encrypt(ccm_nist_key,
+  munit_assert_int(TC_AES_CCM_encrypt((TC_bytes){ccm_nist_key, TC_AES_KEYLEN},
                                       (TC_bytes){ccm_nist_nonce1, sizeof(ccm_nist_nonce1)},
                                       (TC_bytes){NULL, 0}, (TC_bytes){&one, 1},
                                       (TC_buffer){ciphertext, 1}, (TC_buffer){NULL, sizeof(tag)}),
                    ==, TC_ERROR);
 
   memcpy(buffer, ccm_nist_plaintext1, sizeof(ccm_nist_plaintext1));
-  munit_assert_int(TC_AES_CCM_encrypt_short_tag(
-                       ccm_nist_key, (TC_bytes){ccm_nist_nonce1, sizeof(ccm_nist_nonce1)},
-                       (TC_bytes){ccm_nist_aad1, sizeof(ccm_nist_aad1)},
-                       (TC_bytes){buffer, sizeof(ccm_nist_plaintext1)},
-                       (TC_buffer){buffer, sizeof(ccm_nist_plaintext1)},
-                       (TC_buffer){tag, sizeof(ccm_nist_tag1)}),
-                   ==, TC_OK);
+  munit_assert_int(
+      TC_AES_CCM_encrypt_short_tag((TC_bytes){ccm_nist_key, TC_AES_KEYLEN},
+                                   (TC_bytes){ccm_nist_nonce1, sizeof(ccm_nist_nonce1)},
+                                   (TC_bytes){ccm_nist_aad1, sizeof(ccm_nist_aad1)},
+                                   (TC_bytes){buffer, sizeof(ccm_nist_plaintext1)},
+                                   (TC_buffer){buffer, sizeof(ccm_nist_plaintext1)},
+                                   (TC_buffer){tag, sizeof(ccm_nist_tag1)}),
+      ==, TC_OK);
   munit_assert_memory_equal(sizeof(ccm_nist_ciphertext1), buffer, ccm_nist_ciphertext1);
   munit_assert_memory_equal(sizeof(ccm_nist_tag1), tag, ccm_nist_tag1);
-  munit_assert_int(TC_AES_CCM_decrypt_short_tag(
-                       ccm_nist_key, (TC_bytes){ccm_nist_nonce1, sizeof(ccm_nist_nonce1)},
-                       (TC_bytes){ccm_nist_aad1, sizeof(ccm_nist_aad1)},
-                       (TC_bytes){buffer, sizeof(ccm_nist_plaintext1)},
-                       (TC_bytes){tag, sizeof(ccm_nist_tag1)},
-                       (TC_buffer){buffer, sizeof(ccm_nist_plaintext1)}),
-                   ==, TC_OK);
+  munit_assert_int(
+      TC_AES_CCM_decrypt_short_tag((TC_bytes){ccm_nist_key, TC_AES_KEYLEN},
+                                   (TC_bytes){ccm_nist_nonce1, sizeof(ccm_nist_nonce1)},
+                                   (TC_bytes){ccm_nist_aad1, sizeof(ccm_nist_aad1)},
+                                   (TC_bytes){buffer, sizeof(ccm_nist_plaintext1)},
+                                   (TC_bytes){tag, sizeof(ccm_nist_tag1)},
+                                   (TC_buffer){buffer, sizeof(ccm_nist_plaintext1)}),
+      ==, TC_OK);
   munit_assert_memory_equal(sizeof(ccm_nist_plaintext1), buffer, ccm_nist_plaintext1);
 
   memcpy(ciphertext, ccm_nist_ciphertext1, sizeof(ccm_nist_ciphertext1));
   ciphertext[0] ^= 1;
   memset(buffer, 0xa5, sizeof(buffer));
-  munit_assert_int(TC_AES_CCM_decrypt_short_tag(
-                       ccm_nist_key, (TC_bytes){ccm_nist_nonce1, sizeof(ccm_nist_nonce1)},
-                       (TC_bytes){ccm_nist_aad1, sizeof(ccm_nist_aad1)},
-                       (TC_bytes){ciphertext, sizeof(ccm_nist_ciphertext1)},
-                       (TC_bytes){ccm_nist_tag1, sizeof(ccm_nist_tag1)},
-                       (TC_buffer){buffer, sizeof(ccm_nist_ciphertext1)}),
-                   ==, TC_MISMATCH);
+  munit_assert_int(
+      TC_AES_CCM_decrypt_short_tag((TC_bytes){ccm_nist_key, TC_AES_KEYLEN},
+                                   (TC_bytes){ccm_nist_nonce1, sizeof(ccm_nist_nonce1)},
+                                   (TC_bytes){ccm_nist_aad1, sizeof(ccm_nist_aad1)},
+                                   (TC_bytes){ciphertext, sizeof(ccm_nist_ciphertext1)},
+                                   (TC_bytes){ccm_nist_tag1, sizeof(ccm_nist_tag1)},
+                                   (TC_buffer){buffer, sizeof(ccm_nist_ciphertext1)}),
+      ==, TC_MISMATCH);
   for (i = 0; i < sizeof(buffer); ++i)
     munit_assert_uint8(buffer[i], ==, i < sizeof(ccm_nist_ciphertext1) ? 0 : 0xa5);
 
   bad_tag[0] ^= 1;
   memset(buffer, 0xa5, sizeof(buffer));
-  munit_assert_int(TC_AES_CCM_decrypt_short_tag(
-                       ccm_nist_key, (TC_bytes){ccm_nist_nonce1, sizeof(ccm_nist_nonce1)},
-                       (TC_bytes){ccm_nist_aad1, sizeof(ccm_nist_aad1)},
-                       (TC_bytes){ccm_nist_ciphertext1, sizeof(ccm_nist_ciphertext1)},
-                       (TC_bytes){bad_tag, sizeof(bad_tag)},
-                       (TC_buffer){buffer, sizeof(ccm_nist_ciphertext1)}),
-                   ==, TC_MISMATCH);
+  munit_assert_int(
+      TC_AES_CCM_decrypt_short_tag((TC_bytes){ccm_nist_key, TC_AES_KEYLEN},
+                                   (TC_bytes){ccm_nist_nonce1, sizeof(ccm_nist_nonce1)},
+                                   (TC_bytes){ccm_nist_aad1, sizeof(ccm_nist_aad1)},
+                                   (TC_bytes){ccm_nist_ciphertext1, sizeof(ccm_nist_ciphertext1)},
+                                   (TC_bytes){bad_tag, sizeof(bad_tag)},
+                                   (TC_buffer){buffer, sizeof(ccm_nist_ciphertext1)}),
+      ==, TC_MISMATCH);
   bad_aad[0] ^= 1;
-  munit_assert_int(TC_AES_CCM_decrypt_short_tag(
-                       ccm_nist_key, (TC_bytes){ccm_nist_nonce1, sizeof(ccm_nist_nonce1)},
-                       (TC_bytes){bad_aad, sizeof(bad_aad)},
-                       (TC_bytes){ccm_nist_ciphertext1, sizeof(ccm_nist_ciphertext1)},
-                       (TC_bytes){ccm_nist_tag1, sizeof(ccm_nist_tag1)},
-                       (TC_buffer){buffer, sizeof(ccm_nist_ciphertext1)}),
-                   ==, TC_MISMATCH);
+  munit_assert_int(
+      TC_AES_CCM_decrypt_short_tag((TC_bytes){ccm_nist_key, TC_AES_KEYLEN},
+                                   (TC_bytes){ccm_nist_nonce1, sizeof(ccm_nist_nonce1)},
+                                   (TC_bytes){bad_aad, sizeof(bad_aad)},
+                                   (TC_bytes){ccm_nist_ciphertext1, sizeof(ccm_nist_ciphertext1)},
+                                   (TC_bytes){ccm_nist_tag1, sizeof(ccm_nist_tag1)},
+                                   (TC_buffer){buffer, sizeof(ccm_nist_ciphertext1)}),
+      ==, TC_MISMATCH);
   bad_nonce[0] ^= 1;
   munit_assert_int(
-      TC_AES_CCM_decrypt_short_tag(ccm_nist_key, (TC_bytes){bad_nonce, sizeof(bad_nonce)},
+      TC_AES_CCM_decrypt_short_tag((TC_bytes){ccm_nist_key, TC_AES_KEYLEN},
+                                   (TC_bytes){bad_nonce, sizeof(bad_nonce)},
                                    (TC_bytes){ccm_nist_aad1, sizeof(ccm_nist_aad1)},
                                    (TC_bytes){ccm_nist_ciphertext1, sizeof(ccm_nist_ciphertext1)},
                                    (TC_bytes){ccm_nist_tag1, sizeof(ccm_nist_tag1)},
@@ -753,32 +772,36 @@ TC_TEST(test_ccm_api)
     large_aad[i] = (uint8_t)i;
   for (i = 0; i < 2; ++i) {
     const size_t aad_len = i == 0 ? 65279u : 65280u;
-    munit_assert_int(TC_AES_CCM_encrypt_short_tag(
-                         ccm_nist_key, (TC_bytes){ccm_nist_nonce1, sizeof(ccm_nist_nonce1)},
-                         (TC_bytes){large_aad, aad_len},
-                         (TC_bytes){ccm_nist_plaintext1, sizeof(ccm_nist_plaintext1)},
-                         (TC_buffer){ciphertext, sizeof(ccm_nist_plaintext1)},
-                         (TC_buffer){tag, sizeof(ccm_nist_tag1)}),
-                     ==, TC_OK);
-    munit_assert_int(TC_AES_CCM_decrypt_short_tag(
-                         ccm_nist_key, (TC_bytes){ccm_nist_nonce1, sizeof(ccm_nist_nonce1)},
-                         (TC_bytes){large_aad, aad_len},
-                         (TC_bytes){ciphertext, sizeof(ccm_nist_plaintext1)},
-                         (TC_bytes){tag, sizeof(ccm_nist_tag1)},
-                         (TC_buffer){buffer, sizeof(ccm_nist_plaintext1)}),
-                     ==, TC_OK);
+    munit_assert_int(
+        TC_AES_CCM_encrypt_short_tag((TC_bytes){ccm_nist_key, TC_AES_KEYLEN},
+                                     (TC_bytes){ccm_nist_nonce1, sizeof(ccm_nist_nonce1)},
+                                     (TC_bytes){large_aad, aad_len},
+                                     (TC_bytes){ccm_nist_plaintext1, sizeof(ccm_nist_plaintext1)},
+                                     (TC_buffer){ciphertext, sizeof(ccm_nist_plaintext1)},
+                                     (TC_buffer){tag, sizeof(ccm_nist_tag1)}),
+        ==, TC_OK);
+    munit_assert_int(
+        TC_AES_CCM_decrypt_short_tag((TC_bytes){ccm_nist_key, TC_AES_KEYLEN},
+                                     (TC_bytes){ccm_nist_nonce1, sizeof(ccm_nist_nonce1)},
+                                     (TC_bytes){large_aad, aad_len},
+                                     (TC_bytes){ciphertext, sizeof(ccm_nist_plaintext1)},
+                                     (TC_bytes){tag, sizeof(ccm_nist_tag1)},
+                                     (TC_buffer){buffer, sizeof(ccm_nist_plaintext1)}),
+        ==, TC_OK);
     munit_assert_memory_equal(sizeof(ccm_nist_plaintext1), buffer, ccm_nist_plaintext1);
   }
 
   memset(max_plaintext, 0x5a, sizeof(max_plaintext));
   memcpy(max_plaintext_copy, max_plaintext, sizeof(max_plaintext));
-  munit_assert_int(TC_AES_CCM_encrypt_short_tag(ccm_nist_key, (TC_bytes){nonce13, sizeof(nonce13)},
+  munit_assert_int(TC_AES_CCM_encrypt_short_tag((TC_bytes){ccm_nist_key, TC_AES_KEYLEN},
+                                                (TC_bytes){nonce13, sizeof(nonce13)},
                                                 (TC_bytes){NULL, 0},
                                                 (TC_bytes){max_plaintext, sizeof(max_plaintext)},
                                                 (TC_buffer){max_ciphertext, sizeof(max_plaintext)},
                                                 (TC_buffer){tag, sizeof(ccm_nist_tag1)}),
                    ==, TC_OK);
-  munit_assert_int(TC_AES_CCM_decrypt_short_tag(ccm_nist_key, (TC_bytes){nonce13, sizeof(nonce13)},
+  munit_assert_int(TC_AES_CCM_decrypt_short_tag((TC_bytes){ccm_nist_key, TC_AES_KEYLEN},
+                                                (TC_bytes){nonce13, sizeof(nonce13)},
                                                 (TC_bytes){NULL, 0},
                                                 (TC_bytes){max_ciphertext, sizeof(max_ciphertext)},
                                                 (TC_bytes){tag, sizeof(ccm_nist_tag1)},
@@ -786,8 +809,9 @@ TC_TEST(test_ccm_api)
                    ==, TC_OK);
   munit_assert_memory_equal(sizeof(max_plaintext), max_plaintext, max_plaintext_copy);
   munit_assert_int(
-      TC_AES_CCM_encrypt_short_tag(ccm_nist_key, (TC_bytes){nonce13, sizeof(nonce13)},
-                                   (TC_bytes){NULL, 0}, (TC_bytes){&one, sizeof(max_plaintext) + 1},
+      TC_AES_CCM_encrypt_short_tag((TC_bytes){ccm_nist_key, TC_AES_KEYLEN},
+                                   (TC_bytes){nonce13, sizeof(nonce13)}, (TC_bytes){NULL, 0},
+                                   (TC_bytes){&one, sizeof(max_plaintext) + 1},
                                    (TC_buffer){max_ciphertext, sizeof(max_plaintext) + 1},
                                    (TC_buffer){tag, sizeof(ccm_nist_tag1)}),
       ==, TC_ERROR);
@@ -796,10 +820,10 @@ TC_TEST(test_ccm_api)
     const uint64_t maximum = q == sizeof(uint64_t) ? UINT64_MAX : ((UINT64_C(1) << (8u * q)) - 1u);
     if (maximum < (uint64_t)SIZE_MAX) {
       const size_t over = (size_t)(maximum + 1u);
-      munit_assert_int(TC_AES_CCM_encrypt_short_tag(ccm_nist_key, (TC_bytes){nonce13, i},
-                                                    (TC_bytes){NULL, 0}, (TC_bytes){&one, over},
-                                                    (TC_buffer){ciphertext, over},
-                                                    (TC_buffer){tag, sizeof(ccm_nist_tag1)}),
+      munit_assert_int(TC_AES_CCM_encrypt_short_tag(
+                           (TC_bytes){ccm_nist_key, TC_AES_KEYLEN}, (TC_bytes){nonce13, i},
+                           (TC_bytes){NULL, 0}, (TC_bytes){&one, over},
+                           (TC_buffer){ciphertext, over}, (TC_buffer){tag, sizeof(ccm_nist_tag1)}),
                        ==, TC_ERROR);
     }
   }
@@ -826,28 +850,30 @@ TC_TEST(test_ccm_tag_policy)
   /* Default entry: the largest length below the minimum is rejected. */
   memset(output, 0xa5, sizeof(output));
   memset(tag, 0xa5, sizeof(tag));
-  munit_assert_int(TC_AES_CCM_encrypt(ccm_nist_key, nonce, aad, plaintext,
-                                      (TC_buffer){output, sizeof(output)},
+  munit_assert_int(TC_AES_CCM_encrypt((TC_bytes){ccm_nist_key, TC_AES_KEYLEN}, nonce, aad,
+                                      plaintext, (TC_buffer){output, sizeof(output)},
                                       (TC_buffer){tag, short_max}),
                    ==, TC_ERROR);
   munit_assert_true(tc_test_all_value(output, sizeof(output), 0xa5));
   munit_assert_true(tc_test_all_value(tag, sizeof(tag), 0xa5));
   munit_assert_int(
-      TC_AES_CCM_decrypt(
-          ccm_nist_key, nonce, aad, (TC_bytes){ccm_nist_ciphertext1, sizeof(ccm_nist_ciphertext1)},
-          (TC_bytes){ccm_nist_tag1, sizeof(ccm_nist_tag1)}, (TC_buffer){output, sizeof(output)}),
+      TC_AES_CCM_decrypt((TC_bytes){ccm_nist_key, TC_AES_KEYLEN}, nonce, aad,
+                         (TC_bytes){ccm_nist_ciphertext1, sizeof(ccm_nist_ciphertext1)},
+                         (TC_bytes){ccm_nist_tag1, sizeof(ccm_nist_tag1)},
+                         (TC_buffer){output, sizeof(output)}),
       ==, TC_ERROR);
   munit_assert_true(tc_test_all_value(output, sizeof(output), 0xa5));
 
   /* Default entry: the minimum round-trips. */
-  munit_assert_int(TC_AES_CCM_encrypt(ccm_nist_key, nonce, aad, plaintext,
-                                      (TC_buffer){ciphertext, sizeof(ciphertext)},
+  munit_assert_int(TC_AES_CCM_encrypt((TC_bytes){ccm_nist_key, TC_AES_KEYLEN}, nonce, aad,
+                                      plaintext, (TC_buffer){ciphertext, sizeof(ciphertext)},
                                       (TC_buffer){full, default_min}),
                    ==, TC_OK);
-  munit_assert_int(
-      TC_AES_CCM_decrypt(ccm_nist_key, nonce, aad, (TC_bytes){ciphertext, sizeof(ciphertext)},
-                         (TC_bytes){full, default_min}, (TC_buffer){output, sizeof(output)}),
-      ==, TC_OK);
+  munit_assert_int(TC_AES_CCM_decrypt((TC_bytes){ccm_nist_key, TC_AES_KEYLEN}, nonce, aad,
+                                      (TC_bytes){ciphertext, sizeof(ciphertext)},
+                                      (TC_bytes){full, default_min},
+                                      (TC_buffer){output, sizeof(output)}),
+                   ==, TC_OK);
   munit_assert_memory_equal(sizeof(output), output, ccm_nist_plaintext1);
 
   /* Short-tag entry: only valid CCM lengths below the minimum. */
@@ -856,44 +882,47 @@ TC_TEST(test_ccm_tag_policy)
   for (length = 0; length <= 17; ++length) {
     if (length >= 4 && length <= short_max && length % 2 == 0)
       continue;
-    munit_assert_int(TC_AES_CCM_encrypt_short_tag(ccm_nist_key, nonce, aad, plaintext,
-                                                  (TC_buffer){output, sizeof(output)},
-                                                  (TC_buffer){tag, length}),
-                     ==, TC_ERROR);
+    munit_assert_int(
+        TC_AES_CCM_encrypt_short_tag((TC_bytes){ccm_nist_key, TC_AES_KEYLEN}, nonce, aad, plaintext,
+                                     (TC_buffer){output, sizeof(output)}, (TC_buffer){tag, length}),
+        ==, TC_ERROR);
   }
-  munit_assert_int(TC_AES_CCM_decrypt_short_tag(
-                       ccm_nist_key, nonce, aad, (TC_bytes){ciphertext, sizeof(ciphertext)},
-                       (TC_bytes){full, default_min}, (TC_buffer){output, sizeof(output)}),
+  munit_assert_int(TC_AES_CCM_decrypt_short_tag((TC_bytes){ccm_nist_key, TC_AES_KEYLEN}, nonce, aad,
+                                                (TC_bytes){ciphertext, sizeof(ciphertext)},
+                                                (TC_bytes){full, default_min},
+                                                (TC_buffer){output, sizeof(output)}),
                    ==, TC_ERROR);
-  munit_assert_int(TC_AES_CCM_decrypt_short_tag(
-                       ccm_nist_key, nonce, aad, (TC_bytes){ciphertext, sizeof(ciphertext)},
-                       (TC_bytes){NULL, 4}, (TC_buffer){output, sizeof(output)}),
+  munit_assert_int(TC_AES_CCM_decrypt_short_tag((TC_bytes){ccm_nist_key, TC_AES_KEYLEN}, nonce, aad,
+                                                (TC_bytes){ciphertext, sizeof(ciphertext)},
+                                                (TC_bytes){NULL, 4},
+                                                (TC_buffer){output, sizeof(output)}),
                    ==, TC_ERROR);
   munit_assert_true(tc_test_all_value(output, sizeof(output), 0xa5));
   munit_assert_true(tc_test_all_value(tag, sizeof(tag), 0xa5));
 
   /* Short-tag entry: 4 bytes reproduce SP 800-38C example 1, and the
    * largest short length round-trips. */
-  munit_assert_int(TC_AES_CCM_encrypt_short_tag(ccm_nist_key, nonce, aad, plaintext,
-                                                (TC_buffer){output, sizeof(output)},
+  munit_assert_int(TC_AES_CCM_encrypt_short_tag((TC_bytes){ccm_nist_key, TC_AES_KEYLEN}, nonce, aad,
+                                                plaintext, (TC_buffer){output, sizeof(output)},
                                                 (TC_buffer){tag, 4}),
                    ==, TC_OK);
   munit_assert_memory_equal(sizeof(ccm_nist_ciphertext1), output, ccm_nist_ciphertext1);
   munit_assert_memory_equal(sizeof(ccm_nist_tag1), tag, ccm_nist_tag1);
-  munit_assert_int(TC_AES_CCM_encrypt_short_tag(ccm_nist_key, nonce, aad, plaintext,
-                                                (TC_buffer){output, sizeof(output)},
+  munit_assert_int(TC_AES_CCM_encrypt_short_tag((TC_bytes){ccm_nist_key, TC_AES_KEYLEN}, nonce, aad,
+                                                plaintext, (TC_buffer){output, sizeof(output)},
                                                 (TC_buffer){tag, short_max}),
                    ==, TC_OK);
-  munit_assert_int(
-      TC_AES_CCM_decrypt_short_tag(ccm_nist_key, nonce, aad, (TC_bytes){output, sizeof(output)},
-                                   (TC_bytes){tag, short_max}, (TC_buffer){output, sizeof(output)}),
-      ==, TC_OK);
+  munit_assert_int(TC_AES_CCM_decrypt_short_tag((TC_bytes){ccm_nist_key, TC_AES_KEYLEN}, nonce, aad,
+                                                (TC_bytes){output, sizeof(output)},
+                                                (TC_bytes){tag, short_max},
+                                                (TC_buffer){output, sizeof(output)}),
+                   ==, TC_OK);
   munit_assert_memory_equal(sizeof(output), output, ccm_nist_plaintext1);
 
   /* A short-tag mismatch wipes the output. */
   tag[0] ^= 0x01u;
   munit_assert_int(
-      TC_AES_CCM_decrypt_short_tag(ccm_nist_key, nonce, aad,
+      TC_AES_CCM_decrypt_short_tag((TC_bytes){ccm_nist_key, TC_AES_KEYLEN}, nonce, aad,
                                    (TC_bytes){ccm_nist_ciphertext1, sizeof(ccm_nist_ciphertext1)},
                                    (TC_bytes){tag, short_max}, (TC_buffer){output, sizeof(output)}),
       ==, TC_MISMATCH);
@@ -917,22 +946,26 @@ TC_TEST(test_gcm)
   test_initialize_sbox();
   memset(&ctx, 0, sizeof ctx);
   memcpy(buffer, vector->plaintext, vector->length);
-  munit_assert_int(TC_AES_GCM_encrypt_update(&ctx, buffer, vector->length), ==, TC_ERROR);
-  munit_assert_int(TC_AES_GCM_encrypt_finish(&ctx, tag), ==, TC_ERROR);
+  munit_assert_int(TC_AES_GCM_encrypt_update(&ctx, (TC_buffer){buffer, vector->length}), ==,
+                   TC_ERROR);
+  munit_assert_int(TC_AES_GCM_encrypt_finish(&ctx, (TC_buffer){tag, sizeof tag}), ==, TC_ERROR);
   munit_assert_memory_equal(vector->length, buffer, vector->plaintext);
-  munit_assert_int(TC_AES_GCM_init(&ctx, vector->key, (TC_bytes){vector->iv, 0}, vector->tag_len),
+  munit_assert_int(TC_AES_GCM_init(&ctx, (TC_bytes){vector->key, TC_AES_KEYLEN},
+                                   (TC_bytes){vector->iv, 0}, vector->tag_len),
                    ==, TC_ERROR);
-  munit_assert_int(TC_AES_GCM_encrypt_finish(&ctx, tag), ==, TC_ERROR);
+  munit_assert_int(TC_AES_GCM_encrypt_finish(&ctx, (TC_buffer){tag, sizeof tag}), ==, TC_ERROR);
 
   memcpy(buffer, vector->plaintext, vector->length);
-  munit_assert_int(
-      TC_AES_GCM_init(&ctx, vector->key, (TC_bytes){vector->iv, vector->iv_len}, vector->tag_len),
-      ==, TC_OK);
-  munit_assert_int(TC_AES_GCM_aad_update(&ctx, vector->aad, 5), ==, TC_OK);
-  munit_assert_int(TC_AES_GCM_aad_update(&ctx, vector->aad + 5, vector->aad_len - 5), ==, TC_OK);
-  munit_assert_int(TC_AES_GCM_encrypt_update(&ctx, buffer, 3), ==, TC_OK);
-  munit_assert_int(TC_AES_GCM_encrypt_update(&ctx, buffer + 3, vector->length - 3), ==, TC_OK);
-  munit_assert_int(TC_AES_GCM_encrypt_finish(&ctx, tag), ==, TC_OK);
+  munit_assert_int(TC_AES_GCM_init(&ctx, (TC_bytes){vector->key, TC_AES_KEYLEN},
+                                   (TC_bytes){vector->iv, vector->iv_len}, vector->tag_len),
+                   ==, TC_OK);
+  munit_assert_int(TC_AES_GCM_aad_update(&ctx, (TC_bytes){vector->aad, 5}), ==, TC_OK);
+  munit_assert_int(TC_AES_GCM_aad_update(&ctx, (TC_bytes){vector->aad + 5, vector->aad_len - 5}),
+                   ==, TC_OK);
+  munit_assert_int(TC_AES_GCM_encrypt_update(&ctx, (TC_buffer){buffer, 3}), ==, TC_OK);
+  munit_assert_int(TC_AES_GCM_encrypt_update(&ctx, (TC_buffer){buffer + 3, vector->length - 3}), ==,
+                   TC_OK);
+  munit_assert_int(TC_AES_GCM_encrypt_finish(&ctx, (TC_buffer){tag, sizeof tag}), ==, TC_OK);
   munit_assert_memory_equal(vector->length, buffer, vector->ciphertext);
   munit_assert_memory_equal(vector->tag_len, tag, vector->tag);
   /* Finish consumes the context and wipes its key-dependent state. */
@@ -943,54 +976,63 @@ TC_TEST(test_gcm)
     munit_assert_memory_equal(sizeof zero_block, ctx.h, zero_block);
     munit_assert_memory_equal(sizeof zero_block, ctx.s, zero_block);
   }
-  munit_assert_int(TC_AES_GCM_encrypt_finish(&ctx, tag), ==, TC_ERROR);
-  munit_assert_int(TC_AES_GCM_encrypt_update(&ctx, buffer, 1), ==, TC_ERROR);
-  munit_assert_int(TC_AES_GCM_aad_update(&ctx, vector->aad, 1), ==, TC_ERROR);
+  munit_assert_int(TC_AES_GCM_encrypt_finish(&ctx, (TC_buffer){tag, sizeof tag}), ==, TC_ERROR);
+  munit_assert_int(TC_AES_GCM_encrypt_update(&ctx, (TC_buffer){buffer, 1}), ==, TC_ERROR);
+  munit_assert_int(TC_AES_GCM_aad_update(&ctx, (TC_bytes){vector->aad, 1}), ==, TC_ERROR);
 
   /* Fixed t=4 for this key/context. MSBt of the 128-bit tag. */
-  munit_assert_int(
-      TC_AES_GCM_init_short_tag(&ctx, vector->key, (TC_bytes){vector->iv, vector->iv_len}, 4), ==,
-      TC_OK);
-  munit_assert_int(TC_AES_GCM_aad_update(&ctx, vector->aad, vector->aad_len), ==, TC_OK);
-  memcpy(buffer, vector->plaintext, vector->length);
-  munit_assert_int(TC_AES_GCM_encrypt_update(&ctx, buffer, vector->length), ==, TC_OK);
-  munit_assert_int(TC_AES_GCM_encrypt_finish(&ctx, short_tag), ==, TC_OK);
-  munit_assert_memory_equal(sizeof(short_tag), short_tag, vector->tag);
-  munit_assert_int(TC_AES_GCM_init(&ctx, vector->key, (TC_bytes){vector->iv, vector->iv_len}, 4),
-                   ==, TC_ERROR);
-  munit_assert_int(TC_AES_GCM_encrypt(vector->key, (TC_bytes){vector->iv, vector->iv_len},
-                                      (TC_bytes){vector->aad, vector->aad_len},
-                                      (TC_bytes){vector->plaintext, vector->length},
-                                      (TC_buffer){buffer, vector->length},
-                                      (TC_buffer){short_tag, 4}),
-                   ==, TC_ERROR);
-  munit_assert_int(TC_AES_GCM_encrypt_short_tag(vector->key, (TC_bytes){vector->iv, vector->iv_len},
-                                                (TC_bytes){vector->aad, vector->aad_len},
-                                                (TC_bytes){vector->plaintext, vector->length},
-                                                (TC_buffer){buffer, vector->length},
-                                                (TC_buffer){short_tag, 4}),
+  munit_assert_int(TC_AES_GCM_init_short_tag(&ctx, (TC_bytes){vector->key, TC_AES_KEYLEN},
+                                             (TC_bytes){vector->iv, vector->iv_len}, 4),
                    ==, TC_OK);
+  munit_assert_int(TC_AES_GCM_aad_update(&ctx, (TC_bytes){vector->aad, vector->aad_len}), ==,
+                   TC_OK);
+  memcpy(buffer, vector->plaintext, vector->length);
+  munit_assert_int(TC_AES_GCM_encrypt_update(&ctx, (TC_buffer){buffer, vector->length}), ==, TC_OK);
+  munit_assert_int(TC_AES_GCM_encrypt_finish(&ctx, (TC_buffer){short_tag, sizeof short_tag}), ==,
+                   TC_OK);
+  munit_assert_memory_equal(sizeof(short_tag), short_tag, vector->tag);
+  munit_assert_int(TC_AES_GCM_init(&ctx, (TC_bytes){vector->key, TC_AES_KEYLEN},
+                                   (TC_bytes){vector->iv, vector->iv_len}, 4),
+                   ==, TC_ERROR);
+  munit_assert_int(
+      TC_AES_GCM_encrypt(
+          (TC_bytes){vector->key, TC_AES_KEYLEN}, (TC_bytes){vector->iv, vector->iv_len},
+          (TC_bytes){vector->aad, vector->aad_len}, (TC_bytes){vector->plaintext, vector->length},
+          (TC_buffer){buffer, vector->length}, (TC_buffer){short_tag, 4}),
+      ==, TC_ERROR);
+  munit_assert_int(
+      TC_AES_GCM_encrypt_short_tag(
+          (TC_bytes){vector->key, TC_AES_KEYLEN}, (TC_bytes){vector->iv, vector->iv_len},
+          (TC_bytes){vector->aad, vector->aad_len}, (TC_bytes){vector->plaintext, vector->length},
+          (TC_buffer){buffer, vector->length}, (TC_buffer){short_tag, 4}),
+      ==, TC_OK);
   munit_assert_memory_equal(vector->length, buffer, vector->ciphertext);
-  munit_assert_int(TC_AES_GCM_decrypt(vector->key, (TC_bytes){vector->iv, vector->iv_len},
+  munit_assert_int(TC_AES_GCM_decrypt((TC_bytes){vector->key, TC_AES_KEYLEN},
+                                      (TC_bytes){vector->iv, vector->iv_len},
                                       (TC_bytes){vector->aad, vector->aad_len},
                                       (TC_bytes){buffer, vector->length}, (TC_bytes){short_tag, 4},
                                       (TC_buffer){buffer, vector->length}),
                    ==, TC_ERROR);
   munit_assert_int(TC_AES_GCM_decrypt_short_tag(
-                       vector->key, (TC_bytes){vector->iv, vector->iv_len},
+                       (TC_bytes){vector->key, TC_AES_KEYLEN},
+                       (TC_bytes){vector->iv, vector->iv_len},
                        (TC_bytes){vector->aad, vector->aad_len}, (TC_bytes){buffer, vector->length},
                        (TC_bytes){short_tag, 4}, (TC_buffer){buffer, vector->length}),
                    ==, TC_OK);
   munit_assert_memory_equal(vector->length, buffer, vector->plaintext);
 
   /* Reject invalid tag lengths at init (SP 800-38D). */
-  munit_assert_int(TC_AES_GCM_init(&ctx, vector->key, (TC_bytes){vector->iv, vector->iv_len}, 0),
+  munit_assert_int(TC_AES_GCM_init(&ctx, (TC_bytes){vector->key, TC_AES_KEYLEN},
+                                   (TC_bytes){vector->iv, vector->iv_len}, 0),
                    ==, TC_ERROR);
-  munit_assert_int(TC_AES_GCM_init(&ctx, vector->key, (TC_bytes){vector->iv, vector->iv_len}, 5),
+  munit_assert_int(TC_AES_GCM_init(&ctx, (TC_bytes){vector->key, TC_AES_KEYLEN},
+                                   (TC_bytes){vector->iv, vector->iv_len}, 5),
                    ==, TC_ERROR);
-  munit_assert_int(TC_AES_GCM_init(&ctx, vector->key, (TC_bytes){vector->iv, vector->iv_len}, 4),
+  munit_assert_int(TC_AES_GCM_init(&ctx, (TC_bytes){vector->key, TC_AES_KEYLEN},
+                                   (TC_bytes){vector->iv, vector->iv_len}, 4),
                    ==, TC_ERROR);
-  munit_assert_int(TC_AES_GCM_init(&ctx, vector->key, (TC_bytes){vector->iv, vector->iv_len}, 17),
+  munit_assert_int(TC_AES_GCM_init(&ctx, (TC_bytes){vector->key, TC_AES_KEYLEN},
+                                   (TC_bytes){vector->iv, vector->iv_len}, 17),
                    ==, TC_ERROR);
 
   return MUNIT_OK;
@@ -1006,12 +1048,13 @@ TC_TEST(test_gcm_non96_iv)
 
   test_initialize_sbox();
   memcpy(buffer, vector->plaintext, vector->length);
-  munit_assert_int(
-      TC_AES_GCM_init(&ctx, vector->key, (TC_bytes){vector->iv, vector->iv_len}, vector->tag_len),
-      ==, TC_OK);
-  munit_assert_int(TC_AES_GCM_aad_update(&ctx, vector->aad, vector->aad_len), ==, TC_OK);
-  munit_assert_int(TC_AES_GCM_encrypt_update(&ctx, buffer, vector->length), ==, TC_OK);
-  munit_assert_int(TC_AES_GCM_encrypt_finish(&ctx, tag), ==, TC_OK);
+  munit_assert_int(TC_AES_GCM_init(&ctx, (TC_bytes){vector->key, TC_AES_KEYLEN},
+                                   (TC_bytes){vector->iv, vector->iv_len}, vector->tag_len),
+                   ==, TC_OK);
+  munit_assert_int(TC_AES_GCM_aad_update(&ctx, (TC_bytes){vector->aad, vector->aad_len}), ==,
+                   TC_OK);
+  munit_assert_int(TC_AES_GCM_encrypt_update(&ctx, (TC_buffer){buffer, vector->length}), ==, TC_OK);
+  munit_assert_int(TC_AES_GCM_encrypt_finish(&ctx, (TC_buffer){tag, sizeof tag}), ==, TC_OK);
   munit_assert_memory_equal(vector->length, buffer, vector->ciphertext);
   munit_assert_memory_equal(vector->tag_len, tag, vector->tag);
 
@@ -1033,56 +1076,56 @@ TC_TEST(test_gcm_oneshot)
   test_initialize_sbox();
   munit_assert_size(vector->length, <=, sizeof(ciphertext));
 
-  munit_assert_int(TC_AES_GCM_encrypt(vector->key, (TC_bytes){vector->iv, vector->iv_len},
-                                      (TC_bytes){vector->aad, vector->aad_len},
-                                      (TC_bytes){vector->plaintext, vector->length},
-                                      (TC_buffer){ciphertext, vector->length},
-                                      (TC_buffer){tag, vector->tag_len}),
-                   ==, TC_OK);
+  munit_assert_int(
+      TC_AES_GCM_encrypt(
+          (TC_bytes){vector->key, TC_AES_KEYLEN}, (TC_bytes){vector->iv, vector->iv_len},
+          (TC_bytes){vector->aad, vector->aad_len}, (TC_bytes){vector->plaintext, vector->length},
+          (TC_buffer){ciphertext, vector->length}, (TC_buffer){tag, vector->tag_len}),
+      ==, TC_OK);
   munit_assert_memory_equal(vector->length, ciphertext, vector->ciphertext);
   munit_assert_memory_equal(vector->tag_len, tag, vector->tag);
 
   memset(plaintext, 0xa5, sizeof(plaintext));
-  munit_assert_int(TC_AES_GCM_decrypt(vector->key, (TC_bytes){vector->iv, vector->iv_len},
-                                      (TC_bytes){vector->aad, vector->aad_len},
-                                      (TC_bytes){ciphertext, vector->length},
-                                      (TC_bytes){tag, vector->tag_len},
-                                      (TC_buffer){plaintext, vector->length}),
-                   ==, TC_OK);
+  munit_assert_int(
+      TC_AES_GCM_decrypt(
+          (TC_bytes){vector->key, TC_AES_KEYLEN}, (TC_bytes){vector->iv, vector->iv_len},
+          (TC_bytes){vector->aad, vector->aad_len}, (TC_bytes){ciphertext, vector->length},
+          (TC_bytes){tag, vector->tag_len}, (TC_buffer){plaintext, vector->length}),
+      ==, TC_OK);
   munit_assert_memory_equal(vector->length, plaintext, vector->plaintext);
 
   /* A bad tag wipes a separate plaintext output. */
   memcpy(bad_tag, tag, vector->tag_len);
   bad_tag[0] ^= 1u;
   memset(poison, 0x3c, sizeof(poison));
-  munit_assert_int(TC_AES_GCM_decrypt(vector->key, (TC_bytes){vector->iv, vector->iv_len},
-                                      (TC_bytes){vector->aad, vector->aad_len},
-                                      (TC_bytes){ciphertext, vector->length},
-                                      (TC_bytes){bad_tag, vector->tag_len},
-                                      (TC_buffer){poison, vector->length}),
-                   ==, TC_MISMATCH);
+  munit_assert_int(
+      TC_AES_GCM_decrypt(
+          (TC_bytes){vector->key, TC_AES_KEYLEN}, (TC_bytes){vector->iv, vector->iv_len},
+          (TC_bytes){vector->aad, vector->aad_len}, (TC_bytes){ciphertext, vector->length},
+          (TC_bytes){bad_tag, vector->tag_len}, (TC_buffer){poison, vector->length}),
+      ==, TC_MISMATCH);
   for (i = 0; i < vector->length; ++i)
     munit_assert_uint8(poison[i], ==, 0);
 
   /* In-place decrypt with bad tag zeros the shared buffer. */
   memcpy(ciphertext, vector->ciphertext, vector->length);
-  munit_assert_int(TC_AES_GCM_decrypt(vector->key, (TC_bytes){vector->iv, vector->iv_len},
-                                      (TC_bytes){vector->aad, vector->aad_len},
-                                      (TC_bytes){ciphertext, vector->length},
-                                      (TC_bytes){bad_tag, vector->tag_len},
-                                      (TC_buffer){ciphertext, vector->length}),
-                   ==, TC_MISMATCH);
+  munit_assert_int(
+      TC_AES_GCM_decrypt(
+          (TC_bytes){vector->key, TC_AES_KEYLEN}, (TC_bytes){vector->iv, vector->iv_len},
+          (TC_bytes){vector->aad, vector->aad_len}, (TC_bytes){ciphertext, vector->length},
+          (TC_bytes){bad_tag, vector->tag_len}, (TC_buffer){ciphertext, vector->length}),
+      ==, TC_MISMATCH);
   for (i = 0; i < vector->length; ++i)
     munit_assert_uint8(ciphertext[i], ==, 0);
 
   /* Partial overlap is rejected before any write. */
   memcpy(overlap, vector->plaintext, vector->length);
-  munit_assert_int(TC_AES_GCM_encrypt(vector->key, (TC_bytes){vector->iv, vector->iv_len},
-                                      (TC_bytes){vector->aad, vector->aad_len},
-                                      (TC_bytes){overlap, vector->length},
-                                      (TC_buffer){overlap + 1, vector->length},
-                                      (TC_buffer){tag, vector->tag_len}),
-                   ==, TC_ERROR);
+  munit_assert_int(
+      TC_AES_GCM_encrypt(
+          (TC_bytes){vector->key, TC_AES_KEYLEN}, (TC_bytes){vector->iv, vector->iv_len},
+          (TC_bytes){vector->aad, vector->aad_len}, (TC_bytes){overlap, vector->length},
+          (TC_buffer){overlap + 1, vector->length}, (TC_buffer){tag, vector->tag_len}),
+      ==, TC_ERROR);
   munit_assert_memory_equal(vector->length, overlap, vector->plaintext);
 
   return MUNIT_OK;
@@ -1107,18 +1150,20 @@ TC_TEST(test_gcm_multi_key)
   munit_assert_size(va->length, <=, sizeof(buf_a));
 
   memcpy(buf_a, va->plaintext, va->length);
-  munit_assert_int(TC_AES_GCM_init(&ctx_a, va->key, (TC_bytes){va->iv, va->iv_len}, va->tag_len),
+  munit_assert_int(TC_AES_GCM_init(&ctx_a, (TC_bytes){va->key, TC_AES_KEYLEN},
+                                   (TC_bytes){va->iv, va->iv_len}, va->tag_len),
                    ==, TC_OK);
-  munit_assert_int(TC_AES_GCM_aad_update(&ctx_a, va->aad, va->aad_len), ==, TC_OK);
-  munit_assert_int(TC_AES_GCM_encrypt_update(&ctx_a, buf_a, va->length), ==, TC_OK);
-  munit_assert_int(TC_AES_GCM_encrypt_finish(&ctx_a, tag_a), ==, TC_OK);
+  munit_assert_int(TC_AES_GCM_aad_update(&ctx_a, (TC_bytes){va->aad, va->aad_len}), ==, TC_OK);
+  munit_assert_int(TC_AES_GCM_encrypt_update(&ctx_a, (TC_buffer){buf_a, va->length}), ==, TC_OK);
+  munit_assert_int(TC_AES_GCM_encrypt_finish(&ctx_a, (TC_buffer){tag_a, sizeof tag_a}), ==, TC_OK);
 
   memcpy(buf_b, va->plaintext, va->length);
-  munit_assert_int(TC_AES_GCM_init(&ctx_b, key_b, (TC_bytes){va->iv, va->iv_len}, va->tag_len), ==,
-                   TC_OK);
-  munit_assert_int(TC_AES_GCM_aad_update(&ctx_b, va->aad, va->aad_len), ==, TC_OK);
-  munit_assert_int(TC_AES_GCM_encrypt_update(&ctx_b, buf_b, va->length), ==, TC_OK);
-  munit_assert_int(TC_AES_GCM_encrypt_finish(&ctx_b, tag_b), ==, TC_OK);
+  munit_assert_int(TC_AES_GCM_init(&ctx_b, (TC_bytes){key_b, sizeof key_b},
+                                   (TC_bytes){va->iv, va->iv_len}, va->tag_len),
+                   ==, TC_OK);
+  munit_assert_int(TC_AES_GCM_aad_update(&ctx_b, (TC_bytes){va->aad, va->aad_len}), ==, TC_OK);
+  munit_assert_int(TC_AES_GCM_encrypt_update(&ctx_b, (TC_buffer){buf_b, va->length}), ==, TC_OK);
+  munit_assert_int(TC_AES_GCM_encrypt_finish(&ctx_b, (TC_buffer){tag_b, sizeof tag_b}), ==, TC_OK);
 
   /* Different keys must not produce the same ciphertext/tag as the vector. */
   munit_assert_memory_equal(va->length, buf_a, va->ciphertext);
@@ -1127,18 +1172,19 @@ TC_TEST(test_gcm_multi_key)
 
   /* Context A remains valid after B was initialized with another key. */
   memcpy(expect_b, buf_b, va->length);
-  munit_assert_int(TC_AES_GCM_init(&ctx_a, va->key, (TC_bytes){va->iv, va->iv_len}, va->tag_len),
+  munit_assert_int(TC_AES_GCM_init(&ctx_a, (TC_bytes){va->key, TC_AES_KEYLEN},
+                                   (TC_bytes){va->iv, va->iv_len}, va->tag_len),
                    ==, TC_OK);
-  munit_assert_int(TC_AES_GCM_aad_update(&ctx_a, va->aad, va->aad_len), ==, TC_OK);
+  munit_assert_int(TC_AES_GCM_aad_update(&ctx_a, (TC_bytes){va->aad, va->aad_len}), ==, TC_OK);
   memcpy(buf_a, va->plaintext, va->length);
-  munit_assert_int(TC_AES_GCM_encrypt_update(&ctx_a, buf_a, va->length), ==, TC_OK);
-  munit_assert_int(TC_AES_GCM_encrypt_finish(&ctx_a, tag_a), ==, TC_OK);
+  munit_assert_int(TC_AES_GCM_encrypt_update(&ctx_a, (TC_buffer){buf_a, va->length}), ==, TC_OK);
+  munit_assert_int(TC_AES_GCM_encrypt_finish(&ctx_a, (TC_buffer){tag_a, sizeof tag_a}), ==, TC_OK);
   munit_assert_memory_equal(va->length, buf_a, va->ciphertext);
-  munit_assert_int(TC_AES_GCM_decrypt(va->key, (TC_bytes){va->iv, va->iv_len},
-                                      (TC_bytes){va->aad, va->aad_len},
-                                      (TC_bytes){buf_a, va->length}, (TC_bytes){tag_a, va->tag_len},
-                                      (TC_buffer){buf_a, va->length}),
-                   ==, TC_OK);
+  munit_assert_int(
+      TC_AES_GCM_decrypt((TC_bytes){va->key, TC_AES_KEYLEN}, (TC_bytes){va->iv, va->iv_len},
+                         (TC_bytes){va->aad, va->aad_len}, (TC_bytes){buf_a, va->length},
+                         (TC_bytes){tag_a, va->tag_len}, (TC_buffer){buf_a, va->length}),
+      ==, TC_OK);
   munit_assert_memory_equal(va->length, buf_a, va->plaintext);
   munit_assert_memory_equal(va->length, buf_b, expect_b);
 
@@ -1167,30 +1213,44 @@ TC_TEST(test_aead_output_capacity)
   memset(output, 0x5a, sizeof output);
   memset(tag, 0x5a, sizeof tag);
 #if TC_AES_ENABLE_GCM
-  munit_assert_int(TC_AES_GCM_encrypt(key, iv, aad, input, small, (TC_buffer){tag, 16}), ==,
-                   TC_ERROR);
-  munit_assert_int(TC_AES_GCM_decrypt(key, iv, aad, input, (TC_bytes){tag_in, 16}, small), ==,
-                   TC_ERROR);
+  munit_assert_int(TC_AES_GCM_encrypt((TC_bytes){key, TC_AES_KEYLEN}, iv, aad, input, small,
+                                      (TC_buffer){tag, 16}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_AES_GCM_decrypt((TC_bytes){key, TC_AES_KEYLEN}, iv, aad, input,
+                                      (TC_bytes){tag_in, 16}, small),
+                   ==, TC_ERROR);
 #endif
 #if TC_AES_ENABLE_CCM
-  munit_assert_int(TC_AES_CCM_encrypt(key, iv, aad, input, small, (TC_buffer){tag, 16}), ==,
-                   TC_ERROR);
-  munit_assert_int(TC_AES_CCM_decrypt(key, iv, aad, input, (TC_bytes){tag_in, 16}, small), ==,
-                   TC_ERROR);
+  munit_assert_int(TC_AES_CCM_encrypt((TC_bytes){key, TC_AES_KEYLEN}, iv, aad, input, small,
+                                      (TC_buffer){tag, 16}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_AES_CCM_decrypt((TC_bytes){key, TC_AES_KEYLEN}, iv, aad, input,
+                                      (TC_bytes){tag_in, 16}, small),
+                   ==, TC_ERROR);
 #endif
 #if TC_AES_ENABLE_EAX
-  munit_assert_int(TC_AES_EAX_encrypt(key, iv, aad, input, small, (TC_buffer){tag, 16}), ==,
-                   TC_ERROR);
-  munit_assert_int(TC_AES_EAX_decrypt(key, iv, aad, input, (TC_bytes){tag_in, 16}, small), ==,
-                   TC_ERROR);
+  munit_assert_int(TC_AES_EAX_encrypt((TC_bytes){key, TC_AES_KEYLEN}, iv, aad, input, small,
+                                      (TC_buffer){tag, 16}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_AES_EAX_decrypt((TC_bytes){key, TC_AES_KEYLEN}, iv, aad, input,
+                                      (TC_bytes){tag_in, 16}, small),
+                   ==, TC_ERROR);
 #endif
 #if TC_AES_ENABLE_EAX_PRIME
-  munit_assert_int(TC_AES_EAX_PRIME_encrypt(key, iv, input, small, tag), ==, TC_ERROR);
-  munit_assert_int(TC_AES_EAX_PRIME_decrypt(key, iv, input, tag_in, small), ==, TC_ERROR);
+  munit_assert_int(TC_AES_EAX_PRIME_encrypt((TC_bytes){key, TC_AES_KEYLEN}, iv, input, small,
+                                            (TC_buffer){tag, TC_AES_EAX_PRIME_TAG_LEN}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_AES_EAX_PRIME_decrypt((TC_bytes){key, TC_AES_KEYLEN}, iv, input,
+                                            (TC_bytes){tag_in, TC_AES_EAX_PRIME_TAG_LEN}, small),
+                   ==, TC_ERROR);
 #endif
 #if TC_AES_ENABLE_SIV
-  munit_assert_int(TC_AES_SIV_encrypt(key, &aad, 1, input, tag, small), ==, TC_ERROR);
-  munit_assert_int(TC_AES_SIV_decrypt(key, &aad, 1, tag_in, input, small), ==, TC_ERROR);
+  munit_assert_int(TC_AES_SIV_encrypt((TC_bytes){key, TC_AES_SIV_KEYLEN}, &aad, 1, input,
+                                      (TC_buffer){tag, TC_AES_SIV_V_LEN}, small),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_AES_SIV_decrypt((TC_bytes){key, TC_AES_SIV_KEYLEN}, &aad, 1,
+                                      (TC_bytes){tag_in, TC_AES_SIV_V_LEN}, input, small),
+                   ==, TC_ERROR);
 #endif
   for (size_t i = 0; i < sizeof output; ++i)
     munit_assert_uint8(output[i], ==, 0x5a);
@@ -1214,9 +1274,9 @@ static void assert_filled(const uint8_t* data, size_t length, uint8_t value)
 
 #if TC_AES_ENABLE_GCM || TC_AES_ENABLE_CCM || TC_AES_ENABLE_EAX
 /* GCM, CCM and EAX share one one-shot signature. */
-typedef TC_status (*aead_encrypt_fn)(const uint8_t* key, TC_bytes nonce, TC_bytes aad,
-                                     TC_bytes plaintext, TC_buffer ciphertext, TC_buffer tag);
-typedef TC_status (*aead_decrypt_fn)(const uint8_t* key, TC_bytes nonce, TC_bytes aad,
+typedef TC_status (*aead_encrypt_fn)(TC_bytes key, TC_bytes nonce, TC_bytes aad, TC_bytes plaintext,
+                                     TC_buffer ciphertext, TC_buffer tag);
+typedef TC_status (*aead_decrypt_fn)(TC_bytes key, TC_bytes nonce, TC_bytes aad,
                                      TC_bytes ciphertext, TC_bytes tag, TC_buffer plaintext);
 
 /* A tag mismatch wipes the text output for separate and in-place buffers. */
@@ -1226,18 +1286,21 @@ static void check_mismatch_wipes(aead_encrypt_fn encrypt, aead_decrypt_fn decryp
   const TC_bytes aad = {aead_header, sizeof aead_header};
   uint8_t ciphertext[AEAD_TEXT_LEN], output[AEAD_TEXT_LEN], tag[16];
 
-  munit_assert_int(encrypt(aead_key, nonce, aad, (TC_bytes){aead_plain, AEAD_TEXT_LEN},
+  munit_assert_int(encrypt((TC_bytes){aead_key, TC_AES_KEYLEN}, nonce, aad,
+                           (TC_bytes){aead_plain, AEAD_TEXT_LEN},
                            (TC_buffer){ciphertext, sizeof ciphertext}, (TC_buffer){tag, 16}),
                    ==, TC_OK);
   tag[0] ^= 1u;
   memset(output, 0x5a, sizeof output);
-  munit_assert_int(decrypt(aead_key, nonce, aad, (TC_bytes){ciphertext, sizeof ciphertext},
-                           (TC_bytes){tag, 16}, (TC_buffer){output, sizeof output}),
+  munit_assert_int(decrypt((TC_bytes){aead_key, TC_AES_KEYLEN}, nonce, aad,
+                           (TC_bytes){ciphertext, sizeof ciphertext}, (TC_bytes){tag, 16},
+                           (TC_buffer){output, sizeof output}),
                    ==, TC_MISMATCH);
   assert_filled(output, sizeof output, 0);
   memcpy(output, ciphertext, sizeof output);
-  munit_assert_int(decrypt(aead_key, nonce, aad, (TC_bytes){output, sizeof output},
-                           (TC_bytes){tag, 16}, (TC_buffer){output, sizeof output}),
+  munit_assert_int(decrypt((TC_bytes){aead_key, TC_AES_KEYLEN}, nonce, aad,
+                           (TC_bytes){output, sizeof output}, (TC_bytes){tag, 16},
+                           (TC_buffer){output, sizeof output}),
                    ==, TC_MISMATCH);
   assert_filled(output, sizeof output, 0);
 }
@@ -1250,20 +1313,22 @@ static void check_tag_overlap(aead_encrypt_fn encrypt, aead_decrypt_fn decrypt)
   uint8_t buffer[AEAD_TEXT_LEN + 16];
 
   memset(buffer, 0x5a, sizeof buffer);
-  munit_assert_int(encrypt(aead_key, nonce, aad, (TC_bytes){aead_plain, AEAD_TEXT_LEN},
+  munit_assert_int(encrypt((TC_bytes){aead_key, TC_AES_KEYLEN}, nonce, aad,
+                           (TC_bytes){aead_plain, AEAD_TEXT_LEN},
                            (TC_buffer){buffer, AEAD_TEXT_LEN},
                            (TC_buffer){buffer + AEAD_TEXT_LEN - 1, 16}),
                    ==, TC_ERROR);
   assert_filled(buffer, sizeof buffer, 0x5a);
-  munit_assert_int(decrypt(aead_key, nonce, aad, (TC_bytes){aead_plain, AEAD_TEXT_LEN},
-                           (TC_bytes){buffer + 4, 16}, (TC_buffer){buffer, AEAD_TEXT_LEN}),
+  munit_assert_int(decrypt((TC_bytes){aead_key, TC_AES_KEYLEN}, nonce, aad,
+                           (TC_bytes){aead_plain, AEAD_TEXT_LEN}, (TC_bytes){buffer + 4, 16},
+                           (TC_buffer){buffer, AEAD_TEXT_LEN}),
                    ==, TC_ERROR);
   assert_filled(buffer, sizeof buffer, 0x5a);
   /* In-place decrypt with the expected tag inside the ciphertext. */
-  munit_assert_int(decrypt(aead_key, nonce, aad, (TC_bytes){buffer, AEAD_TEXT_LEN},
-                           (TC_bytes){buffer + AEAD_TEXT_LEN - 1, 16},
-                           (TC_buffer){buffer, AEAD_TEXT_LEN}),
-                   ==, TC_ERROR);
+  munit_assert_int(
+      decrypt((TC_bytes){aead_key, TC_AES_KEYLEN}, nonce, aad, (TC_bytes){buffer, AEAD_TEXT_LEN},
+              (TC_bytes){buffer + AEAD_TEXT_LEN - 1, 16}, (TC_buffer){buffer, AEAD_TEXT_LEN}),
+      ==, TC_ERROR);
   assert_filled(buffer, sizeof buffer, 0x5a);
 }
 
@@ -1274,12 +1339,12 @@ static void check_aad_in_output(aead_encrypt_fn encrypt, aead_decrypt_fn decrypt
   const TC_bytes nonce = {aead_nonce, sizeof aead_nonce};
   uint8_t expected[AEAD_TEXT_LEN], buffer[AEAD_TEXT_LEN], tag[16], expected_tag[16];
 
-  munit_assert_int(encrypt(aead_key, nonce, (TC_bytes){aead_plain + 4, 8},
-                           (TC_bytes){aead_plain, AEAD_TEXT_LEN},
+  munit_assert_int(encrypt((TC_bytes){aead_key, TC_AES_KEYLEN}, nonce,
+                           (TC_bytes){aead_plain + 4, 8}, (TC_bytes){aead_plain, AEAD_TEXT_LEN},
                            (TC_buffer){expected, sizeof expected}, (TC_buffer){expected_tag, 16}),
                    ==, TC_OK);
   memcpy(buffer, aead_plain, sizeof buffer);
-  munit_assert_int(encrypt(aead_key, nonce, (TC_bytes){buffer + 4, 8},
+  munit_assert_int(encrypt((TC_bytes){aead_key, TC_AES_KEYLEN}, nonce, (TC_bytes){buffer + 4, 8},
                            (TC_bytes){buffer, sizeof buffer}, (TC_buffer){buffer, sizeof buffer},
                            (TC_buffer){tag, 16}),
                    ==, TC_OK);
@@ -1288,12 +1353,12 @@ static void check_aad_in_output(aead_encrypt_fn encrypt, aead_decrypt_fn decrypt
 
   /* The ciphertext is independent of the AAD. Authenticate with AAD equal to
    * ciphertext bytes 4..11, then decrypt in place with the AAD in the buffer. */
-  munit_assert_int(encrypt(aead_key, nonce, (TC_bytes){expected + 4, 8},
+  munit_assert_int(encrypt((TC_bytes){aead_key, TC_AES_KEYLEN}, nonce, (TC_bytes){expected + 4, 8},
                            (TC_bytes){aead_plain, AEAD_TEXT_LEN},
                            (TC_buffer){buffer, sizeof buffer}, (TC_buffer){tag, 16}),
                    ==, TC_OK);
   munit_assert_memory_equal(sizeof buffer, buffer, expected);
-  munit_assert_int(decrypt(aead_key, nonce, (TC_bytes){buffer + 4, 8},
+  munit_assert_int(decrypt((TC_bytes){aead_key, TC_AES_KEYLEN}, nonce, (TC_bytes){buffer + 4, 8},
                            (TC_bytes){buffer, sizeof buffer}, (TC_bytes){tag, 16},
                            (TC_buffer){buffer, sizeof buffer}),
                    ==, TC_OK);
@@ -1333,20 +1398,23 @@ TC_TEST(test_aead_mismatch_wipes)
     const TC_bytes cleartext = {aead_header, sizeof aead_header};
     uint8_t ciphertext[AEAD_TEXT_LEN], output[AEAD_TEXT_LEN], tag[TC_AES_EAX_PRIME_TAG_LEN];
 
-    munit_assert_int(TC_AES_EAX_PRIME_encrypt(aead_key, cleartext,
+    munit_assert_int(TC_AES_EAX_PRIME_encrypt((TC_bytes){aead_key, TC_AES_KEYLEN}, cleartext,
                                               (TC_bytes){aead_plain, AEAD_TEXT_LEN},
-                                              (TC_buffer){ciphertext, sizeof ciphertext}, tag),
+                                              (TC_buffer){ciphertext, sizeof ciphertext},
+                                              (TC_buffer){tag, TC_AES_EAX_PRIME_TAG_LEN}),
                      ==, TC_OK);
     tag[0] ^= 1u;
     memset(output, 0x5a, sizeof output);
-    munit_assert_int(TC_AES_EAX_PRIME_decrypt(aead_key, cleartext,
-                                              (TC_bytes){ciphertext, sizeof ciphertext}, tag,
+    munit_assert_int(TC_AES_EAX_PRIME_decrypt((TC_bytes){aead_key, TC_AES_KEYLEN}, cleartext,
+                                              (TC_bytes){ciphertext, sizeof ciphertext},
+                                              (TC_bytes){tag, TC_AES_EAX_PRIME_TAG_LEN},
                                               (TC_buffer){output, sizeof output}),
                      ==, TC_MISMATCH);
     assert_filled(output, sizeof output, 0);
     memcpy(output, ciphertext, sizeof output);
-    munit_assert_int(TC_AES_EAX_PRIME_decrypt(aead_key, cleartext,
-                                              (TC_bytes){output, sizeof output}, tag,
+    munit_assert_int(TC_AES_EAX_PRIME_decrypt((TC_bytes){aead_key, TC_AES_KEYLEN}, cleartext,
+                                              (TC_bytes){output, sizeof output},
+                                              (TC_bytes){tag, TC_AES_EAX_PRIME_TAG_LEN},
                                               (TC_buffer){output, sizeof output}),
                      ==, TC_MISMATCH);
     assert_filled(output, sizeof output, 0);
@@ -1357,18 +1425,23 @@ TC_TEST(test_aead_mismatch_wipes)
     const TC_bytes ad = {aead_header, sizeof aead_header};
     uint8_t ciphertext[AEAD_TEXT_LEN], output[AEAD_TEXT_LEN], v[TC_AES_SIV_V_LEN];
 
-    munit_assert_int(TC_AES_SIV_encrypt(aead_key, &ad, 1, (TC_bytes){aead_plain, AEAD_TEXT_LEN}, v,
+    munit_assert_int(TC_AES_SIV_encrypt((TC_bytes){aead_key, TC_AES_SIV_KEYLEN}, &ad, 1,
+                                        (TC_bytes){aead_plain, AEAD_TEXT_LEN},
+                                        (TC_buffer){v, TC_AES_BLOCKLEN},
                                         (TC_buffer){ciphertext, sizeof ciphertext}),
                      ==, TC_OK);
     v[0] ^= 1u;
     memset(output, 0x5a, sizeof output);
-    munit_assert_int(TC_AES_SIV_decrypt(aead_key, &ad, 1, v,
+    munit_assert_int(TC_AES_SIV_decrypt((TC_bytes){aead_key, TC_AES_SIV_KEYLEN}, &ad, 1,
+                                        (TC_bytes){v, TC_AES_BLOCKLEN},
                                         (TC_bytes){ciphertext, sizeof ciphertext},
                                         (TC_buffer){output, sizeof output}),
                      ==, TC_MISMATCH);
     assert_filled(output, sizeof output, 0);
     memcpy(output, ciphertext, sizeof output);
-    munit_assert_int(TC_AES_SIV_decrypt(aead_key, &ad, 1, v, (TC_bytes){output, sizeof output},
+    munit_assert_int(TC_AES_SIV_decrypt((TC_bytes){aead_key, TC_AES_SIV_KEYLEN}, &ad, 1,
+                                        (TC_bytes){v, TC_AES_BLOCKLEN},
+                                        (TC_bytes){output, sizeof output},
                                         (TC_buffer){output, sizeof output}),
                      ==, TC_MISMATCH);
     assert_filled(output, sizeof output, 0);
@@ -1395,13 +1468,15 @@ TC_TEST(test_aead_tag_overlap)
     uint8_t buffer[AEAD_TEXT_LEN + TC_AES_EAX_PRIME_TAG_LEN];
 
     memset(buffer, 0x5a, sizeof buffer);
-    munit_assert_int(
-        TC_AES_EAX_PRIME_encrypt(aead_key, cleartext, (TC_bytes){aead_plain, AEAD_TEXT_LEN},
-                                 (TC_buffer){buffer, AEAD_TEXT_LEN}, buffer + AEAD_TEXT_LEN - 1),
-        ==, TC_ERROR);
+    munit_assert_int(TC_AES_EAX_PRIME_encrypt(
+                         (TC_bytes){aead_key, TC_AES_KEYLEN}, cleartext,
+                         (TC_bytes){aead_plain, AEAD_TEXT_LEN}, (TC_buffer){buffer, AEAD_TEXT_LEN},
+                         (TC_buffer){buffer + AEAD_TEXT_LEN - 1, TC_AES_EAX_PRIME_TAG_LEN}),
+                     ==, TC_ERROR);
     assert_filled(buffer, sizeof buffer, 0x5a);
-    munit_assert_int(TC_AES_EAX_PRIME_decrypt(aead_key, cleartext,
-                                              (TC_bytes){aead_plain, AEAD_TEXT_LEN}, buffer + 4,
+    munit_assert_int(TC_AES_EAX_PRIME_decrypt((TC_bytes){aead_key, TC_AES_KEYLEN}, cleartext,
+                                              (TC_bytes){aead_plain, AEAD_TEXT_LEN},
+                                              (TC_bytes){buffer + 4, TC_AES_EAX_PRIME_TAG_LEN},
                                               (TC_buffer){buffer, AEAD_TEXT_LEN}),
                      ==, TC_ERROR);
     assert_filled(buffer, sizeof buffer, 0x5a);
@@ -1412,12 +1487,14 @@ TC_TEST(test_aead_tag_overlap)
     uint8_t buffer[AEAD_TEXT_LEN + TC_AES_SIV_V_LEN];
 
     memset(buffer, 0x5a, sizeof buffer);
-    munit_assert_int(TC_AES_SIV_encrypt(aead_key, NULL, 0, (TC_bytes){aead_plain, AEAD_TEXT_LEN},
-                                        buffer + AEAD_TEXT_LEN - 1,
+    munit_assert_int(TC_AES_SIV_encrypt((TC_bytes){aead_key, TC_AES_SIV_KEYLEN}, NULL, 0,
+                                        (TC_bytes){aead_plain, AEAD_TEXT_LEN},
+                                        (TC_buffer){buffer + AEAD_TEXT_LEN - 1, TC_AES_BLOCKLEN},
                                         (TC_buffer){buffer, AEAD_TEXT_LEN}),
                      ==, TC_ERROR);
     assert_filled(buffer, sizeof buffer, 0x5a);
-    munit_assert_int(TC_AES_SIV_decrypt(aead_key, NULL, 0, buffer + 4,
+    munit_assert_int(TC_AES_SIV_decrypt((TC_bytes){aead_key, TC_AES_SIV_KEYLEN}, NULL, 0,
+                                        (TC_bytes){buffer + 4, TC_AES_BLOCKLEN},
                                         (TC_bytes){aead_plain, AEAD_TEXT_LEN},
                                         (TC_buffer){buffer, AEAD_TEXT_LEN}),
                      ==, TC_ERROR);

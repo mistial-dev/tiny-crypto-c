@@ -11,12 +11,13 @@ TC_TEST(decrypt)
   TC_TWIC_tpk key = {{0}};
   struct TC_AES_key_ctx aes;
   uint8_t buffer[TC_AES_BLOCKLEN * 2], zeros[sizeof buffer] = {0};
-  munit_assert_int(TC_AES_key_init(&aes, key.key), ==, TC_OK);
+  munit_assert_int(TC_AES_key_init(&aes, (TC_bytes){key.key, TC_AES_KEYLEN}), ==, TC_OK);
   for (size_t padding = 1; padding <= TC_AES_BLOCKLEN; ++padding) {
     memset(buffer, 0x5a, sizeof buffer - padding);
     memset(buffer + sizeof buffer - padding, (int)padding, padding);
     for (size_t offset = 0; offset < sizeof buffer; offset += TC_AES_BLOCKLEN)
-      munit_assert_int(TC_AES_ECB_encrypt(&aes, buffer + offset), ==, TC_OK);
+      munit_assert_int(TC_AES_ECB_encrypt(&aes, (TC_buffer){buffer + offset, TC_AES_BLOCKLEN}), ==,
+                       TC_OK);
     size_t length = SIZE_MAX;
     munit_assert_int(TC_TWIC_object_decrypt(&key, (TC_buffer){buffer, sizeof buffer}, &length), ==,
                      TC_OK);
@@ -29,7 +30,8 @@ TC_TEST(decrypt)
     memset(buffer, TC_AES_BLOCKLEN, sizeof buffer);
     buffer[sizeof buffer - 1 - bad] = 0;
     for (size_t offset = 0; offset < sizeof buffer; offset += TC_AES_BLOCKLEN)
-      munit_assert_int(TC_AES_ECB_encrypt(&aes, buffer + offset), ==, TC_OK);
+      munit_assert_int(TC_AES_ECB_encrypt(&aes, (TC_buffer){buffer + offset, TC_AES_BLOCKLEN}), ==,
+                       TC_OK);
     size_t length = SIZE_MAX;
     munit_assert_int(TC_TWIC_object_decrypt(&key, (TC_buffer){buffer, sizeof buffer}, &length), ==,
                      TC_ERROR);
@@ -38,8 +40,8 @@ TC_TEST(decrypt)
   }
   size_t length = SIZE_MAX;
   memset(buffer, 0x5a, sizeof buffer);
-  munit_assert_int(
-      TC_TWIC_object_decrypt(&key, (TC_buffer){buffer, sizeof buffer - 1}, &length), ==, TC_ERROR);
+  munit_assert_int(TC_TWIC_object_decrypt(&key, (TC_buffer){buffer, sizeof buffer - 1}, &length),
+                   ==, TC_ERROR);
   for (size_t i = 0; i < sizeof buffer; ++i)
     munit_assert_uint(buffer[i], ==, 0x5a);
   munit_assert_size(length, ==, SIZE_MAX);
@@ -67,8 +69,9 @@ TC_TEST(known_answers)
     munit_assert_size(length, ==, i ? 0 : sizeof plaintext - 1);
     munit_assert_memory_equal(length, buffer, plaintext);
     munit_assert_memory_equal(sizeof buffer - length, buffer + length, zeros);
-    munit_assert_int(TC_TWIC_object_encrypt(&key, (TC_buffer){buffer, sizeof buffer}, length,
-                                            &length), ==, TC_OK);
+    munit_assert_int(
+        TC_TWIC_object_encrypt(&key, (TC_buffer){buffer, sizeof buffer}, length, &length), ==,
+        TC_OK);
     munit_assert_size(length, ==, sizeof buffer);
     munit_assert_memory_equal(length, buffer, ciphertext[i]);
   }
@@ -78,12 +81,14 @@ TC_TEST(known_answers)
     uint8_t bytes[TC_AES_BLOCKLEN];
   } alias;
   memcpy(alias.bytes, ciphertext[0], sizeof alias.bytes);
-  munit_assert_int(TC_TWIC_object_decrypt(&key, (TC_buffer){alias.bytes, sizeof alias.bytes},
-                                          &alias.length), ==, TC_ERROR);
+  munit_assert_int(
+      TC_TWIC_object_decrypt(&key, (TC_buffer){alias.bytes, sizeof alias.bytes}, &alias.length), ==,
+      TC_ERROR);
   munit_assert_memory_equal(sizeof alias.bytes, alias.bytes, ciphertext[0]);
   size_t length = SIZE_MAX;
-  munit_assert_int(TC_TWIC_object_decrypt(&alias.key, (TC_buffer){alias.bytes, sizeof alias.bytes},
-                                          &length), ==, TC_ERROR);
+  munit_assert_int(
+      TC_TWIC_object_decrypt(&alias.key, (TC_buffer){alias.bytes, sizeof alias.bytes}, &length), ==,
+      TC_ERROR);
   munit_assert_size(length, ==, SIZE_MAX);
   munit_assert_memory_equal(sizeof alias.bytes, alias.bytes, ciphertext[0]);
   munit_assert_int(TC_TWIC_object_decrypt(NULL, (TC_buffer){buffer, sizeof buffer}, &length), ==,
@@ -109,8 +114,9 @@ TC_TEST(encrypt)
                      ==, TC_ERROR);
     munit_assert_size(length, ==, SIZE_MAX);
     munit_assert_memory_equal(sizeof buffer, buffer, original);
-    munit_assert_int(TC_TWIC_object_encrypt(&key, (TC_buffer){buffer, sizeof buffer}, input,
-                                            &length), ==, TC_OK);
+    munit_assert_int(
+        TC_TWIC_object_encrypt(&key, (TC_buffer){buffer, sizeof buffer}, input, &length), ==,
+        TC_OK);
     munit_assert_size(length, ==, padded);
     munit_assert_memory_equal(sizeof buffer - padded, buffer + padded, original + padded);
     munit_assert_int(TC_TWIC_object_decrypt(&key, (TC_buffer){buffer, length}, &length), ==, TC_OK);
@@ -135,11 +141,12 @@ TC_TEST(encrypt)
     uint8_t bytes[TC_AES_BLOCKLEN * 2];
   } alias;
   memset(alias.bytes, 0x5a, sizeof alias.bytes);
-  munit_assert_int(TC_TWIC_object_encrypt(&key, (TC_buffer){alias.bytes, sizeof alias.bytes}, 0,
-                                          &alias.length), ==, TC_ERROR);
-  munit_assert_int(TC_TWIC_object_encrypt(&alias.key,
-                                          (TC_buffer){alias.bytes, sizeof alias.bytes}, 0, &length),
-                   ==, TC_ERROR);
+  munit_assert_int(
+      TC_TWIC_object_encrypt(&key, (TC_buffer){alias.bytes, sizeof alias.bytes}, 0, &alias.length),
+      ==, TC_ERROR);
+  munit_assert_int(
+      TC_TWIC_object_encrypt(&alias.key, (TC_buffer){alias.bytes, sizeof alias.bytes}, 0, &length),
+      ==, TC_ERROR);
   munit_assert_memory_equal(sizeof alias.bytes, alias.bytes, original);
   return MUNIT_OK;
 }

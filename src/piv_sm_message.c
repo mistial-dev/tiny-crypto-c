@@ -25,10 +25,10 @@ static TC_status prepare_cipher(TC_PIV_SM* session, const tc_sm_suite* suite,
         break;
     iv[0] = 0x80;
   }
-  if (TC_AES_dynamic_key_init(&TC_SM_SYM(w).cipher.aes, session->data.traffic.enc_key,
-                              suite->key_bytes) != TC_OK)
+  if (TC_AES_dynamic_key_init(&TC_SM_SYM(w).cipher.aes,
+                              (TC_bytes){session->data.traffic.enc_key, suite->key_bytes}) != TC_OK)
     return TC_ERROR;
-  return TC_AES_dynamic_encrypt(&TC_SM_SYM(w).cipher.aes, iv);
+  return TC_AES_dynamic_encrypt(&TC_SM_SYM(w).cipher.aes, (TC_buffer){iv, TC_AES_BLOCKLEN});
 }
 
 static int span_contains(TC_bytes outer, TC_bytes inner)
@@ -157,8 +157,9 @@ TC_status TC_PIV_SM_protect(TC_PIV_SM* session, const TC_PIV_SM_protect_request*
     memset(request->ciphertext.data + request->plaintext.length + 1, 0,
            needed - request->plaintext.length - 1);
     if (prepare_cipher(session, suite, workspace, 0) != TC_OK ||
-        TC_AES_dynamic_CBC_encrypt(&TC_SM_SYM(workspace).cipher.aes, TC_SM_SYM(workspace).material,
-                                   request->ciphertext, needed) != TC_OK)
+        TC_AES_dynamic_CBC_encrypt(&TC_SM_SYM(workspace).cipher.aes,
+                                   (TC_buffer){TC_SM_SYM(workspace).material, TC_AES_BLOCKLEN},
+                                   (TC_buffer){request->ciphertext.data, needed}) != TC_OK)
       goto done;
     TC_AES_dynamic_key_clear(&TC_SM_SYM(workspace).cipher.aes);
   }
@@ -235,8 +236,8 @@ TC_status TC_PIV_SM_unprotect(TC_PIV_SM* session, const TC_PIV_SM_unprotect_requ
       goto done;
     memcpy(TC_SM_SYM(workspace).block, request->ciphertext.data + request->ciphertext.length - 16,
            16);
-    if (TC_AES_dynamic_decrypt(&TC_SM_SYM(workspace).cipher.aes, TC_SM_SYM(workspace).block) !=
-        TC_OK)
+    if (TC_AES_dynamic_decrypt(&TC_SM_SYM(workspace).cipher.aes,
+                               (TC_buffer){TC_SM_SYM(workspace).block, TC_AES_BLOCKLEN}) != TC_OK)
       goto done;
     previous = request->ciphertext.length == 16
                    ? TC_SM_SYM(workspace).material
@@ -261,8 +262,9 @@ TC_status TC_PIV_SM_unprotect(TC_PIV_SM* session, const TC_PIV_SM_unprotect_requ
   }
   for (offset = 0; offset + 16 < request->ciphertext.length && offset < length; offset += 16) {
     memcpy(TC_SM_SYM(workspace).block, request->ciphertext.data + offset, 16);
-    if (TC_AES_dynamic_CBC_decrypt(&TC_SM_SYM(workspace).cipher.aes, TC_SM_SYM(workspace).material,
-                                   TC_SM_SYM(workspace).block, 16) != TC_OK) {
+    if (TC_AES_dynamic_CBC_decrypt(&TC_SM_SYM(workspace).cipher.aes,
+                                   (TC_buffer){TC_SM_SYM(workspace).material, TC_AES_BLOCKLEN},
+                                   (TC_buffer){TC_SM_SYM(workspace).block, 16}) != TC_OK) {
       TC_secure_zero(plaintext.data, length);
       goto done;
     }

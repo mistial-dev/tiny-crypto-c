@@ -7,54 +7,57 @@
 #include <stdio.h>
 #include <string.h>
 
-typedef TC_status (*encrypt_fn)(const uint8_t*, TC_bytes, TC_bytes, TC_bytes, TC_buffer, TC_buffer);
-typedef TC_status (*decrypt_fn)(const uint8_t*, TC_bytes, TC_bytes, TC_bytes, TC_bytes, TC_buffer);
+typedef TC_status (*encrypt_fn)(TC_bytes, TC_bytes, TC_bytes, TC_bytes, TC_buffer, TC_buffer);
+typedef TC_status (*decrypt_fn)(TC_bytes, TC_bytes, TC_bytes, TC_bytes, TC_bytes, TC_buffer);
 static const char* vector_path;
 static size_t siv_ad_count;
 
 /* SIV takes the Wycheproof AAD and nonce as its associated-data vector. */
-static TC_status siv_encrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes input,
+static TC_status siv_encrypt(TC_bytes key, TC_bytes nonce, TC_bytes aad, TC_bytes input,
                              TC_buffer output, TC_buffer tag)
 {
   const TC_bytes ad[] = {aad, nonce};
   if (tag.capacity != TC_AES_SIV_V_LEN)
     return TC_ERROR;
-  return TC_AES_SIV_encrypt(key, ad, siv_ad_count, input, tag.data, output);
+  return TC_AES_SIV_encrypt((TC_bytes){key, TC_AES_SIV_KEYLEN}, ad, siv_ad_count,
+                            (TC_buffer){input, TC_AES_BLOCKLEN},
+                            (TC_buffer){tag.data, TC_AES_SIV_V_LEN}, output);
 }
 
-static TC_status siv_decrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes input,
+static TC_status siv_decrypt(TC_bytes key, TC_bytes nonce, TC_bytes aad, TC_bytes input,
                              TC_bytes tag, TC_buffer output)
 {
   const TC_bytes ad[] = {aad, nonce};
   if (tag.length != TC_AES_SIV_V_LEN)
     return TC_ERROR;
-  return TC_AES_SIV_decrypt(key, ad, siv_ad_count, tag.data, input, output);
+  return TC_AES_SIV_decrypt((TC_bytes){key, TC_AES_SIV_KEYLEN}, ad, siv_ad_count,
+                            (TC_bytes){tag.data, TC_AES_SIV_V_LEN}, input, output);
 }
 
 /* Wycheproof CCM groups include 4- and 6-byte tags. Tags below TC_MIN_TAG_LEN
  * go through the explicit short-tag entry points. */
-static TC_status ccm_encrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes input,
+static TC_status ccm_encrypt(TC_bytes key, TC_bytes nonce, TC_bytes aad, TC_bytes input,
                              TC_buffer output, TC_buffer tag)
 {
   return (tag.capacity < TC_MIN_TAG_LEN ? TC_AES_CCM_encrypt_short_tag
                                         : TC_AES_CCM_encrypt)(key, nonce, aad, input, output, tag);
 }
 
-static TC_status ccm_decrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes input,
+static TC_status ccm_decrypt(TC_bytes key, TC_bytes nonce, TC_bytes aad, TC_bytes input,
                              TC_bytes tag, TC_buffer output)
 {
   return (tag.length < TC_MIN_TAG_LEN ? TC_AES_CCM_decrypt_short_tag
                                       : TC_AES_CCM_decrypt)(key, nonce, aad, input, tag, output);
 }
 
-static TC_status eax_encrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes input,
+static TC_status eax_encrypt(TC_bytes key, TC_bytes nonce, TC_bytes aad, TC_bytes input,
                              TC_buffer output, TC_buffer tag)
 {
   return (tag.capacity < TC_MIN_TAG_LEN ? TC_AES_EAX_encrypt_short_tag
                                         : TC_AES_EAX_encrypt)(key, nonce, aad, input, output, tag);
 }
 
-static TC_status eax_decrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes input,
+static TC_status eax_decrypt(TC_bytes key, TC_bytes nonce, TC_bytes aad, TC_bytes input,
                              TC_bytes tag, TC_buffer output)
 {
   return (tag.length < TC_MIN_TAG_LEN ? TC_AES_EAX_decrypt_short_tag
@@ -115,9 +118,9 @@ TC_TEST(vectors)
     munit_assert_size(length[0], ==, siv ? TC_AES_SIV_KEYLEN : TC_AES_KEYLEN);
     munit_assert_size(length[5], <=, sizeof generated);
     memcpy(output, expected, sizeof output);
-    status = decrypt(value[0], span(value[1], length[1]), span(value[2], length[2]),
-                     span(value[4], length[4]), span(value[5], length[5]),
-                     (TC_buffer){output, length[4]});
+    status = decrypt(span(value[0], length[0]), span(value[1], length[1]),
+                     span(value[2], length[2]), span(value[4], length[4]),
+                     span(value[5], length[5]), (TC_buffer){output, length[4]});
     if (valid) {
       if (status != TC_OK)
         munit_errorf("AEAD case %u: valid decrypt rejected (%d)", id, status);
@@ -125,9 +128,9 @@ TC_TEST(vectors)
       munit_assert_memory_equal(length[3], output, value[3]);
       munit_assert_memory_equal(sizeof output - length[3], output + length[3],
                                 expected + length[3]);
-      munit_assert_int(encrypt(value[0], span(value[1], length[1]), span(value[2], length[2]),
-                               span(value[3], length[3]), (TC_buffer){output, length[3]},
-                               (TC_buffer){generated, length[5]}),
+      munit_assert_int(encrypt(span(value[0], length[0]), span(value[1], length[1]),
+                               span(value[2], length[2]), span(value[3], length[3]),
+                               (TC_buffer){output, length[3]}, (TC_buffer){generated, length[5]}),
                        ==, TC_OK);
       munit_assert_memory_equal(length[4], output, value[4]);
       munit_assert_memory_equal(length[5], generated, value[5]);
@@ -144,9 +147,9 @@ TC_TEST(vectors)
     }
     memcpy(output, expected, sizeof output);
     memcpy(output, value[4], length[4]);
-    status = decrypt(value[0], span(value[1], length[1]), span(value[2], length[2]),
-                     (TC_bytes){output, length[4]}, span(value[5], length[5]),
-                     (TC_buffer){output, length[4]});
+    status = decrypt(span(value[0], length[0]), span(value[1], length[1]),
+                     span(value[2], length[2]), (TC_bytes){output, length[4]},
+                     span(value[5], length[5]), (TC_buffer){output, length[4]});
     if (valid) {
       munit_assert_int(status, ==, TC_OK);
       munit_assert_memory_equal(length[3], output, value[3]);

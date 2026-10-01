@@ -400,8 +400,9 @@ TC_TEST(kw_integrity)
 static void kw_reference_encrypt(const uint8_t* kek, uint8_t block[16])
 {
   TC_AES_dynamic_key schedule;
-  munit_assert_int(TC_AES_dynamic_key_init(&schedule, kek, TC_AES_KEYLEN), ==, TC_OK);
-  munit_assert_int(TC_AES_dynamic_encrypt(&schedule, block), ==, TC_OK);
+  munit_assert_int(TC_AES_dynamic_key_init(&schedule, (TC_bytes){kek, TC_AES_KEYLEN}), ==, TC_OK);
+  munit_assert_int(TC_AES_dynamic_encrypt(&schedule, (TC_buffer){block, TC_AES_BLOCKLEN}), ==,
+                   TC_OK);
   TC_AES_dynamic_key_clear(&schedule);
 }
 #elif TC_AES_ENABLE_ECB
@@ -409,8 +410,8 @@ static void kw_reference_encrypt(const uint8_t* kek, uint8_t block[16])
 static void kw_reference_encrypt(const uint8_t* kek, uint8_t block[16])
 {
   struct TC_AES_key_ctx schedule;
-  munit_assert_int(TC_AES_key_init(&schedule, kek), ==, TC_OK);
-  munit_assert_int(TC_AES_ECB_encrypt(&schedule, block), ==, TC_OK);
+  munit_assert_int(TC_AES_key_init(&schedule, (TC_bytes){kek, TC_AES_KEYLEN}), ==, TC_OK);
+  munit_assert_int(TC_AES_ECB_encrypt(&schedule, (TC_buffer){block, TC_AES_BLOCKLEN}), ==, TC_OK);
   TC_AES_key_ctx_clear(&schedule);
 }
 #else

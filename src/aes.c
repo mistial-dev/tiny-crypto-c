@@ -272,11 +272,12 @@ static void tc_aes_key_expansion(uint8_t* round_key, const uint8_t* key, unsigne
   TC_secure_zero(tempa, sizeof(tempa));
 }
 
-TC_status TC_AES_key_init(struct TC_AES_key_ctx* ctx, const uint8_t* key)
+TC_status TC_AES_key_init(struct TC_AES_key_ctx* ctx, TC_bytes key)
 {
   if (ctx == NULL)
     return TC_ERROR;
-  if (key == NULL || !tc_internal_ranges_disjoint(ctx, sizeof *ctx, key, TC_AES_KEYLEN)) {
+  if (key.length != TC_AES_KEYLEN || !tc_internal_span_valid(key.data, key.length) ||
+      !tc_internal_ranges_disjoint(ctx, sizeof *ctx, key.data, key.length)) {
     TC_AES_key_ctx_clear(ctx);
     return TC_ERROR;
   }
@@ -285,16 +286,17 @@ TC_status TC_AES_key_init(struct TC_AES_key_ctx* ctx, const uint8_t* key)
   if (!sbox_ready)
     return TC_ERROR;
 #endif
-  tc_aes_key_expansion(ctx->round_key, key, Nk);
+  tc_aes_key_expansion(ctx->round_key, key.data, Nk);
   ctx->active = 1;
   return TC_OK;
 }
 
-TC_status TC_AES_init(struct TC_AES_ctx* ctx, const uint8_t* key)
+TC_status TC_AES_init(struct TC_AES_ctx* ctx, TC_bytes key)
 {
   if (ctx == NULL)
     return TC_ERROR;
-  if (key == NULL || !tc_internal_ranges_disjoint(ctx, sizeof *ctx, key, TC_AES_KEYLEN)) {
+  if (key.length != TC_AES_KEYLEN || !tc_internal_span_valid(key.data, key.length) ||
+      !tc_internal_ranges_disjoint(ctx, sizeof *ctx, key.data, key.length)) {
     TC_AES_ctx_clear(ctx);
     return TC_ERROR;
   }
@@ -304,12 +306,13 @@ TC_status TC_AES_init(struct TC_AES_ctx* ctx, const uint8_t* key)
   return TC_AES_key_init(&ctx->key, key);
 }
 #if TC_AES_HAVE_IV
-TC_status TC_AES_set_iv(struct TC_AES_ctx* ctx, const uint8_t* iv)
+TC_status TC_AES_set_iv(struct TC_AES_ctx* ctx, TC_bytes iv)
 {
   /* An IV inside the context would be an overlapping copy. */
-  if (!tc_block_mode_args(ctx, sizeof *ctx, iv, TC_AES_BLOCKLEN, 1) || ctx->key.active != 1)
+  if (iv.length != TC_AES_BLOCKLEN ||
+      !tc_block_mode_args(ctx, sizeof *ctx, iv.data, iv.length, 1) || ctx->key.active != 1)
     return TC_ERROR;
-  memcpy(ctx->iv, iv, TC_AES_BLOCKLEN);
+  memcpy(ctx->iv, iv.data, TC_AES_BLOCKLEN);
   ctx->iv_loaded = 1;
 #if TC_AES_ENABLE_CTR
   ctx->ctr_pos = TC_AES_BLOCKLEN;
@@ -501,12 +504,14 @@ TC_status tc_aes_cipher(state_t* state, const uint8_t* round_key)
 #endif
 
 #if TC_AES_CAVP
-TC_status TC_AES_CAVP_encrypt_block(const uint8_t* key, uint8_t block[TC_AES_BLOCKLEN])
+TC_status TC_AES_CAVP_encrypt_block(TC_bytes key, TC_buffer block)
 {
   struct TC_AES_key_ctx schedule;
-  TC_status status = TC_AES_key_init(&schedule, key);
-  if (status == TC_OK)
-    status = tc_aes_cipher((state_t*)block, schedule.round_key);
+  TC_status status = TC_AES_key_init(&schedule, (TC_bytes){key, TC_AES_KEYLEN});
+  if (status == TC_OK && block.capacity == TC_AES_BLOCKLEN)
+    status = tc_aes_cipher((state_t*)block.data, schedule.round_key);
+  else
+    status = TC_ERROR;
   TC_AES_key_ctx_clear(&schedule);
   return status;
 }
@@ -534,23 +539,26 @@ TC_status tc_aes_inverse_rounds(state_t* state, const uint8_t* round_key, uint8_
 #endif
 
 #if TC_AES_CAVP
-TC_status TC_AES_CAVP_decrypt_block(const uint8_t* key, uint8_t block[TC_AES_BLOCKLEN])
+TC_status TC_AES_CAVP_decrypt_block(TC_bytes key, TC_buffer block)
 {
   struct TC_AES_key_ctx schedule;
-  TC_status status = TC_AES_key_init(&schedule, key);
-  if (status == TC_OK)
-    status = tc_aes_inverse_rounds((state_t*)block, schedule.round_key, Nr);
+  TC_status status = TC_AES_key_init(&schedule, (TC_bytes){key, TC_AES_KEYLEN});
+  if (status == TC_OK && block.capacity == TC_AES_BLOCKLEN)
+    status = tc_aes_inverse_rounds((state_t*)block.data, schedule.round_key, Nr);
+  else
+    status = TC_ERROR;
   TC_AES_key_ctx_clear(&schedule);
   return status;
 }
 #endif
 #if TC_AES_ENABLE_DYNAMIC
-TC_status TC_AES_dynamic_key_init(TC_AES_dynamic_key* ctx, const uint8_t* key, size_t length)
+TC_status TC_AES_dynamic_key_init(TC_AES_dynamic_key* ctx, TC_bytes key)
 {
   if (!ctx)
     return TC_ERROR;
-  const int valid = key && (length == 16 || length == 24 || length == 32) &&
-                    tc_internal_ranges_disjoint(ctx, sizeof *ctx, key, length);
+  const int valid = (key.length == 16 || key.length == 24 || key.length == 32) &&
+                    tc_internal_span_valid(key.data, key.length) &&
+                    tc_internal_ranges_disjoint(ctx, sizeof *ctx, key.data, key.length);
   TC_AES_dynamic_key_clear(ctx);
   if (!valid)
     return TC_ERROR;
@@ -558,8 +566,8 @@ TC_status TC_AES_dynamic_key_init(TC_AES_dynamic_key* ctx, const uint8_t* key, s
   if (!sbox_ready)
     return TC_ERROR;
 #endif
-  tc_aes_key_expansion(ctx->round_key, key, (unsigned)(length / 4));
-  ctx->rounds = (uint8_t)(length / 4 + 6);
+  tc_aes_key_expansion(ctx->round_key, key.data, (unsigned)(key.length / 4));
+  ctx->rounds = (uint8_t)(key.length / 4 + 6);
   memset(ctx->round_key + 16 * (ctx->rounds + 1), 0,
          sizeof ctx->round_key - 16 * (ctx->rounds + 1));
   return TC_OK;

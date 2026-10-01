@@ -123,8 +123,10 @@ static void cavp_ecb_block(const uint8_t* key, size_t key_len, int encrypt,
 
   (void)key_len;
   memcpy(block, input, sizeof(block));
-  munit_assert_int(encrypt ? TC_AES_CAVP_encrypt_block(key, block)
-                           : TC_AES_CAVP_decrypt_block(key, block),
+  munit_assert_int(encrypt ? TC_AES_CAVP_encrypt_block((TC_bytes){key, TC_AES_KEYLEN},
+                                                       (TC_buffer){block, TC_AES_BLOCKLEN})
+                           : TC_AES_CAVP_decrypt_block((TC_bytes){key, TC_AES_KEYLEN},
+                                                       (TC_buffer){block, TC_AES_BLOCKLEN}),
                    ==, TC_OK);
   memcpy(output, block, sizeof(block));
 }
@@ -135,7 +137,7 @@ static void cavp_ecb_block(const uint8_t* key, size_t key_len, int encrypt,
 static TC_status cavp_load_iv(struct TC_AES_ctx* ctx, const struct cavp_record* record)
 {
   static const uint8_t zero_iv[TC_AES_BLOCKLEN] = {0};
-  return TC_AES_set_iv(ctx, record->iv != NULL ? record->iv : zero_iv);
+  return TC_AES_set_iv(ctx, (TC_bytes){record->iv != NULL ? record->iv : zero_iv, TC_AES_BLOCKLEN});
 }
 #endif
 
@@ -151,23 +153,23 @@ static TC_status cavp_apply_mode(struct TC_AES_ctx* ctx, enum cavp_mode mode, in
 #if TC_AES_ENABLE_ECB
     status = TC_OK;
     for (size_t offset = 0; status == TC_OK && offset < length; offset += TC_AES_BLOCKLEN)
-      status = encrypt ? TC_AES_ECB_encrypt(&ctx->key, buf + offset)
-                       : TC_AES_ECB_decrypt(&ctx->key, buf + offset);
+      status = encrypt ? TC_AES_ECB_encrypt(&ctx->key, (TC_buffer){buf + offset, TC_AES_BLOCKLEN})
+                       : TC_AES_ECB_decrypt(&ctx->key, (TC_buffer){buf + offset, TC_AES_BLOCKLEN});
 #endif
     break;
   case CAVP_CBC:
 #if TC_AES_ENABLE_CBC
     status = cavp_load_iv(ctx, record);
     if (status == TC_OK)
-      status =
-          encrypt ? TC_AES_CBC_encrypt(ctx, buf, length) : TC_AES_CBC_decrypt(ctx, buf, length);
+      status = encrypt ? TC_AES_CBC_encrypt(ctx, (TC_buffer){buf, length})
+                       : TC_AES_CBC_decrypt(ctx, (TC_buffer){buf, length});
 #endif
     break;
   case CAVP_OFB:
 #if TC_AES_ENABLE_OFB
     status = cavp_load_iv(ctx, record);
     if (status == TC_OK)
-      status = TC_AES_OFB_crypt(ctx, buf, length);
+      status = TC_AES_OFB_crypt(ctx, (TC_buffer){buf, length});
 #endif
     break;
   }
@@ -182,7 +184,7 @@ static TC_status cavp_apply(enum cavp_mode mode, int encrypt, const struct cavp_
                             uint8_t* buf, size_t length)
 {
   struct TC_AES_ctx ctx;
-  TC_status status = TC_AES_init(&ctx, record->key);
+  TC_status status = TC_AES_init(&ctx, (TC_bytes){record->key, TC_AES_KEYLEN});
   if (status == TC_OK)
     status = cavp_apply_mode(&ctx, mode, encrypt, record, buf, length);
   TC_AES_ctx_clear(&ctx);
@@ -344,7 +346,9 @@ static int cavp_mct_case(enum cavp_mode mode, const char* file, int encrypt,
   for (j = 0; j < 1000; ++j) {
     const int first = j == 0;
     if (mode == CAVP_OFB) {
-      munit_assert_int(TC_AES_CAVP_encrypt_block(key, ofb_state), ==, TC_OK);
+      munit_assert_int(TC_AES_CAVP_encrypt_block((TC_bytes){key, TC_AES_KEYLEN},
+                                                 (TC_buffer){ofb_state, TC_AES_BLOCKLEN}),
+                       ==, TC_OK);
       memcpy(output, input, TC_AES_BLOCKLEN);
       cavp_xor(output, ofb_state, TC_AES_BLOCKLEN);
     } else
@@ -629,9 +633,10 @@ static int cavp_run_gcm_decrypt_record(const char* filename, size_t count,
     return 0;
   }
   cavp_initialize_sbox();
-  result = tag_len < 12
-               ? TC_AES_GCM_decrypt_short_tag(key, iv_span, aad_span, ct_span, tag_span, pt_span)
-               : TC_AES_GCM_decrypt(key, iv_span, aad_span, ct_span, tag_span, pt_span);
+  result = tag_len < 12 ? TC_AES_GCM_decrypt_short_tag((TC_bytes){key, TC_AES_KEYLEN}, iv_span,
+                                                       aad_span, ct_span, tag_span, pt_span)
+                        : TC_AES_GCM_decrypt((TC_bytes){key, TC_AES_KEYLEN}, iv_span, aad_span,
+                                             ct_span, tag_span, pt_span);
   ok = expected_fail
            ? result == TC_MISMATCH
            : result == TC_OK && cavp_compare(filename, count, "PT", output, ct_len, pt, pt_len);
@@ -714,11 +719,11 @@ static int cavp_run_gcm_file(const char* filename)
                      ? TC_AES_GCM_init_short_tag(&ctx, key, (TC_bytes){iv, iv_len}, tag_len)
                      : TC_AES_GCM_init(&ctx, key, (TC_bytes){iv, iv_len}, tag_len);
         if (result == TC_OK)
-          result = TC_AES_GCM_aad_update(&ctx, aad, aad_len);
+          result = TC_AES_GCM_aad_update(&ctx, (TC_bytes){aad, aad_len});
         if (result == TC_OK)
-          result = TC_AES_GCM_encrypt_update(&ctx, output, pt_len);
+          result = TC_AES_GCM_encrypt_update(&ctx, (TC_buffer){output, pt_len});
         if (result == TC_OK)
-          result = TC_AES_GCM_encrypt_finish(&ctx, actual_tag);
+          result = TC_AES_GCM_encrypt_finish(&ctx, (TC_buffer){actual_tag, &ctx->tag_len});
         ok = result == TC_OK && cavp_compare(filename, count, "CT", output, pt_len, ct, ct_len) &&
              cavp_compare(filename, count, "Tag", actual_tag, tag_len, tag, tag_len);
         if (!ok)
@@ -858,8 +863,12 @@ TC_TEST_SHARED(test_cavp)
   {
     uint8_t block[TC_AES_BLOCKLEN] = {1, 2, 3}, saved[TC_AES_BLOCKLEN];
     memcpy(saved, block, sizeof block);
-    munit_assert_int(TC_AES_CAVP_encrypt_block(NULL, block), ==, TC_ERROR);
-    munit_assert_int(TC_AES_CAVP_decrypt_block(NULL, block), ==, TC_ERROR);
+    munit_assert_int(TC_AES_CAVP_encrypt_block((TC_bytes){NULL, TC_AES_KEYLEN},
+                                               (TC_buffer){block, TC_AES_BLOCKLEN}),
+                     ==, TC_ERROR);
+    munit_assert_int(TC_AES_CAVP_decrypt_block((TC_bytes){NULL, TC_AES_KEYLEN},
+                                               (TC_buffer){block, TC_AES_BLOCKLEN}),
+                     ==, TC_ERROR);
     munit_assert_memory_equal(sizeof block, block, saved);
   }
   return cavp_run_all() ? MUNIT_OK : MUNIT_FAIL;

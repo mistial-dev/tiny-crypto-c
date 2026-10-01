@@ -31,15 +31,15 @@ typedef struct {
  * key length, a key that overlaps ctx, or, in the runtime S-box profile, a
  * call before TC_AES_init_sbox. A NULL ctx is left alone. Every other
  * failure wipes ctx, so no earlier key stays usable. */
-TC_status TC_AES_dynamic_key_init(TC_AES_dynamic_key* ctx, const uint8_t* key, size_t key_len);
+TC_status TC_AES_dynamic_key_init(TC_AES_dynamic_key* ctx, TC_bytes key);
 /* Wipe the key schedule. NULL is ignored. */
 void TC_AES_dynamic_key_clear(TC_AES_dynamic_key* ctx);
 /* Encrypt or decrypt one 16-byte block in place (FIPS 197 sections 5.1 and
  * 5.3). block must be disjoint from ctx. Returns TC_OK, or TC_ERROR with
  * block unchanged for a NULL argument, an overlap or an unkeyed ctx. A
  * cipher failure wipes block. */
-TC_status TC_AES_dynamic_encrypt(const TC_AES_dynamic_key* ctx, uint8_t block[16]);
-TC_status TC_AES_dynamic_decrypt(const TC_AES_dynamic_key* ctx, uint8_t block[16]);
+TC_status TC_AES_dynamic_encrypt(const TC_AES_dynamic_key* ctx, TC_buffer block);
+TC_status TC_AES_dynamic_decrypt(const TC_AES_dynamic_key* ctx, TC_buffer block);
 
 /* CBC (SP 800-38A section 6.2) in place, without padding. length is a
  * multiple of 16. iv holds the chaining value and advances to the last
@@ -49,10 +49,8 @@ TC_status TC_AES_dynamic_decrypt(const TC_AES_dynamic_key* ctx, uint8_t block[16
  * iv, a NULL buffer with a nonzero length, an unaligned length, an overlap
  * or an unkeyed ctx. A cipher failure part way through wipes buffer and
  * iv. */
-TC_status TC_AES_dynamic_CBC_encrypt(const TC_AES_dynamic_key* ctx, uint8_t iv[16], uint8_t* buffer,
-                                     size_t length);
-TC_status TC_AES_dynamic_CBC_decrypt(const TC_AES_dynamic_key* ctx, uint8_t iv[16], uint8_t* buffer,
-                                     size_t length);
+TC_status TC_AES_dynamic_CBC_encrypt(const TC_AES_dynamic_key* ctx, TC_buffer iv, TC_buffer buffer);
+TC_status TC_AES_dynamic_CBC_decrypt(const TC_AES_dynamic_key* ctx, TC_buffer iv, TC_buffer buffer);
 
 /* Streaming AES-CMAC (SP 800-38B sections 6.1 and 6.2).
  * init keys ctx with a 16, 24 or 32-byte key disjoint from ctx and derives
@@ -69,9 +67,9 @@ TC_status TC_AES_dynamic_CBC_decrypt(const TC_AES_dynamic_key* ctx, uint8_t iv[1
  * overlap or an unkeyed ctx. Otherwise final wipes ctx, on success and on
  * failure.
  * clear wipes ctx and ignores NULL. */
-TC_status TC_AES_dynamic_CMAC_init(TC_AES_dynamic_CMAC* ctx, const uint8_t* key, size_t key_len);
-TC_status TC_AES_dynamic_CMAC_update(TC_AES_dynamic_CMAC* ctx, const uint8_t* data, size_t length);
-TC_status TC_AES_dynamic_CMAC_final(TC_AES_dynamic_CMAC* ctx, uint8_t tag[16]);
+TC_status TC_AES_dynamic_CMAC_init(TC_AES_dynamic_CMAC* ctx, TC_bytes key);
+TC_status TC_AES_dynamic_CMAC_update(TC_AES_dynamic_CMAC* ctx, TC_bytes data);
+TC_status TC_AES_dynamic_CMAC_final(TC_AES_dynamic_CMAC* ctx, TC_buffer tag);
 void TC_AES_dynamic_CMAC_clear(TC_AES_dynamic_CMAC* ctx);
 #endif
 #ifdef __cplusplus

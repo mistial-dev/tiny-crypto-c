@@ -285,7 +285,8 @@ TEST_CASE("AES CMAC wrapper returns status")
   uint8_t tag[TC_AES_BLOCKLEN];
   uint8_t expected[TC_AES_BLOCKLEN];
   CHECK(tiny_crypto::aes_cmac({kat_key, TC_AES_KEYLEN}, {nullptr, 0}, {tag, sizeof(tag)}) == TC_OK);
-  REQUIRE(TC_AES_CMAC(kat_key, nullptr, 0, expected, sizeof(expected)) == TC_OK);
+  REQUIRE(TC_AES_CMAC(TC_bytes{kat_key, TC_AES_KEYLEN}, TC_bytes{nullptr, 0},
+                      TC_buffer{expected, sizeof(expected)}) == TC_OK);
   CHECK(std::memcmp(tag, expected, sizeof(tag)) == 0);
   CHECK(tiny_crypto::aes_cmac({kat_key, TC_AES_KEYLEN - 1}, {nullptr, 0}, {tag, sizeof(tag)}) ==
         TC_ERROR);

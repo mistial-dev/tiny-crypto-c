@@ -23,11 +23,11 @@ static TC_status tc_aes_kw_kek_init(tc_aes_kw_kek* schedule, TC_bytes kek,
                                     tc_aes_block_key* block_key)
 {
 #if TC_AES_ENABLE_DYNAMIC
-  if (TC_AES_dynamic_key_init(schedule, kek.data, kek.length) != TC_OK)
+  if (TC_AES_dynamic_key_init(schedule, (TC_bytes){kek.data, kek.length}) != TC_OK)
     return TC_ERROR;
   block_key->rounds = schedule->rounds;
 #else
-  if (TC_AES_key_init(schedule, kek.data) != TC_OK)
+  if (TC_AES_key_init(schedule, (TC_bytes){kek.data, TC_AES_KEYLEN}) != TC_OK)
     return TC_ERROR;
   block_key->rounds = TC_AES_FIXED_ROUNDS;
 #endif

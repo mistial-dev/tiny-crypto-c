@@ -33,7 +33,7 @@ public:
   AES_dynamic& operator=(const AES_dynamic&) = delete;
   TC_CPP_NODISCARD TC_status init(bytes key) noexcept
   {
-    return ::TC_AES_dynamic_key_init(&ctx_, key.data, key.length);
+    return ::TC_AES_dynamic_key_init(&ctx_, TC_bytes{key.data, key.length});
   }
   template <size_t N> TC_CPP_NODISCARD TC_status init(const uint8_t (&key)[N]) noexcept
   {
@@ -45,21 +45,23 @@ public:
   }
   TC_CPP_NODISCARD TC_status encrypt(uint8_t (&block)[16]) const noexcept
   {
-    return ::TC_AES_dynamic_encrypt(&ctx_, block);
+    return ::TC_AES_dynamic_encrypt(&ctx_, TC_buffer{block, TC_AES_BLOCKLEN});
   }
   TC_CPP_NODISCARD TC_status decrypt(uint8_t (&block)[16]) const noexcept
   {
-    return ::TC_AES_dynamic_decrypt(&ctx_, block);
+    return ::TC_AES_dynamic_decrypt(&ctx_, TC_buffer{block, TC_AES_BLOCKLEN});
   }
   TC_CPP_NODISCARD TC_status cbc_encrypt(uint8_t (&iv)[16], uint8_t* buffer,
                                          size_t length) const noexcept
   {
-    return ::TC_AES_dynamic_CBC_encrypt(&ctx_, iv, buffer, length);
+    return ::TC_AES_dynamic_CBC_encrypt(&ctx_, TC_buffer{iv, TC_AES_BLOCKLEN},
+                                        TC_buffer{buffer, length});
   }
   TC_CPP_NODISCARD TC_status cbc_decrypt(uint8_t (&iv)[16], uint8_t* buffer,
                                          size_t length) const noexcept
   {
-    return ::TC_AES_dynamic_CBC_decrypt(&ctx_, iv, buffer, length);
+    return ::TC_AES_dynamic_CBC_decrypt(&ctx_, TC_buffer{iv, TC_AES_BLOCKLEN},
+                                        TC_buffer{buffer, length});
   }
 };
 
@@ -80,7 +82,7 @@ public:
   AES_dynamic_CMAC& operator=(const AES_dynamic_CMAC&) = delete;
   TC_CPP_NODISCARD TC_status init(bytes key) noexcept
   {
-    return ::TC_AES_dynamic_CMAC_init(&ctx_, key.data, key.length);
+    return ::TC_AES_dynamic_CMAC_init(&ctx_, TC_bytes{key.data, key.length});
   }
   template <size_t N> TC_CPP_NODISCARD TC_status init(const uint8_t (&key)[N]) noexcept
   {
@@ -88,7 +90,7 @@ public:
   }
   TC_CPP_NODISCARD TC_status update(bytes data) noexcept
   {
-    return ::TC_AES_dynamic_CMAC_update(&ctx_, data.data, data.length);
+    return ::TC_AES_dynamic_CMAC_update(&ctx_, TC_bytes{data.data, data.length});
   }
   template <size_t N> TC_CPP_NODISCARD TC_status update(const uint8_t (&data)[N]) noexcept
   {
@@ -96,7 +98,7 @@ public:
   }
   TC_CPP_NODISCARD TC_status finish(uint8_t (&tag)[16]) noexcept
   {
-    return ::TC_AES_dynamic_CMAC_final(&ctx_, tag);
+    return ::TC_AES_dynamic_CMAC_final(&ctx_, TC_buffer{tag, TC_AES_BLOCKLEN});
   }
   void clear() noexcept
   {

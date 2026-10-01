@@ -82,7 +82,7 @@ static TC_status tc_aes_eax_crypt(const uint8_t* key, TC_bytes nonce, TC_bytes a
                                    tag_len))
     return TC_ERROR;
 
-  if (TC_AES_key_init(&st.aes, key) != TC_OK)
+  if (TC_AES_key_init(&st.aes, (TC_bytes){key, TC_AES_KEYLEN}) != TC_OK)
     goto done;
   if (tc_aes_eax_constants(&st.aes, 0, st.d, st.q) != TC_OK ||
       tc_aes_eax_cmac(&st.aes, NULL, 0, nonce.data, nonce.length, st.d, st.q, st.nonce_mac) !=
@@ -140,28 +140,36 @@ static TC_status tc_aes_eax_decrypt_with_policy(const uint8_t* key, TC_bytes non
   return tc_aes_eax_crypt(key, nonce, aad, ciphertext, plaintext, tag.data, NULL, tag.length);
 }
 
-TC_status TC_AES_EAX_encrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes plaintext,
+TC_status TC_AES_EAX_encrypt(TC_bytes key, TC_bytes nonce, TC_bytes aad, TC_bytes plaintext,
                              TC_buffer ciphertext, TC_buffer tag)
 {
-  return tc_aes_eax_encrypt_with_policy(key, nonce, aad, plaintext, ciphertext, tag, 0);
+  if (key.length != TC_AES_KEYLEN)
+    return TC_ERROR;
+  return tc_aes_eax_encrypt_with_policy(key.data, nonce, aad, plaintext, ciphertext, tag, 0);
 }
 
-TC_status TC_AES_EAX_decrypt(const uint8_t* key, TC_bytes nonce, TC_bytes aad, TC_bytes ciphertext,
+TC_status TC_AES_EAX_decrypt(TC_bytes key, TC_bytes nonce, TC_bytes aad, TC_bytes ciphertext,
                              TC_bytes tag, TC_buffer plaintext)
 {
-  return tc_aes_eax_decrypt_with_policy(key, nonce, aad, ciphertext, tag, plaintext, 0);
+  if (key.length != TC_AES_KEYLEN)
+    return TC_ERROR;
+  return tc_aes_eax_decrypt_with_policy(key.data, nonce, aad, ciphertext, tag, plaintext, 0);
 }
 
-TC_status TC_AES_EAX_encrypt_short_tag(const uint8_t* key, TC_bytes nonce, TC_bytes aad,
+TC_status TC_AES_EAX_encrypt_short_tag(TC_bytes key, TC_bytes nonce, TC_bytes aad,
                                        TC_bytes plaintext, TC_buffer ciphertext, TC_buffer tag)
 {
-  return tc_aes_eax_encrypt_with_policy(key, nonce, aad, plaintext, ciphertext, tag, 1);
+  if (key.length != TC_AES_KEYLEN)
+    return TC_ERROR;
+  return tc_aes_eax_encrypt_with_policy(key.data, nonce, aad, plaintext, ciphertext, tag, 1);
 }
 
-TC_status TC_AES_EAX_decrypt_short_tag(const uint8_t* key, TC_bytes nonce, TC_bytes aad,
+TC_status TC_AES_EAX_decrypt_short_tag(TC_bytes key, TC_bytes nonce, TC_bytes aad,
                                        TC_bytes ciphertext, TC_bytes tag, TC_buffer plaintext)
 {
-  return tc_aes_eax_decrypt_with_policy(key, nonce, aad, ciphertext, tag, plaintext, 1);
+  if (key.length != TC_AES_KEYLEN)
+    return TC_ERROR;
+  return tc_aes_eax_decrypt_with_policy(key.data, nonce, aad, ciphertext, tag, plaintext, 1);
 }
 
 #endif /* EAX */
@@ -196,7 +204,7 @@ static TC_status tc_aes_eax_prime_crypt(const uint8_t* key, TC_bytes cleartext, 
                                    TC_AES_EAX_PRIME_TAG_LEN))
     return TC_ERROR;
 
-  if (TC_AES_key_init(&st.aes, key) != TC_OK)
+  if (TC_AES_key_init(&st.aes, (TC_bytes){key, TC_AES_KEYLEN}) != TC_OK)
     goto done;
   if (tc_aes_eax_constants(&st.aes, 1, st.d, st.q) != TC_OK ||
       tc_aes_eax_cmac(&st.aes, st.d, -1, cleartext.data, cleartext.length, st.d, st.q,
@@ -236,18 +244,20 @@ done:
   return status;
 }
 
-TC_status TC_AES_EAX_PRIME_encrypt(const uint8_t* key, TC_bytes cleartext, TC_bytes plaintext,
-                                   TC_buffer ciphertext, uint8_t tag[TC_AES_EAX_PRIME_TAG_LEN])
+TC_status TC_AES_EAX_PRIME_encrypt(TC_bytes key, TC_bytes cleartext, TC_bytes plaintext,
+                                   TC_buffer ciphertext, TC_buffer tag)
 {
-  return tc_aes_eax_prime_crypt(key, cleartext, plaintext, ciphertext, NULL, tag);
+  if (key.length != TC_AES_KEYLEN || tag.capacity < TC_AES_EAX_PRIME_TAG_LEN)
+    return TC_ERROR;
+  return tc_aes_eax_prime_crypt(key.data, cleartext, plaintext, ciphertext, NULL, tag.data);
 }
 
-TC_status TC_AES_EAX_PRIME_decrypt(const uint8_t* key, TC_bytes cleartext, TC_bytes ciphertext,
-                                   const uint8_t tag[TC_AES_EAX_PRIME_TAG_LEN], TC_buffer plaintext)
+TC_status TC_AES_EAX_PRIME_decrypt(TC_bytes key, TC_bytes cleartext, TC_bytes ciphertext,
+                                   TC_bytes tag, TC_buffer plaintext)
 {
-  if (tag == NULL)
+  if (key.length != TC_AES_KEYLEN || tag.data == NULL || tag.length != TC_AES_EAX_PRIME_TAG_LEN)
     return TC_ERROR;
-  return tc_aes_eax_prime_crypt(key, cleartext, ciphertext, plaintext, tag, NULL);
+  return tc_aes_eax_prime_crypt(key.data, cleartext, ciphertext, plaintext, tag.data, NULL);
 }
 
 #endif /* EAX_PRIME */

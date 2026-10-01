@@ -114,17 +114,14 @@ TC_TEST(peer_binding)
   munit_assert_int(TC_SHA256_digest((TC_bytes){certificate, sizeof certificate},
                                     session.data.traffic.peer_digest),
                    ==, TC_OK);
-  munit_assert_true(
-      TC_PIV_SM_peer_matches(&session, (TC_bytes){certificate, sizeof certificate}));
+  munit_assert_true(TC_PIV_SM_peer_matches(&session, (TC_bytes){certificate, sizeof certificate}));
   memcpy(other, certificate, sizeof other);
   other[sizeof other - 1] ^= 1;
   munit_assert_false(TC_PIV_SM_peer_matches(&session, (TC_bytes){other, sizeof other}));
   session.state = TC_PIV_SM_PENDING;
-  munit_assert_true(
-      TC_PIV_SM_peer_matches(&session, (TC_bytes){certificate, sizeof certificate}));
+  munit_assert_true(TC_PIV_SM_peer_matches(&session, (TC_bytes){certificate, sizeof certificate}));
   TC_PIV_SM_clear(&session);
-  munit_assert_false(
-      TC_PIV_SM_peer_matches(&session, (TC_bytes){certificate, sizeof certificate}));
+  munit_assert_false(TC_PIV_SM_peer_matches(&session, (TC_bytes){certificate, sizeof certificate}));
   munit_assert_false(TC_PIV_SM_peer_matches(NULL, (TC_bytes){certificate, sizeof certificate}));
   return MUNIT_OK;
 }
@@ -143,8 +140,8 @@ static void pending_session(TC_PIV_SM* session, TC_PIV_SM_suite suite)
   session->suite = (uint8_t)suite;
   session->state = TC_PIV_SM_READY;
   session->data.traffic.counter[15] = 1;
-  munit_assert_int(TC_PIV_SM_protect(session, &request, &written,
-                                     (TC_buffer){tag, sizeof tag}, &w), ==, TC_OK);
+  munit_assert_int(TC_PIV_SM_protect(session, &request, &written, (TC_buffer){tag, sizeof tag}, &w),
+                   ==, TC_OK);
   munit_assert_size(written, ==, 0);
 }
 
@@ -164,22 +161,27 @@ static size_t make_response(const TC_PIV_SM* session, size_t plain_length, int b
     output[3 + i] = (uint8_t)i;
   output[3 + plain_length] = bad_padding ? 0x81 : 0x80;
   memset(output + 4 + plain_length, 0, padded - plain_length - 1);
-  munit_assert_int(TC_AES_dynamic_key_init(&key, session->data.traffic.enc_key, key_length), ==,
-                   TC_OK);
-  munit_assert_int(TC_AES_dynamic_encrypt(&key, iv), ==, TC_OK);
-  munit_assert_int(TC_AES_dynamic_CBC_encrypt(&key, iv, output + 3, padded), ==, TC_OK);
+  munit_assert_int(
+      TC_AES_dynamic_key_init(&key, (TC_bytes){session->data.traffic.enc_key, key_length}), ==,
+      TC_OK);
+  munit_assert_int(TC_AES_dynamic_encrypt(&key, (TC_buffer){iv, TC_AES_BLOCKLEN}), ==, TC_OK);
+  munit_assert_int(TC_AES_dynamic_CBC_encrypt(&key, (TC_buffer){iv, TC_AES_BLOCKLEN},
+                                              (TC_buffer){output + 3, padded}),
+                   ==, TC_OK);
   TC_AES_dynamic_key_clear(&key);
   at = 3 + padded;
   output[at++] = 0x99;
   output[at++] = 2;
   output[at++] = 0x90;
   output[at++] = 0;
-  munit_assert_int(TC_AES_dynamic_CMAC_init(&mac, session->data.traffic.rmac_key, key_length), ==,
-                   TC_OK);
-  munit_assert_int(TC_AES_dynamic_CMAC_update(&mac, session->data.traffic.response_mcv, 16), ==,
-                   TC_OK);
-  munit_assert_int(TC_AES_dynamic_CMAC_update(&mac, output, at), ==, TC_OK);
-  munit_assert_int(TC_AES_dynamic_CMAC_final(&mac, tag), ==, TC_OK);
+  munit_assert_int(
+      TC_AES_dynamic_CMAC_init(&mac, (TC_bytes){session->data.traffic.rmac_key, key_length}), ==,
+      TC_OK);
+  munit_assert_int(
+      TC_AES_dynamic_CMAC_update(&mac, (TC_bytes){session->data.traffic.response_mcv, 16}), ==,
+      TC_OK);
+  munit_assert_int(TC_AES_dynamic_CMAC_update(&mac, (TC_bytes){output, at}), ==, TC_OK);
+  munit_assert_int(TC_AES_dynamic_CMAC_final(&mac, (TC_buffer){tag, TC_AES_BLOCKLEN}), ==, TC_OK);
   output[at++] = 0x8e;
   output[at++] = 8;
   memcpy(output + at, tag, 8);
@@ -271,10 +273,9 @@ TC_TEST(response_failures)
       plain_length = 999;
       session = saved;
       memset(&w, 0x5a, sizeof w);
-      munit_assert_int(
-          TC_PIV_SM_unprotect(&session, &request, (TC_buffer){output, sizeof output}, &plain_length,
-                              &w), ==,
-          TC_ERROR);
+      munit_assert_int(TC_PIV_SM_unprotect(&session, &request, (TC_buffer){output, sizeof output},
+                                           &plain_length, &w),
+                       ==, TC_ERROR);
       munit_assert_int(TC_PIV_SM_get_state(&session), ==, TC_PIV_SM_PENDING);
       munit_assert_memory_equal(sizeof session, &session, &saved);
       munit_assert_size(plain_length, ==, 999);
@@ -296,15 +297,17 @@ TC_TEST(response_failures)
       uint8_t tag[8];
       size_t written = 999;
       /* One protected command may be pending. */
-      munit_assert_int(TC_PIV_SM_protect(&session, &request, &written,
-                                         (TC_buffer){tag, sizeof tag}, &w), ==, TC_ERROR);
+      munit_assert_int(
+          TC_PIV_SM_protect(&session, &request, &written, (TC_buffer){tag, sizeof tag}, &w), ==,
+          TC_ERROR);
       munit_assert_memory_equal(sizeof session, &session, &saved);
       munit_assert_size(written, ==, 999);
       /* The counter stops before the low 120 bits repeat. */
       session.state = TC_PIV_SM_READY;
       session.data.traffic.counter[0] = 1;
-      munit_assert_int(TC_PIV_SM_protect(&session, &request, &written,
-                                         (TC_buffer){tag, sizeof tag}, &w), ==, TC_ERROR);
+      munit_assert_int(
+          TC_PIV_SM_protect(&session, &request, &written, (TC_buffer){tag, sizeof tag}, &w), ==,
+          TC_ERROR);
       munit_assert_true(tc_test_all_zero(&session, sizeof session));
       munit_assert_size(written, ==, 999);
     }
@@ -347,24 +350,24 @@ TC_TEST(in_place)
                                            (TC_buffer){ciphertext - 1, ciphertext_length},
                                            &plain_length, &w),
                        ==, TC_ERROR);
-      munit_assert_int(
-          TC_PIV_SM_unprotect(&session, &request, (TC_buffer){response + length - 8, 8},
-                              &plain_length, &w), ==,
-          TC_ERROR);
+      munit_assert_int(TC_PIV_SM_unprotect(&session, &request,
+                                           (TC_buffer){response + length - 8, 8}, &plain_length,
+                                           &w),
+                       ==, TC_ERROR);
       munit_assert_memory_equal(sizeof session, &session, &saved);
       munit_assert_size(plain_length, ==, 999);
       munit_assert_memory_equal(length, response, original);
       /* A capacity below the plaintext keeps the session PENDING. */
-      munit_assert_int(
-          TC_PIV_SM_unprotect(&session, &request, (TC_buffer){ciphertext, lengths[i] - 1},
-                              &plain_length, &w),
-          ==, TC_ERROR);
+      munit_assert_int(TC_PIV_SM_unprotect(&session, &request,
+                                           (TC_buffer){ciphertext, lengths[i] - 1}, &plain_length,
+                                           &w),
+                       ==, TC_ERROR);
       munit_assert_memory_equal(sizeof session, &session, &saved);
       munit_assert_memory_equal(length, response, original);
-      munit_assert_int(
-          TC_PIV_SM_unprotect(&session, &request, (TC_buffer){ciphertext, ciphertext_length},
-                              &plain_length, &w),
-          ==, TC_OK);
+      munit_assert_int(TC_PIV_SM_unprotect(&session, &request,
+                                           (TC_buffer){ciphertext, ciphertext_length},
+                                           &plain_length, &w),
+                       ==, TC_OK);
       munit_assert_size(plain_length, ==, lengths[i]);
       munit_assert_memory_equal(lengths[i], ciphertext, plain);
       munit_assert_int(TC_PIV_SM_get_state(&session), ==, TC_PIV_SM_READY);

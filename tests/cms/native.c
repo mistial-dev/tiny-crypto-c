@@ -570,7 +570,8 @@ TC_TEST(signed_data)
                      ==, TC_TLV_OK);
     munit_assert_true(tc_hash_info_get(algorithm.content_hash, &hash));
     munit_assert_int(TC_CMS_content_digest(container.content, algorithm.content_hash, &limits,
-                                           (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, (TC_buffer){digest, sizeof digest}),
+                                           (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
+                                           (TC_buffer){digest, sizeof digest}),
                      ==, TC_TLV_OK);
     uint8_t content_digest_bytes[TC_SHA512_DIGESTLEN];
     memcpy(content_digest_bytes, digest, hash.digest_length);
@@ -842,7 +843,7 @@ static TC_status workflow_card_proof(void* context, TC_PIV_card_profile profile,
   TC_X509_signature_result status =
       TC_X509_signature_verify_digest((TC_bytes){digest, digest_length}, &challenge->signature,
                                       (TC_bytes){signature, length}, key, proof->provider, &work);
-  TC_secure_zero(digest, sizeof digest);
+  TC_secure_zero((TC_buffer){digest, sizeof digest});
   TC_secure_zero(signature, sizeof signature);
   if (status == TC_X509_SIGNATURE_VALID && proof->replacement_ccl) {
     munit_assert_int(TC_TWIC_CCL_store_publish(proof->ccl_store, 1, proof->replacement_ccl), ==,
@@ -1869,8 +1870,7 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
               memcpy(recovered, encrypted, encrypted_length);
               size_t plaintext_length = 0;
               TC_credential_status authenticated = TC_CREDENTIAL_INVALID;
-              if (TC_TWIC_object_decrypt(&selected_key,
-                                         (TC_buffer){recovered, encrypted_length},
+              if (TC_TWIC_object_decrypt(&selected_key, (TC_buffer){recovered, encrypted_length},
                                          &plaintext_length) == TC_OK) {
                 ExampleBiometricRequest decrypted = biometric_request;
                 decrypted.encoded = (TC_bytes){recovered, plaintext_length};

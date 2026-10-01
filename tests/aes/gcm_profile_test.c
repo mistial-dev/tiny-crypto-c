@@ -22,13 +22,15 @@ TC_TEST(test_profile)
   uint8_t recovered[16];
   uint8_t tag[16];
 
-  munit_assert_false(TC_AES_GCM_encrypt(key, (TC_bytes){iv, sizeof(iv)}, (TC_bytes){NULL, 0},
+  munit_assert_false(TC_AES_GCM_encrypt((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){iv, sizeof(iv)},
+                                        (TC_bytes){NULL, 0},
                                         (TC_bytes){plaintext, sizeof(plaintext)},
                                         (TC_buffer){ciphertext, sizeof(plaintext)},
                                         (TC_buffer){tag, sizeof(tag)}) != TC_OK);
   munit_assert_false(memcmp(ciphertext, expected_ciphertext, sizeof(ciphertext)) != 0 ||
                      memcmp(tag, expected_tag, sizeof(tag)) != 0);
-  munit_assert_false(TC_AES_GCM_decrypt(key, (TC_bytes){iv, sizeof(iv)}, (TC_bytes){NULL, 0},
+  munit_assert_false(TC_AES_GCM_decrypt((TC_bytes){key, TC_AES_KEYLEN}, (TC_bytes){iv, sizeof(iv)},
+                                        (TC_bytes){NULL, 0},
                                         (TC_bytes){ciphertext, sizeof(ciphertext)},
                                         (TC_bytes){tag, sizeof(tag)},
                                         (TC_buffer){recovered, sizeof(ciphertext)}) != TC_OK);

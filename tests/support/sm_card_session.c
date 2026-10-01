@@ -22,10 +22,10 @@ static void mac_compute(const uint8_t* key, size_t key_bytes, const TC_bytes* pa
                         uint8_t out[BLOCK])
 {
   TC_AES_dynamic_CMAC mac;
-  TC_AES_dynamic_CMAC_init(&mac, key, key_bytes);
+  TC_AES_dynamic_CMAC_init(&mac, (TC_bytes){key, key_bytes});
   for (size_t i = 0; i < count; ++i)
-    TC_AES_dynamic_CMAC_update(&mac, parts[i].data, parts[i].length);
-  TC_AES_dynamic_CMAC_final(&mac, out);
+    TC_AES_dynamic_CMAC_update(&mac, (TC_bytes){parts[i].data, parts[i].length});
+  TC_AES_dynamic_CMAC_final(&mac, (TC_buffer){out, TC_AES_BLOCKLEN});
   TC_AES_dynamic_CMAC_clear(&mac);
 }
 
@@ -39,13 +39,13 @@ static void cipher(const tc_sm_card_session* session, int response, int decrypt,
   memcpy(iv, session->counter, BLOCK);
   if (response)
     iv[0] = 0x80;
-  TC_AES_dynamic_key_init(&key, session->enc_key, session->key_bytes);
-  TC_AES_dynamic_encrypt(&key, iv);
+  TC_AES_dynamic_key_init(&key, (TC_bytes){session->enc_key, session->key_bytes});
+  TC_AES_dynamic_encrypt(&key, (TC_buffer){iv, TC_AES_BLOCKLEN});
   if (length) {
     if (decrypt)
-      TC_AES_dynamic_CBC_decrypt(&key, iv, data, length);
+      TC_AES_dynamic_CBC_decrypt(&key, (TC_buffer){iv, TC_AES_BLOCKLEN}, (TC_buffer){data, length});
     else
-      TC_AES_dynamic_CBC_encrypt(&key, iv, data, length);
+      TC_AES_dynamic_CBC_encrypt(&key, (TC_buffer){iv, TC_AES_BLOCKLEN}, (TC_buffer){data, length});
   }
   TC_AES_dynamic_key_clear(&key);
 }

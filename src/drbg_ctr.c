@@ -51,7 +51,7 @@ static TC_DRBG_result update(TC_DRBG* drbg, const uint8_t* provided)
   for (i = 0; ok && i < seed_bytes; ++i)
     temp[i] ^= provided[i];
   if (ok)
-    ok = TC_AES_dynamic_key_init(&drbg->state.ctr.key, temp, key_bytes) == TC_OK;
+    ok = TC_AES_dynamic_key_init(&drbg->state.ctr.key, (TC_bytes){temp, key_bytes}) == TC_OK;
   if (ok)
     memcpy(drbg->state.ctr.v, temp + key_bytes, BLOCK);
   TC_secure_zero(temp, sizeof temp);
@@ -101,7 +101,7 @@ static TC_DRBG_result block_cipher_df(TC_DRBG* drbg, const TC_bytes* parts, size
   /* Step 8: K = leftmost keylen bits of 0x00 0x01 ... 0x1F. */
   for (offset = 0; offset < sizeof key; ++offset)
     key[offset] = (uint8_t)offset;
-  ok = ok && TC_AES_dynamic_key_init(&drbg->scratch.df_key, key, key_bytes) == TC_OK;
+  ok = ok && TC_AES_dynamic_key_init(&drbg->scratch.df_key, (TC_bytes){key, key_bytes}) == TC_OK;
   tc_internal_store_be32(header, (uint32_t)input_length);
   tc_internal_store_be32(header + 4, (uint32_t)seed_bytes);
   mac_key.round_key = drbg->scratch.df_key.round_key;
@@ -114,7 +114,7 @@ static TC_DRBG_result block_cipher_df(TC_DRBG* drbg, const TC_bytes* parts, size
 
   /* Steps 12 to 15: K and X from temp, then out = E(K, X) || E(K, E(K, X)) ... */
   if (ok)
-    ok = TC_AES_dynamic_key_init(&drbg->scratch.df_key, temp, key_bytes) == TC_OK;
+    ok = TC_AES_dynamic_key_init(&drbg->scratch.df_key, (TC_bytes){temp, key_bytes}) == TC_OK;
   memmove(temp, temp + key_bytes, BLOCK);
   for (offset = 0; ok && offset < seed_bytes; offset += BLOCK) {
     ok = encrypt(&drbg->scratch.df_key, temp);
@@ -154,7 +154,8 @@ TC_DRBG_result tc_drbg_ctr_seed(TC_DRBG* drbg, const TC_bytes* parts, size_t cou
   TC_DRBG_result result = seed_material(drbg, parts, count, seed);
   if (result == TC_DRBG_OK && !reseed) {
     memset(drbg->state.ctr.v, 0, BLOCK);
-    if (TC_AES_dynamic_key_init(&drbg->state.ctr.key, zero_key, drbg->key_bytes) != TC_OK)
+    if (TC_AES_dynamic_key_init(&drbg->state.ctr.key, (TC_bytes){zero_key, drbg->key_bytes}) !=
+        TC_OK)
       result = TC_DRBG_ERROR;
   }
   if (result == TC_DRBG_OK)

@@ -17,10 +17,10 @@ static int storage_valid(const TC_TWIC_tpk* key, uint8_t* buffer, size_t length,
 static TC_status transform(const TC_TWIC_tpk* key, uint8_t* buffer, size_t length, int encrypt)
 {
   struct TC_AES_key_ctx aes;
-  TC_status result = TC_AES_key_init(&aes, key->key);
+  TC_status result = TC_AES_key_init(&aes, (TC_bytes){key->key, TC_AES_KEYLEN});
   for (size_t offset = 0; result == TC_OK && offset < length; offset += TC_AES_BLOCKLEN)
-    result = encrypt ? TC_AES_ECB_encrypt(&aes, buffer + offset)
-                     : TC_AES_ECB_decrypt(&aes, buffer + offset);
+    result = encrypt ? TC_AES_ECB_encrypt(&aes, (TC_buffer){buffer + offset, TC_AES_BLOCKLEN})
+                     : TC_AES_ECB_decrypt(&aes, (TC_buffer){buffer + offset, TC_AES_BLOCKLEN});
   TC_secure_zero(&aes, sizeof aes);
   if (result != TC_OK)
     TC_secure_zero(buffer, length);

@@ -52,14 +52,14 @@ static void check_fixed_mode(mode_fn mode, size_t length)
   uint8_t buffer[48];
   struct TC_AES_ctx ctx;
   munit_assert_size(length, <=, sizeof buffer);
-  munit_assert_int(TC_AES_init(&ctx, key), ==, TC_OK);
-  munit_assert_int(TC_AES_set_iv(&ctx, iv), ==, TC_OK);
+  munit_assert_int(TC_AES_init(&ctx, (TC_bytes){key, TC_AES_KEYLEN}), ==, TC_OK);
+  munit_assert_int(TC_AES_set_iv(&ctx, (TC_bytes){iv, TC_AES_BLOCKLEN}), ==, TC_OK);
   memset(buffer, 0x11, sizeof buffer);
   calls = 0;
   fail_at = 0;
   munit_assert_int(mode(&ctx, buffer, length), ==, TC_OK);
   munit_assert_uint(calls, >, 1);
-  munit_assert_int(TC_AES_set_iv(&ctx, iv), ==, TC_OK);
+  munit_assert_int(TC_AES_set_iv(&ctx, (TC_bytes){iv, TC_AES_BLOCKLEN}), ==, TC_OK);
   calls = 0;
   fail_at = 2;
   munit_assert_int(mode(&ctx, buffer, length), ==, TC_ERROR);
@@ -83,19 +83,21 @@ TC_TEST(ecb)
   static const uint8_t key[TC_AES_KEYLEN] = {1};
   struct TC_AES_key_ctx schedule;
   uint8_t block[TC_AES_BLOCKLEN] = {0};
-  munit_assert_int(TC_AES_key_init(&schedule, key), ==, TC_OK);
+  munit_assert_int(TC_AES_key_init(&schedule, (TC_bytes){key, TC_AES_KEYLEN}), ==, TC_OK);
   /* A failed block cipher call leaves no partly transformed block. */
   calls = 0;
   fail_at = 1;
   memset(block, 0x33, sizeof block);
-  munit_assert_int(TC_AES_ECB_encrypt(&schedule, block), ==, TC_ERROR);
+  munit_assert_int(TC_AES_ECB_encrypt(&schedule, (TC_buffer){block, TC_AES_BLOCKLEN}), ==,
+                   TC_ERROR);
   munit_assert_true(tc_test_all_zero(block, sizeof block));
   calls = 0;
   memset(block, 0x33, sizeof block);
-  munit_assert_int(TC_AES_ECB_decrypt(&schedule, block), ==, TC_ERROR);
+  munit_assert_int(TC_AES_ECB_decrypt(&schedule, (TC_buffer){block, TC_AES_BLOCKLEN}), ==,
+                   TC_ERROR);
   munit_assert_true(tc_test_all_zero(block, sizeof block));
   fail_at = 0;
-  munit_assert_int(TC_AES_ECB_encrypt(&schedule, block), ==, TC_OK);
+  munit_assert_int(TC_AES_ECB_encrypt(&schedule, (TC_buffer){block, TC_AES_BLOCKLEN}), ==, TC_OK);
   TC_AES_key_ctx_clear(&schedule);
   return MUNIT_OK;
 }
@@ -105,14 +107,16 @@ TC_TEST(dynamic_cbc)
   static const uint8_t raw[16] = {7, 8, 9};
   TC_AES_dynamic_key key;
   uint8_t iv[16], buffer[48];
-  munit_assert_int(TC_AES_dynamic_key_init(&key, raw, sizeof raw), ==, TC_OK);
+  munit_assert_int(TC_AES_dynamic_key_init(&key, (TC_bytes){raw, sizeof raw}), ==, TC_OK);
   for (int decrypt = 0; decrypt < 2; ++decrypt) {
     memset(iv, 0x22, sizeof iv);
     memset(buffer, 0x11, sizeof buffer);
     calls = 0;
     fail_at = 2;
-    munit_assert_int(decrypt ? TC_AES_dynamic_CBC_decrypt(&key, iv, buffer, sizeof buffer)
-                             : TC_AES_dynamic_CBC_encrypt(&key, iv, buffer, sizeof buffer),
+    munit_assert_int(decrypt ? TC_AES_dynamic_CBC_decrypt(&key, (TC_buffer){iv, TC_AES_BLOCKLEN},
+                                                          (TC_buffer){buffer, sizeof buffer})
+                             : TC_AES_dynamic_CBC_encrypt(&key, (TC_buffer){iv, TC_AES_BLOCKLEN},
+                                                          (TC_buffer){buffer, sizeof buffer}),
                      ==, TC_ERROR);
     munit_assert_true(tc_test_all_zero(buffer, sizeof buffer));
     munit_assert_true(tc_test_all_zero(iv, sizeof iv));
@@ -128,18 +132,18 @@ TC_TEST(dynamic_block)
   static const uint8_t raw[24] = {7, 8, 9};
   TC_AES_dynamic_key key;
   uint8_t block[16];
-  munit_assert_int(TC_AES_dynamic_key_init(&key, raw, sizeof raw), ==, TC_OK);
+  munit_assert_int(TC_AES_dynamic_key_init(&key, (TC_bytes){raw, sizeof raw}), ==, TC_OK);
   for (int decrypt = 0; decrypt < 2; ++decrypt) {
     memset(block, 0x33, sizeof block);
     calls = 0;
     fail_at = 1;
-    munit_assert_int(decrypt ? TC_AES_dynamic_decrypt(&key, block)
-                             : TC_AES_dynamic_encrypt(&key, block),
+    munit_assert_int(decrypt ? TC_AES_dynamic_decrypt(&key, (TC_buffer){block, TC_AES_BLOCKLEN})
+                             : TC_AES_dynamic_encrypt(&key, (TC_buffer){block, TC_AES_BLOCKLEN}),
                      ==, TC_ERROR);
     munit_assert_true(tc_test_all_zero(block, sizeof block));
     fail_at = 0;
-    munit_assert_int(decrypt ? TC_AES_dynamic_decrypt(&key, block)
-                             : TC_AES_dynamic_encrypt(&key, block),
+    munit_assert_int(decrypt ? TC_AES_dynamic_decrypt(&key, (TC_buffer){block, TC_AES_BLOCKLEN})
+                             : TC_AES_dynamic_encrypt(&key, (TC_buffer){block, TC_AES_BLOCKLEN}),
                      ==, TC_OK);
   }
   TC_AES_dynamic_key_clear(&key);
