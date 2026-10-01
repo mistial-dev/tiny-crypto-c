@@ -442,10 +442,10 @@ link and clears it on destruction. `piv_application_read` and
   ASYMMETRIC KEY PAIR and OCC VERIFY (`96`, `97`) are outside the library.
 - The response buffer holds the whole answer and SW1 SW2.
   `TC_PIV_RESPONSE_BYTES(nr)` sizes a buffer for nr data bytes on any link.
-- Three TWIC NEXGEN behaviours follow the specification text and await
-  confirmation on a NEXGEN card: the `FF` request after `61 00` (TWIC Part 2 v5
-  section 5.2 note 3a), the `9E` key of section 5.3, and a TWIC AID in the
-  Discovery Object of the PIV application (section 4.7.5).
+- Two TWIC NEXGEN behaviours follow the specification text and await
+  confirmation on a NEXGEN card: the `9E` key of TWIC Part 2 v5 section 5.3,
+  and a TWIC AID in the Discovery Object of the PIV application (section
+  4.7.5).
 
 ## Resource use
 

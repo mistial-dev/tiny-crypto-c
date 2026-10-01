@@ -101,9 +101,10 @@ secure messaging and chaining bits and keeps the logical channel. The 6CXX rule
 still follows the command CLA, so a plain GET RESPONSE after a protected command
 keeps the secure messaging behaviour.
 
-TWIC Part 2 v5 section 5.2 note 3a describes NEXGEN cards that answer GET
-RESPONSE with Le `00` by returning no data. `TC_APDU_GET_RESPONSE_LE_FF` requests
-`FF` after `61 00` for those cards.
+After `61 00` the channel requests 256 bytes with Le `00` (ISO/IEC 7816-4
+section 5.3.4, TWIC Part 2 v5 Appendix E). A TWIC NEXGEN card answers Le `FF`
+after `61 00` with 255 bytes and `9000` and drops the rest of the object, so
+TWIC Part 2 v5 section 5.2 note 3a does not describe its GET RESPONSE.
 
 ## Example
 

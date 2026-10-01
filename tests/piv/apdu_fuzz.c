@@ -273,9 +273,8 @@ static void exchange_check(TC_APDU_length_format format, const TC_APDU_command* 
                            answer_mode mode, TC_bytes source, size_t capacity)
 {
   const TC_APDU_channel_options options = {
-      format,
-      format == TC_APDU_SHORT ? TC_APDU_GET_RESPONSE_PLAIN_CLA | TC_APDU_GET_RESPONSE_LE_FF : 0,
-      CHANNEL_EXCHANGES, 0, 0};
+      format, format == TC_APDU_SHORT ? TC_APDU_GET_RESPONSE_PLAIN_CLA : 0, CHANNEL_EXCHANGES, 0,
+      0};
   TC_APDU_channel channel;
   TC_APDU_response out;
   card_setup(NULL, 0, mode, source, NULL);

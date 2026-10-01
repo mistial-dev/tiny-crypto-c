@@ -346,8 +346,7 @@ TC_TEST(select_twic)
   munit_assert_int(info.application, ==, TC_PIV_APPLICATION_TWIC);
   munit_assert_int(info.profile, ==, TC_TWIC_NEXGEN_CARD);
   munit_assert_int(info.interface, ==, TC_PIV_CONTACTLESS);
-  munit_assert_uint(link.channel.flags, ==,
-                    TC_APDU_GET_RESPONSE_PLAIN_CLA | TC_APDU_GET_RESPONSE_LE_FF);
+  munit_assert_uint(link.channel.flags, ==, TC_APDU_GET_RESPONSE_PLAIN_CLA);
   munit_assert_size(link.channel.max_command_bytes, ==, 0x400);
   munit_assert_size(link.channel.max_response_bytes, ==, 0x800);
   assert_script_done();

@@ -217,10 +217,10 @@ TC_TLV_result TC_PIV_application_read(TC_bytes response, TC_PIV_application_id e
  * other than the selected one also clears a bound secure messaging session.
  * On success the link records
  * the application and profile, applies the DO 7F66 limits to the channel and
- * sets the GET RESPONSE flags: PIV TC_APDU_GET_RESPONSE_PLAIN_CLA (Part 2
- * 4.2.6, A.4.1), TWIC PLAIN_CLA and TC_APDU_GET_RESPONSE_LE_FF (TWIC Part 2
- * v5 5.2 note 3a, Appendix E). Any other outcome after transmit leaves no
- * application selected.
+ * sets TC_APDU_GET_RESPONSE_PLAIN_CLA (Part 2 4.2.6, A.4.1, TWIC Part 2 v5
+ * Appendix E). GET RESPONSE after 61 00 requests 256 bytes with Le 00 on both
+ * applications (TWIC Part 2 v5 Appendix E). Any other outcome after transmit
+ * leaves no application selected.
  *
  * TC_PIV_ARGUMENT     NULL link or out, a cleared link, an unknown
  *                     application or flag, response with NULL data or below

@@ -142,9 +142,7 @@ enum {
   /* GET RESPONSE uses CLA & 0x03 (SM and chaining bits cleared) in place of
    * the command CLA. ISO/IEC 7816-4 5.6 permits the same CLA. SP 800-73-5
    * Part 2 4.2.6 and A.4.1 use 00. */
-  TC_APDU_GET_RESPONSE_PLAIN_CLA = 1u << 0,
-  /* After 61 00, request Le FF in place of 00 (TWIC Part 2 v5 5.2 note 3a). */
-  TC_APDU_GET_RESPONSE_LE_FF = 1u << 1
+  TC_APDU_GET_RESPONSE_PLAIN_CLA = 1u << 0
 };
 
 /* Channel configuration.
@@ -208,8 +206,7 @@ TC_APDU_result TC_APDU_channel_restrict(TC_APDU_channel* channel, size_t max_com
  * 63XX warning on an intermediate answer is INVALID (5.6).
  *
  * A final 61XX is followed by GET RESPONSE (INS C0, P1 P2 00 00, Le = SW2,
- * where 00 requests 256 or FF with TC_APDU_GET_RESPONSE_LE_FF), and each data
- * chunk is appended (5.3.4). GET RESPONSE uses the command CLA, or CLA & 0x03
+ * where 00 requests 256), and each data chunk is appended (5.3.4). GET RESPONSE uses the command CLA, or CLA & 0x03
  * with TC_APDU_GET_RESPONSE_PLAIN_CLA. A 6CXX answer without data to an
  * unchained command with Le, or to a GET RESPONSE step, re-issues that step
  * once with Le = SW2 (5.6), when the command CLA has no SM bits. A second 6CXX

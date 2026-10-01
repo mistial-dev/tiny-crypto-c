@@ -319,11 +319,9 @@ static void selection_reset(TC_PIV_link* link, TC_PIV_application_id application
 static TC_PIV_result selection_apply(TC_PIV_link* link, TC_PIV_application_id application,
                                      const TC_PIV_application* selected)
 {
-  unsigned flags = TC_APDU_GET_RESPONSE_PLAIN_CLA;
-  if (application == TC_PIV_APPLICATION_TWIC)
-    flags |= TC_APDU_GET_RESPONSE_LE_FF;
-  const TC_APDU_result result = TC_APDU_channel_restrict(
-      &link->channel, selected->max_command_bytes, selected->max_response_bytes, flags);
+  const TC_APDU_result result =
+      TC_APDU_channel_restrict(&link->channel, selected->max_command_bytes,
+                               selected->max_response_bytes, TC_APDU_GET_RESPONSE_PLAIN_CLA);
   if (result != TC_APDU_OK)
     return result == TC_APDU_ERROR ? TC_PIV_ERROR : TC_PIV_INVALID;
   link->application = (uint8_t)application;

@@ -105,7 +105,9 @@ TC_TEST(response_chaining)
   return MUNIT_OK;
 }
 
-/* 61 00 requests 256 bytes, or FF with TC_APDU_GET_RESPONSE_LE_FF. */
+/* 61 00 requests 256 bytes with Le 00 (ISO/IEC 7816-4 5.3.4, TWIC Part 2 v5
+ * Appendix E). A NEXGEN card answers Le FF after 61 00 with 255 bytes and
+ * 9000, dropping the rest of the object. */
 TC_TEST(get_response_le)
 {
   static char full[2 * 258 + 1];
@@ -120,9 +122,7 @@ TC_TEST(get_response_le)
   munit_assert_size(out.data.length, ==, 256);
   assert_script_done();
 
-  const tc_script_step twic[] = {{NULL, "6100", {0}, {0}, TC_OK, 0},
-                                 {"00c00000ff", full, {0}, {0}, TC_OK, 0}};
-  channel = start(twic, 2, TC_APDU_SHORT, TC_APDU_GET_RESPONSE_LE_FF);
+  channel = start(plain, 2, TC_APDU_SHORT, TC_APDU_GET_RESPONSE_PLAIN_CLA);
   munit_assert_int(run(&channel, &command, 258, &out), ==, TC_APDU_OK);
   munit_assert_size(out.data.length, ==, 256);
   assert_script_done();

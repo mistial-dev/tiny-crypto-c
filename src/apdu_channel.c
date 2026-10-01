@@ -9,7 +9,7 @@
 #include "internal.h"
 
 enum {
-  KNOWN_FLAGS = TC_APDU_GET_RESPONSE_PLAIN_CLA | TC_APDU_GET_RESPONSE_LE_FF,
+  KNOWN_FLAGS = TC_APDU_GET_RESPONSE_PLAIN_CLA,
   GET_RESPONSE = 0xc0,
   MORE_DATA = 0x61,
   WRONG_LENGTH = 0x6c,
@@ -156,7 +156,7 @@ static TC_APDU_command get_response(const TC_APDU_channel* channel, uint8_t cla,
   if (channel->flags & TC_APDU_GET_RESPONSE_PLAIN_CLA)
     step.cla = (uint8_t)(cla & TC_APDU_CLA_CHANNEL_MASK);
   if (!sw2)
-    step.ne = channel->flags & TC_APDU_GET_RESPONSE_LE_FF ? 0xffu : TC_APDU_SHORT_MAX_NE;
+    step.ne = TC_APDU_SHORT_MAX_NE;
   return step;
 }
 

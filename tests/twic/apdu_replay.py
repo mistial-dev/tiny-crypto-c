@@ -103,7 +103,7 @@ def append_general_authenticate(lines, challenge, signature):
     lines.append((b"\x00\xc0\x00\x00\x08",response[256:] + b"\x90\x00"))
 
 
-def append_object(lines, tag, contents, le_ff, zero_hint=False):
+def append_object(lines, tag, contents, zero_hint=False):
     """Append GET DATA for tag and the GET RESPONSE steps of its answer.
 
     Le 00 on GET DATA gets 256 bytes. With zero_hint the card answers a long
@@ -113,7 +113,7 @@ def append_object(lines, tag, contents, le_ff, zero_hint=False):
     remaining = memoryview(contents)
     if zero_hint and len(contents) > 256:
         lines.append((command, b"\x61\x00"))
-        command = bytes.fromhex("00c00000ff" if le_ff else "00c0000000")
+        command = bytes.fromhex("00c0000000")
     while True:
         chunk = bytes(remaining[:command[-1] or 256])
         remaining = remaining[len(chunk):]
@@ -124,8 +124,7 @@ def append_object(lines, tag, contents, le_ff, zero_hint=False):
         lines.append((command, chunk + status))
         if not remaining:
             break
-        le = status[1] or (0xff if le_ff else 0)
-        command = bytes((0, 0xc0, 0, 0, le))
+        command = bytes((0, 0xc0, 0, 0, status[1]))
 
 
 def append_twic_inventory(lines, profile, interface):
@@ -138,7 +137,7 @@ def append_twic_inventory(lines, profile, interface):
             continue
         path = folder / (name + ".bin")
         if path.exists():
-            append_object(lines, tag, path.read_bytes(), True, tag != "dfc101")
+            append_object(lines, tag, path.read_bytes(), tag != "dfc101")
         elif optional:
             lines.append((get_data(tag), b"\x6a\x82"))
         else:
@@ -146,7 +145,7 @@ def append_twic_inventory(lines, profile, interface):
 
 
 def append_piv_object(lines, folder, name, tag):
-    append_object(lines, tag, (folder / (name + ".bin")).read_bytes(), False, True)
+    append_object(lines, tag, (folder / (name + ".bin")).read_bytes(), True)
 
 
 def render(profile, interface):
