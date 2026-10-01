@@ -106,7 +106,7 @@ static TC_RSA_result sign_v15(const TC_RSA_private_key* key, TC_hash_algorithm h
                               TC_RSA_execution execution)
 {
   const TC_RSA_v15_options options = {hash};
-  return TC_RSA_sign_v15_digest(key, &options, digest, workspace, output, &execution);
+  return TC_RSA_sign_v15_digest(key, &options, digest, output, workspace, &execution);
 }
 
 static TC_RSA_result verify_v15(const TC_RSA_public_key* key, TC_hash_algorithm hash,

@@ -82,6 +82,11 @@ typedef enum {
   TC_EC_OPERATION_GENERATE /* one scalar attempt */
 } TC_EC_operation;
 
+typedef struct {
+  TC_hash_algorithm hash;
+  size_t candidate_attempts;
+} TC_ECDSA_sign_options;
+
 #if TC_ENABLE_EC
 /* Work units for one operation, or one attempt of a randomized operation, on
  * curve. A scalar multiplication or a modular inversion costs one unit per
@@ -227,6 +232,17 @@ TC_EC_result TC_ECDSA_verify_digest(TC_EC_curve curve, TC_bytes public_key, TC_b
 TC_EC_result TC_ECDSA_sign_digest(TC_EC_curve curve, TC_bytes private_key, TC_bytes public_key,
                                   TC_bytes digest, TC_buffer signature,
                                   TC_ECDSA_workspace* workspace, TC_EC_execution* execution);
+
+/* Sign with the deterministic nonce generation procedure from RFC 6979
+ * section 3.2. options.hash identifies the hash that produced digest, whose
+ * length must match that hash. candidate_attempts bounds the RFC 6979 retry
+ * sequence for the negligible r = 0, s = 0, or out-of-range cases. This API
+ * uses the enabled internal hash implementation and does not require HMAC to
+ * be exposed as a public feature. */
+TC_EC_result TC_ECDSA_sign_digest_deterministic(
+    TC_EC_curve curve, const TC_ECDSA_sign_options* options, TC_bytes private_key,
+    TC_bytes public_key, TC_bytes digest, TC_buffer signature, TC_ECDSA_workspace* workspace,
+    TC_work_budget* work);
 #endif
 
 #ifdef __cplusplus

@@ -58,21 +58,21 @@ static TC_RSA_result sign_v15(const TC_RSA_private_key* key, TC_hash_algorithm h
                               TC_RSA_execution execution)
 {
   const TC_RSA_v15_options options = {hash};
-  return TC_RSA_sign_v15_digest(key, &options, digest, workspace, output, &execution);
+  return TC_RSA_sign_v15_digest(key, &options, digest, output, workspace, &execution);
 }
 
 static TC_RSA_result sign_pss(const TC_RSA_private_key* key, TC_RSA_pss_options options,
                               TC_bytes digest, TC_buffer output, const TC_RSA_workspace* workspace,
                               TC_RSA_execution execution)
 {
-  return TC_RSA_sign_pss_digest(key, &options, digest, workspace, output, &execution);
+  return TC_RSA_sign_pss_digest(key, &options, digest, output, workspace, &execution);
 }
 
 static TC_RSA_result decrypt_oaep(const TC_RSA_private_key* key, TC_RSA_oaep_options options,
                                   TC_bytes ciphertext, TC_buffer output, size_t* length,
                                   const TC_RSA_workspace* workspace, TC_RSA_execution execution)
 {
-  return TC_RSA_decrypt_oaep(key, &options, ciphertext, workspace, output, length, &execution);
+  return TC_RSA_decrypt_oaep(key, &options, ciphertext, output, length, workspace, &execution);
 }
 
 TC_TEST(key_generation)

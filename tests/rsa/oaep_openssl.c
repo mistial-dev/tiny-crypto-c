@@ -113,8 +113,8 @@ static MunitResult interoperability(const MunitParameter params[], void* user)
     memset(ciphertext, 0xa5, sizeof ciphertext);
     const TC_RSA_oaep_options options = {TC_HASH_SHA256, TC_HASH_SHA256, labels[0]};
     TC_RSA_execution execution = {{failed_seed, &calls}, 0, {(uint32_t)budget}};
-    munit_assert_int(TC_RSA_encrypt_oaep(&public_key, &options, message, &limited,
-                                         (TC_buffer){ciphertext, output_length}, &execution),
+    munit_assert_int(TC_RSA_encrypt_oaep(&public_key, &options, message,
+                                         (TC_buffer){ciphertext, output_length}, &limited, &execution),
                      ==, expected);
     munit_assert_size(calls, ==, failure == RNG_FAILURE ? 1 : 0);
     for (size_t i = 0; i < sizeof ciphertext; ++i)
@@ -196,8 +196,8 @@ static MunitResult interoperability(const MunitParameter params[], void* user)
             const TC_RSA_oaep_options options = {hashes[h].algorithm, hashes[mgf].algorithm,
                                                  labels[l]};
             TC_RSA_execution execution = {{fixed_seed, seed}, 0, {(uint32_t)budgets[b]}};
-            munit_assert_int(TC_RSA_encrypt_oaep(&public_key, &options, message, &arithmetic,
-                                                 (TC_buffer){ciphertext, width}, &execution),
+            munit_assert_int(TC_RSA_encrypt_oaep(&public_key, &options, message,
+                                                 (TC_buffer){ciphertext, width}, &arithmetic, &execution),
                              ==, complete ? TC_RSA_OK : TC_RSA_LIMIT);
             if (!complete)
               for (size_t j = 0; j < sizeof ciphertext; ++j)

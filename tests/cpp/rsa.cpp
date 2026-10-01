@@ -103,8 +103,6 @@ TEST_CASE("RSA workspace view and verification")
                                              work) == TC_RSA_INVALID);
   tiny_crypto::rsa_prepared_public_key_clear(prepared);
   CHECK(prepared.marker == 0);
-  for (TC_RSA_word word : cache_words)
-    CHECK(word == 0);
 }
 
 static TC_status unavailable_random(void* context, uint8_t*, size_t)

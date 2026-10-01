@@ -64,6 +64,9 @@ if(TINY_CRYPTO_BUILD_TESTS)
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_package_boundaries.py)
     add_test(NAME test_vector_manifests
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_vector_manifests.py)
+    add_test(NAME test_cavp_rsp
+      COMMAND ${Python3_EXECUTABLE} -m unittest tests.test_cavp_rsp)
+    set_tests_properties(test_cavp_rsp PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
     add_test(NAME test_argument_order
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_argument_order.py)
     add_test(NAME test_no_wall_clock
@@ -184,11 +187,11 @@ if(TINY_CRYPTO_BUILD_TESTS)
   tc_add_c_test(test_rsa_pss tiny-crypto-c-test tests/rsa/pss.c)
   tc_add_c_test(test_rsa_oaep tiny-crypto-c-test tests/rsa/oaep.c)
   tc_add_c_test(test_rsa_oaep_arguments tiny-crypto-c-test tests/rsa/oaep_arguments.c ${tc_rsa_sources})
-  target_compile_definitions(test_rsa_oaep_arguments PRIVATE TC_ENABLE_RSA=1)
+  target_compile_definitions(test_rsa_oaep_arguments PRIVATE TC_ENABLE_RSA=1 TC_RSA_ENABLE_1024=1)
   tc_add_c_test(test_rsa_work tiny-crypto-c-test tests/rsa/work.c ${tc_rsa_sources})
-  target_compile_definitions(test_rsa_work PRIVATE TC_ENABLE_RSA=1)
+  target_compile_definitions(test_rsa_work PRIVATE TC_ENABLE_RSA=1 TC_RSA_ENABLE_1024=1)
   tc_add_c_test(test_rsa_work_small tiny-crypto-c-test tests/rsa/work.c ${tc_rsa_sources})
-  target_compile_definitions(test_rsa_work_small PRIVATE TC_ENABLE_RSA=1 TC_RSA_SMALL=1)
+  target_compile_definitions(test_rsa_work_small PRIVATE TC_ENABLE_RSA=1 TC_RSA_ENABLE_1024=1 TC_RSA_SMALL=1)
   foreach(feature AES TLV EC)
     tc_add_c_test(test_direct_${feature}_consumer test_direct_${feature} tests/default_profile.c)
   endforeach()
@@ -290,7 +293,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
     tc_add_test_library(tiny-crypto-c-test-ec-${small} src/common.c src/ec.c ${tc_rsa_sources} src/tlv.c src/tlv_walk.c src/der.c src/x509_key.c src/pki_key.c)
     target_compile_definitions(tiny-crypto-c-test-ec-${small} PUBLIC
       TC_ENABLE_EC=1 TC_EC_ENABLE_P192=1 TC_EC_SMALL=${small} TC_ENABLE_AES=0 TC_ENABLE_SHA256=0
-      TC_ENABLE_RSA=1 TC_RSA_SMALL=${small}
+      TC_ENABLE_RSA=1 TC_RSA_ENABLE_1024=1 TC_RSA_SMALL=${small}
       TC_ENABLE_TLV=1 TC_ENABLE_DER=1 TC_ENABLE_X509=1)
     tc_add_c_test(test_ec_${small} tiny-crypto-c-test-ec-${small} tests/ec/test.c)
     tc_add_c_test(test_ecdsa_reader_${small} tiny-crypto-c-test-ec-${small} tests/ec/signature_reader.c)
@@ -309,7 +312,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   foreach(small 0 1)
     tc_add_test_library(tiny-crypto-c-test-rsa-${small} src/common.c ${tc_rsa_sources})
     target_compile_definitions(tiny-crypto-c-test-rsa-${small} PUBLIC
-      TC_ENABLE_RSA=1 TC_RSA_SMALL=${small} TC_ENABLE_AES=0 TC_ENABLE_SHA256=0)
+      TC_ENABLE_RSA=1 TC_RSA_ENABLE_1024=1 TC_RSA_SMALL=${small} TC_ENABLE_AES=0 TC_ENABLE_SHA256=0)
     tc_add_c_test(test_rsa_public_${small} tiny-crypto-c-test-rsa-${small} tests/rsa/public.c)
     tc_add_c_test(test_rsa_validation_${small} tiny-crypto-c-test-rsa-${small} tests/rsa/validation.c)
     tc_add_c_test(test_rsa_inverse_${small} tiny-crypto-c-test-rsa-${small} tests/rsa/inverse.c)
@@ -319,7 +322,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   tc_add_c_test(test_rsa_oaep_disabled tiny-crypto-c-test-rsa-0 tests/rsa/oaep_arguments.c)
   foreach(small 0 1)
     tc_add_c_test(test_rsa_oaep_reader_${small} tiny-crypto-c-test tests/rsa/oaep_reader.c ${tc_rsa_sources})
-    target_compile_definitions(test_rsa_oaep_reader_${small} PRIVATE TC_ENABLE_RSA=1 TC_RSA_SMALL=${small})
+    target_compile_definitions(test_rsa_oaep_reader_${small} PRIVATE TC_ENABLE_RSA=1 TC_RSA_ENABLE_1024=1 TC_RSA_SMALL=${small})
   endforeach()
   foreach(curve 256 384)
     tc_add_test_library(tiny-crypto-c-test-ec-p${curve} src/common.c src/ec.c)
@@ -328,6 +331,12 @@ if(TINY_CRYPTO_BUILD_TESTS)
       TC_EC_ENABLE_P256=$<STREQUAL:${curve},256> TC_EC_ENABLE_P384=$<STREQUAL:${curve},384>)
     tc_add_c_test(test_ec_p${curve} tiny-crypto-c-test-ec-p${curve} tests/ec/test.c)
   endforeach()
+  tc_add_test_library(tiny-crypto-c-test-ec-rfc6979
+    src/common.c src/hash_core.c src/hash.c src/sha512.c src/ec.c)
+  target_compile_definitions(tiny-crypto-c-test-ec-rfc6979 PUBLIC
+    TC_ENABLE_EC=1 TC_EC_ENABLE_P256=1 TC_EC_ENABLE_P384=1
+    TC_ENABLE_SHA256=1 TC_ENABLE_SHA384=1)
+  tc_add_c_test(test_ec_rfc6979 tiny-crypto-c-test-ec-rfc6979 tests/ec/rfc6979.c)
   tc_add_test_library(tiny-crypto-c-test-sskdf src/common.c ${tc_hash_sources} src/sskdf.c)
   option(TINY_CRYPTO_TEST_EC_ORACLE "Compare EC with Python cryptography" OFF)
   set(TINY_CRYPTO_TEST_WYCHEPROOF_DIR
@@ -523,14 +532,14 @@ if(TINY_CRYPTO_BUILD_TESTS)
   tc_add_c_test(test_idf_signed_rsa tiny-crypto-c-test
     tests/esp_idf/signed_image.c ports/esp-idf/signed_update_rsa.c ${tc_rsa_sources})
   tc_add_c_test(test_rsa_signature_reader tiny-crypto-c-test tests/rsa/signature_reader.c ${tc_rsa_sources})
-  target_compile_definitions(test_rsa_signature_reader PRIVATE TC_ENABLE_RSA=1)
+  target_compile_definitions(test_rsa_signature_reader PRIVATE TC_ENABLE_RSA=1 TC_RSA_ENABLE_1024=1)
   tc_add_c_test(test_rsa_signature_reader_small tiny-crypto-c-test tests/rsa/signature_reader.c ${tc_rsa_sources})
-  target_compile_definitions(test_rsa_signature_reader_small PRIVATE TC_ENABLE_RSA=1 TC_RSA_SMALL=1)
+  target_compile_definitions(test_rsa_signature_reader_small PRIVATE TC_ENABLE_RSA=1 TC_RSA_ENABLE_1024=1 TC_RSA_SMALL=1)
   tc_add_c_test(test_rsa_generation_reader tiny-crypto-c-test tests/rsa/generation_reader.c ${tc_rsa_sources})
-  target_compile_definitions(test_rsa_generation_reader PRIVATE TC_ENABLE_RSA=1)
+  target_compile_definitions(test_rsa_generation_reader PRIVATE TC_ENABLE_RSA=1 TC_RSA_ENABLE_1024=1)
   tc_add_c_test(test_rsa_keygen_reader tiny-crypto-c-test tests/rsa/keygen_reader.c ${tc_rsa_sources})
-  target_compile_definitions(test_rsa_keygen_reader PRIVATE TC_ENABLE_RSA=1)
-  target_compile_definitions(test_idf_signed_rsa PRIVATE TC_ENABLE_RSA=1)
+  target_compile_definitions(test_rsa_keygen_reader PRIVATE TC_ENABLE_RSA=1 TC_RSA_ENABLE_1024=1)
+  target_compile_definitions(test_idf_signed_rsa PRIVATE TC_ENABLE_RSA=1 TC_RSA_ENABLE_1024=1)
   target_include_directories(test_idf_signed_rsa PRIVATE tests/esp_idf/include
     ports/esp-idf/vendor/bootloader_support/src/secure_boot_v2)
   tc_add_test_library(tiny-crypto-c-test-idf-ec src/common.c ${tc_hash_sources} src/ec.c)
@@ -554,7 +563,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
       target_compile_definitions(${policy_target} PRIVATE TC_TEST_IDF_ECDSA=1 TC_ENABLE_EC=1 TC_EC_ENABLE_P192=1)
     else()
       target_sources(${policy_target} PRIVATE ${tc_rsa_sources})
-      target_compile_definitions(${policy_target} PRIVATE TC_ENABLE_RSA=1)
+      target_compile_definitions(${policy_target} PRIVATE TC_ENABLE_RSA=1 TC_RSA_ENABLE_1024=1)
     endif()
     target_include_directories(${policy_target} PRIVATE tests/esp_idf/policy_include
       tests/esp_idf/include ports/esp-idf/vendor/bootloader_support/private_include
@@ -918,7 +927,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
     TC_ENABLE_PIV_VCI=1 TC_ENABLE_PIV_CATALOG=1 TC_ENABLE_PIV_KEY_PROOF=1 TC_ENABLE_GZIP=1
     TC_ENABLE_PIV_CARD_CHECK=1 TC_AES_ENABLE_DYNAMIC=1 TC_ENABLE_SSKDF=1 TC_ENABLE_PIV_SM=1
     TC_PIV_SM_ENABLE_CS2=1 TC_PIV_SM_ENABLE_CS7=1 TC_EC_ENABLE_P192=1 TC_EC_ENABLE_P256=1 TC_EC_ENABLE_P384=1
-    TC_ENABLE_EC=1 TC_ENABLE_RSA=1 TC_ENABLE_SHA1=1 TC_ENABLE_SHA224=1
+    TC_ENABLE_EC=1 TC_ENABLE_RSA=1 TC_RSA_ENABLE_1024=1 TC_ENABLE_SHA1=1 TC_ENABLE_SHA224=1
     TC_ENABLE_SHA256=1 TC_ENABLE_SHA384=1 TC_ENABLE_SHA512=1)
   tc_add_c_test(test_key_challenge_rsa tiny-crypto-c-test-pki-native
     tests/x509/key_challenge_rsa.c)
@@ -1219,7 +1228,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
         if(rsa_scheme STREQUAL "oaep")
           target_sources(${rsa_test} PRIVATE examples/rsa_encrypt.c)
         endif()
-        target_compile_definitions(${rsa_test} PRIVATE TC_ENABLE_RSA=1
+        target_compile_definitions(${rsa_test} PRIVATE TC_ENABLE_RSA=1 TC_RSA_ENABLE_1024=1
           TC_RSA_SMALL=$<STREQUAL:${rsa_profile},small>)
         target_link_libraries(${rsa_test} PRIVATE OpenSSL::Crypto)
         set_property(TARGET ${rsa_test} PROPERTY NO_SYSTEM_FROM_IMPORTED TRUE)
@@ -1229,7 +1238,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
       tc_add_c_test_executable(test_rsa_oaep_decrypt_${small} tiny-crypto-c-test
         tests/rsa/oaep_decrypt_openssl.c ${tc_rsa_sources})
       target_link_libraries(test_rsa_oaep_decrypt_${small} PRIVATE OpenSSL::Crypto)
-      target_compile_definitions(test_rsa_oaep_decrypt_${small} PRIVATE TC_ENABLE_RSA=1 TC_RSA_SMALL=${small})
+      target_compile_definitions(test_rsa_oaep_decrypt_${small} PRIVATE TC_ENABLE_RSA=1 TC_RSA_ENABLE_1024=1 TC_RSA_SMALL=${small})
       set_property(TARGET test_rsa_oaep_decrypt_${small} PROPERTY NO_SYSTEM_FROM_IMPORTED TRUE)
       # The OpenSSL OAEP matrix runs as one CTest shard per modulus size.
       foreach(bits 1024 2048 3072 4096)
@@ -1359,7 +1368,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
       if(TINY_CRYPTO_TEST_OPENSSL)
         tc_add_linked_test(test_cpp_rsa_openssl_${small} tiny-crypto-c-test
           tests/cpp/rsa_openssl.cpp tests/cpp/main.cpp ${tc_rsa_sources})
-        target_compile_definitions(test_cpp_rsa_openssl_${small} PRIVATE TC_ENABLE_RSA=1 TC_RSA_SMALL=${small})
+        target_compile_definitions(test_cpp_rsa_openssl_${small} PRIVATE TC_ENABLE_RSA=1 TC_RSA_ENABLE_1024=1 TC_RSA_SMALL=${small})
         target_include_directories(test_cpp_rsa_openssl_${small} PRIVATE tests/support)
         target_link_libraries(test_cpp_rsa_openssl_${small} PRIVATE OpenSSL::Crypto)
         set_property(TARGET test_cpp_rsa_openssl_${small} PROPERTY NO_SYSTEM_FROM_IMPORTED TRUE)
@@ -1666,7 +1675,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
       list(APPEND header_profile_definitions
         TC_ENABLE_AES=1 TC_AES_ENABLE_CTR=0 TC_AES_ENABLE_KW=1 TC_TEST_HEADER_AES_KW=1)
     elseif(header_profile STREQUAL "rsa")
-      list(APPEND header_profile_definitions TC_ENABLE_RSA=1 TC_TEST_HEADER_RSA=1)
+      list(APPEND header_profile_definitions TC_ENABLE_RSA=1 TC_RSA_ENABLE_1024=1 TC_TEST_HEADER_RSA=1)
     elseif(header_profile STREQUAL "tlv")
       list(APPEND header_profile_definitions TC_ENABLE_TLV=1 TC_TEST_HEADER_TLV=1)
     elseif(header_profile STREQUAL "apdu")
@@ -1819,7 +1828,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
   # wrapper family and treat warnings as errors.
   set(tc_cpp_header_definitions ${tc_full_definitions} TC_AES_KEY_BITS=128
     TC_AES_ENABLE_EAX_PRIME=1 TC_AES_ENABLE_DYNAMIC=1 TC_ENABLE_MD5=1 TC_ENABLE_GZIP=1
-    TC_ENABLE_DRBG=1 TC_DRBG_ENABLE_HMAC=1 TC_ENABLE_RSA=1 TC_ENABLE_TLV=1 TC_ENABLE_DER=1 TC_ENABLE_X509=1
+    TC_ENABLE_DRBG=1 TC_DRBG_ENABLE_HMAC=1 TC_ENABLE_RSA=1 TC_RSA_ENABLE_1024=1 TC_ENABLE_TLV=1 TC_ENABLE_DER=1 TC_ENABLE_X509=1
     TC_ENABLE_PIV_CHUID=1 TC_ENABLE_PIV_CVC=1 TC_ENABLE_EAC_CVC=1 TC_ENABLE_PIV_SM=1
     TC_ENABLE_EC=1 TC_ENABLE_SSKDF=1 TC_ENABLE_APDU=1 TC_ENABLE_PIV_COMMAND=1
     TC_ENABLE_PIV_SM_APDU=1 TC_TLV_ENABLE_BER=1 TC_ENABLE_PIV_OIDS=1 TC_ENABLE_CMS=1
@@ -1907,7 +1916,8 @@ if(TINY_CRYPTO_BUILD_TESTS)
       get_filename_component(rsa_name ${rsa_source} NAME_WE)
       add_test(NAME test_${rsa_name}_compile_avr
         COMMAND ${TC_AVR_CC} -std=c99 -Wall -Wextra -Werror ${tc_avr_work_width_flags} -Os
-          -mmcu=atmega2560 -DTC_ENABLE_RSA=1 -I${CMAKE_CURRENT_SOURCE_DIR}/src
+          -mmcu=atmega2560 -DTC_ENABLE_RSA=1 -DTC_RSA_ENABLE_1024=1
+          -I${CMAKE_CURRENT_SOURCE_DIR}/src
           -c ${CMAKE_CURRENT_SOURCE_DIR}/${rsa_source}
           -o ${CMAKE_CURRENT_BINARY_DIR}/tiny-crypto-c-${rsa_name}-compile.o)
     endforeach()
@@ -2005,7 +2015,8 @@ if(TINY_CRYPTO_BUILD_TESTS)
     add_test(NAME test_key_challenge_compile_avr
       COMMAND ${TC_AVR_CC} -std=c99 -Wall -Wextra -Werror ${tc_avr_work_width_flags} -Os
         -mmcu=atmega2560 -DTC_ENABLE_KEY_CHALLENGE=1 -DTC_ENABLE_X509=1 -DTC_ENABLE_TLV=1
-        -DTC_ENABLE_DER=1 -DTC_ENABLE_RSA=1 -DTC_ENABLE_EC=1 -I${CMAKE_CURRENT_SOURCE_DIR}/src
+        -DTC_ENABLE_DER=1 -DTC_ENABLE_RSA=1 -DTC_RSA_ENABLE_1024=1 -DTC_ENABLE_EC=1
+        -I${CMAKE_CURRENT_SOURCE_DIR}/src
         -c ${CMAKE_CURRENT_SOURCE_DIR}/src/key_challenge.c
         -o ${CMAKE_CURRENT_BINARY_DIR}/tiny-crypto-c-key_challenge-compile.o)
     # TC_APDU_command.ne holds 65536 with a 16-bit size_t.

@@ -80,8 +80,8 @@ TC_TEST(vectors)
     }
     if (result != TC_RSA_OK)
       munit_errorf("RSA generation vector %s: encoding status %d", fields[7], result);
-    result = TC_RSA_raw_private(&key, (TC_bytes){private_exponent, d}, (TC_bytes){encoded, n},
-                                &workspace, (TC_buffer){signature, n}, &execution);
+    result = TC_RSA_raw_private(&key, (TC_bytes){private_exponent, d}, (TC_bytes){encoded, n}, (TC_buffer){signature, n},
+                                &workspace, &execution);
     if (result != TC_RSA_OK)
       munit_errorf("RSA generation vector %s: raw operation status %d", fields[7], result);
     if (memcmp(signature, expected, n))

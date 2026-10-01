@@ -92,8 +92,8 @@ TC_RSA_result TC_RSA_encode_pss_digest(const TC_RSA_pss_options* options, TC_byt
 }
 
 TC_RSA_result TC_RSA_raw_private(const TC_RSA_public_key* key, TC_bytes private_exponent,
-                                 TC_bytes input, const TC_RSA_workspace* workspace,
-                                 TC_buffer output, TC_RSA_execution* execution)
+                                 TC_bytes input,
+                                 TC_buffer output, const TC_RSA_workspace* workspace, TC_RSA_execution* execution)
 {
   tc_rsa_storage storage;
   tc_rsa_storage_begin(&storage, workspace);
@@ -293,8 +293,8 @@ static TC_RSA_result tc_rsa_sign_encoded(const tc_rsa_sign_call* call,
 
 /* RFC 8017 section 8.2.1: EMSA-PKCS1-v1_5 encoding, then RSASP1. */
 TC_RSA_result TC_RSA_sign_v15_digest(const TC_RSA_private_key* key,
-                                     const TC_RSA_v15_options* options, TC_bytes digest,
-                                     const TC_RSA_workspace* workspace, TC_buffer signature,
+                                     const TC_RSA_v15_options* options, TC_bytes digest, TC_buffer signature,
+                                     const TC_RSA_workspace* workspace,
                                      TC_RSA_execution* execution)
 {
   tc_hash_info info;
@@ -328,8 +328,8 @@ TC_RSA_result TC_RSA_sign_v15_digest(const TC_RSA_private_key* key,
 
 /* RFC 8017 section 8.1.1: EMSA-PSS encoding with a fresh salt, then RSASP1. */
 TC_RSA_result TC_RSA_sign_pss_digest(const TC_RSA_private_key* key,
-                                     const TC_RSA_pss_options* options, TC_bytes digest,
-                                     const TC_RSA_workspace* workspace, TC_buffer signature,
+                                     const TC_RSA_pss_options* options, TC_bytes digest, TC_buffer signature,
+                                     const TC_RSA_workspace* workspace,
                                      TC_RSA_execution* execution)
 {
   tc_rsa_private_view view = {0};

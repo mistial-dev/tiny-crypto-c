@@ -48,6 +48,9 @@ void tc_work_budget_types(TC_work_budget* budget, TC_RSA_execution* rsa, TC_EC_e
   TC_EXPECT_FUNCTION(
       TC_ECDSA_verify_digest, TC_EC_result,
       (TC_EC_curve, TC_bytes, TC_bytes, TC_bytes, TC_ECDSA_workspace*, TC_work_budget*));
+  TC_EXPECT_FUNCTION(TC_ECDSA_sign_digest_deterministic, TC_EC_result,
+                     (TC_EC_curve, const TC_ECDSA_sign_options*, TC_bytes, TC_bytes, TC_bytes,
+                      TC_buffer, TC_ECDSA_workspace*, TC_work_budget*));
   TC_EXPECT_FUNCTION(TC_key_challenge_prepare, TC_key_challenge_result,
                      (const TC_X509_public_key*, const TC_key_challenge_options*, TC_random_source,
                       TC_key_challenge_workspace*, TC_work_budget*, TC_bytes*));
@@ -62,7 +65,7 @@ void tc_work_budget_types(TC_work_budget* budget, TC_RSA_execution* rsa, TC_EC_e
       (TC_RSA_keygen_state*, TC_random_source, TC_RSA_cancel_fn, void*, TC_work_budget*));
   TC_EXPECT_FUNCTION(
       TC_RSA_raw_public, TC_RSA_result,
-      (const TC_RSA_public_key*, TC_bytes, const TC_RSA_workspace*, TC_buffer, TC_work_budget*));
+      (const TC_RSA_public_key*, TC_bytes, TC_buffer, const TC_RSA_workspace*, TC_work_budget*));
   TC_EXPECT_FUNCTION(TC_RSA_encode_v15_digest, TC_RSA_result,
                      (const TC_RSA_v15_options*, TC_bytes, TC_buffer, TC_work_budget*));
   TC_EXPECT_FUNCTION(TC_RSA_encode_pss_digest, TC_RSA_result,

@@ -24,7 +24,7 @@ TC_RSA_result example_sign_rsa_v15_digest(const TC_RSA_private_key* key, TC_hash
   const uint32_t work = total_work(TC_RSA_private_work(key, BLINDING_ATTEMPTS),
                                    TC_RSA_encode_v15_work(&options, length), 0);
   TC_RSA_execution execution = {random, BLINDING_ATTEMPTS, {work}};
-  return TC_RSA_sign_v15_digest(key, &options, digest, workspace, signature, &execution);
+  return TC_RSA_sign_v15_digest(key, &options, digest, signature, workspace, &execution);
 }
 
 TC_RSA_result example_sign_rsa_pss_sha256_digest(const TC_RSA_private_key* key, TC_bytes digest,
@@ -37,5 +37,5 @@ TC_RSA_result example_sign_rsa_pss_sha256_digest(const TC_RSA_private_key* key, 
   const uint32_t work = total_work(TC_RSA_private_work(key, BLINDING_ATTEMPTS),
                                    TC_RSA_encode_pss_work(&options, length), 1);
   TC_RSA_execution execution = {random, BLINDING_ATTEMPTS, {work}};
-  return TC_RSA_sign_pss_digest(key, &options, digest, workspace, signature, &execution);
+  return TC_RSA_sign_pss_digest(key, &options, digest, signature, workspace, &execution);
 }

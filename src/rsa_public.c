@@ -15,8 +15,8 @@
 #include "rsa_padding_internal.h"
 #include "rsa_internal.h"
 
-TC_RSA_result TC_RSA_raw_public(const TC_RSA_public_key* key, TC_bytes input,
-                                const TC_RSA_workspace* workspace, TC_buffer output,
+TC_RSA_result TC_RSA_raw_public(const TC_RSA_public_key* key, TC_bytes input, TC_buffer output,
+                                const TC_RSA_workspace* workspace,
                                 TC_work_budget* work)
 {
   tc_rsa_storage storage;

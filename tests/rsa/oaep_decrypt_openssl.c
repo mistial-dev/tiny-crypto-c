@@ -86,8 +86,8 @@ static MunitResult decrypt(const MunitParameter params[], void* user)
     const TC_RSA_oaep_options options = {
         hash->algorithm, mgf->algorithm, {label_bytes, label_length}};
     TC_RSA_execution execution = {{random_bytes, &random}, 1, {UINT32_MAX}};
-    munit_assert_int(TC_RSA_decrypt_oaep(&key, &options, (TC_bytes){ciphertext, width}, &workspace,
-                                         (TC_buffer){output, sizeof output}, &recovered,
+    munit_assert_int(TC_RSA_decrypt_oaep(&key, &options, (TC_bytes){ciphertext, width},
+                                         (TC_buffer){output, sizeof output}, &recovered, &workspace,
                                          &execution),
                      ==, TC_RSA_INVALID);
     munit_assert_size(recovered, ==, SIZE_MAX);
@@ -165,8 +165,8 @@ static MunitResult decrypt(const MunitParameter params[], void* user)
       const int preflight = scenario == ZERO_WORK || scenario == SHORT_WORK || short_output;
       const TC_RSA_oaep_options options = {hash->algorithm, mgf->algorithm, label};
       TC_RSA_execution execution = {{random_bytes, &random}, 1, {(uint32_t)work}};
-      munit_assert_int(TC_RSA_decrypt_oaep(&key, &options, candidate, &workspace,
-                                           (TC_buffer){output, capacity}, &recovered, &execution),
+      munit_assert_int(TC_RSA_decrypt_oaep(&key, &options, candidate,
+                                           (TC_buffer){output, capacity}, &recovered, &workspace, &execution),
                        ==, expected);
       munit_assert_uint(random.calls, ==, preflight || scenario == MODULUS_CIPHERTEXT ? 0 : 1);
       if (preflight)
@@ -202,8 +202,8 @@ static MunitResult decrypt(const MunitParameter params[], void* user)
     const TC_RSA_oaep_options options = {
         hash->algorithm, mgf->algorithm, {label_bytes, label_length}};
     TC_RSA_execution execution = {{random_bytes, &random}, 1, {UINT32_MAX}};
-    munit_assert_int(TC_RSA_decrypt_oaep(&key, &options, (TC_bytes){ciphertext, width}, &workspace,
-                                         (TC_buffer){output, lengths[2]}, &recovered, &execution),
+    munit_assert_int(TC_RSA_decrypt_oaep(&key, &options, (TC_bytes){ciphertext, width},
+                                         (TC_buffer){output, lengths[2]}, &recovered, &workspace, &execution),
                      ==, TC_RSA_OK);
     munit_assert_size(recovered, ==, lengths[2]);
     munit_assert_memory_equal(recovered, output, input);

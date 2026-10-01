@@ -79,8 +79,8 @@ static MunitResult raw_operations(const MunitParameter params[], void* user)
   random_source source = {0, 0};
   TC_RSA_execution execution = {{random_bytes, &source}, 2, {100000}};
   memset(transformed, 0xa5, width);
-  munit_assert_int(TC_RSA_raw_private(&key, (TC_bytes){private_exponent, width}, input, &workspace,
-                                      (TC_buffer){transformed, width}, &execution),
+  munit_assert_int(TC_RSA_raw_private(&key, (TC_bytes){private_exponent, width}, input,
+                                      (TC_buffer){transformed, width}, &workspace, &execution),
                    ==, TC_RSA_OK);
   munit_assert_memory_equal(width, transformed, expected);
   munit_assert_size(source.calls, ==, 1);
@@ -88,8 +88,8 @@ static MunitResult raw_operations(const MunitParameter params[], void* user)
     munit_assert_uint(scratch[i], ==, 0);
 
   TC_work_budget public_work = {100000};
-  munit_assert_int(TC_RSA_raw_public(&key, (TC_bytes){transformed, width}, &workspace,
-                                     (TC_buffer){recovered, width}, &public_work),
+  munit_assert_int(TC_RSA_raw_public(&key, (TC_bytes){transformed, width},
+                                     (TC_buffer){recovered, width}, &workspace, &public_work),
                    ==, TC_RSA_OK);
   munit_assert_memory_equal(width, recovered, representative);
   size_t public_length = width;
@@ -98,7 +98,7 @@ static MunitResult raw_operations(const MunitParameter params[], void* user)
   munit_assert_size(public_length, ==, width);
   public_work.remaining = 100000;
   munit_assert_int(
-      TC_RSA_raw_public(&key, input, &workspace, (TC_buffer){recovered, width}, &public_work), ==,
+      TC_RSA_raw_public(&key, input, (TC_buffer){recovered, width}, &workspace, &public_work), ==,
       TC_RSA_OK);
   munit_assert_memory_equal(width, recovered, expected);
 
@@ -106,16 +106,16 @@ static MunitResult raw_operations(const MunitParameter params[], void* user)
   memcpy(recovered, unchanged, width);
   public_work.remaining = 0;
   munit_assert_int(
-      TC_RSA_raw_public(&key, input, &workspace, (TC_buffer){recovered, width}, &public_work), ==,
+      TC_RSA_raw_public(&key, input, (TC_buffer){recovered, width}, &workspace, &public_work), ==,
       TC_RSA_LIMIT);
   munit_assert_memory_equal(width, recovered, unchanged);
   public_work.remaining = 100000;
   munit_assert_int(
-      TC_RSA_raw_public(&key, input, &workspace, (TC_buffer){representative, width}, &public_work),
+      TC_RSA_raw_public(&key, input, (TC_buffer){representative, width}, &workspace, &public_work),
       ==, TC_RSA_ARGUMENT);
   memcpy(representative, modulus, width);
   munit_assert_int(
-      TC_RSA_raw_public(&key, input, &workspace, (TC_buffer){recovered, width}, &public_work), ==,
+      TC_RSA_raw_public(&key, input, (TC_buffer){recovered, width}, &workspace, &public_work), ==,
       TC_RSA_INVALID);
   munit_assert_memory_equal(width, recovered, unchanged);
   representative[0] = 0;
@@ -123,15 +123,15 @@ static MunitResult raw_operations(const MunitParameter params[], void* user)
   memset(recovered, 0x5a, width);
   source.fail = 1;
   execution.work.remaining = 100000;
-  munit_assert_int(TC_RSA_raw_private(&key, (TC_bytes){private_exponent, width}, input, &workspace,
-                                      (TC_buffer){recovered, width}, &execution),
+  munit_assert_int(TC_RSA_raw_private(&key, (TC_bytes){private_exponent, width}, input,
+                                      (TC_buffer){recovered, width}, &workspace, &execution),
                    ==, TC_RSA_ERROR);
   munit_assert_memory_equal(width, recovered, unchanged);
   source.fail = 0;
   private_exponent[width - 1] ^= 2;
   execution.work.remaining = 100000;
-  munit_assert_int(TC_RSA_raw_private(&key, (TC_bytes){private_exponent, width}, input, &workspace,
-                                      (TC_buffer){recovered, width}, &execution),
+  munit_assert_int(TC_RSA_raw_private(&key, (TC_bytes){private_exponent, width}, input,
+                                      (TC_buffer){recovered, width}, &workspace, &execution),
                    ==, TC_RSA_ERROR);
   munit_assert_memory_equal(width, recovered, unchanged);
 

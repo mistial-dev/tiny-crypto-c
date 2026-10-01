@@ -231,8 +231,8 @@ TC_TEST(encryption_arguments)
     TC_RSA_execution execution = {
         {bad == NULL_RANDOM ? NULL : unexpected_random, &calls}, 0, {WORK_BUDGET}};
     munit_assert_int(TC_RSA_encrypt_oaep(bad == NULL_KEY ? NULL : &key, &options, message,
-                                         bad == NULL_WORKSPACE ? NULL : &workspace,
-                                         (TC_buffer){ciphertext, WIDTH}, &execution),
+                                         (TC_buffer){ciphertext, WIDTH},
+                                         bad == NULL_WORKSPACE ? NULL : &workspace, &execution),
                      ==, TC_RSA_ARGUMENT);
     munit_assert_size(calls, ==, 0);
     munit_assert_memory_equal(sizeof key, &key, &saved_key);
@@ -266,8 +266,8 @@ TC_TEST(encryption_algorithms)
       TC_RSA_execution execution = {{unexpected_random, &calls}, 0, {WORK_BUDGET}};
       memset(output, 0xa5, sizeof output);
       memset(words, 0xa5, sizeof words);
-      munit_assert_int(TC_RSA_encrypt_oaep(&key, &options, (TC_bytes){NULL, 0}, &workspace,
-                                           (TC_buffer){output, sizeof output}, &execution),
+      munit_assert_int(TC_RSA_encrypt_oaep(&key, &options, (TC_bytes){NULL, 0},
+                                           (TC_buffer){output, sizeof output}, &workspace, &execution),
                        ==, available ? TC_RSA_ERROR : TC_RSA_UNSUPPORTED);
       munit_assert_size(calls, ==, available ? 1 : 0);
       for (size_t i = 0; i < sizeof output; ++i)

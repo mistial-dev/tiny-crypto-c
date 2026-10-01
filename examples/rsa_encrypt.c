@@ -18,5 +18,5 @@ TC_RSA_result example_encrypt_rsa_oaep_sha256(const TC_RSA_public_key* key, TC_b
                             ? 1 + padding + exponentiation
                             : 0;
   TC_RSA_execution execution = {random, 0, {work}};
-  return TC_RSA_encrypt_oaep(key, &options, plaintext, workspace, ciphertext, &execution);
+  return TC_RSA_encrypt_oaep(key, &options, plaintext, ciphertext, workspace, &execution);
 }

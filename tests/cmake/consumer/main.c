@@ -33,14 +33,14 @@ int main(void)
       const TC_RSA_oaep_options oaep = {TC_HASH_SHA256, TC_HASH_SHA256, {NULL, 0}};
       key.crt = &crt;
       if (TC_RSA_derive_crt(&key, &crt_output, &workspace, &work) == TC_RSA_OK ||
-          TC_RSA_sign_v15_digest(&key, &v15, (TC_bytes){signature, 32}, &workspace,
-                                 (TC_buffer){signature, sizeof signature},
+          TC_RSA_sign_v15_digest(&key, &v15, (TC_bytes){signature, 32},
+                                 (TC_buffer){signature, sizeof signature}, &workspace,
                                  &execution) == TC_RSA_OK ||
-          TC_RSA_sign_pss_digest(&key, &pss, (TC_bytes){signature, 32}, &workspace,
-                                 (TC_buffer){signature, sizeof signature},
+          TC_RSA_sign_pss_digest(&key, &pss, (TC_bytes){signature, 32},
+                                 (TC_buffer){signature, sizeof signature}, &workspace,
                                  &execution) == TC_RSA_OK ||
-          TC_RSA_decrypt_oaep(&key, &oaep, (TC_bytes){signature, sizeof signature}, &workspace,
-                              (TC_buffer){signature, sizeof signature}, &plaintext_length,
+          TC_RSA_decrypt_oaep(&key, &oaep, (TC_bytes){signature, sizeof signature},
+                              (TC_buffer){signature, sizeof signature}, &plaintext_length, &workspace,
                               &execution) == TC_RSA_OK)
         return 1;
     }

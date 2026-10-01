@@ -116,7 +116,7 @@ TC_TEST(unsupported_sizes)
                                               signature, &workspace, &work),
                      ==, TC_RSA_UNSUPPORTED);
     munit_assert_int(
-        TC_RSA_raw_public(&key, signature, &workspace, (TC_buffer){out, sizeof out}, &work), ==,
+        TC_RSA_raw_public(&key, signature, (TC_buffer){out, sizeof out}, &workspace, &work), ==,
         TC_RSA_UNSUPPORTED);
     munit_assert_uint32(work.remaining, ==, 100000);
   }

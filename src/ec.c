@@ -3,6 +3,8 @@
 #include <tiny_crypto/ec.h>
 #include "internal.h"
 #if TC_ENABLE_EC
+#include <tiny_crypto/hash.h>
+#include "hash_core_internal.h"
 #define TC_MP_WORD_BITS TC_EC_WORD_BITS
 #include "mp_internal.h"
 #include "mp_inverse_internal.h"
@@ -718,6 +720,195 @@ TC_EC_result TC_ECDSA_verify_digest(TC_EC_curve curve, TC_bytes public_key, TC_b
 /* Test seam: corrupts a signature between signing and self-verification. */
 void (*tc_test_ecdsa_fault)(uint8_t* signature, size_t length);
 #endif
+
+#if TC_HASH_CORE_ENABLED
+typedef struct {
+  const tc_hash_algorithm_info* hash;
+  size_t digest_length;
+  size_t block_length;
+  uint8_t key[TC_HASH_CORE_MAX_DIGEST];
+  uint8_t value[TC_HASH_CORE_MAX_DIGEST];
+  uint8_t generated;
+} tc_rfc6979;
+
+static TC_status tc_ecdsa_hmac(const tc_hash_algorithm_info* hash, size_t block_length,
+                               const uint8_t* key, size_t key_length, const TC_bytes* parts,
+                               size_t part_count, uint8_t* tag)
+{
+  TC_hash_context context;
+  uint8_t block[TC_HASH_CORE_MAX_BLOCK], inner[TC_HASH_CORE_MAX_DIGEST];
+  const size_t digest_length = tc_hash_core_digest_bytes(hash);
+  if (key_length > block_length)
+    return TC_ERROR;
+  memset(block, 0x36, block_length);
+  for (size_t i = 0; i < key_length; ++i)
+    block[i] ^= key[i];
+  TC_status status = tc_hash_core_init(hash, &context);
+  if (status == TC_OK)
+    status = tc_hash_core_update(hash, &context, block, block_length);
+  for (size_t i = 0; status == TC_OK && i < part_count; ++i)
+    status = tc_hash_core_update(hash, &context, parts[i].data, parts[i].length);
+  if (status == TC_OK)
+    status = tc_hash_core_final(hash, &context, inner);
+  memset(block, 0x5c, block_length);
+  for (size_t i = 0; i < key_length; ++i)
+    block[i] ^= key[i];
+  if (status == TC_OK)
+    status = tc_hash_core_init(hash, &context);
+  if (status == TC_OK)
+    status = tc_hash_core_update(hash, &context, block, block_length);
+  if (status == TC_OK)
+    status = tc_hash_core_update(hash, &context, inner, digest_length);
+  if (status == TC_OK)
+    status = tc_hash_core_final(hash, &context, tag);
+  tc_hash_core_clear(hash, &context);
+  TC_secure_zero(block, sizeof block);
+  TC_secure_zero(inner, sizeof inner);
+  return status;
+}
+
+static const uint8_t* tc_ecdsa_order(size_t bytes)
+{
+#if TC_EC_ENABLE_P192
+  if (bytes == 24)
+    return &params_192[1][0];
+#endif
+#if TC_EC_ENABLE_P256
+  if (bytes == 32)
+    return &params_256[1][0];
+#endif
+#if TC_EC_ENABLE_P384
+  if (bytes == 48)
+    return &params_384[1][0];
+#endif
+  return NULL;
+}
+
+static void tc_ecdsa_bits2octets(uint8_t* output, size_t width, TC_bytes digest)
+{
+  const uint8_t* order = tc_ecdsa_order(width);
+  memset(output, 0, width);
+  if (digest.length >= width)
+    memcpy(output, digest.data, width);
+  else
+    memcpy(output + width - digest.length, digest.data, digest.length);
+  uint8_t reduced[TC_EC_MAX_BYTES];
+  unsigned borrow = 0;
+  for (size_t i = width; i > 0; --i) {
+    const unsigned a = output[i - 1], b = EC_BYTE(order + i - 1) + borrow;
+    reduced[i - 1] = (uint8_t)(a - b);
+    borrow = a < b;
+  }
+  const uint8_t use_reduced = (uint8_t)(borrow - 1u);
+  for (size_t i = 0; i < width; ++i)
+    output[i] = (uint8_t)((reduced[i] & use_reduced) | (output[i] & (uint8_t)~use_reduced));
+  TC_secure_zero(reduced, sizeof reduced);
+}
+
+static TC_status tc_rfc6979_reseed(tc_rfc6979* state, uint8_t separator, TC_bytes private_key,
+                                   TC_bytes reduced_digest)
+{
+  const TC_bytes parts[] = {{state->value, state->digest_length}, {&separator, 1}, private_key,
+                            reduced_digest};
+  uint8_t next[TC_HASH_CORE_MAX_DIGEST];
+  TC_status status = tc_ecdsa_hmac(state->hash, state->block_length, state->key,
+                                   state->digest_length, parts, private_key.data ? 4 : 2, next);
+  if (status == TC_OK)
+    memcpy(state->key, next, state->digest_length);
+  if (status == TC_OK)
+    status = tc_ecdsa_hmac(state->hash, state->block_length, state->key, state->digest_length,
+                           &(TC_bytes){state->value, state->digest_length}, 1, next);
+  if (status == TC_OK)
+    memcpy(state->value, next, state->digest_length);
+  TC_secure_zero(next, sizeof next);
+  return status;
+}
+
+static TC_status tc_rfc6979_fill(void* context, uint8_t* output, size_t length)
+{
+  tc_rfc6979* state = (tc_rfc6979*)context;
+  if (state->generated && tc_rfc6979_reseed(state, 0, (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0}) !=
+                              TC_OK)
+    return TC_ERROR;
+  size_t written = 0;
+  uint8_t next[TC_HASH_CORE_MAX_DIGEST];
+  while (written < length) {
+    if (tc_ecdsa_hmac(state->hash, state->block_length, state->key, state->digest_length,
+                      &(TC_bytes){state->value, state->digest_length}, 1, next) != TC_OK) {
+      TC_secure_zero(next, sizeof next);
+      return TC_ERROR;
+    }
+    memcpy(state->value, next, state->digest_length);
+    const size_t take = length - written < state->digest_length ? length - written
+                                                                : state->digest_length;
+    memcpy(output + written, state->value, take);
+    written += take;
+  }
+  state->generated = 1;
+  TC_secure_zero(next, sizeof next);
+  return TC_OK;
+}
+
+static TC_status tc_rfc6979_init(tc_rfc6979* state, TC_hash_algorithm algorithm,
+                                 TC_bytes private_key, TC_bytes digest, size_t width)
+{
+  const tc_hash_algorithm_info* hash = tc_hash_core_lookup(algorithm);
+  if (!hash || tc_hash_core_digest_bytes(hash) != digest.length)
+    return TC_ERROR;
+  memset(state, 0, sizeof *state);
+  state->hash = hash;
+  state->digest_length = digest.length;
+  state->block_length =
+      algorithm == TC_HASH_SHA384 || algorithm == TC_HASH_SHA512 ? 128u : 64u;
+  memset(state->value, 1, state->digest_length);
+  uint8_t reduced[TC_EC_MAX_BYTES];
+  tc_ecdsa_bits2octets(reduced, width, digest);
+  TC_status status = tc_rfc6979_reseed(state, 0, private_key, (TC_bytes){reduced, width});
+  if (status == TC_OK)
+    status = tc_rfc6979_reseed(state, 1, private_key, (TC_bytes){reduced, width});
+  TC_secure_zero(reduced, sizeof reduced);
+  return status;
+}
+#endif
+
+TC_EC_result TC_ECDSA_sign_digest_deterministic(
+    TC_EC_curve curve, const TC_ECDSA_sign_options* options, TC_bytes private_key,
+    TC_bytes public_key, TC_bytes digest, TC_buffer signature, TC_ECDSA_workspace* workspace,
+    TC_work_budget* work)
+{
+  if (!options || !work)
+    return TC_EC_ARGUMENT;
+  const size_t bytes = TC_EC_coordinate_bytes(curve);
+  if (!bytes)
+    return TC_EC_UNSUPPORTED;
+#if TC_HASH_CORE_ENABLED
+  const tc_hash_algorithm_info* hash = tc_hash_core_lookup(options->hash);
+  if (!hash)
+    return TC_EC_UNSUPPORTED;
+  if (tc_hash_core_digest_bytes(hash) != digest.length)
+    return TC_EC_ARGUMENT;
+  if (!options->candidate_attempts)
+    return TC_EC_LIMIT;
+  tc_rfc6979 state;
+  if (tc_rfc6979_init(&state, options->hash, private_key, digest, bytes) != TC_OK) {
+    TC_secure_zero(&state, sizeof state);
+    return TC_EC_ERROR;
+  }
+  TC_EC_execution execution = {{tc_rfc6979_fill, &state}, options->candidate_attempts, *work};
+  const TC_EC_result result = TC_ECDSA_sign_digest(curve, private_key, public_key, digest,
+                                                   signature, workspace, &execution);
+  *work = execution.work;
+  TC_secure_zero(&state, sizeof state);
+  return result;
+#else
+  (void)private_key;
+  (void)public_key;
+  (void)digest;
+  (void)signature;
+  (void)workspace;
+  return TC_EC_UNSUPPORTED;
+#endif
+}
 
 TC_EC_result TC_ECDSA_sign_digest(TC_EC_curve curve, TC_bytes private_key, TC_bytes public_key,
                                   TC_bytes digest, TC_buffer signature,

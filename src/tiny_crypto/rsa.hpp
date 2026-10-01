@@ -102,7 +102,7 @@ TC_CPP_NODISCARD inline rsa_result rsa_raw_public(const rsa_public_key& key, byt
                                                   const rsa_workspace& workspace, buffer output,
                                                   TC_work_budget& work) noexcept
 {
-  return ::TC_RSA_raw_public(&key, input, &workspace, output, &work);
+  return ::TC_RSA_raw_public(&key, input, output, &workspace, &work);
 }
 
 template <size_t N>
@@ -118,7 +118,7 @@ TC_CPP_NODISCARD inline rsa_result rsa_raw_private(const rsa_public_key& key,
                                                    const rsa_workspace& workspace, buffer output,
                                                    rsa_execution& execution) noexcept
 {
-  return ::TC_RSA_raw_private(&key, private_exponent, input, &workspace, output, &execution);
+  return ::TC_RSA_raw_private(&key, private_exponent, input, output, &workspace, &execution);
 }
 
 template <size_t N>
@@ -261,7 +261,7 @@ TC_CPP_NODISCARD inline rsa_result rsa_sign_v15_digest(const rsa_private_key& ke
                                                        buffer signature,
                                                        rsa_execution& execution) noexcept
 {
-  return ::TC_RSA_sign_v15_digest(&key, &options, digest, &workspace, signature, &execution);
+  return ::TC_RSA_sign_v15_digest(&key, &options, digest, signature, &workspace, &execution);
 }
 
 TC_CPP_NODISCARD inline rsa_result rsa_sign_pss_digest(const rsa_private_key& key,
@@ -270,7 +270,7 @@ TC_CPP_NODISCARD inline rsa_result rsa_sign_pss_digest(const rsa_private_key& ke
                                                        buffer signature,
                                                        rsa_execution& execution) noexcept
 {
-  return ::TC_RSA_sign_pss_digest(&key, &options, digest, &workspace, signature, &execution);
+  return ::TC_RSA_sign_pss_digest(&key, &options, digest, signature, &workspace, &execution);
 }
 
 TC_CPP_NODISCARD inline rsa_result rsa_encrypt_oaep(const rsa_public_key& key,
@@ -279,7 +279,7 @@ TC_CPP_NODISCARD inline rsa_result rsa_encrypt_oaep(const rsa_public_key& key,
                                                     buffer ciphertext,
                                                     rsa_execution& execution) noexcept
 {
-  return ::TC_RSA_encrypt_oaep(&key, &options, plaintext, &workspace, ciphertext, &execution);
+  return ::TC_RSA_encrypt_oaep(&key, &options, plaintext, ciphertext, &workspace, &execution);
 }
 
 TC_CPP_NODISCARD inline rsa_result
@@ -287,7 +287,7 @@ rsa_decrypt_oaep(const rsa_private_key& key, const rsa_oaep_options& options, by
                  const rsa_workspace& workspace, buffer plaintext, size_t& plaintext_length,
                  rsa_execution& execution) noexcept
 {
-  return ::TC_RSA_decrypt_oaep(&key, &options, ciphertext, &workspace, plaintext, &plaintext_length,
+  return ::TC_RSA_decrypt_oaep(&key, &options, ciphertext, plaintext, &plaintext_length, &workspace,
                                &execution);
 }
 } // namespace tiny_crypto

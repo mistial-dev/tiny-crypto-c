@@ -218,8 +218,8 @@ TC_TEST(public_work)
     TC_work_budget work = {public_cost - short_work};
     memset(output, 0xa5, sizeof output);
     memcpy(saved, output, sizeof saved);
-    munit_assert_int(TC_RSA_raw_public(key, (TC_bytes){input, BYTES}, &workspace,
-                                       (TC_buffer){output, BYTES}, &work),
+    munit_assert_int(TC_RSA_raw_public(key, (TC_bytes){input, BYTES},
+                                       (TC_buffer){output, BYTES}, &workspace, &work),
                      ==, short_work ? TC_RSA_LIMIT : TC_RSA_OK);
     munit_assert_uint32(work.remaining, ==, short_work ? public_cost - 1 : 0);
     if (short_work)
@@ -230,8 +230,8 @@ TC_TEST(public_work)
   unsigned calls = 0;
   TC_RSA_execution signing = {{two_random, &calls}, 1, {UINT32_MAX}};
   const TC_RSA_v15_options v15 = {TC_HASH_SHA256};
-  munit_assert_int(TC_RSA_sign_v15_digest(&fixture->key, &v15, (TC_bytes){digest, sizeof digest},
-                                          &workspace, (TC_buffer){signature, BYTES}, &signing),
+  munit_assert_int(TC_RSA_sign_v15_digest(&fixture->key, &v15, (TC_bytes){digest, sizeof digest}, (TC_buffer){signature, BYTES},
+                                          &workspace, &signing),
                    ==, TC_RSA_OK);
   const uint32_t verify_cost = public_cost + TC_RSA_encode_v15_work(&v15, BYTES);
   for (unsigned short_work = 0; short_work < 2; ++short_work) {
@@ -264,8 +264,8 @@ TC_TEST(public_work)
 
   /* PSS verification costs the public operation plus the PSS encoding. */
   const TC_RSA_pss_options pss = {TC_HASH_SHA256, TC_HASH_SHA256, SHA256_BYTES};
-  munit_assert_int(TC_RSA_sign_pss_digest(&fixture->key, &pss, (TC_bytes){digest, sizeof digest},
-                                          &workspace, (TC_buffer){signature, BYTES}, &signing),
+  munit_assert_int(TC_RSA_sign_pss_digest(&fixture->key, &pss, (TC_bytes){digest, sizeof digest}, (TC_buffer){signature, BYTES},
+                                          &workspace, &signing),
                    ==, TC_RSA_OK);
   const uint32_t pss_cost = public_cost + TC_RSA_encode_pss_work(&pss, BYTES);
   for (unsigned short_work = 0; short_work < 2; ++short_work) {
@@ -285,8 +285,8 @@ TC_TEST(public_work)
     calls = 0;
     TC_RSA_execution execution = {{two_random, &calls}, 0, {encrypt_cost - short_work}};
     memset(output, 0xa5, sizeof output);
-    munit_assert_int(TC_RSA_encrypt_oaep(key, &oaep, (TC_bytes){input, 16}, &workspace,
-                                         (TC_buffer){output, BYTES}, &execution),
+    munit_assert_int(TC_RSA_encrypt_oaep(key, &oaep, (TC_bytes){input, 16},
+                                         (TC_buffer){output, BYTES}, &workspace, &execution),
                      ==, short_work ? TC_RSA_LIMIT : TC_RSA_OK);
     munit_assert_uint32(execution.work.remaining, ==, short_work ? encrypt_cost - 1 : 0);
     munit_assert_uint(calls, ==, short_work ? 0 : 1);
@@ -361,8 +361,8 @@ TC_TEST(rejected_blinding)
       unsigned calls = 0;
       TC_RSA_execution execution = {{reject_once_random, &calls}, 2, {cost - short_work}};
       memset(signature, 0xa5, sizeof signature);
-      munit_assert_int(TC_RSA_sign_v15_digest(&key, &v15, (TC_bytes){digest, sizeof digest},
-                                              &workspace, (TC_buffer){signature, BYTES},
+      munit_assert_int(TC_RSA_sign_v15_digest(&key, &v15, (TC_bytes){digest, sizeof digest}, (TC_buffer){signature, BYTES},
+                                              &workspace,
                                               &execution),
                        ==, short_work ? TC_RSA_LIMIT : TC_RSA_OK);
       munit_assert_uint(calls, ==, short_work ? 0 : 2);
@@ -375,8 +375,8 @@ TC_TEST(rejected_blinding)
     /* One attempt allowed: the rejected factor exhausts it. */
     unsigned calls = 0;
     TC_RSA_execution execution = {{reject_once_random, &calls}, 1, {cost}};
-    munit_assert_int(TC_RSA_sign_v15_digest(&key, &v15, (TC_bytes){digest, sizeof digest},
-                                            &workspace, (TC_buffer){signature, BYTES}, &execution),
+    munit_assert_int(TC_RSA_sign_v15_digest(&key, &v15, (TC_bytes){digest, sizeof digest}, (TC_buffer){signature, BYTES},
+                                            &workspace, &execution),
                      ==, TC_RSA_LIMIT);
     munit_assert_uint(calls, ==, 1);
   }
@@ -415,10 +415,10 @@ TC_TEST(private_work)
         memset(signature, 0xa5, sizeof signature);
         memcpy(saved, signature, sizeof saved);
         const TC_RSA_result result =
-            scheme ? TC_RSA_sign_pss_digest(&key, &pss, (TC_bytes){digest, sizeof digest},
-                                            &workspace, (TC_buffer){signature, BYTES}, &execution)
-                   : TC_RSA_sign_v15_digest(&key, &v15, (TC_bytes){digest, sizeof digest},
-                                            &workspace, (TC_buffer){signature, BYTES}, &execution);
+            scheme ? TC_RSA_sign_pss_digest(&key, &pss, (TC_bytes){digest, sizeof digest}, (TC_buffer){signature, BYTES},
+                                            &workspace, &execution)
+                   : TC_RSA_sign_v15_digest(&key, &v15, (TC_bytes){digest, sizeof digest}, (TC_buffer){signature, BYTES},
+                                            &workspace, &execution);
         munit_assert_int(result, ==, short_work ? TC_RSA_LIMIT : TC_RSA_OK);
         munit_assert_uint32(execution.work.remaining,
                             ==, short_work ? costs[scheme] - 1 : 3 * per_attempt);
@@ -434,16 +434,16 @@ TC_TEST(private_work)
     unsigned calls = 0;
     TC_RSA_execution encryption = {{two_random, &calls}, 0, {UINT32_MAX}};
     munit_assert_int(TC_RSA_encrypt_oaep(&key.public_key, &oaep,
-                                         (TC_bytes){message, sizeof message}, &workspace,
-                                         (TC_buffer){ciphertext, BYTES}, &encryption),
+                                         (TC_bytes){message, sizeof message},
+                                         (TC_buffer){ciphertext, BYTES}, &workspace, &encryption),
                      ==, TC_RSA_OK);
     const uint32_t decrypt_cost = private_cost + TC_RSA_oaep_work(&oaep, BYTES);
     for (unsigned short_work = 0; short_work < 2; ++short_work) {
       calls = 0;
       size_t length = SIZE_MAX;
       TC_RSA_execution execution = {{two_random, &calls}, 4, {decrypt_cost - short_work}};
-      munit_assert_int(TC_RSA_decrypt_oaep(&key, &oaep, (TC_bytes){ciphertext, BYTES}, &workspace,
-                                           (TC_buffer){plaintext, sizeof plaintext}, &length,
+      munit_assert_int(TC_RSA_decrypt_oaep(&key, &oaep, (TC_bytes){ciphertext, BYTES},
+                                           (TC_buffer){plaintext, sizeof plaintext}, &length, &workspace,
                                            &execution),
                        ==, short_work ? TC_RSA_LIMIT : TC_RSA_OK);
       munit_assert_uint32(execution.work.remaining,
@@ -465,8 +465,8 @@ TC_TEST(private_work)
     unsigned calls = 0;
     TC_RSA_execution execution = {{two_random, &calls}, 1, {raw_cost - short_work}};
     munit_assert_int(TC_RSA_raw_private(&fixture->key.public_key, fixture->key.d,
-                                        (TC_bytes){input, BYTES}, &workspace,
-                                        (TC_buffer){signature, BYTES}, &execution),
+                                        (TC_bytes){input, BYTES},
+                                        (TC_buffer){signature, BYTES}, &workspace, &execution),
                      ==, short_work ? TC_RSA_LIMIT : TC_RSA_OK);
     munit_assert_uint32(execution.work.remaining, ==, short_work ? raw_cost - 1 : 0);
   }
@@ -497,24 +497,24 @@ TC_TEST(output_capacity)
       TC_RSA_result result = TC_RSA_ERROR;
       switch (operation) {
       case SIGN_V15:
-        result = TC_RSA_sign_v15_digest(&fixture->key, &v15, (TC_bytes){digest, sizeof digest},
-                                        &workspace, buffer, &execution);
+        result = TC_RSA_sign_v15_digest(&fixture->key, &v15, (TC_bytes){digest, sizeof digest}, buffer,
+                                        &workspace, &execution);
         break;
       case SIGN_PSS:
-        result = TC_RSA_sign_pss_digest(&fixture->key, &pss, (TC_bytes){digest, sizeof digest},
-                                        &workspace, buffer, &execution);
+        result = TC_RSA_sign_pss_digest(&fixture->key, &pss, (TC_bytes){digest, sizeof digest}, buffer,
+                                        &workspace, &execution);
         break;
       case ENCRYPT:
-        result = TC_RSA_encrypt_oaep(&fixture->key.public_key, &oaep, (TC_bytes){input, 8},
-                                     &workspace, buffer, &execution);
+        result = TC_RSA_encrypt_oaep(&fixture->key.public_key, &oaep, (TC_bytes){input, 8}, buffer,
+                                     &workspace, &execution);
         break;
       case RAW_PUBLIC:
-        result = TC_RSA_raw_public(&fixture->key.public_key, (TC_bytes){input, BYTES}, &workspace,
-                                   buffer, &execution.work);
+        result = TC_RSA_raw_public(&fixture->key.public_key, (TC_bytes){input, BYTES},
+                                   buffer, &workspace, &execution.work);
         break;
       default:
         result = TC_RSA_raw_private(&fixture->key.public_key, fixture->key.d,
-                                    (TC_bytes){input, BYTES}, &workspace, buffer, &execution);
+                                    (TC_bytes){input, BYTES}, buffer, &workspace, &execution);
         break;
       }
       munit_assert_int(result, ==, larger ? TC_RSA_OK : TC_RSA_LIMIT);
@@ -581,8 +581,8 @@ TC_TEST(argument_order)
     if (value == 3)
       continue;
     const TC_RSA_public_key small_exponent = {key->modulus, {&value, 1}};
-    munit_assert_int(TC_RSA_raw_public(&small_exponent, (TC_bytes){signature, BYTES}, &workspace,
-                                       (TC_buffer){output, sizeof output}, &work),
+    munit_assert_int(TC_RSA_raw_public(&small_exponent, (TC_bytes){signature, BYTES},
+                                       (TC_buffer){output, sizeof output}, &workspace, &work),
                      ==, TC_RSA_INVALID);
     munit_assert_uint32(TC_RSA_public_work(&small_exponent), ==, 0);
   }
@@ -597,43 +597,43 @@ TC_TEST(argument_order)
    * with an invalid key. */
   TC_RSA_execution execution = {{two_random, &calls}, 1, {UINT32_MAX}};
   memset(output, 0xa5, sizeof output);
-  munit_assert_int(TC_RSA_sign_pss_digest(&fixture->key, &pss, no_digest, &workspace,
-                                          (TC_buffer){output, BYTES - 1}, &execution),
+  munit_assert_int(TC_RSA_sign_pss_digest(&fixture->key, &pss, no_digest,
+                                          (TC_buffer){output, BYTES - 1}, &workspace, &execution),
                    ==, TC_RSA_ARGUMENT);
-  munit_assert_int(TC_RSA_sign_v15_digest(&fixture->key, &v15, no_digest, &workspace,
-                                          (TC_buffer){output, BYTES - 1}, &execution),
+  munit_assert_int(TC_RSA_sign_v15_digest(&fixture->key, &v15, no_digest,
+                                          (TC_buffer){output, BYTES - 1}, &workspace, &execution),
                    ==, TC_RSA_ARGUMENT);
   TC_RSA_private_key broken = fixture->key;
   broken.public_key = invalid_key;
-  munit_assert_int(TC_RSA_sign_v15_digest(&broken, &v15, (TC_bytes){digest, sizeof digest},
-                                          &workspace, (TC_buffer){NULL, BYTES}, &execution),
+  munit_assert_int(TC_RSA_sign_v15_digest(&broken, &v15, (TC_bytes){digest, sizeof digest}, (TC_buffer){NULL, BYTES},
+                                          &workspace, &execution),
                    ==, TC_RSA_ARGUMENT);
   /* A wrong digest length outranks an invalid key, which outranks a short
    * buffer. */
-  munit_assert_int(TC_RSA_sign_v15_digest(&broken, &v15, short_digest, &workspace,
-                                          (TC_buffer){output, BYTES - 1}, &execution),
+  munit_assert_int(TC_RSA_sign_v15_digest(&broken, &v15, short_digest,
+                                          (TC_buffer){output, BYTES - 1}, &workspace, &execution),
                    ==, TC_RSA_ARGUMENT);
-  munit_assert_int(TC_RSA_sign_v15_digest(&broken, &v15, (TC_bytes){digest, sizeof digest},
-                                          &workspace, (TC_buffer){output, BYTES - 1}, &execution),
+  munit_assert_int(TC_RSA_sign_v15_digest(&broken, &v15, (TC_bytes){digest, sizeof digest}, (TC_buffer){output, BYTES - 1},
+                                          &workspace, &execution),
                    ==, TC_RSA_INVALID);
 
   /* Decryption: a NULL ciphertext with a wrong length, and a wrong
    * ciphertext length before a short plaintext buffer. */
   size_t length = SIZE_MAX;
-  munit_assert_int(TC_RSA_decrypt_oaep(&fixture->key, &oaep, (TC_bytes){NULL, BYTES + 1},
-                                       &workspace, (TC_buffer){output, sizeof output}, &length,
+  munit_assert_int(TC_RSA_decrypt_oaep(&fixture->key, &oaep, (TC_bytes){NULL, BYTES + 1}, (TC_buffer){output, sizeof output}, &length,
+                                       &workspace,
                                        &execution),
                    ==, TC_RSA_ARGUMENT);
-  munit_assert_int(TC_RSA_decrypt_oaep(&fixture->key, &oaep, long_signature, &workspace,
-                                       (TC_buffer){output, 1}, &length, &execution),
+  munit_assert_int(TC_RSA_decrypt_oaep(&fixture->key, &oaep, long_signature,
+                                       (TC_buffer){output, 1}, &length, &workspace, &execution),
                    ==, TC_RSA_INVALID);
   /* A missing RNG callback is an argument error. */
   TC_RSA_execution no_random = {{NULL, &calls}, 1, {UINT32_MAX}};
-  munit_assert_int(TC_RSA_raw_private(key, fixture->key.d, (TC_bytes){signature, BYTES}, &workspace,
-                                      (TC_buffer){output, sizeof output}, &no_random),
+  munit_assert_int(TC_RSA_raw_private(key, fixture->key.d, (TC_bytes){signature, BYTES},
+                                      (TC_buffer){output, sizeof output}, &workspace, &no_random),
                    ==, TC_RSA_ARGUMENT);
-  munit_assert_int(TC_RSA_sign_v15_digest(&fixture->key, &v15, (TC_bytes){digest, sizeof digest},
-                                          &workspace, (TC_buffer){output, sizeof output},
+  munit_assert_int(TC_RSA_sign_v15_digest(&fixture->key, &v15, (TC_bytes){digest, sizeof digest}, (TC_buffer){output, sizeof output},
+                                          &workspace,
                                           &no_random),
                    ==, TC_RSA_ARGUMENT);
   TC_RSA_private_key unchecked = fixture->key;
@@ -645,15 +645,15 @@ TC_TEST(argument_order)
   munit_assert_int(TC_RSA_validate_private_key(&all_zero_factor, TC_RSA_EXPONENT_FIPS, &workspace,
                                                &validation),
                    ==, TC_RSA_INVALID);
-  munit_assert_int(TC_RSA_sign_pss_digest(&fixture->key, &pss, (TC_bytes){digest, sizeof digest},
-                                          &workspace, (TC_buffer){output, sizeof output},
+  munit_assert_int(TC_RSA_sign_pss_digest(&fixture->key, &pss, (TC_bytes){digest, sizeof digest}, (TC_buffer){output, sizeof output},
+                                          &workspace,
                                           &no_random),
                    ==, TC_RSA_ARGUMENT);
-  munit_assert_int(TC_RSA_encrypt_oaep(key, &oaep, (TC_bytes){digest, 8}, &workspace,
-                                       (TC_buffer){output, sizeof output}, &no_random),
+  munit_assert_int(TC_RSA_encrypt_oaep(key, &oaep, (TC_bytes){digest, 8},
+                                       (TC_buffer){output, sizeof output}, &workspace, &no_random),
                    ==, TC_RSA_ARGUMENT);
-  munit_assert_int(TC_RSA_decrypt_oaep(&fixture->key, &oaep, (TC_bytes){signature, BYTES},
-                                       &workspace, (TC_buffer){output, sizeof output}, &length,
+  munit_assert_int(TC_RSA_decrypt_oaep(&fixture->key, &oaep, (TC_bytes){signature, BYTES}, (TC_buffer){output, sizeof output}, &length,
+                                       &workspace,
                                        &no_random),
                    ==, TC_RSA_ARGUMENT);
   munit_assert_int(
@@ -661,11 +661,11 @@ TC_TEST(argument_order)
       TC_RSA_ARGUMENT);
   munit_assert_uint32(no_random.work.remaining, ==, UINT32_MAX);
   /* Raw operations: a NULL input with a wrong length. */
-  munit_assert_int(TC_RSA_raw_public(key, (TC_bytes){NULL, BYTES + 1}, &workspace,
-                                     (TC_buffer){output, sizeof output}, &work),
+  munit_assert_int(TC_RSA_raw_public(key, (TC_bytes){NULL, BYTES + 1},
+                                     (TC_buffer){output, sizeof output}, &workspace, &work),
                    ==, TC_RSA_ARGUMENT);
-  munit_assert_int(TC_RSA_raw_private(key, fixture->key.d, (TC_bytes){NULL, BYTES + 1}, &workspace,
-                                      (TC_buffer){output, sizeof output}, &execution),
+  munit_assert_int(TC_RSA_raw_private(key, fixture->key.d, (TC_bytes){NULL, BYTES + 1},
+                                      (TC_buffer){output, sizeof output}, &workspace, &execution),
                    ==, TC_RSA_ARGUMENT);
   munit_assert_size(length, ==, SIZE_MAX);
   munit_assert_true(all_bytes(output, sizeof output, 0xa5));

@@ -17,8 +17,8 @@
 #include "rsa_internal.h"
 
 TC_RSA_result TC_RSA_encrypt_oaep(const TC_RSA_public_key* key, const TC_RSA_oaep_options* options,
-                                  TC_bytes plaintext, const TC_RSA_workspace* workspace,
-                                  TC_buffer ciphertext, TC_RSA_execution* execution)
+                                  TC_bytes plaintext,
+                                  TC_buffer ciphertext, const TC_RSA_workspace* workspace, TC_RSA_execution* execution)
 {
   tc_rsa_storage storage;
   if (!options)
@@ -82,8 +82,8 @@ TC_RSA_result TC_RSA_encrypt_oaep(const TC_RSA_public_key* key, const TC_RSA_oae
 }
 
 TC_RSA_result TC_RSA_decrypt_oaep(const TC_RSA_private_key* key, const TC_RSA_oaep_options* options,
-                                  TC_bytes ciphertext, const TC_RSA_workspace* workspace,
-                                  TC_buffer plaintext, size_t* plaintext_length,
+                                  TC_bytes ciphertext,
+                                  TC_buffer plaintext, size_t* plaintext_length, const TC_RSA_workspace* workspace,
                                   TC_RSA_execution* execution)
 {
   tc_rsa_private_view view = {0};

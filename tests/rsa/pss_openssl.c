@@ -38,7 +38,7 @@ static TC_RSA_result sign_pss(const TC_RSA_private_key* key, TC_RSA_pss_options 
                               TC_bytes digest, TC_buffer output, const TC_RSA_workspace* workspace,
                               TC_RSA_execution execution)
 {
-  return TC_RSA_sign_pss_digest(key, &options, digest, workspace, output, &execution);
+  return TC_RSA_sign_pss_digest(key, &options, digest, output, workspace, &execution);
 }
 
 static MunitResult signatures(const MunitParameter params[], void* user)
