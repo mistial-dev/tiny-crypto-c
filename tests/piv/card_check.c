@@ -12,7 +12,9 @@
 #include <tiny_crypto/piv_vci.h>
 #include "../credential/validation_fixture.h"
 #include "card_simulator.h"
+#include "source_internal.h"
 #include "test_util.h"
+#include <tiny_crypto/x509_crl_source.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -1096,9 +1098,150 @@ TC_TEST(card_certificate)
   return MUNIT_OK;
 }
 
+/* ---- CRL targets ---- */
+
+enum { TARGETS = 32, CRL_JOB_UNITS = 256, CRL_METADATA_BYTES = 4096, CRL_WINDOW_BYTES = 1024 };
+
+static TC_X509_crl_target targets[TARGETS];
+static uint8_t target_certificates[CERTIFICATE_BYTES];
+static TC_PIV_crl_target_workspace target_workspace;
+
+static TC_PIV_result targets_list(size_t capacity, size_t* work, size_t* count)
+{
+  target_workspace.certificates = (TC_buffer){target_certificates, sizeof target_certificates};
+  target_workspace.parsing = card_trust.parser;
+  return TC_PIV_card_crl_targets(&inventory, &card_trust.limits, &target_workspace, work, targets,
+                                 capacity, count);
+}
+
+static int target_listed(TC_bytes serial, TC_bytes issuer, size_t count)
+{
+  for (size_t i = 0; i < count; ++i)
+    if (targets[i].serial.length == serial.length && targets[i].issuer.length == issuer.length &&
+        !memcmp(targets[i].serial.data, serial.data, serial.length) &&
+        !memcmp(targets[i].issuer.data, issuer.data, issuer.length))
+      return 1;
+  return 0;
+}
+
+/* Card 2 on contact with the PIN: the targets cover every card certificate
+ * and every content signer, and CRLs prepared through the source path for
+ * them satisfy every revocation check of the REQUIRED policy. */
+TC_TEST(crl_targets)
+{
+  load("sd33_card2");
+  card2_trust(EVIDENCE_CRLS, TC_VALIDATION_REVOCATION_REQUIRED);
+  link_open(TC_PIV_CONTACT);
+  pin_verify();
+  inventory_read();
+  size_t work = CHECK_WORK, count = 0;
+  munit_assert_int(targets_list(TARGETS, &work, &count), ==, TC_PIV_OK);
+  munit_assert_size(count, >=, 5);
+  /* Each pair is listed once. */
+  for (size_t i = 0; i < count; ++i)
+    for (size_t j = i + 1; j < count; ++j)
+      munit_assert_false(
+          targets[i].serial.length == targets[j].serial.length &&
+          !memcmp(targets[i].serial.data, targets[j].serial.data, targets[i].serial.length) &&
+          targets[i].issuer.length == targets[j].issuer.length &&
+          !memcmp(targets[i].issuer.data, targets[j].issuer.data, targets[i].issuer.length));
+
+  /* The buffer-backed check names the certificates the targets must cover. */
+  TC_PIV_card_check_request request = check_request();
+  request.ocsp = NULL;
+  munit_assert_int(check_run(&request), ==, TC_PIV_OK);
+  for (size_t slot = 0; slot < TC_PIV_CARD_CERTIFICATES; ++slot)
+    munit_assert_true(
+        target_listed(report.certificates[slot].serial, report.certificates[slot].issuer, count));
+  TC_X509_certificate signer;
+  munit_assert_int(
+      TC_X509_read(report.chuid.signer, &card_trust.limits, &card_trust.parser, &signer), ==,
+      TC_TLV_OK);
+  munit_assert_true(target_listed(signer.serial, signer.issuer, count));
+
+  /* Prepare both issuer CRLs for the targets only and index them. */
+  static TC_X509_crl_storage state[2][CRL_JOB_UNITS];
+  static TC_X509_crl_match matches[2][TARGETS];
+  static uint8_t metadata[2][CRL_METADATA_BYTES], window[CRL_WINDOW_BYTES],
+      entry[CRL_METADATA_BYTES], issuer[CRL_METADATA_BYTES];
+  static TC_X509_crl_record records[2];
+  TC_X509_crl_job* jobs[2];
+  for (size_t i = 0; i < 2; ++i) {
+    TC_bytes bytes = content_trust.crls[i];
+    const TC_source source = {tc_source_memory_read, &bytes, bytes.length};
+    const TC_X509_crl_prepare_options options = {content_trust.limits, bytes.length,
+                                                 bytes.length * 4 + 1024, 4096, 1024};
+    const TC_X509_crl_prepare_workspace preparation = {
+        {(uint8_t*)state[i], sizeof state[i]},
+        {window, sizeof window},
+        {metadata[i], sizeof metadata[i]},
+        {entry, sizeof entry},
+        {issuer, sizeof issuer},
+        content_trust.parser,
+        content_trust.workspace.path.validation.names,
+        matches[i],
+        TARGETS};
+    size_t budget = 60000;
+    munit_assert_int(TC_X509_crl_prepare_begin(&source, targets, count, &options, &preparation,
+                                               &budget, &jobs[i]),
+                     ==, TC_TLV_OK);
+    int complete = 0;
+    while (!complete) {
+      budget = 60000;
+      munit_assert_int(TC_X509_crl_prepare_step(jobs[i], 16, 1024, &budget, &complete), ==,
+                       TC_TLV_OK);
+    }
+    munit_assert_int(TC_X509_crl_prepare_finish(jobs[i], &records[i]), ==, TC_TLV_OK);
+  }
+  const TC_X509_crl_index card_index = {records, 1, 0}, content_index = {records, 2, 0};
+  const TC_validation_trust card_sources = {&card_trust.source, &card_index};
+  const TC_validation_trust content_sources = {&content_trust.source, &content_index};
+  munit_assert_int(TC_validation_context_init(&card_sources, &card_trust.options,
+                                              &card_trust.workspace.credential,
+                                              &card_trust.context),
+                   ==, TC_RESULT_OK);
+  munit_assert_int(TC_validation_context_init(&content_sources, &content_trust.options,
+                                              &content_trust.workspace.credential,
+                                              &content_trust.context),
+                   ==, TC_RESULT_OK);
+  request = check_request();
+  request.ocsp = NULL;
+  munit_assert_int(check_run(&request), ==, TC_PIV_OK);
+  expect_card2_complete();
+  for (size_t i = 0; i < 2; ++i)
+    TC_X509_crl_prepare_clear(jobs[i]);
+
+  /* One slot short is LIMIT with count unchanged. Work runs out the same
+   * way. */
+  size_t limited = 77;
+  work = CHECK_WORK;
+  munit_assert_int(targets_list(count - 1, &work, &limited), ==, TC_PIV_LIMIT);
+  munit_assert_size(limited, ==, 77);
+  work = 16;
+  munit_assert_int(targets_list(TARGETS, &work, &limited), ==, TC_PIV_LIMIT);
+  munit_assert_size(limited, ==, 77);
+  /* Argument errors leave the outputs unchanged. */
+  work = CHECK_WORK;
+  munit_assert_int(TC_PIV_card_crl_targets(NULL, &card_trust.limits, &target_workspace, &work,
+                                           targets, TARGETS, &limited),
+                   ==, TC_PIV_ARGUMENT);
+  munit_assert_int(TC_PIV_card_crl_targets(&inventory, &card_trust.limits, &target_workspace, &work,
+                                           NULL, TARGETS, &limited),
+                   ==, TC_PIV_ARGUMENT);
+  munit_assert_int(TC_PIV_card_crl_targets(&inventory, &card_trust.limits, &target_workspace, &work,
+                                           targets, TARGETS, (size_t*)(void*)targets),
+                   ==, TC_PIV_ARGUMENT);
+  munit_assert_size(limited, ==, 77);
+  munit_assert_size(work, ==, CHECK_WORK);
+  TC_PIV_inventory_clear(&inventory);
+  TC_PIV_link_clear(&link);
+  return MUNIT_OK;
+}
+
 int main(int argc, char** argv)
 {
   MunitTest tests[] = {
+      {"/crl-targets", crl_targets, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/card2-contact", card2_contact, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/card2-contactless", card2_contactless, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/card2-without-pin", card2_without_pin, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

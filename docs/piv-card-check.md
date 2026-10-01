@@ -66,6 +66,29 @@ decoded LDS of the Security Object, and 4 KiB covers 16 data groups. The
 workspace and the report are each under 3 KiB on a 64-bit desktop, so keep them
 in static or caller-owned storage on small stacks.
 
+## Large CRLs
+
+An issuer CRL can be far larger than a card. TWIC CA 1 publishes a CRL of
+about 17 MB with more than 750,000 entries. Prepare such a CRL from a byte
+source ([CRLs](x509-crl.md)) for the certificates the card check will query:
+
+1. Read the inventory.
+1. `TC_PIV_card_crl_targets` lists the issuer and serial of each card
+   certificate, the secure messaging signer and every certificate embedded in
+   the CMS of the CHUID, the Security Object and the biometric objects. Each
+   pair appears once. `TC_PIV_crl_target_workspace` holds GZIP scratch, a
+   buffer for decoded certificates and parser frames.
+1. Prepare each CRL with `TC_X509_crl_prepare_begin`, `TC_X509_crl_prepare_step`
+   and `TC_X509_crl_prepare_finish` for those targets, and index the records.
+1. Build the card and content contexts with that index and run
+   `TC_PIV_card_check`.
+
+Preparation scans each CRL once and keeps only the entries of the targets.
+The resolver verifies each prepared CRL's signature, issuer and dates.
+Targets are collected before authentication, and the card check authenticates
+every certificate it relies on. A certificate outside the targets has no
+usable lookup, so its revocation check is not satisfied.
+
 ## Checks
 
 The report lists the checks in this order. Container IDs follow SP 800-73-5

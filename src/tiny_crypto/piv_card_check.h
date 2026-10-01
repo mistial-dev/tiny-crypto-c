@@ -23,6 +23,7 @@
 #include <tiny_crypto/ec.h>
 #include <tiny_crypto/piv_catalog.h>
 #include <tiny_crypto/piv_certificate.h>
+#include <tiny_crypto/x509_crl.h>
 #if TC_ENABLE_PIV_KEY_PROOF
 #include <tiny_crypto/piv_key_proof.h>
 #endif
@@ -313,6 +314,49 @@ const TC_PIV_check* TC_PIV_card_report_find(const TC_PIV_card_report* report,
  * required or a zero count returns 0. */
 int TC_PIV_card_report_accepts(const TC_PIV_card_report* report,
                                const TC_PIV_check_requirement* required, size_t count);
+
+/* Scratch of TC_PIV_card_crl_targets.
+ * gzip          GZIP decoder scratch for compressed certificates.
+ * certificates  receives decoded GZIP certificates, one after another. The
+ *               targets of those certificates borrow it.
+ * parsing       frames and extension OID slots for one certificate or CMS
+ *               object. */
+typedef struct {
+  TC_GZIP_workspace gzip;
+  TC_buffer certificates;
+  TC_X509_workspace parsing;
+} TC_PIV_crl_target_workspace;
+
+/* List the CRL lookup targets of a read inventory: the issuer and serial of
+ * each certificate whose revocation TC_PIV_card_check queries (RFC 5280
+ * section 5.3.3). Prepare a source-backed CRL for these targets with
+ * TC_X509_crl_prepare_begin, so that a large CRL is scanned once and only
+ * their entries are kept.
+ * - The certificates are those of the present certificate containers,
+ *   including the secure messaging signer, and every certificate embedded in
+ *   the CMS of the CHUID, the Security Object and the biometric objects.
+ *   A pair listed once is not repeated.
+ * - Targets are collected before authentication. The card check
+ *   authenticates every certificate it relies on. An object that does not
+ *   decode adds no target, so a lookup for its certificate returns
+ *   UNSUPPORTED and its revocation check is not satisfied.
+ * - Targets borrow the inventory pool and workspace->certificates. Keep them
+ *   unchanged while the targets are used.
+ * limits bound each certificate and CMS object. inventory, its objects and
+ * pool, limits, the workspace, work, targets and count must be disjoint.
+ *
+ * Work: the encoded bytes of each certificate and CMS read, and the GZIP
+ * output of each compressed certificate.
+ * Returns TC_PIV_OK with *count written. TC_PIV_ARGUMENT for NULL arguments,
+ * targets NULL with a capacity, workspace buffers NULL with a capacity or
+ * overlap, with every output unchanged. TC_PIV_LIMIT for more targets than
+ * capacity, a full workspace->certificates, limits too small for an object or
+ * exhausted work, with *count unchanged. The workspace, targets and work are
+ * provisional on failure. */
+TC_PIV_result TC_PIV_card_crl_targets(const TC_PIV_inventory* inventory,
+                                      const TC_TLV_limits* limits,
+                                      TC_PIV_crl_target_workspace* workspace, size_t* work,
+                                      TC_X509_crl_target* targets, size_t capacity, size_t* count);
 
 /* Certificate check of one retained card certificate.
  * encoded             the DER certificate.

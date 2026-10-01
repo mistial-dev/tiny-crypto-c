@@ -152,7 +152,7 @@
      "sources": ["src/piv_key_policy.c", "src/piv_key_proof.c"]},
     {"macro": "TC_ENABLE_PIV_CARD_CHECK", "description": "Build the composed PIV and TWIC card check",
      "sources": ["src/piv_card_check.c", "src/piv_card_check_certificates.c", "src/piv_card_check_signed.c",
-                 "src/piv_card_check_keys.c", "src/piv_card_check_report.c"]}
+                 "src/piv_card_check_keys.c", "src/piv_card_check_report.c", "src/piv_card_crl_targets.c"]}
   ],
   "shared_sources": [
     {"sources": ["src/hash_core.c"],

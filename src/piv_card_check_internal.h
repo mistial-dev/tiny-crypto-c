@@ -79,6 +79,10 @@ void tc_piv_check_secure_messaging(tc_piv_check_run* run);
 int tc_piv_check_card_purpose_valid(const TC_validation_options* options,
                                     TC_PIV_card_profile profile);
 
+/* The value of the BC element of a biometric container value (SP 800-73-5
+ * Part 1 Tables 13 and 14). */
+TC_TLV_result tc_piv_check_biometric_value(TC_bytes value, const TC_TLV_limits* limits,
+                                           TC_bytes* out);
 /* Decode the certificate container object with profile into the next free
  * workspace certificate bytes and parse it with the context's parsing
  * limits. Returns the TLV result. */

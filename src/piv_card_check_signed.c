@@ -155,9 +155,8 @@ void tc_piv_check_security(tc_piv_check_run* run)
   digest_checks(run, object, report->has_security);
 }
 
-/* The value of the BC element of a biometric container value (SP 800-73-5
- * Part 1 Tables 13 and 14). */
-static TC_TLV_result biometric_value(TC_bytes value, const TC_TLV_limits* limits, TC_bytes* out)
+TC_TLV_result tc_piv_check_biometric_value(TC_bytes value, const TC_TLV_limits* limits,
+                                           TC_bytes* out)
 {
   TC_TLV_element element;
   TC_TLV_result status = TC_TLV_read(value, TC_TLV_ISO7816, limits, &element);
@@ -188,8 +187,8 @@ static void biometric_check(tc_piv_check_run* run, uint8_t kind, TC_PIV_CBEFF_fo
     tc_piv_check_not_checkable(&check, TC_PIV_REASON_DEPENDENCY);
   else {
     TC_bytes encoded = {NULL, 0};
-    const TC_TLV_result read =
-        biometric_value(object->value, &run->request->content->options->parsing, &encoded);
+    const TC_TLV_result read = tc_piv_check_biometric_value(
+        object->value, &run->request->content->options->parsing, &encoded);
     if (read != TC_TLV_OK) {
       if (!tc_piv_check_tlv(run, &check, read))
         return;
