@@ -30,7 +30,7 @@ static void card_cvc_check(tc_piv_check_run* run, const TC_PIV_certificate* fiel
     tc_piv_check_not_checkable(check, TC_PIV_REASON_DEPENDENCY);
     return;
   }
-  TC_PIV_link_info info;
+  TC_PIV_link_info info = {0};
   if (request->link)
     TC_PIV_link_info_get(request->link, &info);
   if (!request->link || !info.secured || info.sm_lost) {
