@@ -1222,21 +1222,26 @@ ctest --test-dir build -R '_(compile|qemu)_avr$' --output-on-failure
 python3 tools/measure_avr_resources.py --check tests/budgets/avr.json
 ```
 
-`tools/measure_avr_resources.py` links each profile for the ATmega328P and
-compares linked flash, static RAM and the project stack estimate with
-`tests/budgets/avr.json`. CI runs it with the PlatformIO avr-gcc 7.3.0.
+`tools/measure_avr_resources.py` links each profile and compares linked flash,
+static RAM and the project stack estimate with `tests/budgets/avr.json`. CI
+runs it with the PlatformIO avr-gcc 7.3.0. The primitive profiles link for the
+ATmega328P (32 KiB flash, 2 KiB RAM). The card profiles link for the
+ATmega2560 (256 KiB flash, 8 KiB RAM), the smallest common AVR part that holds
+a PIV reader. Each budget names its part in `mcu`, and the check fails when the
+measured part differs.
 
-| Profile         | Flash | Static RAM | Stack | Contents                                       |
-| --------------- | ----- | ---------- | ----- | ---------------------------------------------- |
-| `apdu_piv_read` | 13500 | 110        | 560   | plain SELECT, GET DATA and VERIFY query        |
-| `piv_sm_cs2`    | 36500 | 150        | 750   | CS2 key establishment and a protected GET DATA |
+| Profile         | Part       | Flash | Static RAM | Stack | Contents                                                |
+| --------------- | ---------- | ----- | ---------- | ----- | ------------------------------------------------------- |
+| `apdu_piv_read` | ATmega2560 | 13500 | 3400       | 560   | plain SELECT, GET DATA of the CHUID and VERIFY query    |
+| `piv_sm_cs2`    | ATmega2560 | 36500 | 4700       | 750   | CS2 key establishment and a protected GET DATA of CHUID |
 
-The card profiles keep the link, the scratch buffers and the secure messaging
-session in application storage, and their stack excludes the transport
-callback. `piv_link_bytes` records `sizeof(TC_PIV_link)`, 40 bytes on AVR.
-`piv_sm_cs2` exceeds the ATmega328P flash and serves as a code-size measure for
-larger parts. Its `sm_framing_flash`, at most 3800 bytes, is the linked code of
-`piv_sm_apdu.c` and `piv_sm_key_request.c`.
+The card profiles hold the link, the scratch buffers, the secure messaging
+session and workspace and a response buffer for a CHUID at its SP 800-73-5
+Part 1 Table 8 capacity of 2881 bytes in static storage, so static RAM counts
+them. Their stack excludes the transport callback. `piv_link_bytes` records
+`sizeof(TC_PIV_link)`, 40 bytes on AVR. The `sm_framing_flash` of `piv_sm_cs2`,
+at most 3800 bytes, is the linked code of `piv_sm_apdu.c` and
+`piv_sm_key_request.c`.
 
 ## PIV card hardware tests
 

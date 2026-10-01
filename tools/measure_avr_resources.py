@@ -22,8 +22,13 @@ ROOT = Path(__file__).resolve().parents[1]
 CC = os.environ.get("AVR_CC", "avr-gcc")
 SIZE = os.environ.get("AVR_SIZE", "avr-size")
 NM = os.environ.get("AVR_NM", "avr-nm")
-BASE = ["-std=c99", "-Os", "-mmcu=atmega328p", "-ffunction-sections",
-        "-fdata-sections", "-fstack-usage", "-I" + str(ROOT / "src")]
+BASE = ["-std=c99", "-Os", "-ffunction-sections", "-fdata-sections", "-fstack-usage",
+        "-I" + str(ROOT / "src")]
+# Target part of each profile. Primitives measure on the ATmega328P (32 KiB
+# flash, 2 KiB RAM). A PIV reader needs the flash and RAM of an ATmega2560
+# (256 KiB flash, 8 KiB RAM).
+DEFAULT_MCU = "atmega328p"
+PROFILE_MCU = {"apdu_piv_read": "atmega2560", "piv_sm_cs2": "atmega2560"}
 PROFILES = {
     "aes_ctr": ([], """
       struct TC_AES_ctx ctx;
@@ -76,14 +81,15 @@ PROFILES = {
       out[0] = signature[0];
       return TC_ECDSA_verify_digest(TC_EC_P256, point, digest, (TC_bytes){signature, sizeof(signature)}, &workspace, &work) != TC_EC_OK;
     """, "TC_ECDSA_sign_digest"),
-    # Plain PIV reads: SELECT, GET DATA and a VERIFY query on a SHORT link.
-    # The link, the 261-byte command scratch and the response buffer are
-    # application storage, recorded as piv_link_bytes and outside the stack.
+    # Plain PIV reads: SELECT, GET DATA of the CHUID and a VERIFY query on a
+    # SHORT link. The link, the 261-byte command scratch and a response
+    # buffer for a CHUID at its SP 800-73-5 Part 1 Table 8 capacity of 2881
+    # bytes are static, so static RAM counts them.
     "apdu_piv_read": (["TC_ENABLE_APDU=1", "TC_ENABLE_TLV=1", "TC_ENABLE_PIV_COMMAND=1"], """
       static const uint8_t chuid[3] = {0x5f, 0xc1, 0x02};
-      const TC_PIV_link_options options = {{TC_APDU_SHORT, 0, 8, 0, 0}, TC_PIV_CONTACT, 0};
-      uint8_t scratch[TC_APDU_SHORT_COMMAND_MAX_BYTES], response[64];
-      TC_PIV_link link;
+      const TC_PIV_link_options options = {{TC_APDU_SHORT, 0, 16, 0, 0}, TC_PIV_CONTACT, 0};
+      static uint8_t scratch[TC_APDU_SHORT_COMMAND_MAX_BYTES], response[TC_PIV_RESPONSE_BYTES(2881)];
+      static TC_PIV_link link;
       TC_PIV_application application;
       TC_PIV_data_object object;
       TC_PIV_reference_status status;
@@ -101,8 +107,9 @@ PROFILES = {
     """, ("TC_PIV_link_init", "TC_PIV_select", "TC_PIV_get_data", "TC_PIV_verify_status",
           "TC_PIV_link_clear")),
     # Secure messaging CS2 on the micro resource profile: key establishment,
-    # link_secure and one protected GET DATA. The session, the workspace and
-    # both scratch buffers are application storage.
+    # link_secure and a protected GET DATA of the CHUID. The link, the
+    # session, the workspace, both scratch buffers and a CHUID-sized response
+    # are static, so static RAM counts them.
     "piv_sm_cs2": ([
         "TC_RESOURCE_PROFILE=1", "TC_ENABLE_APDU=1", "TC_ENABLE_TLV=1", "TC_ENABLE_DER=1",
         "TC_ENABLE_PIV_COMMAND=1", "TC_ENABLE_PIV_SM=1", "TC_ENABLE_PIV_SM_APDU=1",
@@ -110,12 +117,13 @@ PROFILES = {
         "TC_AES_ENABLE_DYNAMIC=1", "TC_PIV_SM_ENABLE_CS2=1", "TC_PIV_SM_ENABLE_CS7=0",
     ], """
       static const uint8_t chuid[3] = {0x5f, 0xc1, 0x02};
-      TC_PIV_SM session;
-      TC_PIV_SM_workspace workspace;
-      uint8_t scratch[TC_APDU_SHORT_COMMAND_MAX_BYTES], sm_scratch[64], response[400];
-      const TC_PIV_link_options options = {{TC_APDU_SHORT, 0, 16, 0, 0}, TC_PIV_CONTACT, 0};
+      static TC_PIV_SM session;
+      static TC_PIV_SM_workspace workspace;
+      static uint8_t scratch[TC_APDU_SHORT_COMMAND_MAX_BYTES], response[TC_PIV_RESPONSE_BYTES(2881)];
+      static uint8_t sm_scratch[TC_PIV_SM_COMMAND_DATA_BYTES(TC_PIV_COMMAND_MAX_NC)];
+      const TC_PIV_link_options options = {{TC_APDU_SHORT, 0, 32, 0, 0}, TC_PIV_CONTACT, 0};
       const uint8_t host[8] = {0};
-      TC_PIV_link link;
+      static TC_PIV_link link;
       TC_PIV_SM_peer peer;
       TC_PIV_data_object object;
       TC_PIV_result result = TC_PIV_link_init(&link, (TC_APDU_transport){card, 0}, &options,
@@ -293,8 +301,8 @@ def unit_flash(directory, elf, units):
     return total
 
 
-def measure(directory, definitions, body, entry, types=None, units=None):
-    flags = BASE + ["-D" + item for item in definitions]
+def measure(directory, definitions, body, entry, mcu, types=None, units=None):
+    flags = BASE + ["-mmcu=" + mcu] + ["-D" + item for item in definitions]
     frames, edges, objects, unknown_indirect = {}, {}, [], []
     hash_core_sites = set()
     all_address_taken = set()
@@ -338,14 +346,14 @@ def measure(directory, definitions, body, entry, types=None, units=None):
             if re.match(r"\s*\.size\s", line):
                 current = None
         obj = assembly.with_suffix(".o")
-        run([CC, "-mmcu=atmega328p", "-c", str(assembly), "-o", str(obj)])
+        run([CC, "-mmcu=" + mcu, "-c", str(assembly), "-o", str(obj)])
         objects.append(str(obj))
     source = directory / "main.c"
     source.write_text(SOURCE % body)
     main_object = directory / "main.o"
     run([CC, *flags, "-c", str(source), "-o", str(main_object)])
     elf = directory / "profile.elf"
-    run([CC, "-mmcu=atmega328p", str(main_object), *objects, "-Wl,--gc-sections",
+    run([CC, "-mmcu=" + mcu, str(main_object), *objects, "-Wl,--gc-sections",
          "-o", str(elf)])
     sections = {}
     for line in run([SIZE, "-A", str(elf)]).splitlines():
@@ -393,6 +401,7 @@ def measure(directory, definitions, body, entry, types=None, units=None):
     entries = entry if isinstance(entry, tuple) else (entry,)
     stack, path = max((chain(name, set()) for name in entries), key=lambda item: item[0])
     report = {
+        "mcu": mcu,
         "flash": sections.get(".text", 0) + sections.get(".data", 0),
         "static_ram": sections.get(".data", 0) + sections.get(".bss", 0),
         "project_stack_estimate": stack,
@@ -421,8 +430,14 @@ def check_budgets(report, budgets, stream=sys.stderr):
     print(f"budgets measured with avr-gcc {budgets.get('avr_gcc_version', 'unknown')}, "
           f"checking with avr-gcc {report.get('avr_gcc_version') or 'unknown'}", file=stream)
     for name, limits in budgets["profiles"].items():
+        measured = report["profiles"][name]
+        if limits.get("mcu", DEFAULT_MCU) != measured["mcu"]:
+            raise SystemExit(f"{name}: budget is for {limits.get('mcu', DEFAULT_MCU)}, "
+                             f"measured on {measured['mcu']}")
         for metric, limit in limits.items():
-            actual = report["profiles"][name][metric]
+            if metric == "mcu":
+                continue
+            actual = measured[metric]
             if actual is None or actual > limit:
                 raise SystemExit(f"{name} {metric}: {actual} exceeds {limit}")
 
@@ -440,6 +455,7 @@ def main():
             directory = Path(temporary) / name
             directory.mkdir()
             report["profiles"][name] = measure(directory, definitions, body, entry,
+                                               PROFILE_MCU.get(name, DEFAULT_MCU),
                                                TYPE_SIZES.get(name), UNIT_FLASH.get(name))
     if args.check:
         check_budgets(report, json.loads(args.check.read_text()))

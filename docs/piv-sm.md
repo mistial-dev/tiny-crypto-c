@@ -459,13 +459,21 @@ adds `piv_discovery_get` and `piv_vci_establish` over a `piv_link`.
 ## Resource use
 
 The framing adds no static state and allocates nothing. The link borrows the
-session, the workspace and the secure messaging scratch from the caller. On
-AVR with avr-gcc 7.3.0 at `-Os`, the `piv_sm_cs2` profile of
-`tests/budgets/avr.json` records the framing code of `piv_sm_apdu.c` and
-`piv_sm_key_request.c` at about 3.6 KB within about 35 KB for CS2 key
-establishment and one protected GET DATA. That exceeds the ATmega328P flash,
-so plan secure messaging for larger parts
-([AVR builds and budgets](testing.md#avr-builds-and-budgets)).
+session, the workspace and the secure messaging scratch from the caller. The
+`piv_sm_cs2` profile of `tests/budgets/avr.json` measures CS2 key
+establishment and a protected GET DATA of the CHUID on an ATmega2560 with
+avr-gcc 7.3.0 at `-Os`
+([AVR builds and budgets](testing.md#avr-builds-and-budgets)):
+
+| Resource   | Budget      | Contents                                                       |
+| ---------- | ----------- | -------------------------------------------------------------- |
+| Flash      | 36500 bytes | EC P-256, AES, CMAC, SSKDF, the CVC reader and the PIV link    |
+| Static RAM | 4700 bytes  | link, session, 1090-byte workspace, scratch and CHUID response |
+| Stack      | 750 bytes   | key establishment through ECDH                                 |
+
+The framing code of `piv_sm_apdu.c` and `piv_sm_key_request.c` takes at most
+3800 bytes of that flash. The ATmega328P (32 KiB flash, 2 KiB RAM) cannot hold
+secure messaging.
 
 ## Tests
 

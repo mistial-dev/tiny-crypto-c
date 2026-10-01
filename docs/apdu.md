@@ -152,6 +152,6 @@ The channel keeps no static state. The caller owns the channel, the scratch
 buffer and the response buffer. On an ATmega328P with avr-gcc 7.3.0 at `-Os`,
 `TC_APDU_transceive` needs about 120 bytes of project stack, excluding the
 transport callback. The `apdu_piv_read` profile of `tests/budgets/avr.json`
-records the codec with the PIV card commands, and
+records the codec with the PIV card commands on an ATmega2560, and
 `test_apdu_piv_read_qemu_avr` runs the 16-bit length cases on an emulated
 Arduino Uno ([AVR builds and budgets](testing.md#avr-builds-and-budgets)).

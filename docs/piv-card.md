@@ -453,14 +453,16 @@ The card commands keep no mutable static state and allocate nothing. The
 caller owns the link, the command scratch and every response buffer.
 `sizeof(TC_PIV_link)` is 40 bytes on AVR, and a SHORT link needs 261 bytes of
 command scratch. The `apdu_piv_read` profile of `tests/budgets/avr.json`
-measures a plain SELECT, GET DATA and VERIFY query on an ATmega328P with
-avr-gcc 7.3.0 at `-Os`:
+measures a plain SELECT, a GET DATA of the CHUID and a VERIFY query on an
+ATmega2560 with avr-gcc 7.3.0 at `-Os`. Its static RAM counts the link, the
+command scratch and a response buffer for a CHUID at its Part 1 Table 8
+capacity of 2881 bytes:
 
-| Resource   | Budget      | Largest parts                                    |
-| ---------- | ----------- | ------------------------------------------------ |
-| Flash      | 13500 bytes | template reader, channel, TLV reader, GET DATA   |
-| Static RAM | 110 bytes   | AID tables and TLV limits, plus 36 harness bytes |
-| Stack      | 560 bytes   | SELECT through the template reader and TLV walk  |
+| Resource   | Budget      | Largest parts                                          |
+| ---------- | ----------- | ------------------------------------------------------ |
+| Flash      | 13500 bytes | template reader, channel, TLV reader, GET DATA         |
+| Static RAM | 3400 bytes  | 2900-byte CHUID response, scratch, link and AID tables |
+| Stack      | 560 bytes   | SELECT through the template reader and TLV walk        |
 
 The catalog, the inventory and the key proofs are larger and target
 ESP32-class and desktop devices. They build for AVR in the compile checks

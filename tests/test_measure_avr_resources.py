@@ -87,6 +87,19 @@ class ProfileBudgets(unittest.TestCase):
         self.assertIn("piv_link_bytes", budgets["apdu_piv_read"])
         self.assertIn("sm_framing_flash", budgets["piv_sm_cs2"])
 
+    def test_budgets_name_the_measured_part(self):
+        budgets = resources.json.loads(
+            (SCRIPT.parents[1] / "tests/budgets/avr.json").read_text())["profiles"]
+        for name, limits in budgets.items():
+            self.assertEqual(limits.get("mcu", resources.DEFAULT_MCU),
+                             resources.PROFILE_MCU.get(name, resources.DEFAULT_MCU), name)
+
+    def test_check_rejects_a_budget_for_another_part(self):
+        report = {"profiles": {"apdu_piv_read": {"mcu": "atmega328p", "flash": 10}}}
+        budgets = {"profiles": {"apdu_piv_read": {"mcu": "atmega2560", "flash": 20}}}
+        with self.assertRaisesRegex(SystemExit, "budget is for atmega2560, measured on atmega328p"):
+            resources.check_budgets(report, budgets, io.StringIO())
+
 
 class ToolchainVersion(unittest.TestCase):
     def test_version_is_read_from_the_banner(self):
@@ -102,7 +115,7 @@ class ToolchainVersion(unittest.TestCase):
 
     def test_check_prints_versions_without_enforcing_them(self):
         report = {"avr_gcc_version": "9.5.0",
-                  "profiles": {"aes_ctr": {"flash": 10}}}
+                  "profiles": {"aes_ctr": {"mcu": "atmega328p", "flash": 10}}}
         budgets = {"avr_gcc_version": "7.3.0",
                    "profiles": {"aes_ctr": {"flash": 20}}}
         stream = io.StringIO()
