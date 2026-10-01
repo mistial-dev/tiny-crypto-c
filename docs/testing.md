@@ -71,7 +71,10 @@ use native crypto and run without OpenSSL. The optional fixture generator and
 independent oracle are described in the
 [synthetic corpus README](../tests/vectors/twic/synthetic/README.md). With
 `TINY_CRYPTO_TEST_OPENSSL=ON`, `test_twic_synthetic_fixture_builder` builds the
-generator and checks that it reproduces every file it writes byte for byte.
+generator and checks that it reproduces every file it writes byte for byte. The
+fixtures carry no CMS signingTime, so the builder needs OpenSSL 3.2 or later
+(`CMS_NO_SIGNING_TIME`). With an older OpenSSL, CMake skips the builder and says
+so at configure time.
 
 `test_apdu_encode`, `test_apdu_response` and `test_apdu_channel` cover the
 [APDU codec](apdu.md): every ISO/IEC 7816-4 length case, recorded SD 33

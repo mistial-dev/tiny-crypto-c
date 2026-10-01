@@ -1117,17 +1117,27 @@ if(TINY_CRYPTO_BUILD_TESTS)
     endif()
     target_link_libraries(test_x509_native PRIVATE OpenSSL::Crypto)
     # The TWIC synthetic fixture builder must keep reproducing the checked-in
-    # vectors byte for byte.
-    tc_add_test_executable(twic_synthetic_fixture_builder
-      tests/twic/generate_synthetic_fixture.c tests/support/munit.c)
-    target_include_directories(twic_synthetic_fixture_builder PRIVATE tests/support src)
-    target_link_libraries(twic_synthetic_fixture_builder PRIVATE OpenSSL::Crypto)
-    set_property(TARGET twic_synthetic_fixture_builder PROPERTY NO_SYSTEM_FROM_IMPORTED TRUE)
-    add_test(NAME test_twic_synthetic_fixture_builder COMMAND ${CMAKE_COMMAND}
-      -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
-      -DBUILDER=$<TARGET_FILE:twic_synthetic_fixture_builder>
-      -DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/twic-synthetic-fixture
-      -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/twic_fixture_builder.cmake)
+    # vectors byte for byte. The fixtures carry no CMS signingTime, and only
+    # OpenSSL 3.2 and later can sign without one (CMS_NO_SIGNING_TIME).
+    include(CheckSymbolExists)
+    set(CMAKE_REQUIRED_INCLUDES ${OPENSSL_INCLUDE_DIR})
+    check_symbol_exists(CMS_NO_SIGNING_TIME "openssl/cms.h" TC_OPENSSL_CMS_NO_SIGNING_TIME)
+    unset(CMAKE_REQUIRED_INCLUDES)
+    if(TC_OPENSSL_CMS_NO_SIGNING_TIME)
+      tc_add_test_executable(twic_synthetic_fixture_builder
+        tests/twic/generate_synthetic_fixture.c tests/support/munit.c)
+      target_include_directories(twic_synthetic_fixture_builder PRIVATE tests/support src)
+      target_link_libraries(twic_synthetic_fixture_builder PRIVATE OpenSSL::Crypto)
+      set_property(TARGET twic_synthetic_fixture_builder PROPERTY NO_SYSTEM_FROM_IMPORTED TRUE)
+      add_test(NAME test_twic_synthetic_fixture_builder COMMAND ${CMAKE_COMMAND}
+        -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+        -DBUILDER=$<TARGET_FILE:twic_synthetic_fixture_builder>
+        -DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/twic-synthetic-fixture
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/twic_fixture_builder.cmake)
+    else()
+      message(STATUS "OpenSSL before 3.2 cannot sign CMS without signingTime; "
+                     "test_twic_synthetic_fixture_builder is not built")
+    endif()
     set_property(TARGET test_x509_native PROPERTY NO_SYSTEM_FROM_IMPORTED TRUE)
     tc_add_c_test(test_lds_native tiny-crypto-c-test-pki-native tests/cms/lds.c)
     # native.c covers SignedData, CHUID and security objects, path.c the
