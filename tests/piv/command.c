@@ -229,7 +229,8 @@ TC_TEST(application_rules)
   assert_read("C00100 61154F0BA000000308000010000100 79064F04A0000003", TC_PIV_APPLICATION_PIV,
               TC_TLV_INVALID);
   assert_read("", TC_PIV_APPLICATION_PIV, TC_TLV_INVALID);
-  /* 7F66: two positive 02 integers of at least 4 and 3 (12.8.1). */
+  /* 7F66: two nonzero 02 sizes of at least 4 and 3 (12.8.1). A set top bit
+   * is a size, as 02 02 80 00 for 32768. */
   static const char* const limits[] = {"7F6606020104020103",      "7F66070202040002 0100",
                                        "7F660402020400",          "7F660C020204000202040002020400",
                                        "7F6608810201008202 0100", "7F66070201030202 0400",
@@ -237,7 +238,7 @@ TC_TEST(application_rules)
                                        "7F6606020104020103"};
   static const TC_TLV_result expected[] = {TC_TLV_OK,      TC_TLV_INVALID, TC_TLV_INVALID,
                                            TC_TLV_INVALID, TC_TLV_INVALID, TC_TLV_INVALID,
-                                           TC_TLV_INVALID, TC_TLV_INVALID, TC_TLV_OK};
+                                           TC_TLV_INVALID, TC_TLV_OK,      TC_TLV_OK};
   for (size_t i = 0; i < sizeof limits / sizeof *limits; ++i) {
     char text[200] = "61154F0BA000000308000010000100 79064F04A0000003 ";
     strcat(text, limits[i]);
@@ -245,8 +246,23 @@ TC_TEST(application_rules)
       strcat(text, limits[i]);
     assert_read(text, TC_PIV_APPLICATION_PIV, i == 8 ? TC_TLV_INVALID : expected[i]);
   }
-  /* A leading zero keeps a large limit positive. Leading zeros beyond that
-   * are non-minimal. */
+  /* A TWIC NEXGEN card answers both SELECTs with 7F66 {02 02 03F8, 02 02
+   * 8001}: 1016 and 32769 bytes. */
+  munit_assert_int(read_hex("612A4F0BA00000036720000001010379074F05A000000367 "
+                            "50124E455847454E2052454C4541534520312E30 "
+                            "7F6608020203F802028001",
+                            TC_PIV_APPLICATION_TWIC, 0, &out),
+                   ==, TC_TLV_OK);
+  munit_assert_int(out.profile, ==, TC_TWIC_NEXGEN_CARD);
+  munit_assert_size(out.max_command_bytes, ==, 1016);
+  munit_assert_size(out.max_response_bytes, ==, 32769);
+  munit_assert_int(read_hex("61224F0BA00000030800001000010079074F05A000000308 "
+                            "500A49442D4F6E6520504956 7F6608020203F802028001",
+                            TC_PIV_APPLICATION_PIV, 0, &out),
+                   ==, TC_TLV_OK);
+  munit_assert_size(out.max_response_bytes, ==, 32769);
+  /* A leading zero may precede a byte with its top bit set. Leading zeros
+   * beyond that are non-minimal. */
   munit_assert_int(
       read_hex("61154F0BA000000308000010000100 79064F04A0000003 7F660902020400020300FFFF",
                TC_PIV_APPLICATION_PIV, 0, &out),

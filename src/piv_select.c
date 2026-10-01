@@ -60,12 +60,14 @@ static TC_TLV_result keep_once(TC_bytes* slot, unsigned* seen, unsigned bit,
   return TC_TLV_OK;
 }
 
-/* Read a positive INTEGER (ISO/IEC 7816-4 12.8.1) in minimal two's
- * complement. Values above SIZE_MAX read as SIZE_MAX. */
-static TC_TLV_result positive_integer(TC_bytes value, size_t* out)
+/* Read a 7F66 size limit: a nonzero unsigned big-endian count. ISO/IEC
+ * 7816-4 12.8.1 asks for a positive INTEGER, and TWIC NEXGEN cards send 32769
+ * as 80 01 without the leading 00 of two's complement, so a set top bit is a
+ * size. A leading 00 is accepted only before such a byte. Values above
+ * SIZE_MAX read as SIZE_MAX. */
+static TC_TLV_result size_limit(TC_bytes value, size_t* out)
 {
-  if (!value.length || (value.data[0] & 0x80) ||
-      (value.length > 1 && !value.data[0] && !(value.data[1] & 0x80)))
+  if (!value.length || (value.length > 1 && !value.data[0] && !(value.data[1] & 0x80)))
     return TC_TLV_INVALID;
   size_t result = 0;
   for (size_t i = 0; i < value.length; ++i)
@@ -76,7 +78,7 @@ static TC_TLV_result positive_integer(TC_bytes value, size_t* out)
   return TC_TLV_OK;
 }
 
-/* DO 7F66: exactly two 02 integers, command and response APDU limits. */
+/* DO 7F66: exactly two 02 size limits, command and response APDU bytes. */
 static TC_TLV_result limits_read(const TC_TLV_reader* parent, const TC_TLV_element* element,
                                  TC_PIV_application* out)
 {
@@ -87,8 +89,7 @@ static TC_TLV_result limits_read(const TC_TLV_reader* parent, const TC_TLV_eleme
   for (size_t i = 0; result == TC_TLV_OK && i < 2; ++i) {
     result = TC_TLV_next(&reader, &integer);
     if (result == TC_TLV_OK)
-      result =
-          tag_is(&integer, INTEGER) ? positive_integer(integer.value, &values[i]) : TC_TLV_INVALID;
+      result = tag_is(&integer, INTEGER) ? size_limit(integer.value, &values[i]) : TC_TLV_INVALID;
   }
   if (result == TC_TLV_OK && TC_TLV_next(&reader, &integer) != TC_TLV_END)
     result = TC_TLV_INVALID;

@@ -54,8 +54,10 @@ v4 Appendix D.3), with Le `00`. SELECT is always plain (Part 2 section 4.2).
 `TC_PIV_application_read` checks the answer, and `TC_PIV_select` uses it:
 
 - The data field starts with one `61` template. DO `7F66` may follow it once
-  with two positive `02` integers, the card's largest command and response
-  APDUs (ISO/IEC 7816-4 section 12.8.1). Other top-level DOs are skipped.
+  with two nonzero `02` sizes, the card's largest command and response APDUs
+  (ISO/IEC 7816-4 section 12.8.1). Each size is an unsigned big-endian count,
+  since TWIC NEXGEN cards send 32769 as `02 02 80 01`. Other top-level DOs are
+  skipped.
 - Inside `61`: one `4F` with the expected AID prefix and two version bytes, one
   `79` holding a nonempty `4F`, and at most one `50`, `5F50` and `AC` (Part 2
   Tables 3 and 4). Part 2 section 3.1.1 and TWIC Part 2 v5 section 5.1.1
