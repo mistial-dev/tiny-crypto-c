@@ -110,6 +110,8 @@ typedef struct {
   TC_X509_time at;
   TC_X509_signature_provider signatures;
   TC_TLV_limits parsing;
+  /* max_candidates and max_candidate_bytes bound the certificates one path
+   * search examines: the store candidates plus those a CMS object embeds. */
   size_t max_certificates, max_input, max_candidates, max_candidate_bytes;
   TC_validation_certificate_policy certificate, crl_signer;
   /* CMS encodings and attribute policy. PIV and TWIC validators replace

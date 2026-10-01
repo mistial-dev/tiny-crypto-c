@@ -10,6 +10,9 @@
 
 enum {
   EXAMPLE_PIV_TRUST_CERTIFICATE_BYTES = 16384,
+  /* Certificates a signed card object may embed beside its signer, such as
+   * the issuing CA of a TWIC content signer. */
+  EXAMPLE_PIV_TRUST_EMBEDDED_CERTIFICATES = 4,
   EXAMPLE_PIV_TRUST_FRAMES = 32,
   EXAMPLE_PIV_TRUST_OIDS = 64,
   EXAMPLE_PIV_TRUST_ARENA_BYTES = 1024 * 1024

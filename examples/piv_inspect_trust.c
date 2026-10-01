@@ -47,9 +47,12 @@ int example_piv_inspect_trust_init(ExamplePIVInspectTrust* trust,
   trust->options.parsing = limits;
   trust->options.max_certificates = 8;
   trust->options.max_input = 8 * EXAMPLE_PIV_TRUST_CERTIFICATE_BYTES;
-  trust->options.max_candidates = EXAMPLE_PIV_INSPECT_ANCHORS;
+  /* A path search examines the anchors and the certificates of the CMS
+   * object it validates. */
+  trust->options.max_candidates =
+      EXAMPLE_PIV_INSPECT_ANCHORS + EXAMPLE_PIV_TRUST_EMBEDDED_CERTIFICATES;
   trust->options.max_candidate_bytes =
-      EXAMPLE_PIV_INSPECT_ANCHORS * EXAMPLE_PIV_TRUST_CERTIFICATE_BYTES;
+      trust->options.max_candidates * EXAMPLE_PIV_TRUST_CERTIFICATE_BYTES;
   trust->options.revocation = options->revocation;
   const TC_validation_trust sources = {&trust->source, &trust->index};
   return TC_validation_context_init(&sources, &trust->options, &trust->workspace.credential,
