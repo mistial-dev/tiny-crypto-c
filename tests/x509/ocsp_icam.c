@@ -441,8 +441,8 @@ TC_TEST(path_ocsp)
   munit_assert_uint(result.evidence.revocation.reason, ==, 0);
   munit_assert_uint(result.evidence.revocation.revoked_at.year, ==, 2024);
   munit_assert_int(check_member("target", "content_signer_revoked", 0, content_signer_at, &result),
-                   ==, TC_TLV_UNSUPPORTED);
-  assert_unchanged(&result);
+                   ==, TC_TLV_OK);
+  munit_assert_int(result.status, ==, TC_X509_REVOCATION_REVOKED);
 
   /* An authenticated unknown status and a stale response fall back to CRLs. */
   munit_assert_int(check_member("target", "content_signer_unknown", 1, content_signer_at, &result),

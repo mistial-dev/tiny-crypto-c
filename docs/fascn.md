@@ -26,7 +26,7 @@ TC_FASCN fields;
 uint8_t encoded[TC_FASCN_BYTES];
 TC_TLV_result result = TC_FASCN_read(input, &fields);
 if (result != TC_TLV_OK) return result;
-result = TC_FASCN_write(&fields, encoded, sizeof encoded);
+result = TC_FASCN_write(&fields, (TC_buffer){encoded, sizeof encoded});
 if (result != TC_TLV_OK) return result;
 ```
 

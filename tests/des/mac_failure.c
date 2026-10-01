@@ -112,6 +112,10 @@ TC_TEST(iso9797_failures)
   for (size_t a = 0; a < sizeof algorithms / sizeof *algorithms; ++a) {
     for (size_t k = 0; k < sizeof keylens / sizeof *keylens; ++k) {
       for (size_t m = 0; m < sizeof messages / sizeof *messages; ++m) {
+        const TC_DES_ISO9797_algorithm algorithm =
+            algorithms[a] == TC_DES_ISO9797_ALG3 && keylens[k] == TC_DES_KEYLEN_3KEY
+                ? TC_DES_ISO9797_ALG3_3KEY_EXTENSION
+                : algorithms[a];
         const TC_DES_ISO9797_padding padding = messages[m].padding;
         const size_t length = messages[m].length;
         struct TC_DES_ISO9797_ctx ctx;
@@ -120,7 +124,7 @@ TC_TEST(iso9797_failures)
         calls = 0;
         fail_at = 0;
         munit_assert_int(
-            iso9797_stream(algorithms[a], padding, keylens[k], data, length, expected, &ctx), ==,
+            iso9797_stream(algorithm, padding, keylens[k], data, length, expected, &ctx), ==,
             TC_OK);
         total = calls;
         /* One CBC call per block, including the padding block. */
@@ -131,7 +135,7 @@ TC_TEST(iso9797_failures)
           calls = 0;
           memcpy(tag, untouched, sizeof tag);
           munit_assert_int(
-              iso9797_stream(algorithms[a], padding, keylens[k], data, length, tag, &ctx), ==,
+              iso9797_stream(algorithm, padding, keylens[k], data, length, tag, &ctx), ==,
               TC_ERROR);
           munit_assert_true(tc_test_all_zero(&ctx, sizeof ctx));
           munit_assert_memory_equal(sizeof tag, tag, untouched);
@@ -140,18 +144,18 @@ TC_TEST(iso9797_failures)
           munit_assert_memory_equal(sizeof tag, tag, untouched);
 
           calls = 0;
-          munit_assert_int(TC_DES_ISO9797_MAC(algorithms[a], padding, key, keylens[k], data, length,
+          munit_assert_int(TC_DES_ISO9797_MAC(algorithm, padding, key, keylens[k], data, length,
                                               tag, sizeof tag),
                            ==, TC_ERROR);
           munit_assert_memory_equal(sizeof tag, tag, untouched);
           calls = 0;
-          munit_assert_int(TC_DES_ISO9797_verify(algorithms[a], padding, key, keylens[k], data,
+          munit_assert_int(TC_DES_ISO9797_verify(algorithm, padding, key, keylens[k], data,
                                                  length, expected, sizeof expected),
                            ==, TC_ERROR);
         }
         fail_at = 0;
         calls = 0;
-        munit_assert_int(TC_DES_ISO9797_verify(algorithms[a], padding, key, keylens[k], data,
+        munit_assert_int(TC_DES_ISO9797_verify(algorithm, padding, key, keylens[k], data,
                                                length, expected, sizeof expected),
                          ==, TC_OK);
       }

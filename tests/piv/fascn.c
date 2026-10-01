@@ -57,7 +57,7 @@ TC_TEST(codec)
   munit_assert_uint(value.organization, ==, 1223);
   munit_assert_uint(value.association, ==, 2);
   memset(encoded, 0xa5, sizeof encoded);
-  munit_assert_int(TC_FASCN_write(&value, encoded, sizeof encoded), ==, TC_TLV_OK);
+  munit_assert_int(TC_FASCN_write(&value, (TC_buffer){encoded, sizeof encoded}), ==, TC_TLV_OK);
   munit_assert_memory_equal(sizeof known, encoded, known);
   munit_assert_uint(encoded[sizeof known], ==, 0xa5);
   const TC_FASCN good = value;
@@ -76,7 +76,7 @@ TC_TEST(codec)
     munit_assert_int(TC_FASCN_read((TC_bytes){known, length}, &value), ==, TC_TLV_INVALID);
     munit_assert_memory_equal(sizeof value, &value, &preserved);
     memset(encoded, 0xa5, sizeof encoded);
-    munit_assert_int(TC_FASCN_write(&good, encoded, length), ==, TC_TLV_LIMIT);
+    munit_assert_int(TC_FASCN_write(&good, (TC_buffer){encoded, length}), ==, TC_TLV_LIMIT);
     for (size_t i = 0; i < sizeof encoded; ++i)
       munit_assert_uint(encoded[i], ==, 0xa5);
   }
@@ -114,13 +114,15 @@ TC_TEST(codec)
     /* A field above its decimal width is a caller error, checked before
      * the capacity. */
     memset(encoded, 0xa5, sizeof encoded);
-    munit_assert_int(TC_FASCN_write(&value, encoded, sizeof encoded), ==, TC_TLV_ARGUMENT);
-    munit_assert_int(TC_FASCN_write(&value, encoded, TC_FASCN_BYTES - 1), ==, TC_TLV_ARGUMENT);
+    munit_assert_int(TC_FASCN_write(&value, (TC_buffer){encoded, sizeof encoded}), ==,
+                     TC_TLV_ARGUMENT);
+    munit_assert_int(TC_FASCN_write(&value, (TC_buffer){encoded, TC_FASCN_BYTES - 1}), ==,
+                     TC_TLV_ARGUMENT);
     for (size_t i = 0; i < sizeof encoded; ++i)
       munit_assert_uint(encoded[i], ==, 0xa5);
   }
   munit_assert_int(TC_FASCN_read((TC_bytes){NULL, 25}, &value), ==, TC_TLV_ARGUMENT);
-  munit_assert_int(TC_FASCN_write(NULL, encoded, sizeof encoded), ==, TC_TLV_ARGUMENT);
+  munit_assert_int(TC_FASCN_write(NULL, (TC_buffer){encoded, sizeof encoded}), ==, TC_TLV_ARGUMENT);
   munit_assert_int(TC_FASCN_read((TC_bytes){encoded, sizeof encoded}, &value), ==, TC_TLV_INVALID);
   union {
     TC_FASCN value;
@@ -131,7 +133,7 @@ TC_TEST(codec)
                    TC_TLV_ARGUMENT);
   munit_assert_memory_equal(sizeof known, alias.bytes, known);
   alias.value = good;
-  munit_assert_int(TC_FASCN_write(&alias.value, alias.bytes, sizeof alias.bytes), ==,
+  munit_assert_int(TC_FASCN_write(&alias.value, (TC_buffer){alias.bytes, sizeof alias.bytes}), ==,
                    TC_TLV_ARGUMENT);
   assert_fascn_equal(&alias.value, &good);
   static const char digits[] = "b0032d0001d092446d0d1d1112223333112232f7";

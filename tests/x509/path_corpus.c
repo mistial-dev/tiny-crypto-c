@@ -159,7 +159,9 @@ TC_TEST(corpus_case)
     TC_X509_certificate parsed;
     munit_assert_int(TC_X509_read(anchor_bytes[i], &options.parsing, &parser, &parsed), ==,
                      TC_TLV_OK);
-    records.anchors[i].trust = (TC_X509_trust_anchor){parsed.subject, parsed.public_key};
+    munit_assert_int(TC_X509_store_anchor_from_certificate(
+                         &parsed, &options.parsing, &parser, &records.anchors[i]),
+                     ==, TC_TLV_OK);
   }
   records.anchor_count = source.anchor_count = anchor_count;
   source.candidate_count = records.candidate_count;

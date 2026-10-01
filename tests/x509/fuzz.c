@@ -142,7 +142,7 @@ static void fuzz_identity_codecs(TC_bytes input)
   TC_TLV_result result = TC_FASCN_read(input, &decoded);
   if (result == TC_TLV_OK) {
     uint8_t encoded[TC_FASCN_BYTES];
-    if (TC_FASCN_write(&decoded, encoded, sizeof encoded) != TC_TLV_OK ||
+    if (TC_FASCN_write(&decoded, (TC_buffer){encoded, sizeof encoded}) != TC_TLV_OK ||
         input.length != sizeof encoded || memcmp(input.data, encoded, sizeof encoded))
       abort();
   } else if (memcmp(&decoded, &saved, sizeof decoded))
@@ -152,7 +152,7 @@ static void fuzz_identity_codecs(TC_bytes input)
   result = TC_TWIC_uuid_read(input, &number);
   if (result == TC_TLV_OK) {
     uint8_t encoded[TC_TWIC_UUID_BYTES];
-    if (TC_TWIC_uuid_write(number, encoded, sizeof encoded) != TC_TLV_OK ||
+    if (TC_TWIC_uuid_write(number, (TC_buffer){encoded, sizeof encoded}) != TC_TLV_OK ||
         input.length != sizeof encoded || memcmp(input.data, encoded, sizeof encoded))
       abort();
   } else if (number != UINT64_MAX)

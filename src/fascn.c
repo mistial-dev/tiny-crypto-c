@@ -89,9 +89,10 @@ TC_TLV_result TC_FASCN_read(TC_bytes encoded, TC_FASCN* out)
   return TC_TLV_OK;
 }
 
-TC_TLV_result TC_FASCN_write(const TC_FASCN* value, uint8_t* out, size_t capacity)
+TC_TLV_result TC_FASCN_write(const TC_FASCN* value, TC_buffer out)
 {
-  if (!value || !out || !tc_internal_ranges_disjoint(value, sizeof *value, out, capacity))
+  if (!value || (!out.data && out.capacity) ||
+      !tc_internal_ranges_disjoint(value, sizeof *value, out.data, out.capacity))
     return TC_TLV_ARGUMENT;
   uint64_t values[FIELDS] = {value->agency,   value->system,       value->credential,
                              value->series,   value->issue,        value->person,
@@ -105,10 +106,10 @@ TC_TLV_result TC_FASCN_write(const TC_FASCN* value, uint8_t* out, size_t capacit
     if (values[i] >= limit)
       return TC_TLV_ARGUMENT;
   }
-  if (capacity < TC_FASCN_BYTES)
+  if (out.capacity < TC_FASCN_BYTES)
     return TC_TLV_LIMIT;
   /* All validation precedes output writes. Each character occupies five bits. */
-  memset(out, 0, TC_FASCN_BYTES);
+  memset(out.data, 0, TC_FASCN_BYTES);
   unsigned checksum = 0;
   size_t field = 0;
   for (size_t i = 0; i < LRC_POSITION; ++i) {
@@ -117,18 +118,18 @@ TC_TLV_result TC_FASCN_write(const TC_FASCN* value, uint8_t* out, size_t capacit
     if (field < FIELDS && i >= fields[field].first)
       continue;
     const unsigned control = delimiter(i);
-    put_character(out, i, control);
+    put_character(out.data, i, control);
     checksum ^= control;
   }
   for (size_t i = 0; i < FIELDS; ++i) {
     for (size_t j = fields[i].digits; j; --j) {
       const unsigned digit = (unsigned)(values[i] % 10);
       values[i] /= 10;
-      put_character(out, fields[i].first + j - 1, digit);
+      put_character(out.data, fields[i].first + j - 1, digit);
       checksum ^= digit;
     }
   }
-  put_character(out, LRC_POSITION, checksum);
+  put_character(out.data, LRC_POSITION, checksum);
   return TC_TLV_OK;
 }
 #endif

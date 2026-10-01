@@ -34,19 +34,20 @@ TC_TLV_result TC_TWIC_uuid_read(TC_bytes encoded, uint64_t* number)
   return TC_TLV_OK;
 }
 
-TC_TLV_result TC_TWIC_uuid_write(uint64_t number, uint8_t* out, size_t capacity)
+TC_TLV_result TC_TWIC_uuid_write(uint64_t number, TC_buffer out)
 {
   TC_bytes output;
   /* TWIC Part 2 v5 Appendix D: the number is 14 decimal digits. A larger
    * caller value is an argument error, checked before the capacity. */
-  if (!out || tc_pki_storage_span(out, capacity, 1, &output) != TC_TLV_OK ||
+  if ((!out.data && out.capacity) ||
+      tc_pki_storage_span(out.data, out.capacity, 1, &output) != TC_TLV_OK ||
       number > maximum_number)
     return TC_TLV_ARGUMENT;
-  if (capacity < TC_TWIC_UUID_BYTES)
+  if (out.capacity < TC_TWIC_UUID_BYTES)
     return TC_TLV_LIMIT;
-  memcpy(out, prefix, sizeof prefix);
+  memcpy(out.data, prefix, sizeof prefix);
   for (size_t i = 0; i < NUMBER_BYTES; ++i) {
-    out[TC_TWIC_UUID_BYTES - 1 - i] = (uint8_t)number;
+    out.data[TC_TWIC_UUID_BYTES - 1 - i] = (uint8_t)number;
     number >>= 8;
   }
   return TC_TLV_OK;

@@ -199,10 +199,10 @@ int main(void)
     if (TC_LDS_read(empty, NULL, example_no_frames, &work, NULL) != TC_TLV_ARGUMENT || work != 100)
       return 1;
     if (TC_FASCN_read(empty, NULL) != TC_TLV_ARGUMENT ||
-        TC_FASCN_write(NULL, NULL, 0) != TC_TLV_ARGUMENT)
+        TC_FASCN_write(NULL, (TC_buffer){NULL, 0}) != TC_TLV_ARGUMENT)
       return 1;
     if (TC_TWIC_uuid_read(empty, NULL) != TC_TLV_ARGUMENT ||
-        TC_TWIC_uuid_write(0, NULL, 0) != TC_TLV_ARGUMENT ||
+        TC_TWIC_uuid_write(0, (TC_buffer){NULL, 0}) != TC_TLV_LIMIT ||
         TC_TWIC_uuid_match(empty, NULL, NULL) != TC_TLV_ARGUMENT)
       return 1;
     if (TC_LDS_read_content(empty, NULL, example_no_frames, &work, NULL, 0, NULL) !=

@@ -16,7 +16,8 @@ TC_TEST(mapping)
   munit_assert_int(TC_TWIC_uuid_read((TC_bytes){known, sizeof known}, &number), ==, TC_TLV_OK);
   munit_assert_uint64(number, ==, expected);
   memset(encoded, 0xa5, sizeof encoded);
-  munit_assert_int(TC_TWIC_uuid_write(expected, encoded, sizeof encoded), ==, TC_TLV_OK);
+  munit_assert_int(TC_TWIC_uuid_write(expected, (TC_buffer){encoded, sizeof encoded}), ==,
+                   TC_TLV_OK);
   munit_assert_memory_equal(sizeof known, known, encoded);
   munit_assert_uint(encoded[sizeof known], ==, 0xa5);
   TC_FASCN fascn = {0, 48796, 7099, 1055, 0, 0, 0, 0, 0};
@@ -40,7 +41,7 @@ TC_TEST(mapping)
                                      UINT64_MAX};
   for (size_t i = 0; i < sizeof numbers / sizeof *numbers; ++i) {
     memset(encoded, 0xa5, sizeof encoded);
-    munit_assert_int(TC_TWIC_uuid_write(numbers[i], encoded, sizeof encoded), ==,
+    munit_assert_int(TC_TWIC_uuid_write(numbers[i], (TC_buffer){encoded, sizeof encoded}), ==,
                      i < 3 ? TC_TLV_OK : TC_TLV_ARGUMENT);
     if (i < 3) {
       munit_assert_int(TC_TWIC_uuid_read((TC_bytes){encoded, sizeof known}, &number), ==,
@@ -53,9 +54,10 @@ TC_TEST(mapping)
   for (size_t length = 0; length < sizeof known; ++length) {
     memset(encoded, 0xa5, sizeof encoded);
     number = expected;
-    munit_assert_int(TC_TWIC_uuid_write(expected, encoded, length), ==, TC_TLV_LIMIT);
+    munit_assert_int(TC_TWIC_uuid_write(expected, (TC_buffer){encoded, length}), ==, TC_TLV_LIMIT);
     /* The caller's number is checked before the capacity. */
-    munit_assert_int(TC_TWIC_uuid_write(UINT64_C(100000000000000), encoded, length), ==,
+    munit_assert_int(TC_TWIC_uuid_write(UINT64_C(100000000000000),
+                                        (TC_buffer){encoded, length}), ==,
                      TC_TLV_ARGUMENT);
     munit_assert_int(TC_TWIC_uuid_read((TC_bytes){known, length}, &number), ==, TC_TLV_INVALID);
     munit_assert_uint64(number, ==, expected);
@@ -63,7 +65,7 @@ TC_TEST(mapping)
       munit_assert_uint(encoded[i], ==, 0xa5);
   }
   munit_assert_int(TC_TWIC_uuid_read((TC_bytes){NULL, 16}, &number), ==, TC_TLV_ARGUMENT);
-  munit_assert_int(TC_TWIC_uuid_write(expected, NULL, 16), ==, TC_TLV_ARGUMENT);
+  munit_assert_int(TC_TWIC_uuid_write(expected, (TC_buffer){NULL, 16}), ==, TC_TLV_ARGUMENT);
   munit_assert_int(TC_TWIC_uuid_match((TC_bytes){known, sizeof known}, NULL, &matched), ==,
                    TC_TLV_ARGUMENT);
   return MUNIT_OK;
@@ -79,7 +81,8 @@ TC_TEST(invalid_storage)
   } storage;
   uint8_t saved[sizeof storage];
   memset(&storage, 0xa5, sizeof storage);
-  munit_assert_int(TC_TWIC_uuid_write(1, storage.bytes, sizeof storage.bytes), ==, TC_TLV_OK);
+  munit_assert_int(TC_TWIC_uuid_write(1, (TC_buffer){storage.bytes, sizeof storage.bytes}), ==,
+                   TC_TLV_OK);
   memcpy(saved, &storage, sizeof saved);
   const TC_bytes encoded = {storage.bytes, TC_TWIC_UUID_BYTES};
   munit_assert_int(TC_TWIC_uuid_read(encoded, &storage.number), ==, TC_TLV_ARGUMENT);
