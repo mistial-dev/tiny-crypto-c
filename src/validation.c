@@ -8,6 +8,7 @@
 #include "validation_internal.h"
 #include "pki_storage_internal.h"
 #include "pki_source_internal.h"
+#include "x509_path_workspace_internal.h"
 #include "x509_revocation_internal.h"
 
 #if TC_ENABLE_CMS_VALIDATION
@@ -72,48 +73,39 @@ TC_result TC_validation_capacity_init(TC_validation_profile profile, TC_validati
   return TC_RESULT_OK;
 }
 
-/* Reserve an aligned array in the arena. Reject size arithmetic overflow. */
-static int reserve(size_t* offset, size_t count, size_t width, size_t* start)
-{
-  const size_t alignment = TC_validation_workspace_alignment();
-  const size_t remainder = *offset % alignment;
-  const size_t padding = remainder ? alignment - remainder : 0;
-  if (padding > SIZE_MAX - *offset)
-    return 0;
-  *start = *offset + padding;
-  if (count > (SIZE_MAX - *start) / width)
-    return 0;
-  *offset = *start + count * width;
-  return 1;
-}
+/* tc_x509_path_workspace_layout requires an alignment that is a multiple of
+ * TC_X509_path_workspace_alignment. This array type fails to compile
+ * otherwise. */
+#define VALIDATION_ALIGNMENT offsetof(validation_alignment, storage)
+#define PATH_ALIGNMENT offsetof(tc_x509_path_storage_alignment, storage)
+typedef char validation_alignment_covers_path[VALIDATION_ALIGNMENT % PATH_ALIGNMENT ? -1 : 1];
+#undef PATH_ALIGNMENT
+#undef VALIDATION_ALIGNMENT
 
-/* Calculate the arena layout and array capacities. A NULL arena sizes the
- * workspace without assigning storage. */
+/* Calculate the arena layout and array capacities. The arena starts with the
+ * TC_X509_path_workspace_init layout of the path counts, followed by the CMS
+ * search and revocation arrays. A NULL arena sizes the workspace without
+ * assigning storage. */
 static TC_result layout(const TC_validation_capacity* c, uint8_t* arena, TC_validation_workspace* w,
                         size_t* bytes)
 {
+  const size_t alignment = TC_validation_workspace_alignment();
+  const TC_X509_path_capacity path = {
+      c->frames,       c->oids,         c->name_scalars,    c->name_attributes,
+      c->policy_nodes, c->policy_edges, c->policy_expected, c->policy_mappings,
+      c->policies,     c->path};
   size_t offset = 0, start;
-  if (!c || !c->frames || !c->oids || !c->name_scalars || !c->name_attributes || !c->path ||
+  if (!c->frames || !c->oids || !c->name_scalars || !c->name_attributes || !c->path ||
       !c->certificates)
     return TC_RESULT_ARGUMENT;
+  if (!tc_x509_path_workspace_layout(&path, arena, alignment, &offset, &w->path.validation))
+    return TC_RESULT_LIMIT;
 #define ARRAY(field, type, count)                                                                  \
   do {                                                                                             \
-    if (!reserve(&offset, (count), sizeof(type), &start))                                          \
+    if (!tc_x509_path_arena_reserve(&offset, (count), sizeof(type), alignment, &start))            \
       return TC_RESULT_LIMIT;                                                                      \
-    w->field = arena && (count) ? (type*)(arena + start) : NULL;                                   \
+    w->field = arena && (count) ? (type*)(void*)(arena + start) : NULL;                            \
   } while (0)
-  ARRAY(path.validation.frames.data, TC_TLV_frame, c->frames);
-  ARRAY(path.validation.oids, TC_bytes, c->oids);
-  ARRAY(path.validation.names.left, uint32_t, c->name_scalars);
-  ARRAY(path.validation.names.right, uint32_t, c->name_scalars);
-  ARRAY(path.validation.names.matched, uint8_t, c->name_attributes);
-  ARRAY(path.validation.nodes, TC_X509_policy_node, c->policy_nodes);
-  ARRAY(path.validation.edges, TC_X509_policy_edge, c->policy_edges);
-  ARRAY(path.validation.expected, TC_X509_policy_expected, c->policy_expected);
-  ARRAY(path.validation.mappings, TC_X509_policy_mapping, c->policy_mappings);
-  ARRAY(path.validation.policies, TC_bytes, c->policies);
-  ARRAY(path.validation.certificates, TC_X509_certificate, c->path);
-  ARRAY(path.validation.summaries, TC_X509_extension_summary, c->path);
   ARRAY(path.search.path, TC_bytes, c->path);
   ARRAY(path.search.frames, TC_X509_search_frame, c->path);
   ARRAY(path.certificates, TC_bytes, c->certificates);
@@ -126,17 +118,6 @@ static TC_result layout(const TC_validation_capacity* c, uint8_t* arena, TC_vali
   ARRAY(credential.signer_path, TC_bytes, c->path);
   ARRAY(credential.signer_policies, TC_bytes, c->policies);
 #undef ARRAY
-  w->path.validation.frames.capacity = c->frames;
-  w->path.validation.oid_capacity = c->oids;
-  w->path.validation.names.scalar_capacity = c->name_scalars;
-  w->path.validation.names.attribute_capacity = c->name_attributes;
-  w->path.validation.node_capacity = c->policy_nodes;
-  w->path.validation.edge_capacity = c->policy_edges;
-  w->path.validation.expected_capacity = c->policy_expected;
-  w->path.validation.mapping_capacity = c->policy_mappings;
-  w->path.validation.policy_capacity = c->policies;
-  w->path.validation.certificate_capacity = c->path;
-  w->path.validation.summary_capacity = c->path;
   w->path.search.capacity = c->path;
   w->path.certificate_capacity = c->certificates;
   w->path.signature_capacity = c->signature_bytes;
@@ -155,7 +136,7 @@ TC_result TC_validation_workspace_size(const TC_validation_capacity* capacity, s
 {
   TC_validation_workspace workspace = {0};
   size_t size;
-  if (!bytes)
+  if (!capacity || !bytes)
     return TC_RESULT_ARGUMENT;
   TC_result result = layout(capacity, NULL, &workspace, &size);
   if (result == TC_RESULT_OK)
@@ -180,9 +161,8 @@ TC_result TC_validation_workspace_init(const TC_validation_capacity* capacity, T
     return result;
   if (arena.capacity < size)
     return TC_RESULT_LIMIT;
-  result = layout(capacity, arena.data, &workspace, &size);
-  if (result != TC_RESULT_OK)
-    return result;
+  /* The sizing pass succeeded, so this pass cannot overflow. */
+  (void)layout(capacity, arena.data, &workspace, &size);
   workspace.credential.path = &out->path;
   *out = workspace;
   return TC_RESULT_OK;

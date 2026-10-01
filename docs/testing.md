@@ -330,7 +330,8 @@ To run the installation checks after configuring a build:
 ctest --test-dir build -R '^test_installed_consumer' --output-on-failure
 ```
 
-The validation workspace test checks arena sizing, profile capacities, stable
+The validation workspace test checks arena sizing, profile capacities, the
+shared path array layout, LIMIT results that leave outputs unchanged, stable
 workspace metadata and context alias rejection:
 
 ```sh

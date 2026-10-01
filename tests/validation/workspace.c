@@ -90,6 +90,166 @@ TC_TEST(profiles)
   return MUNIT_OK;
 }
 
+static TC_X509_path_capacity path_capacity(const TC_validation_capacity* c)
+{
+  TC_X509_path_capacity path = {
+      c->frames,       c->oids,         c->name_scalars,    c->name_attributes,
+      c->policy_nodes, c->policy_edges, c->policy_expected, c->policy_mappings,
+      c->policies,     c->path};
+  return path;
+}
+
+/* The validation arena starts with the TC_X509_path_workspace_init layout for
+ * the same counts, followed by the CMS search and revocation arrays. */
+TC_TEST(shared_path_layout)
+{
+  TC_validation_capacity capacities[4];
+  for (int profile = TC_VALIDATION_MICRO; profile <= TC_VALIDATION_DESKTOP; ++profile)
+    munit_assert_int(
+        TC_validation_capacity_init((TC_validation_profile)profile, &capacities[profile]), ==,
+        TC_RESULT_OK);
+  /* Minimum counts, zero policy arrays and an odd signature size. */
+  capacities[3] = (TC_validation_capacity){.frames = 1,
+                                           .oids = 1,
+                                           .name_scalars = 1,
+                                           .name_attributes = 1,
+                                           .path = 1,
+                                           .certificates = 1,
+                                           .signature_bytes = 3,
+                                           .crls = 1};
+  /* Exact sizes for LP64 hosts with 8-byte alignment. */
+  static const size_t lp64_bytes[4] = {9232, 18592, 68480, 776};
+  for (size_t i = 0; i < 4; ++i) {
+    const TC_validation_capacity* capacity = &capacities[i];
+    const TC_X509_path_capacity path = path_capacity(capacity);
+    TC_validation_workspace workspace;
+    TC_X509_path_workspace expected;
+    size_t bytes = 0, path_bytes = 0;
+    munit_assert_int(TC_validation_workspace_size(capacity, &bytes), ==, TC_RESULT_OK);
+    munit_assert_int(TC_X509_path_workspace_size(&path, &path_bytes), ==, TC_RESULT_OK);
+    munit_assert_size(bytes, >, path_bytes);
+    munit_assert_size(TC_validation_workspace_alignment() % TC_X509_path_workspace_alignment(), ==,
+                      0);
+    if (sizeof(void*) == 8 && sizeof(size_t) == 8 && TC_validation_workspace_alignment() == 8)
+      munit_assert_size(bytes, ==, lp64_bytes[i]);
+    munit_assert_int(
+        TC_validation_workspace_init(capacity, (TC_buffer){(uint8_t*)arena, bytes}, &workspace), ==,
+        TC_RESULT_OK);
+    munit_assert_int(
+        TC_X509_path_workspace_init(&path, (TC_buffer){(uint8_t*)arena, path_bytes}, &expected), ==,
+        TC_RESULT_OK);
+    const TC_X509_path_workspace* actual = &workspace.path.validation;
+    munit_assert_ptr_equal(actual->frames.data, expected.frames.data);
+    munit_assert_ptr_equal(actual->oids, expected.oids);
+    munit_assert_ptr_equal(actual->names.left, expected.names.left);
+    munit_assert_ptr_equal(actual->names.right, expected.names.right);
+    munit_assert_ptr_equal(actual->names.matched, expected.names.matched);
+    munit_assert_ptr_equal(actual->nodes, expected.nodes);
+    munit_assert_ptr_equal(actual->edges, expected.edges);
+    munit_assert_ptr_equal(actual->expected, expected.expected);
+    munit_assert_ptr_equal(actual->mappings, expected.mappings);
+    munit_assert_ptr_equal(actual->policies, expected.policies);
+    munit_assert_ptr_equal(actual->certificates, expected.certificates);
+    munit_assert_ptr_equal(actual->summaries, expected.summaries);
+    munit_assert_size(actual->frames.capacity, ==, expected.frames.capacity);
+    munit_assert_size(actual->oid_capacity, ==, expected.oid_capacity);
+    munit_assert_size(actual->names.scalar_capacity, ==, expected.names.scalar_capacity);
+    munit_assert_size(actual->names.attribute_capacity, ==, expected.names.attribute_capacity);
+    munit_assert_size(actual->node_capacity, ==, expected.node_capacity);
+    munit_assert_size(actual->edge_capacity, ==, expected.edge_capacity);
+    munit_assert_size(actual->expected_capacity, ==, expected.expected_capacity);
+    munit_assert_size(actual->mapping_capacity, ==, expected.mapping_capacity);
+    munit_assert_size(actual->policy_capacity, ==, expected.policy_capacity);
+    munit_assert_size(actual->certificate_capacity, ==, expected.certificate_capacity);
+    munit_assert_size(actual->summary_capacity, ==, expected.summary_capacity);
+    /* The remaining arrays follow the path layout in declaration order. */
+    const struct {
+      const void* start;
+      size_t bytes;
+    } tail[] = {
+        {workspace.path.search.path, capacity->path * sizeof(TC_bytes)},
+        {workspace.path.search.frames, capacity->path * sizeof(TC_X509_search_frame)},
+        {workspace.path.certificates, capacity->certificates * sizeof(TC_bytes)},
+        {workspace.path.signature, capacity->signature_bytes},
+        {workspace.path.signed_digest, TC_CMS_SIGNED_DIGEST_BYTES},
+        {workspace.credential.held_path, capacity->path * sizeof(TC_bytes)},
+        {workspace.credential.crl_states, capacity->crls},
+        {workspace.credential.nodes, capacity->revocation_nodes * sizeof(TC_X509_revocation_node)},
+        {workspace.credential.scopes, capacity->crls * sizeof(TC_X509_revocation_scope)},
+        {workspace.credential.signer_path, capacity->path * sizeof(TC_bytes)},
+        {workspace.credential.signer_policies, capacity->policies * sizeof(TC_bytes)}};
+    uintptr_t end = (uintptr_t)arena + path_bytes;
+    for (size_t t = 0; t < sizeof tail / sizeof *tail; ++t) {
+      if (!tail[t].bytes) {
+        munit_assert_null(tail[t].start);
+        continue;
+      }
+      munit_assert_size((uintptr_t)tail[t].start % TC_validation_workspace_alignment(), ==, 0);
+      munit_assert_true((uintptr_t)tail[t].start >= end);
+      end = (uintptr_t)tail[t].start + tail[t].bytes;
+    }
+    munit_assert_true(end <= (uintptr_t)arena + bytes);
+    munit_assert_true((uintptr_t)arena + bytes - end < TC_validation_workspace_alignment() ||
+                      end == (uintptr_t)arena + bytes);
+  }
+  return MUNIT_OK;
+}
+
+/* A short arena, or a count that overflows in the path part or in the CMS and
+ * revocation part, returns LIMIT with the workspace and arena unchanged. */
+TC_TEST(limits_leave_outputs_unchanged)
+{
+  for (int profile = TC_VALIDATION_MICRO; profile <= TC_VALIDATION_DESKTOP; ++profile) {
+    TC_validation_capacity capacity;
+    TC_validation_workspace workspace, saved;
+    size_t bytes = 0;
+    munit_assert_int(TC_validation_capacity_init((TC_validation_profile)profile, &capacity), ==,
+                     TC_RESULT_OK);
+    munit_assert_int(TC_validation_workspace_size(&capacity, &bytes), ==, TC_RESULT_OK);
+    memset(arena, 0x5a, sizeof arena);
+    memset(&workspace, 0xa5, sizeof workspace);
+    memcpy(&saved, &workspace, sizeof saved);
+    munit_assert_int(TC_validation_workspace_init(
+                         &capacity, (TC_buffer){(uint8_t*)arena, bytes - 1}, &workspace),
+                     ==, TC_RESULT_LIMIT);
+    munit_assert_memory_equal(sizeof saved, &workspace, &saved);
+    for (size_t i = 0; i < sizeof arena; ++i)
+      munit_assert_uint8(((uint8_t*)arena)[i], ==, 0x5a);
+  }
+  for (int field = 0; field < 5; ++field) {
+    TC_validation_capacity capacity;
+    TC_validation_workspace workspace, saved;
+    size_t untouched = 123;
+    munit_assert_int(TC_validation_capacity_init(TC_VALIDATION_MICRO, &capacity), ==, TC_RESULT_OK);
+    switch (field) {
+    case 0:
+      capacity.policy_mappings = SIZE_MAX / 2;
+      break;
+    case 1:
+      capacity.certificates = SIZE_MAX / 2;
+      break;
+    case 2:
+      capacity.signature_bytes = SIZE_MAX - 8;
+      break;
+    case 3:
+      capacity.revocation_nodes = SIZE_MAX / 2;
+      break;
+    default:
+      capacity.crls = SIZE_MAX / 2;
+      break;
+    }
+    munit_assert_int(TC_validation_workspace_size(&capacity, &untouched), ==, TC_RESULT_LIMIT);
+    munit_assert_size(untouched, ==, 123);
+    memset(&workspace, 0xa5, sizeof workspace);
+    memcpy(&saved, &workspace, sizeof saved);
+    munit_assert_int(TC_validation_workspace_init(
+                         &capacity, (TC_buffer){(uint8_t*)arena, sizeof arena}, &workspace),
+                     ==, TC_RESULT_LIMIT);
+    munit_assert_memory_equal(sizeof saved, &workspace, &saved);
+  }
+  return MUNIT_OK;
+}
+
 TC_TEST(invalid_storage)
 {
   TC_validation_capacity capacity;
@@ -254,6 +414,8 @@ int main(int argc, char** argv)
   MunitTest tests[] = {
       {"/status-mapping", status_mapping, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/profiles", profiles, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/shared-path-layout", shared_path_layout, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/limits", limits_leave_outputs_unchanged, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/invalid-storage", invalid_storage, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/context", context_setup, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL}};

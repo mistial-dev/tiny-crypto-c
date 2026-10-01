@@ -8,19 +8,13 @@
 #include "internal.h"
 #include <stddef.h>
 
-typedef struct {
-  char byte;
-  TC_X509_path_storage storage;
-} path_storage_alignment;
-
 size_t TC_X509_path_workspace_alignment(void)
 {
-  return offsetof(path_storage_alignment, storage);
+  return offsetof(tc_x509_path_storage_alignment, storage);
 }
 
-/* Reserve count elements of width bytes at the next aligned offset. Returns 0
- * when the offset overflows size_t. */
-static int reserve(size_t* offset, size_t count, size_t width, size_t alignment, size_t* start)
+int tc_x509_path_arena_reserve(size_t* offset, size_t count, size_t width, size_t alignment,
+                               size_t* start)
 {
   const size_t remainder = *offset % alignment;
   const size_t padding = remainder ? alignment - remainder : 0;
@@ -39,7 +33,7 @@ int tc_x509_path_workspace_layout(const TC_X509_path_capacity* c, uint8_t* arena
   size_t start;
 #define ARRAY(field, type, count)                                                                  \
   do {                                                                                             \
-    if (!reserve(offset, (count), sizeof(type), alignment, &start))                                \
+    if (!tc_x509_path_arena_reserve(offset, (count), sizeof(type), alignment, &start))             \
       return 0;                                                                                    \
     w->field = arena && (count) ? (type*)(void*)(arena + start) : NULL;                            \
   } while (0)
