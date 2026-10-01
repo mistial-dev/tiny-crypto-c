@@ -64,12 +64,15 @@ TEST_CASE("EC wrappers")
   tiny_crypto::ec_execution execution = {{counter_random, &counter}, 4, {100000}};
   REQUIRE(tiny_crypto::ec_generate_key_pair(TC_EC_P256, private_key, generated, workspace,
                                             execution) == TC_EC_OK);
-  CHECK(tiny_crypto::ecdsa_sign_digest(TC_EC_P256, {private_key, sizeof private_key},
-                                       {generated, sizeof generated}, {digest, sizeof digest},
-                                       produced, signature_workspace, execution) == TC_EC_OK);
-  CHECK(tiny_crypto::ecdsa_verify_digest(TC_EC_P256, {generated, sizeof generated},
+  const tiny_crypto::ecdsa_sign_options sign_options = {TC_HASH_SHA256, 4};
+  TC_work_budget sign_work = {100000};
+  CHECK(tiny_crypto::ecdsa_sign_digest(TC_EC_P256, {scalar, sizeof scalar},
+                                       {public_key, sizeof public_key}, {digest, sizeof digest},
+                                       produced, signature_workspace, sign_options,
+                                       sign_work) == TC_EC_OK);
+  CHECK(tiny_crypto::ecdsa_verify_digest(TC_EC_P256, {public_key, sizeof public_key},
                                          {digest, sizeof digest}, {produced, sizeof produced},
-                                         signature_workspace, work) == TC_EC_OK);
+                                         signature_workspace, sign_work) == TC_EC_OK);
   CHECK(tiny_crypto::ec_operation_work(TC_EC_P256, TC_EC_OPERATION_VALIDATE) == 1);
 }
 
@@ -110,10 +113,12 @@ TEST_CASE("EC wrappers reject short arrays, bad lengths and exhausted randomness
                                           execution) == TC_EC_LIMIT);
   CHECK(tiny_crypto::ec_generate_key_pair(TC_EC_P256, private_key, short_point, workspace,
                                           execution) == TC_EC_LIMIT);
+  const tiny_crypto::ecdsa_sign_options sign_options = {TC_HASH_SHA256, 4};
+  TC_work_budget sign_work = {100000};
   CHECK(tiny_crypto::ecdsa_sign_digest(TC_EC_P256, {scalar, sizeof scalar},
                                        {public_key, sizeof public_key}, {digest, sizeof digest},
-                                       short_signature, signature_workspace,
-                                       execution) == TC_EC_LIMIT);
+                                       short_signature, signature_workspace, sign_options,
+                                       sign_work) == TC_EC_LIMIT);
   CHECK(all_equal(short_signature, sizeof short_signature, 0xa5));
   CHECK(calls == 0);
   CHECK(execution.work.remaining == 100000);
@@ -121,9 +126,9 @@ TEST_CASE("EC wrappers reject short arrays, bad lengths and exhausted randomness
   // No attempts left: LIMIT without an RNG request.
   execution.random_attempts = 0;
   std::memset(signature, 0xa5, sizeof signature);
-  CHECK(tiny_crypto::ecdsa_sign_digest(TC_EC_P256, {scalar, sizeof scalar},
-                                       {public_key, sizeof public_key}, {digest, sizeof digest},
-                                       signature, signature_workspace, execution) == TC_EC_LIMIT);
+  CHECK(tiny_crypto::ecdsa_sign_digest_external_random(
+            TC_EC_P256, {scalar, sizeof scalar}, {public_key, sizeof public_key},
+            {digest, sizeof digest}, signature, signature_workspace, execution) == TC_EC_LIMIT);
   CHECK(tiny_crypto::ec_generate_key_pair(TC_EC_P256, private_key, generated, workspace,
                                           execution) == TC_EC_LIMIT);
   CHECK(calls == 0);
@@ -136,9 +141,9 @@ TEST_CASE("EC wrappers reject short arrays, bad lengths and exhausted randomness
   CHECK(tiny_crypto::ec_generate_key_pair(TC_EC_P256, private_key, generated, workspace, failing) ==
         TC_EC_ERROR);
   CHECK(all_equal(private_key, sizeof private_key, 0xa5));
-  CHECK(tiny_crypto::ecdsa_sign_digest(TC_EC_P256, {scalar, sizeof scalar},
-                                       {public_key, sizeof public_key}, {digest, sizeof digest},
-                                       signature, signature_workspace, failing) == TC_EC_ERROR);
+  CHECK(tiny_crypto::ecdsa_sign_digest_external_random(
+            TC_EC_P256, {scalar, sizeof scalar}, {public_key, sizeof public_key},
+            {digest, sizeof digest}, signature, signature_workspace, failing) == TC_EC_ERROR);
   CHECK(all_equal(signature, sizeof signature, 0xa5));
   CHECK(failures == 2);
 

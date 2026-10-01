@@ -39,21 +39,23 @@ TC_TEST(fault_detection)
                                            &execution),
                    ==, TC_EC_OK);
   const TC_bytes key = {private_key, 32}, point = {public_key, 65}, message = {digest, 32};
-  munit_assert_int(TC_ECDSA_sign_digest(TC_EC_P256, key, point, message, (TC_buffer){signature, 64},
-                                        &workspace, &execution),
+  munit_assert_int(TC_ECDSA_sign_digest_external_random(TC_EC_P256, key, point, message,
+                                                        (TC_buffer){signature, 64}, &workspace,
+                                                        &execution),
                    ==, TC_EC_OK);
   tc_test_ecdsa_fault = flip_bit;
   memset(signature, 0xa5, sizeof signature);
-  const TC_EC_result faulted = TC_ECDSA_sign_digest(
+  const TC_EC_result faulted = TC_ECDSA_sign_digest_external_random(
       TC_EC_P256, key, point, message, (TC_buffer){signature, 64}, &workspace, &execution);
   tc_test_ecdsa_fault = NULL;
 #if TC_ECDSA_SIGN_VERIFY
   munit_assert_int(faulted, ==, TC_EC_ERROR);
   for (size_t i = 0; i < sizeof signature; ++i)
     munit_assert_uint(signature[i], ==, 0xa5);
-  munit_assert_int(TC_ECDSA_sign_digest(TC_EC_P256, key, (TC_bytes){other_public, 65}, message,
-                                        (TC_buffer){signature, 64}, &workspace, &execution),
-                   ==, TC_EC_ERROR);
+  munit_assert_int(
+      TC_ECDSA_sign_digest_external_random(TC_EC_P256, key, (TC_bytes){other_public, 65}, message,
+                                           (TC_buffer){signature, 64}, &workspace, &execution),
+      ==, TC_EC_ERROR);
 #else
   munit_assert_int(faulted, ==, TC_EC_OK);
   TC_work_budget work = {UINT32_MAX};
@@ -86,15 +88,15 @@ TC_TEST(work_limits)
   munit_assert_uint32(work.remaining, ==, 0);
   const uint32_t sign = TC_EC_operation_work(TC_EC_P256, TC_EC_OPERATION_SIGN);
   TC_EC_execution execution = {{counter_random, &counter}, 1, {sign - 1}};
-  munit_assert_int(TC_ECDSA_sign_digest(TC_EC_P256, (TC_bytes){scalar, 32},
-                                        (TC_bytes){public_key, 65}, (TC_bytes){digest, 32},
-                                        (TC_buffer){signature, 64}, &signing, &execution),
+  munit_assert_int(TC_ECDSA_sign_digest_external_random(
+                       TC_EC_P256, (TC_bytes){scalar, 32}, (TC_bytes){public_key, 65},
+                       (TC_bytes){digest, 32}, (TC_buffer){signature, 64}, &signing, &execution),
                    ==, TC_EC_LIMIT);
   munit_assert_uint(counter, ==, 0);
   execution.work.remaining = sign;
-  munit_assert_int(TC_ECDSA_sign_digest(TC_EC_P256, (TC_bytes){scalar, 32},
-                                        (TC_bytes){public_key, 65}, (TC_bytes){digest, 32},
-                                        (TC_buffer){signature, 64}, &signing, &execution),
+  munit_assert_int(TC_ECDSA_sign_digest_external_random(
+                       TC_EC_P256, (TC_bytes){scalar, 32}, (TC_bytes){public_key, 65},
+                       (TC_bytes){digest, 32}, (TC_buffer){signature, 64}, &signing, &execution),
                    ==, TC_EC_OK);
   munit_assert_uint32(execution.work.remaining, ==, 0);
   munit_assert_uint32(TC_EC_operation_work((TC_EC_curve)0, TC_EC_OPERATION_SIGN), ==, 0);

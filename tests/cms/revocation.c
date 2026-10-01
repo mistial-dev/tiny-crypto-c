@@ -937,6 +937,7 @@ static MunitResult discovery_anchor_signer(const MunitParameter params[], void* 
     TC_X509_certificate signer;
     munit_assert_int(TC_X509_read((TC_bytes){der, length}, &f->limits, &parser, &signer), ==,
                      TC_TLV_OK);
+    munit_assert_uint(signer.version, ==, 3);
     TC_X509_search_report found, saved;
     memset(&saved, 0xa5, sizeof saved);
     memcpy(&found, &saved, sizeof found);

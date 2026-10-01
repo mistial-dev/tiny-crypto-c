@@ -74,8 +74,14 @@ Verification establishes signature validity only. Key identity and trust
 come from certificate validation. Its point multiplication branches on
 public signature and digest values.
 
-`TC_ECDSA_sign_digest` takes the private scalar and the matching public key.
-Each attempt draws an independent secret nonce. With `TC_ECDSA_SIGN_VERIFY`
+`TC_ECDSA_sign_digest` takes the private scalar, matching public key, digest
+hash algorithm and a retry bound. It derives each secret nonce with RFC 6979,
+so a repeated or restored random source cannot expose the private key.
+
+`TC_ECDSA_sign_digest_external_random` is the advanced API for protocols that
+must supply nonces externally. Each attempt draws an independent secret nonce
+from its execution object. Repeating a nonce across different digests exposes
+the private key. With `TC_ECDSA_SIGN_VERIFY`
 set, the default, the new signature is verified against the public key before
 it is written. A fault during signing, or a public key from another key pair,
 then returns `TC_EC_ERROR` with the output unchanged. Set
@@ -102,8 +108,9 @@ with. The check prints it beside the version in use and accepts either.
 
 The C++11 equivalents are in `<tiny_crypto/ec.hpp>`, including
 `ec_coordinate_bytes`. They take `bytes` inputs, fixed-size output arrays and
-references to the workspace, budget and execution objects. They return the
-same `TC_EC_result` values and do not allocate or throw exceptions.
+references to the workspace and budget. The explicitly named
+`ecdsa_sign_digest_external_random` wrapper takes an execution object. They
+return the same `TC_EC_result` values and do not allocate or throw exceptions.
 
 ## Tests
 

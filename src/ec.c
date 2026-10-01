@@ -808,8 +808,8 @@ static void tc_ecdsa_bits2octets(uint8_t* output, size_t width, TC_bytes digest)
 static TC_status tc_rfc6979_reseed(tc_rfc6979* state, uint8_t separator, TC_bytes private_key,
                                    TC_bytes reduced_digest)
 {
-  const TC_bytes parts[] = {{state->value, state->digest_length}, {&separator, 1}, private_key,
-                            reduced_digest};
+  const TC_bytes parts[] = {
+      {state->value, state->digest_length}, {&separator, 1}, private_key, reduced_digest};
   uint8_t next[TC_HASH_CORE_MAX_DIGEST];
   TC_status status = tc_ecdsa_hmac(state->hash, state->block_length, state->key,
                                    state->digest_length, parts, private_key.data ? 4 : 2, next);
@@ -827,8 +827,8 @@ static TC_status tc_rfc6979_reseed(tc_rfc6979* state, uint8_t separator, TC_byte
 static TC_status tc_rfc6979_fill(void* context, uint8_t* output, size_t length)
 {
   tc_rfc6979* state = (tc_rfc6979*)context;
-  if (state->generated && tc_rfc6979_reseed(state, 0, (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0}) !=
-                              TC_OK)
+  if (state->generated &&
+      tc_rfc6979_reseed(state, 0, (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0}) != TC_OK)
     return TC_ERROR;
   size_t written = 0;
   uint8_t next[TC_HASH_CORE_MAX_DIGEST];
@@ -839,8 +839,8 @@ static TC_status tc_rfc6979_fill(void* context, uint8_t* output, size_t length)
       return TC_ERROR;
     }
     memcpy(state->value, next, state->digest_length);
-    const size_t take = length - written < state->digest_length ? length - written
-                                                                : state->digest_length;
+    const size_t take =
+        length - written < state->digest_length ? length - written : state->digest_length;
     memcpy(output + written, state->value, take);
     written += take;
   }
@@ -858,8 +858,7 @@ static TC_status tc_rfc6979_init(tc_rfc6979* state, TC_hash_algorithm algorithm,
   memset(state, 0, sizeof *state);
   state->hash = hash;
   state->digest_length = digest.length;
-  state->block_length =
-      algorithm == TC_HASH_SHA384 || algorithm == TC_HASH_SHA512 ? 128u : 64u;
+  state->block_length = algorithm == TC_HASH_SHA384 || algorithm == TC_HASH_SHA512 ? 128u : 64u;
   memset(state->value, 1, state->digest_length);
   uint8_t reduced[TC_EC_MAX_BYTES];
   tc_ecdsa_bits2octets(reduced, width, digest);
@@ -871,10 +870,10 @@ static TC_status tc_rfc6979_init(tc_rfc6979* state, TC_hash_algorithm algorithm,
 }
 #endif
 
-TC_EC_result TC_ECDSA_sign_digest_deterministic(
-    TC_EC_curve curve, const TC_ECDSA_sign_options* options, TC_bytes private_key,
-    TC_bytes public_key, TC_bytes digest, TC_buffer signature, TC_ECDSA_workspace* workspace,
-    TC_work_budget* work)
+TC_EC_result TC_ECDSA_sign_digest(TC_EC_curve curve, const TC_ECDSA_sign_options* options,
+                                  TC_bytes private_key, TC_bytes public_key, TC_bytes digest,
+                                  TC_buffer signature, TC_ECDSA_workspace* workspace,
+                                  TC_work_budget* work)
 {
   if (!options || !work)
     return TC_EC_ARGUMENT;
@@ -895,8 +894,8 @@ TC_EC_result TC_ECDSA_sign_digest_deterministic(
     return TC_EC_ERROR;
   }
   TC_EC_execution execution = {{tc_rfc6979_fill, &state}, options->candidate_attempts, *work};
-  const TC_EC_result result = TC_ECDSA_sign_digest(curve, private_key, public_key, digest,
-                                                   signature, workspace, &execution);
+  const TC_EC_result result = TC_ECDSA_sign_digest_external_random(
+      curve, private_key, public_key, digest, signature, workspace, &execution);
   *work = execution.work;
   TC_secure_zero(&state, sizeof state);
   return result;
@@ -910,9 +909,11 @@ TC_EC_result TC_ECDSA_sign_digest_deterministic(
 #endif
 }
 
-TC_EC_result TC_ECDSA_sign_digest(TC_EC_curve curve, TC_bytes private_key, TC_bytes public_key,
-                                  TC_bytes digest, TC_buffer signature,
-                                  TC_ECDSA_workspace* workspace, TC_EC_execution* execution)
+TC_EC_result TC_ECDSA_sign_digest_external_random(TC_EC_curve curve, TC_bytes private_key,
+                                                  TC_bytes public_key, TC_bytes digest,
+                                                  TC_buffer signature,
+                                                  TC_ECDSA_workspace* workspace,
+                                                  TC_EC_execution* execution)
 {
   ec_state s;
   const size_t bytes = TC_EC_coordinate_bytes(curve);

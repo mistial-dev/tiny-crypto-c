@@ -113,6 +113,10 @@ template tiny_crypto::ec_result tiny_crypto::ecdh<32>(tiny_crypto::ec_curve, tin
                                                       TC_work_budget&) noexcept;
 template tiny_crypto::ec_result tiny_crypto::ecdsa_sign_digest<64>(
     tiny_crypto::ec_curve, tiny_crypto::bytes, tiny_crypto::bytes, tiny_crypto::bytes,
+    uint8_t (&)[64], tiny_crypto::ecdsa_workspace&, const tiny_crypto::ecdsa_sign_options&,
+    TC_work_budget&) noexcept;
+template tiny_crypto::ec_result tiny_crypto::ecdsa_sign_digest_external_random<64>(
+    tiny_crypto::ec_curve, tiny_crypto::bytes, tiny_crypto::bytes, tiny_crypto::bytes,
     uint8_t (&)[64], tiny_crypto::ecdsa_workspace&, tiny_crypto::ec_execution&) noexcept;
 #endif
 

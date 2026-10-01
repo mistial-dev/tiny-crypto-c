@@ -1377,7 +1377,7 @@ if(TINY_CRYPTO_BUILD_TESTS)
         set_property(TARGET test_cpp_rsa_openssl_${small} PROPERTY NO_SYSTEM_FROM_IMPORTED TRUE)
       endif()
     endforeach()
-    foreach(pair "sskdf;sskdf" "aes_dynamic;aes-dynamic" "ec;ec-0" "piv_sm;piv-sm")
+    foreach(pair "sskdf;sskdf" "aes_dynamic;aes-dynamic" "ec;ec-rfc6979" "piv_sm;piv-sm")
       list(GET pair 0 name)
       list(GET pair 1 library)
       tc_add_linked_test(test_cpp_${name} tiny-crypto-c-test-${library}

@@ -18,6 +18,7 @@ namespace tiny_crypto {
 typedef ::TC_EC_curve ec_curve;
 typedef ::TC_EC_result ec_result;
 typedef ::TC_EC_execution ec_execution;
+typedef ::TC_ECDSA_sign_options ecdsa_sign_options;
 typedef ::TC_EC_workspace ec_workspace;
 typedef ::TC_ECDSA_workspace ecdsa_workspace;
 
@@ -72,10 +73,19 @@ template <size_t N>
 TC_CPP_NODISCARD inline ec_result
 ecdsa_sign_digest(ec_curve curve, bytes private_key, bytes public_key, bytes digest,
                   uint8_t (&signature)[N], ecdsa_workspace& workspace,
-                  ec_execution& execution) noexcept
+                  const ecdsa_sign_options& options, TC_work_budget& work) noexcept
 {
-  return ::TC_ECDSA_sign_digest(curve, private_key, public_key, digest, TC_buffer{signature, N},
-                                &workspace, &execution);
+  return ::TC_ECDSA_sign_digest(curve, &options, private_key, public_key, digest,
+                                TC_buffer{signature, N}, &workspace, &work);
+}
+template <size_t N>
+TC_CPP_NODISCARD inline ec_result
+ecdsa_sign_digest_external_random(ec_curve curve, bytes private_key, bytes public_key, bytes digest,
+                                  uint8_t (&signature)[N], ecdsa_workspace& workspace,
+                                  ec_execution& execution) noexcept
+{
+  return ::TC_ECDSA_sign_digest_external_random(curve, private_key, public_key, digest,
+                                                TC_buffer{signature, N}, &workspace, &execution);
 }
 } // namespace tiny_crypto
 #endif

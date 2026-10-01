@@ -77,10 +77,10 @@ PROFILES = {
       TC_work_budget work = {UINT32_MAX};
       const TC_bytes point = {public_key, sizeof(public_key)};
       const TC_bytes digest = {key, sizeof(key)};
-      if (TC_ECDSA_sign_digest(TC_EC_P256, (TC_bytes){key, sizeof(key)}, point, digest, (TC_buffer){signature, sizeof(signature)}, &workspace, &execution) != TC_EC_OK) return 1;
+      if (TC_ECDSA_sign_digest_external_random(TC_EC_P256, (TC_bytes){key, sizeof(key)}, point, digest, (TC_buffer){signature, sizeof(signature)}, &workspace, &execution) != TC_EC_OK) return 1;
       out[0] = signature[0];
       return TC_ECDSA_verify_digest(TC_EC_P256, point, digest, (TC_bytes){signature, sizeof(signature)}, &workspace, &work) != TC_EC_OK;
-    """, "TC_ECDSA_sign_digest"),
+    """, "TC_ECDSA_sign_digest_external_random"),
     # Plain PIV reads: SELECT, GET DATA of the CHUID and a VERIFY query on a
     # SHORT link. The link, the 261-byte command scratch and a response
     # buffer for a CHUID at its SP 800-73-5 Part 1 Table 8 capacity of 2881
@@ -154,7 +154,7 @@ UNIT_FLASH = {"piv_sm_cs2": {"sm_framing_flash": ("piv_sm_apdu", "piv_sm_key_req
 # callback frame belongs to the application and is listed as excluded.
 APPLICATION_CALLBACK_SITES = {
     "read_entropy": "TC_random_source entropy callback",
-    "TC_ECDSA_sign_digest": "TC_random_source nonce callback",
+    "TC_ECDSA_sign_digest_external_random": "TC_random_source nonce callback",
     "transmit_step": "TC_APDU_transport transmit callback",
     # TC_TLV_walk and the stream reader call the caller's visitor. The PIV
     # command profile passes none.

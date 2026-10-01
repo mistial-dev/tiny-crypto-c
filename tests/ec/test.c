@@ -71,8 +71,9 @@ static TC_EC_result ecdsa_sign(TC_EC_curve curve, TC_bytes private_key, TC_bytes
   public_key[0] = 4;
   (void)ec_public(curve, private_key.data, private_key.length, public_key, public_length,
                   &key_workspace);
-  return TC_ECDSA_sign_digest(curve, private_key, (TC_bytes){public_key, public_length}, digest,
-                              signature, workspace, &execution);
+  return TC_ECDSA_sign_digest_external_random(curve, private_key,
+                                              (TC_bytes){public_key, public_length}, digest,
+                                              signature, workspace, &execution);
 }
 
 static const struct {
@@ -667,10 +668,10 @@ TC_TEST(short_output_and_lengths)
                      ==, TC_EC_LIMIT);
     for (size_t j = 0; j < sizeof generated; ++j)
       munit_assert_uint(generated[j], ==, 0xa5);
-    munit_assert_int(TC_ECDSA_sign_digest(curve, (TC_bytes){scalar, n},
-                                          (TC_bytes){point, 1 + 2 * n}, (TC_bytes){digest, n},
-                                          (TC_buffer){output, 2 * n - 1}, &signature_workspace,
-                                          &execution),
+    munit_assert_int(TC_ECDSA_sign_digest_external_random(
+                         curve, (TC_bytes){scalar, n}, (TC_bytes){point, 1 + 2 * n},
+                         (TC_bytes){digest, n}, (TC_buffer){output, 2 * n - 1},
+                         &signature_workspace, &execution),
                      ==, TC_EC_LIMIT);
     munit_assert_uint32(work.remaining, ==, UINT32_MAX);
     munit_assert_uint32(execution.work.remaining, ==, UINT32_MAX);
@@ -691,10 +692,11 @@ TC_TEST(short_output_and_lengths)
                                             (TC_bytes){digest, n}, (TC_bytes){signature, 2 * n - 1},
                                             &signature_workspace, &work),
                      ==, TC_EC_INVALID);
-    munit_assert_int(TC_ECDSA_sign_digest(curve, (TC_bytes){scalar, n}, (TC_bytes){point, 2 * n},
-                                          (TC_bytes){digest, n}, (TC_buffer){output, 2 * n},
-                                          &signature_workspace, &execution),
-                     ==, TC_EC_INVALID);
+    munit_assert_int(
+        TC_ECDSA_sign_digest_external_random(curve, (TC_bytes){scalar, n}, (TC_bytes){point, 2 * n},
+                                             (TC_bytes){digest, n}, (TC_buffer){output, 2 * n},
+                                             &signature_workspace, &execution),
+        ==, TC_EC_INVALID);
     /* Invalid data is reported before a short output buffer. */
     munit_assert_int(TC_ECDH(curve, (TC_bytes){scalar, n}, (TC_bytes){point, 2 * n},
                              (TC_buffer){output, n - 1}, &workspace, &work),
@@ -746,10 +748,11 @@ TC_TEST(sign_budget_preflight)
       TC_EC_execution execution = cases[c];
       memset(&workspace, 0x5a, sizeof workspace);
       memset(output, 0xa5, sizeof output);
-      munit_assert_int(TC_ECDSA_sign_digest(curve, (TC_bytes){scalar, n},
-                                            (TC_bytes){point, 1 + 2 * n}, (TC_bytes){digest, n},
-                                            (TC_buffer){output, 2 * n}, &workspace, &execution),
-                       ==, TC_EC_LIMIT);
+      munit_assert_int(
+          TC_ECDSA_sign_digest_external_random(curve, (TC_bytes){scalar, n},
+                                               (TC_bytes){point, 1 + 2 * n}, (TC_bytes){digest, n},
+                                               (TC_buffer){output, 2 * n}, &workspace, &execution),
+          ==, TC_EC_LIMIT);
       munit_assert_uint32(execution.work.remaining, ==, cases[c].work.remaining);
       munit_assert_uint(random.calls, ==, 0);
       for (size_t j = 0; j < sizeof workspace; ++j)
@@ -792,10 +795,10 @@ TC_TEST(work_overlaps_public_key)
     shared.execution.random_attempts = 1;
     shared.execution.work.remaining = UINT32_MAX;
     memcpy(before, &shared, sizeof shared);
-    munit_assert_int(TC_ECDSA_sign_digest(curve, (TC_bytes){scalar, n},
-                                          (TC_bytes){shared.bytes, 1 + 2 * n},
-                                          (TC_bytes){digest, n}, (TC_buffer){output, 2 * n},
-                                          &signature_workspace, &shared.execution),
+    munit_assert_int(TC_ECDSA_sign_digest_external_random(
+                         curve, (TC_bytes){scalar, n}, (TC_bytes){shared.bytes, 1 + 2 * n},
+                         (TC_bytes){digest, n}, (TC_buffer){output, 2 * n}, &signature_workspace,
+                         &shared.execution),
                      ==, TC_EC_ARGUMENT);
     munit_assert_memory_equal(sizeof shared, &shared, before);
     munit_assert_uint(random.calls, ==, 0);

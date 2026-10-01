@@ -48,9 +48,12 @@ void tc_work_budget_types(TC_work_budget* budget, TC_RSA_execution* rsa, TC_EC_e
   TC_EXPECT_FUNCTION(
       TC_ECDSA_verify_digest, TC_EC_result,
       (TC_EC_curve, TC_bytes, TC_bytes, TC_bytes, TC_ECDSA_workspace*, TC_work_budget*));
-  TC_EXPECT_FUNCTION(TC_ECDSA_sign_digest_deterministic, TC_EC_result,
+  TC_EXPECT_FUNCTION(TC_ECDSA_sign_digest, TC_EC_result,
                      (TC_EC_curve, const TC_ECDSA_sign_options*, TC_bytes, TC_bytes, TC_bytes,
                       TC_buffer, TC_ECDSA_workspace*, TC_work_budget*));
+  TC_EXPECT_FUNCTION(TC_ECDSA_sign_digest_external_random, TC_EC_result,
+                     (TC_EC_curve, TC_bytes, TC_bytes, TC_bytes, TC_buffer, TC_ECDSA_workspace*,
+                      TC_EC_execution*));
   TC_EXPECT_FUNCTION(TC_key_challenge_prepare, TC_key_challenge_result,
                      (const TC_X509_public_key*, const TC_key_challenge_options*, TC_random_source,
                       TC_key_challenge_workspace*, TC_work_budget*, TC_bytes*));

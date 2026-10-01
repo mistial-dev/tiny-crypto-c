@@ -205,7 +205,8 @@ TC_EC_result TC_ECDSA_verify_digest(TC_EC_curve curve, TC_bytes public_key, TC_b
                                     TC_bytes signature, TC_ECDSA_workspace* workspace,
                                     TC_work_budget* work);
 
-/* Sign a precomputed digest with private scalar d (FIPS 186-5 section 6.4.1).
+/* Sign a precomputed digest with private scalar d and an externally generated
+ * nonce (FIPS 186-5 section 6.4.1).
  * public_key is the matching SEC 1 key. Each attempt draws a w-byte secret
  * nonce from execution->random and retries an out-of-range nonce, r = 0 or
  * s = 0 within execution->random_attempts. The RNG must be
@@ -228,20 +229,33 @@ TC_EC_result TC_ECDSA_verify_digest(TC_EC_curve curve, TC_bytes public_key, TC_b
  * The LIMIT preflight for the first attempt runs before any workspace write.
  * Work: TC_EC_OPERATION_SIGN per attempt, 3 units per curve bit plus 1, and
  * 4 units per curve bit plus 1 more with TC_ECDSA_SIGN_VERIFY. */
-TC_EC_result TC_ECDSA_sign_digest(TC_EC_curve curve, TC_bytes private_key, TC_bytes public_key,
-                                  TC_bytes digest, TC_buffer signature,
-                                  TC_ECDSA_workspace* workspace, TC_EC_execution* execution);
+TC_EC_result TC_ECDSA_sign_digest_external_random(TC_EC_curve curve, TC_bytes private_key,
+                                                  TC_bytes public_key, TC_bytes digest,
+                                                  TC_buffer signature,
+                                                  TC_ECDSA_workspace* workspace,
+                                                  TC_EC_execution* execution);
 
 /* Sign with the deterministic nonce generation procedure from RFC 6979
  * section 3.2. options.hash identifies the hash that produced digest, whose
  * length must match that hash. candidate_attempts bounds the RFC 6979 retry
  * sequence for the negligible r = 0, s = 0, or out-of-range cases. This API
  * uses the enabled internal hash implementation and does not require HMAC to
- * be exposed as a public feature. */
-TC_EC_result TC_ECDSA_sign_digest_deterministic(
-    TC_EC_curve curve, const TC_ECDSA_sign_options* options, TC_bytes private_key,
-    TC_bytes public_key, TC_bytes digest, TC_buffer signature, TC_ECDSA_workspace* workspace,
-    TC_work_budget* work);
+ * be exposed as a public feature. private_key, public_key, digest, signature,
+ * workspace and work must be disjoint as documented for the external-random
+ * API. The same key, digest and options always produce the same signature.
+ *
+ * TC_EC_ARGUMENT     NULL options, workspace, work or span data, an empty
+ *                    digest, a digest length unlike options.hash, or overlap.
+ * TC_EC_UNSUPPORTED  unknown or disabled curve or hash.
+ * TC_EC_INVALID      private or public key of the wrong length, or d outside
+ *                    [1, n - 1].
+ * TC_EC_LIMIT        short signature, zero candidate_attempts, insufficient
+ *                    work, or every allowed candidate rejected.
+ * TC_EC_ERROR        internal nonce generation or self-verification failed. */
+TC_EC_result TC_ECDSA_sign_digest(TC_EC_curve curve, const TC_ECDSA_sign_options* options,
+                                  TC_bytes private_key, TC_bytes public_key, TC_bytes digest,
+                                  TC_buffer signature, TC_ECDSA_workspace* workspace,
+                                  TC_work_budget* work);
 #endif
 
 #ifdef __cplusplus
