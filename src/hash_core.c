@@ -177,6 +177,20 @@ TC_status tc_hash_core_update(const tc_hash_algorithm_info* stored, void* contex
   return view_absorb(info, view, data, length);
 }
 
+TC_status tc_hash_core_update_parts(const tc_hash_algorithm_info* stored, void* context,
+                                    const TC_bytes* parts, size_t count)
+{
+  TC_status status = TC_OK;
+  if (context == NULL || (count != 0 && parts == NULL))
+    return TC_ERROR;
+  for (size_t i = 0; i < count; ++i)
+    if (!tc_internal_span_valid(parts[i].data, parts[i].length))
+      return TC_ERROR;
+  for (size_t i = 0; status == TC_OK && i < count; ++i)
+    status = tc_hash_core_update(stored, context, parts[i].data, parts[i].length);
+  return status;
+}
+
 TC_status tc_hash_core_final(const tc_hash_algorithm_info* stored, void* context, uint8_t* digest)
 {
   tc_hash_algorithm_info local;

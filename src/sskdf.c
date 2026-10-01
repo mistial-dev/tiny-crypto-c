@@ -58,14 +58,12 @@ static TC_status derive(const tc_hash_algorithm_info* hash, const sskdf_state* s
   }
 #endif
   while (offset < output_len) {
+    const TC_bytes prefix[] = {{counter, sizeof counter}, secret};
     tc_internal_store_be32(counter, round);
     if (tc_hash_core_init(hash, ctx) != TC_OK ||
-        tc_hash_core_update(hash, ctx, counter, 4) != TC_OK ||
-        tc_hash_core_update(hash, ctx, z, z_len) != TC_OK)
+        tc_hash_core_update_parts(hash, ctx, prefix, sizeof prefix / sizeof *prefix) != TC_OK ||
+        tc_hash_core_update_parts(hash, ctx, info, count) != TC_OK)
       goto done;
-    for (i = 0; i < count; ++i)
-      if (tc_hash_core_update(hash, ctx, info[i].data, info[i].length) != TC_OK)
-        goto done;
     if (tc_hash_core_final(hash, ctx, digest) != TC_OK)
       goto done;
     take = output_len - offset;

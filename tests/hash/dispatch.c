@@ -36,6 +36,13 @@ TC_TEST(parts)
       memcpy(actual, saved, sizeof actual);
       munit_assert_int(tc_hash_digest_parts(hash, invalid, 2, actual, &workspace), ==, TC_ERROR);
       munit_assert_memory_equal(sizeof actual, actual, saved);
+
+      /* A bad later span must not absorb the valid prefix. */
+      munit_assert_int(tc_hash_init(hash, &workspace), ==, TC_OK);
+      munit_assert_int(tc_hash_update_parts(hash, &workspace, invalid, 2), ==, TC_ERROR);
+      munit_assert_int(tc_hash_update_parts(hash, &workspace, &whole, 1), ==, TC_OK);
+      munit_assert_int(tc_hash_final(hash, &workspace, actual), ==, TC_OK);
+      munit_assert_memory_equal(info.digest_length, actual, expected);
     }
   }
   munit_assert_false(tc_hash_available(TC_HASH_UNKNOWN));

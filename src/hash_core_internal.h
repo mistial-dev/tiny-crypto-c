@@ -126,6 +126,10 @@ size_t tc_hash_core_digest_bytes(const tc_hash_algorithm_info* info);
 TC_status tc_hash_core_init(const tc_hash_algorithm_info* info, void* context);
 TC_status tc_hash_core_update(const tc_hash_algorithm_info* info, void* context,
                               const uint8_t* data, size_t length);
+/* Validate and absorb borrowed parts in order. Invalid spans leave a live
+ * context unchanged, so callers never commit a partial logical message. */
+TC_status tc_hash_core_update_parts(const tc_hash_algorithm_info* info, void* context,
+                                    const TC_bytes* parts, size_t count);
 TC_status tc_hash_core_final(const tc_hash_algorithm_info* info, void* context, uint8_t* digest);
 void tc_hash_core_clear(const tc_hash_algorithm_info* info, void* context);
 /* One-shot hash through init, update and final. workspace is the caller's

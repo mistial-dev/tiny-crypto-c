@@ -38,6 +38,14 @@ static inline TC_status tc_hash_update(TC_hash_algorithm algorithm, TC_hash_cont
              : TC_ERROR;
 }
 
+static inline TC_status tc_hash_update_parts(TC_hash_algorithm algorithm, TC_hash_context* context,
+                                             const TC_bytes* parts, size_t count)
+{
+  const tc_hash_algorithm_info* info = tc_hash_core_lookup(algorithm);
+  return info != NULL && context != NULL ? tc_hash_core_update_parts(info, context, parts, count)
+                                         : TC_ERROR;
+}
+
 /* The whole context is wiped on success and failure. */
 static inline TC_status tc_hash_final(TC_hash_algorithm algorithm, TC_hash_context* context,
                                       uint8_t* digest)
@@ -60,12 +68,9 @@ static inline TC_status tc_hash_digest_parts(TC_hash_algorithm algorithm, const 
   TC_status status;
   if (!context || !digest || (count && !parts) || !tc_hash_available(algorithm))
     return TC_ERROR;
-  for (size_t i = 0; i < count; ++i)
-    if (!tc_internal_span_valid(parts[i].data, parts[i].length))
-      return TC_ERROR;
   status = tc_hash_init(algorithm, context);
-  for (size_t i = 0; status == TC_OK && i < count; ++i)
-    status = tc_hash_update(algorithm, context, parts[i]);
+  if (status == TC_OK)
+    status = tc_hash_update_parts(algorithm, context, parts, count);
   if (status == TC_OK)
     return tc_hash_final(algorithm, context, digest);
   TC_secure_zero(context, sizeof *context);
@@ -99,6 +104,16 @@ static inline TC_status tc_hash_update(TC_hash_algorithm algorithm, TC_hash_cont
   (void)algorithm;
   (void)context;
   (void)bytes;
+  return TC_ERROR;
+}
+
+static inline TC_status tc_hash_update_parts(TC_hash_algorithm algorithm, TC_hash_context* context,
+                                             const TC_bytes* parts, size_t count)
+{
+  (void)algorithm;
+  (void)context;
+  (void)parts;
+  (void)count;
   return TC_ERROR;
 }
 
