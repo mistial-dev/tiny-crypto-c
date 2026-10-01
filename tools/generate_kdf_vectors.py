@@ -23,6 +23,8 @@ import os
 import re
 import sys
 
+from cavp_rsp import header_records
+
 from cryptography.hazmat.primitives import cmac, hashes
 from cryptography.hazmat.primitives.ciphers import algorithms
 from cryptography.hazmat.primitives.kdf.kbkdf import (
@@ -152,34 +154,8 @@ def cryptography_counter(name, key, before, after, rlen, out_len):
 
 def parse_rsp(path):
     """Yield (section, record) pairs; section is a dict of the bracket headers."""
-    section = {}
-    record = None
     with open(path, "r", newline="") as handle:
-        for raw in handle:
-            line = raw.rstrip("\r\n")
-            if not line or line.startswith("#"):
-                continue
-            if line.startswith("["):
-                if record is not None:
-                    yield dict(section), record
-                    record = None
-                key, _, value = line[1:-1].partition("=")
-                if key == "PRF":
-                    section = {"PRF": value}
-                else:
-                    section[key] = value
-                continue
-            key, _, value = line.partition("=")
-            key = key.strip()
-            value = value.strip()
-            if key == "COUNT":
-                if record is not None:
-                    yield dict(section), record
-                record = {"COUNT": int(value)}
-            else:
-                record[key] = value
-        if record is not None:
-            yield dict(section), record
+        yield from header_records(handle.read())
 
 
 def select_vectors(filename, mode, has_counter, offset):

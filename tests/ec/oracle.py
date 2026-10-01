@@ -7,8 +7,8 @@ from pathlib import Path
 import subprocess
 import sys
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from cavp_rsp import records
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from tools.cavp_rsp import records
 
 
 def check(readers, bits, scalar, public, peer, shared, label):
