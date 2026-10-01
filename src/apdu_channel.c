@@ -149,14 +149,22 @@ static TC_APDU_result chain_send(TC_APDU_channel* channel, const TC_APDU_command
   return TC_APDU_OK;
 }
 
-/* GET RESPONSE after 61XX (5.3.4, 5.6). SW2 00 announces 256 or more bytes. */
+/* Lower ne to the card's response buffer less SW1 SW2 (12.8.1). */
+static uint32_t response_ne(const TC_APDU_channel* channel, uint32_t ne)
+{
+  if (channel->max_response_bytes && ne > channel->max_response_bytes - TC_APDU_STATUS_BYTES)
+    return (uint32_t)(channel->max_response_bytes - TC_APDU_STATUS_BYTES);
+  return ne;
+}
+
+/* GET RESPONSE after 61XX (5.3.4, 5.6). SW2 00 announces 256 or more bytes.
+ * Each step stays within the card's response buffer. */
 static TC_APDU_command get_response(const TC_APDU_channel* channel, uint8_t cla, uint8_t sw2)
 {
   TC_APDU_command step = {{NULL, 0}, sw2, cla, GET_RESPONSE, 0, 0};
   if (channel->flags & TC_APDU_GET_RESPONSE_PLAIN_CLA)
     step.cla = (uint8_t)(cla & TC_APDU_CLA_CHANNEL_MASK);
-  if (!sw2)
-    step.ne = TC_APDU_SHORT_MAX_NE;
+  step.ne = response_ne(channel, sw2 ? sw2 : TC_APDU_SHORT_MAX_NE);
   return step;
 }
 
@@ -253,9 +261,7 @@ static TC_APDU_result transceive_run(TC_APDU_channel* channel, const TC_APDU_com
       return result;
     step.data = (TC_bytes){command->data.data + offset, command->data.length - offset};
   }
-  /* 12.8.1: stay within the card's response buffer. */
-  if (channel->max_response_bytes && step.ne > channel->max_response_bytes - TC_APDU_STATUS_BYTES)
-    step.ne = (uint32_t)(channel->max_response_bytes - TC_APDU_STATUS_BYTES);
+  step.ne = response_ne(channel, step.ne);
   return response_collect(channel, step, chained, state);
 }
 

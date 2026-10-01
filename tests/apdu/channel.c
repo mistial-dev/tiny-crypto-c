@@ -452,6 +452,26 @@ TC_TEST(extended_channel)
   command = get_data(0x00, TC_APDU_MAX_NE);
   munit_assert_int(run(&channel, &command, 64, &out), ==, TC_APDU_OK);
   assert_script_done();
+
+  /* GET RESPONSE stays within the same limit after 61 00 and after a 61XX
+   * above it (ISO/IEC 7816-4 12.8.1). */
+  static char first[2 * 128 + 5], second[2 * 128 + 5], last[2 * 16 + 5];
+  memcpy(first, repeat(0x41, 128), 2 * 128 + 1);
+  strcat(first, "6100");
+  memcpy(second, repeat(0x42, 128), 2 * 128 + 1);
+  strcat(second, "61f0");
+  memcpy(last, repeat(0x43, 16), 2 * 16 + 1);
+  strcat(last, "9000");
+  const tc_script_step continued[] = {{"00cb3fff055c035fc10280", first, {0}, {0}, TC_OK, 0},
+                                      {"00c0000080", second, {0}, {0}, TC_OK, 0},
+                                      {"00c0000080", last, {0}, {0}, TC_OK, 0}};
+  const TC_APDU_channel_options short_responses = {TC_APDU_SHORT, 0, 8, 0, 130};
+  channel = start_options(continued, 3, &short_responses);
+  command = get_data(0x00, 256);
+  /* Room for every requested chunk: 128 + 128 + 128 bytes and SW1 SW2. */
+  munit_assert_int(run(&channel, &command, 386, &out), ==, TC_APDU_OK);
+  munit_assert_size(out.data.length, ==, 272);
+  assert_script_done();
   return MUNIT_OK;
 }
 

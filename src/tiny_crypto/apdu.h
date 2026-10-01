@@ -152,7 +152,9 @@ enum {
  * max_command_bytes  0, or the card's largest command APDU (DO 7F66 first
  *                    integer, ISO/IEC 7816-4 12.8.1), at least 4.
  * max_response_bytes 0, or the card's largest response APDU (DO 7F66 second
- *                    integer), at least 3. */
+ *                    integer), at least 3. Every step stays within it: the
+ *                    command's Ne and each GET RESPONSE Le are lowered to
+ *                    this size less SW1 SW2. */
 typedef struct {
   TC_APDU_length_format format;
   unsigned flags;
@@ -206,7 +208,8 @@ TC_APDU_result TC_APDU_channel_restrict(TC_APDU_channel* channel, size_t max_com
  * 63XX warning on an intermediate answer is INVALID (5.6).
  *
  * A final 61XX is followed by GET RESPONSE (INS C0, P1 P2 00 00, Le = SW2,
- * where 00 requests 256), and each data chunk is appended (5.3.4). GET RESPONSE uses the command CLA, or CLA & 0x03
+ * where 00 requests 256, lowered to the card's response buffer), and each data
+ * chunk is appended (5.3.4). GET RESPONSE uses the command CLA, or CLA & 0x03
  * with TC_APDU_GET_RESPONSE_PLAIN_CLA. A 6CXX answer without data to an
  * unchained command with Le, or to a GET RESPONSE step, re-issues that step
  * once with Le = SW2 (5.6), when the command CLA has no SM bits. A second 6CXX
