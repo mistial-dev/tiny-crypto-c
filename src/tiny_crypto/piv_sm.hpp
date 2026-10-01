@@ -88,8 +88,7 @@ public:
                                        size_t& plaintext_length,
                                        piv_sm_workspace& workspace) noexcept
   {
-    return ::TC_PIV_SM_unprotect(&session_, &request, plaintext.data, plaintext.capacity,
-                                 &plaintext_length, &workspace);
+    return ::TC_PIV_SM_unprotect(&session_, &request, plaintext, &plaintext_length, &workspace);
   }
 };
 } // namespace tiny_crypto

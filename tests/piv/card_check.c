@@ -631,6 +631,35 @@ TC_TEST(card2_evidence)
   return MUNIT_OK;
 }
 
+/* A TWIC reader may use either listed PIV/TWIC OID pair from either card
+ * application (TWIC Part 2 v5 section 6). Keep this OCSP case separate from
+ * the PIV policy case above so the TWIC-compatible EKU policy is exercised
+ * with authenticated revocation evidence. */
+TC_TEST(card2_twic_ocsp_policy)
+{
+  load("sd33_card2");
+  link_open(TC_PIV_CONTACT);
+  pin_verify();
+  inventory_read();
+  card2_trust(EVIDENCE_OCSP, TC_VALIDATION_REVOCATION_REQUIRED);
+  TC_PIV_card_check_request request = check_request();
+  request.profile = TC_TWIC_LEGACY_CARD;
+  munit_assert_int(check_run(&request), ==, TC_PIV_OK);
+  expect_passed(TC_PIV_CHECK_CERTIFICATE_PATH, 0x0500);
+  expect_passed(TC_PIV_CHECK_REVOCATION, 0x0500);
+  /* This PIV sample's identifier values do not satisfy the TWIC card profile;
+   * that independent check must not erase the valid path and OCSP result. */
+  expect(TC_PIV_CHECK_CERTIFICATE_IDENTIFIERS, 0x0500, TC_PIV_CHECK_FAILED,
+         TC_PIV_REASON_NONE);
+  munit_assert_uint8(report.certificate_valid[TC_PIV_CARD_SLOT_CARD_AUTHENTICATION], ==, 1);
+  munit_assert_uint8(report.has_card, ==, 0);
+  munit_assert_int(report.profile, ==, TC_TWIC_LEGACY_CARD);
+  munit_assert_int(report.application, ==, TC_PIV_APPLICATION_PIV);
+  TC_PIV_inventory_clear(&inventory);
+  TC_PIV_link_clear(&link);
+  return MUNIT_OK;
+}
+
 /* Copy fixture object tag into override storage and flip one byte at
  * offset from its end. */
 static TC_bytes tampered_object(uint32_t tag, size_t offset)
@@ -1298,6 +1327,7 @@ int main(int argc, char** argv)
       {"/card2-contactless", card2_contactless, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/card2-without-pin", card2_without_pin, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/card2-evidence", card2_evidence, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+      {"/card2-twic-ocsp-policy", card2_twic_ocsp_policy, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/card2-failures", card2_failures, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/card4-contactless", card4_contactless, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
       {"/report-limit", report_limit, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},

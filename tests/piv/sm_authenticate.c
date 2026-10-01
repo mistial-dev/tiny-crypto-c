@@ -191,7 +191,8 @@ TC_TEST(authenticate)
         {NULL, 0}, {fixture->reply.data + 6, 8}, &status_span, 1};
     size_t plain_length = 99;
     munit_assert_int(
-        TC_PIV_SM_unprotect(&session, &reply, NULL, 0, &plain_length, &workspace.session), ==,
+        TC_PIV_SM_unprotect(&session, &reply, (TC_buffer){NULL, 0}, &plain_length,
+                            &workspace.session), ==,
         TC_OK);
     munit_assert_size(plain_length, ==, 0);
     munit_assert_int(TC_PIV_SM_get_state(&session), ==, TC_PIV_SM_READY);

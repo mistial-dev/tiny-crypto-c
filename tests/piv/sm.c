@@ -202,7 +202,7 @@ static TC_status unprotect_response(TC_PIV_SM* session, const uint8_t* response,
 {
   TC_bytes authenticated;
   const TC_PIV_SM_unprotect_request request = response_request(response, length, &authenticated);
-  return TC_PIV_SM_unprotect(session, &request, output, capacity, plain_length, w);
+  return TC_PIV_SM_unprotect(session, &request, (TC_buffer){output, capacity}, plain_length, w);
 }
 
 static const TC_PIV_SM_suite suites[] = {
@@ -271,7 +271,8 @@ TC_TEST(response_failures)
       session = saved;
       memset(&w, 0x5a, sizeof w);
       munit_assert_int(
-          TC_PIV_SM_unprotect(&session, &request, output, sizeof output, &plain_length, &w), ==,
+          TC_PIV_SM_unprotect(&session, &request, (TC_buffer){output, sizeof output}, &plain_length,
+                              &w), ==,
           TC_ERROR);
       munit_assert_int(TC_PIV_SM_get_state(&session), ==, TC_PIV_SM_PENDING);
       munit_assert_memory_equal(sizeof session, &session, &saved);
@@ -331,29 +332,35 @@ TC_TEST(in_place)
       const size_t ciphertext_length = request.ciphertext.length;
       /* A capacity past the ciphertext and a shifted start are overlaps. */
       plain_length = 999;
-      munit_assert_int(TC_PIV_SM_unprotect(&session, &request, ciphertext, ciphertext_length + 1,
+      munit_assert_int(TC_PIV_SM_unprotect(&session, &request,
+                                           (TC_buffer){ciphertext, ciphertext_length + 1},
                                            &plain_length, &w),
                        ==, TC_ERROR);
-      munit_assert_int(TC_PIV_SM_unprotect(&session, &request, ciphertext + 1,
-                                           ciphertext_length - 1, &plain_length, &w),
+      munit_assert_int(TC_PIV_SM_unprotect(&session, &request,
+                                           (TC_buffer){ciphertext + 1, ciphertext_length - 1},
+                                           &plain_length, &w),
                        ==, TC_ERROR);
-      munit_assert_int(TC_PIV_SM_unprotect(&session, &request, ciphertext - 1, ciphertext_length,
+      munit_assert_int(TC_PIV_SM_unprotect(&session, &request,
+                                           (TC_buffer){ciphertext - 1, ciphertext_length},
                                            &plain_length, &w),
                        ==, TC_ERROR);
       munit_assert_int(
-          TC_PIV_SM_unprotect(&session, &request, response + length - 8, 8, &plain_length, &w), ==,
+          TC_PIV_SM_unprotect(&session, &request, (TC_buffer){response + length - 8, 8},
+                              &plain_length, &w), ==,
           TC_ERROR);
       munit_assert_memory_equal(sizeof session, &session, &saved);
       munit_assert_size(plain_length, ==, 999);
       munit_assert_memory_equal(length, response, original);
       /* A capacity below the plaintext keeps the session PENDING. */
       munit_assert_int(
-          TC_PIV_SM_unprotect(&session, &request, ciphertext, lengths[i] - 1, &plain_length, &w),
+          TC_PIV_SM_unprotect(&session, &request, (TC_buffer){ciphertext, lengths[i] - 1},
+                              &plain_length, &w),
           ==, TC_ERROR);
       munit_assert_memory_equal(sizeof session, &session, &saved);
       munit_assert_memory_equal(length, response, original);
       munit_assert_int(
-          TC_PIV_SM_unprotect(&session, &request, ciphertext, ciphertext_length, &plain_length, &w),
+          TC_PIV_SM_unprotect(&session, &request, (TC_buffer){ciphertext, ciphertext_length},
+                              &plain_length, &w),
           ==, TC_OK);
       munit_assert_size(plain_length, ==, lengths[i]);
       munit_assert_memory_equal(lengths[i], ciphertext, plain);

@@ -162,9 +162,10 @@ static TC_status response_unprotect(TC_PIV_link* link, TC_buffer response,
   *plaintext = fields->ciphertext.length
                    ? response.data + (size_t)(fields->ciphertext.data - response.data)
                    : response.data;
-  return TC_PIV_SM_unprotect(
-      (TC_PIV_SM*)link->sm, &request, fields->ciphertext.length ? *plaintext : NULL,
-      fields->ciphertext.length, plain_length, (TC_PIV_SM_workspace*)link->sm_workspace);
+  const TC_buffer output = {fields->ciphertext.length ? *plaintext : NULL,
+                            fields->ciphertext.length};
+  return TC_PIV_SM_unprotect((TC_PIV_SM*)link->sm, &request, output, plain_length,
+                             (TC_PIV_SM_workspace*)link->sm_workspace);
 }
 
 /* LIMIT before protection keeps the session: the command must fit the SM

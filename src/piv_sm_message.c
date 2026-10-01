@@ -198,7 +198,7 @@ static size_t padding_length(const uint8_t block[16])
 }
 
 TC_status TC_PIV_SM_unprotect(TC_PIV_SM* session, const TC_PIV_SM_unprotect_request* request,
-                              uint8_t* plaintext, size_t capacity, size_t* plaintext_length,
+                              TC_buffer plaintext, size_t* plaintext_length,
                               TC_PIV_SM_workspace* workspace)
 {
   const tc_sm_suite* suite;
@@ -210,11 +210,12 @@ TC_status TC_PIV_SM_unprotect(TC_PIV_SM* session, const TC_PIV_SM_unprotect_requ
       request->tag.length != 8 ||
       request->authenticated_count > TC_PIV_SM_AUTHENTICATED_SPANS_MAX ||
       !tc_sm_disjoint(NULL, 0, request->authenticated, request->authenticated_count) ||
-      ((!plaintext) && capacity) || request->ciphertext.length % 16 ||
+      ((!plaintext.data) && plaintext.capacity) || request->ciphertext.length % 16 ||
       !spans_contain(request->authenticated, request->authenticated_count, request->ciphertext) ||
       session->state != TC_PIV_SM_PENDING)
     return TC_ERROR;
-  if (!unprotect_disjoint(session, request, plaintext, capacity, plaintext_length, workspace))
+  if (!unprotect_disjoint(session, request, plaintext.data, plaintext.capacity, plaintext_length,
+                          workspace))
     return TC_ERROR;
   suite = tc_sm_suite_get(session->suite);
   if (!suite || !counter_nonzero(session->data.traffic.counter))
@@ -246,7 +247,7 @@ TC_status TC_PIV_SM_unprotect(TC_PIV_SM* session, const TC_PIV_SM_unprotect_requ
       goto done;
     length = request->ciphertext.length - padding;
   }
-  if (capacity < length) {
+  if (plaintext.capacity < length) {
     preserve_session = 1;
     goto done;
   }
@@ -256,16 +257,16 @@ TC_status TC_PIV_SM_unprotect(TC_PIV_SM* session, const TC_PIV_SM_unprotect_requ
   if (request->ciphertext.length) {
     const size_t last = request->ciphertext.length - 16;
     if (length > last)
-      memcpy(plaintext + last, TC_SM_SYM(workspace).block, length - last);
+      memcpy(plaintext.data + last, TC_SM_SYM(workspace).block, length - last);
   }
   for (offset = 0; offset + 16 < request->ciphertext.length && offset < length; offset += 16) {
     memcpy(TC_SM_SYM(workspace).block, request->ciphertext.data + offset, 16);
     if (TC_AES_dynamic_CBC_decrypt(&TC_SM_SYM(workspace).cipher.aes, TC_SM_SYM(workspace).material,
                                    TC_SM_SYM(workspace).block, 16) != TC_OK) {
-      TC_secure_zero(plaintext, length);
+      TC_secure_zero(plaintext.data, length);
       goto done;
     }
-    memcpy(plaintext + offset, TC_SM_SYM(workspace).block, 16);
+    memcpy(plaintext.data + offset, TC_SM_SYM(workspace).block, 16);
   }
   memcpy(session->data.traffic.response_mcv, TC_SM_SYM(workspace).digest, 16);
   session->state = TC_PIV_SM_READY;

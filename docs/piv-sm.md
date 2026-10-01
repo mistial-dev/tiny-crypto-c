@@ -405,7 +405,7 @@ released only after authentication. The status word inside the `99` object is
 authenticated. The outer SW1-SW2 of the response APDU is transport status, and
 the caller checks it before calling unprotect.
 
-The plaintext buffer is disjoint from every input, or exactly
+Pass the plaintext storage as a `TC_buffer`. It is disjoint from every input, or exactly
 `request.ciphertext.data` with a capacity of at most
 `request.ciphertext.length`. That exact alias decrypts in place: the final
 block is decrypted first from intact ciphertext, and each earlier block is

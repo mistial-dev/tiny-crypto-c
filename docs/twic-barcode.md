@@ -41,7 +41,8 @@ signature and signer path before using its identity or biometric data.
 `TC_TWIC_object_decrypt` decrypts an enciphered object's `BC` value in place.
 Enable `TINY_CRYPTO_ENABLE_TWIC_OBJECT_CRYPTO`, AES, ECB mode, and a 128-bit AES
 key configuration. Object encryption has no dependency on the TPK container reader.
-Supply a nonempty block-aligned buffer and separate output-length storage.
+Supply the complete nonempty block-aligned ciphertext as a `TC_buffer` and
+separate output-length storage.
 The function checks PKCS#7 padding across the final block, wipes removed padding,
 and returns the plaintext length. Invalid padding or a processing error wipes
 the whole buffer. Bad arguments preserve it. Treat recovered content as
@@ -49,8 +50,8 @@ untrusted until its signature and credential checks succeed.
 
 `TC_TWIC_object_encrypt` pads and encrypts an object in place. Reserve up to
 `TC_AES_BLOCKLEN` extra bytes, including a full padding block for aligned input.
-Pass the plaintext length and buffer capacity separately. The output length
-includes padding. Empty plaintext is supported. Bad arguments preserve the
+Pass a `TC_buffer`, then the plaintext length. The output length includes
+padding. Empty plaintext is supported. Bad arguments preserve the
 buffer and output length. Processing failures wipe the padded region.
 For signed object types, build and sign the object before encrypting it.
 TWIC enciphered printed information (`DFC109`) has no signature block. Its

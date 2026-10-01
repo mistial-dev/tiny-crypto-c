@@ -588,7 +588,8 @@ static int encrypted_object_decode(TC_bytes encoded, TC_buffer output, TC_bytes*
   *work -= value.value.length;
   memcpy(output.data, value.value.data, value.value.length);
   size_t length;
-  if (TC_TWIC_object_decrypt(&sensitive.tpk, output.data, value.value.length, &length) != TC_OK)
+  if (TC_TWIC_object_decrypt(&sensitive.tpk, (TC_buffer){output.data, value.value.length},
+                             &length) != TC_OK)
     return 0;
   *plaintext = (TC_bytes){output.data, length};
   return 1;

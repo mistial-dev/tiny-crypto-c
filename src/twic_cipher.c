@@ -27,25 +27,27 @@ static TC_status transform(const TC_TWIC_tpk* key, uint8_t* buffer, size_t lengt
   return result;
 }
 
-TC_status TC_TWIC_object_encrypt(const TC_TWIC_tpk* key, uint8_t* buffer, size_t length,
-                                 size_t capacity, size_t* ciphertext_length)
+TC_status TC_TWIC_object_encrypt(const TC_TWIC_tpk* key, TC_buffer buffer, size_t length,
+                                 size_t* ciphertext_length)
 {
   const size_t padding = TC_AES_BLOCKLEN - length % TC_AES_BLOCKLEN;
   /* A block-aligned plaintext still needs a complete padding block. */
-  if (length > SIZE_MAX - padding || capacity < length + padding ||
-      !storage_valid(key, buffer, capacity, ciphertext_length))
+  if (length > SIZE_MAX - padding || buffer.capacity < length + padding ||
+      !storage_valid(key, buffer.data, buffer.capacity, ciphertext_length))
     return TC_ERROR;
-  memset(buffer + length, (int)padding, padding);
-  if (transform(key, buffer, length + padding, 1) != TC_OK)
+  memset(buffer.data + length, (int)padding, padding);
+  if (transform(key, buffer.data, length + padding, 1) != TC_OK)
     return TC_ERROR;
   *ciphertext_length = length + padding;
   return TC_OK;
 }
 
-TC_status TC_TWIC_object_decrypt(const TC_TWIC_tpk* key, uint8_t* buffer, size_t length,
+TC_status TC_TWIC_object_decrypt(const TC_TWIC_tpk* key, TC_buffer ciphertext,
                                  size_t* plaintext_length)
 {
   TC_status result = TC_ERROR;
+  uint8_t* const buffer = ciphertext.data;
+  const size_t length = ciphertext.capacity;
   if (!length || length % TC_AES_BLOCKLEN || !storage_valid(key, buffer, length, plaintext_length))
     return TC_ERROR;
   if (transform(key, buffer, length, 0) != TC_OK)

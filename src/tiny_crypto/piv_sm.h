@@ -191,7 +191,7 @@ TC_status TC_PIV_SM_protect(TC_PIV_SM* session, const TC_PIV_SM_protect_request*
  * padding failure is found before any plaintext is written, so in place the
  * ciphertext stays unchanged. */
 TC_status TC_PIV_SM_unprotect(TC_PIV_SM* session, const TC_PIV_SM_unprotect_request* request,
-                              uint8_t* plaintext, size_t capacity, size_t* plaintext_length,
+                              TC_buffer plaintext, size_t* plaintext_length,
                               TC_PIV_SM_workspace* workspace);
 #endif
 

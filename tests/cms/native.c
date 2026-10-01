@@ -1642,12 +1642,14 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
               memcpy(printed_cipher, printed, sizeof printed);
               memcpy(biometric_cipher + 2, record, sizeof record);
               size_t printed_length, biometric_length;
-              munit_assert_int(TC_TWIC_object_encrypt(&privacy_key, printed_cipher, sizeof printed,
-                                                      sizeof printed_cipher, &printed_length),
+              munit_assert_int(TC_TWIC_object_encrypt(
+                                   &privacy_key, (TC_buffer){printed_cipher, sizeof printed_cipher},
+                                   sizeof printed, &printed_length),
                                ==, TC_OK);
-              munit_assert_int(TC_TWIC_object_encrypt(&privacy_key, biometric_cipher + 2,
-                                                      sizeof record, sizeof biometric_cipher - 2,
-                                                      &biometric_length),
+              munit_assert_int(TC_TWIC_object_encrypt(
+                                   &privacy_key,
+                                   (TC_buffer){biometric_cipher + 2, sizeof biometric_cipher - 2},
+                                   sizeof record, &biometric_length),
                                ==, TC_OK);
               biometric_cipher[0] = 0xbc;
               biometric_cipher[1] = (uint8_t)biometric_length;
@@ -1868,7 +1870,8 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
               memcpy(recovered, encrypted, encrypted_length);
               size_t plaintext_length = 0;
               TC_credential_status authenticated = TC_CREDENTIAL_INVALID;
-              if (TC_TWIC_object_decrypt(&selected_key, recovered, encrypted_length,
+              if (TC_TWIC_object_decrypt(&selected_key,
+                                         (TC_buffer){recovered, encrypted_length},
                                          &plaintext_length) == TC_OK) {
                 ExampleBiometricRequest decrypted = biometric_request;
                 decrypted.encoded = (TC_bytes){recovered, plaintext_length};
