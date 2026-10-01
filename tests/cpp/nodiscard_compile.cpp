@@ -202,7 +202,7 @@ void tiny_crypto_nodiscard_compile(uint8_t* data, size_t length)
 
   KMAC256 kmac;
   kmac.update(in);                  /* DISCARDED */
-  kmac.final(out);                  /* DISCARDED */
+  kmac.finish(out);                 /* DISCARDED */
   KMAC256::digest(in, in, in, out); /* DISCARDED */
 
   AES_dynamic dynamic;
@@ -211,7 +211,7 @@ void tiny_crypto_nodiscard_compile(uint8_t* data, size_t length)
   AES_dynamic_CMAC dynamic_cmac;
   dynamic_cmac.init(in);     /* DISCARDED */
   dynamic_cmac.update(in);   /* DISCARDED */
-  dynamic_cmac.final(block); /* DISCARDED */
+  dynamic_cmac.finish(block); /* DISCARDED */
   size_t kw_length = 0;
   aes_kw_wrap(in, in, out);               /* DISCARDED */
   aes_kw_unwrap(in, in, out);             /* DISCARDED */
@@ -247,6 +247,12 @@ void tiny_crypto_nodiscard_compile(uint8_t* data, size_t length)
   apdu_command_encode(command, TC_APDU_SHORT, out, apdu_size); /* DISCARDED */
   apdu_response_read(in, response);                            /* DISCARDED */
   apdu_status_classify(0x9000);                                /* DISCARDED */
+  apdu_channel channel;
+  channel.init(apdu_transport{}, apdu_channel_options{}, out); /* DISCARDED */
+  channel.restrict(0, 0, 0);                                   /* DISCARDED */
+  channel.transceive(command, out, response);                   /* DISCARDED */
+  channel.exchanges_left();                                    /* DISCARDED */
+  channel.native();                                             /* DISCARDED */
   piv_link link;
   piv_application application = {};
   piv_data_object object = {};

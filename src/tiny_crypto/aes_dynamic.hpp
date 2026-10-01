@@ -63,8 +63,8 @@ public:
   }
 };
 
-/* Streaming AES-CMAC with a key length chosen at init. final writes the full
- * 16-byte tag and consumes the key. A failed init, a final and clear leave the
+/* Streaming AES-CMAC with a key length chosen at init. finish writes the full
+ * 16-byte tag and consumes the key. A failed init, finish and clear leave the
  * object unkeyed. The destructor clears the context. */
 class AES_dynamic_CMAC {
   TC_AES_dynamic_CMAC ctx_;
@@ -94,7 +94,7 @@ public:
   {
     return update(bytes{data, N});
   }
-  TC_CPP_NODISCARD TC_status final(uint8_t (&tag)[16]) noexcept
+  TC_CPP_NODISCARD TC_status finish(uint8_t (&tag)[16]) noexcept
   {
     return ::TC_AES_dynamic_CMAC_final(&ctx_, tag);
   }

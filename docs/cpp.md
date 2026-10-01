@@ -4,9 +4,9 @@
 
 # C++ wrappers
 
-The C++11 wrappers live in namespace `tiny_crypto`. Each `.hpp` header wraps
-the C header of the same name and builds only the parts its configuration
-enables. `<tiny_crypto/tiny_crypto.hpp>` includes every enabled wrapper. The
+The C++11 wrappers live in namespace `tiny_crypto` and build only the parts
+their configuration enables. `<tiny_crypto/tiny_crypto.hpp>` includes every
+available wrapper. The
 C contracts in [Working with the API](api.md) apply unchanged: results,
 failure and wipe rules, input stability and work budgets.
 
@@ -70,12 +70,14 @@ are public. Timing depends on the shorter length and is independent of content.
 
 ## Object lifecycle
 
-Cipher, hash, MAC, DRBG, GZIP, PIV SM and PIV link classes own their C state.
+Cipher, hash, MAC, DRBG, GZIP, APDU, PIV SM and PIV link classes own their C state.
 They delete their copy operations, so key material and generator state are
 never duplicated. `TLVReader` holds only a cursor over borrowed input, so it
 may be copied, and a copy acts as a saved position. `drbg`, `piv_sm` and
 `piv_link` also delete their move operations. Destruction clears the context.
-Keyed classes follow init, update, finish or clear:
+Stateful classes use `init`, `update`, `finish` and `clear` where those stages
+apply. More specific operations keep a descriptive verb, such as
+`encrypt_finish`, `decode`, `transceive` and `unprotect`.
 
 | Class              | Key                                                | finish                                                            |
 | ------------------ | -------------------------------------------------- | ----------------------------------------------------------------- |
@@ -83,17 +85,16 @@ Keyed classes follow init, update, finish or clear:
 | `GCM`              | `TC_AES_KEYLEN` bytes and an IV                    | `encrypt_finish` writes `tag_length()` bytes and consumes the key |
 | `AES_CMAC`         | `TC_AES_KEYLEN` bytes                              | writes a 16-byte tag and consumes the key                         |
 | `AES_dynamic`      | 16, 24 or 32 bytes                                 | none                                                              |
-| `AES_dynamic_CMAC` | 16, 24 or 32 bytes                                 | `final` writes a 16-byte tag and consumes the key                 |
+| `AES_dynamic_CMAC` | 16, 24 or 32 bytes                                 | writes a 16-byte tag and consumes the key                         |
 | `DES`              | 8 bytes, or 16 or 24 with TDEA, optional 8-byte IV | none                                                              |
 | `DES_CMAC`         | 8, 16 or 24 bytes                                  | writes an 8-byte tag and consumes the key                         |
 | `DES_ISO9797`      | algorithm, padding and 16 or 24 bytes              | writes the 8-byte MAC and consumes the key                        |
 | `HMAC_SHA*`        | any length                                         | writes `tag_size` bytes and consumes the key                      |
-| `KMAC256`          | any length, optional customization                 | `final` writes `out.capacity` bytes and consumes the key          |
+| `KMAC256`          | any length, optional customization                 | writes `out.capacity` bytes and consumes the key                  |
 | `SHA*`, `MD5`      | none                                               | writes the digest and starts the next message                     |
 
 A default-constructed object, a failed `init`, a completed finish and `clear`
-all leave a keyed object unkeyed. `KMAC256` is the exception for `init`: a
-rejected `init` leaves the object unchanged. Later update and finish calls return
+all leave a keyed object unkeyed. Later update and finish calls return
 `TC_ERROR` until the next successful `init`. `clear` wipes the key schedule
 early, for example after an abandoned message. A hash object starts a message
 at construction, and `reset` discards a partial message. Compare a received
@@ -113,6 +114,11 @@ reusable decoding scratch, and input and output stay caller-owned. The
 layers built on it. The destructor calls `TC_PIV_link_clear`, which wipes the
 borrowed command scratch, so the scratch buffer and the transport context
 outlive the object.
+
+`apdu_channel` owns a `TC_APDU_channel`. `init`, `restrict` and `transceive`
+forward to the bounded C channel, and `exchanges_left` reports its remaining
+budget. The transport context and scratch buffer outlive the wrapper. Its
+destructor clears the channel and wipes the borrowed scratch.
 
 `piv_sm_key_request`, `piv_link_secure` and `piv_link_unsecure` in
 `piv_sm_apdu.hpp` take a `piv_link` and a `piv_sm` by reference. A secured
@@ -188,6 +194,14 @@ the `sskdf_sha*` functions and the KBKDF families forward to their C functions
 with the same span arguments. The EC and RSA wrappers in `ec.hpp` and
 `rsa.hpp` take references in place of pointers and keep the C statuses,
 execution descriptors and work rules.
+
+## C-only APIs
+
+The C++ layer does not yet wrap X.509, CRL, OCSP, CMS, credential validation,
+EAC CVC, PIV object codecs, PIV biometrics, TWIC codecs, AAMVA, LDS, resource
+profiles, snapshots or streaming sources. Include their `.h` headers and call
+the C API from C++ code. `der.h` is used through higher-level C APIs, while
+`md5.h` is wrapped by `hash.hpp`.
 
 ```cpp
 #include <tiny_crypto/des.hpp>

@@ -44,6 +44,8 @@ TC_ASSERT_NOT_COPYABLE(tiny_crypto::piv_sm);
 TC_ASSERT_NOT_MOVABLE(tiny_crypto::piv_sm);
 TC_ASSERT_NOT_COPYABLE(tiny_crypto::piv_link);
 TC_ASSERT_NOT_MOVABLE(tiny_crypto::piv_link);
+TC_ASSERT_NOT_COPYABLE(tiny_crypto::apdu_channel);
+TC_ASSERT_NOT_MOVABLE(tiny_crypto::apdu_channel);
 TC_ASSERT_NOT_COPYABLE(tiny_crypto::piv_inventory);
 TC_ASSERT_NOT_MOVABLE(tiny_crypto::piv_inventory);
 

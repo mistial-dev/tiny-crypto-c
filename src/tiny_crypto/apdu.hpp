@@ -60,6 +60,60 @@ TC_CPP_NODISCARD inline apdu_status_class apdu_status_classify(uint16_t sw) noex
   return ::TC_APDU_status_classify(sw);
 }
 
+/* A bounded APDU exchange channel. The transport context and scratch buffer
+ * must outlive the object. Destruction wipes the scratch and channel state. */
+class apdu_channel {
+  ::TC_APDU_channel channel_{};
+
+public:
+  apdu_channel() noexcept = default;
+  ~apdu_channel() noexcept
+  {
+    clear();
+  }
+  apdu_channel(const apdu_channel&) = delete;
+  apdu_channel& operator=(const apdu_channel&) = delete;
+  apdu_channel(apdu_channel&&) = delete;
+  apdu_channel& operator=(apdu_channel&&) = delete;
+
+  TC_CPP_NODISCARD apdu_result init(apdu_transport transport,
+                                     const apdu_channel_options& options,
+                                     buffer scratch) noexcept
+  {
+    return ::TC_APDU_channel_init(&channel_, transport, &options, scratch);
+  }
+  TC_CPP_NODISCARD apdu_result restrict(size_t max_command_bytes,
+                                         size_t max_response_bytes,
+                                         unsigned flags) noexcept
+  {
+    return ::TC_APDU_channel_restrict(&channel_, max_command_bytes, max_response_bytes, flags);
+  }
+  TC_CPP_NODISCARD apdu_result transceive(const apdu_command& command, buffer response,
+                                           apdu_response& out) noexcept
+  {
+    return ::TC_APDU_transceive(&channel_, &command, response, &out);
+  }
+  template <size_t Size>
+  TC_CPP_NODISCARD apdu_result transceive(const apdu_command& command,
+                                           uint8_t (&response)[Size],
+                                           apdu_response& out) noexcept
+  {
+    return transceive(command, buffer{response, Size}, out);
+  }
+  TC_CPP_NODISCARD size_t exchanges_left() const noexcept
+  {
+    return ::TC_APDU_channel_exchanges_left(&channel_);
+  }
+  void clear() noexcept
+  {
+    ::TC_APDU_channel_clear(&channel_);
+  }
+  TC_CPP_NODISCARD ::TC_APDU_channel* native() noexcept
+  {
+    return &channel_;
+  }
+};
+
 } // namespace tiny_crypto
 #endif
 #endif

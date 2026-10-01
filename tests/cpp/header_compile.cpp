@@ -279,9 +279,11 @@ int tiny_crypto_cpp_header_compile(uint8_t* data, size_t length)
     uint8_t encoded[TC_APDU_HEADER_BYTES];
     size_t written = 0;
     tiny_crypto::apdu_response response = {};
+    tiny_crypto::apdu_channel channel;
     if (tiny_crypto::apdu_command_encode(command, TC_APDU_SHORT, encoded, written) != TC_APDU_OK ||
         tiny_crypto::apdu_response_read({answer, sizeof answer}, response) != TC_APDU_OK ||
-        tiny_crypto::apdu_status_classify(response.sw) != TC_APDU_SW_SUCCESS)
+        tiny_crypto::apdu_status_classify(response.sw) != TC_APDU_SW_SUCCESS ||
+        channel.exchanges_left() != 0 || channel.native() == nullptr)
       ++failures;
   }
 #endif
