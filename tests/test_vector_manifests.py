@@ -8,11 +8,15 @@ changed, when a vector file is missing from its manifest, or when a manifest
 entry escapes its directory.
 """
 import hashlib
+import json
 from pathlib import Path
+import sys
 import unittest
 
 VECTORS = Path(__file__).resolve().parent / "vectors"
 UNLISTED = {"README.md", "SHA256SUMS"}
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from wycheproof_files import supported_vector_names  # noqa: E402
 
 
 def manifest_entries(manifest):
@@ -25,8 +29,21 @@ def manifest_entries(manifest):
 
 
 class Manifests(unittest.TestCase):
-    def test_manifests_present(self):
-        self.assertTrue(list(VECTORS.rglob("SHA256SUMS")))
+    def test_every_vector_file_is_covered(self):
+        covered = set()
+        for manifest in VECTORS.rglob("SHA256SUMS"):
+            root = manifest.parent
+            covered.update((root / name).resolve() for _, name in manifest_entries(manifest))
+        present = {path.resolve() for path in VECTORS.rglob("*")
+                   if path.is_file() and path.name not in UNLISTED}
+        self.assertEqual(sorted(map(str, present - covered)), [],
+                         "vector files missing from every manifest")
+
+    def test_manifest_directories_have_readmes(self):
+        missing = [str(manifest.parent.relative_to(VECTORS))
+                   for manifest in VECTORS.rglob("SHA256SUMS")
+                   if not (manifest.parent / "README.md").is_file()]
+        self.assertEqual(missing, [])
 
     def test_listed_files_match(self):
         for manifest in sorted(VECTORS.rglob("SHA256SUMS")):
@@ -43,6 +60,16 @@ class Manifests(unittest.TestCase):
                        if path.is_file() and path.name not in UNLISTED}
             with self.subTest(manifest=str(manifest.relative_to(VECTORS))):
                 self.assertEqual(sorted(map(str, present - listed)), [], "files missing from the manifest")
+
+    def test_wycheproof_contains_only_exercised_documents(self):
+        root = VECTORS / "wycheproof"
+        documents = {path.name for path in (root / "testvectors_v1").glob("*.json")}
+        self.assertEqual(len(documents), 174)
+        self.assertEqual(documents, supported_vector_names(documents))
+        referenced = {json.loads((root / "testvectors_v1" / name).read_text())["schema"]
+                      for name in documents}
+        schemas = {path.name for path in (root / "schemas").glob("*.json")}
+        self.assertEqual(schemas, referenced)
 
 
 if __name__ == "__main__":

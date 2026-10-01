@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // =============================================================
 // == DO NOT MODIFY THIS FILE BY HAND - IT IS AUTO GENERATED! ==
 // =============================================================

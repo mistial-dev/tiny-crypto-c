@@ -11,10 +11,11 @@ Source: [C2SP/wycheproof](https://github.com/C2SP/wycheproof) at commit
 commit, whose SHA-256 was
 `5dc00fae83575135c3147bfd4a04ee8889b1f0482ac6ca21aa486a8abccf2260`.
 
-Only the vector data is kept: `testvectors_v1/`, the JSON `schemas/` that
-describe it, the upstream `LICENSE`, and the upstream README as
-`UPSTREAM_README.md`. The upstream tools, generators and CI files are left
-out. Every file is unmodified, and `SHA256SUMS` lists its digest.
+The retained subset has 174 vector documents used by the test adapters and the
+17 JSON schemas they reference. It also keeps the upstream `LICENSE` and README
+as `UPSTREAM_README.md`. Unsupported algorithm documents, upstream tools,
+generators and CI files are omitted. Every retained upstream file is unmodified,
+and `SHA256SUMS` lists its digest.
 
 `tests/wycheproof.py` selects the documents for the enabled algorithms and
 feeds them to the C readers. It covers ECDH, ECDSA, RSA PKCS #1 v1.5 and PSS

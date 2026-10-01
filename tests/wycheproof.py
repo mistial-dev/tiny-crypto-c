@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import tempfile
 from munit_runner import run_reader
+from wycheproof_files import supported_vector_names
 
 # tests/vectors/wycheproof holds the pinned C2SP Wycheproof testvectors_v1
 # tree. Its README records the source commit, and SHA256SUMS the file digests.
@@ -352,7 +353,8 @@ def main():
                 args.keywrap_reader, args.keywrap_dynamic_reader)):
         parser.error("At least one reader is required")
     vectors = args.vectors / "testvectors_v1"
-    names_all = sorted(path.name for path in vectors.iterdir())
+    available_names = {path.name for path in vectors.glob("*.json")}
+    names_all = sorted(available_names & supported_vector_names(available_names))
 
     def read(name):
         return (vectors / name).read_bytes()

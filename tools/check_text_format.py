@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Mistial Dev
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Check the text rules applied by the local pre-commit cleanup hooks."""
 
 from pathlib import Path

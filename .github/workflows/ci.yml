@@ -144,10 +144,8 @@ jobs:
         if: matrix.compiler == 'gcc'
         run: |
           pip install platformio==6.1.19
-          pio ci --lib="." --board=uno --board=esp32dev --board=nucleo_f401re examples/aes_ctr.cpp examples/arduino_main.h
-          pio ci --lib="." --board=uno examples/kbkdf.cpp examples/arduino_main.h --project-option="build_flags=-DTC_ENABLE_HMAC=1 -DTC_ENABLE_KDF=1"
-          pio ci --lib="." --board=uno --board=esp32dev examples/sha256.cpp examples/arduino_main.h
-          pio ci --lib="." --board=uno examples/des_ctr.cpp examples/arduino_main.h --project-option="build_flags=-DTC_ENABLE_DES=1"
+          pio ci --lib="." --board=uno --board=esp32dev --board=nucleo_f401re examples/AESCTR/AESCTR.ino
+          pio ci --lib="." --board=uno --board=esp32dev examples/SHA256/SHA256.ino
 
   resources:
     name: Embedded resource reports
@@ -174,7 +172,8 @@ jobs:
           python3 tests/test_measure_avr_resources.py
       - name: Check library package
         run: |
-          pio pkg pack . --output "$RUNNER_TEMP/tiny-crypto-c.tar.gz"
+          python3 tools/stage_arduino_release.py "$RUNNER_TEMP/tiny-crypto-c-embedded"
+          pio pkg pack "$RUNNER_TEMP/tiny-crypto-c-embedded" --output "$RUNNER_TEMP/tiny-crypto-c.tar.gz"
           python3 tests/test_package_boundaries.py --archive "$RUNNER_TEMP/tiny-crypto-c.tar.gz"
       - name: Validate fixtures and generate benchmark report
         run: |

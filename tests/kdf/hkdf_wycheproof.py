@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: Mistial Dev
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Run every vendored Wycheproof HKDF case against the public C API."""
 
 import json

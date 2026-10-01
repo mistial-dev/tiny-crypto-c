@@ -38,7 +38,7 @@ Sp800-56Cr2/expectedResults.json  9c8cdf62f0fa242fa04920c0f62e57447897619e3fc460
 ```
 
 The corpus exercises the SHA2-224 and SHA2-512 auxiliary functions. For each
-revision and hash, `extract_acvp_onestep.py` keeps the three AFT and the three
+revision and hash, `tools/extract_acvp_onestep_vectors.py` keeps the three AFT and the three
 VAL cases with the shortest `Z` and checks each one against `hashlib`. Each
 record keeps `Z`, the expected or supplied DKM, the VAL verdict and the six
 fixedInfo fields in pattern order: `t`, party U `partyId` and
@@ -48,7 +48,7 @@ case derives 1024 bits, which spans several digest blocks.
 Regenerate the file with the two unchanged ACVP directories:
 
 ```
-python3 tests/vectors/kda/extract_acvp_onestep.py <Sp800-56Cr1 dir> <Sp800-56Cr2 dir>
+python3 tools/extract_acvp_onestep_vectors.py <Sp800-56Cr1 dir> <Sp800-56Cr2 dir>
 ```
 
 NIST publishes no one-step SHA-1 vectors. `tests/kdf/sskdf_test.c` covers

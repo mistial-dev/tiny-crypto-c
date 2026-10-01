@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Mistial Dev
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Check supported SHA-2 HKDF cases from NIST ACVP revision 1 and 2 corpora."""
 
 import json

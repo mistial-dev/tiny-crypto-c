@@ -38,7 +38,7 @@ static TC_DRBG drbg;
 
 if (TC_DRBG_instantiate(&drbg, &config, entropy, nonce, personalization) != TC_DRBG_OK)
   return failure;
-if (TC_DRBG_generate(&drbg, key, 32, 0, label) != TC_DRBG_OK)
+if (TC_DRBG_generate(&drbg, (TC_buffer){key, sizeof key}, 0, label) != TC_DRBG_OK)
   return failure;
 TC_DRBG_uninstantiate(&drbg);
 ```

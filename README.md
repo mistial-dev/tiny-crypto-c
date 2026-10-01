@@ -154,6 +154,10 @@ each dependency that `config.h` requires.
 | `TINY_CRYPTO_EC_ENABLE_P384`     | ON      | ON    | ON   | ON      | P-384                                                              |
 | `TINY_CRYPTO_EC_SMALL`           | OFF     | ON    | OFF  | OFF     | Byte limbs for EC arithmetic (always used on AVR)                  |
 | `TINY_CRYPTO_ENABLE_RSA`         | OFF     | OFF   | OFF  | ON      | RSA verification, signing, OAEP, key validation and key generation |
+| `TINY_CRYPTO_RSA_ENABLE_1024`    | OFF     | OFF   | OFF  | OFF     | Legacy RSA-1024, requires an explicit override                      |
+| `TINY_CRYPTO_RSA_ENABLE_2048`    | ON      | ON    | ON   | ON      | RSA-2048                                                           |
+| `TINY_CRYPTO_RSA_ENABLE_3072`    | ON      | ON    | ON   | ON      | RSA-3072                                                           |
+| `TINY_CRYPTO_RSA_ENABLE_4096`    | ON      | ON    | ON   | ON      | RSA-4096                                                           |
 | `TINY_CRYPTO_RSA_SMALL`          | OFF     | ON    | OFF  | OFF     | Byte limbs for RSA arithmetic (always used on AVR)                 |
 | `TINY_CRYPTO_ENABLE_SHA1`        | OFF     | OFF   | OFF  | ON      | SHA-1                                                              |
 | `TINY_CRYPTO_ENABLE_SHA224`      | OFF     | OFF   | OFF  | ON      | SHA-224 on the SHA-256 core                                        |
@@ -644,7 +648,7 @@ including the complete 20,000-vector SP 800-108 KBKDF corpus split across
 CI tests with GCC, Clang, Apple Clang, and MSVC, runs sanitizers, and checks
 Arduino Uno and RP2350 build sizes. The manually triggered
 [Full test suite](.github/workflows/full-tests.yml) runs the vendored cryptographic
-vectors and optional external parser corpora.
+and parser vectors with the Unicode reference files fetched by that workflow.
 
 TLV tests cover framing, DER values, resource limits, and split input. The
 optional corpus adapter compares CVC fields with the supplied metadata and

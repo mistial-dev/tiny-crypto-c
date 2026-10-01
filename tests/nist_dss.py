@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Mistial Dev
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Run selected NIST DSS CAVP records through the public C test readers."""
 
 import argparse
 import hashlib
 import pathlib
 import subprocess
+import sys
 import tempfile
 
-from cavp_rsp import records
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+from tools.cavp_rsp import records
 
 CURVES = {"P-192": 192, "P-256": 256, "P-384": 384}
 HASHES = {"SHA1": "SHA-1", "SHA224": "SHA-224", "SHA256": "SHA-256",
@@ -22,7 +26,7 @@ EXPECTED = {"ecdsa pkv": 180, "ecdsa keypair": 150,
 def rsp(directory, name):
     """Yield (section, record) from one response file in a vector directory."""
     return records((directory / name).read_text(encoding="ascii"), carry=("n", "e", "d"),
-                   is_header=lambda header: not header.startswith("B."))
+                   is_header=lambda header: not header.startswith("B."), ignore_preamble=True)
 
 
 def fixed_hex(value, width, allow_oversize=False):

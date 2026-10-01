@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: Mistial Dev
+# SPDX-License-Identifier: GPL-2.0-or-later
 minimum_pre_commit_version: '4.2.0'
 exclude: '^(ports/esp-idf/vendor/|tests/vectors/|tests/fuzz/|tests/support/(munit\.[ch]|doctest\.h)$|tests/(des/(test_vectors|edge_vectors)\.h|hash/test_vectors\.h|kdf/test_vectors\.h)$|src/unicode_data\.inc$|docs/benchmarks\.md$|AGENTS\.md$)'
 
