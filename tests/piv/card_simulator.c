@@ -570,6 +570,30 @@ TC_TEST(session_destruction)
   munit_assert_false(card.session_active);
   TC_PIV_link_clear(&link);
 
+  /* A protected command that does not parse, here Lc 0A with two data
+   * bytes, is an SM error before any other check. */
+  link_open(&link, TC_PIV_CONTACTLESS);
+  link_secure(&link);
+  munit_assert_uint16(raw("0CCB3FFF0A8E08", NULL), ==, 0x6700);
+  munit_assert_false(card.session_active);
+  munit_assert_uint16(raw("0CCB3FFF0A8E08000000000000000000", NULL), ==, 0x6982);
+  TC_PIV_link_clear(&link);
+
+  /* A malformed plain APDU inside a protected chain breaks that chain. */
+  link_open(&link, TC_PIV_CONTACTLESS);
+  link_secure(&link);
+  munit_assert_uint16(raw("1CCB3FFF0A8E080000000000000000", NULL), ==, 0x9000);
+  munit_assert_uint16(raw("00CB3FFF0A5C", NULL), ==, 0x6700);
+  munit_assert_false(card.session_active);
+  TC_PIV_link_clear(&link);
+
+  /* Outside a protected chain a malformed plain APDU is no SM error. */
+  link_open(&link, TC_PIV_CONTACTLESS);
+  link_secure(&link);
+  munit_assert_uint16(raw("00CB3FFF0A5C", NULL), ==, 0x6700);
+  munit_assert_true(card.session_active);
+  TC_PIV_link_clear(&link);
+
   link_open(&link, TC_PIV_CONTACTLESS);
   link_secure(&link);
   /* A protected chain broken by a plaintext command. */

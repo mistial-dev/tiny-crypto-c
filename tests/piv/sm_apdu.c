@@ -344,7 +344,7 @@ TC_TEST(inner_status)
  * (4.2.7, 4.3, footnote 25). 6CXX is never corrected under SM. */
 TC_TEST(outer_status)
 {
-  static const uint16_t statuses[] = {0x6882, 0x6987, 0x6988, 0x6982, 0x6c10};
+  static const uint16_t statuses[] = {0x6882, 0x6987, 0x6988, 0x6982, 0x6c10, 0x6700};
   static const uint8_t tag[] = {0x7e};
   for (size_t s = 0; s < SUITE_COUNT; ++s)
     for (size_t i = 0; i < sizeof statuses / sizeof statuses[0]; ++i) {

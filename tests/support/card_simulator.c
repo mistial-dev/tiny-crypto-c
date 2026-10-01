@@ -623,8 +623,14 @@ static TC_status transmit(void* context, TC_bytes raw, TC_buffer response, size_
   apdu command;
   ++card->transmits;
   if (!apdu_parse(raw, &command)) {
+    /* A protected CLA, or a protected chain the APDU breaks, makes the error
+     * an SM error, which ends the session (Part 2 4.3 footnote 25). */
+    const int protected_command = raw.length && (raw.data[0] == 0x0c || raw.data[0] == 0x1c ||
+                                                 (card->chaining && card->chain_secured));
     violation(card, "malformed APDU");
     chain_reset(card);
+    if (protected_command)
+      return sm_error(card, SW_WRONG_LENGTH, response, length);
     return status_only(SW_WRONG_LENGTH, response, length);
   }
   if (command.ins == 0xc0)
