@@ -58,7 +58,9 @@ v4 Appendix D.3), with Le `00`. SELECT is always plain (Part 2 section 4.2).
   APDUs (ISO/IEC 7816-4 section 12.8.1). Other top-level DOs are skipped.
 - Inside `61`: one `4F` with the expected AID prefix and two version bytes, one
   `79` holding a nonempty `4F`, and at most one `50`, `5F50` and `AC` (Part 2
-  Tables 3 and 4).
+  Tables 3 and 4). Part 2 section 3.1.1 and TWIC Part 2 v5 section 5.1.1
+  require the complete AID in `4F`. An answer whose `4F` holds only the PIX,
+  such as the YubiKey `61 11 4F 06 00 00 10 00 01 00 79 07 4F 05 A0 00 00 03 08`, is `TC_PIV_INVALID`.
 - In `AC` each `80` holds one algorithm identifier, `06 01 00` appears exactly
   once, and at most one of the secure messaging suites `27` and `2E` is listed
   (Part 2 Table 5). The suite is returned in `sm_suite`.
