@@ -203,15 +203,15 @@ static int tc_kdf_des_key_ok(size_t key_len)
 }
 static TC_status tc_kdf_des_cmac_init(void* ctx, const uint8_t* key, size_t key_len)
 {
-  return TC_DES_CMAC_init((struct TC_DES_CMAC_ctx*)ctx, key, key_len);
+  return TC_DES_CMAC_init((struct TC_DES_CMAC_ctx*)ctx, (TC_bytes){key, key_len});
 }
 static TC_status tc_kdf_des_cmac_update(void* ctx, const uint8_t* data, size_t len)
 {
-  return TC_DES_CMAC_update((struct TC_DES_CMAC_ctx*)ctx, data, len);
+  return TC_DES_CMAC_update((struct TC_DES_CMAC_ctx*)ctx, (TC_bytes){data, len});
 }
 static TC_status tc_kdf_des_cmac_final(void* ctx, uint8_t* out)
 {
-  return TC_DES_CMAC_final((struct TC_DES_CMAC_ctx*)ctx, out);
+  return TC_DES_CMAC_final((struct TC_DES_CMAC_ctx*)ctx, (TC_buffer){out, TC_DES_CMAC_TAG_MAX});
 }
 static void tc_kdf_des_cmac_clear(void* ctx)
 {

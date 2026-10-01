@@ -29,11 +29,11 @@ static const uint8_t key[TC_DES_KEYLEN_3KEY] = {0x01, 0x23, 0x45, 0x67, 0x89, 0x
 static TC_status cmac_stream(size_t keylen, const uint8_t* data, size_t length, uint8_t* tag,
                              struct TC_DES_CMAC_ctx* ctx)
 {
-  TC_status status = TC_DES_CMAC_init(ctx, key, keylen);
+  TC_status status = TC_DES_CMAC_init(ctx, (TC_bytes){key, keylen});
   if (status == TC_OK)
-    status = TC_DES_CMAC_update(ctx, data, length);
+    status = TC_DES_CMAC_update(ctx, (TC_bytes){data, length});
   if (status == TC_OK)
-    status = TC_DES_CMAC_final(ctx, tag);
+    status = TC_DES_CMAC_final(ctx, (TC_buffer){tag, TC_DES_CMAC_TAG_MAX});
   return status;
 }
 
@@ -61,24 +61,27 @@ TC_TEST(cmac_failures)
         munit_assert_int(cmac_stream(keylens[k], data, lengths[m], tag, &ctx), ==, TC_ERROR);
         munit_assert_true(tc_test_all_zero(&ctx, sizeof ctx));
         munit_assert_memory_equal(sizeof tag, tag, untouched);
-        munit_assert_int(TC_DES_CMAC_update(&ctx, data, 1), ==, TC_ERROR);
-        munit_assert_int(TC_DES_CMAC_final(&ctx, tag), ==, TC_ERROR);
+        munit_assert_int(TC_DES_CMAC_update(&ctx, (TC_bytes){data, 1}), ==, TC_ERROR);
+        munit_assert_int(TC_DES_CMAC_final(&ctx, (TC_buffer){tag, TC_DES_CMAC_TAG_MAX}), ==,
+                         TC_ERROR);
         munit_assert_memory_equal(sizeof tag, tag, untouched);
 
         calls = 0;
-        munit_assert_int(TC_DES_CMAC(key, keylens[k], data, lengths[m], tag, sizeof tag), ==,
-                         TC_ERROR);
+        munit_assert_int(TC_DES_CMAC((TC_bytes){key, keylens[k]}, (TC_bytes){data, lengths[m]},
+                                     (TC_buffer){tag, sizeof tag}),
+                         ==, TC_ERROR);
         munit_assert_memory_equal(sizeof tag, tag, untouched);
         calls = 0;
-        munit_assert_int(
-            TC_DES_CMAC_verify(key, keylens[k], data, lengths[m], expected, sizeof expected), ==,
-            TC_ERROR);
+        munit_assert_int(TC_DES_CMAC_verify((TC_bytes){key, keylens[k]},
+                                            (TC_bytes){data, lengths[m]},
+                                            (TC_bytes){expected, sizeof expected}),
+                         ==, TC_ERROR);
       }
       fail_at = 0;
       calls = 0;
-      munit_assert_int(
-          TC_DES_CMAC_verify(key, keylens[k], data, lengths[m], expected, sizeof expected), ==,
-          TC_OK);
+      munit_assert_int(TC_DES_CMAC_verify((TC_bytes){key, keylens[k]}, (TC_bytes){data, lengths[m]},
+                                          (TC_bytes){expected, sizeof expected}),
+                       ==, TC_OK);
     }
   }
   return MUNIT_OK;
@@ -88,11 +91,11 @@ static TC_status iso9797_stream(TC_DES_ISO9797_algorithm algorithm, TC_DES_ISO97
                                 size_t keylen, const uint8_t* data, size_t length, uint8_t* tag,
                                 struct TC_DES_ISO9797_ctx* ctx)
 {
-  TC_status status = TC_DES_ISO9797_init(ctx, algorithm, padding, key, keylen);
+  TC_status status = TC_DES_ISO9797_init(ctx, algorithm, padding, (TC_bytes){key, keylen});
   if (status == TC_OK)
-    status = TC_DES_ISO9797_update(ctx, data, length);
+    status = TC_DES_ISO9797_update(ctx, (TC_bytes){data, length});
   if (status == TC_OK)
-    status = TC_DES_ISO9797_final(ctx, tag);
+    status = TC_DES_ISO9797_final(ctx, (TC_buffer){tag, TC_DES_BLOCKLEN});
   return status;
 }
 
@@ -134,29 +137,32 @@ TC_TEST(iso9797_failures)
         for (fail_at = 1; fail_at <= total; ++fail_at) {
           calls = 0;
           memcpy(tag, untouched, sizeof tag);
-          munit_assert_int(
-              iso9797_stream(algorithm, padding, keylens[k], data, length, tag, &ctx), ==,
-              TC_ERROR);
+          munit_assert_int(iso9797_stream(algorithm, padding, keylens[k], data, length, tag, &ctx),
+                           ==, TC_ERROR);
           munit_assert_true(tc_test_all_zero(&ctx, sizeof ctx));
           munit_assert_memory_equal(sizeof tag, tag, untouched);
-          munit_assert_int(TC_DES_ISO9797_update(&ctx, data, 1), ==, TC_ERROR);
-          munit_assert_int(TC_DES_ISO9797_final(&ctx, tag), ==, TC_ERROR);
+          munit_assert_int(TC_DES_ISO9797_update(&ctx, (TC_bytes){data, 1}), ==, TC_ERROR);
+          munit_assert_int(TC_DES_ISO9797_final(&ctx, (TC_buffer){tag, TC_DES_BLOCKLEN}), ==,
+                           TC_ERROR);
           munit_assert_memory_equal(sizeof tag, tag, untouched);
 
           calls = 0;
-          munit_assert_int(TC_DES_ISO9797_MAC(algorithm, padding, key, keylens[k], data, length,
-                                              tag, sizeof tag),
+          munit_assert_int(TC_DES_ISO9797_MAC(algorithm, padding, (TC_bytes){key, keylens[k]},
+                                              (TC_bytes){data, length},
+                                              (TC_buffer){tag, sizeof tag}),
                            ==, TC_ERROR);
           munit_assert_memory_equal(sizeof tag, tag, untouched);
           calls = 0;
-          munit_assert_int(TC_DES_ISO9797_verify(algorithm, padding, key, keylens[k], data,
-                                                 length, expected, sizeof expected),
+          munit_assert_int(TC_DES_ISO9797_verify(algorithm, padding, (TC_bytes){key, keylens[k]},
+                                                 (TC_bytes){data, length},
+                                                 (TC_bytes){expected, sizeof expected}),
                            ==, TC_ERROR);
         }
         fail_at = 0;
         calls = 0;
-        munit_assert_int(TC_DES_ISO9797_verify(algorithm, padding, key, keylens[k], data,
-                                               length, expected, sizeof expected),
+        munit_assert_int(TC_DES_ISO9797_verify(algorithm, padding, (TC_bytes){key, keylens[k]},
+                                               (TC_bytes){data, length},
+                                               (TC_bytes){expected, sizeof expected}),
                          ==, TC_OK);
       }
     }

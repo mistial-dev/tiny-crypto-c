@@ -17,8 +17,8 @@
 static TC_status des_init_with_iv(struct TC_DES_ctx* ctx, const uint8_t* key, size_t keylen,
                                   const uint8_t* iv)
 {
-  TC_status status = TC_DES_init(ctx, key, keylen);
-  return status == TC_OK ? TC_DES_set_iv(ctx, iv) : status;
+  TC_status status = TC_DES_init(ctx, (TC_bytes){key, keylen});
+  return status == TC_OK ? TC_DES_set_iv(ctx, (TC_bytes){iv, TC_DES_BLOCKLEN}) : status;
 }
 #endif
 
@@ -35,16 +35,16 @@ TC_TEST(test_des_ecb)
   struct TC_DES_ctx ctx;
   uint8_t buffer[8];
 
-  TC_DES_init(&ctx, des_test_key, TC_DES_KEYLEN);
+  TC_DES_init(&ctx, (TC_bytes){des_test_key, TC_DES_KEYLEN});
 
   /* KAT Encrypt */
   memcpy(buffer, des_test_pt, 8);
-  TC_DES_ECB_encrypt(&ctx, buffer);
+  TC_DES_ECB_encrypt(&ctx, (TC_buffer){buffer, TC_DES_BLOCKLEN});
   munit_assert_memory_equal(8, buffer, des_test_ct);
 
   /* KAT Decrypt */
   memcpy(buffer, des_test_ct, 8);
-  TC_DES_ECB_decrypt(&ctx, buffer);
+  TC_DES_ECB_decrypt(&ctx, (TC_buffer){buffer, TC_DES_BLOCKLEN});
   munit_assert_memory_equal(8, buffer, des_test_pt);
 
   return MUNIT_OK;
@@ -61,13 +61,13 @@ TC_TEST(test_des_cbc)
   /* KAT Encrypt */
   des_init_with_iv(&ctx, des_test_key, TC_DES_KEYLEN, des_cbc_iv);
   memcpy(buffer, des_test_pt, 8);
-  TC_DES_CBC_encrypt(&ctx, buffer, 8);
+  TC_DES_CBC_encrypt(&ctx, (TC_buffer){buffer, 8});
   munit_assert_memory_equal(8, buffer, des_cbc_ct);
 
   /* KAT Decrypt */
-  TC_DES_set_iv(&ctx, des_cbc_iv);
+  TC_DES_set_iv(&ctx, (TC_bytes){des_cbc_iv, TC_DES_BLOCKLEN});
   memcpy(buffer, des_cbc_ct, 8);
-  TC_DES_CBC_decrypt(&ctx, buffer, 8);
+  TC_DES_CBC_decrypt(&ctx, (TC_buffer){buffer, 8});
   munit_assert_memory_equal(8, buffer, des_test_pt);
 
   return MUNIT_OK;
@@ -84,15 +84,15 @@ TC_TEST(test_des_ctr_exhaustion)
   memset(iv, 0xff, sizeof iv);
   memset(buffer, 0x11, sizeof buffer);
   munit_assert_int(des_init_with_iv(&ctx, des_test_key, TC_DES_KEYLEN, iv), ==, TC_OK);
-  munit_assert_int(TC_DES_CTR_crypt(&ctx, buffer, sizeof buffer), ==, TC_ERROR);
-  munit_assert_int(TC_DES_CTR_crypt(&ctx, buffer, 4), ==, TC_OK);
-  munit_assert_int(TC_DES_CTR_crypt(&ctx, buffer + 4, 4), ==, TC_OK);
+  munit_assert_int(TC_DES_CTR_crypt(&ctx, (TC_buffer){buffer, sizeof buffer}), ==, TC_ERROR);
+  munit_assert_int(TC_DES_CTR_crypt(&ctx, (TC_buffer){buffer, 4}), ==, TC_OK);
+  munit_assert_int(TC_DES_CTR_crypt(&ctx, (TC_buffer){buffer + 4, 4}), ==, TC_OK);
   memcpy(saved, buffer, sizeof saved);
-  munit_assert_int(TC_DES_CTR_crypt(&ctx, buffer, 1), ==, TC_ERROR);
+  munit_assert_int(TC_DES_CTR_crypt(&ctx, (TC_buffer){buffer, 1}), ==, TC_ERROR);
   munit_assert_memory_equal(sizeof buffer, buffer, saved);
   memset(iv, 0, sizeof iv);
-  munit_assert_int(TC_DES_set_iv(&ctx, iv), ==, TC_OK);
-  munit_assert_int(TC_DES_CTR_crypt(&ctx, buffer, sizeof buffer), ==, TC_OK);
+  munit_assert_int(TC_DES_set_iv(&ctx, (TC_bytes){iv, TC_DES_BLOCKLEN}), ==, TC_OK);
+  munit_assert_int(TC_DES_CTR_crypt(&ctx, (TC_buffer){buffer, sizeof buffer}), ==, TC_OK);
   TC_DES_ctx_clear(&ctx);
 #if TC_DES_ENABLE_TDES
   {
@@ -103,8 +103,8 @@ TC_TEST(test_des_ctr_exhaustion)
     key3[16] = 0x3c;
     memset(iv, 0xff, sizeof iv);
     munit_assert_int(des_init_with_iv(&ctx3, key3, sizeof key3, iv), ==, TC_OK);
-    munit_assert_int(TC_DES_CTR_crypt(&ctx3, buffer, TC_DES_BLOCKLEN), ==, TC_OK);
-    munit_assert_int(TC_DES_CTR_crypt(&ctx3, buffer, 1), ==, TC_ERROR);
+    munit_assert_int(TC_DES_CTR_crypt(&ctx3, (TC_buffer){buffer, TC_DES_BLOCKLEN}), ==, TC_OK);
+    munit_assert_int(TC_DES_CTR_crypt(&ctx3, (TC_buffer){buffer, 1}), ==, TC_ERROR);
     TC_DES_ctx_clear(&ctx3);
   }
 #endif
@@ -120,22 +120,22 @@ TC_TEST(test_des_ctr)
 
   memcpy(known, des_ctr_pt, sizeof(known));
   munit_assert_int(des_init_with_iv(&ctx, des_test_key, TC_DES_KEYLEN, des_ctr_iv), ==, TC_OK);
-  munit_assert_int(TC_DES_CTR_crypt(&ctx, known, 5), ==, TC_OK);
-  munit_assert_int(TC_DES_CTR_crypt(&ctx, known + 5, sizeof(known) - 5), ==, TC_OK);
+  munit_assert_int(TC_DES_CTR_crypt(&ctx, (TC_buffer){known, 5}), ==, TC_OK);
+  munit_assert_int(TC_DES_CTR_crypt(&ctx, (TC_buffer){known + 5, sizeof(known) - 5}), ==, TC_OK);
   munit_assert_memory_equal(sizeof(known), known, des_ctr_ct);
 
   memcpy(buffer, original, 20);
 
   /* Encrypt */
   des_init_with_iv(&ctx, des_test_key, TC_DES_KEYLEN, des_ctr_iv);
-  munit_assert_int(TC_DES_CTR_crypt(&ctx, buffer, 5), ==, TC_OK);
-  munit_assert_int(TC_DES_CTR_crypt(&ctx, buffer + 5, 15), ==, TC_OK);
+  munit_assert_int(TC_DES_CTR_crypt(&ctx, (TC_buffer){buffer, 5}), ==, TC_OK);
+  munit_assert_int(TC_DES_CTR_crypt(&ctx, (TC_buffer){buffer + 5, 15}), ==, TC_OK);
   munit_assert_memory_not_equal(20, buffer, original);
 
   /* Decrypt */
-  TC_DES_set_iv(&ctx, des_ctr_iv);
-  munit_assert_int(TC_DES_CTR_crypt(&ctx, buffer, 7), ==, TC_OK);
-  munit_assert_int(TC_DES_CTR_crypt(&ctx, buffer + 7, 13), ==, TC_OK);
+  TC_DES_set_iv(&ctx, (TC_bytes){des_ctr_iv, TC_DES_BLOCKLEN});
+  munit_assert_int(TC_DES_CTR_crypt(&ctx, (TC_buffer){buffer, 7}), ==, TC_OK);
+  munit_assert_int(TC_DES_CTR_crypt(&ctx, (TC_buffer){buffer + 7, 13}), ==, TC_OK);
   munit_assert_memory_equal(20, buffer, original);
 
   return MUNIT_OK;
@@ -153,18 +153,18 @@ TC_TEST(test_tdes2_ecb)
   struct TC_DES_ctx ctx;
   uint8_t buffer[16];
 
-  TC_DES_init(&ctx, tdes2_key, 16);
+  TC_DES_init(&ctx, (TC_bytes){tdes2_key, 16});
 
   /* KAT Encrypt (2 blocks) */
   memcpy(buffer, tdes2_pt, 16);
-  TC_DES_ECB_encrypt(&ctx, buffer);
-  TC_DES_ECB_encrypt(&ctx, buffer + 8);
+  TC_DES_ECB_encrypt(&ctx, (TC_buffer){buffer, TC_DES_BLOCKLEN});
+  TC_DES_ECB_encrypt(&ctx, (TC_buffer){buffer + 8, TC_DES_BLOCKLEN});
   munit_assert_memory_equal(16, buffer, tdes2_ecb_ct);
 
   /* KAT Decrypt (2 blocks) */
   memcpy(buffer, tdes2_ecb_ct, 16);
-  TC_DES_ECB_decrypt(&ctx, buffer);
-  TC_DES_ECB_decrypt(&ctx, buffer + 8);
+  TC_DES_ECB_decrypt(&ctx, (TC_buffer){buffer, TC_DES_BLOCKLEN});
+  TC_DES_ECB_decrypt(&ctx, (TC_buffer){buffer + 8, TC_DES_BLOCKLEN});
   munit_assert_memory_equal(16, buffer, tdes2_pt);
 
   return MUNIT_OK;
@@ -181,13 +181,13 @@ TC_TEST(test_tdes2_cbc)
   /* KAT Encrypt */
   des_init_with_iv(&ctx, tdes2_key, 16, des_cbc_iv);
   memcpy(buffer, tdes2_pt, 16);
-  TC_DES_CBC_encrypt(&ctx, buffer, 16);
+  TC_DES_CBC_encrypt(&ctx, (TC_buffer){buffer, 16});
   munit_assert_memory_equal(16, buffer, tdes2_cbc_ct);
 
   /* KAT Decrypt */
-  TC_DES_set_iv(&ctx, des_cbc_iv);
+  TC_DES_set_iv(&ctx, (TC_bytes){des_cbc_iv, TC_DES_BLOCKLEN});
   memcpy(buffer, tdes2_cbc_ct, 16);
-  TC_DES_CBC_decrypt(&ctx, buffer, 16);
+  TC_DES_CBC_decrypt(&ctx, (TC_buffer){buffer, 16});
   munit_assert_memory_equal(16, buffer, tdes2_pt);
 
   return MUNIT_OK;
@@ -205,13 +205,13 @@ TC_TEST(test_tdes2_ctr)
   memcpy(buffer, original, 24);
 
   des_init_with_iv(&ctx, tdes2_key, 16, des_ctr_iv);
-  munit_assert_int(TC_DES_CTR_crypt(&ctx, buffer, 5), ==, TC_OK);
-  munit_assert_int(TC_DES_CTR_crypt(&ctx, buffer + 5, 19), ==, TC_OK);
+  munit_assert_int(TC_DES_CTR_crypt(&ctx, (TC_buffer){buffer, 5}), ==, TC_OK);
+  munit_assert_int(TC_DES_CTR_crypt(&ctx, (TC_buffer){buffer + 5, 19}), ==, TC_OK);
   munit_assert_memory_not_equal(24, buffer, original);
 
-  TC_DES_set_iv(&ctx, des_ctr_iv);
-  munit_assert_int(TC_DES_CTR_crypt(&ctx, buffer, 7), ==, TC_OK);
-  munit_assert_int(TC_DES_CTR_crypt(&ctx, buffer + 7, 17), ==, TC_OK);
+  TC_DES_set_iv(&ctx, (TC_bytes){des_ctr_iv, TC_DES_BLOCKLEN});
+  munit_assert_int(TC_DES_CTR_crypt(&ctx, (TC_buffer){buffer, 7}), ==, TC_OK);
+  munit_assert_int(TC_DES_CTR_crypt(&ctx, (TC_buffer){buffer + 7, 17}), ==, TC_OK);
   munit_assert_memory_equal(24, buffer, original);
 
   return MUNIT_OK;
@@ -229,18 +229,18 @@ TC_TEST(test_tdes3_ecb)
   struct TC_DES_ctx ctx;
   uint8_t buffer[16];
 
-  TC_DES_init(&ctx, tdes3_key, 24);
+  TC_DES_init(&ctx, (TC_bytes){tdes3_key, 24});
 
   /* KAT Encrypt (2 blocks) */
   memcpy(buffer, tdes3_pt, 16);
-  TC_DES_ECB_encrypt(&ctx, buffer);
-  TC_DES_ECB_encrypt(&ctx, buffer + 8);
+  TC_DES_ECB_encrypt(&ctx, (TC_buffer){buffer, TC_DES_BLOCKLEN});
+  TC_DES_ECB_encrypt(&ctx, (TC_buffer){buffer + 8, TC_DES_BLOCKLEN});
   munit_assert_memory_equal(16, buffer, tdes3_ecb_ct);
 
   /* KAT Decrypt (2 blocks) */
   memcpy(buffer, tdes3_ecb_ct, 16);
-  TC_DES_ECB_decrypt(&ctx, buffer);
-  TC_DES_ECB_decrypt(&ctx, buffer + 8);
+  TC_DES_ECB_decrypt(&ctx, (TC_buffer){buffer, TC_DES_BLOCKLEN});
+  TC_DES_ECB_decrypt(&ctx, (TC_buffer){buffer + 8, TC_DES_BLOCKLEN});
   munit_assert_memory_equal(16, buffer, tdes3_pt);
 
   return MUNIT_OK;
@@ -257,13 +257,13 @@ TC_TEST(test_tdes3_cbc)
   /* KAT Encrypt */
   des_init_with_iv(&ctx, tdes3_key, 24, des_cbc_iv);
   memcpy(buffer, tdes3_pt, 16);
-  TC_DES_CBC_encrypt(&ctx, buffer, 16);
+  TC_DES_CBC_encrypt(&ctx, (TC_buffer){buffer, 16});
   munit_assert_memory_equal(16, buffer, tdes3_cbc_ct);
 
   /* KAT Decrypt */
-  TC_DES_set_iv(&ctx, des_cbc_iv);
+  TC_DES_set_iv(&ctx, (TC_bytes){des_cbc_iv, TC_DES_BLOCKLEN});
   memcpy(buffer, tdes3_cbc_ct, 16);
-  TC_DES_CBC_decrypt(&ctx, buffer, 16);
+  TC_DES_CBC_decrypt(&ctx, (TC_buffer){buffer, 16});
   munit_assert_memory_equal(16, buffer, tdes3_pt);
 
   return MUNIT_OK;
@@ -281,19 +281,19 @@ TC_TEST(test_tdes3_ctr)
 
   memcpy(known, des_ctr_pt, sizeof(known));
   munit_assert_int(des_init_with_iv(&ctx, tdes3_key, sizeof(tdes3_key), des_ctr_iv), ==, TC_OK);
-  munit_assert_int(TC_DES_CTR_crypt(&ctx, known, sizeof(known)), ==, TC_OK);
+  munit_assert_int(TC_DES_CTR_crypt(&ctx, (TC_buffer){known, sizeof(known)}), ==, TC_OK);
   munit_assert_memory_equal(sizeof(known), known, tdes3_ctr_ct);
 
   memcpy(buffer, original, 32);
 
   des_init_with_iv(&ctx, tdes3_key, 24, des_ctr_iv);
-  munit_assert_int(TC_DES_CTR_crypt(&ctx, buffer, 5), ==, TC_OK);
-  munit_assert_int(TC_DES_CTR_crypt(&ctx, buffer + 5, 27), ==, TC_OK);
+  munit_assert_int(TC_DES_CTR_crypt(&ctx, (TC_buffer){buffer, 5}), ==, TC_OK);
+  munit_assert_int(TC_DES_CTR_crypt(&ctx, (TC_buffer){buffer + 5, 27}), ==, TC_OK);
   munit_assert_memory_not_equal(32, buffer, original);
 
-  TC_DES_set_iv(&ctx, des_ctr_iv);
-  munit_assert_int(TC_DES_CTR_crypt(&ctx, buffer, 7), ==, TC_OK);
-  munit_assert_int(TC_DES_CTR_crypt(&ctx, buffer + 7, 25), ==, TC_OK);
+  TC_DES_set_iv(&ctx, (TC_bytes){des_ctr_iv, TC_DES_BLOCKLEN});
+  munit_assert_int(TC_DES_CTR_crypt(&ctx, (TC_buffer){buffer, 7}), ==, TC_OK);
+  munit_assert_int(TC_DES_CTR_crypt(&ctx, (TC_buffer){buffer + 7, 25}), ==, TC_OK);
   munit_assert_memory_equal(32, buffer, original);
 
   return MUNIT_OK;
@@ -314,14 +314,14 @@ TC_TEST(test_des_ofb)
   /* KAT Encrypt */
   des_init_with_iv(&ctx, des_test_key, TC_DES_KEYLEN, des_cbc_iv);
   memcpy(buffer, des_test_pt, 8);
-  munit_assert_int(TC_DES_OFB_crypt(&ctx, buffer, 3), ==, TC_OK);
-  munit_assert_int(TC_DES_OFB_crypt(&ctx, buffer + 3, 5), ==, TC_OK);
+  munit_assert_int(TC_DES_OFB_crypt(&ctx, (TC_buffer){buffer, 3}), ==, TC_OK);
+  munit_assert_int(TC_DES_OFB_crypt(&ctx, (TC_buffer){buffer + 3, 5}), ==, TC_OK);
   munit_assert_memory_equal(8, buffer, des_ofb_ct);
 
   /* Decrypt is the same operation */
-  TC_DES_set_iv(&ctx, des_cbc_iv);
-  munit_assert_int(TC_DES_OFB_crypt(&ctx, buffer, 5), ==, TC_OK);
-  munit_assert_int(TC_DES_OFB_crypt(&ctx, buffer + 5, 3), ==, TC_OK);
+  TC_DES_set_iv(&ctx, (TC_bytes){des_cbc_iv, TC_DES_BLOCKLEN});
+  munit_assert_int(TC_DES_OFB_crypt(&ctx, (TC_buffer){buffer, 5}), ==, TC_OK);
+  munit_assert_int(TC_DES_OFB_crypt(&ctx, (TC_buffer){buffer + 5, 3}), ==, TC_OK);
   munit_assert_memory_equal(8, buffer, des_test_pt);
 
   return MUNIT_OK;
@@ -337,11 +337,11 @@ TC_TEST(test_des_cfb64)
 
   des_init_with_iv(&ctx, des_test_key, TC_DES_KEYLEN, des_cbc_iv);
   memcpy(buffer, des_test_pt, 8);
-  TC_DES_CFB64_encrypt(&ctx, buffer, 8);
+  TC_DES_CFB64_encrypt(&ctx, (TC_buffer){buffer, 8});
   munit_assert_memory_equal(8, buffer, des_cfb64_ct);
 
-  TC_DES_set_iv(&ctx, des_cbc_iv);
-  TC_DES_CFB64_decrypt(&ctx, buffer, 8);
+  TC_DES_set_iv(&ctx, (TC_bytes){des_cbc_iv, TC_DES_BLOCKLEN});
+  TC_DES_CFB64_decrypt(&ctx, (TC_buffer){buffer, 8});
   munit_assert_memory_equal(8, buffer, des_test_pt);
 
   return MUNIT_OK;
@@ -370,42 +370,42 @@ TC_TEST(test_des_cfb64_short_segment)
       oneshot[i] = split[i] = (uint8_t)(0x30u + i);
 
     munit_assert_int(des_init_with_iv(&ctx, keys[k], keylens[k], des_cbc_iv), ==, TC_OK);
-    munit_assert_int(TC_DES_CFB64_encrypt(&ctx, oneshot, sizeof oneshot), ==, TC_OK);
+    munit_assert_int(TC_DES_CFB64_encrypt(&ctx, (TC_buffer){oneshot, sizeof oneshot}), ==, TC_OK);
     munit_assert_uint8(ctx.cfb64_finished, ==, 1);
 
     /* Aligned splits followed by a short final segment match one call. */
-    munit_assert_int(TC_DES_set_iv(&ctx, des_cbc_iv), ==, TC_OK);
+    munit_assert_int(TC_DES_set_iv(&ctx, (TC_bytes){des_cbc_iv, TC_DES_BLOCKLEN}), ==, TC_OK);
     munit_assert_uint8(ctx.cfb64_finished, ==, 0);
-    munit_assert_int(TC_DES_CFB64_encrypt(&ctx, split, 8), ==, TC_OK);
-    munit_assert_int(TC_DES_CFB64_encrypt(&ctx, split + 8, 8), ==, TC_OK);
-    munit_assert_int(TC_DES_CFB64_encrypt(&ctx, split + 16, 3), ==, TC_OK);
+    munit_assert_int(TC_DES_CFB64_encrypt(&ctx, (TC_buffer){split, 8}), ==, TC_OK);
+    munit_assert_int(TC_DES_CFB64_encrypt(&ctx, (TC_buffer){split + 8, 8}), ==, TC_OK);
+    munit_assert_int(TC_DES_CFB64_encrypt(&ctx, (TC_buffer){split + 16, 3}), ==, TC_OK);
     munit_assert_memory_equal(sizeof split, split, oneshot);
 
     /* After a short segment every CFB64 call fails and changes nothing. */
     memcpy(saved, split, sizeof saved);
     memcpy(saved_iv, ctx.iv, sizeof saved_iv);
-    munit_assert_int(TC_DES_CFB64_encrypt(&ctx, split, 8), ==, TC_ERROR);
-    munit_assert_int(TC_DES_CFB64_decrypt(&ctx, split, 8), ==, TC_ERROR);
-    munit_assert_int(TC_DES_CFB64_encrypt(&ctx, split, 0), ==, TC_ERROR);
+    munit_assert_int(TC_DES_CFB64_encrypt(&ctx, (TC_buffer){split, 8}), ==, TC_ERROR);
+    munit_assert_int(TC_DES_CFB64_decrypt(&ctx, (TC_buffer){split, 8}), ==, TC_ERROR);
+    munit_assert_int(TC_DES_CFB64_encrypt(&ctx, (TC_buffer){split, 0}), ==, TC_ERROR);
     munit_assert_memory_equal(sizeof split, split, saved);
     munit_assert_memory_equal(sizeof saved_iv, ctx.iv, saved_iv);
 
     /* A non-aligned split (3 + 5) is rejected at the second call. */
-    munit_assert_int(TC_DES_set_iv(&ctx, des_cbc_iv), ==, TC_OK);
-    munit_assert_int(TC_DES_CFB64_encrypt(&ctx, split, 3), ==, TC_OK);
-    munit_assert_int(TC_DES_CFB64_encrypt(&ctx, split + 3, 5), ==, TC_ERROR);
+    munit_assert_int(TC_DES_set_iv(&ctx, (TC_bytes){des_cbc_iv, TC_DES_BLOCKLEN}), ==, TC_OK);
+    munit_assert_int(TC_DES_CFB64_encrypt(&ctx, (TC_buffer){split, 3}), ==, TC_OK);
+    munit_assert_int(TC_DES_CFB64_encrypt(&ctx, (TC_buffer){split + 3, 5}), ==, TC_ERROR);
 
     /* Decryption follows the same rule and inverts the one-call ciphertext. */
-    munit_assert_int(TC_DES_set_iv(&ctx, des_cbc_iv), ==, TC_OK);
-    munit_assert_int(TC_DES_CFB64_decrypt(&ctx, oneshot, 16), ==, TC_OK);
-    munit_assert_int(TC_DES_CFB64_decrypt(&ctx, oneshot + 16, 3), ==, TC_OK);
-    munit_assert_int(TC_DES_CFB64_decrypt(&ctx, oneshot, 1), ==, TC_ERROR);
+    munit_assert_int(TC_DES_set_iv(&ctx, (TC_bytes){des_cbc_iv, TC_DES_BLOCKLEN}), ==, TC_OK);
+    munit_assert_int(TC_DES_CFB64_decrypt(&ctx, (TC_buffer){oneshot, 16}), ==, TC_OK);
+    munit_assert_int(TC_DES_CFB64_decrypt(&ctx, (TC_buffer){oneshot + 16, 3}), ==, TC_OK);
+    munit_assert_int(TC_DES_CFB64_decrypt(&ctx, (TC_buffer){oneshot, 1}), ==, TC_ERROR);
     for (i = 0; i < sizeof oneshot; ++i)
       munit_assert_uint8(oneshot[i], ==, (uint8_t)(0x30u + i));
 
     /* A fresh init also starts a new message. */
     munit_assert_int(des_init_with_iv(&ctx, keys[k], keylens[k], des_cbc_iv), ==, TC_OK);
-    munit_assert_int(TC_DES_CFB64_encrypt(&ctx, split, 8), ==, TC_OK);
+    munit_assert_int(TC_DES_CFB64_encrypt(&ctx, (TC_buffer){split, 8}), ==, TC_OK);
     TC_DES_ctx_clear(&ctx);
   }
   return MUNIT_OK;
@@ -421,11 +421,11 @@ TC_TEST(test_des_cfb8)
 
   des_init_with_iv(&ctx, des_test_key, TC_DES_KEYLEN, des_cbc_iv);
   memcpy(buffer, des_test_pt, 8);
-  TC_DES_CFB8_encrypt(&ctx, buffer, 8);
+  TC_DES_CFB8_encrypt(&ctx, (TC_buffer){buffer, 8});
   munit_assert_memory_equal(8, buffer, des_cfb8_ct);
 
-  TC_DES_set_iv(&ctx, des_cbc_iv);
-  TC_DES_CFB8_decrypt(&ctx, buffer, 8);
+  TC_DES_set_iv(&ctx, (TC_bytes){des_cbc_iv, TC_DES_BLOCKLEN});
+  TC_DES_CFB8_decrypt(&ctx, (TC_buffer){buffer, 8});
   munit_assert_memory_equal(8, buffer, des_test_pt);
 
   return MUNIT_OK;
@@ -446,13 +446,13 @@ TC_TEST(test_des_cfb1)
 
   bits[0] = 0x00;
   des_init_with_iv(&ctx, weak_key, TC_DES_KEYLEN, iv0);
-  TC_DES_CFB1_encrypt(&ctx, bits, 1);
+  TC_DES_CFB1_encrypt(&ctx, (TC_buffer){bits, ((1) / 8u + ((1) % 8u != 0))}, 1);
   munit_assert_uint8(bits[0] >> 7, ==, 1);
 
   /* COUNT 2: IV=2000000000000000 PT=0 -> CT=0 */
   bits[0] = 0x00;
-  TC_DES_set_iv(&ctx, iv2);
-  TC_DES_CFB1_encrypt(&ctx, bits, 1);
+  TC_DES_set_iv(&ctx, (TC_bytes){iv2, TC_DES_BLOCKLEN});
+  TC_DES_CFB1_encrypt(&ctx, (TC_buffer){bits, ((1) / 8u + ((1) % 8u != 0))}, 1);
   munit_assert_uint8(bits[0] >> 7, ==, 0);
 
   /* Multi-bit roundtrip with an arbitrary key */
@@ -460,10 +460,10 @@ TC_TEST(test_des_cfb1)
   uint8_t original[3];
   memcpy(original, stream, 3);
   des_init_with_iv(&ctx, des_test_key, TC_DES_KEYLEN, des_cbc_iv);
-  TC_DES_CFB1_encrypt(&ctx, stream, 17);
+  TC_DES_CFB1_encrypt(&ctx, (TC_buffer){stream, ((17) / 8u + ((17) % 8u != 0))}, 17);
   munit_assert_memory_not_equal(3, stream, original);
-  TC_DES_set_iv(&ctx, des_cbc_iv);
-  TC_DES_CFB1_decrypt(&ctx, stream, 17);
+  TC_DES_set_iv(&ctx, (TC_bytes){des_cbc_iv, TC_DES_BLOCKLEN});
+  TC_DES_CFB1_decrypt(&ctx, (TC_buffer){stream, ((17) / 8u + ((17) % 8u != 0))}, 17);
   munit_assert_memory_equal(3, stream, original);
 
   return MUNIT_OK;
@@ -481,36 +481,36 @@ TC_TEST(test_tdes3_feedback_modes)
   /* OFB */
   des_init_with_iv(&ctx, tdes3_key, 24, des_cbc_iv);
   memcpy(buffer, tdes3_pt, 16);
-  TC_DES_OFB_crypt(&ctx, buffer, 16);
+  TC_DES_OFB_crypt(&ctx, (TC_buffer){buffer, 16});
   munit_assert_memory_equal(16, buffer, tdes3_ofb_ct);
-  TC_DES_set_iv(&ctx, des_cbc_iv);
-  TC_DES_OFB_crypt(&ctx, buffer, 16);
+  TC_DES_set_iv(&ctx, (TC_bytes){des_cbc_iv, TC_DES_BLOCKLEN});
+  TC_DES_OFB_crypt(&ctx, (TC_buffer){buffer, 16});
   munit_assert_memory_equal(16, buffer, tdes3_pt);
 
   /* CFB64 */
-  TC_DES_set_iv(&ctx, des_cbc_iv);
-  TC_DES_CFB64_encrypt(&ctx, buffer, 16);
+  TC_DES_set_iv(&ctx, (TC_bytes){des_cbc_iv, TC_DES_BLOCKLEN});
+  TC_DES_CFB64_encrypt(&ctx, (TC_buffer){buffer, 16});
   munit_assert_memory_equal(16, buffer, tdes3_cfb64_ct);
-  TC_DES_set_iv(&ctx, des_cbc_iv);
-  TC_DES_CFB64_decrypt(&ctx, buffer, 16);
+  TC_DES_set_iv(&ctx, (TC_bytes){des_cbc_iv, TC_DES_BLOCKLEN});
+  TC_DES_CFB64_decrypt(&ctx, (TC_buffer){buffer, 16});
   munit_assert_memory_equal(16, buffer, tdes3_pt);
 
   /* CFB8 */
-  TC_DES_set_iv(&ctx, des_cbc_iv);
-  TC_DES_CFB8_encrypt(&ctx, buffer, 16);
+  TC_DES_set_iv(&ctx, (TC_bytes){des_cbc_iv, TC_DES_BLOCKLEN});
+  TC_DES_CFB8_encrypt(&ctx, (TC_buffer){buffer, 16});
   munit_assert_memory_equal(16, buffer, tdes3_cfb8_ct);
-  TC_DES_set_iv(&ctx, des_cbc_iv);
-  TC_DES_CFB8_decrypt(&ctx, buffer, 16);
+  TC_DES_set_iv(&ctx, (TC_bytes){des_cbc_iv, TC_DES_BLOCKLEN});
+  TC_DES_CFB8_decrypt(&ctx, (TC_buffer){buffer, 16});
   munit_assert_memory_equal(16, buffer, tdes3_pt);
 
   /* CFB1 roundtrip. The CAVP files cover the CFB1 KAT. */
   uint8_t stream[2] = {0x5a, 0xc0};
   uint8_t original[2];
   memcpy(original, stream, 2);
-  TC_DES_set_iv(&ctx, des_cbc_iv);
-  TC_DES_CFB1_encrypt(&ctx, stream, 10);
-  TC_DES_set_iv(&ctx, des_cbc_iv);
-  TC_DES_CFB1_decrypt(&ctx, stream, 10);
+  TC_DES_set_iv(&ctx, (TC_bytes){des_cbc_iv, TC_DES_BLOCKLEN});
+  TC_DES_CFB1_encrypt(&ctx, (TC_buffer){stream, ((10) / 8u + ((10) % 8u != 0))}, 10);
+  TC_DES_set_iv(&ctx, (TC_bytes){des_cbc_iv, TC_DES_BLOCKLEN});
+  TC_DES_CFB1_decrypt(&ctx, (TC_buffer){stream, ((10) / 8u + ((10) % 8u != 0))}, 10);
   munit_assert_memory_equal(2, stream, original);
 
   return MUNIT_OK;
@@ -530,40 +530,40 @@ TC_TEST(test_feedback_mode_chaining)
   memcpy(oneshot, tdes3_pt, 16);
   memcpy(split, tdes3_pt, 16);
   des_init_with_iv(&ctx, tdes3_key, 24, des_cbc_iv);
-  TC_DES_CFB64_encrypt(&ctx, oneshot, 16);
-  TC_DES_set_iv(&ctx, des_cbc_iv);
-  TC_DES_CFB64_encrypt(&ctx, split, 8);
-  TC_DES_CFB64_encrypt(&ctx, split + 8, 8);
+  TC_DES_CFB64_encrypt(&ctx, (TC_buffer){oneshot, 16});
+  TC_DES_set_iv(&ctx, (TC_bytes){des_cbc_iv, TC_DES_BLOCKLEN});
+  TC_DES_CFB64_encrypt(&ctx, (TC_buffer){split, 8});
+  TC_DES_CFB64_encrypt(&ctx, (TC_buffer){split + 8, 8});
   munit_assert_memory_equal(16, split, oneshot);
 
   /* CFB8 */
   memcpy(oneshot, tdes3_pt, 16);
   memcpy(split, tdes3_pt, 16);
-  TC_DES_set_iv(&ctx, des_cbc_iv);
-  TC_DES_CFB8_encrypt(&ctx, oneshot, 16);
-  TC_DES_set_iv(&ctx, des_cbc_iv);
-  TC_DES_CFB8_encrypt(&ctx, split, 5);
-  TC_DES_CFB8_encrypt(&ctx, split + 5, 11);
+  TC_DES_set_iv(&ctx, (TC_bytes){des_cbc_iv, TC_DES_BLOCKLEN});
+  TC_DES_CFB8_encrypt(&ctx, (TC_buffer){oneshot, 16});
+  TC_DES_set_iv(&ctx, (TC_bytes){des_cbc_iv, TC_DES_BLOCKLEN});
+  TC_DES_CFB8_encrypt(&ctx, (TC_buffer){split, 5});
+  TC_DES_CFB8_encrypt(&ctx, (TC_buffer){split + 5, 11});
   munit_assert_memory_equal(16, split, oneshot);
 
   /* OFB */
   memcpy(oneshot, tdes3_pt, 16);
   memcpy(split, tdes3_pt, 16);
-  TC_DES_set_iv(&ctx, des_cbc_iv);
-  TC_DES_OFB_crypt(&ctx, oneshot, 16);
-  TC_DES_set_iv(&ctx, des_cbc_iv);
-  TC_DES_OFB_crypt(&ctx, split, 3);
-  TC_DES_OFB_crypt(&ctx, split + 3, 13);
+  TC_DES_set_iv(&ctx, (TC_bytes){des_cbc_iv, TC_DES_BLOCKLEN});
+  TC_DES_OFB_crypt(&ctx, (TC_buffer){oneshot, 16});
+  TC_DES_set_iv(&ctx, (TC_bytes){des_cbc_iv, TC_DES_BLOCKLEN});
+  TC_DES_OFB_crypt(&ctx, (TC_buffer){split, 3});
+  TC_DES_OFB_crypt(&ctx, (TC_buffer){split + 3, 13});
   munit_assert_memory_equal(16, split, oneshot);
 
   /* CFB1: 16 bits one-shot vs two 8-bit calls (split only on byte boundaries) */
   uint8_t bits_oneshot[2] = {0x96, 0x3d};
   uint8_t bits_split[2] = {0x96, 0x3d};
-  TC_DES_set_iv(&ctx, des_cbc_iv);
-  TC_DES_CFB1_encrypt(&ctx, bits_oneshot, 16);
-  TC_DES_set_iv(&ctx, des_cbc_iv);
-  TC_DES_CFB1_encrypt(&ctx, bits_split, 8);
-  TC_DES_CFB1_encrypt(&ctx, bits_split + 1, 8);
+  TC_DES_set_iv(&ctx, (TC_bytes){des_cbc_iv, TC_DES_BLOCKLEN});
+  TC_DES_CFB1_encrypt(&ctx, (TC_buffer){bits_oneshot, ((16) / 8u + ((16) % 8u != 0))}, 16);
+  TC_DES_set_iv(&ctx, (TC_bytes){des_cbc_iv, TC_DES_BLOCKLEN});
+  TC_DES_CFB1_encrypt(&ctx, (TC_buffer){bits_split, ((8) / 8u + ((8) % 8u != 0))}, 8);
+  TC_DES_CFB1_encrypt(&ctx, (TC_buffer){bits_split + 1, ((8) / 8u + ((8) % 8u != 0))}, 8);
   munit_assert_memory_equal(2, bits_split, bits_oneshot);
 
   return MUNIT_OK;
@@ -586,8 +586,8 @@ TC_TEST(test_tdes_single_des_equivalence)
   memcpy(key3 + 8, des_test_key, 8);
   memcpy(key3 + 16, des_test_key, 8);
 
-  TC_DES_init(&single_ctx, des_test_key, TC_DES_KEYLEN);
-  TC_DES_init(&tdes_ctx, key3, 24);
+  TC_DES_init(&single_ctx, (TC_bytes){des_test_key, TC_DES_KEYLEN});
+  TC_DES_init(&tdes_ctx, (TC_bytes){key3, 24});
 
   uint8_t buf_single[8];
   uint8_t buf_tdes[8];
@@ -595,15 +595,15 @@ TC_TEST(test_tdes_single_des_equivalence)
   memcpy(buf_single, des_test_pt, 8);
   memcpy(buf_tdes, des_test_pt, 8);
 
-  TC_DES_ECB_encrypt(&single_ctx, buf_single);
-  TC_DES_ECB_encrypt(&tdes_ctx, buf_tdes);
+  TC_DES_ECB_encrypt(&single_ctx, (TC_buffer){buf_single, TC_DES_BLOCKLEN});
+  TC_DES_ECB_encrypt(&tdes_ctx, (TC_buffer){buf_tdes, TC_DES_BLOCKLEN});
 
   munit_assert_memory_equal(8, buf_single, buf_tdes);
   munit_assert_memory_equal(8, buf_single, des_test_ct);
 
   /* Decryption Equivalence */
-  TC_DES_ECB_decrypt(&single_ctx, buf_single);
-  TC_DES_ECB_decrypt(&tdes_ctx, buf_tdes);
+  TC_DES_ECB_decrypt(&single_ctx, (TC_buffer){buf_single, TC_DES_BLOCKLEN});
+  TC_DES_ECB_decrypt(&tdes_ctx, (TC_buffer){buf_tdes, TC_DES_BLOCKLEN});
   munit_assert_memory_equal(8, buf_single, buf_tdes);
   munit_assert_memory_equal(8, buf_single, des_test_pt);
 
@@ -628,28 +628,47 @@ TC_TEST(test_des_cmac)
   uint8_t cmac1[8], cmac2[8], cmac3[8], cmac_empty[8], bad[8];
   size_t msglen = sizeof(cmac_kat_msg) - 1;
 
-  munit_assert_int(TC_OK, ==, TC_DES_CMAC(des_test_key, 8, cmac_kat_msg, msglen, cmac1, 8));
-  munit_assert_int(TC_OK, ==, TC_DES_CMAC(tdes2_key, 16, cmac_kat_msg, msglen, cmac2, 8));
-  munit_assert_int(TC_OK, ==, TC_DES_CMAC(tdes3_key, 24, cmac_kat_msg, msglen, cmac3, 8));
+  munit_assert_int(TC_OK, ==,
+                   TC_DES_CMAC((TC_bytes){des_test_key, 8}, (TC_bytes){cmac_kat_msg, msglen},
+                               (TC_buffer){cmac1, 8}));
+  munit_assert_int(TC_OK, ==,
+                   TC_DES_CMAC((TC_bytes){tdes2_key, 16}, (TC_bytes){cmac_kat_msg, msglen},
+                               (TC_buffer){cmac2, 8}));
+  munit_assert_int(TC_OK, ==,
+                   TC_DES_CMAC((TC_bytes){tdes3_key, 24}, (TC_bytes){cmac_kat_msg, msglen},
+                               (TC_buffer){cmac3, 8}));
   munit_assert_memory_equal(8, cmac1, cmac_kat_des);
   munit_assert_memory_equal(8, cmac2, cmac_kat_tdes2);
   munit_assert_memory_equal(8, cmac3, cmac_kat_tdes3);
 
-  munit_assert_int(TC_OK, ==, TC_DES_CMAC(des_test_key, 8, NULL, 0, cmac_empty, 8));
+  munit_assert_int(
+      TC_OK, ==,
+      TC_DES_CMAC((TC_bytes){des_test_key, 8}, (TC_bytes){NULL, 0}, (TC_buffer){cmac_empty, 8}));
   munit_assert_memory_equal(8, cmac_empty, cmac_kat_des_empty);
-  munit_assert_int(TC_OK, ==, TC_DES_CMAC(tdes2_key, 16, NULL, 0, cmac_empty, 8));
+  munit_assert_int(
+      TC_OK, ==,
+      TC_DES_CMAC((TC_bytes){tdes2_key, 16}, (TC_bytes){NULL, 0}, (TC_buffer){cmac_empty, 8}));
   munit_assert_memory_equal(8, cmac_empty, cmac_kat_tdes2_empty);
-  munit_assert_int(TC_OK, ==, TC_DES_CMAC(tdes3_key, 24, NULL, 0, cmac_empty, 8));
+  munit_assert_int(
+      TC_OK, ==,
+      TC_DES_CMAC((TC_bytes){tdes3_key, 24}, (TC_bytes){NULL, 0}, (TC_buffer){cmac_empty, 8}));
   munit_assert_memory_equal(8, cmac_empty, cmac_kat_tdes3_empty);
 
-  munit_assert_int(TC_OK, ==, TC_DES_CMAC_verify(tdes2_key, 16, cmac_kat_msg, msglen, cmac2, 8));
+  munit_assert_int(TC_OK, ==,
+                   TC_DES_CMAC_verify((TC_bytes){tdes2_key, 16}, (TC_bytes){cmac_kat_msg, msglen},
+                                      (TC_bytes){cmac2, 8}));
   memcpy(bad, cmac2, 8);
   bad[0] ^= 0x01U;
   munit_assert_int(TC_MISMATCH, ==,
-                   TC_DES_CMAC_verify(tdes2_key, 16, cmac_kat_msg, msglen, bad, 8));
+                   TC_DES_CMAC_verify((TC_bytes){tdes2_key, 16}, (TC_bytes){cmac_kat_msg, msglen},
+                                      (TC_bytes){bad, 8}));
 
-  munit_assert_int(TC_ERROR, ==, TC_DES_CMAC(des_test_key, 10, cmac_kat_msg, msglen, cmac1, 8));
-  munit_assert_int(TC_ERROR, ==, TC_DES_CMAC(des_test_key, 8, cmac_kat_msg, msglen, cmac1, 0));
+  munit_assert_int(TC_ERROR, ==,
+                   TC_DES_CMAC((TC_bytes){des_test_key, 10}, (TC_bytes){cmac_kat_msg, msglen},
+                               (TC_buffer){cmac1, 8}));
+  munit_assert_int(TC_ERROR, ==,
+                   TC_DES_CMAC((TC_bytes){des_test_key, 8}, (TC_bytes){cmac_kat_msg, msglen},
+                               (TC_buffer){cmac1, 0}));
 
   return MUNIT_OK;
 }
@@ -665,48 +684,69 @@ TC_TEST(test_des_cmac_tag_policy)
 
   /* Default entry: min - 1 is rejected, min is accepted. */
   memset(tag, 0xa5, sizeof(tag));
-  munit_assert_int(TC_ERROR, ==, TC_DES_CMAC(tdes2_key, 16, cmac_kat_msg, msglen, tag, below));
+  munit_assert_int(TC_ERROR, ==,
+                   TC_DES_CMAC((TC_bytes){tdes2_key, 16}, (TC_bytes){cmac_kat_msg, msglen},
+                               (TC_buffer){tag, below}));
   munit_assert_true(tc_test_all_value(tag, sizeof(tag), 0xa5));
   munit_assert_int(TC_ERROR, ==,
-                   TC_DES_CMAC_verify(tdes2_key, 16, cmac_kat_msg, msglen, cmac_kat_tdes2, below));
+                   TC_DES_CMAC_verify((TC_bytes){tdes2_key, 16}, (TC_bytes){cmac_kat_msg, msglen},
+                                      (TC_bytes){cmac_kat_tdes2, below}));
   munit_assert_int(TC_OK, ==,
-                   TC_DES_CMAC(tdes2_key, 16, cmac_kat_msg, msglen, tag, TC_MIN_TAG_LEN));
+                   TC_DES_CMAC((TC_bytes){tdes2_key, 16}, (TC_bytes){cmac_kat_msg, msglen},
+                               (TC_buffer){tag, TC_MIN_TAG_LEN}));
   munit_assert_memory_equal(TC_MIN_TAG_LEN, tag, cmac_kat_tdes2);
-  munit_assert_int(
-      TC_OK, ==,
-      TC_DES_CMAC_verify(tdes2_key, 16, cmac_kat_msg, msglen, cmac_kat_tdes2, TC_MIN_TAG_LEN));
+  munit_assert_int(TC_OK, ==,
+                   TC_DES_CMAC_verify((TC_bytes){tdes2_key, 16}, (TC_bytes){cmac_kat_msg, msglen},
+                                      (TC_bytes){cmac_kat_tdes2, TC_MIN_TAG_LEN}));
 
   /* Short-tag entry: 0 and min are rejected with the tag unchanged. */
   memset(tag, 0xa5, sizeof(tag));
   munit_assert_int(TC_ERROR, ==,
-                   TC_DES_CMAC_short_tag(tdes2_key, 16, cmac_kat_msg, msglen, tag, 0));
+                   TC_DES_CMAC_short_tag((TC_bytes){tdes2_key, 16},
+                                         (TC_bytes){cmac_kat_msg, msglen}, (TC_buffer){tag, 0}));
   munit_assert_int(TC_ERROR, ==,
-                   TC_DES_CMAC_short_tag(tdes2_key, 16, cmac_kat_msg, msglen, tag, TC_MIN_TAG_LEN));
+                   TC_DES_CMAC_short_tag((TC_bytes){tdes2_key, 16},
+                                         (TC_bytes){cmac_kat_msg, msglen},
+                                         (TC_buffer){tag, TC_MIN_TAG_LEN}));
   munit_assert_int(TC_ERROR, ==,
-                   TC_DES_CMAC_short_tag(tdes2_key, 10, cmac_kat_msg, msglen, tag, below));
-  munit_assert_int(TC_ERROR, ==, TC_DES_CMAC_short_tag(NULL, 16, cmac_kat_msg, msglen, tag, below));
+                   TC_DES_CMAC_short_tag((TC_bytes){tdes2_key, 10},
+                                         (TC_bytes){cmac_kat_msg, msglen},
+                                         (TC_buffer){tag, below}));
+  munit_assert_int(TC_ERROR, ==,
+                   TC_DES_CMAC_short_tag((TC_bytes){NULL, 16}, (TC_bytes){cmac_kat_msg, msglen},
+                                         (TC_buffer){tag, below}));
   munit_assert_true(tc_test_all_value(tag, sizeof(tag), 0xa5));
 
   /* Short-tag entry: 1 and min - 1 give the leading bytes of the full tag. */
-  munit_assert_int(TC_OK, ==, TC_DES_CMAC_short_tag(tdes2_key, 16, cmac_kat_msg, msglen, tag, 1));
+  munit_assert_int(TC_OK, ==,
+                   TC_DES_CMAC_short_tag((TC_bytes){tdes2_key, 16},
+                                         (TC_bytes){cmac_kat_msg, msglen}, (TC_buffer){tag, 1}));
   munit_assert_uint8(tag[0], ==, cmac_kat_tdes2[0]);
   munit_assert_int(TC_OK, ==,
-                   TC_DES_CMAC_short_tag(tdes2_key, 16, cmac_kat_msg, msglen, tag, below));
+                   TC_DES_CMAC_short_tag((TC_bytes){tdes2_key, 16},
+                                         (TC_bytes){cmac_kat_msg, msglen},
+                                         (TC_buffer){tag, below}));
   munit_assert_memory_equal(below, tag, cmac_kat_tdes2);
   munit_assert_true(tc_test_all_value(tag + below, sizeof(tag) - below, 0xa5));
 
-  munit_assert_int(
-      TC_OK, ==,
-      TC_DES_CMAC_verify_short_tag(tdes2_key, 16, cmac_kat_msg, msglen, cmac_kat_tdes2, below));
+  munit_assert_int(TC_OK, ==,
+                   TC_DES_CMAC_verify_short_tag((TC_bytes){tdes2_key, 16},
+                                                (TC_bytes){cmac_kat_msg, msglen},
+                                                (TC_bytes){cmac_kat_tdes2, below}));
   munit_assert_int(TC_ERROR, ==,
-                   TC_DES_CMAC_verify_short_tag(tdes2_key, 16, cmac_kat_msg, msglen, cmac_kat_tdes2,
-                                                TC_MIN_TAG_LEN));
+                   TC_DES_CMAC_verify_short_tag((TC_bytes){tdes2_key, 16},
+                                                (TC_bytes){cmac_kat_msg, msglen},
+                                                (TC_bytes){cmac_kat_tdes2, TC_MIN_TAG_LEN}));
   munit_assert_int(TC_ERROR, ==,
-                   TC_DES_CMAC_verify_short_tag(tdes2_key, 16, cmac_kat_msg, msglen, NULL, below));
+                   TC_DES_CMAC_verify_short_tag((TC_bytes){tdes2_key, 16},
+                                                (TC_bytes){cmac_kat_msg, msglen},
+                                                (TC_bytes){NULL, below}));
   memcpy(bad, cmac_kat_tdes2, sizeof(bad));
   bad[below - 1u] ^= 0x01u;
   munit_assert_int(TC_MISMATCH, ==,
-                   TC_DES_CMAC_verify_short_tag(tdes2_key, 16, cmac_kat_msg, msglen, bad, below));
+                   TC_DES_CMAC_verify_short_tag((TC_bytes){tdes2_key, 16},
+                                                (TC_bytes){cmac_kat_msg, msglen},
+                                                (TC_bytes){bad, below}));
   return MUNIT_OK;
 }
 
@@ -735,39 +775,41 @@ TC_TEST(test_des_cmac_streaming)
   for (ki = 0; ki < 3; ++ki) {
     for (li = 0; li < sizeof(lengths) / sizeof(lengths[0]); ++li) {
       const size_t len = lengths[li];
-      munit_assert_int(TC_OK, ==, TC_DES_CMAC(keys[ki], keylens[ki], msg, len, expected, 8));
+      munit_assert_int(TC_OK, ==,
+                       TC_DES_CMAC((TC_bytes){keys[ki], keylens[ki]}, (TC_bytes){msg, len},
+                                   (TC_buffer){expected, 8}));
 
-      munit_assert_int(TC_OK, ==, TC_DES_CMAC_init(&ctx, keys[ki], keylens[ki]));
-      munit_assert_int(TC_OK, ==, TC_DES_CMAC_update(&ctx, msg, len));
-      munit_assert_int(TC_OK, ==, TC_DES_CMAC_final(&ctx, tag));
+      munit_assert_int(TC_OK, ==, TC_DES_CMAC_init(&ctx, (TC_bytes){keys[ki], keylens[ki]}));
+      munit_assert_int(TC_OK, ==, TC_DES_CMAC_update(&ctx, (TC_bytes){msg, len}));
+      munit_assert_int(TC_OK, ==, TC_DES_CMAC_final(&ctx, (TC_buffer){tag, TC_DES_CMAC_TAG_MAX}));
       munit_assert_memory_equal(8, tag, expected);
 
       for (si = 0; si < sizeof(splits) / sizeof(splits[0]); ++si) {
         size_t pos = 0;
-        munit_assert_int(TC_OK, ==, TC_DES_CMAC_init(&ctx, keys[ki], keylens[ki]));
+        munit_assert_int(TC_OK, ==, TC_DES_CMAC_init(&ctx, (TC_bytes){keys[ki], keylens[ki]}));
         while (pos < len) {
           const size_t take = (len - pos) < splits[si] ? (len - pos) : splits[si];
-          munit_assert_int(TC_OK, ==, TC_DES_CMAC_update(&ctx, msg + pos, take));
+          munit_assert_int(TC_OK, ==, TC_DES_CMAC_update(&ctx, (TC_bytes){msg + pos, take}));
           pos += take;
         }
-        munit_assert_int(TC_OK, ==, TC_DES_CMAC_update(&ctx, NULL, 0));
-        munit_assert_int(TC_OK, ==, TC_DES_CMAC_final(&ctx, tag));
+        munit_assert_int(TC_OK, ==, TC_DES_CMAC_update(&ctx, (TC_bytes){NULL, 0}));
+        munit_assert_int(TC_OK, ==, TC_DES_CMAC_final(&ctx, (TC_buffer){tag, TC_DES_CMAC_TAG_MAX}));
         munit_assert_memory_equal(8, tag, expected);
       }
     }
   }
 
-  munit_assert_int(TC_ERROR, ==, TC_DES_CMAC_init(NULL, des_test_key, 8));
-  munit_assert_int(TC_ERROR, ==, TC_DES_CMAC_init(&ctx, NULL, 8));
-  munit_assert_int(TC_ERROR, ==, TC_DES_CMAC_init(&ctx, des_test_key, 12));
+  munit_assert_int(TC_ERROR, ==, TC_DES_CMAC_init(NULL, (TC_bytes){des_test_key, 8}));
+  munit_assert_int(TC_ERROR, ==, TC_DES_CMAC_init(&ctx, (TC_bytes){NULL, 8}));
+  munit_assert_int(TC_ERROR, ==, TC_DES_CMAC_init(&ctx, (TC_bytes){des_test_key, 12}));
   memset(&ctx, 0, sizeof ctx);
-  munit_assert_int(TC_DES_CMAC_update(&ctx, msg, 1), ==, TC_ERROR);
-  munit_assert_int(TC_DES_CMAC_final(&ctx, tag), ==, TC_ERROR);
-  munit_assert_int(TC_DES_CMAC_init(&ctx, des_test_key, 8), ==, TC_OK);
-  munit_assert_int(TC_DES_CMAC_final(&ctx, tag), ==, TC_OK);
-  munit_assert_int(TC_DES_CMAC_final(&ctx, tag), ==, TC_ERROR);
+  munit_assert_int(TC_DES_CMAC_update(&ctx, (TC_bytes){msg, 1}), ==, TC_ERROR);
+  munit_assert_int(TC_DES_CMAC_final(&ctx, (TC_buffer){tag, TC_DES_CMAC_TAG_MAX}), ==, TC_ERROR);
+  munit_assert_int(TC_DES_CMAC_init(&ctx, (TC_bytes){des_test_key, 8}), ==, TC_OK);
+  munit_assert_int(TC_DES_CMAC_final(&ctx, (TC_buffer){tag, TC_DES_CMAC_TAG_MAX}), ==, TC_OK);
+  munit_assert_int(TC_DES_CMAC_final(&ctx, (TC_buffer){tag, TC_DES_CMAC_TAG_MAX}), ==, TC_ERROR);
   TC_DES_CMAC_ctx_clear(&ctx);
-  munit_assert_int(TC_DES_CMAC_update(&ctx, msg, 1), ==, TC_ERROR);
+  munit_assert_int(TC_DES_CMAC_update(&ctx, (TC_bytes){msg, 1}), ==, TC_ERROR);
   TC_DES_CMAC_ctx_clear(NULL);
 
   return MUNIT_OK;
@@ -783,9 +825,12 @@ TC_TEST(test_des_cmac_single_des_matches_2k3des_degenerate)
   static const uint8_t expected[8] = {0x25, 0xf8, 0xaf, 0xb2, 0x45, 0xd1, 0x53, 0x88};
 
   uint8_t mac8[8], mac16[8];
-  munit_assert_int(TC_OK, ==, TC_DES_CMAC(key8, sizeof(key8), message, sizeof(message), mac8, 8));
   munit_assert_int(TC_OK, ==,
-                   TC_DES_CMAC(key16, sizeof(key16), message, sizeof(message), mac16, 8));
+                   TC_DES_CMAC((TC_bytes){key8, sizeof(key8)}, (TC_bytes){message, sizeof(message)},
+                               (TC_buffer){mac8, 8}));
+  munit_assert_int(TC_OK, ==,
+                   TC_DES_CMAC((TC_bytes){key16, sizeof(key16)},
+                               (TC_bytes){message, sizeof(message)}, (TC_buffer){mac16, 8}));
   munit_assert_memory_equal(8, mac8, mac16);
   munit_assert_memory_equal(8, mac8, expected);
 
@@ -802,24 +847,24 @@ TC_TEST(test_des_api_errors)
     uint8_t saved[TC_DES_BLOCKLEN];
     memcpy(saved, block, sizeof block);
 #if TC_DES_ENABLE_ECB
-    munit_assert_int(TC_DES_ECB_encrypt(&ctx, block), ==, TC_ERROR);
+    munit_assert_int(TC_DES_ECB_encrypt(&ctx, (TC_buffer){block, TC_DES_BLOCKLEN}), ==, TC_ERROR);
 #endif
 #if TC_DES_ENABLE_CBC
-    munit_assert_int(TC_DES_CBC_encrypt(&ctx, block, sizeof block), ==, TC_ERROR);
+    munit_assert_int(TC_DES_CBC_encrypt(&ctx, (TC_buffer){block, sizeof block}), ==, TC_ERROR);
 #endif
 #if TC_DES_ENABLE_CTR
-    munit_assert_int(TC_DES_CTR_crypt(&ctx, block, sizeof block), ==, TC_ERROR);
+    munit_assert_int(TC_DES_CTR_crypt(&ctx, (TC_buffer){block, sizeof block}), ==, TC_ERROR);
 #endif
 #if TC_DES_ENABLE_OFB
-    munit_assert_int(TC_DES_OFB_crypt(&ctx, block, sizeof block), ==, TC_ERROR);
+    munit_assert_int(TC_DES_OFB_crypt(&ctx, (TC_buffer){block, sizeof block}), ==, TC_ERROR);
 #endif
     munit_assert_memory_equal(sizeof block, block, saved);
-    munit_assert_int(TC_DES_init(&ctx, des_test_key, TC_DES_KEYLEN), ==, TC_OK);
+    munit_assert_int(TC_DES_init(&ctx, (TC_bytes){des_test_key, TC_DES_KEYLEN}), ==, TC_OK);
     TC_DES_ctx_clear(&ctx);
 #if TC_DES_ENABLE_ECB
-    munit_assert_int(TC_DES_ECB_encrypt(&ctx, block), ==, TC_ERROR);
+    munit_assert_int(TC_DES_ECB_encrypt(&ctx, (TC_buffer){block, TC_DES_BLOCKLEN}), ==, TC_ERROR);
 #endif
-    munit_assert_int(TC_DES_init(&ctx, NULL, TC_DES_KEYLEN), ==, TC_ERROR);
+    munit_assert_int(TC_DES_init(&ctx, (TC_bytes){NULL, TC_DES_KEYLEN}), ==, TC_ERROR);
   }
 
 #if TC_DES_ENABLE_CBC
@@ -827,9 +872,9 @@ TC_TEST(test_des_api_errors)
     struct TC_DES_ctx ctx;
     uint8_t buf[16] = {0};
     des_init_with_iv(&ctx, des_test_key, TC_DES_KEYLEN, des_cbc_iv);
-    munit_assert_int(TC_ERROR, ==, TC_DES_CBC_encrypt(&ctx, buf, 7));
-    munit_assert_int(TC_ERROR, ==, TC_DES_CBC_decrypt(&ctx, buf, 1));
-    munit_assert_int(TC_OK, ==, TC_DES_CBC_encrypt(&ctx, buf, 0));
+    munit_assert_int(TC_ERROR, ==, TC_DES_CBC_encrypt(&ctx, (TC_buffer){buf, 7}));
+    munit_assert_int(TC_ERROR, ==, TC_DES_CBC_decrypt(&ctx, (TC_buffer){buf, 1}));
+    munit_assert_int(TC_OK, ==, TC_DES_CBC_encrypt(&ctx, (TC_buffer){buf, 0}));
   }
 #endif
 
@@ -843,10 +888,10 @@ TC_TEST(test_des_api_errors)
     des_init_with_iv(&ctx, des_test_key, TC_DES_KEYLEN, iv_max);
     memcpy(iv_saved, ctx.iv, 8);
     /* One block from all-ones wraps the counter after the block; one block OK. */
-    munit_assert_int(TC_OK, ==, TC_DES_CTR_crypt(&ctx, buf, 8));
+    munit_assert_int(TC_OK, ==, TC_DES_CTR_crypt(&ctx, (TC_buffer){buf, 8}));
     /* Restore max IV and request two blocks: wrap mid-request. */
-    TC_DES_set_iv(&ctx, iv_max);
-    munit_assert_int(TC_ERROR, ==, TC_DES_CTR_crypt(&ctx, buf, 16));
+    TC_DES_set_iv(&ctx, (TC_bytes){iv_max, TC_DES_BLOCKLEN});
+    munit_assert_int(TC_ERROR, ==, TC_DES_CTR_crypt(&ctx, (TC_buffer){buf, 16}));
     munit_assert_memory_equal(8, ctx.iv, iv_max);
   }
 #endif
@@ -858,27 +903,27 @@ TC_TEST(test_des_api_errors)
     uint8_t junk[32] = {0};
     size_t i;
     for (i = 0; i < sizeof bad_lengths / sizeof bad_lengths[0]; ++i) {
-      munit_assert_int(TC_OK, ==, TC_DES_init(&ctx, des_test_key, TC_DES_KEYLEN));
-      munit_assert_int(TC_ERROR, ==, TC_DES_init(&ctx, junk, bad_lengths[i]));
+      munit_assert_int(TC_OK, ==, TC_DES_init(&ctx, (TC_bytes){des_test_key, TC_DES_KEYLEN}));
+      munit_assert_int(TC_ERROR, ==, TC_DES_init(&ctx, (TC_bytes){junk, bad_lengths[i]}));
       munit_assert_uint8(ctx.active, ==, 0);
     }
 #if TC_DES_ENABLE_TDES
-    munit_assert_int(TC_OK, ==, TC_DES_init(&ctx, tdes2_key, TC_DES_KEYLEN_2KEY));
+    munit_assert_int(TC_OK, ==, TC_DES_init(&ctx, (TC_bytes){tdes2_key, TC_DES_KEYLEN_2KEY}));
     munit_assert_uint8(ctx.triple, ==, 1);
-    munit_assert_int(TC_OK, ==, TC_DES_init(&ctx, tdes3_key, TC_DES_KEYLEN_3KEY));
+    munit_assert_int(TC_OK, ==, TC_DES_init(&ctx, (TC_bytes){tdes3_key, TC_DES_KEYLEN_3KEY}));
     munit_assert_uint8(ctx.triple, ==, 1);
 #else
-    munit_assert_int(TC_ERROR, ==, TC_DES_init(&ctx, tdes2_key, TC_DES_KEYLEN_2KEY));
-    munit_assert_int(TC_ERROR, ==, TC_DES_init(&ctx, tdes3_key, TC_DES_KEYLEN_3KEY));
+    munit_assert_int(TC_ERROR, ==, TC_DES_init(&ctx, (TC_bytes){tdes2_key, TC_DES_KEYLEN_2KEY}));
+    munit_assert_int(TC_ERROR, ==, TC_DES_init(&ctx, (TC_bytes){tdes3_key, TC_DES_KEYLEN_3KEY}));
 #endif
-    munit_assert_int(TC_OK, ==, TC_DES_init(&ctx, des_test_key, TC_DES_KEYLEN));
+    munit_assert_int(TC_OK, ==, TC_DES_init(&ctx, (TC_bytes){des_test_key, TC_DES_KEYLEN}));
     munit_assert_uint8(ctx.triple, ==, 0);
-    munit_assert_int(TC_ERROR, ==, TC_DES_init(NULL, des_test_key, TC_DES_KEYLEN));
+    munit_assert_int(TC_ERROR, ==, TC_DES_init(NULL, (TC_bytes){des_test_key, TC_DES_KEYLEN}));
 #if TC_DES_NEEDS_IV
-    munit_assert_int(TC_ERROR, ==, TC_DES_set_iv(&ctx, NULL));
+    munit_assert_int(TC_ERROR, ==, TC_DES_set_iv(&ctx, (TC_bytes){NULL, TC_DES_BLOCKLEN}));
     munit_assert_uint8(ctx.active, ==, 1);
     TC_DES_ctx_clear(&ctx);
-    munit_assert_int(TC_ERROR, ==, TC_DES_set_iv(&ctx, des_cbc_iv));
+    munit_assert_int(TC_ERROR, ==, TC_DES_set_iv(&ctx, (TC_bytes){des_cbc_iv, TC_DES_BLOCKLEN}));
 #endif
     TC_DES_ctx_clear(&ctx);
   }
@@ -925,32 +970,35 @@ TC_TEST(test_des_null_buffers)
     munit_assert_int(TC_OK, ==, des_init_with_iv(&ctx, keys[k], keylens[k], iv));
     memcpy(&saved, &ctx, sizeof ctx);
 #if TC_DES_ENABLE_CBC
-    munit_assert_int(TC_ERROR, ==, TC_DES_CBC_encrypt(&ctx, NULL, 8));
-    munit_assert_int(TC_ERROR, ==, TC_DES_CBC_decrypt(&ctx, NULL, 8));
-    munit_assert_int(TC_OK, ==, TC_DES_CBC_encrypt(&ctx, NULL, 0));
+    munit_assert_int(TC_ERROR, ==, TC_DES_CBC_encrypt(&ctx, (TC_buffer){NULL, 8}));
+    munit_assert_int(TC_ERROR, ==, TC_DES_CBC_decrypt(&ctx, (TC_buffer){NULL, 8}));
+    munit_assert_int(TC_OK, ==, TC_DES_CBC_encrypt(&ctx, (TC_buffer){NULL, 0}));
 #endif
 #if TC_DES_ENABLE_CTR
-    munit_assert_int(TC_ERROR, ==, TC_DES_CTR_crypt(&ctx, NULL, 1));
-    munit_assert_int(TC_OK, ==, TC_DES_CTR_crypt(&ctx, NULL, 0));
+    munit_assert_int(TC_ERROR, ==, TC_DES_CTR_crypt(&ctx, (TC_buffer){NULL, 1}));
+    munit_assert_int(TC_OK, ==, TC_DES_CTR_crypt(&ctx, (TC_buffer){NULL, 0}));
 #endif
 #if TC_DES_ENABLE_CFB64
-    munit_assert_int(TC_ERROR, ==, TC_DES_CFB64_encrypt(&ctx, NULL, 8));
-    munit_assert_int(TC_ERROR, ==, TC_DES_CFB64_decrypt(&ctx, NULL, 3));
-    munit_assert_int(TC_OK, ==, TC_DES_CFB64_encrypt(&ctx, NULL, 0));
+    munit_assert_int(TC_ERROR, ==, TC_DES_CFB64_encrypt(&ctx, (TC_buffer){NULL, 8}));
+    munit_assert_int(TC_ERROR, ==, TC_DES_CFB64_decrypt(&ctx, (TC_buffer){NULL, 3}));
+    munit_assert_int(TC_OK, ==, TC_DES_CFB64_encrypt(&ctx, (TC_buffer){NULL, 0}));
 #endif
 #if TC_DES_ENABLE_CFB8
-    munit_assert_int(TC_ERROR, ==, TC_DES_CFB8_encrypt(&ctx, NULL, 1));
-    munit_assert_int(TC_ERROR, ==, TC_DES_CFB8_decrypt(&ctx, NULL, 1));
-    munit_assert_int(TC_OK, ==, TC_DES_CFB8_decrypt(&ctx, NULL, 0));
+    munit_assert_int(TC_ERROR, ==, TC_DES_CFB8_encrypt(&ctx, (TC_buffer){NULL, 1}));
+    munit_assert_int(TC_ERROR, ==, TC_DES_CFB8_decrypt(&ctx, (TC_buffer){NULL, 1}));
+    munit_assert_int(TC_OK, ==, TC_DES_CFB8_decrypt(&ctx, (TC_buffer){NULL, 0}));
 #endif
 #if TC_DES_ENABLE_CFB1
-    munit_assert_int(TC_ERROR, ==, TC_DES_CFB1_encrypt(&ctx, NULL, 1));
-    munit_assert_int(TC_ERROR, ==, TC_DES_CFB1_decrypt(&ctx, NULL, 1));
-    munit_assert_int(TC_OK, ==, TC_DES_CFB1_encrypt(&ctx, NULL, 0));
+    munit_assert_int(TC_ERROR, ==,
+                     TC_DES_CFB1_encrypt(&ctx, (TC_buffer){NULL, ((1) / 8u + ((1) % 8u != 0))}, 1));
+    munit_assert_int(TC_ERROR, ==,
+                     TC_DES_CFB1_decrypt(&ctx, (TC_buffer){NULL, ((1) / 8u + ((1) % 8u != 0))}, 1));
+    munit_assert_int(TC_OK, ==,
+                     TC_DES_CFB1_encrypt(&ctx, (TC_buffer){NULL, ((0) / 8u + ((0) % 8u != 0))}, 0));
 #endif
 #if TC_DES_ENABLE_OFB
-    munit_assert_int(TC_ERROR, ==, TC_DES_OFB_crypt(&ctx, NULL, 1));
-    munit_assert_int(TC_OK, ==, TC_DES_OFB_crypt(&ctx, NULL, 0));
+    munit_assert_int(TC_ERROR, ==, TC_DES_OFB_crypt(&ctx, (TC_buffer){NULL, 1}));
+    munit_assert_int(TC_OK, ==, TC_DES_OFB_crypt(&ctx, (TC_buffer){NULL, 0}));
 #endif
     assert_des_ctx_equal(&ctx, &saved);
     TC_DES_ctx_clear(&ctx);
@@ -958,7 +1006,43 @@ TC_TEST(test_des_null_buffers)
   return MUNIT_OK;
 }
 
-typedef TC_status (*des_mode_fn)(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
+typedef TC_status (*des_mode_fn)(struct TC_DES_ctx* ctx, TC_buffer buf, size_t length);
+
+#define DES_BYTE_MODE_ADAPTER(adapter, mode)                                                       \
+  static TC_status adapter(struct TC_DES_ctx* ctx, TC_buffer buf, size_t length)                   \
+  {                                                                                                \
+    (void)length;                                                                                  \
+    return mode(ctx, buf);                                                                         \
+  }
+
+#if TC_DES_ENABLE_CBC
+DES_BYTE_MODE_ADAPTER(des_cbc_encrypt, TC_DES_CBC_encrypt)
+DES_BYTE_MODE_ADAPTER(des_cbc_decrypt, TC_DES_CBC_decrypt)
+#endif
+#if TC_DES_ENABLE_CTR
+DES_BYTE_MODE_ADAPTER(des_ctr_crypt, TC_DES_CTR_crypt)
+#endif
+#if TC_DES_ENABLE_CFB64
+DES_BYTE_MODE_ADAPTER(des_cfb64_encrypt, TC_DES_CFB64_encrypt)
+DES_BYTE_MODE_ADAPTER(des_cfb64_decrypt, TC_DES_CFB64_decrypt)
+#endif
+#if TC_DES_ENABLE_CFB8
+DES_BYTE_MODE_ADAPTER(des_cfb8_encrypt, TC_DES_CFB8_encrypt)
+DES_BYTE_MODE_ADAPTER(des_cfb8_decrypt, TC_DES_CFB8_decrypt)
+#endif
+#if TC_DES_ENABLE_CFB1
+static TC_status des_cfb1_encrypt(struct TC_DES_ctx* ctx, TC_buffer buf, size_t bits)
+{
+  return TC_DES_CFB1_encrypt(ctx, buf, bits);
+}
+static TC_status des_cfb1_decrypt(struct TC_DES_ctx* ctx, TC_buffer buf, size_t bits)
+{
+  return TC_DES_CFB1_decrypt(ctx, buf, bits);
+}
+#endif
+#if TC_DES_ENABLE_OFB
+DES_BYTE_MODE_ADAPTER(des_ofb_crypt, TC_DES_OFB_crypt)
+#endif
 
 /* A buffer that overlaps the context would overwrite the subkeys or the
  * feedback register while the mode reads them. Each mode rejects it and
@@ -983,7 +1067,7 @@ static void check_des_mode_overlap(des_mode_fn mode, size_t length, size_t bytes
   memcpy(before, frame.before, sizeof before);
   memcpy(&saved, &frame.ctx, sizeof saved);
   for (i = 0; i < sizeof inside / sizeof inside[0]; ++i) {
-    munit_assert_int(TC_ERROR, ==, mode(&frame.ctx, inside[i], length));
+    munit_assert_int(TC_ERROR, ==, mode(&frame.ctx, (TC_buffer){inside[i], bytes}, length));
     assert_des_ctx_equal(&frame.ctx, &saved);
     munit_assert_memory_equal(sizeof before, frame.before, before);
   }
@@ -1004,27 +1088,27 @@ static void check_des_mode_requires_iv(des_mode_fn mode, size_t length, size_t b
 
   memset(buf, 0x3c, sizeof buf);
   memcpy(before, buf, sizeof buf);
-  munit_assert_int(TC_OK, ==, TC_DES_init(&ctx, des_test_key, TC_DES_KEYLEN));
+  munit_assert_int(TC_OK, ==, TC_DES_init(&ctx, (TC_bytes){des_test_key, TC_DES_KEYLEN}));
   memcpy(&saved, &ctx, sizeof saved);
-  munit_assert_int(TC_ERROR, ==, mode(&ctx, buf, length));
-  munit_assert_int(TC_ERROR, ==, mode(&ctx, NULL, 0));
+  munit_assert_int(TC_ERROR, ==, mode(&ctx, (TC_buffer){buf, bytes}, length));
+  munit_assert_int(TC_ERROR, ==, mode(&ctx, (TC_buffer){NULL, 0}, 0));
   munit_assert_memory_equal(sizeof buf, buf, before);
   assert_des_ctx_equal(&ctx, &saved);
 
   /* A rejected set_iv loads nothing. */
-  munit_assert_int(TC_ERROR, ==, TC_DES_set_iv(&ctx, NULL));
-  munit_assert_int(TC_ERROR, ==, mode(&ctx, buf, length));
+  munit_assert_int(TC_ERROR, ==, TC_DES_set_iv(&ctx, (TC_bytes){NULL, TC_DES_BLOCKLEN}));
+  munit_assert_int(TC_ERROR, ==, mode(&ctx, (TC_buffer){buf, bytes}, length));
   munit_assert_memory_equal(sizeof buf, buf, before);
   assert_des_ctx_equal(&ctx, &saved);
 
-  munit_assert_int(TC_OK, ==, TC_DES_set_iv(&ctx, iv));
-  munit_assert_int(TC_OK, ==, mode(&ctx, buf, length));
+  munit_assert_int(TC_OK, ==, TC_DES_set_iv(&ctx, (TC_bytes){iv, TC_DES_BLOCKLEN}));
+  munit_assert_int(TC_OK, ==, mode(&ctx, (TC_buffer){buf, bytes}, length));
   munit_assert_memory_not_equal(bytes, buf, before);
 
   /* A re-init starts without an IV again. */
   memcpy(buf, before, sizeof buf);
-  munit_assert_int(TC_OK, ==, TC_DES_init(&ctx, des_test_key, TC_DES_KEYLEN));
-  munit_assert_int(TC_ERROR, ==, mode(&ctx, buf, length));
+  munit_assert_int(TC_OK, ==, TC_DES_init(&ctx, (TC_bytes){des_test_key, TC_DES_KEYLEN}));
+  munit_assert_int(TC_ERROR, ==, mode(&ctx, (TC_buffer){buf, bytes}, length));
   munit_assert_memory_equal(sizeof buf, buf, before);
   TC_DES_ctx_clear(&ctx);
 }
@@ -1032,27 +1116,27 @@ static void check_des_mode_requires_iv(des_mode_fn mode, size_t length, size_t b
 TC_TEST(test_des_iv_required)
 {
 #if TC_DES_ENABLE_CBC
-  check_des_mode_requires_iv(TC_DES_CBC_encrypt, 2 * TC_DES_BLOCKLEN, 2 * TC_DES_BLOCKLEN);
-  check_des_mode_requires_iv(TC_DES_CBC_decrypt, TC_DES_BLOCKLEN, TC_DES_BLOCKLEN);
+  check_des_mode_requires_iv(des_cbc_encrypt, 2 * TC_DES_BLOCKLEN, 2 * TC_DES_BLOCKLEN);
+  check_des_mode_requires_iv(des_cbc_decrypt, TC_DES_BLOCKLEN, TC_DES_BLOCKLEN);
 #endif
 #if TC_DES_ENABLE_CTR
-  check_des_mode_requires_iv(TC_DES_CTR_crypt, 5, 5);
+  check_des_mode_requires_iv(des_ctr_crypt, 5, 5);
 #endif
 #if TC_DES_ENABLE_CFB64
-  check_des_mode_requires_iv(TC_DES_CFB64_encrypt, TC_DES_BLOCKLEN, TC_DES_BLOCKLEN);
-  check_des_mode_requires_iv(TC_DES_CFB64_decrypt, 3, 3);
+  check_des_mode_requires_iv(des_cfb64_encrypt, TC_DES_BLOCKLEN, TC_DES_BLOCKLEN);
+  check_des_mode_requires_iv(des_cfb64_decrypt, 3, 3);
 #endif
 #if TC_DES_ENABLE_CFB8
-  check_des_mode_requires_iv(TC_DES_CFB8_encrypt, 9, 9);
-  check_des_mode_requires_iv(TC_DES_CFB8_decrypt, 1, 1);
+  check_des_mode_requires_iv(des_cfb8_encrypt, 9, 9);
+  check_des_mode_requires_iv(des_cfb8_decrypt, 1, 1);
 #endif
 #if TC_DES_ENABLE_CFB1
   /* CFB1 lengths count bits. 57 bits touch 8 bytes. */
-  check_des_mode_requires_iv(TC_DES_CFB1_encrypt, 57, 8);
-  check_des_mode_requires_iv(TC_DES_CFB1_decrypt, 57, 8);
+  check_des_mode_requires_iv(des_cfb1_encrypt, 57, 8);
+  check_des_mode_requires_iv(des_cfb1_decrypt, 57, 8);
 #endif
 #if TC_DES_ENABLE_OFB
-  check_des_mode_requires_iv(TC_DES_OFB_crypt, 11, 11);
+  check_des_mode_requires_iv(des_ofb_crypt, 11, 11);
 #endif
   return MUNIT_OK;
 }
@@ -1063,41 +1147,42 @@ TC_TEST(test_des_mode_overlap)
   struct TC_DES_ctx ctx;
   struct TC_DES_ctx saved;
 #if TC_DES_ENABLE_CBC
-  check_des_mode_overlap(TC_DES_CBC_encrypt, TC_DES_BLOCKLEN, TC_DES_BLOCKLEN);
-  check_des_mode_overlap(TC_DES_CBC_decrypt, TC_DES_BLOCKLEN, TC_DES_BLOCKLEN);
+  check_des_mode_overlap(des_cbc_encrypt, TC_DES_BLOCKLEN, TC_DES_BLOCKLEN);
+  check_des_mode_overlap(des_cbc_decrypt, TC_DES_BLOCKLEN, TC_DES_BLOCKLEN);
 #endif
 #if TC_DES_ENABLE_CTR
-  check_des_mode_overlap(TC_DES_CTR_crypt, 1, 1);
-  check_des_mode_overlap(TC_DES_CTR_crypt, TC_DES_BLOCKLEN, TC_DES_BLOCKLEN);
+  check_des_mode_overlap(des_ctr_crypt, 1, 1);
+  check_des_mode_overlap(des_ctr_crypt, TC_DES_BLOCKLEN, TC_DES_BLOCKLEN);
 #endif
 #if TC_DES_ENABLE_CFB64
-  check_des_mode_overlap(TC_DES_CFB64_encrypt, TC_DES_BLOCKLEN, TC_DES_BLOCKLEN);
-  check_des_mode_overlap(TC_DES_CFB64_decrypt, 3, 3);
+  check_des_mode_overlap(des_cfb64_encrypt, TC_DES_BLOCKLEN, TC_DES_BLOCKLEN);
+  check_des_mode_overlap(des_cfb64_decrypt, 3, 3);
 #endif
 #if TC_DES_ENABLE_CFB8
-  check_des_mode_overlap(TC_DES_CFB8_encrypt, 1, 1);
-  check_des_mode_overlap(TC_DES_CFB8_decrypt, TC_DES_BLOCKLEN, TC_DES_BLOCKLEN);
+  check_des_mode_overlap(des_cfb8_encrypt, 1, 1);
+  check_des_mode_overlap(des_cfb8_decrypt, TC_DES_BLOCKLEN, TC_DES_BLOCKLEN);
 #endif
 #if TC_DES_ENABLE_CFB1
   /* CFB1 lengths count bits. 57 bits touch 8 bytes. */
-  check_des_mode_overlap(TC_DES_CFB1_encrypt, 1, 1);
-  check_des_mode_overlap(TC_DES_CFB1_decrypt, 57, 8);
+  check_des_mode_overlap(des_cfb1_encrypt, 1, 1);
+  check_des_mode_overlap(des_cfb1_decrypt, 57, 8);
 #endif
 #if TC_DES_ENABLE_OFB
-  check_des_mode_overlap(TC_DES_OFB_crypt, 1, 1);
-  check_des_mode_overlap(TC_DES_OFB_crypt, TC_DES_BLOCKLEN, TC_DES_BLOCKLEN);
+  check_des_mode_overlap(des_ofb_crypt, 1, 1);
+  check_des_mode_overlap(des_ofb_crypt, TC_DES_BLOCKLEN, TC_DES_BLOCKLEN);
 #endif
 
   /* set_iv copies into ctx->iv. A source inside the context would be an
    * overlapping memcpy or would copy subkey bytes into the IV. */
   munit_assert_int(TC_OK, ==, des_init_with_iv(&ctx, des_test_key, TC_DES_KEYLEN, iv));
   memcpy(&saved, &ctx, sizeof saved);
-  munit_assert_int(TC_ERROR, ==, TC_DES_set_iv(&ctx, ctx.iv));
-  munit_assert_int(TC_ERROR, ==, TC_DES_set_iv(&ctx, ctx.iv + 1));
-  munit_assert_int(TC_ERROR, ==, TC_DES_set_iv(&ctx, ctx.schedule[0]));
+  munit_assert_int(TC_ERROR, ==, TC_DES_set_iv(&ctx, (TC_bytes){ctx.iv, TC_DES_BLOCKLEN}));
+  munit_assert_int(TC_ERROR, ==, TC_DES_set_iv(&ctx, (TC_bytes){ctx.iv + 1, TC_DES_BLOCKLEN}));
+  munit_assert_int(TC_ERROR, ==, TC_DES_set_iv(&ctx, (TC_bytes){ctx.schedule[0], TC_DES_BLOCKLEN}));
 #if TC_DES_ENABLE_ECB
-  munit_assert_int(TC_ERROR, ==, TC_DES_ECB_encrypt(&ctx, ctx.schedule[1]));
-  munit_assert_int(TC_ERROR, ==, TC_DES_ECB_decrypt(&ctx, ctx.iv));
+  munit_assert_int(TC_ERROR, ==,
+                   TC_DES_ECB_encrypt(&ctx, (TC_buffer){ctx.schedule[1], TC_DES_BLOCKLEN}));
+  munit_assert_int(TC_ERROR, ==, TC_DES_ECB_decrypt(&ctx, (TC_buffer){ctx.iv, TC_DES_BLOCKLEN}));
 #endif
   assert_des_ctx_equal(&ctx, &saved);
   TC_DES_ctx_clear(&ctx);
@@ -1119,19 +1204,22 @@ TC_TEST(test_des_cmac_overlap)
   uint8_t tag[TC_DES_CMAC_TAG_MAX];
   uint8_t saved_mac[TC_DES_BLOCKLEN];
   uint8_t saved_buf[TC_DES_BLOCKLEN];
-  munit_assert_int(TC_OK, ==, TC_DES_CMAC_init(ctx, des_test_key, TC_DES_KEYLEN));
-  munit_assert_int(TC_OK, ==, TC_DES_CMAC_update(ctx, cmac_kat_msg, 3));
+  munit_assert_int(TC_OK, ==, TC_DES_CMAC_init(ctx, (TC_bytes){des_test_key, TC_DES_KEYLEN}));
+  munit_assert_int(TC_OK, ==, TC_DES_CMAC_update(ctx, (TC_bytes){cmac_kat_msg, 3}));
   memcpy(saved_mac, ctx->mac, sizeof saved_mac);
   memcpy(saved_buf, ctx->buf, sizeof saved_buf);
-  munit_assert_int(TC_ERROR, ==, TC_DES_CMAC_update(ctx, ctx->buf, 1));
-  munit_assert_int(TC_ERROR, ==, TC_DES_CMAC_update(ctx, ctx->k1, sizeof ctx->k1));
-  munit_assert_int(TC_ERROR, ==, TC_DES_CMAC_final(ctx, ctx->mac));
-  munit_assert_int(TC_ERROR, ==, TC_DES_CMAC_final(ctx, (uint8_t*)&frame + sizeof frame.ctx - 1));
+  munit_assert_int(TC_ERROR, ==, TC_DES_CMAC_update(ctx, (TC_bytes){ctx->buf, 1}));
+  munit_assert_int(TC_ERROR, ==, TC_DES_CMAC_update(ctx, (TC_bytes){ctx->k1, sizeof ctx->k1}));
+  munit_assert_int(TC_ERROR, ==,
+                   TC_DES_CMAC_final(ctx, (TC_buffer){ctx->mac, TC_DES_CMAC_TAG_MAX}));
+  munit_assert_int(TC_ERROR, ==,
+                   TC_DES_CMAC_final(ctx, (TC_buffer){(uint8_t*)&frame + sizeof frame.ctx - 1,
+                                                      TC_DES_CMAC_TAG_MAX}));
   munit_assert_memory_equal(sizeof saved_mac, ctx->mac, saved_mac);
   munit_assert_memory_equal(sizeof saved_buf, ctx->buf, saved_buf);
   munit_assert_uint8(ctx->buf_len, ==, 3);
   munit_assert_uint8(ctx->active, ==, 1);
-  munit_assert_int(TC_OK, ==, TC_DES_CMAC_final(ctx, tag));
+  munit_assert_int(TC_OK, ==, TC_DES_CMAC_final(ctx, (TC_buffer){tag, TC_DES_CMAC_TAG_MAX}));
   return MUNIT_OK;
 }
 #endif
@@ -1150,21 +1238,22 @@ TC_TEST(test_des_iso9797_overlap)
   uint8_t saved_mac[TC_DES_BLOCKLEN];
   uint8_t saved_buf[TC_DES_BLOCKLEN];
   munit_assert_int(TC_OK, ==,
-                   TC_DES_ISO9797_init(ctx, TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, tdes2_key,
-                                       TC_DES_KEYLEN_2KEY));
-  munit_assert_int(TC_OK, ==, TC_DES_ISO9797_update(ctx, message, 3));
+                   TC_DES_ISO9797_init(ctx, TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2,
+                                       (TC_bytes){tdes2_key, TC_DES_KEYLEN_2KEY}));
+  munit_assert_int(TC_OK, ==, TC_DES_ISO9797_update(ctx, (TC_bytes){message, 3}));
   memcpy(saved_mac, ctx->mac, sizeof saved_mac);
   memcpy(saved_buf, ctx->buf, sizeof saved_buf);
-  munit_assert_int(TC_ERROR, ==, TC_DES_ISO9797_update(ctx, ctx->buf, 1));
-  munit_assert_int(TC_ERROR, ==, TC_DES_ISO9797_update(ctx, ctx->keys.schedule[0], 6));
-  munit_assert_int(TC_ERROR, ==, TC_DES_ISO9797_final(ctx, ctx->mac));
+  munit_assert_int(TC_ERROR, ==, TC_DES_ISO9797_update(ctx, (TC_bytes){ctx->buf, 1}));
+  munit_assert_int(TC_ERROR, ==, TC_DES_ISO9797_update(ctx, (TC_bytes){ctx->keys.schedule[0], 6}));
+  munit_assert_int(TC_ERROR, ==, TC_DES_ISO9797_final(ctx, (TC_buffer){ctx->mac, TC_DES_BLOCKLEN}));
   munit_assert_int(TC_ERROR, ==,
-                   TC_DES_ISO9797_final(ctx, (uint8_t*)&frame + sizeof frame.ctx - 1));
+                   TC_DES_ISO9797_final(
+                       ctx, (TC_buffer){(uint8_t*)&frame + sizeof frame.ctx - 1, TC_DES_BLOCKLEN}));
   munit_assert_memory_equal(sizeof saved_mac, ctx->mac, saved_mac);
   munit_assert_memory_equal(sizeof saved_buf, ctx->buf, saved_buf);
   munit_assert_uint8(ctx->used, ==, 3);
   munit_assert_uint8(ctx->active, ==, 1);
-  munit_assert_int(TC_OK, ==, TC_DES_ISO9797_final(ctx, tag));
+  munit_assert_int(TC_OK, ==, TC_DES_ISO9797_final(ctx, (TC_buffer){tag, TC_DES_BLOCKLEN}));
   return MUNIT_OK;
 }
 #endif
@@ -1183,7 +1272,7 @@ TC_TEST(test_des_secure_zero_and_clear)
   for (i = 0; i < sizeof(buf); ++i)
     munit_assert_uint8(buf[i], ==, 0);
 
-  TC_DES_init(&ctx, des_test_key, TC_DES_KEYLEN);
+  TC_DES_init(&ctx, (TC_bytes){des_test_key, TC_DES_KEYLEN});
   /* Subkey material should be non-zero after init for this KAT key. */
   munit_assert_int(ctx.schedule[0][0] != 0 || ctx.schedule[0][1] != 0, ==, 1);
 
@@ -1199,7 +1288,7 @@ TC_TEST(test_des_secure_zero_and_clear)
 #if TC_DES_ENABLE_TDES
   {
     struct TC_DES_ctx tctx;
-    TC_DES_init(&tctx, tdes3_key, 24);
+    TC_DES_init(&tctx, (TC_bytes){tdes3_key, 24});
     TC_DES_ctx_clear(&tctx);
     {
       const uint8_t* p = (const uint8_t*)&tctx;
@@ -1210,7 +1299,7 @@ TC_TEST(test_des_secure_zero_and_clear)
 #endif
 
   munit_assert_int(TC_OK, ==, 0);
-  munit_assert_int(TC_ERROR, ==, -1);
+  munit_assert_int(TC_ERROR, !=, TC_OK);
 
   return MUNIT_OK;
 }
@@ -1239,7 +1328,7 @@ TC_TEST(test_iso9797_annex_b_algorithm1)
     if (iso9797_annex_b_alg1[i].padding == 2)
       blocks[offset + iso9797_annex_b_alg1[i].message_length] = 0x80;
     munit_assert_int(des_init_with_iv(&ctx, key, TC_DES_KEYLEN, zero_iv), ==, TC_OK);
-    munit_assert_int(TC_DES_CBC_encrypt(&ctx, blocks, length), ==, TC_OK);
+    munit_assert_int(TC_DES_CBC_encrypt(&ctx, (TC_buffer){blocks, length}), ==, TC_OK);
     munit_assert_memory_equal(8, blocks + length - 8, iso9797_annex_b_alg1[i].chaining_value);
     TC_DES_ctx_clear(&ctx);
   }
@@ -1281,17 +1370,16 @@ static void iso9797_reference_mac(TC_DES_ISO9797_algorithm algorithm,
                                     algorithm == TC_DES_ISO9797_ALG1 ? keylen : TC_DES_KEYLEN,
                                     zero_iv),
                    ==, TC_OK);
-  munit_assert_int(TC_DES_CBC_encrypt(&ctx, blocks, padded), ==, TC_OK);
+  munit_assert_int(TC_DES_CBC_encrypt(&ctx, (TC_buffer){blocks, padded}), ==, TC_OK);
   memcpy(out, blocks + padded - TC_DES_BLOCKLEN, TC_DES_BLOCKLEN);
-  if (algorithm == TC_DES_ISO9797_ALG3 ||
-      algorithm == TC_DES_ISO9797_ALG3_3KEY_EXTENSION) {
-    munit_assert_int(TC_DES_init(&ctx, key + TC_DES_KEYLEN, TC_DES_KEYLEN), ==, TC_OK);
-    munit_assert_int(TC_DES_ECB_decrypt(&ctx, out), ==, TC_OK);
-    munit_assert_int(TC_DES_init(&ctx,
-                                 keylen == TC_DES_KEYLEN_3KEY ? key + TC_DES_KEYLEN_2KEY : key,
-                                 TC_DES_KEYLEN),
-                     ==, TC_OK);
-    munit_assert_int(TC_DES_ECB_encrypt(&ctx, out), ==, TC_OK);
+  if (algorithm == TC_DES_ISO9797_ALG3 || algorithm == TC_DES_ISO9797_ALG3_3KEY_EXTENSION) {
+    munit_assert_int(TC_DES_init(&ctx, (TC_bytes){key + TC_DES_KEYLEN, TC_DES_KEYLEN}), ==, TC_OK);
+    munit_assert_int(TC_DES_ECB_decrypt(&ctx, (TC_buffer){out, TC_DES_BLOCKLEN}), ==, TC_OK);
+    munit_assert_int(
+        TC_DES_init(&ctx, (TC_bytes){keylen == TC_DES_KEYLEN_3KEY ? key + TC_DES_KEYLEN_2KEY : key,
+                                     TC_DES_KEYLEN}),
+        ==, TC_OK);
+    munit_assert_int(TC_DES_ECB_encrypt(&ctx, (TC_buffer){out, TC_DES_BLOCKLEN}), ==, TC_OK);
   }
   TC_DES_ctx_clear(&ctx);
 }
@@ -1307,18 +1395,20 @@ TC_TEST(test_iso9797_three_key_reference)
   iso9797_reference_mac(TC_DES_ISO9797_ALG1, TC_DES_ISO9797_PAD1, iso9797_key3, sizeof iso9797_key3,
                         msg, sizeof msg - 2, expected);
   munit_assert_memory_equal(8, expected, alg1_3key_pad1);
-  iso9797_reference_mac(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, TC_DES_ISO9797_PAD2, iso9797_key3, sizeof iso9797_key3,
-                        msg, sizeof msg - 2, expected);
+  iso9797_reference_mac(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, TC_DES_ISO9797_PAD2, iso9797_key3,
+                        sizeof iso9797_key3, msg, sizeof msg - 2, expected);
   munit_assert_memory_equal(8, expected, alg3_3key_pad2);
 
   for (a = 0; a < 2; ++a) {
-    const TC_DES_ISO9797_algorithm algorithm = a ? TC_DES_ISO9797_ALG3_3KEY_EXTENSION : TC_DES_ISO9797_ALG1;
+    const TC_DES_ISO9797_algorithm algorithm =
+        a ? TC_DES_ISO9797_ALG3_3KEY_EXTENSION : TC_DES_ISO9797_ALG1;
     for (p = 0; p < 2; ++p) {
       for (l = 0; l < sizeof lengths / sizeof lengths[0]; ++l) {
         iso9797_reference_mac(algorithm, paddings[p], iso9797_key3, sizeof iso9797_key3, msg,
                               lengths[l], expected);
-        munit_assert_int(TC_DES_ISO9797_MAC(algorithm, paddings[p], iso9797_key3,
-                                            sizeof iso9797_key3, msg, lengths[l], tag, sizeof tag),
+        munit_assert_int(TC_DES_ISO9797_MAC(
+                             algorithm, paddings[p], (TC_bytes){iso9797_key3, sizeof iso9797_key3},
+                             (TC_bytes){msg, lengths[l]}, (TC_buffer){tag, sizeof tag}),
                          ==, TC_OK);
         munit_assert_memory_equal(8, tag, expected);
       }
@@ -1343,86 +1433,104 @@ TC_TEST(test_iso9797_three_key_api)
 
   for (p = 0; p < 3; ++p) {
     const size_t len = paddings[p] == TC_DES_ISO9797_PAD_NONE ? 24 : 22;
-    munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, paddings[p], iso9797_key3,
-                                        sizeof iso9797_key3, msg, len, oneshot, sizeof oneshot),
+    munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, paddings[p],
+                                        (TC_bytes){iso9797_key3, sizeof iso9797_key3},
+                                        (TC_bytes){msg, len}, (TC_buffer){oneshot, sizeof oneshot}),
                      ==, TC_OK);
-    munit_assert_int(TC_DES_ISO9797_init(&ctx, TC_DES_ISO9797_ALG3_3KEY_EXTENSION, paddings[p], iso9797_key3,
-                                         sizeof iso9797_key3),
+    munit_assert_int(TC_DES_ISO9797_init(&ctx, TC_DES_ISO9797_ALG3_3KEY_EXTENSION, paddings[p],
+                                         (TC_bytes){iso9797_key3, sizeof iso9797_key3}),
                      ==, TC_OK);
     for (i = 0; i < len; ++i)
-      munit_assert_int(TC_DES_ISO9797_update(&ctx, msg + i, 1), ==, TC_OK);
-    munit_assert_int(TC_DES_ISO9797_final(&ctx, streamed), ==, TC_OK);
+      munit_assert_int(TC_DES_ISO9797_update(&ctx, (TC_bytes){msg + i, 1}), ==, TC_OK);
+    munit_assert_int(TC_DES_ISO9797_final(&ctx, (TC_buffer){streamed, TC_DES_BLOCKLEN}), ==, TC_OK);
     munit_assert_memory_equal(8, streamed, oneshot);
     munit_assert_uint8(ctx.active, ==, 0);
 
-    munit_assert_int(TC_DES_ISO9797_verify(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, paddings[p], iso9797_key3,
-                                           sizeof iso9797_key3, msg, len, oneshot, 8),
+    munit_assert_int(TC_DES_ISO9797_verify(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, paddings[p],
+                                           (TC_bytes){iso9797_key3, sizeof iso9797_key3},
+                                           (TC_bytes){msg, len}, (TC_bytes){oneshot, 8}),
                      ==, TC_OK);
     streamed[7] ^= 0x01u;
-    munit_assert_int(TC_DES_ISO9797_verify(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, paddings[p], iso9797_key3,
-                                           sizeof iso9797_key3, msg, len, streamed, 8),
+    munit_assert_int(TC_DES_ISO9797_verify(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, paddings[p],
+                                           (TC_bytes){iso9797_key3, sizeof iso9797_key3},
+                                           (TC_bytes){msg, len}, (TC_bytes){streamed, 8}),
                      ==, TC_MISMATCH);
-    munit_assert_int(TC_DES_ISO9797_verify_short_tag(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, paddings[p], iso9797_key3,
-                                                     sizeof iso9797_key3, msg, len, oneshot, 4),
+    munit_assert_int(TC_DES_ISO9797_verify_short_tag(TC_DES_ISO9797_ALG3_3KEY_EXTENSION,
+                                                     paddings[p],
+                                                     (TC_bytes){iso9797_key3, sizeof iso9797_key3},
+                                                     (TC_bytes){msg, len}, (TC_bytes){oneshot, 4}),
                      ==, TC_OK);
   }
 
   /* With K3 = K1 the three-key form equals the two-key Algorithm 3. */
   memcpy(key_k3_is_k1, iso9797_key3, 16);
   memcpy(key_k3_is_k1 + 16, iso9797_key3, 8);
-  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, TC_DES_ISO9797_PAD2, key_k3_is_k1,
-                                      sizeof key_k3_is_k1, msg, 22, oneshot, sizeof oneshot),
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, TC_DES_ISO9797_PAD2,
+                                      (TC_bytes){key_k3_is_k1, sizeof key_k3_is_k1},
+                                      (TC_bytes){msg, 22}, (TC_buffer){oneshot, sizeof oneshot}),
                    ==, TC_OK);
-  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, iso9797_key3, 16,
-                                      msg, 22, two_key, sizeof two_key),
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2,
+                                      (TC_bytes){iso9797_key3, 16}, (TC_bytes){msg, 22},
+                                      (TC_buffer){two_key, sizeof two_key}),
                    ==, TC_OK);
   munit_assert_memory_equal(8, oneshot, two_key);
 
   /* Argument errors return TC_ERROR and leave the tag untouched. */
   memset(guard, 0xa5, sizeof guard);
-  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, TC_DES_ISO9797_PAD2, NULL, 24, msg, 22,
-                                      guard, sizeof guard),
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, TC_DES_ISO9797_PAD2,
+                                      (TC_bytes){NULL, 24}, (TC_bytes){msg, 22},
+                                      (TC_buffer){guard, sizeof guard}),
                    ==, TC_ERROR);
-  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, (TC_DES_ISO9797_padding)3, iso9797_key3,
-                                      sizeof iso9797_key3, msg, 22, guard, sizeof guard),
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, (TC_DES_ISO9797_padding)3,
+                                      (TC_bytes){iso9797_key3, sizeof iso9797_key3},
+                                      (TC_bytes){msg, 22}, (TC_buffer){guard, sizeof guard}),
                    ==, TC_ERROR);
-  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, TC_DES_ISO9797_PAD2, iso9797_key3, 23,
-                                      msg, 22, guard, sizeof guard),
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, TC_DES_ISO9797_PAD2,
+                                      (TC_bytes){iso9797_key3, 23}, (TC_bytes){msg, 22},
+                                      (TC_buffer){guard, sizeof guard}),
                    ==, TC_ERROR);
-  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, TC_DES_ISO9797_PAD2, iso9797_key3,
-                                      sizeof iso9797_key3, msg, 22, guard, 7),
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, TC_DES_ISO9797_PAD2,
+                                      (TC_bytes){iso9797_key3, sizeof iso9797_key3},
+                                      (TC_bytes){msg, 22}, (TC_buffer){guard, 7}),
                    ==, TC_ERROR);
-  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, TC_DES_ISO9797_PAD2, iso9797_key3,
-                                      sizeof iso9797_key3, msg, 22, guard, 9),
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, TC_DES_ISO9797_PAD2,
+                                      (TC_bytes){iso9797_key3, sizeof iso9797_key3},
+                                      (TC_bytes){msg, 22}, (TC_buffer){guard, 9}),
                    ==, TC_ERROR);
   for (i = 0; i < sizeof guard; ++i)
     munit_assert_uint8(guard[i], ==, 0xa5);
-  munit_assert_int(TC_DES_ISO9797_verify(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, TC_DES_ISO9797_PAD2, iso9797_key3,
-                                         sizeof iso9797_key3, msg, 22, oneshot, 7),
+  munit_assert_int(TC_DES_ISO9797_verify(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, TC_DES_ISO9797_PAD2,
+                                         (TC_bytes){iso9797_key3, sizeof iso9797_key3},
+                                         (TC_bytes){msg, 22}, (TC_bytes){oneshot, 7}),
                    ==, TC_ERROR);
-  munit_assert_int(TC_DES_ISO9797_verify(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, TC_DES_ISO9797_PAD2, iso9797_key3,
-                                         sizeof iso9797_key3, msg, 22, oneshot, 9),
+  munit_assert_int(TC_DES_ISO9797_verify(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, TC_DES_ISO9797_PAD2,
+                                         (TC_bytes){iso9797_key3, sizeof iso9797_key3},
+                                         (TC_bytes){msg, 22}, (TC_bytes){oneshot, 9}),
                    ==, TC_ERROR);
-  munit_assert_int(TC_DES_ISO9797_verify(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, TC_DES_ISO9797_PAD2, NULL, 24, msg,
-                                         22, oneshot, 8),
+  munit_assert_int(TC_DES_ISO9797_verify(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, TC_DES_ISO9797_PAD2,
+                                         (TC_bytes){NULL, 24}, (TC_bytes){msg, 22},
+                                         (TC_bytes){oneshot, 8}),
                    ==, TC_ERROR);
   /* A failed re-init of a keyed context wipes the earlier key schedule. */
-  munit_assert_int(TC_DES_ISO9797_init(&ctx, TC_DES_ISO9797_ALG3_3KEY_EXTENSION, TC_DES_ISO9797_PAD2, iso9797_key3,
-                                       sizeof iso9797_key3),
+  munit_assert_int(TC_DES_ISO9797_init(&ctx, TC_DES_ISO9797_ALG3_3KEY_EXTENSION,
+                                       TC_DES_ISO9797_PAD2,
+                                       (TC_bytes){iso9797_key3, sizeof iso9797_key3}),
                    ==, TC_OK);
-  munit_assert_int(TC_DES_ISO9797_update(&ctx, msg, 8), ==, TC_OK);
-  munit_assert_int(TC_DES_ISO9797_init(&ctx, TC_DES_ISO9797_ALG3_3KEY_EXTENSION, (TC_DES_ISO9797_padding)3,
-                                       iso9797_key3, sizeof iso9797_key3),
+  munit_assert_int(TC_DES_ISO9797_update(&ctx, (TC_bytes){msg, 8}), ==, TC_OK);
+  munit_assert_int(TC_DES_ISO9797_init(&ctx, TC_DES_ISO9797_ALG3_3KEY_EXTENSION,
+                                       (TC_DES_ISO9797_padding)3,
+                                       (TC_bytes){iso9797_key3, sizeof iso9797_key3}),
                    ==, TC_ERROR);
   munit_assert_uint8(ctx.active, ==, 0);
   for (i = 0; i < sizeof ctx.keys.schedule; ++i)
     munit_assert_uint8(((const uint8_t*)ctx.keys.schedule)[i], ==, 0);
   for (i = 0; i < sizeof ctx.mac; ++i)
     munit_assert_uint8(ctx.mac[i], ==, 0);
-  munit_assert_int(TC_DES_ISO9797_update(&ctx, msg, 8), ==, TC_ERROR);
-  munit_assert_int(TC_DES_ISO9797_final(&ctx, guard), ==, TC_ERROR);
-  munit_assert_int(TC_DES_ISO9797_init(NULL, TC_DES_ISO9797_ALG3_3KEY_EXTENSION, TC_DES_ISO9797_PAD2, iso9797_key3,
-                                       sizeof iso9797_key3),
+  munit_assert_int(TC_DES_ISO9797_update(&ctx, (TC_bytes){msg, 8}), ==, TC_ERROR);
+  munit_assert_int(TC_DES_ISO9797_final(&ctx, (TC_buffer){guard, TC_DES_BLOCKLEN}), ==, TC_ERROR);
+  munit_assert_int(TC_DES_ISO9797_init(NULL, TC_DES_ISO9797_ALG3_3KEY_EXTENSION,
+                                       TC_DES_ISO9797_PAD2,
+                                       (TC_bytes){iso9797_key3, sizeof iso9797_key3}),
                    ==, TC_ERROR);
   return MUNIT_OK;
 }
@@ -1445,99 +1553,116 @@ TC_TEST(test_des_iso9797)
   size_t i;
 
   /* ISO/IEC 9797-1:2011 Annex B.4 gives these Algorithm 3 tags. */
-  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD_NONE, key2,
-                                      sizeof key2, msg, sizeof msg - 1, tag, sizeof tag),
+  munit_assert_int(TC_DES_ISO9797_MAC(
+                       TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD_NONE, (TC_bytes){key2, sizeof key2},
+                       (TC_bytes){msg, sizeof msg - 1}, (TC_buffer){tag, sizeof tag}),
                    ==, TC_OK);
   munit_assert_memory_equal(8, tag, retail_none);
-  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, key2, sizeof key2,
-                                      msg, sizeof msg - 1, tag, sizeof tag),
-                   ==, TC_OK);
+  munit_assert_int(
+      TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, (TC_bytes){key2, sizeof key2},
+                         (TC_bytes){msg, sizeof msg - 1}, (TC_buffer){tag, sizeof tag}),
+      ==, TC_OK);
   munit_assert_memory_equal(8, tag, retail_pad2);
-  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD1, key2, sizeof key2,
-                                      msg2, sizeof msg2 - 1, tag, sizeof tag),
-                   ==, TC_OK);
+  munit_assert_int(
+      TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD1, (TC_bytes){key2, sizeof key2},
+                         (TC_bytes){msg2, sizeof msg2 - 1}, (TC_buffer){tag, sizeof tag}),
+      ==, TC_OK);
   munit_assert_memory_equal(8, tag, annex_b_msg2_pad1);
-  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, key2, sizeof key2,
-                                      msg2, sizeof msg2 - 1, tag, sizeof tag),
-                   ==, TC_OK);
+  munit_assert_int(
+      TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, (TC_bytes){key2, sizeof key2},
+                         (TC_bytes){msg2, sizeof msg2 - 1}, (TC_buffer){tag, sizeof tag}),
+      ==, TC_OK);
   munit_assert_memory_equal(8, tag, annex_b_msg2_pad2);
-  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG1, TC_DES_ISO9797_PAD1, iso9797_key3,
-                                      sizeof iso9797_key3, msg, sizeof msg - 2, tag, sizeof tag),
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG1, TC_DES_ISO9797_PAD1,
+                                      (TC_bytes){iso9797_key3, sizeof iso9797_key3},
+                                      (TC_bytes){msg, sizeof msg - 2},
+                                      (TC_buffer){tag, sizeof tag}),
                    ==, TC_OK);
   munit_assert_memory_equal(8, tag, alg1_3key_pad1);
-  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3_3KEY_EXTENSION,
-                                      TC_DES_ISO9797_PAD2, iso9797_key3,
-                                      sizeof iso9797_key3, msg, sizeof msg - 2, tag, sizeof tag),
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3_3KEY_EXTENSION, TC_DES_ISO9797_PAD2,
+                                      (TC_bytes){iso9797_key3, sizeof iso9797_key3},
+                                      (TC_bytes){msg, sizeof msg - 2},
+                                      (TC_buffer){tag, sizeof tag}),
                    ==, TC_OK);
   munit_assert_memory_equal(8, tag, alg3_3key_pad2);
 
-  munit_assert_int(
-      TC_DES_ISO9797_init(&ctx, TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, key2, sizeof key2), ==,
-      TC_OK);
+  munit_assert_int(TC_DES_ISO9797_init(&ctx, TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2,
+                                       (TC_bytes){key2, sizeof key2}),
+                   ==, TC_OK);
   for (i = 0; i < sizeof msg - 1; ++i)
-    munit_assert_int(TC_DES_ISO9797_update(&ctx, msg + i, 1), ==, TC_OK);
-  munit_assert_int(TC_DES_ISO9797_update(&ctx, NULL, 0), ==, TC_OK);
-  munit_assert_int(TC_DES_ISO9797_final(&ctx, tag), ==, TC_OK);
+    munit_assert_int(TC_DES_ISO9797_update(&ctx, (TC_bytes){msg + i, 1}), ==, TC_OK);
+  munit_assert_int(TC_DES_ISO9797_update(&ctx, (TC_bytes){NULL, 0}), ==, TC_OK);
+  munit_assert_int(TC_DES_ISO9797_final(&ctx, (TC_buffer){tag, TC_DES_BLOCKLEN}), ==, TC_OK);
   munit_assert_memory_equal(8, tag, retail_pad2);
-  munit_assert_int(TC_DES_ISO9797_update(&ctx, msg, 1), ==, TC_ERROR);
-  munit_assert_int(TC_DES_ISO9797_final(&ctx, tag), ==, TC_ERROR);
+  munit_assert_int(TC_DES_ISO9797_update(&ctx, (TC_bytes){msg, 1}), ==, TC_ERROR);
+  munit_assert_int(TC_DES_ISO9797_final(&ctx, (TC_buffer){tag, TC_DES_BLOCKLEN}), ==, TC_ERROR);
 
   memset(guard, 0xa5, sizeof guard);
-  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD_NONE, key2,
-                                      sizeof key2, msg, 3, guard, sizeof guard),
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD_NONE,
+                                      (TC_bytes){key2, sizeof key2}, (TC_bytes){msg, 3},
+                                      (TC_buffer){guard, sizeof guard}),
                    ==, TC_ERROR);
   for (i = 0; i < sizeof guard; ++i)
     munit_assert_uint8(guard[i], ==, 0xa5);
-  munit_assert_int(
-      TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, key2, 8, msg, 8, guard, 8), ==,
-      TC_ERROR);
-  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG1, TC_DES_ISO9797_PAD2, key2, sizeof key2,
-                                      NULL, 1, guard, 8),
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, (TC_bytes){key2, 8},
+                                      (TC_bytes){msg, 8}, (TC_buffer){guard, 8}),
                    ==, TC_ERROR);
-  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, key2, sizeof key2,
-                                      msg, 8, guard, 3),
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG1, TC_DES_ISO9797_PAD2,
+                                      (TC_bytes){key2, sizeof key2}, (TC_bytes){NULL, 1},
+                                      (TC_buffer){guard, 8}),
                    ==, TC_ERROR);
-  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG1, TC_DES_ISO9797_PAD_NONE, key2,
-                                      sizeof key2, NULL, 0, guard, 8),
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2,
+                                      (TC_bytes){key2, sizeof key2}, (TC_bytes){msg, 8},
+                                      (TC_buffer){guard, 3}),
                    ==, TC_ERROR);
-  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD1, key2, sizeof key2,
-                                      NULL, 0, guard, 8),
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG1, TC_DES_ISO9797_PAD_NONE,
+                                      (TC_bytes){key2, sizeof key2}, (TC_bytes){NULL, 0},
+                                      (TC_buffer){guard, 8}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD1,
+                                      (TC_bytes){key2, sizeof key2}, (TC_bytes){NULL, 0},
+                                      (TC_buffer){guard, 8}),
                    ==, TC_OK);
-  munit_assert_int(TC_DES_ISO9797_verify(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD1, key2,
-                                         sizeof key2, NULL, 0, guard, 8),
+  munit_assert_int(TC_DES_ISO9797_verify(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD1,
+                                         (TC_bytes){key2, sizeof key2}, (TC_bytes){NULL, 0},
+                                         (TC_bytes){guard, 8}),
                    ==, TC_OK);
-  munit_assert_int(
-      TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG1, TC_DES_ISO9797_PAD2, key2, 8, msg, 8, guard, 8), ==,
-      TC_ERROR);
-  munit_assert_int(TC_DES_ISO9797_init(&ctx, (TC_DES_ISO9797_algorithm)2, TC_DES_ISO9797_PAD2, key2,
-                                       sizeof key2),
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG1, TC_DES_ISO9797_PAD2, (TC_bytes){key2, 8},
+                                      (TC_bytes){msg, 8}, (TC_buffer){guard, 8}),
                    ==, TC_ERROR);
-  munit_assert_int(
-      TC_DES_ISO9797_init(&ctx, TC_DES_ISO9797_ALG3, (TC_DES_ISO9797_padding)3, key2, sizeof key2),
-      ==, TC_ERROR);
-  munit_assert_int(
-      TC_DES_ISO9797_init(&ctx, TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2, key2, sizeof key2), ==,
-      TC_OK);
-  munit_assert_int(TC_DES_ISO9797_update(&ctx, NULL, 1), ==, TC_ERROR);
+  munit_assert_int(TC_DES_ISO9797_init(&ctx, (TC_DES_ISO9797_algorithm)2, TC_DES_ISO9797_PAD2,
+                                       (TC_bytes){key2, sizeof key2}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_DES_ISO9797_init(&ctx, TC_DES_ISO9797_ALG3, (TC_DES_ISO9797_padding)3,
+                                       (TC_bytes){key2, sizeof key2}),
+                   ==, TC_ERROR);
+  munit_assert_int(TC_DES_ISO9797_init(&ctx, TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD2,
+                                       (TC_bytes){key2, sizeof key2}),
+                   ==, TC_OK);
+  munit_assert_int(TC_DES_ISO9797_update(&ctx, (TC_bytes){NULL, 1}), ==, TC_ERROR);
   TC_DES_ISO9797_ctx_clear(&ctx);
-  munit_assert_int(TC_DES_ISO9797_verify(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD_NONE, key2,
-                                         sizeof key2, msg, sizeof msg - 1, retail_none, 4),
+  munit_assert_int(TC_DES_ISO9797_verify(
+                       TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD_NONE, (TC_bytes){key2, sizeof key2},
+                       (TC_bytes){msg, sizeof msg - 1}, (TC_bytes){retail_none, 4}),
                    ==, TC_ERROR);
-  munit_assert_int(TC_DES_ISO9797_verify_short_tag(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD_NONE,
-                                                   key2, sizeof key2, msg, sizeof msg - 1,
-                                                   retail_none, 4),
+  munit_assert_int(TC_DES_ISO9797_verify_short_tag(
+                       TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD_NONE, (TC_bytes){key2, sizeof key2},
+                       (TC_bytes){msg, sizeof msg - 1}, (TC_bytes){retail_none, 4}),
                    ==, TC_OK);
-  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD_NONE, key2,
-                                      sizeof key2, msg, sizeof msg - 1, tag, 4),
+  munit_assert_int(TC_DES_ISO9797_MAC(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD_NONE,
+                                      (TC_bytes){key2, sizeof key2},
+                                      (TC_bytes){msg, sizeof msg - 1}, (TC_buffer){tag, 4}),
                    ==, TC_ERROR);
-  munit_assert_int(TC_DES_ISO9797_MAC_short_tag(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD_NONE, key2,
-                                                sizeof key2, msg, sizeof msg - 1, tag, 4),
+  munit_assert_int(TC_DES_ISO9797_MAC_short_tag(
+                       TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD_NONE, (TC_bytes){key2, sizeof key2},
+                       (TC_bytes){msg, sizeof msg - 1}, (TC_buffer){tag, 4}),
                    ==, TC_OK);
   munit_assert_memory_equal(4, tag, retail_none);
   tag[0] = (uint8_t)(retail_none[0] ^ 1);
   memcpy(tag + 1, retail_none + 1, 7);
-  munit_assert_int(TC_DES_ISO9797_verify(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD_NONE, key2,
-                                         sizeof key2, msg, sizeof msg - 1, tag, 8),
+  munit_assert_int(TC_DES_ISO9797_verify(TC_DES_ISO9797_ALG3, TC_DES_ISO9797_PAD_NONE,
+                                         (TC_bytes){key2, sizeof key2},
+                                         (TC_bytes){msg, sizeof msg - 1}, (TC_bytes){tag, 8}),
                    ==, TC_MISMATCH);
   return MUNIT_OK;
 }

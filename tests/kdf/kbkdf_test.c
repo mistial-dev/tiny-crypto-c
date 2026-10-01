@@ -358,8 +358,9 @@ TC_TEST_SHARED(test_kbkdf_cmac_first_block)
                            (TC_bytes){key, key_lens[k]}, &p, (TC_bytes){NULL, 0},
                            (TC_bytes){fixed + 1, sizeof(fixed) - 1}, (TC_buffer){out, sizeof(out)}),
                        ==, TC_OK);
-      munit_assert_int(TC_DES_CMAC(key, key_lens[k], fixed, sizeof(fixed), tag, sizeof(tag)), ==,
-                       TC_OK);
+      munit_assert_int(TC_DES_CMAC((TC_bytes){key, key_lens[k]}, (TC_bytes){fixed, sizeof(fixed)},
+                                   (TC_buffer){tag, sizeof(tag)}),
+                       ==, TC_OK);
       munit_assert_memory_equal(sizeof(out), out, tag);
     }
     ran = 1;

@@ -100,7 +100,7 @@ void TC_DES_ctx_clear(struct TC_DES_ctx* ctx);
 /*
  * The ECB, CBC, CTR, CFB and OFB entry points share one argument contract.
  * They return TC_ERROR for a NULL or uninitialized context, a context without
- * an IV from TC_DES_set_iv (every mode except ECB, even for an empty buffer),
+ * an IV from TC_DES_set_iv(every mode except ECB, (TC_bytes){even for an empty buffer, TC_DES_BLOCKLEN}),
  * a NULL buffer with a nonzero length, or a buffer that overlaps the context,
  * and leave the context and buffer unchanged. Otherwise a NULL buffer with
  * length 0 returns TC_OK.
@@ -129,7 +129,7 @@ void TC_DES_ctx_clear(struct TC_DES_ctx* ctx);
  *       with K1 = K2 or K2 = K3 are rejected, because those collapse to single
  *       DES. K1 = K3 remains valid two-key TDEA.
  */
-TC_status TC_DES_init(struct TC_DES_ctx* ctx, const uint8_t* key, size_t keylen);
+TC_status TC_DES_init(struct TC_DES_ctx* ctx, TC_bytes key);
 #endif
 
 #if TC_ENABLE_DES && TC_DES_NEEDS_IV
@@ -153,7 +153,7 @@ TC_status TC_DES_init(struct TC_DES_ctx* ctx, const uint8_t* key, size_t keylen)
  * @return TC_OK, or TC_ERROR for a NULL argument, an inactive context or an
  *         IV that overlaps ctx. The context is unchanged on error.
  */
-TC_status TC_DES_set_iv(struct TC_DES_ctx* ctx, const uint8_t* iv);
+TC_status TC_DES_set_iv(struct TC_DES_ctx* ctx, TC_bytes iv);
 #endif
 
 #if TC_ENABLE_DES && TC_DES_ENABLE_ECB
@@ -164,7 +164,7 @@ TC_status TC_DES_set_iv(struct TC_DES_ctx* ctx, const uint8_t* iv);
  * @param buf 8-byte block, encrypted in place.
  * @return TC_OK, or TC_ERROR for an argument error.
  */
-TC_status TC_DES_ECB_encrypt(const struct TC_DES_ctx* ctx, uint8_t* buf);
+TC_status TC_DES_ECB_encrypt(const struct TC_DES_ctx* ctx, TC_buffer buf);
 
 /**
  * @brief Decrypt one 8-byte block in ECB mode.
@@ -172,7 +172,7 @@ TC_status TC_DES_ECB_encrypt(const struct TC_DES_ctx* ctx, uint8_t* buf);
  * @param buf 8-byte block, decrypted in place.
  * @return TC_OK, or TC_ERROR for an argument error.
  */
-TC_status TC_DES_ECB_decrypt(const struct TC_DES_ctx* ctx, uint8_t* buf);
+TC_status TC_DES_ECB_decrypt(const struct TC_DES_ctx* ctx, TC_buffer buf);
 #endif
 
 #if TC_ENABLE_DES && TC_DES_ENABLE_CBC
@@ -185,7 +185,7 @@ TC_status TC_DES_ECB_decrypt(const struct TC_DES_ctx* ctx, uint8_t* buf);
  * @return TC_OK, or TC_ERROR for an argument error or a length that is not
  *         block-aligned (context and buffer unchanged).
  */
-TC_status TC_DES_CBC_encrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
+TC_status TC_DES_CBC_encrypt(struct TC_DES_ctx* ctx, TC_buffer buf);
 
 /**
  * @brief Decrypt a buffer in CBC mode (SP 800-38A section 6.2). The IV
@@ -196,7 +196,7 @@ TC_status TC_DES_CBC_encrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length
  * @return TC_OK, or TC_ERROR for an argument error or a length that is not
  *         block-aligned (context and buffer unchanged).
  */
-TC_status TC_DES_CBC_decrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
+TC_status TC_DES_CBC_decrypt(struct TC_DES_ctx* ctx, TC_buffer buf);
 #endif
 
 #if TC_ENABLE_DES && TC_DES_ENABLE_CTR
@@ -211,7 +211,7 @@ TC_status TC_DES_CBC_decrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length
  *         context unchanged). After the counter wraps, calls fail until a
  *         new IV is set.
  */
-TC_status TC_DES_CTR_crypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
+TC_status TC_DES_CTR_crypt(struct TC_DES_ctx* ctx, TC_buffer buf);
 #endif
 
 #if TC_DES_ENABLE_CFB64
@@ -233,7 +233,7 @@ TC_status TC_DES_CTR_crypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
  * @return TC_OK, or TC_ERROR for an argument error or a finished message.
  *         The context and buffer are unchanged on error.
  */
-TC_status TC_DES_CFB64_encrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
+TC_status TC_DES_CFB64_encrypt(struct TC_DES_ctx* ctx, TC_buffer buf);
 
 /**
  * @brief Decrypt a buffer in CFB64 mode.
@@ -243,7 +243,7 @@ TC_status TC_DES_CFB64_encrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t leng
  * @return TC_OK, or TC_ERROR for an argument error or a finished message.
  *         The context and buffer are unchanged on error.
  */
-TC_status TC_DES_CFB64_decrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
+TC_status TC_DES_CFB64_decrypt(struct TC_DES_ctx* ctx, TC_buffer buf);
 #endif
 #endif
 
@@ -255,7 +255,7 @@ TC_status TC_DES_CFB64_decrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t leng
  * @param length Data length in bytes.
  * @return TC_OK, or TC_ERROR for an argument error.
  */
-TC_status TC_DES_CFB8_encrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
+TC_status TC_DES_CFB8_encrypt(struct TC_DES_ctx* ctx, TC_buffer buf);
 
 /**
  * @brief Decrypt a buffer in CFB8 mode (SP 800-38A section 6.3, s = 8).
@@ -264,7 +264,7 @@ TC_status TC_DES_CFB8_encrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t lengt
  * @param length Data length in bytes.
  * @return TC_OK, or TC_ERROR for an argument error.
  */
-TC_status TC_DES_CFB8_decrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
+TC_status TC_DES_CFB8_decrypt(struct TC_DES_ctx* ctx, TC_buffer buf);
 #endif
 
 #if TC_ENABLE_DES && TC_DES_ENABLE_CFB1
@@ -280,7 +280,7 @@ TC_status TC_DES_CFB8_decrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t lengt
  * @param bit_length Data length in bits.
  * @return TC_OK, or TC_ERROR for an argument error.
  */
-TC_status TC_DES_CFB1_encrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t bit_length);
+TC_status TC_DES_CFB1_encrypt(struct TC_DES_ctx* ctx, TC_buffer buf, size_t bit_length);
 
 /**
  * @brief Decrypt bits in CFB1 mode, packed as for TC_DES_CFB1_encrypt.
@@ -289,7 +289,7 @@ TC_status TC_DES_CFB1_encrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t bit_l
  * @param bit_length Data length in bits.
  * @return TC_OK, or TC_ERROR for an argument error.
  */
-TC_status TC_DES_CFB1_decrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t bit_length);
+TC_status TC_DES_CFB1_decrypt(struct TC_DES_ctx* ctx, TC_buffer buf, size_t bit_length);
 #endif
 
 #if TC_ENABLE_DES && TC_DES_ENABLE_OFB
@@ -302,7 +302,7 @@ TC_status TC_DES_CFB1_decrypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t bit_l
  * @return TC_OK, or TC_ERROR for an argument error or a corrupted stream
  *         position.
  */
-TC_status TC_DES_OFB_crypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
+TC_status TC_DES_OFB_crypt(struct TC_DES_ctx* ctx, TC_buffer buf);
 #endif
 
 /* --- DES / 3DES CMAC (NIST SP 800-38B) --- */
@@ -325,24 +325,20 @@ TC_status TC_DES_OFB_crypt(struct TC_DES_ctx* ctx, uint8_t* buf, size_t length);
  *         length or a tag length outside the range. Every failure leaves tag
  *         unchanged.
  */
-TC_status TC_DES_CMAC(const uint8_t* key, size_t keylen, const uint8_t* msg, size_t msg_len,
-                      uint8_t* tag, size_t tag_len);
+TC_status TC_DES_CMAC(TC_bytes key, TC_bytes msg, TC_buffer tag);
 
 /* Recompute the CMAC and compare tag_len bytes in constant time
  * (SP 800-38B section 6.3), with the same length range as TC_DES_CMAC.
  * @return TC_OK when the tag matches, TC_MISMATCH when it differs, or
  *         TC_ERROR as for TC_DES_CMAC. */
-TC_status TC_DES_CMAC_verify(const uint8_t* key, size_t keylen, const uint8_t* msg, size_t msg_len,
-                             const uint8_t* tag, size_t tag_len);
+TC_status TC_DES_CMAC_verify(TC_bytes key, TC_bytes msg, TC_bytes tag);
 
 /* Short-tag DES/3DES-CMAC and verify. tag_len must be in
  * 1..TC_MIN_TAG_LEN - 1. Use them only when the protocol fixes the short tag
  * and limits failed verifications for the key (SP 800-38B Appendix A.2).
  * Status values follow TC_DES_CMAC and TC_DES_CMAC_verify. */
-TC_status TC_DES_CMAC_short_tag(const uint8_t* key, size_t keylen, const uint8_t* msg,
-                                size_t msg_len, uint8_t* tag, size_t tag_len);
-TC_status TC_DES_CMAC_verify_short_tag(const uint8_t* key, size_t keylen, const uint8_t* msg,
-                                       size_t msg_len, const uint8_t* tag, size_t tag_len);
+TC_status TC_DES_CMAC_short_tag(TC_bytes key, TC_bytes msg, TC_buffer tag);
+TC_status TC_DES_CMAC_verify_short_tag(TC_bytes key, TC_bytes msg, TC_bytes tag);
 #endif
 
 /*
@@ -379,9 +375,9 @@ struct TC_DES_CMAC_ctx {
  * TC_OK, or TC_ERROR with ctx unchanged for a NULL argument, an overlap or an
  * unkeyed ctx. Otherwise final wipes ctx.
  * ctx_clear wipes ctx and ignores NULL. */
-TC_status TC_DES_CMAC_init(struct TC_DES_CMAC_ctx* ctx, const uint8_t* key, size_t keylen);
-TC_status TC_DES_CMAC_update(struct TC_DES_CMAC_ctx* ctx, const uint8_t* data, size_t len);
-TC_status TC_DES_CMAC_final(struct TC_DES_CMAC_ctx* ctx, uint8_t tag[TC_DES_CMAC_TAG_MAX]);
+TC_status TC_DES_CMAC_init(struct TC_DES_CMAC_ctx* ctx, TC_bytes key);
+TC_status TC_DES_CMAC_update(struct TC_DES_CMAC_ctx* ctx, TC_bytes data);
+TC_status TC_DES_CMAC_final(struct TC_DES_CMAC_ctx* ctx, TC_buffer tag);
 void TC_DES_CMAC_ctx_clear(struct TC_DES_CMAC_ctx* ctx);
 #endif
 
@@ -445,17 +441,17 @@ struct TC_DES_ISO9797_ctx {
  * padding, another key length, a key that overlaps ctx or a key refused
  * under TC_DES_REJECT_WEAK_KEYS. A NULL ctx is left alone. */
 TC_status TC_DES_ISO9797_init(struct TC_DES_ISO9797_ctx* ctx, TC_DES_ISO9797_algorithm algorithm,
-                              TC_DES_ISO9797_padding padding, const uint8_t* key, size_t keylen);
+                              TC_DES_ISO9797_padding padding, TC_bytes key);
 /* Absorb msg, which may be NULL when msg_len is 0. Returns TC_OK, or
  * TC_ERROR with ctx unchanged for a NULL ctx, a NULL msg with a nonzero
  * length, msg that overlaps ctx, or an inactive or corrupted ctx. */
-TC_status TC_DES_ISO9797_update(struct TC_DES_ISO9797_ctx* ctx, const uint8_t* msg, size_t msg_len);
+TC_status TC_DES_ISO9797_update(struct TC_DES_ISO9797_ctx* ctx, TC_bytes msg);
 /* Pad, apply the output transformation and write the full 8-byte MAC.
  * Callers truncate it to leading bytes (clause 6.8). Returns TC_OK, or
  * TC_ERROR with ctx unchanged for a NULL argument, a tag that overlaps ctx,
  * or an inactive or corrupted ctx. A NONE-padded message that is empty or
  * unaligned returns TC_ERROR and wipes ctx. Every other return wipes ctx. */
-TC_status TC_DES_ISO9797_final(struct TC_DES_ISO9797_ctx* ctx, uint8_t tag[TC_DES_BLOCKLEN]);
+TC_status TC_DES_ISO9797_final(struct TC_DES_ISO9797_ctx* ctx, TC_buffer tag);
 /* Wipe the context. NULL is ignored. */
 void TC_DES_ISO9797_ctx_clear(struct TC_DES_ISO9797_ctx* ctx);
 /* One-shot MAC and verify over the streaming functions. The default forms
@@ -465,21 +461,17 @@ void TC_DES_ISO9797_ctx_clear(struct TC_DES_ISO9797_ctx* ctx);
  * Verify compares in constant time and returns TC_OK on a match,
  * TC_MISMATCH for a different tag and TC_ERROR for the MAC errors. */
 TC_status TC_DES_ISO9797_MAC(TC_DES_ISO9797_algorithm algorithm, TC_DES_ISO9797_padding padding,
-                             const uint8_t* key, size_t keylen, const uint8_t* msg, size_t msg_len,
-                             uint8_t* tag, size_t tag_len);
+                             TC_bytes key, TC_bytes msg, TC_buffer tag);
 TC_status TC_DES_ISO9797_verify(TC_DES_ISO9797_algorithm algorithm, TC_DES_ISO9797_padding padding,
-                                const uint8_t* key, size_t keylen, const uint8_t* msg,
-                                size_t msg_len, const uint8_t* tag, size_t tag_len);
+                                TC_bytes key, TC_bytes msg, TC_bytes tag);
 /* Explicit truncated-MAC API (clause 6.8). Accepts the leading 4..7 bytes
  * and otherwise follows the default forms. */
 TC_status TC_DES_ISO9797_MAC_short_tag(TC_DES_ISO9797_algorithm algorithm,
-                                       TC_DES_ISO9797_padding padding, const uint8_t* key,
-                                       size_t keylen, const uint8_t* msg, size_t msg_len,
-                                       uint8_t* tag, size_t tag_len);
+                                       TC_DES_ISO9797_padding padding, TC_bytes key, TC_bytes msg,
+                                       TC_buffer tag);
 TC_status TC_DES_ISO9797_verify_short_tag(TC_DES_ISO9797_algorithm algorithm,
-                                          TC_DES_ISO9797_padding padding, const uint8_t* key,
-                                          size_t keylen, const uint8_t* msg, size_t msg_len,
-                                          const uint8_t* tag, size_t tag_len);
+                                          TC_DES_ISO9797_padding padding, TC_bytes key,
+                                          TC_bytes msg, TC_bytes tag);
 #endif
 #endif /* TC_DES_ENABLE_ISO9797 */
 

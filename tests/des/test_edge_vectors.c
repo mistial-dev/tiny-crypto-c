@@ -23,21 +23,25 @@ TC_TEST(test_edge_vectors)
     memcpy(buffer, vector->msg, vector->len);
 
     struct TC_DES_ctx ctx;
-    munit_assert_int(TC_DES_init(&ctx, vector->key, vector->key_len), ==, TC_OK);
-    munit_assert_int(TC_DES_set_iv(&ctx, vector->iv), ==, TC_OK);
+    munit_assert_int(TC_DES_init(&ctx, (TC_bytes){vector->key, vector->key_len}), ==, TC_OK);
+    munit_assert_int(TC_DES_set_iv(&ctx, (TC_bytes){vector->iv, TC_DES_BLOCKLEN}), ==, TC_OK);
 
     if (strcmp(vector->mode, "ECB") == 0)
-      munit_assert_int(TC_DES_ECB_encrypt(&ctx, buffer), ==, TC_OK);
+      munit_assert_int(TC_DES_ECB_encrypt(&ctx, (TC_buffer){buffer, TC_DES_BLOCKLEN}), ==, TC_OK);
     else if (strcmp(vector->mode, "CBC") == 0)
-      munit_assert_int(TC_DES_CBC_encrypt(&ctx, buffer, vector->len), ==, TC_OK);
+      munit_assert_int(TC_DES_CBC_encrypt(&ctx, (TC_buffer){buffer, vector->len}), ==, TC_OK);
     else if (strcmp(vector->mode, "CFB1") == 0)
-      munit_assert_int(TC_DES_CFB1_encrypt(&ctx, buffer, vector->bit_length), ==, TC_OK);
+      munit_assert_int(TC_DES_CFB1_encrypt(&ctx,
+                                           (TC_buffer){buffer, ((vector->bit_length) / 8u +
+                                                                ((vector->bit_length) % 8u != 0))},
+                                           vector->bit_length),
+                       ==, TC_OK);
     else if (strcmp(vector->mode, "CFB8") == 0)
-      munit_assert_int(TC_DES_CFB8_encrypt(&ctx, buffer, vector->len), ==, TC_OK);
+      munit_assert_int(TC_DES_CFB8_encrypt(&ctx, (TC_buffer){buffer, vector->len}), ==, TC_OK);
     else if (strcmp(vector->mode, "CFB64") == 0)
-      munit_assert_int(TC_DES_CFB64_encrypt(&ctx, buffer, vector->len), ==, TC_OK);
+      munit_assert_int(TC_DES_CFB64_encrypt(&ctx, (TC_buffer){buffer, vector->len}), ==, TC_OK);
     else if (strcmp(vector->mode, "OFB") == 0)
-      munit_assert_int(TC_DES_OFB_crypt(&ctx, buffer, vector->len), ==, TC_OK);
+      munit_assert_int(TC_DES_OFB_crypt(&ctx, (TC_buffer){buffer, vector->len}), ==, TC_OK);
     else
       munit_errorf("unknown DES edge-vector mode: %s", vector->mode);
     TC_DES_ctx_clear(&ctx);

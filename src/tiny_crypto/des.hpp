@@ -33,7 +33,7 @@ public:
 
   TC_CPP_NODISCARD TC_status init(bytes key) noexcept
   {
-    return TC_DES_init(&ctx_, key.data, key.length);
+    return TC_DES_init(&ctx_, key);
   }
   template <size_t N> TC_CPP_NODISCARD TC_status init(const uint8_t (&key)[N]) noexcept
   {
@@ -48,9 +48,9 @@ public:
       TC_DES_ctx_clear(&ctx_);
       return TC_ERROR;
     }
-    TC_status status = TC_DES_init(&ctx_, key.data, key.length);
+    TC_status status = TC_DES_init(&ctx_, key);
     if (status == TC_OK)
-      status = TC_DES_set_iv(&ctx_, iv.data);
+      status = TC_DES_set_iv(&ctx_, iv);
     if (status != TC_OK)
       TC_DES_ctx_clear(&ctx_);
     return status;
@@ -64,7 +64,7 @@ public:
   /* Start a new message. A wrong length returns TC_ERROR and keeps the key. */
   TC_CPP_NODISCARD TC_status set_iv(bytes iv) noexcept
   {
-    return iv.length == TC_DES_BLOCKLEN ? TC_DES_set_iv(&ctx_, iv.data) : TC_ERROR;
+    return iv.length == TC_DES_BLOCKLEN ? TC_DES_set_iv(&ctx_, iv) : TC_ERROR;
   }
   TC_CPP_NODISCARD TC_status set_iv(const uint8_t (&iv)[TC_DES_BLOCKLEN]) noexcept
   {
@@ -74,58 +74,60 @@ public:
 #if TC_DES_ENABLE_ECB
   TC_CPP_NODISCARD TC_status encrypt_ecb(uint8_t* block) const noexcept
   {
-    return TC_DES_ECB_encrypt(&ctx_, block);
+    return TC_DES_ECB_encrypt(&ctx_, TC_buffer{block, TC_DES_BLOCKLEN});
   }
   TC_CPP_NODISCARD TC_status decrypt_ecb(uint8_t* block) const noexcept
   {
-    return TC_DES_ECB_decrypt(&ctx_, block);
+    return TC_DES_ECB_decrypt(&ctx_, TC_buffer{block, TC_DES_BLOCKLEN});
   }
 #endif
 #if TC_DES_ENABLE_CBC
   TC_CPP_NODISCARD TC_status encrypt_cbc(uint8_t* data, size_t n) noexcept
   {
-    return TC_DES_CBC_encrypt(&ctx_, data, n);
+    return TC_DES_CBC_encrypt(&ctx_, TC_buffer{data, n});
   }
   TC_CPP_NODISCARD TC_status decrypt_cbc(uint8_t* data, size_t n) noexcept
   {
-    return TC_DES_CBC_decrypt(&ctx_, data, n);
+    return TC_DES_CBC_decrypt(&ctx_, TC_buffer{data, n});
   }
 #endif
 #if TC_DES_ENABLE_CTR
   TC_CPP_NODISCARD TC_status xcrypt_ctr(uint8_t* data, size_t n) noexcept
   {
-    return TC_DES_CTR_crypt(&ctx_, data, n);
+    return TC_DES_CTR_crypt(&ctx_, TC_buffer{data, n});
   }
 #endif
 #if TC_DES_ENABLE_CFB64
   /* A call whose length is not a multiple of 8 ends the message. See des.h. */
   TC_CPP_NODISCARD TC_status encrypt_cfb64(uint8_t* data, size_t n) noexcept
   {
-    return TC_DES_CFB64_encrypt(&ctx_, data, n);
+    return TC_DES_CFB64_encrypt(&ctx_, TC_buffer{data, n});
   }
   TC_CPP_NODISCARD TC_status decrypt_cfb64(uint8_t* data, size_t n) noexcept
   {
-    return TC_DES_CFB64_decrypt(&ctx_, data, n);
+    return TC_DES_CFB64_decrypt(&ctx_, TC_buffer{data, n});
   }
 #endif
 #if TC_DES_ENABLE_CFB8
   TC_CPP_NODISCARD TC_status encrypt_cfb8(uint8_t* data, size_t n) noexcept
   {
-    return TC_DES_CFB8_encrypt(&ctx_, data, n);
+    return TC_DES_CFB8_encrypt(&ctx_, TC_buffer{data, n});
   }
   TC_CPP_NODISCARD TC_status decrypt_cfb8(uint8_t* data, size_t n) noexcept
   {
-    return TC_DES_CFB8_decrypt(&ctx_, data, n);
+    return TC_DES_CFB8_decrypt(&ctx_, TC_buffer{data, n});
   }
 #endif
 #if TC_DES_ENABLE_CFB1
   TC_CPP_NODISCARD TC_status encrypt_cfb1(uint8_t* data, size_t data_len, size_t bits) noexcept
   {
-    return cfb1_fits(data_len, bits) ? TC_DES_CFB1_encrypt(&ctx_, data, bits) : TC_ERROR;
+    return cfb1_fits(data_len, bits) ? TC_DES_CFB1_encrypt(&ctx_, TC_buffer{data, data_len}, bits)
+                                     : TC_ERROR;
   }
   TC_CPP_NODISCARD TC_status decrypt_cfb1(uint8_t* data, size_t data_len, size_t bits) noexcept
   {
-    return cfb1_fits(data_len, bits) ? TC_DES_CFB1_decrypt(&ctx_, data, bits) : TC_ERROR;
+    return cfb1_fits(data_len, bits) ? TC_DES_CFB1_decrypt(&ctx_, TC_buffer{data, data_len}, bits)
+                                     : TC_ERROR;
   }
   template <size_t N>
   TC_CPP_NODISCARD TC_status encrypt_cfb1(uint8_t (&data)[N], size_t bits) noexcept
@@ -141,7 +143,7 @@ public:
 #if TC_DES_ENABLE_OFB
   TC_CPP_NODISCARD TC_status xcrypt_ofb(uint8_t* data, size_t n) noexcept
   {
-    return TC_DES_OFB_crypt(&ctx_, data, n);
+    return TC_DES_OFB_crypt(&ctx_, TC_buffer{data, n});
   }
 #endif
   void clear() noexcept
@@ -173,23 +175,20 @@ private:
  * TC_DES_CMAC_verify. An argument error leaves the tag unchanged. */
 TC_CPP_NODISCARD inline TC_status des_cmac(bytes key, bytes message, buffer tag) noexcept
 {
-  return TC_DES_CMAC(key.data, key.length, message.data, message.length, tag.data, tag.capacity);
+  return TC_DES_CMAC(key, message, tag);
 }
 TC_CPP_NODISCARD inline TC_status des_cmac_verify(bytes key, bytes message, bytes tag) noexcept
 {
-  return TC_DES_CMAC_verify(key.data, key.length, message.data, message.length, tag.data,
-                            tag.length);
+  return TC_DES_CMAC_verify(key, message, tag);
 }
 TC_CPP_NODISCARD inline TC_status des_cmac_short_tag(bytes key, bytes message, buffer tag) noexcept
 {
-  return TC_DES_CMAC_short_tag(key.data, key.length, message.data, message.length, tag.data,
-                               tag.capacity);
+  return TC_DES_CMAC_short_tag(key, message, tag);
 }
 TC_CPP_NODISCARD inline TC_status des_cmac_verify_short_tag(bytes key, bytes message,
                                                             bytes tag) noexcept
 {
-  return TC_DES_CMAC_verify_short_tag(key.data, key.length, message.data, message.length, tag.data,
-                                      tag.length);
+  return TC_DES_CMAC_verify_short_tag(key, message, tag);
 }
 
 /* Streaming DES/TDEA-CMAC. init takes the key lengths of des_cmac. finish
@@ -212,7 +211,7 @@ public:
 
   TC_CPP_NODISCARD TC_status init(bytes key) noexcept
   {
-    const TC_status status = TC_DES_CMAC_init(&ctx_, key.data, key.length);
+    const TC_status status = TC_DES_CMAC_init(&ctx_, key);
     if (status != TC_OK)
       TC_DES_CMAC_ctx_clear(&ctx_);
     return status;
@@ -223,7 +222,7 @@ public:
   }
   TC_CPP_NODISCARD TC_status update(bytes data) noexcept
   {
-    return TC_DES_CMAC_update(&ctx_, data.data, data.length);
+    return TC_DES_CMAC_update(&ctx_, data);
   }
   template <size_t N> TC_CPP_NODISCARD TC_status update(const uint8_t (&data)[N]) noexcept
   {
@@ -231,7 +230,7 @@ public:
   }
   TC_CPP_NODISCARD TC_status finish(uint8_t (&tag)[TC_DES_CMAC_TAG_MAX]) noexcept
   {
-    return TC_DES_CMAC_final(&ctx_, tag);
+    return TC_DES_CMAC_final(&ctx_, TC_buffer{tag, TC_DES_CMAC_TAG_MAX});
   }
   void clear() noexcept
   {
@@ -254,31 +253,27 @@ TC_CPP_NODISCARD inline TC_status des_iso9797_mac(TC_DES_ISO9797_algorithm algor
                                                   TC_DES_ISO9797_padding padding, bytes key,
                                                   bytes message, buffer tag) noexcept
 {
-  return TC_DES_ISO9797_MAC(algorithm, padding, key.data, key.length, message.data, message.length,
-                            tag.data, tag.capacity);
+  return TC_DES_ISO9797_MAC(algorithm, padding, key, message, tag);
 }
 TC_CPP_NODISCARD inline TC_status des_iso9797_verify(TC_DES_ISO9797_algorithm algorithm,
                                                      TC_DES_ISO9797_padding padding, bytes key,
                                                      bytes message, bytes tag) noexcept
 {
-  return TC_DES_ISO9797_verify(algorithm, padding, key.data, key.length, message.data,
-                               message.length, tag.data, tag.length);
+  return TC_DES_ISO9797_verify(algorithm, padding, key, message, tag);
 }
 TC_CPP_NODISCARD inline TC_status des_iso9797_mac_short_tag(TC_DES_ISO9797_algorithm algorithm,
                                                             TC_DES_ISO9797_padding padding,
                                                             bytes key, bytes message,
                                                             buffer tag) noexcept
 {
-  return TC_DES_ISO9797_MAC_short_tag(algorithm, padding, key.data, key.length, message.data,
-                                      message.length, tag.data, tag.capacity);
+  return TC_DES_ISO9797_MAC_short_tag(algorithm, padding, key, message, tag);
 }
 TC_CPP_NODISCARD inline TC_status des_iso9797_verify_short_tag(TC_DES_ISO9797_algorithm algorithm,
                                                                TC_DES_ISO9797_padding padding,
                                                                bytes key, bytes message,
                                                                bytes tag) noexcept
 {
-  return TC_DES_ISO9797_verify_short_tag(algorithm, padding, key.data, key.length, message.data,
-                                         message.length, tag.data, tag.length);
+  return TC_DES_ISO9797_verify_short_tag(algorithm, padding, key, message, tag);
 }
 
 /* Streaming ISO/IEC 9797-1 MAC. init takes the algorithm, padding and key of
@@ -303,7 +298,7 @@ public:
   TC_CPP_NODISCARD TC_status init(TC_DES_ISO9797_algorithm algorithm,
                                   TC_DES_ISO9797_padding padding, bytes key) noexcept
   {
-    return TC_DES_ISO9797_init(&ctx_, algorithm, padding, key.data, key.length);
+    return TC_DES_ISO9797_init(&ctx_, algorithm, padding, key);
   }
   template <size_t N>
   TC_CPP_NODISCARD TC_status init(TC_DES_ISO9797_algorithm algorithm,
@@ -313,7 +308,7 @@ public:
   }
   TC_CPP_NODISCARD TC_status update(bytes message) noexcept
   {
-    return TC_DES_ISO9797_update(&ctx_, message.data, message.length);
+    return TC_DES_ISO9797_update(&ctx_, message);
   }
   template <size_t N> TC_CPP_NODISCARD TC_status update(const uint8_t (&message)[N]) noexcept
   {
@@ -321,7 +316,7 @@ public:
   }
   TC_CPP_NODISCARD TC_status finish(uint8_t (&tag)[TC_DES_BLOCKLEN]) noexcept
   {
-    return TC_DES_ISO9797_final(&ctx_, tag);
+    return TC_DES_ISO9797_final(&ctx_, TC_buffer{tag, TC_DES_BLOCKLEN});
   }
   void clear() noexcept
   {

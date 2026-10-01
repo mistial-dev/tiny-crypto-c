@@ -8,11 +8,11 @@ static TC_status ctr(size_t length)
   static uint8_t buffer[16384];
   static const uint8_t iv[8] = {0};
   struct TC_DES_ctx ctx;
-  TC_status status = TC_DES_init(&ctx, key, TC_DES_KEYLEN);
+  TC_status status = TC_DES_init(&ctx, (TC_bytes){key, TC_DES_KEYLEN});
   if (status == TC_OK)
-    status = TC_DES_set_iv(&ctx, iv);
+    status = TC_DES_set_iv(&ctx, (TC_bytes){iv, TC_DES_BLOCKLEN});
   if (status == TC_OK && length != 0)
-    status = TC_DES_CTR_crypt(&ctx, buffer, length);
+    status = TC_DES_CTR_crypt(&ctx, (TC_buffer){buffer, length});
   if (status == TC_OK)
     tc_benchmark_consume(length ? (const void*)buffer : (const void*)&ctx);
   TC_DES_ctx_clear(&ctx);
@@ -28,11 +28,11 @@ static TC_status ctr3(size_t length)
   static uint8_t buffer[16384];
   static const uint8_t iv[8] = {0};
   struct TC_DES_ctx ctx;
-  TC_status status = TC_DES_init(&ctx, key3, sizeof(key3));
+  TC_status status = TC_DES_init(&ctx, (TC_bytes){key3, sizeof(key3)});
   if (status == TC_OK)
-    status = TC_DES_set_iv(&ctx, iv);
+    status = TC_DES_set_iv(&ctx, (TC_bytes){iv, TC_DES_BLOCKLEN});
   if (status == TC_OK && length != 0)
-    status = TC_DES_CTR_crypt(&ctx, buffer, length);
+    status = TC_DES_CTR_crypt(&ctx, (TC_buffer){buffer, length});
   if (status == TC_OK)
     tc_benchmark_consume(length ? (const void*)buffer : (const void*)&ctx);
   TC_DES_ctx_clear(&ctx);

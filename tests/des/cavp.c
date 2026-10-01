@@ -84,15 +84,20 @@ static TC_status cavp_apply_iv_mode(struct TC_DES_ctx* ctx, int mode, int encryp
 {
   switch (mode) {
   case CAVP_TCBC:
-    return encrypt ? TC_DES_CBC_encrypt(ctx, buf, len) : TC_DES_CBC_decrypt(ctx, buf, len);
+    return encrypt ? TC_DES_CBC_encrypt(ctx, (TC_buffer){buf, len})
+                   : TC_DES_CBC_decrypt(ctx, (TC_buffer){buf, len});
   case CAVP_TCFB1:
-    return encrypt ? TC_DES_CFB1_encrypt(ctx, buf, len) : TC_DES_CFB1_decrypt(ctx, buf, len);
+    return encrypt
+               ? TC_DES_CFB1_encrypt(ctx, (TC_buffer){buf, ((len) / 8u + ((len) % 8u != 0))}, len)
+               : TC_DES_CFB1_decrypt(ctx, (TC_buffer){buf, ((len) / 8u + ((len) % 8u != 0))}, len);
   case CAVP_TCFB8:
-    return encrypt ? TC_DES_CFB8_encrypt(ctx, buf, len) : TC_DES_CFB8_decrypt(ctx, buf, len);
+    return encrypt ? TC_DES_CFB8_encrypt(ctx, (TC_buffer){buf, len})
+                   : TC_DES_CFB8_decrypt(ctx, (TC_buffer){buf, len});
   case CAVP_TCFB64:
-    return encrypt ? TC_DES_CFB64_encrypt(ctx, buf, len) : TC_DES_CFB64_decrypt(ctx, buf, len);
+    return encrypt ? TC_DES_CFB64_encrypt(ctx, (TC_buffer){buf, len})
+                   : TC_DES_CFB64_decrypt(ctx, (TC_buffer){buf, len});
   default: /* CAVP_TOFB */
-    return TC_DES_OFB_crypt(ctx, buf, len);
+    return TC_DES_OFB_crypt(ctx, (TC_buffer){buf, len});
   }
 }
 
@@ -104,14 +109,15 @@ static TC_status cavp_apply(int mode, int encrypt, const uint8_t key[24], const 
 {
   static const uint8_t zero_iv[TC_DES_BLOCKLEN] = {0};
   struct TC_DES_ctx ctx;
-  TC_status status = TC_DES_init(&ctx, key, 24);
+  TC_status status = TC_DES_init(&ctx, (TC_bytes){key, 24});
   size_t i;
 
   if (status == TC_OK && mode == CAVP_TECB) {
     for (i = 0; status == TC_OK && i < len; i += TC_DES_BLOCKLEN)
-      status = encrypt ? TC_DES_ECB_encrypt(&ctx, buf + i) : TC_DES_ECB_decrypt(&ctx, buf + i);
+      status = encrypt ? TC_DES_ECB_encrypt(&ctx, (TC_buffer){buf + i, TC_DES_BLOCKLEN})
+                       : TC_DES_ECB_decrypt(&ctx, (TC_buffer){buf + i, TC_DES_BLOCKLEN});
   } else if (status == TC_OK) {
-    status = TC_DES_set_iv(&ctx, have_iv ? iv : zero_iv);
+    status = TC_DES_set_iv(&ctx, (TC_bytes){have_iv ? iv : zero_iv, TC_DES_BLOCKLEN});
     if (status == TC_OK)
       status = cavp_apply_iv_mode(&ctx, mode, encrypt, buf, len);
   }
@@ -238,7 +244,7 @@ static void mct_round(int mode, int encrypt, struct mct_state* st, uint8_t resul
   uint8_t cur[8], cv[8], tmp[8], text0[8], last_ks[8];
   int j;
 
-  TC_DES_init(&ctx, st->key, 24);
+  TC_DES_init(&ctx, (TC_bytes){st->key, 24});
   memset(hist, 0, sizeof(hist));
   memcpy(cur, st->text, 8);
   memcpy(cv, st->iv, 8);
@@ -249,9 +255,9 @@ static void mct_round(int mode, int encrypt, struct mct_state* st, uint8_t resul
     switch (mode) {
     case CAVP_TECB:
       if (encrypt)
-        TC_DES_ECB_encrypt(&ctx, cur);
+        TC_DES_ECB_encrypt(&ctx, (TC_buffer){cur, TC_DES_BLOCKLEN});
       else
-        TC_DES_ECB_decrypt(&ctx, cur);
+        TC_DES_ECB_decrypt(&ctx, (TC_buffer){cur, TC_DES_BLOCKLEN});
       mct_hist_push_block(hist, cur);
       break;
 
@@ -260,14 +266,14 @@ static void mct_round(int mode, int encrypt, struct mct_state* st, uint8_t resul
         uint8_t k;
         for (k = 0; k < 8; k++)
           tmp[k] = (uint8_t)(cur[k] ^ cv[k]);
-        TC_DES_ECB_encrypt(&ctx, tmp);
+        TC_DES_ECB_encrypt(&ctx, (TC_buffer){tmp, TC_DES_BLOCKLEN});
         mct_hist_push_block(hist, tmp);
         memcpy(cur, cv, 8); /* P' = CV */
         memcpy(cv, tmp, 8);
       } else {
         uint8_t k;
         memcpy(tmp, cur, 8);
-        TC_DES_ECB_decrypt(&ctx, tmp);
+        TC_DES_ECB_decrypt(&ctx, (TC_buffer){tmp, TC_DES_BLOCKLEN});
         for (k = 0; k < 8; k++)
           tmp[k] ^= cv[k];
         mct_hist_push_block(hist, tmp);
@@ -278,8 +284,8 @@ static void mct_round(int mode, int encrypt, struct mct_state* st, uint8_t resul
 
     case CAVP_TOFB: {
       uint8_t k;
-      memcpy(tmp, cv, 8);            /* cv doubles as the OFB feedback register */
-      TC_DES_ECB_encrypt(&ctx, tmp); /* O = E(FB) */
+      memcpy(tmp, cv, 8); /* cv doubles as the OFB feedback register */
+      TC_DES_ECB_encrypt(&ctx, (TC_buffer){tmp, TC_DES_BLOCKLEN}); /* O = E(FB) */
       for (k = 0; k < 8; k++)
         last_ks[k] = (uint8_t)(cur[k] ^ tmp[k]); /* R = in ^ O (reuse) */
       mct_hist_push_block(hist, last_ks);
@@ -291,7 +297,7 @@ static void mct_round(int mode, int encrypt, struct mct_state* st, uint8_t resul
     case CAVP_TCFB64: {
       uint8_t k;
       memcpy(tmp, cv, 8);
-      TC_DES_ECB_encrypt(&ctx, tmp); /* O = E(CV) */
+      TC_DES_ECB_encrypt(&ctx, (TC_buffer){tmp, TC_DES_BLOCKLEN}); /* O = E(CV) */
       for (k = 0; k < 8; k++)
         tmp[k] ^= cur[k]; /* R = in ^ O; O = R ^ in later if needed */
       mct_hist_push_block(hist, tmp);
@@ -312,7 +318,7 @@ static void mct_round(int mode, int encrypt, struct mct_state* st, uint8_t resul
     case CAVP_TCFB8: {
       uint8_t o, res, in = cur[0];
       memcpy(tmp, cv, 8);
-      TC_DES_ECB_encrypt(&ctx, tmp);
+      TC_DES_ECB_encrypt(&ctx, (TC_buffer){tmp, TC_DES_BLOCKLEN});
       o = tmp[0];
       res = (uint8_t)(in ^ o);
       mct_hist_push_byte(hist, res);
@@ -331,7 +337,7 @@ static void mct_round(int mode, int encrypt, struct mct_state* st, uint8_t resul
     {
       uint8_t o, res, in = (uint8_t)(cur[0] >> 7);
       memcpy(tmp, cv, 8);
-      TC_DES_ECB_encrypt(&ctx, tmp);
+      TC_DES_ECB_encrypt(&ctx, (TC_buffer){tmp, TC_DES_BLOCKLEN});
       o = (uint8_t)(tmp[0] >> 7);
       res = (uint8_t)(in ^ o);
       mct_hist_push_bit(hist, res);

@@ -23,9 +23,11 @@ static int des_ctr_roundtrip(void)
 
   memcpy(orig, buf, sizeof(buf));
   /* Encrypt, then reset the IV and apply the same keystream to decrypt. */
-  failed = TC_DES_init(&ctx, key, TC_DES_KEYLEN) != TC_OK || TC_DES_set_iv(&ctx, iv) != TC_OK ||
-           TC_DES_CTR_crypt(&ctx, buf, sizeof(buf)) != TC_OK || TC_DES_set_iv(&ctx, iv) != TC_OK ||
-           TC_DES_CTR_crypt(&ctx, buf, sizeof(buf)) != TC_OK;
+  failed = TC_DES_init(&ctx, TC_bytes{key, TC_DES_KEYLEN}) != TC_OK ||
+           TC_DES_set_iv(&ctx, TC_bytes{iv, TC_DES_BLOCKLEN}) != TC_OK ||
+           TC_DES_CTR_crypt(&ctx, TC_buffer{buf, sizeof(buf)}) != TC_OK ||
+           TC_DES_set_iv(&ctx, TC_bytes{iv, TC_DES_BLOCKLEN}) != TC_OK ||
+           TC_DES_CTR_crypt(&ctx, TC_buffer{buf, sizeof(buf)}) != TC_OK;
   TC_DES_ctx_clear(&ctx);
   if (failed)
     return 1;
