@@ -52,7 +52,8 @@ The shared sequence is:
 
 The request selects PIV, TWIC Legacy, or TWIC NEXGEN and its signed CHUID
 schema. `TC_CHUID_PROFILE_LEGACY_KEY_MAP` is the explicit PIV-shaped option for
-the historical `3D` field. PIV uses strict PIV
+the historical `3D` field. TWIC profiles take it for the PIV application of a
+TWIC card, where a NEXGEN card sends an empty `3D`. PIV uses strict PIV
 identifier and OID rules. TWIC identity binding follows Part 3 section 4.4.4:
 the signed certificate FASC-N identifies the credential. The certificate may
 omit its UUID URI. A present UUID must satisfy the selected profile and match

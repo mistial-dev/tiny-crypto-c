@@ -47,15 +47,19 @@ void tc_piv_check_chuid(tc_piv_check_run* run)
     tc_piv_check_not_checkable(&check, TC_PIV_REASON_DEPENDENCY);
     tc_piv_check_not_checkable(&revocation, TC_PIV_REASON_DEPENDENCY);
   } else {
-    /* SP 800-73-5 Part 1 section 3.1.2, TWIC Part 2 v5 section 4.6.3. */
-    const TC_PIV_CHUID_validation_request request = {
-        object->encoded,
-        TC_PIV_CHUID_CONTAINER,
-        report->profile,
-        tc_piv_check_piv(run) ? TC_CHUID_PROFILE_PIV : TC_CHUID_PROFILE_TWIC_SIGNED,
-        0,
-        &report->card,
-        &report->card_expiration};
+    /* SP 800-73-5 Part 1 section 3.1.2, TWIC Part 2 v5 section 4.6.3. The
+     * PIV application of a TWIC card keeps the optional Authentication Key
+     * Map of SP 800-73-2 (3D), which a NEXGEN card sends empty. */
+    const TC_PIV_CHUID_validation_request request = {object->encoded,
+                                                     TC_PIV_CHUID_CONTAINER,
+                                                     report->profile,
+                                                     tc_piv_check_piv(run) ? TC_CHUID_PROFILE_PIV
+                                                     : run->twic_piv
+                                                         ? TC_CHUID_PROFILE_LEGACY_KEY_MAP
+                                                         : TC_CHUID_PROFILE_TWIC_SIGNED,
+                                                     0,
+                                                     &report->card,
+                                                     &report->card_expiration};
     const TC_credential_status status =
         TC_PIV_CHUID_validate(&request, run->request->content, run->work, &report->chuid);
     if (!signer_result(run, status, report->chuid.revocation_checked, &check, &revocation))

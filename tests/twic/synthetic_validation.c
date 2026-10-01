@@ -287,6 +287,25 @@ static MunitResult validate(const MunitParameter params[], void* user_data)
                                              &state->card_expiration};
   TC_PIV_CHUID_result chuid;
   size_t work = WORK;
+  /* The PIV application CHUID of a TWIC card carries an empty
+   * Authentication Key Map (3D 00). The key-map profile accepts it under
+   * the TWIC profile, and the TWIC application profile rejects it. */
+  TC_PIV_CHUID_validation_request piv_application = request;
+  piv_application.encoded = (TC_bytes){state->piv_chuid, state->piv_chuid_length};
+  piv_application.chuid_profile = TC_CHUID_PROFILE_LEGACY_KEY_MAP;
+  munit_assert_int(TC_PIV_CHUID_validate(&piv_application, &state->context, &work, &chuid), ==,
+                   TC_CREDENTIAL_VALID);
+  munit_assert_not_null(chuid.object.authentication_key_map.data);
+  munit_assert_size(chuid.object.authentication_key_map.length, ==, 0);
+  piv_application.chuid_profile = TC_CHUID_PROFILE_TWIC_SIGNED;
+  work = WORK;
+  munit_assert_int(TC_PIV_CHUID_validate(&piv_application, &state->context, &work, &chuid), ==,
+                   TC_CREDENTIAL_INVALID);
+  piv_application.chuid_profile = TC_CHUID_PROFILE_PIV;
+  work = WORK;
+  munit_assert_int(TC_PIV_CHUID_validate(&piv_application, &state->context, &work, &chuid), ==,
+                   TC_CREDENTIAL_ERROR);
+  work = WORK;
   munit_assert_int(TC_PIV_CHUID_validate(&request, &state->context, &work, &chuid), ==,
                    TC_CREDENTIAL_VALID);
   TC_PIV_biometric_validation_request fingerprint = {

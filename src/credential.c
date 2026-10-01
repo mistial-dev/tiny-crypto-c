@@ -67,10 +67,10 @@ TC_credential_status TC_PIV_CHUID_validate(const TC_PIV_CHUID_validation_request
       !request->card_expiration || !context || !work || !out ||
       (request->twic_reader_policy != 0 && request->twic_reader_policy != 1) ||
       (request->profile != TC_PIV_CARD && request->twic_reader_policy) ||
-      (request->profile == TC_PIV_CARD
-           ? request->chuid_profile != TC_CHUID_PROFILE_PIV &&
-                 request->chuid_profile != TC_CHUID_PROFILE_LEGACY_KEY_MAP
-           : request->chuid_profile != TC_CHUID_PROFILE_TWIC_SIGNED) ||
+      (request->chuid_profile != TC_CHUID_PROFILE_LEGACY_KEY_MAP &&
+       request->chuid_profile != (request->profile == TC_PIV_CARD
+                                      ? TC_CHUID_PROFILE_PIV
+                                      : TC_CHUID_PROFILE_TWIC_SIGNED)) ||
       !tc_credential_session_open(&session, context, request->profile))
     return TC_CREDENTIAL_ERROR;
   const int strict_piv = session.piv && !request->twic_reader_policy;
