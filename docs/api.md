@@ -495,7 +495,7 @@ returns `TC_MISMATCH`. Inputs and outputs may overlap in any way. See
 ## Tag lengths
 
 `TC_MIN_TAG_LEN` in `config.h` sets one minimum tag length for CCM, EAX,
-AES-CMAC and DES-CMAC. It defaults to 8 bytes, the 64-bit floor of SP 800-38B
+AES-CMAC, DES-CMAC, HMAC and KMAC. It defaults to 8 bytes, the 64-bit floor of SP 800-38B
 Appendix A.2, and a build may raise it to 16. Values outside 8..16 stop the
 build. A value above 8 also requires `TC_DES_ENABLE_CMAC=0`, since a DES-CMAC
 tag holds at most 8 bytes.
@@ -508,6 +508,8 @@ tag holds at most 8 bytes.
 | DES-CMAC   | `TC_MIN_TAG_LEN`..8                      | 1..`TC_MIN_TAG_LEN - 1`                        |
 | GCM        | 12..16                                   | 4 or 8 (SP 800-38D appendix C)                 |
 | ISO 9797-1 | 8                                        | 4..7                                           |
+| HMAC       | `max(TC_HMAC_MIN_TAG_LEN, TC_MIN_TAG_LEN)`..digest length | 1..default minimum - 1 |
+| KMAC256    | `TC_MIN_TAG_LEN`..`UINT64_MAX / 8`       | 1..`TC_MIN_TAG_LEN - 1`                        |
 
 Each length has exactly one entry point. The other entry point returns
 `TC_ERROR` and leaves every output unchanged. A zero-length tag is never

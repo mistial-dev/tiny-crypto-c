@@ -36,8 +36,8 @@ extern "C" {
  * init absorbs the cSHAKE256 prefix with N = "KMAC" and S = custom, then
  * bytepad(encode_string(key), 136) (section 4.3). key and custom are read
  * only during init. It returns TC_OK, or TC_ERROR for a NULL ctx, an invalid
- * span, an oversized length or a span that overlaps ctx, and leaves ctx
- * unchanged in each case. A successful init also restarts a live ctx. */
+ * span, an oversized length or a span that overlaps ctx. Every failed init
+ * wipes ctx, including an earlier live key. A successful init restarts it. */
 TC_status TC_KMAC256_init(struct TC_KMAC256_ctx* ctx, TC_bytes key, TC_bytes custom);
 /* Absorb data into an active context. data must be disjoint from ctx.
  * Returns TC_ERROR for a NULL or inactive ctx, an invalid span or an overlap.

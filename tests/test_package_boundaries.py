@@ -12,7 +12,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
-from stage_arduino_release import package_paths, stage  # noqa: E402
+from stage_embedded_package import package_paths, stage  # noqa: E402
 
 MAX_EMBEDDED_PACKAGE_BYTES = 5 * 1024 * 1024
 
@@ -59,7 +59,7 @@ class PackageTests(unittest.TestCase):
                 self.assertTrue(path.is_file())
                 self.assertEqual(path.stem, path.parent.name)
 
-    def test_arduino_release_tree_is_bounded(self):
+    def test_embedded_package_tree_is_bounded(self):
         with tempfile.TemporaryDirectory() as temporary:
             destination = Path(temporary) / "tiny-crypto-c"
             stage(destination)
@@ -73,6 +73,20 @@ class PackageTests(unittest.TestCase):
             self.assertLessEqual(size, MAX_EMBEDDED_PACKAGE_BYTES)
             self.assertFalse({"tests", "tools", "benchmarks", "docs"} &
                              {path.parts[0] for path in map(Path, staged)})
+
+    def test_workflows_do_not_publish_embedded_packages(self):
+        workflows = "\n".join(
+            path.read_text() for path in sorted((ROOT / ".github/workflows").glob("*.yml"))
+        ).lower()
+        forbidden = (
+            "pio pkg publish",
+            "platformio.org/publish",
+            "arduino/library-registry",
+            "arduino-cli lib publish",
+        )
+        for command in forbidden:
+            with self.subTest(command=command):
+                self.assertNotIn(command, workflows)
 
     def test_versions_match_cmake_project(self):
         version = read_match("CMakeLists.txt",

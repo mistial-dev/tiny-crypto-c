@@ -127,11 +127,16 @@ the same provenance and manifest checks as other external vectors.
 
 ## Arduino, PlatformIO and installed packages
 
-Package checks run strict `arduino-lint`, compile the shipped `.ino` sketches,
-pack the PlatformIO library, and build CMake consumers from an installation.
-The inspected archives must contain public sources, licenses and supported
-examples while excluding external corpora. Package size limits catch accidental
+Package checks compile the source-tree `.ino` sketches, pack the PlatformIO
+library for inspection, and build CMake consumers from an installation. The
+inspected archives must contain public sources, licenses and supported examples
+while excluding external corpora. Package size limits catch accidental
 repository-wide exports.
+
+`library.properties` supports direct Arduino source imports and build testing.
+The project does not publish an Arduino Library Manager release and must not be
+submitted to its registry. CI checks that embedded package publishing commands
+are absent from the workflows.
 
 ## Hardware tests
 

@@ -46,9 +46,9 @@
  *            before reuse.
  *   digest   One-shot hash or HMAC. TC_OK, or TC_ERROR for a NULL output,
  *            an invalid input span, a message past the limit, an HMAC key
- *            error, or an HMAC tag.capacity outside
- *            TC_HMAC_MIN_TAG_LEN..digest length. A truncated HMAC tag keeps
- *            the leftmost bytes. The output is written last, so it may
+ *            error, or an HMAC tag.capacity outside the documented default
+ *            or explicit short-tag range. A truncated HMAC tag keeps the
+ *            leftmost bytes. The output is written last, so it may
  *            overlap the message or key. A failed call leaves the output
  *            unchanged.
  *   verify   TC_OK on a match, TC_MISMATCH on a well-formed mismatch, and
@@ -385,8 +385,9 @@ TC_status TC_HMAC_SHA1_final(struct TC_HMAC_SHA1_ctx* ctx, uint8_t tag[TC_SHA1_D
 /* Wipe the context and leave it inactive. NULL is ignored. */
 void TC_HMAC_SHA1_ctx_clear(struct TC_HMAC_SHA1_ctx* ctx);
 
-/* One-shot HMAC-SHA-1 truncated to tag.capacity bytes, from
- * TC_HMAC_MIN_TAG_LEN to TC_SHA1_DIGESTLEN. */
+/* One-shot HMAC-SHA-1 truncated to tag.capacity bytes. The default call takes
+ * max(TC_HMAC_MIN_TAG_LEN, TC_MIN_TAG_LEN)..TC_SHA1_DIGESTLEN; the short-tag
+ * call takes 1..that minimum - 1. */
 TC_status TC_HMAC_SHA1_digest(TC_bytes key, TC_bytes message, TC_buffer tag);
 TC_status TC_HMAC_SHA1_digest_short_tag(TC_bytes key, TC_bytes message, TC_buffer tag);
 
@@ -413,8 +414,9 @@ TC_status TC_HMAC_SHA224_final(struct TC_HMAC_SHA224_ctx* ctx, uint8_t tag[TC_SH
 /* Wipe the context and leave it inactive. NULL is ignored. */
 void TC_HMAC_SHA224_ctx_clear(struct TC_HMAC_SHA224_ctx* ctx);
 
-/* One-shot HMAC-SHA-224 truncated to tag.capacity bytes, from
- * TC_HMAC_MIN_TAG_LEN to TC_SHA224_DIGESTLEN. */
+/* One-shot HMAC-SHA-224 truncated to tag.capacity bytes. The default call takes
+ * max(TC_HMAC_MIN_TAG_LEN, TC_MIN_TAG_LEN)..TC_SHA224_DIGESTLEN; the short-tag
+ * call takes 1..that minimum - 1. */
 TC_status TC_HMAC_SHA224_digest(TC_bytes key, TC_bytes message, TC_buffer tag);
 TC_status TC_HMAC_SHA224_digest_short_tag(TC_bytes key, TC_bytes message, TC_buffer tag);
 
@@ -441,8 +443,9 @@ TC_status TC_HMAC_SHA256_final(struct TC_HMAC_SHA256_ctx* ctx, uint8_t tag[TC_SH
 /* Wipe the context and leave it inactive. NULL is ignored. */
 void TC_HMAC_SHA256_ctx_clear(struct TC_HMAC_SHA256_ctx* ctx);
 
-/* One-shot HMAC-SHA-256 truncated to tag.capacity bytes, from
- * TC_HMAC_MIN_TAG_LEN to TC_SHA256_DIGESTLEN. */
+/* One-shot HMAC-SHA-256 truncated to tag.capacity bytes. The default call takes
+ * max(TC_HMAC_MIN_TAG_LEN, TC_MIN_TAG_LEN)..TC_SHA256_DIGESTLEN; the short-tag
+ * call takes 1..that minimum - 1. */
 TC_status TC_HMAC_SHA256_digest(TC_bytes key, TC_bytes message, TC_buffer tag);
 TC_status TC_HMAC_SHA256_digest_short_tag(TC_bytes key, TC_bytes message, TC_buffer tag);
 
@@ -469,8 +472,9 @@ TC_status TC_HMAC_SHA384_final(struct TC_HMAC_SHA384_ctx* ctx, uint8_t tag[TC_SH
 /* Wipe the context and leave it inactive. NULL is ignored. */
 void TC_HMAC_SHA384_ctx_clear(struct TC_HMAC_SHA384_ctx* ctx);
 
-/* One-shot HMAC-SHA-384 truncated to tag.capacity bytes, from
- * TC_HMAC_MIN_TAG_LEN to TC_SHA384_DIGESTLEN. */
+/* One-shot HMAC-SHA-384 truncated to tag.capacity bytes. The default call takes
+ * max(TC_HMAC_MIN_TAG_LEN, TC_MIN_TAG_LEN)..TC_SHA384_DIGESTLEN; the short-tag
+ * call takes 1..that minimum - 1. */
 TC_status TC_HMAC_SHA384_digest(TC_bytes key, TC_bytes message, TC_buffer tag);
 TC_status TC_HMAC_SHA384_digest_short_tag(TC_bytes key, TC_bytes message, TC_buffer tag);
 
@@ -497,8 +501,9 @@ TC_status TC_HMAC_SHA512_final(struct TC_HMAC_SHA512_ctx* ctx, uint8_t tag[TC_SH
 /* Wipe the context and leave it inactive. NULL is ignored. */
 void TC_HMAC_SHA512_ctx_clear(struct TC_HMAC_SHA512_ctx* ctx);
 
-/* One-shot HMAC-SHA-512 truncated to tag.capacity bytes, from
- * TC_HMAC_MIN_TAG_LEN to TC_SHA512_DIGESTLEN. */
+/* One-shot HMAC-SHA-512 truncated to tag.capacity bytes. The default call takes
+ * max(TC_HMAC_MIN_TAG_LEN, TC_MIN_TAG_LEN)..TC_SHA512_DIGESTLEN; the short-tag
+ * call takes 1..that minimum - 1. */
 TC_status TC_HMAC_SHA512_digest(TC_bytes key, TC_bytes message, TC_buffer tag);
 TC_status TC_HMAC_SHA512_digest_short_tag(TC_bytes key, TC_bytes message, TC_buffer tag);
 

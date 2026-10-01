@@ -163,10 +163,10 @@ TC_status tc_hmac_core_parts(const tc_hash_algorithm_info* info, void* context, 
 TC_status tc_hmac_core_resume_parts(const tc_hash_algorithm_info* info, const void* keyed,
                                     void* context, const TC_bytes* parts, size_t count,
                                     uint8_t* tag);
-/* One-shot HMAC truncated to tag.capacity bytes, which must be at least
- * TC_HMAC_MIN_TAG_LEN and at most digest_bytes (SP 800-107). workspace is
- * the caller's HMAC context. Once the arguments pass their checks, workspace
- * is wiped before return. */
+/* One-shot HMAC truncated to tag.capacity bytes. Default entry points require
+ * max(TC_HMAC_MIN_TAG_LEN, TC_MIN_TAG_LEN)..digest_bytes (SP 800-107), while
+ * explicit short-tag entry points require 1..that minimum - 1. workspace is
+ * the caller's HMAC context and is wiped after argument validation. */
 TC_status tc_hmac_core_digest(const tc_hash_algorithm_info* info, void* workspace, TC_bytes key,
                               TC_bytes message, TC_buffer tag, int short_tag);
 /* Recompute a tag of tag.length bytes and compare it with TC_ct_equal.

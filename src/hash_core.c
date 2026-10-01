@@ -397,7 +397,7 @@ void tc_hmac_core_clear(const tc_hash_algorithm_info* stored, void* context)
   TC_secure_zero(hmac.context, hmac.size);
 }
 
-/* One-shot HMAC with an optional truncated tag of at least TC_HMAC_MIN_TAG_LEN. */
+/* One-shot HMAC with the library-wide default or explicit short-tag policy. */
 TC_status tc_hmac_core_digest(const tc_hash_algorithm_info* stored, void* workspace, TC_bytes key,
                               TC_bytes message, TC_buffer tag, int short_tag)
 {
@@ -406,8 +406,8 @@ TC_status tc_hmac_core_digest(const tc_hash_algorithm_info* stored, void* worksp
   uint8_t full[TC_HASH_CORE_MAX_DIGEST];
   TC_status status;
 
-  /* SP 800-107: a truncated tag keeps the leftmost bytes, and
-   * TC_HMAC_MIN_TAG_LEN sets the shortest length accepted. */
+  /* SP 800-107: a truncated tag keeps the leftmost bytes. The algorithm and
+   * library-wide policies jointly set the default minimum. */
   const size_t minimum = TC_HMAC_MIN_TAG_LEN > TC_MIN_TAG_LEN ? TC_HMAC_MIN_TAG_LEN : TC_MIN_TAG_LEN;
   if (tag.data == NULL || tag.capacity > info->digest_bytes ||
       (short_tag ? tag.capacity == 0 || tag.capacity >= minimum : tag.capacity < minimum) ||

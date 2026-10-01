@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: Mistial Dev
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Stage the bounded tree used for Arduino and PlatformIO releases."""
+"""Stage the bounded tree used for embedded package validation."""
 
 import argparse
 from pathlib import Path

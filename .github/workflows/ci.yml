@@ -172,7 +172,7 @@ jobs:
           python3 tests/test_measure_avr_resources.py
       - name: Check library package
         run: |
-          python3 tools/stage_arduino_release.py "$RUNNER_TEMP/tiny-crypto-c-embedded"
+          python3 tools/stage_embedded_package.py "$RUNNER_TEMP/tiny-crypto-c-embedded"
           pio pkg pack "$RUNNER_TEMP/tiny-crypto-c-embedded" --output "$RUNNER_TEMP/tiny-crypto-c.tar.gz"
           python3 tests/test_package_boundaries.py --archive "$RUNNER_TEMP/tiny-crypto-c.tar.gz"
       - name: Validate fixtures and generate benchmark report
