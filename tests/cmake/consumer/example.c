@@ -196,16 +196,17 @@ int main(void)
     memset(&store, 0, sizeof store);
     memset(&slot, 0, sizeof slot);
     const TC_CMS_validation_request request = {empty, 0, empty, NULL, 0, empty};
+    const TC_buffer empty_buffer = {NULL, 0};
     if (TC_LDS_read(empty, NULL, example_no_frames, &work, NULL) != TC_TLV_ARGUMENT || work != 100)
       return 1;
     if (TC_FASCN_read(empty, NULL) != TC_TLV_ARGUMENT ||
-        TC_FASCN_write(NULL, (TC_buffer){NULL, 0}) != TC_TLV_ARGUMENT)
+        TC_FASCN_write(NULL, empty_buffer) != TC_TLV_ARGUMENT)
       return 1;
     if (TC_TWIC_uuid_read(empty, NULL) != TC_TLV_ARGUMENT ||
-        TC_TWIC_uuid_write(0, (TC_buffer){NULL, 0}) != TC_TLV_LIMIT ||
+        TC_TWIC_uuid_write(0, empty_buffer) != TC_TLV_LIMIT ||
         TC_TWIC_uuid_match(empty, NULL, NULL) != TC_TLV_ARGUMENT)
       return 1;
-    if (TC_LDS_read_content(empty, NULL, example_no_frames, &work, (TC_buffer){NULL, 0}, NULL) !=
+    if (TC_LDS_read_content(empty, NULL, example_no_frames, &work, empty_buffer, NULL) !=
             TC_TLV_ARGUMENT ||
         work != 100)
       return 1;
@@ -476,15 +477,16 @@ int main(void)
         0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4,
         0xc8, 0x99, 0x6f, 0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b,
         0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55};
+    const TC_buffer digest_buffer = {digest, sizeof digest};
     work = 4096;
     if (TC_CMS_content_digest(encoded_content, TC_HASH_SHA256, &limits, cms_frames, &work,
-                              (TC_buffer){digest, sizeof digest}) != TC_TLV_OK)
+                              digest_buffer) != TC_TLV_OK)
       return 24;
     if (memcmp(digest, sha256_empty, sizeof digest))
       return 25;
     work = 0;
     if (TC_CMS_content_digest(encoded_content, TC_HASH_SHA256, &limits, cms_frames, &work,
-                              (TC_buffer){digest, sizeof digest}) != TC_TLV_LIMIT)
+                              digest_buffer) != TC_TLV_LIMIT)
       return 26;
     if (memcmp(digest, sha256_empty, sizeof digest))
       return 27;
