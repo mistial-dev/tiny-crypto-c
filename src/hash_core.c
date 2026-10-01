@@ -408,7 +408,8 @@ TC_status tc_hmac_core_digest(const tc_hash_algorithm_info* stored, void* worksp
 
   /* SP 800-107: a truncated tag keeps the leftmost bytes. The algorithm and
    * library-wide policies jointly set the default minimum. */
-  const size_t minimum = TC_HMAC_MIN_TAG_LEN > TC_MIN_TAG_LEN ? TC_HMAC_MIN_TAG_LEN : TC_MIN_TAG_LEN;
+  const size_t minimum =
+      TC_HMAC_MIN_TAG_LEN > TC_MIN_TAG_LEN ? TC_HMAC_MIN_TAG_LEN : TC_MIN_TAG_LEN;
   if (tag.data == NULL || tag.capacity > info->digest_bytes ||
       (short_tag ? tag.capacity == 0 || tag.capacity >= minimum : tag.capacity < minimum) ||
       (message.length != 0 && message.data == NULL))

@@ -332,7 +332,8 @@ static const uint16_t card2_mapped[] = {0xdb00, 0x3000, 0x6010, 0x3001, 0x6030, 
 static const TC_PIV_check_requirement iris_only[] = {{TC_PIV_CHECK_BIOMETRIC, 0, 0x1015},
                                                      {TC_PIV_CHECK_SM_CVC, 0, 0x1017}};
 static const TC_PIV_check_requirement card2_exceptions[] = {
-    {TC_PIV_CHECK_BIOMETRIC, 0, 0x1015}, {TC_PIV_CHECK_SM_CVC, 0, 0x1017},
+    {TC_PIV_CHECK_BIOMETRIC, 0, 0x1015},
+    {TC_PIV_CHECK_SM_CVC, 0, 0x1017},
     {TC_PIV_CHECK_DISCOVERY_CONSISTENCY, 0, 0x6050}};
 
 static void expect_card2_complete(void)
@@ -649,8 +650,7 @@ TC_TEST(card2_twic_ocsp_policy)
   expect_passed(TC_PIV_CHECK_REVOCATION, 0x0500);
   /* This PIV sample's identifier values do not satisfy the TWIC card profile;
    * that independent check must not erase the valid path and OCSP result. */
-  expect(TC_PIV_CHECK_CERTIFICATE_IDENTIFIERS, 0x0500, TC_PIV_CHECK_FAILED,
-         TC_PIV_REASON_NONE);
+  expect(TC_PIV_CHECK_CERTIFICATE_IDENTIFIERS, 0x0500, TC_PIV_CHECK_FAILED, TC_PIV_REASON_NONE);
   munit_assert_uint8(report.certificate_valid[TC_PIV_CARD_SLOT_CARD_AUTHENTICATION], ==, 1);
   munit_assert_uint8(report.has_card, ==, 0);
   munit_assert_int(report.profile, ==, TC_TWIC_LEGACY_CARD);
@@ -934,24 +934,22 @@ TC_TEST(work_limit)
 TC_TEST(arguments)
 {
   TC_PIV_CHUID_profile chuid_profile = TC_CHUID_PROFILE_PIV;
-  munit_assert_int(TC_PIV_card_chuid_profile(TC_PIV_APPLICATION_PIV, TC_PIV_CARD,
-                                             &chuid_profile),
+  munit_assert_int(TC_PIV_card_chuid_profile(TC_PIV_APPLICATION_PIV, TC_PIV_CARD, &chuid_profile),
                    ==, TC_TLV_OK);
   munit_assert_int(chuid_profile, ==, TC_CHUID_PROFILE_PIV);
-  munit_assert_int(TC_PIV_card_chuid_profile(TC_PIV_APPLICATION_PIV, TC_TWIC_LEGACY_CARD,
-                                             &chuid_profile),
-                   ==, TC_TLV_OK);
+  munit_assert_int(
+      TC_PIV_card_chuid_profile(TC_PIV_APPLICATION_PIV, TC_TWIC_LEGACY_CARD, &chuid_profile), ==,
+      TC_TLV_OK);
   munit_assert_int(chuid_profile, ==, TC_CHUID_PROFILE_LEGACY_KEY_MAP);
-  munit_assert_int(TC_PIV_card_chuid_profile(TC_PIV_APPLICATION_PIV, TC_TWIC_NEXGEN_CARD,
-                                             &chuid_profile),
-                   ==, TC_TLV_OK);
+  munit_assert_int(
+      TC_PIV_card_chuid_profile(TC_PIV_APPLICATION_PIV, TC_TWIC_NEXGEN_CARD, &chuid_profile), ==,
+      TC_TLV_OK);
   munit_assert_int(chuid_profile, ==, TC_CHUID_PROFILE_LEGACY_KEY_MAP);
-  munit_assert_int(TC_PIV_card_chuid_profile(TC_PIV_APPLICATION_TWIC, TC_TWIC_NEXGEN_CARD,
-                                             &chuid_profile),
-                   ==, TC_TLV_OK);
+  munit_assert_int(
+      TC_PIV_card_chuid_profile(TC_PIV_APPLICATION_TWIC, TC_TWIC_NEXGEN_CARD, &chuid_profile), ==,
+      TC_TLV_OK);
   munit_assert_int(chuid_profile, ==, TC_CHUID_PROFILE_TWIC_SIGNED);
-  munit_assert_int(TC_PIV_card_chuid_profile(TC_PIV_APPLICATION_TWIC, TC_PIV_CARD,
-                                             &chuid_profile),
+  munit_assert_int(TC_PIV_card_chuid_profile(TC_PIV_APPLICATION_TWIC, TC_PIV_CARD, &chuid_profile),
                    ==, TC_TLV_ARGUMENT);
   munit_assert_int(TC_PIV_card_chuid_profile(TC_PIV_APPLICATION_PIV, TC_PIV_CARD, NULL), ==,
                    TC_TLV_ARGUMENT);

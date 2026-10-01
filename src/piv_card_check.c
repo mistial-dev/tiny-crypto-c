@@ -34,11 +34,10 @@ static int profile_fits(TC_PIV_card_profile profile, const TC_PIV_inventory* inv
 }
 
 TC_TLV_result TC_PIV_card_chuid_profile(TC_PIV_application_id application,
-                                        TC_PIV_card_profile profile,
-                                        TC_PIV_CHUID_profile* out)
+                                        TC_PIV_card_profile profile, TC_PIV_CHUID_profile* out)
 {
-  if (!out || (profile != TC_PIV_CARD && profile != TC_TWIC_LEGACY_CARD &&
-               profile != TC_TWIC_NEXGEN_CARD))
+  if (!out ||
+      (profile != TC_PIV_CARD && profile != TC_TWIC_LEGACY_CARD && profile != TC_TWIC_NEXGEN_CARD))
     return TC_TLV_ARGUMENT;
   if (application == TC_PIV_APPLICATION_PIV)
     *out = profile == TC_PIV_CARD ? TC_CHUID_PROFILE_PIV : TC_CHUID_PROFILE_LEGACY_KEY_MAP;
@@ -64,8 +63,8 @@ static int objects_valid(const TC_PIV_object* objects, size_t count)
  * substituting metadata with the same container number. */
 static int inventory_complete(const TC_PIV_inventory* inventory)
 {
-  const size_t expected = TC_PIV_catalog_count(inventory->link.application,
-                                                inventory->link.profile);
+  const size_t expected =
+      TC_PIV_catalog_count(inventory->link.application, inventory->link.profile);
   if (!expected || inventory->count != expected || inventory->capacity < expected ||
       !inventory->objects || (!inventory->pool && inventory->pool_used))
     return 0;

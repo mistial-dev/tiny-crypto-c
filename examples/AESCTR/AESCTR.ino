@@ -28,4 +28,5 @@ void setup()
   Serial.println(self_test() ? "AES-CTR self-test passed" : "AES-CTR self-test failed");
 }
 
-void loop() {}
+void loop()
+{}

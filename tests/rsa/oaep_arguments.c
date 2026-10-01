@@ -267,7 +267,8 @@ TC_TEST(encryption_algorithms)
       memset(output, 0xa5, sizeof output);
       memset(words, 0xa5, sizeof words);
       munit_assert_int(TC_RSA_encrypt_oaep(&key, &options, (TC_bytes){NULL, 0},
-                                           (TC_buffer){output, sizeof output}, &workspace, &execution),
+                                           (TC_buffer){output, sizeof output}, &workspace,
+                                           &execution),
                        ==, available ? TC_RSA_ERROR : TC_RSA_UNSUPPORTED);
       munit_assert_size(calls, ==, available ? 1 : 0);
       for (size_t i = 0; i < sizeof output; ++i)

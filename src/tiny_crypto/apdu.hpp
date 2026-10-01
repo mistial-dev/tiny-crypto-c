@@ -76,27 +76,24 @@ public:
   apdu_channel(apdu_channel&&) = delete;
   apdu_channel& operator=(apdu_channel&&) = delete;
 
-  TC_CPP_NODISCARD apdu_result init(apdu_transport transport,
-                                     const apdu_channel_options& options,
-                                     buffer scratch) noexcept
+  TC_CPP_NODISCARD apdu_result init(apdu_transport transport, const apdu_channel_options& options,
+                                    buffer scratch) noexcept
   {
     return ::TC_APDU_channel_init(&channel_, transport, &options, scratch);
   }
-  TC_CPP_NODISCARD apdu_result restrict(size_t max_command_bytes,
-                                         size_t max_response_bytes,
-                                         unsigned flags) noexcept
+  TC_CPP_NODISCARD apdu_result restrict(size_t max_command_bytes, size_t max_response_bytes,
+                                        unsigned flags) noexcept
   {
     return ::TC_APDU_channel_restrict(&channel_, max_command_bytes, max_response_bytes, flags);
   }
   TC_CPP_NODISCARD apdu_result transceive(const apdu_command& command, buffer response,
-                                           apdu_response& out) noexcept
+                                          apdu_response& out) noexcept
   {
     return ::TC_APDU_transceive(&channel_, &command, response, &out);
   }
   template <size_t Size>
-  TC_CPP_NODISCARD apdu_result transceive(const apdu_command& command,
-                                           uint8_t (&response)[Size],
-                                           apdu_response& out) noexcept
+  TC_CPP_NODISCARD apdu_result transceive(const apdu_command& command, uint8_t (&response)[Size],
+                                          apdu_response& out) noexcept
   {
     return transceive(command, buffer{response, Size}, out);
   }

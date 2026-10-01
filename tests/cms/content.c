@@ -184,7 +184,8 @@ TC_TEST(encoded_content)
       size_t work = WORK_BUDGET;
       memset(actual, OUTPUT_SENTINEL, sizeof actual);
       munit_assert_int(TC_CMS_content_digest(encodings[i], hash, &limits,
-                                             (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, (TC_buffer){actual, sizeof actual}),
+                                             (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
+                                             (TC_buffer){actual, sizeof actual}),
                        ==, TC_TLV_OK);
       munit_assert_memory_equal(info.digest_length, actual, expected);
       for (size_t spare = info.digest_length; spare < sizeof actual; ++spare)
@@ -201,7 +202,8 @@ TC_TEST(encoded_content)
       }
       work = required;
       munit_assert_int(TC_CMS_content_digest(encodings[i], hash, &limits,
-                                             (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, (TC_buffer){actual, sizeof actual}),
+                                             (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
+                                             (TC_buffer){actual, sizeof actual}),
                        ==, TC_TLV_OK);
       munit_assert_size(work, ==, 0);
       for (size_t capacity = 0; capacity < info.digest_length; ++capacity) {
@@ -233,7 +235,8 @@ TC_TEST(encoded_content)
     /* A second root after the OCTET STRING is malformed content. */
     work = WORK_BUDGET;
     munit_assert_int(TC_CMS_content_digest((TC_bytes){two_roots, sizeof two_roots}, hash, &limits,
-                                           (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, (TC_buffer){actual, sizeof actual}),
+                                           (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
+                                           (TC_buffer){actual, sizeof actual}),
                      ==, TC_TLV_INVALID);
     munit_assert_memory_equal(sizeof actual, actual, untouched);
     /* Nested BER chunks need one frame per constructed level. */
@@ -246,7 +249,8 @@ TC_TEST(encoded_content)
     munit_assert_int(tc_hash_digest_parts(hash, NULL, 0, expected, &scratch), ==, TC_OK);
     work = WORK_BUDGET;
     munit_assert_int(TC_CMS_content_digest((TC_bytes){empty, sizeof empty}, hash, &limits,
-                                           (TC_TLV_frames){frames, FRAME_CAPACITY}, &work, (TC_buffer){actual, sizeof actual}),
+                                           (TC_TLV_frames){frames, FRAME_CAPACITY}, &work,
+                                           (TC_buffer){actual, sizeof actual}),
                      ==, TC_TLV_OK);
     munit_assert_memory_equal(info.digest_length, actual, expected);
   }

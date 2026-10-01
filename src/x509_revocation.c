@@ -439,8 +439,7 @@ static TC_TLV_result x509_ocsp_issuer(const x509_crl_path_context* path, size_t 
 /* Keep the delegate's three-state result. An unavailable delegate check may
  * not authorize GOOD, but it must not discard an authenticated REVOKED answer
  * about the target. */
-static TC_TLV_result x509_ocsp_delegate_status(const x509_crl_path_context* path,
-                                               TC_bytes delegate,
+static TC_TLV_result x509_ocsp_delegate_status(const x509_crl_path_context* path, TC_bytes delegate,
                                                TC_X509_revocation_status* status)
 {
   TC_X509_crl_evidence evidence = {0};

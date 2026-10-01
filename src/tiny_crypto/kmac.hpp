@@ -54,7 +54,7 @@ public:
     return TC_KMAC256_digest(key, data, custom, out);
   }
   TC_CPP_NODISCARD static TC_status digest_short_tag(bytes key, bytes data, bytes custom,
-                                                      buffer out) noexcept
+                                                     buffer out) noexcept
   {
     return TC_KMAC256_digest_short_tag(key, data, custom, out);
   }
@@ -63,7 +63,7 @@ public:
     return TC_KMAC256_verify(key, data, custom, tag);
   }
   TC_CPP_NODISCARD static TC_status verify_short_tag(bytes key, bytes data, bytes custom,
-                                                      bytes tag) noexcept
+                                                     bytes tag) noexcept
   {
     return TC_KMAC256_verify_short_tag(key, data, custom, tag);
   }

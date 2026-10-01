@@ -17,8 +17,8 @@
 #include "rsa_internal.h"
 
 TC_RSA_result TC_RSA_encrypt_oaep(const TC_RSA_public_key* key, const TC_RSA_oaep_options* options,
-                                  TC_bytes plaintext,
-                                  TC_buffer ciphertext, const TC_RSA_workspace* workspace, TC_RSA_execution* execution)
+                                  TC_bytes plaintext, TC_buffer ciphertext,
+                                  const TC_RSA_workspace* workspace, TC_RSA_execution* execution)
 {
   tc_rsa_storage storage;
   if (!options)
@@ -82,8 +82,8 @@ TC_RSA_result TC_RSA_encrypt_oaep(const TC_RSA_public_key* key, const TC_RSA_oae
 }
 
 TC_RSA_result TC_RSA_decrypt_oaep(const TC_RSA_private_key* key, const TC_RSA_oaep_options* options,
-                                  TC_bytes ciphertext,
-                                  TC_buffer plaintext, size_t* plaintext_length, const TC_RSA_workspace* workspace,
+                                  TC_bytes ciphertext, TC_buffer plaintext,
+                                  size_t* plaintext_length, const TC_RSA_workspace* workspace,
                                   TC_RSA_execution* execution)
 {
   tc_rsa_private_view view = {0};
@@ -128,8 +128,8 @@ TC_RSA_result TC_RSA_decrypt_oaep(const TC_RSA_private_key* key, const TC_RSA_oa
   /* RFC 8017 section 7.1.2, note after step 4: an opponent must not learn
    * which decryption error occurred. Plaintext capacity and the whole budget
    * are checked before decryption, so LIMIT depends only on public sizes. */
-  if (plaintext.capacity < max_message || !private_cost ||
-      workspace->capacity < required || *work < private_cost || *work - private_cost < decode_cost)
+  if (plaintext.capacity < max_message || !private_cost || workspace->capacity < required ||
+      *work < private_cost || *work - private_cost < decode_cost)
     return TC_RSA_LIMIT;
   TC_hash_context hash_workspace;
   uint8_t block[64];

@@ -56,13 +56,9 @@ void tc_piv_check_chuid(tc_piv_check_run* run)
       run->result = TC_PIV_ERROR;
       return;
     }
-    const TC_PIV_CHUID_validation_request request = {object->encoded,
-                                                     TC_PIV_CHUID_CONTAINER,
-                                                     report->profile,
-                                                     chuid_profile,
-                                                     0,
-                                                     &report->card,
-                                                     &report->card_expiration};
+    const TC_PIV_CHUID_validation_request request = {
+        object->encoded, TC_PIV_CHUID_CONTAINER,  report->profile, chuid_profile, 0,
+        &report->card,   &report->card_expiration};
     const TC_credential_status status =
         TC_PIV_CHUID_validate(&request, run->request->content, run->work, &report->chuid);
     if (!signer_result(run, status, report->chuid.revocation_checked, &check, &revocation))

@@ -40,8 +40,8 @@ int main(void)
                                  (TC_buffer){signature, sizeof signature}, &workspace,
                                  &execution) == TC_RSA_OK ||
           TC_RSA_decrypt_oaep(&key, &oaep, (TC_bytes){signature, sizeof signature},
-                              (TC_buffer){signature, sizeof signature}, &plaintext_length, &workspace,
-                              &execution) == TC_RSA_OK)
+                              (TC_buffer){signature, sizeof signature}, &plaintext_length,
+                              &workspace, &execution) == TC_RSA_OK)
         return 1;
     }
   }

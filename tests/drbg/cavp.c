@@ -126,9 +126,9 @@ static void run_trial(variant kind, const TC_DRBG_config* config, const trial* t
   if (kind == VARIANT_PR_FALSE)
     munit_assert_int(TC_DRBG_reseed(&drbg, span(&t->additional_reseed)), ==, TC_DRBG_OK);
   for (call = 0; call < 2; ++call)
-    munit_assert_int(
-        TC_DRBG_generate(&drbg, (TC_buffer){output, t->returned_length}, pr, span(&t->additional[call])), ==,
-        TC_DRBG_OK);
+    munit_assert_int(TC_DRBG_generate(&drbg, (TC_buffer){output, t->returned_length}, pr,
+                                      span(&t->additional[call])),
+                     ==, TC_DRBG_OK);
   munit_assert_size(source.used, ==, source.count);
   if (memcmp(output, t->returned, t->returned_length) != 0) {
     fprintf(stderr, "DRBG CAVP mismatch %s [%s] COUNT = %ld\n", file, option, t->count);

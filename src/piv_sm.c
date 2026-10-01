@@ -198,10 +198,9 @@ int TC_PIV_SM_peer_matches(const TC_PIV_SM* session, TC_bytes certificate)
       (session->state != TC_PIV_SM_READY && session->state != TC_PIV_SM_PENDING) ||
       TC_SHA256_digest(certificate, digest) != TC_OK)
     return 0;
-  const int matches =
-      TC_ct_equal((TC_bytes){digest, sizeof digest},
-                  (TC_bytes){session->data.traffic.peer_digest,
-                             sizeof session->data.traffic.peer_digest}) == TC_OK;
+  const int matches = TC_ct_equal((TC_bytes){digest, sizeof digest},
+                                  (TC_bytes){session->data.traffic.peer_digest,
+                                             sizeof session->data.traffic.peer_digest}) == TC_OK;
   TC_secure_zero(digest, sizeof digest);
   return matches;
 }

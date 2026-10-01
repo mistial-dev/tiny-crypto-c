@@ -48,10 +48,9 @@ static inline TC_status tc_internal_verify_tag(TC_status computed_status, uint8_
                                                size_t computed_size, const uint8_t* tag,
                                                size_t tag_length)
 {
-  TC_status status = computed_status == TC_OK
-                         ? TC_ct_equal((TC_bytes){computed, tag_length},
-                                       (TC_bytes){tag, tag_length})
-                         : TC_ERROR;
+  TC_status status = computed_status == TC_OK ? TC_ct_equal((TC_bytes){computed, tag_length},
+                                                            (TC_bytes){tag, tag_length})
+                                              : TC_ERROR;
   TC_secure_zero(computed, computed_size);
   return status;
 }

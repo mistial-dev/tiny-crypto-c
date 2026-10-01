@@ -79,10 +79,10 @@ static void check_profile(const char* profile, int face_and_printed)
       }
     }
     size_t encoded_length = SIZE_MAX;
-    munit_assert_int(TC_TWIC_object_encrypt(
-                         &key, (TC_buffer){(uint8_t*)ciphertext.data, ciphertext.length},
-                         plain_length, &encoded_length),
-                     ==, TC_OK);
+    munit_assert_int(
+        TC_TWIC_object_encrypt(&key, (TC_buffer){(uint8_t*)ciphertext.data, ciphertext.length},
+                               plain_length, &encoded_length),
+        ==, TC_OK);
     munit_assert_size(encoded_length, ==, ciphertext.length);
     munit_assert_memory_equal(encoded_length, ciphertext.data, saved);
     TC_TWIC_tpk wrong = key;

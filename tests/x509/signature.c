@@ -83,7 +83,8 @@ TC_TEST(dispatch)
     state.result = results[i];
     state.calls = 0;
     work = 100;
-    munit_assert_int(TC_X509_signature_verify(&certificate, &key, &provider, &work), ==, results[i]);
+    munit_assert_int(TC_X509_signature_verify(&certificate, &key, &provider, &work), ==,
+                     results[i]);
     munit_assert_uint(state.calls, ==, 1);
     munit_assert_size(work, <, 100);
   }

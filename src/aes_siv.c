@@ -122,8 +122,8 @@ static TC_status tc_aes_siv_crypt(const uint8_t* key, const TC_bytes* ad, size_t
       status = tc_aes_siv_s2v(st.k1.round_key, ad, ad_count, (TC_bytes){output.data, input_len},
                               st.computed);
     if (status == TC_OK)
-      status = TC_ct_equal((TC_bytes){st.computed, TC_AES_BLOCKLEN},
-                           (TC_bytes){v, TC_AES_BLOCKLEN});
+      status =
+          TC_ct_equal((TC_bytes){st.computed, TC_AES_BLOCKLEN}, (TC_bytes){v, TC_AES_BLOCKLEN});
   } else {
     status = tc_aes_siv_s2v(st.k1.round_key, ad, ad_count, input, v);
     if (status == TC_OK)

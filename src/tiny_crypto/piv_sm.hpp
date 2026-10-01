@@ -81,8 +81,8 @@ public:
                                      size_t& ciphertext_length, uint8_t (&tag)[8],
                                      piv_sm_workspace& workspace) noexcept
   {
-    return ::TC_PIV_SM_protect(&session_, &request, &ciphertext_length,
-                               buffer{tag, sizeof tag}, &workspace);
+    return ::TC_PIV_SM_protect(&session_, &request, &ciphertext_length, buffer{tag, sizeof tag},
+                               &workspace);
   }
   // Write at most plaintext.capacity bytes and report the count in plaintext_length.
   TC_CPP_NODISCARD TC_status unprotect(const piv_sm_unprotect_request& request, buffer plaintext,

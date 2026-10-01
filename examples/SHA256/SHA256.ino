@@ -17,4 +17,5 @@ void setup()
   Serial.println(passed ? "SHA-256 self-test passed" : "SHA-256 self-test failed");
 }
 
-void loop() {}
+void loop()
+{}

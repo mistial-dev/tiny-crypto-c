@@ -137,15 +137,14 @@ static void prepare(const char* profile)
   TC_bytes ciphertext =
       value(value((TC_bytes){state->fingerprint, state->fingerprint_length}, 0x53), 0xbc);
   memcpy(state->fingerprint_plain, ciphertext.data, ciphertext.length);
-  munit_assert_int(TC_TWIC_object_decrypt(
-                       &key, (TC_buffer){state->fingerprint_plain, ciphertext.length},
-                       &state->fingerprint_plain_length),
+  munit_assert_int(TC_TWIC_object_decrypt(&key,
+                                          (TC_buffer){state->fingerprint_plain, ciphertext.length},
+                                          &state->fingerprint_plain_length),
                    ==, TC_OK);
   if (!strcmp(profile, "nexgen")) {
     ciphertext = value(value((TC_bytes){state->face, state->face_length}, 0x53), 0xbc);
     memcpy(state->face_plain, ciphertext.data, ciphertext.length);
-    munit_assert_int(TC_TWIC_object_decrypt(&key,
-                                            (TC_buffer){state->face_plain, ciphertext.length},
+    munit_assert_int(TC_TWIC_object_decrypt(&key, (TC_buffer){state->face_plain, ciphertext.length},
                                             &state->face_plain_length),
                      ==, TC_OK);
     ciphertext = value(value((TC_bytes){state->printed, state->printed_length}, 0x53), 0xbc);

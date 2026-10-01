@@ -56,9 +56,8 @@ TC_TEST(mapping)
     number = expected;
     munit_assert_int(TC_TWIC_uuid_write(expected, (TC_buffer){encoded, length}), ==, TC_TLV_LIMIT);
     /* The caller's number is checked before the capacity. */
-    munit_assert_int(TC_TWIC_uuid_write(UINT64_C(100000000000000),
-                                        (TC_buffer){encoded, length}), ==,
-                     TC_TLV_ARGUMENT);
+    munit_assert_int(TC_TWIC_uuid_write(UINT64_C(100000000000000), (TC_buffer){encoded, length}),
+                     ==, TC_TLV_ARGUMENT);
     munit_assert_int(TC_TWIC_uuid_read((TC_bytes){known, length}, &number), ==, TC_TLV_INVALID);
     munit_assert_uint64(number, ==, expected);
     for (size_t i = 0; i < sizeof encoded; ++i)

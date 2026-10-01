@@ -67,17 +67,14 @@ TC_TEST(test_profile)
   munit_assert(TC_KMAC256_digest((TC_bytes){NULL, 0}, (TC_bytes){NULL, 0}, (TC_bytes){NULL, 0},
                                  (TC_buffer){stream, 48}) == TC_OK);
   munit_assert(memcmp(out, stream, 32) != 0);
-  munit_assert(TC_KMAC256_digest((TC_bytes){key, 32}, (TC_bytes){data, 4},
-                                 (TC_bytes){NULL, 0}, (TC_buffer){out, TC_MIN_TAG_LEN}) == TC_OK);
-  munit_assert(TC_KMAC256_verify((TC_bytes){key, 32}, (TC_bytes){data, 4},
-                                 (TC_bytes){NULL, 0},
+  munit_assert(TC_KMAC256_digest((TC_bytes){key, 32}, (TC_bytes){data, 4}, (TC_bytes){NULL, 0},
+                                 (TC_buffer){out, TC_MIN_TAG_LEN}) == TC_OK);
+  munit_assert(TC_KMAC256_verify((TC_bytes){key, 32}, (TC_bytes){data, 4}, (TC_bytes){NULL, 0},
                                  (TC_bytes){out, TC_MIN_TAG_LEN}) == TC_OK);
   out[TC_MIN_TAG_LEN - 1] ^= 1;
-  munit_assert(TC_KMAC256_verify((TC_bytes){key, 32}, (TC_bytes){data, 4},
-                                 (TC_bytes){NULL, 0},
+  munit_assert(TC_KMAC256_verify((TC_bytes){key, 32}, (TC_bytes){data, 4}, (TC_bytes){NULL, 0},
                                  (TC_bytes){out, TC_MIN_TAG_LEN}) == TC_MISMATCH);
-  munit_assert(TC_KMAC256_digest((TC_bytes){key, 32}, (TC_bytes){data, 4},
-                                 (TC_bytes){NULL, 0},
+  munit_assert(TC_KMAC256_digest((TC_bytes){key, 32}, (TC_bytes){data, 4}, (TC_bytes){NULL, 0},
                                  (TC_buffer){out, TC_MIN_TAG_LEN - 1}) == TC_ERROR);
   munit_assert(TC_KMAC256_digest_short_tag((TC_bytes){key, 32}, (TC_bytes){data, 4},
                                            (TC_bytes){NULL, 0},

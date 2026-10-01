@@ -76,8 +76,8 @@ TC_TEST(vectors)
                                          associated};
     TC_RSA_execution execution = {{blinding_bytes, NULL}, 1, {UINT32_MAX}};
     TC_RSA_result result =
-        TC_RSA_decrypt_oaep(&key, &options, encrypted,
-                            (TC_buffer){output, sizeof output}, &recovered, &workspace, &execution);
+        TC_RSA_decrypt_oaep(&key, &options, encrypted, (TC_buffer){output, sizeof output},
+                            &recovered, &workspace, &execution);
     if (result != (valid ? TC_RSA_OK : TC_RSA_INVALID))
       munit_errorf("OAEP vector %s: status %d, expected %s", fields[11], result, fields[10]);
     if (valid) {

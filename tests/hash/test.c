@@ -263,12 +263,10 @@ TC_TEST(test_ct_eq)
   munit_assert_int(TC_ct_equal((TC_bytes){a, 0}, (TC_bytes){b, 0}), ==, TC_OK);
 
   b[0] ^= 0x01U;
-  munit_assert_int(TC_ct_equal((TC_bytes){a, sizeof a}, (TC_bytes){b, sizeof b}), ==,
-                   TC_MISMATCH);
+  munit_assert_int(TC_ct_equal((TC_bytes){a, sizeof a}, (TC_bytes){b, sizeof b}), ==, TC_MISMATCH);
   b[0] ^= 0x01U;
   b[sizeof(b) - 1] ^= 0x80U;
-  munit_assert_int(TC_ct_equal((TC_bytes){a, sizeof a}, (TC_bytes){b, sizeof b}), ==,
-                   TC_MISMATCH);
+  munit_assert_int(TC_ct_equal((TC_bytes){a, sizeof a}, (TC_bytes){b, sizeof b}), ==, TC_MISMATCH);
 
   munit_assert_int(TC_ct_equal((TC_bytes){a, sizeof a}, (TC_bytes){b, sizeof b - 1}), ==,
                    TC_MISMATCH);

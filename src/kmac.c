@@ -221,7 +221,6 @@ static TC_status tc_kmac_digest(TC_bytes key, TC_bytes data, TC_bytes custom, TC
   return status;
 }
 
-
 TC_status TC_KMAC256_digest(TC_bytes key, TC_bytes data, TC_bytes custom, TC_buffer out)
 {
   return tc_kmac_digest(key, data, custom, out, 0);

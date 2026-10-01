@@ -100,7 +100,8 @@ static TC_status command_protect(TC_PIV_link* link, const TC_APDU_command* comma
       command->data,
       {layout->ciphertext_length ? field + layout->ciphertext_offset : NULL,
        layout->ciphertext_length},
-      authenticated, 2};
+      authenticated,
+      2};
   uint8_t* mac = field + layout->authenticated_length;
   size_t written = 0;
   mac[0] = MAC_OBJECT;

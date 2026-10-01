@@ -264,11 +264,10 @@ void TC_RSA_keygen_clear(TC_RSA_keygen_state* state);
  * TC_RSA_private_work with a key whose crt is NULL for the private
  * operation. */
 TC_RSA_result TC_RSA_raw_public(const TC_RSA_public_key* key, TC_bytes input, TC_buffer output,
-                                const TC_RSA_workspace* workspace,
-                                TC_work_budget* work);
+                                const TC_RSA_workspace* workspace, TC_work_budget* work);
 TC_RSA_result TC_RSA_raw_private(const TC_RSA_public_key* key, TC_bytes private_exponent,
-                                 TC_bytes input,
-                                 TC_buffer output, const TC_RSA_workspace* workspace, TC_RSA_execution* execution);
+                                 TC_bytes input, TC_buffer output,
+                                 const TC_RSA_workspace* workspace, TC_RSA_execution* execution);
 
 /* Return 1 when bits names a supported modulus size, otherwise 0. */
 int TC_RSA_modulus_supported(size_t bits);
@@ -376,8 +375,8 @@ TC_RSA_result TC_RSA_encode_pss_digest(const TC_RSA_pss_options* options, TC_byt
  * Work: 1 + TC_RSA_oaep_work + TC_RSA_public_work, checked in full before the
  * seed request. */
 TC_RSA_result TC_RSA_encrypt_oaep(const TC_RSA_public_key* key, const TC_RSA_oaep_options* options,
-                                  TC_bytes plaintext,
-                                  TC_buffer ciphertext, const TC_RSA_workspace* workspace, TC_RSA_execution* execution);
+                                  TC_bytes plaintext, TC_buffer ciphertext,
+                                  const TC_RSA_workspace* workspace, TC_RSA_execution* execution);
 
 /* RSAES-OAEP decryption (RFC 8017 section 7.1.2) with a validated, unchanged
  * private key and explicit hashes, both enabled. Label bytes are borrowed,
@@ -402,8 +401,8 @@ TC_RSA_result TC_RSA_encrypt_oaep(const TC_RSA_public_key* key, const TC_RSA_oae
  *
  * Work: TC_RSA_private_work + TC_RSA_oaep_work. */
 TC_RSA_result TC_RSA_decrypt_oaep(const TC_RSA_private_key* key, const TC_RSA_oaep_options* options,
-                                  TC_bytes ciphertext,
-                                  TC_buffer plaintext, size_t* plaintext_length, const TC_RSA_workspace* workspace,
+                                  TC_bytes ciphertext, TC_buffer plaintext,
+                                  size_t* plaintext_length, const TC_RSA_workspace* workspace,
                                   TC_RSA_execution* execution);
 
 /* Sign a precomputed digest with RSASSA-PKCS1-v1_5 (RFC 8017 section 8.2.1)
@@ -425,8 +424,8 @@ TC_RSA_result TC_RSA_decrypt_oaep(const TC_RSA_private_key* key, const TC_RSA_oa
  *
  * Work: TC_RSA_private_work + TC_RSA_encode_v15_work. */
 TC_RSA_result TC_RSA_sign_v15_digest(const TC_RSA_private_key* key,
-                                     const TC_RSA_v15_options* options, TC_bytes digest, TC_buffer signature,
-                                     const TC_RSA_workspace* workspace,
+                                     const TC_RSA_v15_options* options, TC_bytes digest,
+                                     TC_buffer signature, const TC_RSA_workspace* workspace,
                                      TC_RSA_execution* execution);
 
 /* RSASSA-PSS signing (RFC 8017 section 8.1.1) with explicit message and MGF
@@ -437,8 +436,8 @@ TC_RSA_result TC_RSA_sign_v15_digest(const TC_RSA_private_key* key,
  * Work: TC_RSA_private_work + TC_RSA_encode_pss_work, plus 1 for a salt
  * request. */
 TC_RSA_result TC_RSA_sign_pss_digest(const TC_RSA_private_key* key,
-                                     const TC_RSA_pss_options* options, TC_bytes digest, TC_buffer signature,
-                                     const TC_RSA_workspace* workspace,
+                                     const TC_RSA_pss_options* options, TC_bytes digest,
+                                     TC_buffer signature, const TC_RSA_workspace* workspace,
                                      TC_RSA_execution* execution);
 
 /* Validate two-prime RSA components at 1024, 2048, 3072 or 4096 bits. Public

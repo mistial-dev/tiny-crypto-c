@@ -181,8 +181,9 @@ TC_TEST(authenticate)
     const TC_PIV_SM_protect_request command = {{NULL, 0}, {NULL, 0}, header_span, 1};
     uint8_t tag[8];
     size_t written = 99;
-    munit_assert_int(TC_PIV_SM_protect(&session, &command, &written,
-                                       (TC_buffer){tag, sizeof tag}, &workspace.session), ==, TC_OK);
+    munit_assert_int(TC_PIV_SM_protect(&session, &command, &written, (TC_buffer){tag, sizeof tag},
+                                       &workspace.session),
+                     ==, TC_OK);
     munit_assert_size(written, ==, 0);
     munit_assert_size(fixture->command.length, ==, 10);
     munit_assert_memory_equal(8, tag, fixture->command.data + 2);
@@ -190,10 +191,9 @@ TC_TEST(authenticate)
     const TC_PIV_SM_unprotect_request reply = {
         {NULL, 0}, {fixture->reply.data + 6, 8}, &status_span, 1};
     size_t plain_length = 99;
-    munit_assert_int(
-        TC_PIV_SM_unprotect(&session, &reply, (TC_buffer){NULL, 0}, &plain_length,
-                            &workspace.session), ==,
-        TC_OK);
+    munit_assert_int(TC_PIV_SM_unprotect(&session, &reply, (TC_buffer){NULL, 0}, &plain_length,
+                                         &workspace.session),
+                     ==, TC_OK);
     munit_assert_size(plain_length, ==, 0);
     munit_assert_int(TC_PIV_SM_get_state(&session), ==, TC_PIV_SM_READY);
 

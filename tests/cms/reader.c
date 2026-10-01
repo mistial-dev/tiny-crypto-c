@@ -302,9 +302,10 @@ TC_TEST(storage)
                                       (TC_TLV_frames){pointers[FRAMES], FRAME_CAPACITY},
                                       pointers[WORK], pointers[OUTPUT]);
         else if (reader == DIGEST)
-          result = TC_CMS_content_digest(input, TC_HASH_SHA256, pointers[LIMITS],
-                                         (TC_TLV_frames){pointers[FRAMES], FRAME_CAPACITY},
-                                         pointers[WORK], (TC_buffer){pointers[OUTPUT], INPUT_CAPACITY});
+          result =
+              TC_CMS_content_digest(input, TC_HASH_SHA256, pointers[LIMITS],
+                                    (TC_TLV_frames){pointers[FRAMES], FRAME_CAPACITY},
+                                    pointers[WORK], (TC_buffer){pointers[OUTPUT], INPUT_CAPACITY});
         else
           result = TC_CMS_signed_data_read(input, &cms_policy, pointers[LIMITS],
                                            (TC_TLV_frames){pointers[FRAMES], FRAME_CAPACITY},
