@@ -843,7 +843,7 @@ static TC_status workflow_card_proof(void* context, TC_PIV_card_profile profile,
   TC_X509_signature_result status =
       TC_X509_signature_verify_digest((TC_bytes){digest, digest_length}, &challenge->signature,
                                       (TC_bytes){signature, length}, key, proof->provider, &work);
-  TC_secure_zero((TC_buffer){digest, sizeof digest});
+  TC_secure_zero(digest, sizeof digest);
   TC_secure_zero(signature, sizeof signature);
   if (status == TC_X509_SIGNATURE_VALID && proof->replacement_ccl) {
     munit_assert_int(TC_TWIC_CCL_store_publish(proof->ccl_store, 1, proof->replacement_ccl), ==,
@@ -1404,7 +1404,8 @@ static MunitResult chuid_signature(const MunitParameter params[], void* user)
       static const uint8_t twic_content_signing[] = {0x2b, 6, 1, 4, 1, 0x81, 0xe3, 0x52, 6, 7};
       TC_X509_certificate parsed_root;
       munit_assert_int(TC_X509_read(root_der, &limits, &parser, &parsed_root), ==, TC_TLV_OK);
-      TC_X509_store_anchor anchor = {.trust = {parsed_root.subject, parsed_root.public_key}};
+      TC_X509_store_anchor anchor = {.trust = {parsed_root.subject, parsed_root.public_key},
+                                     .usage = TC_X509_ANCHOR_USAGE_CRL_SIGN};
       const TC_X509_store_source anchors = {&anchor, 0, 1, NULL, crl_trust_anchor};
       candidate_source supplied = {&root_der, 1, 0, TC_TLV_OK, 0};
       const TC_X509_store_source issuers = {&supplied, 1, 0, read_candidate, NULL};

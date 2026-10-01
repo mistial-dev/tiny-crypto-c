@@ -204,7 +204,8 @@ static void* path_setup(const MunitParameter params[], void* user)
   munit_assert_int(
       TC_X509_read((TC_bytes){f->root_der, f->root_length}, &f->limits, &f->parser, &parsed_root),
       ==, TC_TLV_OK);
-  f->anchor = (TC_X509_store_anchor){.trust = {parsed_root.subject, parsed_root.public_key}};
+  f->anchor = (TC_X509_store_anchor){.trust = {parsed_root.subject, parsed_root.public_key},
+                                     .usage = TC_X509_ANCHOR_USAGE_CRL_SIGN};
   f->external = (TC_X509_store_source){&f->anchor, 0, 1, NULL, crl_trust_anchor};
   f->options.at = (TC_X509_time){2026, 1, 1, 0, 0, 0};
   f->options.parsing = f->limits;
