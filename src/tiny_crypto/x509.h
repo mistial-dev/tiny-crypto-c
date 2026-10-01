@@ -107,7 +107,7 @@ typedef struct {
  *
  * Frames and OID slots may change on failure. out changes only on OK. */
 TC_TLV_result TC_X509_read(TC_bytes encoded, const TC_TLV_limits* limits,
-                           TC_X509_workspace* workspace, TC_X509_certificate* out);
+                           const TC_X509_workspace* workspace, TC_X509_certificate* out);
 /* Time helpers. A valid TC_X509_time is a Gregorian UTC calendar time in
  * years 1..9999 with hour <= 23, minute <= 59 and second <= 59, without leap
  * seconds (RFC 5280 section 4.1.2.5). Each returns ARGUMENT for a NULL

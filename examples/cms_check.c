@@ -73,10 +73,10 @@ int main(int argc, char** argv)
     }
 
   const TC_TLV_limits limits = {OBJECT_BYTES, OBJECT_BYTES, ELEMENTS, EXAMPLE_CMS_FRAME_CAPACITY};
-  TC_X509_workspace parser = {{scratch.cms.path.validation.frames, EXAMPLE_CMS_FRAME_CAPACITY},
-                              scratch.cms.path.validation.oids,
-                              sizeof scratch.cms.path.validation.oids /
-                                  sizeof scratch.cms.path.validation.oids[0]};
+  const TC_X509_workspace parser = {
+      {scratch.cms.path.validation.frames, EXAMPLE_CMS_FRAME_CAPACITY},
+      scratch.cms.path.validation.oids,
+      sizeof scratch.cms.path.validation.oids / sizeof scratch.cms.path.validation.oids[0]};
   TC_X509_certificate root;
   TC_X509_crl_index index;
   size_t work = WORK_LIMIT;

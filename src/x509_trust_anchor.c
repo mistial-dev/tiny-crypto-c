@@ -64,7 +64,8 @@ static TC_TLV_result policy_flags(TC_bytes contents, unsigned* flags)
 }
 
 static TC_TLV_result name_constraints(TC_bytes contents, const TC_TLV_limits* limits,
-                                      TC_X509_workspace* workspace, TC_X509_name_constraints* out)
+                                      const TC_X509_workspace* workspace,
+                                      TC_X509_name_constraints* out)
 {
   TC_TLV_reader reader;
   TC_TLV_element element;
@@ -96,8 +97,8 @@ static TC_TLV_result name_constraints(TC_bytes contents, const TC_TLV_limits* li
 }
 
 static TC_TLV_result cert_path_controls(TC_bytes contents, const TC_TLV_limits* limits,
-                                        TC_X509_workspace* workspace, TC_X509_store_anchor* out,
-                                        TC_bytes pubkey, TC_bytes key_id)
+                                        const TC_X509_workspace* workspace,
+                                        TC_X509_store_anchor* out, TC_bytes pubkey, TC_bytes key_id)
 {
   TC_TLV_reader reader;
   TC_TLV_element element;
@@ -176,7 +177,8 @@ static TC_TLV_result cert_path_controls(TC_bytes contents, const TC_TLV_limits* 
 }
 
 static TC_TLV_result trust_anchor_info(TC_bytes contents, const TC_TLV_limits* limits,
-                                       TC_X509_workspace* workspace, TC_X509_store_anchor* out)
+                                       const TC_X509_workspace* workspace,
+                                       TC_X509_store_anchor* out)
 {
   TC_TLV_reader reader;
   TC_TLV_element element;
@@ -255,7 +257,7 @@ static TC_TLV_result trust_anchor_info(TC_bytes contents, const TC_TLV_limits* l
 
 TC_TLV_result TC_X509_trust_anchor_list_init(TC_X509_trust_anchor_reader* reader, TC_bytes encoded,
                                              const TC_TLV_limits* limits,
-                                             TC_X509_workspace* workspace)
+                                             const TC_X509_workspace* workspace)
 {
   TC_X509_trust_anchor_reader parsed;
   TC_TLV_result result;
@@ -317,7 +319,7 @@ TC_TLV_result TC_X509_trust_anchor_next(TC_X509_trust_anchor_reader* reader,
   TC_TLV_element choice;
   TC_X509_store_anchor parsed = {0};
   const TC_TLV_limits* limits;
-  TC_X509_workspace* workspace;
+  const TC_X509_workspace* workspace;
   TC_TLV_result result;
   if (!reader || !out)
     return TC_TLV_ARGUMENT;

@@ -9,8 +9,8 @@ TC_TLV_result example_check_path_revocation(const TC_bytes* chain, size_t count,
 {
   if (!storage)
     return TC_TLV_ARGUMENT;
-  TC_X509_path_workspace validation = example_x509_workspace(&storage->search.validation);
-  TC_X509_search_workspace search = example_x509_search_workspace(&storage->search);
+  const TC_X509_path_workspace validation = example_x509_workspace(&storage->search.validation);
+  const TC_X509_search_workspace search = example_x509_search_workspace(&storage->search);
   const TC_X509_revocation_workspace workspace = {
       &validation,
       &search,

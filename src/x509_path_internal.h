@@ -66,7 +66,7 @@ typedef struct {
   const TC_TLV_limits* limits;
   /* Original DER spans and parser for filling cache during the basic pass. */
   const TC_bytes* encoded;
-  TC_X509_workspace* parser;
+  const TC_X509_workspace* parser;
   /* Filled in order by the basic pass, then exposed through certificates. */
   TC_X509_certificate* cache;
   /* One extension summary per certificate, filled on first use. */

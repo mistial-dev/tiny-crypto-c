@@ -46,7 +46,7 @@ TC_credential_status example_validate_biometric(
 {
   if (!request || !snapshot || !options || !revocation || !work || !storage || !out)
     return TC_CREDENTIAL_ERROR;
-  TC_CMS_path_workspace path = example_cms_path_workspace(&storage->cms);
+  const TC_CMS_path_workspace path = example_cms_path_workspace(&storage->cms);
   const TC_CMS_credential_workspace workspace = example_cms_credential_workspace(storage, &path);
   TC_validation_options validation;
   TC_validation_context context;
@@ -67,7 +67,7 @@ TC_credential_status example_validate_security(const TC_PIV_security_validation_
 {
   if (!request || !snapshot || !options || !revocation || !work || !storage)
     return TC_CREDENTIAL_ERROR;
-  TC_CMS_path_workspace path = example_cms_path_workspace(&storage->credential.cms);
+  const TC_CMS_path_workspace path = example_cms_path_workspace(&storage->credential.cms);
   const TC_CMS_credential_workspace credential =
       example_cms_credential_workspace(&storage->credential, &path);
   const TC_PIV_security_validation_workspace workspace = {storage->content,

@@ -16,7 +16,7 @@ TC_CMS_path_workspace example_cms_path_workspace(ExampleCMSPathWorkspace* storag
 }
 
 TC_CMS_credential_workspace example_cms_credential_workspace(ExampleCMSCredentialWorkspace* storage,
-                                                             TC_CMS_path_workspace* path)
+                                                             const TC_CMS_path_workspace* path)
 {
   const TC_CMS_credential_workspace workspace = {path,
                                                  storage->held_path,
@@ -45,7 +45,7 @@ TC_credential_status example_validate_cms_credential(const TC_CMS_validation_req
       (snapshot->state != TC_SNAPSHOT_CURRENT && snapshot->state != TC_SNAPSHOT_RETIRED) ||
       !storage)
     return TC_CREDENTIAL_ERROR;
-  TC_CMS_path_workspace cms = example_cms_path_workspace(&storage->cms);
+  const TC_CMS_path_workspace cms = example_cms_path_workspace(&storage->cms);
   const TC_CMS_credential_workspace workspace = example_cms_credential_workspace(storage, &cms);
   return TC_CMS_credential_validate(request, &snapshot->source, options, revocation, &workspace,
                                     work);
@@ -85,7 +85,7 @@ TC_X509_path_status example_find_cms_signer_path(const TC_CMS_signer_path_reques
 {
   if (!storage)
     return TC_X509_PATH_ERROR;
-  TC_CMS_path_workspace workspace = example_cms_path_workspace(storage);
+  const TC_CMS_path_workspace workspace = example_cms_path_workspace(storage);
   return TC_CMS_signer_path_build(request, source, options, &workspace, &work_limit, out);
 }
 
@@ -98,6 +98,6 @@ TC_X509_path_status example_check_cms_signed_data(const TC_CMS_validation_reques
 {
   if (!storage)
     return TC_X509_PATH_ERROR;
-  TC_CMS_path_workspace workspace = example_cms_path_workspace(storage);
+  const TC_CMS_path_workspace workspace = example_cms_path_workspace(storage);
   return TC_CMS_signed_data_path_build(request, source, options, &workspace, &work_limit, out);
 }

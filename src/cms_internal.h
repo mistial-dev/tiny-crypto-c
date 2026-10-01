@@ -217,8 +217,8 @@ TC_X509_path_status tc_cms_signer_find(const tc_cms_candidates* candidates,
  * must be disjoint from parser scratch, reader, output and work. */
 TC_TLV_result tc_cms_x509_candidate_next(tc_cms_candidates* reader, tc_pki_candidate_filter filter,
                                          const void* context, const tc_pki_tree_workspace* tree,
-                                         TC_X509_workspace* parser, TC_X509_certificate* scratch,
-                                         TC_bytes* out);
+                                         const TC_X509_workspace* parser,
+                                         TC_X509_certificate* scratch, TC_bytes* out);
 /* Candidate searches over a collection and its external store. Each search owns
  * its cursor, and certificate and CRL bytes stay borrowed from the source.
  * tc_cms_store_cursor views the external store from the collection position. */

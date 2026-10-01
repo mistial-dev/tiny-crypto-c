@@ -338,7 +338,7 @@ static void fuzz_trust_anchor_list(TC_bytes input)
 /* Anchor records built from a parsed certificate borrow its DER. After
  * argument checks, failures zero the record. */
 static void fuzz_certificate_anchor(const TC_X509_certificate* certificate,
-                                    const TC_TLV_limits* limits, TC_X509_workspace* workspace)
+                                    const TC_TLV_limits* limits, const TC_X509_workspace* workspace)
 {
   TC_X509_store_anchor anchor;
   memset(&anchor, 0xa5, sizeof anchor);

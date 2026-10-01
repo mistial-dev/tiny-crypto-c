@@ -54,8 +54,8 @@ TC_TLV_result tc_cms_signer_candidate_next(tc_cms_candidates* reader,
                                            const TC_CMS_signer_info* signer, TC_TLV_profile profile,
                                            const TC_X509_name_workspace* names,
                                            const tc_pki_tree_workspace* tree,
-                                           TC_X509_workspace* parser, TC_X509_certificate* scratch,
-                                           TC_bytes* out);
+                                           const TC_X509_workspace* parser,
+                                           TC_X509_certificate* scratch, TC_bytes* out);
 /* Select CRL signer candidates by subject, authority hints and cRLSign usage.
  * Same iterator/storage contract as above. Signature, path, scope and freshness
  * checks remain separate. Unsupported authority-name matching is reported. */
@@ -63,7 +63,7 @@ TC_TLV_result tc_cms_crl_signer_candidate_next(tc_cms_candidates* reader, const 
                                                const TC_X509_crl_extensions* extensions,
                                                const TC_X509_name_workspace* names,
                                                const tc_pki_tree_workspace* tree,
-                                               TC_X509_workspace* parser,
+                                               const TC_X509_workspace* parser,
                                                TC_X509_certificate* scratch, TC_bytes* out);
 /* CRL signer search with an explicit external store. */
 TC_TLV_result tc_cms_crl_source_search(const void* candidates, const TC_X509_store_source* external,

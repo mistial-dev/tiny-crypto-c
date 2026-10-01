@@ -28,7 +28,7 @@ typedef struct {
 
 static inline TC_X509_path_workspace example_x509_workspace(ExampleX509Workspace* storage)
 {
-  TC_X509_path_workspace workspace = TC_X509_PATH_WORKSPACE_INIT(
+  const TC_X509_path_workspace workspace = TC_X509_PATH_WORKSPACE_INIT(
       storage->frames, storage->oids, storage->left, storage->right, storage->matched,
       storage->nodes, storage->edges, storage->expected, storage->mappings, storage->policies,
       storage->certificates, storage->summaries);
@@ -38,8 +38,8 @@ static inline TC_X509_path_workspace example_x509_workspace(ExampleX509Workspace
 static inline TC_X509_search_workspace
 example_x509_search_workspace(ExampleX509SearchWorkspace* storage)
 {
-  TC_X509_search_workspace workspace = {storage->path, storage->frames,
-                                        sizeof storage->path / sizeof storage->path[0]};
+  const TC_X509_search_workspace workspace = {storage->path, storage->frames,
+                                              sizeof storage->path / sizeof storage->path[0]};
   return workspace;
 }
 #endif

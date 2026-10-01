@@ -19,7 +19,7 @@ typedef struct {
  * Callback state, parser scratch and work remain provisional on failure. */
 static inline TC_TLV_result tc_pki_store_candidate_next(void* context,
                                                         const tc_pki_tree_workspace* tree,
-                                                        TC_X509_workspace* parser,
+                                                        const TC_X509_workspace* parser,
                                                         TC_X509_certificate* out)
 {
   tc_pki_store_candidates* reader = context;
@@ -55,7 +55,8 @@ typedef TC_TLV_result (*tc_pki_candidate_attempt)(const void* context,
                                                   const TC_X509_certificate* candidate,
                                                   TC_X509_search_result* out);
 typedef TC_TLV_result (*tc_pki_candidate_next)(void* context, const tc_pki_tree_workspace* tree,
-                                               TC_X509_workspace* parser, TC_X509_certificate* out);
+                                               const TC_X509_workspace* parser,
+                                               TC_X509_certificate* out);
 
 /* Per-candidate checks of one search. filter decides whether a candidate is
  * worth a path attempt, and attempt builds and validates that path. Each

@@ -862,7 +862,7 @@ typedef union {
 
 /* Expect ARGUMENT and no change to shared or out. */
 static void read_rejected(TC_bytes encoded, const TC_TLV_limits* limits,
-                          TC_X509_workspace* workspace, TC_X509_certificate* out,
+                          const TC_X509_workspace* workspace, TC_X509_certificate* out,
                           read_storage* shared)
 {
   static read_storage before;

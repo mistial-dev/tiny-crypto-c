@@ -34,7 +34,7 @@ int main(void)
     return 1;
 
   const TC_TLV_limits limits = {FIXTURE_CAPACITY, FIXTURE_CAPACITY, 128, 16};
-  TC_X509_workspace parser = {{storage.frames, 16}, storage.oids, 16};
+  const TC_X509_workspace parser = {{storage.frames, 16}, storage.oids, 16};
   TC_X509_certificate issuer;
   if (TC_X509_read((TC_bytes){ca, ca_length}, &limits, &parser, &issuer) != TC_TLV_OK)
     return 2;

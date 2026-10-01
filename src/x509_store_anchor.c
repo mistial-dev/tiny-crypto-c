@@ -10,7 +10,7 @@
 #include <string.h>
 
 TC_TLV_result tc_x509_anchor_policy_set(TC_bytes contents, const TC_TLV_limits* limits,
-                                        TC_X509_workspace* workspace, int qualifiers_allowed)
+                                        const TC_X509_workspace* workspace, int qualifiers_allowed)
 {
   TC_TLV_reader policies;
   TC_X509_policy policy;
@@ -33,7 +33,8 @@ TC_TLV_result tc_x509_anchor_policy_set(TC_bytes contents, const TC_TLV_limits* 
 }
 
 TC_TLV_result tc_x509_anchor_subtrees(const TC_X509_name_constraints* names,
-                                      const TC_TLV_limits* limits, TC_X509_workspace* workspace)
+                                      const TC_TLV_limits* limits,
+                                      const TC_X509_workspace* workspace)
 {
   const TC_bytes lists[] = {names->permitted, names->excluded};
   for (size_t i = 0; i < 2; ++i) {
@@ -54,7 +55,7 @@ TC_TLV_result tc_x509_anchor_subtrees(const TC_X509_name_constraints* names,
 }
 
 TC_TLV_result tc_x509_anchor_extensions(TC_bytes encoded, const TC_TLV_limits* limits,
-                                        TC_X509_workspace* workspace, int trust_anchor_info,
+                                        const TC_X509_workspace* workspace, int trust_anchor_info,
                                         TC_X509_store_anchor* out)
 {
   TC_TLV_reader reader;
@@ -156,7 +157,8 @@ TC_TLV_result tc_x509_anchor_extensions(TC_bytes encoded, const TC_TLV_limits* l
 /* An anchor issues certificates, so its subject is non-empty (RFC 5280
  * section 4.1.2.6). A reversed validity period is malformed. */
 TC_TLV_result tc_x509_anchor_certificate(const TC_X509_certificate* certificate,
-                                         const TC_TLV_limits* limits, TC_X509_workspace* workspace,
+                                         const TC_TLV_limits* limits,
+                                         const TC_X509_workspace* workspace,
                                          TC_X509_store_anchor* out)
 {
   TC_bytes contents;
@@ -199,7 +201,7 @@ static TC_TLV_result anchor_storage(const TC_X509_certificate* certificate,
 
 TC_TLV_result TC_X509_store_anchor_from_certificate(const TC_X509_certificate* certificate,
                                                     const TC_TLV_limits* limits,
-                                                    TC_X509_workspace* workspace,
+                                                    const TC_X509_workspace* workspace,
                                                     TC_X509_store_anchor* out)
 {
   TC_X509_store_anchor anchor = {0};

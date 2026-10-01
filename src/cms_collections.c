@@ -199,8 +199,8 @@ TC_TLV_result tc_cms_path_source_init(const tc_cms_candidates* candidates,
 
 TC_TLV_result tc_cms_x509_candidate_next(tc_cms_candidates* reader, tc_pki_candidate_filter filter,
                                          const void* context, const tc_pki_tree_workspace* tree,
-                                         TC_X509_workspace* parser, TC_X509_certificate* scratch,
-                                         TC_bytes* out)
+                                         const TC_X509_workspace* parser,
+                                         TC_X509_certificate* scratch, TC_bytes* out)
 {
   tc_cms_candidates next;
   tc_cms_certificate_choice choice;
@@ -248,7 +248,7 @@ TC_TLV_result tc_cms_x509_candidate_next(tc_cms_candidates* reader, tc_pki_candi
 }
 
 static TC_TLV_result cms_next_candidate(void* context, const tc_pki_tree_workspace* tree,
-                                        TC_X509_workspace* parser, TC_X509_certificate* out)
+                                        const TC_X509_workspace* parser, TC_X509_certificate* out)
 {
   TC_bytes encoded;
   return tc_cms_x509_candidate_next(context, NULL, NULL, tree, parser, out, &encoded);

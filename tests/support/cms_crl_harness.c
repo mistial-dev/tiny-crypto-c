@@ -28,8 +28,8 @@ TC_TLV_result tc_cms_signer_candidate_next(tc_cms_candidates* reader,
                                            const TC_CMS_signer_info* signer, TC_TLV_profile profile,
                                            const TC_X509_name_workspace* names,
                                            const tc_pki_tree_workspace* tree,
-                                           TC_X509_workspace* parser, TC_X509_certificate* scratch,
-                                           TC_bytes* out)
+                                           const TC_X509_workspace* parser,
+                                           TC_X509_certificate* scratch, TC_bytes* out)
 {
   const harness_signer_filter filter = {signer, profile, names};
   if (!signer || (profile != TC_TLV_DER && profile != TC_TLV_BER))
@@ -173,7 +173,7 @@ TC_TLV_result tc_cms_crl_signer_candidate_next(tc_cms_candidates* reader, const 
                                                const TC_X509_crl_extensions* extensions,
                                                const TC_X509_name_workspace* names,
                                                const tc_pki_tree_workspace* tree,
-                                               TC_X509_workspace* parser,
+                                               const TC_X509_workspace* parser,
                                                TC_X509_certificate* scratch, TC_bytes* out)
 {
   const tc_x509_crl_filter filter = {crl, extensions, names};

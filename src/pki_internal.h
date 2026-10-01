@@ -175,7 +175,8 @@ TC_TLV_result tc_x509_pss_parameters(TC_bytes encoded);
  * context tag for an IMPLICIT Certificate. Rules and output match
  * TC_X509_read. */
 TC_TLV_result tc_x509_certificate_read(TC_bytes encoded, unsigned tag, const TC_TLV_limits* limits,
-                                       TC_X509_workspace* workspace, TC_X509_certificate* out);
+                                       const TC_X509_workspace* workspace,
+                                       TC_X509_certificate* out);
 /* TC_X509_certificate_names_check with the subjectAltName value supplied.
  * san.data is NULL when the certificate has no subjectAltName. */
 TC_TLV_result tc_x509_certificate_names_check_san(const TC_X509_certificate* certificate,
@@ -192,7 +193,7 @@ TC_TLV_result tc_x509_policy_information_next(TC_TLV_reader* reader, TC_X509_pol
  * signature and the outer signatureAlgorithm stay empty. The TBS signature
  * field is returned in signature_algorithm. */
 TC_TLV_result tc_x509_tbs_read(TC_bytes encoded, const TC_TLV_limits* limits,
-                               TC_X509_workspace* workspace, TC_X509_certificate* out);
+                               const TC_X509_workspace* workspace, TC_X509_certificate* out);
 typedef struct {
   TC_DER_algorithm hash, mgf_hash;
   /* Nonnegative INTEGER contents, retaining sign padding. Default is 20.

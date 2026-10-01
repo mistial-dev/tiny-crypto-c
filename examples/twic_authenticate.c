@@ -379,7 +379,7 @@ static int root_read(TC_bytes encoded, const char* expected_digest, const TC_TLV
                      TC_X509_store_anchor* anchor, size_t* max_certificates)
 {
   enum { BASIC_CONSTRAINTS = 19, KEY_USAGE = 15, NAME_CONSTRAINTS = 30 };
-  TC_X509_workspace parser = parser_workspace();
+  const TC_X509_workspace parser = parser_workspace();
   TC_X509_certificate root;
   if (!root_digest_match(encoded, expected_digest) ||
       TC_X509_read(encoded, limits, &parser, &root) != TC_TLV_OK ||
@@ -415,7 +415,7 @@ static int purpose_read(TC_bytes encoded, TC_PIV_oid expected, const TC_TLV_limi
   if (encoded.length > *work / 2)
     return 0;
   *work -= encoded.length * 2;
-  TC_X509_workspace parser = parser_workspace();
+  const TC_X509_workspace parser = parser_workspace();
   TC_X509_certificate certificate;
   if (TC_X509_read(encoded, limits, &parser, &certificate) != TC_TLV_OK)
     return 0;
@@ -475,7 +475,7 @@ static int crl_target_add(TC_bytes encoded, const TC_TLV_limits* limits, size_t*
   if (sensitive.crl.count == CRL_TARGETS || encoded.length > *work)
     return 0;
   *work -= encoded.length;
-  TC_X509_workspace parser = parser_workspace();
+  const TC_X509_workspace parser = parser_workspace();
   TC_X509_certificate certificate;
   if (TC_X509_read(encoded, limits, &parser, &certificate) != TC_TLV_OK)
     return 0;
@@ -501,7 +501,7 @@ static int content_crls_prepare(const Options* options, TC_bytes encoded,
   TC_PIV_CHUID chuid;
   if (TC_PIV_CHUID_read(encoded, encoding, TC_CHUID_PROFILE_TWIC_SIGNED, &chuid) != TC_TLV_OK)
     return 0;
-  TC_X509_workspace parser = parser_workspace();
+  const TC_X509_workspace parser = parser_workspace();
   TC_CMS_signed_data cms;
   const TC_CMS_verification_policy envelope = {.envelope = TC_CMS_ENVELOPE_BER};
   if (TC_CMS_signed_data_read(chuid.signature, &envelope, limits, parser.frames, work, &cms) !=
@@ -759,7 +759,7 @@ static int signed_objects_check(TC_PIV_link* link, const Options* options, TC_by
   const TC_PIV_CHUID_validation_request request = {
       *encoded, encoding,          profile,         TC_CHUID_PROFILE_TWIC_SIGNED,
       0,        &card.identifiers, &card.expiration};
-  TC_CMS_path_workspace chuid_path =
+  const TC_CMS_path_workspace chuid_path =
       example_cms_path_workspace(&sensitive.scratch.object_validation.cms);
   const TC_CMS_credential_workspace chuid_workspace =
       example_cms_credential_workspace(&sensitive.scratch.object_validation, &chuid_path);
@@ -806,7 +806,7 @@ static int signed_objects_check(TC_PIV_link* link, const Options* options, TC_by
                                                          &card.expiration,
                                                          entries,
                                                          count};
-    TC_CMS_path_workspace security_path =
+    const TC_CMS_path_workspace security_path =
         example_cms_path_workspace(&sensitive.scratch.security_validation.credential.cms);
     const TC_CMS_credential_workspace security_credential = example_cms_credential_workspace(
         &sensitive.scratch.security_validation.credential, &security_path);

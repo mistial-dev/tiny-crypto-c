@@ -26,7 +26,7 @@ typedef struct {
 } fixture;
 
 static TC_TLV_result next_candidate(void* context, const tc_pki_tree_workspace* tree,
-                                    TC_X509_workspace* parser, TC_X509_certificate* out)
+                                    const TC_X509_workspace* parser, TC_X509_certificate* out)
 {
   fixture* state = context;
   (void)parser;

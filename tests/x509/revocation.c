@@ -13,7 +13,7 @@ typedef struct {
 } signer_cursor;
 
 static TC_TLV_result signer_next(void* context, const tc_pki_tree_workspace* tree,
-                                 TC_X509_workspace* parser, TC_X509_certificate* out)
+                                 const TC_X509_workspace* parser, TC_X509_certificate* out)
 {
   signer_cursor* cursor = context;
   (void)tree;

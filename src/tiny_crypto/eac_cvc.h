@@ -55,7 +55,7 @@ typedef struct {
  * overlap. out is unchanged on failure and workspace frames may change. The
  * caller verifies the signature, chain and dates. */
 TC_TLV_result TC_EAC_CVC_read(TC_bytes encoded, const TC_TLV_limits* limits,
-                              TC_EAC_CVC_workspace* workspace, TC_EAC_CVC* out);
+                              const TC_EAC_CVC_workspace* workspace, TC_EAC_CVC* out);
 /* Read one standalone public key (tag 7F49). A standalone key may also be
  * an EC key-agreement key, and EC domain parameters stay optional. Statuses,
  * lifetime and work follow TC_EAC_CVC_read without the frame workspace.

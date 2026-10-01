@@ -31,7 +31,7 @@ disjoint and lie outside the list and the workspace struct. init returns
 enum { ANCHOR_CAPACITY = 8 };
 TC_TLV_frame frames[16];
 TC_bytes oids[32];
-TC_X509_workspace parser = {{frames, 16}, oids, 32};
+const TC_X509_workspace parser = {{frames, 16}, oids, 32};
 const TC_TLV_limits limits = {16384, 16384, 2048, 16};
 TC_X509_store_anchor anchors[ANCHOR_CAPACITY], record;
 TC_X509_trust_anchor_reader reader;

@@ -40,9 +40,10 @@ TC_TLV_result example_read_card_identity(TC_bytes encoded, TC_PIV_card_profile p
   if (encoded.length > *work / 2)
     return TC_TLV_LIMIT;
   *work -= encoded.length * 2;
-  TC_X509_workspace parser = {{storage->frames, sizeof storage->frames / sizeof *storage->frames},
-                              storage->oids,
-                              sizeof storage->oids / sizeof *storage->oids};
+  const TC_X509_workspace parser = {
+      {storage->frames, sizeof storage->frames / sizeof *storage->frames},
+      storage->oids,
+      sizeof storage->oids / sizeof *storage->oids};
   TC_X509_certificate certificate;
   TC_TLV_result status = TC_X509_read(encoded, limits, &parser, &certificate);
   if (status != TC_TLV_OK)

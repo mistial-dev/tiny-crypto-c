@@ -61,7 +61,7 @@ static TC_TLV_result pss_anchor(void* context, size_t index, size_t* work,
   return TC_TLV_OK;
 }
 
-static void check_envelope_path(TC_bytes signer, EVP_PKEY* key, TC_RSA_workspace* rsa)
+static void check_envelope_path(TC_bytes signer, EVP_PKEY* key, const TC_RSA_workspace* rsa)
 {
   enum { CERT_CAPACITY = 2 * ENCODED_CAPACITY, PATH_WORK = 10 * WORK_BUDGET };
   static const uint8_t algorithms[] = {0x31, 13, 0x30, 11, 6, 9, 0x60, 0x86,

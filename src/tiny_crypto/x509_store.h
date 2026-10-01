@@ -77,7 +77,7 @@ typedef struct {
  * never compared with a time. */
 TC_TLV_result TC_X509_store_anchor_from_certificate(const TC_X509_certificate* certificate,
                                                     const TC_TLV_limits* limits,
-                                                    TC_X509_workspace* workspace,
+                                                    const TC_X509_workspace* workspace,
                                                     TC_X509_store_anchor* out);
 
 /* Array-backed source for a fixed, caller-owned snapshot. All records and

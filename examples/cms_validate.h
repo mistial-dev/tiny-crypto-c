@@ -31,7 +31,7 @@ typedef struct {
 
 TC_CMS_path_workspace example_cms_path_workspace(ExampleCMSPathWorkspace* storage);
 TC_CMS_credential_workspace example_cms_credential_workspace(ExampleCMSCredentialWorkspace* storage,
-                                                             TC_CMS_path_workspace* path);
+                                                             const TC_CMS_path_workspace* path);
 
 /* Hold the snapshot and CRL index unchanged through the acceptance decision.
  * Request spans stay borrowed through signature, path and revocation checks. */

@@ -1802,6 +1802,26 @@ if(TINY_CRYPTO_BUILD_TESTS)
     target_compile_options(test_cpp_headers_cxx17 PRIVATE -Werror)
   endif()
 
+  # const_descriptors.c passes const workspace descriptors to every public
+  # entry that takes one. The C object needs -Werror for discarded qualifiers.
+  foreach(language c cpp)
+    add_library(test_${language}_const_descriptors OBJECT tests/headers/const_descriptors.${language})
+    target_include_directories(test_${language}_const_descriptors PRIVATE src)
+    target_compile_definitions(test_${language}_const_descriptors PRIVATE ${tc_cpp_header_definitions})
+    tc_warnings(test_${language}_const_descriptors)
+    if(language STREQUAL "c")
+      set(compiler_id ${CMAKE_C_COMPILER_ID})
+    else()
+      set(compiler_id ${CMAKE_CXX_COMPILER_ID})
+    endif()
+    if(compiler_id MATCHES "GNU|Clang")
+      target_compile_options(test_${language}_const_descriptors PRIVATE -Werror)
+    elseif(MSVC)
+      target_compile_options(test_${language}_const_descriptors PRIVATE /WX)
+    endif()
+  endforeach()
+  set_property(TARGET test_cpp_const_descriptors PROPERTY CXX_STANDARD 11)
+
   # copy_contract.cpp asserts the documented copy and move rules of every
   # wrapper class in C++11. avr-g++ has no <type_traits>, so it runs on the host.
   add_library(test_cpp_copy_contract OBJECT tests/cpp/copy_contract.cpp)

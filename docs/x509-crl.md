@@ -55,7 +55,7 @@ scope and base/delta selection are separate from this reader. Use
 ```c
 enum { CRL_EXTENSION_CAPACITY = 16 };
 TC_bytes extension_oids[CRL_EXTENSION_CAPACITY];
-TC_X509_workspace workspace = {
+const TC_X509_workspace workspace = {
     {frames, CRL_MAX_DEPTH}, extension_oids, CRL_EXTENSION_CAPACITY
 };
 TC_X509_crl_extensions extensions;

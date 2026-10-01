@@ -417,7 +417,7 @@ TC_TLV_result read_certificate(TC_bytes der, TC_X509_certificate* certificate)
 {
   TC_TLV_frame frames[16];
   TC_bytes extension_oids[32];
-  TC_X509_workspace workspace = {{frames, 16}, extension_oids, 32};
+  const TC_X509_workspace workspace = {{frames, 16}, extension_oids, 32};
   const TC_TLV_limits limits = {8192, 8192, 1024, 16};
 
   /* certificate borrows der and changes only on TC_TLV_OK. */

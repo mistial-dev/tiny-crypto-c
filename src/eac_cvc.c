@@ -227,7 +227,7 @@ TC_TLV_result TC_EAC_CVC_extension_next(TC_TLV_reader* reader, TC_EAC_CVC_extens
 }
 
 TC_TLV_result TC_EAC_CVC_read(TC_bytes encoded, const TC_TLV_limits* limits,
-                              TC_EAC_CVC_workspace* workspace, TC_EAC_CVC* out)
+                              const TC_EAC_CVC_workspace* workspace, TC_EAC_CVC* out)
 {
   static const uint8_t roles[] = {4, 0, 0x7f, 0, 7, 3, 1, 2};
   TC_EAC_CVC certificate;

@@ -734,7 +734,7 @@ TC_TEST(reader_binding)
     uint8_t original[sizeof shared];
     TC_X509_workspace frames_alias = {{shared.frames, 16}, oids, 32};
     TC_X509_workspace oids_alias = {{frames, 16}, shared.oids, 32};
-    TC_X509_workspace* const aliases[] = {&shared.workspace, &frames_alias, &oids_alias};
+    const TC_X509_workspace* const aliases[] = {&shared.workspace, &frames_alias, &oids_alias};
     size_t i;
     memset(&shared, 0x5a, sizeof shared);
     memcpy(shared.bytes + 1, encoded, length);

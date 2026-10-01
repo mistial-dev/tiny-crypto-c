@@ -19,7 +19,7 @@ extern "C" {
  * to this reader until the last next call. */
 typedef struct {
   TC_TLV_reader reader;
-  TC_X509_workspace* workspace;
+  const TC_X509_workspace* workspace;
 } TC_X509_trust_anchor_reader;
 
 /* Bind a DER TrustAnchorList, a SEQUENCE of one or more TrustAnchorChoice
@@ -35,7 +35,7 @@ typedef struct {
  * changes only on OK. */
 TC_TLV_result TC_X509_trust_anchor_list_init(TC_X509_trust_anchor_reader* reader, TC_bytes encoded,
                                              const TC_TLV_limits* limits,
-                                             TC_X509_workspace* workspace);
+                                             const TC_X509_workspace* workspace);
 /* Decode the next TrustAnchorChoice (RFC 5914 section 2): a Certificate, a
  * TBSCertificate or a TrustAnchorInfo, each into a TC_X509_store_anchor with
  * normalized path controls (RFC 5937 section 2). A TrustAnchorInfo without

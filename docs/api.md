@@ -161,6 +161,11 @@ requested buffer before returning `TC_OK`.
 Workspaces hold caller-owned scratch. Use static or application-owned storage
 for large RSA and certificate-validation workspaces on constrained devices.
 Keep workspace metadata alive for every operation that refers to it.
+Descriptors that only point at caller storage, such as `TC_X509_workspace`,
+`TC_X509_path_workspace`, `TC_CMS_path_workspace` and `TC_RSA_workspace`, are
+passed as const pointers or as `TC_TLV_frames` values, and calls write the
+storage they point to. Storage types such as `TC_EC_workspace` and
+`TC_GZIP_workspace`, and readers, contexts and results, are passed mutable.
 
 The [validation setup guide](validation.md) shows checked arena sizing and the
 micro, mini, and desktop capacity presets. RSA calls group scheme settings in

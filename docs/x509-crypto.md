@@ -11,8 +11,8 @@ algorithms, and the hashes used by your certificates.
 ```c
 TC_ECDSA_workspace ec;
 TC_RSA_word words[TC_RSA_VERIFY_WORKSPACE_WORDS(3072)];
-TC_RSA_workspace rsa = {words, sizeof words / sizeof *words};
-TC_X509_native_workspace scratch = {&ec, &rsa, TC_X509_NATIVE_DEFAULT_SIGNATURE_WORK};
+const TC_RSA_workspace rsa = {words, sizeof words / sizeof *words};
+const TC_X509_native_workspace scratch = {&ec, &rsa, TC_X509_NATIVE_DEFAULT_SIGNATURE_WORK};
 TC_X509_signature_provider provider = TC_X509_native_provider(&scratch);
 ```
 

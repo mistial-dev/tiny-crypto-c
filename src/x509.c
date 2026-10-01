@@ -300,7 +300,7 @@ static TC_TLV_result general_name(const TC_TLV_element* element, int constraint)
 
 /* Certificate parsing is bounded by its element budget, so the name scan is
  * unmetered. */
-static TC_TLV_result general_names(TC_bytes encoded, TC_X509_workspace* workspace)
+static TC_TLV_result general_names(TC_bytes encoded, const TC_X509_workspace* workspace)
 {
   size_t work = SIZE_MAX;
   const tc_pki_tree_workspace tree = {workspace->frames.data, workspace->frames.capacity, &work};
@@ -483,7 +483,7 @@ TC_TLV_result TC_X509_general_subtree_next(TC_X509_general_subtrees_reader* read
   return TC_TLV_OK;
 }
 
-static TC_TLV_result extensions(TC_bytes encoded, TC_X509_workspace* workspace,
+static TC_TLV_result extensions(TC_bytes encoded, const TC_X509_workspace* workspace,
                                 TC_TLV_limits* budget, int* critical_san)
 {
   TC_bytes contents;
@@ -576,7 +576,7 @@ static TC_TLV_result signature_format(const TC_X509_certificate* certificate)
 /* TBSCertificate fields after the SEQUENCE header (RFC 5280 section 4.1).
  * budget holds the elements left after the caller's walk. Sub-readers are
  * unlimited because that walk bounded depth and element count. */
-static TC_TLV_result tbs_fields(TC_bytes contents, TC_X509_workspace* workspace,
+static TC_TLV_result tbs_fields(TC_bytes contents, const TC_X509_workspace* workspace,
                                 TC_TLV_limits* budget, TC_X509_certificate* certificate)
 {
   /* issuerUniqueID [1], subjectUniqueID [2], extensions [3]. */
@@ -660,7 +660,7 @@ static TC_TLV_result read_storage(TC_bytes encoded, const TC_TLV_limits* limits,
 /* Read one constructed element with the given tag, walk its tree to bound
  * depth and elements, and return its contents with the remaining budget. */
 static TC_TLV_result read_bounded(TC_bytes encoded, unsigned tag, const TC_TLV_limits* limits,
-                                  TC_X509_workspace* workspace, TC_TLV_limits* budget,
+                                  const TC_X509_workspace* workspace, TC_TLV_limits* budget,
                                   TC_TLV_element* out)
 {
   TC_TLV_result result = TC_TLV_read(encoded, TC_TLV_DER, limits, out);
@@ -674,7 +674,7 @@ static TC_TLV_result read_bounded(TC_bytes encoded, unsigned tag, const TC_TLV_l
 }
 
 TC_TLV_result tc_x509_tbs_read(TC_bytes encoded, const TC_TLV_limits* limits,
-                               TC_X509_workspace* workspace, TC_X509_certificate* out)
+                               const TC_X509_workspace* workspace, TC_X509_certificate* out)
 {
   TC_X509_certificate certificate = {0};
   TC_TLV_element element;
@@ -694,7 +694,7 @@ TC_TLV_result tc_x509_tbs_read(TC_bytes encoded, const TC_TLV_limits* limits,
 }
 
 TC_TLV_result tc_x509_certificate_read(TC_bytes encoded, unsigned tag, const TC_TLV_limits* limits,
-                                       TC_X509_workspace* workspace, TC_X509_certificate* out)
+                                       const TC_X509_workspace* workspace, TC_X509_certificate* out)
 {
   TC_X509_certificate certificate = {0};
   TC_DER_algorithm outer_algorithm;
@@ -735,7 +735,7 @@ TC_TLV_result tc_x509_certificate_read(TC_bytes encoded, unsigned tag, const TC_
 }
 
 TC_TLV_result TC_X509_read(TC_bytes encoded, const TC_TLV_limits* limits,
-                           TC_X509_workspace* workspace, TC_X509_certificate* out)
+                           const TC_X509_workspace* workspace, TC_X509_certificate* out)
 {
   return tc_x509_certificate_read(encoded, 0x30, limits, workspace, out);
 }
