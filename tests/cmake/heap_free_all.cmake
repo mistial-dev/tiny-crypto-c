@@ -19,6 +19,7 @@ if(option_count LESS 20)
   message(FATAL_ERROR "Found only ${option_count} feature options")
 endif()
 
+file(REMOVE_RECURSE "${BINARY_DIR}" "${BINARY_DIR}-values")
 execute_process(COMMAND "${CMAKE_COMMAND}" -S "${SOURCE_DIR}" -B "${BINARY_DIR}"
   -DCMAKE_C_COMPILER=${C_COMPILER} -DCMAKE_BUILD_TYPE=Release
   -DTINY_CRYPTO_BUILD_TESTS=OFF -DTINY_CRYPTO_BUILD_BENCHMARKS=OFF ${options}

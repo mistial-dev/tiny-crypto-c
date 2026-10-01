@@ -7,6 +7,7 @@ function(run)
   endif()
   set(last_output "${output}" PARENT_SCOPE)
 endfunction()
+file(REMOVE_RECURSE "${BINARY_DIR}")
 run("${CMAKE_COMMAND}" -S "${SOURCE_DIR}" -B "${BINARY_DIR}"
   "-DCMAKE_C_COMPILER=${C_COMPILER}" -DCMAKE_BUILD_TYPE=Release
   -DTINY_CRYPTO_BUILD_TESTS=OFF -DTINY_CRYPTO_BUILD_BENCHMARKS=ON

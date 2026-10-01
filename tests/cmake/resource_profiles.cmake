@@ -1,4 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
+# The loop reconfigures one tree, so it starts from an empty one.
+file(REMOVE_RECURSE "${BINARY_DIR}")
 foreach(settings "desktop;3;1;1;0;2" "micro;1;0;0;1;1" "mini;2;0;1;0;0" "desktop;3;1;1;0;2")
   list(GET settings 0 name)
   list(GET settings 1 profile)
