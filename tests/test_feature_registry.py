@@ -30,8 +30,9 @@ INTERNAL_NAMES = {"TINY_CRYPTO_PUBLIC_DEFINITIONS", "TINY_CRYPTO_PUBLIC_MACROS",
 # An option name, also directly after -D. A trailing underscore names a family.
 OPTION_TOKEN = re.compile(r"(?:(?<=-D)|(?<![A-Za-z0-9_]))(TINY_CRYPTO_[A-Za-z0-9_]*)")
 HEADER_GUARD = re.compile(r"_(H|HPP)_?$")
-# Files that name retired options: the registry map and the configure check test.
-RETIRED_NAME_FILES = {"cmake/features.json", "tests/cmake/option_names.cmake"}
+# Files that name invalid options on purpose: the retired-option map, checked by
+# test_retired_options_name_their_replacements, and the configure check test.
+INVALID_NAME_FILES = {"cmake/features.json", "tests/cmake/option_names.cmake"}
 # Option names are read from every tracked file outside the library sources and
 # the third-party corpora.
 SCANNED_EXCLUDE = re.compile(r"^(src/|tests/vectors/|tests/fuzz/|ports/esp-idf/vendor/)")
@@ -135,17 +136,15 @@ class RegistryTests(unittest.TestCase):
 
     def test_named_options_exist(self):
         for path in tracked_files():
-            if path.resolve() == Path(__file__).resolve():
+            if path.resolve() == Path(__file__).resolve() or \
+                    path.relative_to(ROOT).as_posix() in INVALID_NAME_FILES:
                 continue
             try:
                 text = path.read_text()
             except (UnicodeDecodeError, OSError):
                 continue
-            retired_allowed = path.relative_to(ROOT).as_posix() in RETIRED_NAME_FILES
             for name in sorted(set(OPTION_TOKEN.findall(text))):
                 if HEADER_GUARD.search(name) or name in INTERNAL_NAMES:
-                    continue
-                if retired_allowed and name in self.retired:
                     continue
                 if name.endswith("_"):
                     known = any(option.startswith(name) for option in self.options) or \
