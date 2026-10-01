@@ -1401,8 +1401,11 @@ reproducer to the regression corpus with the fix that resolves it. Keep the
 files small and synthetic, with no private keys or captured credential data.
 
 CI replays the regression corpora, then runs each harness for 60 seconds with
-an 8192-byte input limit and a two-second per-input timeout. Each run starts
-from its regression corpus plus fixtures under 8 KiB from `tests/vectors`.
+a 40960-byte input limit and a two-second per-input timeout. Each run starts
+from its regression corpus plus fixtures under 40 KiB from `tests/vectors`.
+The harnesses pass every input to the library. Their buffers grow with the
+input, so only a malformed input or a configured limit below the input size
+stops a read, with INVALID or LIMIT.
 
 The PKI harness includes all three PIV certificate-container profiles. It checks
 that returned spans stay within the input and failures preserve the result.

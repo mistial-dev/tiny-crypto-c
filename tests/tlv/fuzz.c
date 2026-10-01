@@ -33,8 +33,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
   TC_DER_algorithm algorithm;
   TC_DER_signature_pair signature;
   int profile;
-  if (length > limits.max_input)
-    return 0;
+  /* Inputs above limits.max_input reach the readers, which return LIMIT. */
   for (profile = TC_TLV_DER; profile <= TC_TLV_ISO7816_PAD_ZERO_FF; ++profile) {
     TC_TLV_result r;
     struct trace a = {0, 0, 0}, b = {0, 0, 0};

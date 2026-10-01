@@ -8,8 +8,6 @@
 #include <tiny_crypto/twic_ccl.h>
 #include <tiny_crypto/twic_tpk.h>
 
-enum { MAX_INPUT = 32768, MAX_RECORDS = MAX_INPUT / 2 };
-
 static void check_borrowed_span(TC_bytes input, TC_bytes span)
 {
   uintptr_t start = (uintptr_t)input.data, borrowed = (uintptr_t)span.data;
@@ -86,15 +84,22 @@ static TC_TWIC_CCL_result stream_chunks(TC_bytes input, size_t chunk_bytes, size
   return result;
 }
 
+/* A record capacity no input can exceed: every record spans at least two
+ * bytes. A smaller capacity is checked to give LIMIT. */
+static size_t record_capacity(TC_bytes input)
+{
+  return input.length / 2 + 1;
+}
+
 static void fuzz_ccl_stream(TC_bytes input)
 {
   ccl_digest whole = {0, 0, {0}}, split = {0, 0, {0}}, limited = {0, 0, {0}};
   const size_t chunk = input.length ? (size_t)input.data[0] % 97 + 1 : 1;
   const TC_TWIC_CCL_result result =
-      stream_chunks(input, input.length ? input.length : 1, MAX_RECORDS, &whole);
+      stream_chunks(input, input.length ? input.length : 1, record_capacity(input), &whole);
   /* Chunk boundaries never change the result or the delivered records. */
-  if (stream_chunks(input, chunk, MAX_RECORDS, &split) != result || split.count != whole.count ||
-      split.hash != whole.hash)
+  if (stream_chunks(input, chunk, record_capacity(input), &split) != result ||
+      split.count != whole.count || split.hash != whole.hash)
     abort();
   if (result == TC_TWIC_CCL_OK) {
     int listed = -1;
@@ -121,7 +126,8 @@ static void fuzz_ccl_index(TC_bytes input)
   TC_TWIC_CCL_index index, saved;
   memset(&saved, 0xa5, sizeof saved);
   memcpy(&index, &saved, sizeof index);
-  const TC_TWIC_CCL_result result = TC_TWIC_CCL_index_from_memory(&image, MAX_RECORDS, &index);
+  const TC_TWIC_CCL_result result =
+      TC_TWIC_CCL_index_from_memory(&image, record_capacity(input), &index);
   if (result != TC_TWIC_CCL_OK) {
     if (memcmp(&index, &saved, sizeof index))
       abort();
@@ -224,7 +230,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length);
 int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
 {
   const TC_bytes input = {data, length};
-  if (!length || length > MAX_INPUT)
+  if (!length)
     return 0;
   fuzz_ccl_record(input);
   fuzz_ccl_stream(input);

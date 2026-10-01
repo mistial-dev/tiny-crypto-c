@@ -36,8 +36,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define INPUT_MAX 8192u
-#define RESPONSE_BYTES TC_PIV_RESPONSE_BYTES(INPUT_MAX)
 #define DER_BYTES 4096u
 #define SENTINEL 0xa5u
 #define UNWRITTEN 0x5au
@@ -56,7 +54,10 @@ enum {
    * answers add AES work without new paths. */
   SM_PLAIN_MAX = 1024,
   VCI_PLAIN_MAX = 64,
-  WORK = 1 << 24
+  WORK = 1 << 24,
+  /* The response buffer holds at least this many answer bytes, enough for
+   * the setup SELECT and key establishment answers of every input. */
+  SETUP_ANSWER_BYTES = 8192
 };
 
 static void require(int condition)
@@ -199,11 +200,27 @@ static const uint8_t tag_twic_privacy[] = {0xdf, 0xc1, 0x01};
 static const uint8_t pairing_code[] = "31415926";
 
 static uint8_t scratch[SCRATCH_BYTES], sm_scratch[SM_SCRATCH_BYTES];
-static uint8_t response[RESPONSE_BYTES];
+/* Sized for the whole input as one answer, so the library sees every input.
+ * A smaller configured buffer or limit must give LIMIT. */
+static uint8_t* response;
+static size_t response_bytes;
+
+/* Size the response buffer for an answer of answer_bytes, and at least for
+ * the setup answers. */
+static void response_prepare(size_t answer_bytes)
+{
+  const size_t bytes =
+      TC_PIV_RESPONSE_BYTES(answer_bytes > SETUP_ANSWER_BYTES ? answer_bytes : SETUP_ANSWER_BYTES);
+  if (bytes > response_bytes) {
+    response = realloc(response, bytes);
+    require(response != NULL);
+    response_bytes = bytes;
+  }
+}
 
 static TC_buffer response_reset(size_t capacity)
 {
-  memset(response, SENTINEL, sizeof response);
+  memset(response, SENTINEL, response_bytes);
   card_track(response, capacity);
   return (TC_buffer){response, capacity};
 }
@@ -218,7 +235,7 @@ static void link_open(TC_PIV_link* link, TC_APDU_length_format format,
   require(TC_PIV_link_init(link, transport, &options, (TC_buffer){scratch, sizeof scratch}) ==
           TC_PIV_OK);
   if (application != TC_PIV_APPLICATION_NONE)
-    require(TC_PIV_select(link, application, 0, response_reset(RESPONSE_BYTES), &selected) ==
+    require(TC_PIV_select(link, application, 0, response_reset(response_bytes), &selected) ==
             TC_PIV_OK);
 }
 
@@ -302,8 +319,8 @@ static void apdu_check(TC_bytes input, TC_bytes with_status)
         {{command_data, sizeof command_data}, ne, 0x00, 0x87, 0x07, 0x9e},
         {{command_data, 8}, 0, 0x00, 0x20, 0x00, 0x80}};
     for (size_t c = 0; c < sizeof commands / sizeof *commands; ++c) {
-      exchange_check(formats[f], &commands[c], ANSWER_REPEAT, input, RESPONSE_BYTES);
-      exchange_check(formats[f], &commands[c], ANSWER_REPEAT, with_status, RESPONSE_BYTES);
+      exchange_check(formats[f], &commands[c], ANSWER_REPEAT, input, response_bytes);
+      exchange_check(formats[f], &commands[c], ANSWER_REPEAT, with_status, response_bytes);
       exchange_check(formats[f], &commands[c], ANSWER_SCRIPT, input, SCRIPT_CAPACITY);
     }
   }
@@ -339,18 +356,18 @@ static void select_check(TC_PIV_application_id application, TC_bytes answer)
   TC_PIV_application out;
   card_setup(NULL, 0, ANSWER_REPEAT, answer, NULL);
   link_open(&link, TC_APDU_SHORT, TC_PIV_APPLICATION_NONE);
-  const TC_buffer buffer = response_reset(RESPONSE_BYTES);
+  const TC_buffer buffer = response_reset(response_bytes);
   memset(&out, UNWRITTEN, sizeof out);
   const TC_PIV_result result = TC_PIV_select(&link, application, 0, buffer, &out);
   const TC_PIV_link_info info = link_info(&link);
   if (result == TC_PIV_OK)
-    require(info.application == application && span_within(out.aid, response, RESPONSE_BYTES) &&
-            span_within(out.label, response, RESPONSE_BYTES) &&
-            span_within(out.url, response, RESPONSE_BYTES) &&
-            span_within(out.algorithms, response, RESPONSE_BYTES));
+    require(info.application == application && span_within(out.aid, response, response_bytes) &&
+            span_within(out.label, response, response_bytes) &&
+            span_within(out.url, response, response_bytes) &&
+            span_within(out.algorithms, response, response_bytes));
   else
     require(result != TC_PIV_ARGUMENT && result != TC_PIV_REFUSED &&
-            info.application == TC_PIV_APPLICATION_NONE && all_value(response, RESPONSE_BYTES, 0) &&
+            info.application == TC_PIV_APPLICATION_NONE && all_value(response, response_bytes, 0) &&
             all_value(&out, sizeof out, UNWRITTEN));
   TC_PIV_link_clear(&link);
 }
@@ -358,7 +375,7 @@ static void select_check(TC_PIV_application_id application, TC_bytes answer)
 /* A data object borrows the response. FORM_NONE has no spans. */
 static void object_within(const TC_PIV_data_object* object)
 {
-  require(span_within(object->encoded, response, RESPONSE_BYTES));
+  require(span_within(object->encoded, response, response_bytes));
   require(span_within(object->value, object->encoded.data, object->encoded.length));
   require(object->status == 0x9000 || object->status == 0x6282);
   require(object->form <= TC_PIV_FORM_NONE);
@@ -370,7 +387,7 @@ static void object_within(const TC_PIV_data_object* object)
 static void get_data_failed(TC_PIV_result result, const TC_PIV_data_object* out)
 {
   require(result != TC_PIV_ARGUMENT && result != TC_PIV_REFUSED && result != TC_PIV_UNSUPPORTED);
-  require(all_value(response, RESPONSE_BYTES, 0) && all_value(out, sizeof *out, UNWRITTEN));
+  require(all_value(response, response_bytes, 0) && all_value(out, sizeof *out, UNWRITTEN));
 }
 
 static void get_data_check(TC_PIV_application_id application, TC_APDU_length_format format,
@@ -381,7 +398,7 @@ static void get_data_check(TC_PIV_application_id application, TC_APDU_length_for
   card_setup(application == TC_PIV_APPLICATION_PIV ? &piv_select : &twic_select, 1, mode, source,
              NULL);
   link_open(&link, format, application);
-  const TC_buffer buffer = response_reset(RESPONSE_BYTES);
+  const TC_buffer buffer = response_reset(response_bytes);
   memset(&out, UNWRITTEN, sizeof out);
   const TC_PIV_result result = TC_PIV_get_data(&link, tag, buffer, &out);
   if (result == TC_PIV_OK)
@@ -554,7 +571,7 @@ static void secured_save(const struct tc_sm_fixture* fixture)
   memset(&session, 0, sizeof session);
   require(TC_PIV_SM_key_request(&secured, &session, fixture->suite, host_id,
                                 (TC_random_source){scalar_one, NULL},
-                                response_reset(RESPONSE_BYTES), &peer, &sm_workspace) == TC_PIV_OK);
+                                response_reset(response_bytes), &peer, &sm_workspace) == TC_PIV_OK);
   require(TC_PIV_SM_finish(&session, &peer, fixture->public_key, &sm_workspace) == TC_OK);
   tc_sm_card_keys(&sm_card, fixture->material);
   require(TC_PIV_link_secure(&secured, &sm_workspace, (TC_buffer){sm_scratch, sizeof sm_scratch}) ==
@@ -595,9 +612,9 @@ static void session_lost_check(TC_PIV_result result)
           result == TC_PIV_ERROR);
   require(info.sm_lost && !info.secured && !info.vci && !info.pin_verified);
   require(all_value(&session, sizeof session, 0) && all_value(sm_scratch, sizeof sm_scratch, 0));
-  require(all_value(response, RESPONSE_BYTES, 0));
+  require(all_value(response, response_bytes, 0));
   const size_t sent = card.transmits;
-  require(TC_PIV_get_data(&secured, chuid, response_reset(RESPONSE_BYTES), &out) == TC_PIV_REFUSED);
+  require(TC_PIV_get_data(&secured, chuid, response_reset(response_bytes), &out) == TC_PIV_REFUSED);
   require(card.transmits == sent);
 }
 
@@ -610,7 +627,7 @@ static void sm_raw_check(size_t s, answer_mode mode, TC_bytes source)
   secured_restore(s, 0);
   card.mode = mode;
   card.source = source;
-  const TC_buffer buffer = response_reset(RESPONSE_BYTES);
+  const TC_buffer buffer = response_reset(response_bytes);
   memset(&out, UNWRITTEN, sizeof out);
   const TC_PIV_result result = TC_PIV_get_data(&secured, chuid, buffer, &out);
   if (result == TC_PIV_OK) {
@@ -639,14 +656,14 @@ static void sm_answer_check(size_t s, TC_bytes plaintext, uint16_t inner_sw)
     memcpy(sm_card.answer, plaintext.data, plaintext.length);
   sm_card.answer_length = plaintext.length;
   sm_card.inner_sw = inner_sw;
-  TC_buffer buffer = response_reset(RESPONSE_BYTES);
+  TC_buffer buffer = response_reset(response_bytes);
   require(tc_piv_link_transceive(&secured, TC_PIV_COMMAND_GET_DATA, &get_chuid, buffer, &answer) ==
           TC_PIV_OK);
   require(answer.sw == inner_sw && answer.data.length == plaintext.length &&
-          span_within(answer.data, response, RESPONSE_BYTES));
+          span_within(answer.data, response, response_bytes));
   require(!plaintext.length || !memcmp(answer.data.data, plaintext.data, plaintext.length));
   require(session_live() && !sm_card.broken);
-  buffer = response_reset(RESPONSE_BYTES);
+  buffer = response_reset(response_bytes);
   memset(&out, UNWRITTEN, sizeof out);
   const TC_PIV_result result = TC_PIV_get_data(&secured, chuid, buffer, &out);
   require(session_live());
@@ -681,7 +698,7 @@ static void sm_fault_check(size_t s, TC_bytes plaintext, uint8_t selector, uint1
   sm_card.answer_length = plaintext.length;
   sm_card.fault = fault;
   sm_card.outer_sw = outer_sw;
-  const TC_buffer buffer = response_reset(RESPONSE_BYTES);
+  const TC_buffer buffer = response_reset(response_bytes);
   memset(&out, UNWRITTEN, sizeof out);
   const TC_PIV_result result = TC_PIV_get_data(&secured, chuid, buffer, &out);
   require(result != TC_PIV_OK && all_value(&out, sizeof out, UNWRITTEN));
@@ -703,15 +720,15 @@ static void vci_check(size_t s, TC_bytes plaintext, uint16_t verify_sw)
   sm_card.answer_length = plaintext.length;
   memset(&discovery, UNWRITTEN, sizeof discovery);
   const TC_PIV_result read = TC_PIV_discovery_get(&secured, TC_PIV_DISCOVERY_PIV,
-                                                  response_reset(RESPONSE_BYTES), &discovery);
+                                                  response_reset(response_bytes), &discovery);
   require(session_live());
   if (read != TC_PIV_OK) {
     require((read == TC_PIV_INVALID || read == TC_PIV_UNSUPPORTED) &&
-            all_value(response, RESPONSE_BYTES, 0) &&
+            all_value(response, response_bytes, 0) &&
             all_value(&discovery, sizeof discovery, UNWRITTEN));
     return;
   }
-  require(discovery.secured && span_within(discovery.aid, response, RESPONSE_BYTES));
+  require(discovery.secured && span_within(discovery.aid, response, response_bytes));
   sm_card.answer_length = 0;
   sm_card.inner_sw = verify_sw;
   const size_t sent = sm_card.protected_commands;
@@ -877,6 +894,7 @@ int LLVMFuzzerInitialize(int* argc, char*** argv)
 {
   (void)argc;
   (void)argv;
+  response_prepare(0);
   for (size_t i = 0; i < sizeof sm_fixtures / sizeof *sm_fixtures; ++i)
     if (!sm_fixtures[i].intermediate.length && suite_count < SUITES)
       secured_save(&sm_fixtures[i]);
@@ -887,9 +905,8 @@ int LLVMFuzzerInitialize(int* argc, char*** argv)
 
 int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
 {
-  if (length > INPUT_MAX)
-    return 0;
   const TC_bytes input = {data, length};
+  response_prepare(length);
   /* An exact-size copy lets AddressSanitizer catch reads past the answer. */
   uint8_t* appended = malloc(length + TC_APDU_STATUS_BYTES);
   require(appended != NULL);

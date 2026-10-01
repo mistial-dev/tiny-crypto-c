@@ -230,7 +230,7 @@ jobs:
             mkdir -p "$RUNNER_TEMP/corpus/$target"
             cp tests/fuzz/"$target"/* "$RUNNER_TEMP/corpus/$target/"
             for pattern in "$@"; do
-              find tests/vectors -type f -path "$pattern" -size -8k \
+              find tests/vectors -type f -path "$pattern" -size -40k \
                 -exec cp --backup=numbered {} "$RUNNER_TEMP/corpus/$target/" \;
             done
           }
@@ -241,14 +241,14 @@ jobs:
           seed ocsp '*/x509/ocsp/*.der'
           seed twic '*/twic/synthetic/*/tpk.bin'
       - name: Fuzz TLV
-        run: build-parser/fuzz_tlv "$RUNNER_TEMP/corpus/tlv" -max_total_time=60 -max_len=8192 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"
+        run: build-parser/fuzz_tlv "$RUNNER_TEMP/corpus/tlv" -max_total_time=60 -max_len=40960 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"
       - name: Fuzz certificates, trust anchors and PIV objects
-        run: build-parser/fuzz_pki "$RUNNER_TEMP/corpus/pki" -max_total_time=60 -max_len=8192 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"
+        run: build-parser/fuzz_pki "$RUNNER_TEMP/corpus/pki" -max_total_time=60 -max_len=40960 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"
       - name: Fuzz PIV card answers
-        run: build-parser/fuzz_piv_apdu "$RUNNER_TEMP/corpus/piv_apdu" -max_total_time=60 -max_len=8192 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"
+        run: build-parser/fuzz_piv_apdu "$RUNNER_TEMP/corpus/piv_apdu" -max_total_time=60 -max_len=40960 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"
       - name: Fuzz certificate decompression
-        run: build-parser/fuzz_gzip "$RUNNER_TEMP/corpus/gzip" -max_total_time=60 -max_len=8192 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"
+        run: build-parser/fuzz_gzip "$RUNNER_TEMP/corpus/gzip" -max_total_time=60 -max_len=40960 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"
       - name: Fuzz OCSP responses and requests
-        run: build-parser/fuzz_ocsp "$RUNNER_TEMP/corpus/ocsp" -max_total_time=60 -max_len=8192 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"
+        run: build-parser/fuzz_ocsp "$RUNNER_TEMP/corpus/ocsp" -max_total_time=60 -max_len=40960 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"
       - name: Fuzz TWIC CCL, AAMVA and privacy key inputs
-        run: build-parser/fuzz_twic "$RUNNER_TEMP/corpus/twic" -max_total_time=60 -max_len=8192 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"
+        run: build-parser/fuzz_twic "$RUNNER_TEMP/corpus/twic" -max_total_time=60 -max_len=40960 -timeout=2 -verbosity=0 -artifact_prefix="$RUNNER_TEMP/"

@@ -641,8 +641,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t length)
   uint16_t usage;
   TC_TLV_result result;
   int encoding, profile;
-  if (length > limits.max_input)
-    return 0;
+  /* Inputs above limits.max_input reach the readers, which return LIMIT. */
   fuzz_certificate_container(data, length);
   fuzz_card_identifiers(data, length);
   fuzz_identity_codecs((TC_bytes){data, length});
